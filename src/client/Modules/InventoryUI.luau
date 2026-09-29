@@ -1,7 +1,9 @@
 --[[
 	The gem pouch: a grid of gem cards tinted by rarity, and a detail panel
 	with a spinning 3D model, rarity/element badges, stat bars and value.
-	Also used as a picker, e.g. to choose a stone to cut:
+	Also used as a picker, e.g. to choose a stone to cut. In a picker the
+	action button is pinned to the bottom of the detail panel, and tapping
+	the selected card again picks it too:
 
 	InventoryUI.open({
 		Title = "Choose a stone to cut",
@@ -223,6 +225,7 @@ local camera = new("Camera", { FieldOfView = 34 }, viewport)
 camera.CFrame = CFrame.lookAt(Vector3.new(0, 2.8, 8), Vector3.new(0, 1.3, 0))
 viewport.CurrentCamera = camera
 
+local ACTION_HEIGHT = 44
 local info = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
@@ -234,6 +237,21 @@ local info = new("ScrollingFrame", {
 }, detail)
 UiKit.pad(info, 12)
 UiKit.list(info, 8)
+
+-- Picker action ("Send to the laser", "Cut this stone"): always visible, never scrolled away.
+local actionButton = new("TextButton", {
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.new(0, 10, 1, -8),
+	Size = UDim2.new(1, -20, 0, ACTION_HEIGHT - 8),
+	BackgroundColor3 = K.Accent,
+	Font = BOLD,
+	TextSize = 16,
+	TextColor3 = Color3.fromRGB(6, 20, 24),
+	Visible = false,
+	ZIndex = 4,
+}, detail)
+UiKit.round(actionButton, 8)
+local actionGem = nil -- the gem the action button will pick
 
 local backButton = new("TextButton", {
 	Position = UDim2.fromOffset(8, 8),
@@ -300,10 +318,15 @@ local function showDetail(gem)
 	model.Parent = viewport
 	spinning = model
 
-	local name = label(info, shade.Name, 18, K.Text, BOLD)
+	local stateWord = if gem.Cut then "" else "Rough "
+	local name = label(info, stateWord .. shade.Stone, 18, K.Text, BOLD)
 	name.TextWrapped = true
 	name.AutomaticSize = Enum.AutomaticSize.Y
 	name.LayoutOrder = 1
+	local colour = label(info, shade.Name, 12, shade.Color:Lerp(Color3.new(1, 1, 1), 0.35), BOLD)
+	colour.TextWrapped = true
+	colour.AutomaticSize = Enum.AutomaticSize.Y
+	colour.LayoutOrder = 1
 
 	local badges = new("Frame", {
 		BackgroundTransparency = 1,
@@ -338,26 +361,31 @@ local function showDetail(gem)
 	end
 	local found = label(info, origin, 12, K.Dim)
 	found.LayoutOrder = 8
-
-	local options = current
-	if options and options.OnPick then
-		local pick = options.OnPick
-		local button = new("TextButton", {
-			BackgroundColor3 = K.Accent,
-			Size = UDim2.new(1, 0, 0, 40),
-			Text = string.upper(options.ActionText or "Choose"),
-			Font = BOLD,
-			TextSize = 16,
-			TextColor3 = Color3.fromRGB(6, 20, 24),
-			LayoutOrder = 9,
-		}, info)
-		UiKit.round(button, 8)
-		button.Activated:Connect(function()
-			InventoryUI.close()
-			pick(gem)
-		end)
-	end
 end
+
+-- Shows the picker's action button for `gem` (hidden outside pickers or with no selection).
+local function showAction(gem)
+	local options = current
+	local picking = options ~= nil and options.OnPick ~= nil and gem ~= nil
+	actionGem = if picking then gem else nil
+	actionButton.Visible = picking
+	actionButton.Text = if picking then string.upper((options :: Options).ActionText or "Choose") else ""
+	info.Size = UDim2.new(1, 0, 1, if picking then -186 - ACTION_HEIGHT else -186)
+end
+
+local function pick(gem)
+	local options = current
+	if not options or not options.OnPick or not gem then
+		return
+	end
+	local onPick = options.OnPick
+	InventoryUI.close()
+	onPick(gem)
+end
+
+actionButton.Activated:Connect(function()
+	pick(actionGem)
+end)
 
 -- Grid ------------------------------------------------------------------------
 
@@ -395,15 +423,32 @@ local FILTERS = {
 	end,
 }
 
-local function card(gem, order: number)
+-- Cards are kept between refreshes (each holds a 3D icon), and only rebuilt
+-- when something about their gem changes.
+type CardEntry = { button: TextButton, stroke: UIStroke, key: string, tier: string }
+local cards: { [string]: CardEntry } = {}
+
+local function cardKey(gem): string
+	return table.concat({ gem.Element, gem.Tier, gem.Size, gem.Clarity, tostring(gem.Cut) }, "|")
+end
+
+local function styleCard(entry: CardEntry, hovered: boolean?)
+	if entry.tier == "UltraRare" then
+		return -- keeps its shimmer
+	end
+	local stroke = entry.stroke
+	local selected = cards[selectedId or ""] == entry
+	stroke.Thickness = if selected then 3 else 1.5
+	stroke.Transparency = if selected then 0 elseif hovered then 0.15 else 0.55
+end
+
+local function card(gem): CardEntry
 	local shade = GemConfig.shade(gem)
 	local tierColor = GemConfig.TierColors[gem.Tier]
-	local selected = gem.Id == selectedId
 	local button = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		LayoutOrder = order,
 	}, grid)
 	UiKit.round(button, 10)
 	new("UIGradient", {
@@ -412,8 +457,8 @@ local function card(gem, order: number)
 	}, button)
 	local stroke = new("UIStroke", {
 		Color = tierColor,
-		Transparency = if selected then 0 else 0.55,
-		Thickness = if selected then 3 else 1.5,
+		Transparency = 0.55,
+		Thickness = 1.5,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, button)
 	if gem.Tier == "UltraRare" then
@@ -432,17 +477,18 @@ local function card(gem, order: number)
 		}):Play()
 	end
 
-	local icon = GemArt.icon(button, gem, 70)
+	local icon = GemArt.icon(button, gem, 78)
 	icon.AnchorPoint = Vector2.new(0.5, 0)
-	icon.Position = UDim2.new(0.5, 0, 0, 12)
+	icon.Position = UDim2.new(0.5, 0, 0, 8)
 
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "MINT" else "CUT " .. gem.Cut
 	local tag = label(button, state, 10, if gem.Cut then K.Gold else K.Dim, BOLD)
 	tag.Position = UDim2.fromOffset(8, 6)
 	tag.Size = UDim2.new(1, -16, 0, 12)
+	tag.ZIndex = 2
 
-	local name = label(button, shade.Name, 12, K.Text, BOLD)
-	name.Position = UDim2.fromOffset(6, 86)
+	local name = label(button, shade.Stone, 12, K.Text, BOLD)
+	name.Position = UDim2.fromOffset(6, 88)
 	name.Size = UDim2.new(1, -12, 0, 30)
 	name.TextWrapped = true
 	name.TextXAlignment = Enum.TextXAlignment.Center
@@ -454,19 +500,25 @@ local function card(gem, order: number)
 	value.Size = UDim2.new(1, -12, 0, 16)
 	value.TextXAlignment = Enum.TextXAlignment.Center
 
-	if gem.Tier ~= "UltraRare" and not selected then
-		button.MouseEnter:Connect(function()
-			stroke.Transparency = 0.15
-		end)
-		button.MouseLeave:Connect(function()
-			stroke.Transparency = 0.55
-		end)
-	end
+	local entry: CardEntry = { button = button, stroke = stroke, key = cardKey(gem), tier = gem.Tier }
+	local id = gem.Id
+	button.MouseEnter:Connect(function()
+		styleCard(entry, true)
+	end)
+	button.MouseLeave:Connect(function()
+		styleCard(entry, false)
+	end)
 	button.Activated:Connect(function()
-		selectedId = gem.Id
+		-- In a picker, tapping the already-selected stone picks it.
+		if selectedId == id and current and current.OnPick then
+			pick(actionGem)
+			return
+		end
+		selectedId = id
 		detailOpen = true
 		InventoryUI.refresh()
 	end)
+	return entry
 end
 
 local function tabs(parent: Instance, names: { string }, active: string, onPick: (string) -> ())
@@ -523,17 +575,13 @@ function InventoryUI.refresh()
 	subtitle.Text = options.Title or "Your collection"
 
 	clearChildren(pills, { UIListLayout = true })
-	for _, child in grid:GetChildren() do
-		if child:IsA("GuiObject") then
-			child:Destroy()
-		end
-	end
 
 	local profile = GemClient.Profile
 	if not profile then
 		emptyLabel.Text = "Loading..."
 		emptyLabel.Visible = true
 		showDetail(nil)
+		showAction(nil)
 		return
 	end
 	local quota = profile.Quota
@@ -584,12 +632,35 @@ function InventoryUI.refresh()
 		layout()
 	end
 
+	-- Reuse cards whose gem hasn't changed; drop the rest.
+	local listed = {}
 	for i, gem in gems do
-		card(gem, i)
+		local entry = cards[gem.Id]
+		if entry and entry.key ~= cardKey(gem) then
+			entry.button:Destroy()
+			entry = nil
+		end
+		if not entry then
+			entry = card(gem)
+			cards[gem.Id] = entry
+		end
+		entry.button.LayoutOrder = i
+		listed[gem.Id] = true
 	end
+	for id, entry in cards do
+		if not listed[id] then
+			entry.button:Destroy()
+			cards[id] = nil
+		end
+	end
+	for _, entry in cards do
+		styleCard(entry)
+	end
+
 	emptyLabel.Visible = #gems == 0
 	emptyLabel.Text = options.Empty or "No gems yet. Mine some in the quarry up the north road!"
 	showDetail(selected)
+	showAction(selected)
 end
 
 function InventoryUI.open(options: Options?)

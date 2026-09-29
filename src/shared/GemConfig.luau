@@ -29,41 +29,44 @@ export type Gem = {
 	Found: number,
 }
 
-export type Shade = { Tier: string, Name: string, Color: Color3, Color2: Color3?, Prismatic: boolean? }
+export type Shade = { Tier: string, Name: string, Stone: string, Color: Color3, Color2: Color3?, Prismatic: boolean? }
 
 local GemConfig = {}
 
 GemConfig.Elements = { "Fire", "Frost", "Shock", "Poison" }
 
 -- Each element's colour tiers. Fire and Frost top out at Rare; Shock and
--- Poison top out at Ultra-Rare.
+-- Poison top out at Ultra-Rare. `Name` is the colour grade from the design
+-- doc; `Stone` is the real gemstone that colour is (what players see first).
 GemConfig.Shades = {
 	Fire = {
-		{ Tier = "Common", Name = "Pale Amber", Color = Color3.fromRGB(255, 196, 110) },
-		{ Tier = "Uncommon", Name = "Vibrant Orange", Color = Color3.fromRGB(255, 118, 20) },
-		{ Tier = "Rare", Name = "Deep Ruby Red", Color = Color3.fromRGB(176, 8, 40) },
+		{ Tier = "Common", Name = "Pale Amber", Stone = "Citrine", Color = Color3.fromRGB(255, 196, 110) },
+		{ Tier = "Uncommon", Name = "Vibrant Orange", Stone = "Fire Opal", Color = Color3.fromRGB(255, 118, 20) },
+		{ Tier = "Rare", Name = "Deep Ruby Red", Stone = "Ruby", Color = Color3.fromRGB(176, 8, 40) },
 	},
 	Frost = {
-		{ Tier = "Common", Name = "Quartz Clear", Color = Color3.fromRGB(224, 236, 242) },
-		{ Tier = "Uncommon", Name = "Vivid Blue", Color = Color3.fromRGB(40, 140, 255) },
-		{ Tier = "Rare", Name = "Deep Royal Sapphire Blue", Color = Color3.fromRGB(18, 40, 160) },
+		{ Tier = "Common", Name = "Quartz Clear", Stone = "Clear Quartz", Color = Color3.fromRGB(224, 236, 242) },
+		{ Tier = "Uncommon", Name = "Vivid Blue", Stone = "Blue Topaz", Color = Color3.fromRGB(40, 140, 255) },
+		{ Tier = "Rare", Name = "Deep Royal Sapphire Blue", Stone = "Sapphire", Color = Color3.fromRGB(18, 40, 160) },
 	},
 	Shock = {
-		{ Tier = "Common", Name = "Smoky Grey", Color = Color3.fromRGB(128, 128, 138) },
-		{ Tier = "Uncommon", Name = "Bright Yellow", Color = Color3.fromRGB(255, 228, 40) },
+		{ Tier = "Common", Name = "Smoky Grey", Stone = "Smoky Quartz", Color = Color3.fromRGB(128, 128, 138) },
+		{ Tier = "Uncommon", Name = "Bright Yellow", Stone = "Yellow Sapphire", Color = Color3.fromRGB(255, 228, 40) },
 		{
 			Tier = "UltraRare",
 			Name = "Intense Neon Green / Prismatic",
+			Stone = "Demantoid Garnet",
 			Color = Color3.fromRGB(60, 255, 90),
 			Prismatic = true,
 		},
 	},
 	Poison = {
-		{ Tier = "Common", Name = "Pale Lime", Color = Color3.fromRGB(200, 240, 140) },
-		{ Tier = "Uncommon", Name = "Emerald Green", Color = Color3.fromRGB(20, 170, 80) },
+		{ Tier = "Common", Name = "Pale Lime", Stone = "Prehnite", Color = Color3.fromRGB(200, 240, 140) },
+		{ Tier = "Uncommon", Name = "Emerald Green", Stone = "Emerald", Color = Color3.fromRGB(20, 170, 80) },
 		{
 			Tier = "UltraRare",
 			Name = "Blood Ruby / Deep Emerald Fusion",
+			Stone = "Bloodstone",
 			Color = Color3.fromRGB(140, 16, 56),
 			Color2 = Color3.fromRGB(0, 110, 60),
 		},
@@ -165,9 +168,10 @@ function GemConfig.shade(gem: Gem): Shade
 	return GemConfig.Shades[gem.Element][1]
 end
 
+-- e.g. "Rough Blue Topaz (Frost)" or "Ruby (Fire)".
 function GemConfig.displayName(gem: Gem): string
 	local state = if gem.Cut then "" else "Rough "
-	return state .. GemConfig.shade(gem).Name .. " (" .. gem.Element .. ")"
+	return state .. GemConfig.shade(gem).Stone .. " (" .. gem.Element .. ")"
 end
 
 -- Target zone width and sweep time for cutting a stone of this size.

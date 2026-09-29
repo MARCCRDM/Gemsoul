@@ -44,8 +44,7 @@ function CuttingGame.play(gem, session): { number }?
 	limit.MaxSize = Vector2.new(560, math.huge)
 	limit.Parent = panel
 
-	local titleLabel =
-		UiKit.text(panel, "CUTTING: " .. string.upper(GemConfig.shade(gem).Name), 20, shade.Color, Enum.Font.Arcade)
+	local titleLabel = UiKit.text(panel, "CUTTING: " .. string.upper(shade.Stone), 20, shade.Color, Enum.Font.Arcade)
 	titleLabel.LayoutOrder = 1
 	local help = UiKit.text(panel, "Strike when the marker crosses the centre line. [SPACE] or STRIKE.", 16, K.Dim)
 	help.LayoutOrder = 2
