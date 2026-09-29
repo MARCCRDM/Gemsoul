@@ -1,11 +1,16 @@
--- Spawns a gem node on every NodeSpawner pad. Nodes are static and do not
--- regenerate: once mined, a node is gone until the server restarts.
+-- Spawns a crystal node on every NodeSpawner pad. Mining a node uses one of
+-- the player's free daily/weekly mines and gives them a random rough stone.
+-- Nodes are static and do not regenerate: once mined, a node is gone until
+-- the server restarts. With no free mines left, the node stays put and the
+-- player is sent to the Mining Store.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
-local Leaderboard = require(script.Parent.Leaderboard)
+local Gems = require(script.Parent.Gems)
+local PlayerData = require(script.Parent.PlayerData)
+local Remotes = require(script.Parent.Remotes)
 
 local SHARDS = {
 	{ Size = Vector3.new(1.4, 4, 1.4), Offset = Vector3.zero, Tilt = Vector3.zero },
@@ -57,15 +62,27 @@ local function spawnNode(spawner: BasePart, folder: Folder)
 
 	local mined = false
 	prompt.Triggered:Connect(function(player)
-		if mined then
+		if mined or not PlayerData.get(player) then
 			return
 		end
 		if isVip and not player:GetAttribute("IsVIP") then
 			return
 		end
+		if not PlayerData.useFreeMine(player) then
+			Remotes.Notify:FireClient(
+				player,
+				"You've used all your free mines. Garrick at the Mining Guild sells rough stones."
+			)
+			return
+		end
 		mined = true
-		Leaderboard.addGems(player, if isVip then Config.VipGemValue else Config.GemValue)
-		node:Destroy()
+		if Gems.award(player, if isVip then "VipMiningNode" else "MiningNode") then
+			node:Destroy()
+		else
+			-- Pouch full: give the free mine back and leave the node.
+			mined = false
+			PlayerData.refundFreeMine(player)
+		end
 	end)
 
 	node.Parent = folder

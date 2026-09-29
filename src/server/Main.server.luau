@@ -1,11 +1,13 @@
--- Server entry point: build the town, then start the gameplay systems that
+-- Server entry point: build the world, then start the gameplay systems that
 -- hook into it through CollectionService tags.
 local WorldBuilder = require(script.Parent.World.WorldBuilder)
-local Leaderboard = require(script.Parent.Systems.Leaderboard)
+local PlayerData = require(script.Parent.Systems.PlayerData)
 local Vip = require(script.Parent.Systems.Vip)
 local Mining = require(script.Parent.Systems.Mining)
+local Shop = require(script.Parent.Systems.Shop)
 
 WorldBuilder.build()
-Leaderboard.start()
+PlayerData.start()
 Vip.start()
 Mining.start()
+Shop.start()

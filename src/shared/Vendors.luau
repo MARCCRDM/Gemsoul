@@ -2,7 +2,9 @@
 -- each entry; the client shows its dialogue when a player talks to it.
 --
 -- Each option either has a Reply (text shown back) or an Action the client
--- handles in code (for example "Quota").
+-- handles in code: "Quota", "BuyStone", "Pouch", "HandCut" or "AutoCut".
+
+local Config = require(script.Parent.Config)
 
 export type Option = { Text: string, Reply: string?, Action: string? }
 export type Vendor = {
@@ -22,16 +24,21 @@ local Vendors: { [string]: Vendor } = {
 		Color = Color3.fromRGB(0, 240, 255),
 		Tunic = Color3.fromRGB(70, 90, 110),
 		Face = "o_o",
-		Greeting = "Welcome to Gemsoul, miner! The quarry's just up the road. Hold [E] on a crystal node to mine it.",
+		Greeting = "Welcome to Gemsoul, miner! Every miner gets free mines each day and week. Hold [E] on a crystal node in the quarry up the road.",
 		Options = {
-			{ Text = "How am I doing on my daily quota?", Action = "Quota" },
+			{ Text = "How many free mines do I have left?", Action = "Quota" },
 			{
-				Text = "How does mining work?",
-				Reply = "Every node in the quarry holds gems, but once a node is mined it's gone for good. Mine them before the other miners do!",
+				Text = string.format("Buy a random rough stone (%d coins)", Config.RoughStonePrice),
+				Action = "BuyStone",
+			},
+			{ Text = "Show me my gems", Action = "Pouch" },
+			{
+				Text = "What makes a stone valuable?",
+				Reply = "Colour, size, clarity and cut. Each element has common, uncommon and rare colours. Size matters most: every grade is worth far more than the last.",
 			},
 			{
 				Text = "What's behind the pink energy gate?",
-				Reply = "The VIP quarry. Only VIP miners can pass the gate, and its nodes are worth three gems each.",
+				Reply = "The VIP pit. Only VIP miners pass the gate, and its stones roll rarer colours and better grades.",
 			},
 		},
 	},
@@ -41,15 +48,13 @@ local Vendors: { [string]: Vendor } = {
 		Color = Color3.fromRGB(255, 160, 30),
 		Tunic = Color3.fromRGB(120, 70, 40),
 		Face = "^_^",
-		Greeting = "Rough gems are worth little. Cut them well and they'll shine. What can I do for you?",
+		Greeting = "A rough stone is worth half its promise. Cut it well and it'll shine. What'll it be?",
 		Options = {
+			{ Text = "Cut a gem by hand (free)", Action = "HandCut" },
+			{ Text = "Use a laser cutter", Action = "AutoCut" },
 			{
-				Text = "Cut a gem by hand",
-				Reply = "Hand-cutting takes timing: strike when the beam lines up. The cutting bench opens soon!",
-			},
-			{
-				Text = "Use the laser cutters",
-				Reply = "Our laser cutters come in three tiers. Higher tiers cut faster and cleaner. Coming soon!",
+				Text = "How is a cut graded?",
+				Reply = "From 1 to 10. A steady hand earns up to 8. Land every strike near the line for a 9, and a flawless cut is a 10: Gem Mint. My precision laser always cuts a 9, the premium one a 10. Bigger stones are harder to cut by hand.",
 			},
 		},
 	},
@@ -84,8 +89,8 @@ local Vendors: { [string]: Vendor } = {
 				Reply = "The containment fields aren't stable yet. Enchanting opens soon!",
 			},
 			{
-				Text = "What do enchantments do?",
-				Reply = "Each gem lends its power to your gear: speed, strength, luck and stranger things.",
+				Text = "Which gems make the strongest enchantments?",
+				Reply = "Big ones. Size decides most of a gem's potency, then clarity and cut. Fire, Frost, Shock and Poison each grant their own power.",
 			},
 		},
 	},
@@ -99,11 +104,11 @@ local Vendors: { [string]: Vendor } = {
 		Options = {
 			{
 				Text = "Join a PvP duel (collateral)",
-				Reply = "Both fighters put gems on the line, and the winner takes all. Duels open soon!",
+				Reply = "Each fighter wagers a gem. The winner walks away with the loser's stone, every property intact. Duels open soon!",
 			},
 			{
 				Text = "Start PvE combat",
-				Reply = "Waves of constructs, stronger every round. PvE opens soon!",
+				Reply = "Monsters drop loot, crafting materials and raw stones, and tougher ones drop better stones. PvE opens soon!",
 			},
 		},
 	},

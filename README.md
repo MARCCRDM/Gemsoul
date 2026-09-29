@@ -28,9 +28,22 @@ Gemsoul is a walled village on a sunny afternoon, laid out like an Oblivion town
 | East road | Arcanum tower with glowing runes and floating containment fields | Vey, Arcanist |
 | West road | Obsidian arena with PvP and PvE queue screens | Brutus, Arena Master |
 
-Every shop has a robot shopkeeper outside. Walk up and press **E** to talk, then pick a question from the dialogue box. Mining works now (hold E on a crystal node in the quarry); the other shops explain what's coming.
+Every shop has a robot shopkeeper outside. Walk up and press **E** to talk, then pick a question from the dialogue box. Mining, the Mining Store and gem cutting work now; the other shops explain what's coming.
 
 Streets and building plots are painted terrain (cobblestone, pavement, dirt), so grass only grows in the gardens, the farm field and outside the walls.
+
+## Gems
+
+Gemstones follow the *GemSoul Gemstone Property & Generation Architecture* design:
+
+- **Element and colour:** Fire, Frost, Shock or Poison, each with Common, Uncommon and Rare (Fire, Frost) or Ultra-Rare (Shock, Poison) colours. Roughly 71% common, 25% uncommon, 2.5% rare, 1.6% ultra-rare.
+- **Clarity and size:** graded 1-10 on generation, high grades rarer. Size raises value exponentially and makes hand-cutting harder.
+- **Cut:** stones start rough. Ilsa's hand-cutting minigame grades 1-8 by accuracy, 9 for mastery and 10 (Gem Mint) for a flawless cut. Her lasers cut 5-8, 9 or 10 for 40, 150 or 400 coins.
+- **Sources:** mining nodes (limited by free daily and weekly mines), Garrick's Mining Store (coins for a random rough stone), PvE drops (`Gems.dropFromMonster`) and PvP wagers (`PlayerData.transferGem`, which keeps every property). Luckier sources (VIP pit, store, tougher monsters) roll better stones.
+
+Press **G** or the corner button to open your gem pouch. Coins, gems and quotas save between sessions; in Studio this needs *Game Settings > Security > Enable Studio Access to API Services*.
+
+Tunable numbers live in `src/shared/Config.luau` (quotas, prices, starting coins) and `src/shared/GemConfig.luau` (colour tiers, odds, cut difficulty, values).
 
 ## Code layout
 
@@ -49,15 +62,22 @@ src/
       Zones/                  one file per shop
         Mining.luau  Crafting.luau  Marketplace.luau  Enchanting.luau  Arena.luau
     Systems/
-      Leaderboard.luau        Gems stat, quota tracking
-      Mining.luau             spawns gem nodes on NodeSpawner pads
+      GemGenerator.luau       rolls gems and grades cuts (pure logic)
+      Gems.luau               awards generated gems to players (all sources)
+      PlayerData.luau         saved coins, gem inventory, free-mining quota
+      Mining.luau             quarry nodes: free mines give rough stones
+      Shop.luau               store purchases, laser cuts, hand-cut minigame
+      Remotes.luau            client/server remotes
       Vip.luau                IsVIP attribute (game pass, or everyone in Studio)
   client/                     -> StarterPlayerScripts.Client
-    Dialogue.client.luau      shopkeeper dialogue box, quota terminal display
+    Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
+    Hud.client.luau           coins/gems button, opens the pouch ([G])
+    Modules/                  gem pouch, cutting minigame, profile copy, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared
-    Config.luau               tunable numbers (quota, gem values, VIP pass id)
+    Config.luau               tunable numbers (quotas, prices, saving, VIP pass id)
+    GemConfig.luau            gem colours, tiers, odds, cut grades, value formula
     Vendors.luau              shopkeeper names, greetings and dialogue options
     Tags.luau                 CollectionService tag names
 ```
