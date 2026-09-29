@@ -530,6 +530,19 @@ function Builder.prompt(part: BasePart, actionText: string, objectText: string, 
 	return prompt
 end
 
+--[[
+	Makes a part (a workbench, terminal...) talk for a shopkeeper: pressing
+	[E] on it opens that shopkeeper's dialogue, and with `action` jumps
+	straight to one of their options (see Dialogue.client).
+]]
+function Builder.station(part: BasePart, vendorId: string, actionText: string, objectText: string, action: string?)
+	Builder.prompt(part, actionText, objectText)
+	part:SetAttribute("VendorId", vendorId)
+	if action then
+		part:SetAttribute("VendorAction", action)
+	end
+end
+
 -- Rugged, randomly tilted boulder.
 function Builder.rock(parent: Instance, origin: CFrame, position: Vector3, size: Vector3, rng: Random)
 	local shade = rng:NextNumber(0.8, 1.15)

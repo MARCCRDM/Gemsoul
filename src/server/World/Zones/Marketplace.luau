@@ -88,6 +88,14 @@ local function tradeBoard(folder: Folder, frame: CFrame, color: Color3)
 		Color = C.WornStone,
 		Material = Enum.Material.Cobblestone,
 	})
+	local base = Builder.part(folder, frame, {
+		Name = "BoardConsole",
+		Size = Vector3.new(4, 3.4, 2),
+		At = CFrame.new(0, 2.9, -0.6),
+		Color = C.Chrome,
+		Material = Enum.Material.Metal,
+	})
+	Builder.station(base, "Market", "View Listings", "Trade Board")
 	Builder.holo(
 		folder,
 		frame,

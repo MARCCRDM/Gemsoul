@@ -20,13 +20,14 @@ local function workbench(folder: Folder, frame: CFrame, color: Color3)
 		Color = Color3.fromRGB(150, 90, 40),
 		Material = Enum.Material.Fabric,
 	})
-	Builder.part(folder, frame, {
+	local bench = Builder.part(folder, frame, {
 		Name = "Workbench",
 		Size = Vector3.new(10, 1.4, 3.6),
 		At = CFrame.new(0, 3.7, -3),
 		Color = C.WornStone,
 		Material = Enum.Material.Slate,
 	})
+	Builder.station(bench, "Crafting", "Cut Gem", "Cutting Bench", "HandCut")
 	for _, x in { -3.8, 3.8 } do
 		Builder.part(folder, frame, {
 			Name = "BenchLeg",
@@ -66,13 +67,14 @@ local function workbench(folder: Folder, frame: CFrame, color: Color3)
 end
 
 local function laserCutter(folder: Folder, frame: CFrame)
-	Builder.part(folder, frame, {
+	local base = Builder.part(folder, frame, {
 		Name = "LaserBase",
 		Size = Vector3.new(4, 2.5, 3.4),
 		At = CFrame.new(0, 1.25, 0),
 		Color = C.Chrome,
 		Material = Enum.Material.DiamondPlate,
 	})
+	Builder.station(base, "Crafting", "Use Laser", "Laser Cutter", "AutoCut")
 	Builder.part(folder, frame, {
 		Name = "LaserChamber",
 		Size = Vector3.new(3.6, 3.4, 3),

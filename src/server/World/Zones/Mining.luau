@@ -87,11 +87,12 @@ function Mining.buildGuild(folder: Folder, frame: CFrame, color: Color3)
 		Color = C.WornStone,
 		Material = Enum.Material.Cobblestone,
 	})
-	Builder.screen(folder, frame, CFrame.new(10, 5.3, -3), Vector3.new(4.6, 3.6, 2.4), {
+	local terminal = Builder.screen(folder, frame, CFrame.new(10, 5.3, -3), Vector3.new(4.6, 3.6, 2.4), {
 		Name = "QuotaTerminal",
-		Text = "DAILY QUOTA\n> ASK GARRICK_",
+		Text = "FREE MINES\n> PRESS [E]_",
 		Tag = Tags.QuotaTerminal,
 	})
+	Builder.station(terminal, "Mining", "Check Free Mines", "Quota Terminal", "Quota")
 
 	mineCart(folder, frame * CFrame.new(-10, 0.5, -4))
 	for i, offset in { Vector3.new(-15, 1.5, -2.5), Vector3.new(-15, 4.5, -2.5), Vector3.new(-12.4, 1.5, -2) } do

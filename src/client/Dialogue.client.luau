@@ -345,6 +345,11 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt)
 	local vendorId = part and part:GetAttribute("VendorId")
 	if typeof(vendorId) == "string" and part:IsA("BasePart") then
 		open(vendorId, part)
+		-- Stations (the cutting bench, laser, terminal) jump to their option.
+		local action = actions[part:GetAttribute("VendorAction")]
+		if action then
+			action()
+		end
 	end
 end)
 
