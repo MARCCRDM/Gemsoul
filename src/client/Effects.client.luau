@@ -38,10 +38,12 @@ local lasers = track(Tags.Laser)
 local VENDOR_NOTICE_DISTANCE = 20
 local vendors: { [Model]: { Base: CFrame, Yaw: number, Rest: number } } = {}
 local function addVendor(instance: Instance)
-	if instance:IsA("Model") then
-		local base = instance:GetPivot()
-		local rest = math.atan2(-base.LookVector.X, -base.LookVector.Z)
-		vendors[instance] = { Base = base, Yaw = rest, Rest = rest }
+	-- Use the spot the server recorded, never the model's current pivot:
+	-- a partly streamed-in model reports the wrong one.
+	local home = instance:GetAttribute("Home")
+	if instance:IsA("Model") and typeof(home) == "CFrame" then
+		local rest = math.atan2(-home.LookVector.X, -home.LookVector.Z)
+		vendors[instance] = { Base = home, Yaw = rest, Rest = rest }
 	end
 end
 for _, instance in CollectionService:GetTagged(Tags.Vendor) do
@@ -64,7 +66,7 @@ local function turnVendors(dt: number)
 			end
 		end
 		local diff = (target - state.Yaw + math.pi) % (2 * math.pi) - math.pi
-		if math.abs(diff) > 0.01 then
+		if math.abs(diff) > 0.01 and model.PrimaryPart then
 			state.Yaw += diff * math.min(1, dt * 6)
 			model:PivotTo(CFrame.new(state.Base.Position) * CFrame.Angles(0, state.Yaw, 0))
 		end

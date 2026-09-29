@@ -906,6 +906,11 @@ function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info)
 	prompt.MaxActivationDistance = 10
 	torso:SetAttribute("VendorId", vendorId)
 	model.PrimaryPart = torso
+	-- Clients turn vendors to face players. They must rotate around this
+	-- recorded spot, and receive the whole robot at once, or a half-loaded
+	-- robot can be "turned" to the wrong place.
+	model:SetAttribute("Home", torso.CFrame)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	CollectionService:AddTag(model, "Vendor")
 	model.Parent = parent
 	return model
