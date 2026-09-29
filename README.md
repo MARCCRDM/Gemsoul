@@ -41,6 +41,8 @@ Gemstones follow the *GemSoul Gemstone Property & Generation Architecture* desig
 - **Cut:** stones start rough. Ilsa's hand-cutting minigame grades 1-8 by accuracy, 9 for mastery and 10 (Gem Mint) for a flawless cut. Her lasers cut 5-8, 9 or 10 for 40, 150 or 400 coins.
 - **Sources:** mining nodes (limited by free daily and weekly mines), Garrick's Mining Store (coins for a random rough stone), PvE drops (`Gems.dropFromMonster`) and PvP wagers (`PlayerData.transferGem`, which keeps every property). Luckier sources (VIP pit, store, tougher monsters) roll better stones.
 
+Every gem is shown in 3D and its look follows its properties: rough stones are water-worn pebbles unique to each gem, cut stones are round brilliants whose symmetry and facets improve with the cut grade (sparkling at 9-10), size sets how big it is, and clarity sets how clear or cloudy it is (low clarity shows inclusions).
+
 Press **G** or the corner button to open your gem pouch. Coins, gems and quotas save between sessions; in Studio this needs *Game Settings > Security > Enable Studio Access to API Services*.
 
 Tunable numbers live in `src/shared/Config.luau` (quotas, prices, starting coins) and `src/shared/GemConfig.luau` (colour tiers, odds, cut difficulty, values).
@@ -72,7 +74,7 @@ src/
   client/                     -> StarterPlayerScripts.Client
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
     Hud.client.luau           coins/gems button, opens the pouch ([G])
-    Modules/                  gem pouch, gem art (icons + 3D models), cutting minigame, UI helpers
+    Modules/                  gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared

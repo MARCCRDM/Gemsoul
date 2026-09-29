@@ -213,15 +213,10 @@ local detailStroke = new("UIStroke", { Color = K.Accent, Transparency = 0.5, Thi
 local viewport = new("ViewportFrame", {
 	BackgroundColor3 = Color3.new(1, 1, 1),
 	Size = UDim2.new(1, 0, 0, 180),
-	Ambient = Color3.fromRGB(150, 150, 165),
-	LightColor = Color3.new(1, 1, 1),
-	LightDirection = Vector3.new(-0.5, -1, -0.7),
 }, detail)
 UiKit.round(viewport, 10)
 local viewportGlow = new("UIGradient", { Rotation = 90 }, viewport)
-local camera = new("Camera", { FieldOfView = 34 }, viewport)
-camera.CFrame = CFrame.lookAt(Vector3.new(0, 2.8, 8), Vector3.new(0, 1.3, 0))
-viewport.CurrentCamera = camera
+GemArt.setupViewport(viewport)
 
 local info = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
@@ -251,6 +246,7 @@ UiKit.round(backButton, 14)
 -- Detail view -------------------------------------------------------------------
 
 local spinning: Model? = nil
+local spinningGem = nil
 
 local function statBar(name: string, value: number?, color: Color3, order: number)
 	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = order }, info)
@@ -282,6 +278,7 @@ local function showDetail(gem)
 	if spinning then
 		spinning:Destroy()
 		spinning = nil
+		spinningGem = nil
 	end
 	if not gem then
 		viewportGlow.Color = ColorSequence.new(Color3.fromRGB(30, 40, 40), Color3.fromRGB(10, 14, 18))
@@ -295,10 +292,11 @@ local function showDetail(gem)
 	detailStroke.Color = tierColor
 	viewportGlow.Color = ColorSequence.new(shade.Color:Lerp(Color3.new(0, 0, 0), 0.55), Color3.fromRGB(8, 10, 14))
 
-	local model = GemArt.model(gem)
-	model.WorldPivot = CFrame.new()
+	local model = GemArt.model(gem, true)
+	model:PivotTo(GemArt.pose(gem, 0))
 	model.Parent = viewport
 	spinning = model
+	spinningGem = gem
 
 	local name = label(info, shade.Name, 18, K.Text, BOLD)
 	name.TextWrapped = true
@@ -360,6 +358,22 @@ local function showDetail(gem)
 end
 
 -- Grid ------------------------------------------------------------------------
+
+-- Card stages still waiting for their 3D stone.
+local pending: { [Frame]: any } = {}
+
+local function buildVisibleStones()
+	local top = grid.AbsolutePosition.Y - 150
+	local bottom = grid.AbsolutePosition.Y + grid.AbsoluteSize.Y + 150
+	for stage, gem in pending do
+		if not stage.Parent then
+			pending[stage] = nil
+		elseif stage.AbsolutePosition.Y < bottom and stage.AbsolutePosition.Y + stage.AbsoluteSize.Y > top then
+			pending[stage] = nil
+			GemArt.viewport(stage, gem, false)
+		end
+	end
+end
 
 local SORTS = {
 	Value = function(a, b)
@@ -432,9 +446,14 @@ local function card(gem, order: number)
 		}):Play()
 	end
 
-	local icon = GemArt.icon(button, gem, 70)
-	icon.AnchorPoint = Vector2.new(0.5, 0)
-	icon.Position = UDim2.new(0.5, 0, 0, 12)
+	-- The 3D stone is built when the card first scrolls into view.
+	local stage = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 10),
+		Size = UDim2.fromOffset(84, 76),
+	}, button)
+	pending[stage] = gem
 
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "MINT" else "CUT " .. gem.Cut
 	local tag = label(button, state, 10, if gem.Cut then K.Gold else K.Dim, BOLD)
@@ -528,6 +547,7 @@ function InventoryUI.refresh()
 			child:Destroy()
 		end
 	end
+	table.clear(pending)
 
 	local profile = GemClient.Profile
 	if not profile then
@@ -590,6 +610,8 @@ function InventoryUI.refresh()
 	emptyLabel.Visible = #gems == 0
 	emptyLabel.Text = options.Empty or "No gems yet. Mine some in the quarry up the north road!"
 	showDetail(selected)
+	-- Positions settle after layout, so build the visible stones next frame.
+	task.defer(buildVisibleStones)
 end
 
 function InventoryUI.open(options: Options?)
@@ -608,9 +630,11 @@ end
 function InventoryUI.close()
 	current = nil
 	gui.Enabled = false
+	table.clear(pending)
 	if spinning then
 		spinning:Destroy()
 		spinning = nil
+		spinningGem = nil
 	end
 end
 
@@ -639,9 +663,11 @@ GemClient.Changed:Connect(function()
 	end
 end)
 
+grid:GetPropertyChangedSignal("CanvasPosition"):Connect(buildVisibleStones)
+
 RunService.RenderStepped:Connect(function()
-	if spinning and gui.Enabled then
-		spinning:PivotTo(CFrame.Angles(0, os.clock() * 0.9, 0))
+	if spinning and spinningGem and gui.Enabled then
+		spinning:PivotTo(GemArt.pose(spinningGem, os.clock() * 0.8))
 	end
 end)
 
