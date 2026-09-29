@@ -44,7 +44,7 @@ local function obelisk(folder: Folder)
 		Vector3.new(3, 3, 3),
 		CFrame.new(0, 36, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
 		C.Cyan,
-		60,
+		nil,
 		"Spin"
 	)
 	crystal.Name = "SoulCrystal"
@@ -67,7 +67,33 @@ local function obelisk(folder: Folder)
 	end
 end
 
-local function road(folder: Folder, zone, distance: number)
+-- Round fountain pool around the obelisk steps.
+local function fountain(folder: Folder)
+	local radius, count = 12, 24
+	local segment = 2 * math.pi * radius / count + 0.3
+	for i = 0, count - 1 do
+		Builder.part(folder, CFrame.identity, {
+			Name = "FountainRim",
+			Size = Vector3.new(segment, 2, 1.5),
+			At = CFrame.Angles(0, i / count * 2 * math.pi, 0) * CFrame.new(0, 2.1, -radius),
+			Color = C.WornStone,
+			Material = Enum.Material.Cobblestone,
+		})
+	end
+	Builder.disc(folder, CFrame.identity, {
+		Name = "FountainWater",
+		Radius = radius - 0.5,
+		Height = 1.2,
+		At = CFrame.new(0, 1.9, 0),
+		Color = Color3.fromRGB(70, 160, 210),
+		Material = Enum.Material.Glass,
+		Transparency = 0.35,
+		CanCollide = false,
+		CastShadow = false,
+	})
+end
+
+function Hub.road(folder: Instance, zone, distance: number)
 	local frame = Hub.radial(zone.Angle)
 	local length = distance - Hub.PlazaRadius
 	local mid = Hub.PlazaRadius + length / 2
@@ -105,17 +131,10 @@ local function road(folder: Folder, zone, distance: number)
 	)
 end
 
-function Hub.build(parent: Instance, zones, distance: number): Folder
+function Hub.build(parent: Instance, zones, distance: number, gateAngle: number): Folder
 	local folder = Builder.folder(parent, "Hub")
 	local o = CFrame.identity
 
-	Builder.disc(folder, o, {
-		Name = "Ground",
-		Radius = 290,
-		At = CFrame.new(0, 0.4, 0),
-		Color = C.Ground,
-		Material = Enum.Material.Slate,
-	})
 	Builder.disc(folder, o, {
 		Name = "Plaza",
 		Radius = Hub.PlazaRadius,
@@ -124,10 +143,11 @@ function Hub.build(parent: Instance, zones, distance: number): Folder
 		Color = C.WornStone,
 		Material = Enum.Material.Cobblestone,
 	})
-	Builder.neonRing(folder, o, Vector3.new(0, 1.15, 0), Hub.PlazaRadius - 1, 40, C.Cyan)
+	Builder.neonRing(folder, o, Vector3.new(0, 1.15, 0), Hub.PlazaRadius - 1, 32, C.Cyan)
 	Builder.neonRing(folder, o, Vector3.new(0, 1.15, 0), 14, 20, C.Magenta, 0.4)
 
 	obelisk(folder)
+	fountain(folder)
 
 	local spawn = Builder.part(folder, o, {
 		Class = "SpawnLocation",
@@ -140,12 +160,19 @@ function Hub.build(parent: Instance, zones, distance: number): Folder
 	}) :: SpawnLocation
 	spawn.Duration = 0
 
+	local rng = Random.new(7)
 	for _, zone in zones do
-		road(folder, zone, distance)
-		-- Lamps between the roads.
-		local lampFrame = Hub.radial(zone.Angle + 36)
-		local lampPos = lampFrame * Vector3.new(0, 1.1, -(Hub.PlazaRadius - 5))
-		Builder.lamp(folder, CFrame.new(lampPos), 0, 0, C.Amber)
+		Hub.road(folder, zone, distance)
+
+		-- A lamp, flower bed and bench between each pair of roads, except
+		-- where the avenue to the main gate leaves the plaza.
+		local between = (zone.Angle + 36) % 360
+		if between ~= gateAngle then
+			local frame = Hub.radial(between)
+			Builder.lamp(folder, frame * CFrame.new(0, 1.1, -(Hub.PlazaRadius - 5)), 0, 0, C.Amber)
+			Builder.planter(folder, frame, CFrame.new(0, 1.1, -30), 10, rng)
+			Builder.bench(folder, frame, CFrame.new(0, 1.1, -24) * CFrame.Angles(0, math.pi, 0))
+		end
 	end
 
 	return folder

@@ -19,6 +19,9 @@ local LASER_TIERS = {
 
 local Crafting = {}
 
+-- Area the zone occupies in its local space, kept clear of trees and flowers.
+Crafting.Footprint = { MinX = -34, MaxX = 34, MinZ = -4, MaxZ = 54 }
+
 local function shell(folder: Folder, origin: CFrame, color: Color3)
 	Builder.part(folder, origin, {
 		Name = "Floor",

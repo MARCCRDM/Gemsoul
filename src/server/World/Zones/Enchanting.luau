@@ -13,6 +13,9 @@ local CENTER = Vector3.new(0, 0, RADIUS + 2)
 
 local Enchanting = {}
 
+-- Area the zone occupies in its local space, kept clear of trees and flowers.
+Enchanting.Footprint = { MinX = -28, MaxX = 28, MinZ = -4, MaxZ = 52 }
+
 -- Octagon corner k; the side between corners 0 and 1 faces the plaza.
 local function corner(k: number): Vector3
 	local angle = math.rad(-22.5 + 45 * k)
@@ -90,7 +93,7 @@ local function chamber(folder: Folder, origin: CFrame, color: Color3)
 			Color = C.DarkStone,
 			Material = Enum.Material.Slate,
 		})
-		Builder.neonRing(folder, origin, CENTER + Vector3.new(0, y + 1.05, 0), radius - 0.4, 24, color, 0.3)
+		Builder.neonBand(folder, origin, CENTER + Vector3.new(0, y + 0.5, 0), radius, color)
 	end
 	Builder.part(folder, origin, {
 		Name = "Spire",
@@ -105,7 +108,7 @@ local function chamber(folder: Folder, origin: CFrame, color: Color3)
 		Vector3.new(3, 3, 3),
 		CFrame.new(CENTER + Vector3.new(0, HEIGHT + 13, 0)) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
 		color,
-		40,
+		nil,
 		Tags.Spin
 	)
 
@@ -131,7 +134,7 @@ local function altar(folder: Folder, origin: CFrame, color: Color3)
 		Tag = Tags.EnchantAltar,
 	})
 	Builder.prompt(top, "Fuse Gem", "Enchanting Altar")
-	Builder.neonRing(folder, origin, CENTER + Vector3.new(0, 3.65, 0), 3.6, 16, color, 0.25)
+	Builder.neonBand(folder, origin, CENTER + Vector3.new(0, 3.3, 0), 4, color)
 	Builder.neon(
 		folder,
 		origin,
@@ -144,7 +147,7 @@ local function altar(folder: Folder, origin: CFrame, color: Color3)
 
 	-- Floor runes circling the altar.
 	Builder.neonRing(folder, origin, CENTER + Vector3.new(0, 0.15, 0), 7, 28, color, 0.3)
-	Builder.neonRing(folder, origin, CENTER + Vector3.new(0, 0.15, 0), 13, 40, color, 0.3)
+	Builder.neonRing(folder, origin, CENTER + Vector3.new(0, 0.15, 0), 13, 24, color, 0.3)
 	for i = 0, 9 do
 		local angle = i / 10 * 2 * math.pi
 		local flat = CFrame.new(CENTER + Vector3.new(0, 0.15, 0))
@@ -169,7 +172,7 @@ local function containmentFields(folder: Folder, origin: CFrame, color: Color3)
 			Color = C.Iron,
 			Material = Enum.Material.Metal,
 		})
-		Builder.neonRing(folder, origin, position + Vector3.new(0, 3.05, 0), 1.3, 8, color, 0.25)
+		Builder.neonBand(folder, origin, position + Vector3.new(0, 2.7, 0), 1.5, color)
 
 		local fieldCF = CFrame.new(position + Vector3.new(0, 7, 0))
 		Builder.part(folder, origin, {

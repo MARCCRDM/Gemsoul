@@ -8,11 +8,13 @@ local CollectionService = game:GetService("CollectionService")
 local Builder = {}
 
 Builder.Colors = {
-	Ground = Color3.fromRGB(52, 50, 58),
-	Stone = Color3.fromRGB(96, 92, 98),
-	WornStone = Color3.fromRGB(122, 116, 112),
-	DarkStone = Color3.fromRGB(48, 46, 54),
-	Obsidian = Color3.fromRGB(24, 20, 32),
+	Stone = Color3.fromRGB(158, 150, 138),
+	WornStone = Color3.fromRGB(188, 178, 160),
+	DarkStone = Color3.fromRGB(104, 98, 96),
+	Obsidian = Color3.fromRGB(44, 38, 54),
+	RoofBlue = Color3.fromRGB(46, 72, 128),
+	Banner = Color3.fromRGB(38, 62, 140),
+	Gold = Color3.fromRGB(230, 184, 70),
 	Wood = Color3.fromRGB(104, 72, 46),
 	DarkWood = Color3.fromRGB(66, 44, 30),
 	Iron = Color3.fromRGB(58, 58, 64),
@@ -144,6 +146,21 @@ function Builder.neonRing(
 	end
 end
 
+-- A glowing edge band: one neon cylinder slightly wider than the round part
+-- it wraps, instead of a ring of separate segments.
+function Builder.neonBand(parent: Instance, origin: CFrame, center: Vector3, radius: number, color: Color3)
+	return Builder.disc(parent, origin, {
+		Name = "NeonBand",
+		Radius = radius + 0.15,
+		Height = 0.3,
+		At = CFrame.new(center),
+		Color = color,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		CastShadow = false,
+	})
+end
+
 -- Battlements and a neon trim line along the top of a wall.
 local function crown(parent: Instance, origin: CFrame, topCF: CFrame, length: number, props: { [string]: any })
 	local thickness = props.Thickness or 2
@@ -158,6 +175,7 @@ local function crown(parent: Instance, origin: CFrame, topCF: CFrame, length: nu
 				At = topCF * CFrame.new(x, 1.25, 0),
 				Color = props.Color,
 				Material = props.Material,
+				CastShadow = false,
 			})
 		end
 	end
@@ -250,8 +268,7 @@ function Builder.wallWithDoor(
 			origin,
 			Vector3.new(doorWidth + 0.4, 0.4, thickness + 0.2),
 			baseCF * CFrame.new(0, doorHeight, 0),
-			trim,
-			16
+			trim
 		)
 	end
 end
@@ -313,8 +330,7 @@ function Builder.torch(parent: Instance, origin: CFrame, at: CFrame, color: Colo
 		origin,
 		Vector3.new(0.8, 0.8, 0.8),
 		at * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
-		color,
-		14
+		color
 	)
 	CollectionService:AddTag(flame, "Flicker")
 	return flame
@@ -344,7 +360,7 @@ function Builder.lamp(parent: Instance, origin: CFrame, x: number, z: number, co
 		Color = C.Chrome,
 		Material = Enum.Material.Metal,
 	})
-	local lantern = Builder.neon(parent, origin, Vector3.new(1.4, 2.4, 1.4), CFrame.new(x, h + 0.4, z), color, 28)
+	local lantern = Builder.neon(parent, origin, Vector3.new(1.4, 2.4, 1.4), CFrame.new(x, h + 0.4, z), color)
 	CollectionService:AddTag(lantern, "Flicker")
 end
 
@@ -520,6 +536,148 @@ function Builder.rock(parent: Instance, origin: CFrame, position: Vector3, size:
 		Color = Color3.new(C.DarkStone.R * shade, C.DarkStone.G * shade, C.DarkStone.B * shade),
 		Material = Enum.Material.Rock,
 	})
+end
+
+local LEAF_COLORS = {
+	Color3.fromRGB(86, 150, 62),
+	Color3.fromRGB(70, 132, 56),
+	Color3.fromRGB(104, 160, 70),
+	Color3.fromRGB(62, 118, 60),
+}
+
+local FLOWER_COLORS = {
+	Color3.fromRGB(255, 120, 150),
+	Color3.fromRGB(255, 210, 80),
+	Color3.fromRGB(180, 120, 255),
+	Color3.fromRGB(255, 255, 255),
+	Color3.fromRGB(255, 150, 60),
+}
+
+-- Leafy tree: a trunk and three rounded canopies. `position` is on the ground.
+function Builder.tree(parent: Instance, position: Vector3, scale: number, rng: Random)
+	local model = Instance.new("Model")
+	model.Name = "Tree"
+	local height = 10 * scale
+	Builder.part(model, CFrame.identity, {
+		Name = "Trunk",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(height, 1.6 * scale, 1.6 * scale),
+		At = CFrame.new(position + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = C.Wood,
+		Material = Enum.Material.Wood,
+	})
+	local green = LEAF_COLORS[rng:NextInteger(1, #LEAF_COLORS)]
+	local canopies = {
+		{ Offset = Vector3.new(0, 1, 0), Size = 9 },
+		{ Offset = Vector3.new(2.2, -1.5, 1), Size = 6.5 },
+		{ Offset = Vector3.new(-2, -1, -1.6), Size = 6 },
+	}
+	for _, canopy in canopies do
+		Builder.part(model, CFrame.identity, {
+			Name = "Leaves",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * canopy.Size * scale,
+			At = CFrame.new(position + Vector3.new(0, height, 0) + canopy.Offset * scale),
+			Color = green,
+			Material = Enum.Material.Grass,
+			CanCollide = false,
+		})
+	end
+	model.Parent = parent
+	return model
+end
+
+-- Stone planter box full of flowers, running along the frame's X axis.
+function Builder.planter(parent: Instance, origin: CFrame, at: CFrame, length: number, rng: Random)
+	Builder.part(parent, origin, {
+		Name = "Planter",
+		Size = Vector3.new(length, 1.4, 3),
+		At = at * CFrame.new(0, 0.7, 0),
+		Color = C.WornStone,
+		Material = Enum.Material.Cobblestone,
+	})
+	Builder.part(parent, origin, {
+		Name = "Soil",
+		Size = Vector3.new(length - 0.6, 0.2, 2.4),
+		At = at * CFrame.new(0, 1.45, 0),
+		Color = Color3.fromRGB(78, 56, 40),
+		Material = Enum.Material.Ground,
+		CastShadow = false,
+	})
+	local count = math.floor(length / 1.4)
+	for i = 1, count do
+		local x = -length / 2 + (i - 0.5) * length / count
+		Builder.part(parent, origin, {
+			Name = "Flower",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * rng:NextNumber(0.8, 1.2),
+			At = at * CFrame.new(x, 1.9, rng:NextNumber(-0.6, 0.6)),
+			Color = FLOWER_COLORS[rng:NextInteger(1, #FLOWER_COLORS)],
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+			CastShadow = false,
+		})
+	end
+end
+
+-- Wooden bench; the seat faces the frame's -Z.
+function Builder.bench(parent: Instance, origin: CFrame, at: CFrame)
+	local wood = { Color = C.Wood, Material = Enum.Material.WoodPlanks }
+	Builder.part(parent, origin, {
+		Name = "BenchSeat",
+		Size = Vector3.new(6, 0.5, 2),
+		At = at * CFrame.new(0, 1.8, 0),
+		Color = wood.Color,
+		Material = wood.Material,
+	})
+	Builder.part(parent, origin, {
+		Name = "BenchBack",
+		Size = Vector3.new(6, 1.6, 0.4),
+		At = at * CFrame.new(0, 3, 0.9) * CFrame.Angles(math.rad(-10), 0, 0),
+		Color = wood.Color,
+		Material = wood.Material,
+	})
+	for _, x in { -2.4, 2.4 } do
+		Builder.part(parent, origin, {
+			Name = "BenchLeg",
+			Size = Vector3.new(0.5, 1.6, 1.8),
+			At = at * CFrame.new(x, 0.8, 0),
+			Color = C.Iron,
+			Material = Enum.Material.Metal,
+			CastShadow = false,
+		})
+	end
+end
+
+-- Hanging cloth banner with a gold stripe and a thin neon edge; faces -Z.
+function Builder.banner(parent: Instance, origin: CFrame, at: CFrame, color: Color3, height: number)
+	Builder.part(parent, origin, {
+		Name = "BannerRod",
+		Size = Vector3.new(6, 0.4, 0.4),
+		At = at,
+		Color = C.Iron,
+		Material = Enum.Material.Metal,
+		CastShadow = false,
+	})
+	Builder.part(parent, origin, {
+		Name = "Banner",
+		Size = Vector3.new(5, height, 0.2),
+		At = at * CFrame.new(0, -height / 2, 0),
+		Color = color,
+		Material = Enum.Material.Fabric,
+		CanCollide = false,
+		CastShadow = false,
+	})
+	Builder.part(parent, origin, {
+		Name = "BannerStripe",
+		Size = Vector3.new(1, height - 1, 0.1),
+		At = at * CFrame.new(0, -height / 2, -0.12),
+		Color = C.Gold,
+		Material = Enum.Material.Fabric,
+		CanCollide = false,
+		CastShadow = false,
+	})
+	Builder.neon(parent, origin, Vector3.new(5.1, 0.2, 0.25), at * CFrame.new(0, -height, 0), C.Cyan)
 end
 
 return Builder

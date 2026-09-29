@@ -25,7 +25,7 @@ local function spawnNode(spawner: BasePart, folder: Folder)
 	local node = Instance.new("Model")
 	node.Name = if isVip then "VipGemNode" else "GemNode"
 
-	local base = CFrame.new(spawner.Position + Vector3.new(0, spawner.Size.X / 2, 0))
+	local base = CFrame.new(spawner.CFrame.Position + Vector3.new(0, spawner.Size.X / 2, 0))
 		* CFrame.Angles(0, rng:NextNumber(0, 2 * math.pi), 0)
 	local core: BasePart
 	for i, shard in SHARDS do
@@ -46,10 +46,6 @@ local function spawnNode(spawner: BasePart, folder: Folder)
 		end
 	end
 	node.PrimaryPart = core
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Range = 10
-	light.Parent = core
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Mine"

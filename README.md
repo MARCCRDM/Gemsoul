@@ -18,7 +18,9 @@ A Roblox game. Code lives in `src/` as Luau files and is synced into Roblox Stud
 
 The world is built by code when the server starts, so **it only appears after you press Play**. In edit mode you'll just see the empty baseplate.
 
-A central plaza with a CRT obelisk sits in the middle, with neon roads out to five zones:
+The town is a walled kingdom on a sunny afternoon. A sixteen-sided stone wall with blue-roofed towers and a moat surrounds everything; the main gate and drawbridge are to the south, where a tree-lined avenue runs from the plaza. Outside the walls are rolling hills, forest, a country road and snow-capped mountains (all Roblox terrain).
+
+A central plaza with a CRT obelisk and fountain sits in the middle, with neon roads out to five zones:
 
 | Zone | Direction | What's there |
 |---|---|---|
@@ -38,8 +40,10 @@ src/
     Main.server.luau          builds the world, then starts the systems
     World/
       Builder.luau            shared pieces: walls, pillars, neon, CRT screens, holograms, signs
-      Lighting.luau           dusk sky, bloom, atmosphere
-      Hub.luau                plaza, obelisk, spawn, roads
+      Lighting.luau           daytime sky, clouds, haze, bloom
+      Hub.luau                plaza, obelisk, fountain, spawn, roads
+      Kingdom.luau            outer walls, towers, gatehouse, gardens
+      Landscape.luau          terrain: plains, moat, hills, mountains, forest
       WorldBuilder.luau       zone list and ring layout
       Zones/                  one file per building
         Mining.luau  Crafting.luau  Marketplace.luau  Enchanting.luau  Arena.luau

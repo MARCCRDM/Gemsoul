@@ -21,6 +21,9 @@ local CANOPY_COLORS = {
 
 local Marketplace = {}
 
+-- Area the zone occupies in its local space, kept clear of trees and flowers.
+Marketplace.Footprint = { MinX = -40, MaxX = 40, MinZ = -4, MaxZ = 68 }
+
 -- A wooden stall whose counter faces the stall frame's -Z (the aisle).
 local function stall(folder: Folder, frame: CFrame, index: number, color: Color3)
 	Builder.part(folder, frame, {
@@ -95,7 +98,7 @@ local function tradeBoard(folder: Folder, origin: CFrame, color: Color3)
 		Color = C.WornStone,
 		Material = Enum.Material.Cobblestone,
 	})
-	local board = Builder.holo(
+	Builder.holo(
 		folder,
 		origin,
 		CFrame.new(0, 13, z),
@@ -104,7 +107,6 @@ local function tradeBoard(folder: Folder, origin: CFrame, color: Color3)
 		"P2P TRADE LISTINGS\n\n-- NO LISTINGS YET --",
 		Tags.TradeBoard
 	)
-	Builder.light(board, color, 30, 2)
 end
 
 function Marketplace.build(folder: Folder, origin: CFrame, color: Color3)
@@ -161,7 +163,7 @@ function Marketplace.build(folder: Folder, origin: CFrame, color: Color3)
 	-- Hovering drone lanterns over the aisle.
 	for _, z in { 10, 22, 34, 46 } do
 		local lantern =
-			Builder.neon(folder, origin, Vector3.new(1.4, 1.4, 1.4), CFrame.new(0, 11, z), color, 22, Tags.Bob)
+			Builder.neon(folder, origin, Vector3.new(1.4, 1.4, 1.4), CFrame.new(0, 11, z), color, nil, Tags.Bob)
 		lantern.Name = "DroneLantern"
 	end
 

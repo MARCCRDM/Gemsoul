@@ -14,6 +14,9 @@ local GATE_WIDTH = 16
 
 local Mining = {}
 
+-- Area the zone occupies in its local space, kept clear of trees and flowers.
+Mining.Footprint = { MinX = -64, MaxX = 64, MinZ = -4, MaxZ = 146 }
+
 local function nodeSpawner(folder: Folder, origin: CFrame, x: number, y: number, z: number, isVip: boolean)
 	local color = if isVip then C.Magenta else C.Cyan
 	local pad = Builder.disc(folder, origin, {
@@ -26,7 +29,7 @@ local function nodeSpawner(folder: Folder, origin: CFrame, x: number, y: number,
 		Tag = Tags.NodeSpawner,
 	})
 	pad:SetAttribute("VIP", isVip)
-	Builder.neonRing(folder, origin, Vector3.new(x, y + 0.45, z), 2.4, 8, color, 0.25)
+	Builder.neonBand(folder, origin, Vector3.new(x, y + 0.15, z), 2.35, color)
 end
 
 local function ledge(folder: Folder, origin: CFrame, x: number, z1: number, z2: number, height: number)
@@ -133,7 +136,7 @@ local function energyGate(folder: Folder, origin: CFrame)
 		C.Magenta
 	)
 
-	local field = Builder.part(folder, origin, {
+	Builder.part(folder, origin, {
 		Name = "EnergyGate",
 		Size = Vector3.new(GATE_WIDTH, 22, 1),
 		At = CFrame.new(0, 11, z),
@@ -143,7 +146,6 @@ local function energyGate(folder: Folder, origin: CFrame)
 		CastShadow = false,
 		Tag = Tags.VipGate,
 	})
-	Builder.light(field, C.Magenta, 24, 3)
 end
 
 function Mining.build(folder: Folder, origin: CFrame)

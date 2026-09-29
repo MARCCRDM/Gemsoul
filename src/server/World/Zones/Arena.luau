@@ -16,6 +16,9 @@ local ENTRANCE_GAP = 11
 
 local Arena = {}
 
+-- Area the zone occupies in its local space, kept clear of trees and flowers.
+Arena.Footprint = { MinX = -80, MaxX = 80, MinZ = -14, MaxZ = 158 }
+
 -- Calls place(frame, segmentLength) around a circle, skipping the entrance.
 -- Each frame sits on the ring with its X axis running along the circle.
 local function ring(radius: number, count: number, gap: number, place: (CFrame, number) -> ())
@@ -70,7 +73,7 @@ local function floor(folder: Folder, origin: CFrame, color: Color3)
 			color
 		)
 	end
-	Builder.neonRing(folder, origin, CENTER + Vector3.new(0, 0.2, 0), FLOOR_RADIUS, 48, color, 0.5)
+	Builder.neonRing(folder, origin, CENTER + Vector3.new(0, 0.2, 0), FLOOR_RADIUS, 32, color, 0.5)
 	Builder.neonRing(folder, origin, CENTER + Vector3.new(0, 0.2, 0), 10, 24, C.Cyan, 0.5)
 end
 
@@ -120,9 +123,7 @@ local function outerWall(folder: Folder, origin: CFrame, color: Color3)
 			Material = Enum.Material.Basalt,
 		})
 		-- Glowing gridlines on the outer face.
-		for _, y in { 8, 16, 24 } do
-			Builder.neon(folder, origin, Vector3.new(length, 0.3, 0.2), frame * CFrame.new(0, y, -2.1), color)
-		end
+		Builder.neon(folder, origin, Vector3.new(length, 0.3, 0.2), frame * CFrame.new(0, 16, -2.1), color)
 		Builder.neon(
 			folder,
 			origin,
@@ -139,14 +140,14 @@ local function outerWall(folder: Folder, origin: CFrame, color: Color3)
 		})
 	end)
 
-	-- Floodlights on the rim aimed at the combat floor.
+	-- Floodlight housings on the rim, aimed at the combat floor.
 	for _, angle in { 45, 135, 225, 315 } do
 		local position = (CFrame.new(CENTER) * CFrame.Angles(0, math.rad(angle), 0) * CFrame.new(
 			0,
 			WALL_HEIGHT + 4,
 			-OUTER_RADIUS
 		)).Position
-		local lamp = Builder.part(folder, origin, {
+		Builder.part(folder, origin, {
 			Name = "Floodlight",
 			Size = Vector3.new(4, 2, 1),
 			At = CFrame.lookAt(position, CENTER),
@@ -154,13 +155,6 @@ local function outerWall(folder: Folder, origin: CFrame, color: Color3)
 			Material = Enum.Material.Neon,
 			CanCollide = false,
 		})
-		local spot = Instance.new("SpotLight")
-		spot.Face = Enum.NormalId.Front
-		spot.Angle = 70
-		spot.Range = 60
-		spot.Brightness = 3
-		spot.Color = Color3.fromRGB(255, 235, 245)
-		spot.Parent = lamp
 	end
 end
 
@@ -209,7 +203,7 @@ local function queueTerminal(
 		Material = Enum.Material.DiamondPlate,
 		Tag = tag,
 	})
-	Builder.neonRing(folder, origin, Vector3.new(x, 0.45, z), 4.6, 20, color, 0.4)
+	Builder.neonBand(folder, origin, Vector3.new(x, 0.15, z), 5.25, color)
 	Builder.part(folder, origin, {
 		Name = "TerminalPedestal",
 		Size = Vector3.new(6, 4, 3),
@@ -223,7 +217,6 @@ local function queueTerminal(
 		TextColor = color,
 	})
 	Builder.prompt(pad, action, title)
-	Builder.light(pad, color, 18, 2)
 end
 
 function Arena.build(folder: Folder, origin: CFrame, color: Color3)

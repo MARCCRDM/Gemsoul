@@ -1,7 +1,10 @@
--- Builds the whole town when the server starts: lighting, the central hub,
--- and the five zone buildings arranged in a ring facing the plaza.
-local Hub = require(script.Parent.Hub)
+-- Builds the whole world when the server starts: lighting, terrain, the
+-- central hub, the five zone buildings in a ring facing the plaza, and the
+-- kingdom walls around everything.
 local Builder = require(script.Parent.Builder)
+local Hub = require(script.Parent.Hub)
+local Kingdom = require(script.Parent.Kingdom)
+local Landscape = require(script.Parent.Landscape)
 local applyLighting = require(script.Parent.Lighting)
 
 local C = Builder.Colors
@@ -32,14 +35,19 @@ function WorldBuilder.build(): Folder
 	end
 
 	local town = Builder.folder(workspace, "Town")
-	Hub.build(town, ZONES, ZONE_DISTANCE)
 
 	for _, zone in ZONES do
 		-- Local -Z faces the plaza; the building extends away from it along +Z.
-		local origin = Hub.radial(zone.Angle) * CFrame.new(0, GROUND_Y, -ZONE_DISTANCE) * CFrame.Angles(0, math.pi, 0)
-		local folder = Builder.folder(town, zone.Name)
-		require(zone.Module).build(folder, origin, zone.Color)
+		zone.Origin = Hub.radial(zone.Angle) * CFrame.new(0, GROUND_Y, -ZONE_DISTANCE) * CFrame.Angles(0, math.pi, 0)
 	end
+
+	Landscape.build(town, Kingdom.MoatDistance, Kingdom.GateAngle)
+	Hub.build(town, ZONES, ZONE_DISTANCE, Kingdom.GateAngle)
+	for _, zone in ZONES do
+		local folder = Builder.folder(town, zone.Name)
+		require(zone.Module).build(folder, zone.Origin, zone.Color)
+	end
+	Kingdom.build(town, ZONES, ZONE_DISTANCE)
 
 	return town
 end
