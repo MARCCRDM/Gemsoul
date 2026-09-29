@@ -85,6 +85,23 @@ GemConfig.TierLabels = {
 	UltraRare = "Ultra-Rare",
 }
 
+-- Badge colours for each element.
+GemConfig.ElementColors = {
+	Fire = Color3.fromRGB(255, 110, 50),
+	Frost = Color3.fromRGB(120, 200, 255),
+	Shock = Color3.fromRGB(255, 225, 60),
+	Poison = Color3.fromRGB(130, 230, 90),
+}
+
+GemConfig.SourceLabels = {
+	MiningNode = "Mined in the quarry",
+	MiningStore = "Bought at the Mining Store",
+	PvEDrop = "Dropped by a monster",
+	PvPWager = "Won in a PvP duel",
+}
+
+GemConfig.TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4 }
+
 GemConfig.TierColors = {
 	Common = Color3.fromRGB(200, 200, 200),
 	Uncommon = Color3.fromRGB(90, 220, 120),

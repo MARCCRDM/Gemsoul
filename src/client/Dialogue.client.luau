@@ -252,7 +252,7 @@ function actions.HandCut()
 	InventoryUI.open({
 		Title = "Choose a stone to cut by hand",
 		Filter = isRough,
-		ActionText = "Cut",
+		ActionText = "Cut this stone",
 		Empty = "You have no rough stones. Mine some or buy one from Garrick.",
 		OnPick = function(gem)
 			perform(function()
@@ -280,7 +280,7 @@ function actions.AutoCut()
 	InventoryUI.open({
 		Title = "Choose a stone for the laser",
 		Filter = isRough,
-		ActionText = "Laser",
+		ActionText = "Send to the laser",
 		Empty = "You have no rough stones. Mine some or buy one from Garrick.",
 		OnPick = function(gem)
 			say(string.format("%s. Which laser?", GemConfig.displayName(gem)))

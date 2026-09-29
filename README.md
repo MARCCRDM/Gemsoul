@@ -72,7 +72,7 @@ src/
   client/                     -> StarterPlayerScripts.Client
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
     Hud.client.luau           coins/gems button, opens the pouch ([G])
-    Modules/                  gem pouch, cutting minigame, profile copy, UI helpers
+    Modules/                  gem pouch, gem art (icons + 3D models), cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared
