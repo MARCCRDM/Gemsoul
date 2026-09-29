@@ -210,13 +210,24 @@ local detail = new("Frame", {
 UiKit.round(detail, 10)
 local detailStroke = new("UIStroke", { Color = K.Accent, Transparency = 0.5, Thickness = 1.5 }, detail)
 
-local viewport = new("ViewportFrame", {
+-- Close-up: a neutral studio backdrop with the stone in a viewport on top.
+local stageFrame = new("Frame", {
 	BackgroundColor3 = Color3.new(1, 1, 1),
 	Size = UDim2.new(1, 0, 0, 180),
+	ClipsDescendants = true,
 }, detail)
-UiKit.round(viewport, 10)
-local viewportGlow = new("UIGradient", { Rotation = 90 }, viewport)
-GemArt.setupViewport(viewport)
+UiKit.round(stageFrame, 10)
+new("UIGradient", {
+	Rotation = 90,
+	Color = ColorSequence.new(Color3.fromRGB(74, 84, 100), Color3.fromRGB(16, 20, 26)),
+}, stageFrame)
+GemArt.backdrop(stageFrame)
+local viewport = new("ViewportFrame", {
+	BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 2,
+}, stageFrame)
+local viewportCamera = GemArt.setupViewport(viewport)
 
 local info = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
@@ -281,7 +292,6 @@ local function showDetail(gem)
 		spinningGem = nil
 	end
 	if not gem then
-		viewportGlow.Color = ColorSequence.new(Color3.fromRGB(30, 40, 40), Color3.fromRGB(10, 14, 18))
 		label(info, "Select a gem to see it up close.", 15, K.Dim).TextWrapped = true
 		detailStroke.Color = K.Accent
 		return
@@ -290,9 +300,9 @@ local function showDetail(gem)
 	local shade = GemConfig.shade(gem)
 	local tierColor = GemConfig.TierColors[gem.Tier]
 	detailStroke.Color = tierColor
-	viewportGlow.Color = ColorSequence.new(shade.Color:Lerp(Color3.new(0, 0, 0), 0.55), Color3.fromRGB(8, 10, 14))
 
-	local model = GemArt.model(gem, true)
+	local model, radius = GemArt.model(gem, true)
+	viewportCamera.CFrame = CFrame.lookAt(Vector3.new(0, 0, GemArt.detailDistance(radius)), Vector3.zero)
 	model:PivotTo(GemArt.pose(gem, 0))
 	model.Parent = viewport
 	spinning = model
@@ -420,9 +430,11 @@ local function card(gem, order: number)
 		LayoutOrder = order,
 	}, grid)
 	UiKit.round(button, 10)
+	-- Neutral card so the stone's own colour stands out; rarity shows in the
+	-- border and the label.
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(tierColor:Lerp(Color3.fromRGB(20, 30, 28), 0.72), Color3.fromRGB(16, 22, 22)),
+		Color = ColorSequence.new(Color3.fromRGB(38, 44, 52), Color3.fromRGB(20, 24, 30)),
 	}, button)
 	local stroke = new("UIStroke", {
 		Color = tierColor,
@@ -450,10 +462,18 @@ local function card(gem, order: number)
 	local stage = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 10),
-		Size = UDim2.fromOffset(84, 76),
+		Position = UDim2.new(0.5, 0, 0, 16),
+		Size = UDim2.fromOffset(92, 72),
 	}, button)
+	GemArt.backdrop(stage)
 	pending[stage] = gem
+
+	local rarityText = if gem.Tier == "UltraRare" then "ULTRA" else string.upper(GemConfig.TierLabels[gem.Tier])
+	local rarity = label(button, rarityText, 10, tierColor, BOLD)
+	rarity.AnchorPoint = Vector2.new(1, 0)
+	rarity.Position = UDim2.new(1, -8, 0, 6)
+	rarity.Size = UDim2.new(0.6, 0, 0, 12)
+	rarity.TextXAlignment = Enum.TextXAlignment.Right
 
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "MINT" else "CUT " .. gem.Cut
 	local tag = label(button, state, 10, if gem.Cut then K.Gold else K.Dim, BOLD)
@@ -461,7 +481,7 @@ local function card(gem, order: number)
 	tag.Size = UDim2.new(1, -16, 0, 12)
 
 	local name = label(button, shade.Name, 12, K.Text, BOLD)
-	name.Position = UDim2.fromOffset(6, 86)
+	name.Position = UDim2.fromOffset(6, 92)
 	name.Size = UDim2.new(1, -12, 0, 30)
 	name.TextWrapped = true
 	name.TextXAlignment = Enum.TextXAlignment.Center

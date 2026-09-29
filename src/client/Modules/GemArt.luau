@@ -1,12 +1,17 @@
 --[[
 	Turns GemShapes into real 3D models for ViewportFrames.
 
-	GemArt.model(gem, detailed)   a Model of the stone, centred on the origin
-	GemArt.pose(gem, spin)        how to hold it: cut stones tilt their table
-	                              toward the camera; `spin` turns it around
-	GemArt.setupViewport(frame)   lighting and a fixed camera, so bigger
-	                              stones really do look bigger
-	GemArt.viewport(parent, gem)  a ready-made static view, for cards
+	GemArt.model(gem, detailed)      a Model of the stone centred on the
+	                                 origin, and its bounding radius
+	GemArt.pose(gem, spin)           how to hold it: cut stones tilt their
+	                                 table toward the camera
+	GemArt.setupViewport(frame, d)   bright studio lighting, camera at d
+	GemArt.cardDistance(radius)      camera distance for cards: stones fill
+	                                 the card, bigger ones a bit more
+	GemArt.detailDistance(radius)    camera distance for the close-up
+	GemArt.backdrop(parent)          neutral spotlight and floor shadow, so
+	                                 any colour of stone stands out
+	GemArt.viewport(parent, gem)     a ready-made static view, for cards
 ]]
 local GemShapes = require(script.Parent.GemShapes)
 
@@ -14,7 +19,6 @@ local GemArt = {}
 
 local FACET_THICKNESS = 0.02
 local CAMERA_FOV = 34
-local CAMERA_DISTANCE = GemShapes.MaxRadius * 3.5
 
 local function wedge(model: Model, spec, color: Color3, transparency: number)
 	local part = Instance.new("WedgePart")
@@ -50,7 +54,7 @@ local function ball(
 	part.Parent = model
 end
 
-function GemArt.model(gem, detailed: boolean?): Model
+function GemArt.model(gem, detailed: boolean?): (Model, number)
 	local shape = GemShapes.build(gem, detailed)
 	local model = Instance.new("Model")
 	model.Name = "Gem"
@@ -69,7 +73,62 @@ function GemArt.model(gem, detailed: boolean?): Model
 		ball(model, point, 0.06, Color3.new(1, 1, 1), 0, true)
 	end
 	model.WorldPivot = CFrame.new()
-	return model
+	return model, shape.Radius
+end
+
+-- Cards: every stone fills most of the card, but a size-10 stone still
+-- looks noticeably bigger than a size-1.
+function GemArt.cardDistance(radius: number): number
+	return (radius + (GemShapes.MaxRadius - radius) * 0.3) * 2.7
+end
+
+function GemArt.detailDistance(radius: number): number
+	return radius * 2.8
+end
+
+-- A soft grey spotlight with a shadow beneath the stone. Neutral on
+-- purpose: a stone never sits on a background of its own colour.
+function GemArt.backdrop(parent: Instance): Frame
+	local holder = Instance.new("Frame")
+	holder.Name = "Backdrop"
+	holder.BackgroundTransparency = 1
+	holder.Size = UDim2.fromScale(1, 1)
+	holder.ZIndex = 1
+	holder.Parent = parent
+
+	local spot = Instance.new("Frame")
+	spot.AnchorPoint = Vector2.new(0.5, 0.5)
+	spot.Position = UDim2.fromScale(0.5, 0.46)
+	spot.Size = UDim2.fromScale(0.92, 0.92)
+	spot.BackgroundColor3 = Color3.fromRGB(190, 200, 215)
+	spot.BorderSizePixel = 0
+	spot.Parent = holder
+	local aspect = Instance.new("UIAspectRatioConstraint")
+	aspect.Parent = spot
+	local round = Instance.new("UICorner")
+	round.CornerRadius = UDim.new(0.5, 0)
+	round.Parent = spot
+	local fade = Instance.new("UIGradient")
+	fade.Rotation = 90
+	fade.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.62),
+		NumberSequenceKeypoint.new(0.55, 0.78),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	fade.Parent = spot
+
+	local shadow = Instance.new("Frame")
+	shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+	shadow.Position = UDim2.fromScale(0.5, 0.84)
+	shadow.Size = UDim2.fromScale(0.55, 0.09)
+	shadow.BackgroundColor3 = Color3.new(0, 0, 0)
+	shadow.BackgroundTransparency = 0.55
+	shadow.BorderSizePixel = 0
+	shadow.Parent = holder
+	local shadowRound = Instance.new("UICorner")
+	shadowRound.CornerRadius = UDim.new(0.5, 0)
+	shadowRound.Parent = shadow
+	return holder
 end
 
 function GemArt.pose(gem, spin: number): CFrame
@@ -77,10 +136,10 @@ function GemArt.pose(gem, spin: number): CFrame
 	return CFrame.Angles(math.rad(tilt), 0, 0) * CFrame.Angles(0, spin, 0)
 end
 
-function GemArt.setupViewport(viewport: ViewportFrame): Camera
-	viewport.Ambient = Color3.fromRGB(150, 150, 165)
+function GemArt.setupViewport(viewport: ViewportFrame, distance: number?): Camera
+	viewport.Ambient = Color3.fromRGB(190, 190, 200)
 	viewport.LightColor = Color3.new(1, 1, 1)
-	viewport.LightDirection = Vector3.new(-0.5, -1, -0.7)
+	viewport.LightDirection = Vector3.new(-0.4, -1, -0.6)
 	local camera = viewport:FindFirstChildOfClass("Camera")
 	if not camera then
 		camera = Instance.new("Camera")
@@ -88,7 +147,7 @@ function GemArt.setupViewport(viewport: ViewportFrame): Camera
 	end
 	viewport.CurrentCamera = camera
 	camera.FieldOfView = CAMERA_FOV
-	camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, CAMERA_DISTANCE), Vector3.zero)
+	camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, distance or GemShapes.MaxRadius * 3.5), Vector3.zero)
 	return camera
 end
 
@@ -97,8 +156,9 @@ function GemArt.viewport(parent: Instance, gem, detailed: boolean?): ViewportFra
 	local viewport = Instance.new("ViewportFrame")
 	viewport.BackgroundTransparency = 1
 	viewport.Size = UDim2.fromScale(1, 1)
-	GemArt.setupViewport(viewport)
-	local model = GemArt.model(gem, detailed)
+	viewport.ZIndex = 2
+	local model, radius = GemArt.model(gem, detailed)
+	GemArt.setupViewport(viewport, GemArt.cardDistance(radius))
 	model:PivotTo(GemArt.pose(gem, 0.6))
 	model.Parent = viewport
 	viewport.Parent = parent
