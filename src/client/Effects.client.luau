@@ -1,7 +1,9 @@
 -- Animates tagged world pieces on each client: spinning crystals, bobbing
--- lanterns, floating containment fields, pulsing runes, flickering flames
--- and lasers. Purely visual; the server never sees these changes.
+-- lanterns, floating containment fields, pulsing runes, flickering flames,
+-- lasers, and shopkeepers turning to face you. Purely visual; the server
+-- never sees these changes.
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -32,6 +34,43 @@ local runes = track(Tags.ArcaneRune)
 local flames = track(Tags.Flicker)
 local lasers = track(Tags.Laser)
 
+-- Shopkeepers turn to face a nearby player, then back to the street.
+local VENDOR_NOTICE_DISTANCE = 20
+local vendors: { [Model]: { Base: CFrame, Yaw: number, Rest: number } } = {}
+local function addVendor(instance: Instance)
+	if instance:IsA("Model") then
+		local base = instance:GetPivot()
+		local rest = math.atan2(-base.LookVector.X, -base.LookVector.Z)
+		vendors[instance] = { Base = base, Yaw = rest, Rest = rest }
+	end
+end
+for _, instance in CollectionService:GetTagged(Tags.Vendor) do
+	addVendor(instance)
+end
+CollectionService:GetInstanceAddedSignal(Tags.Vendor):Connect(addVendor)
+CollectionService:GetInstanceRemovedSignal(Tags.Vendor):Connect(function(instance)
+	vendors[instance] = nil
+end)
+
+local function turnVendors(dt: number)
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	for model, state in vendors do
+		local target = state.Rest
+		if root then
+			local offset = root.Position - state.Base.Position
+			if Vector3.new(offset.X, 0, offset.Z).Magnitude < VENDOR_NOTICE_DISTANCE then
+				target = math.atan2(-offset.X, -offset.Z)
+			end
+		end
+		local diff = (target - state.Yaw + math.pi) % (2 * math.pi) - math.pi
+		if math.abs(diff) > 0.01 then
+			state.Yaw += diff * math.min(1, dt * 6)
+			model:PivotTo(CFrame.new(state.Base.Position) * CFrame.Angles(0, state.Yaw, 0))
+		end
+	end
+end
+
 -- A stable per-part offset so neighbours don't move in lockstep.
 local function phaseOf(base: CFrame): number
 	return base.Position.X * 0.37 + base.Position.Z * 0.21
@@ -46,9 +85,10 @@ local function near(base: CFrame, from: Vector3): boolean
 	return (base.Position - from).Magnitude < ANIMATE_DISTANCE
 end
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
 	local t = os.clock()
 	local eye = camera.CFrame.Position
+	turnVendors(dt)
 
 	for part, base in spinning do
 		if not near(base, eye) then

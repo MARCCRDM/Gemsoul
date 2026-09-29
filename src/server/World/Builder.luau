@@ -15,6 +15,9 @@ Builder.Colors = {
 	RoofBlue = Color3.fromRGB(46, 72, 128),
 	Banner = Color3.fromRGB(38, 62, 140),
 	Gold = Color3.fromRGB(230, 184, 70),
+	Plaster = Color3.fromRGB(226, 214, 190),
+	RoofRed = Color3.fromRGB(150, 70, 52),
+	WindowGlass = Color3.fromRGB(80, 120, 160),
 	Wood = Color3.fromRGB(104, 72, 46),
 	DarkWood = Color3.fromRGB(66, 44, 30),
 	Iron = Color3.fromRGB(58, 58, 64),
@@ -29,6 +32,11 @@ Builder.Colors = {
 	Red = Color3.fromRGB(255, 45, 70),
 }
 local C = Builder.Colors
+
+-- A frame at `position` whose -Z (front) faces the direction (dx, dz).
+function Builder.facing(position: Vector3, dx: number, dz: number): CFrame
+	return CFrame.new(position) * CFrame.Angles(0, math.atan2(-dx, -dz), 0)
+end
 
 -- Offset in studs plus rotation in degrees.
 function Builder.at(x: number, y: number, z: number, rx: number?, ry: number?, rz: number?): CFrame
@@ -678,6 +686,216 @@ function Builder.banner(parent: Instance, origin: CFrame, at: CFrame, color: Col
 		CastShadow = false,
 	})
 	Builder.neon(parent, origin, Vector3.new(5.1, 0.2, 0.25), at * CFrame.new(0, -height, 0), C.Cyan)
+end
+
+--[[
+	Medieval house facing the frame's -Z: stone ground floor, an optional
+	timber-framed plaster upper floor that juts out over the street, a pitched
+	roof, door, windows and chimney. The front wall is at z = 0 and the house
+	extends back to z = Depth. Returns the model.
+
+	opts: Width, Depth, Floors (1 or 2), Stone, Upper, Roof, Trim, Name
+]]
+function Builder.house(parent: Instance, frame: CFrame, opts: { [string]: any }): Model
+	local model = Instance.new("Model")
+	model.Name = opts.Name or "House"
+	local w, d = opts.Width, opts.Depth
+	local floors = opts.Floors or 2
+	local storey = 10
+
+	Builder.part(model, frame, {
+		Name = "GroundFloor",
+		Size = Vector3.new(w, storey, d),
+		At = CFrame.new(0, storey / 2, d / 2),
+		Color = opts.Stone or C.WornStone,
+		Material = Enum.Material.Cobblestone,
+	})
+	local top, front = storey, 0
+	if floors >= 2 then
+		front = -1.5
+		local upper = storey - 1
+		Builder.part(model, frame, {
+			Name = "UpperFloor",
+			Size = Vector3.new(w, upper, d - front),
+			At = CFrame.new(0, storey + upper / 2, (d + front) / 2),
+			Color = opts.Upper or C.Plaster,
+			Material = Enum.Material.Plaster,
+		})
+		-- Timber framing on the jettied front.
+		local beam = { Color = C.DarkWood, Material = Enum.Material.Wood, CastShadow = false }
+		local z = front - 0.15
+		for _, y in { storey + 0.3, storey + upper - 0.3 } do
+			Builder.part(model, frame, {
+				Name = "Beam",
+				Size = Vector3.new(w, 0.6, 0.3),
+				At = CFrame.new(0, y, z),
+				Color = beam.Color,
+				Material = beam.Material,
+				CastShadow = false,
+			})
+		end
+		for _, x in { -w / 2 + 0.3, 0, w / 2 - 0.3 } do
+			Builder.part(model, frame, {
+				Name = "Beam",
+				Size = Vector3.new(0.6, upper, 0.3),
+				At = CFrame.new(x, storey + upper / 2, z),
+				Color = beam.Color,
+				Material = beam.Material,
+				CastShadow = false,
+			})
+		end
+		top = storey + upper
+		for _, x in { -w / 4, w / 4 } do
+			Builder.part(model, frame, {
+				Name = "Window",
+				Size = Vector3.new(3, 3.4, 0.3),
+				At = CFrame.new(x, storey + upper / 2, z - 0.05),
+				Color = C.WindowGlass,
+				Material = Enum.Material.Glass,
+				CastShadow = false,
+			})
+		end
+	end
+
+	-- Pitched roof: two wedges meeting at a ridge that runs along the street.
+	local roofDepth = d - front + 3
+	local roofHeight = math.min(roofDepth * 0.4, 10)
+	local roofFront = front - 1.5
+	local roof = { Color = opts.Roof or C.RoofRed, Material = Enum.Material.Slate }
+	Builder.part(model, frame, {
+		Class = "WedgePart",
+		Name = "Roof",
+		Size = Vector3.new(w + 2, roofHeight, roofDepth / 2),
+		At = CFrame.new(0, top + roofHeight / 2, roofFront + roofDepth / 4),
+		Color = roof.Color,
+		Material = roof.Material,
+	})
+	Builder.part(model, frame, {
+		Class = "WedgePart",
+		Name = "Roof",
+		Size = Vector3.new(w + 2, roofHeight, roofDepth / 2),
+		At = CFrame.new(0, top + roofHeight / 2, roofFront + roofDepth * 3 / 4) * CFrame.Angles(0, math.pi, 0),
+		Color = roof.Color,
+		Material = roof.Material,
+	})
+	Builder.part(model, frame, {
+		Name = "Chimney",
+		Size = Vector3.new(2.5, roofHeight + 4, 2.5),
+		At = CFrame.new(w / 2 - 3, top + (roofHeight + 4) / 2, d * 0.65),
+		Color = C.DarkStone,
+		Material = Enum.Material.Brick,
+	})
+
+	-- Door and ground-floor windows.
+	Builder.part(model, frame, {
+		Name = "Door",
+		Size = Vector3.new(4, 7, 0.4),
+		At = CFrame.new(0, 3.5, -0.15),
+		Color = C.DarkWood,
+		Material = Enum.Material.WoodPlanks,
+		CastShadow = false,
+	})
+	if w >= 16 then
+		for _, x in { -w / 2 + 4, w / 2 - 4 } do
+			Builder.part(model, frame, {
+				Name = "Window",
+				Size = Vector3.new(3, 3.4, 0.3),
+				At = CFrame.new(x, 5, -0.1),
+				Color = C.WindowGlass,
+				Material = Enum.Material.Glass,
+				CastShadow = false,
+			})
+		end
+	end
+	if opts.Trim then
+		Builder.neon(model, frame, Vector3.new(w, 0.3, 0.2), CFrame.new(0, top - 0.6, front - 0.35), opts.Trim)
+		Builder.neon(model, frame, Vector3.new(4.6, 0.3, 0.3), CFrame.new(0, 7.2, -0.35), opts.Trim)
+	end
+
+	model.Parent = parent
+	return model
+end
+
+--[[
+	A shopkeeper: a retro robot in a medieval tunic with a CRT monitor for a
+	head. It stands at the frame's origin facing -Z. Talking to it opens the
+	dialogue for `vendorId` (see Shared.Vendors).
+]]
+function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info): Model
+	local model = Instance.new("Model")
+	model.Name = info.Name
+	local limb = { Color = C.Chrome, Material = Enum.Material.Metal }
+
+	for _, x in { -0.55, 0.55 } do
+		Builder.part(model, frame, {
+			Name = "Leg",
+			Size = Vector3.new(0.9, 3, 0.9),
+			At = CFrame.new(x, 1.5, 0),
+			Color = C.Iron,
+			Material = Enum.Material.Metal,
+			CastShadow = false,
+		})
+	end
+	local torso = Builder.part(model, frame, {
+		Name = "Torso",
+		Size = Vector3.new(2.6, 3, 1.4),
+		At = CFrame.new(0, 4.5, 0),
+		Color = info.Tunic,
+		Material = Enum.Material.Fabric,
+	})
+	Builder.neon(model, frame, Vector3.new(2.7, 0.3, 1.5), CFrame.new(0, 3.4, 0), info.Color)
+	for _, x in { -1.75, 1.75 } do
+		Builder.part(model, frame, {
+			Name = "Arm",
+			Size = Vector3.new(0.8, 2.8, 0.8),
+			At = CFrame.new(x, 4.6, 0),
+			Color = limb.Color,
+			Material = limb.Material,
+			CastShadow = false,
+		})
+	end
+	local head = Builder.screen(model, frame, CFrame.new(0, 7.1, 0), Vector3.new(2.4, 2, 1.6), {
+		Name = "Head",
+		Text = info.Face,
+		TextColor = info.Color,
+	})
+	Builder.part(model, frame, {
+		Name = "Antenna",
+		Size = Vector3.new(0.15, 1.2, 0.15),
+		At = CFrame.new(0.7, 8.7, 0.3),
+		Color = C.Iron,
+		Material = Enum.Material.Metal,
+		CastShadow = false,
+	})
+	Builder.neon(model, frame, Vector3.new(0.45, 0.45, 0.45), CFrame.new(0.7, 9.4, 0.3), info.Color)
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "Nameplate"
+	billboard.Size = UDim2.fromOffset(220, 54)
+	billboard.StudsOffset = Vector3.new(0, 2.6, 0)
+	billboard.MaxDistance = 70
+	billboard.LightInfluence = 0
+	billboard.Parent = head
+	for i, line in { { info.Name, Enum.Font.Arcade, info.Color }, { info.Role, Enum.Font.Code, Color3.new(1, 1, 1) } } do
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 0.5)
+		label.Position = UDim2.fromScale(0, (i - 1) * 0.5)
+		label.BackgroundTransparency = 1
+		label.Text = line[1]
+		label.Font = line[2]
+		label.TextColor3 = line[3]
+		label.TextStrokeTransparency = 0.4
+		label.TextScaled = true
+		label.Parent = billboard
+	end
+
+	local prompt = Builder.prompt(torso, "Talk", info.Name .. ", " .. info.Role)
+	prompt.MaxActivationDistance = 10
+	torso:SetAttribute("VendorId", vendorId)
+	model.PrimaryPart = torso
+	CollectionService:AddTag(model, "Vendor")
+	model.Parent = parent
+	return model
 end
 
 return Builder

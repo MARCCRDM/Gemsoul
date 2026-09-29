@@ -18,19 +18,19 @@ A Roblox game. Code lives in `src/` as Luau files and is synced into Roblox Stud
 
 The world is built by code when the server starts, so **it only appears after you press Play**. In edit mode you'll just see the empty baseplate.
 
-The town is a walled kingdom on a sunny afternoon. A sixteen-sided stone wall with blue-roofed towers and a moat surrounds everything; the main gate and drawbridge are to the south, where a tree-lined avenue runs from the plaza. Outside the walls are rolling hills, forest, a country road and snow-capped mountains (all Roblox terrain).
+Gemsoul is a walled village on a sunny afternoon, laid out like an Oblivion town. You spawn in the market square by the fountain. The main street runs south to the gatehouse and drawbridge, and three more roads lead off the square, lined with timber-and-stone houses:
 
-A central plaza with a CRT obelisk and fountain sits in the middle, with neon roads out to five zones:
-
-| Zone | Direction | What's there |
+| Where | What's there | Shopkeeper |
 |---|---|---|
-| Mine | North | Neon-lit quarry, static gem nodes (don't regenerate), daily quota terminal, VIP energy gate |
-| Craft & Cut | Northeast | Stone workbench with holographic displays (QTE cutting), forge, laser cutters tiers 1-3 |
-| Bazaar | Southeast | Wooden stalls with trade kiosks, drone lanterns, holographic P2P listing board |
-| Arcanum | Southwest | Octagonal chamber, pulsing runes, floating containment fields, enchanting altar |
-| Arena | Northwest | Obsidian colosseum, glowing grid floor, PvP collateral and PvE queue terminals |
+| North road | Mining Guild and daily quota terminal, then the quarry with static gem nodes and the VIP energy gate | Garrick, Mining Foreman |
+| North road | Craft & Cut workshop: holographic cutting bench and laser cutter out front | Ilsa, Master Gemcutter |
+| Market square | Stalls with trade kiosks and the holographic P2P listing board | Tamsin, Trade Broker |
+| East road | Arcanum tower with glowing runes and floating containment fields | Vey, Arcanist |
+| West road | Obsidian arena with PvP and PvE queue screens | Brutus, Arena Master |
 
-Only mining works so far. The other stations show "coming soon" when used.
+Every shop has a robot shopkeeper outside. Walk up and press **E** to talk, then pick a question from the dialogue box. Mining works now (hold E on a crystal node in the quarry); the other shops explain what's coming.
+
+Streets and building plots are painted terrain (cobblestone, pavement, dirt), so grass only grows in the gardens, the farm field and outside the walls.
 
 ## Code layout
 
@@ -39,24 +39,26 @@ src/
   server/                     -> ServerScriptService.Server
     Main.server.luau          builds the world, then starts the systems
     World/
-      Builder.luau            shared pieces: walls, pillars, neon, CRT screens, holograms, signs
+      Builder.luau            shared pieces: houses, shopkeepers, walls, neon, CRT screens, signs, trees
       Lighting.luau           daytime sky, clouds, haze, bloom
-      Hub.luau                plaza, obelisk, fountain, spawn, roads
-      Kingdom.luau            outer walls, towers, gatehouse, gardens
+      Hub.luau                square centrepiece: obelisk, fountain, benches, spawn
+      Town.luau               village layout: streets, houses, lamps, farm, gardens
+      Kingdom.luau            town walls, towers, gatehouse, drawbridge
       Landscape.luau          terrain: plains, moat, hills, mountains, forest
-      WorldBuilder.luau       zone list and ring layout
-      Zones/                  one file per building
+      WorldBuilder.luau       builds everything in order
+      Zones/                  one file per shop
         Mining.luau  Crafting.luau  Marketplace.luau  Enchanting.luau  Arena.luau
     Systems/
       Leaderboard.luau        Gems stat, quota tracking
       Mining.luau             spawns gem nodes on NodeSpawner pads
       Vip.luau                IsVIP attribute (game pass, or everyone in Studio)
   client/                     -> StarterPlayerScripts.Client
-    Effects.client.luau       spinning, bobbing, pulsing, flickering
-    Interactions.client.luau  quota terminal, "coming soon" prompts
+    Dialogue.client.luau      shopkeeper dialogue box, quota terminal display
+    Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared
     Config.luau               tunable numbers (quota, gem values, VIP pass id)
+    Vendors.luau              shopkeeper names, greetings and dialogue options
     Tags.luau                 CollectionService tag names
 ```
 

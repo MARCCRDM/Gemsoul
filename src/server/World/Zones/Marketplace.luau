@@ -1,14 +1,13 @@
--- Zone 3: Marketplace Building.
--- An open-air bazaar behind a stone arch: two rows of wooden stalls with
--- canvas canopies, each fitted with a digital trading kiosk, drone lanterns
--- over the aisle, and a large holographic board for player trade listings.
-local Tags = require(game:GetService("ReplicatedStorage").Shared.Tags)
+-- Marketplace: wooden stalls with digital trading kiosks around the edges of
+-- the town square, drone lanterns overhead, and the holographic trade board
+-- where Tamsin the broker takes player-to-player listings.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Tags = require(ReplicatedStorage.Shared.Tags)
+local Vendors = require(ReplicatedStorage.Shared.Vendors)
 local Builder = require(script.Parent.Parent.Builder)
 
 local C = Builder.Colors
-
-local WIDTH = 70
-local DEPTH = 64
 
 local CANOPY_COLORS = {
 	Color3.fromRGB(150, 40, 50),
@@ -21,10 +20,7 @@ local CANOPY_COLORS = {
 
 local Marketplace = {}
 
--- Area the zone occupies in its local space, kept clear of trees and flowers.
-Marketplace.Footprint = { MinX = -40, MaxX = 40, MinZ = -4, MaxZ = 68 }
-
--- A wooden stall whose counter faces the stall frame's -Z (the aisle).
+-- A wooden stall whose counter faces the frame's -Z.
 local function stall(folder: Folder, frame: CFrame, index: number, color: Color3)
 	Builder.part(folder, frame, {
 		Name = "StallCounter",
@@ -36,40 +32,35 @@ local function stall(folder: Folder, frame: CFrame, index: number, color: Color3
 	Builder.part(folder, frame, {
 		Name = "StallBackShelf",
 		Size = Vector3.new(10, 6, 1.5),
-		At = CFrame.new(0, 3, 6),
+		At = CFrame.new(0, 3, 5),
 		Color = C.DarkWood,
 		Material = Enum.Material.WoodPlanks,
 	})
 	for _, x in { -4.8, 4.8 } do
-		for _, z in { -1, 6 } do
+		for _, z in { -1, 5 } do
 			Builder.part(folder, frame, {
 				Name = "StallPost",
 				Size = Vector3.new(0.8, 9, 0.8),
 				At = CFrame.new(x, 4.5, z),
 				Color = C.DarkWood,
 				Material = Enum.Material.Wood,
+				CastShadow = false,
 			})
 		end
 	end
 	Builder.part(folder, frame, {
 		Name = "Canopy",
-		Size = Vector3.new(11, 0.4, 9),
-		At = CFrame.new(0, 9.4, 2.5) * CFrame.Angles(math.rad(-10), 0, 0),
+		Size = Vector3.new(11, 0.4, 8),
+		At = CFrame.new(0, 9.4, 2) * CFrame.Angles(math.rad(-10), 0, 0),
 		Color = CANOPY_COLORS[(index - 1) % #CANOPY_COLORS + 1],
 		Material = Enum.Material.Fabric,
 	})
-	-- Neon price strip along the counter front.
 	Builder.neon(folder, frame, Vector3.new(10.2, 0.3, 0.2), CFrame.new(0, 3.2, -1.55), color)
-
-	local kiosk = Builder.screen(folder, frame, CFrame.new(2.5, 4.8, 0), Vector3.new(3.4, 2.6, 2), {
+	Builder.screen(folder, frame, CFrame.new(2.5, 4.8, 0), Vector3.new(3.4, 2.6, 2), {
 		Name = "TradeKiosk",
-		Text = string.format("KIOSK %02d\n> TRADE [E]_", index),
+		Text = string.format("KIOSK %02d\n> ONLINE_", index),
 		Tag = Tags.TradeKiosk,
 	})
-	kiosk:SetAttribute("KioskId", index)
-	Builder.prompt(kiosk, "Open Kiosk", string.format("Trade Kiosk %02d", index))
-
-	-- Crates of goods.
 	Builder.part(folder, frame, {
 		Name = "Crate",
 		Size = Vector3.new(2, 2, 2),
@@ -79,95 +70,67 @@ local function stall(folder: Folder, frame: CFrame, index: number, color: Color3
 	})
 end
 
-local function tradeBoard(folder: Folder, origin: CFrame, color: Color3)
-	local z = DEPTH - 8
-	for _, x in { -10, 10 } do
-		Builder.part(folder, origin, {
+local function tradeBoard(folder: Folder, frame: CFrame, color: Color3)
+	for _, x in { -8, 8 } do
+		Builder.part(folder, frame, {
 			Name = "BoardPost",
-			Size = Vector3.new(1.4, 22, 1.4),
-			At = CFrame.new(x, 11, z),
+			Size = Vector3.new(1.2, 18, 1.2),
+			At = CFrame.new(x, 9, 0),
 			Color = C.Chrome,
 			Material = Enum.Material.Metal,
 		})
-		Builder.neon(folder, origin, Vector3.new(1.6, 0.3, 1.6), CFrame.new(x, 20, z), color)
+		Builder.neon(folder, frame, Vector3.new(1.4, 0.3, 1.4), CFrame.new(x, 16.5, 0), color)
 	end
-	Builder.part(folder, origin, {
+	Builder.part(folder, frame, {
 		Name = "BoardBase",
-		Size = Vector3.new(24, 1.5, 4),
-		At = CFrame.new(0, 0.75, z),
+		Size = Vector3.new(19, 1.2, 3),
+		At = CFrame.new(0, 0.6, 0),
 		Color = C.WornStone,
 		Material = Enum.Material.Cobblestone,
 	})
 	Builder.holo(
 		folder,
-		origin,
-		CFrame.new(0, 13, z),
-		Vector3.new(18, 12, 0.3),
+		frame,
+		CFrame.new(0, 10.5, 0),
+		Vector3.new(14.5, 9, 0.3),
 		color,
 		"P2P TRADE LISTINGS\n\n-- NO LISTINGS YET --",
 		Tags.TradeBoard
 	)
 end
 
-function Marketplace.build(folder: Folder, origin: CFrame, color: Color3)
-	Builder.part(folder, origin, {
-		Name = "BazaarFloor",
-		Size = Vector3.new(WIDTH, 1, DEPTH),
-		At = CFrame.new(0, -0.4, DEPTH / 2),
-		Color = C.WornStone,
-		Material = Enum.Material.Cobblestone,
-	})
-	-- Aisle runner.
-	Builder.part(folder, origin, {
-		Name = "Aisle",
-		Size = Vector3.new(10, 0.2, DEPTH - 12),
-		At = CFrame.new(0, 0.2, (DEPTH - 12) / 2),
-		Color = C.Stone,
-		Material = Enum.Material.Slate,
-	})
-
-	-- Low perimeter walls and a grand entrance arch.
-	local hw = WIDTH / 2
-	local low = { Thickness = 2, Color = C.Stone, Battlements = true, Trim = color }
-	Builder.wall(folder, origin, -hw, 0, -8, 0, 4, low)
-	Builder.wall(folder, origin, 8, 0, hw, 0, 4, low)
-	Builder.wall(folder, origin, -hw, DEPTH, hw, DEPTH, 4, low)
-	Builder.wall(folder, origin, -hw, 0, -hw, DEPTH, 4, low)
-	Builder.wall(folder, origin, hw, 0, hw, DEPTH, 4, low)
-	for _, side in { -1, 1 } do
-		Builder.pillar(folder, origin, side * 9, 0, 18, color, { Width = 4 })
-		for _, z in { 3, DEPTH - 3 } do
-			Builder.lamp(folder, origin * CFrame.new(side * (hw - 2), 0, z), 0, 0, C.Amber, 10)
-		end
-	end
-	Builder.part(folder, origin, {
-		Name = "ArchBeam",
-		Size = Vector3.new(24, 3, 4),
-		At = CFrame.new(0, 19.5, 0),
-		Color = C.WornStone,
-		Material = Enum.Material.Cobblestone,
-	})
-	Builder.sign(folder, origin, CFrame.new(0, 19.5, -2.3), Vector3.new(16, 2.6, 0.5), "BAZAAR // EXCHANGE", color)
-
-	-- Two rows of stalls facing the centre aisle.
-	local index = 0
-	for _, z in { 14, 28, 42 } do
-		for _, side in { -1, 1 } do
-			index += 1
-			-- Rotate so the counter (-Z) faces the aisle at x = 0.
-			local frame = origin * CFrame.new(side * 20, 0, z) * CFrame.Angles(0, math.rad(side * 90), 0)
-			stall(folder, frame, index, color)
-		end
+-- `square` is the square's centre on the ground; stalls sit `edge` studs out.
+function Marketplace.build(folder: Folder, square: CFrame, color: Color3, edge: number)
+	local stalls = {
+		-- position (x, z) and the direction the counter faces
+		{ -edge, -22, 1, 0 },
+		{ -edge, 22, 1, 0 },
+		{ edge, 22, -1, 0 },
+		{ -22, edge, 0, -1 },
+		{ 22, edge, 0, -1 },
+		{ -22, -edge, 0, 1 },
+	}
+	for i, s in stalls do
+		stall(folder, Builder.facing(square * Vector3.new(s[1], 0, s[2]), s[3], s[4]), i, color)
 	end
 
-	-- Hovering drone lanterns over the aisle.
-	for _, z in { 10, 22, 34, 46 } do
-		local lantern =
-			Builder.neon(folder, origin, Vector3.new(1.4, 1.4, 1.4), CFrame.new(0, 11, z), color, nil, Tags.Bob)
+	local board = Builder.facing(square * Vector3.new(edge + 1, 0, -22), -1, 0)
+	tradeBoard(folder, board, color)
+	Builder.vendor(folder, board * CFrame.new(3, 0, -5), "Market", Vendors.Market)
+
+	for _, angle in { 0, 90, 180, 270 } do
+		local position = square * (CFrame.Angles(0, math.rad(angle + 45), 0) * Vector3.new(0, 12, -22))
+		local lantern = Builder.neon(
+			folder,
+			CFrame.new(position),
+			Vector3.new(1.3, 1.3, 1.3),
+			CFrame.identity,
+			color,
+			nil,
+			Tags.Bob
+		)
 		lantern.Name = "DroneLantern"
 	end
-
-	tradeBoard(folder, origin, color)
 end
 
 return Marketplace

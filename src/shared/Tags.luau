@@ -6,20 +6,12 @@ return {
 	QuotaTerminal = "QuotaTerminal",
 	VipGate = "VipGate",
 
-	-- Crafting & Cutting
-	CuttingStation = "CuttingStation",
-	LaserCutter = "LaserCutter",
-
 	-- Marketplace
 	TradeKiosk = "TradeKiosk",
 	TradeBoard = "TradeBoard",
 
-	-- Enchanting
-	EnchantAltar = "EnchantAltar",
-
-	-- Arena
-	PvPQueue = "PvPQueue",
-	PvETerminal = "PvETerminal",
+	-- Shopkeepers (models; the torso carries a VendorId attribute)
+	Vendor = "Vendor",
 
 	-- Visual effects (animated on each client)
 	Flicker = "Flicker",

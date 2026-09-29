@@ -1,24 +1,26 @@
--- The kingdom walls: a sixteen-sided curtain wall with round blue-roofed
--- towers, banners, and a gatehouse with a drawbridge over the moat. Also
--- plants the tree-lined avenue to the gate and gardens between the zones.
+-- The town walls: a twelve-sided curtain wall with round blue-roofed towers,
+-- banners, and a gatehouse with a drawbridge over the moat.
 local Builder = require(script.Parent.Builder)
 local Hub = require(script.Parent.Hub)
 
 local C = Builder.Colors
 
-local SIDES = 16
-local RADIUS = 305 -- plaza centre to each corner tower
-local WALL_HEIGHT = 34
+local SIDES = 12
+local APOTHEM = 180 -- town centre to the middle of each wall
+local RADIUS = APOTHEM / math.cos(math.pi / SIDES) -- town centre to each corner tower
+local WALL_HEIGHT = 28
 local WALL_THICKNESS = 8
-local GATE_WIDTH = 22
-local GATE_HEIGHT = 26
-local TOWER_RADIUS = 11
+local GATE_WIDTH = 20
+local GATE_HEIGHT = 22
+local TOWER_RADIUS = 9
 
 local Kingdom = {}
 
+Kingdom.Sides = SIDES
 Kingdom.GateAngle = 180
-Kingdom.Apothem = RADIUS * math.cos(math.pi / SIDES) -- plaza centre to the middle of each wall
-Kingdom.MoatDistance = Kingdom.Apothem + 18
+Kingdom.Apothem = APOTHEM
+Kingdom.InnerFace = APOTHEM - WALL_THICKNESS / 2
+Kingdom.MoatDistance = APOTHEM + 18
 
 local function corner(k: number): Vector3
 	local angle = math.rad(360 / SIDES * (k + 0.5))
@@ -256,116 +258,22 @@ local function gatehouse(folder: Folder, frame: CFrame)
 	end
 end
 
--- True when a spot inside the walls is free of buildings, roads and the plaza.
-local function isClear(position: Vector3, margin: number, zones, roadEnds: { [number]: number }): boolean
-	local flat = Vector3.new(position.X, 0, position.Z)
-	local r = flat.Magnitude
-	if r < Hub.PlazaRadius + margin or r > Kingdom.Apothem - WALL_THICKNESS - margin - 6 then
-		return false
-	end
-	for _, zone in zones do
-		local footprint = require(zone.Module).Footprint
-		local p = zone.Origin:PointToObjectSpace(Vector3.new(position.X, zone.Origin.Y, position.Z))
-		if
-			p.X > footprint.MinX - margin
-			and p.X < footprint.MaxX + margin
-			and p.Z > footprint.MinZ - margin
-			and p.Z < footprint.MaxZ + margin
-		then
-			return false
-		end
-	end
-	for angle, roadEnd in roadEnds do
-		local p = Hub.radial(angle):PointToObjectSpace(flat)
-		if -p.Z > 0 and -p.Z < roadEnd + margin and math.abs(p.X) < 7 + margin then
-			return false
-		end
-	end
-	return true
-end
-
-local function gardens(folder: Folder, zones, zoneDistance: number)
-	local rng = Random.new(42)
-	local roadEnds = { [Kingdom.GateAngle] = Kingdom.Apothem }
-	for _, zone in zones do
-		roadEnds[zone.Angle] = zoneDistance
-	end
-
-	local trees = {}
-	local function spaced(position: Vector3, gap: number): boolean
-		for _, other in trees do
-			if (other - position).Magnitude < gap then
-				return false
-			end
-		end
-		return true
-	end
-
-	-- Tree-lined avenue from the plaza to the main gate.
-	local gateFrame = Hub.radial(Kingdom.GateAngle)
-	for r = Hub.PlazaRadius + 20, Kingdom.Apothem - 24, 24 do
-		for _, side in { -1, 1 } do
-			local position = gateFrame * Vector3.new(side * 16, 0.5, -r)
-			Builder.tree(folder, position, 1.1, rng)
-			table.insert(trees, position)
-		end
-	end
-
-	-- Trees scattered through the open ground between zones.
-	local placed, attempts = 0, 0
-	while placed < 45 and attempts < 800 do
-		attempts += 1
-		local angle = rng:NextNumber(0, 2 * math.pi)
-		local r = math.sqrt(rng:NextNumber((Hub.PlazaRadius + 10) ^ 2, Kingdom.Apothem ^ 2))
-		local position = Vector3.new(r * math.sin(angle), 0.5, -r * math.cos(angle))
-		if isClear(position, 7, zones, roadEnds) and spaced(position, 14) then
-			Builder.tree(folder, position, rng:NextNumber(0.9, 1.4), rng)
-			table.insert(trees, position)
-			placed += 1
-		end
-	end
-
-	-- Flower beds.
-	placed, attempts = 0, 0
-	while placed < 14 and attempts < 400 do
-		attempts += 1
-		local angle = rng:NextNumber(0, 2 * math.pi)
-		local r = rng:NextNumber(Hub.PlazaRadius + 12, Kingdom.Apothem - 30)
-		local position = Vector3.new(r * math.sin(angle), 0.5, -r * math.cos(angle))
-		if isClear(position, 5, zones, roadEnds) and spaced(position, 9) then
-			local at = CFrame.new(position) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0)
-			Builder.planter(folder, CFrame.identity, at, 8, rng)
-			table.insert(trees, position)
-			placed += 1
-		end
-	end
-end
-
-function Kingdom.build(parent: Instance, zones, zoneDistance: number): Folder
-	local folder = Builder.folder(parent, "Kingdom")
-	local walls = Builder.folder(folder, "Walls")
+function Kingdom.build(parent: Instance): Folder
+	local folder = Builder.folder(parent, "Walls")
 
 	for k = 0, SIDES - 1 do
 		local a, b = corner(k), corner(k + 1)
 		local midAngle = (k + 1) * 360 / SIDES
-		-- Frame at the middle of this side, -Z facing out of the kingdom.
+		-- Frame at the middle of this side, -Z facing out of the town.
 		local frame = Hub.radial(midAngle) * CFrame.new(0, 0, -Kingdom.Apothem)
 		local isGate = midAngle % 360 == Kingdom.GateAngle
-		wallSide(walls, frame, (b - a).Magnitude, isGate)
-		tower(walls, a)
+		wallSide(folder, frame, (b - a).Magnitude, isGate)
+		tower(folder, a)
 		if isGate then
-			gatehouse(walls, frame)
+			gatehouse(folder, frame)
 		end
 	end
 
-	Hub.road(folder, {
-		Name = "Gate",
-		Title = "MAIN GATE",
-		Angle = Kingdom.GateAngle,
-		Color = C.Gold,
-	}, Kingdom.Apothem - WALL_THICKNESS / 2)
-
-	gardens(Builder.folder(folder, "Gardens"), zones, zoneDistance)
 	return folder
 end
 

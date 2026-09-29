@@ -1,249 +1,225 @@
--- Zone 1: Mining Building / Introduction Zone.
--- A stone gatehouse opening onto a rugged, neon-lit quarry. Static gem node
--- spawners dot the floor and ledges, a CRT terminal checks the daily quota,
--- and an energy gate at the back leads to the VIP quarry.
-local Tags = require(game:GetService("ReplicatedStorage").Shared.Tags)
+-- Mining Guild and the quarry at the end of the north road.
+-- The guild is a stone shopfront with Foreman Garrick outside, a mine cart
+-- and the daily quota terminal. The walled quarry holds static gem node
+-- spawners, with an energy gate at the back leading to the VIP pit.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Tags = require(ReplicatedStorage.Shared.Tags)
+local Vendors = require(ReplicatedStorage.Shared.Vendors)
 local Builder = require(script.Parent.Parent.Builder)
 
 local C = Builder.Colors
 
-local WIDTH = 100
-local QUARRY_DEPTH = 100 -- main quarry runs z = 0..100
-local VIP_DEPTH = 32 -- VIP quarry behind the energy gate
-local GATE_WIDTH = 16
+local QUARRY_HALF_WIDTH = 40
+local QUARRY_DEPTH = 55 -- main quarry runs z = 0..55 in the quarry frame
+local VIP_HALF_WIDTH = 20
+local VIP_DEPTH = 22
+local GATE_HALF_WIDTH = 7
 
 local Mining = {}
 
--- Area the zone occupies in its local space, kept clear of trees and flowers.
-Mining.Footprint = { MinX = -64, MaxX = 64, MinZ = -4, MaxZ = 146 }
+Mining.QuarryDepth = QUARRY_DEPTH + VIP_DEPTH
 
-local function nodeSpawner(folder: Folder, origin: CFrame, x: number, y: number, z: number, isVip: boolean)
-	local color = if isVip then C.Magenta else C.Cyan
+local function nodeSpawner(folder: Folder, origin: CFrame, x: number, z: number, isVip: boolean)
 	local pad = Builder.disc(folder, origin, {
 		Name = "NodeSpawner",
 		Radius = 2.2,
 		Height = 0.4,
-		At = CFrame.new(x, y + 0.2, z),
+		At = CFrame.new(x, 0.7, z),
 		Color = C.Iron,
 		Material = Enum.Material.DiamondPlate,
 		Tag = Tags.NodeSpawner,
 	})
 	pad:SetAttribute("VIP", isVip)
-	Builder.neonBand(folder, origin, Vector3.new(x, y + 0.15, z), 2.35, color)
+	Builder.neonBand(folder, origin, Vector3.new(x, 0.65, z), 2.35, if isVip then C.Magenta else C.Cyan)
 end
 
-local function ledge(folder: Folder, origin: CFrame, x: number, z1: number, z2: number, height: number)
-	local depth = z2 - z1
-	Builder.part(folder, origin, {
-		Name = "Ledge",
-		Size = Vector3.new(16, height, depth),
-		At = CFrame.new(x, height / 2, (z1 + z2) / 2),
-		Color = C.DarkStone,
-		Material = Enum.Material.Rock,
+local function mineCart(folder: Folder, frame: CFrame)
+	Builder.part(folder, frame, {
+		Name = "MineCart",
+		Size = Vector3.new(5, 2.6, 3),
+		At = CFrame.new(0, 2.1, 0),
+		Color = C.Iron,
+		Material = Enum.Material.CorrodedMetal,
 	})
-	-- Ramp up from the quarry floor at the near end.
-	Builder.part(folder, origin, {
-		Class = "WedgePart",
-		Name = "Ramp",
-		Size = Vector3.new(8, height, 10),
-		At = CFrame.new(x, height / 2, z1 - 5),
-		Color = C.DarkStone,
-		Material = Enum.Material.Rock,
-	})
-	Builder.neon(folder, origin, Vector3.new(16, 0.2, 0.4), CFrame.new(x, height + 0.05, z1 + 0.3), C.Cyan)
-end
-
-local function cliffLine(folder: Folder, origin: CFrame, rng: Random, points: { Vector3 })
-	for _, point in points do
-		local height = rng:NextNumber(16, 28)
-		Builder.rock(
+	for _, x in { -1.7, 1.7 } do
+		for _, z in { -1.6, 1.6 } do
+			Builder.part(folder, frame, {
+				Name = "Wheel",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.4, 1.6, 1.6),
+				At = CFrame.new(x, 0.8, z) * CFrame.Angles(0, math.rad(90), 0),
+				Color = C.DarkWood,
+				Material = Enum.Material.Wood,
+				CastShadow = false,
+			})
+		end
+	end
+	for i, color in { C.Cyan, C.Magenta, C.Green } do
+		Builder.neon(
 			folder,
-			origin,
-			point + Vector3.new(0, height / 2 - 2, 0),
-			Vector3.new(rng:NextNumber(10, 16), height, rng:NextNumber(10, 16)),
-			rng
+			frame,
+			Vector3.new(1, 1.6, 1),
+			CFrame.new(-1.5 + (i - 1) * 1.5, 3.6, 0) * CFrame.Angles(0, 0, math.rad(15 * (i - 2))),
+			color
 		)
 	end
 end
 
-local function gatehouse(folder: Folder, origin: CFrame)
-	Builder.wallWithDoor(folder, origin, -WIDTH / 2 + 4, 0, WIDTH / 2 - 4, 0, 18, 14, 12, {
-		Thickness = 4,
-		Color = C.DarkStone,
-		Battlements = true,
-		Trim = C.Cyan,
+function Mining.buildGuild(folder: Folder, frame: CFrame, color: Color3)
+	Builder.house(folder, frame, {
+		Name = "MiningGuild",
+		Width = 34,
+		Depth = 22,
+		Floors = 2,
+		Stone = C.DarkStone,
+		Roof = C.RoofBlue,
+		Trim = color,
 	})
-	for _, side in { -1, 1 } do
-		Builder.pillar(folder, origin, side * (WIDTH / 2), 0, 26, C.Cyan, {
-			Width = 9,
-			Color = C.DarkStone,
-		})
-		Builder.torch(folder, origin, CFrame.new(side * 10, 8, -2.6), C.Cyan)
-	end
-	Builder.sign(folder, origin, CFrame.new(0, 15, -2.3), Vector3.new(18, 3.4, 0.6), "MINE // SECTOR 01", C.Cyan)
-end
+	Builder.sign(folder, frame, CFrame.new(0, 8.8, -0.6), Vector3.new(14, 2, 0.5), "MINING GUILD", color)
 
-local function quotaTerminal(folder: Folder, origin: CFrame)
-	local x, z = -14, 14
-	Builder.part(folder, origin, {
-		Name = "TerminalDesk",
-		Size = Vector3.new(7, 3, 4),
-		At = CFrame.new(x, 1.5, z),
+	-- Foreman Garrick, with the quota terminal beside him.
+	Builder.vendor(folder, frame * CFrame.new(5, 0.5, -6), "Mining", Vendors.Mining)
+	Builder.part(folder, frame, {
+		Name = "TerminalPedestal",
+		Size = Vector3.new(3.4, 3, 2.4),
+		At = CFrame.new(10, 2, -3),
 		Color = C.WornStone,
 		Material = Enum.Material.Cobblestone,
 	})
-	local monitor = Builder.screen(folder, origin, CFrame.new(x, 5.4, z), Vector3.new(6, 4.8, 3), {
+	Builder.screen(folder, frame, CFrame.new(10, 5.3, -3), Vector3.new(4.6, 3.6, 2.4), {
 		Name = "QuotaTerminal",
-		Text = "DAILY QUOTA\n> PRESS [E]_",
+		Text = "DAILY QUOTA\n> ASK GARRICK_",
 		Tag = Tags.QuotaTerminal,
 	})
-	Builder.prompt(monitor, "Check Quota", "Quota Terminal")
-	Builder.neon(folder, origin, Vector3.new(7.2, 0.3, 4.2), CFrame.new(x, 3.05, z), C.Cyan)
+
+	mineCart(folder, frame * CFrame.new(-10, 0.5, -4))
+	for i, offset in { Vector3.new(-15, 1.5, -2.5), Vector3.new(-15, 4.5, -2.5), Vector3.new(-12.4, 1.5, -2) } do
+		Builder.part(folder, frame, {
+			Name = "Crate",
+			Size = Vector3.new(3, 3, 3),
+			At = CFrame.new(offset) * CFrame.Angles(0, math.rad(i * 12), 0),
+			Color = C.Wood,
+			Material = Enum.Material.WoodPlanks,
+		})
+	end
 end
 
-local function energyGate(folder: Folder, origin: CFrame)
-	local z = QUARRY_DEPTH
+function Mining.buildQuarry(folder: Folder, frame: CFrame, color: Color3)
+	local rng = Random.new(1337)
+	local w, vw = QUARRY_HALF_WIDTH, VIP_HALF_WIDTH
+	local back = QUARRY_DEPTH + VIP_DEPTH
+
+	-- Rock walls, leaving the entrance and the energy gate open.
+	local rock = { Thickness = 3, Color = C.DarkStone, Material = Enum.Material.Rock }
+	Builder.wall(folder, frame, -w, 0, -GATE_HALF_WIDTH - 2, 0, 14, rock)
+	Builder.wall(folder, frame, GATE_HALF_WIDTH + 2, 0, w, 0, 14, rock)
+	Builder.wall(folder, frame, -w, 0, -w, QUARRY_DEPTH, 14, rock)
+	Builder.wall(folder, frame, w, 0, w, QUARRY_DEPTH, 14, rock)
+	Builder.wall(folder, frame, -w, QUARRY_DEPTH, -GATE_HALF_WIDTH - 2, QUARRY_DEPTH, 14, rock)
+	Builder.wall(folder, frame, GATE_HALF_WIDTH + 2, QUARRY_DEPTH, w, QUARRY_DEPTH, 14, rock)
+	Builder.wall(folder, frame, -vw, QUARRY_DEPTH, -vw, back, 14, rock)
+	Builder.wall(folder, frame, vw, QUARRY_DEPTH, vw, back, 14, rock)
+	Builder.wall(folder, frame, -vw, back, vw, back, 14, rock)
+
+	-- Boulders along the inside of the walls for a rugged look.
+	local boulders = {}
+	for z = 8, QUARRY_DEPTH - 6, 11 do
+		table.insert(boulders, Vector3.new(-w + 3, 0, z))
+		table.insert(boulders, Vector3.new(w - 3, 0, z))
+	end
+	for _, x in { -30, -18, 18, 30 } do
+		table.insert(boulders, Vector3.new(x, 0, QUARRY_DEPTH - 3))
+	end
+	for _, z in { QUARRY_DEPTH + 8, back - 6 } do
+		table.insert(boulders, Vector3.new(-vw + 3, 0, z))
+		table.insert(boulders, Vector3.new(vw - 3, 0, z))
+	end
+	for _, point in boulders do
+		local height = rng:NextNumber(8, 15)
+		Builder.rock(
+			folder,
+			frame,
+			point + Vector3.new(0, height / 2 - 1, 0),
+			Vector3.new(rng:NextNumber(6, 9), height, rng:NextNumber(6, 9)),
+			rng
+		)
+	end
+
+	-- Entrance arch.
 	for _, side in { -1, 1 } do
-		Builder.pillar(folder, origin, side * (GATE_WIDTH / 2 + 2), z, 22, C.Magenta, {
+		Builder.pillar(folder, frame, side * (GATE_HALF_WIDTH + 2), 0, 18, color, {
+			Width = 4,
+			Color = C.DarkStone,
+		})
+	end
+	Builder.part(folder, frame, {
+		Name = "ArchBeam",
+		Size = Vector3.new(GATE_HALF_WIDTH * 2 + 8, 2.5, 4),
+		At = CFrame.new(0, 19, 0),
+		Color = C.DarkStone,
+		Material = Enum.Material.Cobblestone,
+	})
+	Builder.sign(folder, frame, CFrame.new(0, 19, -2.3), Vector3.new(12, 2.2, 0.5), "QUARRY", color)
+
+	-- Work lamps and glowing cables.
+	for _, side in { -1, 1 } do
+		Builder.lamp(folder, frame * CFrame.new(side * (w - 9), 0.5, 6), 0, 0, color, 10)
+		Builder.neon(
+			folder,
+			frame,
+			Vector3.new(0.4, 0.4, QUARRY_DEPTH - 12),
+			CFrame.new(side * (w - 8), 0.7, QUARRY_DEPTH / 2),
+			color
+		)
+	end
+
+	-- Static node spawners: nodes do not regenerate once mined.
+	local spawns = {
+		{ -24, 14 },
+		{ 0, 12 },
+		{ 24, 14 },
+		{ -12, 25 },
+		{ 12, 25 },
+		{ -28, 36 },
+		{ 0, 37 },
+		{ 28, 36 },
+		{ -14, 47 },
+		{ 14, 47 },
+	}
+	for _, spot in spawns do
+		nodeSpawner(folder, frame, spot[1], spot[2], false)
+	end
+	for _, spot in { { -10, 62 }, { 10, 62 }, { -10, 71 }, { 10, 71 } } do
+		nodeSpawner(folder, frame, spot[1], spot[2], true)
+	end
+
+	-- Energy gate to the VIP pit.
+	for _, side in { -1, 1 } do
+		Builder.pillar(folder, frame, side * (GATE_HALF_WIDTH + 2), QUARRY_DEPTH, 18, C.Magenta, {
 			Width = 4,
 			Color = C.Obsidian,
 			Material = Enum.Material.Basalt,
 		})
-		-- Emitter coils facing the field.
-		for _, y in { 4, 10, 16 } do
-			Builder.part(folder, origin, {
-				Name = "GateCoil",
-				Size = Vector3.new(1, 1.2, 1.2),
-				At = CFrame.new(side * (GATE_WIDTH / 2 - 0.4), y, z),
-				Color = C.Chrome,
-				Material = Enum.Material.Metal,
-			})
-		end
 	end
-	Builder.part(folder, origin, {
-		Name = "GateLintel",
-		Size = Vector3.new(GATE_WIDTH + 8, 3, 4),
-		At = CFrame.new(0, 23.5, z),
-		Color = C.Obsidian,
-		Material = Enum.Material.Basalt,
-	})
 	Builder.sign(
 		folder,
-		origin,
-		CFrame.new(0, 23.5, z - 2.3),
-		Vector3.new(16, 2.4, 0.5),
+		frame,
+		CFrame.new(0, 16.5, QUARRY_DEPTH - 0.5),
+		Vector3.new(12, 2, 0.5),
 		"VIP // AUTHORIZED",
 		C.Magenta
 	)
-
-	Builder.part(folder, origin, {
+	Builder.part(folder, frame, {
 		Name = "EnergyGate",
-		Size = Vector3.new(GATE_WIDTH, 22, 1),
-		At = CFrame.new(0, 11, z),
+		Size = Vector3.new(GATE_HALF_WIDTH * 2, 15, 1),
+		At = CFrame.new(0, 8, QUARRY_DEPTH),
 		Color = C.Magenta,
 		Material = Enum.Material.ForceField,
 		Transparency = 0.1,
 		CastShadow = false,
 		Tag = Tags.VipGate,
 	})
-end
-
-function Mining.build(folder: Folder, origin: CFrame)
-	local rng = Random.new(1337)
-	local totalDepth = QUARRY_DEPTH + VIP_DEPTH
-
-	Builder.part(folder, origin, {
-		Name = "QuarryFloor",
-		Size = Vector3.new(WIDTH, 1, totalDepth),
-		At = CFrame.new(0, -0.4, totalDepth / 2),
-		Color = C.DarkStone,
-		Material = Enum.Material.Ground,
-	})
-	-- VIP floor: glowing magenta grid.
-	for x = -12, 12, 6 do
-		Builder.neon(
-			folder,
-			origin,
-			Vector3.new(0.3, 0.1, VIP_DEPTH - 2),
-			CFrame.new(x, 0.15, QUARRY_DEPTH + VIP_DEPTH / 2),
-			C.Magenta
-		)
-	end
-
-	gatehouse(folder, origin)
-
-	-- Rugged cliff walls around the quarry, leaving a gap for the energy gate.
-	local cliff = {}
-	for z = 8, QUARRY_DEPTH, 11 do
-		table.insert(cliff, Vector3.new(-WIDTH / 2 - 2, 0, z))
-		table.insert(cliff, Vector3.new(WIDTH / 2 + 2, 0, z))
-	end
-	for x = -WIDTH / 2 + 6, WIDTH / 2 - 6, 11 do
-		if math.abs(x) > GATE_WIDTH / 2 + 8 then
-			table.insert(cliff, Vector3.new(x, 0, QUARRY_DEPTH + 2))
-		end
-	end
-	-- VIP quarry walls.
-	for z = QUARRY_DEPTH + 8, totalDepth, 10 do
-		table.insert(cliff, Vector3.new(-24, 0, z))
-		table.insert(cliff, Vector3.new(24, 0, z))
-	end
-	for x = -18, 18, 12 do
-		table.insert(cliff, Vector3.new(x, 0, totalDepth + 4))
-	end
-	cliffLine(folder, origin, rng, cliff)
-
-	-- Solid walls behind the rocks so nobody can slip around the energy gate.
-	local wallProps = { Thickness = 3, Color = C.DarkStone, Material = Enum.Material.Rock }
-	Builder.wall(folder, origin, -WIDTH / 2, 2, -WIDTH / 2, QUARRY_DEPTH, 16, wallProps)
-	Builder.wall(folder, origin, WIDTH / 2, 2, WIDTH / 2, QUARRY_DEPTH, 16, wallProps)
-	Builder.wall(folder, origin, -WIDTH / 2, QUARRY_DEPTH, -GATE_WIDTH / 2 - 2, QUARRY_DEPTH, 16, wallProps)
-	Builder.wall(folder, origin, GATE_WIDTH / 2 + 2, QUARRY_DEPTH, WIDTH / 2, QUARRY_DEPTH, 16, wallProps)
-	Builder.wall(folder, origin, -22, QUARRY_DEPTH, -22, totalDepth, 16, wallProps)
-	Builder.wall(folder, origin, 22, QUARRY_DEPTH, 22, totalDepth, 16, wallProps)
-	Builder.wall(folder, origin, -22, totalDepth, 22, totalDepth, 16, wallProps)
-
-	-- Neon cables and work lights embedded in the rock.
-	for _, side in { -1, 1 } do
-		local x = side * (WIDTH / 2 - 7)
-		Builder.neon(
-			folder,
-			origin,
-			Vector3.new(0.4, 0.4, QUARRY_DEPTH - 10),
-			CFrame.new(x, 0.3, QUARRY_DEPTH / 2 + 5),
-			C.Cyan
-		)
-		for _, z in { 18, 92 } do
-			Builder.lamp(folder, origin * CFrame.new(x, 0, z), 0, 0, C.Cyan, 10)
-		end
-	end
-
-	ledge(folder, origin, -34, 40, 80, 5)
-	ledge(folder, origin, 34, 40, 80, 5)
-
-	-- Static node spawners (nodes do not regenerate once mined).
-	local floorSpawns = {
-		{ -16, 30 },
-		{ 0, 36 },
-		{ 16, 30 },
-		{ -10, 55 },
-		{ 10, 55 },
-		{ 0, 72 },
-		{ -18, 86 },
-		{ 18, 86 },
-	}
-	for _, spot in floorSpawns do
-		nodeSpawner(folder, origin, spot[1], 0.1, spot[2], false)
-	end
-	for _, spot in { { -34, 50 }, { -34, 70 }, { 34, 50 }, { 34, 70 } } do
-		nodeSpawner(folder, origin, spot[1], 5, spot[2], false)
-	end
-	for _, spot in { { -10, 112 }, { 10, 112 }, { -10, 124 }, { 10, 124 } } do
-		nodeSpawner(folder, origin, spot[1], 0.1, spot[2], true)
-	end
-
-	quotaTerminal(folder, origin)
-	energyGate(folder, origin)
 end
 
 return Mining

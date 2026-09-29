@@ -1,4 +1,4 @@
--- Terrain around the kingdom: a grassy plain, the moat, rolling hills,
+-- Terrain around the town: a grassy plain, the moat, rolling hills,
 -- a ring of snow-capped mountains on the horizon, a dirt road leading out
 -- of the main gate, and trees scattered across the countryside.
 local Builder = require(script.Parent.Builder)
@@ -12,6 +12,12 @@ local MOAT_WIDTH = 22
 local ROAD_LENGTH = 420
 
 local Landscape = {}
+
+-- Repaints the ground surface inside a flat rectangle (centre, size in X/Z)
+-- with another terrain material, keeping the ground level unchanged.
+function Landscape.paint(center: Vector3, sizeX: number, sizeZ: number, material: Enum.Material)
+	Terrain:FillBlock(CFrame.new(center.X, GROUND_TOP - 2, center.Z), Vector3.new(sizeX, 4, sizeZ), material)
+end
 
 local function angleFrom(angle: number, target: number): number
 	local diff = math.abs(angle - target) % 360
@@ -28,11 +34,11 @@ local function styleTerrain()
 	Terrain.WaterWaveSpeed = 6
 end
 
-local function moat(moatDistance: number)
+local function moat(moatDistance: number, sides: number)
 	-- One straight trench per wall side; overlapping ends close the corners.
-	local length = 2 * moatDistance * math.tan(math.pi / 16) + 10
-	for k = 1, 16 do
-		local frame = Hub.radial(k * 22.5) * CFrame.new(0, 0, -moatDistance)
+	local length = 2 * moatDistance * math.tan(math.pi / sides) + 10
+	for k = 1, sides do
+		local frame = Hub.radial(k * 360 / sides) * CFrame.new(0, 0, -moatDistance)
 		Terrain:FillBlock(frame * CFrame.new(0, -2.5, 0), Vector3.new(length, 8, MOAT_WIDTH), Enum.Material.Air)
 		Terrain:FillBlock(frame * CFrame.new(0, -4.5, 0), Vector3.new(length, 4, MOAT_WIDTH), Enum.Material.Water)
 		Terrain:FillBlock(frame * CFrame.new(0, -7.5, 0), Vector3.new(length, 2, MOAT_WIDTH), Enum.Material.Mud)
@@ -97,7 +103,7 @@ local function forest(folder: Folder, rng: Random, gateAngle: number, innerRadiu
 	end
 end
 
-function Landscape.build(parent: Instance, moatDistance: number, gateAngle: number): Folder
+function Landscape.build(parent: Instance, moatDistance: number, sides: number, gateAngle: number): Folder
 	local folder = Builder.folder(parent, "Landscape")
 	local rng = Random.new(2024)
 	local outside = moatDistance + MOAT_WIDTH / 2 + 30
@@ -114,7 +120,7 @@ function Landscape.build(parent: Instance, moatDistance: number, gateAngle: numb
 			)
 		end
 	end
-	moat(moatDistance)
+	moat(moatDistance, sides)
 	hills(rng, gateAngle, outside + 40)
 	mountains(rng)
 	road(folder, gateAngle, moatDistance + MOAT_WIDTH / 2)
