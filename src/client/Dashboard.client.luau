@@ -24,6 +24,7 @@ end
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local CutFlow = require(script.Parent.Modules.CutFlow)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
+local GemArt = require(script.Parent.Modules.GemArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local InventoryUI = require(script.Parent.Modules.InventoryUI)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -585,9 +586,14 @@ local function gemCard(gem, order: number)
 		Rotation = 90,
 		Color = ColorSequence.new(tier:Lerp(Color3.new(0, 0, 0), 0.45), tier:Lerp(Color3.new(0, 0, 0), 0.8)),
 	}, card)
-	local swatch = UiKit.swatch(card, GemConfig.shade(gem), 34)
-	swatch.AnchorPoint = Vector2.new(0.5, 0)
-	swatch.Position = UDim2.new(0.5, 0, 0, 12)
+	-- The stone itself, in 3D.
+	local gemStage = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 2),
+		Size = UDim2.fromOffset(60, 52),
+	}, card)
+	GemArt.viewport(gemStage, gem, false)
 	local state = if gem.Cut then "CUT " .. gem.Cut else "ROUGH"
 	local tag = label(card, state, 11, if gem.Cut then P.Gold else LIGHT, CHUNKY)
 	place(tag, 4, 52, 90, 14)
