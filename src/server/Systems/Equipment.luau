@@ -11,13 +11,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local ArmorKits = require(script.Parent.ArmorKits)
 local PlayerData = require(script.Parent.PlayerData)
 
 local FOLDER_NAME = "GemsoulGear"
 
 local Equipment = {}
-
-type Palette = { Main: Color3, Trim: Color3, Accent: Color3, Material: Enum.Material }
 
 local STEEL = Color3.fromRGB(165, 170, 180)
 local IRON = Color3.fromRGB(95, 98, 106)
@@ -27,10 +26,6 @@ local DARK_WOOD = Color3.fromRGB(70, 48, 32)
 -- Body parts, R15 first then R6.
 local function bodyPart(character: Model, r15: string, r6: string): BasePart?
 	return (character:FindFirstChild(r15) or character:FindFirstChild(r6)) :: BasePart?
-end
-
-local function isR6(character: Model): boolean
-	return character:FindFirstChild("Torso") ~= nil
 end
 
 local function piece(
@@ -67,217 +62,6 @@ local function neon(folder: Instance, anchor: BasePart, cframe: CFrame, size: Ve
 	local part = piece(folder, anchor, cframe, size, color, Enum.Material.Neon)
 	part.CastShadow = false
 	return part
-end
-
--- Armor ------------------------------------------------------------------------------
-
-local ARMOR_PALETTES: { [string]: Palette } = {
-	Plate = { Main = STEEL, Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
-	Scale = { Main = Color3.fromRGB(140, 146, 152), Trim = IRON, Accent = STEEL, Material = Enum.Material.DiamondPlate },
-	Chain = {
-		Main = Color3.fromRGB(120, 124, 130),
-		Trim = DARK_WOOD,
-		Accent = STEEL,
-		Material = Enum.Material.CorrodedMetal,
-	},
-	Bulwark = { Main = STEEL, Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
-	TowerPlate = { Main = Color3.fromRGB(120, 124, 134), Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
-	Vanguard = { Main = Color3.fromRGB(190, 194, 204), Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
-	Robe = {
-		Main = Color3.fromRGB(70, 60, 120),
-		Trim = Color3.fromRGB(200, 180, 110),
-		Accent = STEEL,
-		Material = Enum.Material.Fabric,
-	},
-	WardedRobe = {
-		Main = Color3.fromRGB(40, 36, 80),
-		Trim = Color3.fromRGB(200, 180, 110),
-		Accent = STEEL,
-		Material = Enum.Material.Fabric,
-	},
-	Wraps = {
-		Main = Color3.fromRGB(200, 196, 214),
-		Trim = Color3.fromRGB(90, 80, 150),
-		Accent = STEEL,
-		Material = Enum.Material.Fabric,
-	},
-	Leather = { Main = Color3.fromRGB(120, 80, 48), Trim = DARK_WOOD, Accent = IRON, Material = Enum.Material.Leather },
-	StuddedLeather = {
-		Main = Color3.fromRGB(96, 64, 40),
-		Trim = DARK_WOOD,
-		Accent = STEEL,
-		Material = Enum.Material.Leather,
-	},
-	ShadowLeather = {
-		Main = Color3.fromRGB(44, 44, 52),
-		Trim = Color3.fromRGB(24, 24, 30),
-		Accent = IRON,
-		Material = Enum.Material.Leather,
-	},
-}
-
-local HEAVY = { Plate = true, Scale = true, Chain = true, Bulwark = true, TowerPlate = true, Vanguard = true }
-local ROBES = { Robe = true, WardedRobe = true, Wraps = true }
-
-local function helmet(folder: Instance, head: BasePart, look: string, palette: Palette, accent: Color3)
-	local h = head.Size
-	if HEAVY[look] then
-		-- Cap covering the top of the head, cheek guards, and a glowing visor band.
-		piece(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.3, 0.04),
-			Vector3.new(h.X * 1.14, h.Y * 0.5, h.Z * 1.14),
-			palette.Main,
-			palette.Material
-		)
-		for _, side in { -1, 1 } do
-			piece(
-				folder,
-				head,
-				CFrame.new(side * h.X * 0.55, -h.Y * 0.05, 0.05),
-				Vector3.new(h.X * 0.1, h.Y * 0.55, h.Z * 0.9),
-				palette.Main,
-				palette.Material
-			)
-		end
-		neon(folder, head, CFrame.new(0, h.Y * 0.1, -h.Z * 0.56), Vector3.new(h.X * 1.02, h.Y * 0.08, 0.06), accent)
-		if look == "TowerPlate" or look == "Bulwark" then
-			piece(
-				folder,
-				head,
-				CFrame.new(0, h.Y * 0.62, 0.1),
-				Vector3.new(0.2, h.Y * 0.3, h.Z * 0.9),
-				accent,
-				Enum.Material.Fabric
-			)
-		end
-	elseif ROBES[look] then
-		-- A hood pulled back from the face.
-		piece(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.12, h.Z * 0.18),
-			Vector3.new(h.X * 1.22, h.Y * 1.05, h.Z * 1.0),
-			palette.Main,
-			palette.Material
-		)
-		neon(folder, head, CFrame.new(0, h.Y * 0.55, -h.Z * 0.3), Vector3.new(h.X * 1.0, 0.06, 0.06), accent)
-	else
-		-- Leather hood/cap.
-		piece(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.3, h.Z * 0.12),
-			Vector3.new(h.X * 1.14, h.Y * 0.55, h.Z * 1.0),
-			palette.Main,
-			palette.Material
-		)
-	end
-end
-
-local function chest(folder: Instance, torso: BasePart, look: string, palette: Palette, accent: Color3)
-	local t = torso.Size
-	local depth = if HEAVY[look] then 1.3 else 1.18
-	piece(
-		folder,
-		torso,
-		CFrame.new(0, 0.05, 0),
-		Vector3.new(t.X * 1.08, t.Y * 0.96, t.Z * depth),
-		palette.Main,
-		palette.Material
-	)
-	-- Glowing class stripe down the front: the retro-futuristic touch.
-	neon(folder, torso, CFrame.new(0, 0.05, -t.Z * depth / 2 - 0.02), Vector3.new(0.12, t.Y * 0.8, 0.05), accent)
-	if look == "StuddedLeather" then
-		for _, x in { -0.3, 0.3 } do
-			for _, y in { -0.25, 0.25 } do
-				piece(
-					folder,
-					torso,
-					CFrame.new(t.X * x, t.Y * y, -t.Z * depth / 2),
-					Vector3.one * 0.18,
-					palette.Accent,
-					Enum.Material.Metal,
-					Enum.PartType.Ball
-				)
-			end
-		end
-	elseif look == "WardedRobe" then
-		for _, y in { -0.2, 0.15 } do
-			neon(
-				folder,
-				torso,
-				CFrame.new(0, t.Y * y, -t.Z * depth / 2 - 0.02),
-				Vector3.new(t.X * 0.7, 0.06, 0.05),
-				accent
-			)
-		end
-	end
-end
-
-local function shoulders(folder: Instance, character: Model, look: string, palette: Palette, accent: Color3)
-	if ROBES[look] or look == "Chain" or look == "ShadowLeather" then
-		return
-	end
-	local big = look == "TowerPlate" or look == "Bulwark"
-	for _, side in { "Left", "Right" } do
-		local arm = bodyPart(character, side .. "UpperArm", side .. " Arm")
-		if arm then
-			local a = arm.Size
-			local top = if isR6(character) then a.Y * 0.4 else a.Y * 0.35
-			local scale = if big then 1.7 elseif HEAVY[look] then 1.45 else 1.25
-			local out = if side == "Left" then -0.12 else 0.12
-			piece(
-				folder,
-				arm,
-				CFrame.new(out, top, 0),
-				Vector3.new(a.X * scale, 0.5, a.Z * scale),
-				palette.Main,
-				palette.Material
-			)
-			if HEAVY[look] then
-				neon(
-					folder,
-					arm,
-					CFrame.new(out, top - 0.27, 0),
-					Vector3.new(a.X * scale + 0.02, 0.07, a.Z * scale + 0.02),
-					accent
-				)
-			end
-		end
-	end
-end
-
-local function waist(folder: Instance, character: Model, look: string, palette: Palette, accent: Color3)
-	local lower = bodyPart(character, "LowerTorso", "Torso")
-	if not lower then
-		return
-	end
-	local l = lower.Size
-	local y = if isR6(character) then -l.Y * 0.45 else 0
-	piece(
-		folder,
-		lower,
-		CFrame.new(0, y, 0),
-		Vector3.new(l.X * 1.12, 0.35, l.Z * 1.35),
-		palette.Trim,
-		Enum.Material.Leather
-	)
-	if look == "Robe" or look == "WardedRobe" then
-		-- Robe skirt down to the knees.
-		piece(
-			folder,
-			lower,
-			CFrame.new(0, y - 1.1, 0),
-			Vector3.new(l.X * 1.1, 2, l.Z * 1.3),
-			palette.Main,
-			palette.Material
-		)
-		neon(folder, lower, CFrame.new(0, y - 2.08, 0), Vector3.new(l.X * 1.12, 0.06, l.Z * 1.32), accent)
-	elseif look == "Wraps" then
-		neon(folder, lower, CFrame.new(0, y, -l.Z * 0.7), Vector3.new(0.25, 0.3, 0.05), accent)
-	end
 end
 
 -- Weapons -----------------------------------------------------------------------------
@@ -522,13 +306,17 @@ local function gripAnchor(folder: Instance, character: Model, side: string): Bas
 	return anchor
 end
 
--- Hats and hair would poke through helmets and hoods.
+-- Hats, hair and face accessories would poke through helms and hoods.
+local HEAD_ATTACHMENTS = { "HatAttachment", "HairAttachment", "FaceFrontAttachment", "FaceCenterAttachment" }
 local function removeHeadwear(character: Model)
 	for _, accessory in character:GetChildren() do
 		if accessory:IsA("Accessory") then
 			local handle = accessory:FindFirstChild("Handle")
-			if handle and (handle:FindFirstChild("HatAttachment") or handle:FindFirstChild("HairAttachment")) then
-				accessory:Destroy()
+			for _, name in HEAD_ATTACHMENTS do
+				if handle and handle:FindFirstChild(name) then
+					accessory:Destroy()
+					break
+				end
 			end
 		end
 	end
@@ -554,19 +342,9 @@ function Equipment.apply(player: Player)
 	local folder = Instance.new("Folder")
 	folder.Name = FOLDER_NAME
 	local accent = class.Color
-	local palette = ARMOR_PALETTES[armor.Look] or ARMOR_PALETTES.Plate
 
-	local head = character:FindFirstChild("Head") :: BasePart?
-	local torso = bodyPart(character, "UpperTorso", "Torso")
-	if head then
-		removeHeadwear(character)
-		helmet(folder, head, armor.Look, palette, accent)
-	end
-	if torso then
-		chest(folder, torso, armor.Look, palette, accent)
-	end
-	shoulders(folder, character, armor.Look, palette, accent)
-	waist(folder, character, armor.Look, palette, accent)
+	removeHeadwear(character)
+	ArmorKits.build(folder, character, armor.Look, accent)
 
 	local right = gripAnchor(folder, character, "Right")
 	local left = gripAnchor(folder, character, "Left")
