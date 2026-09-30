@@ -36,6 +36,12 @@ function Mine.mithrilChance(depth: number): number
 	return math.min(0.35, 0.04 + depth * 0.02)
 end
 
+-- Chance a lucky rock also holds the next armor set up your ladder (from
+-- depth 2 down).
+function Mine.armorChance(depth: number): number
+	return if depth >= 2 then math.min(0.3, 0.06 + depth * 0.02) else 0
+end
+
 -- Coins in a coin pouch at this depth.
 function Mine.pouch(depth: number): (number, number)
 	local scale = 1 + (depth - 1) * 0.15

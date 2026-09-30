@@ -75,7 +75,7 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 6,
+		Version = 7,
 		Coins = Config.StartingCoins,
 		Marks = 0,
 		Gems = {},
@@ -161,6 +161,21 @@ local function migrate(profile: Profile): Profile
 		profile.FirstJoin = profile.FirstJoin or 0
 		profile.WelcomeBought = profile.WelcomeBought or false
 		profile.Version = 6
+	end
+	if profile.Version < 7 then
+		-- Armor became a ladder with a starter set: the free Iron Plate the
+		-- old intro handed out becomes the starter Padded Jack. Plate that
+		-- was upgraded at the forge is kept.
+		local armors = profile.Owned.Armors
+		if armors.IronPlate == 1 then
+			armors.IronPlate = nil
+			armors.PaddedJack = 1
+			if profile.Character.Armor == "IronPlate" then
+				profile.Character.Armor = "PaddedJack"
+				profile.Character.ArmorQuality = 1
+			end
+		end
+		profile.Version = 7
 	end
 	return profile
 end

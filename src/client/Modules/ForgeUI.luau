@@ -320,7 +320,11 @@ local function drawCraft()
 	}, detail)
 	UiKit.list(actions, 8, true)
 
-	if target <= Crafting.MaxQuality then
+	-- Armor is a ladder: the set below must be owned before this one is forged.
+	local previous = if kind == "Armors" and not quality then Classes.previousArmor(classId, id) else nil
+	if previous and not ownedQuality("Armors", previous.Id) then
+		text(info, string.format("Forge the %s first (or find this set in the Mine).", previous.Name), 14, P.Bad, BOLD)
+	elseif target <= Crafting.MaxQuality then
 		local next_ = Crafting.Qualities[target]
 		text(
 			info,
@@ -334,7 +338,7 @@ local function drawCraft()
 			next_.Color,
 			BOLD
 		)
-		local recipe = Crafting.recipe(classId, kind, target) :: Crafting.Recipe
+		local recipe = Crafting.recipe(classId, kind, target, gear.Tier) :: Crafting.Recipe
 		text(info, "NEEDS", 12, P.Gold, BOLD)
 		local r = 0
 		for _, matId in Crafting.MaterialOrder do

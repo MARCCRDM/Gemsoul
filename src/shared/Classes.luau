@@ -231,33 +231,48 @@ Classes.List = {
 				},
 			},
 		},
+		-- Armor is a ladder: you start in the Padded Jack, then forge (or
+		-- find in the Mine) each better set in turn. Tier sets the forge cost.
 		Armors = {
 			{
-				Id = "IronPlate",
-				Name = "Iron Plate",
-				Style = "Defensive",
-				Description = "Full plate. Shrugs off blows but slows you down.",
-				Look = "Plate",
-				Mods = { Defense = 1, Speed = -1 },
-				Passive = BASTION,
-			},
-			{
-				Id = "IronScale",
-				Name = "Iron Scale",
-				Style = "Balanced",
-				Description = "Overlapping scales: solid protection that still moves.",
-				Look = "Scale",
-				Mods = {},
-				Passive = ATTUNED,
+				Id = "PaddedJack",
+				Name = "Padded Jack",
+				Tier = 1,
+				Style = "Starter",
+				Description = "Quilted cloth, a leather hood and boots. Every warrior starts somewhere.",
+				Look = "Padded",
+				Mods = { Defense = -1 },
+				Passive = { Name = "Light", Text = "No special effect.", Effect = {} },
 			},
 			{
 				Id = "IronChain",
 				Name = "Iron Chainmail",
+				Tier = 2,
 				Style = "Agile",
 				Description = "Light links for warriors who never stand still.",
 				Look = "Chain",
-				Mods = { Speed = 1, Defense = -1 },
+				Mods = { Speed = 1 },
 				Passive = FLEET,
+			},
+			{
+				Id = "IronScale",
+				Name = "Iron Scale",
+				Tier = 3,
+				Style = "Balanced",
+				Description = "Overlapping scales: solid protection that still moves.",
+				Look = "Scale",
+				Mods = { Defense = 1 },
+				Passive = ATTUNED,
+			},
+			{
+				Id = "IronPlate",
+				Name = "Knight's Plate",
+				Tier = 4,
+				Style = "Defensive",
+				Description = "Full plate with a plumed helm. Shrugs off blows but slows you down.",
+				Look = "Plate",
+				Mods = { Defense = 2, Speed = -1 },
+				Passive = BASTION,
 			},
 		},
 		Specs = {
@@ -1004,6 +1019,21 @@ end
 
 function Classes.maxHealth(healthRating: number): number
 	return math.floor(60 + healthRating * 0.6)
+end
+
+-- The armor one tier below `armorId` in its class's ladder (nil for the first).
+function Classes.previousArmor(classId: string, armorId: string)
+	local class = Classes.get(classId)
+	local armor = Classes.armor(classId, armorId)
+	if not class or not armor or not armor.Tier then
+		return nil
+	end
+	for _, other in class.Armors do
+		if other.Tier == armor.Tier - 1 then
+			return other
+		end
+	end
+	return nil
 end
 
 return Classes

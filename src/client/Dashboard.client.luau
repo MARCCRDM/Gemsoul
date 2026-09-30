@@ -658,8 +658,18 @@ local function refresh(profile)
 	end
 	local weapon = class and Classes.weapon(class.Id, character.Weapon)
 	local nextQuality = Crafting.Qualities[(character.WeaponQuality or 1) + 1]
-	craftCard.Line.Text = if weapon and nextQuality
-		then string.format("Upgrade your %s to %s.", weapon.Name, nextQuality.Name)
+	-- Point at the next armor set up the ladder first, then weapon upgrades.
+	local owned = profile.Owned and profile.Owned.Armors or {}
+	local nextArmor = nil
+	for _, armor in class and class.Armors or {} do
+		if not owned[armor.Id] then
+			nextArmor = armor
+			break
+		end
+	end
+	craftCard.Line.Text = if nextArmor
+		then string.format("Forge better armor: the %s.", nextArmor.Name)
+		elseif weapon and nextQuality then string.format("Upgrade your %s to %s.", weapon.Name, nextQuality.Name)
 		else "Buy materials and forge new gear."
 	enchantCard.Line.Text = if character.WeaponGem and character.ArmorGem
 		then "Both sockets are filled. Swap in better gems any time."

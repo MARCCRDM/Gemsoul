@@ -32,7 +32,16 @@ Keys: M mine, F craft, E enchant, X cut, V sell, G gem pouch, B shop.
 
 **The look.** The menus use a restrained, grown-up style (`src/client/Modules/IronUi.luau`): dark iron panels with a thin gold edge, serif titles (Merriweather), condensed labels (Oswald), muted buttons and small hover and press motion. `IronUi.mute` tones any bright colour down.
 
-**The Warrior's armor** (`src/server/Systems/ArmorKits.luau`) is full plate in the style of a fantasy RPG knight, built from smooth rounded plates over dark mail, with brass trim and dyed cloth. It covers the whole figure, so the blocky avatar underneath is hidden, and R15 avatars get more human proportions (a bit taller and slimmer, smaller head: `ArmorKits.Proportions`). Iron Plate has a plumed armet, tabard and cape; Iron Scale a Nordic helm and fur mantle; Iron Chain a great helm and surcoat. The Longsword has a crossguard, leather grip, pommel and pointed blade.
+**The Warrior's armor** (`src/server/Systems/ArmorKits.luau`) is a ladder of four sets, in the style of a fantasy RPG. Each is one simple figure of 32-41 smooth parts (rounded plates and tubes, no blocks) that covers the whole body, so the blocky avatar underneath is hidden:
+
+| Tier | Set | Look | How you get it |
+|---|---|---|---|
+| 1 | Padded Jack | quilted jack, leather hood, gloves and boots | everyone starts in it |
+| 2 | Iron Chainmail | mail under a dyed surcoat, great helm | forge it, or find it in the Mine |
+| 3 | Iron Scale | scale cuirass, pauldrons, fur mantle, Nordic helm | forge it (needs Mithril), or find it |
+| 4 | Knight's Plate | full plate, plumed armet, tabard and cape | forge it (needs Mithril and Gem Shards), or find it |
+
+Each set must be owned before the next can be forged, and better sets cost more (`TIER_COSTS` in `src/shared/Crafting.luau`). From depth 2 down, a lucky (gold) rock in the Mine can also hold the next set you don't own yet (`Mine.armorChance`). Every set can still be upgraded from Standard to Masterwork. The Longsword has a crossguard, leather grip, pommel and pointed blade.
 
 ## The Mine (the hook)
 

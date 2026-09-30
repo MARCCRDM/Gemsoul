@@ -223,7 +223,9 @@ end
 
 local function lootText(loot): string
 	if loot.Kind == "Gem" then
-		return loot.Text .. (if loot.Coins then string.format("  +%d coins", loot.Coins) else "")
+		return loot.Text
+			.. (if loot.Coins then string.format("  +%d coins", loot.Coins) else "")
+			.. (if loot.Gear then "  +" .. loot.Gear else "")
 	elseif loot.Count then
 		return string.format("+%d %s", loot.Count, loot.Text)
 	end
@@ -883,6 +885,10 @@ function MineUI.swing(index: number)
 				floatWord(ui.Button, lootText(loot), color, 18)
 			end
 			addToTray(loot)
+			if loot.Gear then
+				-- A lucky rock can hold the next armor set up the ladder.
+				UiKit.toast(string.format("ARMOR FOUND: %s! Wear it from Gear & Enchant.", loot.Gear), P.Gold)
+			end
 		else
 			drawPips(ui, result.Tile.Hp)
 			showCracks(ui, result.Tile.Hp, result.Tile.MaxHp)

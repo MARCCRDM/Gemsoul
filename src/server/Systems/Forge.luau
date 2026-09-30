@@ -142,8 +142,13 @@ local function craft(player: Player, kind: any, gearId: any)
 	if current >= Crafting.MaxQuality then
 		return reply(false, gear.Name .. " is already Masterwork.")
 	end
+	-- Armor is a ladder: forge (or find) each set before the next.
+	local previous = if kind == "Armors" and current == 0 then Classes.previousArmor(classId, gearId) else nil
+	if previous and not profile.Owned.Armors[previous.Id] then
+		return reply(false, "Forge the " .. previous.Name .. " first.")
+	end
 	local target = current + 1
-	local recipe = Crafting.recipe(classId, kind, target) :: Crafting.Recipe
+	local recipe = Crafting.recipe(classId, kind, target, gear.Tier) :: Crafting.Recipe
 	-- Check everything before taking anything.
 	for id, need in recipe.Materials do
 		local have = profile.Materials[id] or 0

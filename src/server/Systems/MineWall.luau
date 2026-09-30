@@ -12,6 +12,7 @@
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -168,6 +169,21 @@ local function recordDepth(player: Player, depth: number)
 	end
 end
 
+-- The next armor set up the player's ladder that they don't own yet.
+local function nextArmor(player: Player)
+	local profile = PlayerData.get(player)
+	local class = profile and Classes.get(profile.Character.Class)
+	if not profile or not class then
+		return nil
+	end
+	for _, armor in class.Armors do
+		if not profile.Owned.Armors[armor.Id] then
+			return armor
+		end
+	end
+	return nil
+end
+
 -- Gives what a broken rock held. Returns the loot description.
 local function grant(player: Player, wall: Wall, tile: Tile)
 	local rng = Gems.random()
@@ -206,6 +222,11 @@ local function grant(player: Player, wall: Wall, tile: Tile)
 			local coins = rng:NextInteger(lo, hi) * 2
 			PlayerData.addCoins(player, coins)
 			loot.Coins = coins
+			local armor = nextArmor(player)
+			if armor and rng:NextNumber() < Mine.armorChance(wall.Depth) then
+				PlayerData.setGearQuality(player, "Armors", armor.Id, 1)
+				loot.Gear = armor.Name
+			end
 		end
 		return loot
 	elseif tile.Kind == "Ore" then

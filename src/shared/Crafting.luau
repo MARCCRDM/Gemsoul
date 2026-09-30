@@ -100,23 +100,36 @@ local STEPS = {
 
 export type Recipe = { Materials: { [string]: number }, Marks: number }
 
+-- Forging a new piece of a better armor tier costs more (tier 1 is the
+-- starter set): { material multiplier, Mithril, Shards, Marks }.
+local TIER_COSTS = {
+	[2] = { 2, 0, 0, 120 },
+	[3] = { 3, 3, 0, 300 },
+	[4] = { 4, 6, 12, 700 },
+}
+
 -- What it costs a class to make `kind` ("Weapons" or "Armors") at `quality`.
-function Crafting.recipe(classId: string, kind: string, quality: number): Recipe?
+-- `tier` (an armor's Tier) raises the price of forging a new piece.
+function Crafting.recipe(classId: string, kind: string, quality: number, tier: number?): Recipe?
 	local family = Crafting.Families[classId]
 	local step = STEPS[quality]
 	if not family or not family[kind] or not step then
 		return nil
 	end
+	local extra = quality == 1 and TIER_COSTS[tier or 1]
+	local scale = if extra then extra[1] else 1
 	local materials = {}
-	materials[family[kind][1]] = step.Main
-	materials[family[kind][2]] = step.Second
-	if step.Mithril > 0 then
-		materials.Mithril = step.Mithril
+	materials[family[kind][1]] = step.Main * scale
+	materials[family[kind][2]] = step.Second * scale
+	local mithril = step.Mithril + (if extra then extra[2] else 0)
+	local shards = step.Shards + (if extra then extra[3] else 0)
+	if mithril > 0 then
+		materials.Mithril = mithril
 	end
-	if step.Shards > 0 then
-		materials.Shards = step.Shards
+	if shards > 0 then
+		materials.Shards = shards
 	end
-	return { Materials = materials, Marks = step.Marks }
+	return { Materials = materials, Marks = if extra then extra[4] else step.Marks }
 end
 
 -- Rating bonus from quality: weapons hit harder, armor protects more.

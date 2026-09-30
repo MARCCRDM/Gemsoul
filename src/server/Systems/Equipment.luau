@@ -720,14 +720,6 @@ function Equipment.apply(player: Player)
 	if not character or not loadout then
 		return
 	end
-	local fitted = Classes.armor(loadout.Class, loadout.Armor)
-	if fitted and ArmorKits.proportion(character, fitted.Look) then
-		-- Let the rig resize before fitting armor to it.
-		task.wait(0.2)
-		if player.Character ~= character then
-			return
-		end
-	end
 	local existing = character:FindFirstChild(FOLDER_NAME)
 	if existing then
 		existing:Destroy()
