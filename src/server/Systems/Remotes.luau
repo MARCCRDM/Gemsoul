@@ -4,6 +4,7 @@
 --   Request (function, client -> server): shop and cutting actions
 --   CombatInput (event, client -> server): attacks and abilities
 --   CombatFx (event, server -> clients): hits, damage numbers, cooldowns
+--   Party (event, server -> client): party state and invites
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local folder = Instance.new("Folder")
@@ -15,6 +16,7 @@ local Remotes = {
 	Request = Instance.new("RemoteFunction"),
 	CombatInput = Instance.new("RemoteEvent"),
 	CombatFx = Instance.new("RemoteEvent"),
+	Party = Instance.new("RemoteEvent"),
 }
 for name, remote in Remotes do
 	remote.Name = name

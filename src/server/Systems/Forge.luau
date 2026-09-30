@@ -16,6 +16,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local Nearby = require(script.Parent.Nearby)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local Shop = require(script.Parent.Shop)
 
 local RANGE = 40 -- studs from Hilde or Borin
@@ -87,6 +88,7 @@ local function sellGems(player: Player, ids: any)
 	end
 	PlayerData.addMarks(player, total)
 	PlayerData.milestone(player, "Sold")
+	Progress.addXP(player, "Sell")
 	return reply(true, string.format("Sold %d gem%s for %d Guild Marks.", #gems, if #gems == 1 then "" else "s", total))
 end
 
@@ -107,6 +109,7 @@ local function salvageGems(player: Player, ids: any)
 	profile.Materials.Shards = (profile.Materials.Shards or 0) + shards
 	PlayerData.sync(player)
 	PlayerData.milestone(player, "Sold")
+	Progress.addXP(player, "Sell")
 	return reply(
 		true,
 		string.format("Salvaged %d gem%s into %d Gem Shards.", #gems, if #gems == 1 then "" else "s", shards)
@@ -157,6 +160,7 @@ local function craft(player: Player, kind: any, gearId: any)
 	end
 	PlayerData.setGearQuality(player, kind, gearId, target)
 	PlayerData.milestone(player, "Crafted")
+	Progress.addXP(player, "Craft")
 	local name = Crafting.gearName(gear.Name, target)
 	return reply(
 		true,
@@ -183,6 +187,7 @@ local function marketSell(player: Player, ids: any)
 	end
 	PlayerData.addCoins(player, total)
 	PlayerData.milestone(player, "Sold")
+	Progress.addXP(player, "Sell")
 	return reply(true, string.format("Sold %d gem%s for %d coins.", #gems, if #gems == 1 then "" else "s", total))
 end
 

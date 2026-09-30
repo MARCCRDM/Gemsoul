@@ -40,7 +40,7 @@ local atVey = false
 
 -- Screen -------------------------------------------------------------------------------
 
-local window = IronUi.window("Character", 8, WIDTH, HEIGHT)
+local window = IronUi.window("Character", 8, WIDTH, HEIGHT, "🛡️")
 local gui, panel, scale, fit = window.Gui, window.Panel, window.Scale, window.Fit
 local title, subtitle = window.Title, window.Subtitle
 

@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Nearby = require(script.Parent.Nearby)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local Shop = require(script.Parent.Shop)
 
 local VEY_RANGE = 30 -- studs from Vey the Arcanist
@@ -37,6 +38,7 @@ local function socketGem(player: Player, gemId: any, slot: any)
 		return reply(false, "Only cut gems can be socketed. Rough stones need cutting first.")
 	end
 	PlayerData.milestone(player, "Enchanted")
+	Progress.addXP(player, "Enchant")
 	local name, effect = GemConfig.enchantment(gem, slot)
 	return reply(true, string.format("%s: %s", name, effect), { Gem = gem })
 end

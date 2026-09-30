@@ -34,7 +34,7 @@ local SLOT_KEY = { Weapons = "Weapon", Armors = "Armor" }
 
 local ForgeUI = {}
 
-local window = IronUi.window("Forge", 9, WIDTH, HEIGHT)
+local window = IronUi.window("Forge", 9, WIDTH, HEIGHT, "⚒️")
 local gui, panel = window.Gui, window.Panel
 window.Title.Text = "CRAFTING HALL"
 
@@ -93,16 +93,15 @@ UiKit.list(tabBar, 8, true)
 local strip = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -24, 0, 22),
+	Position = UDim2.new(1, -44, 0, 22),
 	Size = UDim2.fromOffset(560, 20),
 }, panel)
 UiKit.list(strip, 12, true).HorizontalAlignment = Enum.HorizontalAlignment.Right
 local marksLabel = text(panel, "", 16, P.Gold, BOLD)
 marksLabel.AnchorPoint = Vector2.new(1, 0)
-marksLabel.Position = UDim2.new(1, -24, 0, 50)
+marksLabel.Position = UDim2.new(1, -44, 0, 50)
 marksLabel.Size = UDim2.fromOffset(300, 20)
 marksLabel.TextXAlignment = Enum.TextXAlignment.Right
-window.Close.Position = UDim2.new(1, -16, 0, 80)
 
 local body = new("Frame", {
 	BackgroundTransparency = 1,

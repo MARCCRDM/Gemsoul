@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Season = require(ReplicatedStorage.Shared.Season)
 local Remotes = require(script.Parent.Remotes)
 
 type Gem = GemConfig.Gem
@@ -45,6 +46,13 @@ type Profile = {
 	-- Firsts that guide new players: "Mined", "Cut", "Sold", "Crafted", "Enchanted".
 	Milestones: { [string]: boolean },
 	Daily: { Day: number, Streak: number }, -- daily reward
+	Cosmetics: { Owned: { [string]: boolean }, Trim: string?, Back: string? },
+	Season: { XP: number, Claimed: { [string]: boolean } }, -- claimed levels, as strings
+	Stats: { Kills: number, BestGem: number }, -- for Top Players
+	Crates: { [string]: number }, -- unopened crates
+	Boosts: { XPUntil: number }, -- os.time() when 2x XP ends
+	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle
+	WelcomeBought: boolean,
 }
 
 local PlayerData = {}
@@ -66,7 +74,7 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 5,
+		Version = 6,
 		Coins = Config.StartingCoins,
 		Marks = 0,
 		Gems = {},
@@ -77,6 +85,13 @@ local function newProfile(): Profile
 		Owned = { Weapons = {}, Armors = {} },
 		Milestones = {},
 		Daily = { Day = 0, Streak = 0 },
+		Cosmetics = { Owned = {} },
+		Season = { XP = 0, Claimed = {} },
+		Stats = { Kills = 0, BestGem = 0 },
+		Crates = {},
+		Boosts = { XPUntil = 0 },
+		FirstJoin = os.time(),
+		WelcomeBought = false,
 	}
 end
 
@@ -134,6 +149,17 @@ local function migrate(profile: Profile): Profile
 		end
 		profile.Daily = profile.Daily or { Day = 0, Streak = 0 }
 		profile.Version = 5
+	end
+	if profile.Version < 6 then
+		profile.Cosmetics = profile.Cosmetics or { Owned = {} }
+		profile.Season = profile.Season or { XP = 0, Claimed = {} }
+		profile.Stats = profile.Stats or { Kills = 0, BestGem = 0 }
+		profile.Crates = profile.Crates or {}
+		profile.Boosts = profile.Boosts or { XPUntil = 0 }
+		-- The Welcome Bundle is for players who join from now on.
+		profile.FirstJoin = profile.FirstJoin or 0
+		profile.WelcomeBought = profile.WelcomeBought or false
+		profile.Version = 6
 	end
 	return profile
 end
@@ -207,6 +233,7 @@ local function claimDaily(player: Player, profile: Profile)
 	daily.Day = day
 	local reward = Config.DailyRewardBase + Config.DailyRewardPerStreak * (daily.Streak - 1)
 	profile.Coins += reward
+	profile.Season.XP += Season.XP.Daily
 	Remotes.Notify:FireClient(
 		player,
 		string.format("Daily reward: +%d coins (day %d streak). Come back tomorrow for more!", reward, daily.Streak)
@@ -303,6 +330,14 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Owned = profile.Owned,
 		Milestones = profile.Milestones,
 		Daily = profile.Daily,
+		Cosmetics = profile.Cosmetics,
+		Season = profile.Season,
+		Stats = profile.Stats,
+		Crates = profile.Crates,
+		Boosts = profile.Boosts,
+		FirstJoin = profile.FirstJoin,
+		WelcomeBought = profile.WelcomeBought,
+		ServerTime = os.time(),
 	}
 end
 
@@ -402,6 +437,16 @@ function PlayerData.setAbilities(player: Player, ids: { string })
 	if profile then
 		profile.Character.Abilities = ids
 		sync(player)
+	end
+end
+
+-- Wears (or with nil, removes) a trim or back piece; ownership is checked by the caller.
+function PlayerData.setCosmetic(player: Player, kind: string, id: string?)
+	local profile = profiles[player]
+	if profile then
+		(profile.Cosmetics :: any)[kind] = id
+		sync(player)
+		characterChanged:Fire(player)
 	end
 end
 

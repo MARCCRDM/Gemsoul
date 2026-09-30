@@ -96,6 +96,25 @@ Fighting is off inside the town walls, except in the **Arena** (west road), wher
 
 Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or weaken, and an armor gem cuts damage from monsters of its element. Power, Defense, Speed and Health ratings (from class, gear, quality and gems) drive damage, damage taken, crit chance, max health and walk speed. Everything is in `src/shared/Classes.luau` and `src/shared/Combat.luau`; the server runs every hit (`Systems/CombatServer.luau`, `Systems/Enemies.luau`).
 
+## Hub, Shop, Season Path, Party and Top Players
+
+**The hub.** Round menu buttons down the left (Character C, Abilities K, Gems G, Party P) and, top right, your coins, Guild Marks and gems beside round buttons for the Season Path (J), Top Players (L) and the Shop (B). Every window shares one look: an icon badge on the corner, pill tabs and buttons, a round red close button.
+
+**Shop** (coins today, Robux-ready). Tabs:
+
+- **Bundles:** cards with value tags.
+- **Back Pieces** and **Trims:** cosmetics with rarity-coloured tiles, a preview, and Buy / Equip / Take off.
+- **Geode Crates:** odds shown, open with a reveal.
+- **Passes:** VIP.
+
+New players get a **Welcome Bundle** popup after the intro: 5x value, once, with a 24-hour countdown. Cosmetics use the gem rarity tiers. *Trims* recolour your class glow. *Back pieces* (Prospector's Pack, War Banner, Geode Shell, Ember Cape, Crystal Wings, Gem Halo) are worn behind your armor. To sell for Robux too, create Developer Products on Roblox and put their ids in `Store.RobuxProducts` (`src/shared/Store.luau`); the Shop shows Robux buttons and the server grants the items.
+
+**Season Path.** Everything earns XP: mining, cutting, selling, crafting, enchanting, slaying and the daily reward. There are 30 levels, each with a reward to claim: coins, Marks, crates, materials, and exclusive trims and back pieces at levels 5, 10, 15, 20, 25 and 30. Bundles can include a 2x XP boost. Tuning is in `src/shared/Season.luau`.
+
+**Party.** Invite up to three players in the server; they get an Accept / Decline popup. The party has a ready check, and the leader can kick members and set a **rally point** (Wilds, Arena, Quarry, Crafting Hall, Market) that draws a trail for everyone. Teammates' health shows at the top right with a marker over their heads. Monster kills reward every party member fighting nearby.
+
+**Top Players.** Global leaderboards (best gem ever owned, Wilds kills, Season level), or the current server when data stores aren't available.
+
 ## Coins, Marks and getting started
 
 - **Two currencies.** *Coins* buy rough stones from Garrick and laser cuts from Ilsa. You get them from a **daily reward** (75 coins, plus 25 more for each day of your streak, up to a week) and by selling stones to **Tamsin** at the Market (50% of value). *Guild Marks* are only for the Crafting Hall and come from selling stones to Hilde (60% of value).
@@ -133,17 +152,21 @@ src/
       Nearby.luau             is a player standing near a shopkeeper?
       CombatServer.luau       attacks, abilities, resources, buffs, damage taken
       Enemies.luau            training dummies and Wilds monsters: spawning, AI, loot
+      StoreServer.luau        shop bundles, cosmetics, crates, Season Path claims, Robux receipts
+      Progress.luau           season XP and levels
+      Party.luau              parties: invites, ready check, rally points, shared rewards
+      TopPlayers.luau         global leaderboards (ordered data stores)
       Equipment.luau          builds class weapons onto avatars, and socketed gems
       ArmorKits.luau          the 12 low-poly armor sets: helms, hoods, pauldrons
       Remotes.luau            client/server remotes
       Vip.luau                IsVIP attribute (game pass, or everyone in Studio)
   client/                     -> StarterPlayerScripts.Client
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
-    Hud.client.luau           corner buttons: character screen ([C]) and gem pouch ([G])
+    Hud.client.luau           the hub: menu buttons, currencies, shop/season/top players; Welcome Bundle popup
     Guide.client.luau         NEXT STEP panel and trail for new players ([H] hides)
     Combat.client.luau        combat controls, hotbar HUD and hit effects
     Intro.client.luau         new-player intro screens
-    Modules/                  character screen, Crafting Hall screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
+    Modules/                  shop, season, party, top players, character screen, Crafting Hall screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared
@@ -152,6 +175,9 @@ src/
     Classes.luau              classes, weapons, armor, abilities, specs, ratings
     Crafting.luau             materials, gear quality, recipes, gem sell prices
     Combat.luau               combat formulas, resources, where fighting is allowed
+    Cosmetics.luau            trims and back pieces
+    Store.luau                bundles, crates, welcome bundle, Robux product ids
+    Season.luau               XP per activity, levels and rewards
     Vendors.luau              shopkeeper names, greetings and dialogue options
     Tags.luau                 CollectionService tag names
 ```

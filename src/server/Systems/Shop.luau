@@ -14,6 +14,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemGenerator = require(script.Parent.GemGenerator)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 
 type Session = { GemId: string, Started: number, Centers: { number }, Zone: number, Sweep: number }
@@ -84,6 +85,7 @@ function handlers.AutoCut(player: Player, gemId: any, tier: any)
 	gem.CutMethod = "AutoCut"
 	PlayerData.gemChanged(player)
 	PlayerData.milestone(player, "Cut")
+	Progress.addXP(player, "CutByLaser")
 	return reply(
 		true,
 		string.format("%s cut to grade %d. Now worth ~%d coins.", laser.Name, gem.Cut, GemConfig.value(gem)),
@@ -136,6 +138,7 @@ function handlers.FinishCut(player: Player, times: any)
 	gem.CutMethod = "Manual"
 	PlayerData.gemChanged(player)
 	PlayerData.milestone(player, "Cut")
+	Progress.addXP(player, "CutByHand")
 	local verdict = if gem.Cut >= 10
 		then "Flawless! Gem Mint!"
 		elseif gem.Cut >= 9 then "Masterful cut!"

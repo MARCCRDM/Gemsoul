@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local ArmorKits = require(script.Parent.ArmorKits)
 local PlayerData = require(script.Parent.PlayerData)
 
@@ -355,6 +356,116 @@ WEAPONS.Halberd = function(folder, _character, right, _left, accent, gem)
 	gemSocket(folder, right, m, Vector3.new(0, 4.6, 0), gem, 0.26)
 end
 
+-- Back pieces (cosmetics) ---------------------------------------------------------------------
+-- Built behind the torso; `m` is the middle of the back, facing backward.
+
+local BACKS: { [string]: (Instance, BasePart, CFrame, Color3, Color3) -> () } = {}
+
+BACKS.Pack = function(folder, torso, m, glow, _accent)
+	piece(folder, torso, m * CFrame.new(0, -0.1, -0.35), Vector3.new(1.4, 1.6, 0.7), DARK_WOOD, Enum.Material.Leather)
+	piece(folder, torso, m * CFrame.new(0, 0.85, -0.4), Vector3.new(1.5, 0.35, 0.8), WOOD, Enum.Material.Fabric)
+	-- A pick strapped to the side.
+	piece(
+		folder,
+		torso,
+		m * CFrame.new(0.85, 0.2, -0.3) * CFrame.Angles(0, 0, math.rad(15)),
+		Vector3.new(0.12, 2.4, 0.12),
+		WOOD,
+		Enum.Material.Wood
+	)
+	piece(folder, torso, m * CFrame.new(1.1, 1.3, -0.3), Vector3.new(0.9, 0.18, 0.18), IRON, Enum.Material.Metal)
+	neon(folder, torso, m * CFrame.new(0, -0.1, -0.72), Vector3.new(0.3, 0.3, 0.05), glow)
+end
+
+BACKS.Banner = function(folder, torso, m, glow, accent)
+	piece(folder, torso, m * CFrame.new(0.6, 1.4, -0.3), Vector3.new(0.14, 5, 0.14), DARK_WOOD, Enum.Material.Wood)
+	local cloth = piece(
+		folder,
+		torso,
+		m * CFrame.new(0.6 - 0.75, 2.6, -0.3),
+		Vector3.new(1.4, 2, 0.05),
+		accent:Lerp(Color3.new(0, 0, 0), 0.25),
+		Enum.Material.Fabric
+	)
+	cloth.Name = "Banner"
+	neon(folder, torso, m * CFrame.new(0.6 - 0.75, 1.65, -0.3), Vector3.new(1.4, 0.1, 0.07), glow)
+	neon(folder, torso, m * CFrame.new(0.6, 3.95, -0.3), Vector3.new(0.3, 0.3, 0.3), glow)
+end
+
+BACKS.Geode = function(folder, torso, m, glow, _accent)
+	piece(
+		folder,
+		torso,
+		m * CFrame.new(0, 0, -0.4),
+		Vector3.new(1.8, 1.8, 0.8),
+		Color3.fromRGB(90, 84, 96),
+		Enum.Material.Slate,
+		Enum.PartType.Ball
+	)
+	for i = 0, 4 do
+		local angle = math.rad(i * 72)
+		neon(
+			folder,
+			torso,
+			m * CFrame.new(math.cos(angle) * 0.45, math.sin(angle) * 0.45, -0.8) * CFrame.Angles(0, 0, angle),
+			Vector3.new(0.25, 0.5, 0.25),
+			glow
+		)
+	end
+end
+
+BACKS.Cape = function(folder, torso, m, glow, accent)
+	local length = torso.Size.Y * 1.9
+	piece(
+		folder,
+		torso,
+		m * CFrame.new(0, torso.Size.Y / 2 - length / 2 + 0.3, -0.15) * CFrame.Angles(math.rad(-6), 0, 0),
+		Vector3.new(torso.Size.X * 0.95, length, 0.08),
+		accent:Lerp(Color3.new(0, 0, 0), 0.55),
+		Enum.Material.Fabric
+	)
+	neon(
+		folder,
+		torso,
+		m * CFrame.new(0, torso.Size.Y / 2 - length + 0.35, -0.22) * CFrame.Angles(math.rad(-6), 0, 0),
+		Vector3.new(torso.Size.X * 0.95, 0.12, 0.09),
+		glow
+	)
+end
+
+BACKS.Wings = function(folder, torso, m, glow, _accent)
+	for _, side in { -1, 1 } do
+		for i, size in { 2.6, 2, 1.4 } do
+			neon(
+				folder,
+				torso,
+				m
+					* CFrame.new(side * (0.5 + i * 0.35), 0.5 + i * 0.15, -0.3 - i * 0.1)
+					* CFrame.Angles(0, 0, math.rad(side * (-50 + i * 18))),
+				Vector3.new(0.35, size, 0.08),
+				glow
+			).Transparency =
+				0.25
+		end
+	end
+end
+
+BACKS.Halo = function(folder, torso, m, glow, _accent)
+	local center = m * CFrame.new(0, torso.Size.Y / 2 + 0.9, -0.3)
+	for i = 0, 7 do
+		local angle = math.rad(i * 45)
+		neon(
+			folder,
+			torso,
+			center
+				* CFrame.new(math.cos(angle) * 1.1, math.sin(angle) * 1.1, 0)
+				* CFrame.Angles(0, 0, angle + math.rad(45)),
+			Vector3.one * 0.3,
+			if i % 2 == 0 then glow else Color3.new(1, 1, 1)
+		)
+	end
+end
+
 -- Elemental effects ----------------------------------------------------------------------
 -- An enchanted item takes on its gem's element: its glowing trim turns the
 -- element's colour, the gem lights up its surroundings, and particles pour
@@ -561,7 +672,11 @@ function Equipment.apply(player: Player)
 
 	local folder = Instance.new("Folder")
 	folder.Name = FOLDER_NAME
-	local accent = class.Color
+	-- A trim (cosmetic) recolours the class glow.
+	local profile = PlayerData.get(player)
+	local cosmetics = profile and profile.Cosmetics
+	local trim = cosmetics and Cosmetics.get(cosmetics.Trim)
+	local accent = if trim then trim.Color else class.Color
 
 	removeHeadwear(character)
 	ArmorKits.build(folder, character, armor.Look, accent, loadout.ArmorQuality)
@@ -584,15 +699,23 @@ function Equipment.apply(player: Player)
 		end
 	end
 
+	-- A back piece (cosmetic), worn behind the armor.
+	local back = cosmetics and Cosmetics.get(cosmetics.Back)
+	local build = back and back.Look and BACKS[back.Look]
+	if torso and build then
+		local mount = CFrame.new(0, 0, torso.Size.Z / 2 + 0.55) * CFrame.Angles(0, math.rad(180), 0)
+		build(folder, torso, mount, back.Color, accent)
+	end
+
 	-- The weapon gets its own folder, so its parts are easy to tell apart.
 	local weaponFolder = Instance.new("Folder")
 	weaponFolder.Name = "Weapon"
 	weaponFolder.Parent = folder
 	local right = gripAnchor(weaponFolder, character, "Right")
 	local left = gripAnchor(weaponFolder, character, "Left")
-	local build = WEAPONS[weapon.Look]
-	if build and right and left then
-		build(weaponFolder, character, right, left, accent, loadout.WeaponGem)
+	local buildWeapon = WEAPONS[weapon.Look]
+	if buildWeapon and right and left then
+		buildWeapon(weaponFolder, character, right, left, accent, loadout.WeaponGem)
 	end
 	-- Crafted quality shows on the weapon's metal.
 	if (loadout.WeaponQuality or 1) > 1 then

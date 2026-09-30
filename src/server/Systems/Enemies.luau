@@ -21,7 +21,9 @@ local RunService = game:GetService("RunService")
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Gems = require(script.Parent.Gems)
+local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 
 local Enemies = {}
@@ -412,7 +414,8 @@ local function updateBar(enemy: Enemy)
 	enemy.Bar.Size = UDim2.fromScale(math.clamp(enemy.Humanoid.Health / enemy.Humanoid.MaxHealth, 0, 1), 1)
 end
 
--- Who did the most damage gets the rewards.
+-- The player who did the most damage gets the rewards, and so does every
+-- member of their party fighting nearby. Each gets their own loot roll.
 local function reward(enemy: Enemy)
 	local best, most = nil, 0
 	for player, amount in enemy.Damage do
@@ -423,11 +426,18 @@ local function reward(enemy: Enemy)
 	if not best then
 		return
 	end
-	PlayerData.addCoins(best, enemy.Kind.Coins)
-	PlayerData.milestone(best, "Slain")
-	Remotes.Notify:FireClient(best, string.format("Defeated a %s: +%d coins", enemy.Kind.Name, enemy.Kind.Coins))
-	if math.random() < enemy.Kind.DropChance then
-		Gems.dropFromMonster(best, enemy.Kind.Luck)
+	for _, player in Party.nearby(best, enemy.Root.Position, 90) do
+		PlayerData.addCoins(player, enemy.Kind.Coins)
+		PlayerData.milestone(player, "Slain")
+		local profile = PlayerData.get(player)
+		if profile then
+			profile.Stats.Kills += 1
+		end
+		Progress.addXP(player, if enemy.KindId == "Brute" then "SlayBrute" else "SlayCrawler")
+		Remotes.Notify:FireClient(player, string.format("Defeated a %s: +%d coins", enemy.Kind.Name, enemy.Kind.Coins))
+		if math.random() < enemy.Kind.DropChance then
+			Gems.dropFromMonster(player, enemy.Kind.Luck)
+		end
 	end
 end
 

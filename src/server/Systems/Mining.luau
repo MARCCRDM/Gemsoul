@@ -10,6 +10,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 
 local SHARDS = {
@@ -79,6 +80,7 @@ local function spawnNode(spawner: BasePart, folder: Folder)
 		mined = true
 		if Gems.award(player, if isVip then "VipMiningNode" else "MiningNode") then
 			PlayerData.milestone(player, "Mined")
+			Progress.addXP(player, "Mine")
 			node:Destroy()
 			-- A new crystal grows back on the pad after a while.
 			task.delay(rng:NextNumber(REGROW_SECONDS.Min, REGROW_SECONDS.Max), spawnNode, spawner, folder)

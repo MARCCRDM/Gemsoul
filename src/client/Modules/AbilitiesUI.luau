@@ -27,7 +27,7 @@ local KIND_LABELS = {
 
 local AbilitiesUI = {}
 
-local window = IronUi.window("Abilities", 9, WIDTH, HEIGHT)
+local window = IronUi.window("Abilities", 9, WIDTH, HEIGHT, "⚔️")
 local gui, panel = window.Gui, window.Panel
 window.Title.Text = "ABILITIES"
 

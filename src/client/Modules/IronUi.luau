@@ -69,7 +69,14 @@ function IronUi.button(parent: Instance, label: string, primary: boolean, onClic
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromOffset(0, 34),
 	}, parent)
-	UiKit.round(b, 6)
+	-- Pill-shaped, with a soft highlight along the top.
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = b
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 200, 200)),
+	}, b)
 	new("UIStroke", { Color = P.Edge, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
 	new("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, b)
 	b.Activated:Connect(onClick)
@@ -98,7 +105,66 @@ export type Window = {
 
 -- A hidden full-screen window: dimmed backdrop, gold-edged panel of a fixed
 -- design size scaled to fit the screen, a title, subtitle and close button.
-function IronUi.window(name: string, order: number, width: number, height: number): Window
+-- A row of pill tabs; `entries` are { Id, Label }. Returns the row.
+function IronUi.tabs(parent: Instance, entries: { { string } }, active: string, onPick: (string) -> ()): Frame
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 32),
+	}, parent)
+	UiKit.list(row, 8, true)
+	for i, entry in entries do
+		local on = entry[1] == active
+		local tab = new("TextButton", {
+			Text = entry[2],
+			Font = IronUi.Bold,
+			TextSize = 13,
+			BackgroundColor3 = if on then P.Gold else P.Slot,
+			TextColor3 = if on then Color3.fromRGB(24, 18, 10) else P.Dim,
+			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromOffset(0, 30),
+			LayoutOrder = i,
+		}, row)
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.5, 0)
+		corner.Parent = tab
+		new("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, tab)
+		if not on then
+			new("UIStroke", { Color = P.Edge, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, tab)
+		end
+		tab.Activated:Connect(function()
+			onPick(entry[1])
+		end)
+	end
+	return row
+end
+
+-- A round badge with an icon (an emoji works well), e.g. on a window's corner.
+function IronUi.badge(parent: Instance, icon: string, size: number, color: Color3?): Frame
+	local badge = new("Frame", {
+		BackgroundColor3 = color or P.Gold,
+		Size = UDim2.fromOffset(size, size),
+	}, parent)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = badge
+	new("UIStroke", { Color = P.Frame, Thickness = 3 }, badge)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 150, 150)),
+	}, badge)
+	new("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Text = icon,
+		TextSize = math.floor(size * 0.55),
+		Font = IronUi.Bold,
+		TextColor3 = Color3.new(1, 1, 1),
+	}, badge)
+	return badge
+end
+
+function IronUi.window(name: string, order: number, width: number, height: number, icon: string?): Window
 	local gui = UiKit.gui(name, order)
 	gui.Enabled = false
 	gui.IgnoreGuiInset = true
@@ -124,25 +190,42 @@ function IronUi.window(name: string, order: number, width: number, height: numbe
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 
+	-- The icon badge sits over the top-left corner; the title moves over.
+	local left = 24
+	if icon then
+		local badge = IronUi.badge(panel, icon, 62)
+		badge.Position = UDim2.fromOffset(-18, -18)
+		badge.ZIndex = 5
+		for _, child in badge:GetDescendants() do
+			if child:IsA("GuiObject") then
+				child.ZIndex = 6
+			end
+		end
+		left = 56
+	end
 	local title = IronUi.text(panel, "", 24, P.Gold, IronUi.Heading)
-	title.Position = UDim2.fromOffset(24, 16)
+	title.Position = UDim2.fromOffset(left, 16)
 	title.Size = UDim2.new(0.5, 0, 0, 26)
 	local subtitle = IronUi.text(panel, "", 14, P.Dim, IronUi.Bold)
-	subtitle.Position = UDim2.fromOffset(24, 44)
+	subtitle.Position = UDim2.fromOffset(left, 44)
 	subtitle.Size = UDim2.new(0.5, 0, 0, 18)
 
+	-- A round red close button on the top-right corner.
 	local close = new("TextButton", {
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -16, 0, 14),
-		Size = UDim2.fromOffset(36, 36),
-		BackgroundColor3 = P.Slot,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -8, 0, 8),
+		Size = UDim2.fromOffset(40, 40),
+		BackgroundColor3 = Color3.fromRGB(220, 60, 60),
 		Text = "X",
 		Font = IronUi.Bold,
 		TextSize = 18,
-		TextColor3 = P.Gold,
+		TextColor3 = Color3.new(1, 1, 1),
+		ZIndex = 5,
 	}, panel)
-	UiKit.round(close, 6)
-	new("UIStroke", { Color = P.Edge, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, close)
+	local closeCorner = Instance.new("UICorner")
+	closeCorner.CornerRadius = UDim.new(0.5, 0)
+	closeCorner.Parent = close
+	new("UIStroke", { Color = P.Frame, Thickness = 3 }, close)
 
 	return {
 		Gui = gui,
