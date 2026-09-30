@@ -1,0 +1,602 @@
+--[[
+	Puts each player's class armor and weapon on their avatar, built from
+	parts welded to the body so every player sees them. Works with R15 and
+	R6 avatars; sizes follow the avatar's own body parts.
+
+	Rebuilt on every spawn and whenever the class, gear or socketed gem
+	changes. A socketed gem glows on the weapon in its own colour.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Classes = require(ReplicatedStorage.Shared.Classes)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local PlayerData = require(script.Parent.PlayerData)
+
+local FOLDER_NAME = "GemsoulGear"
+
+local Equipment = {}
+
+type Palette = { Main: Color3, Trim: Color3, Accent: Color3, Material: Enum.Material }
+
+local STEEL = Color3.fromRGB(165, 170, 180)
+local IRON = Color3.fromRGB(95, 98, 106)
+local WOOD = Color3.fromRGB(110, 76, 48)
+local DARK_WOOD = Color3.fromRGB(70, 48, 32)
+
+-- Body parts, R15 first then R6.
+local function bodyPart(character: Model, r15: string, r6: string): BasePart?
+	return (character:FindFirstChild(r15) or character:FindFirstChild(r6)) :: BasePart?
+end
+
+local function isR6(character: Model): boolean
+	return character:FindFirstChild("Torso") ~= nil
+end
+
+local function piece(
+	folder: Instance,
+	anchor: BasePart,
+	cframe: CFrame,
+	size: Vector3,
+	color: Color3,
+	material: Enum.Material,
+	shape: Enum.PartType?
+): BasePart
+	local part = Instance.new("Part")
+	part.Name = "Gear"
+	if shape then
+		part.Shape = shape
+	end
+	part.Size = size
+	part.Color = color
+	part.Material = material
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Massless = true
+	part.CFrame = anchor.CFrame * cframe
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = anchor
+	weld.Part1 = part
+	weld.Parent = part
+	part.Parent = folder
+	return part
+end
+
+local function neon(folder: Instance, anchor: BasePart, cframe: CFrame, size: Vector3, color: Color3): BasePart
+	local part = piece(folder, anchor, cframe, size, color, Enum.Material.Neon)
+	part.CastShadow = false
+	return part
+end
+
+-- Armor ------------------------------------------------------------------------------
+
+local ARMOR_PALETTES: { [string]: Palette } = {
+	Plate = { Main = STEEL, Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
+	Scale = { Main = Color3.fromRGB(140, 146, 152), Trim = IRON, Accent = STEEL, Material = Enum.Material.DiamondPlate },
+	Chain = {
+		Main = Color3.fromRGB(120, 124, 130),
+		Trim = DARK_WOOD,
+		Accent = STEEL,
+		Material = Enum.Material.CorrodedMetal,
+	},
+	Bulwark = { Main = STEEL, Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
+	TowerPlate = { Main = Color3.fromRGB(120, 124, 134), Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
+	Vanguard = { Main = Color3.fromRGB(190, 194, 204), Trim = IRON, Accent = STEEL, Material = Enum.Material.Metal },
+	Robe = {
+		Main = Color3.fromRGB(70, 60, 120),
+		Trim = Color3.fromRGB(200, 180, 110),
+		Accent = STEEL,
+		Material = Enum.Material.Fabric,
+	},
+	WardedRobe = {
+		Main = Color3.fromRGB(40, 36, 80),
+		Trim = Color3.fromRGB(200, 180, 110),
+		Accent = STEEL,
+		Material = Enum.Material.Fabric,
+	},
+	Wraps = {
+		Main = Color3.fromRGB(200, 196, 214),
+		Trim = Color3.fromRGB(90, 80, 150),
+		Accent = STEEL,
+		Material = Enum.Material.Fabric,
+	},
+	Leather = { Main = Color3.fromRGB(120, 80, 48), Trim = DARK_WOOD, Accent = IRON, Material = Enum.Material.Leather },
+	StuddedLeather = {
+		Main = Color3.fromRGB(96, 64, 40),
+		Trim = DARK_WOOD,
+		Accent = STEEL,
+		Material = Enum.Material.Leather,
+	},
+	ShadowLeather = {
+		Main = Color3.fromRGB(44, 44, 52),
+		Trim = Color3.fromRGB(24, 24, 30),
+		Accent = IRON,
+		Material = Enum.Material.Leather,
+	},
+}
+
+local HEAVY = { Plate = true, Scale = true, Chain = true, Bulwark = true, TowerPlate = true, Vanguard = true }
+local ROBES = { Robe = true, WardedRobe = true, Wraps = true }
+
+local function helmet(folder: Instance, head: BasePart, look: string, palette: Palette, accent: Color3)
+	local h = head.Size
+	if HEAVY[look] then
+		-- Cap covering the top of the head, cheek guards, and a glowing visor band.
+		piece(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.3, 0.04),
+			Vector3.new(h.X * 1.14, h.Y * 0.5, h.Z * 1.14),
+			palette.Main,
+			palette.Material
+		)
+		for _, side in { -1, 1 } do
+			piece(
+				folder,
+				head,
+				CFrame.new(side * h.X * 0.55, -h.Y * 0.05, 0.05),
+				Vector3.new(h.X * 0.1, h.Y * 0.55, h.Z * 0.9),
+				palette.Main,
+				palette.Material
+			)
+		end
+		neon(folder, head, CFrame.new(0, h.Y * 0.1, -h.Z * 0.56), Vector3.new(h.X * 1.02, h.Y * 0.08, 0.06), accent)
+		if look == "TowerPlate" or look == "Bulwark" then
+			piece(
+				folder,
+				head,
+				CFrame.new(0, h.Y * 0.62, 0.1),
+				Vector3.new(0.2, h.Y * 0.3, h.Z * 0.9),
+				accent,
+				Enum.Material.Fabric
+			)
+		end
+	elseif ROBES[look] then
+		-- A hood pulled back from the face.
+		piece(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.12, h.Z * 0.18),
+			Vector3.new(h.X * 1.22, h.Y * 1.05, h.Z * 1.0),
+			palette.Main,
+			palette.Material
+		)
+		neon(folder, head, CFrame.new(0, h.Y * 0.55, -h.Z * 0.3), Vector3.new(h.X * 1.0, 0.06, 0.06), accent)
+	else
+		-- Leather hood/cap.
+		piece(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.3, h.Z * 0.12),
+			Vector3.new(h.X * 1.14, h.Y * 0.55, h.Z * 1.0),
+			palette.Main,
+			palette.Material
+		)
+	end
+end
+
+local function chest(folder: Instance, torso: BasePart, look: string, palette: Palette, accent: Color3)
+	local t = torso.Size
+	local depth = if HEAVY[look] then 1.3 else 1.18
+	piece(
+		folder,
+		torso,
+		CFrame.new(0, 0.05, 0),
+		Vector3.new(t.X * 1.08, t.Y * 0.96, t.Z * depth),
+		palette.Main,
+		palette.Material
+	)
+	-- Glowing class stripe down the front: the retro-futuristic touch.
+	neon(folder, torso, CFrame.new(0, 0.05, -t.Z * depth / 2 - 0.02), Vector3.new(0.12, t.Y * 0.8, 0.05), accent)
+	if look == "StuddedLeather" then
+		for _, x in { -0.3, 0.3 } do
+			for _, y in { -0.25, 0.25 } do
+				piece(
+					folder,
+					torso,
+					CFrame.new(t.X * x, t.Y * y, -t.Z * depth / 2),
+					Vector3.one * 0.18,
+					palette.Accent,
+					Enum.Material.Metal,
+					Enum.PartType.Ball
+				)
+			end
+		end
+	elseif look == "WardedRobe" then
+		for _, y in { -0.2, 0.15 } do
+			neon(
+				folder,
+				torso,
+				CFrame.new(0, t.Y * y, -t.Z * depth / 2 - 0.02),
+				Vector3.new(t.X * 0.7, 0.06, 0.05),
+				accent
+			)
+		end
+	end
+end
+
+local function shoulders(folder: Instance, character: Model, look: string, palette: Palette, accent: Color3)
+	if ROBES[look] or look == "Chain" or look == "ShadowLeather" then
+		return
+	end
+	local big = look == "TowerPlate" or look == "Bulwark"
+	for _, side in { "Left", "Right" } do
+		local arm = bodyPart(character, side .. "UpperArm", side .. " Arm")
+		if arm then
+			local a = arm.Size
+			local top = if isR6(character) then a.Y * 0.4 else a.Y * 0.35
+			local scale = if big then 1.7 elseif HEAVY[look] then 1.45 else 1.25
+			local out = if side == "Left" then -0.12 else 0.12
+			piece(
+				folder,
+				arm,
+				CFrame.new(out, top, 0),
+				Vector3.new(a.X * scale, 0.5, a.Z * scale),
+				palette.Main,
+				palette.Material
+			)
+			if HEAVY[look] then
+				neon(
+					folder,
+					arm,
+					CFrame.new(out, top - 0.27, 0),
+					Vector3.new(a.X * scale + 0.02, 0.07, a.Z * scale + 0.02),
+					accent
+				)
+			end
+		end
+	end
+end
+
+local function waist(folder: Instance, character: Model, look: string, palette: Palette, accent: Color3)
+	local lower = bodyPart(character, "LowerTorso", "Torso")
+	if not lower then
+		return
+	end
+	local l = lower.Size
+	local y = if isR6(character) then -l.Y * 0.45 else 0
+	piece(
+		folder,
+		lower,
+		CFrame.new(0, y, 0),
+		Vector3.new(l.X * 1.12, 0.35, l.Z * 1.35),
+		palette.Trim,
+		Enum.Material.Leather
+	)
+	if look == "Robe" or look == "WardedRobe" then
+		-- Robe skirt down to the knees.
+		piece(
+			folder,
+			lower,
+			CFrame.new(0, y - 1.1, 0),
+			Vector3.new(l.X * 1.1, 2, l.Z * 1.3),
+			palette.Main,
+			palette.Material
+		)
+		neon(folder, lower, CFrame.new(0, y - 2.08, 0), Vector3.new(l.X * 1.12, 0.06, l.Z * 1.32), accent)
+	elseif look == "Wraps" then
+		neon(folder, lower, CFrame.new(0, y, -l.Z * 0.7), Vector3.new(0.25, 0.3, 0.05), accent)
+	end
+end
+
+-- Weapons -----------------------------------------------------------------------------
+-- Weapons are built along +Y with the grip at the origin, then mounted in a hand.
+
+local function gemSocket(folder: Instance, anchor: BasePart, mount: CFrame, at: Vector3, gem, size: number)
+	if gem then
+		local shade = GemConfig.shade(gem)
+		local color = if shade.Prismatic then Color3.fromRGB(120, 255, 200) else shade.Color
+		local stone = neon(
+			folder,
+			anchor,
+			mount * CFrame.new(at) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
+			Vector3.one * size,
+			color
+		)
+		stone.Name = "SocketedGem"
+	else
+		piece(
+			folder,
+			anchor,
+			mount * CFrame.new(at),
+			Vector3.one * size * 0.8,
+			IRON,
+			Enum.Material.Metal,
+			Enum.PartType.Ball
+		)
+	end
+end
+
+local function sword(folder: Instance, hand: BasePart, mount: CFrame, accent: Color3, gem, bladeLength: number)
+	piece(folder, hand, mount * CFrame.new(0, 0, 0), Vector3.new(0.22, 0.9, 0.22), DARK_WOOD, Enum.Material.Wood)
+	piece(folder, hand, mount * CFrame.new(0, 0.5, 0), Vector3.new(1.1, 0.18, 0.28), IRON, Enum.Material.Metal)
+	piece(
+		folder,
+		hand,
+		mount * CFrame.new(0, 0.6 + bladeLength / 2, 0),
+		Vector3.new(0.34, bladeLength, 0.08),
+		STEEL,
+		Enum.Material.Metal
+	)
+	neon(
+		folder,
+		hand,
+		mount * CFrame.new(0, 0.6 + bladeLength / 2, -0.045),
+		Vector3.new(0.06, bladeLength * 0.85, 0.02),
+		accent
+	)
+	gemSocket(folder, hand, mount, Vector3.new(0, 0.5, -0.16), gem, 0.24)
+end
+
+local function shield(folder: Instance, arm: BasePart, side: number, width: number, height: number, accent: Color3, gem)
+	local mount = CFrame.new(side * (arm.Size.X / 2 + 0.2), 0, 0) * CFrame.Angles(0, math.rad(90 * side), 0)
+	piece(folder, arm, mount, Vector3.new(width, height, 0.2), STEEL, Enum.Material.Metal)
+	piece(
+		folder,
+		arm,
+		mount * CFrame.new(0, 0, -0.12),
+		Vector3.new(width * 0.8, height * 0.8, 0.06),
+		Color3.fromRGB(60, 70, 110),
+		Enum.Material.Fabric
+	)
+	for _, y in { -height / 2, height / 2 } do
+		neon(folder, arm, mount * CFrame.new(0, y, -0.1), Vector3.new(width, 0.08, 0.05), accent)
+	end
+	gemSocket(folder, arm, mount, Vector3.new(0, 0, -0.2), gem, 0.4)
+end
+
+local WEAPONS: { [string]: (Instance, Model, BasePart, BasePart, Color3, any) -> () } = {}
+
+-- `right` / `left` are grip points in each hand; mounts are relative to them.
+local HELD_FORWARD = CFrame.Angles(math.rad(-110), 0, 0) -- pointing forward and a little down
+local UPRIGHT = CFrame.Angles(math.rad(-12), 0, 0)
+
+WEAPONS.Sword = function(folder, _character, right, _left, accent, gem)
+	sword(folder, right, HELD_FORWARD, accent, gem, 3)
+end
+
+WEAPONS.TwinBlades = function(folder, _character, right, left, accent, gem)
+	sword(folder, right, HELD_FORWARD, accent, gem, 2.2)
+	sword(folder, left, HELD_FORWARD, accent, nil, 2.2)
+end
+
+WEAPONS.Greataxe = function(folder, _character, right, _left, accent, gem)
+	local m = UPRIGHT * CFrame.new(0, -1, 0)
+	piece(folder, right, m * CFrame.new(0, 1.6, 0), Vector3.new(0.24, 4.4, 0.24), WOOD, Enum.Material.Wood)
+	piece(folder, right, m * CFrame.new(0, 3.3, -0.55), Vector3.new(0.14, 1.5, 1), STEEL, Enum.Material.Metal)
+	piece(folder, right, m * CFrame.new(0, 3.3, 0.3), Vector3.new(0.14, 0.7, 0.5), IRON, Enum.Material.Metal)
+	neon(folder, right, m * CFrame.new(0, 3.3, -1.07), Vector3.new(0.05, 1.4, 0.05), accent)
+	gemSocket(folder, right, m, Vector3.new(0, 3.3, 0), gem, 0.3)
+end
+
+WEAPONS.Warhammer = function(folder, _character, right, _left, accent, gem)
+	local m = UPRIGHT * CFrame.new(0, -1, 0)
+	piece(folder, right, m * CFrame.new(0, 1.6, 0), Vector3.new(0.26, 4.4, 0.26), WOOD, Enum.Material.Wood)
+	piece(folder, right, m * CFrame.new(0, 3.5, 0), Vector3.new(0.8, 0.8, 1.6), IRON, Enum.Material.Metal)
+	neon(folder, right, m * CFrame.new(0, 3.5, 0), Vector3.new(0.84, 0.1, 1.64), accent)
+	gemSocket(folder, right, m, Vector3.new(0.42, 3.5, 0), gem, 0.34)
+end
+
+WEAPONS.Staff = function(folder, _character, right, _left, accent, gem)
+	local m = CFrame.new(0, -1.8, 0)
+	piece(folder, right, m * CFrame.new(0, 2.4, 0), Vector3.new(0.24, 6, 0.24), DARK_WOOD, Enum.Material.Wood)
+	for _, a in { 0, 90 } do
+		piece(
+			folder,
+			right,
+			m * CFrame.new(0, 5.55, 0) * CFrame.Angles(0, math.rad(a), 0),
+			Vector3.new(0.8, 0.12, 0.12),
+			STEEL,
+			Enum.Material.Metal
+		)
+	end
+	neon(folder, right, m * CFrame.new(0, 4.5, 0), Vector3.new(0.3, 0.1, 0.3), accent)
+	gemSocket(folder, right, m, Vector3.new(0, 5.8, 0), gem, 0.5)
+end
+
+WEAPONS.WandTome = function(folder, _character, right, left, accent, gem)
+	local m = CFrame.Angles(math.rad(-100), 0, 0)
+	piece(folder, right, m * CFrame.new(0, 0.5, 0), Vector3.new(0.14, 1.5, 0.14), DARK_WOOD, Enum.Material.Wood)
+	gemSocket(folder, right, m, Vector3.new(0, 1.35, 0), gem, 0.24)
+	local book = CFrame.new(0, 0, -0.35) * CFrame.Angles(math.rad(-70), 0, 0)
+	piece(folder, left, book, Vector3.new(0.95, 1.2, 0.3), Color3.fromRGB(90, 40, 60), Enum.Material.Leather)
+	piece(
+		folder,
+		left,
+		book * CFrame.new(0.04, 0, 0),
+		Vector3.new(0.88, 1.1, 0.32),
+		Color3.fromRGB(235, 225, 200),
+		Enum.Material.SmoothPlastic
+	)
+	neon(folder, left, book * CFrame.new(0, 0, -0.17), Vector3.new(0.5, 0.5, 0.02), accent)
+end
+
+WEAPONS.Orb = function(folder, _character, right, _left, accent, gem)
+	local m = CFrame.new(0, 0.3, -0.9)
+	local orb =
+		piece(folder, right, m, Vector3.one * 1, Color3.fromRGB(170, 220, 255), Enum.Material.Glass, Enum.PartType.Ball)
+	orb.Transparency = 0.45
+	piece(
+		folder,
+		right,
+		m * CFrame.Angles(0, 0, math.rad(90)),
+		Vector3.new(0.1, 1.3, 1.3),
+		accent,
+		Enum.Material.Neon,
+		Enum.PartType.Cylinder
+	).Transparency =
+		0.5
+	gemSocket(folder, right, m, Vector3.zero, gem, 0.34)
+end
+
+local function bow(folder: Instance, hand: BasePart, length: number, accent: Color3, gem)
+	-- Held beside the left hand (outside the arm) so it's easy to see.
+	local grip = CFrame.new(-0.6, 0, -0.15)
+	for _, side in { -1, 1 } do
+		piece(
+			folder,
+			hand,
+			grip * CFrame.new(0, side * length * 0.26, 0.12) * CFrame.Angles(math.rad(side * 14), 0, 0),
+			Vector3.new(0.16, length * 0.52, 0.2),
+			WOOD,
+			Enum.Material.Wood
+		)
+		neon(folder, hand, grip * CFrame.new(0, side * length * 0.5, 0.3), Vector3.new(0.12, 0.12, 0.12), accent)
+	end
+	local string_ = piece(
+		folder,
+		hand,
+		grip * CFrame.new(0, 0, 0.36),
+		Vector3.new(0.04, length * 0.98, 0.04),
+		Color3.fromRGB(230, 230, 220),
+		Enum.Material.SmoothPlastic
+	)
+	string_.CastShadow = false
+	piece(folder, hand, grip, Vector3.new(0.24, 0.6, 0.26), DARK_WOOD, Enum.Material.Leather)
+	gemSocket(folder, hand, grip, Vector3.new(0, 0, -0.18), gem, 0.22)
+end
+
+WEAPONS.Longbow = function(folder, _character, _right, left, accent, gem)
+	bow(folder, left, 5, accent, gem)
+end
+
+WEAPONS.Shortbow = function(folder, _character, _right, left, accent, gem)
+	bow(folder, left, 3.4, accent, gem)
+end
+
+WEAPONS.Crossbow = function(folder, _character, right, _left, accent, gem)
+	local m = CFrame.Angles(math.rad(-90), 0, 0)
+	piece(folder, right, m * CFrame.new(0, 0.6, 0), Vector3.new(0.3, 2.2, 0.3), WOOD, Enum.Material.Wood)
+	piece(folder, right, m * CFrame.new(0, 1.6, 0), Vector3.new(2.2, 0.16, 0.22), STEEL, Enum.Material.Metal)
+	piece(
+		folder,
+		right,
+		m * CFrame.new(0, 1.2, 0.05),
+		Vector3.new(2, 0.04, 0.04),
+		Color3.fromRGB(230, 230, 220),
+		Enum.Material.SmoothPlastic
+	)
+	neon(folder, right, m * CFrame.new(0, 1.2, -0.16), Vector3.new(0.06, 1.2, 0.04), accent)
+	gemSocket(folder, right, m, Vector3.new(0, 1.6, -0.18), gem, 0.24)
+end
+
+WEAPONS.SwordShield = function(folder, character, right, _left, accent, gem)
+	sword(folder, right, HELD_FORWARD, accent, nil, 2.8)
+	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
+	if arm then
+		shield(folder, arm, -1, 1.8, 2.2, accent, gem)
+	end
+end
+
+WEAPONS.MaceShield = function(folder, character, right, _left, accent, gem)
+	local m = HELD_FORWARD
+	piece(folder, right, m * CFrame.new(0, 0.7, 0), Vector3.new(0.22, 2.2, 0.22), WOOD, Enum.Material.Wood)
+	piece(folder, right, m * CFrame.new(0, 2, 0), Vector3.new(0.7, 0.7, 0.7), IRON, Enum.Material.Metal)
+	neon(folder, right, m * CFrame.new(0, 2, 0), Vector3.new(0.74, 0.1, 0.74), accent)
+	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
+	if arm then
+		shield(folder, arm, -1, 2, 3.4, accent, gem)
+	end
+end
+
+-- Where a hand grips: the hand itself on R15, the bottom of the arm on R6.
+local function gripPoint(character: Model, side: string): (BasePart?, CFrame)
+	local hand = character:FindFirstChild(side .. "Hand") :: BasePart?
+	if hand then
+		return hand, CFrame.new(0, -0.1, 0)
+	end
+	local arm = character:FindFirstChild(side .. " Arm") :: BasePart?
+	return arm, CFrame.new(0, -0.9, 0)
+end
+
+-- Grip points as tiny invisible parts, so weapon code can treat them like hands.
+local function gripAnchor(folder: Instance, character: Model, side: string): BasePart?
+	local part, offset = gripPoint(character, side)
+	if not part then
+		return nil
+	end
+	local anchor = piece(folder, part, offset, Vector3.one * 0.05, Color3.new(), Enum.Material.SmoothPlastic)
+	anchor.Name = side .. "Grip"
+	anchor.Transparency = 1
+	return anchor
+end
+
+-- Hats and hair would poke through helmets and hoods.
+local function removeHeadwear(character: Model)
+	for _, accessory in character:GetChildren() do
+		if accessory:IsA("Accessory") then
+			local handle = accessory:FindFirstChild("Handle")
+			if handle and (handle:FindFirstChild("HatAttachment") or handle:FindFirstChild("HairAttachment")) then
+				accessory:Destroy()
+			end
+		end
+	end
+end
+
+function Equipment.apply(player: Player)
+	local character = player.Character
+	local loadout = PlayerData.character(player)
+	if not character or not loadout then
+		return
+	end
+	local existing = character:FindFirstChild(FOLDER_NAME)
+	if existing then
+		existing:Destroy()
+	end
+	local class = Classes.get(loadout.Class)
+	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
+	local armor = Classes.armor(loadout.Class, loadout.Armor)
+	if not class or not weapon or not armor then
+		return
+	end
+
+	local folder = Instance.new("Folder")
+	folder.Name = FOLDER_NAME
+	local accent = class.Color
+	local palette = ARMOR_PALETTES[armor.Look] or ARMOR_PALETTES.Plate
+
+	local head = character:FindFirstChild("Head") :: BasePart?
+	local torso = bodyPart(character, "UpperTorso", "Torso")
+	if head then
+		removeHeadwear(character)
+		helmet(folder, head, armor.Look, palette, accent)
+	end
+	if torso then
+		chest(folder, torso, armor.Look, palette, accent)
+	end
+	shoulders(folder, character, armor.Look, palette, accent)
+	waist(folder, character, armor.Look, palette, accent)
+
+	local right = gripAnchor(folder, character, "Right")
+	local left = gripAnchor(folder, character, "Left")
+	local build = WEAPONS[weapon.Look]
+	if build and right and left then
+		build(folder, character, right, left, accent, loadout.WeaponGem)
+	end
+	folder.Parent = character
+end
+
+local function watch(player: Player)
+	player.CharacterAppearanceLoaded:Connect(function()
+		-- The profile may still be loading on the first spawn.
+		for _ = 1, 20 do
+			if PlayerData.character(player) then
+				break
+			end
+			task.wait(0.5)
+		end
+		Equipment.apply(player)
+	end)
+end
+
+function Equipment.start()
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+		task.spawn(Equipment.apply, player)
+	end
+	PlayerData.CharacterChanged:Connect(Equipment.apply)
+end
+
+return Equipment

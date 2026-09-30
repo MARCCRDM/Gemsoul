@@ -1,5 +1,6 @@
 --[[
-	Each player's saved profile: coins, gem inventory and free-mining quota.
+	Each player's saved profile: coins, gem inventory, free-mining quota,
+	chosen class and gear, and progress through the intro.
 	Loads from a DataStore on join and saves on leave, on shutdown and every
 	few minutes. If loading fails (for example in Studio without API access)
 	the player gets a fresh profile that is not saved, so a failed load can
@@ -18,17 +19,30 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Remotes = require(script.Parent.Remotes)
 
 type Gem = GemConfig.Gem
+type Character = {
+	Class: string?,
+	Weapon: string?,
+	Armor: string?,
+	WeaponGem: Gem?, -- a cut gem socketed into the weapon
+}
+type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean }
 type Profile = {
 	Version: number,
 	Coins: number,
 	Gems: { Gem },
 	Quota: { Day: number, UsedToday: number, Week: number, UsedThisWeek: number },
+	Character: Character,
+	Intro: Intro,
 }
 
 local PlayerData = {}
 
 local profiles: { [Player]: Profile } = {}
 local canSave: { [Player]: boolean } = {}
+
+-- Fires (player) when a player's class, gear or socketed gem changes.
+local characterChanged = Instance.new("BindableEvent")
+PlayerData.CharacterChanged = characterChanged.Event
 
 local store = nil
 do
@@ -40,11 +54,23 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 1,
+		Version = 2,
 		Coins = Config.StartingCoins,
 		Gems = {},
 		Quota = { Day = 0, UsedToday = 0, Week = 0, UsedThisWeek = 0 },
+		Character = {},
+		Intro = { Spun = false, FirstStone = false, Done = false },
 	}
+end
+
+-- Brings profiles saved by older versions of the game up to date.
+local function migrate(profile: Profile): Profile
+	if (profile.Version or 1) < 2 then
+		profile.Character = profile.Character or {}
+		profile.Intro = profile.Intro or { Spun = false, FirstStone = false, Done = false }
+		profile.Version = 2
+	end
+	return profile
 end
 
 -- Days and weeks (starting Monday) since the Unix epoch, in UTC.
@@ -103,7 +129,7 @@ local function load(player: Player)
 		for attempt = 1, 3 do
 			local ok, result = pcall(store.GetAsync, store, "player_" .. player.UserId)
 			if ok then
-				profile = result or newProfile()
+				profile = if result then migrate(result) else newProfile()
 				loaded = true
 				break
 			end
@@ -179,7 +205,69 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		DailyQuota = Config.DailyQuota,
 		WeeklyQuota = Config.WeeklyQuota,
 		Saving = canSave[player] == true,
+		Character = profile.Character,
+		Intro = profile.Intro,
 	}
+end
+
+function PlayerData.character(player: Player): Character?
+	local profile = profiles[player]
+	return profile and profile.Character
+end
+
+function PlayerData.intro(player: Player): Intro?
+	local profile = profiles[player]
+	return profile and profile.Intro
+end
+
+-- Records a step of the intro (e.g. "Spun", "FirstStone", "Done").
+function PlayerData.setIntroFlag(player: Player, flag: string)
+	local profile = profiles[player]
+	if profile then
+		(profile.Intro :: any)[flag] = true
+		sync(player)
+	end
+end
+
+-- Sets class, weapon and armor (ids are checked by the caller).
+function PlayerData.setLoadout(player: Player, classId: string, weaponId: string, armorId: string)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	local character = profile.Character
+	if character.Class ~= classId and character.WeaponGem then
+		-- Changing class puts a socketed gem back in the pouch.
+		table.insert(profile.Gems, character.WeaponGem)
+		character.WeaponGem = nil
+	end
+	character.Class, character.Weapon, character.Armor = classId, weaponId, armorId
+	sync(player)
+	characterChanged:Fire(player)
+end
+
+--[[
+	Moves a cut gem from the pouch into the weapon's socket. A gem already
+	in the socket goes back to the pouch. Returns the socketed gem.
+]]
+function PlayerData.socketGem(player: Player, gemId: string): Gem?
+	local profile = profiles[player]
+	if not profile or not profile.Character.Weapon then
+		return nil
+	end
+	local gem = PlayerData.findGem(player, gemId)
+	if not gem or gem.Cut == nil then
+		return nil
+	end
+	PlayerData.removeGem(player, gemId)
+	local previous = profile.Character.WeaponGem
+	if previous then
+		table.insert(profile.Gems, previous)
+	end
+	profile.Character.WeaponGem = gem
+	sync(player)
+	characterChanged:Fire(player)
+	return gem
 end
 
 function PlayerData.get(player: Player): Profile?

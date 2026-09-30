@@ -145,6 +145,13 @@ function handlers.FinishCut(player: Player, times: any)
 	)
 end
 
+-- Lets other systems add request actions (e.g. the intro's).
+function Shop.register(action: string, handler: (Player, ...any) -> { [string]: any })
+	handlers[action] = handler
+end
+
+Shop.reply = reply
+
 -- Entry point for every client request (also called directly by tests).
 function Shop.handle(player: Player, action: any, ...): { [string]: any }
 	local now = os.clock()

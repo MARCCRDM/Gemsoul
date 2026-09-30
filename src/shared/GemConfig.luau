@@ -98,6 +98,16 @@ GemConfig.SourceLabels = {
 	MiningStore = "Bought at the Mining Store",
 	PvEDrop = "Dropped by a monster",
 	PvPWager = "Won in a PvP duel",
+	StarterSpin = "Starter gem spin",
+	FirstStone = "Your first stone, from Ilsa",
+}
+
+-- What a gem does when socketed into a weapon.
+GemConfig.ElementEffects = {
+	Fire = "Burns enemies, dealing damage over time.",
+	Frost = "Chills enemies, slowing them down.",
+	Shock = "Arcs to a second nearby enemy.",
+	Poison = "Weakens enemies so they deal less damage.",
 }
 
 GemConfig.TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4 }
@@ -120,6 +130,8 @@ GemConfig.SourceLuck = {
 	VipMiningNode = 0.5,
 	MiningStore = 0.15,
 	PvEDrop = 0.1, -- plus the monster's own bonus
+	StarterSpin = 0.25,
+	FirstStone = 0,
 }
 
 --[[

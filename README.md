@@ -32,6 +32,20 @@ Every shop has a robot shopkeeper outside. Walk up and press **E** to talk, then
 
 Streets and building plots are painted terrain (cobblestone, pavement, dirt), so grass only grows in the gardens, the farm field and outside the walls.
 
+## New players: the intro
+
+Players who haven't finished the intro see it when they join (over a flyover of the kingdom):
+
+1. **Welcome** to Gemsoul.
+2. **Class:** Warrior, Wizard, Archer or Tank, each with a role, stats, difficulty and three core abilities.
+3. **Weapon** and 4. **Armor:** three playstyles each per class. A live preview shows your own avatar wearing your picks.
+5. **Starter gems:** a lottery spin for three already-cut gems (at least one Uncommon or better).
+6. **Gem school:** cut a rough stone yourself while each property is explained, plus where gems go in town.
+7. **Enchant:** socket a cut gem into your weapon; it glows in the gem's colour.
+8. **Ready:** character sheet, then into the game wearing your gear.
+
+Classes, gear and upcoming specializations are defined in `src/shared/Classes.luau`. Combat isn't built yet: abilities are listed but not active.
+
 ## Gems
 
 Gemstones follow the *GemSoul Gemstone Property & Generation Architecture* design:
@@ -69,17 +83,21 @@ src/
       PlayerData.luau         saved coins, gem inventory, free-mining quota
       Mining.luau             quarry nodes: free mines give rough stones
       Shop.luau               store purchases, laser cuts, hand-cut minigame
+      Intro.luau              intro steps: loadout, starter spin, first stone, socketing
+      Equipment.luau          builds class armor and weapons onto avatars
       Remotes.luau            client/server remotes
       Vip.luau                IsVIP attribute (game pass, or everyone in Studio)
   client/                     -> StarterPlayerScripts.Client
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
     Hud.client.luau           coins/gems button, opens the pouch ([G])
+    Intro.client.luau         new-player intro screens
     Modules/                  gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared
     Config.luau               tunable numbers (quotas, prices, saving, VIP pass id)
     GemConfig.luau            gem colours, tiers, odds, cut grades, value formula
+    Classes.luau              classes, weapons, armor, abilities, specs
     Vendors.luau              shopkeeper names, greetings and dialogue options
     Tags.luau                 CollectionService tag names
 ```
