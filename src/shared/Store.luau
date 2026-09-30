@@ -44,9 +44,14 @@ export type Crate = {
 
 local Store = {}
 
-Store.Tabs = { "Bundles", "Backs", "Trims", "Crates", "Passes" }
-Store.TabNames =
-	{ Bundles = "Bundles", Backs = "Back Pieces", Trims = "Trims", Crates = "Geode Crates", Passes = "Passes" }
+Store.Tabs = { "Featured", "Bundles", "Backs", "Trims", "Passes" }
+Store.TabNames = {
+	Featured = "⭐ Featured",
+	Bundles = "🎁 Bundles",
+	Backs = "🎒 Back Pieces",
+	Trims = "✨ Trims",
+	Passes = "👑 Passes",
+}
 
 -- New players can buy the Welcome Bundle once, within this long of joining.
 Store.WelcomeHours = 24
@@ -141,6 +146,14 @@ Store.Crates = {
 	},
 } :: { [string]: Crate }
 Store.CrateOrder = { "GeodeCrate", "MasterworkCrate" }
+
+-- Buying in bulk is cheaper: count -> price multiplier.
+Store.CrateBulk = { [1] = 1, [5] = 4.5, [10] = 8.5 }
+
+function Store.cratePrice(crate: Crate, count: number): number?
+	local mult = Store.CrateBulk[count]
+	return if mult then math.floor(crate.Price * mult) else nil
+end
 
 -- A cosmetic you already own becomes this many coins instead.
 Store.DuplicateRefund = 120

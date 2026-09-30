@@ -1,14 +1,15 @@
 --[[
-	The Shop [B]: five tabs.
-	  Bundles       big coloured cards with a value tag and what's inside
-	  Back Pieces   rarity-coloured tiles; buy, equip or take off
+	The Gem Shop [B].
+	  Featured      the Geode Crate hero card: odds, 1 / 5 / 10 buy buttons,
+	                open buttons; plus the Masterwork Crate and a bundle
+	  Bundles       big coloured cards with value ribbons
+	  Back Pieces   rarity tiles that bounce; preview, buy / equip / take off
 	  Trims         the same, for glow colours
-	  Geode Crates  buy, then open with a reveal
-	  Passes        the VIP pass (when you've set one up)
-	Plus the Welcome Bundle popup for new players (ShopUI.showWelcome), with
-	its 24-hour countdown.
-	Prices are coins. When a Robux product is switched on in Store.luau, its
-	card also gets a Robux button.
+	  Passes        the VIP pass
+	Opening crates plays the full-screen reveal (CrateReveal). New players
+	also get the Welcome Bundle popup with its 24-hour countdown.
+	Prices are coins; Robux buttons appear for products switched on in
+	Store.RobuxProducts.
 ]]
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -20,62 +21,54 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Store = require(ReplicatedStorage.Shared.Store)
+local CrateReveal = require(script.Parent.CrateReveal)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local ShopArt = require(script.Parent.ShopArt)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
 local P = IronUi.Colors
-local BOLD, HEADING = IronUi.Bold, IronUi.Heading
-local new, text, box, button, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
+local CHUNKY, HEADING = IronUi.Chunky, IronUi.Heading
+local new, text, title, clear = IronUi.new, IronUi.text, IronUi.title, IronUi.clear
 
-local WIDTH, HEIGHT = 1000, 620
-local BACK_ICONS = { Pack = "🎒", Banner = "🚩", Geode = "🔮", Cape = "🧥", Wings = "🦋", Halo = "💫" }
+local WIDTH, HEIGHT = 1040, 640
+local RARITY_NAMES = { Common = "Common", Uncommon = "Uncommon", Rare = "Rare", UltraRare = "Ultra Rare" }
 
 local ShopUI = {}
 
-local window = IronUi.window("Shop", 10, WIDTH, HEIGHT, "🛒")
+local window = IronUi.window("Shop", 10, WIDTH, HEIGHT, "🛒", P.Amethyst)
 local gui, panel = window.Gui, window.Panel
-window.Title.Text = "SHOP"
-window.Subtitle.Text = "Everything here costs coins. Earn them daily, from monsters and from Tamsin."
+window.Title.Text = "GEM SHOP"
+window.Subtitle.Text = "Crates, cosmetics and bundles. Everything costs coins."
 
-local tab = "Bundles"
-local selected: string? = nil -- cosmetic id on the Backs / Trims tabs
+local tab = "Featured"
+local selected: string? = nil
 local busy = false
 
-local coinsPill = text(panel, "", 16, P.Gold, BOLD)
-coinsPill.AnchorPoint = Vector2.new(1, 0)
-coinsPill.Position = UDim2.new(1, -44, 0, 24)
-coinsPill.Size = UDim2.fromOffset(260, 22)
-coinsPill.TextXAlignment = Enum.TextXAlignment.Right
+local wallet = text(panel, "", 18, P.Gold, CHUNKY)
+wallet.AnchorPoint = Vector2.new(1, 0)
+wallet.Position = UDim2.new(1, -56, 0, 22)
+wallet.Size = UDim2.fromOffset(320, 24)
+wallet.AutomaticSize = Enum.AutomaticSize.None
+wallet.TextXAlignment = Enum.TextXAlignment.Right
+wallet.ZIndex = 4
 
 local tabBar = new(
 	"Frame",
-	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(24, 76), Size = UDim2.fromOffset(700, 32) },
+	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(26, 80), Size = UDim2.fromOffset(900, 36) },
 	panel
 )
 local body = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(24, 122),
-	Size = UDim2.fromOffset(WIDTH - 48, HEIGHT - 146),
+	Position = UDim2.fromOffset(26, 128),
+	Size = UDim2.fromOffset(WIDTH - 52, HEIGHT - 152),
 }, panel)
+
+-- Helpers -----------------------------------------------------------------------------------------
 
 local function profile()
 	return GemClient.Profile or {}
-end
-
-local function run(action: string, ...: any)
-	if busy then
-		return
-	end
-	busy = true
-	local args = table.pack(...)
-	task.spawn(function()
-		local result = GemClient.request(action, table.unpack(args, 1, args.n))
-		UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
-		busy = false
-		ShopUI.refresh()
-	end)
 end
 
 local function commas(n: number): string
@@ -94,12 +87,48 @@ local function cosmeticName(id: string): string
 	return if c then c.Name else id
 end
 
+-- Text that floats up from a spot and fades, e.g. "+5 CRATES!".
+local function floatText(from: GuiObject, message: string, color: Color3)
+	local label = IronUi.title(panel, message, 22, color)
+	label.AutomaticSize = Enum.AutomaticSize.XY
+	label.Size = UDim2.fromOffset(0, 0)
+	label.AnchorPoint = Vector2.new(0.5, 1)
+	local offset = from.AbsolutePosition - panel.AbsolutePosition
+	local s = window.Scale.Scale
+	label.Position = UDim2.fromOffset((offset.X + from.AbsoluteSize.X / 2) / s, offset.Y / s)
+	label.ZIndex = 30
+	label.Rotation = math.random(-8, 8)
+	TweenService:Create(label, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = label.Position - UDim2.fromOffset(0, 60),
+		TextTransparency = 1,
+	}):Play()
+	task.delay(0.95, function()
+		label:Destroy()
+	end)
+end
+
+local function run(from: GuiObject?, success: string?, action: string, ...: any)
+	if busy then
+		return
+	end
+	busy = true
+	local args = table.pack(...)
+	task.spawn(function()
+		local result = GemClient.request(action, table.unpack(args, 1, args.n))
+		if result.Ok and from and success then
+			pcall(floatText, from, success, P.Gold)
+		end
+		UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
+		busy = false
+		ShopUI.refresh()
+	end)
+end
+
 local function welcomeSecondsLeft(): number
 	local p = profile()
 	if not p.FirstJoin or p.FirstJoin == 0 or p.WelcomeBought then
 		return 0
 	end
-	-- Use the server's clock (sent with the profile) so the countdown is honest.
 	local offset = (p.ServerTime or os.time()) - os.time()
 	return math.max(0, p.FirstJoin + Store.WelcomeHours * 3600 - (os.time() + offset))
 end
@@ -108,137 +137,390 @@ local function clock(seconds: number): string
 	return string.format("%02d:%02d:%02d", seconds // 3600, (seconds % 3600) // 60, seconds % 60)
 end
 
--- A card with a coloured gradient background.
-local function colorCard(parent: Instance, color: Color3, order: number?): Frame
-	local card = new("Frame", { BackgroundColor3 = color, LayoutOrder = order or 0 }, parent)
-	UiKit.round(card, 12)
-	new("UIStroke", { Color = color:Lerp(Color3.new(1, 1, 1), 0.35), Thickness = 2 }, card)
+-- A chunky card: saturated gradient, dark ink edge, glossy top and diagonal sheen.
+local function card(parent: Instance, color: Color3, order: number?): Frame
+	local c = new(
+		"Frame",
+		{ BackgroundColor3 = Color3.new(1, 1, 1), LayoutOrder = order or 0, ClipsDescendants = true },
+		parent
+	)
+	UiKit.round(c, 14)
+	new("UIStroke", { Color = P.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, c)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.15), color:Lerp(Color3.new(0, 0, 0), 0.45)),
-	}, card)
-	return card
+		Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.2), color:Lerp(Color3.new(0, 0, 0), 0.5)),
+	}, c)
+	for i, x in { 0.15, 0.55, 0.85 } do
+		new("Frame", {
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = if i == 2 then 0.9 else 0.94,
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(x, 0.5),
+			Size = UDim2.new(0, if i == 2 then 70 else 30, 2, 0),
+			Rotation = 25,
+		}, c)
+	end
+	local gloss = new("Frame", {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.85,
+		Position = UDim2.fromOffset(8, 6),
+		Size = UDim2.new(1, -16, 0, 12),
+	}, c)
+	UiKit.round(gloss, 6)
+	return c
 end
 
-local function valueTag(parent: Instance, label: string)
+-- A tilted ribbon tag, e.g. "5X VALUE" or "SEASON 1".
+local function ribbon(parent: Instance, label: string, color: Color3?, x: number?, y: number?)
 	local tag = new("TextLabel", {
-		BackgroundColor3 = P.Gold,
-		Position = UDim2.fromOffset(10, 10),
+		BackgroundColor3 = color or P.Gold,
+		Position = UDim2.fromOffset(x or 10, y or 10),
 		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 22),
+		Size = UDim2.fromOffset(0, 26),
 		Text = label,
-		Font = BOLD,
-		TextSize = 12,
-		TextColor3 = Color3.fromRGB(40, 24, 8),
-		Rotation = -4,
-		ZIndex = 3,
+		Font = CHUNKY,
+		TextSize = 14,
+		TextColor3 = Color3.new(1, 1, 1),
+		Rotation = -6,
+		ZIndex = 6,
 	}, parent)
-	UiKit.round(tag, 6)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, tag)
+	UiKit.round(tag, 8)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, tag)
+	IronUi.outline(tag, 2)
+	return tag
 end
 
-local function bigIcon(parent: Instance, icon: string, y: number, size: number)
-	local label = new("TextLabel", {
+local function emoji(parent: Instance, glyph: string, size: number, position: UDim2): TextLabel
+	-- A dark copy behind for a drop shadow.
+	local shadow = new("TextLabel", {
 		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, y),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = position + UDim2.fromOffset(4, 5),
 		Size = UDim2.fromOffset(size, size),
-		Text = icon,
+		Text = glyph,
 		TextSize = size,
-		Font = BOLD,
+		Font = CHUNKY,
+		TextColor3 = Color3.new(0, 0, 0),
+		TextTransparency = 0.6,
 	}, parent)
-	return label
+	shadow.Name = "Shadow"
+	return new("TextLabel", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = position,
+		Size = UDim2.fromOffset(size, size),
+		Text = glyph,
+		TextSize = size,
+		Font = CHUNKY,
+	}, parent)
 end
 
 local function robuxButton(parent: Instance, key: string)
 	local id = Store.RobuxProducts[key]
 	if id and id ~= 0 then
-		button(parent, string.format("R$ %d", Store.RobuxPrices[key] or 0), false, function()
-			MarketplaceService:PromptProductPurchase(player, id)
-		end)
+		IronUi.gemButton(
+			parent,
+			string.format("R$ %d", Store.RobuxPrices[key] or 0),
+			Color3.fromRGB(40, 170, 90),
+			function()
+				MarketplaceService:PromptProductPurchase(player, id)
+			end
+		)
 	end
 end
 
--- Bundles ------------------------------------------------------------------------------------------
+-- Opens crates and plays the reveal.
+local function openCrates(crate: Store.Crate, count: number)
+	if busy then
+		return
+	end
+	busy = true
+	task.spawn(function()
+		local result = GemClient.request("OpenCrate", crate.Id, count)
+		busy = false
+		if not result.Ok then
+			UiKit.toast(result.Message, P.Bad)
+			return
+		end
+		gui.Enabled = false
+		CrateReveal.play(crate, result.Results or { result })
+		gui.Enabled = true
+		ShopUI.refresh()
+	end)
+end
 
-local function drawBundles()
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, -64) }, body)
+-- Featured --------------------------------------------------------------------------------------------
+
+-- A row of odds tiles for a crate: what can drop and how likely.
+local function oddsRow(parent: Instance, crate: Store.Crate, tileSize: number): Frame
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, tileSize),
+	}, parent)
+	UiKit.list(row, 8, true)
+	local total = 0
+	for _, roll in crate.Rolls do
+		total += roll.Weight
+	end
+	for i, roll in crate.Rolls do
+		local rarity = roll.Cosmetic
+			or (if roll.Reward and (roll.Reward.CutGems or roll.Reward.Marks) then "Uncommon" else "Common")
+		local tile = ShopArt.rarityTile(row, rarity, tileSize)
+		tile.LayoutOrder = i
+		local kind = if roll.Cosmetic
+			then "Cosmetic"
+			elseif roll.Reward.CutGems then "CutGems"
+			elseif roll.Reward.Stones then "Stones"
+			elseif roll.Reward.Marks then "Marks"
+			else "Materials"
+		ShopArt.icon(tile, kind, nil, tileSize * 0.8).Position = UDim2.fromScale(0.5, 0.42)
+		local pct = text(
+			tile,
+			string.format("%d%%", math.floor(roll.Weight / total * 100 + 0.5)),
+			13,
+			Color3.new(1, 1, 1),
+			CHUNKY
+		)
+		pct.AnchorPoint = Vector2.new(0, 1)
+		pct.Position = UDim2.new(0, 0, 1, -2)
+		pct.TextXAlignment = Enum.TextXAlignment.Center
+		local bob = new("UIScale", {}, tile)
+		-- Tiles bob gently, one after another.
+		local phase = i * 0.5
+		IronUi.animate(tile, function(t)
+			bob.Scale = 1 + math.sin(t * 3 + phase) * 0.03
+		end)
+	end
+	return row
+end
+
+local function buyRow(parent: Instance, crate: Store.Crate)
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 62),
+	}, parent)
+	UiKit.list(row, 12, true)
+	for i, count in { 1, 5, 10 } do
+		local slot = new("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(150, 62),
+			LayoutOrder = i,
+		}, row)
+		local price = Store.cratePrice(crate, count) :: number
+		local b
+		b = IronUi.gemButton(slot, "💰 " .. commas(price), P.Emerald, function()
+			run(b, string.format("+%d CRATE%s!", count, if count == 1 then "" else "S"), "BuyCrate", crate.Id, count)
+		end)
+		b.AutomaticSize = Enum.AutomaticSize.None
+		b.Size = UDim2.new(1, 0, 0, 40)
+		local label = text(
+			slot,
+			string.format("%d Crate%s", count, if count == 1 then "" else "s"),
+			13,
+			Color3.new(1, 1, 1),
+			CHUNKY
+		)
+		label.Position = UDim2.fromOffset(0, 44)
+		label.TextXAlignment = Enum.TextXAlignment.Center
+		if count > 1 then
+			local save = math.floor((1 - Store.CrateBulk[count] / count) * 100 + 0.5)
+			ribbon(slot, string.format("-%d%%", save), P.Bad, 110, -12).TextSize = 12
+		end
+	end
+	return row
+end
+
+local function drawFeatured()
+	local geode = Store.Crates.GeodeCrate
+	local hero = card(body, geode.Color)
+	hero.Size = UDim2.new(1, 0, 0, 290)
+	ribbon(hero, "SEASON 1", P.Amethyst, 14, 14)
+	local art = ShopArt.crate(hero, 210, Color3.fromRGB(120, 240, 255))
+	art.Position = UDim2.fromOffset(140, 150)
+	-- The crate floats gently.
+	IronUi.animate(art, function(t)
+		art.Position = UDim2.fromOffset(140, 150 + math.sin(t * 2) * 5)
+		art.Rotation = math.sin(t * 1.3) * 3
+	end)
+	local right = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(280, 16),
+		Size = UDim2.new(1, -300, 1, -32),
+	}, hero)
+	UiKit.list(right, 10)
+	local heading = title(right, "GEODE CRATE!", 38, P.Gold)
+	heading.LayoutOrder = 1
+	local blurb = text(right, geode.Description, 14, Color3.new(1, 1, 1), IronUi.Bold)
+	blurb.LayoutOrder = 2
+	oddsRow(right, geode, 62).LayoutOrder = 3
+	buyRow(right, geode).LayoutOrder = 4
+	robuxButton(right, geode.Id)
+
+	-- Crates you own, ready to open.
+	local have = (profile().Crates or {}).GeodeCrate or 0
+	if have > 0 then
+		local open = new("Frame", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -16, 0, 16),
+			Size = UDim2.fromOffset(0, 40),
+			AutomaticSize = Enum.AutomaticSize.X,
+		}, hero)
+		UiKit.list(open, 8, true)
+		IronUi.gemButton(open, "OPEN 1", P.Gold:Lerp(Color3.fromRGB(255, 140, 0), 0.4), function()
+			openCrates(geode, 1)
+		end)
+		if have > 1 then
+			IronUi.gemButton(
+				open,
+				string.format("OPEN %d", math.min(have, 10)),
+				Color3.fromRGB(230, 120, 30),
+				function()
+					openCrates(geode, math.min(have, 10))
+				end
+			)
+		end
+		local owned = text(hero, string.format("You have %d", have), 14, Color3.new(1, 1, 1), CHUNKY)
+		owned.AnchorPoint = Vector2.new(1, 0)
+		owned.Position = UDim2.new(1, -18, 0, 60)
+		owned.Size = UDim2.fromOffset(200, 0)
+		owned.TextXAlignment = Enum.TextXAlignment.Right
+	end
+
+	-- Two feature cards underneath.
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 304),
+		Size = UDim2.new(1, 0, 1, -304),
+	}, body)
 	new("UIGridLayout", {
-		CellSize = UDim2.new(1 / 3, -10, 1, 0),
+		CellSize = UDim2.new(0.5, -7, 1, 0),
 		CellPadding = UDim2.fromOffset(14, 0),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, row)
+	local master = Store.Crates.MasterworkCrate
+	local mCard = card(row, master.Color, 1)
+	local mArt = ShopArt.crate(mCard, 120, Color3.fromRGB(255, 190, 80))
+	mArt.Position = UDim2.fromOffset(80, 92)
+	local mInfo = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(150, 14),
+		Size = UDim2.new(1, -164, 1, -28),
+	}, mCard)
+	UiKit.list(mInfo, 6)
+	title(mInfo, "MASTERWORK CRATE", 22, Color3.new(1, 1, 1)).LayoutOrder = 1
+	text(mInfo, master.Description, 12, Color3.new(1, 1, 1), IronUi.Bold).LayoutOrder = 2
+	local mButtons = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), LayoutOrder = 3 }, mInfo)
+	UiKit.list(mButtons, 8, true)
+	local mBuy
+	mBuy = IronUi.gemButton(mButtons, "💰 " .. commas(master.Price), P.Emerald, function()
+		run(mBuy, "+1 CRATE!", "BuyCrate", master.Id, 1)
+	end)
+	local mHave = (profile().Crates or {}).MasterworkCrate or 0
+	if mHave > 0 then
+		IronUi.gemButton(mButtons, string.format("OPEN (%d)", mHave), Color3.fromRGB(230, 120, 30), function()
+			openCrates(master, math.min(mHave, 10))
+		end)
+	end
+
+	-- The Welcome Bundle while it lasts, otherwise the Legend Bundle.
+	local left = welcomeSecondsLeft()
+	local bundle = if left > 0 then Store.bundle("Welcome") else Store.bundle("Legend")
+	if bundle then
+		local bCard = card(row, bundle.Color, 2)
+		emoji(bCard, bundle.Icon, 80, UDim2.fromOffset(78, 92))
+		ribbon(bCard, bundle.Value, P.Bad, 12, 12)
+		local bInfo = new("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(150, 14),
+			Size = UDim2.new(1, -164, 1, -28),
+		}, bCard)
+		UiKit.list(bInfo, 6)
+		title(bInfo, string.upper(bundle.Name), 22, Color3.new(1, 1, 1)).LayoutOrder = 1
+		local sub = if left > 0 then "⏰ Ends in " .. clock(left) .. "  •  new players only" else bundle.Tagline
+		text(bInfo, sub, 12, Color3.new(1, 1, 1), IronUi.Bold).LayoutOrder = 2
+		local bButtons =
+			new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), LayoutOrder = 3 }, bInfo)
+		UiKit.list(bButtons, 8, true)
+		local bBuy
+		bBuy = IronUi.gemButton(bButtons, "💰 " .. commas(bundle.Price), P.Emerald, function()
+			run(bBuy, "BUNDLE GET!", "BuyBundle", bundle.Id)
+		end)
+		robuxButton(bButtons, bundle.Id)
+	end
+end
+
+-- Bundles ------------------------------------------------------------------------------------------------
+
+local function drawBundles()
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, body)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(1 / 3, -10, 1, 0),
+		CellPadding = UDim2.fromOffset(15, 0),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, row)
 	for i, bundle in Store.Bundles do
-		if not bundle.NewPlayersOnly then
-			local card = colorCard(row, bundle.Color, i)
-			valueTag(card, bundle.Value)
-			bigIcon(card, bundle.Icon, 40, 70)
+		if not bundle.NewPlayersOnly or welcomeSecondsLeft() > 0 then
+			local c = card(row, bundle.Color, if bundle.NewPlayersOnly then 0 else i)
+			ribbon(c, bundle.Value, P.Bad, 12, 12)
+			local icon = emoji(c, bundle.Icon, 96, UDim2.new(0.5, 0, 0, 110))
+			-- The icon breathes.
+			IronUi.animate(icon, function(t)
+				icon.Rotation = math.sin(t * 1.6 + i) * 6
+			end)
 			local info = new("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(14, 120),
-				Size = UDim2.new(1, -28, 1, -176),
-			}, card)
-			UiKit.list(info, 3).HorizontalAlignment = Enum.HorizontalAlignment.Center
-			local name = text(info, string.upper(bundle.Name), 18, Color3.new(1, 1, 1), HEADING)
+				Position = UDim2.fromOffset(16, 176),
+				Size = UDim2.new(1, -32, 1, -240),
+			}, c)
+			UiKit.list(info, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
+			local name = title(info, string.upper(bundle.Name), 24, Color3.new(1, 1, 1))
 			name.TextXAlignment = Enum.TextXAlignment.Center
-			local tagline = text(info, bundle.Tagline, 12, Color3.fromRGB(230, 230, 230))
+			local tagline = text(info, bundle.Tagline, 13, Color3.new(1, 1, 1), IronUi.Bold)
 			tagline.TextXAlignment = Enum.TextXAlignment.Center
-			local contents =
-				text(info, table.concat(Store.describe(bundle.Contents, cosmeticName), "  •  "), 12, P.Gold, BOLD)
-			contents.TextXAlignment = Enum.TextXAlignment.Center
+			-- Contents as little chips.
+			local chips = new("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+			}, info)
+			local chipList = UiKit.list(chips, 6, true)
+			chipList.Wraps = true
+			chipList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			for _, line in Store.describe(bundle.Contents, cosmeticName) do
+				local chip = new("TextLabel", {
+					BackgroundColor3 = Color3.new(0, 0, 0),
+					BackgroundTransparency = 0.55,
+					AutomaticSize = Enum.AutomaticSize.X,
+					Size = UDim2.fromOffset(0, 22),
+					Text = line,
+					Font = CHUNKY,
+					TextSize = 12,
+					TextColor3 = P.Gold,
+				}, chips)
+				UiKit.round(chip, 11)
+				new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, chip)
+			end
 			local buttons = new("Frame", {
 				BackgroundTransparency = 1,
 				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 1, -12),
-				Size = UDim2.new(1, -24, 0, 34),
-			}, card)
+				Position = UDim2.new(0.5, 0, 1, -16),
+				Size = UDim2.new(1, -24, 0, 40),
+			}, c)
 			UiKit.list(buttons, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
-			button(buttons, "💰 " .. commas(bundle.Price), true, function()
-				run("BuyBundle", bundle.Id)
+			local b
+			b = IronUi.gemButton(buttons, "💰 " .. commas(bundle.Price), P.Emerald, function()
+				run(b, "BUNDLE GET!", "BuyBundle", bundle.Id)
 			end)
 			robuxButton(buttons, bundle.Id)
 		end
 	end
-	-- The Welcome Bundle, while it lasts.
-	local left = welcomeSecondsLeft()
-	if left > 0 then
-		local banner = colorCard(body, Store.bundle("Welcome").Color)
-		banner.Position = UDim2.new(0, 0, 1, -52)
-		banner.Size = UDim2.new(1, 0, 0, 52)
-		local b = new("TextButton", {
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 1),
-			Text = string.format(
-				"🎁  WELCOME BUNDLE  •  5X VALUE  •  ends in %s  •  new players only",
-				clock(left)
-			),
-			Font = BOLD,
-			TextSize = 16,
-			TextColor3 = Color3.new(1, 1, 1),
-		}, banner)
-		b.Activated:Connect(ShopUI.showWelcome)
-	end
 end
 
--- Back pieces and trims -------------------------------------------------------------------------------
-
-local function tileIcon(parent: Instance, cosmetic, size: number)
-	if cosmetic.Kind == "Trim" then
-		local dot = new("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(size * 0.55, size * 0.55),
-			BackgroundColor3 = cosmetic.Color,
-		}, parent)
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0.5, 0)
-		corner.Parent = dot
-		new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 3 }, dot)
-	else
-		local label = bigIcon(parent, BACK_ICONS[cosmetic.Look] or "✨", size * 0.2, math.floor(size * 0.55))
-		label.AnchorPoint = Vector2.new(0.5, 0)
-	end
-end
+-- Back pieces and trims -------------------------------------------------------------------------------------
 
 local function drawCosmetics(kind: string)
 	local p = profile()
@@ -254,275 +536,175 @@ local function drawCosmetics(kind: string)
 		selected = worn or ids[1]
 	end
 
-	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.62, 0, 1, 0) }, body)
+	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.6, 0, 1, 0) }, body)
 	new("UIGridLayout", {
-		CellSize = UDim2.fromOffset(104, 104),
+		CellSize = UDim2.fromOffset(112, 112),
 		CellPadding = UDim2.fromOffset(12, 12),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, grid)
 	for i, id in ids do
 		local cosmetic = Cosmetics.List[id]
+		local color = Cosmetics.rarityColor(cosmetic)
 		local tile = new("TextButton", {
 			Text = "",
-			AutoButtonColor = true,
-			BackgroundColor3 = Cosmetics.rarityColor(cosmetic):Lerp(Color3.new(0, 0, 0), 0.55),
+			AutoButtonColor = false,
+			BackgroundColor3 = Color3.new(1, 1, 1),
 			LayoutOrder = i,
 		}, grid)
-		UiKit.round(tile, 12)
-		new("UIStroke", {
-			Color = if id == selected then P.Gold else Cosmetics.rarityColor(cosmetic),
-			Thickness = if id == selected then 3 else 2,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}, tile)
+		UiKit.round(tile, 16)
 		new("UIGradient", {
 			Rotation = 90,
-			Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(120, 120, 120)),
+			Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.2), color:Lerp(Color3.new(0, 0, 0), 0.55)),
 		}, tile)
-		tileIcon(tile, cosmetic, 104)
+		new("UIStroke", {
+			Color = if id == selected then P.Gold else P.Ink,
+			Thickness = if id == selected then 4 else 3,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}, tile)
+		ShopArt.icon(tile, "Cosmetic", id, 80).Position = UDim2.fromScale(0.5, 0.44)
+		local rarity = text(tile, RARITY_NAMES[cosmetic.Rarity], 11, Color3.new(1, 1, 1), CHUNKY)
+		rarity.AnchorPoint = Vector2.new(0, 1)
+		rarity.Position = UDim2.new(0, 0, 1, -4)
+		rarity.TextXAlignment = Enum.TextXAlignment.Center
 		if id == worn then
-			local check = IronUi.badge(tile, "✓", 26, P.Good)
-			check.Position = UDim2.new(1, -30, 0, 4)
+			local check = IronUi.badge(tile, "✓", 28, P.Good)
+			check.Position = UDim2.new(1, -32, 0, 4)
 		elseif not owned[id] and not cosmetic.Price then
-			local lock = text(tile, "🔒", 16, P.Text, BOLD)
+			local lock = text(tile, "🔒", 18, P.Text, CHUNKY)
 			lock.Position = UDim2.fromOffset(6, 4)
-			lock.Size = UDim2.fromOffset(20, 20)
+			lock.Size = UDim2.fromOffset(22, 22)
 		end
+		IronUi.juice(tile, 1.08)
 		tile.Activated:Connect(function()
 			selected = id
 			ShopUI.refresh()
 		end)
 	end
 
-	-- Preview panel.
+	-- The preview: a big glowing card.
 	local cosmetic = Cosmetics.get(selected)
 	if not cosmetic then
 		return
 	end
-	local side = colorCard(body, Cosmetics.rarityColor(cosmetic):Lerp(Color3.new(0, 0, 0), 0.4))
-	side.Position = UDim2.new(0.62, 16, 0, 0)
-	side.Size = UDim2.new(0.38, -16, 1, 0)
-	local stage = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 190) }, side)
-	tileIcon(stage, cosmetic, 190)
+	local color = Cosmetics.rarityColor(cosmetic)
+	local side = card(body, color)
+	side.Position = UDim2.new(0.6, 16, 0, 0)
+	side.Size = UDim2.new(0.4, -16, 1, 0)
+	local glow = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, 120),
+		Size = UDim2.fromOffset(190, 190),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.82,
+	}, side)
+	UiKit.round(glow, 95)
+	local stage = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, 120),
+		Size = UDim2.fromOffset(180, 180),
+	}, side)
+	ShopArt.icon(stage, "Cosmetic", cosmetic.Id, 160)
+	IronUi.animate(stage, function(t)
+		stage.Position = UDim2.new(0.5, 0, 0, 120 + math.sin(t * 2) * 6)
+		stage.Rotation = math.sin(t * 1.2) * 5
+	end)
+	ribbon(side, string.upper(RARITY_NAMES[cosmetic.Rarity]), color:Lerp(Color3.new(0, 0, 0), 0.2), 12, 12)
 	local info = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(16, 196),
-		Size = UDim2.new(1, -32, 1, -250),
+		Position = UDim2.fromOffset(16, 226),
+		Size = UDim2.new(1, -32, 1, -290),
 	}, side)
 	UiKit.list(info, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local rarity = new("TextLabel", {
-		BackgroundColor3 = Cosmetics.rarityColor(cosmetic),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 22),
-		Text = string.upper(Cosmetics.rarityName(cosmetic)),
-		Font = BOLD,
-		TextSize = 12,
-		TextColor3 = Color3.fromRGB(20, 16, 10),
-	}, info)
-	UiKit.round(rarity, 11)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, rarity)
-	local name = text(info, cosmetic.Name, 20, Color3.new(1, 1, 1), BOLD)
+	local name = title(info, cosmetic.Name, 28, Color3.new(1, 1, 1))
 	name.TextXAlignment = Enum.TextXAlignment.Center
-	local description = text(info, cosmetic.Description, 13, Color3.fromRGB(225, 225, 225))
+	local description = text(info, cosmetic.Description, 14, Color3.new(1, 1, 1), IronUi.Bold)
 	description.TextXAlignment = Enum.TextXAlignment.Center
 	local actions = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -14),
-		Size = UDim2.new(1, -24, 0, 34),
+		Position = UDim2.new(0.5, 0, 1, -18),
+		Size = UDim2.new(1, -24, 0, 40),
 	}, side)
 	UiKit.list(actions, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	if owned[cosmetic.Id] then
 		if worn == cosmetic.Id then
-			button(actions, "TAKE OFF", false, function()
-				run("EquipCosmetic", kind, nil)
+			IronUi.gemButton(actions, "TAKE OFF", Color3.fromRGB(110, 100, 130), function()
+				run(nil, nil, "EquipCosmetic", kind, nil)
 			end)
 		else
-			button(actions, "EQUIP", true, function()
-				run("EquipCosmetic", kind, cosmetic.Id)
+			local b
+			b = IronUi.gemButton(actions, "EQUIP", P.Emerald, function()
+				run(b, "EQUIPPED!", "EquipCosmetic", kind, cosmetic.Id)
 			end)
 		end
 	elseif cosmetic.Price then
-		button(actions, "BUY  💰 " .. commas(cosmetic.Price), true, function()
-			run("BuyCosmetic", cosmetic.Id)
+		local b
+		b = IronUi.gemButton(actions, "BUY  💰 " .. commas(cosmetic.Price), P.Emerald, function()
+			run(b, "UNLOCKED!", "BuyCosmetic", cosmetic.Id)
 		end)
 	else
-		local note = text(actions, "Found in Geode Crates and the Season Path", 12, P.Gold, BOLD)
+		local note = text(actions, "Found in crates and the Season Path", 14, P.Gold, CHUNKY)
 		note.TextXAlignment = Enum.TextXAlignment.Center
 	end
 end
 
--- Crates ---------------------------------------------------------------------------------------------
-
-local reveal: Frame? = nil
-
-local function showReveal(result)
-	if reveal then
-		reveal:Destroy()
-	end
-	local color = if result.Rarity and result.Rarity ~= "Common" then GemConfig.TierColors[result.Rarity] else P.Gold
-	local card = colorCard(panel, color:Lerp(Color3.new(0, 0, 0), 0.3))
-	reveal = card
-	card.AnchorPoint = Vector2.new(0.5, 0.5)
-	card.Position = UDim2.fromScale(0.5, 0.55)
-	card.Size = UDim2.fromOffset(420, 260)
-	card.ZIndex = 20
-	local scale = new("UIScale", { Scale = 0.2 }, card)
-	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-		:Play()
-	local list = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(20, 20),
-		Size = UDim2.new(1, -40, 1, -80),
-	}, card)
-	UiKit.list(list, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local title = text(list, "YOU FOUND", 22, Color3.new(1, 1, 1), HEADING)
-	title.TextXAlignment = Enum.TextXAlignment.Center
-	if result.Cosmetic then
-		local cosmetic = Cosmetics.get(result.Cosmetic)
-		local rare = text(list, string.upper(cosmetic and Cosmetics.rarityName(cosmetic) or ""), 14, color, BOLD)
-		rare.TextXAlignment = Enum.TextXAlignment.Center
-	end
-	for _, line in result.Lines or {} do
-		local l = text(list, line, 16, P.Gold, BOLD)
-		l.TextXAlignment = Enum.TextXAlignment.Center
-	end
-	local ok = button(card, "NICE!", true, function()
-		card:Destroy()
-		reveal = nil
-	end)
-	ok.AnchorPoint = Vector2.new(0.5, 1)
-	ok.Position = UDim2.new(0.5, 0, 1, -16)
-	for _, child in card:GetDescendants() do
-		if child:IsA("GuiObject") then
-			child.ZIndex = 21
-		end
-	end
-end
-
-local function drawCrates()
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, body)
-	new("UIGridLayout", {
-		CellSize = UDim2.new(0.5, -8, 1, 0),
-		CellPadding = UDim2.fromOffset(16, 0),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, row)
-	for i, id in Store.CrateOrder do
-		local crate = Store.Crates[id]
-		local card = colorCard(row, crate.Color, i)
-		bigIcon(card, crate.Icon, 26, 70)
-		local info = new("Frame", {
-			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(20, 110),
-			Size = UDim2.new(1, -40, 1, -170),
-		}, card)
-		UiKit.list(info, 4).HorizontalAlignment = Enum.HorizontalAlignment.Center
-		local name = text(info, string.upper(crate.Name), 20, Color3.new(1, 1, 1), HEADING)
-		name.TextXAlignment = Enum.TextXAlignment.Center
-		local description = text(info, crate.Description, 13, Color3.fromRGB(230, 230, 230))
-		description.TextXAlignment = Enum.TextXAlignment.Center
-		-- Odds, so players know what they're buying.
-		local total = 0
-		for _, roll in crate.Rolls do
-			total += roll.Weight
-		end
-		local odds = {}
-		for _, roll in crate.Rolls do
-			local label = if roll.Cosmetic
-				then string.format("%s cosmetic", roll.Cosmetic == "UltraRare" and "Ultra Rare" or roll.Cosmetic)
-				else table.concat(Store.describe(roll.Reward or {}), ", ")
-			table.insert(odds, string.format("%d%%  %s", math.floor(roll.Weight / total * 100 + 0.5), label))
-		end
-		local oddsText = text(info, table.concat(odds, "\n"), 12, P.Gold, BOLD)
-		oddsText.TextXAlignment = Enum.TextXAlignment.Center
-		local have = (profile().Crates or {})[id] or 0
-		local buttons = new("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -14),
-			Size = UDim2.new(1, -24, 0, 34),
-		}, card)
-		UiKit.list(buttons, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
-		button(buttons, "BUY  💰 " .. commas(crate.Price), false, function()
-			run("BuyCrate", id)
-		end)
-		robuxButton(buttons, id)
-		if have > 0 then
-			button(buttons, string.format("OPEN (%d)", have), true, function()
-				if busy then
-					return
-				end
-				busy = true
-				task.spawn(function()
-					local result = GemClient.request("OpenCrate", id)
-					busy = false
-					ShopUI.refresh()
-					if result.Ok then
-						showReveal(result)
-					else
-						UiKit.toast(result.Message, P.Bad)
-					end
-				end)
-			end)
-		end
-	end
-end
-
--- Passes -----------------------------------------------------------------------------------------------
+-- Passes --------------------------------------------------------------------------------------------------
 
 local function drawPasses()
-	local card = colorCard(body, Color3.fromRGB(200, 60, 160))
-	card.Size = UDim2.new(0.5, 0, 1, 0)
-	bigIcon(card, "👑", 30, 80)
+	local c = card(body, Color3.fromRGB(210, 70, 170))
+	c.Size = UDim2.new(0.55, 0, 1, 0)
+	emoji(c, "👑", 110, UDim2.new(0.5, 0, 0, 100))
+	ribbon(c, "BEST VALUE", P.Gold, 12, 12)
 	local info = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(20, 130),
-		Size = UDim2.new(1, -40, 1, -190),
-	}, card)
-	UiKit.list(info, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local name = text(info, "VIP PASS", 24, Color3.new(1, 1, 1), HEADING)
-	name.TextXAlignment = Enum.TextXAlignment.Center
+		Position = UDim2.fromOffset(20, 170),
+		Size = UDim2.new(1, -40, 1, -240),
+	}, c)
+	UiKit.list(info, 8).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	title(info, "VIP PASS", 34, Color3.new(1, 1, 1)).TextXAlignment = Enum.TextXAlignment.Center
 	for _, perk in
 		{
-			"Walk through the pink energy gate into the VIP pit",
-			"VIP nodes roll rarer colours and better grades",
-			"Show your support for Gemsoul",
+			"✦ Walk through the pink gate into the VIP pit",
+			"✦ VIP nodes roll rarer colours and better grades",
+			"✦ Support Gemsoul's development",
 		}
 	do
-		local line = text(info, "•  " .. perk, 14, Color3.fromRGB(240, 240, 240))
-		line.TextXAlignment = Enum.TextXAlignment.Center
+		text(info, perk, 15, Color3.new(1, 1, 1), CHUNKY).TextXAlignment = Enum.TextXAlignment.Center
 	end
 	local actions = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -16),
-		Size = UDim2.new(1, -24, 0, 34),
-	}, card)
+		Position = UDim2.new(0.5, 0, 1, -20),
+		Size = UDim2.new(1, -24, 0, 40),
+	}, c)
 	UiKit.list(actions, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	if player:GetAttribute("IsVIP") then
-		text(actions, "✓ You're a VIP", 16, P.Good, BOLD).TextXAlignment = Enum.TextXAlignment.Center
+		title(actions, "✓ YOU'RE A VIP", 22, P.Good).TextXAlignment = Enum.TextXAlignment.Center
 	elseif Config.VipGamePassId ~= 0 then
-		button(actions, "GET VIP", true, function()
+		IronUi.gemButton(actions, "GET VIP", P.Emerald, function()
 			MarketplaceService:PromptGamePassPurchase(player, Config.VipGamePassId)
 		end)
 	else
-		text(actions, "Coming soon", 16, P.Gold, BOLD).TextXAlignment = Enum.TextXAlignment.Center
+		title(actions, "COMING SOON", 22, P.Gold).TextXAlignment = Enum.TextXAlignment.Center
 	end
 end
 
--- Welcome popup ----------------------------------------------------------------------------------------
+-- Welcome popup ---------------------------------------------------------------------------------------------
 
-local welcome = IronUi.window("WelcomeBundle", 12, 720, 400, "🎁")
+local welcome = IronUi.window("WelcomeBundle", 12, 760, 420, "🎁", P.Teal)
 welcome.Title.Text = "WELCOME BUNDLE"
 welcome.Subtitle.Text = "Only for new players. One per player."
-local welcomeTimer = text(welcome.Panel, "", 14, Color3.new(1, 1, 1), BOLD)
+local welcomeTimer = text(welcome.Panel, "", 16, Color3.new(1, 1, 1), CHUNKY)
 welcomeTimer.AnchorPoint = Vector2.new(1, 0)
-welcomeTimer.Position = UDim2.new(1, -40, 0, 24)
-welcomeTimer.Size = UDim2.fromOffset(200, 22)
+welcomeTimer.Position = UDim2.new(1, -56, 0, 22)
+welcomeTimer.Size = UDim2.fromOffset(220, 0)
 welcomeTimer.TextXAlignment = Enum.TextXAlignment.Right
+welcomeTimer.ZIndex = 4
 local welcomeBody = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(24, 80),
-	Size = UDim2.fromOffset(672, 296),
+	Position = UDim2.fromOffset(26, 84),
+	Size = UDim2.fromOffset(708, 312),
 }, welcome.Panel)
 
 function ShopUI.showWelcome()
@@ -533,38 +715,37 @@ function ShopUI.showWelcome()
 	local bundle = Store.bundle("Welcome")
 	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.58, 0, 1, 0) }, welcomeBody)
 	new("UIGridLayout", {
-		CellSize = UDim2.fromOffset(120, 88),
+		CellSize = UDim2.fromOffset(128, 96),
 		CellPadding = UDim2.fromOffset(10, 10),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, grid)
-	local icons = { "🪨", "⚒️", "🚩", "📦", "⭐" }
+	local icons = { "🪨", "⚒️", "⚒️", "⚒️", "⚒️", "🚩", "📦", "⭐" }
 	for i, line in Store.describe(bundle.Contents, cosmeticName) do
-		local cell = box(grid, UDim2.new(), UDim2.new(), P.Slot, 10)
-		cell.LayoutOrder = i
-		bigIcon(cell, icons[((i - 1) % #icons) + 1], 6, 36)
-		local label = text(cell, line, 12, P.Text, BOLD)
-		label.Position = UDim2.fromOffset(0, 50)
+		local cell = card(grid, Color3.fromRGB(40, 60, 90), i)
+		emoji(cell, icons[((i - 1) % #icons) + 1], 36, UDim2.new(0.5, 0, 0, 30))
+		local label = text(cell, line, 12, Color3.new(1, 1, 1), CHUNKY)
+		label.Position = UDim2.fromOffset(4, 58)
+		label.Size = UDim2.new(1, -8, 0, 0)
 		label.TextXAlignment = Enum.TextXAlignment.Center
 	end
-	local side = colorCard(welcomeBody, bundle.Color)
+	local side = card(welcomeBody, bundle.Color)
 	side.Position = UDim2.new(0.6, 0, 0, 0)
 	side.Size = UDim2.new(0.4, 0, 1, 0)
-	valueTag(side, bundle.Value)
-	bigIcon(side, bundle.Icon, 30, 110)
+	ribbon(side, bundle.Value, P.Bad, 12, 12)
+	emoji(side, bundle.Icon, 120, UDim2.new(0.5, 0, 0, 120))
 	local buttons = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -16),
-		Size = UDim2.new(1, -20, 0, 34),
+		Position = UDim2.new(0.5, 0, 1, -18),
+		Size = UDim2.new(1, -20, 0, 40),
 	}, side)
 	UiKit.list(buttons, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
-	button(buttons, "💰 " .. commas(bundle.Price), true, function()
+	IronUi.gemButton(buttons, "💰 " .. commas(bundle.Price), P.Emerald, function()
 		welcome.Gui.Enabled = false
-		run("BuyBundle", "Welcome")
+		run(nil, nil, "BuyBundle", "Welcome")
 	end)
 	robuxButton(buttons, "Welcome")
 	welcome.Gui.Enabled = true
-	welcome.Fit()
 end
 welcome.Close.Activated:Connect(function()
 	welcome.Gui.Enabled = false
@@ -573,9 +754,10 @@ welcome.Shade.Activated:Connect(function()
 	welcome.Gui.Enabled = false
 end)
 
--- Drawing and opening -----------------------------------------------------------------------------------
+-- Drawing and opening ---------------------------------------------------------------------------------------
 
 local DRAW = {
+	Featured = drawFeatured,
 	Bundles = drawBundles,
 	Backs = function()
 		drawCosmetics("Back")
@@ -583,7 +765,6 @@ local DRAW = {
 	Trims = function()
 		drawCosmetics("Trim")
 	end,
-	Crates = drawCrates,
 	Passes = drawPasses,
 }
 
@@ -592,7 +773,7 @@ function ShopUI.refresh()
 		return
 	end
 	local p = profile()
-	coinsPill.Text = string.format("💰 %s   🎖️ %s Marks", commas(p.Coins or 0), commas(p.Marks or 0))
+	wallet.Text = string.format("💰 %s    🎖️ %s", commas(p.Coins or 0), commas(p.Marks or 0))
 	clear(tabBar)
 	local entries = {}
 	for _, id in Store.Tabs do
@@ -605,12 +786,18 @@ function ShopUI.refresh()
 	end)
 	clear(body)
 	DRAW[tab]()
+	-- Slide the new page in.
+	body.Position = UDim2.fromOffset(46, 128)
+	TweenService:Create(body, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = UDim2.fromOffset(26, 128),
+	}):Play()
 end
 
 function ShopUI.open(which: string?)
-	tab = which or tab
+	if which and DRAW[which] then
+		tab = which
+	end
 	gui.Enabled = true
-	window.Fit()
 	ShopUI.refresh()
 end
 
@@ -635,7 +822,7 @@ GemClient.Changed:Connect(function()
 	end
 end)
 
--- Tick the welcome countdowns once a second.
+-- Tick the welcome countdown.
 local elapsed = 0
 RunService.Heartbeat:Connect(function(dt)
 	elapsed += dt
@@ -643,8 +830,8 @@ RunService.Heartbeat:Connect(function(dt)
 		return
 	end
 	elapsed = 0
-	local left = welcomeSecondsLeft()
 	if welcome.Gui.Enabled then
+		local left = welcomeSecondsLeft()
 		welcomeTimer.Text = if left > 0 then "⏰ Ends in " .. clock(left) else "Offer ended"
 	end
 end)

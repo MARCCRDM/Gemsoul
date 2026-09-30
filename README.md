@@ -98,14 +98,16 @@ Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or we
 
 ## Hub, Shop, Season Path, Party and Top Players
 
-**The hub.** Round menu buttons down the left (Character C, Abilities K, Gems G, Party P) and, top right, your coins, Guild Marks and gems beside round buttons for the Season Path (J), Top Players (L) and the Shop (B). Every window shares one look: an icon badge on the corner, pill tabs and buttons, a round red close button.
+**The hub.** Round menu buttons down the left (Character C, Abilities K, Gems G, Party P) and, top right, your coins, Guild Marks and gems beside round buttons for the Season Path (J), Top Players (L) and the Shop (B). Every window shares one chunky look: a gold-rimmed frame that pops open, a glossy header with a tilted icon badge, outlined cartoon lettering, shiny gem buttons that bounce when you hover and press, and a round red close button.
 
 **Shop** (coins today, Robux-ready). Tabs:
 
-- **Bundles:** cards with value tags.
-- **Back Pieces** and **Trims:** cosmetics with rarity-coloured tiles, a preview, and Buy / Equip / Take off.
-- **Geode Crates:** odds shown, open with a reveal.
+- **Featured:** the Geode Crate hero card: a floating crate, every prize with its odds, and buy 1, 5 (-10%) or 10 (-15%). Beside it the Masterwork Crate and the Welcome (or Legend) bundle.
+- **Bundles:** big cards with value ribbons.
+- **Back Pieces** and **Trims:** cosmetics with rarity-coloured tiles, a floating preview, and Buy / Equip / Take off.
 - **Passes:** VIP.
+
+**Opening crates** is full screen: light rays spin, the crate shakes harder and harder (click to hurry it), a white flash, then the prize pops out with its name, rarity and odds ("1/16.7"). Open up to 10 at once and the rest line up as cards underneath.
 
 New players get a **Welcome Bundle** popup after the intro: 5x value, once, with a 24-hour countdown. Cosmetics use the gem rarity tiers. *Trims* recolour your class glow. *Back pieces* (Prospector's Pack, War Banner, Geode Shell, Ember Cape, Crystal Wings, Gem Halo) are worn behind your armor. To sell for Robux too, create Developer Products on Roblox and put their ids in `Store.RobuxProducts` (`src/shared/Store.luau`); the Shop shows Robux buttons and the server grants the items.
 
