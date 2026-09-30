@@ -271,15 +271,35 @@ local flyover = RunService.RenderStepped:Connect(function()
 	end
 end)
 
+-- Freeze movement and hide the HUD while the intro is open. This runs in the
+-- background with a time limit so the screens never wait on it.
 local controls = nil
-pcall(function()
-	controls = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
-	controls:Disable()
+local introOpen = true
+task.spawn(function()
+	local scripts = player:WaitForChild("PlayerScripts", 5)
+	local module = scripts and scripts:WaitForChild("PlayerModule", 5)
+	if module and introOpen then
+		local ok, result = pcall(function()
+			return require(module):GetControls()
+		end)
+		if ok and result then
+			controls = result
+			result:Disable()
+		end
+	end
 end)
-local hud = player.PlayerGui:FindFirstChild("Hud")
-if hud then
-	(hud :: ScreenGui).Enabled = false
+local function setHud(enabled: boolean)
+	local hud = player.PlayerGui:FindFirstChild("Hud")
+	if hud and hud:IsA("ScreenGui") then
+		hud.Enabled = enabled
+	end
 end
+setHud(false)
+task.delay(2, function()
+	if introOpen then
+		setHud(false)
+	end
+end)
 
 -- Pages --------------------------------------------------------------------------------
 
@@ -900,12 +920,11 @@ local function finish()
 		if humanoid then
 			camera.CameraSubject = humanoid
 		end
+		introOpen = false
 		if controls then
 			controls:Enable()
 		end
-		if hud then
-			(hud :: ScreenGui).Enabled = true
-		end
+		setHud(true)
 		gui:Destroy()
 		UiKit.toast("Welcome to Gemsoul! Talk to Garrick at the Mining Guild, up the north road.", K.Accent)
 	end)
@@ -918,7 +937,14 @@ function pages.redraw()
 	for i, cell in progressCells do
 		cell.BackgroundColor3 = if i <= step then K.Accent else K.Row
 	end
-	local canContinue = pages[step]()
+	-- If a page fails, say so on screen rather than leaving it blank.
+	local ok, result = pcall(pages[step])
+	local canContinue = ok and result
+	if not ok then
+		warn("[Intro] Page " .. step .. " failed: " .. tostring(result))
+		text(body, "Something went wrong on this page:\n" .. tostring(result), 14, K.Bad)
+		canContinue = true
+	end
 	backButton.Visible = step > 1 and step ~= 6
 	nextButton.Visible = canContinue
 	nextButton.Text = if step == 1 then "BEGIN" elseif step == #STEPS then "ENTER GEMSOUL" else "NEXT"
