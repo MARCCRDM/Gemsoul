@@ -19,7 +19,6 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
-local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Store = require(ReplicatedStorage.Shared.Store)
 local CrateReveal = require(script.Parent.CrateReveal)
 local GemClient = require(script.Parent.GemClient)
@@ -29,7 +28,7 @@ local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
 local P = IronUi.Colors
-local CHUNKY, HEADING = IronUi.Chunky, IronUi.Heading
+local CHUNKY = IronUi.Chunky
 local new, text, title, clear = IronUi.new, IronUi.text, IronUi.title, IronUi.clear
 
 local WIDTH, HEIGHT = 1040, 640
@@ -545,26 +544,22 @@ local function drawCosmetics(kind: string)
 	for i, id in ids do
 		local cosmetic = Cosmetics.List[id]
 		local color = Cosmetics.rarityColor(cosmetic)
-		local tile = new("TextButton", {
-			Text = "",
-			AutoButtonColor = false,
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			LayoutOrder = i,
-		}, grid)
-		UiKit.round(tile, 16)
-		new("UIGradient", {
-			Rotation = 90,
-			Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.2), color:Lerp(Color3.new(0, 0, 0), 0.55)),
-		}, tile)
-		new("UIStroke", {
-			Color = if id == selected then P.Gold else P.Ink,
-			Thickness = if id == selected then 4 else 3,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}, tile)
-		ShopArt.icon(tile, "Cosmetic", id, 80).Position = UDim2.fromScale(0.5, 0.44)
-		local rarity = text(tile, RARITY_NAMES[cosmetic.Rarity], 11, Color3.new(1, 1, 1), CHUNKY)
+		local tile, face = IronUi.chunk(grid, {
+			Color = color:Lerp(Color3.new(0, 0, 0), 0.15),
+			Rim = if id == selected then P.Gold else color:Lerp(Color3.new(1, 1, 1), 0.5),
+			Radius = 16,
+			Lip = 6,
+			Stripes = "None",
+			Dots = true,
+		})
+		tile.LayoutOrder = i
+		if id == selected then
+			tile:FindFirstChildOfClass("UIStroke").Thickness = 4
+		end
+		ShopArt.icon(face, "Cosmetic", id, 80).Position = UDim2.fromScale(0.5, 0.4)
+		local rarity = text(face, RARITY_NAMES[cosmetic.Rarity], 12, Color3.new(1, 1, 1), CHUNKY)
 		rarity.AnchorPoint = Vector2.new(0, 1)
-		rarity.Position = UDim2.new(0, 0, 1, -4)
+		rarity.Position = UDim2.new(0, 0, 1, -3)
 		rarity.TextXAlignment = Enum.TextXAlignment.Center
 		if id == worn then
 			local check = IronUi.badge(tile, "✓", 28, P.Good)
@@ -574,7 +569,6 @@ local function drawCosmetics(kind: string)
 			lock.Position = UDim2.fromOffset(6, 4)
 			lock.Size = UDim2.fromOffset(22, 22)
 		end
-		IronUi.juice(tile, 1.08)
 		tile.Activated:Connect(function()
 			selected = id
 			ShopUI.refresh()

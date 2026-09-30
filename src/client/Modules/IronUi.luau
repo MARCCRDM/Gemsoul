@@ -3,9 +3,15 @@
 	gold trim, gradient header bars, chunky outlined titles, and buttons that
 	bounce when you hover and press them. Windows pop open.
 
-	Builders: new, text, title (chunky outlined text), box, button,
-	gemButton (a big coloured buy button with a moving shine), tabs, badge,
-	juice (hover/press bounce for anything), shine, clear, window.
+	Buttons are "chunks": thick 3D slabs like a toy. From the outside in:
+	a black outline, a darker lip underneath (the depth), a light rim, then a
+	gradient face with a glossy top, diagonal light stripes and an optional
+	halftone dot texture. Icons are drawn big and break out of the edge.
+	Pressing one sinks the face into its lip.
+
+	Builders: new, text, title (chunky outlined text), box, chunk (the 3D
+	slab), label (outlined text on a chunk's face), button, gemButton, tabs,
+	badge, juice (hover/press bounce), shine, animate, clear, window.
 ]]
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -35,8 +41,6 @@ IronUi.Heading = Enum.Font.LuckiestGuy -- big titles
 IronUi.Chunky = Enum.Font.FredokaOne -- buttons, tabs, labels that should pop
 IronUi.Body = Enum.Font.Gotham
 IronUi.Bold = Enum.Font.GothamBold
-
-local POP = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 function IronUi.new(className: string, props: { [string]: any }, parent: Instance?): any
 	local object = Instance.new(className)
@@ -139,7 +143,7 @@ function IronUi.title(parent: Instance, value: string, size: number, color: Colo
 end
 
 -- Bounce on hover and press. Works on any button.
-function IronUi.juice(guiButton: GuiButton, hoverScale: number?)
+function IronUi.juice(guiButton: GuiButton, hoverScale: number?, pressScale: number?)
 	local scale = guiButton:FindFirstChildOfClass("UIScale") or new("UIScale", {}, guiButton)
 	local hover = hoverScale or 1.06
 	local function to(value: number, time: number?)
@@ -154,7 +158,7 @@ function IronUi.juice(guiButton: GuiButton, hoverScale: number?)
 		to(1)
 	end)
 	guiButton.MouseButton1Down:Connect(function()
-		to(0.92, 0.06)
+		to(pressScale or 0.92, 0.06)
 	end)
 	guiButton.MouseButton1Up:Connect(function()
 		to(hover)
@@ -163,14 +167,24 @@ end
 
 -- A band of light that sweeps across `object` every few seconds.
 function IronUi.shine(object: GuiObject, every: number?)
-	object.ClipsDescendants = true
+	-- Clipped in its own layer, so icons can still break out of `object`.
+	local clip = new("Frame", {
+		Name = "ShineClip",
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = object.ZIndex + 1,
+	}, object)
 	local sweep = new("Frame", {
 		Name = "Shine",
 		BackgroundColor3 = Color3.new(1, 1, 1),
 		BackgroundTransparency = 0,
 		Size = UDim2.fromScale(1, 1),
-		ZIndex = object.ZIndex + 1,
-	}, object)
+	}, clip)
+	local round = object:FindFirstChildOfClass("UICorner")
+	if round then
+		corner(sweep, round.CornerRadius)
+	end
 	local gradient = new("UIGradient", {
 		Rotation = 20,
 		Transparency = NumberSequence.new({
@@ -204,70 +218,225 @@ function IronUi.box(parent: Instance, position: UDim2, size: UDim2, fill: Color3
 	return frame
 end
 
--- A pill button: gold for the main action, slate for the rest.
-function IronUi.button(parent: Instance, label: string, primary: boolean, onClick: () -> ()): TextButton
+local function lighter(color: Color3, amount: number): Color3
+	return color:Lerp(Color3.new(1, 1, 1), amount)
+end
+local function darker(color: Color3, amount: number): Color3
+	return color:Lerp(Color3.new(0, 0, 0), amount)
+end
+IronUi.lighter, IronUi.darker = lighter, darker
+
+-- Hard-edged bands of light for a UIGradient: { {from, to, transparency} }.
+local function bands(list: { { number } }): NumberSequence
+	local points = { NumberSequenceKeypoint.new(0, 1) }
+	for _, band in list do
+		table.insert(points, NumberSequenceKeypoint.new(band[1], 1))
+		table.insert(points, NumberSequenceKeypoint.new(band[1] + 0.001, band[3]))
+		table.insert(points, NumberSequenceKeypoint.new(band[2], band[3]))
+		table.insert(points, NumberSequenceKeypoint.new(band[2] + 0.001, 1))
+	end
+	table.insert(points, NumberSequenceKeypoint.new(1, 1))
+	return NumberSequence.new(points)
+end
+local THIN_STRIPES = bands({ { 0.56, 0.64, 0.8 }, { 0.7, 0.74, 0.84 } })
+local BROAD_STRIPES = bands({ { 0.18, 0.34, 0.8 }, { 0.44, 0.52, 0.84 }, { 0.72, 0.9, 0.8 } })
+
+-- Rows of little diamonds, offset every other row: a halftone texture.
+local DOT_ROWS = (function()
+	local rows = {}
+	for i = 1, 8 do
+		table.insert(rows, (if i % 2 == 0 then "  " else "") .. string.rep("◆   ", 14))
+	end
+	return table.concat(rows, "\n")
+end)()
+
+export type ChunkOptions = {
+	Color: Color3, -- the face colour
+	Size: UDim2?,
+	Radius: number?, -- corner size in pixels (default 12)
+	Lip: number?, -- how thick the slab looks (default 5)
+	Rim: Color3?, -- the light edge around the face
+	Stripes: ("Thin" | "Broad" | "None")?, -- diagonal light (default Thin)
+	Dots: boolean?, -- a halftone texture fading in from the right
+	PadX: number?, -- side padding, for buttons sized by their text
+}
+
+--[[
+	A 3D button slab. Returns the button and its face (put icons and labels
+	on the face so they sink with it when pressed).
+]]
+function IronUi.chunk(parent: Instance, options: ChunkOptions): (TextButton, Frame)
+	local fill = options.Color
+	local radius = options.Radius or 12
+	local lip = options.Lip or 5
+	local pad = options.PadX or 0
 	local b = new("TextButton", {
-		BackgroundColor3 = if primary then P.Gold else P.Slot,
-		Text = label,
-		Font = IronUi.Chunky,
-		TextSize = 15,
-		TextColor3 = if primary then Color3.fromRGB(40, 24, 8) else P.Text,
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 36),
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = darker(fill, 0.5),
+		Size = options.Size or UDim2.fromOffset(120, 46),
 	}, parent)
-	corner(b, UDim.new(0.5, 0))
+	corner(b, UDim.new(0, radius))
+	new("UIStroke", {
+		Color = P.Ink,
+		Thickness = 3,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		LineJoinMode = Enum.LineJoinMode.Round,
+	}, b)
+	if pad > 0 then
+		new("UIPadding", { PaddingLeft = UDim.new(0, pad), PaddingRight = UDim.new(0, pad) }, b)
+	end
+	-- The rim sits on top of the lip; pressing slides it down over the lip.
+	local rim = new("Frame", {
+		Name = "Rim",
+		BackgroundColor3 = options.Rim or lighter(fill, 0.55),
+		Position = UDim2.fromOffset(-pad, 0),
+		Size = UDim2.new(1, pad * 2, 1, -lip),
+	}, b)
+	corner(rim, UDim.new(0, radius))
+	local face = new("Frame", {
+		Name = "Face",
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Position = UDim2.fromOffset(3, 3),
+		Size = UDim2.new(1, -6, 1, -6),
+	}, rim)
+	corner(face, UDim.new(0, math.max(3, radius - 3)))
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 190, 190)),
-	}, b)
-	new("UIStroke", {
-		Color = if primary then Color3.fromRGB(120, 80, 20) else P.Edge,
-		Thickness = 2,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, b)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, b)
-	IronUi.juice(b)
+		Color = ColorSequence.new(lighter(fill, 0.2), darker(fill, 0.15)),
+	}, face)
+	-- Halftone dots, strongest at the right edge.
+	if options.Dots then
+		local clip = new("Frame", {
+			Name = "Dots",
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			Position = UDim2.fromOffset(radius / 2, radius / 2),
+			Size = UDim2.new(1, -radius, 1, -radius),
+		}, face)
+		local dots = new("TextLabel", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Text = DOT_ROWS,
+			TextSize = 7,
+			LineHeight = 1.2,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = Color3.new(1, 1, 1),
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextYAlignment = Enum.TextYAlignment.Center,
+		}, clip)
+		new("UIGradient", {
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.55, 1),
+				NumberSequenceKeypoint.new(1, 0.55),
+			}),
+		}, dots)
+	end
+	-- Diagonal stripes of light.
+	local stripes = options.Stripes or "Thin"
+	if stripes ~= "None" then
+		local layer = new("Frame", {
+			Name = "Stripes",
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			Size = UDim2.fromScale(1, 1),
+		}, face)
+		corner(layer, UDim.new(0, math.max(3, radius - 3)))
+		new("UIGradient", {
+			Rotation = -35,
+			Transparency = if stripes == "Broad" then BROAD_STRIPES else THIN_STRIPES,
+		}, layer)
+	end
+	-- Gloss over the top half.
+	local gloss = new("Frame", {
+		Name = "Gloss",
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Position = UDim2.fromOffset(4, 2),
+		Size = UDim2.new(1, -8, 0.46, -2),
+	}, face)
+	corner(gloss, UDim.new(0, math.max(3, radius - 5)))
+	new("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new(0.62, 0.9),
+	}, gloss)
+
+	-- Hover grows it; pressing sinks the face into the lip.
+	IronUi.juice(b, 1.05, 0.97)
+	local up, down = rim.Position, UDim2.fromOffset(-pad, lip - 1)
+	local function sink(pressed: boolean)
+		TweenService:Create(rim, TweenInfo.new(0.06), { Position = if pressed then down else up }):Play()
+	end
+	b.MouseButton1Down:Connect(function()
+		sink(true)
+	end)
+	b.MouseButton1Up:Connect(function()
+		sink(false)
+	end)
+	b.MouseLeave:Connect(function()
+		sink(false)
+	end)
+	return b, face
+end
+
+-- Big outlined text on a chunk's face. It follows the button's own Text and
+-- TextSize, so code can keep setting those.
+function IronUi.label(b: TextButton, face: Frame, value: string, size: number, font: Enum.Font?): TextLabel
+	b.Text = value
+	b.TextSize = size
+	b.Font = font or IronUi.Chunky
+	b.TextTransparency = 1
+	local label = new("TextLabel", {
+		Name = "Label",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Text = value,
+		TextSize = size,
+		Font = font or IronUi.Chunky,
+		TextColor3 = Color3.new(1, 1, 1),
+		TextScaled = false,
+	}, face)
+	IronUi.outline(label, if size >= 22 then 3 else 2)
+	b:GetPropertyChangedSignal("Text"):Connect(function()
+		label.Text = b.Text
+	end)
+	b:GetPropertyChangedSignal("TextSize"):Connect(function()
+		label.TextSize = b.TextSize
+	end)
+	return label
+end
+
+local SLATE = Color3.fromRGB(88, 80, 112)
+
+-- A chunky pill button: gold for the main action, slate for the rest.
+function IronUi.button(parent: Instance, label: string, primary: boolean, onClick: () -> ()): TextButton
+	local b, face = IronUi.chunk(parent, {
+		Color = if primary then Color3.fromRGB(250, 186, 40) else SLATE,
+		Rim = if primary then Color3.fromRGB(255, 236, 150) else Color3.fromRGB(170, 162, 196),
+		Size = UDim2.fromOffset(0, 40),
+		Radius = 10,
+		Lip = 4,
+		PadX = 16,
+		Stripes = if primary then "Thin" else "None",
+	})
+	b.AutomaticSize = Enum.AutomaticSize.X
+	IronUi.label(b, face, label, 15)
 	b.Activated:Connect(onClick)
 	return b
 end
 
--- A big coloured buy button with white outlined text and a moving shine.
+-- A big coloured buy button: stripes, dots and a moving shine.
 function IronUi.gemButton(parent: Instance, label: string, color: Color3?, onClick: () -> ()): TextButton
-	local fill = color or P.Emerald
-	local b = new("TextButton", {
-		BackgroundColor3 = fill,
-		Text = label, -- sets the width; the visible text is the outlined label
-		Font = IronUi.Chunky,
-		TextSize = 18,
-		TextTransparency = 1,
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 40),
-		AutoButtonColor = true,
-	}, parent)
-	corner(b, UDim.new(0, 10))
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(fill:Lerp(Color3.new(1, 1, 1), 0.35), fill:Lerp(Color3.new(0, 0, 0), 0.25)),
-	}, b)
-	new("UIStroke", {
-		Color = fill:Lerp(Color3.new(0, 0, 0), 0.55),
-		Thickness = 3,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, b)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, b)
-	local text = new("TextLabel", {
-		Name = "Label",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		Text = label,
-		Font = IronUi.Chunky,
-		TextSize = 18,
-		TextColor3 = Color3.new(1, 1, 1),
-		ZIndex = b.ZIndex + 2,
-	}, b)
-	IronUi.outline(text, 2)
-	IronUi.shine(b)
-	IronUi.juice(b, 1.07)
+	local b, face = IronUi.chunk(parent, {
+		Color = color or P.Emerald,
+		Size = UDim2.fromOffset(0, 48),
+		Radius = 12,
+		Lip = 6,
+		PadX = 18,
+		Dots = true,
+	})
+	b.AutomaticSize = Enum.AutomaticSize.X
+	IronUi.label(b, face, label, 19)
+	IronUi.shine(face)
 	b.Activated:Connect(onClick)
 	return b
 end
@@ -281,52 +450,32 @@ function IronUi.clear(parent: Instance)
 	end
 end
 
--- A row of chunky pill tabs; `entries` are { Id, Label }. Returns the row.
+-- A row of chunky tabs; `entries` are { Id, Label }. Returns the row.
 function IronUi.tabs(parent: Instance, entries: { { string } }, active: string, onPick: (string) -> ()): Frame
 	local row = new("Frame", {
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 36),
+		Size = UDim2.fromOffset(0, 44),
 	}, parent)
 	UiKit.list(row, 8, true)
 	for i, entry in entries do
 		local on = entry[1] == active
-		local tab = new("TextButton", {
-			Text = entry[2],
-			Font = IronUi.Chunky,
-			TextSize = 15,
-			BackgroundColor3 = if on then P.Amethyst else P.Slot,
-			TextColor3 = if on then Color3.new(1, 1, 1) else P.Dim,
-			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.fromOffset(0, 34),
-			LayoutOrder = i,
-		}, row)
-		corner(tab, UDim.new(0.5, 0))
-		new("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, tab)
-		new("UIStroke", {
-			Color = if on then P.Gold else P.Edge,
-			Thickness = if on then 2.5 else 1.5,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}, tab)
-		if on then
-			new("UIGradient", {
-				Rotation = 90,
-				Color = ColorSequence.new(Color3.fromRGB(200, 150, 255), Color3.fromRGB(110, 60, 170)),
-			}, tab)
-			-- Keep the width from the text, show an outlined copy on top.
-			tab.TextTransparency = 1
-			local shown = new("TextLabel", {
-				BackgroundTransparency = 1,
-				Size = UDim2.fromScale(1, 1),
-				Text = entry[2],
-				Font = IronUi.Chunky,
-				TextSize = 15,
-				TextColor3 = Color3.new(1, 1, 1),
-				ZIndex = tab.ZIndex + 1,
-			}, tab)
-			IronUi.outline(shown, 2)
+		local tab, face = IronUi.chunk(row, {
+			Color = if on then P.Amethyst else Color3.fromRGB(52, 46, 68),
+			Rim = if on then Color3.fromRGB(214, 180, 255) else Color3.fromRGB(96, 88, 120),
+			Size = UDim2.fromOffset(0, if on then 42 else 38),
+			Radius = 10,
+			Lip = if on then 5 else 4,
+			PadX = 16,
+			Stripes = if on then "Thin" else "None",
+			Dots = on,
+		})
+		tab.AutomaticSize = Enum.AutomaticSize.X
+		tab.LayoutOrder = i
+		local label = IronUi.label(tab, face, entry[2], 15)
+		if not on then
+			label.TextColor3 = Color3.fromRGB(196, 186, 220)
 		end
-		IronUi.juice(tab)
 		tab.Activated:Connect(function()
 			onPick(entry[1])
 		end)
@@ -498,25 +647,17 @@ function IronUi.window(
 	subtitle.ZIndex = 3
 
 	-- A chunky red close button on the top-right corner.
-	local close = new("TextButton", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -6, 0, 6),
-		Size = UDim2.fromOffset(46, 46),
-		BackgroundColor3 = Color3.fromRGB(230, 60, 60),
-		Text = "X",
-		Font = IronUi.Heading,
-		TextSize = 24,
-		TextColor3 = Color3.new(1, 1, 1),
-		ZIndex = 5,
-	}, panel)
-	corner(close, UDim.new(0.5, 0))
-	new("UIStroke", { Color = P.Ink, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, close)
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(255, 170, 170), Color3.fromRGB(170, 60, 60)),
-	}, close)
-	IronUi.inner(close, "X", IronUi.Heading, 24, Color3.new(1, 1, 1)).ZIndex = 7
-	IronUi.juice(close, 1.12)
+	local close, closeFace = IronUi.chunk(panel, {
+		Color = Color3.fromRGB(232, 58, 58),
+		Size = UDim2.fromOffset(50, 50),
+		Radius = 14,
+		Lip = 6,
+		Stripes = "None",
+	})
+	close.AnchorPoint = Vector2.new(0.5, 0.5)
+	close.Position = UDim2.new(1, -6, 0, 6)
+	close.ZIndex = 5
+	IronUi.label(close, closeFace, "X", 26, IronUi.Heading)
 
 	return {
 		Gui = gui,

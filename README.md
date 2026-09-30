@@ -98,7 +98,9 @@ Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or we
 
 ## Hub, Shop, Season Path, Party and Top Players
 
-**The hub.** Round menu buttons down the left (Character C, Abilities K, Gems G, Party P) and, top right, your coins, Guild Marks and gems beside round buttons for the Season Path (J), Top Players (L) and the Shop (B). Every window shares one chunky look: a gold-rimmed frame that pops open, a glossy header with a tilted icon badge, outlined cartoon lettering, shiny gem buttons that bounce when you hover and press, and a round red close button.
+**The hub.** On the left, a big yellow SHOP button (B) over a 2x2 grid of menu tiles: Character (C), Abilities (K), Gems (G) and Party (P). Top right, gold-edged bars show your coins (the green + opens the Shop), Guild Marks and gems, with Season (J) and Top (L) buttons underneath.
+
+**Buttons** are chunky 3D slabs, built by `IronUi.chunk`. From the outside in, each has a black outline, a darker lip underneath for depth, a light rim, and a gradient face. The face has a glossy top, diagonal light stripes and, on some buttons, a halftone dot texture. Icons are drawn big and break out of the edge. Hovering makes a button grow; pressing sinks its face into the lip. Windows share the look: a gold-rimmed frame that pops open, a glossy header with a tilted icon badge, outlined cartoon lettering and a red close slab.
 
 **Shop** (coins today, Robux-ready). Tabs:
 

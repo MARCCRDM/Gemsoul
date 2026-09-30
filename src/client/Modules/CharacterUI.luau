@@ -26,7 +26,7 @@ local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
 local P = IronUi.Colors
-local HEADING, BOLD = IronUi.Heading, IronUi.Bold
+local BOLD = IronUi.Bold
 local new, text, box, actionButton, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
 
 local WIDTH, HEIGHT = 1000, 620

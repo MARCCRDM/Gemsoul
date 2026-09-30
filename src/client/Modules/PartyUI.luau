@@ -277,7 +277,7 @@ local hudGui = UiKit.gui("PartyHud", 2)
 local hudList = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -16, 0, 84),
+	Position = UDim2.new(1, -16, 0, 132),
 	Size = UDim2.fromOffset(220, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 }, hudGui)

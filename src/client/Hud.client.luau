@@ -1,7 +1,8 @@
 --[[
-	The hub: big round menu buttons down the left (Character, Abilities,
-	Gems, Party) and round buttons top-right (Shop, Season Path, Top
-	Players) beside your coins, Guild Marks and gem count.
+	The hub. Left: a big yellow SHOP button over a 2x2 grid of chunky menu
+	tiles (Character, Abilities, Gems, Party). Top right: gold-edged bars
+	for coins (with a + that opens the Shop), Guild Marks and gems, and
+	pills for the Season Path and Top Players.
 
 	Keys: C character, K abilities, G gems, P party, B shop, J season,
 	L top players. New players see the Welcome Bundle once the intro ends.
@@ -9,7 +10,6 @@
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
-local TweenService = game:GetService("TweenService")
 
 local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
@@ -25,7 +25,7 @@ local UiKit = require(script.Parent.Modules.UiKit)
 local player = Players.LocalPlayer
 local P = IronUi.Colors
 local BOLD = IronUi.Bold
-local new, text = IronUi.new, IronUi.text
+local new = IronUi.new
 
 -- The hub replaces Roblox's player list (coins, Marks and gems show here;
 -- players are listed in the Party window).
@@ -33,86 +33,112 @@ pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, fal
 
 local gui = UiKit.gui("Hud", 1)
 
--- A round button with an icon, a caption and a key hint.
-local function roundButton(
-	parent: Instance,
-	icon: string,
-	caption: string,
-	key: string,
-	color: Color3,
-	size: number,
-	onClick: () -> ()
-): TextButton
-	local holder = new("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(size + 16, size + (if caption ~= "" then 20 else 0)),
+-- A little key hint chip on a button's corner.
+local function keyHint(parent: Instance, key: string)
+	local hint = new("TextLabel", {
+		Name = "Key",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -4, 0, 4),
+		Size = UDim2.fromOffset(22, 22),
+		BackgroundColor3 = P.Gold,
+		Text = key,
+		Font = IronUi.Chunky,
+		TextSize = 13,
+		TextColor3 = P.Ink,
+		ZIndex = 4,
 	}, parent)
-	local b = new("TextButton", {
-		Text = "",
-		AutoButtonColor = true,
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 0),
-		Size = UDim2.fromOffset(size, size),
-		BackgroundColor3 = color,
-	}, holder)
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.5, 0)
-	corner.Parent = b
-	new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2, Transparency = 0.4 }, b)
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(140, 140, 140)),
-	}, b)
-	new("TextLabel", {
+	local hintCorner = Instance.new("UICorner")
+	hintCorner.CornerRadius = UDim.new(0.5, 0)
+	hintCorner.Parent = hint
+	new("UIStroke", { Color = P.Ink, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, hint)
+end
+
+-- A big emoji that breaks out of its button.
+local function bigIcon(face: Frame, icon: string, size: number, position: UDim2, rotation: number?): TextLabel
+	return new("TextLabel", {
+		Name = "Icon",
 		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = position,
+		Size = UDim2.fromOffset(size, size),
 		Text = icon,
-		TextSize = math.floor(size * 0.48),
+		TextSize = size,
 		Font = BOLD,
 		TextColor3 = Color3.new(1, 1, 1),
-	}, b)
-	if key ~= "" then
-		local hint = new("TextLabel", {
-			BackgroundColor3 = P.Frame,
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.fromScale(1, 1),
-			Size = UDim2.fromOffset(18, 18),
-			Text = key,
-			Font = BOLD,
-			TextSize = 11,
-			TextColor3 = P.Gold,
-		}, b)
-		local hintCorner = Instance.new("UICorner")
-		hintCorner.CornerRadius = UDim.new(0.5, 0)
-		hintCorner.Parent = hint
-	end
-	if caption ~= "" then
-		local label = text(holder, caption, 13, Color3.new(1, 1, 1), BOLD)
-		label.Position = UDim2.fromOffset(0, size + 2)
-		label.TextXAlignment = Enum.TextXAlignment.Center
-		label.TextStrokeTransparency = 0.4
-	end
-	-- A little bounce when pressed.
-	local scale = new("UIScale", {}, b)
-	b.Activated:Connect(function()
-		scale.Scale = 0.88
-		TweenService:Create(scale, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-			:Play()
-		onClick()
-	end)
+		Rotation = rotation or 0,
+	}, face)
+end
+
+-- A square menu tile: a slate slab, a big icon popping out of the top and
+-- the name along the bottom.
+local TILE = Color3.fromRGB(92, 84, 118)
+local function tile(parent: Instance, icon: string, caption: string, key: string, onClick: () -> ()): TextButton
+	local b, face = IronUi.chunk(parent, {
+		Color = TILE,
+		Rim = Color3.fromRGB(186, 178, 210),
+		Size = UDim2.fromOffset(84, 90),
+		Radius = 14,
+		Lip = 6,
+		Stripes = "None",
+		Dots = true,
+	})
+	b.Name = caption
+	bigIcon(face, icon, 48, UDim2.new(0.5, 0, 0.3, -6), -6)
+	local label = IronUi.text(face, string.upper(caption), 12, Color3.new(1, 1, 1), IronUi.Chunky)
+	label.AutomaticSize = Enum.AutomaticSize.None
+	label.TextWrapped = false
+	label.AnchorPoint = Vector2.new(0.5, 1)
+	label.Position = UDim2.new(0.5, 0, 1, -4)
+	label.Size = UDim2.new(1, 4, 0, 16)
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	keyHint(b, key)
+	b.Activated:Connect(onClick)
 	return b
 end
 
--- Left: the main menu.
+-- Left: a big yellow SHOP button over a 2x2 grid of menu tiles.
 local left = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0, 0.5),
-	Position = UDim2.new(0, 12, 0.56, 0),
-	Size = UDim2.fromOffset(90, 0),
+	Position = UDim2.new(0, 18, 0.58, 0),
+	Size = UDim2.fromOffset(180, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 }, gui)
-UiKit.list(left, 6)
-local TEAL = Color3.fromRGB(30, 110, 120)
+UiKit.list(left, 12)
+
+local shopButton, shopFace = IronUi.chunk(left, {
+	Color = Color3.fromRGB(255, 196, 30),
+	Rim = Color3.fromRGB(255, 240, 160),
+	Size = UDim2.fromOffset(180, 80),
+	Radius = 16,
+	Lip = 7,
+	Stripes = "Broad",
+})
+shopButton.Name = "Shop"
+shopButton.LayoutOrder = 1
+bigIcon(shopFace, "🛒", 50, UDim2.new(0.5, 0, 0.3, -8), -8)
+local shopLabel = IronUi.title(shopFace, "SHOP", 30)
+shopLabel.AutomaticSize = Enum.AutomaticSize.None
+shopLabel.AnchorPoint = Vector2.new(0.5, 1)
+shopLabel.Position = UDim2.new(0.5, 0, 1, 0)
+shopLabel.Size = UDim2.new(1, 0, 0, 32)
+shopLabel.TextXAlignment = Enum.TextXAlignment.Center
+IronUi.shine(shopFace, 3.5)
+keyHint(shopButton, "B")
+shopButton.Activated:Connect(function()
+	ShopUI.toggle()
+end)
+
+local grid = new("Frame", {
+	BackgroundTransparency = 1,
+	Size = UDim2.fromOffset(180, 192),
+	LayoutOrder = 2,
+}, left)
+local gridLayout = Instance.new("UIGridLayout")
+gridLayout.CellSize = UDim2.fromOffset(84, 90)
+gridLayout.CellPadding = UDim2.fromOffset(12, 12)
+gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+gridLayout.Parent = grid
 local menu = {
 	{ "🛡️", "Character", "C", CharacterUI.toggle },
 	{ "⚔️", "Abilities", "K", AbilitiesUI.toggle },
@@ -120,51 +146,132 @@ local menu = {
 	{ "👥", "Party", "P", PartyUI.toggle },
 }
 for i, item in menu do
-	local b = roundButton(left, item[1], item[2], item[3], TEAL, 60, item[4])
-	b.Parent.LayoutOrder = i
+	tile(grid, item[1], item[2], item[3], item[4]).LayoutOrder = i
 end
 
--- Top right: currencies and the shop, season and leaderboard.
+-- Top right: currency bars, then the Season Path and Top Players pills.
 local right = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -12, 0, 8),
-	Size = UDim2.fromOffset(0, 58),
-	AutomaticSize = Enum.AutomaticSize.X,
+	Position = UDim2.new(1, -16, 0, 12),
+	Size = UDim2.fromOffset(0, 0),
+	AutomaticSize = Enum.AutomaticSize.XY,
 }, gui)
-UiKit.list(right, 8, true).VerticalAlignment = Enum.VerticalAlignment.Top
+UiKit.list(right, 10).HorizontalAlignment = Enum.HorizontalAlignment.Right
+local bars = new("Frame", {
+	BackgroundTransparency = 1,
+	Size = UDim2.fromOffset(0, 44),
+	AutomaticSize = Enum.AutomaticSize.X,
+	LayoutOrder = 1,
+}, right)
+UiKit.list(bars, 26, true)
 
-local function pill(order: number): TextLabel
-	local label = new("TextLabel", {
-		BackgroundColor3 = P.Frame,
-		BackgroundTransparency = 0.1,
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 30),
-		Font = BOLD,
-		TextSize = 14,
-		TextColor3 = P.Gold,
+-- A currency bar: a dark gold-edged bar with a big round icon overlapping
+-- its left end, the amount in chunky outlined numbers, and an optional
+-- green + button.
+local function currencyBar(order: number, icon: string, coin: Color3, width: number, onPlus: (() -> ())?): TextLabel
+	local bar = new("Frame", {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Size = UDim2.fromOffset(width, 38),
 		LayoutOrder = order,
-	}, right)
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.5, 0)
-	corner.Parent = label
-	new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, label)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, label)
-	return label
+	}, bars)
+	local barCorner = Instance.new("UICorner")
+	barCorner.CornerRadius = UDim.new(0.5, 0)
+	barCorner.Parent = bar
+	new("UIStroke", { Color = P.Gold, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, bar)
+	new("UIGradient", {
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 14, 30)),
+			ColorSequenceKeypoint.new(0.6, Color3.fromRGB(46, 38, 64)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(86, 76, 110)),
+		}),
+	}, bar)
+	-- The coin: a round gold-rimmed badge sitting over the bar's left end.
+	local disc = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 2, 0.5, 0),
+		Size = UDim2.fromOffset(50, 50),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		ZIndex = 2,
+	}, bar)
+	local discCorner = Instance.new("UICorner")
+	discCorner.CornerRadius = UDim.new(0.5, 0)
+	discCorner.Parent = disc
+	new("UIStroke", { Color = P.Ink, Thickness = 3 }, disc)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(IronUi.lighter(coin, 0.45), IronUi.darker(coin, 0.3)),
+	}, disc)
+	new("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Text = icon,
+		TextSize = 28,
+		Font = BOLD,
+		TextColor3 = Color3.new(1, 1, 1),
+		ZIndex = 3,
+	}, disc)
+	local amount = IronUi.text(bar, "0", 22, Color3.new(1, 1, 1), IronUi.Chunky)
+	amount.AutomaticSize = Enum.AutomaticSize.None
+	amount.Position = UDim2.fromOffset(32, 0)
+	amount.Size = UDim2.new(1, if onPlus then -70 else -42, 1, 0)
+	amount.TextXAlignment = Enum.TextXAlignment.Right
+	amount.TextYAlignment = Enum.TextYAlignment.Center
+	amount.TextWrapped = false
+	amount.TextScaled = false
+	if onPlus then
+		local plus, plusFace = IronUi.chunk(bar, {
+			Color = Color3.fromRGB(60, 200, 90),
+			Size = UDim2.fromOffset(32, 32),
+			Radius = 9,
+			Lip = 4,
+			Stripes = "None",
+		})
+		plus.Name = "Plus"
+		plus.AnchorPoint = Vector2.new(1, 0.5)
+		plus.Position = UDim2.new(1, -3, 0.5, 0)
+		IronUi.label(plus, plusFace, "+", 24, IronUi.Heading)
+		plus.Activated:Connect(onPlus)
+	end
+	return amount
 end
-local coins = pill(1)
-local marks = pill(2)
-local gems = pill(3)
-local PURPLE = Color3.fromRGB(120, 60, 160)
-local corner = {
-	{ "⭐", "J", PURPLE, SeasonUI.toggle },
-	{ "🏆", "L", PURPLE, TopPlayersUI.toggle },
-	{ "🛒", "B", Color3.fromRGB(200, 80, 150), ShopUI.toggle },
-}
-for i, item in corner do
-	local b = roundButton(right, item[1], "", item[2], item[3], 46, item[4])
-	b.Parent.LayoutOrder = 3 + i
+local coins = currencyBar(1, "💰", Color3.fromRGB(255, 190, 40), 188, function()
+	ShopUI.open("Bundles")
+end)
+local marks = currencyBar(2, "🎖️", Color3.fromRGB(90, 150, 255), 140)
+local gems = currencyBar(3, "💎", Color3.fromRGB(180, 90, 255), 110)
+
+-- Season Path and Top Players: coloured pills with the icon breaking out
+-- of the left end.
+local pills = new("Frame", {
+	BackgroundTransparency = 1,
+	Size = UDim2.fromOffset(0, 50),
+	AutomaticSize = Enum.AutomaticSize.X,
+	LayoutOrder = 2,
+}, right)
+UiKit.list(pills, 12, true)
+local function pillButton(order: number, icon: string, caption: string, key: string, color: Color3, onClick: () -> ())
+	local b, face = IronUi.chunk(pills, {
+		Color = color,
+		Size = UDim2.fromOffset(150, 48),
+		Radius = 12,
+		Lip = 6,
+		Dots = true,
+	})
+	b.Name = caption
+	b.LayoutOrder = order
+	bigIcon(face, icon, 40, UDim2.new(0, 12, 0.5, -4), -10)
+	local label = IronUi.text(face, caption, 20, Color3.new(1, 1, 1), IronUi.Chunky)
+	label.AutomaticSize = Enum.AutomaticSize.None
+	label.Position = UDim2.fromOffset(38, 0)
+	label.Size = UDim2.new(1, -44, 1, 0)
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	keyHint(b, key)
+	b.Activated:Connect(onClick)
 end
+pillButton(1, "⭐", "season", "J", Color3.fromRGB(150, 70, 230), SeasonUI.toggle)
+pillButton(2, "🏆", "top", "L", Color3.fromRGB(50, 110, 240), TopPlayersUI.toggle)
 
 local function commas(n: number): string
 	local s = tostring(math.floor(n))
@@ -178,9 +285,9 @@ local function commas(n: number): string
 end
 
 local function refresh(profile)
-	coins.Text = "💰 " .. commas(profile.Coins or 0)
-	marks.Text = "🎖️ " .. commas(profile.Marks or 0)
-	gems.Text = "💎 " .. tostring(#(profile.Gems or {}))
+	coins.Text = commas(profile.Coins or 0)
+	marks.Text = commas(profile.Marks or 0)
+	gems.Text = tostring(#(profile.Gems or {}))
 end
 GemClient.Changed:Connect(refresh)
 if GemClient.Profile then
