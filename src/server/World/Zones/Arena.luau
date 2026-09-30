@@ -33,6 +33,9 @@ local function ring(radius: number, gap: number, place: (CFrame, number) -> ())
 end
 
 function Arena.build(folder: Folder, frame: CFrame, color: Color3)
+	-- Combat is allowed on the floor (training dummies stand here).
+	Builder.landmark("ArenaFloor", (frame * CFrame.new(CENTER + Vector3.new(0, 0.7, 0))).Position)
+	Builder.landmark("ArenaRadius", FLOOR_RADIUS)
 	Builder.disc(folder, frame, {
 		Name = "ArenaGrounds",
 		Radius = OUTER_RADIUS + 1,

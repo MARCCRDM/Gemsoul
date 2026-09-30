@@ -25,6 +25,7 @@ type Character = {
 	Armor: string?,
 	WeaponGem: Gem?, -- a cut gem socketed into the weapon
 	ArmorGem: Gem?, -- a cut gem socketed into the armor
+	Abilities: { string }?, -- the three ability ids on Q / E / R (Classes.loadout)
 	WeaponQuality: number?, -- 1-4, see Crafting.Qualities
 	ArmorQuality: number?,
 }
@@ -393,6 +394,15 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 	sync(player)
 	characterChanged:Fire(player)
 	return gem
+end
+
+-- The three abilities on Q / E / R (validated by the caller).
+function PlayerData.setAbilities(player: Player, ids: { string })
+	local profile = profiles[player]
+	if profile then
+		profile.Character.Abilities = ids
+		sync(player)
+	end
 end
 
 local GEAR_KEYS = { Weapons = "Weapon", Armors = "Armor" }

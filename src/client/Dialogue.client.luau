@@ -14,6 +14,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Vendors = require(ReplicatedStorage.Shared.Vendors)
+local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local CuttingGame = require(script.Parent.Modules.CuttingGame)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
@@ -263,6 +264,11 @@ for action, tab in { Forge = "Craft", Materials = "Materials", SellGems = "Sell"
 		close()
 		ForgeUI.open(tab)
 	end
+end
+
+function actions.Abilities()
+	close()
+	AbilitiesUI.open()
 end
 
 function actions.MarketSell()

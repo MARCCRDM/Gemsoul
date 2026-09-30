@@ -17,6 +17,7 @@ local TweenService = game:GetService("TweenService")
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local AbilitiesUI = require(script.Parent.AbilitiesUI)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -282,6 +283,10 @@ local function drawCraft()
 		BOLD
 	)
 	text(info, string.upper(gear.Style) .. "   " .. gear.Description, 13, P.Dim)
+	if gear.Attack then
+		text(info, AbilitiesUI.attackSummary(gear.Attack), 12, P.Text, BOLD)
+	end
+	text(info, gear.Passive.Name .. ": " .. gear.Passive.Text, 12, P.Gold, BOLD)
 
 	-- Quality ladder: one pip per quality, lit up to the current one.
 	local ladder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 26) }, info)

@@ -18,6 +18,7 @@ local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
 local CuttingGame = require(script.Parent.Modules.CuttingGame)
 local GemArt = require(script.Parent.Modules.GemArt)
 local GemClient = require(script.Parent.Modules.GemClient)
@@ -401,11 +402,15 @@ pages[2] = function()
 		text(card, class.Role .. "  |  " .. string.rep("*", class.Difficulty) .. " difficulty", 13, K.Dim, BOLD)
 		text(card, class.Tagline, 14, K.Text)
 		statBars(card, class.Stats, class.Color)
-		text(card, "ABILITIES", 11, K.Dim, BOLD)
+		text(card, "6 ABILITIES (EQUIP ANY 3)", 11, K.Dim, BOLD)
+		local names = {}
 		for _, ability in class.Abilities do
-			text(card, ability.Name, 14, K.Text, BOLD)
-			text(card, ability.Description, 12, K.Dim)
+			table.insert(names, ability.Name)
 		end
+		text(card, table.concat(names, ", "), 13, K.Text)
+		text(card, "ULTIMATE", 11, K.Dim, BOLD)
+		text(card, class.Ultimate.Name, 14, K.Gold, BOLD)
+		text(card, class.Ultimate.Description, 12, K.Dim)
 	end
 	return state.Class ~= nil
 end
@@ -436,6 +441,10 @@ local function gearPage(kind: "Weapons" | "Armors")
 		text(card, gear.Name, 18, K.Text, BOLD)
 		text(card, string.upper(gear.Style), 12, class.Color, BOLD)
 		text(card, gear.Description, 14, K.Dim)
+		if gear.Attack then
+			text(card, AbilitiesUI.attackSummary(gear.Attack), 12, class.Color, BOLD)
+		end
+		text(card, gear.Passive.Name .. ": " .. gear.Passive.Text, 13, K.Text)
 		text(card, modsText(gear.Mods), 13, K.Gold, BOLD)
 	end
 	local side = column(body, 0.62, 0.38, 8)
@@ -689,7 +698,7 @@ pages[6] = function()
 			"Crafting Hall (north road): sell stones to Hilde for Guild Marks, buy materials, and have Borin forge your gear.",
 			"Marketplace (town square): Tamsin's board lists gems for trade between players.",
 			"Arcanum (east road): Vey sockets gems into your weapon and armor to enchant them.",
-			"Arena (west road): wager gems in PvP duels. Winner takes the stone.",
+			"Arena (west road): train on dummies; beyond the south gate, crystal monsters drop stones and coins.",
 		}
 	do
 		text(right, line, 14, K.Text)
@@ -888,15 +897,26 @@ pages[8] = function()
 		)
 	end
 	text(sheet, string.format("Armor: %s (%s)", armor and armor.Name or "?", armor and armor.Style or ""), 14, K.Text)
-	text(sheet, "ABILITIES", 12, K.Accent, BOLD)
-	for _, ability in class.Abilities do
-		text(sheet, ability.Name .. ": " .. ability.Description, 13, K.Text)
+	text(sheet, "ABILITIES  (press K in game to swap; 6 to choose from)", 12, K.Accent, BOLD)
+	for i, ability in Classes.loadout(class.Id, nil) do
+		text(sheet, string.format("[%s] %s: %s", Classes.AbilityKeys[i], ability.Name, ability.Description), 13, K.Text)
 	end
+	text(
+		sheet,
+		string.format("[%s] %s: %s", Classes.UltimateKey, class.Ultimate.Name, class.Ultimate.Description),
+		13,
+		K.Gold
+	)
 	text(sheet, "AT LEVEL 5, CHOOSE A SPECIALIZATION", 12, K.Accent, BOLD)
 	for _, spec in class.Specs do
 		text(sheet, string.format("%s (%s): unlocks %s", spec.Name, spec.Style, spec.Signature.Name), 13, K.Dim)
 	end
-	text(sheet, "Combat is on its way: abilities switch on when it arrives.", 12, K.Dim)
+	text(
+		sheet,
+		"Left click to attack. Practise on dummies in the Arena (west road), then hunt crystal monsters outside the south gate.",
+		12,
+		K.Dim
+	)
 
 	local side = column(body, 0.6, 0.4, 6)
 	new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 330) }, side)

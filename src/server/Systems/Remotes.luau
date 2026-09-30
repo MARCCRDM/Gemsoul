@@ -2,6 +2,8 @@
 --   Profile (event, server -> client): the player's coins, gems and quota
 --   Notify (event, server -> client): a short message to pop up
 --   Request (function, client -> server): shop and cutting actions
+--   CombatInput (event, client -> server): attacks and abilities
+--   CombatFx (event, server -> clients): hits, damage numbers, cooldowns
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local folder = Instance.new("Folder")
@@ -11,6 +13,8 @@ local Remotes = {
 	Profile = Instance.new("RemoteEvent"),
 	Notify = Instance.new("RemoteEvent"),
 	Request = Instance.new("RemoteFunction"),
+	CombatInput = Instance.new("RemoteEvent"),
+	CombatFx = Instance.new("RemoteEvent"),
 }
 for name, remote in Remotes do
 	remote.Name = name

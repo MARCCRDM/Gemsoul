@@ -13,7 +13,7 @@ local Builder = {}
 	clients can point players to places that haven't streamed in yet, e.g.
 	the guide's trail. Every shopkeeper is recorded under their vendor id.
 ]]
-function Builder.landmark(name: string, position: Vector3)
+function Builder.landmark(name: string, position: Vector3 | number)
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
 	if not landmarks then
 		landmarks = Instance.new("Configuration")

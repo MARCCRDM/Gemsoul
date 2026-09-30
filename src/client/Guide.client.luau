@@ -6,6 +6,7 @@
 	  3 sell stones to Hilde at the Crafting Hall
 	  4 forge or upgrade gear at Borin's anvil
 	  5 enchant gear at Vey's Arcanum
+	  6 defeat a crystal monster in the Wilds, outside the south gate
 	Each step completes from the server's saved milestones. [H] hides it.
 ]]
 local ContextActionService = game:GetService("ContextActionService")
@@ -41,6 +42,11 @@ local STEPS = {
 		Milestone = "Enchanted",
 		Target = "Enchanting",
 		Text = "Socket a cut gem into your gear at Vey's Arcanum, east road.",
+	},
+	{
+		Milestone = "Slain",
+		Target = "Wilds",
+		Text = "Practise on the Arena dummies, then defeat a crystal monster outside the south gate.",
 	},
 }
 

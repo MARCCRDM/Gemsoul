@@ -253,29 +253,37 @@ GemConfig.EnchantNames = {
 	Armor = { Fire = "Emberward", Frost = "Frostward", Shock = "Stormward", Poison = "Venomward" },
 }
 
-function GemConfig.enchantment(gem: Gem, slot: string): (string, string)
+-- The numbers behind an enchantment, used by combat:
+--   Weapon  Fire: Burn (damage over 3s)   Frost: Slow (fraction, 2s)
+--           Shock: Arc (share of each hit to a nearby enemy)
+--           Poison: Weaken (enemies deal this much less, 4s)
+--   Armor   Resist (fraction less damage from that element)
+function GemConfig.enchantValues(gem: Gem, slot: string): { [string]: number }
 	local p = GemConfig.potency(gem)
-	local name = GemConfig.EnchantNames[slot] and GemConfig.EnchantNames[slot][gem.Element] or "Enchanted"
 	if slot == "Armor" then
-		return name,
-			string.format(
-				"+%d%% %s resistance, +%d max health",
-				math.min(60, 10 + math.floor(p / 4)),
-				gem.Element,
-				math.floor(p / 2)
-			)
+		return { Resist = math.min(60, 10 + math.floor(p / 4)) / 100 }
 	end
-	local text = if gem.Element == "Fire"
-		then string.format("Hits burn for %d damage over 3s", math.floor(p * 0.3 + 0.5))
-		elseif gem.Element == "Frost" then string.format(
-			"Hits slow enemies by %d%% for 2s",
-			math.min(40, 10 + math.floor(p / 6))
-		)
-		elseif gem.Element == "Shock" then string.format(
-			"%d%% of each hit arcs to a nearby enemy",
-			math.min(60, 15 + math.floor(p / 4))
-		)
-		else string.format("Poisoned enemies deal %d%% less damage for 4s", math.min(25, 5 + math.floor(p / 10)))
+	if gem.Element == "Fire" then
+		return { Burn = math.floor(p * 0.3 + 0.5) }
+	elseif gem.Element == "Frost" then
+		return { Slow = math.min(40, 10 + math.floor(p / 6)) / 100 }
+	elseif gem.Element == "Shock" then
+		return { Arc = math.min(60, 15 + math.floor(p / 4)) / 100 }
+	end
+	return { Weaken = math.min(25, 5 + math.floor(p / 10)) / 100 }
+end
+
+function GemConfig.enchantment(gem: Gem, slot: string): (string, string)
+	local name = GemConfig.EnchantNames[slot] and GemConfig.EnchantNames[slot][gem.Element] or "Enchanted"
+	local v = GemConfig.enchantValues(gem, slot)
+	if slot == "Armor" then
+		return name, string.format("Take %d%% less %s damage", math.floor(v.Resist * 100 + 0.5), gem.Element)
+	end
+	local text = if v.Burn
+		then string.format("Hits burn for %d damage over 3s", v.Burn)
+		elseif v.Slow then string.format("Hits slow enemies by %d%% for 2s", math.floor(v.Slow * 100 + 0.5))
+		elseif v.Arc then string.format("%d%% of each hit arcs to a nearby enemy", math.floor(v.Arc * 100 + 0.5))
+		else string.format("Poisoned enemies deal %d%% less damage for 4s", math.floor(v.Weaken * 100 + 0.5))
 	return name, text
 end
 

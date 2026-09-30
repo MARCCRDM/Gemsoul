@@ -81,6 +81,21 @@ The Crafting Hall on the north road (east side) is for crafting only; gem cuttin
 
 Recipes, prices and quality bonuses live in `src/shared/Crafting.luau`. Selling, buying and crafting only work at the hall (the server checks). Marks show on the leaderboard and the HUD.
 
+## Combat
+
+Fighting is off inside the town walls, except in the **Arena** (west road), where four training dummies stand. Outside the south gate are the **Crystal Wilds**: Crystal Crawlers (quick, sometimes drop a stone) and Shard Brutes (tough, always drop one), each with an element. Monsters chase you, hit back, walk home if you drag them too far, and respawn. Kills pay coins to whoever did the most damage.
+
+**Controls:** left click attacks (hold to keep swinging), **Q / E / R** cast your three chosen abilities, **F** is your ultimate, **K** opens the abilities screen. The hotbar at the bottom shows health, your class resource and cooldowns, and works on touch screens.
+
+**Every class has:**
+
+- **4 weapons.** Each has its own basic attack (melee cone with a combo finisher, or a ranged shot) and a passive: crits, armor break, bleeding, reach, splash, mana on hit, wards, chain lightning, long-range bonus, piercing, shield block, stuns or slows. New this update: Spear, Storm Scepter, Throwing Knives and Halberd.
+- **3 armors**, each with a passive: Bastion (take less damage), Attuned (faster cooldowns) or Fleet (faster walking).
+- **6 abilities; equip any 3** on Q / E / R, plus a class **ultimate** on F. Ability types: frontal strikes, area blasts, dashes, projectiles, self buffs and ground zones, with stuns, slows, taunts, burns, poison and executes.
+- **A resource:** Rage (Warrior) and Resolve (Tank) build as you fight and fade out of combat; Mana (Wizard) and Focus (Archer) refill over time.
+
+Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or weaken, and an armor gem cuts damage from monsters of its element. Power, Defense, Speed and Health ratings (from class, gear, quality and gems) drive damage, damage taken, crit chance, max health and walk speed. Everything is in `src/shared/Classes.luau` and `src/shared/Combat.luau`; the server runs every hit (`Systems/CombatServer.luau`, `Systems/Enemies.luau`).
+
 ## Coins, Marks and getting started
 
 - **Two currencies.** *Coins* buy rough stones from Garrick and laser cuts from Ilsa. You get them from a **daily reward** (75 coins, plus 25 more for each day of your streak, up to a week) and by selling stones to **Tamsin** at the Market (50% of value). *Guild Marks* are only for the Crafting Hall and come from selling stones to Hilde (60% of value).
@@ -116,6 +131,8 @@ src/
       Enchanting.luau         socketing gems into weapon and armor (at Vey's)
       Forge.luau              the Crafting Hall: selling stones for Marks, materials, crafting, equipping
       Nearby.luau             is a player standing near a shopkeeper?
+      CombatServer.luau       attacks, abilities, resources, buffs, damage taken
+      Enemies.luau            training dummies and Wilds monsters: spawning, AI, loot
       Equipment.luau          builds class weapons onto avatars, and socketed gems
       ArmorKits.luau          the 12 low-poly armor sets: helms, hoods, pauldrons
       Remotes.luau            client/server remotes
@@ -124,6 +141,7 @@ src/
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
     Hud.client.luau           corner buttons: character screen ([C]) and gem pouch ([G])
     Guide.client.luau         NEXT STEP panel and trail for new players ([H] hides)
+    Combat.client.luau        combat controls, hotbar HUD and hit effects
     Intro.client.luau         new-player intro screens
     Modules/                  character screen, Crafting Hall screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
@@ -133,6 +151,7 @@ src/
     GemConfig.luau            gem colours, tiers, odds, cut grades, value formula
     Classes.luau              classes, weapons, armor, abilities, specs, ratings
     Crafting.luau             materials, gear quality, recipes, gem sell prices
+    Combat.luau               combat formulas, resources, where fighting is allowed
     Vendors.luau              shopkeeper names, greetings and dialogue options
     Tags.luau                 CollectionService tag names
 ```

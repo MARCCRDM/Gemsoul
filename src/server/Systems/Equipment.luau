@@ -287,6 +287,74 @@ WEAPONS.MaceShield = function(folder, character, right, _left, accent, gem)
 	end
 end
 
+-- Newer weapons: a spear, a storm scepter, throwing knives and a halberd.
+
+WEAPONS.Spear = function(folder, _character, right, _left, accent, gem)
+	local m = HELD_FORWARD * CFrame.new(0, -1.2, 0)
+	piece(folder, right, m * CFrame.new(0, 1.8, 0), Vector3.new(0.2, 6, 0.2), WOOD, Enum.Material.Wood)
+	-- Leaf-shaped head: a blade with a crossguard beneath it.
+	piece(folder, right, m * CFrame.new(0, 5.3, 0), Vector3.new(0.34, 1.4, 0.08), STEEL, Enum.Material.Metal)
+	piece(folder, right, m * CFrame.new(0, 4.55, 0), Vector3.new(0.7, 0.14, 0.18), IRON, Enum.Material.Metal)
+	neon(folder, right, m * CFrame.new(0, 5.3, -0.045), Vector3.new(0.05, 1.2, 0.02), accent)
+	gemSocket(folder, right, m, Vector3.new(0, 4.4, -0.14), gem, 0.22)
+end
+
+WEAPONS.Scepter = function(folder, _character, right, _left, accent, gem)
+	local m = CFrame.Angles(math.rad(-20), 0, 0)
+	piece(folder, right, m * CFrame.new(0, 0.9, 0), Vector3.new(0.18, 2.4, 0.18), DARK_WOOD, Enum.Material.Wood)
+	-- A ring cage holding the crackling core.
+	for _, a in { 0, 60, 120 } do
+		piece(
+			folder,
+			right,
+			m * CFrame.new(0, 2.5, 0) * CFrame.Angles(0, math.rad(a), 0),
+			Vector3.new(0.9, 0.9, 0.1),
+			STEEL,
+			Enum.Material.Metal
+		).Transparency =
+			0.2
+	end
+	neon(folder, right, m * CFrame.new(0, 2.5, 0), Vector3.new(0.4, 0.4, 0.4), accent)
+	gemSocket(folder, right, m, Vector3.new(0, 2.05, -0.12), gem, 0.2)
+end
+
+WEAPONS.Knives = function(folder, character, right, left, accent, gem)
+	-- A knife in each hand, and a bandolier of spares across the chest.
+	for _, hand in { right, left } do
+		local m = CFrame.Angles(math.rad(-100), 0, 0)
+		piece(folder, hand, m * CFrame.new(0, 0.2, 0), Vector3.new(0.14, 0.4, 0.14), DARK_WOOD, Enum.Material.Leather)
+		piece(folder, hand, m * CFrame.new(0, 0.75, 0), Vector3.new(0.18, 0.7, 0.05), STEEL, Enum.Material.Metal)
+	end
+	local torso = bodyPart(character, "UpperTorso", "Torso")
+	if torso then
+		local strap = CFrame.new(0, 0, -torso.Size.Z / 2 - 0.12) * CFrame.Angles(0, 0, math.rad(40))
+		piece(folder, torso, strap, Vector3.new(0.35, torso.Size.Y * 1.35, 0.1), DARK_WOOD, Enum.Material.Leather)
+		for i = -2, 2 do
+			piece(
+				folder,
+				torso,
+				strap * CFrame.new(0, i * 0.35, -0.08),
+				Vector3.new(0.12, 0.3, 0.05),
+				STEEL,
+				Enum.Material.Metal
+			)
+		end
+		neon(folder, torso, strap * CFrame.new(0, 0, -0.06), Vector3.new(0.05, torso.Size.Y * 1.3, 0.02), accent)
+		gemSocket(folder, torso, strap, Vector3.new(0, 0.9, -0.14), gem, 0.22)
+	end
+end
+
+WEAPONS.Halberd = function(folder, _character, right, _left, accent, gem)
+	local m = UPRIGHT * CFrame.new(0, -1.4, 0)
+	piece(folder, right, m * CFrame.new(0, 2, 0), Vector3.new(0.22, 6.2, 0.22), WOOD, Enum.Material.Wood)
+	-- Axe blade on one side, a hook on the other, a spike on top.
+	piece(folder, right, m * CFrame.new(0, 4.6, -0.55), Vector3.new(0.12, 1.3, 0.9), STEEL, Enum.Material.Metal)
+	piece(folder, right, m * CFrame.new(0, 4.8, 0.4), Vector3.new(0.12, 0.35, 0.6), IRON, Enum.Material.Metal)
+	piece(folder, right, m * CFrame.new(0, 5.6, 0), Vector3.new(0.14, 1, 0.14), STEEL, Enum.Material.Metal)
+	neon(folder, right, m * CFrame.new(0, 4.6, -1.02), Vector3.new(0.05, 1.2, 0.05), accent)
+	gemSocket(folder, right, m, Vector3.new(0, 4.6, 0), gem, 0.26)
+end
+
 -- Elemental effects ----------------------------------------------------------------------
 -- An enchanted item takes on its gem's element: its glowing trim turns the
 -- element's colour, the gem lights up its surroundings, and particles pour
@@ -465,7 +533,10 @@ local function applyStats(character: Model, loadout)
 		return
 	end
 	local ratings = Classes.ratings(loadout)
-	humanoid.WalkSpeed = Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus)
+	-- Agile armor (Fleet) adds a little on top.
+	local armor = Classes.armor(loadout.Class, loadout.Armor)
+	local extra = armor and armor.Passive.Effect.SpeedAdd or 0
+	humanoid.WalkSpeed = Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus) + extra
 	local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 	humanoid.MaxHealth = Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)
 	humanoid.Health = humanoid.MaxHealth * fraction

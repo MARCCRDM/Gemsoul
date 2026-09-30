@@ -3,7 +3,7 @@
 --
 -- Each option either has a Reply (text shown back) or an Action the client
 -- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
--- "Enchant", "Forge", "Materials", "SellGems" or "MarketSell".
+-- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "Abilities".
 
 local Config = require(script.Parent.Config)
 
@@ -138,15 +138,20 @@ local Vendors: { [string]: Vendor } = {
 		Color = Color3.fromRGB(255, 45, 70),
 		Tunic = Color3.fromRGB(110, 30, 40),
 		Face = ">_<",
-		Greeting = "Looking for a fight? The arena never sleeps.",
+		Greeting = "Looking for a fight? Warm up on my dummies inside, then go hunt the crystal beasts past the south gate.",
 		Options = {
+			{ Text = "Choose my abilities", Action = "Abilities" },
+			{
+				Text = "How do I fight?",
+				Reply = "Left click to attack; hold it to keep swinging. Q, E and R cast the three abilities you've picked, F is your ultimate. Press K to swap abilities. You can't fight in town, only here in the Arena and outside the walls.",
+			},
+			{
+				Text = "What's out past the south gate?",
+				Reply = "The Crystal Wilds. Crawlers and Shard Brutes, each tied to an element. Beat them for coins and rough stones; brutes always drop one. A matching armor gem blunts their bite.",
+			},
 			{
 				Text = "Join a PvP duel (collateral)",
 				Reply = "Each fighter wagers a gem. The winner walks away with the loser's stone, every property intact. Duels open soon!",
-			},
-			{
-				Text = "Start PvE combat",
-				Reply = "Monsters drop loot, crafting materials and raw stones, and tougher ones drop better stones. PvE opens soon!",
 			},
 		},
 	},
