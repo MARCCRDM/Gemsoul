@@ -1,12 +1,13 @@
 --[[
-	Borin's forge at the Craft & Cut workshop. Request actions:
-	  "BuyMaterial", materialId, count      buy crafting materials
-	  "SellGems", { gemId }                 60% of each gem's value in coins
+	The Crafting Hall: Hilde's stone exchange and materials stall, and
+	Borin's forge next door. Request actions:
+	  "BuyMaterial", materialId, count      buy materials with Guild Marks
+	  "SellGems", { gemId }                 60% of each gem's value in Marks
 	  "SalvageGems", { gemId }              break gems into Gem Shards
 	  "Craft", kind, gearId                 make a piece, or raise its quality
 	  "EquipGear", kind, gearId             wear gear you own (anywhere)
 	kind is "Weapons" or "Armors". Everything except equipping needs you at
-	the workshop. Costs come from shared/Crafting.luau.
+	the hall. Costs come from shared/Crafting.luau.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -16,21 +17,21 @@ local Nearby = require(script.Parent.Nearby)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 
-local RANGE = 40 -- studs from Borin or Ilsa
+local RANGE = 40 -- studs from Hilde or Borin
 local MAX_BUY = 50
 local reply = Shop.reply
 
 local Forge = {}
 
 local function atWorkshop(player: Player): boolean
-	return Nearby.vendor(player, { "Forge", "Crafting" }, RANGE)
+	return Nearby.vendor(player, { "Quartermaster", "Forge" }, RANGE)
 end
-local AWAY = "Visit Borin's forge at Craft & Cut (north road)."
+local AWAY = "Visit the Crafting Hall on the north road."
 
 local function buyMaterial(player: Player, materialId: any, count: any)
 	local material = typeof(materialId) == "string" and Crafting.Materials[materialId]
 	if not material or not material.Price then
-		return reply(false, "Borin doesn't sell that.")
+		return reply(false, "Hilde doesn't sell that.")
 	end
 	if typeof(count) ~= "number" or count ~= math.floor(count) or count < 1 or count > MAX_BUY then
 		return reply(false, "Buy between 1 and " .. MAX_BUY .. " at a time.")
@@ -39,8 +40,11 @@ local function buyMaterial(player: Player, materialId: any, count: any)
 		return reply(false, AWAY)
 	end
 	local profile = PlayerData.get(player)
-	if not profile or not PlayerData.spendCoins(player, material.Price * count) then
-		return reply(false, string.format("You need %d coins for that.", material.Price * count))
+	if not profile or not PlayerData.spendMarks(player, material.Price * count) then
+		return reply(
+			false,
+			string.format("You need %d Guild Marks for that. Sell stones to Hilde for more.", material.Price * count)
+		)
 	end
 	profile.Materials[materialId] = (profile.Materials[materialId] or 0) + count
 	PlayerData.sync(player)
@@ -80,8 +84,8 @@ local function sellGems(player: Player, ids: any)
 		total += Crafting.sellPrice(gem)
 		PlayerData.removeGem(player, gem.Id)
 	end
-	PlayerData.addCoins(player, total)
-	return reply(true, string.format("Sold %d gem%s for %d coins.", #gems, if #gems == 1 then "" else "s", total))
+	PlayerData.addMarks(player, total)
+	return reply(true, string.format("Sold %d gem%s for %d Guild Marks.", #gems, if #gems == 1 then "" else "s", total))
 end
 
 local function salvageGems(player: Player, ids: any)
@@ -141,10 +145,10 @@ local function craft(player: Player, kind: any, gearId: any)
 			return reply(false, string.format("You need %d more %s.", need - have, Crafting.Materials[id].Name))
 		end
 	end
-	if profile.Coins < recipe.Coins then
-		return reply(false, string.format("You need %d coins.", recipe.Coins))
+	if profile.Marks < recipe.Marks then
+		return reply(false, string.format("The forge fee is %d Guild Marks.", recipe.Marks))
 	end
-	PlayerData.spendCoins(player, recipe.Coins)
+	PlayerData.spendMarks(player, recipe.Marks)
 	for id, need in recipe.Materials do
 		profile.Materials[id] -= need
 	end
@@ -163,7 +167,7 @@ local function equipGear(player: Player, kind: any, gearId: any)
 	local profile = PlayerData.get(player)
 	local gear = gearFor(profile and profile.Character.Class, kind, gearId)
 	if not gear or not PlayerData.equipGear(player, kind, gearId) then
-		return reply(false, "You don't own that yet. Craft it at Borin's forge.")
+		return reply(false, "You don't own that yet. Craft it at Borin's forge in the Crafting Hall.")
 	end
 	return reply(true, "Equipped " .. Crafting.gearName(gear.Name, profile.Owned[kind][gearId]) .. ".")
 end

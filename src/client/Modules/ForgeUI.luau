@@ -1,10 +1,11 @@
 --[[
-	Borin's forge screen, in three tabs:
+	The Crafting Hall screen (Hilde's exchange and Borin's forge), in three
+	tabs. Everything here is paid in Guild Marks, earned by selling stones:
 	  CRAFT      your class's weapons and armor: craft new pieces, upgrade
 	             their quality (Standard > Fine > Superior > Masterwork) and
 	             equip them. "Buy missing" tops up materials in one click.
 	  MATERIALS  buy iron, timber, leather, cloth and mithril.
-	  SELL GEMS  pick gems you don't want, then sell them for coins or
+	  SELL STONES  pick gems you don't want, then sell them for Marks or
 	             salvage them into Gem Shards (asks you to confirm).
 	The server checks everything and that you're at the workshop.
 ]]
@@ -32,7 +33,7 @@ local ForgeUI = {}
 
 local window = IronUi.window("Forge", 9, WIDTH, HEIGHT)
 local gui, panel = window.Gui, window.Panel
-window.Title.Text = "BORIN'S FORGE"
+window.Title.Text = "CRAFTING HALL"
 
 local tab = "Craft"
 local busy = false
@@ -91,11 +92,11 @@ local strip = new("Frame", {
 	Size = UDim2.fromOffset(560, 20),
 }, panel)
 UiKit.list(strip, 12, true).HorizontalAlignment = Enum.HorizontalAlignment.Right
-local coinsLabel = text(panel, "", 16, P.Gold, BOLD)
-coinsLabel.AnchorPoint = Vector2.new(1, 0)
-coinsLabel.Position = UDim2.new(1, -24, 0, 50)
-coinsLabel.Size = UDim2.fromOffset(300, 20)
-coinsLabel.TextXAlignment = Enum.TextXAlignment.Right
+local marksLabel = text(panel, "", 16, P.Gold, BOLD)
+marksLabel.AnchorPoint = Vector2.new(1, 0)
+marksLabel.Position = UDim2.new(1, -24, 0, 50)
+marksLabel.Size = UDim2.fromOffset(300, 20)
+marksLabel.TextXAlignment = Enum.TextXAlignment.Right
 window.Close.Position = UDim2.new(1, -16, 0, 80)
 
 local body = new("Frame", {
@@ -136,7 +137,7 @@ local function drawStrip()
 		count.Size = UDim2.fromOffset(0, 0)
 		count.TextWrapped = false
 	end
-	coinsLabel.Text = commas(GemClient.Profile and GemClient.Profile.Coins or 0) .. " COINS"
+	marksLabel.Text = commas(GemClient.Profile and GemClient.Profile.Marks or 0) .. " GUILD MARKS"
 end
 
 -- CRAFT tab --------------------------------------------------------------------------------
@@ -330,15 +331,15 @@ local function drawCraft()
 				recipeRow(info, Crafting.Materials[matId], need, 100 + r)
 			end
 		end
-		local coins = profile.Coins or 0
-		local coinLine = text(
+		local marks = profile.Marks or 0
+		local feeLine = text(
 			info,
-			string.format("%s / %s coins", commas(coins), commas(recipe.Coins)),
+			string.format("Forge fee  %s / %s Marks", commas(marks), commas(recipe.Marks)),
 			14,
-			if coins >= recipe.Coins then P.Good else P.Bad,
+			if marks >= recipe.Marks then P.Good else P.Bad,
 			BOLD
 		)
-		coinLine.LayoutOrder = 200
+		feeLine.LayoutOrder = 200
 
 		button(actions, if quality then "UPGRADE TO " .. string.upper(next_.Name) else "FORGE IT", true, function()
 			run({ { "Craft", kind, id } }, ForgeUI.refresh)
@@ -354,7 +355,7 @@ local function drawCraft()
 			end
 		end
 		if #missing > 0 then
-			button(actions, string.format("BUY MISSING (%d coins)", cost), false, function()
+			button(actions, string.format("BUY MISSING (%d Marks)", cost), false, function()
 				run(missing, ForgeUI.refresh)
 			end)
 		end
@@ -371,7 +372,7 @@ end
 -- MATERIALS tab ----------------------------------------------------------------------------
 
 local function drawMaterials()
-	window.Subtitle.Text = "Supplies for the anvil. Gem Shards come from salvaging gems."
+	window.Subtitle.Text = "Hilde's materials, paid in Guild Marks. Gem Shards come from salvaging stones."
 	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, body)
 	new("UIGridLayout", {
 		CellSize = UDim2.new(1 / 3, -10, 0.5, -8),
@@ -395,7 +396,7 @@ local function drawMaterials()
 		text(info, string.format("You have %d", have(id)), 14, P.Text, BOLD)
 		text(
 			info,
-			if material.Price then string.format("%d coins each", material.Price) else "Not for sale",
+			if material.Price then string.format("%d Marks each", material.Price) else "Not for sale",
 			14,
 			P.Gold,
 			BOLD
@@ -520,19 +521,19 @@ function drawSellSide(gems: { any })
 	UiKit.pad(side, 16)
 	local info = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, -130) }, side)
 	UiKit.list(info, 8)
-	local count, coins, shards = 0, 0, 0
+	local count, marks, shards = 0, 0, 0
 	local selected = {}
 	for _, gem in gems do
 		if picked[gem.Id] then
 			count += 1
-			coins += Crafting.sellPrice(gem)
+			marks += Crafting.sellPrice(gem)
 			shards += Crafting.salvageShards(gem)
 			table.insert(selected, gem.Id)
 		end
 	end
 	text(info, string.format("%d GEM%s SELECTED", count, if count == 1 then "" else "S"), 20, P.Gold, IronUi.Heading)
 	text(info, "Click gems to pick them. Socketed gems stay safe in your gear.", 13, P.Dim)
-	text(info, string.format("Sell for  %s coins", commas(coins)), 18, P.Text, BOLD)
+	text(info, string.format("Sell for  %s Guild Marks", commas(marks)), 18, P.Gold, BOLD)
 	text(info, string.format("or salvage into  %d Gem Shards", shards), 18, Crafting.Materials.Shards.Color, BOLD)
 	text(info, "Shards are needed for Masterwork gear.", 12, P.Dim)
 
@@ -584,7 +585,7 @@ function drawSellSide(gems: { any })
 	for _, action in { "Sell", "Salvage" } do
 		local label = if confirming == action
 			then "CONFIRM " .. string.upper(action) .. "?"
-			elseif action == "Sell" then string.format("SELL (%s)", commas(coins))
+			elseif action == "Sell" then string.format("SELL (%s)", commas(marks))
 			else string.format("SALVAGE (%d)", shards)
 		local b = button(actions, label, action == "Sell", function()
 			if confirming ~= action then
@@ -605,7 +606,7 @@ function drawSellSide(gems: { any })
 end
 
 local function drawSell()
-	window.Subtitle.Text = "Borin pays 60% of a gem's value, or salvages it into Gem Shards."
+	window.Subtitle.Text = "Hilde pays 60% of a stone's value in Guild Marks, or salvages it into Gem Shards."
 	local gems = sortedGems()
 	local present, ids = {}, {}
 	for i, gem in gems do
@@ -629,7 +630,7 @@ end
 
 -- Drawing and opening -----------------------------------------------------------------------
 
-local TABS = { { "Craft", "CRAFT" }, { "Materials", "MATERIALS" }, { "Sell", "SELL GEMS" } }
+local TABS = { { "Craft", "CRAFT" }, { "Materials", "MATERIALS" }, { "Sell", "SELL STONES" } }
 local DRAW = { Craft = drawCraft, Materials = drawMaterials, Sell = drawSell }
 
 function ForgeUI.refresh()

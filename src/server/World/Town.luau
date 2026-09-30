@@ -175,12 +175,18 @@ local function zones(folder: Folder, blocked: { Rect })
 	-- Ground under each zone is painted as dirt once they're all placed.
 	local lots: { Rect } = {}
 
-	-- North road: Mining Guild (west side) faces the workshop (east side).
+	-- North road: Mining Guild (west side) faces the Crafting Hall (east side).
 	local mining = zoneFolder("Mining")
 	Mining.buildGuild(mining, Builder.facing(Vector3.new(-FRONT, 0, -62), 1, 0), ZONE_COLORS.Mining)
 	table.insert(lots, lot(-FRONT, -62, 1, 0, 34, 22))
 	Mining.buildQuarry(mining, Builder.facing(Vector3.new(0, 0, -95), 0, 1), ZONE_COLORS.Mining)
 	table.insert(lots, rect(-42, 42, -95, -95 - Mining.QuarryDepth - 2))
+
+	-- Ilsa's cutting stall sits next to the guild, on the quarry side.
+	local Cutting = require(Zones.Cutting)
+	local cuttingZ = -62 - 17 - Cutting.Width / 2 - 2
+	Cutting.build(zoneFolder("Cutting"), Builder.facing(Vector3.new(-FRONT, 0, cuttingZ), 1, 0), ZONE_COLORS.Crafting)
+	table.insert(lots, lot(-FRONT, cuttingZ, 1, 0, Cutting.Width, Cutting.Depth + 4))
 
 	Crafting.build(zoneFolder("Crafting"), Builder.facing(Vector3.new(FRONT, 0, -62), -1, 0), ZONE_COLORS.Crafting)
 	table.insert(lots, lot(FRONT, -62, -1, 0, 30, 20))

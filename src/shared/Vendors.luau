@@ -43,7 +43,7 @@ local Vendors: { [string]: Vendor } = {
 			},
 		},
 	},
-	Crafting = {
+	Cutting = {
 		Name = "Ilsa",
 		Role = "Master Gemcutter",
 		Color = Color3.fromRGB(255, 160, 30),
@@ -53,10 +53,29 @@ local Vendors: { [string]: Vendor } = {
 		Options = {
 			{ Text = "Cut a gem by hand (free)", Action = "HandCut" },
 			{ Text = "Use a laser cutter", Action = "AutoCut" },
-			{ Text = "Sell stones I don't want", Action = "SellGems" },
 			{
 				Text = "How is a cut graded?",
 				Reply = "From 1 to 10. A steady hand earns up to 8. Land every strike near the line for a 9, and a flawless cut is a 10: Gem Mint. My precision laser always cuts a 9, the premium one a 10. Bigger stones are harder to cut by hand.",
+			},
+		},
+	},
+	Quartermaster = {
+		Name = "Hilde",
+		Role = "Guild Quartermaster",
+		Color = Color3.fromRGB(255, 200, 60),
+		Tunic = Color3.fromRGB(110, 80, 40),
+		Face = "-_-",
+		Greeting = "Welcome to the Crafting Hall. I pay Guild Marks for stones, and Marks buy the materials Borin needs to make your gear.",
+		Options = {
+			{ Text = "Sell stones for Guild Marks", Action = "SellGems" },
+			{ Text = "Buy crafting materials", Action = "Materials" },
+			{
+				Text = "What are Guild Marks?",
+				Reply = "The hall's own currency. You earn Marks only by selling stones here, and they pay for materials and Borin's forge fees. Coins won't buy anything in this hall.",
+			},
+			{
+				Text = "Can I break stones down instead?",
+				Reply = "Salvage them at my counter and you get Gem Shards. Borin needs shards for Masterwork gear.",
 			},
 		},
 	},
@@ -66,18 +85,16 @@ local Vendors: { [string]: Vendor } = {
 		Color = Color3.fromRGB(255, 120, 30),
 		Tunic = Color3.fromRGB(90, 56, 36),
 		Face = "o_O",
-		Greeting = "Steel, timber, leather, mithril. Bring me materials and coin and I'll forge you something worth wearing. I'll buy your spare gems too.",
+		Greeting = "Bring me materials from Hilde and a few Marks for the fire, and I'll forge you something worth wearing.",
 		Options = {
 			{ Text = "Craft or upgrade gear", Action = "Forge" },
-			{ Text = "Buy materials", Action = "Materials" },
-			{ Text = "Sell or salvage gems", Action = "SellGems" },
 			{
 				Text = "How does gear quality work?",
 				Reply = "Everything starts Standard. Upgrade it to Fine, then Superior with mithril, then Masterwork with gem shards. Each step hits harder or guards better, and looks it.",
 			},
 			{
-				Text = "Where do gem shards come from?",
-				Reply = "Salvage gems you don't want at my counter. Bigger, better gems break into more shards.",
+				Text = "Where do I get materials?",
+				Reply = "Hilde, out front of the hall. Sell her your spare stones for Guild Marks, then buy what the recipe needs.",
 			},
 		},
 	},

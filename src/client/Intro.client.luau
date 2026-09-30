@@ -685,7 +685,8 @@ pages[6] = function()
 	for _, line in
 		{
 			"Mining Guild (north road): Garrick gives free daily mines in the quarry, and sells rough stones.",
-			"Craft & Cut (north road): Ilsa cuts rough stones by hand for free, or with lasers for coins.",
+			"Gem Cutter (north road, by the Mining Guild): Ilsa cuts rough stones by hand for free, or with lasers for coins.",
+			"Crafting Hall (north road): sell stones to Hilde for Guild Marks, buy materials, and have Borin forge your gear.",
 			"Marketplace (town square): Tamsin's board lists gems for trade between players.",
 			"Arcanum (east road): Vey sockets gems into your weapon and armor to enchant them.",
 			"Arena (west road): wager gems in PvP duels. Winner takes the stone.",

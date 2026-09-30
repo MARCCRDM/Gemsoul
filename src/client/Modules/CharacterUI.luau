@@ -340,7 +340,7 @@ local function drawTooltip()
 		if not any then
 			text(tipBody, "Nothing yet.", 13, P.Dim)
 		end
-		text(tipBody, "Craft and upgrade gear at Borin's forge, beside Craft & Cut (north road).", 12, P.Dim)
+		text(tipBody, "Craft and upgrade gear at Borin's forge in the Crafting Hall (north road).", 12, P.Dim)
 		return
 	end
 
@@ -388,7 +388,7 @@ local function drawTooltip()
 			request("SocketGem", gem.Id, "Armor")
 		end)
 	else
-		text(tipActions, "Rough stones must be cut first. Ilsa cuts them at Craft & Cut.", 12, P.Dim).Size =
+		text(tipActions, "Rough stones must be cut first. Ilsa's stall is beside the Mining Guild.", 12, P.Dim).Size =
 			UDim2.new(1, 0, 1, 0)
 	end
 end

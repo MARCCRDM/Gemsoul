@@ -34,6 +34,7 @@ type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean }
 type Profile = {
 	Version: number,
 	Coins: number,
+	Marks: number, -- Guild Marks: from selling stones, spent in the Crafting Hall
 	Gems: { Gem },
 	Quota: { Day: number, UsedToday: number, Week: number, UsedThisWeek: number },
 	Character: Character,
@@ -61,8 +62,9 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 3,
+		Version = 4,
 		Coins = Config.StartingCoins,
+		Marks = 0,
 		Gems = {},
 		Quota = { Day = 0, UsedToday = 0, Week = 0, UsedThisWeek = 0 },
 		Character = {},
@@ -94,6 +96,10 @@ local function migrate(profile: Profile): Profile
 		end
 		profile.Owned = owned
 		profile.Version = 3
+	end
+	if profile.Version < 4 then
+		profile.Marks = profile.Marks or 0
+		profile.Version = 4
 	end
 	return profile
 end
@@ -128,6 +134,7 @@ local function sync(player: Player)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
 		leaderstats.Coins.Value = profile.Coins
+		leaderstats.Marks.Value = profile.Marks
 		leaderstats.Gems.Value = #profile.Gems
 	end
 	player:SetAttribute("MinedToday", profile.Quota.UsedToday)
@@ -170,7 +177,7 @@ local function load(player: Player)
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
-	for _, name in { "Coins", "Gems" } do
+	for _, name in { "Coins", "Marks", "Gems" } do
 		local value = Instance.new("IntValue")
 		value.Name = name
 		value.Parent = leaderstats
@@ -225,6 +232,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 	end
 	return {
 		Coins = profile.Coins,
+		Marks = profile.Marks,
 		Gems = profile.Gems,
 		Quota = profile.Quota,
 		DailyQuota = Config.DailyQuota,
@@ -425,6 +433,25 @@ end
 -- Marks a gem as changed (e.g. after cutting) so clients see it.
 function PlayerData.gemChanged(player: Player)
 	sync(player)
+end
+
+-- Guild Marks, the Crafting Hall's currency.
+function PlayerData.spendMarks(player: Player, amount: number): boolean
+	local profile = profiles[player]
+	if not profile or profile.Marks < amount then
+		return false
+	end
+	profile.Marks -= amount
+	sync(player)
+	return true
+end
+
+function PlayerData.addMarks(player: Player, amount: number)
+	local profile = profiles[player]
+	if profile then
+		profile.Marks += amount
+		sync(player)
+	end
 end
 
 function PlayerData.spendCoins(player: Player, amount: number): boolean

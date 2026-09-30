@@ -23,7 +23,8 @@ Gemsoul is a walled village on a sunny afternoon, laid out like an Oblivion town
 | Where | What's there | Shopkeeper |
 |---|---|---|
 | North road | Mining Guild and daily quota terminal, then the quarry with static gem nodes and the VIP energy gate | Garrick, Mining Foreman |
-| North road | Craft & Cut workshop: holographic cutting bench and laser cutter out front | Ilsa, Master Gemcutter |
+| North road | Gem Cutter stall beside the Mining Guild: holographic cutting bench and laser cutter | Ilsa, Master Gemcutter |
+| North road | Crafting Hall: stone exchange and materials stall out front, Borin's open-air forge next door | Hilde, Guild Quartermaster; Borin, Master Smith |
 | Market square | Stalls with trade kiosks and the holographic P2P listing board | Tamsin, Trade Broker |
 | East road | Arcanum tower with glowing runes and floating containment fields | Vey, Arcanist |
 | West road | Obsidian arena with PvP and PvE queue screens | Brutus, Arena Master |
@@ -70,15 +71,15 @@ Each piece of gear has one socket, for cut gems only. An enchanted item takes on
 
 Attributes are ratings (20 per class/gear point, plus gem bonuses) and they're live: Speed sets walk speed and Health sets max health (`Classes.walkSpeed` / `Classes.maxHealth`). After the intro, sockets are changed at Vey's Arcanum on the east road ("Enchant my gear").
 
-## Borin's forge: crafting, materials and selling gems
+## The Crafting Hall: selling stones, materials and gear
 
-Beside the **Craft & Cut** workshop on the north road (toward the quarry) is Borin's open-air smithy. Talk to Borin, or use the anvil (craft), the crates (materials) or the gem counter (sell). Ilsa can send you to the gem counter too.
+The Crafting Hall on the north road (east side) is for crafting only; gem cutting is across the road at Ilsa's stall beside the Mining Guild.
 
-- **Craft:** every weapon and armor for your class can be forged, then upgraded through four qualities: Standard (white), Fine (green), Superior (blue, needs Mithril) and Masterwork (orange, needs Mithril and Gem Shards). Each step adds Power to weapons or Defense and Health to armor, and changes the look: polished, then mithril blue-silver, then blackened steel with gold trim. *Buy missing* tops up materials in one click. Equip crafted gear at the forge, or click a gear slot on the character screen.
-- **Materials:** Iron, Timber, Leather, Cloth and Mithril are sold by Borin. Each class uses its own pair (Warrior/Tank: iron, timber, leather; Wizard: timber, cloth, leather; Archer: timber, leather, cloth).
-- **Sell gems:** pick gems you don't want. Sell them for 60% of their value, or salvage them into Gem Shards. Both ask you to confirm. *All rough* and *All common* select in bulk.
+- **Guild Marks:** the hall's own currency. You earn Marks only by selling stones to **Hilde** at the stone exchange out front (60% of a stone's value), and spend them on materials and forge fees. Coins aren't used in the hall. Hilde can also salvage stones into Gem Shards. Selling and salvaging ask you to confirm; *All rough* and *All common* select in bulk.
+- **Materials:** Hilde's stall sells Iron, Timber, Leather, Cloth and Mithril for Marks. Each class uses its own set (Warrior/Tank: iron, timber, leather; Wizard: timber, cloth, leather; Archer: timber, leather, cloth). Gem Shards can't be bought.
+- **Crafting:** at **Borin's** anvil next door, forge any weapon or armor for your class, then upgrade it through four qualities: Standard (white), Fine (green), Superior (blue, needs Mithril) and Masterwork (orange, needs Mithril and Gem Shards). Each step adds Power to weapons or Defense and Health to armor, and changes the look: polished, then mithril blue-silver, then blackened steel with gold trim. *Buy missing* tops up materials in one click. Equip gear at the hall, or click a gear slot on the character screen.
 
-Recipes, prices and quality bonuses live in `src/shared/Crafting.luau`. Buying, selling and crafting only work at the workshop (the server checks).
+Recipes, prices and quality bonuses live in `src/shared/Crafting.luau`. Selling, buying and crafting only work at the hall (the server checks). Marks show on the leaderboard and the HUD.
 
 Press **G** or the corner button to open your gem pouch. Coins, gems and quotas save between sessions; in Studio this needs *Game Settings > Security > Enable Studio Access to API Services*.
 
@@ -99,16 +100,16 @@ src/
       Landscape.luau          terrain: plains, moat, hills, mountains, forest
       WorldBuilder.luau       builds everything in order
       Zones/                  one file per shop
-        Mining.luau  Crafting.luau  Marketplace.luau  Enchanting.luau  Arena.luau
+        Mining.luau  Cutting.luau  Crafting.luau  Marketplace.luau  Enchanting.luau  Arena.luau
     Systems/
       GemGenerator.luau       rolls gems and grades cuts (pure logic)
       Gems.luau               awards generated gems to players (all sources)
-      PlayerData.luau         saved coins, gem inventory, free-mining quota
+      PlayerData.luau         saved coins, Guild Marks, gems, materials, gear, free-mining quota
       Mining.luau             quarry nodes: free mines give rough stones
       Shop.luau               store purchases, laser cuts, hand-cut minigame
       Intro.luau              intro steps: loadout, starter spin, first stone
       Enchanting.luau         socketing gems into weapon and armor (at Vey's)
-      Forge.luau              Borin's forge: materials, crafting, equipping, selling gems
+      Forge.luau              the Crafting Hall: selling stones for Marks, materials, crafting, equipping
       Nearby.luau             is a player standing near a shopkeeper?
       Equipment.luau          builds class weapons onto avatars, and socketed gems
       ArmorKits.luau          the 12 low-poly armor sets: helms, hoods, pauldrons
@@ -118,7 +119,7 @@ src/
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
     Hud.client.luau           corner buttons: character screen ([C]) and gem pouch ([G])
     Intro.client.luau         new-player intro screens
-    Modules/                  character screen, forge screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
+    Modules/                  character screen, Crafting Hall screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared

@@ -1,7 +1,8 @@
--- Crafting & Cutting workshop on the north road. Master Gemcutter Ilsa works
--- out front at a heavy stone bench fitted with floating holographic displays
--- (the manual QTE cutting station), next to a compact laser cutter. Borin
--- the smith keeps an open-air forge next door.
+-- The Crafting Hall on the north road. Out front, Hilde the quartermaster
+-- runs the stone exchange (sell gems for Guild Marks) and a materials stall;
+-- next door, on the quarry side, Borin the smith works an open-air forge
+-- where gear is made and upgraded. (Gem cutting is across the road, at
+-- Ilsa's stall beside the Mining Guild.)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Tags = require(ReplicatedStorage.Shared.Tags)
@@ -9,103 +10,104 @@ local Vendors = require(ReplicatedStorage.Shared.Vendors)
 local Builder = require(script.Parent.Parent.Builder)
 
 local C = Builder.Colors
+local BRASS = Color3.fromRGB(190, 150, 70)
 
 local Crafting = {}
 
 -- How far along the street (past the workshop) the smithy's centre sits.
 Crafting.SmithyOffset = 25
 
-local function workbench(folder: Folder, frame: CFrame, color: Color3)
-	-- Canvas awning over the bench.
-	Builder.part(folder, frame, {
-		Name = "Awning",
-		Size = Vector3.new(13, 0.4, 6),
-		At = CFrame.new(0, 9.3, -3) * CFrame.Angles(math.rad(12), 0, 0),
-		Color = Color3.fromRGB(150, 90, 40),
-		Material = Enum.Material.Fabric,
-	})
-	local bench = Builder.part(folder, frame, {
-		Name = "Workbench",
-		Size = Vector3.new(10, 1.4, 3.6),
-		At = CFrame.new(0, 3.7, -3),
+-- The front of the hall: Hilde's exchange counter, where stones are sold
+-- for Guild Marks, and her materials stall.
+local function exchange(folder: Folder, f: CFrame, color: Color3)
+	local counter = Builder.part(folder, f, {
+		Name = "ExchangeCounter",
+		Size = Vector3.new(9, 3, 2),
+		At = CFrame.new(0, 1.5, 0),
 		Color = C.WornStone,
 		Material = Enum.Material.Slate,
 	})
-	Builder.station(bench, "Crafting", "Cut Gem", "Cutting Bench", "HandCut")
-	for _, x in { -3.8, 3.8 } do
-		Builder.part(folder, frame, {
-			Name = "BenchLeg",
-			Size = Vector3.new(2, 3, 3),
-			At = CFrame.new(x, 1.5, -3),
-			Color = C.Stone,
-			Material = Enum.Material.Cobblestone,
+	Builder.station(counter, "Quartermaster", "Sell Stones", "Stone Exchange", "SellGems")
+	Builder.neon(folder, f, Vector3.new(9.1, 0.15, 2.1), CFrame.new(0, 3.05, 0), color)
+	-- Assay scales with a floating gem, and a board of the day's rates.
+	for _, x in { -2.6, 2.6 } do
+		Builder.part(folder, f, {
+			Name = "ScalePan",
+			Size = Vector3.new(1.4, 0.15, 1.4),
+			At = CFrame.new(x, 3.5, 0),
+			Color = BRASS,
+			Material = Enum.Material.Metal,
+			CastShadow = false,
 		})
 	end
-	Builder.neon(folder, frame, Vector3.new(10.2, 0.2, 3.8), CFrame.new(0, 3.05, -3), color)
+	Builder.part(folder, f, {
+		Name = "ScaleBeam",
+		Size = Vector3.new(5.6, 0.15, 0.15),
+		At = CFrame.new(0, 4.4, 0),
+		Color = BRASS,
+		Material = Enum.Material.Metal,
+		CastShadow = false,
+	})
 	Builder.neon(
 		folder,
-		frame,
-		Vector3.new(0.8, 0.8, 0.8),
-		CFrame.new(0, 5, -3) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
+		f,
+		Vector3.new(0.7, 0.7, 0.7),
+		CFrame.new(0, 5.2, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
 		C.Cyan,
 		nil,
 		Tags.Spin
 	)
+	Builder.holo(folder, f, CFrame.new(0, 7.2, 0.6), Vector3.new(5, 1.6, 0.15), color, "STONES > MARKS")
+end
 
-	-- Holographic displays facing the street.
-	local displays = {
-		{ X = -3.6, Yaw = 15, Size = Vector3.new(2.8, 2, 0.15), Text = "ANGLE\n42 DEG" },
-		{ X = 0, Yaw = 0, Size = Vector3.new(3.6, 2.4, 0.15), Text = "QTE CUT\nREADY" },
-		{ X = 3.6, Yaw = -15, Size = Vector3.new(2.8, 2, 0.15), Text = "CLARITY\n--%" },
-	}
-	for _, display in displays do
-		Builder.holo(
-			folder,
-			frame,
-			CFrame.new(display.X, 6.6, -2.2) * CFrame.Angles(0, math.rad(display.Yaw), 0),
-			display.Size,
-			color,
-			display.Text
-		)
+local function materialStall(folder: Folder, f: CFrame)
+	local shelf = Builder.part(folder, f, {
+		Name = "MaterialShelf",
+		Size = Vector3.new(6, 0.4, 2.4),
+		At = CFrame.new(0, 2.6, 0),
+		Color = Color3.fromRGB(110, 76, 48),
+		Material = Enum.Material.WoodPlanks,
+	})
+	Builder.station(shelf, "Quartermaster", "Buy Materials", "Materials", "Materials")
+	for _, x in { -2.7, 2.7 } do
+		Builder.part(folder, f, {
+			Name = "ShelfLeg",
+			Size = Vector3.new(0.4, 2.4, 2.2),
+			At = CFrame.new(x, 1.2, 0),
+			Color = Color3.fromRGB(90, 62, 40),
+			Material = Enum.Material.Wood,
+		})
 	end
-end
-
-local function laserCutter(folder: Folder, frame: CFrame)
-	local base = Builder.part(folder, frame, {
-		Name = "LaserBase",
-		Size = Vector3.new(4, 2.5, 3.4),
-		At = CFrame.new(0, 1.25, 0),
-		Color = C.Chrome,
-		Material = Enum.Material.DiamondPlate,
-	})
-	Builder.station(base, "Crafting", "Use Laser", "Laser Cutter", "AutoCut")
-	Builder.part(folder, frame, {
-		Name = "LaserChamber",
-		Size = Vector3.new(3.6, 3.4, 3),
-		At = CFrame.new(0, 4.2, 0),
-		Color = Color3.fromRGB(180, 220, 255),
-		Material = Enum.Material.Glass,
-		Transparency = 0.6,
-		CanCollide = false,
-	})
-	Builder.part(folder, frame, {
-		Name = "LaserHead",
-		Size = Vector3.new(4, 1.2, 3.4),
-		At = CFrame.new(0, 6.5, 0),
-		Color = C.Iron,
-		Material = Enum.Material.Metal,
-	})
-	Builder.neon(folder, frame, Vector3.new(0.2, 3.2, 0.2), CFrame.new(0, 4.2, 0), C.Red, nil, Tags.Laser)
-	Builder.screen(folder, frame, CFrame.new(0, 8.6, 0), Vector3.new(3.6, 2.4, 1.8), {
-		Name = "LaserScreen",
-		Text = "LASER\nT1-T3",
-		TextColor = C.Amber,
+	-- One of each material on the shelf: ingots, timber, leather, cloth, mithril.
+	local goods = {
+		{ -2.2, Vector3.new(0.9, 0.35, 0.45), C.Chrome, Enum.Material.Metal },
+		{ -1.1, Vector3.new(1.2, 0.4, 0.4), Color3.fromRGB(150, 105, 60), Enum.Material.Wood },
+		{ 0, Vector3.new(0.9, 0.5, 0.7), Color3.fromRGB(120, 72, 40), Enum.Material.Leather },
+		{ 1.1, Vector3.new(0.9, 0.45, 0.7), Color3.fromRGB(120, 90, 190), Enum.Material.Fabric },
+		{ 2.2, Vector3.new(0.9, 0.35, 0.45), Color3.fromRGB(170, 215, 240), Enum.Material.Metal },
+	}
+	for _, good in goods do
+		Builder.part(folder, f, {
+			Name = "Goods",
+			Size = good[2],
+			At = CFrame.new(good[1], 2.8 + good[2].Y / 2, 0),
+			Color = good[3],
+			Material = good[4],
+			CastShadow = false,
+		})
+	end
+	Builder.part(folder, f, {
+		Name = "Crate",
+		Size = Vector3.new(2, 2, 2),
+		At = CFrame.new(4.2, 1, 0.4) * CFrame.Angles(0, math.rad(12), 0),
+		Color = Color3.fromRGB(120, 86, 52),
+		Material = Enum.Material.WoodPlanks,
 	})
 end
 
--- Borin's open-air smithy beside the workshop (toward the quarry): a stone
--- floor under a timber roof, a glowing forge, an anvil where gear is made,
--- a rack of blades, material crates and a counter where he buys gems.
+-- Borin's open-air smithy beside the hall (toward the quarry): a stone
+-- floor under a timber roof, a glowing forge, the anvil where gear is made,
+-- a rack of blades and stacked material crates.
 local function smithy(folder: Folder, f: CFrame, color: Color3)
 	local wood = Color3.fromRGB(92, 62, 40)
 	Builder.part(folder, f, {
@@ -227,16 +229,13 @@ local function smithy(folder: Folder, f: CFrame, color: Color3)
 
 	-- Material crates with ingots, timber and leather on top.
 	for i, spot in { { 4.6, 1, 2.2 }, { 6.4, 1, 3.6 }, { 5.2, 3, 2.6 } } do
-		local crate = Builder.part(folder, f, {
+		Builder.part(folder, f, {
 			Name = "Crate",
 			Size = Vector3.new(2, 2, 2),
 			At = CFrame.new(spot[1], spot[2] + 0.3, spot[3]) * CFrame.Angles(0, math.rad(i * 11), 0),
 			Color = Color3.fromRGB(120, 86, 52),
 			Material = Enum.Material.WoodPlanks,
 		})
-		if i == 1 then
-			Builder.station(crate, "Forge", "Buy Materials", "Supplies", "Materials")
-		end
 	end
 	for j = 0, 2 do
 		Builder.part(folder, f, {
@@ -249,26 +248,6 @@ local function smithy(folder: Folder, f: CFrame, color: Color3)
 		})
 	end
 
-	-- Counter where Borin buys gems, with a glowing assay scale.
-	local counter = Builder.part(folder, f, {
-		Name = "GemCounter",
-		Size = Vector3.new(4, 3, 1.6),
-		At = CFrame.new(-4.8, 1.8, 3),
-		Color = C.WornStone,
-		Material = Enum.Material.Slate,
-	})
-	Builder.station(counter, "Forge", "Sell Gems", "Gem Counter", "SellGems")
-	Builder.neon(folder, f, Vector3.new(4.1, 0.15, 1.7), CFrame.new(-4.8, 3.3, 3), color)
-	Builder.neon(
-		folder,
-		f,
-		Vector3.new(0.6, 0.6, 0.6),
-		CFrame.new(-4.8, 4, 3) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
-		C.Cyan,
-		nil,
-		Tags.Spin
-	)
-
 	Builder.vendor(folder, f * CFrame.new(1, 0, -2.2), "Forge", Vendors.Forge)
 end
 
@@ -280,7 +259,7 @@ function Crafting.build(folder: Folder, frame: CFrame, color: Color3)
 		Floors = 2,
 		Trim = color,
 	})
-	Builder.sign(folder, frame, CFrame.new(0, 8.8, -0.6), Vector3.new(12, 2, 0.5), "CRAFT & CUT", color)
+	Builder.sign(folder, frame, CFrame.new(0, 8.8, -0.6), Vector3.new(12, 2, 0.5), "CRAFTING HALL", color)
 
 	-- The forge chimney glows at the top.
 	Builder.part(folder, frame, {
@@ -293,9 +272,9 @@ function Crafting.build(folder: Folder, frame: CFrame, color: Color3)
 	local glow = Builder.neon(folder, frame, Vector3.new(3.2, 0.6, 3.2), CFrame.new(-11, 30.1, 12), C.Amber)
 	glow:AddTag(Tags.Flicker)
 
-	workbench(folder, frame * CFrame.new(-7, 0.5, 0), color)
-	laserCutter(folder, frame * CFrame.new(10.5, 0.5, -2.5))
-	Builder.vendor(folder, frame * CFrame.new(3.5, 0.5, -6.5), "Crafting", Vendors.Crafting)
+	exchange(folder, frame * CFrame.new(-7, 0.5, -3), color)
+	materialStall(folder, frame * CFrame.new(9, 0.5, -3))
+	Builder.vendor(folder, frame * CFrame.new(2, 0.5, -6.5), "Quartermaster", Vendors.Quartermaster)
 	-- Beside the workshop, on the quarry side.
 	smithy(folder, frame * CFrame.new(Crafting.SmithyOffset, 0.5, 0), color)
 end

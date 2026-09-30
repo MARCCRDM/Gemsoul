@@ -38,7 +38,8 @@ local gems = hudButton("GEMS", K.Accent, InventoryUI.toggle)
 gems.LayoutOrder = 2
 
 local function refresh(profile)
-	gems.Text = string.format("GEMS %d  |  %d COINS  [G]", #profile.Gems, profile.Coins)
+	gems.Text =
+		string.format("GEMS %d  |  %d COINS  |  %d MARKS  [G]", #profile.Gems, profile.Coins, profile.Marks or 0)
 end
 GemClient.Changed:Connect(refresh)
 if GemClient.Profile then
