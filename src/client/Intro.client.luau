@@ -22,6 +22,7 @@ local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
 local CuttingGame = require(script.Parent.Modules.CuttingGame)
 local GemArt = require(script.Parent.Modules.GemArt)
 local GemClient = require(script.Parent.Modules.GemClient)
+local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
@@ -73,19 +74,11 @@ local function text(parent: Instance, value: string, size: number, color: Color3
 	}, parent)
 end
 
+-- Chunky 3D buttons, the same as every other screen.
 local function button(parent: Instance, label: string, primary: boolean, onClick: () -> ()): TextButton
-	local b = new("TextButton", {
-		BackgroundColor3 = if primary then K.Accent else K.Row,
-		Text = label,
-		Font = BOLD,
-		TextSize = 16,
-		TextColor3 = if primary then Color3.fromRGB(6, 20, 24) else K.Text,
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 42),
-	}, parent)
-	UiKit.round(b, 8)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 22), PaddingRight = UDim.new(0, 22) }, b)
-	b.Activated:Connect(onClick)
+	local b = IronUi.button(parent, label, primary, onClick)
+	b.Size = UDim2.fromOffset(0, 48)
+	b.TextSize = 18
 	return b
 end
 

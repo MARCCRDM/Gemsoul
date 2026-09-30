@@ -18,10 +18,12 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
+local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
 local K = UiKit.Colors
-local HEADING = Enum.Font.Arcade
+local P = IronUi.Colors
+local HEADING = IronUi.Heading
 local BODY = Enum.Font.Gotham
 local BOLD = Enum.Font.GothamBold
 local MAX_WIDTH = 880
@@ -79,15 +81,16 @@ end
 local function pill(parent: Instance, text: string, color: Color3, order: number): Frame
 	local frame = new("Frame", {
 		BackgroundColor3 = color,
-		BackgroundTransparency = 0.82,
+		BackgroundTransparency = 0.78,
 		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 24),
+		Size = UDim2.fromOffset(0, 26),
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(frame, 12)
-	new("UIStroke", { Color = color, Transparency = 0.4, Thickness = 1 }, frame)
+	UiKit.round(frame, 13)
+	new("UIStroke", { Color = color, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
 	new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, frame)
-	local text_ = label(frame, text, 12, color, BOLD)
+	local text_ = label(frame, text, 13, Color3.new(1, 1, 1), IronUi.Chunky)
+	IronUi.outline(text_, 2)
 	text_.AutomaticSize = Enum.AutomaticSize.X
 	text_.Size = UDim2.fromScale(0, 1)
 	return frame
@@ -114,7 +117,32 @@ local backdrop = new("TextButton", {
 	Size = UDim2.fromScale(1, 1),
 }, gui)
 
-local panel = UiKit.panel(gui)
+-- The same crystal window as every other screen: gold rim, dark body,
+-- a glossy gradient header bar.
+local panel = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1) }, gui)
+UiKit.round(panel, 16)
+new("UIStroke", { Color = P.Gold, Thickness = 4 }, panel)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(34, 26, 48), P.Frame) }, panel)
+local headerBar = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	Position = UDim2.fromOffset(5, 5),
+	Size = UDim2.new(1, -10, 0, 66),
+}, panel)
+UiKit.round(headerBar, 12)
+new("UIGradient", {
+	Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, IronUi.lighter(P.Amethyst, 0.1)),
+		ColorSequenceKeypoint.new(0.6, IronUi.darker(P.Amethyst, 0.25)),
+		ColorSequenceKeypoint.new(1, IronUi.darker(P.Teal, 0.3)),
+	}),
+}, headerBar)
+local headerGloss = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BackgroundTransparency = 0.82,
+	Position = UDim2.fromOffset(8, 4),
+	Size = UDim2.new(1, -16, 0, 10),
+}, headerBar)
+UiKit.round(headerGloss, 5)
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
 panel.Size = UDim2.fromScale(0.94, 0.86)
@@ -128,9 +156,10 @@ local header = new("Frame", {
 	Position = UDim2.fromOffset(16, 12),
 	Size = UDim2.new(1, -32, 0, 58),
 }, panel)
-local title = label(header, "GEM POUCH", 24, K.Accent, HEADING)
-title.Size = UDim2.new(0.5, 0, 0, 28)
-local subtitle = label(header, "", 14, K.Dim)
+local title = label(header, "GEM POUCH", 28, Color3.new(1, 1, 1), HEADING)
+IronUi.outline(title, 3)
+title.Size = UDim2.new(0.5, 0, 0, 30)
+local subtitle = label(header, "", 13, Color3.fromRGB(240, 230, 255), BOLD)
 subtitle.Position = UDim2.fromOffset(0, 32)
 subtitle.Size = UDim2.new(0.5, 0, 0, 18)
 subtitle.TextTruncate = Enum.TextTruncate.AtEnd
@@ -138,30 +167,29 @@ subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 local pills = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -48, 0, 4),
+	Position = UDim2.new(1, -56, 0, 8),
 	Size = UDim2.new(0.5, 0, 0, 52),
 }, header)
 local pillLayout = UiKit.list(pills, 6, true)
 pillLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 pillLayout.Wraps = true
 
-local closeButton = new("TextButton", {
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, 0, 0, 2),
-	Size = UDim2.fromOffset(36, 36),
-	BackgroundColor3 = K.Row,
-	Text = "X",
-	Font = BOLD,
-	TextSize = 18,
-	TextColor3 = K.Bad,
-}, header)
-UiKit.round(closeButton, 18)
+local closeButton, closeFace = IronUi.chunk(header, {
+	Color = Color3.fromRGB(232, 58, 58),
+	Size = UDim2.fromOffset(44, 44),
+	Radius = 12,
+	Lip = 5,
+	Stripes = "None",
+})
+closeButton.AnchorPoint = Vector2.new(1, 0)
+closeButton.Position = UDim2.new(1, 4, 0, 0)
+IronUi.label(closeButton, closeFace, "X", 22, HEADING)
 
 -- Toolbar: filter tabs on the left, sort tabs on the right.
 local toolbar = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 76),
-	Size = UDim2.new(1, -32, 0, 30),
+	Position = UDim2.fromOffset(16, 80),
+	Size = UDim2.new(1, -32, 0, 40),
 }, panel)
 local filters = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.42, 0, 1, 0) }, toolbar)
 UiKit.list(filters, 6, true)
@@ -176,8 +204,8 @@ UiKit.list(sorts, 6, true).HorizontalAlignment = Enum.HorizontalAlignment.Right
 -- Body: the card grid and the detail panel.
 local body = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 116),
-	Size = UDim2.new(1, -32, 1, -130),
+	Position = UDim2.fromOffset(16, 130),
+	Size = UDim2.new(1, -32, 1, -144),
 }, panel)
 local grid = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
@@ -185,7 +213,7 @@ local grid = new("ScrollingFrame", {
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollBarThickness = 5,
-	ScrollBarImageColor3 = K.Accent,
+	ScrollBarImageColor3 = P.Gold,
 	Size = UDim2.new(1, -300, 1, 0),
 }, body)
 new("UIGridLayout", {
@@ -202,13 +230,13 @@ emptyLabel.TextYAlignment = Enum.TextYAlignment.Top
 emptyLabel.Visible = false
 
 local detail = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(14, 22, 20),
+	BackgroundColor3 = P.Inset,
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.fromScale(1, 0),
 	Size = UDim2.new(0, 286, 1, 0),
 }, body)
 UiKit.round(detail, 10)
-local detailStroke = new("UIStroke", { Color = K.Accent, Transparency = 0.5, Thickness = 1.5 }, detail)
+local detailStroke = new("UIStroke", { Color = P.Gold, Thickness = 3 }, detail)
 
 -- Close-up: a neutral studio backdrop with the stone in a viewport on top.
 local stageFrame = new("Frame", {
@@ -241,18 +269,18 @@ local info = new("ScrollingFrame", {
 UiKit.pad(info, 12)
 UiKit.list(info, 8)
 
-local backButton = new("TextButton", {
-	Position = UDim2.fromOffset(8, 8),
-	Size = UDim2.fromOffset(74, 28),
-	BackgroundColor3 = K.Row,
-	Text = "< Back",
-	Font = BOLD,
-	TextSize = 14,
-	TextColor3 = K.Text,
-	ZIndex = 5,
-	Visible = false,
-}, detail)
-UiKit.round(backButton, 14)
+local backButton, backFace = IronUi.chunk(detail, {
+	Color = Color3.fromRGB(88, 80, 112),
+	Rim = Color3.fromRGB(170, 162, 196),
+	Size = UDim2.fromOffset(86, 36),
+	Radius = 10,
+	Lip = 4,
+	Stripes = "None",
+})
+backButton.Position = UDim2.fromOffset(8, 8)
+backButton.ZIndex = 5
+backButton.Visible = false
+IronUi.label(backButton, backFace, "< Back", 14)
 
 -- Detail view -------------------------------------------------------------------
 
@@ -271,7 +299,7 @@ local function statBar(name: string, value: number?, color: Color3, order: numbe
 	UiKit.list(cells, 3, true)
 	for i = 1, 10 do
 		local cell = new("Frame", {
-			BackgroundColor3 = if value and i <= value then color else Color3.fromRGB(40, 50, 48),
+			BackgroundColor3 = if value and i <= value then color else Color3.fromRGB(48, 42, 64),
 			Size = UDim2.new(0.1, -3, 1, 0),
 			LayoutOrder = i,
 		}, cells)
@@ -293,7 +321,7 @@ local function showDetail(gem)
 	end
 	if not gem then
 		label(info, "Select a gem to see it up close.", 15, K.Dim).TextWrapped = true
-		detailStroke.Color = K.Accent
+		detailStroke.Color = P.Gold
 		return
 	end
 
@@ -308,7 +336,8 @@ local function showDetail(gem)
 	spinning = model
 	spinningGem = gem
 
-	local name = label(info, shade.Name, 18, K.Text, BOLD)
+	local name = label(info, shade.Name, 20, Color3.new(1, 1, 1), IronUi.Chunky)
+	IronUi.outline(name, 2)
 	name.TextWrapped = true
 	name.AutomaticSize = Enum.AutomaticSize.Y
 	name.LayoutOrder = 1
@@ -329,7 +358,8 @@ local function showDetail(gem)
 	statBar("CLARITY", gem.Clarity, tierColor, 4)
 	statBar("CUT", gem.Cut, K.Gold, 5)
 
-	local value = label(info, commas(GemConfig.value(gem)) .. " coins", 22, K.Gold, BOLD)
+	local value = label(info, "💰 " .. commas(GemConfig.value(gem)), 24, P.Gold, IronUi.Chunky)
+	IronUi.outline(value, 2)
 	value.LayoutOrder = 6
 	if not gem.Cut then
 		local asCut = table.clone(gem)
@@ -350,20 +380,13 @@ local function showDetail(gem)
 	local options = current
 	if options and options.OnPick then
 		local pick = options.OnPick
-		local button = new("TextButton", {
-			BackgroundColor3 = K.Accent,
-			Size = UDim2.new(1, 0, 0, 40),
-			Text = string.upper(options.ActionText or "Choose"),
-			Font = BOLD,
-			TextSize = 16,
-			TextColor3 = Color3.fromRGB(6, 20, 24),
-			LayoutOrder = 9,
-		}, info)
-		UiKit.round(button, 8)
-		button.Activated:Connect(function()
+		local button = IronUi.gemButton(info, string.upper(options.ActionText or "Choose"), P.Emerald, function()
 			InventoryUI.close()
 			pick(gem)
 		end)
+		button.AutomaticSize = Enum.AutomaticSize.None
+		button.Size = UDim2.new(1, 0, 0, 50)
+		button.LayoutOrder = 9
 	end
 end
 
@@ -423,29 +446,23 @@ local function card(gem, order: number)
 	local shade = GemConfig.shade(gem)
 	local tierColor = GemConfig.TierColors[gem.Tier]
 	local selected = gem.Id == selectedId
-	local button = new("TextButton", {
-		Text = "",
-		AutoButtonColor = false,
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		LayoutOrder = order,
-	}, grid)
-	UiKit.round(button, 10)
-	-- Neutral card so the stone's own colour stands out; rarity shows in the
-	-- border and the label.
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(38, 44, 52), Color3.fromRGB(20, 24, 30)),
-	}, button)
-	local stroke = new("UIStroke", {
-		Color = tierColor,
-		Transparency = if selected then 0 else 0.55,
-		Thickness = if selected then 3 else 1.5,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, button)
+	-- A dark slab so the stone's own colour stands out; rarity shows in the
+	-- rim and the label, and the selected card gets a gold outline.
+	local button, face = IronUi.chunk(grid, {
+		Color = Color3.fromRGB(40, 36, 54),
+		Rim = if selected then P.Gold else tierColor,
+		Radius = 12,
+		Lip = 5,
+		Stripes = "None",
+	})
+	button.LayoutOrder = order
+	local stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke
+	if selected then
+		stroke.Thickness = 4
+	end
 	if gem.Tier == "UltraRare" then
-		-- A shimmer running around the border.
+		-- A shimmer running around the outline.
 		stroke.Color = Color3.new(1, 1, 1)
-		stroke.Transparency = 0
 		local shimmer = new("UIGradient", {
 			Color = ColorSequence.new({
 				ColorSequenceKeypoint.new(0, tierColor),
@@ -462,45 +479,39 @@ local function card(gem, order: number)
 	local stage = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 16),
-		Size = UDim2.fromOffset(92, 72),
-	}, button)
+		Position = UDim2.new(0.5, 0, 0, 14),
+		Size = UDim2.fromOffset(92, 70),
+	}, face)
 	GemArt.backdrop(stage)
 	pending[stage] = gem
 
 	local rarityText = if gem.Tier == "UltraRare" then "ULTRA" else string.upper(GemConfig.TierLabels[gem.Tier])
-	local rarity = label(button, rarityText, 10, tierColor, BOLD)
+	local rarity = label(face, rarityText, 10, tierColor, BOLD)
 	rarity.AnchorPoint = Vector2.new(1, 0)
 	rarity.Position = UDim2.new(1, -8, 0, 6)
 	rarity.Size = UDim2.new(0.6, 0, 0, 12)
 	rarity.TextXAlignment = Enum.TextXAlignment.Right
 
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "MINT" else "CUT " .. gem.Cut
-	local tag = label(button, state, 10, if gem.Cut then K.Gold else K.Dim, BOLD)
+	local tag = label(face, state, 10, if gem.Cut then K.Gold else K.Dim, BOLD)
 	tag.Position = UDim2.fromOffset(8, 6)
 	tag.Size = UDim2.new(1, -16, 0, 12)
 
-	local name = label(button, shade.Name, 12, K.Text, BOLD)
-	name.Position = UDim2.fromOffset(6, 92)
-	name.Size = UDim2.new(1, -12, 0, 30)
+	local name = label(face, shade.Name, 12, Color3.new(1, 1, 1), IronUi.Chunky)
+	IronUi.outline(name, 1.5)
+	name.Position = UDim2.fromOffset(4, 86)
+	name.Size = UDim2.new(1, -8, 0, 30)
 	name.TextWrapped = true
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	name.TextYAlignment = Enum.TextYAlignment.Top
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 
-	local value = label(button, commas(GemConfig.value(gem)), 13, K.Gold, BOLD)
-	value.Position = UDim2.new(0, 6, 1, -22)
+	local value = label(face, "💰 " .. commas(GemConfig.value(gem)), 13, P.Gold, IronUi.Chunky)
+	IronUi.outline(value, 1.5)
+	value.Position = UDim2.new(0, 6, 1, -20)
 	value.Size = UDim2.new(1, -12, 0, 16)
 	value.TextXAlignment = Enum.TextXAlignment.Center
 
-	if gem.Tier ~= "UltraRare" and not selected then
-		button.MouseEnter:Connect(function()
-			stroke.Transparency = 0.15
-		end)
-		button.MouseLeave:Connect(function()
-			stroke.Transparency = 0.55
-		end)
-	end
 	button.Activated:Connect(function()
 		selectedId = gem.Id
 		detailOpen = true
@@ -512,18 +523,21 @@ local function tabs(parent: Instance, names: { string }, active: string, onPick:
 	clearChildren(parent, { UIListLayout = true })
 	for i, name in names do
 		local on = name == active
-		local tab = new("TextButton", {
-			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.fromOffset(0, 28),
-			BackgroundColor3 = if on then K.Accent else K.Row,
-			Text = name,
-			Font = BOLD,
-			TextSize = 13,
-			TextColor3 = if on then Color3.fromRGB(6, 20, 24) else K.Text,
-			LayoutOrder = i,
-		}, parent)
-		UiKit.round(tab, 14)
-		new("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, tab)
+		local tab, face = IronUi.chunk(parent, {
+			Color = if on then P.Amethyst else Color3.fromRGB(52, 46, 68),
+			Rim = if on then Color3.fromRGB(214, 180, 255) else Color3.fromRGB(96, 88, 120),
+			Size = UDim2.fromOffset(0, if on then 38 else 34),
+			Radius = 10,
+			Lip = if on then 5 else 4,
+			PadX = 12,
+			Stripes = if on then "Thin" else "None",
+		})
+		tab.AutomaticSize = Enum.AutomaticSize.X
+		tab.LayoutOrder = i
+		local text_ = IronUi.label(tab, face, name, 13)
+		if not on then
+			text_.TextColor3 = Color3.fromRGB(196, 186, 220)
+		end
 		tab.Activated:Connect(function()
 			onPick(name)
 		end)
@@ -578,7 +592,7 @@ function InventoryUI.refresh()
 	end
 	local quota = profile.Quota
 	pill(pills, commas(profile.Coins) .. " COINS", K.Gold, 1)
-	pill(pills, string.format("%d / %d GEMS", #profile.Gems, Config.MaxGems), K.Accent, 2)
+	pill(pills, string.format("%d / %d GEMS", #profile.Gems, Config.MaxGems), Color3.fromRGB(190, 120, 255), 2)
 	pill(
 		pills,
 		string.format("FREE MINES %d/%d", math.max(0, profile.DailyQuota - quota.UsedToday), profile.DailyQuota),

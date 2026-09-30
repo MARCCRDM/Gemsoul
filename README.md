@@ -100,7 +100,7 @@ Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or we
 
 **The hub.** On the left, a big yellow SHOP button (B) over a 2x2 grid of menu tiles: Character (C), Abilities (K), Gems (G) and Party (P). Top right, gold-edged bars show your coins (the green + opens the Shop), Guild Marks and gems, with Season (J) and Top (L) buttons underneath.
 
-**Buttons** are chunky 3D slabs, built by `IronUi.chunk`. From the outside in, each has a black outline, a darker lip underneath for depth, a light rim, and a gradient face. The face has a glossy top, diagonal light stripes and, on some buttons, a halftone dot texture. Icons are drawn big and break out of the edge. Hovering makes a button grow; pressing sinks its face into the lip. Windows share the look: a gold-rimmed frame that pops open, a glossy header with a tilted icon badge, outlined cartoon lettering and a red close slab.
+**Buttons** are chunky 3D slabs, built by `IronUi.chunk`. From the outside in, each has a black outline, a darker lip underneath for depth, a light rim, and a gradient face. The face has a glossy top, diagonal light stripes and, on some buttons, a halftone dot texture. Icons are drawn big and break out of the edge. Hovering makes a button grow; pressing sinks its face into the lip. The same slabs are used for the combat hotbar (rimmed in your class colour), the gem pouch cards and tabs, shopkeeper replies and the intro. Windows share the look: a gold-rimmed frame that pops open, a glossy header with a tilted icon badge, outlined cartoon lettering and a red close slab.
 
 **Shop** (coins today, Robux-ready). Tabs:
 

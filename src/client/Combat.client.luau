@@ -155,11 +155,21 @@ local function bar(y: number, color: Color3): (Frame, TextLabel)
 		Position = UDim2.fromOffset(0, y),
 		Size = UDim2.new(1, 0, 0, 14),
 	}, hud)
-	UiKit.round(back, 4)
-	new("UIStroke", { Color = P.Edge, Thickness = 1 }, back)
+	UiKit.round(back, 7)
+	new("UIStroke", { Color = P.Ink, Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, back)
 	local fill = new("Frame", { BackgroundColor3 = color, Size = UDim2.fromScale(1, 1) }, back)
-	UiKit.round(fill, 4)
-	local label = text(back, "", 11, Color3.new(1, 1, 1), BOLD)
+	UiKit.round(fill, 7)
+	-- A glossy top half on the fill.
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+			ColorSequenceKeypoint.new(0.45, Color3.fromRGB(235, 235, 235)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(190, 190, 190)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 150, 150)),
+		}),
+	}, fill)
+	local label = text(back, "", 11, Color3.new(1, 1, 1), IronUi.Chunky)
 	label.Size = UDim2.fromScale(1, 1)
 	label.AutomaticSize = Enum.AutomaticSize.None
 	label.TextXAlignment = Enum.TextXAlignment.Center
@@ -173,7 +183,7 @@ local shieldFill = new("Frame", {
 	Size = UDim2.fromScale(0, 1),
 	ZIndex = 2,
 }, healthFill.Parent)
-UiKit.round(shieldFill, 4)
+UiKit.round(shieldFill, 7)
 local resourceFill, resourceLabel = bar(18, Color3.fromRGB(70, 130, 255))
 
 local slots = new("Frame", {
@@ -190,27 +200,36 @@ zoneLabel.Size = UDim2.fromOffset(420, 18)
 zoneLabel.TextXAlignment = Enum.TextXAlignment.Center
 zoneLabel.TextStrokeTransparency = 0.5
 
-type Slot = { Button: TextButton, Name: TextLabel, Shade: Frame, Timer: TextLabel, Stroke: UIStroke, Ability: any? }
+type Slot = {
+	Button: TextButton,
+	Name: TextLabel,
+	Shade: Frame,
+	Timer: TextLabel,
+	Stroke: UIStroke,
+	Rim: Frame,
+	Face: Frame,
+	Ability: any?,
+}
 local slotUi: { Slot } = {}
 
 local function makeSlot(order: number, key: string, onPress: () -> ()): Slot
-	local button = new("TextButton", {
-		Text = "",
-		AutoButtonColor = true,
-		BackgroundColor3 = P.Slot,
-		Size = UDim2.fromOffset(64, 64),
-		LayoutOrder = order,
-		ClipsDescendants = true,
-	}, slots)
-	UiKit.round(button, 8)
-	local stroke =
-		new("UIStroke", { Color = P.Edge, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, button)
-	local keyLabel = text(button, key, 12, P.Gold, BOLD)
+	-- A chunky slab; its rim takes the class colour.
+	local button, slab = IronUi.chunk(slots, {
+		Color = Color3.fromRGB(52, 46, 70),
+		Size = UDim2.fromOffset(64, 68),
+		Radius = 12,
+		Lip = 5,
+		Stripes = "None",
+	})
+	button.LayoutOrder = order
+	local stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke
+	local rim = slab.Parent :: Frame
+	local keyLabel = text(slab, key, 12, P.Gold, IronUi.Chunky)
 	keyLabel.Position = UDim2.fromOffset(5, 3)
 	keyLabel.Size = UDim2.fromOffset(40, 14)
 	keyLabel.AutomaticSize = Enum.AutomaticSize.None
 	keyLabel.ZIndex = 4
-	local name = text(button, "", 11, P.Text, BOLD)
+	local name = text(slab, "", 11, Color3.new(1, 1, 1), IronUi.Chunky)
 	name.AnchorPoint = Vector2.new(0.5, 1)
 	name.Position = UDim2.new(0.5, 0, 1, -4)
 	name.Size = UDim2.new(1, -6, 0, 28)
@@ -225,14 +244,15 @@ local function makeSlot(order: number, key: string, onPress: () -> ()): Slot
 		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.fromScale(1, 0),
 		ZIndex = 5,
-	}, button)
-	local timer = text(button, "", 18, Color3.new(1, 1, 1), BOLD)
+	}, slab)
+	UiKit.round(shade, 9)
+	local timer = text(slab, "", 20, Color3.new(1, 1, 1), IronUi.Heading)
 	timer.Size = UDim2.fromScale(1, 1)
 	timer.AutomaticSize = Enum.AutomaticSize.None
 	timer.TextXAlignment = Enum.TextXAlignment.Center
 	timer.ZIndex = 6
 	button.Activated:Connect(onPress)
-	return { Button = button, Name = name, Shade = shade, Timer = timer, Stroke = stroke }
+	return { Button = button, Name = name, Shade = shade, Timer = timer, Stroke = stroke, Rim = rim, Face = slab }
 end
 
 slotUi[0] = makeSlot(0, "CLICK", tryAttack)
@@ -246,7 +266,7 @@ slotUi[4] = makeSlot(4, Classes.UltimateKey, function()
 end)
 local abilitiesButton = IronUi.button(slots, "K", false, AbilitiesUI.toggle)
 abilitiesButton.LayoutOrder = 5
-abilitiesButton.Size = UDim2.fromOffset(0, 64)
+abilitiesButton.Size = UDim2.fromOffset(0, 68)
 
 local function refreshSlots()
 	local kit = loadout()
@@ -256,17 +276,17 @@ local function refreshSlots()
 	end
 	local weapon = kit.Weapon
 	slotUi[0].Name.Text = if weapon then weapon.Name:gsub("^Iron ", "") else "Attack"
-	slotUi[0].Stroke.Color = kit.Class.Color
+	slotUi[0].Rim.BackgroundColor3 = kit.Class.Color
 	for i = 1, 3 do
 		local ability = kit.Slots[i]
 		slotUi[i].Ability = ability
 		slotUi[i].Name.Text = if ability then ability.Name else ""
-		slotUi[i].Stroke.Color = kit.Class.Color
+		slotUi[i].Rim.BackgroundColor3 = kit.Class.Color
 	end
 	slotUi[4].Ability = kit.Ultimate
 	slotUi[4].Name.Text = kit.Ultimate.Name
-	slotUi[4].Stroke.Color = P.Gold
-	slotUi[4].Stroke.Thickness = 3
+	slotUi[4].Rim.BackgroundColor3 = P.Gold
+	slotUi[4].Stroke.Thickness = 4
 	resourceFill.BackgroundColor3 = Combat.ResourceColors[kit.Class.ResourceId] or resourceFill.BackgroundColor3
 end
 GemClient.Changed:Connect(refreshSlots)
@@ -314,7 +334,10 @@ RunService.RenderStepped:Connect(function()
 	local fight = canFight()
 	zoneLabel.Text = if fight then "" else "TOWN: fighting is off. Arena (west road) or the Crystal Wilds (south gate)."
 	for i = 0, 4 do
-		slotUi[i].Button.BackgroundTransparency = if fight then 0 else 0.5
+		local fade = if fight then 0 else 0.5
+		slotUi[i].Button.BackgroundTransparency = fade
+		slotUi[i].Rim.BackgroundTransparency = fade
+		slotUi[i].Face.BackgroundTransparency = fade
 	end
 	if holding and fight then
 		tryAttack()
