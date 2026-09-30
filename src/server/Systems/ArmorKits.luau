@@ -1161,11 +1161,26 @@ local KITS: { [string]: { Metal: Color3, Trim: Color3, Cloth: Color3?, Material:
 	},
 }
 
-function ArmorKits.build(folder: Instance, character: Model, look: string, accent: Color3)
+-- Better-made gear looks it: Fine is polished, Superior is mithril
+-- blue-silver, Masterwork is blackened steel with gold trim.
+local GOLD = Color3.fromRGB(214, 172, 72)
+function ArmorKits.tint(color: Color3, quality: number?, isTrim: boolean?): Color3
+	local q = quality or 1
+	if q == 2 then
+		return color:Lerp(Color3.new(1, 1, 1), 0.15)
+	elseif q == 3 then
+		return color:Lerp(Color3.fromRGB(175, 212, 240), 0.45)
+	elseif q >= 4 then
+		return if isTrim then GOLD else color:Lerp(Color3.fromRGB(38, 36, 46), 0.6)
+	end
+	return color
+end
+
+function ArmorKits.build(folder: Instance, character: Model, look: string, accent: Color3, quality: number?)
 	local palette = KITS[look] or KITS.Plate
 	local kit: Kit = {
-		Metal = palette.Metal,
-		Trim = palette.Trim,
+		Metal = ArmorKits.tint(palette.Metal, quality),
+		Trim = ArmorKits.tint(palette.Trim, quality, true),
 		-- Tabards and capes are the class colour, deepened like dyed cloth.
 		Cloth = palette.Cloth or darken(accent, 0.45),
 		Material = palette.Material,

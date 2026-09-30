@@ -184,6 +184,8 @@ local function zones(folder: Folder, blocked: { Rect })
 
 	Crafting.build(zoneFolder("Crafting"), Builder.facing(Vector3.new(FRONT, 0, -62), -1, 0), ZONE_COLORS.Crafting)
 	table.insert(lots, lot(FRONT, -62, -1, 0, 30, 20))
+	-- Borin's smithy, next to the workshop on the quarry side.
+	table.insert(lots, lot(FRONT, -62 - Crafting.SmithyOffset, -1, 0, 18, 17))
 
 	Marketplace.build(zoneFolder("Marketplace"), CFrame.new(0, GROUND, 0), ZONE_COLORS.Market, SQUARE_HALF - 6)
 

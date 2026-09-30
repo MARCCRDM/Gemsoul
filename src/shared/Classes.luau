@@ -36,6 +36,7 @@ export type Class = {
 	Specs: { Spec },
 }
 
+local Crafting = require(script.Parent.Crafting)
 local GemConfig = require(script.Parent.GemConfig)
 
 local Classes = {}
@@ -444,8 +445,8 @@ function Classes.stats(classId: string, weaponId: string?, armorId: string?): St
 	return stats
 end
 
--- Ratings out of 100 for the character screen: each 1-5 stat point is worth
--- 20, and socketed gems add their bonuses on top.
+-- Ratings for the character screen: each 1-5 stat point is worth 20, gear
+-- quality adds to that, and socketed gems add their bonuses on top.
 -- Element is the gem that gives the largest bonus, for colouring it.
 export type Rating = { Base: number, Bonus: number, Element: string? }
 function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
@@ -453,6 +454,12 @@ function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
 	local ratings = {}
 	for _, name in Classes.StatNames do
 		ratings[name] = { Base = stats[name] * 20, Bonus = 0 }
+	end
+	-- Better-made gear (Fine, Superior, Masterwork) raises the base.
+	for kind, key in { Weapons = "Weapon", Armors = "Armor" } do
+		for stat, amount in Crafting.qualityBonus(kind, loadout[key .. "Quality"]) do
+			ratings[stat].Base += amount
+		end
 	end
 	for _, slot in { "Weapon", "Armor" } do
 		local gem = loadout[slot .. "Gem"]

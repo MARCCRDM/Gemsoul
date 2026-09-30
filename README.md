@@ -70,6 +70,16 @@ Each piece of gear has one socket, for cut gems only. An enchanted item takes on
 
 Attributes are ratings (20 per class/gear point, plus gem bonuses) and they're live: Speed sets walk speed and Health sets max health (`Classes.walkSpeed` / `Classes.maxHealth`). After the intro, sockets are changed at Vey's Arcanum on the east road ("Enchant my gear").
 
+## Borin's forge: crafting, materials and selling gems
+
+Beside the **Craft & Cut** workshop on the north road (toward the quarry) is Borin's open-air smithy. Talk to Borin, or use the anvil (craft), the crates (materials) or the gem counter (sell). Ilsa can send you to the gem counter too.
+
+- **Craft:** every weapon and armor for your class can be forged, then upgraded through four qualities: Standard (white), Fine (green), Superior (blue, needs Mithril) and Masterwork (orange, needs Mithril and Gem Shards). Each step adds Power to weapons or Defense and Health to armor, and changes the look: polished, then mithril blue-silver, then blackened steel with gold trim. *Buy missing* tops up materials in one click. Equip crafted gear at the forge, or click a gear slot on the character screen.
+- **Materials:** Iron, Timber, Leather, Cloth and Mithril are sold by Borin. Each class uses its own pair (Warrior/Tank: iron, timber, leather; Wizard: timber, cloth, leather; Archer: timber, leather, cloth).
+- **Sell gems:** pick gems you don't want. Sell them for 60% of their value, or salvage them into Gem Shards. Both ask you to confirm. *All rough* and *All common* select in bulk.
+
+Recipes, prices and quality bonuses live in `src/shared/Crafting.luau`. Buying, selling and crafting only work at the workshop (the server checks).
+
 Press **G** or the corner button to open your gem pouch. Coins, gems and quotas save between sessions; in Studio this needs *Game Settings > Security > Enable Studio Access to API Services*.
 
 Tunable numbers live in `src/shared/Config.luau` (quotas, prices, starting coins) and `src/shared/GemConfig.luau` (colour tiers, odds, cut difficulty, values).
@@ -98,6 +108,8 @@ src/
       Shop.luau               store purchases, laser cuts, hand-cut minigame
       Intro.luau              intro steps: loadout, starter spin, first stone
       Enchanting.luau         socketing gems into weapon and armor (at Vey's)
+      Forge.luau              Borin's forge: materials, crafting, equipping, selling gems
+      Nearby.luau             is a player standing near a shopkeeper?
       Equipment.luau          builds class weapons onto avatars, and socketed gems
       ArmorKits.luau          the 12 low-poly armor sets: helms, hoods, pauldrons
       Remotes.luau            client/server remotes
@@ -106,13 +118,14 @@ src/
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
     Hud.client.luau           corner buttons: character screen ([C]) and gem pouch ([G])
     Intro.client.luau         new-player intro screens
-    Modules/                  character screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
+    Modules/                  character screen, forge screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared
     Config.luau               tunable numbers (quotas, prices, saving, VIP pass id)
     GemConfig.luau            gem colours, tiers, odds, cut grades, value formula
-    Classes.luau              classes, weapons, armor, abilities, specs
+    Classes.luau              classes, weapons, armor, abilities, specs, ratings
+    Crafting.luau             materials, gear quality, recipes, gem sell prices
     Vendors.luau              shopkeeper names, greetings and dialogue options
     Tags.luau                 CollectionService tag names
 ```

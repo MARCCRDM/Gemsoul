@@ -25,7 +25,11 @@ type Character = {
 	Armor: string?,
 	WeaponGem: Gem?, -- a cut gem socketed into the weapon
 	ArmorGem: Gem?, -- a cut gem socketed into the armor
+	WeaponQuality: number?, -- 1-4, see Crafting.Qualities
+	ArmorQuality: number?,
 }
+-- Gear the player has made or been given: gear id -> quality (1-4).
+type Owned = { Weapons: { [string]: number }, Armors: { [string]: number } }
 type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean }
 type Profile = {
 	Version: number,
@@ -34,6 +38,8 @@ type Profile = {
 	Quota: { Day: number, UsedToday: number, Week: number, UsedThisWeek: number },
 	Character: Character,
 	Intro: Intro,
+	Materials: { [string]: number }, -- crafting materials by id (see Crafting.Materials)
+	Owned: Owned,
 }
 
 local PlayerData = {}
@@ -55,12 +61,14 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 2,
+		Version = 3,
 		Coins = Config.StartingCoins,
 		Gems = {},
 		Quota = { Day = 0, UsedToday = 0, Week = 0, UsedThisWeek = 0 },
 		Character = {},
 		Intro = { Spun = false, FirstStone = false, Done = false },
+		Materials = {},
+		Owned = { Weapons = {}, Armors = {} },
 	}
 end
 
@@ -70,6 +78,22 @@ local function migrate(profile: Profile): Profile
 		profile.Character = profile.Character or {}
 		profile.Intro = profile.Intro or { Spun = false, FirstStone = false, Done = false }
 		profile.Version = 2
+	end
+	if profile.Version < 3 then
+		-- Crafting arrives: the gear you already wear counts as owned.
+		profile.Materials = profile.Materials or {}
+		local owned = { Weapons = {}, Armors = {} }
+		local character = profile.Character
+		if character.Weapon then
+			owned.Weapons[character.Weapon] = 1
+			character.WeaponQuality = 1
+		end
+		if character.Armor then
+			owned.Armors[character.Armor] = 1
+			character.ArmorQuality = 1
+		end
+		profile.Owned = owned
+		profile.Version = 3
 	end
 	return profile
 end
@@ -208,6 +232,8 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Saving = canSave[player] == true,
 		Character = profile.Character,
 		Intro = profile.Intro,
+		Materials = profile.Materials,
+		Owned = profile.Owned,
 	}
 end
 
@@ -250,6 +276,9 @@ function PlayerData.setLoadout(player: Player, classId: string, weaponId: string
 		end
 	end
 	character.Class, character.Weapon, character.Armor = classId, weaponId, armorId
+	-- Picking gear in the intro gives you just those two pieces.
+	profile.Owned = { Weapons = { [weaponId] = 1 }, Armors = { [armorId] = 1 } }
+	character.WeaponQuality, character.ArmorQuality = 1, 1
 	sync(player)
 	characterChanged:Fire(player)
 end
@@ -296,6 +325,40 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 	sync(player)
 	characterChanged:Fire(player)
 	return gem
+end
+
+local GEAR_KEYS = { Weapons = "Weapon", Armors = "Armor" }
+
+-- Wears a piece of gear you own ("Weapons" or "Armors", gear id).
+function PlayerData.equipGear(player: Player, kind: string, gearId: string): boolean
+	local profile = profiles[player]
+	local key = GEAR_KEYS[kind]
+	local quality = profile and key and profile.Owned[kind][gearId]
+	if not profile or not quality then
+		return false
+	end
+	local character: { [string]: any } = profile.Character
+	character[key] = gearId
+	character[key .. "Quality"] = quality
+	sync(player)
+	characterChanged:Fire(player)
+	return true
+end
+
+-- Records newly crafted gear, or an upgrade to gear you own.
+function PlayerData.setGearQuality(player: Player, kind: string, gearId: string, quality: number)
+	local profile = profiles[player]
+	local key = GEAR_KEYS[kind]
+	if not profile or not key then
+		return
+	end
+	profile.Owned[kind][gearId] = quality
+	local character: { [string]: any } = profile.Character
+	if character[key] == gearId then
+		character[key .. "Quality"] = quality
+		characterChanged:Fire(player)
+	end
+	sync(player)
 end
 
 function PlayerData.get(player: Player): Profile?

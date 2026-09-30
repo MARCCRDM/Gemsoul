@@ -2,8 +2,8 @@
 -- each entry; the client shows its dialogue when a player talks to it.
 --
 -- Each option either has a Reply (text shown back) or an Action the client
--- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut" or
--- "Enchant".
+-- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
+-- "Enchant", "Forge", "Materials" or "SellGems".
 
 local Config = require(script.Parent.Config)
 
@@ -53,9 +53,31 @@ local Vendors: { [string]: Vendor } = {
 		Options = {
 			{ Text = "Cut a gem by hand (free)", Action = "HandCut" },
 			{ Text = "Use a laser cutter", Action = "AutoCut" },
+			{ Text = "Sell stones I don't want", Action = "SellGems" },
 			{
 				Text = "How is a cut graded?",
 				Reply = "From 1 to 10. A steady hand earns up to 8. Land every strike near the line for a 9, and a flawless cut is a 10: Gem Mint. My precision laser always cuts a 9, the premium one a 10. Bigger stones are harder to cut by hand.",
+			},
+		},
+	},
+	Forge = {
+		Name = "Borin",
+		Role = "Master Smith",
+		Color = Color3.fromRGB(255, 120, 30),
+		Tunic = Color3.fromRGB(90, 56, 36),
+		Face = "o_O",
+		Greeting = "Steel, timber, leather, mithril. Bring me materials and coin and I'll forge you something worth wearing. I'll buy your spare gems too.",
+		Options = {
+			{ Text = "Craft or upgrade gear", Action = "Forge" },
+			{ Text = "Buy materials", Action = "Materials" },
+			{ Text = "Sell or salvage gems", Action = "SellGems" },
+			{
+				Text = "How does gear quality work?",
+				Reply = "Everything starts Standard. Upgrade it to Fine, then Superior with mithril, then Masterwork with gem shards. Each step hits harder or guards better, and looks it.",
+			},
+			{
+				Text = "Where do gem shards come from?",
+				Reply = "Salvage gems you don't want at my counter. Bigger, better gems break into more shards.",
 			},
 		},
 	},

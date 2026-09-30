@@ -1,7 +1,8 @@
 -- Talking to shopkeepers. Pressing [E] on a vendor opens a retro terminal
 -- style dialogue box with their greeting and a list of things to ask or do:
 -- check free mines, buy rough stones, cut gems by hand or by laser, and
--- enchant gear at Vey's (which opens the character screen).
+-- enchant gear at Vey's (which opens the character screen), and craft,
+-- buy materials and sell gems at Borin's forge (the forge screen).
 -- Also keeps the quota terminal outside the Mining Guild up to date.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -15,6 +16,7 @@ local Tags = require(ReplicatedStorage.Shared.Tags)
 local Vendors = require(ReplicatedStorage.Shared.Vendors)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local CuttingGame = require(script.Parent.Modules.CuttingGame)
+local ForgeUI = require(script.Parent.Modules.ForgeUI)
 local GemClient = require(script.Parent.Modules.GemClient)
 local InventoryUI = require(script.Parent.Modules.InventoryUI)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -253,6 +255,14 @@ end
 function actions.Enchant()
 	close()
 	CharacterUI.open({ AtVey = true })
+end
+
+-- Borin's forge: each opens the forge screen on its own tab.
+for action, tab in { Forge = "Craft", Materials = "Materials", SellGems = "Sell" } do
+	actions[action] = function()
+		close()
+		ForgeUI.open(tab)
+	end
 end
 
 function actions.HandCut()

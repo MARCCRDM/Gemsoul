@@ -3,7 +3,8 @@
 	weapon and armor slots on either side, each with a gem socket beneath
 	it; stats and active enchantments below; and a grid inventory of every
 	gem on the right. Click a gem or a socket to inspect it in the tooltip
-	box; from there gems go into sockets and back out again.
+	box; from there gems go into sockets and back out again. Click a gear
+	slot to swap to other gear you own (crafted at Borin's forge).
 
 	Opens with [C] or the HUD button. Talking to Vey at the Arcanum opens it
 	too; sockets can only be changed near Vey (the server checks).
@@ -16,138 +17,32 @@ local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
+local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
-local HEADING = Enum.Font.Arcade
-local BODY = Enum.Font.Gotham
-local BOLD = Enum.Font.GothamBold
-
--- Dark iron and old gold.
-local P = {
-	Frame = Color3.fromRGB(14, 13, 12),
-	Inset = Color3.fromRGB(22, 20, 18),
-	Slot = Color3.fromRGB(28, 25, 22),
-	Edge = Color3.fromRGB(92, 72, 44),
-	Gold = Color3.fromRGB(214, 170, 92),
-	Text = Color3.fromRGB(226, 218, 200),
-	Dim = Color3.fromRGB(150, 140, 122),
-	Good = Color3.fromRGB(120, 220, 120),
-	Bad = Color3.fromRGB(235, 90, 80),
-}
+local P = IronUi.Colors
+local HEADING, BOLD = IronUi.Heading, IronUi.Bold
+local new, text, box, actionButton, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
 
 local WIDTH, HEIGHT = 1000, 620
 local CELL, GAP, COLUMNS = 52, 6, 8
 
 local CharacterUI = {}
 
-type Selection = { Kind: "Gem", Gem: any } | { Kind: "Socket", Slot: string }
+type Selection = { Kind: "Gem", Gem: any } | { Kind: "Socket", Slot: string } | { Kind: "Gear", Slot: string }
 local selection: Selection? = nil
 local atVey = false
 
-local function new(className: string, props: { [string]: any }, parent: Instance?): any
-	local object = Instance.new(className)
-	for key, value in props do
-		(object :: any)[key] = value
-	end
-	object.Parent = parent
-	return object
-end
-
-local function text(parent: Instance, value: string, size: number, color: Color3?, font: Enum.Font?): TextLabel
-	return new("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = value,
-		TextSize = size,
-		TextColor3 = color or P.Text,
-		Font = font or BODY,
-		TextWrapped = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-	}, parent)
-end
-
--- A bevelled box: dark fill, bronze edge, lighter at the top.
-local function box(parent: Instance, position: UDim2, size: UDim2, fill: Color3?, radius: number?): Frame
-	local frame = new("Frame", { BackgroundColor3 = fill or P.Inset, Position = position, Size = size }, parent)
-	UiKit.round(frame, radius or 6)
-	new("UIStroke", { Color = P.Edge, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(170, 170, 170)),
-	}, frame)
-	return frame
-end
-
-local function actionButton(parent: Instance, label: string, primary: boolean, onClick: () -> ()): TextButton
-	local b = new("TextButton", {
-		BackgroundColor3 = if primary then P.Gold else P.Slot,
-		Text = label,
-		Font = BOLD,
-		TextSize = 14,
-		TextColor3 = if primary then Color3.fromRGB(24, 18, 10) else P.Text,
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 34),
-	}, parent)
-	UiKit.round(b, 6)
-	new("UIStroke", { Color = P.Edge, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, b)
-	b.Activated:Connect(onClick)
-	return b
-end
-
 -- Screen -------------------------------------------------------------------------------
 
-local gui = UiKit.gui("Character", 8)
-gui.Enabled = false
-gui.IgnoreGuiInset = true
-
-local shade = new("TextButton", {
-	Text = "",
-	AutoButtonColor = false,
-	BackgroundColor3 = Color3.new(0, 0, 0),
-	BackgroundTransparency = 0.45,
-	Size = UDim2.fromScale(1, 1),
-}, gui)
-
-local panel = new("Frame", {
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.fromOffset(WIDTH, HEIGHT),
-	BackgroundColor3 = P.Frame,
-}, gui)
-UiKit.round(panel, 10)
-new("UIStroke", { Color = P.Gold, Thickness = 2.5 }, panel)
-local scale = new("UIScale", {}, panel)
-local function fit()
-	local screen = gui.AbsoluteSize
-	scale.Scale = math.min(1, (screen.X - 24) / WIDTH, (screen.Y - 24) / HEIGHT)
-end
-gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-
-local title = text(panel, "", 24, P.Gold, HEADING)
-title.Position = UDim2.fromOffset(24, 16)
-title.Size = UDim2.new(0.5, 0, 0, 26)
-local subtitle = text(panel, "", 14, P.Dim, BOLD)
-subtitle.Position = UDim2.fromOffset(24, 44)
-subtitle.Size = UDim2.new(0.5, 0, 0, 18)
-
-local closeButton = new("TextButton", {
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -16, 0, 14),
-	Size = UDim2.fromOffset(36, 36),
-	BackgroundColor3 = P.Slot,
-	Text = "X",
-	Font = BOLD,
-	TextSize = 18,
-	TextColor3 = P.Gold,
-}, panel)
-UiKit.round(closeButton, 6)
-new("UIStroke", { Color = P.Edge, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, closeButton)
+local window = IronUi.window("Character", 8, WIDTH, HEIGHT)
+local gui, panel, scale, fit = window.Gui, window.Panel, window.Scale, window.Fit
+local title, subtitle = window.Title, window.Subtitle
 
 -- Left: the paper doll -----------------------------------------------------------------
 
@@ -241,6 +136,18 @@ local function slot(x: number, label: string, socketName: string): Slot
 	style.TextXAlignment = Enum.TextXAlignment.Center
 	local bonus = text(item, "", 11, P.Dim, BOLD)
 	bonus.TextXAlignment = Enum.TextXAlignment.Center
+	-- Clicking the slot lists the gear you own for it.
+	local hit = new("TextButton", {
+		Text = "",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.fromOffset(110, 150),
+		ZIndex = 5,
+	}, holder)
+	hit.Activated:Connect(function()
+		selection = { Kind = "Gear", Slot = socketName }
+		CharacterUI.refresh()
+	end)
 
 	local socketLabel = text(holder, "GEM SOCKET", 11, P.Dim, BOLD)
 	socketLabel.Position = UDim2.fromOffset(0, 184)
@@ -325,15 +232,6 @@ UiKit.list(tipActions, 8, true)
 
 -- Drawing --------------------------------------------------------------------------------
 
-local function clear(parent: Instance)
-	for _, child in parent:GetChildren() do
-		-- Keep layouts, corners, outlines and padding.
-		if not child:IsA("UIComponent") then
-			child:Destroy()
-		end
-	end
-end
-
 local function socketed(slotName: string)
 	local character = GemClient.Profile and GemClient.Profile.Character
 	return character and character[slotName .. "Gem"]
@@ -399,6 +297,53 @@ local function drawTooltip()
 	tooltipStroke.Color = P.Edge
 	local hint = if atVey then "" else "  Sockets can be changed at Vey's Arcanum (east road)."
 
+	if selection and selection.Kind == "Gear" then
+		local slotName = selection.Slot
+		local kind = slotName .. "s"
+		local profile = GemClient.Profile
+		local loadout = profile and profile.Character or {}
+		local owned = profile and profile.Owned and profile.Owned[kind] or {}
+		text(tipBody, "YOUR " .. string.upper(if slotName == "Armor" then "armor" else "weapons"), 18, P.Gold, BOLD)
+		local any = false
+		for _, gear in (loadout.Class and Classes.List[loadout.Class] or {})[kind] or {} do
+			local quality = owned[gear.Id]
+			if quality then
+				any = true
+				local isOn = loadout[slotName] == gear.Id
+				local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30) }, tipBody)
+				local label = text(
+					row,
+					Crafting.gearName(gear.Name, quality) .. "  (" .. string.lower(gear.Style) .. ")",
+					13,
+					Crafting.Qualities[quality].Color,
+					BOLD
+				)
+				label.AutomaticSize = Enum.AutomaticSize.None
+				label.Size = UDim2.new(1, -96, 1, 0)
+				label.TextYAlignment = Enum.TextYAlignment.Center
+				if isOn then
+					local tag = text(row, "EQUIPPED", 11, P.Dim, BOLD)
+					tag.AutomaticSize = Enum.AutomaticSize.None
+					tag.Position = UDim2.new(1, -90, 0, 0)
+					tag.Size = UDim2.new(0, 90, 1, 0)
+					tag.TextYAlignment = Enum.TextYAlignment.Center
+				else
+					local b = actionButton(row, "EQUIP", false, function()
+						request("EquipGear", kind, gear.Id)
+					end)
+					b.AnchorPoint = Vector2.new(1, 0)
+					b.Position = UDim2.new(1, 0, 0, 0)
+					b.Size = UDim2.fromOffset(0, 28)
+				end
+			end
+		end
+		if not any then
+			text(tipBody, "Nothing yet.", 13, P.Dim)
+		end
+		text(tipBody, "Craft and upgrade gear at Borin's forge, beside Craft & Cut (north road).", 12, P.Dim)
+		return
+	end
+
 	if selection and selection.Kind == "Socket" then
 		local slotName = selection.Slot
 		local gem = socketed(slotName)
@@ -448,12 +393,13 @@ local function drawTooltip()
 	end
 end
 
-local function drawSlot(ui: Slot, slotName: string, gear, class)
+local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number?)
 	local gem = socketed(slotName)
 	-- Enchanted gear is named for its gem, Diablo style, and glows its colour.
-	ui.Name.Text = if gear then GemConfig.itemName(gear.Name, gem, slotName) else "Empty"
+	ui.Name.Text = if gear then Crafting.gearName(GemConfig.itemName(gear.Name, gem, slotName), quality) else "Empty"
 	ui.Name.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Text
 	ui.Style.Text = if gear then string.upper(gear.Style) else ""
+	ui.Style.TextColor3 = Crafting.Qualities[quality or 1].Color
 	ui.Bonus.Text = if gem then (string.gsub(bonusText(gem, slotName), "  ", "\n")) else ""
 	ui.Bonus.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Dim
 	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
@@ -670,8 +616,20 @@ function CharacterUI.refresh()
 		selection = if still then { Kind = "Gem", Gem = still } else nil
 	end
 
-	drawSlot(weaponSlot, "Weapon", loadout.Class and Classes.weapon(loadout.Class, loadout.Weapon), class)
-	drawSlot(armorSlot, "Armor", loadout.Class and Classes.armor(loadout.Class, loadout.Armor), class)
+	drawSlot(
+		weaponSlot,
+		"Weapon",
+		loadout.Class and Classes.weapon(loadout.Class, loadout.Weapon),
+		class,
+		loadout.WeaponQuality
+	)
+	drawSlot(
+		armorSlot,
+		"Armor",
+		loadout.Class and Classes.armor(loadout.Class, loadout.Armor),
+		class,
+		loadout.ArmorQuality
+	)
 	drawStats(loadout, class)
 	drawGrid(profile)
 	drawTooltip()
@@ -713,8 +671,8 @@ function CharacterUI.toggle()
 	end
 end
 
-closeButton.Activated:Connect(CharacterUI.close)
-shade.Activated:Connect(CharacterUI.close)
+window.Close.Activated:Connect(CharacterUI.close)
+window.Shade.Activated:Connect(CharacterUI.close)
 grid:GetPropertyChangedSignal("CanvasPosition"):Connect(buildVisible)
 GemClient.Changed:Connect(CharacterUI.refresh)
 

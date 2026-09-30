@@ -5,11 +5,10 @@
 	A weapon gem adds its element to your hits; an armor gem wards you
 	against it. See GemConfig.enchantment for the numbers.
 ]]
-local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
-local Tags = require(ReplicatedStorage.Shared.Tags)
+local Nearby = require(script.Parent.Nearby)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 
@@ -19,26 +18,10 @@ local reply = Shop.reply
 
 local Enchanting = {}
 
-local function nearVey(player: Player): boolean
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
-		return false
-	end
-	for _, vendor in CollectionService:GetTagged(Tags.Vendor) do
-		local torso = vendor:FindFirstChild("Torso")
-		if vendor:IsA("Model") and torso and torso:GetAttribute("VendorId") == "Enchanting" then
-			if (vendor:GetPivot().Position - root.Position).Magnitude <= VEY_RANGE then
-				return true
-			end
-		end
-	end
-	return false
-end
-
 -- New players socket their first gem in the intro; after that it's Vey's job.
 local function canEnchant(player: Player): boolean
 	local intro = PlayerData.intro(player)
-	return not (intro and intro.Done) or nearVey(player)
+	return not (intro and intro.Done) or Nearby.vendor(player, { "Enchanting" }, VEY_RANGE)
 end
 
 local function socketGem(player: Player, gemId: any, slot: any)

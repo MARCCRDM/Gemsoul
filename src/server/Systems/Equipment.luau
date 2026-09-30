@@ -493,7 +493,7 @@ function Equipment.apply(player: Player)
 	local accent = class.Color
 
 	removeHeadwear(character)
-	ArmorKits.build(folder, character, armor.Look, accent)
+	ArmorKits.build(folder, character, armor.Look, accent, loadout.ArmorQuality)
 	-- An armor gem glows at the centre of the chest.
 	local torso = bodyPart(character, "UpperTorso", "Torso")
 	if torso and loadout.ArmorGem then
@@ -522,6 +522,17 @@ function Equipment.apply(player: Player)
 	local build = WEAPONS[weapon.Look]
 	if build and right and left then
 		build(weaponFolder, character, right, left, accent, loadout.WeaponGem)
+	end
+	-- Crafted quality shows on the weapon's metal.
+	if (loadout.WeaponQuality or 1) > 1 then
+		for _, part in weaponFolder:GetDescendants() do
+			if
+				part:IsA("BasePart")
+				and (part.Material == Enum.Material.Metal or part.Material == Enum.Material.DiamondPlate)
+			then
+				part.Color = ArmorKits.tint(part.Color, loadout.WeaponQuality, part.Color == IRON)
+			end
+		end
 	end
 
 	-- Enchanted gear takes on its gem's element.
