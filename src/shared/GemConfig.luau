@@ -246,4 +246,37 @@ function GemConfig.potency(gem: Gem): number
 	return gem.Size * 10 + gem.Clarity * 3 + (gem.Cut or 0) * 2
 end
 
+-- What a socketed gem does. Weapon gems add their element to your hits;
+-- armor gems ward you against that element. Numbers grow with potency.
+GemConfig.EnchantNames = {
+	Weapon = { Fire = "Burning", Frost = "Frostbite", Shock = "Arcing", Poison = "Venom" },
+	Armor = { Fire = "Emberward", Frost = "Frostward", Shock = "Stormward", Poison = "Venomward" },
+}
+
+function GemConfig.enchantment(gem: Gem, slot: string): (string, string)
+	local p = GemConfig.potency(gem)
+	local name = GemConfig.EnchantNames[slot] and GemConfig.EnchantNames[slot][gem.Element] or "Enchanted"
+	if slot == "Armor" then
+		return name,
+			string.format(
+				"+%d%% %s resistance, +%d max health",
+				math.min(60, 10 + math.floor(p / 4)),
+				gem.Element,
+				math.floor(p / 2)
+			)
+	end
+	local text = if gem.Element == "Fire"
+		then string.format("Hits burn for %d damage over 3s", math.floor(p * 0.3 + 0.5))
+		elseif gem.Element == "Frost" then string.format(
+			"Hits slow enemies by %d%% for 2s",
+			math.min(40, 10 + math.floor(p / 6))
+		)
+		elseif gem.Element == "Shock" then string.format(
+			"%d%% of each hit arcs to a nearby enemy",
+			math.min(60, 15 + math.floor(p / 4))
+		)
+		else string.format("Poisoned enemies deal %d%% less damage for 4s", math.min(25, 5 + math.floor(p / 10)))
+	return name, text
+end
+
 return GemConfig

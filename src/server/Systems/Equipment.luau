@@ -4,7 +4,8 @@
 	R6 avatars; sizes follow the avatar's own body parts.
 
 	Rebuilt on every spawn and whenever the class, gear or socketed gem
-	changes. A socketed gem glows on the weapon in its own colour.
+	changes. Socketed gems glow in their own colour: on the weapon, and at
+	the centre of the chest for an armor gem.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -345,6 +346,18 @@ function Equipment.apply(player: Player)
 
 	removeHeadwear(character)
 	ArmorKits.build(folder, character, armor.Look, accent)
+	-- An armor gem glows at the centre of the chest.
+	local torso = bodyPart(character, "UpperTorso", "Torso")
+	if torso and loadout.ArmorGem then
+		gemSocket(
+			folder,
+			torso,
+			CFrame.new(),
+			Vector3.new(0, torso.Size.Y * 0.12, -torso.Size.Z * 0.5 - 0.42),
+			loadout.ArmorGem,
+			0.36
+		)
+	end
 
 	local right = gripAnchor(folder, character, "Right")
 	local left = gripAnchor(folder, character, "Left")

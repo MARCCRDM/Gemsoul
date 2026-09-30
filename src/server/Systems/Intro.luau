@@ -4,8 +4,8 @@
 	  "StarterSpin"                                 three random cut gems, once
 	  "FirstStone"                                  a small rough stone to learn
 	                                                cutting on, once
-	  "SocketGem", gemId                            enchant the weapon with a cut gem
 	  "FinishIntro"                                 done: gear appears in the world
+	Socketing the first gem is Enchanting's "SocketGem".
 	Everything is validated here; the client only asks.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -91,21 +91,6 @@ local function firstStone(player: Player)
 	return reply(true, "Here's a rough stone to practise on.", { Gem = gem })
 end
 
-local function socketGem(player: Player, gemId: any)
-	if typeof(gemId) ~= "string" then
-		return reply(false, "Pick a gem to socket.")
-	end
-	local gem = PlayerData.socketGem(player, gemId)
-	if not gem then
-		return reply(false, "Only cut gems can be socketed, and you need a weapon first.")
-	end
-	return reply(
-		true,
-		string.format("%s socketed. %s", GemConfig.shade(gem).Name, GemConfig.ElementEffects[gem.Element]),
-		{ Gem = gem }
-	)
-end
-
 local function finishIntro(player: Player)
 	local character = PlayerData.character(player)
 	if not character or not character.Class then
@@ -119,7 +104,6 @@ function Intro.start()
 	Shop.register("ChooseLoadout", chooseLoadout)
 	Shop.register("StarterSpin", starterSpin)
 	Shop.register("FirstStone", firstStone)
-	Shop.register("SocketGem", socketGem)
 	Shop.register("FinishIntro", finishIntro)
 end
 

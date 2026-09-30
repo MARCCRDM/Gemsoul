@@ -41,7 +41,7 @@ Players who haven't finished the intro see it when they join (over a flyover of 
 3. **Weapon** and 4. **Armor:** three playstyles each per class. A live preview shows your own avatar wearing your picks.
 5. **Starter gems:** a lottery spin for three already-cut gems (at least one Uncommon or better).
 6. **Gem school:** cut a rough stone yourself while each property is explained, plus where gems go in town.
-7. **Enchant:** socket a cut gem into your weapon; it glows in the gem's colour.
+7. **Enchant:** socket a cut gem into your weapon; it glows in the gem's colour. The armor socket opens at Vey's Arcanum.
 8. **Ready:** character sheet, then into the game wearing your gear.
 
 Classes, gear and upcoming specializations are defined in `src/shared/Classes.luau`. Combat isn't built yet: abilities are listed but not active.
@@ -56,6 +56,12 @@ Gemstones follow the *GemSoul Gemstone Property & Generation Architecture* desig
 - **Sources:** mining nodes (limited by free daily and weekly mines), Garrick's Mining Store (coins for a random rough stone), PvE drops (`Gems.dropFromMonster`) and PvP wagers (`PlayerData.transferGem`, which keeps every property). Luckier sources (VIP pit, store, tougher monsters) roll better stones.
 
 Every gem is shown in 3D and its look follows its properties: rough stones are water-worn pebbles unique to each gem, cut stones are round brilliants whose symmetry and facets improve with the cut grade (sparkling at 9-10), size sets how big it is, and clarity sets how clear or cloudy it is (low clarity shows inclusions).
+
+## Character screen and enchanting
+
+Press **C** (or the CHARACTER button) for a Diablo-style character screen: your avatar with the weapon and armor slots either side, a gem socket under each, attributes and active enchantments below, and a grid inventory of every gem. Click a gem or socket to inspect it.
+
+Each piece of gear has one socket, for cut gems only. A weapon gem adds its element to your hits (Burning, Frostbite, Arcing, Venom) and an armor gem wards you against it (+resistance and max health). Strength grows with the gem's potency (mostly size, then clarity and cut); see `GemConfig.enchantment`. Socketed gems glow on the weapon and at the centre of the chest. After the intro, sockets are changed at Vey's Arcanum on the east road ("Enchant my gear").
 
 Press **G** or the corner button to open your gem pouch. Coins, gems and quotas save between sessions; in Studio this needs *Game Settings > Security > Enable Studio Access to API Services*.
 
@@ -83,15 +89,17 @@ src/
       PlayerData.luau         saved coins, gem inventory, free-mining quota
       Mining.luau             quarry nodes: free mines give rough stones
       Shop.luau               store purchases, laser cuts, hand-cut minigame
-      Intro.luau              intro steps: loadout, starter spin, first stone, socketing
-      Equipment.luau          builds class armor and weapons onto avatars
+      Intro.luau              intro steps: loadout, starter spin, first stone
+      Enchanting.luau         socketing gems into weapon and armor (at Vey's)
+      Equipment.luau          builds class weapons onto avatars, and socketed gems
+      ArmorKits.luau          the 12 low-poly armor sets: helms, hoods, pauldrons
       Remotes.luau            client/server remotes
       Vip.luau                IsVIP attribute (game pass, or everyone in Studio)
   client/                     -> StarterPlayerScripts.Client
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
-    Hud.client.luau           coins/gems button, opens the pouch ([G])
+    Hud.client.luau           corner buttons: character screen ([C]) and gem pouch ([G])
     Intro.client.luau         new-player intro screens
-    Modules/                  gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
+    Modules/                  character screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning
     VipGate.client.luau       lets VIPs walk through the energy gate
   shared/                     -> ReplicatedStorage.Shared

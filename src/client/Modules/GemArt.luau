@@ -155,8 +155,13 @@ end
 function GemArt.viewport(parent: Instance, gem, detailed: boolean?): ViewportFrame
 	local viewport = Instance.new("ViewportFrame")
 	viewport.BackgroundTransparency = 1
+	-- Square and centred, so the stone sits inside the round backdrop.
+	viewport.AnchorPoint = Vector2.new(0.5, 0.5)
+	viewport.Position = UDim2.fromScale(0.5, 0.5)
 	viewport.Size = UDim2.fromScale(1, 1)
 	viewport.ZIndex = 2
+	local square = Instance.new("UIAspectRatioConstraint")
+	square.Parent = viewport
 	local model, radius = GemArt.model(gem, detailed)
 	GemArt.setupViewport(viewport, GemArt.cardDistance(radius))
 	model:PivotTo(GemArt.pose(gem, 0.6))

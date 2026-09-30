@@ -24,6 +24,7 @@ type Character = {
 	Weapon: string?,
 	Armor: string?,
 	WeaponGem: Gem?, -- a cut gem socketed into the weapon
+	ArmorGem: Gem?, -- a cut gem socketed into the armor
 }
 type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean }
 type Profile = {
@@ -230,16 +231,23 @@ function PlayerData.setIntroFlag(player: Player, flag: string)
 end
 
 -- Sets class, weapon and armor (ids are checked by the caller).
+local SOCKET_KEYS = { Weapon = "WeaponGem", Armor = "ArmorGem" }
+
 function PlayerData.setLoadout(player: Player, classId: string, weaponId: string, armorId: string)
 	local profile = profiles[player]
 	if not profile then
 		return
 	end
 	local character = profile.Character
-	if character.Class ~= classId and character.WeaponGem then
-		-- Changing class puts a socketed gem back in the pouch.
-		table.insert(profile.Gems, character.WeaponGem)
-		character.WeaponGem = nil
+	if character.Class ~= classId then
+		-- Changing class puts socketed gems back in the pouch.
+		local sockets: { [string]: any } = character
+		for _, key in SOCKET_KEYS do
+			if sockets[key] then
+				table.insert(profile.Gems, sockets[key])
+				sockets[key] = nil
+			end
+		end
 	end
 	character.Class, character.Weapon, character.Armor = classId, weaponId, armorId
 	sync(player)
@@ -247,12 +255,13 @@ function PlayerData.setLoadout(player: Player, classId: string, weaponId: string
 end
 
 --[[
-	Moves a cut gem from the pouch into the weapon's socket. A gem already
-	in the socket goes back to the pouch. Returns the socketed gem.
+	Moves a cut gem from the pouch into the weapon's or armor's socket. A gem
+	already in that socket goes back to the pouch. Returns the socketed gem.
 ]]
-function PlayerData.socketGem(player: Player, gemId: string): Gem?
+function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem?
 	local profile = profiles[player]
-	if not profile or not profile.Character.Weapon then
+	local key = SOCKET_KEYS[slot or "Weapon"]
+	if not profile or not key or not profile.Character[if slot == "Armor" then "Armor" else "Weapon"] then
 		return nil
 	end
 	local gem = PlayerData.findGem(player, gemId)
@@ -260,11 +269,30 @@ function PlayerData.socketGem(player: Player, gemId: string): Gem?
 		return nil
 	end
 	PlayerData.removeGem(player, gemId)
-	local previous = profile.Character.WeaponGem
-	if previous then
-		table.insert(profile.Gems, previous)
+	local sockets: { [string]: any } = profile.Character
+	if sockets[key] then
+		table.insert(profile.Gems, sockets[key])
 	end
-	profile.Character.WeaponGem = gem
+	sockets[key] = gem
+	sync(player)
+	characterChanged:Fire(player)
+	return gem
+end
+
+-- Takes the gem out of a socket and back into the pouch, if there's room.
+function PlayerData.unsocketGem(player: Player, slot: string): Gem?
+	local profile = profiles[player]
+	local key = SOCKET_KEYS[slot]
+	if not profile or not key then
+		return nil
+	end
+	local sockets: { [string]: any } = profile.Character
+	local gem = sockets[key]
+	if not gem or #profile.Gems >= Config.MaxGems then
+		return nil
+	end
+	sockets[key] = nil
+	table.insert(profile.Gems, gem)
 	sync(player)
 	characterChanged:Fire(player)
 	return gem

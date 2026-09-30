@@ -2,7 +2,8 @@
 -- each entry; the client shows its dialogue when a player talks to it.
 --
 -- Each option either has a Reply (text shown back) or an Action the client
--- handles in code: "Quota", "BuyStone", "Pouch", "HandCut" or "AutoCut".
+-- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut" or
+-- "Enchant".
 
 local Config = require(script.Parent.Config)
 
@@ -82,12 +83,9 @@ local Vendors: { [string]: Vendor } = {
 		Color = Color3.fromRGB(150, 70, 255),
 		Tunic = Color3.fromRGB(70, 40, 110),
 		Face = "*_*",
-		Greeting = "The runes hum today. Bring me a gem and a piece of gear, and I'll bind them together.",
+		Greeting = "The runes hum today. Bring me a cut gem and I'll bind it to your weapon or armor.",
 		Options = {
-			{
-				Text = "Fuse a gem onto my gear",
-				Reply = "The containment fields aren't stable yet. Enchanting opens soon!",
-			},
+			{ Text = "Enchant my gear", Action = "Enchant" },
 			{
 				Text = "Which gems make the strongest enchantments?",
 				Reply = "Big ones. Size decides most of a gem's potency, then clarity and cut. Fire, Frost, Shock and Poison each grant their own power.",

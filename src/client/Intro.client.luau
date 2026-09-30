@@ -645,7 +645,7 @@ pages[6] = function()
 
 	local stage = new(
 		"Frame",
-		{ BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, 0, 0, 250), ClipsDescendants = true },
+		{ BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, 0, 0, 300), ClipsDescendants = true },
 		left
 	)
 	UiKit.round(stage, 10)
@@ -655,17 +655,22 @@ pages[6] = function()
 		stage
 	)
 	GemArt.backdrop(stage)
-	local caption = text(left, "", 15, K.Text, BOLD)
-	caption.Position = UDim2.fromOffset(0, 260)
+	local info = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 312),
+		Size = UDim2.new(1, 0, 1, -312),
+	}, left)
+	UiKit.list(info, 8).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local caption = text(info, "", 17, K.Text, BOLD)
 	caption.TextXAlignment = Enum.TextXAlignment.Center
-	local valueLine = text(left, "", 14, K.Gold, BOLD)
-	valueLine.Position = UDim2.fromOffset(0, 300)
+	caption.LayoutOrder = 1
+	local valueLine = text(info, "", 15, K.Gold, BOLD)
 	valueLine.TextXAlignment = Enum.TextXAlignment.Center
-	local actions = new(
-		"Frame",
-		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 340), Size = UDim2.new(1, 0, 0, 42) },
-		left
-	)
+	valueLine.LayoutOrder = 2
+	local status = text(info, "", 13, K.Dim)
+	status.TextXAlignment = Enum.TextXAlignment.Center
+	status.LayoutOrder = 3
+	local actions = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 42), LayoutOrder = 4 }, info)
 	UiKit.list(actions, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 	text(right, "GEM SCHOOL", 22, K.Accent, HEADING)
@@ -676,20 +681,20 @@ pages[6] = function()
 		K.Dim
 	)
 	for _, help in PROPERTY_HELP do
-		text(right, help[1], 12, K.Accent, BOLD)
-		text(right, help[2], 13, K.Text)
+		text(right, help[1], 13, K.Accent, BOLD)
+		text(right, help[2], 14, K.Text)
 	end
-	text(right, "WHERE YOUR GEMS GO", 12, K.Accent, BOLD)
+	text(right, "WHERE YOUR GEMS GO", 13, K.Accent, BOLD)
 	for _, line in
 		{
 			"Mining Guild (north road): Garrick gives free daily mines in the quarry, and sells rough stones.",
 			"Craft & Cut (north road): Ilsa cuts rough stones by hand for free, or with lasers for coins.",
 			"Marketplace (town square): Tamsin's board lists gems for trade between players.",
-			"Arcanum (east road): Vey socket gems into your gear to enchant it.",
+			"Arcanum (east road): Vey sockets gems into your weapon and armor to enchant them.",
 			"Arena (west road): wager gems in PvP duels. Winner takes the stone.",
 		}
 	do
-		text(right, line, 13, K.Text)
+		text(right, line, 14, K.Text)
 	end
 
 	local stone = nil
@@ -719,9 +724,13 @@ pages[6] = function()
 			end
 		end
 		if stone and stone.Cut then
+			status.Text = "Cut! Press NEXT to enchant your weapon."
+			status.TextColor3 = K.Accent
 			nextButton.Visible = true
 			return
 		end
+		status.Text = "Rough stones are worth half. Cut it to see it shine."
+		status.TextColor3 = K.Dim
 		button(actions, "CUT IT NOW", true, function()
 			if busy or not stone then
 				return
@@ -759,6 +768,7 @@ pages[6] = function()
 			end)
 		end)
 		button(actions, "Skip", false, function()
+			status.Text = "You can cut it later at Ilsa's. Press NEXT."
 			nextButton.Visible = true
 		end)
 	end
@@ -937,16 +947,19 @@ function pages.redraw()
 	for i, cell in progressCells do
 		cell.BackgroundColor3 = if i <= step then K.Accent else K.Row
 	end
+	-- Hidden until the page allows it. Some pages reveal it themselves once
+	-- you've done something (spun, cut), possibly before they return.
+	nextButton.Visible = false
 	-- If a page fails, say so on screen rather than leaving it blank.
 	local ok, result = pcall(pages[step])
-	local canContinue = ok and result
 	if not ok then
 		warn("[Intro] Page " .. step .. " failed: " .. tostring(result))
 		text(body, "Something went wrong on this page:\n" .. tostring(result), 14, K.Bad)
-		canContinue = true
 	end
 	backButton.Visible = step > 1 and step ~= 6
-	nextButton.Visible = canContinue
+	if not ok or result then
+		nextButton.Visible = true
+	end
 	nextButton.Text = if step == 1 then "BEGIN" elseif step == #STEPS then "ENTER GEMSOUL" else "NEXT"
 end
 
