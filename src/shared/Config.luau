@@ -1,5 +1,11 @@
 -- Game-wide settings shared by server and client.
 local Config = {
+	-- Menu-first: everything (mining, cutting, crafting, selling, the shop)
+	-- is played from the menu. Combat and walking around the town are paused
+	-- while this is on: no monsters, no hotbar, and the camera shows the
+	-- kingdom behind the menu.
+	MenuOnly = true,
+
 	-- Free mining: each mined node uses one free mine. When the daily or
 	-- weekly allowance runs out, players buy rough stones at the Mining Store.
 	DailyQuota = 10,

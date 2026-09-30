@@ -48,7 +48,7 @@ type Profile = {
 	Daily: { Day: number, Streak: number }, -- daily reward
 	Cosmetics: { Owned: { [string]: boolean }, Trim: string?, Back: string? },
 	Season: { XP: number, Claimed: { [string]: boolean } }, -- claimed levels, as strings
-	Stats: { Kills: number, BestGem: number }, -- for Top Players
+	Stats: { Kills: number, BestGem: number, BestDepth: number? }, -- for Top Players
 	Crates: { [string]: number }, -- unopened crates
 	Boosts: { XPUntil: number }, -- os.time() when 2x XP ends
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle

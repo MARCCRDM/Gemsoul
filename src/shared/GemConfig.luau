@@ -94,12 +94,12 @@ GemConfig.ElementColors = {
 }
 
 GemConfig.SourceLabels = {
-	MiningNode = "Mined in the quarry",
+	MiningNode = "Dug from the mine",
 	MiningStore = "Bought at the Mining Store",
 	PvEDrop = "Dropped by a monster",
 	PvPWager = "Won in a PvP duel",
 	StarterSpin = "Starter gem spin",
-	FirstStone = "Your first stone, from Ilsa",
+	FirstStone = "Your first stone, from the mine",
 }
 
 -- What a gem does when socketed into a weapon.

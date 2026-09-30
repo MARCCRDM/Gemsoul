@@ -1,6 +1,8 @@
 --[[
-	The hub. Left: a big yellow SHOP button over a 2x2 grid of chunky menu
-	tiles (Character, Abilities, Gems, Party). Top right: gold-edged bars
+	The hub. Left: a big hero button over a grid of chunky menu tiles. In
+	menu-only mode (Shared/Config) that's MINE (M) over Cut (X), Craft (F),
+	Sell (V), Gems (G), Character (C) and Shop (B); otherwise SHOP over
+	Character, Abilities, Gems and Party. Top right: gold-edged bars
 	for coins (with a + that opens the Shop), Guild Marks and gems, and
 	pills for the Season Path and Top Players.
 
@@ -9,13 +11,19 @@
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
+local CutFlow = require(script.Parent.Modules.CutFlow)
+local ForgeUI = require(script.Parent.Modules.ForgeUI)
 local GemClient = require(script.Parent.Modules.GemClient)
 local InventoryUI = require(script.Parent.Modules.InventoryUI)
 local IronUi = require(script.Parent.Modules.IronUi)
+local MineUI = require(script.Parent.Modules.MineUI)
 local PartyUI = require(script.Parent.Modules.PartyUI)
 local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
@@ -96,42 +104,105 @@ local function tile(parent: Instance, icon: string, caption: string, key: string
 	return b
 end
 
--- Left: a big yellow SHOP button over a 2x2 grid of menu tiles.
+-- Left: a big hero button over a grid of menu tiles. In menu-only mode the
+-- hero is the Mine (with today's free walls on a badge) and the grid holds
+-- everything else; otherwise it's the Shop over the combat menu.
+local MENU_ONLY = Config.MenuOnly
 local left = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0, 0.5),
-	Position = UDim2.new(0, 18, 0.58, 0),
+	Position = UDim2.new(0, 18, 0.56, 0),
 	Size = UDim2.fromOffset(180, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 }, gui)
 UiKit.list(left, 12)
 
-local shopButton, shopFace = IronUi.chunk(left, {
-	Color = Color3.fromRGB(255, 196, 30),
-	Rim = Color3.fromRGB(255, 240, 160),
-	Size = UDim2.fromOffset(180, 80),
+local heroColor = if MENU_ONLY then Color3.fromRGB(240, 140, 40) else Color3.fromRGB(255, 196, 30)
+local heroButton, heroFace = IronUi.chunk(left, {
+	Color = heroColor,
+	Rim = if MENU_ONLY then Color3.fromRGB(255, 214, 150) else Color3.fromRGB(255, 240, 160),
+	Size = UDim2.fromOffset(180, 84),
 	Radius = 16,
 	Lip = 7,
 	Stripes = "Broad",
 })
-shopButton.Name = "Shop"
-shopButton.LayoutOrder = 1
-bigIcon(shopFace, "🛒", 50, UDim2.new(0.5, 0, 0.3, -8), -8)
-local shopLabel = IronUi.title(shopFace, "SHOP", 30)
-shopLabel.AutomaticSize = Enum.AutomaticSize.None
-shopLabel.AnchorPoint = Vector2.new(0.5, 1)
-shopLabel.Position = UDim2.new(0.5, 0, 1, 0)
-shopLabel.Size = UDim2.new(1, 0, 0, 32)
-shopLabel.TextXAlignment = Enum.TextXAlignment.Center
-IronUi.shine(shopFace, 3.5)
-keyHint(shopButton, "B")
-shopButton.Activated:Connect(function()
-	ShopUI.toggle()
+heroButton.Name = if MENU_ONLY then "Mine" else "Shop"
+heroButton.LayoutOrder = 1
+bigIcon(heroFace, if MENU_ONLY then "⛏️" else "🛒", 52, UDim2.new(0.5, 0, 0.3, -8), -8)
+local heroLabel = IronUi.title(heroFace, if MENU_ONLY then "MINE" else "SHOP", 32)
+heroLabel.AutomaticSize = Enum.AutomaticSize.None
+heroLabel.AnchorPoint = Vector2.new(0.5, 1)
+heroLabel.Position = UDim2.new(0.5, 0, 1, 0)
+heroLabel.Size = UDim2.new(1, 0, 0, 34)
+heroLabel.TextXAlignment = Enum.TextXAlignment.Center
+IronUi.shine(heroFace, 3)
+keyHint(heroButton, if MENU_ONLY then "M" else "B")
+heroButton.Activated:Connect(function()
+	if MENU_ONLY then
+		MineUI.toggle()
+	else
+		ShopUI.toggle()
+	end
+end)
+-- Free walls left today, on a red badge (menu-only).
+local freeBadge = new("TextLabel", {
+	Name = "FreeBadge",
+	AnchorPoint = Vector2.new(0, 0.5),
+	Position = UDim2.new(0, -4, 0, 2),
+	Size = UDim2.fromOffset(0, 26),
+	AutomaticSize = Enum.AutomaticSize.X,
+	BackgroundColor3 = Color3.fromRGB(230, 50, 60),
+	Text = "",
+	Font = IronUi.Chunky,
+	TextSize = 14,
+	TextColor3 = Color3.new(1, 1, 1),
+	Rotation = -10,
+	Visible = false,
+	ZIndex = 5,
+}, heroButton)
+local badgeCorner = Instance.new("UICorner")
+badgeCorner.CornerRadius = UDim.new(0.5, 0)
+badgeCorner.Parent = freeBadge
+new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, freeBadge)
+IronUi.outline(freeBadge, 2)
+-- The hero gently bobs so the eye goes there first.
+IronUi.animate(heroButton, function(t)
+	heroButton.Rotation = math.sin(t * 2.2) * 1.2
 end)
 
+local menu = if MENU_ONLY
+	then {
+		{ "✂️", "Cut", "X", CutFlow.open },
+		{
+			"⚒️",
+			"Craft",
+			"F",
+			function()
+				ForgeUI.open("Craft")
+			end,
+		},
+		{
+			"💰",
+			"Sell",
+			"V",
+			function()
+				ForgeUI.open("Sell", true)
+			end,
+		},
+		{ "💎", "Gems", "G", InventoryUI.toggle },
+		{ "🛡️", "Character", "C", CharacterUI.toggle },
+		{ "🛒", "Shop", "B", ShopUI.toggle },
+	}
+	else {
+		{ "🛡️", "Character", "C", CharacterUI.toggle },
+		{ "⚔️", "Abilities", "K", AbilitiesUI.toggle },
+		{ "💎", "Gems", "G", InventoryUI.toggle },
+		{ "👥", "Party", "P", PartyUI.toggle },
+	}
+local rows = math.ceil(#menu / 2)
 local grid = new("Frame", {
 	BackgroundTransparency = 1,
-	Size = UDim2.fromOffset(180, 192),
+	Size = UDim2.fromOffset(180, rows * 90 + (rows - 1) * 12),
 	LayoutOrder = 2,
 }, left)
 local gridLayout = Instance.new("UIGridLayout")
@@ -139,12 +210,6 @@ gridLayout.CellSize = UDim2.fromOffset(84, 90)
 gridLayout.CellPadding = UDim2.fromOffset(12, 12)
 gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 gridLayout.Parent = grid
-local menu = {
-	{ "🛡️", "Character", "C", CharacterUI.toggle },
-	{ "⚔️", "Abilities", "K", AbilitiesUI.toggle },
-	{ "💎", "Gems", "G", InventoryUI.toggle },
-	{ "👥", "Party", "P", PartyUI.toggle },
-}
 for i, item in menu do
 	tile(grid, item[1], item[2], item[3], item[4]).LayoutOrder = i
 end
@@ -288,6 +353,15 @@ local function refresh(profile)
 	coins.Text = commas(profile.Coins or 0)
 	marks.Text = commas(profile.Marks or 0)
 	gems.Text = tostring(#(profile.Gems or {}))
+	-- Free walls left today, on the Mine button.
+	local quota = profile.Quota
+	if MENU_ONLY and quota then
+		local daily = profile.DailyQuota or Config.DailyQuota
+		local weekly = profile.WeeklyQuota or Config.WeeklyQuota
+		local free = math.max(0, math.min(daily - (quota.UsedToday or 0), weekly - (quota.UsedThisWeek or 0)))
+		freeBadge.Visible = free > 0
+		freeBadge.Text = free .. " FREE"
+	end
 end
 GemClient.Changed:Connect(refresh)
 if GemClient.Profile then
@@ -319,20 +393,44 @@ end)
 GemClient.Changed:Connect(maybeWelcome)
 task.defer(maybeWelcome)
 
--- Keys (C and K are bound by the character and combat scripts).
+-- Keys (C is bound by the character screen, K by combat).
 local KEYS = {
 	G = InventoryUI.toggle,
-	P = PartyUI.toggle,
 	B = ShopUI.toggle,
 	J = SeasonUI.toggle,
 	L = TopPlayersUI.toggle,
 }
-ContextActionService:BindAction("GemsoulHub", function(_, state, inputObject)
-	if state == Enum.UserInputState.Begin and not introOpen() then
-		local action = KEYS[inputObject.KeyCode.Name]
-		if action then
-			action()
-		end
+if MENU_ONLY then
+	KEYS.M = MineUI.toggle
+	KEYS.X = CutFlow.open
+	KEYS.F = function()
+		ForgeUI.open("Craft")
 	end
-	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.G, Enum.KeyCode.P, Enum.KeyCode.B, Enum.KeyCode.J, Enum.KeyCode.L)
+	KEYS.V = function()
+		ForgeUI.open("Sell", true)
+	end
+else
+	KEYS.P = PartyUI.toggle
+end
+ContextActionService:BindAction(
+	"GemsoulHub",
+	function(_, state, inputObject)
+		if state == Enum.UserInputState.Begin and not introOpen() then
+			local action = KEYS[inputObject.KeyCode.Name]
+			if action then
+				action()
+			end
+		end
+		return Enum.ContextActionResult.Pass
+	end,
+	false,
+	Enum.KeyCode.G,
+	Enum.KeyCode.P,
+	Enum.KeyCode.B,
+	Enum.KeyCode.J,
+	Enum.KeyCode.L,
+	Enum.KeyCode.M,
+	Enum.KeyCode.X,
+	Enum.KeyCode.F,
+	Enum.KeyCode.V
+)

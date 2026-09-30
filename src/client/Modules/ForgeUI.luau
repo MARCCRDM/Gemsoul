@@ -15,6 +15,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local AbilitiesUI = require(script.Parent.AbilitiesUI)
@@ -712,7 +713,7 @@ local LEAVE_DISTANCE = 60
 local checkTimer = 0
 RunService.Heartbeat:Connect(function(dt)
 	checkTimer += dt
-	if checkTimer < 0.5 or not gui.Enabled then
+	if checkTimer < 0.5 or not gui.Enabled or Config.MenuOnly then
 		return
 	end
 	checkTimer = 0

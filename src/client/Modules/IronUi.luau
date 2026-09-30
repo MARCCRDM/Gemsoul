@@ -251,6 +251,68 @@ local DOT_ROWS = (function()
 	return table.concat(rows, "\n")
 end)()
 
+-- A hover highlight for any button: a soft white glow washes over `surface`
+-- (the button itself if none) and the outline turns gold. Eased in and out.
+local HOVER_IN = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local HOVER_OUT = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+function IronUi.highlight(button: GuiButton, surface: GuiObject?)
+	local target = surface or button
+	local stroke = button:FindFirstChildOfClass("UIStroke") or (surface and surface:FindFirstChildOfClass("UIStroke"))
+	-- Read on the first hover (not at build time), so outlines and layouts
+	-- added after building are seen: a selected tile's thicker rim comes back
+	-- exactly as it was, and a list or grid (which would lay the glow out
+	-- like any other child) gets no glow, only the lit outline.
+	local ready, glow = false, nil
+	local baseColor, baseThickness
+	local function prepare()
+		ready = true
+		if stroke then
+			baseColor, baseThickness = stroke.Color, stroke.Thickness
+		end
+		if target:FindFirstChildWhichIsA("UIGridStyleLayout") then
+			return
+		end
+		glow = new("Frame", {
+			Name = "HoverGlow",
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = target.ZIndex + 3,
+		}, target)
+		local round = target:FindFirstChildOfClass("UICorner")
+		if round then
+			corner(glow, round.CornerRadius)
+		end
+		new("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.55),
+				NumberSequenceKeypoint.new(1, 0.9),
+			}),
+		}, glow)
+	end
+	local gold = Color3.fromRGB(255, 230, 120)
+	button.MouseEnter:Connect(function()
+		if not ready then
+			prepare()
+		end
+		if glow and glow.Parent then
+			TweenService:Create(glow, HOVER_IN, { BackgroundTransparency = 0.55 }):Play()
+		end
+		if stroke then
+			TweenService:Create(stroke, HOVER_IN, { Color = gold, Thickness = (baseThickness or 3) + 1 }):Play()
+		end
+	end)
+	button.MouseLeave:Connect(function()
+		if glow and glow.Parent then
+			TweenService:Create(glow, HOVER_OUT, { BackgroundTransparency = 1 }):Play()
+		end
+		if stroke and baseColor then
+			TweenService:Create(stroke, HOVER_OUT, { Color = baseColor, Thickness = baseThickness }):Play()
+		end
+	end)
+end
+
 export type ChunkOptions = {
 	Color: Color3, -- the face colour
 	Size: UDim2?,
@@ -363,8 +425,9 @@ function IronUi.chunk(parent: Instance, options: ChunkOptions): (TextButton, Fra
 		Transparency = NumberSequence.new(0.62, 0.9),
 	}, gloss)
 
-	-- Hover grows it; pressing sinks the face into the lip.
+	-- Hover grows it and lights it up; pressing sinks the face into the lip.
 	IronUi.juice(b, 1.05, 0.97)
+	IronUi.highlight(b, face)
 	local up, down = rim.Position, UDim2.fromOffset(0, lip - 1)
 	local function sink(pressed: boolean)
 		TweenService:Create(rim, TweenInfo.new(0.06), { Position = if pressed then down else up }):Play()

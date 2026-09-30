@@ -12,7 +12,23 @@ A Roblox game. Code lives in `src/` as Luau files and is synced into Roblox Stud
 1. `git pull` to get the latest code.
 2. `rojo serve` in this folder.
 3. Open a Baseplate in Studio → Plugins → Rojo → **Connect**.
-4. Press **Play**. Walk into the glowing gems and watch your Gems count go up.
+4. Press **Play**. Everything is played from the menu: press **M** (or click MINE) to dig.
+
+## Menu-first play (right now)
+
+`Config.MenuOnly = true` in `src/shared/Config.luau` (on today): the whole game is played from the menu. Combat, monsters and walking around the town are paused. The character stays put, and the camera drifts slowly around the kingdom behind the menus. Set it to `false` to bring back the open town, combat and the shopkeepers' "stand next to me" rules.
+
+**The hub.** A big orange **MINE** button (M) with a red badge counting today's free walls. Below it are tiles for Cut (X), Craft (F), Sell (V), Gems (G), Character (C) and Shop (B). Season (J) and Top (L) sit top right under the currency bars. Every button lights up with a soft glow and a gold outline on hover.
+
+## The Mine (the hook)
+
+A cave wall of 24 rocks (6 x 4). Each wall gives you 14 swings of the pickaxe, and each click chips one rock. Every swing has a 15% chance to crit and chip two layers. Rocks crack, shake and throw chips; when one breaks you get what was inside:
+
+- **Glinting rocks (✦)** hide a rough gem (3 layers). A gold glint is a lucky rock: a luckier gem plus a coin bonus.
+- **Speckled rocks (◆)** hide ore for crafting: Iron, sometimes Mithril or Shards (2 layers).
+- **Plain rocks** are usually rubble, sometimes a few coins or a coin pouch.
+
+Out of swings? **Descend** to a new wall one level deeper. Deeper walls hold luckier gems (+3% gem luck per level, up to +45%) but tougher rock. Each wall uses one of your free daily mines; after that a wall costs 40 coins. Your deepest dig is saved. Everything is rolled on the server (`src/server/Systems/MineWall.luau`); the menu only learns a rock's hint until it breaks. Rules and tuning: `src/shared/Mine.luau`.
 
 ## The town
 
@@ -38,14 +54,14 @@ Streets and building plots are painted terrain (cobblestone, pavement, dirt), so
 Players who haven't finished the intro see it when they join (over a flyover of the kingdom):
 
 1. **Welcome** to Gemsoul.
-2. **Class:** Warrior, Wizard, Archer or Tank, each with a role, stats, difficulty and three core abilities.
-3. **Weapon** and 4. **Armor:** three playstyles each per class. A live preview shows your own avatar wearing your picks.
-5. **Starter gems:** a lottery spin for three already-cut gems (at least one Uncommon or better).
-6. **Gem school:** cut a rough stone yourself while each property is explained, plus where gems go in town.
-7. **Enchant:** socket a cut gem into your weapon; it glows in the gem's colour. The armor socket opens at Vey's Arcanum.
-8. **Ready:** character sheet, then into the game wearing your gear.
+2. **Class:** Warrior, Wizard, Archer or Tank: your look and your stats. Your starter weapon and armor come with it.
+3. **Starter gems:** spin for three already-cut gems (at least one Uncommon or better), revealed on rarity cards.
+4. **First dig:** a free tutorial wall in the Mine with your first rough stone in it. Break the glinting rock.
+5. **Gem school:** cut that stone yourself while each gem property is explained, plus what each menu button does.
+6. **Enchant:** socket a cut gem into your weapon; it glows in the gem's colour.
+7. **Ready:** a tour of the menu (Mine, Cut, Craft, Sell, Gems, Shop), then into the game.
 
-Classes, gear and upcoming specializations are defined in `src/shared/Classes.luau`. Combat isn't built yet: abilities are listed but not active.
+Classes and gear are defined in `src/shared/Classes.luau`.
 
 ## Gems
 
@@ -98,7 +114,7 @@ Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or we
 
 ## Hub, Shop, Season Path, Party and Top Players
 
-**The hub.** On the left, a big yellow SHOP button (B) over a 2x2 grid of menu tiles: Character (C), Abilities (K), Gems (G) and Party (P). Top right, gold-edged bars show your coins (the green + opens the Shop), Guild Marks and gems, with Season (J) and Top (L) buttons underneath.
+**The hub** (with menu-only mode off). On the left, a big yellow SHOP button (B) over a 2x2 grid of menu tiles: Character (C), Abilities (K), Gems (G) and Party (P). Top right, gold-edged bars show your coins (the green + opens the Shop), Guild Marks and gems, with Season (J) and Top (L) buttons underneath.
 
 **Buttons** are chunky 3D slabs, built by `IronUi.chunk`. From the outside in, each has a black outline, a darker lip underneath for depth, a light rim, and a gradient face. The face has a glossy top, diagonal light stripes and, on some buttons, a halftone dot texture. Icons are drawn big and break out of the edge. Hovering makes a button grow; pressing sinks its face into the lip. The same slabs are used for the combat hotbar (rimmed in your class colour), the gem pouch cards and tabs, shopkeeper replies and the intro. Windows share the look: a gold-rimmed frame that pops open, a glossy header with a tilted icon badge, outlined cartoon lettering and a red close slab.
 

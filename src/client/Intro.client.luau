@@ -2,12 +2,11 @@
 	The new-player intro, shown until it's finished once:
 	  1 Welcome          title and story, over a flyover of the kingdom
 	  2 Class            Warrior, Wizard, Archer or Tank
-	  3 Weapon           three playstyles per class
-	  4 Armor            three playstyles per class
-	  5 Starter gems     a lottery spin for three already-cut gems
-	  6 Gem school       cut a rough stone yourself; how gems and the town work
-	  7 Enchant          socket a gem into your weapon
-	  8 Ready            character sheet, then into the game
+	  3 Starter gems     a lottery spin for three already-cut gems
+	  4 First dig        a free wall in the Mine with your first rough stone
+	  5 Gem school       cut that stone yourself; what makes a gem valuable
+	  6 Enchant          socket a gem into your weapon
+	  7 Ready            a tour of the menu, then into the game
 	Gear picks are saved as you go, so the preview shows your own avatar
 	wearing them. Progress is saved, so leaving mid-way picks up again.
 ]]
@@ -17,12 +16,13 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
-local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
 local CuttingGame = require(script.Parent.Modules.CuttingGame)
 local GemArt = require(script.Parent.Modules.GemArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
+local MineUI = require(script.Parent.Modules.MineUI)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
@@ -38,7 +38,7 @@ local DARK = Color3.fromRGB(14, 10, 22)
 local CLASS_ICONS = { Warrior = "⚔️", Wizard = "🔮", Archer = "🏹", Tank = "🛡️" }
 local ELEMENT_ICONS = { Fire = "🔥", Frost = "❄️", Shock = "⚡", Poison = "☠️" }
 
-local STEPS = { "Welcome", "Class", "Weapon", "Armor", "Starter Gems", "Gem School", "Enchant", "Ready" }
+local STEPS = { "Welcome", "Class", "Starter Gems", "First Dig", "Gem School", "Enchant", "Ready" }
 
 -- Wait for the profile, and only run for players who haven't finished.
 while not GemClient.Profile do
@@ -108,17 +108,6 @@ local function statBars(parent: Instance, stats: { [string]: number }, color: Co
 			end
 		end
 	end
-end
-
-local function modsText(mods: { [string]: number }): string
-	local parts = {}
-	for _, name in Classes.StatNames do
-		local change = mods[name]
-		if change then
-			table.insert(parts, string.format("%s%d %s", if change > 0 then "+" else "", change, name))
-		end
-	end
-	return if #parts > 0 then table.concat(parts, "  ") else "No trade-offs"
 end
 
 -- Screen -------------------------------------------------------------------------------
@@ -450,6 +439,7 @@ local function optionCard(
 	}, card)
 	UiKit.pad(card, 14)
 	IronUi.juice(card, 1.03, 0.98)
+	IronUi.highlight(card)
 	card.Activated:Connect(onClick)
 	return card
 end
@@ -521,7 +511,16 @@ pages[1] = function()
 end
 
 pages[2] = function()
-	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, body)
+	local heading = text(body, "CHOOSE YOUR HERO", 34, Color3.new(1, 1, 1), HEADING)
+	heading.TextXAlignment = Enum.TextXAlignment.Center
+	local sub = text(body, "Your class sets your look and your stats.", 16, LIGHT, BOLD)
+	sub.Position = UDim2.fromOffset(0, 42)
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+	local grid = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 84),
+		Size = UDim2.new(1, 0, 0, 330),
+	}, body)
 	new("UIGridLayout", {
 		CellSize = UDim2.new(0.25, -9, 1, 0),
 		CellPadding = UDim2.fromOffset(12, 0),
@@ -539,12 +538,12 @@ pages[2] = function()
 			pages.redraw()
 		end)
 		UiKit.list(card, 6)
-		local icon = text(card, CLASS_ICONS[classId] or "✨", 40, Color3.new(1, 1, 1), BODY)
+		local icon = text(card, CLASS_ICONS[classId] or "✨", 64, Color3.new(1, 1, 1), BODY)
 		icon.TextXAlignment = Enum.TextXAlignment.Center
 		IronUi.animate(icon, function(t)
 			icon.Rotation = math.sin(t * 1.8 + i) * 6
 		end)
-		local name = text(card, string.upper(class.Name), 26, Color3.new(1, 1, 1), HEADING)
+		local name = text(card, string.upper(class.Name), 30, Color3.new(1, 1, 1), HEADING)
 		name.TextXAlignment = Enum.TextXAlignment.Center
 		local role = text(
 			card,
@@ -554,74 +553,11 @@ pages[2] = function()
 			BOLD
 		)
 		role.TextXAlignment = Enum.TextXAlignment.Center
-		text(card, class.Tagline, 14, LIGHT)
+		local tagline = text(card, class.Tagline, 15, LIGHT, BOLD)
+		tagline.TextXAlignment = Enum.TextXAlignment.Center
 		statBars(card, class.Stats, class.Color)
-		text(card, "6 ABILITIES (EQUIP ANY 3)", 12, ACCENT, BOLD)
-		local names = {}
-		for _, ability in class.Abilities do
-			table.insert(names, ability.Name)
-		end
-		text(card, table.concat(names, ", "), 13, LIGHT)
-		text(card, "ULTIMATE: " .. string.upper(class.Ultimate.Name), 15, P.Gold, BOLD)
-		text(card, class.Ultimate.Description, 12, P.Dim)
 	end
 	return state.Class ~= nil
-end
-
-local function gearPage(kind: "Weapons" | "Armors")
-	local class = Classes.List[state.Class]
-	local list = column(body, 0, 0.62)
-	local heading = if kind == "Weapons" then "Choose your weapon" else "Choose your armor"
-	text(list, string.upper(heading), 20, class.Color, HEADING)
-	local sub = if kind == "Weapons"
-		then "Each weapon plays differently. Your weapon has one gem socket for an enchantment."
-		else class.ArmorWeight .. " armor. Each set trades protection for mobility differently."
-	text(list, sub, 14, P.Dim)
-	for i, gear in class[kind] do
-		local chosen = if kind == "Weapons" then state.Weapon == gear.Id else state.Armor == gear.Id
-		local card = optionCard(list, class.Color, chosen, i + 2, function()
-			if kind == "Weapons" then
-				state.Weapon = gear.Id
-			else
-				state.Armor = gear.Id
-			end
-			saveLoadout()
-			pages.redraw()
-		end)
-		card.Size = UDim2.new(1, 0, 0, 0)
-		card.AutomaticSize = Enum.AutomaticSize.Y
-		UiKit.list(card, 4)
-		text(card, gear.Name, 18, LIGHT, BOLD)
-		text(card, string.upper(gear.Style), 12, class.Color, BOLD)
-		text(card, gear.Description, 14, P.Dim)
-		if gear.Attack then
-			text(card, AbilitiesUI.attackSummary(gear.Attack), 12, class.Color, BOLD)
-		end
-		text(card, gear.Passive.Name .. ": " .. gear.Passive.Text, 13, LIGHT)
-		text(card, modsText(gear.Mods), 13, P.Gold, BOLD)
-	end
-	local side = column(body, 0.62, 0.38, 8)
-	local spacer = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 300) }, side)
-	showPreview(0.62, 0, 300)
-	spacer.LayoutOrder = 0
-	text(side, "YOUR STATS", 11, P.Dim, BOLD).LayoutOrder = 1
-	local bars = new("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		LayoutOrder = 2,
-	}, side)
-	UiKit.list(bars, 4)
-	statBars(bars, Classes.stats(state.Class, state.Weapon, state.Armor), class.Color)
-	return true
-end
-
-pages[3] = function()
-	return gearPage("Weapons")
-end
-
-pages[4] = function()
-	return gearPage("Armors")
 end
 
 -- Little stars that burst out of `parent` when a gem lands.
@@ -801,7 +737,7 @@ local function gemsFrom(source: string)
 	return found
 end
 
-pages[5] = function()
+pages[3] = function()
 	local top = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 60) }, body)
 	UiKit.list(top, 4).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	local heading = text(top, "SPIN FOR YOUR STARTER GEMS!", 30, Color3.new(1, 1, 1), HEADING)
@@ -885,6 +821,117 @@ pages[5] = function()
 	return false
 end
 
+-- The first dig: a free wall in the Mine with the player's first stone in
+-- it. The mine opens on top of the intro; it comes back when they continue.
+pages[4] = function()
+	local top = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 70) }, body)
+	UiKit.list(top, 4).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local heading = text(top, "TIME TO DIG!", 34, Color3.new(1, 1, 1), HEADING)
+	heading.TextXAlignment = Enum.TextXAlignment.Center
+	local sub =
+		text(top, "Gems grow inside the rock under Gemsoul. Swing your pickaxe and break them out.", 16, LIGHT, BOLD)
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+
+	-- Three example rocks: what the hints mean.
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 92),
+		Size = UDim2.new(1, 0, 0, 230),
+	}, body)
+	UiKit.list(row, 24, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local examples = {
+		{ "✦", Color3.fromRGB(190, 250, 255), "GLINTING ROCK", "A gem is inside. Keep hitting it!" },
+		{ "◆", Color3.fromRGB(190, 195, 205), "SPECKLED ROCK", "Ore for crafting gear." },
+		{ "💰", P.Gold, "PLAIN ROCK", "Often rubble, sometimes coins." },
+	}
+	for n, example in examples do
+		local card = slab(row)
+		card.Size = UDim2.fromOffset(250, 230)
+		card.LayoutOrder = n
+		local rock = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 18),
+			Size = UDim2.fromOffset(100, 100),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			Rotation = (n - 2) * 5,
+		}, card)
+		UiKit.round(rock, 30)
+		new("UIStroke", { Color = DARK, Thickness = 3 }, rock)
+		new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.fromRGB(150, 138, 128), Color3.fromRGB(84, 74, 70)),
+		}, rock)
+		local mark = text(rock, example[1], if n == 3 then 30 else 40, example[2], BOLD)
+		mark.AutomaticSize = Enum.AutomaticSize.None
+		mark.Size = UDim2.fromScale(1, 1)
+		mark.TextXAlignment = Enum.TextXAlignment.Center
+		mark.TextYAlignment = Enum.TextYAlignment.Center
+		mark.TextTransparency = if n == 3 then 0.5 else 0
+		if n == 1 then
+			IronUi.animate(mark, function(t)
+				mark.Rotation = t * 60
+				mark.TextTransparency = 0.5 - (math.sin(t * 3) + 1) / 4
+			end)
+		end
+		local name = text(card, example[3], 20, Color3.new(1, 1, 1), HEADING)
+		name.AutomaticSize = Enum.AutomaticSize.None
+		name.Position = UDim2.fromOffset(10, 132)
+		name.Size = UDim2.new(1, -20, 0, 24)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		local what = text(card, example[4], 15, LIGHT, BOLD)
+		what.Position = UDim2.fromOffset(14, 164)
+		what.Size = UDim2.new(1, -28, 0, 0)
+		what.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	local status = text(body, "", 17, ACCENT, BOLD)
+	status.Position = UDim2.fromOffset(0, 342)
+	status.TextXAlignment = Enum.TextXAlignment.Center
+
+	local function found(): boolean
+		local stone = gemsFrom("FirstStone")[1]
+		if stone then
+			status.Text = string.format("You dug up %s! Next: cut it to make it shine.", GemConfig.displayName(stone))
+			status.TextColor3 = P.Good
+			nextButton.Visible = true
+			return true
+		end
+		return false
+	end
+	if found() then
+		return true
+	end
+	status.Text = "Your pickaxe is ready. Every new miner gets one free wall."
+	local dig
+	dig = IronUi.gemButton(footer, "⛏️  START DIGGING", Color3.fromRGB(255, 150, 30), function()
+		if busy then
+			return
+		end
+		busy = true
+		gui.Enabled = false
+		MineUI.tutorial()
+		gui.Enabled = true
+		-- If the dig couldn't start, Ilsa hands over a practice stone instead.
+		if not gemsFrom("FirstStone")[1] and not GemClient.Profile.Intro.FirstStone then
+			GemClient.request("FirstStone")
+		end
+		busy = false
+		if found() then
+			dig:Destroy()
+		else
+			status.Text = "No stone yet! Press START DIGGING and break the glinting rock."
+		end
+	end)
+	dig.Name = "PageAction"
+	dig.AnchorPoint = Vector2.new(1, 0.5)
+	dig.Position = UDim2.new(1, 0, 0.5, 0)
+	dig.Size = UDim2.fromOffset(0, 58)
+	dig.TextSize = 24
+	IronUi.animate(dig, function(t)
+		dig.Rotation = math.sin(t * 6) * 2
+	end)
+	return false
+end
+
 local PROPERTY_HELP = {
 	{
 		"COLOUR AND ELEMENT",
@@ -906,15 +953,15 @@ local PROPERTY_HELP = {
 
 local LESSON_ICONS = { "🎨", "📏", "💎", "✂️" }
 local PLACES = {
-	{ "⛏️", "Mining Guild (north road): Garrick gives free daily mines in the quarry, and sells rough stones." },
-	{ "💎", "Gem Cutter (north road): Ilsa cuts rough stones by hand for free, or with lasers for coins." },
-	{ "⚒️", "Crafting Hall (north road): sell stones for Guild Marks, buy materials, and forge your gear." },
-	{ "🏪", "Marketplace (town square): Tamsin's board lists gems for trade between players." },
-	{ "✨", "Arcanum (east road): Vey sockets gems into your weapon and armor to enchant them." },
-	{ "⚔️", "Arena (west road): train on dummies; beyond the south gate, monsters drop stones and coins." },
+	{ "⛏️", "Mine (M): dig walls of rock for gems, ore and coins. Deeper walls hold rarer gems." },
+	{ "✂️", "Cut (X): shape rough stones by hand. A better cut is worth far more." },
+	{ "⚒️", "Craft (F): buy materials and forge weapons and armor." },
+	{ "💰", "Sell (V): trade stones you don't need for coins." },
+	{ "💎", "Gems (G): your pouch. Set gems into your gear from the Character screen (C)." },
+	{ "🛒", "Shop (B): crates, cosmetics and bundles." },
 }
 
-pages[6] = function()
+pages[5] = function()
 	-- Left: the stone on a stage, its stats, and the cut buttons.
 	local left = slab(body)
 	left.Size = UDim2.new(0.4, -8, 1, 0)
@@ -985,7 +1032,7 @@ pages[6] = function()
 		text(card, help[1], 16, ACCENT, BOLD).LayoutOrder = 1
 		text(card, help[2], 14, LIGHT).LayoutOrder = 2
 	end
-	text(right, "WHERE YOUR GEMS GO", 18, Color3.new(1, 1, 1), HEADING).LayoutOrder = 10
+	text(right, "ALL FROM THE MENU", 18, Color3.new(1, 1, 1), HEADING).LayoutOrder = 10
 	for n, place in PLACES do
 		local row = slab(right, Color3.fromRGB(60, 90, 110))
 		row.Size = UDim2.new(1, 0, 0, 0)
@@ -1069,7 +1116,7 @@ pages[6] = function()
 			end)
 		end)
 		button(actions, "Skip", false, function()
-			status.Text = "You can cut it later at Ilsa's. Press NEXT."
+			status.Text = "You can cut it any time: Cut (X) in the menu. Press NEXT."
 			nextButton.Visible = true
 		end)
 	end
@@ -1079,6 +1126,7 @@ pages[6] = function()
 		if existing then
 			show(existing)
 		else
+			-- Skipped the dig? Ilsa hands over a practice stone instead.
 			local result = GemClient.request("FirstStone")
 			if result.Ok and result.Gem then
 				show(result.Gem)
@@ -1089,7 +1137,7 @@ pages[6] = function()
 	return false
 end
 
-pages[7] = function()
+pages[6] = function()
 	local class = Classes.List[state.Class]
 	local weapon = Classes.weapon(state.Class, state.Weapon)
 	local top = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 74) }, body)
@@ -1098,7 +1146,7 @@ pages[7] = function()
 	text(
 		top,
 		string.format(
-			"Your %s has one gem socket. A socketed gem adds its element to your hits, raises your stats and wreathes the weapon in its element. Pick one of your cut gems (you can swap it later at the Arcanum).",
+			"Your %s has one gem socket. A socketed gem adds its element to your hits, raises your stats and wreathes the weapon in its element. Pick one of your cut gems (swap it any time from your Character screen, C).",
 			weapon and weapon.Name or "weapon"
 		),
 		14,
@@ -1166,55 +1214,69 @@ pages[7] = function()
 	return socketed ~= nil
 end
 
-pages[8] = function()
-	local class = Classes.List[state.Class]
-	local weapon = Classes.weapon(state.Class, state.Weapon)
-	local armor = Classes.armor(state.Class, state.Armor)
-	local gem = GemClient.Profile.Character and GemClient.Profile.Character.WeaponGem
-	local sheet = column(body, 0, 0.6, 8)
-	text(sheet, "READY, " .. string.upper(player.DisplayName), 22, class.Color, HEADING)
-	text(sheet, string.format("%s  |  %s", class.Name, class.Role), 15, LIGHT, BOLD)
-	text(sheet, class.Resource, 13, P.Dim)
-	text(sheet, "GEAR", 12, ACCENT, BOLD)
-	text(
-		sheet,
-		string.format("Weapon: %s (%s)", weapon and weapon.Name or "?", weapon and weapon.Style or ""),
-		14,
-		LIGHT
-	)
-	if gem then
-		text(
-			sheet,
-			string.format("   Enchanted with %s: %s", GemConfig.shade(gem).Name, GemConfig.ElementEffects[gem.Element]),
-			13,
-			GemConfig.ElementColors[gem.Element]
-		)
-	end
-	text(sheet, string.format("Armor: %s (%s)", armor and armor.Name or "?", armor and armor.Style or ""), 14, LIGHT)
-	text(sheet, "ABILITIES  (press K in game to swap; 6 to choose from)", 12, ACCENT, BOLD)
-	for i, ability in Classes.loadout(class.Id, nil) do
-		text(sheet, string.format("[%s] %s: %s", Classes.AbilityKeys[i], ability.Name, ability.Description), 13, LIGHT)
-	end
-	text(
-		sheet,
-		string.format("[%s] %s: %s", Classes.UltimateKey, class.Ultimate.Name, class.Ultimate.Description),
-		13,
-		P.Gold
-	)
-	text(sheet, "AT LEVEL 5, CHOOSE A SPECIALIZATION", 12, ACCENT, BOLD)
-	for _, spec in class.Specs do
-		text(sheet, string.format("%s (%s): unlocks %s", spec.Name, spec.Style, spec.Signature.Name), 13, P.Dim)
-	end
-	text(
-		sheet,
-		"Left click to attack. Practise on dummies in the Arena (west road), then hunt crystal monsters outside the south gate.",
-		12,
-		P.Dim
-	)
+-- Ready: a tour of the menu, with your avatar alongside.
+local TOUR = {
+	{
+		"⛏️",
+		"MINE",
+		"M",
+		"Dig walls for gems, ore and coins. Go deeper for rarer finds.",
+		Color3.fromRGB(240, 140, 40),
+	},
+	{ "✂️", "CUT", "X", "Cut rough stones by hand to multiply their value.", Color3.fromRGB(60, 160, 220) },
+	{ "⚒️", "CRAFT", "F", "Forge weapons and armor from materials.", Color3.fromRGB(150, 100, 60) },
+	{ "💰", "SELL", "V", "Turn spare stones into coins.", Color3.fromRGB(230, 180, 40) },
+	{ "💎", "GEMS", "G", "Your pouch, with every stone in 3D.", Color3.fromRGB(150, 80, 220) },
+	{ "🛒", "SHOP", "B", "Crates, cosmetics and bundles.", Color3.fromRGB(220, 70, 140) },
+}
 
-	local side = column(body, 0.6, 0.4, 6)
+pages[7] = function()
+	local class = Classes.List[state.Class]
+	local left = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.62, 0, 1, 0) }, body)
+	text(left, "READY, " .. string.upper(player.DisplayName) .. "!", 32, Color3.new(1, 1, 1), HEADING)
+	local sub = text(left, class.Name .. "  •  everything is one click away in the menu:", 16, LIGHT, BOLD)
+	sub.Position = UDim2.fromOffset(0, 42)
+	local grid = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 76),
+		Size = UDim2.new(1, 0, 1, -76),
+	}, left)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(0.5, -6, 0, 104),
+		CellPadding = UDim2.fromOffset(12, 12),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, grid)
+	for n, stop in TOUR do
+		local card = slab(grid, stop[5])
+		card.LayoutOrder = n
+		local icon = text(card, stop[1], 40, Color3.new(1, 1, 1), BODY)
+		icon.AutomaticSize = Enum.AutomaticSize.None
+		icon.Position = UDim2.fromOffset(12, 12)
+		icon.Size = UDim2.fromOffset(52, 52)
+		local name = text(card, stop[2], 22, Color3.new(1, 1, 1), HEADING)
+		name.AutomaticSize = Enum.AutomaticSize.None
+		name.Position = UDim2.fromOffset(72, 12)
+		name.Size = UDim2.new(1, -120, 0, 26)
+		local key = new("TextLabel", {
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -12, 0, 12),
+			Size = UDim2.fromOffset(26, 26),
+			BackgroundColor3 = P.Gold,
+			Text = stop[3],
+			Font = BOLD,
+			TextSize = 14,
+			TextColor3 = DARK,
+		}, card)
+		UiKit.round(key, 13)
+		new("UIStroke", { Color = DARK, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, key)
+		local what = text(card, stop[4], 13, LIGHT, BOLD)
+		what.Position = UDim2.fromOffset(72, 42)
+		what.Size = UDim2.new(1, -84, 0, 0)
+	end
+
+	local side = column(body, 0.62, 0.38, 6)
 	new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 330) }, side)
-	showPreview(0.6, 0, 330)
+	showPreview(0.62, 0, 330)
 	local bars = new(
 		"Frame",
 		{ BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y },
@@ -1237,12 +1299,19 @@ local function finish()
 			return
 		end
 		flyover:Disconnect()
+		introOpen = false
+		if Config.MenuOnly then
+			-- The menu camera takes over; the character stays put.
+			setHud(true)
+			gui:Destroy()
+			UiKit.toast("Welcome to Gemsoul! Press M or click MINE to start digging.", ACCENT)
+			return
+		end
 		camera.CameraType = Enum.CameraType.Custom
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
 			camera.CameraSubject = humanoid
 		end
-		introOpen = false
 		if controls then
 			controls:Enable()
 		end
@@ -1267,7 +1336,8 @@ function pages.redraw()
 		warn("[Intro] Page " .. step .. " failed: " .. tostring(result))
 		text(body, "Something went wrong on this page:\n" .. tostring(result), 14, K.Bad)
 	end
-	backButton.Visible = step > 1 and step ~= 6
+	-- No going back once the one-time gem steps start (dig, school).
+	backButton.Visible = step > 1 and step ~= 4 and step ~= 5
 	if not ok or result then
 		nextButton.Visible = true
 	end
@@ -1280,7 +1350,7 @@ local function go(delta: number)
 	end
 	local target = math.clamp(state.Step + delta, 1, #STEPS)
 	-- Can't go back past the one-time gem steps.
-	if delta < 0 and state.Step >= 6 and target < 6 then
+	if delta < 0 and state.Step >= 4 and target < 4 then
 		return
 	end
 	state.Step = target
@@ -1295,7 +1365,7 @@ backButton.Position = UDim2.fromScale(0, 0.5)
 nextButton = IronUi.gemButton(footer, "NEXT", P.Emerald, function()
 	if state.Step == #STEPS then
 		finish()
-	elseif state.Step == 4 then
+	elseif state.Step == 2 then
 		-- Make sure the final gear pick is saved before moving on.
 		busy = true
 		saveLoadout(function()

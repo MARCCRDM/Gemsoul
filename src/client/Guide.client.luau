@@ -17,6 +17,12 @@ local RunService = game:GetService("RunService")
 local GemClient = require(script.Parent.Modules.GemClient)
 local UiKit = require(script.Parent.Modules.UiKit)
 
+-- The walking guide points at places in the town; it's off while the game
+-- is played from the menu (Shared/Config).
+if require(game:GetService("ReplicatedStorage").Shared.Config).MenuOnly then
+	return
+end
+
 local player = Players.LocalPlayer
 local K = UiKit.Colors
 local ARRIVED = 18 -- studs: close enough, hide the trail

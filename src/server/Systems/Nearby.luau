@@ -3,11 +3,16 @@
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 
 local Nearby = {}
 
 function Nearby.vendor(player: Player, vendorIds: { string }, range: number): boolean
+	-- In menu-only mode every counter works from the menu.
+	if Config.MenuOnly then
+		return true
+	end
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then
 		return false

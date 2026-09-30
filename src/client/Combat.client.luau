@@ -27,6 +27,11 @@ local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
 
+-- Combat is paused while the game is menu-only (Shared/Config).
+if require(ReplicatedStorage.Shared.Config).MenuOnly then
+	return
+end
+
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local remotes = ReplicatedStorage:WaitForChild("Remotes")

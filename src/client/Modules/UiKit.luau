@@ -149,27 +149,68 @@ function UiKit.toast(message: string, color: Color3?)
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		toastHolder = holder
 	end
-	local toast = UiKit.panel(toastHolder :: Frame, color)
+	-- A chunky dark pill: coloured rim and edge stripe, white outlined text.
+	-- It pops in, then fades and floats away.
+	local accent = color or K.Gold
+	local toast = Instance.new("Frame")
 	toast.AutomaticSize = Enum.AutomaticSize.XY
 	toast.Size = UDim2.fromOffset(0, 0)
-	UiKit.pad(toast, 10)
+	toast.BackgroundColor3 = Color3.new(1, 1, 1)
+	toast.Parent = toastHolder
+	UiKit.round(toast, 14)
+	local shade = Instance.new("UIGradient")
+	shade.Rotation = 90
+	shade.Color = ColorSequence.new(Color3.fromRGB(48, 36, 70), Color3.fromRGB(20, 14, 30))
+	shade.Parent = toast
+	local rim = Instance.new("UIStroke")
+	rim.Color = accent
+	rim.Thickness = 3
+	rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	rim.Parent = toast
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0, 10)
+	padding.PaddingBottom = UDim.new(0, 10)
+	padding.PaddingLeft = UDim.new(0, 26)
+	padding.PaddingRight = UDim.new(0, 18)
+	padding.Parent = toast
 	local constraint = Instance.new("UISizeConstraint")
-	constraint.MaxSize = Vector2.new(560, math.huge)
+	constraint.MaxSize = Vector2.new(620, math.huge)
 	constraint.Parent = toast
-	local label = UiKit.text(toast, message, 17, color)
+	local stripe = Instance.new("Frame")
+	stripe.BackgroundColor3 = accent
+	stripe.Position = UDim2.new(0, -18, 0, -2)
+	stripe.Size = UDim2.new(0, 6, 1, 4)
+	stripe.Parent = toast
+	UiKit.round(stripe, 3)
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromOffset(0, 0)
 	label.AutomaticSize = Enum.AutomaticSize.XY
+	label.Font = Enum.Font.FredokaOne
+	label.TextSize = 18
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.Text = message
 	label.TextWrapped = false
+	label.Parent = toast
+	local ink = Instance.new("UIStroke")
+	ink.Color = Color3.fromRGB(12, 8, 18)
+	ink.Thickness = 2
+	ink.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	ink.Parent = label
+	local pop = Instance.new("UIScale")
+	pop.Scale = 0.6
+	pop.Parent = toast
+	TweenService:Create(pop, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 
 	task.delay(4, function()
-		local fade = TweenInfo.new(0.6)
+		local fade = TweenInfo.new(0.5)
 		TweenService:Create(toast, fade, { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(stripe, fade, { BackgroundTransparency = 1 }):Play()
 		TweenService:Create(label, fade, { TextTransparency = 1 }):Play()
-		local outline = toast:FindFirstChild("Outline")
-		if outline then
-			TweenService:Create(outline, fade, { Transparency = 1 }):Play()
-		end
-		task.wait(0.6)
+		TweenService:Create(ink, fade, { Transparency = 1 }):Play()
+		TweenService:Create(rim, fade, { Transparency = 1 }):Play()
+		TweenService:Create(pop, fade, { Scale = 0.9 }):Play()
+		task.wait(0.5)
 		toast:Destroy()
 	end)
 end
