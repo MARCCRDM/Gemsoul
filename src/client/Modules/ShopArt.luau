@@ -18,7 +18,19 @@ local ShopArt = {}
 
 ShopArt.BackIcons = { Pack = "🎒", Banner = "🚩", Geode = "🔮", Cape = "🧥", Wings = "🦋", Halo = "💫" }
 ShopArt.KindIcons =
-	{ Stones = "🪨", Materials = "⚒️", Marks = "🎖️", CutGems = "💎", Coins = "💰", Cosmetic = "✨" }
+	{ Stones = "⛏️", Materials = "⚒️", Marks = "🎖️", CutGems = "💎", Coins = "💰", Cosmetic = "✨" }
+
+ShopArt.MaterialIcons =
+	{ Iron = "⛓️", Timber = "🌲", Leather = "🥾", Cloth = "🧵", Mithril = "💠", Shards = "✨" }
+ShopArt.KindColors = {
+	Coins = Color3.fromRGB(240, 180, 40),
+	Marks = Color3.fromRGB(70, 130, 230),
+	Stones = Color3.fromRGB(120, 110, 140),
+	CutGems = Color3.fromRGB(170, 80, 230),
+	Crates = Color3.fromRGB(230, 120, 40),
+	Cosmetic = Color3.fromRGB(200, 60, 140),
+	XPBoost = Color3.fromRGB(40, 180, 120),
+}
 
 local function round(parent: Instance, px: number)
 	local c = Instance.new("UICorner")

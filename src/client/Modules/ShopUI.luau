@@ -19,6 +19,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local Store = require(ReplicatedStorage.Shared.Store)
 local CrateReveal = require(script.Parent.CrateReveal)
 local GemClient = require(script.Parent.GemClient)
@@ -191,19 +192,17 @@ local function ribbon(parent: Instance, label: string, color: Color3?, x: number
 end
 
 local function emoji(parent: Instance, glyph: string, size: number, position: UDim2): TextLabel
-	-- A dark copy behind for a drop shadow.
-	local shadow = new("TextLabel", {
-		BackgroundTransparency = 1,
+	-- A soft oval shadow under it (emoji ignore text colour, so a dark copy
+	-- of the glyph would just show as a ghost).
+	local shadow = new("Frame", {
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.72,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = position + UDim2.fromOffset(4, 5),
-		Size = UDim2.fromOffset(size, size),
-		Text = glyph,
-		TextSize = size,
-		Font = CHUNKY,
-		TextColor3 = Color3.new(0, 0, 0),
-		TextTransparency = 0.6,
+		Position = position + UDim2.fromOffset(0, math.floor(size * 0.46)),
+		Size = UDim2.fromOffset(math.floor(size * 0.7), math.floor(size * 0.16)),
 	}, parent)
 	shadow.Name = "Shadow"
+	UiKit.round(shadow, size)
 	return new("TextLabel", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -213,6 +212,43 @@ local function emoji(parent: Instance, glyph: string, size: number, position: UD
 		TextSize = size,
 		Font = CHUNKY,
 	}, parent)
+end
+
+-- One reward as a colourful tile: its icon, a big "x15" and its name.
+local function rewardTile(parent: Instance, item: Store.RewardItem, order: number): Frame
+	local color = ShopArt.KindColors[item.Kind] or Color3.fromRGB(80, 90, 120)
+	local glyph = ShopArt.KindIcons[item.Kind] or "✨"
+	if item.Kind == "Materials" and item.Id then
+		local material = Crafting.Materials[item.Id]
+		color = if material then material.Color:Lerp(Color3.fromRGB(120, 80, 40), 0.35) else color
+		glyph = ShopArt.MaterialIcons[item.Id] or glyph
+	elseif item.Kind == "Crates" then
+		glyph = "📦"
+	elseif item.Kind == "XPBoost" then
+		glyph = "⭐"
+	end
+	local cell = card(parent, color, order)
+	if item.Kind == "Cosmetic" and item.Id then
+		ShopArt.icon(cell, "Cosmetic", item.Id, 50).Position = UDim2.new(0.5, 0, 0, 36)
+	else
+		emoji(cell, glyph, 40, UDim2.new(0.5, 0, 0, 36))
+	end
+	if item.Count then
+		local count = IronUi.title(cell, "x" .. commas(item.Count), 20)
+		count.AutomaticSize = Enum.AutomaticSize.None
+		count.AnchorPoint = Vector2.new(1, 0)
+		count.Position = UDim2.new(1, -8, 0, 4)
+		count.Size = UDim2.fromOffset(70, 22)
+		count.TextXAlignment = Enum.TextXAlignment.Right
+		count.Rotation = 6
+		count.ZIndex = 4
+	end
+	local label = text(cell, item.Text, 13, Color3.new(1, 1, 1), CHUNKY)
+	label.AnchorPoint = Vector2.new(0, 1)
+	label.Position = UDim2.new(0, 4, 1, -6)
+	label.Size = UDim2.new(1, -8, 0, 0)
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	return cell
 end
 
 local function robuxButton(parent: Instance, key: string)
@@ -713,14 +749,8 @@ function ShopUI.showWelcome()
 		CellPadding = UDim2.fromOffset(10, 10),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, grid)
-	local icons = { "🪨", "⚒️", "⚒️", "⚒️", "⚒️", "🚩", "📦", "⭐" }
-	for i, line in Store.describe(bundle.Contents, cosmeticName) do
-		local cell = card(grid, Color3.fromRGB(40, 60, 90), i)
-		emoji(cell, icons[((i - 1) % #icons) + 1], 36, UDim2.new(0.5, 0, 0, 30))
-		local label = text(cell, line, 12, Color3.new(1, 1, 1), CHUNKY)
-		label.Position = UDim2.fromOffset(4, 58)
-		label.Size = UDim2.new(1, -8, 0, 0)
-		label.TextXAlignment = Enum.TextXAlignment.Center
+	for i, item in Store.items(bundle.Contents, cosmeticName) do
+		rewardTile(grid, item, i)
 	end
 	local side = card(welcomeBody, bundle.Color)
 	side.Position = UDim2.new(0.6, 0, 0, 0)
