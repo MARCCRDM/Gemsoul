@@ -164,7 +164,7 @@ local bars = new("Frame", {
 	AutomaticSize = Enum.AutomaticSize.X,
 	LayoutOrder = 1,
 }, right)
-UiKit.list(bars, 26, true)
+UiKit.list(bars, 34, true)
 
 -- A currency bar: a dark gold-edged bar with a big round icon overlapping
 -- its left end, the amount in chunky outlined numbers, and an optional

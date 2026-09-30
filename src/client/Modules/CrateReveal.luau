@@ -60,15 +60,23 @@ local function rays(parent: Instance, color: Color3): Frame
 		Position = UDim2.fromScale(0.5, 0.45),
 		Size = UDim2.fromOffset(0, 0),
 	}, parent)
+	-- Roblox rotates a frame around its own centre, so each ray sits in an
+	-- invisible arm centred on the fan: turning the arm swings the ray
+	-- around the middle of the screen.
 	for i = 0, 15 do
-		local ray = new("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
+		local arm = new("Frame", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromOffset(0, 0),
-			Size = UDim2.fromOffset(if i % 2 == 0 then 34 else 18, 900),
+			Size = UDim2.fromOffset(if i % 2 == 0 then 34 else 18, 1800),
 			Rotation = i * 22.5,
+		}, fan)
+		local ray = new("Frame", {
+			Name = "Ray",
+			Size = UDim2.fromScale(1, 0.5),
 			BackgroundColor3 = if i % 3 == 0 then Color3.new(1, 1, 1) else color,
 			BorderSizePixel = 0,
-		}, fan)
+		}, arm)
 		new("UIGradient", {
 			Rotation = 90,
 			Transparency = NumberSequence.new({
@@ -206,8 +214,8 @@ function CrateReveal.play(crate, results: { any })
 	tween(flash, 0.12, { BackgroundTransparency = 0 })
 	task.wait(0.12)
 	art:Destroy()
-	for _, ray in fan:GetChildren() do
-		if ray:IsA("Frame") and ray.BackgroundColor3 ~= Color3.new(1, 1, 1) then
+	for _, ray in fan:GetDescendants() do
+		if ray.Name == "Ray" and ray:IsA("Frame") and ray.BackgroundColor3 ~= Color3.new(1, 1, 1) then
 			ray.BackgroundColor3 = color
 		end
 	end
