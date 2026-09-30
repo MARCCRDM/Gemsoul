@@ -9,7 +9,9 @@
 	             salvage them into Gem Shards (asks you to confirm).
 	The server checks everything and that you're at the workshop.
 ]]
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
@@ -700,6 +702,33 @@ function ForgeUI.close()
 	sellSide = nil
 	clear(body)
 end
+
+-- Close by itself when you walk away: the counters only work in person.
+local LEAVE_DISTANCE = 60
+local checkTimer = 0
+RunService.Heartbeat:Connect(function(dt)
+	checkTimer += dt
+	if checkTimer < 0.5 or not gui.Enabled then
+		return
+	end
+	checkTimer = 0
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not landmarks or not root then
+		return
+	end
+	local near = false
+	for _, id in if mode == "Market" then { "Market" } else { "Quartermaster", "Forge" } do
+		local spot = landmarks:GetAttribute(id)
+		if typeof(spot) == "Vector3" and (spot - root.Position).Magnitude < LEAVE_DISTANCE then
+			near = true
+		end
+	end
+	if not near then
+		ForgeUI.close()
+	end
+end)
 
 window.Close.Activated:Connect(ForgeUI.close)
 window.Shade.Activated:Connect(ForgeUI.close)
