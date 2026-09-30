@@ -14,6 +14,7 @@
 	badge, juice (hover/press bounce), shine, animate, clear, window.
 ]]
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 
 local UiKit = require(script.Parent.UiKit)
@@ -283,15 +284,17 @@ function IronUi.chunk(parent: Instance, options: ChunkOptions): (TextButton, Fra
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		LineJoinMode = Enum.LineJoinMode.Round,
 	}, b)
+	-- Buttons sized by their text: IronUi.label sets the width (text + pad
+	-- on each side). No AutomaticSize: the slab's layers fill the button,
+	-- and letting them size it makes it grow forever.
 	if pad > 0 then
-		new("UIPadding", { PaddingLeft = UDim.new(0, pad), PaddingRight = UDim.new(0, pad) }, b)
+		b:SetAttribute("PadX", pad)
 	end
 	-- The rim sits on top of the lip; pressing slides it down over the lip.
 	local rim = new("Frame", {
 		Name = "Rim",
 		BackgroundColor3 = options.Rim or lighter(fill, 0.55),
-		Position = UDim2.fromOffset(-pad, 0),
-		Size = UDim2.new(1, pad * 2, 1, -lip),
+		Size = UDim2.new(1, 0, 1, -lip),
 	}, b)
 	corner(rim, UDim.new(0, radius))
 	local face = new("Frame", {
@@ -362,7 +365,7 @@ function IronUi.chunk(parent: Instance, options: ChunkOptions): (TextButton, Fra
 
 	-- Hover grows it; pressing sinks the face into the lip.
 	IronUi.juice(b, 1.05, 0.97)
-	local up, down = rim.Position, UDim2.fromOffset(-pad, lip - 1)
+	local up, down = rim.Position, UDim2.fromOffset(0, lip - 1)
 	local function sink(pressed: boolean)
 		TweenService:Create(rim, TweenInfo.new(0.06), { Position = if pressed then down else up }):Play()
 	end
@@ -396,12 +399,31 @@ function IronUi.label(b: TextButton, face: Frame, value: string, size: number, f
 		TextScaled = false,
 	}, face)
 	IronUi.outline(label, if size >= 22 then 3 else 2)
+	-- Text-sized buttons (see chunk's PadX) keep their width fitted to the
+	-- words; a width set by scale (e.g. full-width) is left alone.
+	local pad = b:GetAttribute("PadX")
+	local function fit()
+		if not pad or b.Size.X.Scale ~= 0 then
+			return
+		end
+		local ok, bounds = pcall(function()
+			return TextService:GetTextSize(b.Text, b.TextSize, b.Font, Vector2.new(10000, 10000))
+		end)
+		local width = math.ceil((if ok then bounds.X else #b.Text * b.TextSize * 0.6) + pad * 2)
+		if b.Size.X.Offset ~= width then
+			b.Size = UDim2.new(0, width, b.Size.Y.Scale, b.Size.Y.Offset)
+		end
+	end
 	b:GetPropertyChangedSignal("Text"):Connect(function()
 		label.Text = b.Text
+		fit()
 	end)
 	b:GetPropertyChangedSignal("TextSize"):Connect(function()
 		label.TextSize = b.TextSize
+		fit()
 	end)
+	b:GetPropertyChangedSignal("Size"):Connect(fit)
+	fit()
 	return label
 end
 
@@ -418,7 +440,6 @@ function IronUi.button(parent: Instance, label: string, primary: boolean, onClic
 		PadX = 16,
 		Stripes = if primary then "Thin" else "None",
 	})
-	b.AutomaticSize = Enum.AutomaticSize.X
 	IronUi.label(b, face, label, 15)
 	b.Activated:Connect(onClick)
 	return b
@@ -434,7 +455,6 @@ function IronUi.gemButton(parent: Instance, label: string, color: Color3?, onCli
 		PadX = 18,
 		Dots = true,
 	})
-	b.AutomaticSize = Enum.AutomaticSize.X
 	IronUi.label(b, face, label, 19)
 	IronUi.shine(face)
 	b.Activated:Connect(onClick)
@@ -470,7 +490,6 @@ function IronUi.tabs(parent: Instance, entries: { { string } }, active: string, 
 			Stripes = if on then "Thin" else "None",
 			Dots = on,
 		})
-		tab.AutomaticSize = Enum.AutomaticSize.X
 		tab.LayoutOrder = i
 		local label = IronUi.label(tab, face, entry[2], 15)
 		if not on then

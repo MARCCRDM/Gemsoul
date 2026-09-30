@@ -27,9 +27,16 @@ local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
 local K = UiKit.Colors
-local HEADING = Enum.Font.Arcade
+local P = IronUi.Colors
+local HEADING = IronUi.Heading
 local BODY = Enum.Font.Gotham
-local BOLD = Enum.Font.GothamBold
+local BOLD = IronUi.Chunky
+local ACCENT = Color3.fromRGB(255, 214, 90) -- headings and highlights
+local LIGHT = Color3.fromRGB(236, 230, 250)
+local DARK = Color3.fromRGB(14, 10, 22)
+
+local CLASS_ICONS = { Warrior = "⚔️", Wizard = "🔮", Archer = "🏹", Tank = "🛡️" }
+local ELEMENT_ICONS = { Fire = "🔥", Frost = "❄️", Shock = "⚡", Poison = "☠️" }
 
 local STEPS = { "Welcome", "Class", "Weapon", "Armor", "Starter Gems", "Gem School", "Enchant", "Ready" }
 
@@ -61,17 +68,7 @@ local function new(className: string, props: { [string]: any }, parent: Instance
 end
 
 local function text(parent: Instance, value: string, size: number, color: Color3?, font: Enum.Font?): TextLabel
-	return new("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = value,
-		TextSize = size,
-		TextColor3 = color or K.Text,
-		Font = font or BODY,
-		TextWrapped = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-	}, parent)
+	return IronUi.text(parent, value, size, color or P.Text, font or BODY)
 end
 
 -- Chunky 3D buttons, the same as every other screen.
@@ -84,23 +81,31 @@ end
 
 local function statBars(parent: Instance, stats: { [string]: number }, color: Color3)
 	for _, name in Classes.StatNames do
-		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 16) }, parent)
-		local caption = text(row, string.upper(name), 11, K.Dim, BOLD)
+		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 18) }, parent)
+		local caption = text(row, string.upper(name), 12, LIGHT, BOLD)
 		caption.AutomaticSize = Enum.AutomaticSize.None
 		caption.Size = UDim2.new(0, 64, 1, 0)
 		local cells = new(
 			"Frame",
-			{ BackgroundTransparency = 1, Position = UDim2.fromOffset(66, 3), Size = UDim2.new(1, -66, 0, 10) },
+			{ BackgroundTransparency = 1, Position = UDim2.fromOffset(70, 3), Size = UDim2.new(1, -72, 0, 12) },
 			row
 		)
-		UiKit.list(cells, 3, true)
+		UiKit.list(cells, 4, true)
 		for i = 1, 5 do
+			local on = i <= stats[name]
 			local cell = new("Frame", {
-				BackgroundColor3 = if i <= stats[name] then color else Color3.fromRGB(44, 54, 52),
-				Size = UDim2.new(0.2, -3, 1, 0),
+				BackgroundColor3 = if on then color else Color3.fromRGB(40, 34, 56),
+				Size = UDim2.new(0.2, -4, 1, 0),
 				LayoutOrder = i,
 			}, cells)
-			UiKit.round(cell, 3)
+			UiKit.round(cell, 6)
+			new("UIStroke", { Color = DARK, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, cell)
+			if on then
+				new("UIGradient", {
+					Rotation = 90,
+					Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(170, 170, 170)),
+				}, cell)
+			end
 		end
 	end
 end
@@ -132,48 +137,125 @@ new("Frame", {
 	Size = UDim2.fromScale(1, 1),
 }, gui)
 
-local panel = UiKit.panel(gui)
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-panel.Position = UDim2.fromScale(0.5, 0.5)
-panel.Size = UDim2.fromOffset(1000, 640)
+-- The window: gold rim, dark crystal body, a glossy header with a big gem
+-- badge, the step's name and a row of progress pips.
+local PANEL_W, PANEL_H = 1000, 640
+local BODY_TOP = 98
+local panel = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(PANEL_W, PANEL_H),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+}, gui)
+UiKit.round(panel, 18)
+new("UIStroke", { Color = P.Gold, Thickness = 5 }, panel)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(40, 30, 60), P.Frame) }, panel)
 local scale = new("UIScale", {}, panel)
 local function fit()
 	local screen = gui.AbsoluteSize
-	scale.Scale = math.min(1, (screen.X - 24) / 1000, (screen.Y - 24) / 640)
+	scale.Scale = math.min(1, (screen.X - 40) / PANEL_W, (screen.Y - 40) / PANEL_H)
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 fit()
 
-local stepLabel = text(panel, "", 13, K.Accent, BOLD)
-stepLabel.Position = UDim2.fromOffset(24, 18)
-stepLabel.Size = UDim2.new(1, -48, 0, 16)
+local header = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	Position = UDim2.fromOffset(6, 6),
+	Size = UDim2.new(1, -12, 0, 78),
+}, panel)
+UiKit.round(header, 14)
+new("UIGradient", {
+	Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, IronUi.lighter(P.Amethyst, 0.12)),
+		ColorSequenceKeypoint.new(0.6, IronUi.darker(P.Amethyst, 0.25)),
+		ColorSequenceKeypoint.new(1, IronUi.darker(P.Teal, 0.3)),
+	}),
+}, header)
+local gloss = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BackgroundTransparency = 0.8,
+	Position = UDim2.fromOffset(10, 5),
+	Size = UDim2.new(1, -20, 0, 14),
+}, header)
+UiKit.round(gloss, 7)
 
-local progress = new(
-	"Frame",
-	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(24, 40), Size = UDim2.new(1, -48, 0, 4) },
-	panel
-)
-UiKit.list(progress, 4, true)
-local progressCells = {}
+local badge = IronUi.badge(panel, "💎", 96)
+badge.Position = UDim2.fromOffset(-30, -34)
+badge.Rotation = -8
+badge.ZIndex = 5
+for _, child in badge:GetDescendants() do
+	if child:IsA("GuiObject") then
+		child.ZIndex = 6
+	end
+end
+IronUi.animate(badge, function(t)
+	badge.Rotation = -8 + math.sin(t * 1.5) * 4
+end)
+
+local titleLabel = IronUi.title(panel, "", 34)
+titleLabel.Position = UDim2.fromOffset(82, 14)
+titleLabel.Size = UDim2.new(0.55, 0, 0, 38)
+titleLabel.TextWrapped = false
+titleLabel.ZIndex = 3
+local stepLabel = text(panel, "", 14, LIGHT, BOLD)
+stepLabel.Position = UDim2.fromOffset(84, 54)
+stepLabel.Size = UDim2.new(0.5, 0, 0, 18)
+stepLabel.ZIndex = 3
+
+-- Progress pips: gold ticks behind you, a big bright pip for this step.
+local pipRow = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -24, 0, 45),
+	Size = UDim2.fromOffset(0, 34),
+	AutomaticSize = Enum.AutomaticSize.X,
+	ZIndex = 3,
+}, panel)
+UiKit.list(pipRow, 8, true)
+local pips = {}
 for i = 1, #STEPS do
-	progressCells[i] = new("Frame", {
-		BackgroundColor3 = K.Row,
-		Size = UDim2.new(1 / #STEPS, -4, 1, 0),
+	local pip = new("Frame", {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Size = UDim2.fromOffset(24, 24),
 		LayoutOrder = i,
-	}, progress)
+	}, pipRow)
+	local round = Instance.new("UICorner")
+	round.CornerRadius = UDim.new(0.5, 0)
+	round.Parent = pip
+	new("UIStroke", { Color = DARK, Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, pip)
+	local mark = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Text = tostring(i),
+		Font = BOLD,
+		TextSize = 13,
+		TextColor3 = Color3.new(1, 1, 1),
+	}, pip)
+	IronUi.outline(mark, 1.5)
+	pips[i] = { Frame = pip, Mark = mark }
+end
+local function drawPips(step: number)
+	for i, pip in pips do
+		local done, current = i < step, i == step
+		pip.Frame.Size = if current then UDim2.fromOffset(32, 32) else UDim2.fromOffset(24, 24)
+		pip.Frame.BackgroundColor3 = if done then P.Gold elseif current then P.Emerald else Color3.fromRGB(44, 38, 62)
+		pip.Mark.Text = if done then "✓" else tostring(i)
+		pip.Mark.TextSize = if current then 16 else 13
+		pip.Mark.TextTransparency = if done or current then 0 else 0.4
+	end
 end
 
-local body = new(
-	"Frame",
-	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(24, 58), Size = UDim2.new(1, -48, 1, -128) },
-	panel
-)
+local body = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(28, BODY_TOP),
+	Size = UDim2.new(1, -56, 1, -BODY_TOP - 88),
+}, panel)
 
 local footer = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.new(0, 24, 1, -16),
-	Size = UDim2.new(1, -48, 0, 42),
+	Position = UDim2.new(0, 28, 1, -18),
+	Size = UDim2.new(1, -56, 0, 60),
 }, panel)
 local backButton, nextButton
 
@@ -182,13 +264,14 @@ local backButton, nextButton
 -- A plain background: a UIGradient on a ViewportFrame would darken the
 -- avatar along with it.
 local preview = new("ViewportFrame", {
-	BackgroundColor3 = Color3.fromRGB(44, 52, 62),
+	BackgroundColor3 = Color3.fromRGB(58, 48, 82),
 	Ambient = Color3.fromRGB(200, 200, 205),
 	LightColor = Color3.new(1, 1, 1),
 	LightDirection = Vector3.new(-0.3, -0.8, -1),
 	Visible = false,
 }, panel)
-UiKit.round(preview, 10)
+UiKit.round(preview, 14)
+new("UIStroke", { Color = P.Gold, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, preview)
 local previewWorld = new("WorldModel", {}, preview)
 local previewCamera = new("Camera", { FieldOfView = 30 }, preview)
 preview.CurrentCamera = previewCamera
@@ -240,12 +323,12 @@ end
 player.CharacterAdded:Connect(watchCharacter)
 
 -- Places the preview over the right-hand part of the page. The panel is a
--- fixed 1000x640 (scaled as a whole), and the page body starts at (24, 58).
-local BODY_WIDTH = 1000 - 48
+-- fixed size (scaled as a whole), and the page body starts at (28, BODY_TOP).
+local BODY_WIDTH = PANEL_W - 56
 local function showPreview(fromFraction: number, top: number, height: number)
-	local x = 24 + math.floor(BODY_WIDTH * fromFraction) + 12
-	preview.Position = UDim2.fromOffset(x, 58 + top)
-	preview.Size = UDim2.fromOffset(1000 - 24 - x, height)
+	local x = 28 + math.floor(BODY_WIDTH * fromFraction) + 12
+	preview.Position = UDim2.fromOffset(x, BODY_TOP + top)
+	preview.Size = UDim2.fromOffset(PANEL_W - 28 - x, height)
 	preview.Visible = true
 end
 
@@ -301,6 +384,12 @@ local function clearBody()
 	for _, child in body:GetChildren() do
 		child:Destroy()
 	end
+	-- Page-specific footer buttons (e.g. SPIN!).
+	for _, child in footer:GetChildren() do
+		if child.Name == "PageAction" then
+			child:Destroy()
+		end
+	end
 	preview.Visible = false
 end
 
@@ -319,7 +408,20 @@ local function column(parent: Instance, x: number, width: number, gap: number?):
 	return frame
 end
 
--- A clickable option card; `selected` draws it highlighted.
+-- A dark slab panel with an ink edge (for info blocks that aren't buttons).
+local function slab(parent: Instance, tint: Color3?): Frame
+	local frame = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1) }, parent)
+	UiKit.round(frame, 14)
+	local base = tint or Color3.fromRGB(80, 66, 110)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(base:Lerp(DARK, 0.55), base:Lerp(DARK, 0.8)),
+	}, frame)
+	new("UIStroke", { Color = DARK, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
+	return frame
+end
+
+-- A clickable option card tinted in `accent`; `selected` gets a gold rim.
 local function optionCard(
 	parent: Instance,
 	accent: Color3,
@@ -330,17 +432,24 @@ local function optionCard(
 	local card = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = if selected then Color3.fromRGB(28, 40, 44) else Color3.fromRGB(20, 26, 30),
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(card, 10)
+	UiKit.round(card, 14)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(
+			accent:Lerp(DARK, if selected then 0.35 else 0.55),
+			accent:Lerp(DARK, if selected then 0.7 else 0.82)
+		),
+	}, card)
 	new("UIStroke", {
-		Color = accent,
-		Thickness = if selected then 3 else 1.5,
-		Transparency = if selected then 0 else 0.6,
+		Color = if selected then P.Gold else DARK,
+		Thickness = if selected then 5 else 3,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, card)
 	UiKit.pad(card, 14)
+	IronUi.juice(card, 1.03, 0.98)
 	card.Activated:Connect(onClick)
 	return card
 end
@@ -356,19 +465,58 @@ end
 
 pages[1] = function()
 	local center = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, body)
-	local list = UiKit.list(center, 18)
+	local list = UiKit.list(center, 16)
 	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	list.VerticalAlignment = Enum.VerticalAlignment.Center
-	local title = text(center, "GEMSOUL", 72, K.Accent, HEADING)
+	local title = text(center, "GEMSOUL", 96, P.Gold, HEADING)
 	title.TextXAlignment = Enum.TextXAlignment.Center
+	title.LayoutOrder = 1
+	title:FindFirstChildOfClass("UIStroke").Thickness = 5
+	local tagline = text(center, "A kingdom built on elemental gems", 24, Color3.new(1, 1, 1), BOLD)
+	tagline.TextXAlignment = Enum.TextXAlignment.Center
+	tagline.LayoutOrder = 2
+	-- The four elements, as chunky chips.
+	local chips = new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(0, 44),
+		AutomaticSize = Enum.AutomaticSize.X,
+		LayoutOrder = 3,
+	}, center)
+	UiKit.list(chips, 12, true)
+	for i, element in GemConfig.Elements do
+		local chip = new("Frame", {
+			BackgroundColor3 = GemConfig.ElementColors[element],
+			Size = UDim2.fromOffset(150, 44),
+			LayoutOrder = i,
+		}, chips)
+		UiKit.round(chip, 12)
+		new("UIStroke", { Color = DARK, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, chip)
+		new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 150, 150)),
+		}, chip)
+		local label =
+			text(chip, (ELEMENT_ICONS[element] or "") .. "  " .. string.upper(element), 18, Color3.new(1, 1, 1), BOLD)
+		label.AutomaticSize = Enum.AutomaticSize.None
+		label.Size = UDim2.fromScale(1, 1)
+		label.TextXAlignment = Enum.TextXAlignment.Center
+		label.TextYAlignment = Enum.TextYAlignment.Center
+		IronUi.animate(chip, function(t)
+			chip.Rotation = math.sin(t * 2 + i) * 2
+		end)
+	end
+	local card = slab(center)
+	card.Size = UDim2.fromOffset(720, 0)
+	card.AutomaticSize = Enum.AutomaticSize.Y
+	card.LayoutOrder = 4
+	UiKit.pad(card, 20)
 	local story = text(
-		center,
-		"Beneath the walled kingdom of Gemsoul lie stones that hold the power of the elements: Fire, Frost, Shock and Poison. Miners dig them, cutters shape them, and heroes bind them to their weapons.\n\nChoose your path, claim your first gems, and step through the gate.",
+		card,
+		"Beneath the walled kingdom of Gemsoul lie stones that hold the power of the elements. Miners dig them, cutters shape them, and heroes bind them to their weapons.\n\nChoose your path, claim your first gems, and step through the gate.",
 		18,
-		K.Text
+		LIGHT
 	)
 	story.TextXAlignment = Enum.TextXAlignment.Center
-	new("UISizeConstraint", { MaxSize = Vector2.new(700, math.huge) }, story)
 	return true
 end
 
@@ -390,20 +538,32 @@ pages[2] = function()
 			end
 			pages.redraw()
 		end)
-		UiKit.list(card, 8)
-		text(card, string.upper(class.Name), 24, class.Color, HEADING)
-		text(card, class.Role .. "  |  " .. string.rep("*", class.Difficulty) .. " difficulty", 13, K.Dim, BOLD)
-		text(card, class.Tagline, 14, K.Text)
+		UiKit.list(card, 6)
+		local icon = text(card, CLASS_ICONS[classId] or "✨", 40, Color3.new(1, 1, 1), BODY)
+		icon.TextXAlignment = Enum.TextXAlignment.Center
+		IronUi.animate(icon, function(t)
+			icon.Rotation = math.sin(t * 1.8 + i) * 6
+		end)
+		local name = text(card, string.upper(class.Name), 26, Color3.new(1, 1, 1), HEADING)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		local role = text(
+			card,
+			class.Role .. "  •  " .. string.rep("★", class.Difficulty),
+			14,
+			class.Color:Lerp(Color3.new(1, 1, 1), 0.4),
+			BOLD
+		)
+		role.TextXAlignment = Enum.TextXAlignment.Center
+		text(card, class.Tagline, 14, LIGHT)
 		statBars(card, class.Stats, class.Color)
-		text(card, "6 ABILITIES (EQUIP ANY 3)", 11, K.Dim, BOLD)
+		text(card, "6 ABILITIES (EQUIP ANY 3)", 12, ACCENT, BOLD)
 		local names = {}
 		for _, ability in class.Abilities do
 			table.insert(names, ability.Name)
 		end
-		text(card, table.concat(names, ", "), 13, K.Text)
-		text(card, "ULTIMATE", 11, K.Dim, BOLD)
-		text(card, class.Ultimate.Name, 14, K.Gold, BOLD)
-		text(card, class.Ultimate.Description, 12, K.Dim)
+		text(card, table.concat(names, ", "), 13, LIGHT)
+		text(card, "ULTIMATE: " .. string.upper(class.Ultimate.Name), 15, P.Gold, BOLD)
+		text(card, class.Ultimate.Description, 12, P.Dim)
 	end
 	return state.Class ~= nil
 end
@@ -416,7 +576,7 @@ local function gearPage(kind: "Weapons" | "Armors")
 	local sub = if kind == "Weapons"
 		then "Each weapon plays differently. Your weapon has one gem socket for an enchantment."
 		else class.ArmorWeight .. " armor. Each set trades protection for mobility differently."
-	text(list, sub, 14, K.Dim)
+	text(list, sub, 14, P.Dim)
 	for i, gear in class[kind] do
 		local chosen = if kind == "Weapons" then state.Weapon == gear.Id else state.Armor == gear.Id
 		local card = optionCard(list, class.Color, chosen, i + 2, function()
@@ -431,20 +591,20 @@ local function gearPage(kind: "Weapons" | "Armors")
 		card.Size = UDim2.new(1, 0, 0, 0)
 		card.AutomaticSize = Enum.AutomaticSize.Y
 		UiKit.list(card, 4)
-		text(card, gear.Name, 18, K.Text, BOLD)
+		text(card, gear.Name, 18, LIGHT, BOLD)
 		text(card, string.upper(gear.Style), 12, class.Color, BOLD)
-		text(card, gear.Description, 14, K.Dim)
+		text(card, gear.Description, 14, P.Dim)
 		if gear.Attack then
 			text(card, AbilitiesUI.attackSummary(gear.Attack), 12, class.Color, BOLD)
 		end
-		text(card, gear.Passive.Name .. ": " .. gear.Passive.Text, 13, K.Text)
-		text(card, modsText(gear.Mods), 13, K.Gold, BOLD)
+		text(card, gear.Passive.Name .. ": " .. gear.Passive.Text, 13, LIGHT)
+		text(card, modsText(gear.Mods), 13, P.Gold, BOLD)
 	end
 	local side = column(body, 0.62, 0.38, 8)
 	local spacer = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 300) }, side)
 	showPreview(0.62, 0, 300)
 	spacer.LayoutOrder = 0
-	text(side, "YOUR STATS", 11, K.Dim, BOLD).LayoutOrder = 1
+	text(side, "YOUR STATS", 11, P.Dim, BOLD).LayoutOrder = 1
 	local bars = new("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, 0),
@@ -464,73 +624,167 @@ pages[4] = function()
 	return gearPage("Armors")
 end
 
--- Starter gems: three reels that spin and land on your gems.
-local function gemReel(parent: Instance, order: number): (Frame, (any) -> (), () -> ())
-	local reel = new("Frame", { BackgroundColor3 = Color3.fromRGB(20, 26, 30), LayoutOrder = order }, parent)
-	UiKit.round(reel, 10)
-	local stroke = new("UIStroke", { Color = K.Accent, Transparency = 0.6, Thickness = 1.5 }, reel)
+-- Little stars that burst out of `parent` when a gem lands.
+local function sparkle(parent: GuiObject, color: Color3)
+	for n = 1, 10 do
+		local star = new("TextLabel", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.4),
+			Size = UDim2.fromOffset(28, 28),
+			Text = if n % 2 == 0 then "✦" else "✧",
+			TextSize = math.random(18, 30),
+			TextColor3 = if n % 3 == 0 then Color3.new(1, 1, 1) else color,
+			Font = BOLD,
+			ZIndex = 8,
+		}, parent)
+		local angle = math.random() * math.pi * 2
+		local distance = math.random(90, 170)
+		TweenService:Create(star, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.5, math.cos(angle) * distance, 0.4, math.sin(angle) * distance),
+			TextTransparency = 1,
+			Rotation = 180,
+		}):Play()
+		task.delay(0.85, function()
+			star:Destroy()
+		end)
+	end
+end
+
+-- Size / Clarity / Cut as three little stat tiles.
+local function statTiles(parent: Instance, order: number): (string, string, string) -> ()
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 50),
+		LayoutOrder = order,
+	}, parent)
+	UiKit.list(row, 6, true)
+	local values = {}
+	for n, caption in { "SIZE", "CLARITY", "CUT" } do
+		local tile = new("Frame", {
+			BackgroundColor3 = Color3.fromRGB(34, 28, 50),
+			Size = UDim2.new(1 / 3, -4, 1, 0),
+			LayoutOrder = n,
+		}, row)
+		UiKit.round(tile, 10)
+		new("UIStroke", { Color = DARK, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, tile)
+		local top = text(tile, caption, 11, P.Dim, BOLD)
+		top.AutomaticSize = Enum.AutomaticSize.None
+		top.Position = UDim2.fromOffset(0, 4)
+		top.Size = UDim2.new(1, 0, 0, 14)
+		top.TextXAlignment = Enum.TextXAlignment.Center
+		local value = text(tile, "?", 22, Color3.new(1, 1, 1), HEADING)
+		value.AutomaticSize = Enum.AutomaticSize.None
+		value.Position = UDim2.fromOffset(0, 20)
+		value.Size = UDim2.new(1, 0, 0, 26)
+		value.TextXAlignment = Enum.TextXAlignment.Center
+		values[n] = value
+	end
+	return function(size, clarity, cut)
+		values[1].Text, values[2].Text, values[3].Text = size, clarity, cut
+	end
+end
+
+-- A gem reveal card: a rarity ribbon, the gem on a glowing stage, its name,
+-- element, stat tiles and value. Returns (card, land(gem), spin(), empty()).
+local function gemReel(parent: Instance, order: number)
+	local reel = slab(parent)
+	reel.LayoutOrder = order
+	local stroke = reel:FindFirstChildOfClass("UIStroke") :: UIStroke
+	local ribbon = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0),
+		Size = UDim2.fromOffset(140, 30),
+		BackgroundColor3 = Color3.fromRGB(90, 80, 120),
+		ZIndex = 6,
+	}, reel)
+	UiKit.round(ribbon, 10)
+	new("UIStroke", { Color = DARK, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ribbon)
+	local ribbonText = text(ribbon, "???", 16, Color3.new(1, 1, 1), BOLD)
+	ribbonText.AutomaticSize = Enum.AutomaticSize.None
+	ribbonText.Size = UDim2.fromScale(1, 1)
+	ribbonText.TextXAlignment = Enum.TextXAlignment.Center
+	ribbonText.TextYAlignment = Enum.TextYAlignment.Center
+	ribbonText.ZIndex = 7
+
 	local stage = new("Frame", {
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		Position = UDim2.fromOffset(10, 10),
-		Size = UDim2.new(1, -20, 0, 170),
+		Position = UDim2.fromOffset(12, 24),
+		Size = UDim2.new(1, -24, 0, 170),
 		ClipsDescendants = true,
 	}, reel)
-	UiKit.round(stage, 8)
-	new(
-		"UIGradient",
-		{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(74, 84, 100), Color3.fromRGB(16, 20, 26)) },
-		stage
-	)
-	GemArt.backdrop(stage)
-	local info = new(
-		"Frame",
-		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 188), Size = UDim2.new(1, -24, 1, -196) },
-		reel
-	)
-	UiKit.list(info, 4)
-	local title = text(info, "?", 16, K.Text, BOLD)
+	UiKit.round(stage, 12)
+	local stageShade = new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(90, 80, 120), Color3.fromRGB(22, 18, 34)),
+	}, stage)
+	local spot = GemArt.backdrop(stage):FindFirstChildOfClass("Frame")
+
+	local info = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(12, 202),
+		Size = UDim2.new(1, -24, 1, -210),
+	}, reel)
+	UiKit.list(info, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local title = text(info, "?", 22, Color3.new(1, 1, 1), HEADING)
 	title.TextXAlignment = Enum.TextXAlignment.Center
-	local detail = text(info, "", 13, K.Dim)
-	detail.TextXAlignment = Enum.TextXAlignment.Center
+	title.LayoutOrder = 1
+	local element = text(info, "", 15, LIGHT, BOLD)
+	element.TextXAlignment = Enum.TextXAlignment.Center
+	element.LayoutOrder = 2
+	local setStats = statTiles(info, 3)
+	local worth = text(info, "", 22, P.Gold, BOLD)
+	worth.TextXAlignment = Enum.TextXAlignment.Center
+	worth.LayoutOrder = 4
 
 	local spinning = false
 	local function spin()
 		spinning = true
 		task.spawn(function()
 			while spinning do
-				local element = GemConfig.Elements[math.random(1, 4)]
-				local shade = GemConfig.Shades[element][math.random(1, 3)]
-				stage.BackgroundColor3 = shade.Color
+				local el = GemConfig.Elements[math.random(1, #GemConfig.Elements)]
+				local shade = GemConfig.Shades[el][math.random(1, 3)]
+				if spot then
+					spot.BackgroundColor3 = shade.Color
+				end
 				title.Text = shade.Name
+				element.Text = (ELEMENT_ICONS[el] or "") .. " " .. string.upper(el)
 				task.wait(0.07)
 			end
 		end)
 	end
 	local function land(gem)
 		spinning = false
-		stage.BackgroundColor3 = Color3.new(1, 1, 1)
-		GemArt.viewport(stage, gem, true)
 		local tierColor = GemConfig.TierColors[gem.Tier]
+		if spot then
+			spot.BackgroundColor3 = tierColor
+		end
+		stageShade.Color = ColorSequence.new(tierColor:Lerp(DARK, 0.35), tierColor:Lerp(DARK, 0.85))
+		GemArt.viewport(stage, gem, true)
 		stroke.Color = tierColor
-		stroke.Transparency = 0
-		stroke.Thickness = 3
+		stroke.Thickness = 5
+		ribbon.BackgroundColor3 = tierColor
+		ribbonText.Text = string.upper(GemConfig.TierLabels[gem.Tier])
 		title.Text = GemConfig.shade(gem).Name
-		title.TextColor3 = K.Text
-		detail.Text = string.format(
-			"%s %s\nSize %d  |  Clarity %d  |  Cut %d\nWorth %d coins",
-			string.upper(GemConfig.TierLabels[gem.Tier]),
-			string.upper(gem.Element),
-			gem.Size,
-			gem.Clarity,
-			gem.Cut or 0,
-			GemConfig.value(gem)
-		)
-		detail.TextColor3 = tierColor
-		local pop = new("UIScale", { Scale = 1.12 }, reel)
-		TweenService:Create(pop, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+		element.Text = (ELEMENT_ICONS[gem.Element] or "") .. " " .. string.upper(gem.Element)
+		element.TextColor3 = GemConfig.ElementColors[gem.Element]:Lerp(Color3.new(1, 1, 1), 0.3)
+		setStats(tostring(gem.Size), tostring(gem.Clarity), if gem.Cut then tostring(gem.Cut) else "-")
+		worth.Text = "💰 " .. tostring(GemConfig.value(gem))
+		sparkle(reel, tierColor)
+		local pop = reel:FindFirstChildOfClass("UIScale") or new("UIScale", {}, reel)
+		pop.Scale = 1.15
+		TweenService:Create(pop, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 			:Play()
 	end
-	return reel, land, spin
+	-- Nothing to show here (e.g. that starter gem was sold or used).
+	local function empty()
+		spinning = false
+		title.Text = "Used"
+		element.Text = "Already in your pouch or sold"
+		element.TextColor3 = P.Dim
+		ribbonText.Text = "-"
+	end
+	return reel, land, spin, empty
 end
 
 local function gemsFrom(source: string)
@@ -548,54 +802,53 @@ local function gemsFrom(source: string)
 end
 
 pages[5] = function()
-	local top = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 70) }, body)
-	UiKit.list(top, 4)
-	text(top, "YOUR STARTER GEMS", 22, K.Accent, HEADING)
-	text(
-		top,
-		"Every new arrival gets three gems, already cut and ready to use. Spin to see what fortune gives you: at least one is guaranteed Uncommon or better.",
-		14,
-		K.Dim
-	)
+	local top = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 60) }, body)
+	UiKit.list(top, 4).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local heading = text(top, "SPIN FOR YOUR STARTER GEMS!", 30, Color3.new(1, 1, 1), HEADING)
+	heading.TextXAlignment = Enum.TextXAlignment.Center
+	local sub =
+		text(top, "Three gems, already cut and ready to use. At least one is Uncommon or better.", 15, LIGHT, BOLD)
+	sub.TextXAlignment = Enum.TextXAlignment.Center
 	local reels = new(
 		"Frame",
-		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 84), Size = UDim2.new(1, 0, 1, -140) },
+		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 84), Size = UDim2.new(1, 0, 1, -84) },
 		body
 	)
 	new("UIGridLayout", {
-		CellSize = UDim2.new(1 / 3, -10, 1, 0),
-		CellPadding = UDim2.fromOffset(15, 0),
+		CellSize = UDim2.new(1 / 3, -14, 1, 0),
+		CellPadding = UDim2.fromOffset(20, 0),
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, reels)
-	local landers, spinners = {}, {}
+	local landers, spinners, empties = {}, {}, {}
 	for i = 1, 3 do
-		local _, land, spin = gemReel(reels, i)
-		landers[i], spinners[i] = land, spin
+		local _, land, spin, empty = gemReel(reels, i)
+		landers[i], spinners[i], empties[i] = land, spin, empty
+	end
+	local function showAll(gems)
+		for i = 1, 3 do
+			if gems[i] then
+				landers[i](gems[i])
+			else
+				empties[i]()
+			end
+		end
 	end
 
 	local existing = gemsFrom("StarterSpin")
-	if GemClient.Profile.Intro.Spun and #existing > 0 then
-		for i, gem in existing do
-			if landers[i] then
-				landers[i](gem)
-			end
-		end
+	if GemClient.Profile.Intro.Spun then
+		showAll(existing)
 		return true
 	end
 
-	local actions = new("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.fromScale(0.5, 1),
-		Size = UDim2.fromOffset(200, 42),
-	}, body)
+	-- The big SPIN button sits in the footer, in NEXT's place, and pulses.
 	local spinButton
-	spinButton = button(actions, "SPIN!", true, function()
+	spinButton = IronUi.gemButton(footer, "🎰  SPIN!", Color3.fromRGB(255, 176, 30), function()
 		if busy then
 			return
 		end
 		busy = true
-		spinButton.Visible = false
+		spinButton:Destroy()
 		for _, spin in spinners do
 			spin()
 		end
@@ -603,16 +856,31 @@ pages[5] = function()
 			local result = GemClient.request("StarterSpin")
 			task.wait(1.2)
 			if result.Ok then
-				for i, gem in result.Gems do
+				for i = 1, 3 do
 					task.wait(0.6)
-					landers[i](gem)
+					if result.Gems[i] then
+						landers[i](result.Gems[i])
+					else
+						empties[i]()
+					end
 				end
 				nextButton.Visible = true
 			else
+				for _, empty in empties do
+					empty()
+				end
 				UiKit.toast(result.Message, K.Bad)
 			end
 			busy = false
 		end)
+	end)
+	spinButton.Name = "PageAction"
+	spinButton.AnchorPoint = Vector2.new(1, 0.5)
+	spinButton.Position = UDim2.new(1, 0, 0.5, 0)
+	spinButton.Size = UDim2.fromOffset(0, 58)
+	spinButton.TextSize = 26
+	IronUi.animate(spinButton, function(t)
+		spinButton.Rotation = math.sin(t * 6) * 2
 	end)
 	return false
 end
@@ -636,65 +904,104 @@ local PROPERTY_HELP = {
 	},
 }
 
-pages[6] = function()
-	local left = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.38, 0, 1, 0) }, body)
-	local right = column(body, 0.38, 0.62, 8)
-	right.Position = UDim2.new(0.38, 16, 0, 0)
-	right.Size = UDim2.new(0.62, -16, 1, 0)
+local LESSON_ICONS = { "🎨", "📏", "💎", "✂️" }
+local PLACES = {
+	{ "⛏️", "Mining Guild (north road): Garrick gives free daily mines in the quarry, and sells rough stones." },
+	{ "💎", "Gem Cutter (north road): Ilsa cuts rough stones by hand for free, or with lasers for coins." },
+	{ "⚒️", "Crafting Hall (north road): sell stones for Guild Marks, buy materials, and forge your gear." },
+	{ "🏪", "Marketplace (town square): Tamsin's board lists gems for trade between players." },
+	{ "✨", "Arcanum (east road): Vey sockets gems into your weapon and armor to enchant them." },
+	{ "⚔️", "Arena (west road): train on dummies; beyond the south gate, monsters drop stones and coins." },
+}
 
-	local stage = new(
-		"Frame",
-		{ BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, 0, 0, 300), ClipsDescendants = true },
-		left
-	)
-	UiKit.round(stage, 10)
-	new(
-		"UIGradient",
-		{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(74, 84, 100), Color3.fromRGB(16, 20, 26)) },
-		stage
-	)
+pages[6] = function()
+	-- Left: the stone on a stage, its stats, and the cut buttons.
+	local left = slab(body)
+	left.Size = UDim2.new(0.4, -8, 1, 0)
+	local right = column(body, 0.4, 0.6, 10)
+	right.Position = UDim2.new(0.4, 12, 0, 0)
+	right.Size = UDim2.new(0.6, -12, 1, 0)
+
+	local stage = new("Frame", {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.new(1, -24, 0, 200),
+		ClipsDescendants = true,
+	}, left)
+	UiKit.round(stage, 12)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(110, 90, 150), Color3.fromRGB(22, 18, 34)),
+	}, stage)
 	GemArt.backdrop(stage)
 	local info = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 312),
-		Size = UDim2.new(1, 0, 1, -312),
+		Position = UDim2.fromOffset(12, 220),
+		Size = UDim2.new(1, -24, 1, -228),
 	}, left)
-	UiKit.list(info, 8).HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local caption = text(info, "", 17, K.Text, BOLD)
+	UiKit.list(info, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local caption = text(info, "", 20, Color3.new(1, 1, 1), HEADING)
 	caption.TextXAlignment = Enum.TextXAlignment.Center
 	caption.LayoutOrder = 1
-	local valueLine = text(info, "", 15, K.Gold, BOLD)
+	local setStats = statTiles(info, 2)
+	local valueLine = text(info, "", 18, P.Gold, BOLD)
 	valueLine.TextXAlignment = Enum.TextXAlignment.Center
-	valueLine.LayoutOrder = 2
-	local status = text(info, "", 13, K.Dim)
+	valueLine.LayoutOrder = 3
+	local status = text(info, "", 13, LIGHT, BOLD)
 	status.TextXAlignment = Enum.TextXAlignment.Center
-	status.LayoutOrder = 3
-	local actions = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 42), LayoutOrder = 4 }, info)
-	UiKit.list(actions, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	status.LayoutOrder = 4
+	local actions = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 52), LayoutOrder = 5 }, info)
+	UiKit.list(actions, 10, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-	text(right, "GEM SCHOOL", 22, K.Accent, HEADING)
-	text(
+	-- Right: the gem lessons as cards.
+	local intro = text(
 		right,
 		"Ilsa, the town's Master Gemcutter, hands you a rough stone to practise on. Here's what makes a gem:",
-		14,
-		K.Dim
+		15,
+		LIGHT,
+		BOLD
 	)
-	for _, help in PROPERTY_HELP do
-		text(right, help[1], 13, K.Accent, BOLD)
-		text(right, help[2], 14, K.Text)
+	intro.LayoutOrder = 0
+	for n, help in PROPERTY_HELP do
+		local card = slab(right)
+		card.Size = UDim2.new(1, 0, 0, 0)
+		card.AutomaticSize = Enum.AutomaticSize.Y
+		card.LayoutOrder = n
+		new("UIPadding", {
+			PaddingTop = UDim.new(0, 10),
+			PaddingBottom = UDim.new(0, 10),
+			PaddingLeft = UDim.new(0, 58),
+			PaddingRight = UDim.new(0, 12),
+		}, card)
+		UiKit.list(card, 2)
+		local icon = text(card, LESSON_ICONS[n] or "💎", 30, Color3.new(1, 1, 1), BODY)
+		icon.AutomaticSize = Enum.AutomaticSize.None
+		icon.Position = UDim2.fromOffset(-48, 0)
+		icon.Size = UDim2.fromOffset(40, 40)
+		-- Keep the icon out of the list flow.
+		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0) }, card)
+		holder.LayoutOrder = 0
+		icon.Parent = holder
+		text(card, help[1], 16, ACCENT, BOLD).LayoutOrder = 1
+		text(card, help[2], 14, LIGHT).LayoutOrder = 2
 	end
-	text(right, "WHERE YOUR GEMS GO", 13, K.Accent, BOLD)
-	for _, line in
-		{
-			"Mining Guild (north road): Garrick gives free daily mines in the quarry, and sells rough stones.",
-			"Gem Cutter (north road, by the Mining Guild): Ilsa cuts rough stones by hand for free, or with lasers for coins.",
-			"Crafting Hall (north road): sell stones to Hilde for Guild Marks, buy materials, and have Borin forge your gear.",
-			"Marketplace (town square): Tamsin's board lists gems for trade between players.",
-			"Arcanum (east road): Vey sockets gems into your weapon and armor to enchant them.",
-			"Arena (west road): train on dummies; beyond the south gate, crystal monsters drop stones and coins.",
-		}
-	do
-		text(right, line, 14, K.Text)
+	text(right, "WHERE YOUR GEMS GO", 18, Color3.new(1, 1, 1), HEADING).LayoutOrder = 10
+	for n, place in PLACES do
+		local row = slab(right, Color3.fromRGB(60, 90, 110))
+		row.Size = UDim2.new(1, 0, 0, 0)
+		row.AutomaticSize = Enum.AutomaticSize.Y
+		row.LayoutOrder = 10 + n
+		new("UIPadding", {
+			PaddingTop = UDim.new(0, 8),
+			PaddingBottom = UDim.new(0, 8),
+			PaddingLeft = UDim.new(0, 46),
+			PaddingRight = UDim.new(0, 10),
+		}, row)
+		local icon = text(row, place[1], 22, Color3.new(1, 1, 1), BODY)
+		icon.AutomaticSize = Enum.AutomaticSize.None
+		icon.Position = UDim2.fromOffset(-38, -2)
+		icon.Size = UDim2.fromOffset(30, 30)
+		text(row, place[2], 13, LIGHT)
 	end
 
 	local stone = nil
@@ -707,14 +1014,8 @@ pages[6] = function()
 		end
 		GemArt.viewport(stage, gem, true)
 		caption.Text = GemConfig.displayName(gem)
-		local cut = if gem.Cut then "Cut " .. gem.Cut else "Rough"
-		valueLine.Text = string.format(
-			"Size %d  |  Clarity %d  |  %s\nWorth %d coins",
-			gem.Size,
-			gem.Clarity,
-			cut,
-			GemConfig.value(gem)
-		)
+		setStats(tostring(gem.Size), tostring(gem.Clarity), if gem.Cut then tostring(gem.Cut) else "ROUGH")
+		valueLine.Text = "💰 Worth " .. tostring(GemConfig.value(gem)) .. " coins"
 	end
 
 	local function cutButton()
@@ -725,13 +1026,13 @@ pages[6] = function()
 		end
 		if stone and stone.Cut then
 			status.Text = "Cut! Press NEXT to enchant your weapon."
-			status.TextColor3 = K.Accent
+			status.TextColor3 = P.Good
 			nextButton.Visible = true
 			return
 		end
 		status.Text = "Rough stones are worth half. Cut it to see it shine."
-		status.TextColor3 = K.Dim
-		button(actions, "CUT IT NOW", true, function()
+		status.TextColor3 = LIGHT
+		IronUi.gemButton(actions, "✂️  CUT IT NOW", Color3.fromRGB(255, 176, 30), function()
 			if busy or not stone then
 				return
 			end
@@ -754,7 +1055,7 @@ pages[6] = function()
 									before,
 									GemConfig.value(result.Gem)
 								),
-								K.Gold
+								P.Gold
 							)
 						else
 							UiKit.toast(result.Message, K.Bad)
@@ -801,7 +1102,7 @@ pages[7] = function()
 			weapon and weapon.Name or "weapon"
 		),
 		14,
-		K.Dim
+		P.Dim
 	)
 	local grid = new("ScrollingFrame", {
 		BackgroundTransparency = 1,
@@ -838,7 +1139,7 @@ pages[7] = function()
 			busy = true
 			task.spawn(function()
 				local result = GemClient.request("SocketGem", gem.Id)
-				UiKit.toast(result.Message, if result.Ok then K.Gold else K.Bad)
+				UiKit.toast(result.Message, if result.Ok then P.Gold else K.Bad)
 				busy = false
 				pages.redraw()
 			end)
@@ -852,7 +1153,7 @@ pages[7] = function()
 			card
 		)
 		UiKit.list(info, 2)
-		text(info, GemConfig.shade(gem).Name, 13, K.Text, BOLD)
+		text(info, GemConfig.shade(gem).Name, 13, LIGHT, BOLD)
 		text(
 			info,
 			string.upper(gem.Element) .. (if isSocketed then "  |  SOCKETED" else ""),
@@ -860,7 +1161,7 @@ pages[7] = function()
 			GemConfig.ElementColors[gem.Element],
 			BOLD
 		)
-		text(info, GemConfig.ElementEffects[gem.Element], 11, K.Dim)
+		text(info, GemConfig.ElementEffects[gem.Element], 11, P.Dim)
 	end
 	return socketed ~= nil
 end
@@ -872,14 +1173,14 @@ pages[8] = function()
 	local gem = GemClient.Profile.Character and GemClient.Profile.Character.WeaponGem
 	local sheet = column(body, 0, 0.6, 8)
 	text(sheet, "READY, " .. string.upper(player.DisplayName), 22, class.Color, HEADING)
-	text(sheet, string.format("%s  |  %s", class.Name, class.Role), 15, K.Text, BOLD)
-	text(sheet, class.Resource, 13, K.Dim)
-	text(sheet, "GEAR", 12, K.Accent, BOLD)
+	text(sheet, string.format("%s  |  %s", class.Name, class.Role), 15, LIGHT, BOLD)
+	text(sheet, class.Resource, 13, P.Dim)
+	text(sheet, "GEAR", 12, ACCENT, BOLD)
 	text(
 		sheet,
 		string.format("Weapon: %s (%s)", weapon and weapon.Name or "?", weapon and weapon.Style or ""),
 		14,
-		K.Text
+		LIGHT
 	)
 	if gem then
 		text(
@@ -889,26 +1190,26 @@ pages[8] = function()
 			GemConfig.ElementColors[gem.Element]
 		)
 	end
-	text(sheet, string.format("Armor: %s (%s)", armor and armor.Name or "?", armor and armor.Style or ""), 14, K.Text)
-	text(sheet, "ABILITIES  (press K in game to swap; 6 to choose from)", 12, K.Accent, BOLD)
+	text(sheet, string.format("Armor: %s (%s)", armor and armor.Name or "?", armor and armor.Style or ""), 14, LIGHT)
+	text(sheet, "ABILITIES  (press K in game to swap; 6 to choose from)", 12, ACCENT, BOLD)
 	for i, ability in Classes.loadout(class.Id, nil) do
-		text(sheet, string.format("[%s] %s: %s", Classes.AbilityKeys[i], ability.Name, ability.Description), 13, K.Text)
+		text(sheet, string.format("[%s] %s: %s", Classes.AbilityKeys[i], ability.Name, ability.Description), 13, LIGHT)
 	end
 	text(
 		sheet,
 		string.format("[%s] %s: %s", Classes.UltimateKey, class.Ultimate.Name, class.Ultimate.Description),
 		13,
-		K.Gold
+		P.Gold
 	)
-	text(sheet, "AT LEVEL 5, CHOOSE A SPECIALIZATION", 12, K.Accent, BOLD)
+	text(sheet, "AT LEVEL 5, CHOOSE A SPECIALIZATION", 12, ACCENT, BOLD)
 	for _, spec in class.Specs do
-		text(sheet, string.format("%s (%s): unlocks %s", spec.Name, spec.Style, spec.Signature.Name), 13, K.Dim)
+		text(sheet, string.format("%s (%s): unlocks %s", spec.Name, spec.Style, spec.Signature.Name), 13, P.Dim)
 	end
 	text(
 		sheet,
 		"Left click to attack. Practise on dummies in the Arena (west road), then hunt crystal monsters outside the south gate.",
 		12,
-		K.Dim
+		P.Dim
 	)
 
 	local side = column(body, 0.6, 0.4, 6)
@@ -947,17 +1248,16 @@ local function finish()
 		end
 		setHud(true)
 		gui:Destroy()
-		UiKit.toast("Welcome to Gemsoul! Talk to Garrick at the Mining Guild, up the north road.", K.Accent)
+		UiKit.toast("Welcome to Gemsoul! Talk to Garrick at the Mining Guild, up the north road.", ACCENT)
 	end)
 end
 
 function pages.redraw()
 	clearBody()
 	local step = state.Step
-	stepLabel.Text = string.format("STEP %d OF %d  |  %s", step, #STEPS, string.upper(STEPS[step]))
-	for i, cell in progressCells do
-		cell.BackgroundColor3 = if i <= step then K.Accent else K.Row
-	end
+	titleLabel.Text = string.upper(STEPS[step])
+	stepLabel.Text = string.format("STEP %d OF %d", step, #STEPS)
+	drawPips(step)
 	-- Hidden until the page allows it. Some pages reveal it themselves once
 	-- you've done something (spun, cut), possibly before they return.
 	nextButton.Visible = false
@@ -971,7 +1271,7 @@ function pages.redraw()
 	if not ok or result then
 		nextButton.Visible = true
 	end
-	nextButton.Text = if step == 1 then "BEGIN" elseif step == #STEPS then "ENTER GEMSOUL" else "NEXT"
+	nextButton.Text = if step == 1 then "BEGIN  ▶" elseif step == #STEPS then "ENTER GEMSOUL  ▶" else "NEXT  ▶"
 end
 
 local function go(delta: number)
@@ -987,11 +1287,12 @@ local function go(delta: number)
 	pages.redraw()
 end
 
-UiKit.list(footer, 10, true).HorizontalAlignment = Enum.HorizontalAlignment.Right
-backButton = button(footer, "Back", false, function()
+backButton = button(footer, "◀  Back", false, function()
 	go(-1)
 end)
-nextButton = button(footer, "NEXT", true, function()
+backButton.AnchorPoint = Vector2.new(0, 0.5)
+backButton.Position = UDim2.fromScale(0, 0.5)
+nextButton = IronUi.gemButton(footer, "NEXT", P.Emerald, function()
 	if state.Step == #STEPS then
 		finish()
 	elseif state.Step == 4 then
@@ -1005,6 +1306,10 @@ nextButton = button(footer, "NEXT", true, function()
 		go(1)
 	end
 end)
+nextButton.AnchorPoint = Vector2.new(1, 0.5)
+nextButton.Position = UDim2.fromScale(1, 0.5)
+nextButton.Size = UDim2.fromOffset(0, 58)
+nextButton.TextSize = 24
 
 -- The enchant page lists gems from the profile, so redraw it when that changes.
 GemClient.Changed:Connect(function()

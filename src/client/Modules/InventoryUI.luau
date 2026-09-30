@@ -532,7 +532,6 @@ local function tabs(parent: Instance, names: { string }, active: string, onPick:
 			PadX = 12,
 			Stripes = if on then "Thin" else "None",
 		})
-		tab.AutomaticSize = Enum.AutomaticSize.X
 		tab.LayoutOrder = i
 		local text_ = IronUi.label(tab, face, name, 13)
 		if not on then
