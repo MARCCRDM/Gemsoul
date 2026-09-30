@@ -185,19 +185,16 @@ local backButton, nextButton
 
 -- Live character preview ---------------------------------------------------------------
 
+-- A plain background: a UIGradient on a ViewportFrame would darken the
+-- avatar along with it.
 local preview = new("ViewportFrame", {
-	BackgroundColor3 = Color3.new(1, 1, 1),
-	Ambient = Color3.fromRGB(170, 170, 180),
+	BackgroundColor3 = Color3.fromRGB(44, 52, 62),
+	Ambient = Color3.fromRGB(200, 200, 205),
 	LightColor = Color3.new(1, 1, 1),
-	LightDirection = Vector3.new(-0.4, -1, -0.6),
+	LightDirection = Vector3.new(-0.3, -0.8, -1),
 	Visible = false,
 }, panel)
 UiKit.round(preview, 10)
-new(
-	"UIGradient",
-	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(74, 84, 100), Color3.fromRGB(16, 20, 26)) },
-	preview
-)
 local previewWorld = new("WorldModel", {}, preview)
 local previewCamera = new("Camera", { FieldOfView = 30 }, preview)
 preview.CurrentCamera = previewCamera
@@ -797,7 +794,7 @@ pages[7] = function()
 	text(
 		top,
 		string.format(
-			"Your %s has one gem socket. A socketed gem lends its element to your attacks and glows on the weapon. Pick one of your cut gems (you can swap it later at the Arcanum).",
+			"Your %s has one gem socket. A socketed gem adds its element to your hits, raises your stats and wreathes the weapon in its element. Pick one of your cut gems (you can swap it later at the Arcanum).",
 			weapon and weapon.Name or "weapon"
 		),
 		14,

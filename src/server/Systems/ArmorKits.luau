@@ -127,6 +127,8 @@ local function make(
 	part.CanQuery = false
 	part.CanTouch = false
 	part.Massless = true
+	-- Small trim doesn't need a shadow; it's a big share of the shadow cost.
+	part.CastShadow = math.max(size.X, size.Y, size.Z) > 0.6
 	part.CFrame = seg.Part.CFrame * seg.Offset * cframe
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = seg.Part

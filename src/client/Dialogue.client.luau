@@ -251,7 +251,7 @@ function actions.Pouch()
 end
 
 function actions.Enchant()
-	say("Choose a cut gem, then the socket. I'll do the rest.")
+	close()
 	CharacterUI.open({ AtVey = true })
 end
 

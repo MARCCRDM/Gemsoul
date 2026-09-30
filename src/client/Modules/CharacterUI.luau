@@ -157,21 +157,27 @@ local doll = new("Frame", {
 	Size = UDim2.fromOffset(470, 330),
 }, panel)
 
-local avatar = new("ViewportFrame", {
+-- The gradient sits on a frame behind the viewport: on the viewport itself
+-- it would tint the avatar too.
+local avatarBack = new("Frame", {
 	BackgroundColor3 = Color3.new(1, 1, 1),
-	Ambient = Color3.fromRGB(160, 150, 140),
-	LightColor = Color3.fromRGB(255, 240, 220),
-	LightDirection = Vector3.new(-0.4, -1, -0.6),
 	Position = UDim2.fromOffset(122, 0),
 	Size = UDim2.fromOffset(226, 330),
 }, doll)
-UiKit.round(avatar, 8)
-new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, avatar)
+UiKit.round(avatarBack, 8)
+new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, avatarBack)
 new(
 	"UIGradient",
-	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(70, 60, 50), Color3.fromRGB(16, 14, 12)) },
-	avatar
+	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(96, 84, 68), Color3.fromRGB(22, 19, 16)) },
+	avatarBack
 )
+local avatar = new("ViewportFrame", {
+	BackgroundTransparency = 1,
+	Ambient = Color3.fromRGB(200, 196, 190),
+	LightColor = Color3.new(1, 1, 1),
+	LightDirection = Vector3.new(-0.3, -0.8, -1),
+	Size = UDim2.fromScale(1, 1),
+}, avatarBack)
 local avatarWorld = new("WorldModel", {}, avatar)
 local avatarCamera = new("Camera", { FieldOfView = 30 }, avatar)
 avatar.CurrentCamera = avatarCamera
@@ -209,7 +215,15 @@ local function refreshAvatar()
 end
 
 -- An equipment slot (a tall bevelled box) with its gem socket beneath.
-type Slot = { Box: Frame, Name: TextLabel, Style: TextLabel, Socket: TextButton, Caption: TextLabel }
+type Slot = {
+	Box: Frame,
+	Name: TextLabel,
+	Style: TextLabel,
+	Bonus: TextLabel,
+	Socket: TextButton,
+	Caption: TextLabel,
+	Shown: string?, -- id of the gem drawn in the socket
+}
 local function slot(x: number, label: string, socketName: string): Slot
 	local holder = new("Frame", {
 		BackgroundTransparency = 1,
@@ -225,6 +239,8 @@ local function slot(x: number, label: string, socketName: string): Slot
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	local style = text(item, "", 11, P.Dim, BOLD)
 	style.TextXAlignment = Enum.TextXAlignment.Center
+	local bonus = text(item, "", 11, P.Dim, BOLD)
+	bonus.TextXAlignment = Enum.TextXAlignment.Center
 
 	local socketLabel = text(holder, "GEM SOCKET", 11, P.Dim, BOLD)
 	socketLabel.Position = UDim2.fromOffset(0, 184)
@@ -246,7 +262,7 @@ local function slot(x: number, label: string, socketName: string): Slot
 		selection = { Kind = "Socket", Slot = socketName }
 		CharacterUI.refresh()
 	end)
-	return { Box = item, Name = name, Style = style, Socket = socket, Caption = caption }
+	return { Box = item, Name = name, Style = style, Bonus = bonus, Socket = socket, Caption = caption }
 end
 
 local weaponSlot = slot(0, "WEAPON", "Weapon")
@@ -258,7 +274,7 @@ local statsList = new("Frame", {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(0.42, 0, 1, 0),
 }, statsBox)
-UiKit.list(statsList, 5)
+UiKit.list(statsList, 4)
 local enchantList = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.new(0.46, 0, 0, 0),
@@ -331,6 +347,17 @@ local function request(action: string, ...)
 	end)
 end
 
+local function bonusText(gem, slotName: string): string
+	local parts = {}
+	local bonuses = GemConfig.statBonuses(gem, slotName)
+	for _, stat in Classes.StatNames do
+		if bonuses[stat] then
+			table.insert(parts, string.format("+%d %s", bonuses[stat], stat))
+		end
+	end
+	return table.concat(parts, "  ")
+end
+
 local function gemLines(gem)
 	local tierColor = GemConfig.TierColors[gem.Tier]
 	text(tipBody, GemConfig.shade(gem).Name, 18, tierColor, BOLD)
@@ -357,7 +384,9 @@ local function gemLines(gem)
 	)
 	for _, slotName in { "Weapon", "Armor" } do
 		local name, effect = GemConfig.enchantment(gem, slotName)
-		text(tipBody, string.format("%s: %s. %s", string.upper(slotName), name, effect), 12, P.Dim)
+		local heading = text(tipBody, string.format("IN %s: %s", string.upper(slotName), name), 12, P.Gold, BOLD)
+		heading.TextColor3 = GemConfig.ElementColors[gem.Element]
+		text(tipBody, string.format("%s.  %s", effect, bonusText(gem, slotName)), 12, P.Dim)
 	end
 	GemArt.viewport(tipArt, gem, true)
 	tooltipStroke.Color = tierColor
@@ -420,24 +449,38 @@ local function drawTooltip()
 end
 
 local function drawSlot(ui: Slot, slotName: string, gear, class)
-	ui.Name.Text = if gear then gear.Name else "Empty"
-	ui.Style.Text = if gear then string.upper(gear.Style) else ""
-	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
-	stroke.Color = if class then class.Color else P.Edge
-	clear(ui.Socket)
 	local gem = socketed(slotName)
+	-- Enchanted gear is named for its gem, Diablo style, and glows its colour.
+	ui.Name.Text = if gear then GemConfig.itemName(gear.Name, gem, slotName) else "Empty"
+	ui.Name.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Text
+	ui.Style.Text = if gear then string.upper(gear.Style) else ""
+	ui.Bonus.Text = if gem then (string.gsub(bonusText(gem, slotName), "  ", "\n")) else ""
+	ui.Bonus.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Dim
+	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
+	stroke.Color = if gem then GemConfig.ElementColors[gem.Element] elseif class then class.Color else P.Edge
+	stroke.Thickness = if gem then 2.5 else 1.5
 	local ring = ui.Socket:FindFirstChild("Ring") :: UIStroke
+	local shown = if gem then gem.Id else ""
+	local redraw = ui.Shown ~= shown
+	ui.Shown = shown
+	if redraw then
+		clear(ui.Socket)
+	end
 	local chosen = selection and selection.Kind == "Socket" and selection.Slot == slotName
 	if gem then
-		GemArt.viewport(ui.Socket, gem, false)
+		if redraw then
+			GemArt.viewport(ui.Socket, gem, false)
+		end
 		ring.Color = GemConfig.TierColors[gem.Tier]
 		ui.Caption.Text = (GemConfig.enchantment(gem, slotName))
 		ui.Caption.TextColor3 = GemConfig.ElementColors[gem.Element]
 	else
-		local plus = text(ui.Socket, "+", 30, P.Edge, BOLD)
-		plus.Size = UDim2.fromScale(1, 1)
-		plus.AutomaticSize = Enum.AutomaticSize.None
-		plus.TextXAlignment = Enum.TextXAlignment.Center
+		if redraw then
+			local plus = text(ui.Socket, "+", 30, P.Edge, BOLD)
+			plus.Size = UDim2.fromScale(1, 1)
+			plus.AutomaticSize = Enum.AutomaticSize.None
+			plus.TextXAlignment = Enum.TextXAlignment.Center
+		end
 		ring.Color = P.Edge
 		ui.Caption.Text = "EMPTY"
 		ui.Caption.TextColor3 = P.Dim
@@ -448,24 +491,37 @@ local function drawSlot(ui: Slot, slotName: string, gear, class)
 	end
 end
 
-local function statRow(name: string, value: number, color: Color3)
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 16) }, statsList)
+local RATING_MAX = 140 -- a full bar
+
+local function statRow(name: string, rating: Classes.Rating, color: Color3)
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 18) }, statsList)
 	local caption = text(row, string.upper(name), 11, P.Dim, BOLD)
 	caption.AutomaticSize = Enum.AutomaticSize.None
-	caption.Size = UDim2.new(0, 64, 1, 0)
-	local cells = new(
-		"Frame",
-		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(66, 3), Size = UDim2.new(1, -66, 0, 10) },
-		row
-	)
-	UiKit.list(cells, 3, true)
-	for i = 1, 5 do
-		local cell = new("Frame", {
-			BackgroundColor3 = if i <= value then color else Color3.fromRGB(46, 40, 34),
-			Size = UDim2.new(0.2, -3, 1, 0),
-			LayoutOrder = i,
-		}, cells)
-		UiKit.round(cell, 2)
+	caption.Size = UDim2.new(0, 60, 1, 0)
+	local total = rating.Base + rating.Bonus
+	local bonusColor = if rating.Element then GemConfig.ElementColors[rating.Element] else P.Good
+	local number = text(row, tostring(total), 13, if rating.Bonus > 0 then bonusColor else P.Text, BOLD)
+	number.AutomaticSize = Enum.AutomaticSize.None
+	number.Position = UDim2.fromOffset(60, 0)
+	number.Size = UDim2.new(0, 30, 1, 0)
+	local track = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(46, 40, 34),
+		Position = UDim2.fromOffset(94, 5),
+		Size = UDim2.new(1, -94, 0, 8),
+	}, row)
+	UiKit.round(track, 3)
+	local base = new("Frame", {
+		BackgroundColor3 = color,
+		Size = UDim2.fromScale(math.min(1, rating.Base / RATING_MAX), 1),
+	}, track)
+	UiKit.round(base, 3)
+	if rating.Bonus > 0 then
+		local extra = new("Frame", {
+			BackgroundColor3 = bonusColor,
+			Position = UDim2.fromScale(math.min(1, rating.Base / RATING_MAX), 0),
+			Size = UDim2.fromScale(math.min(1, total / RATING_MAX) - math.min(1, rating.Base / RATING_MAX), 1),
+		}, track)
+		UiKit.round(extra, 3)
 	end
 end
 
@@ -474,9 +530,21 @@ local function drawStats(loadout, class)
 	clear(enchantList)
 	text(statsList, "ATTRIBUTES", 12, P.Gold, BOLD)
 	if class then
+		local ratings = Classes.ratings(loadout)
 		for _, name in Classes.StatNames do
-			statRow(name, Classes.stats(loadout.Class, loadout.Weapon, loadout.Armor)[name], class.Color)
+			statRow(name, ratings[name], class.Color)
 		end
+		text(
+			statsList,
+			string.format(
+				"Max health %d  |  Walk speed %.1f",
+				Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus),
+				Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus)
+			),
+			11,
+			P.Text,
+			BOLD
+		)
 		text(statsList, class.Resource, 11, P.Dim)
 	end
 	text(enchantList, "ENCHANTMENTS", 12, P.Gold, BOLD)
@@ -486,8 +554,9 @@ local function drawStats(loadout, class)
 		if gem then
 			any = true
 			local name, effect = GemConfig.enchantment(gem, slotName)
-			text(enchantList, name, 14, GemConfig.ElementColors[gem.Element], BOLD)
-			text(enchantList, effect, 12, P.Text)
+			local color = GemConfig.ElementColors[gem.Element]
+			text(enchantList, string.format("%s  (%s)", name, string.lower(slotName)), 13, color, BOLD)
+			text(enchantList, effect .. ".  " .. bonusText(gem, slotName), 11, P.Text)
 		end
 	end
 	if not any then
@@ -510,36 +579,57 @@ local function buildVisible()
 	end
 end
 
+-- Cells are rebuilt only when the gems themselves change; picking a gem
+-- just moves the highlight, so its 3D stones aren't built again.
+local gridKey = ""
+local cellsById: { [string]: { Cell: TextButton, Stroke: UIStroke, Gem: any } } = {}
+
+local function highlight()
+	for id, entry in cellsById do
+		local chosen = selection ~= nil and selection.Kind == "Gem" and selection.Gem.Id == id
+		entry.Cell.BackgroundColor3 = if chosen then Color3.fromRGB(52, 44, 32) else P.Slot
+		entry.Stroke.Color = if chosen then P.Gold else GemConfig.TierColors[entry.Gem.Tier]
+		entry.Stroke.Thickness = if chosen then 2.5 else 1.2
+		entry.Stroke.Transparency = if chosen then 0 else 0.35
+	end
+end
+
 local function drawGrid(profile)
-	clear(grid)
-	table.clear(pending)
 	local gems = table.clone(profile.Gems)
 	table.sort(gems, function(a, b)
 		return GemConfig.value(a) > GemConfig.value(b)
 	end)
 	invTitle.Text = string.format("INVENTORY   %d / %d GEMS   |   %d COINS", #gems, Config.MaxGems, profile.Coins)
+	local ids = {}
+	for i, gem in gems do
+		ids[i] = gem.Id .. ":" .. tostring(gem.Cut)
+	end
+	local key = table.concat(ids, ",")
+	if key == gridKey then
+		highlight()
+		return
+	end
+	gridKey = key
+	clear(grid)
+	table.clear(pending)
+	table.clear(cellsById)
 	-- Empty cells fill out the grid so it always reads as a bag.
 	local cells = math.max(#gems, COLUMNS * 4)
 	cells = math.ceil(cells / COLUMNS) * COLUMNS
 	for i = 1, cells do
 		local gem = gems[i]
-		local chosen = gem and selection and selection.Kind == "Gem" and selection.Gem.Id == gem.Id
 		local cell = new("TextButton", {
 			Text = "",
 			AutoButtonColor = gem ~= nil,
-			BackgroundColor3 = if chosen then Color3.fromRGB(52, 44, 32) else P.Slot,
+			BackgroundColor3 = P.Slot,
 			LayoutOrder = i,
 		}, grid)
 		UiKit.round(cell, 4)
 		local stroke = new("UIStroke", {
-			Color = if gem then GemConfig.TierColors[gem.Tier] else Color3.fromRGB(44, 38, 30),
-			Thickness = if chosen then 2.5 else 1.2,
-			Transparency = if gem and not chosen then 0.35 else 0,
+			Color = Color3.fromRGB(44, 38, 30),
+			Thickness = 1.2,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}, cell)
-		if chosen then
-			stroke.Color = P.Gold
-		end
 		if gem then
 			if not gem.Cut then
 				local rough = text(cell, "R", 10, P.Dim, BOLD)
@@ -547,12 +637,14 @@ local function drawGrid(profile)
 				rough.ZIndex = 3
 			end
 			pending[cell] = gem
+			cellsById[gem.Id] = { Cell = cell, Stroke = stroke, Gem = gem }
 			cell.Activated:Connect(function()
 				selection = { Kind = "Gem", Gem = gem }
 				CharacterUI.refresh()
 			end)
 		end
 	end
+	highlight()
 	task.defer(buildVisible)
 end
 
@@ -604,6 +696,8 @@ end
 
 function CharacterUI.close()
 	gui.Enabled = false
+	-- Rebuild the grid next time, so unbuilt stones still get drawn.
+	gridKey = ""
 	table.clear(pending)
 	if avatarModel then
 		avatarModel:Destroy()

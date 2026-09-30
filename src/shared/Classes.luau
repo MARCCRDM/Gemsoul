@@ -36,6 +36,8 @@ export type Class = {
 	Specs: { Spec },
 }
 
+local GemConfig = require(script.Parent.GemConfig)
+
 local Classes = {}
 
 Classes.StatNames = { "Health", "Power", "Defense", "Speed" }
@@ -440,6 +442,41 @@ function Classes.stats(classId: string, weaponId: string?, armorId: string?): St
 	apply(Classes.weapon(classId, weaponId))
 	apply(Classes.armor(classId, armorId))
 	return stats
+end
+
+-- Ratings out of 100 for the character screen: each 1-5 stat point is worth
+-- 20, and socketed gems add their bonuses on top.
+-- Element is the gem that gives the largest bonus, for colouring it.
+export type Rating = { Base: number, Bonus: number, Element: string? }
+function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
+	local stats = Classes.stats(loadout.Class, loadout.Weapon, loadout.Armor)
+	local ratings = {}
+	for _, name in Classes.StatNames do
+		ratings[name] = { Base = stats[name] * 20, Bonus = 0 }
+	end
+	for _, slot in { "Weapon", "Armor" } do
+		local gem = loadout[slot .. "Gem"]
+		if gem then
+			for stat, amount in GemConfig.statBonuses(gem, slot) do
+				local rating = ratings[stat]
+				if amount > rating.Bonus then
+					rating.Element = gem.Element
+				end
+				rating.Bonus += amount
+			end
+		end
+	end
+	return ratings
+end
+
+-- What ratings do to the avatar (16 speed and 100 health at ratings of 40
+-- and 67, the Roblox defaults).
+function Classes.walkSpeed(speedRating: number): number
+	return math.clamp(12 + speedRating * 0.1, 12, 28)
+end
+
+function Classes.maxHealth(healthRating: number): number
+	return math.floor(60 + healthRating * 0.6)
 end
 
 return Classes

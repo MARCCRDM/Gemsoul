@@ -61,7 +61,14 @@ Every gem is shown in 3D and its look follows its properties: rough stones are w
 
 Press **C** (or the CHARACTER button) for a Diablo-style character screen: your avatar with the weapon and armor slots either side, a gem socket under each, attributes and active enchantments below, and a grid inventory of every gem. Click a gem or socket to inspect it.
 
-Each piece of gear has one socket, for cut gems only. A weapon gem adds its element to your hits (Burning, Frostbite, Arcing, Venom) and an armor gem wards you against it (+resistance and max health). Strength grows with the gem's potency (mostly size, then clarity and cut); see `GemConfig.enchantment`. Socketed gems glow on the weapon and at the centre of the chest. After the intro, sockets are changed at Vey's Arcanum on the east road ("Enchant my gear").
+Each piece of gear has one socket, for cut gems only. An enchanted item takes on its gem's element:
+
+- **Name:** Diablo-style affixes, e.g. *Venomous Longsword*, *Iron Plate of Storms*.
+- **Effect:** a weapon gem adds its element to your hits (Burning, Frostbite, Arcing, Venom); an armor gem wards you against it (+resistance, +max health).
+- **Stats:** each element raises its own attributes, scaled by the gem's potency (mostly size, then clarity and cut). Fire gives Power; Frost gives Defense; Shock gives Speed; Poison gives Health. See `GemConfig.EnchantStats`.
+- **Looks:** the item's glowing trim turns the element's colour, the gem lights up, and particles pour off it (flames, frost motes, sparks, poison fumes). Frost also rimes the blade.
+
+Attributes are ratings (20 per class/gear point, plus gem bonuses) and they're live: Speed sets walk speed and Health sets max health (`Classes.walkSpeed` / `Classes.maxHealth`). After the intro, sockets are changed at Vey's Arcanum on the east road ("Enchant my gear").
 
 Press **G** or the corner button to open your gem pouch. Coins, gems and quotas save between sessions; in Studio this needs *Game Settings > Security > Enable Studio Access to API Services*.
 

@@ -279,4 +279,48 @@ function GemConfig.enchantment(gem: Gem, slot: string): (string, string)
 	return name, text
 end
 
+-- Stats a socketed gem adds, by slot and element: { stat, weight }. The
+-- bonus is potency x weight / 4, so a big clear well-cut gem adds far more.
+GemConfig.EnchantStats = {
+	Weapon = {
+		Fire = { { "Power", 1 } },
+		Frost = { { "Power", 0.5 }, { "Defense", 0.4 } },
+		Shock = { { "Speed", 0.7 }, { "Power", 0.4 } },
+		Poison = { { "Power", 0.6 }, { "Health", 0.4 } },
+	},
+	Armor = {
+		Fire = { { "Health", 0.6 }, { "Power", 0.4 } },
+		Frost = { { "Defense", 1 } },
+		Shock = { { "Speed", 0.8 }, { "Defense", 0.2 } },
+		Poison = { { "Health", 1 } },
+	},
+}
+
+function GemConfig.statBonuses(gem: Gem, slot: string): { [string]: number }
+	local bonuses = {}
+	local p = GemConfig.potency(gem)
+	for _, entry in (GemConfig.EnchantStats[slot] or {})[gem.Element] or {} do
+		bonuses[entry[1]] = math.floor(p * entry[2] / 4 + 0.5)
+	end
+	return bonuses
+end
+
+-- Enchanted gear takes a name from its gem: "Burning Longsword",
+-- "Iron Plate of Embers".
+GemConfig.ItemAffixes = {
+	Weapon = { Fire = "Burning", Frost = "Frostbitten", Shock = "Thundering", Poison = "Venomous" },
+	Armor = { Fire = "of Embers", Frost = "of the Glacier", Shock = "of Storms", Poison = "of the Viper" },
+}
+
+function GemConfig.itemName(baseName: string, gem: Gem?, slot: string): string
+	if not gem then
+		return baseName
+	end
+	local affix = GemConfig.ItemAffixes[slot] and GemConfig.ItemAffixes[slot][gem.Element]
+	if not affix then
+		return baseName
+	end
+	return if slot == "Armor" then baseName .. " " .. affix else affix .. " " .. baseName
+end
+
 return GemConfig

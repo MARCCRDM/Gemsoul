@@ -4,7 +4,8 @@
 	R6 avatars; sizes follow the avatar's own body parts.
 
 	Rebuilt on every spawn and whenever the class, gear or socketed gem
-	changes. Socketed gems glow in their own colour: on the weapon, and at
+	changes, and sets walk speed and max health from the character's
+	ratings. Socketed gems glow in their own colour: on the weapon, and at
 	the centre of the chest for an armor gem.
 ]]
 local Players = game:GetService("Players")
@@ -50,6 +51,7 @@ local function piece(
 	part.CanQuery = false
 	part.CanTouch = false
 	part.Massless = true
+	part.CastShadow = math.max(size.X, size.Y, size.Z) > 0.6
 	part.CFrame = anchor.CFrame * cframe
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = anchor
@@ -285,6 +287,138 @@ WEAPONS.MaceShield = function(folder, character, right, _left, accent, gem)
 	end
 end
 
+-- Elemental effects ----------------------------------------------------------------------
+-- An enchanted item takes on its gem's element: its glowing trim turns the
+-- element's colour, the gem lights up its surroundings, and particles pour
+-- off the item (flames, frost motes, sparks or poison fumes).
+
+local FIRE_TEXTURE = "rbxasset://textures/particles/fire_main.dds"
+local SPARK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+
+type ParticleStyle = {
+	Texture: string,
+	Colors: { Color3 },
+	Size: number,
+	Lifetime: NumberRange,
+	Speed: NumberRange,
+	Acceleration: Vector3,
+	Rate: number,
+	Transparency: number,
+	Spread: number,
+}
+
+local PARTICLES: { [string]: ParticleStyle } = {
+	Fire = {
+		Texture = FIRE_TEXTURE,
+		Colors = { Color3.fromRGB(255, 200, 80), Color3.fromRGB(255, 80, 20) },
+		Size = 0.45,
+		Lifetime = NumberRange.new(0.35, 0.6),
+		Speed = NumberRange.new(0.5, 1.5),
+		Acceleration = Vector3.new(0, 5, 0),
+		Rate = 22,
+		Transparency = 0.25,
+		Spread = 20,
+	},
+	Frost = {
+		Texture = SPARK_TEXTURE,
+		Colors = { Color3.fromRGB(230, 250, 255), Color3.fromRGB(120, 200, 255) },
+		Size = 0.3,
+		Lifetime = NumberRange.new(0.8, 1.4),
+		Speed = NumberRange.new(0.2, 0.6),
+		Acceleration = Vector3.new(0, -1.5, 0),
+		Rate = 14,
+		Transparency = 0.1,
+		Spread = 180,
+	},
+	Shock = {
+		Texture = SPARK_TEXTURE,
+		Colors = { Color3.fromRGB(255, 255, 200), Color3.fromRGB(255, 220, 40) },
+		Size = 0.28,
+		Lifetime = NumberRange.new(0.1, 0.25),
+		Speed = NumberRange.new(4, 7),
+		Acceleration = Vector3.zero,
+		Rate = 26,
+		Transparency = 0,
+		Spread = 180,
+	},
+	Poison = {
+		Texture = SMOKE_TEXTURE,
+		Colors = { Color3.fromRGB(170, 255, 110), Color3.fromRGB(60, 140, 40) },
+		Size = 0.5,
+		Lifetime = NumberRange.new(0.8, 1.3),
+		Speed = NumberRange.new(0.2, 0.5),
+		Acceleration = Vector3.new(0, -1, 0),
+		Rate = 10,
+		Transparency = 0.45,
+		Spread = 60,
+	},
+}
+
+-- Particles from the whole volume of `part`. Rate is per item, so a bigger
+-- enchantment (higher potency) is a little busier.
+local function particles(part: BasePart, element: string, strength: number)
+	local style = PARTICLES[element]
+	if not style then
+		return
+	end
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Enchantment"
+	emitter.Texture = style.Texture
+	emitter.Color = ColorSequence.new(style.Colors[1], style.Colors[2])
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, style.Size),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, style.Transparency),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Lifetime = style.Lifetime
+	emitter.Speed = style.Speed
+	emitter.SpreadAngle = Vector2.new(style.Spread, style.Spread)
+	emitter.Acceleration = style.Acceleration
+	emitter.Rate = style.Rate * (0.6 + 0.4 * strength)
+	emitter.LightEmission = if element == "Poison" then 0.2 else 1
+	emitter.LockedToPart = element == "Shock"
+	emitter.Shape = Enum.ParticleEmitterShape.Box
+	emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	emitter.Parent = part
+end
+
+-- Recolours an item's glowing trim, lights its gem and adds particles to its
+-- biggest piece (the blade, head, staff or chest).
+local function enchant(parts: { BasePart }, gem, main: BasePart?)
+	local color = GemConfig.ElementColors[gem.Element]
+	local strength = math.clamp(GemConfig.potency(gem) / 150, 0, 1)
+	local biggest, biggestSize = nil, 0
+	for _, part in parts do
+		if part.Name == "SocketedGem" then
+			local light = Instance.new("PointLight")
+			light.Color = color
+			light.Range = 5 + strength * 5
+			light.Brightness = 1.2
+			light.Shadows = false
+			light.Parent = part
+		elseif part.Material == Enum.Material.Neon then
+			part.Color = color
+		elseif part.Transparency < 1 then
+			local size = part.Size.X * part.Size.Y * part.Size.Z
+			if size > biggestSize then
+				biggest, biggestSize = part, size
+			end
+		end
+	end
+	if biggest and gem.Element == "Frost" then
+		-- Rime creeps over a frost-enchanted item.
+		biggest.Color = biggest.Color:Lerp(Color3.fromRGB(190, 230, 255), 0.45)
+	end
+	local target = main or biggest
+	if target then
+		particles(target, gem.Element, strength)
+	end
+end
+
 -- Where a hand grips: the hand itself on R15, the bottom of the arm on R6.
 local function gripPoint(character: Model, side: string): (BasePart?, CFrame)
 	local hand = character:FindFirstChild(side .. "Hand") :: BasePart?
@@ -323,6 +457,20 @@ local function removeHeadwear(character: Model)
 	end
 end
 
+-- Ratings drive the avatar: Speed sets walk speed and Health sets max
+-- health, so gear and gems are felt straight away.
+local function applyStats(character: Model, loadout)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
+	local ratings = Classes.ratings(loadout)
+	humanoid.WalkSpeed = Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus)
+	local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
+	humanoid.MaxHealth = Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)
+	humanoid.Health = humanoid.MaxHealth * fraction
+end
+
 function Equipment.apply(player: Player)
 	local character = player.Character
 	local loadout = PlayerData.character(player)
@@ -358,14 +506,39 @@ function Equipment.apply(player: Player)
 			0.36
 		)
 	end
+	local armorParts = {}
+	for _, part in folder:GetDescendants() do
+		if part:IsA("BasePart") then
+			table.insert(armorParts, part)
+		end
+	end
 
-	local right = gripAnchor(folder, character, "Right")
-	local left = gripAnchor(folder, character, "Left")
+	-- The weapon gets its own folder, so its parts are easy to tell apart.
+	local weaponFolder = Instance.new("Folder")
+	weaponFolder.Name = "Weapon"
+	weaponFolder.Parent = folder
+	local right = gripAnchor(weaponFolder, character, "Right")
+	local left = gripAnchor(weaponFolder, character, "Left")
 	local build = WEAPONS[weapon.Look]
 	if build and right and left then
-		build(folder, character, right, left, accent, loadout.WeaponGem)
+		build(weaponFolder, character, right, left, accent, loadout.WeaponGem)
+	end
+
+	-- Enchanted gear takes on its gem's element.
+	if loadout.ArmorGem then
+		enchant(armorParts, loadout.ArmorGem, torso)
+	end
+	if loadout.WeaponGem then
+		local weaponParts = {}
+		for _, part in weaponFolder:GetDescendants() do
+			if part:IsA("BasePart") then
+				table.insert(weaponParts, part)
+			end
+		end
+		enchant(weaponParts, loadout.WeaponGem, nil)
 	end
 	folder.Parent = character
+	applyStats(character, loadout)
 end
 
 local function watch(player: Player)
