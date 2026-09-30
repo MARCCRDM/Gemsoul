@@ -1,5 +1,6 @@
 -- Server entry point: build the world, then start the gameplay systems that
 -- hook into it through CollectionService tags.
+local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 local WorldBuilder = require(script.Parent.World.WorldBuilder)
 local PlayerData = require(script.Parent.Systems.PlayerData)
 local Vip = require(script.Parent.Systems.Vip)
@@ -15,9 +16,24 @@ local Party = require(script.Parent.Systems.Party)
 local StoreServer = require(script.Parent.Systems.StoreServer)
 local TopPlayers = require(script.Parent.Systems.TopPlayers)
 local Equipment = require(script.Parent.Systems.Equipment)
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
-WorldBuilder.build()
+-- Menu-only mode plays entirely from the dashboard, so the town isn't built
+-- (nothing to render or stream). The character still spawns on the
+-- place's baseplate so the dashboard can show it wearing its gear.
+if Config.MenuOnly then
+	require(script.Parent.World.Lighting)()
+	-- No baseplate spawn in this place? A small hidden pad to stand on.
+	if not workspace:FindFirstChildWhichIsA("SpawnLocation") then
+		local pad = Instance.new("SpawnLocation")
+		pad.Name = "LobbyPad"
+		pad.Anchored = true
+		pad.Size = Vector3.new(16, 1, 16)
+		pad.Transparency = 1
+		pad.Parent = workspace
+	end
+else
+	WorldBuilder.build()
+end
 PlayerData.start()
 Vip.start()
 Mining.start()

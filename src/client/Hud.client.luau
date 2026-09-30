@@ -39,6 +39,11 @@ local new = IronUi.new
 -- players are listed in the Party window).
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
 
+-- Menu-only mode uses the full-screen dashboard (Dashboard.client) instead.
+if Config.MenuOnly then
+	return
+end
+
 local gui = UiKit.gui("Hud", 1)
 
 -- A little key hint chip on a button's corner.

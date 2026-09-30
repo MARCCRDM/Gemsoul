@@ -5,6 +5,9 @@ local Config = {
 	-- while this is on: no monsters, no hotbar, and the camera shows the
 	-- kingdom behind the menu.
 	MenuOnly = true,
+	-- Only this class is playable for now; everyone is set to it (with its
+	-- first weapon and armor). nil opens all classes again.
+	OnlyClass = "Warrior",
 
 	-- Free mining: each mined node uses one free mine. When the daily or
 	-- weekly allowance runs out, players buy rough stones at the Mining Store.

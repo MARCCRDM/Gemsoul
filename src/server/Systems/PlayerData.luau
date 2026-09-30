@@ -14,6 +14,7 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Season = require(ReplicatedStorage.Shared.Season)
@@ -270,6 +271,15 @@ local function load(player: Player)
 	leaderstats.Parent = player
 
 	claimDaily(player, profiles[player])
+	-- One class for now (Config.OnlyClass): anyone without it gets it, with
+	-- its starter weapon and armor.
+	local only = Config.OnlyClass
+	if only and profiles[player].Character.Class ~= only then
+		local class = Classes.get(only)
+		if class then
+			PlayerData.setLoadout(player, only, class.Weapons[1].Id, class.Armors[1].Id)
+		end
+	end
 	sync(player)
 	if not loaded then
 		Remotes.Notify:FireClient(player, "Progress won't be saved this session (data storage unavailable).")

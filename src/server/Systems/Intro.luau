@@ -5,12 +5,16 @@
 	  "FirstStone"                                  a small rough stone to learn
 	                                                cutting on, once
 	  "FinishIntro"                                 done: gear appears in the world
+	  "QuickStart"                                  the short intro's finish: the
+	                                                class (Config.OnlyClass), starter
+	                                                gems if not had yet, and done
 	Socketing the first gem is Enchanting's "SocketGem".
 	Everything is validated here; the client only asks.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemGenerator = require(script.Parent.GemGenerator)
 local Gems = require(script.Parent.Gems)
@@ -38,6 +42,9 @@ local function chooseLoadout(player: Player, classId: any, weaponId: any, armorI
 	if intro and intro.Done then
 		return reply(false, "Your class is already chosen. Class trainers will offer changes later.")
 	end
+	if Config.OnlyClass and classId ~= Config.OnlyClass then
+		return reply(false, "Only the " .. Config.OnlyClass .. " is available for now.")
+	end
 	if not Classes.get(classId) or not Classes.weapon(classId, weaponId) or not Classes.armor(classId, armorId) then
 		return reply(false, "That class and gear don't go together.")
 	end
@@ -46,11 +53,7 @@ local function chooseLoadout(player: Player, classId: any, weaponId: any, armorI
 end
 
 -- Three already-cut gems, like a lottery. At least one is Uncommon or better.
-local function starterSpin(player: Player)
-	local intro = PlayerData.intro(player)
-	if not intro or intro.Spun then
-		return reply(false, "You've already spun for your starter gems.")
-	end
+local function rollStarterGems(player: Player): { GemConfig.Gem }
 	local rng = Gems.random()
 	local gems = {}
 	for i = 1, STARTER_GEMS do
@@ -74,7 +77,33 @@ local function starterSpin(player: Player)
 		PlayerData.addGem(player, gem)
 	end
 	PlayerData.setIntroFlag(player, "Spun")
-	return reply(true, "Your starter gems!", { Gems = gems })
+	return gems
+end
+
+local function starterSpin(player: Player)
+	local intro = PlayerData.intro(player)
+	if not intro or intro.Spun then
+		return reply(false, "You've already spun for your starter gems.")
+	end
+	return reply(true, "Your starter gems!", { Gems = rollStarterGems(player) })
+end
+
+-- The short intro's last step: set the class, hand out the starter gems
+-- (once), and finish.
+local function quickStart(player: Player)
+	local intro = PlayerData.intro(player)
+	if not intro then
+		return reply(false, "Try again in a moment.")
+	end
+	local character = PlayerData.character(player)
+	local classId = Config.OnlyClass or (character and character.Class) or "Warrior"
+	local class = Classes.get(classId)
+	if class and (not character or character.Class ~= classId) then
+		PlayerData.setLoadout(player, classId, class.Weapons[1].Id, class.Armors[1].Id)
+	end
+	local gems = if intro.Spun then {} else rollStarterGems(player)
+	PlayerData.setIntroFlag(player, "Done")
+	return reply(true, "Welcome to Gemsoul!", { Gems = gems })
 end
 
 local function firstStone(player: Player)
@@ -105,6 +134,7 @@ function Intro.start()
 	Shop.register("StarterSpin", starterSpin)
 	Shop.register("FirstStone", firstStone)
 	Shop.register("FinishIntro", finishIntro)
+	Shop.register("QuickStart", quickStart)
 end
 
 return Intro

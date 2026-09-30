@@ -16,9 +16,19 @@ A Roblox game. Code lives in `src/` as Luau files and is synced into Roblox Stud
 
 ## Menu-first play (right now)
 
-`Config.MenuOnly = true` in `src/shared/Config.luau` (on today): the whole game is played from the menu. Combat, monsters and walking around the town are paused. The character stays put, and the camera drifts slowly around the kingdom behind the menus. Set it to `false` to bring back the open town, combat and the shopkeepers' "stand next to me" rules.
+Two switches in `src/shared/Config.luau` set how the game plays today:
 
-**The hub.** A big orange **MINE** button (M) with a red badge counting today's free walls. Below it are tiles for Cut (X), Craft (F), Sell (V), Gems (G), Character (C) and Shop (B). Season (J) and Top (L) sit top right under the currency bars. Every button lights up with a soft glow and a gold outline on hover.
+- `MenuOnly = true`: the whole game is one full-screen **dashboard**. The town isn't built at all (only lighting), so there's no world to load; combat and monsters are off. Your character still spawns (on the place's baseplate, out of sight) so the dashboard can show it wearing its gear.
+- `OnlyClass = "Warrior"`: everyone plays the Warrior, with the Iron Longsword and Iron Plate to start. Other classes are refused for now; set it to `nil` to open them again.
+
+**The dashboard** (`src/client/Dashboard.client.luau`):
+
+- **Left, your hero:** your warrior in 3D wearing their armor, the weapon and armor (with quality), each gem socket, four stat bars, and **Gear & Enchant**.
+- **Middle:** **The Mine** (free walls today, deepest dig, a big **DIG!** button), then **Craft**, **Enchant**, **Cut** and **Sell** cards, each saying what you can do right now.
+- **Right, inventory:** your gems (rarity colour, rough or cut, value) and your materials.
+- **Top:** coins, Guild Marks and the Shop.
+
+Keys: M mine, F craft, E enchant, X cut, V sell, G gem pouch, B shop.
 
 ## The Mine (the hook)
 
@@ -51,17 +61,12 @@ Streets and building plots are painted terrain (cobblestone, pavement, dirt), so
 
 ## New players: the intro
 
-Players who haven't finished the intro see it when they join (over a flyover of the kingdom):
+Two screens, then the dashboard:
 
-1. **Welcome** to Gemsoul.
-2. **Class:** Warrior, Wizard, Archer or Tank: your look and your stats. Your starter weapon and armor come with it.
-3. **Starter gems:** spin for three already-cut gems (at least one Uncommon or better), revealed on rarity cards.
-4. **First dig:** a free tutorial wall in the Mine with your first rough stone in it. Break the glinting rock.
-5. **Gem school:** cut that stone yourself while each gem property is explained, plus what each menu button does.
-6. **Enchant:** socket a cut gem into your weapon; it glows in the gem's colour.
-7. **Ready:** a tour of the menu (Mine, Cut, Craft, Sell, Gems, Shop), then into the game.
+1. **Welcome** and **Start digging:** the Mine opens with a free tutorial wall. Break the glinting rock to find your first stone.
+2. **You're a miner!:** your first stone, and **Claim 3 free gems** (already cut). Then **Enter Gemsoul**.
 
-Classes and gear are defined in `src/shared/Classes.luau`.
+The server sets you up as a Warrior (`"QuickStart"` in `src/server/Systems/Intro.luau`).
 
 ## Gems
 
