@@ -9,6 +9,13 @@ local Config = {
 	StartingCoins = 300,
 	RoughStonePrice = 60, -- Mining Store; a random rough stone averages ~51 coins
 	MaxGems = 200, -- inventory limit
+	-- Daily reward: base coins, plus more per day of streak (up to a week).
+	DailyRewardBase = 75,
+	DailyRewardPerStreak = 25,
+	DailyStreakMax = 7,
+	-- Tamsin at the Market buys stones for coins at this share of their value
+	-- (Hilde pays 60% in Guild Marks at the Crafting Hall).
+	MarketSellRate = 0.5,
 
 	MineHoldSeconds = 1,
 

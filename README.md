@@ -22,10 +22,10 @@ Gemsoul is a walled village on a sunny afternoon, laid out like an Oblivion town
 
 | Where | What's there | Shopkeeper |
 |---|---|---|
-| North road | Mining Guild and daily quota terminal, then the quarry with static gem nodes and the VIP energy gate | Garrick, Mining Foreman |
+| North road | Mining Guild and daily quota terminal, then the quarry with gem nodes (they regrow 45-90 s after mining) and the VIP energy gate | Garrick, Mining Foreman |
 | North road | Gem Cutter stall beside the Mining Guild: holographic cutting bench and laser cutter | Ilsa, Master Gemcutter |
 | North road | Crafting Hall: stone exchange and materials stall out front, Borin's open-air forge next door | Hilde, Guild Quartermaster; Borin, Master Smith |
-| Market square | Stalls with trade kiosks and the holographic P2P listing board | Tamsin, Trade Broker |
+| Market square | Stalls with trade kiosks and the holographic P2P listing board; Tamsin buys stones for coins | Tamsin, Trade Broker |
 | East road | Arcanum tower with glowing runes and floating containment fields | Vey, Arcanist |
 | West road | Obsidian arena with PvP and PvE queue screens | Brutus, Arena Master |
 
@@ -81,6 +81,11 @@ The Crafting Hall on the north road (east side) is for crafting only; gem cuttin
 
 Recipes, prices and quality bonuses live in `src/shared/Crafting.luau`. Selling, buying and crafting only work at the hall (the server checks). Marks show on the leaderboard and the HUD.
 
+## Coins, Marks and getting started
+
+- **Two currencies.** *Coins* buy rough stones from Garrick and laser cuts from Ilsa. You get them from a **daily reward** (75 coins, plus 25 more for each day of your streak, up to a week) and by selling stones to **Tamsin** at the Market (50% of value). *Guild Marks* are only for the Crafting Hall and come from selling stones to Hilde (60% of value).
+- **The guide.** After the intro, a NEXT STEP panel and a glowing trail lead new players through the loop: mine, cut, sell, craft, enchant. Each step completes when you first do it. Returning players' earlier progress counts. Press **H** to hide it.
+
 Press **G** or the corner button to open your gem pouch. Coins, gems and quotas save between sessions; in Studio this needs *Game Settings > Security > Enable Studio Access to API Services*.
 
 Tunable numbers live in `src/shared/Config.luau` (quotas, prices, starting coins) and `src/shared/GemConfig.luau` (colour tiers, odds, cut difficulty, values).
@@ -118,6 +123,7 @@ src/
   client/                     -> StarterPlayerScripts.Client
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
     Hud.client.luau           corner buttons: character screen ([C]) and gem pouch ([G])
+    Guide.client.luau         NEXT STEP panel and trail for new players ([H] hides)
     Intro.client.luau         new-player intro screens
     Modules/                  character screen, Crafting Hall screen, gem pouch, 3D gem shapes and models, cutting minigame, UI helpers
     Effects.client.luau       spinning, bobbing, pulsing, flickering, shopkeepers turning

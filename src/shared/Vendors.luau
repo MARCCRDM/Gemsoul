@@ -3,7 +3,7 @@
 --
 -- Each option either has a Reply (text shown back) or an Action the client
 -- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
--- "Enchant", "Forge", "Materials" or "SellGems".
+-- "Enchant", "Forge", "Materials", "SellGems" or "MarketSell".
 
 local Config = require(script.Parent.Config)
 
@@ -106,6 +106,7 @@ local Vendors: { [string]: Vendor } = {
 		Face = "$_$",
 		Greeting = "Buying? Selling? Every trade in Gemsoul goes up on my board.",
 		Options = {
+			{ Text = "Sell stones for coins", Action = "MarketSell" },
 			{
 				Text = "Show me the trade listings",
 				Reply = "The board's empty for now. Player-to-player trading opens soon!",

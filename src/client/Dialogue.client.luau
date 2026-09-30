@@ -265,6 +265,11 @@ for action, tab in { Forge = "Craft", Materials = "Materials", SellGems = "Sell"
 	end
 end
 
+function actions.MarketSell()
+	close()
+	ForgeUI.open("Sell", true)
+end
+
 function actions.HandCut()
 	InventoryUI.open({
 		Title = "Choose a stone to cut by hand",

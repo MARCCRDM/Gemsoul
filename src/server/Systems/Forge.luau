@@ -6,6 +6,7 @@
 	  "SalvageGems", { gemId }              break gems into Gem Shards
 	  "Craft", kind, gearId                 make a piece, or raise its quality
 	  "EquipGear", kind, gearId             wear gear you own (anywhere)
+	  "MarketSell", { gemId }               Tamsin at the Market: stones for coins
 	kind is "Weapons" or "Armors". Everything except equipping needs you at
 	the hall. Costs come from shared/Crafting.luau.
 ]]
@@ -85,6 +86,7 @@ local function sellGems(player: Player, ids: any)
 		PlayerData.removeGem(player, gem.Id)
 	end
 	PlayerData.addMarks(player, total)
+	PlayerData.milestone(player, "Sold")
 	return reply(true, string.format("Sold %d gem%s for %d Guild Marks.", #gems, if #gems == 1 then "" else "s", total))
 end
 
@@ -104,6 +106,7 @@ local function salvageGems(player: Player, ids: any)
 	end
 	profile.Materials.Shards = (profile.Materials.Shards or 0) + shards
 	PlayerData.sync(player)
+	PlayerData.milestone(player, "Sold")
 	return reply(
 		true,
 		string.format("Salvaged %d gem%s into %d Gem Shards.", #gems, if #gems == 1 then "" else "s", shards)
@@ -153,6 +156,7 @@ local function craft(player: Player, kind: any, gearId: any)
 		profile.Materials[id] -= need
 	end
 	PlayerData.setGearQuality(player, kind, gearId, target)
+	PlayerData.milestone(player, "Crafted")
 	local name = Crafting.gearName(gear.Name, target)
 	return reply(
 		true,
@@ -161,6 +165,25 @@ local function craft(player: Player, kind: any, gearId: any)
 			else "Upgraded to " .. name .. "!",
 		{ Quality = target }
 	)
+end
+
+-- Tamsin at the Market buys stones for coins (less than Hilde's Marks).
+local function marketSell(player: Player, ids: any)
+	if not Nearby.vendor(player, { "Market" }, RANGE) then
+		return reply(false, "Tamsin trades at the Market in the town square.")
+	end
+	local gems = pickGems(player, ids)
+	if not gems then
+		return reply(false, "Those gems aren't in your pouch.")
+	end
+	local total = 0
+	for _, gem in gems do
+		total += Crafting.marketPrice(gem)
+		PlayerData.removeGem(player, gem.Id)
+	end
+	PlayerData.addCoins(player, total)
+	PlayerData.milestone(player, "Sold")
+	return reply(true, string.format("Sold %d gem%s for %d coins.", #gems, if #gems == 1 then "" else "s", total))
 end
 
 local function equipGear(player: Player, kind: any, gearId: any)
@@ -178,6 +201,7 @@ function Forge.start()
 	Shop.register("SalvageGems", salvageGems)
 	Shop.register("Craft", craft)
 	Shop.register("EquipGear", equipGear)
+	Shop.register("MarketSell", marketSell)
 end
 
 return Forge

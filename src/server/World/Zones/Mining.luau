@@ -107,6 +107,7 @@ function Mining.buildGuild(folder: Folder, frame: CFrame, color: Color3)
 end
 
 function Mining.buildQuarry(folder: Folder, frame: CFrame, color: Color3)
+	Builder.landmark("Quarry", (frame * CFrame.new(0, 3, 14)).Position)
 	local rng = Random.new(1337)
 	local w, vw = QUARRY_HALF_WIDTH, VIP_HALF_WIDTH
 	local back = QUARRY_DEPTH + VIP_DEPTH

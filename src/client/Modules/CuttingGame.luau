@@ -130,12 +130,13 @@ function CuttingGame.play(gem, session): { number }?
 		finished = true
 	end)
 
-	ContextActionService:BindAction("GemsoulStrike", function(_, state)
+	-- High priority, so Space strikes instead of making the character jump.
+	ContextActionService:BindActionAtPriority("GemsoulStrike", function(_, state)
 		if state == Enum.UserInputState.Begin then
 			strike()
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
+	end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
 
 	local timeout = GemConfig.Cutting.SessionTimeout - 5
 	while not finished do

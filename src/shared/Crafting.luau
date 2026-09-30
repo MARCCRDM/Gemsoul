@@ -12,6 +12,7 @@
 	Hall's own currency. Marks buy materials and pay Borin's forge fees; Gem
 	Shards come only from salvaging stones you don't want.
 ]]
+local Config = require(script.Parent.Config)
 local GemConfig = require(script.Parent.GemConfig)
 
 local Crafting = {}
@@ -140,6 +141,11 @@ end
 -- shards instead.
 function Crafting.sellPrice(gem: GemConfig.Gem): number
 	return math.max(1, math.floor(GemConfig.value(gem) * 0.6))
+end
+
+-- What Tamsin at the Market pays for a stone, in coins.
+function Crafting.marketPrice(gem: GemConfig.Gem): number
+	return math.max(1, math.floor(GemConfig.value(gem) * Config.MarketSellRate))
 end
 
 function Crafting.salvageShards(gem: GemConfig.Gem): number

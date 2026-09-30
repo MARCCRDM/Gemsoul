@@ -41,6 +41,9 @@ type Profile = {
 	Intro: Intro,
 	Materials: { [string]: number }, -- crafting materials by id (see Crafting.Materials)
 	Owned: Owned,
+	-- Firsts that guide new players: "Mined", "Cut", "Sold", "Crafted", "Enchanted".
+	Milestones: { [string]: boolean },
+	Daily: { Day: number, Streak: number }, -- daily reward
 }
 
 local PlayerData = {}
@@ -62,7 +65,7 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 4,
+		Version = 5,
 		Coins = Config.StartingCoins,
 		Marks = 0,
 		Gems = {},
@@ -71,6 +74,8 @@ local function newProfile(): Profile
 		Intro = { Spun = false, FirstStone = false, Done = false },
 		Materials = {},
 		Owned = { Weapons = {}, Armors = {} },
+		Milestones = {},
+		Daily = { Day = 0, Streak = 0 },
 	}
 end
 
@@ -100,6 +105,34 @@ local function migrate(profile: Profile): Profile
 	if profile.Version < 4 then
 		profile.Marks = profile.Marks or 0
 		profile.Version = 4
+	end
+	if profile.Version < 5 then
+		-- Work out what returning players have already done, so the guide
+		-- doesn't send them back to the quarry.
+		local done = {}
+		for _, gem in profile.Gems do
+			done.Mined = done.Mined or gem.Source == "MiningNode" or gem.Source == "VipMiningNode"
+			done.Cut = done.Cut or gem.CutMethod == "Manual" or gem.CutMethod == "AutoCut"
+		end
+		done.Mined = done.Mined or profile.Quota.UsedThisWeek > 0
+		done.Sold = profile.Marks > 0
+		for _, kind in { "Weapons", "Armors" } do
+			local count = 0
+			for _, quality in profile.Owned[kind] do
+				count += 1
+				done.Crafted = done.Crafted or quality > 1
+			end
+			done.Crafted = done.Crafted or count > 1
+		end
+		done.Enchanted = profile.Character.WeaponGem ~= nil or profile.Character.ArmorGem ~= nil
+		profile.Milestones = profile.Milestones or {}
+		for name, value in done do
+			if value then
+				profile.Milestones[name] = true
+			end
+		end
+		profile.Daily = profile.Daily or { Day = 0, Streak = 0 }
+		profile.Version = 5
 	end
 	return profile
 end
@@ -144,15 +177,39 @@ local function sync(player: Player)
 	Remotes.Profile:FireClient(player, PlayerData.snapshot(player))
 end
 
+-- Saves with UpdateAsync, retrying a couple of times if Roblox is busy.
 local function save(player: Player)
 	local profile = profiles[player]
 	if not profile or not canSave[player] or not store then
 		return
 	end
-	local ok, err = pcall(store.SetAsync, store, "player_" .. player.UserId, profile)
-	if not ok then
-		warn("[PlayerData] Could not save " .. player.Name .. ": " .. tostring(err))
+	for attempt = 1, 3 do
+		local ok, err = pcall(store.UpdateAsync, store, "player_" .. player.UserId, function()
+			return profile
+		end)
+		if ok then
+			return
+		end
+		warn(("[PlayerData] Save attempt %d failed for %s: %s"):format(attempt, player.Name, tostring(err)))
+		task.wait(attempt)
 	end
+end
+
+-- Coins for coming back each day; the streak (up to a week) pays more.
+local function claimDaily(player: Player, profile: Profile)
+	local daily = profile.Daily
+	local day = today()
+	if daily.Day == day then
+		return
+	end
+	daily.Streak = if daily.Day == day - 1 then math.min(daily.Streak + 1, Config.DailyStreakMax) else 1
+	daily.Day = day
+	local reward = Config.DailyRewardBase + Config.DailyRewardPerStreak * (daily.Streak - 1)
+	profile.Coins += reward
+	Remotes.Notify:FireClient(
+		player,
+		string.format("Daily reward: +%d coins (day %d streak). Come back tomorrow for more!", reward, daily.Streak)
+	)
 end
 
 local function load(player: Player)
@@ -184,6 +241,7 @@ local function load(player: Player)
 	end
 	leaderstats.Parent = player
 
+	claimDaily(player, profiles[player])
 	sync(player)
 	if not loaded then
 		Remotes.Notify:FireClient(player, "Progress won't be saved this session (data storage unavailable).")
@@ -242,6 +300,8 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Intro = profile.Intro,
 		Materials = profile.Materials,
 		Owned = profile.Owned,
+		Milestones = profile.Milestones,
+		Daily = profile.Daily,
 	}
 end
 
@@ -367,6 +427,15 @@ function PlayerData.setGearQuality(player: Player, kind: string, gearId: string,
 		characterChanged:Fire(player)
 	end
 	sync(player)
+end
+
+-- Records a first (see Profile.Milestones). Only syncs when it's new.
+function PlayerData.milestone(player: Player, name: string)
+	local profile = profiles[player]
+	if profile and not profile.Milestones[name] then
+		profile.Milestones[name] = true
+		sync(player)
+	end
 end
 
 function PlayerData.get(player: Player): Profile?

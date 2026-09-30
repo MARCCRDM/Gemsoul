@@ -83,6 +83,7 @@ function handlers.AutoCut(player: Player, gemId: any, tier: any)
 	gem.Cut = GemGenerator.autoCutGrade(Gems.random(), laser.Tier)
 	gem.CutMethod = "AutoCut"
 	PlayerData.gemChanged(player)
+	PlayerData.milestone(player, "Cut")
 	return reply(
 		true,
 		string.format("%s cut to grade %d. Now worth ~%d coins.", laser.Name, gem.Cut, GemConfig.value(gem)),
@@ -134,6 +135,7 @@ function handlers.FinishCut(player: Player, times: any)
 	gem.Cut = GemGenerator.manualCutGrade(accuracies)
 	gem.CutMethod = "Manual"
 	PlayerData.gemChanged(player)
+	PlayerData.milestone(player, "Cut")
 	local verdict = if gem.Cut >= 10
 		then "Flawless! Gem Mint!"
 		elseif gem.Cut >= 9 then "Masterful cut!"

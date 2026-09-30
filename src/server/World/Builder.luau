@@ -4,8 +4,24 @@
 -- Every helper takes an `origin` CFrame (the zone's local space) and places
 -- pieces relative to it, so each zone can be built facing the town plaza.
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Builder = {}
+
+--[[
+	Records a named spot in ReplicatedStorage.Landmarks (as an attribute), so
+	clients can point players to places that haven't streamed in yet, e.g.
+	the guide's trail. Every shopkeeper is recorded under their vendor id.
+]]
+function Builder.landmark(name: string, position: Vector3)
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	if not landmarks then
+		landmarks = Instance.new("Configuration")
+		landmarks.Name = "Landmarks"
+		landmarks.Parent = ReplicatedStorage
+	end
+	landmarks:SetAttribute(name, position)
+end
 
 Builder.Colors = {
 	Stone = Color3.fromRGB(158, 150, 138),
@@ -910,6 +926,7 @@ function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info)
 	-- recorded spot, and receive the whole robot at once, or a half-loaded
 	-- robot can be "turned" to the wrong place.
 	model:SetAttribute("Home", torso.CFrame)
+	Builder.landmark(vendorId, torso.CFrame.Position)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	CollectionService:AddTag(model, "Vendor")
 	model.Parent = parent

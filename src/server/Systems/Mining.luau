@@ -1,8 +1,8 @@
 -- Spawns a crystal node on every NodeSpawner pad. Mining a node uses one of
 -- the player's free daily/weekly mines and gives them a random rough stone.
--- Nodes are static and do not regenerate: once mined, a node is gone until
--- the server restarts. With no free mines left, the node stays put and the
--- player is sent to the Mining Store.
+-- A mined node regrows on its pad after a short wait, so a busy server never
+-- runs dry. With no free mines left, the node stays put and the player is
+-- sent to the Mining Store.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,6 +22,7 @@ local SHARDS = {
 local Mining = {}
 
 local rng = Random.new()
+local REGROW_SECONDS = NumberRange.new(45, 90)
 
 local function spawnNode(spawner: BasePart, folder: Folder)
 	local isVip = spawner:GetAttribute("VIP") == true
@@ -77,7 +78,10 @@ local function spawnNode(spawner: BasePart, folder: Folder)
 		end
 		mined = true
 		if Gems.award(player, if isVip then "VipMiningNode" else "MiningNode") then
+			PlayerData.milestone(player, "Mined")
 			node:Destroy()
+			-- A new crystal grows back on the pad after a while.
+			task.delay(rng:NextNumber(REGROW_SECONDS.Min, REGROW_SECONDS.Max), spawnNode, spawner, folder)
 		else
 			-- Pouch full: give the free mine back and leave the node.
 			mined = false

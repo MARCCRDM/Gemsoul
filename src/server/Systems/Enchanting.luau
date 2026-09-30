@@ -36,6 +36,7 @@ local function socketGem(player: Player, gemId: any, slot: any)
 	if not gem then
 		return reply(false, "Only cut gems can be socketed. Rough stones need cutting first.")
 	end
+	PlayerData.milestone(player, "Enchanted")
 	local name, effect = GemConfig.enchantment(gem, slot)
 	return reply(true, string.format("%s: %s", name, effect), { Gem = gem })
 end

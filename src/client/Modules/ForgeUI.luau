@@ -36,6 +36,8 @@ local gui, panel = window.Gui, window.Panel
 window.Title.Text = "CRAFTING HALL"
 
 local tab = "Craft"
+-- "Hall" (Hilde and Borin, Guild Marks) or "Market" (Tamsin, coins; selling only).
+local mode = "Hall"
 local busy = false
 local chosen: { Kind: string, Id: string }? = nil -- CRAFT tab selection
 local picked: { [string]: boolean } = {} -- SELL tab selection
@@ -137,7 +139,11 @@ local function drawStrip()
 		count.Size = UDim2.fromOffset(0, 0)
 		count.TextWrapped = false
 	end
-	marksLabel.Text = commas(GemClient.Profile and GemClient.Profile.Marks or 0) .. " GUILD MARKS"
+	local profile = GemClient.Profile
+	strip.Visible = mode == "Hall"
+	marksLabel.Text = if mode == "Market"
+		then commas(profile and profile.Coins or 0) .. " COINS"
+		else commas(profile and profile.Marks or 0) .. " GUILD MARKS"
 end
 
 -- CRAFT tab --------------------------------------------------------------------------------
@@ -526,16 +532,21 @@ function drawSellSide(gems: { any })
 	for _, gem in gems do
 		if picked[gem.Id] then
 			count += 1
-			marks += Crafting.sellPrice(gem)
+			marks += if mode == "Market" then Crafting.marketPrice(gem) else Crafting.sellPrice(gem)
 			shards += Crafting.salvageShards(gem)
 			table.insert(selected, gem.Id)
 		end
 	end
 	text(info, string.format("%d GEM%s SELECTED", count, if count == 1 then "" else "S"), 20, P.Gold, IronUi.Heading)
 	text(info, "Click gems to pick them. Socketed gems stay safe in your gear.", 13, P.Dim)
-	text(info, string.format("Sell for  %s Guild Marks", commas(marks)), 18, P.Gold, BOLD)
-	text(info, string.format("or salvage into  %d Gem Shards", shards), 18, Crafting.Materials.Shards.Color, BOLD)
-	text(info, "Shards are needed for Masterwork gear.", 12, P.Dim)
+	if mode == "Market" then
+		text(info, string.format("Sell for  %s coins", commas(marks)), 18, P.Gold, BOLD)
+		text(info, "Hilde at the Crafting Hall pays more, in Guild Marks for crafting.", 12, P.Dim)
+	else
+		text(info, string.format("Sell for  %s Guild Marks", commas(marks)), 18, P.Gold, BOLD)
+		text(info, string.format("or salvage into  %d Gem Shards", shards), 18, Crafting.Materials.Shards.Color, BOLD)
+		text(info, "Shards are needed for Masterwork gear.", 12, P.Dim)
+	end
 
 	local quick = new("Frame", {
 		BackgroundTransparency = 1,
@@ -582,7 +593,7 @@ function drawSellSide(gems: { any })
 		return
 	end
 	-- Selling can't be undone, so each action asks once more.
-	for _, action in { "Sell", "Salvage" } do
+	for _, action in if mode == "Market" then { "Sell" } else { "Sell", "Salvage" } do
 		local label = if confirming == action
 			then "CONFIRM " .. string.upper(action) .. "?"
 			elseif action == "Sell" then string.format("SELL (%s)", commas(marks))
@@ -596,7 +607,11 @@ function drawSellSide(gems: { any })
 			confirming = nil
 			local ids = table.clone(selected)
 			table.clear(picked)
-			run({ { if action == "Sell" then "SellGems" else "SalvageGems", ids } }, ForgeUI.refresh)
+			local request = if action == "Salvage"
+				then "SalvageGems"
+				elseif mode == "Market" then "MarketSell"
+				else "SellGems"
+			run({ { request, ids } }, ForgeUI.refresh)
 		end)
 		if confirming == action then
 			b.BackgroundColor3 = P.Bad
@@ -606,7 +621,9 @@ function drawSellSide(gems: { any })
 end
 
 local function drawSell()
-	window.Subtitle.Text = "Hilde pays 60% of a stone's value in Guild Marks, or salvages it into Gem Shards."
+	window.Subtitle.Text = if mode == "Market"
+		then "Tamsin buys stones for coins at half their value."
+		else "Hilde pays 60% of a stone's value in Guild Marks, or salvages it into Gem Shards."
 	local gems = sortedGems()
 	local present, ids = {}, {}
 	for i, gem in gems do
@@ -638,7 +655,8 @@ function ForgeUI.refresh()
 		return
 	end
 	clear(tabBar)
-	for i, entry in TABS do
+	window.Title.Text = if mode == "Market" then "TAMSIN'S STALL" else "CRAFTING HALL"
+	for i, entry in if mode == "Market" then { TABS[3] } else TABS do
 		local b = button(tabBar, entry[2], entry[1] == tab, function()
 			tab = entry[1]
 			confirming = nil
@@ -656,8 +674,13 @@ function ForgeUI.refresh()
 	DRAW[tab]()
 end
 
-function ForgeUI.open(which: string?)
-	tab = which or "Craft"
+-- `which` is the tab; `market` opens Tamsin's coin sale instead of the hall.
+function ForgeUI.open(which: string?, market: boolean?)
+	mode = if market then "Market" else "Hall"
+	tab = if market then "Sell" else which or "Craft"
+	sellKey = ""
+	sellSide = nil
+	clear(body)
 	chosen = nil
 	confirming = nil
 	table.clear(picked)
