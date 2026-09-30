@@ -694,10 +694,14 @@ function refreshSide()
 		depthBanner.Text = "READY TO DIG"
 		depthHint.Text = ""
 	end
-	if quota then
+	if wall and wall.Tutorial then
+		costLine.Text = "🎁 Your first wall is on the house!"
+	elseif quota then
 		costLine.Text = if quota.FreeLeft > 0
 			then string.format("🎟️ Free walls today: %d / %d", quota.FreeLeft, quota.Daily)
 			else string.format("Next wall: 💰 %d  (free walls reset daily)", quota.Price)
+	end
+	if quota then
 		window.Subtitle.Text = string.format("Deepest dig: depth %d", quota.BestDepth or 0)
 	end
 	drawButtons()
