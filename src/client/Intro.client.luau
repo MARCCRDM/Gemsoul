@@ -22,7 +22,7 @@ local player = Players.LocalPlayer
 local new, text = IronUi.new, IronUi.text
 local P = IronUi.Colors
 local HEADING, CHUNKY = IronUi.Heading, IronUi.Chunky
-local LIGHT = Color3.fromRGB(236, 230, 250)
+local LIGHT = Color3.fromRGB(214, 208, 196)
 local INK = P.Ink
 
 -- Wait for the profile, and only run for players who haven't finished.
@@ -46,23 +46,23 @@ local backdrop = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = U
 new("UIGradient", {
 	Rotation = 110,
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(46, 26, 84)),
-		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(22, 16, 44)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 32, 52)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 38, 44)),
+		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 20, 24)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 20, 26)),
 	}),
 }, backdrop)
 
 -- One centred panel, scaled to fit the screen.
-local W, H = 860, 560
+local W, H = 860, 600
 local panel = new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.5),
 	Size = UDim2.fromOffset(W, H),
 	BackgroundColor3 = Color3.new(1, 1, 1),
 }, gui)
-UiKit.round(panel, 22)
-new("UIStroke", { Color = P.Gold, Thickness = 5 }, panel)
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(44, 32, 66), P.Frame) }, panel)
+UiKit.round(panel, 10)
+new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, panel)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(34, 33, 39), P.Frame) }, panel)
 local panelScale = new("UIScale", {}, panel)
 local function fit()
 	local screen = gui.AbsoluteSize
@@ -72,7 +72,7 @@ local function fit()
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 fit()
-local badge = IronUi.badge(panel, "💎", 110)
+local badge = IronUi.badge(panel, "💎", 84)
 badge.AnchorPoint = Vector2.new(0.5, 0.5)
 badge.Position = UDim2.new(0.5, 0, 0, 0)
 badge.ZIndex = 5
@@ -82,7 +82,7 @@ for _, child in badge:GetDescendants() do
 	end
 end
 IronUi.animate(badge, function(t)
-	badge.Rotation = math.sin(t * 1.5) * 8
+	badge.Rotation = math.sin(t * 1.2) * 3
 end)
 
 local body = new("Frame", {
@@ -124,7 +124,7 @@ end
 
 local CARD_W, CARD_H = 170, 236
 local STAGE_W, STAGE_H = 146, 124
-local MYSTERY = Color3.fromRGB(110, 96, 140)
+local MYSTERY = Color3.fromRGB(86, 84, 94)
 
 local function sound(id: string, speed: number)
 	local s = Instance.new("Sound")
@@ -186,8 +186,8 @@ local function cardFrame(parent: Instance, order: number): Card
 		Size = UDim2.fromOffset(CARD_W, CARD_H),
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(c, 18)
-	local stroke = new("UIStroke", { Color = MYSTERY, Thickness = 4 }, c)
+	UiKit.round(c, 8)
+	local stroke = new("UIStroke", { Color = MYSTERY, Thickness = 2 }, c)
 	local shade = new("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new(MYSTERY:Lerp(Color3.new(0, 0, 0), 0.35), MYSTERY:Lerp(Color3.new(0, 0, 0), 0.8)),
@@ -202,7 +202,7 @@ local function cardFrame(parent: Instance, order: number): Card
 	ribbon.TextXAlignment = Enum.TextXAlignment.Center
 	ribbon.TextYAlignment = Enum.TextYAlignment.Center
 	ribbon.ZIndex = 8
-	UiKit.round(ribbon, 10)
+	UiKit.round(ribbon, 4)
 	-- The window the gem sits in (and the reel spins behind).
 	local stage = new("Frame", {
 		BackgroundColor3 = Color3.new(1, 1, 1),
@@ -211,11 +211,11 @@ local function cardFrame(parent: Instance, order: number): Card
 		Size = UDim2.fromOffset(STAGE_W, STAGE_H),
 		ClipsDescendants = true,
 	}, c)
-	UiKit.round(stage, 12)
-	new("UIStroke", { Color = INK, Thickness = 2 }, stage)
+	UiKit.round(stage, 6)
+	new("UIStroke", { Color = INK, Thickness = 1 }, stage)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(96, 86, 120), Color3.fromRGB(20, 16, 30)),
+		Color = ColorSequence.new(Color3.fromRGB(70, 68, 78), Color3.fromRGB(16, 16, 20)),
 	}, stage)
 	local name = text(c, "", 16, Color3.new(1, 1, 1), HEADING)
 	name.AutomaticSize = Enum.AutomaticSize.None
@@ -245,7 +245,7 @@ end
 local function showGem(card: Card, gem, caption: string?)
 	local tier = GemConfig.TierColors[gem.Tier] or P.Dim
 	card.Stroke.Color = tier
-	card.Shade.Color = ColorSequence.new(tier:Lerp(Color3.new(0, 0, 0), 0.3), tier:Lerp(Color3.new(0, 0, 0), 0.8))
+	card.Shade.Color = ColorSequence.new(tier:Lerp(Color3.new(0, 0, 0), 0.55), tier:Lerp(Color3.new(0, 0, 0), 0.88))
 	card.Ribbon.BackgroundColor3 = tier
 	card.Ribbon.Text = caption or string.upper(GemConfig.TierLabels[gem.Tier] or gem.Tier)
 	for _, child in card.Stage:GetChildren() do
@@ -273,9 +273,31 @@ local function gemCard(parent: Instance, gem, order: number, caption: string?): 
 	return card
 end
 
--- A lottery reel: a "?" card whose window spins a strip of gems. spin(gem,
--- delay) sends the strip whizzing past and lands it on `gem`.
-local REEL_ITEMS = 18
+-- A lottery reel: a "?" card whose window spins a strip of 3D stones past a
+-- gold payline. spin(gem, seconds, tease) sends the strip whizzing past,
+-- ticking as each stone crosses the line, and lands it on `gem` with a
+-- little overshoot and settle. A teased reel glows its gem's rarity colour
+-- as it slows, so you know something good is coming.
+local REEL_ITEMS = 12
+local TICK = "rbxasset://sounds/clickfast.wav"
+local TIER_RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4 }
+
+-- A random stone for the strip (only its looks matter).
+local reelSeed = 0
+local function decoy()
+	reelSeed += 1
+	local element = GemConfig.Elements[math.random(1, #GemConfig.Elements)]
+	local shade = GemConfig.Shades[element][math.random(1, #GemConfig.Shades[element])]
+	return {
+		Id = "reel-" .. reelSeed,
+		Element = element,
+		Tier = shade.Tier,
+		Size = math.random(3, 8),
+		Clarity = math.random(3, 8),
+		Cut = math.random(4, 9),
+	}
+end
+
 local function reelCard(parent: Instance, order: number)
 	local card = cardFrame(parent, order)
 	card.Name.Text = "?"
@@ -284,21 +306,49 @@ local function reelCard(parent: Instance, order: number)
 		BackgroundTransparency = 1,
 		Size = UDim2.fromOffset(STAGE_W, STAGE_H * REEL_ITEMS),
 	}, card.Stage)
-	local shades = {}
-	local function item(k: number, shade)
+	local names = {}
+	local function item(k: number, gem)
 		local slot = new("Frame", {
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(0, (k - 1) * STAGE_H),
 			Size = UDim2.fromOffset(STAGE_W, STAGE_H),
 		}, strip)
-		local chip = UiKit.swatch(slot, shade, 62)
-		chip.AnchorPoint = Vector2.new(0.5, 0.5)
-		chip.Position = UDim2.fromScale(0.5, 0.5)
-		shades[k] = shade
+		GemArt.viewport(slot, gem, false)
+		names[k] = GemConfig.shade(gem).Name
+		return slot
 	end
 	for k = 1, REEL_ITEMS - 1 do
-		local element = GemConfig.Elements[math.random(1, #GemConfig.Elements)]
-		item(k, GemConfig.Shades[element][math.random(1, 3)])
+		item(k, decoy())
+	end
+	-- Depth: the window darkens towards its top and bottom edges.
+	for _, edge in { 0, 1 } do
+		local fade = new("Frame", {
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			AnchorPoint = Vector2.new(0, edge),
+			Position = UDim2.fromScale(0, edge),
+			Size = UDim2.new(1, 0, 0.32, 0),
+			ZIndex = 6,
+		}, card.Stage)
+		new("UIGradient", {
+			Rotation = if edge == 0 then 90 else -90,
+			Transparency = NumberSequence.new(0.2, 1),
+		}, fade)
+	end
+	-- The payline: gold pointers either side of the window.
+	local pointers = {}
+	for _, side in { -1, 1 } do
+		local pointer = new("TextLabel", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, side * (STAGE_W / 2 + 6), 0, 24 + STAGE_H / 2),
+			Size = UDim2.fromOffset(18, 24),
+			Text = if side == -1 then "►" else "◄",
+			TextSize = 18,
+			TextColor3 = P.Gold,
+			Font = IronUi.Bold,
+			ZIndex = 9,
+		}, card.Frame)
+		table.insert(pointers, pointer)
 	end
 	-- A big "?" over the window until it spins.
 	local mystery = text(card.Stage, "?", 70, Color3.new(1, 1, 1), HEADING)
@@ -306,10 +356,10 @@ local function reelCard(parent: Instance, order: number)
 	mystery.Size = UDim2.fromScale(1, 1)
 	mystery.TextXAlignment = Enum.TextXAlignment.Center
 	mystery.TextYAlignment = Enum.TextYAlignment.Center
-	mystery.ZIndex = 5
+	mystery.ZIndex = 7
 	strip.Visible = false
 	IronUi.animate(mystery, function(t)
-		mystery.Rotation = math.sin(t * 3 + order) * 8
+		mystery.Rotation = math.sin(t * 3 + order) * 6
 	end)
 	card.Scale.Scale = 0.3
 	task.delay(0.12 * order, function()
@@ -318,29 +368,57 @@ local function reelCard(parent: Instance, order: number)
 		}):Play()
 	end)
 
-	local function spin(gem, seconds: number)
+	local function spin(gem, seconds: number, tease: boolean)
 		-- The last slot on the strip is the real gem.
-		item(REEL_ITEMS, GemConfig.shade(gem))
+		item(REEL_ITEMS, gem)
 		mystery:Destroy()
 		strip.Visible = true
 		card.Ribbon.Text = "SPINNING"
-		local stop = UDim2.fromOffset(0, -(REEL_ITEMS - 1) * STAGE_H)
+		local tier = GemConfig.TierColors[gem.Tier] or P.Gold
+		local stop = -(REEL_ITEMS - 1) * STAGE_H
+		local overshoot = 18
 		TweenService:Create(strip, TweenInfo.new(seconds, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-			Position = stop,
+			Position = UDim2.fromOffset(0, stop - overshoot),
 		}):Play()
-		-- The name flicks through whatever is in the window as it passes.
+		-- Tick each time a stone crosses the payline; the pointers kick.
 		local started = os.clock()
+		local last = 1
+		local teasing = false
 		while os.clock() - started < seconds do
 			local k = math.clamp(math.floor(-strip.Position.Y.Offset / STAGE_H + 0.5) + 1, 1, REEL_ITEMS)
-			local shade = shades[k]
-			if shade then
-				card.Name.Text = shade.Name
+			if k ~= last then
+				last = k
+				card.Name.Text = names[k] or "?"
+				sound(TICK, 0.9 + k / REEL_ITEMS * 0.4)
+				for _, pointer in pointers do
+					pointer.TextSize = 24
+					TweenService:Create(pointer, TweenInfo.new(0.12), { TextSize = 18 }):Play()
+				end
 			end
-			card.Frame.Rotation = math.sin(os.clock() * 40) * 1.5
-			task.wait(0.05)
+			if tease and not teasing and os.clock() - started > seconds * 0.55 then
+				-- Slowing down... the card starts to glow.
+				teasing = true
+				card.Ribbon.Text = "..."
+				TweenService
+					:Create(
+						card.Stroke,
+						TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+						{
+							Color = tier,
+							Thickness = 5,
+						}
+					)
+					:Play()
+			end
+			card.Frame.Rotation = math.sin(os.clock() * 40) * (1.2 * (1 - (os.clock() - started) / seconds))
+			task.wait()
 		end
 		card.Frame.Rotation = 0
-		-- Clunk: land, flash, and show the real stone.
+		-- Clunk: settle back onto the payline, flash, and show the real stone.
+		TweenService:Create(strip, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Position = UDim2.fromOffset(0, stop),
+		}):Play()
+		task.wait(0.22)
 		local flash = new("Frame", {
 			BackgroundColor3 = Color3.new(1, 1, 1),
 			Size = UDim2.fromScale(1, 1),
@@ -351,15 +429,16 @@ local function reelCard(parent: Instance, order: number)
 		task.delay(0.5, function()
 			flash:Destroy()
 		end)
+		TweenService:Create(card.Stroke, TweenInfo.new(0.2), { Thickness = 2 }):Play()
 		showGem(card, gem)
-		local tier = GemConfig.TierColors[gem.Tier] or P.Gold
-		sparkle(card.Frame, tier, if gem.Tier == "Common" then 8 else 16)
-		sound("rbxasset://sounds/electronicpingshort.wav", if gem.Tier == "Common" then 1 else 1.4)
-		card.Scale.Scale = 1.2
-		TweenService:Create(card.Scale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		local rank = TIER_RANK[gem.Tier] or 1
+		sparkle(card.Frame, tier, 6 + rank * 6)
+		sound("rbxasset://sounds/electronicpingshort.wav", 0.9 + rank * 0.15)
+		card.Scale.Scale = 1.15 + rank * 0.03
+		TweenService:Create(card.Scale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			Scale = 1,
 		}):Play()
-		if gem.Tier ~= "Common" then
+		if rank > 1 then
 			local shout =
 				text(card.Frame, string.upper(GemConfig.TierLabels[gem.Tier] or gem.Tier) .. "!", 26, tier, HEADING)
 			shout.AutomaticSize = Enum.AutomaticSize.None
@@ -367,7 +446,6 @@ local function reelCard(parent: Instance, order: number)
 			shout.Position = UDim2.fromScale(0.5, 0.3)
 			shout.Size = UDim2.fromOffset(220, 32)
 			shout.TextXAlignment = Enum.TextXAlignment.Center
-			shout.Rotation = -8
 			shout.ZIndex = 18
 			TweenService:Create(shout, TweenInfo.new(1.2), {
 				Position = UDim2.fromScale(0.5, -0.1),
@@ -385,6 +463,38 @@ local function reelCard(parent: Instance, order: number)
 	return card, spin
 end
 
+-- Marquee bulbs along an edge of the reels, chasing while they spin.
+type Marquee = { Bulbs: { Frame }, Color: Color3, Mode: string }
+local function marquee(parent: Instance, order: number, width: number): Marquee
+	local bar = new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(width, 10),
+		LayoutOrder = order,
+	}, parent)
+	local row = UiKit.list(bar, 14, true)
+	row.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local state: Marquee = { Bulbs = {}, Color = P.Gold, Mode = "Idle" }
+	for i = 1, math.floor(width / 24) do
+		local bulb = new("Frame", {
+			BackgroundColor3 = P.Gold,
+			Size = UDim2.fromOffset(10, 10),
+			LayoutOrder = i,
+		}, bar)
+		UiKit.round(bulb, 5)
+		table.insert(state.Bulbs, bulb)
+	end
+	IronUi.animate(bar, function(t)
+		local speed = if state.Mode == "Spin" then 14 elseif state.Mode == "Win" then 6 else 2.5
+		local step = math.floor(t * speed)
+		for i, bulb in state.Bulbs do
+			local lit = if state.Mode == "Win" then step % 2 == 0 else (i + step) % 3 == 0
+			bulb.BackgroundColor3 = state.Color
+			bulb.BackgroundTransparency = if lit then 0 else 0.75
+		end
+	end)
+	return state
+end
+
 local showReady: () -> ()
 
 -- Screen 1: welcome and the first dig.
@@ -393,7 +503,7 @@ local function showWelcome()
 	local title = line("GEMSOUL", 84, P.Gold, HEADING, 1)
 	local titleStroke = title:FindFirstChildOfClass("UIStroke")
 	if titleStroke then
-		titleStroke.Thickness = 5
+		titleStroke.Thickness = 2
 	end
 	line("Dig up gems. Cut them. Forge them into legendary gear.", 22, Color3.new(1, 1, 1), CHUNKY, 2)
 	line(
@@ -439,7 +549,7 @@ function showReady()
 	local row = new("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, CARD_H + 16),
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 	}, body)
 	local rowList = UiKit.list(row, 16, true)
 	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -472,10 +582,18 @@ function showReady()
 			spins[i] = spin
 		end
 	end
+	-- Chasing lights above and below the reels.
+	local lights = if claimed then {} else { marquee(body, 3, 760), marquee(body, 5, 760) }
+	local function lightsTo(mode: string, color: Color3?)
+		for _, bar in lights do
+			bar.Mode = mode
+			bar.Color = color or P.Gold
+		end
+	end
 	local button
 	button = IronUi.gemButton(
 		body,
-		if claimed then "ENTER GEMSOUL  ▶" else "🎰  SPIN!",
+		if claimed then "ENTER GEMSOUL  ►" else "SPIN THE REELS",
 		if claimed then P.Emerald else Color3.fromRGB(255, 150, 30),
 		function()
 			if busy then
@@ -495,15 +613,21 @@ function showReady()
 					busy = false
 					return
 				end
-				-- Each reel runs a little longer than the last, so they land
-				-- one after another.
-				local gems = result.Gems or {}
+				-- Each reel runs longer than the last, so they land one after
+				-- another, and the rarest gem is saved for the last reel.
+				local gems = table.clone(result.Gems or {})
+				table.sort(gems, function(a, b)
+					return (TIER_RANK[a.Tier] or 1) < (TIER_RANK[b.Tier] or 1)
+				end)
+				lightsTo("Spin")
 				local done = 0
 				for i, spin in spins do
 					local gem = gems[i]
 					if gem then
+						local last = i == #spins
+						local tease = last and (TIER_RANK[gem.Tier] or 1) > 1
 						task.spawn(function()
-							spin(gem, 1.6 + (i - 1) * 0.7)
+							spin(gem, 1.8 + (i - 1) * 0.8 + (if tease then 1.2 else 0), tease)
 							done += 1
 						end)
 					else
@@ -513,16 +637,26 @@ function showReady()
 				while done < #spins do
 					task.wait(0.1)
 				end
-				task.wait(0.5)
+				-- The lights flash in the best gem's colour, and the haul is totted up.
+				local best = gems[#gems]
+				lightsTo("Win", best and GemConfig.TierColors[best.Tier] or P.Gold)
+				local total = 0
+				for _, gem in gems do
+					total += GemConfig.value(gem)
+				end
+				for n = 1, 20 do
+					sub.Text = string.format("Your haul is worth  💰 %d", math.floor(total * n / 20))
+					task.wait(0.03)
+				end
+				task.wait(0.6)
 				claimed = true
-				sub.Text = "Your first stone, plus three cut gems to get you started."
-				button.Text = "ENTER GEMSOUL  ▶"
+				button.Text = "ENTER GEMSOUL  ►"
 				button.Visible = true
 				busy = false
 			end)
 		end
 	)
-	button.LayoutOrder = 5
+	button.LayoutOrder = 6
 	button.Size = UDim2.fromOffset(0, 64)
 	button.TextSize = 26
 	if not claimed then

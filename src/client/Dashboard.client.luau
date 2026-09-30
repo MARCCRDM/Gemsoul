@@ -38,7 +38,7 @@ local new, text = IronUi.new, IronUi.text
 local P = IronUi.Colors
 local HEADING, CHUNKY = IronUi.Heading, IronUi.Chunky
 local INK = P.Ink
-local LIGHT = Color3.fromRGB(236, 230, 250)
+local LIGHT = Color3.fromRGB(214, 208, 196)
 local W, H = 1280, 720
 
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
@@ -52,9 +52,9 @@ local backdrop = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = U
 new("UIGradient", {
 	Rotation = 110,
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(46, 26, 84)),
-		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(22, 16, 44)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 32, 52)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 38, 44)),
+		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 20, 24)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 20, 26)),
 	}),
 }, backdrop)
 local pattern = new("TextLabel", {
@@ -103,20 +103,22 @@ local function panel(parent: Instance, x: number, y: number, w: number, h: numbe
 		Size = UDim2.fromOffset(w, h),
 		BackgroundColor3 = Color3.new(1, 1, 1),
 	}, parent)
-	UiKit.round(frame, 18)
-	new("UIStroke", { Color = INK, Thickness = 3 }, frame)
+	UiKit.round(frame, 8)
+	new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.15 }, frame)
+	-- Dark iron, with just a hint of the panel's colour at the top.
+	local muted = IronUi.mute(tint)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(tint:Lerp(Color3.new(0, 0, 0), 0.35), tint:Lerp(Color3.new(0, 0, 0), 0.75)),
+		Color = ColorSequence.new(muted:Lerp(P.Frame, 0.6), muted:Lerp(P.Frame, 0.9)),
 	}, frame)
-	-- A strip of light along the top.
-	local gloss = new("Frame", {
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = 0.86,
-		Position = UDim2.fromOffset(10, 6),
-		Size = UDim2.new(1, -20, 0, 12),
+	-- A thin gold rule along the top edge.
+	new("Frame", {
+		BackgroundColor3 = P.Gold,
+		BackgroundTransparency = 0.6,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(12, 0),
+		Size = UDim2.new(1, -24, 0, 1),
 	}, frame)
-	UiKit.round(gloss, 6)
 	return frame
 end
 
@@ -144,8 +146,8 @@ local function keyChip(parent: Instance, key: string): TextLabel
 		TextColor3 = INK,
 		ZIndex = 6,
 	}, parent)
-	UiKit.round(chip, 13)
-	new("UIStroke", { Color = INK, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, chip)
+	UiKit.round(chip, 4)
+	new("UIStroke", { Color = INK, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, chip)
 	return chip
 end
 
@@ -160,7 +162,7 @@ end
 
 local logo = IronUi.badge(root, "💎", 64)
 logo.Position = UDim2.fromOffset(16, 8)
-logo.Rotation = -8
+logo.Rotation = 0
 local title = IronUi.title(root, "GEMSOUL", 40, P.Gold)
 title.AutomaticSize = Enum.AutomaticSize.None
 place(title, 92, 14, 300, 44)
@@ -177,12 +179,12 @@ local wallet = new("Frame", {
 UiKit.list(wallet, 12, true)
 local function pill(order: number, icon: string, color: Color3): TextLabel
 	local frame = new("Frame", {
-		BackgroundColor3 = Color3.fromRGB(24, 18, 36),
+		BackgroundColor3 = P.Frame,
 		Size = UDim2.fromOffset(150, 44),
 		LayoutOrder = order,
 	}, wallet)
-	UiKit.round(frame, 22)
-	new("UIStroke", { Color = color, Thickness = 3 }, frame)
+	UiKit.round(frame, 6)
+	new("UIStroke", { Color = IronUi.mute(color), Thickness = 1.5 }, frame)
 	local ic = label(frame, icon, 24, Color3.new(1, 1, 1), Enum.Font.Gotham)
 	place(ic, 10, 6, 32, 32)
 	ic.TextXAlignment = Enum.TextXAlignment.Center
@@ -207,7 +209,7 @@ local hero = panel(root, 16, TOP, 360, H - TOP - 16, Color3.fromRGB(130, 70, 60)
 local heroTitle = IronUi.title(hero, "WARRIOR", 28)
 heroTitle.AutomaticSize = Enum.AutomaticSize.None
 place(heroTitle, 18, 16, 324, 32)
-local heroSub = label(hero, "Melee damage", 14, Color3.fromRGB(255, 210, 190))
+local heroSub = label(hero, "Melee damage", 14, LIGHT)
 place(heroSub, 20, 48, 320, 18)
 
 local stage = new("Frame", {
@@ -216,25 +218,25 @@ local stage = new("Frame", {
 	Size = UDim2.fromOffset(328, 250),
 	ClipsDescendants = true,
 }, hero)
-UiKit.round(stage, 14)
-new("UIStroke", { Color = INK, Thickness = 2 }, stage)
+UiKit.round(stage, 6)
+new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.3 }, stage)
 new("UIGradient", {
 	Rotation = 90,
-	Color = ColorSequence.new(Color3.fromRGB(120, 96, 150), Color3.fromRGB(34, 26, 48)),
+	Color = ColorSequence.new(Color3.fromRGB(62, 60, 66), Color3.fromRGB(16, 16, 20)),
 }, stage)
 local glow = new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.5),
 	Size = UDim2.fromOffset(210, 210),
-	BackgroundColor3 = Color3.fromRGB(255, 220, 160),
-	BackgroundTransparency = 0.82,
+	BackgroundColor3 = Color3.fromRGB(255, 226, 180),
+	BackgroundTransparency = 0.9,
 }, stage)
 UiKit.round(glow, 105)
 local avatar = new("ViewportFrame", {
 	BackgroundTransparency = 1,
-	Ambient = Color3.fromRGB(200, 196, 200),
-	LightColor = Color3.new(1, 1, 1),
-	LightDirection = Vector3.new(-0.3, -0.8, -1),
+	Ambient = Color3.fromRGB(128, 128, 140),
+	LightColor = Color3.fromRGB(255, 238, 214),
+	LightDirection = Vector3.new(-0.5, -0.7, 0.8),
 	Size = UDim2.fromScale(1, 1),
 }, stage)
 local avatarWorld = new("WorldModel", {}, avatar)
@@ -419,7 +421,7 @@ digHint.AnchorPoint = Vector2.new(0.5, 0.5)
 digHint.Position = UDim2.new(1, -4, 0, 4)
 local freeBadge = label(mine, "", 16, Color3.new(1, 1, 1), CHUNKY)
 freeBadge.BackgroundTransparency = 0
-freeBadge.BackgroundColor3 = Color3.fromRGB(230, 50, 60)
+freeBadge.BackgroundColor3 = Color3.fromRGB(168, 64, 56)
 freeBadge.AnchorPoint = Vector2.new(1, 0)
 place(freeBadge, 0, 0, 120, 30)
 freeBadge.AnchorPoint = Vector2.new(1, 0)
@@ -444,11 +446,11 @@ local function workshop(
 	local card = panel(root, x, y, 234, 175, color)
 	local ic = label(card, icon, 40, Color3.new(1, 1, 1), Enum.Font.Gotham)
 	place(ic, 14, 14, 48, 48)
-	ic.Rotation = -8
+	ic.Rotation = 0
 	local head = IronUi.title(card, name, 24)
 	head.AutomaticSize = Enum.AutomaticSize.None
 	place(head, 70, 22, 150, 28)
-	local line = label(card, "", 13, Color3.fromRGB(245, 240, 250), CHUNKY)
+	local line = label(card, "", 13, LIGHT, IronUi.Body)
 	place(line, 16, 68, 204, 44)
 	line.TextWrapped = true
 	line.TextYAlignment = Enum.TextYAlignment.Top
@@ -629,7 +631,7 @@ local function refresh(profile)
 		local stats = Classes.stats(class.Id, character.Weapon, character.Armor)
 		for name, cells in statBars do
 			for n, cell in cells do
-				cell.BackgroundColor3 = if n <= (stats[name] or 0) then class.Color else Color3.fromRGB(40, 34, 56)
+				cell.BackgroundColor3 = if n <= (stats[name] or 0) then IronUi.mute(class.Color) else P.Slot
 			end
 		end
 	end

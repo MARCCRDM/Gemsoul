@@ -30,6 +30,10 @@ Two switches in `src/shared/Config.luau` set how the game plays today:
 
 Keys: M mine, F craft, E enchant, X cut, V sell, G gem pouch, B shop.
 
+**The look.** The menus use a restrained, grown-up style (`src/client/Modules/IronUi.luau`): dark iron panels with a thin gold edge, serif titles (Merriweather), condensed labels (Oswald), muted buttons and small hover and press motion. `IronUi.mute` tones any bright colour down.
+
+**The Warrior's armor** (`src/server/Systems/ArmorKits.luau`) is full plate in the style of a fantasy RPG knight, built from smooth rounded plates over dark mail, with brass trim and dyed cloth. It covers the whole figure, so the blocky avatar underneath is hidden, and R15 avatars get more human proportions (a bit taller and slimmer, smaller head: `ArmorKits.Proportions`). Iron Plate has a plumed armet, tabard and cape; Iron Scale a Nordic helm and fur mantle; Iron Chain a great helm and surcoat. The Longsword has a crossguard, leather grip, pommel and pointed blade.
+
 ## The Mine (the hook)
 
 A cave wall of 24 rocks (6 x 4). Each wall gives you 14 swings of the pickaxe, and each click chips one rock. Every swing has a 15% chance to crit and chip two layers. Rocks crack, shake and throw chips; when one breaks you get what was inside:
@@ -64,7 +68,7 @@ Streets and building plots are painted terrain (cobblestone, pavement, dirt), so
 Two screens, then the dashboard:
 
 1. **Welcome** and **Start digging:** the Mine opens with a free tutorial wall. Break the glinting rock to find your first stone.
-2. **You're a miner!:** your first stone, and **Claim 3 free gems** (already cut). Then **Enter Gemsoul**.
+2. **You're a miner!:** your first stone, and three free cut gems won on a slot machine. Press **Spin the reels**: each reel whips a strip of 3D stones past a gold payline, ticking as they pass, while marquee lights chase round the machine. The reels stop one by one, the rarest gem is saved for the last reel (which slows and glows in its rarity colour first), then the lights flash and your haul is totted up. Then **Enter Gemsoul**.
 
 The server sets you up as a Warrior (`"QuickStart"` in `src/server/Systems/Intro.luau`).
 
@@ -88,7 +92,7 @@ Each piece of gear has one socket, for cut gems only. An enchanted item takes on
 - **Name:** Diablo-style affixes, e.g. *Venomous Longsword*, *Iron Plate of Storms*.
 - **Effect:** a weapon gem adds its element to your hits (Burning, Frostbite, Arcing, Venom); an armor gem wards you against it (+resistance, +max health).
 - **Stats:** each element raises its own attributes, scaled by the gem's potency (mostly size, then clarity and cut). Fire gives Power; Frost gives Defense; Shock gives Speed; Poison gives Health. See `GemConfig.EnchantStats`.
-- **Looks:** the item's glowing trim turns the element's colour, the gem lights up, and particles pour off it (flames, frost motes, sparks, poison fumes). Frost also rimes the blade.
+- **Looks:** the item's glowing trim (on plate armor, the brass bands; on the sword, the fuller) turns the element's colour, the gem lights up, and particles pour off it (flames, frost motes, sparks, poison fumes). Frost also rimes the blade.
 
 Attributes are ratings (20 per class/gear point, plus gem bonuses) and they're live: Speed sets walk speed and Health sets max health (`Classes.walkSpeed` / `Classes.maxHealth`). After the intro, sockets are changed at Vey's Arcanum on the east road ("Enchant my gear").
 
@@ -121,7 +125,7 @@ Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or we
 
 **The hub** (with menu-only mode off). On the left, a big yellow SHOP button (B) over a 2x2 grid of menu tiles: Character (C), Abilities (K), Gems (G) and Party (P). Top right, gold-edged bars show your coins (the green + opens the Shop), Guild Marks and gems, with Season (J) and Top (L) buttons underneath.
 
-**Buttons** are chunky 3D slabs, built by `IronUi.chunk`. From the outside in, each has a black outline, a darker lip underneath for depth, a light rim, and a gradient face. The face has a glossy top, diagonal light stripes and, on some buttons, a halftone dot texture. Icons are drawn big and break out of the edge. Hovering makes a button grow; pressing sinks its face into the lip. The same slabs are used for the combat hotbar (rimmed in your class colour), the gem pouch cards and tabs, shopkeeper replies and the intro. Windows share the look: a gold-rimmed frame that pops open, a glossy header with a tilted icon badge, outlined cartoon lettering and a red close slab.
+**Buttons** are low slabs, built by `IronUi.chunk`: a thin dark outline, a darker lip underneath for depth, a rim, and a gradient face with a faint sheen. Colours passed in are muted (`IronUi.mute`). Hovering lifts a button slightly and lights its edge gold; pressing sinks its face into the lip. The same slabs are used for the combat hotbar, the gem pouch cards and tabs, shopkeeper replies and the intro. Windows share the look: a dark iron panel with a thin gold edge, a dark header tinted with the window's colour over a gold rule, an icon badge, serif titles and a small close button.
 
 **Shop** (coins today, Robux-ready). Tabs:
 
@@ -132,7 +136,7 @@ Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or we
 
 **Opening crates** is full screen: light rays spin, the crate shakes harder and harder (click to hurry it), a white flash, then the prize pops out with its name, rarity and odds ("1/16.7"). Open up to 10 at once and the rest line up as cards underneath.
 
-New players get a **Welcome Bundle** popup after the intro: 5x value, once, with a 24-hour countdown. Cosmetics use the gem rarity tiers. *Trims* recolour your class glow. *Back pieces* (Prospector's Pack, War Banner, Geode Shell, Ember Cape, Crystal Wings, Gem Halo) are worn behind your armor. To sell for Robux too, create Developer Products on Roblox and put their ids in `Store.RobuxProducts` (`src/shared/Store.luau`); the Shop shows Robux buttons and the server grants the items.
+New players get a **Welcome Bundle** popup after the intro: 5x value, once, with a 24-hour countdown. Cosmetics use the gem rarity tiers. *Trims* light your armor's brass bands in their colour. *Back pieces* (Prospector's Pack, War Banner, Geode Shell, Ember Cape, Crystal Wings, Gem Halo) are worn behind your armor. To sell for Robux too, create Developer Products on Roblox and put their ids in `Store.RobuxProducts` (`src/shared/Store.luau`); the Shop shows Robux buttons and the server grants the items.
 
 **Season Path.** Everything earns XP: mining, cutting, selling, crafting, enchanting, slaying and the daily reward. There are 30 levels, each with a reward to claim: coins, Marks, crates, materials, and exclusive trims and back pieces at levels 5, 10, 15, 20, 25 and 30. Bundles can include a 2x XP boost. Tuning is in `src/shared/Season.luau`.
 

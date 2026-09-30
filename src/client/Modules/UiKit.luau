@@ -186,7 +186,7 @@ function UiKit.toast(message: string, color: Color3?)
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromOffset(0, 0)
 	label.AutomaticSize = Enum.AutomaticSize.XY
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Enum.Font.Oswald
 	label.TextSize = 18
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Text = message
@@ -194,7 +194,7 @@ function UiKit.toast(message: string, color: Color3?)
 	label.Parent = toast
 	local ink = Instance.new("UIStroke")
 	ink.Color = Color3.fromRGB(12, 8, 18)
-	ink.Thickness = 2
+	ink.Thickness = 1
 	ink.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	ink.Parent = label
 	local pop = Instance.new("UIScale")

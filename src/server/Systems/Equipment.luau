@@ -96,25 +96,81 @@ local function gemSocket(folder: Instance, anchor: BasePart, mount: CFrame, at: 
 	end
 end
 
-local function sword(folder: Instance, hand: BasePart, mount: CFrame, accent: Color3, gem, bladeLength: number)
-	piece(folder, hand, mount * CFrame.new(0, 0, 0), Vector3.new(0.22, 0.9, 0.22), DARK_WOOD, Enum.Material.Wood)
-	piece(folder, hand, mount * CFrame.new(0, 0.5, 0), Vector3.new(1.1, 0.18, 0.28), IRON, Enum.Material.Metal)
+-- A pointed blade tip: two wedges meeting on the blade's centre line.
+local function bladeTip(folder: Instance, hand: BasePart, at: CFrame, width: number, length: number, color: Color3)
+	for _, side in { -1, 1 } do
+		local wedge = Instance.new("WedgePart")
+		wedge.Name = "Gear"
+		wedge.Size = Vector3.new(0.06, length, width / 2)
+		wedge.Color = color
+		wedge.Material = Enum.Material.Metal
+		wedge.CanCollide = false
+		wedge.CanQuery = false
+		wedge.CanTouch = false
+		wedge.Massless = true
+		wedge.CastShadow = false
+		wedge.CFrame = hand.CFrame
+			* at
+			* CFrame.new(side * width / 4, length / 2, 0)
+			* CFrame.Angles(0, math.rad(-90 * side), 0)
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = hand
+		weld.Part1 = wedge
+		weld.Parent = wedge
+		wedge.Parent = folder
+	end
+end
+
+-- A knightly longsword: leather grip, brass pommel, a crossguard with
+-- rounded ends and a pointed blade with a fuller down the middle. An
+-- enchanted blade's fuller glows in its gem's element.
+local LEATHER_GRIP = Color3.fromRGB(62, 40, 28)
+local BRASS = Color3.fromRGB(184, 144, 70)
+local function sword(folder: Instance, hand: BasePart, mount: CFrame, _accent: Color3, gem, bladeLength: number)
+	piece(folder, hand, mount, Vector3.new(0.18, 0.86, 0.18), LEATHER_GRIP, Enum.Material.Leather)
+	for _, y in { -0.2, 0.2 } do
+		piece(folder, hand, mount * CFrame.new(0, y, 0), Vector3.new(0.21, 0.05, 0.21), BRASS, Enum.Material.Metal)
+	end
 	piece(
 		folder,
 		hand,
-		mount * CFrame.new(0, 0.6 + bladeLength / 2, 0),
-		Vector3.new(0.34, bladeLength, 0.08),
+		mount * CFrame.new(0, -0.5, 0),
+		Vector3.one * 0.3,
+		BRASS,
+		Enum.Material.Metal,
+		Enum.PartType.Ball
+	)
+	piece(folder, hand, mount * CFrame.new(0, 0.5, 0), Vector3.new(1.0, 0.12, 0.16), STEEL, Enum.Material.Metal)
+	for _, side in { -1, 1 } do
+		piece(
+			folder,
+			hand,
+			mount * CFrame.new(side * 0.52, 0.52, 0),
+			Vector3.one * 0.18,
+			BRASS,
+			Enum.Material.Metal,
+			Enum.PartType.Ball
+		)
+	end
+	local tip = 0.45
+	local body = bladeLength - tip
+	piece(
+		folder,
+		hand,
+		mount * CFrame.new(0, 0.56 + body / 2, 0),
+		Vector3.new(0.26, body, 0.06),
 		STEEL,
 		Enum.Material.Metal
 	)
-	neon(
-		folder,
-		hand,
-		mount * CFrame.new(0, 0.6 + bladeLength / 2, -0.045),
-		Vector3.new(0.06, bladeLength * 0.85, 0.02),
-		accent
-	)
-	gemSocket(folder, hand, mount, Vector3.new(0, 0.5, -0.16), gem, 0.24)
+	bladeTip(folder, hand, mount * CFrame.new(0, 0.56 + body, 0), 0.26, tip, STEEL)
+	local fuller = Vector3.new(0.05, body * 0.8, 0.07)
+	local fullerAt = mount * CFrame.new(0, 0.6 + body * 0.42, 0)
+	if gem then
+		neon(folder, hand, fullerAt, fuller, GemConfig.ElementColors[gem.Element] or STEEL)
+	else
+		piece(folder, hand, fullerAt, fuller, IRON, Enum.Material.Metal)
+	end
+	gemSocket(folder, hand, mount, Vector3.new(0, 0.5, -0.1), gem, 0.2)
 end
 
 local function shield(folder: Instance, arm: BasePart, side: number, width: number, height: number, accent: Color3, gem)
@@ -581,6 +637,11 @@ local function enchant(parts: { BasePart }, gem, main: BasePart?)
 			light.Parent = part
 		elseif part.Material == Enum.Material.Neon then
 			part.Color = color
+		elseif part.Name == "Armor" and part.Color == ArmorKits.Brass then
+			-- Plate armor's brass trim glows with the gem's element.
+			part.Material = Enum.Material.Neon
+			part.Color = color
+			part.CastShadow = false
 		elseif part.Transparency < 1 then
 			local size = part.Size.X * part.Size.Y * part.Size.Z
 			if size > biggestSize then
@@ -659,6 +720,14 @@ function Equipment.apply(player: Player)
 	if not character or not loadout then
 		return
 	end
+	local fitted = Classes.armor(loadout.Class, loadout.Armor)
+	if fitted and ArmorKits.proportion(character, fitted.Look) then
+		-- Let the rig resize before fitting armor to it.
+		task.wait(0.2)
+		if player.Character ~= character then
+			return
+		end
+	end
 	local existing = character:FindFirstChild(FOLDER_NAME)
 	if existing then
 		existing:Destroy()
@@ -680,6 +749,16 @@ function Equipment.apply(player: Player)
 
 	removeHeadwear(character)
 	ArmorKits.build(folder, character, armor.Look, accent, loadout.ArmorQuality)
+	if trim then
+		-- A trim (cosmetic) lights plate armor's brass bands in its colour.
+		for _, part in folder:GetDescendants() do
+			if part:IsA("BasePart") and part.Name == "Armor" and part.Color == ArmorKits.Brass then
+				part.Material = Enum.Material.Neon
+				part.Color = accent
+				part.CastShadow = false
+			end
+		end
+	end
 	-- An armor gem glows at the centre of the chest.
 	local torso = bodyPart(character, "UpperTorso", "Torso")
 	if torso and loadout.ArmorGem then
@@ -687,9 +766,9 @@ function Equipment.apply(player: Player)
 			folder,
 			torso,
 			CFrame.new(),
-			Vector3.new(0, torso.Size.Y * 0.12, -torso.Size.Z * 0.5 - 0.42),
+			Vector3.new(0, torso.Size.Y * 0.12, -torso.Size.Z * 0.5 - 0.2),
 			loadout.ArmorGem,
-			0.36
+			0.3
 		)
 	end
 	local armorParts = {}

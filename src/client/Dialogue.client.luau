@@ -205,7 +205,7 @@ local function optionButton(order: number, text: string, color: Color3, onClick:
 		Stripes = "None",
 	})
 	button.LayoutOrder = order
-	local reply = IronUi.label(button, face, "▶  " .. text, 16)
+	local reply = IronUi.label(button, face, "►  " .. text, 16)
 	reply.TextColor3 = color
 	reply.TextXAlignment = Enum.TextXAlignment.Left
 	reply.TextWrapped = true

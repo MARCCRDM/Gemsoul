@@ -715,7 +715,7 @@ function drawButtons()
 	end
 	if tutorialMode then
 		if wall and foundCount > 0 then
-			local done = IronUi.gemButton(buttons, "CONTINUE  ▶", P.Emerald, function()
+			local done = IronUi.gemButton(buttons, "CONTINUE  ►", P.Emerald, function()
 				if tutorialDone then
 					tutorialFinished = true
 					tutorialDone:Fire()
