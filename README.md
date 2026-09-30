@@ -1,6 +1,8 @@
-# Gemsoul
+# Brainrot Crusaders
 
-A Roblox game. Code lives in `src/` as Luau files and is synced into Roblox Studio with [Rojo](https://rojo.space).
+*Futuristic space miners on a distant colony.* The Saga Miners live on ancient, pulsing **Saga Stones**. A rift in reality let in interdimensional brainrot entities who need the stones to exist, so the miners defend them: dig them up, enchant their gear with them, and fight back.
+
+A Roblox game (the repo and some code names still say Gemsoul: gems are Saga Stones in the game). Code lives in `src/` as Luau files and is synced into Roblox Studio with [Rojo](https://rojo.space).
 
 ## Setup (once, on your Windows/Mac computer)
 
@@ -30,18 +32,18 @@ Two switches in `src/shared/Config.luau` set how the game plays today:
 
 Keys: M mine, F craft, E enchant, X cut, V sell, G gem pouch, B shop.
 
-**The look.** The menus use a restrained, grown-up style (`src/client/Modules/IronUi.luau`): dark iron panels with a thin gold edge, serif titles (Merriweather), condensed labels (Oswald), muted buttons and small hover and press motion. `IronUi.mute` tones any bright colour down.
+**The look.** The menus use a sci-fi style (`src/client/Modules/IronUi.luau`): dark space-station panels with a thin holo-blue edge, wide titles (Michroma), clean technical labels (Titillium Web), Saga amber for currency and main actions, and small hover and press motion. The dashboard's backdrop is deep space, thin enough that the moon base shows through.
 
-**The Warrior's armor** (`src/server/Systems/ArmorKits.luau`) is a ladder of four sets, in the style of a fantasy RPG. Each is one simple figure of 32-41 smooth parts (rounded plates and tubes, no blocks) that covers the whole body, so the blocky avatar underneath is hidden:
+**Saga Miners** (the `Warrior` class id, kept for saved data) start with the iconic kit: a spacesuit, the **Saga Pistol & Shield** (a blaster in the right hand, a riot shield on the left arm, both with glowing trim). Suits are a ladder of four (`src/server/Systems/ArmorKits.luau`), each one simple figure of smooth parts that covers the whole body, so the blocky avatar underneath is hidden:
 
-| Tier | Set | Look | How you get it |
+| Tier | Suit | Look | How you get it |
 |---|---|---|---|
-| 1 | Padded Jack | quilted jack, leather hood, gloves and boots | everyone starts in it |
-| 2 | Iron Chainmail | mail under a dyed surcoat, great helm | forge it, or find it in the Mine |
-| 3 | Iron Scale | scale cuirass, pauldrons, fur mantle, Nordic helm | forge it (needs Mithril), or find it |
-| 4 | Knight's Plate | full plate, plumed armet, tabard and cape | forge it (needs Mithril and Gem Shards), or find it |
+| 1 | Scrap Suit | patched white suit, bubble helmet, small air pack | everyone starts in it |
+| 2 | Miner Suit | hi-vis orange, headlamp, twin air tanks | forge it, or find it in the Mine |
+| 3 | Ranger Suit | teal armour plates, pauldrons, glowing visor strip | forge it (needs Mithril), or find it |
+| 4 | Crusader Exo | white and gold exo-armour, jet pack, red cape | forge it (needs Mithril and Gem Shards), or find it |
 
-Each set must be owned before the next can be forged, and better sets cost more (`TIER_COSTS` in `src/shared/Crafting.luau`). From depth 2 down, a lucky (gold) rock in the Mine can also hold the next set you don't own yet (`Mine.armorChance`). Every set can still be upgraded from Standard to Masterwork. The Longsword has a crossguard, leather grip, pommel and pointed blade.
+Each suit must be owned before the next can be forged, and better suits cost more (`TIER_COSTS` in `src/shared/Crafting.luau`). From depth 2 down, a lucky (gold) rock in the Mine can also hold the next suit you don't own yet (`Mine.armorChance`). Every piece can still be upgraded from Standard to Masterwork. The other weapons (Plasma Blade, Breaker Axe, Twin Beam Knives, Ion Lance) can be forged too. The glowing bits (chest light, wrist displays, pack lights, shield rim, pistol cell) take a trim's colour, or an enchanting gem's element.
 
 ## The Mine (the hook)
 
@@ -74,12 +76,16 @@ Streets and building plots are painted terrain (cobblestone, pavement, dirt), so
 
 ## New players: the intro
 
-Two screens, then the dashboard:
+`src/client/Intro.client.luau`, with the 3D sets in `src/client/Modules/Scenes.luau` (built on the client only):
 
-1. **Welcome** and **Start digging:** the Mine opens with a free tutorial wall. Break the glinting rock to find your first stone.
-2. **You're a miner!:** your first stone, and three free cut gems won on a slot machine. Press **Spin the reels**: each reel whips a strip of 3D stones past a gold payline, ticking as they pass, while marquee lights chase round the machine. The reels stop one by one, the rarest gem is saved for the last reel (which slows and glows in its rarity colour first), then the lights flash and your haul is totted up. Then **Enter Gemsoul**.
-
-The server sets you up as a Warrior (`"QuickStart"` in `src/server/Systems/Intro.luau`).
+1. **The lore "video"**: a skippable cinematic in five shots with typewriter captions: the colony on its moon, the pulsing Saga Stone, the rift tearing open, the brainrot alligator bomber flying through, and the title.
+2. **The colony ship**: you wake up to red alarms. Outside the window the alligator bomber loops past, strafing the hull (bolts, blasts, the camera shakes). An objectives list walks you through the mechanics, one station at a time, with your own figure (a copy of your character in its gear) at each:
+   - **Suit up** at the locker: the Scrap Suit, Saga Pistol and Shield (`"SuitUp"`).
+   - **Daily ration** at the dispenser: a slot-machine spin for three cut Saga Stones (`"StarterSpin"`).
+   - **Enchant** at the holo console: your best stone goes into your blaster (`"SocketGem"`).
+   - **Drive off the bomber**: press FIRE five times; it retreats smoking.
+   - **Teleport** from the pad (`"QuickStart"`, which finishes the intro).
+3. **The moon base**: you beam down to the dashboard. Behind it the camera circles the moon base station: domes, corridors, the vendor kiosks (Market, Forge, Enchant, Supply, Mine Lift), the Saga Stone pylon and a planet in the black sky (`src/client/MenuCamera.client.luau`).
 
 ## Gems
 

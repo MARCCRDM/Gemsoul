@@ -12,7 +12,30 @@ local function getOrCreate(parent: Instance, className: string): any
 	return instance
 end
 
-return function()
+-- `space` (menu-only mode, on the moon base): a black starry sky, no haze
+-- or clouds, and cool light.
+return function(space: boolean?)
+	if space then
+		Lighting.ClockTime = 0
+		Lighting.Brightness = 2
+		Lighting.Ambient = Color3.fromRGB(96, 102, 122)
+		Lighting.OutdoorAmbient = Color3.fromRGB(150, 156, 176)
+		Lighting.GlobalShadows = true
+		local sky = getOrCreate(Lighting, "Sky")
+		sky.StarCount = 5000
+		sky.CelestialBodiesShown = false
+		local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+		if atmosphere then
+			atmosphere.Density = 0
+			atmosphere.Haze = 0
+			atmosphere.Glare = 0
+		end
+		local bloom = getOrCreate(Lighting, "BloomEffect")
+		bloom.Intensity = 0.6
+		bloom.Size = 24
+		bloom.Threshold = 1.6
+		return
+	end
 	Lighting.ClockTime = 14.5
 	Lighting.GeographicLatitude = 30
 	Lighting.Brightness = 3

@@ -196,6 +196,65 @@ local WEAPONS: { [string]: (Instance, Model, BasePart, BasePart, Color3, any) ->
 local HELD_FORWARD = CFrame.Angles(math.rad(-110), 0, 0) -- pointing forward and a little down
 local UPRIGHT = CFrame.Angles(math.rad(-12), 0, 0)
 
+-- The Saga Miner's iconic kit: a blaster in the right hand and a riot
+-- shield on the left forearm. The pistol's energy cell and the shield's rim
+-- glow in the accent colour (an enchanting gem recolours them).
+local SUIT_WHITE = Color3.fromRGB(214, 216, 220)
+local GUNMETAL = Color3.fromRGB(58, 62, 72)
+WEAPONS.PistolShield = function(folder, character, right, _left, accent, gem)
+	-- In the held frame +Y points out along the barrel and +Z is up. K scales
+	-- the whole pistol, so it reads clearly at a distance.
+	local m = HELD_FORWARD
+	local K = 1.5
+	local function at(x: number, y: number, z: number): CFrame
+		return m * CFrame.new(x * K, y * K, z * K)
+	end
+	piece(folder, right, at(0, 0, -0.05), Vector3.new(0.2, 0.26, 0.5) * K, GUNMETAL, Enum.Material.SmoothPlastic)
+	piece(folder, right, at(0, 0.3, 0.26), Vector3.new(0.26, 0.95, 0.32) * K, SUIT_WHITE, Enum.Material.SmoothPlastic)
+	piece(
+		folder,
+		right,
+		at(0, 0.86, 0.3) * CFrame.Angles(0, 0, math.rad(90)),
+		Vector3.new(0.5, 0.18, 0.18) * K,
+		GUNMETAL,
+		Enum.Material.Metal,
+		Enum.PartType.Cylinder
+	)
+	neon(folder, right, at(0, 0.12, 0.44), Vector3.new(0.14, 0.4, 0.08) * K, accent)
+	neon(folder, right, at(0, 1.12, 0.3), Vector3.new(0.2, 0.04, 0.2) * K, accent)
+	gemSocket(folder, right, m, Vector3.new(0.15, 0.3, 0.26) * K, gem, 0.2)
+
+	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
+	if arm then
+		local mount = CFrame.new(-(arm.Size.X / 2 + 0.25), 0, 0) * CFrame.Angles(0, math.rad(-90), 0)
+		piece(folder, arm, mount, Vector3.new(1.7, 2.2, 0.16), SUIT_WHITE, Enum.Material.SmoothPlastic)
+		piece(folder, arm, mount * CFrame.new(0, 0, -0.09), Vector3.new(1.3, 1.8, 0.05), GUNMETAL, Enum.Material.Metal)
+		-- A viewing slit near the top, and a glowing rim.
+		piece(
+			folder,
+			arm,
+			mount * CFrame.new(0, 0.62, -0.12),
+			Vector3.new(0.9, 0.12, 0.04),
+			Color3.fromRGB(20, 28, 40),
+			Enum.Material.Glass
+		)
+		for _, y in { -1.1, 1.1 } do
+			neon(folder, arm, mount * CFrame.new(0, y, -0.02), Vector3.new(1.72, 0.06, 0.18), accent)
+		end
+		for _, x in { -0.85, 0.85 } do
+			neon(folder, arm, mount * CFrame.new(x, 0, -0.02), Vector3.new(0.06, 2.2, 0.18), accent)
+		end
+		-- A Saga Stone emblem in the middle.
+		neon(
+			folder,
+			arm,
+			mount * CFrame.new(0, -0.1, -0.13) * CFrame.Angles(0, 0, math.rad(45)),
+			Vector3.new(0.34, 0.34, 0.04),
+			Color3.fromRGB(255, 184, 72)
+		)
+	end
+end
+
 WEAPONS.Sword = function(folder, _character, right, _left, accent, gem)
 	sword(folder, right, HELD_FORWARD, accent, gem, 3)
 end

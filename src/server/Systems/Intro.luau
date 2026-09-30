@@ -5,6 +5,9 @@
 	  "FirstStone"                                  a small rough stone to learn
 	                                                cutting on, once
 	  "FinishIntro"                                 done: gear appears in the world
+	  "SuitUp"                                      the ship intro's first step: the
+	                                                class (Config.OnlyClass) and its
+	                                                starter kit (suit, pistol, shield)
 	  "QuickStart"                                  the short intro's finish: the
 	                                                class (Config.OnlyClass), starter
 	                                                gems if not had yet, and done
@@ -88,22 +91,37 @@ local function starterSpin(player: Player)
 	return reply(true, "Your starter gems!", { Gems = rollStarterGems(player) })
 end
 
--- The short intro's last step: set the class, hand out the starter gems
--- (once), and finish.
-local function quickStart(player: Player)
-	local intro = PlayerData.intro(player)
-	if not intro then
-		return reply(false, "Try again in a moment.")
-	end
+-- Sets the class (Config.OnlyClass) with its starter kit, unless it's set.
+local function giveStarterKit(player: Player)
 	local character = PlayerData.character(player)
 	local classId = Config.OnlyClass or (character and character.Class) or "Warrior"
 	local class = Classes.get(classId)
 	if class and (not character or character.Class ~= classId) then
 		PlayerData.setLoadout(player, classId, class.Weapons[1].Id, class.Armors[1].Id)
 	end
+end
+
+-- The ship intro's first step: put on the suit and pick up the pistol and shield.
+local function suitUp(player: Player)
+	local intro = PlayerData.intro(player)
+	if not intro or intro.Done then
+		return reply(false, "You're already suited up.")
+	end
+	giveStarterKit(player)
+	return reply(true, "Suited up.")
+end
+
+-- The intro's last step: the starter kit and the starter stones (each once),
+-- and done.
+local function quickStart(player: Player)
+	local intro = PlayerData.intro(player)
+	if not intro then
+		return reply(false, "Try again in a moment.")
+	end
+	giveStarterKit(player)
 	local gems = if intro.Spun then {} else rollStarterGems(player)
 	PlayerData.setIntroFlag(player, "Done")
-	return reply(true, "Welcome to Gemsoul!", { Gems = gems })
+	return reply(true, "Welcome to the moon base, Crusader!", { Gems = gems })
 end
 
 local function firstStone(player: Player)
@@ -126,7 +144,7 @@ local function finishIntro(player: Player)
 		return reply(false, "Choose a class first.")
 	end
 	PlayerData.setIntroFlag(player, "Done")
-	return reply(true, "Welcome to Gemsoul!")
+	return reply(true, "Welcome to the moon base, Crusader!")
 end
 
 function Intro.start()
@@ -134,6 +152,7 @@ function Intro.start()
 	Shop.register("StarterSpin", starterSpin)
 	Shop.register("FirstStone", firstStone)
 	Shop.register("FinishIntro", finishIntro)
+	Shop.register("SuitUp", suitUp)
 	Shop.register("QuickStart", quickStart)
 end
 

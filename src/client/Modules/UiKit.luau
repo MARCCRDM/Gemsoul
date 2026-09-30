@@ -1,4 +1,4 @@
--- Small helpers so every Gemsoul screen shares the same retro terminal look.
+-- Small helpers so every Brainrot Crusaders screen shares the same look.
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
@@ -186,7 +186,7 @@ function UiKit.toast(message: string, color: Color3?)
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromOffset(0, 0)
 	label.AutomaticSize = Enum.AutomaticSize.XY
-	label.Font = Enum.Font.Oswald
+	label.Font = Enum.Font.TitilliumWeb
 	label.TextSize = 18
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Text = message

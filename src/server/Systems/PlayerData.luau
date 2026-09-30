@@ -75,7 +75,7 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 7,
+		Version = 8,
 		Coins = Config.StartingCoins,
 		Marks = 0,
 		Gems = {},
@@ -176,6 +176,21 @@ local function migrate(profile: Profile): Profile
 			end
 		end
 		profile.Version = 7
+	end
+	if profile.Version < 8 then
+		-- Saga Miners: everyone gets the Saga Pistol & Shield, the new starter
+		-- kit, and wears it instead of the free starter sword.
+		local weapons = profile.Owned.Weapons
+		weapons.PistolShield = weapons.PistolShield or 1
+		if
+			profile.Character.Class == "Warrior"
+			and profile.Character.Weapon == "Longsword"
+			and weapons.Longsword == 1
+		then
+			profile.Character.Weapon = "PistolShield"
+			profile.Character.WeaponQuality = weapons.PistolShield
+		end
+		profile.Version = 8
 	end
 	return profile
 end

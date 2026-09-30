@@ -697,7 +697,7 @@ local function drawPasses()
 		{
 			"✦ Walk through the pink gate into the VIP pit",
 			"✦ VIP nodes roll rarer colours and better grades",
-			"✦ Support Gemsoul's development",
+			"✦ Support Brainrot Crusaders' development",
 		}
 	do
 		text(info, perk, 15, Color3.new(1, 1, 1), CHUNKY).TextXAlignment = Enum.TextXAlignment.Center

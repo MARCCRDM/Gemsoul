@@ -21,7 +21,7 @@ local Equipment = require(script.Parent.Systems.Equipment)
 -- (nothing to render or stream). The character still spawns on the
 -- place's baseplate so the dashboard can show it wearing its gear.
 if Config.MenuOnly then
-	require(script.Parent.World.Lighting)()
+	require(script.Parent.World.Lighting)(true)
 	-- No baseplate spawn in this place? A small hidden pad to stand on.
 	if not workspace:FindFirstChildWhichIsA("SpawnLocation") then
 		local pad = Instance.new("SpawnLocation")

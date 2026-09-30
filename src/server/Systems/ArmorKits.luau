@@ -694,19 +694,18 @@ end
 
 local BUILDERS: { [string]: (Instance, Body, Kit) -> () } = {}
 
--- Warrior -------------------------------------------------------------------------------
+-- Saga Miners (the Warrior) -----------------------------------------------------------------
 --[[
-	Warrior armor, in the style of a fantasy RPG: a ladder of four sets, from a
-	quilted Padded Jack up to Knight's Plate. Every set is one simple figure
-	(about 30-45 smooth parts: ellipsoids and tubes, no blocks) that covers
-	the whole body, so the avatar underneath is hidden (see ArmorKits.build)
-	and the silhouette is a person in armor rather than a blocky avatar.
-	Surfaces are Plate (the kit's metal), Mail (dark links), Quilt (padded
-	cloth) or Leather. Helms have dark eye slits, never glowing eyes.
+	Saga Miners wear spacesuits: a ladder of four, from a patched Scrap Suit up
+	to the Crusader Exo. Every suit is one simple figure (about 35-50 smooth
+	parts: ellipsoids and tubes, no blocks) that covers the whole body, so the
+	avatar underneath is hidden (see ArmorKits.build). Helmets have a dark
+	glass visor. The glowing bits (chest light, wrist displays, pack lights)
+	are Neon in the kit's accent colour, so trims and enchantments light them.
 ]]
 
 local function shaped(folder, seg, cframe, size, color, material, meshType: Enum.MeshType)
-	local part = make(folder, seg, "Part", cframe, size, color, material or Enum.Material.Metal)
+	local part = make(folder, seg, "Part", cframe, size, color, material or Enum.Material.SmoothPlastic)
 	if part then
 		local mesh = Instance.new("SpecialMesh")
 		mesh.MeshType = meshType
@@ -715,7 +714,7 @@ local function shaped(folder, seg, cframe, size, color, material, meshType: Enum
 	return part
 end
 
--- A smooth rounded plate: an ellipsoid filling `size`.
+-- A smooth rounded shape: an ellipsoid filling `size`.
 local function ellipsoid(folder, seg, cframe, size, color, material)
 	return shaped(folder, seg, cframe, size, color, material, Enum.MeshType.Sphere)
 end
@@ -725,232 +724,204 @@ local function tube(folder, seg, cframe, size, color, material)
 	return shaped(folder, seg, cframe, size, color, material, Enum.MeshType.Cylinder)
 end
 
-local SHADOW = Color3.fromRGB(14, 12, 12)
-local MAIL = Enum.Material.CorrodedMetal
-local QUILT = Color3.fromRGB(150, 128, 96)
+local function light(folder, seg, cframe, size, color)
+	local part = shaped(folder, seg, cframe, size, color, Enum.Material.Neon, Enum.MeshType.Sphere)
+	if part then
+		part.CastShadow = false
+	end
+	return part
+end
 
-type Surface = "Plate" | "Mail" | "Quilt" | "Leather" | "Cloth"
-type Knight = {
-	Helm: "Hood" | "Armet" | "Nordic" | "GreatHelm",
-	Torso: Surface,
-	Arms: Surface,
-	Legs: Surface,
+local VISOR = Color3.fromRGB(18, 26, 40)
+local FABRIC = Enum.Material.Fabric
+local SMOOTH = Enum.Material.SmoothPlastic
+
+type Suit = {
+	Helmet: "Bubble" | "Miner" | "Ranger" | "Crusader",
+	Plates: boolean, -- armour plates over the suit (chest, knees, shoulders)
 	Pauldrons: boolean,
-	Plume: boolean,
-	Fur: boolean,
-	Tabard: boolean,
+	Pack: "Pack" | "Tanks" | "Jet",
+	Stripes: boolean, -- hi-vis bands on arms and legs
 	Cape: boolean,
 }
 
-local function surface(kit: Kit, kind: Surface): (Color3, Enum.Material)
-	if kind == "Plate" then
-		return kit.Metal, kit.Material
-	elseif kind == "Mail" then
-		return kit.Trim, MAIL
-	elseif kind == "Quilt" then
-		return QUILT, Enum.Material.Fabric
-	elseif kind == "Cloth" then
-		return kit.Cloth, Enum.Material.Fabric
-	end
-	return LEATHER, Enum.Material.Leather
-end
-
--- The head the helm is built around: a person's, a bit smaller than an
+-- The head the helmet is built around: a person's, a bit smaller than an
 -- avatar's big blocky head (which is hidden anyway).
 local function humanHead(head: Segment): Segment
 	return { Part = head.Part, Offset = head.Offset * CFrame.new(0, -head.Size.Y * 0.06, 0), Size = head.Size * 0.84 }
 end
 
-local function helm(folder, head: Segment, kit: Kit, style: Knight)
+local function helmet(folder, head: Segment, kit: Kit, style: Suit)
 	local h = head.Size
-	if style.Helm == "Hood" then
-		-- A leather hood with the face lost in shadow, and a cowl.
-		ellipsoid(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.06, 0.04),
-			h * Vector3.new(1.08, 1.16, 1.16),
-			LEATHER,
-			Enum.Material.Leather
-		)
-		ellipsoid(folder, head, CFrame.new(0, -h.Y * 0.02, -h.Z * 0.2), h * Vector3.new(0.72, 0.8, 0.76), SHADOW)
-	elseif style.Helm == "Armet" then
-		ellipsoid(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.08, 0.03),
-			h * Vector3.new(1.02, 1.12, 1.14),
-			kit.Metal,
-			kit.Material
-		)
-		-- The visor comes to a blunt point, with one dark eye slit.
-		ellipsoid(
-			folder,
-			head,
-			CFrame.new(0, -h.Y * 0.06, -h.Z * 0.2),
-			h * Vector3.new(0.86, 0.82, 0.86),
-			kit.Metal,
-			kit.Material
-		)
-		box(folder, head, CFrame.new(0, h.Y * 0.1, -h.Z * 0.6), Vector3.new(h.X * 0.5, h.Y * 0.06, 0.1), SHADOW)
-		tube(folder, head, CFrame.new(0, h.Y * 0.28, 0.03), h * Vector3.new(1.0, 0.07, 1.12), BRASS)
-	elseif style.Helm == "Nordic" then
-		-- Mail aventail over the face, shadowed eyes, a dome and nasal guard.
-		ellipsoid(folder, head, CFrame.new(0, -h.Y * 0.14, 0.02), h * Vector3.new(1.02, 0.95, 1.1), kit.Trim, MAIL)
-		ellipsoid(folder, head, CFrame.new(0, h.Y * 0.08, -h.Z * 0.04), h * Vector3.new(0.9, 0.3, 1.04), SHADOW)
-		ellipsoid(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.28, 0.02),
-			h * Vector3.new(1.04, 0.92, 1.1),
-			kit.Metal,
-			kit.Material
-		)
-		tube(folder, head, CFrame.new(0, h.Y * 0.2, 0.02), h * Vector3.new(1.06, 0.1, 1.12), BRASS)
-		box(folder, head, CFrame.new(0, h.Y * 0.02, -h.Z * 0.56), Vector3.new(0.14, h.Y * 0.42, 0.1), BRASS)
-	else
-		-- Great helm: a flat-topped drum with two eye slits and a brass cross.
-		tube(folder, head, CFrame.new(0, -h.Y * 0.02, 0.02), h * Vector3.new(1.06, 1.1, 1.14), kit.Metal, kit.Material)
-		ellipsoid(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.5, 0.02),
-			h * Vector3.new(1.06, 0.4, 1.14),
-			kit.Metal,
-			kit.Material
-		)
-		box(folder, head, CFrame.new(0, h.Y * 0.14, -h.Z * 0.56), Vector3.new(h.X * 0.76, h.Y * 0.07, 0.12), SHADOW)
-		box(folder, head, CFrame.new(0, 0, -h.Z * 0.58), Vector3.new(0.12, h.Y * 0.86, 0.1), BRASS)
+	local shellColor = if style.Helmet == "Bubble" then kit.Cloth else kit.Metal
+	local shellMaterial = if style.Helmet == "Bubble" then SMOOTH else kit.Material
+	ellipsoid(
+		folder,
+		head,
+		CFrame.new(0, h.Y * 0.06, 0.02),
+		h * Vector3.new(1.24, 1.26, 1.26),
+		shellColor,
+		shellMaterial
+	)
+	-- The visor: dark glass, gold on the Crusader Exo.
+	local visor = ellipsoid(
+		folder,
+		head,
+		CFrame.new(0, h.Y * 0.04, -h.Z * 0.26),
+		h * Vector3.new(0.96, 0.72, 0.84),
+		if style.Helmet == "Crusader" then Color3.fromRGB(214, 170, 80) else VISOR,
+		if style.Helmet == "Crusader" then Enum.Material.Foil else Enum.Material.Glass
+	)
+	if visor then
+		visor.Reflectance = 0.25
 	end
-	if style.Plume then
-		-- Horsehair plume sweeping back from the crown.
+	-- Collar ring.
+	tube(folder, head, CFrame.new(0, -h.Y * 0.6, 0.02), h * Vector3.new(1.1, 0.2, 1.1), kit.Trim, kit.Material)
+	if style.Helmet == "Miner" then
+		-- A headlamp over the visor.
+		tube(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.6, -h.Z * 0.42) * CFrame.Angles(math.rad(70), 0, 0),
+			Vector3.new(0.32, 0.22, 0.32),
+			kit.Trim,
+			kit.Material
+		)
+		light(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.62, -h.Z * 0.55),
+			Vector3.new(0.24, 0.24, 0.1),
+			Color3.fromRGB(255, 244, 200)
+		)
+	elseif style.Helmet == "Ranger" then
+		-- A glowing visor strip and an antenna.
+		box(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.12, -h.Z * 0.66),
+			Vector3.new(h.X * 0.62, 0.06, 0.06),
+			kit.Accent,
+			Enum.Material.Neon
+		)
+		box(folder, head, CFrame.new(h.X * 0.5, h.Y * 0.7, 0.1), Vector3.new(0.05, 0.7, 0.05), kit.Trim, kit.Material)
+	elseif style.Helmet == "Crusader" then
+		-- A crest fin over the crown.
 		ellipsoid(
 			folder,
 			head,
-			CFrame.new(0, h.Y * 0.62, h.Z * 0.3) * CFrame.Angles(math.rad(30), 0, 0),
-			Vector3.new(0.2, h.Y * 0.5, h.Z * 1.1),
-			kit.Cloth,
-			Enum.Material.Fabric
+			CFrame.new(0, h.Y * 0.62, 0.06),
+			Vector3.new(0.14, h.Y * 0.36, h.Z * 1.2),
+			kit.Trim,
+			kit.Material
+		)
+	end
+	-- Ear pods on every helmet.
+	for _, side in sides() do
+		tube(
+			folder,
+			head,
+			CFrame.new(side * h.X * 0.62, h.Y * 0.02, 0.04) * CFrame.Angles(0, 0, math.rad(90)),
+			Vector3.new(0.4, 0.14, 0.4),
+			kit.Trim,
+			kit.Material
 		)
 	end
 end
 
--- Chest, belly, neck, belt and skirt.
-local function torsoPieces(folder, parts: Body, kit: Kit, style: Knight)
+local function torsoPieces(folder, parts: Body, kit: Kit, style: Suit)
 	local torso, waist = parts.Torso, parts.Waist
-	local color, material = surface(kit, style.Torso)
 	if torso then
 		local t = torso.Size
-		-- One rounded chest, broad shoulders under it, and the belly.
-		ellipsoid(folder, torso, CFrame.new(0, t.Y * 0.08, 0), t * Vector3.new(1.02, 1.1, 1.2), color, material)
-		ellipsoid(folder, torso, CFrame.new(0, t.Y * 0.3, 0), t * Vector3.new(1.3, 0.5, 0.95), color, material)
-		tube(folder, torso, CFrame.new(0, -t.Y * 0.38, 0), t * Vector3.new(0.88, 0.3, 1.0), color, material)
-		tube(folder, torso, CFrame.new(0, t.Y * 0.56, 0), Vector3.new(t.X * 0.42, 0.5, t.Z * 0.68), color, material)
-		if style.Torso == "Quilt" then
-			-- Quilting seams across the jack.
-			for _, y in { 0.2, -0.12 } do
-				tube(
-					folder,
-					torso,
-					CFrame.new(0, t.Y * y, 0),
-					t * Vector3.new(0.97, 0.03, 1.12),
-					darken(QUILT, 0.3),
-					Enum.Material.Fabric
-				)
-			end
-		end
-		if style.Fur then
+		ellipsoid(folder, torso, CFrame.new(0, t.Y * 0.08, 0), t * Vector3.new(1.02, 1.1, 1.18), kit.Cloth, FABRIC)
+		ellipsoid(folder, torso, CFrame.new(0, t.Y * 0.3, 0), t * Vector3.new(1.3, 0.5, 0.95), kit.Cloth, FABRIC)
+		tube(folder, torso, CFrame.new(0, -t.Y * 0.38, 0), t * Vector3.new(0.88, 0.3, 1.0), kit.Cloth, FABRIC)
+		if style.Plates then
 			ellipsoid(
 				folder,
 				torso,
-				CFrame.new(0, t.Y * 0.4, t.Z * 0.05),
-				Vector3.new(t.X * 1.35, 0.7, t.Z * 1.35),
-				Color3.fromRGB(92, 70, 52),
-				Enum.Material.Fabric
+				CFrame.new(0, t.Y * 0.14, -t.Z * 0.2),
+				t * Vector3.new(0.86, 0.78, 0.9),
+				kit.Metal,
+				kit.Material
 			)
 		end
+		-- Chest light, and a panel for it.
+		box(folder, torso, CFrame.new(0, t.Y * 0.16, -t.Z * 0.62), Vector3.new(0.5, 0.36, 0.1), kit.Trim, kit.Material)
+		light(folder, torso, CFrame.new(0, t.Y * 0.16, -t.Z * 0.68), Vector3.new(0.26, 0.2, 0.08), kit.Accent)
+		-- Life support on the back.
+		if style.Pack == "Pack" then
+			box(
+				folder,
+				torso,
+				CFrame.new(0, t.Y * 0.08, t.Z * 0.72),
+				Vector3.new(t.X * 0.62, t.Y * 0.8, 0.44),
+				kit.Trim,
+				kit.Material
+			)
+			light(folder, torso, CFrame.new(0, t.Y * 0.3, t.Z * 0.95), Vector3.new(0.3, 0.1, 0.06), kit.Accent)
+		else
+			for _, side in sides() do
+				tube(
+					folder,
+					torso,
+					CFrame.new(side * t.X * 0.18, t.Y * 0.04, t.Z * 0.78),
+					Vector3.new(0.5, t.Y * 0.95, 0.5),
+					if style.Pack == "Jet" then kit.Metal else kit.Trim,
+					kit.Material
+				)
+				light(
+					folder,
+					torso,
+					CFrame.new(side * t.X * 0.18, -t.Y * 0.44 - (if style.Pack == "Jet" then 0.1 else 0), t.Z * 0.78),
+					Vector3.new(0.34, 0.14, 0.34),
+					kit.Accent
+				)
+			end
+		end
 		if style.Cape then
-			-- Two strips angled apart, so the cape falls in a fold.
 			for _, side in sides() do
 				box(
 					folder,
 					torso,
-					CFrame.new(side * t.X * 0.22, t.Y * 0.45, t.Z * 0.6)
-						* CFrame.Angles(math.rad(-7), math.rad(side * 10), 0)
+					CFrame.new(side * t.X * 0.24, t.Y * 0.45, t.Z * 1.06)
+						* CFrame.Angles(math.rad(-6), math.rad(side * 10), 0)
 						* CFrame.new(0, -1.7, 0),
 					Vector3.new(t.X * 0.46, 3.4, 0.06),
-					kit.Cloth,
-					Enum.Material.Fabric
+					Color3.fromRGB(150, 36, 40),
+					FABRIC
 				)
 			end
 		end
 	end
 	if waist then
 		local w = waist.Size
-		local skirtColor, skirtMaterial = surface(kit, style.Legs)
-		tube(folder, waist, CFrame.identity, w * Vector3.new(0.9, 1.3, 1.0), color, material)
+		tube(folder, waist, CFrame.identity, w * Vector3.new(0.9, 1.3, 1.0), kit.Cloth, FABRIC)
 		tube(
 			folder,
 			waist,
 			CFrame.new(0, w.Y * 0.2, 0),
-			Vector3.new(w.X * 0.94, 0.22, w.Z * 1.06),
-			DARK_LEATHER,
-			Enum.Material.Leather
+			Vector3.new(w.X * 0.95, 0.24, w.Z * 1.08),
+			kit.Trim,
+			kit.Material
 		)
-		box(folder, waist, CFrame.new(0, w.Y * 0.2, -w.Z * 0.54), Vector3.new(0.3, 0.26, 0.08), BRASS)
-		-- A flared skirt over the hips.
-		tube(
-			folder,
-			waist,
-			CFrame.new(0, -w.Y * 1.1, 0),
-			Vector3.new(w.X * 1.02, 0.6, w.Z * 1.14),
-			skirtColor,
-			skirtMaterial
-		)
-		if style.Tabard then
-			-- A dyed tabard hanging front and back.
-			for _, dir in { -1, 1 } do
-				box(
-					folder,
-					waist,
-					CFrame.new(0, -0.85, dir * w.Z * 0.62) * CFrame.Angles(math.rad(dir * -4), 0, 0),
-					Vector3.new(w.X * 0.4, 1.6, 0.05),
-					kit.Cloth,
-					Enum.Material.Fabric
-				)
-			end
+		for _, side in sides() do
+			-- Utility pouches on the belt.
+			box(
+				folder,
+				waist,
+				CFrame.new(side * w.X * 0.34, w.Y * 0.05, -w.Z * 0.5),
+				Vector3.new(0.34, 0.3, 0.2),
+				kit.Trim,
+				kit.Material
+			)
 		end
+		tube(folder, waist, CFrame.new(0, -w.Y * 1.0, 0), Vector3.new(w.X * 1.0, 0.5, w.Z * 1.08), kit.Cloth, FABRIC)
 	end
 end
 
-local function pauldronPlate(folder, parts: Body, kit: Kit, side: number)
-	local arm = parts[side == -1 and "LeftUpperArm" or "RightUpperArm"]
-	if not arm then
-		return
-	end
-	local a = arm.Size
-	-- Tilted so the plate slopes down and away from the neck, with a lame below.
-	local top = CFrame.new(side * a.X * 0.06, a.Y * 0.36, 0) * CFrame.Angles(0, 0, math.rad(side * -16))
-	ellipsoid(folder, arm, top, Vector3.new(a.X * 1.45, a.Y * 0.8, a.Z * 1.4), kit.Metal, kit.Material)
-	tube(folder, arm, top, Vector3.new(a.X * 1.49, 0.07, a.Z * 1.44), BRASS)
-	ellipsoid(
-		folder,
-		arm,
-		top * CFrame.new(side * 0.04, -0.3, 0),
-		Vector3.new(a.X * 1.26, 0.34, a.Z * 1.22),
-		kit.Metal,
-		kit.Material
-	)
-end
-
--- Arms and legs: a tube for each limb segment, round joints, gloves and boots.
-local function limbs(folder, parts: Body, kit: Kit, style: Knight)
-	local armColor, armMaterial = surface(kit, style.Arms)
-	local legColor, legMaterial = surface(kit, style.Legs)
-	-- Gloves and boots: steel on plate sets, leather otherwise.
-	local endColor, endMaterial =
-		if style.Arms == "Plate" then darken(kit.Metal, 0.25) else DARK_LEATHER,
-		if style.Arms == "Plate" then kit.Material else Enum.Material.Leather
+local function limbs(folder, parts: Body, kit: Kit, style: Suit)
+	local stripe = Color3.fromRGB(235, 222, 90)
 	for _, side in sides() do
 		local L = if side == -1 then "Left" else "Right"
 		-- Arm pieces sit a little in from the avatar's arms, closing the gap
@@ -959,16 +930,31 @@ local function limbs(folder, parts: Body, kit: Kit, style: Knight)
 		local upper, lower, hand = parts[L .. "UpperArm"], parts[L .. "LowerArm"], parts[L .. "Hand"]
 		if upper then
 			local a = upper.Size
-			tube(folder, upper, inward, a * Vector3.new(0.82, 1.0, 0.86), armColor, armMaterial)
-			if not style.Pauldrons then
-				-- A rounded shoulder (plate sets wear pauldrons here instead).
+			tube(folder, upper, inward, a * Vector3.new(0.84, 1.0, 0.88), kit.Cloth, FABRIC)
+			if style.Pauldrons then
+				local top = inward
+					* CFrame.new(side * a.X * 0.06, a.Y * 0.34, 0)
+					* CFrame.Angles(0, 0, math.rad(side * -14))
+				ellipsoid(folder, upper, top, Vector3.new(a.X * 1.4, a.Y * 0.74, a.Z * 1.34), kit.Metal, kit.Material)
+				tube(folder, upper, top, Vector3.new(a.X * 1.44, 0.07, a.Z * 1.38), kit.Trim, kit.Material)
+			else
 				ellipsoid(
 					folder,
 					upper,
 					inward * CFrame.new(0, a.Y * 0.38, 0),
-					a * Vector3.new(0.98, 0.6, 0.98),
-					armColor,
-					armMaterial
+					a * Vector3.new(1.0, 0.62, 1.0),
+					kit.Cloth,
+					FABRIC
+				)
+			end
+			if style.Stripes then
+				tube(
+					folder,
+					upper,
+					inward * CFrame.new(0, -a.Y * 0.15, 0),
+					a * Vector3.new(0.88, 0.1, 0.92),
+					stripe,
+					SMOOTH
 				)
 			end
 		end
@@ -977,27 +963,34 @@ local function limbs(folder, parts: Body, kit: Kit, style: Knight)
 			ellipsoid(
 				folder,
 				lower,
-				inward * CFrame.new(0, l.Y * 0.46, l.Z * 0.04),
-				l * Vector3.new(0.86, 0.5, 0.92),
-				armColor,
-				armMaterial
+				inward * CFrame.new(0, l.Y * 0.46, 0),
+				l * Vector3.new(0.86, 0.46, 0.9),
+				kit.Trim,
+				kit.Material
 			)
 			tube(
 				folder,
 				lower,
-				inward * CFrame.new(0, -l.Y * 0.08, 0),
-				l * Vector3.new(0.78, 0.9, 0.82),
-				armColor,
-				armMaterial
+				inward * CFrame.new(0, -l.Y * 0.06, 0),
+				l * Vector3.new(0.8, 0.9, 0.84),
+				kit.Cloth,
+				FABRIC
 			)
-			-- A glove cuff at the wrist.
+			-- A chunky cuff with a glowing wrist display.
 			tube(
 				folder,
 				lower,
-				inward * CFrame.new(0, -l.Y * 0.4, 0),
-				l * Vector3.new(0.9, 0.24, 0.94),
-				endColor,
-				endMaterial
+				inward * CFrame.new(0, -l.Y * 0.36, 0),
+				l * Vector3.new(0.94, 0.32, 0.98),
+				if style.Plates then kit.Metal else kit.Trim,
+				kit.Material
+			)
+			light(
+				folder,
+				lower,
+				inward * CFrame.new(0, -l.Y * 0.36, -l.Z * 0.46),
+				Vector3.new(0.3, 0.14, 0.08),
+				kit.Accent
 			)
 		end
 		if hand then
@@ -1005,9 +998,9 @@ local function limbs(folder, parts: Body, kit: Kit, style: Knight)
 				folder,
 				hand,
 				inward * CFrame.new(0, -hand.Size.Y * 0.3, 0),
-				hand.Size * Vector3.new(0.74, 2.3, 0.86),
-				endColor,
-				endMaterial
+				hand.Size * Vector3.new(0.78, 2.3, 0.9),
+				kit.Trim,
+				kit.Material
 			)
 		end
 		local thigh, shin, foot = parts[L .. "UpperLeg"], parts[L .. "LowerLeg"], parts[L .. "Foot"]
@@ -1016,104 +1009,106 @@ local function limbs(folder, parts: Body, kit: Kit, style: Knight)
 				folder,
 				thigh,
 				CFrame.new(0, thigh.Size.Y * 0.05, 0),
-				thigh.Size * Vector3.new(0.9, 1.1, 0.9),
-				legColor,
-				legMaterial
+				thigh.Size * Vector3.new(0.92, 1.1, 0.92),
+				kit.Cloth,
+				FABRIC
 			)
+			if style.Stripes then
+				tube(
+					folder,
+					thigh,
+					CFrame.new(0, -thigh.Size.Y * 0.2, 0),
+					thigh.Size * Vector3.new(0.95, 0.1, 0.95),
+					stripe,
+					SMOOTH
+				)
+			end
 		end
 		if shin then
 			local l = shin.Size
 			ellipsoid(
 				folder,
 				shin,
-				CFrame.new(0, l.Y * 0.46, -l.Z * 0.1),
-				l * Vector3.new(0.82, 0.5, 0.82),
-				legColor,
-				legMaterial
+				CFrame.new(0, l.Y * 0.44, -l.Z * 0.12),
+				l * Vector3.new(0.84, 0.5, 0.82),
+				if style.Plates then kit.Metal else kit.Trim,
+				kit.Material
 			)
-			tube(folder, shin, CFrame.new(0, -l.Y * 0.04, 0), l * Vector3.new(0.78, 0.96, 0.8), endColor, endMaterial)
+			tube(folder, shin, CFrame.new(0, -l.Y * 0.04, 0), l * Vector3.new(0.82, 0.96, 0.84), kit.Cloth, FABRIC)
 		end
 		if foot then
 			local f = foot.Size
+			-- Chunky magnetic boots.
+			tube(
+				folder,
+				foot,
+				CFrame.new(0, f.Y * 0.6, 0.02),
+				Vector3.new(f.X * 0.9, 0.5, f.Z * 0.94),
+				kit.Trim,
+				kit.Material
+			)
 			ellipsoid(
 				folder,
 				foot,
-				CFrame.new(0, f.Y * 0.08, -f.Z * 0.16),
-				Vector3.new(f.X * 0.82, f.Y * 1.6, f.Z * 1.3),
-				endColor,
-				endMaterial
+				CFrame.new(0, f.Y * 0.1, -f.Z * 0.16),
+				Vector3.new(f.X * 0.9, f.Y * 1.8, f.Z * 1.36),
+				kit.Trim,
+				kit.Material
 			)
 		end
 	end
 end
 
-local function knight(style: Knight)
+local function suit(style: Suit)
 	return function(folder, parts: Body, kit: Kit)
 		if parts.Head then
-			helm(folder, humanHead(parts.Head), kit, style)
+			helmet(folder, humanHead(parts.Head), kit, style)
 		end
 		torsoPieces(folder, parts, kit, style)
-		if style.Pauldrons then
-			for _, side in sides() do
-				pauldronPlate(folder, parts, kit, side)
-			end
-		end
 		limbs(folder, parts, kit, style)
 	end
 end
 
 -- Looks that cover the whole figure: the avatar underneath is hidden.
-local FULL_BODY = { Padded = true, Chain = true, Scale = true, Plate = true }
+local FULL_BODY = { SuitScrap = true, SuitMiner = true, SuitRanger = true, SuitCrusader = true }
 
--- Tier 1, the starter: a quilted jack, leather hood, gloves and boots.
-BUILDERS.Padded = knight({
-	Helm = "Hood",
-	Torso = "Quilt",
-	Arms = "Quilt",
-	Legs = "Leather",
+-- Tier 1, the starter: a patched white suit, bubble helmet and a small pack.
+BUILDERS.SuitScrap = suit({
+	Helmet = "Bubble",
+	Plates = false,
 	Pauldrons = false,
-	Plume = false,
-	Fur = false,
-	Tabard = false,
+	Pack = "Pack",
+	Stripes = false,
 	Cape = false,
 })
 
--- Tier 2: mail from head to knee under a dyed surcoat, and a great helm.
-BUILDERS.Chain = knight({
-	Helm = "GreatHelm",
-	Torso = "Cloth",
-	Arms = "Mail",
-	Legs = "Mail",
+-- Tier 2: a hi-vis mining suit with a headlamp and twin air tanks.
+BUILDERS.SuitMiner = suit({
+	Helmet = "Miner",
+	Plates = false,
 	Pauldrons = false,
-	Plume = false,
-	Fur = false,
-	Tabard = true,
+	Pack = "Tanks",
+	Stripes = true,
 	Cape = false,
 })
 
--- Tier 3: a scale cuirass, fur mantle and a Nordic helm.
-BUILDERS.Scale = knight({
-	Helm = "Nordic",
-	Torso = "Plate",
-	Arms = "Mail",
-	Legs = "Mail",
+-- Tier 3: armour plates, pauldrons and a glowing visor strip.
+BUILDERS.SuitRanger = suit({
+	Helmet = "Ranger",
+	Plates = true,
 	Pauldrons = true,
-	Plume = false,
-	Fur = true,
-	Tabard = true,
+	Pack = "Tanks",
+	Stripes = false,
 	Cape = false,
 })
 
--- Tier 4: full plate, a plumed armet, tabard and cape.
-BUILDERS.Plate = knight({
-	Helm = "Armet",
-	Torso = "Plate",
-	Arms = "Plate",
-	Legs = "Plate",
+-- Tier 4: white and gold exo-armour, a jet pack and a crusader's cape.
+BUILDERS.SuitCrusader = suit({
+	Helmet = "Crusader",
+	Plates = true,
 	Pauldrons = true,
-	Plume = true,
-	Fur = false,
-	Tabard = true,
+	Pack = "Jet",
+	Stripes = false,
 	Cape = true,
 })
 
@@ -1422,10 +1417,32 @@ end
 
 -- Colours for each look: metal, trim, cloth and the material the metal uses.
 local KITS: { [string]: { Metal: Color3, Trim: Color3, Cloth: Color3?, Material: Enum.Material } } = {
-	Plate = { Metal = Color3.fromRGB(168, 172, 180), Trim = DARK_STEEL, Material = Enum.Material.Metal },
-	Scale = { Metal = Color3.fromRGB(128, 134, 144), Trim = DARK_STEEL, Material = Enum.Material.DiamondPlate },
-	Padded = { Metal = LEATHER, Trim = DARK_LEATHER, Material = Enum.Material.Leather },
-	Chain = { Metal = Color3.fromRGB(122, 126, 134), Trim = DARK_STEEL, Material = Enum.Material.Metal },
+	-- Saga Miner suits: Metal is the armour plates, Trim the dark fittings,
+	-- Cloth the suit itself.
+	SuitScrap = {
+		Metal = Color3.fromRGB(150, 154, 162),
+		Trim = Color3.fromRGB(72, 76, 86),
+		Cloth = Color3.fromRGB(206, 206, 204),
+		Material = Enum.Material.SmoothPlastic,
+	},
+	SuitMiner = {
+		Metal = Color3.fromRGB(150, 154, 162),
+		Trim = Color3.fromRGB(58, 60, 68),
+		Cloth = Color3.fromRGB(222, 116, 38),
+		Material = Enum.Material.SmoothPlastic,
+	},
+	SuitRanger = {
+		Metal = Color3.fromRGB(64, 138, 150),
+		Trim = Color3.fromRGB(40, 44, 54),
+		Cloth = Color3.fromRGB(70, 76, 88),
+		Material = Enum.Material.Metal,
+	},
+	SuitCrusader = {
+		Metal = Color3.fromRGB(228, 230, 234),
+		Trim = Color3.fromRGB(206, 164, 76),
+		Cloth = Color3.fromRGB(90, 94, 104),
+		Material = Enum.Material.SmoothPlastic,
+	},
 	Bulwark = { Metal = Color3.fromRGB(120, 130, 150), Trim = DARK_STEEL, Material = Enum.Material.Metal },
 	TowerPlate = { Metal = Color3.fromRGB(88, 94, 108), Trim = DARK_STEEL, Material = Enum.Material.Metal },
 	Vanguard = { Metal = Color3.fromRGB(188, 194, 206), Trim = DARK_STEEL, Material = Enum.Material.Metal },

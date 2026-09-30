@@ -1,8 +1,9 @@
 --[[
-	Gemsoul's menu style, shared by every window: dark iron panels with a thin
-	gold edge, serif titles, and muted, weighty buttons in the manner of a
-	classic fantasy RPG. Aimed at older players as much as younger ones:
-	restrained colour, soft outlines, small hover and press motion.
+	Brainrot Crusaders' menu style, shared by every window: dark space-station
+	panels with a thin holo-blue edge, wide sci-fi titles, and low buttons.
+	Aimed at older players as much as younger ones: restrained colour, soft
+	outlines, small hover and press motion. Saga amber marks the important
+	things (currency, main actions).
 
 	Buttons are "chunks": low slabs. From the outside in: a thin dark
 	outline, a darker lip underneath (the depth), a rim, then a gradient face
@@ -21,24 +22,24 @@ local UiKit = require(script.Parent.UiKit)
 local IronUi = {}
 
 IronUi.Colors = {
-	Frame = Color3.fromRGB(17, 17, 21),
-	Inset = Color3.fromRGB(27, 27, 32),
-	Slot = Color3.fromRGB(37, 36, 42),
-	Edge = Color3.fromRGB(112, 92, 60),
-	Gold = Color3.fromRGB(222, 184, 108),
-	Text = Color3.fromRGB(232, 226, 212),
-	Dim = Color3.fromRGB(156, 148, 134),
-	Good = Color3.fromRGB(110, 196, 124),
-	Bad = Color3.fromRGB(206, 92, 80),
-	Amethyst = Color3.fromRGB(104, 72, 150),
-	Teal = Color3.fromRGB(46, 118, 128),
-	Emerald = Color3.fromRGB(58, 146, 96),
-	Ink = Color3.fromRGB(8, 8, 10), -- outlines on display text
+	Frame = Color3.fromRGB(9, 13, 24),
+	Inset = Color3.fromRGB(15, 21, 36),
+	Slot = Color3.fromRGB(23, 31, 50),
+	Edge = Color3.fromRGB(56, 122, 160), -- holo blue
+	Gold = Color3.fromRGB(255, 184, 72), -- Saga amber
+	Text = Color3.fromRGB(226, 236, 246),
+	Dim = Color3.fromRGB(128, 148, 170),
+	Good = Color3.fromRGB(90, 220, 150),
+	Bad = Color3.fromRGB(240, 92, 92),
+	Amethyst = Color3.fromRGB(118, 88, 220),
+	Teal = Color3.fromRGB(40, 170, 200),
+	Emerald = Color3.fromRGB(40, 190, 130),
+	Ink = Color3.fromRGB(3, 5, 12), -- outlines on display text
 }
 local P = IronUi.Colors
 
-IronUi.Heading = Enum.Font.Merriweather -- titles: a book serif
-IronUi.Chunky = Enum.Font.Oswald -- buttons, tabs and labels: a strong condensed sans
+IronUi.Heading = Enum.Font.Michroma -- titles: a wide sci-fi face
+IronUi.Chunky = Enum.Font.TitilliumWeb -- buttons, tabs and labels: a clean technical sans
 IronUi.Body = Enum.Font.Gotham
 IronUi.Bold = Enum.Font.GothamBold
 
@@ -337,7 +338,7 @@ export type ChunkOptions = {
 -- Toy-bright colours are toned down to muted, weathered ones.
 local function mute(color: Color3): Color3
 	local h, s, v = color:ToHSV()
-	return Color3.fromHSV(h, s * 0.62, math.min(v, 0.7))
+	return Color3.fromHSV(h, s * 0.8, math.min(v, 0.78))
 end
 IronUi.mute = mute
 
@@ -649,7 +650,7 @@ function IronUi.window(
 	new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, panel)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(32, 31, 37), P.Frame),
+		Color = ColorSequence.new(Color3.fromRGB(20, 30, 52), P.Frame),
 	}, panel)
 	local rim = new("Frame", {
 		BackgroundTransparency = 1,

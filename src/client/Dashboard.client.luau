@@ -47,20 +47,25 @@ pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false
 local gui = UiKit.gui("Dashboard", 1)
 gui.IgnoreGuiInset = true
 
--- Background: covers the whole screen (there's no world behind it).
-local backdrop = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1) }, gui)
+-- Background: deep space over the whole screen, thin enough that the moon
+-- base (see MenuCamera) shows through behind the panels.
+local backdrop = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BackgroundTransparency = 0.18,
+	Size = UDim2.fromScale(1, 1),
+}, gui)
 new("UIGradient", {
 	Rotation = 110,
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 38, 44)),
-		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 20, 24)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 20, 26)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 28, 58)),
+		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(7, 10, 22)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 24, 40)),
 	}),
 }, backdrop)
 local pattern = new("TextLabel", {
 	BackgroundTransparency = 1,
 	Size = UDim2.fromScale(1, 1),
-	Text = string.rep(string.rep("◆      ", 40) .. "\n", 30),
+	Text = string.rep(string.rep("·        ", 30) .. "\n", 30),
 	TextSize = 14,
 	LineHeight = 2,
 	Font = Enum.Font.GothamBold,
@@ -160,12 +165,12 @@ end
 
 -- Top bar ---------------------------------------------------------------------------------------------------
 
-local logo = IronUi.badge(root, "💎", 64)
+local logo = IronUi.badge(root, "🪐", 64)
 logo.Position = UDim2.fromOffset(16, 8)
 logo.Rotation = 0
-local title = IronUi.title(root, "GEMSOUL", 40, P.Gold)
+local title = IronUi.title(root, "BRAINROT CRUSADERS", 26, P.Gold)
 title.AutomaticSize = Enum.AutomaticSize.None
-place(title, 92, 14, 300, 44)
+place(title, 92, 16, 560, 34)
 local hello = label(root, "", 15, LIGHT)
 place(hello, 94, 52, 400, 18)
 
@@ -205,8 +210,8 @@ shopButton.Size = UDim2.fromOffset(0, 46)
 -- Left: the hero --------------------------------------------------------------------------------------------
 
 local TOP = 84
-local hero = panel(root, 16, TOP, 360, H - TOP - 16, Color3.fromRGB(130, 70, 60))
-local heroTitle = IronUi.title(hero, "WARRIOR", 28)
+local hero = panel(root, 16, TOP, 360, H - TOP - 16, Color3.fromRGB(50, 110, 170))
+local heroTitle = IronUi.title(hero, "SAGA MINER", 22)
 heroTitle.AutomaticSize = Enum.AutomaticSize.None
 place(heroTitle, 18, 16, 324, 32)
 local heroSub = label(hero, "Melee damage", 14, LIGHT)
@@ -365,15 +370,20 @@ gearButton.Position = UDim2.new(0.5, 0, 1, -16)
 
 local MID_X, MID_W = 392, 480
 local mine = panel(root, MID_X, TOP, MID_W, 250, Color3.fromRGB(230, 130, 40))
-local mineTitle = IronUi.title(mine, "THE MINE", 40)
+local mineTitle = IronUi.title(mine, "MOON MINE", 28)
 mineTitle.AutomaticSize = Enum.AutomaticSize.None
 place(mineTitle, 22, 18, 300, 44)
 local mineLine1 = label(mine, "", 17, Color3.new(1, 1, 1), CHUNKY)
 place(mineLine1, 24, 70, 280, 22)
 local mineLine2 = label(mine, "", 17, Color3.new(1, 1, 1), CHUNKY)
 place(mineLine2, 24, 96, 280, 22)
-local mineLine3 =
-	label(mine, "Glinting rocks hide gems. Deeper walls hold rarer ones!", 14, Color3.fromRGB(255, 236, 210), CHUNKY)
+local mineLine3 = label(
+	mine,
+	"Glinting rocks hide Saga Stones. Deeper shafts hold rarer ones!",
+	14,
+	Color3.fromRGB(255, 236, 210),
+	CHUNKY
+)
 place(mineLine3, 24, 124, 260, 40)
 mineLine3.TextWrapped = true
 mineLine3.TextYAlignment = Enum.TextYAlignment.Top
@@ -447,7 +457,7 @@ local function workshop(
 	local ic = label(card, icon, 40, Color3.new(1, 1, 1), Enum.Font.Gotham)
 	place(ic, 14, 14, 48, 48)
 	ic.Rotation = 0
-	local head = IronUi.title(card, name, 24)
+	local head = IronUi.title(card, name, 18)
 	head.AutomaticSize = Enum.AutomaticSize.None
 	place(head, 70, 22, 150, 28)
 	local line = label(card, "", 13, LIGHT, IronUi.Body)
@@ -496,7 +506,7 @@ local sellCard = workshop(
 
 local INV_X = 888
 local inventory = panel(root, INV_X, TOP, W - INV_X - 16, H - TOP - 16, Color3.fromRGB(60, 90, 150))
-local invTitle = IronUi.title(inventory, "INVENTORY", 28)
+local invTitle = IronUi.title(inventory, "CARGO", 22)
 invTitle.AutomaticSize = Enum.AutomaticSize.None
 place(invTitle, 18, 16, 240, 32)
 local invCount = label(inventory, "", 14, LIGHT, CHUNKY)
@@ -507,7 +517,7 @@ end)
 pouchButton.AnchorPoint = Vector2.new(1, 0)
 pouchButton.Position = UDim2.new(1, -14, 0, 16)
 
-local gemsHead = label(inventory, "GEMS", 15, P.Gold, CHUNKY)
+local gemsHead = label(inventory, "SAGA STONES", 15, P.Gold, CHUNKY)
 place(gemsHead, 18, 76, 200, 18)
 local gemGrid = new("ScrollingFrame", {
 	BackgroundColor3 = Color3.fromRGB(18, 14, 28),

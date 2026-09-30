@@ -1,8 +1,8 @@
 --[[
 	Menu-only mode (Shared/Config.MenuOnly): the game is played from the
 	menu, so the character can't walk around and the camera drifts slowly
-	around the kingdom behind the menus. The intro runs its own flyover;
-	this takes over once it's done.
+	around the moon base station behind the menus (built here, on the
+	client). The intro runs its own scenes; this takes over once it's done.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +12,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 if not Config.MenuOnly then
 	return
 end
+local Scenes = require(script.Parent.Modules.Scenes)
 
 local player = Players.LocalPlayer
 
@@ -33,17 +34,24 @@ task.spawn(function()
 	end
 end)
 
--- A slow orbit around the town, a little lower and closer than the intro's.
+-- The moon base, built once, and a slow orbit around it.
+local BASE_AT = CFrame.new(0, 300, 0)
+local base: Scenes.Base? = nil
 local started = os.clock()
 RunService.RenderStepped:Connect(function()
 	if introOpen() then
 		return
 	end
+	if not base then
+		Scenes.spaceLighting()
+		base = Scenes.moonBase(BASE_AT)
+	end
 	local camera = workspace.CurrentCamera
 	if camera.CameraType ~= Enum.CameraType.Scriptable then
 		camera.CameraType = Enum.CameraType.Scriptable
 	end
-	local t = (os.clock() - started) * 0.035 + 0.8
-	local eye = Vector3.new(math.cos(t) * 135, 55 + math.sin(t * 0.7) * 8, math.sin(t) * 135)
-	camera.CFrame = CFrame.lookAt(eye, Vector3.new(0, 12, 0))
+	local b = base :: Scenes.Base
+	local t = (os.clock() - started) * 0.03 + 0.8
+	local eye = b.Center + Vector3.new(math.cos(t) * 120, 42 + math.sin(t * 0.7) * 6, math.sin(t) * 120)
+	camera.CFrame = CFrame.lookAt(eye, b.Center)
 end)

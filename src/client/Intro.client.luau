@@ -1,11 +1,22 @@
 --[[
-	The new-player intro: two screens.
-	  1  Welcome, and your first dig: a free wall in the Mine with your first
-	     stone in it (the Mine window opens on top).
-	  2  "You're a miner!": your first stone and three free starter gems,
-	     then into the dashboard.
-	You play as a Warrior (Config.OnlyClass); the server sets it up.
-	Leaving part-way picks up where you left off.
+	The new-player intro for Brainrot Crusaders:
+
+	  1  The lore "video": a short cinematic. The Saga Miners' colony, the
+	     pulsing Saga Stones, the rift, the brainrot entities. (Skippable.)
+	  2  Aboard the colony ship: you wake up to alarms. A brainrot alligator
+	     bomber is strafing the ship outside the window. The tutorial walks
+	     you through the core mechanics, one station at a time:
+	       suit up (Scrap Suit, Saga Pistol and Shield)   "SuitUp"
+	       collect your Saga Stone ration (a slot spin)    "StarterSpin"
+	       enchant your blaster with your best stone       "SocketGem"
+	       drive off the bomber (shoot it)                 (client only)
+	       teleport out                                    "QuickStart" (done)
+	  3  You beam down to the moon base (the dashboard, with the base behind
+	     it: see MenuCamera).
+
+	The ship and the bomber are built on the client (Modules/Scenes). Your
+	figure in the ship is a copy of your character, so it wears whatever the
+	server has dressed it in. Leaving part-way picks up where you left off.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,15 +26,18 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemArt = require(script.Parent.Modules.GemArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
-local MineUI = require(script.Parent.Modules.MineUI)
+local Scenes = require(script.Parent.Modules.Scenes)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
 local new, text = IronUi.new, IronUi.text
 local P = IronUi.Colors
 local HEADING, CHUNKY = IronUi.Heading, IronUi.Chunky
-local LIGHT = Color3.fromRGB(214, 208, 196)
+local LIGHT = Color3.fromRGB(200, 214, 230)
 local INK = P.Ink
+local SAGA = P.Gold
+local HOLO = Color3.fromRGB(90, 210, 255)
+local ALARM = Color3.fromRGB(255, 70, 60)
 
 -- Wait for the profile, and only run for players who haven't finished.
 while not GemClient.Profile do
@@ -41,85 +55,33 @@ local gui = new("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 }, player:WaitForChild("PlayerGui"))
 
--- Full-screen background, like the dashboard's.
-local backdrop = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1) }, gui)
-new("UIGradient", {
-	Rotation = 110,
-	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 38, 44)),
-		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 20, 24)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 20, 26)),
-	}),
-}, backdrop)
-
--- One centred panel, scaled to fit the screen.
-local W, H = 860, 600
-local panel = new("Frame", {
+-- Everything is laid out on a 1280x720 canvas scaled to the screen.
+local W, H = 1280, 720
+local canvas = new("Frame", {
+	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.5),
 	Size = UDim2.fromOffset(W, H),
-	BackgroundColor3 = Color3.new(1, 1, 1),
 }, gui)
-UiKit.round(panel, 10)
-new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, panel)
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(34, 33, 39), P.Frame) }, panel)
-local panelScale = new("UIScale", {}, panel)
+local canvasScale = new("UIScale", {}, canvas)
 local function fit()
 	local screen = gui.AbsoluteSize
 	if screen.X > 0 then
-		panelScale.Scale = math.min(1, (screen.X - 40) / W, (screen.Y - 40) / H)
+		canvasScale.Scale = math.min(screen.X / W, screen.Y / H)
 	end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 fit()
-local badge = IronUi.badge(panel, "💎", 84)
-badge.AnchorPoint = Vector2.new(0.5, 0.5)
-badge.Position = UDim2.new(0.5, 0, 0, 0)
-badge.ZIndex = 5
-for _, child in badge:GetDescendants() do
-	if child:IsA("GuiObject") then
-		child.ZIndex = 6
-	end
-end
-IronUi.animate(badge, function(t)
-	badge.Rotation = math.sin(t * 1.2) * 3
-end)
 
-local body = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(40, 70),
-	Size = UDim2.new(1, -80, 1, -110),
-}, panel)
-local list = UiKit.list(body, 14)
-list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local busy = false
-
-local function clear()
-	for _, child in body:GetChildren() do
-		if child:IsA("GuiObject") then
-			child:Destroy()
-		end
-	end
-	local pop = badge:FindFirstChild("Pop") or new("UIScale", { Name = "Pop" }, badge)
-	pop.Scale = 0.8
-	TweenService:Create(pop, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+local function label(parent: Instance, value: string, size: number, color: Color3?, font: Enum.Font?): TextLabel
+	local t = text(parent, value, size, color or Color3.new(1, 1, 1), font or CHUNKY)
+	t.AutomaticSize = Enum.AutomaticSize.None
+	return t
 end
 
-local function line(value: string, size: number, color: Color3, font: Enum.Font, order: number): TextLabel
-	local label = text(body, value, size, color, font)
-	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.LayoutOrder = order
-	return label
-end
-
-local function firstStone()
-	for _, gem in GemClient.Profile.Gems or {} do
-		if gem.Source == "FirstStone" then
-			return gem
-		end
-	end
-	return nil
+local function place(object: GuiObject, x: number, y: number, w: number, h: number)
+	object.Position = UDim2.fromOffset(x, y)
+	object.Size = UDim2.fromOffset(w, h)
 end
 
 local CARD_W, CARD_H = 170, 236
@@ -217,7 +179,7 @@ local function cardFrame(parent: Instance, order: number): Card
 		Rotation = 90,
 		Color = ColorSequence.new(Color3.fromRGB(70, 68, 78), Color3.fromRGB(16, 16, 20)),
 	}, stage)
-	local name = text(c, "", 16, Color3.new(1, 1, 1), HEADING)
+	local name = text(c, "", 17, Color3.new(1, 1, 1), CHUNKY)
 	name.AutomaticSize = Enum.AutomaticSize.None
 	name.Position = UDim2.fromOffset(6, 158)
 	name.Size = UDim2.new(1, -12, 0, 38)
@@ -258,19 +220,6 @@ local function showGem(card: Card, gem, caption: string?)
 	card.Name.Text = GemConfig.shade(gem).Name
 	local state = if gem.Cut then "Cut " .. gem.Cut else "Rough"
 	card.Info.Text = string.format("%s  •  💰 %d", state, GemConfig.value(gem))
-end
-
--- A card that pops in already showing its gem.
-local function gemCard(parent: Instance, gem, order: number, caption: string?): Card
-	local card = cardFrame(parent, order)
-	showGem(card, gem, caption)
-	card.Scale.Scale = 0.3
-	task.delay(0.12 * order, function()
-		TweenService:Create(card.Scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Scale = 1,
-		}):Play()
-	end)
-	return card
 end
 
 -- A lottery reel: a "?" card whose window spins a strip of 3D stones past a
@@ -495,179 +444,763 @@ local function marquee(parent: Instance, order: number, width: number): Marquee
 	return state
 end
 
-local showReady: () -> ()
+-- 1  The lore "video" ------------------------------------------------------------------------
 
--- Screen 1: welcome and the first dig.
-local function showWelcome()
-	clear()
-	local title = line("GEMSOUL", 84, P.Gold, HEADING, 1)
-	local titleStroke = title:FindFirstChildOfClass("UIStroke")
-	if titleStroke then
-		titleStroke.Thickness = 2
-	end
-	line("Dig up gems. Cut them. Forge them into legendary gear.", 22, Color3.new(1, 1, 1), CHUNKY, 2)
-	line(
-		"Gems grow in the rock under the kingdom. Glinting rocks hide them:\nswing your pickaxe and break one out!",
-		17,
-		LIGHT,
-		CHUNKY,
-		3
-	)
-	local spacer = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(10, 20), LayoutOrder = 4 }, body)
-	spacer.Name = "Spacer"
-	local dig
-	dig = IronUi.gemButton(body, "⛏️  START DIGGING", Color3.fromRGB(255, 150, 30), function()
-		if busy then
-			return
-		end
-		busy = true
-		gui.Enabled = false
-		MineUI.tutorial()
-		gui.Enabled = true
-		-- If the dig couldn't start, a practice stone instead.
-		if not firstStone() and not GemClient.Profile.Intro.FirstStone then
-			GemClient.request("FirstStone")
-		end
-		busy = false
-		if firstStone() then
-			showReady()
-		end
-	end)
-	dig.LayoutOrder = 5
-	dig.Size = UDim2.fromOffset(0, 70)
-	dig.TextSize = 30
-	IronUi.animate(dig, function(t)
-		dig.Rotation = math.sin(t * 6) * 2
-	end)
-end
-
--- Screen 2: your gems, then into the game.
-function showReady()
-	clear()
-	line("YOU'RE A MINER!", 46, Color3.new(1, 1, 1), HEADING, 1)
-	local sub = line("Your first stone! Now spin for 3 free cut gems.", 18, LIGHT, CHUNKY, 2)
-	local row = new("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, CARD_H + 16),
-		LayoutOrder = 4,
-	}, body)
-	local rowList = UiKit.list(row, 16, true)
-	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	rowList.VerticalAlignment = Enum.VerticalAlignment.Bottom
-	local stone = firstStone()
-	if stone then
-		gemCard(row, stone, 1, "YOUR FIRST")
-	end
-	local function enter()
-		gui:Destroy()
-		UiKit.toast("Welcome to Gemsoul! Press M or click DIG to mine.", P.Gold)
-	end
-	local starters = {}
-	for _, gem in GemClient.Profile.Gems or {} do
-		if gem.Source == "StarterSpin" then
-			table.insert(starters, gem)
-		end
-	end
-	-- Already spun (came back part-way)? Show them; otherwise three reels.
-	local claimed = #starters > 0 or GemClient.Profile.Intro.Done == true
-	local spins = {}
-	if claimed then
-		sub.Text = "Your first stone, plus three cut gems to get you started."
-		for i, gem in starters do
-			gemCard(row, gem, i + 1)
-		end
-	else
-		for i = 1, 3 do
-			local _, spin = reelCard(row, i + 1)
-			spins[i] = spin
-		end
-	end
-	-- Chasing lights above and below the reels.
-	local lights = if claimed then {} else { marquee(body, 3, 760), marquee(body, 5, 760) }
-	local function lightsTo(mode: string, color: Color3?)
-		for _, bar in lights do
-			bar.Mode = mode
-			bar.Color = color or P.Gold
-		end
-	end
-	local button
-	button = IronUi.gemButton(
-		body,
-		if claimed then "ENTER GEMSOUL  ►" else "SPIN THE REELS",
-		if claimed then P.Emerald else Color3.fromRGB(255, 150, 30),
-		function()
-			if busy then
-				return
-			end
-			if claimed then
-				enter()
-				return
-			end
-			busy = true
-			button.Visible = false
-			task.spawn(function()
-				local result = GemClient.request("QuickStart")
-				if not result.Ok then
-					UiKit.toast(result.Message, P.Bad)
-					button.Visible = true
-					busy = false
-					return
-				end
-				-- Each reel runs longer than the last, so they land one after
-				-- another, and the rarest gem is saved for the last reel.
-				local gems = table.clone(result.Gems or {})
-				table.sort(gems, function(a, b)
-					return (TIER_RANK[a.Tier] or 1) < (TIER_RANK[b.Tier] or 1)
-				end)
-				lightsTo("Spin")
-				local done = 0
-				for i, spin in spins do
-					local gem = gems[i]
-					if gem then
-						local last = i == #spins
-						local tease = last and (TIER_RANK[gem.Tier] or 1) > 1
-						task.spawn(function()
-							spin(gem, 1.8 + (i - 1) * 0.8 + (if tease then 1.2 else 0), tease)
-							done += 1
-						end)
-					else
-						done += 1
-					end
-				end
-				while done < #spins do
-					task.wait(0.1)
-				end
-				-- The lights flash in the best gem's colour, and the haul is totted up.
-				local best = gems[#gems]
-				lightsTo("Win", best and GemConfig.TierColors[best.Tier] or P.Gold)
-				local total = 0
-				for _, gem in gems do
-					total += GemConfig.value(gem)
-				end
-				for n = 1, 20 do
-					sub.Text = string.format("Your haul is worth  💰 %d", math.floor(total * n / 20))
-					task.wait(0.03)
-				end
-				task.wait(0.6)
-				claimed = true
-				button.Text = "ENTER GEMSOUL  ►"
-				button.Visible = true
-				busy = false
-			end)
-		end
-	)
-	button.LayoutOrder = 6
-	button.Size = UDim2.fromOffset(0, 64)
-	button.TextSize = 26
-	if not claimed then
-		IronUi.animate(button, function(t)
-			button.Rotation = if claimed then 0 else math.sin(t * 6) * 2
+-- A field of drifting stars on a black frame.
+local function starfield(parent: GuiObject, count: number, drift: number)
+	local rng = Random.new(11)
+	for _ = 1, count do
+		local size = rng:NextInteger(1, 3)
+		local star = new("Frame", {
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = rng:NextNumber(0, 0.6),
+			BorderSizePixel = 0,
+			Position = UDim2.fromScale(rng:NextNumber(), rng:NextNumber()),
+			Size = UDim2.fromOffset(size, size),
+		}, parent)
+		local speed = rng:NextNumber(0.2, 1) * drift
+		local x0 = star.Position.X.Scale
+		IronUi.animate(star, function(t)
+			star.Position = UDim2.fromScale((x0 - t * speed * 0.01) % 1, star.Position.Y.Scale)
 		end)
 	end
 end
 
-if firstStone() then
-	showReady()
-else
-	showWelcome()
+local function circle(parent: Instance, x: number, y: number, size: number, top: Color3, bottom: Color3): Frame
+	local f = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(size, size),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+	}, parent)
+	UiKit.round(f, size / 2)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(top, bottom) }, f)
+	return f
 end
+
+-- A soft round glow.
+local function halo(parent: Instance, x: number, y: number, size: number, color: Color3): Frame
+	local f = circle(parent, x, y, size, color, color)
+	f:FindFirstChildOfClass("UIGradient"):Destroy()
+	f.BackgroundColor3 = color
+	f.BackgroundTransparency = 0.8
+	return f
+end
+
+-- The shots of the cinematic. Each builds its picture on `stage`.
+type Shot = { Caption: string, Seconds: number, Build: (Frame) -> () }
+local SAGA_GEM = { Id = "saga-lore", Element = "Fire", Tier = "Common", Size = 9, Clarity = 8, Cut = 9 }
+local SHOTS: { Shot } = {
+	{
+		Caption = "Far beyond the known stars, the Saga Miners built a colony on a lonely moon.",
+		Seconds = 5,
+		Build = function(stage)
+			starfield(stage, 90, 1)
+			local moon = circle(stage, 640, 900, 1300, Color3.fromRGB(170, 172, 182), Color3.fromRGB(70, 72, 84))
+			moon.ZIndex = 2
+			for i, spec in { { 470, 58 }, { 560, 90 }, { 690, 70 }, { 790, 46 } } do
+				local dome =
+					circle(stage, spec[1], 268, spec[2], Color3.fromRGB(230, 236, 244), Color3.fromRGB(120, 140, 170))
+				dome.ZIndex = 3
+				local light = new("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromOffset(spec[1], 268 - spec[2] * 0.2),
+					Size = UDim2.fromOffset(6, 6),
+					BackgroundColor3 = if i % 2 == 0 then SAGA else HOLO,
+					ZIndex = 4,
+				}, stage)
+				UiKit.round(light, 3)
+			end
+			circle(stage, 1030, 150, 150, Color3.fromRGB(90, 150, 230), Color3.fromRGB(30, 60, 120)).ZIndex = 1
+		end,
+	},
+	{
+		Caption = "They live on the ancient, pulsing Saga Stones: air, heat and light, all drawn from the stone.",
+		Seconds = 5.5,
+		Build = function(stage)
+			starfield(stage, 60, 0.4)
+			local glow = halo(stage, 640, 330, 420, SAGA)
+			local holder = new("Frame", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(640, 330),
+				Size = UDim2.fromOffset(340, 340),
+				ZIndex = 3,
+			}, stage)
+			pcall(GemArt.viewport, holder, SAGA_GEM, true)
+			local pulse = new("UIScale", {}, holder)
+			IronUi.animate(holder, function(t)
+				local beat = (math.sin(t * 4) + 1) / 2
+				pulse.Scale = 1 + beat * 0.06
+				glow.BackgroundTransparency = 0.88 - beat * 0.12
+				glow.Size = UDim2.fromOffset(420 + beat * 60, 420 + beat * 60)
+			end)
+		end,
+	},
+	{
+		Caption = "Then, one night, reality tore open.",
+		Seconds = 4,
+		Build = function(stage)
+			starfield(stage, 90, 2)
+			-- A jagged crack of light across the sky.
+			local points = { { 520, 60 }, { 600, 170 }, { 560, 260 }, { 690, 360 }, { 640, 470 }, { 760, 600 } }
+			for i = 1, #points - 1 do
+				local a, b = points[i], points[i + 1]
+				local dx, dy = b[1] - a[1], b[2] - a[2]
+				local length = math.sqrt(dx * dx + dy * dy)
+				for _, spec in { { 22, Color3.fromRGB(200, 90, 255), 0.5 }, { 8, Color3.new(1, 1, 1), 0 } } do
+					local seg = new("Frame", {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset((a[1] + b[1]) / 2, (a[2] + b[2]) / 2),
+						Size = UDim2.fromOffset(0, spec[1]),
+						Rotation = math.deg(math.atan2(dy, dx)),
+						BackgroundColor3 = spec[2],
+						BackgroundTransparency = spec[3],
+						BorderSizePixel = 0,
+						ZIndex = 3,
+					}, stage)
+					task.delay(i * 0.18, function()
+						TweenService:Create(seg, TweenInfo.new(0.2), { Size = UDim2.fromOffset(length + 8, spec[1]) })
+							:Play()
+					end)
+				end
+			end
+			local flash = new("Frame", {
+				BackgroundColor3 = Color3.fromRGB(230, 200, 255),
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 5,
+			}, stage)
+			task.delay(1.2, function()
+				flash.BackgroundTransparency = 0.1
+				TweenService:Create(flash, TweenInfo.new(0.8), { BackgroundTransparency = 1 }):Play()
+			end)
+		end,
+	},
+	{
+		Caption = "Brainrot entities poured through the rift. They need the Saga Stones to exist.",
+		Seconds = 5.5,
+		Build = function(stage)
+			starfield(stage, 90, 1.5)
+			halo(stage, 640, 360, 700, Color3.fromRGB(170, 80, 255))
+			-- The alligator bomber, flying through.
+			local view = new("ViewportFrame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				Ambient = Color3.fromRGB(150, 150, 170),
+				LightColor = Color3.new(1, 1, 1),
+				LightDirection = Vector3.new(-0.3, -1, -0.5),
+				ZIndex = 3,
+			}, stage)
+			local camera = new("Camera", { FieldOfView = 40 }, view)
+			view.CurrentCamera = camera
+			camera.CFrame = CFrame.lookAt(Vector3.new(0, 4, 40), Vector3.zero)
+			local ok, croc = pcall(Scenes.croc)
+			if ok and croc then
+				croc.Parent = view
+				local started = os.clock()
+				IronUi.animate(view, function(t)
+					local k = (t - started) / 5.5
+					local at = CFrame.new(-40 + k * 80, math.sin(k * 6) * 2, -10 + k * 8)
+						* CFrame.Angles(0, math.rad(-100), math.rad(math.sin(k * 5) * 12))
+					croc:PivotTo(at)
+					Scenes.spinPropellers(croc, t)
+				end)
+			end
+		end,
+	},
+	{
+		Caption = "Now the Saga Miners must defend their stones. Enchant your gear. Fight back. Secure the future.",
+		Seconds = 5.5,
+		Build = function(stage)
+			starfield(stage, 120, 0.6)
+			halo(stage, 640, 300, 520, SAGA)
+			local title = label(stage, "BRAINROT\nCRUSADERS", 64, SAGA, HEADING)
+			title.TextXAlignment = Enum.TextXAlignment.Center
+			title.TextYAlignment = Enum.TextYAlignment.Center
+			place(title, 140, 170, 1000, 200)
+			title.ZIndex = 4
+			local scale = new("UIScale", { Scale = 1.3 }, title)
+			TweenService:Create(scale, TweenInfo.new(1.2, Enum.EasingStyle.Quint), { Scale = 1 }):Play()
+			local sub = label(stage, "THE SAGA MINERS", 20, HOLO, HEADING)
+			sub.TextXAlignment = Enum.TextXAlignment.Center
+			place(sub, 140, 380, 1000, 30)
+			sub.ZIndex = 4
+		end,
+	},
+}
+
+local function playCinematic()
+	-- Black behind the canvas (ZIndex below it), letterbox bars above it.
+	local screen = new("Frame", {
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = -1,
+	}, gui)
+	local stageHolder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, canvas)
+	-- Letterbox bars and the caption.
+	for _, edge in { 0, 1 } do
+		new("Frame", {
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0, edge),
+			Position = UDim2.fromScale(0, edge),
+			Size = UDim2.new(1, 0, 0, 60),
+			ZIndex = 3,
+		}, gui)
+	end
+	local caption = label(canvas, "", 24, Color3.new(1, 1, 1), CHUNKY)
+	caption.TextXAlignment = Enum.TextXAlignment.Center
+	caption.TextWrapped = true
+	place(caption, 160, 560, 960, 80)
+	caption.ZIndex = 21
+	caption.BackgroundColor3 = Color3.new(0, 0, 0)
+	caption.BackgroundTransparency = 0.4
+	UiKit.round(caption, 8)
+	local skipped = false
+	local skip = IronUi.button(canvas, "SKIP  ►", false, function()
+		skipped = true
+	end)
+	skip.AnchorPoint = Vector2.new(1, 0)
+	skip.Position = UDim2.fromOffset(W - 24, 20)
+	skip.ZIndex = 22
+
+	for _, shot in SHOTS do
+		if skipped then
+			break
+		end
+		local stage = new("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(W, H),
+			ClipsDescendants = true,
+		}, stageHolder)
+		shot.Build(stage)
+		-- A slow push in, like a camera move.
+		local push = new("UIScale", { Scale = 1 }, stage)
+		TweenService:Create(push, TweenInfo.new(shot.Seconds, Enum.EasingStyle.Linear), { Scale = 1.06 }):Play()
+		-- Typewriter caption.
+		local started = os.clock()
+		while not skipped and os.clock() - started < shot.Seconds do
+			local shown = math.min(#shot.Caption, math.floor((os.clock() - started) * 45))
+			caption.Text = string.sub(shot.Caption, 1, shown)
+			task.wait(0.03)
+		end
+		caption.Text = shot.Caption
+		stage:Destroy()
+	end
+	stageHolder:Destroy()
+	for _, child in gui:GetChildren() do
+		if child:IsA("Frame") and child.ZIndex == 3 then
+			child:Destroy()
+		end
+	end
+	caption:Destroy()
+	skip:Destroy()
+	screen:Destroy()
+end
+
+-- 2  The ship --------------------------------------------------------------------------------
+
+local SHIP_AT = CFrame.new(0, 900, 0)
+local ship: Scenes.Ship
+local croc: Model
+local camera = workspace.CurrentCamera
+local attacking = true -- the bomber strafes the ship until you drive it off
+local retreating = false
+
+local function shake(amount: number)
+	task.spawn(function()
+		for i = 1, 8 do
+			local fade = 1 - i / 8
+			camera.CFrame = camera.CFrame
+				* CFrame.new((math.random() - 0.5) * amount * fade, (math.random() - 0.5) * amount * fade, 0)
+			task.wait(0.03)
+		end
+	end)
+end
+
+-- A short-lived glowing beam between two points.
+local function beam(from: Vector3, to: Vector3, color: Color3, width: number)
+	local length = (to - from).Magnitude
+	local p = Scenes.part(
+		workspace,
+		CFrame.lookAt((from + to) / 2, to),
+		Vector3.new(width, width, length),
+		color,
+		Enum.Material.Neon
+	)
+	p.CastShadow = false
+	task.delay(0.12, function()
+		p:Destroy()
+	end)
+end
+
+-- A burst of light that swells and fades.
+local function blast(at: Vector3, color: Color3, size: number)
+	local p = Scenes.part(workspace, CFrame.new(at), Vector3.one * size * 0.3, color, Enum.Material.Neon, "Ball")
+	p.CastShadow = false
+	TweenService:Create(p, TweenInfo.new(0.4), { Size = Vector3.one * size, Transparency = 1 }):Play()
+	task.delay(0.45, function()
+		p:Destroy()
+	end)
+end
+
+-- The camera glides to a shot.
+local function shot(cframe: CFrame, seconds: number?)
+	camera.CameraType = Enum.CameraType.Scriptable
+	local tween = TweenService:Create(
+		camera,
+		TweenInfo.new(seconds or 1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+		{ CFrame = cframe }
+	)
+	tween:Play()
+	task.wait(seconds or 1.2)
+end
+
+-- Your figure in the ship: a copy of your character (with whatever gear the
+-- server has put on it), standing at `spot`.
+local hero: Model? = nil
+local heroSpot = CFrame.identity
+local function placeHero(spot: CFrame)
+	heroSpot = spot
+	local character = player.Character
+	if not character then
+		return
+	end
+	character.Archivable = true
+	local copy = character:Clone()
+	character.Archivable = false
+	if not copy then
+		return
+	end
+	for _, d in copy:GetDescendants() do
+		if d:IsA("BaseScript") or d:IsA("Sound") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+		end
+	end
+	local humanoid = copy:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	end
+	if hero then
+		hero:Destroy()
+	end
+	hero = copy
+	copy:PivotTo(spot * CFrame.new(0, 3, 0))
+	copy.Parent = workspace
+end
+
+-- Where the pistol is (roughly): in front of the figure's right hand.
+local function muzzle(): Vector3
+	return (heroSpot * CFrame.new(1.4, 4.4, -2.2)).Position
+end
+
+-- Waits for the server to re-dress the character (new gear folder), then
+-- copies it again.
+local function refreshHero()
+	local character = player.Character
+	if character then
+		local gear = character:FindFirstChild("GemsoulGear")
+		local started = os.clock()
+		while os.clock() - started < 3 do
+			local now = character:FindFirstChild("GemsoulGear")
+			if now and now ~= gear then
+				break
+			end
+			task.wait(0.1)
+		end
+		task.wait(0.1)
+	end
+	placeHero(heroSpot)
+end
+
+-- The bomber's flight: loops past the window, strafing the hull. Once you
+-- drive it off it peels away and is gone.
+local crocAt = CFrame.identity
+local lastShot = 0
+local retreatStart = 0
+local function flyCroc(t: number)
+	if not croc or not croc.Parent then
+		return
+	end
+	local outside = ship.Spots.Outside
+	if retreating then
+		local k = os.clock() - retreatStart
+		crocAt = crocAt * CFrame.new(0, k * 0.05, -k * 2.2) * CFrame.Angles(0, 0, math.rad(6))
+	else
+		local a = t * 0.45
+		local pos = (outside * CFrame.new(math.sin(a) * 38, math.sin(a * 2) * 5, math.cos(a) * 14)).Position
+		local ahead = (
+			outside * CFrame.new(math.sin(a + 0.1) * 38, math.sin((a + 0.1) * 2) * 5, math.cos(a + 0.1) * 14)
+		).Position
+		crocAt = CFrame.lookAt(pos, ahead) * CFrame.Angles(0, 0, math.rad(-math.cos(a) * 25))
+	end
+	croc:PivotTo(crocAt)
+	Scenes.spinPropellers(croc, t)
+	-- Strafing runs: red bolts at the hull, a boom, the room shakes.
+	if attacking and not retreating and t - lastShot > 2.6 then
+		lastShot = t
+		local gun = croc:FindFirstChild("Gun") :: BasePart?
+		local hit = (ship.Spots.Window * CFrame.new(math.random(-14, 14), math.random(-5, 5), -1.5)).Position
+		if gun then
+			beam(gun.Position, hit, ALARM, 0.5)
+		end
+		blast(hit, Color3.fromRGB(255, 160, 60), 8)
+		shake(0.6)
+	end
+end
+
+-- The alarm lights pulse red while the ship is under attack.
+local function pulseAlarms(t: number)
+	local beat = (math.sin(t * 5) + 1) / 2
+	for _, light in ship.Alarms do
+		light.Brightness = if attacking then 1 + beat * 4 else 0.6
+		light.Color = if attacking then ALARM else HOLO
+	end
+	for _, strip in ship.AlarmStrips do
+		strip.Color = if attacking then ALARM:Lerp(Color3.fromRGB(80, 10, 10), 1 - beat) else HOLO
+	end
+end
+
+-- The tutorial HUD: an objectives list, a caption and one action button.
+local OBJECTIVES = {
+	"Wake up",
+	"Suit up",
+	"Collect your Saga Stone ration",
+	"Enchant your blaster",
+	"Drive off the bomber",
+	"Teleport to the moon base",
+}
+local hud = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, canvas)
+local objectives = IronUi.box(hud, UDim2.fromOffset(24, 90), UDim2.fromOffset(330, 60 + #OBJECTIVES * 30), P.Frame)
+objectives.BackgroundTransparency = 0.15
+local objTitle = label(objectives, "OBJECTIVES", 14, SAGA, HEADING)
+place(objTitle, 16, 12, 300, 20)
+local objLines = {}
+for i, textValue in OBJECTIVES do
+	local line = label(objectives, "○  " .. textValue, 16, P.Dim, CHUNKY)
+	place(line, 16, 40 + (i - 1) * 30, 300, 26)
+	objLines[i] = line
+end
+local function objective(index: number)
+	for i, line in objLines do
+		local mark = if i < index then "✓" elseif i == index then "►" else "○"
+		line.Text = mark .. "  " .. OBJECTIVES[i]
+		line.TextColor3 = if i < index then P.Good elseif i == index then Color3.new(1, 1, 1) else P.Dim
+	end
+end
+
+local promptBox = IronUi.box(hud, UDim2.fromOffset(W / 2 - 330, H - 200), UDim2.fromOffset(660, 170), P.Frame)
+promptBox.BackgroundTransparency = 0.1
+local promptTitle = label(promptBox, "", 22, SAGA, HEADING)
+place(promptTitle, 24, 16, 612, 30)
+local promptText = label(promptBox, "", 17, LIGHT, CHUNKY)
+place(promptText, 24, 50, 612, 52)
+promptText.TextWrapped = true
+promptText.TextYAlignment = Enum.TextYAlignment.Top
+local pressed = false
+local promptButton = IronUi.gemButton(promptBox, "OK", SAGA, function()
+	pressed = true
+end)
+promptButton.AnchorPoint = Vector2.new(0.5, 1)
+promptButton.Position = UDim2.new(0.5, 0, 1, -14)
+promptButton.Size = UDim2.fromOffset(0, 48)
+
+-- Shows a prompt and waits for its button.
+local function prompt(title: string, body: string, button: string)
+	promptBox.Visible = true
+	promptTitle.Text = title
+	promptText.Text = body
+	promptButton.Text = button
+	promptButton.Visible = true
+	pressed = false
+	while not pressed do
+		task.wait(0.05)
+	end
+	promptButton.Visible = false
+end
+
+local function fade(to: number, seconds: number)
+	local cover = gui:FindFirstChild("Fade")
+		or new("Frame", {
+			Name = "Fade",
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 50,
+		}, gui)
+	TweenService:Create(cover, TweenInfo.new(seconds), { BackgroundTransparency = to }):Play()
+	task.wait(seconds)
+end
+
+-- The Saga Stone ration: the slot machine, in a panel over the ship.
+local function rationSpin()
+	local panel = IronUi.box(canvas, UDim2.fromOffset(W / 2 - 430, 90), UDim2.fromOffset(860, 520), P.Frame)
+	panel.ZIndex = 30
+	local title = label(panel, "SAGA STONE RATION", 30, SAGA, HEADING)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	place(title, 0, 22, 860, 40)
+	local sub = label(panel, "Three cut Saga Stones, straight from the colony's reserve.", 17, LIGHT, CHUNKY)
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+	place(sub, 0, 66, 860, 24)
+	local body = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(40, 100),
+		Size = UDim2.fromOffset(780, 400),
+	}, panel)
+	local list = UiKit.list(body, 12)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local lights = { marquee(body, 1, 700) }
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, CARD_H + 16),
+		LayoutOrder = 2,
+	}, body)
+	local rowList = UiKit.list(row, 20, true)
+	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	rowList.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	table.insert(lights, marquee(body, 3, 700))
+	local spins = {}
+	for i = 1, 3 do
+		local _, spin = reelCard(row, i)
+		spins[i] = spin
+	end
+	local go = false
+	local button = IronUi.gemButton(body, "SPIN THE RATION", SAGA, function()
+		go = true
+	end)
+	button.LayoutOrder = 4
+	button.Size = UDim2.fromOffset(0, 52)
+	while not go do
+		task.wait(0.05)
+	end
+	button.Visible = false
+	local result = GemClient.request("StarterSpin")
+	if not result.Ok then
+		UiKit.toast(result.Message, P.Bad)
+		panel:Destroy()
+		return
+	end
+	-- Each reel runs longer than the last; the rarest stone lands last.
+	local gems = table.clone(result.Gems or {})
+	table.sort(gems, function(a, b)
+		return (TIER_RANK[a.Tier] or 1) < (TIER_RANK[b.Tier] or 1)
+	end)
+	for _, bar in lights do
+		bar.Mode = "Spin"
+	end
+	local done = 0
+	for i, spin in spins do
+		local gem = gems[i]
+		if gem then
+			local tease = i == #spins and (TIER_RANK[gem.Tier] or 1) > 1
+			task.spawn(function()
+				spin(gem, 1.8 + (i - 1) * 0.8 + (if tease then 1.2 else 0), tease)
+				done += 1
+			end)
+		else
+			done += 1
+		end
+	end
+	while done < #spins do
+		task.wait(0.1)
+	end
+	local best = gems[#gems]
+	for _, bar in lights do
+		bar.Mode = "Win"
+		bar.Color = best and GemConfig.TierColors[best.Tier] or SAGA
+	end
+	local total = 0
+	for _, gem in gems do
+		total += GemConfig.value(gem)
+	end
+	for n = 1, 20 do
+		sub.Text = string.format("Your ration is worth  💰 %d", math.floor(total * n / 20))
+		task.wait(0.03)
+	end
+	local taken = false
+	local take = IronUi.gemButton(body, "TAKE RATION  ►", P.Emerald, function()
+		taken = true
+	end)
+	take.LayoutOrder = 5
+	take.Size = UDim2.fromOffset(0, 52)
+	while not taken do
+		task.wait(0.05)
+	end
+	panel:Destroy()
+end
+
+-- The best cut stone in the pouch (by value).
+local function bestCutStone()
+	local best, bestValue = nil, -1
+	for _, gem in GemClient.Profile.Gems or {} do
+		if gem.Cut and GemConfig.value(gem) > bestValue then
+			best, bestValue = gem, GemConfig.value(gem)
+		end
+	end
+	return best
+end
+
+local function playShip()
+	Scenes.spaceLighting()
+	ship = Scenes.ship(SHIP_AT)
+	croc = Scenes.croc()
+	croc.Parent = workspace
+	IronUi.animate(gui, function(t)
+		flyCroc(t)
+		pulseAlarms(t)
+	end)
+	local spots = ship.Spots
+	local profile = GemClient.Profile
+	hud.Visible = true
+	promptBox.Visible = false
+
+	-- Wake up: eyes open on the ceiling, alarms blaring.
+	objective(1)
+	camera.CameraType = Enum.CameraType.Scriptable
+	camera.CFrame =
+		CFrame.lookAt((spots.Bed * CFrame.new(0, 1.5, 3)).Position, (spots.Bed * CFrame.new(0, 12, -2)).Position)
+	fade(0, 0.01)
+	fade(1, 1.5)
+	shake(1)
+	prompt(
+		"⚠  HULL BREACH",
+		"Crusader, wake up! Something came through the rift and it's attacking the ship. Get up!",
+		"GET UP"
+	)
+
+	-- Suit up at the locker.
+	objective(2)
+	placeHero(spots.Locker)
+	shot(CFrame.lookAt((spots.Locker * CFrame.new(3, 6, -12)).Position, (spots.Locker * CFrame.new(0, 4, 0)).Position))
+	if not profile.Character.Class then
+		prompt(
+			"SUIT UP",
+			"Grab your Scrap Suit, Saga Pistol and Shield from the locker. No miner goes out without them.",
+			"SUIT UP"
+		)
+		local result = GemClient.request("SuitUp")
+		if not result.Ok then
+			UiKit.toast(result.Message, P.Bad)
+		end
+		refreshHero()
+		UiKit.toast("Scrap Suit, Saga Pistol and Shield equipped.", SAGA)
+	end
+
+	-- The daily Saga Stone ration.
+	objective(3)
+	placeHero(spots.Ration)
+	shot(CFrame.lookAt((spots.Ration * CFrame.new(-3, 6, -12)).Position, (spots.Ration * CFrame.new(0, 4, 0)).Position))
+	if not profile.Intro.Spun then
+		prompt(
+			"DAILY RATION",
+			"Every colonist gets a Saga Stone ration. Today's is on the house: spin for three cut stones.",
+			"OPEN RATION"
+		)
+		promptBox.Visible = false
+		rationSpin()
+	end
+
+	-- Enchant the blaster at the console.
+	objective(4)
+	placeHero(spots.Console * CFrame.new(0, 0, 5))
+	shot(CFrame.lookAt((spots.Console * CFrame.new(-8, 8, 8)).Position, (spots.Console * CFrame.new(0, 4, 0)).Position))
+	local stone = bestCutStone()
+	if not profile.Character.WeaponGem and stone then
+		prompt(
+			"ENCHANT",
+			string.format(
+				"Set your best stone, the %s, into your blaster. Its element charges every shot.",
+				GemConfig.shade(stone).Name
+			),
+			"ENCHANT BLASTER"
+		)
+		local result = GemClient.request("SocketGem", stone.Id, "Weapon")
+		UiKit.toast(result.Message, if result.Ok then SAGA else P.Bad)
+		blast((spots.Console * CFrame.new(0, 4.6, 0)).Position, HOLO, 6)
+		refreshHero()
+	end
+
+	-- Drive off the bomber: shoot it through the window.
+	objective(5)
+	placeHero(spots.Stand * CFrame.new(0, 0, -6))
+	shot(CFrame.lookAt((spots.Stand * CFrame.new(3, 7, 4)).Position, spots.Outside.Position), 1.4)
+	prompt("DEFEND THE SHIP", "Shoot the bomber through the window! Hit it five times to drive it off.", "READY")
+	local hits = 0
+	promptTitle.Text = "HITS  0 / 5"
+	promptText.Text = "Press FIRE to shoot."
+	local fire = IronUi.gemButton(promptBox, "FIRE", ALARM, function()
+		if hits >= 5 or not croc.Parent then
+			return
+		end
+		hits += 1
+		local target = crocAt.Position
+		beam(muzzle(), target, HOLO, 0.35)
+		blast(target, Color3.fromRGB(255, 200, 90), 10)
+		promptTitle.Text = string.format("HITS  %d / 5", hits)
+	end)
+	fire.AnchorPoint = Vector2.new(0.5, 1)
+	fire.Position = UDim2.new(0.5, 0, 1, -14)
+	fire.Size = UDim2.fromOffset(0, 48)
+	while hits < 5 do
+		task.wait(0.05)
+	end
+	fire:Destroy()
+	retreating = true
+	retreatStart = os.clock()
+	blast(crocAt.Position, Color3.fromRGB(255, 120, 40), 18)
+	shake(0.8)
+	promptTitle.Text = "THE BOMBER RETREATS!"
+	promptText.Text = "It's smoking and heading back to the rift. The ship is safe, for now."
+	task.wait(2)
+	attacking = false
+
+	-- Teleport out.
+	objective(6)
+	placeHero(spots.Pad)
+	shot(CFrame.lookAt((spots.Pad * CFrame.new(0, 7, -14)).Position, (spots.Pad * CFrame.new(0, 4, 0)).Position))
+	prompt(
+		"TELEPORT",
+		"The colony needs every miner at the moon base: the Saga Stone mines, the forge and the market are all there.",
+		"TELEPORT"
+	)
+	local beamColumn = Scenes.part(
+		workspace,
+		spots.Pad * CFrame.new(0, 6, 0),
+		Vector3.new(6, 12, 6),
+		HOLO,
+		Enum.Material.Neon,
+		"Tube",
+		{ Transparency = 0.5 }
+	)
+	TweenService:Create(beamColumn, TweenInfo.new(1), { Size = Vector3.new(1, 14, 1), Transparency = 0.1 }):Play()
+	task.wait(1)
+	local result = GemClient.request("QuickStart")
+	if not result.Ok then
+		UiKit.toast(result.Message, P.Bad)
+	end
+	local flash = new("Frame", {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 60,
+	}, gui)
+	task.wait(0.2)
+	beamColumn:Destroy()
+	if hero then
+		hero:Destroy()
+	end
+	croc:Destroy()
+	ship.Model:Destroy()
+	hud.Visible = false
+	TweenService:Create(flash, TweenInfo.new(1), { BackgroundTransparency = 1 }):Play()
+	task.wait(1)
+end
+
+playCinematic()
+playShip()
+gui:Destroy()
+UiKit.toast("Welcome to the moon base, Crusader! Press M or click DIG to mine Saga Stones.", SAGA)
