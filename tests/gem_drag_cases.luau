@@ -227,9 +227,66 @@ gem.Cut = nil
 mouseBegin()
 check(drag == nil, "Uncut gem can be dragged")
 gem.Cut = cut
-print(
-	string.format(
-		"Gem drag: %d checks passed (six targets, scaled bounds, mouse/touch, replacement and cancellation).",
-		count
-	)
+-- Exercise the actual docking lifecycle and then drag through its new ScreenGui.
+local embedded = false
+local window = { Gui = gui, Close = { Visible = true }, Shade = { Visible = true } }
+local originalGui = gui
+local panel = new("Frame", {}, gui)
+local scale = { Parent = panel, Scale = 0.5 }
+local title = {}
+local subtitle = {}
+local avatarRefreshes = 0
+local function refreshAvatar()
+	avatarRefreshes += 1
+end
+-- Standalone-only dependencies: those branches must never run once mounted.
+local function fit()
+	error("Docked armory used modal fit")
+end
+local TweenService = {
+	Create = function()
+		error("Docked armory used modal tween")
+	end,
+}
+local TweenInfo = {}
+local atVey, gridKey, pending, avatarModel = false, "", {}, nil
+Vector2.zero = Vector2.new(0, 0)
+Enum.TextTruncate = { AtEnd = "AtEnd" }
+-- INSERT_REAL_ARMORY_LIFECYCLE
+local host = new("ScreenGui", { Enabled = true })
+local hostRoot = new("Frame", {}, host)
+mouseBegin()
+mouseMove(170, 150)
+CharacterUI.mount(hostRoot, host, Vector2.new(16, 84))
+check(embedded and panel.Parent == hostRoot and gui == host, "Armory not mounted in dashboard")
+check(dragGhost.Parent == host and scale.Parent == nil, "Ghost/scale not transferred to dashboard coordinates")
+check(
+	not window.Close.Visible and not window.Shade.Visible and not originalGui.Enabled,
+	"Modal chrome survived docking"
 )
+check(drag == nil and not dragGhost.Visible, "Dock did not cancel old gesture")
+check(avatarRefreshes == 1, "Dock did not load avatar")
+CharacterUI.close()
+check(host.Enabled, "Closing embedded armory hid dashboard")
+CharacterUI.toggle()
+check(host.Enabled and avatarRefreshes == 2, "Toggle did not preserve dashboard")
+local refreshes = avatarRefreshes
+CharacterUI.mount(new("Frame"), new("ScreenGui"), Vector2.zero)
+check(panel.Parent == hostRoot and avatarRefreshes == refreshes, "Repeated mount duplicated setup")
+mouseBegin()
+mouseMove(170, 150)
+mouseEnd()
+check(#requests == n + 1 and requests[#requests][3] == "Weapon", "Docked drag failed")
+n = #requests
+mouseBegin()
+mouseMove(170, 150)
+host.Enabled = false
+host:GetPropertyChangedSignal("Enabled"):Fire()
+mouseEnd()
+check(drag == nil and #requests == n, "Hidden dashboard submitted a drag")
+CharacterUI.open()
+check(not host.Enabled, "Armory open bypassed intro hiding")
+host.Enabled = true
+host:GetPropertyChangedSignal("Enabled"):Fire()
+check(avatarRefreshes == refreshes + 1, "Visible dashboard did not restore avatar")
+print(string.format("Gem drag + dashboard docking: %d checks passed.", count))

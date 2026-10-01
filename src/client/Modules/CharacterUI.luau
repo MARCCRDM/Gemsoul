@@ -42,6 +42,7 @@ local enchantPending = false
 local window = IronUi.window("Character", 8, WIDTH, HEIGHT, "🛡️")
 local gui, panel, scale, fit = window.Gui, window.Panel, window.Scale, window.Fit
 local title, subtitle = window.Title, window.Subtitle
+local embedded = false
 
 -- Equipment board -----------------------------------------------------------------
 
@@ -548,7 +549,7 @@ local function drawTooltip()
 		if not any then
 			text(tipBody, "No reserve equipment. Recover gear on lunar expeditions.", 13, P.Dim)
 		end
-		text(tipBody, "Recover equipment in Moon Mine caches or trade with another explorer [T].", 12, P.Dim)
+		text(tipBody, "Recover equipment in Moon Mine caches or visit the Market [T].", 12, P.Dim)
 		return
 	end
 
@@ -1047,7 +1048,49 @@ end
 
 type Options = { AtVey: boolean? }
 
+-- Dock into the dashboard without duplicating item models, inventory or input handlers.
+-- The modal's scale is detached because the dashboard supplies its own scale.
+function CharacterUI.mount(parent: GuiObject, hostGui: ScreenGui, position: UDim2)
+	if embedded then
+		return
+	end
+	cancelDrag()
+	window.Gui.Enabled = false
+	embedded = true
+	scale.Parent = nil
+	panel.AnchorPoint = Vector2.zero
+	panel.Position = position
+	panel.Parent = parent
+	window.Close.Visible = false
+	window.Shade.Visible = false
+	gui = hostGui
+	dragGhost.Parent = hostGui
+	title.Size = UDim2.fromOffset(420, 32)
+	subtitle.Size = UDim2.fromOffset(420, 16)
+	title.TextTruncate = Enum.TextTruncate.AtEnd
+	title.AutomaticSize = Enum.AutomaticSize.None
+	gui:GetPropertyChangedSignal("Enabled"):Connect(function()
+		if gui.Enabled then
+			refreshAvatar()
+			CharacterUI.refresh()
+		else
+			cancelDrag()
+		end
+	end)
+	refreshAvatar()
+	CharacterUI.refresh()
+end
+
+CharacterUI.cancelDrag = cancelDrag
+
 function CharacterUI.open(options: Options?)
+	if embedded then
+		if gui.Enabled then
+			refreshAvatar()
+			CharacterUI.refresh()
+		end
+		return
+	end
 	atVey = options ~= nil and options.AtVey == true
 	selection = nil
 	gui.Enabled = true
@@ -1062,6 +1105,9 @@ end
 
 function CharacterUI.close()
 	cancelDrag()
+	if embedded then
+		return
+	end
 	gui.Enabled = false
 	-- Rebuild the grid next time, so unbuilt stones still get drawn.
 	gridKey = ""
@@ -1073,6 +1119,10 @@ function CharacterUI.close()
 end
 
 function CharacterUI.toggle()
+	if embedded then
+		CharacterUI.open()
+		return
+	end
 	if gui.Enabled then
 		CharacterUI.close()
 	else
@@ -1103,12 +1153,14 @@ if player.Character then
 end
 player.CharacterAdded:Connect(watchCharacter)
 
-ContextActionService:BindAction("GemsoulCharacter", function(_, state)
-	-- Not while the new-player intro is still open.
-	if state == Enum.UserInputState.Begin and not player.PlayerGui:FindFirstChild("Intro") then
-		CharacterUI.toggle()
-	end
-	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.C)
+if not Config.MenuOnly then
+	ContextActionService:BindAction("GemsoulCharacter", function(_, state)
+		-- Not while the new-player intro is still open.
+		if state == Enum.UserInputState.Begin and not player.PlayerGui:FindFirstChild("Intro") then
+			CharacterUI.toggle()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.C)
+end
 
 return CharacterUI
