@@ -1544,6 +1544,7 @@ local function frontierSuit(family: number)
 		local trim = kit.Trim
 		local cloth = kit.Cloth
 		local ornament = if rarity == 5 then BRASS else edge
+		local helmetVariant = kit.Traits and kit.Traits.Helmet or 1
 		local function block(seg, x, y, z, sx, sy, sz, color, tilt)
 			box(
 				folder,
@@ -1571,7 +1572,7 @@ local function frontierSuit(family: number)
 			-- Recessed wrap visor inside an angular brow and sloped cheek armor.
 			block(head, 0, 0, 0.04, x * 0.86, y * 0.92, z * 0.88, trim)
 			plate(head, 0, y * 0.34, 0.015, x * 1.02, y * 0.34, z * 0.98, metal)
-			block(head, 0, y * 0.53, 0.055, x * 0.68, y * 0.12, z * 0.8, edge)
+			block(head, 0, y * 0.53, 0.055, x * (0.6 + helmetVariant * 0.025), y * 0.12, z * 0.8, edge)
 			block(head, 0, y * 0.03, -z * 0.5, x * 0.79, y * 0.4, 0.045, Color3.fromRGB(8, 20, 30))
 			local visor = kit.Traits and kit.Traits.VisorColor or Color3.fromRGB(238, 174, 57)
 			block(head, 0, y * 0.065, -z * 0.535, x * 0.68, y * 0.24, 0.025, visor)
@@ -1583,6 +1584,20 @@ local function frontierSuit(family: number)
 			plate(head, 0, -y * 0.36, -z * 0.37, x * 0.65, y * 0.18, z * 0.38, metal)
 			block(head, 0, -y * 0.36, -z * 0.58, x * 0.31, y * 0.085, 0.03, trim)
 			block(head, 0, -y * 0.56, 0.02, x * 0.58, y * 0.17, z * 0.6, cloth)
+
+			if family == 1 then
+				-- Survey lamp defines the working miner silhouette.
+				block(head, 0, y * 0.38, -z * 0.54, x * 0.24, y * 0.16, 0.1, trim)
+				lit(head, 0, y * 0.38, -z * 0.6, x * 0.14, y * 0.08, 0.025)
+			elseif family == 2 then
+				block(head, -x * 0.55, y * 0.16, 0.1, 0.09, y * 0.55, 0.1, metal)
+				block(head, -x * 0.55, y * 0.43, 0.1, 0.045, y * 0.18, 0.045, edge)
+			else
+				-- Heavy suits frame the visor with a deeper armored brow.
+				for _, side in { -1, 1 } do
+					block(head, side * x * 0.32, y * 0.28, -z * 0.48, x * 0.27, y * 0.16, 0.16, metal, side * -12)
+				end
+			end
 			if rarity >= 2 then
 				for _, side in { -1, 1 } do
 					block(head, side * x * 0.53, y * 0.02, -z * 0.08, 0.06, y * 0.2, 0.16, edge)
@@ -1624,7 +1639,19 @@ local function frontierSuit(family: number)
 			plate(torso, 0, y * 0.02, z * 0.62, x * 0.53, y * 0.84, 0.27, trim)
 			block(torso, 0, y * 0.19, z * 0.79, x * 0.28, y * 0.25, 0.08, metal)
 			for i = 1, 3 do
-				block(torso, 0, -y * (0.02 + i * 0.1), z * 0.79, x * 0.32, 0.045, 0.04, edge)
+				block(torso, 0, -y * (0.02 + i * 0.1), z * 0.83, x * 0.32, 0.045, 0.05, edge)
+			end
+
+			if family == 1 then
+				block(torso, x * 0.34, -y * 0.18, z * 0.46, x * 0.16, y * 0.35, 0.2, metal)
+				block(torso, x * 0.34, -y * 0.18, z * 0.575, x * 0.08, 0.06, 0.025, edge)
+			elseif family == 2 then
+				block(torso, 0, y * 0.39, z * 0.85, x * 0.4, 0.065, 0.09, metal)
+				block(torso, 0, -y * 0.42, z * 0.85, x * 0.4, 0.065, 0.09, metal)
+			else
+				for _, side in { -1, 1 } do
+					plate(torso, side * x * 0.28, -y * 0.02, z * 0.72, x * 0.2, y * 0.7, 0.22, metal)
+				end
 			end
 			if rarity >= 2 then
 				for _, side in { -1, 1 } do
@@ -1645,7 +1672,7 @@ local function frontierSuit(family: number)
 			if rarity >= 5 then
 				for _, side in { -1, 1 } do
 					block(torso, side * x * 0.13, y * 0.26, -z * 0.66, x * 0.14, 0.045, 0.025, BRASS, side * -25)
-					block(torso, side * x * 0.24, z * 0.02, z * 0.84, 0.065, y * 0.54, 0.06, BRASS)
+					block(torso, side * x * 0.24, y * 0.02, z * 0.86, 0.065, y * 0.54, 0.06, BRASS)
 				end
 			end
 		end
@@ -1800,7 +1827,7 @@ local function frontierSuit(family: number)
 					metal,
 					SMOOTH
 				)
-				block(foot, 0, s.Y * 0.42, s.Z * 0.16, s.X * 0.79, s.Y * 0.6, s.Z * 0.48, metal)
+				block(foot, 0, s.Y * 0.42, s.Z * 0.13, s.X * 0.79, s.Y * 0.6, s.Z * 0.48, metal)
 			end
 		end
 	end
@@ -1896,7 +1923,7 @@ local KITS: { [string]: { Metal: Color3, Trim: Color3, Cloth: Color3?, Material:
 -- blue-silver, Masterwork is blackened steel with gold trim.
 local GOLD = Color3.fromRGB(214, 172, 72)
 KITS.UtilityMiner = {
-	Metal = Color3.fromRGB(170, 179, 185),
+	Metal = Color3.fromRGB(185, 131, 62),
 	Trim = Color3.fromRGB(44, 51, 60),
 	Cloth = Color3.fromRGB(48, 65, 78),
 	Material = SMOOTH,
@@ -1908,7 +1935,7 @@ KITS.FrontierRanger = {
 	Material = SMOOTH,
 }
 KITS.HeavyVanguard = {
-	Metal = Color3.fromRGB(112, 125, 139),
+	Metal = Color3.fromRGB(82, 108, 139),
 	Trim = Color3.fromRGB(35, 42, 52),
 	Cloth = Color3.fromRGB(45, 53, 62),
 	Material = SMOOTH,
