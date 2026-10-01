@@ -4,7 +4,7 @@
 	it; stats and active enchantments below; and a grid inventory of every
 	gem on the right. Click a gem or a socket to inspect it in the tooltip
 	box; from there gems go into sockets and back out again. Click a gear
-	slot to swap to other gear you own (crafted at Borin's forge).
+	slot to swap to other gear you own (recovered or traded).
 
 	Opens with [C] or the HUD button. Talking to Vey at the Arcanum opens it
 	too; sockets can only be changed near Vey (the server checks).
@@ -19,6 +19,9 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -61,11 +64,8 @@ local avatarBack = new("Frame", {
 }, doll)
 UiKit.round(avatarBack, 8)
 new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, avatarBack)
-new(
-	"UIGradient",
-	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(96, 84, 68), Color3.fromRGB(22, 19, 16)) },
-	avatarBack
-)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(26, 98, 127), P.Frame) }, avatarBack)
+IronUi.orbit(avatarBack, P.Teal, 210)
 local avatar = new("ViewportFrame", {
 	BackgroundTransparency = 1,
 	Ambient = Color3.fromRGB(200, 196, 190),
@@ -119,61 +119,66 @@ type Slot = {
 	Caption: TextLabel,
 	Shown: string?, -- id of the gem drawn in the socket
 }
-local function slot(x: number, label: string, socketName: string): Slot
-	local holder = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(x, 0),
-		Size = UDim2.fromOffset(110, 330),
-	}, doll)
-	text(holder, label, 12, P.Dim, BOLD).TextXAlignment = Enum.TextXAlignment.Center
-	local item = box(holder, UDim2.fromOffset(0, 20), UDim2.fromOffset(110, 150), P.Slot)
-	UiKit.pad(item, 8)
-	local list = UiKit.list(item, 6)
-	list.VerticalAlignment = Enum.VerticalAlignment.Center
-	local name = text(item, "", 15, P.Text, BOLD)
+local function slot(x: number, y: number, label: string, socketName: string): Slot
+	local holder = new(
+		"Frame",
+		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(110, 102) },
+		doll
+	)
+	local head = text(holder, label, 11, P.Dim, BOLD)
+	head.TextXAlignment = Enum.TextXAlignment.Center
+	local item = box(holder, UDim2.fromOffset(0, 18), UDim2.fromOffset(110, 58), P.Slot)
+	local name = text(item, "", 12, P.Text, BOLD)
+	name.Position = UDim2.fromOffset(5, 4)
+	name.Size = UDim2.fromOffset(100, 32)
+	name.AutomaticSize = Enum.AutomaticSize.None
 	name.TextXAlignment = Enum.TextXAlignment.Center
-	local style = text(item, "", 11, P.Dim, BOLD)
+	local style = text(item, "", 9, P.Dim)
+	style.Position = UDim2.fromOffset(5, 39)
+	style.Size = UDim2.fromOffset(100, 14)
+	style.AutomaticSize = Enum.AutomaticSize.None
 	style.TextXAlignment = Enum.TextXAlignment.Center
-	local bonus = text(item, "", 11, P.Dim, BOLD)
-	bonus.TextXAlignment = Enum.TextXAlignment.Center
-	-- Clicking the slot lists the gear you own for it.
+	local bonus = text(item, "", 10, P.Dim)
+	bonus.Visible = false
 	local hit = new("TextButton", {
 		Text = "",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 20),
-		Size = UDim2.fromOffset(110, 150),
+		Position = UDim2.fromOffset(0, 18),
+		Size = UDim2.fromOffset(110, 58),
 		ZIndex = 5,
 	}, holder)
+	IronUi.highlight(hit, item)
 	hit.Activated:Connect(function()
 		selection = { Kind = "Gear", Slot = socketName }
 		CharacterUI.refresh()
 	end)
-
-	local socketLabel = text(holder, "GEM SOCKET", 11, P.Dim, BOLD)
-	socketLabel.Position = UDim2.fromOffset(0, 184)
-	socketLabel.TextXAlignment = Enum.TextXAlignment.Center
 	local socket = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.fromRGB(10, 9, 8),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 204),
-		Size = UDim2.fromOffset(78, 78),
+		BackgroundColor3 = P.Frame,
+		Position = UDim2.fromOffset(0, 80),
+		Size = UDim2.fromOffset(22, 22),
 	}, holder)
-	UiKit.round(socket, 39)
-	new("UIStroke", { Name = "Ring", Color = P.Edge, Thickness = 3 }, socket)
-	local caption = text(holder, "", 11, P.Dim, BOLD)
-	caption.Position = UDim2.fromOffset(0, 290)
-	caption.TextXAlignment = Enum.TextXAlignment.Center
+	UiKit.round(socket, 5)
+	new("UIStroke", { Name = "Ring", Color = P.Edge, Thickness = 1 }, socket)
+	IronUi.highlight(socket)
+	local caption = text(holder, "", 9, P.Dim)
+	caption.Position = UDim2.fromOffset(28, 83)
+	caption.Size = UDim2.fromOffset(82, 16)
+	caption.AutomaticSize = Enum.AutomaticSize.None
+	caption.TextTruncate = Enum.TextTruncate.AtEnd
 	socket.Activated:Connect(function()
 		selection = { Kind = "Socket", Slot = socketName }
 		CharacterUI.refresh()
 	end)
 	return { Box = item, Name = name, Style = style, Bonus = bonus, Socket = socket, Caption = caption }
 end
-
-local weaponSlot = slot(0, "WEAPON", "Weapon")
-local armorSlot = slot(360, "ARMOR", "Armor")
+local equipmentSlots = {}
+for i, key in { "Helmet", "Armor", "Gloves", "Weapon", "Shield", "Boots" } do
+	local x = if i <= 3 then 0 else 360
+	local y = ((i - 1) % 3) * 110
+	equipmentSlots[key] = slot(x, y, string.upper(Slots.Definitions[key].Label), key)
+end
 
 local statsBox = box(panel, UDim2.fromOffset(24, 420), UDim2.fromOffset(470, 176), P.Inset)
 UiKit.pad(statsBox, 12)
@@ -182,7 +187,11 @@ local statsList = new("Frame", {
 	Size = UDim2.new(0.42, 0, 1, 0),
 }, statsBox)
 UiKit.list(statsList, 4)
-local enchantList = new("Frame", {
+local enchantList = new("ScrollingFrame", {
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 3,
+	BorderSizePixel = 0,
 	BackgroundTransparency = 1,
 	Position = UDim2.new(0.46, 0, 0, 0),
 	Size = UDim2.new(0.54, 0, 1, 0),
@@ -216,19 +225,27 @@ local tooltip = box(panel, UDim2.fromOffset(506, 366), UDim2.fromOffset(470, 230
 local tooltipStroke = tooltip:FindFirstChildOfClass("UIStroke") :: UIStroke
 UiKit.pad(tooltip, 12)
 local tipArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(96, 96) }, tooltip)
-local tipBody = new("Frame", {
+local tipBody = new("ScrollingFrame", {
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 3,
+	BorderSizePixel = 0,
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(106, 0),
-	Size = UDim2.new(1, -106, 1, -42),
+	Size = UDim2.new(1, -106, 1, -72),
 }, tooltip)
 UiKit.list(tipBody, 3)
 local tipActions = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0, 1),
 	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.new(1, 0, 0, 34),
+	Size = UDim2.new(1, 0, 0, 64),
 }, tooltip)
-UiKit.list(tipActions, 8, true)
+new("UIGridLayout", {
+	CellSize = UDim2.new(1 / 3, -6, 0, 28),
+	CellPadding = UDim2.fromOffset(6, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, tipActions)
 
 -- Drawing --------------------------------------------------------------------------------
 
@@ -244,6 +261,19 @@ local function request(action: string, ...)
 		UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
 	end)
 end
+
+local regenerate = actionButton(panel, "REGENERATE LOADOUT", false, function()
+	request("AdminRegenerateEquipment")
+end)
+regenerate.Position = UDim2.fromOffset(520, 14)
+regenerate.Size = UDim2.fromOffset(190, 40)
+regenerate.Visible = false
+local regenerateGems = actionButton(panel, "REROLL 3 GEMS", false, function()
+	request("AdminRegenerateGems")
+end)
+regenerateGems.Position = UDim2.fromOffset(720, 14)
+regenerateGems.Size = UDim2.fromOffset(180, 40)
+regenerateGems.Visible = false
 
 local function bonusText(gem, slotName: string): string
 	local parts = {}
@@ -262,7 +292,12 @@ local function gemLines(gem)
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "GEM MINT" else "CUT " .. gem.Cut
 	text(
 		tipBody,
-		string.format("%s %s  |  %s", string.upper(GemConfig.TierLabels[gem.Tier]), string.upper(gem.Element), state),
+		string.format(
+			"%s %s  |  %s",
+			string.upper(GemConfig.TierLabels[gem.Tier]),
+			string.upper(GemConfig.elementName(gem.Element)),
+			state
+		),
 		12,
 		GemConfig.ElementColors[gem.Element],
 		BOLD
@@ -280,7 +315,7 @@ local function gemLines(gem)
 		12,
 		P.Text
 	)
-	for _, slotName in { "Weapon", "Armor" } do
+	for _, slotName in Slots.Order do
 		local name, effect = GemConfig.enchantment(gem, slotName)
 		local heading = text(tipBody, string.format("IN %s: %s", string.upper(slotName), name), 12, P.Gold, BOLD)
 		heading.TextColor3 = GemConfig.ElementColors[gem.Element]
@@ -299,11 +334,42 @@ local function drawTooltip()
 
 	if selection and selection.Kind == "Gear" then
 		local slotName = selection.Slot
-		local kind = slotName .. "s"
+		local kind = Slots.Definitions[slotName].Kind
 		local profile = GemClient.Profile
 		local loadout = profile and profile.Character or {}
 		local owned = profile and profile.Owned and profile.Owned[kind] or {}
-		text(tipBody, "YOUR " .. string.upper(if slotName == "Armor" then "armor" else "weapons"), 18, P.Gold, BOLD)
+		text(tipBody, "EQUIPPED " .. string.upper(Slots.Definitions[slotName].Label), 18, P.Gold, BOLD)
+		local equippedItem = Classes.gear(loadout.Class, kind, loadout[slotName])
+		if equippedItem then
+			text(tipBody, equippedItem.Passive.Name .. ": " .. equippedItem.Passive.Text, 12, P.Gold)
+			if equippedItem.ProposedBuff and not equippedItem.BuffReady then
+				text(tipBody, "Planned signature: " .. equippedItem.ProposedBuff, 11, P.Dim)
+			end
+		end
+		if slotName == "Helmet" and loadout.Helmet then
+			local helmetRoll = GearRolls.get(loadout, "Helmet")
+			local traits = if helmetRoll
+				then GearRolls.appearance(helmetRoll)
+				else SuitTraits.forSuit(player.UserId, loadout.Helmet)
+			text(tipBody, traits.HelmetName .. " • " .. traits.HelmetRarity, 11, P.Dim)
+			if traits.VisorName then
+				text(tipBody, "Visor: " .. traits.VisorName .. " (cosmetic)", 11, P.Teal)
+			end
+		end
+		local roll = GearRolls.get(loadout, slotName)
+		if roll then
+			local bonuses = {}
+			for stat, amount in roll.Stats do
+				table.insert(bonuses, "+" .. amount .. " " .. stat)
+			end
+			table.sort(bonuses)
+			text(
+				tipBody,
+				GearRolls.Rarities[roll.Rarity].Name .. " • " .. table.concat(bonuses, ", "),
+				12,
+				GearRolls.Rarities[roll.Rarity].Color
+			)
+		end
 		local any = false
 		for _, gear in (loadout.Class and Classes.List[loadout.Class] or {})[kind] or {} do
 			local quality = owned[gear.Id]
@@ -338,9 +404,9 @@ local function drawTooltip()
 			end
 		end
 		if not any then
-			text(tipBody, "Nothing yet.", 13, P.Dim)
+			text(tipBody, "No reserve equipment. Recover gear on lunar expeditions.", 13, P.Dim)
 		end
-		text(tipBody, "Craft and upgrade gear at Borin's forge in the Crafting Hall (north road).", 12, P.Dim)
+		text(tipBody, "Recover equipment in Moon Mine caches or trade with another explorer [T].", 12, P.Dim)
 		return
 	end
 
@@ -372,7 +438,7 @@ local function drawTooltip()
 		text(tipBody, "INSPECT", 18, P.Gold, BOLD)
 		text(
 			tipBody,
-			"Click a gem to inspect it, or a socket to see its enchantment. Weapon gems add their element to your hits; armor gems ward you against it."
+			"Select any of the six items to replace it. Select a cut gem, then choose its equipment socket below."
 				.. hint,
 			13,
 			P.Dim
@@ -381,14 +447,14 @@ local function drawTooltip()
 	end
 	gemLines(gem)
 	if gem.Cut then
-		actionButton(tipActions, "SOCKET IN WEAPON", true, function()
-			request("SocketGem", gem.Id, "Weapon")
-		end)
-		actionButton(tipActions, "SOCKET IN ARMOR", true, function()
-			request("SocketGem", gem.Id, "Armor")
-		end)
+		for _, key in Slots.Order do
+			local b = actionButton(tipActions, string.upper(Slots.Definitions[key].Label), true, function()
+				request("SocketGem", gem.Id, key)
+			end)
+			b.TextSize = 11
+		end
 	else
-		text(tipActions, "Rough stones must be cut first. Ilsa's stall is beside the Mining Guild.", 12, P.Dim).Size =
+		text(tipActions, "Gem data is unavailable. Rejoin to refresh your saved equipment.", 12, P.Dim).Size =
 			UDim2.new(1, 0, 1, 0)
 	end
 end
@@ -398,8 +464,12 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 	-- Enchanted gear is named for its gem, Diablo style, and glows its colour.
 	ui.Name.Text = if gear then Crafting.gearName(GemConfig.itemName(gear.Name, gem, slotName), quality) else "Empty"
 	ui.Name.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Text
-	ui.Style.Text = if gear then string.upper(gear.Style) else ""
-	ui.Style.TextColor3 = Crafting.Qualities[quality or 1].Color
+	local loadout = GemClient.Profile and GemClient.Profile.Character or {}
+	local roll = GearRolls.get(loadout, slotName)
+	ui.Style.Text = if roll
+		then string.upper(GearRolls.Rarities[roll.Rarity].Name)
+		else (if gear then string.upper(gear.Style) else "")
+	ui.Style.TextColor3 = if roll then GearRolls.Rarities[roll.Rarity].Color else Crafting.Qualities[quality or 1].Color
 	ui.Bonus.Text = if gem then (string.gsub(bonusText(gem, slotName), "  ", "\n")) else ""
 	ui.Bonus.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Dim
 	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
@@ -422,16 +492,16 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 		ui.Caption.TextColor3 = GemConfig.ElementColors[gem.Element]
 	else
 		if redraw then
-			local plus = text(ui.Socket, "+", 30, P.Edge, BOLD)
+			local plus = text(ui.Socket, "+", 18, P.Edge, BOLD)
 			plus.Size = UDim2.fromScale(1, 1)
 			plus.AutomaticSize = Enum.AutomaticSize.None
 			plus.TextXAlignment = Enum.TextXAlignment.Center
 		end
 		ring.Color = P.Edge
-		ui.Caption.Text = "EMPTY"
+		ui.Caption.Text = "UNATTUNED"
 		ui.Caption.TextColor3 = P.Dim
 	end
-	ring.Thickness = if chosen then 4 else 3
+	ring.Thickness = if chosen then 2 else 1
 	if chosen then
 		ring.Color = P.Gold
 	end
@@ -474,7 +544,7 @@ end
 local function drawStats(loadout, class)
 	clear(statsList)
 	clear(enchantList)
-	text(statsList, "ATTRIBUTES", 12, P.Gold, BOLD)
+	text(statsList, "COMBAT RATINGS", 12, P.Gold, BOLD)
 	if class then
 		local ratings = Classes.ratings(loadout)
 		for _, name in Classes.StatNames do
@@ -493,9 +563,9 @@ local function drawStats(loadout, class)
 		)
 		text(statsList, class.Resource, 11, P.Dim)
 	end
-	text(enchantList, "ENCHANTMENTS", 12, P.Gold, BOLD)
+	text(enchantList, "ACTIVE ATTUNEMENTS", 12, P.Gold, BOLD)
 	local any = false
-	for _, slotName in { "Weapon", "Armor" } do
+	for _, slotName in Slots.Order do
 		local gem = socketed(slotName)
 		if gem then
 			any = true
@@ -506,7 +576,7 @@ local function drawStats(loadout, class)
 		end
 	end
 	if not any then
-		text(enchantList, "None yet. Socket cut gems into your weapon and armor.", 12, P.Dim)
+		text(enchantList, "Each equipment item has its own gem socket.", 12, P.Dim)
 	end
 end
 
@@ -545,7 +615,7 @@ local function drawGrid(profile)
 	table.sort(gems, function(a, b)
 		return GemConfig.value(a) > GemConfig.value(b)
 	end)
-	invTitle.Text = string.format("INVENTORY   %d / %d GEMS   |   %d COINS", #gems, Config.MaxGems, profile.Coins)
+	invTitle.Text = string.format("STONE RESERVE   %d / %d   |   %d COINS", #gems, Config.MaxGems, profile.Coins)
 	local ids = {}
 	for i, gem in gems do
 		ids[i] = gem.Id .. ":" .. tostring(gem.Cut)
@@ -596,6 +666,8 @@ end
 
 function CharacterUI.refresh()
 	local profile = GemClient.Profile
+	regenerate.Visible = profile ~= nil and profile.CanRegenerateEquipment == true
+	regenerateGems.Visible = regenerate.Visible
 	if not profile or not gui.Enabled then
 		return
 	end
@@ -616,20 +688,15 @@ function CharacterUI.refresh()
 		selection = if still then { Kind = "Gem", Gem = still } else nil
 	end
 
-	drawSlot(
-		weaponSlot,
-		"Weapon",
-		loadout.Class and Classes.weapon(loadout.Class, loadout.Weapon),
-		class,
-		loadout.WeaponQuality
-	)
-	drawSlot(
-		armorSlot,
-		"Armor",
-		loadout.Class and Classes.armor(loadout.Class, loadout.Armor),
-		class,
-		loadout.ArmorQuality
-	)
+	for _, key in Slots.Order do
+		drawSlot(
+			equipmentSlots[key],
+			key,
+			loadout.Class and Classes.gear(loadout.Class, Slots.Definitions[key].Kind, loadout[key]),
+			class,
+			loadout[key .. "Quality"]
+		)
+	end
 	drawStats(loadout, class)
 	drawGrid(profile)
 	drawTooltip()

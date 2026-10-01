@@ -48,7 +48,7 @@ local function rollShade(rng: Random, element: string, luck: number): string
 end
 
 --[[
-	Makes a new rough stone.
+	Recovers a naturally faceted, enchant-ready gemstone.
 	source: "MiningNode" | "MiningStore" | "PvEDrop" | "PvPWager"
 	opts.Luck: extra luck on top of the source's own (0-1)
 	opts.Id: unique id (the server passes a GUID)
@@ -62,41 +62,11 @@ function GemGenerator.generate(rng: Random, source: string, opts: { Luck: number
 		Tier = rollShade(rng, element, luck),
 		Clarity = rollGrade(rng, luck),
 		Size = rollGrade(rng, luck),
-		Cut = nil,
-		CutMethod = nil,
+		Cut = rollGrade(rng, luck),
+		CutMethod = "Natural",
 		Source = if source == "VipMiningNode" then "MiningNode" else source,
 		Found = opts.Time,
 	}
-end
-
--- Accuracy of each cutting strike (see GemConfig.strikeAccuracy).
-GemGenerator.strikeAccuracy = GemConfig.strikeAccuracy
-
--- Cut grade from minigame accuracies: 1-8 by average accuracy, 9 for
--- mastery (every strike in the zone and a high average), 10 when flawless.
-function GemGenerator.manualCutGrade(accuracies: { number }): number
-	local sum, allHit, allPerfect = 0, true, true
-	for _, accuracy in accuracies do
-		sum += accuracy
-		allHit = allHit and accuracy > 0
-		allPerfect = allPerfect and accuracy >= GemConfig.Cutting.PerfectAccuracy
-	end
-	local average = if #accuracies > 0 then sum / #accuracies else 0
-	if allHit and allPerfect then
-		return 10
-	elseif allHit and average >= GemConfig.Cutting.MasteryAccuracy then
-		return 9
-	end
-	return math.clamp(1 + math.floor(average * 8), 1, 8)
-end
-
-function GemGenerator.autoCutGrade(rng: Random, tier: number): number?
-	for _, laser in GemConfig.AutoCut do
-		if laser.Tier == tier then
-			return rng:NextInteger(laser.MinCut, laser.MaxCut)
-		end
-	end
-	return nil
 end
 
 return GemGenerator

@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Nearby = require(script.Parent.Nearby)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
@@ -27,7 +28,7 @@ end
 
 local function socketGem(player: Player, gemId: any, slot: any)
 	slot = slot or "Weapon"
-	if typeof(gemId) ~= "string" or (slot ~= "Weapon" and slot ~= "Armor") then
+	if typeof(gemId) ~= "string" or (typeof(slot) ~= "string" or not Slots.Definitions[slot]) then
 		return reply(false, "Pick a gem and a socket.")
 	end
 	if not canEnchant(player) then
@@ -35,16 +36,19 @@ local function socketGem(player: Player, gemId: any, slot: any)
 	end
 	local gem = PlayerData.socketGem(player, gemId, slot)
 	if not gem then
-		return reply(false, "Only cut gems can be socketed. Rough stones need cutting first.")
+		return reply(false, "Choose an available gem from your pouch and an equipment socket.")
 	end
 	PlayerData.milestone(player, "Enchanted")
-	Progress.addXP(player, "Enchant")
+	if not gem.EnchantmentXPGranted then
+		gem.EnchantmentXPGranted = true
+		Progress.addXP(player, "Enchant")
+	end
 	local name, effect = GemConfig.enchantment(gem, slot)
 	return reply(true, string.format("%s: %s", name, effect), { Gem = gem })
 end
 
 local function unsocketGem(player: Player, slot: any)
-	if slot ~= "Weapon" and slot ~= "Armor" then
+	if typeof(slot) ~= "string" or not Slots.Definitions[slot] then
 		return reply(false, "Pick a socket.")
 	end
 	if not canEnchant(player) then

@@ -14,7 +14,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
-local Crafting = require(ReplicatedStorage.Shared.Crafting)
+local Economy = require(ReplicatedStorage.Shared.ExpeditionEconomy)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Store = require(ReplicatedStorage.Shared.Store)
 local GemGenerator = require(script.Parent.GemGenerator)
@@ -45,15 +45,10 @@ function StoreServer.grant(player: Player, reward: Store.Reward): { string }
 		profile.Coins += reward.Coins
 		add(string.format("%d coins", reward.Coins))
 	end
-	if reward.Marks then
-		profile.Marks += reward.Marks
-		add(string.format("%d Guild Marks", reward.Marks))
-	end
-	for id, count in reward.Materials or {} do
-		if count > 0 and Crafting.Materials[id] then
-			profile.Materials[id] = (profile.Materials[id] or 0) + count
-			add(string.format("%d %s", count, Crafting.Materials[id].Name))
-		end
+	local legacy = Economy.legacyCredits(reward.Marks, reward.Materials)
+	if legacy > 0 then
+		profile.Coins += legacy
+		add(string.format("%d legacy salvage credits", legacy))
 	end
 	for id, count in reward.Crates or {} do
 		if Store.Crates[id] then
@@ -78,7 +73,7 @@ function StoreServer.grant(player: Player, reward: Store.Reward): { string }
 	end
 	for _ = 1, reward.Stones or 0 do
 		if Gems.award(player, "MiningStore") then
-			add("a rough stone")
+			add("an enchant-ready gem")
 		end
 	end
 	for _ = 1, reward.CutGems or 0 do

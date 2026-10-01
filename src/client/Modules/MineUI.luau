@@ -647,9 +647,9 @@ local function startScreen()
 	title.TextXAlignment = Enum.TextXAlignment.Center
 	title.LayoutOrder = 1
 	local lines = {
-		"Each wall gives you " .. Mine.Swings .. " swings of your pickaxe.",
-		"✦ Glinting rocks hide gems.   ◆ Speckled rocks hide ore.",
-		"Clear a wall, then descend: deeper walls hold rarer gems!",
+		"Survey each rock face. You have " .. Mine.Swings .. " strikes to uncover its rewards.",
+		"Glinting rock holds Saga Stones. Speckled deposits yield salvage.",
+		"Finish the rock face, then descend. Deeper shafts offer rarer discoveries.",
 	}
 	for n, line in lines do
 		local label = text(overlayList, line, 17, Color3.fromRGB(240, 230, 220), CHUNKY)
@@ -887,7 +887,7 @@ function MineUI.swing(index: number)
 			addToTray(loot)
 			if loot.Gear then
 				-- A lucky rock can hold the next armor set up the ladder.
-				UiKit.toast(string.format("ARMOR FOUND: %s! Wear it from Gear & Enchant.", loot.Gear), P.Gold)
+				UiKit.toast(string.format("EQUIPMENT RECOVERED: %s! Wear it from Gear & Enchant.", loot.Gear), P.Gold)
 			end
 		else
 			drawPips(ui, result.Tile.Hp)

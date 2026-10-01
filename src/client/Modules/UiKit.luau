@@ -1,16 +1,16 @@
--- Small helpers so every Brainrot Crusaders screen shares the same look.
+-- Small helpers so every Saga Miners screen shares the same look.
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local UiKit = {}
 
 UiKit.Colors = {
-	Background = Color3.fromRGB(8, 14, 12),
-	Row = Color3.fromRGB(22, 32, 28),
-	Text = Color3.fromRGB(210, 255, 225),
-	Dim = Color3.fromRGB(140, 160, 150),
-	Accent = Color3.fromRGB(0, 240, 255),
-	Gold = Color3.fromRGB(240, 196, 80),
+	Background = Color3.fromRGB(12, 10, 25),
+	Row = Color3.fromRGB(36, 29, 52),
+	Text = Color3.fromRGB(235, 242, 249),
+	Dim = Color3.fromRGB(153, 172, 191),
+	Accent = Color3.fromRGB(58, 203, 233),
+	Gold = Color3.fromRGB(255, 202, 91),
 	Bad = Color3.fromRGB(255, 90, 90),
 }
 local K = UiKit.Colors
@@ -61,7 +61,8 @@ function UiKit.panel(parent: Instance, accent: Color3?): Frame
 	UiKit.round(frame)
 	local stroke = Instance.new("UIStroke")
 	stroke.Name = "Outline"
-	stroke.Thickness = 2
+	stroke.Thickness = 1
+	stroke.Transparency = 0.55
 	stroke.Color = accent or K.Accent
 	stroke.Parent = frame
 	return frame
@@ -72,7 +73,7 @@ function UiKit.text(parent: Instance, text: string, size: number, color: Color3?
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 0)
 	label.AutomaticSize = Enum.AutomaticSize.Y
-	label.Font = font or Enum.Font.Code
+	label.Font = font or Enum.Font.Gotham
 	label.TextSize = size
 	label.TextColor3 = color or K.Text
 	label.TextWrapped = true
@@ -86,7 +87,7 @@ function UiKit.button(parent: Instance, text: string, color: Color3?, onClick: (
 	local button = Instance.new("TextButton")
 	button.AutomaticSize = Enum.AutomaticSize.XY
 	button.BackgroundColor3 = K.Row
-	button.Font = Enum.Font.Code
+	button.Font = Enum.Font.Gotham
 	button.TextSize = 18
 	button.TextColor3 = color or K.Text
 	button.Text = text
@@ -160,11 +161,12 @@ function UiKit.toast(message: string, color: Color3?)
 	UiKit.round(toast, 14)
 	local shade = Instance.new("UIGradient")
 	shade.Rotation = 90
-	shade.Color = ColorSequence.new(Color3.fromRGB(48, 36, 70), Color3.fromRGB(20, 14, 30))
+	shade.Color = ColorSequence.new(K.Row, K.Background)
 	shade.Parent = toast
 	local rim = Instance.new("UIStroke")
 	rim.Color = accent
-	rim.Thickness = 3
+	rim.Thickness = 1
+	rim.Transparency = 0.5
 	rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	rim.Parent = toast
 	local padding = Instance.new("UIPadding")
@@ -186,7 +188,7 @@ function UiKit.toast(message: string, color: Color3?)
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromOffset(0, 0)
 	label.AutomaticSize = Enum.AutomaticSize.XY
-	label.Font = Enum.Font.TitilliumWeb
+	label.Font = Enum.Font.GothamMedium
 	label.TextSize = 18
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Text = message
@@ -195,6 +197,7 @@ function UiKit.toast(message: string, color: Color3?)
 	local ink = Instance.new("UIStroke")
 	ink.Color = Color3.fromRGB(12, 8, 18)
 	ink.Thickness = 1
+	ink.Transparency = 1
 	ink.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	ink.Parent = label
 	local pop = Instance.new("UIScale")

@@ -68,7 +68,7 @@ local function materialStall(folder: Folder, f: CFrame)
 		Color = Color3.fromRGB(110, 76, 48),
 		Material = Enum.Material.WoodPlanks,
 	})
-	Builder.station(shelf, "Quartermaster", "Buy Materials", "Materials", "Materials")
+	Builder.station(shelf, "Quartermaster", "Inspect Equipment", "Equipment", "Equipment")
 	for _, x in { -2.7, 2.7 } do
 		Builder.part(folder, f, {
 			Name = "ShelfLeg",
@@ -185,7 +185,7 @@ local function smithy(folder: Folder, f: CFrame, color: Color3)
 		Color = Color3.fromRGB(60, 62, 70),
 		Material = Enum.Material.Metal,
 	})
-	Builder.station(anvil, "Forge", "Craft Gear", "Anvil", "Forge")
+	Builder.station(anvil, "Forge", "Inspect Equipment", "Equipment Bench", "Equipment")
 	Builder.neon(folder, f, Vector3.new(0.6, 0.12, 0.3), CFrame.new(1.8, 2.5, 6), C.Amber) -- a glowing blank
 
 	-- Quench barrel.
@@ -259,7 +259,7 @@ function Crafting.build(folder: Folder, frame: CFrame, color: Color3)
 		Floors = 2,
 		Trim = color,
 	})
-	Builder.sign(folder, frame, CFrame.new(0, 8.8, -0.6), Vector3.new(12, 2, 0.5), "CRAFTING HALL", color)
+	Builder.sign(folder, frame, CFrame.new(0, 8.8, -0.6), Vector3.new(12, 2, 0.5), "EXPEDITION EXCHANGE", color)
 
 	-- The forge chimney glows at the top.
 	Builder.part(folder, frame, {

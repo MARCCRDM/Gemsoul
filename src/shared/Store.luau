@@ -60,51 +60,47 @@ Store.Bundles = {
 	{
 		Id = "Welcome",
 		Name = "Welcome Bundle",
-		Tagline = "Everything a new miner needs. Once only.",
+		Tagline = "A colony banner and an hour of expedition XP. Once only.",
 		Price = 150,
-		Value = "5X VALUE",
+		Value = "EXPEDITION",
 		Color = Color3.fromRGB(0, 170, 190),
 		Icon = "🎁",
 		NewPlayersOnly = true,
 		Contents = {
-			Stones = 3,
-			Materials = { Iron = 15, Timber = 15, Leather = 10, Cloth = 10 },
 			Cosmetics = { "BackBanner" },
-			Crates = { GeodeCrate = 2 },
 			XPBoostMinutes = 60,
 		},
 	},
 	{
 		Id = "Prospector",
 		Name = "Prospector Bundle",
-		Tagline = "Stones, a pack and a crate to crack.",
+		Tagline = "A survey pack and matching station trim.",
 		Price = 400,
-		Value = "3X VALUE",
+		Value = "STYLE KIT",
 		Color = Color3.fromRGB(40, 140, 170),
 		Icon = "⛏️",
-		Contents = { Stones = 4, Cosmetics = { "BackPack" }, Crates = { GeodeCrate = 1 } },
+		Contents = { Cosmetics = { "BackPack", "TrimEmber" } },
 	},
 	{
 		Id = "Forgemaster",
-		Name = "Forgemaster Bundle",
-		Tagline = "Mithril, shards and Marks for serious crafting.",
+		Name = "Station Specialist Bundle",
+		Tagline = "Geode back piece and radiant trim. Equipment is earned in expeditions.",
 		Price = 1200,
-		Value = "4X VALUE",
+		Value = "STYLE KIT",
 		Color = Color3.fromRGB(190, 110, 40),
 		Icon = "⚒️",
-		Contents = { Marks = 250, Materials = { Mithril = 10, Shards = 30, Iron = 20 } },
+		Contents = { Cosmetics = { "BackGeode", "TrimRoseGold" } },
 	},
 	{
 		Id = "Legend",
 		Name = "Legend Bundle",
 		Tagline = "Crystal Wings, Storm Trim and a double-XP hour.",
 		Price = 3000,
-		Value = "5X VALUE",
+		Value = "EXPEDITION",
 		Color = Color3.fromRGB(150, 70, 220),
 		Icon = "👑",
 		Contents = {
 			Cosmetics = { "BackWings", "TrimStorm" },
-			Crates = { GeodeCrate = 2, MasterworkCrate = 1 },
 			XPBoostMinutes = 60,
 		},
 	},
@@ -114,14 +110,14 @@ Store.Crates = {
 	GeodeCrate = {
 		Id = "GeodeCrate",
 		Name = "Geode Crate",
-		Description = "Crack it open: stones, materials, Marks, a cut gem or a cosmetic.",
+		Description = "Recovered expedition cache: ready gems, credits or station cosmetics.",
 		Price = 250,
 		Color = Color3.fromRGB(80, 170, 200),
 		Icon = "⛏️",
 		Rolls = {
 			{ Weight = 38, Reward = { Stones = 2 } },
-			{ Weight = 24, Reward = { Materials = { Iron = 10, Timber = 10, Leather = 8, Cloth = 8 } } },
-			{ Weight = 15, Reward = { Marks = 150 } },
+			{ Weight = 24, Reward = { Coins = 160 } },
+			{ Weight = 15, Reward = { Coins = 150 } },
 			{ Weight = 11, Reward = { CutGems = 1 } },
 			{ Weight = 6, Cosmetic = "Uncommon" },
 			{ Weight = 4, Cosmetic = "Rare" },
@@ -131,14 +127,14 @@ Store.Crates = {
 	MasterworkCrate = {
 		Id = "MasterworkCrate",
 		Name = "Masterwork Crate",
-		Description = "For the forge: mithril, shards, gems, and better odds on rare cosmetics.",
+		Description = "Deep-space cache: ready gems, credits and rare station cosmetics.",
 		Price = 800,
 		Color = Color3.fromRGB(230, 150, 50),
 		Icon = "💎",
 		Rolls = {
-			{ Weight = 30, Reward = { Materials = { Mithril = 6, Shards = 15 } } },
+			{ Weight = 30, Reward = { Coins = 450 } },
 			{ Weight = 22, Reward = { CutGems = 2 } },
-			{ Weight = 18, Reward = { Marks = 400 } },
+			{ Weight = 18, Reward = { Coins = 400 } },
 			{ Weight = 14, Cosmetic = "Rare" },
 			{ Weight = 10, Reward = { Stones = 5 } },
 			{ Weight = 6, Cosmetic = "UltraRare" },
@@ -158,14 +154,12 @@ end
 -- A cosmetic you already own becomes this many coins instead.
 Store.DuplicateRefund = 120
 
--- Developer Product ids, to also sell bundles and crates for Robux (0 = off).
+-- Direct cosmetic/XP bundles only. Random caches use earned coins, never Robux.
 Store.RobuxProducts = {
 	Welcome = 0,
 	Prospector = 0,
 	Forgemaster = 0,
 	Legend = 0,
-	GeodeCrate = 0,
-	MasterworkCrate = 0,
 }
 -- Shown next to the Robux button when the product is on.
 Store.RobuxPrices =
@@ -196,7 +190,7 @@ function Store.items(reward: Reward, cosmeticName: ((string) -> string)?): { Rew
 		add("Marks", nil, reward.Marks, "Guild Marks")
 	end
 	if reward.Stones then
-		add("Stones", nil, reward.Stones, if reward.Stones == 1 then "Rough Stone" else "Rough Stones")
+		add("Stones", nil, reward.Stones, if reward.Stones == 1 then "Ready Gem" else "Ready Gems")
 	end
 	if reward.CutGems then
 		add("CutGems", nil, reward.CutGems, if reward.CutGems == 1 then "Cut Gem" else "Cut Gems")
@@ -231,7 +225,7 @@ function Store.describe(reward: Reward, cosmeticName: ((string) -> string)?): { 
 		table.insert(lines, string.format("%d Guild Marks", reward.Marks))
 	end
 	if reward.Stones then
-		table.insert(lines, string.format("%d rough stone%s", reward.Stones, if reward.Stones == 1 then "" else "s"))
+		table.insert(lines, string.format("%d ready gem%s", reward.Stones, if reward.Stones == 1 then "" else "s"))
 	end
 	if reward.CutGems then
 		table.insert(lines, string.format("%d cut gem%s", reward.CutGems, if reward.CutGems == 1 then "" else "s"))

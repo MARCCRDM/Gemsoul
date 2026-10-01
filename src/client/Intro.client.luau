@@ -1,5 +1,5 @@
 --[[
-	The new-player intro for Brainrot Crusaders:
+	The new-player intro for Saga Miners:
 
 	  1  The lore "video": a short cinematic. The Saga Miners' colony, the
 	     pulsing Saga Stones, the rift, the brainrot entities. (Skippable.)
@@ -21,6 +21,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemArt = require(script.Parent.Modules.GemArt)
@@ -663,7 +664,7 @@ local function playCinematic()
 		skipped = true
 	end)
 	skip.AnchorPoint = Vector2.new(1, 0)
-	skip.Position = UDim2.fromOffset(W - 24, 20)
+	skip.Position = UDim2.fromOffset(W - 24, 126)
 	skip.ZIndex = 22
 
 	for _, shot in SHOTS do
@@ -706,6 +707,7 @@ local SHIP_AT = CFrame.new(0, 900, 0)
 local ship: Scenes.Ship
 local croc: Model
 local camera = workspace.CurrentCamera
+local cameraTween: Tween? = nil
 local attacking = true -- the bomber strafes the ship until you drive it off
 local retreating = false
 
@@ -754,8 +756,12 @@ local function shot(cframe: CFrame, seconds: number?)
 		TweenInfo.new(seconds or 1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
 		{ CFrame = cframe }
 	)
+	cameraTween = tween
 	tween:Play()
 	task.wait(seconds or 1.2)
+	if cameraTween == tween then
+		cameraTween = nil
+	end
 end
 
 -- Your figure in the ship: a copy of your character (with whatever gear the
@@ -871,7 +877,7 @@ local OBJECTIVES = {
 	"Wake up",
 	"Suit up",
 	"Collect your Saga Stone ration",
-	"Enchant your blaster",
+	"Attune your weapon",
 	"Drive off the bomber",
 	"Teleport to the moon base",
 }
@@ -1080,7 +1086,7 @@ local function playShip()
 	if not profile.Character.Class then
 		prompt(
 			"SUIT UP",
-			"Grab your Scrap Suit, Saga Pistol and Shield from the locker. No miner goes out without them.",
+			"Collect your randomized expedition loadout: helmet, chest suit, gloves, boots, weapon and shield.",
 			"SUIT UP"
 		)
 		local result = GemClient.request("SuitUp")
@@ -1088,7 +1094,7 @@ local function playShip()
 			UiKit.toast(result.Message, P.Bad)
 		end
 		refreshHero()
-		UiKit.toast("Scrap Suit, Saga Pistol and Shield equipped.", SAGA)
+		UiKit.toast("Your randomized expedition gear is equipped.", SAGA)
 	end
 
 	-- The daily Saga Stone ration.
@@ -1114,7 +1120,7 @@ local function playShip()
 		prompt(
 			"ENCHANT",
 			string.format(
-				"Set your best stone, the %s, into your blaster. Its element charges every shot.",
+				"Set your best stone, the %s, into your weapon. Its element empowers every attack.",
 				GemConfig.shade(stone).Name
 			),
 			"ENCHANT BLASTER"
@@ -1200,7 +1206,68 @@ local function playShip()
 	task.wait(1)
 end
 
-playCinematic()
-playShip()
-gui:Destroy()
-UiKit.toast("Welcome to the moon base, Crusader! Press M or click DIG to mine Saga Stones.", SAGA)
+-- Skip the whole intro through the existing server-authoritative quick start.
+-- Only remove the scenes after the server confirms the starter kit and rewards.
+local introThread: thread? = nil
+local skipping = false
+local finished = false
+local skipInput: RBXScriptConnection? = nil
+local function skipIntro()
+	if skipping or finished then
+		return
+	end
+	skipping = true
+	local ok, result = pcall(GemClient.request, "QuickStart")
+	if not ok or not result.Ok then
+		skipping = false
+		UiKit.toast(if ok then result.Message else "Could not skip the intro. Try again.", P.Bad)
+		return
+	end
+	if finished then
+		return
+	end
+	finished = true
+	if introThread and coroutine.status(introThread) ~= "dead" then
+		task.cancel(introThread)
+	end
+	if cameraTween then
+		cameraTween:Cancel()
+	end
+	if skipInput then
+		skipInput:Disconnect()
+	end
+	if hero then
+		hero:Destroy()
+	end
+	if croc then
+		croc:Destroy()
+	end
+	if ship then
+		ship.Model:Destroy()
+	end
+	camera.CameraType = Enum.CameraType.Custom
+	gui:Destroy()
+	UiKit.toast("Intro skipped. Your starter kit is ready — welcome to the moon base!", SAGA)
+end
+local skipAll = IronUi.button(canvas, "Skip intro [Space]", false, skipIntro)
+skipAll.AnchorPoint = Vector2.new(1, 0)
+skipAll.Position = UDim2.fromOffset(W - 24, 78)
+skipAll.ZIndex = 30
+skipInput = UserInputService.InputBegan:Connect(function(input, processed)
+	if processed or UserInputService:GetFocusedTextBox() then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.Space then
+		skipIntro()
+	end
+end)
+introThread = task.defer(function()
+	playCinematic()
+	playShip()
+	finished = true
+	if skipInput then
+		skipInput:Disconnect()
+	end
+	gui:Destroy()
+	UiKit.toast("Welcome to the moon base, Crusader! Press M or click DIG to mine Saga Stones.", SAGA)
+end)

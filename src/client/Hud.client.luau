@@ -15,10 +15,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Season = require(ReplicatedStorage.Shared.Season)
 
 local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
-local CutFlow = require(script.Parent.Modules.CutFlow)
+local TradeUI = require(script.Parent.Modules.TradeUI)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
 local GemClient = require(script.Parent.Modules.GemClient)
 local InventoryUI = require(script.Parent.Modules.InventoryUI)
@@ -177,13 +178,13 @@ end)
 
 local menu = if MENU_ONLY
 	then {
-		{ "✂️", "Cut", "X", CutFlow.open },
+		{ "⇄", "Trade", "T", TradeUI.open },
 		{
 			"⚒️",
-			"Craft",
-			"F",
+			"Equipment",
+			"C",
 			function()
-				ForgeUI.open("Craft")
+				CharacterUI.open()
 			end,
 		},
 		{
@@ -356,7 +357,7 @@ end
 
 local function refresh(profile)
 	coins.Text = commas(profile.Coins or 0)
-	marks.Text = commas(profile.Marks or 0)
+	marks.Text = "LV " .. tostring(Season.levelFor(profile.Season.XP))
 	gems.Text = tostring(#(profile.Gems or {}))
 	-- Free walls left today, on the Mine button.
 	local quota = profile.Quota
@@ -407,9 +408,9 @@ local KEYS = {
 }
 if MENU_ONLY then
 	KEYS.M = MineUI.toggle
-	KEYS.X = CutFlow.open
-	KEYS.F = function()
-		ForgeUI.open("Craft")
+	KEYS.T = TradeUI.open
+	KEYS.C = function()
+		CharacterUI.open()
 	end
 	KEYS.V = function()
 		ForgeUI.open("Sell", true)
@@ -435,7 +436,7 @@ ContextActionService:BindAction(
 	Enum.KeyCode.J,
 	Enum.KeyCode.L,
 	Enum.KeyCode.M,
-	Enum.KeyCode.X,
-	Enum.KeyCode.F,
+	Enum.KeyCode.T,
+	Enum.KeyCode.C,
 	Enum.KeyCode.V
 )

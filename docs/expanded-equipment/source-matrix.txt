@@ -1,0 +1,71 @@
+Trait Category Variation Detail Rarity Buff Type Stat Modifier / Effect
+Helmet Style Zero-G Standard Helm Common (40%) Kinetic Resistance +5% Physical Defense
+Helmet Style Platon Tactical Helm Uncommon (25%) Shield Capacity +10 Max Energy Shield
+Helmet Style Asterois Closed Helm Rare (15%) Elemental Resist +8% Cryo Resistance
+Helmet Style Intableed Visored Helm Ultra Rare (10%) Critical Strike +4% Critical Hit Chance
+Helmet Style Jutaim Command Helm Legendary (5%) Saga Resonance +15% Saga Stone Yield
+Helmet Style Qutany Fpv Helm Common (40%) Sensor Array +5% Detection Range
+Helmet Style Watten Speed Helm Uncommon (25%) Agility Boost +6% Movement Acceleration
+Helmet Style Photon Shield Helm Rare (15%) Energy Barrier +12 Shield Rejuvenation
+Helmet Style Photrin Perfect Helm Ultra Rare (10%) Precision Lock +10% Weakpoint Damage
+Helmet Style Metron Meshed Helm Legendary (5%) Neural Sync +15% Cooldown Reduction
+Visor Color Standard Amber Common (40%) Accuracy +2% Ranged Accuracy
+Visor Color Glacial Cyan (Cryo) Uncommon (25%) Cryo Potency +5% Freeze Buildup
+Visor Color Electric Amber (Volt) Rare (15%) Volt Potency +5% Stun Duration
+Visor Color Corrosive Emerald (Radiation) Ultra Rare (10%) Radiation Potency +8% DoT Tick Rate
+Visor Color Void Violet (Plasma) Legendary (5%) Thermal Potency +12% Plasma Burn Damage
+Visor Color Crimson Infrared Common (40%) Threat Detection +6% Vision Through Smoke
+Visor Color Cobalt Deep-Space Uncommon (25%) Vacuum Seal Immunity to Asphyxiation Hazards
+Visor Color Solar Gold Rare (15%) Energy Reflection Reflects 3% Projectile Damage
+Visor Color Matrix Green Ultra Rare (10%) Data Scans Reveals Enemy Weak Points Automatically
+Visor Color Prismatic Opaque Legendary (5%) Refraction Shield Negates 1st Hit Every 30s
+Suit Type Zero-G Bulk Suit Common (40%) Armor Plating +20 Flat Armor
+Suit Type Platon Armor Rig Uncommon (25%) Stamina Regeneration +10% Stamina Regen
+Suit Type Asterois Exosuit Rare (15%) Mobility +5% Movement Speed
+Suit Type Intableed Combat Rig Ultra Rare (10%) Lifesteal / Bio +3% Damage Converted to Health
+Suit Type Jutaim Heavy Vanguard Legendary (5%) Damage Reduction +15% Overall Damage Reduction
+Suit Type Qutany Fpv Suit Common (40%) Power Conduit +10 Max Power Pool
+Suit Type Watten Speed Suit Uncommon (25%) Velocity Matrix +8% Dash Speed
+Suit Type Photon Shield Suit Rare (15%) Barrier Generator +25 Max Energy Shield
+Suit Type Photrin Reflective Suit Ultra Rare (10%) Energy Deflection +10% Elemental Resistance
+Suit Type Metron Meshed Suit Legendary (5%) Nanite Repair Regenerates 1% HP per second
+Gloves Reinforced Grips Common (40%) Melee Impact +5% Shield Bash Stagger
+Gloves Capacitor Liners Uncommon (25%) Volt Synergy +6% Electrical Arc Chance
+Gloves Cryo-Cooler Gauntlets Rare (15%) Chill Infusion +8% Slow Application
+Gloves Thermal Conduit Gloves Ultra Rare (10%) Plasma Overcharge +10% Critical Damage
+Gloves Saga-Tuned Handwraps Legendary (5%) Attack Speed +12% Weapon Cycle Speed
+Gloves Hydraulic Crushers Common (40%) Stagger Force +15% Heavy Melee Knockback
+Gloves Nanite Weave Gloves Uncommon (25%) Self-Cleaning Immunity to Corrosive Sludge
+Gloves Kinetic Shock Mitts Rare (15%) Impact Absorption Reduces Melee Damage Taken by 10%
+Gloves Void-weave Bracers Ultra Rare (10%) Phase Strike Melee Attacks Ignore 20% Armor
+Gloves Overclocked Servos Legendary (5%) Burst Action +20% Attack Speed for 5s on Kill
+Boots Mag-Lock Greaves Common (40%) Knockback Resist +10% Stability against Shoves
+Boots Hydraulic Striders Uncommon (25%) Sprint Efficiency -10% Stamina Drain on Sprint
+Boots Phase-Dodge Treads Rare (15%) Evade Distance +15% Dodge Roll I-Frames
+Boots Reactor-Core Boots Ultra Rare (10%) Energy Recharge +8% Shield Recharge Rate
+Boots Void-Strider Sabatons Legendary (5%) Traversal Speed +20% Movement Speed in Combat
+Boots Gravity-Stabilized Treads Common (40%) Fall Mitigation -25% Fall Damage Taken
+Boots Aero-Stream Greaves Uncommon (25%) Slipstream +10% Movement Speed after Sprinting 3s
+Boots Crystalline Striders Rare (15%) Saga Resonance +5% Extra Saga Stones on Pickup
+Boots Thermal-Insulated Boots Ultra Rare (10%) Thermal Shielding Immunity to Lava and Fire Hazards
+Boots Quantum-Step Sabatons Legendary (5%) Teleport Dodge Dodge Roll Leaves a Decoy Explosion
+Left Hand Pistol Standard Sidearm Common (40%) Base Kinetic 100% Base Weapon Damage
+Left Hand Pistol Cryo-Pistol Sub-Zero Uncommon (25%) Cryo Application Applies Slow on Hit
+Left Hand Pistol Volt-Spark Blaster Rare (15%) Volt Stun Chain Lightning on Crit
+Left Hand Pistol Radiation Corrupter Ultra Rare (10%) Armor Shred Reduces Target Armor by 15%
+Left Hand Pistol Plasma Melter Legendary (5%) Thermal Burn Applies Stackable Burn Over Time
+Left Hand Pistol Pulse-Laser Repeater Common (40%) Rapid Fire +25% Fire Rate, -10% Base Damage
+Left Hand Pistol Heavy Mag-Driver Uncommon (25%) Impact Slug Staggers Light Targets on Hit
+Left Hand Pistol Void-Caster Handgun Rare (15%) Spatial Distortion Pulls Targets Toward Impact Point
+Left Hand Pistol Saga-Infused Repeater Ultra Rare (10%) Energy Surge Generates Shield on Kills with Pistol
+Left Hand Pistol Omega-Protocol Handcannon Legendary (5%) Annihilation Round Fires Explosive Rounds every 5th Shot
+Right Hand ShieldTitanium Breach Shield Common (40%) Block Stability +50 Shield Block Health
+Right Hand ShieldCryo-Barrier Aegis Uncommon (25%) Chill Deflection Chills Attackers on Block
+Right Hand ShieldVolt-Field Bulwark Rare (15%) Shock Retaliation Shocks Melee Attackers
+Right Hand ShieldRadiation-Vented Wall Ultra Rare (10%) Corrosive Aura Deals Radiation AoE when Raised
+Right Hand ShieldSaga-Reactor Aegis Legendary (5%) Energy Reflection Reflects 10% Ranged Damage Back
+Right Hand ShieldComposite Riot Gate Common (40%) Coverage Area +15% Shield Width
+Right Hand ShieldKinetic Deflector Wall Uncommon (25%) Projectile Redirect Deflects Minor Projectiles Automatically
+Right Hand ShieldPlasma-Edge Bulwark Rare (15%) Thermal Counter Melee Attackers Take Plasma Burn
+Right Hand ShieldPhase-Shield Barrier Ultra Rare (10%) Ethereal Guard Allows Ranged Shots Through Shield at 50% Penalty
+Right Hand ShieldWorld-Breaker Aegis Legendary (5%) Bulwark Slam Shield Bash Creates a Shockwave Stun

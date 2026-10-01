@@ -1,17 +1,11 @@
---[[
-	The Crafting Hall: Hilde's stone exchange and materials stall, and
-	Borin's forge next door. Request actions:
-	  "BuyMaterial", materialId, count      buy materials with Guild Marks
-	  "SellGems", { gemId }                 60% of each gem's value in Marks
-	  "SalvageGems", { gemId }              break gems into Gem Shards
-	  "Craft", kind, gearId                 make a piece, or raise its quality
-	  "EquipGear", kind, gearId             wear gear you own (anywhere)
-	  "MarketSell", { gemId }               Tamsin at the Market: stones for coins
-	kind is "Weapons" or "Armors". Everything except equipping needs you at
-	the hall. Costs come from shared/Crafting.luau.
-]]
+-- Equipment selection and the station gem exchange. No crafting or salvage.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Players = game:GetService("Players")
+local TestAdmin = require(script.Parent.TestAdmin)
+local Equipment = require(script.Parent.Equipment)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local Nearby = require(script.Parent.Nearby)
@@ -20,38 +14,9 @@ local Progress = require(script.Parent.Progress)
 local Shop = require(script.Parent.Shop)
 
 local RANGE = 40 -- studs from Hilde or Borin
-local MAX_BUY = 50
 local reply = Shop.reply
 
 local Forge = {}
-
-local function atWorkshop(player: Player): boolean
-	return Nearby.vendor(player, { "Quartermaster", "Forge" }, RANGE)
-end
-local AWAY = "Visit the Crafting Hall on the north road."
-
-local function buyMaterial(player: Player, materialId: any, count: any)
-	local material = typeof(materialId) == "string" and Crafting.Materials[materialId]
-	if not material or not material.Price then
-		return reply(false, "Hilde doesn't sell that.")
-	end
-	if typeof(count) ~= "number" or count ~= math.floor(count) or count < 1 or count > MAX_BUY then
-		return reply(false, "Buy between 1 and " .. MAX_BUY .. " at a time.")
-	end
-	if not atWorkshop(player) then
-		return reply(false, AWAY)
-	end
-	local profile = PlayerData.get(player)
-	if not profile or not PlayerData.spendMarks(player, material.Price * count) then
-		return reply(
-			false,
-			string.format("You need %d Guild Marks for that. Sell stones to Hilde for more.", material.Price * count)
-		)
-	end
-	profile.Materials[materialId] = (profile.Materials[materialId] or 0) + count
-	PlayerData.sync(player)
-	return reply(true, string.format("Bought %d %s.", count, material.Name))
-end
 
 -- Checks a list of gem ids from the client: all distinct and all yours.
 local function pickGems(player: Player, ids: any): { any }?
@@ -73,107 +38,11 @@ local function pickGems(player: Player, ids: any): { any }?
 	return gems
 end
 
-local function sellGems(player: Player, ids: any)
-	if not atWorkshop(player) then
-		return reply(false, AWAY)
-	end
-	local gems = pickGems(player, ids)
-	if not gems then
-		return reply(false, "Those gems aren't in your pouch.")
-	end
-	local total = 0
-	for _, gem in gems do
-		total += Crafting.sellPrice(gem)
-		PlayerData.removeGem(player, gem.Id)
-	end
-	PlayerData.addMarks(player, total)
-	PlayerData.milestone(player, "Sold")
-	Progress.addXP(player, "Sell")
-	return reply(true, string.format("Sold %d gem%s for %d Guild Marks.", #gems, if #gems == 1 then "" else "s", total))
-end
-
-local function salvageGems(player: Player, ids: any)
-	if not atWorkshop(player) then
-		return reply(false, AWAY)
-	end
-	local gems = pickGems(player, ids)
-	local profile = PlayerData.get(player)
-	if not gems or not profile then
-		return reply(false, "Those gems aren't in your pouch.")
-	end
-	local shards = 0
-	for _, gem in gems do
-		shards += Crafting.salvageShards(gem)
-		PlayerData.removeGem(player, gem.Id)
-	end
-	profile.Materials.Shards = (profile.Materials.Shards or 0) + shards
-	PlayerData.sync(player)
-	PlayerData.milestone(player, "Sold")
-	Progress.addXP(player, "Sell")
-	return reply(
-		true,
-		string.format("Salvaged %d gem%s into %d Gem Shards.", #gems, if #gems == 1 then "" else "s", shards)
-	)
-end
-
 local function gearFor(classId: string?, kind: any, gearId: any)
 	if not classId or typeof(gearId) ~= "string" then
 		return nil
 	end
-	if kind == "Weapons" then
-		return Classes.weapon(classId, gearId)
-	elseif kind == "Armors" then
-		return Classes.armor(classId, gearId)
-	end
-	return nil
-end
-
-local function craft(player: Player, kind: any, gearId: any)
-	local profile = PlayerData.get(player)
-	local classId = profile and profile.Character.Class
-	local gear = gearFor(classId, kind, gearId)
-	if not profile or not gear then
-		return reply(false, "Your class can't craft that.")
-	end
-	if not atWorkshop(player) then
-		return reply(false, AWAY)
-	end
-	local current = profile.Owned[kind][gearId] or 0
-	if current >= Crafting.MaxQuality then
-		return reply(false, gear.Name .. " is already Masterwork.")
-	end
-	-- Armor is a ladder: forge (or find) each set before the next.
-	local previous = if kind == "Armors" and current == 0 then Classes.previousArmor(classId, gearId) else nil
-	if previous and not profile.Owned.Armors[previous.Id] then
-		return reply(false, "Forge the " .. previous.Name .. " first.")
-	end
-	local target = current + 1
-	local recipe = Crafting.recipe(classId, kind, target, gear.Tier) :: Crafting.Recipe
-	-- Check everything before taking anything.
-	for id, need in recipe.Materials do
-		local have = profile.Materials[id] or 0
-		if have < need then
-			return reply(false, string.format("You need %d more %s.", need - have, Crafting.Materials[id].Name))
-		end
-	end
-	if profile.Marks < recipe.Marks then
-		return reply(false, string.format("The forge fee is %d Guild Marks.", recipe.Marks))
-	end
-	PlayerData.spendMarks(player, recipe.Marks)
-	for id, need in recipe.Materials do
-		profile.Materials[id] -= need
-	end
-	PlayerData.setGearQuality(player, kind, gearId, target)
-	PlayerData.milestone(player, "Crafted")
-	Progress.addXP(player, "Craft")
-	local name = Crafting.gearName(gear.Name, target)
-	return reply(
-		true,
-		if current == 0
-			then "Forged a " .. name .. "! Equip it from the forge or your character screen."
-			else "Upgraded to " .. name .. "!",
-		{ Quality = target }
-	)
+	return if typeof(kind) == "string" then Classes.gear(classId, kind, gearId) else nil
 end
 
 -- Tamsin at the Market buys stones for coins (less than Hilde's Marks).
@@ -200,16 +69,51 @@ local function equipGear(player: Player, kind: any, gearId: any)
 	local profile = PlayerData.get(player)
 	local gear = gearFor(profile and profile.Character.Class, kind, gearId)
 	if not gear or not PlayerData.equipGear(player, kind, gearId) then
-		return reply(false, "You don't own that yet. Craft it at Borin's forge in the Crafting Hall.")
+		return reply(false, "Recover that equipment in the mine or trade for it.")
 	end
 	return reply(true, "Equipped " .. Crafting.gearName(gear.Name, profile.Owned[kind][gearId]) .. ".")
 end
 
+local lastRegeneration: { [Player]: number } = {}
+local function regenerateEquipment(player: Player)
+	if not TestAdmin.allowed(player.UserId) then
+		return reply(false, "This test tool is restricted to the test admin.")
+	end
+	local profile = PlayerData.get(player)
+	local class = profile and Classes.List[profile.Character.Class]
+	if not class then
+		return reply(false, "Choose your character first.")
+	end
+	local now = os.clock()
+	if lastRegeneration[player] and now - lastRegeneration[player] < 3 then
+		return reply(false, "Wait three seconds before regenerating again.")
+	end
+	lastRegeneration[player] = now
+	local rng = Random.new()
+	profile.Character.RandomLoadoutVersion = nil
+	-- Existing equipment and socketed gems stay owned; select a new six-item roll.
+	GearRolls.grant(profile, class, rng)
+	for _, slot in Slots.Order do
+		local kind = Slots.Definitions[slot].Kind
+		local id = profile.Character[slot]
+		local gear = Classes.gear(profile.Character.Class, kind, id)
+		local roll = GearRolls.roll(rng, gear.RarityTier)
+		-- Preserve the weighted visor rules used by normal starter generation.
+		local previous = profile.Character.GearRolls[kind][id]
+		roll.MatrixVisor = previous.MatrixVisor
+		profile.Character.GearRolls[kind][id] = roll
+	end
+	PlayerData.sync(player)
+	Equipment.apply(player)
+	return reply(true, "Test loadout regenerated: six new equipment rolls.")
+end
+
 function Forge.start()
-	Shop.register("BuyMaterial", buyMaterial)
-	Shop.register("SellGems", sellGems)
-	Shop.register("SalvageGems", salvageGems)
-	Shop.register("Craft", craft)
+	Shop.register("AdminRegenerateEquipment", regenerateEquipment)
+	Players.PlayerRemoving:Connect(function(player)
+		lastRegeneration[player] = nil
+	end)
+	Shop.register("SellGems", marketSell) -- legacy sale requests also pay coins
 	Shop.register("EquipGear", equipGear)
 	Shop.register("MarketSell", marketSell)
 end

@@ -1,5 +1,5 @@
 --[[
-	The 3D sets for Brainrot Crusaders, built on the client (only you see
+	The 3D sets for Saga Miners, built on the client (only you see
 	them, and nothing is sent over the network):
 
 	  Scenes.croc()        the brainrot alligator bomber, a crocodile with

@@ -2,8 +2,7 @@
 	Server side of the new-player intro. Each step is a request action:
 	  "ChooseLoadout", classId, weaponId, armorId   pick class and starter gear
 	  "StarterSpin"                                 three random cut gems, once
-	  "FirstStone"                                  a small rough stone to learn
-	                                                cutting on, once
+	  "FirstStone"                                  a small, enchant-ready gem, once
 	  "FinishIntro"                                 done: gear appears in the world
 	  "SuitUp"                                      the ship intro's first step: the
 	                                                class (Config.OnlyClass) and its
@@ -23,10 +22,12 @@ local GemGenerator = require(script.Parent.GemGenerator)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
+local TestAdmin = require(script.Parent.TestAdmin)
+local Players = game:GetService("Players")
 
 local STARTER_GEMS = 3
 local STARTER_MIN_CUT, STARTER_MAX_CUT = 5, 8
-local FIRST_STONE_MAX_SIZE = 4 -- small stones are easier to cut by hand
+local FIRST_STONE_MAX_SIZE = 4 -- a modest first discovery
 
 local reply = Shop.reply
 
@@ -56,7 +57,7 @@ local function chooseLoadout(player: Player, classId: any, weaponId: any, armorI
 end
 
 -- Three already-cut gems, like a lottery. At least one is Uncommon or better.
-local function rollStarterGems(player: Player): { GemConfig.Gem }
+local function generateStarterGems(): { GemConfig.Gem }
 	local rng = Gems.random()
 	local gems = {}
 	for i = 1, STARTER_GEMS do
@@ -76,11 +77,39 @@ local function rollStarterGems(player: Player): { GemConfig.Gem }
 		gem.CutMethod = "Starter"
 		table.insert(gems, gem)
 	end
+	return gems
+end
+
+local function rollStarterGems(player: Player): { GemConfig.Gem }
+	local gems = generateStarterGems()
 	for _, gem in gems do
 		PlayerData.addGem(player, gem)
 	end
 	PlayerData.setIntroFlag(player, "Spun")
 	return gems
+end
+
+-- Replace only the first three loose cargo stones; equipped gems stay intact.
+local lastGemRegeneration: { [Player]: number } = {}
+local function regenerateStarterGems(player: Player)
+	if not TestAdmin.allowed(player.UserId) then
+		return reply(false, "This test tool is restricted to the test admin.")
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	local now = os.clock()
+	if lastGemRegeneration[player] and now - lastGemRegeneration[player] < 3 then
+		return reply(false, "Wait three seconds before regenerating again.")
+	end
+	local gems = generateStarterGems()
+	lastGemRegeneration[player] = now
+	for i, gem in gems do
+		profile.Gems[i] = gem
+	end
+	PlayerData.sync(player)
+	return reply(true, "First three cargo gemstones regenerated.", { Gems = gems })
 end
 
 local function starterSpin(player: Player)
@@ -135,7 +164,7 @@ local function firstStone(player: Player)
 		return reply(false, "Your gem pouch is full.")
 	end
 	PlayerData.setIntroFlag(player, "FirstStone")
-	return reply(true, "Here's a rough stone to practise on.", { Gem = gem })
+	return reply(true, "Recovered a naturally cut gem. It is ready to enchant your equipment.", { Gem = gem })
 end
 
 local function finishIntro(player: Player)
@@ -148,6 +177,10 @@ local function finishIntro(player: Player)
 end
 
 function Intro.start()
+	Shop.register("AdminRegenerateGems", regenerateStarterGems)
+	Players.PlayerRemoving:Connect(function(player)
+		lastGemRegeneration[player] = nil
+	end)
 	Shop.register("ChooseLoadout", chooseLoadout)
 	Shop.register("StarterSpin", starterSpin)
 	Shop.register("FirstStone", firstStone)

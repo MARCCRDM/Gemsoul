@@ -19,10 +19,7 @@ local new, text, box, button, clear = IronUi.new, IronUi.text, IronUi.box, IronU
 local WIDTH, HEIGHT = 1000, 560
 local XP_LABELS = {
 	{ "Mine", "Mine a crystal" },
-	{ "CutByHand", "Cut by hand" },
-	{ "CutByLaser", "Laser cut" },
-	{ "Sell", "Sell or salvage" },
-	{ "Craft", "Forge gear" },
+	{ "Sell", "Sell a gem" },
 	{ "Enchant", "Enchant" },
 	{ "SlayCrawler", "Slay a Crawler" },
 	{ "SlayBrute", "Slay a Brute" },

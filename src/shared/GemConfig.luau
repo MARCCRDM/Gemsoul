@@ -10,8 +10,8 @@
 		Tier: "Common" | "Uncommon" | "Rare" | "UltraRare",
 		Clarity: 1-10,   -- rolled on generation
 		Size: 1-10,      -- rolled on generation
-		Cut: 1-10?,      -- nil while the stone is still rough
-		CutMethod: "Manual" | "AutoCut" | nil,
+		Cut: 1-10,       -- natural facet quality, rolled at discovery
+		CutMethod: "Natural" | "Starter" | "Crate",
 		Source: "MiningNode" | "MiningStore" | "PvEDrop" | "PvPWager",
 		Found: number,   -- os.time() when generated
 	}
@@ -25,6 +25,7 @@ export type Gem = {
 	Size: number,
 	Cut: number?,
 	CutMethod: string?,
+	EnchantmentXPGranted: boolean?,
 	Source: string,
 	Found: number,
 }
@@ -32,6 +33,11 @@ export type Gem = {
 export type Shade = { Tier: string, Name: string, Color: Color3, Color2: Color3?, Prismatic: boolean? }
 
 local GemConfig = {}
+-- Retain saved element keys while presenting space-tech affinities everywhere.
+GemConfig.ElementLabels = { Fire = "Thermal", Frost = "Cryo", Shock = "Ion", Poison = "Radiation" }
+function GemConfig.elementName(element: string): string
+	return GemConfig.ElementLabels[element] or element
+end
 
 GemConfig.Elements = { "Fire", "Frost", "Shock", "Poison" }
 
@@ -104,10 +110,10 @@ GemConfig.SourceLabels = {
 
 -- What a gem does when socketed into a weapon.
 GemConfig.ElementEffects = {
-	Fire = "Burns enemies, dealing damage over time.",
+	Fire = "Superheats targets, dealing damage over time.",
 	Frost = "Chills enemies, slowing them down.",
 	Shock = "Arcs to a second nearby enemy.",
-	Poison = "Weakens enemies so they deal less damage.",
+	Poison = "Irradiates targets, reducing their damage output.",
 }
 
 GemConfig.TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4 }
@@ -134,31 +140,7 @@ GemConfig.SourceLuck = {
 	FirstStone = 0,
 }
 
---[[
-	Cut grades:
-	  1-8  manual cutting minigame, by accuracy
-	  9    manual mastery (every strike lands, high accuracy) or mid-tier auto-cut
-	  10   "Gem Mint": a flawless manual cut or premium auto-cut
-]]
-GemConfig.Cutting = {
-	Strikes = 3,
-	MasteryAccuracy = 0.9, -- average accuracy needed for a 9
-	PerfectAccuracy = 0.97, -- every strike at least this accurate for a 10
-	-- The target zone shrinks as stones get bigger: bigger gems need more
-	-- precision. Width is a fraction of the bar.
-	ZoneWidthSmall = 0.3,
-	ZoneWidthLarge = 0.12,
-	-- Seconds for the marker to cross the bar; bigger stones move faster.
-	SweepSecondsSmall = 1.4,
-	SweepSecondsLarge = 0.8,
-	SessionTimeout = 45,
-}
-
-GemConfig.AutoCut = {
-	{ Tier = 1, Name = "Laser T1 (Basic)", Price = 40, MinCut = 5, MaxCut = 8 },
-	{ Tier = 2, Name = "Laser T2 (Precision)", Price = 150, MinCut = 9, MaxCut = 9 },
-	{ Tier = 3, Name = "Laser T3 (Premium)", Price = 400, MinCut = 10, MaxCut = 10 },
-}
+-- Natural facet quality: 1-10, rolled at recovery. Diamond cut is the only shape.
 
 -- Base value in coins by colour tier, before size, clarity and cut.
 GemConfig.TierValue = {
@@ -179,48 +161,7 @@ end
 
 function GemConfig.displayName(gem: Gem): string
 	local state = if gem.Cut then "" else "Rough "
-	return state .. GemConfig.shade(gem).Name .. " (" .. gem.Element .. ")"
-end
-
--- Target zone width and sweep time for cutting a stone of this size.
-function GemConfig.cuttingDifficulty(size: number): (number, number)
-	local t = (math.clamp(size, 1, 10) - 1) / 9
-	local cutting = GemConfig.Cutting
-	local zone = cutting.ZoneWidthSmall + (cutting.ZoneWidthLarge - cutting.ZoneWidthSmall) * t
-	local sweep = cutting.SweepSecondsSmall + (cutting.SweepSecondsLarge - cutting.SweepSecondsSmall) * t
-	return zone, sweep
-end
-
--- Where the cutting marker is (0-1 across the bar) `t` seconds in. It
--- sweeps back and forth, taking `sweepSeconds` to cross once.
-function GemConfig.markerPosition(t: number, sweepSeconds: number): number
-	local phase = (t / sweepSeconds) % 2
-	return if phase <= 1 then phase else 2 - phase
-end
-
---[[
-	How close each cutting strike landed to its target zone. `times` are
-	seconds since the cut started. Returns accuracy 0-1 per strike
-	(0 = outside the zone, 1 = dead centre). The server uses this to grade
-	the cut; the client uses it to show feedback.
-]]
-function GemConfig.strikeAccuracy(
-	times: { number },
-	zoneCenters: { number },
-	zoneWidth: number,
-	sweepSeconds: number
-): { number }
-	local accuracies = {}
-	for i, center in zoneCenters do
-		local t = times[i]
-		if typeof(t) ~= "number" or t ~= t or t < 0 then
-			accuracies[i] = 0
-		else
-			local distance = math.abs(GemConfig.markerPosition(t, sweepSeconds) - center)
-			accuracies[i] = math.max(0, 1 - distance / (zoneWidth / 2))
-		end
-	end
-	return accuracies
+	return state .. GemConfig.shade(gem).Name .. " (" .. GemConfig.elementName(gem.Element) .. ")"
 end
 
 --[[
@@ -249,8 +190,8 @@ end
 -- What a socketed gem does. Weapon gems add their element to your hits;
 -- armor gems ward you against that element. Numbers grow with potency.
 GemConfig.EnchantNames = {
-	Weapon = { Fire = "Burning", Frost = "Frostbite", Shock = "Arcing", Poison = "Venom" },
-	Armor = { Fire = "Emberward", Frost = "Frostward", Shock = "Stormward", Poison = "Venomward" },
+	Weapon = { Fire = "Thermal", Frost = "Cryogenic", Shock = "Ionized", Poison = "Irradiated" },
+	Armor = { Fire = "Heat Shield", Frost = "Cryo Shield", Shock = "Ion Shield", Poison = "Radiation Shield" },
 }
 
 -- The numbers behind an enchantment, used by combat:
@@ -259,6 +200,7 @@ GemConfig.EnchantNames = {
 --           Poison: Weaken (enemies deal this much less, 4s)
 --   Armor   Resist (fraction less damage from that element)
 function GemConfig.enchantValues(gem: Gem, slot: string): { [string]: number }
+	slot = if slot == "Weapon" then "Weapon" else "Armor"
 	local p = GemConfig.potency(gem)
 	if slot == "Armor" then
 		return { Resist = math.min(60, 10 + math.floor(p / 4)) / 100 }
@@ -274,16 +216,22 @@ function GemConfig.enchantValues(gem: Gem, slot: string): { [string]: number }
 end
 
 function GemConfig.enchantment(gem: Gem, slot: string): (string, string)
+	slot = if slot == "Weapon" then "Weapon" else "Armor"
 	local name = GemConfig.EnchantNames[slot] and GemConfig.EnchantNames[slot][gem.Element] or "Enchanted"
 	local v = GemConfig.enchantValues(gem, slot)
 	if slot == "Armor" then
-		return name, string.format("Take %d%% less %s damage", math.floor(v.Resist * 100 + 0.5), gem.Element)
+		return name,
+			string.format(
+				"Take %d%% less %s damage",
+				math.floor(v.Resist * 100 + 0.5),
+				GemConfig.elementName(gem.Element)
+			)
 	end
 	local text = if v.Burn
 		then string.format("Hits burn for %d damage over 3s", v.Burn)
 		elseif v.Slow then string.format("Hits slow enemies by %d%% for 2s", math.floor(v.Slow * 100 + 0.5))
 		elseif v.Arc then string.format("%d%% of each hit arcs to a nearby enemy", math.floor(v.Arc * 100 + 0.5))
-		else string.format("Poisoned enemies deal %d%% less damage for 4s", math.floor(v.Weaken * 100 + 0.5))
+		else string.format("Irradiated enemies deal %d%% less damage for 4s", math.floor(v.Weaken * 100 + 0.5))
 	return name, text
 end
 
@@ -305,6 +253,7 @@ GemConfig.EnchantStats = {
 }
 
 function GemConfig.statBonuses(gem: Gem, slot: string): { [string]: number }
+	slot = if slot == "Weapon" then "Weapon" else "Armor"
 	local bonuses = {}
 	local p = GemConfig.potency(gem)
 	for _, entry in (GemConfig.EnchantStats[slot] or {})[gem.Element] or {} do
@@ -316,11 +265,17 @@ end
 -- Enchanted gear takes a name from its gem: "Burning Longsword",
 -- "Iron Plate of Embers".
 GemConfig.ItemAffixes = {
-	Weapon = { Fire = "Burning", Frost = "Frostbitten", Shock = "Thundering", Poison = "Venomous" },
-	Armor = { Fire = "of Embers", Frost = "of the Glacier", Shock = "of Storms", Poison = "of the Viper" },
+	Weapon = { Fire = "Thermal", Frost = "Cryogenic", Shock = "Ionized", Poison = "Irradiated" },
+	Armor = {
+		Fire = "of Thermal Shielding",
+		Frost = "of Cryo Insulation",
+		Shock = "of Ion Shielding",
+		Poison = "of Radiation Containment",
+	},
 }
 
 function GemConfig.itemName(baseName: string, gem: Gem?, slot: string): string
+	slot = if slot == "Weapon" then "Weapon" else "Armor"
 	if not gem then
 		return baseName
 	end

@@ -1,0 +1,154 @@
+-- Weighted starting-pool coverage and executable equipment contracts.
+local draws, counts = 0, {}
+for kind, catalog in ExpandedTraits.Catalog do
+	assert(#catalog == (if kind == "Weapons" then 20 else 10), "Unexpected catalog size for " .. kind)
+	local seen, rarityCounts = {}, { 0, 0, 0, 0, 0 }
+	local rng = Random.new(9231)
+	for _ = 1, 10000 do
+		local item = ExpandedTraits.pick(catalog, rng)
+		assert(item and item.StartPool, "Draw escaped the expanded pool")
+		seen[item.Id] = true
+		rarityCounts[item.RarityTier] += 1
+		draws += 1
+	end
+	for _, item in catalog do
+		assert(seen[item.Id], "Starting draw never reached " .. item.Id)
+		assert(Classes.gear("Warrior", kind, item.Id) == item, "Catalog identity differs")
+		if kind == "Weapons" then
+			assert(
+				(item.Attack.Kind == "Shot" or (item.Attack.Kind == "Melee" and item.Attack.Range <= 8 and item.Attack.Combo == 3))
+					and item.Attack.Rate > 0
+					and item.Attack.Damage > 0,
+				"Sword attack contract invalid"
+			)
+		end
+	end
+	for rarity, expected in ExpandedTraits.Weights do
+		assert(math.abs(rarityCounts[rarity] / 100 - expected) < 2, "Rarity weights drifted")
+	end
+	counts[kind] = rarityCounts
+end
+local visorSeen = {}
+local visorRng = Random.new(59123)
+for _ = 1, 10000 do
+	visorSeen[ExpandedTraits.pick(ExpandedTraits.Visors, visorRng).Index] = true
+end
+for i = 1, 10 do
+	assert(visorSeen[i], "Visor unreachable")
+end
+local seedProfile = { Character = { Class = "Warrior" }, Owned = {}, Gems = {} }
+GearRolls.grant(seedProfile, Classes.get("Warrior"), Random.new(312))
+for _, slot in Slots.Order do
+	local item = Classes.gear("Warrior", Slots.Definitions[slot].Kind, seedProfile.Character[slot])
+	local roll = GearRolls.get(seedProfile.Character, slot)
+	assert(item.StartPool and roll.Rarity == item.RarityTier, "Item rarity disagrees with persisted roll")
+	assert(GearRolls.appearance(roll).VisorName, "Visor identity missing")
+end
+local previous = seedProfile.Character.Weapon
+assert(not GearRolls.grant(seedProfile, Classes.get("Warrior"), Random.new(434)), "Rejoining rerolled equipment")
+assert(seedProfile.Character.Weapon == previous, "Rejoining changed saved item")
+print(
+	"PASS: 60,000 weighted starter draws; all 70 items and 10 visors reachable; attack contracts and saved rarity valid"
+)
+
+local rapid = Classes.gear("Warrior", "Weapons", "MatrixWeapons6")
+assert(rapid.Attack.Rate == 0.36 and rapid.Attack.Damage == 9.9, "Pistol rapid-fire tradeoff drifted")
+
+local B = EquipmentBalance
+assert(B.passiveDamageMultiplier(0.5, 0.6) == 0.8, "Combined passive budget exceeded")
+assert(math.abs(B.passiveDamageMultiplier(0.9, 0.05) - 0.855) < 0.00001, "Below-cap mitigation changed")
+assert(B.passiveDamageMultiplier(nil, 0) == 1, "Unmodified damage changed")
+assert(B.cooldownMultiplier(0.1) == 0.8 and B.cooldownMultiplier(0.9) == 0.9, "Cooldown cap failed")
+assert(B.criticalChance(10000, 1) == 0.1, "Critical chance exceeded 10%")
+assert(B.criticalChance(0, 0) == 0.05, "Base critical chance changed")
+assert(B.hazardResistance(1) == 0.6 and B.hazardResistance(-1) == 0, "Hazard immunity slipped through")
+local gates = {}
+assert(B.consumeUtility(gates, "Reflection", 100), "First reflection denied")
+assert(not B.consumeUtility(gates, "Reflection", 124.99), "Reflection cooldown bypassed")
+assert(B.consumeUtility(gates, "Reflection", 125), "Reflection boundary denied")
+assert(B.consumeUtility(gates, "PhaseDodge", 100), "Independent utility denied")
+assert(not B.consumeUtility(gates, "PhaseDodge", 129.99), "Phase cooldown bypassed")
+assert(B.consumeUtility(gates, "PhaseDodge", 130), "Phase boundary denied")
+assert(not B.consumeUtility(gates, "Unknown", 200), "Unknown utility authorized")
+-- Force stacked real catalog effects to exercise aggregation, then restore them.
+local helmet = Classes.gear("Warrior", "Helmets", "MatrixHelmets1")
+local gloves = Classes.gear("Warrior", "Gloves", "MatrixGloves1")
+local oldHelmet, oldGloves = helmet.Passive.Effect, gloves.Passive.Effect
+helmet.Passive.Effect = { TakenMult = 0.6, CooldownMult = 0.6, CritAdd = 0.08 }
+gloves.Passive.Effect = { TakenMult = 0.6, CooldownMult = 0.6, CritAdd = 0.08 }
+local capped = Classes.effects({ Class = "Warrior", Helmet = helmet.Id, Gloves = gloves.Id })
+assert(capped.TakenMult == 0.8 and capped.CooldownMult == 0.8 and capped.CritAdd == 0.1, "Loadout caps not applied")
+helmet.Passive.Effect, gloves.Passive.Effect = oldHelmet, oldGloves
+print("PASS: passive budget stacking, critical cap, hazard resistance and shared utility cooldown boundaries")
+
+assert(ExpandedTraits.Catalog.Boots[9].PlannedHazardResistance == 0.6, "Thermal resistance policy missing")
+assert(ExpandedTraits.Catalog.Gloves[7].PlannedHazardResistance == 0.6, "Corrosive resistance policy missing")
+assert(ExpandedTraits.Catalog.Boots[10].InternalCooldown == 30, "Phase utility budget missing")
+assert(ExpandedTraits.Visors[10].InternalCooldown == 30, "First hit budget missing")
+assert(ExpandedTraits.Catalog.Shields[5].InternalCooldown == 25, "Reflection budget missing")
+
+for _, isR15 in { false, true } do
+	for _, look in { "UtilityMiner", "FrontierRanger", "HeavyVanguard" } do
+		local before = built
+		ArmorKits.build(
+			{},
+			rig(isR15),
+			look,
+			Color3.fromRGB(72, 207, 226),
+			4,
+			{ VisorColor = Color3.fromRGB(72, 207, 226), FinishColor = Color3.fromRGB(200, 100, 50), Variant = 4 }
+		)
+		assert(built - before >= 25 and built - before <= 110, "Frontier family part budget violated")
+		for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
+			local start = built
+			ArmorKits.build({}, rig(isR15), look, Color3.fromRGB(72, 207, 226), 1, nil, slot)
+			assert(built > start, "Clean equipment slot has no geometry")
+		end
+	end
+end
+assert(Classes.gear("Warrior", "Weapons", "MatrixSwords6").Look == "FrontierSword", "Sword model not connected")
+print("PASS: simplified families build on R6/R15, all four armor slots, at most 110 parts per family")
+
+for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
+	local previous = 0
+	for rarity = 1, 5 do
+		local before = built
+		ArmorKits.build({}, rig(false), "FrontierRanger", Color3.fromRGB(72, 207, 226), 1, {
+			Rarity = rarity,
+			Helmet = 1,
+			VisorColor = Color3.fromRGB(72, 207, 226),
+			FinishColor = Color3.fromRGB(90, 100, 120),
+		}, slot)
+		local count = built - before
+		assert(count > previous, "Each rarity must add visible details to " .. slot)
+		previous = count
+	end
+end
+assert(GearRolls.appearance({ Rarity = 5, Helmet = 1, Visor = 1, Finish = 1, Variant = 1 }).Rarity == 5)
+print("PASS: every armor slot gains geometry at each rarity; saved rarity reaches rendering")
+
+for _, builder in { FrontierAssets.sword, FrontierAssets.shield } do
+	local previous = 0
+	for rarity = 1, 5 do
+		local before = built
+		builder(
+			{},
+			{ CFrame = CFrame.identity },
+			CFrame.identity,
+			rarity,
+			Color3.fromRGB(72, 207, 226),
+			Color3.fromRGB(72, 117, 129)
+		)
+		local count = built - before
+		assert(count > previous and count < 50, "Weapon/shield detail must increase within budget")
+		previous = count
+	end
+end
+for _, weapon in Classes.List.Warrior.Weapons do
+	if weapon.WeaponType == "Sword" then
+		assert(weapon.Attack.Kind == "Melee" and weapon.Look == "FrontierSword")
+	else
+		assert(weapon.Attack.Kind == "Shot" and weapon.Look == "CleanSidearm", "Original pistol changed")
+	end
+end
+print("PASS: five sword/shield rarity models, valid geometry, saved weapon compatibility")

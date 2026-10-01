@@ -1,5 +1,5 @@
 -- Spawns a crystal node on every NodeSpawner pad. Mining a node uses one of
--- the player's free daily/weekly mines and gives them a random rough stone.
+-- the player's free daily/weekly mines and gives them a naturally cut gemstone.
 -- A mined node regrows on its pad after a short wait, so a busy server never
 -- runs dry. With no free mines left, the node stays put and the player is
 -- sent to the Mining Store.
@@ -73,7 +73,7 @@ local function spawnNode(spawner: BasePart, folder: Folder)
 		if not PlayerData.useFreeMine(player) then
 			Remotes.Notify:FireClient(
 				player,
-				"You've used all your free mines. Garrick at the Mining Guild sells rough stones."
+				"You've used all your free mines. Free quota replenishes on reset. Fund another Moon Mine wall with coins."
 			)
 			return
 		end

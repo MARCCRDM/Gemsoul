@@ -15,6 +15,10 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local ArmorKits = require(script.Parent.ArmorKits)
+local FrontierAssets = require(script.Parent.FrontierAssets)
+local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local PlayerData = require(script.Parent.PlayerData)
 
 local FOLDER_NAME = "GemsoulGear"
@@ -199,35 +203,40 @@ local UPRIGHT = CFrame.Angles(math.rad(-12), 0, 0)
 -- The Saga Miner's iconic kit: a blaster in the right hand and a riot
 -- shield on the left forearm. The pistol's energy cell and the shield's rim
 -- glow in the accent colour (an enchanting gem recolours them).
-local SUIT_WHITE = Color3.fromRGB(214, 216, 220)
 local GUNMETAL = Color3.fromRGB(58, 62, 72)
-WEAPONS.PistolShield = function(folder, character, right, _left, accent, gem)
+local function pistolKit(folder, _character, right, accent, gem, finish: Color3, heavy: boolean)
 	-- In the held frame +Y points out along the barrel and +Z is up. K scales
 	-- the whole pistol, so it reads clearly at a distance.
 	local m = HELD_FORWARD
-	local K = 1.5
+	local K = if heavy then 1.35 else 1.15
 	local function at(x: number, y: number, z: number): CFrame
 		return m * CFrame.new(x * K, y * K, z * K)
 	end
 	piece(folder, right, at(0, 0, -0.05), Vector3.new(0.2, 0.26, 0.5) * K, GUNMETAL, Enum.Material.SmoothPlastic)
-	piece(folder, right, at(0, 0.3, 0.26), Vector3.new(0.26, 0.95, 0.32) * K, SUIT_WHITE, Enum.Material.SmoothPlastic)
-	piece(
-		folder,
-		right,
-		at(0, 0.86, 0.3) * CFrame.Angles(0, 0, math.rad(90)),
-		Vector3.new(0.5, 0.18, 0.18) * K,
-		GUNMETAL,
-		Enum.Material.Metal,
-		Enum.PartType.Cylinder
-	)
+	piece(folder, right, at(0, 0.3, 0.26), Vector3.new(0.26, 0.95, 0.32) * K, finish, Enum.Material.SmoothPlastic)
+	piece(folder, right, at(0, 0.86, 0.3), Vector3.new(0.3, 0.22, 0.3) * K, GUNMETAL, Enum.Material.SmoothPlastic)
+	piece(folder, right, at(0, 0.35, 0.48), Vector3.new(0.12, 0.58, 0.06) * K, GUNMETAL, Enum.Material.SmoothPlastic)
+	for y = 0, 2 do
+		piece(
+			folder,
+			right,
+			at(0.14, 0.35 + y * 0.14, 0.3),
+			Vector3.new(0.035, 0.06, 0.16) * K,
+			GUNMETAL,
+			Enum.Material.SmoothPlastic
+		)
+	end
 	neon(folder, right, at(0, 0.12, 0.44), Vector3.new(0.14, 0.4, 0.08) * K, accent)
 	neon(folder, right, at(0, 1.12, 0.3), Vector3.new(0.2, 0.04, 0.2) * K, accent)
 	gemSocket(folder, right, m, Vector3.new(0.15, 0.3, 0.26) * K, gem, 0.2)
+end
 
+local function _shieldKit(folder, character, accent, gem, finish: Color3, heavy: boolean)
 	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
 	if arm then
 		local mount = CFrame.new(-(arm.Size.X / 2 + 0.25), 0, 0) * CFrame.Angles(0, math.rad(-90), 0)
-		piece(folder, arm, mount, Vector3.new(1.7, 2.2, 0.16), SUIT_WHITE, Enum.Material.SmoothPlastic)
+		local shieldHeight = if heavy then 2.6 else 2.2
+		piece(folder, arm, mount, Vector3.new(1.7, shieldHeight, 0.18), finish, Enum.Material.SmoothPlastic)
 		piece(folder, arm, mount * CFrame.new(0, 0, -0.09), Vector3.new(1.3, 1.8, 0.05), GUNMETAL, Enum.Material.Metal)
 		-- A viewing slit near the top, and a glowing rim.
 		piece(
@@ -238,11 +247,26 @@ WEAPONS.PistolShield = function(folder, character, right, _left, accent, gem)
 			Color3.fromRGB(20, 28, 40),
 			Enum.Material.Glass
 		)
-		for _, y in { -1.1, 1.1 } do
-			neon(folder, arm, mount * CFrame.new(0, y, -0.02), Vector3.new(1.72, 0.06, 0.18), accent)
+		for _, y in { -shieldHeight / 2, shieldHeight / 2 } do
+			piece(
+				folder,
+				arm,
+				mount * CFrame.new(0, y, -0.02),
+				Vector3.new(1.72, 0.12, 0.22),
+				GUNMETAL,
+				Enum.Material.SmoothPlastic
+			)
 		end
 		for _, x in { -0.85, 0.85 } do
-			neon(folder, arm, mount * CFrame.new(x, 0, -0.02), Vector3.new(0.06, 2.2, 0.18), accent)
+			piece(
+				folder,
+				arm,
+				mount * CFrame.new(x, 0, -0.02),
+				Vector3.new(0.12, shieldHeight, 0.22),
+				GUNMETAL,
+				Enum.Material.SmoothPlastic
+			)
+			neon(folder, arm, mount * CFrame.new(x, 0.35, -0.15), Vector3.new(0.055, 0.5, 0.035), accent)
 		end
 		-- A Saga Stone emblem in the middle.
 		neon(
@@ -252,7 +276,74 @@ WEAPONS.PistolShield = function(folder, character, right, _left, accent, gem)
 			Vector3.new(0.34, 0.34, 0.04),
 			Color3.fromRGB(255, 184, 72)
 		)
+		gemSocket(folder, arm, mount, Vector3.new(0, -0.1, -0.2), gem, 0.25)
 	end
+end
+
+-- Compact, undecorated expedition sidearm: one cell indicator and a socket.
+WEAPONS.CleanSidearm = function(folder, _character, right, _left, accent, gem)
+	local m = HELD_FORWARD
+	piece(
+		folder,
+		right,
+		m * CFrame.new(0, 0, -0.06),
+		Vector3.new(0.2, 0.3, 0.48),
+		GUNMETAL,
+		Enum.Material.SmoothPlastic
+	)
+	piece(
+		folder,
+		right,
+		m * CFrame.new(0, 0.28, 0.23),
+		Vector3.new(0.28, 0.76, 0.27),
+		Color3.fromRGB(118, 132, 146),
+		Enum.Material.SmoothPlastic
+	)
+	piece(
+		folder,
+		right,
+		m * CFrame.new(0, 0.73, 0.23) * CFrame.Angles(0, 0, math.rad(90)),
+		Vector3.new(0.18, 0.23, 0.23),
+		GUNMETAL,
+		Enum.Material.Metal,
+		Enum.PartType.Cylinder
+	)
+	piece(
+		folder,
+		right,
+		m * CFrame.new(0, 0.3, 0.39),
+		Vector3.new(0.09, 0.15, 0.045),
+		accent,
+		Enum.Material.SmoothPlastic
+	)
+	gemSocket(folder, right, m, Vector3.new(0.15, 0.12, 0.23), gem, 0.15)
+end
+local function frontierShield(folder, character, accent, gem, finish, rarity)
+	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
+	if not arm then
+		return
+	end
+	local mount = CFrame.new(-(arm.Size.X / 2 + 0.2), 0, 0) * CFrame.Angles(0, math.rad(-90), 0)
+	FrontierAssets.shield(folder, arm, mount, rarity, accent, finish)
+	gemSocket(folder, arm, mount, Vector3.new(0, 0.1, -0.28), gem, 0.19)
+end
+
+WEAPONS.PistolShield = function(folder, character, right, _left, accent, gem)
+	pistolKit(folder, character, right, accent, gem, Color3.fromRGB(218, 146, 59), false)
+end
+WEAPONS.SurveyorKit = function(folder, character, right, _left, accent, gem)
+	pistolKit(folder, character, right, accent, gem, Color3.fromRGB(97, 161, 177), false)
+	piece(
+		folder,
+		right,
+		HELD_FORWARD * CFrame.new(0, 0.38, 0.7),
+		Vector3.new(0.22, 0.5, 0.18),
+		GUNMETAL,
+		Enum.Material.SmoothPlastic
+	)
+end
+WEAPONS.BulwarkKit = function(folder, character, right, _left, accent, gem)
+	pistolKit(folder, character, right, accent, gem, Color3.fromRGB(210, 220, 229), true)
 end
 
 WEAPONS.Sword = function(folder, _character, right, _left, accent, gem)
@@ -765,8 +856,7 @@ local function applyStats(character: Model, loadout)
 	end
 	local ratings = Classes.ratings(loadout)
 	-- Agile armor (Fleet) adds a little on top.
-	local armor = Classes.armor(loadout.Class, loadout.Armor)
-	local extra = armor and armor.Passive.Effect.SpeedAdd or 0
+	local extra = Classes.effects(loadout).SpeedAdd or 0
 	humanoid.WalkSpeed = Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus) + extra
 	local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 	humanoid.MaxHealth = Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)
@@ -799,7 +889,37 @@ function Equipment.apply(player: Player)
 	local accent = if trim then trim.Color else class.Color
 
 	removeHeadwear(character)
-	ArmorKits.build(folder, character, armor.Look, accent, loadout.ArmorQuality)
+	local armorSlots = {}
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
+		local gear = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
+		if gear then
+			local component = Instance.new("Folder")
+			component.Name = slot
+			component.Parent = folder
+			armorSlots[slot] = component
+			ArmorKits.build(
+				component,
+				character,
+				gear.Look,
+				accent,
+				loadout[slot .. "Quality"],
+				if GearRolls.get(loadout, slot)
+					then GearRolls.appearance(GearRolls.get(loadout, slot))
+					else SuitTraits.forSuit(player.UserId, gear.Id),
+				slot
+			)
+			local gem = loadout[slot .. "Gem"]
+			if gem and slot ~= "Armor" then
+				local parts = {}
+				for _, part in component:GetDescendants() do
+					if part:IsA("BasePart") then
+						table.insert(parts, part)
+					end
+				end
+				enchant(parts, gem, nil)
+			end
+		end
+	end
 	if trim then
 		-- A trim (cosmetic) lights plate armor's brass bands in its colour.
 		for _, part in folder:GetDescendants() do
@@ -823,7 +943,7 @@ function Equipment.apply(player: Player)
 		)
 	end
 	local armorParts = {}
-	for _, part in folder:GetDescendants() do
+	for _, part in (armorSlots.Armor or folder):GetDescendants() do
 		if part:IsA("BasePart") then
 			table.insert(armorParts, part)
 		end
@@ -844,8 +964,93 @@ function Equipment.apply(player: Player)
 	local right = gripAnchor(weaponFolder, character, "Right")
 	local left = gripAnchor(weaponFolder, character, "Left")
 	local buildWeapon = WEAPONS[weapon.Look]
-	if buildWeapon and right and left then
+	if weapon.Look == "FrontierSword" and right then
+		local roll = GearRolls.get(loadout, "Weapon")
+		local rarity = if roll then roll.Rarity else weapon.RarityTier or 1
+		local finish = if roll then GearRolls.appearance(roll).FinishColor else STEEL
+		local mount = UPRIGHT * CFrame.Angles(0, 0, math.rad(-12))
+		FrontierAssets.sword(weaponFolder, right, mount, rarity, accent, finish)
+		gemSocket(weaponFolder, right, mount, Vector3.new(0, 0.39, -0.18), loadout.WeaponGem, 0.17)
+	elseif buildWeapon and right and left then
 		buildWeapon(weaponFolder, character, right, left, accent, loadout.WeaponGem)
+	end
+	local shieldItem = Classes.gear(loadout.Class, "Shields", loadout.Shield)
+	if shieldItem then
+		local component = Instance.new("Folder")
+		component.Name = "Shield"
+		component.Parent = folder
+		local shieldRoll = GearRolls.get(loadout, "Shield")
+		local traits = if shieldRoll
+			then GearRolls.appearance(shieldRoll)
+			else SuitTraits.forSuit(player.UserId, shieldItem.Id)
+		frontierShield(
+			component,
+			character,
+			accent,
+			loadout.ShieldGem,
+			ArmorKits.tint(traits.FinishColor, loadout.ShieldQuality),
+			if shieldRoll then shieldRoll.Rarity else shieldItem.RarityTier or 1
+		)
+		if loadout.ShieldGem then
+			local parts = {}
+			for _, part in component:GetDescendants() do
+				if part:IsA("BasePart") then
+					table.insert(parts, part)
+				end
+			end
+			enchant(parts, loadout.ShieldGem, nil)
+		end
+	end
+	local weaponRoll = GearRolls.get(loadout, "Weapon")
+	if weaponRoll and right and weapon.Look ~= "FrontierSword" then
+		local appearance = GearRolls.appearance(weaponRoll)
+		for _, part in weaponFolder:GetDescendants() do
+			if part:IsA("BasePart") and part.Name == "Gear" and part.Material == Enum.Material.SmoothPlastic then
+				part.Color = if weapon.Look == "CleanSidearm"
+					then part.Color:Lerp(appearance.FinishColor, 0.18)
+					else appearance.FinishColor
+			end
+		end
+		local variant = if weapon.Look == "CleanSidearm" then 0 else weaponRoll.Variant
+		if variant == 1 then
+			piece(
+				weaponFolder,
+				right,
+				HELD_FORWARD * CFrame.new(0, 0.45, 0.72),
+				Vector3.new(0.3, 0.62, 0.15),
+				GUNMETAL,
+				Enum.Material.SmoothPlastic
+			)
+		elseif variant == 2 then
+			for _, side in { -1, 1 } do
+				piece(
+					weaponFolder,
+					right,
+					HELD_FORWARD * CFrame.new(side * 0.22, 0.5, 0.34),
+					Vector3.new(0.12, 0.8, 0.18),
+					GUNMETAL,
+					Enum.Material.SmoothPlastic
+				)
+			end
+		elseif variant == 3 then
+			piece(
+				weaponFolder,
+				right,
+				HELD_FORWARD * CFrame.new(0, 0.15, -0.24),
+				Vector3.new(0.42, 0.45, 0.25),
+				GUNMETAL,
+				Enum.Material.SmoothPlastic
+			)
+		else
+			piece(
+				weaponFolder,
+				right,
+				HELD_FORWARD * CFrame.new(0, 1.35, 0.34),
+				Vector3.new(0.24, 0.44, 0.24),
+				GUNMETAL,
+				Enum.Material.SmoothPlastic
+			)
+		end
 	end
 	-- Crafted quality shows on the weapon's metal.
 	if (loadout.WeaponQuality or 1) > 1 then

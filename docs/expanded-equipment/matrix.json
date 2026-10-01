@@ -1,0 +1,492 @@
+[
+  {
+    "category": "Helmet Style",
+    "name": "Zero-G Standard Helm",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Kinetic Resistance +5% Physical Defense"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Platon Tactical Helm",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Shield Capacity +10 Max Energy Shield"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Asterois Closed Helm",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Elemental Resist +8% Cryo Resistance"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Intableed Visored Helm",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Critical Strike +4% Critical Hit Chance"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Jutaim Command Helm",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Saga Resonance +15% Saga Stone Yield"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Qutany Fpv Helm",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Sensor Array +5% Detection Range"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Watten Speed Helm",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Agility Boost +6% Movement Acceleration"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Photon Shield Helm",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Energy Barrier +12 Shield Rejuvenation"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Photrin Perfect Helm",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Precision Lock +10% Weakpoint Damage"
+  },
+  {
+    "category": "Helmet Style",
+    "name": "Metron Meshed Helm",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Neural Sync +15% Cooldown Reduction"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Standard Amber",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Accuracy +2% Ranged Accuracy"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Glacial Cyan (Cryo)",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Cryo Potency +5% Freeze Buildup"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Electric Amber (Volt)",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Volt Potency +5% Stun Duration"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Corrosive Emerald (Radiation)",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Radiation Potency +8% DoT Tick Rate"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Void Violet (Plasma)",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Thermal Potency +12% Plasma Burn Damage"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Crimson Infrared",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Threat Detection +6% Vision Through Smoke"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Cobalt Deep-Space",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Vacuum Seal Immunity to Asphyxiation Hazards"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Solar Gold",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Energy Reflection Reflects 3% Projectile Damage"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Matrix Green",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Data Scans Reveals Enemy Weak Points Automatically"
+  },
+  {
+    "category": "Visor Color",
+    "name": "Prismatic Opaque",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Refraction Shield Negates 1st Hit Every 30s"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Zero-G Bulk Suit",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Armor Plating +20 Flat Armor"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Platon Armor Rig",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Stamina Regeneration +10% Stamina Regen"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Asterois Exosuit",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Mobility +5% Movement Speed"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Intableed Combat Rig",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Lifesteal / Bio +3% Damage Converted to Health"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Jutaim Heavy Vanguard",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Damage Reduction +15% Overall Damage Reduction"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Qutany Fpv Suit",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Power Conduit +10 Max Power Pool"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Watten Speed Suit",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Velocity Matrix +8% Dash Speed"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Photon Shield Suit",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Barrier Generator +25 Max Energy Shield"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Photrin Reflective Suit",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Energy Deflection +10% Elemental Resistance"
+  },
+  {
+    "category": "Suit Type",
+    "name": "Metron Meshed Suit",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Nanite Repair Regenerates 1% HP per second"
+  },
+  {
+    "category": "Gloves",
+    "name": "Reinforced Grips",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Melee Impact +5% Shield Bash Stagger"
+  },
+  {
+    "category": "Gloves",
+    "name": "Capacitor Liners",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Volt Synergy +6% Electrical Arc Chance"
+  },
+  {
+    "category": "Gloves",
+    "name": "Cryo-Cooler Gauntlets",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Chill Infusion +8% Slow Application"
+  },
+  {
+    "category": "Gloves",
+    "name": "Thermal Conduit Gloves",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Plasma Overcharge +10% Critical Damage"
+  },
+  {
+    "category": "Gloves",
+    "name": "Saga-Tuned Handwraps",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Attack Speed +12% Weapon Cycle Speed"
+  },
+  {
+    "category": "Gloves",
+    "name": "Hydraulic Crushers",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Stagger Force +15% Heavy Melee Knockback"
+  },
+  {
+    "category": "Gloves",
+    "name": "Nanite Weave Gloves",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Self-Cleaning Immunity to Corrosive Sludge"
+  },
+  {
+    "category": "Gloves",
+    "name": "Kinetic Shock Mitts",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Impact Absorption Reduces Melee Damage Taken by 10%"
+  },
+  {
+    "category": "Gloves",
+    "name": "Void-weave Bracers",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Phase Strike Melee Attacks Ignore 20% Armor"
+  },
+  {
+    "category": "Gloves",
+    "name": "Overclocked Servos",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Burst Action +20% Attack Speed for 5s on Kill"
+  },
+  {
+    "category": "Boots",
+    "name": "Mag-Lock Greaves",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Knockback Resist +10% Stability against Shoves"
+  },
+  {
+    "category": "Boots",
+    "name": "Hydraulic Striders",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Sprint Efficiency -10% Stamina Drain on Sprint"
+  },
+  {
+    "category": "Boots",
+    "name": "Phase-Dodge Treads",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Evade Distance +15% Dodge Roll I-Frames"
+  },
+  {
+    "category": "Boots",
+    "name": "Reactor-Core Boots",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Energy Recharge +8% Shield Recharge Rate"
+  },
+  {
+    "category": "Boots",
+    "name": "Void-Strider Sabatons",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Traversal Speed +20% Movement Speed in Combat"
+  },
+  {
+    "category": "Boots",
+    "name": "Gravity-Stabilized Treads",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Fall Mitigation -25% Fall Damage Taken"
+  },
+  {
+    "category": "Boots",
+    "name": "Aero-Stream Greaves",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Slipstream +10% Movement Speed after Sprinting 3s"
+  },
+  {
+    "category": "Boots",
+    "name": "Crystalline Striders",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Saga Resonance +5% Extra Saga Stones on Pickup"
+  },
+  {
+    "category": "Boots",
+    "name": "Thermal-Insulated Boots",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Thermal Shielding Immunity to Lava and Fire Hazards"
+  },
+  {
+    "category": "Boots",
+    "name": "Quantum-Step Sabatons",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Teleport Dodge Dodge Roll Leaves a Decoy Explosion"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Standard Sidearm",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Base Kinetic 100% Base Weapon Damage"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Cryo-Pistol Sub-Zero",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Cryo Application Applies Slow on Hit"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Volt-Spark Blaster",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Volt Stun Chain Lightning on Crit"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Radiation Corrupter",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Armor Shred Reduces Target Armor by 15%"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Plasma Melter",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Thermal Burn Applies Stackable Burn Over Time"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Pulse-Laser Repeater",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Rapid Fire +25% Fire Rate, -10% Base Damage"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Heavy Mag-Driver",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Impact Slug Staggers Light Targets on Hit"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Void-Caster Handgun",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Spatial Distortion Pulls Targets Toward Impact Point"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Saga-Infused Repeater",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Energy Surge Generates Shield on Kills with Pistol"
+  },
+  {
+    "category": "Left Hand Pistol",
+    "name": "Omega-Protocol Handcannon",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Annihilation Round Fires Explosive Rounds every 5th Shot"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Titanium Breach Shield",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Block Stability +50 Shield Block Health"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Cryo-Barrier Aegis",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Chill Deflection Chills Attackers on Block"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Volt-Field Bulwark",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Shock Retaliation Shocks Melee Attackers"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Radiation-Vented Wall",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Corrosive Aura Deals Radiation AoE when Raised"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Saga-Reactor Aegis",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Energy Reflection Reflects 10% Ranged Damage Back"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Composite Riot Gate",
+    "rarity": "Common",
+    "sourceWeight": 40,
+    "description": "Coverage Area +15% Shield Width"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Kinetic Deflector Wall",
+    "rarity": "Uncommon",
+    "sourceWeight": 25,
+    "description": "Projectile Redirect Deflects Minor Projectiles Automatically"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Plasma-Edge Bulwark",
+    "rarity": "Rare",
+    "sourceWeight": 15,
+    "description": "Thermal Counter Melee Attackers Take Plasma Burn"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "Phase-Shield Barrier",
+    "rarity": "Ultra Rare",
+    "sourceWeight": 10,
+    "description": "Ethereal Guard Allows Ranged Shots Through Shield at 50% Penalty"
+  },
+  {
+    "category": "Right Hand Shield",
+    "name": "World-Breaker Aegis",
+    "rarity": "Legendary",
+    "sourceWeight": 5,
+    "description": "Bulwark Slam Shield Bash Creates a Shockwave Stun"
+  }
+]

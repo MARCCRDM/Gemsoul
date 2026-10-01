@@ -14,7 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
-local Crafting = require(ReplicatedStorage.Shared.Crafting)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local GemGenerator = require(script.Parent.GemGenerator)
@@ -169,19 +169,31 @@ local function recordDepth(player: Player, depth: number)
 	end
 end
 
--- The next armor set up the player's ladder that they don't own yet.
-local function nextArmor(player: Player)
+-- Recover a new model or a better-quality replacement. Keep existing rolled traits and enchants.
+local function recoverGear(player: Player, depth: number)
 	local profile = PlayerData.get(player)
 	local class = profile and Classes.get(profile.Character.Class)
 	if not profile or not class then
 		return nil
 	end
-	for _, armor in class.Armors do
-		if not profile.Owned.Armors[armor.Id] then
-			return armor
+	local maxQuality = math.clamp(1 + math.floor(depth / 10), 1, 4)
+	local choices = {}
+	for _, kind in Slots.Kinds do
+		for _, gear in class[kind] do
+			local ownedQuality = profile.Owned[kind][gear.Id] or 0
+			if ownedQuality < maxQuality then
+				table.insert(choices, { Kind = kind, Gear = gear, Quality = ownedQuality })
+			end
 		end
 	end
-	return nil
+	if #choices == 0 then
+		return nil
+	end
+	local rng = Gems.random()
+	local pick = choices[rng:NextInteger(1, #choices)]
+	PlayerData.setGearQuality(player, pick.Kind, pick.Gear.Id, rng:NextInteger(pick.Quality + 1, maxQuality))
+	PlayerData.milestone(player, "Recovered")
+	return pick.Gear.Name
 end
 
 -- Gives what a broken rock held. Returns the loot description.
@@ -222,20 +234,19 @@ local function grant(player: Player, wall: Wall, tile: Tile)
 			local coins = rng:NextInteger(lo, hi) * 2
 			PlayerData.addCoins(player, coins)
 			loot.Coins = coins
-			local armor = nextArmor(player)
-			if armor and rng:NextNumber() < Mine.armorChance(wall.Depth) then
-				PlayerData.setGearQuality(player, "Armors", armor.Id, 1)
-				loot.Gear = armor.Name
+			if rng:NextNumber() < Mine.armorChance(wall.Depth) then
+				loot.Gear = recoverGear(player, wall.Depth)
 			end
 		end
 		return loot
 	elseif tile.Kind == "Ore" then
-		local id = tile.Ore or "Iron"
-		local amount = if id == "Iron" then rng:NextInteger(1, 3) else 1
-		profile.Materials[id] = (profile.Materials[id] or 0) + amount
-		PlayerData.sync(player)
-		local material = Crafting.Materials[id]
-		return { Kind = "Ore", Material = id, Count = amount, Text = (if material then material.Name else id) }
+		local lo, hi = Mine.pouch(wall.Depth)
+		local coins = rng:NextInteger(lo, hi)
+		PlayerData.addCoins(player, coins)
+		local gear = if rng:NextNumber() < math.min(0.35, 0.15 + wall.Depth * 0.005)
+			then recoverGear(player, wall.Depth)
+			else nil
+		return { Kind = "Coins", Count = coins, Coins = coins, Gear = gear, Text = "Recovered salvage credits" }
 	elseif tile.Kind == "Coins" then
 		local lo, hi = Mine.pouch(wall.Depth)
 		local coins = rng:NextInteger(lo, hi)

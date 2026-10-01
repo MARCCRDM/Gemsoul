@@ -32,7 +32,7 @@ local function workbench(folder: Folder, frame: CFrame, color: Color3)
 		Color = C.WornStone,
 		Material = Enum.Material.Slate,
 	})
-	Builder.station(bench, "Cutting", "Cut Gem", "Cutting Bench", "HandCut")
+	Builder.station(bench, "Cutting", "Inspect Gems", "Gem Scanner", "Pouch")
 	for _, x in { -3.8, 3.8 } do
 		Builder.part(folder, frame, {
 			Name = "BenchLeg",
@@ -79,7 +79,7 @@ local function laserCutter(folder: Folder, frame: CFrame)
 		Color = C.Chrome,
 		Material = Enum.Material.DiamondPlate,
 	})
-	Builder.station(base, "Cutting", "Use Laser", "Laser Cutter", "AutoCut")
+	Builder.station(base, "Cutting", "Inspect Gems", "Facet Analyzer", "Pouch")
 	Builder.part(folder, frame, {
 		Name = "LaserChamber",
 		Size = Vector3.new(3.6, 3.4, 3),
@@ -119,7 +119,7 @@ function Cutting.build(folder: Folder, frame: CFrame, color: Color3)
 		Color = C.Stone,
 		Material = Enum.Material.Cobblestone,
 	})
-	Builder.sign(folder, frame, CFrame.new(0, 9.2, Cutting.Depth - 2.4), Vector3.new(9, 2, 0.5), "GEM CUTTER", color)
+	Builder.sign(folder, frame, CFrame.new(0, 9.2, Cutting.Depth - 2.4), Vector3.new(9, 2, 0.5), "GEM ANALYSIS", color)
 	-- The hand-cutting bench out front, the laser behind it to one side.
 	workbench(folder, frame * CFrame.new(0, 0.5, 4), color)
 	laserCutter(folder, frame * CFrame.new(3.2, 0.5, 10))

@@ -1,7 +1,7 @@
 --[[
-	Armor designs, built from a few chunky low-poly parts welded to the avatar:
-	oversized layered pauldrons, full helms and hoods that hide the face
-	behind glowing eyes, gauntlets, greaves, tabards and capes.
+	Armor designs welded to the avatar. Current miner assets use three compact families:
+	stepped helmets, layered plates and tapered human proportions. Legacy fantasy builders
+	are retained for other classes.
 
 	Every set covers the whole head. Sizes follow the avatar's own body
 	parts, so it fits R15 and R6 avatars of any proportions.
@@ -180,6 +180,7 @@ type Kit = {
 	Cloth: Color3,
 	Material: Enum.Material,
 	Accent: Color3,
+	Traits: any?,
 }
 
 -- The shell every helm starts from: a box around the whole head.
@@ -698,34 +699,19 @@ local BUILDERS: { [string]: (Instance, Body, Kit) -> () } = {}
 --[[
 	Saga Miners wear spacesuits: a ladder of four, from a patched Scrap Suit up
 	to the Crusader Exo. Every suit is one simple figure (about 35-50 smooth
-	parts: ellipsoids and tubes, no blocks) that covers the whole body, so the
+	parts: stepped armor plates and utility blocks) that covers the whole body, so the
 	avatar underneath is hidden (see ArmorKits.build). Helmets have a dark
 	glass visor. The glowing bits (chest light, wrist displays, pack lights)
 	are Neon in the kit's accent colour, so trims and enchantments light them.
 ]]
 
-local function shaped(folder, seg, cframe, size, color, material, meshType: Enum.MeshType)
-	local part = make(folder, seg, "Part", cframe, size, color, material or Enum.Material.SmoothPlastic)
-	if part then
-		local mesh = Instance.new("SpecialMesh")
-		mesh.MeshType = meshType
-		mesh.Parent = part
-	end
-	return part
+-- Native block geometry gives the suits a crisp voxel silhouette.
+-- These helpers are local to the miner suits; other classes keep their builders.
+local function suitBlock(folder, seg, cframe, size, color, material)
+	return box(folder, seg, cframe, size, color, material or Enum.Material.SmoothPlastic)
 end
-
--- A smooth rounded shape: an ellipsoid filling `size`.
-local function ellipsoid(folder, seg, cframe, size, color, material)
-	return shaped(folder, seg, cframe, size, color, material, Enum.MeshType.Sphere)
-end
-
--- A round tube along the segment's Y axis, filling `size` (X and Z are its width and depth).
-local function tube(folder, seg, cframe, size, color, material)
-	return shaped(folder, seg, cframe, size, color, material, Enum.MeshType.Cylinder)
-end
-
 local function light(folder, seg, cframe, size, color)
-	local part = shaped(folder, seg, cframe, size, color, Enum.Material.Neon, Enum.MeshType.Sphere)
+	local part = box(folder, seg, cframe, size, color, Enum.Material.Neon)
 	if part then
 		part.CastShadow = false
 	end
@@ -748,84 +734,108 @@ type Suit = {
 -- The head the helmet is built around: a person's, a bit smaller than an
 -- avatar's big blocky head (which is hidden anyway).
 local function humanHead(head: Segment): Segment
-	return { Part = head.Part, Offset = head.Offset * CFrame.new(0, -head.Size.Y * 0.06, 0), Size = head.Size * 0.84 }
+	return { Part = head.Part, Offset = head.Offset * CFrame.new(0, -head.Size.Y * 0.06, 0), Size = head.Size * 0.72 }
 end
 
 local function helmet(folder, head: Segment, kit: Kit, style: Suit)
 	local h = head.Size
-	local shellColor = if style.Helmet == "Bubble" then kit.Cloth else kit.Metal
-	local shellMaterial = if style.Helmet == "Bubble" then SMOOTH else kit.Material
-	ellipsoid(
+	local shellColor = kit.Metal
+	-- Stepped crown and cheek guards frame a flat, readable visor.
+	box(folder, head, CFrame.new(0, 0, 0.05), h * Vector3.new(1.12, 1.06, 1.12), kit.Trim, SMOOTH)
+	box(folder, head, CFrame.new(0, h.Y * 0.36, 0), h * Vector3.new(1.22, 0.34, 1.16), shellColor, SMOOTH)
+	box(folder, head, CFrame.new(0, h.Y * 0.57, 0.04), h * Vector3.new(0.88, 0.14, 0.98), shellColor, SMOOTH)
+	box(folder, head, CFrame.new(0, h.Y * 0.08, -h.Z * 0.59), h * Vector3.new(0.92, 0.5, 0.08), VISOR, SMOOTH)
+	box(
 		folder,
 		head,
-		CFrame.new(0, h.Y * 0.06, 0.02),
-		h * Vector3.new(1.24, 1.26, 1.26),
-		shellColor,
-		shellMaterial
+		CFrame.new(0, h.Y * 0.1, -h.Z * 0.64),
+		h * Vector3.new(0.74, 0.38, 0.03),
+		if kit.Traits then kit.Traits.VisorColor else Color3.fromRGB(20, 139, 184),
+		SMOOTH
 	)
-	-- The visor: dark glass, gold on the Crusader Exo.
-	local visor = ellipsoid(
+	light(
 		folder,
 		head,
-		CFrame.new(0, h.Y * 0.04, -h.Z * 0.26),
-		h * Vector3.new(0.96, 0.72, 0.84),
-		if style.Helmet == "Crusader" then Color3.fromRGB(214, 170, 80) else VISOR,
-		if style.Helmet == "Crusader" then Enum.Material.Foil else Enum.Material.Glass
+		CFrame.new(-h.X * 0.23, h.Y * 0.1, -h.Z * 0.665),
+		h * Vector3.new(0.08, 0.34, 0.02),
+		Color3.fromRGB(100, 232, 248)
 	)
-	if visor then
-		visor.Reflectance = 0.25
-	end
-	-- Collar ring.
-	tube(folder, head, CFrame.new(0, -h.Y * 0.6, 0.02), h * Vector3.new(1.1, 0.2, 1.1), kit.Trim, kit.Material)
-	if style.Helmet == "Miner" then
-		-- A headlamp over the visor.
-		tube(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.6, -h.Z * 0.42) * CFrame.Angles(math.rad(70), 0, 0),
-			Vector3.new(0.32, 0.22, 0.32),
-			kit.Trim,
-			kit.Material
-		)
-		light(
-			folder,
-			head,
-			CFrame.new(0, h.Y * 0.62, -h.Z * 0.55),
-			Vector3.new(0.24, 0.24, 0.1),
-			Color3.fromRGB(255, 244, 200)
-		)
-	elseif style.Helmet == "Ranger" then
-		-- A glowing visor strip and an antenna.
+	box(folder, head, CFrame.new(0, -h.Y * 0.36, -h.Z * 0.5), h * Vector3.new(0.84, 0.24, 0.34), shellColor, SMOOTH)
+	for _, side in sides() do
 		box(
 			folder,
 			head,
-			CFrame.new(0, h.Y * 0.12, -h.Z * 0.66),
-			Vector3.new(h.X * 0.62, 0.06, 0.06),
-			kit.Accent,
-			Enum.Material.Neon
+			CFrame.new(side * h.X * 0.52, -h.Y * 0.12, -h.Z * 0.24),
+			h * Vector3.new(0.24, 0.7, 0.76),
+			shellColor,
+			SMOOTH
 		)
-		box(folder, head, CFrame.new(h.X * 0.5, h.Y * 0.7, 0.1), Vector3.new(0.05, 0.7, 0.05), kit.Trim, kit.Material)
-	elseif style.Helmet == "Crusader" then
-		-- A crest fin over the crown.
-		ellipsoid(
+		box(folder, head, CFrame.new(side * h.X * 0.65, 0, 0.05), h * Vector3.new(0.16, 0.42, 0.48), kit.Trim, SMOOTH)
+		box(
 			folder,
 			head,
-			CFrame.new(0, h.Y * 0.62, 0.06),
-			Vector3.new(0.14, h.Y * 0.36, h.Z * 1.2),
-			kit.Trim,
-			kit.Material
+			CFrame.new(side * h.X * 0.72, 0.03, 0.05),
+			h * Vector3.new(0.05, 0.16, 0.22),
+			kit.Accent,
+			SMOOTH
 		)
 	end
-	-- Ear pods on every helmet.
+	if kit.Traits then
+		local tier = kit.Traits.Helmet or 1
+		for i = 1, tier - 1 do
+			box(
+				folder,
+				head,
+				CFrame.new((i - tier / 2) * h.X * 0.16, h.Y * 0.64, 0.08),
+				Vector3.new(h.X * 0.1, h.Y * (0.08 + tier * 0.025), h.Z * 0.52),
+				kit.Metal,
+				SMOOTH
+			)
+		end
+	end
 	for _, side in sides() do
-		tube(
+		wedge(
 			folder,
 			head,
-			CFrame.new(side * h.X * 0.62, h.Y * 0.02, 0.04) * CFrame.Angles(0, 0, math.rad(90)),
-			Vector3.new(0.4, 0.14, 0.4),
-			kit.Trim,
-			kit.Material
+			CFrame.new(side * h.X * 0.52, h.Y * 0.3, -h.Z * 0.32) * CFrame.Angles(0, 0, math.rad(side * 18)),
+			Vector3.new(h.X * 0.18, h.Y * 0.3, h.Z * 0.7),
+			shellColor,
+			SMOOTH
 		)
+		box(
+			folder,
+			head,
+			CFrame.new(side * h.X * 0.4, -h.Y * 0.27, -h.Z * 0.65),
+			Vector3.new(0.06, 0.15, 0.04),
+			kit.Trim,
+			SMOOTH
+		)
+	end
+	-- Respirator vents, rather than a featureless round face.
+	for x = -1, 1 do
+		box(
+			folder,
+			head,
+			CFrame.new(x * h.X * 0.17, -h.Y * 0.35, -h.Z * 0.685),
+			h * Vector3.new(0.08, 0.12, 0.025),
+			kit.Trim,
+			SMOOTH
+		)
+	end
+	box(folder, head, CFrame.new(0, -h.Y * 0.59, 0.02), h * Vector3.new(0.94, 0.16, 0.94), kit.Trim, SMOOTH)
+	if style.Helmet == "Miner" or style.Helmet == "Bubble" then
+		box(folder, head, CFrame.new(0, h.Y * 0.42, -h.Z * 0.61), h * Vector3.new(0.28, 0.2, 0.14), kit.Trim, SMOOTH)
+		light(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.42, -h.Z * 0.695),
+			h * Vector3.new(0.17, 0.11, 0.03),
+			Color3.fromRGB(255, 229, 166)
+		)
+	elseif style.Helmet == "Ranger" then
+		box(folder, head, CFrame.new(h.X * 0.55, h.Y * 0.58, 0.16), Vector3.new(0.06, 0.55, 0.06), kit.Trim, SMOOTH)
+	else
+		box(folder, head, CFrame.new(0, h.Y * 0.65, 0.02), h * Vector3.new(0.2, 0.22, 0.92), kit.Trim, SMOOTH)
 	end
 end
 
@@ -833,11 +843,11 @@ local function torsoPieces(folder, parts: Body, kit: Kit, style: Suit)
 	local torso, waist = parts.Torso, parts.Waist
 	if torso then
 		local t = torso.Size
-		ellipsoid(folder, torso, CFrame.new(0, t.Y * 0.08, 0), t * Vector3.new(1.02, 1.1, 1.18), kit.Cloth, FABRIC)
-		ellipsoid(folder, torso, CFrame.new(0, t.Y * 0.3, 0), t * Vector3.new(1.3, 0.5, 0.95), kit.Cloth, FABRIC)
-		tube(folder, torso, CFrame.new(0, -t.Y * 0.38, 0), t * Vector3.new(0.88, 0.3, 1.0), kit.Cloth, FABRIC)
+		suitBlock(folder, torso, CFrame.new(0, t.Y * 0.08, 0), t * Vector3.new(0.96, 1.02, 1.04), kit.Cloth, FABRIC)
+		suitBlock(folder, torso, CFrame.new(0, t.Y * 0.3, 0), t * Vector3.new(1.08, 0.32, 1.08), kit.Cloth, FABRIC)
+		suitBlock(folder, torso, CFrame.new(0, -t.Y * 0.38, 0), t * Vector3.new(0.88, 0.3, 1.0), kit.Cloth, FABRIC)
 		if style.Plates then
-			ellipsoid(
+			suitBlock(
 				folder,
 				torso,
 				CFrame.new(0, t.Y * 0.14, -t.Z * 0.2),
@@ -846,6 +856,25 @@ local function torsoPieces(folder, parts: Body, kit: Kit, style: Suit)
 				kit.Material
 			)
 		end
+		-- Twin shoulder straps and a stepped chest plate.
+		for _, side in sides() do
+			box(
+				folder,
+				torso,
+				CFrame.new(side * t.X * 0.32, t.Y * 0.12, -t.Z * 0.55),
+				Vector3.new(t.X * 0.12, t.Y * 0.78, 0.08),
+				kit.Trim,
+				SMOOTH
+			)
+		end
+		box(
+			folder,
+			torso,
+			CFrame.new(0, t.Y * 0.31, -t.Z * 0.56),
+			Vector3.new(t.X * 0.5, t.Y * 0.14, 0.1),
+			kit.Metal,
+			SMOOTH
+		)
 		-- Chest light, and a panel for it.
 		box(folder, torso, CFrame.new(0, t.Y * 0.16, -t.Z * 0.62), Vector3.new(0.5, 0.36, 0.1), kit.Trim, kit.Material)
 		light(folder, torso, CFrame.new(0, t.Y * 0.16, -t.Z * 0.68), Vector3.new(0.26, 0.2, 0.08), kit.Accent)
@@ -862,7 +891,7 @@ local function torsoPieces(folder, parts: Body, kit: Kit, style: Suit)
 			light(folder, torso, CFrame.new(0, t.Y * 0.3, t.Z * 0.95), Vector3.new(0.3, 0.1, 0.06), kit.Accent)
 		else
 			for _, side in sides() do
-				tube(
+				suitBlock(
 					folder,
 					torso,
 					CFrame.new(side * t.X * 0.18, t.Y * 0.04, t.Z * 0.78),
@@ -896,8 +925,8 @@ local function torsoPieces(folder, parts: Body, kit: Kit, style: Suit)
 	end
 	if waist then
 		local w = waist.Size
-		tube(folder, waist, CFrame.identity, w * Vector3.new(0.9, 1.3, 1.0), kit.Cloth, FABRIC)
-		tube(
+		suitBlock(folder, waist, CFrame.identity, w * Vector3.new(0.9, 1.3, 1.0), kit.Cloth, FABRIC)
+		suitBlock(
 			folder,
 			waist,
 			CFrame.new(0, w.Y * 0.2, 0),
@@ -916,12 +945,19 @@ local function torsoPieces(folder, parts: Body, kit: Kit, style: Suit)
 				kit.Material
 			)
 		end
-		tube(folder, waist, CFrame.new(0, -w.Y * 1.0, 0), Vector3.new(w.X * 1.0, 0.5, w.Z * 1.08), kit.Cloth, FABRIC)
+		suitBlock(
+			folder,
+			waist,
+			CFrame.new(0, -w.Y * 1.0, 0),
+			Vector3.new(w.X * 1.0, 0.5, w.Z * 1.08),
+			kit.Cloth,
+			FABRIC
+		)
 	end
 end
 
 local function limbs(folder, parts: Body, kit: Kit, style: Suit)
-	local stripe = Color3.fromRGB(235, 222, 90)
+	local stripe = Color3.fromRGB(242, 173, 65)
 	for _, side in sides() do
 		local L = if side == -1 then "Left" else "Right"
 		-- Arm pieces sit a little in from the avatar's arms, closing the gap
@@ -930,25 +966,25 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 		local upper, lower, hand = parts[L .. "UpperArm"], parts[L .. "LowerArm"], parts[L .. "Hand"]
 		if upper then
 			local a = upper.Size
-			tube(folder, upper, inward, a * Vector3.new(0.84, 1.0, 0.88), kit.Cloth, FABRIC)
+			suitBlock(folder, upper, inward, a * Vector3.new(0.84, 1.0, 0.88), kit.Cloth, FABRIC)
 			if style.Pauldrons then
 				local top = inward
 					* CFrame.new(side * a.X * 0.06, a.Y * 0.34, 0)
 					* CFrame.Angles(0, 0, math.rad(side * -14))
-				ellipsoid(folder, upper, top, Vector3.new(a.X * 1.4, a.Y * 0.74, a.Z * 1.34), kit.Metal, kit.Material)
-				tube(folder, upper, top, Vector3.new(a.X * 1.44, 0.07, a.Z * 1.38), kit.Trim, kit.Material)
+				suitBlock(folder, upper, top, Vector3.new(a.X * 1.4, a.Y * 0.74, a.Z * 1.34), kit.Metal, kit.Material)
+				suitBlock(folder, upper, top, Vector3.new(a.X * 1.44, 0.07, a.Z * 1.38), kit.Trim, kit.Material)
 			else
-				ellipsoid(
+				suitBlock(
 					folder,
 					upper,
 					inward * CFrame.new(0, a.Y * 0.38, 0),
-					a * Vector3.new(1.0, 0.62, 1.0),
+					a * Vector3.new(1.06, 0.42, 1.06),
 					kit.Cloth,
 					FABRIC
 				)
 			end
 			if style.Stripes then
-				tube(
+				suitBlock(
 					folder,
 					upper,
 					inward * CFrame.new(0, -a.Y * 0.15, 0),
@@ -960,7 +996,7 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 		end
 		if lower then
 			local l = lower.Size
-			ellipsoid(
+			suitBlock(
 				folder,
 				lower,
 				inward * CFrame.new(0, l.Y * 0.46, 0),
@@ -968,7 +1004,7 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 				kit.Trim,
 				kit.Material
 			)
-			tube(
+			suitBlock(
 				folder,
 				lower,
 				inward * CFrame.new(0, -l.Y * 0.06, 0),
@@ -977,7 +1013,7 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 				FABRIC
 			)
 			-- A chunky cuff with a glowing wrist display.
-			tube(
+			suitBlock(
 				folder,
 				lower,
 				inward * CFrame.new(0, -l.Y * 0.36, 0),
@@ -994,18 +1030,39 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 			)
 		end
 		if hand then
-			ellipsoid(
+			suitBlock(
 				folder,
 				hand,
 				inward * CFrame.new(0, -hand.Size.Y * 0.3, 0),
-				hand.Size * Vector3.new(0.78, 2.3, 0.9),
+				hand.Size * Vector3.new(0.86, 1.3, 0.94),
 				kit.Trim,
 				kit.Material
 			)
 		end
+		if hand then
+			local h = hand.Size
+			box(
+				folder,
+				hand,
+				inward * CFrame.new(0, 0, -h.Z * 0.48),
+				h * Vector3.new(0.74, 0.5, 0.2),
+				kit.Metal,
+				SMOOTH
+			)
+			for knuckle = -1, 1 do
+				box(
+					folder,
+					hand,
+					inward * CFrame.new(knuckle * h.X * 0.2, -h.Y * 0.18, -h.Z * 0.58),
+					Vector3.new(h.X * 0.13, h.Y * 0.15, 0.06),
+					kit.Trim,
+					SMOOTH
+				)
+			end
+		end
 		local thigh, shin, foot = parts[L .. "UpperLeg"], parts[L .. "LowerLeg"], parts[L .. "Foot"]
 		if thigh then
-			tube(
+			suitBlock(
 				folder,
 				thigh,
 				CFrame.new(0, thigh.Size.Y * 0.05, 0),
@@ -1014,7 +1071,7 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 				FABRIC
 			)
 			if style.Stripes then
-				tube(
+				suitBlock(
 					folder,
 					thigh,
 					CFrame.new(0, -thigh.Size.Y * 0.2, 0),
@@ -1026,7 +1083,7 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 		end
 		if shin then
 			local l = shin.Size
-			ellipsoid(
+			suitBlock(
 				folder,
 				shin,
 				CFrame.new(0, l.Y * 0.44, -l.Z * 0.12),
@@ -1034,12 +1091,12 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 				if style.Plates then kit.Metal else kit.Trim,
 				kit.Material
 			)
-			tube(folder, shin, CFrame.new(0, -l.Y * 0.04, 0), l * Vector3.new(0.82, 0.96, 0.84), kit.Cloth, FABRIC)
+			suitBlock(folder, shin, CFrame.new(0, -l.Y * 0.04, 0), l * Vector3.new(0.82, 0.96, 0.84), kit.Cloth, FABRIC)
 		end
 		if foot then
 			local f = foot.Size
 			-- Chunky magnetic boots.
-			tube(
+			suitBlock(
 				folder,
 				foot,
 				CFrame.new(0, f.Y * 0.6, 0.02),
@@ -1047,7 +1104,7 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 				kit.Trim,
 				kit.Material
 			)
-			ellipsoid(
+			suitBlock(
 				folder,
 				foot,
 				CFrame.new(0, f.Y * 0.1, -f.Z * 0.16),
@@ -1055,6 +1112,23 @@ local function limbs(folder, parts: Body, kit: Kit, style: Suit)
 				kit.Trim,
 				kit.Material
 			)
+			box(
+				folder,
+				foot,
+				CFrame.new(0, -f.Y * 0.48, -f.Z * 0.12),
+				Vector3.new(f.X * 0.98, f.Y * 0.22, f.Z * 1.4),
+				Color3.fromRGB(20, 27, 35),
+				SMOOTH
+			)
+			wedge(
+				folder,
+				foot,
+				CFrame.new(0, f.Y * 0.24, -f.Z * 0.51),
+				Vector3.new(f.X * 0.9, f.Y * 0.75, f.Z * 0.5),
+				kit.Metal,
+				SMOOTH
+			)
+			light(folder, foot, CFrame.new(0, f.Y * 0.4, -f.Z * 0.78), Vector3.new(f.X * 0.46, 0.06, 0.04), kit.Accent)
 		end
 	end
 end
@@ -1070,9 +1144,10 @@ local function suit(style: Suit)
 end
 
 -- Looks that cover the whole figure: the avatar underneath is hidden.
-local FULL_BODY = { SuitScrap = true, SuitMiner = true, SuitRanger = true, SuitCrusader = true }
+local FULL_BODY =
+	{ SuitScrap = true, SuitMiner = true, SuitRanger = true, SuitCrusader = true, SuitZeroG = true, SuitThermal = true }
 
--- Tier 1, the starter: a patched white suit, bubble helmet and a small pack.
+-- Tier 1, the starter: a patched white suit, amber helmet and a small pack.
 BUILDERS.SuitScrap = suit({
 	Helmet = "Bubble",
 	Plates = false,
@@ -1111,6 +1186,11 @@ BUILDERS.SuitCrusader = suit({
 	Stripes = false,
 	Cape = true,
 })
+
+BUILDERS.SuitZeroG =
+	suit({ Helmet = "Ranger", Plates = false, Pauldrons = false, Pack = "Jet", Stripes = true, Cape = false })
+BUILDERS.SuitThermal =
+	suit({ Helmet = "Miner", Plates = true, Pauldrons = true, Pack = "Tanks", Stripes = true, Cape = false })
 
 -- Tank -----------------------------------------------------------------------------------
 
@@ -1415,14 +1495,335 @@ BUILDERS.ShadowLeather = function(folder, body, kit)
 	end
 end
 
+-- Three expedition families with faceted plates and exposed flex joints.
+-- Built on body segments so individual pieces support both R6 and R15 rigs.
+local CLEAN_LOOKS = { UtilityMiner = true, FrontierRanger = true, HeavyVanguard = true }
+local CLEAN_ALIASES = {
+	SuitScrap = "UtilityMiner",
+	SuitMiner = "UtilityMiner",
+	SuitZeroG = "FrontierRanger",
+	SuitRanger = "FrontierRanger",
+	SuitThermal = "HeavyVanguard",
+	SuitCrusader = "HeavyVanguard",
+}
+-- Shape the visible armor independently of the collision rig. Keep joint heights
+-- unchanged so equipped pieces still follow both R6 and R15 animations.
+local function humanBody(parts: Body): Body
+	local result: Body = {}
+	for name, seg in parts do
+		local scale = Vector3.new(1, 1, 1)
+		if name == "Torso" then
+			scale = Vector3.new(0.87, 1, 0.8)
+		elseif name == "Waist" then
+			scale = Vector3.new(0.67, 1, 0.76)
+		elseif string.find(name, "UpperArm") then
+			scale = Vector3.new(0.67, 1, 0.68)
+		elseif string.find(name, "LowerArm") then
+			scale = Vector3.new(0.61, 1, 0.64)
+		elseif string.find(name, "Hand") then
+			scale = Vector3.new(0.58, 1, 0.63)
+		elseif string.find(name, "UpperLeg") then
+			scale = Vector3.new(0.78, 1, 0.79)
+		elseif string.find(name, "LowerLeg") then
+			scale = Vector3.new(0.66, 1, 0.7)
+		elseif string.find(name, "Foot") then
+			scale = Vector3.new(0.69, 1, 0.82)
+		end
+		result[name] = { Part = seg.Part, Offset = seg.Offset, Size = seg.Size * scale }
+	end
+	return result
+end
+
+-- Purpose-built expedition armor. Plates follow anatomy, leaving joints exposed.
+local function frontierSuit(family: number)
+	return function(folder, raw: Body, kit: Kit)
+		local body = humanBody(raw)
+		local rarity = math.clamp(kit.Traits and kit.Traits.Rarity or 1, 1, 5)
+		local metal = kit.Metal
+		local edge = metal:Lerp(Color3.fromRGB(214, 229, 232), 0.32)
+		local trim = kit.Trim
+		local cloth = kit.Cloth
+		local ornament = if rarity == 5 then BRASS else edge
+		local function block(seg, x, y, z, sx, sy, sz, color, tilt)
+			box(
+				folder,
+				seg,
+				CFrame.new(x, y, z) * CFrame.Angles(0, 0, math.rad(tilt or 0)),
+				Vector3.new(sx, sy, sz),
+				color,
+				SMOOTH
+			)
+		end
+		local function lit(seg, x, y, z, sx, sy, sz)
+			light(folder, seg, CFrame.new(x, y, z), Vector3.new(sx, sy, sz), kit.Accent)
+		end
+		local function plate(seg, x, y, z, sx, sy, sz, color)
+			block(seg, x, y, z, sx * 0.72, sy, sz, color)
+			for _, sign in { -1, 1 } do
+				block(seg, x + sign * sx * 0.38, y, z + sz * 0.18, sx * 0.23, sy * 0.86, sz * 0.72, color, sign * -12)
+			end
+		end
+		local head = body.Head
+		if head then
+			head = humanHead(head)
+			local s = head.Size
+			local x, y, z = s.X, s.Y, s.Z
+			-- Recessed wrap visor inside an angular brow and sloped cheek armor.
+			block(head, 0, 0, 0.04, x * 0.86, y * 0.92, z * 0.88, trim)
+			plate(head, 0, y * 0.34, 0.015, x * 1.02, y * 0.34, z * 0.98, metal)
+			block(head, 0, y * 0.53, 0.055, x * 0.68, y * 0.12, z * 0.8, edge)
+			block(head, 0, y * 0.03, -z * 0.5, x * 0.79, y * 0.4, 0.045, Color3.fromRGB(8, 20, 30))
+			local visor = kit.Traits and kit.Traits.VisorColor or Color3.fromRGB(238, 174, 57)
+			block(head, 0, y * 0.065, -z * 0.535, x * 0.68, y * 0.24, 0.025, visor)
+			for _, side in { -1, 1 } do
+				block(head, side * x * 0.385, y * 0.06, -z * 0.47, x * 0.17, y * 0.25, 0.1, visor, side * -8)
+				block(head, side * x * 0.4, -y * 0.19, -z * 0.39, x * 0.2, y * 0.45, z * 0.32, metal, side * -18)
+				block(head, side * x * 0.52, 0, 0.04, x * 0.16, y * 0.34, z * 0.4, trim)
+			end
+			plate(head, 0, -y * 0.36, -z * 0.37, x * 0.65, y * 0.18, z * 0.38, metal)
+			block(head, 0, -y * 0.36, -z * 0.58, x * 0.31, y * 0.085, 0.03, trim)
+			block(head, 0, -y * 0.56, 0.02, x * 0.58, y * 0.17, z * 0.6, cloth)
+			if rarity >= 2 then
+				for _, side in { -1, 1 } do
+					block(head, side * x * 0.53, y * 0.02, -z * 0.08, 0.06, y * 0.2, 0.16, edge)
+				end
+			end
+			if rarity >= 3 then
+				block(head, x * 0.48, y * 0.36, 0.12, 0.07, y * 0.5, 0.08, trim)
+				block(head, 0, y * 0.33, -z * 0.53, x * 0.5, 0.045, 0.055, ornament)
+			end
+			if rarity >= 4 then
+				lit(head, -x * 0.53, y * 0.06, -z * 0.18, 0.04, 0.075, 0.06)
+				lit(head, x * 0.53, y * 0.06, -z * 0.18, 0.04, 0.075, 0.06)
+			end
+			if rarity >= 5 then
+				for _, side in { -1, 1 } do
+					block(head, side * x * 0.24, y * 0.46, 0.03, 0.08, y * 0.11, z * 0.7, BRASS)
+				end
+			end
+		end
+		local torso = body.Torso
+		if torso then
+			local s = torso.Size
+			local x, y, z = s.X, s.Y, s.Z
+			block(torso, 0, 0, 0, x * 0.88, y * 0.92, z * 0.84, cloth)
+			-- A narrow abdomen joins the ribcage to the belt instead of a square slab.
+			block(torso, 0, -y * 0.56, 0, x * 0.61, y * 0.47, z * 0.76, cloth)
+			for i = 1, 3 do
+				block(torso, 0, -y * (0.27 + i * 0.13), -z * 0.43, x * (0.66 - i * 0.055), y * 0.105, 0.1, trim)
+			end
+			for _, side in { -1, 1 } do
+				block(torso, side * x * 0.22, y * 0.14, -z * 0.45, x * 0.43, y * 0.46, z * 0.29, metal, side * -10)
+				block(torso, side * x * 0.38, -y * 0.18, -z * 0.36, x * 0.2, y * 0.34, z * 0.25, metal, side * 14)
+				block(torso, side * x * 0.29, y * 0.41, -z * 0.31, x * 0.23, y * 0.12, z * 0.48, edge, side * -10)
+			end
+			-- Armored collar, flush central reactor and separate life-support unit.
+			block(torso, 0, y * 0.48, 0.02, x * 0.5, y * 0.12, z * 0.78, trim)
+			block(torso, 0, y * 0.04, -z * 0.64, x * 0.17, y * 0.29, 0.1, trim)
+			lit(torso, 0, y * 0.08, -z * 0.702, x * 0.08, y * 0.1, 0.035)
+			plate(torso, 0, y * 0.02, z * 0.62, x * 0.53, y * 0.84, 0.27, trim)
+			block(torso, 0, y * 0.19, z * 0.79, x * 0.28, y * 0.25, 0.08, metal)
+			for i = 1, 3 do
+				block(torso, 0, -y * (0.02 + i * 0.1), z * 0.79, x * 0.32, 0.045, 0.04, edge)
+			end
+			if rarity >= 2 then
+				for _, side in { -1, 1 } do
+					block(torso, side * x * 0.3, y * 0.06, -z * 0.64, 0.06, y * 0.18, 0.04, edge, side * -10)
+				end
+			end
+			if rarity >= 3 then
+				for _, side in { -1, 1 } do
+					block(torso, side * x * 0.34, -y * 0.35, -z * 0.4, x * 0.2, y * 0.18, 0.15, metal, side * 16)
+					block(torso, side * x * 0.28, y * 0.32, -z * 0.64, x * 0.2, 0.04, 0.035, ornament, side * -10)
+				end
+			end
+			if rarity >= 4 then
+				for _, side in { -1, 1 } do
+					lit(torso, side * x * 0.29, y * 0.31, -z * 0.67, x * 0.13, 0.025, 0.025)
+				end
+			end
+			if rarity >= 5 then
+				for _, side in { -1, 1 } do
+					block(torso, side * x * 0.13, y * 0.26, -z * 0.66, x * 0.14, 0.045, 0.025, BRASS, side * -25)
+					block(torso, side * x * 0.24, z * 0.02, z * 0.84, 0.065, y * 0.54, 0.06, BRASS)
+				end
+			end
+		end
+		local waist = body.Waist
+		if waist then
+			local s = waist.Size
+			block(waist, 0, 0, 0, s.X * 0.96, s.Y * 1.12, s.Z * 0.84, cloth)
+			block(waist, 0, s.Y * 0.19, -0.015, s.X * 1.04, 0.16, s.Z * 0.95, trim)
+			block(waist, 0, s.Y * 0.19, -s.Z * 0.54, 0.21, 0.16, 0.075, ornament)
+			for _, side in { -1, 1 } do
+				block(waist, side * s.X * 0.39, -s.Y * 0.12, -s.Z * 0.4, s.X * 0.24, s.Y * 0.62, 0.18, metal, side * 8)
+			end
+		end
+		for _, side in { -1, 1 } do
+			local prefix = if side == -1 then "Left" else "Right"
+			local upper = body[prefix .. "UpperArm"]
+			if upper then
+				local s = upper.Size
+				local inward = -side * 0.12
+				block(upper, inward, -s.Y * 0.08, 0, s.X * 0.74, s.Y * 0.94, s.Z * 0.76, cloth)
+				-- Sloping shoulder shell; heavier families have more coverage, not wider arms.
+				local span = if family == 3 then 1.42 elseif family == 2 then 1.26 else 1.08
+				block(upper, inward, s.Y * 0.32, 0, s.X * span, s.Y * 0.3, s.Z * 1.16, metal, side * -17)
+				block(
+					upper,
+					inward + side * s.X * 0.4,
+					s.Y * 0.12,
+					0,
+					s.X * 0.19,
+					s.Y * 0.3,
+					s.Z * 0.93,
+					metal,
+					side * -14
+				)
+				if rarity >= 2 then
+					block(upper, inward, s.Y * 0.36, -s.Z * 0.58, s.X * span, 0.055, 0.045, edge, side * -17)
+				end
+				if rarity >= 3 then
+					block(
+						upper,
+						inward + side * s.X * 0.15,
+						-s.Y * 0.035,
+						0,
+						s.X * 1.13,
+						s.Y * 0.18,
+						s.Z * 1.01,
+						metal,
+						side * -12
+					)
+				end
+				if rarity >= 4 then
+					lit(upper, inward + side * s.X * 0.33, s.Y * 0.17, -s.Z * 0.57, 0.05, s.Y * 0.13, 0.025)
+				end
+				if rarity >= 5 then
+					block(upper, inward, s.Y * 0.43, 0, s.X * 1.03, 0.055, s.Z * 0.88, BRASS, side * -17)
+				end
+			end
+			local fore = body[prefix .. "LowerArm"]
+			if fore then
+				local s = fore.Size
+				local inward = -side * 0.1
+				block(fore, inward, 0, 0, s.X * 0.75, s.Y * 0.94, s.Z * 0.72, cloth)
+				plate(fore, inward, -s.Y * 0.05, -s.Z * 0.34, s.X * 0.86, s.Y * 0.7, s.Z * 0.34, metal)
+				block(fore, inward, s.Y * 0.43, 0, s.X * 0.7, s.Y * 0.16, s.Z * 0.73, trim)
+				block(fore, inward, -s.Y * 0.41, 0, s.X * 0.83, s.Y * 0.14, s.Z * 0.87, trim)
+				if rarity >= 2 then
+					block(fore, inward, -s.Y * 0.29, -s.Z * 0.56, s.X * 0.61, 0.055, 0.05, edge)
+				end
+				if rarity >= 3 then
+					for i = 1, 2 do
+						block(fore, inward, s.Y * (0.3 - i * 0.16), -s.Z * 0.55, s.X * 0.55, 0.06, 0.07, trim)
+					end
+				end
+				if rarity >= 4 then
+					lit(fore, inward, s.Y * 0.17, -s.Z * 0.6, s.X * 0.27, 0.04, 0.025)
+				end
+				if rarity >= 5 then
+					for _, edgeSide in { -1, 1 } do
+						block(fore, inward + edgeSide * s.X * 0.29, 0, -s.Z * 0.52, 0.04, s.Y * 0.45, 0.04, BRASS)
+					end
+				end
+			end
+			local hand = body[prefix .. "Hand"]
+			if hand then
+				local s = hand.Size
+				local inward = -side * 0.1
+				block(hand, inward, -s.Y * 0.12, 0, s.X * 0.72, s.Y * 1.13, s.Z * 0.66, trim)
+				block(hand, inward, 0, -s.Z * 0.35, s.X * 0.62, s.Y * 0.48, 0.08, metal)
+				block(
+					hand,
+					inward - side * s.X * 0.37,
+					-s.Y * 0.08,
+					-s.Z * 0.08,
+					s.X * 0.18,
+					s.Y * 0.65,
+					s.Z * 0.3,
+					cloth,
+					side * -18
+				)
+			end
+			local thigh = body[prefix .. "UpperLeg"]
+			if thigh then
+				local s = thigh.Size
+				block(thigh, 0, 0, 0, s.X * 0.85, s.Y * 1.02, s.Z * 0.8, cloth)
+				block(
+					thigh,
+					side * s.X * 0.11,
+					s.Y * 0.12,
+					-s.Z * 0.37,
+					s.X * 0.69,
+					s.Y * 0.58,
+					s.Z * 0.25,
+					metal,
+					side * 6
+				)
+				if rarity >= 3 then
+					block(thigh, side * s.X * 0.35, -s.Y * 0.13, 0, s.X * 0.22, s.Y * 0.44, s.Z * 0.73, trim, side * 5)
+				end
+			end
+			local shin = body[prefix .. "LowerLeg"]
+			if shin then
+				local s = shin.Size
+				block(shin, 0, 0, 0, s.X * 0.78, s.Y, s.Z * 0.77, cloth)
+				-- Diamond knee cap and tapered shin shell expose the flex joint.
+				block(shin, 0, s.Y * 0.45, -s.Z * 0.37, s.X * 0.47, s.Y * 0.34, s.Z * 0.32, edge, 45)
+				plate(shin, 0, -s.Y * 0.08, -s.Z * 0.37, s.X * 0.76, s.Y * 0.67, s.Z * 0.29, metal)
+				if rarity >= 2 then
+					block(shin, 0, -s.Y * 0.37, -s.Z * 0.56, s.X * 0.6, 0.055, 0.05, edge)
+				end
+				if rarity >= 3 then
+					for _, edgeSide in { -1, 1 } do
+						block(shin, edgeSide * s.X * 0.28, -s.Y * 0.02, -s.Z * 0.48, 0.04, s.Y * 0.42, 0.08, trim)
+					end
+				end
+				if rarity >= 4 then
+					lit(shin, 0, s.Y * 0.4, -s.Z * 0.56, s.X * 0.19, 0.04, 0.035)
+				end
+				if rarity >= 5 then
+					block(shin, 0, -s.Y * 0.07, -s.Z * 0.55, 0.055, s.Y * 0.43, 0.04, BRASS)
+				end
+			end
+			local foot = body[prefix .. "Foot"]
+			if foot then
+				local s = foot.Size
+				block(foot, 0, 0, -s.Z * 0.09, s.X * 0.86, s.Y * 1.1, s.Z * 0.98, trim)
+				block(foot, 0, -s.Y * 0.47, -s.Z * 0.09, s.X * 0.92, 0.07, s.Z * 1.05, cloth)
+				wedge(
+					folder,
+					foot,
+					CFrame.new(0, s.Y * 0.25, -s.Z * 0.3),
+					Vector3.new(s.X * 0.81, s.Y * 0.7, s.Z * 0.5),
+					metal,
+					SMOOTH
+				)
+				block(foot, 0, s.Y * 0.42, s.Z * 0.16, s.X * 0.79, s.Y * 0.6, s.Z * 0.48, metal)
+			end
+		end
+	end
+end
+BUILDERS.UtilityMiner = frontierSuit(1)
+BUILDERS.FrontierRanger = frontierSuit(2)
+BUILDERS.HeavyVanguard = frontierSuit(3)
+
+for old, current in CLEAN_ALIASES do
+	BUILDERS[old] = BUILDERS[current]
+end
+for look in CLEAN_LOOKS do
+	FULL_BODY[look] = true
+end
+
 -- Colours for each look: metal, trim, cloth and the material the metal uses.
 local KITS: { [string]: { Metal: Color3, Trim: Color3, Cloth: Color3?, Material: Enum.Material } } = {
 	-- Saga Miner suits: Metal is the armour plates, Trim the dark fittings,
 	-- Cloth the suit itself.
 	SuitScrap = {
-		Metal = Color3.fromRGB(150, 154, 162),
+		Metal = Color3.fromRGB(218, 146, 59),
 		Trim = Color3.fromRGB(72, 76, 86),
-		Cloth = Color3.fromRGB(206, 206, 204),
+		Cloth = Color3.fromRGB(48, 65, 83),
 		Material = Enum.Material.SmoothPlastic,
 	},
 	SuitMiner = {
@@ -1441,6 +1842,18 @@ local KITS: { [string]: { Metal: Color3, Trim: Color3, Cloth: Color3?, Material:
 		Metal = Color3.fromRGB(228, 230, 234),
 		Trim = Color3.fromRGB(206, 164, 76),
 		Cloth = Color3.fromRGB(90, 94, 104),
+		Material = Enum.Material.SmoothPlastic,
+	},
+	SuitZeroG = {
+		Metal = Color3.fromRGB(190, 218, 230),
+		Trim = Color3.fromRGB(44, 64, 85),
+		Cloth = Color3.fromRGB(43, 82, 101),
+		Material = Enum.Material.SmoothPlastic,
+	},
+	SuitThermal = {
+		Metal = Color3.fromRGB(211, 132, 69),
+		Trim = Color3.fromRGB(58, 48, 44),
+		Cloth = Color3.fromRGB(72, 62, 58),
 		Material = Enum.Material.SmoothPlastic,
 	},
 	Bulwark = { Metal = Color3.fromRGB(120, 130, 150), Trim = DARK_STEEL, Material = Enum.Material.Metal },
@@ -1482,6 +1895,25 @@ local KITS: { [string]: { Metal: Color3, Trim: Color3, Cloth: Color3?, Material:
 -- Better-made gear looks it: Fine is polished, Superior is mithril
 -- blue-silver, Masterwork is blackened steel with gold trim.
 local GOLD = Color3.fromRGB(214, 172, 72)
+KITS.UtilityMiner = {
+	Metal = Color3.fromRGB(170, 179, 185),
+	Trim = Color3.fromRGB(44, 51, 60),
+	Cloth = Color3.fromRGB(48, 65, 78),
+	Material = SMOOTH,
+}
+KITS.FrontierRanger = {
+	Metal = Color3.fromRGB(72, 117, 129),
+	Trim = Color3.fromRGB(32, 44, 55),
+	Cloth = Color3.fromRGB(53, 64, 73),
+	Material = SMOOTH,
+}
+KITS.HeavyVanguard = {
+	Metal = Color3.fromRGB(112, 125, 139),
+	Trim = Color3.fromRGB(35, 42, 52),
+	Cloth = Color3.fromRGB(45, 53, 62),
+	Material = SMOOTH,
+}
+
 function ArmorKits.tint(color: Color3, quality: number?, isTrim: boolean?): Color3
 	local q = quality or 1
 	if q == 2 then
@@ -1494,18 +1926,76 @@ function ArmorKits.tint(color: Color3, quality: number?, isTrim: boolean?): Colo
 	return color
 end
 
-function ArmorKits.build(folder: Instance, character: Model, look: string, accent: Color3, quality: number?)
-	local palette = KITS[look] or KITS.Plate
+function ArmorKits.build(
+	folder: Instance,
+	character: Model,
+	look: string,
+	accent: Color3,
+	quality: number?,
+	traits: any?,
+	slot: string?
+)
+	local cleanLook = CLEAN_ALIASES[look] or (if CLEAN_LOOKS[look] then look else nil)
+	local palette = KITS[cleanLook or look] or KITS.Plate
 	local kit: Kit = {
-		Metal = ArmorKits.tint(palette.Metal, quality),
-		Trim = ArmorKits.tint(palette.Trim, quality, true),
+		Metal = ArmorKits.tint(
+			if traits then palette.Metal:Lerp(traits.FinishColor, if cleanLook then 0.18 else 0.8) else palette.Metal,
+			if cleanLook then math.min(quality or 1, 2) else quality
+		),
+		Trim = ArmorKits.tint(palette.Trim, if cleanLook then 1 else quality, true),
 		-- Tabards and capes are the class colour, deepened like dyed cloth.
 		Cloth = palette.Cloth or darken(accent, 0.45),
 		Material = palette.Material,
 		Accent = accent,
+		Traits = traits,
 	}
 	local build = BUILDERS[look] or BUILDERS.Plate
-	build(folder, ArmorKits.body(character), kit)
+	local body = ArmorKits.body(character)
+	if slot then
+		local groups = {
+			Helmet = { Head = true },
+			Armor = {
+				Torso = true,
+				Waist = true,
+				LeftUpperArm = true,
+				RightUpperArm = true,
+				LeftUpperLeg = true,
+				RightUpperLeg = true,
+			},
+			Gloves = { LeftLowerArm = true, RightLowerArm = true, LeftHand = true, RightHand = true },
+			Boots = { LeftLowerLeg = true, RightLowerLeg = true, LeftFoot = true, RightFoot = true },
+		}
+		for key in body do
+			if not (groups[slot] and groups[slot][key]) then
+				body[key] = nil
+			end
+		end
+	end
+	if traits and traits.Variant and not cleanLook then
+		local variant = traits.Variant
+		for key, bodySegment in body do
+			if
+				key == "Torso"
+				or key == "LeftLowerLeg"
+				or key == "RightLowerLeg"
+				or key == "LeftLowerArm"
+				or key == "RightLowerArm"
+			then
+				local size = bodySegment.Size
+				for panel = 1, variant do
+					box(
+						folder,
+						bodySegment,
+						CFrame.new(0, size.Y * (0.35 - panel * 0.15), -size.Z * 0.58),
+						Vector3.new(size.X * 0.7, 0.07, 0.1),
+						kit.Metal,
+						SMOOTH
+					)
+				end
+			end
+		end
+	end
+	build(folder, body, kit)
 	if FULL_BODY[look] then
 		ArmorKits.hideAvatar(character)
 	end

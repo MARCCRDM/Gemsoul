@@ -1,14 +1,4 @@
---[[
-	The guide: after the intro, a small "NEXT STEP" panel walks new players
-	through the game loop, with a glowing trail from them to the place to go:
-	  1 mine a crystal in the quarry
-	  2 cut a rough stone at Ilsa's Gem Cutter stall
-	  3 sell stones to Hilde at the Crafting Hall
-	  4 forge or upgrade gear at Borin's anvil
-	  5 enchant gear at Vey's Arcanum
-	  6 defeat a crystal monster in the Wilds, outside the south gate
-	Each step completes from the server's saved milestones. [H] hides it.
-]]
+-- New explorer guide: mine, exchange unwanted gems, recover equipment and enchant.
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,21 +19,8 @@ local ARRIVED = 18 -- studs: close enough, hide the trail
 
 local STEPS = {
 	{ Milestone = "Mined", Target = "Quarry", Text = "Mine a crystal in the quarry at the end of the north road." },
-	{
-		Milestone = "Cut",
-		Target = "Cutting",
-		Text = "Cut a rough stone at Ilsa's Gem Cutter stall, beside the Mining Guild.",
-	},
-	{
-		Milestone = "Sold",
-		Target = "Quartermaster",
-		Text = "Sell stones you don't need to Hilde at the Crafting Hall for Guild Marks.",
-	},
-	{
-		Milestone = "Crafted",
-		Target = "Forge",
-		Text = "Buy materials from Hilde, then forge or upgrade gear at Borin's anvil.",
-	},
+	{ Milestone = "Sold", Target = "Market", Text = "Sell unwanted gems at the station exchange for coins." },
+	{ Milestone = "Recovered", Target = "Quarry", Text = "Mine recovery seams or lucky rocks to discover equipment." },
 	{
 		Milestone = "Enchanted",
 		Target = "Enchanting",

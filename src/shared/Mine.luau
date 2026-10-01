@@ -14,7 +14,7 @@ Mine.TutorialSwings = 20
 Mine.CritChance = 0.15 -- a crit chips two layers at once
 Mine.WallPrice = 40 -- coins per wall once today's free mines are used up
 
--- Ore found in the mine, as crafting materials (ids in Shared/Crafting).
+-- Recovery seams: their salvage pays credits and may reveal equipment.
 Mine.Ores = {
 	Iron = { Color = Color3.fromRGB(190, 195, 205) },
 	Mithril = { Color = Color3.fromRGB(110, 230, 255) },
@@ -36,7 +36,7 @@ function Mine.mithrilChance(depth: number): number
 	return math.min(0.35, 0.04 + depth * 0.02)
 end
 
--- Chance a lucky rock also holds the next armor set up your ladder (from
+-- Chance a lucky rock also holds recovered equipment from any slot (from
 -- depth 2 down).
 function Mine.armorChance(depth: number): number
 	return if depth >= 2 then math.min(0.3, 0.06 + depth * 0.02) else 0

@@ -8,7 +8,7 @@
 
 	Numbers:
 	  damage = base x (Power / 60) x buffs, x1.6 on a crit or combo finisher
-	  crit chance = 5% + Speed / 1000 (+ weapon passive)
+	  crit chance = min(10%, 5% + min(2.5%, Speed / 4000) + equipment bonus)
 	  damage taken = hit x 60 / (60 + Defense) x armor/weapon/buff multipliers
 	Resources (per class) fill and drain as below; abilities spend them.
 
@@ -23,6 +23,7 @@
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local EquipmentBalance = require(script.Parent.EquipmentBalance)
 local Combat = {}
 
 Combat.TownRadius = 192 -- the walls and moat; no fighting inside (but the Arena)
@@ -56,7 +57,7 @@ function Combat.defenseMult(defense: number): number
 end
 
 function Combat.critChance(speed: number, bonus: number?): number
-	return 0.05 + speed / 1000 + (bonus or 0)
+	return EquipmentBalance.criticalChance(speed, bonus)
 end
 
 -- Landmarks the world builder publishes (see Builder.landmark).

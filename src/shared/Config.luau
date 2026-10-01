@@ -1,29 +1,27 @@
 -- Game-wide settings shared by server and client.
 local Config = {
-	-- Menu-first: everything (mining, cutting, crafting, selling, the shop)
+	-- Menu-first: everything (mining, trading, enchanting, selling and the shop)
 	-- is played from the menu. Combat and walking around the town are paused
 	-- while this is on: no monsters, no hotbar, and the camera shows the
 	-- kingdom behind the menu.
 	MenuOnly = true,
 	-- Only this class is playable for now; everyone is set to it (with its
-	-- first weapon and armor). nil opens all classes again.
+	-- random equipment set). nil opens all classes again.
 	OnlyClass = "Warrior",
 
 	-- Free mining: each mined node uses one free mine. When the daily or
-	-- weekly allowance runs out, players buy rough stones at the Mining Store.
+	-- weekly allowance runs out, players fund more mine walls with coins.
 	DailyQuota = 10,
 	WeeklyQuota = 50,
 
 	-- Economy
 	StartingCoins = 300,
-	RoughStonePrice = 60, -- Mining Store; a random rough stone averages ~51 coins
 	MaxGems = 200, -- inventory limit
 	-- Daily reward: base coins, plus more per day of streak (up to a week).
 	DailyRewardBase = 75,
 	DailyRewardPerStreak = 25,
 	DailyStreakMax = 7,
 	-- Tamsin at the Market buys stones for coins at this share of their value
-	-- (Hilde pays 60% in Guild Marks at the Crafting Hall).
 	MarketSellRate = 0.5,
 
 	MineHoldSeconds = 1,

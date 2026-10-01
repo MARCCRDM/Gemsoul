@@ -2,7 +2,7 @@
 	The one place gems enter the game. Every source calls Gems.award:
 	  "MiningNode"   mining a node in the quarry (uses the free quota)
 	  "VipMiningNode" mining a node in the VIP pit (luckier rolls)
-	  "MiningStore"  buying a rough stone from Garrick
+	  "MiningStore"  legacy store / expedition cache rewards
 	  "PvEDrop"      monster loot; pass opts.Luck for tougher monsters
 	PvP wagers don't create gems: they move existing ones with
 	PlayerData.transferGem.
@@ -18,7 +18,7 @@ local Gems = {}
 
 local rng = Random.new()
 
--- Generates a rough stone for the player. Returns the gem, or nil if their
+-- Recovers an enchant-ready gem for the player. Returns the gem, or nil if their
 -- inventory is full.
 function Gems.award(player: Player, source: string, opts: { Luck: number? }?): GemConfig.Gem?
 	local gem = GemGenerator.generate(rng, source, {

@@ -1,15 +1,4 @@
---[[
-	The gem pouch: a grid of gem cards tinted by rarity, and a detail panel
-	with a spinning 3D model, rarity/element badges, stat bars and value.
-	Also used as a picker, e.g. to choose a stone to cut:
-
-	InventoryUI.open({
-		Title = "Choose a stone to cut",
-		Filter = function(gem) return gem.Cut == nil end,
-		ActionText = "Cut this stone",
-		OnPick = function(gem) ... end,
-	})
-]]
+-- Gem pouch and inspect-before-action picker. All recovered gems are enchant-ready.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -26,11 +15,12 @@ local P = IronUi.Colors
 local HEADING = IronUi.Heading
 local BODY = Enum.Font.Gotham
 local BOLD = Enum.Font.GothamBold
-local MAX_WIDTH = 880
+local MAX_WIDTH = 960
 local NARROW = 620 -- below this panel width the detail view covers the grid
 
 type Options = {
 	Title: string?,
+	InitialGemId: string?,
 	Filter: ((any) -> boolean)?,
 	ActionText: string?,
 	OnPick: ((any) -> ())?,
@@ -120,9 +110,9 @@ local backdrop = new("TextButton", {
 -- The same crystal window as every other screen: gold rim, dark body,
 -- a glossy gradient header bar.
 local panel = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1) }, gui)
-UiKit.round(panel, 16)
-new("UIStroke", { Color = P.Gold, Thickness = 4 }, panel)
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(34, 26, 48), P.Frame) }, panel)
+UiKit.round(panel, 12)
+new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, panel)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(26, 36, 58), P.Frame) }, panel)
 local headerBar = new("Frame", {
 	BackgroundColor3 = Color3.new(1, 1, 1),
 	Position = UDim2.fromOffset(5, 5),
@@ -131,23 +121,23 @@ local headerBar = new("Frame", {
 UiKit.round(headerBar, 12)
 new("UIGradient", {
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, IronUi.lighter(P.Amethyst, 0.1)),
-		ColorSequenceKeypoint.new(0.6, IronUi.darker(P.Amethyst, 0.25)),
-		ColorSequenceKeypoint.new(1, IronUi.darker(P.Teal, 0.3)),
+		ColorSequenceKeypoint.new(0, P.Amethyst:Lerp(P.Inset, 0.65)),
+		ColorSequenceKeypoint.new(0.6, P.Inset),
+		ColorSequenceKeypoint.new(1, P.Teal:Lerp(P.Frame, 0.82)),
 	}),
 }, headerBar)
 local headerGloss = new("Frame", {
 	BackgroundColor3 = Color3.new(1, 1, 1),
-	BackgroundTransparency = 0.82,
+	BackgroundTransparency = 0.72,
 	Position = UDim2.fromOffset(8, 4),
-	Size = UDim2.new(1, -16, 0, 10),
+	Size = UDim2.new(1, -16, 0, 2),
 }, headerBar)
 UiKit.round(headerGloss, 5)
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
 panel.Size = UDim2.fromScale(0.94, 0.86)
 panel.ClipsDescendants = true
-new("UISizeConstraint", { MaxSize = Vector2.new(MAX_WIDTH, 600) }, panel)
+new("UISizeConstraint", { MaxSize = Vector2.new(MAX_WIDTH, 660) }, panel)
 local panelScale = new("UIScale", { Scale = 1 }, panel)
 
 -- Header: title, balance pills, close.
@@ -156,8 +146,8 @@ local header = new("Frame", {
 	Position = UDim2.fromOffset(16, 12),
 	Size = UDim2.new(1, -32, 0, 58),
 }, panel)
-local title = label(header, "GEM POUCH", 28, Color3.new(1, 1, 1), HEADING)
-IronUi.outline(title, 3)
+local title = label(header, "SAGA COLLECTION", 24, Color3.new(1, 1, 1), HEADING)
+IronUi.outline(title, 1)
 title.Size = UDim2.new(0.5, 0, 0, 30)
 local subtitle = label(header, "", 13, Color3.fromRGB(240, 230, 255), BOLD)
 subtitle.Position = UDim2.fromOffset(0, 32)
@@ -175,7 +165,7 @@ pillLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 pillLayout.Wraps = true
 
 local closeButton, closeFace = IronUi.chunk(header, {
-	Color = Color3.fromRGB(232, 58, 58),
+	Color = Color3.fromRGB(136, 62, 68),
 	Size = UDim2.fromOffset(44, 44),
 	Radius = 12,
 	Lip = 5,
@@ -201,11 +191,28 @@ local sorts = new("Frame", {
 }, toolbar)
 UiKit.list(sorts, 6, true).HorizontalAlignment = Enum.HorizontalAlignment.Right
 
+local search = new("TextBox", {
+	BackgroundColor3 = P.Frame,
+	Text = "",
+	ClearTextOnFocus = false,
+	PlaceholderText = "Search gem names, rarity or affinity...",
+	PlaceholderColor3 = P.Dim,
+	TextColor3 = P.Text,
+	Font = IronUi.Body,
+	TextSize = 14,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Position = UDim2.fromOffset(16, 126),
+	Size = UDim2.new(1, -32, 0, 32),
+}, panel)
+UiKit.round(search, 6)
+UiKit.pad(search, 10)
+new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.5 }, search)
+
 -- Body: the card grid and the detail panel.
 local body = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 130),
-	Size = UDim2.new(1, -32, 1, -144),
+	Position = UDim2.fromOffset(16, 170),
+	Size = UDim2.new(1, -32, 1, -184),
 }, panel)
 local grid = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
@@ -236,7 +243,7 @@ local detail = new("Frame", {
 	Size = UDim2.new(0, 286, 1, 0),
 }, body)
 UiKit.round(detail, 10)
-local detailStroke = new("UIStroke", { Color = P.Gold, Thickness = 3 }, detail)
+local detailStroke = new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, detail)
 
 -- Close-up: a neutral studio backdrop with the stone in a viewport on top.
 local stageFrame = new("Frame", {
@@ -247,9 +254,10 @@ local stageFrame = new("Frame", {
 UiKit.round(stageFrame, 10)
 new("UIGradient", {
 	Rotation = 90,
-	Color = ColorSequence.new(Color3.fromRGB(74, 84, 100), Color3.fromRGB(16, 20, 26)),
+	Color = ColorSequence.new(Color3.fromRGB(35, 59, 82), P.Frame),
 }, stageFrame)
 GemArt.backdrop(stageFrame)
+IronUi.orbit(stageFrame, P.Teal, 168)
 local viewport = new("ViewportFrame", {
 	BackgroundTransparency = 1,
 	Size = UDim2.fromScale(1, 1),
@@ -350,7 +358,7 @@ local function showDetail(gem)
 	}, info)
 	UiKit.list(badges, 6, true).Wraps = true
 	pill(badges, string.upper(GemConfig.TierLabels[gem.Tier]), tierColor, 1)
-	pill(badges, string.upper(gem.Element), GemConfig.ElementColors[gem.Element], 2)
+	pill(badges, string.upper(GemConfig.elementName(gem.Element)), GemConfig.ElementColors[gem.Element], 2)
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "GEM MINT" else "CUT " .. gem.Cut
 	pill(badges, state, if gem.Cut and gem.Cut >= 10 then K.Gold else K.Text, 3)
 
@@ -434,11 +442,11 @@ local FILTERS = {
 	All = function()
 		return true
 	end,
-	Rough = function(gem)
-		return gem.Cut == nil
+	["Rare+"] = function(gem)
+		return (GemConfig.TierRank[gem.Tier] or 0) >= 3
 	end,
-	Cut = function(gem)
-		return gem.Cut ~= nil
+	Mint = function(gem)
+		return (gem.Cut or 0) == 10
 	end,
 }
 
@@ -449,16 +457,16 @@ local function card(gem, order: number)
 	-- A dark slab so the stone's own colour stands out; rarity shows in the
 	-- rim and the label, and the selected card gets a gold outline.
 	local button, face = IronUi.chunk(grid, {
-		Color = Color3.fromRGB(40, 36, 54),
+		Color = tierColor:Lerp(P.Frame, 0.50),
 		Rim = if selected then P.Gold else tierColor,
-		Radius = 12,
-		Lip = 5,
+		Radius = 8,
+		Lip = 4,
 		Stripes = "None",
 	})
 	button.LayoutOrder = order
 	local stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke
 	if selected then
-		stroke.Thickness = 4
+		stroke.Thickness = 2.5
 	end
 	if gem.Tier == "UltraRare" then
 		-- A shimmer running around the outline.
@@ -524,8 +532,8 @@ local function tabs(parent: Instance, names: { string }, active: string, onPick:
 	for i, name in names do
 		local on = name == active
 		local tab, face = IronUi.chunk(parent, {
-			Color = if on then P.Amethyst else Color3.fromRGB(52, 46, 68),
-			Rim = if on then Color3.fromRGB(214, 180, 255) else Color3.fromRGB(96, 88, 120),
+			Color = if on then P.Teal:Lerp(P.Inset, 0.6) else P.Slot,
+			Rim = if on then P.Teal else P.Edge,
 			Size = UDim2.fromOffset(0, if on then 38 else 34),
 			Radius = 10,
 			Lip = if on then 5 else 4,
@@ -562,7 +570,9 @@ local function layout()
 		grid.Visible = true
 		backButton.Visible = false
 	end
-	pills.Visible = width >= 560
+	pills.Visible = width >= 720
+	filters.Visible = width >= 620
+	sorts.Size = UDim2.new(if width >= 620 then 0.58 else 1, 0, 1, 0)
 end
 
 function InventoryUI.refresh()
@@ -571,8 +581,8 @@ function InventoryUI.refresh()
 		return
 	end
 	layout()
-	title.Text = if options.OnPick then "CHOOSE A GEM" else "GEM POUCH"
-	subtitle.Text = options.Title or "Your collection"
+	title.Text = if options.OnPick then "GEM EXCHANGE" else "SAGA COLLECTION"
+	subtitle.Text = options.Title or "Recover. Inspect. Enchant."
 
 	clearChildren(pills, { UIListLayout = true })
 	for _, child in grid:GetChildren() do
@@ -589,20 +599,13 @@ function InventoryUI.refresh()
 		showDetail(nil)
 		return
 	end
-	local quota = profile.Quota
 	pill(pills, commas(profile.Coins) .. " COINS", K.Gold, 1)
-	pill(pills, string.format("%d / %d GEMS", #profile.Gems, Config.MaxGems), Color3.fromRGB(190, 120, 255), 2)
-	pill(
-		pills,
-		string.format("FREE MINES %d/%d", math.max(0, profile.DailyQuota - quota.UsedToday), profile.DailyQuota),
-		K.Text,
-		3
-	)
+	pill(pills, string.format("%d / %d GEMS", #profile.Gems, Config.MaxGems), P.Teal, 2)
 
 	if options.Filter then
 		clearChildren(filters, { UIListLayout = true })
 	else
-		tabs(filters, { "All", "Rough", "Cut" }, filterTab, function(name)
+		tabs(filters, { "All", "Rare+", "Mint" }, filterTab, function(name)
 			filterTab = name
 			InventoryUI.refresh()
 		end)
@@ -615,7 +618,9 @@ function InventoryUI.refresh()
 	local gems = {}
 	for _, gem in profile.Gems do
 		local keep = if options.Filter then options.Filter(gem) else FILTERS[filterTab](gem)
-		if keep then
+		local query = string.lower(search.Text)
+		local searchable = string.lower(GemConfig.displayName(gem) .. " " .. GemConfig.TierLabels[gem.Tier])
+		if keep and (query == "" or string.find(searchable, query, 1, true)) then
 			table.insert(gems, gem)
 		end
 	end
@@ -641,7 +646,9 @@ function InventoryUI.refresh()
 		card(gem, i)
 	end
 	emptyLabel.Visible = #gems == 0
-	emptyLabel.Text = options.Empty or "No gems yet. Mine some in the quarry up the north road!"
+	emptyLabel.Text = if #profile.Gems > 0
+		then "No matching gems. Try another search or filter."
+		else options.Empty or "Your collection begins in the Moon Mine. Recover Saga Stones to enchant your equipment."
 	showDetail(selected)
 	-- Positions settle after layout, so build the visible stones next frame.
 	task.defer(buildVisibleStones)
@@ -649,9 +656,10 @@ end
 
 function InventoryUI.open(options: Options?)
 	current = options or {}
-	selectedId = nil
-	detailOpen = false
+	selectedId = options and options.InitialGemId
+	detailOpen = selectedId ~= nil
 	filterTab = "All"
+	search.Text = ""
 	gui.Enabled = true
 	InventoryUI.refresh()
 	panelScale.Scale = 0.94
@@ -678,6 +686,17 @@ function InventoryUI.toggle()
 		InventoryUI.open()
 	end
 end
+
+local searchRevision = 0
+search:GetPropertyChangedSignal("Text"):Connect(function()
+	searchRevision += 1
+	local revision = searchRevision
+	task.delay(0.18, function()
+		if revision == searchRevision and current then
+			InventoryUI.refresh()
+		end
+	end)
+end)
 
 closeButton.Activated:Connect(InventoryUI.close)
 backdrop.Activated:Connect(InventoryUI.close)

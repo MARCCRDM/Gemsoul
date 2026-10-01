@@ -73,6 +73,10 @@ export type Class = {
 local Crafting = require(script.Parent.Crafting)
 local GemConfig = require(script.Parent.GemConfig)
 
+local Slots = require(script.Parent.EquipmentSlots)
+local EquipmentBalance = require(script.Parent.EquipmentBalance)
+local ExpandedTraits = require(script.Parent.ExpandedItemTraits)
+local GearRolls = require(script.Parent.GearRolls)
 local Classes = {}
 
 Classes.StatNames = { "Health", "Power", "Defense", "Speed" }
@@ -90,8 +94,8 @@ Classes.List = {
 		Id = "Warrior",
 		-- The Saga Miner: a colonist in a spacesuit with a pistol and shield,
 		-- defending the Saga Stones. (The id stays "Warrior" for saved data.)
-		Name = "Saga Miner",
-		Role = "Blaster and shield",
+		Name = "Saga Vanguard",
+		Role = "Frontier combat miner",
 		Tagline = "Guard the Saga Stones. Shield up, blaster out.",
 		Color = Color3.fromRGB(90, 210, 255),
 		ResourceId = "Rage",
@@ -195,23 +199,43 @@ Classes.List = {
 				},
 			},
 			{
+				Id = "SurveyorKit",
+				Name = "Surveyor Pistol & Shield",
+				Style = "Precision",
+				Description = "A teal survey pistol with a raised sight and compact shield. Longer reach, slower shots.",
+				Look = "SurveyorKit",
+				Mods = { Speed = 1, Defense = -1 },
+				Attack = { Kind = "Shot", Damage = 11, Range = 58, Rate = 0.6 },
+				Passive = { Name = "Survey Guard", Text = "Every 8 seconds, absorb 12 damage.", Effect = { Ward = 12 } },
+			},
+			{
+				Id = "BulwarkKit",
+				Name = "Bulwark Pistol & Shield",
+				Style = "Defensive",
+				Description = "An ivory heavy blaster and reinforced tower shield. Trades mobility and fire rate for protection.",
+				Look = "BulwarkKit",
+				Mods = { Defense = 2, Speed = -1 },
+				Attack = { Kind = "Shot", Damage = 14, Range = 38, Rate = 0.7 },
+				Passive = { Name = "Heavy Guard", Text = "Every 8 seconds, absorb 24 damage.", Effect = { Ward = 24 } },
+			},
+			{
 				Id = "Longsword",
-				Name = "Plasma Blade",
+				Name = "Frontier Pistol & Shield",
 				Style = "Balanced",
-				Description = "A humming plasma edge for close work. A three-swing combo.",
-				Look = "Sword",
+				Description = "A balanced frontier sidearm and survey shield.",
+				Look = "SurveyorKit",
 				Mods = {},
-				Attack = { Kind = "Melee", Damage = 14, Range = 7, Arc = 100, Rate = 0.55, Combo = 3 },
+				Attack = { Kind = "Shot", Damage = 12, Range = 48, Rate = 0.5 },
 				Passive = { Name = "Keen Edge", Text = "+10% critical hit chance.", Effect = { CritAdd = 0.1 } },
 			},
 			{
 				Id = "Greataxe",
-				Name = "Breaker Axe",
+				Name = "Breach Pistol & Shield",
 				Style = "Heavy hitter",
-				Description = "A heavy rock-breaker: slow, brutal swings that cleave through crowds.",
-				Look = "Greataxe",
+				Description = "A heavy breaching sidearm with a reinforced shield.",
+				Look = "BulwarkKit",
 				Mods = { Power = 1, Speed = -1 },
-				Attack = { Kind = "Melee", Damage = 24, Range = 8, Arc = 140, Rate = 0.95, Combo = 2 },
+				Attack = { Kind = "Shot", Damage = 18, Range = 32, Rate = 0.9 },
 				Passive = {
 					Name = "Armor Breaker",
 					Text = "Hits make enemies take 8% more damage for 5s (stacks 3 times).",
@@ -220,29 +244,29 @@ Classes.List = {
 			},
 			{
 				Id = "TwinBlades",
-				Name = "Twin Beam Knives",
+				Name = "Rapid Pistol & Shield",
 				Style = "Swift",
-				Description = "A beam knife in each hand for a storm of quick cuts.",
-				Look = "TwinBlades",
+				Description = "A fast cycling sidearm with a light survey shield.",
+				Look = "SurveyorKit",
 				Mods = { Speed = 1, Power = -1 },
-				Attack = { Kind = "Melee", Damage = 8, Range = 6, Arc = 90, Rate = 0.32, Combo = 4 },
+				Attack = { Kind = "Shot", Damage = 8, Range = 40, Rate = 0.34 },
 				Passive = {
-					Name = "Lacerate",
-					Text = "Hits make enemies bleed for 30% more damage over 3s.",
+					Name = "Destabilize",
+					Text = "Hits destabilize enemies for 30% more damage over 3s.",
 					Effect = { Bleed = 0.3 },
 				},
 			},
 			{
 				Id = "Spear",
-				Name = "Ion Lance",
+				Name = "Longshot Pistol & Shield",
 				Style = "Reach",
-				Description = "Keep them at a distance with long, straight thrusts.",
-				Look = "Spear",
+				Description = "A precision sidearm with a long-range emitter and survey shield.",
+				Look = "SurveyorKit",
 				Mods = { Speed = 1, Defense = -1 },
-				Attack = { Kind = "Melee", Damage = 13, Range = 11, Arc = 35, Rate = 0.6, Combo = 3 },
+				Attack = { Kind = "Shot", Damage = 13, Range = 65, Rate = 0.7 },
 				Passive = {
-					Name = "Impale",
-					Text = "Thrusts reach 11 studs and hit every enemy in the line.",
+					Name = "Longshot Optics",
+					Text = "Precision emitter reaches targets up to 65 studs away.",
 					Effect = {},
 				},
 			},
@@ -256,10 +280,14 @@ Classes.List = {
 				Name = "Scrap Suit",
 				Tier = 1,
 				Style = "Starter",
-				Description = "A patched colony spacesuit with a bubble helmet. Every miner starts somewhere.",
+				Description = "An amber work helmet, cyan visor, navy utility suit and magnetic boots. Your first expedition kit.",
 				Look = "SuitScrap",
 				Mods = { Defense = -1 },
-				Passive = { Name = "Light", Text = "No special effect.", Effect = {} },
+				Passive = {
+					Name = "Life Support",
+					Text = "+1 walk speed from lightweight utility gear.",
+					Effect = { SpeedAdd = 1 },
+				},
 			},
 			{
 				Id = "IronChain",
@@ -290,6 +318,34 @@ Classes.List = {
 				Look = "SuitCrusader",
 				Mods = { Defense = 2, Speed = -1 },
 				Passive = BASTION,
+			},
+			{
+				Id = "ZeroGSuit",
+				Name = "Zero-G Survey Suit",
+				Tier = 2,
+				Style = "Mobility",
+				Description = "Light survey shell with a compact maneuver pack and recon helmet.",
+				Look = "SuitZeroG",
+				Mods = { Speed = 1, Defense = -1 },
+				Passive = {
+					Name = "Maneuver Thrusters",
+					Text = "+3 walk speed; sacrifices armor weight.",
+					Effect = { SpeedAdd = 3 },
+				},
+			},
+			{
+				Id = "ThermalSuit",
+				Name = "Thermal Containment Suit",
+				Tier = 3,
+				Style = "Survival",
+				Description = "Reinforced containment shell with twin scrubber tanks and heavy shoulders.",
+				Look = "SuitThermal",
+				Mods = { Health = 1, Speed = -1 },
+				Passive = {
+					Name = "Containment Barrier",
+					Text = "Every 8 seconds, absorb 18 damage.",
+					Effect = { Ward = 18 },
+				},
 			},
 		},
 		Specs = {
@@ -911,6 +967,69 @@ Classes.List = {
 	},
 } :: { [string]: Class }
 
+-- Miner weapon entries now represent only the sidearm; shields are independent.
+for _, weapon in Classes.List.Warrior.Weapons do
+	weapon.Name = string.gsub(weapon.Name, " & Shield", "")
+	if weapon.Passive.Effect.Ward then
+		weapon.Passive = { Name = "Stable Emitter", Text = "Standard precision sidearm.", Effect = {} }
+	end
+end
+for _, class in Classes.List do
+	for kind, catalog in Slots.Catalog do
+		class[kind] = catalog
+	end
+end
+-- Keep saved legacy equipment valid; only new-player draws use the expanded pool.
+for kind, entries in ExpandedTraits.Catalog do
+	Classes.List.Warrior[kind] = table.clone(Classes.List.Warrior[kind])
+	for _, gear in entries do
+		table.insert(Classes.List.Warrior[kind], gear)
+	end
+end
+-- Original pistols keep their ranged attacks; new sword IDs use melee models.
+for _, weapon in Classes.List.Warrior.Weapons do
+	if weapon.WeaponType ~= "Sword" then
+		weapon.Look = "CleanSidearm"
+		weapon.WeaponType = "Pistol"
+	end
+end
+function Classes.gear(classId: string, kind: string, id: string?)
+	local class = Classes.List[classId]
+	for _, gear in class and class[kind] or {} do
+		if gear.Id == id then
+			return gear
+		end
+	end
+	return nil
+end
+function Classes.effects(loadout)
+	local effects = {}
+	for _, slot in Slots.Order do
+		local gear = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
+		for key, value in gear and gear.Passive.Effect or {} do
+			if key == "TakenMult" or key == "CooldownMult" then
+				effects[key] = (effects[key] or 1) * value
+			elseif key == "SpeedAdd" or key == "CritAdd" then
+				effects[key] = (effects[key] or 0) + value
+			elseif key == "Ward" then
+				effects[key] = math.max(effects[key] or 0, value)
+			else
+				effects[key] = value
+			end
+		end
+	end
+	if effects.TakenMult then
+		effects.TakenMult = EquipmentBalance.passiveDamageMultiplier(effects.TakenMult, 0)
+	end
+	if effects.CooldownMult then
+		effects.CooldownMult = EquipmentBalance.cooldownMultiplier(effects.CooldownMult)
+	end
+	if effects.CritAdd then
+		effects.CritAdd = math.clamp(effects.CritAdd, 0, EquipmentBalance.MaxCriticalChance)
+	end
+	return effects
+end
+
 function Classes.get(classId: any): Class?
 	return if typeof(classId) == "string" then Classes.List[classId] else nil
 end
@@ -1013,7 +1132,16 @@ function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
 			ratings[stat].Base += amount
 		end
 	end
-	for _, slot in { "Weapon", "Armor" } do
+	for _, slot in { "Helmet", "Gloves", "Boots", "Shield" } do
+		local gear = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
+		for stat, value in gear and gear.Mods or {} do
+			ratings[stat].Base += value
+		end
+		for stat, value in Crafting.qualityBonus("Armors", loadout[slot .. "Quality"]) do
+			ratings[stat].Base += math.floor(value * 0.25)
+		end
+	end
+	for _, slot in Slots.Order do
 		local gem = loadout[slot .. "Gem"]
 		if gem then
 			for stat, amount in GemConfig.statBonuses(gem, slot) do
@@ -1023,6 +1151,12 @@ function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
 				end
 				rating.Bonus += amount
 			end
+		end
+	end
+	for _, slot in Slots.Order do
+		local roll = GearRolls.get(loadout, slot)
+		for stat, amount in roll and roll.Stats or {} do
+			ratings[stat].Base += amount
 		end
 	end
 	return ratings

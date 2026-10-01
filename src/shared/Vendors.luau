@@ -5,8 +5,6 @@
 -- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
 -- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "Abilities".
 
-local Config = require(script.Parent.Config)
-
 export type Option = { Text: string, Reply: string?, Action: string? }
 export type Vendor = {
 	Name: string,
@@ -28,10 +26,6 @@ local Vendors: { [string]: Vendor } = {
 		Greeting = "Welcome to Gemsoul, miner! Every miner gets free mines each day and week. Hold [E] on a crystal node in the quarry up the road.",
 		Options = {
 			{ Text = "How many free mines do I have left?", Action = "Quota" },
-			{
-				Text = string.format("Buy a random rough stone (%d coins)", Config.RoughStonePrice),
-				Action = "BuyStone",
-			},
 			{ Text = "Show me my gems", Action = "Pouch" },
 			{
 				Text = "What makes a stone valuable?",
@@ -45,56 +39,44 @@ local Vendors: { [string]: Vendor } = {
 	},
 	Cutting = {
 		Name = "Ilsa",
-		Role = "Master Gemcutter",
+		Role = "Gem Analyst",
 		Color = Color3.fromRGB(255, 160, 30),
 		Tunic = Color3.fromRGB(120, 70, 40),
 		Face = "^_^",
-		Greeting = "A rough stone is worth half its promise. Cut it well and it'll shine. What'll it be?",
+		Greeting = "Moon pressure forms diamond-cut Saga Stones naturally. Their facets are fixed when recovered.",
 		Options = {
-			{ Text = "Cut a gem by hand (free)", Action = "HandCut" },
-			{ Text = "Use a laser cutter", Action = "AutoCut" },
+			{ Text = "Inspect my gems", Action = "Pouch" },
 			{
-				Text = "How is a cut graded?",
-				Reply = "From 1 to 10. A steady hand earns up to 8. Land every strike near the line for a 9, and a flawless cut is a 10: Gem Mint. My precision laser always cuts a 9, the premium one a 10. Bigger stones are harder to cut by hand.",
+				Text = "What does cut quality mean?",
+				Reply = "Natural facet quality runs from 1 to 10. Better facets strengthen enchantments and increase exchange value. Gems arrive ready to socket; there is no cutting service.",
 			},
 		},
 	},
 	Quartermaster = {
 		Name = "Hilde",
-		Role = "Guild Quartermaster",
+		Role = "Expedition Quartermaster",
 		Color = Color3.fromRGB(255, 200, 60),
 		Tunic = Color3.fromRGB(110, 80, 40),
 		Face = "-_-",
-		Greeting = "Welcome to the Crafting Hall. I pay Guild Marks for stones, and Marks buy the materials Borin needs to make your gear.",
+		Greeting = "Equipment comes from your colony-issued random kit, recovery caches and other explorers. Spare gems fund the next expedition.",
 		Options = {
-			{ Text = "Sell stones for Guild Marks", Action = "SellGems" },
-			{ Text = "Buy crafting materials", Action = "Materials" },
-			{
-				Text = "What are Guild Marks?",
-				Reply = "The hall's own currency. You earn Marks only by selling stones here, and they pay for materials and Borin's forge fees. Coins won't buy anything in this hall.",
-			},
-			{
-				Text = "Can I break stones down instead?",
-				Reply = "Salvage them at my counter and you get Gem Shards. Borin needs shards for Masterwork gear.",
-			},
+			{ Text = "Sell gems for coins", Action = "SellGems" },
+			{ Text = "Inspect equipment", Action = "Equipment" },
 		},
 	},
 	Forge = {
 		Name = "Borin",
-		Role = "Master Smith",
+		Role = "Equipment Specialist",
 		Color = Color3.fromRGB(255, 120, 30),
 		Tunic = Color3.fromRGB(90, 56, 36),
 		Face = "o_O",
-		Greeting = "Bring me materials from Hilde and a few Marks for the fire, and I'll forge you something worth wearing.",
+		Greeting = "We recover equipment instead of manufacturing it here. Every helmet, chest, glove, boot, pistol and shield carries its own roll and socket.",
 		Options = {
-			{ Text = "Craft or upgrade gear", Action = "Forge" },
+			{ Text = "Manage my loadout", Action = "Equipment" },
+			{ Text = "Trade equipment", Action = "Trade" },
 			{
-				Text = "How does gear quality work?",
-				Reply = "Everything starts Standard. Upgrade it to Fine, then Superior with mithril, then Masterwork with gem shards. Each step hits harder or guards better, and looks it.",
-			},
-			{
-				Text = "Where do I get materials?",
-				Reply = "Hilde, out front of the hall. Sell her your spare stones for Guild Marks, then buy what the recipe needs.",
+				Text = "How do I find better gear?",
+				Reply = "Mine recovery seams and lucky rocks. Deeper expeditions can recover better quality equipment. Rarity and bonus stats are rolled once and stay with each item.",
 			},
 		},
 	},
@@ -109,11 +91,11 @@ local Vendors: { [string]: Vendor } = {
 			{ Text = "Sell stones for coins", Action = "MarketSell" },
 			{
 				Text = "Show me the trade listings",
-				Reply = "The board's empty for now. Player-to-player trading opens soon!",
+				Action = "Trade",
 			},
 			{
 				Text = "How does trading work?",
-				Reply = "Post your gems on the board with a price, and other players can buy them from any kiosk.",
+				Reply = "Open Trade, select a player and equipment, then review their same-slot counteroffer. Both players must confirm. Item stats and socketed gems travel with the equipment.",
 			},
 		},
 	},
@@ -123,12 +105,12 @@ local Vendors: { [string]: Vendor } = {
 		Color = Color3.fromRGB(150, 70, 255),
 		Tunic = Color3.fromRGB(70, 40, 110),
 		Face = "*_*",
-		Greeting = "The runes hum today. Bring me a cut gem and I'll bind it to your weapon or armor.",
+		Greeting = "The runes hum today. Bring me a cut gem and I'll bind it to your six equipment slots.",
 		Options = {
 			{ Text = "Enchant my gear", Action = "Enchant" },
 			{
 				Text = "Which gems make the strongest enchantments?",
-				Reply = "Big ones. Size decides most of a gem's potency, then clarity and cut. Fire, Frost, Shock and Poison each grant their own power.",
+				Reply = "Big ones. Size decides most of a gem's potency, then clarity and cut. Thermal, Cryo, Ion and Radiation each grant their own power.",
 			},
 		},
 	},
@@ -147,7 +129,7 @@ local Vendors: { [string]: Vendor } = {
 			},
 			{
 				Text = "What's out past the south gate?",
-				Reply = "The Crystal Wilds. Crawlers and Shard Brutes, each tied to an element. Beat them for coins and rough stones; brutes always drop one. A matching armor gem blunts their bite.",
+				Reply = "The Crystal Wilds. Crawlers and Shard Brutes, each tied to an element. Beat them for coins and ready gems; brutes always drop one. A matching armor gem blunts their bite.",
 			},
 			{
 				Text = "Join a PvP duel (collateral)",

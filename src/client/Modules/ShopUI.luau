@@ -19,7 +19,6 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
-local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local Store = require(ReplicatedStorage.Shared.Store)
 local CrateReveal = require(script.Parent.CrateReveal)
 local GemClient = require(script.Parent.GemClient)
@@ -218,11 +217,7 @@ end
 local function rewardTile(parent: Instance, item: Store.RewardItem, order: number): Frame
 	local color = ShopArt.KindColors[item.Kind] or Color3.fromRGB(80, 90, 120)
 	local glyph = ShopArt.KindIcons[item.Kind] or "✨"
-	if item.Kind == "Materials" and item.Id then
-		local material = Crafting.Materials[item.Id]
-		color = if material then material.Color:Lerp(Color3.fromRGB(120, 80, 40), 0.35) else color
-		glyph = ShopArt.MaterialIcons[item.Id] or glyph
-	elseif item.Kind == "Crates" then
+	if item.Kind == "Crates" then
 		glyph = "📦"
 	elseif item.Kind == "XPBoost" then
 		glyph = "⭐"
@@ -308,8 +303,8 @@ local function oddsRow(parent: Instance, crate: Store.Crate, tileSize: number): 
 			then "Cosmetic"
 			elseif roll.Reward.CutGems then "CutGems"
 			elseif roll.Reward.Stones then "Stones"
-			elseif roll.Reward.Marks then "Marks"
-			else "Materials"
+			elseif roll.Reward.Coins then "Coins"
+			else "CutGems"
 		ShopArt.icon(tile, kind, nil, tileSize * 0.8).Position = UDim2.fromScale(0.5, 0.42)
 		local pct = text(
 			tile,
@@ -697,7 +692,7 @@ local function drawPasses()
 		{
 			"✦ Walk through the pink gate into the VIP pit",
 			"✦ VIP nodes roll rarer colours and better grades",
-			"✦ Support Brainrot Crusaders' development",
+			"✦ Support Saga Miners' development",
 		}
 	do
 		text(info, perk, 15, Color3.new(1, 1, 1), CHUNKY).TextXAlignment = Enum.TextXAlignment.Center
@@ -797,7 +792,7 @@ function ShopUI.refresh()
 		return
 	end
 	local p = profile()
-	wallet.Text = string.format("💰 %s    🎖️ %s", commas(p.Coins or 0), commas(p.Marks or 0))
+	wallet.Text = string.format("💰 %s COINS", commas(p.Coins or 0))
 	clear(tabBar)
 	local entries = {}
 	for _, id in Store.Tabs do

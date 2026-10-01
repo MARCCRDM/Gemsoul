@@ -21,6 +21,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Enemies = require(script.Parent.Enemies)
@@ -77,13 +79,7 @@ local function kit(player: Player): Kit?
 	if not weapon or not armor then
 		return nil
 	end
-	local effects = {}
-	for key, value in armor.Passive.Effect do
-		effects[key] = value
-	end
-	for key, value in weapon.Passive.Effect do
-		effects[key] = if key == "TakenMult" and effects.TakenMult then effects.TakenMult * value else value
-	end
+	local effects = Classes.effects(loadout)
 	return {
 		Class = class,
 		Weapon = weapon,
@@ -563,11 +559,15 @@ function CombatServer.hurt(player: Player, amount: number, element: string?)
 	end
 	local st = state(player)
 	local damage = amount * Combat.defenseMult(rating(k, "Defense"))
-	damage *= (k.Effects.TakenMult or 1) * buffTotal(st, "TakenMult")
-	local armorGem = k.Loadout.ArmorGem
-	if element and armorGem and armorGem.Element == element then
-		damage *= 1 - GemConfig.enchantValues(armorGem, "Armor").Resist
+	damage *= buffTotal(st, "TakenMult")
+	local resistance = 0
+	for _, slot in Slots.Order do
+		local gem = k.Loadout[slot .. "Gem"]
+		if slot ~= "Weapon" and element and gem and gem.Element == element then
+			resistance += GemConfig.enchantValues(gem, slot).Resist / 5
+		end
 	end
+	damage *= EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
 	damage = math.max(1, math.floor(damage + 0.5))
 	if st.Shield > 0 and os.clock() < st.ShieldUntil then
 		local absorbed = math.min(st.Shield, damage)

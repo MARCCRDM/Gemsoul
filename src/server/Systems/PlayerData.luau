@@ -15,6 +15,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local TestAdmin = require(script.Parent.TestAdmin)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local Economy = require(ReplicatedStorage.Shared.ExpeditionEconomy)
+local TradeJournal = require(script.Parent.TradeJournal)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Season = require(ReplicatedStorage.Shared.Season)
@@ -30,9 +35,10 @@ type Character = {
 	Abilities: { string }?, -- the three ability ids on Q / E / R (Classes.loadout)
 	WeaponQuality: number?, -- 1-4, see Crafting.Qualities
 	ArmorQuality: number?,
+	[string]: any,
 }
 -- Gear the player has made or been given: gear id -> quality (1-4).
-type Owned = { Weapons: { [string]: number }, Armors: { [string]: number } }
+type Owned = { [string]: { [string]: number } }
 type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean }
 type Profile = {
 	Version: number,
@@ -60,6 +66,7 @@ local PlayerData = {}
 
 local profiles: { [Player]: Profile } = {}
 local canSave: { [Player]: boolean } = {}
+local saving, tradeLocks, tradeReady = {}, {}, {}
 
 -- Fires (player) when a player's class, gear or socketed gem changes.
 local characterChanged = Instance.new("BindableEvent")
@@ -75,7 +82,7 @@ end
 
 local function newProfile(): Profile
 	return {
-		Version = 8,
+		Version = 9,
 		Coins = Config.StartingCoins,
 		Marks = 0,
 		Gems = {},
@@ -192,6 +199,8 @@ local function migrate(profile: Profile): Profile
 		end
 		profile.Version = 8
 	end
+	Slots.initialize(profile)
+	profile.Version = math.max(profile.Version, 9)
 	return profile
 end
 
@@ -238,19 +247,26 @@ end
 -- Saves with UpdateAsync, retrying a couple of times if Roblox is busy.
 local function save(player: Player)
 	local profile = profiles[player]
-	if not profile or not canSave[player] or not store then
-		return
+	if not profile or not canSave[player] or not store or saving[player] then
+		return false
 	end
+	saving[player] = true
+	local applied = table.clone(profile.AppliedEquipmentTrades or {})
 	for attempt = 1, 3 do
 		local ok, err = pcall(store.UpdateAsync, store, "player_" .. player.UserId, function()
 			return profile
 		end)
 		if ok then
-			return
+			TradeJournal.checkpoint(player.UserId, applied)
+			saving[player] = nil
+			tradeReady[player] = true
+			return true
 		end
 		warn(("[PlayerData] Save attempt %d failed for %s: %s"):format(attempt, player.Name, tostring(err)))
 		task.wait(attempt)
 	end
+	saving[player] = nil
+	return false
 end
 
 -- Coins for coming back each day; the streak (up to a week) pays more.
@@ -289,6 +305,9 @@ local function load(player: Player)
 		return
 	end
 	profiles[player] = profile or newProfile()
+	if loaded and not TradeJournal.recover(player.UserId, profiles[player]) then
+		loaded = false
+	end
 	canSave[player] = loaded
 
 	local leaderstats = Instance.new("Folder")
@@ -310,7 +329,17 @@ local function load(player: Player)
 			PlayerData.setLoadout(player, only, class.Weapons[1].Id, class.Armors[1].Id)
 		end
 	end
+	Economy.migrate(profiles[player], Random.new())
+	local currentProfile = profiles[player]
+	local class = Classes.get(currentProfile.Character.Class)
+	if class then
+		GearRolls.grant(currentProfile, class, Random.new())
+	end
+	if loaded then
+		save(player)
+	end
 	sync(player)
+	characterChanged:Fire(player)
 	if not loaded then
 		Remotes.Notify:FireClient(player, "Progress won't be saved this session (data storage unavailable).")
 	end
@@ -325,6 +354,8 @@ function PlayerData.start()
 		save(player)
 		profiles[player] = nil
 		canSave[player] = nil
+		tradeLocks[player] = nil
+		tradeReady[player] = nil
 	end)
 	game:BindToClose(function()
 		local pending = 0
@@ -378,6 +409,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		FirstJoin = profile.FirstJoin,
 		WelcomeBought = profile.WelcomeBought,
 		ServerTime = os.time(),
+		CanRegenerateEquipment = TestAdmin.allowed(player.UserId),
 	}
 end
 
@@ -401,7 +433,10 @@ function PlayerData.setIntroFlag(player: Player, flag: string)
 end
 
 -- Sets class, weapon and armor (ids are checked by the caller).
-local SOCKET_KEYS = { Weapon = "WeaponGem", Armor = "ArmorGem" }
+local SOCKET_KEYS = {}
+for _, slot in Slots.Order do
+	SOCKET_KEYS[slot] = slot .. "Gem"
+end
 
 function PlayerData.setLoadout(player: Player, classId: string, weaponId: string, armorId: string)
 	local profile = profiles[player]
@@ -410,19 +445,32 @@ function PlayerData.setLoadout(player: Player, classId: string, weaponId: string
 	end
 	local character = profile.Character
 	if character.Class ~= classId then
-		-- Changing class puts socketed gems back in the pouch.
-		local sockets: { [string]: any } = character
-		for _, key in SOCKET_KEYS do
-			if sockets[key] then
-				table.insert(profile.Gems, sockets[key])
-				sockets[key] = nil
+		local returned = {}
+		for _, gems in character.ItemGems or {} do
+			for _, gem in gems do
+				if not returned[gem.Id] then
+					table.insert(profile.Gems, gem)
+					returned[gem.Id] = true
+				end
 			end
 		end
+		local sockets: { [string]: any } = character
+		for _, key in SOCKET_KEYS do
+			local gem = sockets[key]
+			if gem and not returned[gem.Id] then
+				table.insert(profile.Gems, gem)
+				returned[gem.Id] = true
+			end
+			sockets[key] = nil
+		end
+		character.ItemGems = {}
 	end
 	character.Class, character.Weapon, character.Armor = classId, weaponId, armorId
 	-- Picking gear in the intro gives you just those two pieces.
 	profile.Owned = { Weapons = { [weaponId] = 1 }, Armors = { [armorId] = 1 } }
 	character.WeaponQuality, character.ArmorQuality = 1, 1
+	Slots.initialize(profile)
+	GearRolls.grant(profile, Classes.get(classId), Random.new())
 	sync(player)
 	characterChanged:Fire(player)
 end
@@ -434,7 +482,7 @@ end
 function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem?
 	local profile = profiles[player]
 	local key = SOCKET_KEYS[slot or "Weapon"]
-	if not profile or not key or not profile.Character[if slot == "Armor" then "Armor" else "Weapon"] then
+	if not profile or not key or not profile.Character[slot or "Weapon"] then
 		return nil
 	end
 	local gem = PlayerData.findGem(player, gemId)
@@ -447,6 +495,8 @@ function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem
 		table.insert(profile.Gems, sockets[key])
 	end
 	sockets[key] = gem
+	local slotName = slot or "Weapon"
+	profile.Character.ItemGems[slotName][profile.Character[slotName]] = gem
 	sync(player)
 	characterChanged:Fire(player)
 	return gem
@@ -465,6 +515,7 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 		return nil
 	end
 	sockets[key] = nil
+	profile.Character.ItemGems[slot][profile.Character[slot]] = nil
 	table.insert(profile.Gems, gem)
 	sync(player)
 	characterChanged:Fire(player)
@@ -490,7 +541,7 @@ function PlayerData.setCosmetic(player: Player, kind: string, id: string?)
 	end
 end
 
-local GEAR_KEYS = { Weapons = "Weapon", Armors = "Armor" }
+local GEAR_KEYS = Slots.ByKind
 
 -- Wears a piece of gear you own ("Weapons" or "Armors", gear id).
 function PlayerData.equipGear(player: Player, kind: string, gearId: string): boolean
@@ -501,14 +552,20 @@ function PlayerData.equipGear(player: Player, kind: string, gearId: string): boo
 		return false
 	end
 	local character: { [string]: any } = profile.Character
+	character.ItemGems = character.ItemGems or {}
+	character.ItemGems[key] = character.ItemGems[key] or {}
+	if character[key] and character[key .. "Gem"] then
+		character.ItemGems[key][character[key]] = character[key .. "Gem"]
+	end
 	character[key] = gearId
+	character[key .. "Gem"] = character.ItemGems[key][gearId]
 	character[key .. "Quality"] = quality
 	sync(player)
 	characterChanged:Fire(player)
 	return true
 end
 
--- Records newly crafted gear, or an upgrade to gear you own.
+-- Records recovered equipment and its quality.
 function PlayerData.setGearQuality(player: Player, kind: string, gearId: string, quality: number)
 	local profile = profiles[player]
 	local key = GEAR_KEYS[kind]
@@ -516,6 +573,7 @@ function PlayerData.setGearQuality(player: Player, kind: string, gearId: string,
 		return
 	end
 	profile.Owned[kind][gearId] = quality
+	GearRolls.ensure(profile, Random.new())
 	local character: { [string]: any } = profile.Character
 	if character[key] == gearId then
 		character[key .. "Quality"] = quality
@@ -532,6 +590,20 @@ function PlayerData.milestone(player: Player, name: string)
 		sync(player)
 	end
 end
+
+function PlayerData.canTrade(player: Player): boolean
+	return canSave[player] == true and tradeReady[player] == true
+end
+function PlayerData.setTradeLocked(player: Player, locked: boolean)
+	tradeLocks[player] = if locked then true else nil
+end
+function PlayerData.isTradeLocked(player: Player): boolean
+	return tradeLocks[player] == true
+end
+function PlayerData.suspendSaving(player: Player)
+	canSave[player] = false
+end
+PlayerData.save = save
 
 function PlayerData.get(player: Player): Profile?
 	return profiles[player]
