@@ -364,6 +364,8 @@ local function makeTile(index: number, data): TileUi
 		Position = UDim2.fromOffset(col * (CELL + GAP), row * (CELL + GAP)),
 		Size = UDim2.fromOffset(CELL, CELL),
 	}, wallHolder)
+	-- The rocks have their own sounds.
+	button:SetAttribute("UiSound", "None")
 	-- The rock: a lumpy rounded boulder with a lighter top.
 	local rock = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),

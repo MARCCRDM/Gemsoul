@@ -2,6 +2,8 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
+local UiSound = require(script.Parent.UiSound)
+
 local UiKit = {}
 
 UiKit.Colors = {
@@ -137,6 +139,7 @@ local toastGui: ScreenGui? = nil
 local toastHolder: Frame? = nil
 
 function UiKit.toast(message: string, color: Color3?)
+	UiSound.play(if UiSound.isAlert(color) then "Error" else "Notify")
 	if not toastHolder then
 		toastGui = UiKit.gui("Toasts", 20)
 		local holder = Instance.new("Frame")

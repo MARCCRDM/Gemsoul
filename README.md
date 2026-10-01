@@ -168,6 +168,18 @@ Press **G** or the corner button to open your gem pouch. Coins, gems and quotas 
 
 Tunable numbers live in `src/shared/Config.luau` (quotas, prices, starting coins) and `src/shared/GemConfig.luau` (colour tiers, odds, cut difficulty, values).
 
+## Menu sounds
+
+Every button and window has sound: a soft tick on hover, a press sound on click, a brighter one for main actions, a lower one for Back and Close, a sweep when a window opens, and little jingles for coins, crafting, enchanting, equipping, rewards, notices and errors. The 14 sounds are in `assets/sounds` (`_preview_all.mp3` plays them all in turn).
+
+**One step for you.** Roblox only plays audio that has been uploaded to it, so until you do that the game plays quieter built-in Roblox sounds as stand-ins:
+
+1. In Creator Hub, open **Audio** and upload each `.mp3` from `assets/sounds` (Roblox may ask you to verify your account first).
+2. Copy each upload's id (the number in `rbxassetid://12345`).
+3. Paste the ids into `UiSound.Ids` in `src/client/Modules/UiSound.luau`. Any id left at `0` keeps its built-in stand-in.
+
+How it fits together: `UiSounds.client.luau` hooks hover and click on every button automatically. A button picks its own sound with the `UiSound` attribute (`"Confirm"`, `"Tab"`, `"Back"`, or `"None"` for silence; the Mine's rocks use `"None"`). `IronUi.window` plays open and close, `UiKit.toast` plays notices and errors, and `GemClient.request` plays the sound for a craft, enchant, sale, purchase or reward. `UiSound.Volume` (0 to 1) is the master volume. To change a sound, edit its recipe in `tools/make_sounds.py` (`pip install numpy soundfile`, then `python tools/make_sounds.py`) and upload the new file.
+
 ## Code layout
 
 ```

@@ -88,26 +88,18 @@ for i = 1, 42 do
 		Position = UDim2.fromScale(x, y),
 	}, backdrop)
 	if i % 7 == 0 then
-		new(
-			"Frame",
-			{
-				BackgroundColor3 = P.Teal,
-				BackgroundTransparency = 0.7,
-				Position = UDim2.fromOffset(-3, 1),
-				Size = UDim2.fromOffset(10, 2),
-			},
-			star
-		)
-		new(
-			"Frame",
-			{
-				BackgroundColor3 = P.Teal,
-				BackgroundTransparency = 0.7,
-				Position = UDim2.fromOffset(1, -3),
-				Size = UDim2.fromOffset(2, 10),
-			},
-			star
-		)
+		new("Frame", {
+			BackgroundColor3 = P.Teal,
+			BackgroundTransparency = 0.7,
+			Position = UDim2.fromOffset(-3, 1),
+			Size = UDim2.fromOffset(10, 2),
+		}, star)
+		new("Frame", {
+			BackgroundColor3 = P.Teal,
+			BackgroundTransparency = 0.7,
+			Position = UDim2.fromOffset(1, -3),
+			Size = UDim2.fromOffset(2, 10),
+		}, star)
 	end
 end
 -- Large atmospheric arcs frame the layout without competing with its text.

@@ -4,6 +4,7 @@ local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 
 local UiKit = require(script.Parent.UiKit)
+local UiSound = require(script.Parent.UiSound)
 
 local IronUi = {}
 
@@ -149,18 +150,14 @@ function IronUi.wordmark(parent: Instance): Frame
 	layer(0, 4, Color3.fromRGB(143, 43, 136))
 	layer(0, 2, Color3.fromRGB(213, 103, 52))
 	local face = layer(0, 0, Color3.new(1, 1, 1))
-	new(
-		"UIGradient",
-		{
-			Rotation = 90,
-			Color = ColorSequence.new({
-				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 247, 185)),
-				ColorSequenceKeypoint.new(0.48, P.Gold),
-				ColorSequenceKeypoint.new(1, Color3.fromRGB(229, 143, 44)),
-			}),
-		},
-		face
-	)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 247, 185)),
+			ColorSequenceKeypoint.new(0.48, P.Gold),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(229, 143, 44)),
+		}),
+	}, face)
 	return mark
 end
 
@@ -543,6 +540,9 @@ function IronUi.button(parent: Instance, label: string, primary: boolean, onClic
 		Stripes = if primary then "Thin" else "None",
 	})
 	IronUi.label(b, face, label, 15)
+	if primary then
+		b:SetAttribute("UiSound", "Confirm")
+	end
 	b.Activated:Connect(onClick)
 	return b
 end
@@ -558,6 +558,7 @@ function IronUi.gemButton(parent: Instance, label: string, color: Color3?, onCli
 		Dots = true,
 	})
 	IronUi.label(b, face, label, 19)
+	b:SetAttribute("UiSound", "Confirm")
 	b.Activated:Connect(onClick)
 	return b
 end
@@ -592,6 +593,7 @@ function IronUi.tabs(parent: Instance, entries: { { string } }, active: string, 
 			Dots = on,
 		})
 		tab.LayoutOrder = i
+		tab:SetAttribute("UiSound", "Tab")
 		local label = IronUi.label(tab, face, entry[2], 15)
 		if not on then
 			label.TextColor3 = Color3.fromRGB(196, 186, 220)
@@ -723,8 +725,10 @@ function IronUi.window(
 	-- Pop open (and fade the backdrop in) every time the window is shown.
 	gui:GetPropertyChangedSignal("Enabled"):Connect(function()
 		if not gui.Enabled then
+			UiSound.play("Close")
 			return
 		end
+		UiSound.play("Open")
 		fit()
 		popping = true
 		scale.Scale = target * 0.94
@@ -778,6 +782,7 @@ function IronUi.window(
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.new(1, -14, 0, 18)
 	close.ZIndex = 5
+	close:SetAttribute("UiSound", "Back")
 	IronUi.label(close, closeFace, "X", 18, IronUi.Chunky)
 
 	return {
