@@ -27,11 +27,15 @@ local BOLD = IronUi.Bold
 local new, text, box, actionButton, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
 
 local WIDTH, HEIGHT = 1000, 720
-local CELL, GAP, COLUMNS = 52, 6, 16
+local CELL, GAP, COLUMNS = 50, 6, 8
 
 local CharacterUI = {}
 
-type Selection = { Kind: "Gem", Gem: any } | { Kind: "Socket", Slot: string } | { Kind: "Gear", Slot: string }
+type Selection =
+	{ Kind: "Gem", Gem: any }
+	| { Kind: "Socket", Slot: string }
+	| { Kind: "Gear", Slot: string }
+	| { Kind: "Inventory", Slot: string, Id: string }
 local selection: Selection? = nil
 local atVey = false
 local suppressClickUntil = 0
@@ -331,9 +335,9 @@ UiKit.list(enchantList, 5)
 
 local invTitle = text(panel, "", 13, P.Dim, BOLD)
 invTitle.Position = UDim2.fromOffset(28, 516)
-invTitle.Size = UDim2.fromOffset(940, 18)
+invTitle.Size = UDim2.fromOffset(460, 18)
 
-local gridBox = box(panel, UDim2.fromOffset(24, 538), UDim2.fromOffset(952, 158), Color3.fromRGB(10, 9, 8))
+local gridBox = box(panel, UDim2.fromOffset(24, 538), UDim2.fromOffset(468, 158), Color3.fromRGB(10, 9, 8))
 local grid = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
@@ -349,6 +353,35 @@ new("UIGridLayout", {
 	CellPadding = UDim2.fromOffset(GAP, GAP),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, grid)
+
+-- Spare equipment uses the existing saved ownership records; worn items stay above.
+local equipmentTitle = text(panel, "EQUIPMENT INVENTORY", 13, P.Gold, BOLD)
+equipmentTitle.Position = UDim2.fromOffset(512, 516)
+equipmentTitle.Size = UDim2.fromOffset(460, 18)
+local equipmentBox = box(panel, UDim2.fromOffset(508, 538), UDim2.fromOffset(468, 158), P.Frame)
+local equipmentGrid = new("ScrollingFrame", {
+	Name = "StoredEquipment",
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(4, 4),
+	Size = UDim2.new(1, -8, 1, -8),
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 5,
+	ScrollBarImageColor3 = P.Edge,
+}, equipmentBox)
+new("UIGridLayout", {
+	CellSize = UDim2.fromOffset(106, 66),
+	CellPadding = UDim2.fromOffset(6, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, equipmentGrid)
+local equipmentEmpty =
+	text(equipmentBox, "No spare equipment yet.\nRecover loot in the Moon Mine or visit the Market.", 13, P.Dim)
+equipmentEmpty.Position = UDim2.fromOffset(20, 38)
+equipmentEmpty.Size = UDim2.new(1, -40, 0, 70)
+equipmentEmpty.AutomaticSize = Enum.AutomaticSize.None
+equipmentEmpty.TextXAlignment = Enum.TextXAlignment.Center
+equipmentEmpty.ZIndex = 3
 
 local tooltip = box(panel, UDim2.fromOffset(592, 82), UDim2.fromOffset(384, 244), P.Inset)
 local tooltipStroke = tooltip:FindFirstChildOfClass("UIStroke") :: UIStroke
@@ -465,7 +498,7 @@ local function gemLines(gem)
 end
 
 local function drawTooltip()
-	local showArt = selection ~= nil and selection.Kind ~= "Gear"
+	local showArt = selection ~= nil and (selection.Kind == "Gem" or selection.Kind == "Socket")
 	tipArt.Visible = showArt
 	tipBody.Position = UDim2.fromOffset(if showArt then 66 else 0, 0)
 	tipBody.Size = UDim2.new(1, if showArt then -66 else 0, 1, -72)
@@ -474,6 +507,59 @@ local function drawTooltip()
 	clear(tipArt)
 	tooltipStroke.Color = P.Edge
 	local hint = if atVey or Config.MenuOnly then "" else "  Sockets can be changed at Vey's Arcanum (east road)."
+
+	if selection and selection.Kind == "Inventory" then
+		local slotName, id = selection.Slot, selection.Id
+		local kind = Slots.Definitions[slotName].Kind
+		local profile = GemClient.Profile
+		local loadout = profile and profile.Character or {}
+		local quality = profile and profile.Owned and profile.Owned[kind] and profile.Owned[kind][id]
+		local gear = loadout.Class and Classes.gear(loadout.Class, kind, id)
+		if not quality or not gear then
+			text(tipBody, "ITEM UNAVAILABLE", 18, P.Dim, BOLD)
+			text(tipBody, "This item is no longer in your inventory.", 13, P.Dim)
+			return
+		end
+		local roll = GearRolls.get(loadout, slotName, id)
+		local rarity = GearRolls.Rarities[if roll then roll.Rarity else 1]
+		local gem = loadout.ItemGems and loadout.ItemGems[slotName] and loadout.ItemGems[slotName][id]
+		tooltipStroke.Color = rarity.Color
+		text(tipBody, Crafting.gearName(GemConfig.itemName(gear.Name, gem, slotName), quality), 17, rarity.Color, BOLD)
+		text(
+			tipBody,
+			rarity.Name .. " • " .. Slots.Definitions[slotName].Label .. " • " .. Crafting.Qualities[quality].Name,
+			12,
+			P.Dim
+		)
+		text(tipBody, gear.Passive.Name .. ": " .. gear.Passive.Text, 12, P.Gold)
+		if gem then
+			local name, effect = GemConfig.enchantment(gem, slotName)
+			text(tipBody, name .. ": " .. effect, 12, GemConfig.ElementColors[gem.Element])
+		else
+			text(tipBody, "Empty gem socket • Equip, then drag a gem onto it.", 12, P.Dim)
+		end
+		if loadout[slotName] == id then
+			text(tipActions, "EQUIPPED", 12, P.Gold, BOLD)
+		else
+			local candidate = table.clone(loadout)
+			candidate[slotName], candidate[slotName .. "Quality"], candidate[slotName .. "Gem"] = id, quality, gem
+			local before, after = Classes.ratings(loadout), Classes.ratings(candidate)
+			text(tipBody, "CHANGE IF EQUIPPED", 11, P.Dim, BOLD)
+			for _, stat in Classes.StatNames do
+				local delta = after[stat].Base + after[stat].Bonus - before[stat].Base - before[stat].Bonus
+				text(
+					tipBody,
+					string.format("%s  %+d", stat, delta),
+					12,
+					if delta > 0 then P.Good elseif delta < 0 then P.Bad else P.Dim
+				)
+			end
+			actionButton(tipActions, "EQUIP", true, function()
+				request("EquipGear", kind, id)
+			end)
+		end
+		return
+	end
 
 	if selection and selection.Kind == "Gear" then
 		local slotName = selection.Slot
@@ -947,7 +1033,7 @@ local function drawGrid(profile)
 	table.sort(gems, function(a, b)
 		return GemConfig.value(a) > GemConfig.value(b)
 	end)
-	invTitle.Text = string.format("GEM BACKPACK   %d / %d   |   %d COINS", #gems, Config.MaxGems, profile.Coins)
+	invTitle.Text = string.format("GEM BACKPACK   %d / %d", #gems, Config.MaxGems)
 	local ids = {}
 	for i, gem in gems do
 		ids[i] = gem.Id .. ":" .. tostring(gem.Cut)
@@ -1006,6 +1092,150 @@ local function drawGrid(profile)
 	task.defer(buildVisible)
 end
 
+-- Stored equipment data ---------------------------------------------------------------
+local function storedEquipment(profile)
+	local loadout = profile.Character or {}
+	local items = {}
+	for order, slotName in Slots.Order do
+		local kind = Slots.Definitions[slotName].Kind
+		for id, quality in (profile.Owned and profile.Owned[kind]) or {} do
+			local gear = loadout.Class and Classes.gear(loadout.Class, kind, id)
+			if gear and id ~= loadout[slotName] then
+				local roll = GearRolls.get(loadout, slotName, id)
+				table.insert(items, {
+					Id = id,
+					Slot = slotName,
+					Order = order,
+					Gear = gear,
+					Quality = quality,
+					Rarity = if roll then roll.Rarity else 1,
+					Gem = loadout.ItemGems and loadout.ItemGems[slotName] and loadout.ItemGems[slotName][id],
+				})
+			end
+		end
+	end
+	table.sort(items, function(a, b)
+		if a.Order ~= b.Order then
+			return a.Order < b.Order
+		end
+		if a.Rarity ~= b.Rarity then
+			return a.Rarity > b.Rarity
+		end
+		return a.Id < b.Id
+	end)
+	return items
+end
+
+-- Stored equipment drawing ------------------------------------------------------------
+-- Lightweight category silhouettes keep a large reserve bag cheap to render.
+local function equipmentIcon(parent, slotName, gear, color)
+	local icon = new(
+		"Frame",
+		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(5, 4), Size = UDim2.fromOffset(28, 26) },
+		parent
+	)
+	local function part(x, y, w, h, angle)
+		new(
+			"Frame",
+			{
+				BackgroundColor3 = color,
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(x, y),
+				Size = UDim2.fromOffset(w, h),
+				Rotation = angle or 0,
+			},
+			icon
+		)
+	end
+	if slotName == "Helmet" then
+		part(4, 3, 20, 19)
+		part(7, 22, 14, 3)
+		new(
+			"Frame",
+			{ BackgroundColor3 = P.Frame, Position = UDim2.fromOffset(7, 9), Size = UDim2.fromOffset(14, 6) },
+			icon
+		)
+	elseif slotName == "Armor" then
+		part(7, 7, 15, 17)
+		part(1, 4, 8, 9, 12)
+		part(21, 4, 7, 9, -12)
+	elseif slotName == "Gloves" then
+		part(7, 9, 14, 14)
+		part(7, 3, 4, 10)
+		part(13, 2, 4, 10)
+		part(19, 4, 3, 10)
+		part(2, 12, 6, 8, -20)
+	elseif slotName == "Boots" then
+		part(6, 3, 11, 17)
+		part(6, 18, 19, 7)
+	elseif slotName == "Shield" then
+		part(5, 3, 19, 14)
+		part(8, 13, 13, 11, 45)
+	elseif gear.Look == "FrontierSword" then
+		part(12, 0, 5, 18)
+		part(6, 17, 17, 3)
+		part(12, 20, 5, 6)
+	else
+		part(3, 6, 23, 8)
+		part(7, 13, 8, 12, 12)
+	end
+end
+
+local function drawEquipmentInventory(profile)
+	local items = storedEquipment(profile)
+	equipmentTitle.Text = string.format("EQUIPMENT INVENTORY   %d STORED", #items)
+	equipmentEmpty.Visible = #items == 0
+	local scrollPosition = equipmentGrid.CanvasPosition
+	clear(equipmentGrid)
+	for index, item in items do
+		local color = GearRolls.Rarities[item.Rarity].Color
+		local selected = selection
+			and selection.Kind == "Inventory"
+			and selection.Id == item.Id
+			and selection.Slot == item.Slot
+		local card = new(
+			"TextButton",
+			{ Text = "", AutoButtonColor = false, BackgroundColor3 = P.Slot, LayoutOrder = index },
+			equipmentGrid
+		)
+		UiKit.round(card, 3)
+		new(
+			"UIStroke",
+			{
+				Color = if selected then P.Gold else color,
+				Thickness = if selected then 2.5 else 1,
+				Transparency = if selected then 0 else 0.35,
+			},
+			card
+		)
+		equipmentIcon(card, item.Slot, item.Gear, color)
+		local category = text(card, string.upper(Slots.Definitions[item.Slot].Label), 8, color, BOLD)
+		category.Position = UDim2.fromOffset(37, 6)
+		category.Size = UDim2.fromOffset(65, 22)
+		category.AutomaticSize = Enum.AutomaticSize.None
+		local name = text(card, item.Gear.Name, 10, P.Text, BOLD)
+		name.Position = UDim2.fromOffset(5, 32)
+		name.Size = UDim2.fromOffset(96, 31)
+		name.AutomaticSize = Enum.AutomaticSize.None
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		if item.Gem then
+			local marker = text(card, "◆", 10, GemConfig.ElementColors[item.Gem.Element], BOLD)
+			marker.Position = UDim2.fromOffset(91, 19)
+			marker.Size = UDim2.fromOffset(12, 12)
+			marker.AutomaticSize = Enum.AutomaticSize.None
+		end
+		IronUi.highlight(card)
+		card.Activated:Connect(function()
+			if os.clock() < suppressClickUntil or (drag and drag.Active) then
+				return
+			end
+			selection = { Kind = "Inventory", Slot = item.Slot, Id = item.Id }
+			CharacterUI.refresh()
+		end)
+	end
+	equipmentGrid.CanvasPosition = scrollPosition
+end
+
 function CharacterUI.refresh()
 	local profile = GemClient.Profile
 	regenerate.Visible = profile ~= nil and profile.CanRegenerateEquipment == true
@@ -1041,6 +1271,7 @@ function CharacterUI.refresh()
 	end
 	drawStats(loadout, class)
 	drawGrid(profile)
+	drawEquipmentInventory(profile)
 	drawTooltip()
 end
 
