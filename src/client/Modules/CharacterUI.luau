@@ -1,18 +1,11 @@
 --[[
-	The character screen, Diablo style: your avatar in the middle with the
-	weapon and armor slots on either side, each with a gem socket beneath
-	it; stats and active enchantments below; and a grid inventory of every
-	gem on the right. Click a gem or a socket to inspect it in the tooltip
-	box; from there gems go into sockets and back out again. Click a gear
-	slot to swap to other gear you own (recovered or traded).
-
-	Opens with [C] or the HUD button. Talking to Vey at the Arcanum opens it
-	too; sockets can only be changed near Vey (the server checks).
+ Classic RPG armory: equipped item models surround a character silhouette,
+ a compact gemstone backpack sits beneath it, and an inspector handles
+ comparisons and attunement. Equipment and gem sockets are separate targets.
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
@@ -32,8 +25,8 @@ local P = IronUi.Colors
 local BOLD = IronUi.Bold
 local new, text, box, actionButton, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
 
-local WIDTH, HEIGHT = 1000, 620
-local CELL, GAP, COLUMNS = 52, 6, 8
+local WIDTH, HEIGHT = 1000, 720
+local CELL, GAP, COLUMNS = 52, 6, 16
 
 local CharacterUI = {}
 
@@ -47,25 +40,49 @@ local window = IronUi.window("Character", 8, WIDTH, HEIGHT, "🛡️")
 local gui, panel, scale, fit = window.Gui, window.Panel, window.Scale, window.Fit
 local title, subtitle = window.Title, window.Subtitle
 
--- Left: the paper doll -----------------------------------------------------------------
+-- Equipment board -----------------------------------------------------------------
 
 local doll = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(24, 76),
-	Size = UDim2.fromOffset(470, 330),
+	Position = UDim2.fromOffset(24, 82),
+	Size = UDim2.fromOffset(552, 416),
 }, panel)
 
 -- The gradient sits on a frame behind the viewport: on the viewport itself
 -- it would tint the avatar too.
 local avatarBack = new("Frame", {
 	BackgroundColor3 = Color3.new(1, 1, 1),
-	Position = UDim2.fromOffset(122, 0),
-	Size = UDim2.fromOffset(226, 330),
+	Position = UDim2.fromOffset(0, 0),
+	Size = UDim2.fromOffset(552, 416),
 }, doll)
-UiKit.round(avatarBack, 8)
+UiKit.round(avatarBack, 3)
 new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, avatarBack)
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(26, 98, 127), P.Frame) }, avatarBack)
-IronUi.orbit(avatarBack, P.Teal, 210)
+new(
+	"UIGradient",
+	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(35, 36, 43), Color3.fromRGB(12, 14, 22)) },
+	avatarBack
+)
+-- Engraved corners and sparse seams frame the equipment board.
+for _, corner in { Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1), Vector2.new(1, 1) } do
+	local cornerFrame = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = corner,
+		Position = UDim2.new(corner.X, if corner.X == 0 then 7 else -7, corner.Y, if corner.Y == 0 then 7 else -7),
+		Size = UDim2.fromOffset(22, 22),
+	}, avatarBack)
+	new("Frame", {
+		BackgroundColor3 = P.Gold,
+		BackgroundTransparency = 0.35,
+		Size = UDim2.fromOffset(22, 2),
+		Position = UDim2.fromScale(0, corner.Y),
+	}, cornerFrame)
+	new("Frame", {
+		BackgroundColor3 = P.Gold,
+		BackgroundTransparency = 0.35,
+		Size = UDim2.fromOffset(2, 22),
+		Position = UDim2.fromScale(corner.X, 0),
+	}, cornerFrame)
+end
 local avatar = new("ViewportFrame", {
 	BackgroundTransparency = 1,
 	Ambient = Color3.fromRGB(200, 196, 190),
@@ -76,8 +93,10 @@ local avatar = new("ViewportFrame", {
 local avatarWorld = new("WorldModel", {}, avatar)
 local avatarCamera = new("Camera", { FieldOfView = 30 }, avatar)
 avatar.CurrentCamera = avatarCamera
-avatarCamera.CFrame = CFrame.lookAt(Vector3.new(0, 1.2, -11), Vector3.new(0, 0.6, 0))
+avatarCamera.CFrame = CFrame.lookAt(Vector3.new(0, 1, -13.5), Vector3.new(0, 0.5, 0))
 local avatarModel: Model? = nil
+local equipmentSlots = {}
+local refreshItemArt: (() -> ())? = nil
 
 local function refreshAvatar()
 	local character = player.Character
@@ -95,6 +114,8 @@ local function refreshAvatar()
 			d:Destroy()
 		elseif d:IsA("BasePart") then
 			d.Anchored = true
+			d.Transparency = math.max(d.Transparency, 0.78)
+			d.Color = Color3.fromRGB(63, 71, 85)
 		end
 	end
 	local humanoid = copy:FindFirstChildOfClass("Humanoid")
@@ -107,11 +128,15 @@ local function refreshAvatar()
 	avatarModel = copy
 	copy:PivotTo(CFrame.new())
 	copy.Parent = avatarWorld
+	if refreshItemArt then
+		refreshItemArt()
+	end
 end
 
 -- An equipment slot (a tall bevelled box) with its gem socket beneath.
 type Slot = {
 	Box: Frame,
+	Art: ViewportFrame,
 	Name: TextLabel,
 	Style: TextLabel,
 	Bonus: TextLabel,
@@ -122,20 +147,28 @@ type Slot = {
 local function slot(x: number, y: number, label: string, socketName: string): Slot
 	local holder = new(
 		"Frame",
-		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(110, 102) },
+		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(112, 128) },
 		doll
 	)
 	local head = text(holder, label, 11, P.Dim, BOLD)
 	head.TextXAlignment = Enum.TextXAlignment.Center
-	local item = box(holder, UDim2.fromOffset(0, 18), UDim2.fromOffset(110, 58), P.Slot)
-	local name = text(item, "", 12, P.Text, BOLD)
-	name.Position = UDim2.fromOffset(5, 4)
-	name.Size = UDim2.fromOffset(100, 32)
+	local item = box(holder, UDim2.fromOffset(0, 16), UDim2.fromOffset(112, 88), Color3.fromRGB(30, 22, 30), 2)
+	local art = new("ViewportFrame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(5, 4),
+		Size = UDim2.fromOffset(102, 52),
+		Ambient = Color3.fromRGB(185, 190, 210),
+		LightColor = Color3.fromRGB(255, 235, 201),
+		LightDirection = Vector3.new(-0.4, -1, -0.6),
+	}, item)
+	local name = text(item, "", 10, P.Text, BOLD)
+	name.Position = UDim2.fromOffset(5, 56)
+	name.Size = UDim2.fromOffset(102, 22)
 	name.AutomaticSize = Enum.AutomaticSize.None
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	local style = text(item, "", 9, P.Dim)
-	style.Position = UDim2.fromOffset(5, 39)
-	style.Size = UDim2.fromOffset(100, 14)
+	style.Position = UDim2.fromOffset(5, 76)
+	style.Size = UDim2.fromOffset(102, 11)
 	style.AutomaticSize = Enum.AutomaticSize.None
 	style.TextXAlignment = Enum.TextXAlignment.Center
 	local bonus = text(item, "", 10, P.Dim)
@@ -143,8 +176,8 @@ local function slot(x: number, y: number, label: string, socketName: string): Sl
 	local hit = new("TextButton", {
 		Text = "",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 18),
-		Size = UDim2.fromOffset(110, 58),
+		Position = UDim2.fromOffset(0, 16),
+		Size = UDim2.fromOffset(112, 88),
 		ZIndex = 5,
 	}, holder)
 	IronUi.highlight(hit, item)
@@ -156,14 +189,14 @@ local function slot(x: number, y: number, label: string, socketName: string): Sl
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = P.Frame,
-		Position = UDim2.fromOffset(0, 80),
+		Position = UDim2.fromOffset(0, 106),
 		Size = UDim2.fromOffset(22, 22),
 	}, holder)
 	UiKit.round(socket, 5)
 	new("UIStroke", { Name = "Ring", Color = P.Edge, Thickness = 1 }, socket)
 	IronUi.highlight(socket)
 	local caption = text(holder, "", 9, P.Dim)
-	caption.Position = UDim2.fromOffset(28, 83)
+	caption.Position = UDim2.fromOffset(28, 109)
 	caption.Size = UDim2.fromOffset(82, 16)
 	caption.AutomaticSize = Enum.AutomaticSize.None
 	caption.TextTruncate = Enum.TextTruncate.AtEnd
@@ -171,18 +204,82 @@ local function slot(x: number, y: number, label: string, socketName: string): Sl
 		selection = { Kind = "Socket", Slot = socketName }
 		CharacterUI.refresh()
 	end)
-	return { Box = item, Name = name, Style = style, Bonus = bonus, Socket = socket, Caption = caption }
+	return { Box = item, Art = art, Name = name, Style = style, Bonus = bonus, Socket = socket, Caption = caption }
 end
-local equipmentSlots = {}
-for i, key in { "Helmet", "Armor", "Gloves", "Weapon", "Shield", "Boots" } do
-	local x = if i <= 3 then 0 else 360
-	local y = ((i - 1) % 3) * 110
-	equipmentSlots[key] = slot(x, y, string.upper(Slots.Definitions[key].Label), key)
+-- Physical equipment placement follows the silhouette, like a classic RPG paper doll.
+local slotPositions = {
+	Helmet = Vector2.new(220, 8),
+	Armor = Vector2.new(220, 142),
+	Boots = Vector2.new(220, 276),
+	Weapon = Vector2.new(28, 82),
+	Gloves = Vector2.new(28, 250),
+	Shield = Vector2.new(412, 82),
+}
+for _, key in Slots.Order do
+	local at = slotPositions[key]
+	equipmentSlots[key] = slot(at.X, at.Y, string.upper(Slots.Definitions[key].Label), key)
+end
+local boardHint = text(doll, "SELECT GEAR\nTO COMPARE", 10, P.Dim, BOLD)
+boardHint.Position = UDim2.fromOffset(411, 285)
+boardHint.Size = UDim2.fromOffset(112, 46)
+boardHint.TextXAlignment = Enum.TextXAlignment.Center
+boardHint.AutomaticSize = Enum.AutomaticSize.None
+
+refreshItemArt = function()
+	local character = player.Character
+	local equipment = character and character:FindFirstChild("GemsoulGear")
+	if not character or not equipment then
+		return
+	end
+	for key, ui in equipmentSlots do
+		ui.Art:ClearAllChildren()
+		local source = equipment:FindFirstChild(key)
+		if source then
+			local world = new("WorldModel", {}, ui.Art)
+			local model = new("Model", {}, world)
+			for _, part in source:GetDescendants() do
+				if not part:IsA("BasePart") or part.Transparency >= 1 then
+					continue
+				end
+				local weld = part:FindFirstChildOfClass("WeldConstraint")
+				local anchor = weld and weld.Part0
+				local anchorName = anchor and anchor.Name or ""
+				-- Show one glove/boot and just the chest assembly, keeping thumbnails readable.
+				if (key == "Gloves" or key == "Boots") and string.find(anchorName, "Right") then
+					continue
+				end
+				if key == "Armor" and (string.find(anchorName, "Arm") or string.find(anchorName, "Leg")) then
+					continue
+				end
+				local clone = part:Clone()
+				for _, child in clone:GetChildren() do
+					child:Destroy()
+				end
+				clone.Anchored = true
+				clone.CFrame = character:GetPivot():ToObjectSpace(part.CFrame)
+				clone.Parent = model
+			end
+			if #model:GetChildren() > 0 then
+				local frame, size = model:GetBoundingBox()
+				local camera = new("Camera", { FieldOfView = 30 }, ui.Art)
+				local direction = if key == "Shield"
+					then Vector3.new(1, 0.15, -0.1).Unit
+					else Vector3.new(0.22, 0.1, -1).Unit
+				local distance = math.max(size.X, size.Y, size.Z) * 2.3 + 0.2
+				camera.CFrame = CFrame.lookAt(frame.Position + direction * distance, frame.Position)
+				ui.Art.CurrentCamera = camera
+			end
+		end
+	end
 end
 
-local statsBox = box(panel, UDim2.fromOffset(24, 420), UDim2.fromOffset(470, 176), P.Inset)
+local statsBox = box(panel, UDim2.fromOffset(592, 340), UDim2.fromOffset(384, 158), P.Inset)
 UiKit.pad(statsBox, 12)
-local statsList = new("Frame", {
+local statsList = new("ScrollingFrame", {
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 2,
+	BorderSizePixel = 0,
 	BackgroundTransparency = 1,
 	Size = UDim2.new(0.42, 0, 1, 0),
 }, statsBox)
@@ -198,13 +295,13 @@ local enchantList = new("ScrollingFrame", {
 }, statsBox)
 UiKit.list(enchantList, 5)
 
--- Right: inventory grid and tooltip ------------------------------------------------------
+-- Backpack and inspector ------------------------------------------------------
 
 local invTitle = text(panel, "", 13, P.Dim, BOLD)
-invTitle.Position = UDim2.fromOffset(510, 76)
-invTitle.Size = UDim2.fromOffset(466, 18)
+invTitle.Position = UDim2.fromOffset(28, 516)
+invTitle.Size = UDim2.fromOffset(940, 18)
 
-local gridBox = box(panel, UDim2.fromOffset(506, 98), UDim2.fromOffset(470, 256), Color3.fromRGB(10, 9, 8))
+local gridBox = box(panel, UDim2.fromOffset(24, 538), UDim2.fromOffset(952, 158), Color3.fromRGB(10, 9, 8))
 local grid = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
@@ -221,18 +318,18 @@ new("UIGridLayout", {
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, grid)
 
-local tooltip = box(panel, UDim2.fromOffset(506, 366), UDim2.fromOffset(470, 230), P.Inset)
+local tooltip = box(panel, UDim2.fromOffset(592, 82), UDim2.fromOffset(384, 244), P.Inset)
 local tooltipStroke = tooltip:FindFirstChildOfClass("UIStroke") :: UIStroke
 UiKit.pad(tooltip, 12)
-local tipArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(96, 96) }, tooltip)
+local tipArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(58, 58) }, tooltip)
 local tipBody = new("ScrollingFrame", {
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollBarThickness = 3,
 	BorderSizePixel = 0,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(106, 0),
-	Size = UDim2.new(1, -106, 1, -72),
+	Position = UDim2.fromOffset(66, 0),
+	Size = UDim2.new(1, -66, 1, -72),
 }, tooltip)
 UiKit.list(tipBody, 3)
 local tipActions = new("Frame", {
@@ -326,11 +423,15 @@ local function gemLines(gem)
 end
 
 local function drawTooltip()
+	local showArt = selection ~= nil and selection.Kind ~= "Gear"
+	tipArt.Visible = showArt
+	tipBody.Position = UDim2.fromOffset(if showArt then 66 else 0, 0)
+	tipBody.Size = UDim2.new(1, if showArt then -66 else 0, 1, -72)
 	clear(tipBody)
 	clear(tipActions)
 	clear(tipArt)
 	tooltipStroke.Color = P.Edge
-	local hint = if atVey then "" else "  Sockets can be changed at Vey's Arcanum (east road)."
+	local hint = if atVey or Config.MenuOnly then "" else "  Sockets can be changed at Vey's Arcanum (east road)."
 
 	if selection and selection.Kind == "Gear" then
 		local slotName = selection.Slot
@@ -473,8 +574,12 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 	ui.Bonus.Text = if gem then (string.gsub(bonusText(gem, slotName), "  ", "\n")) else ""
 	ui.Bonus.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Dim
 	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
-	stroke.Color = if gem then GemConfig.ElementColors[gem.Element] elseif class then class.Color else P.Edge
-	stroke.Thickness = if gem then 2.5 else 1.5
+	stroke.Color = if roll then GearRolls.Rarities[roll.Rarity].Color elseif class then class.Color else P.Edge
+	local selectedGear = selection ~= nil and selection.Kind == "Gear" and selection.Slot == slotName
+	if selectedGear then
+		stroke.Color = P.Gold
+	end
+	stroke.Thickness = if selectedGear or gem then 2.5 else 1.5
 	local ring = ui.Socket:FindFirstChild("Ring") :: UIStroke
 	local shown = if gem then gem.Id else ""
 	local redraw = ui.Shown ~= shown
@@ -615,7 +720,7 @@ local function drawGrid(profile)
 	table.sort(gems, function(a, b)
 		return GemConfig.value(a) > GemConfig.value(b)
 	end)
-	invTitle.Text = string.format("STONE RESERVE   %d / %d   |   %d COINS", #gems, Config.MaxGems, profile.Coins)
+	invTitle.Text = string.format("GEM BACKPACK   %d / %d   |   %d COINS", #gems, Config.MaxGems, profile.Coins)
 	local ids = {}
 	for i, gem in gems do
 		ids[i] = gem.Id .. ":" .. tostring(gem.Cut)
@@ -630,7 +735,7 @@ local function drawGrid(profile)
 	table.clear(pending)
 	table.clear(cellsById)
 	-- Empty cells fill out the grid so it always reads as a bag.
-	local cells = math.max(#gems, COLUMNS * 4)
+	local cells = math.max(#gems, COLUMNS * 3)
 	cells = math.ceil(cells / COLUMNS) * COLUMNS
 	for i = 1, cells do
 		local gem = gems[i]
@@ -640,13 +745,16 @@ local function drawGrid(profile)
 			BackgroundColor3 = P.Slot,
 			LayoutOrder = i,
 		}, grid)
-		UiKit.round(cell, 4)
+		UiKit.round(cell, 1)
 		local stroke = new("UIStroke", {
 			Color = Color3.fromRGB(44, 38, 30),
 			Thickness = 1.2,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}, cell)
 		if gem then
+			local grade = text(cell, "Q" .. tostring(gem.Cut or 0), 9, P.Gold, BOLD)
+			grade.Position = UDim2.fromOffset(3, CELL - 13)
+			grade.ZIndex = 3
 			if not gem.Cut then
 				local rough = text(cell, "R", 10, P.Dim, BOLD)
 				rough.Position = UDim2.fromOffset(4, 2)
@@ -756,12 +864,6 @@ if player.Character then
 	watchCharacter(player.Character)
 end
 player.CharacterAdded:Connect(watchCharacter)
-
-RunService.RenderStepped:Connect(function()
-	if avatarModel and gui.Enabled then
-		avatarModel:PivotTo(CFrame.Angles(0, math.sin(os.clock() * 0.5) * 0.6, 0))
-	end
-end)
 
 ContextActionService:BindAction("GemsoulCharacter", function(_, state)
 	-- Not while the new-player intro is still open.
