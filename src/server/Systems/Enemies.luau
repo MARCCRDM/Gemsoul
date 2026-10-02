@@ -104,7 +104,15 @@ local CAMPS = {
 local LEASH = 70 -- studs from home before a monster gives up and walks back
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 
-export type Dot = { PerTick: number, Ticks: number, Source: Player?, Color: Color3 }
+export type Dot = {
+	PerTick: number,
+	Ticks: number,
+	Source: Player?,
+	Color: Color3,
+	Key: string?, -- a keyed dot refreshes instead of stacking (gem burns)
+	Every: number?, -- tick every N half-second cycles
+	Wait: number?,
+}
 export type Enemy = {
 	Model: Model,
 	Kind: Kind,
@@ -126,6 +134,10 @@ export type Enemy = {
 	Sunder: number, -- extra damage taken, as a fraction
 	WeakenUntil: number,
 	Weaken: number,
+	VulnerableUntil: number,
+	Vulnerable: number, -- extra damage taken from Corrosive vulnerability
+	AuraUntil: number,
+	Aura: number, -- extra damage taken inside a Corrosive aura
 	TauntUntil: number,
 	Taunter: Player?,
 	Dots: { Dot },
@@ -391,6 +403,10 @@ local function spawn(kindId: string, home: Vector3, facing: Vector3?)
 		Sunder = 0,
 		WeakenUntil = 0,
 		Weaken = 0,
+		VulnerableUntil = 0,
+		Vulnerable = 0,
+		AuraUntil = 0,
+		Aura = 0,
 		TauntUntil = 0,
 		Taunter = nil,
 		Dots = {},
@@ -461,7 +477,7 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	if not enemy.Alive or amount <= 0 then
 		return
 	end
-	amount = math.floor(amount * (1 + (if os.clock() < enemy.SunderUntil then enemy.Sunder else 0)) + 0.5)
+	amount = math.floor(amount * (1 + Enemies.exposure(enemy)) + 0.5)
 	local humanoid = enemy.Humanoid
 	enemy.LastHit = os.clock()
 	if source then
@@ -484,7 +500,16 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	end
 end
 
--- Stun, Slow (fraction), Sunder (fraction, stacks to 3x), Weaken (fraction).
+-- Extra damage taken right now: Sunder/armor shred, Vulnerable and Corrosive auras.
+function Enemies.exposure(enemy: Enemy): number
+	local now = os.clock()
+	return (if now < enemy.SunderUntil then enemy.Sunder else 0)
+		+ (if now < enemy.VulnerableUntil then enemy.Vulnerable else 0)
+		+ (if now < enemy.AuraUntil then enemy.Aura else 0)
+end
+
+-- Stun, Slow (fraction), Sunder (fraction, stacks to 3x), Weaken (fraction),
+-- Vulnerable and Aura (fractions; the strongest applies, they don't stack).
 function Enemies.addStatus(enemy: Enemy, status: string, amount: number, seconds: number)
 	local now = os.clock()
 	if status == "Stun" then
@@ -496,6 +521,11 @@ function Enemies.addStatus(enemy: Enemy, status: string, amount: number, seconds
 		local current = if now < enemy.SunderUntil then enemy.Sunder else 0
 		enemy.Sunder = math.min(amount * 3, current + amount)
 		enemy.SunderUntil = now + seconds
+	elseif status == "Vulnerable" or status == "Aura" then
+		local untilKey = status .. "Until"
+		local e = enemy :: any
+		e[status] = math.max(if now < e[untilKey] then e[status] else 0, amount)
+		e[untilKey] = math.max(e[untilKey], now + seconds)
 	elseif status == "Weaken" then
 		enemy.Weaken = math.max(if now < enemy.WeakenUntil then enemy.Weaken else 0, amount)
 		enemy.WeakenUntil = now + seconds
@@ -506,6 +536,23 @@ end
 function Enemies.addDot(enemy: Enemy, total: number, seconds: number, source: Player?, color: Color3)
 	local ticks = math.max(1, math.floor(seconds / 0.5))
 	table.insert(enemy.Dots, { PerTick = total / ticks, Ticks = ticks, Source = source, Color = color })
+end
+
+-- A gem burn: `perTick` every second for `seconds`. A new hit refreshes the
+-- caster's burn (latest strength, longest time) rather than stacking another.
+function Enemies.setBurn(enemy: Enemy, perTick: number, seconds: number, source: Player?, color: Color3)
+	local ticks = math.max(1, math.ceil(seconds - 1e-6))
+	for _, dot in enemy.Dots do
+		if dot.Key == "GemBurn" and dot.Source == source then
+			dot.PerTick = perTick
+			dot.Ticks = math.max(dot.Ticks, ticks)
+			return
+		end
+	end
+	table.insert(
+		enemy.Dots,
+		{ Key = "GemBurn", PerTick = perTick, Ticks = ticks, Every = 2, Wait = 0, Source = source, Color = color }
+	)
 end
 
 function Enemies.taunt(enemy: Enemy, player: Player, seconds: number)
@@ -601,10 +648,14 @@ end
 local function tickDots(enemy: Enemy)
 	for i = #enemy.Dots, 1, -1 do
 		local dot = enemy.Dots[i]
-		dot.Ticks -= 1
-		Enemies.damage(enemy, dot.PerTick, dot.Source, false, dot.Color)
-		if dot.Ticks <= 0 then
-			table.remove(enemy.Dots, i)
+		dot.Wait = (dot.Wait or 0) + 1
+		if dot.Wait >= (dot.Every or 1) then
+			dot.Wait = 0
+			dot.Ticks -= 1
+			Enemies.damage(enemy, dot.PerTick, dot.Source, false, dot.Color)
+			if dot.Ticks <= 0 then
+				table.remove(enemy.Dots, i)
+			end
 		end
 		if not enemy.Alive then
 			return

@@ -566,7 +566,13 @@ local function gemPopup(loot)
 	local stats = text(
 		card,
 		if gem
-			then string.format("Size %d  •  Clarity %d  •  💰 %d", gem.Size, gem.Clarity, GemConfig.value(gem))
+			then string.format(
+				"Size %d  •  Clarity %d  •  Cut %d  •  💰 %d",
+				gem.Size,
+				gem.Clarity,
+				gem.Cut or 0,
+				GemConfig.value(gem)
+			)
 			else "",
 		15,
 		Color3.fromRGB(240, 235, 250),

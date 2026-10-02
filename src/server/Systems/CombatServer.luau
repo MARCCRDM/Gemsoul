@@ -8,6 +8,7 @@ local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local Enemies = require(script.Parent.Enemies)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
@@ -84,6 +85,7 @@ local function canPvP(source, target)
 	if not a or not b then
 		return false
 	end
+	if source.Character:FindFirstChildOfClass("ForceField") then return false end
 	local sameTeam = source.Team ~= nil and source.Team == target.Team and not source.Neutral and not target.Neutral
 	return Actions.canPvP(
 		source,
@@ -183,7 +185,7 @@ local function rawDamage(target, amount, source, crit, color)
 		Enemies.damage(target.Enemy, amount, source, crit, color)
 	end
 end
-receive = function(player, amount, element, source, origin, projectile, heavy, reflected, enemySource)
+receive = function(player, amount, element, source, origin, projectile, heavy, reflected, enemySource, crit)
 	local humanoid, root = alive(player)
 	local k = kit(player)
 	if not humanoid or not root or not k or amount <= 0 or not Combat.canFight(root.Position) then
@@ -245,7 +247,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 			{ Player = player, Humanoid = humanoid, Root = root },
 			damage,
 			source,
-			false,
+			crit == true,
 			GemConfig.ElementColors[element] or WHITE
 		)
 	end
@@ -330,7 +332,7 @@ local function strike(source, k, st, target, heavy, projectile)
 	local gem = k.Loadout.WeaponGem
 	local element = gem and gem.Element
 	if target.Player then
-		damage = receive(target.Player, damage, element, source, root.Position, projectile, heavy, false)
+		damage = receive(target.Player, damage, element, source, root.Position, projectile, heavy, false, nil, crit)
 	else
 		Enemies.damage(
 			target.Enemy,

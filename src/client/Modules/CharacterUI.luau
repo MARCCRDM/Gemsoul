@@ -472,15 +472,23 @@ regenerateGems.Position = UDim2.fromOffset(720, 14)
 regenerateGems.Size = UDim2.fromOffset(180, 40)
 regenerateGems.Visible = false
 
-local function bonusText(gem, slotName: string): string
-	local parts = {}
-	local bonuses = GemConfig.statBonuses(gem, slotName)
-	for _, stat in Classes.StatNames do
-		if bonuses[stat] then
-			table.insert(parts, string.format("+%d %s", bonuses[stat], stat))
-		end
+-- Elemental affinities from the armor you're wearing boost your gems.
+local function wornAffinities(): { [string]: number }
+	local profile = GemClient.Profile
+	return if profile and profile.Character then Classes.affinities(profile.Character) else {}
+end
+
+-- A gem's concrete effects in one slot, each tagged with the grade behind it:
+-- "+12 Thermal damage per tick (Size 8)".
+local function effectRows(parent: Instance, gem, slotName: string, color: Color3, affinity)
+	for _, line in GemConfig.lines(gem, slotName, { Affinity = affinity }) do
+		local tag = if line.Metric then string.format("  (%s %d)", line.Metric, line.Grade or 0) else ""
+		local row = text(parent, line.Text .. tag, 12, P.Text)
+		row.TextColor3 = if line.Metric == "Size"
+			then P.Text
+			elseif line.Metric == "Clarity" then P.Text:Lerp(P.Teal, 0.35)
+			else P.Text:Lerp(color, 0.35)
 	end
-	return table.concat(parts, "  ")
 end
 
 local gemViewAngles = { Id = "", Spin = 0.6, Tilt = 0 }
@@ -538,7 +546,7 @@ local function gemLines(gem)
 		Position = UDim2.fromOffset(166, 0),
 		Size = UDim2.new(1, -166, 0, 166),
 	}, hero)
-	local gemNameLabel = text(info, GemConfig.shade(gem).Name, 18, tierColor, BOLD)
+	local gemNameLabel = text(info, GemConfig.title(gem), 18, tierColor, BOLD)
 	gemNameLabel.AutomaticSize = Enum.AutomaticSize.None
 	gemNameLabel.Size = UDim2.new(1, 0, 0, 42)
 	gemNameLabel.TextYAlignment = Enum.TextYAlignment.Top
@@ -558,9 +566,9 @@ local function gemLines(gem)
 	badge.Position = UDim2.fromOffset(0, 43)
 	badge.Size = UDim2.new(1, 0, 0, 24)
 	badge.TextSize = 10
-	gemMetric(info, "SIZE", gem.Size, tierColor, 68)
-	gemMetric(info, "CLARITY", gem.Clarity, P.Teal, 100)
-	gemMetric(info, "CUT", gem.Cut, P.Gold, 132)
+	gemMetric(info, "SIZE  ·  MAGNITUDE", gem.Size, tierColor, 68)
+	gemMetric(info, "CLARITY  ·  DURATION", gem.Clarity, P.Teal, 100)
+	gemMetric(info, "CUT  ·  PRECISION", gem.Cut, P.Gold, 132)
 	local controls = new("Frame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(0, 174),
@@ -594,15 +602,30 @@ local function gemLines(gem)
 	end
 	text(
 		tipBody,
-		string.format("%s   |   Potency %d   |   %d coins", state, GemConfig.potency(gem), GemConfig.value(gem)),
+		string.format("%s   |   %s   |   Sells for %d coins", state, GemConfig.shade(gem).Name, GemConfig.value(gem)),
 		12,
 		P.Text
 	)
-	for _, slotName in Slots.Order do
-		local name, effect = GemConfig.enchantment(gem, slotName)
-		local heading = text(tipBody, string.format("IN %s: %s", string.upper(slotName), name), 12, P.Gold, BOLD)
-		heading.TextColor3 = GemConfig.ElementColors[gem.Element]
-		text(tipBody, string.format("%s.  %s", effect, bonusText(gem, slotName)), 12, P.Dim)
+	local color = GemConfig.ElementColors[gem.Element]
+	local affinity = wornAffinities()
+	for _, section in { { "Weapon", "IN A WEAPON" }, { "Armor", "IN ARMOR OR SHIELD" } } do
+		local name = GemConfig.enchantment(gem, section[1])
+		text(tipBody, string.format("%s  ·  %s", section[2], string.upper(name)), 12, color, BOLD)
+		effectRows(tipBody, gem, section[1], color, affinity)
+		if section[1] == "Weapon" then
+			-- PvP tag: the reduced numbers a player target feels.
+			local pvp = {}
+			for _, line in GemConfig.lines(gem, "Weapon", { Affinity = affinity, PvP = true }) do
+				table.insert(pvp, line.Text)
+			end
+			text(tipBody, "PVP  ·  " .. table.concat(pvp, "  ·  "), 11, P.Dim)
+		end
+	end
+	for id, bonus in affinity do
+		local affix = GemConfig.AffixById[id]
+		if affix and affix.Element == gem.Element then
+			text(tipBody, "Boosted by your armor  ·  " .. GemConfig.affixText(id, bonus), 12, color)
+		end
 	end
 	tooltipStroke.Color = tierColor
 end
@@ -738,6 +761,14 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		)
 	end
 
+	-- Elemental affinities this piece rolled, in their element's colour.
+	for _, affix in roll and roll.Affixes or {} do
+		local def = GemConfig.AffixById[affix.Id]
+		if def then
+			text(tipBody, GemConfig.affixText(affix.Id, affix.Bonus), 13, GemConfig.ElementColors[def.Element], BOLD)
+		end
+	end
+
 	-- The socket: the gem and what it adds, or an invitation to fill it.
 	local socket = new("Frame", {
 		BackgroundColor3 = P.Frame,
@@ -761,7 +792,7 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		title.Position = UDim2.fromOffset(54, 5)
 		title.Size = UDim2.new(1, -60, 0, 16)
 		title.TextTruncate = Enum.TextTruncate.AtEnd
-		local adds = text(socket, bonusText(gem, slotName) .. "   " .. effect, 12, P.Text)
+		local adds = text(socket, effect, 12, P.Text)
 		adds.AutomaticSize = Enum.AutomaticSize.None
 		adds.Position = UDim2.fromOffset(54, 23)
 		adds.Size = UDim2.new(1, -60, 0, 24)
@@ -791,6 +822,9 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		hint.Position = UDim2.fromOffset(54, 25)
 		hint.Size = UDim2.new(1, -60, 0, 16)
 		hint.TextTruncate = Enum.TextTruncate.AtEnd
+	end
+	if gem then
+		effectRows(tipBody, gem, slotName, gemColor, wornAffinities())
 	end
 	if gear.ArmorFamily then
 		local state = Classes.setState(GemClient.Profile.Character).Active[gear.ArmorFamily]
@@ -1030,7 +1064,9 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 		then string.upper(GearRolls.Rarities[roll.Rarity].Name)
 		else (if gear then string.upper(gear.Style) else "")
 	ui.Style.TextColor3 = if roll then GearRolls.Rarities[roll.Rarity].Color else Crafting.Qualities[quality or 1].Color
-	ui.Bonus.Text = if gem then (string.gsub(bonusText(gem, slotName), "  ", "\n")) else ""
+	-- The gem's headline effect (its Size line), e.g. "Heat Shield absorbs 16 damage".
+	local headline = gem and GemConfig.lines(gem, slotName, { Affinity = wornAffinities() })[1]
+	ui.Bonus.Text = if headline then headline.Text else ""
 	ui.Bonus.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Dim
 	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
 	stroke.Color = if roll then GearRolls.Rarities[roll.Rarity].Color elseif class then class.Color else P.Edge

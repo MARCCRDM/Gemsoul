@@ -110,7 +110,7 @@ local Vendors: { [string]: Vendor } = {
 			{ Text = "Enchant my gear", Action = "Enchant" },
 			{
 				Text = "Which gems make the strongest enchantments?",
-				Reply = "Big ones. Size decides most of a gem's potency, then clarity and cut. Thermal, Cryo, Ion and Radiation each grant their own power.",
+				Reply = "Depends what you need. Size is how hard it hits, Clarity is how long it lasts, Cut is how often it triggers. Thermal burns, Cryo slows, Corrosive shreds armor and Ion arcs and executes.",
 			},
 		},
 	},

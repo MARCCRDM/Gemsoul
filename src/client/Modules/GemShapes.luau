@@ -7,7 +7,8 @@
 	           have rainbow facets
 	  Size     overall scale (grade 10 is about twice grade 1)
 	  Clarity  how see-through the stone is, plus dark inclusions and a
-	           milky cloud inside low-clarity stones
+	           milky cloud inside low-clarity stones; clear stones (7+)
+	           glow from a core that brightens with clarity
 	  Cut      rough stones are water-worn pebbles shaped by their id; cut
 	           stones are round brilliants whose symmetry, proportions and
 	           facet count improve with the cut grade, sparkling at 9-10
@@ -17,7 +18,7 @@
 	    Triangles = { { A, B, C: Vector3, Color: Color3 } },
 	    Transparency = number,     -- for every facet
 	    Material = "Glass" | "SmoothPlastic",
-	    Specks = { { Position: Vector3, Radius: number, Color: Color3, Transparency: number } },
+	    Specks = { { Position: Vector3, Radius: number, Color: Color3, Transparency: number, Glow: boolean? } },
 	    Sparkles = { Vector3 },    -- points that get a small glint
 	    Radius = number,           -- bounding radius, for framing a camera
 	  }
@@ -59,7 +60,7 @@ local function colorer(shade)
 	if shade.Prismatic then
 		return function(centroid: Vector3): Color3
 			local hue = (math.atan2(centroid.Z, centroid.X) / (2 * math.pi) + 0.5 + centroid.Y * 0.15) % 1
-			return Color3.fromHSV(hue, 0.55, 1):Lerp(shade.Color, 0.35)
+			return Color3.fromHSV(hue, 0.55, 1):Lerp(shade.Color, 0.6)
 		end
 	elseif shade.Color2 then
 		return function(centroid: Vector3): Color3
@@ -274,11 +275,22 @@ local function cutStone(gem, shade, detailed: boolean)
 		end
 	end
 
+	local specks = inclusions(rng, gem.Clarity, 0.6 * scale, shade.Color)
+	if gem.Clarity >= 7 then
+		-- Clear stones glow from within; the clearer, the brighter the core.
+		table.insert(specks, {
+			Position = Vector3.zero,
+			Radius = 0.28 * scale,
+			Color = shade.Color:Lerp(Color3.new(1, 1, 1), 0.25),
+			Transparency = 0.75 - (math.clamp(gem.Clarity, 7, 10) - 7) * 0.1,
+			Glow = true,
+		})
+	end
 	return {
 		Triangles = triangles,
 		Transparency = transparencyFor(gem.Clarity) * 0.8,
 		Material = "Glass",
-		Specks = inclusions(rng, gem.Clarity, 0.6 * scale, shade.Color),
+		Specks = specks,
 		Sparkles = sparkles,
 		Radius = 1.1 * scale,
 	}

@@ -33,10 +33,11 @@ function Gems.award(player: Player, source: string, opts: { Luck: number? }?): G
 	Remotes.Notify:FireClient(
 		player,
 		string.format(
-			"Found: %s  |  Size %d, Clarity %d  |  worth ~%d coins",
+			"Found: %s  |  Size %d, Clarity %d, Cut %d  |  worth ~%d coins",
 			GemConfig.displayName(gem),
 			gem.Size,
 			gem.Clarity,
+			gem.Cut or 0,
 			GemConfig.value(gem)
 		)
 	)

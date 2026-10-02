@@ -1,4 +1,5 @@
 -- Armor defines the build. IDs remain stable; old items stay saved-compatible.
+local GemConfig = require(script.Parent.GemConfig)
 local Armor = {}
 Armor.Version = 1
 Armor.FullSetPieces = 6 -- five armor pieces plus a matching weapon
@@ -139,6 +140,14 @@ for familyIndex, family in Armor.Order do
 					Effect = {},
 				},
 			}
+			if rarity >= 3 then
+				-- Every element can roll on every family: a Juggernaut chest can carry a
+				-- Cryo affinity (the off-meta chase) or an Ion one (trade bait).
+				item.AffixTable = {}
+				for _, affix in GemConfig.Affixes do
+					table.insert(item.AffixTable, affix.Id)
+				end
+			end
 			Armor.ById[id] = item
 			table.insert(Armor.Catalog[kind], item)
 		end
@@ -173,6 +182,30 @@ function Armor.rollStats(item, rng)
 		table.insert(modifiers, stat)
 	end
 	return stats, allocations, modifiers
+end
+-- Elemental Affinity Affixes for a Rare+ armor piece: 1/2/3 distinct affixes at
+-- +5-10% / +10-15% / +15-20%. `pool` is the item's AffixTable (defaults to all).
+function Armor.rollAffixes(rarity, rng, pool)
+	local count = GemConfig.AffixCounts[rarity] or 0
+	local range = GemConfig.AffixRanges[rarity]
+	local affixes = {}
+	if count == 0 or not range then
+		return affixes
+	end
+	local choices = {}
+	for _, id in pool or {} do
+		table.insert(choices, id)
+	end
+	if #choices == 0 then
+		for _, affix in GemConfig.Affixes do
+			table.insert(choices, affix.Id)
+		end
+	end
+	for _ = 1, math.min(count, #choices) do
+		local id = table.remove(choices, rng:NextInteger(1, #choices))
+		table.insert(affixes, { Id = id, Bonus = rng:NextInteger(range[1], range[2]) / 100 })
+	end
+	return affixes
 end
 function Armor.pick(catalog, rng, depth)
 	local weights = if depth then Armor.DepthWeights[math.clamp(math.ceil(depth / 2), 1, 5)] else Armor.Weights

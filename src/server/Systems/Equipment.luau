@@ -743,7 +743,7 @@ end
 -- biggest piece (the blade, head, staff or chest).
 local function enchant(parts: { BasePart }, gem, main: BasePart?)
 	local color = GemConfig.ElementColors[gem.Element]
-	local strength = math.clamp(GemConfig.potency(gem) / 150, 0, 1)
+	local strength = GemConfig.strength(gem)
 	local biggest, biggestSize = nil, 0
 	for _, part in parts do
 		if part.Name == "SocketedGem" then
@@ -775,6 +775,62 @@ local function enchant(parts: { BasePart }, gem, main: BasePart?)
 	if target then
 		particles(target, gem.Element, strength)
 	end
+end
+
+-- Rare+ armor with Elemental Affinity Affixes gets a faint aura in its
+-- affixes' element colours: a soft light and a few slow motes on its biggest
+-- piece. Subtler than a socketed gem's enchantment.
+local function affinityGlow(component: Instance, roll)
+	local colors = {}
+	for _, affix in roll and roll.Affixes or {} do
+		local def = GemConfig.AffixById[affix.Id]
+		if def then
+			table.insert(colors, GemConfig.ElementColors[def.Element])
+		end
+	end
+	if #colors == 0 then
+		return
+	end
+	local biggest, biggestSize = nil, 0
+	for _, part in component:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 then
+			local size = part.Size.X * part.Size.Y * part.Size.Z
+			if size > biggestSize then
+				biggest, biggestSize = part, size
+			end
+		end
+	end
+	if not biggest then
+		return
+	end
+	local light = Instance.new("PointLight")
+	light.Name = "Affinity"
+	light.Color = colors[1]
+	light.Range = 3 + #colors
+	light.Brightness = 0.5
+	light.Shadows = false
+	light.Parent = biggest
+	local keypoints = {}
+	for i, color in colors do
+		table.insert(keypoints, ColorSequenceKeypoint.new(if #colors == 1 then 0 else (i - 1) / (#colors - 1), color))
+	end
+	if #keypoints == 1 then
+		table.insert(keypoints, ColorSequenceKeypoint.new(1, colors[1]))
+	end
+	local motes = Instance.new("ParticleEmitter")
+	motes.Name = "Affinity"
+	motes.Texture = SPARK_TEXTURE
+	motes.Color = ColorSequence.new(keypoints)
+	motes.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.14), NumberSequenceKeypoint.new(1, 0) })
+	motes.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+	motes.Lifetime = NumberRange.new(1, 1.6)
+	motes.Speed = NumberRange.new(0.1, 0.3)
+	motes.SpreadAngle = Vector2.new(180, 180)
+	motes.Rate = 1.5 + #colors
+	motes.LightEmission = 1
+	motes.Shape = Enum.ParticleEmitterShape.Box
+	motes.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+	motes.Parent = biggest
 end
 
 -- Where a hand grips: the hand itself on R15, the bottom of the arm on R6.
@@ -869,6 +925,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 				slot,
 				gear.Id
 			)
+			affinityGlow(component, GearRolls.get(loadout, slot))
 			local gem = loadout[slot .. "Gem"]
 			if gem and slot ~= "Armor" then
 				local parts = {}
@@ -962,6 +1019,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 			if shieldRoll then shieldRoll.Rarity else shieldItem.RarityTier or 1,
 			shieldItem.ArmorFamily
 		)
+		affinityGlow(component, shieldRoll)
 		if loadout.ShieldGem then
 			local parts = {}
 			for _, part in component:GetDescendants() do
