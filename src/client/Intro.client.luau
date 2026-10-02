@@ -21,13 +21,13 @@ if GemClient.Profile.Intro and GemClient.Profile.Intro.Done then
 end
 local new = IronUi.new
 local C = {
-	Ink = Color3.fromRGB(8, 13, 23),
-	Panel = Color3.fromRGB(15, 24, 38),
-	Edge = Color3.fromRGB(50, 71, 92),
+	Ink = Color3.fromRGB(8, 12, 19),
+	Panel = Color3.fromRGB(20, 27, 37),
+	Edge = Color3.fromRGB(108, 89, 62),
 	Text = Color3.fromRGB(241, 244, 250),
 	Dim = Color3.fromRGB(144, 164, 187),
-	Cyan = Color3.fromRGB(99, 220, 235),
-	Gold = Color3.fromRGB(255, 196, 101),
+	Cyan = Color3.fromRGB(94, 206, 221),
+	Gold = Color3.fromRGB(224, 177, 98),
 }
 local gui = UiKit.gui("Intro", 15)
 local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BorderSizePixel = 0 }, gui)
@@ -53,6 +53,24 @@ local function tween(object, seconds, props, style)
 	TweenService:Create(object, TweenInfo.new(seconds, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
 		:Play()
 end
+local function metalTrim(parent, gold)
+	local inset =
+		frame(parent, { BackgroundTransparency = 1, Position = UDim2.fromOffset(4, 4), Size = UDim2.new(1, -8, 1, -8) })
+	UiKit.round(inset, 4)
+	new("UIStroke", { Color = gold, Thickness = 1, Transparency = 0.72 }, inset)
+	for _, x in { 0, 1 } do
+		for _, y in { 0, 1 } do
+			local stud = frame(parent, {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(x, if x == 0 then 9 else -9, y, if y == 0 then 9 else -9),
+				Size = UDim2.fromOffset(4, 4),
+				Rotation = 45,
+				BackgroundColor3 = gold,
+			})
+			new("UIGradient", { Rotation = 90, Color = ColorSequence.new(gold, Color3.fromRGB(58, 44, 31)) }, stud)
+		end
+	end
+end
 -- Bounded, quiet points of light; no imported imagery or fullscreen flashes.
 for i = 1, 36 do
 	local x = ((i * 43) % 101) / 100
@@ -76,19 +94,21 @@ brand.Position, brand.Size = UDim2.fromOffset(0, 0), UDim2.new(0.7, 0, 0, 20)
 local chapter = label(panel, "01 / 03", 11, C.Gold)
 chapter.TextXAlignment = Enum.TextXAlignment.Right
 chapter.Position, chapter.Size = UDim2.new(1, -100, 0, 0), UDim2.fromOffset(100, 20)
-local title = label(panel, "YOUR FIRST DROP.", 36)
+local title = label(panel, "YOUR LEGEND BEGINS", 36)
 title.Position, title.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, 44)
+title.Font = Enum.Font.Garamond
 local subtitle = label(panel, "A full loadout. Nine gemstones. A build that starts with you.", 13, C.Dim)
 subtitle.Position, subtitle.Size = UDim2.fromOffset(0, 72), UDim2.new(1, 0, 0, 24)
 local body = frame(panel, { BackgroundTransparency = 1 })
 local hero = frame(body, { BackgroundColor3 = C.Panel, ClipsDescendants = true })
-UiKit.round(hero, 20)
-local heroStroke = new("UIStroke", { Color = C.Edge, Thickness = 1 }, hero)
+UiKit.round(hero, 6)
+local heroStroke = new("UIStroke", { Color = C.Edge, Thickness = 2 }, hero)
 new(
 	"UIGradient",
 	{ Rotation = 65, Color = ColorSequence.new(Color3.fromRGB(19, 43, 57), Color3.fromRGB(15, 20, 37)) },
 	hero
 )
+metalTrim(hero, C.Gold)
 local ring = frame(hero, {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.42),
@@ -106,11 +126,50 @@ local inner = frame(ring, {
 })
 UiKit.round(inner, 999)
 new("UIStroke", { Color = C.Cyan, Thickness = 1, Transparency = 0.9 }, inner)
+local orbitMarks = {}
+for index = 1, 24 do
+	local angle = index * math.pi / 12
+	local mark = frame(ring, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5 + math.sin(angle) * 0.49, 0.5 + math.cos(angle) * 0.49),
+		Size = UDim2.fromOffset(if index % 3 == 0 then 4 else 2, if index % 3 == 0 then 12 else 5),
+		Rotation = -math.deg(angle),
+		BackgroundColor3 = C.Gold,
+		BackgroundTransparency = 0.4,
+	})
+	table.insert(orbitMarks, mark)
+end
+local crest = frame(hero, {
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 12),
+	Size = UDim2.fromOffset(172, 40),
+	BackgroundColor3 = C.Ink,
+	BackgroundTransparency = 0.12,
+	ZIndex = 6,
+})
+UiKit.round(crest, 3)
+local crestStroke = new("UIStroke", { Color = C.Gold, Thickness = 1, Transparency = 0.25 }, crest)
+local crestTitle = label(crest, "SEALED RELIQUARY", 12, C.Gold)
+crestTitle.TextXAlignment = Enum.TextXAlignment.Center
+crestTitle.Position, crestTitle.Size = UDim2.fromOffset(0, 3), UDim2.new(1, 0, 0, 21)
+crestTitle.ZIndex = 7
+local rarityPips = {}
+for index = 1, 5 do
+	local pip = frame(crest, {
+		Position = UDim2.new(0.5, (index - 3) * 12 - 2, 0, 29),
+		Size = UDim2.fromOffset(4, 4),
+		Rotation = 45,
+		BackgroundColor3 = C.Edge,
+		ZIndex = 7,
+	})
+	table.insert(rarityPips, pip)
+end
 local heroKicker = label(hero, "YOUR LAUNCH CAPSULE", 10, C.Cyan)
-heroKicker.Position, heroKicker.Size = UDim2.fromOffset(18, 12), UDim2.new(1, -36, 0, 18)
+heroKicker.Position, heroKicker.Size = UDim2.fromOffset(18, 12), UDim2.new(0.27, -18, 0, 18)
 heroKicker.ZIndex = 5
 local heroArt = frame(hero, { BackgroundTransparency = 1, ZIndex = 2 })
 local heroName = label(hero, "A NEW WARRIOR AWAKENS", 24)
+heroName.Font = Enum.Font.Garamond
 heroName.ZIndex = 5
 local heroMeta = label(hero, "6 EQUIPMENT PIECES  /  9 GEMSTONES", 11, C.Cyan)
 heroMeta.ZIndex = 5
@@ -131,6 +190,16 @@ local stage = new("ScrollingFrame", {
 	ScrollBarImageColor3 = C.Edge,
 	CanvasSize = UDim2.new(),
 }, rack)
+local rail = frame(
+	rack,
+	{
+		Position = UDim2.fromOffset(0, 26),
+		Size = UDim2.new(1, 0, 0, 2),
+		BackgroundColor3 = C.Edge,
+		BackgroundTransparency = 0.6,
+	}
+)
+local railFill = frame(rail, { Size = UDim2.fromScale(0, 1), BackgroundColor3 = C.Gold })
 local grid =
 	new("UIGridLayout", { CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }, stage)
 local footer = frame(panel, {
@@ -150,7 +219,8 @@ local primary = new("TextButton", {
 	BackgroundColor3 = C.Gold,
 	AutoButtonColor = false,
 }, footer)
-UiKit.round(primary, 10)
+UiKit.round(primary, 4)
+metalTrim(primary, Color3.fromRGB(255, 233, 178))
 new("UISizeConstraint", { MaxSize = Vector2.new(440, 50) }, primary)
 new(
 	"UIGradient",
@@ -215,12 +285,13 @@ local function fit()
 		rack.Position, rack.Size = UDim2.new(0.53, 10, 0, 0), UDim2.new(0.47, -10, 1, 0)
 	end
 	heroKicker.Visible = not portrait and not short
+	crest.Visible = not portrait and not short
 	heroArt.Position, heroArt.Size =
 		UDim2.fromOffset(8, if portrait or short then 4 else 25),
 		UDim2.new(1, -16, 1, if portrait or short then -57 else -86)
 	heroName.Position, heroName.Size =
 		UDim2.new(0, 18, 1, if portrait or short then -49 else -56), UDim2.new(1, -36, 0, 30)
-	heroName.TextSize = if portrait or short then 17 else 24
+	heroName.TextSize = if portrait or short then 21 else 30
 	heroMeta.Position, heroMeta.Size = UDim2.new(0, 18, 1, -25), UDim2.new(1, -36, 0, 18)
 	local rows = if phase == "Gems" then 3 else 2
 	if horizontal then
@@ -251,11 +322,11 @@ local function describe(entry, isGem)
 		rarity.Name,
 		if item then item.ArmorFamily or slotName(entry.Slot) else slotName(entry.Slot)
 end
-local function burst(color, major)
+local function burst(color, major, rank)
 	if calm then
 		return
 	end
-	for i = 1, if major then 26 else 12 do
+	for i = 1, if major then 30 else 8 + (rank or 1) * 3 do
 		local shard = frame(hero, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.4),
@@ -281,7 +352,17 @@ local function spotlight(card, celebrate)
 	end
 	local name, color, rarity, detail = describe(card.Entry, phase == "Gems")
 	heroName.Text, heroMeta.Text = name, rarity:upper() .. "  /  " .. detail:upper()
-	heroKicker.Text = "REWARD SECURED  /  " .. slotName(card.Entry.Slot):upper()
+	heroKicker.Text = slotName(card.Entry.Slot):upper()
+	local rank = ({ Common = 1, Uncommon = 2, Rare = 3, ["Ultra Rare"] = 4, ["Ultra-Rare"] = 4, Legendary = 5 })[rarity]
+		or 1
+	crestTitle.Text, crestTitle.TextColor3, crestStroke.Color = rarity:upper(), color, color
+	for index, pip in rarityPips do
+		pip.BackgroundColor3 = if index <= rank then color else C.Edge
+	end
+	for _, mark in orbitMarks do
+		mark.BackgroundColor3 = color
+		mark.BackgroundTransparency = if rank >= 3 then 0.25 else 0.6
+	end
 	heroKicker.TextColor3, heroMeta.TextColor3 = color, color
 	heroStroke.Color, ringStroke.Color = color, color
 	heroRecord = Art.show(heroArt, if phase == "Gems" then card.Entry.Gem else nil, card.Entry.Slot, color, false)
@@ -295,8 +376,14 @@ local function spotlight(card, celebrate)
 			tween(heroRecord.Camera, 0.55, { FieldOfView = 34 }, Enum.EasingStyle.Back)
 		end
 		local major = card.Index == #cards
-		burst(color, major)
-		UiSound.play(if major then "Reward" else "Confirm")
+		burst(color, major, rank)
+		UiSound.play(
+			if major or rank >= 4
+				then "Reward"
+				elseif rank == 3 then "Enchant"
+				elseif rank == 2 then "Confirm"
+				else "Equip"
+		)
 	end
 end
 local function createCards(entries)
@@ -314,14 +401,20 @@ local function createCards(entries)
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
 		}, stage)
-		UiKit.round(cell, 10)
+		UiKit.round(cell, 4)
+		metalTrim(cell, C.Edge)
+		new(
+			"UIGradient",
+			{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(41, 51, 62), Color3.fromRGB(13, 19, 29)) },
+			cell
+		)
 		local stroke = new(
 			"UIStroke",
 			{ ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = C.Edge, Transparency = 0.25, Thickness = 1 },
 			cell
 		)
 		local slot = label(cell, slotName(entry.Slot):upper(), 10, C.Dim)
-		slot.Position, slot.Size = UDim2.fromOffset(9, 5), UDim2.new(1, -18, 0, 18)
+		slot.Position, slot.Size = UDim2.fromOffset(15, 5), UDim2.new(1, -30, 0, 18)
 		local art = frame(
 			cell,
 			{ BackgroundTransparency = 1, Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -57) }
@@ -403,6 +496,12 @@ local function animate(entries, isGem)
 	phase = if isGem then "Gems" else "Armor"
 	createCards(entries)
 	counter.Text = string.format("00 / %02d", #entries)
+	railFill.Size = UDim2.fromScale(0, 1)
+	crestTitle.Text = "BREAKING THE SEAL"
+	crestTitle.TextColor3, crestStroke.Color = C.Gold, C.Gold
+	for _, pip in rarityPips do
+		pip.BackgroundColor3 = C.Edge
+	end
 	heroRecord = Art.show(heroArt, nil, nil, if isGem then C.Gold else C.Cyan, true)
 	heroStart = os.clock()
 	heroName.Text = if isGem then "CHARGING THE CORE" else "ASSEMBLING YOUR DESTINY"
@@ -457,7 +556,13 @@ listen(RunService.RenderStepped, function(dt)
 		return
 	end
 	local now = os.clock()
+	heroRecord.Opening = if spin and spin.Count == 0
+		then math.clamp((now - spin.Start - cards[1].StopAt + 0.7) / 0.7, 0, 1)
+		else 0
 	Art.pose(heroRecord, now - heroStart, calm)
+	if not calm then
+		ring.Rotation = (now * 5) % 360
+	end
 	scan.Visible = not calm and spin ~= nil
 	if scan.Visible then
 		scan.Position = UDim2.fromScale(0, ((now * 0.35) % 0.7) + 0.05)
@@ -505,6 +610,7 @@ listen(RunService.RenderStepped, function(dt)
 			spin.Count += 1
 			showCard(card)
 			counter.Text = string.format("%02d / %02d", spin.Count, #cards)
+			tween(railFill, 0.28, { Size = UDim2.fromScale(spin.Count / #cards, 1) })
 		end
 	end
 	if nextCard and elapsed >= spin.NextSound then

@@ -25,3 +25,11 @@ All reels begin together. Each reel scrolls vertically, slows as its reveal appr
 Portrait phones use a large preview above a horizontal reward strip. Short landscape windows also use a strip to keep controls accessible. Full desktop uses three columns, with two rows for equipment and three for gems. Previews frame against the narrower viewport dimension. A Motion: calm control removes preview bobbing, reel translation, scan lines, zoom punches and particle bursts while preserving reward information and timing. Skip still grants the same saved rewards.
 
 `tests/run_lottery_ui.py` runs the real intro controller with GUI/service doubles and checks the complete equipment-to-gem flow, inspectable rewards, failed-request retry, repeat input protection, calm mode, claim behavior and cleanup. It does not certify live Roblox rendering. Studio review is still required for visual framing, scrolling, touch reach and audio pacing.
+
+## Premium RPG visual pass
+
+The launch chamber now uses forged-metal bevels, brass corner fasteners, a serif display heading and a framed rarity crest. The custom six-sided reliquary has plated doors, inset emissive seams, a crown and a segmented pedestal. Its shell opens outward and its crown rises during the final 0.7 seconds before the first reveal; calm motion keeps the mechanism still. Camera framing widens during opening.
+
+Rarity has a visible hierarchy: one to five illuminated crest diamonds, a colored orbital dial, and increasing impact-particle density. Common rewards use a mechanical equip sound, Uncommon a confirmation tone, Rare an enchantment tone, and Ultra Rare/Legendary a reward cue. Final reveals receive the completion cue regardless of rarity. The manifest progress rail fills as rewards lock in. All styling and geometry are original to Saga Miners.
+
+The new art pass preserves the existing server-owned reward plan and claim path. Static thumbnail cameras now skip redundant positioning work when their size is unchanged. Studio review remains necessary for the new metal lighting, capsule opening and rarity emphasis.
