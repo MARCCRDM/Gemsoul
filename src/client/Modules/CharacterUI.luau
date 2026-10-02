@@ -530,6 +530,50 @@ local function gemMetric(parent: Instance, label: string, value: number?, color:
 	end
 end
 
+-- Simple view first: one overall score and one short sentence. Everything
+-- else sits behind MORE DETAILS (reset whenever the selection changes).
+local showDetails, detailsKey = false, nil
+local drawTooltip
+local QUALITY_WORDS = { "Flawed", "Flawed", "Flawed", "Fair", "Fair", "Fine", "Fine", "Superb", "Superb", "Flawless" }
+local function summary(value: string)
+	local line = text(tipBody, value, 13, P.Text)
+	line.Size = UDim2.new(1, -8, 0, 0)
+	return line
+end
+local function detailsButton()
+	local b = new("TextButton", {
+		Text = if showDetails then "HIDE DETAILS  ▴" else "MORE DETAILS  ▾",
+		TextSize = 12,
+		Font = BOLD,
+		TextColor3 = P.Teal,
+		BackgroundColor3 = P.Frame,
+		BackgroundTransparency = 0.2,
+		Size = UDim2.new(1, -8, 0, 30),
+	}, tipBody)
+	UiKit.round(b, 6)
+	new("UIStroke", { Color = P.Teal, Thickness = 1, Transparency = 0.55 }, b)
+	b.Activated:Connect(function()
+		showDetails = not showDetails
+		drawTooltip()
+	end)
+end
+-- A gem's overall quality: the average of its graded metrics, 1-10.
+local function gemQuality(gem): number
+	local total, count = 0, 0
+	for _, value in { gem.Size, gem.Clarity, gem.Cut } do
+		if value then
+			total += value
+			count += 1
+		end
+	end
+	return if count > 0 then math.clamp(math.floor(total / count + 0.5), 1, 10) else 1
+end
+-- What a gem's element does, in a few words ("Raw damage and anti-heal").
+local function elementGist(element: string): string
+	local effect = GemConfig.ElementEffects[element] or ""
+	return (string.match(effect, "^([^:]+)") or effect)
+end
+
 local function gemLines(gem)
 	local tierColor = GemConfig.TierColors[gem.Tier]
 	-- Focus the center column on the selected stone. Gear selections restore
@@ -539,7 +583,11 @@ local function gemLines(gem)
 	tipArt.Visible = false
 	tipBody.Position = UDim2.fromOffset(0, 0)
 	tipBody.Size = UDim2.new(1, 0, 1, -72)
-	local hero = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -6, 0, 204) }, tipBody)
+	local hero = new(
+		"Frame",
+		{ BackgroundTransparency = 1, Size = UDim2.new(1, -6, 0, if showDetails then 204 else 168) },
+		tipBody
+	)
 	local stage = new("Frame", {
 		BackgroundColor3 = Color3.fromRGB(17, 27, 40),
 		Size = UDim2.fromOffset(156, 166),
@@ -577,6 +625,32 @@ local function gemLines(gem)
 	badge.Position = UDim2.fromOffset(0, 43)
 	badge.Size = UDim2.new(1, 0, 0, 24)
 	badge.TextSize = 10
+	if not showDetails then
+		local quality = gemQuality(gem)
+		gemMetric(info, "QUALITY  ·  " .. string.upper(QUALITY_WORDS[quality]), quality, tierColor, 68)
+		local id = Tech.surgeOf(gem)
+		local surge = id and Tech.Catalog[id]
+		local gist = text(
+			info,
+			elementGist(gem.Element) .. "." .. (if surge then " Casts " .. surge.Name .. " as a Gem Surge." else ""),
+			12,
+			P.Text
+		)
+		gist.AutomaticSize = Enum.AutomaticSize.None
+		gist.Position, gist.Size = UDim2.fromOffset(0, 104), UDim2.new(1, 0, 0, 58)
+		gist.TextYAlignment = Enum.TextYAlignment.Top
+		text(
+			tipBody,
+			string.format(
+				"Sells for %d coins  ·  %s",
+				GemConfig.value(gem),
+				if gem.Cut then "ready to socket" else "rough"
+			),
+			12,
+			P.Dim
+		)
+		return
+	end
 	gemMetric(info, "SIZE  ·  MAGNITUDE", gem.Size, tierColor, 68)
 	gemMetric(info, "CLARITY  ·  DURATION", gem.Clarity, P.Teal, 100)
 	gemMetric(info, "CUT  ·  PRECISION", gem.Cut, P.Gold, 132)
@@ -760,22 +834,48 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 	local flow = UiKit.list(chips, 4, true)
 	flow.Wraps = true
 	chipLabel(chips, rarity.Name, rarity.Color, 0)
-	local stats = {}
+	local stats, score, best = {}, 0, nil
 	for stat, amount in roll and roll.Stats or {} do
-		table.insert(stats, { stat, amount })
+		local percent = stat == "Critical" or stat == "Cooldown"
+		table.insert(stats, { stat, amount, percent })
+		local points = if percent then amount * 100 else amount
+		score += points
+		if not best or points > best[2] then
+			best = { stat, points }
+		end
 	end
 	table.sort(stats, function(a, b)
 		return a[1] < b[1]
 	end)
-	for i, entry in stats do
-		chipLabel(
-			chips,
-			if entry[1] == "Critical" or entry[1] == "Cooldown"
+	-- One overall number up front; the stat-by-stat list is in the details.
+	chipLabel(chips, string.format("GEAR SCORE %d", math.floor(score + 0.5)), P.Gold, 1)
+	local slotWord = string.lower(Slots.Definitions[slotName].Label)
+	summary(
+		string.format("%s %s", rarity.Name, slotWord)
+			.. (if best then " built for " .. best[1] .. "." else ".")
+			.. (
+				if gem
+					then " Enchanted with " .. GemConfig.elementName(gem.Element) .. ": " .. string.lower(
+						elementGist(gem.Element)
+					) .. "."
+					else " Its gem socket is empty."
+			)
+	)
+	if not showDetails then
+		return
+	end
+	-- Every rolled stat, spelled out.
+	local parts = {}
+	for _, entry in stats do
+		table.insert(
+			parts,
+			if entry[3]
 				then string.format("+%g%% %s", entry[2] * 100, entry[1])
-				else string.format("+%g %s", entry[2], entry[1]),
-			P.Text,
-			i
+				else string.format("+%g %s", entry[2], entry[1])
 		)
+	end
+	if #parts > 0 then
+		text(tipBody, "STATS  ·  " .. table.concat(parts, "  ·  "), 12, P.Gold, BOLD)
 	end
 
 	-- Elemental affinities this piece rolled, in their element's colour.
@@ -867,6 +967,14 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 end
 
 local function drawTooltipContent()
+	local key = if selection
+		then selection.Kind .. ":" .. tostring(selection.Slot or "") .. ":" .. tostring(
+			selection.Id or (selection.Gem and selection.Gem.Id) or ""
+		)
+		else nil
+	if key ~= detailsKey then
+		detailsKey, showDetails = key, false
+	end
 	tooltip.Size = UDim2.fromOffset(384, 240)
 	statsBox.Visible = true
 	local showArt = selection ~= nil and (selection.Kind == "Gem" or selection.Kind == "Socket")
@@ -926,6 +1034,7 @@ local function drawTooltipContent()
 				request("EquipGear", kind, id)
 			end)
 		end
+		detailsButton()
 		return
 	end
 
@@ -941,7 +1050,10 @@ local function drawTooltipContent()
 		if equippedItem then
 			itemCard(slotName, loadout[slotName], equippedItem, roll, loadout[slotName .. "Gem"], true)
 		end
-		if slotName == "Helmet" and loadout.Helmet then
+		if equippedItem then
+			detailsButton()
+		end
+		if showDetails and slotName == "Helmet" and loadout.Helmet then
 			local traits = if roll
 				then GearRolls.appearance(roll)
 				else SuitTraits.forSuit(player.UserId, loadout.Helmet)
@@ -1004,6 +1116,7 @@ local function drawTooltipContent()
 		local gem = socketed(slotName)
 		if gem then
 			gemLines(gem)
+			detailsButton()
 			actionButton(tipActions, "REMOVE GEM", false, function()
 				request("UnsocketGem", slotName)
 			end)
@@ -1053,6 +1166,7 @@ local function drawTooltipContent()
 		return
 	end
 	gemLines(gem)
+	detailsButton()
 	if gem.Cut then
 		for _, key in Slots.Order do
 			local b = actionButton(tipActions, string.upper(Slots.Definitions[key].Label), true, function()
@@ -1067,7 +1181,7 @@ local function drawTooltipContent()
 end
 
 -- The inspector body takes the whole panel unless there are action buttons.
-local function drawTooltip()
+function drawTooltip()
 	drawTooltipContent()
 	local hasActions = false
 	for _, child in tipActions:GetChildren() do
