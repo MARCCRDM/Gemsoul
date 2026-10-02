@@ -16,6 +16,7 @@ local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemArt = require(script.Parent.GemArt)
 local SurgeArrayUI = require(script.Parent.SurgeArrayUI)
@@ -258,17 +259,13 @@ for _, key in Slots.Order do
 	local at = slotPositions[key]
 	equipmentSlots[key] = slot(at.X, at.Y, string.upper(Slots.Definitions[key].Label), key)
 end
-local boardHint = new(
-	"TextButton",
-	{
-		Text = "SURGE ARRAY\nQ · E · R  [L]",
-		TextSize = 12,
-		Font = BOLD,
-		TextColor3 = P.Teal,
-		BackgroundColor3 = P.Inset,
-	},
-	doll
-)
+local boardHint = new("TextButton", {
+	Text = "SURGE ARRAY\nQ · E · R  [L]",
+	TextSize = 12,
+	Font = BOLD,
+	TextColor3 = P.Teal,
+	BackgroundColor3 = P.Inset,
+}, doll)
 UiKit.round(boardHint, 8)
 boardHint.Activated:Connect(SurgeArrayUI.open)
 boardHint.Position = UDim2.fromOffset(406, 290)
@@ -621,6 +618,12 @@ local function gemLines(gem)
 		P.Text
 	)
 	local color = GemConfig.ElementColors[gem.Element]
+	-- The surge this gem casts from a Surge Array slot.
+	local surge = Tech.surgeLines(gem)
+	if #surge > 0 then
+		text(tipBody, string.upper(surge[1]), 12, P.Gold, BOLD)
+		text(tipBody, table.concat(surge, "  ·  ", 2), 12, P.Text)
+	end
 	local affinity = wornAffinities()
 	for _, section in { { "Weapon", "IN A WEAPON" }, { "Armor", "IN ARMOR OR SHIELD" } } do
 		local name = GemConfig.enchantment(gem, section[1])

@@ -23,6 +23,7 @@ function GemGenerator.generate(rng: Random, source: string, opts: { Luck: number
 		Id = opts.Id,
 		Element = rolled.Element,
 		Tier = rolled.Tier,
+		Surge = rolled.Surge,
 		SurgeTier = rolled.SurgeTier,
 		SurgeRank = rolled.SurgeRank,
 		Clarity = rolled.Clarity,

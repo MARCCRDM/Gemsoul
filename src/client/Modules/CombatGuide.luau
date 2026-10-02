@@ -177,6 +177,14 @@ function CombatGuide.refresh()
 		)
 		line.Size, line.TextWrapped = UDim2.new(1, -12, 0, 18), true
 	end
+	local resonance = {}
+	for tier, id in Tech.Resonance do
+		table.insert(resonance, string.format("T%d %s", tier, Tech.Catalog[id].Name))
+	end
+	table.sort(resonance)
+	local resonanceLine =
+		text(body, "RESONANCE (any element) · " .. table.concat(resonance, " · "), 12, Tech.Resources.Charge.Color)
+	resonanceLine.Size, resonanceLine.TextWrapped = UDim2.new(1, -12, 0, 18), true
 	local augments = text(
 		body,
 		"PASSIVE AUGMENTS · Your equipped gear applies these bonuses automatically.",

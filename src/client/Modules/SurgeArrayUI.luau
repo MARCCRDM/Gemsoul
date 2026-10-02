@@ -98,7 +98,7 @@ local function request(action, ...)
 	end)
 end
 
--- "Thermal Beam · T2 · II" and the gem's numbers for that surge.
+-- "Ember Lance · T2 · II" and the gem's numbers for that surge.
 local function surgeLine(gem, amps)
 	local definition = Tech.surgeStats(gem, amps)
 	if not definition then
@@ -158,9 +158,9 @@ local function socketCard(parent, key, x, gem, amps)
 			label(
 				card,
 				string.format(
-					"%s  ·  TIER %d  ·  RANK %s",
-					GemConfig.elementName(gem.Element):upper(),
-					definition.Tier,
+					"%s  ·  %s  ·  RANK %s",
+					if definition.Element then GemConfig.elementName(definition.Element):upper() else "RESONANCE",
+					string.upper(Tech.TierNames[definition.Tier] or ""),
 					ROMAN[definition.Rank]
 				),
 				11,

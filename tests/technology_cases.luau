@@ -81,7 +81,7 @@ check(not cast("Q"), "Surge slot cooldown bypass")
 st = reset()
 surgeGem("Frost", 1)
 check(cast("Q") and st.Resources.Charge == 75 and hv.Health < 1000, "Cryo Lance cost/damage")
-check(CombatServer._state(victim).SlowUntil > now, "Cryo Lance slow missing")
+check(CombatServer._state(victim).StunUntil > now, "Cryo Lance freeze missing")
 st = reset()
 surgeGem("Frost", 3)
 check(cast("Q") and st.Resources.Charge == 70 and st.Shield == 42, "Cryo Shield cost/barrier")
@@ -104,12 +104,12 @@ cast("Q")
 now += 0.6; CombatServer._tick(0.6)
 check(st.Channel == nil, "Lost stream release packet stuck channel")
 st = reset()
-surgeGem("Fire", 2)
-check(cast("Q") and st.Channel ~= nil and hv.Health < 1000, "Thermal Beam channel")
+surgeGem("Frost", 2)
+check(cast("Q") and st.Channel ~= nil and hv.Health < 1000, "Cryo Stream channel")
 loadout.Surge1Gem = nil
 health = hv.Health
 now += 0.25; CombatServer._tick(0.25)
-check(st.Channel == nil and hv.Health == health, "Beam kept firing after its gem left the slot")
+check(st.Channel == nil and hv.Health == health, "Stream kept firing after its gem left the slot")
 st = reset()
 surgeGem("Fire", 1)
 st.Resources.Stamina, st.Resources.Charge = 50, 50
@@ -129,13 +129,30 @@ wallBlocks = true
 check(cast("Q") and hv.Health == 1000, "Surge ignored wall")
 -- Every element's ability tiers.
 st = reset()
+surgeGem("Fire", 2)
+check(cast("Q") and hv.Health < 1000 and st.Resources.Charge == 75, "Ember Lance bolt")
+local lance = 1000 - hv.Health
+st = reset()
+surgeGem("Fire", 1)
+cast("Q")
+check(close(lance / (1000 - hv.Health), 1.4), "Ember Lance is 140% to Thermal Burst's 100%")
+st = reset()
 surgeGem("Fire", 3)
-check(cast("Q") and hv.Health < 1000 and st.Resources.Charge == 65, "Thermal Wave ring")
+check(cast("Q") and hv.Health == 1000 and #st.Pending == 1 and st.Resources.Charge == 60, "Solar Flare wind-up")
+now += 0.65; CombatServer._tick(0.65)
+check(hv.Health < 1000, "Solar Flare blast missing")
 st = reset()
 surgeGem("Fire", 4)
-check(cast("Q") and hv.Health == 1000 and #st.Pending == 1, "Thermal Cataclysm wind-up")
+check(cast("Q") and hv.Health == 1000 and #st.Pending == 1, "Supernova wind-up")
 now += 1.25; CombatServer._tick(1.25)
-check(hv.Health < 1000 and #st.Zones == 1, "Thermal Cataclysm blast or burning field missing")
+check(hv.Health < 1000, "Supernova blast missing")
+-- Resonance surges: no element, carried by any gem.
+st = reset()
+surgeGem("Poison", 2, 1, { Surge = "EnergySiphon" })
+check(cast("Q") and st.SiphonUntil > now and st.SiphonCapacity == 40, "Energy Siphon field")
+st = reset()
+surgeGem("Shock", 3, 1, { Surge = "ResonanceEcho" })
+check(cast("Q") and st.EchoUntil > now + 5, "Resonance Echo duration")
 st = reset()
 surgeGem("Poison", 1)
 check(cast("Q") and st.Resources.Charge == 80 and hv.Health < 1000, "Acid Spray cost/cone damage")
@@ -155,7 +172,7 @@ st = reset()
 surgeGem("Shock", 4)
 hv.Health = 120
 check(cast("Q") and hv.Health == 0, "Overload execute below 20%")
-check(Tech.Catalog.ChainLightning.Chain == 5, "Chain Lightning bounces")
+check(Tech.Catalog.ChainLightning.Chain == 3, "Chain Lightning bounces")
 -- Gem metrics and rank: Size = damage, Clarity = duration, rank = power and cost.
 st = reset()
 hv.Health = 1000
@@ -164,20 +181,57 @@ check(cast("Q") and st.Resources.Charge == 85 and hv.Health < 1000, "Ion Spark c
 local plain = 1000 - hv.Health
 st = reset()
 surgeGem("Shock", 1, 3)
-check(cast("Q") and close((1000 - hv.Health) / plain, 1.3) and close(st.Resources.Charge, 100 - 15 * 0.84), "Rank III surge power/cost")
+check(cast("Q") and close((1000 - hv.Health) / plain, 1.5) and close(st.Resources.Charge, 100 - 15 * 0.84), "Rank III surge power/cost")
 st = reset()
 surgeGem("Shock", 1, 1, { Size = 10 })
 check(cast("Q") and close((1000 - hv.Health) / plain, 1.3 / 1.12), "Gem Size damage")
-st = reset()
-surgeGem("Frost", 1, 1, { Clarity = 10 })
-cast("Q")
-local longSlow = CombatServer._state(victim).SlowUntil - now
-st = reset()
-surgeGem("Frost", 1, 1, { Clarity = 1 })
-cast("Q")
-check(longSlow > CombatServer._state(victim).SlowUntil - now, "Gem Clarity duration")
+local clear = Tech.surgeStats({ Id = "f", Element = "Frost", SurgeTier = 1, SurgeRank = 1, Clarity = 10 })
+local cloudy = Tech.surgeStats({ Id = "f", Element = "Frost", SurgeTier = 1, SurgeRank = 1, Clarity = 1 })
+check(close(clear.Stun, 0.7) and close(cloudy.Stun, 0.52) and clear.Recovery < cloudy.Recovery and clear.Range > cloudy.Range, "Gem Clarity duration, recovery and reach")
 local stats = Tech.surgeStats({ Id = "x", Element = "Poison", Tier = "Rare", SurgeTier = 2, SurgeRank = 1, Size = 5, Clarity = 5, Cut = 10 }, { SurgePower = 0.2, SurgeEfficiency = 0.3, ArcaneResonance = 0.2 })
-check(stats.Id == "ArmorMelt" and close(stats.Crit, 0.2) and close(stats.Damage, 0.6 * 1.2) and close(stats.Recovery, 1.5 * 0.7) and stats.Echo == 0.2, "Surge Amplifiers and Cut")
+check(stats.Id == "ArmorMelt" and close(stats.Crit, 0.05) and close(stats.Damage, 0.6 * 1.2) and close(stats.Recovery, 1.5 * 0.9 * 0.7) and close(stats.Shred, 0.35) and stats.Echo == 0.2, "Surge Amplifiers and Cut")
+-- The directive's worked examples.
+stats = Tech.surgeStats({ Id = "c", Element = "Poison", Tier = "Rare", SurgeTier = 3, SurgeRank = 1, Size = 7, Clarity = 6, Cut = 5 })
+check(stats.Id == "ToxicCloud" and close(stats.Cloud.Duration, 8) and close(stats.Cloud.Shred, 0.125) and close(stats.Shred, 0.125), "Toxic Cloud Clarity/Cut example")
+stats = Tech.surgeStats({ Id = "n", Element = "Fire", Tier = "Legendary", SurgeTier = 4, SurgeRank = 3, Size = 10, Clarity = 8, Cut = 9 })
+check(stats.Id == "Supernova" and close(stats.Damage, 3.6) and close(stats.Recovery, 3 * 0.8 * 0.84), "Supernova Rank III example")
+local lines = Tech.surgeLines({ Id = "u", Element = "Fire", Tier = "Uncommon", SurgeTier = 2, SurgeRank = 1, Size = 5, Clarity = 6, Cut = 4 })
+check(lines[1] == "Surge: Ember Lance (Apprentice · Rank I)" and lines[2] == "140% base damage" and lines[3] == "Size 5 (+15% damage)" and lines[5] == "Cut 4 (2% crit chance)" and lines[6] == "Sockets into any Surge Slot.", "Gem surge tooltip")
+-- GemRoller: rarity bands, ranks, metrics and the Resonance share.
+-- (The combat doubles pin math.random, so this uses its own generator.)
+local seed = 7
+local function nextNumber()
+	seed = (seed * 1103515245 + 12345) % 2147483648
+	return seed / 2147483648
+end
+local rng = { NextInteger = function(_, a, b) return a + math.floor(nextNumber() * (b - a + 1)) end, NextNumber = nextNumber }
+local counts, resonance, middle, bad = {}, 0, 0, nil
+for _ = 1, 20000 do
+	local g = GemRoller.roll(rng, 0)
+	local rules = GemRoller.ByRarity[g.Tier]
+	counts[g.Tier] = (counts[g.Tier] or 0) + 1
+	if not table.find(rules.Tiers, g.SurgeTier) or not table.find(rules.Ranks, g.SurgeRank) then
+		bad = "tier/rank outside its rarity"
+	end
+	for _, metric in { g.Size, g.Clarity, g.Cut } do
+		if metric < rules.Metrics[1] or metric > rules.Metrics[2] then
+			bad = "metric outside its rarity band"
+		end
+	end
+	local surge = Tech.Catalog[g.Surge]
+	if not surge or Tech.surgeOf(g) ~= g.Surge then
+		bad = "no castable surge"
+	elseif g.SurgeTier == 2 or g.SurgeTier == 3 then
+		middle += 1
+		resonance += if surge.Element == nil then 1 else 0
+	elseif surge.Element ~= g.Element then
+		bad = "Novice/Master gem rolled off-element"
+	end
+end
+check(bad == nil, "GemRoller: " .. tostring(bad))
+check(math.abs((counts.Common or 0) / 20000 - 0.40) < 0.03 and math.abs((counts.Legendary or 0) / 20000 - 0.05) < 0.01, "Rarity weights 40/25/20/10/5")
+check(math.abs(resonance / middle - GemRoller.ResonanceChance) < 0.02, "Resonance share")
+check(GemRoller.ByRarity.Rare.Ranks[2] == 3 and GemRoller.ByRarity.UltraRare.Ranks[1] == 3 and GemRoller.ByRarity.Legendary.Metrics[1] == 8, "Directive rarity table")
 -- Overcharge perks multiply their element's surges.
 for _, id in { "CleaverCalibration", "ChargeRecycler", "IonOvercharge" } do
 	profiles[source].Augments.Unlocked[id] = true
@@ -204,4 +258,4 @@ st = reset()
 loadout.Surge3Gem = {Id="cap",Element="Fire",Size=4,Clarity=5,Cut=5}
 check(CombatServer._technology(source, nil, rv.Position, "R") and hv.Health<1000,"Live Surge did not draw from its R capacitor")
 loadout.Surge3Gem = nil
-print("PASS: " .. checks .. " live technology/resource checks (maneuvers, all 16 gem surges by slot, gem metrics, ranks, amplifiers, Overcharge, channels, wind-ups, PvP and walls)")
+print("PASS: " .. checks .. " live technology/resource checks (maneuvers, all 16 gem surges and both Resonance surges by slot, gem metrics, ranks, amplifiers, Overcharge, channels, wind-ups, PvP and walls)")

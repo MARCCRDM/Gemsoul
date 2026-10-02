@@ -2,13 +2,16 @@
 	Rolls a mined gem, in order (Ability System v3.0):
 	  1. Element   25% each: Thermal (Fire), Cryo (Frost), Corrosive (Poison), Ion (Shock)
 	  2. Rarity    40% Common, 25% Uncommon, 20% Rare, 10% Ultra Rare, 5% Legendary
-	  3. Tier      the Gem Surge it carries, 1-4, by rarity
-	  4. Rank      I-III, by rarity
-	  5. Metrics   Size, Clarity and Cut, 1-10, in a band set by rarity
+	  3. Tier      the Gem Surge it carries: Novice (1) to Master (4), by rarity
+	  4. Surge     the element's surge at that tier; an Apprentice or Adept gem
+	               may carry a Resonance surge instead (no element needed)
+	  5. Rank      I-III, by rarity
+	  6. Metrics   Size, Clarity and Cut, 1-10, in a band set by rarity
 
 	Pure logic (pass in a Random), shared so the client can show the same
 	numbers. Saved gems keep their existing keys: `Tier` is the rarity name
-	("Common" … "Legendary"); the surge is `SurgeTier` and `SurgeRank`.
+	("Common" … "Legendary"); the surge is `Surge` (its id), `SurgeTier` and
+	`SurgeRank`.
 
 	Gems saved before surges existed get theirs from a seed of their id, so the
 	server and every client agree without a migration (GemRoller.surge).
@@ -30,10 +33,23 @@ GemRoller.Rarities = {
 GemRoller.ByRarity = {
 	Common = { Tiers = { 1 }, Ranks = { 1 }, Metrics = { 1, 4 } },
 	Uncommon = { Tiers = { 1, 2 }, Ranks = { 1, 2 }, Metrics = { 2, 6 } },
-	Rare = { Tiers = { 2, 3 }, Ranks = { 2 }, Metrics = { 3, 8 } },
-	UltraRare = { Tiers = { 3, 4 }, Ranks = { 2, 3 }, Metrics = { 5, 9 } },
-	Legendary = { Tiers = { 4 }, Ranks = { 3 }, Metrics = { 7, 10 } },
+	Rare = { Tiers = { 2, 3 }, Ranks = { 2, 3 }, Metrics = { 4, 8 } },
+	UltraRare = { Tiers = { 3, 4 }, Ranks = { 3 }, Metrics = { 6, 10 } },
+	Legendary = { Tiers = { 4 }, Ranks = { 3 }, Metrics = { 8, 10 } },
 }
+
+-- Each element's surge at each tier (ids in CombatTechnology's catalog).
+GemRoller.TierNames = { "Novice", "Apprentice", "Adept", "Master" }
+GemRoller.Surges = {
+	Fire = { "ThermalBurst", "EmberLance", "SolarFlare", "Supernova" },
+	Frost = { "CryoLance", "CryoStream", "CryoShield", "AbsoluteZero" },
+	Poison = { "AcidSpray", "ArmorMelt", "ToxicCloud", "BioCorrosion" },
+	Shock = { "IonSpark", "StaticField", "ChainLightning", "Overload" },
+}
+-- Resonance surges have no element: an Apprentice or Adept gem of any element
+-- carries one instead of its own surge this often.
+GemRoller.Resonance = { [2] = "EnergySiphon", [3] = "ResonanceEcho" }
+GemRoller.ResonanceChance = 0.12
 
 local function pick(rng, list)
 	return list[rng:NextInteger(1, #list)]
@@ -83,15 +99,21 @@ function GemRoller.rollRarity(rng, luck: number?): string
 	return GemRoller.Rarities[#GemRoller.Rarities].Name
 end
 
--- The five rolls, as saved gem fields.
+-- The rolls, as saved gem fields.
 function GemRoller.roll(rng, luck: number?)
 	local element = pick(rng, GemRoller.Elements)
 	local rarity = GemRoller.rollRarity(rng, luck)
 	local rules = GemRoller.ByRarity[rarity]
+	local tier = pick(rng, rules.Tiers)
+	local surge = GemRoller.Surges[element][tier]
+	if GemRoller.Resonance[tier] and rng:NextNumber() < GemRoller.ResonanceChance then
+		surge = GemRoller.Resonance[tier]
+	end
 	return {
 		Element = element,
 		Tier = rarity,
-		SurgeTier = pick(rng, rules.Tiers),
+		Surge = surge,
+		SurgeTier = tier,
 		SurgeRank = pick(rng, rules.Ranks),
 		Size = grade(rng, rules.Metrics),
 		Clarity = grade(rng, rules.Metrics),

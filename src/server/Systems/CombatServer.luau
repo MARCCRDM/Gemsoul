@@ -1081,7 +1081,13 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
 	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, recovery)
 	Remotes.CombatFx:FireClient(player, "TechStatus", definition.Name)
-	if id == "CryoShield" then
+	if id == "EnergySiphon" then
+		st.SiphonUntil, st.SiphonCapacity = now + definition.Duration, definition.Absorb
+		fx("TechField", player, Tech.Resources.Charge.Color)
+	elseif id == "ResonanceEcho" then
+		st.EchoUntil = now + definition.Duration
+		fx("TechField", player, Tech.Resources.Charge.Color)
+	elseif id == "CryoShield" then
 		local gem = definition.Gem or surgeGem(k.Loadout, "Frost")
 		st.Shield = math.max(st.Shield, 30 + (gem and gem.Size or 1) * 3)
 		st.ShieldUntil = math.max(st.ShieldUntil, now + definition.Duration)
@@ -1220,7 +1226,7 @@ local function tick(_dt)
 			end
 		end
 		if st.Channel then
-			-- A held beam (Cryo Stream, Thermal Beam): bills a quarter-second at a
+			-- A held beam (Cryo Stream): bills a quarter-second at a
 			-- time and stops when released, blocked or its gem leaves the slot.
 			local channel = st.Channel
 			local definition = channel.Definition
