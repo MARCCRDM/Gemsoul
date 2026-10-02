@@ -463,6 +463,9 @@ function GemConfig.enchantment(
 	slot: string,
 	opts: { Affinity: { [string]: number }?, PvP: boolean? }?
 ): (string, string)
+	if slot == "Surge1" or slot == "Surge2" or slot == "Surge3" then
+		return "Surge Capacitor", "Powers " .. (GemConfig.ElementLabels[gem.Element] or gem.Element) .. " Gem Surges."
+	end
 	local side = GemConfig.side(slot)
 	local name = GemConfig.EnchantNames[if side == "Offense" then "Weapon" else "Armor"][gem.Element] or "Enchanted"
 	local parts = {}

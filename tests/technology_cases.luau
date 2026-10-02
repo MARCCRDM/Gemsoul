@@ -168,4 +168,13 @@ CombatServer._input(source, "GemSurge", "HydraulicSlam", rv.Position)
 check(hv.Health == 1000, "Mismatched action category accepted")
 rs.Position = Vector3.zero
 check(not fire("HydraulicSlam"), "Town technique accepted")
+check(Tech.hasGem({Surge2Gem={Element="Frost"}},"Frost"),"Dedicated capacitor does not enable its element")
+check(not Tech.hasGem({Surge1Gem={Element="Fire"}},"Shock"),"Capacitor enabled unrelated element")
+check(Tech.hasGem({Surge3Gem={Element="Poison"}}),"Capacitor did not enable Charge regen")
+rs.Position = arena
+st = reset()
+loadout.WeaponGem = nil
+loadout.Surge1Gem = {Element="Fire",Size=4,Clarity=5,Cut=5}
+check(fire("ThermalBurst") and hv.Health<1000,"Live Surge did not draw from dedicated capacitor")
+loadout.Surge1Gem = nil
 print("PASS: " .. checks .. " live technology/resource checks (all actions incl. Corrosive/Ion surges, clouds, execute, Overcharge, costs, sockets, channels, wind-ups, PvP and walls)")

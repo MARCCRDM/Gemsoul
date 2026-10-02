@@ -758,7 +758,7 @@ local function block(player, held, aim)
 	return true
 end
 local function surgeGem(loadout, element)
-	for _, slot in { "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+	for _, slot in { "Surge1", "Surge2", "Surge3", "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 		local gem = loadout[slot .. "Gem"]
 		if gem and (not element or gem.Element == element) then
 			return gem

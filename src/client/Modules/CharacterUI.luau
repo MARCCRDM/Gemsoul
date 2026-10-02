@@ -18,6 +18,7 @@ local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemArt = require(script.Parent.GemArt)
+local SurgeSockets = require(script.Parent.SurgeSockets)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -257,11 +258,18 @@ for _, key in Slots.Order do
 	local at = slotPositions[key]
 	equipmentSlots[key] = slot(at.X, at.Y, string.upper(Slots.Definitions[key].Label), key)
 end
-local boardHint = text(doll, "SELECT GEAR\nTO COMPARE", 12, P.Dim, BOLD)
+local boardHint = new(
+	"TextButton",
+	{ Text = "SURGE GEMS\n3 CAPACITORS", TextSize = 12, Font = BOLD, TextColor3 = P.Teal, BackgroundColor3 = P.Inset },
+	doll
+)
+UiKit.round(boardHint, 8)
+boardHint.Activated:Connect(SurgeSockets.open)
 boardHint.Position = UDim2.fromOffset(406, 290)
 boardHint.Size = UDim2.fromOffset(124, 46)
 boardHint.TextXAlignment = Enum.TextXAlignment.Center
 boardHint.AutomaticSize = Enum.AutomaticSize.None
+boardHint.TextWrapped = true
 
 -- Draws one item's parts in a viewport, framed for a thumbnail. `anchorOf`
 -- names the body part a piece is worn on; `placeOf` gives its CFrame

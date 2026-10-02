@@ -454,6 +454,9 @@ end
 
 -- Sets class, weapon and armor (ids are checked by the caller).
 local SOCKET_KEYS = {}
+for _, slot in Slots.SurgeOrder do
+	SOCKET_KEYS[slot] = slot .. "Gem"
+end
 for _, slot in Slots.Order do
 	SOCKET_KEYS[slot] = slot .. "Gem"
 end
@@ -502,7 +505,11 @@ end
 function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem?
 	local profile = profiles[player]
 	local key = SOCKET_KEYS[slot or "Weapon"]
-	if not profile or not key or not profile.Character[slot or "Weapon"] then
+	if
+		not profile
+		or not key
+		or (not Slots.SurgeDefinitions[slot or "Weapon"] and not profile.Character[slot or "Weapon"])
+	then
 		return nil
 	end
 	local gem = PlayerData.findGem(player, gemId)
@@ -516,7 +523,9 @@ function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem
 	end
 	sockets[key] = gem
 	local slotName = slot or "Weapon"
-	profile.Character.ItemGems[slotName][profile.Character[slotName]] = gem
+	if not Slots.SurgeDefinitions[slotName] then
+		profile.Character.ItemGems[slotName][profile.Character[slotName]] = gem
+	end
 	sync(player)
 	characterChanged:Fire(player)
 	return gem
@@ -535,7 +544,9 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 		return nil
 	end
 	sockets[key] = nil
-	profile.Character.ItemGems[slot][profile.Character[slot]] = nil
+	if not Slots.SurgeDefinitions[slot] then
+		profile.Character.ItemGems[slot][profile.Character[slot]] = nil
+	end
 	table.insert(profile.Gems, gem)
 	sync(player)
 	characterChanged:Fire(player)

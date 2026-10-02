@@ -28,7 +28,10 @@ end
 
 local function socketGem(player: Player, gemId: any, slot: any)
 	slot = slot or "Weapon"
-	if typeof(gemId) ~= "string" or (typeof(slot) ~= "string" or not Slots.Definitions[slot]) then
+	if
+		typeof(gemId) ~= "string"
+		or (typeof(slot) ~= "string" or (not Slots.Definitions[slot] and not Slots.SurgeDefinitions[slot]))
+	then
 		return reply(false, "Pick a gem and a socket.")
 	end
 	if not canEnchant(player) then
@@ -48,7 +51,7 @@ local function socketGem(player: Player, gemId: any, slot: any)
 end
 
 local function unsocketGem(player: Player, slot: any)
-	if typeof(slot) ~= "string" or not Slots.Definitions[slot] then
+	if typeof(slot) ~= "string" or (not Slots.Definitions[slot] and not Slots.SurgeDefinitions[slot]) then
 		return reply(false, "Pick a socket.")
 	end
 	if not canEnchant(player) then

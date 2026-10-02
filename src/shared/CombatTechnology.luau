@@ -385,7 +385,7 @@ Tech.Consumables = {
 	EnergyDrink = { Name = "Energy Drink", Resource = "Stamina" },
 }
 function Tech.hasGem(loadout, element)
-	for _, slot in { "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+	for _, slot in { "Surge1", "Surge2", "Surge3", "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 		local gem = loadout[slot .. "Gem"]
 		if gem and (not element or gem.Element == element) then
 			return true
