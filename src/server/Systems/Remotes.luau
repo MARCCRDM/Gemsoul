@@ -2,7 +2,7 @@
 --   Profile (event, server -> client): the player's coins, gems and quota
 --   Notify (event, server -> client): a short message to pop up
 --   Request (function, client -> server): shop and cutting actions
---   CombatInput (event, client -> server): attacks and abilities
+--   CombatInput (event, client -> server): attacks and rig maneuvers
 --   CombatFx (event, server -> clients): hits, damage numbers, cooldowns
 --   Party (event, server -> client): party state and invites
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

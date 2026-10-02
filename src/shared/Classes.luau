@@ -1,19 +1,8 @@
 --[[
-	Classes, gear and abilities. Shared by the server (which saves choices,
-	builds gear on characters and runs combat) and the client (screens, HUD).
-
-	Stats are on a 1-5 scale: Health, Power, Defense, Speed. A class sets the
-	base; its weapon and armor shift them (+1 / -1).
-
-	Each class has:
-	  * 4 weapons. A weapon sets your basic attack (click) and has a passive.
-	  * 3 armors, each with a passive.
-	  * 6 abilities: equip any 3 on Q / E / R. Plus an ultimate on F.
-	  * a resource that abilities spend: Rage, Mana, Focus or Resolve.
-	Specs and their talent nodes are listed for the upcoming talent tree.
-
-	Ability and attack numbers are read by the server's combat code; see
-	shared/Combat.luau for how damage, resources and effects work.
+ Shared equipment and passive augment catalog. All players are Warriors;
+ armor families define their build. CombatTechnology owns the universal
+ Stamina-powered Rig Maneuvers and socket-powered Gem Surges.
+ Retired class records remain for saved equipment compatibility.
 ]]
 
 export type Stats = { Health: number, Power: number, Defense: number, Speed: number }
@@ -39,7 +28,7 @@ export type Gear = {
 	Attack: Attack?, -- weapons
 	Passive: Passive,
 }
-export type Ability = {
+export type RigManeuver = {
 	Id: string,
 	Name: string,
 	Description: string,
@@ -50,8 +39,8 @@ export type Ability = {
 	Ultimate: boolean?,
 	[string]: any, -- the kind's own numbers
 }
-export type SpecAbility = { Name: string, Description: string }
-export type Spec = { Name: string, Style: string, Nodes: { string }, Signature: SpecAbility }
+export type SpecRigManeuver = { Name: string, Description: string }
+export type Spec = { Name: string, Style: string, Nodes: { string }, Signature: SpecRigManeuver }
 export type Class = {
 	Id: string,
 	Name: string,
@@ -63,8 +52,8 @@ export type Class = {
 	ArmorWeight: string,
 	Difficulty: number,
 	Stats: Stats,
-	Abilities: { Ability }, -- six; any three go on Q / E / R
-	Ultimate: Ability?,
+	RigManeuvers: { RigManeuver }, -- six; any three go on Q / E / R
+	Ultimate: RigManeuver?,
 	Weapons: { Gear },
 	Armors: { Gear },
 	Specs: { Spec },
@@ -82,12 +71,13 @@ local Classes = {}
 
 Classes.StatNames = { "Health", "Power", "Defense", "Speed" }
 Classes.Order = { "Warrior", "Wizard", "Archer", "Tank" }
-Classes.AbilityKeys = { "Q", "E", "R" }
+Classes.RigManeuverKeys = { "Q", "E", "R" }
 Classes.UltimateKey = "F"
 
 -- Armor passives, one per style.
 local BASTION = { Name = "Bastion", Text = "Take 12% less damage.", Effect = { TakenMult = 0.88 } }
-local ATTUNED = { Name = "Attuned", Text = "Abilities recharge 10% faster.", Effect = { CooldownMult = 0.9 } }
+local ATTUNED =
+	{ Name = "Attuned", Text = "Rig Maneuvers and Gem Surges recharge 10% faster.", Effect = { CooldownMult = 0.9 } }
 local FLEET = { Name = "Fleet", Text = "+2 walk speed.", Effect = { SpeedAdd = 2 } }
 
 Classes.List = {
@@ -104,7 +94,7 @@ Classes.List = {
 		ArmorWeight = "Heavy",
 		Difficulty = 1,
 		Stats = { Health = 4, Power = 4, Defense = 3, Speed = 2 },
-		Abilities = {
+		RigManeuvers = {
 			{
 				Id = "Cleave",
 				Name = "Cleave",
@@ -377,19 +367,19 @@ Classes.List = {
 	Wizard = {
 		Id = "Wizard",
 		Name = "Wizard",
-		Role = "Ranged magic",
+		Role = "Ranged gemstone energy",
 		Tagline = "Bend the elements from a safe distance.",
 		Color = Color3.fromRGB(150, 90, 255),
-		ResourceId = "Mana",
-		Resource = "Mana: spent on spells, refills steadily",
+		ResourceId = "Charge",
+		Resource = "Charge: spent on gem surges, refills steadily",
 		ArmorWeight = "Light",
 		Difficulty = 3,
 		Stats = { Health = 1, Power = 4, Defense = 1, Speed = 3 },
-		Abilities = {
+		RigManeuvers = {
 			{
 				Id = "ArcaneBolt",
-				Name = "Arcane Bolt",
-				Description = "A fast bolt of pure magic.",
+				Name = "Resonance Bolt",
+				Description = "A fast bolt of pure gemstone energy.",
 				Kind = "Bolt",
 				Damage = 26,
 				Range = 60,
@@ -407,8 +397,8 @@ Classes.List = {
 				Cooldown = 8,
 			},
 			{
-				Id = "ManaShield",
-				Name = "Mana Shield",
+				Id = "SiphonField",
+				Name = "Charge Shield",
 				Description = "A barrier that absorbs 60 damage for 8 seconds.",
 				Kind = "Buff",
 				Duration = 8,
@@ -429,8 +419,8 @@ Classes.List = {
 				Cooldown = 12,
 			},
 			{
-				Id = "Fireball",
-				Name = "Fireball",
+				Id = "ThermalBurst",
+				Name = "Thermal Burst",
 				Description = "A slow ball of fire that explodes and burns everything nearby.",
 				Kind = "Bolt",
 				Damage = 30,
@@ -485,11 +475,15 @@ Classes.List = {
 				Id = "WandTome",
 				Name = "Wand and Tome",
 				Style = "Quick casting",
-				Description = "Rapid bolts from a wand, backed by a spellbook.",
+				Description = "Rapid bolts from a wand, backed by a field console.",
 				Look = "WandTome",
 				Mods = { Speed = 1, Power = -1 },
 				Attack = { Kind = "Shot", Damage = 9, Range = 45, Rate = 0.35 },
-				Passive = { Name = "Arcane Flow", Text = "Each hit restores 3 Mana.", Effect = { ResourceOnHit = 3 } },
+				Passive = {
+					Name = "Resonance Flow",
+					Text = "Each hit restores 3 Charge.",
+					Effect = { ResourceOnHit = 3 },
+				},
 			},
 			{
 				Id = "CrystalOrb",
@@ -553,7 +547,7 @@ Classes.List = {
 			{
 				Name = "Evoker",
 				Style = "Burst damage",
-				Nodes = { "Overload: more spell power", "Chain Cast: bolts bounce to a second target" },
+				Nodes = { "Overload: more gem surge power", "Chain Cast: bolts bounce to a second target" },
 				Signature = { Name = "Meteor", Description = "Call down a meteor on an area." },
 			},
 			{
@@ -582,7 +576,7 @@ Classes.List = {
 		ArmorWeight = "Medium",
 		Difficulty = 2,
 		Stats = { Health = 2, Power = 3, Defense = 2, Speed = 4 },
-		Abilities = {
+		RigManeuvers = {
 			{
 				Id = "PowerShot",
 				Name = "Power Shot",
@@ -783,10 +777,10 @@ Classes.List = {
 		ArmorWeight = "Fortified",
 		Difficulty = 1,
 		Stats = { Health = 5, Power = 2, Defense = 4, Speed = 1 },
-		Abilities = {
+		RigManeuvers = {
 			{
 				Id = "ShieldBash",
-				Name = "Shield Bash",
+				Name = "Kinetic Ram",
 				Description = "Stun the enemy in front of you and make it attack you. Builds Resolve.",
 				Kind = "Cone",
 				Damage = 14,
@@ -1020,8 +1014,8 @@ for classId, class in Classes.List do
 	end
 end
 Classes.Order = { "Warrior" }
--- Universal actions replace all active ability/ultimate picks.
-Classes.List.Warrior.Abilities = {}
+-- Universal actions replace all active rigManeuver/ultimate picks.
+Classes.List.Warrior.RigManeuvers = {}
 Classes.List.Warrior.Ultimate = nil
 Classes.List.Warrior.Specs = {}
 function Classes.setState(loadout)
@@ -1120,25 +1114,25 @@ function Classes.armor(classId: any, armorId: any): Gear?
 	return class and find(class.Armors, armorId)
 end
 
-function Classes.ability(classId: any, abilityId: any): Ability?
+function Classes.rigManeuver(classId: any, maneuverId: any): RigManeuver?
 	local class = Classes.get(classId)
 	if not class then
 		return nil
 	end
-	if class.Ultimate and class.Ultimate.Id == abilityId then
+	if class.Ultimate and class.Ultimate.Id == maneuverId then
 		return class.Ultimate
 	end
-	for _, ability in class.Abilities do
-		if ability.Id == abilityId then
-			return ability
+	for _, rigManeuver in class.RigManeuvers do
+		if rigManeuver.Id == maneuverId then
+			return rigManeuver
 		end
 	end
 	return nil
 end
 
--- The three abilities on Q / E / R: the saved picks if they're valid,
+-- The three rig maneuvers on Q / E / R: the saved picks if they're valid,
 -- otherwise the class's first three.
-function Classes.loadout(classId: any, picks: { any }?): { Ability }
+function Classes.loadout(classId: any, picks: { any }?): { RigManeuver }
 	local class = Classes.get(classId)
 	if not class then
 		return {}
@@ -1146,19 +1140,19 @@ function Classes.loadout(classId: any, picks: { any }?): { Ability }
 	local chosen, seen = {}, {}
 	for i = 1, 3 do
 		local id = picks and picks[i]
-		local ability = Classes.ability(classId, id)
-		if ability and not ability.Ultimate and not seen[id] then
-			chosen[i] = ability
+		local rigManeuver = Classes.rigManeuver(classId, id)
+		if rigManeuver and not rigManeuver.Ultimate and not seen[id] then
+			chosen[i] = rigManeuver
 			seen[id] = true
 		end
 	end
-	-- Fill gaps with the first abilities not already chosen.
+	-- Fill gaps with the first rig maneuvers not already chosen.
 	for i = 1, 3 do
 		if not chosen[i] then
-			for _, ability in class.Abilities do
-				if not seen[ability.Id] then
-					chosen[i] = ability
-					seen[ability.Id] = true
+			for _, rigManeuver in class.RigManeuvers do
+				if not seen[rigManeuver.Id] then
+					chosen[i] = rigManeuver
+					seen[rigManeuver.Id] = true
 					break
 				end
 			end

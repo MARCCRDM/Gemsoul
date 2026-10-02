@@ -6,10 +6,10 @@ The dashboard now provides **Train** and **PvP Arena** entry buttons. Both use t
 |---|---|---|---|
 | Attack | Tap LMB; Q left / E right | Tap Left / Right | 100% weapon damage; 0.45s pistol / 0.65s sword recovery; alternate sides for combos |
 | Heavy | Hold then release LMB / Q / E | Hold then release Left / Right | Heavy after 0.45s; 180% PvE / 150% PvP damage; 1.2s recovery; breaks frontal guard |
-| Dodge | Space | Dodge button | Movement direction, or facing when stationary; 15 studs; 3s cooldown; 0.5s PvE / 0.3s PvP immunity |
+| Dodge | Space | Dodge button | Movement direction, or facing when stationary; 15 Stamina; 15 studs; 3s cooldown; 0.5s PvE / 0.3s PvP immunity |
 | Block | Hold right click | Hold Block | 120° frontal coverage; 50% PvE / 40% PvP reduction; attacks unavailable while blocking |
 
-Space retains its normal behavior outside combat. Block slows movement to 60%; a broken guard cannot be raised for 0.8s. Dodge motion lasts 0.25s. Lost focus cancels charging and blocking, and the server releases a block after 0.6s without a held-input refresh.
+See [Combat technology](combat-technology.md) for the Stamina/Charge resources, six Rig Maneuvers, six Gem Surges and their controls. Space retains its normal behavior outside combat. Block slows movement to 60%; a broken guard cannot be raised for 0.8s. Dodge motion lasts 0.25s. Lost focus cancels charging and blocking, and the server releases a block after 0.6s without a held-input refresh.
 
 ## First-person presentation and timing
 
@@ -26,7 +26,7 @@ All timing and combo damage are server-derived. The client submits an attack sid
 
 ## Armor enhancements
 
-Two matching pieces activate a family's action enhancements. Matching weapons count toward family totals. Hybrid builds combine enhancements from each qualifying family. Passive 2/4/6-piece stat bonuses remain in `ArmorFamilies`; active ability picks and ultimates are retired.
+Two matching pieces activate a family's action enhancements. Matching weapons count toward family totals. Hybrid builds combine enhancements from each qualifying family. Passive 2/4/6-piece stat bonuses remain in `ArmorFamilies`; retired class-specific technique picks and ultimates are removed; the shared technology kit is universal.
 
 | Family | Attack | Heavy | Dodge | Block |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@ All five defensive sockets contribute their metrics. Re-raising Block cannot byp
 
 ## Server checks and validation
 
-The server owns damage, target selection, cooldowns, heavy-charge timing, guard state and dodge motion. Hits check range, aim, wall obstruction, eligibility and dodge immunity. Heavy is derived from a server-recorded charge; client-provided damage values are never accepted. Legacy Ability and ultimate packets have no handler. Status damage stops after either participant loses PvP eligibility, and session transitions clear combat state.
+The server owns damage, target selection, cooldowns, heavy-charge timing, guard state and dodge motion. Hits check range, aim, wall obstruction, eligibility and dodge immunity. Heavy is derived from a server-recorded charge; client-provided damage values are never accepted. Retired class-technique and ultimate packets have no handler. Status damage stops after either participant loses PvP eligibility, and session transitions clear combat state.
 
 Validation completed: 82 executable action/server/session checks and 12 first-person camera/cursor/visibility lifecycle checks; equipment and save regressions; 6,995 gem metric/affix/crowd-control checks; expedition/trading regressions; gem preview and drag tests; clean lint for new combat modules; successful Rojo place build.
 

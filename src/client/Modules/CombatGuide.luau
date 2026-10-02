@@ -1,24 +1,33 @@
--- Compatibility module name retained for existing menu/vendor callers; no ability picks remain.
+-- Grounded combat guide: universal actions, exosuit techniques and socket-powered surges.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemClient = require(script.Parent.GemClient)
 local ArenaScene = require(script.Parent.ArenaScene)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
-local AbilitiesUI = {}
+local CombatGuide = {}
 local P = IronUi.Colors
 local new, text, clear = IronUi.new, IronUi.text, IronUi.clear
 local window = IronUi.window("Combat", 9, 980, 620, "⚔️")
 window.Title.Text = "WARRIOR COMBAT"
 local gui = window.Gui
 local body = new(
-	"Frame",
-	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(24, 76), Size = UDim2.new(1, -48, 1, -100) },
+	"ScrollingFrame",
+	{
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 5,
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		Position = UDim2.fromOffset(24, 76),
+		Size = UDim2.new(1, -48, 1, -100),
+	},
 	window.Panel
 )
-function AbilitiesUI.refresh()
+function CombatGuide.refresh()
 	if not gui.Enabled then
 		return
 	end
@@ -28,7 +37,8 @@ function AbilitiesUI.refresh()
 	if not loadout then
 		return
 	end
-	window.Subtitle.Text = "Every Warrior has four actions. Armor enhances them at two matching pieces."
+	window.Subtitle.Text =
+		"Health · Stamina powers Rig Maneuvers · Charge powers socketed Gem Surges. Z/X cycle; R/F trigger."
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local sets = Classes.setState(loadout)
 	local effects = Classes.effects(loadout)
@@ -58,7 +68,7 @@ function AbilitiesUI.refresh()
 			),
 		},
 		{
-			"DODGE · Space / Dodge Button",
+			"DODGE · Space / Dodge Button · 15 Stamina",
 			string.format(
 				"%.2g studs · %.2fs cooldown · %.2gs PvE / %.2gs PvP immunity. Rolls in your movement direction.",
 				rules.DodgeDistance,
@@ -88,6 +98,54 @@ function AbilitiesUI.refresh()
 		description.Size = UDim2.new(1, -24, 0, 28)
 		description.TextWrapped = true
 	end
+	for _, group in { "RigManeuvers", "GemSurges" } do
+		local heading = text(
+			body,
+			if group == "RigManeuvers" then "RIG MANEUVERS · STAMINA · R / Z" else "GEM SURGES · CHARGE · F / X",
+			14,
+			if group == "RigManeuvers" then Tech.Resources.Stamina.Color else Tech.Resources.Charge.Color,
+			IronUi.Bold
+		)
+		heading.Size = UDim2.new(1, -12, 0, 26)
+		for _, id in Tech.Order[group] do
+			local definition = Tech.Catalog[id]
+			local available = definition.Resource ~= "Charge" or Tech.hasGem(loadout, definition.Element)
+			local card = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -12, 0, 70) }, body)
+			UiKit.round(card, 8)
+			local title = text(
+				card,
+				string.format(
+					"%s %s · %d %s%s",
+					definition.Icon,
+					definition.Name,
+					definition.Cost,
+					definition.Resource,
+					if definition.PerSecond then "/s" else ""
+				),
+				13,
+				if available then P.Gold else P.Dim,
+				IronUi.Bold
+			)
+			title.Position, title.Size = UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 22)
+			local description = text(
+				card,
+				definition.Description
+					.. (if not available then " Socket a compatible gem to power this surge." else ""),
+				12,
+				P.Text
+			)
+			description.Position, description.Size = UDim2.fromOffset(12, 30), UDim2.new(1, -24, 0, 34)
+			description.TextWrapped = true
+		end
+	end
+	local augments = text(
+		body,
+		"PASSIVE AUGMENTS · Your equipped gear applies these bonuses automatically.",
+		13,
+		P.Gold,
+		IronUi.Bold
+	)
+	augments.Size, augments.TextWrapped = UDim2.new(1, -12, 0, 32), true
 	for _, family in ArmorFamilies.Order do
 		local line = text(
 			body,
@@ -105,33 +163,33 @@ function AbilitiesUI.refresh()
 		line.TextWrapped = true
 	end
 	local training = IronUi.gemButton(body, "TRAIN ON DUMMIES", P.Teal, function()
-		AbilitiesUI.close()
+		CombatGuide.close()
 		ArenaScene.enter(false)
 	end)
 	training.Size = UDim2.fromOffset(230, 36)
 	local pvp = IronUi.gemButton(body, "ENTER PVP ARENA", P.Gold, function()
-		AbilitiesUI.close()
+		CombatGuide.close()
 		ArenaScene.enter(true)
 	end)
 	pvp.Size = UDim2.fromOffset(230, 36)
 end
-function AbilitiesUI.open()
+function CombatGuide.open()
 	gui.Enabled = true
 	window.Fit()
-	AbilitiesUI.refresh()
+	CombatGuide.refresh()
 end
-function AbilitiesUI.close()
+function CombatGuide.close()
 	gui.Enabled = false
 	clear(body)
 end
-function AbilitiesUI.toggle()
+function CombatGuide.toggle()
 	if gui.Enabled then
-		AbilitiesUI.close()
+		CombatGuide.close()
 	else
-		AbilitiesUI.open()
+		CombatGuide.open()
 	end
 end
-window.Close.Activated:Connect(AbilitiesUI.close)
-window.Shade.Activated:Connect(AbilitiesUI.close)
-GemClient.Changed:Connect(AbilitiesUI.refresh)
-return AbilitiesUI
+window.Close.Activated:Connect(CombatGuide.close)
+window.Shade.Activated:Connect(CombatGuide.close)
+GemClient.Changed:Connect(CombatGuide.refresh)
+return CombatGuide

@@ -2,11 +2,11 @@
 	The hub. Left: a big hero button over a grid of chunky menu tiles. In
 	menu-only mode (Shared/Config) that's MINE (M) over Cut (X), Craft (F),
 	Sell (V), Gems (G), Character (C) and Shop (B); otherwise SHOP over
-	Character, Abilities, Gems and Party. Top right: gold-edged bars
+	Character, RigManeuvers, Gems and Party. Top right: gold-edged bars
 	for coins (with a + that opens the Shop), Guild Marks and gems, and
 	pills for the Season Path and Top Players.
 
-	Keys: C character, K abilities, G gems, P party, B shop, J season,
+	Keys: C character, K rig maneuvers, G gems, P party, B shop, J season,
 	L top players. New players see the Welcome Bundle once the intro ends.
 ]]
 local ContextActionService = game:GetService("ContextActionService")
@@ -17,7 +17,7 @@ local StarterGui = game:GetService("StarterGui")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Season = require(ReplicatedStorage.Shared.Season)
 
-local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
+local CombatGuide = require(script.Parent.Modules.CombatGuide)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
@@ -201,7 +201,7 @@ local menu = if MENU_ONLY
 	}
 	else {
 		{ "🛡️", "Character", "C", CharacterUI.toggle },
-		{ "⚔️", "Combat", "K", AbilitiesUI.toggle },
+		{ "⚔️", "Combat", "K", CombatGuide.toggle },
 		{ "💎", "Gems", "G", InventoryUI.toggle },
 		{ "👥", "Party", "P", PartyUI.toggle },
 	}

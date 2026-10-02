@@ -3,7 +3,7 @@
 --
 -- Each option either has a Reply (text shown back) or an Action the client
 -- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
--- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "Abilities".
+-- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "RigManeuvers".
 
 export type Option = { Text: string, Reply: string?, Action: string? }
 export type Vendor = {
@@ -122,10 +122,10 @@ local Vendors: { [string]: Vendor } = {
 		Face = ">_<",
 		Greeting = "Looking for a fight? Warm up on my dummies inside, then go hunt the crystal beasts past the south gate.",
 		Options = {
-			{ Text = "Choose my abilities", Action = "Abilities" },
+			{ Text = "Review my combat rig", Action = "CombatGuide" },
 			{
 				Text = "How do I fight?",
-				Reply = "Left click to attack; hold it to keep swinging. Q, E and R cast the three abilities you've picked, F is your ultimate. Press K to swap abilities. You can't fight in town, only here in the Arena and outside the walls.",
+				Reply = "LMB attacks; hold and release on gold for a perfect hit. Q/E select swing sides, RMB guards, Space dodges. R triggers your Rig Maneuver; F triggers your Gem Surge. Z/X cycle them. Stamina powers your rig; socketed gems store Charge. Press K for the combat guide.",
 			},
 			{
 				Text = "What's out past the south gate?",

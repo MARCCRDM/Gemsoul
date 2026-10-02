@@ -923,14 +923,14 @@ end
 
 -- Passes --------------------------------------------------------------------------------------------------
 
-local function perkList(parent: Instance, perks: { string }, color: Color3, y: number)
+local function benefitList(parent: Instance, benefits: { string }, color: Color3, y: number)
 	local list = new("Frame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(24, y),
 		Size = UDim2.new(1, -48, 0, 150),
 	}, parent)
 	UiKit.list(list, 10)
-	for i, perk in perks do
+	for i, benefit in benefits do
 		local line = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = i }, list)
 		local dot = new("Frame", {
 			BackgroundColor3 = color,
@@ -940,7 +940,7 @@ local function perkList(parent: Instance, perks: { string }, color: Color3, y: n
 			Rotation = 45,
 		}, line)
 		UiKit.round(dot, 1)
-		local text = label(line, perk, 14, P.Text, BODY)
+		local text = label(line, benefit, 14, P.Text, BODY)
 		place(text, 20, 0, 400, 20)
 	end
 end
@@ -976,7 +976,7 @@ local function drawPasses()
 	best.Position = UDim2.fromOffset(10, 10)
 	local name = label(c, "VIP PASS", 28, WHITE, HEADING)
 	place(name, 24, 198, 300, 34)
-	perkList(c, {
+	benefitList(c, {
 		"Entry to the VIP shaft at the moon base",
 		"VIP seams roll rarer colours and better grades",
 		"Support Saga Miners' development",
@@ -1035,7 +1035,7 @@ local function drawPasses()
 	free.Position = UDim2.fromOffset(10, 10)
 	local sName = label(s, string.upper(Season.Name), 22, WHITE, HEADING)
 	place(sName, 24, 198, half - 48, 34)
-	perkList(s, {
+	benefitList(s, {
 		"Earn XP from expeditions, sales and daily visits",
 		"Coins, caches, cut gems and cosmetics every level",
 		"Exclusive trims and back pieces at levels 5 to 30",

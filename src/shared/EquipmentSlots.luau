@@ -31,7 +31,7 @@ for _, slot in { "Helmet", "Gloves", "Boots", "Shield" } do
 			elseif slot == "Helmet" then
 				passive = {
 					Name = "Targeting Array",
-					Text = "Abilities recharge " .. (i * 2) .. "% faster.",
+					Text = "Rig Maneuvers and Gem Surges recharge " .. (i * 2) .. "% faster.",
 					Effect = { CooldownMult = 1 - i * 0.02 },
 				}
 			elseif slot == "Gloves" then

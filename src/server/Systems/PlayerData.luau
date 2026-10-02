@@ -32,7 +32,7 @@ type Character = {
 	Armor: string?,
 	WeaponGem: Gem?, -- a cut gem socketed into the weapon
 	ArmorGem: Gem?, -- a cut gem socketed into the armor
-	Abilities: { string }?, -- the three ability ids on Q / E / R (Classes.loadout)
+	RigManeuvers: { string }?, -- the three rigManeuver ids on Q / E / R (Classes.loadout)
 	WeaponQuality: number?, -- 1-4, see Crafting.Qualities
 	ArmorQuality: number?,
 	[string]: any,
@@ -339,7 +339,8 @@ local function load(player: Player)
 		profiles[player].Character.Subclass = nil
 		profiles[player].Character.SubClass = nil
 		profiles[player].Character.Spec = nil
-		profiles[player].Character.Abilities = nil
+		profiles[player].Character["Abilities"] = nil -- discard retired saved picks
+		profiles[player].Character.RigManeuvers = nil
 	end
 	local currentProfile = profiles[player]
 	local class = Classes.get(currentProfile.Character.Class)
@@ -533,11 +534,11 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 	return gem
 end
 
--- The three abilities on Q / E / R (validated by the caller).
-function PlayerData.setAbilities(player: Player, ids: { string })
+-- The three rig maneuvers on Q / E / R (validated by the caller).
+function PlayerData.setRigManeuvers(player: Player, ids: { string })
 	local profile = profiles[player]
 	if profile then
-		profile.Character.Abilities = ids
+		profile.Character.RigManeuvers = ids
 		sync(player)
 	end
 end

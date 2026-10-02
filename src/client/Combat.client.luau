@@ -10,6 +10,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local FirstPerson = require(script.Parent.Modules.FirstPersonCombat)
 local GemClient = require(script.Parent.Modules.GemClient)
@@ -26,7 +27,10 @@ local new, text = IronUi.new, IronUi.text
 local cooldowns = {}
 local attackSide, nextSide, cursorFree = "Right", "Right", false
 local feedbackUntil = 0
-local attackTouch, blockTouch
+local attackTouch, blockTouch, surgeTouch
+local beamHeld, nextBeamUpdate = false, 0
+local selected = { RigManeuvers = 1, GemSurges = 1 }
+local techCooldowns = {}
 local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
 local gui = UiKit.gui("CombatHud", 5)
 local hud = new("Frame", {
@@ -34,14 +38,14 @@ local hud = new("Frame", {
 	BackgroundTransparency = 0.1,
 	AnchorPoint = Vector2.new(0.5, 1),
 	Position = UDim2.new(0.5, 0, 1, -120),
-	Size = UDim2.fromOffset(280, 74),
+	Size = UDim2.fromOffset(280, 118),
 }, gui)
 UiKit.round(hud, 12)
 local hp = text(hud, "", 14, P.Text, IronUi.Bold)
 hp.Position = UDim2.fromOffset(12, 8)
 hp.Size = UDim2.new(1, -24, 0, 22)
 local hint = text(hud, "Alternate sides; release when gold", 11, P.Dim)
-hint.Position = UDim2.fromOffset(12, 32)
+hint.Position = UDim2.fromOffset(12, 88)
 hint.Size = UDim2.new(1, -24, 0, 28)
 hint.TextWrapped = true
 local row =
@@ -57,6 +61,23 @@ local healthFill = new(
 	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
 	healthTrack
 )
+local resourceBars = {}
+for index, id in { "Stamina", "Charge" } do
+	local label = text(hud, id:upper(), 9, Tech.Resources[id].Color, IronUi.Bold)
+	label.Position, label.Size = UDim2.fromOffset(12, 36 + (index - 1) * 25), UDim2.new(1, -24, 0, 15)
+	local track = new("Frame", {
+		BackgroundColor3 = P.Dim,
+		BackgroundTransparency = 0.6,
+		Position = UDim2.fromOffset(12, 52 + (index - 1) * 25),
+		Size = UDim2.new(1, -24, 0, 5),
+	}, hud)
+	local fill = new(
+		"Frame",
+		{ BackgroundColor3 = Tech.Resources[id].Color, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) },
+		track
+	)
+	resourceBars[id] = { Label = label, Fill = fill }
+end
 local reticle = text(gui, "+", 24, P.Text, IronUi.Bold)
 reticle.AnchorPoint, reticle.Position, reticle.Size =
 	Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(40, 40)
@@ -93,7 +114,8 @@ local targetFill = new(
 	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
 	targetTrack
 )
-local controlsHint = text(gui, "LMB Attack | Q/E Side | RMB Guard | Space Dodge | Tab Cursor", 11, P.Text)
+local controlsHint =
+	text(gui, "LMB Attack | Q/E Side | RMB Guard | Space Dodge | R Rig | F Surge | Z/X Cycle | Tab Cursor", 11, P.Text)
 controlsHint.AnchorPoint, controlsHint.Position, controlsHint.Size =
 	Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -8), UDim2.new(1, -20, 0, 22)
 controlsHint.TextXAlignment = Enum.TextXAlignment.Center
@@ -148,6 +170,9 @@ local function rules()
 	)
 end
 local function beginAttack(side)
+	if beamHeld then
+		return
+	end
 	if cursorFree or not canFight() or blockHeld or holding or os.clock() < nextAttack then
 		return
 	end
@@ -177,6 +202,8 @@ local function setBlock(held)
 	end
 	blockHeld = held
 	if held then
+		beamHeld = false
+		input:FireServer("CancelTech")
 		holding = false
 		input:FireServer("CancelAttack")
 	end
@@ -197,6 +224,8 @@ local function dodge()
 	end
 	holding = false
 	blockHeld = false
+	beamHeld = false
+	input:FireServer("CancelTech")
 	input:FireServer("CancelAttack")
 	input:FireServer("Block", false)
 	local root = rootPart()
@@ -205,6 +234,81 @@ local function dodge()
 		"Dodge",
 		if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then humanoid.MoveDirection else root.CFrame.LookVector
 	)
+end
+local techButtons = {}
+local function selectedTech(group)
+	return Tech.Order[group][selected[group]]
+end
+local function triggerTech(group)
+	if cursorFree or not canFight() or holding or blockHeld then
+		return
+	end
+	local id = selectedTech(group)
+	if os.clock() < (techCooldowns[id] or 0) then
+		return
+	end
+	local definition = Tech.Catalog[id]
+	if definition.PerSecond then
+		beamHeld, nextBeamUpdate = true, os.clock() + 0.2
+	end
+	input:FireServer(if group == "RigManeuvers" then "RigManeuver" else "GemSurge", id, aimPoint())
+end
+local function stopBeam()
+	if beamHeld then
+		beamHeld = false
+		input:FireServer("CancelTech")
+	end
+end
+for index, group in { "RigManeuvers", "GemSurges" } do
+	local button = new("TextButton", {
+		BackgroundColor3 = P.Inset,
+		BackgroundTransparency = 0.15,
+		TextColor3 = P.Text,
+		TextSize = 11,
+		TextWrapped = true,
+		Size = UDim2.fromOffset(142, 58),
+		Position = UDim2.fromOffset(12, 82 + (index - 1) * 66),
+	}, gui)
+	UiKit.round(button, 10)
+	local cycle = new("TextButton", {
+		BackgroundColor3 = P.Inset,
+		TextColor3 = P.Gold,
+		Text = ">",
+		TextSize = 20,
+		Size = UDim2.fromOffset(28, 40),
+		Position = UDim2.fromOffset(158, 91 + (index - 1) * 66),
+	}, gui)
+	UiKit.round(cycle, 8)
+	cycle.Activated:Connect(function()
+		stopBeam()
+		selected[group] = selected[group] % #Tech.Order[group] + 1
+	end)
+	techButtons[group] = button
+	if group == "GemSurges" then
+		button.InputBegan:Connect(function(obj)
+			if
+				obj.UserInputType == Enum.UserInputType.Touch
+				or obj.UserInputType == Enum.UserInputType.MouseButton1
+			then
+				if obj.UserInputType == Enum.UserInputType.Touch then
+					surgeTouch = obj
+				end
+				triggerTech(group)
+			end
+		end)
+		button.InputEnded:Connect(function(obj)
+			if
+				obj.UserInputType == Enum.UserInputType.Touch
+				or obj.UserInputType == Enum.UserInputType.MouseButton1
+			then
+				stopBeam()
+			end
+		end)
+	else
+		button.Activated:Connect(function()
+			triggerTech(group)
+		end)
+	end
 end
 local function makeSlot(id, label, key, position)
 	local button, faceBox = IronUi.chunk(
@@ -271,7 +375,9 @@ leave.AnchorPoint = Vector2.new(1, 0)
 leave.Position = UDim2.new(1, -12, 0, 82)
 leave.Size = UDim2.fromOffset(160, 38)
 local function cancel()
-	attackTouch, blockTouch = nil, nil
+	attackTouch, blockTouch, surgeTouch = nil, nil, nil
+	beamHeld = false
+	input:FireServer("CancelTech")
 	holding = false
 	blockHeld = false
 	input:FireServer("CancelAttack")
@@ -281,7 +387,15 @@ UserInputService.InputBegan:Connect(function(obj, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
 		return
 	end
-	if obj.KeyCode == Enum.KeyCode.Q then
+	if obj.KeyCode == Enum.KeyCode.R then
+		triggerTech("RigManeuvers")
+	elseif obj.KeyCode == Enum.KeyCode.F then
+		triggerTech("GemSurges")
+	elseif obj.KeyCode == Enum.KeyCode.Z or obj.KeyCode == Enum.KeyCode.X then
+		stopBeam()
+		local group = if obj.KeyCode == Enum.KeyCode.Z then "RigManeuvers" else "GemSurges"
+		selected[group] = selected[group] % #Tech.Order[group] + 1
+	elseif obj.KeyCode == Enum.KeyCode.Q then
 		beginAttack("Left")
 	elseif obj.KeyCode == Enum.KeyCode.E then
 		beginAttack("Right")
@@ -292,6 +406,10 @@ UserInputService.InputBegan:Connect(function(obj, processed)
 	end
 end)
 UserInputService.InputEnded:Connect(function(obj)
+	if obj == surgeTouch or obj.KeyCode == Enum.KeyCode.F then
+		surgeTouch = nil
+		stopBeam()
+	end
 	if obj == attackTouch then
 		attackTouch = nil
 		releaseAttack()
@@ -335,14 +453,14 @@ player.CharacterAdded:Connect(function()
 	cancel()
 	FirstPerson.stop()
 	cursorFree = false
-	cooldowns = {}
+	cooldowns, techCooldowns = {}, {}
 	nextAttack = 0
 end)
 player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 	cancel()
 	FirstPerson.stop()
 	cursorFree = false
-	cooldowns = {}
+	cooldowns, techCooldowns = {}, {}
 	nextAttack = 0
 end)
 local lastActive = false
@@ -363,6 +481,17 @@ RunService.RenderStepped:Connect(function()
 	lastActive = true
 	local camera = workspace.CurrentCamera
 	local viewport = camera.ViewportSize
+	if viewport.Y < 430 and viewport.X >= 600 then
+		hud.AnchorPoint, hud.Position, hud.Size =
+			Vector2.new(1, 0), UDim2.new(1, -12, 0, 140), UDim2.fromOffset(220, 118)
+		dodgeButton.Position = UDim2.new(1, -56, 0, 80)
+		leave.Position = UDim2.new(1, -12, 0, 88)
+	else
+		hud.AnchorPoint, hud.Position, hud.Size =
+			Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -120), UDim2.fromOffset(280, 118)
+		dodgeButton.Position = UDim2.new(1, -56, 1, if viewport.X < 500 then -270 else -116)
+		leave.Position = UDim2.new(1, -12, 0, if viewport.X < 400 then 218 else 82)
+	end
 	local scale = math.min(1, math.max(0.65, (viewport.X - 20) / 280))
 	local sizing = hud:FindFirstChildOfClass("UIScale")
 	if not sizing then
@@ -379,6 +508,36 @@ RunService.RenderStepped:Connect(function()
 			math.ceil(humanoid.MaxHealth),
 			player:GetAttribute("Shield") or 0
 		)
+	end
+	for id, bar in resourceBars do
+		local amount, maximum = player:GetAttribute(id) or 0, player:GetAttribute("Max" .. id) or 100
+		bar.Label.Text = string.format("%s  %d / %d", id:upper(), math.floor(amount), maximum)
+		bar.Fill.Size = UDim2.fromScale(math.clamp(amount / math.max(1, maximum), 0, 1), 1)
+	end
+	for group, button in techButtons do
+		local id = selectedTech(group)
+		local definition = Tech.Catalog[id]
+		local remaining = math.max(0, (techCooldowns[id] or 0) - os.clock())
+		local loadout = GemClient.Profile and GemClient.Profile.Character
+		local available = definition.Resource ~= "Charge" or (loadout and Tech.hasGem(loadout, definition.Element))
+		button.TextColor3 = if available then P.Text else P.Dim
+		button.Text = string.format(
+			"%s %s\n%s · %d %s%s",
+			definition.Icon,
+			definition.Name,
+			if group == "RigManeuvers" then "R · RIG MANEUVER" else "F · GEM SURGE",
+			definition.Cost,
+			definition.Resource,
+			if not available
+				then " · socket gem"
+				elseif remaining > 0 then string.format(" · %.1fs", remaining)
+				elseif definition.PerSecond then "/s · HOLD"
+				else ""
+		)
+	end
+	if beamHeld and os.clock() >= nextBeamUpdate then
+		input:FireServer("GemSurge", "CryoStream", aimPoint())
+		nextBeamUpdate = os.clock() + 0.2
 	end
 	local now = os.clock()
 	chargeTrack.Visible = holding
@@ -527,6 +686,51 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 end
 
 local handlers = {}
+function handlers.TechStatus(message)
+	hint.Text, feedbackUntil = message, os.clock() + 1
+end
+function handlers.TechCooldown(id, duration)
+	techCooldowns[id] = os.clock() + duration
+	nextAttack = math.max(nextAttack, os.clock() + duration)
+	if Tech.Catalog[id].Resource == "Stamina" then
+		FirstPerson.swing("Right")
+	end
+end
+function handlers.TechPulse(_who, from, to, color, radius)
+	local distance = (to - from).Magnitude
+	if distance > 0.1 then
+		local beam = effectPart(Vector3.new(0.16, 0.16, distance), CFrame.lookAt((from + to) / 2, to), color)
+		fade(beam, 0.2)
+	end
+	if radius > 0 then
+		for _, axis in { CFrame.new(), CFrame.Angles(math.pi / 2, 0, 0), CFrame.Angles(0, 0, math.pi / 2) } do
+			local pulse = effectPart(
+				Vector3.new(0.15, radius * 2, radius * 2),
+				CFrame.new(to) * axis,
+				color,
+				Enum.PartType.Cylinder
+			)
+			pulse.Transparency = 0.75
+			fade(pulse, 0.35, pulse.Size * 1.25)
+		end
+	end
+end
+function handlers.TechField(who, color)
+	local root = who.Character and who.Character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	for index = 1, 6 do
+		local angle = index * math.pi / 3
+		local panel = effectPart(
+			Vector3.new(0.12, 1.5, 0.6),
+			CFrame.new(root.Position) * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0, -1.5),
+			color
+		)
+		panel.Transparency = 0.4
+		fade(panel, 0.5)
+	end
+end
 function handlers.HighBlock()
 	hint.Text, feedbackUntil = "HIGH BLOCK - COUNTER!", os.clock() + 1
 end

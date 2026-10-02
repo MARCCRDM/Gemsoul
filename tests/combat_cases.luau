@@ -46,7 +46,7 @@ a.Team,b.Team,a.Neutral,b.Neutral="Blue","Blue",false,false
 check(not CombatServer._canPvP(a,b),"Teammate attacked")
 a.Neutral,b.Neutral=true,true
 CombatServer.start()
-check(registered.SetAbilities(a,{}).Ok==false and Classes.ability("Warrior","Charge")==nil,"Retired abilities callable")
+check(registered.SetRigManeuvers(a,{}).Ok==false and Classes.rigManeuver("Warrior","Charge")==nil,"Retired abilities callable")
 CombatServer._input(a,"Ability",1,rb.Position)
 check(hb.Health==1000,"Retired Ability packet hit")
 CombatServer._input(a,"ReleaseAttack",rb.Position)

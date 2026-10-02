@@ -10,9 +10,9 @@
 	  damage = base x (Power / 60) x buffs, x1.6 on a crit or combo finisher
 	  crit chance = min(75%, 5% + min(2.5%, Speed / 4000) + equipment bonus)
 	  damage taken = hit x 60 / (60 + Defense) x armor/weapon/buff multipliers
-	Resources (per class) fill and drain as below; abilities spend them.
+	Resources (per class) fill and drain as below; rig maneuvers spend them.
 
-	Ability kinds (numbers live on each ability in Classes):
+	RigManeuver kinds (numbers live on each rigManeuver in Classes):
 	  Cone  hit enemies in front: Damage, Range, Arc
 	  Nova  hit enemies around you (or the aimed spot with AtTarget): Radius
 	  Dash  move Distance (Backward, Teleport), then hit around you if Damage
@@ -35,17 +35,13 @@ export type Resource = { Max: number, Start: number, Regen: number, OnHit: numbe
 
 -- Regen is per second; negative means it fades while out of combat.
 Combat.Resources = {
-	Rage = { Max = 100, Start = 0, Regen = -4, OnHit = 6, OnHurt = 4 },
-	Mana = { Max = 100, Start = 100, Regen = 7, OnHit = 0, OnHurt = 0 },
-	Focus = { Max = 100, Start = 100, Regen = 11, OnHit = 0, OnHurt = 0 },
-	Resolve = { Max = 100, Start = 0, Regen = -4, OnHit = 3, OnHurt = 8 },
+	Stamina = { Max = 100, Start = 100, Regen = 12, OnHit = 0, OnHurt = 0 },
+	Charge = { Max = 100, Start = 100, Regen = 7, OnHit = 0, OnHurt = 0 },
 } :: { [string]: Resource }
-
 Combat.ResourceColors = {
-	Rage = Color3.fromRGB(230, 60, 50),
-	Mana = Color3.fromRGB(70, 130, 255),
-	Focus = Color3.fromRGB(240, 200, 60),
-	Resolve = Color3.fromRGB(90, 200, 255),
+	Health = Color3.fromRGB(198, 62, 73),
+	Stamina = Color3.fromRGB(65, 195, 112),
+	Charge = Color3.fromRGB(70, 130, 255),
 }
 
 function Combat.powerMult(power: number): number

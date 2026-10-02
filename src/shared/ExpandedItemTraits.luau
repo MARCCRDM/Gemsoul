@@ -145,7 +145,7 @@ table.insert(Traits.Catalog.Helmets, {
 	Mods = {},
 	ProposedBuff = "Neural Sync +15% Cooldown Reduction",
 	BuffReady = true,
-	Passive = { Name = "Signature", Text = "Abilities recharge 15% faster.", Effect = { CooldownMult = 0.85 } },
+	Passive = { Name = "Signature", Text = "Rig Maneuvers and Gem Surges recharge 15% faster.", Effect = { CooldownMult = 0.85 } },
 })
 table.insert(
 	Traits.Visors,
@@ -351,7 +351,7 @@ table.insert(Traits.Catalog.Gloves, {
 	Style = "Frontier",
 	Look = "SuitScrap",
 	Mods = {},
-	ProposedBuff = "Melee Impact +5% Shield Bash Stagger",
+	ProposedBuff = "Melee Impact +5% Kinetic Ram Stagger",
 	BuffReady = false,
 	Passive = { Name = "Signature", Text = "Visual prototype. Signature effect is planned.", Effect = {} },
 })
@@ -915,7 +915,7 @@ table.insert(Traits.Catalog.Shields, {
 	Style = "Frontier",
 	Look = "SuitThermal",
 	Mods = {},
-	ProposedBuff = "Bulwark Slam Shield Bash Creates a Shockwave Stun",
+	ProposedBuff = "Bulwark Slam Kinetic Ram Creates a Shockwave Stun",
 	BuffReady = false,
 	Passive = { Name = "Signature", Text = "Visual prototype. Signature effect is planned.", Effect = {} },
 })

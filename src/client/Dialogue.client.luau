@@ -8,7 +8,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Vendors = require(ReplicatedStorage.Shared.Vendors)
-local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
+local CombatGuide = require(script.Parent.Modules.CombatGuide)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
@@ -248,9 +248,9 @@ function actions.SellGems()
 	ForgeUI.open()
 end
 
-function actions.Abilities()
+function actions.CombatGuide()
 	close()
-	AbilitiesUI.open()
+	CombatGuide.open()
 end
 
 function actions.MarketSell()

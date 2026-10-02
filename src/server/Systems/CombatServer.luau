@@ -6,6 +6,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local Enemies = require(script.Parent.Enemies)
@@ -88,6 +89,14 @@ end
 local function state(player)
 	if not states[player] then
 		states[player] = {
+			Resources = { Stamina = 100, Charge = 100 },
+			ResourceAt = os.clock(),
+			TechCooldowns = {},
+			NextTech = 0,
+			Pending = {},
+			SiphonUntil = 0,
+			SiphonCapacity = 0,
+			EchoUntil = 0,
 			NextAttack = 0,
 			NextDodge = 0,
 			BlockUntil = 0,
@@ -111,6 +120,20 @@ local function state(player)
 		}
 	end
 	return states[player]
+end
+local function updateResources(player, st, k)
+	local now = os.clock()
+	local elapsed = math.clamp(now - st.ResourceAt, 0, 1)
+	st.ResourceAt = now
+	for id, rule in Tech.Resources do
+		local regen = rule.Regen * (1 + (k.Effects[id .. "Regen"] or 0))
+		st.Resources[id] = math.min(rule.Max, st.Resources[id] + elapsed * regen)
+		if id == "Charge" and not Tech.hasGem(k.Loadout) then
+			st.Resources[id] = 0
+		end
+		player:SetAttribute(id, st.Resources[id])
+		player:SetAttribute("Max" .. id, rule.Max)
+	end
 end
 local function flat(v)
 	local direction = Vector3.new(v.X, 0, v.Z)
@@ -176,7 +199,8 @@ local function lineClear(from, to)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = skip
 	params.RespectCanCollide = true
-	return workspace:Raycast(from, to - from, params) == nil
+	local hit = workspace:Raycast(from, to - from, params)
+	return hit == nil or hit.Distance >= (to - from).Magnitude - 0.2
 end
 local function blocking(st, now)
 	return now < st.BlockUntil and now >= st.BlockBrokenUntil
@@ -225,7 +249,7 @@ local function rawDamage(target, amount, source, crit, color)
 		Enemies.damage(target.Enemy, amount, source, crit, color)
 	end
 end
-receive = function(player, amount, element, source, origin, projectile, heavy, reflected, enemySource, crit)
+receive = function(player, amount, element, source, origin, projectile, heavy, reflected, enemySource, crit, pierce)
 	local humanoid, root = alive(player)
 	local k = kit(player)
 	if not humanoid or not root or not k or amount <= 0 or not Combat.canFight(root.Position) then
@@ -249,7 +273,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		* EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
 	damage *= 1 + CrowdControl.debuff(st.CC, "Vulnerable", now) + CrowdControl.debuff(st.CC, "Aura", now)
 	local guarded = false
-	if blocking(st, now) and origin then
+	if blocking(st, now) and origin and not pierce then
 		local dot = flat(origin - root.Position):Dot(st.BlockDirection or flat(root.CFrame.LookVector))
 		if heavy and dot >= math.cos(math.rad(k.Rules.BlockArc / 2)) then
 			st.BlockUntil, st.BlockBrokenUntil = 0, now + Actions.Base.Heavy.BreakSeconds
@@ -298,6 +322,13 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				damage *= multiplier
 			end
 		end
+	end
+	if now < st.SiphonUntil and st.SiphonCapacity > 0 then
+		local absorbed = math.min(damage, st.SiphonCapacity)
+		st.SiphonCapacity -= absorbed
+		st.Resources.Charge = math.min(100, st.Resources.Charge + absorbed * 0.5)
+		damage -= absorbed
+		player:SetAttribute("Charge", st.Resources.Charge)
 	end
 	if now < st.ShieldUntil and st.Shield > 0 then
 		local absorbed = math.min(st.Shield, damage)
@@ -478,6 +509,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	if crit then
 		damage *= Combat.CritMult
 	end
+	local echoDamage = damage
 	local guarded = false
 	local gem = k.Loadout.WeaponGem
 	local element = gem and gem.Element
@@ -505,6 +537,19 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	if damage <= 0 or target.Humanoid.Health <= 0 then
 		return damage > 0 and not guarded, guarded
 	end
+	if os.clock() < st.EchoUntil then
+		if target.Player then
+			receive(target.Player, echoDamage, element, source, root.Position, projectile, false, false, nil, false)
+		else
+			Enemies.damage(target.Enemy, echoDamage, source, false, Color3.fromRGB(70, 180, 255))
+		end
+		fx(
+			"Arc",
+			root.Position + Vector3.new(0, 1.5, 0),
+			target.Root.Position + Vector3.new(0, 1.5, 0),
+			Color3.fromRGB(70, 180, 255)
+		)
+	end
 	procGem(source, k, target)
 	if heavy then
 		target.Root:ApplyImpulse(
@@ -523,7 +568,7 @@ local function attack(player, aim, heavy, swing)
 		return false
 	end
 	local st, now = state(player), os.clock()
-	if now < st.NextAttack or now < st.StunUntil or blocking(st, now) or st.DodgeMove then
+	if now < st.NextAttack or now < st.StunUntil or blocking(st, now) or st.DodgeMove or st.Channel then
 		return false
 	end
 	st.NextAttack = now + (if heavy then k.Rules.HeavyCooldown else k.Rules.BasicCooldown)
@@ -610,7 +655,7 @@ local function dodge(player, requested)
 		return false
 	end
 	local st, now = state(player), os.clock()
-	if now < st.NextDodge or now < st.StunUntil or st.DodgeMove then
+	if now < st.NextDodge or now < st.StunUntil or st.DodgeMove or st.Resources.Stamina < Tech.DodgeCost then
 		return false
 	end
 	local direction = if Vector3.new(requested.X, 0, requested.Z).Magnitude > 0.1
@@ -622,7 +667,10 @@ local function dodge(player, requested)
 	params.RespectCanCollide = true
 	local collision = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * k.Rules.DodgeDistance, params)
 	local travel = if collision then math.max(0, collision.Distance - 0.2) else k.Rules.DodgeDistance
+	Tech.spend(st.Resources, "Stamina", Tech.DodgeCost)
+	player:SetAttribute("Stamina", st.Resources.Stamina)
 	st.NextDodge, st.DodgeStarted = now + k.Rules.DodgeCooldown, now
+	st.Channel, st.Pending = nil, {}
 	st.AfterDodgeUntil, st.BlockUntil, st.ChargeStarted = now + Actions.AfterDodgeSeconds, 0, nil
 	st.DodgeMove = {
 		Root = root,
@@ -664,6 +712,7 @@ local function block(player, held, aim)
 		cleanse(st)
 		st.NextCleanse = now + k.Defense.CleanseInterval
 	end
+	st.Channel, st.Pending = nil, {}
 	st.BlockDirection, st.BlockUntil, st.ChargeStarted = flat(aim - root.Position), now + Actions.BlockLease, nil
 	player:SetAttribute("Blocking", true)
 	if not wasBlocking then
@@ -677,10 +726,217 @@ local function block(player, held, aim)
 	end
 	return true
 end
+local function surgeGem(loadout, element)
+	for _, slot in { "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+		local gem = loadout[slot .. "Gem"]
+		if gem and (not element or gem.Element == element) then
+			return gem
+		end
+	end
+	return nil
+end
+local function technologyHit(player, k, target, definition, scale)
+	if not targetAllowed(player, target) then
+		return
+	end
+	local _, root = alive(player)
+	local gem = if definition.Resource == "Charge" then surgeGem(k.Loadout, definition.Element) else nil
+	local damage = k.Weapon.Attack.Damage * Combat.powerMult(rating(k, "Power")) * definition.Damage * (scale or 1)
+	if gem then
+		damage *= 1 + math.clamp(gem.Size or 1, 1, 10) * 0.03
+	end
+	local color = GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80)
+	if target.Player then
+		damage = receive(
+			target.Player,
+			damage,
+			definition.Element,
+			player,
+			root.Position,
+			definition.Resource == "Charge",
+			definition.Heavy == true,
+			false,
+			nil,
+			false,
+			definition.Pierce
+		)
+	else
+		Enemies.damage(target.Enemy, damage, player, false, color)
+	end
+	if damage <= 0 then
+		return
+	end
+	if definition.Stun then
+		applyCC(target, definition.Stun)
+	end
+	if definition.Slow then
+		if target.Player then
+			local victim = state(target.Player)
+			victim.Slow = CrowdControl.applyDebuff(victim.CC, "Slow", definition.Slow, 0.75, os.clock(), true)
+			victim.SlowUntil = os.clock() + 0.75
+		else
+			Enemies.addStatus(target.Enemy, "Slow", definition.Slow, 0.75)
+		end
+	end
+	if definition.Element == "Fire" and gem then
+		local values = GemConfig.stats(gem, "Weapon", { Affinity = k.Affinity, PvP = target.Player ~= nil })
+		if target.Player then
+			addDot(target.Player, player, values.BurnDamage, values.BurnDuration)
+		else
+			Enemies.addDot(target.Enemy, values.BurnDamage, values.BurnDuration, player, color)
+		end
+	end
+end
+local function technologyStrike(player, definition, aim, scale)
+	local humanoid, root = alive(player)
+	local k, st = kit(player), state(player)
+	if
+		not humanoid
+		or not k
+		or not Combat.canFight(root.Position)
+		or os.clock() < st.StunUntil
+		or blocking(st, os.clock())
+		or st.DodgeMove
+	then
+		return
+	end
+	if definition.Resource == "Charge" and not Tech.hasGem(k.Loadout, definition.Element) then
+		return
+	end
+	local origin = root.Position + Vector3.new(0, 1.5, 0)
+	local offset = aim - origin
+	local direction = if offset.Magnitude > 0.01 then offset.Unit else root.CFrame.LookVector
+	local center = origin + direction * math.min(offset.Magnitude, definition.Range)
+	local color = GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80)
+	if definition.Resource == "Stamina" then
+		fx("Swing", player, root.Position, flat(direction), definition.Range, 100, color, definition.Heavy == true)
+		for _, target in targets(player) do
+			local v = target.Root.Position - root.Position
+			if
+				v.Magnitude <= definition.Range
+				and flat(v):Dot(flat(direction)) >= 0.5
+				and lineClear(origin, target.Root.Position + Vector3.new(0, 1.5, 0))
+			then
+				technologyHit(player, k, target, definition, scale)
+			end
+		end
+	elseif definition.Radius then
+		if not lineClear(origin, center) then
+			return
+		end
+		fx("TechPulse", player, origin, center, color, definition.Radius)
+		for _, target in targets(player) do
+			if
+				(target.Root.Position - center).Magnitude <= definition.Radius
+				and lineClear(center, target.Root.Position + Vector3.new(0, 1.5, 0))
+			then
+				technologyHit(player, k, target, definition, scale)
+			end
+		end
+	else
+		local nearest, along = nil, definition.Range
+		for _, target in targets(player) do
+			local v = target.Root.Position + Vector3.new(0, 1.5, 0) - origin
+			local projection = v:Dot(direction)
+			if
+				projection > 0
+				and projection <= along
+				and (v - direction * projection).Magnitude <= 2
+				and lineClear(origin, target.Root.Position + Vector3.new(0, 1.5, 0))
+			then
+				nearest, along = target, projection
+			end
+		end
+		fx("TechPulse", player, origin, origin + direction * along, color, 0)
+		if nearest then
+			technologyHit(player, k, nearest, definition, scale)
+		end
+	end
+end
+local function triggerTechnology(player, id, aim)
+	local definition = if typeof(id) == "string" then Tech.Catalog[id] else nil
+	local k, st, now = kit(player), state(player), os.clock()
+	local humanoid, root = alive(player)
+	if
+		not definition
+		or not k
+		or not humanoid
+		or not Actions.finiteVector(aim)
+		or not Combat.canFight(root.Position)
+	then
+		return false
+	end
+	if now < st.StunUntil or st.DodgeMove or blocking(st, now) or st.ChargeStarted then
+		return false
+	end
+	if definition.Resource == "Charge" and not Tech.hasGem(k.Loadout, definition.Element) then
+		return false
+	end
+	if id == "CryoStream" and st.Channel then
+		st.Channel.Aim, st.Channel.Until = aim, now + 0.5
+		return true
+	end
+	if now < st.NextAttack or now < st.NextTech or now < (st.TechCooldowns[id] or 0) or st.Channel then
+		return false
+	end
+	if definition.Shield and not Classes.gear(k.Loadout.Class, "Shields", k.Loadout.Shield) then
+		return false
+	end
+	local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)
+	if st.Resources[definition.Resource] < cost then
+		Remotes.CombatFx:FireClient(player, "TechStatus", "Not enough " .. definition.Resource)
+		return false
+	end
+	if id == "StimDodge" then
+		if not dodge(player, aim - root.Position) then
+			return false
+		end
+		CombatServer.heal(player, humanoid.MaxHealth * definition.Heal)
+	else
+		Tech.spend(st.Resources, definition.Resource, cost)
+	end
+	local recovery = definition.Recovery * (k.Effects.CooldownMult or 1)
+	st.TechCooldowns[id], st.NextTech = now + recovery, now + recovery
+	st.NextAttack = math.max(st.NextAttack, st.NextTech)
+	st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
+	player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
+	Remotes.CombatFx:FireClient(player, "TechCooldown", id, recovery)
+	Remotes.CombatFx:FireClient(player, "TechStatus", definition.Name)
+	if id == "EnergySiphon" then
+		st.SiphonUntil, st.SiphonCapacity = now + definition.Duration, 40
+		fx("TechField", player, Color3.fromRGB(70, 130, 255))
+	elseif id == "CryoShield" then
+		local gem = surgeGem(k.Loadout, "Frost")
+		st.Shield = math.max(st.Shield, 30 + (gem.Size or 1) * 3)
+		st.ShieldUntil = math.max(st.ShieldUntil, now + definition.Duration)
+		fx("TechField", player, GemConfig.ElementColors.Frost)
+	elseif id == "ResonanceEcho" then
+		st.EchoUntil = now + definition.Duration
+		fx("TechField", player, Color3.fromRGB(70, 130, 255))
+	elseif id == "CryoStream" then
+		technologyStrike(player, definition, aim, 0.25)
+		st.Channel = { Aim = aim, Until = now + 0.5, Next = now + 0.25 }
+	elseif definition.Damage then
+		if definition.Windup then
+			table.insert(st.Pending, { Id = id, Aim = aim, At = now + definition.Windup })
+			fx("TechField", player, Color3.fromRGB(255, 190, 80))
+		else
+			technologyStrike(player, definition, aim)
+			if definition.Hits == 2 then
+				table.insert(st.Pending, { Id = id, Aim = aim, At = now + 0.16 })
+			end
+		end
+	end
+	return true
+end
 local function onInput(player, action, a, b)
 	local st, now = state(player), os.clock()
 	if action == "Block" and a == false then
 		block(player, false)
+		return
+	end
+	if action == "CancelTech" then
+		st.Channel, st.Pending = nil, {}
 		return
 	end
 	if action == "CancelAttack" then
@@ -698,13 +954,24 @@ local function onInput(player, action, a, b)
 	if not humanoid or not Combat.canFight(root.Position) then
 		return
 	end
-	if action == "BeginAttack" then
+	local currentKit = kit(player)
+	if not currentKit then
+		return
+	end
+	updateResources(player, st, currentKit)
+	if action == "RigManeuver" or action == "GemSurge" then
+		local definition = typeof(a) == "string" and Tech.Catalog[a]
+		if definition and definition.Resource == (if action == "RigManeuver" then "Stamina" else "Charge") then
+			triggerTechnology(player, a, b)
+		end
+	elseif action == "BeginAttack" then
 		if
 			now >= st.NextAttack
 			and now >= st.StunUntil
 			and not blocking(st, now)
 			and not st.DodgeMove
 			and not st.ChargeStarted
+			and not st.Channel
 		then
 			st.ChargeStarted = now
 			st.ChargeSide = Actions.side(a)
@@ -736,11 +1003,37 @@ local function tick(_dt)
 		local humanoid, root = alive(player)
 		if not humanoid or not k or not Combat.canFight(root.Position) then
 			st.BlockUntil, st.ChargeStarted, st.DodgeStarted = 0, nil, nil
-			st.Dots = {}
+			st.Dots, st.Pending, st.Channel = {}, {}, nil
 			stopDodge(st)
 			player:SetAttribute("Blocking", false)
 			continue
 		end
+		updateResources(player, st, k)
+		if now < st.StunUntil then
+			st.Channel, st.Pending = nil, {}
+		end
+		for i = #st.Pending, 1, -1 do
+			local pending = st.Pending[i]
+			if now >= pending.At then
+				table.remove(st.Pending, i)
+				technologyStrike(player, Tech.Catalog[pending.Id], pending.Aim)
+			end
+		end
+		if st.Channel then
+			local channel, definition = st.Channel, Tech.Catalog.CryoStream
+			if now >= channel.Until or blocking(st, now) or st.DodgeMove or not Tech.hasGem(k.Loadout, "Frost") then
+				st.Channel = nil
+			elseif now >= channel.Next then
+				if Tech.spend(st.Resources, "Charge", definition.Cost * 0.25) then
+					technologyStrike(player, definition, channel.Aim, 0.25)
+					channel.Next = now + 0.25
+				else
+					st.Channel = nil
+				end
+			end
+		end
+		player:SetAttribute("Channeling", st.Channel ~= nil)
+		player:SetAttribute("Charge", st.Resources.Charge)
 		if st.DodgeMove then
 			if now >= st.DodgeMove.Ends then
 				stopDodge(st)
@@ -823,14 +1116,20 @@ function CombatServer.reset(player)
 	player:SetAttribute("Blocking", false)
 	player:SetAttribute("Shield", 0)
 	player:SetAttribute("CombatCharging", false)
+	player:SetAttribute("Channeling", false)
+	player:SetAttribute("Stamina", 100)
+	player:SetAttribute("Charge", 0)
 end
 function CombatServer.start()
 	Enemies.hitPlayer = function(player, amount, element, enemy)
 		CombatServer.hurt(player, amount, element, enemy)
 	end
 	Remotes.CombatInput.OnServerEvent:Connect(onInput)
-	Shop.register("SetAbilities", function()
-		return Shop.reply(false, "Every Warrior uses Attack, Heavy, Dodge and Block. Armor enhances these actions.")
+	Shop.register("SetRigManeuvers", function()
+		return Shop.reply(
+			false,
+			"Rig Maneuvers are universal. Cycle your combat rig with Z; trigger with R. Gem Surges use X and F."
+		)
 	end)
 	local function watch(player)
 		player.CharacterAdded:Connect(function()
@@ -855,6 +1154,7 @@ function CombatServer.start()
 	end)
 	RunService.Heartbeat:Connect(tick)
 end
+CombatServer._technology = triggerTechnology
 CombatServer._attack, CombatServer._dodge, CombatServer._block = attack, dodge, block
 CombatServer._input, CombatServer._state, CombatServer._tick, CombatServer._canPvP = onInput, state, tick, canPvP
 return CombatServer

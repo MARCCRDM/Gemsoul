@@ -26,7 +26,7 @@ source += "local profiles = {}\nlocal PlayerData = {}\nlocal characterChanged = 
 source += "function PlayerData.findGem(player,id) for _,gem in profiles[player].Gems do if gem.Id==id then return gem end end end\n"
 source += "function PlayerData.removeGem(player,id) for i,gem in profiles[player].Gems do if gem.Id==id then table.remove(profiles[player].Gems,i); return gem end end end\n"
 data = read("src/server/Systems/PlayerData.luau")
-source += data[data.index("local SOCKET_KEYS"):data.index("-- The three abilities")]
+source += data[data.index("local SOCKET_KEYS"):data.index("-- The three rig maneuvers")]
 source += data[data.index("local GEAR_KEYS"):data.index("-- Records a first")]
 source += read("tests/equipment_cases.luau")
 source += read("tests/expanded_traits_cases.luau")

@@ -1,4 +1,4 @@
--- One passive equipment budget, independent of armor ratings and temporary abilities.
+-- One passive equipment budget, independent of armor ratings and temporary rig maneuvers.
 local Balance = {}
 Balance.MaxDamageReduction = 0.20
 Balance.MaxCooldownReduction = 0.60
