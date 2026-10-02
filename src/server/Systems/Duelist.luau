@@ -113,6 +113,8 @@ local function buildRig(loadout, name: string, at: CFrame): Model?
 		return nil
 	end
 	rig.Name = name
+	-- Stream the whole body at once, so clients can pose its joints.
+	rig.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	rig:PivotTo(at)
 	Equipment.dressModel(rig, loadout, math.random(1, 1e6))
 	-- A translucent shield plate that shows while its guard is up.

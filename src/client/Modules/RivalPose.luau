@@ -30,7 +30,8 @@ local JOINTS = {
 	RightKnee = "RightLowerLeg",
 	LeftKnee = "LeftLowerLeg",
 }
-local FOLLOW = 0.28 -- how long a strike's follow-through holds, seconds
+local JOINT_COUNT = 10
+local FOLLOW = 0.32 -- how long a strike's follow-through holds, seconds
 
 -- Angles are radians about the joint's X (positive swings a limb forward and
 -- up, or leans the torso back), Y (twists left) and Z (positive raises the
@@ -213,21 +214,33 @@ end
 -- [model] = { Motors = { [joint] = { Motor, C0 } }, Angles = {...} }
 local rigs = setmetatable({}, { __mode = "k" })
 
+-- Its joints. With streaming on, the body parts can arrive after the model
+-- itself, so any joint not found yet is looked for again every half second.
 local function rigOf(model: Model)
 	local rig = rigs[model]
-	if rig then
-		return rig
+	if not rig then
+		rig = { Motors = {}, Angles = {}, Found = 0, NextScan = 0 }
+		rigs[model] = rig
 	end
-	rig = { Motors = {}, Angles = {} }
-	for joint, partName in JOINTS do
-		local part = model:FindFirstChild(partName)
-		local motor = part and part:FindFirstChild(joint)
-		if motor and motor:IsA("Motor6D") then
-			rig.Motors[joint] = { Motor = motor, C0 = motor.C0 }
-			rig.Angles[joint] = { 0, 0, 0 }
+	local now = os.clock()
+	if rig.Found < JOINT_COUNT and now >= rig.NextScan then
+		rig.NextScan = now + 0.5
+		for joint, partName in JOINTS do
+			local entry = rig.Motors[joint]
+			if not entry or entry.Motor.Parent == nil then
+				local part = model:FindFirstChild(partName)
+				local motor = part and part:FindFirstChild(joint)
+				if motor and motor:IsA("Motor6D") then
+					rig.Motors[joint] = { Motor = motor, C0 = motor.C0 }
+					rig.Angles[joint] = { 0, 0, 0 }
+				end
+			end
+		end
+		rig.Found = 0
+		for _ in rig.Motors do
+			rig.Found += 1
 		end
 	end
-	rigs[model] = rig
 	return rig
 end
 
