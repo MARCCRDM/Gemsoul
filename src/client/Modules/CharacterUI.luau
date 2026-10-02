@@ -106,6 +106,7 @@ local avatarCamera = new("Camera", { FieldOfView = 30 }, avatar)
 avatar.CurrentCamera = avatarCamera
 avatarCamera.CFrame = CFrame.lookAt(Vector3.new(0, 1, -13.5), Vector3.new(0, 0.5, 0))
 local avatarModel: Model? = nil
+local onAvatarChanged: (() -> ())? = nil -- redraws the portrait card (set below)
 local equipmentSlots = {}
 local refreshItemArt: (() -> ())? = nil
 
@@ -141,6 +142,9 @@ local function refreshAvatar()
 	copy.Parent = avatarWorld
 	if refreshItemArt then
 		refreshItemArt()
+	end
+	if onAvatarChanged then
+		onAvatarChanged()
 	end
 end
 
@@ -1185,6 +1189,7 @@ local function drawTooltipContent()
 		local view = new("ViewportFrame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
+			ZIndex = 2, -- above the backdrop's glow
 			Ambient = Color3.fromRGB(150, 160, 185),
 			LightColor = Color3.fromRGB(255, 240, 215),
 			LightDirection = Vector3.new(-0.5, -0.8, 0.6),
@@ -1212,9 +1217,15 @@ local function drawTooltipContent()
 				copy:PivotTo(CFrame.new())
 				copy.Parent = world
 				-- A head-and-shoulders shot, facing the camera.
-				local box, size = copy:GetBoundingBox()
-				local focus = box.Position + Vector3.new(0, size.Y * 0.2, 0)
-				camera.CFrame = CFrame.lookAt(focus + Vector3.new(0.6, 0.3, -size.Y * 1.25), focus)
+				local head = copy:FindFirstChild("Head")
+				local focus
+				if head and head:IsA("BasePart") then
+					focus = head.Position - Vector3.new(0, 0.9, 0)
+				else
+					local box, size = copy:GetBoundingBox()
+					focus = box.Position + Vector3.new(0, size.Y * 0.2, 0)
+				end
+				camera.CFrame = CFrame.lookAt(focus + Vector3.new(1.2, 0.5, -8.5), focus)
 			end)
 		end
 		local info = new("Frame", {
@@ -1316,6 +1327,12 @@ function drawTooltip()
 	tipBody.Size =
 		UDim2.new(tipBody.Size.X.Scale, tipBody.Size.X.Offset, 1, if hasActions then -(actionHeight + 8) else 0)
 	tipActions.Visible = hasActions
+end
+-- The portrait card re-draws once the character (re)loads.
+onAvatarChanged = function()
+	if selection == nil then
+		drawTooltip()
+	end
 end
 
 local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number?)
