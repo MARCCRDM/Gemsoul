@@ -1112,6 +1112,15 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	return folder
 end
 
+-- Dresses any rig (the PvP Duelist) in a loadout, as a player would wear it.
+function Equipment.dressModel(model: Model, loadout, seed: number): Folder?
+	local folder = dress(model, loadout, nil, seed)
+	if folder then
+		folder.Parent = model
+	end
+	return folder
+end
+
 function Equipment.apply(player: Player)
 	local character = player.Character
 	local loadout = PlayerData.character(player)

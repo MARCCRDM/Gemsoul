@@ -1181,8 +1181,9 @@ local function onInput(player, action, a, b)
 		block(player, true, b)
 	end
 end
-function CombatServer.hurt(player, amount, element, enemy)
-	return receive(player, amount, element, nil, enemy and enemy.Root.Position, false, false, false, enemy)
+-- A monster or Duelist hit. `heavy` blows break a raised guard, like a player's.
+function CombatServer.hurt(player, amount, element, enemy, heavy)
+	return receive(player, amount, element, nil, enemy and enemy.Root.Position, false, heavy == true, false, enemy)
 end
 local function tick(_dt)
 	local now = os.clock()
@@ -1335,8 +1336,8 @@ function CombatServer.reset(player)
 	player:SetAttribute("Charge", 0)
 end
 function CombatServer.start()
-	Enemies.hitPlayer = function(player, amount, element, enemy)
-		CombatServer.hurt(player, amount, element, enemy)
+	Enemies.hitPlayer = function(player, amount, element, enemy, heavy)
+		CombatServer.hurt(player, amount, element, enemy, heavy)
 	end
 	Remotes.CombatInput.OnServerEvent:Connect(onInput)
 	Shop.register("SetRigManeuvers", function()

@@ -141,13 +141,20 @@ export type Enemy = {
 	TauntUntil: number,
 	Taunter: Player?,
 	Dots: { Dot },
+	-- Custom fighters (the PvP Duelist) bring their own brain and rules:
+	Brain: ((Enemy, number) -> ())?, -- thinks instead of the monster AI
+	OnDeath: ((Enemy) -> ())?, -- replaces the usual rewards and respawn
+	GuardUntil: number?, -- raised guard: incoming damage x GuardMult
+	GuardMult: number?,
+	DodgeUntil: number?, -- mid-dodge: hits miss
+	[string]: any,
 }
 
 local enemies: { [Model]: Enemy } = {}
 local folder: Folder
 
 -- Hooks CombatServer fills in (avoids the two modules requiring each other).
-Enemies.hitPlayer = function(_player: Player, _amount: number, _element: string?, _enemy: Enemy) end
+Enemies.hitPlayer = function(_player: Player, _amount: number, _element: string?, _enemy: Enemy, _heavy: boolean?) end
 
 local function fx(kind: string, ...)
 	Remotes.CombatFx:FireAllClients(kind, ...)
@@ -413,6 +420,61 @@ local function spawn(kindId: string, home: Vector3, facing: Vector3?)
 	}
 end
 
+-- Registers a ready-built fighter (a rig with a Humanoid) as an enemy, so
+-- every player attack, surge and status already works against it.
+function Enemies.adopt(model: Model, kind, opts: { Element: string?, Title: string?, Home: Vector3? }): Enemy
+	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
+	local root = (model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")) :: BasePart
+	humanoid.MaxHealth, humanoid.Health = kind.Health, kind.Health
+	humanoid.WalkSpeed = kind.Speed
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	humanoid.BreakJointsOnDeath = false
+	local color = if opts.Element then GemConfig.ElementColors[opts.Element] else Color3.new(1, 1, 1)
+	local bar = healthBar(root, opts.Title or kind.Name, color, 3.5)
+	model:SetAttribute("Enemy", kind.Name)
+	model.Parent = folder
+	pcall(root.SetNetworkOwner, root, nil)
+	local enemy = {
+		Model = model,
+		Kind = kind,
+		KindId = kind.Name,
+		Humanoid = humanoid,
+		Root = root,
+		Home = opts.Home or root.Position,
+		Element = opts.Element,
+		Bar = bar,
+		Alive = true,
+		LastHit = 0,
+		LastAttack = 0,
+		Damage = {},
+		Threat = {},
+		StunUntil = 0,
+		SlowUntil = 0,
+		Slow = 0,
+		SunderUntil = 0,
+		Sunder = 0,
+		WeakenUntil = 0,
+		Weaken = 0,
+		VulnerableUntil = 0,
+		Vulnerable = 0,
+		AuraUntil = 0,
+		Aura = 0,
+		TauntUntil = 0,
+		Taunter = nil,
+		Dots = {},
+	}
+	enemies[model] = enemy
+	return enemy
+end
+
+-- Takes a fighter out without a death (its session ended).
+function Enemies.remove(enemy: Enemy)
+	enemy.Alive = false
+	enemies[enemy.Model] = nil
+	enemy.Model:Destroy()
+end
+
 -- Damage and effects -------------------------------------------------------------------------
 
 function Enemies.all(): { Enemy }
@@ -463,19 +525,33 @@ end
 local function die(enemy: Enemy)
 	enemy.Alive = false
 	fx("Death", enemy.Root.Position, if enemy.Element then GemConfig.ElementColors[enemy.Element] else nil)
-	reward(enemy)
+	if enemy.OnDeath then
+		enemy.OnDeath(enemy)
+	else
+		reward(enemy)
+	end
 	local model = enemy.Model
 	task.delay(0.6, function()
 		enemies[model] = nil
 		model:Destroy()
 	end)
-	task.delay(enemy.Kind.Respawn, spawn, enemy.KindId, enemy.Home)
+	if enemy.Kind.Respawn and enemy.Kind.Respawn > 0 then
+		task.delay(enemy.Kind.Respawn, spawn, enemy.KindId, enemy.Home)
+	end
 end
 
 -- Deals damage. `color` tints the floating number (element hits, crits).
 function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boolean?, color: Color3?)
 	if not enemy.Alive or amount <= 0 then
 		return
+	end
+	local now = os.clock()
+	if enemy.DodgeUntil and now < enemy.DodgeUntil then
+		return -- slipped out of the way
+	end
+	if enemy.GuardUntil and now < enemy.GuardUntil then
+		amount *= enemy.GuardMult or 0.3
+		fx("BlockSpark", enemy.Root.Position, false)
 	end
 	amount = math.floor(amount * (1 + Enemies.exposure(enemy)) + 0.5)
 	local humanoid = enemy.Humanoid
@@ -705,6 +781,8 @@ function Enemies.start(trainingOnly: boolean?)
 							enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
 							updateBar(enemy)
 						end
+					elseif enemy.Brain then
+						enemy.Brain(enemy, now)
 					else
 						think(enemy, now)
 					end

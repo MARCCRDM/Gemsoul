@@ -7,6 +7,9 @@ local CombatServer = require(script.Parent.CombatServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 local ArenaSessions = {}
+-- Hooks set by the Duelist (a computer rival in PvP); nil when not running.
+ArenaSessions.onEnter = nil :: ((Player, boolean) -> ())?
+ArenaSessions.onLeave = nil :: ((Player) -> ())?
 local busy = {}
 local function enter(player, pvp)
 	if busy[player] or player:GetAttribute("CombatSession") then
@@ -42,14 +45,20 @@ local function enter(player, pvp)
 	local protection = Instance.new("ForceField")
 	protection.Parent = character
 	Debris:AddItem(protection, 3)
+	if ArenaSessions.onEnter then
+		task.spawn(ArenaSessions.onEnter, player, pvp == true)
+	end
 	return Shop.reply(
 		true,
 		if pvp
-			then "PvP Arena: other Arena fighters can attack you."
+			then "PvP Arena: a rival miner steps in. Other Arena fighters can attack you too."
 			else "Training Arena: practise on dummies. Player damage is off."
 	)
 end
 local function leave(player)
+	if ArenaSessions.onLeave then
+		ArenaSessions.onLeave(player)
+	end
 	CombatServer.reset(player)
 	player:SetAttribute("PvPEnabled", false)
 	player:SetAttribute("CombatSession", nil)
@@ -70,6 +79,9 @@ function ArenaSessions.start()
 	Shop.register("ArenaLeave", leave)
 	local function watch(player)
 		player.CharacterAdded:Connect(function()
+			if ArenaSessions.onLeave then
+				ArenaSessions.onLeave(player)
+			end
 			player:SetAttribute("PvPEnabled", false)
 			player:SetAttribute("CombatSession", nil)
 		end)
@@ -80,6 +92,9 @@ function ArenaSessions.start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		busy[player] = nil
+		if ArenaSessions.onLeave then
+			ArenaSessions.onLeave(player)
+		end
 	end)
 	-- Leaving the floor ends PvP eligibility; re-entry requires an explicit session.
 	local timer = 0
