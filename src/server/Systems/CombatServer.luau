@@ -771,7 +771,9 @@ local function technologyHit(player, k, target, definition, scale)
 		return
 	end
 	local _, root = alive(player)
-	local gem = if definition.Resource == "Charge" then surgeGem(k.Loadout, definition.Element) else nil
+	local gem = if definition.Resource == "Charge"
+		then (definition.Gem or surgeGem(k.Loadout, definition.Element))
+		else nil
 	local damage = k.Weapon.Attack.Damage * Combat.powerMult(rating(k, "Power")) * definition.Damage * (scale or 1)
 	if definition.Resource == "Stamina" then
 		damage *= k.Effects.WeaponAugmentMult
@@ -790,6 +792,11 @@ local function technologyHit(player, k, target, definition, scale)
 	if gem then
 		damage *= 1 + math.clamp(gem.Size or 1, 1, 10) * 0.03
 	end
+	-- A surge gem's Cut sets its critical chance.
+	local crit = (definition.Crit or 0) > 0 and math.random() < definition.Crit
+	if crit then
+		damage *= Combat.CritMult
+	end
 	local color = GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80)
 	if target.Player then
 		damage = receive(
@@ -806,7 +813,7 @@ local function technologyHit(player, k, target, definition, scale)
 			definition.Pierce
 		)
 	else
-		Enemies.damage(target.Enemy, damage, player, false, color)
+		Enemies.damage(target.Enemy, damage, player, crit, color)
 	end
 	if damage <= 0 then
 		return
@@ -817,10 +824,11 @@ local function technologyHit(player, k, target, definition, scale)
 	if definition.Slow then
 		if target.Player then
 			local victim = state(target.Player)
-			victim.Slow = CrowdControl.applyDebuff(victim.CC, "Slow", definition.Slow, 0.75, os.clock(), true)
-			victim.SlowUntil = os.clock() + 0.75
+			local slowTime = definition.SlowTime or 0.75
+			victim.Slow = CrowdControl.applyDebuff(victim.CC, "Slow", definition.Slow, slowTime, os.clock(), true)
+			victim.SlowUntil = os.clock() + slowTime
 		else
-			Enemies.addStatus(target.Enemy, "Slow", definition.Slow, 0.75)
+			Enemies.addStatus(target.Enemy, "Slow", definition.Slow, definition.SlowTime or 0.75)
 		end
 	end
 	if definition.Shred then
@@ -866,7 +874,7 @@ local function technologyStrike(player, definition, aim, scale)
 	then
 		return
 	end
-	if definition.Resource == "Charge" and not Tech.hasGem(k.Loadout, definition.Element) then
+	if definition.Resource == "Charge" and not definition.Gem and not Tech.hasGem(k.Loadout, definition.Element) then
 		return
 	end
 	local origin = root.Position + Vector3.new(0, 1.5, 0)
@@ -920,6 +928,7 @@ local function technologyStrike(player, definition, aim, scale)
 				Definition = {
 					Name = definition.Name,
 					Resource = "Charge",
+					Gem = definition.Gem,
 					Element = definition.Element,
 					Damage = cloud.Damage,
 					Shred = cloud.Shred,
@@ -948,6 +957,23 @@ local function technologyStrike(player, definition, aim, scale)
 			then
 				nearest, along = target, projection
 			end
+		end
+		if definition.Piercing then
+			-- Pierces: everyone along the line, out to Range (Cryo Lance).
+			fx("TechPulse", player, origin, origin + direction * definition.Range, color, 0)
+			for _, target in targets(player) do
+				local v = target.Root.Position + Vector3.new(0, 1.5, 0) - origin
+				local projection = v:Dot(direction)
+				if
+					projection > 0
+					and projection <= definition.Range
+					and (v - direction * projection).Magnitude <= 2
+					and lineClear(origin, target.Root.Position + Vector3.new(0, 1.5, 0))
+				then
+					technologyHit(player, k, target, definition, scale)
+				end
+			end
+			return
 		end
 		fx("TechPulse", player, origin, origin + direction * along, color, 0)
 		if nearest then
@@ -985,36 +1011,51 @@ local function technologyStrike(player, definition, aim, scale)
 		end
 	end
 end
-local function triggerTechnology(player, id, aim)
-	local definition = if typeof(id) == "string" then Tech.Catalog[id] else nil
+-- Rig Maneuvers (learned in the Augment Tree, keys 1-3) and Gem Surges (the
+-- gem in Surge Array slot Q, E or R). `surgeKey` marks a surge cast.
+local function triggerTechnology(player, id, aim, surgeKey)
 	local k, st, now = kit(player), state(player), os.clock()
 	local humanoid, root = alive(player)
-	if
-		not definition
-		or not k
-		or not humanoid
-		or not Actions.finiteVector(aim)
-		or not Combat.canFight(root.Position)
-	then
+	if not k or not humanoid or not Actions.finiteVector(aim) or not Combat.canFight(root.Position) then
 		return false
 	end
-	if not Tree.isLearned(PlayerData.get(player), id) then
-		Remotes.CombatFx:FireClient(player, "TechStatus", "Unlock " .. definition.Name .. " in the Augment Tree.")
+	local profile = PlayerData.get(player)
+	local definition, cooldownKey
+	if surgeKey then
+		-- The surge comes from the gem: its element and tier pick the ability;
+		-- its rank, Size, Clarity and Cut, plus Surge Amplifiers, set the numbers.
+		local gem = k.Loadout.SurgeGems and k.Loadout.SurgeGems[surgeKey]
+		if not gem then
+			Remotes.CombatFx:FireClient(player, "TechStatus", "Socket a gem in surge slot " .. surgeKey)
+			return false
+		end
+		definition = Tech.surgeStats(gem, Tree.effects(profile))
+		cooldownKey = "Surge" .. surgeKey
+	else
+		local base = if typeof(id) == "string" then Tech.Catalog[id] else nil
+		if not base or base.Resource ~= "Stamina" then
+			return false
+		end
+		if not Tree.isLearned(profile, id) then
+			Remotes.CombatFx:FireClient(player, "TechStatus", "Unlock " .. base.Name .. " in the Augment Tree.")
+			return false
+		end
+		-- Ranks II and III hit harder, cost less, recover faster and last longer.
+		definition = Tree.techStats(profile, id)
+		cooldownKey = id
+	end
+	if not definition then
 		return false
 	end
-	-- Ranks II and III hit harder, cost less, recover faster and last longer.
-	definition = Tree.techStats(PlayerData.get(player), id)
+	id = definition.Id or id
 	if now < st.StunUntil or st.DodgeMove or blocking(st, now) or st.ChargeStarted then
 		return false
 	end
-	if definition.Resource == "Charge" and not Tech.hasGem(k.Loadout, definition.Element) then
-		return false
-	end
-	if id == "CryoStream" and st.Channel then
+	if definition.PerSecond and st.Channel and st.Channel.Key == cooldownKey then
 		st.Channel.Aim, st.Channel.Until = aim, now + 0.5
 		return true
 	end
-	if now < st.NextAttack or now < st.NextTech or now < (st.TechCooldowns[id] or 0) or st.Channel then
+	if now < st.NextAttack or now < st.NextTech or now < (st.TechCooldowns[cooldownKey] or 0) or st.Channel then
 		return false
 	end
 	if definition.Shield and not Classes.gear(k.Loadout.Class, "Shields", k.Loadout.Shield) then
@@ -1034,35 +1075,34 @@ local function triggerTechnology(player, id, aim)
 		Tech.spend(st.Resources, definition.Resource, cost)
 	end
 	local recovery = definition.Recovery * (k.Effects.CooldownMult or 1)
-	st.TechCooldowns[id], st.NextTech = now + recovery, now + recovery
+	st.TechCooldowns[cooldownKey], st.NextTech = now + recovery, now + recovery
 	st.NextAttack = math.max(st.NextAttack, st.NextTech)
 	st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
 	player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
-	Remotes.CombatFx:FireClient(player, "TechCooldown", id, recovery)
+	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, recovery)
 	Remotes.CombatFx:FireClient(player, "TechStatus", definition.Name)
-	if id == "EnergySiphon" then
-		st.SiphonUntil, st.SiphonCapacity = now + definition.Duration, 40
-		fx("TechField", player, Color3.fromRGB(70, 130, 255))
-	elseif id == "CryoShield" then
-		local gem = surgeGem(k.Loadout, "Frost")
-		st.Shield = math.max(st.Shield, 30 + (gem.Size or 1) * 3)
+	if id == "CryoShield" then
+		local gem = definition.Gem or surgeGem(k.Loadout, "Frost")
+		st.Shield = math.max(st.Shield, 30 + (gem and gem.Size or 1) * 3)
 		st.ShieldUntil = math.max(st.ShieldUntil, now + definition.Duration)
 		fx("TechField", player, GemConfig.ElementColors.Frost)
-	elseif id == "ResonanceEcho" then
-		st.EchoUntil = now + definition.Duration
-		fx("TechField", player, Color3.fromRGB(70, 130, 255))
-	elseif id == "CryoStream" then
+	elseif definition.PerSecond then
 		technologyStrike(player, definition, aim, 0.25)
-		st.Channel = { Aim = aim, Until = now + 0.5, Next = now + 0.25 }
+		st.Channel = { Key = cooldownKey, Definition = definition, Aim = aim, Until = now + 0.5, Next = now + 0.25 }
 	elseif definition.Damage then
 		if definition.Windup then
-			table.insert(st.Pending, { Id = id, Aim = aim, At = now + definition.Windup })
+			table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + definition.Windup })
 			fx("TechField", player, Color3.fromRGB(255, 190, 80))
 		else
 			technologyStrike(player, definition, aim)
 			if definition.Hits == 2 then
-				table.insert(st.Pending, { Id = id, Aim = aim, At = now + 0.16 })
+				table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + 0.16 })
 			end
+		end
+		-- Arcane Resonance: a chance for the surge to fire a second time, free.
+		if (definition.Echo or 0) > 0 and math.random() < definition.Echo then
+			table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + (definition.Windup or 0) + 0.3 })
+			Remotes.CombatFx:FireClient(player, "TechStatus", "Arcane Resonance!")
 		end
 	end
 	return true
@@ -1097,10 +1137,11 @@ local function onInput(player, action, a, b)
 		return
 	end
 	updateResources(player, st, currentKit)
-	if action == "RigManeuver" or action == "GemSurge" then
-		local definition = typeof(a) == "string" and Tech.Catalog[a]
-		if definition and definition.Resource == (if action == "RigManeuver" then "Stamina" else "Charge") then
-			triggerTechnology(player, a, b)
+	if action == "RigManeuver" then
+		triggerTechnology(player, a, b)
+	elseif action == "Surge" then
+		if a == "Q" or a == "E" or a == "R" then
+			triggerTechnology(player, nil, b, a)
 		end
 	elseif action == "BeginAttack" then
 		if
@@ -1154,7 +1195,7 @@ local function tick(_dt)
 			local pending = st.Pending[i]
 			if now >= pending.At then
 				table.remove(st.Pending, i)
-				technologyStrike(player, Tree.techStats(PlayerData.get(player), pending.Id), pending.Aim)
+				technologyStrike(player, pending.Definition, pending.Aim)
 			end
 		end
 		for i = #(st.Zones or {}), 1, -1 do
@@ -1179,8 +1220,14 @@ local function tick(_dt)
 			end
 		end
 		if st.Channel then
-			local channel, definition = st.Channel, Tree.techStats(PlayerData.get(player), "CryoStream")
-			if now >= channel.Until or blocking(st, now) or st.DodgeMove or not Tech.hasGem(k.Loadout, "Frost") then
+			-- A held beam (Cryo Stream, Thermal Beam): bills a quarter-second at a
+			-- time and stops when released, blocked or its gem leaves the slot.
+			local channel = st.Channel
+			local definition = channel.Definition
+			local surgeKey = string.match(channel.Key, "^Surge(%a)$")
+			local gemGone = surgeKey ~= nil
+				and (not k.Loadout.SurgeGems or k.Loadout.SurgeGems[surgeKey] ~= definition.Gem)
+			if now >= channel.Until or blocking(st, now) or st.DodgeMove or gemGone then
 				st.Channel = nil
 			elseif now >= channel.Next then
 				if Tech.spend(st.Resources, "Charge", definition.Cost * 0.25) then
@@ -1287,7 +1334,7 @@ function CombatServer.start()
 	Shop.register("SetRigManeuvers", function()
 		return Shop.reply(
 			false,
-			"Rig Maneuvers are universal. Cycle your combat rig with Z; trigger with R. Gem Surges use X and F."
+			"Put Rig Maneuvers on keys 1, 2 and 3 and gems in the Surge Array (Q, E, R) from the Loadout."
 		)
 	end)
 	local function watch(player)

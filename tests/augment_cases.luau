@@ -4,9 +4,9 @@ local function close(a, b) return math.abs(a - b) < 0.00001 end
 local profile = { Season = { XP = 0 } }
 local data = Tree.initialize(profile)
 check(data.Points == 3 and data.Spent == 0, "Starting point budget")
-check(Tree.isLearned(profile, "HydraulicSlam") and Tree.isLearned(profile, "ThermalBurst"), "Starter nodes")
+check(Tree.isLearned(profile, "HydraulicSlam") and not Tree.isLearned(profile, "ThermalBurst"), "Starter nodes")
 check(not Tree.isLearned(profile, "ServoFlurry"), "Non-starter unlocked automatically")
-check(#Tree.available(profile, "RigManeuvers") == 1 and #Tree.available(profile, "GemSurges") == 1, "HUD exposes locked techniques")
+check(#Tree.available(profile, "RigManeuvers") == 1 and Tree.Nodes.ThermalBurst == nil, "HUD exposes locked techniques or surges still in the tree")
 check(not Tree.learn(profile, "BreachHammer"), "Skipped prerequisite")
 check(not Tree.learn(profile, {}) and not Tree.learn(profile, "spoofed"), "Invalid unlock IDs")
 check(Tree.learn(profile, "ServoFlurry") and profile.Augments.Points == 2, "Point purchase")
@@ -42,16 +42,14 @@ local complete = { Augments = { XP = (Tree.UnlockPoints - Tree.StartingPoints) *
 Tree.initialize(complete)
 local total, seen = 0, {}
 for _, branch in Tree.Branches do
-	check(#Tree.Order[branch] == ({ RigManeuvers = 8, GemSurges = 18, PassiveAugments = 10 })[branch], "Branch node count")
+	check(#Tree.Order[branch] == ({ RigManeuvers = 8, SurgeAmplifiers = 5, PassiveAugments = 10 })[branch], "Branch node count")
 	for _, id in Tree.Order[branch] do
 		local n = Tree.Nodes[id]
 		local columns = if Tree.Columns[branch] then #Tree.Columns[branch] else 4
 		check(not seen[id] and n.Branch == branch and n.Tier >= 1 and n.Tier <= #Tree.TierLevels and n.Column >= 1 and n.Column <= columns, "Invalid node placement")
 		check(not n.Parent or seen[n.Parent], "Cyclic or out-of-order dependency")
 		for _, other in n.Requires and n.Requires.Any or {} do check(seen[other], "Out-of-order requirement") end
-		if branch == "GemSurges" and Tree.Columns.GemSurges[n.Column].Element then
-			check(Tech.Catalog[id].Element == Tree.Columns.GemSurges[n.Column].Element, "Surge sits in the wrong element column")
-		end
+		check(n.MaxRank == (if id == "ElementalMastery" or id == "ArcaneResonance" then 1 else 3), "Rank cap")
 		seen[id] = true
 		total += n.Cost
 		if not n.Free then check(Tree.learn(complete, id), "Complete tree cannot be purchased") end
@@ -70,9 +68,13 @@ local harmony = { Augments = { XP = 100000, Unlocked = { ChargeRecycler = true, 
 Tree.initialize(harmony)
 check(not Tree.learn(harmony, "ElementalHarmony"), "Harmony with one Overcharge")
 check(Tree.learn(harmony, "IonOvercharge") and Tree.learn(harmony, "ElementalHarmony"), "Harmony with two Overcharges")
-local young = { Augments = { XP = (Tree.TierLevels[4] - 2) * Tree.XPPerPoint, Unlocked = { ThermalBurst = true, EmberLance = true, SolarFlare = true } } }
+local young = { Augments = { XP = (Tree.TierLevels[4] - 2) * Tree.XPPerPoint, Unlocked = { SurgePower = true, ElementalMastery = true } } }
 Tree.initialize(young)
-check(young.Augments.Level == Tree.TierLevels[4] - 1 and not Tree.learn(young, "Supernova"), "Master tier opened early")
+check(young.Augments.Level == Tree.TierLevels[4] - 1 and young.Augments.Unlocked.ElementalMastery and not Tree.learn(young, "ArcaneResonance"), "Master tier opened early")
+check(not Tree.upgrade(young, "ElementalMastery"), "Single-rank node ranked up")
+-- Surge Amplifiers feed every equipped surge.
+local amps = Tree.effects(complete)
+check(close(amps.SurgePower, 0.1) and close(amps.SurgeEfficiency, 0.1) and close(amps.SurgeDuration, 0.1) and close(amps.ElementalMastery, 0.15) and close(amps.ArcaneResonance, 0.2), "Surge Amplifier effects")
 check(close(Tree.weaponMultiplier(effects, { Look = "FrontierSword", Attack = { Kind = "Melee" } }), 1.05), "Blade calibration")
 check(close(Tree.weaponMultiplier(effects, { Look = "Cleaver", Attack = { Kind = "Melee" } }), 1.05), "Cleaver calibration")
 check(Tree.weaponMultiplier(effects, { Look = "CleanSidearm", Attack = { Kind = "Shot" } }) == 1, "Sword augment boosted pistol")
@@ -128,7 +130,9 @@ local expectedSpeed = Classes.walkSpeed(Classes.ratings(loadout).Speed.Base + Cl
 check(close(hs.WalkSpeed, expectedSpeed), "Live mobility augment did not change movement")
 now += 2
 hv.Health = 1000
-check(CombatServer._technology(source, "ThermalBurst", rv.Position) and close(1000 - hv.Health, damage * 1.12 * 1.1), "Live Thermal augment surge damage")
+loadout.SurgeGems = { Q = { Id = "amp", Element = "Fire", Tier = "Rare", SurgeTier = 1, SurgeRank = 1, Size = 4, Clarity = 5, Cut = 0 } }
+check(CombatServer._technology(source, nil, rv.Position, "Q") and close(1000 - hv.Health, damage * 1.12 * 1.1 * 1.25), "Live Thermal surge with Overcharge, Surge Power and Elemental Mastery")
+loadout.SurgeGems = nil
 now += 2
 hv.Health = 1000
 CombatServer._state(victim).Dots = {}

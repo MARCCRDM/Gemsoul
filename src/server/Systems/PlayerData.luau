@@ -542,6 +542,63 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 	return gem
 end
 
+--[[
+	The Surge Array: three gem slots (Q, E, R). A gem there casts its surge
+	instead of enchanting gear. Moving a gem in sends the slot's old gem back
+	to the pouch. Saved as Character.SurgeGems = { Q = gem, E = gem, R = gem }.
+]]
+PlayerData.SurgeKeys = { Q = true, E = true, R = true }
+function PlayerData.socketSurge(player: Player, gemId: string, key: string): Gem?
+	local profile = profiles[player]
+	if not profile or not PlayerData.SurgeKeys[key] then
+		return nil
+	end
+	local gem = PlayerData.findGem(player, gemId)
+	if not gem or gem.Cut == nil then
+		return nil
+	end
+	PlayerData.removeGem(player, gemId)
+	local array = profile.Character.SurgeGems or {}
+	profile.Character.SurgeGems = array
+	if array[key] then
+		table.insert(profile.Gems, array[key])
+	end
+	array[key] = gem
+	sync(player)
+	return gem
+end
+
+function PlayerData.unsocketSurge(player: Player, key: string): Gem?
+	local profile = profiles[player]
+	local array = profile and profile.Character.SurgeGems
+	local gem = array and PlayerData.SurgeKeys[key] and array[key]
+	if not gem or #profile.Gems >= Config.MaxGems then
+		return nil
+	end
+	array[key] = nil
+	table.insert(profile.Gems, gem)
+	sync(player)
+	return gem
+end
+
+-- The Rig Maneuver on key 1, 2 or 3 (validated by the caller). An id already
+-- on another key swaps places with this key's maneuver.
+function PlayerData.setManeuver(player: Player, slot: number, id: string)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	local list = table.clone(profile.Character.Maneuvers or { "HydraulicSlam", "KineticRam", "StimDodge" })
+	for i, other in list do
+		if other == id then
+			list[i] = list[slot]
+		end
+	end
+	list[slot] = id
+	profile.Character.Maneuvers = list
+	sync(player)
+end
+
 -- The three rig maneuvers on Q / E / R (validated by the caller).
 function PlayerData.setRigManeuvers(player: Player, ids: { string })
 	local profile = profiles[player]

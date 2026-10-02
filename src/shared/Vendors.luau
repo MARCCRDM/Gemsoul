@@ -126,7 +126,7 @@ local Vendors: { [string]: Vendor } = {
 			{ Text = "Review my combat rig", Action = "CombatGuide" },
 			{
 				Text = "How do I fight?",
-				Reply = "LMB attacks; hold and release on gold for a perfect hit. Q/E select swing sides, RMB guards, Space dodges. R triggers your Rig Maneuver; F triggers your Gem Surge. Z/X cycle them. Stamina powers your rig; socketed gems store Charge. Press K for your Augment Tree.",
+				Reply = "LMB swings (Shift+LMB for your off-hand); hold and release on gold for a perfect hit. RMB guards, Space dodges. Keys 1, 2 and 3 fire your Rig Maneuvers (Stamina). Q, E and R fire the gems in your Surge Array (Charge). Press L for your Loadout and K for your Augment Tree.",
 			},
 			{
 				Text = "What's out past the south gate?",

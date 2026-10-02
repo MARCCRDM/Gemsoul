@@ -5,13 +5,15 @@
 	  Augment Level  1 + XP / 150; every level also earns an Augment Point
 	  Tiers          Novice opens at level 1, Apprentice at 3, Adept at 6 and
 	                 Master at 10
-	  Ranks          every node has ranks I-III; rank I learns it (its tier's
+	  Ranks          most nodes have ranks I-III (Elemental Mastery and
+	                 Arcane Resonance have one); rank I learns it (its tier's
 	                 cost), rank II costs its tier in points, rank III one more
-	  Rank effects   maneuvers and surges hit harder, cost less, recover
-	                 faster and last longer; passives add their bonus again
+	  Rank effects   maneuvers hit harder, cost less, recover faster and last
+	                 longer; perks and amplifiers add their bonus again
 
-	Gem Surges has a column per element (Thermal, Corrosive, Ion, Cryo) plus
-	Resonance, and every surge needs a gem of its element socketed.
+	Branches: Rig Maneuvers (physical abilities), Surge Amplifiers (boost the
+	gem surges equipped in the Surge Array) and Passive Augments. Gem Surges
+	themselves are not learned here: they come from gems (GemRoller).
 	Learning every node at rank I costs Tree.UnlockPoints; the rest of the
 	budget (up to Tree.MaxPoints) goes into ranks.
 ]]
@@ -25,20 +27,15 @@ Tree.TierLevels = { 1, 3, 6, 10 }
 Tree.TierCosts = { 1, 1, 2, 3 } -- points to learn a node of each tier
 -- Per rank above I.
 Tree.RankScaling = { Damage = 0.10, Cost = -0.08, Recovery = -0.05, Duration = 0.15, Heal = 0.25 }
-Tree.Branches = { "RigManeuvers", "GemSurges", "PassiveAugments" }
-Tree.BranchNames = { RigManeuvers = "Rig Maneuvers", GemSurges = "Gem Surges", PassiveAugments = "Passive Augments" }
+Tree.Branches = { "RigManeuvers", "SurgeAmplifiers", "PassiveAugments" }
+Tree.BranchNames =
+	{ RigManeuvers = "Rig Maneuvers", SurgeAmplifiers = "Surge Amplifiers", PassiveAugments = "Passive Augments" }
 
--- Columns per branch. Gem Surges has one per element, plus Resonance (any gem).
+-- Columns per branch.
 -- Passive Augments has none: each tier's perks sit centred in a row.
 Tree.Columns = {
 	RigManeuvers = { { Name = "Strikes" }, { Name = "Tactics" } },
-	GemSurges = {
-		{ Name = "Thermal", Element = "Fire" },
-		{ Name = "Corrosive", Element = "Poison" },
-		{ Name = "Ion", Element = "Shock" },
-		{ Name = "Cryo", Element = "Frost" },
-		{ Name = "Resonance" },
-	},
+	SurgeAmplifiers = { { Name = "Power" }, { Name = "Flow" } },
 }
 
 -- { id, tier, column, parent? }. Listed tier by tier, so parents come first.
@@ -53,25 +50,14 @@ local layout = {
 		{ "SeismicBreaker", 4, 1, "BreachHammer" },
 		{ "TremorSlam", 4, 2, "ArmorPiercer" },
 	},
-	GemSurges = {
-		{ "ThermalBurst", 1, 1 },
-		{ "AcidSpray", 1, 2 },
-		{ "IonSpark", 1, 3 },
-		{ "CryoLance", 1, 4 },
-		{ "EmberLance", 2, 1, "ThermalBurst" },
-		{ "ArmorMelt", 2, 2, "AcidSpray" },
-		{ "StaticField", 2, 3, "IonSpark" },
-		{ "CryoStream", 2, 4, "CryoLance" },
-		{ "EnergySiphon", 2, 5 },
-		{ "SolarFlare", 3, 1, "EmberLance" },
-		{ "ToxicCloud", 3, 2, "ArmorMelt" },
-		{ "ChainLightning", 3, 3, "StaticField" },
-		{ "CryoShield", 3, 4, "CryoStream" },
-		{ "ResonanceEcho", 3, 5, "EnergySiphon" },
-		{ "Supernova", 4, 1, "SolarFlare" },
-		{ "BioCorrosion", 4, 2, "ToxicCloud" },
-		{ "Overload", 4, 3, "ChainLightning" },
-		{ "AbsoluteZero", 4, 4, "CryoShield" },
+	-- Gem Surges come from the gems in the Surge Array (Q, E, R); this branch
+	-- only strengthens whatever surges are equipped.
+	SurgeAmplifiers = {
+		{ "SurgePower", 1, 1 },
+		{ "SurgeEfficiency", 1, 2 },
+		{ "SurgeDuration", 2, 2, "SurgeEfficiency" },
+		{ "ElementalMastery", 3, 1, "SurgePower" },
+		{ "ArcaneResonance", 4, 1, "ElementalMastery" },
 	},
 	PassiveAugments = {
 		{ "BladeCalibration", 1, 1 },
@@ -87,7 +73,9 @@ local layout = {
 	},
 }
 -- Free starters: learned from the start at rank I.
-local FREE = { HydraulicSlam = true, ThermalBurst = true }
+local FREE = { HydraulicSlam = true }
+-- Single-rank nodes (everything else ranks I-III).
+local SINGLE_RANK = { ElementalMastery = true, ArcaneResonance = true }
 -- Elemental Harmony asks for any two Overcharges instead of one parent.
 local REQUIRES = {
 	ElementalHarmony = {
@@ -97,6 +85,41 @@ local REQUIRES = {
 }
 
 local passiveDefinitions = {
+	SurgePower = {
+		Name = "Surge Power",
+		Description = "+10% / +20% / +30% damage for every equipped surge.",
+		Effect = "SurgePower",
+		Amount = 0.10,
+		Icon = "💠",
+	},
+	SurgeEfficiency = {
+		Name = "Surge Efficiency",
+		Description = "-10% / -20% / -30% surge cooldown.",
+		Effect = "SurgeEfficiency",
+		Amount = 0.10,
+		Icon = "⏱",
+	},
+	SurgeDuration = {
+		Name = "Surge Duration",
+		Description = "+10% / +20% / +30% surge duration: burns, slows, freezes, shred and clouds.",
+		Effect = "SurgeDuration",
+		Amount = 0.10,
+		Icon = "⏳",
+	},
+	ElementalMastery = {
+		Name = "Elemental Mastery",
+		Description = "All surges deal +15% damage.",
+		Effect = "ElementalMastery",
+		Amount = 0.15,
+		Icon = "🌐",
+	},
+	ArcaneResonance = {
+		Name = "Arcane Resonance",
+		Description = "20% chance that a surge triggers a second time for free.",
+		Effect = "ArcaneResonance",
+		Amount = 0.20,
+		Icon = "✨",
+	},
 	BladeCalibration = {
 		Name = "Blade Calibration",
 		Description = "+5% damage with swords, blades and knives per rank.",
@@ -179,7 +202,7 @@ for _, branch in Tree.Branches do
 	Tree.Order[branch] = {}
 	for _, entry in layout[branch] do
 		local id, tier, column, parent = entry[1], entry[2], entry[3], entry[4]
-		local d = Tech.Catalog[id] or passiveDefinitions[id]
+		local d = passiveDefinitions[id] or Tech.Catalog[id]
 		local node = {
 			Id = id,
 			Name = d.Name,
@@ -194,6 +217,7 @@ for _, branch in Tree.Branches do
 			Parent = parent,
 			Requires = REQUIRES[id],
 			Free = FREE[id] == true,
+			MaxRank = if SINGLE_RANK[id] then 1 else Tree.MaxRank,
 			Cost = if FREE[id] then 0 else Tree.TierCosts[tier],
 		}
 		Tree.Nodes[id] = node
@@ -264,8 +288,8 @@ function Tree.initialize(profile)
 	local saved = if typeof(profile.Augments) == "table" then profile.Augments else nil
 	local xp = if saved then saved.XP else profile.Season and profile.Season.XP or 0
 	xp = if finite(xp) then math.clamp(math.floor(xp), 0, 100000000) else 0
-	local unlocked = { HydraulicSlam = true, ThermalBurst = true }
-	local ranks = { HydraulicSlam = 1, ThermalBurst = 1 }
+	local unlocked = { HydraulicSlam = true }
+	local ranks = { HydraulicSlam = 1 }
 	local source = saved and saved.Unlocked
 	local savedRanks = if saved and typeof(saved.Ranks) == "table" then saved.Ranks else {}
 	local spent, budget, level = 0, earned(xp), Tree.level(xp)
@@ -291,7 +315,7 @@ function Tree.initialize(profile)
 		for _, id in Tree.Order[branch] do
 			local wanted = savedRanks[id]
 			if unlocked[id] and finite(wanted) then
-				for rank = 2, math.clamp(math.floor(wanted), 1, Tree.MaxRank) do
+				for rank = 2, math.clamp(math.floor(wanted), 1, Tree.Nodes[id].MaxRank) do
 					local cost = Tree.rankCost(id, rank)
 					if spent + cost > budget then
 						break
@@ -361,7 +385,7 @@ function Tree.upgrade(profile, id)
 		return false, "Unlock " .. n.Name .. " first."
 	end
 	local rank = data.Ranks[id] or 1
-	if rank >= Tree.MaxRank then
+	if rank >= n.MaxRank then
 		return false, n.Name .. " is already at its highest rank."
 	end
 	local cost = Tree.rankCost(id, rank + 1)
@@ -402,11 +426,14 @@ function Tree.available(profile, branch)
 end
 function Tree.effects(profile)
 	local effects = {}
-	for _, id in Tree.Order.PassiveAugments do
-		local rank = Tree.rank(profile, id)
-		if rank > 0 then
-			local n = Tree.Nodes[id]
-			effects[n.Effect] = n.Amount * rank
+	-- Perks and Surge Amplifiers both add their bonus per rank.
+	for _, branch in { "PassiveAugments", "SurgeAmplifiers" } do
+		for _, id in Tree.Order[branch] do
+			local rank = Tree.rank(profile, id)
+			if rank > 0 then
+				local n = Tree.Nodes[id]
+				effects[n.Effect] = n.Amount * rank
+			end
 		end
 	end
 	return effects

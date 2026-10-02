@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local Combat = require(ReplicatedStorage.Shared.Combat)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 local Augments = {}
@@ -40,6 +41,60 @@ function Augments.start()
 			PlayerData.augmentsChanged(player)
 		end
 		return Shop.reply(ok, message, { Augments = profile.Augments })
+	end)
+	-- The Surge Array (Q, E, R) and the Rig Maneuver keys (1, 2, 3).
+	Shop.register("SocketSurge", function(player, gemId, key)
+		if typeof(gemId) ~= "string" or typeof(key) ~= "string" or not PlayerData.SurgeKeys[key] then
+			return Shop.reply(false, "Pick a gem and a surge slot.")
+		end
+		if not canChange(player) then
+			return Shop.reply(false, "Return to the dashboard or town to change your surges.")
+		end
+		local gem = PlayerData.socketSurge(player, gemId, key)
+		if not gem then
+			return Shop.reply(false, "Choose a cut gem from your pouch.")
+		end
+		local id, tier, rank = Tech.surgeOf(gem)
+		local surge = id and Tech.Catalog[id]
+		return Shop.reply(
+			true,
+			string.format("%s ready on %s (tier %d, rank %d).", surge and surge.Name or "Surge", key, tier, rank),
+			{ Gem = gem }
+		)
+	end)
+	Shop.register("UnsocketSurge", function(player, key)
+		if typeof(key) ~= "string" or not PlayerData.SurgeKeys[key] then
+			return Shop.reply(false, "Pick a surge slot.")
+		end
+		if not canChange(player) then
+			return Shop.reply(false, "Return to the dashboard or town to change your surges.")
+		end
+		local gem = PlayerData.unsocketSurge(player, key)
+		if not gem then
+			return Shop.reply(false, "Nothing to remove, or your pouch is full.")
+		end
+		return Shop.reply(true, "Gem back in your pouch.", { Gem = gem })
+	end)
+	Shop.register("EquipManeuver", function(player, slot, id)
+		local profile = PlayerData.get(player)
+		if
+			not profile
+			or typeof(slot) ~= "number"
+			or slot ~= math.floor(slot)
+			or slot < 1
+			or slot > Tech.ManeuverSlots
+		then
+			return Shop.reply(false, "Pick key 1, 2 or 3.")
+		end
+		local node = typeof(id) == "string" and Tree.Nodes[id]
+		if not node or node.Branch ~= "RigManeuvers" then
+			return Shop.reply(false, "Pick a Rig Maneuver.")
+		end
+		if not Tree.isLearned(profile, id) then
+			return Shop.reply(false, "Learn " .. node.Name .. " in the Augment Tree first.")
+		end
+		PlayerData.setManeuver(player, slot, id)
+		return Shop.reply(true, string.format("%s on key %d.", node.Name, slot))
 	end)
 	Shop.register("ResetAugments", function(player)
 		local profile = PlayerData.get(player)
