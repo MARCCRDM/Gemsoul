@@ -1,33 +1,44 @@
 --[[
 	The PvP Duelist's decisions (pure, so they can be tested): given what it
-	sees this moment, what to do next.
+	sees this moment, what to do next. It plays aggressively and reads the
+	player:
 
 	  Stagger   stunned or parried: does nothing
-	  Guard     raises its guard against a charging swing (takes 30% damage)
-	  Dodge     sidesteps a charging swing (untouchable for a moment)
-	  Surge     casts its gem's surge from range (bolt or a ground blast)
-	  Retreat   backs off when badly hurt, now and then
-	  Approach  closes the distance, weaving side to side
-	  Light     a quick swing (short wind-up, may chain a second)
+	  Guard     raises its guard against a charging swing or a surge wind-up
+	  Dodge     sidesteps a charging swing or a surge wind-up
+	  Punish    a fast counter-swing while the player recovers from an attack
+	  Surge     casts its gem's surge: from range, or point-blank when the
+	            player is stunned, slowed or hiding behind their guard
+	  Retreat   backs off briefly when badly hurt (never when the player is low)
+	  Lunge     dashes in from mid range and swings straight away
+	  Approach  closes the distance
+	  Light     a quick swing (may chain into a combo)
 	  Heavy     a slow, telegraphed blow that breaks a raised guard
 	  Strafe    circles the player between attacks
 ]]
 local Brain = {}
 
 Brain.Reach = 6.5 -- melee range, studs
-Brain.Windup = { Light = 0.35, Heavy = 0.8, Bolt = 0.5, Nova = 1.0 }
+Brain.Windup = { Light = 0.3, Heavy = 0.75, Punish = 0.18, Lunge = 0.25, Bolt = 0.45, Nova = 0.9 }
+Brain.SurgeRange = 32
+Brain.LungeRange = 18
 
 export type View = {
 	Now: number,
 	Distance: number,
 	HealthRatio: number,
 	Stunned: boolean,
-	FoeCharging: boolean, -- the player is winding up a swing
-	FoeBlocking: boolean, -- the player's guard is up
+	FoeCharging: boolean, -- winding up a swing
+	FoeCasting: boolean, -- winding up a surge or maneuver
+	FoeBlocking: boolean, -- guard up
+	FoeRecovering: boolean, -- just attacked and can't act yet
+	FoeVulnerable: boolean, -- stunned or slowed
+	FoeLow: boolean, -- below 30% health
 	NextAttack: number,
 	NextSurge: number,
 	NextDefense: number,
 	NextRetreat: number,
+	NextLunge: number,
 }
 
 -- `roll` is a random number in [0, 1).
@@ -35,28 +46,40 @@ function Brain.decide(v: View, roll: number): string
 	if v.Stunned then
 		return "Stagger"
 	end
-	if v.FoeCharging and v.Distance <= Brain.Reach + 3 and v.Now >= v.NextDefense then
-		if roll < 0.45 then
+	-- Defend against what's coming, but not every time (it reads, not cheats).
+	if (v.FoeCharging or v.FoeCasting) and v.Distance <= Brain.Reach + 4 and v.Now >= v.NextDefense then
+		if roll < 0.4 then
 			return "Guard"
-		elseif roll < 0.75 then
+		elseif roll < 0.8 then
 			return "Dodge"
 		end
 	end
-	if v.Now >= v.NextSurge and v.Distance >= 8 and v.Distance <= 32 then
-		return "Surge"
+	-- An opening: hit the player while they recover.
+	if v.FoeRecovering and v.Distance <= Brain.Reach + 2 then
+		return "Punish"
 	end
-	if v.HealthRatio < 0.3 and v.Now >= v.NextRetreat then
+	if v.Now >= v.NextSurge and v.Distance <= Brain.SurgeRange then
+		if v.Distance >= 8 or v.FoeVulnerable or v.FoeBlocking then
+			return "Surge"
+		end
+	end
+	if v.HealthRatio < 0.25 and not v.FoeLow and v.Now >= v.NextRetreat then
 		return "Retreat"
+	end
+	if v.Distance > Brain.Reach + 2 and v.Distance <= Brain.LungeRange and v.Now >= v.NextLunge then
+		return "Lunge"
 	end
 	if v.Distance > Brain.Reach then
 		return "Approach"
 	end
 	if v.Now >= v.NextAttack then
-		-- A raised guard invites a guard-breaking heavy.
 		if v.FoeBlocking then
 			return if roll < 0.7 then "Heavy" else "Light"
 		end
-		return if roll < 0.3 then "Heavy" else "Light"
+		if v.FoeLow then
+			return if roll < 0.15 then "Heavy" else "Light" -- quick pressure to finish
+		end
+		return if roll < 0.25 then "Heavy" else "Light"
 	end
 	return "Strafe"
 end

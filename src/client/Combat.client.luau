@@ -13,6 +13,7 @@ local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local CombatGuide = require(script.Parent.Modules.CombatGuide)
 local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
@@ -402,6 +403,161 @@ shadowed(controlsHint)
 local cursorModal =
 	new("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.fromOffset(1, 1), Modal = false }, gui)
 local slots = {}
+-- Rival panel (top-right): the Arena rival's loadout, its surge cooldown and
+-- what it's about to do. Fed by attributes the server sets on the rival.
+local rivalPanel = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
+	BackgroundTransparency = 0.12,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -12, 0, 62),
+	Size = UDim2.fromOffset(250, 246),
+	Visible = false,
+}, gui)
+UiKit.round(rivalPanel, 10)
+local rivalStroke =
+	new("UIStroke", { Color = Color3.fromRGB(190, 70, 80), Transparency = 0.35, Thickness = 1 }, rivalPanel)
+local function rivalLabel(size, color, x, y, w, h)
+	local label = shadowed(text(rivalPanel, "", size, color, IronUi.Bold))
+	label.AutomaticSize, label.TextWrapped, label.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+	label.Position, label.Size = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h)
+	return label
+end
+local rivalName = rivalLabel(14, P.Text, 12, 8, 160, 18)
+local rivalTag = rivalLabel(10, Color3.fromRGB(255, 120, 120), 172, 10, 66, 14)
+rivalTag.TextXAlignment = Enum.TextXAlignment.Right
+local rivalInfo = rivalLabel(10, P.Dim, 12, 27, 226, 14)
+local rivalGear = {}
+for i = 1, 6 do
+	local row = rivalLabel(10, P.Text, 12, 44 + (i - 1) * 14, 226, 14)
+	rivalGear[i] = row
+end
+-- The surge: a socket with a draining cooldown, its name and its state.
+local rivalSocket = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(30, 34, 50),
+	Position = UDim2.fromOffset(12, 134),
+	Size = UDim2.fromOffset(46, 46),
+}, rivalPanel)
+new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, rivalSocket)
+local rivalSocketStroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, rivalSocket)
+local rivalIcon = rivalLabel(20, P.Text, 0, 0, 46, 46)
+rivalIcon.Parent, rivalIcon.TextXAlignment = rivalSocket, Enum.TextXAlignment.Center
+rivalIcon.TextYAlignment = Enum.TextYAlignment.Center
+local rivalShade = new("Frame", {
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BorderSizePixel = 0,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 2,
+}, rivalSocket)
+new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, rivalShade)
+local rivalWipe = new("UIGradient", { Rotation = 90 }, rivalShade)
+local rivalSurgeName = rivalLabel(12, P.Text, 66, 136, 172, 16)
+local rivalSurgeTier = rivalLabel(10, P.Dim, 66, 152, 172, 12)
+local rivalSurgeState = rivalLabel(13, P.Good, 66, 165, 172, 16)
+-- What it's doing right now, as a warning strip.
+local rivalStance = rivalLabel(12, P.Text, 0, 0, 250, 26)
+rivalStance.Position, rivalStance.Size = UDim2.fromOffset(0, 192), UDim2.new(1, 0, 0, 26)
+rivalStance.TextXAlignment = Enum.TextXAlignment.Center
+rivalStance.TextYAlignment = Enum.TextYAlignment.Center
+local rivalHealth = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(12, 226),
+	Size = UDim2.new(1, -24, 0, 8),
+}, rivalPanel)
+UiKit.round(rivalHealth, 3)
+local rivalHealthFill = new(
+	"Frame",
+	{ BackgroundColor3 = Color3.fromRGB(220, 70, 82), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
+	rivalHealth
+)
+UiKit.round(rivalHealthFill, 3)
+local STANCES = {
+	Heavy = { "⚠  HEAVY BLOW INCOMING  ·  DODGE", Color3.fromRGB(255, 120, 70) },
+	Counter = { "COUNTER-ATTACK!", Color3.fromRGB(255, 90, 100) },
+	Lunge = { "LUNGING IN", Color3.fromRGB(255, 170, 80) },
+	Guard = { "GUARD UP  ·  USE A HEAVY", Color3.fromRGB(120, 220, 255) },
+	Dodge = { "DODGING", Color3.fromRGB(200, 210, 230) },
+	Surge = { "CASTING ITS SURGE", P.Gold },
+}
+local SLOT_SHORT =
+	{ Helmet = "HEAD", Armor = "CHEST", Gloves = "HANDS", Boots = "FEET", Weapon = "WEAPON", Shield = "SHIELD" }
+local rivalModel, nextRivalScan = nil, 0
+local function findRival()
+	local folder = workspace:FindFirstChild("Enemies")
+	for _, model in folder and folder:GetChildren() or {} do
+		if model:GetAttribute("RivalOwner") == player.UserId then
+			return model
+		end
+	end
+	return nil
+end
+local function drawRival(now, viewport)
+	if now >= nextRivalScan or (rivalModel and not rivalModel.Parent) then
+		nextRivalScan = now + 0.5
+		rivalModel = findRival()
+	end
+	local model = rivalModel
+	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+	rivalPanel.Visible = humanoid ~= nil and humanoid.Health > 0 and viewport.X >= 700
+	if not rivalPanel.Visible then
+		return
+	end
+	local element = model:GetAttribute("RivalElement")
+	local color = GemConfig.ElementColors[element] or P.Gold
+	rivalName.Text, rivalName.TextColor3 = model:GetAttribute("RivalName") or model.Name, color
+	rivalTag.Text = if model:GetAttribute("RivalSparring") then "SPARRING" else "RIVAL"
+	rivalStroke.Color = color
+	rivalInfo.Text = string.format(
+		"%s  ·  GEAR SCORE %d",
+		string.upper(GemConfig.elementName(element or "")),
+		model:GetAttribute("RivalScore") or 0
+	)
+	local entries = string.split(model:GetAttribute("RivalGear") or "", ";")
+	for i, row in rivalGear do
+		local parts = string.split(entries[i] or "", "|")
+		local rarity = GearRolls.Rarities[tonumber(parts[3]) or 1] or GearRolls.Rarities[1]
+		row.Text = if parts[2] then (SLOT_SHORT[parts[1]] or parts[1]) .. "  " .. parts[2] else ""
+		row.TextColor3 = rarity.Color
+	end
+	-- Surge cooldown, from server time so it matches the real thing.
+	local serverNow = workspace:GetServerTimeNow()
+	local readyAt = model:GetAttribute("SurgeReadyAt") or 0
+	local total = math.max(1, model:GetAttribute("SurgeCooldown") or 10)
+	local remaining = math.max(0, readyAt - serverNow)
+	local share = math.clamp(remaining / total, 0, 0.998)
+	rivalShade.Visible = share > 0
+	if share > 0 then
+		rivalWipe.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.3),
+			NumberSequenceKeypoint.new(math.max(0.001, share), 0.3),
+			NumberSequenceKeypoint.new(math.min(0.999, share + 0.001), 1),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+	end
+	rivalIcon.Text, rivalIcon.TextColor3 = model:GetAttribute("RivalSurgeIcon") or "◆", color
+	rivalSocketStroke.Color = color
+	rivalSurgeName.Text = model:GetAttribute("RivalSurge") or "Gem Surge"
+	rivalSurgeTier.Text = string.format(
+		"%s  ·  RANK %s",
+		string.upper(Tech.TierNames[model:GetAttribute("RivalSurgeTier") or 1] or ""),
+		ROMAN[model:GetAttribute("RivalSurgeRank") or 1] or "I"
+	)
+	local castAgo = serverNow - (model:GetAttribute("SurgeCastAt") or -100)
+	if castAgo < 1.2 then
+		rivalSurgeState.Text, rivalSurgeState.TextColor3 = "CASTING!", P.Gold
+		rivalSocketStroke.Thickness = 3
+	elseif remaining > 0 then
+		rivalSurgeState.Text, rivalSurgeState.TextColor3 = string.format("Ready in %.1fs", remaining), P.Dim
+		rivalSocketStroke.Thickness = 2
+	else
+		rivalSurgeState.Text, rivalSurgeState.TextColor3 = "READY  ·  watch out", Color3.fromRGB(255, 120, 120)
+		rivalSocketStroke.Thickness = 2
+	end
+	local stance = STANCES[model:GetAttribute("Stance") or ""]
+	rivalStance.Text = if stance then stance[1] else ""
+	rivalStance.TextColor3 = if stance then stance[2] else P.Text
+	rivalHealthFill.Size = UDim2.fromScale(math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1), 1)
+end
 local function rootPart()
 	return player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 end
@@ -992,6 +1148,7 @@ RunService.RenderStepped:Connect(function(dt)
 	perfectWindow.Visible = holding
 	castBar.Visible = holding or cast ~= nil or beamKey ~= nil
 	chargeFill.BackgroundColor3 = castColor
+	drawRival(now, viewport)
 	local trackedTarget = TargetLock.target()
 	reticle.TextColor3 = if holding
 		then castColor

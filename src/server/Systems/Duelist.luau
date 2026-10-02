@@ -152,6 +152,14 @@ local function ownerRoot(owner: Player): (BasePart?, Humanoid?)
 	return nil, nil
 end
 
+-- What the rival is doing, for the player's rival panel (only on change).
+local function setStance(duel, stance: string)
+	if duel.Stance ~= stance then
+		duel.Stance = stance
+		duel.Enemy.Model:SetAttribute("Stance", stance)
+	end
+end
+
 local function face(root: BasePart, target: Vector3)
 	local look = flat(target - root.Position)
 	if look.Magnitude > 0.1 then
@@ -197,17 +205,20 @@ local function think(enemy, now: number)
 		end
 		duel.Action = nil
 		local damage = duel.Damage * (1 - Enemies.weakness(enemy))
-		if action.Kind == "Light" or action.Kind == "Heavy" then
+		if action.Kind == "Light" or action.Kind == "Heavy" or action.Kind == "Punish" or action.Kind == "Lunge" then
 			local heavy = action.Kind == "Heavy"
 			fx("Swing", nil, root.Position, dir, Brain.Reach, if heavy then 140 else 100, color, heavy)
 			if distance <= Brain.Reach + 1.5 then
 				Enemies.hitPlayer(owner, damage * (if heavy then 2 else 1), duel.Element, enemy, heavy)
 			end
-			if action.Chain and math.random() < 0.5 then
-				duel.Action = { Kind = "Light", At = now + 0.4 }
+			-- Combos: up to three swings in a row.
+			local hits = (action.Hits or 1) + 1
+			if not heavy and hits <= 3 and math.random() < 0.65 then
+				duel.Action = { Kind = "Light", At = now + 0.32, Hits = hits }
 				return
 			end
-			duel.NextAttack = now + duel.Rate * (0.8 + math.random() * 0.6)
+			setStance(duel, "")
+			duel.NextAttack = now + duel.Rate * (0.8 + math.random() * 0.4)
 		elseif action.Kind == "Bolt" then
 			local from = root.Position + Vector3.new(0, 1.5, 0)
 			fx("Shot", nil, from, target.Position, color, "Fireball")
@@ -217,47 +228,74 @@ local function think(enemy, now: number)
 					Enemies.hitPlayer(owner, damage * duel.SurgePower, duel.Element, enemy, false)
 				end
 			end)
-			duel.NextAttack = now + 0.6
+			duel.NextAttack = now + 0.4
+			setStance(duel, "")
 		elseif action.Kind == "Nova" then
 			if (flat(target.Position - action.Center)).Magnitude <= action.Radius then
 				Enemies.hitPlayer(owner, damage * duel.SurgePower * 1.2, duel.Element, enemy, false)
 			end
-			duel.NextAttack = now + 0.6
+			duel.NextAttack = now + 0.4
+			setStance(duel, "")
 		end
 		return
 	end
 
+	-- Read the player: what they're doing and how they're doing.
 	local foe = CombatServer._state(owner)
+	local ownerHumanoid = owner.Character and owner.Character:FindFirstChildOfClass("Humanoid")
 	local view = {
 		Now = now,
 		Distance = distance,
 		HealthRatio = humanoid.Health / math.max(1, humanoid.MaxHealth),
 		Stunned = now < enemy.StunUntil,
 		FoeCharging = foe ~= nil and foe.ChargeStarted ~= nil,
+		FoeCasting = foe ~= nil and (#(foe.Pending or {}) > 0 or foe.Channel ~= nil),
 		FoeBlocking = owner:GetAttribute("Blocking") == true,
+		FoeRecovering = foe ~= nil and foe.NextAttack > now + 0.15 and foe.ChargeStarted == nil,
+		FoeVulnerable = foe ~= nil and (now < foe.StunUntil or now < (foe.SlowUntil or 0)),
+		FoeLow = ownerHumanoid ~= nil and ownerHumanoid.Health < ownerHumanoid.MaxHealth * 0.3,
 		NextAttack = duel.NextAttack,
 		NextSurge = duel.NextSurge,
 		NextDefense = duel.NextDefense,
 		NextRetreat = duel.NextRetreat,
+		NextLunge = duel.NextLunge,
 	}
-	if view.FoeCharging and distance <= Brain.Reach + 3 and now >= duel.NextDefense then
-		duel.NextDefense = now + 2.2 -- considered: don't react to every swing
+	if (view.FoeCharging or view.FoeCasting) and distance <= Brain.Reach + 4 and now >= duel.NextDefense then
+		duel.NextDefense = now + 1.6 -- considered: don't react to every swing
 	end
 	local choice = Brain.decide(view, math.random())
 	if choice == "Stagger" then
 		humanoid:MoveTo(root.Position)
 	elseif choice == "Guard" then
 		enemy.GuardUntil, enemy.GuardMult = now + 0.9, 0.3
+		setStance(duel, "Guard")
 		duel.NextAttack = math.max(duel.NextAttack, now + 0.9)
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
 	elseif choice == "Dodge" then
 		local away = side * (if math.random() < 0.5 then 1 else -1)
 		enemy.DodgeUntil = now + 0.35
+		setStance(duel, "Dodge")
 		root.AssemblyLinearVelocity = away * 55 + Vector3.new(0, 6, 0)
 		fx("DodgeRoll", nil, root.Position, away, 8, true)
+	elseif choice == "Punish" then
+		duel.Action = { Kind = "Punish", At = now + Brain.Windup.Punish, Hits = 1 }
+		setStance(duel, "Counter")
+		humanoid:MoveTo(root.Position)
+		face(root, target.Position)
+	elseif choice == "Lunge" then
+		-- Dash in and swing as it arrives.
+		duel.NextLunge = now + 4 + math.random() * 2
+		root.AssemblyLinearVelocity = dir * math.min(80, distance * 5) + Vector3.new(0, 4, 0)
+		fx("DodgeRoll", nil, root.Position, dir, math.min(14, distance - 3), false)
+		duel.Action = { Kind = "Lunge", At = now + Brain.Windup.Lunge, Hits = 1 }
+		setStance(duel, "Lunge")
+		face(root, target.Position)
 	elseif choice == "Surge" then
-		duel.NextSurge = now + 8 + math.random() * 4
+		duel.NextSurge = now + duel.SurgeCooldown
+		enemy.Model:SetAttribute("SurgeReadyAt", workspace:GetServerTimeNow() + duel.SurgeCooldown)
+		enemy.Model:SetAttribute("SurgeCastAt", workspace:GetServerTimeNow())
+		setStance(duel, "Surge")
 		Remotes.CombatFx:FireClient(owner, "TechStatus", duel.Name .. " casts " .. duel.SurgeName .. "!")
 		if duel.Element == "Frost" or duel.Element == "Poison" then
 			-- A ground blast under the player, with a warning ring to step out of.
@@ -269,17 +307,18 @@ local function think(enemy, now: number)
 			duel.Action = { Kind = "Bolt", At = now + Brain.Windup.Bolt }
 		end
 	elseif choice == "Retreat" then
-		duel.NextRetreat = now + 9
-		duel.RetreatUntil = now + 1.6
+		duel.NextRetreat = now + 10
+		duel.RetreatUntil = now + 1.2
 	elseif choice == "Approach" then
 		if now >= duel.NextWeave then
 			duel.Weave, duel.NextWeave = -duel.Weave, now + 0.8 + math.random()
 		end
-		humanoid:MoveTo(target.Position - dir * 3 + side * duel.Weave * 3)
+		humanoid:MoveTo(target.Position - dir * 2 + side * duel.Weave * 1.5)
 		face(root, target.Position)
 	elseif choice == "Light" or choice == "Heavy" then
 		local heavy = choice == "Heavy"
-		duel.Action = { Kind = choice, At = now + Brain.Windup[choice], Chain = not heavy }
+		duel.Action = { Kind = choice, At = now + Brain.Windup[choice], Hits = 1 }
+		setStance(duel, if heavy then "Heavy" else "")
 		if heavy then
 			-- Telegraph: a warning ring at its feet before the blow lands.
 			fx("Nova", root.Position - Vector3.new(0, 2.5, 0), 3.5, Color3.fromRGB(255, 120, 60), Brain.Windup.Heavy)
@@ -287,11 +326,14 @@ local function think(enemy, now: number)
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
 	else -- Strafe
+		if duel.Stance == "Guard" or duel.Stance == "Dodge" then
+			setStance(duel, "")
+		end
 		if now >= duel.NextWeave then
 			duel.Weave, duel.NextWeave = -duel.Weave, now + 1 + math.random() * 1.2
 		end
 		local keep = if distance < 3 then -dir * 3 else Vector3.zero
-		humanoid:MoveTo(root.Position + side * duel.Weave * 6 + keep)
+		humanoid:MoveTo(root.Position + side * duel.Weave * 4 + keep)
 		face(root, target.Position)
 	end
 	if duel.RetreatUntil and now < duel.RetreatUntil and not duel.Action then
@@ -384,9 +426,9 @@ function spawnRival(owner: Player)
 		Name = "Rival Duelist",
 		Health = health,
 		Damage = 0,
-		Speed = 16,
+		Speed = 18,
 		Reach = Brain.Reach,
-		Rate = 1.1,
+		Rate = 0.8,
 		Aggro = 0,
 		Coins = WIN_COINS,
 		DropChance = 0,
@@ -413,18 +455,44 @@ function spawnRival(owner: Player)
 			else 1),
 		SurgePower = if surge and surge.Damage then math.clamp(surge.Damage, 1, 2) else 1.4,
 		SurgeName = if surge then surge.Name else "a Gem Surge",
-		Speed = 16,
-		Rate = 1.1,
+		Speed = 18,
+		Rate = if sparring then 1.1 else 0.8,
+		SurgeCooldown = 8 + math.random() * 3,
 		Action = nil,
-		NextAttack = now + 1.5,
-		NextSurge = now + 4 + math.random() * 3,
+		NextAttack = now + 1.2,
+		NextSurge = now + 4 + math.random() * 2,
 		NextDefense = now,
-		NextRetreat = now + 6,
+		NextRetreat = now + 8,
+		NextLunge = now + 1,
 		NextWeave = now,
 		Weave = 1,
 		RetreatUntil = 0,
 	}
 	enemy.Duel = duel
+	-- Its loadout and surge, for the player's rival panel.
+	local model = enemy.Model
+	model:SetAttribute("RivalOwner", owner.UserId)
+	model:SetAttribute("RivalName", name)
+	model:SetAttribute("RivalElement", element)
+	model:SetAttribute("RivalSparring", sparring)
+	local gear, score = {}, 0
+	for _, slot in Slots.Order do
+		local item = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
+		local roll = GearRolls.get(loadout, slot)
+		for stat, amount in roll and roll.Stats or {} do
+			score += if stat == "Critical" or stat == "Cooldown" then amount * 100 else amount
+		end
+		table.insert(gear, string.format("%s|%s|%d", slot, if item then item.Name else "?", roll and roll.Rarity or 1))
+	end
+	model:SetAttribute("RivalGear", table.concat(gear, ";"))
+	model:SetAttribute("RivalScore", math.floor(score + 0.5))
+	model:SetAttribute("RivalSurge", duel.SurgeName)
+	model:SetAttribute("RivalSurgeIcon", if surge then surge.Icon or "◆" else "◆")
+	local _, surgeTier, surgeRank = Tech.surgeOf(loadout.Surge1Gem)
+	model:SetAttribute("RivalSurgeTier", surgeTier)
+	model:SetAttribute("RivalSurgeRank", surgeRank)
+	model:SetAttribute("SurgeReadyAt", workspace:GetServerTimeNow() + (duel.NextSurge - now))
+	model:SetAttribute("SurgeCooldown", duel.SurgeCooldown)
 	enemy.Brain = think
 	enemy.OnDeath = onWin
 	duels[owner] = duel
