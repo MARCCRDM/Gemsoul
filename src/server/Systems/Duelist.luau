@@ -650,6 +650,10 @@ function spawnRival(owner: Player)
 		Home = spot,
 	})
 	enemy.Humanoid.AutoRotate = false
+	-- Every bout starts even: the player steps in at full health too.
+	if ownerHumanoid and ownerHumanoid.Health > 0 then
+		ownerHumanoid.Health = ownerHumanoid.MaxHealth
+	end
 	-- Its own legs only: the stock Animate script doesn't run on a server rig.
 	local animateScript = rig:FindFirstChild("Animate")
 	if animateScript then

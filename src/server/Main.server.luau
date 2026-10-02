@@ -58,6 +58,8 @@ Party.start()
 StoreServer.start()
 TopPlayers.start()
 Equipment.start()
+-- One health-recovery rule for players and computer fighters alike.
+require(script.Parent.Systems.HealthRegen).start()
 -- The dashboard opens Arena sessions; the full town also enables the Wilds.
 if Config.CombatEnabled or not Config.MenuOnly then
 	Enemies.start(Config.MenuOnly)

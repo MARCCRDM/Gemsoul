@@ -90,4 +90,10 @@ check(RivalPose.pose({ ActionKind = "Stagger", ActionStart = 100, ActionAt = 100
 check(RivalPose.pose({ GuardUntil = 101 }, 100.5).RightElbow[1] > 1.5, "Guard did not raise the forearms")
 check(RivalPose.pose({ GuardUntil = 101 }, 101.5).Waist == nil, "Guard pose stuck after it dropped")
 check(RivalPose.pose({ ActionKind = "Bogus", ActionStart = 100, ActionAt = 100 }, 100).RightShoulder ~= nil, "Unknown action broke the pose")
-print("PASS: " .. checks .. " Duelist checks (decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
+-- Health recovery is the same for everyone: none mid-fight in the Arena.
+check(HealthRegen.amount(50, 100, true, 60, 1) == 0, "Player healed during an Arena fight")
+check(HealthRegen.amount(50, 100, false, 2, 1) == 0, "Player healed right after taking damage")
+check(HealthRegen.amount(50, 100, false, 6, 1) == 1, "Player never recovered out of combat")
+check(HealthRegen.amount(99.5, 100, false, 6, 1) == 0.5, "Recovery overfilled health")
+check(HealthRegen.amount(0, 100, false, 60, 1) == 0, "A fallen player recovered")
+print("PASS: " .. checks .. " Duelist checks (health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
