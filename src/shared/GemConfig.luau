@@ -56,47 +56,61 @@ GemConfig.Shades = {
 		{ Tier = "Common", Name = "Ember Red", Color = Color3.fromRGB(232, 104, 92) },
 		{ Tier = "Uncommon", Name = "Plasma Crimson", Color = Color3.fromRGB(222, 36, 42) },
 		{ Tier = "Rare", Name = "Deep Ruby Red", Color = Color3.fromRGB(168, 6, 34) },
+		{
+			Tier = "UltraRare",
+			Name = "Solar Garnet",
+			Color = Color3.fromRGB(200, 20, 60),
+			Color2 = Color3.fromRGB(120, 0, 24),
+		},
+		{ Tier = "Legendary", Name = "Starfire Ruby", Color = Color3.fromRGB(255, 46, 46), Prismatic = true },
 	},
 	Frost = {
 		{ Tier = "Common", Name = "Glacier Blue", Color = Color3.fromRGB(150, 200, 246) },
 		{ Tier = "Uncommon", Name = "Vivid Blue", Color = Color3.fromRGB(40, 140, 255) },
 		{ Tier = "Rare", Name = "Deep Royal Sapphire Blue", Color = Color3.fromRGB(18, 40, 160) },
+		{
+			Tier = "UltraRare",
+			Name = "Abyssal Sapphire",
+			Color = Color3.fromRGB(10, 30, 120),
+			Color2 = Color3.fromRGB(40, 110, 230),
+		},
+		{ Tier = "Legendary", Name = "Aurora Sapphire", Color = Color3.fromRGB(60, 120, 255), Prismatic = true },
 	},
 	Shock = {
 		{ Tier = "Common", Name = "Pale Citrine", Color = Color3.fromRGB(240, 222, 132) },
 		{ Tier = "Uncommon", Name = "Bright Yellow", Color = Color3.fromRGB(255, 220, 30) },
+		{ Tier = "Rare", Name = "Golden Topaz", Color = Color3.fromRGB(230, 180, 20) },
 		{
 			Tier = "UltraRare",
 			Name = "Prismatic Arc Gold",
 			Color = Color3.fromRGB(255, 196, 0),
 			Prismatic = true,
 		},
+		{ Tier = "Legendary", Name = "Stormheart Citrine", Color = Color3.fromRGB(255, 236, 90), Prismatic = true },
 	},
 	Poison = {
 		{ Tier = "Common", Name = "Pale Lime", Color = Color3.fromRGB(184, 232, 128) },
 		{ Tier = "Uncommon", Name = "Emerald Green", Color = Color3.fromRGB(20, 170, 80) },
+		{ Tier = "Rare", Name = "Viridian Jade", Color = Color3.fromRGB(30, 140, 90) },
 		{
 			Tier = "UltraRare",
 			Name = "Toxic Neon Emerald",
 			Color = Color3.fromRGB(70, 250, 100),
 			Color2 = Color3.fromRGB(0, 110, 60),
 		},
+		{ Tier = "Legendary", Name = "Venomheart Emerald", Color = Color3.fromRGB(0, 255, 120), Prismatic = true },
 	},
 } :: { [string]: { Shade } }
 
--- Relative chance of rolling each colour tier. Luck boosts the rarer tiers.
-GemConfig.TierWeights = {
-	Common = 70,
-	Uncommon = 25,
-	Rare = 5,
-	UltraRare = 3,
-}
+-- Rarity odds live in GemRoller (40 / 25 / 20 / 10 / 5).
+GemConfig.TierOrder = { "Common", "Uncommon", "Rare", "UltraRare", "Legendary" }
 
 GemConfig.TierLabels = {
 	Common = "Common",
 	Uncommon = "Uncommon",
 	Rare = "Rare",
 	UltraRare = "Ultra-Rare",
+	Legendary = "Legendary",
 }
 
 -- Badge colours for each element.
@@ -124,13 +138,14 @@ GemConfig.ElementEffects = {
 	Poison = "Anti-tank: shreds armor and leaves targets vulnerable.",
 }
 
-GemConfig.TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4 }
+GemConfig.TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 
 GemConfig.TierColors = {
 	Common = Color3.fromRGB(200, 200, 200),
 	Uncommon = Color3.fromRGB(90, 220, 120),
 	Rare = Color3.fromRGB(80, 160, 255),
 	UltraRare = Color3.fromRGB(255, 90, 220),
+	Legendary = Color3.fromRGB(255, 176, 60),
 }
 
 -- Clarity and size are graded 1-10. High grades are rarer: these are the
@@ -156,6 +171,7 @@ GemConfig.TierValue = {
 	Uncommon = 25,
 	Rare = 60,
 	UltraRare = 120,
+	Legendary = 250,
 }
 
 function GemConfig.shade(gem: Gem): Shade

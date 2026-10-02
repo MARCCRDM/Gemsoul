@@ -5,9 +5,7 @@ local source, hs, rs, loadout = makePlayer(20, arena, nil)
 local victim, hv, rv, defense = makePlayer(21, arena + Vector3.new(0, 0, -5), nil)
 local progress = Tree.initialize(profiles[source])
 progress.XP = (Tree.UnlockPoints - Tree.StartingPoints) * Tree.XPPerPoint
-for _, group in { "RigManeuvers", "GemSurges" } do
- for _, id in Tree.Order[group] do progress.Unlocked[id] = true end
-end
+for _, id in Tree.Order.RigManeuvers do progress.Unlocked[id] = true end
 Tree.initialize(profiles[source])
 loadout.Shield = "ArmorProspectorShield1"
 local expected = Classes.weapon("Warrior", loadout.Weapon).Attack.Damage * Combat.powerMult(Classes.ratings(loadout).Power.Base) * Combat.defenseMult(Classes.ratings(defense).Defense.Base)
@@ -16,13 +14,24 @@ local function reset()
 	CombatServer.reset(source); CombatServer.reset(victim)
 	hs.Health, hv.Health = 1000, 1000
 	loadout.WeaponGem, loadout.ArmorGem = nil, nil
+	loadout.Surge1Gem, loadout.Surge2Gem, loadout.Surge3Gem = nil, nil, nil
 	wallBlocks = false
 	return CombatServer._state(source)
 end
 local function fire(id) return CombatServer._technology(source, id, rv.Position) end
-for _, group in { "RigManeuvers", "GemSurges" } do
-	check(#Tech.Order[group] == #Tree.Order[group], "Kit catalog parity")
-	for _, id in Tech.Order[group] do check(Tech.Catalog[id] ~= nil, "Missing kit entry") end
+-- Gem Surges: the gem in a Surge Array slot (Q, E, R) decides the ability.
+local function surgeGem(element, tier, rank, extra)
+	local gem = { Id = "g" .. element .. tier, Element = element, Tier = "Rare", SurgeTier = tier, SurgeRank = rank or 1, Size = 4, Clarity = 5, Cut = 0 }
+	for key, value in extra or {} do gem[key] = value end
+	loadout.Surge1Gem = gem
+	return gem
+end
+local function cast(key) return CombatServer._technology(source, nil, rv.Position, key or "Q") end
+check(#Tech.Order.RigManeuvers == #Tree.Order.RigManeuvers, "Kit catalog parity")
+for _, id in Tech.Order.RigManeuvers do check(Tech.Catalog[id] ~= nil, "Missing kit entry") end
+for element, list in Tech.Surges do
+	check(#list == 4, "Four surge tiers per element")
+	for _, id in list do check(Tech.Catalog[id] and Tech.Catalog[id].Element == element and Tech.Catalog[id].Resource == "Charge", "Surge catalog entry " .. id) end
 end
 local st = reset()
 st.Resources.Stamina = 29
@@ -62,37 +71,26 @@ st = reset()
 st.Resources.Stamina = 14
 check(not CombatServer._dodge(source, Vector3.new(0, 0, -1)), "Free ordinary dodge")
 st = reset()
-check(not fire("ThermalBurst") and st.Resources.Charge == 100, "Surge without gem consumed Charge")
-loadout.WeaponGem = { Element = "Frost", Size = 4, Clarity = 5, Cut = 5 }
-check(not fire("ThermalBurst"), "Wrong element powered surge")
-loadout.WeaponGem.Element = "Fire"
-check(fire("ThermalBurst") and st.Resources.Charge == 75 and hv.Health < 1000, "Thermal Burst cost/damage")
+check(not cast("Q") and st.Resources.Charge == 100, "Empty surge slot consumed Charge")
+check(not fire("ThermalBurst"), "Surge cast as a learned technique")
+surgeGem("Fire", 1)
+check(not cast("E"), "Surge from an empty slot")
+check(cast("Q") and st.Resources.Charge == 75 and hv.Health < 1000, "Thermal Burst cost/damage")
 check(CombatServer._state(victim).Dots[source] ~= nil, "Thermal Burst burn missing")
+check(not cast("Q"), "Surge slot cooldown bypass")
 st = reset()
-loadout.ArmorGem = { Element = "Frost", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("CryoLance") and st.Resources.Charge == 75 and hv.Health < 1000, "Armor socket did not power Cryo Lance")
-check(CombatServer._state(victim).StunUntil > now, "Cryo Lance stun missing")
+surgeGem("Frost", 1)
+check(cast("Q") and st.Resources.Charge == 75 and hv.Health < 1000, "Cryo Lance cost/damage")
+check(CombatServer._state(victim).SlowUntil > now, "Cryo Lance slow missing")
 st = reset()
-loadout.WeaponGem = { Element = "Frost", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("CryoShield") and st.Resources.Charge == 70 and st.Shield == 42, "Cryo Shield cost/barrier")
+surgeGem("Frost", 3)
+check(cast("Q") and st.Resources.Charge == 70 and st.Shield == 42, "Cryo Shield cost/barrier")
 st = reset()
-loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("EnergySiphon") and st.Resources.Charge == 80, "Energy Siphon cost")
-local before = hs.Health
-CombatServer.hurt(source, 20, "Fire", { Root = { Position = rv.Position } })
-check(hs.Health == before and st.Resources.Charge > 80 and st.SiphonCapacity < 40, "Siphon absorption/conversion")
-st = reset()
-loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("ResonanceEcho") and st.Resources.Charge == 60, "Resonance Echo cost")
-loadout.WeaponGem = nil -- isolate duplicate weapon damage from elemental procs
-now += 1.1
-check(CombatServer._attack(source, rv.Position, false) and close(1000 - hv.Health, expected * 2 * Actions.resolve(Classes.setState(loadout).Counts, "Sword", 0).BasicDamage), "Resonance Echo duplicate damage")
-st = reset()
-loadout.WeaponGem = { Element = "Frost", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("CryoStream") and close(st.Resources.Charge, 96.25) and st.Channel ~= nil, "Stream opening quarter-second cost")
+surgeGem("Frost", 2)
+check(cast("Q") and close(st.Resources.Charge, 96.25) and st.Channel ~= nil, "Stream opening quarter-second cost")
 local health = hv.Health
 now += 0.25
-check(fire("CryoStream"), "Stream refresh refused")
+check(cast("Q"), "Stream refresh refused")
 CombatServer._tick(0.25)
 check(hv.Health < health and close(st.Resources.Charge, 94.25), "Stream pulse billing or damage")
 check(not CombatServer._attack(source, rv.Position, false), "Attacked during channel")
@@ -101,70 +99,100 @@ health = hv.Health
 now += 0.3; CombatServer._tick(0.3)
 check(st.Channel == nil and hv.Health == health, "Released stream continued")
 st = reset()
-loadout.WeaponGem = { Element = "Frost", Size = 4, Clarity = 5, Cut = 5 }
-fire("CryoStream")
+surgeGem("Frost", 2)
+cast("Q")
 now += 0.6; CombatServer._tick(0.6)
 check(st.Channel == nil, "Lost stream release packet stuck channel")
 st = reset()
-loadout.WeaponGem = { Element = "Fire", Size = 4, Clarity = 5, Cut = 5 }
+surgeGem("Fire", 2)
+check(cast("Q") and st.Channel ~= nil and hv.Health < 1000, "Thermal Beam channel")
+loadout.Surge1Gem = nil
+health = hv.Health
+now += 0.25; CombatServer._tick(0.25)
+check(st.Channel == nil and hv.Health == health, "Beam kept firing after its gem left the slot")
+st = reset()
+surgeGem("Fire", 1)
 st.Resources.Stamina, st.Resources.Charge = 50, 50
 now += 0.5; CombatServer._tick(0.5)
 check(close(st.Resources.Stamina, 56) and close(st.Resources.Charge, 53.5), "Resource regeneration")
-loadout.WeaponGem = nil
+loadout.Surge1Gem = nil
 now += 0.1; CombatServer._tick(0.1)
 check(st.Resources.Charge == 0, "Unsocketed rig retained Charge")
 st = reset()
-loadout.WeaponGem = { Element = "Fire", Size = 4, Clarity = 5, Cut = 5 }
+surgeGem("Fire", 1)
 victim:SetAttribute("PvPEnabled", false)
-check(fire("ThermalBurst") and hv.Health == 1000, "Surge hit training visitor")
+check(cast("Q") and hv.Health == 1000, "Surge hit training visitor")
 victim:SetAttribute("PvPEnabled", true)
 st = reset()
-loadout.WeaponGem = { Element = "Frost", Size = 4, Clarity = 5, Cut = 5 }
+surgeGem("Frost", 1)
 wallBlocks = true
-check(fire("CryoLance") and hv.Health == 1000, "Surge ignored wall")
--- New elemental surges: each needs its own gem, and does its own job.
+check(cast("Q") and hv.Health == 1000, "Surge ignored wall")
+-- Every element's ability tiers.
 st = reset()
-check(not fire("AcidSpray"), "Corrosive surge without a Corrosive gem")
-loadout.WeaponGem = { Element = "Poison", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("AcidSpray") and st.Resources.Charge == 80 and hv.Health < 1000, "Acid Spray cost/cone damage")
+surgeGem("Fire", 3)
+check(cast("Q") and hv.Health < 1000 and st.Resources.Charge == 65, "Thermal Wave ring")
+st = reset()
+surgeGem("Fire", 4)
+check(cast("Q") and hv.Health == 1000 and #st.Pending == 1, "Thermal Cataclysm wind-up")
+now += 1.25; CombatServer._tick(1.25)
+check(hv.Health < 1000 and #st.Zones == 1, "Thermal Cataclysm blast or burning field missing")
+st = reset()
+surgeGem("Poison", 1)
+check(cast("Q") and st.Resources.Charge == 80 and hv.Health < 1000, "Acid Spray cost/cone damage")
 check(CombatServer._state(victim).Sunder > 0 and CombatServer._state(victim).SunderUntil > now, "Acid Spray shred missing")
 st = reset()
-loadout.WeaponGem = { Element = "Poison", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("ToxicCloud") and #st.Zones == 1, "Toxic Cloud pool missing")
+surgeGem("Poison", 3)
+check(cast("Q") and #st.Zones == 1, "Toxic Cloud pool missing")
 local cloudHealth = hv.Health
 now += 1.05; CombatServer._tick(1.05)
 check(hv.Health < cloudHealth, "Toxic Cloud did not tick")
-now += 6; CombatServer._tick(6)
+now += 8; CombatServer._tick(8)
 check(#st.Zones == 0, "Toxic Cloud never cleared")
 st = reset()
-loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("StaticField") and hv.Health < 1000 and CombatServer._state(victim).StunUntil > now, "Static Field self-centred stun")
+surgeGem("Shock", 2)
+check(cast("Q") and hv.Health < 1000 and CombatServer._state(victim).StunUntil > now, "Static Field self-centred stun")
 st = reset()
-loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
+surgeGem("Shock", 4)
 hv.Health = 120
-check(fire("Overload") and hv.Health == 0, "Overload execute below 20%")
+check(cast("Q") and hv.Health == 0, "Overload execute below 20%")
+check(Tech.Catalog.ChainLightning.Chain == 5, "Chain Lightning bounces")
+-- Gem metrics and rank: Size = damage, Clarity = duration, rank = power and cost.
 st = reset()
-loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
 hv.Health = 1000
-check(fire("IonSpark") and st.Resources.Charge == 85 and hv.Health < 1000, "Ion Spark cost/damage")
--- Overcharge perks multiply their element's surges.
-st = reset()
-loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
-check(fire("IonSpark"), "Ion Spark refused")
+surgeGem("Shock", 1)
+check(cast("Q") and st.Resources.Charge == 85 and hv.Health < 1000, "Ion Spark cost/damage")
 local plain = 1000 - hv.Health
+st = reset()
+surgeGem("Shock", 1, 3)
+check(cast("Q") and close((1000 - hv.Health) / plain, 1.3) and close(st.Resources.Charge, 100 - 15 * 0.84), "Rank III surge power/cost")
+st = reset()
+surgeGem("Shock", 1, 1, { Size = 10 })
+check(cast("Q") and close((1000 - hv.Health) / plain, 1.3 / 1.12), "Gem Size damage")
+st = reset()
+surgeGem("Frost", 1, 1, { Clarity = 10 })
+cast("Q")
+local longSlow = CombatServer._state(victim).SlowUntil - now
+st = reset()
+surgeGem("Frost", 1, 1, { Clarity = 1 })
+cast("Q")
+check(longSlow > CombatServer._state(victim).SlowUntil - now, "Gem Clarity duration")
+local stats = Tech.surgeStats({ Id = "x", Element = "Poison", Tier = "Rare", SurgeTier = 2, SurgeRank = 1, Size = 5, Clarity = 5, Cut = 10 }, { SurgePower = 0.2, SurgeEfficiency = 0.3, ArcaneResonance = 0.2 })
+check(stats.Id == "ArmorMelt" and close(stats.Crit, 0.2) and close(stats.Damage, 0.6 * 1.2) and close(stats.Recovery, 1.5 * 0.7) and stats.Echo == 0.2, "Surge Amplifiers and Cut")
+-- Overcharge perks multiply their element's surges.
 for _, id in { "CleaverCalibration", "ChargeRecycler", "IonOvercharge" } do
 	profiles[source].Augments.Unlocked[id] = true
 end
 Tree.initialize(profiles[source])
 check(Tree.effects(profiles[source]).Ion == 0.1, "Ion Overcharge not learned")
 st = reset()
-loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
-local boosted = fire("IonSpark") and (1000 - hv.Health)
+surgeGem("Shock", 1)
+local boosted = cast("Q") and (1000 - hv.Health)
 check(boosted and close(boosted / plain, 1.1), "Ion Overcharge multiplier")
 st = reset()
 check(not CombatServer._technology(source, "spoofed", rv.Position), "Unknown technique accepted")
 check(not CombatServer._technology(source, "HydraulicSlam", Vector3.new(0/0, 0, 0)), "Nonfinite technique aim accepted")
-CombatServer._input(source, "GemSurge", "HydraulicSlam", rv.Position)
+CombatServer._input(source, "Surge", "HydraulicSlam", rv.Position)
+CombatServer._input(source, "RigManeuver", "ThermalBurst", rv.Position)
 check(hv.Health == 1000, "Mismatched action category accepted")
 rs.Position = Vector3.zero
 check(not fire("HydraulicSlam"), "Town technique accepted")
@@ -173,8 +201,7 @@ check(not Tech.hasGem({Surge1Gem={Element="Fire"}},"Shock"),"Capacitor enabled u
 check(Tech.hasGem({Surge3Gem={Element="Poison"}}),"Capacitor did not enable Charge regen")
 rs.Position = arena
 st = reset()
-loadout.WeaponGem = nil
-loadout.Surge1Gem = {Element="Fire",Size=4,Clarity=5,Cut=5}
-check(fire("ThermalBurst") and hv.Health<1000,"Live Surge did not draw from dedicated capacitor")
-loadout.Surge1Gem = nil
-print("PASS: " .. checks .. " live technology/resource checks (all actions incl. Corrosive/Ion surges, clouds, execute, Overcharge, costs, sockets, channels, wind-ups, PvP and walls)")
+loadout.Surge3Gem = {Id="cap",Element="Fire",Size=4,Clarity=5,Cut=5}
+check(CombatServer._technology(source, nil, rv.Position, "R") and hv.Health<1000,"Live Surge did not draw from its R capacitor")
+loadout.Surge3Gem = nil
+print("PASS: " .. checks .. " live technology/resource checks (maneuvers, all 16 gem surges by slot, gem metrics, ranks, amplifiers, Overcharge, channels, wind-ups, PvP and walls)")

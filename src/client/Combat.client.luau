@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Config = require(ReplicatedStorage.Shared.Config)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
@@ -33,39 +34,37 @@ local attackSide, nextSide, cursorFree = "Right", "Right", false
 local feedbackUntil = 0
 local guideWasOpen = false
 local attackTouch, blockTouch, surgeTouch
-local beamHeld, nextBeamUpdate = false, 0
-local selected = { RigManeuvers = 1, GemSurges = 1 }
-local techCooldowns = {}
-local techLabels = {}
+local beamKey, nextBeamUpdate = nil, 0 -- the surge key held to channel a beam
+local SURGE_KEYS = { "Q", "E", "R" }
+local ROMAN = { "I", "II", "III" }
+local techCooldowns = {} -- [cooldown key] = { Ready, Total }
 local hitUntil, hitCritical = 0, false
 local incomingUntil, incomingOrigin = 0, nil
 local healthTrailRatio = 1
 local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
 local gui = UiKit.gui("CombatHud", 5)
+-- Bottom of the screen: Gem Surges (Q, E, R) on the left, Health over the
+-- Charge bar in the centre, Rig Maneuvers (1, 2, 3) under Stamina on the right.
 local hud = new("Frame", {
 	BackgroundColor3 = P.Inset,
 	BackgroundTransparency = 0.1,
 	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -120),
-	Size = UDim2.fromOffset(280, 118),
+	Position = UDim2.new(0.5, 0, 1, -34),
+	Size = UDim2.fromOffset(300, 92),
 }, gui)
 UiKit.round(hud, 12)
 new("UIStroke", { Color = Color3.fromRGB(65, 108, 128), Transparency = 0.35, Thickness = 1 }, hud)
 local hp = text(hud, "", 13, P.Text, IronUi.Bold)
 hp.AutomaticSize, hp.TextWrapped, hp.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
-hp.Position = UDim2.fromOffset(12, 8)
-hp.Size = UDim2.new(1, -24, 0, 22)
-local hint = text(hud, "Alternate sides; release when gold", 11, P.Dim)
-hint.Position = UDim2.fromOffset(12, 88)
-hint.Size = UDim2.new(1, -24, 0, 28)
-hint.TextWrapped = true
+hp.Position = UDim2.fromOffset(12, 6)
+hp.Size = UDim2.new(1, -24, 0, 20)
 local row =
 	new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromScale(0, 0), Size = UDim2.fromScale(1, 1) }, gui)
 local healthTrack = new("Frame", {
 	BackgroundColor3 = P.Dim,
 	BackgroundTransparency = 0.6,
-	Position = UDim2.fromOffset(12, 30),
-	Size = UDim2.new(1, -24, 0, 7),
+	Position = UDim2.fromOffset(12, 27),
+	Size = UDim2.new(1, -24, 0, 9),
 	BorderSizePixel = 0,
 }, hud)
 local healthTrail = new(
@@ -79,21 +78,100 @@ local healthFill = new(
 	healthTrack
 )
 local resourceBars = {}
-for index, id in { "Stamina", "Charge" } do
-	local label = text(hud, id:upper(), 11, Tech.Resources[id].Color, IronUi.Bold)
-	label.Position, label.Size = UDim2.fromOffset(12, 36 + (index - 1) * 25), UDim2.new(1, -24, 0, 15)
+local function resourceBar(parent, id, x, y)
+	local label = text(parent, id:upper(), 11, Tech.Resources[id].Color, IronUi.Bold)
+	label.AutomaticSize, label.TextWrapped = Enum.AutomaticSize.None, false
+	label.Position, label.Size = UDim2.fromOffset(x, y), UDim2.new(1, -2 * x, 0, 12)
 	local track = new("Frame", {
 		BackgroundColor3 = P.Dim,
 		BackgroundTransparency = 0.6,
-		Position = UDim2.fromOffset(12, 52 + (index - 1) * 25),
-		Size = UDim2.new(1, -24, 0, 5),
-	}, hud)
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(x, y + 14),
+		Size = UDim2.new(1, -2 * x, 0, 6),
+	}, parent)
+	UiKit.round(track, 3)
 	local fill = new(
 		"Frame",
 		{ BackgroundColor3 = Tech.Resources[id].Color, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) },
 		track
 	)
+	UiKit.round(fill, 3)
 	resourceBars[id] = { Label = label, Fill = fill }
+end
+resourceBar(hud, "Charge", 12, 41)
+local hint = text(hud, "Alternate sides; release when gold", 11, P.Dim)
+hint.Position = UDim2.fromOffset(12, 64)
+hint.Size = UDim2.new(1, -24, 0, 26)
+hint.TextWrapped = true
+local function centered(parent, size, color)
+	local label = text(parent, "", size, color, IronUi.Bold)
+	label.AutomaticSize, label.TextWrapped, label.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	return label
+end
+local surgeTray = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1) }, gui)
+local surgeHeader = centered(surgeTray, 11, P.Gold)
+surgeHeader.Text = "SURGE ARRAY"
+surgeHeader.TextXAlignment = Enum.TextXAlignment.Left
+surgeHeader.Position, surgeHeader.Size = UDim2.fromOffset(0, 2), UDim2.new(1, 0, 0, 14)
+local maneuverTray = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1) }, gui)
+resourceBar(maneuverTray, "Stamina", 0, 0)
+-- One ability icon: a round gem socket (surges) or a rounded square (maneuvers).
+local function makeIcon(parent, key, round)
+	local radius = UDim.new(if round then 0.5 else 0.22, 0)
+	local button = new(
+		"TextButton",
+		{ Text = "", AutoButtonColor = false, BackgroundColor3 = P.Inset, BackgroundTransparency = 0.08 },
+		parent
+	)
+	new("UICorner", { CornerRadius = radius }, button)
+	local stroke =
+		new("UIStroke", { Color = P.Dim, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, button)
+	local glyph = centered(button, 24, P.Text)
+	glyph.Position, glyph.Size = UDim2.fromScale(0, 0.1), UDim2.fromScale(1, 0.56)
+	local badge = centered(button, 10, P.Gold)
+	badge.Position, badge.Size = UDim2.fromScale(0, 0.64), UDim2.fromScale(1, 0.24)
+	local shade = new("Frame", {
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		Visible = false,
+		ZIndex = 2,
+	}, button)
+	new("UICorner", { CornerRadius = radius }, shade)
+	local timer = centered(button, 18, P.Text)
+	timer.Size, timer.ZIndex = UDim2.fromScale(1, 1), 3
+	local chip = new("Frame", {
+		BackgroundColor3 = P.Gold,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.14, 0.14),
+		Size = UDim2.fromOffset(18, 18),
+		ZIndex = 4,
+	}, button)
+	UiKit.round(chip, 9)
+	local keyLabel = centered(chip, 11, P.Inset)
+	keyLabel.Text, keyLabel.Size, keyLabel.ZIndex = key, UDim2.fromScale(1, 1), 4
+	local name = centered(parent, 10, P.Text)
+	return { Button = button, Stroke = stroke, Glyph = glyph, Badge = badge, Shade = shade, Timer = timer, Name = name }
+end
+local function layoutTray(frame, icons, size)
+	local gap = math.floor(size * 0.16)
+	frame.Size = UDim2.fromOffset(size * 3 + gap * 2, 22 + size + 16)
+	for i, icon in icons do
+		local x = (i - 1) * (size + gap)
+		icon.Button.Position, icon.Button.Size = UDim2.fromOffset(x, 22), UDim2.fromOffset(size, size)
+		icon.Name.Position, icon.Name.Size = UDim2.fromOffset(x - gap // 2, 24 + size), UDim2.fromOffset(size + gap, 14)
+		icon.Glyph.TextSize = math.floor(size * 0.38)
+	end
+end
+local function setIcon(icon, color, cd, usable, active)
+	local remaining = if cd then math.max(0, cd.Ready - os.clock()) else 0
+	icon.Shade.Visible = remaining > 0
+	icon.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
+	icon.Stroke.Color = if active then P.Gold else color
+	icon.Stroke.Transparency = if usable and remaining <= 0 then 0 else 0.6
+	icon.Glyph.TextTransparency = if usable then 0 else 0.45
 end
 local reticle = text(gui, "·", 24, P.Text, IronUi.Bold)
 reticle.AnchorPoint, reticle.Position, reticle.Size =
@@ -142,8 +220,12 @@ local targetFill = new(
 	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
 	targetTrack
 )
-local controlsHint =
-	text(gui, "LMB Attack | Q/E Side | RMB Guard | Space Dodge | R Rig | F Surge | Z/X Cycle | Tab Cursor", 11, P.Text)
+local controlsHint = text(
+	gui,
+	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Dodge | Q/E/R Gem Surges | 1/2/3 Rig Maneuvers | K Tree | Tab Cursor",
+	11,
+	P.Text
+)
 controlsHint.AnchorPoint, controlsHint.Position, controlsHint.Size =
 	Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -8), UDim2.new(1, -20, 0, 22)
 controlsHint.TextXAlignment = Enum.TextXAlignment.Center
@@ -202,7 +284,7 @@ local function rules()
 	)
 end
 local function beginAttack(side)
-	if beamHeld then
+	if beamKey then
 		return
 	end
 	if cursorFree or not canFight() or blockHeld or holding or os.clock() < nextAttack then
@@ -234,7 +316,7 @@ local function setBlock(held)
 	end
 	blockHeld = held
 	if held then
-		beamHeld = false
+		beamKey = nil
 		input:FireServer("CancelTech")
 		holding = false
 		input:FireServer("CancelAttack")
@@ -256,7 +338,7 @@ local function dodge()
 	end
 	holding = false
 	blockHeld = false
-	beamHeld = false
+	beamKey = nil
 	input:FireServer("CancelTech")
 	input:FireServer("CancelAttack")
 	input:FireServer("Block", false)
@@ -267,97 +349,77 @@ local function dodge()
 		if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then humanoid.MoveDirection else root.CFrame.LookVector
 	)
 end
-local techButtons = {}
-local function selectedTech(group)
-	local available = Tree.available(GemClient.Profile, group)
-	selected[group] = math.clamp(selected[group], 1, math.max(1, #available))
-	return available[selected[group]] or Tech.Order[group][1]
+local function pressInput(obj)
+	return obj.UserInputType == Enum.UserInputType.MouseButton1 or obj.UserInputType == Enum.UserInputType.Touch
 end
-local function triggerTech(group)
+local function loadoutOf()
+	return GemClient.Profile and GemClient.Profile.Character
+end
+-- The Rig Maneuver on key 1, 2 or 3 (set in the Loadout).
+local function maneuverOn(slot)
+	local loadout = loadoutOf()
+	return (loadout and loadout.Maneuvers or Tech.DefaultManeuvers)[slot]
+end
+local function techReady(key)
+	local cd = techCooldowns[key]
+	return not cd or os.clock() >= cd.Ready
+end
+-- Gem Surges: the gem in Surge Array slot Q, E or R decides what fires.
+local function triggerSurge(key)
+	if cursorFree or not canFight() or holding or blockHeld or not techReady("Surge" .. key) then
+		return
+	end
+	local loadout = loadoutOf()
+	local gem = Tech.surgeGem(loadout, key)
+	if not gem then
+		hint.Text, feedbackUntil = "Socket a gem in surge slot " .. key .. " (Loadout)", os.clock() + 1.2
+		return
+	end
+	local definition = Tech.surgeStats(gem, Tree.effects(GemClient.Profile))
+	if definition and definition.PerSecond then
+		beamKey, nextBeamUpdate = key, os.clock() + 0.2
+	end
+	input:FireServer("Surge", key, aimPoint())
+end
+local function triggerManeuver(slot)
 	if cursorFree or not canFight() or holding or blockHeld then
 		return
 	end
-	local id = selectedTech(group)
-	if os.clock() < (techCooldowns[id] or 0) then
-		return
+	local id = maneuverOn(slot)
+	if id and techReady(id) then
+		input:FireServer("RigManeuver", id, aimPoint())
 	end
-	local definition = Tech.Catalog[id]
-	if definition.PerSecond then
-		beamHeld, nextBeamUpdate = true, os.clock() + 0.2
-	end
-	input:FireServer(if group == "RigManeuvers" then "RigManeuver" else "GemSurge", id, aimPoint())
 end
-local function stopBeam()
-	if beamHeld then
-		beamHeld = false
+local function stopBeam(key)
+	if beamKey and (key == nil or key == beamKey) then
+		beamKey = nil
 		input:FireServer("CancelTech")
 	end
 end
-for index, group in { "RigManeuvers", "GemSurges" } do
-	local button = new("TextButton", {
-		BackgroundColor3 = P.Inset,
-		BackgroundTransparency = 0.15,
-		TextColor3 = P.Text,
-		TextSize = 11,
-		TextWrapped = true,
-		Size = UDim2.fromOffset(142, 58),
-		Position = UDim2.fromOffset(12, 82 + (index - 1) * 66),
-	}, gui)
-	UiKit.round(button, 10)
-	local cycle = new("TextButton", {
-		BackgroundColor3 = P.Inset,
-		TextColor3 = P.Gold,
-		Text = ">",
-		TextSize = 20,
-		Size = UDim2.fromOffset(44, 44),
-		Position = UDim2.fromOffset(158, 89 + (index - 1) * 66),
-	}, gui)
-	UiKit.round(cycle, 8)
-	cycle.Activated:Connect(function()
-		stopBeam()
-		local available = Tree.available(GemClient.Profile, group)
-		selected[group] = selected[group] % math.max(1, #available) + 1
+local surgeIcons, maneuverIcons = {}, {}
+for i, key in SURGE_KEYS do
+	local icon = makeIcon(surgeTray, key, true)
+	surgeIcons[i] = icon
+	icon.Button.InputBegan:Connect(function(obj)
+		if pressInput(obj) then
+			if obj.UserInputType == Enum.UserInputType.Touch then
+				surgeTouch = obj
+			end
+			triggerSurge(key)
+		end
 	end)
-	button.Text = ""
-	local title = text(button, "", 13, P.Text, IronUi.Bold)
-	title.AutomaticSize, title.TextWrapped, title.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
-	title.Position, title.Size = UDim2.fromOffset(8, 5), UDim2.new(1, -16, 0, 20)
-	local stateLabel = text(button, "", 10, P.Gold, IronUi.Bold)
-	stateLabel.Position, stateLabel.Size = UDim2.fromOffset(8, 28), UDim2.new(1, -16, 0, 24)
-	stateLabel.AutomaticSize = Enum.AutomaticSize.None
-	stateLabel.TextWrapped = true
-	local stroke = new(
-		"UIStroke",
-		{ Color = P.Gold, Transparency = 0.35, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
-		button
-	)
-	techLabels[group] = { Title = title, State = stateLabel, Stroke = stroke }
-	techButtons[group] = button
-	if group == "GemSurges" then
-		button.InputBegan:Connect(function(obj)
-			if
-				obj.UserInputType == Enum.UserInputType.Touch
-				or obj.UserInputType == Enum.UserInputType.MouseButton1
-			then
-				if obj.UserInputType == Enum.UserInputType.Touch then
-					surgeTouch = obj
-				end
-				triggerTech(group)
-			end
-		end)
-		button.InputEnded:Connect(function(obj)
-			if
-				obj.UserInputType == Enum.UserInputType.Touch
-				or obj.UserInputType == Enum.UserInputType.MouseButton1
-			then
-				stopBeam()
-			end
-		end)
-	else
-		button.Activated:Connect(function()
-			triggerTech(group)
-		end)
-	end
+	icon.Button.InputEnded:Connect(function(obj)
+		if pressInput(obj) then
+			stopBeam(key)
+		end
+	end)
+end
+for slot = 1, Tech.ManeuverSlots do
+	local icon = makeIcon(maneuverTray, tostring(slot), false)
+	maneuverIcons[slot] = icon
+	icon.Button.Activated:Connect(function()
+		triggerManeuver(slot)
+	end)
 end
 local function makeSlot(id, label, key, position)
 	local button, faceBox = IronUi.chunk(
@@ -379,13 +441,10 @@ local function makeSlot(id, label, key, position)
 	slots[id] = { Button = button, Name = name, Timer = timer, Key = keyLabel }
 	return button
 end
-local attackButton = makeSlot("Basic", "LEFT", "Q / HOLD", UDim2.new(0, 56, 1, -32))
-local heavyButton = makeSlot("Heavy", "RIGHT", "E / HOLD", UDim2.new(1, -56, 1, -32))
-local dodgeButton = makeSlot("Dodge", "DODGE", "SPACE", UDim2.new(1, -56, 1, -210))
-local blockButton = makeSlot("Block", "GUARD", "HOLD RMB", UDim2.new(0.5, 0, 1, -32))
-local function pressInput(obj)
-	return obj.UserInputType == Enum.UserInputType.MouseButton1 or obj.UserInputType == Enum.UserInputType.Touch
-end
+local attackButton = makeSlot("Basic", "LEFT", "HOLD", UDim2.new(0, 56, 1, -32))
+local heavyButton = makeSlot("Heavy", "RIGHT", "HOLD", UDim2.new(1, -56, 1, -32))
+local dodgeButton = makeSlot("Dodge", "DODGE", "TAP", UDim2.new(1, -56, 1, -210))
+local blockButton = makeSlot("Block", "GUARD", "HOLD", UDim2.new(0.5, 0, 1, -32))
 attackButton.InputBegan:Connect(function(obj)
 	if pressInput(obj) and not holding then
 		attackTouch = if obj.UserInputType == Enum.UserInputType.Touch then obj else nil
@@ -426,7 +485,7 @@ leave.Position = UDim2.new(1, -12, 0, 82)
 leave.Size = UDim2.fromOffset(160, 38)
 local function cancel()
 	attackTouch, blockTouch, surgeTouch = nil, nil, nil
-	beamHeld = false
+	beamKey = nil
 	input:FireServer("CancelTech")
 	holding = false
 	blockHeld = false
@@ -452,8 +511,8 @@ local treeButton = new("TextButton", {
 	TextSize = 12,
 	TextColor3 = P.Gold,
 	BackgroundColor3 = P.Inset,
-	Position = UDim2.fromOffset(12, 214),
-	Size = UDim2.fromOffset(142, 30),
+	Position = UDim2.fromOffset(58, 21),
+	Size = UDim2.fromOffset(150, 30),
 }, gui)
 UiKit.round(treeButton, 8)
 treeButton.Activated:Connect(toggleTree)
@@ -476,33 +535,37 @@ ContextActionService:BindActionAtPriority("CombatAugmentTree", function(_, state
 	end
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 20, Enum.KeyCode.K)
+local SURGE_INPUT = { [Enum.KeyCode.Q] = "Q", [Enum.KeyCode.E] = "E", [Enum.KeyCode.R] = "R" }
+local MANEUVER_INPUT = {
+	[Enum.KeyCode.One] = 1,
+	[Enum.KeyCode.Two] = 2,
+	[Enum.KeyCode.Three] = 3,
+	[Enum.KeyCode.KeypadOne] = 1,
+	[Enum.KeyCode.KeypadTwo] = 2,
+	[Enum.KeyCode.KeypadThree] = 3,
+}
 UserInputService.InputBegan:Connect(function(obj, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
 		return
 	end
-	if obj.KeyCode == Enum.KeyCode.R then
-		triggerTech("RigManeuvers")
-	elseif obj.KeyCode == Enum.KeyCode.F then
-		triggerTech("GemSurges")
-	elseif obj.KeyCode == Enum.KeyCode.Z or obj.KeyCode == Enum.KeyCode.X then
-		stopBeam()
-		local group = if obj.KeyCode == Enum.KeyCode.Z then "RigManeuvers" else "GemSurges"
-		local available = Tree.available(GemClient.Profile, group)
-		selected[group] = selected[group] % math.max(1, #available) + 1
-	elseif obj.KeyCode == Enum.KeyCode.Q then
-		beginAttack("Left")
-	elseif obj.KeyCode == Enum.KeyCode.E then
-		beginAttack("Right")
+	if SURGE_INPUT[obj.KeyCode] then
+		triggerSurge(SURGE_INPUT[obj.KeyCode])
+	elseif MANEUVER_INPUT[obj.KeyCode] then
+		triggerManeuver(MANEUVER_INPUT[obj.KeyCode])
 	elseif obj.UserInputType == Enum.UserInputType.MouseButton1 then
-		beginAttack()
+		local offHand = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+		beginAttack(if offHand then "Left" else nil)
 	elseif obj.UserInputType == Enum.UserInputType.MouseButton2 then
 		setBlock(true)
 	end
 end)
 UserInputService.InputEnded:Connect(function(obj)
-	if obj == surgeTouch or obj.KeyCode == Enum.KeyCode.F then
+	if obj == surgeTouch then
 		surgeTouch = nil
 		stopBeam()
+	elseif SURGE_INPUT[obj.KeyCode] then
+		stopBeam(SURGE_INPUT[obj.KeyCode])
 	end
 	if obj == attackTouch then
 		attackTouch = nil
@@ -512,11 +575,7 @@ UserInputService.InputEnded:Connect(function(obj)
 		blockTouch = nil
 		setBlock(false)
 	end
-	if
-		obj.UserInputType == Enum.UserInputType.MouseButton1
-		or obj.KeyCode == Enum.KeyCode.Q
-		or obj.KeyCode == Enum.KeyCode.E
-	then
+	if obj.UserInputType == Enum.UserInputType.MouseButton1 then
 		releaseAttack()
 	elseif obj.UserInputType == Enum.UserInputType.MouseButton2 then
 		setBlock(false)
@@ -596,39 +655,36 @@ RunService.RenderStepped:Connect(function(dt)
 	local viewport = camera.ViewportSize
 	local portrait = viewport.X < 600
 	local short = viewport.Y < 430 and not portrait
-	if short then
-		hud.AnchorPoint, hud.Position, hud.Size =
-			Vector2.new(1, 0), UDim2.new(1, -12, 0, 100), UDim2.fromOffset(220, 118)
-	else
-		hud.AnchorPoint, hud.Position, hud.Size =
-			Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, if portrait then -112 else -58), UDim2.fromOffset(280, 118)
+	local touch = UserInputService.TouchEnabled
+	local iconSize = if portrait
+		then math.clamp(math.floor((viewport.X - 76) / 6.6), 36, 52)
+		elseif short then 50
+		else 62
+	layoutTray(surgeTray, surgeIcons, iconSize)
+	layoutTray(maneuverTray, maneuverIcons, iconSize)
+	surgeTray.Position, maneuverTray.Position = UDim2.new(0, 16, 1, -12), UDim2.new(1, -16, 1, -12)
+	-- The Health/Charge panel sits between the trays, or above them when narrow.
+	local trayWidth, trayHeight = surgeTray.Size.X.Offset, surgeTray.Size.Y.Offset
+	local between = viewport.X - 2 * (trayWidth + 32)
+	local stacked = portrait or between < 240
+	local hudBottom = if stacked then 22 + trayHeight else 34
+	local hudWidth = if stacked then math.min(300, viewport.X - 32) else math.min(300, between)
+	hud.AnchorPoint, hud.Position, hud.Size =
+		Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -hudBottom), UDim2.fromOffset(hudWidth, 92)
+	-- Touch players get on-screen swing, guard and dodge buttons above the panel.
+	local slotWidth = math.min(80, (viewport.X - 32) / 4 - 8)
+	for index, id in { "Basic", "Heavy", "Block", "Dodge" } do
+		local slot = slots[id]
+		slot.Button.Visible = touch
+		slot.Button.Size = UDim2.fromOffset(slotWidth, 70)
+		slot.Button.Position = UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(hudBottom + 100))
 	end
-	if portrait or short then
-		for index, id in { "Basic", "Heavy", "Block", "Dodge" } do
-			slots[id].Button.Position = UDim2.new((index - 0.5) / 4, 0, 1, -28)
-			slots[id].Button.Size = UDim2.fromOffset(math.min(76, (viewport.X - 32) / 4), 70)
-		end
-		leave.Position, leave.Size = UDim2.new(1, -12, 0, if portrait then 214 else 16), UDim2.fromOffset(130, 30)
-	else
-		attackButton.Position, heavyButton.Position = UDim2.new(1, -232, 1, -32), UDim2.new(1, -144, 1, -32)
-		blockButton.Position, dodgeButton.Position = UDim2.new(1, -56, 1, -32), UDim2.new(1, -56, 1, -112)
-		for _, slot in slots do
-			slot.Button.Size = UDim2.fromOffset(80, 70)
-		end
-		leave.Position, leave.Size = UDim2.new(1, -12, 0, 16), UDim2.fromOffset(160, 38)
-	end
+	controlsHint.Position = UDim2.new(0.5, 0, 1, -(hudBottom + 98))
+	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 22)
+	leave.Position, leave.Size =
+		UDim2.new(1, -12, 0, if portrait then 80 else 16), UDim2.fromOffset(if portrait then 130 else 160, 38)
 	targetCard.Size = UDim2.fromOffset(if portrait then math.min(176, viewport.X - 120) else 260, 56)
 	targetName.TextSize = if portrait then 11 else 13
-
-	if not portrait and not short and viewport.X < 1000 then
-		hud.AnchorPoint, hud.Position = Vector2.new(0, 1), UDim2.new(0, 12, 1, -58)
-	end
-	local scale = math.min(1, math.max(0.65, (viewport.X - 20) / 280))
-	local sizing = hud:FindFirstChildOfClass("UIScale")
-	if not sizing then
-		sizing = new("UIScale", {}, hud)
-	end
-	sizing.Scale = scale
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		local ratio = math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
@@ -652,45 +708,49 @@ RunService.RenderStepped:Connect(function(dt)
 		bar.Label.Text = string.format("%s  %d / %d", id:upper(), math.floor(amount), maximum)
 		bar.Fill.Size = UDim2.fromScale(math.clamp(amount / math.max(1, maximum), 0, 1), 1)
 	end
-	for group in techButtons do
-		local id = selectedTech(group)
-		local definition = Tree.techStats(GemClient.Profile, id)
-		local remaining = math.max(0, (techCooldowns[id] or 0) - os.clock())
-		local loadout = GemClient.Profile and GemClient.Profile.Character
-		local available = definition.Resource ~= "Charge" or (loadout and Tech.hasGem(loadout, definition.Element))
-		local resource = player:GetAttribute(definition.Resource) or 0
-		local stateText, color
-		if not available then
-			stateText, color = "GEM REQUIRED", P.Dim
-		elseif definition.Shield and not (loadout and Classes.gear(loadout.Class, "Shields", loadout.Shield)) then
-			stateText, color = "SHIELD REQUIRED", P.Dim
-		elseif definition.PerSecond and player:GetAttribute("Channeling") then
-			stateText, color = "CHANNELING", Tech.Resources[definition.Resource].Color
-		elseif remaining > 0 then
-			stateText, color = string.format("COOLDOWN %.1fs", remaining), Color3.fromRGB(160, 175, 195)
-		elseif resource < definition.Cost * (if definition.PerSecond then 0.25 else 1) then
-			stateText, color = "LOW " .. definition.Resource:upper(), Color3.fromRGB(255, 167, 91)
-		elseif holding or blockHeld then
-			stateText, color = if blockHeld then "LOWER GUARD" else "RELEASE ATTACK", P.Dim
-		elseif os.clock() < nextAttack then
-			stateText, color = string.format("RECOVERY %.1fs", nextAttack - os.clock()), P.Dim
+	local profile = GemClient.Profile
+	local loadout = profile and profile.Character
+	local amps = if profile then Tree.effects(profile) else {}
+	for i, key in SURGE_KEYS do
+		local icon = surgeIcons[i]
+		local gem = Tech.surgeGem(loadout, key)
+		local definition = gem and Tech.surgeStats(gem, amps)
+		if definition then
+			local color = GemConfig.ElementColors[gem.Element] or P.Gold
+			local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)
+			icon.Glyph.Text, icon.Glyph.TextColor3 = definition.Icon or "◆", color
+			icon.Badge.Text = string.format("T%d · %s", definition.Tier, ROMAN[definition.Rank] or "I")
+			icon.Name.Text = definition.Name
+			local usable = (player:GetAttribute("Charge") or 0) >= cost
+			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key)
 		else
-			stateText, color = "READY", Tech.Resources[definition.Resource].Color
+			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
+			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
+			setIcon(icon, P.Dim, nil, false, false)
 		end
-		local labels = techLabels[group]
-		labels.Title.Text = definition.Name
-		labels.State.Text = string.format(
-			"%s · %s\n%g %s%s",
-			if group == "RigManeuvers" then "R" else "F",
-			stateText,
-			math.floor(definition.Cost * 10 + 0.5) / 10,
-			definition.Resource:upper(),
-			if definition.PerSecond then "/s · HOLD" else ""
-		)
-		labels.State.TextColor3, labels.Stroke.Color = color, color
 	end
-	if beamHeld and os.clock() >= nextBeamUpdate then
-		input:FireServer("GemSurge", "CryoStream", aimPoint())
+	local shielded = loadout and Classes.gear(loadout.Class, "Shields", loadout.Shield)
+	for slot, icon in maneuverIcons do
+		local id = maneuverOn(slot)
+		local definition = id and Tree.techStats(profile, id)
+		local color = Tech.Resources.Stamina.Color
+		if definition then
+			local learned = Tree.isLearned(profile, id)
+			icon.Glyph.Text, icon.Glyph.TextColor3 = definition.Icon or "✦", color
+			icon.Name.Text = definition.Name
+			icon.Badge.Text = if learned then string.format("%d ST", math.floor(definition.Cost + 0.5)) else "LOCKED"
+			local usable = learned
+				and (player:GetAttribute("Stamina") or 0) >= definition.Cost
+				and (not definition.Shield or shielded ~= nil)
+			setIcon(icon, color, techCooldowns[id], usable, false)
+		else
+			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
+			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
+			setIcon(icon, P.Dim, nil, false, false)
+		end
+	end
+	if beamKey and os.clock() >= nextBeamUpdate then
+		input:FireServer("Surge", beamKey, aimPoint())
 		nextBeamUpdate = os.clock() + 0.2
 	end
 	local now = os.clock()
@@ -771,7 +831,7 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		slot.Key.Text = if UserInputService.TouchEnabled
 			then (if id == "Dodge" then "TAP" else "HOLD")
-			else ({ Basic = "Q / HOLD", Heavy = "E / HOLD", Block = "HOLD RMB", Dodge = "SPACE" })[id]
+			else ({ Basic = "LMB", Heavy = "SHIFT+LMB", Block = "HOLD RMB", Dodge = "SPACE" })[id]
 		slot.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
 		local pressed = (id == "Block" and blockHeld)
 			or (holding and ((id == "Basic" and attackSide == "Left") or (id == "Heavy" and attackSide == "Right")))
@@ -881,9 +941,10 @@ function handlers.TechStatus(message)
 	hint.Text, feedbackUntil = message, os.clock() + 1
 end
 function handlers.TechCooldown(id, duration)
-	techCooldowns[id] = os.clock() + duration
+	techCooldowns[id] = { Ready = os.clock() + duration, Total = duration }
 	nextAttack = math.max(nextAttack, os.clock() + duration)
-	if Tech.Catalog[id].Resource == "Stamina" then
+	local definition = Tech.Catalog[id]
+	if definition and definition.Resource == "Stamina" then
 		FirstPerson.swing("Right")
 	end
 end

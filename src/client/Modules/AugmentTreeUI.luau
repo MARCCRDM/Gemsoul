@@ -38,11 +38,11 @@ local BRANCH = {
 		Kind = "Ability",
 		Blurb = "Abilities  ·  powered by Stamina",
 	},
-	GemSurges = {
+	SurgeAmplifiers = {
 		Color = Color3.fromRGB(70, 130, 255),
 		Icon = "◆",
-		Kind = "Gem Spell",
-		Blurb = "Gem spells  ·  four elements",
+		Kind = "Amplifier",
+		Blurb = "Boost every equipped gem surge",
 	},
 	PassiveAugments = { Color = P.Gold, Icon = "⚙", Kind = "Perk", Blurb = "Perks  ·  always on" },
 }
@@ -54,6 +54,15 @@ local PASSIVE_LABELS = {
 	ChargeRegen = "Charge regeneration",
 	StaminaRegen = "Stamina regeneration",
 	Thermal = "Thermal damage",
+	Corrosive = "Corrosive damage",
+	Ion = "Ion damage",
+	Cryo = "Cryo damage",
+	Harmony = "Damage after switching",
+	SurgePower = "Surge damage",
+	SurgeEfficiency = "Surge cooldown cut",
+	SurgeDuration = "Surge duration",
+	ElementalMastery = "All surge damage",
+	ArcaneResonance = "Chance to surge twice",
 }
 local BRONZE = Color3.fromRGB(196, 150, 82)
 local LOCKED_FILL = Color3.fromRGB(19, 17, 32)
@@ -130,9 +139,9 @@ local function medallion(parent: Instance, icon: string, size: number, color: Co
 end
 
 -- Rank pips: ◆ for each rank owned, ◇ for each still to earn.
-local function pips(parent: Instance, rank: number, color: Color3, size: number): TextLabel
+local function pips(parent: Instance, rank: number, color: Color3, size: number, max: number?): TextLabel
 	local marks = {}
-	for i = 1, Tree.MaxRank do
+	for i = 1, max or Tree.MaxRank do
 		table.insert(marks, if i <= rank then "◆" else "◇")
 	end
 	local label = centered(fixed(text(parent, table.concat(marks, " "), size, if rank > 0 then color else MUTED)))
@@ -453,14 +462,14 @@ local function drawDetail(data)
 	local rankLine = fixed(
 		text(
 			top,
-			if learned then string.format("RANK %s / %s", NUMERALS[rank], NUMERALS[Tree.MaxRank]) else "NOT LEARNED",
+			if learned then string.format("RANK %s / %s", NUMERALS[rank], NUMERALS[node.MaxRank]) else "NOT LEARNED",
 			12,
 			if learned then P.Gold else MUTED,
 			IronUi.Bold
 		)
 	)
 	rankLine.Position, rankLine.Size = UDim2.fromOffset(94, 54), UDim2.fromOffset(110, 18)
-	local rankPips = pips(top, rank, P.Gold, 16)
+	local rankPips = pips(top, rank, P.Gold, 16, node.MaxRank)
 	rankPips.Position, rankPips.Size = UDim2.fromOffset(204, 52), UDim2.fromOffset(70, 20)
 	rankPips.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -487,7 +496,7 @@ local function drawDetail(data)
 	}, detail)
 	UiKit.round(compare, 10)
 	stroke(compare, BRONZE, 1, 0.65)
-	local nextRank = if rank < Tree.MaxRank then rank + 1 else nil
+	local nextRank = if rank < node.MaxRank then rank + 1 else nil
 	local current = rankRows(node, rank)
 	local upcoming = if nextRank then rankRows(node, nextRank) else nil
 	local function heading(value: string, x: number, color: Color3)
@@ -564,15 +573,18 @@ local function drawDetail(data)
 	else
 		requirement(true, "No prerequisite", 2)
 	end
-	-- Gem surges draw on a socketed gem of their element (Resonance: any gem).
-	local tech = Tech.Catalog[selected]
-	if tech and tech.Resource == "Charge" then
+	-- Rig Maneuvers are used from the three maneuver keys (1, 2, 3).
+	if node.Branch == "RigManeuvers" then
 		local loadout = GemClient.Profile and GemClient.Profile.Character or {}
+		local key
+		for i, id in loadout.Maneuvers or Tech.DefaultManeuvers do
+			if id == selected then
+				key = i
+			end
+		end
 		requirement(
-			Tech.hasGem(loadout, tech.Element),
-			if tech.Element
-				then string.format("Socket a %s gem to cast it", GemConfig.elementName(tech.Element))
-				else "Socket any gem to cast it",
+			key ~= nil,
+			if key then string.format("Equipped on key %d", key) else "Equip it on 1, 2 or 3 in the Loadout",
 			3
 		)
 	end
@@ -806,7 +818,7 @@ local function drawSheet(data)
 		name.Position, name.Size, name.ZIndex = UDim2.fromOffset(0, medal + 9), UDim2.new(1, 0, 0, 15), 3
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		local sub = if rank > 0
-			then pips(holder, rank, P.Gold, 11)
+			then pips(holder, rank, P.Gold, 11, node.MaxRank)
 			else centered(
 				fixed(
 					text(
@@ -852,7 +864,10 @@ function UI.refresh()
 
 	for id, tab in tabs do
 		local meta, on = BRANCH[id], id == branch
-		local owned, total = 0, #Tree.Order[id] * Tree.MaxRank
+		local owned, total = 0, 0
+		for _, nodeId in Tree.Order[id] do
+			total += Tree.Nodes[nodeId].MaxRank
+		end
 		for _, nodeId in Tree.Order[id] do
 			owned += rankOf(data, nodeId)
 		end

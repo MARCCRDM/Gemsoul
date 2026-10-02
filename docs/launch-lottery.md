@@ -8,7 +8,7 @@ Enter Moon Base grants and attunes all nine gems. Existing equipped gems are pre
 
 Server preparation stores the complete reveal plan in Intro.Lottery. Repeated requests and reconnects reuse that plan; the Granted flag prevents duplicate claims. Claim capacity is checked before any gem assignment. Legacy QuickStart and FinishIntro use the same completion path; class selection is retired. Gems are escrowed until completion rather than added temporarily to the backpack.
 
-The armory now has a SURGE GEMS / 3 CAPACITORS button. It opens a panel showing the three actual sockets. Select a backpack gemstone and a capacitor to bind it, or tap a filled capacitor with no selection to remove it. Vey's existing proximity requirement applies after onboarding. Capacitor gems provide elemental access to Gem Surges, but they do not contribute armor or weapon enchantment stats and do not unlock unlearned abilities.
+The three Gem Surge capacitors are the Surge Array sockets on Q, E and R (saved as Surge1Gem, Surge2Gem and Surge3Gem). The armory's SURGE ARRAY button, the dashboard socket strip and the L key open the Surge Array window: pick a socket, then a cut gem from the pouch. Each gem's element and surge tier decide its ability (Ability System v3.0); capacitor gems do not add armor or weapon enchantment stats.
 
 ## Validation
 

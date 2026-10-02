@@ -68,6 +68,23 @@ check(
 	PlayerData.unsocketGem(player, "Helmet").Id == "bound" and old.Character.ItemGems.Helmet[originalHelmet] == nil,
 	"Unsocket left duplicate enchant"
 )
+-- The Surge Array (Q, E, R) and the Rig Maneuver keys.
+old.Character.HelmetGem = nil
+old.Gems = { { Id = "s1", Element = "Shock", Size = 3, Clarity = 3, Cut = 3 }, { Id = "s2", Element = "Fire", Size = 3, Clarity = 3, Cut = 3 } }
+check(PlayerData.socketSurge(player, "s1", "Q").Id == "s1" and old.Character.Surge1Gem.Id == "s1" and #old.Gems == 1, "Surge socket failed")
+check(PlayerData.socketSurge(player, "s2", "Q").Id == "s2" and old.Gems[1].Id == "s1", "Surge swap lost the old gem")
+check(PlayerData.socketSurge(player, "s1", "F") == nil and #old.Gems == 1, "Invalid surge key accepted")
+old.Gems = { { Id = "rough" } }
+check(PlayerData.socketSurge(player, "rough", "E") == nil, "Rough gem socketed as a surge")
+old.Gems = { { Id = "a" }, { Id = "b" } }
+check(PlayerData.unsocketSurge(player, "Q") == nil and old.Character.Surge1Gem.Id == "s2", "Full pouch lost surge gem")
+old.Gems = {}
+check(PlayerData.unsocketSurge(player, "Q").Id == "s2" and old.Character.Surge1Gem == nil and #old.Gems == 1, "Surge unsocket failed")
+check(PlayerData.unsocketSurge(player, "E") == nil, "Empty surge slot unsocketed")
+PlayerData.setManeuver(player, 1, "ServoFlurry")
+check(old.Character.Maneuvers[1] == "ServoFlurry" and old.Character.Maneuvers[2] == "KineticRam", "Maneuver equip failed")
+PlayerData.setManeuver(player, 3, "ServoFlurry")
+check(old.Character.Maneuvers[3] == "ServoFlurry" and old.Character.Maneuvers[1] == "StimDodge", "Duplicate maneuver not swapped")
 local function rig(r15)
 	local parts = {}
 	local names = if r15

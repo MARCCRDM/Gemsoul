@@ -553,6 +553,40 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 	return gem
 end
 
+--[[
+	The Surge Array: the three surge capacitor sockets (Surge1-3) on Q, E and
+	R. A gem there casts its surge instead of enchanting gear; the socket's old
+	gem goes back to the pouch.
+]]
+PlayerData.SurgeKeys = { Q = "Surge1", E = "Surge2", R = "Surge3" }
+function PlayerData.socketSurge(player: Player, gemId: string, key: string): Gem?
+	local slot = PlayerData.SurgeKeys[key]
+	return if slot then PlayerData.socketGem(player, gemId, slot) else nil
+end
+
+function PlayerData.unsocketSurge(player: Player, key: string): Gem?
+	local slot = PlayerData.SurgeKeys[key]
+	return if slot then PlayerData.unsocketGem(player, slot) else nil
+end
+
+-- The Rig Maneuver on key 1, 2 or 3 (validated by the caller). An id already
+-- on another key swaps places with this key's maneuver.
+function PlayerData.setManeuver(player: Player, slot: number, id: string)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	local list = table.clone(profile.Character.Maneuvers or { "HydraulicSlam", "KineticRam", "StimDodge" })
+	for i, other in list do
+		if other == id then
+			list[i] = list[slot]
+		end
+	end
+	list[slot] = id
+	profile.Character.Maneuvers = list
+	sync(player)
+end
+
 -- The three rig maneuvers on Q / E / R (validated by the caller).
 function PlayerData.setRigManeuvers(player: Player, ids: { string })
 	local profile = profiles[player]

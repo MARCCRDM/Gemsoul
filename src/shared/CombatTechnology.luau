@@ -1,5 +1,6 @@
 -- Grounded mining technology. Costs follow the approved universe conversion;
 -- recovery, regeneration and unspecified damage are first-playtest tuning.
+local GemRoller = require(script.Parent.GemRoller)
 local Tech = {}
 Tech.Resources = {
 	Stamina = { Max = 100, Start = 100, Regen = 12, Color = Color3.fromRGB(65, 195, 112) },
@@ -9,7 +10,7 @@ Tech.DodgeCost = 15
 Tech.ProgressionTerms = {
 	Tree = "Augment Tree",
 	Points = "Augment Points",
-	Branches = { "Rig Maneuvers", "Gem Surges", "Passive Augments" },
+	Branches = { "Rig Maneuvers", "Surge Amplifiers", "Passive Augments" },
 }
 Tech.Order = {
 	RigManeuvers = {
@@ -22,28 +23,43 @@ Tech.Order = {
 		"SeismicBreaker",
 		"TremorSlam",
 	},
-	-- Tier by tier (Novice to Master), columns Thermal, Corrosive, Ion, Cryo, Resonance.
+	-- Gem Surges come from gems, not the tree: Tech.Surges[element][tier].
 	GemSurges = {
 		"ThermalBurst",
-		"AcidSpray",
-		"IonSpark",
+		"ThermalBeam",
+		"ThermalWave",
+		"ThermalCataclysm",
 		"CryoLance",
-		"EmberLance",
-		"ArmorMelt",
-		"StaticField",
 		"CryoStream",
-		"EnergySiphon",
-		"SolarFlare",
-		"ToxicCloud",
-		"ChainLightning",
 		"CryoShield",
-		"ResonanceEcho",
-		"Supernova",
-		"BioCorrosion",
-		"Overload",
 		"AbsoluteZero",
+		"AcidSpray",
+		"ArmorMelt",
+		"ToxicCloud",
+		"BioCorrosion",
+		"IonSpark",
+		"StaticField",
+		"ChainLightning",
+		"Overload",
 	},
 }
+-- The 16 gem surges, by element and the gem's surge tier (1-4).
+Tech.Surges = {
+	Fire = { "ThermalBurst", "ThermalBeam", "ThermalWave", "ThermalCataclysm" },
+	Frost = { "CryoLance", "CryoStream", "CryoShield", "AbsoluteZero" },
+	Poison = { "AcidSpray", "ArmorMelt", "ToxicCloud", "BioCorrosion" },
+	Shock = { "IonSpark", "StaticField", "ChainLightning", "Overload" },
+}
+Tech.SurgeSlots = 3 -- Q, E, R
+-- The Surge Array keys and the saved capacitor sockets they cast from
+-- (Character.Surge1Gem, Surge2Gem, Surge3Gem).
+Tech.SurgeSockets = { Q = "Surge1", E = "Surge2", R = "Surge3" }
+function Tech.surgeGem(loadout, key: string)
+	local slot = Tech.SurgeSockets[key]
+	return if slot and loadout then loadout[slot .. "Gem"] else nil
+end
+Tech.ManeuverSlots = 3 -- 1, 2, 3
+Tech.DefaultManeuvers = { "HydraulicSlam", "KineticRam", "StimDodge" }
 Tech.Catalog = {
 	HydraulicSlam = {
 		Name = "Hydraulic Slam",
@@ -122,14 +138,45 @@ Tech.Catalog = {
 		Icon = "🔥",
 		Description = "Socket-powered plasma detonation at the aimed surface.",
 	},
-	EnergySiphon = {
-		Name = "Energy Siphon",
+	ThermalBeam = {
+		Name = "Thermal Beam",
 		Resource = "Charge",
-		Cost = 20,
+		Cost = 15,
+		PerSecond = true,
+		Element = "Fire",
+		Damage = 0.5,
+		Range = 24,
+		Recovery = 0.25,
+		Icon = "🔥",
+		Description = "Hold to channel a plasma beam that burns whatever it touches; costs 15 Charge per second.",
+	},
+	ThermalWave = {
+		Name = "Thermal Wave",
+		Resource = "Charge",
+		Cost = 35,
+		Element = "Fire",
+		Damage = 1.2,
+		Radius = 12,
+		Self = true,
+		Range = 0,
+		Recovery = 2,
+		Icon = "🌋",
+		Description = "An expanding ring of fire that hits and ignites everything around you.",
+	},
+	ThermalCataclysm = {
+		Name = "Thermal Cataclysm",
+		Resource = "Charge",
+		Cost = 55,
+		Element = "Fire",
+		Damage = 2.2,
+		Radius = 14,
+		Range = 30,
+		Windup = 1.2,
+		Cloud = { Duration = 4, Every = 1, Damage = 0.3 },
 		Duration = 4,
-		Recovery = 1,
-		Icon = "⚡",
-		Description = "Absorption field converts intercepted damage into stored Charge.",
+		Recovery = 3,
+		Icon = "💥",
+		Description = "A massive detonation that leaves the ground burning for four seconds.",
 	},
 	CryoLance = {
 		Name = "Cryo Lance",
@@ -137,11 +184,13 @@ Tech.Catalog = {
 		Cost = 25,
 		Element = "Frost",
 		Damage = 1,
-		Stun = 0.5,
+		Piercing = true,
+		Slow = 0.30,
+		SlowTime = 2,
 		Range = 45,
 		Recovery = 1.2,
 		Icon = "❄",
-		Description = "Cryogenic accelerator launches a shard and briefly stuns.",
+		Description = "An ice shard that pierces every enemy in its path and slows them.",
 	},
 	CryoStream = {
 		Name = "Cryo Stream",
@@ -166,15 +215,6 @@ Tech.Catalog = {
 		Icon = "❄",
 		Description = "Cryogenic barrier absorbs damage for five seconds.",
 	},
-	ResonanceEcho = {
-		Name = "Resonance Echo",
-		Resource = "Charge",
-		Cost = 40,
-		Duration = 5,
-		Recovery = 1,
-		Icon = "⚡",
-		Description = "Stored gemstone resonance duplicates weapon strikes for five seconds.",
-	},
 	--[[ Gem Surge fields beyond the basics:
 	  Cone      degrees: hits everyone in a cone in front, out to Range
 	  Self      the Radius burst centres on you instead of the aimed spot
@@ -182,7 +222,9 @@ Tech.Catalog = {
 	  Chain     bounces to this many more enemies within ChainRange
 	  Execute   finishes a target left below this share of its health
 	  Spread    shred and half the hit jump to everyone within this radius
-	  Cloud     a lingering pool: { Duration, Every, Damage, Shred } ]]
+	  Cloud     a lingering pool: { Duration, Every, Damage, Shred }
+	  Piercing  the bolt hits everyone along its line, not just the first
+	  SlowTime  how long Slow lasts (default 0.75s) ]]
 	SeismicBreaker = {
 		Name = "Seismic Breaker",
 		Resource = "Stamina",
@@ -205,43 +247,6 @@ Tech.Catalog = {
 		Range = 8,
 		Icon = "💢",
 		Description = "A hydraulic stomp: 160% damage that staggers everything in front for a second.",
-	},
-	EmberLance = {
-		Name = "Ember Lance",
-		Resource = "Charge",
-		Cost = 25,
-		Element = "Fire",
-		Damage = 1.4,
-		Range = 45,
-		Recovery = 1.2,
-		Icon = "🔥",
-		Description = "A superheated plasma bolt that sets its target burning.",
-	},
-	SolarFlare = {
-		Name = "Solar Flare",
-		Resource = "Charge",
-		Cost = 40,
-		Element = "Fire",
-		Damage = 1.3,
-		Radius = 12,
-		Range = 35,
-		Windup = 0.6,
-		Recovery = 2,
-		Icon = "☀",
-		Description = "After a short charge, a wide flare scorches and ignites everything at the aimed spot.",
-	},
-	Supernova = {
-		Name = "Supernova",
-		Resource = "Charge",
-		Cost = 55,
-		Element = "Fire",
-		Damage = 2.4,
-		Radius = 14,
-		Range = 30,
-		Windup = 1.2,
-		Recovery = 3,
-		Icon = "💥",
-		Description = "Overload the Thermal core: a 240% detonation that leaves everything burning.",
 	},
 	AcidSpray = {
 		Name = "Acid Spray",
@@ -334,11 +339,11 @@ Tech.Catalog = {
 		Element = "Shock",
 		Damage = 1.1,
 		Range = 40,
-		Chain = 3,
+		Chain = 5,
 		ChainRange = 14,
 		Recovery = 1.6,
 		Icon = "⚡",
-		Description = "A bolt that bounces between up to three more enemies.",
+		Description = "A bolt that bounces between up to five more enemies.",
 	},
 	Overload = {
 		Name = "Overload",
@@ -384,6 +389,55 @@ Tech.Consumables = {
 	ChargeCell = { Name = "Charge Cell", Resource = "Charge" },
 	EnergyDrink = { Name = "Energy Drink", Resource = "Stamina" },
 }
+-- The surge a gem casts: its id, surge tier and rank.
+function Tech.surgeOf(gem): (string?, number, number)
+	local tier, rank = GemRoller.surge(gem)
+	local list = Tech.Surges[gem.Element]
+	return list and list[tier], tier, rank
+end
+
+--[[
+	A gem's surge, with its numbers for this gem (a copy; the catalog is untouched):
+	  Rank     +15% damage and -8% Charge cost per rank above I
+	  Size     damage (applied per hit: +3% per grade)
+	  Clarity  durations: x0.68 at 1, x1.0 at 4, x1.4 at 10
+	  Cut      critical chance: 2% per grade
+	amps: Surge Amplifier effects from the Augment Tree (Tree.effects).
+]]
+Tech.RankDamage, Tech.RankCost = 0.15, -0.08
+function Tech.surgeStats(gem, amps)
+	local id, tier, rank = Tech.surgeOf(gem)
+	local base = id and Tech.Catalog[id]
+	if not base then
+		return nil
+	end
+	amps = amps or {}
+	local d = table.clone(base)
+	local steps = rank - 1
+	local clarity = math.clamp(gem.Clarity or 1, 1, 10)
+	local cut = math.clamp(gem.Cut or 0, 0, 10)
+	if d.Damage then
+		d.Damage *= (1 + Tech.RankDamage * steps) * (1 + (amps.SurgePower or 0) + (amps.ElementalMastery or 0))
+	end
+	d.Cost *= 1 + Tech.RankCost * steps
+	local long = (0.6 + 0.08 * clarity) * (1 + (amps.SurgeDuration or 0))
+	for _, key in { "Duration", "Stun", "SlowTime", "ShredTime" } do
+		if d[key] then
+			d[key] *= long
+		end
+	end
+	if d.Cloud then
+		d.Cloud = table.clone(d.Cloud)
+		d.Cloud.Duration *= long
+	end
+	d.Recovery *= 1 - math.clamp(amps.SurgeEfficiency or 0, 0, 0.6)
+	d.Crit = cut * 0.02
+	d.Echo = amps.ArcaneResonance or 0
+	d.Id, d.Tier, d.Rank, d.Gem = id, tier, rank, gem
+	return d
+end
+
+-- Is a gem (of `element`, or any) socketed in gear or the Surge Array?
 function Tech.hasGem(loadout, element)
 	for _, slot in { "Surge1", "Surge2", "Surge3", "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 		local gem = loadout[slot .. "Gem"]

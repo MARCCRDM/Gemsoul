@@ -7,6 +7,8 @@ local StarterGui = game:GetService("StarterGui")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Season = require(ReplicatedStorage.Shared.Season)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 if not Config.MenuOnly then
 	return
 end
@@ -18,6 +20,7 @@ local IronUi = require(script.Parent.Modules.IronUi)
 local MineScene = require(script.Parent.Modules.MineScene)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
+local SurgeArrayUI = require(script.Parent.Modules.SurgeArrayUI)
 local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -383,37 +386,62 @@ marketButton.TextSize = 15
 -- Training and explicit PvP sessions share the Arena; training visitors are protected.
 local social = panel(root, 1080, STRIP_Y, W - 1096, STRIP_H, P.Teal)
 local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
-place(socialTitle, 20, 16, 200, 28)
-local soon = label(social, "WARRIORS", 11, P.Teal, IronUi.Bold)
-soon.BackgroundTransparency = 0.8
-soon.BackgroundColor3 = P.Teal
-soon.TextXAlignment = Enum.TextXAlignment.Center
-soon.AnchorPoint = Vector2.new(1, 0)
-place(soon, 0, 0, 104, 22)
-soon.Position = UDim2.new(1, -16, 0, 18)
-UiKit.round(soon, 4)
-local socialCopy = label(social, "Choose your build in the Augment Tree.", 12, LIGHT, IronUi.Body)
+place(socialTitle, 20, 16, 170, 28)
+local socialCopy = label(social, "Gem Surges Q · E · R  ·  Maneuvers 1 · 2 · 3", 12, LIGHT, IronUi.Body)
 place(socialCopy, 20, 46, W - 1136, 20)
 socialCopy.TextWrapped = true
 socialCopy.TextYAlignment = Enum.TextYAlignment.Top
-local training = IronUi.gemButton(social, "TRAIN", P.Teal, function()
+-- The Surge Array at a glance: the three gem sockets. Click to open the loadout.
+local surgeStrip = new("TextButton", {
+	Text = "",
+	AutoButtonColor = false,
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -14, 0, 10),
+	Size = UDim2.fromOffset(122, 38),
+}, social)
+local surgeSockets = {}
+for i, key in { "Q", "E", "R" } do
+	local circle = new("Frame", {
+		BackgroundColor3 = P.Inset,
+		Position = UDim2.fromOffset((i - 1) * 42, 0),
+		Size = UDim2.fromOffset(36, 36),
+	}, surgeStrip)
+	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, circle)
+	local ring = new("UIStroke", { Color = LIGHT, Thickness = 2, Transparency = 0.4 }, circle)
+	local glyph = label(circle, "+", 15, LIGHT, IronUi.Bold)
+	glyph.Size, glyph.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	glyph.TextYAlignment = Enum.TextYAlignment.Center
+	local keyLabel = label(circle, key, 10, P.Gold, IronUi.Bold)
+	keyLabel.AnchorPoint, keyLabel.Position, keyLabel.Size =
+		Vector2.new(1, 1), UDim2.new(1, 4, 1, 4), UDim2.fromOffset(14, 14)
+	keyLabel.TextXAlignment = Enum.TextXAlignment.Center
+	surgeSockets[key] = { Ring = ring, Glyph = glyph }
+end
+surgeStrip.Activated:Connect(function()
+	launch(SurgeArrayUI.open)
+end)
+local function arenaButton(caption, color, x, w, onClick)
+	local b = IronUi.gemButton(social, caption, color, onClick)
+	b.Position, b.Size, b.TextSize = UDim2.fromOffset(x, 72), UDim2.fromOffset(w, 32), 11
+	return b
+end
+arenaButton("TRAIN", P.Teal, 16, 62, function()
 	launch(function()
 		ArenaScene.enter(false)
 	end)
 end)
-training.Position = UDim2.fromOffset(20, 72)
-training.Size = UDim2.fromOffset(76, 32)
-local pvp = IronUi.gemButton(social, "PVP ARENA", P.Gold, function()
+arenaButton("PVP", P.Gold, 84, 56, function()
 	launch(function()
 		ArenaScene.enter(true)
 	end)
 end)
-pvp.Position = UDim2.fromOffset(104, 72)
-pvp.Size = UDim2.fromOffset(88, 32)
-local augments = IronUi.gemButton(social, "AUGMENT TREE", P.Gold, function()
+arenaButton("LOADOUT [L]", P.Teal, 146, 98, function()
+	launch(SurgeArrayUI.open)
+end)
+arenaButton("TREE [K]", P.Gold, 250, 72, function()
 	launch(AugmentTreeUI.open)
 end)
-augments.Position, augments.Size, augments.TextSize = UDim2.fromOffset(200, 72), UDim2.fromOffset(116, 32), 11
 
 -- The armory fills the rest: equipment, sockets, stats, backpack and spare gear.
 CharacterUI.mount(root, gui, UDim2.fromOffset(16, STRIP_Y + STRIP_H + 12))
@@ -456,6 +484,13 @@ local function refresh(profile)
 		else "Free walls used up today"
 	local best = profile.Stats and profile.Stats.BestDepth or 0
 	mineLine2.Text = if best > 0 then "Deepest shaft: depth " .. best else "Dig deeper for rarer finds"
+	for key, socket in surgeSockets do
+		local gem = Tech.surgeGem(profile.Character, key)
+		local definition = gem and Tech.surgeStats(gem)
+		local color = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else LIGHT
+		socket.Ring.Color, socket.Ring.Transparency = color, if gem then 0 else 0.4
+		socket.Glyph.Text, socket.Glyph.TextColor3 = if definition then definition.Icon or "◆" else "+", color
+	end
 end
 GemClient.Changed:Connect(refresh)
 if GemClient.Profile then
@@ -492,7 +527,14 @@ GemClient.Changed:Connect(maybeWelcome)
 task.defer(maybeWelcome)
 
 -- Equipment and enchantment are on the dashboard; only destinations need shortcuts.
-local KEYS = { K = AugmentTreeUI.toggle, M = MineScene.begin, T = TradeUI.open, B = ShopUI.toggle, J = SeasonUI.toggle }
+local KEYS = {
+	K = AugmentTreeUI.toggle,
+	L = SurgeArrayUI.toggle,
+	M = MineScene.begin,
+	T = TradeUI.open,
+	B = ShopUI.toggle,
+	J = SeasonUI.toggle,
+}
 ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObject)
 	if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
 		local action = KEYS[inputObject.KeyCode.Name]
@@ -501,4 +543,4 @@ ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObje
 		end
 	end
 	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.K, Enum.KeyCode.M, Enum.KeyCode.T, Enum.KeyCode.B, Enum.KeyCode.J)
+end, false, Enum.KeyCode.K, Enum.KeyCode.L, Enum.KeyCode.M, Enum.KeyCode.T, Enum.KeyCode.B, Enum.KeyCode.J)

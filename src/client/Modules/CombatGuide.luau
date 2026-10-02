@@ -5,6 +5,7 @@ local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local AugmentTreeUI = require(script.Parent.AugmentTreeUI)
 local GemClient = require(script.Parent.GemClient)
 local ArenaScene = require(script.Parent.ArenaScene)
@@ -36,7 +37,7 @@ function CombatGuide.refresh()
 		return
 	end
 	window.Subtitle.Text =
-		"Health · Stamina powers Rig Maneuvers · Charge powers socketed Gem Surges. Z/X cycle; R/F trigger."
+		"Stamina powers Rig Maneuvers (1 / 2 / 3) · Charge powers the gems in your Surge Array (Q / E / R)."
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local sets = Classes.setState(loadout)
 	local effects = Classes.effects(loadout)
@@ -48,7 +49,7 @@ function CombatGuide.refresh()
 	UiKit.list(body, 10)
 	local rows = {
 		{
-			"ATTACK · LMB / Q Left / E Right / Touch",
+			"ATTACK · LMB / Shift+LMB Off-hand / Touch",
 			string.format(
 				"%.0f%% weapon damage · %.2fs recovery. Alternate sides for up to +20%% combo damage; a miss or block resets the combo.",
 				rules.BasicDamage * 100,
@@ -96,51 +97,85 @@ function CombatGuide.refresh()
 		description.Size = UDim2.new(1, -24, 0, 28)
 		description.TextWrapped = true
 	end
-	for _, group in { "RigManeuvers", "GemSurges" } do
-		local heading = text(
-			body,
-			if group == "RigManeuvers" then "RIG MANEUVERS · STAMINA · R / Z" else "GEM SURGES · CHARGE · F / X",
-			14,
-			if group == "RigManeuvers" then Tech.Resources.Stamina.Color else Tech.Resources.Charge.Color,
-			IronUi.Bold
+	local function card(titleText, color, description)
+		local frame = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -12, 0, 70) }, body)
+		UiKit.round(frame, 8)
+		local title = text(frame, titleText, 13, color, IronUi.Bold)
+		title.Position, title.Size = UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 22)
+		local line = text(frame, description, 12, P.Text)
+		line.Position, line.Size = UDim2.fromOffset(12, 30), UDim2.new(1, -24, 0, 34)
+		line.TextWrapped = true
+	end
+	local function heading(value, color)
+		local label = text(body, value, 14, color, IronUi.Bold)
+		label.Size = UDim2.new(1, -12, 0, 26)
+	end
+	-- Rig Maneuvers: learned in the Augment Tree, put on keys 1-3 in the Loadout.
+	heading("RIG MANEUVERS · STAMINA · KEYS 1 / 2 / 3", Tech.Resources.Stamina.Color)
+	local equipped = loadout.Maneuvers or Tech.DefaultManeuvers
+	for _, id in Tech.Order.RigManeuvers do
+		local definition = Tree.techStats(profile, id)
+		local learned = Tree.isLearned(profile, id)
+		local key = table.find(equipped, id)
+		card(
+			string.format(
+				"%s %s · %d Stamina%s",
+				definition.Icon,
+				definition.Name,
+				math.floor(definition.Cost + 0.5),
+				if key and learned then " · KEY " .. key else ""
+			),
+			if learned and key then P.Gold else P.Dim,
+			definition.Description
+				.. (
+					if not learned
+						then " Unlock this node in your Augment Tree (K)."
+						elseif not key then " Put it on key 1, 2 or 3 in the Loadout (L)."
+						else ""
+				)
 		)
-		heading.Size = UDim2.new(1, -12, 0, 26)
-		for _, id in Tech.Order[group] do
-			local definition = Tech.Catalog[id]
-			local learned = Tree.isLearned(profile, id)
-			local available = learned and (definition.Resource ~= "Charge" or Tech.hasGem(loadout, definition.Element))
-			local card = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -12, 0, 70) }, body)
-			UiKit.round(card, 8)
-			local title = text(
-				card,
+	end
+	-- Gem Surges: the gem in each Surge Array socket decides the ability.
+	heading("GEM SURGES · CHARGE · Q / E / R", Tech.Resources.Charge.Color)
+	local amps = Tree.effects(profile)
+	for _, key in { "Q", "E", "R" } do
+		local gem = Tech.surgeGem(loadout, key)
+		local definition = gem and Tech.surgeStats(gem, amps)
+		if definition then
+			card(
 				string.format(
-					"%s %s · %d %s%s",
+					"%s %s · %s · Tier %d · Rank %d · %g Charge%s",
+					key,
 					definition.Icon,
 					definition.Name,
-					definition.Cost,
-					definition.Resource,
+					definition.Tier,
+					definition.Rank,
+					math.floor(definition.Cost * 10 + 0.5) / 10,
 					if definition.PerSecond then "/s" else ""
 				),
-				13,
-				if available then P.Gold else P.Dim,
-				IronUi.Bold
-			)
-			title.Position, title.Size = UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 22)
-			local description = text(
-				card,
+				GemConfig.ElementColors[gem.Element] or P.Gold,
 				definition.Description
-					.. (
-						if not learned
-							then " Unlock this node in your Augment Tree (K)."
-							elseif not available then " Socket a compatible gem to power this surge."
-							else ""
-					),
-				12,
-				P.Text
 			)
-			description.Position, description.Size = UDim2.fromOffset(12, 30), UDim2.new(1, -24, 0, 34)
-			description.TextWrapped = true
+		else
+			card(
+				key .. " · Empty socket",
+				P.Dim,
+				"Socket a cut gem in the Surge Array (L). Its element and surge tier pick the ability; Size, Clarity and Cut set damage, duration and critical chance."
+			)
 		end
+	end
+	for _, element in GemConfig.Elements do
+		local names = {}
+		for tier, id in Tech.Surges[element] do
+			table.insert(names, string.format("T%d %s", tier, Tech.Catalog[id].Name))
+		end
+		local line = text(
+			body,
+			string.upper(GemConfig.elementName(element)) .. " · " .. table.concat(names, " · "),
+			12,
+			GemConfig.ElementColors[element]
+		)
+		line.Size, line.TextWrapped = UDim2.new(1, -12, 0, 18), true
 	end
 	local augments = text(
 		body,

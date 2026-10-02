@@ -18,7 +18,7 @@ local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemArt = require(script.Parent.GemArt)
-local SurgeSockets = require(script.Parent.SurgeSockets)
+local SurgeArrayUI = require(script.Parent.SurgeArrayUI)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -260,11 +260,17 @@ for _, key in Slots.Order do
 end
 local boardHint = new(
 	"TextButton",
-	{ Text = "SURGE GEMS\n3 CAPACITORS", TextSize = 12, Font = BOLD, TextColor3 = P.Teal, BackgroundColor3 = P.Inset },
+	{
+		Text = "SURGE ARRAY\nQ · E · R  [L]",
+		TextSize = 12,
+		Font = BOLD,
+		TextColor3 = P.Teal,
+		BackgroundColor3 = P.Inset,
+	},
 	doll
 )
 UiKit.round(boardHint, 8)
-boardHint.Activated:Connect(SurgeSockets.open)
+boardHint.Activated:Connect(SurgeArrayUI.open)
 boardHint.Position = UDim2.fromOffset(406, 290)
 boardHint.Size = UDim2.fromOffset(124, 46)
 boardHint.TextXAlignment = Enum.TextXAlignment.Center
@@ -1377,7 +1383,7 @@ local function cancelDrag()
 	for _, ui in equipmentSlots do
 		ui.DropTarget.Visible = false
 	end
-	boardHint.Text = "SELECT GEAR\nTO COMPARE"
+	boardHint.Text = "SURGE ARRAY\nQ · E · R  [L]"
 end
 
 local function moveDrag(point)
