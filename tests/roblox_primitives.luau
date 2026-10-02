@@ -48,6 +48,7 @@ local Enum = setmetatable({}, {
 	end,
 })
 local built = 0
+local builtParts = {}
 local Instance = {
 	new = function(className)
 		local values = { ClassName = className }
@@ -66,6 +67,7 @@ local Instance = {
 				values[key] = value
 				if key == "Parent" and (className == "Part" or className == "WedgePart") then
 					built += 1
+					table.insert(builtParts, values)
 				end
 			end,
 		})

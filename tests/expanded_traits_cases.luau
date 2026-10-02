@@ -16,7 +16,10 @@ for kind, catalog in ExpandedTraits.Catalog do
 		assert(Classes.gear("Warrior", kind, item.Id) == item, "Catalog identity differs")
 		if kind == "Weapons" then
 			assert(
-				(item.Attack.Kind == "Shot" or (item.Attack.Kind == "Melee" and item.Attack.Range <= 8 and item.Attack.Combo == 3))
+				(
+					item.Attack.Kind == "Shot"
+					or (item.Attack.Kind == "Melee" and item.Attack.Range <= 8 and item.Attack.Combo == 3)
+				)
 					and item.Attack.Rate > 0
 					and item.Attack.Damage > 0,
 				"Sword attack contract invalid"
@@ -127,7 +130,34 @@ end
 assert(GearRolls.appearance({ Rarity = 5, Helmet = 1, Visor = 1, Finish = 1, Variant = 1 }).Rarity == 5)
 print("PASS: every armor slot gains geometry at each rarity; saved rarity reaches rendering")
 
-for _, builder in { FrontierAssets.sword, FrontierAssets.shield } do
+-- Named helmets must remain distinct even when their saved cosmetic rolls match.
+for _, isR15 in { false, true } do
+	local signatures = {}
+	for _, item in ExpandedTraits.Catalog.Helmets do
+		local before = #builtParts
+		ArmorKits.build({}, rig(isR15), item.Look, Color3.fromRGB(72, 207, 226), 1, {
+			Rarity = item.RarityTier,
+			Helmet = 1,
+			VisorColor = Color3.fromRGB(72, 207, 226),
+			FinishColor = Color3.fromRGB(90, 100, 120),
+		}, "Helmet", item.Id)
+		local geometry = {}
+		for i = before + 1, #builtParts do
+			local part = builtParts[i]
+			table.insert(
+				geometry,
+				string.format("%s:%.4f:%.4f:%.4f", part.ClassName, part.Size.X, part.Size.Y, part.Size.Z)
+			)
+		end
+		local signature = table.concat(geometry, "|")
+		assert(not signatures[signature], "Named helmets share geometry: " .. item.Id)
+		signatures[signature] = true
+		assert(#geometry <= 65, "Helmet exceeds geometry budget: " .. item.Id)
+	end
+end
+print("PASS: all ten named helmets have distinct geometry on R6/R15 with identical saved rolls")
+
+for _, builder in { FrontierAssets.sidearm, FrontierAssets.sword, FrontierAssets.shield } do
 	local previous = 0
 	for rarity = 1, 5 do
 		local before = built
@@ -141,6 +171,13 @@ for _, builder in { FrontierAssets.sword, FrontierAssets.shield } do
 		)
 		local count = built - before
 		assert(count > previous and count < 50, "Weapon/shield detail must increase within budget")
+		for i = #builtParts - count + 1, #builtParts do
+			local part = builtParts[i]
+			assert(
+				part.Massless and not part.CanCollide and not part.CanTouch and not part.CanQuery,
+				"Decorative equipment must not affect physics or targeting"
+			)
+		end
 		previous = count
 	end
 end
@@ -151,4 +188,25 @@ for _, weapon in Classes.List.Warrior.Weapons do
 		assert(weapon.Attack.Kind == "Shot" and weapon.Look == "CleanSidearm", "Original pistol changed")
 	end
 end
-print("PASS: five sword/shield rarity models, valid geometry, saved weapon compatibility")
+print("PASS: five pistol/sword/shield rarity models, valid geometry and physics, saved weapon compatibility")
+
+for _, isR15 in { false, true } do
+	for _, look in { "UtilityMiner", "FrontierRanger", "HeavyVanguard" } do
+		for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
+			local previous = 0
+			for rarity = 1, 5 do
+				local before = built
+				ArmorKits.build({}, rig(isR15), look, Color3.fromRGB(72, 207, 226), 1, {
+					Rarity = rarity,
+					Helmet = 1,
+					VisorColor = Color3.fromRGB(72, 207, 226),
+					FinishColor = Color3.fromRGB(90, 100, 120),
+				}, slot)
+				local count = built - before
+				assert(count > previous and count <= 100, "Armor detail progression or slot budget violated")
+				previous = count
+			end
+		end
+	end
+end
+print("PASS: all suit families and armor slots gain detail at each rarity on R6/R15 within slot budgets")

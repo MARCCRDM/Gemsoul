@@ -281,43 +281,10 @@ local function _shieldKit(folder, character, accent, gem, finish: Color3, heavy:
 	end
 end
 
--- Compact, undecorated expedition sidearm: one cell indicator and a socket.
+-- The fallback uses the same sidearm geometry as rarity-aware runtime builds.
 WEAPONS.CleanSidearm = function(folder, _character, right, _left, accent, gem)
-	local m = HELD_FORWARD
-	piece(
-		folder,
-		right,
-		m * CFrame.new(0, 0, -0.06),
-		Vector3.new(0.2, 0.3, 0.48),
-		GUNMETAL,
-		Enum.Material.SmoothPlastic
-	)
-	piece(
-		folder,
-		right,
-		m * CFrame.new(0, 0.28, 0.23),
-		Vector3.new(0.28, 0.76, 0.27),
-		Color3.fromRGB(118, 132, 146),
-		Enum.Material.SmoothPlastic
-	)
-	piece(
-		folder,
-		right,
-		m * CFrame.new(0, 0.73, 0.23) * CFrame.Angles(0, 0, math.rad(90)),
-		Vector3.new(0.18, 0.23, 0.23),
-		GUNMETAL,
-		Enum.Material.Metal,
-		Enum.PartType.Cylinder
-	)
-	piece(
-		folder,
-		right,
-		m * CFrame.new(0, 0.3, 0.39),
-		Vector3.new(0.09, 0.15, 0.045),
-		accent,
-		Enum.Material.SmoothPlastic
-	)
-	gemSocket(folder, right, m, Vector3.new(0.15, 0.12, 0.23), gem, 0.15)
+	FrontierAssets.sidearm(folder, right, HELD_FORWARD, 1, accent, STEEL)
+	gemSocket(folder, right, HELD_FORWARD, Vector3.new(0.15, 0.12, 0.23), gem, 0.15)
 end
 local function frontierShield(folder, character, accent, gem, finish, rarity)
 	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
@@ -899,7 +866,8 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 				if GearRolls.get(loadout, slot)
 					then GearRolls.appearance(GearRolls.get(loadout, slot))
 					else SuitTraits.forSuit(userId, gear.Id),
-				slot
+				slot,
+				gear.Id
 			)
 			local gem = loadout[slot .. "Gem"]
 			if gem and slot ~= "Armor" then
@@ -967,6 +935,12 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		local mount = UPRIGHT * CFrame.Angles(0, 0, math.rad(-12))
 		FrontierAssets.sword(weaponFolder, right, mount, rarity, accent, finish)
 		gemSocket(weaponFolder, right, mount, Vector3.new(0, 0.39, -0.18), loadout.WeaponGem, 0.17)
+	elseif weapon.Look == "CleanSidearm" and right then
+		local roll = GearRolls.get(loadout, "Weapon")
+		local rarity = if roll then roll.Rarity else weapon.RarityTier or 1
+		local finish = if roll then GearRolls.appearance(roll).FinishColor else STEEL
+		FrontierAssets.sidearm(weaponFolder, right, HELD_FORWARD, rarity, accent, finish)
+		gemSocket(weaponFolder, right, HELD_FORWARD, Vector3.new(0.15, 0.12, 0.23), loadout.WeaponGem, 0.15)
 	elseif buildWeapon and right and left then
 		buildWeapon(weaponFolder, character, right, left, accent, loadout.WeaponGem)
 	end

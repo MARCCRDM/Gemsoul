@@ -482,29 +482,108 @@ local function bonusText(gem, slotName: string): string
 	return table.concat(parts, "  ")
 end
 
+local gemViewAngles = { Id = "", Spin = 0.6, Tilt = 0 }
+
+local function gemMetric(parent: Instance, label: string, value: number?, color: Color3, y: number)
+	local row = new("Frame", {
+		Name = label .. "Metric",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, y),
+		Size = UDim2.new(1, 0, 0, 32),
+	}, parent)
+	local caption = text(row, label, 11, P.Dim, BOLD)
+	caption.AutomaticSize = Enum.AutomaticSize.None
+	caption.Size = UDim2.new(1, -55, 0, 16)
+	local grade = text(row, if value then tostring(value) .. " / 10" else "ROUGH", 11, color, BOLD)
+	grade.AutomaticSize = Enum.AutomaticSize.None
+	grade.Position = UDim2.new(1, -55, 0, 0)
+	grade.Size = UDim2.fromOffset(55, 16)
+	grade.TextXAlignment = Enum.TextXAlignment.Right
+	for i = 1, 10 do
+		local segment = new("Frame", {
+			BorderSizePixel = 0,
+			BackgroundColor3 = if value and i <= value then color else P.Slot,
+			Position = UDim2.new((i - 1) / 10, 0, 0, 20),
+			Size = UDim2.new(0.1, -2, 0, 7),
+		}, row)
+		UiKit.round(segment, 2)
+	end
+end
+
 local function gemLines(gem)
 	local tierColor = GemConfig.TierColors[gem.Tier]
-	text(tipBody, GemConfig.shade(gem).Name, 18, tierColor, BOLD)
+	-- Focus the center column on the selected stone. Gear selections restore
+	-- the compact inspector and combat ratings below it.
+	tooltip.Size = UDim2.fromOffset(384, 416)
+	statsBox.Visible = false
+	tipArt.Visible = false
+	tipBody.Position = UDim2.fromOffset(0, 0)
+	tipBody.Size = UDim2.new(1, 0, 1, -72)
+	local hero = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -6, 0, 204) }, tipBody)
+	local stage = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(17, 27, 40),
+		Size = UDim2.fromOffset(156, 166),
+		ClipsDescendants = true,
+	}, hero)
+	UiKit.round(stage, 8)
+	new("UIStroke", { Color = tierColor, Transparency = 0.5, Thickness = 1 }, stage)
+	GemArt.backdrop(stage)
+	if gemViewAngles.Id ~= gem.Id then
+		gemViewAngles.Id, gemViewAngles.Spin, gemViewAngles.Tilt = gem.Id, 0.6, 0
+	end
+	local _, viewControls = GemArt.inspectorViewport(stage, gem, gemViewAngles)
+	local info = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(166, 0),
+		Size = UDim2.new(1, -166, 0, 166),
+	}, hero)
+	local name = text(info, GemConfig.shade(gem).Name, 18, tierColor, BOLD)
+	name.AutomaticSize = Enum.AutomaticSize.None
+	name.Size = UDim2.new(1, 0, 0, 42)
+	name.TextYAlignment = Enum.TextYAlignment.Top
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "GEM MINT" else "CUT " .. gem.Cut
-	text(
-		tipBody,
+	local badge = text(
+		info,
 		string.format(
-			"%s %s  |  %s",
+			"%s %s",
 			string.upper(GemConfig.TierLabels[gem.Tier]),
-			string.upper(GemConfig.elementName(gem.Element)),
-			state
+			string.upper(GemConfig.elementName(gem.Element))
 		),
 		12,
 		GemConfig.ElementColors[gem.Element],
 		BOLD
 	)
+	badge.AutomaticSize = Enum.AutomaticSize.None
+	badge.Position = UDim2.fromOffset(0, 43)
+	badge.Size = UDim2.new(1, 0, 0, 24)
+	badge.TextSize = 10
+	gemMetric(info, "SIZE", gem.Size, tierColor, 68)
+	gemMetric(info, "CLARITY", gem.Clarity, P.Teal, 100)
+	gemMetric(info, "CUT", gem.Cut, P.Gold, 132)
+	local controls = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 174),
+		Size = UDim2.new(1, 0, 0, 28),
+	}, hero)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(0.25, -5, 0, 28),
+		CellPadding = UDim2.fromOffset(6, 0),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, controls)
+	for i, control in {
+		{ Label = "LEFT", Run = function() viewControls.Rotate(-math.pi / 6) end },
+		{ Label = "RIGHT", Run = function() viewControls.Rotate(math.pi / 6) end },
+		{ Label = "TILT", Run = viewControls.Tilt },
+		{ Label = "RESET", Run = viewControls.Reset },
+	} do
+		local button = actionButton(controls, control.Label, false, control.Run)
+		button.LayoutOrder = i
+	end
 	text(
 		tipBody,
 		string.format(
-			"Size %d   Clarity %d   Cut %s   |   Potency %d   |   %d coins",
-			gem.Size,
-			gem.Clarity,
-			if gem.Cut then tostring(gem.Cut) else "-",
+			"%s   |   Potency %d   |   %d coins",
+			state,
 			GemConfig.potency(gem),
 			GemConfig.value(gem)
 		),
@@ -517,7 +596,6 @@ local function gemLines(gem)
 		heading.TextColor3 = GemConfig.ElementColors[gem.Element]
 		text(tipBody, string.format("%s.  %s", effect, bonusText(gem, slotName)), 12, P.Dim)
 	end
-	GemArt.viewport(tipArt, gem, true)
 	tooltipStroke.Color = tierColor
 end
 
@@ -703,6 +781,8 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 end
 
 local function drawTooltipContent()
+	tooltip.Size = UDim2.fromOffset(384, 240)
+	statsBox.Visible = true
 	local showArt = selection ~= nil and (selection.Kind == "Gem" or selection.Kind == "Socket")
 	tipArt.Visible = showArt
 	tipBody.Position = UDim2.fromOffset(if showArt then 66 else 0, 0)
