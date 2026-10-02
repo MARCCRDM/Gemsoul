@@ -248,6 +248,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		* Combat.defenseMult(defense)
 		* EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
 	damage *= 1 + CrowdControl.debuff(st.CC, "Vulnerable", now) + CrowdControl.debuff(st.CC, "Aura", now)
+	local guarded = false
 	if blocking(st, now) and origin then
 		local dot = flat(origin - root.Position):Dot(st.BlockDirection or flat(root.CFrame.LookVector))
 		if heavy and dot >= math.cos(math.rad(k.Rules.BlockArc / 2)) then
@@ -258,6 +259,27 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		else
 			local multiplier, covered = Actions.blockMultiplier(k.Rules, pvp, dot, projectile, heavy)
 			if covered then
+				guarded = true
+				if
+					not projectile
+					and not reflected
+					and st.BlockRaisedAt
+					and now - st.BlockRaisedAt <= 0.3
+					and not st.ParrySpent
+				then
+					st.ParrySpent = true
+					multiplier = math.min(multiplier, if pvp then 0.35 else 0.25)
+					if source then
+						local attacker = state(source)
+						local duration = CrowdControl.ApplyCC(attacker.CC, 0.25, now, true)
+						attacker.StunUntil = math.max(attacker.StunUntil, now + duration)
+						attacker.ChargeStarted, attacker.ComboSide, attacker.ComboCount = nil, nil, 0
+						Remotes.CombatFx:FireClient(source, "Parried", duration)
+					elseif enemySource then
+						Enemies.addStatus(enemySource, "Stun", 1, 0.5)
+					end
+					Remotes.CombatFx:FireClient(player, "HighBlock")
+				end
 				fx("BlockSpark", root.Position, false)
 				if k.Defense.Deflect > 0 and math.random() < k.Defense.Deflect then
 					multiplier = 0
@@ -291,7 +313,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 			GemConfig.ElementColors[element] or WHITE
 		)
 	end
-	return damage
+	return damage, guarded
 end
 local function addDot(player, source, perTick, duration)
 	if duration <= 0 or perTick <= 0 then
@@ -432,7 +454,7 @@ local function procGem(source, k, target)
 	end
 end
 
-local function strike(source, k, st, target, heavy, projectile)
+local function strike(source, k, st, target, heavy, projectile, swing)
 	if not targetAllowed(source, target) then
 		return
 	end
@@ -441,21 +463,27 @@ local function strike(source, k, st, target, heavy, projectile)
 		then (if target.Player then k.Rules.HeavyPvPDamage else k.Rules.HeavyDamage)
 		else k.Rules.BasicDamage
 	local damage = k.Weapon.Attack.Damage * Combat.powerMult(rating(k, "Power")) * multiplier
+	if swing then
+		damage *= swing.Scale * (1 + (swing.Combo - 1) * 0.1)
+	end
 	if os.clock() < st.AfterDodgeUntil then
 		damage *= 1 + (k.Effects.DamageAfterDodge or 0)
 	end
-	local crit = math.random()
-		< math.min(
-			0.75,
-			Combat.critChance(rating(k, "Speed"), k.Effects.CritAdd) + (if heavy then k.Rules.HeavyCrit else 0)
-		)
+	local crit = (swing and swing.Perfect)
+		or math.random()
+			< math.min(
+				0.75,
+				Combat.critChance(rating(k, "Speed"), k.Effects.CritAdd) + (if heavy then k.Rules.HeavyCrit else 0)
+			)
 	if crit then
 		damage *= Combat.CritMult
 	end
+	local guarded = false
 	local gem = k.Loadout.WeaponGem
 	local element = gem and gem.Element
 	if target.Player then
-		damage = receive(target.Player, damage, element, source, root.Position, projectile, heavy, false, nil, crit)
+		damage, guarded =
+			receive(target.Player, damage, element, source, root.Position, projectile, heavy, false, nil, crit)
 	else
 		Enemies.damage(
 			target.Enemy,
@@ -475,7 +503,7 @@ local function strike(source, k, st, target, heavy, projectile)
 		end
 	end
 	if damage <= 0 or target.Humanoid.Health <= 0 then
-		return
+		return damage > 0 and not guarded, guarded
 	end
 	procGem(source, k, target)
 	if heavy then
@@ -486,8 +514,9 @@ local function strike(source, k, st, target, heavy, projectile)
 		st.NextStagger = os.clock() + 1
 		applyCC(target, 0.2)
 	end
+	return not guarded, guarded
 end
-local function attack(player, aim, heavy)
+local function attack(player, aim, heavy, swing)
 	local k = kit(player)
 	local humanoid, root = alive(player)
 	if not k or not humanoid or not Actions.finiteVector(aim) or not Combat.canFight(root.Position) then
@@ -500,6 +529,15 @@ local function attack(player, aim, heavy)
 	st.NextAttack = now + (if heavy then k.Rules.HeavyCooldown else k.Rules.BasicCooldown)
 	st.ChargeStarted = nil
 	Remotes.CombatFx:FireClient(player, "Cooldown", if heavy then "Heavy" else "Basic", st.NextAttack - now)
+	local landed, interrupted = false, false
+	if swing then
+		swing.Combo = Actions.combo(st.ComboSide, st.ComboCount, st.ComboAt, swing.Side, now)
+	end
+	local function hit(target, projectile)
+		local success, guarded = strike(player, k, st, target, heavy, projectile, swing)
+		landed = landed or success == true
+		interrupted = interrupted or guarded == true
+	end
 	local a, color =
 		k.Weapon.Attack, GemConfig.ElementColors[k.Loadout.WeaponGem and k.Loadout.WeaponGem.Element] or WHITE
 	local direction = flat(aim - root.Position)
@@ -515,7 +553,7 @@ local function attack(player, aim, heavy)
 				and (distance < 1.5 or flat(offset):Dot(direction) >= math.cos(math.rad((a.Arc or 90) / 2)))
 				and lineClear(origin, target.Root.Position + Vector3.new(0, 1.5, 0))
 			then
-				strike(player, k, st, target, heavy, false)
+				hit(target, false)
 			end
 		end
 	else
@@ -535,9 +573,23 @@ local function attack(player, aim, heavy)
 			end
 		end
 		if nearest then
-			strike(player, k, st, nearest, heavy, true)
+			hit(nearest, true)
 		end
 		fx("Shot", player, origin, origin + ray * along, color, k.Weapon.Look)
+	end
+	if swing then
+		if landed and not interrupted then
+			st.ComboSide, st.ComboCount, st.ComboAt = swing.Side, swing.Combo, now
+		else
+			st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
+		end
+		Remotes.CombatFx:FireClient(
+			player,
+			"AttackTiming",
+			if interrupted then "BLOCKED" elseif not landed then "MISS" else swing.Stage,
+			swing.Side,
+			st.ComboCount
+		)
 	end
 	return true
 end
@@ -615,6 +667,11 @@ local function block(player, held, aim)
 	st.BlockDirection, st.BlockUntil, st.ChargeStarted = flat(aim - root.Position), now + Actions.BlockLease, nil
 	player:SetAttribute("Blocking", true)
 	if not wasBlocking then
+		st.ParrySpent = false
+		st.BlockRaisedAt = if now >= (st.NextHighBlock or 0) then now else nil
+		if st.BlockRaisedAt then
+			st.NextHighBlock = now + 1.5
+		end
 		triggerBlockGem(player, k, st, now)
 		fx("BlockRaise", player)
 	end
@@ -650,12 +707,15 @@ local function onInput(player, action, a, b)
 			and not st.ChargeStarted
 		then
 			st.ChargeStarted = now
+			st.ChargeSide = Actions.side(a)
 		end
 	elseif action == "ReleaseAttack" and Actions.finiteVector(a) then
 		local started = st.ChargeStarted
 		st.ChargeStarted = nil
 		if started and now - started <= 3 then
-			attack(player, a, now - started >= Actions.Base.Heavy.Charge)
+			local swing = Actions.charge(now - started)
+			swing.Side = st.ChargeSide or "Right"
+			attack(player, a, swing.Heavy, swing)
 		end
 	elseif action == "Attack" and Actions.finiteVector(a) then
 		st.ChargeStarted = nil

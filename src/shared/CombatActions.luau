@@ -39,7 +39,10 @@ function Actions.side(value)
 	return if value == "Left" then "Left" else "Right"
 end
 function Actions.combo(previousSide, count, lastHit, side, now)
-	return if previousSide and previousSide ~= side and lastHit and now - lastHit <= Actions.ComboWindow
+	return if previousSide
+			and previousSide ~= side
+			and lastHit
+			and now - lastHit <= Actions.ComboWindow
 		then math.min((count or 0) + 1, 3)
 		else 1
 end

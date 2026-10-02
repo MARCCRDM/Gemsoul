@@ -40,17 +40,17 @@ function AbilitiesUI.refresh()
 	UiKit.list(body, 10)
 	local rows = {
 		{
-			"ATTACK · Click / Tap",
+			"ATTACK · LMB / Q Left / E Right / Touch",
 			string.format(
-				"%.0f%% weapon damage · %.2fs recovery. Tap for an attack; hold to charge Heavy.",
+				"%.0f%% weapon damage · %.2fs recovery. Alternate sides for up to +20%% combo damage; a miss or block resets the combo.",
 				rules.BasicDamage * 100,
 				rules.BasicCooldown
 			),
 		},
 		{
-			"HEAVY · Hold Attack",
+			"HEAVY · Hold then Release on Gold",
 			string.format(
-				"%.0f%% PvE / %.0f%% PvP damage · %.2fs recovery · breaks guard. +%.0f%% heavy critical chance.",
+				"%.0f%% PvE / %.0f%% PvP damage · %.2fs recovery · breaks sustained guard. Gold release guarantees a critical; overholding reduces damage. +%.0f%% heavy critical chance.",
 				rules.HeavyDamage * 100,
 				rules.HeavyPvPDamage * 100,
 				rules.HeavyCooldown,
@@ -70,7 +70,7 @@ function AbilitiesUI.refresh()
 		{
 			"BLOCK · Hold RMB / Block Button",
 			string.format(
-				"%.0f%% PvE / %.0f%% PvP reduction · %.0f° frontal coverage. Cannot attack while blocking.%s",
+				"%.0f%% PvE / %.0f%% PvP reduction · %.0f° frontal coverage. First 0.3s can parry a melee quick attack; high block refreshes every 1.5s. Cannot attack while blocking.%s",
 				rules.BlockReduction * 100,
 				rules.BlockPvPReduction * 100,
 				rules.BlockArc,

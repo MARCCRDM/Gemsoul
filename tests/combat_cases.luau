@@ -22,6 +22,16 @@ check(Actions.blockMultiplier(base,true,-1,false,false)==1,"Back attacks bypass 
 check(Actions.invulnerable(100,100.29,tank,true) and not Actions.invulnerable(100,100.31,tank,true),"PvP immunity boundary")
 check(Actions.invulnerable(100,100.74,tank,false) and not Actions.invulnerable(100,100.76,tank,false),"PvE tank immunity boundary")
 check(not Actions.finiteVector(Vector3.new(0/0,0,0)) and not Actions.finiteVector(Vector3.new(math.huge,0,0)),"Nonfinite aim accepted")
+check(Actions.charge(0.1).Stage=="QUICK" and not Actions.charge(0.1).Heavy,"Quick timing")
+check(Actions.charge(0.6).Heavy and not Actions.charge(0.6).Perfect,"Charged timing")
+check(Actions.charge(0.75).Perfect,"Perfect timing window")
+check(not Actions.charge(0.64).Perfect and not Actions.charge(0.86).Perfect,"Perfect window bounds")
+check(Actions.charge(1.15).Scale==0.65 and not Actions.charge(1.15).Heavy,"Overcharge penalty")
+check(Actions.combo("Left",1,10,"Right",11)==2,"Alternating combo")
+check(Actions.combo("Left",3,10,"Right",11)==3,"Combo cap")
+check(Actions.combo("Left",3,10,"Left",11)==1,"Repeated side reset")
+check(Actions.combo("Left",3,10,"Right",12)==1,"Expired combo reset")
+check(Actions.side("spoofed")=="Right","Invalid side validation")
 local a,ha,ra,la=makePlayer(1,arena,nil)
 local b,hb,rb,lb=makePlayer(2,arena+Vector3.new(0,0,-5),nil)
 local damage=Classes.weapon("Warrior",la.Weapon).Attack.Damage*Combat.powerMult(Classes.ratings(la).Power.Base)*Combat.defenseMult(Classes.ratings(lb).Defense.Base)
@@ -51,8 +61,13 @@ now+=1
 CombatServer._block(b,true,ra.Position)
 local before=hb.Health
 CombatServer._input(a,"Attack",rb.Position)
-check(close(before-hb.Health,damage*0.6),"Live frontal PvP block")
+check(close(before-hb.Health,damage*0.35),"Live timed high block")
 check(not CombatServer._attack(b,ra.Position,false),"Attacked while blocking")
+check(CombatServer._state(a).StunUntil>now,"High block failed to stagger attacker")
+local raisedAt=CombatServer._state(b).BlockRaisedAt
+now+=0.4
+CombatServer._block(b,true,ra.Position)
+check(CombatServer._state(b).BlockRaisedAt==raisedAt,"Guard refresh restarted high block window")
 now+=1
 CombatServer._block(b,true,ra.Position)
 CombatServer._input(a,"BeginAttack")
@@ -165,6 +180,48 @@ CombatServer._attack(a,enemy.Root.Position,true)
 local pveDamage=Classes.weapon("Warrior",la.Weapon).Attack.Damage*Combat.powerMult(Classes.ratings(la).Power.Base)*1.8
 check(close(1000-enemy.Humanoid.Health,pveDamage),"PvE heavy multiplier changed")
 enemyList={}
+c:SetAttribute("PvPEnabled",false)
+CombatServer.reset(a)
+CombatServer.reset(b)
+la.WeaponGem=nil
+for _,slot in {"Helmet", "Chest", "Gloves", "Boots", "Shield"} do lb[slot.."Gem"]=nil end
+hb.Health=1000
+now+=20
+local function releaseSide(side,seconds)
+ CombatServer._input(a,"BeginAttack",side)
+ now+=seconds
+ CombatServer._input(a,"ReleaseAttack",rb.Position)
+end
+before=hb.Health
+releaseSide("Left",0.75)
+check(close(before-hb.Health,damage*1.5*Combat.CritMult),"Server perfect release damage")
+now+=1.3
+before=hb.Health
+releaseSide("Right",0.1)
+check(close(before-hb.Health,damage*1.1),"Server alternating combo damage")
+now+=1
+before=hb.Health
+releaseSide("Right",1.2)
+check(close(before-hb.Health,damage*0.65),"Server overcharge damage")
+now+=1
+CombatServer._input(a,"BeginAttack","Left")
+CombatServer._input(a,"CancelAttack")
+before=hb.Health
+CombatServer._input(a,"ReleaseAttack",rb.Position)
+check(hb.Health==before,"Cancelled charge released")
+CombatServer.reset(a)
+now+=1
+before=hb.Health
+releaseSide("Left",0.1)
+now+=0.8
+rb.Position=arena+Vector3.new(0,0,-80)
+releaseSide("Right",0.1)
+check(CombatServer._state(a).ComboCount==0,"Miss retained combo")
+rb.Position=arena+Vector3.new(0,0,-5)
+now+=0.8
+CombatServer._block(b,true,ra.Position)
+releaseSide("Left",0.1)
+check(CombatServer._state(a).ComboCount==0,"Guard retained combo")
 ArenaSessions.start()
 a:SetAttribute("Expedition",true)
 check(not registered.ArenaPvP(a).Ok,"Mining expedition joined Arena")

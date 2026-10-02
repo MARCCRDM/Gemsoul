@@ -1,4 +1,4 @@
--- Four universal actions: click/tap Attack, hold for Heavy, Space Dodge, hold RMB Block.
+-- First-person timed attacks, alternating sides, reactive guard and universal dodge.
 local ContextActionService = game:GetService("ContextActionService")
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -11,6 +11,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
+local FirstPerson = require(script.Parent.Modules.FirstPersonCombat)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -23,53 +24,105 @@ local fxEvent = ReplicatedStorage.Remotes:WaitForChild("CombatFx")
 local P = IronUi.Colors
 local new, text = IronUi.new, IronUi.text
 local cooldowns = {}
+local attackSide, nextSide, cursorFree = "Right", "Right", false
+local feedbackUntil = 0
+local attackTouch, blockTouch
 local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
 local gui = UiKit.gui("CombatHud", 5)
 local hud = new("Frame", {
 	BackgroundColor3 = P.Inset,
 	BackgroundTransparency = 0.1,
 	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -16),
-	Size = UDim2.fromOffset(380, 154),
+	Position = UDim2.new(0.5, 0, 1, -120),
+	Size = UDim2.fromOffset(280, 74),
 }, gui)
 UiKit.round(hud, 12)
 local hp = text(hud, "", 14, P.Text, IronUi.Bold)
 hp.Position = UDim2.fromOffset(12, 8)
 hp.Size = UDim2.new(1, -24, 0, 22)
-local hint = text(hud, "Click Attack · Hold Heavy · Space Dodge · Hold RMB Block", 11, P.Dim)
+local hint = text(hud, "Alternate sides; release when gold", 11, P.Dim)
 hint.Position = UDim2.fromOffset(12, 32)
 hint.Size = UDim2.new(1, -24, 0, 28)
 hint.TextWrapped = true
-local row = new(
+local row =
+	new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromScale(0, 0), Size = UDim2.fromScale(1, 1) }, gui)
+local healthTrack = new("Frame", {
+	BackgroundColor3 = P.Dim,
+	BackgroundTransparency = 0.6,
+	Position = UDim2.fromOffset(12, 30),
+	Size = UDim2.new(1, -24, 0, 5),
+}, hud)
+local healthFill = new(
 	"Frame",
-	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 66), Size = UDim2.new(1, -24, 0, 70) },
-	hud
+	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
+	healthTrack
 )
-UiKit.list(row, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
+local reticle = text(gui, "+", 24, P.Text, IronUi.Bold)
+reticle.AnchorPoint, reticle.Position, reticle.Size =
+	Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(40, 40)
+reticle.TextXAlignment = Enum.TextXAlignment.Center
+local chargeTrack = new("Frame", {
+	BackgroundColor3 = P.Inset,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0.5, 30),
+	Size = UDim2.fromOffset(160, 8),
+	Visible = false,
+}, gui)
+UiKit.round(chargeTrack, 4)
+local chargeFill =
+	new("Frame", { BackgroundColor3 = P.Gold, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, chargeTrack)
+local targetCard = new("Frame", {
+	BackgroundColor3 = P.Inset,
+	BackgroundTransparency = 0.15,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 16),
+	Size = UDim2.fromOffset(260, 56),
+	Visible = false,
+}, gui)
+UiKit.round(targetCard, 10)
+local targetName = text(targetCard, "", 13, P.Gold, IronUi.Bold)
+targetName.Position, targetName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -20, 0, 22)
+targetName.TextXAlignment = Enum.TextXAlignment.Center
+local targetTrack = new(
+	"Frame",
+	{ BackgroundColor3 = P.Dim, Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -24, 0, 8) },
+	targetCard
+)
+local targetFill = new(
+	"Frame",
+	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
+	targetTrack
+)
+local controlsHint = text(gui, "LMB Attack | Q/E Side | RMB Guard | Space Dodge | Tab Cursor", 11, P.Text)
+controlsHint.AnchorPoint, controlsHint.Position, controlsHint.Size =
+	Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -8), UDim2.new(1, -20, 0, 22)
+controlsHint.TextXAlignment = Enum.TextXAlignment.Center
+local cursorModal =
+	new("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.fromOffset(1, 1), Modal = false }, gui)
 local slots = {}
 local function rootPart()
 	return player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 end
 local function canFight()
 	local root = rootPart()
-	return root
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	return humanoid
+		and humanoid.Health > 0
+		and root
 		and not player.PlayerGui:FindFirstChild("Intro")
 		and Combat.canFight(root.Position)
 		and (not Config.MenuOnly or ArenaScene.isActive())
 end
 local aimParams = RaycastParams.new()
 aimParams.FilterType = Enum.RaycastFilterType.Exclude
-local function aimPoint()
-	local root = rootPart()
-	local fallback = if root then root.Position + root.CFrame.LookVector * 40 else Vector3.zero
-	if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
-		return fallback
-	end
+local function aimedHit()
 	local camera = workspace.CurrentCamera
-	local mouse = UserInputService:GetMouseLocation()
-	local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
-	aimParams.FilterDescendantsInstances = { player.Character, workspace:FindFirstChild("CombatFx") }
-	local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, aimParams)
+	local ray = camera:ViewportPointToRay(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+	aimParams.FilterDescendantsInstances = { player.Character, workspace:FindFirstChild("CombatFx"), camera }
+	return workspace:Raycast(ray.Origin, ray.Direction * 500, aimParams), ray
+end
+local function aimPoint()
+	local hit, ray = aimedHit()
 	return if hit then hit.Position else ray.Origin + ray.Direction * 120
 end
 local function face(aim)
@@ -94,12 +147,13 @@ local function rules()
 		1 - (effects.CooldownMult or 1)
 	)
 end
-local function beginAttack()
-	if not canFight() or blockHeld or holding or os.clock() < nextAttack then
+local function beginAttack(side)
+	if cursorFree or not canFight() or blockHeld or holding or os.clock() < nextAttack then
 		return
 	end
 	holding, chargeStarted = true, os.clock()
-	input:FireServer("BeginAttack")
+	attackSide = side or nextSide
+	input:FireServer("BeginAttack", attackSide)
 end
 local function releaseAttack()
 	if not holding then
@@ -112,12 +166,13 @@ local function releaseAttack()
 	end
 	local aim = aimPoint()
 	face(aim)
-	local heavy = os.clock() - chargeStarted >= Actions.Base.Heavy.Charge
+	local heavy = Actions.charge(os.clock() - chargeStarted).Heavy
+	nextSide = if attackSide == "Right" then "Left" else "Right"
 	nextAttack = os.clock() + (if heavy then rules().HeavyCooldown else rules().BasicCooldown)
 	input:FireServer("ReleaseAttack", aim)
 end
 local function setBlock(held)
-	if held and not canFight() then
+	if held and (cursorFree or not canFight()) then
 		return
 	end
 	blockHeld = held
@@ -133,7 +188,7 @@ local function setBlock(held)
 	nextBlockUpdate = os.clock() + 0.15
 end
 local function dodge()
-	if not canFight() then
+	if cursorFree or not canFight() then
 		return
 	end
 	local cd = cooldowns.Dodge
@@ -151,11 +206,12 @@ local function dodge()
 		if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then humanoid.MoveDirection else root.CFrame.LookVector
 	)
 end
-local function makeSlot(id, label, key)
+local function makeSlot(id, label, key, position)
 	local button, faceBox = IronUi.chunk(
 		row,
-		{ Color = Color3.fromRGB(52, 46, 70), Size = UDim2.fromOffset(80, 70), Radius = 10, Lip = 4, Stripes = "None" }
+		{ Color = Color3.fromRGB(52, 46, 70), Size = UDim2.fromOffset(80, 70), Radius = 35, Lip = 4, Stripes = "None" }
 	)
+	button.AnchorPoint, button.Position = Vector2.new(0.5, 1), position
 	local name = text(faceBox, label, 12, P.Text, IronUi.Bold)
 	name.Position = UDim2.fromOffset(4, 28)
 	name.Size = UDim2.new(1, -8, 0, 26)
@@ -169,16 +225,17 @@ local function makeSlot(id, label, key)
 	slots[id] = { Button = button, Name = name, Timer = timer }
 	return button
 end
-local attackButton = makeSlot("Basic", "Attack", "CLICK / TAP")
-local heavyButton = makeSlot("Heavy", "Heavy", "HOLD")
-local dodgeButton = makeSlot("Dodge", "Dodge", "SPACE")
-local blockButton = makeSlot("Block", "Block", "HOLD RMB")
+local attackButton = makeSlot("Basic", "LEFT", "Q / HOLD", UDim2.new(0, 56, 1, -32))
+local heavyButton = makeSlot("Heavy", "RIGHT", "E / HOLD", UDim2.new(1, -56, 1, -32))
+local dodgeButton = makeSlot("Dodge", "DODGE", "SPACE", UDim2.new(1, -56, 1, -210))
+local blockButton = makeSlot("Block", "GUARD", "HOLD RMB", UDim2.new(0.5, 0, 1, -32))
 local function pressInput(obj)
 	return obj.UserInputType == Enum.UserInputType.MouseButton1 or obj.UserInputType == Enum.UserInputType.Touch
 end
 attackButton.InputBegan:Connect(function(obj)
-	if pressInput(obj) then
-		beginAttack()
+	if pressInput(obj) and not holding then
+		attackTouch = if obj.UserInputType == Enum.UserInputType.Touch then obj else nil
+		beginAttack("Left")
 	end
 end)
 attackButton.InputEnded:Connect(function(obj)
@@ -186,15 +243,21 @@ attackButton.InputEnded:Connect(function(obj)
 		releaseAttack()
 	end
 end)
-heavyButton.Activated:Connect(function()
-	beginAttack()
-	if holding then
-		task.delay(Actions.Base.Heavy.Charge + 0.1, releaseAttack)
+heavyButton.InputBegan:Connect(function(obj)
+	if pressInput(obj) and not holding then
+		attackTouch = if obj.UserInputType == Enum.UserInputType.Touch then obj else nil
+		beginAttack("Right")
+	end
+end)
+heavyButton.InputEnded:Connect(function(obj)
+	if pressInput(obj) then
+		releaseAttack()
 	end
 end)
 dodgeButton.Activated:Connect(dodge)
 blockButton.InputBegan:Connect(function(obj)
 	if pressInput(obj) then
+		blockTouch = if obj.UserInputType == Enum.UserInputType.Touch then obj else nil
 		setBlock(true)
 	end
 end)
@@ -205,9 +268,10 @@ blockButton.InputEnded:Connect(function(obj)
 end)
 local leave = IronUi.gemButton(gui, "LEAVE ARENA", P.Gold, ArenaScene.leave)
 leave.AnchorPoint = Vector2.new(1, 0)
-leave.Position = UDim2.new(1, -20, 0, 20)
+leave.Position = UDim2.new(1, -12, 0, 82)
 leave.Size = UDim2.fromOffset(160, 38)
 local function cancel()
+	attackTouch, blockTouch = nil, nil
 	holding = false
 	blockHeld = false
 	input:FireServer("CancelAttack")
@@ -217,19 +281,46 @@ UserInputService.InputBegan:Connect(function(obj, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
 		return
 	end
-	if obj.UserInputType == Enum.UserInputType.MouseButton1 then
+	if obj.KeyCode == Enum.KeyCode.Q then
+		beginAttack("Left")
+	elseif obj.KeyCode == Enum.KeyCode.E then
+		beginAttack("Right")
+	elseif obj.UserInputType == Enum.UserInputType.MouseButton1 then
 		beginAttack()
 	elseif obj.UserInputType == Enum.UserInputType.MouseButton2 then
 		setBlock(true)
 	end
 end)
 UserInputService.InputEnded:Connect(function(obj)
-	if obj.UserInputType == Enum.UserInputType.MouseButton1 then
+	if obj == attackTouch then
+		attackTouch = nil
+		releaseAttack()
+	end
+	if obj == blockTouch then
+		blockTouch = nil
+		setBlock(false)
+	end
+	if
+		obj.UserInputType == Enum.UserInputType.MouseButton1
+		or obj.KeyCode == Enum.KeyCode.Q
+		or obj.KeyCode == Enum.KeyCode.E
+	then
 		releaseAttack()
 	elseif obj.UserInputType == Enum.UserInputType.MouseButton2 then
 		setBlock(false)
 	end
 end)
+ContextActionService:BindActionAtPriority("CombatCursor", function(_, state)
+	if not canFight() then
+		return Enum.ContextActionResult.Pass
+	end
+	if state == Enum.UserInputState.Begin then
+		cancel()
+		cursorFree = not cursorFree
+		FirstPerson.setCursorFree(cursorFree)
+	end
+	return Enum.ContextActionResult.Sink
+end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Tab)
 UserInputService.WindowFocusReleased:Connect(cancel)
 ContextActionService:BindActionAtPriority("UniversalDodge", function(_, state)
 	if not canFight() or UserInputService:GetFocusedTextBox() then
@@ -242,11 +333,15 @@ ContextActionService:BindActionAtPriority("UniversalDodge", function(_, state)
 end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Space)
 player.CharacterAdded:Connect(function()
 	cancel()
+	FirstPerson.stop()
+	cursorFree = false
 	cooldowns = {}
 	nextAttack = 0
 end)
 player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 	cancel()
+	FirstPerson.stop()
+	cursorFree = false
 	cooldowns = {}
 	nextAttack = 0
 end)
@@ -258,14 +353,17 @@ RunService.RenderStepped:Connect(function()
 	if not fight then
 		if lastActive then
 			cancel()
+			FirstPerson.stop()
+			cursorFree = false
 		end
 		lastActive = false
 		return
 	end
+	FirstPerson.start()
 	lastActive = true
 	local camera = workspace.CurrentCamera
 	local viewport = camera.ViewportSize
-	local scale = math.min(1, math.max(0.65, (viewport.X - 20) / 380))
+	local scale = math.min(1, math.max(0.65, (viewport.X - 20) / 280))
 	local sizing = hud:FindFirstChildOfClass("UIScale")
 	if not sizing then
 		sizing = new("UIScale", {}, hud)
@@ -273,6 +371,7 @@ RunService.RenderStepped:Connect(function()
 	sizing.Scale = scale
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
+		healthFill.Size = UDim2.fromScale(math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1), 1)
 		hp.Text = string.format(
 			"%s  ·  %d / %d HP  ·  %d Shield",
 			player:GetAttribute("CombatSession") or "Combat",
@@ -282,12 +381,46 @@ RunService.RenderStepped:Connect(function()
 		)
 	end
 	local now = os.clock()
+	chargeTrack.Visible = holding
+	local elapsed = if holding then now - chargeStarted else 0
+	local charged = Actions.charge(elapsed)
+	chargeFill.Size = UDim2.fromScale(math.clamp(elapsed / Actions.PerfectAt, 0, 1), 1)
+	chargeFill.BackgroundColor3 = if charged.Stage == "OVERCHARGED"
+		then Color3.fromRGB(233, 70, 70)
+		elseif charged.Perfect then P.Gold
+		else Color3.fromRGB(83, 174, 204)
+	reticle.TextColor3 = if holding then chargeFill.BackgroundColor3 elseif blockHeld then P.Gold else P.Text
 	if holding then
-		slots.Basic.Timer.Text =
-			string.format("%d%%", math.min(100, math.floor((now - chargeStarted) / Actions.Base.Heavy.Charge * 100)))
-		if now - chargeStarted >= Actions.Base.Heavy.Charge + 0.1 then
-			releaseAttack()
-		end
+		hint.Text = if charged.Perfect
+			then "RELEASE! PERFECT WINDOW"
+			elseif charged.Stage == "OVERCHARGED" then "OVERCHARGED - damage reduced"
+			else attackSide:upper() .. " - RELEASE ON GOLD"
+	elseif now > feedbackUntil then
+		hint.Text = if cursorFree
+			then "Tab to return to combat"
+			elseif blockHeld then "GUARD UP"
+			else "Alternate LEFT / RIGHT for combos"
+	end
+	if holding and elapsed > 3 then
+		cancel()
+	end
+	FirstPerson.setPose(blockHeld, elapsed / Actions.PerfectAt)
+	controlsHint.Visible = not UserInputService.TouchEnabled
+	cursorModal.Modal = cursorFree
+	local hit = aimedHit()
+	local target = hit and hit.Instance:FindFirstAncestorOfClass("Model")
+	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
+	targetCard.Visible = enemyHumanoid ~= nil and enemyHumanoid.Health > 0 and target ~= player.Character
+	if targetCard.Visible then
+		local opponent = Players:GetPlayerFromCharacter(target)
+		targetName.Text = string.format(
+			"%s - %d / %d",
+			if opponent then opponent.DisplayName else target.Name,
+			math.ceil(enemyHumanoid.Health),
+			math.ceil(enemyHumanoid.MaxHealth)
+		)
+		targetFill.Size =
+			UDim2.fromScale(math.clamp(enemyHumanoid.Health / math.max(1, enemyHumanoid.MaxHealth), 0, 1), 1)
 	end
 	if blockHeld and now >= nextBlockUpdate then
 		local aim = aimPoint()
@@ -298,11 +431,12 @@ RunService.RenderStepped:Connect(function()
 	for id, slot in slots do
 		local cd = cooldowns[id]
 		local remaining = if cd then math.max(0, cd.Ready - now) else 0
-		if not (id == "Basic" and holding) then
-			slot.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
+		if id == "Basic" or id == "Heavy" then
+			remaining = math.max(0, nextAttack - now)
 		end
+		slot.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
 	end
-	slots.Block.Name.Text = if player:GetAttribute("Blocking") then "Blocking" else "Block"
+	slots.Block.Name.Text = if player:GetAttribute("Blocking") then "GUARD UP" else "GUARD"
 end)
 local fxFolder = Instance.new("Folder")
 fxFolder.Name = "CombatFx"
@@ -393,6 +527,19 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 end
 
 local handlers = {}
+function handlers.HighBlock()
+	hint.Text, feedbackUntil = "HIGH BLOCK - COUNTER!", os.clock() + 1
+end
+function handlers.Parried(seconds)
+	cancel()
+	nextAttack = math.max(nextAttack, os.clock() + seconds)
+	hint.Text, feedbackUntil = "PARRIED", os.clock() + 0.9
+end
+function handlers.AttackTiming(stage, side, combo)
+	hint.Text = stage .. (if combo > 1 then " - COMBO x" .. combo else "")
+	feedbackUntil = os.clock() + 0.9
+	FirstPerson.swing(side)
+end
 
 function handlers.Damage(position: Vector3, amount: number, crit: boolean, color: Color3?)
 	damageNumber(position, amount, crit, color)
