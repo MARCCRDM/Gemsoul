@@ -17,6 +17,8 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
+local Season = require(ReplicatedStorage.Shared.Season)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemArt = require(script.Parent.GemArt)
 local SurgeArrayUI = require(script.Parent.SurgeArrayUI)
@@ -1171,7 +1173,7 @@ local function drawTooltipContent()
 		local loadout = profile and profile.Character or {}
 		local card = new("Frame", {
 			BackgroundColor3 = Color3.fromRGB(17, 27, 40),
-			Size = UDim2.new(1, -6, 0, 196),
+			Size = UDim2.new(1, -6, 0, 138),
 			ClipsDescendants = true,
 		}, tipBody)
 		UiKit.round(card, 8)
@@ -1251,10 +1253,10 @@ local function drawTooltipContent()
 		end
 		local scoreLabel = text(info, "GEAR SCORE", 10, P.Dim, BOLD)
 		scoreLabel.AutomaticSize = Enum.AutomaticSize.None
-		scoreLabel.Position, scoreLabel.Size = UDim2.fromOffset(0, 50), UDim2.new(1, 0, 0, 12)
+		scoreLabel.Position, scoreLabel.Size = UDim2.fromOffset(0, 46), UDim2.new(1, 0, 0, 12)
 		local scoreValue = text(info, tostring(math.floor(score + 0.5)), 26, P.Gold, BOLD)
 		scoreValue.AutomaticSize = Enum.AutomaticSize.None
-		scoreValue.Position, scoreValue.Size = UDim2.fromOffset(0, 62), UDim2.new(1, 0, 0, 30)
+		scoreValue.Position, scoreValue.Size = UDim2.fromOffset(0, 58), UDim2.new(1, 0, 0, 30)
 		-- Armor set progress, best set first.
 		local sets = {}
 		local active = loadout.Class and Classes.setState(loadout).Active or {}
@@ -1273,17 +1275,74 @@ local function drawTooltipContent()
 		end
 		local setLabel = text(
 			info,
-			if #setLines > 0 then "SETS\n" .. table.concat(setLines, "\n") else "SETS\nNo set pieces yet",
-			11,
+			"SETS  ·  " .. (if #setLines > 0 then table.concat(setLines, "  ·  ") else "none yet"),
+			10,
 			P.Text
 		)
 		setLabel.AutomaticSize = Enum.AutomaticSize.None
-		setLabel.Position, setLabel.Size = UDim2.fromOffset(0, 98), UDim2.new(1, 0, 0, 48)
+		setLabel.Position, setLabel.Size = UDim2.fromOffset(0, 88), UDim2.new(1, 0, 0, 26)
+		setLabel.TextWrapped = true
 		setLabel.TextYAlignment = Enum.TextYAlignment.Top
-		local tip = text(info, "Select any item or gem to inspect it.", 11, P.Dim)
-		tip.AutomaticSize = Enum.AutomaticSize.None
-		tip.AnchorPoint, tip.Position, tip.Size = Vector2.new(0, 1), UDim2.fromScale(0, 1), UDim2.new(1, 0, 0, 28)
-		tip.TextYAlignment = Enum.TextYAlignment.Bottom
+		-- Below the portrait: the combat loadout and a few records, three per row.
+		local function gridRow(title: string, cells)
+			local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 22) }, tipBody)
+			local lead = text(row, title, 10, P.Dim, BOLD)
+			lead.AutomaticSize, lead.Position, lead.Size =
+				Enum.AutomaticSize.None, UDim2.fromOffset(0, 0), UDim2.fromOffset(70, 22)
+			lead.TextYAlignment = Enum.TextYAlignment.Center
+			local holder = new("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(72, 0),
+				Size = UDim2.new(1, -72, 1, 0),
+			}, row)
+			new("UIGridLayout", {
+				CellSize = UDim2.new(1 / 3, -4, 0, 20),
+				CellPadding = UDim2.fromOffset(4, 0),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, holder)
+			for order, cell in cells do
+				local chip = new("TextLabel", {
+					Text = cell[1],
+					TextSize = 10,
+					Font = BOLD,
+					TextColor3 = cell[2],
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					BackgroundColor3 = cell[2],
+					BackgroundTransparency = 0.84,
+					LayoutOrder = order,
+				}, holder)
+				UiKit.round(chip, 4)
+				new("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }, chip)
+			end
+		end
+		local surgeCells = {}
+		for _, key in { "Q", "E", "R" } do
+			local gem = Tech.surgeGem(loadout, key)
+			local surge = gem and Tech.surgeStats(gem)
+			table.insert(surgeCells, {
+				key .. "  " .. (if surge then surge.Name else "Empty"),
+				if gem then GemConfig.ElementColors[gem.Element] or P.Gold else P.Dim,
+			})
+		end
+		gridRow("SURGES", surgeCells)
+		local maneuverCells = {}
+		for i, id in loadout.Maneuvers or Tech.DefaultManeuvers do
+			local definition = Tech.Catalog[id]
+			local learned = profile ~= nil and Tree.isLearned(profile, id)
+			table.insert(maneuverCells, {
+				i .. "  " .. (if definition then definition.Name else id),
+				if learned then Tech.Resources.Stamina.Color else P.Dim,
+			})
+		end
+		gridRow("MANEUVERS", maneuverCells)
+		local stats = profile and profile.Stats or {}
+		local augmentLevel = Tree.level(profile and profile.Augments and profile.Augments.XP or 0)
+		local seasonLevel = Season.levelFor(profile and profile.Season and profile.Season.XP or 0)
+		gridRow("RECORDS", {
+			{ "Augment Lv " .. augmentLevel, P.Gold },
+			{ "Season Lv " .. seasonLevel, P.Teal },
+			{ "Depth " .. (stats.BestDepth or 0) .. "  ·  " .. (stats.Kills or 0) .. " kills", P.Text },
+		})
 		if hint ~= "" then
 			text(tipBody, (string.gsub(hint, "^%s+", "")), 12, P.Dim)
 		end
