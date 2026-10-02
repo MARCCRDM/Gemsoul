@@ -727,7 +727,14 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		return a[1] < b[1]
 	end)
 	for i, entry in stats do
-		chipLabel(chips, string.format("+%d %s", entry[2], entry[1]), P.Text, i)
+		chipLabel(
+			chips,
+			if entry[1] == "Critical" or entry[1] == "Cooldown"
+				then string.format("+%g%% %s", entry[2] * 100, entry[1])
+				else string.format("+%g %s", entry[2], entry[1]),
+			P.Text,
+			i
+		)
 	end
 
 	-- The socket: the gem and what it adds, or an invitation to fill it.
@@ -783,6 +790,23 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		hint.Position = UDim2.fromOffset(54, 25)
 		hint.Size = UDim2.new(1, -60, 0, 16)
 		hint.TextTruncate = Enum.TextTruncate.AtEnd
+	end
+	if gear.ArmorFamily then
+		local state = Classes.setState(GemClient.Profile.Character).Active[gear.ArmorFamily]
+		text(
+			tipBody,
+			string.format("%s · %d/6 equipped · %d-piece bonus active", gear.ArmorFamily, state.Count, state.Tier),
+			12,
+			P.Teal
+		)
+		if roll and roll.Budget then
+			text(
+				tipBody,
+				string.format("%d stat points · %d modifiers", roll.Budget, #(roll.Modifiers or {})),
+				12,
+				P.Dim
+			)
+		end
 	end
 	signatureLine(gear)
 end

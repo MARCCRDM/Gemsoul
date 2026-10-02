@@ -143,12 +143,26 @@ function Assets.sword(folder, hand, mount, rarity, accent, finish)
 	end
 end
 
-function Assets.shield(folder, arm, mount, rarity, accent, finish)
+function Assets.shield(folder, arm, mount, rarity, accent, finish, family)
 	rarity = math.clamp(rarity or 1, 1, 5)
 	local function add(x, y, z, sx, sy, sz, color, material)
 		return part(folder, arm, mount, CFrame.new(x, y, z), Vector3.new(sx, sy, sz), color, material)
 	end
 	-- Stepped kite silhouette replaces the smooth oval; plates float over a dark frame.
+	if family == "Prospector" then
+		for _, side in { -1, 1 } do
+			add(side * 0.69, 0.15, 0.02, 0.12, 0.62, 0.18, steel)
+		end
+	elseif family == "Skirmisher" then
+		for _, side in { -1, 1 } do
+			add(side * 0.67, 0.42, -0.08, 0.04, 0.88, 0.05, accent)
+		end
+	elseif family == "Juggernaut" then
+		add(0, 0.86, 0, 1.46, 0.16, 0.36, steel)
+		for _, side in { -1, 1 } do
+			add(side * 0.69, -0.1, 0.02, 0.15, 1.16, 0.3, finish)
+		end
+	end
 	add(0, 0.18, 0, 1.35, 1.55, 0.22, dark)
 	add(0, -0.7, 0, 0.95, 0.3, 0.22, dark)
 	add(0, -0.92, 0, 0.55, 0.16, 0.22, dark)

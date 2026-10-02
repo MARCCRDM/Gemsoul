@@ -42,6 +42,7 @@ type State = {
 	Buffs: { Buff },
 	Shield: number,
 	ShieldUntil: number,
+	DodgeUntil: number,
 	NextWard: number,
 	Inputs: number, -- inputs this second, to ignore spam
 	InputWindow: number,
@@ -108,6 +109,7 @@ local function state(player: Player): State
 			Buffs = {},
 			Shield = 0,
 			ShieldUntil = 0,
+			DodgeUntil = 0,
 			NextWard = 0,
 			Inputs = 0,
 			InputWindow = 0,
@@ -247,6 +249,9 @@ local function hit(player: Player, k: Kit, st: State, enemy: Enemies.Enemy, base
 	local extras = o.Extras or {}
 	local _, root = alive(player)
 	local damage = base * Combat.powerMult(rating(k, "Power")) * buffTotal(st, "DamageMult")
+	if os.clock() < st.DodgeUntil then
+		damage *= 1 + (k.Effects.DamageAfterDodge or 0)
+	end
 	if o.Finisher then
 		damage *= Combat.FinisherMult
 	end
@@ -430,7 +435,7 @@ end
 
 -- Abilities -------------------------------------------------------------------------------------------
 
-local function applyBuff(player: Player, st: State, ability: any)
+local function applyBuff(player: Player, st: State, ability: any, k: Kit)
 	local humanoid = alive(player)
 	if ability.Duration and ability.Duration > 0 then
 		table.insert(st.Buffs, {
@@ -441,7 +446,10 @@ local function applyBuff(player: Player, st: State, ability: any)
 		})
 	end
 	if ability.Heal and humanoid then
-		humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * ability.Heal)
+		humanoid.Health = math.min(
+			humanoid.MaxHealth,
+			humanoid.Health + humanoid.MaxHealth * ability.Heal * (1 + (k.Effects.HealingReceived or 0))
+		)
 	end
 	if ability.Shield then
 		st.Shield = math.max(st.Shield, ability.Shield)
@@ -500,6 +508,9 @@ local function cast(player: Player, slot: number, aim: Vector3)
 			end
 		end)
 	elseif kind == "Dash" then
+		if ability.Dodge then
+			st.DodgeUntil = os.clock() + 3
+		end
 		-- The client moves itself; hit around where it lands.
 		Remotes.CombatFx:FireClient(
 			player,
@@ -526,7 +537,7 @@ local function cast(player: Player, slot: number, aim: Vector3)
 		local finish = shoot(player, k, st, origin, target, ability.Range, ability.Damage, ability)
 		fx("Shot", player, origin, finish, color, ability.Id)
 	elseif kind == "Buff" then
-		applyBuff(player, st, ability)
+		applyBuff(player, st, ability, k)
 		fx("Buff", player, color)
 		if ability.TauntRadius then
 			fx("Nova", root.Position, ability.TauntRadius, color, 0)

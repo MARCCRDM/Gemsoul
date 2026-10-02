@@ -104,6 +104,208 @@ local Random = {
 	end,
 }
 
+local ArmorFamilies=(function()
+-- Armor defines the build. IDs remain stable; old items stay saved-compatible.
+local Armor = {}
+Armor.Version = 1
+Armor.FullSetPieces = 6 -- five armor pieces plus a matching weapon
+Armor.Slots = { "Helmet", "Armor", "Gloves", "Boots", "Shield" }
+Armor.Order = { "Prospector", "Skirmisher", "Juggernaut" }
+Armor.Budgets = { 10, 15, 22, 30, 40 }
+Armor.ModifierSlots = { 0, 0, 1, 2, 3 }
+Armor.Weights = { 40, 25, 20, 10, 5 }
+Armor.Costs = { Health = 1, Power = 1, Defense = 1, Speed = 2, Critical = 2, Cooldown = 2 }
+Armor.Values = { Health = 5, Power = 1, Defense = 1, Speed = 0.5, Critical = 0.005, Cooldown = 0.005 }
+Armor.Stats = { "Health", "Power", "Defense", "Speed", "Critical", "Cooldown" }
+Armor.Families = {
+	Prospector = {
+		Look = "UtilityMiner",
+		Description = "Balanced sustain and self-sufficient mining",
+		Primary = { Helmet = "Health", Armor = "Health", Gloves = "Power", Boots = "Speed", Shield = "Defense" },
+		PreferredWeapon = "Sword",
+		Gem = "Corrosive",
+		Color = Color3.fromRGB(218, 159, 76),
+	},
+	Skirmisher = {
+		Look = "FrontierRanger",
+		Description = "Mobile scout with critical burst",
+		Primary = { Helmet = "Speed", Armor = "Power", Gloves = "Critical", Boots = "Speed", Shield = "Defense" },
+		PreferredWeapon = "Pistol",
+		Gem = "Ion",
+		Color = Color3.fromRGB(72, 174, 186),
+	},
+	Juggernaut = {
+		Look = "HeavyVanguard",
+		Description = "Armored defense and battlefield control",
+		Primary = { Helmet = "Health", Armor = "Health", Gloves = "Power", Boots = "Health", Shield = "Defense" },
+		PreferredWeapon = "Sword",
+		Gem = "Thermal",
+		Color = Color3.fromRGB(104, 139, 189),
+	},
+}
+-- Highest unlocked tier replaces lower tiers; bonuses are not added together.
+Armor.Sets = {
+	Prospector = {
+		[2] = { Health = 10, Power = 1 },
+		[4] = { Health = 20, Power = 2, Cooldown = 0.05 },
+		[6] = { Health = 30, Power = 3, Cooldown = 0.10, HealingReceived = 0.05 },
+	},
+	Skirmisher = {
+		[2] = { Speed = 0.5, Critical = 0.02 },
+		[4] = { Speed = 1, Critical = 0.04, Cooldown = 0.05 },
+		[6] = { Speed = 1.5, Critical = 0.08, Cooldown = 0.10, DamageAfterDodge = 0.10 },
+	},
+	Juggernaut = {
+		[2] = { Health = 15, Defense = 1 },
+		[4] = { Health = 25, Defense = 2, DamageReduction = 0.05 },
+		[6] = { Health = 40, Defense = 4, DamageReduction = 0.10, ThreatGeneration = 0.15 },
+	},
+}
+Armor.DepthWeights = {
+	{ 80, 20, 0, 0, 0 },
+	{ 50, 40, 10, 0, 0 },
+	{ 20, 50, 25, 5, 0 },
+	{ 0, 30, 50, 18, 2 },
+	{ 0, 10, 40, 40, 10 },
+}
+Armor.Catalog, Armor.ById = {}, {}
+local kinds = { Helmet = "Helmets", Armor = "Armors", Gloves = "Gloves", Boots = "Boots", Shield = "Shields" }
+local suffixes = { Helmet = "Helm", Armor = "Rig", Gloves = "Grips", Boots = "Greaves", Shield = "Shield" }
+local common = {
+	Prospector = {
+		"Zero-G Standard Helm",
+		"Zero-G Bulk Suit",
+		"Reinforced Grips",
+		"Mag-Lock Greaves",
+		"Titanium Breach Shield",
+	},
+	Skirmisher = {
+		"Frontier Scout Helm",
+		"Frontier Scout Rig",
+		"Scout Trigger Grips",
+		"Scout Striders",
+		"Scout Deflector Shield",
+	},
+	Juggernaut = {
+		"Vanguard Guard Helm",
+		"Vanguard Guard Rig",
+		"Guard Gauntlets",
+		"Guard Sabatons",
+		"Guard Bulwark Shield",
+	},
+}
+local prefixes = {
+	Prospector = { "", "Reinforced Miner", "Surveyor's", "Prospector Elite", "Prospector Prime" },
+	Skirmisher = { "", "Recon", "Pathfinder's", "Skirmisher Elite", "Skirmisher Prime" },
+	Juggernaut = { "", "Reinforced Vanguard", "Bastion's", "Juggernaut Elite", "Juggernaut Prime" },
+}
+for familyIndex, family in Armor.Order do
+	for slotIndex, slot in Armor.Slots do
+		local kind = kinds[slot]
+		Armor.Catalog[kind] = Armor.Catalog[kind] or {}
+		for rarity = 1, 5 do
+			local id = "Armor" .. family .. slot .. rarity
+			local item = {
+				Id = id,
+				Name = if rarity == 1
+					then common[family][slotIndex]
+					else prefixes[family][rarity] .. " " .. suffixes[slot],
+				Tier = rarity,
+				RarityTier = rarity,
+				StartPool = true,
+				ArmorFamily = family,
+				AssetFamily = Armor.Families[family].Look,
+				Look = Armor.Families[family].Look,
+				Style = family,
+				Mods = {},
+				Budget = Armor.Budgets[rarity],
+				PrimaryStat = Armor.Families[family].Primary[slot],
+				ModifierSlots = Armor.ModifierSlots[rarity],
+				HelmetDesign = (familyIndex - 1) * 5 + rarity,
+				Description = Armor.Families[family].Description,
+				Passive = {
+					Name = "Armor Identity",
+					Text = "Wear matching " .. family .. " pieces for set bonuses.",
+					Effect = {},
+				},
+			}
+			Armor.ById[id] = item
+			table.insert(Armor.Catalog[kind], item)
+		end
+	end
+end
+function Armor.rollStats(item, rng)
+	local slots = item.ModifierSlots
+	local modifierBudget = if slots == 0 then 0 elseif slots == 1 then 6 elseif slots == 2 then 8 else 12
+	local primaryBudget = item.Budget - modifierBudget
+	local cost = Armor.Costs[item.PrimaryStat]
+	-- Odd speed/critical budgets spend the remaining point on Power.
+	local points = math.floor(primaryBudget / cost)
+	local stats = { [item.PrimaryStat] = points * Armor.Values[item.PrimaryStat] }
+	local allocations = { [item.PrimaryStat] = points }
+	if primaryBudget % cost > 0 then
+		stats.Power = (stats.Power or 0) + 1
+		allocations.Power = (allocations.Power or 0) + 1
+	end
+	local available = {}
+	for _, stat in Armor.Stats do
+		if stat ~= item.PrimaryStat and not allocations[stat] then
+			table.insert(available, stat)
+		end
+	end
+	local modifiers = {}
+	for _ = 1, slots do
+		local stat = table.remove(available, rng:NextInteger(1, #available))
+		local spent = modifierBudget / slots
+		local amount = spent / Armor.Costs[stat]
+		stats[stat] = (stats[stat] or 0) + amount * Armor.Values[stat]
+		allocations[stat] = amount
+		table.insert(modifiers, stat)
+	end
+	return stats, allocations, modifiers
+end
+function Armor.pick(catalog, rng, depth)
+	local weights = if depth then Armor.DepthWeights[math.clamp(math.ceil(depth / 2), 1, 5)] else Armor.Weights
+	local pick = rng:NextNumber(0, 100)
+	local rarity = 5
+	for i, weight in weights do
+		pick -= weight
+		if weight > 0 and pick < 0 then
+			rarity = i
+			break
+		end
+	end
+	local choices = {}
+	for _, item in catalog do
+		if item.ArmorFamily and item.RarityTier == rarity then
+			table.insert(choices, item)
+		end
+	end
+	return if #choices > 0 then choices[rng:NextInteger(1, #choices)] else nil
+end
+function Armor.setState(loadout, resolve)
+	local counts, bonuses, active = {}, {}, {}
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield", "Weapon" } do
+		local gear = resolve(slot, loadout[slot])
+		local family = gear and gear.ArmorFamily
+		if family then
+			counts[family] = (counts[family] or 0) + 1
+		end
+	end
+	for _, family in Armor.Order do
+		local count = counts[family] or 0
+		local tier = if count >= Armor.FullSetPieces then 6 elseif count >= 4 then 4 elseif count >= 2 then 2 else 0
+		active[family] = { Count = count, Tier = tier }
+		for stat, amount in Armor.Sets[family][tier] or {} do
+			bonuses[stat] = (bonuses[stat] or 0) + amount
+		end
+	end
+	return { Counts = counts, Bonuses = bonuses, Active = active }
+end
+return Armor
+
+end)()
+
 local ArmorKits=(function()
 --[[
 	Armor designs welded to the avatar. Current miner assets use three compact families:
@@ -1748,11 +1950,43 @@ local function frontierSuit(family: number)
 				for i = 1, 2 do
 					lit(head, x * 0.3, y * 0.48, -z * (0.25 + i * 0.1), x * 0.08, y * 0.07, 0.025)
 				end
-			else -- Metron: interlocking neural lattice over the visor and crown.
+			elseif design == 10 then -- Metron: interlocking neural lattice over the visor and crown.
 				for _, side in sides() do
 					block(head, side * x * 0.2, y * 0.06, -z * 0.575, x * 0.055, y * 0.33, 0.04, ornament, side * 30)
 					block(head, side * x * 0.19, y * 0.56, 0.06, x * 0.065, y * 0.16, z * 0.78, ornament, side * 20)
 					lit(head, side * x * 0.39, y * 0.32, -z * 0.52, x * 0.065, y * 0.12, 0.03)
+				end
+			elseif design >= 11 then
+				-- Vanguard: progressively reinforced face plates and a distinct crown per tier.
+				local tier = design - 10
+				block(head, 0, -y * 0.25, -z * 0.62, x * (0.48 + tier * 0.035), y * 0.22, 0.13, metal)
+				for i = 1, tier do
+					local offset = (i - (tier + 1) / 2) * x * 0.14
+					block(
+						head,
+						offset,
+						y * (0.52 + tier * 0.015),
+						0,
+						x * 0.085,
+						y * (0.10 + tier * 0.025),
+						z * 0.74,
+						if tier >= 4 then ornament else edge
+					)
+				end
+				for _, side in sides() do
+					block(
+						head,
+						side * x * 0.48,
+						-y * 0.06,
+						-z * 0.42,
+						x * 0.17,
+						y * (0.25 + tier * 0.03),
+						z * 0.32,
+						metal
+					)
+					if tier >= 3 then
+						lit(head, side * x * 0.5, y * 0.10, -z * 0.6, x * 0.07, y * 0.08, 0.03)
+					end
 				end
 			end
 
@@ -2225,7 +2459,10 @@ function ArmorKits.build(
 		Material = palette.Material,
 		Accent = accent,
 		Traits = traits,
-		HelmetDesign = if itemId then tonumber(string.match(itemId, "^MatrixHelmets(%d+)$")) else nil,
+		HelmetDesign = if itemId and ArmorFamilies.ById[itemId]
+			then ArmorFamilies.ById[itemId].HelmetDesign
+			elseif itemId then tonumber(string.match(itemId, "^MatrixHelmets(%d+)$"))
+			else nil,
 	}
 	local build = BUILDERS[look] or BUILDERS.Plate
 	local body = ArmorKits.body(character)
@@ -2450,12 +2687,26 @@ function Assets.sword(folder, hand, mount, rarity, accent, finish)
 	end
 end
 
-function Assets.shield(folder, arm, mount, rarity, accent, finish)
+function Assets.shield(folder, arm, mount, rarity, accent, finish, family)
 	rarity = math.clamp(rarity or 1, 1, 5)
 	local function add(x, y, z, sx, sy, sz, color, material)
 		return part(folder, arm, mount, CFrame.new(x, y, z), Vector3.new(sx, sy, sz), color, material)
 	end
 	-- Stepped kite silhouette replaces the smooth oval; plates float over a dark frame.
+	if family == "Prospector" then
+		for _, side in { -1, 1 } do
+			add(side * 0.69, 0.15, 0.02, 0.12, 0.62, 0.18, steel)
+		end
+	elseif family == "Skirmisher" then
+		for _, side in { -1, 1 } do
+			add(side * 0.67, 0.42, -0.08, 0.04, 0.88, 0.05, accent)
+		end
+	elseif family == "Juggernaut" then
+		add(0, 0.86, 0, 1.46, 0.16, 0.36, steel)
+		for _, side in { -1, 1 } do
+			add(side * 0.69, -0.1, 0.02, 0.15, 1.16, 0.3, finish)
+		end
+	end
 	add(0, 0.18, 0, 1.35, 1.55, 0.22, dark)
 	add(0, -0.7, 0, 0.95, 0.3, 0.22, dark)
 	add(0, -0.92, 0, 0.55, 0.16, 0.22, dark)
@@ -2520,12 +2771,19 @@ local function dump(label)
  end
  table.clear(builtParts)
 end
-local traits={Rarity=5,Helmet=1,VisorColor=Color3.fromRGB(168,99,246),FinishColor=Color3.fromRGB(211,176,84)}
-for _,slot in {"Helmet","Armor","Gloves","Boots"} do
- local target=if slot=="Helmet" then "Head" elseif slot=="Armor" then "Torso" elseif slot=="Gloves" then "RightLowerArm" else "RightFoot"
- local rig={GetChildren=function() return {} end,FindFirstChild=function(_,name) if name==target or name=="UpperTorso" then return anchor end return nil end}
- ArmorKits.build({},rig,"HeavyVanguard",Color3.fromRGB(72,207,226),1,traits,slot,"MatrixHelmets10")
- dump(slot)
+for _,family in ArmorFamilies.Order do
+ for _,slot in ArmorFamilies.Slots do
+  for rarity=1,5 do
+   local item=ArmorFamilies.ById["Armor"..family..slot..rarity]
+   local traits={Rarity=rarity,Helmet=1,VisorColor=Color3.fromRGB(72,207,226),FinishColor=Color3.fromRGB(90,100,120)}
+   if slot=="Shield" then
+    Assets.shield({},anchor,CFrame.identity,rarity,Color3.fromRGB(72,207,226),traits.FinishColor,family)
+   else
+    local target=if slot=="Helmet" then "Head" elseif slot=="Armor" then "Torso" elseif slot=="Gloves" then "RightLowerArm" else "RightFoot"
+    local rig={GetChildren=function() return {} end,FindFirstChild=function(_,name) if name==target or name=="UpperTorso" then return anchor end return nil end}
+    ArmorKits.build({},rig,item.Look,Color3.fromRGB(72,207,226),1,traits,slot,item.Id)
+   end
+   dump(family.." / "..slot.." / "..rarity)
+  end
+ end
 end
-Assets.sidearm({},anchor,CFrame.identity,5,Color3.fromRGB(72,207,226),Color3.fromRGB(82,108,139)); dump("Pistol")
-Assets.shield({},anchor,CFrame.identity,5,Color3.fromRGB(72,207,226),Color3.fromRGB(82,108,139)); dump("Shield")

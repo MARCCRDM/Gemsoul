@@ -97,7 +97,7 @@ local function regenerateEquipment(player: Player)
 		local kind = Slots.Definitions[slot].Kind
 		local id = profile.Character[slot]
 		local gear = Classes.gear(profile.Character.Class, kind, id)
-		local roll = GearRolls.roll(rng, gear.RarityTier)
+		local roll = GearRolls.roll(rng, gear.RarityTier, gear)
 		-- Preserve the weighted visor rules used by normal starter generation.
 		local previous = profile.Character.GearRolls[kind][id]
 		roll.MatrixVisor = previous.MatrixVisor

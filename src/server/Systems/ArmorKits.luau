@@ -9,6 +9,7 @@
 	ArmorKits.build(folder, character, look, accent) builds one armor set.
 	`look` comes from Classes (e.g. "Plate", "Robe"), `accent` is the class colour.
 ]]
+local ArmorFamilies = require(game:GetService("ReplicatedStorage").Shared.ArmorFamilies)
 local ArmorKits = {}
 
 -- A body segment: the part to weld to, where on it, and how big it is.
@@ -1641,11 +1642,43 @@ local function frontierSuit(family: number)
 				for i = 1, 2 do
 					lit(head, x * 0.3, y * 0.48, -z * (0.25 + i * 0.1), x * 0.08, y * 0.07, 0.025)
 				end
-			else -- Metron: interlocking neural lattice over the visor and crown.
+			elseif design == 10 then -- Metron: interlocking neural lattice over the visor and crown.
 				for _, side in sides() do
 					block(head, side * x * 0.2, y * 0.06, -z * 0.575, x * 0.055, y * 0.33, 0.04, ornament, side * 30)
 					block(head, side * x * 0.19, y * 0.56, 0.06, x * 0.065, y * 0.16, z * 0.78, ornament, side * 20)
 					lit(head, side * x * 0.39, y * 0.32, -z * 0.52, x * 0.065, y * 0.12, 0.03)
+				end
+			elseif design >= 11 then
+				-- Vanguard: progressively reinforced face plates and a distinct crown per tier.
+				local tier = design - 10
+				block(head, 0, -y * 0.25, -z * 0.62, x * (0.48 + tier * 0.035), y * 0.22, 0.13, metal)
+				for i = 1, tier do
+					local offset = (i - (tier + 1) / 2) * x * 0.14
+					block(
+						head,
+						offset,
+						y * (0.52 + tier * 0.015),
+						0,
+						x * 0.085,
+						y * (0.10 + tier * 0.025),
+						z * 0.74,
+						if tier >= 4 then ornament else edge
+					)
+				end
+				for _, side in sides() do
+					block(
+						head,
+						side * x * 0.48,
+						-y * 0.06,
+						-z * 0.42,
+						x * 0.17,
+						y * (0.25 + tier * 0.03),
+						z * 0.32,
+						metal
+					)
+					if tier >= 3 then
+						lit(head, side * x * 0.5, y * 0.10, -z * 0.6, x * 0.07, y * 0.08, 0.03)
+					end
 				end
 			end
 
@@ -2118,7 +2151,10 @@ function ArmorKits.build(
 		Material = palette.Material,
 		Accent = accent,
 		Traits = traits,
-		HelmetDesign = if itemId then tonumber(string.match(itemId, "^MatrixHelmets(%d+)$")) else nil,
+		HelmetDesign = if itemId and ArmorFamilies.ById[itemId]
+			then ArmorFamilies.ById[itemId].HelmetDesign
+			elseif itemId then tonumber(string.match(itemId, "^MatrixHelmets(%d+)$"))
+			else nil,
 	}
 	local build = BUILDERS[look] or BUILDERS.Plate
 	local body = ArmorKits.body(character)

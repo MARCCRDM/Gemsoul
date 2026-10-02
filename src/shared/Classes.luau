@@ -77,6 +77,7 @@ local Slots = require(script.Parent.EquipmentSlots)
 local EquipmentBalance = require(script.Parent.EquipmentBalance)
 local ExpandedTraits = require(script.Parent.ExpandedItemTraits)
 local GearRolls = require(script.Parent.GearRolls)
+local ArmorFamilies = require(script.Parent.ArmorFamilies)
 local Classes = {}
 
 Classes.StatNames = { "Health", "Power", "Defense", "Speed" }
@@ -980,6 +981,12 @@ for _, class in Classes.List do
 	end
 end
 -- Keep saved legacy equipment valid; only new-player draws use the expanded pool.
+for kind, entries in ExpandedTraits.LegacyCatalog do
+	Classes.List.Warrior[kind] = table.clone(Classes.List.Warrior[kind])
+	for _, gear in entries do
+		table.insert(Classes.List.Warrior[kind], gear)
+	end
+end
 for kind, entries in ExpandedTraits.Catalog do
 	Classes.List.Warrior[kind] = table.clone(Classes.List.Warrior[kind])
 	for _, gear in entries do
@@ -992,6 +999,58 @@ for _, weapon in Classes.List.Warrior.Weapons do
 		weapon.Look = "CleanSidearm"
 		weapon.WeaponType = "Pistol"
 	end
+end
+-- Every player is a Warrior; retain other-class items so migration never erases gear.
+for classId, class in Classes.List do
+	if classId ~= "Warrior" then
+		for _, kind in Slots.Kinds do
+			for _, item in class[kind] do
+				local exists = false
+				for _, old in Classes.List.Warrior[kind] do
+					if old.Id == item.Id then
+						exists = true
+						break
+					end
+				end
+				if not exists then
+					table.insert(Classes.List.Warrior[kind], item)
+				end
+			end
+		end
+	end
+end
+Classes.Order = { "Warrior" }
+table.insert(
+	Classes.List.Warrior.Abilities,
+	{
+		Id = "WarriorDodge",
+		Name = "Dodge Roll",
+		Description = "Roll backward. A full Skirmisher set grants 10% damage for 3 seconds afterward.",
+		Kind = "Dash",
+		Distance = 12,
+		Backward = true,
+		Dodge = true,
+		Cost = 0,
+		Cooldown = 5,
+	}
+)
+Classes.List.Warrior.Specs = {}
+function Classes.setState(loadout)
+	return ArmorFamilies.setState(loadout, function(slot, id)
+		return Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, id)
+	end)
+end
+function Classes.armorBonuses(loadout)
+	local bonuses = table.clone(Classes.setState(loadout).Bonuses)
+	for _, slot in ArmorFamilies.Slots do
+		local roll = GearRolls.get(loadout, slot)
+		if roll and roll.ArmorBudgetVersion then
+			for stat, amount in roll.Stats do
+				bonuses[stat] = (bonuses[stat] or 0) + amount
+			end
+		end
+	end
+	return bonuses
 end
 function Classes.gear(classId: string, kind: string, id: string?)
 	local class = Classes.List[classId]
@@ -1018,6 +1077,13 @@ function Classes.effects(loadout)
 			end
 		end
 	end
+	local bonuses = Classes.armorBonuses(loadout)
+	effects.CritAdd = (effects.CritAdd or 0) + (bonuses.Critical or 0)
+	effects.CooldownMult = (effects.CooldownMult or 1) * (1 - math.min(bonuses.Cooldown or 0, 0.60))
+	effects.TakenMult = (effects.TakenMult or 1) * (1 - (bonuses.DamageReduction or 0))
+	effects.HealingReceived = bonuses.HealingReceived or 0
+	effects.DamageAfterDodge = bonuses.DamageAfterDodge or 0
+	effects.ThreatGeneration = bonuses.ThreatGeneration or 0
 	if effects.TakenMult then
 		effects.TakenMult = EquipmentBalance.passiveDamageMultiplier(effects.TakenMult, 0)
 	end
@@ -1155,17 +1221,23 @@ function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
 	end
 	for _, slot in Slots.Order do
 		local roll = GearRolls.get(loadout, slot)
-		for stat, amount in roll and roll.Stats or {} do
+		for stat, amount in (if roll and not roll.ArmorBudgetVersion then roll.Stats else {}) or {} do
 			ratings[stat].Base += amount
 		end
 	end
+	local bonuses = Classes.armorBonuses(loadout)
+	-- Convert physical HP/SPD into the existing rating units exactly once.
+	ratings.Health.Base += (bonuses.Health or 0) / 0.6
+	ratings.Speed.Base += (bonuses.Speed or 0) / 0.1
+	ratings.Power.Base += bonuses.Power or 0
+	ratings.Defense.Base += bonuses.Defense or 0
 	return ratings
 end
 
 -- What ratings do to the avatar (16 speed and 100 health at ratings of 40
 -- and 67, the Roblox defaults).
 function Classes.walkSpeed(speedRating: number): number
-	return math.clamp(12 + speedRating * 0.1, 12, 28)
+	return math.max(12 + speedRating * 0.1, 12)
 end
 
 function Classes.maxHealth(healthRating: number): number

@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Combat = require(ReplicatedStorage.Shared.Combat)
+local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Gems = require(script.Parent.Gems)
 local Party = require(script.Parent.Party)
@@ -117,6 +118,7 @@ export type Enemy = {
 	LastHit: number,
 	LastAttack: number,
 	Damage: { [Player]: number },
+	Threat: { [Player]: number },
 	StunUntil: number,
 	SlowUntil: number,
 	Slow: number,
@@ -381,6 +383,7 @@ local function spawn(kindId: string, home: Vector3, facing: Vector3?)
 		LastHit = 0,
 		LastAttack = 0,
 		Damage = {},
+		Threat = {},
 		StunUntil = 0,
 		SlowUntil = 0,
 		Slow = 0,
@@ -463,6 +466,9 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	enemy.LastHit = os.clock()
 	if source then
 		enemy.Damage[source] = (enemy.Damage[source] or 0) + amount
+		local loadout = PlayerData.character(source)
+		local bonus = if loadout then Classes.effects(loadout).ThreatGeneration or 0 else 0
+		enemy.Threat[source] = (enemy.Threat[source] or 0) + amount * (1 + bonus)
 	end
 	fx("Damage", enemy.Root.Position + Vector3.new(0, enemy.Root.Size.Y / 2 + 1, 0), amount, crit == true, color)
 	if enemy.Kind.Dummy then
@@ -533,13 +539,20 @@ local function pickTarget(enemy: Enemy): (Player?, BasePart?)
 		end
 	end
 	local best, bestRoot, bestDistance = nil, nil, enemy.Kind.Aggro
+	local bestThreat = -1
 	for _, player in Players:GetPlayers() do
 		local root = fighterRoot(player)
 		if root then
 			local distance = (root.Position - enemy.Root.Position).Magnitude
 			-- Once hurt, a monster keeps chasing a bit further.
-			local reach = if now - enemy.LastHit < 6 then bestDistance * 1.6 else bestDistance
-			if distance < reach and (root.Position - enemy.Home).Magnitude < LEASH then
+			local reach = enemy.Kind.Aggro * (if now - enemy.LastHit < 6 then 1.6 else 1)
+			local threat = enemy.Threat[player] or 0
+			if
+				distance < reach
+				and (root.Position - enemy.Home).Magnitude < LEASH
+				and (threat > bestThreat or (threat == bestThreat and distance < bestDistance))
+			then
+				bestThreat = threat
 				best, bestRoot, bestDistance = player, root, distance
 			end
 		end
@@ -566,6 +579,7 @@ local function think(enemy: Enemy, now: number)
 			updateBar(enemy)
 			if humanoid.Health >= humanoid.MaxHealth then
 				table.clear(enemy.Damage)
+				table.clear(enemy.Threat)
 			end
 		end
 		return

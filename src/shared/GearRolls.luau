@@ -1,6 +1,7 @@
 -- Serializable item rolls. Only the server creates them; clients read saved results.
 local Slots = require(script.Parent.EquipmentSlots)
 local ExpandedTraits = require(script.Parent.ExpandedItemTraits)
+local ArmorFamilies = require(script.Parent.ArmorFamilies)
 local GearRolls = {}
 GearRolls.Rarities = {
 	{ Name = "Common", Weight = 40, Color = Color3.fromRGB(205, 216, 225) },
@@ -23,7 +24,7 @@ local visors = {
 	Color3.fromRGB(237, 102, 198),
 	Color3.fromRGB(100, 235, 174),
 }
-function GearRolls.roll(rng, fixedRarity)
+function GearRolls.roll(rng, fixedRarity, gear)
 	local pick, rarity = rng:NextInteger(1, 100), 1
 	for i, entry in GearRolls.Rarities do
 		pick -= entry.Weight
@@ -40,7 +41,7 @@ function GearRolls.roll(rng, fixedRarity)
 		local name = table.remove(names, index)
 		stats[name] = rng:NextInteger(2, 4) * rarity
 	end
-	return {
+	local roll = {
 		Rarity = rarity,
 		Stats = stats,
 		Helmet = rng:NextInteger(1, 5),
@@ -48,6 +49,12 @@ function GearRolls.roll(rng, fixedRarity)
 		Finish = rng:NextInteger(1, 5),
 		Variant = rng:NextInteger(1, 4),
 	}
+	if gear and ArmorFamilies.ById[gear.Id] then
+		roll.Stats, roll.Points, roll.Modifiers = ArmorFamilies.rollStats(gear, rng)
+		roll.ArmorBudgetVersion = ArmorFamilies.Version
+		roll.Budget = gear.Budget
+	end
+	return roll
 end
 function GearRolls.get(loadout, slot, id)
 	local kind = Slots.Definitions[slot].Kind
@@ -75,14 +82,23 @@ function GearRolls.ensure(profile, rng)
 		c.GearRolls[kind] = c.GearRolls[kind] or {}
 		for id in profile.Owned[kind] or {} do
 			if not c.GearRolls[kind][id] then
-				local fixedRarity
+				local fixedRarity, item
 				for _, gear in ExpandedTraits.Catalog[kind] or {} do
 					if gear.Id == id then
 						fixedRarity = gear.RarityTier
+						item = gear
 						break
 					end
 				end
-				local roll = GearRolls.roll(rng, fixedRarity)
+				if not item then
+					for _, gear in ExpandedTraits.LegacyCatalog[kind] or {} do
+						if gear.Id == id then
+							fixedRarity, item = gear.RarityTier, gear
+							break
+						end
+					end
+				end
+				local roll = GearRolls.roll(rng, fixedRarity, item)
 				if fixedRarity then
 					local visor = ExpandedTraits.pick(ExpandedTraits.Visors, rng)
 					roll.MatrixVisor = visor.Index
@@ -103,7 +119,7 @@ function GearRolls.grant(profile, class, rng)
 		local kind = Slots.Definitions[slot].Kind
 		local catalog = class[kind]
 		-- Retire the fixed basic starter; independently roll every equipment category.
-		local gear = ExpandedTraits.pick(catalog, rng)
+		local gear = (if kind ~= "Weapons" then ArmorFamilies.pick(catalog, rng) else ExpandedTraits.pick(catalog, rng))
 			or catalog[rng:NextInteger(if #catalog > 1 then 2 else 1, #catalog)]
 		if c[slot] and c[slot .. "Gem"] then
 			c.ItemGems[slot][c[slot]] = c[slot .. "Gem"]

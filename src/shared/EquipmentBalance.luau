@@ -1,8 +1,8 @@
 -- One passive equipment budget, independent of armor ratings and temporary abilities.
 local Balance = {}
 Balance.MaxDamageReduction = 0.20
-Balance.MaxCooldownReduction = 0.20
-Balance.MaxCriticalChance = 0.10
+Balance.MaxCooldownReduction = 0.60
+Balance.MaxCriticalChance = 0.75
 Balance.MaxHazardResistance = 0.60
 Balance.UtilityCooldowns = { Reflection = 25, PhaseDodge = 30, FirstHitGuard = 30 }
 function Balance.passiveDamageMultiplier(taken, resistance)

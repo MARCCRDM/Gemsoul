@@ -17,6 +17,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
+local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -182,23 +184,23 @@ local function recoverGear(player: Player, depth: number)
 		return nil
 	end
 	local maxQuality = math.clamp(1 + math.floor(depth / 10), 1, 4)
-	local choices = {}
-	for _, kind in Slots.Kinds do
-		for _, gear in class[kind] do
-			local ownedQuality = profile.Owned[kind][gear.Id] or 0
-			if ownedQuality < maxQuality then
-				table.insert(choices, { Kind = kind, Gear = gear, Quality = ownedQuality })
-			end
-		end
-	end
-	if #choices == 0 then
+	local rng = Gems.random()
+	local kind = Slots.Kinds[rng:NextInteger(1, #Slots.Kinds)]
+	local weights = ArmorFamilies.DepthWeights[math.clamp(math.ceil(depth / 2), 1, 5)]
+	local gear = if kind == "Weapons"
+		then ExpandedTraits.pick(ExpandedTraits.Catalog.Weapons, rng, weights)
+		else ArmorFamilies.pick(ArmorFamilies.Catalog[kind], rng, depth)
+	if not gear then
 		return nil
 	end
-	local rng = Gems.random()
-	local pick = choices[rng:NextInteger(1, #choices)]
-	PlayerData.setGearQuality(player, pick.Kind, pick.Gear.Id, rng:NextInteger(pick.Quality + 1, maxQuality))
+	local quality = profile.Owned[kind][gear.Id] or 0
+	if quality >= maxQuality then
+		PlayerData.addCoins(player, gear.RarityTier * 5)
+		return gear.Name .. " (salvaged)"
+	end
+	PlayerData.setGearQuality(player, kind, gear.Id, rng:NextInteger(quality + 1, maxQuality))
 	PlayerData.milestone(player, "Recovered")
-	return pick.Gear.Name
+	return gear.Name
 end
 
 -- Gives what a broken rock held. Returns the loot description.

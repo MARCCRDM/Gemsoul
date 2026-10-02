@@ -326,10 +326,20 @@ local function load(player: Player)
 	if only and profiles[player].Character.Class ~= only then
 		local class = Classes.get(only)
 		if class then
-			PlayerData.setLoadout(player, only, class.Weapons[1].Id, class.Armors[1].Id)
+			local character = profiles[player].Character
+			character.Class = only
+			character.Weapon = character.Weapon or class.Weapons[1].Id
+			character.Armor = character.Armor or class.Armors[1].Id
+			-- Family identity is equipped gear, never a saved subclass selection.
+			character.Subclass, character.SubClass, character.Spec = nil, nil, nil
 		end
 	end
 	Economy.migrate(profiles[player], Random.new())
+	if only then
+		profiles[player].Character.Subclass = nil
+		profiles[player].Character.SubClass = nil
+		profiles[player].Character.Spec = nil
+	end
 	local currentProfile = profiles[player]
 	local class = Classes.get(currentProfile.Character.Class)
 	if class then

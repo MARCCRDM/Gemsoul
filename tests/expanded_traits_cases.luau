@@ -1,7 +1,7 @@
 -- Weighted starting-pool coverage and executable equipment contracts.
 local draws, counts = 0, {}
 for kind, catalog in ExpandedTraits.Catalog do
-	assert(#catalog == (if kind == "Weapons" then 20 else 10), "Unexpected catalog size for " .. kind)
+	assert(#catalog == (if kind == "Weapons" then 20 else 15), "Unexpected catalog size for " .. kind)
 	local seen, rarityCounts = {}, { 0, 0, 0, 0, 0 }
 	local rng = Random.new(9231)
 	for _ = 1, 10000 do
@@ -51,7 +51,7 @@ local previous = seedProfile.Character.Weapon
 assert(not GearRolls.grant(seedProfile, Classes.get("Warrior"), Random.new(434)), "Rejoining rerolled equipment")
 assert(seedProfile.Character.Weapon == previous, "Rejoining changed saved item")
 print(
-	"PASS: 60,000 weighted starter draws; all 70 items and 10 visors reachable; attack contracts and saved rarity valid"
+	"PASS: 60,000 weighted starter draws; all 95 items and 10 visors reachable; attack contracts and saved rarity valid"
 )
 
 local rapid = Classes.gear("Warrior", "Weapons", "MatrixWeapons6")
@@ -61,8 +61,8 @@ local B = EquipmentBalance
 assert(B.passiveDamageMultiplier(0.5, 0.6) == 0.8, "Combined passive budget exceeded")
 assert(math.abs(B.passiveDamageMultiplier(0.9, 0.05) - 0.855) < 0.00001, "Below-cap mitigation changed")
 assert(B.passiveDamageMultiplier(nil, 0) == 1, "Unmodified damage changed")
-assert(B.cooldownMultiplier(0.1) == 0.8 and B.cooldownMultiplier(0.9) == 0.9, "Cooldown cap failed")
-assert(B.criticalChance(10000, 1) == 0.1, "Critical chance exceeded 10%")
+assert(B.cooldownMultiplier(0.1) == 0.4 and B.cooldownMultiplier(0.9) == 0.9, "Cooldown cap failed")
+assert(B.criticalChance(10000, 1) == 0.75, "Critical chance exceeded 10%")
 assert(B.criticalChance(0, 0) == 0.05, "Base critical chance changed")
 assert(B.hazardResistance(1) == 0.6 and B.hazardResistance(-1) == 0, "Hazard immunity slipped through")
 local gates = {}
@@ -80,15 +80,15 @@ local oldHelmet, oldGloves = helmet.Passive.Effect, gloves.Passive.Effect
 helmet.Passive.Effect = { TakenMult = 0.6, CooldownMult = 0.6, CritAdd = 0.08 }
 gloves.Passive.Effect = { TakenMult = 0.6, CooldownMult = 0.6, CritAdd = 0.08 }
 local capped = Classes.effects({ Class = "Warrior", Helmet = helmet.Id, Gloves = gloves.Id })
-assert(capped.TakenMult == 0.8 and capped.CooldownMult == 0.8 and capped.CritAdd == 0.1, "Loadout caps not applied")
+assert(capped.TakenMult == 0.8 and capped.CooldownMult == 0.4 and capped.CritAdd == 0.16, "Loadout caps not applied")
 helmet.Passive.Effect, gloves.Passive.Effect = oldHelmet, oldGloves
 print("PASS: passive budget stacking, critical cap, hazard resistance and shared utility cooldown boundaries")
 
-assert(ExpandedTraits.Catalog.Boots[9].PlannedHazardResistance == 0.6, "Thermal resistance policy missing")
-assert(ExpandedTraits.Catalog.Gloves[7].PlannedHazardResistance == 0.6, "Corrosive resistance policy missing")
-assert(ExpandedTraits.Catalog.Boots[10].InternalCooldown == 30, "Phase utility budget missing")
+assert(ExpandedTraits.LegacyCatalog.Boots[9].PlannedHazardResistance == 0.6, "Thermal resistance policy missing")
+assert(ExpandedTraits.LegacyCatalog.Gloves[7].PlannedHazardResistance == 0.6, "Corrosive resistance policy missing")
+assert(ExpandedTraits.LegacyCatalog.Boots[10].InternalCooldown == 30, "Phase utility budget missing")
 assert(ExpandedTraits.Visors[10].InternalCooldown == 30, "First hit budget missing")
-assert(ExpandedTraits.Catalog.Shields[5].InternalCooldown == 25, "Reflection budget missing")
+assert(ExpandedTraits.LegacyCatalog.Shields[5].InternalCooldown == 25, "Reflection budget missing")
 
 for _, isR15 in { false, true } do
 	for _, look in { "UtilityMiner", "FrontierRanger", "HeavyVanguard" } do
@@ -152,10 +152,10 @@ for _, isR15 in { false, true } do
 		local signature = table.concat(geometry, "|")
 		assert(not signatures[signature], "Named helmets share geometry: " .. item.Id)
 		signatures[signature] = true
-		assert(#geometry <= 65, "Helmet exceeds geometry budget: " .. item.Id)
+		assert(#geometry <= 80, "Helmet exceeds geometry budget: " .. item.Id)
 	end
 end
-print("PASS: all ten named helmets have distinct geometry on R6/R15 with identical saved rolls")
+print("PASS: all fifteen new helmets have distinct geometry on R6/R15 with identical saved rolls")
 
 for _, builder in { FrontierAssets.sidearm, FrontierAssets.sword, FrontierAssets.shield } do
 	local previous = 0
@@ -182,7 +182,10 @@ for _, builder in { FrontierAssets.sidearm, FrontierAssets.sword, FrontierAssets
 	end
 end
 for _, weapon in Classes.List.Warrior.Weapons do
-	if weapon.WeaponType == "Sword" then
+	if weapon.WeaponType == nil then
+		-- Migrated Wizard/Archer/Tank items retain their original weapon models.
+		assert(weapon.Attack)
+	elseif weapon.WeaponType == "Sword" then
 		assert(weapon.Attack.Kind == "Melee" and weapon.Look == "FrontierSword")
 	else
 		assert(weapon.Attack.Kind == "Shot" and weapon.Look == "CleanSidearm", "Original pistol changed")

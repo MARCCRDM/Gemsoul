@@ -1,8 +1,9 @@
 local Config = {MaxGems = 200, MarketSellRate = 0.5, DataStoreName = "Regression"}
-local registry, removal = {}, nil
+local registry, removals = {}, {}
+local function removal(player) for _, callback in removals do callback(player) end end
 local Players = {
  GetPlayerByUserId = function(_self, id) return registry[id] end,
- PlayerRemoving = {Connect = function(_self, callback) removal = callback end},
+ PlayerRemoving = {Connect = function(_self, callback) table.insert(removals, callback) end},
 }
 local guid = 0
 local HttpService = {GenerateGUID = function() guid += 1; return "trade-" .. guid end}

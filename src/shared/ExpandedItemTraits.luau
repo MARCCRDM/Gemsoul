@@ -1,6 +1,7 @@
 -- Expanded equipment identities from the supplied traits matrix.
 -- Proposed effects remain metadata until their gameplay systems exist.
 local EquipmentBalance = require(script.Parent.EquipmentBalance)
+local ArmorFamilies = require(script.Parent.ArmorFamilies)
 local Traits = {}
 Traits.Catalog = {}
 Traits.Visors = {}
@@ -1049,7 +1050,8 @@ for _, visor in Traits.Visors do
 	end
 end
 
-function Traits.pick(catalog, rng)
+function Traits.pick(catalog, rng, weights)
+	weights = weights or Traits.Weights
 	local groups = {}
 	for _, gear in catalog do
 		if gear.StartPool then
@@ -1059,7 +1061,7 @@ function Traits.pick(catalog, rng)
 		end
 	end
 	local total = 0
-	for rarity, weight in Traits.Weights do
+	for rarity, weight in weights do
 		if groups[rarity] then
 			total += weight
 		end
@@ -1068,9 +1070,9 @@ function Traits.pick(catalog, rng)
 		return nil
 	end
 	local pick = rng:NextNumber(0, total)
-	for rarity, weight in Traits.Weights do
+	for rarity, weight in weights do
 		local group = groups[rarity]
-		if group then
+		if group and weight > 0 then
 			pick -= weight
 			if pick <= 0 then
 				return group[rng:NextInteger(1, #group)]
@@ -1078,5 +1080,19 @@ function Traits.pick(catalog, rng)
 		end
 	end
 	return nil
+end
+-- Preserve all old IDs for ownership/sockets, but only the uniform grid drops.
+Traits.LegacyCatalog = {}
+for kind, catalog in ArmorFamilies.Catalog do
+	Traits.LegacyCatalog[kind] = Traits.Catalog[kind]
+	for _, item in Traits.LegacyCatalog[kind] do
+		item.StartPool = false
+	end
+	Traits.Catalog[kind] = catalog
+end
+for _, weapon in Traits.Catalog.Weapons do
+	weapon.ArmorFamily = if weapon.WeaponType == "Sword"
+		then (if tonumber(string.match(weapon.Id, "%d+$")) <= 5 then "Prospector" else "Juggernaut")
+		else "Skirmisher"
 end
 return Traits

@@ -12,6 +12,7 @@ source = read("tests/roblox_primitives.luau")
 source += read("tests/expedition_services.luau")
 for name, path in [
     ("EquipmentBalance", "src/shared/EquipmentBalance.luau"),
+    ("ArmorFamilies", "src/shared/ArmorFamilies.luau"),
     ("ExpandedTraits", "src/shared/ExpandedItemTraits.luau"),
     ("Slots", "src/shared/EquipmentSlots.luau"),
     ("GemConfig", "src/shared/GemConfig.luau"),

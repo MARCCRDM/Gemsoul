@@ -286,13 +286,13 @@ WEAPONS.CleanSidearm = function(folder, _character, right, _left, accent, gem)
 	FrontierAssets.sidearm(folder, right, HELD_FORWARD, 1, accent, STEEL)
 	gemSocket(folder, right, HELD_FORWARD, Vector3.new(0.15, 0.12, 0.23), gem, 0.15)
 end
-local function frontierShield(folder, character, accent, gem, finish, rarity)
+local function frontierShield(folder, character, accent, gem, finish, rarity, family)
 	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
 	if not arm then
 		return
 	end
 	local mount = CFrame.new(-(arm.Size.X / 2 + 0.2), 0, 0) * CFrame.Angles(0, math.rad(-90), 0)
-	FrontierAssets.shield(folder, arm, mount, rarity, accent, finish)
+	FrontierAssets.shield(folder, arm, mount, rarity, accent, finish, family)
 	gemSocket(folder, arm, mount, Vector3.new(0, 0.1, -0.28), gem, 0.19)
 end
 
@@ -959,7 +959,8 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 			accent,
 			loadout.ShieldGem,
 			ArmorKits.tint(traits.FinishColor, loadout.ShieldQuality),
-			if shieldRoll then shieldRoll.Rarity else shieldItem.RarityTier or 1
+			if shieldRoll then shieldRoll.Rarity else shieldItem.RarityTier or 1,
+			shieldItem.ArmorFamily
 		)
 		if loadout.ShieldGem then
 			local parts = {}
