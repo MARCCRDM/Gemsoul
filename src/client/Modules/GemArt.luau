@@ -170,4 +170,46 @@ function GemArt.viewport(parent: Instance, gem, detailed: boolean?): ViewportFra
 	return viewport
 end
 
+-- Close-up inspector with explicit controls; no perpetual animation or global
+-- input connections. Keep the whole stone inside the camera at every angle.
+function GemArt.inspectorViewport(parent: Instance, gem, angles)
+	local viewport = Instance.new("ViewportFrame")
+	viewport.Name = "GemInspectorViewport"
+	viewport.BackgroundTransparency = 1
+	viewport.Size = UDim2.fromScale(1, 1)
+	viewport.ZIndex = 2
+	local model, radius = GemArt.model(gem, true)
+	local camera = GemArt.setupViewport(viewport)
+	model.Parent = viewport
+	viewport.Parent = parent
+	local function fitCamera()
+		local size = viewport.AbsoluteSize
+		local aspect = if size.Y > 0 then math.max(size.X / size.Y, 0.1) else 1
+		local halfFov = math.rad(CAMERA_FOV / 2)
+		local limitingFov = math.min(halfFov, math.atan(math.tan(halfFov) * aspect))
+		local distance = radius / math.sin(limitingFov) * 1.12
+		camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, distance), Vector3.zero)
+	end
+	local function pose()
+		model:PivotTo(CFrame.Angles(math.rad(angles.Tilt), 0, 0) * GemArt.pose(gem, angles.Spin))
+	end
+	viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitCamera)
+	fitCamera()
+	pose()
+	return viewport, {
+		Rotate = function(delta: number)
+			angles.Spin = (angles.Spin + delta) % (math.pi * 2)
+			pose()
+		end,
+		Tilt = function()
+			angles.Tilt = if angles.Tilt == 0 then -35 elseif angles.Tilt == -35 then 25 else 0
+			pose()
+		end,
+		Reset = function()
+			angles.Spin, angles.Tilt = 0.6, 0
+			pose()
+		end,
+	}
+end
+
 return GemArt
