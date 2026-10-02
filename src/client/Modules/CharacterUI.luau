@@ -537,10 +537,10 @@ local function gemLines(gem)
 		Position = UDim2.fromOffset(166, 0),
 		Size = UDim2.new(1, -166, 0, 166),
 	}, hero)
-	local name = text(info, GemConfig.shade(gem).Name, 18, tierColor, BOLD)
-	name.AutomaticSize = Enum.AutomaticSize.None
-	name.Size = UDim2.new(1, 0, 0, 42)
-	name.TextYAlignment = Enum.TextYAlignment.Top
+	local gemNameLabel = text(info, GemConfig.shade(gem).Name, 18, tierColor, BOLD)
+	gemNameLabel.AutomaticSize = Enum.AutomaticSize.None
+	gemNameLabel.Size = UDim2.new(1, 0, 0, 42)
+	gemNameLabel.TextYAlignment = Enum.TextYAlignment.Top
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "GEM MINT" else "CUT " .. gem.Cut
 	local badge = text(
 		info,
@@ -570,23 +570,30 @@ local function gemLines(gem)
 		CellPadding = UDim2.fromOffset(6, 0),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, controls)
-	for i, control in {
-		{ Label = "LEFT", Run = function() viewControls.Rotate(-math.pi / 6) end },
-		{ Label = "RIGHT", Run = function() viewControls.Rotate(math.pi / 6) end },
-		{ Label = "TILT", Run = viewControls.Tilt },
-		{ Label = "RESET", Run = viewControls.Reset },
-	} do
+	for i, control in
+		{
+			{
+				Label = "LEFT",
+				Run = function()
+					viewControls.Rotate(-math.pi / 6)
+				end,
+			},
+			{
+				Label = "RIGHT",
+				Run = function()
+					viewControls.Rotate(math.pi / 6)
+				end,
+			},
+			{ Label = "TILT", Run = viewControls.Tilt },
+			{ Label = "RESET", Run = viewControls.Reset },
+		}
+	do
 		local button = actionButton(controls, control.Label, false, control.Run)
 		button.LayoutOrder = i
 	end
 	text(
 		tipBody,
-		string.format(
-			"%s   |   Potency %d   |   %d coins",
-			state,
-			GemConfig.potency(gem),
-			GemConfig.value(gem)
-		),
+		string.format("%s   |   Potency %d   |   %d coins", state, GemConfig.potency(gem), GemConfig.value(gem)),
 		12,
 		P.Text
 	)

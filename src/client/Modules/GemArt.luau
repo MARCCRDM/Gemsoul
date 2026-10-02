@@ -196,20 +196,21 @@ function GemArt.inspectorViewport(parent: Instance, gem, angles)
 	viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitCamera)
 	fitCamera()
 	pose()
-	return viewport, {
-		Rotate = function(delta: number)
-			angles.Spin = (angles.Spin + delta) % (math.pi * 2)
-			pose()
-		end,
-		Tilt = function()
-			angles.Tilt = if angles.Tilt == 0 then -35 elseif angles.Tilt == -35 then 25 else 0
-			pose()
-		end,
-		Reset = function()
-			angles.Spin, angles.Tilt = 0.6, 0
-			pose()
-		end,
-	}
+	return viewport,
+		{
+			Rotate = function(delta: number)
+				angles.Spin = (angles.Spin + delta) % (math.pi * 2)
+				pose()
+			end,
+			Tilt = function()
+				angles.Tilt = if angles.Tilt == 0 then -35 elseif angles.Tilt == -35 then 25 else 0
+				pose()
+			end,
+			Reset = function()
+				angles.Spin, angles.Tilt = 0.6, 0
+				pose()
+			end,
+		}
 end
 
 return GemArt
