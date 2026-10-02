@@ -899,7 +899,8 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 				if GearRolls.get(loadout, slot)
 					then GearRolls.appearance(GearRolls.get(loadout, slot))
 					else SuitTraits.forSuit(userId, gear.Id),
-				slot
+				slot,
+				gear.Id
 			)
 			local gem = loadout[slot .. "Gem"]
 			if gem and slot ~= "Armor" then

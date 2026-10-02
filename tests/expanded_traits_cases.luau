@@ -16,7 +16,10 @@ for kind, catalog in ExpandedTraits.Catalog do
 		assert(Classes.gear("Warrior", kind, item.Id) == item, "Catalog identity differs")
 		if kind == "Weapons" then
 			assert(
-				(item.Attack.Kind == "Shot" or (item.Attack.Kind == "Melee" and item.Attack.Range <= 8 and item.Attack.Combo == 3))
+				(
+					item.Attack.Kind == "Shot"
+					or (item.Attack.Kind == "Melee" and item.Attack.Range <= 8 and item.Attack.Combo == 3)
+				)
 					and item.Attack.Rate > 0
 					and item.Attack.Damage > 0,
 				"Sword attack contract invalid"
@@ -126,6 +129,33 @@ for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
 end
 assert(GearRolls.appearance({ Rarity = 5, Helmet = 1, Visor = 1, Finish = 1, Variant = 1 }).Rarity == 5)
 print("PASS: every armor slot gains geometry at each rarity; saved rarity reaches rendering")
+
+-- Named helmets must remain distinct even when their saved cosmetic rolls match.
+for _, isR15 in { false, true } do
+	local signatures = {}
+	for _, item in ExpandedTraits.Catalog.Helmets do
+		local before = #builtParts
+		ArmorKits.build({}, rig(isR15), item.Look, Color3.fromRGB(72, 207, 226), 1, {
+			Rarity = item.RarityTier,
+			Helmet = 1,
+			VisorColor = Color3.fromRGB(72, 207, 226),
+			FinishColor = Color3.fromRGB(90, 100, 120),
+		}, "Helmet", item.Id)
+		local geometry = {}
+		for i = before + 1, #builtParts do
+			local part = builtParts[i]
+			table.insert(
+				geometry,
+				string.format("%s:%.4f:%.4f:%.4f", part.ClassName, part.Size.X, part.Size.Y, part.Size.Z)
+			)
+		end
+		local signature = table.concat(geometry, "|")
+		assert(not signatures[signature], "Named helmets share geometry: " .. item.Id)
+		signatures[signature] = true
+		assert(#geometry <= 65, "Helmet exceeds geometry budget: " .. item.Id)
+	end
+end
+print("PASS: all ten named helmets have distinct geometry on R6/R15 with identical saved rolls")
 
 for _, builder in { FrontierAssets.sword, FrontierAssets.shield } do
 	local previous = 0

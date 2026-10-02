@@ -181,6 +181,7 @@ type Kit = {
 	Material: Enum.Material,
 	Accent: Color3,
 	Traits: any?,
+	HelmetDesign: number?,
 }
 
 -- The shell every helm starts from: a box around the whole head.
@@ -1544,7 +1545,9 @@ local function frontierSuit(family: number)
 		local trim = kit.Trim
 		local cloth = kit.Cloth
 		local ornament = if rarity == 5 then BRASS else edge
-		local helmetVariant = kit.Traits and kit.Traits.Helmet or 1
+		local helmetVariant = math.clamp(kit.Traits and kit.Traits.Helmet or 1, 1, 5)
+		-- Catalog identity is stable across saved cosmetic rolls.
+		local design = kit.HelmetDesign or helmetVariant
 		local function block(seg, x, y, z, sx, sy, sz, color, tilt)
 			box(
 				folder,
@@ -1585,6 +1588,67 @@ local function frontierSuit(family: number)
 			block(head, 0, -y * 0.36, -z * 0.58, x * 0.31, y * 0.085, 0.03, trim)
 			block(head, 0, -y * 0.56, 0.02, x * 0.58, y * 0.17, z * 0.6, cloth)
 
+			-- Keep the wrap visor and faceted shell; each helm has its own face
+			-- frame and crown equipment rather than a recolor of the same shape.
+			if design == 1 then -- Zero-G: sealed center ridge and compact respirator.
+				block(head, 0, y * 0.43, 0.04, x * 0.15, y * 0.21, z * 0.88, metal)
+				block(head, 0, -y * 0.25, -z * 0.58, x * 0.34, y * 0.16, z * 0.13, edge)
+			elseif design == 2 then -- Platon: split tactical goggles and brow guards.
+				block(head, 0, y * 0.06, -z * 0.56, x * 0.095, y * 0.3, 0.04, metal)
+				for _, side in sides() do
+					block(head, side * x * 0.25, y * 0.26, -z * 0.54, x * 0.4, y * 0.1, 0.1, edge, side * -10)
+				end
+			elseif design == 3 then -- Asterois: enclosed T-face and filtered jaw.
+				for _, side in sides() do
+					block(head, side * x * 0.27, -y * 0.02, -z * 0.565, x * 0.22, y * 0.27, 0.06, metal)
+				end
+				block(head, 0, -y * 0.19, -z * 0.59, x * 0.13, y * 0.2, 0.045, visor)
+				for i = -1, 1 do
+					block(head, i * x * 0.12, -y * 0.35, -z * 0.61, x * 0.065, y * 0.065, 0.035, edge)
+				end
+			elseif design == 4 then -- Intableed: sweeping visor and angular temples.
+				for _, side in sides() do
+					block(head, side * x * 0.27, y * 0.19, -z * 0.57, x * 0.4, y * 0.085, 0.065, edge, side * 14)
+					block(head, side * x * 0.47, y * 0.27, 0, x * 0.12, y * 0.37, z * 0.52, metal, side * -12)
+				end
+			elseif design == 5 then -- Jutaim: command crest, gilt jaw and crown rails.
+				plate(head, 0, y * 0.62, 0.06, x * 0.22, y * 0.22, z * 0.7, metal)
+				for _, side in sides() do
+					block(head, side * x * 0.4, y * 0.46, 0.06, x * 0.08, y * 0.22, z * 0.62, ornament, side * -16)
+					block(head, side * x * 0.2, -y * 0.28, -z * 0.58, x * 0.24, y * 0.065, 0.045, ornament, side * 22)
+				end
+			elseif design == 6 then -- Qutany: projecting FPV optics under a sun hood.
+				block(head, 0, y * 0.24, -z * 0.56, x * 0.8, y * 0.1, z * 0.25, metal)
+				for _, side in sides() do
+					block(head, side * x * 0.2, y * 0.04, -z * 0.59, x * 0.27, y * 0.23, z * 0.14, trim)
+					block(head, side * x * 0.2, y * 0.04, -z * 0.675, x * 0.19, y * 0.14, 0.025, visor)
+				end
+			elseif design == 7 then -- Watten: swept crown fins and narrow speed visor.
+				block(head, 0, y * 0.18, -z * 0.57, x * 0.76, y * 0.1, 0.06, metal)
+				for _, side in sides() do
+					block(head, side * x * 0.31, y * 0.46, z * 0.15, x * 0.1, y * 0.23, z * 0.74, edge, side * -20)
+				end
+			elseif design == 8 then -- Photon: shield-shaped face surround and emitters.
+				for _, side in sides() do
+					block(head, side * x * 0.37, -y * 0.05, -z * 0.55, x * 0.1, y * 0.46, 0.075, edge, side * -18)
+					block(head, side * x * 0.54, -y * 0.08, 0.02, x * 0.14, y * 0.26, z * 0.28, metal)
+					lit(head, side * x * 0.62, -y * 0.08, 0.02, 0.025, y * 0.12, z * 0.12)
+				end
+			elseif design == 9 then -- Photrin: precision monocle and asymmetric sensor rail.
+				block(head, -x * 0.23, y * 0.04, -z * 0.6, x * 0.28, y * 0.26, 0.12, edge)
+				block(head, -x * 0.23, y * 0.04, -z * 0.675, x * 0.17, y * 0.15, 0.025, visor)
+				block(head, x * 0.3, y * 0.48, 0.04, x * 0.18, y * 0.18, z * 0.75, metal)
+				for i = 1, 2 do
+					lit(head, x * 0.3, y * 0.48, -z * (0.25 + i * 0.1), x * 0.08, y * 0.07, 0.025)
+				end
+			else -- Metron: interlocking neural lattice over the visor and crown.
+				for _, side in sides() do
+					block(head, side * x * 0.2, y * 0.06, -z * 0.575, x * 0.055, y * 0.33, 0.04, ornament, side * 30)
+					block(head, side * x * 0.19, y * 0.56, 0.06, x * 0.065, y * 0.16, z * 0.78, ornament, side * 20)
+					lit(head, side * x * 0.39, y * 0.32, -z * 0.52, x * 0.065, y * 0.12, 0.03)
+				end
+			end
+
 			if family == 1 then
 				-- Survey lamp defines the working miner silhouette.
 				block(head, 0, y * 0.38, -z * 0.54, x * 0.24, y * 0.16, 0.1, trim)
@@ -1601,6 +1665,7 @@ local function frontierSuit(family: number)
 			if rarity >= 2 then
 				for _, side in { -1, 1 } do
 					block(head, side * x * 0.53, y * 0.02, -z * 0.08, 0.06, y * 0.2, 0.16, edge)
+					block(head, side * x * 0.34, -y * 0.27, -z * 0.54, x * 0.13, y * 0.055, 0.045, edge, side * -18)
 				end
 			end
 			if rarity >= 3 then
@@ -1608,10 +1673,13 @@ local function frontierSuit(family: number)
 				block(head, 0, y * 0.33, -z * 0.53, x * 0.5, 0.045, 0.055, ornament)
 			end
 			if rarity >= 4 then
+				plate(head, 0, y * 0.4, z * 0.4, x * 0.7, y * 0.22, z * 0.14, edge)
 				lit(head, -x * 0.53, y * 0.06, -z * 0.18, 0.04, 0.075, 0.06)
 				lit(head, x * 0.53, y * 0.06, -z * 0.18, 0.04, 0.075, 0.06)
 			end
 			if rarity >= 5 then
+				block(head, 0, y * 0.36, -z * 0.62, x * 0.13, y * 0.14, 0.05, BRASS)
+				lit(head, 0, y * 0.36, -z * 0.655, x * 0.065, y * 0.065, 0.025)
 				for _, side in { -1, 1 } do
 					block(head, side * x * 0.24, y * 0.46, 0.03, 0.08, y * 0.11, z * 0.7, BRASS)
 				end
@@ -1656,11 +1724,13 @@ local function frontierSuit(family: number)
 			if rarity >= 2 then
 				for _, side in { -1, 1 } do
 					block(torso, side * x * 0.3, y * 0.06, -z * 0.64, 0.06, y * 0.18, 0.04, edge, side * -10)
+					block(torso, side * x * 0.21, -y * 0.06, -z * 0.61, x * 0.25, 0.04, 0.035, edge, side * -10)
 				end
 			end
 			if rarity >= 3 then
 				for _, side in { -1, 1 } do
 					block(torso, side * x * 0.34, -y * 0.35, -z * 0.4, x * 0.2, y * 0.18, 0.15, metal, side * 16)
+					block(torso, side * x * 0.39, y * 0.14, -z * 0.56, 0.045, y * 0.27, 0.045, edge, side * -10)
 					block(torso, side * x * 0.28, y * 0.32, -z * 0.64, x * 0.2, 0.04, 0.035, ornament, side * -10)
 				end
 			end
@@ -1744,6 +1814,7 @@ local function frontierSuit(family: number)
 				if rarity >= 3 then
 					for i = 1, 2 do
 						block(fore, inward, s.Y * (0.3 - i * 0.16), -s.Z * 0.55, s.X * 0.55, 0.06, 0.07, trim)
+						block(fore, inward, s.Y * (0.3 - i * 0.16) + 0.04, -s.Z * 0.56, s.X * 0.46, 0.025, 0.035, edge)
 					end
 				end
 				if rarity >= 4 then
@@ -1761,6 +1832,12 @@ local function frontierSuit(family: number)
 				local inward = -side * 0.1
 				block(hand, inward, -s.Y * 0.12, 0, s.X * 0.72, s.Y * 1.13, s.Z * 0.66, trim)
 				block(hand, inward, 0, -s.Z * 0.35, s.X * 0.62, s.Y * 0.48, 0.08, metal)
+				if rarity >= 2 then
+					block(hand, inward, s.Y * 0.23, -s.Z * 0.41, s.X * 0.53, 0.045, 0.04, edge)
+				end
+				if rarity >= 4 then
+					lit(hand, inward, 0, -s.Z * 0.43, s.X * 0.21, 0.035, 0.025)
+				end
 				block(
 					hand,
 					inward - side * s.X * 0.37,
@@ -1805,6 +1882,7 @@ local function frontierSuit(family: number)
 				if rarity >= 3 then
 					for _, edgeSide in { -1, 1 } do
 						block(shin, edgeSide * s.X * 0.28, -s.Y * 0.02, -s.Z * 0.48, 0.04, s.Y * 0.42, 0.08, trim)
+						block(shin, edgeSide * s.X * 0.24, -s.Y * 0.02, -s.Z * 0.54, 0.025, s.Y * 0.36, 0.035, edge)
 					end
 				end
 				if rarity >= 4 then
@@ -1828,6 +1906,12 @@ local function frontierSuit(family: number)
 					SMOOTH
 				)
 				block(foot, 0, s.Y * 0.42, s.Z * 0.13, s.X * 0.79, s.Y * 0.6, s.Z * 0.48, metal)
+				if rarity >= 2 then
+					block(foot, 0, s.Y * 0.15, -s.Z * 0.55, s.X * 0.67, 0.045, 0.04, edge)
+				end
+				if rarity >= 5 then
+					block(foot, 0, s.Y * 0.7, s.Z * 0.12, s.X * 0.59, 0.035, s.Z * 0.35, BRASS)
+				end
 			end
 		end
 	end
@@ -1960,7 +2044,8 @@ function ArmorKits.build(
 	accent: Color3,
 	quality: number?,
 	traits: any?,
-	slot: string?
+	slot: string?,
+	itemId: string?
 )
 	local cleanLook = CLEAN_ALIASES[look] or (if CLEAN_LOOKS[look] then look else nil)
 	local palette = KITS[cleanLook or look] or KITS.Plate
@@ -1975,6 +2060,7 @@ function ArmorKits.build(
 		Material = palette.Material,
 		Accent = accent,
 		Traits = traits,
+		HelmetDesign = if itemId then tonumber(string.match(itemId, "^MatrixHelmets(%d+)$")) else nil,
 	}
 	local build = BUILDERS[look] or BUILDERS.Plate
 	local body = ArmorKits.body(character)
