@@ -40,69 +40,136 @@ local ROMAN = { "I", "II", "III" }
 local techCooldowns = {} -- [cooldown key] = { Ready, Total }
 local hitUntil, hitCritical = 0, false
 local incomingUntil, incomingOrigin = 0, nil
-local healthTrailRatio = 1
+local healthTrailRatio, targetTrailRatio, lastTarget = 1, 1, nil
+local cast = nil -- a wind-up in progress: { Name, Start, Duration, Color }
+local comboUntil, flashUntil, fightSince = 0, 0, 0
 local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
 local gui = UiKit.gui("CombatHud", 5)
--- Bottom of the screen: Gem Surges (Q, E, R) on the left, Health over the
--- Charge bar in the centre, Rig Maneuvers (1, 2, 3) under Stamina on the right.
+-- Low-health / damage vignette: four soft red edges, drawn under everything.
+local vignette = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, gui)
+for _, edge in
+	{
+		{ UDim2.fromScale(0, 0), UDim2.new(1, 0, 0.18, 0), 90 },
+		{ UDim2.fromScale(0, 0.82), UDim2.new(1, 0, 0.18, 0), 270 },
+		{ UDim2.fromScale(0, 0), UDim2.new(0.12, 0, 1, 0), 0 },
+		{ UDim2.fromScale(0.88, 0), UDim2.new(0.12, 0, 1, 0), 180 },
+	}
+do
+	local frame = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(190, 20, 30),
+		BorderSizePixel = 0,
+		Position = edge[1],
+		Size = edge[2],
+	}, vignette)
+	new("UIGradient", { Rotation = edge[3], Transparency = NumberSequence.new(0.35, 1) }, frame)
+end
+local function shadowed(label)
+	label.TextStrokeColor3, label.TextStrokeTransparency = Color3.new(0, 0, 0), 0.45
+	return label
+end
+local function fillGradient(frame, color)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.25), color:Lerp(Color3.new(0, 0, 0), 0.2)),
+	}, frame)
+end
+-- Bottom of the screen: Gem Surges (Q, E, R) on the left, the unit frame
+-- (Health over Charge) in the centre, Rig Maneuvers (1, 2, 3) under Stamina
+-- on the right.
 local hud = new("Frame", {
-	BackgroundColor3 = P.Inset,
-	BackgroundTransparency = 0.1,
+	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
+	BackgroundTransparency = 0.12,
 	AnchorPoint = Vector2.new(0.5, 1),
 	Position = UDim2.new(0.5, 0, 1, -34),
-	Size = UDim2.fromOffset(300, 92),
+	Size = UDim2.fromOffset(320, 74),
 }, gui)
-UiKit.round(hud, 12)
-new("UIStroke", { Color = Color3.fromRGB(65, 108, 128), Transparency = 0.35, Thickness = 1 }, hud)
-local hp = text(hud, "", 13, P.Text, IronUi.Bold)
-hp.AutomaticSize, hp.TextWrapped, hp.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
-hp.Position = UDim2.fromOffset(12, 6)
-hp.Size = UDim2.new(1, -24, 0, 20)
+UiKit.round(hud, 10)
+new("UIStroke", { Color = Color3.fromRGB(70, 96, 128), Transparency = 0.45, Thickness = 1 }, hud)
+local nameLabel = text(hud, string.upper(player.DisplayName), 12, P.Text, IronUi.Bold)
+nameLabel.AutomaticSize, nameLabel.TextWrapped, nameLabel.TextTruncate =
+	Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+nameLabel.Position, nameLabel.Size = UDim2.fromOffset(12, 6), UDim2.new(0.6, -12, 0, 16)
+local hp = text(hud, "", 11, Color3.fromRGB(150, 225, 255), IronUi.Bold)
+hp.AutomaticSize, hp.TextWrapped = Enum.AutomaticSize.None, false
+hp.TextXAlignment = Enum.TextXAlignment.Right
+hp.Position, hp.Size = UDim2.new(0.4, 0, 0, 6), UDim2.new(0.6, -12, 0, 16)
 local row =
 	new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromScale(0, 0), Size = UDim2.fromScale(1, 1) }, gui)
 local healthTrack = new("Frame", {
-	BackgroundColor3 = P.Dim,
-	BackgroundTransparency = 0.6,
-	Position = UDim2.fromOffset(12, 27),
-	Size = UDim2.new(1, -24, 0, 9),
+	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
+	Position = UDim2.fromOffset(12, 25),
+	Size = UDim2.new(1, -24, 0, 16),
 	BorderSizePixel = 0,
 }, hud)
+UiKit.round(healthTrack, 4)
+new("UIStroke", { Color = Color3.new(0, 0, 0), Transparency = 0.4, Thickness = 1 }, healthTrack)
 local healthTrail = new(
 	"Frame",
-	{ BackgroundColor3 = Color3.fromRGB(255, 184, 94), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
+	{ BackgroundColor3 = Color3.fromRGB(255, 196, 110), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
 	healthTrack
 )
+UiKit.round(healthTrail, 4)
 local healthFill = new(
 	"Frame",
-	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
+	{ BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 2 },
 	healthTrack
 )
+UiKit.round(healthFill, 4)
+local healthGradient = new("UIGradient", { Rotation = 90 }, healthFill)
+-- Barrier (shield) absorbs, drawn as a pale band after current health.
+local shieldFill = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(190, 240, 255),
+	BackgroundTransparency = 0.25,
+	BorderSizePixel = 0,
+	Size = UDim2.fromScale(0, 1),
+	ZIndex = 3,
+}, healthTrack)
+local healthText = shadowed(text(healthTrack, "", 11, P.Text, IronUi.Bold))
+healthText.AutomaticSize, healthText.TextWrapped = Enum.AutomaticSize.None, false
+healthText.TextXAlignment, healthText.Size, healthText.ZIndex = Enum.TextXAlignment.Center, UDim2.fromScale(1, 1), 4
 local resourceBars = {}
 local function resourceBar(parent, id, x, y)
-	local label = text(parent, id:upper(), 11, Tech.Resources[id].Color, IronUi.Bold)
+	local color = Tech.Resources[id].Color
+	local label = text(parent, id:upper(), 11, color, IronUi.Bold)
 	label.AutomaticSize, label.TextWrapped = Enum.AutomaticSize.None, false
 	label.Position, label.Size = UDim2.fromOffset(x, y), UDim2.new(1, -2 * x, 0, 12)
+	local value = text(parent, "", 11, P.Text, IronUi.Bold)
+	value.AutomaticSize, value.TextWrapped = Enum.AutomaticSize.None, false
+	value.TextXAlignment = Enum.TextXAlignment.Right
+	value.Position, value.Size = UDim2.fromOffset(x, y), UDim2.new(1, -2 * x, 0, 12)
 	local track = new("Frame", {
-		BackgroundColor3 = P.Dim,
-		BackgroundTransparency = 0.6,
+		BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(x, y + 14),
-		Size = UDim2.new(1, -2 * x, 0, 6),
+		Position = UDim2.fromOffset(x, y + 15),
+		Size = UDim2.new(1, -2 * x, 0, 8),
 	}, parent)
 	UiKit.round(track, 3)
 	local fill = new(
 		"Frame",
-		{ BackgroundColor3 = Tech.Resources[id].Color, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) },
+		{ BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) },
 		track
 	)
 	UiKit.round(fill, 3)
-	resourceBars[id] = { Label = label, Fill = fill }
+	fillGradient(fill, color)
+	-- Segment ticks every quarter, like a classic resource orb/bar.
+	for tick = 1, 3 do
+		new("Frame", {
+			BackgroundColor3 = Color3.fromRGB(12, 17, 28),
+			BackgroundTransparency = 0.2,
+			BorderSizePixel = 0,
+			Position = UDim2.new(tick / 4, -1, 0, 0),
+			Size = UDim2.new(0, 2, 1, 0),
+			ZIndex = 2,
+		}, track)
+	end
+	resourceBars[id] = { Label = label, Value = value, Fill = fill }
 end
-resourceBar(hud, "Charge", 12, 41)
-local hint = text(hud, "Alternate sides; release when gold", 11, P.Dim)
-hint.Position = UDim2.fromOffset(12, 64)
-hint.Size = UDim2.new(1, -24, 0, 26)
-hint.TextWrapped = true
+resourceBar(hud, "Charge", 12, 47)
+-- Floating callouts under the crosshair (PERFECT, PARRIED, Not enough Charge...).
+local hint = shadowed(text(gui, "", 15, P.Text, IronUi.Bold))
+hint.AutomaticSize, hint.TextWrapped = Enum.AutomaticSize.None, false
+hint.AnchorPoint, hint.Position, hint.Size = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0.5, 30), UDim2.fromOffset(460, 22)
+hint.TextXAlignment = Enum.TextXAlignment.Center
 local function centered(parent, size, color)
 	local label = text(parent, "", size, color, IronUi.Bold)
 	label.AutomaticSize, label.TextWrapped, label.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
@@ -131,15 +198,30 @@ local function makeIcon(parent, key, round)
 	glyph.Position, glyph.Size = UDim2.fromScale(0, 0.1), UDim2.fromScale(1, 0.56)
 	local badge = centered(button, 10, P.Gold)
 	badge.Position, badge.Size = UDim2.fromScale(0, 0.64), UDim2.fromScale(1, 0.24)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(70, 82, 110), Color3.fromRGB(30, 34, 50)),
+	}, button)
+	-- Cooldown: a dark wipe that drains from the top as the ability recovers.
 	local shade = new("Frame", {
 		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.35,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 		Visible = false,
 		ZIndex = 2,
 	}, button)
 	new("UICorner", { CornerRadius = radius }, shade)
+	local wipe = new("UIGradient", { Rotation = 90 }, shade)
+	-- Ready flash: a ring that blooms outward when the cooldown ends.
+	local flash = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 5,
+	}, button)
+	new("UICorner", { CornerRadius = radius }, flash)
+	local flashStroke = new("UIStroke", { Color = P.Gold, Thickness = 3, Transparency = 1 }, flash)
 	local timer = centered(button, 18, P.Text)
 	timer.Size, timer.ZIndex = UDim2.fromScale(1, 1), 3
 	local chip = new("Frame", {
@@ -153,7 +235,19 @@ local function makeIcon(parent, key, round)
 	local keyLabel = centered(chip, 11, P.Inset)
 	keyLabel.Text, keyLabel.Size, keyLabel.ZIndex = key, UDim2.fromScale(1, 1), 4
 	local name = centered(parent, 10, P.Text)
-	return { Button = button, Stroke = stroke, Glyph = glyph, Badge = badge, Shade = shade, Timer = timer, Name = name }
+	timer.TextStrokeTransparency = 0.4
+	return {
+		Button = button,
+		Stroke = stroke,
+		Glyph = glyph,
+		Badge = badge,
+		Shade = shade,
+		Wipe = wipe,
+		Flash = flash,
+		FlashStroke = flashStroke,
+		Timer = timer,
+		Name = name,
+	}
 end
 local function layoutTray(frame, icons, size)
 	local gap = math.floor(size * 0.16)
@@ -165,13 +259,37 @@ local function layoutTray(frame, icons, size)
 		icon.Glyph.TextSize = math.floor(size * 0.38)
 	end
 end
-local function setIcon(icon, color, cd, usable, active)
+-- usable: learned and affordable; lacking: only the resource is short.
+local function setIcon(icon, color, cd, usable, active, lacking)
 	local remaining = if cd then math.max(0, cd.Ready - os.clock()) else 0
-	icon.Shade.Visible = remaining > 0
-	icon.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
-	icon.Stroke.Color = if active then P.Gold else color
-	icon.Stroke.Transparency = if usable and remaining <= 0 then 0 else 0.6
-	icon.Glyph.TextTransparency = if usable then 0 else 0.45
+	local share = if cd and remaining > 0 then math.clamp(remaining / math.max(0.05, cd.Total), 0.002, 0.998) else 0
+	icon.Shade.Visible = share > 0
+	if share > 0 then
+		icon.Wipe.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.3),
+			NumberSequenceKeypoint.new(share, 0.3),
+			NumberSequenceKeypoint.new(math.min(0.999, share + 0.001), 0.85),
+			NumberSequenceKeypoint.new(1, 0.85),
+		})
+	end
+	icon.Timer.Text = if remaining >= 1
+		then tostring(math.ceil(remaining))
+		elseif remaining > 0 then string.format("%.1f", remaining)
+		else ""
+	if icon.Cooling and remaining <= 0 then
+		-- Just came off cooldown: bloom a ring.
+		icon.Flash.Size, icon.FlashStroke.Transparency = UDim2.fromScale(1, 1), 0
+		TweenService
+			:Create(icon.Flash, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { Size = UDim2.fromScale(1.35, 1.35) })
+			:Play()
+		TweenService:Create(icon.FlashStroke, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { Transparency = 1 }):Play()
+	end
+	icon.Cooling = remaining > 0
+	icon.Stroke.Color = if active then P.Gold elseif lacking then Color3.fromRGB(90, 120, 220) else color
+	icon.Stroke.Thickness = if active then 3 else 2
+	icon.Stroke.Transparency = if (usable or active) and remaining <= 0 then 0 else 0.55
+	icon.Glyph.TextTransparency = if usable then 0 else 0.5
+	icon.Badge.TextColor3 = if lacking then Color3.fromRGB(255, 120, 120) else P.Gold
 end
 local reticle = text(gui, "·", 24, P.Text, IronUi.Bold)
 reticle.AnchorPoint, reticle.Position, reticle.Size =
@@ -186,40 +304,82 @@ local incomingMarker = text(gui, "▲", 24, Color3.fromRGB(255, 100, 110), IronU
 incomingMarker.AnchorPoint, incomingMarker.Size = Vector2.new(0.5, 0.5), UDim2.fromOffset(36, 36)
 incomingMarker.TextXAlignment = Enum.TextXAlignment.Center
 incomingMarker.Visible = false
-local chargeTrack = new("Frame", {
-	BackgroundColor3 = P.Inset,
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0.5, 30),
-	Size = UDim2.fromOffset(160, 8),
-	Visible = false,
-}, gui)
-UiKit.round(chargeTrack, 4)
-local chargeFill =
-	new("Frame", { BackgroundColor3 = P.Gold, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, chargeTrack)
-local targetCard = new("Frame", {
-	BackgroundColor3 = P.Inset,
+-- Cast bar: heavy-attack charge, surge/maneuver wind-ups and channels.
+local castBar = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
 	BackgroundTransparency = 0.15,
 	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0.5, 58),
+	Size = UDim2.fromOffset(240, 22),
+	Visible = false,
+}, gui)
+UiKit.round(castBar, 6)
+new("UIStroke", { Color = Color3.fromRGB(70, 96, 128), Transparency = 0.3, Thickness = 1 }, castBar)
+local castTrack = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(3, 3),
+	Size = UDim2.new(1, -6, 1, -6),
+}, castBar)
+local chargeFill = new(
+	"Frame",
+	{ BackgroundColor3 = P.Gold, BackgroundTransparency = 0.15, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) },
+	castTrack
+)
+UiKit.round(chargeFill, 4)
+local castLabel = shadowed(text(castBar, "", 11, P.Text, IronUi.Bold))
+castLabel.AutomaticSize, castLabel.TextWrapped = Enum.AutomaticSize.None, false
+castLabel.TextXAlignment, castLabel.Size, castLabel.ZIndex = Enum.TextXAlignment.Center, UDim2.fromScale(1, 1), 3
+-- Combo counter, beside the crosshair.
+local comboLabel = shadowed(text(gui, "", 26, P.Gold, IronUi.Bold))
+comboLabel.AutomaticSize, comboLabel.TextWrapped = Enum.AutomaticSize.None, false
+comboLabel.AnchorPoint, comboLabel.Position, comboLabel.Size =
+	Vector2.new(0, 0.5), UDim2.new(0.5, 44, 0.5, -6), UDim2.fromOffset(140, 30)
+local comboScale = new("UIScale", {}, comboLabel)
+local comboWord = shadowed(text(comboLabel, "COMBO", 10, P.Text, IronUi.Bold))
+comboWord.AutomaticSize, comboWord.Position, comboWord.Size =
+	Enum.AutomaticSize.None, UDim2.fromOffset(2, 26), UDim2.fromOffset(80, 12)
+local targetCard = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
+	BackgroundTransparency = 0.12,
+	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 16),
-	Size = UDim2.fromOffset(260, 56),
+	Size = UDim2.fromOffset(300, 54),
 	Visible = false,
 }, gui)
 UiKit.round(targetCard, 10)
-local targetName = text(targetCard, "", 13, P.Gold, IronUi.Bold)
+local targetStroke =
+	new("UIStroke", { Color = Color3.fromRGB(190, 70, 80), Transparency = 0.4, Thickness = 1 }, targetCard)
+local targetName = text(targetCard, "", 13, P.Text, IronUi.Bold)
 targetName.AutomaticSize, targetName.TextWrapped, targetName.TextTruncate =
 	Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
-targetName.Position, targetName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -20, 0, 22)
-targetName.TextXAlignment = Enum.TextXAlignment.Center
-local targetTrack = new(
+targetName.Position, targetName.Size = UDim2.fromOffset(12, 5), UDim2.new(1, -96, 0, 18)
+local targetTag = text(targetCard, "", 10, P.Gold, IronUi.Bold)
+targetTag.AutomaticSize, targetTag.TextWrapped = Enum.AutomaticSize.None, false
+targetTag.TextXAlignment = Enum.TextXAlignment.Right
+targetTag.Position, targetTag.Size = UDim2.new(1, -92, 0, 6), UDim2.fromOffset(80, 16)
+local targetTrack = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(12, 27),
+	Size = UDim2.new(1, -24, 0, 16),
+}, targetCard)
+UiKit.round(targetTrack, 4)
+local targetTrail = new(
 	"Frame",
-	{ BackgroundColor3 = P.Dim, Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -24, 0, 8) },
-	targetCard
-)
-local targetFill = new(
-	"Frame",
-	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
+	{ BackgroundColor3 = Color3.fromRGB(255, 196, 110), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
 	targetTrack
 )
+UiKit.round(targetTrail, 4)
+local targetFill = new(
+	"Frame",
+	{ BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 2 },
+	targetTrack
+)
+UiKit.round(targetFill, 4)
+fillGradient(targetFill, Color3.fromRGB(200, 55, 66))
+local targetText = shadowed(text(targetTrack, "", 11, P.Text, IronUi.Bold))
+targetText.AutomaticSize, targetText.TextWrapped = Enum.AutomaticSize.None, false
+targetText.TextXAlignment, targetText.Size, targetText.ZIndex = Enum.TextXAlignment.Center, UDim2.fromScale(1, 1), 3
 local controlsHint = text(
 	gui,
 	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Dodge | Q/E/R Gem Surges | 1/2/3 Rig Maneuvers | K Tree | Tab Cursor",
@@ -229,6 +389,7 @@ local controlsHint = text(
 controlsHint.AnchorPoint, controlsHint.Position, controlsHint.Size =
 	Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -8), UDim2.new(1, -20, 0, 22)
 controlsHint.TextXAlignment = Enum.TextXAlignment.Center
+shadowed(controlsHint)
 local cursorModal =
 	new("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.fromOffset(1, 1), Modal = false }, gui)
 local slots = {}
@@ -484,6 +645,7 @@ leave.AnchorPoint = Vector2.new(1, 0)
 leave.Position = UDim2.new(1, -12, 0, 82)
 leave.Size = UDim2.fromOffset(160, 38)
 local function cancel()
+	cast = nil
 	attackTouch, blockTouch, surgeTouch = nil, nil, nil
 	beamKey = nil
 	input:FireServer("CancelTech")
@@ -650,6 +812,9 @@ RunService.RenderStepped:Connect(function(dt)
 		FirstPerson.setCursorFree(cursorFree)
 	end
 	guideWasOpen = guideOpen
+	if not lastActive then
+		fightSince = os.clock()
+	end
 	lastActive = true
 	local camera = workspace.CurrentCamera
 	local viewport = camera.ViewportSize
@@ -670,42 +835,54 @@ RunService.RenderStepped:Connect(function(dt)
 	local hudBottom = if stacked then 22 + trayHeight else 34
 	local hudWidth = if stacked then math.min(300, viewport.X - 32) else math.min(300, between)
 	hud.AnchorPoint, hud.Position, hud.Size =
-		Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -hudBottom), UDim2.fromOffset(hudWidth, 92)
+		Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -hudBottom), UDim2.fromOffset(hudWidth, 74)
 	-- Touch players get on-screen swing, guard and dodge buttons above the panel.
 	local slotWidth = math.min(80, (viewport.X - 32) / 4 - 8)
 	for index, id in { "Basic", "Heavy", "Block", "Dodge" } do
 		local slot = slots[id]
 		slot.Button.Visible = touch
 		slot.Button.Size = UDim2.fromOffset(slotWidth, 70)
-		slot.Button.Position = UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(hudBottom + 100))
+		slot.Button.Position = UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(hudBottom + 84))
 	end
-	controlsHint.Position = UDim2.new(0.5, 0, 1, -(hudBottom + 98))
+	controlsHint.Position = UDim2.new(0.5, 0, 1, -(hudBottom + 82))
 	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 22)
 	leave.Position, leave.Size =
 		UDim2.new(1, -12, 0, if portrait then 80 else 16), UDim2.fromOffset(if portrait then 130 else 160, 38)
-	targetCard.Size = UDim2.fromOffset(if portrait then math.min(176, viewport.X - 120) else 260, 56)
+	targetCard.Size = UDim2.fromOffset(if portrait then math.min(220, viewport.X - 150) else 300, 54)
 	targetName.TextSize = if portrait then 11 else 13
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
-		local ratio = math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
+		local maxHealth = math.max(1, humanoid.MaxHealth)
+		local ratio = math.clamp(humanoid.Health / maxHealth, 0, 1)
 		healthFill.Size = UDim2.fromScale(ratio, 1)
 		healthTrailRatio = if ratio >= healthTrailRatio
 			then ratio
 			else healthTrailRatio + (ratio - healthTrailRatio) * (1 - math.exp(-dt * 3))
 		healthTrail.Size = UDim2.fromScale(healthTrailRatio, 1)
-		healthFill.BackgroundColor3 = if ratio <= 0.25
-			then Color3.fromRGB(255, 89, 104)
-			else Color3.fromRGB(220, 78, 94)
-		hp.Text = string.format(
-			"HP %d / %d · SHIELD %d",
-			math.ceil(humanoid.Health),
-			math.ceil(humanoid.MaxHealth),
-			player:GetAttribute("Shield") or 0
-		)
+		local low = ratio <= 0.3
+		local top = if low then Color3.fromRGB(255, 110, 110) else Color3.fromRGB(240, 90, 100)
+		healthGradient.Color = ColorSequence.new(top, top:Lerp(Color3.new(0, 0, 0), 0.3))
+		local shield = player:GetAttribute("Shield") or 0
+		shieldFill.Position = UDim2.fromScale(ratio, 0)
+		shieldFill.Size = UDim2.fromScale(math.min(shield / maxHealth, 1 - ratio), 1)
+		healthText.Text = string.format("%d / %d", math.ceil(humanoid.Health), math.ceil(humanoid.MaxHealth))
+		hp.Text = if shield > 0 then string.format("◈ SHIELD %d", shield) else ""
+		-- Red edges: pulse below 30% health, flash briefly when hit.
+		local now = os.clock()
+		vignette.Visible = low or now < flashUntil
+		if vignette.Visible then
+			local strength = if now < flashUntil then (flashUntil - now) / 0.3 else 0
+			if low then
+				strength = math.max(strength, 0.55 + 0.25 * math.sin(now * 5))
+			end
+			for _, edge in vignette:GetChildren() do
+				edge.BackgroundTransparency = 1 - math.clamp(strength, 0, 1)
+			end
+		end
 	end
 	for id, bar in resourceBars do
 		local amount, maximum = player:GetAttribute(id) or 0, player:GetAttribute("Max" .. id) or 100
-		bar.Label.Text = string.format("%s  %d / %d", id:upper(), math.floor(amount), maximum)
+		bar.Value.Text = string.format("%d / %d", math.floor(amount), maximum)
 		bar.Fill.Size = UDim2.fromScale(math.clamp(amount / math.max(1, maximum), 0, 1), 1)
 	end
 	local profile = GemClient.Profile
@@ -722,7 +899,7 @@ RunService.RenderStepped:Connect(function(dt)
 			icon.Badge.Text = string.format("T%d · %s", definition.Tier, ROMAN[definition.Rank] or "I")
 			icon.Name.Text = definition.Name
 			local usable = (player:GetAttribute("Charge") or 0) >= cost
-			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key)
+			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key, not usable)
 		else
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
 			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
@@ -739,10 +916,9 @@ RunService.RenderStepped:Connect(function(dt)
 			icon.Glyph.Text, icon.Glyph.TextColor3 = definition.Icon or "✦", color
 			icon.Name.Text = definition.Name
 			icon.Badge.Text = if learned then string.format("%d ST", math.floor(definition.Cost + 0.5)) else "LOCKED"
-			local usable = learned
-				and (player:GetAttribute("Stamina") or 0) >= definition.Cost
-				and (not definition.Shield or shielded ~= nil)
-			setIcon(icon, color, techCooldowns[id], usable, false)
+			local affordable = (player:GetAttribute("Stamina") or 0) >= definition.Cost
+			local usable = learned and affordable and (not definition.Shield or shielded ~= nil)
+			setIcon(icon, color, techCooldowns[id], usable, false, learned and not affordable)
 		else
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
 			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
@@ -765,37 +941,62 @@ RunService.RenderStepped:Connect(function(dt)
 		incomingMarker.Rotation = math.deg(angle)
 		incomingMarker.TextTransparency = math.clamp(1 - (incomingUntil - now) / 0.65, 0, 1)
 	end
-	chargeTrack.Visible = holding
 	local elapsed = if holding then now - chargeStarted else 0
 	local charged = Actions.charge(elapsed)
-	chargeFill.Size = UDim2.fromScale(math.clamp(elapsed / Actions.PerfectAt, 0, 1), 1)
-	chargeFill.BackgroundColor3 = if charged.Stage == "OVERCHARGED"
-		then Color3.fromRGB(233, 70, 70)
-		elseif charged.Perfect then P.Gold
-		else Color3.fromRGB(83, 174, 204)
+	-- Cast bar: heavy charge first, then a wind-up, then a held channel.
+	local castColor = Color3.fromRGB(83, 174, 204)
+	if holding then
+		castColor = if charged.Stage == "OVERCHARGED"
+			then Color3.fromRGB(233, 70, 70)
+			elseif charged.Perfect then P.Gold
+			else Color3.fromRGB(83, 174, 204)
+		chargeFill.Size = UDim2.fromScale(math.clamp(elapsed / Actions.PerfectAt, 0, 1), 1)
+		castLabel.Text = if charged.Perfect
+			then "RELEASE!  PERFECT"
+			elseif charged.Stage == "OVERCHARGED" then "OVERCHARGED"
+			else attackSide:upper() .. " SWING  ·  RELEASE ON GOLD"
+	elseif cast and now < cast.Start + cast.Duration then
+		castColor = cast.Color
+		chargeFill.Size = UDim2.fromScale(math.clamp((now - cast.Start) / cast.Duration, 0, 1), 1)
+		castLabel.Text = string.format("%s  ·  %.1fs", cast.Name:upper(), cast.Start + cast.Duration - now)
+	elseif beamKey then
+		local gem = Tech.surgeGem(loadout, beamKey)
+		local definition = gem and Tech.surgeStats(gem)
+		castColor = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else P.Gold
+		local charge = player:GetAttribute("Charge") or 0
+		chargeFill.Size = UDim2.fromScale(math.clamp(charge / (player:GetAttribute("MaxCharge") or 100), 0, 1), 1)
+		castLabel.Text = (if definition then definition.Name:upper() else "CHANNEL") .. "  ·  CHANNELING"
+	else
+		cast = nil
+	end
+	castBar.Visible = holding or cast ~= nil or beamKey ~= nil
+	chargeFill.BackgroundColor3 = castColor
 	local trackedTarget = TargetLock.target()
 	reticle.TextColor3 = if holding
-		then chargeFill.BackgroundColor3
+		then castColor
 		elseif blockHeld then P.Gold
 		elseif trackedTarget then Color3.fromRGB(101, 210, 228)
 		else P.Text
-	if holding then
-		hint.Text = if charged.Perfect
-			then "RELEASE! PERFECT WINDOW"
-			elseif charged.Stage == "OVERCHARGED" then "OVERCHARGED - damage reduced"
-			else attackSide:upper() .. " - RELEASE ON GOLD"
-	elseif now > feedbackUntil then
-		hint.Text = if cursorFree
-			then "Tab to return to combat"
-			elseif blockHeld then "GUARD UP"
-			elseif trackedTarget then "AUTO LOCK · turn away to release"
-			else "Free aim · face a target to auto lock"
+	-- Callouts fade out; idle shows only states that need attention.
+	if now > feedbackUntil then
+		hint.Text = if cursorFree then "TAB  ·  return to combat" elseif blockHeld then "GUARD UP" else ""
+		hint.TextTransparency = 0
+	else
+		hint.TextTransparency = math.clamp(1 - (feedbackUntil - now) / 0.3, 0, 1)
+	end
+	comboLabel.Visible = now < comboUntil
+	if comboLabel.Visible then
+		local fadeOut = math.clamp(1 - (comboUntil - now) / 0.4, 0, 1)
+		comboLabel.TextTransparency, comboWord.TextTransparency = fadeOut, fadeOut
 	end
 	if holding and elapsed > 3 then
 		cancel()
 	end
 	FirstPerson.setPose(blockHeld, elapsed / Actions.PerfectAt)
-	controlsHint.Visible = not UserInputService.TouchEnabled
+	-- Key reminder: shown for the first seconds of a fight, or with a free cursor.
+	local hintAge = now - fightSince
+	controlsHint.Visible = not UserInputService.TouchEnabled and (cursorFree or hintAge < 13)
+	controlsHint.TextTransparency = if cursorFree then 0 else math.clamp(hintAge - 12, 0, 1)
 	cursorModal.Modal = cursorFree
 	local hit = aimedHit()
 	local lockedTarget = trackedTarget
@@ -807,15 +1008,27 @@ RunService.RenderStepped:Connect(function(dt)
 		and not game:GetService("CollectionService"):HasTag(target, "Vendor")
 	if targetCard.Visible then
 		local opponent = Players:GetPlayerFromCharacter(target)
-		targetName.Text = string.format(
-			"%s%s - %d / %d",
-			if lockedTarget then "LOCK · " else "",
-			if opponent then opponent.DisplayName else target.Name,
+		local ratio = math.clamp(enemyHumanoid.Health / math.max(1, enemyHumanoid.MaxHealth), 0, 1)
+		if target ~= lastTarget then
+			lastTarget, targetTrailRatio = target, ratio
+		end
+		targetTrailRatio = if ratio >= targetTrailRatio
+			then ratio
+			else targetTrailRatio + (ratio - targetTrailRatio) * (1 - math.exp(-dt * 3))
+		targetName.Text = if opponent then opponent.DisplayName else target.Name
+		targetTag.Text = if lockedTarget then "◎ LOCKED" elseif opponent then "PLAYER" else "ENEMY"
+		targetTag.TextColor3 = if lockedTarget then Color3.fromRGB(101, 210, 228) else P.Dim
+		targetStroke.Color = if lockedTarget then Color3.fromRGB(101, 210, 228) else Color3.fromRGB(190, 70, 80)
+		targetFill.Size = UDim2.fromScale(ratio, 1)
+		targetTrail.Size = UDim2.fromScale(targetTrailRatio, 1)
+		targetText.Text = string.format(
+			"%d / %d  (%d%%)",
 			math.ceil(enemyHumanoid.Health),
-			math.ceil(enemyHumanoid.MaxHealth)
+			math.ceil(enemyHumanoid.MaxHealth),
+			math.ceil(ratio * 100)
 		)
-		targetFill.Size =
-			UDim2.fromScale(math.clamp(enemyHumanoid.Health / math.max(1, enemyHumanoid.MaxHealth), 0, 1), 1)
+	else
+		lastTarget = nil
 	end
 	if blockHeld and now >= nextBlockUpdate then
 		local aim = aimPoint()
@@ -936,6 +1149,7 @@ function handlers.HitConfirm(crit)
 end
 function handlers.IncomingDamage(origin)
 	incomingOrigin, incomingUntil = origin, os.clock() + 0.65
+	flashUntil = os.clock() + 0.3
 end
 function handlers.TechStatus(message)
 	hint.Text, feedbackUntil = message, os.clock() + 1
@@ -946,6 +1160,22 @@ function handlers.TechCooldown(id, duration)
 	local definition = Tech.Catalog[id]
 	if definition and definition.Resource == "Stamina" then
 		FirstPerson.swing("Right")
+	end
+	-- Wind-ups (Solar Flare, Supernova, Breach Hammer...) fill the cast bar.
+	local profile = GemClient.Profile
+	local key = string.match(id, "^Surge(%a)$")
+	local gem = key and Tech.surgeGem(profile and profile.Character, key)
+	local stats = if gem
+		then Tech.surgeStats(gem, profile and Tree.effects(profile))
+		elseif definition then Tree.techStats(profile, id)
+		else nil
+	if stats and stats.Windup then
+		cast = {
+			Name = stats.Name,
+			Start = os.clock(),
+			Duration = stats.Windup,
+			Color = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else Tech.Resources.Stamina.Color,
+		}
 	end
 end
 function handlers.TechPulse(_who, from, to, color, radius)
@@ -988,12 +1218,18 @@ function handlers.HighBlock()
 end
 function handlers.Parried(seconds)
 	cancel()
+	cast = nil
 	nextAttack = math.max(nextAttack, os.clock() + seconds)
 	hint.Text, feedbackUntil = "PARRIED", os.clock() + 0.9
 end
 function handlers.AttackTiming(stage, side, combo)
-	hint.Text = stage .. (if combo > 1 then " - COMBO x" .. combo else "")
+	hint.Text = stage
 	feedbackUntil = os.clock() + 0.9
+	if combo > 1 then
+		comboLabel.Text, comboUntil = "x" .. combo, os.clock() + 2
+		comboScale.Scale = 1.4
+		TweenService:Create(comboScale, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	end
 	local loadout = GemClient.Profile and GemClient.Profile.Character
 	local weapon = loadout and Classes.weapon(loadout.Class, loadout.Weapon)
 	if weapon and weapon.Attack.Kind == "Shot" then
