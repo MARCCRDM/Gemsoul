@@ -16,6 +16,7 @@ local TradeUI = require(script.Parent.Modules.TradeUI)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local MineUI = require(script.Parent.Modules.MineUI)
+local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
 local UiKit = require(script.Parent.Modules.UiKit)
 
@@ -29,7 +30,7 @@ local function launch(action)
 	CharacterUI.cancelDrag()
 	action()
 end
-local W, H = 1440, 820
+local W, H = 1432, 720
 
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false)
@@ -112,7 +113,8 @@ for i, spec in { { 0.08, 0.24, 560, P.Amethyst }, { 0.93, 0.8, 720, P.Teal } } d
 	end)
 end
 
--- The layout is designed at 1440x820 and scaled to fit the screen, below
+-- The layout is designed at 1432x720 (wide and short, to suit landscape
+-- screens) and scaled to fit the screen, below
 -- Roblox's own top bar (its menu buttons sit in the top-left corner).
 local TOPBAR = 54
 local safe = new("Frame", {
@@ -219,79 +221,99 @@ local function bigButton(parent: Instance, caption: string, color: Color3, onCli
 	return b
 end
 
--- Top bar ---------------------------------------------------------------------------------------------------
+-- Header ----------------------------------------------------------------------------------------------------
 
-local logo = IronUi.badge(root, "◆", 48, P.Gold)
-logo.Position = UDim2.fromOffset(20, 14)
+local logo = IronUi.badge(root, "◆", 44, P.Gold)
+logo.Position = UDim2.fromOffset(18, 8)
 logo.Rotation = 0
 local title = IronUi.wordmark(root)
-place(title, 84, 10, 400, 40)
-local hello = label(root, "", 12, P.Gold)
-place(hello, 85, 48, 400, 18)
+place(title, 76, 4, 400, 40)
+local hello = label(root, "", 13, P.Gold, IronUi.Bold)
+place(hello, 77, 40, 400, 18)
 
 local wallet = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.fromOffset(W - 16, 14),
-	Size = UDim2.fromOffset(0, 50),
+	Position = UDim2.fromOffset(W - 16, 6),
+	Size = UDim2.fromOffset(0, 48),
 	AutomaticSize = Enum.AutomaticSize.X,
 }, root)
-UiKit.list(wallet, 12, true)
-local function pill(order: number, icon: string, color: Color3): TextLabel
+UiKit.list(wallet, 10, true)
+local function pill(order: number, caption: string, color: Color3, width: number): (Frame, TextLabel)
 	local frame = new("Frame", {
 		BackgroundColor3 = P.Frame,
-		Size = UDim2.fromOffset(150, 44),
+		Size = UDim2.fromOffset(width, 44),
 		LayoutOrder = order,
 	}, wallet)
 	UiKit.round(frame, 6)
-	new("UIStroke", { Color = IronUi.mute(color), Thickness = 1, Transparency = 0.55 }, frame)
-	local ic = label(frame, icon, 11, color, Enum.Font.Gotham)
-	place(ic, 10, 6, 54, 32)
-	ic.TextXAlignment = Enum.TextXAlignment.Center
-	local value = label(frame, "0", 20, Color3.new(1, 1, 1), CHUNKY)
-	place(value, 66, 0, 72, 44)
+	new("UIStroke", { Color = IronUi.mute(color), Thickness = 1, Transparency = 0.45 }, frame)
+	local ic = label(frame, caption, 12, color, IronUi.Bold)
+	place(ic, 12, 0, 70, 44)
+	local value = label(frame, "0", 21, Color3.new(1, 1, 1), IronUi.Heading)
+	place(value, 70, 0, width - 82, 44)
 	value.TextXAlignment = Enum.TextXAlignment.Right
-	value.TextYAlignment = Enum.TextYAlignment.Center
-	return value
+	return frame, value
 end
-local coinsValue = pill(1, "COINS", P.Gold)
-local marksValue = pill(2, "LEVEL", P.Teal)
-local shopButton = IronUi.gemButton(wallet, "Supply Depot", P.Amethyst, function()
+local _, coinsValue = pill(1, "COINS", P.Gold, 160)
+-- The Season level doubles as the way into the Season Path.
+local seasonFrame, marksValue = pill(2, "SEASON", P.Teal, 170)
+local seasonTrack = new("Frame", {
+	BackgroundColor3 = P.Slot,
+	Position = UDim2.new(0, 12, 1, -9),
+	Size = UDim2.new(1, -24, 0, 4),
+}, seasonFrame)
+UiKit.round(seasonTrack, 2)
+local seasonFill = new("Frame", { BackgroundColor3 = P.Teal, Size = UDim2.fromScale(0, 1) }, seasonTrack)
+UiKit.round(seasonFill, 2)
+local seasonAlert = label(seasonFrame, "", 12, Color3.new(1, 1, 1), IronUi.Bold)
+seasonAlert.BackgroundTransparency = 0
+seasonAlert.BackgroundColor3 = P.Bad
+seasonAlert.AnchorPoint = Vector2.new(0.5, 0.5)
+seasonAlert.Position = UDim2.new(1, -2, 0, 2)
+seasonAlert.Size = UDim2.fromOffset(20, 20)
+seasonAlert.TextXAlignment = Enum.TextXAlignment.Center
+seasonAlert.ZIndex = 4
+seasonAlert.Visible = false
+UiKit.round(seasonAlert, 10)
+local seasonHit = new("TextButton", {
+	Text = "",
+	BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 5,
+}, seasonFrame)
+seasonHit:SetAttribute("UiSound", "Open")
+IronUi.highlight(seasonHit, seasonFrame)
+seasonHit.Activated:Connect(function()
+	launch(SeasonUI.toggle)
+end)
+local shopButton = IronUi.gemButton(wallet, "Supply Depot  [B]", P.Amethyst, function()
 	launch(ShopUI.toggle)
 end)
 shopButton.LayoutOrder = 3
-shopButton.Size = UDim2.fromOffset(0, 46)
+shopButton.Size = UDim2.fromOffset(0, 44)
+shopButton.TextSize = 17
 
--- The armory is the dashboard, not a second modal or a duplicate inventory.
-CharacterUI.mount(root, gui, UDim2.fromOffset(16, 84))
+-- Mission strip: the Moon Mine, the Market and what's coming ------------------------------------------------
 
--- Mission rail ---------------------------------------------------------------------------
-local TOP, MID_X, MID_W = 84, 1032, 392
-local mine = panel(root, MID_X, TOP, MID_W, 250, Color3.fromRGB(230, 130, 40))
-local mineTitle = IronUi.title(mine, "MOON MINE", 28, P.Text)
-mineTitle.AutomaticSize = Enum.AutomaticSize.None
-local sector = label(mine, "L U N A R   F R O N T I E R", 10, P.Gold)
-place(sector, 24, 14, 260, 14)
-place(mineTitle, 22, 30, 300, 36)
-local mineLine1 = label(mine, "", 17, Color3.new(1, 1, 1), CHUNKY)
-place(mineLine1, 22, 76, 220, 22)
-local mineLine2 = label(mine, "", 17, Color3.new(1, 1, 1), CHUNKY)
-place(mineLine2, 22, 104, 218, 22)
-local mineLine3 =
-	label(mine, "Recover charged gems and lost equipment. Push deeper for rarer finds.", 14, P.Dim, CHUNKY)
-place(mineLine3, 22, 134, 218, 42)
-mineLine3.TextWrapped = true
-mineLine3.TextYAlignment = Enum.TextYAlignment.Top
--- A quiet lunar illustration made from native UI geometry.
+local STRIP_Y, STRIP_H = 66, 110
+
+local mine = panel(root, 16, STRIP_Y, 660, STRIP_H, Color3.fromRGB(230, 130, 40))
+local sector = label(mine, "LUNAR FRONTIER", 11, P.Gold, IronUi.Bold)
+place(sector, 20, 12, 200, 14)
+local mineTitle = label(mine, "MOON MINE", 26, P.Text, IronUi.Heading)
+place(mineTitle, 18, 28, 240, 32)
+local mineLine1 = label(mine, "", 15, Color3.new(1, 1, 1), CHUNKY)
+place(mineLine1, 20, 64, 250, 20)
+local mineLine2 = label(mine, "", 14, P.Dim, CHUNKY)
+place(mineLine2, 20, 84, 250, 18)
+-- A small lit moon between the details and the button.
 local moon = new("Frame", {
-	Position = UDim2.fromOffset(272, 82),
-	Size = UDim2.fromOffset(92, 92),
+	Position = UDim2.fromOffset(282, 17),
+	Size = UDim2.fromOffset(76, 76),
 	BackgroundColor3 = Color3.fromRGB(53, 88, 130),
-	BorderSizePixel = 0,
 }, mine)
-UiKit.round(moon, 62)
+UiKit.round(moon, 38)
 new("UIStroke", { Color = P.Teal, Thickness = 2, Transparency = 0.25 }, moon)
--- Lit planetary preview, rather than a flat placeholder moon icon.
 local lunarView = new("ViewportFrame", {
 	BackgroundTransparency = 1,
 	Size = UDim2.fromScale(1, 1),
@@ -299,7 +321,7 @@ local lunarView = new("ViewportFrame", {
 	LightColor = Color3.fromRGB(203, 229, 255),
 	LightDirection = Vector3.new(-1, -0.4, -0.7),
 }, moon)
-UiKit.round(lunarView, 62)
+UiKit.round(lunarView, 38)
 local lunarWorld = new("WorldModel", {}, lunarView)
 local lunarModel = new("Model", {}, lunarWorld)
 new("Part", {
@@ -325,100 +347,55 @@ lunarView.CurrentCamera = lunarCamera
 IronUi.animate(lunarView, function(t)
 	lunarModel:PivotTo(CFrame.Angles(0, math.sin(t * 0.18) * 0.18, -0.12))
 end)
-for _, spec in { { 110, 0.6 }, { 132, 0.83 } } do
-	local orbit = new("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(318, 128),
-		Size = UDim2.fromOffset(spec[1], spec[1]),
-	}, mine)
-	UiKit.round(orbit, spec[1] / 2)
-	new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = spec[2] }, orbit)
-end
-local crystal = new("Frame", {
-	Position = UDim2.fromOffset(276, 153),
-	Size = UDim2.fromOffset(26, 26),
-	Rotation = 45,
-	BackgroundColor3 = P.Teal,
-	BorderSizePixel = 0,
-}, mine)
-UiKit.round(crystal, 5)
-new("UIStroke", { Color = Color3.fromRGB(159, 255, 255), Thickness = 2, Transparency = 0.2 }, crystal)
-IronUi.animate(crystal, function(t)
-	crystal.Position = UDim2.fromOffset(276, 153 + math.sin(t * 1.5) * 5)
-	crystal.Rotation = 45 + math.sin(t) * 8
-end)
-new("UIGradient", { Rotation = 45, Color = ColorSequence.new(P.Teal, P.Emerald) }, crystal)
 local digButton = bigButton(mine, "BEGIN EXPEDITION", Color3.fromRGB(255, 167, 46), function()
 	launch(MineUI.open)
 end)
-digButton.Position = UDim2.fromOffset(22, 190)
-digButton.Size = UDim2.fromOffset(0, 44)
+digButton.AnchorPoint = Vector2.new(1, 0.5)
+digButton.Position = UDim2.new(1, -54, 0.5, 0)
+digButton.Size = UDim2.fromOffset(0, 50)
 digButton.TextSize = 19
 IronUi.shine(digButton, 6)
-local digHint = keyChip(digButton, "M")
-digHint.AnchorPoint = Vector2.new(0, 0.5)
-digHint.Position = UDim2.new(1, 10, 0.5, 0)
-local freeBadge = label(mine, "", 12, Color3.new(1, 1, 1), CHUNKY)
-freeBadge.BackgroundTransparency = 0
-freeBadge.BackgroundColor3 = Color3.fromRGB(18, 93, 79)
-freeBadge.AnchorPoint = Vector2.new(1, 0)
-place(freeBadge, 0, 0, 102, 26)
-freeBadge.AnchorPoint = Vector2.new(1, 0)
-freeBadge.Position = UDim2.new(1, -16, 0, 16)
-freeBadge.Rotation = 0
-freeBadge.TextXAlignment = Enum.TextXAlignment.Center
-freeBadge.TextYAlignment = Enum.TextYAlignment.Center
-UiKit.round(freeBadge, 15)
+local digHint = keyChip(mine, "M")
+digHint.AnchorPoint = Vector2.new(1, 0.5)
+digHint.Position = UDim2.new(1, -16, 0.5, 0)
 
--- Market retains the existing player-to-player trade system.
-local market = panel(root, 1032, 348, 392, 138, P.Gold)
-local marketIcon = IronUi.emblem(market, "Trade", P.Gold, 38)
-marketIcon.Position = UDim2.fromOffset(18, 18)
+-- Market keeps the existing player-to-player trade system.
+local market = panel(root, 688, STRIP_Y, 380, STRIP_H, P.Gold)
+local marketIcon = IronUi.emblem(market, "Trade", P.Gold, 34)
+marketIcon.Position = UDim2.fromOffset(18, 14)
 local marketTitle = label(market, "MARKET", 21, P.Text, IronUi.Heading)
-place(marketTitle, 66, 18, 220, 28)
-keyChip(market, "T")
-local marketCopy =
-	label(market, "Exchange equipment with other miners. Both players confirm every trade.", 13, LIGHT, IronUi.Body)
-place(marketCopy, 20, 52, 350, 34)
-local marketButton = IronUi.gemButton(market, "OPEN MARKET", P.Gold, function()
+place(marketTitle, 60, 16, 160, 30)
+local marketCopy = label(market, "Swap gear with other miners. Both confirm.", 13, LIGHT, IronUi.Body)
+place(marketCopy, 20, 56, 200, 36)
+marketCopy.TextWrapped = true
+marketCopy.TextYAlignment = Enum.TextYAlignment.Top
+local marketButton = IronUi.gemButton(market, "OPEN  [T]", P.Gold, function()
 	launch(TradeUI.open)
 end)
-marketButton.Position = UDim2.fromOffset(20, 94)
-marketButton.Size = UDim2.fromOffset(0, 32)
-marketButton.TextSize = 13
+marketButton.AnchorPoint = Vector2.new(1, 0.5)
+marketButton.Position = UDim2.new(1, -18, 0.5, 0)
+marketButton.Size = UDim2.fromOffset(0, 42)
+marketButton.TextSize = 15
 
 -- Social spaces are honest placeholders: no simulated messages or working inputs.
-local function comingSoon(parent)
-	local badge = label(parent, "COMING SOON", 10, P.Dim, IronUi.Bold)
-	badge.TextXAlignment = Enum.TextXAlignment.Right
-	place(badge, 250, 20, 122, 20)
-end
-local chat = panel(root, 1032, 500, 392, 170, P.Teal)
-local chatTitle = label(chat, "GLOBAL CHAT", 18, P.Text, IronUi.Heading)
-place(chatTitle, 20, 18, 220, 26)
-comingSoon(chat)
-local comms = label(chat, "STATION COMMS / OFFLINE", 10, P.Teal, IronUi.Bold)
-place(comms, 20, 54, 352, 18)
-local chatCopy =
-	label(chat, "A place to share discoveries and meet other miners across the stars.", 13, LIGHT, IronUi.Body)
-place(chatCopy, 20, 78, 350, 38)
-local inputPlaceholder = IronUi.box(chat, UDim2.fromOffset(20, 126), UDim2.fromOffset(352, 28), P.Frame, 4)
-local inputText = label(inputPlaceholder, "Messaging unavailable in this build", 11, P.Dim, IronUi.Body)
-place(inputText, 10, 5, 332, 20)
+local social = panel(root, 1080, STRIP_Y, W - 1096, STRIP_H, P.Teal)
+local socialTitle = label(social, "CHAT & PARTY", 19, P.Text, IronUi.Heading)
+place(socialTitle, 20, 16, 200, 28)
+local soon = label(social, "COMING SOON", 11, P.Teal, IronUi.Bold)
+soon.BackgroundTransparency = 0.8
+soon.BackgroundColor3 = P.Teal
+soon.TextXAlignment = Enum.TextXAlignment.Center
+soon.AnchorPoint = Vector2.new(1, 0)
+place(soon, 0, 0, 104, 22)
+soon.Position = UDim2.new(1, -16, 0, 18)
+UiKit.round(soon, 4)
+local socialCopy = label(social, "Station comms and expedition crews are on the way.", 13, LIGHT, IronUi.Body)
+place(socialCopy, 20, 54, W - 1136, 40)
+socialCopy.TextWrapped = true
+socialCopy.TextYAlignment = Enum.TextYAlignment.Top
 
-local party = panel(root, 1032, 684, 392, 120, P.Amethyst)
-local partyTitle = label(party, "PARTY", 18, P.Text, IronUi.Heading)
-place(partyTitle, 20, 16, 200, 26)
-comingSoon(party)
-local partyCopy = label(
-	party,
-	"Your next expedition crew starts here. Invites and party management are on the way.",
-	13,
-	LIGHT,
-	IronUi.Body
-)
-place(partyCopy, 20, 51, 350, 49)
+-- The armory fills the rest: equipment, sockets, stats, backpack and spare gear.
+CharacterUI.mount(root, gui, UDim2.fromOffset(16, STRIP_Y + STRIP_H + 12))
 
 local function commas(n: number): string
 	local s = tostring(math.floor(n))
@@ -437,16 +414,27 @@ local function refresh(profile)
 	end
 	hello.Text = "EXPEDITION COMMAND  /  " .. string.upper(player.DisplayName)
 	coinsValue.Text = commas(profile.Coins or 0)
-	marksValue.Text = tostring(Season.levelFor(profile.Season and profile.Season.XP or 0))
+	local seasonData = profile.Season or { XP = 0, Claimed = {} }
+	local level, into, need = Season.levelFor(seasonData.XP or 0)
+	marksValue.Text = "LV " .. level
+	seasonFill.Size = UDim2.fromScale(if level >= Season.MaxLevel then 1 else math.clamp(into / need, 0, 1), 1)
+	local unclaimed = 0
+	for l = 1, level do
+		if not (seasonData.Claimed or {})[tostring(l)] then
+			unclaimed += 1
+		end
+	end
+	seasonAlert.Visible = unclaimed > 0
+	seasonAlert.Text = if unclaimed > 9 then "9+" else tostring(unclaimed)
 	local quota = profile.Quota or {}
 	local daily = profile.DailyQuota or Config.DailyQuota
 	local weekly = profile.WeeklyQuota or Config.WeeklyQuota
 	local free = math.max(0, math.min(daily - (quota.UsedToday or 0), weekly - (quota.UsedThisWeek or 0)))
-	mineLine1.Text = string.format("Daily entries  %d / %d", free, daily)
+	mineLine1.Text = if free > 0
+		then string.format("%d of %d free walls left today", free, daily)
+		else "Free walls used up today"
 	local best = profile.Stats and profile.Stats.BestDepth or 0
-	mineLine2.Text = if best > 0 then "Deepest shaft  " .. best else "Deeper shafts. Rarer finds."
-	freeBadge.Visible = true
-	freeBadge.Text = if free > 0 then free .. " free entries" else "Quota used"
+	mineLine2.Text = if best > 0 then "Deepest shaft: depth " .. best else "Dig deeper for rarer finds"
 end
 GemClient.Changed:Connect(refresh)
 if GemClient.Profile then
@@ -483,7 +471,7 @@ GemClient.Changed:Connect(maybeWelcome)
 task.defer(maybeWelcome)
 
 -- Equipment and enchantment are on the dashboard; only destinations need shortcuts.
-local KEYS = { M = MineUI.toggle, T = TradeUI.open, B = ShopUI.toggle }
+local KEYS = { M = MineUI.toggle, T = TradeUI.open, B = ShopUI.toggle, J = SeasonUI.toggle }
 ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObject)
 	if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
 		local action = KEYS[inputObject.KeyCode.Name]
@@ -492,4 +480,4 @@ ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObje
 		end
 	end
 	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.M, Enum.KeyCode.T, Enum.KeyCode.B)
+end, false, Enum.KeyCode.M, Enum.KeyCode.T, Enum.KeyCode.B, Enum.KeyCode.J)
