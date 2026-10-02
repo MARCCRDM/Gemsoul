@@ -130,9 +130,9 @@ local expectedSpeed = Classes.walkSpeed(Classes.ratings(loadout).Speed.Base + Cl
 check(close(hs.WalkSpeed, expectedSpeed), "Live mobility augment did not change movement")
 now += 2
 hv.Health = 1000
-loadout.SurgeGems = { Q = { Id = "amp", Element = "Fire", Tier = "Rare", SurgeTier = 1, SurgeRank = 1, Size = 4, Clarity = 5, Cut = 0 } }
+loadout.Surge1Gem = { Id = "amp", Element = "Fire", Tier = "Rare", SurgeTier = 1, SurgeRank = 1, Size = 4, Clarity = 5, Cut = 0 }
 check(CombatServer._technology(source, nil, rv.Position, "Q") and close(1000 - hv.Health, damage * 1.12 * 1.1 * 1.25), "Live Thermal surge with Overcharge, Surge Power and Elemental Mastery")
-loadout.SurgeGems = nil
+loadout.Surge1Gem = nil
 now += 2
 hv.Health = 1000
 CombatServer._state(victim).Dots = {}

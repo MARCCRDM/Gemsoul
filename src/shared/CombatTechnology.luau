@@ -51,6 +51,13 @@ Tech.Surges = {
 	Shock = { "IonSpark", "StaticField", "ChainLightning", "Overload" },
 }
 Tech.SurgeSlots = 3 -- Q, E, R
+-- The Surge Array keys and the saved capacitor sockets they cast from
+-- (Character.Surge1Gem, Surge2Gem, Surge3Gem).
+Tech.SurgeSockets = { Q = "Surge1", E = "Surge2", R = "Surge3" }
+function Tech.surgeGem(loadout, key: string)
+	local slot = Tech.SurgeSockets[key]
+	return if slot and loadout then loadout[slot .. "Gem"] else nil
+end
 Tech.ManeuverSlots = 3 -- 1, 2, 3
 Tech.DefaultManeuvers = { "HydraulicSlam", "KineticRam", "StimDodge" }
 Tech.Catalog = {
@@ -432,14 +439,9 @@ end
 
 -- Is a gem (of `element`, or any) socketed in gear or the Surge Array?
 function Tech.hasGem(loadout, element)
-	for _, slot in { "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+	for _, slot in { "Surge1", "Surge2", "Surge3", "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 		local gem = loadout[slot .. "Gem"]
 		if gem and (not element or gem.Element == element) then
-			return true
-		end
-	end
-	for _, gem in loadout.SurgeGems or {} do
-		if not element or gem.Element == element then
 			return true
 		end
 	end

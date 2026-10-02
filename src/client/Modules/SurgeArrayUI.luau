@@ -463,9 +463,8 @@ function SurgeArrayUI.refresh()
 	local amps = Tree.effects(profile)
 	local heading = place(label(body, "GEM SURGES  ·  CHARGE", 13, Tech.Resources.Charge.Color), 0, 0, 620, 18)
 	heading.TextXAlignment = Enum.TextXAlignment.Left
-	local array = loadout.SurgeGems or {}
 	for i, key in KEYS do
-		socketCard(body, key, (i - 1) * 212, array[key], amps)
+		socketCard(body, key, (i - 1) * 212, Tech.surgeGem(loadout, key), amps)
 	end
 	pouchList(body, profile, amps)
 	maneuverColumn(body, profile, loadout)

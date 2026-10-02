@@ -139,7 +139,7 @@ function CombatGuide.refresh()
 	heading("GEM SURGES · CHARGE · Q / E / R", Tech.Resources.Charge.Color)
 	local amps = Tree.effects(profile)
 	for _, key in { "Q", "E", "R" } do
-		local gem = loadout.SurgeGems and loadout.SurgeGems[key]
+		local gem = Tech.surgeGem(loadout, key)
 		local definition = gem and Tech.surgeStats(gem, amps)
 		if definition then
 			card(

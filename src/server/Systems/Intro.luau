@@ -1,18 +1,5 @@
---[[
-	Server side of the new-player intro. Each step is a request action:
-	  "ChooseLoadout", classId, weaponId, armorId   pick class and starter gear
-	  "StarterSpin"                                 three random cut gems, once
-	  "FirstStone"                                  a small, enchant-ready gem, once
-	  "FinishIntro"                                 done: gear appears in the world
-	  "SuitUp"                                      the ship intro's first step: the
-	                                                class (Config.OnlyClass) and its
-	                                                starter kit (suit, pistol, shield)
-	  "QuickStart"                                  the short intro's finish: the
-	                                                class (Config.OnlyClass), starter
-	                                                gems if not had yet, and done
-	Socketing the first gem is Enchanting's "SocketGem".
-	Everything is validated here; the client only asks.
-]]
+-- Server-owned launch lottery; prepare persists rewards, finish grants nine sockets once.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
@@ -32,6 +19,7 @@ local FIRST_STONE_MAX_SIZE = 4 -- a modest first discovery
 local reply = Shop.reply
 
 local Intro = {}
+local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 
 local function newGem(source: string, luck: number?): GemConfig.Gem
 	return GemGenerator.generate(Gems.random(), source, {
@@ -39,21 +27,6 @@ local function newGem(source: string, luck: number?): GemConfig.Gem
 		Time = os.time(),
 		Luck = luck,
 	})
-end
-
-local function chooseLoadout(player: Player, classId: any, weaponId: any, armorId: any)
-	local intro = PlayerData.intro(player)
-	if intro and intro.Done then
-		return reply(false, "Your class is already chosen. Class trainers will offer changes later.")
-	end
-	if Config.OnlyClass and classId ~= Config.OnlyClass then
-		return reply(false, "Only the " .. Config.OnlyClass .. " is available for now.")
-	end
-	if not Classes.get(classId) or not Classes.weapon(classId, weaponId) or not Classes.armor(classId, armorId) then
-		return reply(false, "That class and gear don't go together.")
-	end
-	PlayerData.setLoadout(player, classId, weaponId, armorId)
-	return reply(true, "Loadout saved.")
 end
 
 -- Three already-cut gems, like a lottery. At least one is Uncommon or better.
@@ -80,15 +53,6 @@ local function generateStarterGems(): { GemConfig.Gem }
 	return gems
 end
 
-local function rollStarterGems(player: Player): { GemConfig.Gem }
-	local gems = generateStarterGems()
-	for _, gem in gems do
-		PlayerData.addGem(player, gem)
-	end
-	PlayerData.setIntroFlag(player, "Spun")
-	return gems
-end
-
 -- Replace only the first three loose cargo stones; equipped gems stay intact.
 local lastGemRegeneration: { [Player]: number } = {}
 local function regenerateStarterGems(player: Player)
@@ -112,14 +76,6 @@ local function regenerateStarterGems(player: Player)
 	return reply(true, "First three cargo gemstones regenerated.", { Gems = gems })
 end
 
-local function starterSpin(player: Player)
-	local intro = PlayerData.intro(player)
-	if not intro or intro.Spun then
-		return reply(false, "You've already spun for your starter gems.")
-	end
-	return reply(true, "Your starter gems!", { Gems = rollStarterGems(player) })
-end
-
 -- Sets the class (Config.OnlyClass) with its starter kit, unless it's set.
 local function giveStarterKit(player: Player)
 	local character = PlayerData.character(player)
@@ -140,17 +96,38 @@ local function suitUp(player: Player)
 	return reply(true, "Suited up.")
 end
 
--- The intro's last step: the starter kit and the starter stones (each once),
--- and done.
-local function quickStart(player: Player)
-	local intro = PlayerData.intro(player)
-	if not intro then
-		return reply(false, "Try again in a moment.")
+local function prepareLottery(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile or profile.Intro.Done then
+		return reply(false, "Your starter kit is already claimed.")
 	end
 	giveStarterKit(player)
-	local gems = if intro.Spun then {} else rollStarterGems(player)
-	PlayerData.setIntroFlag(player, "Done")
-	return reply(true, "Welcome to the moon base, Crusader!", { Gems = gems })
+	local reward = Lottery.prepare(profile, Gems.random(), function(element)
+		local gem = newGem("StarterSpin")
+		gem.Element = element
+		return gem
+	end)
+	PlayerData.sync(player)
+	return reply(true, "Your launch lottery is ready!", { Lottery = reward })
+end
+local function quickStart(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	if profile.Intro.Done then
+		return reply(true, "Your kit is already ready.")
+	end
+	local prepared = prepareLottery(player)
+	if not prepared.Ok then
+		return prepared
+	end
+	local ok, message = Lottery.finish(profile, Config.MaxGems)
+	if not ok then
+		return reply(false, message)
+	end
+	PlayerData.augmentsChanged(player)
+	return reply(true, "Nine gemstones attuned. Welcome to Saga Miners!", { Lottery = profile.Intro.Lottery })
 end
 
 local function firstStone(player: Player)
@@ -168,12 +145,7 @@ local function firstStone(player: Player)
 end
 
 local function finishIntro(player: Player)
-	local character = PlayerData.character(player)
-	if not character or not character.Class then
-		return reply(false, "Choose a class first.")
-	end
-	PlayerData.setIntroFlag(player, "Done")
-	return reply(true, "Welcome to the moon base, Crusader!")
+	return quickStart(player)
 end
 
 function Intro.start()
@@ -181,8 +153,12 @@ function Intro.start()
 	Players.PlayerRemoving:Connect(function(player)
 		lastGemRegeneration[player] = nil
 	end)
-	Shop.register("ChooseLoadout", chooseLoadout)
-	Shop.register("StarterSpin", starterSpin)
+	Shop.register("ChooseLoadout", function()
+		return reply(false, "All players are Warriors. Roll your launch kit instead.")
+	end)
+	Shop.register("StarterSpin", prepareLottery)
+	Shop.register("PrepareStarterLottery", prepareLottery)
+	Shop.register("FinishStarterLottery", quickStart)
 	Shop.register("FirstStone", firstStone)
 	Shop.register("FinishIntro", finishIntro)
 	Shop.register("SuitUp", suitUp)

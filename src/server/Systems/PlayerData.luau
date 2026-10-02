@@ -454,6 +454,9 @@ end
 
 -- Sets class, weapon and armor (ids are checked by the caller).
 local SOCKET_KEYS = {}
+for _, slot in Slots.SurgeOrder do
+	SOCKET_KEYS[slot] = slot .. "Gem"
+end
 for _, slot in Slots.Order do
 	SOCKET_KEYS[slot] = slot .. "Gem"
 end
@@ -502,7 +505,11 @@ end
 function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem?
 	local profile = profiles[player]
 	local key = SOCKET_KEYS[slot or "Weapon"]
-	if not profile or not key or not profile.Character[slot or "Weapon"] then
+	if
+		not profile
+		or not key
+		or (not Slots.SurgeDefinitions[slot or "Weapon"] and not profile.Character[slot or "Weapon"])
+	then
 		return nil
 	end
 	local gem = PlayerData.findGem(player, gemId)
@@ -516,7 +523,9 @@ function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem
 	end
 	sockets[key] = gem
 	local slotName = slot or "Weapon"
-	profile.Character.ItemGems[slotName][profile.Character[slotName]] = gem
+	if not Slots.SurgeDefinitions[slotName] then
+		profile.Character.ItemGems[slotName][profile.Character[slotName]] = gem
+	end
 	sync(player)
 	characterChanged:Fire(player)
 	return gem
@@ -535,7 +544,9 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 		return nil
 	end
 	sockets[key] = nil
-	profile.Character.ItemGems[slot][profile.Character[slot]] = nil
+	if not Slots.SurgeDefinitions[slot] then
+		profile.Character.ItemGems[slot][profile.Character[slot]] = nil
+	end
 	table.insert(profile.Gems, gem)
 	sync(player)
 	characterChanged:Fire(player)
@@ -543,42 +554,19 @@ function PlayerData.unsocketGem(player: Player, slot: string): Gem?
 end
 
 --[[
-	The Surge Array: three gem slots (Q, E, R). A gem there casts its surge
-	instead of enchanting gear. Moving a gem in sends the slot's old gem back
-	to the pouch. Saved as Character.SurgeGems = { Q = gem, E = gem, R = gem }.
+	The Surge Array: the three surge capacitor sockets (Surge1-3) on Q, E and
+	R. A gem there casts its surge instead of enchanting gear; the socket's old
+	gem goes back to the pouch.
 ]]
-PlayerData.SurgeKeys = { Q = true, E = true, R = true }
+PlayerData.SurgeKeys = { Q = "Surge1", E = "Surge2", R = "Surge3" }
 function PlayerData.socketSurge(player: Player, gemId: string, key: string): Gem?
-	local profile = profiles[player]
-	if not profile or not PlayerData.SurgeKeys[key] then
-		return nil
-	end
-	local gem = PlayerData.findGem(player, gemId)
-	if not gem or gem.Cut == nil then
-		return nil
-	end
-	PlayerData.removeGem(player, gemId)
-	local array = profile.Character.SurgeGems or {}
-	profile.Character.SurgeGems = array
-	if array[key] then
-		table.insert(profile.Gems, array[key])
-	end
-	array[key] = gem
-	sync(player)
-	return gem
+	local slot = PlayerData.SurgeKeys[key]
+	return if slot then PlayerData.socketGem(player, gemId, slot) else nil
 end
 
 function PlayerData.unsocketSurge(player: Player, key: string): Gem?
-	local profile = profiles[player]
-	local array = profile and profile.Character.SurgeGems
-	local gem = array and PlayerData.SurgeKeys[key] and array[key]
-	if not gem or #profile.Gems >= Config.MaxGems then
-		return nil
-	end
-	array[key] = nil
-	table.insert(profile.Gems, gem)
-	sync(player)
-	return gem
+	local slot = PlayerData.SurgeKeys[key]
+	return if slot then PlayerData.unsocketGem(player, slot) else nil
 end
 
 -- The Rig Maneuver on key 1, 2 or 3 (validated by the caller). An id already

@@ -1,5 +1,8 @@
 -- Weapon/Armor remain the saved keys for pistol/chest for backward compatibility.
 local Slots = {}
+Slots.SurgeOrder = { "Surge1", "Surge2", "Surge3" }
+Slots.SurgeDefinitions =
+	{ Surge1 = { Label = "Gem Surge 1" }, Surge2 = { Label = "Gem Surge 2" }, Surge3 = { Label = "Gem Surge 3" } }
 Slots.Order = { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" }
 Slots.Definitions = {
 	Weapon = { Kind = "Weapons", Label = "Weapon" },

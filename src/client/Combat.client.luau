@@ -370,7 +370,7 @@ local function triggerSurge(key)
 		return
 	end
 	local loadout = loadoutOf()
-	local gem = loadout and loadout.SurgeGems and loadout.SurgeGems[key]
+	local gem = Tech.surgeGem(loadout, key)
 	if not gem then
 		hint.Text, feedbackUntil = "Socket a gem in surge slot " .. key .. " (Loadout)", os.clock() + 1.2
 		return
@@ -713,7 +713,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local amps = if profile then Tree.effects(profile) else {}
 	for i, key in SURGE_KEYS do
 		local icon = surgeIcons[i]
-		local gem = loadout and loadout.SurgeGems and loadout.SurgeGems[key]
+		local gem = Tech.surgeGem(loadout, key)
 		local definition = gem and Tech.surgeStats(gem, amps)
 		if definition then
 			local color = GemConfig.ElementColors[gem.Element] or P.Gold

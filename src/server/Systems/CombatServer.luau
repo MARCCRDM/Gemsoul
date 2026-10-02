@@ -758,7 +758,7 @@ local function block(player, held, aim)
 	return true
 end
 local function surgeGem(loadout, element)
-	for _, slot in { "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+	for _, slot in { "Surge1", "Surge2", "Surge3", "Weapon", "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 		local gem = loadout[slot .. "Gem"]
 		if gem and (not element or gem.Element == element) then
 			return gem
@@ -1024,7 +1024,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	if surgeKey then
 		-- The surge comes from the gem: its element and tier pick the ability;
 		-- its rank, Size, Clarity and Cut, plus Surge Amplifiers, set the numbers.
-		local gem = k.Loadout.SurgeGems and k.Loadout.SurgeGems[surgeKey]
+		local gem = Tech.surgeGem(k.Loadout, surgeKey)
 		if not gem then
 			Remotes.CombatFx:FireClient(player, "TechStatus", "Socket a gem in surge slot " .. surgeKey)
 			return false
@@ -1225,8 +1225,7 @@ local function tick(_dt)
 			local channel = st.Channel
 			local definition = channel.Definition
 			local surgeKey = string.match(channel.Key, "^Surge(%a)$")
-			local gemGone = surgeKey ~= nil
-				and (not k.Loadout.SurgeGems or k.Loadout.SurgeGems[surgeKey] ~= definition.Gem)
+			local gemGone = surgeKey ~= nil and Tech.surgeGem(k.Loadout, surgeKey) ~= definition.Gem
 			if now >= channel.Until or blocking(st, now) or st.DodgeMove or gemGone then
 				st.Channel = nil
 			elseif now >= channel.Next then

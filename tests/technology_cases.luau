@@ -13,7 +13,8 @@ local function reset()
 	now += 20
 	CombatServer.reset(source); CombatServer.reset(victim)
 	hs.Health, hv.Health = 1000, 1000
-	loadout.WeaponGem, loadout.ArmorGem, loadout.SurgeGems = nil, nil, nil
+	loadout.WeaponGem, loadout.ArmorGem = nil, nil
+	loadout.Surge1Gem, loadout.Surge2Gem, loadout.Surge3Gem = nil, nil, nil
 	wallBlocks = false
 	return CombatServer._state(source)
 end
@@ -22,7 +23,7 @@ local function fire(id) return CombatServer._technology(source, id, rv.Position)
 local function surgeGem(element, tier, rank, extra)
 	local gem = { Id = "g" .. element .. tier, Element = element, Tier = "Rare", SurgeTier = tier, SurgeRank = rank or 1, Size = 4, Clarity = 5, Cut = 0 }
 	for key, value in extra or {} do gem[key] = value end
-	loadout.SurgeGems = { Q = gem }
+	loadout.Surge1Gem = gem
 	return gem
 end
 local function cast(key) return CombatServer._technology(source, nil, rv.Position, key or "Q") end
@@ -105,7 +106,7 @@ check(st.Channel == nil, "Lost stream release packet stuck channel")
 st = reset()
 surgeGem("Fire", 2)
 check(cast("Q") and st.Channel ~= nil and hv.Health < 1000, "Thermal Beam channel")
-loadout.SurgeGems = nil
+loadout.Surge1Gem = nil
 health = hv.Health
 now += 0.25; CombatServer._tick(0.25)
 check(st.Channel == nil and hv.Health == health, "Beam kept firing after its gem left the slot")
@@ -114,7 +115,7 @@ surgeGem("Fire", 1)
 st.Resources.Stamina, st.Resources.Charge = 50, 50
 now += 0.5; CombatServer._tick(0.5)
 check(close(st.Resources.Stamina, 56) and close(st.Resources.Charge, 53.5), "Resource regeneration")
-loadout.SurgeGems = nil
+loadout.Surge1Gem = nil
 now += 0.1; CombatServer._tick(0.1)
 check(st.Resources.Charge == 0, "Unsocketed rig retained Charge")
 st = reset()
@@ -195,4 +196,12 @@ CombatServer._input(source, "RigManeuver", "ThermalBurst", rv.Position)
 check(hv.Health == 1000, "Mismatched action category accepted")
 rs.Position = Vector3.zero
 check(not fire("HydraulicSlam"), "Town technique accepted")
+check(Tech.hasGem({Surge2Gem={Element="Frost"}},"Frost"),"Dedicated capacitor does not enable its element")
+check(not Tech.hasGem({Surge1Gem={Element="Fire"}},"Shock"),"Capacitor enabled unrelated element")
+check(Tech.hasGem({Surge3Gem={Element="Poison"}}),"Capacitor did not enable Charge regen")
+rs.Position = arena
+st = reset()
+loadout.Surge3Gem = {Id="cap",Element="Fire",Size=4,Clarity=5,Cut=5}
+check(CombatServer._technology(source, nil, rv.Position, "R") and hv.Health<1000,"Live Surge did not draw from its R capacitor")
+loadout.Surge3Gem = nil
 print("PASS: " .. checks .. " live technology/resource checks (maneuvers, all 16 gem surges by slot, gem metrics, ranks, amplifiers, Overcharge, channels, wind-ups, PvP and walls)")

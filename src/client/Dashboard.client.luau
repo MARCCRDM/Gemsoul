@@ -484,9 +484,8 @@ local function refresh(profile)
 		else "Free walls used up today"
 	local best = profile.Stats and profile.Stats.BestDepth or 0
 	mineLine2.Text = if best > 0 then "Deepest shaft: depth " .. best else "Dig deeper for rarer finds"
-	local array = profile.Character and profile.Character.SurgeGems or {}
 	for key, socket in surgeSockets do
-		local gem = array[key]
+		local gem = Tech.surgeGem(profile.Character, key)
 		local definition = gem and Tech.surgeStats(gem)
 		local color = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else LIGHT
 		socket.Ring.Color, socket.Ring.Transparency = color, if gem then 0 else 0.4
