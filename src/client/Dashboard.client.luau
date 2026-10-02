@@ -4,6 +4,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Season = require(ReplicatedStorage.Shared.Season)
@@ -53,7 +54,7 @@ local backdrop = new("Frame", {
 new("UIGradient", {
 	Rotation = 110,
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 17, 49)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(19, 23, 38)),
 		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(8, 8, 19)),
 		ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 22, 36)),
 	}),
@@ -66,7 +67,7 @@ local pattern = new("TextLabel", {
 	LineHeight = 2,
 	Font = Enum.Font.GothamBold,
 	TextColor3 = Color3.new(1, 1, 1),
-	TextTransparency = 0.88,
+	TextTransparency = 0.95,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextYAlignment = Enum.TextYAlignment.Top,
 }, backdrop)
@@ -183,12 +184,32 @@ local function panel(parent: Instance, x: number, y: number, w: number, h: numbe
 		Position = UDim2.fromOffset(0, 16),
 		Size = UDim2.fromOffset(2, 32),
 	}, frame)
+	-- Small inset brackets give the panels depth without surrounding text with glow.
+	for _, corner in { Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1), Vector2.new(1, 1) } do
+		local bracket = new("Frame", {
+			BackgroundTransparency = 1,
+			AnchorPoint = corner,
+			Position = UDim2.new(corner.X, if corner.X == 0 then 5 else -5, corner.Y, if corner.Y == 0 then 5 else -5),
+			Size = UDim2.fromOffset(10, 10),
+		}, frame)
+		for _, size in { Vector2.new(10, 1), Vector2.new(1, 10) } do
+			new("Frame", {
+				BorderSizePixel = 0,
+				BackgroundColor3 = tint,
+				BackgroundTransparency = 0.55,
+				AnchorPoint = corner,
+				Position = UDim2.fromScale(corner.X, corner.Y),
+				Size = UDim2.fromOffset(size.X, size.Y),
+			}, bracket)
+		end
+	end
 	return frame
 end
 
 local function label(parent: Instance, value: string, size: number, color: Color3?, font: Enum.Font?): TextLabel
-	local t = text(parent, value, size, color or Color3.new(1, 1, 1), font or CHUNKY)
+	local t = text(parent, value, size, color or Color3.new(1, 1, 1), font or IronUi.Body)
 	t.AutomaticSize = Enum.AutomaticSize.None
+	t.TextTruncate = Enum.TextTruncate.AtEnd
 	return t
 end
 
@@ -210,6 +231,7 @@ local function keyChip(parent: Instance, key: string): TextLabel
 		TextColor3 = P.Dim,
 		ZIndex = 6,
 	}, parent)
+	chip.Visible = UserInputService.KeyboardEnabled
 	UiKit.round(chip, 4)
 	new(
 		"UIStroke",
@@ -235,6 +257,10 @@ local title = IronUi.wordmark(root)
 place(title, 76, 4, 400, 40)
 local hello = label(root, "", 13, P.Gold, IronUi.Bold)
 place(hello, 77, 40, 400, 18)
+local readiness = label(root, "LOADOUT", 11, P.Dim, IronUi.Bold)
+place(readiness, 500, 10, 230, 16)
+local readinessValue = label(root, "Syncing equipment…", 14, P.Text, IronUi.Body)
+place(readinessValue, 500, 30, 270, 22)
 
 local wallet = new("Frame", {
 	BackgroundTransparency = 1,
@@ -253,10 +279,10 @@ local function pill(order: number, caption: string, color: Color3, width: number
 	UiKit.round(frame, 6)
 	new("UIStroke", { Color = IronUi.mute(color), Thickness = 1, Transparency = 0.45 }, frame)
 	local ic = label(frame, caption, 12, color, IronUi.Bold)
-	place(ic, 12, 0, 70, 44)
+	place(ic, 12, 6, width - 24, 12)
 	local value = label(frame, "0", 21, Color3.new(1, 1, 1), IronUi.Heading)
-	place(value, 70, 0, width - 82, 44)
-	value.TextXAlignment = Enum.TextXAlignment.Right
+	place(value, 12, 18, width - 24, 21)
+	value.TextXAlignment = Enum.TextXAlignment.Left
 	return frame, value
 end
 local _, coinsValue = pill(1, "COINS", P.Gold, 160)
@@ -264,8 +290,8 @@ local _, coinsValue = pill(1, "COINS", P.Gold, 160)
 local seasonFrame, marksValue = pill(2, "SEASON", P.Teal, 170)
 local seasonTrack = new("Frame", {
 	BackgroundColor3 = P.Slot,
-	Position = UDim2.new(0, 12, 1, -9),
-	Size = UDim2.new(1, -24, 0, 4),
+	Position = UDim2.new(0, 12, 1, -4),
+	Size = UDim2.new(1, -24, 0, 2),
 }, seasonFrame)
 UiKit.round(seasonTrack, 2)
 local seasonFill = new("Frame", { BackgroundColor3 = P.Teal, Size = UDim2.fromScale(0, 1) }, seasonTrack)
@@ -307,10 +333,23 @@ local sector = label(mine, "LUNAR FRONTIER", 11, P.Gold, IronUi.Bold)
 place(sector, 20, 12, 200, 14)
 local mineTitle = label(mine, "MOON MINE", 26, P.Text, IronUi.Heading)
 place(mineTitle, 18, 28, 240, 32)
-local mineLine1 = label(mine, "", 15, Color3.new(1, 1, 1), CHUNKY)
+local mineLine1 = label(mine, "", 14, P.Text, IronUi.Body)
 place(mineLine1, 20, 64, 250, 20)
-local mineLine2 = label(mine, "", 14, P.Dim, CHUNKY)
+local mineLine2 = label(mine, "", 12, P.Dim, IronUi.Body)
 place(mineLine2, 20, 84, 250, 18)
+local allowanceTrack = new("Frame", {
+	BackgroundColor3 = P.Slot,
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(20, 104),
+	Size = UDim2.fromOffset(236, 3),
+}, mine)
+UiKit.round(allowanceTrack, 2)
+local allowanceFill = new("Frame", {
+	BackgroundColor3 = P.Gold,
+	BorderSizePixel = 0,
+	Size = UDim2.fromScale(0, 1),
+}, allowanceTrack)
+UiKit.round(allowanceFill, 2)
 -- A small lit moon between the details and the button.
 local moon = new("Frame", {
 	Position = UDim2.fromOffset(266, 17),
@@ -387,8 +426,8 @@ marketButton.TextSize = 15
 local social = panel(root, 970, STRIP_Y, W - 986, STRIP_H, P.Teal)
 local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
 place(socialTitle, 20, 14, 240, 28)
-local socialCopy = label(social, "Gem Surges Q · E · R  ·  Maneuvers 1 · 2 · 3", 12, LIGHT, IronUi.Body)
-place(socialCopy, 20, 44, 260, 18)
+local socialCopy = label(social, "Practice safely or enter opt-in PvP.", 12, LIGHT, IronUi.Body)
+place(socialCopy, 20, 44, 270, 18)
 socialCopy.TextWrapped = true
 socialCopy.TextYAlignment = Enum.TextYAlignment.Top
 -- The Surge Array at a glance: the three gem sockets. Click to open the loadout.
@@ -475,10 +514,26 @@ local function refresh(profile)
 	end
 	seasonAlert.Visible = unclaimed > 0
 	seasonAlert.Text = if unclaimed > 9 then "9+" else tostring(unclaimed)
+	local equipped, surges = 0, 0
+	local loadout = profile.Character or {}
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
+		if loadout[slot] then
+			equipped += 1
+		end
+	end
+	for _, key in { "Q", "E", "R" } do
+		if Tech.surgeGem(loadout, key) then
+			surges += 1
+		end
+	end
+	readinessValue.Text = string.format("%d/6 equipped   ·   %d/3 surges", equipped, surges)
+	readinessValue.TextColor3 = if equipped == 6 and surges == 3 then P.Teal else P.Gold
 	local quota = profile.Quota or {}
 	local daily = profile.DailyQuota or Config.DailyQuota
 	local weekly = profile.WeeklyQuota or Config.WeeklyQuota
 	local free = math.max(0, math.min(daily - (quota.UsedToday or 0), weekly - (quota.UsedThisWeek or 0)))
+	allowanceFill.Size = UDim2.fromScale(math.clamp(free / math.max(1, daily), 0, 1), 1)
+	allowanceFill.BackgroundColor3 = if free > 0 then P.Gold else P.Dim
 	mineLine1.Text = if free > 0
 		then string.format("%d of %d free walls left today", free, daily)
 		else "Free walls used up today"
