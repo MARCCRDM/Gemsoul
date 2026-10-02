@@ -50,6 +50,7 @@ local function new(class, props, parent)
 end
 local Instance = { new = function(class) return new(class, {}) end }
 local UiKit = { Colors = { Bad = "bad" }, round = function() end, toast = function() end }
+UiKit.list = function(parent) return new("UIListLayout", {}, parent) end
 UiKit.gui = function(name) return new("ScreenGui", { Name = name }) end
 local palette = {}
 for _, key in { "Frame", "Inset", "Slot", "Edge", "Gold", "Text", "Dim", "Good", "Bad", "Teal", "Ink" } do
@@ -79,6 +80,7 @@ local GemClient = { Profile = { Season = { XP = 0 } }, Changed = signal() }
 GemClient.request = function(action, id)
 	local ok, message
 	if action == "LearnAugment" then ok, message = Tree.learn(GemClient.Profile, id)
+	elseif action == "UpgradeAugment" then ok, message = Tree.upgrade(GemClient.Profile, id)
 	else ok, message = Tree.respec(GemClient.Profile) end
 	return { Ok = ok, Message = message, Augments = GemClient.Profile.Augments }
 end

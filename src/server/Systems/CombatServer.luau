@@ -890,6 +890,8 @@ local function triggerTechnology(player, id, aim)
 		Remotes.CombatFx:FireClient(player, "TechStatus", "Unlock " .. definition.Name .. " in the Augment Tree.")
 		return false
 	end
+	-- Ranks II and III hit harder, cost less, recover faster and last longer.
+	definition = Tree.techStats(PlayerData.get(player), id)
 	if now < st.StunUntil or st.DodgeMove or blocking(st, now) or st.ChargeStarted then
 		return false
 	end
@@ -1040,11 +1042,11 @@ local function tick(_dt)
 			local pending = st.Pending[i]
 			if now >= pending.At then
 				table.remove(st.Pending, i)
-				technologyStrike(player, Tech.Catalog[pending.Id], pending.Aim)
+				technologyStrike(player, Tree.techStats(PlayerData.get(player), pending.Id), pending.Aim)
 			end
 		end
 		if st.Channel then
-			local channel, definition = st.Channel, Tech.Catalog.CryoStream
+			local channel, definition = st.Channel, Tree.techStats(PlayerData.get(player), "CryoStream")
 			if now >= channel.Until or blocking(st, now) or st.DodgeMove or not Tech.hasGem(k.Loadout, "Frost") then
 				st.Channel = nil
 			elseif now >= channel.Next then

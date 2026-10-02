@@ -11,17 +11,30 @@ check(not Tree.learn(profile, "BreachHammer"), "Skipped prerequisite")
 check(not Tree.learn(profile, {}) and not Tree.learn(profile, "spoofed"), "Invalid unlock IDs")
 check(Tree.learn(profile, "ServoFlurry") and profile.Augments.Points == 2, "Point purchase")
 check(not Tree.learn(profile, "ServoFlurry") and profile.Augments.Points == 2, "Duplicate purchase spent points")
-check(Tree.learn(profile, "StimDodge") and profile.Augments.Points == 1, "Linked branch unlock")
+-- Blades-style tiers: Tier II opens at Augment Level 3, Tier III at 6.
+check(not Tree.learn(profile, "StimDodge") and profile.Augments.Points == 2, "Tier II opened before level 3")
 check(not Tree.learn(profile, "ArmorPiercer"), "Insufficient point purchase")
-check(Tree.addXP(profile, 149) == 0 and profile.Augments.Points == 1, "XP below point boundary")
-check(Tree.addXP(profile, 1) == 1 and profile.Augments.Points == 2, "Point boundary award")
-check(Tree.learn(profile, "ArmorPiercer") and profile.Augments.Points == 0, "Capstone purchase")
-local reloaded = { Augments = { XP = profile.Augments.XP, Unlocked = table.clone(profile.Augments.Unlocked), Points = 999 } }
+check(Tree.addXP(profile, 149) == 0 and profile.Augments.Points == 2, "XP below point boundary")
+check(Tree.addXP(profile, 1) == 1 and profile.Augments.Points == 3 and profile.Augments.Level == 2, "Point boundary award")
+check(Tree.addXP(profile, 150) == 1 and profile.Augments.Level == 3, "Level 3 boundary")
+check(Tree.learn(profile, "StimDodge") and profile.Augments.Points == 3, "Linked branch unlock")
+check(not Tree.learn(profile, "ArmorPiercer") and profile.Augments.Points == 3, "Tier III opened before level 6")
+check(Tree.addXP(profile, 450) == 3 and profile.Augments.Level == 6, "Level 6 boundary")
+check(Tree.learn(profile, "ArmorPiercer") and profile.Augments.Points == 4, "Capstone purchase")
+-- Ranks: II costs the tier, III one more; never past III; never on a locked node.
+check(Tree.upgrade(profile, "ServoFlurry") and Tree.rank(profile, "ServoFlurry") == 2 and profile.Augments.Points == 3, "Rank II cost")
+check(Tree.upgrade(profile, "ServoFlurry") and Tree.rank(profile, "ServoFlurry") == 3 and profile.Augments.Points == 1, "Rank III cost")
+check(not Tree.upgrade(profile, "ServoFlurry") and profile.Augments.Points == 1, "Rank past the maximum")
+check(not Tree.upgrade(profile, "BreachHammer") and not Tree.upgrade(profile, "spoofed"), "Upgraded a locked or unknown node")
+check(not Tree.upgrade(profile, "ArmorPiercer"), "Rank II without the points")
+local reloaded = { Augments = { XP = profile.Augments.XP, Unlocked = table.clone(profile.Augments.Unlocked), Ranks = table.clone(profile.Augments.Ranks), Points = 999 } }
 data = Tree.initialize(reloaded)
-check(data.Points == 0 and data.Unlocked.ArmorPiercer, "Reload or forged points invalid")
-check(Tree.respec(reloaded) and reloaded.Augments.Points == 4 and reloaded.Augments.Spent == 0, "Point refund")
-check(reloaded.Augments.XP == 150 and not reloaded.Augments.Unlocked.ArmorPiercer, "Reset lost XP or retained paid node")
-check(Tree.respec(reloaded) and reloaded.Augments.Points == 4, "Repeated reset minted points")
+check(data.Points == 1 and data.Unlocked.ArmorPiercer and data.Ranks.ServoFlurry == 3, "Reload or forged points invalid")
+check(Tree.respec(reloaded) and reloaded.Augments.Points == 8 and reloaded.Augments.Spent == 0, "Point refund")
+check(reloaded.Augments.XP == 750 and not reloaded.Augments.Unlocked.ArmorPiercer and Tree.rank(reloaded, "ServoFlurry") == 0, "Reset lost XP or retained paid node")
+check(Tree.respec(reloaded) and reloaded.Augments.Points == 8, "Repeated reset minted points")
+local forged = Tree.initialize({ Augments = { XP = 0, Unlocked = { ServoFlurry = true }, Ranks = { ServoFlurry = 99, HydraulicSlam = 3, BreachHammer = 3 } } })
+check(forged.Points >= 0 and forged.Spent <= forged.Earned and forged.Ranks.ServoFlurry <= 3 and not forged.Ranks.BreachHammer, "Forged ranks minted power")
 local corrupt = { Augments = { XP = 0/0, Points = 999999, Unlocked = { spoofed = true, ArmorPiercer = true, ServoFlurry = "true" } } }
 data = Tree.initialize(corrupt)
 check(data.XP == 0 and data.Points == 3 and not data.Unlocked.spoofed and not data.Unlocked.ArmorPiercer, "Corrupt save sanitization")
@@ -39,8 +52,9 @@ for _, branch in Tree.Branches do
 		if not n.Free then check(Tree.learn(complete, id), "Complete tree cannot be purchased") end
 	end
 end
-check(total == Tree.MaxPoints and complete.Augments.Points == 0 and complete.Augments.Spent == 24, "Whole-tree point budget")
-check(Tree.addXP(complete, 100000) == 0 and complete.Augments.Points == 0, "Point cap bypass")
+check(total == Tree.UnlockPoints and complete.Augments.Points == 0 and complete.Augments.Spent == 24, "Whole-tree point budget")
+check(Tree.addXP(complete, 100000) == Tree.MaxPoints - 24 and complete.Augments.Points == Tree.MaxPoints - 24, "Rank budget beyond unlocks")
+check(Tree.addXP(complete, 100000) == 0 and complete.Augments.Level == Tree.MaxLevel, "Point cap bypass")
 check(Tree.addXP(complete, math.huge) == 0 and Tree.addXP(complete, -100) == 0, "Invalid XP accepted")
 local effects = Tree.effects(complete)
 check(effects.Mobility == 0.05 and effects.StaminaRegen == 0.15 and effects.ChargeRegen == 0.15 and effects.Thermal == 0.1, "Passive effects missing")
@@ -48,6 +62,10 @@ check(close(Tree.weaponMultiplier(effects, { Look = "FrontierSword", Attack = { 
 check(close(Tree.weaponMultiplier(effects, { Look = "Cleaver", Attack = { Kind = "Melee" } }), 1.05), "Cleaver calibration")
 check(Tree.weaponMultiplier(effects, { Look = "CleanSidearm", Attack = { Kind = "Shot" } }) == 1, "Sword augment boosted pistol")
 check(Tree.weaponMultiplier(effects, { Look = "Hammer", Attack = { Kind = "Melee" } }) == 1, "Unclassified weapon boosted")
+check(Tree.upgrade(complete, "MobilityAugment") and Tree.upgrade(complete, "MobilityAugment") and close(Tree.effects(complete).Mobility, 0.15), "Passive ranks stack their bonus")
+check(Tree.upgrade(complete, "HydraulicSlam") and Tree.upgrade(complete, "HydraulicSlam"), "Starter node ranks")
+local slam = Tree.techStats(complete, "HydraulicSlam")
+check(close(slam.Damage, 1.8 * 1.2) and close(slam.Cost, 30 * 0.84) and close(Tech.Catalog.HydraulicSlam.Damage, 1.8), "Rank III technology scaling or catalog mutated")
 
 -- Real unlock handlers and live combat: purchases are authoritative and build changes are safe.
 local source, hs, rs, loadout = makePlayer(30, Vector3.zero, nil)

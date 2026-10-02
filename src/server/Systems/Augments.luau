@@ -26,6 +26,21 @@ function Augments.start()
 		end
 		return Shop.reply(ok, message, { Augments = profile.Augments })
 	end)
+	-- Raise an unlocked node one rank (Blades-style rank II and III).
+	Shop.register("UpgradeAugment", function(player, id)
+		local profile = PlayerData.get(player)
+		if not profile then
+			return Shop.reply(false, "Profile unavailable.")
+		end
+		if not canChange(player) then
+			return Shop.reply(false, "Return to the dashboard or town to change augments.")
+		end
+		local ok, message = Tree.upgrade(profile, id)
+		if ok then
+			PlayerData.augmentsChanged(player)
+		end
+		return Shop.reply(ok, message, { Augments = profile.Augments })
+	end)
 	Shop.register("ResetAugments", function(player)
 		local profile = PlayerData.get(player)
 		if not profile then
