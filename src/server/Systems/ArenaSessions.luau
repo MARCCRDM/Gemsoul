@@ -52,7 +52,7 @@ local function enter(player, pvp)
 		true,
 		if pvp
 			then "PvP Arena: a rival miner steps in. Other Arena fighters can attack you too."
-			else "Training Arena: practise on dummies. Player damage is off."
+			else "Training Arena: a sparring partner steps in. Player damage is off."
 	)
 end
 local function leave(player)

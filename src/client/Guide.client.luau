@@ -29,7 +29,7 @@ local STEPS = {
 	{
 		Milestone = "Slain",
 		Target = "Wilds",
-		Text = "Practise on the Arena dummies, then defeat a crystal monster outside the south gate.",
+		Text = "Spar in the Arena, then defeat a crystal monster outside the south gate.",
 	},
 }
 

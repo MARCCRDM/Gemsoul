@@ -747,16 +747,9 @@ function Enemies.start(trainingOnly: boolean?)
 	folder.Name = "Enemies"
 	folder.Parent = workspace
 
-	-- Training dummies in a ring on the Arena floor, facing the middle.
+	-- The Arena floor has no standing targets: each Arena session brings its
+	-- own rival or sparring partner (see Duelist).
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local arena = landmarks and landmarks:GetAttribute("ArenaFloor")
-	if typeof(arena) == "Vector3" then
-		for i = 1, 4 do
-			local angle = math.rad(i * 90 + 45)
-			local spot = arena + Vector3.new(math.cos(angle) * 12, 0.7, math.sin(angle) * 12)
-			spawn("Dummy", spot, (arena - spot).Unit)
-		end
-	end
 	if not trainingOnly then
 		for _, camp in CAMPS do
 			spawn(camp[1], Enemies.WildsCenter + camp[2])

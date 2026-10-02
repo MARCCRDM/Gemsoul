@@ -120,7 +120,7 @@ local Vendors: { [string]: Vendor } = {
 		Color = Color3.fromRGB(255, 45, 70),
 		Tunic = Color3.fromRGB(110, 30, 40),
 		Face = ">_<",
-		Greeting = "Looking for a fight? Warm up on my dummies inside, then go hunt the crystal beasts past the south gate.",
+		Greeting = "Looking for a fight? Warm up against a sparring partner inside, then go hunt the crystal beasts past the south gate.",
 		Options = {
 			{ Text = "Open my Augment Tree", Action = "AugmentTree" },
 			{ Text = "Review my combat rig", Action = "CombatGuide" },

@@ -112,7 +112,7 @@ local function buildRig(loadout, name: string, at: CFrame): Model?
 		warn("Duelist rig failed:", rig)
 		return nil
 	end
-	rig.Name = "Rival · " .. name
+	rig.Name = name
 	rig:PivotTo(at)
 	Equipment.dressModel(rig, loadout, math.random(1, 1e6))
 	-- A translucent shield plate that shows while its guard is up.
@@ -171,7 +171,7 @@ local function think(enemy, now: number)
 		return
 	end
 	local target = ownerRoot(owner)
-	if not target or owner:GetAttribute("CombatSession") ~= "PvP" or not Combat.canFight(target.Position) then
+	if not target or owner:GetAttribute("CombatSession") ~= duel.Session or not Combat.canFight(target.Position) then
 		Duelist.despawn(owner)
 		return
 	end
@@ -306,6 +306,17 @@ local function onWin(enemy)
 	if not owner.Parent then
 		return
 	end
+	local session = duel.Session
+	if session == "Training" then
+		-- Sparring: no rewards, just another partner.
+		Remotes.Notify:FireClient(owner, string.format("Sparring won against %s. A new partner steps in…", duel.Name))
+		task.delay(REMATCH_DELAY, function()
+			if owner.Parent and owner:GetAttribute("CombatSession") == session and not duels[owner] then
+				spawnRival(owner)
+			end
+		end)
+		return
+	end
 	PlayerData.addCoins(owner, WIN_COINS)
 	local profile = PlayerData.get(owner)
 	if profile then
@@ -317,7 +328,7 @@ local function onWin(enemy)
 		string.format("Victory! You defeated %s: +%d coins. A new rival steps in…", duel.Name, WIN_COINS)
 	)
 	task.delay(REMATCH_DELAY, function()
-		if owner.Parent and owner:GetAttribute("CombatSession") == "PvP" and not duels[owner] then
+		if owner.Parent and owner:GetAttribute("CombatSession") == session and not duels[owner] then
 			spawnRival(owner)
 		end
 	end)
@@ -327,6 +338,13 @@ function spawnRival(owner: Player)
 	if duels[owner] or starting[owner] then
 		return
 	end
+	-- PvP brings a full-strength rival; Training a sparring partner that hits
+	-- for half and gives no rewards.
+	local session = owner:GetAttribute("CombatSession")
+	if session ~= "PvP" and session ~= "Training" then
+		return
+	end
+	local sparring = session == "Training"
 	local root = ownerRoot(owner)
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
 	local center = landmarks and landmarks:GetAttribute("ArenaFloor")
@@ -344,7 +362,7 @@ function spawnRival(owner: Player)
 	local spot = center + away * 18 + Vector3.new(0, 4, 0)
 	local rig = buildRig(loadout, name, CFrame.lookAt(spot, Vector3.new(root.Position.X, spot.Y, root.Position.Z)))
 	starting[owner] = nil
-	if not rig or not owner.Parent or owner:GetAttribute("CombatSession") ~= "PvP" or duels[owner] then
+	if not rig or not owner.Parent or owner:GetAttribute("CombatSession") ~= session or duels[owner] then
 		if rig then
 			rig:Destroy()
 		end
@@ -389,7 +407,10 @@ function spawnRival(owner: Player)
 		Name = name,
 		Element = element,
 		Plate = rig:FindFirstChild("GuardPlate"),
-		Damage = (if ownerHumanoid then ownerHumanoid.MaxHealth else 300) / 13 * strength,
+		Session = session,
+		Damage = (if ownerHumanoid then ownerHumanoid.MaxHealth else 300) / 13 * strength * (if sparring
+			then 0.5
+			else 1),
 		SurgePower = if surge and surge.Damage then math.clamp(surge.Damage, 1, 2) else 1.4,
 		SurgeName = if surge then surge.Name else "a Gem Surge",
 		Speed = 16,
@@ -407,17 +428,18 @@ function spawnRival(owner: Player)
 	enemy.Brain = think
 	enemy.OnDeath = onWin
 	duels[owner] = duel
-	Remotes.Notify:FireClient(owner, string.format("%s enters the Arena with %s. Fight!", name, duel.SurgeName))
+	Remotes.Notify:FireClient(
+		owner,
+		if sparring
+			then string.format("Sparring partner %s steps in with %s. Hits are softened.", name, duel.SurgeName)
+			else string.format("%s enters the Arena with %s. Fight!", name, duel.SurgeName)
+	)
 end
 
 function Duelist.start()
-	ArenaSessions.onEnter = function(player: Player, pvp: boolean)
-		if pvp then
-			task.wait(1.5) -- let the arrival protection settle first
-			if player:GetAttribute("CombatSession") == "PvP" then
-				spawnRival(player)
-			end
-		end
+	ArenaSessions.onEnter = function(player: Player, _pvp: boolean)
+		task.wait(1.5) -- let the arrival protection settle first
+		spawnRival(player)
 	end
 	ArenaSessions.onLeave = function(player: Player)
 		Duelist.despawn(player)
