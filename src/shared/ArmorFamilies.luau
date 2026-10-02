@@ -10,6 +10,23 @@ Armor.Weights = { 40, 25, 20, 10, 5 }
 Armor.Costs = { Health = 1, Power = 1, Defense = 1, Speed = 2, Critical = 2, Cooldown = 2 }
 Armor.Values = { Health = 5, Power = 1, Defense = 1, Speed = 0.5, Critical = 0.005, Cooldown = 0.005 }
 Armor.Stats = { "Health", "Power", "Defense", "Speed", "Critical", "Cooldown" }
+Armor.Enhancements = {
+	Prospector = { BasicDamage = 1.10, Knockback = 1.15, DodgeCooldown = 0.85, BlockWidth = 1.20 },
+	Skirmisher = { AttackSpeed = 1.15, HeavyCrit = 0.20, DodgeDistance = 1.25, Deflect = true },
+	Juggernaut = {
+		Stagger = 0.10,
+		HeavyDamage = 1.25,
+		DodgeDistance = 0.80,
+		Invincible = 0.75,
+		BlockReduction = 0.65,
+		BlockPvPReduction = 0.50,
+	},
+}
+Armor.EnhancementText = {
+	Prospector = "2+ pieces: Attack +10% damage; Heavy +15% knockback; Dodge -15% cooldown; Block +20% width.",
+	Skirmisher = "2+ pieces: Attack +15% speed; Heavy +20% critical chance; Dodge +25% distance; Block deflects light projectiles.",
+	Juggernaut = "2+ pieces: Attack +10% stagger chance; Heavy +25% damage; Dodge 12 studs / 0.75s PvE immunity; Block 65% PvE / 50% PvP reduction.",
+}
 Armor.Families = {
 	Prospector = {
 		Look = "UtilityMiner",

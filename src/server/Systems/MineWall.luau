@@ -374,6 +374,9 @@ local function teleport(player: Player, target: CFrame): boolean
 end
 
 local function expeditionStart(player: Player)
+	if player:GetAttribute("CombatSession") then
+		return reply(false, "Leave the Arena before starting an expedition.")
+	end
 	local site = MiningSite.Current
 	if not site then
 		return reply(false, "The mining site isn't ready yet.")

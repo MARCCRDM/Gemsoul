@@ -1020,20 +1020,9 @@ for classId, class in Classes.List do
 	end
 end
 Classes.Order = { "Warrior" }
-table.insert(
-	Classes.List.Warrior.Abilities,
-	{
-		Id = "WarriorDodge",
-		Name = "Dodge Roll",
-		Description = "Roll backward. A full Skirmisher set grants 10% damage for 3 seconds afterward.",
-		Kind = "Dash",
-		Distance = 12,
-		Backward = true,
-		Dodge = true,
-		Cost = 0,
-		Cooldown = 5,
-	}
-)
+-- Universal actions replace all active ability/ultimate picks.
+Classes.List.Warrior.Abilities = {}
+Classes.List.Warrior.Ultimate = nil
 Classes.List.Warrior.Specs = {}
 function Classes.setState(loadout)
 	return ArmorFamilies.setState(loadout, function(slot, id)
@@ -1124,7 +1113,7 @@ function Classes.ability(classId: any, abilityId: any): Ability?
 	if not class then
 		return nil
 	end
-	if class.Ultimate.Id == abilityId then
+	if class.Ultimate and class.Ultimate.Id == abilityId then
 		return class.Ultimate
 	end
 	for _, ability in class.Abilities do

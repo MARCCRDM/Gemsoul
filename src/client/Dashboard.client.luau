@@ -16,6 +16,7 @@ local TradeUI = require(script.Parent.Modules.TradeUI)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local MineScene = require(script.Parent.Modules.MineScene)
+local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -380,9 +381,9 @@ marketButton.TextSize = 15
 
 -- Social spaces are honest placeholders: no simulated messages or working inputs.
 local social = panel(root, 1080, STRIP_Y, W - 1096, STRIP_H, P.Teal)
-local socialTitle = label(social, "CHAT & PARTY", 19, P.Text, IronUi.Heading)
+local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
 place(socialTitle, 20, 16, 200, 28)
-local soon = label(social, "COMING SOON", 11, P.Teal, IronUi.Bold)
+local soon = label(social, "WARRIORS", 11, P.Teal, IronUi.Bold)
 soon.BackgroundTransparency = 0.8
 soon.BackgroundColor3 = P.Teal
 soon.TextXAlignment = Enum.TextXAlignment.Center
@@ -390,10 +391,24 @@ soon.AnchorPoint = Vector2.new(1, 0)
 place(soon, 0, 0, 104, 22)
 soon.Position = UDim2.new(1, -16, 0, 18)
 UiKit.round(soon, 4)
-local socialCopy = label(social, "Station comms and expedition crews are on the way.", 13, LIGHT, IronUi.Body)
-place(socialCopy, 20, 54, W - 1136, 40)
+local socialCopy = label(social, "Four actions. Your armor defines the fight.", 12, LIGHT, IronUi.Body)
+place(socialCopy, 20, 46, W - 1136, 20)
 socialCopy.TextWrapped = true
 socialCopy.TextYAlignment = Enum.TextYAlignment.Top
+local training = IronUi.gemButton(social, "TRAIN", P.Teal, function()
+	launch(function()
+		ArenaScene.enter(false)
+	end)
+end)
+training.Position = UDim2.fromOffset(20, 72)
+training.Size = UDim2.fromOffset(114, 32)
+local pvp = IronUi.gemButton(social, "PVP ARENA", P.Gold, function()
+	launch(function()
+		ArenaScene.enter(true)
+	end)
+end)
+pvp.Position = UDim2.fromOffset(152, 72)
+pvp.Size = UDim2.fromOffset(138, 32)
 
 -- The armory fills the rest: equipment, sockets, stats, backpack and spare gear.
 CharacterUI.mount(root, gui, UDim2.fromOffset(16, STRIP_Y + STRIP_H + 12))

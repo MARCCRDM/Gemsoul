@@ -5,6 +5,8 @@ local Config = {
 	-- while this is on: no monsters, no hotbar, and the camera shows the
 	-- kingdom behind the menu.
 	MenuOnly = true,
+	-- Arena combat is playable from the dashboard without enabling the old town loop.
+	CombatEnabled = true,
 	-- Only this class is playable for now; everyone is set to it (with its
 	-- random equipment set). nil opens all classes again.
 	OnlyClass = "Warrior",

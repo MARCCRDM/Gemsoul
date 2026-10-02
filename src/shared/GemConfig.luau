@@ -34,7 +34,7 @@ export type Shade = { Tier: string, Name: string, Color: Color3, Color2: Color3?
 
 local GemConfig = {}
 -- Retain saved element keys while presenting space-tech affinities everywhere.
-GemConfig.ElementLabels = { Fire = "Thermal", Frost = "Cryo", Shock = "Ion", Poison = "Radiation" }
+GemConfig.ElementLabels = { Fire = "Thermal", Frost = "Cryo", Shock = "Ion", Poison = "Corrosive" }
 function GemConfig.elementName(element: string): string
 	return GemConfig.ElementLabels[element] or element
 end
@@ -215,6 +215,27 @@ function GemConfig.enchantValues(gem: Gem, slot: string): { [string]: number }
 	return { Weaken = math.min(25, 5 + math.floor(p / 10)) / 100 }
 end
 
+-- Universal-action effects. Saved element IDs remain Fire/Frost/Poison/Shock.
+function GemConfig.actionValues(gem: Gem, action: string): { [string]: any }
+	local potency = GemConfig.potency(gem)
+	if action == "Block" then
+		if gem.Element == "Fire" then
+			return { ReflectThermal = 0.10 }
+		elseif gem.Element == "Frost" then
+			return { FrostShield = math.max(2, math.floor(potency * 0.15)) }
+		elseif gem.Element == "Poison" then
+			return { Cleanse = true }
+		elseif gem.Element == "Shock" then
+			return { Recharge = math.max(2, math.floor(potency * 0.10)) }
+		end
+	end
+	local values = GemConfig.enchantValues(gem, "Weapon")
+	if gem.Element == "Poison" then
+		return { Sunder = values.Weaken, Duration = 4 }
+	end
+	return values
+end
+
 function GemConfig.enchantment(gem: Gem, slot: string): (string, string)
 	slot = if slot == "Weapon" then "Weapon" else "Armor"
 	local name = GemConfig.EnchantNames[slot] and GemConfig.EnchantNames[slot][gem.Element] or "Enchanted"
@@ -231,7 +252,7 @@ function GemConfig.enchantment(gem: Gem, slot: string): (string, string)
 		then string.format("Hits burn for %d damage over 3s", v.Burn)
 		elseif v.Slow then string.format("Hits slow enemies by %d%% for 2s", math.floor(v.Slow * 100 + 0.5))
 		elseif v.Arc then string.format("%d%% of each hit arcs to a nearby enemy", math.floor(v.Arc * 100 + 0.5))
-		else string.format("Irradiated enemies deal %d%% less damage for 4s", math.floor(v.Weaken * 100 + 0.5))
+		else string.format("Basic and Heavy attacks shred armor by %d%% for 4s", math.floor(v.Weaken * 100 + 0.5))
 	return name, text
 end
 

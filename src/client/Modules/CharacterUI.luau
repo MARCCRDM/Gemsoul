@@ -10,6 +10,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -807,6 +808,9 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 				P.Dim
 			)
 		end
+	end
+	if gear.ArmorFamily then
+		text(tipBody, ArmorFamilies.EnhancementText[gear.ArmorFamily], 12, P.Dim)
 	end
 	signatureLine(gear)
 end

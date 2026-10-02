@@ -612,7 +612,7 @@ local function tickDots(enemy: Enemy)
 	end
 end
 
-function Enemies.start()
+function Enemies.start(trainingOnly: boolean?)
 	folder = Instance.new("Folder")
 	folder.Name = "Enemies"
 	folder.Parent = workspace
@@ -627,8 +627,10 @@ function Enemies.start()
 			spawn("Dummy", spot, (arena - spot).Unit)
 		end
 	end
-	for _, camp in CAMPS do
-		spawn(camp[1], Enemies.WildsCenter + camp[2])
+	if not trainingOnly then
+		for _, camp in CAMPS do
+			spawn(camp[1], Enemies.WildsCenter + camp[2])
+		end
 	end
 	if landmarks then
 		landmarks:SetAttribute("Wilds", Enemies.WildsCenter)

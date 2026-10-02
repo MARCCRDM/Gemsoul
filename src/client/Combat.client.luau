@@ -1,17 +1,4 @@
---[[
-	Combat on the client: controls, the hotbar and every effect you see.
-
-	Controls (only outside town, or in the Arena):
-	  Left click (hold to keep swinging)   basic attack with your weapon
-	  Q / E / R                            your three chosen abilities
-	  F                                    your class ultimate
-	  K                                    choose abilities (AbilitiesUI)
-	The hotbar buttons work too, for touch screens.
-
-	The server decides every hit; this script sends what you pressed and
-	where you aimed, moves your character for dashes, and draws swings,
-	shots, blasts, zones and floating damage numbers.
-]]
+-- Four universal actions: click/tap Attack, hold for Heavy, Space Dodge, hold RMB Block.
 local ContextActionService = game:GetService("ContextActionService")
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -19,378 +6,308 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-
+local Config = require(ReplicatedStorage.Shared.Config)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
-local AbilitiesUI = require(script.Parent.Modules.AbilitiesUI)
+local Actions = require(ReplicatedStorage.Shared.CombatActions)
+local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
-
--- Combat is paused while the game is menu-only (Shared/Config).
-if require(ReplicatedStorage.Shared.Config).MenuOnly then
+if Config.MenuOnly and not Config.CombatEnabled then
 	return
 end
-
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local remotes = ReplicatedStorage:WaitForChild("Remotes")
-local input = remotes:WaitForChild("CombatInput") :: RemoteEvent
-local fxEvent = remotes:WaitForChild("CombatFx") :: RemoteEvent
-
+local input = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CombatInput")
+local fxEvent = ReplicatedStorage.Remotes:WaitForChild("CombatFx")
 local P = IronUi.Colors
 local new, text = IronUi.new, IronUi.text
-local BOLD = IronUi.Bold
-
-local cooldowns: { [string]: { Ready: number, Total: number } } = {}
-local rateBuff = { Mult = 1, Until = 0 }
-local nextAttack = 0
-local holding = false
-
--- What the player has equipped ------------------------------------------------------------------
-
-local function loadout()
-	local profile = GemClient.Profile
-	local character = profile and profile.Character
-	local class = character and Classes.get(character.Class)
-	if not class then
-		return nil
-	end
-	local weapon = Classes.weapon(class.Id, character.Weapon)
-	return {
-		Class = class,
-		Weapon = weapon,
-		Slots = Classes.loadout(class.Id, character.Abilities),
-		Ultimate = class.Ultimate,
-	}
+local cooldowns = {}
+local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
+local gui = UiKit.gui("CombatHud", 5)
+local hud = new(
+	"Frame",
+	{
+		BackgroundColor3 = P.Inset,
+		BackgroundTransparency = 0.1,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -16),
+		Size = UDim2.fromOffset(380, 154),
+	},
+	gui
+)
+UiKit.round(hud, 12)
+local hp = text(hud, "", 14, P.Text, IronUi.Bold)
+hp.Position = UDim2.fromOffset(12, 8)
+hp.Size = UDim2.new(1, -24, 0, 22)
+local hint = text(hud, "Click Attack · Hold Heavy · Space Dodge · Hold RMB Block", 11, P.Dim)
+hint.Position = UDim2.fromOffset(12, 32)
+hint.Size = UDim2.new(1, -24, 0, 28)
+hint.TextWrapped = true
+local row = new(
+	"Frame",
+	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 66), Size = UDim2.new(1, -24, 0, 70) },
+	hud
+)
+UiKit.list(row, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
+local slots = {}
+local function rootPart()
+	return player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 end
-
-local function rootPart(): BasePart?
-	local character = player.Character
-	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-end
-
-local function introOpen(): boolean
-	return player.PlayerGui:FindFirstChild("Intro") ~= nil
-end
-
-local function canFight(): boolean
+local function canFight()
 	local root = rootPart()
-	return root ~= nil and not introOpen() and Combat.canFight(root.Position)
+	return root
+		and not player.PlayerGui:FindFirstChild("Intro")
+		and Combat.canFight(root.Position)
+		and (not Config.MenuOnly or ArenaScene.isActive())
 end
-
--- Where the mouse points in the world (or straight ahead on touch screens).
 local aimParams = RaycastParams.new()
 aimParams.FilterType = Enum.RaycastFilterType.Exclude
-local function aimPoint(): Vector3
+local function aimPoint()
 	local root = rootPart()
-	local fallback = if root then root.Position + root.CFrame.LookVector * 30 else Vector3.zero
+	local fallback = if root then root.Position + root.CFrame.LookVector * 40 else Vector3.zero
 	if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
 		return fallback
 	end
+	local camera = workspace.CurrentCamera
 	local mouse = UserInputService:GetMouseLocation()
 	local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
-	aimParams.FilterDescendantsInstances =
-		{ player.Character :: Instance, workspace:FindFirstChild("CombatFx") :: Instance }
+	aimParams.FilterDescendantsInstances = { player.Character, workspace:FindFirstChild("CombatFx") }
 	local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, aimParams)
 	return if hit then hit.Position else ray.Origin + ray.Direction * 120
 end
-
--- Turn to face where you're attacking.
-local function face(target: Vector3)
+local function face(aim)
 	local root = rootPart()
 	if root then
-		local flat = Vector3.new(target.X, root.Position.Y, target.Z)
+		local flat = Vector3.new(aim.X, root.Position.Y, aim.Z)
 		if (flat - root.Position).Magnitude > 0.5 then
 			root.CFrame = CFrame.lookAt(root.Position, flat)
 		end
 	end
 end
-
--- Actions -----------------------------------------------------------------------------------------
-
-local function tryAttack()
-	local kit = loadout()
-	if not kit or not kit.Weapon or not kit.Weapon.Attack or not canFight() then
-		return
+local function rules()
+	local loadout = GemClient.Profile and GemClient.Profile.Character
+	if not loadout then
+		return Actions.resolve({}, "Sword", 0)
 	end
-	local now = os.clock()
-	if now < nextAttack then
-		return
-	end
-	local rate = kit.Weapon.Attack.Rate * (if now < rateBuff.Until then rateBuff.Mult else 1)
-	nextAttack = now + rate
-	local aim = aimPoint()
-	face(aim)
-	input:FireServer("Attack", aim)
+	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
+	local effects = Classes.effects(loadout)
+	return Actions.resolve(
+		Classes.setState(loadout).Counts,
+		if weapon and weapon.Attack.Kind == "Melee" then "Sword" else "Pistol",
+		1 - (effects.CooldownMult or 1)
+	)
 end
-
-local function tryAbility(slot: number)
-	local kit = loadout()
-	if not kit then
+local function beginAttack()
+	if not canFight() or blockHeld or holding or os.clock() < nextAttack then
 		return
 	end
+	holding, chargeStarted = true, os.clock()
+	input:FireServer("BeginAttack")
+end
+local function releaseAttack()
+	if not holding then
+		return
+	end
+	holding = false
 	if not canFight() then
-		UiKit.toast("You can't fight in town. Head to the Arena or out the south gate.", UiKit.Colors.Dim)
-		return
-	end
-	local ability = if slot == 4 then kit.Ultimate else kit.Slots[slot]
-	local cd = ability and cooldowns[ability.Id]
-	if not ability or (cd and os.clock() < cd.Ready) then
+		input:FireServer("CancelAttack")
 		return
 	end
 	local aim = aimPoint()
 	face(aim)
-	input:FireServer("Ability", slot, aim)
+	local heavy = os.clock() - chargeStarted >= Actions.Base.Heavy.Charge
+	nextAttack = os.clock() + (if heavy then rules().HeavyCooldown else rules().BasicCooldown)
+	input:FireServer("ReleaseAttack", aim)
 end
-
--- HUD -------------------------------------------------------------------------------------------------
-
-local gui = UiKit.gui("CombatHud", 3)
-local hud = new("Frame", {
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -14),
-	Size = UDim2.fromOffset(392, 110),
-	BackgroundTransparency = 1,
-}, gui)
-
-local function bar(y: number, color: Color3): (Frame, TextLabel)
-	local back = new("Frame", {
-		BackgroundColor3 = Color3.fromRGB(18, 16, 14),
-		Position = UDim2.fromOffset(0, y),
-		Size = UDim2.new(1, 0, 0, 14),
-	}, hud)
-	UiKit.round(back, 7)
-	new("UIStroke", { Color = P.Ink, Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, back)
-	local fill = new("Frame", { BackgroundColor3 = color, Size = UDim2.fromScale(1, 1) }, back)
-	UiKit.round(fill, 7)
-	-- A glossy top half on the fill.
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-			ColorSequenceKeypoint.new(0.45, Color3.fromRGB(235, 235, 235)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(190, 190, 190)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 150, 150)),
-		}),
-	}, fill)
-	local label = text(back, "", 11, Color3.new(1, 1, 1), IronUi.Chunky)
-	label.Size = UDim2.fromScale(1, 1)
-	label.AutomaticSize = Enum.AutomaticSize.None
-	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.ZIndex = 3
-	return fill, label
-end
-local healthFill, healthLabel = bar(0, Color3.fromRGB(200, 50, 50))
-local shieldFill = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(180, 220, 255),
-	BackgroundTransparency = 0.3,
-	Size = UDim2.fromScale(0, 1),
-	ZIndex = 2,
-}, healthFill.Parent)
-UiKit.round(shieldFill, 7)
-local resourceFill, resourceLabel = bar(18, Color3.fromRGB(70, 130, 255))
-
-local slots = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 38),
-	Size = UDim2.new(1, 0, 0, 68),
-}, hud)
-UiKit.list(slots, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local zoneLabel = text(gui, "", 13, P.Gold, BOLD)
-zoneLabel.AnchorPoint = Vector2.new(0.5, 1)
-zoneLabel.Position = UDim2.new(0.5, 0, 1, -128)
-zoneLabel.Size = UDim2.fromOffset(420, 18)
-zoneLabel.TextXAlignment = Enum.TextXAlignment.Center
-zoneLabel.TextStrokeTransparency = 0.5
-
-type Slot = {
-	Button: TextButton,
-	Name: TextLabel,
-	Shade: Frame,
-	Timer: TextLabel,
-	Stroke: UIStroke,
-	Rim: Frame,
-	Face: Frame,
-	Ability: any?,
-}
-local slotUi: { Slot } = {}
-
-local function makeSlot(order: number, key: string, onPress: () -> ()): Slot
-	-- A chunky slab; its rim takes the class colour.
-	local button, slab = IronUi.chunk(slots, {
-		Color = Color3.fromRGB(52, 46, 70),
-		Size = UDim2.fromOffset(64, 68),
-		Radius = 12,
-		Lip = 5,
-		Stripes = "None",
-	})
-	button.LayoutOrder = order
-	local stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke
-	local rim = slab.Parent :: Frame
-	local keyLabel = text(slab, key, 12, P.Gold, IronUi.Chunky)
-	keyLabel.Position = UDim2.fromOffset(5, 3)
-	keyLabel.Size = UDim2.fromOffset(40, 14)
-	keyLabel.AutomaticSize = Enum.AutomaticSize.None
-	keyLabel.ZIndex = 4
-	local name = text(slab, "", 11, Color3.new(1, 1, 1), IronUi.Chunky)
-	name.AnchorPoint = Vector2.new(0.5, 1)
-	name.Position = UDim2.new(0.5, 0, 1, -4)
-	name.Size = UDim2.new(1, -6, 0, 28)
-	name.AutomaticSize = Enum.AutomaticSize.None
-	name.TextXAlignment = Enum.TextXAlignment.Center
-	name.TextYAlignment = Enum.TextYAlignment.Bottom
-	name.ZIndex = 4
-	local shade = new("Frame", {
-		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.35,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.fromScale(1, 0),
-		ZIndex = 5,
-	}, slab)
-	UiKit.round(shade, 9)
-	local timer = text(slab, "", 20, Color3.new(1, 1, 1), IronUi.Heading)
-	timer.Size = UDim2.fromScale(1, 1)
-	timer.AutomaticSize = Enum.AutomaticSize.None
-	timer.TextXAlignment = Enum.TextXAlignment.Center
-	timer.ZIndex = 6
-	button.Activated:Connect(onPress)
-	return { Button = button, Name = name, Shade = shade, Timer = timer, Stroke = stroke, Rim = rim, Face = slab }
-end
-
-slotUi[0] = makeSlot(0, "CLICK", tryAttack)
-for i, key in Classes.AbilityKeys do
-	slotUi[i] = makeSlot(i, key, function()
-		tryAbility(i)
-	end)
-end
-slotUi[4] = makeSlot(4, Classes.UltimateKey, function()
-	tryAbility(4)
-end)
-local abilitiesButton = IronUi.button(slots, "K", false, AbilitiesUI.toggle)
-abilitiesButton.LayoutOrder = 5
-abilitiesButton.Size = UDim2.fromOffset(0, 68)
-
-local function refreshSlots()
-	local kit = loadout()
-	gui.Enabled = kit ~= nil and not introOpen()
-	if not kit then
+local function setBlock(held)
+	if held and not canFight() then
 		return
 	end
-	local weapon = kit.Weapon
-	slotUi[0].Name.Text = if weapon then weapon.Name:gsub("^Iron ", "") else "Attack"
-	slotUi[0].Rim.BackgroundColor3 = kit.Class.Color
-	for i = 1, 3 do
-		local ability = kit.Slots[i]
-		slotUi[i].Ability = ability
-		slotUi[i].Name.Text = if ability then ability.Name else ""
-		slotUi[i].Rim.BackgroundColor3 = kit.Class.Color
-	end
-	slotUi[4].Ability = kit.Ultimate
-	slotUi[4].Name.Text = kit.Ultimate.Name
-	slotUi[4].Rim.BackgroundColor3 = P.Gold
-	slotUi[4].Stroke.Thickness = 4
-	resourceFill.BackgroundColor3 = Combat.ResourceColors[kit.Class.ResourceId] or resourceFill.BackgroundColor3
-end
-GemClient.Changed:Connect(refreshSlots)
-player.PlayerGui.ChildRemoved:Connect(function(child)
-	if child.Name == "Intro" then
-		task.defer(refreshSlots)
-	end
-end)
-refreshSlots()
-
--- Bars, cooldowns and the zone hint, every frame.
-RunService.RenderStepped:Connect(function()
-	if not gui.Enabled then
-		return
-	end
-	local now = os.clock()
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		healthFill.Size = UDim2.fromScale(math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1), 1)
-		healthLabel.Text = string.format("%d / %d", math.ceil(humanoid.Health), humanoid.MaxHealth)
-		local shield = player:GetAttribute("Shield") or 0
-		shieldFill.Size = UDim2.fromScale(math.clamp(shield / humanoid.MaxHealth, 0, 1), 1)
-	end
-	local resource = player:GetAttribute("Resource") or 0
-	local max = player:GetAttribute("ResourceMax") or 100
-	resourceFill.Size = UDim2.fromScale(math.clamp(resource / max, 0, 1), 1)
-	resourceLabel.Text = string.format("%s %d / %d", player:GetAttribute("ResourceKind") or "", resource, max)
-	for i = 1, 4 do
-		local ui = slotUi[i]
-		local ability = ui.Ability
-		local cd = ability and cooldowns[ability.Id]
-		local left = if cd then cd.Ready - now else 0
-		if left > 0 then
-			ui.Shade.Size = UDim2.fromScale(1, left / cd.Total)
-			ui.Timer.Text = if left >= 1 then tostring(math.ceil(left)) else string.format("%.1f", left)
-		else
-			ui.Shade.Size = UDim2.fromScale(1, 0)
-			ui.Timer.Text = ""
-		end
-		-- Dim what you can't afford yet.
-		local short = ability and (ability.Cost or 0) > resource
-		ui.Name.TextTransparency = if short then 0.55 else 0
-	end
-	local fight = canFight()
-	zoneLabel.Text = if fight then "" else "TOWN: fighting is off. Arena (west road) or the Crystal Wilds (south gate)."
-	for i = 0, 4 do
-		local fade = if fight then 0 else 0.5
-		slotUi[i].Button.BackgroundTransparency = fade
-		slotUi[i].Rim.BackgroundTransparency = fade
-		slotUi[i].Face.BackgroundTransparency = fade
-	end
-	if holding and fight then
-		tryAttack()
-	end
-end)
-
--- Input --------------------------------------------------------------------------------------------------
-
-UserInputService.InputBegan:Connect(function(inputObject, processed)
-	if processed then
-		return
-	end
-	if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
-		holding = true
-		tryAttack()
-	end
-end)
-UserInputService.InputEnded:Connect(function(inputObject)
-	if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
+	blockHeld = held
+	if held then
 		holding = false
+		input:FireServer("CancelAttack")
+	end
+	local aim = aimPoint()
+	if held then
+		face(aim)
+	end
+	input:FireServer("Block", held, aim)
+	nextBlockUpdate = os.clock() + 0.15
+end
+local function dodge()
+	if not canFight() then
+		return
+	end
+	local cd = cooldowns.Dodge
+	if cd and os.clock() < cd.Ready then
+		return
+	end
+	holding = false
+	blockHeld = false
+	input:FireServer("CancelAttack")
+	input:FireServer("Block", false)
+	local root = rootPart()
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	input:FireServer(
+		"Dodge",
+		if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then humanoid.MoveDirection else root.CFrame.LookVector
+	)
+end
+local function makeSlot(id, label, key)
+	local button, faceBox = IronUi.chunk(
+		row,
+		{ Color = Color3.fromRGB(52, 46, 70), Size = UDim2.fromOffset(80, 70), Radius = 10, Lip = 4, Stripes = "None" }
+	)
+	local name = text(faceBox, label, 12, P.Text, IronUi.Bold)
+	name.Position = UDim2.fromOffset(4, 28)
+	name.Size = UDim2.new(1, -8, 0, 26)
+	name.TextXAlignment = Enum.TextXAlignment.Center
+	local keyLabel = text(faceBox, key, 10, P.Gold)
+	keyLabel.Position = UDim2.fromOffset(6, 4)
+	local timer = text(faceBox, "", 18, P.Gold, IronUi.Bold)
+	timer.Position = UDim2.fromOffset(4, 18)
+	timer.Size = UDim2.new(1, -8, 0, 25)
+	timer.TextXAlignment = Enum.TextXAlignment.Center
+	slots[id] = { Button = button, Name = name, Timer = timer }
+	return button
+end
+local attackButton = makeSlot("Basic", "Attack", "CLICK / TAP")
+local heavyButton = makeSlot("Heavy", "Heavy", "HOLD")
+local dodgeButton = makeSlot("Dodge", "Dodge", "SPACE")
+local blockButton = makeSlot("Block", "Block", "HOLD RMB")
+local function pressInput(obj)
+	return obj.UserInputType == Enum.UserInputType.MouseButton1 or obj.UserInputType == Enum.UserInputType.Touch
+end
+attackButton.InputBegan:Connect(function(obj)
+	if pressInput(obj) then
+		beginAttack()
 	end
 end)
-
-local KEYS = { Q = 1, E = 2, R = 3, F = 4 }
-ContextActionService:BindAction("GemsoulAbilities", function(_, state, inputObject)
-	if state ~= Enum.UserInputState.Begin then
+attackButton.InputEnded:Connect(function(obj)
+	if pressInput(obj) then
+		releaseAttack()
+	end
+end)
+heavyButton.Activated:Connect(function()
+	beginAttack()
+	if holding then
+		task.delay(Actions.Base.Heavy.Charge + 0.1, releaseAttack)
+	end
+end)
+dodgeButton.Activated:Connect(dodge)
+blockButton.InputBegan:Connect(function(obj)
+	if pressInput(obj) then
+		setBlock(true)
+	end
+end)
+blockButton.InputEnded:Connect(function(obj)
+	if pressInput(obj) then
+		setBlock(false)
+	end
+end)
+local leave = IronUi.gemButton(gui, "LEAVE ARENA", P.Gold, ArenaScene.leave)
+leave.AnchorPoint = Vector2.new(1, 0)
+leave.Position = UDim2.new(1, -20, 0, 20)
+leave.Size = UDim2.fromOffset(160, 38)
+local function cancel()
+	holding = false
+	blockHeld = false
+	input:FireServer("CancelAttack")
+	input:FireServer("Block", false)
+end
+UserInputService.InputBegan:Connect(function(obj, processed)
+	if processed or UserInputService:GetFocusedTextBox() then
+		return
+	end
+	if obj.UserInputType == Enum.UserInputType.MouseButton1 then
+		beginAttack()
+	elseif obj.UserInputType == Enum.UserInputType.MouseButton2 then
+		setBlock(true)
+	end
+end)
+UserInputService.InputEnded:Connect(function(obj)
+	if obj.UserInputType == Enum.UserInputType.MouseButton1 then
+		releaseAttack()
+	elseif obj.UserInputType == Enum.UserInputType.MouseButton2 then
+		setBlock(false)
+	end
+end)
+UserInputService.WindowFocusReleased:Connect(cancel)
+ContextActionService:BindActionAtPriority("UniversalDodge", function(_, state)
+	if not canFight() or UserInputService:GetFocusedTextBox() then
 		return Enum.ContextActionResult.Pass
 	end
-	-- In town, E still talks to shopkeepers.
-	if not canFight() then
-		return Enum.ContextActionResult.Pass
-	end
-	local slot = KEYS[inputObject.KeyCode.Name]
-	if slot then
-		tryAbility(slot)
+	if state == Enum.UserInputState.Begin then
+		dodge()
 	end
 	return Enum.ContextActionResult.Sink
-end, false, Enum.KeyCode.Q, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.F)
-
-ContextActionService:BindAction("GemsoulAbilityPicker", function(_, state)
-	if state == Enum.UserInputState.Begin and not introOpen() then
-		AbilitiesUI.toggle()
+end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Space)
+player.CharacterAdded:Connect(function()
+	cancel()
+	cooldowns = {}
+	nextAttack = 0
+end)
+player:GetAttributeChangedSignal("CombatSession"):Connect(function()
+	cancel()
+	cooldowns = {}
+	nextAttack = 0
+end)
+local lastActive = false
+RunService.RenderStepped:Connect(function()
+	local fight = canFight() == true
+	gui.Enabled = fight
+	leave.Visible = ArenaScene.isActive()
+	if not fight then
+		if lastActive then
+			cancel()
+		end
+		lastActive = false
+		return
 	end
-	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.K)
-
--- Effects ---------------------------------------------------------------------------------------------------
-
+	lastActive = true
+	local camera = workspace.CurrentCamera
+	local viewport = camera.ViewportSize
+	local scale = math.min(1, math.max(0.65, (viewport.X - 20) / 380))
+	local sizing = hud:FindFirstChildOfClass("UIScale")
+	if not sizing then
+		sizing = new("UIScale", {}, hud)
+	end
+	sizing.Scale = scale
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		hp.Text = string.format(
+			"%s  ·  %d / %d HP  ·  %d Shield",
+			player:GetAttribute("CombatSession") or "Combat",
+			math.ceil(humanoid.Health),
+			math.ceil(humanoid.MaxHealth),
+			player:GetAttribute("Shield") or 0
+		)
+	end
+	local now = os.clock()
+	if holding then
+		slots.Basic.Timer.Text =
+			string.format("%d%%", math.min(100, math.floor((now - chargeStarted) / Actions.Base.Heavy.Charge * 100)))
+		if now - chargeStarted >= Actions.Base.Heavy.Charge + 0.1 then
+			releaseAttack()
+		end
+	end
+	if blockHeld and now >= nextBlockUpdate then
+		local aim = aimPoint()
+		face(aim)
+		input:FireServer("Block", true, aim)
+		nextBlockUpdate = now + 0.15
+	end
+	for id, slot in slots do
+		local cd = cooldowns[id]
+		local remaining = if cd then math.max(0, cd.Ready - now) else 0
+		if not (id == "Basic" and holding) then
+			slot.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
+		end
+	end
+	slots.Block.Name.Text = if player:GetAttribute("Blocking") then "Blocking" else "Block"
+end)
 local fxFolder = Instance.new("Folder")
 fxFolder.Name = "CombatFx"
 fxFolder.Parent = workspace
@@ -613,63 +530,54 @@ function handlers.EnemySwing(from: Vector3, to: Vector3, color: Color3)
 	fade(slash, 0.25)
 end
 
--- Just for the caster --------------------------------------------------------------------------------------
-
-function handlers.Cooldown(abilityId: string, seconds: number)
-	cooldowns[abilityId] = { Ready = os.clock() + seconds, Total = seconds }
-	local kit = loadout()
-	local ability = kit and Classes.ability(kit.Class.Id, abilityId)
-	if ability and ability.RateMult then
-		rateBuff = { Mult = ability.RateMult, Until = os.clock() + (ability.Duration or 0) }
+function handlers.Cooldown(id, seconds)
+	cooldowns[id] = { Ready = os.clock() + seconds, Total = seconds }
+	if id == "Basic" or id == "Heavy" then
+		nextAttack = os.clock() + seconds
 	end
 end
-
-function handlers.NoResource()
-	local kind = player:GetAttribute("ResourceKind") or "resource"
-	resourceFill.BackgroundColor3 = Color3.new(1, 1, 1)
-	task.delay(0.12, refreshSlots)
-	UiKit.toast("Not enough " .. kind .. ".", UiKit.Colors.Bad)
+function handlers.BlockBroken(seconds)
+	blockHeld = false
+	cooldowns.Block = { Ready = os.clock() + seconds, Total = seconds }
+	UiKit.toast("Guard broken!", P.Gold)
 end
-
--- Dashes, rolls and blinks move your own character (the server hits around
--- where you land).
-function handlers.Dash(distance: number, backward: boolean, teleport: boolean, aim: Vector3)
-	local root = rootPart()
-	if not root then
-		return
-	end
-	local direction = Vector3.new(aim.X - root.Position.X, 0, aim.Z - root.Position.Z)
-	direction = if direction.Magnitude > 0.1 then direction.Unit else root.CFrame.LookVector
-	if backward then
-		direction = -direction
-	end
-	-- Stop short of walls.
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { player.Character :: Instance, fxFolder }
-	local hit = workspace:Raycast(root.Position, direction * distance, params)
-	local travel = if hit then math.max(0, (hit.Position - root.Position).Magnitude - 2) else distance
-	if teleport then
-		local flash = ring(root.Position - Vector3.new(0, 2.5, 0), 1.5, Color3.fromRGB(170, 120, 255), 0.2)
-		fade(flash, 0.4, Vector3.new(0.2, 6, 6))
-		root.CFrame = root.CFrame + direction * travel
-		return
-	end
-	local seconds = 0.25
-	local speed = travel / seconds
-	local stop = os.clock() + seconds
-	local connection
-	connection = RunService.Heartbeat:Connect(function()
-		if os.clock() >= stop or not root.Parent then
-			connection:Disconnect()
-			root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
-			return
-		end
-		root.AssemblyLinearVelocity = direction * speed + Vector3.new(0, math.min(root.AssemblyLinearVelocity.Y, 0), 0)
-	end)
+function handlers.BlockSpark(position, broken)
+	local spark = ring(position, if broken then 2 else 1, if broken then Color3.fromRGB(255, 160, 50) else P.Teal, 0.2)
+	fade(spark, 0.2, Vector3.new(0.1, 6, 6))
 end
-
-fxEvent.OnClientEvent:Connect(function(kind: string, ...)
+function handlers.BlockRaise(who)
+	local root = who.Character and who.Character:FindFirstChild("HumanoidRootPart")
+	if root then
+		local plate = effectPart(Vector3.new(2.4, 2.5, 0.1), root.CFrame * CFrame.new(0, 0, -2), P.Teal)
+		plate.Transparency = 0.6
+		fade(plate, 0.2)
+	end
+end
+function handlers.BlockGem(who, element)
+	local colors = {
+		Fire = Color3.fromRGB(255, 100, 55),
+		Frost = Color3.fromRGB(90, 195, 255),
+		Poison = Color3.fromRGB(100, 230, 130),
+		Shock = Color3.fromRGB(255, 230, 80),
+	}
+	handlers.Buff(who, colors[element] or P.Teal)
+end
+function handlers.DodgeRoll(who, origin, direction, distance, afterimage)
+	local color = if afterimage then Color3.fromRGB(80, 225, 255) else P.Gold
+	for i = 0, 4 do
+		task.delay(i * 0.05, function()
+			local cf = CFrame.lookAt(origin + direction * distance * i / 4, origin + direction * (distance * i / 4 + 1))
+			local ghost =
+				effectPart(if afterimage then Vector3.new(1.4, 2.6, 0.4) else Vector3.new(1.8, 0.15, 1), cf, color)
+			ghost.Transparency = 0.55
+			fade(ghost, 0.25)
+		end)
+	end
+	if who == player then
+		holding = false
+	end
+end
+fxEvent.OnClientEvent:Connect(function(kind, ...)
 	local handler = handlers[kind]
 	if handler then
 		handler(...)

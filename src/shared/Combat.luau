@@ -8,7 +8,7 @@
 
 	Numbers:
 	  damage = base x (Power / 60) x buffs, x1.6 on a crit or combo finisher
-	  crit chance = min(10%, 5% + min(2.5%, Speed / 4000) + equipment bonus)
+	  crit chance = min(75%, 5% + min(2.5%, Speed / 4000) + equipment bonus)
 	  damage taken = hit x 60 / (60 + Defense) x armor/weapon/buff multipliers
 	Resources (per class) fill and drain as below; abilities spend them.
 

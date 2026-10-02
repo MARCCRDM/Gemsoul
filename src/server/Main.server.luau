@@ -26,6 +26,12 @@ if Config.MenuOnly then
 	-- The Moon Mine's expedition site, far from the spawn pad, walked on foot.
 	local MiningSite = require(game:GetService("ReplicatedStorage").Shared.MiningSite)
 	MiningSite.build(MiningSite.Location, workspace)
+	if Config.CombatEnabled then
+		local arena = Instance.new("Folder")
+		arena.Name = "CombatArena"
+		arena.Parent = workspace
+		require(script.Parent.World.Zones.Arena).build(arena, CFrame.new(600, 0, 0), Color3.fromRGB(190, 65, 80))
+	end
 	-- No baseplate spawn in this place? A small hidden pad to stand on.
 	if not workspace:FindFirstChildWhichIsA("SpawnLocation") then
 		local pad = Instance.new("SpawnLocation")
@@ -52,7 +58,8 @@ StoreServer.start()
 TopPlayers.start()
 Equipment.start()
 -- Combat is paused in menu-only mode (see Config.MenuOnly).
-if not Config.MenuOnly then
-	Enemies.start()
+if Config.CombatEnabled or not Config.MenuOnly then
+	Enemies.start(Config.MenuOnly)
 	CombatServer.start()
+	require(script.Parent.Systems.ArenaSessions).start()
 end

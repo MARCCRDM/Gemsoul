@@ -339,6 +339,7 @@ local function load(player: Player)
 		profiles[player].Character.Subclass = nil
 		profiles[player].Character.SubClass = nil
 		profiles[player].Character.Spec = nil
+		profiles[player].Character.Abilities = nil
 	end
 	local currentProfile = profiles[player]
 	local class = Classes.get(currentProfile.Character.Class)

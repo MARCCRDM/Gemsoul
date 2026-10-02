@@ -29,7 +29,7 @@ task.spawn(function()
 		local ok, controls = pcall(function()
 			return require(module):GetControls()
 		end)
-		if ok and controls then
+		if ok and controls and not player:GetAttribute("CombatSession") and not MineScene.isActive() then
 			controls:Disable()
 		end
 	end
@@ -42,7 +42,7 @@ local base: Scenes.Base? = nil
 local started = os.clock()
 RunService.RenderStepped:Connect(function()
 	-- The intro and the mining site run their own cameras.
-	if introOpen() or MineScene.isActive() then
+	if introOpen() or MineScene.isActive() or player:GetAttribute("CombatSession") then
 		return
 	end
 	if not base then

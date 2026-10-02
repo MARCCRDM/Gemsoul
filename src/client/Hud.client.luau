@@ -201,7 +201,7 @@ local menu = if MENU_ONLY
 	}
 	else {
 		{ "🛡️", "Character", "C", CharacterUI.toggle },
-		{ "⚔️", "Abilities", "K", AbilitiesUI.toggle },
+		{ "⚔️", "Combat", "K", AbilitiesUI.toggle },
 		{ "💎", "Gems", "G", InventoryUI.toggle },
 		{ "👥", "Party", "P", PartyUI.toggle },
 	}
