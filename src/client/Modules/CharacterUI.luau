@@ -542,7 +542,7 @@ local function summary(value: string)
 end
 local function detailsButton()
 	local b = new("TextButton", {
-		Text = if showDetails then "HIDE DETAILS  ▴" else "MORE DETAILS  ▾",
+		Text = if showDetails then "HIDE DETAILS  –" else "MORE DETAILS  +",
 		TextSize = 12,
 		Font = BOLD,
 		TextColor3 = P.Teal,
@@ -861,58 +861,61 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 					else " Its gem socket is empty."
 			)
 	)
-	if not showDetails then
-		return
-	end
-	-- Every rolled stat, spelled out.
-	local parts = {}
-	for _, entry in stats do
-		table.insert(
-			parts,
-			if entry[3]
-				then string.format("+%g%% %s", entry[2] * 100, entry[1])
-				else string.format("+%g %s", entry[2], entry[1])
-		)
-	end
-	if #parts > 0 then
-		text(tipBody, "STATS  ·  " .. table.concat(parts, "  ·  "), 12, P.Gold, BOLD)
-	end
-
-	-- Elemental affinities this piece rolled, in their element's colour.
-	for _, affix in roll and roll.Affixes or {} do
-		local def = GemConfig.AffixById[affix.Id]
-		if def then
-			text(tipBody, GemConfig.affixText(affix.Id, affix.Bonus), 13, GemConfig.ElementColors[def.Element], BOLD)
-		end
-	end
-
 	-- The socket: the gem and what it adds, or an invitation to fill it.
 	local socket = new("Frame", {
 		BackgroundColor3 = P.Frame,
 		BackgroundTransparency = 0.2,
-		Size = UDim2.new(1, -8, 0, 46),
+		Size = UDim2.new(1, -8, 0, if gem then 66 else 46),
 	}, tipBody)
 	UiKit.round(socket, 6)
 	local gemColor = if gem then GemConfig.ElementColors[gem.Element] or P.Teal else P.Edge
 	new("UIStroke", { Color = gemColor, Thickness = 1, Transparency = if gem then 0.35 else 0.6 }, socket)
 	local well = new("Frame", {
 		BackgroundColor3 = gemColor:Lerp(P.Frame, 0.8),
-		Position = UDim2.fromOffset(6, 4),
-		Size = UDim2.fromOffset(38, 38),
+		Position = UDim2.fromOffset(6, if gem then 8 else 4),
+		Size = UDim2.fromOffset(if gem then 50 else 38, if gem then 50 else 38),
 	}, socket)
-	UiKit.round(well, 19)
+	UiKit.round(well, if gem then 25 else 19)
 	if gem then
+		-- The gem in this piece: name, one quality bar and what it adds.
 		GemArt.viewport(well, gem, false)
 		local gemName, effect = GemConfig.enchantment(gem, slotName)
 		local title = text(socket, string.format("%s  ·  %s", GemConfig.shade(gem).Name, gemName), 13, gemColor, BOLD)
 		title.AutomaticSize = Enum.AutomaticSize.None
-		title.Position = UDim2.fromOffset(54, 5)
-		title.Size = UDim2.new(1, -60, 0, 16)
+		title.Position = UDim2.fromOffset(66, 5)
+		title.Size = UDim2.new(1, -72, 0, 16)
 		title.TextTruncate = Enum.TextTruncate.AtEnd
+		local quality = gemQuality(gem)
+		local grade = text(
+			socket,
+			string.format(
+				"%s %s  ·  QUALITY %d/10 %s",
+				string.upper(GemConfig.TierLabels[gem.Tier] or gem.Tier),
+				string.upper(GemConfig.elementName(gem.Element)),
+				quality,
+				string.upper(QUALITY_WORDS[quality])
+			),
+			10,
+			P.Dim,
+			BOLD
+		)
+		grade.AutomaticSize = Enum.AutomaticSize.None
+		grade.Position = UDim2.fromOffset(66, 22)
+		grade.Size = UDim2.new(1, -72, 0, 12)
+		grade.TextTruncate = Enum.TextTruncate.AtEnd
+		for i = 1, 10 do
+			local segment = new("Frame", {
+				BorderSizePixel = 0,
+				BackgroundColor3 = if i <= quality then gemColor else P.Slot,
+				Position = UDim2.fromOffset(66 + (i - 1) * 14, 37),
+				Size = UDim2.fromOffset(12, 5),
+			}, socket)
+			UiKit.round(segment, 2)
+		end
 		local adds = text(socket, effect, 12, P.Text)
 		adds.AutomaticSize = Enum.AutomaticSize.None
-		adds.Position = UDim2.fromOffset(54, 23)
-		adds.Size = UDim2.new(1, -60, 0, 24)
+		adds.Position = UDim2.fromOffset(66, 46)
+		adds.Size = UDim2.new(1, -72, 0, 16)
 		adds.TextTruncate = Enum.TextTruncate.AtEnd
 		adds.TextWrapped = false
 	else
@@ -940,8 +943,33 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		hint.Size = UDim2.new(1, -60, 0, 16)
 		hint.TextTruncate = Enum.TextTruncate.AtEnd
 	end
+	if not showDetails then
+		return
+	end
+	-- Every rolled stat, spelled out.
+	local parts = {}
+	for _, entry in stats do
+		table.insert(
+			parts,
+			if entry[3]
+				then string.format("+%g%% %s", entry[2] * 100, entry[1])
+				else string.format("+%g %s", entry[2], entry[1])
+		)
+	end
+	if #parts > 0 then
+		text(tipBody, "STATS  ·  " .. table.concat(parts, "  ·  "), 12, P.Gold, BOLD)
+	end
+
+	-- Elemental affinities this piece rolled, in their element's colour.
+	for _, affix in roll and roll.Affixes or {} do
+		local def = GemConfig.AffixById[affix.Id]
+		if def then
+			text(tipBody, GemConfig.affixText(affix.Id, affix.Bonus), 13, GemConfig.ElementColors[def.Element], BOLD)
+		end
+	end
+
 	if gem then
-		effectRows(tipBody, gem, slotName, gemColor, wornAffinities())
+		effectRows(tipBody, gem, slotName, GemConfig.ElementColors[gem.Element] or P.Teal, wornAffinities())
 	end
 	if gear.ArmorFamily then
 		local state = Classes.setState(GemClient.Profile.Character).Active[gear.ArmorFamily]
