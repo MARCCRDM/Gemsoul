@@ -30,6 +30,20 @@ check(DuelistBrain.decide(view(), 0.1) == "Heavy", "Rival never used a heavy blo
 check(DuelistBrain.decide(view({ FoeLow = true }), 0.5) == "Light", "Rival did not press a low foe")
 check(DuelistBrain.decide(view({ FoeBlocking = true }), 0.6) == "Heavy", "Raised guard did not invite a heavy")
 check(DuelistBrain.decide(view({ NextAttack = 20 }), 0.5) == "Strafe", "Rival stood still between attacks")
+-- Picking among its three surges.
+local bolt = { Name = "Bolt", Kind = "Bolt", Power = 1.4, Next = 0 }
+local blast = { Name = "Blast", Kind = "Nova", Radius = 7, Power = 1.3, Next = 0 }
+local shield = { Name = "Shield", Kind = "Self", Power = 1, Next = 0 }
+local ring = { Name = "Ring", Kind = "Nova", SelfCentered = true, Radius = 8, Power = 0.5, Next = 0 }
+local array = { bolt, blast, shield }
+check(DuelistBrain.pickSurge(array, 10, 15, view()) == bolt, "Rival did not bolt from range")
+check(DuelistBrain.pickSurge(array, 10, 15, view({ FoeBlocking = true })) == blast, "Rival did not blast a turtling foe")
+check(DuelistBrain.pickSurge({ shield }, 10, 15, view({ HealthRatio = 0.4 })) == shield, "Hurt rival never shielded")
+check(DuelistBrain.pickSurge({ shield }, 10, 15, view()) == nil, "Healthy rival wasted a shield at range")
+check(DuelistBrain.pickSurge({ ring }, 10, 15, view()) == nil, "Self-centred blast cast out of reach")
+check(DuelistBrain.pickSurge({ ring }, 10, 5, view()) == ring, "Self-centred blast unused up close")
+bolt.Next = 20
+check(DuelistBrain.pickSurge({ bolt }, 10, 15, view()) == nil, "Surge used on cooldown")
 -- Its blows meet the player's guard like any monster's: quick ones are
 -- reduced, heavy ones break it.
 local guardian, gh, gr = makePlayer(31, arena, nil)
@@ -43,4 +57,4 @@ check(gh.Health > before - 100 and guardian:GetAttribute("Blocking") == true, "G
 CombatServer._block(guardian, true, rival.Root.Position)
 CombatServer.hurt(guardian, 100, nil, rival, true)
 check(guardian:GetAttribute("Blocking") == false, "Rival's heavy blow did not break the guard")
-print("PASS: " .. checks .. " Duelist checks (decisions, reads, punishes, lunges, surge timing, guard, dodge, heavy vs guard)")
+print("PASS: " .. checks .. " Duelist checks (decisions, reads, punishes, lunges, three-surge choice, guard, dodge, heavy vs guard)")

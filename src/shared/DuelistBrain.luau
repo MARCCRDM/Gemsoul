@@ -84,4 +84,35 @@ function Brain.decide(v: View, roll: number): string
 	return "Strafe"
 end
 
+-- Which ready surge suits this moment, or nil. Surges are
+-- { Kind = "Bolt" | "Nova" | "Self", SelfCentered, Radius, Power, Next }.
+function Brain.pickSurge(surges, now: number, distance: number, v: View)
+	local best, bestScore = nil, 0
+	for _, surge in surges do
+		if now >= surge.Next then
+			local score = 0
+			if surge.Kind == "Self" then
+				-- Shields, heals and buffs: when hurt or in the thick of it.
+				score = if v.HealthRatio < 0.7 or distance <= Brain.Reach then 3 else 0
+			elseif surge.Kind == "Nova" then
+				if surge.SelfCentered then
+					score = if distance <= surge.Radius then 4 else 0
+				else
+					-- Blasts land best on a target that can't step away.
+					score = if v.FoeVulnerable or v.FoeBlocking then 5 else 2
+				end
+			else
+				score = if distance >= 8 then 4 else 1 -- bolts from range
+			end
+			if score > 0 then
+				score += surge.Power
+				if score > bestScore then
+					best, bestScore = surge, score
+				end
+			end
+		end
+	end
+	return best
+end
+
 return Brain

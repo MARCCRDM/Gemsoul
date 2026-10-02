@@ -1,14 +1,15 @@
 --[[
 	The PvP Duelist: entering the PvP Arena brings a computer rival with its
 	own random loadout (rolled like a new player's: six pieces of gear, a gem
-	in the weapon and a Gem Surge). It fights like a player:
+	in the weapon and three Gem Surges). It fights like a player:
 
 	  · closes in weaving, circles you between attacks
 	  · quick swings (sometimes a two-hit chain) and slow, telegraphed heavy
 	    blows that break your guard
 	  · raises its guard or sidesteps when you wind up a swing
-	  · casts its surge from range: a bolt (Thermal/Ion) or a ground blast you
-	    can step out of (Cryo/Corrosive)
+	  · a full Surge Array (three rolled surge gems, each on its own
+	    cooldown): bolts from range, ground blasts with a warning ring you can
+	    step out of, and self-buffs (Cryo Shield, Energy Siphon, Resonance Echo)
 	  · backs off now and then when badly hurt
 
 	Your guard, parries, dodges and gems all work against it, because it is an
@@ -25,7 +26,6 @@ local Brain = require(ReplicatedStorage.Shared.DuelistBrain)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
-local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
@@ -89,11 +89,11 @@ local function rollLoadout(rng: Random)
 	local gem = GemGenerator.generate(rng, "PvEDrop", { Id = "duel-w" .. idCounter, Time = os.time() })
 	c.WeaponGem = gem
 	c.ItemGems.Weapon[c.Weapon] = gem
-	-- Its surge shares the weapon gem's element, so the rival has one colour.
-	local surge = GemGenerator.generate(rng, "PvEDrop", { Id = "duel-s" .. idCounter, Time = os.time() })
-	surge.Element = gem.Element
-	surge.Surge = GemRoller.Surges[gem.Element][surge.SurgeTier]
-	c.Surge1Gem = surge
+	-- A full Surge Array, like a player's: three gems rolled like mined ones.
+	for i = 1, 3 do
+		c["Surge" .. i .. "Gem"] =
+			GemGenerator.generate(rng, "PvEDrop", { Id = "duel-s" .. idCounter .. "-" .. i, Time = os.time() })
+	end
 	return c
 end
 
@@ -141,6 +141,8 @@ function Duelist.despawn(owner: Player)
 end
 
 local spawnRival
+local castSurge
+local P_GOLD = Color3.fromRGB(255, 190, 80)
 
 local function ownerRoot(owner: Player): (BasePart?, Humanoid?)
 	local character = owner.Character
@@ -164,6 +166,58 @@ local function face(root: BasePart, target: Vector3)
 	local look = flat(target - root.Position)
 	if look.Magnitude > 0.1 then
 		root.CFrame = CFrame.lookAt(root.Position, root.Position + look)
+	end
+end
+
+-- Self-buff surges; every other surge is a bolt or, with a radius, a blast.
+local SELF_SURGES = { CryoShield = true, EnergySiphon = true, ResonanceEcho = true }
+
+local function nextSurgeTime(duel, now: number): number
+	local soonest = math.huge
+	for _, surge in duel.Surges do
+		soonest = math.min(soonest, surge.Next)
+	end
+	return math.max(soonest, now)
+end
+
+function castSurge(enemy, duel, surge, now: number, target: BasePart)
+	local root = enemy.Root
+	local model = enemy.Model
+	local color = GemConfig.ElementColors[surge.Element] or P_GOLD
+	surge.Next = now + surge.Cooldown
+	-- A short gap after any surge, so it doesn't fire all three at once.
+	duel.NextSurge = math.max(nextSurgeTime(duel, now), now + 2.5)
+	model:SetAttribute("SurgeReadyAt" .. surge.Slot, workspace:GetServerTimeNow() + surge.Cooldown)
+	model:SetAttribute("SurgeCastAt" .. surge.Slot, workspace:GetServerTimeNow())
+	setStance(duel, "Surge")
+	Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " casts " .. surge.Name .. "!")
+	if surge.Kind == "Self" then
+		fx("TechPulse", nil, root.Position, root.Position, color, 5)
+		if surge.Id == "CryoShield" then
+			enemy.GuardUntil, enemy.GuardMult = now + 4, 0.5 -- a barrier that halves hits
+		elseif surge.Id == "EnergySiphon" then
+			local humanoid = enemy.Humanoid
+			humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * 0.12)
+		else -- ResonanceEcho
+			duel.EchoUntil = now + 5
+		end
+		return
+	end
+	if surge.Kind == "Nova" then
+		-- A blast with a warning ring: under the player, or around itself.
+		local center = if surge.SelfCentered then root.Position else target.Position
+		fx("Nova", center - Vector3.new(0, 2.5, 0), surge.Radius, color, Brain.Windup.Nova)
+		duel.Action = {
+			Kind = "Nova",
+			At = now + Brain.Windup.Nova,
+			Center = center,
+			Radius = surge.Radius,
+			Power = surge.Power,
+			Element = surge.Element,
+		}
+	else
+		fx("TechPulse", nil, root.Position, root.Position, color, 3)
+		duel.Action = { Kind = "Bolt", At = now + Brain.Windup.Bolt, Power = surge.Power, Element = surge.Element }
 	end
 end
 
@@ -209,7 +263,9 @@ local function think(enemy, now: number)
 			local heavy = action.Kind == "Heavy"
 			fx("Swing", nil, root.Position, dir, Brain.Reach, if heavy then 140 else 100, color, heavy)
 			if distance <= Brain.Reach + 1.5 then
-				Enemies.hitPlayer(owner, damage * (if heavy then 2 else 1), duel.Element, enemy, heavy)
+				-- Resonance Echo: its swings hit harder for a while.
+				local echo = if now < (duel.EchoUntil or 0) then 1.5 else 1
+				Enemies.hitPlayer(owner, damage * (if heavy then 2 else 1) * echo, duel.Element, enemy, heavy)
 			end
 			-- Combos: up to three swings in a row.
 			local hits = (action.Hits or 1) + 1
@@ -221,18 +277,18 @@ local function think(enemy, now: number)
 			duel.NextAttack = now + duel.Rate * (0.8 + math.random() * 0.4)
 		elseif action.Kind == "Bolt" then
 			local from = root.Position + Vector3.new(0, 1.5, 0)
-			fx("Shot", nil, from, target.Position, color, "Fireball")
+			fx("Shot", nil, from, target.Position, GemConfig.ElementColors[action.Element] or color, "Fireball")
 			task.delay(math.clamp(distance / 140, 0.05, 0.5), function()
 				local stillRoot = ownerRoot(owner)
 				if duels[owner] == duel and stillRoot then
-					Enemies.hitPlayer(owner, damage * duel.SurgePower, duel.Element, enemy, false)
+					Enemies.hitPlayer(owner, damage * action.Power, action.Element, enemy, false)
 				end
 			end)
 			duel.NextAttack = now + 0.4
 			setStance(duel, "")
 		elseif action.Kind == "Nova" then
 			if (flat(target.Position - action.Center)).Magnitude <= action.Radius then
-				Enemies.hitPlayer(owner, damage * duel.SurgePower * 1.2, duel.Element, enemy, false)
+				Enemies.hitPlayer(owner, damage * action.Power * 1.2, action.Element, enemy, false)
 			end
 			duel.NextAttack = now + 0.4
 			setStance(duel, "")
@@ -264,6 +320,14 @@ local function think(enemy, now: number)
 		duel.NextDefense = now + 1.6 -- considered: don't react to every swing
 	end
 	local choice = Brain.decide(view, math.random())
+	if choice ~= "Stagger" and now >= duel.NextSurge and view.HealthRatio < 0.6 then
+		for _, surge in duel.Surges do
+			if surge.Kind == "Self" and now >= surge.Next then
+				choice = "Surge"
+				break
+			end
+		end
+	end
 	if choice == "Stagger" then
 		humanoid:MoveTo(root.Position)
 	elseif choice == "Guard" then
@@ -292,19 +356,11 @@ local function think(enemy, now: number)
 		setStance(duel, "Lunge")
 		face(root, target.Position)
 	elseif choice == "Surge" then
-		duel.NextSurge = now + duel.SurgeCooldown
-		enemy.Model:SetAttribute("SurgeReadyAt", workspace:GetServerTimeNow() + duel.SurgeCooldown)
-		enemy.Model:SetAttribute("SurgeCastAt", workspace:GetServerTimeNow())
-		setStance(duel, "Surge")
-		Remotes.CombatFx:FireClient(owner, "TechStatus", duel.Name .. " casts " .. duel.SurgeName .. "!")
-		if duel.Element == "Frost" or duel.Element == "Poison" then
-			-- A ground blast under the player, with a warning ring to step out of.
-			local center = target.Position
-			fx("Nova", center - Vector3.new(0, 2.5, 0), 7, color, Brain.Windup.Nova)
-			duel.Action = { Kind = "Nova", At = now + Brain.Windup.Nova, Center = center, Radius = 7 }
+		local surge = Brain.pickSurge(duel.Surges, now, distance, view)
+		if surge then
+			castSurge(enemy, duel, surge, now, target)
 		else
-			fx("TechPulse", nil, root.Position, root.Position, color, 3)
-			duel.Action = { Kind = "Bolt", At = now + Brain.Windup.Bolt }
+			duel.NextSurge = now + 1 -- nothing fits right now; look again soon
 		end
 	elseif choice == "Retreat" then
 		duel.NextRetreat = now + 10
@@ -326,7 +382,7 @@ local function think(enemy, now: number)
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
 	else -- Strafe
-		if duel.Stance == "Guard" or duel.Stance == "Dodge" then
+		if duel.Stance == "Guard" or duel.Stance == "Dodge" or duel.Stance == "Surge" then
 			setStance(duel, "")
 		end
 		if now >= duel.NextWeave then
@@ -420,8 +476,6 @@ function spawnRival(owner: Player)
 	local strength = math.clamp(rating(mine, "Power") / math.max(1, rating(theirs, "Power")), 0.8, 1.25)
 	local ownerHumanoid = owner.Character:FindFirstChildOfClass("Humanoid")
 	local health = math.max(150, math.floor(playerHit * 16 * toughness))
-	local surgeId = Tech.surgeOf(loadout.Surge1Gem)
-	local surge = surgeId and Tech.Catalog[surgeId]
 	local kind = {
 		Name = "Rival Duelist",
 		Health = health,
@@ -453,14 +507,12 @@ function spawnRival(owner: Player)
 		Damage = (if ownerHumanoid then ownerHumanoid.MaxHealth else 300) / 13 * strength * (if sparring
 			then 0.5
 			else 1),
-		SurgePower = if surge and surge.Damage then math.clamp(surge.Damage, 1, 2) else 1.4,
-		SurgeName = if surge then surge.Name else "a Gem Surge",
 		Speed = 18,
 		Rate = if sparring then 1.1 else 0.8,
-		SurgeCooldown = 8 + math.random() * 3,
 		Action = nil,
 		NextAttack = now + 1.2,
-		NextSurge = now + 4 + math.random() * 2,
+		NextSurge = now + 3.5,
+		Surges = {},
 		NextDefense = now,
 		NextRetreat = now + 8,
 		NextLunge = now + 1,
@@ -486,21 +538,47 @@ function spawnRival(owner: Player)
 	end
 	model:SetAttribute("RivalGear", table.concat(gear, ";"))
 	model:SetAttribute("RivalScore", math.floor(score + 0.5))
-	model:SetAttribute("RivalSurge", duel.SurgeName)
-	model:SetAttribute("RivalSurgeIcon", if surge then surge.Icon or "◆" else "◆")
-	local _, surgeTier, surgeRank = Tech.surgeOf(loadout.Surge1Gem)
-	model:SetAttribute("RivalSurgeTier", surgeTier)
-	model:SetAttribute("RivalSurgeRank", surgeRank)
-	model:SetAttribute("SurgeReadyAt", workspace:GetServerTimeNow() + (duel.NextSurge - now))
-	model:SetAttribute("SurgeCooldown", duel.SurgeCooldown)
+	-- Its three surges (Q, E, R), each with its own cooldown.
+	local names = {}
+	for slot = 1, 3 do
+		local gem = loadout["Surge" .. slot .. "Gem"]
+		local id, tier, rank = Tech.surgeOf(gem)
+		local stats = gem and Tech.surgeStats(gem)
+		if id and stats then
+			local surge = {
+				Slot = slot,
+				Id = id,
+				Name = stats.Name,
+				Icon = stats.Icon or "◆",
+				Element = gem.Element,
+				Kind = if SELF_SURGES[id] then "Self" elseif stats.Radius then "Nova" else "Bolt",
+				SelfCentered = stats.Self == true,
+				Radius = math.clamp(stats.Radius or 7, 5, 10),
+				Power = if stats.Damage then math.clamp(stats.Damage, 0.8, 2.4) else 1,
+				Cooldown = 6 + tier * 1.5,
+				Next = now + 2.5 + slot * 1.5,
+			}
+			table.insert(duel.Surges, surge)
+			table.insert(names, surge.Name)
+			model:SetAttribute("RivalSurge" .. slot, surge.Name)
+			model:SetAttribute("RivalSurgeIcon" .. slot, surge.Icon)
+			model:SetAttribute("RivalSurgeElement" .. slot, surge.Element)
+			model:SetAttribute("RivalSurgeTier" .. slot, tier)
+			model:SetAttribute("RivalSurgeRank" .. slot, rank)
+			model:SetAttribute("SurgeCooldown" .. slot, surge.Cooldown)
+			model:SetAttribute("SurgeReadyAt" .. slot, workspace:GetServerTimeNow() + (surge.Next - now))
+		end
+	end
+	duel.NextSurge = nextSurgeTime(duel, now)
+	local surgeList = if #names > 0 then table.concat(names, ", ") else "no surges"
 	enemy.Brain = think
 	enemy.OnDeath = onWin
 	duels[owner] = duel
 	Remotes.Notify:FireClient(
 		owner,
 		if sparring
-			then string.format("Sparring partner %s steps in with %s. Hits are softened.", name, duel.SurgeName)
-			else string.format("%s enters the Arena with %s. Fight!", name, duel.SurgeName)
+			then string.format("Sparring partner %s steps in (%s). Hits are softened.", name, surgeList)
+			else string.format("%s enters the Arena with %s. Fight!", name, surgeList)
 	)
 end
 

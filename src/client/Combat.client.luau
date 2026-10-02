@@ -410,7 +410,7 @@ local rivalPanel = new("Frame", {
 	BackgroundTransparency = 0.12,
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -12, 0, 62),
-	Size = UDim2.fromOffset(250, 246),
+	Size = UDim2.fromOffset(250, 302),
 	Visible = false,
 }, gui)
 UiKit.round(rivalPanel, 10)
@@ -431,37 +431,53 @@ for i = 1, 6 do
 	local row = rivalLabel(10, P.Text, 12, 44 + (i - 1) * 14, 226, 14)
 	rivalGear[i] = row
 end
--- The surge: a socket with a draining cooldown, its name and its state.
-local rivalSocket = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(30, 34, 50),
-	Position = UDim2.fromOffset(12, 134),
-	Size = UDim2.fromOffset(46, 46),
-}, rivalPanel)
-new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, rivalSocket)
-local rivalSocketStroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, rivalSocket)
-local rivalIcon = rivalLabel(20, P.Text, 0, 0, 46, 46)
-rivalIcon.Parent, rivalIcon.TextXAlignment = rivalSocket, Enum.TextXAlignment.Center
-rivalIcon.TextYAlignment = Enum.TextYAlignment.Center
-local rivalShade = new("Frame", {
-	BackgroundColor3 = Color3.new(0, 0, 0),
-	BorderSizePixel = 0,
-	Size = UDim2.fromScale(1, 1),
-	ZIndex = 2,
-}, rivalSocket)
-new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, rivalShade)
-local rivalWipe = new("UIGradient", { Rotation = 90 }, rivalShade)
-local rivalSurgeName = rivalLabel(12, P.Text, 66, 136, 172, 16)
-local rivalSurgeTier = rivalLabel(10, P.Dim, 66, 152, 172, 12)
-local rivalSurgeState = rivalLabel(13, P.Good, 66, 165, 172, 16)
+-- Its three surges (Q, E, R): a socket with a draining cooldown, the name and
+-- its state.
+local rivalSurges = {}
+for slot, key in { "Q", "E", "R" } do
+	local y = 134 + (slot - 1) * 42
+	local socket = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(30, 34, 50),
+		Position = UDim2.fromOffset(12, y),
+		Size = UDim2.fromOffset(36, 36),
+	}, rivalPanel)
+	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, socket)
+	local stroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, socket)
+	local icon = rivalLabel(16, P.Text, 0, 0, 36, 36)
+	icon.Parent, icon.TextXAlignment, icon.TextYAlignment =
+		socket, Enum.TextXAlignment.Center, Enum.TextYAlignment.Center
+	local shade = new("Frame", {
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 2,
+	}, socket)
+	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, shade)
+	local keyLabel = rivalLabel(9, P.Inset, 0, 0, 14, 14)
+	keyLabel.Parent, keyLabel.Text, keyLabel.BackgroundTransparency, keyLabel.BackgroundColor3 = socket, key, 0, P.Gold
+	keyLabel.TextXAlignment, keyLabel.ZIndex = Enum.TextXAlignment.Center, 3
+	UiKit.round(keyLabel, 7)
+	rivalSurges[slot] = {
+		Socket = socket,
+		Stroke = stroke,
+		Icon = icon,
+		Shade = shade,
+		Wipe = new("UIGradient", { Rotation = 90 }, shade),
+		Name = rivalLabel(11, P.Text, 56, y + 1, 182, 14),
+		Tier = rivalLabel(9, P.Dim, 56, y + 14, 90, 12),
+		State = rivalLabel(11, P.Good, 140, y + 13, 98, 16),
+	}
+	rivalSurges[slot].State.TextXAlignment = Enum.TextXAlignment.Right
+end
 -- What it's doing right now, as a warning strip.
 local rivalStance = rivalLabel(12, P.Text, 0, 0, 250, 26)
-rivalStance.Position, rivalStance.Size = UDim2.fromOffset(0, 192), UDim2.new(1, 0, 0, 26)
+rivalStance.Position, rivalStance.Size = UDim2.fromOffset(0, 258), UDim2.new(1, 0, 0, 24)
 rivalStance.TextXAlignment = Enum.TextXAlignment.Center
 rivalStance.TextYAlignment = Enum.TextYAlignment.Center
 local rivalHealth = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(12, 226),
+	Position = UDim2.fromOffset(12, 286),
 	Size = UDim2.new(1, -24, 0, 8),
 }, rivalPanel)
 UiKit.round(rivalHealth, 3)
@@ -519,39 +535,45 @@ local function drawRival(now, viewport)
 		row.Text = if parts[2] then (SLOT_SHORT[parts[1]] or parts[1]) .. "  " .. parts[2] else ""
 		row.TextColor3 = rarity.Color
 	end
-	-- Surge cooldown, from server time so it matches the real thing.
+	-- Surge cooldowns, from server time so they match the real thing.
 	local serverNow = workspace:GetServerTimeNow()
-	local readyAt = model:GetAttribute("SurgeReadyAt") or 0
-	local total = math.max(1, model:GetAttribute("SurgeCooldown") or 10)
-	local remaining = math.max(0, readyAt - serverNow)
-	local share = math.clamp(remaining / total, 0, 0.998)
-	rivalShade.Visible = share > 0
-	if share > 0 then
-		rivalWipe.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.3),
-			NumberSequenceKeypoint.new(math.max(0.001, share), 0.3),
-			NumberSequenceKeypoint.new(math.min(0.999, share + 0.001), 1),
-			NumberSequenceKeypoint.new(1, 1),
-		})
-	end
-	rivalIcon.Text, rivalIcon.TextColor3 = model:GetAttribute("RivalSurgeIcon") or "◆", color
-	rivalSocketStroke.Color = color
-	rivalSurgeName.Text = model:GetAttribute("RivalSurge") or "Gem Surge"
-	rivalSurgeTier.Text = string.format(
-		"%s  ·  RANK %s",
-		string.upper(Tech.TierNames[model:GetAttribute("RivalSurgeTier") or 1] or ""),
-		ROMAN[model:GetAttribute("RivalSurgeRank") or 1] or "I"
-	)
-	local castAgo = serverNow - (model:GetAttribute("SurgeCastAt") or -100)
-	if castAgo < 1.2 then
-		rivalSurgeState.Text, rivalSurgeState.TextColor3 = "CASTING!", P.Gold
-		rivalSocketStroke.Thickness = 3
-	elseif remaining > 0 then
-		rivalSurgeState.Text, rivalSurgeState.TextColor3 = string.format("Ready in %.1fs", remaining), P.Dim
-		rivalSocketStroke.Thickness = 2
-	else
-		rivalSurgeState.Text, rivalSurgeState.TextColor3 = "READY  ·  watch out", Color3.fromRGB(255, 120, 120)
-		rivalSocketStroke.Thickness = 2
+	for slot, row in rivalSurges do
+		local surgeName = model:GetAttribute("RivalSurge" .. slot)
+		local surgeColor = GemConfig.ElementColors[model:GetAttribute("RivalSurgeElement" .. slot)] or P.Gold
+		row.Socket.Visible = surgeName ~= nil
+		row.Name.Text = surgeName or ""
+		row.Name.TextColor3 = surgeColor
+		row.Icon.Text, row.Icon.TextColor3 = model:GetAttribute("RivalSurgeIcon" .. slot) or "◆", surgeColor
+		row.Tier.Text = if surgeName
+			then string.format(
+				"%s · %s",
+				string.upper(Tech.TierNames[model:GetAttribute("RivalSurgeTier" .. slot) or 1] or ""),
+				ROMAN[model:GetAttribute("RivalSurgeRank" .. slot) or 1] or "I"
+			)
+			else ""
+		local remaining = math.max(0, (model:GetAttribute("SurgeReadyAt" .. slot) or 0) - serverNow)
+		local total = math.max(1, model:GetAttribute("SurgeCooldown" .. slot) or 10)
+		local share = math.clamp(remaining / total, 0, 0.998)
+		row.Shade.Visible = share > 0
+		if share > 0 then
+			row.Wipe.Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.3),
+				NumberSequenceKeypoint.new(math.max(0.001, share), 0.3),
+				NumberSequenceKeypoint.new(math.min(0.999, share + 0.001), 1),
+				NumberSequenceKeypoint.new(1, 1),
+			})
+		end
+		row.Stroke.Color = surgeColor
+		if serverNow - (model:GetAttribute("SurgeCastAt" .. slot) or -100) < 1.2 then
+			row.State.Text, row.State.TextColor3 = "CASTING!", P.Gold
+			row.Stroke.Thickness = 3
+		elseif remaining > 0 then
+			row.State.Text, row.State.TextColor3 = string.format("%.1fs", remaining), P.Dim
+			row.Stroke.Thickness = 2
+		else
+			row.State.Text, row.State.TextColor3 = "READY", Color3.fromRGB(255, 120, 120)
+			row.Stroke.Thickness = 2
+		end
 	end
 	local stance = STANCES[model:GetAttribute("Stance") or ""]
 	rivalStance.Text = if stance then stance[1] else ""
