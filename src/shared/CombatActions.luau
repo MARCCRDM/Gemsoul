@@ -18,6 +18,31 @@ Actions.Base = {
 }
 Actions.AfterDodgeSeconds = 3
 Actions.BlockLease = 0.6 -- release automatically if focus/disconnection drops an End packet
+Actions.PerfectAt = 0.75
+Actions.PerfectWindow = 0.09
+Actions.OverchargeAt = 1.15
+Actions.ComboWindow = 1.8
+-- These timings are Saga's tuning. Damage and timing are always resolved on the server.
+function Actions.charge(seconds)
+	if seconds >= Actions.OverchargeAt then
+		return { Heavy = false, Perfect = false, Scale = 0.65, Stage = "OVERCHARGED" }
+	end
+	local perfect = math.abs(seconds - Actions.PerfectAt) <= Actions.PerfectWindow
+	return {
+		Heavy = seconds >= Actions.Base.Heavy.Charge,
+		Perfect = perfect,
+		Scale = 1,
+		Stage = if perfect then "PERFECT" elseif seconds >= Actions.Base.Heavy.Charge then "CHARGED" else "QUICK",
+	}
+end
+function Actions.side(value)
+	return if value == "Left" then "Left" else "Right"
+end
+function Actions.combo(previousSide, count, lastHit, side, now)
+	return if previousSide and previousSide ~= side and lastHit and now - lastHit <= Actions.ComboWindow
+		then math.min((count or 0) + 1, 3)
+		else 1
+end
 function Actions.resolve(counts, weaponType, cooldownReduction)
 	local result = {
 		BasicDamage = 1,
