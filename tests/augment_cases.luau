@@ -38,26 +38,41 @@ check(forged.Points >= 0 and forged.Spent <= forged.Earned and forged.Ranks.Serv
 local corrupt = { Augments = { XP = 0/0, Points = 999999, Unlocked = { spoofed = true, ArmorPiercer = true, ServoFlurry = "true" } } }
 data = Tree.initialize(corrupt)
 check(data.XP == 0 and data.Points == 3 and not data.Unlocked.spoofed and not data.Unlocked.ArmorPiercer, "Corrupt save sanitization")
-local complete = { Augments = { XP = 3150, Unlocked = {} } }
+local complete = { Augments = { XP = (Tree.UnlockPoints - Tree.StartingPoints) * Tree.XPPerPoint, Unlocked = {} } }
 Tree.initialize(complete)
 local total, seen = 0, {}
 for _, branch in Tree.Branches do
-	check(#Tree.Order[branch] == 6, "Branch node count")
+	check(#Tree.Order[branch] == ({ RigManeuvers = 8, GemSurges = 18, PassiveAugments = 10 })[branch], "Branch node count")
 	for _, id in Tree.Order[branch] do
 		local n = Tree.Nodes[id]
-		check(not seen[id] and n.Branch == branch and n.Tier >= 1 and n.Tier <= 3 and (n.Column == 1 or n.Column == 2), "Invalid node placement")
+		local columns = if Tree.Columns[branch] then #Tree.Columns[branch] else 4
+		check(not seen[id] and n.Branch == branch and n.Tier >= 1 and n.Tier <= #Tree.TierLevels and n.Column >= 1 and n.Column <= columns, "Invalid node placement")
 		check(not n.Parent or seen[n.Parent], "Cyclic or out-of-order dependency")
+		for _, other in n.Requires and n.Requires.Any or {} do check(seen[other], "Out-of-order requirement") end
+		if branch == "GemSurges" and Tree.Columns.GemSurges[n.Column].Element then
+			check(Tech.Catalog[id].Element == Tree.Columns.GemSurges[n.Column].Element, "Surge sits in the wrong element column")
+		end
 		seen[id] = true
 		total += n.Cost
 		if not n.Free then check(Tree.learn(complete, id), "Complete tree cannot be purchased") end
 	end
 end
-check(total == Tree.UnlockPoints and complete.Augments.Points == 0 and complete.Augments.Spent == 24, "Whole-tree point budget")
-check(Tree.addXP(complete, 100000) == Tree.MaxPoints - 24 and complete.Augments.Points == Tree.MaxPoints - 24, "Rank budget beyond unlocks")
+check(total == Tree.UnlockPoints and complete.Augments.Points == 0 and complete.Augments.Spent == Tree.UnlockPoints, "Whole-tree point budget")
+local rankBudget = Tree.MaxPoints - Tree.UnlockPoints
+check(Tree.addXP(complete, 100000) == rankBudget and complete.Augments.Points == rankBudget, "Rank budget beyond unlocks")
 check(Tree.addXP(complete, 100000) == 0 and complete.Augments.Level == Tree.MaxLevel, "Point cap bypass")
 check(Tree.addXP(complete, math.huge) == 0 and Tree.addXP(complete, -100) == 0, "Invalid XP accepted")
 local effects = Tree.effects(complete)
 check(effects.Mobility == 0.05 and effects.StaminaRegen == 0.15 and effects.ChargeRegen == 0.15 and effects.Thermal == 0.1, "Passive effects missing")
+check(effects.Corrosive == 0.1 and effects.Ion == 0.1 and effects.Cryo == 0.1 and effects.Harmony == 0.1, "Overcharge or Harmony perks missing")
+-- Elemental Harmony needs any two Overcharges, and the Master tier opens at level 10.
+local harmony = { Augments = { XP = 100000, Unlocked = { ChargeRecycler = true, CleaverCalibration = true, ThermalOvercharge = true } } }
+Tree.initialize(harmony)
+check(not Tree.learn(harmony, "ElementalHarmony"), "Harmony with one Overcharge")
+check(Tree.learn(harmony, "IonOvercharge") and Tree.learn(harmony, "ElementalHarmony"), "Harmony with two Overcharges")
+local young = { Augments = { XP = (Tree.TierLevels[4] - 2) * Tree.XPPerPoint, Unlocked = { ThermalBurst = true, EmberLance = true, SolarFlare = true } } }
+Tree.initialize(young)
+check(young.Augments.Level == Tree.TierLevels[4] - 1 and not Tree.learn(young, "Supernova"), "Master tier opened early")
 check(close(Tree.weaponMultiplier(effects, { Look = "FrontierSword", Attack = { Kind = "Melee" } }), 1.05), "Blade calibration")
 check(close(Tree.weaponMultiplier(effects, { Look = "Cleaver", Attack = { Kind = "Melee" } }), 1.05), "Cleaver calibration")
 check(Tree.weaponMultiplier(effects, { Look = "CleanSidearm", Attack = { Kind = "Shot" } }) == 1, "Sword augment boosted pistol")
@@ -93,7 +108,7 @@ check(not CombatServer._technology(source, "ServoFlurry", rv.Position) and Comba
 for _, other in playerList do other:SetAttribute("PvPEnabled", false) end
 source:SetAttribute("PvPEnabled", true); victim:SetAttribute("PvPEnabled", true)
 local progress = Tree.initialize(profiles[source])
-progress.XP = 3150
+progress.XP = (Tree.UnlockPoints - Tree.StartingPoints) * Tree.XPPerPoint
 Tree.initialize(profiles[source])
 for _, branch in Tree.Branches do
 	for _, id in Tree.Order[branch] do

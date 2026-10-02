@@ -75,7 +75,10 @@ IronUi.window = function(name)
 		Shade = new("TextButton", { Text = "" }, gui),
 	}
 end
-local GemConfig = { ElementColors = {}, elementName = function(element) return element end }
+local GemConfig = { elementName = function(element) return element end, ElementColors = {} }
+for _, element in { "Fire", "Frost", "Shock", "Poison" } do
+	GemConfig.ElementColors[element] = Color3.new(0.5, 0.5, 0.5)
+end
 local GemClient = { Profile = { Season = { XP = 0 } }, Changed = signal() }
 GemClient.request = function(action, id)
 	local ok, message

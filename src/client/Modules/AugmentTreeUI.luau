@@ -42,11 +42,11 @@ local BRANCH = {
 		Color = Color3.fromRGB(70, 130, 255),
 		Icon = "◆",
 		Kind = "Gem Spell",
-		Blurb = "Gem spells  ·  powered by Charge",
+		Blurb = "Gem spells  ·  four elements",
 	},
 	PassiveAugments = { Color = P.Gold, Icon = "⚙", Kind = "Perk", Blurb = "Perks  ·  always on" },
 }
-local NUMERALS = { "I", "II", "III" }
+local NUMERALS = { "I", "II", "III", "IV" }
 local PASSIVE_LABELS = {
 	Slashing = "Sword damage",
 	Cleaving = "Axe damage",
@@ -230,7 +230,7 @@ end
 
 local BODY_Y = TAB_Y + TAB_H + 12
 local BODY_H = HEIGHT - BODY_Y - 20
-local SHEET_W = 640
+local SHEET_W = 684
 local sheetPane = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(15, 13, 28),
 	Position = UDim2.fromOffset(20, BODY_Y),
@@ -339,30 +339,57 @@ end
 -- Fixed traits that don't change with rank, shown as chips.
 local function traits(node): { { any } }
 	local list = {}
+	if node.Element then
+		table.insert(list, { string.upper(GemConfig.elementName(node.Element)), GemConfig.ElementColors[node.Element] })
+	end
 	local tech = Tech.Catalog[node.Id]
 	if not tech then
 		table.insert(list, { "ALWAYS ON" })
 		return list
 	end
-	if tech.Element then
-		table.insert(list, { string.upper(GemConfig.elementName(tech.Element)), GemConfig.ElementColors[tech.Element] })
-	end
-	if tech.Range then
+	if tech.Self then
+		table.insert(list, { "AROUND YOU  " .. tech.Radius })
+	elseif tech.Cone then
+		table.insert(list, { string.format("CONE %d°", tech.Cone) })
+	elseif tech.Range then
 		table.insert(list, { "RANGE " .. tech.Range })
 	end
-	if tech.Radius then
+	if tech.Radius and not tech.Self then
 		table.insert(list, { "RADIUS " .. tech.Radius })
 	end
+	if tech.Windup then
+		table.insert(list, { "WIND-UP " .. seconds(tech.Windup) })
+	end
 	if tech.Stun then
-		table.insert(list, { "STAGGER " .. seconds(tech.Stun) })
+		table.insert(list, { (if tech.Element == "Frost" then "FREEZE " else "STUN ") .. seconds(tech.Stun) })
 	end
 	if tech.Slow then
 		table.insert(list, { "SLOW " .. percent(tech.Slow) })
+	end
+	if tech.Shred then
+		table.insert(list, { "SHRED " .. percent(tech.Shred) })
+	end
+	if tech.Chain then
+		table.insert(list, { string.format("CHAINS ×%d", tech.Chain) })
+	end
+	if tech.Spread then
+		table.insert(list, { "SPREADS " .. tech.Spread })
+	end
+	if tech.Cloud then
+		table.insert(list, { "LINGERS " .. seconds(tech.Cloud.Duration) })
+	end
+	if tech.Execute then
+		table.insert(list, { "EXECUTE <" .. percent(tech.Execute) })
 	end
 	if tech.Heavy then
 		table.insert(list, { "BREAKS GUARD" })
 	end
 	return list
+end
+
+-- A node's colour: its element's for gem surges and overcharges, else its branch's.
+local function nodeColor(node): Color3
+	return if node.Element then GemConfig.ElementColors[node.Element] else BRANCH[node.Branch].Color
 end
 
 -- Detail pane --------------------------------------------------------------------------
@@ -392,11 +419,12 @@ local function drawDetail(data)
 	local meta = BRANCH[node.Branch]
 	local rank = rankOf(data, selected)
 	local learned = rank > 0
-	local parentMet = not node.Parent or data.Unlocked[node.Parent] == true
+	local parentMet = Tree.prerequisiteMet(data.Unlocked, selected)
 	local levelNeeded = Tree.tierLevel(selected)
 	local levelMet = data.Level >= levelNeeded
 	local changeable = canChange()
-	detailStroke.Color = if learned then meta.Color else BRONZE
+	local color = nodeColor(node)
+	detailStroke.Color = if learned then color else BRONZE
 	detailStroke.Transparency = if learned then 0.25 else 0.55
 
 	-- Medallion, kind and tier, name, rank.
@@ -405,16 +433,16 @@ local function drawDetail(data)
 		top,
 		node.Icon,
 		80,
-		meta.Color,
+		color,
 		if learned then "learned" elseif parentMet and levelMet then "open" else "locked"
 	)
 	badge.Position = UDim2.fromOffset(0, 2)
 	local kind = fixed(
 		text(
 			top,
-			string.format("%s  ·  TIER %s", string.upper(meta.Kind), NUMERALS[node.Tier] or "?"),
+			string.format("%s  ·  %s", string.upper(meta.Kind), string.upper(Tree.TierNames[node.Tier] or "")),
 			11,
-			meta.Color,
+			color,
 			IronUi.Bold
 		)
 	)
@@ -441,10 +469,12 @@ local function drawDetail(data)
 
 	local chips = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 132),
-		Size = UDim2.new(1, 0, 0, 22),
+		Position = UDim2.fromOffset(0, 134),
+		Size = UDim2.new(1, 0, 0, 46),
 	}, detail)
-	UiKit.list(chips, 6, true)
+	local flow = UiKit.list(chips, 5, true)
+	flow.Wraps = true
+	flow.VerticalAlignment = Enum.VerticalAlignment.Top
 	for i, entry in traits(node) do
 		chip(chips, entry[1], entry[2], i)
 	end
@@ -452,8 +482,8 @@ local function drawDetail(data)
 	-- Current rank vs next rank, Blades-style.
 	local compare = new("Frame", {
 		BackgroundColor3 = Color3.fromRGB(16, 14, 30),
-		Position = UDim2.fromOffset(0, 164),
-		Size = UDim2.new(1, 0, 0, 160),
+		Position = UDim2.fromOffset(0, 184),
+		Size = UDim2.new(1, 0, 0, 140),
 	}, detail)
 	UiKit.round(compare, 10)
 	stroke(compare, BRONZE, 1, 0.65)
@@ -477,12 +507,12 @@ local function drawDetail(data)
 		Size = UDim2.new(0, 1, 1, -20),
 	}, compare)
 	for i, row in (if learned then current else upcoming) or current do
-		local y = 32 + (i - 1) * 31
+		local y = 28 + (i - 1) * 28
 		local label = fixed(text(compare, row[1], 10, P.Dim))
 		label.Position, label.Size = UDim2.new(0, 12, 0, y), UDim2.new(0.5, -20, 0, 10)
 		label.TextTruncate = Enum.TextTruncate.AtEnd
 		local now = fixed(text(compare, if learned then current[i][2] else "—", 13, P.Text, IronUi.Bold))
-		now.Position, now.Size = UDim2.new(0, 12, 0, y + 12), UDim2.new(0.5, -20, 0, 16)
+		now.Position, now.Size = UDim2.new(0, 12, 0, y + 11), UDim2.new(0.5, -20, 0, 15)
 		if upcoming and upcoming[i] then
 			local changed = not learned or upcoming[i][2] ~= current[i][2]
 			local nextValue = fixed(
@@ -494,7 +524,7 @@ local function drawDetail(data)
 					IronUi.Bold
 				)
 			)
-			nextValue.Position, nextValue.Size = UDim2.new(0.5, 12, 0, y + 12), UDim2.new(0.5, -20, 0, 16)
+			nextValue.Position, nextValue.Size = UDim2.new(0.5, 12, 0, y + 11), UDim2.new(0.5, -20, 0, 15)
 			local nextLabel = fixed(text(compare, upcoming[i][1], 10, P.Dim))
 			nextLabel.Position, nextLabel.Size = UDim2.new(0.5, 12, 0, y), UDim2.new(0.5, -20, 0, 10)
 			nextLabel.TextTruncate = Enum.TextTruncate.AtEnd
@@ -510,7 +540,7 @@ local function drawDetail(data)
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 0, 1, 0),
-		Size = UDim2.new(1, 0, 0, 40),
+		Size = UDim2.new(1, 0, 0, 58),
 	}, detail)
 	UiKit.list(requirements, 4)
 	local function requirement(ok: boolean, value: string, order: number)
@@ -525,13 +555,26 @@ local function drawDetail(data)
 		)
 		line.Size, line.LayoutOrder = UDim2.new(1, 0, 0, 16), order
 	end
-	requirement(levelMet, string.format("Augment Level %d", levelNeeded), 1)
-	if node.Parent then
-		requirement(parentMet, "Learn " .. Tree.Nodes[node.Parent].Name, 2)
-	elseif not changeable then
+	requirement(levelMet, string.format("%s tier  ·  Augment Level %d", Tree.TierNames[node.Tier], levelNeeded), 1)
+	local prerequisite = Tree.prerequisiteText(selected)
+	if not changeable then
 		requirement(false, "Return to the dashboard or town to change augments", 2)
+	elseif prerequisite then
+		requirement(parentMet, prerequisite, 2)
 	else
-		requirement(true, "Starting node of its tier", 2)
+		requirement(true, "No prerequisite", 2)
+	end
+	-- Gem surges draw on a socketed gem of their element (Resonance: any gem).
+	local tech = Tech.Catalog[selected]
+	if tech and tech.Resource == "Charge" then
+		local loadout = GemClient.Profile and GemClient.Profile.Character or {}
+		requirement(
+			Tech.hasGem(loadout, tech.Element),
+			if tech.Element
+				then string.format("Socket a %s gem to cast it", GemConfig.elementName(tech.Element))
+				else "Socket any gem to cast it",
+			3
+		)
 	end
 
 	-- The button: Learn, Upgrade, or why not.
@@ -560,8 +603,8 @@ local function drawDetail(data)
 	end
 	local ready = nextAction ~= nil
 	action.Active = ready
-	action.BackgroundColor3 = if ready then meta.Color elseif learned then meta.Color:Lerp(P.Inset, 0.7) else P.Slot
-	action.TextColor3 = if ready then P.Ink elseif learned then meta.Color else P.Dim
+	action.BackgroundColor3 = if ready then color elseif learned then color:Lerp(P.Inset, 0.7) else P.Slot
+	action.TextColor3 = if ready then P.Ink elseif learned then color else P.Dim
 	actionStroke.Transparency = if ready then 0.4 else 1
 	reset.Active = not busy and changeable and data.Spent > 0
 	reset.TextColor3 = if reset.Active then P.Gold else MUTED
@@ -572,8 +615,7 @@ end
 
 -- Sheet --------------------------------------------------------------------------------
 
-local MEDAL = 72
-local NODE_W, NODE_H = 170, 128
+local GUTTER = 92 -- tier name and level, left of the nodes
 
 local function line(from: Vector2, to: Vector2, color: Color3, thickness: number, transparency: number)
 	local delta = to - from
@@ -591,67 +633,120 @@ end
 local function drawSheet(data)
 	IronUi.clear(sheet)
 	local meta = BRANCH[branch]
-	local bandH = (BODY_H - 24) / 3
+	local columns = Tree.Columns[branch]
+	local tiers = 0
+	for _, nodeId in Tree.Order[branch] do
+		tiers = math.max(tiers, Tree.Nodes[nodeId].Tier)
+	end
+	local headerH = if columns then 24 else 0
+	local top = 10 + headerH
+	local bandH = (BODY_H - top - 10) / tiers
+	local area = SHEET_W - GUTTER - 14
+	-- Columns: fixed per element (Gem Surges, Rig Maneuvers), or each tier's
+	-- perks centred in their row (Passive Augments).
+	local perRow = {}
+	for _, nodeId in Tree.Order[branch] do
+		local tier = Tree.Nodes[nodeId].Tier
+		perRow[tier] = (perRow[tier] or 0) + 1
+	end
+	local slots = if columns then #columns else 4
+	local slotW = area / slots
+	local medal = math.floor(math.clamp(math.min(bandH - 50, slotW - 44), 44, 70))
+	local nodeW = math.min(150, slotW - 4)
 	local centers = {}
+	local seenInRow = {}
 	for _, nodeId in Tree.Order[branch] do
 		local node = Tree.Nodes[nodeId]
-		centers[nodeId] = Vector2.new(
-			SHEET_W * (if node.Column == 1 then 0.33 else 0.72),
-			12 + (node.Tier - 1) * bandH + 28 + MEDAL / 2
-		)
+		local x
+		if columns then
+			x = GUTTER + slotW * (node.Column - 0.5)
+		else
+			seenInRow[node.Tier] = (seenInRow[node.Tier] or 0) + 1
+			x = GUTTER + area * (seenInRow[node.Tier] - 0.5) / perRow[node.Tier]
+		end
+		local bandTop = top + (node.Tier - 1) * bandH
+		centers[nodeId] = Vector2.new(x, bandTop + (bandH - (medal + 40)) / 2 + medal / 2)
 	end
 
-	-- Tier bands: a header with the level that opens them.
-	for tier = 1, 3 do
-		local y = 12 + (tier - 1) * bandH
+	-- Column headings (elements for Gem Surges).
+	for i, column in columns or {} do
+		local color = if column.Element then GemConfig.ElementColors[column.Element] else P.Gold
+		local heading = centered(fixed(text(sheet, string.upper(column.Name), 11, color, IronUi.Heading)))
+		heading.Position, heading.Size = UDim2.fromOffset(GUTTER + slotW * (i - 1), 10), UDim2.fromOffset(slotW, 16)
+		local rule = new("Frame", {
+			BackgroundColor3 = color,
+			BackgroundTransparency = 0.4,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.fromOffset(GUTTER + slotW * (i - 0.5), 28),
+			Size = UDim2.fromOffset(math.min(64, slotW - 20), 2),
+		}, sheet)
+		UiKit.round(rule, 1)
+	end
+
+	-- Tier bands, Novice to Master, each with the level that opens it.
+	for tier = 1, tiers do
+		local y = top + (tier - 1) * bandH
 		local open = data.Level >= Tree.TierLevels[tier]
 		local band = new("Frame", {
 			BackgroundColor3 = if open then meta.Color else Color3.new(0, 0, 0),
-			BackgroundTransparency = if open then 0.95 else 0.6,
-			Position = UDim2.fromOffset(12, y),
-			Size = UDim2.new(1, -24, 0, bandH - 8),
+			BackgroundTransparency = if open then 0.95 else 0.55,
+			Position = UDim2.fromOffset(10, y + 3),
+			Size = UDim2.new(1, -20, 0, bandH - 6),
 			ZIndex = 0,
 		}, sheet)
 		UiKit.round(band, 10)
 		stroke(band, if open then BRONZE else MUTED, 1, if open then 0.7 else 0.8)
-		local title = fixed(text(band, "TIER " .. NUMERALS[tier], 13, if open then P.Gold else MUTED, IronUi.Heading))
-		title.Position, title.Size = UDim2.fromOffset(14, 8), UDim2.fromOffset(90, 16)
-		local gate = fixed(
-			text(
-				band,
-				if open
-					then string.format("LEVEL %d  ·  OPEN", Tree.TierLevels[tier])
-					else string.format("🔒  REACH AUGMENT LEVEL %d", Tree.TierLevels[tier]),
-				10,
-				if open then P.Dim else MUTED,
-				IronUi.Bold
+		local numeral = centered(
+			fixed(text(band, NUMERALS[tier] or tostring(tier), 20, if open then P.Gold else MUTED, IronUi.Heading))
+		)
+		numeral.Position, numeral.Size = UDim2.new(0, 6, 0.5, -26), UDim2.fromOffset(GUTTER - 18, 22)
+		local name = centered(
+			fixed(text(band, string.upper(Tree.TierNames[tier]), 11, if open then P.Text else MUTED, IronUi.Heading))
+		)
+		name.Position, name.Size = UDim2.new(0, 6, 0.5, -3), UDim2.fromOffset(GUTTER - 18, 14)
+		local gate = centered(
+			fixed(
+				text(
+					band,
+					if open then "LEVEL " .. Tree.TierLevels[tier] else "🔒 LEVEL " .. Tree.TierLevels[tier],
+					9,
+					if open then P.Dim else MUTED,
+					IronUi.Bold
+				)
 			)
 		)
-		gate.Position, gate.Size = UDim2.fromOffset(14, 26), UDim2.fromOffset(170, 12)
+		gate.Position, gate.Size = UDim2.new(0, 6, 0.5, 12), UDim2.fromOffset(GUTTER - 18, 12)
 	end
 
-	-- Connectors under the medallions.
+	-- Connectors under the medallions: gold when learned, white when next, dim when locked.
+	local function connect(fromId: string, toId: string)
+		local from, to = centers[fromId], centers[toId]
+		if not from or not to then
+			return
+		end
+		if data.Unlocked[toId] and data.Unlocked[fromId] then
+			line(from, to, P.Gold, 8, 0.8)
+			line(from, to, BRONZE, 3, 0)
+		elseif data.Unlocked[fromId] then
+			line(from, to, P.Text, 2, 0.5)
+		else
+			line(from, to, MUTED, 2, 0.65)
+		end
+	end
 	for _, nodeId in Tree.Order[branch] do
 		local node = Tree.Nodes[nodeId]
 		if node.Parent then
-			local from, to = centers[node.Parent], centers[nodeId]
-			if data.Unlocked[nodeId] then
-				line(from, to, P.Gold, 8, 0.8)
-				line(from, to, BRONZE, 3, 0)
-			elseif data.Unlocked[node.Parent] then
-				line(from, to, P.Text, 2, 0.5)
-			else
-				line(from, to, MUTED, 2, 0.65)
-			end
+			connect(node.Parent, nodeId)
+		end
+		for _, other in node.Requires and node.Requires.Any or {} do
+			connect(other, nodeId)
 		end
 	end
 
 	for _, nodeId in Tree.Order[branch] do
 		local node, center = Tree.Nodes[nodeId], centers[nodeId]
 		local rank = rankOf(data, nodeId)
-		local open = rank == 0
-			and (not node.Parent or data.Unlocked[node.Parent] == true)
-			and data.Level >= Tree.tierLevel(nodeId)
+		local open = rank == 0 and Tree.prerequisiteMet(data.Unlocked, nodeId) and data.Level >= Tree.tierLevel(nodeId)
 		local state = if rank > 0 then "learned" elseif open then "open" else "locked"
 		local isSelected = nodeId == selected
 		local holder = new("TextButton", {
@@ -659,8 +754,8 @@ local function drawSheet(data)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.fromOffset(center.X, center.Y - MEDAL / 2 - 4),
-			Size = UDim2.fromOffset(NODE_W, NODE_H),
+			Position = UDim2.fromOffset(center.X, center.Y - medal / 2 - 4),
+			Size = UDim2.fromOffset(nodeW, medal + 42),
 			ZIndex = 2,
 		}, sheet)
 		holder:SetAttribute("AugmentNode", nodeId)
@@ -671,51 +766,60 @@ local function drawSheet(data)
 				BackgroundTransparency = 0.8,
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.new(0.5, 0, 0, -2),
-				Size = UDim2.fromOffset(MEDAL + 16, MEDAL + 16),
+				Size = UDim2.fromOffset(medal + 14, medal + 14),
 				ZIndex = 2,
 			}, holder)
-			UiKit.round(halo, MEDAL)
+			UiKit.round(halo, medal)
 			stroke(halo, P.Gold, 2, 0)
 		end
-		local medal = medallion(holder, node.Icon, MEDAL, meta.Color, state)
-		medal.AnchorPoint = Vector2.new(0.5, 0)
-		medal.Position = UDim2.new(0.5, 0, 0, 6)
-		medal.ZIndex = 3
-		-- Rank numeral on the medallion's rim.
+		local medallionFrame = medallion(holder, node.Icon, medal, nodeColor(node), state)
+		medallionFrame.AnchorPoint = Vector2.new(0.5, 0)
+		medallionFrame.Position = UDim2.new(0.5, 0, 0, 5)
+		medallionFrame.ZIndex = 3
+		-- Rank numeral on the medallion's rim, or a lock.
 		if rank > 0 then
-			local tag = centered(fixed(text(holder, NUMERALS[rank], 11, P.Ink, IronUi.Heading)))
+			local tag = centered(fixed(text(holder, NUMERALS[rank], 10, P.Ink, IronUi.Heading)))
 			tag.BackgroundColor3, tag.BackgroundTransparency = P.Gold, 0
 			tag.AnchorPoint = Vector2.new(0.5, 0.5)
-			tag.Position = UDim2.new(0.5, MEDAL / 2 - 6, 0, 6 + MEDAL - 8)
-			tag.Size, tag.ZIndex = UDim2.fromOffset(24, 18), 5
-			UiKit.round(tag, 9)
+			tag.Position = UDim2.new(0.5, medal / 2 - 5, 0, 5 + medal - 7)
+			tag.Size, tag.ZIndex = UDim2.fromOffset(22, 16), 5
+			UiKit.round(tag, 8)
 		elseif state == "locked" then
-			local lock = centered(fixed(text(holder, "🔒", 12, P.Text)))
+			local lock = centered(fixed(text(holder, "🔒", 11, P.Text)))
 			lock.BackgroundColor3, lock.BackgroundTransparency = LOCKED_FILL, 0
 			lock.AnchorPoint = Vector2.new(0.5, 0.5)
-			lock.Position = UDim2.new(0.5, MEDAL / 2 - 6, 0, 6 + MEDAL - 8)
-			lock.Size, lock.ZIndex = UDim2.fromOffset(22, 22), 5
-			UiKit.round(lock, 11)
+			lock.Position = UDim2.new(0.5, medal / 2 - 5, 0, 5 + medal - 7)
+			lock.Size, lock.ZIndex = UDim2.fromOffset(20, 20), 5
+			UiKit.round(lock, 10)
 		end
-		local name =
-			centered(fixed(text(holder, node.Name, 13, if state == "locked" then MUTED else P.Text, IronUi.Heading)))
-		name.Position, name.Size, name.ZIndex = UDim2.fromOffset(0, MEDAL + 12), UDim2.new(1, 0, 0, 16), 3
+		local name = centered(
+			fixed(
+				text(
+					holder,
+					node.Name,
+					if nodeW < 130 then 11 else 12,
+					if state == "locked" then MUTED else P.Text,
+					IronUi.Heading
+				)
+			)
+		)
+		name.Position, name.Size, name.ZIndex = UDim2.fromOffset(0, medal + 9), UDim2.new(1, 0, 0, 15), 3
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		local sub = if rank > 0
-			then pips(holder, rank, P.Gold, 12)
+			then pips(holder, rank, P.Gold, 11)
 			else centered(
 				fixed(
 					text(
 						holder,
 						if state == "open" then "◆ " .. costText(node.Cost) else "LOCKED",
-						10,
+						9,
 						if state == "open" then P.Gold else MUTED,
 						IronUi.Bold
 					)
 				)
 			)
-		sub.Position, sub.Size, sub.ZIndex = UDim2.fromOffset(0, MEDAL + 29), UDim2.new(1, 0, 0, 14), 3
-		IronUi.juice(holder, 1.04, 0.97)
+		sub.Position, sub.Size, sub.ZIndex = UDim2.fromOffset(0, medal + 25), UDim2.new(1, 0, 0, 13), 3
+		IronUi.juice(holder, 1.05, 0.97)
 		holder.Activated:Connect(function()
 			selected = nodeId
 			UI.refresh()
