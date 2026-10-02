@@ -33,4 +33,3 @@ with tempfile.TemporaryDirectory(prefix="gemsoul-equipment-") as directory:
     script = Path(directory) / "tests.luau"
     script.write_text(source, encoding="utf-8")
     subprocess.run([str(ROOT / ".tools/luau/luau.exe"), str(script)], check=True)
-

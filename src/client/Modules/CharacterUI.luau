@@ -1784,7 +1784,12 @@ function CharacterUI.refresh()
 	local class = loadout.Class and Classes.List[loadout.Class]
 	title.Text = string.upper(player.DisplayName)
 	local sets = Classes.setState(loadout).Active
-	subtitle.Text = string.format("Warrior · Prospector %d/6 · Skirmisher %d/6 · Juggernaut %d/6", sets.Prospector.Count, sets.Skirmisher.Count, sets.Juggernaut.Count)
+	subtitle.Text = string.format(
+		"Warrior · Prospector %d/6 · Skirmisher %d/6 · Juggernaut %d/6",
+		sets.Prospector.Count,
+		sets.Skirmisher.Count,
+		sets.Juggernaut.Count
+	)
 	subtitle.TextColor3 = if class then class.Color else P.Dim
 
 	-- Keep the selected gem only while it's still in the pouch.
