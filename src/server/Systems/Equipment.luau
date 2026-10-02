@@ -20,6 +20,7 @@ local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local PlayerData = require(script.Parent.PlayerData)
+local Shop = require(script.Parent.Shop)
 
 local FOLDER_NAME = "GemsoulGear"
 
@@ -863,35 +864,27 @@ local function applyStats(character: Model, loadout)
 	humanoid.Health = humanoid.MaxHealth * fraction
 end
 
-function Equipment.apply(player: Player)
-	local character = player.Character
-	local loadout = PlayerData.character(player)
-	if not character or not loadout then
-		return
-	end
-	local existing = character:FindFirstChild(FOLDER_NAME)
-	if existing then
-		existing:Destroy()
-	end
+-- Builds the gear folder for a loadout on a character (not parented yet).
+-- `only` limits it to one slot, for item previews.
+local function dress(character: Model, loadout, cosmetics, userId: number, only: string?): Folder?
 	local class = Classes.get(loadout.Class)
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local armor = Classes.armor(loadout.Class, loadout.Armor)
 	if not class or not weapon or not armor then
-		return
+		return nil
 	end
 
 	local folder = Instance.new("Folder")
 	folder.Name = FOLDER_NAME
 	-- A trim (cosmetic) recolours the class glow.
-	local profile = PlayerData.get(player)
-	local cosmetics = profile and profile.Cosmetics
 	local trim = cosmetics and Cosmetics.get(cosmetics.Trim)
 	local accent = if trim then trim.Color else class.Color
 
 	removeHeadwear(character)
 	local armorSlots = {}
 	for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
-		local gear = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
+		local gear = (not only or only == slot)
+			and Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
 		if gear then
 			local component = Instance.new("Folder")
 			component.Name = slot
@@ -905,7 +898,7 @@ function Equipment.apply(player: Player)
 				loadout[slot .. "Quality"],
 				if GearRolls.get(loadout, slot)
 					then GearRolls.appearance(GearRolls.get(loadout, slot))
-					else SuitTraits.forSuit(player.UserId, gear.Id),
+					else SuitTraits.forSuit(userId, gear.Id),
 				slot
 			)
 			local gem = loadout[slot .. "Gem"]
@@ -932,7 +925,7 @@ function Equipment.apply(player: Player)
 	end
 	-- An armor gem glows at the centre of the chest.
 	local torso = bodyPart(character, "UpperTorso", "Torso")
-	if torso and loadout.ArmorGem then
+	if torso and loadout.ArmorGem and (not only or only == "Armor") then
 		gemSocket(
 			folder,
 			torso,
@@ -952,7 +945,7 @@ function Equipment.apply(player: Player)
 	-- A back piece (cosmetic), worn behind the armor.
 	local back = cosmetics and Cosmetics.get(cosmetics.Back)
 	local build = back and back.Look and BACKS[back.Look]
-	if torso and build then
+	if torso and build and not only then
 		local mount = CFrame.new(0, 0, torso.Size.Z / 2 + 0.55) * CFrame.Angles(0, math.rad(180), 0)
 		build(folder, torso, mount, back.Color, accent)
 	end
@@ -964,6 +957,9 @@ function Equipment.apply(player: Player)
 	local right = gripAnchor(weaponFolder, character, "Right")
 	local left = gripAnchor(weaponFolder, character, "Left")
 	local buildWeapon = WEAPONS[weapon.Look]
+	if only and only ~= "Weapon" then
+		right, left = nil, nil
+	end
 	if weapon.Look == "FrontierSword" and right then
 		local roll = GearRolls.get(loadout, "Weapon")
 		local rarity = if roll then roll.Rarity else weapon.RarityTier or 1
@@ -974,7 +970,7 @@ function Equipment.apply(player: Player)
 	elseif buildWeapon and right and left then
 		buildWeapon(weaponFolder, character, right, left, accent, loadout.WeaponGem)
 	end
-	local shieldItem = Classes.gear(loadout.Class, "Shields", loadout.Shield)
+	local shieldItem = (not only or only == "Shield") and Classes.gear(loadout.Class, "Shields", loadout.Shield)
 	if shieldItem then
 		local component = Instance.new("Folder")
 		component.Name = "Shield"
@@ -982,7 +978,7 @@ function Equipment.apply(player: Player)
 		local shieldRoll = GearRolls.get(loadout, "Shield")
 		local traits = if shieldRoll
 			then GearRolls.appearance(shieldRoll)
-			else SuitTraits.forSuit(player.UserId, shieldItem.Id)
+			else SuitTraits.forSuit(userId, shieldItem.Id)
 		frontierShield(
 			component,
 			character,
@@ -1065,7 +1061,7 @@ function Equipment.apply(player: Player)
 	end
 
 	-- Enchanted gear takes on its gem's element.
-	if loadout.ArmorGem then
+	if loadout.ArmorGem and (not only or only == "Armor") then
 		enchant(armorParts, loadout.ArmorGem, torso)
 	end
 	if loadout.WeaponGem then
@@ -1077,8 +1073,161 @@ function Equipment.apply(player: Player)
 		end
 		enchant(weaponParts, loadout.WeaponGem, nil)
 	end
+	return folder
+end
+
+function Equipment.apply(player: Player)
+	local character = player.Character
+	local loadout = PlayerData.character(player)
+	if not character or not loadout then
+		return
+	end
+	local existing = character:FindFirstChild(FOLDER_NAME)
+	if existing then
+		existing:Destroy()
+	end
+	local profile = PlayerData.get(player)
+	local folder = dress(character, loadout, profile and profile.Cosmetics, player.UserId)
+	if not folder then
+		return
+	end
 	folder.Parent = character
 	applyStats(character, loadout)
+end
+
+-- Item previews ----------------------------------------------------------------------------
+-- Spare equipment is shown in the Armory as the real 3D item: each one is
+-- built on a plain mannequin by the same code that dresses players, then its
+-- parts are stored (relative to the mannequin) in a hidden ScreenGui in the
+-- owner's PlayerGui, which only that player receives.
+local PREVIEW_GUI = "GearPreviews"
+local mannequinTemplate: Model? = nil
+local building: { [Player]: boolean } = {}
+
+local function mannequin(): Model?
+	if not mannequinTemplate then
+		local ok, rig = pcall(function()
+			return Players:CreateHumanoidModelFromDescription(
+				Instance.new("HumanoidDescription"),
+				Enum.HumanoidRigType.R15
+			)
+		end)
+		if not ok or not rig then
+			return nil
+		end
+		rig.Name = "PreviewMannequin"
+		mannequinTemplate = rig
+	end
+	local rig = (mannequinTemplate :: Model):Clone()
+	local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root then
+		root.Anchored = true
+	end
+	-- Far above the moon base, where the joints settle the limbs into place.
+	rig:PivotTo(CFrame.new(0, 5000, 0))
+	rig.Parent = workspace
+	return rig
+end
+
+-- What a preview depends on; it's rebuilt only when this changes.
+local function previewKey(loadout, slot: string, id: string, quality: number): string
+	local roll = GearRolls.get(loadout, slot, id)
+	local gem = loadout.ItemGems and loadout.ItemGems[slot] and loadout.ItemGems[slot][id]
+	return table.concat({
+		tostring(quality),
+		if roll then string.format("%d-%d-%d-%d", roll.Rarity, roll.Finish, roll.Helmet, roll.Variant) else "-",
+		if gem then gem.Element .. tostring(gem.Id) else "-",
+	}, "|")
+end
+
+-- Builds previews for every owned item not being worn. Returns true when
+-- they're all up to date.
+function Equipment.previews(player: Player): boolean
+	local profile = PlayerData.get(player)
+	local loadout = PlayerData.character(player)
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if not profile or not loadout or not playerGui or building[player] then
+		return false
+	end
+	local store = playerGui:FindFirstChild(PREVIEW_GUI)
+	if not store then
+		local gui = Instance.new("ScreenGui")
+		gui.Name = PREVIEW_GUI
+		gui.Enabled = false
+		gui.ResetOnSpawn = false
+		gui.Parent = playerGui
+		store = gui
+	end
+	local wanted = {}
+	for _, slot in Slots.Order do
+		local kind = Slots.Definitions[slot].Kind
+		for id, quality in profile.Owned[kind] or {} do
+			if id ~= loadout[slot] and Classes.gear(loadout.Class, kind, id) then
+				wanted[slot .. "|" .. id] = { Slot = slot, Id = id, Quality = quality }
+			end
+		end
+	end
+	for _, child in (store :: Instance):GetChildren() do
+		local item = wanted[child.Name]
+		if item and child:GetAttribute("Key") == previewKey(loadout, item.Slot, item.Id, item.Quality) then
+			wanted[child.Name] = nil
+		else
+			child:Destroy()
+		end
+	end
+	if next(wanted) == nil then
+		return true
+	end
+	building[player] = true
+	local rig = mannequin()
+	if not rig then
+		building[player] = nil
+		return false
+	end
+	task.wait()
+	local origin = rig:GetPivot()
+	for name, item in wanted do
+		local trial = table.clone(loadout)
+		local gems = loadout.ItemGems and loadout.ItemGems[item.Slot]
+		trial[item.Slot] = item.Id
+		trial[item.Slot .. "Quality"] = item.Quality
+		trial[item.Slot .. "Gem"] = gems and gems[item.Id]
+		local ok, folder = pcall(dress, rig, trial, nil, player.UserId, item.Slot)
+		local source = ok and folder and folder:FindFirstChild(item.Slot)
+		if source then
+			local preview = Instance.new("Folder")
+			preview.Name = name
+			preview:SetAttribute("Slot", item.Slot)
+			preview:SetAttribute("Key", previewKey(loadout, item.Slot, item.Id, item.Quality))
+			local parts = {}
+			for _, part in source:GetDescendants() do
+				if part:IsA("BasePart") and part.Transparency < 1 then
+					table.insert(parts, part)
+				end
+			end
+			for _, part in parts do
+				-- Remember which body part it sat on (the thumbnail filter uses it).
+				local weld = part:FindFirstChildOfClass("WeldConstraint")
+				local anchor = weld and weld.Part0
+				part:SetAttribute("Anchor", if anchor then anchor.Name else "")
+				for _, child in part:GetChildren() do
+					if child:IsA("JointInstance") or child:IsA("WeldConstraint") then
+						child:Destroy()
+					end
+				end
+				part.Anchored = true
+				part.CFrame = origin:ToObjectSpace(part.CFrame)
+				part.Parent = preview
+			end
+			preview.Parent = store
+		end
+		if ok and folder then
+			folder:Destroy()
+		end
+	end
+	rig:Destroy()
+	building[player] = nil
+	return true
 end
 
 local function watch(player: Player)
@@ -1101,6 +1250,14 @@ function Equipment.start()
 		task.spawn(Equipment.apply, player)
 	end
 	PlayerData.CharacterChanged:Connect(Equipment.apply)
+	Players.PlayerRemoving:Connect(function(player)
+		building[player] = nil
+	end)
+	-- The Armory asks for previews when it opens and when the gear changes.
+	Shop.register("GearPreviews", function(player)
+		local done = Equipment.previews(player)
+		return Shop.reply(true, "", { Done = done })
+	end)
 end
 
 return Equipment

@@ -261,50 +261,77 @@ boardHint.Size = UDim2.fromOffset(112, 46)
 boardHint.TextXAlignment = Enum.TextXAlignment.Center
 boardHint.AutomaticSize = Enum.AutomaticSize.None
 
+-- Draws one item's parts in a viewport, framed for a thumbnail. `anchorOf`
+-- names the body part a piece is worn on; `placeOf` gives its CFrame
+-- relative to the wearer.
+local function frameGear(
+	view: ViewportFrame,
+	key: string,
+	parts: { BasePart },
+	anchorOf: (BasePart) -> string,
+	placeOf: (BasePart) -> CFrame
+)
+	view:ClearAllChildren()
+	local world = new("WorldModel", {}, view)
+	local model = new("Model", {}, world)
+	for _, part in parts do
+		if part.Transparency >= 1 then
+			continue
+		end
+		local anchorName = anchorOf(part)
+		-- Show one glove/boot and just the chest assembly, keeping thumbnails readable.
+		if (key == "Gloves" or key == "Boots") and string.find(anchorName, "Right") then
+			continue
+		end
+		if key == "Armor" and (string.find(anchorName, "Arm") or string.find(anchorName, "Leg")) then
+			continue
+		end
+		local clone = part:Clone()
+		for _, child in clone:GetChildren() do
+			child:Destroy()
+		end
+		clone.Anchored = true
+		clone.CFrame = placeOf(part)
+		clone.Parent = model
+	end
+	if #model:GetChildren() > 0 then
+		local frame, size = model:GetBoundingBox()
+		local camera = new("Camera", { FieldOfView = 30 }, view)
+		-- Shields and guns (held pointing forward) read best from the side.
+		local sideways = key == "Shield" or (key == "Weapon" and size.Z > size.Y)
+		local direction = if sideways then Vector3.new(1, 0.15, -0.1).Unit else Vector3.new(0.22, 0.1, -1).Unit
+		local distance = math.max(size.X, size.Y, size.Z) * 2.3 + 0.2
+		camera.CFrame = CFrame.lookAt(frame.Position + direction * distance, frame.Position)
+		view.CurrentCamera = camera
+		return true
+	end
+	return false
+end
+
 refreshItemArt = function()
 	local character = player.Character
 	local equipment = character and character:FindFirstChild("GemsoulGear")
 	if not character or not equipment then
 		return
 	end
+	local origin = character:GetPivot()
 	for key, ui in equipmentSlots do
 		ui.Art:ClearAllChildren()
 		local source = equipment:FindFirstChild(key)
 		if source then
-			local world = new("WorldModel", {}, ui.Art)
-			local model = new("Model", {}, world)
+			local parts = {}
 			for _, part in source:GetDescendants() do
-				if not part:IsA("BasePart") or part.Transparency >= 1 then
-					continue
+				if part:IsA("BasePart") then
+					table.insert(parts, part)
 				end
+			end
+			frameGear(ui.Art, key, parts, function(part)
 				local weld = part:FindFirstChildOfClass("WeldConstraint")
 				local anchor = weld and weld.Part0
-				local anchorName = anchor and anchor.Name or ""
-				-- Show one glove/boot and just the chest assembly, keeping thumbnails readable.
-				if (key == "Gloves" or key == "Boots") and string.find(anchorName, "Right") then
-					continue
-				end
-				if key == "Armor" and (string.find(anchorName, "Arm") or string.find(anchorName, "Leg")) then
-					continue
-				end
-				local clone = part:Clone()
-				for _, child in clone:GetChildren() do
-					child:Destroy()
-				end
-				clone.Anchored = true
-				clone.CFrame = character:GetPivot():ToObjectSpace(part.CFrame)
-				clone.Parent = model
-			end
-			if #model:GetChildren() > 0 then
-				local frame, size = model:GetBoundingBox()
-				local camera = new("Camera", { FieldOfView = 30 }, ui.Art)
-				local direction = if key == "Shield"
-					then Vector3.new(1, 0.15, -0.1).Unit
-					else Vector3.new(0.22, 0.1, -1).Unit
-				local distance = math.max(size.X, size.Y, size.Z) * 2.3 + 0.2
-				camera.CFrame = CFrame.lookAt(frame.Position + direction * distance, frame.Position)
-				ui.Art.CurrentCamera = camera
-			end
+				return if anchor then anchor.Name else ""
+			end, function(part)
+				return origin:ToObjectSpace(part.CFrame)
+			end)
 		end
 	end
 end
@@ -371,7 +398,7 @@ local equipmentGrid = new("ScrollingFrame", {
 	ScrollBarImageColor3 = P.Edge,
 }, equipmentBox)
 new("UIGridLayout", {
-	CellSize = UDim2.fromOffset(106, 66),
+	CellSize = UDim2.fromOffset(106, 104),
 	CellPadding = UDim2.fromOffset(6, 6),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, equipmentGrid)
@@ -1135,17 +1162,13 @@ local function equipmentIcon(parent, slotName, gear, color)
 		parent
 	)
 	local function part(x, y, w, h, angle)
-		new(
-			"Frame",
-			{
-				BackgroundColor3 = color,
-				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(x, y),
-				Size = UDim2.fromOffset(w, h),
-				Rotation = angle or 0,
-			},
-			icon
-		)
+		new("Frame", {
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(x, y),
+			Size = UDim2.fromOffset(w, h),
+			Rotation = angle or 0,
+		}, icon)
 	end
 	if slotName == "Helmet" then
 		part(4, 3, 20, 19)
@@ -1181,6 +1204,63 @@ local function equipmentIcon(parent, slotName, gear, color)
 	end
 end
 
+-- 3D previews of spare items arrive from the server in a hidden ScreenGui.
+local function previewStore(): Instance?
+	return player:FindFirstChildOfClass("PlayerGui")
+		and (player:FindFirstChildOfClass("PlayerGui") :: PlayerGui):FindFirstChild("GearPreviews")
+end
+
+local function previewFor(slotName: string, id: string): Instance?
+	local store = previewStore()
+	return store and store:FindFirstChild(slotName .. "|" .. id)
+end
+
+-- Ask the server for previews when the spare items change (or on opening).
+local previewSignature = ""
+local previewPending = false
+local previewRetries = 0
+local function requestPreviews(profile, force: boolean?)
+	local parts = {}
+	for _, item in storedEquipment(profile) do
+		local gem = item.Gem
+		table.insert(
+			parts,
+			string.format(
+				"%s|%s|%d|%d|%s",
+				item.Slot,
+				item.Id,
+				item.Quality or 1,
+				item.Rarity,
+				gem and gem.Element or "-"
+			)
+		)
+	end
+	local signature = table.concat(parts, ",")
+	if previewPending or (signature == previewSignature and not force) then
+		return
+	end
+	previewSignature = signature
+	previewPending = true
+	task.spawn(function()
+		local result = GemClient.request("GearPreviews")
+		previewPending = false
+		if result.Ok and result.Done then
+			previewRetries = 0
+		else
+			-- Busy or rate limited: try again shortly (a few times).
+			previewSignature = ""
+			previewRetries += 1
+			if previewRetries <= 5 then
+				task.delay(2, function()
+					if GemClient.Profile then
+						requestPreviews(GemClient.Profile)
+					end
+				end)
+			end
+		end
+	end)
+end
+
 local function drawEquipmentInventory(profile)
 	local items = storedEquipment(profile)
 	equipmentTitle.Text = string.format("EQUIPMENT INVENTORY   %d STORED", #items)
@@ -1199,30 +1279,71 @@ local function drawEquipmentInventory(profile)
 			equipmentGrid
 		)
 		UiKit.round(card, 3)
-		new(
-			"UIStroke",
-			{
-				Color = if selected then P.Gold else color,
-				Thickness = if selected then 2.5 else 1,
-				Transparency = if selected then 0 else 0.35,
-			},
-			card
-		)
-		equipmentIcon(card, item.Slot, item.Gear, color)
-		local category = text(card, string.upper(Slots.Definitions[item.Slot].Label), 8, color, BOLD)
-		category.Position = UDim2.fromOffset(37, 6)
-		category.Size = UDim2.fromOffset(65, 22)
+		new("UIStroke", {
+			Color = if selected then P.Gold else color,
+			Thickness = if selected then 2.5 else 1,
+			Transparency = if selected then 0 else 0.35,
+		}, card)
+		-- The item itself, in 3D (built by the server); the drawn silhouette
+		-- stands in until the preview arrives.
+		local stage = new("Frame", {
+			BackgroundColor3 = color:Lerp(P.Frame, 0.82),
+			Position = UDim2.fromOffset(4, 4),
+			Size = UDim2.fromOffset(98, 60),
+			ClipsDescendants = true,
+		}, card)
+		UiKit.round(stage, 2)
+		local view = new("ViewportFrame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Ambient = Color3.fromRGB(185, 190, 210),
+			LightColor = Color3.fromRGB(255, 235, 201),
+			LightDirection = Vector3.new(-0.4, -1, -0.6),
+		}, stage)
+		local preview = previewFor(item.Slot, item.Id)
+		local drawn = false
+		if preview then
+			local parts = {}
+			for _, part in preview:GetChildren() do
+				if part:IsA("BasePart") then
+					table.insert(parts, part)
+				end
+			end
+			drawn = frameGear(view, item.Slot, parts, function(part)
+				return part:GetAttribute("Anchor") or ""
+			end, function(part)
+				return part.CFrame
+			end)
+		end
+		if not drawn then
+			local holder = new("Frame", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(38, 34),
+			}, stage)
+			equipmentIcon(holder, item.Slot, item.Gear, color)
+		end
+		local category = text(stage, string.upper(Slots.Definitions[item.Slot].Label), 8, color, BOLD)
+		category.Position = UDim2.fromOffset(4, 2)
+		category.Size = UDim2.fromOffset(80, 12)
 		category.AutomaticSize = Enum.AutomaticSize.None
+		category.ZIndex = 3
 		local name = text(card, item.Gear.Name, 10, P.Text, BOLD)
-		name.Position = UDim2.fromOffset(5, 32)
-		name.Size = UDim2.fromOffset(96, 31)
+		name.Position = UDim2.fromOffset(5, 66)
+		name.Size = UDim2.fromOffset(96, 22)
 		name.AutomaticSize = Enum.AutomaticSize.None
 		name.TextTruncate = Enum.TextTruncate.AtEnd
+		local rarity = text(card, string.upper(GearRolls.Rarities[item.Rarity].Name), 8, color, BOLD)
+		rarity.Position = UDim2.fromOffset(5, 88)
+		rarity.Size = UDim2.fromOffset(96, 12)
+		rarity.AutomaticSize = Enum.AutomaticSize.None
 		if item.Gem then
 			local marker = text(card, "◆", 10, GemConfig.ElementColors[item.Gem.Element], BOLD)
-			marker.Position = UDim2.fromOffset(91, 19)
+			marker.Position = UDim2.fromOffset(88, 6)
 			marker.Size = UDim2.fromOffset(12, 12)
 			marker.AutomaticSize = Enum.AutomaticSize.None
+			marker.ZIndex = 4
 		end
 		IronUi.highlight(card)
 		card.Activated:Connect(function()
@@ -1272,8 +1393,38 @@ function CharacterUI.refresh()
 	drawStats(loadout, class)
 	drawGrid(profile)
 	drawEquipmentInventory(profile)
+	requestPreviews(profile)
 	drawTooltip()
 end
+
+-- Redraw the spare items as their 3D previews arrive (a burst becomes one redraw).
+local previewRedraw = false
+local function previewsChanged()
+	if previewRedraw then
+		return
+	end
+	previewRedraw = true
+	task.delay(0.2, function()
+		previewRedraw = false
+		if gui.Enabled and GemClient.Profile then
+			drawEquipmentInventory(GemClient.Profile)
+		end
+	end)
+end
+local function watchPreviews(store: Instance)
+	store.ChildAdded:Connect(previewsChanged)
+	store.ChildRemoved:Connect(previewsChanged)
+	previewsChanged()
+end
+local playerGui = player:WaitForChild("PlayerGui")
+if playerGui:FindFirstChild("GearPreviews") then
+	watchPreviews(playerGui:FindFirstChild("GearPreviews") :: Instance)
+end
+playerGui.ChildAdded:Connect(function(child)
+	if child.Name == "GearPreviews" then
+		watchPreviews(child)
+	end
+end)
 
 -- Opening and closing ----------------------------------------------------------------------
 
@@ -1324,6 +1475,7 @@ function CharacterUI.open(options: Options?)
 	end
 	atVey = options ~= nil and options.AtVey == true
 	selection = nil
+	previewSignature = ""
 	gui.Enabled = true
 	fit()
 	refreshAvatar()
