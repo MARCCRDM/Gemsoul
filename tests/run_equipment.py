@@ -11,10 +11,12 @@ def module(name, path):
 source = read("tests/roblox_primitives.luau")
 source += "local Config = {MaxGems=2,MarketSellRate=0.45}\n"
 source += module("EquipmentBalance", "src/shared/EquipmentBalance.luau")
+source += module("ExpeditionEconomy", "src/shared/ExpeditionEconomy.luau")
+source += module("CrowdControl", "src/shared/CrowdControl.luau")
+source += module("GemConfig", "src/shared/GemConfig.luau")
 source += module("ArmorFamilies", "src/shared/ArmorFamilies.luau")
 source += module("ExpandedTraits", "src/shared/ExpandedItemTraits.luau")
 source += module("Slots", "src/shared/EquipmentSlots.luau")
-source += module("GemConfig", "src/shared/GemConfig.luau")
 source += module("Crafting", "src/shared/Crafting.luau")
 source += module("GearRolls", "src/shared/GearRolls.luau")
 source += module("Classes", "src/shared/Classes.luau")
@@ -29,6 +31,7 @@ source += data[data.index("local GEAR_KEYS"):data.index("-- Records a first")]
 source += read("tests/equipment_cases.luau")
 source += read("tests/expanded_traits_cases.luau")
 source += read("tests/armor_family_cases.luau")
+source += read("tests/gem_metric_cases.luau")
 with tempfile.TemporaryDirectory(prefix="gemsoul-equipment-") as directory:
     script = Path(directory) / "tests.luau"
     script.write_text(source, encoding="utf-8")

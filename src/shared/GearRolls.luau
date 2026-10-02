@@ -24,6 +24,16 @@ local visors = {
 	Color3.fromRGB(237, 102, 198),
 	Color3.fromRGB(100, 235, 174),
 }
+-- Rare+ armor carries Elemental Affinity Affixes. Saved rolls from before
+-- affixes get theirs once (AffixVersion); weapons never roll them.
+GearRolls.AffixVersion = 1
+function GearRolls.addAffixes(roll, rng, gear)
+	if roll.AffixVersion then
+		return
+	end
+	roll.Affixes = ArmorFamilies.rollAffixes(roll.Rarity, rng, gear and gear.AffixTable)
+	roll.AffixVersion = GearRolls.AffixVersion
+end
 function GearRolls.roll(rng, fixedRarity, gear)
 	local pick, rarity = rng:NextInteger(1, 100), 1
 	for i, entry in GearRolls.Rarities do
@@ -53,6 +63,9 @@ function GearRolls.roll(rng, fixedRarity, gear)
 		roll.Stats, roll.Points, roll.Modifiers = ArmorFamilies.rollStats(gear, rng)
 		roll.ArmorBudgetVersion = ArmorFamilies.Version
 		roll.Budget = gear.Budget
+	end
+	if gear and not gear.Attack and not gear.WeaponType then
+		GearRolls.addAffixes(roll, rng, gear)
 	end
 	return roll
 end
@@ -104,6 +117,9 @@ function GearRolls.ensure(profile, rng)
 					roll.MatrixVisor = visor.Index
 				end
 				c.GearRolls[kind][id] = roll
+			end
+			if kind ~= "Weapons" then
+				GearRolls.addAffixes(c.GearRolls[kind][id], rng, ArmorFamilies.ById[id])
 			end
 		end
 	end

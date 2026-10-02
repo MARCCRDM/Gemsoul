@@ -1052,6 +1052,18 @@ function Classes.armorBonuses(loadout)
 	end
 	return bonuses
 end
+-- Elemental Affinity Affixes from every equipped armor piece, summed per affix:
+-- { [affixId]: bonus }. Feed it to GemConfig.stats / GemConfig.lines.
+function Classes.affinities(loadout): { [string]: number }
+	local totals = {}
+	for _, slot in ArmorFamilies.Slots do
+		local roll = GearRolls.get(loadout, slot)
+		for _, affix in roll and roll.Affixes or {} do
+			totals[affix.Id] = (totals[affix.Id] or 0) + affix.Bonus
+		end
+	end
+	return totals
+end
 function Classes.gear(classId: string, kind: string, id: string?)
 	local class = Classes.List[classId]
 	for _, gear in class and class[kind] or {} do

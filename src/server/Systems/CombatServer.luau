@@ -25,6 +25,7 @@ local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local Enemies = require(script.Parent.Enemies)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
@@ -44,6 +45,12 @@ type State = {
 	ShieldUntil: number,
 	DodgeUntil: number,
 	NextWard: number,
+	GemShield: number, -- from defensive gems: raised on the first hit, then recharges
+	GemShieldUntil: number,
+	GemShieldReady: number,
+	NextCleanse: number,
+	NextAura: number,
+	CC: CrowdControl.Tracker, -- diminishing returns, healing cuts and debuffs on this player
 	Inputs: number, -- inputs this second, to ignore spam
 	InputWindow: number,
 }
@@ -55,6 +62,19 @@ local CRIT = Color3.fromRGB(255, 220, 80)
 local BLEED = Color3.fromRGB(200, 40, 40)
 local POISON = GemConfig.ElementColors.Poison
 local FIRE = GemConfig.ElementColors.Fire
+local SHOCK = GemConfig.ElementColors.Shock
+local RULES = GemConfig.Rules
+
+-- Crowd-control trackers for monsters (diminishing returns only bite in PvP).
+local enemyCC: { [any]: CrowdControl.Tracker } = setmetatable({}, { __mode = "k" }) :: any
+local function ccFor(target: any): CrowdControl.Tracker
+	local tracker = enemyCC[target]
+	if not tracker then
+		tracker = CrowdControl.new()
+		enemyCC[target] = tracker
+	end
+	return tracker
+end
 
 -- Setup ---------------------------------------------------------------------------------------
 
@@ -66,7 +86,54 @@ type Kit = {
 	Loadout: { [string]: any },
 	Resource: Combat.Resource,
 	Effects: { [string]: any }, -- weapon + armor passive effects merged
+	Affinity: { [string]: number }, -- Elemental Affinity Affixes from armor
+	Defense: GemDefense, -- what the armor gems add up to
 }
+
+-- Defensive gems (every slot but the weapon), added together.
+type GemDefense = {
+	Shield: number,
+	Duration: number,
+	Cooldown: number,
+	Reflect: number,
+	Resist: number,
+	Deflect: number,
+	Aura: number,
+	Cleanse: number?, -- seconds between cleanses
+}
+
+local function gemDefense(loadout: { [string]: any }, affinity: { [string]: number }): GemDefense
+	local d: GemDefense = {
+		Shield = 0,
+		Duration = RULES.ShieldBaseDuration,
+		Cooldown = RULES.ShieldBaseCooldown,
+		Reflect = 0,
+		Resist = 0,
+		Deflect = 0,
+		Aura = 0,
+		Cleanse = nil,
+	}
+	local recharge = 0
+	for _, slot in Slots.Order do
+		local gem = if slot ~= "Weapon" then loadout[slot .. "Gem"] else nil
+		if gem then
+			local v = GemConfig.stats(gem, slot, { Affinity = affinity })
+			d.Shield += v.ShieldAmount or 0
+			d.Cooldown -= v.CooldownCut or 0
+			d.Duration += v.ShieldDuration or 0
+			recharge += v.RechargeRate or 0
+			d.Reflect += v.ReflectChance or 0
+			d.Resist += v.Resistance or 0
+			d.Deflect += v.DeflectChance or 0
+			d.Aura += v.AuraShred or 0
+			if v.CleanseRate then
+				d.Cleanse = math.min(d.Cleanse or math.huge, GemConfig.cleanseInterval(v.CleanseRate))
+			end
+		end
+	end
+	d.Cooldown = math.max(RULES.ShieldMinCooldown, d.Cooldown) / (1 + recharge)
+	return d
+end
 
 -- Everything about the player's build that combat needs, fresh each time.
 local function kit(player: Player): Kit?
@@ -81,6 +148,7 @@ local function kit(player: Player): Kit?
 		return nil
 	end
 	local effects = Classes.effects(loadout)
+	local affinity = Classes.affinities(loadout)
 	return {
 		Class = class,
 		Weapon = weapon,
@@ -89,6 +157,8 @@ local function kit(player: Player): Kit?
 		Loadout = loadout,
 		Resource = Combat.Resources[class.ResourceId],
 		Effects = effects,
+		Affinity = affinity,
+		Defense = gemDefense(loadout, affinity),
 	}
 end
 
@@ -111,6 +181,12 @@ local function state(player: Player): State
 			ShieldUntil = 0,
 			DodgeUntil = 0,
 			NextWard = 0,
+			GemShield = 0,
+			GemShieldUntil = 0,
+			GemShieldReady = 0,
+			NextCleanse = 0,
+			NextAura = 0,
+			CC = CrowdControl.new(),
 			Inputs = 0,
 			InputWindow = 0,
 		}
@@ -242,6 +318,7 @@ type HitOptions = {
 	Finisher: boolean?,
 	Extras: { [string]: any }?, -- ability extras: Stun, Slow, SlowTime, Taunt, Burn, Poison, Execute...
 	NoProcs: boolean?, -- zone ticks and chain echoes don't re-trigger passives
+	PvP: boolean?, -- the target is a player: PvP gem multipliers, caps and diminishing returns
 }
 
 local function hit(player: Player, k: Kit, st: State, enemy: Enemies.Enemy, base: number, opts: HitOptions?)
@@ -311,20 +388,50 @@ local function hit(player: Player, k: Kit, st: State, enemy: Enemies.Enemy, base
 		gainResource(player, st, e.ResourceOnHit)
 	end
 
-	-- The weapon's socketed gem.
+	-- The weapon's socketed gem: Size is how hard, Clarity how long, Cut how often.
 	if gem then
-		local v = GemConfig.enchantValues(gem, "Weapon")
-		if v.Burn then
-			Enemies.addDot(enemy, v.Burn, 3, player, FIRE)
-		elseif v.Slow then
-			Enemies.addStatus(enemy, "Slow", v.Slow, 2)
-		elseif v.Weaken then
-			Enemies.addStatus(enemy, "Weaken", v.Weaken, 4)
-		elseif v.Arc then
-			local other = nearestOther(enemy, 14, {})
-			if other then
-				fx("Arc", enemy.Root.Position, other.Root.Position, GemConfig.ElementColors.Shock)
-				Enemies.damage(other, damage * v.Arc, player, false, GemConfig.ElementColors.Shock)
+		local v = GemConfig.stats(gem, "Weapon", { Affinity = k.Affinity, PvP = o.PvP })
+		local now = os.clock()
+		if gem.Element == "Fire" then
+			local perTick = v.BurnDamage
+			if math.random() < v.IgniteChance then
+				perTick *= Combat.CritMult -- a critical burn
+			end
+			Enemies.setBurn(enemy, perTick, v.BurnDuration, player, FIRE)
+		elseif gem.Element == "Frost" then
+			Enemies.addStatus(enemy, "Slow", v.SlowAmount, v.SlowDuration)
+			if math.random() < v.FreezeChance then
+				local seconds = CrowdControl.ApplyCC(ccFor(enemy), v.FreezeSeconds, now, o.PvP)
+				if seconds > 0 then
+					Enemies.addStatus(enemy, "Stun", 1, seconds)
+				end
+			end
+		elseif gem.Element == "Poison" then
+			Enemies.addStatus(enemy, "Sunder", v.ArmorShred, v.DebuffDuration)
+			if math.random() < v.VulnerableChance then
+				Enemies.addStatus(enemy, "Vulnerable", v.VulnerableAmount, v.DebuffDuration)
+			end
+		elseif gem.Element == "Shock" then
+			local struck, from = { [enemy] = true }, enemy
+			for _ = 1, v.ChainLength do
+				local other = nearestOther(from, RULES.ArcRange, struck)
+				if not other then
+					break
+				end
+				struck[other] = true
+				fx("Arc", from.Root.Position, other.Root.Position, SHOCK)
+				Enemies.damage(other, v.ArcDamage, player, false, SHOCK)
+				from = other
+			end
+			if v.StunChance > 0 and math.random() < v.StunChance then
+				local seconds = CrowdControl.ApplyCC(ccFor(enemy), v.StunSeconds, now, o.PvP)
+				if seconds > 0 then
+					Enemies.addStatus(enemy, "Stun", 1, seconds)
+				end
+			end
+			-- Execute: finish anything left below the threshold.
+			if enemy.Alive and not enemy.Kind.Dummy and health.Health < health.MaxHealth * v.ExecuteThreshold then
+				Enemies.damage(enemy, health.Health / (1 + Enemies.exposure(enemy)) + 1, player, true, SHOCK)
 			end
 		end
 	end
@@ -448,7 +555,11 @@ local function applyBuff(player: Player, st: State, ability: any, k: Kit)
 	if ability.Heal and humanoid then
 		humanoid.Health = math.min(
 			humanoid.MaxHealth,
-			humanoid.Health + humanoid.MaxHealth * ability.Heal * (1 + (k.Effects.HealingReceived or 0))
+			humanoid.Health
+				+ humanoid.MaxHealth
+					* ability.Heal
+					* (1 + (k.Effects.HealingReceived or 0))
+					* CrowdControl.healingMultiplier(st.CC, os.clock())
 		)
 	end
 	if ability.Shield then
@@ -562,25 +673,41 @@ end
 
 -- Taking damage ------------------------------------------------------------------------------------------
 
-function CombatServer.hurt(player: Player, amount: number, element: string?)
+function CombatServer.hurt(player: Player, amount: number, element: string?, attacker: Enemies.Enemy?)
 	local humanoid, root = alive(player)
 	local k = kit(player)
 	if not humanoid or not root or not k then
 		return
 	end
 	local st = state(player)
+	local d = k.Defense
+	local now = os.clock()
+	-- Ion armor: a clean deflect takes nothing.
+	if d.Deflect > 0 and math.random() < d.Deflect then
+		fx("Damage", root.Position + Vector3.new(0, 3, 0), 0, false, SHOCK)
+		return
+	end
 	local damage = amount * Combat.defenseMult(rating(k, "Defense"))
 	damage *= buffTotal(st, "TakenMult")
-	local resistance = 0
-	for _, slot in Slots.Order do
-		local gem = k.Loadout[slot .. "Gem"]
-		if slot ~= "Weapon" and element and gem and gem.Element == element then
-			resistance += GemConfig.enchantValues(gem, slot).Resist / 5
-		end
-	end
-	damage *= EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
+	-- Cryo armor's resistance shares the passive damage-reduction cap.
+	damage *= EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, d.Resist)
 	damage = math.max(1, math.floor(damage + 0.5))
-	if st.Shield > 0 and os.clock() < st.ShieldUntil then
+	-- Thermal armor: reflect the hit back at whoever threw it.
+	if attacker and attacker.Alive and d.Reflect > 0 and math.random() < d.Reflect then
+		Enemies.damage(attacker, damage, player, false, FIRE)
+	end
+	-- Gem shields raise on the first hit once charged, hold, then recharge.
+	if d.Shield > 0 and now >= st.GemShieldReady then
+		st.GemShield = d.Shield
+		st.GemShieldUntil = now + d.Duration
+		st.GemShieldReady = now + d.Duration + d.Cooldown
+	end
+	if st.GemShield > 0 and now < st.GemShieldUntil then
+		local absorbed = math.min(st.GemShield, damage)
+		st.GemShield -= absorbed
+		damage -= absorbed
+	end
+	if st.Shield > 0 and now < st.ShieldUntil then
 		local absorbed = math.min(st.Shield, damage)
 		st.Shield -= absorbed
 		damage -= absorbed
@@ -590,7 +717,7 @@ function CombatServer.hurt(player: Player, amount: number, element: string?)
 		humanoid:TakeDamage(damage)
 	end
 	gainResource(player, st, k.Resource.OnHurt)
-	st.LastCombat = os.clock()
+	st.LastCombat = now
 end
 
 -- Loadout ---------------------------------------------------------------------------------------------
@@ -662,6 +789,22 @@ local function tick(dt: number)
 			if now >= st.ShieldUntil then
 				st.Shield = 0
 			end
+			if now >= st.GemShieldUntil then
+				st.GemShield = 0
+			end
+			local d = k.Defense
+			local _, root = alive(player)
+			-- Corrosive armor: an aura that leaves nearby enemies exposed, and cleansing.
+			if root and d.Aura > 0 and now >= st.NextAura then
+				st.NextAura = now + 1
+				for _, enemy in inRadius(root.Position, RULES.AuraRadius) do
+					Enemies.addStatus(enemy, "Aura", d.Aura, 1.5)
+				end
+			end
+			if d.Cleanse and now >= st.NextCleanse then
+				st.NextCleanse = now + d.Cleanse
+				CrowdControl.cleanse(st.CC, now)
+			end
 			for i = #st.Buffs, 1, -1 do
 				if now >= st.Buffs[i].Until then
 					table.remove(st.Buffs, i)
@@ -670,14 +813,14 @@ local function tick(dt: number)
 			player:SetAttribute("Resource", math.floor(st.Resource))
 			player:SetAttribute("ResourceMax", r.Max)
 			player:SetAttribute("ResourceKind", k.Class.ResourceId)
-			player:SetAttribute("Shield", math.floor(st.Shield))
+			player:SetAttribute("Shield", math.floor(st.Shield + st.GemShield))
 		end
 	end
 end
 
 function CombatServer.start()
-	Enemies.hitPlayer = function(player, amount, element)
-		CombatServer.hurt(player, amount, element)
+	Enemies.hitPlayer = function(player, amount, element, enemy)
+		CombatServer.hurt(player, amount, element, enemy)
 	end
 	Remotes.CombatInput.OnServerEvent:Connect(onInput)
 	Shop.register("SetAbilities", setAbilities)
@@ -693,6 +836,9 @@ function CombatServer.start()
 				st.Resource = if k then k.Resource.Start else 0
 				st.Buffs = {}
 				st.Shield = 0
+				st.GemShield = 0
+				st.GemShieldReady = 0
+				st.CC = CrowdControl.new()
 			end
 		end)
 	end

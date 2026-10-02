@@ -153,23 +153,23 @@ table.insert(
 )
 table.insert(
 	Traits.Visors,
-	{ Id = "MatrixVisor2", Name = "Glacial Cyan (Cryo)", Rarity = 2, ProposedBuff = "Cryo Potency +5% Freeze Buildup" }
+	{ Id = "MatrixVisor2", Name = "Glacial Cyan (Cryo)", Rarity = 2, ProposedBuff = "Cryo Affinity +5% Freeze Chance" }
 )
 table.insert(
 	Traits.Visors,
-	{ Id = "MatrixVisor3", Name = "Electric Amber (Volt)", Rarity = 3, ProposedBuff = "Volt Potency +5% Stun Duration" }
+	{ Id = "MatrixVisor3", Name = "Electric Amber (Volt)", Rarity = 3, ProposedBuff = "Ion Affinity +5% Stun Chance" }
 )
 table.insert(Traits.Visors, {
 	Id = "MatrixVisor4",
-	Name = "Corrosive Emerald (Radiation)",
+	Name = "Corrosive Emerald (Corrosive)",
 	Rarity = 4,
-	ProposedBuff = "Radiation Potency +8% DoT Tick Rate",
+	ProposedBuff = "Corrosive Affinity +8% Armor Shred",
 })
 table.insert(Traits.Visors, {
 	Id = "MatrixVisor5",
 	Name = "Void Violet (Plasma)",
 	Rarity = 5,
-	ProposedBuff = "Thermal Potency +12% Plasma Burn Damage",
+	ProposedBuff = "Thermal Affinity +12% Burn Damage",
 })
 table.insert(Traits.Visors, {
 	Id = "MatrixVisor6",

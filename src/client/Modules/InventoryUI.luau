@@ -362,13 +362,19 @@ local function showDetail(gem)
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "GEM MINT" else "CUT " .. gem.Cut
 	pill(badges, state, if gem.Cut and gem.Cut >= 10 then K.Gold else K.Text, 3)
 
-	statBar("SIZE", gem.Size, tierColor, 3)
-	statBar("CLARITY", gem.Clarity, tierColor, 4)
-	statBar("CUT", gem.Cut, K.Gold, 5)
+	statBar("SIZE  ·  MAGNITUDE", gem.Size, tierColor, 3)
+	statBar("CLARITY  ·  DURATION", gem.Clarity, tierColor, 4)
+	statBar("CUT  ·  PRECISION", gem.Cut, K.Gold, 5)
 
 	local value = label(info, "💰 " .. commas(GemConfig.value(gem)), 24, P.Gold, IronUi.Chunky)
 	IronUi.outline(value, 2)
 	value.LayoutOrder = 6
+	-- What it does in a weapon: the concrete numbers, not an abstract score.
+	for i, line in GemConfig.lines(gem, "Weapon") do
+		local tag = if line.Metric then string.format("  (%s %d)", line.Metric, line.Grade or 0) else ""
+		local effect = label(info, line.Text .. tag, 12, K.Text)
+		effect.LayoutOrder = 10 + i
+	end
 	if not gem.Cut then
 		local asCut = table.clone(gem)
 		asCut.Cut = 8
@@ -383,7 +389,7 @@ local function showDetail(gem)
 		origin ..= ", " .. DateTime.fromUnixTimestamp(gem.Found):FormatLocalTime("MMM D", "en-us")
 	end
 	local found = label(info, origin, 12, K.Dim)
-	found.LayoutOrder = 8
+	found.LayoutOrder = 20
 
 	local options = current
 	if options and options.OnPick then
@@ -394,7 +400,7 @@ local function showDetail(gem)
 		end)
 		button.AutomaticSize = Enum.AutomaticSize.None
 		button.Size = UDim2.new(1, 0, 0, 50)
-		button.LayoutOrder = 9
+		button.LayoutOrder = 30
 	end
 end
 

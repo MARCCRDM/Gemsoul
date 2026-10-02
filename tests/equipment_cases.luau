@@ -33,7 +33,9 @@ for _, slot in Slots.Order do
 end
 local before = Classes.ratings(old.Character)
 old.Character.BootsGem = { Id = "boots", Element = "Shock", Size = 5, Clarity = 5, Cut = 5 }
-check(Classes.ratings(old.Character).Speed.Bonus > before.Speed.Bonus, "Boot gem does not affect stats")
+-- Gems no longer add flat ratings; a boots gem raises a defensive Ion Shield.
+check(Classes.ratings(old.Character).Speed.Bonus == before.Speed.Bonus, "Gem still adds flat ratings")
+check(GemConfig.stats(old.Character.BootsGem, "Boots").ShieldAmount == 10, "Boot gem shield missing")
 local player = {}
 profiles[player] = old
 for _, slot in Slots.Order do

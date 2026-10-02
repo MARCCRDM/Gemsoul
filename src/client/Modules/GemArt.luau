@@ -67,7 +67,7 @@ function GemArt.model(gem, detailed: boolean?): (Model, number)
 		end
 	end
 	for _, speck in shape.Specks do
-		ball(model, speck.Position, speck.Radius, speck.Color, speck.Transparency)
+		ball(model, speck.Position, speck.Radius, speck.Color, speck.Transparency, speck.Glow)
 	end
 	for _, point in shape.Sparkles do
 		ball(model, point, 0.06, Color3.new(1, 1, 1), 0, true)
