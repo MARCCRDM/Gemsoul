@@ -1,5 +1,4 @@
--- A short welcome, simultaneous equipment reels, and nine guaranteed starter gems.
-local Players = game:GetService("Players")
+-- Launch ceremony: server-owned outcomes, simultaneous reels, a spotlight for every reward.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -8,12 +7,12 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
-local GemArt = require(script.Parent.Modules.GemArt)
+local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
+local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
 local UiSound = require(script.Parent.Modules.UiSound)
-local player = Players.LocalPlayer
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -21,369 +20,563 @@ if GemClient.Profile.Intro and GemClient.Profile.Intro.Done then
 	return
 end
 local new = IronUi.new
-local cyan = Color3.fromRGB(101, 218, 242)
+local C = {
+	Ink = Color3.fromRGB(8, 13, 23),
+	Panel = Color3.fromRGB(15, 24, 38),
+	Edge = Color3.fromRGB(50, 71, 92),
+	Text = Color3.fromRGB(241, 244, 250),
+	Dim = Color3.fromRGB(144, 164, 187),
+	Cyan = Color3.fromRGB(99, 220, 235),
+	Gold = Color3.fromRGB(255, 196, 101),
+}
 local gui = UiKit.gui("Intro", 15)
-local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(9, 15, 29) }, gui)
-new(
-	"UIGradient",
-	{ Rotation = 35, Color = ColorSequence.new(Color3.fromRGB(13, 34, 52), Color3.fromRGB(25, 13, 40)) },
-	back
-)
-local panel = new("Frame", {
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.new(1, -24, 1, -24),
-}, back)
-new("UISizeConstraint", { MaxSize = Vector2.new(1080, 900) }, panel)
+local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BorderSizePixel = 0 }, gui)
+new("UIGradient", { Rotation = 25, Color = ColorSequence.new(C.Ink, Color3.fromRGB(23, 25, 48)) }, back)
+local function frame(parent, props)
+	props.BorderSizePixel = 0
+	return new("Frame", props, parent)
+end
 local function label(parent, value, size, color)
 	return new("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = value,
-		Font = Enum.Font.GothamBold,
 		TextSize = size,
-		TextColor3 = color or Color3.fromRGB(236, 242, 251),
-		TextWrapped = true,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = color or C.Text,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextXAlignment = Enum.TextXAlignment.Left,
 		Size = UDim2.fromScale(1, 1),
 	}, parent)
 end
-local eyebrow = label(panel, "SAGA MINERS · LAUNCH LOTTERY", 11, cyan)
-eyebrow.Position, eyebrow.Size = UDim2.fromOffset(0, 8), UDim2.new(1, 0, 0, 22)
-local title = label(panel, "Your adventure starts here", 28)
-title.Position, title.Size = UDim2.fromOffset(0, 34), UDim2.new(1, 0, 0, 64)
-local subtitle = label(
-	panel,
-	"One Warrior. A random kit. Nine gemstones. Your build begins with a surprise.",
-	13,
-	Color3.fromRGB(166, 186, 210)
+local function tween(object, seconds, props, style)
+	TweenService:Create(object, TweenInfo.new(seconds, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+		:Play()
+end
+-- Bounded, quiet points of light; no imported imagery or fullscreen flashes.
+for i = 1, 36 do
+	local x = ((i * 43) % 101) / 100
+	local y = ((i * 29) % 97) / 96
+	frame(back, {
+		Position = UDim2.fromScale(x, y),
+		Size = UDim2.fromOffset(if i % 4 == 0 then 3 else 1, if i % 4 == 0 then 3 else 1),
+		BackgroundColor3 = C.Cyan,
+		BackgroundTransparency = 0.65,
+	})
+end
+local panel = frame(back, {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.new(1, -32, 1, -24),
+})
+new("UISizeConstraint", { MaxSize = Vector2.new(1280, 920) }, panel)
+local brand = label(panel, "S A G A  /  M I N E R S", 11, C.Cyan)
+brand.Position, brand.Size = UDim2.fromOffset(0, 0), UDim2.new(0.7, 0, 0, 20)
+local chapter = label(panel, "01 / 03", 11, C.Gold)
+chapter.TextXAlignment = Enum.TextXAlignment.Right
+chapter.Position, chapter.Size = UDim2.new(1, -100, 0, 0), UDim2.fromOffset(100, 20)
+local title = label(panel, "YOUR FIRST DROP.", 36)
+title.Position, title.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, 44)
+local subtitle = label(panel, "A full loadout. Nine gemstones. A build that starts with you.", 13, C.Dim)
+subtitle.Position, subtitle.Size = UDim2.fromOffset(0, 72), UDim2.new(1, 0, 0, 24)
+local body = frame(panel, { BackgroundTransparency = 1 })
+local hero = frame(body, { BackgroundColor3 = C.Panel, ClipsDescendants = true })
+UiKit.round(hero, 20)
+local heroStroke = new("UIStroke", { Color = C.Edge, Thickness = 1 }, hero)
+new(
+	"UIGradient",
+	{ Rotation = 65, Color = ColorSequence.new(Color3.fromRGB(19, 43, 57), Color3.fromRGB(15, 20, 37)) },
+	hero
 )
-subtitle.Position, subtitle.Size = UDim2.fromOffset(0, 98), UDim2.new(1, 0, 0, 42)
-local stage = new(
-	"ScrollingFrame",
-	{
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ScrollBarThickness = 4,
-		CanvasSize = UDim2.new(),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		Position = UDim2.fromOffset(0, 150),
-		Size = UDim2.new(1, 0, 1, -254),
-	},
-	panel
-)
+local ring = frame(hero, {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.42),
+	Size = UDim2.fromScale(0.76, 0.76),
+	BackgroundTransparency = 1,
+})
+new("UIAspectRatioConstraint", { AspectRatio = 1 }, ring)
+UiKit.round(ring, 999)
+local ringStroke = new("UIStroke", { Color = C.Cyan, Thickness = 1, Transparency = 0.78 }, ring)
+local inner = frame(ring, {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromScale(0.82, 0.82),
+	BackgroundTransparency = 1,
+})
+UiKit.round(inner, 999)
+new("UIStroke", { Color = C.Cyan, Thickness = 1, Transparency = 0.9 }, inner)
+local heroKicker = label(hero, "YOUR LAUNCH CAPSULE", 10, C.Cyan)
+heroKicker.Position, heroKicker.Size = UDim2.fromOffset(18, 12), UDim2.new(1, -36, 0, 18)
+heroKicker.ZIndex = 5
+local heroArt = frame(hero, { BackgroundTransparency = 1, ZIndex = 2 })
+local heroName = label(hero, "A NEW WARRIOR AWAKENS", 24)
+heroName.ZIndex = 5
+local heroMeta = label(hero, "6 EQUIPMENT PIECES  /  9 GEMSTONES", 11, C.Cyan)
+heroMeta.ZIndex = 5
+local scan =
+	frame(hero, { Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = C.Cyan, BackgroundTransparency = 0.8, ZIndex = 4 })
+local rack = frame(body, { BackgroundTransparency = 1 })
+local rackTitle = label(rack, "LAUNCH MANIFEST", 11, C.Dim)
+rackTitle.Size = UDim2.new(0.75, 0, 0, 24)
+local counter = label(rack, "00 / 06", 11, C.Cyan)
+counter.TextXAlignment = Enum.TextXAlignment.Right
+counter.Position, counter.Size = UDim2.fromScale(0.75, 0), UDim2.new(0.25, 0, 0, 24)
+local stage = new("ScrollingFrame", {
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(0, 30),
+	Size = UDim2.new(1, 0, 1, -34),
+	ScrollBarThickness = 3,
+	ScrollBarImageColor3 = C.Edge,
+	CanvasSize = UDim2.new(),
+}, rack)
 local grid =
 	new("UIGridLayout", { CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }, stage)
-grid.Parent = nil
-local primary = new("TextButton", {
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -40),
-	Size = UDim2.new(1, 0, 0, 48),
-	BackgroundColor3 = cyan,
-	TextColor3 = Color3.fromRGB(8, 24, 36),
-	Text = "ROLL MY STARTER KIT",
-	TextSize = 16,
-	Font = Enum.Font.GothamBold,
-}, panel)
-UiKit.round(primary, 12)
-local skip = new("TextButton", {
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.fromScale(0.5, 1),
-	Size = UDim2.new(1, 0, 0, 36),
+local footer = frame(panel, {
 	BackgroundTransparency = 1,
-	TextColor3 = Color3.fromRGB(168, 185, 211),
-	Text = "Skip animation · keep every reward",
-	TextSize = 12,
-	Font = Enum.Font.Gotham,
-}, panel)
-local cards, phase, reward, busy, spin, heartbeat, keyboard = {}, "Welcome", nil, false, nil, nil
-local symbols = {
-	Boots = "⇧",
-	Gloves = "✊",
-	Weapon = "⚔",
-	Shield = "◇",
-	Armor = "▣",
-	Helmet = "⬡",
-	Surge1 = "⚡",
-	Surge2 = "⚡",
-	Surge3 = "⚡",
-}
-local function fit()
-	local columns = if panel.AbsoluteSize.X < 480 then 3 else (if phase == "Gems" then 3 else 6)
-	local rows = math.ceil((if phase == "Gems" then 9 else 6) / columns)
-	grid.CellSize = UDim2.new(1 / columns, -8, 0, math.max(90, (stage.AbsoluteSize.Y - (rows - 1) * 8) / rows))
-	title.TextSize = if panel.AbsoluteSize.X < 480 then 22 else 28
-end
-panel:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-local welcome = label(
-	stage,
-	[[SUIT UP.
-POWER UP.
-MAKE IT YOURS.]],
-	30,
-	cyan
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.fromScale(0, 1),
+	Size = UDim2.new(1, 0, 0, 100),
+})
+local primary = new("TextButton", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromScale(0.5, 0),
+	Size = UDim2.new(1, 0, 0, 50),
+	Text = "IGNITE THE LOTTERY",
+	TextSize = 15,
+	Font = Enum.Font.GothamBold,
+	TextColor3 = C.Ink,
+	BackgroundColor3 = C.Gold,
+	AutoButtonColor = false,
+}, footer)
+UiKit.round(primary, 10)
+new("UISizeConstraint", { MaxSize = Vector2.new(440, 50) }, primary)
+new(
+	"UIGradient",
+	{ Rotation = 10, Color = ColorSequence.new(Color3.fromRGB(255, 221, 153), Color3.fromRGB(237, 165, 77)) },
+	primary
 )
-local function burst(card, color)
-	for i = 1, 12 do
-		local star = label(card, "✦", 16, color)
-		star.AnchorPoint, star.Position, star.Size =
-			Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.4), UDim2.fromOffset(20, 20)
-		star.ZIndex = 8
-		local angle = i * math.pi / 6
-		TweenService:Create(
-			star,
-			TweenInfo.new(0.65, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{
-				Position = UDim2.new(0.5, math.cos(angle) * 55, 0.4, math.sin(angle) * 55),
-				TextTransparency = 1,
-				Rotation = i * 35,
-			}
-		):Play()
-		task.delay(0.7, function()
-			star:Destroy()
+local buttonStroke = new("UIStroke", {
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	Color = Color3.fromRGB(255, 226, 172),
+	Thickness = 1,
+	Transparency = 0.2,
+}, primary)
+local skip = new("TextButton", {
+	Position = UDim2.fromOffset(0, 56),
+	Size = UDim2.new(0.68, 0, 0, 44),
+	Text = "Skip reveal · keep all rewards",
+	Font = Enum.Font.Gotham,
+	TextSize = 11,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = C.Dim,
+	BackgroundTransparency = 1,
+}, footer)
+local motion = new("TextButton", {
+	Position = UDim2.new(0.68, 0, 0, 56),
+	Size = UDim2.new(0.32, 0, 0, 44),
+	Text = "Motion: full",
+	Font = Enum.Font.Gotham,
+	TextSize = 11,
+	TextXAlignment = Enum.TextXAlignment.Right,
+	TextColor3 = C.Dim,
+	BackgroundTransparency = 1,
+}, footer)
+local cards, connections = {}, {}
+local phase, reward, busy, spin, calm, closed = "Welcome", nil, false, nil, false, false
+local heroRecord, heroStart = Art.show(heroArt, nil, nil, C.Cyan, true), os.clock()
+local horizontal = false
+local function listen(signal, fn)
+	table.insert(connections, signal:Connect(fn))
+end
+local function slotName(slot)
+	return (Slots.SurgeDefinitions[slot] or Slots.Definitions[slot]).Label
+end
+local function fit()
+	local w, h = panel.AbsoluteSize.X, panel.AbsoluteSize.Y
+	local short = h < 480
+	local header = if short then 70 elseif w < 650 then 84 else 108
+	local bodyHeight = math.max(80, h - header - 112)
+	title.TextSize = if w < 500 then 25 elseif short then 28 else 38
+	title.Position, title.Size = UDim2.fromOffset(0, 22), UDim2.new(1, 0, 0, if short then 36 else 44)
+	subtitle.Visible = not short
+	subtitle.Position = UDim2.fromOffset(0, if w < 650 then 60 else 72)
+	body.Position, body.Size = UDim2.fromOffset(0, header), UDim2.new(1, 0, 0, bodyHeight)
+	local portrait = w < 650 and h > w
+	horizontal = portrait or bodyHeight < 300
+	if portrait then
+		local heroHeight = math.max(100, bodyHeight - 136)
+		hero.Position, hero.Size = UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, heroHeight)
+		rack.Position, rack.Size =
+			UDim2.fromOffset(0, heroHeight + 10), UDim2.new(1, 0, 0, bodyHeight - heroHeight - 10)
+	else
+		hero.Position, hero.Size = UDim2.fromOffset(0, 0), UDim2.new(0.53, -8, 1, 0)
+		rack.Position, rack.Size = UDim2.new(0.53, 10, 0, 0), UDim2.new(0.47, -10, 1, 0)
+	end
+	heroKicker.Visible = not portrait and not short
+	heroArt.Position, heroArt.Size =
+		UDim2.fromOffset(8, if portrait or short then 4 else 25),
+		UDim2.new(1, -16, 1, if portrait or short then -57 else -86)
+	heroName.Position, heroName.Size =
+		UDim2.new(0, 18, 1, if portrait or short then -49 else -56), UDim2.new(1, -36, 0, 30)
+	heroName.TextSize = if portrait or short then 17 else 24
+	heroMeta.Position, heroMeta.Size = UDim2.new(0, 18, 1, -25), UDim2.new(1, -36, 0, 18)
+	local rows = if phase == "Gems" then 3 else 2
+	if horizontal then
+		grid.FillDirection, grid.FillDirectionMaxCells = Enum.FillDirection.Vertical, 1
+		grid.CellSize = UDim2.fromOffset(118, math.max(90, stage.AbsoluteSize.Y - 5))
+		stage.AutomaticCanvasSize, stage.ScrollingDirection = Enum.AutomaticSize.X, Enum.ScrollingDirection.X
+	else
+		grid.FillDirection, grid.FillDirectionMaxCells = Enum.FillDirection.Horizontal, 3
+		grid.CellSize = UDim2.new(1 / 3, -6, 0, math.max(112, (stage.AbsoluteSize.Y - (rows - 1) * 8) / rows))
+		stage.AutomaticCanvasSize, stage.ScrollingDirection = Enum.AutomaticSize.Y, Enum.ScrollingDirection.Y
+	end
+end
+local function describe(entry, isGem)
+	if isGem then
+		local gem = entry.Gem
+		return GemConfig.shade(gem).Name,
+			GemConfig.TierColors[gem.Tier],
+			GemConfig.TierLabels[gem.Tier] or gem.Tier,
+			(GemConfig.ElementLabels[gem.Element] or gem.Element) .. " / CUT " .. gem.Cut
+	end
+	local c = GemClient.Profile.Character
+	local kind = Slots.Definitions[entry.Slot].Kind
+	local item = Classes.gear(c.Class, kind, entry.Id)
+	local roll = c.GearRolls and c.GearRolls[kind] and c.GearRolls[kind][entry.Id]
+	local rarity = GearRolls.Rarities[(roll and roll.Rarity) or 1]
+	return if item then item.Name else entry.Id,
+		rarity.Color,
+		rarity.Name,
+		if item then item.ArmorFamily or slotName(entry.Slot) else slotName(entry.Slot)
+end
+local function burst(color, major)
+	if calm then
+		return
+	end
+	for i = 1, if major then 26 else 12 do
+		local shard = frame(hero, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.4),
+			Size = UDim2.fromOffset(if i % 3 == 0 then 3 else 2, if i % 3 == 0 then 12 else 4),
+			BackgroundColor3 = color,
+			Rotation = i * 31,
+			ZIndex = 8,
+		})
+		local a = i * 2.4
+		tween(shard, 0.7, {
+			Position = UDim2.new(0.5, math.cos(a) * (70 + i * 2), 0.4, math.sin(a) * (45 + i * 2)),
+			BackgroundTransparency = 1,
+			Rotation = i * 50,
+		})
+		task.delay(0.75, function()
+			shard:Destroy()
 		end)
 	end
 end
-local function gearView(parent, slot)
-	local character = player.Character
-	local equipment = character and character:FindFirstChild("GemsoulGear")
-	local source = equipment and equipment:FindFirstChild(slot)
-	if not source then
-		return false
+local function spotlight(card, celebrate)
+	if not card.Stopped then
+		return
 	end
-	local view = new("ViewportFrame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0.05, 0.13),
-		Size = UDim2.fromScale(0.9, 0.56),
-		Ambient = Color3.fromRGB(180, 190, 210),
-		LightColor = Color3.new(1, 1, 1),
-	}, parent)
-	local model = new("Model", {}, view)
-	for _, part in source:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 then
-			local copy = part:Clone()
-			for _, child in copy:GetDescendants() do
-				if
-					child:IsA("JointInstance")
-					or child:IsA("WeldConstraint")
-					or child:IsA("Script")
-					or child:IsA("LocalScript")
-				then
-					child:Destroy()
-				end
-			end
-			copy.Anchored, copy.CanCollide = true, false
-			copy.Parent = model
+	local name, color, rarity, detail = describe(card.Entry, phase == "Gems")
+	heroName.Text, heroMeta.Text = name, rarity:upper() .. "  /  " .. detail:upper()
+	heroKicker.Text = "REWARD SECURED  /  " .. slotName(card.Entry.Slot):upper()
+	heroKicker.TextColor3, heroMeta.TextColor3 = color, color
+	heroStroke.Color, ringStroke.Color = color, color
+	heroRecord = Art.show(heroArt, if phase == "Gems" then card.Entry.Gem else nil, card.Entry.Slot, color, false)
+	heroStart = os.clock()
+	for _, other in cards do
+		other.Stroke.Thickness = if other == card then 2 else 1
+	end
+	if celebrate then
+		if not calm then
+			heroRecord.Camera.FieldOfView = 44
+			tween(heroRecord.Camera, 0.55, { FieldOfView = 34 }, Enum.EasingStyle.Back)
 		end
+		local major = card.Index == #cards
+		burst(color, major)
+		UiSound.play(if major then "Reward" else "Confirm")
 	end
-	if #model:GetChildren() == 0 then
-		view:Destroy()
-		return false
-	end
-	local center, size = model:GetBoundingBox()
-	local camera = new("Camera", { FieldOfView = 32 }, view)
-	camera.CFrame = CFrame.lookAt(
-		center.Position + Vector3.new(0.5, 0.3, -1).Unit * math.max(size.X, size.Y, size.Z) * 2.3,
-		center.Position
-	)
-	view.CurrentCamera = camera
-	return true
 end
-local function createCards(entries, isGem)
-	grid.Parent = stage
-	stage.CanvasPosition = Vector2.zero
+local function createCards(entries)
 	for _, card in cards do
 		card.Frame:Destroy()
 	end
 	table.clear(cards)
-	if welcome then
-		welcome:Destroy()
-		welcome = nil
-	end
+	stage.CanvasPosition = Vector2.zero
 	for index, entry in entries do
-		local frame = new(
-			"Frame",
-			{ LayoutOrder = index, BackgroundColor3 = Color3.fromRGB(19, 29, 46), BorderSizePixel = 0 },
-			stage
+		local cell = new("TextButton", {
+			Text = "",
+			AutoButtonColor = false,
+			LayoutOrder = index,
+			BackgroundColor3 = C.Panel,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+		}, stage)
+		UiKit.round(cell, 10)
+		local stroke = new(
+			"UIStroke",
+			{ ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = C.Edge, Transparency = 0.25, Thickness = 1 },
+			cell
 		)
-		UiKit.round(frame, 12)
-		local stroke = new("UIStroke", { Color = cyan, Transparency = 0.6, Thickness = 1 }, frame)
-		local slotLabel = label(
-			frame,
-			if Slots.SurgeDefinitions[entry.Slot]
-				then Slots.SurgeDefinitions[entry.Slot].Label
-				else Slots.Definitions[entry.Slot].Label,
-			10,
-			cyan
+		local slot = label(cell, slotName(entry.Slot):upper(), 10, C.Dim)
+		slot.Position, slot.Size = UDim2.fromOffset(9, 5), UDim2.new(1, -18, 0, 18)
+		local art = frame(
+			cell,
+			{ BackgroundTransparency = 1, Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -57) }
 		)
-		slotLabel.Position, slotLabel.Size = UDim2.fromScale(0, 0.02), UDim2.fromScale(1, 0.16)
-		local glyph = label(frame, if isGem then "◆" else symbols[entry.Slot], 34, cyan)
-		glyph.Position, glyph.Size = UDim2.fromScale(0, 0.19), UDim2.fromScale(1, 0.4)
-		local name = label(frame, "ROLLING…", 11)
-		name.TextWrapped, name.TextTruncate = false, Enum.TextTruncate.AtEnd
-		name.Position, name.Size = UDim2.fromScale(0.04, 0.61), UDim2.fromScale(0.92, 0.23)
-		local badge = label(frame, "? ? ?", 10, cyan)
-		badge.Position, badge.Size = UDim2.fromScale(0.02, 0.84), UDim2.fromScale(0.96, 0.14)
-		table.insert(cards, {
-			Frame = frame,
+		local reel = frame(art, { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ClipsDescendants = true })
+		local tape = frame(reel, { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 120) })
+		local lines = {}
+		for line = 1, 4 do
+			local txt = label(
+				tape,
+				if phase == "Welcome" then "SEALED / " .. string.format("%02d", index) else "SCANNING…",
+				11,
+				if line == 2 then C.Cyan else C.Edge
+			)
+			txt.Position, txt.Size = UDim2.fromOffset(0, (line - 1) * 30), UDim2.new(1, 0, 0, 30)
+			txt.TextXAlignment = Enum.TextXAlignment.Center
+			table.insert(lines, txt)
+		end
+		frame(reel, {
+			Position = UDim2.fromScale(0, 0.5),
+			Size = UDim2.new(1, 0, 0, 1),
+			BackgroundColor3 = C.Cyan,
+			BackgroundTransparency = 0.75,
+		})
+		local name = label(cell, "AWAITING RELEASE", 10, C.Dim)
+		name.Position, name.Size = UDim2.new(0, 9, 1, -31), UDim2.new(1, -18, 0, 16)
+		local band =
+			frame(cell, { Position = UDim2.new(0, 0, 1, -3), Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = C.Edge })
+		local pip = label(cell, string.format("%02d", index), 9, C.Edge)
+		pip.TextXAlignment = Enum.TextXAlignment.Right
+		pip.Position, pip.Size = UDim2.new(1, -30, 1, -15), UDim2.fromOffset(20, 12)
+		local card = {
+			Frame = cell,
 			Stroke = stroke,
-			Glyph = glyph,
+			Art = art,
+			Reel = reel,
+			Tape = tape,
+			Lines = lines,
 			Name = name,
-			Badge = badge,
+			Band = band,
+			Index = index,
 			Entry = entry,
 			Stopped = false,
-			Scale = new("UIScale", {}, frame),
-		})
+			NextTick = 0,
+			Shift = 0,
+			Record = nil,
+		}
+		table.insert(cards, card)
+		cell.Activated:Connect(function()
+			spotlight(card, false)
+		end)
 	end
 	fit()
 end
-local function reveal(card, isGem)
-	local entry = card.Entry
-	local color
-	if isGem then
-		color = GemConfig.TierColors[entry.Gem.Tier]
-		card.Name.Text = GemConfig.shade(entry.Gem).Name
-		card.Badge.Text = (GemConfig.TierLabels[entry.Gem.Tier] or entry.Gem.Tier) .. " · CUT " .. entry.Gem.Cut
-		local holder = new(
-			"Frame",
-			{ BackgroundTransparency = 1, Position = UDim2.fromScale(0.05, 0.17), Size = UDim2.fromScale(0.9, 0.44) },
-			card.Frame
-		)
-		GemArt.viewport(holder, entry.Gem)
+local placeholders = {}
+for _, slot in Lottery.GearOrder do
+	table.insert(placeholders, { Slot = slot })
+end
+createCards(placeholders)
+local function showCard(card)
+	local name, color, rarity = describe(card.Entry, phase == "Gems")
+	card.Reel.Visible = false
+	card.Name.Text, card.Name.TextColor3 = rarity:upper(), color
+	card.Band.BackgroundColor3, card.Stroke.Color = color, color
+	card.Frame.BackgroundColor3 = C.Panel:Lerp(color, 0.1)
+	card.Record = Art.show(card.Art, if phase == "Gems" then card.Entry.Gem else nil, card.Entry.Slot, color, false)
+	card.Frame:SetAttribute("RewardName", name)
+	spotlight(card, true)
+	local position = card.Frame.AbsolutePosition - stage.AbsolutePosition + stage.CanvasPosition
+	if horizontal then
+		stage.CanvasPosition =
+			Vector2.new(math.max(0, position.X - (stage.AbsoluteSize.X - card.Frame.AbsoluteSize.X) * 0.5), 0)
 	else
-		local c = GemClient.Profile.Character
-		local item = Classes.gear(c.Class, Slots.Definitions[entry.Slot].Kind, entry.Id)
-		local roll = c.GearRolls
-			and c.GearRolls[Slots.Definitions[entry.Slot].Kind]
-			and c.GearRolls[Slots.Definitions[entry.Slot].Kind][entry.Id]
-		local rarity = GearRolls.Rarities[(roll and roll.Rarity) or 1]
-		color = rarity.Color
-		card.Name.Text = if item then item.Name else entry.Id
-		card.Badge.Text = rarity.Name
-		card.Glyph.Visible = not gearView(card.Frame, entry.Slot)
+		stage.CanvasPosition =
+			Vector2.new(0, math.max(0, position.Y + card.Frame.AbsoluteSize.Y - stage.AbsoluteSize.Y))
 	end
-	if isGem then
-		card.Glyph.Visible = false
-	end
-	card.Stroke.Color, card.Stroke.Transparency, card.Badge.TextColor3 = color, 0, color
-	card.Scale.Scale = 0.86
-	TweenService:Create(card.Scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-		:Play()
-	burst(card.Frame, color)
-	UiSound.play(if entry.Slot == "Helmet" then "Reward" else "Confirm")
 end
 local function animate(entries, isGem)
-	createCards(entries, isGem)
-	local start = os.clock()
-	spin = { Start = start, IsGem = isGem, NextTick = 0 }
-	primary.Text, primary.Active = "REVEALING YOUR REWARDS…", false
+	phase = if isGem then "Gems" else "Armor"
+	createCards(entries)
+	counter.Text = string.format("00 / %02d", #entries)
+	heroRecord = Art.show(heroArt, nil, nil, if isGem then C.Gold else C.Cyan, true)
+	heroStart = os.clock()
+	heroName.Text = if isGem then "CHARGING THE CORE" else "ASSEMBLING YOUR DESTINY"
+	heroMeta.Text = "EVERY REEL IS LIVE"
+	heroKicker.Text = if isGem then "GEMSTONE RESONANCE CHAMBER" else "EQUIPMENT RELEASE SEQUENCE"
+	title.Text = if isGem then "POWER, UNEARTHED." else "YOUR LOADOUT. REVEALED."
+	subtitle.Text = if isGem
+		then "Nine gemstones. Every socket gets its spark."
+		else "Boots first. Helmet last. Every piece is yours."
+	chapter.Text = if isGem then "02 / 03" else "01 / 03"
+	rackTitle.Text = if isGem then "GEMSTONE MANIFEST" else "EQUIPMENT MANIFEST"
+	spin = { Start = os.clock(), NextSound = 0, Count = 0 }
+	for index, card in cards do
+		card.StopAt = (if isGem then 1.8 + index * 0.6 else 2 + index * 0.85) + (if index == #cards then 0.65 else 0)
+	end
+	primary.Text, primary.Active = "REVEAL IN PROGRESS…", false
+	primary.BackgroundColor3 = Color3.fromRGB(166, 164, 158)
 end
-heartbeat = RunService.RenderStepped:Connect(function()
-	if not spin then
+local function close()
+	if closed then
 		return
 	end
-	local elapsed = os.clock() - spin.Start
-	if elapsed > spin.NextTick then
-		spin.NextTick = elapsed + 0.08
-		for _, card in cards do
-			if not card.Stopped then
-				if spin.IsGem then
-					local element = GemConfig.Elements[math.random(1, #GemConfig.Elements)]
-					card.Glyph.TextColor3 = GemConfig.ElementColors[element]
-					card.Name.Text = (GemConfig.ElementLabels[element] or element) .. " GEM"
-				else
-					local catalog =
-						Classes.get(GemClient.Profile.Character.Class)[Slots.Definitions[card.Entry.Slot].Kind]
-					card.Name.Text = catalog[math.random(1, #catalog)].Name
-					card.Glyph.TextColor3 = GearRolls.Rarities[math.random(1, #GearRolls.Rarities)].Color
-				end
-				card.Glyph.Rotation = math.sin(elapsed * 13) * 12
-			end
-		end
-		UiSound.play("Hover")
+	closed = true
+	for _, connection in connections do
+		connection:Disconnect()
 	end
-	local allStopped = true
-	for index, card in cards do
-		if not card.Stopped and elapsed >= 1.8 + index * (if spin.IsGem then 0.33 else 0.65) then
-			card.Stopped = true
-			reveal(card, spin.IsGem)
-			local bottom = card.Frame.AbsolutePosition.Y
-				- stage.AbsolutePosition.Y
-				+ stage.CanvasPosition.Y
-				+ card.Frame.AbsoluteSize.Y
-			local offset = math.max(0, bottom - stage.AbsoluteSize.Y)
-			if bottom > stage.AbsoluteSize.Y then
-				stage.CanvasPosition = Vector2.new(0, offset)
-			end
-			subtitle.Text = if card.Entry.Slot == "Helmet"
-				then "Helmet locked! Your Warrior is ready for its gemstones."
-				else "REVEALED " .. index .. " / " .. #cards .. " · " .. (if Slots.SurgeDefinitions[card.Entry.Slot]
-					then Slots.SurgeDefinitions[card.Entry.Slot].Label
-					else Slots.Definitions[card.Entry.Slot].Label)
-		end
-		allStopped = allStopped and card.Stopped
-	end
-	if allStopped then
-		spin = nil
-		primary.Active = true
-		primary.Text = if phase == "Armor" then "ROLL MY NINE GEMSTONES" else "ATTUNE ALL NINE · ENTER THE MOON BASE"
-		subtitle.Text = if phase == "Armor"
-			then "Boots to helmet, one reveal at a time. Next: a gem for every socket."
-			else "Six equipment gems + three Gem Surge gems. Every reward is yours."
-	end
-end)
+	gui:Destroy()
+end
 local function finish()
-	if busy then
+	if busy or closed then
 		return
 	end
 	busy = true
-	primary.Text = "PREPARING YOUR LOADOUT…"
+	local previous = primary.Text
+	primary.Text = "ATTUNING YOUR LOADOUT…"
 	local result = GemClient.request("FinishStarterLottery")
+	if closed then
+		return
+	end
 	busy = false
 	if not result.Ok then
-		primary.Text = "RETRY · ENTER THE MOON BASE"
+		primary.Text = previous
 		UiKit.toast(result.Message)
 		return
 	end
-	if heartbeat then
-		heartbeat:Disconnect()
-	end
-	if keyboard then
-		keyboard:Disconnect()
-	end
-	gui:Destroy()
+	close()
 	UiSound.play("Reward")
-	UiKit.toast("Starter kit ready! Six equipment sockets and three Surge sockets filled.", cyan)
+	UiKit.toast("Your journey begins. All nine gem sockets are ready.", C.Cyan)
 end
-primary.Activated:Connect(function()
-	if busy or spin then
+listen(RunService.RenderStepped, function(dt)
+	if closed then
+		return
+	end
+	local now = os.clock()
+	Art.pose(heroRecord, now - heroStart, calm)
+	scan.Visible = not calm and spin ~= nil
+	if scan.Visible then
+		scan.Position = UDim2.fromScale(0, ((now * 0.35) % 0.7) + 0.05)
+	end
+	for _, card in cards do
+		if card.Record then
+			Art.pose(card.Record, 0, true)
+		end
+	end
+	if not spin then
+		return
+	end
+	local elapsed = now - spin.Start
+	local nextCard = cards[spin.Count + 1]
+	for _, card in cards do
+		if card.Stopped then
+			continue
+		end
+		local remaining = card.StopAt - elapsed
+		local interval = if remaining < 0.9 then 0.12 + (0.9 - math.max(0, remaining)) * 0.22 else 0.055
+		card.Shift = (card.Shift + dt / interval) % 1
+		card.Tape.Position = UDim2.new(0, 0, 0, if calm then 0 else -card.Shift * 30)
+		if elapsed >= card.NextTick then
+			card.NextTick = elapsed + interval
+			for _, line in card.Lines do
+				if phase == "Gems" then
+					local element = GemConfig.Elements[math.random(1, #GemConfig.Elements)]
+					line.Text = (GemConfig.ElementLabels[element] or element):upper()
+					line.TextColor3 = GemConfig.ElementColors[element]:Lerp(C.Dim, 0.3)
+				else
+					local catalog =
+						Classes.get(GemClient.Profile.Character.Class)[Slots.Definitions[card.Entry.Slot].Kind]
+					line.Text = catalog[math.random(1, #catalog)].Name:upper()
+					line.TextColor3 = if card == nextCard then C.Cyan else C.Dim
+				end
+			end
+		end
+		card.Stroke.Color = if card == nextCard then C.Cyan else C.Edge
+		card.Stroke.Transparency = if card == nextCard then 0.1 else 0.5
+		card.Name.Text = if card == nextCard
+			then (if remaining < 0.9 then "LOCKING IN…" else "NEXT TO REVEAL")
+			else "ROLLING"
+		if remaining <= 0 then
+			card.Stopped = true
+			spin.Count += 1
+			showCard(card)
+			counter.Text = string.format("%02d / %02d", spin.Count, #cards)
+		end
+	end
+	if nextCard and elapsed >= spin.NextSound then
+		spin.NextSound = elapsed + (if nextCard.StopAt - elapsed < 1 then 0.24 else 0.11)
+		UiSound.play("Hover")
+	end
+	if spin.Count == #cards then
+		spin = nil
+		primary.Active = true
+		primary.BackgroundColor3 = C.Gold
+		primary.Text = if phase == "Armor" then "UNEARTH MY NINE GEMSTONES" else "ATTUNE & BEGIN YOUR SAGA"
+		title.Text = if phase == "Armor" then "BUILT FOR YOUR JOURNEY." else "YOUR SAGA STARTS NOW."
+		subtitle.Text = if phase == "Armor"
+			then "Inspect any piece. Your gemstones are next."
+			else "Six equipment sockets. Three Surge capacitors. Fully powered."
+		if phase == "Gems" then
+			chapter.Text = "03 / 03"
+		end
+		heroKicker.Text = "COLLECTION COMPLETE  /  SELECT ANY REWARD"
+	end
+end)
+listen(primary.Activated, function()
+	if busy or spin or closed then
 		return
 	end
 	if phase == "Welcome" then
 		busy = true
+		primary.Text = "OPENING YOUR CAPSULE…"
 		local result = GemClient.request("PrepareStarterLottery")
+		if closed then
+			return
+		end
 		busy = false
 		if not result.Ok then
+			primary.Text = "RETRY THE LAUNCH"
 			UiKit.toast(result.Message)
 			return
 		end
 		reward = result.Lottery
-		phase = "Armor"
-		title.Text = "Your armor is rolling…"
-		subtitle.Text = "All reels roll together. Boots finish first. Helmet finishes last."
 		animate(reward.Gear, false)
 	elseif phase == "Armor" then
-		phase = "Gems"
-		title.Text = "Nine gemstones. Nine surprises."
-		subtitle.Text = "Six equipment sockets + three dedicated Gem Surge sockets."
 		animate(reward.Gems, true)
 	else
 		finish()
 	end
 end)
-skip.Activated:Connect(finish)
-keyboard = UserInputService.InputBegan:Connect(function(input, processed)
-	if not processed and input.KeyCode == Enum.KeyCode.Space and gui.Parent then
+listen(skip.Activated, finish)
+listen(motion.Activated, function()
+	calm = not calm
+	motion.Text = if calm then "Motion: calm" else "Motion: full"
+end)
+listen(primary.MouseEnter, function()
+	if not busy and not spin then
+		tween(buttonStroke, 0.15, { Thickness = 2, Transparency = 0 })
+	end
+end)
+listen(primary.MouseLeave, function()
+	tween(buttonStroke, 0.15, { Thickness = 1, Transparency = 0.2 })
+end)
+listen(UserInputService.InputBegan, function(input, processed)
+	if not processed and input.KeyCode == Enum.KeyCode.Space then
 		finish()
+	end
+end)
+listen(panel:GetPropertyChangedSignal("AbsoluteSize"), fit)
+listen(stage:GetPropertyChangedSignal("AbsoluteSize"), fit)
+listen(gui.Destroying, function()
+	if not closed then
+		closed = true
+		for _, connection in connections do
+			connection:Disconnect()
+		end
 	end
 end)
 fit()
