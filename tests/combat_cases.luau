@@ -129,6 +129,54 @@ end
 check(GemConfig.actionValues(gem,"Basic").Arc~=nil,"Ion attack chain missing")
 gem.Element="Poison"
 check(GemConfig.actionValues(gem,"Heavy").Sunder~=nil,"Corrosive armor shred missing")
+-- Crowd-control history survives a cleanse; healing cuts use the real healing entry point.
+local victim=CombatServer._state(b)
+victim.CC.Count,victim.CC.Last=3,now
+victim.NextCleanse=0
+CombatServer._block(b,false)
+CombatServer._block(b,true,ra.Position)
+check(victim.CC.Count==3 and victim.CC.Last==now,"Cleanse reset diminishing returns")
+hb.Health=500
+CrowdControl.applyHealCut(victim.CC,"GrievousWounds",now)
+CrowdControl.applyHealCut(victim.CC,"MortalStrike",now)
+check(close(CombatServer.heal(b,100),50),"Anti-heal cap not applied to real healing")
+a.Protected=true
+check(not CombatServer._canPvP(a,b),"Protected spawn could attack a player")
+a.Protected=false
+-- Six-piece damage-after-dodge uses the universal Dodge action without an ability pick.
+local c,hc,rc,lc=makePlayer(3,arena,"Skirmisher")
+CombatServer.reset(b)
+lb.ShieldGem=nil
+now+=10
+local expected=Classes.weapon("Warrior",lc.Weapon).Attack.Damage*Combat.powerMult(Classes.ratings(lc).Power.Base)*Combat.defenseMult(Classes.ratings(lb).Defense.Base)
+check(CombatServer._dodge(c,Vector3.new(1,0,0)),"Universal full-set dodge refused")
+check(not CombatServer._attack(c,rb.Position,false),"Attacked during dodge motion")
+now+=0.3
+CombatServer._tick(0.3)
+before=hb.Health
+CombatServer._attack(c,rb.Position+Vector3.new(0,1.5,0),false)
+check(close(before-hb.Health,expected*1.1),"Six-piece after-dodge capstone missing")
+-- PvE heavy remains 180%, with no PvP multiplier leaking into dummy hits.
+local enemy={Alive=true,Root={Position=arena+Vector3.new(0,0,-4),AssemblyMass=1,ApplyImpulse=function() end},Humanoid={Health=1000,MaxHealth=1000},Kind={Dummy=true}}
+table.insert(enemyList,enemy)
+la.Weapon,la.WeaponGem="MatrixSwords1",nil
+now+=2
+CombatServer._attack(a,enemy.Root.Position,true)
+local pveDamage=Classes.weapon("Warrior",la.Weapon).Attack.Damage*Combat.powerMult(Classes.ratings(la).Power.Base)*1.8
+check(close(1000-enemy.Humanoid.Health,pveDamage),"PvE heavy multiplier changed")
+enemyList={}
+ArenaSessions.start()
+a:SetAttribute("Expedition",true)
+check(not registered.ArenaPvP(a).Ok,"Mining expedition joined Arena")
+a:SetAttribute("Expedition",nil)
+check(registered.ArenaTraining(a).Ok and not a:GetAttribute("PvPEnabled") and a:GetAttribute("CombatSession")=="Training","Training entry flags")
+check(not registered.ArenaPvP(a).Ok,"Switched sessions without leaving")
+check(registered.ArenaLeave(a).Ok and a:GetAttribute("CombatSession")==nil,"Arena leave failed")
+check(registered.ArenaPvP(a).Ok and a:GetAttribute("PvPEnabled") and a:GetAttribute("CombatSession")=="PvP","PvP entry flags")
+Players.PlayerAdded.Fire(c)
+Players.PlayerAdded.Fire(b)
+b.CharacterAdded.Fire()
+check(b:GetAttribute("CombatSession")==nil and not b:GetAttribute("PvPEnabled"),"Respawn retained PvP participation")
 Players.PlayerRemoving.Fire(a)
 check(CombatServer._state(b).Dots[a]==nil,"Disconnected attacker kept burning victim")
 print("PASS: "..checks.." universal-action and live combat checks (PvP gates, charge, block, dodge, LOS, gems and cleanup)")

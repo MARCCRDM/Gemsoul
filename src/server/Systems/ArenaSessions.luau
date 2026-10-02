@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
 local Combat = require(ReplicatedStorage.Shared.Combat)
+local CombatServer = require(script.Parent.CombatServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 local ArenaSessions = {}
@@ -36,6 +37,7 @@ local function enter(player, pvp)
 		return Shop.reply(false, "Couldn't enter the Arena. Try again.")
 	end
 	player:SetAttribute("PvPEnabled", pvp == true)
+	CombatServer.reset(player)
 	player:SetAttribute("CombatSession", if pvp then "PvP" else "Training")
 	local protection = Instance.new("ForceField")
 	protection.Parent = character
@@ -48,6 +50,7 @@ local function enter(player, pvp)
 	)
 end
 local function leave(player)
+	CombatServer.reset(player)
 	player:SetAttribute("PvPEnabled", false)
 	player:SetAttribute("CombatSession", nil)
 	player:SetAttribute("Blocking", false)

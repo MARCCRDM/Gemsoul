@@ -25,17 +25,13 @@ local new, text = IronUi.new, IronUi.text
 local cooldowns = {}
 local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
 local gui = UiKit.gui("CombatHud", 5)
-local hud = new(
-	"Frame",
-	{
-		BackgroundColor3 = P.Inset,
-		BackgroundTransparency = 0.1,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -16),
-		Size = UDim2.fromOffset(380, 154),
-	},
-	gui
-)
+local hud = new("Frame", {
+	BackgroundColor3 = P.Inset,
+	BackgroundTransparency = 0.1,
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -16),
+	Size = UDim2.fromOffset(380, 154),
+}, gui)
 UiKit.round(hud, 12)
 local hp = text(hud, "", 14, P.Text, IronUi.Bold)
 hp.Position = UDim2.fromOffset(12, 8)

@@ -64,7 +64,7 @@ export type Class = {
 	Difficulty: number,
 	Stats: Stats,
 	Abilities: { Ability }, -- six; any three go on Q / E / R
-	Ultimate: Ability,
+	Ultimate: Ability?,
 	Weapons: { Gear },
 	Armors: { Gear },
 	Specs: { Spec },

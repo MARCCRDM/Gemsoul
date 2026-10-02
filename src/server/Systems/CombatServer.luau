@@ -3,7 +3,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Classes = require(ReplicatedStorage.Shared.Classes)
-local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
@@ -35,7 +34,43 @@ local function kit(player)
 		return nil
 	end
 	local effects = Classes.effects(loadout)
+	local affinity = Classes.affinities(loadout)
+	local defense = {
+		Shield = 0,
+		Duration = GemConfig.Rules.ShieldBaseDuration,
+		Cooldown = GemConfig.Rules.ShieldBaseCooldown,
+		Resistance = 0,
+		Reflect = 0,
+		ReflectThermal = 0,
+		Deflect = 0,
+		Aura = 0,
+		CleanseInterval = math.huge,
+	}
+	local recharge, cooldownCut = 0, 0
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+		local gem = loadout[slot .. "Gem"]
+		if gem then
+			local v = GemConfig.stats(gem, slot, { Affinity = affinity })
+			defense.Shield += v.ShieldAmount or 0
+			defense.Duration += v.ShieldDuration or 0
+			cooldownCut += v.CooldownCut or 0
+			recharge += v.RechargeRate or 0
+			defense.Resistance += v.Resistance or 0
+			defense.Reflect += v.ReflectChance or 0
+			defense.Deflect += v.DeflectChance or 0
+			defense.Aura += v.AuraShred or 0
+			if gem.Element == "Fire" then
+				defense.ReflectThermal = 0.10
+			end
+			if v.CleanseRate then
+				defense.CleanseInterval = math.min(defense.CleanseInterval, GemConfig.cleanseInterval(v.CleanseRate))
+			end
+		end
+	end
+	defense.Cooldown = math.max(GemConfig.Rules.ShieldMinCooldown, defense.Cooldown - cooldownCut) / (1 + recharge)
 	return {
+		Affinity = affinity,
+		Defense = defense,
 		Loadout = loadout,
 		Weapon = weapon,
 		Effects = effects,
@@ -71,6 +106,8 @@ local function state(player)
 			SunderUntil = 0,
 			Sunder = 0,
 			StunUntil = 0,
+			CC = CrowdControl.new(),
+			NextCleanse = 0,
 		}
 	end
 	return states[player]
@@ -85,7 +122,9 @@ local function canPvP(source, target)
 	if not a or not b then
 		return false
 	end
-	if source.Character:FindFirstChildOfClass("ForceField") then return false end
+	if source.Character:FindFirstChildOfClass("ForceField") then
+		return false
+	end
 	local sameTeam = source.Team ~= nil and source.Team == target.Team and not source.Neutral and not target.Neutral
 	return Actions.canPvP(
 		source,
@@ -155,6 +194,8 @@ end
 local function cleanse(st)
 	st.Dots = {}
 	st.SlowUntil, st.SunderUntil, st.StunUntil = 0, 0, 0
+	-- A cleanse removes effects, not the victim's diminishing-return history.
+	st.CC.HealCuts, st.CC.Debuffs = {}, {}
 end
 local function triggerBlockGem(player, k, st, now)
 	if now < st.NextBlockGem then
@@ -164,16 +205,15 @@ local function triggerBlockGem(player, k, st, now)
 	if not gem then
 		return
 	end
-	local values = GemConfig.actionValues(gem, "Block")
-	if values.Cleanse then
+	if k.Defense.CleanseInterval < math.huge then
 		cleanse(st)
+		st.NextCleanse = now + k.Defense.CleanseInterval
 	end
-	local amount = values.FrostShield or values.Recharge
-	if amount then
-		st.Shield = math.min(25, st.Shield + amount)
-		st.ShieldUntil = now + 5
+	if k.Defense.Shield > 0 then
+		st.Shield = math.max(st.Shield, k.Defense.Shield)
+		st.ShieldUntil = now + k.Defense.Duration
 	end
-	st.NextBlockGem = now + 3
+	st.NextBlockGem = now + k.Defense.Duration + k.Defense.Cooldown
 	fx("BlockGem", player, gem.Element)
 end
 local receive
@@ -202,17 +242,12 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	if Actions.invulnerable(st.DodgeStarted, now, k.Rules, pvp) then
 		return 0
 	end
-	local resistance = 0
-	for _, slot in Slots.Order do
-		local gem = k.Loadout[slot .. "Gem"]
-		if slot ~= "Weapon" and gem and gem.Element == element then
-			resistance += GemConfig.enchantValues(gem, slot).Resist / 5
-		end
-	end
+	local resistance = k.Defense.Resistance
 	local defense = rating(k, "Defense") * (if now < st.SunderUntil then 1 - st.Sunder else 1)
 	local damage = amount
 		* Combat.defenseMult(defense)
 		* EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
+	damage *= 1 + CrowdControl.debuff(st.CC, "Vulnerable", now) + CrowdControl.debuff(st.CC, "Aura", now)
 	if blocking(st, now) and origin then
 		local dot = flat(origin - root.Position):Dot(st.BlockDirection or flat(root.CFrame.LookVector))
 		if heavy and dot >= math.cos(math.rad(k.Rules.BlockArc / 2)) then
@@ -224,12 +259,17 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 			local multiplier, covered = Actions.blockMultiplier(k.Rules, pvp, dot, projectile, heavy)
 			if covered then
 				fx("BlockSpark", root.Position, false)
-				local gem = blockGem(k)
-				if gem and element == "Fire" and not reflected then
-					local reflect = GemConfig.actionValues(gem, "Block").ReflectThermal
-					if reflect and source then
+				if k.Defense.Deflect > 0 and math.random() < k.Defense.Deflect then
+					multiplier = 0
+				end
+				if not reflected then
+					local reflect = if math.random() < k.Defense.Reflect
+						then 1
+						elseif element == "Fire" then k.Defense.ReflectThermal
+						else 0
+					if reflect > 0 and source then
 						receive(source, damage * reflect, "Fire", player, root.Position, false, false, true)
-					elseif reflect and enemySource then
+					elseif reflect > 0 and enemySource then
 						Enemies.damage(enemySource, damage * reflect, player, false, GemConfig.ElementColors.Fire)
 					end
 				end
@@ -253,62 +293,145 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	end
 	return damage
 end
-local function addDot(player, source, total)
-	local st = state(player)
-	st.Dots[source] = { Source = source, Remaining = 3, Damage = total / 3, Next = os.clock() + 1 }
+local function addDot(player, source, perTick, duration)
+	if duration <= 0 or perTick <= 0 then
+		return
+	end
+	local st, now = state(player), os.clock()
+	st.Dots[source] =
+		{ Source = source, Damage = perTick, Last = now, Ends = now + duration, Next = now + math.min(1, duration) }
 end
-local function procGem(source, k, target, damage)
+local enemyCC = setmetatable({}, { __mode = "k" })
+local function applyCC(target, seconds)
+	local tracker
+	if target.Player then
+		tracker = state(target.Player).CC
+	else
+		tracker = enemyCC[target.Enemy]
+		if not tracker then
+			tracker = CrowdControl.new()
+			enemyCC[target.Enemy] = tracker
+		end
+	end
+	local duration = CrowdControl.ApplyCC(tracker, seconds, os.clock(), target.Player ~= nil)
+	if duration > 0 then
+		if target.Player then
+			local st = state(target.Player)
+			st.StunUntil = math.max(st.StunUntil, os.clock() + duration)
+			st.ChargeStarted, st.BlockUntil = nil, 0
+		else
+			Enemies.addStatus(target.Enemy, "Stun", 1, duration)
+		end
+	end
+end
+local function procGem(source, k, target)
 	local gem = k.Loadout.WeaponGem
 	if not gem then
 		return
 	end
-	local values = GemConfig.actionValues(gem, "Basic")
-	if target.Player then
-		local st, now = state(target.Player), os.clock()
-		if values.Burn then
-			addDot(target.Player, source, values.Burn)
+	local values = GemConfig.actionValues(gem, "Basic", { Affinity = k.Affinity, PvP = target.Player ~= nil })
+	local st = if target.Player then state(target.Player) else nil
+	local now = os.clock()
+	if values.Burn then
+		local burning = values.Burn
+		local critical = math.random() < values.Ignite
+		if critical then
+			burning *= Combat.CritMult
 		end
-		if values.Slow then
-			st.Slow, st.SlowUntil = math.max(st.Slow, values.Slow), now + 2
+		if st then
+			addDot(target.Player, source, burning, values.Duration)
+			if critical then
+				CrowdControl.applyHealCut(st.CC, "GrievousWounds", now)
+			end
+		else
+			Enemies.setBurn(target.Enemy, burning, values.Duration, source, GemConfig.ElementColors.Fire)
 		end
-		if values.Sunder then
-			st.Sunder, st.SunderUntil = math.min(0.4, math.max(st.Sunder, values.Sunder)), now + 4
+	end
+	if values.Slow then
+		if st then
+			st.Slow = CrowdControl.applyDebuff(st.CC, "Slow", values.Slow, values.Duration, now, true)
+			st.SlowUntil = st.CC.Debuffs.Slow.Until
+		else
+			Enemies.addStatus(target.Enemy, "Slow", values.Slow, values.Duration)
 		end
-	else
-		if values.Burn then
-			Enemies.addDot(target.Enemy, values.Burn, 3, source, GemConfig.ElementColors.Fire)
+		if math.random() < values.Freeze then
+			applyCC(target, values.FreezeSeconds)
 		end
-		if values.Slow then
-			Enemies.addStatus(target.Enemy, "Slow", values.Slow, 2)
+	end
+	if values.Sunder then
+		if st then
+			st.Sunder = CrowdControl.applyDebuff(st.CC, "Sunder", values.Sunder, values.Duration, now, true)
+			st.SunderUntil = st.CC.Debuffs.Sunder.Until
+		else
+			Enemies.addStatus(target.Enemy, "Sunder", values.Sunder, values.Duration)
 		end
-		if values.Sunder then
-			Enemies.addStatus(target.Enemy, "Sunder", values.Sunder, 4)
+		if math.random() < values.Vulnerable then
+			if st then
+				CrowdControl.applyDebuff(st.CC, "Vulnerable", values.VulnerableAmount, values.Duration, now, true)
+				CrowdControl.applyHealCut(st.CC, "MortalStrike", now)
+			else
+				Enemies.addStatus(target.Enemy, "Vulnerable", values.VulnerableAmount, values.Duration)
+			end
 		end
 	end
 	if values.Arc then
-		local closest, distance = nil, 14
-		for _, other in targets(source) do
-			if
-				other.Root ~= target.Root
-				and targetAllowed(source, other)
-				and lineClear(target.Root.Position, other.Root.Position)
-			then
-				local d = (other.Root.Position - target.Root.Position).Magnitude
-				if d < distance then
-					closest, distance = other, d
+		local visited, from = { [target.Root] = true }, target
+		-- PvP caps this at one jump; no recursive gem procs or cross-boundary chain targets.
+		for _ = 1, values.Chain do
+			local closest, distance = nil, GemConfig.Rules.ArcRange
+			for _, other in targets(source) do
+				if
+					not visited[other.Root]
+					and targetAllowed(source, other)
+					and (other.Player ~= nil) == (target.Player ~= nil)
+					and lineClear(from.Root.Position, other.Root.Position)
+				then
+					local d = (other.Root.Position - from.Root.Position).Magnitude
+					if d < distance then
+						closest, distance = other, d
+					end
 				end
 			end
-		end
-		if closest then
-			fx("Arc", target.Root.Position, closest.Root.Position, GemConfig.ElementColors.Shock)
+			if not closest then
+				break
+			end
+			visited[closest.Root] = true
+			fx("Arc", from.Root.Position, closest.Root.Position, GemConfig.ElementColors.Shock)
 			if closest.Player then
-				receive(closest.Player, damage * values.Arc, "Shock", source, target.Root.Position, true, false, false)
+				receive(closest.Player, values.Arc, "Shock", source, from.Root.Position, true, false, false)
 			else
-				Enemies.damage(closest.Enemy, damage * values.Arc, source, false, GemConfig.ElementColors.Shock)
+				Enemies.damage(closest.Enemy, values.Arc, source, false, GemConfig.ElementColors.Shock)
+			end
+			from = closest
+		end
+		if math.random() < values.Stun then
+			applyCC(target, values.StunSeconds)
+		end
+		if target.Humanoid.Health > 0 and target.Humanoid.Health < target.Humanoid.MaxHealth * values.Execute then
+			if target.Player then
+				receive(
+					target.Player,
+					target.Humanoid.Health * 20,
+					"Shock",
+					source,
+					source.Character.HumanoidRootPart.Position,
+					false,
+					false,
+					false
+				)
+			elseif not target.Enemy.Kind.Dummy then
+				Enemies.damage(
+					target.Enemy,
+					target.Humanoid.Health / (1 + Enemies.exposure(target.Enemy)) + 1,
+					source,
+					true,
+					GemConfig.ElementColors.Shock
+				)
 			end
 		end
 	end
 end
+
 local function strike(source, k, st, target, heavy, projectile)
 	if not targetAllowed(source, target) then
 		return
@@ -354,19 +477,14 @@ local function strike(source, k, st, target, heavy, projectile)
 	if damage <= 0 or target.Humanoid.Health <= 0 then
 		return
 	end
-	procGem(source, k, target, damage)
+	procGem(source, k, target)
 	if heavy then
 		target.Root:ApplyImpulse(
 			flat(target.Root.Position - root.Position) * target.Root.AssemblyMass * k.Rules.Knockback
 		)
 	elseif k.Rules.Stagger > 0 and os.clock() >= st.NextStagger and math.random() < k.Rules.Stagger then
 		st.NextStagger = os.clock() + 1
-		if target.Player then
-			local victim = state(target.Player)
-			victim.StunUntil, victim.ChargeStarted, victim.BlockUntil = os.clock() + 0.2, nil, 0
-		else
-			Enemies.addStatus(target.Enemy, "Stun", 1, 0.2)
-		end
+		applyCC(target, 0.2)
 	end
 end
 local function attack(player, aim, heavy)
@@ -490,6 +608,10 @@ local function block(player, held, aim)
 		return false
 	end
 	local wasBlocking = blocking(st, now)
+	if k.Defense.CleanseInterval < math.huge and now >= st.NextCleanse then
+		cleanse(st)
+		st.NextCleanse = now + k.Defense.CleanseInterval
+	end
 	st.BlockDirection, st.BlockUntil, st.ChargeStarted = flat(aim - root.Position), now + Actions.BlockLease, nil
 	player:SetAttribute("Blocking", true)
 	if not wasBlocking then
@@ -571,6 +693,24 @@ local function tick(_dt)
 			st.ChargeStarted = nil
 		end
 		player:SetAttribute("Blocking", blocking(st, now))
+		if blocking(st, now) and k.Defense.CleanseInterval < math.huge and now >= st.NextCleanse then
+			cleanse(st)
+			st.NextCleanse = now + k.Defense.CleanseInterval
+		end
+		if blocking(st, now) and k.Defense.Aura > 0 then
+			for _, target in targets(player) do
+				if
+					(target.Root.Position - root.Position).Magnitude <= GemConfig.Rules.AuraRadius
+					and targetAllowed(player, target)
+				then
+					if target.Player then
+						CrowdControl.applyDebuff(state(target.Player).CC, "Aura", k.Defense.Aura, 0.5, now, true)
+					else
+						Enemies.addStatus(target.Enemy, "Aura", k.Defense.Aura, 0.5)
+					end
+				end
+			end
+		end
 		local speed = Classes.walkSpeed(rating(k, "Speed"))
 		humanoid.WalkSpeed = if now < st.StunUntil
 			then 0
@@ -585,9 +725,10 @@ local function tick(_dt)
 			if not canPvP(source, player) then
 				st.Dots[source] = nil
 			elseif now >= dot.Next then
-				receive(player, dot.Damage, "Fire", source, nil, false, false, false)
-				dot.Next, dot.Remaining = now + 1, dot.Remaining - 1
-				if dot.Remaining <= 0 then
+				local through = math.min(now, dot.Ends)
+				receive(player, dot.Damage * (through - dot.Last), "Fire", source, nil, false, false, false)
+				dot.Last, dot.Next = through, math.min(through + 1, dot.Ends)
+				if through >= dot.Ends then
 					st.Dots[source] = nil
 				end
 			end
@@ -595,6 +736,33 @@ local function tick(_dt)
 		player:SetAttribute("Shield", math.floor(st.Shield))
 		player:SetAttribute("CombatCharging", st.ChargeStarted ~= nil)
 	end
+end
+function CombatServer.heal(player, amount)
+	local humanoid = alive(player)
+	local k = kit(player)
+	if not humanoid or not k or amount <= 0 then
+		return 0
+	end
+	local healing = amount
+		* (1 + (k.Effects.HealingReceived or 0))
+		* CrowdControl.healingMultiplier(state(player).CC, os.clock())
+	local restored = math.min(humanoid.MaxHealth - humanoid.Health, healing)
+	if restored > 0 then
+		humanoid.Health += restored
+	end
+	return restored
+end
+function CombatServer.reset(player)
+	if states[player] then
+		stopDodge(states[player])
+	end
+	states[player] = nil
+	for _, st in states do
+		st.Dots[player] = nil
+	end
+	player:SetAttribute("Blocking", false)
+	player:SetAttribute("Shield", 0)
+	player:SetAttribute("CombatCharging", false)
 end
 function CombatServer.start()
 	Enemies.hitPlayer = function(player, amount, element, enemy)

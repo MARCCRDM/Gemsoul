@@ -38,6 +38,7 @@ local workspace={
 	Raycast=function() return if wallBlocks then {Distance=2} else nil end,
 	Blockcast=function() return if wallDistance then {Distance=wallDistance} else nil end,
 }
+CFrame.lookAt=function(position) return {Position=position} end
 local RaycastParams={new=function() return {} end}
 local Remotes={
 	CombatInput={OnServerEvent=signal()},

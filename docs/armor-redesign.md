@@ -26,7 +26,7 @@ One purchased stat increment gives +5 HP, +1 Power or +1 Defense for one budget 
 | Skirmisher | +0.5 Speed, +2% Critical | +1 Speed, +4% Critical, +5% CDR | +1.5 Speed, +8% Critical, +10% CDR, +10% damage after Dodge Roll |
 | Juggernaut | +15 HP, +1 Defense | +25 HP, +2 Defense, +5% damage reduction | +40 HP, +4 Defense, +10% damage reduction, +15% threat |
 
-Dodge Roll is available in Warrior ability selection. Its damage window lasts three seconds, with a five-second base cooldown. Threat influences enemy targeting while damage credit for loot stays separate. Taunts retain priority. Healing received applies to ability healing. Existing combat ceilings are 75% critical chance, 60% cooldown reduction and 20% combined passive damage reduction.
+Universal Dodge replaces the ability picker. Its damage window lasts three seconds, with a three-second base cooldown modified by armor. Threat influences enemy targeting while damage credit for loot stays separate. Healing received applies through the server healing entry point. Existing combat ceilings are 75% critical chance, 60% cooldown reduction and 20% combined passive damage reduction. See [the universal combat implementation](universal-combat.md) for PvP adjustments and gem integration.
 
 | Depth | Common | Uncommon | Rare | Ultra Rare | Legendary |
 |---|---:|---:|---:|---:|---:|

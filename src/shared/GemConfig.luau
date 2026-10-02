@@ -474,19 +474,41 @@ end
 
 -- Universal actions consume the independent Size/Clarity/Precision metrics.
 function GemConfig.actionValues(gem: Gem, action: string, opts): { [string]: any }
- local v = GemConfig.stats(gem, if action == "Block" then "Shield" else "Weapon", opts)
- if action == "Block" then
-  return { Shield = v.ShieldAmount, Duration = GemConfig.Rules.ShieldBaseDuration + (v.ShieldDuration or 0),
-   Cooldown = math.max(GemConfig.Rules.ShieldMinCooldown, GemConfig.Rules.ShieldBaseCooldown - (v.CooldownCut or 0)) / (1 + (v.RechargeRate or 0)),
-   ReflectThermal = if gem.Element == "Fire" then 0.10 else nil, ReflectChance = v.ReflectChance,
-   Cleanse = gem.Element == "Poison", CleanseInterval = if v.CleanseRate then GemConfig.cleanseInterval(v.CleanseRate) else nil,
-   Resist = v.Resistance, Deflect = v.DeflectChance, Aura = v.AuraShred }
- end
- return { Burn = v.BurnDamage, Duration = v.BurnDuration or v.SlowDuration or v.DebuffDuration,
-  Ignite = v.IgniteChance, Slow = v.SlowAmount, Freeze = v.FreezeChance, FreezeSeconds = v.FreezeSeconds,
-  Sunder = v.ArmorShred, Vulnerable = v.VulnerableChance, VulnerableAmount = v.VulnerableAmount,
-  Arc = v.ArcDamage, Chain = v.ChainLength, Stun = v.StunChance, StunSeconds = v.StunSeconds,
-  Execute = v.ExecuteThreshold, HealingReduction = v.HealingReduction }
+	local v = GemConfig.stats(gem, if action == "Block" then "Shield" else "Weapon", opts)
+	if action == "Block" then
+		return {
+			Shield = v.ShieldAmount,
+			Duration = GemConfig.Rules.ShieldBaseDuration + (v.ShieldDuration or 0),
+			Cooldown = math.max(
+				GemConfig.Rules.ShieldMinCooldown,
+				GemConfig.Rules.ShieldBaseCooldown - (v.CooldownCut or 0)
+			) / (1 + (v.RechargeRate or 0)),
+			ReflectThermal = if gem.Element == "Fire" then 0.10 else nil,
+			ReflectChance = v.ReflectChance,
+			Cleanse = gem.Element == "Poison",
+			CleanseInterval = if v.CleanseRate then GemConfig.cleanseInterval(v.CleanseRate) else nil,
+			Resist = v.Resistance,
+			Deflect = v.DeflectChance,
+			Aura = v.AuraShred,
+		}
+	end
+	return {
+		Burn = v.BurnDamage,
+		Duration = v.BurnDuration or v.SlowDuration or v.DebuffDuration,
+		Ignite = v.IgniteChance,
+		Slow = v.SlowAmount,
+		Freeze = v.FreezeChance,
+		FreezeSeconds = v.FreezeSeconds,
+		Sunder = v.ArmorShred,
+		Vulnerable = v.VulnerableChance,
+		VulnerableAmount = v.VulnerableAmount,
+		Arc = v.ArcDamage,
+		Chain = v.ChainLength,
+		Stun = v.StunChance,
+		StunSeconds = v.StunSeconds,
+		Execute = v.ExecuteThreshold,
+		HealingReduction = v.HealingReduction,
+	}
 end
 
 -- Gems no longer add flat ratings; their power lives in their effects.

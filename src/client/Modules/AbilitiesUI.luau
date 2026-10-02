@@ -42,7 +42,8 @@ function AbilitiesUI.refresh()
 		{
 			"ATTACK · Click / Tap",
 			string.format(
-				"100%% weapon damage · %.2fs recovery. Tap for an attack; hold to charge Heavy.",
+				"%.0f%% weapon damage · %.2fs recovery. Tap for an attack; hold to charge Heavy.",
+				rules.BasicDamage * 100,
 				rules.BasicCooldown
 			),
 		},

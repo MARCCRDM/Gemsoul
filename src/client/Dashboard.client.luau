@@ -379,7 +379,7 @@ marketButton.Position = UDim2.new(1, -18, 0.5, 0)
 marketButton.Size = UDim2.fromOffset(0, 42)
 marketButton.TextSize = 15
 
--- Social spaces are honest placeholders: no simulated messages or working inputs.
+-- Training and explicit PvP sessions share the Arena; training visitors are protected.
 local social = panel(root, 1080, STRIP_Y, W - 1096, STRIP_H, P.Teal)
 local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
 place(socialTitle, 20, 16, 200, 28)
