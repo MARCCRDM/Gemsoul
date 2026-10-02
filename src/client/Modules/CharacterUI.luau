@@ -634,27 +634,106 @@ local function gemLines(gem)
 	if not showDetails then
 		local quality = gemQuality(gem)
 		gemMetric(info, "QUALITY  ·  " .. string.upper(QUALITY_WORDS[quality]), quality, tierColor, 68)
-		local id = Tech.surgeOf(gem)
-		local surge = id and Tech.Catalog[id]
-		local gist = text(
-			info,
-			elementGist(gem.Element) .. "." .. (if surge then " Casts " .. surge.Name .. " as a Gem Surge." else ""),
-			12,
-			P.Text
-		)
+		local gist = text(info, elementGist(gem.Element) .. ".", 12, P.Text)
 		gist.AutomaticSize = Enum.AutomaticSize.None
-		gist.Position, gist.Size = UDim2.fromOffset(0, 104), UDim2.new(1, 0, 0, 58)
+		gist.Position, gist.Size = UDim2.fromOffset(0, 104), UDim2.new(1, 0, 0, 34)
 		gist.TextYAlignment = Enum.TextYAlignment.Top
-		text(
-			tipBody,
-			string.format(
-				"Sells for %d coins  ·  %s",
-				GemConfig.value(gem),
-				if gem.Cut then "ready to socket" else "rough"
-			),
-			12,
-			P.Dim
-		)
+		local worth = text(info, string.format("Worth %d coins", GemConfig.value(gem)), 11, P.Gold, BOLD)
+		worth.AutomaticSize = Enum.AutomaticSize.None
+		worth.Position, worth.Size = UDim2.fromOffset(0, 142), UDim2.new(1, 0, 0, 16)
+		local surge = gem.Cut and Tech.surgeStats(gem)
+		-- Three metric tiles: the grade and what it does for this gem.
+		local tiles = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 48) }, tipBody)
+		new("UIGridLayout", {
+			CellSize = UDim2.new(1 / 3, -4, 0, 48),
+			CellPadding = UDim2.fromOffset(6, 0),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, tiles)
+		for order, metric in
+			{
+				{ "SIZE", gem.Size, tierColor, string.format("+%d%% damage", (gem.Size or 0) * 3) },
+				{
+					"CLARITY",
+					gem.Clarity,
+					P.Teal,
+					if surge then string.format("%.1fs cooldown", surge.Recovery) else "longer effects",
+				},
+				{
+					"CUT",
+					gem.Cut,
+					P.Gold,
+					if gem.Cut then string.format("%g%% crit", (gem.Cut or 0) * 0.5) else "uncut",
+				},
+			}
+		do
+			local tile = new("Frame", { BackgroundColor3 = P.Frame, LayoutOrder = order }, tiles)
+			UiKit.round(tile, 6)
+			new("UIStroke", { Color = metric[3], Thickness = 1, Transparency = 0.6 }, tile)
+			local caption = text(tile, metric[1], 10, P.Dim, BOLD)
+			caption.AutomaticSize, caption.Position, caption.Size =
+				Enum.AutomaticSize.None, UDim2.fromOffset(8, 4), UDim2.new(0.5, 0, 0, 12)
+			local value = text(tile, if metric[2] then tostring(metric[2]) else "–", 18, metric[3], BOLD)
+			value.AutomaticSize, value.Position, value.Size =
+				Enum.AutomaticSize.None, UDim2.new(0.5, 0, 0, 2), UDim2.new(0.5, -8, 0, 20)
+			value.TextXAlignment = Enum.TextXAlignment.Right
+			local effect = text(tile, metric[4], 10, P.Text)
+			effect.AutomaticSize, effect.TextWrapped, effect.TextTruncate =
+				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+			effect.Position, effect.Size = UDim2.fromOffset(8, 26), UDim2.new(1, -16, 0, 16)
+		end
+		-- The surge this gem casts from a Surge Array slot.
+		if surge then
+			local color = GemConfig.ElementColors[gem.Element] or P.Gold
+			local card = new("Frame", { BackgroundColor3 = P.Frame, Size = UDim2.new(1, -8, 0, 44) }, tipBody)
+			UiKit.round(card, 6)
+			new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.5 }, card)
+			local icon = text(card, surge.Icon or "◆", 20, color, BOLD)
+			icon.AutomaticSize, icon.Position, icon.Size =
+				Enum.AutomaticSize.None, UDim2.fromOffset(8, 0), UDim2.fromOffset(28, 44)
+			icon.TextXAlignment, icon.TextYAlignment = Enum.TextXAlignment.Center, Enum.TextYAlignment.Center
+			local title = text(
+				card,
+				string.format(
+					"GEM SURGE  ·  %s  ·  %s %s",
+					string.upper(surge.Name),
+					string.upper(Tech.TierNames[surge.Tier] or ""),
+					({ "I", "II", "III" })[surge.Rank] or "I"
+				),
+				11,
+				color,
+				BOLD
+			)
+			title.AutomaticSize, title.TextWrapped, title.TextTruncate =
+				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+			title.Position, title.Size = UDim2.fromOffset(42, 6), UDim2.new(1, -50, 0, 14)
+			local parts = {}
+			if surge.Damage then
+				table.insert(parts, string.format("%d%% damage", math.floor(surge.Damage * 100 + 0.5)))
+			elseif surge.Duration then
+				table.insert(parts, string.format("%gs effect", math.floor(surge.Duration * 10 + 0.5) / 10))
+			end
+			table.insert(
+				parts,
+				string.format(
+					"%g Charge%s",
+					math.floor(surge.Cost * 10 + 0.5) / 10,
+					if surge.PerSecond then "/s" else ""
+				)
+			)
+			table.insert(parts, string.format("%.1fs cooldown", surge.Recovery))
+			local line = text(card, table.concat(parts, "  ·  "), 11, P.Text)
+			line.AutomaticSize, line.TextWrapped, line.TextTruncate =
+				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+			line.Position, line.Size = UDim2.fromOffset(42, 23), UDim2.new(1, -50, 0, 14)
+		end
+		-- What it does as an enchant, one line per side.
+		for _, side in { { "Weapon", "IN A WEAPON" }, { "Armor", "IN ARMOR" } } do
+			local name, effect = GemConfig.enchantment(gem, side[1])
+			local line = text(tipBody, string.format("%s  ·  %s:  %s", side[2], name, effect), 11, P.Dim)
+			line.AutomaticSize, line.TextWrapped, line.TextTruncate =
+				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+			line.Size = UDim2.new(1, -8, 0, 15)
+		end
 		return
 	end
 	gemMetric(info, "SIZE  ·  MAGNITUDE", gem.Size, tierColor, 68)
