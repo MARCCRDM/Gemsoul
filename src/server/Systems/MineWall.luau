@@ -5,11 +5,15 @@
 	  "MineDescend"          a new wall one level deeper
 	  "MineHit", index       swing at a rock (1..Columns*Rows)
 	  "MineLeave"            stop digging (depth goes back to 1)
+	  "ExpeditionStart"      go to the mining site (a new wall if needed) and
+	                         dig its rocks on foot
+	  "ExpeditionLeave"      back to base (the wall is kept to come back to)
 	Each wall costs a free mine (or Mine.WallPrice coins once they're gone).
 	Everything is rolled and checked here: the client never learns what a
 	rock holds until it breaks, only its hint (glint, gold glint, speck).
 	New players get one free tutorial wall with their first stone in it.
 ]]
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
@@ -17,6 +21,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
+local MiningSite = require(ReplicatedStorage.Shared.MiningSite)
 local GemGenerator = require(script.Parent.GemGenerator)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
@@ -345,6 +350,51 @@ local function mineLeave(player: Player)
 	return reply(true, "See you at the rock face.")
 end
 
+-- Expeditions on foot -------------------------------------------------------------------
+
+-- Where players wait between expeditions: the place's spawn pad.
+local function lobbyCFrame(): CFrame
+	local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+	return if spawn then spawn.CFrame + Vector3.new(0, 4, 0) else CFrame.new(0, 6, 0)
+end
+
+local function teleport(player: Player, target: CFrame): boolean
+	local character = player.Character
+	if not character or not character:FindFirstChild("HumanoidRootPart") then
+		return false
+	end
+	-- With streaming on, load the destination before arriving.
+	pcall(function()
+		player:RequestStreamAroundAsync(target.Position)
+	end)
+	character:PivotTo(target)
+	return true
+end
+
+local function expeditionStart(player: Player)
+	local site = MiningSite.Current
+	if not site then
+		return reply(false, "The mining site isn't ready yet.")
+	end
+	local result = mineStart(player, false)
+	if not result.Ok then
+		return result
+	end
+	if not teleport(player, site.Spawn * CFrame.new(0, 3.5, 0)) then
+		return reply(false, "Your miner hasn't arrived yet. Try again in a moment.")
+	end
+	player:SetAttribute("Expedition", true)
+	result.Message = "Welcome to the crystal cliff."
+	return result
+end
+
+local function expeditionLeave(player: Player)
+	player:SetAttribute("Expedition", nil)
+	teleport(player, lobbyCFrame())
+	local wall = walls[player]
+	return reply(true, "Back at base.", { Wall = if wall then wallView(wall) else nil, Quota = quotaInfo(player) })
+end
+
 function MineWall.clear(player: Player)
 	walls[player] = nil
 end
@@ -355,7 +405,19 @@ function MineWall.start()
 	Shop.register("MineDescend", mineDescend)
 	Shop.register("MineHit", mineHit)
 	Shop.register("MineLeave", mineLeave)
-	game:GetService("Players").PlayerRemoving:Connect(MineWall.clear)
+	Shop.register("ExpeditionStart", expeditionStart)
+	Shop.register("ExpeditionLeave", expeditionLeave)
+	Players.PlayerRemoving:Connect(MineWall.clear)
+	-- A new character (respawn) starts back at base.
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function()
+			player:SetAttribute("Expedition", nil)
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
 end
 
 return MineWall

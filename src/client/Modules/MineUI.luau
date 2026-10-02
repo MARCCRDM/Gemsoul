@@ -11,13 +11,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
-local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
-local MineScene = require(script.Parent.MineScene)
 local ShopArt = require(script.Parent.ShopArt)
 local UiKit = require(script.Parent.UiKit)
 
@@ -860,7 +858,6 @@ function MineUI.swing(index: number)
 	tween(ui.Rock, 0.15, { Rotation = base })
 	dust(ui.Button, Color3.fromRGB(170, 150, 130), 5)
 	clink(false)
-	MineScene.strike()
 	task.spawn(function()
 		local result = request("MineHit", index)
 		if not result.Ok then
@@ -910,11 +907,6 @@ end
 function MineUI.open()
 	tutorialMode = false
 	window.Close.Visible = true
-	-- In the menu game, the expedition plays out at the mining site beside the window.
-	if Config.MenuOnly then
-		MineScene.enter()
-		window.Dock(0.62)
-	end
 	window.Gui.Enabled = true
 	task.spawn(function()
 		local result = request("MineState")
@@ -926,8 +918,6 @@ end
 
 function MineUI.close()
 	window.Gui.Enabled = false
-	MineScene.leave()
-	window.Dock(nil)
 end
 
 function MineUI.toggle()
@@ -942,7 +932,6 @@ end
 -- until the player presses CONTINUE (or closes it).
 function MineUI.tutorial()
 	tutorialMode = true
-	window.Dock(nil)
 	window.Close.Visible = false
 	window.Gui.Enabled = true
 	tutorialDone = Instance.new("BindableEvent")
@@ -962,8 +951,7 @@ end
 
 window.Close.Activated:Connect(MineUI.close)
 window.Shade.Activated:Connect(function()
-	-- Beside the mining site, a click on the scene shouldn't end the expedition.
-	if not tutorialMode and not MineScene.isActive() then
+	if not tutorialMode then
 		MineUI.close()
 	end
 end)

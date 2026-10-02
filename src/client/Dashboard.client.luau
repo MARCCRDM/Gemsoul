@@ -15,7 +15,7 @@ local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
-local MineUI = require(script.Parent.Modules.MineUI)
+local MineScene = require(script.Parent.Modules.MineScene)
 local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -348,7 +348,8 @@ IronUi.animate(lunarView, function(t)
 	lunarModel:PivotTo(CFrame.Angles(0, math.sin(t * 0.18) * 0.18, -0.12))
 end)
 local digButton = bigButton(mine, "BEGIN EXPEDITION", Color3.fromRGB(255, 167, 46), function()
-	launch(MineUI.open)
+	-- Expeditions are on foot: off to the mining site.
+	launch(MineScene.begin)
 end)
 digButton.AnchorPoint = Vector2.new(1, 0.5)
 digButton.Position = UDim2.new(1, -54, 0.5, 0)
@@ -471,7 +472,7 @@ GemClient.Changed:Connect(maybeWelcome)
 task.defer(maybeWelcome)
 
 -- Equipment and enchantment are on the dashboard; only destinations need shortcuts.
-local KEYS = { M = MineUI.toggle, T = TradeUI.open, B = ShopUI.toggle, J = SeasonUI.toggle }
+local KEYS = { M = MineScene.begin, T = TradeUI.open, B = ShopUI.toggle, J = SeasonUI.toggle }
 ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObject)
 	if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
 		local action = KEYS[inputObject.KeyCode.Name]
