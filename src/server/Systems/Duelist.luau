@@ -162,6 +162,14 @@ local function setStance(duel, stance: string)
 	end
 end
 
+-- The "button" the rival just pressed (LMB, RMB, SPACE, Q/E/R, 1/2/3), so the
+-- player's rival panel can light up its keys like their own controls.
+local function press(duel, key: string)
+	local model = duel.Enemy.Model
+	model:SetAttribute("LastKey", key)
+	model:SetAttribute("LastKeyAt", workspace:GetServerTimeNow())
+end
+
 local function face(root: BasePart, target: Vector3)
 	local look = flat(target - root.Position)
 	if look.Magnitude > 0.1 then
@@ -190,6 +198,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 	model:SetAttribute("SurgeReadyAt" .. surge.Slot, workspace:GetServerTimeNow() + surge.Cooldown)
 	model:SetAttribute("SurgeCastAt" .. surge.Slot, workspace:GetServerTimeNow())
 	setStance(duel, "Surge")
+	press(duel, ({ "Q", "E", "R" })[surge.Slot])
 	Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " casts " .. surge.Name .. "!")
 	if surge.Kind == "Self" then
 		fx("TechPulse", nil, root.Position, root.Position, color, 5)
@@ -219,6 +228,43 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		fx("TechPulse", nil, root.Position, root.Position, color, 3)
 		duel.Action = { Kind = "Bolt", At = now + Brain.Windup.Bolt, Power = surge.Power, Element = surge.Element }
 	end
+end
+
+-- Uses one of its Rig Maneuvers (keys 1, 2, 3), like a player would.
+local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Vector3, side: Vector3, distance: number)
+	local root, model = enemy.Root, enemy.Model
+	move.Next = now + move.Cooldown
+	model:SetAttribute("MoveReadyAt" .. move.Slot, workspace:GetServerTimeNow() + move.Cooldown)
+	press(duel, tostring(move.Slot))
+	Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " uses " .. move.Name .. "!")
+	face(root, target.Position)
+	if move.Id == "StimDodge" then
+		-- Dodge and patch up.
+		local away = side * (if math.random() < 0.5 then 1 else -1)
+		enemy.DodgeUntil = now + 0.35
+		root.AssemblyLinearVelocity = away * 55 + Vector3.new(0, 6, 0)
+		fx("DodgeRoll", nil, root.Position, away, 8, true)
+		local humanoid = enemy.Humanoid
+		humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * move.Heal)
+		setStance(duel, "Dodge")
+		return
+	end
+	if move.Id == "KineticRam" then
+		-- Shoulder-charge in and strike on arrival.
+		root.AssemblyLinearVelocity = dir * math.min(80, distance * 5) + Vector3.new(0, 4, 0)
+		fx("DodgeRoll", nil, root.Position, dir, math.min(14, math.max(2, distance - 3)), false)
+	end
+	if move.Windup then
+		fx("Nova", root.Position - Vector3.new(0, 2.5, 0), 4.5, Color3.fromRGB(255, 120, 60), move.Windup)
+	end
+	setStance(duel, if move.Windup then "Heavy" else "Maneuver")
+	duel.Action = {
+		Kind = "Move",
+		At = now + (move.Windup or 0.25),
+		Power = move.Power,
+		Heavy = move.Windup ~= nil,
+		Hits = move.Hits,
+	}
 end
 
 -- Every 0.15s while the rival is alive.
@@ -271,6 +317,7 @@ local function think(enemy, now: number)
 			local hits = (action.Hits or 1) + 1
 			if not heavy and hits <= 3 and math.random() < 0.65 then
 				duel.Action = { Kind = "Light", At = now + 0.32, Hits = hits }
+				press(duel, "LMB")
 				return
 			end
 			setStance(duel, "")
@@ -285,6 +332,18 @@ local function think(enemy, now: number)
 				end
 			end)
 			duel.NextAttack = now + 0.4
+			setStance(duel, "")
+		elseif action.Kind == "Move" then
+			fx("Swing", nil, root.Position, dir, Brain.Reach + 1, 150, color, action.Heavy)
+			if distance <= Brain.Reach + 2 then
+				Enemies.hitPlayer(owner, damage * action.Power, duel.Element, enemy, action.Heavy)
+			end
+			if (action.Hits or 1) > 1 then
+				-- Multi-hit maneuvers (Servo Flurry) strike again quickly.
+				duel.Action = { Kind = "Move", At = now + 0.2, Power = action.Power, Hits = action.Hits - 1 }
+				return
+			end
+			duel.NextAttack = now + duel.Rate
 			setStance(duel, "")
 		elseif action.Kind == "Nova" then
 			if (flat(target.Position - action.Center)).Magnitude <= action.Radius then
@@ -328,11 +387,22 @@ local function think(enemy, now: number)
 			end
 		end
 	end
+	-- Like a player, it reaches for a maneuver (1, 2, 3) when one fits.
+	local move = choice ~= "Stagger" and Brain.pickMove(duel.Moves, choice, now, distance, math.random())
+	if move then
+		humanoid:MoveTo(root.Position)
+		useMove(enemy, duel, move, now, target, dir, side, distance)
+		if choice == "Lunge" then
+			duel.NextLunge = now + 4 + math.random() * 2
+		end
+		return
+	end
 	if choice == "Stagger" then
 		humanoid:MoveTo(root.Position)
 	elseif choice == "Guard" then
 		enemy.GuardUntil, enemy.GuardMult = now + 0.9, 0.3
 		setStance(duel, "Guard")
+		press(duel, "RMB")
 		duel.NextAttack = math.max(duel.NextAttack, now + 0.9)
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
@@ -340,11 +410,13 @@ local function think(enemy, now: number)
 		local away = side * (if math.random() < 0.5 then 1 else -1)
 		enemy.DodgeUntil = now + 0.35
 		setStance(duel, "Dodge")
+		press(duel, "SPACE")
 		root.AssemblyLinearVelocity = away * 55 + Vector3.new(0, 6, 0)
 		fx("DodgeRoll", nil, root.Position, away, 8, true)
 	elseif choice == "Punish" then
 		duel.Action = { Kind = "Punish", At = now + Brain.Windup.Punish, Hits = 1 }
 		setStance(duel, "Counter")
+		press(duel, "LMB")
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
 	elseif choice == "Lunge" then
@@ -354,6 +426,7 @@ local function think(enemy, now: number)
 		fx("DodgeRoll", nil, root.Position, dir, math.min(14, distance - 3), false)
 		duel.Action = { Kind = "Lunge", At = now + Brain.Windup.Lunge, Hits = 1 }
 		setStance(duel, "Lunge")
+		press(duel, "LMB")
 		face(root, target.Position)
 	elseif choice == "Surge" then
 		local surge = Brain.pickSurge(duel.Surges, now, distance, view)
@@ -375,6 +448,7 @@ local function think(enemy, now: number)
 		local heavy = choice == "Heavy"
 		duel.Action = { Kind = choice, At = now + Brain.Windup[choice], Hits = 1 }
 		setStance(duel, if heavy then "Heavy" else "")
+		press(duel, "LMB")
 		if heavy then
 			-- Telegraph: a warning ring at its feet before the blow lands.
 			fx("Nova", root.Position - Vector3.new(0, 2.5, 0), 3.5, Color3.fromRGB(255, 120, 60), Brain.Windup.Heavy)
@@ -382,7 +456,7 @@ local function think(enemy, now: number)
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
 	else -- Strafe
-		if duel.Stance == "Guard" or duel.Stance == "Dodge" or duel.Stance == "Surge" then
+		if duel.Stance == "Guard" or duel.Stance == "Dodge" or duel.Stance == "Surge" or duel.Stance == "Maneuver" then
 			setStance(duel, "")
 		end
 		if now >= duel.NextWeave then
@@ -513,6 +587,7 @@ function spawnRival(owner: Player)
 		NextAttack = now + 1.2,
 		NextSurge = now + 3.5,
 		Surges = {},
+		Moves = {},
 		NextDefense = now,
 		NextRetreat = now + 8,
 		NextLunge = now + 1,
@@ -570,6 +645,28 @@ function spawnRival(owner: Player)
 		end
 	end
 	duel.NextSurge = nextSurgeTime(duel, now)
+	-- Three Rig Maneuvers on 1, 2, 3, picked from the same list players learn.
+	local pool = table.clone(Tech.Order.RigManeuvers)
+	for slot = 1, math.min(3, #pool) do
+		local id = table.remove(pool, rng:NextInteger(1, #pool))
+		local stats = Tech.Catalog[id]
+		local move = {
+			Slot = slot,
+			Id = id,
+			Name = stats.Name,
+			Power = stats.Damage or 0,
+			Windup = stats.Windup,
+			Heal = stats.Heal or 0,
+			Hits = stats.Hits,
+			Cooldown = math.clamp((stats.Recovery or 1) * 3, 3.5, 9),
+			Next = now + 2 + slot,
+		}
+		table.insert(duel.Moves, move)
+		model:SetAttribute("RivalMove" .. slot, move.Name)
+		model:SetAttribute("RivalMoveIcon" .. slot, stats.Icon or "✦")
+		model:SetAttribute("MoveCooldown" .. slot, move.Cooldown)
+		model:SetAttribute("MoveReadyAt" .. slot, workspace:GetServerTimeNow() + (move.Next - now))
+	end
 	local surgeList = if #names > 0 then table.concat(names, ", ") else "no surges"
 	enemy.Brain = think
 	enemy.OnDeath = onWin

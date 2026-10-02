@@ -44,6 +44,19 @@ check(DuelistBrain.pickSurge({ ring }, 10, 15, view()) == nil, "Self-centred bla
 check(DuelistBrain.pickSurge({ ring }, 10, 5, view()) == ring, "Self-centred blast unused up close")
 bolt.Next = 20
 check(DuelistBrain.pickSurge({ bolt }, 10, 15, view()) == nil, "Surge used on cooldown")
+-- Using its Rig Maneuvers (1, 2, 3) like a player.
+local slam = { Id = "HydraulicSlam", Power = 1.8, Next = 0 }
+local hammer = { Id = "BreachHammer", Power = 2.5, Windup = 1, Next = 0 }
+local stim = { Id = "StimDodge", Power = 0, Next = 0 }
+local ram = { Id = "KineticRam", Power = 1.2, Next = 0 }
+local moves = { slam, hammer, stim, ram }
+check(DuelistBrain.pickMove(moves, "Dodge", 10, 4, 0.9) == stim, "Rival dodged without its Stim Dodge")
+check(DuelistBrain.pickMove(moves, "Lunge", 10, 12, 0.9) == ram, "Rival lunged without its Kinetic Ram")
+check(DuelistBrain.pickMove(moves, "Light", 10, 4, 0.1) == slam, "Quick swing swapped for a slow wind-up")
+check(DuelistBrain.pickMove(moves, "Heavy", 10, 4, 0.1) == hammer, "Heavy never used its strongest maneuver")
+check(DuelistBrain.pickMove(moves, "Light", 10, 4, 0.9) == nil, "Rival used a maneuver on every swing")
+slam.Next, hammer.Next, ram.Next = 20, 20, 20
+check(DuelistBrain.pickMove(moves, "Light", 10, 4, 0.1) == nil, "Maneuver used on cooldown")
 -- Its blows meet the player's guard like any monster's: quick ones are
 -- reduced, heavy ones break it.
 local guardian, gh, gr = makePlayer(31, arena, nil)
@@ -57,4 +70,4 @@ check(gh.Health > before - 100 and guardian:GetAttribute("Blocking") == true, "G
 CombatServer._block(guardian, true, rival.Root.Position)
 CombatServer.hurt(guardian, 100, nil, rival, true)
 check(guardian:GetAttribute("Blocking") == false, "Rival's heavy blow did not break the guard")
-print("PASS: " .. checks .. " Duelist checks (decisions, reads, punishes, lunges, three-surge choice, guard, dodge, heavy vs guard)")
+print("PASS: " .. checks .. " Duelist checks (decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard)")

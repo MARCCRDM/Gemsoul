@@ -115,4 +115,41 @@ function Brain.pickSurge(surges, now: number, distance: number, v: View)
 	return best
 end
 
+-- Swaps a basic action for one of its Rig Maneuvers (keys 1, 2, 3) when one
+-- fits, as a player would. Moves are { Id, Power, Windup?, Next }.
+function Brain.pickMove(moves, choice: string, now: number, distance: number, roll: number)
+	local function ready(id: string)
+		for _, move in moves do
+			if move.Id == id and now >= move.Next then
+				return move
+			end
+		end
+		return nil
+	end
+	if choice == "Dodge" then
+		return ready("StimDodge") -- a dodge that also heals
+	elseif choice == "Lunge" then
+		return ready("KineticRam") -- a dash that staggers
+	elseif
+		(choice == "Light" or choice == "Heavy" or choice == "Punish")
+		and distance <= Brain.Reach
+		and roll < 0.4
+	then
+		-- The strongest ready strike; slow wind-up ones only in place of a heavy.
+		local best = nil
+		for _, move in moves do
+			if
+				now >= move.Next
+				and move.Id ~= "StimDodge"
+				and (choice == "Heavy" or not move.Windup)
+				and (not best or move.Power > best.Power)
+			then
+				best = move
+			end
+		end
+		return best
+	end
+	return nil
+end
+
 return Brain

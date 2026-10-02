@@ -410,7 +410,7 @@ local rivalPanel = new("Frame", {
 	BackgroundTransparency = 0.12,
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -12, 0, 62),
-	Size = UDim2.fromOffset(250, 302),
+	Size = UDim2.fromOffset(250, 344),
 	Visible = false,
 }, gui)
 UiKit.round(rivalPanel, 10)
@@ -469,15 +469,46 @@ for slot, key in { "Q", "E", "R" } do
 	}
 	rivalSurges[slot].State.TextXAlignment = Enum.TextXAlignment.Right
 end
+-- Its controls, mirrored: the keys it presses light up, like yours would.
+local RIVAL_KEYS = {
+	{ "LMB", 28 },
+	{ "RMB", 28 },
+	{ "SPACE", 34 },
+	{ "Q", 20 },
+	{ "E", 20 },
+	{ "R", 20 },
+	{ "1", 20 },
+	{ "2", 20 },
+	{ "3", 20 },
+}
+local rivalCaps = {}
+do
+	local x = 12
+	for _, entry in RIVAL_KEYS do
+		local cap = new("Frame", {
+			BackgroundColor3 = Color3.fromRGB(30, 34, 50),
+			Position = UDim2.fromOffset(x, 262),
+			Size = UDim2.fromOffset(entry[2], 20),
+		}, rivalPanel)
+		UiKit.round(cap, 4)
+		local capStroke = new("UIStroke", { Color = Color3.fromRGB(70, 96, 128), Thickness = 1 }, cap)
+		local label = rivalLabel(9, P.Text, 0, 0, entry[2], 20)
+		label.Parent, label.TextXAlignment, label.TextYAlignment =
+			cap, Enum.TextXAlignment.Center, Enum.TextYAlignment.Center
+		rivalCaps[entry[1]] = { Cap = cap, Stroke = capStroke, Label = label }
+		x += entry[2] + 2
+	end
+end
+local rivalMoves = rivalLabel(9, P.Dim, 12, 286, 226, 12)
 -- What it's doing right now, as a warning strip.
 local rivalStance = rivalLabel(12, P.Text, 0, 0, 250, 26)
-rivalStance.Position, rivalStance.Size = UDim2.fromOffset(0, 258), UDim2.new(1, 0, 0, 24)
+rivalStance.Position, rivalStance.Size = UDim2.fromOffset(0, 300), UDim2.new(1, 0, 0, 24)
 rivalStance.TextXAlignment = Enum.TextXAlignment.Center
 rivalStance.TextYAlignment = Enum.TextYAlignment.Center
 local rivalHealth = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(12, 286),
+	Position = UDim2.fromOffset(12, 328),
 	Size = UDim2.new(1, -24, 0, 8),
 }, rivalPanel)
 UiKit.round(rivalHealth, 3)
@@ -494,6 +525,7 @@ local STANCES = {
 	Guard = { "GUARD UP  ·  USE A HEAVY", Color3.fromRGB(120, 220, 255) },
 	Dodge = { "DODGING", Color3.fromRGB(200, 210, 230) },
 	Surge = { "CASTING ITS SURGE", P.Gold },
+	Maneuver = { "RIG MANEUVER!", Tech.Resources.Stamina.Color },
 }
 local SLOT_SHORT =
 	{ Helmet = "HEAD", Armor = "CHEST", Gloves = "HANDS", Boots = "FEET", Weapon = "WEAPON", Shield = "SHIELD" }
@@ -575,6 +607,32 @@ local function drawRival(now, viewport)
 			row.Stroke.Thickness = 2
 		end
 	end
+	-- Mirrored controls: the key it just pressed lights up gold; surge and
+	-- maneuver keys count down while they recharge.
+	local lastKey = model:GetAttribute("LastKey")
+	local pressedRecently = serverNow - (model:GetAttribute("LastKeyAt") or -100) < 0.45
+	for key, cap in rivalCaps do
+		local cooldown = 0
+		local slot = table.find({ "Q", "E", "R" }, key)
+		if slot then
+			cooldown = (model:GetAttribute("SurgeReadyAt" .. slot) or 0) - serverNow
+		elseif tonumber(key) then
+			cooldown = (model:GetAttribute("MoveReadyAt" .. key) or 0) - serverNow
+		end
+		local pressed = pressedRecently and lastKey == key
+		cap.Cap.BackgroundColor3 = if pressed then P.Gold else Color3.fromRGB(30, 34, 50)
+		cap.Stroke.Color = if pressed then P.Gold else Color3.fromRGB(70, 96, 128)
+		cap.Label.Text = if not pressed and cooldown > 0 then tostring(math.ceil(cooldown)) else key
+		cap.Label.TextColor3 = if pressed then P.Inset elseif cooldown > 0 then P.Dim else P.Text
+	end
+	local moveNames = {}
+	for slot = 1, 3 do
+		local moveName = model:GetAttribute("RivalMove" .. slot)
+		if moveName then
+			table.insert(moveNames, slot .. " " .. moveName)
+		end
+	end
+	rivalMoves.Text = table.concat(moveNames, "  ·  ")
 	local stance = STANCES[model:GetAttribute("Stance") or ""]
 	rivalStance.Text = if stance then stance[1] else ""
 	rivalStance.TextColor3 = if stance then stance[2] else P.Text
