@@ -788,7 +788,9 @@ player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 end)
 local lastActive = false
 RunService.RenderStepped:Connect(function(dt)
-	local fight = canFight() == true
+	-- The combat HUD never draws over the menu dashboard.
+	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
+	local fight = canFight() == true and not (dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled)
 	gui.Enabled = fight
 	TargetLock.setActive(fight and not cursorFree and not CombatGuide.isOpen() and not AugmentTreeUI.isOpen())
 	leave.Visible = ArenaScene.isActive()

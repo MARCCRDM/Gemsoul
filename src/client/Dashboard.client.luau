@@ -501,7 +501,13 @@ end
 local function introOpen(): boolean
 	return player.PlayerGui:FindFirstChild("Intro") ~= nil
 end
-gui.Enabled = not introOpen()
+-- One rule for showing the dashboard: never over the intro, an Arena session
+-- or an expedition (each of those has its own full-screen view).
+local function syncVisibility()
+	gui.Enabled = not introOpen() and player:GetAttribute("CombatSession") == nil and not MineScene.isActive()
+end
+syncVisibility()
+player:GetAttributeChangedSignal("CombatSession"):Connect(syncVisibility)
 player.PlayerGui.ChildAdded:Connect(function(child)
 	if child.Name == "Intro" then
 		gui.Enabled = false
@@ -518,7 +524,7 @@ local function maybeWelcome()
 end
 player.PlayerGui.ChildRemoved:Connect(function(child)
 	if child.Name == "Intro" then
-		gui.Enabled = true
+		syncVisibility()
 		CharacterUI.open()
 		maybeWelcome()
 	end
