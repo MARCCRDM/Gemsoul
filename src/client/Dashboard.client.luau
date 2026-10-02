@@ -302,7 +302,7 @@ shopButton.TextSize = 17
 
 local STRIP_Y, STRIP_H = 66, 110
 
-local mine = panel(root, 16, STRIP_Y, 660, STRIP_H, Color3.fromRGB(230, 130, 40))
+local mine = panel(root, 16, STRIP_Y, 630, STRIP_H, Color3.fromRGB(230, 130, 40))
 local sector = label(mine, "LUNAR FRONTIER", 11, P.Gold, IronUi.Bold)
 place(sector, 20, 12, 200, 14)
 local mineTitle = label(mine, "MOON MINE", 26, P.Text, IronUi.Heading)
@@ -313,7 +313,7 @@ local mineLine2 = label(mine, "", 14, P.Dim, CHUNKY)
 place(mineLine2, 20, 84, 250, 18)
 -- A small lit moon between the details and the button.
 local moon = new("Frame", {
-	Position = UDim2.fromOffset(282, 17),
+	Position = UDim2.fromOffset(266, 17),
 	Size = UDim2.fromOffset(76, 76),
 	BackgroundColor3 = Color3.fromRGB(53, 88, 130),
 }, mine)
@@ -366,13 +366,13 @@ digHint.AnchorPoint = Vector2.new(1, 0.5)
 digHint.Position = UDim2.new(1, -16, 0.5, 0)
 
 -- Market keeps the existing player-to-player trade system.
-local market = panel(root, 688, STRIP_Y, 380, STRIP_H, P.Gold)
+local market = panel(root, 658, STRIP_Y, 300, STRIP_H, P.Gold)
 local marketIcon = IronUi.emblem(market, "Trade", P.Gold, 34)
 marketIcon.Position = UDim2.fromOffset(18, 14)
 local marketTitle = label(market, "MARKET", 21, P.Text, IronUi.Heading)
-place(marketTitle, 60, 16, 160, 30)
-local marketCopy = label(market, "Swap gear with other miners. Both confirm.", 13, LIGHT, IronUi.Body)
-place(marketCopy, 20, 56, 200, 36)
+place(marketTitle, 60, 16, 120, 30)
+local marketCopy = label(market, "Swap gear with other miners. Both confirm.", 12, LIGHT, IronUi.Body)
+place(marketCopy, 20, 56, 150, 40)
 marketCopy.TextWrapped = true
 marketCopy.TextYAlignment = Enum.TextYAlignment.Top
 local marketButton = IronUi.gemButton(market, "OPEN  [T]", P.Gold, function()
@@ -384,11 +384,11 @@ marketButton.Size = UDim2.fromOffset(0, 42)
 marketButton.TextSize = 15
 
 -- Training and explicit PvP sessions share the Arena; training visitors are protected.
-local social = panel(root, 1080, STRIP_Y, W - 1096, STRIP_H, P.Teal)
+local social = panel(root, 970, STRIP_Y, W - 986, STRIP_H, P.Teal)
 local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
-place(socialTitle, 20, 16, 170, 28)
+place(socialTitle, 20, 14, 240, 28)
 local socialCopy = label(social, "Gem Surges Q · E · R  ·  Maneuvers 1 · 2 · 3", 12, LIGHT, IronUi.Body)
-place(socialCopy, 20, 46, W - 1136, 20)
+place(socialCopy, 20, 44, 260, 18)
 socialCopy.TextWrapped = true
 socialCopy.TextYAlignment = Enum.TextYAlignment.Top
 -- The Surge Array at a glance: the three gem sockets. Click to open the loadout.
@@ -397,24 +397,24 @@ local surgeStrip = new("TextButton", {
 	AutoButtonColor = false,
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -14, 0, 10),
-	Size = UDim2.fromOffset(122, 38),
+	Position = UDim2.new(1, -16, 0, 8),
+	Size = UDim2.fromOffset(126, 56),
 }, social)
 local surgeSockets = {}
 for i, key in { "Q", "E", "R" } do
 	local circle = new("Frame", {
 		BackgroundColor3 = P.Inset,
-		Position = UDim2.fromOffset((i - 1) * 42, 0),
-		Size = UDim2.fromOffset(36, 36),
+		Position = UDim2.fromOffset((i - 1) * 46, 0),
+		Size = UDim2.fromOffset(34, 34),
 	}, surgeStrip)
 	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, circle)
 	local ring = new("UIStroke", { Color = LIGHT, Thickness = 2, Transparency = 0.4 }, circle)
 	local glyph = label(circle, "+", 15, LIGHT, IronUi.Bold)
 	glyph.Size, glyph.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
 	glyph.TextYAlignment = Enum.TextYAlignment.Center
-	local keyLabel = label(circle, key, 10, P.Gold, IronUi.Bold)
-	keyLabel.AnchorPoint, keyLabel.Position, keyLabel.Size =
-		Vector2.new(1, 1), UDim2.new(1, 4, 1, 4), UDim2.fromOffset(14, 14)
+	-- The key, centred under its socket.
+	local keyLabel = label(surgeStrip, key, 10, P.Gold, IronUi.Bold)
+	place(keyLabel, (i - 1) * 46, 38, 34, 12)
 	keyLabel.TextXAlignment = Enum.TextXAlignment.Center
 	surgeSockets[key] = { Ring = ring, Glyph = glyph }
 end
@@ -423,23 +423,23 @@ surgeStrip.Activated:Connect(function()
 end)
 local function arenaButton(caption, color, x, w, onClick)
 	local b = IronUi.gemButton(social, caption, color, onClick)
-	b.Position, b.Size, b.TextSize = UDim2.fromOffset(x, 72), UDim2.fromOffset(w, 32), 11
+	b.Position, b.Size, b.TextSize = UDim2.fromOffset(x, 70), UDim2.fromOffset(w, 32), 12
 	return b
 end
-arenaButton("TRAIN", P.Teal, 16, 62, function()
+arenaButton("TRAIN", P.Teal, 16, 76, function()
 	launch(function()
 		ArenaScene.enter(false)
 	end)
 end)
-arenaButton("PVP", P.Gold, 84, 56, function()
+arenaButton("PVP", P.Gold, 100, 66, function()
 	launch(function()
 		ArenaScene.enter(true)
 	end)
 end)
-arenaButton("LOADOUT [L]", P.Teal, 146, 98, function()
+arenaButton("LOADOUT [L]", P.Teal, 174, 118, function()
 	launch(SurgeArrayUI.open)
 end)
-arenaButton("TREE [K]", P.Gold, 250, 72, function()
+arenaButton("TREE [K]", P.Gold, 300, 96, function()
 	launch(AugmentTreeUI.open)
 end)
 

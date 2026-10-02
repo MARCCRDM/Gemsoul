@@ -1022,13 +1022,34 @@ local function drawTooltipContent()
 	local gem = selection and selection.Kind == "Gem" and selection.Gem
 	if not gem then
 		text(tipBody, "INSPECT", 18, P.Gold, BOLD)
-		text(
-			tipBody,
-			"Drag a gem onto any equipped item or its socket to enchant it. On touch, hold the gem briefly before dragging. You can also select a gem and use the slot buttons."
-				.. hint,
-			13,
-			P.Dim
-		)
+		-- Nothing selected: three quick steps instead of a block of text.
+		for i, step in
+			{
+				{ "Select anything", "Click a gem or an item to see its stats here." },
+				{ "Enchant your gear", "Drag a gem onto an equipped item (hold it first on touch)." },
+				{ "Power your surges", "Socket gems in the Surge Array on Q · E · R  [L]." },
+			}
+		do
+			local row = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -6, 0, 50) }, tipBody)
+			UiKit.round(row, 8)
+			local chip = new("TextLabel", {
+				Text = tostring(i),
+				TextSize = 14,
+				Font = BOLD,
+				TextColor3 = P.Inset,
+				BackgroundColor3 = P.Gold,
+				Position = UDim2.fromOffset(10, 13),
+				Size = UDim2.fromOffset(24, 24),
+			}, row)
+			UiKit.round(chip, 12)
+			local title = text(row, step[1], 14, P.Text, BOLD)
+			title.Position, title.Size = UDim2.fromOffset(46, 6), UDim2.new(1, -54, 0, 18)
+			local line = text(row, step[2], 12, P.Dim)
+			line.Position, line.Size = UDim2.fromOffset(46, 26), UDim2.new(1, -54, 0, 18)
+		end
+		if hint ~= "" then
+			text(tipBody, (string.gsub(hint, "^%s+", "")), 12, P.Dim)
+		end
 		return
 	end
 	gemLines(gem)
