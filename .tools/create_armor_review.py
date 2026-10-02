@@ -23,6 +23,7 @@ s=s[:a]+'''for _,family in ArmorFamilies.Order do
  end
 end
 '''+s[b:]
+s=s.replace("bundle=root/'.tools/details-preview.luau'", "bundle=root/'.tools/armor-review-preview.luau'")
 s=s.replace('W,H=1800,1220','W,H=1800,5700')
 s=s.replace('GEMSOUL  /  ENHANCED LOADOUT DETAILS','SAGA MINERS / ALL 75 ARMOR ASSETS')
 s=s.replace('Legendary examples rendered from the current Luau builders','Common → Uncommon → Rare → Ultra Rare → Legendary · Current Luau builders')
