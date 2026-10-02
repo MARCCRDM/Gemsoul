@@ -1015,6 +1015,8 @@ for classId, class in Classes.List do
 end
 Classes.Order = { "Warrior" }
 -- Universal actions replace all active rigManeuver/ultimate picks.
+Classes.List.Warrior.ResourceId = "Stamina"
+Classes.List.Warrior.Resource = "Stamina powers your exosuit; socketed gemstones store Charge for Gem Surges."
 Classes.List.Warrior.RigManeuvers = {}
 Classes.List.Warrior.Ultimate = nil
 Classes.List.Warrior.Specs = {}

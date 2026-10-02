@@ -12,6 +12,7 @@ local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
+local CombatGuide = require(script.Parent.Modules.CombatGuide)
 local FirstPerson = require(script.Parent.Modules.FirstPersonCombat)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -27,6 +28,7 @@ local new, text = IronUi.new, IronUi.text
 local cooldowns = {}
 local attackSide, nextSide, cursorFree = "Right", "Right", false
 local feedbackUntil = 0
+local guideWasOpen = false
 local attackTouch, blockTouch, surgeTouch
 local beamHeld, nextBeamUpdate = false, 0
 local selected = { RigManeuvers = 1, GemSurges = 1 }
@@ -41,7 +43,7 @@ local hud = new("Frame", {
 	Size = UDim2.fromOffset(280, 118),
 }, gui)
 UiKit.round(hud, 12)
-local hp = text(hud, "", 14, P.Text, IronUi.Bold)
+local hp = text(hud, "", 12, P.Text, IronUi.Bold)
 hp.Position = UDim2.fromOffset(12, 8)
 hp.Size = UDim2.new(1, -24, 0, 22)
 local hint = text(hud, "Alternate sides; release when gold", 11, P.Dim)
@@ -383,6 +385,35 @@ local function cancel()
 	input:FireServer("CancelAttack")
 	input:FireServer("Block", false)
 end
+local function toggleGuide()
+	cancel()
+	CombatGuide.toggle()
+	cursorFree = CombatGuide.isOpen()
+	FirstPerson.setCursorFree(cursorFree)
+end
+local guideButton = new(
+	"TextButton",
+	{
+		Text = "?",
+		TextSize = 22,
+		TextColor3 = P.Gold,
+		BackgroundColor3 = P.Inset,
+		Position = UDim2.fromOffset(12, 16),
+		Size = UDim2.fromOffset(38, 40),
+	},
+	gui
+)
+UiKit.round(guideButton, 10)
+guideButton.Activated:Connect(toggleGuide)
+ContextActionService:BindActionAtPriority("CombatGuide", function(_, state)
+	if not canFight() then
+		return Enum.ContextActionResult.Pass
+	end
+	if state == Enum.UserInputState.Begin then
+		toggleGuide()
+	end
+	return Enum.ContextActionResult.Sink
+end, false, Enum.ContextActionPriority.High.Value + 20, Enum.KeyCode.K)
 UserInputService.InputBegan:Connect(function(obj, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
 		return
@@ -434,7 +465,12 @@ ContextActionService:BindActionAtPriority("CombatCursor", function(_, state)
 	end
 	if state == Enum.UserInputState.Begin then
 		cancel()
-		cursorFree = not cursorFree
+		if CombatGuide.isOpen() then
+			CombatGuide.close()
+			cursorFree = false
+		else
+			cursorFree = not cursorFree
+		end
 		FirstPerson.setCursorFree(cursorFree)
 	end
 	return Enum.ContextActionResult.Sink
@@ -472,12 +508,20 @@ RunService.RenderStepped:Connect(function()
 		if lastActive then
 			cancel()
 			FirstPerson.stop()
+			CombatGuide.close()
+			guideWasOpen = false
 			cursorFree = false
 		end
 		lastActive = false
 		return
 	end
 	FirstPerson.start()
+	local guideOpen = CombatGuide.isOpen()
+	if guideOpen ~= guideWasOpen then
+		cursorFree = guideOpen
+		FirstPerson.setCursorFree(cursorFree)
+	end
+	guideWasOpen = guideOpen
 	lastActive = true
 	local camera = workspace.CurrentCamera
 	local viewport = camera.ViewportSize
@@ -502,8 +546,7 @@ RunService.RenderStepped:Connect(function()
 	if humanoid then
 		healthFill.Size = UDim2.fromScale(math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1), 1)
 		hp.Text = string.format(
-			"%s  ·  %d / %d HP  ·  %d Shield",
-			player:GetAttribute("CombatSession") or "Combat",
+			"HEALTH %d / %d · SHIELD %d",
 			math.ceil(humanoid.Health),
 			math.ceil(humanoid.MaxHealth),
 			player:GetAttribute("Shield") or 0

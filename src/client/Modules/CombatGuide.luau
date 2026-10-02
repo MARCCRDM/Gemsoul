@@ -14,19 +14,15 @@ local new, text, clear = IronUi.new, IronUi.text, IronUi.clear
 local window = IronUi.window("Combat", 9, 980, 620, "⚔️")
 window.Title.Text = "WARRIOR COMBAT"
 local gui = window.Gui
-local body = new(
-	"ScrollingFrame",
-	{
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ScrollBarThickness = 5,
-		CanvasSize = UDim2.new(),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		Position = UDim2.fromOffset(24, 76),
-		Size = UDim2.new(1, -48, 1, -100),
-	},
-	window.Panel
-)
+local body = new("ScrollingFrame", {
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 5,
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	Position = UDim2.fromOffset(24, 76),
+	Size = UDim2.new(1, -48, 1, -100),
+}, window.Panel)
 function CombatGuide.refresh()
 	if not gui.Enabled then
 		return
@@ -172,6 +168,9 @@ function CombatGuide.refresh()
 		ArenaScene.enter(true)
 	end)
 	pvp.Size = UDim2.fromOffset(230, 36)
+end
+function CombatGuide.isOpen()
+	return gui.Enabled
 end
 function CombatGuide.open()
 	gui.Enabled = true
