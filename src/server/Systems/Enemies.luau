@@ -481,6 +481,9 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	local humanoid = enemy.Humanoid
 	enemy.LastHit = os.clock()
 	if source then
+		if amount > 0 then
+			Remotes.CombatFx:FireClient(source, "HitConfirm", crit == true)
+		end
 		enemy.Damage[source] = (enemy.Damage[source] or 0) + amount
 		local loadout = PlayerData.character(source)
 		local bonus = if loadout then Classes.effects(loadout).ThreatGeneration or 0 else 0

@@ -35,6 +35,10 @@ local attackTouch, blockTouch, surgeTouch
 local beamHeld, nextBeamUpdate = false, 0
 local selected = { RigManeuvers = 1, GemSurges = 1 }
 local techCooldowns = {}
+local techLabels = {}
+local hitUntil, hitCritical = 0, false
+local incomingUntil, incomingOrigin = 0, nil
+local healthTrailRatio = 1
 local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
 local gui = UiKit.gui("CombatHud", 5)
 local hud = new("Frame", {
@@ -45,7 +49,9 @@ local hud = new("Frame", {
 	Size = UDim2.fromOffset(280, 118),
 }, gui)
 UiKit.round(hud, 12)
-local hp = text(hud, "", 12, P.Text, IronUi.Bold)
+new("UIStroke", { Color = Color3.fromRGB(65, 108, 128), Transparency = 0.35, Thickness = 1 }, hud)
+local hp = text(hud, "", 13, P.Text, IronUi.Bold)
+hp.AutomaticSize, hp.TextWrapped, hp.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 hp.Position = UDim2.fromOffset(12, 8)
 hp.Size = UDim2.new(1, -24, 0, 22)
 local hint = text(hud, "Alternate sides; release when gold", 11, P.Dim)
@@ -58,8 +64,14 @@ local healthTrack = new("Frame", {
 	BackgroundColor3 = P.Dim,
 	BackgroundTransparency = 0.6,
 	Position = UDim2.fromOffset(12, 30),
-	Size = UDim2.new(1, -24, 0, 5),
+	Size = UDim2.new(1, -24, 0, 7),
+	BorderSizePixel = 0,
 }, hud)
+local healthTrail = new(
+	"Frame",
+	{ BackgroundColor3 = Color3.fromRGB(255, 184, 94), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
+	healthTrack
+)
 local healthFill = new(
 	"Frame",
 	{ BackgroundColor3 = Color3.fromRGB(198, 62, 73), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
@@ -67,7 +79,7 @@ local healthFill = new(
 )
 local resourceBars = {}
 for index, id in { "Stamina", "Charge" } do
-	local label = text(hud, id:upper(), 9, Tech.Resources[id].Color, IronUi.Bold)
+	local label = text(hud, id:upper(), 11, Tech.Resources[id].Color, IronUi.Bold)
 	label.Position, label.Size = UDim2.fromOffset(12, 36 + (index - 1) * 25), UDim2.new(1, -24, 0, 15)
 	local track = new("Frame", {
 		BackgroundColor3 = P.Dim,
@@ -82,10 +94,19 @@ for index, id in { "Stamina", "Charge" } do
 	)
 	resourceBars[id] = { Label = label, Fill = fill }
 end
-local reticle = text(gui, "+", 24, P.Text, IronUi.Bold)
+local reticle = text(gui, "·", 24, P.Text, IronUi.Bold)
 reticle.AnchorPoint, reticle.Position, reticle.Size =
 	Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(40, 40)
 reticle.TextXAlignment = Enum.TextXAlignment.Center
+local hitMarker = text(gui, "×", 38, P.Text, IronUi.Bold)
+hitMarker.AnchorPoint, hitMarker.Position, hitMarker.Size =
+	Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(48, 48)
+hitMarker.TextXAlignment = Enum.TextXAlignment.Center
+hitMarker.Visible = false
+local incomingMarker = text(gui, "▲", 24, Color3.fromRGB(255, 100, 110), IronUi.Bold)
+incomingMarker.AnchorPoint, incomingMarker.Size = Vector2.new(0.5, 0.5), UDim2.fromOffset(36, 36)
+incomingMarker.TextXAlignment = Enum.TextXAlignment.Center
+incomingMarker.Visible = false
 local chargeTrack = new("Frame", {
 	BackgroundColor3 = P.Inset,
 	AnchorPoint = Vector2.new(0.5, 0),
@@ -106,6 +127,8 @@ local targetCard = new("Frame", {
 }, gui)
 UiKit.round(targetCard, 10)
 local targetName = text(targetCard, "", 13, P.Gold, IronUi.Bold)
+targetName.AutomaticSize, targetName.TextWrapped, targetName.TextTruncate =
+	Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 targetName.Position, targetName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -20, 0, 22)
 targetName.TextXAlignment = Enum.TextXAlignment.Center
 local targetTrack = new(
@@ -281,8 +304,8 @@ for index, group in { "RigManeuvers", "GemSurges" } do
 		TextColor3 = P.Gold,
 		Text = ">",
 		TextSize = 20,
-		Size = UDim2.fromOffset(28, 40),
-		Position = UDim2.fromOffset(158, 91 + (index - 1) * 66),
+		Size = UDim2.fromOffset(44, 44),
+		Position = UDim2.fromOffset(158, 89 + (index - 1) * 66),
 	}, gui)
 	UiKit.round(cycle, 8)
 	cycle.Activated:Connect(function()
@@ -290,6 +313,20 @@ for index, group in { "RigManeuvers", "GemSurges" } do
 		local available = Tree.available(GemClient.Profile, group)
 		selected[group] = selected[group] % math.max(1, #available) + 1
 	end)
+	button.Text = ""
+	local title = text(button, "", 13, P.Text, IronUi.Bold)
+	title.AutomaticSize, title.TextWrapped, title.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+	title.Position, title.Size = UDim2.fromOffset(8, 5), UDim2.new(1, -16, 0, 20)
+	local stateLabel = text(button, "", 10, P.Gold, IronUi.Bold)
+	stateLabel.Position, stateLabel.Size = UDim2.fromOffset(8, 28), UDim2.new(1, -16, 0, 24)
+	stateLabel.AutomaticSize = Enum.AutomaticSize.None
+	stateLabel.TextWrapped = true
+	local stroke = new(
+		"UIStroke",
+		{ Color = P.Gold, Transparency = 0.35, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
+		button
+	)
+	techLabels[group] = { Title = title, State = stateLabel, Stroke = stroke }
 	techButtons[group] = button
 	if group == "GemSurges" then
 		button.InputBegan:Connect(function(obj)
@@ -324,16 +361,17 @@ local function makeSlot(id, label, key, position)
 	)
 	button.AnchorPoint, button.Position = Vector2.new(0.5, 1), position
 	local name = text(faceBox, label, 12, P.Text, IronUi.Bold)
-	name.Position = UDim2.fromOffset(4, 28)
+	name.Position = UDim2.fromOffset(4, 40)
 	name.Size = UDim2.new(1, -8, 0, 26)
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	local keyLabel = text(faceBox, key, 10, P.Gold)
-	keyLabel.Position = UDim2.fromOffset(6, 4)
+	keyLabel.Position, keyLabel.Size = UDim2.fromOffset(6, 4), UDim2.new(1, -12, 0, 15)
+	keyLabel.AutomaticSize, keyLabel.TextWrapped = Enum.AutomaticSize.None, false
 	local timer = text(faceBox, "", 18, P.Gold, IronUi.Bold)
-	timer.Position = UDim2.fromOffset(4, 18)
+	timer.Position = UDim2.fromOffset(4, 17)
 	timer.Size = UDim2.new(1, -8, 0, 25)
 	timer.TextXAlignment = Enum.TextXAlignment.Center
-	slots[id] = { Button = button, Name = name, Timer = timer }
+	slots[id] = { Button = button, Name = name, Timer = timer, Key = keyLabel }
 	return button
 end
 local attackButton = makeSlot("Basic", "LEFT", "Q / HOLD", UDim2.new(0, 56, 1, -32))
@@ -521,12 +559,13 @@ player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 	nextAttack = 0
 end)
 local lastActive = false
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
 	local fight = canFight() == true
 	gui.Enabled = fight
 	leave.Visible = ArenaScene.isActive()
 	if not fight then
 		if lastActive then
+			hitUntil, incomingUntil, incomingOrigin = 0, 0, nil
 			cancel()
 			FirstPerson.stop()
 			CombatGuide.close()
@@ -547,16 +586,34 @@ RunService.RenderStepped:Connect(function()
 	lastActive = true
 	local camera = workspace.CurrentCamera
 	local viewport = camera.ViewportSize
-	if viewport.Y < 430 and viewport.X >= 600 then
+	local portrait = viewport.X < 600
+	local short = viewport.Y < 430 and not portrait
+	if short then
 		hud.AnchorPoint, hud.Position, hud.Size =
-			Vector2.new(1, 0), UDim2.new(1, -12, 0, 140), UDim2.fromOffset(220, 118)
-		dodgeButton.Position = UDim2.new(1, -56, 0, 80)
-		leave.Position = UDim2.new(1, -12, 0, 88)
+			Vector2.new(1, 0), UDim2.new(1, -12, 0, 100), UDim2.fromOffset(220, 118)
 	else
 		hud.AnchorPoint, hud.Position, hud.Size =
-			Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -120), UDim2.fromOffset(280, 118)
-		dodgeButton.Position = UDim2.new(1, -56, 1, if viewport.X < 500 then -270 else -116)
-		leave.Position = UDim2.new(1, -12, 0, if viewport.X < 400 then 218 else 82)
+			Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, if portrait then -112 else -58), UDim2.fromOffset(280, 118)
+	end
+	if portrait or short then
+		for index, id in { "Basic", "Heavy", "Block", "Dodge" } do
+			slots[id].Button.Position = UDim2.new((index - 0.5) / 4, 0, 1, -28)
+			slots[id].Button.Size = UDim2.fromOffset(math.min(76, (viewport.X - 32) / 4), 70)
+		end
+		leave.Position, leave.Size = UDim2.new(1, -12, 0, if portrait then 214 else 16), UDim2.fromOffset(130, 30)
+	else
+		attackButton.Position, heavyButton.Position = UDim2.new(1, -232, 1, -32), UDim2.new(1, -144, 1, -32)
+		blockButton.Position, dodgeButton.Position = UDim2.new(1, -56, 1, -32), UDim2.new(1, -56, 1, -112)
+		for _, slot in slots do
+			slot.Button.Size = UDim2.fromOffset(80, 70)
+		end
+		leave.Position, leave.Size = UDim2.new(1, -12, 0, 16), UDim2.fromOffset(160, 38)
+	end
+	targetCard.Size = UDim2.fromOffset(if portrait then math.min(176, viewport.X - 120) else 260, 56)
+	targetName.TextSize = if portrait then 11 else 13
+
+	if not portrait and not short and viewport.X < 1000 then
+		hud.AnchorPoint, hud.Position = Vector2.new(0, 1), UDim2.new(0, 12, 1, -58)
 	end
 	local scale = math.min(1, math.max(0.65, (viewport.X - 20) / 280))
 	local sizing = hud:FindFirstChildOfClass("UIScale")
@@ -566,9 +623,17 @@ RunService.RenderStepped:Connect(function()
 	sizing.Scale = scale
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
-		healthFill.Size = UDim2.fromScale(math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1), 1)
+		local ratio = math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
+		healthFill.Size = UDim2.fromScale(ratio, 1)
+		healthTrailRatio = if ratio >= healthTrailRatio
+			then ratio
+			else healthTrailRatio + (ratio - healthTrailRatio) * (1 - math.exp(-dt * 3))
+		healthTrail.Size = UDim2.fromScale(healthTrailRatio, 1)
+		healthFill.BackgroundColor3 = if ratio <= 0.25
+			then Color3.fromRGB(255, 89, 104)
+			else Color3.fromRGB(220, 78, 94)
 		hp.Text = string.format(
-			"HEALTH %d / %d · SHIELD %d",
+			"HP %d / %d · SHIELD %d",
 			math.ceil(humanoid.Health),
 			math.ceil(humanoid.MaxHealth),
 			player:GetAttribute("Shield") or 0
@@ -579,32 +644,59 @@ RunService.RenderStepped:Connect(function()
 		bar.Label.Text = string.format("%s  %d / %d", id:upper(), math.floor(amount), maximum)
 		bar.Fill.Size = UDim2.fromScale(math.clamp(amount / math.max(1, maximum), 0, 1), 1)
 	end
-	for group, button in techButtons do
+	for group in techButtons do
 		local id = selectedTech(group)
-		local definition = Tech.Catalog[id]
+		local definition = Tree.techStats(GemClient.Profile, id)
 		local remaining = math.max(0, (techCooldowns[id] or 0) - os.clock())
 		local loadout = GemClient.Profile and GemClient.Profile.Character
 		local available = definition.Resource ~= "Charge" or (loadout and Tech.hasGem(loadout, definition.Element))
-		button.TextColor3 = if available then P.Text else P.Dim
-		button.Text = string.format(
-			"%s %s\n%s · %d %s%s",
-			definition.Icon,
-			definition.Name,
-			if group == "RigManeuvers" then "R · RIG MANEUVER" else "F · GEM SURGE",
-			definition.Cost,
-			definition.Resource,
-			if not available
-				then " · socket gem"
-				elseif remaining > 0 then string.format(" · %.1fs", remaining)
-				elseif definition.PerSecond then "/s · HOLD"
-				else ""
+		local resource = player:GetAttribute(definition.Resource) or 0
+		local stateText, color
+		if not available then
+			stateText, color = "GEM REQUIRED", P.Dim
+		elseif definition.Shield and not (loadout and Classes.gear(loadout.Class, "Shields", loadout.Shield)) then
+			stateText, color = "SHIELD REQUIRED", P.Dim
+		elseif definition.PerSecond and player:GetAttribute("Channeling") then
+			stateText, color = "CHANNELING", Tech.Resources[definition.Resource].Color
+		elseif remaining > 0 then
+			stateText, color = string.format("COOLDOWN %.1fs", remaining), Color3.fromRGB(160, 175, 195)
+		elseif resource < definition.Cost * (if definition.PerSecond then 0.25 else 1) then
+			stateText, color = "LOW " .. definition.Resource:upper(), Color3.fromRGB(255, 167, 91)
+		elseif holding or blockHeld then
+			stateText, color = if blockHeld then "LOWER GUARD" else "RELEASE ATTACK", P.Dim
+		elseif os.clock() < nextAttack then
+			stateText, color = string.format("RECOVERY %.1fs", nextAttack - os.clock()), P.Dim
+		else
+			stateText, color = "READY", Tech.Resources[definition.Resource].Color
+		end
+		local labels = techLabels[group]
+		labels.Title.Text = definition.Name
+		labels.State.Text = string.format(
+			"%s · %s\n%g %s%s",
+			if group == "RigManeuvers" then "R" else "F",
+			stateText,
+			math.floor(definition.Cost * 10 + 0.5) / 10,
+			definition.Resource:upper(),
+			if definition.PerSecond then "/s · HOLD" else ""
 		)
+		labels.State.TextColor3, labels.Stroke.Color = color, color
 	end
 	if beamHeld and os.clock() >= nextBeamUpdate then
 		input:FireServer("GemSurge", "CryoStream", aimPoint())
 		nextBeamUpdate = os.clock() + 0.2
 	end
 	local now = os.clock()
+	hitMarker.Visible = now < hitUntil
+	hitMarker.TextColor3 = if hitCritical then P.Gold else P.Text
+	hitMarker.TextTransparency = math.clamp(1 - (hitUntil - now) / 0.18, 0, 1)
+	incomingMarker.Visible = now < incomingUntil and incomingOrigin ~= nil
+	if incomingMarker.Visible then
+		local localDirection = camera.CFrame:VectorToObjectSpace(incomingOrigin - camera.CFrame.Position)
+		local angle = math.atan2(localDirection.X, -localDirection.Z)
+		incomingMarker.Position = UDim2.new(0.5, math.sin(angle) * 94, 0.5, -math.cos(angle) * 94)
+		incomingMarker.Rotation = math.deg(angle)
+		incomingMarker.TextTransparency = math.clamp(1 - (incomingUntil - now) / 0.65, 0, 1)
+	end
 	chargeTrack.Visible = holding
 	local elapsed = if holding then now - chargeStarted else 0
 	local charged = Actions.charge(elapsed)
@@ -634,7 +726,10 @@ RunService.RenderStepped:Connect(function()
 	local hit = aimedHit()
 	local target = hit and hit.Instance:FindFirstAncestorOfClass("Model")
 	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
-	targetCard.Visible = enemyHumanoid ~= nil and enemyHumanoid.Health > 0 and target ~= player.Character
+	targetCard.Visible = enemyHumanoid ~= nil
+		and enemyHumanoid.Health > 0
+		and target ~= player.Character
+		and not game:GetService("CollectionService"):HasTag(target, "Vendor")
 	if targetCard.Visible then
 		local opponent = Players:GetPlayerFromCharacter(target)
 		targetName.Text = string.format(
@@ -658,7 +753,13 @@ RunService.RenderStepped:Connect(function()
 		if id == "Basic" or id == "Heavy" then
 			remaining = math.max(0, nextAttack - now)
 		end
+		slot.Key.Text = if UserInputService.TouchEnabled
+			then (if id == "Dodge" then "TAP" else "HOLD")
+			else ({ Basic = "Q / HOLD", Heavy = "E / HOLD", Block = "HOLD RMB", Dodge = "SPACE" })[id]
 		slot.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
+		local pressed = (id == "Block" and blockHeld)
+			or (holding and ((id == "Basic" and attackSide == "Left") or (id == "Heavy" and attackSide == "Right")))
+		slot.Name.TextColor3 = if pressed then P.Gold elseif remaining > 0 then P.Dim else P.Text
 	end
 	slots.Block.Name.Text = if player:GetAttribute("Blocking") then "GUARD UP" else "GUARD"
 end)
@@ -715,7 +816,7 @@ end
 
 local numbers = 0
 local function damageNumber(position: Vector3, amount: number, crit: boolean, color: Color3?)
-	if numbers > 40 then
+	if numbers >= 24 then
 		return -- plenty on screen already
 	end
 	numbers += 1
@@ -723,7 +824,7 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 		effectPart(Vector3.one * 0.1, CFrame.new(position + Vector3.new(math.random() - 0.5, 0, 0)), Color3.new())
 	anchor.Transparency = 1
 	local board = new("BillboardGui", {
-		Size = UDim2.fromOffset(90, 40),
+		Size = UDim2.fromOffset(140, 48),
 		AlwaysOnTop = true,
 		MaxDistance = 120,
 		StudsOffset = Vector3.zero,
@@ -732,11 +833,14 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		Font = Enum.Font.GothamBlack,
-		Text = tostring(amount) .. (if crit then "!" else ""),
-		TextSize = if crit then 30 else 20,
+		Text = (if crit then "CRIT " else "") .. tostring(amount),
+		TextSize = if crit then 32 else 24,
 		TextColor3 = color or Color3.new(1, 1, 1),
 		TextStrokeTransparency = 0.2,
 	}, board)
+	local punch = new("UIScale", { Scale = 1.35 }, label)
+	TweenService:Create(punch, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+		:Play()
 	TweenService:Create(board, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		StudsOffset = Vector3.new(0, 3, 0),
 	}):Play()
@@ -751,6 +855,12 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 end
 
 local handlers = {}
+function handlers.HitConfirm(crit)
+	hitUntil, hitCritical = os.clock() + 0.18, crit == true
+end
+function handlers.IncomingDamage(origin)
+	incomingOrigin, incomingUntil = origin, os.clock() + 0.65
+end
 function handlers.TechStatus(message)
 	hint.Text, feedbackUntil = message, os.clock() + 1
 end
@@ -775,7 +885,7 @@ function handlers.TechPulse(_who, from, to, color, radius)
 				color,
 				Enum.PartType.Cylinder
 			)
-			pulse.Transparency = 0.75
+			pulse.Transparency = 0.88
 			fade(pulse, 0.35, pulse.Size * 1.25)
 		end
 	end
@@ -807,7 +917,13 @@ end
 function handlers.AttackTiming(stage, side, combo)
 	hint.Text = stage .. (if combo > 1 then " - COMBO x" .. combo else "")
 	feedbackUntil = os.clock() + 0.9
-	FirstPerson.swing(side)
+	local loadout = GemClient.Profile and GemClient.Profile.Character
+	local weapon = loadout and Classes.weapon(loadout.Class, loadout.Weapon)
+	if weapon and weapon.Attack.Kind == "Shot" then
+		FirstPerson.fire()
+	else
+		FirstPerson.swing(side)
+	end
 end
 
 function handlers.Damage(position: Vector3, amount: number, crit: boolean, color: Color3?)
@@ -832,7 +948,7 @@ function handlers.Swing(
 		local reach = range * 0.6
 		local cf = CFrame.new(origin + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0, -reach)
 		local blade = effectPart(Vector3.new(if big then 0.5 else 0.3, 0.12, range * 0.6), cf, color)
-		blade.Transparency = 0.2
+		blade.Transparency = 0.65
 		fade(blade, 0.22)
 	end
 end
@@ -847,7 +963,7 @@ function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, 
 		or look == "Crossbow"
 		or look == "Knives"
 		or look == "PowerShot"
-	local size = if isArrow then Vector3.new(0.15, 0.15, 2) else Vector3.one * 0.8
+	local size = if isArrow then Vector3.new(0.15, 0.15, 2) else Vector3.one * 0.35
 	local bolt =
 		effectPart(size, CFrame.lookAt(from, to), color, if isArrow then Enum.PartType.Block else Enum.PartType.Ball)
 	local travel = math.clamp(distance / 140, 0.05, 0.5)

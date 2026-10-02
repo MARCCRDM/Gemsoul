@@ -49,29 +49,44 @@ function Arena.build(folder: Folder, frame: CFrame, color: Color3)
 		Radius = FLOOR_RADIUS,
 		Height = 1,
 		At = CFrame.new(CENTER + Vector3.new(0, 0.2, 0)),
-		Color = Color3.fromRGB(34, 30, 42),
+		Color = Color3.fromRGB(37, 47, 58),
 		Material = Enum.Material.SmoothPlastic,
 	})
+	-- Cool navigation grid; warm red remains reserved for hostile telegraphs.
+	local gridColor = Color3.fromRGB(58, 111, 132)
+	for index = 0, 3 do
+		local angle = index * math.pi / 2 + math.pi / 4
+		local fixture = Builder.neon(
+			folder,
+			frame,
+			Vector3.new(3, 0.2, 2),
+			CFrame.new(CENTER + Vector3.new(math.cos(angle) * 24, 15, math.sin(angle) * 24)),
+			Color3.fromRGB(175, 212, 225)
+		)
+		local light = Instance.new("PointLight")
+		light.Color, light.Brightness, light.Range, light.Shadows = Color3.fromRGB(188, 216, 232), 1.4, 38, false
+		light.Parent = fixture
+	end
 	-- Glowing gridlines clipped to the circular floor.
 	for offset = -FLOOR_RADIUS + 5, FLOOR_RADIUS - 5, 10 do
 		local half = math.sqrt(FLOOR_RADIUS ^ 2 - offset ^ 2) - 0.5
 		Builder.neon(
 			folder,
 			frame,
-			Vector3.new(0.3, 0.1, half * 2),
+			Vector3.new(0.12, 0.06, half * 2),
 			CFrame.new(CENTER + Vector3.new(offset, 0.72, 0)),
-			color
+			gridColor
 		)
 		Builder.neon(
 			folder,
 			frame,
-			Vector3.new(half * 2, 0.1, 0.3),
+			Vector3.new(half * 2, 0.06, 0.12),
 			CFrame.new(CENTER + Vector3.new(0, 0.72, offset)),
-			color
+			gridColor
 		)
 	end
 	-- Sits just under the floor surface so only its rim shows.
-	Builder.neonBand(folder, frame, CENTER + Vector3.new(0, 0.5, 0), FLOOR_RADIUS, color)
+	Builder.neonBand(folder, frame, CENTER + Vector3.new(0, 0.5, 0), FLOOR_RADIUS, gridColor)
 
 	-- Low podium wall and two tiers of seating.
 	ring(FLOOR_RADIUS + 1.5, ENTRANCE_GAP + 8, function(segment, length)

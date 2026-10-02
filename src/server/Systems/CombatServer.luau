@@ -251,6 +251,9 @@ local receive
 local function rawDamage(target, amount, source, crit, color)
 	if target.Player then
 		target.Humanoid:TakeDamage(amount)
+		if source then
+			Remotes.CombatFx:FireClient(source, "HitConfirm", crit == true)
+		end
 		fx("Damage", target.Root.Position + Vector3.new(0, 3, 0), math.floor(amount + 0.5), crit == true, color)
 	else
 		Enemies.damage(target.Enemy, amount, source, crit, color)
@@ -343,6 +346,9 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		damage -= absorbed
 	end
 	if damage > 0 then
+		if origin then
+			Remotes.CombatFx:FireClient(player, "IncomingDamage", origin)
+		end
 		rawDamage(
 			{ Player = player, Humanoid = humanoid, Root = root },
 			damage,

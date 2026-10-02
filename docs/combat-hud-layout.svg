@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+<rect width="1280" height="800" fill="#0e1621"/>
+<style>text{font-family:Segoe UI,Arial,sans-serif;fill:#e5edf5} .small{font-size:12px;fill:#9fb4c8}.title{font-size:15px;font-weight:700}</style>
+<text x="24" y="30" font-size="21" font-weight="700">SAGA MINERS · COMBAT HUD PRODUCTION LAYOUT</text>
+<text x="24" y="54" class="small">1280 × 720 desktop layout · schematic only, not a game screenshot</text>
+<g transform="translate(0 80)"><rect x="1" y="1" width="1278" height="718" fill="#17232d" stroke="#395269"/>
+<rect x="510" y="16" width="260" height="56" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="520" y="37" class="title">TRAINING DUMMY</text>
+<text x="520" y="57" class="small">Target health / identity</text>
+<rect x="1108" y="16" width="160" height="38" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="1118" y="37" class="title">LEAVE ARENA</text>
+<rect x="12" y="82" width="142" height="58" rx="9" fill="#101c29" stroke="#65c370"/><text x="22" y="103" class="title">Hydraulic Slam</text>
+<text x="22" y="123" class="small">R · READY / COST</text>
+<rect x="158" y="89" width="44" height="44" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="168" y="110" class="title">›</text>
+<rect x="12" y="148" width="142" height="58" rx="9" fill="#101c29" stroke="#779df5"/><text x="22" y="169" class="title">Thermal Burst</text>
+<text x="22" y="189" class="small">F · COOLDOWN 2.4s</text>
+<rect x="158" y="155" width="44" height="44" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="168" y="176" class="title">›</text>
+<rect x="12" y="214" width="142" height="30" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="22" y="235" class="title">AUGMENT TREE</text>
+<rect x="440" y="250" width="400" height="220" rx="28" fill="none" stroke="#456175" stroke-dasharray="7 7"/><text x="494" y="283" class="small">KEEP OPPONENT / ATTACK TELLS READABLE</text><text x="632" y="368" font-size="28">·</text><text x="512" y="453" class="small">Brief hit and direction markers only</text>
+<rect x="500" y="544" width="280" height="118" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="510" y="565" class="title">HP 240 / 300 · SHIELD 0</text>
+<rect x="512" y="579" width="256" height="6" fill="#33404d"/><rect x="512" y="579" width="204.8" height="6" fill="#dc4e5e"/>
+<text x="512" y="601" class="small">STAMINA 68 / 100</text>
+<rect x="512" y="606" width="256" height="6" fill="#33404d"/><rect x="512" y="606" width="174.08" height="6" fill="#41c370"/>
+<text x="512" y="626" class="small">CHARGE 42 / 100</text>
+<rect x="512" y="631" width="256" height="6" fill="#33404d"/><rect x="512" y="631" width="107.52" height="6" fill="#4682ff"/>
+<text x="512" y="654" class="small">Alternate LEFT / RIGHT for combos</text>
+<rect x="1008" y="618" width="80" height="70" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="1018" y="639" class="title">LEFT</text>
+<text x="1018" y="659" class="small">HOLD</text>
+<rect x="1096" y="618" width="80" height="70" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="1106" y="639" class="title">RIGHT</text>
+<text x="1106" y="659" class="small">HOLD</text>
+<rect x="1184" y="618" width="80" height="70" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="1194" y="639" class="title">GUARD</text>
+<text x="1194" y="659" class="small">HOLD</text>
+<rect x="1184" y="538" width="80" height="70" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="1194" y="559" class="title">DODGE</text>
+<text x="1194" y="579" class="small">SPACE</text>
+<text x="24" y="704" class="small">Hierarchy: target → confirmed impact → player health → resource / technique state → action prompts</text></g></svg>

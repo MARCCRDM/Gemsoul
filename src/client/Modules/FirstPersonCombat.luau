@@ -8,6 +8,7 @@ local saved, model, gear, connection
 local pieces, hidden = {}, {}
 local raised, charge, swingAt, swingSide = 0, 0, -10, "Right"
 local cursorFree = false
+local fireAt, smoothedRaised = -10, 0
 local dirty = true
 local function clearModel()
 	if model then
@@ -52,6 +53,10 @@ local function rebuild(character, equipment)
 						copy.Anchored, copy.CanCollide, copy.CanTouch, copy.CanQuery, copy.CastShadow =
 							true, false, false, false, false
 						copy.LocalTransparencyModifier = 0
+						-- Preserve authored neon and colors; give metal panels a restrained highlight.
+						if copy.Material == Enum.Material.Metal then
+							copy.Reflectance = math.max(copy.Reflectance, 0.08)
+						end
 						copy.Size *= 0.65
 						copy.Parent = model
 						local offset = anchor.CFrame:ToObjectSpace(part.CFrame)
@@ -71,6 +76,9 @@ function View.setPose(blocking, progress)
 end
 function View.swing(side)
 	swingAt, swingSide = os.clock(), side or "Right"
+end
+function View.fire()
+	fireAt = os.clock()
 end
 function View.setCursorFree(value)
 	cursorFree = value
@@ -100,6 +108,7 @@ function View.stop()
 	end
 	saved = nil
 	cursorFree, raised, charge = false, 0, 0
+	fireAt, smoothedRaised, swingAt = -10, 0, -10
 end
 function View.start()
 	if saved then
@@ -131,7 +140,7 @@ function View.start()
 		end
 		connection = character.DescendantAdded:Connect(track)
 	end
-	RunService:BindToRenderStep("SagaFirstPerson", Enum.RenderPriority.Camera.Value + 1, function()
+	RunService:BindToRenderStep("SagaFirstPerson", Enum.RenderPriority.Camera.Value + 1, function(dt)
 		local current = workspace.CurrentCamera
 		for part in hidden do
 			if part.Parent then
@@ -155,19 +164,28 @@ function View.start()
 		local elapsed = os.clock() - swingAt
 		local swing = if elapsed >= 0 and elapsed < 0.34 then math.sin(elapsed / 0.34 * math.pi) else 0
 		local direction = if swingSide == "Left" then -1 else 1
-		local breathe = math.sin(os.clock() * 2) * 0.015
+		local breathe = math.sin(os.clock() * 2) * 0.012
+		smoothedRaised += (raised - smoothedRaised) * (1 - math.exp(-(dt or 1 / 60) * 18))
+		local fireElapsed = os.clock() - fireAt
+		local recoil = if fireElapsed >= 0 and fireElapsed < 0.24
+			then math.sin(math.min(1, fireElapsed / 0.045) * math.pi / 2) * math.exp(-fireElapsed * 16)
+			else 0
 		for _, piece in pieces do
 			local pose = if piece.Left
-				then CFrame.new(-0.72 + raised * 0.4, -0.8 + raised * 0.45 + breathe, -1.35) * CFrame.Angles(
+				then CFrame.new(-0.72 + smoothedRaised * 0.4, -0.8 + smoothedRaised * 0.45 + breathe, -1.35) * CFrame.Angles(
 					0,
 					0,
-					math.rad(-12 + raised * 25)
+					math.rad(-12 + smoothedRaised * 25)
 				)
 				else CFrame.new(
 					0.65 - swing * direction * 0.85,
 					-0.8 + charge * 0.18 + breathe,
-					-1.15 - swing * 0.35
-				) * CFrame.Angles(math.rad(-charge * 15), 0, math.rad(12 + charge * 20 - swing * direction * 85))
+					-1.15 - swing * 0.35 + recoil * 0.18
+				) * CFrame.Angles(
+					math.rad(-charge * 15 - recoil * 9),
+					0,
+					math.rad(12 + charge * 20 - swing * direction * 85)
+				)
 			piece.Part.CFrame = current.CFrame * pose * piece.Offset
 		end
 	end)
