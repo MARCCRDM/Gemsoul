@@ -8,6 +8,7 @@ local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -30,6 +31,8 @@ local C = {
 	Gold = Color3.fromRGB(224, 177, 98),
 }
 local gui = UiKit.gui("Intro", 15)
+-- Full bleed: the starfield runs under the Roblox top bar too.
+gui.IgnoreGuiInset = true
 local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BorderSizePixel = 0 }, gui)
 new("UIGradient", { Rotation = 25, Color = ColorSequence.new(C.Ink, Color3.fromRGB(23, 25, 48)) }, back)
 local function frame(parent, props)
@@ -85,8 +88,8 @@ end
 local panel = frame(back, {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.new(1, -32, 1, -24),
+	Position = UDim2.new(0.5, 0, 0.5, 18),
+	Size = UDim2.new(1, -32, 1, -84),
 })
 new("UISizeConstraint", { MaxSize = Vector2.new(1280, 920) }, panel)
 local brand = label(panel, "S A G A  /  M I N E R S", 11, C.Cyan)
@@ -140,8 +143,8 @@ for index = 1, 24 do
 	table.insert(orbitMarks, mark)
 end
 local crest = frame(hero, {
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 12),
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -14, 0, 12),
 	Size = UDim2.fromOffset(172, 40),
 	BackgroundColor3 = C.Ink,
 	BackgroundTransparency = 0.12,
@@ -165,7 +168,7 @@ for index = 1, 5 do
 	table.insert(rarityPips, pip)
 end
 local heroKicker = label(hero, "YOUR LAUNCH CAPSULE", 10, C.Cyan)
-heroKicker.Position, heroKicker.Size = UDim2.fromOffset(18, 12), UDim2.new(0.27, -18, 0, 18)
+heroKicker.Position, heroKicker.Size = UDim2.fromOffset(18, 14), UDim2.new(1, -214, 0, 18)
 heroKicker.ZIndex = 5
 local heroArt = frame(hero, { BackgroundTransparency = 1, ZIndex = 2 })
 local heroName = label(hero, "A NEW WARRIOR AWAKENS", 24)
@@ -190,15 +193,12 @@ local stage = new("ScrollingFrame", {
 	ScrollBarImageColor3 = C.Edge,
 	CanvasSize = UDim2.new(),
 }, rack)
-local rail = frame(
-	rack,
-	{
-		Position = UDim2.fromOffset(0, 26),
-		Size = UDim2.new(1, 0, 0, 2),
-		BackgroundColor3 = C.Edge,
-		BackgroundTransparency = 0.6,
-	}
-)
+local rail = frame(rack, {
+	Position = UDim2.fromOffset(0, 26),
+	Size = UDim2.new(1, 0, 0, 2),
+	BackgroundColor3 = C.Edge,
+	BackgroundTransparency = 0.6,
+})
 local railFill = frame(rail, { Size = UDim2.fromScale(0, 1), BackgroundColor3 = C.Gold })
 local grid =
 	new("UIGridLayout", { CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }, stage)
@@ -260,7 +260,14 @@ local horizontal = false
 local function listen(signal, fn)
 	table.insert(connections, signal:Connect(fn))
 end
+local SURGE_KEYS = {}
+for key, slot in Tech.SurgeSockets do
+	SURGE_KEYS[slot] = key
+end
 local function slotName(slot)
+	if SURGE_KEYS[slot] then
+		return "Gem Surge  ·  " .. SURGE_KEYS[slot]
+	end
 	return (Slots.SurgeDefinitions[slot] or Slots.Definitions[slot]).Label
 end
 local function fit()
@@ -307,10 +314,16 @@ end
 local function describe(entry, isGem)
 	if isGem then
 		local gem = entry.Gem
+		local detail = (GemConfig.ElementLabels[gem.Element] or gem.Element) .. " / CUT " .. gem.Cut
+		-- A surge capacitor gem: name the ability it casts.
+		local surge = SURGE_KEYS[entry.Slot] and Tech.surgeStats(gem)
+		if surge then
+			detail ..= string.format("  /  %s (%s)", surge.Name, Tech.TierNames[surge.Tier] or "")
+		end
 		return GemConfig.shade(gem).Name,
 			GemConfig.TierColors[gem.Tier],
 			GemConfig.TierLabels[gem.Tier] or gem.Tier,
-			(GemConfig.ElementLabels[gem.Element] or gem.Element) .. " / CUT " .. gem.Cut
+			detail
 	end
 	local c = GemClient.Profile.Character
 	local kind = Slots.Definitions[entry.Slot].Kind
@@ -625,7 +638,7 @@ listen(RunService.RenderStepped, function(dt)
 		title.Text = if phase == "Armor" then "BUILT FOR YOUR JOURNEY." else "YOUR SAGA STARTS NOW."
 		subtitle.Text = if phase == "Armor"
 			then "Inspect any piece. Your gemstones are next."
-			else "Six equipment sockets. Three Surge capacitors. Fully powered."
+			else "Six enchanted sockets. Three Gem Surges ready on Q · E · R."
 		if phase == "Gems" then
 			chapter.Text = "03 / 03"
 		end
