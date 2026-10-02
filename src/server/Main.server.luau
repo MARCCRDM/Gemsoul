@@ -23,6 +23,9 @@ local Equipment = require(script.Parent.Systems.Equipment)
 -- place's baseplate so the dashboard can show it wearing its gear.
 if Config.MenuOnly then
 	require(script.Parent.World.Lighting)(true)
+	-- The Moon Mine's expedition site, far from the spawn pad, walked on foot.
+	local MiningSite = require(game:GetService("ReplicatedStorage").Shared.MiningSite)
+	MiningSite.build(MiningSite.Location, workspace)
 	-- No baseplate spawn in this place? A small hidden pad to stand on.
 	if not workspace:FindFirstChildWhichIsA("SpawnLocation") then
 		local pad = Instance.new("SpawnLocation")

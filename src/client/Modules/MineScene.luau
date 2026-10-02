@@ -1,154 +1,667 @@
 --[[
-	The 3D side of an expedition (menu-only mode): while the Mine is open the
-	camera flies to the terraformed mining site (Scenes.miningSite) and your
-	miner stands at the crystal cliff, wearing your gear.
+	Expeditions on foot (menu-only mode). "Begin Expedition" sends your miner
+	to the mining site (Shared/MiningSite, built by the server) where you
+	walk up to the rocks of your wall and mine them.
 
-	Every strike swaps the weapon for the mining laser: the arm comes up, a
-	beam cuts into the rock with sparks and a flash, then the laser is put
-	away and the weapon comes back.
+	  Rocks       one per tile of your wall, at the foot of the crystal face.
+	              Glinting crystal = gems, ore flecks = salvage credits, gold =
+	              a lucky rock. Pips over each rock show the hits left.
+	  Mining      walk up and press E (or tap the prompt). Your weapon is put
+	              away and the space pickaxe comes out for the swing; a moment
+	              after you stop, the weapon comes back.
+	  HUD         depth, swings left and what you've found, with Descend and
+	              Return to base.
+	The server decides everything (MineWall: ExpeditionStart, MineHit,
+	MineDescend, ExpeditionLeave); this only shows it.
 
-	MineScene.enter() / MineScene.leave()   fly in and out
-	MineScene.strike(color?)                 one laser shot (color: a gem's glow)
-	MineScene.isActive()                     for the menu camera
-	Everything here is built on the client; nobody else sees it.
+	MineScene.begin()     start (or resume) an expedition
+	MineScene.leave()     back to base
+	MineScene.isActive()  for the menu camera
 ]]
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local MiningSite = require(ReplicatedStorage.Shared.MiningSite)
+local GemClient = require(script.Parent.GemClient)
+local IronUi = require(script.Parent.IronUi)
 local Scenes = require(script.Parent.Scenes)
+local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
+local P = IronUi.Colors
+local new = IronUi.new
 
 local MineScene = {}
 
-local SITE_AT = CFrame.new(3000, 300, 0)
-local LASER = Color3.fromRGB(90, 210, 255)
-local GUN_HOLD = 0.7 -- seconds the laser stays out after the last strike
+local SWING_TIME = 0.42 -- one pickaxe swing
+local IMPACT_AT = 0.2 -- when the pick hits the rock
+local PICK_HOLD = 1.3 -- seconds the pickaxe stays out after a swing
+local COOLDOWN = 0.36
+local ROCK = Color3.fromRGB(118, 112, 122)
+local CRYSTAL = Color3.fromRGB(110, 225, 255)
+local GOLD = Color3.fromRGB(255, 196, 70)
 
 local active = false
-local site: Scenes.Site? = nil
-local miner: Model? = nil
-local shoulder: Motor6D? = nil
-local weaponParts: { [BasePart]: number } = {}
-local gunParts: { BasePart } = {}
-local muzzle: BasePart? = nil
-local gunUntil = 0
-local aim = 0 -- 0 = arm down, 1 = aiming
-local shake = 0
+local busy = false
+local layout = MiningSite.layout(MiningSite.Location)
+local wall = nil -- the server's view of the current wall
+local quota = nil
+local rockFolder: Folder? = nil
+local rocks: { [number]: { Body: BasePart, Model: Model, Pips: TextLabel } } = {}
+local found = { Gems = 0, Coins = 0, Gear = 0 }
 local hiddenGui: ScreenGui? = nil
-local started = 0
+
+-- The pickaxe in the right hand, and the right shoulder that swings it.
+local pickParts: { BasePart } = {}
+local shoulder: Motor6D? = nil
+local swingStart = -math.huge
+local pickUntil = 0
+local lastSwing = 0
 
 function MineScene.isActive(): boolean
 	return active
 end
 
-local function tween(object: Instance, seconds: number, goal: { [string]: any })
-	TweenService:Create(object, TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal):Play()
+local function tween(object: Instance, seconds: number, goal: { [string]: any }, style: Enum.EasingStyle?)
+	local t = TweenService:Create(
+		object,
+		TweenInfo.new(seconds, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		goal
+	)
+	t:Play()
+	return t
 end
 
--- Shows the laser and hides the weapon, or the other way round.
-local function holdLaser(on: boolean)
-	for part, transparency in weaponParts do
-		if part.Parent then
-			part.Transparency = if on then 1 else transparency
+local function sound(id: string, speed: number, volume: number, parent: Instance?)
+	local s = Instance.new("Sound")
+	s.SoundId = id
+	s.PlaybackSpeed = speed
+	s.Volume = volume
+	s.Parent = parent or workspace
+	pcall(function()
+		s:Play()
+	end)
+	task.delay(2, function()
+		s:Destroy()
+	end)
+end
+
+-- Walking: menu mode keeps the controls off; expeditions turn them on.
+local function setWalking(on: boolean)
+	local scripts = player:FindFirstChild("PlayerScripts")
+	local module = scripts and scripts:FindFirstChild("PlayerModule")
+	if not module then
+		return
+	end
+	pcall(function()
+		local controls = require(module):GetControls()
+		if on then
+			controls:Enable()
+		else
+			controls:Disable()
+		end
+	end)
+end
+
+-- HUD ---------------------------------------------------------------------------------------------
+
+local hud = UiKit.gui("Expedition", 5)
+hud.IgnoreGuiInset = true
+hud.Enabled = false
+local hudScale = new("UIScale", {}, hud)
+local function fitHud()
+	local screen = hud.AbsoluteSize
+	if screen.X > 0 then
+		hudScale.Scale = math.clamp(math.min(screen.X / 1280, screen.Y / 720), 0.6, 1.3)
+	end
+end
+hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitHud)
+
+local function label(parent: Instance, value: string, size: number, color: Color3, font: Enum.Font?): TextLabel
+	local t = IronUi.text(parent, value, size, color, font or IronUi.Bold)
+	t.AutomaticSize = Enum.AutomaticSize.None
+	return t
+end
+
+-- Top: depth, swings left and what you've found.
+local bar = new("Frame", {
+	BackgroundColor3 = P.Frame,
+	BackgroundTransparency = 0.12,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 12),
+	Size = UDim2.fromOffset(640, 64),
+}, hud)
+UiKit.round(bar, 8)
+new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.35 }, bar)
+local sector = label(bar, "CRYSTAL CLIFF  ·  LUNAR FRONTIER", 10, P.Gold)
+sector.Position = UDim2.fromOffset(16, 10)
+sector.Size = UDim2.fromOffset(230, 12)
+local depthText = label(bar, "DEPTH 1", 24, Color3.new(1, 1, 1), IronUi.Heading)
+depthText.Position = UDim2.fromOffset(16, 24)
+depthText.Size = UDim2.fromOffset(150, 30)
+local swingsCaption = label(bar, "SWINGS LEFT", 10, P.Dim)
+swingsCaption.Position = UDim2.fromOffset(262, 10)
+swingsCaption.Size = UDim2.fromOffset(120, 12)
+local swingsText = label(bar, "14", 24, Color3.new(1, 1, 1), IronUi.Heading)
+swingsText.Position = UDim2.fromOffset(262, 24)
+swingsText.Size = UDim2.fromOffset(50, 30)
+local swingTrack = new("Frame", {
+	BackgroundColor3 = P.Slot,
+	Position = UDim2.fromOffset(314, 37),
+	Size = UDim2.fromOffset(120, 6),
+}, bar)
+UiKit.round(swingTrack, 3)
+local swingFill = new("Frame", { BackgroundColor3 = P.Gold, Size = UDim2.fromScale(1, 1) }, swingTrack)
+UiKit.round(swingFill, 3)
+local foundCaption = label(bar, "FOUND THIS TRIP", 10, P.Dim)
+foundCaption.Position = UDim2.fromOffset(456, 10)
+foundCaption.Size = UDim2.fromOffset(160, 12)
+local foundText = label(bar, "Nothing yet", 15, Color3.new(1, 1, 1))
+foundText.Position = UDim2.fromOffset(456, 26)
+foundText.Size = UDim2.fromOffset(170, 26)
+foundText.TextYAlignment = Enum.TextYAlignment.Center
+
+-- Bottom right: the way down, and the way home.
+local actions = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, -20, 1, -20),
+	Size = UDim2.fromOffset(0, 50),
+	AutomaticSize = Enum.AutomaticSize.X,
+}, hud)
+UiKit.list(actions, 10, true)
+local descendButton = IronUi.gemButton(actions, "DESCEND", Color3.fromRGB(230, 140, 40), function()
+	MineScene.descend()
+end)
+descendButton.LayoutOrder = 1
+local homeButton = IronUi.button(actions, "RETURN TO BASE", false, function()
+	MineScene.leave()
+end)
+homeButton.LayoutOrder = 2
+homeButton.Size = UDim2.fromOffset(0, 46)
+local costNote = label(hud, "", 12, P.Dim)
+costNote.AnchorPoint = Vector2.new(1, 1)
+costNote.Position = UDim2.new(1, -24, 1, -76)
+costNote.Size = UDim2.fromOffset(320, 16)
+costNote.TextXAlignment = Enum.TextXAlignment.Right
+
+-- Bottom centre: a hint until you've swung once, and banners.
+local hint = label(hud, "Walk up to a rock and press E to mine it", 16, Color3.new(1, 1, 1))
+hint.AnchorPoint = Vector2.new(0.5, 1)
+hint.Position = UDim2.new(0.5, 0, 1, -96)
+hint.Size = UDim2.fromOffset(600, 22)
+hint.TextXAlignment = Enum.TextXAlignment.Center
+new("UIStroke", { Color = P.Ink, Thickness = 2, Transparency = 0.2 }, hint)
+local banner = label(hud, "", 32, P.Gold, IronUi.Heading)
+banner.AnchorPoint = Vector2.new(0.5, 0.5)
+banner.Position = UDim2.fromScale(0.5, 0.36)
+banner.Size = UDim2.fromOffset(1100, 44)
+banner.TextXAlignment = Enum.TextXAlignment.Center
+banner.TextTransparency = 1
+new("UIStroke", { Color = P.Ink, Thickness = 3, Transparency = 0.1 }, banner)
+local fade = new("Frame", {
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 50,
+}, hud)
+
+local function showBanner(message: string, color: Color3?)
+	banner.Text = message
+	banner.TextColor3 = color or P.Gold
+	banner.TextTransparency = 0
+	banner:FindFirstChildOfClass("UIStroke").Transparency = 0.1
+	task.delay(1.6, function()
+		if banner.Text == message then
+			tween(banner, 0.5, { TextTransparency = 1 })
+			tween(banner:FindFirstChildOfClass("UIStroke"), 0.5, { Transparency = 1 })
+		end
+	end)
+end
+
+local function refreshHud()
+	if not wall then
+		return
+	end
+	depthText.Text = "DEPTH " .. wall.Depth
+	swingsText.Text = tostring(wall.Swings)
+	local max = 14
+	swingFill.Size = UDim2.fromScale(math.clamp(wall.Swings / max, 0, 1), 1)
+	swingFill.BackgroundColor3 = if wall.Swings <= 3 then P.Bad else P.Gold
+	local parts = {}
+	if found.Gems > 0 then
+		table.insert(parts, string.format("◆ %d gem%s", found.Gems, if found.Gems == 1 then "" else "s"))
+	end
+	if found.Coins > 0 then
+		table.insert(parts, found.Coins .. " coins")
+	end
+	if found.Gear > 0 then
+		table.insert(parts, found.Gear .. " gear")
+	end
+	foundText.Text = if #parts > 0 then table.concat(parts, "  ·  ") else "Nothing yet"
+	local free = quota and quota.FreeLeft or 0
+	costNote.Text = if free > 0
+		then string.format("Next wall free (%d left today)", free)
+		else string.format("Next wall costs %d coins", quota and quota.Price or 40)
+	descendButton.Text = if wall.Swings <= 0 then "DESCEND  ▼" else "DESCEND"
+end
+
+-- Text that rises from a rock and fades.
+local function floatText(at: Vector3, message: string, color: Color3, size: number?)
+	local anchor = Scenes.part(workspace, CFrame.new(at), Vector3.one * 0.2, color, Enum.Material.Neon)
+	anchor.Transparency = 1
+	local board = new("BillboardGui", {
+		Size = UDim2.fromOffset(260, 40),
+		StudsOffset = Vector3.new(0, 1, 0),
+		AlwaysOnTop = true,
+		LightInfluence = 0,
+	}, anchor)
+	local t = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Text = message,
+		Font = IronUi.Heading,
+		TextSize = size or 22,
+		TextColor3 = color,
+	}, board)
+	new("UIStroke", { Color = P.Ink, Thickness = 2 }, t)
+	tween(board, 1.2, { StudsOffset = Vector3.new(0, 4, 0) })
+	task.delay(0.6, function()
+		tween(t, 0.6, { TextTransparency = 1 })
+	end)
+	task.delay(1.3, function()
+		anchor:Destroy()
+	end)
+end
+
+-- Rocks ---------------------------------------------------------------------------------------------
+
+local function pipText(hp: number, maxHp: number): string
+	return string.rep("●", hp) .. string.rep("○", math.max(0, maxHp - hp))
+end
+
+-- One rock of the wall: a lumpy boulder, dressed by its hint, with a prompt.
+local function makeRock(index: number, tile, spot: CFrame, depth: number)
+	local m = new("Model", { Name = "Rock" .. index }, rockFolder)
+	-- Deeper walls are darker, with more colour in the stone.
+	local tint = ROCK:Lerp(Color3.fromRGB(70, 60, 90), math.clamp((depth - 1) / 10, 0, 0.7))
+	local size = 3.2 + (tile.MaxHp or 2) * 0.25
+	local body = Scenes.part(
+		m,
+		spot * CFrame.new(0, size * 0.36, 0),
+		Vector3.new(size, size * 0.8, size * 0.9),
+		tint,
+		Enum.Material.Slate,
+		"Sphere"
+	)
+	body.CanCollide = true
+	body.CanQuery = true
+	body.Name = "Body"
+	for k = 1, 2 do
+		local lump = Scenes.part(
+			m,
+			body.CFrame * CFrame.new((k == 1 and -1 or 1) * size * 0.3, -size * 0.12, (k - 1.5) * size * 0.25),
+			Vector3.new(size * 0.55, size * 0.45, size * 0.6),
+			tint:Lerp(Color3.new(0, 0, 0), 0.12),
+			Enum.Material.Slate,
+			"Sphere"
+		)
+		lump.CanCollide = true
+	end
+	local kind = "Rock"
+	if tile.Hint == "Glint" then
+		kind = "Crystal Rock"
+		for k = 1, 3 do
+			local shard = Scenes.part(
+				m,
+				body.CFrame
+					* CFrame.Angles(math.rad(-25 + k * 15), math.rad(k * 110), math.rad(-20 + k * 12))
+					* CFrame.new(0, size * 0.42, 0),
+				Vector3.new(0.45, 1.2 + k * 0.2, 0.45),
+				CRYSTAL,
+				Enum.Material.Neon
+			)
+			shard.Transparency = 0.15
+		end
+		local sparkle = new("ParticleEmitter", {
+			Texture = "rbxasset://textures/particles/sparkles_main.dds",
+			Color = ColorSequence.new(CRYSTAL),
+			Size = NumberSequence.new(0.3, 0),
+			Lifetime = NumberRange.new(0.6, 1),
+			Rate = 4,
+			Speed = NumberRange.new(0.5, 1.5),
+			LightEmission = 1,
+		}, body)
+		sparkle.SpreadAngle = Vector2.new(180, 180)
+		new("PointLight", { Color = CRYSTAL, Range = 8, Brightness = 1.2 }, body)
+	elseif tile.Hint == "Gold" then
+		kind = "Golden Rock"
+		for k = 1, 5 do
+			Scenes.part(
+				m,
+				body.CFrame * CFrame.Angles(math.rad(k * 70), math.rad(k * 47), 0) * CFrame.new(0, size * 0.4, 0),
+				Vector3.one * 0.45,
+				GOLD,
+				Enum.Material.Neon,
+				"Ball"
+			)
+		end
+		new("PointLight", { Color = GOLD, Range = 10, Brightness = 1.6 }, body)
+	elseif tile.Hint == "Speck" then
+		kind = "Ore Seam"
+		local ore = tile.OreColor or Color3.fromRGB(200, 205, 215)
+		for k = 1, 6 do
+			Scenes.part(
+				m,
+				body.CFrame * CFrame.Angles(math.rad(k * 53), math.rad(k * 97), 0) * CFrame.new(0, size * 0.39, 0),
+				Vector3.new(0.5, 0.25, 0.4),
+				ore,
+				Enum.Material.Metal
+			)
 		end
 	end
-	for _, part in gunParts do
-		part.Transparency = if on then 0 else 1
+	-- Hits left, floating over the rock.
+	local board = new("BillboardGui", {
+		Size = UDim2.fromOffset(120, 22),
+		StudsOffset = Vector3.new(0, size * 0.75, 0),
+		MaxDistance = 40,
+		LightInfluence = 0,
+	}, body)
+	local pips = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Text = pipText(tile.Hp, tile.MaxHp),
+		Font = IronUi.Bold,
+		TextSize = 16,
+		TextColor3 = if kind == "Golden Rock"
+			then GOLD
+			elseif kind == "Crystal Rock" then CRYSTAL
+			else Color3.fromRGB(235, 235, 240),
+	}, board)
+	new("UIStroke", { Color = P.Ink, Thickness = 1.5 }, pips)
+	local prompt = new("ProximityPrompt", {
+		ActionText = "Mine",
+		ObjectText = kind,
+		KeyboardKeyCode = Enum.KeyCode.E,
+		HoldDuration = 0,
+		MaxActivationDistance = 9,
+		RequiresLineOfSight = false,
+	}, body)
+	prompt.Triggered:Connect(function()
+		MineScene.swing(index)
+	end)
+	rocks[index] = { Body = body, Model = m, Pips = pips }
+end
+
+local function buildRocks()
+	if rockFolder then
+		rockFolder:Destroy()
+	end
+	table.clear(rocks)
+	rockFolder = new("Folder", { Name = "ExpeditionRocks" }, workspace)
+	if not wall then
+		return
+	end
+	for index, tile in wall.Tiles do
+		local spot = layout.RockSpots[index]
+		if spot and tile.Hp > 0 then
+			makeRock(index, tile, spot, wall.Depth)
+		end
 	end
 end
 
--- A copy of your character, gear and all, standing at the cliff.
-local function placeMiner()
+-- A broken rock crumbles into pieces that roll and fade.
+local function crumble(index: number)
+	local rock = rocks[index]
+	if not rock then
+		return
+	end
+	rocks[index] = nil
+	local center = rock.Body.CFrame.Position
+	-- Collect first: destroying prompts/billboards mid-walk would invalidate the descendant list.
+	local parts, extras = {}, {}
+	for _, item in rock.Model:GetDescendants() do
+		if item:IsA("BasePart") then
+			table.insert(parts, item)
+		elseif item:IsA("ProximityPrompt") or item:IsA("BillboardGui") or item:IsA("ParticleEmitter") then
+			table.insert(extras, item)
+		end
+	end
+	for _, item in extras do
+		item:Destroy()
+	end
+	for _, part in parts do
+		part.CanCollide = false
+		local away = (part.CFrame.Position - center) + Vector3.new(0, 0.5, 0)
+		if away.Magnitude < 0.01 then
+			away = Vector3.new(0, 1, 0)
+		end
+		tween(part, 0.5, {
+			Size = part.Size * 0.3,
+			Position = part.CFrame.Position + away.Unit * 1.5 - Vector3.new(0, 0.8, 0),
+			Transparency = 1,
+		})
+	end
+	task.delay(0.6, function()
+		rock.Model:Destroy()
+	end)
+end
+
+-- The pickaxe ------------------------------------------------------------------------------------
+
+local function weaponParts(): { BasePart }
+	local list = {}
 	local character = player.Character
-	local s = site
-	if not character or not s then
-		return
-	end
-	character.Archivable = true
-	local copy = character:Clone()
-	character.Archivable = false
-	if not copy then
-		return
-	end
-	for _, d in copy:GetDescendants() do
-		if d:IsA("BaseScript") or d:IsA("Sound") or d:IsA("Animator") then
-			d:Destroy()
-		end
-	end
-	local humanoid = copy:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-	end
-	local root = copy:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
-		copy:Destroy()
-		return
-	end
-	-- Stand on the ground: lift by the root's height above the feet.
-	local lowest = math.huge
-	for _, d in copy:GetDescendants() do
-		if d:IsA("BasePart") and d.Transparency < 1 then
-			lowest = math.min(lowest, d.Position.Y - d.Size.Y / 2)
-		end
-	end
-	local rise = if lowest < math.huge then root.Position.Y - lowest else 3
-	root.Anchored = true
-	copy:PivotTo(s.Stand * CFrame.new(0, rise, 0))
-	copy.Parent = workspace
-
-	-- The weapon (put away while the laser is out) and the right shoulder.
-	weaponParts = {}
-	local gear = copy:FindFirstChild("GemsoulGear")
+	local gear = character and character:FindFirstChild("GemsoulGear")
 	local weapon = gear and gear:FindFirstChild("Weapon")
 	for _, d in (weapon and weapon:GetDescendants() or {}) do
 		if d:IsA("BasePart") then
-			weaponParts[d] = d.Transparency
+			table.insert(list, d)
 		end
 	end
-	local upperArm = copy:FindFirstChild("RightUpperArm")
-	shoulder = upperArm and upperArm:FindFirstChild("RightShoulder") :: Motor6D?
-	local hand = copy:FindFirstChild("RightHand") :: BasePart?
-	gunParts, muzzle = {}, nil
-	if hand then
-		gunParts, muzzle = Scenes.miningGun(hand, LASER)
-	end
-	miner = copy
-	holdLaser(false)
+	return list
 end
 
-function MineScene.enter()
-	if active then
+-- Out for digging (weapon hidden on this screen), or put away.
+local function holdPick(on: boolean)
+	for _, part in pickParts do
+		part.Transparency = if on then 0 else 1
+	end
+	for _, part in weaponParts() do
+		part.LocalTransparencyModifier = if on then 1 else 0
+	end
+end
+
+local function makePick()
+	for _, part in pickParts do
+		part:Destroy()
+	end
+	pickParts = {}
+	local character = player.Character
+	local hand = character and character:FindFirstChild("RightHand") :: BasePart?
+	local upperArm = character and character:FindFirstChild("RightUpperArm")
+	shoulder = upperArm and upperArm:FindFirstChild("RightShoulder") :: Motor6D?
+	if hand then
+		pickParts = Scenes.spacePickaxe(hand)
+	end
+	holdPick(false)
+end
+
+-- One swing at rock `index`.
+function MineScene.swing(index: number)
+	local rock = rocks[index]
+	if not active or not wall or not rock then
 		return
 	end
-	active = true
-	started = os.clock()
-	if not site then
-		site = Scenes.miningSite(SITE_AT)
+	local now = os.clock()
+	if now - lastSwing < COOLDOWN then
+		return
 	end
-	Scenes.terraformLighting()
-	placeMiner()
-	-- The dashboard's backdrop would hide the scene; put it away while mining.
+	if wall.Swings <= 0 then
+		showBanner("OUT OF SWINGS", P.Bad)
+		return
+	end
+	lastSwing = now
+	hint.Visible = false
+	-- Turn to the rock and swing.
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local target = rock.Body.CFrame.Position
+	if root then
+		root.CFrame = CFrame.lookAt(root.CFrame.Position, Vector3.new(target.X, root.CFrame.Position.Y, target.Z))
+	end
+	if #pickParts == 0 then
+		makePick()
+	end
+	holdPick(true)
+	swingStart = now
+	pickUntil = now + PICK_HOLD
+	task.delay(IMPACT_AT, function()
+		if not rock.Body.Parent then
+			return
+		end
+		-- The hit: sparks, dust and a shake.
+		local from = if root then Vector3.new(root.CFrame.Position.X, target.Y, root.CFrame.Position.Z) else target
+		local face = target + (from - target).Unit * (rock.Body.Size.X * 0.45)
+		for _ = 1, 7 do
+			local spark = Scenes.part(workspace, CFrame.new(face), Vector3.one * 0.15, CRYSTAL, Enum.Material.Neon)
+			local out = ((from - target).Unit + Vector3.new(
+				math.random() - 0.5,
+				math.random() * 0.8,
+				math.random() - 0.5
+			)).Unit
+			tween(spark, 0.4, { Position = face + out * (1.5 + math.random() * 1.5), Transparency = 1 })
+			task.delay(0.45, function()
+				spark:Destroy()
+			end)
+		end
+		for _ = 1, 3 do
+			local dust = Scenes.part(
+				workspace,
+				CFrame.new(face),
+				Vector3.one * 0.6,
+				Color3.fromRGB(170, 166, 170),
+				Enum.Material.SmoothPlastic,
+				"Ball"
+			)
+			dust.Transparency = 0.4
+			tween(dust, 0.7, {
+				Position = face + Vector3.new(math.random() - 0.5, 0.6 + math.random(), math.random() - 0.5) * 1.5,
+				Size = Vector3.one * 1.6,
+				Transparency = 1,
+			})
+			task.delay(0.75, function()
+				dust:Destroy()
+			end)
+		end
+		local base = rock.Body.CFrame
+		rock.Body.CFrame = base * CFrame.Angles(0.06, 0, 0.06)
+		tween(rock.Body, 0.15, { CFrame = base })
+		sound("rbxasset://sounds/swordhit.wav", 0.7 + math.random() * 0.15, 0.5, rock.Body)
+	end)
+	-- The server rolls the hit.
+	task.spawn(function()
+		local result = GemClient.request("MineHit", index)
+		if not result.Ok then
+			if result.Message ~= "" and result.Message ~= "Slow down!" then
+				UiKit.toast(result.Message, P.Bad)
+			end
+			return
+		end
+		wall.Swings = result.Swings
+		wall.Tiles[index] = result.Tile
+		quota = result.Quota or quota
+		task.wait(math.max(0, swingStart + IMPACT_AT - os.clock()))
+		if result.Crit then
+			floatText(target + Vector3.new(0, 2, 0), "CRIT!", Color3.fromRGB(255, 150, 40), 26)
+		end
+		local loot = result.Loot
+		if loot then
+			crumble(index)
+			if loot.Kind == "Gem" and loot.Gem then
+				found.Gems += 1
+				local color = GemConfig.TierColors[loot.Gem.Tier] or CRYSTAL
+				floatText(target + Vector3.new(0, 1.5, 0), "GEM!  " .. (loot.Text or ""), color, 24)
+				UiKit.toast("Found " .. (loot.Text or "a gem") .. "!", color)
+				sound("rbxasset://sounds/electronicpingshort.wav", 1.2, 0.5)
+			elseif loot.Kind == "Full" then
+				floatText(target + Vector3.new(0, 1.5, 0), "POUCH FULL", P.Bad, 22)
+			elseif loot.Kind ~= "Stone" then
+				floatText(target + Vector3.new(0, 1.5, 0), loot.Text or "Found something", P.Gold, 20)
+			else
+				floatText(target + Vector3.new(0, 1.5, 0), "Rubble", P.Dim, 18)
+			end
+			found.Coins += loot.Coins or loot.Count or 0
+			if loot.Gear then
+				found.Gear += 1
+				UiKit.toast("EQUIPMENT RECOVERED: " .. loot.Gear .. "! See it in your Armory.", P.Gold)
+			end
+		elseif rocks[index] then
+			rocks[index].Pips.Text = pipText(result.Tile.Hp, result.Tile.MaxHp)
+		end
+		refreshHud()
+		if wall.Swings <= 0 then
+			task.delay(0.8, function()
+				showBanner("OUT OF SWINGS  ·  DESCEND OR RETURN", P.Gold)
+			end)
+		end
+	end)
+end
+
+-- Expedition flow ------------------------------------------------------------------------------------
+
+local function enterScene(result)
+	wall = result.Wall
+	quota = result.Quota
+	found = { Gems = 0, Coins = 0, Gear = 0 }
+	active = true
+	MiningSite.lighting()
+	-- The dashboard's backdrop would cover the world; put it away while out.
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
 	if dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled then
 		dashboard.Enabled = false
 		hiddenGui = dashboard
 	end
+	local camera = workspace.CurrentCamera
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	camera.CameraType = Enum.CameraType.Custom
+	if humanoid then
+		camera.CameraSubject = humanoid
+	end
+	setWalking(true)
+	makePick()
+	buildRocks()
+	fitHud()
+	hint.Visible = true
+	hud.Enabled = true
+	refreshHud()
+	fade.BackgroundTransparency = 0
+	tween(fade, 0.6, { BackgroundTransparency = 1 })
+	showBanner("DEPTH " .. wall.Depth, P.Gold)
 end
 
-function MineScene.leave()
+-- Back to the menu (after the server has moved us, or on respawn).
+local function exitScene()
 	if not active then
 		return
 	end
 	active = false
-	if miner then
-		miner:Destroy()
-		miner = nil
+	hud.Enabled = false
+	if rockFolder then
+		rockFolder:Destroy()
+		rockFolder = nil
 	end
-	shoulder, muzzle = nil, nil
-	weaponParts, gunParts = {}, {}
-	aim, gunUntil = 0, 0
+	table.clear(rocks)
+	holdPick(false)
+	for _, part in pickParts do
+		part:Destroy()
+	end
+	pickParts = {}
+	shoulder = nil
+	setWalking(false)
 	Scenes.spaceLighting()
 	if hiddenGui then
 		hiddenGui.Enabled = true
@@ -156,117 +669,93 @@ function MineScene.leave()
 	end
 end
 
--- One shot of the mining laser into the cliff.
-function MineScene.strike(color: Color3?)
-	local s = site
-	if not active or not s or not miner then
+function MineScene.begin()
+	if busy or active then
 		return
 	end
-	gunUntil = os.clock() + GUN_HOLD
-	holdLaser(true)
-	local glow = color or LASER
-	-- A spot on the working face.
-	local target = (s.Face * CFrame.new((math.random() - 0.5) * s.FaceSize.X, (math.random() - 0.5) * s.FaceSize.Y, 0)).Position
-	task.delay(0.08, function()
-		local from = if muzzle and muzzle.Parent then muzzle.Position else target + Vector3.new(0, 0, 6)
-		local length = (target - from).Magnitude
-		local beam = Scenes.part(
-			workspace,
-			CFrame.lookAt((from + target) / 2, target),
-			Vector3.new(0.22, 0.22, length),
-			glow,
-			Enum.Material.Neon
-		)
-		beam.CastShadow = false
-		tween(beam, 0.28, { Transparency = 1, Size = Vector3.new(0.05, 0.05, length) })
-		-- The hit: a flash, a burst of sparks and a chip of rock.
-		local flash = Scenes.part(workspace, CFrame.new(target), Vector3.one * 1.2, glow, Enum.Material.Neon, "Ball")
-		flash.CastShadow = false
-		local light = Instance.new("PointLight")
-		light.Color = glow
-		light.Range = 14
-		light.Brightness = 4
-		light.Parent = flash
-		tween(flash, 0.35, { Transparency = 1, Size = Vector3.one * 3 })
-		tween(light, 0.35, { Brightness = 0 })
-		local normal = s.Face.LookVector
-		for _ = 1, 8 do
-			local spark = Scenes.part(workspace, CFrame.new(target), Vector3.one * 0.18, glow, Enum.Material.Neon)
-			spark.CastShadow = false
-			local out = (normal + Vector3.new(math.random() - 0.5, math.random() - 0.3, math.random() - 0.5)).Unit
-			tween(spark, 0.45, { Position = target + out * (2 + math.random() * 2), Transparency = 1 })
-			task.delay(0.5, function()
-				spark:Destroy()
-			end)
+	busy = true
+	task.spawn(function()
+		local result = GemClient.request("ExpeditionStart")
+		busy = false
+		if not result.Ok then
+			UiKit.toast(result.Message, P.Bad)
+			return
 		end
-		local chip = Scenes.part(
-			workspace,
-			CFrame.new(target + normal * 0.4) * CFrame.Angles(math.random() * 3, math.random() * 3, 0),
-			Vector3.one * (0.4 + math.random() * 0.4),
-			Color3.fromRGB(120, 116, 124),
-			Enum.Material.Slate
-		)
-		local ground = s.Stand.Position.Y + 0.3
-		tween(chip, 0.6, { Position = Vector3.new(target.X, ground, target.Z) + normal * (1.5 + math.random()) })
-		shake = 0.15
-		task.delay(0.5, function()
-			beam:Destroy()
-			flash:Destroy()
-		end)
-		task.delay(3, function()
-			chip:Destroy()
-		end)
+		enterScene(result)
 	end)
 end
 
--- Each frame: the camera, the aiming arm and putting the laser away.
-RunService.RenderStepped:Connect(function(dt)
-	if not active or not site then
+function MineScene.descend()
+	if busy or not active then
 		return
 	end
-	local s = site :: Scenes.Site
-	local now = os.clock()
-	local camera = workspace.CurrentCamera
-	if camera.CameraType ~= Enum.CameraType.Scriptable then
-		camera.CameraType = Enum.CameraType.Scriptable
-	end
-	-- Ease in from above on arrival, then a slow drift; a small kick on each hit.
-	local arrive = math.clamp((now - started) / 1.2, 0, 1)
-	arrive = 1 - (1 - arrive) ^ 3
-	local drift = Vector3.new(math.sin(now * 0.25) * 0.6, math.sin(now * 0.33) * 0.3, 0)
-	local eye = s.Eye + drift + Vector3.new(0, (1 - arrive) * 18, (1 - arrive) * 10)
-	local kick = Vector3.zero
-	if shake > 0 then
-		shake = math.max(0, shake - dt)
-		kick = Vector3.new(math.random() - 0.5, math.random() - 0.5, 0) * shake * 0.6
-	end
-	camera.CFrame = CFrame.lookAt(eye + kick, s.Look)
-	-- Raise the arm while the laser is out; lower it and swap back after.
-	local want = if now < gunUntil then 1 else 0
-	aim += (want - aim) * math.min(1, dt * 14)
-	if want == 0 and aim < 0.05 and #gunParts > 0 and gunParts[1].Transparency < 1 then
-		holdLaser(false)
-	end
-end)
+	busy = true
+	task.spawn(function()
+		local result = GemClient.request("MineDescend")
+		busy = false
+		if not result.Ok then
+			UiKit.toast(result.Message, P.Bad)
+			quota = result.Quota or quota
+			refreshHud()
+			return
+		end
+		tween(fade, 0.25, { BackgroundTransparency = 0 })
+		task.wait(0.3)
+		wall = result.Wall
+		quota = result.Quota or quota
+		buildRocks()
+		refreshHud()
+		tween(fade, 0.5, { BackgroundTransparency = 1 })
+		showBanner("DEPTH " .. wall.Depth, P.Gold)
+		sound("rbxasset://sounds/electronicpingshort.wav", 0.8, 0.4)
+	end)
+end
 
--- The arm pose goes on after animation and before physics.
+function MineScene.leave()
+	if busy or not active then
+		return
+	end
+	busy = true
+	task.spawn(function()
+		tween(fade, 0.25, { BackgroundTransparency = 0 })
+		local result = GemClient.request("ExpeditionLeave")
+		busy = false
+		task.wait(0.3)
+		exitScene()
+		fade.BackgroundTransparency = 1
+		if result.Ok and (found.Gems > 0 or found.Coins > 0) then
+			UiKit.toast(string.format("Expedition haul: %d gems, %d coins", found.Gems, found.Coins), P.Gold)
+		end
+	end)
+end
+
+-- Each frame: the swing, and putting the pickaxe away afterwards.
 RunService.Stepped:Connect(function()
-	if active and shoulder and shoulder.Parent then
-		shoulder.Transform = CFrame.Angles(math.rad(90) * aim, 0, 0)
+	if not active then
+		return
+	end
+	local now = os.clock()
+	local t = (now - swingStart) / SWING_TIME
+	if shoulder and shoulder.Parent and t >= 0 and t < 1 then
+		-- Wind up over the shoulder, strike down, recover.
+		local angle
+		if t < 0.35 then
+			angle = 165 * (t / 0.35)
+		elseif t < 0.6 then
+			angle = 165 - 120 * ((t - 0.35) / 0.25)
+		else
+			angle = 45 * (1 - (t - 0.6) / 0.4)
+		end
+		shoulder.Transform = CFrame.Angles(math.rad(angle), 0, 0)
+	end
+	if now > pickUntil and #pickParts > 0 and pickParts[1].Transparency < 1 then
+		holdPick(false)
 	end
 end)
 
--- A new character (respawn) means a new miner next time.
+-- Respawning ends the expedition (the server sends you back to base).
 player.CharacterAdded:Connect(function()
-	if active then
-		if miner then
-			miner:Destroy()
-		end
-		task.wait(1)
-		if active then
-			placeMiner()
-		end
-	end
+	exitScene()
 end)
 
 return MineScene
