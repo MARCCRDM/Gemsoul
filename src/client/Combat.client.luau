@@ -21,6 +21,7 @@ local FirstPerson = require(script.Parent.Modules.FirstPersonCombat)
 local TargetLock = require(script.Parent.Modules.TargetLock)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
+local RivalPose = require(script.Parent.Modules.RivalPose)
 local UiKit = require(script.Parent.Modules.UiKit)
 if Config.MenuOnly and not Config.CombatEnabled then
 	return
@@ -1229,6 +1230,7 @@ RunService.RenderStepped:Connect(function(dt)
 	castBar.Visible = holding or cast ~= nil or beamKey ~= nil
 	chargeFill.BackgroundColor3 = castColor
 	drawRival(now, viewport)
+	RivalPose.update(rivalModel, dt)
 	local trackedTarget = TargetLock.target()
 	reticle.TextColor3 = if holding
 		then castColor

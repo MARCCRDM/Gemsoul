@@ -170,6 +170,66 @@ local function press(duel, key: string)
 	model:SetAttribute("LastKeyAt", workspace:GetServerTimeNow())
 end
 
+-- What its body is doing, for the player's client to pose (see the client's
+-- RivalPose): the action, when its wind-up began and when it lands.
+local function animate(duel, kind: string, windup: number, side: number?)
+	local model = duel.Enemy.Model
+	local t = workspace:GetServerTimeNow()
+	duel.Swings = (duel.Swings or 0) + 1
+	model:SetAttribute("ActionKind", kind)
+	model:SetAttribute("ActionStart", t)
+	model:SetAttribute("ActionAt", t + windup)
+	model:SetAttribute("ActionSide", side or (if duel.Swings % 2 == 0 then -1 else 1))
+end
+
+-- Roblox's stock R15 idle, walk and run, played on the server so every
+-- client sees its legs move.
+local LOCOMOTION = { Idle = 507766388, Walk = 507777826, Run = 507767714 }
+
+local function animateLegs(humanoid: Humanoid)
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
+	local tracks = {}
+	for name, id in LOCOMOTION do
+		local animation = Instance.new("Animation")
+		animation.AnimationId = "rbxassetid://" .. id
+		local ok, track = pcall(animator.LoadAnimation, animator, animation)
+		if ok and track then
+			track.Looped = true
+			track.Priority = Enum.AnimationPriority.Core
+			tracks[name] = track
+		end
+	end
+	local current
+	local function play(name: string, speed: number)
+		local track = tracks[name]
+		if not track then
+			return
+		end
+		if current ~= track then
+			if current then
+				current:Stop(0.2)
+			end
+			track:Play(0.2)
+			current = track
+		end
+		track:AdjustSpeed(speed)
+	end
+	play("Idle", 1)
+	humanoid.Running:Connect(function(speed)
+		if speed > 12 then
+			play("Run", speed / 16)
+		elseif speed > 0.5 then
+			play("Walk", math.max(0.5, speed / 10))
+		else
+			play("Idle", 1)
+		end
+	end)
+end
+
 local function face(root: BasePart, target: Vector3)
 	local look = flat(target - root.Position)
 	if look.Magnitude > 0.1 then
@@ -201,6 +261,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 	press(duel, ({ "Q", "E", "R" })[surge.Slot])
 	Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " casts " .. surge.Name .. "!")
 	if surge.Kind == "Self" then
+		animate(duel, "Buff", 0.15)
 		fx("TechPulse", nil, root.Position, root.Position, color, 5)
 		if surge.Id == "CryoShield" then
 			enemy.GuardUntil, enemy.GuardMult = now + 4, 0.5 -- a barrier that halves hits
@@ -216,6 +277,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		-- A blast with a warning ring: under the player, or around itself.
 		local center = if surge.SelfCentered then root.Position else target.Position
 		fx("Nova", center - Vector3.new(0, 2.5, 0), surge.Radius, color, Brain.Windup.Nova)
+		animate(duel, "Nova", Brain.Windup.Nova)
 		duel.Action = {
 			Kind = "Nova",
 			At = now + Brain.Windup.Nova,
@@ -227,6 +289,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 	else
 		fx("TechPulse", nil, root.Position, root.Position, color, 3)
 		duel.Action = { Kind = "Bolt", At = now + Brain.Windup.Bolt, Power = surge.Power, Element = surge.Element }
+		animate(duel, "Bolt", Brain.Windup.Bolt)
 	end
 end
 
@@ -240,8 +303,10 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 	face(root, target.Position)
 	if move.Id == "StimDodge" then
 		-- Dodge and patch up.
-		local away = side * (if math.random() < 0.5 then 1 else -1)
+		local sign = if math.random() < 0.5 then 1 else -1
+		local away = side * sign
 		enemy.DodgeUntil = now + 0.35
+		animate(duel, "Dodge", 0, sign)
 		root.AssemblyLinearVelocity = away * 55 + Vector3.new(0, 6, 0)
 		fx("DodgeRoll", nil, root.Position, away, 8, true)
 		local humanoid = enemy.Humanoid
@@ -258,6 +323,7 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 		fx("Nova", root.Position - Vector3.new(0, 2.5, 0), 4.5, Color3.fromRGB(255, 120, 60), move.Windup)
 	end
 	setStance(duel, if move.Windup then "Heavy" else "Maneuver")
+	animate(duel, if move.Windup then "Heavy" else "Slash", move.Windup or 0.25)
 	duel.Action = {
 		Kind = "Move",
 		At = now + (move.Windup or 0.25),
@@ -296,6 +362,8 @@ local function think(enemy, now: number)
 	if action then
 		if now < enemy.StunUntil then
 			duel.Action = nil -- parried or stunned: the blow is lost
+			duel.StaggeredFor = enemy.StunUntil
+			animate(duel, "Stagger", 0)
 			return
 		end
 		humanoid:MoveTo(root.Position)
@@ -317,6 +385,7 @@ local function think(enemy, now: number)
 			local hits = (action.Hits or 1) + 1
 			if not heavy and hits <= 3 and math.random() < 0.65 then
 				duel.Action = { Kind = "Light", At = now + 0.32, Hits = hits }
+				animate(duel, "Slash", 0.32)
 				press(duel, "LMB")
 				return
 			end
@@ -341,6 +410,7 @@ local function think(enemy, now: number)
 			if (action.Hits or 1) > 1 then
 				-- Multi-hit maneuvers (Servo Flurry) strike again quickly.
 				duel.Action = { Kind = "Move", At = now + 0.2, Power = action.Power, Hits = action.Hits - 1 }
+				animate(duel, "Slash", 0.2)
 				return
 			end
 			duel.NextAttack = now + duel.Rate
@@ -399,22 +469,30 @@ local function think(enemy, now: number)
 	end
 	if choice == "Stagger" then
 		humanoid:MoveTo(root.Position)
+		if duel.StaggeredFor ~= enemy.StunUntil then
+			duel.StaggeredFor = enemy.StunUntil -- reel once per stun
+			animate(duel, "Stagger", 0)
+		end
 	elseif choice == "Guard" then
 		enemy.GuardUntil, enemy.GuardMult = now + 0.9, 0.3
+		enemy.Model:SetAttribute("GuardUntil", workspace:GetServerTimeNow() + 0.9)
 		setStance(duel, "Guard")
 		press(duel, "RMB")
 		duel.NextAttack = math.max(duel.NextAttack, now + 0.9)
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
 	elseif choice == "Dodge" then
-		local away = side * (if math.random() < 0.5 then 1 else -1)
+		local sign = if math.random() < 0.5 then 1 else -1
+		local away = side * sign
 		enemy.DodgeUntil = now + 0.35
+		animate(duel, "Dodge", 0, sign)
 		setStance(duel, "Dodge")
 		press(duel, "SPACE")
 		root.AssemblyLinearVelocity = away * 55 + Vector3.new(0, 6, 0)
 		fx("DodgeRoll", nil, root.Position, away, 8, true)
 	elseif choice == "Punish" then
 		duel.Action = { Kind = "Punish", At = now + Brain.Windup.Punish, Hits = 1 }
+		animate(duel, "Slash", Brain.Windup.Punish)
 		setStance(duel, "Counter")
 		press(duel, "LMB")
 		humanoid:MoveTo(root.Position)
@@ -425,6 +503,7 @@ local function think(enemy, now: number)
 		root.AssemblyLinearVelocity = dir * math.min(80, distance * 5) + Vector3.new(0, 4, 0)
 		fx("DodgeRoll", nil, root.Position, dir, math.min(14, distance - 3), false)
 		duel.Action = { Kind = "Lunge", At = now + Brain.Windup.Lunge, Hits = 1 }
+		animate(duel, "Slash", Brain.Windup.Lunge)
 		setStance(duel, "Lunge")
 		press(duel, "LMB")
 		face(root, target.Position)
@@ -447,6 +526,7 @@ local function think(enemy, now: number)
 	elseif choice == "Light" or choice == "Heavy" then
 		local heavy = choice == "Heavy"
 		duel.Action = { Kind = choice, At = now + Brain.Windup[choice], Hits = 1 }
+		animate(duel, if heavy then "Heavy" else "Slash", Brain.Windup[choice])
 		setStance(duel, if heavy then "Heavy" else "")
 		press(duel, "LMB")
 		if heavy then
@@ -570,6 +650,12 @@ function spawnRival(owner: Player)
 		Home = spot,
 	})
 	enemy.Humanoid.AutoRotate = false
+	-- Its own legs only: the stock Animate script doesn't run on a server rig.
+	local animateScript = rig:FindFirstChild("Animate")
+	if animateScript then
+		animateScript:Destroy()
+	end
+	animateLegs(enemy.Humanoid)
 	local now = os.clock()
 	local duel = {
 		Enemy = enemy,
