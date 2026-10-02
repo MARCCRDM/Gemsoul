@@ -157,7 +157,7 @@ for _, isR15 in { false, true } do
 end
 print("PASS: all ten named helmets have distinct geometry on R6/R15 with identical saved rolls")
 
-for _, builder in { FrontierAssets.sword, FrontierAssets.shield } do
+for _, builder in { FrontierAssets.sidearm, FrontierAssets.sword, FrontierAssets.shield } do
 	local previous = 0
 	for rarity = 1, 5 do
 		local before = built
@@ -171,6 +171,13 @@ for _, builder in { FrontierAssets.sword, FrontierAssets.shield } do
 		)
 		local count = built - before
 		assert(count > previous and count < 50, "Weapon/shield detail must increase within budget")
+		for i = #builtParts - count + 1, #builtParts do
+			local part = builtParts[i]
+			assert(
+				part.Massless and not part.CanCollide and not part.CanTouch and not part.CanQuery,
+				"Decorative equipment must not affect physics or targeting"
+			)
+		end
 		previous = count
 	end
 end
@@ -181,4 +188,25 @@ for _, weapon in Classes.List.Warrior.Weapons do
 		assert(weapon.Attack.Kind == "Shot" and weapon.Look == "CleanSidearm", "Original pistol changed")
 	end
 end
-print("PASS: five sword/shield rarity models, valid geometry, saved weapon compatibility")
+print("PASS: five pistol/sword/shield rarity models, valid geometry and physics, saved weapon compatibility")
+
+for _, isR15 in { false, true } do
+	for _, look in { "UtilityMiner", "FrontierRanger", "HeavyVanguard" } do
+		for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
+			local previous = 0
+			for rarity = 1, 5 do
+				local before = built
+				ArmorKits.build({}, rig(isR15), look, Color3.fromRGB(72, 207, 226), 1, {
+					Rarity = rarity,
+					Helmet = 1,
+					VisorColor = Color3.fromRGB(72, 207, 226),
+					FinishColor = Color3.fromRGB(90, 100, 120),
+				}, slot)
+				local count = built - before
+				assert(count > previous and count <= 100, "Armor detail progression or slot budget violated")
+				previous = count
+			end
+		end
+	end
+end
+print("PASS: all suit families and armor slots gain detail at each rarity on R6/R15 within slot budgets")

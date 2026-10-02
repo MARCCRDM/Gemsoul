@@ -1666,19 +1666,29 @@ local function frontierSuit(family: number)
 				for _, side in { -1, 1 } do
 					block(head, side * x * 0.53, y * 0.02, -z * 0.08, 0.06, y * 0.2, 0.16, edge)
 					block(head, side * x * 0.34, -y * 0.27, -z * 0.54, x * 0.13, y * 0.055, 0.045, edge, side * -18)
+					-- Flush temple rivets and recessed rebreather vents.
+					block(head, side * x * 0.46, y * 0.24, -z * 0.42, 0.05, 0.05, 0.035, edge)
+					for vent = 1, 2 do
+						block(head, side * x * 0.43, -y * (0.17 + vent * 0.075), -z * 0.47, x * 0.09, 0.025, 0.04, trim)
+					end
 				end
 			end
 			if rarity >= 3 then
 				block(head, x * 0.48, y * 0.36, 0.12, 0.07, y * 0.5, 0.08, trim)
 				block(head, 0, y * 0.33, -z * 0.53, x * 0.5, 0.045, 0.055, ornament)
+				block(head, 0, -y * 0.29, z * 0.5, x * 0.48, y * 0.12, 0.05, edge)
 			end
 			if rarity >= 4 then
 				plate(head, 0, y * 0.4, z * 0.4, x * 0.7, y * 0.22, z * 0.14, edge)
+				lit(head, 0, -y * 0.29, z * 0.54, x * 0.23, 0.035, 0.025)
 				lit(head, -x * 0.53, y * 0.06, -z * 0.18, 0.04, 0.075, 0.06)
 				lit(head, x * 0.53, y * 0.06, -z * 0.18, 0.04, 0.075, 0.06)
 			end
 			if rarity >= 5 then
 				block(head, 0, y * 0.36, -z * 0.62, x * 0.13, y * 0.14, 0.05, BRASS)
+				for _, side in sides() do
+					block(head, side * x * 0.27, -y * 0.38, -z * 0.56, x * 0.12, 0.035, 0.035, BRASS, side * 18)
+				end
 				lit(head, 0, y * 0.36, -z * 0.655, x * 0.065, y * 0.065, 0.025)
 				for _, side in { -1, 1 } do
 					block(head, side * x * 0.24, y * 0.46, 0.03, 0.08, y * 0.11, z * 0.7, BRASS)
@@ -1725,9 +1735,14 @@ local function frontierSuit(family: number)
 				for _, side in { -1, 1 } do
 					block(torso, side * x * 0.3, y * 0.06, -z * 0.64, 0.06, y * 0.18, 0.04, edge, side * -10)
 					block(torso, side * x * 0.21, -y * 0.06, -z * 0.61, x * 0.25, 0.04, 0.035, edge, side * -10)
+					block(torso, side * x * 0.29, y * 0.33, -z * 0.6, 0.055, 0.055, 0.04, trim)
+					block(torso, side * x * 0.19, y * 0.19, z * 0.845, 0.045, 0.045, 0.025, edge)
 				end
 			end
 			if rarity >= 3 then
+				for vent = 1, 3 do
+					block(torso, 0, y * (0.15 + vent * 0.07), z * 0.845, x * 0.18, 0.025, 0.025, trim)
+				end
 				for _, side in { -1, 1 } do
 					block(torso, side * x * 0.34, -y * 0.35, -z * 0.4, x * 0.2, y * 0.18, 0.15, metal, side * 16)
 					block(torso, side * x * 0.39, y * 0.14, -z * 0.56, 0.045, y * 0.27, 0.045, edge, side * -10)
@@ -1737,6 +1752,7 @@ local function frontierSuit(family: number)
 			if rarity >= 4 then
 				for _, side in { -1, 1 } do
 					lit(torso, side * x * 0.29, y * 0.31, -z * 0.67, x * 0.13, 0.025, 0.025)
+					lit(torso, side * x * 0.16, y * 0.2, z * 0.865, 0.03, y * 0.17, 0.025)
 				end
 			end
 			if rarity >= 5 then
@@ -1752,6 +1768,9 @@ local function frontierSuit(family: number)
 			block(waist, 0, 0, 0, s.X * 0.96, s.Y * 1.12, s.Z * 0.84, cloth)
 			block(waist, 0, s.Y * 0.19, -0.015, s.X * 1.04, 0.16, s.Z * 0.95, trim)
 			block(waist, 0, s.Y * 0.19, -s.Z * 0.54, 0.21, 0.16, 0.075, ornament)
+			if rarity >= 2 then
+				block(waist, 0, s.Y * 0.19, -s.Z * 0.59, 0.12, 0.075, 0.025, trim)
+			end
 			for _, side in { -1, 1 } do
 				block(waist, side * s.X * 0.39, -s.Y * 0.12, -s.Z * 0.4, s.X * 0.24, s.Y * 0.62, 0.18, metal, side * 8)
 			end
@@ -1795,6 +1814,18 @@ local function frontierSuit(family: number)
 				end
 				if rarity >= 4 then
 					lit(upper, inward + side * s.X * 0.33, s.Y * 0.17, -s.Z * 0.57, 0.05, s.Y * 0.13, 0.025)
+					for vent = 1, 2 do
+						block(
+							upper,
+							inward + side * s.X * 0.31,
+							s.Y * (0.1 - vent * 0.07),
+							-s.Z * 0.5,
+							s.X * 0.15,
+							0.025,
+							0.035,
+							trim
+						)
+					end
 				end
 				if rarity >= 5 then
 					block(upper, inward, s.Y * 0.43, 0, s.X * 1.03, 0.055, s.Z * 0.88, BRASS, side * -17)
@@ -1810,6 +1841,7 @@ local function frontierSuit(family: number)
 				block(fore, inward, -s.Y * 0.41, 0, s.X * 0.83, s.Y * 0.14, s.Z * 0.87, trim)
 				if rarity >= 2 then
 					block(fore, inward, -s.Y * 0.29, -s.Z * 0.56, s.X * 0.61, 0.055, 0.05, edge)
+					block(fore, inward, s.Y * 0.28, -s.Z * 0.56, s.X * 0.33, s.Y * 0.17, 0.055, trim)
 				end
 				if rarity >= 3 then
 					for i = 1, 2 do
@@ -1819,6 +1851,7 @@ local function frontierSuit(family: number)
 				end
 				if rarity >= 4 then
 					lit(fore, inward, s.Y * 0.17, -s.Z * 0.6, s.X * 0.27, 0.04, 0.025)
+					lit(fore, inward, s.Y * 0.28, -s.Z * 0.6, s.X * 0.22, s.Y * 0.09, 0.025)
 				end
 				if rarity >= 5 then
 					for _, edgeSide in { -1, 1 } do
@@ -1834,6 +1867,18 @@ local function frontierSuit(family: number)
 				block(hand, inward, 0, -s.Z * 0.35, s.X * 0.62, s.Y * 0.48, 0.08, metal)
 				if rarity >= 2 then
 					block(hand, inward, s.Y * 0.23, -s.Z * 0.41, s.X * 0.53, 0.045, 0.04, edge)
+					for knuckle = -1, 1 do
+						block(
+							hand,
+							inward + knuckle * s.X * 0.19,
+							-s.Y * 0.12,
+							-s.Z * 0.42,
+							s.X * 0.13,
+							s.Y * 0.28,
+							0.035,
+							metal
+						)
+					end
 				end
 				if rarity >= 4 then
 					lit(hand, inward, 0, -s.Z * 0.43, s.X * 0.21, 0.035, 0.025)
@@ -1867,6 +1912,7 @@ local function frontierSuit(family: number)
 				)
 				if rarity >= 3 then
 					block(thigh, side * s.X * 0.35, -s.Y * 0.13, 0, s.X * 0.22, s.Y * 0.44, s.Z * 0.73, trim, side * 5)
+					block(thigh, side * s.X * 0.1, -s.Y * 0.13, -s.Z * 0.52, s.X * 0.44, 0.04, 0.035, edge, side * 6)
 				end
 			end
 			local shin = body[prefix .. "LowerLeg"]
@@ -1878,6 +1924,9 @@ local function frontierSuit(family: number)
 				plate(shin, 0, -s.Y * 0.08, -s.Z * 0.37, s.X * 0.76, s.Y * 0.67, s.Z * 0.29, metal)
 				if rarity >= 2 then
 					block(shin, 0, -s.Y * 0.37, -s.Z * 0.56, s.X * 0.6, 0.055, 0.05, edge)
+					for _, fastener in sides() do
+						block(shin, fastener * s.X * 0.2, s.Y * 0.44, -s.Z * 0.56, 0.045, 0.045, 0.035, trim)
+					end
 				end
 				if rarity >= 3 then
 					for _, edgeSide in { -1, 1 } do
@@ -1908,6 +1957,15 @@ local function frontierSuit(family: number)
 				block(foot, 0, s.Y * 0.42, s.Z * 0.13, s.X * 0.79, s.Y * 0.6, s.Z * 0.48, metal)
 				if rarity >= 2 then
 					block(foot, 0, s.Y * 0.15, -s.Z * 0.55, s.X * 0.67, 0.045, 0.04, edge)
+					for tread = 1, 2 do
+						block(foot, 0, -s.Y * 0.47, -s.Z * (0.12 + tread * 0.17), s.X * 0.87, 0.085, 0.055, trim)
+					end
+				end
+				if rarity >= 3 then
+					block(foot, 0, s.Y * 0.72, s.Z * 0.12, s.X * 0.49, 0.035, s.Z * 0.24, trim)
+				end
+				if rarity >= 4 then
+					lit(foot, 0, s.Y * 0.35, s.Z * 0.4, s.X * 0.24, 0.035, 0.025)
 				end
 				if rarity >= 5 then
 					block(foot, 0, s.Y * 0.7, s.Z * 0.12, s.X * 0.59, 0.035, s.Z * 0.35, BRASS)
