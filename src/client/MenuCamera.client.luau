@@ -12,6 +12,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 if not Config.MenuOnly then
 	return
 end
+local MineScene = require(script.Parent.Modules.MineScene)
 local Scenes = require(script.Parent.Modules.Scenes)
 
 local player = Players.LocalPlayer
@@ -34,12 +35,14 @@ task.spawn(function()
 	end
 end)
 
--- The moon base, built once, and a slow orbit around it.
+-- The moon base, built once, and a slow orbit around it (the Mine flies
+-- off to the mining site; see MineScene).
 local BASE_AT = CFrame.new(0, 300, 0)
 local base: Scenes.Base? = nil
 local started = os.clock()
 RunService.RenderStepped:Connect(function()
-	if introOpen() then
+	-- The intro and the mining site run their own cameras.
+	if introOpen() or MineScene.isActive() then
 		return
 	end
 	if not base then

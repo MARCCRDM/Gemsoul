@@ -638,6 +638,7 @@ export type Window = {
 	Title: TextLabel,
 	Subtitle: TextLabel,
 	Fit: () -> (),
+	Dock: (number?) -> (),
 }
 
 --[[
@@ -714,9 +715,13 @@ function IronUi.window(
 	local scale = new("UIScale", {}, panel)
 	local target = 1
 	local popping = false
+	-- Docked: the panel sits on the right, using `dockShare` of the screen's
+	-- width, and the backdrop isn't dimmed (a 3D scene shows beside it).
+	local dockShare: number? = nil
 	local function fit()
 		local screen = gui.AbsoluteSize
-		target = math.min(1, (screen.X - 40) / width, (screen.Y - 40) / height)
+		local wide = if dockShare then screen.X * dockShare else screen.X
+		target = math.min(1, (wide - 40) / width, (screen.Y - 40) / height)
 		if not popping then
 			scale.Scale = target
 		end
@@ -733,7 +738,7 @@ function IronUi.window(
 		popping = true
 		scale.Scale = target * 0.94
 		shade.BackgroundTransparency = 1
-		TweenService:Create(shade, TweenInfo.new(0.2), { BackgroundTransparency = 0.4 }):Play()
+		TweenService:Create(shade, TweenInfo.new(0.2), { BackgroundTransparency = if dockShare then 1 else 0.4 }):Play()
 		local tween = TweenService:Create(
 			scale,
 			TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -785,6 +790,20 @@ function IronUi.window(
 	close:SetAttribute("UiSound", "Back")
 	IronUi.label(close, closeFace, "X", 18, IronUi.Chunky)
 
+	-- Dock to the right with a share of the screen (e.g. 0.62), or nil to centre.
+	local function dock(share: number?)
+		dockShare = share
+		if share then
+			panel.AnchorPoint = Vector2.new(1, 0.5)
+			panel.Position = UDim2.new(1, -20, 0.5, 0)
+		else
+			panel.AnchorPoint = Vector2.new(0.5, 0.5)
+			panel.Position = UDim2.fromScale(0.5, 0.5)
+		end
+		shade.BackgroundTransparency = if share then 1 else 0.4
+		fit()
+	end
+
 	return {
 		Gui = gui,
 		Panel = panel,
@@ -795,6 +814,7 @@ function IronUi.window(
 		Title = title,
 		Subtitle = subtitle,
 		Fit = fit,
+		Dock = dock,
 	}
 end
 

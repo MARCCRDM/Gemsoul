@@ -9,7 +9,10 @@
 	                       a teleport pad and a big window onto space.
 	  Scenes.moonBase(at)  the moon base station: domes, habitat modules,
 	                       vendor kiosks and the Saga Stone pylon.
+	  Scenes.miningSite(at) the terraformed moon cliff where expeditions dig.
+	  Scenes.miningGun(hand) the mining laser, welded to a hand.
 	  Scenes.spaceLighting()  a black, starry sky with cool light.
+	  Scenes.terraformLighting()  the same sky with a thin new atmosphere.
 
 	Each builder returns a table with the Model and named spots (CFrames) for
 	cameras and stations. Everything is anchored and non-colliding.
@@ -558,6 +561,395 @@ function Scenes.moonBase(at: CFrame): Base
 
 	m.Parent = workspace
 	return { Model = m, Center = at.Position + Vector3.new(0, 8, 0), Radius = 110, Pylon = pylon }
+end
+
+-- The mining site ------------------------------------------------------------------------------
+-- A cliff on the moon where terraforming has begun: grey regolith and
+-- craters, but green spreading out from a biodome with trees and a lake,
+-- atmosphere processors breathing out air, Earth in the sky, and a rock face
+-- veined with glowing Saga crystal under floodlights.
+
+export type Site = {
+	Model: Model,
+	Stand: CFrame, -- where the miner stands (feet), facing the cliff
+	Eye: Vector3, -- the camera, and what it looks at
+	Look: Vector3,
+	Face: CFrame, -- centre of the rock face, facing out (+Z toward the miner)
+	FaceSize: Vector2,
+}
+
+function Scenes.miningSite(at: CFrame): Site
+	local m = model("MiningSite")
+	local REGOLITH = Color3.fromRGB(150, 150, 156)
+	local ROCK = Color3.fromRGB(108, 104, 114)
+	local GRASS = Color3.fromRGB(88, 156, 72)
+	local GRASS_LIGHT = Color3.fromRGB(122, 182, 88)
+	local WHITE = Color3.fromRGB(222, 226, 232)
+	local METAL = Color3.fromRGB(80, 84, 94)
+	local rng = Random.new(91)
+	local function c(x: number, y: number, z: number): CFrame
+		return at * CFrame.new(x, y, z)
+	end
+	local function disc(x: number, y: number, z: number, w: number, d: number, h: number, color: Color3, material)
+		return part(m, c(x, y, z), Vector3.new(w, h, d), color, material, "Sphere")
+	end
+
+	-- The ground: regolith with craters.
+	part(m, c(0, -2, 0), Vector3.new(4, 760, 760), REGOLITH, Enum.Material.Slate, "Cylinder", {
+		CFrame = c(0, -2, 0) * CFrame.Angles(0, 0, math.rad(90)),
+	})
+	for _ = 1, 14 do
+		local angle = rng:NextNumber() * math.pi * 2
+		local dist = rng:NextNumber(110, 320)
+		local size = rng:NextNumber(16, 44)
+		local x, z = math.cos(angle) * dist, math.sin(angle) * dist
+		disc(x, 0.1, z, size, size, 1.2, Color3.fromRGB(122, 122, 130), Enum.Material.Slate)
+		disc(x, 0.5, z, size * 0.7, size * 0.7, 0.8, Color3.fromRGB(98, 98, 106), Enum.Material.Slate)
+	end
+
+	-- Terraforming: green spreading out across the regolith from the dome.
+	for _ = 1, 30 do
+		local x = rng:NextNumber(-150, 0)
+		local z = rng:NextNumber(-130, 30)
+		local s = rng:NextNumber(10, 34)
+		disc(
+			x,
+			0.15,
+			z,
+			s,
+			s * rng:NextNumber(0.6, 1),
+			0.7,
+			if rng:NextNumber() < 0.5 then GRASS else GRASS_LIGHT,
+			Enum.Material.Grass
+		)
+	end
+	-- Little tufts and flowers at the edges of the green.
+	for _ = 1, 50 do
+		local x = rng:NextNumber(-140, -6)
+		local z = rng:NextNumber(-120, 26)
+		disc(x, 0.6, z, 1.6, 1.6, 1.2, GRASS_LIGHT, Enum.Material.LeafyGrass)
+		if rng:NextNumber() < 0.35 then
+			local petal = ({
+				Color3.fromRGB(255, 214, 90),
+				Color3.fromRGB(255, 140, 190),
+				Color3.fromRGB(170, 140, 255),
+			})[rng:NextInteger(1, 3)]
+			glow(m, c(x + 0.4, 1.3, z), Vector3.one * 0.5, petal, "Ball")
+		end
+	end
+
+	-- The biodome: grass, a lake and trees under glass.
+	local DOME_X, DOME_Z, DOME_R = -62, -44, 30
+	disc(DOME_X, 0.3, DOME_Z, DOME_R * 2, DOME_R * 2, 1, GRASS, Enum.Material.Grass)
+	part(
+		m,
+		c(DOME_X + 4, 0.25, DOME_Z + 8),
+		Vector3.new(24, 0.6, 14),
+		Color3.fromRGB(70, 150, 210),
+		Enum.Material.Glass,
+		"Sphere",
+		{
+			Transparency = 0.15,
+			Reflectance = 0.2,
+		}
+	)
+	local function tree(x: number, z: number, h: number)
+		part(m, c(x, h / 2, z), Vector3.new(1.4, h, 1.4), Color3.fromRGB(110, 78, 52), Enum.Material.Wood, "Tube")
+		for i = 1, 3 do
+			local s = h * rng:NextNumber(0.45, 0.7)
+			part(
+				m,
+				c(x + rng:NextNumber(-1.5, 1.5), h + rng:NextNumber(-1, 1.5) + i * 0.6, z + rng:NextNumber(-1.5, 1.5)),
+				Vector3.new(s, s * 0.85, s),
+				if i == 2 then Color3.fromRGB(66, 138, 64) else Color3.fromRGB(84, 160, 74),
+				Enum.Material.LeafyGrass,
+				"Ball"
+			)
+		end
+	end
+	for _, spec in
+		{
+			{ -74, -56, 10 },
+			{ -66, -64, 8 },
+			{ -50, -58, 9 },
+			{ -78, -36, 8 },
+			{ -54, -30, 7 },
+			{ -70, -24, 9 },
+			{ -42, -44, 6 },
+			-- Young trees planted out in the open.
+			{ -24, -18, 5 },
+			{ -30, 4, 4 },
+			{ -96, -10, 6 },
+			{ -110, -60, 7 },
+			{ -18, -40, 4 },
+		}
+	do
+		tree(spec[1], spec[2], spec[3])
+	end
+	part(
+		m,
+		c(DOME_X, 0, DOME_Z),
+		Vector3.one * DOME_R * 2,
+		Color3.fromRGB(170, 220, 255),
+		Enum.Material.Glass,
+		"Ball",
+		{
+			Transparency = 0.72,
+			CastShadow = false,
+		}
+	)
+	part(
+		m,
+		c(DOME_X, 0.6, DOME_Z),
+		Vector3.new(1.4, DOME_R * 2 + 1.5, DOME_R * 2 + 1.5),
+		METAL,
+		Enum.Material.Metal,
+		"Cylinder",
+		{
+			CFrame = c(DOME_X, 0.6, DOME_Z) * CFrame.Angles(0, 0, math.rad(90)),
+		}
+	)
+
+	-- Atmosphere processors breathing out the new air.
+	for _, spec in { { -118, -110, 46 }, { 46, -86, 52 }, { -20, -150, 40 } } do
+		local x, z, h = spec[1], spec[2], spec[3]
+		part(m, c(x, h / 2, z), Vector3.new(7, h, 7), WHITE, Enum.Material.SmoothPlastic, "Tube")
+		part(m, c(x, 1.5, z), Vector3.new(12, 3, 12), METAL, Enum.Material.DiamondPlate, "Tube")
+		for i = 1, 3 do
+			glow(m, c(x, h * i / 4, z), Vector3.new(7.6, 0.6, 7.6), HOLO, "Tube")
+		end
+		part(m, c(x, h + 1.5, z), Vector3.new(10, 3, 10), METAL, Enum.Material.Metal, "Tube")
+		for i = 1, 4 do
+			local puff = part(
+				m,
+				c(x + rng:NextNumber(-3, 3), h + 6 + i * 6, z + rng:NextNumber(-3, 3)),
+				Vector3.one * (6 + i * 4),
+				Color3.fromRGB(235, 242, 250),
+				Enum.Material.SmoothPlastic,
+				"Ball",
+				{ Transparency = 0.55 + i * 0.1, CastShadow = false }
+			)
+			if i == 1 then
+				local mist = Instance.new("ParticleEmitter")
+				mist.Texture = "rbxasset://textures/particles/smoke_main.dds"
+				mist.Color = ColorSequence.new(Color3.fromRGB(230, 240, 250))
+				mist.Transparency = NumberSequence.new(0.5, 1)
+				mist.Size = NumberSequence.new(4, 14)
+				mist.Lifetime = NumberRange.new(4, 6)
+				mist.Rate = 3
+				mist.Speed = NumberRange.new(3, 5)
+				mist.SpreadAngle = Vector2.new(12, 12)
+				mist.Parent = puff
+			end
+		end
+	end
+
+	-- The rock face, veined with Saga crystal.
+	local FACE_Z = -14
+	local FACE_X = 12
+	part(m, c(FACE_X + 12, 11, FACE_Z - 9), Vector3.new(70, 24, 16), ROCK, Enum.Material.Slate)
+	for _ = 1, 22 do
+		local x = FACE_X + rng:NextNumber(-26, 34)
+		local h = rng:NextNumber(8, 22)
+		local w = rng:NextNumber(6, 13)
+		part(
+			m,
+			c(x, h / 2 - 1, FACE_Z - rng:NextNumber(0, 4))
+				* CFrame.Angles(rng:NextNumber(-0.25, 0.25), rng:NextNumber(-0.5, 0.5), rng:NextNumber(-0.3, 0.3)),
+			Vector3.new(w, h, w * 0.8),
+			ROCK:Lerp(Color3.fromRGB(140, 134, 128), rng:NextNumber(0, 0.6)),
+			if rng:NextNumber() < 0.6 then Enum.Material.Slate else Enum.Material.Basalt
+		)
+	end
+	-- Fallen rubble at the foot of the cliff.
+	for _ = 1, 16 do
+		local s = rng:NextNumber(1, 3)
+		part(
+			m,
+			c(FACE_X + rng:NextNumber(-24, 10), s * 0.3, FACE_Z + rng:NextNumber(1, 6))
+				* CFrame.Angles(rng:NextNumber() * 3, rng:NextNumber() * 3, 0),
+			Vector3.new(s, s * 0.8, s * 1.1),
+			ROCK:Lerp(REGOLITH, 0.4),
+			Enum.Material.Slate
+		)
+	end
+	-- Crystal veins across the face, and clusters breaking through.
+	for i = 1, 7 do
+		local color = if i % 3 == 0 then HOLO else SAGA
+		glow(
+			m,
+			c(FACE_X + rng:NextNumber(-24, 2), rng:NextNumber(3, 13), FACE_Z + 3.6)
+				* CFrame.Angles(0, 0, rng:NextNumber(-0.9, 0.9)),
+			Vector3.new(rng:NextNumber(5, 11), 0.3, 0.3),
+			color
+		)
+	end
+	for _, spec in { { -22, 4, SAGA }, { -16, 9, HOLO }, { -10, 3, SAGA }, { -4, 11, SAGA }, { 2, 7, HOLO } } do
+		local cluster = c(FACE_X + spec[1], spec[2], FACE_Z + 3.4)
+		for k = 1, 4 do
+			local shard = part(
+				m,
+				cluster
+					* CFrame.Angles(rng:NextNumber(-0.6, 0.6), 0, rng:NextNumber(-0.9, 0.9))
+					* CFrame.new(0, 0.6 + k * 0.2, 0),
+				Vector3.new(0.6, rng:NextNumber(1.6, 3), 0.6),
+				spec[3],
+				Enum.Material.Glass,
+				nil,
+				{ Transparency = 0.15, CastShadow = false }
+			)
+			if k == 1 then
+				lamp(shard, spec[3], 10, 1.4)
+			end
+		end
+		glow(m, cluster, Vector3.one * 0.9, spec[3], "Ball")
+	end
+
+	-- Floodlights on the face, an ore cart on rails and supply crates.
+	for _, x in { -14, 20 } do
+		part(m, c(x, 5, 1), Vector3.new(0.6, 10, 0.6), METAL, Enum.Material.Metal, "Tube")
+		local head = part(
+			m,
+			CFrame.lookAt(c(x, 10, 1).Position, c(FACE_X, 5, FACE_Z).Position),
+			Vector3.new(2.4, 1.4, 1.2),
+			WHITE,
+			Enum.Material.SmoothPlastic
+		)
+		local lens =
+			glow(m, head.CFrame * CFrame.new(0, 0, -0.65), Vector3.new(2, 1, 0.1), Color3.fromRGB(255, 244, 214))
+		local beam = Instance.new("SpotLight")
+		beam.Color = Color3.fromRGB(255, 240, 210)
+		beam.Range = 40
+		beam.Brightness = 3
+		beam.Angle = 60
+		beam.Face = Enum.NormalId.Front
+		beam.Parent = lens
+	end
+	for _, x in { -1.4, 1.4 } do
+		part(
+			m,
+			c(14 + x, 0.25, 6) * CFrame.Angles(0, math.rad(20), 0),
+			Vector3.new(0.3, 0.3, 30),
+			METAL,
+			Enum.Material.Metal
+		)
+	end
+	local cart = c(15, 1.8, 3) * CFrame.Angles(0, math.rad(20), 0)
+	part(m, cart, Vector3.new(4, 2.2, 5.5), Color3.fromRGB(200, 120, 50), Enum.Material.Metal)
+	for _, offset in { { -1.2, -1.6 }, { 1.2, -1.6 }, { -1.2, 1.6 }, { 1.2, 1.6 } } do
+		part(
+			m,
+			cart * CFrame.new(offset[1] * 1.6, -1.2, offset[2]),
+			Vector3.new(0.5, 1, 1),
+			HULL_DARK,
+			Enum.Material.Metal,
+			"Cylinder"
+		)
+	end
+	for k = 1, 5 do
+		part(
+			m,
+			cart * CFrame.new(rng:NextNumber(-1.2, 1.2), 1.3, rng:NextNumber(-2, 2)),
+			Vector3.one * rng:NextNumber(0.8, 1.4),
+			ROCK,
+			Enum.Material.Slate,
+			"Ball"
+		)
+		if k <= 2 then
+			glow(
+				m,
+				cart * CFrame.new(rng:NextNumber(-1, 1), 1.6, rng:NextNumber(-1.5, 1.5)),
+				Vector3.new(0.4, 0.9, 0.4),
+				SAGA
+			)
+		end
+	end
+	for _, spec in { { -15, 4 }, { -17.5, 5.5 }, { -16, 6.8 } } do
+		part(
+			m,
+			c(spec[1], 1, spec[2]) * CFrame.Angles(0, rng:NextNumber(-0.4, 0.4), 0),
+			Vector3.new(2, 2, 2),
+			Color3.fromRGB(70, 78, 92),
+			Enum.Material.DiamondPlate
+		)
+		glow(m, c(spec[1], 2.05, spec[2]), Vector3.new(1.6, 0.1, 0.3), HOLO)
+	end
+
+	-- Earth, already looking a little like home, hangs over the valley.
+	part(m, c(-560, 330, -900), Vector3.one * 380, Color3.fromRGB(56, 112, 190), Enum.Material.SmoothPlastic, "Ball")
+	part(m, c(-544, 352, -884), Vector3.one * 340, Color3.fromRGB(92, 170, 102), Enum.Material.SmoothPlastic, "Ball", {
+		Transparency = 0.6,
+	})
+	part(m, c(-566, 338, -870), Vector3.one * 394, Color3.fromRGB(240, 246, 255), Enum.Material.SmoothPlastic, "Ball", {
+		Transparency = 0.82,
+	})
+
+	m.Parent = workspace
+	return {
+		Model = m,
+		Stand = CFrame.lookAt(c(-1, 0, 3).Position, c(FACE_X - 16, 0, FACE_Z).Position),
+		Eye = c(6, 7, 14).Position,
+		Look = c(5, 6, -30).Position,
+		Face = c(FACE_X - 16, 6, FACE_Z + 3),
+		FaceSize = Vector2.new(8, 6),
+	}
+end
+
+-- The mining laser: a chunky emitter held in the right hand while digging.
+-- Built pointing down -Y (along the arm), welded to `hand`; returns its parts
+-- and the muzzle part (the beam starts there).
+function Scenes.miningGun(hand: BasePart, accent: Color3?): ({ BasePart }, BasePart)
+	local glowColor = accent or HOLO
+	local parts = {}
+	local function piece(offset: CFrame, size: Vector3, color: Color3, material: Enum.Material?, shape: string?)
+		local p = part(hand.Parent :: Instance, hand.CFrame * offset, size, color, material, shape)
+		p.Anchored = false
+		p.Massless = true
+		p.CastShadow = false
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = hand
+		weld.Part1 = p
+		weld.Parent = p
+		table.insert(parts, p)
+		return p
+	end
+	local GUN = Color3.fromRGB(226, 160, 52)
+	local DARK = Color3.fromRGB(48, 52, 62)
+	-- Grip and body.
+	piece(CFrame.new(0, -0.2, 0.15), Vector3.new(0.35, 0.7, 0.4), DARK, Enum.Material.SmoothPlastic)
+	piece(CFrame.new(0, -0.9, -0.15), Vector3.new(0.6, 1.3, 0.7), GUN, Enum.Material.SmoothPlastic)
+	piece(CFrame.new(0, -0.8, 0.35), Vector3.new(0.5, 0.9, 0.35), DARK, Enum.Material.Metal)
+	-- The energy cell, glowing.
+	piece(CFrame.new(0.38, -0.85, -0.15), Vector3.new(0.18, 0.8, 0.5), glowColor, Enum.Material.Neon)
+	-- Emitter barrel with cooling rings.
+	piece(CFrame.new(0, -1.8, -0.15), Vector3.new(0.42, 0.9, 0.42), DARK, Enum.Material.Metal, "Tube")
+	for i = 0, 2 do
+		piece(CFrame.new(0, -1.55 - i * 0.25, -0.15), Vector3.new(0.56, 0.08, 0.56), GUN, Enum.Material.Metal, "Tube")
+	end
+	local muzzle = piece(CFrame.new(0, -2.3, -0.15), Vector3.new(0.3, 0.12, 0.3), glowColor, Enum.Material.Neon, "Tube")
+	muzzle.Name = "Muzzle"
+	return parts, muzzle
+end
+
+-- Terraformed: still a starry sky, but with a thin new atmosphere and warm light.
+function Scenes.terraformLighting()
+	Lighting.ClockTime = 14
+	Lighting.Brightness = 2.4
+	Lighting.Ambient = Color3.fromRGB(110, 116, 130)
+	Lighting.OutdoorAmbient = Color3.fromRGB(160, 168, 184)
+	Lighting.GlobalShadows = true
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+	atmosphere.Density = 0.22
+	atmosphere.Offset = 0.1
+	atmosphere.Color = Color3.fromRGB(150, 180, 220)
+	atmosphere.Decay = Color3.fromRGB(70, 90, 130)
+	atmosphere.Haze = 0.6
+	atmosphere.Glare = 0
+	atmosphere.Parent = Lighting
+	local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
+	sky.StarCount = 3000
+	sky.CelestialBodiesShown = false
+	sky.Parent = Lighting
 end
 
 -- Space: a black, starry sky, no haze, cool light that still shows colours.
