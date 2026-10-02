@@ -42,6 +42,14 @@ local function kit(player)
 	effects.MobilityMult = 1 + (augments.Mobility or 0)
 	effects.WeaponAugmentMult = Tree.weaponMultiplier(augments, weapon)
 	effects.ThermalMult = 1 + (augments.Thermal or 0)
+	-- Overcharge perks, by gem element; Elemental Harmony rewards switching.
+	effects.ElementMult = {
+		Fire = effects.ThermalMult,
+		Poison = 1 + (augments.Corrosive or 0),
+		Shock = 1 + (augments.Ion or 0),
+		Frost = 1 + (augments.Cryo or 0),
+	}
+	effects.Harmony = augments.Harmony or 0
 	local affinity = Classes.affinities(loadout)
 	local defense = {
 		Shield = 0,
@@ -101,6 +109,9 @@ local function state(player)
 			TechCooldowns = {},
 			NextTech = 0,
 			Pending = {},
+			Zones = {}, -- lingering surge pools (Toxic Cloud)
+			HarmonyElement = nil,
+			HarmonyUntil = 0,
 			SiphonUntil = 0,
 			SiphonCapacity = 0,
 			EchoUntil = 0,
@@ -765,8 +776,16 @@ local function technologyHit(player, k, target, definition, scale)
 	if definition.Resource == "Stamina" then
 		damage *= k.Effects.WeaponAugmentMult
 	end
-	if definition.Element == "Fire" then
-		damage *= k.Effects.ThermalMult
+	if definition.Element then
+		damage *= k.Effects.ElementMult[definition.Element] or 1
+		-- Elemental Harmony: switching elements within 5s hits harder.
+		local st, now = state(player), os.clock()
+		if k.Effects.Harmony > 0 then
+			if now < st.HarmonyUntil and st.HarmonyElement ~= definition.Element then
+				damage *= 1 + k.Effects.Harmony
+			end
+			st.HarmonyElement, st.HarmonyUntil = definition.Element, now + 5
+		end
 	end
 	if gem then
 		damage *= 1 + math.clamp(gem.Size or 1, 1, 10) * 0.03
@@ -804,6 +823,27 @@ local function technologyHit(player, k, target, definition, scale)
 			Enemies.addStatus(target.Enemy, "Slow", definition.Slow, 0.75)
 		end
 	end
+	if definition.Shred then
+		local now = os.clock()
+		if target.Player then
+			local victim = state(target.Player)
+			victim.Sunder =
+				CrowdControl.applyDebuff(victim.CC, "Sunder", definition.Shred, definition.ShredTime or 5, now, true)
+			victim.SunderUntil = victim.CC.Debuffs.Sunder.Until
+		else
+			Enemies.addStatus(target.Enemy, "Sunder", definition.Shred, definition.ShredTime or 5)
+		end
+	end
+	-- Execute: finish a target left below the threshold.
+	if definition.Execute and target.Humanoid and target.Humanoid.Health > 0 then
+		if target.Humanoid.Health < target.Humanoid.MaxHealth * definition.Execute then
+			if target.Player then
+				target.Humanoid.Health = 0
+			else
+				Enemies.damage(target.Enemy, target.Humanoid.MaxHealth * 10, player, true, color)
+			end
+		end
+	end
 	if definition.Element == "Fire" and gem then
 		local values = GemConfig.stats(gem, "Weapon", { Affinity = k.Affinity, PvP = target.Player ~= nil })
 		if target.Player then
@@ -832,9 +872,25 @@ local function technologyStrike(player, definition, aim, scale)
 	local origin = root.Position + Vector3.new(0, 1.5, 0)
 	local offset = aim - origin
 	local direction = if offset.Magnitude > 0.01 then offset.Unit else root.CFrame.LookVector
-	local center = origin + direction * math.min(offset.Magnitude, definition.Range)
+	local center = if definition.Self
+		then root.Position
+		else origin + direction * math.min(offset.Magnitude, definition.Range)
 	local color = GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80)
-	if definition.Resource == "Stamina" then
+	if definition.Cone then
+		-- A cone in front, out to Range (Acid Spray).
+		local half = math.cos(math.rad(definition.Cone / 2))
+		fx("Swing", player, root.Position, flat(direction), definition.Range, definition.Cone, color, false)
+		for _, target in targets(player) do
+			local v = target.Root.Position - root.Position
+			if
+				v.Magnitude <= definition.Range
+				and flat(v):Dot(flat(direction)) >= half
+				and lineClear(origin, target.Root.Position + Vector3.new(0, 1.5, 0))
+			then
+				technologyHit(player, k, target, definition, scale)
+			end
+		end
+	elseif definition.Resource == "Stamina" then
 		fx("Swing", player, root.Position, flat(direction), definition.Range, 100, color, definition.Heavy == true)
 		for _, target in targets(player) do
 			local v = target.Root.Position - root.Position
@@ -847,10 +903,30 @@ local function technologyStrike(player, definition, aim, scale)
 			end
 		end
 	elseif definition.Radius then
-		if not lineClear(origin, center) then
+		if not definition.Self and not lineClear(origin, center) then
 			return
 		end
 		fx("TechPulse", player, origin, center, color, definition.Radius)
+		if definition.Cloud then
+			-- A lingering pool that keeps hitting (Toxic Cloud).
+			st.Zones = st.Zones or {}
+			local cloud = definition.Cloud
+			table.insert(st.Zones, {
+				Center = center,
+				Radius = definition.Radius,
+				Every = cloud.Every,
+				Next = os.clock() + cloud.Every,
+				Until = os.clock() + (definition.Duration or cloud.Duration),
+				Definition = {
+					Name = definition.Name,
+					Resource = "Charge",
+					Element = definition.Element,
+					Damage = cloud.Damage,
+					Shred = cloud.Shred,
+					ShredTime = cloud.Every * 2,
+				},
+			})
+		end
 		for _, target in targets(player) do
 			if
 				(target.Root.Position - center).Magnitude <= definition.Radius
@@ -876,6 +952,36 @@ local function technologyStrike(player, definition, aim, scale)
 		fx("TechPulse", player, origin, origin + direction * along, color, 0)
 		if nearest then
 			technologyHit(player, k, nearest, definition, scale)
+			-- Chain: bounce on to the nearest new targets, 20% weaker each jump.
+			local struck, from = { [nearest.Root] = true }, nearest
+			for jump = 1, definition.Chain or 0 do
+				local best, bestDistance = nil, definition.ChainRange or 12
+				for _, target in targets(player) do
+					local distance = (target.Root.Position - from.Root.Position).Magnitude
+					if not struck[target.Root] and distance <= bestDistance then
+						best, bestDistance = target, distance
+					end
+				end
+				if not best then
+					break
+				end
+				struck[best.Root] = true
+				fx("TechPulse", player, from.Root.Position, best.Root.Position, color, 0)
+				technologyHit(player, k, best, definition, (scale or 1) * 0.8 ^ jump)
+				from = best
+			end
+			-- Spread: corrosion and half the hit jump to everyone nearby.
+			if definition.Spread then
+				fx("TechPulse", player, nearest.Root.Position, nearest.Root.Position, color, definition.Spread)
+				for _, target in targets(player) do
+					if
+						target.Root ~= nearest.Root
+						and (target.Root.Position - nearest.Root.Position).Magnitude <= definition.Spread
+					then
+						technologyHit(player, k, target, definition, (scale or 1) * 0.5)
+					end
+				end
+			end
 		end
 	end
 end
@@ -1035,7 +1141,7 @@ local function tick(_dt)
 		local humanoid, root = alive(player)
 		if not humanoid or not k or not Combat.canFight(root.Position) then
 			st.BlockUntil, st.ChargeStarted, st.DodgeStarted = 0, nil, nil
-			st.Dots, st.Pending, st.Channel = {}, {}, nil
+			st.Dots, st.Pending, st.Channel, st.Zones = {}, {}, nil, {}
 			stopDodge(st)
 			player:SetAttribute("Blocking", false)
 			continue
@@ -1049,6 +1155,27 @@ local function tick(_dt)
 			if now >= pending.At then
 				table.remove(st.Pending, i)
 				technologyStrike(player, Tree.techStats(PlayerData.get(player), pending.Id), pending.Aim)
+			end
+		end
+		for i = #(st.Zones or {}), 1, -1 do
+			local zone = st.Zones[i]
+			if now >= zone.Until then
+				table.remove(st.Zones, i)
+			elseif now >= zone.Next then
+				zone.Next += zone.Every
+				fx(
+					"TechPulse",
+					player,
+					zone.Center,
+					zone.Center,
+					GemConfig.ElementColors[zone.Definition.Element],
+					zone.Radius
+				)
+				for _, target in targets(player) do
+					if (target.Root.Position - zone.Center).Magnitude <= zone.Radius then
+						technologyHit(player, k, target, zone.Definition)
+					end
+				end
 			end
 		end
 		if st.Channel then

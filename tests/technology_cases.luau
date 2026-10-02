@@ -4,7 +4,7 @@ local function close(a, b) return math.abs(a - b) < 0.00001 end
 local source, hs, rs, loadout = makePlayer(20, arena, nil)
 local victim, hv, rv, defense = makePlayer(21, arena + Vector3.new(0, 0, -5), nil)
 local progress = Tree.initialize(profiles[source])
-progress.XP = 3150
+progress.XP = (Tree.UnlockPoints - Tree.StartingPoints) * Tree.XPPerPoint
 for _, group in { "RigManeuvers", "GemSurges" } do
  for _, id in Tree.Order[group] do progress.Unlocked[id] = true end
 end
@@ -21,7 +21,7 @@ local function reset()
 end
 local function fire(id) return CombatServer._technology(source, id, rv.Position) end
 for _, group in { "RigManeuvers", "GemSurges" } do
-	check(#Tech.Order[group] == 6, "Kit catalog parity")
+	check(#Tech.Order[group] == #Tree.Order[group], "Kit catalog parity")
 	for _, id in Tech.Order[group] do check(Tech.Catalog[id] ~= nil, "Missing kit entry") end
 end
 local st = reset()
@@ -122,6 +122,45 @@ st = reset()
 loadout.WeaponGem = { Element = "Frost", Size = 4, Clarity = 5, Cut = 5 }
 wallBlocks = true
 check(fire("CryoLance") and hv.Health == 1000, "Surge ignored wall")
+-- New elemental surges: each needs its own gem, and does its own job.
+st = reset()
+check(not fire("AcidSpray"), "Corrosive surge without a Corrosive gem")
+loadout.WeaponGem = { Element = "Poison", Size = 4, Clarity = 5, Cut = 5 }
+check(fire("AcidSpray") and st.Resources.Charge == 80 and hv.Health < 1000, "Acid Spray cost/cone damage")
+check(CombatServer._state(victim).Sunder > 0 and CombatServer._state(victim).SunderUntil > now, "Acid Spray shred missing")
+st = reset()
+loadout.WeaponGem = { Element = "Poison", Size = 4, Clarity = 5, Cut = 5 }
+check(fire("ToxicCloud") and #st.Zones == 1, "Toxic Cloud pool missing")
+local cloudHealth = hv.Health
+now += 1.05; CombatServer._tick(1.05)
+check(hv.Health < cloudHealth, "Toxic Cloud did not tick")
+now += 6; CombatServer._tick(6)
+check(#st.Zones == 0, "Toxic Cloud never cleared")
+st = reset()
+loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
+check(fire("StaticField") and hv.Health < 1000 and CombatServer._state(victim).StunUntil > now, "Static Field self-centred stun")
+st = reset()
+loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
+hv.Health = 120
+check(fire("Overload") and hv.Health == 0, "Overload execute below 20%")
+st = reset()
+loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
+hv.Health = 1000
+check(fire("IonSpark") and st.Resources.Charge == 85 and hv.Health < 1000, "Ion Spark cost/damage")
+-- Overcharge perks multiply their element's surges.
+st = reset()
+loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
+check(fire("IonSpark"), "Ion Spark refused")
+local plain = 1000 - hv.Health
+for _, id in { "CleaverCalibration", "ChargeRecycler", "IonOvercharge" } do
+	profiles[source].Augments.Unlocked[id] = true
+end
+Tree.initialize(profiles[source])
+check(Tree.effects(profiles[source]).Ion == 0.1, "Ion Overcharge not learned")
+st = reset()
+loadout.WeaponGem = { Element = "Shock", Size = 4, Clarity = 5, Cut = 5 }
+local boosted = fire("IonSpark") and (1000 - hv.Health)
+check(boosted and close(boosted / plain, 1.1), "Ion Overcharge multiplier")
 st = reset()
 check(not CombatServer._technology(source, "spoofed", rv.Position), "Unknown technique accepted")
 check(not CombatServer._technology(source, "HydraulicSlam", Vector3.new(0/0, 0, 0)), "Nonfinite technique aim accepted")
@@ -129,4 +168,4 @@ CombatServer._input(source, "GemSurge", "HydraulicSlam", rv.Position)
 check(hv.Health == 1000, "Mismatched action category accepted")
 rs.Position = Vector3.zero
 check(not fire("HydraulicSlam"), "Town technique accepted")
-print("PASS: " .. checks .. " live technology/resource checks (all 12 actions, costs, sockets, channels, wind-ups, PvP and walls)")
+print("PASS: " .. checks .. " live technology/resource checks (all actions incl. Corrosive/Ion surges, clouds, execute, Overcharge, costs, sockets, channels, wind-ups, PvP and walls)")

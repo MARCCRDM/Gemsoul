@@ -3,117 +3,240 @@
 	Blades skill sheet. UI and server share one node graph.
 
 	  Augment Level  1 + XP / 150; every level also earns an Augment Point
-	  Tiers          I opens at level 1, II at level 3, III at level 6
-	  Ranks          every node has ranks I-III; rank I unlocks it (its Cost),
-	                 rank II costs its tier in points, rank III one more
+	  Tiers          Novice opens at level 1, Apprentice at 3, Adept at 6 and
+	                 Master at 10
+	  Ranks          every node has ranks I-III; rank I learns it (its tier's
+	                 cost), rank II costs its tier in points, rank III one more
 	  Rank effects   maneuvers and surges hit harder, cost less, recover
 	                 faster and last longer; passives add their bonus again
 
-	Unlocking every node at rank I costs exactly Tree.UnlockPoints (24); the
-	rest of the budget (up to Tree.MaxPoints) goes into ranks, so a full
-	build is a choice of what to master.
+	Gem Surges has a column per element (Thermal, Corrosive, Ion, Cryo) plus
+	Resonance, and every surge needs a gem of its element socketed.
+	Learning every node at rank I costs Tree.UnlockPoints; the rest of the
+	budget (up to Tree.MaxPoints) goes into ranks.
 ]]
 local Tech = require(script.Parent.CombatTechnology)
 local Tree = {}
-Tree.StartingPoints, Tree.XPPerPoint, Tree.MaxPoints = 3, 150, 60
-Tree.UnlockPoints = 24
+Tree.StartingPoints, Tree.XPPerPoint = 3, 150
 Tree.MaxRank = 3
-Tree.TierLevels = { 1, 3, 6 }
+-- Tiers, Elder Scrolls style: the level each opens at.
+Tree.TierNames = { "Novice", "Apprentice", "Adept", "Master" }
+Tree.TierLevels = { 1, 3, 6, 10 }
+Tree.TierCosts = { 1, 1, 2, 3 } -- points to learn a node of each tier
 -- Per rank above I.
 Tree.RankScaling = { Damage = 0.10, Cost = -0.08, Recovery = -0.05, Duration = 0.15, Heal = 0.25 }
 Tree.Branches = { "RigManeuvers", "GemSurges", "PassiveAugments" }
 Tree.BranchNames = { RigManeuvers = "Rig Maneuvers", GemSurges = "Gem Surges", PassiveAugments = "Passive Augments" }
-Tree.Order = {
-	RigManeuvers = { "HydraulicSlam", "ServoFlurry", "KineticRam", "StimDodge", "BreachHammer", "ArmorPiercer" },
-	GemSurges = { "ThermalBurst", "EnergySiphon", "CryoLance", "CryoShield", "CryoStream", "ResonanceEcho" },
-	PassiveAugments = {
-		"BladeCalibration",
-		"CleaverCalibration",
-		"MobilityAugment",
-		"ChargeRecycler",
-		"StaminaRecycler",
-		"ThermalOvercharge",
+
+-- Columns per branch. Gem Surges has one per element, plus Resonance (any gem).
+-- Passive Augments has none: each tier's perks sit centred in a row.
+Tree.Columns = {
+	RigManeuvers = { { Name = "Strikes" }, { Name = "Tactics" } },
+	GemSurges = {
+		{ Name = "Thermal", Element = "Fire" },
+		{ Name = "Corrosive", Element = "Poison" },
+		{ Name = "Ion", Element = "Shock" },
+		{ Name = "Cryo", Element = "Frost" },
+		{ Name = "Resonance" },
 	},
 }
-Tree.Nodes = {}
-local costs = { 0, 1, 1, 1, 2, 2 }
-for _, branch in { "RigManeuvers", "GemSurges" } do
-	local order = Tree.Order[branch]
-	for index, id in order do
-		local definition = Tech.Catalog[id]
-		Tree.Nodes[id] = {
-			Id = id,
-			Name = definition.Name,
-			Description = definition.Description,
-			Icon = definition.Icon,
-			Branch = branch,
-			Tier = math.ceil(index / 2),
-			Column = if index % 2 == 1 then 1 else 2,
-			Cost = costs[index] + (if branch == "GemSurges" and index == 4 then 1 else 0),
-			Parent = if index == 1 then nil elseif index == 2 then order[1] else order[index - 2],
-			Free = index == 1,
-		}
-	end
-end
+
+-- { id, tier, column, parent? }. Listed tier by tier, so parents come first.
+local layout = {
+	RigManeuvers = {
+		{ "HydraulicSlam", 1, 1 },
+		{ "ServoFlurry", 1, 2, "HydraulicSlam" },
+		{ "KineticRam", 2, 1, "HydraulicSlam" },
+		{ "StimDodge", 2, 2, "ServoFlurry" },
+		{ "BreachHammer", 3, 1, "KineticRam" },
+		{ "ArmorPiercer", 3, 2, "StimDodge" },
+		{ "SeismicBreaker", 4, 1, "BreachHammer" },
+		{ "TremorSlam", 4, 2, "ArmorPiercer" },
+	},
+	GemSurges = {
+		{ "ThermalBurst", 1, 1 },
+		{ "AcidSpray", 1, 2 },
+		{ "IonSpark", 1, 3 },
+		{ "CryoLance", 1, 4 },
+		{ "EmberLance", 2, 1, "ThermalBurst" },
+		{ "ArmorMelt", 2, 2, "AcidSpray" },
+		{ "StaticField", 2, 3, "IonSpark" },
+		{ "CryoStream", 2, 4, "CryoLance" },
+		{ "EnergySiphon", 2, 5 },
+		{ "SolarFlare", 3, 1, "EmberLance" },
+		{ "ToxicCloud", 3, 2, "ArmorMelt" },
+		{ "ChainLightning", 3, 3, "StaticField" },
+		{ "CryoShield", 3, 4, "CryoStream" },
+		{ "ResonanceEcho", 3, 5, "EnergySiphon" },
+		{ "Supernova", 4, 1, "SolarFlare" },
+		{ "BioCorrosion", 4, 2, "ToxicCloud" },
+		{ "Overload", 4, 3, "ChainLightning" },
+		{ "AbsoluteZero", 4, 4, "CryoShield" },
+	},
+	PassiveAugments = {
+		{ "BladeCalibration", 1, 1 },
+		{ "CleaverCalibration", 1, 2 },
+		{ "MobilityAugment", 1, 3 },
+		{ "ChargeRecycler", 2, 1, "CleaverCalibration" },
+		{ "StaminaRecycler", 2, 2, "MobilityAugment" },
+		{ "ThermalOvercharge", 3, 1, "ChargeRecycler" },
+		{ "CorrosiveOvercharge", 3, 2, "ChargeRecycler" },
+		{ "IonOvercharge", 3, 3, "ChargeRecycler" },
+		{ "CryoOvercharge", 3, 4, "ChargeRecycler" },
+		{ "ElementalHarmony", 4, 1 },
+	},
+}
+-- Free starters: learned from the start at rank I.
+local FREE = { HydraulicSlam = true, ThermalBurst = true }
+-- Elemental Harmony asks for any two Overcharges instead of one parent.
+local REQUIRES = {
+	ElementalHarmony = {
+		Any = { "ThermalOvercharge", "CorrosiveOvercharge", "IonOvercharge", "CryoOvercharge" },
+		Count = 2,
+	},
+}
+
 local passiveDefinitions = {
 	BladeCalibration = {
 		Name = "Blade Calibration",
-		Description = "+5% damage with swords, blades and knives.",
+		Description = "+5% damage with swords, blades and knives per rank.",
 		Effect = "Slashing",
 		Amount = 0.05,
 		Icon = "⚔",
 	},
 	CleaverCalibration = {
 		Name = "Cleaver Calibration",
-		Description = "+5% damage with axes and cleavers.",
+		Description = "+5% damage with axes and cleavers per rank.",
 		Effect = "Cleaving",
 		Amount = 0.05,
 		Icon = "⚒",
 	},
 	MobilityAugment = {
 		Name = "Mobility Augment",
-		Description = "+5% movement speed.",
+		Description = "+5% movement speed per rank.",
 		Effect = "Mobility",
 		Amount = 0.05,
 		Icon = "🥾",
 	},
 	ChargeRecycler = {
 		Name = "Charge Recycler",
-		Description = "+15% Charge regeneration while a gem is socketed.",
+		Description = "+15% Charge regeneration per rank while a gem is socketed.",
 		Effect = "ChargeRegen",
 		Amount = 0.15,
-		Icon = "⚡",
+		Icon = "🔋",
 	},
 	StaminaRecycler = {
 		Name = "Stamina Recycler",
-		Description = "+15% Stamina regeneration.",
+		Description = "+15% Stamina regeneration per rank.",
 		Effect = "StaminaRegen",
 		Amount = 0.15,
 		Icon = "✊",
 	},
 	ThermalOvercharge = {
 		Name = "Thermal Overcharge",
-		Description = "+10% Thermal weapon, surge and burn damage.",
+		Description = "+10% / +20% / +30% Thermal weapon, surge and burn damage.",
 		Effect = "Thermal",
 		Amount = 0.10,
 		Icon = "🔥",
+		Element = "Fire",
+	},
+	CorrosiveOvercharge = {
+		Name = "Corrosive Overcharge",
+		Description = "+10% / +20% / +30% Corrosive surge damage.",
+		Effect = "Corrosive",
+		Amount = 0.10,
+		Icon = "☣",
+		Element = "Poison",
+	},
+	IonOvercharge = {
+		Name = "Ion Overcharge",
+		Description = "+10% / +20% / +30% Ion surge damage.",
+		Effect = "Ion",
+		Amount = 0.10,
+		Icon = "⚡",
+		Element = "Shock",
+	},
+	CryoOvercharge = {
+		Name = "Cryo Overcharge",
+		Description = "+10% / +20% / +30% Cryo surge damage.",
+		Effect = "Cryo",
+		Amount = 0.10,
+		Icon = "❄",
+		Element = "Frost",
+	},
+	ElementalHarmony = {
+		Name = "Elemental Harmony",
+		Description = "Deal damage of one element and your other elements hit +10% / +20% / +30% harder for 5 seconds.",
+		Effect = "Harmony",
+		Amount = 0.10,
+		Icon = "✦",
 	},
 }
-for index, id in Tree.Order.PassiveAugments do
-	local d = passiveDefinitions[id]
-	Tree.Nodes[id] = {
-		Id = id,
-		Name = d.Name,
-		Description = d.Description,
-		Icon = d.Icon,
-		Effect = d.Effect,
-		Amount = d.Amount,
-		Branch = "PassiveAugments",
-		Tier = math.ceil(index / 2),
-		Column = if index % 2 == 1 then 1 else 2,
-		Cost = if index <= 3 then 1 else 2,
-		Parent = if index <= 2 then nil else Tree.Order.PassiveAugments[index - 2],
-	}
+
+Tree.Order, Tree.Nodes = {}, {}
+Tree.UnlockPoints = 0
+for _, branch in Tree.Branches do
+	Tree.Order[branch] = {}
+	for _, entry in layout[branch] do
+		local id, tier, column, parent = entry[1], entry[2], entry[3], entry[4]
+		local d = Tech.Catalog[id] or passiveDefinitions[id]
+		local node = {
+			Id = id,
+			Name = d.Name,
+			Description = d.Description,
+			Icon = d.Icon,
+			Element = d.Element,
+			Effect = d.Effect,
+			Amount = d.Amount,
+			Branch = branch,
+			Tier = tier,
+			Column = column,
+			Parent = parent,
+			Requires = REQUIRES[id],
+			Free = FREE[id] == true,
+			Cost = if FREE[id] then 0 else Tree.TierCosts[tier],
+		}
+		Tree.Nodes[id] = node
+		table.insert(Tree.Order[branch], id)
+		Tree.UnlockPoints += node.Cost
+	end
+end
+-- Learning every node at rank I costs UnlockPoints; the rest of the budget
+-- goes into ranks II and III, so a full build is a choice of what to master.
+Tree.MaxPoints = Tree.UnlockPoints + 47
+
+-- Is a node's prerequisite (one parent, or "any N of" a set) met?
+function Tree.prerequisiteMet(unlocked, id: string): boolean
+	local n = Tree.Nodes[id]
+	if not n then
+		return false
+	end
+	if n.Parent and not unlocked[n.Parent] then
+		return false
+	end
+	if n.Requires then
+		local have = 0
+		for _, other in n.Requires.Any do
+			if unlocked[other] then
+				have += 1
+			end
+		end
+		return have >= n.Requires.Count
+	end
+	return true
+end
+function Tree.prerequisiteText(id: string): string?
+	local n = Tree.Nodes[id]
+	if not n then
+		return nil
+	end
+	if n.Parent then
+		return "Learn " .. Tree.Nodes[n.Parent].Name
+	end
+	if n.Requires then
+		return string.format("Learn any %d Overcharges", n.Requires.Count)
+	end
+	return nil
 end
 local function finite(value)
 	return typeof(value) == "number" and value == value and math.abs(value) < math.huge
@@ -155,7 +278,7 @@ function Tree.initialize(profile)
 				if
 					not n.Free
 					and source[id] == true
-					and (not n.Parent or unlocked[n.Parent])
+					and Tree.prerequisiteMet(unlocked, id)
 					and level >= Tree.tierLevel(id)
 					and spent + n.Cost <= budget
 				then
@@ -213,11 +336,11 @@ function Tree.learn(profile, id)
 	if data.Unlocked[id] then
 		return false, "Already unlocked."
 	end
-	if n.Parent and not data.Unlocked[n.Parent] then
-		return false, "Unlock " .. Tree.Nodes[n.Parent].Name .. " first."
+	if not Tree.prerequisiteMet(data.Unlocked, id) then
+		return false, (Tree.prerequisiteText(id) or "Learn its prerequisite") .. " first."
 	end
 	if data.Level < Tree.tierLevel(id) then
-		return false, string.format("Tier %d opens at Augment Level %d.", n.Tier, Tree.tierLevel(id))
+		return false, string.format("%s tier opens at Augment Level %d.", Tree.TierNames[n.Tier], Tree.tierLevel(id))
 	end
 	if data.Points < n.Cost then
 		return false, "Not enough Augment Points."
