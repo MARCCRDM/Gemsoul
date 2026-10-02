@@ -18,7 +18,7 @@ local camera = {Parent=true,FieldOfView=62}
 local workspace = {CurrentCamera=camera}
 local input = {MouseEnabled=true, MouseBehavior="Free", MouseIconEnabled=true}
 local run = {
- BindToRenderStep=function(_, name, priority, fn) assert(name=="SagaFirstPerson" and priority==201); bound=fn; bindCount+=1 end,
+ BindToRenderStep=function(_, name, priority, fn) assert(name=="SagaFirstPerson" and priority==202); bound=fn; bindCount+=1 end,
  UnbindFromRenderStep=function() bound=nil end,
 }
 local services = {Players={LocalPlayer=player},RunService=run,UserInputService=input}

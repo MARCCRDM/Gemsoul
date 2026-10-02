@@ -140,7 +140,7 @@ function View.start()
 		end
 		connection = character.DescendantAdded:Connect(track)
 	end
-	RunService:BindToRenderStep("SagaFirstPerson", Enum.RenderPriority.Camera.Value + 1, function(dt)
+	RunService:BindToRenderStep("SagaFirstPerson", Enum.RenderPriority.Camera.Value + 2, function(dt)
 		local current = workspace.CurrentCamera
 		for part in hidden do
 			if part.Parent then

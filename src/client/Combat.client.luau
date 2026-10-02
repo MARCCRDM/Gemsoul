@@ -16,6 +16,7 @@ local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local CombatGuide = require(script.Parent.Modules.CombatGuide)
 local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local FirstPerson = require(script.Parent.Modules.FirstPersonCombat)
+local TargetLock = require(script.Parent.Modules.TargetLock)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -171,6 +172,10 @@ local function aimedHit()
 	return workspace:Raycast(ray.Origin, ray.Direction * 500, aimParams), ray
 end
 local function aimPoint()
+	local lockedPoint = TargetLock.point()
+	if lockedPoint then
+		return lockedPoint
+	end
 	local hit, ray = aimedHit()
 	return if hit then hit.Position else ray.Origin + ray.Direction * 120
 end
@@ -547,11 +552,13 @@ end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Space)
 player.CharacterAdded:Connect(function()
 	cancel()
 	FirstPerson.stop()
+	TargetLock.reset()
 	cursorFree = false
 	cooldowns, techCooldowns = {}, {}
 	nextAttack = 0
 end)
 player:GetAttributeChangedSignal("CombatSession"):Connect(function()
+	TargetLock.setActive(false)
 	cancel()
 	FirstPerson.stop()
 	cursorFree = false
@@ -562,6 +569,7 @@ local lastActive = false
 RunService.RenderStepped:Connect(function(dt)
 	local fight = canFight() == true
 	gui.Enabled = fight
+	TargetLock.setActive(fight and not cursorFree and not CombatGuide.isOpen() and not AugmentTreeUI.isOpen())
 	leave.Visible = ArenaScene.isActive()
 	if not fight then
 		if lastActive then
@@ -705,7 +713,12 @@ RunService.RenderStepped:Connect(function(dt)
 		then Color3.fromRGB(233, 70, 70)
 		elseif charged.Perfect then P.Gold
 		else Color3.fromRGB(83, 174, 204)
-	reticle.TextColor3 = if holding then chargeFill.BackgroundColor3 elseif blockHeld then P.Gold else P.Text
+	local trackedTarget = TargetLock.target()
+	reticle.TextColor3 = if holding
+		then chargeFill.BackgroundColor3
+		elseif blockHeld then P.Gold
+		elseif trackedTarget then Color3.fromRGB(101, 210, 228)
+		else P.Text
 	if holding then
 		hint.Text = if charged.Perfect
 			then "RELEASE! PERFECT WINDOW"
@@ -715,7 +728,8 @@ RunService.RenderStepped:Connect(function(dt)
 		hint.Text = if cursorFree
 			then "Tab to return to combat"
 			elseif blockHeld then "GUARD UP"
-			else "Alternate LEFT / RIGHT for combos"
+			elseif trackedTarget then "AUTO LOCK · turn away to release"
+			else "Free aim · face a target to auto lock"
 	end
 	if holding and elapsed > 3 then
 		cancel()
@@ -724,7 +738,8 @@ RunService.RenderStepped:Connect(function(dt)
 	controlsHint.Visible = not UserInputService.TouchEnabled
 	cursorModal.Modal = cursorFree
 	local hit = aimedHit()
-	local target = hit and hit.Instance:FindFirstAncestorOfClass("Model")
+	local lockedTarget = trackedTarget
+	local target = lockedTarget or (hit and hit.Instance:FindFirstAncestorOfClass("Model"))
 	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
 	targetCard.Visible = enemyHumanoid ~= nil
 		and enemyHumanoid.Health > 0
@@ -733,7 +748,8 @@ RunService.RenderStepped:Connect(function(dt)
 	if targetCard.Visible then
 		local opponent = Players:GetPlayerFromCharacter(target)
 		targetName.Text = string.format(
-			"%s - %d / %d",
+			"%s%s - %d / %d",
+			if lockedTarget then "LOCK · " else "",
 			if opponent then opponent.DisplayName else target.Name,
 			math.ceil(enemyHumanoid.Health),
 			math.ceil(enemyHumanoid.MaxHealth)
