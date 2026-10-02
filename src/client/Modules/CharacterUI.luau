@@ -1162,32 +1162,117 @@ local function drawTooltipContent()
 
 	local gem = selection and selection.Kind == "Gem" and selection.Gem
 	if not gem then
-		text(tipBody, "INSPECT", 18, P.Gold, BOLD)
-		-- Nothing selected: three quick steps instead of a block of text.
-		for i, step in
-			{
-				{ "Select anything", "Click a gem or an item to see its stats here." },
-				{ "Enchant your gear", "Drag a gem onto an equipped item (hold it first on touch)." },
-				{ "Power your surges", "Socket gems in the Surge Array on Q · E · R  [L]." },
-			}
-		do
-			local row = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -6, 0, 50) }, tipBody)
-			UiKit.round(row, 8)
-			local chip = new("TextLabel", {
-				Text = tostring(i),
-				TextSize = 14,
-				Font = BOLD,
-				TextColor3 = P.Inset,
-				BackgroundColor3 = P.Gold,
-				Position = UDim2.fromOffset(10, 13),
-				Size = UDim2.fromOffset(24, 24),
-			}, row)
-			UiKit.round(chip, 12)
-			local title = text(row, step[1], 14, P.Text, BOLD)
-			title.Position, title.Size = UDim2.fromOffset(46, 6), UDim2.new(1, -54, 0, 18)
-			local line = text(row, step[2], 12, P.Dim)
-			line.Position, line.Size = UDim2.fromOffset(46, 26), UDim2.new(1, -54, 0, 18)
+		-- Nothing selected: the character's portrait card.
+		local profile = GemClient.Profile
+		local loadout = profile and profile.Character or {}
+		local card = new("Frame", {
+			BackgroundColor3 = Color3.fromRGB(17, 27, 40),
+			Size = UDim2.new(1, -6, 0, 196),
+			ClipsDescendants = true,
+		}, tipBody)
+		UiKit.round(card, 8)
+		new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.6 }, card)
+		-- The portrait sits in its own lit alcove on the left.
+		local alcove = new("Frame", {
+			BackgroundColor3 = Color3.fromRGB(24, 38, 56),
+			Position = UDim2.fromOffset(8, 8),
+			Size = UDim2.new(0, 146, 1, -16),
+			ClipsDescendants = true,
+		}, card)
+		UiKit.round(alcove, 6)
+		new("UIStroke", { Color = P.Teal, Thickness = 1, Transparency = 0.7 }, alcove)
+		GemArt.backdrop(alcove)
+		local view = new("ViewportFrame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Ambient = Color3.fromRGB(150, 160, 185),
+			LightColor = Color3.fromRGB(255, 240, 215),
+			LightDirection = Vector3.new(-0.5, -0.8, 0.6),
+		}, alcove)
+		local world = new("WorldModel", {}, view)
+		local camera = new("Camera", { FieldOfView = 26 }, view)
+		view.CurrentCamera = camera
+		local character = player.Character
+		if character then
+			pcall(function()
+				character.Archivable = true
+				local copy = character:Clone()
+				character.Archivable = false
+				for _, d in copy:GetDescendants() do
+					if d:IsA("BaseScript") or d:IsA("Sound") or d:IsA("BillboardGui") then
+						d:Destroy()
+					elseif d:IsA("BasePart") then
+						d.Anchored = true
+					end
+				end
+				local humanoid = copy:FindFirstChildOfClass("Humanoid")
+				if humanoid then
+					humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+				end
+				copy:PivotTo(CFrame.new())
+				copy.Parent = world
+				-- A head-and-shoulders shot, facing the camera.
+				local box, size = copy:GetBoundingBox()
+				local focus = box.Position + Vector3.new(0, size.Y * 0.2, 0)
+				camera.CFrame = CFrame.lookAt(focus + Vector3.new(0.6, 0.3, -size.Y * 1.25), focus)
+			end)
 		end
+		local info = new("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(164, 14),
+			Size = UDim2.new(1, -176, 1, -28),
+		}, card)
+		local nameLabel = text(info, string.upper(player.DisplayName), 18, P.Text, BOLD)
+		nameLabel.AutomaticSize, nameLabel.TextWrapped, nameLabel.TextTruncate =
+			Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+		nameLabel.Size = UDim2.new(1, 0, 0, 22)
+		local class = loadout.Class and Classes.get(loadout.Class)
+		local classLabel = text(info, string.upper(class and class.Name or "Miner"), 12, P.Teal, BOLD)
+		classLabel.AutomaticSize = Enum.AutomaticSize.None
+		classLabel.Position, classLabel.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, 16)
+		-- Overall gear score: every rolled stat on the six worn pieces.
+		local score = 0
+		for _, slotName in Slots.Order do
+			local roll = loadout[slotName] and GearRolls.get(loadout, slotName)
+			for stat, amount in roll and roll.Stats or {} do
+				score += if stat == "Critical" or stat == "Cooldown" then amount * 100 else amount
+			end
+		end
+		local scoreLabel = text(info, "GEAR SCORE", 10, P.Dim, BOLD)
+		scoreLabel.AutomaticSize = Enum.AutomaticSize.None
+		scoreLabel.Position, scoreLabel.Size = UDim2.fromOffset(0, 50), UDim2.new(1, 0, 0, 12)
+		local scoreValue = text(info, tostring(math.floor(score + 0.5)), 26, P.Gold, BOLD)
+		scoreValue.AutomaticSize = Enum.AutomaticSize.None
+		scoreValue.Position, scoreValue.Size = UDim2.fromOffset(0, 62), UDim2.new(1, 0, 0, 30)
+		-- Armor set progress, best set first.
+		local sets = {}
+		local active = loadout.Class and Classes.setState(loadout).Active or {}
+		for _, family in ArmorFamilies.Order do
+			local state = active[family]
+			if state and state.Count > 0 then
+				table.insert(sets, { family, state.Count })
+			end
+		end
+		table.sort(sets, function(a, b)
+			return a[2] > b[2]
+		end)
+		local setLines = {}
+		for i = 1, math.min(2, #sets) do
+			table.insert(setLines, string.format("%s  %d/6", sets[i][1], sets[i][2]))
+		end
+		local setLabel = text(
+			info,
+			if #setLines > 0 then "SETS\n" .. table.concat(setLines, "\n") else "SETS\nNo set pieces yet",
+			11,
+			P.Text
+		)
+		setLabel.AutomaticSize = Enum.AutomaticSize.None
+		setLabel.Position, setLabel.Size = UDim2.fromOffset(0, 98), UDim2.new(1, 0, 0, 48)
+		setLabel.TextYAlignment = Enum.TextYAlignment.Top
+		local tip = text(info, "Select any item or gem to inspect it.", 11, P.Dim)
+		tip.AutomaticSize = Enum.AutomaticSize.None
+		tip.AnchorPoint, tip.Position, tip.Size = Vector2.new(0, 1), UDim2.fromScale(0, 1), UDim2.new(1, 0, 0, 28)
+		tip.TextYAlignment = Enum.TextYAlignment.Bottom
 		if hint ~= "" then
 			text(tipBody, (string.gsub(hint, "^%s+", "")), 12, P.Dim)
 		end
