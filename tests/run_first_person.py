@@ -7,10 +7,12 @@ ROOT = Path(__file__).resolve().parents[1]
 setup = r'''
 local Enum = { CameraMode = {LockFirstPerson="First"}, MouseBehavior={Default="Free",LockCenter="Locked"}, RenderPriority={Camera={Value=200}} }
 local disconnected, bound, bindCount = false, nil, 0
+local removalCallback, removalDisconnected
 local part = { Parent=true, LocalTransparencyModifier=0.25, IsA=function(_, kind) return kind=="BasePart" end }
 local character = {
  GetDescendants=function() return {part} end,
  FindFirstChild=function() return nil end,
+ DescendantRemoving={Connect=function(_, fn) removalCallback=fn; removalDisconnected=false; return {Disconnect=function() removalDisconnected=true end} end},
  DescendantAdded={Connect=function() disconnected=false; return {Disconnect=function() disconnected=true end} end},
 }
 local player = {Character=character, CameraMode="Classic", CameraMinZoomDistance=1, CameraMaxZoomDistance=80}

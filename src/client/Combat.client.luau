@@ -326,6 +326,15 @@ local chargeFill = new(
 	castTrack
 )
 UiKit.round(chargeFill, 4)
+local perfectWindow = new("Frame", {
+	BackgroundColor3 = P.Gold,
+	BackgroundTransparency = 0.7,
+	BorderSizePixel = 0,
+	Position = UDim2.fromScale((Actions.PerfectAt - Actions.PerfectWindow) / Actions.OverchargeAt, 0),
+	Size = UDim2.fromScale(2 * Actions.PerfectWindow / Actions.OverchargeAt, 1),
+	ZIndex = 2,
+}, castTrack)
+new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.15 }, perfectWindow)
 local castLabel = shadowed(text(castBar, "", 11, P.Text, IronUi.Bold))
 castLabel.AutomaticSize, castLabel.TextWrapped = Enum.AutomaticSize.None, false
 castLabel.TextXAlignment, castLabel.Size, castLabel.ZIndex = Enum.TextXAlignment.Center, UDim2.fromScale(1, 1), 3
@@ -654,6 +663,8 @@ local function cancel()
 	input:FireServer("CancelAttack")
 	input:FireServer("Block", false)
 end
+UserInputService.WindowFocusReleased:Connect(cancel)
+
 local function toggleGuide()
 	cancel()
 	AugmentTreeUI.close()
@@ -885,7 +896,14 @@ RunService.RenderStepped:Connect(function(dt)
 	for id, bar in resourceBars do
 		local amount, maximum = player:GetAttribute(id) or 0, player:GetAttribute("Max" .. id) or 100
 		bar.Value.Text = string.format("%d / %d", math.floor(amount), maximum)
-		bar.Fill.Size = UDim2.fromScale(math.clamp(amount / math.max(1, maximum), 0, 1), 1)
+		local ratio = math.clamp(amount / math.max(1, maximum), 0, 1)
+		-- Spending is immediate; regeneration eases toward authoritative values.
+		bar.Display = if not bar.Display or ratio < bar.Display
+			then ratio
+			else bar.Display + (ratio - bar.Display) * (1 - math.exp(-dt * 12))
+		bar.Fill.Size = UDim2.fromScale(bar.Display, 1)
+		bar.Label.Text = id:upper() .. (if ratio <= 0.2 then "  ·  LOW" else "")
+		bar.Value.TextColor3 = if ratio <= 0.2 then P.Gold else P.Text
 	end
 	local profile = GemClient.Profile
 	local loadout = profile and profile.Character
@@ -952,7 +970,7 @@ RunService.RenderStepped:Connect(function(dt)
 			then Color3.fromRGB(233, 70, 70)
 			elseif charged.Perfect then P.Gold
 			else Color3.fromRGB(83, 174, 204)
-		chargeFill.Size = UDim2.fromScale(math.clamp(elapsed / Actions.PerfectAt, 0, 1), 1)
+		chargeFill.Size = UDim2.fromScale(math.clamp(elapsed / Actions.OverchargeAt, 0, 1), 1)
 		castLabel.Text = if charged.Perfect
 			then "RELEASE!  PERFECT"
 			elseif charged.Stage == "OVERCHARGED" then "OVERCHARGED"
@@ -971,6 +989,7 @@ RunService.RenderStepped:Connect(function(dt)
 	else
 		cast = nil
 	end
+	perfectWindow.Visible = holding
 	castBar.Visible = holding or cast ~= nil or beamKey ~= nil
 	chargeFill.BackgroundColor3 = castColor
 	local trackedTarget = TargetLock.target()
@@ -994,7 +1013,7 @@ RunService.RenderStepped:Connect(function(dt)
 	if holding and elapsed > 3 then
 		cancel()
 	end
-	FirstPerson.setPose(blockHeld, elapsed / Actions.PerfectAt)
+	FirstPerson.setPose(blockHeld, elapsed / Actions.OverchargeAt)
 	-- Key reminder: shown for the first seconds of a fight, or with a free cursor.
 	local hintAge = now - fightSince
 	controlsHint.Visible = not UserInputService.TouchEnabled and (cursorFree or hintAge < 13)

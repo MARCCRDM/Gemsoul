@@ -35,6 +35,25 @@ function Actions.charge(seconds)
 		Stage = if perfect then "PERFECT" elseif seconds >= Actions.Base.Heavy.Charge then "CHARGED" else "QUICK",
 	}
 end
+-- Reject malformed remote payloads before resolving equipment or mutating combat state.
+function Actions.validInput(action, a, b)
+	if action == "CancelTech" or action == "CancelAttack" then
+		return true
+	elseif action == "BeginAttack" then
+		return a == nil or a == "Left" or a == "Right"
+	elseif action == "Attack" or action == "ReleaseAttack" then
+		return Actions.finiteVector(a)
+	elseif action == "Block" then
+		return a == false or (a == true and Actions.finiteVector(b))
+	elseif action == "Dodge" then
+		return a == nil or Actions.finiteVector(a)
+	elseif action == "RigManeuver" then
+		return typeof(a) == "string" and #a <= 64 and Actions.finiteVector(b)
+	elseif action == "Surge" then
+		return (a == "Q" or a == "E" or a == "R") and Actions.finiteVector(b)
+	end
+	return false
+end
 function Actions.side(value)
 	return if value == "Left" then "Left" else "Right"
 end

@@ -1114,6 +1114,9 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	return true
 end
 local function onInput(player, action, a, b)
+	if not Actions.validInput(action, a, b) then
+		return
+	end
 	local st, now = state(player), os.clock()
 	if action == "Block" and a == false then
 		block(player, false)

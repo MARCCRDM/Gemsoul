@@ -251,3 +251,12 @@ check(b:GetAttribute("CombatSession")==nil and not b:GetAttribute("PvPEnabled"),
 Players.PlayerRemoving.Fire(a)
 check(CombatServer._state(b).Dots[a]==nil,"Disconnected attacker kept burning victim")
 print("PASS: "..checks.." universal-action and live combat checks (PvP gates, charge, block, dodge, LOS, gems and cleanup)")
+
+assert(not Actions.validInput("Unknown", nil, nil))
+assert(not Actions.validInput("RigManeuver", {}, Vector3.new(0,0,0)))
+assert(not Actions.validInput("Attack", Vector3.new(0/0,0,0)))
+assert(not Actions.validInput("Block", true, "bad"))
+assert(Actions.validInput("Block", false))
+assert(Actions.validInput("CancelAttack"))
+assert(Actions.validInput("Surge", "Q", Vector3.new(0,0,1)))
+print("PASS: 7 combat payload validation checks")
