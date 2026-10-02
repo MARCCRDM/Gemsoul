@@ -4,6 +4,8 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
+local AugmentTreeUI = require(script.Parent.AugmentTreeUI)
 local GemClient = require(script.Parent.GemClient)
 local ArenaScene = require(script.Parent.ArenaScene)
 local IronUi = require(script.Parent.IronUi)
@@ -105,7 +107,8 @@ function CombatGuide.refresh()
 		heading.Size = UDim2.new(1, -12, 0, 26)
 		for _, id in Tech.Order[group] do
 			local definition = Tech.Catalog[id]
-			local available = definition.Resource ~= "Charge" or Tech.hasGem(loadout, definition.Element)
+			local learned = Tree.isLearned(profile, id)
+			local available = learned and (definition.Resource ~= "Charge" or Tech.hasGem(loadout, definition.Element))
 			local card = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -12, 0, 70) }, body)
 			UiKit.round(card, 8)
 			local title = text(
@@ -126,7 +129,12 @@ function CombatGuide.refresh()
 			local description = text(
 				card,
 				definition.Description
-					.. (if not available then " Socket a compatible gem to power this surge." else ""),
+					.. (
+						if not learned
+							then " Unlock this node in your Augment Tree (K)."
+							elseif not available then " Socket a compatible gem to power this surge."
+							else ""
+					),
 				12,
 				P.Text
 			)
@@ -158,6 +166,11 @@ function CombatGuide.refresh()
 		line.Size = UDim2.new(1, 0, 0, 36)
 		line.TextWrapped = true
 	end
+	local treeButton = IronUi.gemButton(body, "OPEN AUGMENT TREE · K", P.Gold, function()
+		CombatGuide.close()
+		AugmentTreeUI.open()
+	end)
+	treeButton.Size = UDim2.fromOffset(250, 36)
 	local training = IronUi.gemButton(body, "TRAIN ON DUMMIES", P.Teal, function()
 		CombatGuide.close()
 		ArenaScene.enter(false)

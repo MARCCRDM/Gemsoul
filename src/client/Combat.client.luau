@@ -11,8 +11,10 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local CombatGuide = require(script.Parent.Modules.CombatGuide)
+local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local FirstPerson = require(script.Parent.Modules.FirstPersonCombat)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -239,7 +241,9 @@ local function dodge()
 end
 local techButtons = {}
 local function selectedTech(group)
-	return Tech.Order[group][selected[group]]
+	local available = Tree.available(GemClient.Profile, group)
+	selected[group] = math.clamp(selected[group], 1, math.max(1, #available))
+	return available[selected[group]] or Tech.Order[group][1]
 end
 local function triggerTech(group)
 	if cursorFree or not canFight() or holding or blockHeld then
@@ -283,7 +287,8 @@ for index, group in { "RigManeuvers", "GemSurges" } do
 	UiKit.round(cycle, 8)
 	cycle.Activated:Connect(function()
 		stopBeam()
-		selected[group] = selected[group] % #Tech.Order[group] + 1
+		local available = Tree.available(GemClient.Profile, group)
+		selected[group] = selected[group] % math.max(1, #available) + 1
 	end)
 	techButtons[group] = button
 	if group == "GemSurges" then
@@ -387,30 +392,44 @@ local function cancel()
 end
 local function toggleGuide()
 	cancel()
+	AugmentTreeUI.close()
 	CombatGuide.toggle()
 	cursorFree = CombatGuide.isOpen()
 	FirstPerson.setCursorFree(cursorFree)
 end
-local guideButton = new(
-	"TextButton",
-	{
-		Text = "?",
-		TextSize = 22,
-		TextColor3 = P.Gold,
-		BackgroundColor3 = P.Inset,
-		Position = UDim2.fromOffset(12, 16),
-		Size = UDim2.fromOffset(38, 40),
-	},
-	gui
-)
+local function toggleTree()
+	cancel()
+	CombatGuide.close()
+	AugmentTreeUI.toggle()
+	cursorFree = AugmentTreeUI.isOpen()
+	FirstPerson.setCursorFree(cursorFree)
+end
+local treeButton = new("TextButton", {
+	Text = "AUGMENT TREE · K",
+	TextSize = 12,
+	TextColor3 = P.Gold,
+	BackgroundColor3 = P.Inset,
+	Position = UDim2.fromOffset(12, 214),
+	Size = UDim2.fromOffset(142, 30),
+}, gui)
+UiKit.round(treeButton, 8)
+treeButton.Activated:Connect(toggleTree)
+local guideButton = new("TextButton", {
+	Text = "?",
+	TextSize = 22,
+	TextColor3 = P.Gold,
+	BackgroundColor3 = P.Inset,
+	Position = UDim2.fromOffset(12, 16),
+	Size = UDim2.fromOffset(38, 40),
+}, gui)
 UiKit.round(guideButton, 10)
 guideButton.Activated:Connect(toggleGuide)
-ContextActionService:BindActionAtPriority("CombatGuide", function(_, state)
+ContextActionService:BindActionAtPriority("CombatAugmentTree", function(_, state)
 	if not canFight() then
 		return Enum.ContextActionResult.Pass
 	end
 	if state == Enum.UserInputState.Begin then
-		toggleGuide()
+		toggleTree()
 	end
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 20, Enum.KeyCode.K)
@@ -425,7 +444,8 @@ UserInputService.InputBegan:Connect(function(obj, processed)
 	elseif obj.KeyCode == Enum.KeyCode.Z or obj.KeyCode == Enum.KeyCode.X then
 		stopBeam()
 		local group = if obj.KeyCode == Enum.KeyCode.Z then "RigManeuvers" else "GemSurges"
-		selected[group] = selected[group] % #Tech.Order[group] + 1
+		local available = Tree.available(GemClient.Profile, group)
+		selected[group] = selected[group] % math.max(1, #available) + 1
 	elseif obj.KeyCode == Enum.KeyCode.Q then
 		beginAttack("Left")
 	elseif obj.KeyCode == Enum.KeyCode.E then
@@ -465,8 +485,9 @@ ContextActionService:BindActionAtPriority("CombatCursor", function(_, state)
 	end
 	if state == Enum.UserInputState.Begin then
 		cancel()
-		if CombatGuide.isOpen() then
+		if CombatGuide.isOpen() or AugmentTreeUI.isOpen() then
 			CombatGuide.close()
+			AugmentTreeUI.close()
 			cursorFree = false
 		else
 			cursorFree = not cursorFree
@@ -509,6 +530,7 @@ RunService.RenderStepped:Connect(function()
 			cancel()
 			FirstPerson.stop()
 			CombatGuide.close()
+			AugmentTreeUI.close()
 			guideWasOpen = false
 			cursorFree = false
 		end
@@ -516,7 +538,7 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 	FirstPerson.start()
-	local guideOpen = CombatGuide.isOpen()
+	local guideOpen = CombatGuide.isOpen() or AugmentTreeUI.isOpen()
 	if guideOpen ~= guideWasOpen then
 		cursorFree = guideOpen
 		FirstPerson.setCursorFree(cursorFree)

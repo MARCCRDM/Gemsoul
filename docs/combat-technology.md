@@ -1,6 +1,6 @@
 # Saga Miners combat technology
 
-Implemented from the approved Combat Terminology & Universe Conversion brief. Combat remains first person; every player is a Warrior whose equipment defines their build. All twelve techniques are available to review and cycle. Gem Surges require compatible socketed gemstones; Kinetic Ram requires a shield.
+Implemented from the approved Combat Terminology & Universe Conversion brief. Combat remains first person; every player is a Warrior whose equipment defines their build. All twelve techniques are available to review in the Augment Tree. Only unlocked techniques appear in the combat cycling controls. Gem Surges require compatible socketed gemstones; Kinetic Ram requires a shield.
 
 ## Resources and controls
 
@@ -12,7 +12,7 @@ Implemented from the approved Combat Terminology & Universe Conversion brief. Co
 
 The capacities and regeneration rates are initial tuning; the brief specifies costs but not regeneration. Unsocketing every gem clears Charge. Ordinary Dodge costs 15 Stamina. Charges, barriers and timed effects belong to the combat session and reset when it ends.
 
-LMB attacks, Q/E choose swing sides, RMB guards, and Space dodges. **Z cycles Rig Maneuvers; R triggers the selected maneuver. X cycles Gem Surges; F triggers the selected surge.** Hold F for Cryo Stream and release to stop. Touch has matching trigger and cycle buttons. Tab frees the desktop cursor. K opens the scrollable combat guide.
+LMB attacks, Q/E choose swing sides, RMB guards, and Space dodges. **Z cycles Rig Maneuvers; R triggers the selected maneuver. X cycles Gem Surges; F triggers the selected surge.** Hold F for Cryo Stream and release to stop. Touch has matching trigger and cycle buttons. Tab frees the desktop cursor. K opens the Augment Tree. The ? button opens the combat guide. The dashboard also has a visible AUGMENT TREE button.
 
 The stored **Charge resource** is distinct from the **attack wind-up timing indicator**. Holding a normal weapon attack does not spend Charge.
 
@@ -44,7 +44,7 @@ Unspecified surge damage uses weapon damage and Power, scaled by the powering ge
 
 Active code and UI use **Rig Maneuvers**, **Gem Surges**, **Passive Augments**, **Charge**, **Augment Tree**, and **Augment Points**. The instructor explains current controls. Existing gear augments remain automatic and retain their stat budgets. The shared technology catalog records Blade Calibration, Cleaver Calibration, Mobility Augment, Stamina Recycler, Charge Recycler and Thermal Overcharge.
 
-Consumable naming is standardized as **Stim Shot**, **Charge Cell**, and **Energy Drink**. These are catalog conventions; this change does not introduce a consumable inventory or a new purchase economy. Augment Tree and Augment Points are the progression vocabulary; the brief does not define unlock prices, levels or point awards, so this change does not invent those progression rules.
+Consumable naming is standardized as **Stim Shot**, **Charge Cell**, and **Energy Drink**. These are catalog conventions; this change does not introduce a consumable inventory or a new purchase economy. The Augment Tree now has 18 connected nodes across three branches. See [Augment Tree progression](augment-tree.md) for saved unlocks, node prices, XP awards and free resets.
 
 Retired saved technique picks are discarded during profile normalization. Equipment IDs, rarity rolls, gem IDs and asset geometry are preserved. Pulse VFX use straight emitter beams, expanding plasma discs and segmented field panels.
 

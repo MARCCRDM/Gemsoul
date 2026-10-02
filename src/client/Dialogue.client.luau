@@ -9,6 +9,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Vendors = require(ReplicatedStorage.Shared.Vendors)
 local CombatGuide = require(script.Parent.Modules.CombatGuide)
+local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
@@ -251,6 +252,10 @@ end
 function actions.CombatGuide()
 	close()
 	CombatGuide.open()
+end
+function actions.AugmentTree()
+	close()
+	AugmentTreeUI.open()
 end
 
 function actions.MarketSell()

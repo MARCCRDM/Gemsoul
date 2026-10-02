@@ -17,6 +17,7 @@ local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local MineScene = require(script.Parent.Modules.MineScene)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
+local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -391,7 +392,7 @@ soon.AnchorPoint = Vector2.new(1, 0)
 place(soon, 0, 0, 104, 22)
 soon.Position = UDim2.new(1, -16, 0, 18)
 UiKit.round(soon, 4)
-local socialCopy = label(social, "Four actions. Your armor defines the fight.", 12, LIGHT, IronUi.Body)
+local socialCopy = label(social, "Choose your build in the Augment Tree.", 12, LIGHT, IronUi.Body)
 place(socialCopy, 20, 46, W - 1136, 20)
 socialCopy.TextWrapped = true
 socialCopy.TextYAlignment = Enum.TextYAlignment.Top
@@ -401,14 +402,18 @@ local training = IronUi.gemButton(social, "TRAIN", P.Teal, function()
 	end)
 end)
 training.Position = UDim2.fromOffset(20, 72)
-training.Size = UDim2.fromOffset(114, 32)
+training.Size = UDim2.fromOffset(76, 32)
 local pvp = IronUi.gemButton(social, "PVP ARENA", P.Gold, function()
 	launch(function()
 		ArenaScene.enter(true)
 	end)
 end)
-pvp.Position = UDim2.fromOffset(152, 72)
-pvp.Size = UDim2.fromOffset(138, 32)
+pvp.Position = UDim2.fromOffset(104, 72)
+pvp.Size = UDim2.fromOffset(88, 32)
+local augments = IronUi.gemButton(social, "AUGMENT TREE", P.Gold, function()
+	launch(AugmentTreeUI.open)
+end)
+augments.Position, augments.Size, augments.TextSize = UDim2.fromOffset(200, 72), UDim2.fromOffset(116, 32), 11
 
 -- The armory fills the rest: equipment, sockets, stats, backpack and spare gear.
 CharacterUI.mount(root, gui, UDim2.fromOffset(16, STRIP_Y + STRIP_H + 12))
@@ -487,7 +492,7 @@ GemClient.Changed:Connect(maybeWelcome)
 task.defer(maybeWelcome)
 
 -- Equipment and enchantment are on the dashboard; only destinations need shortcuts.
-local KEYS = { M = MineScene.begin, T = TradeUI.open, B = ShopUI.toggle, J = SeasonUI.toggle }
+local KEYS = { K = AugmentTreeUI.toggle, M = MineScene.begin, T = TradeUI.open, B = ShopUI.toggle, J = SeasonUI.toggle }
 ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObject)
 	if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
 		local action = KEYS[inputObject.KeyCode.Name]
@@ -496,4 +501,4 @@ ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObje
 		end
 	end
 	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.M, Enum.KeyCode.T, Enum.KeyCode.B, Enum.KeyCode.J)
+end, false, Enum.KeyCode.K, Enum.KeyCode.M, Enum.KeyCode.T, Enum.KeyCode.B, Enum.KeyCode.J)

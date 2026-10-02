@@ -12,6 +12,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local ArmorKits = require(script.Parent.ArmorKits)
@@ -873,7 +874,7 @@ end
 
 -- Ratings drive the avatar: Speed sets walk speed and Health sets max
 -- health, so gear and gems are felt straight away.
-local function applyStats(character: Model, loadout)
+local function applyStats(character: Model, loadout, profile)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
 		return
@@ -881,7 +882,9 @@ local function applyStats(character: Model, loadout)
 	local ratings = Classes.ratings(loadout)
 	-- Agile armor (Fleet) adds a little on top.
 	local extra = Classes.effects(loadout).SpeedAdd or 0
-	humanoid.WalkSpeed = Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus) + extra
+	local augments = Tree.effects(profile)
+	humanoid.WalkSpeed = (Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus) + extra)
+		* (1 + (augments.Mobility or 0))
 	local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 	humanoid.MaxHealth = Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)
 	humanoid.Health = humanoid.MaxHealth * fraction
@@ -1125,7 +1128,7 @@ function Equipment.apply(player: Player)
 		return
 	end
 	folder.Parent = character
-	applyStats(character, loadout)
+	applyStats(character, loadout, profile)
 end
 
 -- Item previews ----------------------------------------------------------------------------

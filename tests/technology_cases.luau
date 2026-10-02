@@ -3,6 +3,12 @@ local function check(value, message) checks += 1; assert(value, message) end
 local function close(a, b) return math.abs(a - b) < 0.00001 end
 local source, hs, rs, loadout = makePlayer(20, arena, nil)
 local victim, hv, rv, defense = makePlayer(21, arena + Vector3.new(0, 0, -5), nil)
+local progress = Tree.initialize(profiles[source])
+progress.XP = 3150
+for _, group in { "RigManeuvers", "GemSurges" } do
+ for _, id in Tree.Order[group] do progress.Unlocked[id] = true end
+end
+Tree.initialize(profiles[source])
 loadout.Shield = "ArmorProspectorShield1"
 local expected = Classes.weapon("Warrior", loadout.Weapon).Attack.Damage * Combat.powerMult(Classes.ratings(loadout).Power.Base) * Combat.defenseMult(Classes.ratings(defense).Defense.Base)
 local function reset()

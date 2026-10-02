@@ -17,7 +17,7 @@ local StarterGui = game:GetService("StarterGui")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Season = require(ReplicatedStorage.Shared.Season)
 
-local CombatGuide = require(script.Parent.Modules.CombatGuide)
+local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
@@ -201,7 +201,7 @@ local menu = if MENU_ONLY
 	}
 	else {
 		{ "🛡️", "Character", "C", CharacterUI.toggle },
-		{ "⚔️", "Combat", "K", CombatGuide.toggle },
+		{ "⚙️", "Augments", "K", AugmentTreeUI.toggle },
 		{ "💎", "Gems", "G", InventoryUI.toggle },
 		{ "👥", "Party", "P", PartyUI.toggle },
 	}
@@ -401,6 +401,7 @@ task.defer(maybeWelcome)
 
 -- Keys (C is bound by the character screen, K by combat).
 local KEYS = {
+	K = AugmentTreeUI.toggle,
 	G = InventoryUI.toggle,
 	B = ShopUI.toggle,
 	J = SeasonUI.toggle,
@@ -430,6 +431,7 @@ ContextActionService:BindAction(
 		return Enum.ContextActionResult.Pass
 	end,
 	false,
+	Enum.KeyCode.K,
 	Enum.KeyCode.G,
 	Enum.KeyCode.P,
 	Enum.KeyCode.B,

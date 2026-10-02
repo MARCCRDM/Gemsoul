@@ -6,6 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Season = require(ReplicatedStorage.Shared.Season)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 
@@ -21,6 +22,17 @@ function Progress.addXP(player: Player, reason: string, times: number?)
 	local amount = base * (times or 1) * (if boosted then 2 else 1)
 	local before = Season.levelFor(profile.Season.XP)
 	profile.Season.XP += amount
+	local points = Tree.addXP(profile, base * (times or 1))
+	if points > 0 then
+		Remotes.Notify:FireClient(
+			player,
+			string.format(
+				"+%d Augment Point%s! Open your Augment Tree with K.",
+				points,
+				if points == 1 then "" else "s"
+			)
+		)
+	end
 	local after = Season.levelFor(profile.Season.XP)
 	if after > before then
 		Remotes.Notify:FireClient(

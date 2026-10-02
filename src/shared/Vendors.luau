@@ -122,10 +122,11 @@ local Vendors: { [string]: Vendor } = {
 		Face = ">_<",
 		Greeting = "Looking for a fight? Warm up on my dummies inside, then go hunt the crystal beasts past the south gate.",
 		Options = {
+			{ Text = "Open my Augment Tree", Action = "AugmentTree" },
 			{ Text = "Review my combat rig", Action = "CombatGuide" },
 			{
 				Text = "How do I fight?",
-				Reply = "LMB attacks; hold and release on gold for a perfect hit. Q/E select swing sides, RMB guards, Space dodges. R triggers your Rig Maneuver; F triggers your Gem Surge. Z/X cycle them. Stamina powers your rig; socketed gems store Charge. Press K for the combat guide.",
+				Reply = "LMB attacks; hold and release on gold for a perfect hit. Q/E select swing sides, RMB guards, Space dodges. R triggers your Rig Maneuver; F triggers your Gem Surge. Z/X cycle them. Stamina powers your rig; socketed gems store Charge. Press K for your Augment Tree.",
 			},
 			{
 				Text = "What's out past the south gate?",

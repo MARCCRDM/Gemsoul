@@ -15,6 +15,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local TestAdmin = require(script.Parent.TestAdmin)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
@@ -41,6 +42,7 @@ type Character = {
 type Owned = { [string]: { [string]: number } }
 type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean }
 type Profile = {
+	Augments: { [string]: any },
 	Version: number,
 	Coins: number,
 	Marks: number, -- Guild Marks: from selling stones, spent in the Crafting Hall
@@ -81,8 +83,9 @@ do
 end
 
 local function newProfile(): Profile
-	return {
-		Version = 9,
+	local profile = {
+		Version = 10,
+		Augments = {},
 		Coins = Config.StartingCoins,
 		Marks = 0,
 		Gems = {},
@@ -101,6 +104,8 @@ local function newProfile(): Profile
 		FirstJoin = os.time(),
 		WelcomeBought = false,
 	}
+	Tree.initialize(profile)
+	return profile
 end
 
 -- Brings profiles saved by older versions of the game up to date.
@@ -200,7 +205,8 @@ local function migrate(profile: Profile): Profile
 		profile.Version = 8
 	end
 	Slots.initialize(profile)
-	profile.Version = math.max(profile.Version, 9)
+	profile.Version = math.max(profile.Version, 10)
+	Tree.initialize(profile)
 	return profile
 end
 
@@ -281,6 +287,7 @@ local function claimDaily(player: Player, profile: Profile)
 	local reward = Config.DailyRewardBase + Config.DailyRewardPerStreak * (daily.Streak - 1)
 	profile.Coins += reward
 	profile.Season.XP += Season.XP.Daily
+	Tree.addXP(profile, Season.XP.Daily)
 	Remotes.Notify:FireClient(
 		player,
 		string.format("Daily reward: +%d coins (day %d streak). Come back tomorrow for more!", reward, daily.Streak)
@@ -400,6 +407,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		return nil
 	end
 	return {
+		Augments = profile.Augments,
 		Coins = profile.Coins,
 		Marks = profile.Marks,
 		Gems = profile.Gems,
@@ -745,6 +753,11 @@ function PlayerData.refundFreeMine(player: Player)
 		profile.Quota.UsedThisWeek = math.max(0, profile.Quota.UsedThisWeek - 1)
 		sync(player)
 	end
+end
+
+function PlayerData.augmentsChanged(player: Player)
+	sync(player)
+	characterChanged:Fire(player)
 end
 
 function PlayerData.sync(player: Player)

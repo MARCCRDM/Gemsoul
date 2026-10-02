@@ -7,6 +7,7 @@ local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local Enemies = require(script.Parent.Enemies)
@@ -35,6 +36,12 @@ local function kit(player)
 		return nil
 	end
 	local effects = Classes.effects(loadout)
+	local augments = Tree.effects(PlayerData.get(player))
+	effects.StaminaRegen = (effects.StaminaRegen or 0) + (augments.StaminaRegen or 0)
+	effects.ChargeRegen = (effects.ChargeRegen or 0) + (augments.ChargeRegen or 0)
+	effects.MobilityMult = 1 + (augments.Mobility or 0)
+	effects.WeaponAugmentMult = Tree.weaponMultiplier(augments, weapon)
+	effects.ThermalMult = 1 + (augments.Thermal or 0)
 	local affinity = Classes.affinities(loadout)
 	local defense = {
 		Shield = 0,
@@ -386,7 +393,7 @@ local function procGem(source, k, target)
 	local st = if target.Player then state(target.Player) else nil
 	local now = os.clock()
 	if values.Burn then
-		local burning = values.Burn
+		local burning = values.Burn * k.Effects.ThermalMult
 		local critical = math.random() < values.Ignite
 		if critical then
 			burning *= Combat.CritMult
@@ -493,7 +500,10 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	local multiplier = if heavy
 		then (if target.Player then k.Rules.HeavyPvPDamage else k.Rules.HeavyDamage)
 		else k.Rules.BasicDamage
-	local damage = k.Weapon.Attack.Damage * Combat.powerMult(rating(k, "Power")) * multiplier
+	local damage = k.Weapon.Attack.Damage
+		* Combat.powerMult(rating(k, "Power"))
+		* multiplier
+		* k.Effects.WeaponAugmentMult
 	if swing then
 		damage *= swing.Scale * (1 + (swing.Combo - 1) * 0.1)
 	end
@@ -513,6 +523,10 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	local guarded = false
 	local gem = k.Loadout.WeaponGem
 	local element = gem and gem.Element
+	if element == "Fire" then
+		damage *= k.Effects.ThermalMult
+		echoDamage = damage
+	end
 	if target.Player then
 		damage, guarded =
 			receive(target.Player, damage, element, source, root.Position, projectile, heavy, false, nil, crit)
@@ -742,6 +756,12 @@ local function technologyHit(player, k, target, definition, scale)
 	local _, root = alive(player)
 	local gem = if definition.Resource == "Charge" then surgeGem(k.Loadout, definition.Element) else nil
 	local damage = k.Weapon.Attack.Damage * Combat.powerMult(rating(k, "Power")) * definition.Damage * (scale or 1)
+	if definition.Resource == "Stamina" then
+		damage *= k.Effects.WeaponAugmentMult
+	end
+	if definition.Element == "Fire" then
+		damage *= k.Effects.ThermalMult
+	end
 	if gem then
 		damage *= 1 + math.clamp(gem.Size or 1, 1, 10) * 0.03
 	end
@@ -781,9 +801,9 @@ local function technologyHit(player, k, target, definition, scale)
 	if definition.Element == "Fire" and gem then
 		local values = GemConfig.stats(gem, "Weapon", { Affinity = k.Affinity, PvP = target.Player ~= nil })
 		if target.Player then
-			addDot(target.Player, player, values.BurnDamage, values.BurnDuration)
+			addDot(target.Player, player, values.BurnDamage * k.Effects.ThermalMult, values.BurnDuration)
 		else
-			Enemies.addDot(target.Enemy, values.BurnDamage, values.BurnDuration, player, color)
+			Enemies.addDot(target.Enemy, values.BurnDamage * k.Effects.ThermalMult, values.BurnDuration, player, color)
 		end
 	end
 end
@@ -864,6 +884,10 @@ local function triggerTechnology(player, id, aim)
 		or not Actions.finiteVector(aim)
 		or not Combat.canFight(root.Position)
 	then
+		return false
+	end
+	if not Tree.isLearned(PlayerData.get(player), id) then
+		Remotes.CombatFx:FireClient(player, "TechStatus", "Unlock " .. definition.Name .. " in the Augment Tree.")
 		return false
 	end
 	if now < st.StunUntil or st.DodgeMove or blocking(st, now) or st.ChargeStarted then
@@ -1064,7 +1088,7 @@ local function tick(_dt)
 				end
 			end
 		end
-		local speed = Classes.walkSpeed(rating(k, "Speed"))
+		local speed = Classes.walkSpeed(rating(k, "Speed")) * k.Effects.MobilityMult
 		humanoid.WalkSpeed = if now < st.StunUntil
 			then 0
 			else speed * (if now < st.SlowUntil then 1 - st.Slow else 1) * (if blocking(st, now) then 0.6 else 1)
