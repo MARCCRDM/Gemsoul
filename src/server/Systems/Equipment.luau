@@ -751,7 +751,7 @@ end
 
 -- Recolours an item's glowing trim, lights its gem and adds particles to its
 -- biggest piece (the blade, head, staff or chest).
-local function enchant(parts: { BasePart }, gem, main: BasePart?)
+local function enchant(parts: { BasePart }, gem, main: BasePart?, quiet: boolean?)
 	local color = GemConfig.ElementColors[gem.Element]
 	local strength = GemConfig.strength(gem)
 	local biggest, biggestSize = nil, 0
@@ -782,7 +782,7 @@ local function enchant(parts: { BasePart }, gem, main: BasePart?)
 		biggest.Color = biggest.Color:Lerp(Color3.fromRGB(190, 230, 255), 0.45)
 	end
 	local target = main or biggest
-	if target then
+	if target and not quiet then
 		particles(target, gem.Element, strength)
 	end
 end
@@ -858,46 +858,53 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 	end
 end
 
--- A gem in a piece of armor enchants it with the gem's element, more the
--- rarer the gem, while the armor keeps its own colours and detail:
---   * its glowing trims turn the element's colour;
---   * streams of enchanting energy loop around its biggest plates (Beams
---     whose sparkling texture flows along them; animated on each client, so
---     nothing replicates per frame), more loops and thicker up the tiers;
---   * a rippling ForceField shimmer over its plates;
---   * an enchanting sigil swirling on its biggest plate;
---   * a breathing light and the element's own signature particles: flames
---     and embers (Thermal), falling ice crystals and cold mist (Cryo),
---     crackling sparks (Ion), rising bubbles and fumes (Corrosive).
---   light brightness, light range, looped plates, loop width, shimmer plates,
---   shimmer transparency, signature particles per second, sigils per second
+-- A gem in a piece of armor enchants it with the gem's element. Two layers:
+--   * a Highlight around the piece in the element's colour: the rarer the
+--     gem, the brighter and bolder (a faint wash at Common, a blazing outline
+--     and glow at Legendary);
+--   * the element's own effect pouring off its biggest plate:
+--       Thermal    flames licking upward, embers, a flickering heat-glow
+--       Cryo       a crust of ice crystals on the plate, falling snow and
+--                  cold mist, a slow cold glow
+--       Ion        crackling sparks and flashes, a strobing light
+--       Corrosive  dripping toxic goo, rising bubbles and fumes
+--     busier and brighter up the tiers.
+--   highlight fill transparency, highlight outline transparency, light
+--   brightness, light range, particles per second, ice crystals (Cryo)
 local GEM_GLOW = {
-	{ 1.4, 8, 1, 0.14, 2, 0.35, 5, 0.6 }, -- Common
-	{ 1.9, 10, 1, 0.2, 3, 0.25, 8, 0.9 }, -- Uncommon
-	{ 2.5, 12, 2, 0.24, 5, 0.15, 11, 1.2 }, -- Rare
-	{ 3.1, 14, 3, 0.28, 7, 0.05, 15, 1.6 }, -- Ultra Rare
-	{ 4, 17, 4, 0.34, 10, 0, 20, 2.2 }, -- Legendary
+	{ 0.88, 0.7, 1.2, 8, 6, 2 }, -- Common
+	{ 0.8, 0.45, 1.7, 10, 9, 3 }, -- Uncommon
+	{ 0.7, 0.25, 2.3, 12, 13, 4 }, -- Rare
+	{ 0.58, 0.08, 3, 14, 18, 6 }, -- Ultra Rare
+	{ 0.42, 0, 4, 17, 26, 8 }, -- Legendary
 }
-local VORTEX_TEXTURE = "rbxasset://textures/particles/forcefield_vortex_main.dds"
+-- How each element's light moves: seconds per pulse, and how far it dims.
+local GEM_PULSE = {
+	Fire = { 0.16, 0.55 }, -- flicker
+	Frost = { 1.6, 0.7 }, -- slow and cold
+	Shock = { 0.07, 0.25 }, -- strobe
+	Poison = { 1.0, 0.5 }, -- sickly throb
+}
 -- Each element's signature: what pours off enchanted armor.
+local DRIP_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local SIGNATURE: { [string]: { any } } = {
 	Fire = {
 		{
 			Texture = FIRE_TEXTURE,
-			Colors = { Color3.fromRGB(255, 210, 90), Color3.fromRGB(255, 60, 20) },
-			Size = 0.7,
-			Lifetime = NumberRange.new(0.3, 0.6),
+			Colors = { Color3.fromRGB(255, 220, 110), Color3.fromRGB(255, 50, 15) },
+			Size = 0.9,
+			Lifetime = NumberRange.new(0.3, 0.55),
 			Speed = NumberRange.new(1, 2.5),
-			Acceleration = Vector3.new(0, 7, 0),
-			Spread = 25,
-			Transparency = 0.15,
+			Acceleration = Vector3.new(0, 8, 0),
+			Spread = 20,
+			Transparency = 0.1,
 			Light = 1,
 			Share = 1,
 		},
 		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(255, 230, 140), Color3.fromRGB(255, 90, 30) },
-			Size = 0.22,
+			Colors = { Color3.fromRGB(255, 235, 150), Color3.fromRGB(255, 90, 30) },
+			Size = 0.2,
 			Lifetime = NumberRange.new(0.8, 1.5),
 			Speed = NumberRange.new(1.5, 3.5),
 			Acceleration = Vector3.new(0, 4, 0),
@@ -910,11 +917,11 @@ local SIGNATURE: { [string]: { any } } = {
 	Frost = {
 		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(240, 252, 255), Color3.fromRGB(90, 180, 255) },
-			Size = 0.32,
-			Lifetime = NumberRange.new(1, 1.8),
-			Speed = NumberRange.new(0.2, 0.7),
-			Acceleration = Vector3.new(0, -2.5, 0),
+			Colors = { Color3.fromRGB(245, 253, 255), Color3.fromRGB(110, 190, 255) },
+			Size = 0.3,
+			Lifetime = NumberRange.new(1.2, 2),
+			Speed = NumberRange.new(0.1, 0.4),
+			Acceleration = Vector3.new(0, -2, 0),
 			Spread = 180,
 			Transparency = 0,
 			Light = 1,
@@ -923,24 +930,24 @@ local SIGNATURE: { [string]: { any } } = {
 		},
 		{
 			Texture = SMOKE_TEXTURE,
-			Colors = { Color3.fromRGB(210, 240, 255), Color3.fromRGB(120, 190, 255) },
-			Size = 1.1,
-			Lifetime = NumberRange.new(1, 1.6),
-			Speed = NumberRange.new(0.2, 0.5),
-			Acceleration = Vector3.new(0, -1.2, 0),
-			Spread = 60,
-			Transparency = 0.6,
-			Light = 0.4,
-			Share = 0.4,
+			Colors = { Color3.fromRGB(220, 245, 255), Color3.fromRGB(140, 200, 255) },
+			Size = 1.2,
+			Lifetime = NumberRange.new(1.2, 1.8),
+			Speed = NumberRange.new(0.1, 0.4),
+			Acceleration = Vector3.new(0, -1.4, 0),
+			Spread = 50,
+			Transparency = 0.65,
+			Light = 0.3,
+			Share = 0.35,
 		},
 	},
 	Shock = {
 		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(255, 255, 230), Color3.fromRGB(255, 215, 30) },
+			Colors = { Color3.fromRGB(255, 255, 235), Color3.fromRGB(255, 215, 30) },
 			Size = 0.35,
-			Lifetime = NumberRange.new(0.06, 0.18),
-			Speed = NumberRange.new(6, 11),
+			Lifetime = NumberRange.new(0.05, 0.15),
+			Speed = NumberRange.new(7, 12),
 			Acceleration = Vector3.zero,
 			Spread = 180,
 			Transparency = 0,
@@ -950,30 +957,44 @@ local SIGNATURE: { [string]: { any } } = {
 		},
 		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(255, 250, 200), Color3.fromRGB(255, 230, 80) },
-			Size = 0.6,
-			Lifetime = NumberRange.new(0.05, 0.1),
-			Speed = NumberRange.new(0, 0.2),
+			Colors = { Color3.fromRGB(255, 255, 220), Color3.fromRGB(255, 235, 90) },
+			Size = 0.8,
+			Lifetime = NumberRange.new(0.04, 0.09),
+			Speed = NumberRange.new(0),
 			Acceleration = Vector3.zero,
 			Spread = 0,
 			Transparency = 0,
 			Light = 1,
-			Share = 0.5,
+			Share = 0.45,
 			Locked = true,
 		},
 	},
 	Poison = {
 		{
+			-- Goo dripping off the plate.
+			Texture = DRIP_TEXTURE,
+			Colors = { Color3.fromRGB(170, 255, 90), Color3.fromRGB(50, 170, 40) },
+			Size = 0.28,
+			Lifetime = NumberRange.new(0.6, 1),
+			Speed = NumberRange.new(0, 0.3),
+			Acceleration = Vector3.new(0, -14, 0),
+			Spread = 10,
+			Transparency = 0,
+			Light = 0.6,
+			Share = 0.7,
+			Squash = true,
+		},
+		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(200, 255, 140), Color3.fromRGB(60, 200, 70) },
-			Size = 0.3,
+			Colors = { Color3.fromRGB(210, 255, 150), Color3.fromRGB(70, 210, 80) },
+			Size = 0.28,
 			Lifetime = NumberRange.new(1, 1.8),
 			Speed = NumberRange.new(0.3, 0.9),
 			Acceleration = Vector3.new(0, 1.8, 0),
 			Spread = 40,
 			Transparency = 0.05,
 			Light = 0.8,
-			Share = 1,
+			Share = 0.6,
 		},
 		{
 			Texture = SMOKE_TEXTURE,
@@ -983,9 +1004,9 @@ local SIGNATURE: { [string]: { any } } = {
 			Speed = NumberRange.new(0.2, 0.5),
 			Acceleration = Vector3.new(0, 0.8, 0),
 			Spread = 60,
-			Transparency = 0.55,
+			Transparency = 0.6,
 			Light = 0.2,
-			Share = 0.5,
+			Share = 0.35,
 		},
 	},
 }
@@ -997,63 +1018,28 @@ local function gemTier(gem): number
 	end
 	return 1
 end
-local function shell(plate: Part, color: Color3, transparency: number)
-	local part = Instance.new("Part")
-	part.Name = "GemAura"
-	part.Shape = plate.Shape
-	part.Size = plate.Size * 1.08 + Vector3.one * 0.06
-	part.CFrame = plate.CFrame
-	part.Material = Enum.Material.ForceField
-	part.Color = color
-	part.Transparency = transparency
-	part.CanCollide, part.CanQuery, part.CanTouch = false, false, false
-	part.Massless, part.CastShadow = true, false
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0, weld.Part1 = plate, part
-	weld.Parent = part
-	part.Parent = plate.Parent
-end
--- A loop of flowing energy around `plate`: two arcs between opposite
--- corners, one bulging out of its front and one out of its back, so together
--- they ring it. `twist` tips the loop so several loops cross each other.
-local function energyLoop(plate: BasePart, color: Color3, width: number, twist: number, speed: number)
+-- Cryo: a crust of ice crystals jutting from the plate's top edge.
+local function iceCrust(plate: BasePart, count: number, rng: Random)
 	local half = plate.Size / 2
-	local reach = (math.max(half.Z, 0.25) + 0.45) * 1.6
-	local tilt = CFrame.Angles(0, 0, twist)
-	local ends = {
-		(tilt * CFrame.new(-half.X - 0.1, half.Y * 0.6, 0)).Position,
-		(tilt * CFrame.new(half.X + 0.1, -half.Y * 0.6, 0)).Position,
-	}
-	for _, facing in { 1, -1 } do
-		local points = {}
-		for i, at in ends do
-			local attachment = Instance.new("Attachment")
-			attachment.Name = "GemLoop"
-			-- Its axis (X) points out of the plate's front (-Z) or back (+Z).
-			attachment.CFrame = CFrame.new(at) * CFrame.Angles(0, math.rad(90 * facing), 0)
-			attachment.Parent = plate
-			points[i] = attachment
-		end
-		local beam = Instance.new("Beam")
-		beam.Name = "GemLoop"
-		beam.Attachment0, beam.Attachment1 = points[1], points[2]
-		beam.CurveSize0, beam.CurveSize1 = reach, -reach
-		beam.Texture = SPARK_TEXTURE
-		beam.TextureMode = Enum.TextureMode.Wrap
-		beam.TextureLength = 0.8
-		beam.TextureSpeed = speed * facing
-		beam.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.45), color)
-		beam.LightEmission = 1
-		beam.LightInfluence = 0
-		beam.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.6),
-			NumberSequenceKeypoint.new(0.5, 0.05),
-			NumberSequenceKeypoint.new(1, 0.6),
-		})
-		beam.Width0, beam.Width1 = width, width
-		beam.FaceCamera = true
-		beam.Segments = 16
-		beam.Parent = plate
+	for i = 1, count do
+		local crystal = Instance.new("Part")
+		crystal.Name = "GemIce"
+		local height = 0.25 + rng:NextNumber() * 0.35
+		crystal.Size = Vector3.new(0.12, height, 0.12)
+		crystal.Material = Enum.Material.Glass
+		crystal.Color = Color3.fromRGB(200, 235, 255)
+		crystal.Transparency = 0.25
+		crystal.Reflectance = 0.2
+		crystal.CanCollide, crystal.CanQuery, crystal.CanTouch = false, false, false
+		crystal.Massless, crystal.CastShadow = true, false
+		local x = (i - (count + 1) / 2) / count * half.X * 1.6
+		crystal.CFrame = plate.CFrame
+			* CFrame.new(x, half.Y + height * 0.3, -half.Z * rng:NextNumber())
+			* CFrame.Angles(rng:NextNumber(-0.4, 0.4), 0, rng:NextNumber(-0.5, 0.5))
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0, weld.Part1 = plate, crystal
+		weld.Parent = crystal
+		crystal.Parent = plate.Parent
 	end
 end
 local function gemGlow(component: Instance, gem)
@@ -1065,7 +1051,7 @@ local function gemGlow(component: Instance, gem)
 	local spec = GEM_GLOW[tier]
 	local plates = {}
 	for _, part in component:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" and part.Name ~= "GemAura" then
+		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" then
 			if part.Material == Enum.Material.Neon then
 				part.Color = color -- trims glow in the element's colour
 			end
@@ -1079,62 +1065,34 @@ local function gemGlow(component: Instance, gem)
 		return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
 	end)
 	local biggest = plates[1]
-	-- The light breathes: brighter, dimmer, brighter.
+	-- The highlight: brighter and bolder the rarer the gem.
+	if component:IsA("Model") then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "GemHighlight"
+		highlight.FillColor = color
+		highlight.FillTransparency = spec[1]
+		highlight.OutlineColor = color:Lerp(Color3.new(1, 1, 1), 0.25)
+		highlight.OutlineTransparency = spec[2]
+		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+		highlight.Parent = component
+	end
+	-- The light, moving the element's way.
+	local pulse = GEM_PULSE[gem.Element] or { 1, 0.5 }
 	local light = Instance.new("PointLight")
 	light.Name = "GemGlow"
 	light.Color = color
-	light.Brightness = spec[1]
-	light.Range = spec[2]
+	light.Brightness = spec[3]
+	light.Range = spec[4]
 	light.Shadows = false
 	light.Parent = biggest
 	TweenService:Create(
 		light,
-		TweenInfo.new(1.1 - tier * 0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Brightness = spec[1] * 0.45, Range = spec[2] * 0.8 }
+		TweenInfo.new(pulse[1], Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+		{ Brightness = spec[3] * pulse[2] }
 	):Play()
-	-- Energy looping around the biggest plates: crossing loops on the
-	-- biggest (one more per tier from Uncommon, up to three), one on the rest.
-	for index = 1, math.min(spec[3], #plates) do
-		local loops = if index == 1 then math.clamp(tier - 1, 1, 3) else 1
-		for loop = 1, loops do
-			local twist = math.rad(-35 + (loop - 1) * 70 + index * 25)
-			energyLoop(plates[index], color, spec[4], twist, 0.9 + tier * 0.25)
-		end
+	if gem.Element == "Frost" then
+		iceCrust(biggest, spec[6], Random.new(#plates * 7 + tier))
 	end
-	-- The rippling shimmer.
-	local shimmers = 0
-	for _, plate in plates do
-		if shimmers >= spec[5] then
-			break
-		end
-		if plate:IsA("Part") then
-			shell(plate, color, spec[6])
-			shimmers += 1
-		end
-	end
-	-- A swirling sigil on its biggest plate.
-	local sigil = Instance.new("ParticleEmitter")
-	sigil.Name = "GemSigil"
-	sigil.Texture = VORTEX_TEXTURE
-	sigil.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.3), color)
-	sigil.LightEmission = 1
-	sigil.LockedToPart = true
-	sigil.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.4),
-		NumberSequenceKeypoint.new(0.4, 1.2 + tier * 0.25),
-		NumberSequenceKeypoint.new(1, 1.6 + tier * 0.3),
-	})
-	sigil.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.3, 0.45),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	sigil.Lifetime = NumberRange.new(1.2, 1.6)
-	sigil.Speed = NumberRange.new(0)
-	sigil.Rotation = NumberRange.new(0, 360)
-	sigil.RotSpeed = NumberRange.new(140, 220)
-	sigil.Rate = spec[8]
-	sigil.Parent = biggest
 	-- The element's signature particles.
 	for _, style in SIGNATURE[gem.Element] or {} do
 		local emitter = Instance.new("ParticleEmitter")
@@ -1156,11 +1114,18 @@ local function gemGlow(component: Instance, gem)
 		emitter.Speed = style.Speed
 		emitter.SpreadAngle = Vector2.new(style.Spread, style.Spread)
 		emitter.Acceleration = style.Acceleration
-		emitter.Rate = spec[7] * style.Share
+		emitter.Rate = spec[5] * style.Share
 		emitter.LockedToPart = style.Locked == true
 		if style.Spin then
 			emitter.RotSpeed = NumberRange.new(-120, 120)
 			emitter.Rotation = NumberRange.new(0, 360)
+		end
+		if style.Squash then
+			-- Drops stretch as they fall.
+			emitter.Squash = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(1, 1.5),
+			})
 		end
 		emitter.Shape = Enum.ParticleEmitterShape.Box
 		emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
@@ -1302,7 +1267,8 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		local gear = (not only or only == slot)
 			and Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
 		if gear then
-			local component = Instance.new("Folder")
+			-- A Model (not a Folder) so it can carry its gem's Highlight.
+			local component = Instance.new("Model")
 			component.Name = slot
 			component.Parent = folder
 			armorSlots[slot] = component
@@ -1327,7 +1293,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 						table.insert(parts, part)
 					end
 				end
-				enchant(parts, gem, nil)
+				enchant(parts, gem, nil, true)
 			end
 		end
 	end
@@ -1398,7 +1364,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	end
 	local shieldItem = (not only or only == "Shield") and Classes.gear(loadout.Class, "Shields", loadout.Shield)
 	if shieldItem then
-		local component = Instance.new("Folder")
+		local component = Instance.new("Model")
 		component.Name = "Shield"
 		component.Parent = folder
 		local shieldRoll = GearRolls.get(loadout, "Shield")
@@ -1422,7 +1388,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 					table.insert(parts, part)
 				end
 			end
-			enchant(parts, loadout.ShieldGem, nil)
+			enchant(parts, loadout.ShieldGem, nil, true)
 		end
 	end
 	local weaponRoll = GearRolls.get(loadout, "Weapon")
@@ -1490,7 +1456,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 
 	-- Enchanted gear takes on its gem's element.
 	if loadout.ArmorGem and (not only or only == "Armor") then
-		enchant(armorParts, loadout.ArmorGem, torso)
+		enchant(armorParts, loadout.ArmorGem, torso, true)
 	end
 	if loadout.WeaponGem then
 		local weaponParts = {}

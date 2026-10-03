@@ -40,12 +40,18 @@ local function rebuild(character, equipment)
 						or character:FindFirstChild("Right Arm")
 					if anchor then
 						local copy = part:Clone()
+						-- Enchantment particles, beams and lights stay on the real
+						-- gear (others see them); up against the camera they'd
+						-- only smear across the view.
 						for _, descendant in copy:GetDescendants() do
 							if
 								descendant:IsA("JointInstance")
 								or descendant:IsA("WeldConstraint")
 								or descendant:IsA("Script")
 								or descendant:IsA("LocalScript")
+								or descendant:IsA("ParticleEmitter")
+								or descendant:IsA("Beam")
+								or descendant:IsA("Light")
 							then
 								descendant:Destroy()
 							end
