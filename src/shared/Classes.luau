@@ -1106,9 +1106,18 @@ local function find(list: { Gear }, id: any): Gear?
 	return nil
 end
 
--- The weapon a new kit starts with: the first one that can be handed out
--- right now (with pistols switched off, the first sword).
-function Classes.starterWeapon(class: Class): Gear
+-- The weapon a new kit starts with. Given an rng it's a rarity-weighted
+-- draw (ExpandedItemTraits.Weights) from what can be handed out right now,
+-- so a new kit can come with anything from Common to Legendary; without
+-- one, the first weapon that can be handed out (the first sword while
+-- pistols are switched off).
+function Classes.starterWeapon(class: Class, rng: Random?): Gear
+	if rng then
+		local drawn = ExpandedTraits.pick(class.Weapons, rng)
+		if drawn then
+			return drawn
+		end
+	end
 	for _, weapon in class.Weapons do
 		if ExpandedTraits.obtainable(weapon) then
 			return weapon

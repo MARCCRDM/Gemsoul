@@ -850,16 +850,16 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 end
 
 -- A gem in a piece of armor makes it glow with the gem's element, more the
--- rarer the gem: a light and tint from Common, glowing trims from Uncommon,
--- and from Rare a shimmering element aura (a ForceField shell) wrapped over
--- its largest plates, thicker and over more plates up to Legendary.
+-- rarer the gem: a light, a tint and glowing trims from Common, and from
+-- Uncommon a shimmering element aura (a ForceField shell) wrapped over its
+-- largest plates, thicker and over more plates up to Legendary.
 --   light brightness, light range, tint, aura plates, aura transparency, motes/s
 local GEM_GLOW = {
-	{ 0.6, 5, 0.08, 0, 1, 2 }, -- Common
-	{ 0.9, 7, 0.14, 0, 1, 4 }, -- Uncommon
-	{ 1.3, 9, 0.2, 3, 0.55, 6 }, -- Rare
-	{ 1.8, 11, 0.26, 6, 0.4, 9 }, -- Ultra Rare
-	{ 2.5, 14, 0.32, 10, 0.25, 14 }, -- Legendary
+	{ 1.2, 8, 0.16, 0, 1, 4 }, -- Common
+	{ 1.6, 10, 0.22, 2, 0.7, 6 }, -- Uncommon
+	{ 2.1, 12, 0.28, 4, 0.55, 9 }, -- Rare
+	{ 2.7, 14, 0.34, 7, 0.4, 12 }, -- Ultra Rare
+	{ 3.5, 17, 0.4, 10, 0.25, 18 }, -- Legendary
 }
 local function gemTier(gem): number
 	for index, tier in GemConfig.TierOrder do
@@ -880,9 +880,7 @@ local function gemGlow(component: Instance, gem)
 	for _, part in component:GetDescendants() do
 		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" and part.Name ~= "GemAura" then
 			if part.Material == Enum.Material.Neon then
-				if tier >= 2 then
-					part.Color = color -- trims glow in the element's colour
-				end
+				part.Color = color -- trims glow in the element's colour
 			else
 				part.Color = part.Color:Lerp(color, spec[3])
 			end

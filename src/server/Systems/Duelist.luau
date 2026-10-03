@@ -83,7 +83,7 @@ end
 local function rollLoadout(rng: Random)
 	local class = Classes.get("Warrior")
 	local profile = {
-		Character = { Class = "Warrior", Weapon = Classes.starterWeapon(class).Id, Armor = class.Armors[1].Id },
+		Character = { Class = "Warrior", Weapon = Classes.starterWeapon(class, rng).Id, Armor = class.Armors[1].Id },
 		Owned = {},
 	}
 	Slots.initialize(profile)
@@ -95,6 +95,19 @@ local function rollLoadout(rng: Random)
 	local gem = GemGenerator.generate(rng, "PvEDrop", { Id = "duel-w" .. idCounter, Time = os.time() })
 	c.WeaponGem = gem
 	c.ItemGems.Weapon[c.Weapon] = gem
+	-- A gem in every armor piece too, like a player's starter lottery, all
+	-- in the rival's element so its whole kit glows one colour (brighter
+	-- the rarer each gem; Equipment's gemGlow).
+	for _, slot in Slots.Order do
+		if slot ~= "Weapon" and c[slot] then
+			local armorGem =
+				GemGenerator.generate(rng, "PvEDrop", { Id = "duel-" .. slot .. idCounter, Time = os.time() })
+			armorGem.Element = gem.Element
+			c[slot .. "Gem"] = armorGem
+			c.ItemGems[slot] = c.ItemGems[slot] or {}
+			c.ItemGems[slot][c[slot]] = armorGem
+		end
+	end
 	-- A full Surge Array, like a player's: three gems rolled like mined ones.
 	for i = 1, 3 do
 		c["Surge" .. i .. "Gem"] =

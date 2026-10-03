@@ -195,7 +195,7 @@ local function migrate(profile: Profile): Profile
 		-- old saves get the starter sword instead.
 		local weapons = profile.Owned.Weapons
 		local warrior = Classes.get("Warrior")
-		local starter = if warrior then Classes.starterWeapon(warrior).Id else "PistolShield"
+		local starter = if warrior then Classes.starterWeapon(warrior, Random.new()).Id else "PistolShield"
 		weapons[starter] = weapons[starter] or 1
 		if
 			profile.Character.Class == "Warrior"
@@ -338,7 +338,7 @@ local function load(player: Player)
 		if class then
 			local character = profiles[player].Character
 			character.Class = only
-			character.Weapon = character.Weapon or Classes.starterWeapon(class).Id
+			character.Weapon = character.Weapon or Classes.starterWeapon(class, Random.new()).Id
 			character.Armor = character.Armor or class.Armors[1].Id
 			-- Family identity is equipped gear, never a saved subclass selection.
 			character.Subclass, character.SubClass, character.Spec = nil, nil, nil

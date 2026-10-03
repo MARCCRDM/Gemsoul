@@ -82,7 +82,7 @@ local function giveStarterKit(player: Player)
 	local classId = Config.OnlyClass or (character and character.Class) or "Warrior"
 	local class = Classes.get(classId)
 	if class and (not character or character.Class ~= classId) then
-		PlayerData.setLoadout(player, classId, Classes.starterWeapon(class).Id, class.Armors[1].Id)
+		PlayerData.setLoadout(player, classId, Classes.starterWeapon(class, Random.new()).Id, class.Armors[1].Id)
 	end
 end
 
