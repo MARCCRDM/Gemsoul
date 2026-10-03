@@ -1489,12 +1489,24 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 	ui.Bonus.Text = if headline then headline.Text else ""
 	ui.Bonus.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Dim
 	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
-	stroke.Color = if roll then GearRolls.Rarities[roll.Rarity].Color elseif class then class.Color else P.Edge
+	-- The tile glows in its element's colour (its gem's, else the weapon
+	-- gem's), stronger and with a thicker edge the rarer the item is.
+	local tier = if roll then roll.Rarity else 1
+	local glowGem = gem or loadout.WeaponGem
+	local glow = if gear and glowGem then GemConfig.ElementColors[glowGem.Element] else nil
+	local base = ui.Box:GetAttribute("BaseColor")
+	if typeof(base) ~= "Color3" then
+		base = ui.Box.BackgroundColor3
+		ui.Box:SetAttribute("BaseColor", base)
+	end
+	ui.Box.BackgroundColor3 = if glow and tier > 1 then base:Lerp(glow, 0.04 + 0.04 * tier) else base
+	local rarityColor = if roll then GearRolls.Rarities[roll.Rarity].Color elseif class then class.Color else P.Edge
+	stroke.Color = if glow and tier >= 3 then rarityColor:Lerp(glow, 0.45) else rarityColor
 	local selectedGear = selection ~= nil and selection.Kind == "Gear" and selection.Slot == slotName
 	if selectedGear then
 		stroke.Color = P.Gold
 	end
-	stroke.Thickness = if selectedGear or gem then 2.5 else 1.5
+	stroke.Thickness = if selectedGear or gem then 2.5 else 1.1 + 0.35 * tier
 	local ring = ui.Socket:FindFirstChild("Ring") :: UIStroke
 	local shown = if gem then gem.Id else ""
 	local redraw = ui.Shown ~= shown

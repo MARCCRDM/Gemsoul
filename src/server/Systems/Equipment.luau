@@ -778,6 +778,77 @@ local function enchant(parts: { BasePart }, gem, main: BasePart?)
 	end
 end
 
+-- Rarity shows at a glance: each piece glows in its element's colour (its
+-- own gem's, else the weapon gem's, else the rarity's colour), and the rarer
+-- it is the shinier the metal, the brighter the glow and the more sparkles.
+--   reflectance, glow brightness, glow range, sparkles per second
+local SHINE = {
+	{ 0, 0, 0, 0 }, -- Common: plain
+	{ 0.06, 0.45, 5, 0 }, -- Uncommon: glowing trims, a faint glow
+	{ 0.14, 0.8, 7, 2 }, -- Rare
+	{ 0.22, 1.2, 9, 4 }, -- Ultra Rare
+	{ 0.32, 1.8, 12, 8 }, -- Legendary
+}
+local SHINY = {
+	[Enum.Material.Metal] = true,
+	[Enum.Material.DiamondPlate] = true,
+	[Enum.Material.SmoothPlastic] = true,
+	[Enum.Material.Plastic] = true,
+	[Enum.Material.Foil] = true,
+	[Enum.Material.Glass] = true,
+}
+local function rarityShine(component: Instance, rarity: number, color: Color3)
+	local tier = math.clamp(math.floor(rarity or 1), 1, #SHINE)
+	local spec = SHINE[tier]
+	if tier <= 1 then
+		return
+	end
+	local biggest, biggestSize = nil, 0
+	for _, part in component:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" then
+			if part.Material == Enum.Material.Neon then
+				part.Color = color -- trims glow in the element's colour
+			elseif SHINY[part.Material] then
+				part.Reflectance = math.max(part.Reflectance, spec[1])
+			end
+			local size = part.Size.X * part.Size.Y * part.Size.Z
+			if size > biggestSize then
+				biggest, biggestSize = part, size
+			end
+		end
+	end
+	if not biggest then
+		return
+	end
+	local light = Instance.new("PointLight")
+	light.Name = "RarityGlow"
+	light.Color = color
+	light.Brightness = spec[2]
+	light.Range = spec[3]
+	light.Shadows = false
+	light.Parent = biggest
+	if spec[4] > 0 then
+		local sparkles = Instance.new("ParticleEmitter")
+		sparkles.Name = "RarityShine"
+		sparkles.Texture = SPARK_TEXTURE
+		sparkles.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.4), color)
+		sparkles.LightEmission = 1
+		sparkles.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.3, 0.18 + tier * 0.03),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		sparkles.Transparency = NumberSequence.new(0.1, 1)
+		sparkles.Lifetime = NumberRange.new(0.6, 1.2)
+		sparkles.Speed = NumberRange.new(0.2, 0.8)
+		sparkles.SpreadAngle = Vector2.new(180, 180)
+		sparkles.Rate = spec[4]
+		sparkles.Shape = Enum.ParticleEmitterShape.Box
+		sparkles.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		sparkles.Parent = biggest
+	end
+end
+
 -- Rare+ armor with Elemental Affinity Affixes gets a faint aura in its
 -- affixes' element colours: a soft light and a few slow motes on its biggest
 -- piece. Subtler than a socketed gem's enchantment.
@@ -1108,6 +1179,23 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 			end
 		end
 		enchant(weaponParts, loadout.WeaponGem, nil)
+	end
+	-- Rarity shine on every piece, in its element's colour.
+	local mainGem = loadout.WeaponGem
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield", "Weapon" } do
+		local component = if slot == "Weapon" then weaponFolder else folder:FindFirstChild(slot)
+		if component and (not only or only == slot) then
+			local roll = GearRolls.get(loadout, slot)
+			local item = if slot == "Weapon"
+				then weapon
+				else Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
+			local rarity = if roll then roll.Rarity else (item and item.RarityTier) or 1
+			local gem = loadout[slot .. "Gem"] or mainGem
+			local color = if gem
+				then GemConfig.ElementColors[gem.Element]
+				else GearRolls.Rarities[math.clamp(rarity, 1, #GearRolls.Rarities)].Color
+			rarityShine(component, rarity, color)
+		end
 	end
 	return folder
 end
