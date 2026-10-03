@@ -11,7 +11,8 @@ local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Rules = require(ReplicatedStorage.Shared.TargetLockRules)
 local player = Players.LocalPlayer
 local Lock = {}
-local active, manualUntil, nextScan = false, 0, 0
+local active, paused, manualUntil, nextScan = false, false, 0, 0
+local engagedUntil = setmetatable({}, { __mode = "k" }) -- [model] = until (os.clock)
 local state, candidates = Rules.new(), {}
 local params = RaycastParams.new()
 params.FilterType = Enum.RaycastFilterType.Exclude
@@ -85,6 +86,30 @@ function Lock.setActive(value)
 	end
 	active = value
 end
+-- Pauses the camera pull (a menu is open) without letting go of the target.
+function Lock.setPaused(value)
+	paused = value == true
+end
+-- Something attacked you: lock it at once if you have no target.
+function Lock.engage(model)
+	if model then
+		engagedUntil[model] = os.clock() + 8
+	end
+end
+-- An attack came from this spot: engage whatever is standing there.
+function Lock.engageNear(position)
+	local best, bestDistance = nil, 15
+	for _, model in candidates do
+		local root = rootOf(model)
+		if root and model ~= player.Character then
+			local distance = (root.Position - position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = model, distance
+			end
+		end
+	end
+	Lock.engage(best)
+end
 -- The locked target (held through brief cover).
 function Lock.target()
 	local model = state.Target
@@ -144,7 +169,8 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 		if point and eligible(model) then
 			local delta = point - camera.CFrame.Position
 			local distance = (point - ownRoot.Position).Magnitude
-			if delta.Magnitude > 0.01 and distance <= Rules.RetainRange then
+			local rival = player.UserId ~= nil and model:GetAttribute("RivalOwner") == player.UserId
+			if delta.Magnitude > 0.01 and (distance <= Rules.RetainRange or rival) then
 				table.insert(records, {
 					Target = model,
 					Distance = distance,
@@ -153,17 +179,18 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 					Visible = visible(model, point),
 					-- Your Arena rival: always the one to lock.
 					Priority = player.UserId ~= nil and model:GetAttribute("RivalOwner") == player.UserId,
+					Engaged = (engagedUntil[model] or 0) > now,
 				})
 			end
 		end
 	end
 	local target = Rules.update(state, records, now, now < manualUntil)
 	outline.Adornee, outline.Enabled = target, target ~= nil
-	if target then
-		-- Strong pull; gentler (not released) while you're looking around.
+	if target and not paused then
+		-- A hard pull; a little softer (never released) while you look around.
 		local point = pointOf(target)
 		if point then
-			local rate = if now < manualUntil then 4 else 14
+			local rate = if now < manualUntil then 9 else 16
 			camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, point), 1 - math.exp(-dt * rate))
 		end
 	end

@@ -1171,7 +1171,9 @@ RunService.RenderStepped:Connect(function(dt)
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
 	local fight = canFight() == true and not (dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled)
 	gui.Enabled = fight
-	TargetLock.setActive(fight and not cursorFree and not CombatGuide.isOpen() and not AugmentTreeUI.isOpen())
+	-- The lock stays on through menus and a free cursor; only its camera pull pauses.
+	TargetLock.setActive(fight)
+	TargetLock.setPaused(CombatGuide.isOpen() or AugmentTreeUI.isOpen())
 	leave.Visible = ArenaScene.isActive()
 	if not fight then
 		if lastActive then
@@ -1577,6 +1579,9 @@ function handlers.HitConfirm(crit)
 end
 function handlers.IncomingDamage(origin)
 	incomingOrigin, incomingUntil = origin, os.clock() + 0.65
+	if typeof(origin) == "Vector3" then
+		TargetLock.engageNear(origin) -- whatever hit you gets locked
+	end
 	flashUntil = os.clock() + 0.3
 	CombatSound.play("Hurt")
 	CombatFx.shake(0.018, 0.22)

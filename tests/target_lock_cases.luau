@@ -1,7 +1,7 @@
 local checks = 0
 local function check(value, message) checks += 1; assert(value, message) end
-local function c(id, distance, facing, visible, allowed, priority)
- return {Target=id, Distance=distance, Facing=facing or 1, Visible=visible ~= false, Allowed=allowed ~= false, Priority=priority}
+local function c(id, distance, facing, visible, allowed, priority, engaged)
+ return {Target=id, Distance=distance, Facing=facing or 1, Visible=visible ~= false, Allowed=allowed ~= false, Priority=priority, Engaged=engaged}
 end
 local s=Rules.new()
 check(Rules.update(s,{c("far",20),c("near",8)},0,false)=="near","Nearest visible target not selected")
@@ -9,8 +9,8 @@ check(Rules.update(s,{c("far",2),c("near",8)},0.1,false)=="near","Lock jumped to
 check(Rules.update(s,{c("near",8,0.8)},0.2,false)=="near","Normal tracking lost retained target")
 check(Rules.update(s,{c("near",8,-0.9)},0.3,true)=="near","Turning away broke the lock")
 check(Rules.update(s,{c("near",8,1,false)},0.4,false)=="near","Brief cover broke the lock")
-check(Rules.update(s,{c("near",8,1,false)},1.5,false)=="near","Lock dropped inside the cover grace")
-check(Rules.update(s,{c("near",8,1,false),c("other",12)},2.0,false)=="other","Lock held a target hidden too long")
+check(Rules.update(s,{c("near",8,1,false)},3.5,false)=="near","Lock dropped inside the cover grace")
+check(Rules.update(s,{c("near",8,1,false),c("other",12)},4.5,false)=="other","Lock held a target hidden too long")
 s=Rules.new()
 check(Rules.update(s,{c("off-axis",2,0.6),c("ahead",10)},0,false)=="ahead","Acquired outside forward cone")
 s=Rules.new()
@@ -28,4 +28,16 @@ s=Rules.new()
 check(Rules.update(s,{c("monster",5)},0,false)=="monster","Monster not locked")
 check(Rules.update(s,{c("monster",5),c("rival",30,0.2,true,true,true)},0.1,false)=="rival","Rival didn't take over the lock")
 check(Rules.update(s,{c("monster",5),c("rival",30,0.2,true,false,true)},0.2,false)=="monster","Dead or ineligible rival kept the lock")
-print("PASS: "..checks.." sticky target selection, rival priority, cover grace and range checks")
+-- The rival is never let go for distance or cover, only when it's gone.
+s=Rules.new()
+check(Rules.update(s,{c("rival",30,1,true,true,true)},0,false)=="rival","Rival not locked")
+check(Rules.update(s,{c("rival",300,-1,false,true,true)},10,false)=="rival","Rival lock broke from range or cover")
+check(Rules.update(s,{c("rival",300,-1,false,true,true)},60,false)=="rival","Rival lock timed out behind cover")
+check(Rules.update(s,{c("monster",3)},61,false)=="monster","Lock didn't move on after the rival left")
+-- Whatever attacks you is locked at once, from any angle, if you have no target.
+s=Rules.new()
+check(Rules.update(s,{c("sniper",80,-0.9,false,true,false,true)},0,false)=="sniper","Attacker behind you not locked")
+s=Rules.new()
+check(Rules.update(s,{c("front",10)},0,false)=="front","Front target not locked")
+check(Rules.update(s,{c("front",10),c("other",5,-1,true,true,false,true)},0.1,false)=="front","An attacker stole an existing lock")
+print("PASS: "..checks.." unbreakable rival lock, auto-engage, cover grace and range checks")
