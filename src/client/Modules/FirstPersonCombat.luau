@@ -77,10 +77,13 @@ local function rebuild(character, equipment)
 						copy.Size *= 0.65
 						copy.Parent = holder
 						local offset = anchor.CFrame:ToObjectSpace(part.CFrame)
-						table.insert(
-							pieces,
-							{ Part = copy, Left = left, Offset = CFrame.new(offset.Position * 0.65) * offset.Rotation }
-						)
+						offset = CFrame.new(offset.Position * 0.65) * offset.Rotation
+						if slot == "Shield" then
+							-- On the real arm the shield faces out to the side; held up
+							-- in view it turns to face the enemy ahead (you see its back).
+							offset = CFrame.Angles(0, math.rad(-70), 0) * offset
+						end
+						table.insert(pieces, { Part = copy, Left = left, Offset = offset })
 					end
 				end
 			end

@@ -301,7 +301,12 @@ local function frontierShield(folder, character, accent, gem, finish, rarity, fa
 	if not arm then
 		return
 	end
-	local mount = CFrame.new(-(arm.Size.X / 2 + 0.2), 0, 0) * CFrame.Angles(0, math.rad(-90), 0)
+	-- The shield's face (its -Z: plates, rim and gem) turns out, away from
+	-- the forearm. On a body posed by RivalPose (FistGrip) it's angled a
+	-- further 20 degrees forward, so in its guard (forearm raised across the
+	-- chest) the face meets its foe.
+	local turn = if character:GetAttribute("FistGrip") then 110 else 90
+	local mount = CFrame.new(-(arm.Size.X / 2 + 0.2), 0, 0) * CFrame.Angles(0, math.rad(turn), 0)
 	FrontierAssets.shield(folder, arm, mount, rarity, accent, finish, family)
 	gemSocket(folder, arm, mount, Vector3.new(0, 0.1, -0.28), gem, 0.19)
 end
