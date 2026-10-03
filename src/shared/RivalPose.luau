@@ -138,12 +138,13 @@ local function frames(kind: string, s: number)
 			LeftElbow = { 1.4, 0, 0 },
 			Waist = { -0.2, 0, 0 },
 		}, {
-			Waist = { 0.2, 0, 0 },
-			Neck = { 0.35, 0, 0 },
-			RightShoulder = { 0.5, 0, 1.6 },
-			LeftShoulder = { 0.5, 0, -1.6 },
-			RightElbow = { 0.2, 0, 0 },
-			LeftElbow = { 0.2, 0, 0 },
+			-- Both hands raised in front, channelling.
+			Waist = { 0.12, 0, 0 },
+			Neck = { 0.2, 0, 0 },
+			RightShoulder = { 1.9, 0, 0.45 },
+			LeftShoulder = { 1.9, 0, -0.45 },
+			RightElbow = { 0.6, 0, 0 },
+			LeftElbow = { 0.6, 0, 0 },
 		}
 	elseif kind == "Dodge" then
 		local tuck = {

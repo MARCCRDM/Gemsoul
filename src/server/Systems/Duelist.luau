@@ -22,9 +22,11 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 
 local Brain = require(ReplicatedStorage.Shared.DuelistBrain)
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
+local Matchup = require(ReplicatedStorage.Shared.Matchup)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -100,6 +102,58 @@ local function rollLoadout(rng: Random)
 	return c
 end
 
+-- Places with Roblox's newer avatar joints build rigs from physics joints
+-- (AnimationConstraints and ball sockets), which let posed limbs swing
+-- loose. The rival gets classic rigid Motor6D joints instead, built from the
+-- same rig attachments, so its poses hold exactly.
+local JOINT_NAMES = {
+	Root = true,
+	Waist = true,
+	Neck = true,
+	LeftShoulder = true,
+	LeftElbow = true,
+	LeftWrist = true,
+	RightShoulder = true,
+	RightElbow = true,
+	RightWrist = true,
+	LeftHip = true,
+	LeftKnee = true,
+	LeftAnkle = true,
+	RightHip = true,
+	RightKnee = true,
+	RightAnkle = true,
+}
+local function classicJoints(rig: Model): number
+	local converted = 0
+	for _, constraint in rig:GetDescendants() do
+		if constraint:IsA("AnimationConstraint") and constraint.Attachment0 and constraint.Attachment1 then
+			local a0, a1 = constraint.Attachment0, constraint.Attachment1
+			local part0, part1 = a0.Parent, a1.Parent
+			if part0 and part0:IsA("BasePart") and part1 and part1:IsA("BasePart") then
+				local name = if JOINT_NAMES[constraint.Name]
+					then constraint.Name
+					else (string.gsub(a0.Name, "RigAttachment$", ""))
+				local motor = Instance.new("Motor6D")
+				motor.Name = name
+				motor.Part0, motor.Part1 = part0, part1
+				motor.C0, motor.C1 = a0.CFrame, a1.CFrame
+				motor.Parent = part1
+				constraint:Destroy()
+				converted += 1
+			end
+		end
+	end
+	if converted > 0 then
+		-- The ball sockets only limited the physics joints.
+		for _, socket in rig:GetDescendants() do
+			if socket:IsA("BallSocketConstraint") or socket:IsA("HingeConstraint") then
+				socket:Destroy()
+			end
+		end
+	end
+	return converted
+end
+
 -- An R15 rig in the rival's gear, standing at `at`.
 local function buildRig(loadout, name: string, at: CFrame): Model?
 	local ok, rig = pcall(function()
@@ -116,6 +170,7 @@ local function buildRig(loadout, name: string, at: CFrame): Model?
 		return nil
 	end
 	rig.Name = name
+	classicJoints(rig)
 	-- Stream the whole body at once, so clients can pose its joints.
 	rig.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	rig:PivotTo(at)
@@ -849,6 +904,44 @@ function spawnRival(owner: Player)
 		model:SetAttribute("MoveCooldown" .. slot, move.Cooldown)
 		model:SetAttribute("MoveReadyAt" .. slot, workspace:GetServerTimeNow() + (move.Next - now))
 	end
+	-- You vs it, for the player's matchup panel: the numbers each side really
+	-- fights with, and each side's strengths and weaknesses.
+	local yourSurges = {}
+	for slot = 1, 3 do
+		local gem = ownerLoadout["Surge" .. slot .. "Gem"]
+		local id = gem and Tech.surgeOf(gem)
+		local stats = gem and Tech.surgeStats(gem)
+		if id and stats then
+			table.insert(yourSurges, {
+				Id = id,
+				Name = stats.Name,
+				Kind = if SELF_SURGES[id] then "Self" elseif stats.Radius then "Nova" else "Bolt",
+			})
+		end
+	end
+	local foeMoves = {}
+	for _, move in duel.Moves do
+		table.insert(foeMoves, move.Id)
+	end
+	local matchup = Matchup.build({
+		Name = owner.DisplayName,
+		Health = math.floor(ownerHumanoid and ownerHumanoid.MaxHealth or 300),
+		Hit = math.floor(playerHit + 0.5),
+		Speed = math.floor(ownerHumanoid and ownerHumanoid.WalkSpeed or 16),
+		Element = ownerLoadout.WeaponGem and ownerLoadout.WeaponGem.Element,
+		Surges = yourSurges,
+		Moves = ownerLoadout.Maneuvers or Tech.DefaultManeuvers,
+	}, {
+		Name = name,
+		Health = health,
+		-- Its quick hit after your armor.
+		Hit = math.floor(duel.Damage * Combat.defenseMult(rating(theirs, "Defense")) + 0.5),
+		Speed = duel.Speed,
+		Element = element,
+		Surges = duel.Surges,
+		Moves = foeMoves,
+	})
+	model:SetAttribute("Matchup", HttpService:JSONEncode(matchup))
 	local surgeList = if #names > 0 then table.concat(names, ", ") else "no surges"
 	enemy.Brain = think
 	enemy.OnDeath = onWin

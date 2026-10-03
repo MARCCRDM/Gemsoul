@@ -84,7 +84,7 @@ local heavy = RivalPose.pose({ ActionKind = "Heavy", ActionStart = 100, ActionAt
 check(heavy.LeftShoulder[1] > 2.5 and heavy.RightShoulder[1] > 2.5, "Heavy wind-up was not overhead")
 check(RivalPose.pose({ ActionKind = "Nova", ActionStart = 100, ActionAt = 100.9 }, 100.95).RightKnee[1] < 0, "Blast did not slam down")
 check(RivalPose.pose({ ActionKind = "Bolt", ActionStart = 100, ActionAt = 100.45 }, 100.5).RightElbow[1] < 0.3, "Bolt did not thrust the arm")
-check(RivalPose.pose({ ActionKind = "Buff", ActionStart = 100, ActionAt = 100.15 }, 100.4).LeftShoulder[3] < -1, "Buff did not spread the arms")
+check(RivalPose.pose({ ActionKind = "Buff", ActionStart = 100, ActionAt = 100.15 }, 100.4).LeftShoulder[1] > 1.5, "Buff did not raise the hands")
 check(RivalPose.pose({ ActionKind = "Dodge", ActionStart = 100, ActionAt = 100 }, 100.2).RightKnee[1] < -1, "Dodge did not tuck")
 check(RivalPose.pose({ ActionKind = "Stagger", ActionStart = 100, ActionAt = 100 }, 100.2).Waist[1] > 0.3, "Stagger did not rock back")
 check(RivalPose.pose({ GuardUntil = 101 }, 100.5).RightElbow[1] > 1.5, "Guard did not raise the forearms")
@@ -215,4 +215,22 @@ check(hst.DodgeKind == "Hop" and hst.DodgeStarted == now, "Hop blocked by the ro
 check(DuelistBrain.boltHits(Vector3.new(0, 0, 0), Vector3.new(2, 3, 1)), "Bolt missed a player standing still")
 check(not DuelistBrain.boltHits(Vector3.new(0, 0, 0), Vector3.new(6, 0, 0)), "Bolt hit a player who hopped aside")
 check(DuelistBrain.Windup.Bolt >= 0.6, "Bolt too fast to react to")
-print("PASS: " .. checks .. " Duelist checks (hop and roll, dodgeable bolts, combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
+-- The matchup: real numbers and both sides' strengths and weaknesses.
+local m = Matchup.build(
+	{ Name = "You", Health = 300, Hit = 20, Speed = 16, Element = "Frost", Surges = {}, Moves = { "HydraulicSlam" } },
+	{ Name = "Kade", Health = 400, Hit = 30, Speed = 18, Element = "Fire",
+		Surges = { { Id = "EnergySiphon", Name = "Energy Siphon", Kind = "Self" }, { Id = "SolarFlare", Name = "Solar Flare", Kind = "Bolt" } },
+		Moves = { "StimDodge" } }
+)
+check(m.Rows[3].Stat == "Hits to win" and m.Rows[3].You == 20 and m.Rows[3].Foe == 10 and m.Rows[3].Better == "Foe", "Hits-to-win row wrong")
+check(m.Rows[1].Better == "Foe" and m.Rows[4].Better == "Foe", "Better stat not marked")
+local function anyFind(list, word) for _, line in list do if string.find(line, word, 1, true) then return true end end return false end
+check(anyFind(m.FoeEdges, "Wins the trade") and anyFind(m.FoeEdges, "Tougher"), "Rival's edges missing: " .. table.concat(m.FoeEdges, " | "))
+check(anyFind(m.FoeWeak, "Heals itself") and anyFind(m.FoeWeak, "Solar Flare"), "Rival's weaknesses missing: " .. table.concat(m.FoeWeak, " | "))
+check(anyFind(m.YourEdges, "Cryo"), "Your element edge missing")
+check(#m.YourWeak > 0 and #m.FoeEdges <= 4 and #m.FoeWeak <= 4, "Edge lists not capped or empty")
+local thermal = Matchup.build({ Health = 300, Hit = 40, Speed = 20, Element = "Fire", Surges = {}, Moves = {} },
+	{ Health = 250, Hit = 15, Speed = 18, Element = "Shock", Surges = { { Id = "EnergySiphon", Name = "Energy Siphon", Kind = "Self" } }, Moves = {} })
+check(anyFind(thermal.YourEdges, "cuts its healing") and anyFind(thermal.YourEdges, "win the trade"), "Your edges missing: " .. table.concat(thermal.YourEdges, " | "))
+check(anyFind(thermal.FoeWeak, "Fragile"), "Rival's low health not called out")
+print("PASS: " .. checks .. " Duelist checks (matchup, hop and roll, dodgeable bolts, combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")

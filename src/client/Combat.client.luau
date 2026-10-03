@@ -25,6 +25,7 @@ local StatusBars = require(script.Parent.Modules.StatusBars)
 local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
 local CombatFx = require(script.Parent.Modules.CombatFx)
 local CombatSound = require(script.Parent.Modules.CombatSound)
+local MatchupUI = require(script.Parent.Modules.MatchupUI)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local UiKit = require(script.Parent.Modules.UiKit)
 if Config.MenuOnly and not Config.CombatEnabled then
@@ -618,6 +619,9 @@ local rivalStatusRow = new("Frame", {
 	Size = UDim2.new(1, 0, 0, 34),
 }, rivalPanel)
 local rivalStatuses = StatusBars.strip(rivalStatusRow, true, Enum.HorizontalAlignment.Right)
+
+-- The matchup (beside the rival panel): you vs it, strengths and weaknesses.
+local matchup = MatchupUI.new(gui)
 local rivalHealth = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 	BorderSizePixel = 0,
@@ -1370,6 +1374,7 @@ RunService.RenderStepped:Connect(function(dt)
 		rivalModel and (rivalModel:GetAttribute("RivalName") or rivalModel.Name)
 	)
 	drawFoeCast(rivalModel, serverNow)
+	matchup:draw(rivalModel, viewport, rivalPanel.Visible)
 	CombatFx.auras(serverNow)
 	if rivalModel ~= logRival and rivalModel ~= nil then
 		logRival = rivalModel
