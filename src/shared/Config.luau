@@ -39,7 +39,7 @@ local Config = {
 		Build = "Playtest 1 · 2026-10-03",
 		-- UserIds who can read feedback and error reports in game (Social >
 		-- Feedback > Reports). In Studio everyone can.
-		Owners = {},
+		Owners = { 11738957136 }, -- Devvolver
 		-- UserIds who get the test-admin tools (e.g. regenerating gear).
 		Testers = {},
 		-- Everyone gets the test-admin tools while testing. Turn off for launch.
