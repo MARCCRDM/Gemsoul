@@ -53,12 +53,15 @@ end
 --[[
 	The shield as you see it in your own hands, Elder Scrolls / Blades style:
 	a big kite shield whose back faces you. The worn shield's back is a plain
-	board, so the view builds its own: a planked wooden board tapering to a
-	point, a thick metal rim (in the shield's own metal colour) studded with
-	rivets, the back of its iron boss, two leather arm straps with buckles, a
-	padded arm rest and a grip. Its gem's highlight and element effects ride
-	along. Sizes in studs, in the shield's frame (its face is -Z, away from
-	you; its back +Z, toward you).
+	board, so the view builds its own, as armoured tech to match the game: a
+	gunmetal shell inside a rim of the shield's own metal, a glowing accent
+	line just inside the rim, an inset lip for depth, a raised spine with
+	recessed vented panels either side, the glowing back of its gem socket
+	with energy conduits running out to the corners, and a forearm brace
+	(padded cuff and a grip bar with a lit strip). The glow is the shield
+	gem's element colour (else the shield's trim colour). Its gem's
+	highlight and element effects ride along. Sizes in studs, in the
+	shield's frame (its face is -Z, away from you; its back +Z, toward you).
 ]]
 local SHIELD_W, SHIELD_H = 1.15, 1.0 -- the board's width, and its height above the point
 local function shieldPart(holder, pieces, size, cframe, color, material, shape)
@@ -75,126 +78,169 @@ local function shieldPart(holder, pieces, size, cframe, color, material, shape)
 	table.insert(pieces, { Part = part, Shield = true, Offset = cframe })
 	return part
 end
+-- A bar from a to b (in the shield's plane) at depth z.
+local function strut(holder, pieces, a: Vector2, b: Vector2, width, depth, z, color, material)
+	local mid = (a + b) / 2
+	local delta = b - a
+	return shieldPart(
+		holder,
+		pieces,
+		Vector3.new(delta.Magnitude + width * 0.5, width, depth),
+		CFrame.new(mid.X, mid.Y, z) * CFrame.Angles(0, 0, math.atan2(delta.Y, delta.X)),
+		color,
+		material
+	)
+end
 local function buildViewShield(holder, source)
 	local pieces = {}
-	-- Its metal: the worn shield's largest metal-looking plate, else steel.
+	-- Its metal: the worn shield's largest metal-looking plate, else steel;
+	-- its glow: the gem's highlight colour, else its trim, else teal.
 	local metal, area = Color3.fromRGB(150, 156, 166), 0
+	local glow
 	local emitters = {}
 	for _, part in source:GetDescendants() do
 		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" then
 			local flat = part.Size.X * part.Size.Y
-			if part.Material ~= Enum.Material.Neon and flat > area and flat < 1.9 then
+			if part.Material == Enum.Material.Neon then
+				glow = glow or part.Color
+			elseif flat > area and flat < 1.9 then
 				metal, area = part.Color, flat
 			end
 		elseif part:IsA("ParticleEmitter") then
 			table.insert(emitters, part)
 		end
 	end
+	local highlight = source:FindFirstChild("GemHighlight")
+	if highlight and highlight:IsA("Highlight") then
+		glow = highlight.OutlineColor
+	end
+	glow = glow or Color3.fromRGB(80, 220, 235)
 	local W, H = SHIELD_W, SHIELD_H
-	local wood = Color3.fromRGB(104, 70, 44)
-	local seam = Color3.fromRGB(58, 38, 24)
-	local leather = Color3.fromRGB(78, 50, 32)
-	local iron = Color3.fromRGB(70, 72, 78)
-	-- The board: a rectangle on a diamond, so it tapers to a point below.
-	local board = shieldPart(holder, pieces, Vector3.new(W, H, 0.07), CFrame.new(), wood, Enum.Material.Wood)
+	local P = Vector2.new
+	local shell = Color3.fromRGB(46, 50, 58):Lerp(metal, 0.2)
+	local recess = Color3.fromRGB(28, 31, 37)
+	local pad = Color3.fromRGB(34, 34, 38)
+	local Metal, Plate, Neon, Fabric =
+		Enum.Material.Metal, Enum.Material.DiamondPlate, Enum.Material.Neon, Enum.Material.Fabric
+
+	-- The shell: a rectangle on a diamond, so it tapers to a point below.
+	local board = shieldPart(holder, pieces, Vector3.new(W, H, 0.07), CFrame.new(), shell, Metal)
 	local side = W / math.sqrt(2)
 	shieldPart(
 		holder,
 		pieces,
 		Vector3.new(side, side, 0.07),
 		CFrame.new(0, -H / 2, 0) * CFrame.Angles(0, 0, math.rad(45)),
-		wood,
-		Enum.Material.Wood
+		shell,
+		Metal
 	)
-	-- Plank seams running down the back.
-	for _, x in { -W / 4, 0, W / 4 } do
-		local length = H + (W / 2 - math.abs(x)) * 0.95
-		shieldPart(
-			holder,
-			pieces,
-			Vector3.new(0.025, length, 0.01),
-			CFrame.new(x, H / 2 - length / 2, 0.04),
-			seam,
-			Enum.Material.Wood
-		)
+	-- The outline, corner to corner: top-left, top-right, right shoulder,
+	-- the point, left shoulder.
+	local corners = { P(-W / 2, H / 2), P(W / 2, H / 2), P(W / 2, -H / 2), P(0, -H / 2 - W / 2), P(-W / 2, -H / 2) }
+	local function inset(k: number)
+		local out = {}
+		for i, c in corners do
+			out[i] = c * (1 - k) + P(0, -H * 0.12) * k
+		end
+		return out
 	end
-	-- The metal rim: top, both sides, and the two edges down to the point.
-	local rim, depth = 0.09, 0.13
-	shieldPart(holder, pieces, Vector3.new(W + rim, rim, depth), CFrame.new(0, H / 2, 0), metal, Enum.Material.Metal)
+	local function loop(points, width, depth, z, color, material)
+		for i = 1, #points do
+			strut(holder, pieces, points[i], points[i % #points + 1], width, depth, z, color, material)
+		end
+	end
+	-- The rim in the shield's metal, a glowing line inside it, and an inset
+	-- lip a little further in, for depth.
+	loop(corners, 0.085, 0.14, 0, metal, Metal)
+	loop(inset(0.09), 0.022, 0.02, 0.045, glow, Neon)
+	loop(inset(0.17), 0.05, 0.05, 0.05, recess, Metal)
+	-- The spine down the middle, and recessed vented panels either side.
+	strut(
+		holder,
+		pieces,
+		P(0, H / 2 - 0.08),
+		P(0, -H / 2 - W / 2 + 0.16),
+		0.11,
+		0.08,
+		0.06,
+		metal:Lerp(shell, 0.4),
+		Metal
+	)
 	for _, sx in { -1, 1 } do
-		shieldPart(holder, pieces, Vector3.new(rim, H, depth), CFrame.new(sx * W / 2, 0, 0), metal, Enum.Material.Metal)
 		shieldPart(
 			holder,
 			pieces,
-			Vector3.new(side + rim, rim, depth),
-			CFrame.new(sx * W / 4, -H / 2 - W / 4, 0) * CFrame.Angles(0, 0, math.rad(sx * 45)),
-			metal,
-			Enum.Material.Metal
+			Vector3.new(W * 0.28, H * 0.5, 0.02),
+			CFrame.new(sx * W * 0.24, 0.12, 0.045),
+			recess,
+			Plate
 		)
+		for i = 0, 2 do
+			shieldPart(
+				holder,
+				pieces,
+				Vector3.new(W * 0.2, 0.025, 0.02),
+				CFrame.new(sx * W * 0.24, 0.27 - i * 0.07, 0.058),
+				Color3.fromRGB(14, 15, 18),
+				Metal
+			)
+		end
 	end
-	-- Rivets around the rim.
-	for _, spot in
-		{
-			Vector2.new(-W / 2, H / 2),
-			Vector2.new(0, H / 2),
-			Vector2.new(W / 2, H / 2),
-			Vector2.new(-W / 2, 0),
-			Vector2.new(W / 2, 0),
-			Vector2.new(-W / 2, -H / 2),
-			Vector2.new(W / 2, -H / 2),
-			Vector2.new(-W / 4, -H / 2 - W / 4),
-			Vector2.new(W / 4, -H / 2 - W / 4),
-			Vector2.new(0, -H / 2 - W / 2 + 0.06),
-		}
-	do
+	-- The back of the gem socket: a glowing core in a metal ring, with
+	-- conduits running out to the corners.
+	shieldPart(
+		holder,
+		pieces,
+		Vector3.new(0.05, 0.34, 0.34),
+		CFrame.new(0, -0.12, 0.06) * CFrame.Angles(0, math.rad(90), 0),
+		metal,
+		Metal,
+		Enum.PartType.Cylinder
+	)
+	shieldPart(
+		holder,
+		pieces,
+		Vector3.new(0.06, 0.2, 0.2),
+		CFrame.new(0, -0.12, 0.075) * CFrame.Angles(0, math.rad(90), 0),
+		glow,
+		Neon,
+		Enum.PartType.Cylinder
+	)
+	local core = P(0, -0.12)
+	for _, target in { P(-W * 0.38, H * 0.38), P(W * 0.38, H * 0.38), P(0, -H / 2 - W / 2 + 0.22) } do
+		local from = core + (target - core).Unit * 0.17
+		strut(holder, pieces, from, target, 0.02, 0.015, 0.068, glow, Neon)
+	end
+	-- The forearm brace: a padded cuff across the upper half, and a grip bar
+	-- on two posts with a lit strip.
+	shieldPart(holder, pieces, Vector3.new(0.5, 0.2, 0.08), CFrame.new(0, 0.3, 0.1), pad, Fabric)
+	shieldPart(holder, pieces, Vector3.new(0.56, 0.06, 0.1), CFrame.new(0, 0.4, 0.13), metal, Metal)
+	shieldPart(holder, pieces, Vector3.new(0.56, 0.06, 0.1), CFrame.new(0, 0.2, 0.13), metal, Metal)
+	for _, sx in { -1, 1 } do
+		shieldPart(holder, pieces, Vector3.new(0.06, 0.06, 0.16), CFrame.new(sx * 0.17, -0.42, 0.12), metal, Metal)
+	end
+	shieldPart(
+		holder,
+		pieces,
+		Vector3.new(0.4, 0.08, 0.08),
+		CFrame.new(0, -0.42, 0.2) * CFrame.Angles(0, 0, 0),
+		Color3.fromRGB(30, 30, 34),
+		Fabric,
+		Enum.PartType.Cylinder
+	)
+	shieldPart(holder, pieces, Vector3.new(0.26, 0.018, 0.02), CFrame.new(0, -0.42, 0.245), glow, Neon)
+	-- A few rivets at the rim's corners.
+	for _, c in corners do
 		shieldPart(
 			holder,
 			pieces,
-			Vector3.one * 0.06,
-			CFrame.new(spot.X, spot.Y, depth / 2),
-			metal:Lerp(Color3.new(1, 1, 1), 0.25),
-			Enum.Material.Metal,
+			Vector3.one * 0.05,
+			CFrame.new(c.X * 0.93, c.Y * 0.93 + (if c.Y < 0 then 0.03 else -0.03), 0.075),
+			metal:Lerp(Color3.new(1, 1, 1), 0.2),
+			Metal,
 			Enum.PartType.Ball
 		)
 	end
-	-- The back of the boss, behind the hand.
-	shieldPart(
-		holder,
-		pieces,
-		Vector3.new(0.05, 0.36, 0.36),
-		CFrame.new(0, 0.02, 0.05) * CFrame.Angles(0, math.rad(90), 0),
-		iron,
-		Enum.Material.Metal,
-		Enum.PartType.Cylinder
-	)
-	-- Padded arm rest, two straps with buckles, and the grip.
-	shieldPart(holder, pieces, Vector3.new(0.3, 0.72, 0.07), CFrame.new(0, -0.08, 0.08), leather, Enum.Material.Fabric)
-	for _, y in { 0.2, -0.32 } do
-		shieldPart(
-			holder,
-			pieces,
-			Vector3.new(W * 0.72, 0.11, 0.04),
-			CFrame.new(0, y, 0.12),
-			leather,
-			Enum.Material.Leather
-		)
-		shieldPart(
-			holder,
-			pieces,
-			Vector3.new(0.09, 0.13, 0.03),
-			CFrame.new(W * 0.22, y, 0.145),
-			metal:Lerp(Color3.fromRGB(200, 170, 90), 0.5),
-			Enum.Material.Metal
-		)
-	end
-	shieldPart(
-		holder,
-		pieces,
-		Vector3.new(0.08, 0.34, 0.08),
-		CFrame.new(-0.02, -0.04, 0.2),
-		leather,
-		Enum.Material.Leather
-	)
 	-- Its gem's element effects, thinned out up close.
 	for _, emitter in emitters do
 		local copy = emitter:Clone()
@@ -246,11 +292,15 @@ local function rebuild(character, equipment)
 	-- (Facing set as yaw then pitch: its face turned 28 degrees out to the
 	-- left and tipped a little down at rest; square ahead when raised.)
 	-- At rest it fills the lower-left (its point running off the bottom);
-	-- raised, it covers the left half up to the centre line.
+	-- raised, it covers the left half, short of the centre line.
 	shieldRest = CFrame.new(-1.2, -0.62, -1.85)
 		* CFrame.Angles(0, math.rad(28), 0)
 		* CFrame.Angles(math.rad(-6), 0, math.rad(-10))
-	shieldRaised = CFrame.new(-0.58, -0.12, -1.55) * CFrame.Angles(0, math.rad(6), 0)
+	-- Raised it stays angled (turned 25 degrees, tipped back) so it reads as
+	-- a shield held up, not a wall, and keeps the centre of the view clear.
+	shieldRaised = CFrame.new(-0.72, -0.25, -1.95)
+		* CFrame.Angles(0, math.rad(25), 0)
+		* CFrame.Angles(math.rad(-10), 0, math.rad(-10))
 	for _, slot in { "Weapon", "Shield", "Gloves" } do
 		local source = equipment:FindFirstChild(slot)
 		if source then
