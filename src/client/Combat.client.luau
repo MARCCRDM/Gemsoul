@@ -23,6 +23,8 @@ local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local StatusBars = require(script.Parent.Modules.StatusBars)
 local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
+local CombatFx = require(script.Parent.Modules.CombatFx)
+local CombatSound = require(script.Parent.Modules.CombatSound)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local UiKit = require(script.Parent.Modules.UiKit)
 if Config.MenuOnly and not Config.CombatEnabled then
@@ -353,6 +355,7 @@ foeDodge.TextXAlignment = Enum.TextXAlignment.Center
 foeDodge.AnchorPoint, foeDodge.Position, foeDodge.Size =
 	Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 184), UDim2.fromOffset(320, 28)
 foeDodge.Visible = false
+local lastFoeCast, foeWarned = nil, false
 local function drawFoeCast(model, serverNow)
 	local name = model and model:GetAttribute("ActionName")
 	local start, at = model and model:GetAttribute("ActionStart"), model and model:GetAttribute("ActionAt")
@@ -368,6 +371,12 @@ local function drawFoeCast(model, serverNow)
 	if not casting then
 		return
 	end
+	-- A new cast: hear it wind up.
+	if start ~= lastFoeCast then
+		lastFoeCast, foeWarned = start, false
+		local root = model:FindFirstChild("HumanoidRootPart")
+		CombatSound.play("Cast", if root then root.Position else nil, { Volume = 0.9 })
+	end
 	local color = GemConfig.ElementColors[model:GetAttribute("ActionElement") or ""] or P.Gold
 	local left = math.max(0, at - serverNow)
 	local progress = math.clamp((serverNow - start) / (at - start), 0, 1)
@@ -380,6 +389,10 @@ local function drawFoeCast(model, serverNow)
 	local urgent = left <= 0.35
 	foeCastStroke.Color = if urgent then Color3.fromRGB(255, 90, 80) else color
 	foeDodge.Visible = urgent
+	if urgent and not foeWarned then
+		foeWarned = true
+		CombatSound.play("Warn")
+	end
 	foeDodge.TextTransparency = if urgent then 0.15 * (1 + math.sin(os.clock() * 30)) else 1
 end
 
@@ -1357,6 +1370,7 @@ RunService.RenderStepped:Connect(function(dt)
 		rivalModel and (rivalModel:GetAttribute("RivalName") or rivalModel.Name)
 	)
 	drawFoeCast(rivalModel, serverNow)
+	CombatFx.auras(serverNow)
 	if rivalModel ~= logRival and rivalModel ~= nil then
 		logRival = rivalModel
 		combatLog:reset() -- a new rival: a new fight
@@ -1537,8 +1551,20 @@ end
 
 local handlers = {}
 function handlers.Log(entry)
-	if type(entry) == "table" then
-		combatLog:add(entry)
+	if type(entry) ~= "table" then
+		return
+	end
+	combatLog:add(entry)
+	if entry.Kind == "Heal" and (entry.Amount or 0) > 0 then
+		-- A green shimmer on whoever healed.
+		local model = if entry.Dir == "Foe" then rivalModel else player.Character
+		local root = model and model:FindFirstChild("HumanoidRootPart")
+		if root then
+			CombatFx.burst(root.Position, Color3.fromRGB(110, 235, 140), "Frost", 1.2)
+			CombatSound.play("Heal", root.Position)
+		end
+	elseif entry.Kind == "Kill" then
+		CombatSound.play("Kill")
 	end
 end
 function handlers.HitConfirm(crit)
@@ -1547,6 +1573,8 @@ end
 function handlers.IncomingDamage(origin)
 	incomingOrigin, incomingUntil = origin, os.clock() + 0.65
 	flashUntil = os.clock() + 0.3
+	CombatSound.play("Hurt")
+	CombatFx.shake(0.018, 0.22)
 end
 function handlers.TechStatus(message)
 	hint.Text, feedbackUntil = message, os.clock() + 1
@@ -1576,6 +1604,10 @@ function handlers.TechCooldown(id, duration)
 	end
 end
 function handlers.TechPulse(_who, from, to, color, radius)
+	CombatSound.play("Cast", from)
+	if radius > 0 then
+		CombatFx.burst(to, color, "Sparks", 1.2)
+	end
 	local distance = (to - from).Magnitude
 	if distance > 0.1 then
 		local beam = effectPart(Vector3.new(0.16, 0.16, distance), CFrame.lookAt((from + to) / 2, to), color)
@@ -1599,6 +1631,8 @@ function handlers.TechField(who, color)
 	if not root then
 		return
 	end
+	CombatSound.play("Shield", root.Position)
+	CombatFx.burst(root.Position, color, "Frost", 0.8)
 	for index = 1, 6 do
 		local angle = index * math.pi / 3
 		local panel = effectPart(
@@ -1612,8 +1646,15 @@ function handlers.TechField(who, color)
 end
 function handlers.HighBlock()
 	hint.Text, feedbackUntil = "HIGH BLOCK - COUNTER!", os.clock() + 1
+	CombatSound.play("Parry")
+	local root = rootPart()
+	if root then
+		CombatFx.burst(root.Position + root.CFrame.LookVector * 2, P.Gold, "Sparks", 1.6)
+	end
 end
 function handlers.Parried(seconds)
+	CombatSound.play("GuardBreak", nil, { Volume = 0.7 })
+	CombatFx.shake(0.02, 0.25)
 	cancel()
 	cast = nil
 	nextAttack = math.max(nextAttack, os.clock() + seconds)
@@ -1638,6 +1679,16 @@ end
 
 function handlers.Damage(position: Vector3, amount: number, crit: boolean, color: Color3?)
 	damageNumber(position, amount, crit, color)
+	if amount <= 0 then
+		return
+	end
+	-- Sparks in the hit's colour; crits burst bigger, ring out and shake a little.
+	local tint = color or Color3.new(1, 1, 1)
+	CombatFx.burst(position - Vector3.new(0, 1, 0), tint, "Sparks", if crit then 1.8 else 1)
+	CombatSound.play(if crit then "Crit" else "Hit", position)
+	if crit and CombatFx.nearMe(position, 30) then
+		CombatFx.shake(0.012, 0.15)
+	end
 end
 
 -- A fan of glowing blades across the swing's arc.
@@ -1650,17 +1701,25 @@ function handlers.Swing(
 	color: Color3,
 	big: boolean
 )
-	local blades = math.clamp(math.floor(arc / 25), 2, 7)
+	CombatSound.play(if big then "HeavySwing" else "Swing", origin)
+	-- The blades sweep across the arc one after another, like a slash trail.
+	local blades = math.clamp(math.floor(arc / 18), 3, 9)
 	local base = math.atan2(-direction.X, -direction.Z)
+	local sweep = if big then 0.11 else 0.07
 	for i = 0, blades - 1 do
 		local t = if blades > 1 then i / (blades - 1) - 0.5 else 0
 		local angle = base + math.rad(arc) * t
 		local reach = range * 0.6
-		local cf = CFrame.new(origin + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0, -reach)
-		local blade = effectPart(Vector3.new(if big then 0.5 else 0.3, 0.12, range * 0.6), cf, color)
-		blade.Transparency = 0.65
-		fade(blade, 0.22)
+		local cf = CFrame.new(origin + Vector3.new(0, 0.6 + t * 0.6, 0))
+			* CFrame.Angles(0, angle, 0)
+			* CFrame.new(0, 0, -reach)
+		task.delay(sweep * i / blades, function()
+			local blade = effectPart(Vector3.new(if big then 0.55 else 0.32, 0.12, range * 0.6), cf, color)
+			blade.Transparency = 0.45
+			fade(blade, 0.24, Vector3.new(0.05, 0.05, range * 0.75))
+		end)
 	end
+	CombatFx.flash(origin + direction * range * 0.5, color, if big then 2.5 else 1.4, range + 4, 0.18)
 end
 
 function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, look: string?)
@@ -1677,6 +1736,19 @@ function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, 
 	local bolt =
 		effectPart(size, CFrame.lookAt(from, to), color, if isArrow then Enum.PartType.Block else Enum.PartType.Ball)
 	local travel = math.clamp(distance / 140, 0.05, 0.5)
+	-- Muzzle flash, a glowing round, and sparks where it lands.
+	local fireball = look == "Fireball"
+	CombatSound.play(if fireball then "Bolt" else "Shot", from)
+	CombatFx.burst(from, color, "Sparks", if fireball then 1 else 0.6)
+	local glow = Instance.new("PointLight")
+	glow.Color, glow.Range, glow.Brightness, glow.Shadows = color, if fireball then 14 else 8, 2, false
+	glow.Parent = bolt
+	if fireball then
+		bolt.Size = Vector3.one * 1.1
+	end
+	task.delay(travel, function()
+		CombatFx.burst(to, color, if fireball then "Embers" else "Sparks", if fireball then 1.4 else 0.7)
+	end)
 	TweenService
 		:Create(
 			bolt,
@@ -1694,21 +1766,42 @@ function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: nu
 	if delay and delay > 0 then
 		-- Warning circle, then the blast.
 		local warn = ring(floor, radius, Color3.fromRGB(255, 60, 40), 0.7)
+		CombatSound.play("NovaWarn", floor)
+		-- The ring pulses faster as the blast comes.
+		task.spawn(function()
+			local stop = os.clock() + delay
+			while warn.Parent and os.clock() < stop do
+				local left = stop - os.clock()
+				warn.Transparency = 0.45 + 0.35 * (0.5 + 0.5 * math.sin(os.clock() * (8 + 30 * (1 - left / delay))))
+				task.wait()
+			end
+		end)
 		task.delay(delay, function()
 			warn:Destroy()
 			local blast = ring(floor, 1, color, 0.1)
 			fade(blast, 0.45, Vector3.new(0.2, radius * 2, radius * 2))
 			local pillar = effectPart(Vector3.new(2, 40, 2), CFrame.new(floor + Vector3.new(0, 20, 0)), color)
 			fade(pillar, 0.4, Vector3.new(radius, 40, radius))
+			CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Embers", 1.5 + radius / 8)
+			CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(120, 110, 100), "Smoke", 1.5)
+			CombatFx.flash(floor + Vector3.new(0, 3, 0), color, 6, radius * 3, 0.4)
+			CombatSound.play("Blast", floor)
+			if CombatFx.nearMe(floor, radius + 14) then
+				CombatFx.shake(0.04, 0.4)
+			end
 		end)
 		return
 	end
 	local blast = ring(floor, 1, color, 0.2)
 	fade(blast, 0.4, Vector3.new(0.2, radius * 2, radius * 2))
+	CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Sparks", 1 + radius / 10)
+	CombatSound.play("Blast", floor, { Volume = 0.6, Pitch = 1.3 })
 end
 
 function handlers.Zone(center: Vector3, radius: number, duration: number, color: Color3)
 	local floor = floorUnder(center)
+	CombatSound.play("Corrode", floor)
+	CombatFx.burst(floor + Vector3.new(0, 0.5, 0), color, "Smoke", 1 + radius / 8)
 	local disc = ring(floor, radius, color, 0.75)
 	local edge = ring(floor + Vector3.new(0, 0.05, 0), radius, color, 0.4)
 	edge.Size = Vector3.new(0.1, radius * 2, radius * 2)
@@ -1734,18 +1827,34 @@ function handlers.Buff(who: Player, color: Color3)
 	local character = who.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if root then
+		CombatSound.play("Shield", root.Position)
+		CombatFx.burst(root.Position, color, "Frost", 1)
 		local halo = ring(root.Position - Vector3.new(0, 2.5, 0), 2, color, 0.2)
 		fade(halo, 0.6, Vector3.new(0.2, 9, 9))
 	end
 end
 
 function handlers.Arc(from: Vector3, to: Vector3, color: Color3)
-	local distance = (to - from).Magnitude
-	local bolt = effectPart(Vector3.new(0.2, 0.2, distance), CFrame.lookAt((from + to) / 2, to), color)
-	fade(bolt, 0.2)
+	-- A jagged bolt: a few kinked segments instead of one straight beam.
+	local points = { from }
+	for i = 1, 3 do
+		local along = from:Lerp(to, i / 4)
+		table.insert(points, along + Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 1.6)
+	end
+	table.insert(points, to)
+	for i = 1, #points - 1 do
+		local a, b = points[i], points[i + 1]
+		local segment = effectPart(Vector3.new(0.18, 0.18, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b), color)
+		fade(segment, 0.2)
+	end
+	CombatFx.burst(to, color, "Sparks", 0.9)
+	CombatSound.play("Zap", to)
 end
 
 function handlers.Death(position: Vector3, color: Color3?)
+	CombatFx.burst(position, color or Color3.new(1, 1, 1), "Shards", 1.4)
+	CombatFx.flash(position, color or Color3.new(1, 1, 1), 5, 20, 0.5)
+	CombatSound.play("Death", position)
 	for _ = 1, 8 do
 		local shard = effectPart(
 			Vector3.new(0.5, 0.9, 0.5),
@@ -1762,6 +1871,7 @@ function handlers.Death(position: Vector3, color: Color3?)
 end
 
 function handlers.EnemySwing(from: Vector3, to: Vector3, color: Color3)
+	CombatSound.play("Swing", from, { Pitch = 0.85 })
 	local mid = from:Lerp(to, 0.7)
 	local slash =
 		effectPart(Vector3.new(2.5, 0.15, 0.5), CFrame.lookAt(mid, to) * CFrame.Angles(0, 0, math.rad(35)), color)
@@ -1780,6 +1890,16 @@ function handlers.BlockBroken(seconds)
 	UiKit.toast("Guard broken!", P.Gold)
 end
 function handlers.BlockSpark(position, broken)
+	CombatSound.play(if broken then "GuardBreak" else "Block", position)
+	CombatFx.burst(
+		position + Vector3.new(0, 1, 0),
+		if broken then Color3.fromRGB(255, 160, 50) else Color3.fromRGB(200, 240, 255),
+		"Sparks",
+		if broken then 1.8 else 1.1
+	)
+	if broken and CombatFx.nearMe(position, 20) then
+		CombatFx.shake(0.03, 0.3)
+	end
 	local spark = ring(position, if broken then 2 else 1, if broken then Color3.fromRGB(255, 160, 50) else P.Teal, 0.2)
 	fade(spark, 0.2, Vector3.new(0.1, 6, 6))
 end
@@ -1801,6 +1921,10 @@ function handlers.BlockGem(who, element)
 	handlers.Buff(who, colors[element] or P.Teal)
 end
 function handlers.DodgeRoll(who, origin, direction, distance, afterimage)
+	-- A hop is short; a roll goes the distance and kicks up more dust.
+	local hop = distance < 10
+	CombatSound.play(if hop then "Hop" else "Roll", origin)
+	CombatFx.burst(origin - Vector3.new(0, 2.5, 0), Color3.fromRGB(170, 160, 145), "Smoke", if hop then 0.6 else 1.1)
 	local color = if afterimage then Color3.fromRGB(80, 225, 255) else P.Gold
 	for i = 0, 4 do
 		task.delay(i * 0.05, function()
