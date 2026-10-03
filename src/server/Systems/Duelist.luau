@@ -385,7 +385,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		animate(duel, "Buff", 0.15)
 		fx("TechPulse", nil, root.Position, root.Position, color, 5)
 		if surge.Id == "CryoShield" then
-			enemy.GuardUntil, enemy.GuardMult = now + 4, 0.5 -- a barrier that halves hits
+			enemy.GuardUntil, enemy.GuardMult, enemy.Barrier = now + 4, 0.5, true -- a barrier that halves hits
 			duel.CryoUntil = now + 4
 		elseif surge.Id == "EnergySiphon" then
 			healSelf(duel, 0.12, surge.Name)
@@ -466,19 +466,46 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 	}
 end
 
+-- Its Stamina and Charge, refilled by the same rules as a player's: Stamina
+-- pauses after a spend and drains while its guard is up; Charge refills
+-- steadily (CombatTechnology.Resources, CombatActions.Stamina).
+local function refill(duel, now: number, guardUp: boolean)
+	local elapsed = math.clamp(now - (duel.ResourceAt or now), 0, 1)
+	duel.ResourceAt = now
+	local staminaRule, chargeRule = Tech.Resources.Stamina, Tech.Resources.Charge
+	local regen = if guardUp
+		then -Actions.Stamina.GuardDrain
+		elseif now < (duel.StaminaRestUntil or 0) then 0
+		else staminaRule.Regen
+	duel.Stamina = math.clamp((duel.Stamina or staminaRule.Max) + regen * elapsed, 0, staminaRule.Max)
+	duel.Charge = math.clamp((duel.Charge or chargeRule.Max) + chargeRule.Regen * elapsed, 0, chargeRule.Max)
+	duel.Enemy.Model:SetAttribute("RivalStamina", math.floor(duel.Stamina))
+	duel.Enemy.Model:SetAttribute("RivalCharge", math.floor(duel.Charge))
+end
+local function spendStamina(duel, amount: number)
+	duel.Stamina = math.max(0, (duel.Stamina or 0) - amount)
+	duel.StaminaRestUntil = os.clock() + Actions.Stamina.RegenDelay
+end
+
 -- Its own guard (not a Cryo Shield barrier, which only halves hits).
 local function guarding(enemy, now: number): boolean
-	return enemy.GuardUntil ~= nil and now < enemy.GuardUntil and (enemy.GuardMult or 0.3) < 0.5
+	return enemy.GuardUntil ~= nil and now < enemy.GuardUntil and not enemy.Barrier
 end
 
 -- Raises (or keeps up) its guard for `seconds`. Freshly raised, a swing that
 -- lands right away is parried (see Enemies.damage).
 local function raiseGuard(enemy, duel, now: number, seconds: number)
 	if not guarding(enemy, now) then
+		if (duel.Stamina or 0) < Actions.Stamina.BlockMin or now < (enemy.GuardBrokenUntil or 0) then
+			return -- too winded to raise a guard, like a player
+		end
 		enemy.GuardRaisedAt = now
 		press(duel, "RMB")
 	end
-	enemy.GuardUntil, enemy.GuardMult = math.max(enemy.GuardUntil or 0, now + seconds), 0.3
+	-- A guard takes off what a player's PvP block does (it blocks 40%).
+	enemy.Barrier = nil
+	enemy.GuardUntil = math.max(enemy.GuardUntil or 0, now + seconds)
+	enemy.GuardMult = Actions.blockMultiplier(Actions.resolve({}, "Sword", 0), true, 1, false, false)
 	enemy.Model:SetAttribute("GuardUntil", workspace:GetServerTimeNow() + (enemy.GuardUntil - now))
 	setStance(duel, "Guard")
 end
@@ -511,6 +538,22 @@ local function think(enemy, now: number)
 	local distance = offset.Magnitude
 	local dir = if distance > 0.01 then offset.Unit else Vector3.new(0, 0, -1)
 	local side = Vector3.new(-dir.Z, 0, dir.X)
+	refill(duel, now, guarding(enemy, now))
+	if guarding(enemy, now) and duel.Stamina <= 0 then
+		dropGuard(enemy, now) -- held until there was nothing left
+	end
+	-- A blow it takes on its guard costs Stamina; one it can't pay for breaks
+	-- the guard (Enemies.damage asks), just as for a player.
+	enemy.GuardCost = enemy.GuardCost
+		or function(amount: number): boolean
+			local cost = math.max(Actions.Stamina.BlockMin, amount * Actions.Stamina.BlockPerDamage)
+			if duel.Stamina >= cost then
+				spendStamina(duel, cost)
+				return true
+			end
+			spendStamina(duel, duel.Stamina)
+			return false
+		end
 	humanoid.WalkSpeed = duel.Speed
 		* (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
 		* (if guarding(enemy, now) then 0.7 else 1) -- a shield-walk
@@ -534,13 +577,27 @@ local function think(enemy, now: number)
 		local damage = duel.Damage * (1 - Enemies.weakness(enemy))
 		if action.Kind == "Light" or action.Kind == "Heavy" or action.Kind == "Punish" or action.Kind == "Lunge" then
 			local heavy = action.Kind == "Heavy"
+			-- Stamina, as a player's: a heavy it can't afford comes out light,
+			-- a light swing it can't afford lands winded.
+			if heavy and duel.Stamina < Actions.swingCost(duel.Weapon, true) then
+				heavy = false
+			end
+			local cost = Actions.swingCost(duel.Weapon, heavy)
+			local winded = duel.Stamina < cost
+			spendStamina(duel, cost)
 			fx("Swing", nil, root.Position, dir, Brain.Reach, if heavy then 140 else 100, color, heavy)
 			if distance <= Brain.Reach + 1.5 then
 				-- Resonance Echo: its swings hit harder for a while.
 				local echo = if now < (duel.EchoUntil or 0) then 1.5 else 1
+				-- Crits by its Speed, as yours are.
+				local crit = math.random() < (duel.Crit or 0)
 				strike(
 					duel,
-					damage * (if heavy then 2 else 1) * echo,
+					damage
+						* (if heavy then Actions.Base.Heavy.PvPDamage else 1)
+						* echo
+						* (if crit then Combat.CritMult else 1)
+						* (if winded then Actions.Stamina.WindedDamage else 1),
 					duel.Element,
 					heavy,
 					duel.WeaponGem,
@@ -551,8 +608,10 @@ local function think(enemy, now: number)
 			local hits = (action.Hits or 1) + 1
 			-- (A counter is a single blow.)
 			if not heavy and action.Kind ~= "Punish" and hits <= 3 and math.random() < 0.65 then
-				duel.Action = { Kind = "Light", At = now + 0.32, Hits = hits }
-				animate(duel, "Slash", 0.32)
+				-- The next swing of the combo at a player's swing pace.
+				local gap = duel.SwingCooldown or Actions.Base.Basic.SwordCooldown
+				duel.Action = { Kind = "Light", At = now + gap, Hits = hits }
+				animate(duel, "Slash", gap)
 				press(duel, "LMB")
 				return
 			end
@@ -610,7 +669,7 @@ local function think(enemy, now: number)
 				local scale, cc, seconds = Actions.blastFalloff(distance, action.Radius)
 				local dealt, guarded = strike(
 					duel,
-					damage * action.Power * 1.2 * scale,
+					damage * action.Power * scale,
 					action.Element,
 					false,
 					action.Gem,
@@ -697,7 +756,11 @@ local function think(enemy, now: number)
 	end
 	-- Like a player, it reaches for a maneuver (1, 2, 3) when one fits.
 	local move = choice ~= "Stagger" and Brain.pickMove(duel.Moves, choice, now, distance, math.random())
+	if move and duel.Stamina < (move.Cost or 0) then
+		move = nil -- can't afford it, like a player
+	end
 	if move then
+		spendStamina(duel, move.Cost or 0)
 		humanoid:MoveTo(root.Position)
 		dropGuard(enemy, now)
 		useMove(enemy, duel, move, now, target, dir, side, distance)
@@ -740,7 +803,8 @@ local function think(enemy, now: number)
 		Remotes.CombatFx:FireClient(owner, "TechStatus", duel.Name .. " counters!")
 		humanoid:MoveTo(root.Position)
 		face(root, target.Position)
-	elseif choice == "Dodge" then
+	elseif choice == "Dodge" and duel.Stamina >= Actions.Base.Hop.Cost then
+		spendStamina(duel, Actions.Base.Hop.Cost)
 		local sign = if math.random() < 0.5 then 1 else -1
 		local away = side * sign
 		enemy.DodgeUntil = now + 0.35
@@ -770,7 +834,11 @@ local function think(enemy, now: number)
 		face(root, target.Position)
 	elseif choice == "Surge" then
 		local surge = Brain.pickSurge(duel.Surges, now, distance, view)
+		if surge and duel.Charge < (surge.Cost or 0) then
+			surge = nil -- not enough Charge, like a player
+		end
 		if surge then
+			duel.Charge -= surge.Cost or 0
 			dropGuard(enemy, now)
 			castSurge(enemy, duel, surge, now, target)
 		else
@@ -896,16 +964,19 @@ function spawnRival(owner: Player)
 		end
 		return
 	end
-	-- Balance against the player: its health is about 16 of their basic hits,
-	-- and each of its quick swings takes about 1/13 of their health, scaled by
-	-- how its rolled gear compares with theirs.
+	-- Equal ground: it's a new player with its own random kit, built by
+	-- exactly the rules that build yours. Its health, swing damage, armour,
+	-- walk speed, crit chance and swing pace all come from its own gear and
+	-- gems (Classes.ratings), as yours do; nothing is scaled to you.
 	local mine, theirs = Classes.ratings(loadout), Classes.ratings(ownerLoadout)
 	local weapon = Classes.weapon(ownerLoadout.Class, ownerLoadout.Weapon)
+	local rivalWeapon = Classes.weapon(loadout.Class, loadout.Weapon)
+	local rivalEffects = Classes.effects(loadout)
+	local rules = Actions.resolve(Classes.setState(loadout).Counts, "Sword", 1 - (rivalEffects.CooldownMult or 1))
 	local playerHit = (if weapon then weapon.Attack.Damage else 10) * Combat.powerMult(rating(theirs, "Power"))
-	local toughness = math.clamp(rating(mine, "Health") / math.max(1, rating(theirs, "Health")), 0.8, 1.25)
-	local strength = math.clamp(rating(mine, "Power") / math.max(1, rating(theirs, "Power")), 0.8, 1.25)
+	local rivalHit = (if rivalWeapon then rivalWeapon.Attack.Damage else 18) * Combat.powerMult(rating(mine, "Power"))
 	local ownerHumanoid = owner.Character:FindFirstChildOfClass("Humanoid")
-	local health = math.max(150, math.floor(playerHit * 16 * toughness))
+	local health = Classes.maxHealth(rating(mine, "Health"))
 	local kind = {
 		Name = "Rival Duelist",
 		Health = health,
@@ -926,6 +997,8 @@ function spawnRival(owner: Player)
 		Home = spot,
 	})
 	enemy.Humanoid.AutoRotate = false
+	-- Its armour cuts your hits the way yours cuts its (Enemies.damage).
+	enemy.DefenseMult = Combat.defenseMult(rating(mine, "Defense"))
 	-- Every bout starts even: the player steps in at full health too.
 	if ownerHumanoid and ownerHumanoid.Health > 0 then
 		ownerHumanoid.Health = ownerHumanoid.MaxHealth
@@ -949,11 +1022,18 @@ function spawnRival(owner: Player)
 		FoeRanged = weapon ~= nil and weapon.Attack.Kind == "Shot",
 		WeaponGem = loadout.WeaponGem,
 		Session = session,
-		Damage = (if ownerHumanoid then ownerHumanoid.MaxHealth else 300) / 13 * strength * (if sparring
-			then 0.5
-			else 1),
-		Speed = 18,
-		Rate = if sparring then 1.2 else 0.75, -- presses you, and guards in between
+		-- (Training's sparring partner hits for half.)
+		Damage = rivalHit * (if sparring then 0.5 else 1),
+		Weapon = rivalWeapon,
+		Crit = Combat.critChance(rating(mine, "Speed"), rivalEffects.CritAdd),
+		Speed = Classes.walkSpeed(rating(mine, "Speed")) + (rivalEffects.SpeedAdd or 0),
+		SwingCooldown = rules.BasicCooldown,
+		Rate = if sparring then rules.BasicCooldown * 1.8 else rules.BasicCooldown,
+		-- Its own Stamina and Charge, by the same rules as yours.
+		Stamina = Tech.Resources.Stamina.Max,
+		Charge = Tech.Resources.Charge.Max,
+		ResourceAt = os.clock(),
+		StaminaRestUntil = 0,
 		Action = nil,
 		NextAttack = now + 1.2,
 		NextSurge = now + 3.5,
@@ -1012,8 +1092,10 @@ function spawnRival(owner: Player)
 				Kind = if SELF_SURGES[id] then "Self" elseif stats.Radius then "Nova" else "Bolt",
 				SelfCentered = stats.Self == true,
 				Radius = Actions.blastRadius(stats.Radius), -- wide: see Actions.Blast
-				Power = if stats.Damage then math.clamp(stats.Damage, 0.8, 2.4) else 1,
-				Cooldown = 6 + tier * 1.5,
+				-- A player's surge numbers: its damage, Charge cost and recovery.
+				Power = stats.Damage or 1,
+				Cost = stats.Cost or 0,
+				Cooldown = math.max(stats.Recovery or 1, 2.5),
 				Next = now + 2.5 + slot * 1.5,
 			}
 			table.insert(duel.Surges, surge)
@@ -1041,7 +1123,9 @@ function spawnRival(owner: Player)
 			Windup = stats.Windup,
 			Heal = stats.Heal or 0,
 			Hits = stats.Hits,
-			Cooldown = math.clamp((stats.Recovery or 1) * 3, 3.5, 9),
+			-- A player's maneuver numbers: its Stamina cost and recovery.
+			Cost = stats.Cost or 0,
+			Cooldown = math.max(stats.Recovery or 1, 1.5),
 			Next = now + 2 + slot,
 		}
 		table.insert(duel.Moves, move)
@@ -1072,7 +1156,7 @@ function spawnRival(owner: Player)
 	local matchup = Matchup.build({
 		Name = owner.DisplayName,
 		Health = math.floor(ownerHumanoid and ownerHumanoid.MaxHealth or 300),
-		Hit = math.floor(playerHit + 0.5),
+		Hit = math.floor(playerHit * enemy.DefenseMult + 0.5), -- after its armour
 		Speed = math.floor(ownerHumanoid and ownerHumanoid.WalkSpeed or 16),
 		Element = ownerLoadout.WeaponGem and ownerLoadout.WeaponGem.Element,
 		Surges = yourSurges,

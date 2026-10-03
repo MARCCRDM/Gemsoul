@@ -573,8 +573,12 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	local exposure = 1 + Enemies.exposure(enemy)
 	local blocked = 0
 	local e = enemy :: any
+	-- Armour (a rival duelist's Defense), as a player's cuts what hits them.
+	if e.DefenseMult then
+		amount *= e.DefenseMult
+	end
 	if enemy.GuardUntil and now < enemy.GuardUntil then
-		if heavy == true and (e.GuardMult or 0.3) < 0.5 then
+		if heavy == true and not e.Barrier then
 			-- A heavy blow smashes through a raised guard and staggers it
 			-- (not a Cryo Shield barrier, which only halves hits).
 			enemy.GuardUntil = 0
@@ -591,6 +595,13 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 			DamageLog.send(source, { Dir = "Out", Kind = "Parried", Who = name })
 			Enemies.parryPlayer(source, 0.45)
 			return
+		elseif e.GuardCost and not e.Barrier and not e.GuardCost(amount) then
+			-- Out of Stamina: the guard breaks and the blow lands in full.
+			enemy.GuardUntil = 0
+			e.GuardBrokenUntil = now + Enemies.GuardBreakSeconds
+			enemy.Model:SetAttribute("GuardUntil", 0)
+			fx("BlockSpark", enemy.Root.Position, true)
+			DamageLog.send(source, { Dir = "Out", Kind = "GuardBreak", Who = name })
 		else
 			local guarded = amount * (e.GuardMult or 0.3)
 			blocked = (amount - guarded) * exposure

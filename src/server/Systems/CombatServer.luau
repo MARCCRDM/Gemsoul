@@ -299,8 +299,9 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	if not humanoid or not root or not k or amount <= 0 or not Combat.canFight(root.Position) then
 		return 0
 	end
-	local pvp = source ~= nil
-	if pvp and not canPvP(source, player) then
+	-- A rival duelist's blows count as PvP too (block, dodge windows).
+	local pvp = source ~= nil or (enemySource ~= nil and enemySource.Duel ~= nil)
+	if source and not canPvP(source, player) then
 		return 0
 	end
 	if player.Character:FindFirstChildOfClass("ForceField") then
@@ -604,8 +605,10 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		return
 	end
 	local _, root = alive(source)
+	-- A rival duelist is fought by PvP rules, as another player would be.
+	local versus = target.Player ~= nil or (target.Enemy ~= nil and target.Enemy.Duel ~= nil)
 	local multiplier = if heavy
-		then (if target.Player then k.Rules.HeavyPvPDamage else k.Rules.HeavyDamage)
+		then (if versus then k.Rules.HeavyPvPDamage else k.Rules.HeavyDamage)
 		else k.Rules.BasicDamage
 	local damage = k.Weapon.Attack.Damage
 		* Combat.powerMult(rating(k, "Power"))
