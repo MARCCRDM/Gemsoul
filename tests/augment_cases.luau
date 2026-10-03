@@ -124,6 +124,7 @@ check(CombatServer._attack(source, rv.Position, false) and close(1000 - hv.Healt
 local st = CombatServer._state(source)
 loadout.WeaponGem = { Element = "Fire", Size = 4, Clarity = 5, Cut = 5 }
 st.Resources.Stamina, st.Resources.Charge, st.ResourceAt = 50, 50, now
+st.StaminaRestUntil = 0 -- past the swing's regen pause (Actions.Stamina.RegenDelay)
 now += 0.5; CombatServer._tick(0.5)
 check(close(st.Resources.Stamina, 56.9) and close(st.Resources.Charge, 54.025), "Live recyclers did not change regeneration")
 local expectedSpeed = Classes.walkSpeed(Classes.ratings(loadout).Speed.Base + Classes.ratings(loadout).Speed.Bonus) * 1.05

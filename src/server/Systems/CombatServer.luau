@@ -141,13 +141,34 @@ local function state(player)
 	end
 	return states[player]
 end
+-- Spends Stamina (swings, guarding, maneuvers, dodges) and holds off its
+-- regeneration for a moment, so it never refills mid-flurry.
+local function spendStamina(player, st, amount)
+	st.Resources.Stamina = math.max(0, st.Resources.Stamina - amount)
+	st.StaminaRestUntil = os.clock() + Actions.Stamina.RegenDelay
+	player:SetAttribute("Stamina", st.Resources.Stamina)
+end
 local function updateResources(player, st, k)
 	local now = os.clock()
 	local elapsed = math.clamp(now - st.ResourceAt, 0, 1)
 	st.ResourceAt = now
 	for id, rule in Tech.Resources do
 		local regen = rule.Regen * (1 + (k.Effects[id .. "Regen"] or 0))
-		st.Resources[id] = math.min(rule.Max, st.Resources[id] + elapsed * regen)
+		if id == "Stamina" then
+			if now < st.BlockUntil and now >= st.BlockBrokenUntil then
+				regen = -Actions.Stamina.GuardDrain -- a raised guard tires you
+			elseif now < (st.StaminaRestUntil or 0) then
+				regen = 0
+			end
+		end
+		st.Resources[id] = math.clamp(st.Resources[id] + elapsed * regen, 0, rule.Max)
+		if id == "Stamina" and regen < 0 and st.Resources.Stamina <= 0 then
+			-- Held the guard until there was nothing left: it drops.
+			st.BlockUntil, st.BlockBrokenUntil = 0, now + Actions.Stamina.GuardBreakSeconds
+			st.StaminaRestUntil = now + Actions.Stamina.RegenDelay
+			player:SetAttribute("Blocking", false)
+			Remotes.CombatFx:FireClient(player, "BlockBroken", Actions.Stamina.GuardBreakSeconds, "Exhausted")
+		end
 		if id == "Charge" and not Tech.hasGem(k.Loadout) then
 			st.Resources[id] = 0
 		end
@@ -334,22 +355,47 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 					end
 					Remotes.CombatFx:FireClient(player, "HighBlock")
 				end
-				fx("BlockSpark", root.Position, false)
-				if k.Defense.Deflect > 0 and math.random() < k.Defense.Deflect then
-					multiplier = 0
-				end
-				if not reflected then
-					local reflect = if math.random() < k.Defense.Reflect
-						then 1
-						elseif element == "Fire" then k.Defense.ReflectThermal
-						else 0
-					local previous = DamageLog.push("Reflect", "Fire")
-					if reflect > 0 and source then
-						receive(source, damage * reflect, "Fire", player, root.Position, false, false, true)
-					elseif reflect > 0 and enemySource then
-						Enemies.damage(enemySource, damage * reflect, player, false, GemConfig.ElementColors.Fire)
+				-- Taking the blow on your guard costs Stamina (a parry is free);
+				-- one you can't pay for breaks the guard and lands in full.
+				local exhausted = false
+				if not (st.ParrySpent and not parriedBefore) then
+					local cost = math.max(Actions.Stamina.BlockMin, beforeGuard * Actions.Stamina.BlockPerDamage)
+					if st.Resources.Stamina >= cost then
+						spendStamina(player, st, cost)
+					else
+						exhausted, guarded, guardBroken = true, false, true
+						spendStamina(player, st, st.Resources.Stamina)
+						st.BlockUntil = 0
+						st.BlockBrokenUntil = now + Actions.Stamina.GuardBreakSeconds
+						player:SetAttribute("Blocking", false)
+						Remotes.CombatFx:FireClient(
+							player,
+							"BlockBroken",
+							Actions.Stamina.GuardBreakSeconds,
+							"Exhausted"
+						)
+						fx("BlockSpark", root.Position, true)
+						multiplier = 1
 					end
-					DamageLog.pop(previous)
+				end
+				if not exhausted then
+					fx("BlockSpark", root.Position, false)
+					if k.Defense.Deflect > 0 and math.random() < k.Defense.Deflect then
+						multiplier = 0
+					end
+					if not reflected then
+						local reflect = if math.random() < k.Defense.Reflect
+							then 1
+							elseif element == "Fire" then k.Defense.ReflectThermal
+							else 0
+						local previous = DamageLog.push("Reflect", "Fire")
+						if reflect > 0 and source then
+							receive(source, damage * reflect, "Fire", player, root.Position, false, false, true)
+						elseif reflect > 0 and enemySource then
+							Enemies.damage(enemySource, damage * reflect, player, false, GemConfig.ElementColors.Fire)
+						end
+						DamageLog.pop(previous)
+					end
 				end
 				damage *= multiplier
 			end
@@ -568,6 +614,9 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	if swing then
 		damage *= swing.Scale * (1 + (swing.Combo - 1) * 0.1)
 	end
+	if st.Winded then
+		damage *= Actions.Stamina.WindedDamage -- swung without the Stamina for it
+	end
 	if os.clock() < st.AfterDodgeUntil then
 		damage *= 1 + (k.Effects.DamageAfterDodge or 0)
 	end
@@ -649,6 +698,18 @@ local function attack(player, aim, heavy, swing)
 	if now < st.NextAttack or now < st.StunUntil or blocking(st, now) or st.DodgeMove or st.Channel then
 		return false
 	end
+	-- Stamina: a heavy you can't afford comes out as a light swing; a light
+	-- swing you can't afford still lands, but winded (weaker).
+	updateResources(player, st, k)
+	if heavy and st.Resources.Stamina < Actions.swingCost(k.Weapon, true) then
+		heavy = false
+		if swing then
+			swing.Heavy = false
+		end
+	end
+	local cost = Actions.swingCost(k.Weapon, heavy)
+	st.Winded = st.Resources.Stamina < cost
+	spendStamina(player, st, cost)
 	st.NextAttack = now + (if heavy then k.Rules.HeavyCooldown else k.Rules.BasicCooldown)
 	st.ChargeStarted = nil
 	Remotes.CombatFx:FireClient(player, "Cooldown", if heavy then "Heavy" else "Basic", st.NextAttack - now)
@@ -715,11 +776,12 @@ local function attack(player, aim, heavy, swing)
 		Remotes.CombatFx:FireClient(
 			player,
 			"AttackTiming",
-			if interrupted then "BLOCKED" elseif not landed then "MISS" else swing.Stage,
+			if interrupted then "BLOCKED" elseif not landed then "MISS" elseif st.Winded then "WINDED" else swing.Stage,
 			swing.Side,
 			st.ComboCount
 		)
 	end
+	st.Winded = false
 	return true
 end
 local function stopDodge(st)
@@ -760,8 +822,7 @@ local function dodge(player, requested, kind)
 	local duration = if hop then Actions.Base.Hop.Duration else Actions.Base.Dodge.Duration
 	local collision = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * distance, params)
 	local travel = if collision then math.max(0, collision.Distance - 0.2) else distance
-	Tech.spend(st.Resources, "Stamina", cost)
-	player:SetAttribute("Stamina", st.Resources.Stamina)
+	spendStamina(player, st, cost)
 	if hop then
 		st.NextHop = now + Actions.Base.Hop.Cooldown
 	else
@@ -814,6 +875,11 @@ local function block(player, held, aim)
 		return false
 	end
 	local wasBlocking = blocking(st, now)
+	if not wasBlocking and st.Resources.Stamina < Actions.Stamina.BlockMin then
+		-- Too winded to raise a guard.
+		Remotes.CombatFx:FireClient(player, "BlockBroken", 0.4, "Exhausted")
+		return false
+	end
 	if k.Defense.CleanseInterval < math.huge and now >= st.NextCleanse then
 		cleanse(st)
 		st.NextCleanse = now + k.Defense.CleanseInterval
@@ -1170,6 +1236,8 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		local previous = DamageLog.push(definition.Name)
 		CombatServer.heal(player, humanoid.MaxHealth * definition.Heal)
 		DamageLog.pop(previous)
+	elseif definition.Resource == "Stamina" then
+		spendStamina(player, st, cost)
 	else
 		Tech.spend(st.Resources, definition.Resource, cost)
 	end

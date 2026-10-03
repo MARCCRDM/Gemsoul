@@ -37,7 +37,7 @@ function CombatGuide.refresh()
 		return
 	end
 	window.Subtitle.Text =
-		"Stamina powers Rig Maneuvers (1 / 2 / 3) · Charge powers the gems in your Surge Array (Q / E / R)."
+		"Stamina powers every swing, your guard, dodges and Rig Maneuvers (1 / 2 / 3); it refills once you ease off · Charge powers the gems in your Surge Array (Q / E / R)."
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local sets = Classes.setState(loadout)
 	local effects = Classes.effects(loadout)
@@ -49,17 +49,18 @@ function CombatGuide.refresh()
 	UiKit.list(body, 10)
 	local rows = {
 		{
-			"ATTACK · LMB / Shift+LMB Off-hand / Touch",
+			string.format("ATTACK · LMB / Shift+LMB Off-hand / Touch · %d Stamina", Actions.swingCost(weapon, false)),
 			string.format(
-				"%.0f%% weapon damage · %.2fs recovery. Alternate sides for up to +20%% combo damage; a miss or block resets the combo.",
+				"%.0f%% weapon damage · %.2fs recovery. Alternate sides for up to +20%% combo damage; a miss or block resets the combo. Out of Stamina you still swing, winded (%.0f%% damage).",
 				rules.BasicDamage * 100,
-				rules.BasicCooldown
+				rules.BasicCooldown,
+				Actions.Stamina.WindedDamage * 100
 			),
 		},
 		{
-			"HEAVY · Hold then Release on Gold",
+			string.format("HEAVY · Hold then Release on Gold · %d Stamina", Actions.swingCost(weapon, true)),
 			string.format(
-				"%.0f%% PvE / %.0f%% PvP damage · %.2fs recovery · breaks sustained guard. Gold release guarantees a critical; overholding reduces damage. +%.0f%% heavy critical chance.",
+				"%.0f%% PvE / %.0f%% PvP damage · %.2fs recovery · breaks sustained guard. Gold release guarantees a critical; overholding reduces damage. +%.0f%% heavy critical chance. Without the Stamina for it, it comes out as a light swing.",
 				rules.HeavyDamage * 100,
 				rules.HeavyPvPDamage * 100,
 				rules.HeavyCooldown,
@@ -87,12 +88,13 @@ function CombatGuide.refresh()
 			),
 		},
 		{
-			"BLOCK · Hold RMB / Block Button",
+			string.format("BLOCK · Hold RMB / Block Button · %d Stamina/s", Actions.Stamina.GuardDrain),
 			string.format(
-				"%.0f%% PvE / %.0f%% PvP reduction · %.0f° frontal coverage. First 0.3s can parry a melee quick attack; high block refreshes every 1.5s. Cannot attack while blocking.%s",
+				"%.0f%% PvE / %.0f%% PvP reduction · %.0f° frontal coverage. Each blow you block costs Stamina (half its damage, at least %d); a blow you can't pay for breaks your guard. First 0.3s can parry a melee quick attack for free; high block refreshes every 1.5s. Cannot attack while blocking.%s",
 				rules.BlockReduction * 100,
 				rules.BlockPvPReduction * 100,
 				rules.BlockArc,
+				Actions.Stamina.BlockMin,
 				if rules.Deflect then " Deflects light projectiles." else ""
 			),
 		},

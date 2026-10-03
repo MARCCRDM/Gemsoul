@@ -81,14 +81,15 @@ local function fillGradient(frame, color)
 	}, frame)
 end
 -- Bottom of the screen: Gem Surges (Q, E, R) on the left, the unit frame
--- (Health over Charge) in the centre, Rig Maneuvers (1, 2, 3) under Stamina
--- on the right.
+-- (Health, then Stamina, then Charge) in the centre, Rig Maneuvers (1, 2, 3)
+-- on the right. Stamina sits right under Health, as every swing, guard,
+-- dodge and maneuver spends it.
 local hud = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
 	BackgroundTransparency = 0.12,
 	AnchorPoint = Vector2.new(0.5, 1),
 	Position = UDim2.new(0.5, 0, 1, -34),
-	Size = UDim2.fromOffset(320, 74),
+	Size = UDim2.fromOffset(320, 98),
 }, gui)
 UiKit.round(hud, 10)
 new("UIStroke", { Color = Color3.fromRGB(70, 96, 128), Transparency = 0.45, Thickness = 1 }, hud)
@@ -171,7 +172,8 @@ local function resourceBar(parent, id, x, y)
 	end
 	resourceBars[id] = { Label = label, Value = value, Fill = fill }
 end
-resourceBar(hud, "Charge", 12, 47)
+resourceBar(hud, "Stamina", 12, 47)
+resourceBar(hud, "Charge", 12, 71)
 -- Floating callouts under the crosshair (PERFECT, PARRIED, Not enough Charge...).
 local hint = shadowed(text(gui, "", 15, P.Text, IronUi.Bold))
 hint.AutomaticSize, hint.TextWrapped = Enum.AutomaticSize.None, false
@@ -189,7 +191,6 @@ surgeHeader.Text = "SURGE ARRAY"
 surgeHeader.TextXAlignment = Enum.TextXAlignment.Left
 surgeHeader.Position, surgeHeader.Size = UDim2.fromOffset(0, 2), UDim2.new(1, 0, 0, 14)
 local maneuverTray = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1) }, gui)
-resourceBar(maneuverTray, "Stamina", 0, 0)
 -- One ability icon: a round gem socket (surges) or a rounded square (maneuvers).
 local function makeIcon(parent, key, round)
 	local radius = UDim.new(if round then 0.5 else 0.22, 0)
@@ -1233,16 +1234,18 @@ RunService.RenderStepped:Connect(function(dt)
 	local hudBottom = if stacked then 22 + trayHeight else 34
 	local hudWidth = if stacked then math.min(300, viewport.X - 32) else math.min(300, between)
 	hud.AnchorPoint, hud.Position, hud.Size =
-		Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -hudBottom), UDim2.fromOffset(hudWidth, 74)
+		Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -hudBottom), UDim2.fromOffset(hudWidth, 98)
 	-- Touch players get on-screen swing, guard and dodge buttons above the panel.
 	local slotWidth = math.min(80, (viewport.X - 32) / 4 - 8)
 	for index, id in { "Basic", "Heavy", "Block", "Dodge" } do
 		local slot = slots[id]
 		slot.Button.Visible = touch
 		slot.Button.Size = UDim2.fromOffset(slotWidth, 70)
-		slot.Button.Position = UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(hudBottom + 84))
+		slot.Button.Position = UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(hudBottom + 108))
 	end
-	controlsHint.Position = UDim2.new(0.5, 0, 1, -(hudBottom + 82))
+	controlsHint.Position = UDim2.new(0.5, 0, 1, -(hudBottom + 106))
+	-- Your buffs and debuffs ride just above the unit frame, wherever it sits.
+	selfStatusRow.Position = UDim2.new(0.5, 0, 1, -(hudBottom + (if touch then 184 else 132)))
 	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 22)
 	leave.Position, leave.Size =
 		UDim2.new(1, -12, 0, if portrait then 80 else 16), UDim2.fromOffset(if portrait then 130 else 160, 38)
@@ -1909,10 +1912,16 @@ function handlers.Cooldown(id, seconds)
 		nextAttack = os.clock() + seconds
 	end
 end
-function handlers.BlockBroken(seconds)
+function handlers.BlockBroken(seconds, reason)
 	blockHeld = false
 	cooldowns.Block = { Ready = os.clock() + seconds, Total = seconds }
-	UiKit.toast("Guard broken!", P.Gold)
+	if reason == "Exhausted" then
+		-- Out of Stamina: the guard can't hold (or can't go up at all).
+		hint.Text, feedbackUntil = "OUT OF STAMINA", os.clock() + 1.2
+		UiKit.toast("Out of Stamina: your guard drops!", Tech.Resources.Stamina.Color)
+	else
+		UiKit.toast("Guard broken!", P.Gold)
+	end
 end
 function handlers.BlockSpark(position, broken)
 	CombatSound.play(if broken then "GuardBreak" else "Block", position)

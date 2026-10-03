@@ -28,6 +28,52 @@ Actions.Base = {
 	},
 	Block = { Name = "Block", Reduction = 0.5, PvPReduction = 0.4, Arc = 120 },
 }
+--[[
+	Stamina, Elder Scrolls style: every swing and every blow you take on your
+	guard costs Stamina, and it only refills once you ease off.
+
+	A light swing costs 0.4 Stamina per point of the weapon's damage, so
+	heavier blades tire you faster (Attack.StaminaCost overrides it):
+	  Scout Shortsword (15)                           6 light, 17 heavy
+	  Frontier Sword, Runeblade, etc (18)             7 light, 20 heavy
+	  Impact Falchion, Omega Greatblade (23)          9 light, 26 heavy
+	A heavy is 2.85x a light. Against 100 Stamina and 12/s regen (paused
+	RegenDelay after any spend, so it never refills mid-flurry): about 14
+	light swings or 5 heavies in a row with a standard sword before you're
+	winded. A shot (sidearm) costs 0.25 per point (3).
+
+	Guard: holding it up drains GuardDrain per second (no regen while it's
+	up), and each blow it takes costs BlockPerDamage per point of the blow
+	(at least BlockMin): a rival's 9-11 damage hit costs about 5. A parry (a
+	perfect block) costs nothing. A blow you can't pay for breaks your guard
+	(GuardBreakSeconds) and lands in full.
+
+	Out of Stamina: a heavy comes out as a light swing, a light swing still
+	lands but WindedDamage weaker, and you can't raise your guard below
+	BlockMin.
+]]
+Actions.Stamina = {
+	PerDamage = 0.4,
+	HeavyMult = 2.85,
+	ShotPerDamage = 0.25,
+	GuardDrain = 4,
+	BlockPerDamage = 0.5,
+	BlockMin = 3,
+	RegenDelay = 0.8,
+	WindedDamage = 0.6,
+	GuardBreakSeconds = 1,
+}
+-- Stamina for one attack with `weapon` (a Classes gear entry).
+function Actions.swingCost(weapon, heavy: boolean?): number
+	local attack = weapon and weapon.Attack or {}
+	local light = attack.StaminaCost
+		or math.floor(
+			(attack.Damage or 18)
+					* (if attack.Kind == "Melee" then Actions.Stamina.PerDamage else Actions.Stamina.ShotPerDamage)
+				+ 0.5
+		)
+	return if heavy then math.floor(light * Actions.Stamina.HeavyMult + 0.5) else light
+end
 Actions.AfterDodgeSeconds = 3
 Actions.DoubleTap = 0.3 -- seconds between Space taps that make a roll
 Actions.BlockLease = 0.6 -- release automatically if focus/disconnection drops an End packet

@@ -236,6 +236,60 @@ now+=0.8
 CombatServer._block(b,true,ra.Position)
 releaseSide("Left",0.1)
 check(CombatServer._state(a).ComboCount==0,"Guard retained combo")
+do
+ -- Stamina, Elder Scrolls style: swings and guarding spend it.
+ check(Actions.swingCost({Attack={Kind="Melee",Damage=18}})==7 and Actions.swingCost({Attack={Kind="Melee",Damage=18}},true)==20,"Standard sword stamina costs")
+ check(Actions.swingCost({Attack={Kind="Melee",Damage=15}})==6 and Actions.swingCost({Attack={Kind="Melee",Damage=23}},true)==26,"Per-sword stamina costs")
+ check(Actions.swingCost({Attack={Kind="Melee",Damage=18,StaminaCost=4}})==4,"Weapon stamina override")
+ local s,_,rs,ls=makePlayer(41,arena+Vector3.new(14,0,0),nil)
+ local t,ht,rt=makePlayer(42,arena+Vector3.new(14,0,-5),nil)
+ now+=5
+ local ss,ts=CombatServer._state(s),CombatServer._state(t)
+ local cost=Actions.swingCost(Classes.weapon("Warrior",ls.Weapon))
+ ss.Resources.Stamina,ss.ResourceAt,ss.StaminaRestUntil=100,now,0
+ check(CombatServer._attack(s,rt.Position,false) and close(ss.Resources.Stamina,100-cost),"Light swing did not cost stamina")
+ now+=0.5; CombatServer._tick(0.5)
+ check(close(ss.Resources.Stamina,100-cost),"Stamina refilled mid-flurry")
+ now+=1; CombatServer._tick(1)
+ check(ss.Resources.Stamina>100-cost,"Stamina never refilled after the pause")
+ -- A heavy you can't afford comes out light; a light you can't afford lands winded.
+ now+=2
+ ss.Resources.Stamina,ss.ResourceAt=10,now
+ local before=ht.Health
+ CombatServer._attack(s,rt.Position,true)
+ local light=before-ht.Health
+ check(close(ss.Resources.Stamina,10-cost) and light>0,"Unaffordable heavy was not a light swing")
+ now+=2
+ ss.Resources.Stamina,ss.ResourceAt=2,now
+ before=ht.Health
+ CombatServer._attack(s,rt.Position,false)
+ check(ss.Resources.Stamina==0 and before-ht.Health<light,"Winded swing was not weaker")
+ -- Guard: drains while up, each blocked blow costs, running dry breaks it.
+ now+=2
+ ts.Resources.Stamina,ts.ResourceAt,ts.StaminaRestUntil=50,now,0
+ CombatServer._block(t,true,rs.Position)
+ now+=0.5; CombatServer._block(t,true,rs.Position); CombatServer._tick(0.5)
+ check(close(ts.Resources.Stamina,50-Actions.Stamina.GuardDrain*0.5),"Raised guard did not drain stamina")
+ -- (strike after the perfect-block window: a parry is free)
+ now+=1; CombatServer._block(t,true,rs.Position)
+ now+=0.4; CombatServer._block(t,true,rs.Position)
+ ss.Resources.Stamina,ss.ResourceAt=100,now
+ ts.ResourceAt=now
+ local guardBefore=ts.Resources.Stamina
+ CombatServer._attack(s,rt.Position,false)
+ check(ts.Resources.Stamina<guardBefore-Actions.Stamina.BlockMin+0.5 and t:GetAttribute("Blocking")==true,"Blocked blow did not cost stamina")
+ now+=1; CombatServer._block(t,true,rs.Position)
+ now+=0.4; CombatServer._block(t,true,rs.Position)
+ ts.Resources.Stamina,ts.ResourceAt=1,now
+ before=ht.Health
+ ss.Resources.Stamina,ss.ResourceAt=100,now
+ CombatServer._attack(s,rt.Position,false)
+ check(t:GetAttribute("Blocking")==false and ts.BlockBrokenUntil>now and ts.Resources.Stamina==0,"Exhausted guard held")
+ now+=2
+ ts.Resources.Stamina,ts.ResourceAt,ts.StaminaRestUntil=1,now,0
+ check(not CombatServer._block(t,true,rs.Position),"Raised a guard with no stamina")
+ table.remove(playerList,table.find(playerList,s)); table.remove(playerList,table.find(playerList,t))
+end
 ArenaSessions.start()
 a:SetAttribute("Expedition",true)
 check(not registered.ArenaPvP(a).Ok,"Mining expedition joined Arena")
