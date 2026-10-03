@@ -552,7 +552,15 @@ local function die(enemy: Enemy)
 end
 
 -- Deals damage. `color` tints the floating number (element hits, crits).
-function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boolean?, color: Color3?)
+-- Set by CombatServer: stuns a player whose swing was parried.
+Enemies.parryPlayer = function(_player: Player, _seconds: number) end
+Enemies.ParryWindow = 0.22 -- a swing landing this soon after the guard goes up is parried
+Enemies.GuardBreakSeconds = 0.9
+
+-- `heavy` is true/false for weapon swings and shots (nil for surges, burns
+-- and other effects): a heavy breaks a raised guard, and a swing landing just
+-- as the guard goes up is parried.
+function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boolean?, color: Color3?, heavy: boolean?)
 	if not enemy.Alive or amount <= 0 then
 		return
 	end
@@ -564,11 +572,34 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	end
 	local exposure = 1 + Enemies.exposure(enemy)
 	local blocked = 0
+	local e = enemy :: any
 	if enemy.GuardUntil and now < enemy.GuardUntil then
-		local guarded = amount * (enemy.GuardMult or 0.3)
-		blocked = (amount - guarded) * exposure
-		amount = guarded
-		fx("BlockSpark", enemy.Root.Position, false)
+		if heavy == true and (e.GuardMult or 0.3) < 0.5 then
+			-- A heavy blow smashes through a raised guard and staggers it
+			-- (not a Cryo Shield barrier, which only halves hits).
+			enemy.GuardUntil = 0
+			e.GuardBrokenUntil = now + Enemies.GuardBreakSeconds
+			enemy.StunUntil = math.max(enemy.StunUntil, now + 0.35)
+			e.StunKind = "Stunned"
+			enemy.Model:SetAttribute("GuardUntil", 0)
+			fx("BlockSpark", enemy.Root.Position, true)
+			DamageLog.send(source, { Dir = "Out", Kind = "GuardBreak", Who = name })
+		elseif heavy == false and source and e.GuardRaisedAt and now - e.GuardRaisedAt <= Enemies.ParryWindow then
+			-- Timed perfectly: parried, and the attacker is left open.
+			fx("BlockSpark", enemy.Root.Position, false)
+			e.BlockedAt = now
+			DamageLog.send(source, { Dir = "Out", Kind = "Parried", Who = name })
+			Enemies.parryPlayer(source, 0.45)
+			return
+		else
+			local guarded = amount * (e.GuardMult or 0.3)
+			blocked = (amount - guarded) * exposure
+			amount = guarded
+			if heavy ~= nil then
+				e.BlockedAt = now -- a swing it can answer
+			end
+			fx("BlockSpark", enemy.Root.Position, false)
+		end
 	end
 	amount = math.floor(amount * exposure + 0.5)
 	DamageLog.send(

@@ -108,6 +108,10 @@ function CombatLogUI.format(entry): string
 			return string.format("%s's %s heals it for %s%s", who, ability or "heal", healed, details(entry))
 		end
 		return string.format("Your %s heals you for %s%s", ability or "heal", healed, details(entry))
+	elseif entry.Kind == "GuardBreak" then
+		return string.format("You %s %s's guard!", paint("broke", GOLD, true), who)
+	elseif entry.Kind == "Parried" then
+		return string.format("%s %s your %s!", who, paint("parried", HURT, true), ability or "attack")
 	elseif entry.Kind == "Cast" then
 		return string.format("%s casts %s", who, ability or "a surge")
 	elseif entry.Kind == "Kill" then

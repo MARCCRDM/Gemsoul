@@ -4,8 +4,13 @@
 	player:
 
 	  Stagger   stunned or parried: does nothing
-	  Guard     raises its guard against a charging swing or a surge wind-up
-	  Dodge     sidesteps a charging swing or a surge wind-up
+	  Riposte   a counter-swing straight after blocking one of yours
+	  Guard     raises its guard against your swings (most of the time, and
+	            longer when you're pressing it); a hit that lands just as
+	            it raises it is parried
+	  Dodge     sidesteps a charged heavy (which would break its guard) or a
+	            surge wind-up, and anything once its guard is broken
+	  GuardAdvance  closes in shield-first while you shoot from range
 	  Punish    a fast counter-swing while the player recovers from an attack
 	  Surge     casts its gem's surge: from range, or point-blank when the
 	            player is stunned, slowed or hiding behind their guard
@@ -32,6 +37,13 @@ export type View = {
 	HealthRatio: number,
 	Stunned: boolean,
 	FoeCharging: boolean, -- winding up a swing
+	FoeHeavy: boolean?, -- held long enough to be a heavy (breaks a guard)
+	FoeAttacking: boolean?, -- swung in the last half second (mid-combo)
+	FoeAggressive: boolean?, -- two or more swings in the last few seconds
+	FoeRanged: boolean?, -- fights with a gun
+	GuardBroken: boolean?, -- its guard was just broken: can't raise it
+	JustBlocked: boolean?, -- just blocked one of your swings
+	Guarding: boolean?, -- its guard is up right now
 	FoeCasting: boolean, -- winding up a surge or maneuver
 	FoeBlocking: boolean, -- guard up
 	FoeRecovering: boolean, -- just attacked and can't act yet
@@ -55,12 +67,43 @@ function Brain.decide(v: View, roll: number): string
 	if v.Stunned then
 		return "Stagger"
 	end
+	-- Blocked your swing: hit back while you're open.
+	if v.JustBlocked and v.Distance <= Brain.Reach + 1.5 then
+		return "Riposte"
+	end
+	-- Shield already up and you're still swinging: hold it (a heavy is
+	-- dodged instead, below). It answers once a swing is blocked.
+	if v.Guarding and (v.FoeAttacking or v.FoeCharging) and not v.FoeHeavy then
+		return "Guard"
+	end
 	-- Defend against what's coming, but not every time (it reads, not cheats).
-	if (v.FoeCharging or v.FoeCasting) and v.Distance <= Brain.Reach + 4 and v.Now >= v.NextDefense then
-		if roll < 0.4 then
-			return "Guard"
-		elseif roll < 0.8 then
-			return "Dodge"
+	local threat = v.FoeCharging or v.FoeCasting or v.FoeAttacking
+	if threat and v.Distance <= Brain.Reach + 4 and v.Now >= v.NextDefense then
+		if v.FoeHeavy or v.GuardBroken then
+			-- A heavy would break the guard: get out of the way instead.
+			if roll < 0.75 then
+				return "Dodge"
+			end
+		elseif v.FoeCasting and not v.FoeCharging then
+			if roll < 0.45 then
+				return "Guard"
+			elseif roll < 0.85 then
+				return "Dodge"
+			end
+		else
+			-- Quick swings: shield up, more so against a flurry.
+			local guard = if v.FoeAggressive then 0.8 else 0.65
+			if roll < guard then
+				return "Guard"
+			elseif roll < guard + 0.15 then
+				return "Dodge"
+			end
+		end
+	end
+	-- Being shot at from range: close in behind the shield.
+	if v.FoeRanged and v.FoeRecovering and v.Distance > Brain.Reach + 2 and not v.GuardBroken then
+		if v.Now >= v.NextDefense and roll < 0.55 then
+			return "GuardAdvance"
 		end
 	end
 	-- An opening: hit the player while they recover.
@@ -89,6 +132,10 @@ function Brain.decide(v: View, roll: number): string
 			return if roll < 0.15 then "Heavy" else "Light" -- quick pressure to finish
 		end
 		return if roll < 0.25 then "Heavy" else "Light"
+	end
+	-- Waiting on its next swing up close: shield up rather than open.
+	if v.Distance <= Brain.Reach + 2 and not v.GuardBroken and roll < 0.6 then
+		return "Guard"
 	end
 	return "Strafe"
 end

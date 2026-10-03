@@ -597,7 +597,8 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 			damage,
 			source,
 			crit,
-			if crit then Color3.fromRGB(255, 220, 80) else GemConfig.ElementColors[element] or WHITE
+			if crit then Color3.fromRGB(255, 220, 80) else GemConfig.ElementColors[element] or WHITE,
+			heavy == true
 		)
 		if k.Effects.Sunder then
 			Enemies.addStatus(target.Enemy, "Sunder", k.Effects.Sunder, 5)
@@ -1545,6 +1546,15 @@ end
 function CombatServer.start()
 	Enemies.hitPlayer = function(player, amount, element, enemy, heavy)
 		return CombatServer.hurt(player, amount, element, enemy, heavy)
+	end
+	-- A rival parried your swing: you're left open for a moment.
+	Enemies.parryPlayer = function(player, seconds)
+		local st = state(player)
+		local now = os.clock()
+		st.StunUntil = math.max(st.StunUntil, now + seconds)
+		st.StunKind = "Stunned"
+		st.ChargeStarted, st.ComboSide, st.ComboCount = nil, nil, 0
+		Remotes.CombatFx:FireClient(player, "Parried", seconds)
 	end
 	Remotes.CombatInput.OnServerEvent:Connect(onInput)
 	Shop.register("SetRigManeuvers", function()

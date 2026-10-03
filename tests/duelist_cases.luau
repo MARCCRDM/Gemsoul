@@ -13,7 +13,15 @@ local function view(changes)
 end
 check(DuelistBrain.decide(view({ Stunned = true }), 0.1) == "Stagger", "Stunned rival acted")
 check(DuelistBrain.decide(view({ FoeCharging = true }), 0.1) == "Guard", "Rival ignored a charging swing (guard)")
-check(DuelistBrain.decide(view({ FoeCharging = true }), 0.6) == "Dodge", "Rival ignored a charging swing (dodge)")
+check(DuelistBrain.decide(view({ FoeCharging = true }), 0.6) == "Guard", "Rival didn't block a quick swing")
+check(DuelistBrain.decide(view({ FoeCharging = true }), 0.72) == "Dodge", "Rival never sidestepped a quick swing")
+check(DuelistBrain.decide(view({ FoeCharging = true, FoeHeavy = true }), 0.1) == "Dodge", "Rival blocked a guard-breaking heavy")
+check(DuelistBrain.decide(view({ FoeAttacking = true, FoeAggressive = true }), 0.75) == "Guard", "Rival didn't turtle against a flurry")
+check(DuelistBrain.decide(view({ FoeCharging = true, GuardBroken = true }), 0.1) == "Dodge", "Rival guarded with a broken guard")
+check(DuelistBrain.decide(view({ JustBlocked = true }), 0.9) == "Riposte", "Rival didn't counter after a block")
+check(DuelistBrain.decide(view({ Guarding = true, FoeAttacking = true, FoeRecovering = true, NextDefense = 20 }), 0.9) == "Guard", "Rival dropped its guard mid-flurry")
+check(DuelistBrain.decide(view({ Guarding = true, FoeCharging = true, FoeHeavy = true }), 0.1) == "Dodge", "Rival held its guard against a heavy")
+check(DuelistBrain.decide(view({ FoeRanged = true, FoeRecovering = true, NextAttack = 20, Distance = 15 }), 0.3) == "GuardAdvance", "Rival walked into gunfire without its shield")
 check(DuelistBrain.decide(view({ FoeCasting = true }), 0.6) == "Dodge", "Rival ignored a surge wind-up")
 check(DuelistBrain.decide(view({ FoeRecovering = true, NextAttack = 20 }), 0.9) == "Punish", "Rival missed an opening")
 check(DuelistBrain.decide(view({ Distance = 4, NextSurge = 0, FoeVulnerable = true }), 0.9) == "Surge", "Rival wasted a stunned target")
@@ -29,7 +37,9 @@ check(DuelistBrain.decide(view(), 0.5) == "Light", "Rival in reach did not swing
 check(DuelistBrain.decide(view(), 0.1) == "Heavy", "Rival never used a heavy blow")
 check(DuelistBrain.decide(view({ FoeLow = true }), 0.5) == "Light", "Rival did not press a low foe")
 check(DuelistBrain.decide(view({ FoeBlocking = true }), 0.6) == "Heavy", "Raised guard did not invite a heavy")
-check(DuelistBrain.decide(view({ NextAttack = 20 }), 0.5) == "Strafe", "Rival stood still between attacks")
+check(DuelistBrain.decide(view({ NextAttack = 20 }), 0.7) == "Strafe", "Rival stood still between attacks")
+check(DuelistBrain.decide(view({ NextAttack = 20 }), 0.3) == "Guard", "Rival stayed open between its attacks")
+check(DuelistBrain.decide(view({ NextAttack = 20, Distance = 15 }), 0.3) ~= "Guard", "Rival turtled from across the arena")
 -- Picking among its three surges.
 local bolt = { Name = "Bolt", Kind = "Bolt", Power = 1.4, Next = 0 }
 local blast = { Name = "Blast", Kind = "Nova", Radius = 7, Power = 1.3, Next = 0 }
