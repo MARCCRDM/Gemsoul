@@ -1366,14 +1366,19 @@ RunService.RenderStepped:Connect(function(dt)
 	elseif cast and now < cast.Start + cast.Duration then
 		castColor = cast.Color
 		chargeFill.Size = UDim2.fromScale(math.clamp((now - cast.Start) / cast.Duration, 0, 1), 1)
-		castLabel.Text = string.format("%s  ·  %.1fs", cast.Name:upper(), cast.Start + cast.Duration - now)
+		castLabel.Text = string.format(
+			"%s  ·  %.1fs%s",
+			cast.Name:upper(),
+			cast.Start + cast.Duration - now,
+			if player:GetAttribute("CastRooted") then "  ·  ROOTED" else ""
+		)
 	elseif beamKey then
 		local gem = Tech.surgeGem(loadout, beamKey)
 		local definition = gem and Tech.surgeStats(gem)
 		castColor = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else P.Gold
 		local charge = player:GetAttribute("Charge") or 0
 		chargeFill.Size = UDim2.fromScale(math.clamp(charge / (player:GetAttribute("MaxCharge") or 100), 0, 1), 1)
-		castLabel.Text = (if definition then definition.Name:upper() else "CHANNEL") .. "  ·  CHANNELING"
+		castLabel.Text = (if definition then definition.Name:upper() else "CHANNEL") .. "  ·  CHANNELING (SLOWED)"
 	else
 		cast = nil
 	end

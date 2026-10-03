@@ -1262,7 +1262,14 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	elseif definition.PerSecond then
 		technologyStrike(player, definition, aim, 0.25)
 		st.Channel = { Key = cooldownKey, Definition = definition, Aim = aim, Until = now + 0.5, Next = now + 0.25 }
-	elseif definition.Damage then
+	end
+	-- Casting slows you, or roots you for a wind-up (Actions.castMovement).
+	local castSpeed, castSeconds = Actions.castMovement(definition)
+	if castSpeed < 1 and not definition.PerSecond then
+		local seconds = castSeconds or definition.Windup or 0
+		st.CastUntil, st.CastSpeed = now + seconds, castSpeed
+	end
+	if definition.Damage and not definition.PerSecond then
 		if definition.Windup then
 			table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + definition.Windup })
 			fx("TechField", player, Color3.fromRGB(255, 190, 80))
@@ -1522,9 +1529,19 @@ local function tick(_dt)
 			end
 		end
 		local speed = Classes.walkSpeed(rating(k, "Speed")) * k.Effects.MobilityMult
+		-- Casting: rooted through a wind-up, slowed while a beam pours out or
+		-- just after a throw (Actions.castMovement).
+		local casting = if st.Channel
+			then select(1, Actions.castMovement(st.Channel.Definition))
+			elseif now < (st.CastUntil or 0) and (st.CastSpeed > 0 or #st.Pending > 0) then st.CastSpeed
+			else 1 -- (a wind-up a dodge or stun cut short frees you)
 		humanoid.WalkSpeed = if now < st.StunUntil
 			then 0
-			else speed * (if now < st.SlowUntil then 1 - st.Slow else 1) * (if blocking(st, now) then 0.6 else 1)
+			else speed
+				* (if now < st.SlowUntil then 1 - st.Slow else 1)
+				* (if blocking(st, now) then 0.6 else 1)
+				* casting
+		player:SetAttribute("CastRooted", casting == 0)
 		if now >= st.ShieldUntil then
 			st.Shield = 0
 		end

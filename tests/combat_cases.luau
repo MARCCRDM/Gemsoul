@@ -290,6 +290,15 @@ do
  check(not CombatServer._block(t,true,rs.Position),"Raised a guard with no stamina")
  table.remove(playerList,table.find(playerList,s)); table.remove(playerList,table.find(playerList,t))
 end
+do
+ -- Casting slows you, or roots you for a wind-up.
+ check(Actions.castMovement({Windup=1.2,Damage=2.4,Resource="Charge",Radius=14})==0,"Wind-up does not root")
+ check(Actions.castMovement({PerSecond=true,Damage=0.45,Resource="Charge"})==0.4,"Channel does not slow")
+ local blast,blastFor=Actions.castMovement({Damage=1,Resource="Charge",Radius=8})
+ local bolt,boltFor=Actions.castMovement({Damage=1,Resource="Charge",Range=45})
+ check(blast==0.35 and blastFor==0.5 and bolt==0.55 and boltFor==0.35,"Instant cast slows")
+ check(Actions.castMovement({Resource="Charge"})==1 and Actions.castMovement({Resource="Stamina",Damage=1.8})==1,"Buffs or sword maneuvers slow you")
+end
 ArenaSessions.start()
 a:SetAttribute("Expedition",true)
 check(not registered.ArenaPvP(a).Ok,"Mining expedition joined Arena")

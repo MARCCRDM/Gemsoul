@@ -113,6 +113,39 @@ function Actions.blastFalloff(distance: number, radius: number): (number, string
 	end
 	return scale, nil, 0
 end
+--[[
+	Moving while you cast, by what the cast is (Actions.castMovement):
+	  wind-up (Supernova, Solar Flare, Breach Hammer,   ROOTED for the whole
+	    Seismic Breaker)                                wind-up: you plant your
+	                                                    feet to call it down
+	  channel (Cryo Stream)                             walk at 40% while the
+	                                                    beam pours out
+	  instant ground blast (Thermal Burst, Toxic        35% speed for 0.5s as
+	    Cloud, Absolute Zero)                           you throw it
+	  instant bolt, lance, cone or field (Cryo Lance,   55% speed for 0.35s
+	    Ember Lance, Ion Spark, Chain Lightning,
+	    Overload, Armor Melt, Bio-Corrosion, Acid
+	    Spray, Static Field)
+	  self buffs (Cryo Shield, Energy Siphon,           no slow
+	    Resonance Echo), sword maneuvers and Stim Dodge
+	Returns the speed multiplier and how long it lasts (nil seconds: for the
+	wind-up or channel itself).
+]]
+function Actions.castMovement(definition): (number, number?)
+	if not definition then
+		return 1, 0
+	end
+	if definition.Windup then
+		return 0, nil
+	elseif definition.PerSecond then
+		return 0.4, nil
+	elseif definition.Resource ~= "Charge" or not definition.Damage then
+		return 1, 0
+	elseif definition.Radius and not definition.Self then
+		return 0.35, 0.5
+	end
+	return 0.55, 0.35
+end
 Actions.AfterDodgeSeconds = 3
 Actions.DoubleTap = 0.3 -- seconds between Space taps that make a roll
 Actions.BlockLease = 0.6 -- release automatically if focus/disconnection drops an End packet
