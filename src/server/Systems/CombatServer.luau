@@ -252,7 +252,9 @@ local function targetAllowed(source, target)
 	if target.Player then
 		return canPvP(source, target.Player)
 	end
-	return target.Enemy.Alive and Combat.canFight(target.Root.Position)
+	return target.Enemy.Alive
+		and (not target.Enemy.DungeonId or source:GetAttribute("DungeonId") == target.Enemy.DungeonId)
+		and Combat.canFight(target.Root.Position)
 end
 local function targets(source)
 	local list = {}
@@ -861,7 +863,8 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 			source,
 			crit,
 			if crit then Color3.fromRGB(255, 220, 80) else GemConfig.ElementColors[element] or WHITE,
-			heavy == true
+			heavy == true,
+			element
 		)
 		if k.Effects.Sunder then
 			Enemies.addStatus(target.Enemy, "Sunder", k.Effects.Sunder, 5)
@@ -1204,7 +1207,7 @@ function technologyHitInner(player, k, target, definition, scale)
 			definition.Pierce
 		)
 	else
-		Enemies.damage(target.Enemy, damage, player, crit, color)
+		Enemies.damage(target.Enemy, damage, player, crit, color, nil, definition.Element)
 		enemyWard(player, target.Enemy)
 	end
 	if damage <= 0 then
@@ -1802,6 +1805,9 @@ function CombatServer.rivalAura(player, amount)
 end
 
 function CombatServer.hurt(player, amount, element, enemy, heavy, crit)
+	if enemy and enemy.DungeonId and player:GetAttribute("DungeonId") ~= enemy.DungeonId then
+		return 0, false
+	end
 	return receive(
 		player,
 		amount,

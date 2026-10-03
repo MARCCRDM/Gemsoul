@@ -8,6 +8,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 local ArenaSessions = {}
 -- Hooks set by the Duelist (a computer rival in PvP); nil when not running.
+ArenaSessions.onDungeonLeave = nil
 ArenaSessions.onEnter = nil :: ((Player, boolean) -> ())?
 ArenaSessions.onLeave = nil :: ((Player) -> ())?
 local busy = {}
@@ -56,6 +57,9 @@ local function enter(player, pvp)
 	)
 end
 local function leave(player)
+	if ArenaSessions.onDungeonLeave then
+		ArenaSessions.onDungeonLeave(player)
+	end
 	if ArenaSessions.onLeave then
 		ArenaSessions.onLeave(player)
 	end
@@ -110,7 +114,12 @@ function ArenaSessions.start()
 		timer = 0
 		for _, player in Players:GetPlayers() do
 			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-			if player:GetAttribute("CombatSession") and root and not Combat.inArena(root.Position) then
+			if
+				player:GetAttribute("CombatSession")
+				and root
+				and not player:GetAttribute("DungeonId")
+				and not Combat.inArena(root.Position)
+			then
 				leave(player)
 			end
 		end

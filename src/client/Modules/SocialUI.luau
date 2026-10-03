@@ -540,12 +540,12 @@ local function drawArena()
 	local raiders = if party then #party.Members else 1
 	chip(
 		practice,
-		string.format("RAID %d/%d", raiders, Matchmaking.Raid.Min),
+		string.format("DUNGEON %d/%d", raiders, Matchmaking.Raid.Min),
 		if raiders >= Matchmaking.Raid.Min and isLeader() then Color3.fromRGB(222, 86, 72) else P.Edge,
 		SocialUI.raid,
 		100
 	)
-	local rule = text(rows, "Queue duels are rated. Challenges from the player list are friendly.", 12, P.Dim)
+	local rule = text(rows, "Dungeons: 3–4 players. Everyone marks Ready; the leader queues.", 12, P.Dim)
 	rule.LayoutOrder = 4
 end
 
@@ -564,7 +564,7 @@ end
 -- The leader starts a Party Raid (three or more against a raid boss).
 function SocialUI.raid()
 	SocialUI.close()
-	run("PartyRaid")
+	run("PartyDungeon")
 end
 
 function SocialUI.refresh()

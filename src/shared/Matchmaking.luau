@@ -114,6 +114,10 @@ function Matchmaking.ownsRival(model, player): boolean
 	if not model or not player then
 		return false
 	end
+	local dungeon = attribute(model, "DungeonId")
+	if dungeon then
+		return dungeon == attribute(player, "DungeonId")
+	end
 	if player.UserId ~= nil and model:GetAttribute("RivalOwner") == player.UserId then
 		return true
 	end

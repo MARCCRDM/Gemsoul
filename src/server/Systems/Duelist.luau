@@ -56,7 +56,9 @@ local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local DamageLog = require(script.Parent.DamageLog)
 
+local BrainrotSkins = require(script.Parent.BrainrotSkins)
 local Duelist = {}
+local dungeonActors = {}
 
 local NAMES = {
 	"Kade Vorn",
@@ -226,6 +228,16 @@ local function buildRig(loadout, name: string, at: CFrame): Model?
 end
 
 function Duelist.despawn(owner: Player)
+	for enemy, actor in dungeonActors do
+		if actor.Raid and actor.Raid.Dungeon and table.find(actor.Raid.Members, owner) then
+			local index = table.find(actor.Raid.Members, owner)
+			table.remove(actor.Raid.Members, index)
+			if #actor.Raid.Members == 0 then
+				dungeonActors[enemy] = nil
+				Enemies.remove(enemy)
+			end
+		end
+	end
 	local duel = duels[owner]
 	duels[owner] = nil
 	-- A raider leaving: the boss fights on while anyone's left.
@@ -908,7 +920,7 @@ local function think(enemy, now: number)
 			fx("Shot", nil, from, aim, GemConfig.ElementColors[action.Element] or color, "Fireball")
 			task.delay(math.clamp(distance / 140, 0.05, 0.5), function()
 				local stillRoot = ownerRoot(owner)
-				if duels[owner] ~= duel or not stillRoot then
+				if (not duel.Dungeon and duels[owner] ~= duel) or not enemy.Alive or not stillRoot then
 					return
 				end
 				if Brain.boltHits(aim, stillRoot.Position) then
@@ -1342,6 +1354,11 @@ end
 
 local function onWin(enemy)
 	local duel = enemy.Duel
+	if duel.Dungeon then
+		dungeonActors[enemy] = nil
+		duel.Dungeon.OnDeath(enemy)
+		return
+	end
 	if duel.Raid then
 		raidCleared(duel)
 		return
@@ -1379,8 +1396,8 @@ local function onWin(enemy)
 	end)
 end
 
-function spawnRival(owner: Player, raid)
-	if duels[owner] or starting[owner] then
+function spawnRival(owner: Player, raid, encounter)
+	if (not encounter and duels[owner]) or starting[owner] then
 		return
 	end
 	-- PvP brings a full-strength rival; Training a sparring partner that hits
@@ -1396,7 +1413,7 @@ function spawnRival(owner: Player, raid)
 	local sparring = session == "Training"
 	local root = ownerRoot(owner)
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local center = landmarks and landmarks:GetAttribute("ArenaFloor")
+	local center = if encounter then encounter.Center else landmarks and landmarks:GetAttribute("ArenaFloor")
 	local ownerLoadout = PlayerData.character(owner)
 	if not root or typeof(center) ~= "Vector3" or not ownerLoadout then
 		return
@@ -1404,21 +1421,57 @@ function spawnRival(owner: Player, raid)
 	starting[owner] = true
 	local rng = Random.new()
 	local loadout = rollLoadout(rng)
+	if encounter then
+		local spec = encounter.Spec
+		for _, candidate in Classes.get("Warrior").Weapons do
+			if (candidate.Attack.Kind == "Shot") == (spec.Shape == "Crocodile") then
+				loadout.Weapon = candidate.Id
+				break
+			end
+		end
+		for _, key in { "WeaponGem", "Surge1Gem", "Surge2Gem", "Surge3Gem" } do
+			local gem = loadout[key]
+			GemRoller.setElement(gem, spec.Element)
+			if key ~= "WeaponGem" then
+				local slot = tonumber(string.sub(key, 6, 6)) or 1
+				local tier = if encounter.Boss then slot + 1 else math.min(slot, 2)
+				gem.SurgeTier, gem.SurgeRank = tier, if encounter.Boss then 3 else 1
+				gem.Surge = Tech.Surges[spec.Element][tier]
+			end
+		end
+	end
 	local name = NAMES[rng:NextInteger(1, #NAMES)]
 	if raid then
 		name = "Warlord " .. name
 	end
+	if encounter then
+		name = (if encounter.Boss then "Colossus " else "") .. encounter.Spec.Name
+	end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
 	away = if away.Magnitude > 1 then away.Unit else Vector3.new(1, 0, 0)
-	local spot = center + away * 18 + Vector3.new(0, 4, 0)
+	local spot = if encounter then encounter.Spot else center + away * 18 + Vector3.new(0, 4, 0)
 	local rig = buildRig(loadout, name, CFrame.lookAt(spot, Vector3.new(root.Position.X, spot.Y, root.Position.Z)))
 	starting[owner] = nil
-	if not rig or not owner.Parent or owner:GetAttribute("CombatSession") ~= session or duels[owner] then
+	if
+		not rig
+		or not owner.Parent
+		or owner:GetAttribute("CombatSession") ~= session
+		or (not encounter and duels[owner])
+	then
 		if rig then
 			rig:Destroy()
 		end
 		return
+	end
+	if encounter then
+		-- Remove cosmetic equipment, retaining the entire jointed animation skeleton.
+		for _, child in rig:GetChildren() do
+			if child:IsA("Folder") or child:IsA("Accessory") then
+				child:Destroy()
+			end
+		end
+		BrainrotSkins.apply(rig, encounter.Spec, GemConfig.ElementColors[encounter.Spec.Element], encounter.Boss)
 	end
 	-- Equal ground: it's a new player with its own random kit, built by
 	-- exactly the rules that build yours. Its health, swing damage, armour,
@@ -1442,6 +1495,10 @@ function spawnRival(owner: Player, raid)
 	if raid then
 		raidHealth, raidDamage = Matchmaking.raidScale(#raid.Members, raid.Wave)
 		health = math.floor(health * raidHealth)
+		if encounter then
+			health = math.floor(health * (if encounter.Boss then 2.2 else 0.38))
+			raidDamage *= if encounter.Boss then 1 else 0.65
+		end
 	end
 	local kind = {
 		Name = "Rival Duelist",
@@ -1459,7 +1516,14 @@ function spawnRival(owner: Player, raid)
 	local element = loadout.WeaponGem.Element
 	local enemy = Enemies.adopt(rig, kind, {
 		Element = element,
-		Title = string.format("%s  ·  %s", name, GemConfig.elementName(element)),
+		Title = if encounter
+			then string.format(
+				"%s · %s · weak: %s",
+				name,
+				GemConfig.elementName(element),
+				GemConfig.elementName(encounter.Spec.Weakness)
+			)
+			else string.format("%s  ·  %s", name, GemConfig.elementName(element)),
 		Home = spot,
 	})
 	enemy.Humanoid.AutoRotate = false
@@ -1472,7 +1536,7 @@ function spawnRival(owner: Player, raid)
 	enemy.Reflect = if rivalKit.Defense.Reflect > 0 then rivalKit.Defense.Reflect else nil
 	enemy.GuardBreakTime = Actions.Base.Heavy.BreakSeconds
 	-- Every bout starts even: the player (every raider) steps in at full health too.
-	for _, member in if raid then raid.Members else { owner } do
+	for _, member in if encounter then {} elseif raid then raid.Members else { owner } do
 		local _, memberHumanoid = ownerRoot(member)
 		if memberHumanoid then
 			memberHumanoid.Health = memberHumanoid.MaxHealth
@@ -1525,6 +1589,14 @@ function spawnRival(owner: Player, raid)
 		RetreatUntil = 0,
 	}
 	enemy.Duel = duel
+	if encounter then
+		duel.Dungeon = encounter
+		enemy.DungeonId = raid.Id
+		enemy.ElementWeakness = encounter.Spec.Weakness
+		enemy.Model:SetAttribute("DungeonId", raid.Id)
+		enemy.Model:SetAttribute("ElementWeakness", encounter.Spec.Weakness)
+		enemy.Model:SetAttribute("ElementResistance", encounter.Spec.Element)
+	end
 	-- A reflected blow goes back to whoever struck it, as a player's does.
 	enemy.OnReflect = function(_source, amount: number)
 		strike(duel, amount, nil, false, nil, "Reflect")
@@ -1611,7 +1683,7 @@ function spawnRival(owner: Player, raid)
 	end
 	duel.NextSurge = nextSurgeTime(duel, now)
 	-- Three Rig Maneuvers on 1, 2, 3, picked from the same list players learn.
-	local pool = table.clone(Tech.Order.RigManeuvers)
+	local pool = table.clone(if encounter then encounter.Spec.Moves else Tech.Order.RigManeuvers)
 	for slot = 1, math.min(3, #pool) do
 		local id = table.remove(pool, rng:NextInteger(1, #pool))
 		local stats = Tech.Catalog[id]
@@ -1681,6 +1753,10 @@ function spawnRival(owner: Player, raid)
 	local surgeList = if #names > 0 then table.concat(names, ", ") else "no surges"
 	enemy.Brain = think
 	enemy.OnDeath = onWin
+	if encounter then
+		dungeonActors[enemy] = duel
+		return enemy
+	end
 	if raid then
 		for _, member in raid.Members do
 			duels[member] = duel
@@ -1710,6 +1786,21 @@ function Duelist.startRaid(members: { Player }, id: string)
 	return raid
 end
 
+function Duelist.spawnDungeon(members, id, encounter)
+	local raid =
+		{ Id = id, Members = table.clone(members), All = table.clone(members), Wave = encounter.Room, Dungeon = true }
+	return spawnRival(members[1], raid, encounter)
+end
+function Duelist.removeDungeon(id)
+	for enemy, duel in dungeonActors do
+		if duel.Raid.Id == id then
+			dungeonActors[enemy] = nil
+			if enemy.Alive then
+				Enemies.remove(enemy)
+			end
+		end
+	end
+end
 function Duelist.start()
 	-- Your Pneumatic Jab on a rival mid-cast: the cast is cancelled and its
 	-- surges lock for `seconds`. True if there was a cast to cancel.
@@ -1748,7 +1839,18 @@ function Duelist.start()
 	RunService.Heartbeat:Connect(function(dt)
 		local now = workspace:GetServerTimeNow()
 		local posed = {}
+		local actors = {}
 		for _, duel in duels do
+			table.insert(actors, duel)
+		end
+		for enemy, duel in dungeonActors do
+			if enemy.Alive then
+				table.insert(actors, duel)
+			else
+				dungeonActors[enemy] = nil
+			end
+		end
+		for _, duel in actors do
 			-- (A raid boss is listed once per raider; pose it once.)
 			if posed[duel] then
 				continue

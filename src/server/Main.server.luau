@@ -73,4 +73,5 @@ if Config.CombatEnabled or not Config.MenuOnly then
 	require(script.Parent.Systems.Duels).start()
 	-- Party Raids: a party of three or more against a raid boss.
 	require(script.Parent.Systems.Raids).start()
+	require(script.Parent.Systems.Dungeons).start()
 end

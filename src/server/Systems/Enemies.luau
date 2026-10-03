@@ -30,6 +30,7 @@ local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local DamageLog = require(script.Parent.DamageLog)
 
+local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Enemies = {}
 
 -- The Wilds: just outside the south gate, either side of the country road.
@@ -561,7 +562,21 @@ Enemies.GuardBreakSeconds = 0.9
 -- `heavy` is true/false for weapon swings and shots (nil for surges, burns
 -- and other effects): a heavy breaks a raised guard, and a swing landing just
 -- as the guard goes up is parried.
-function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boolean?, color: Color3?, heavy: boolean?)
+function Enemies.damage(
+	enemy: Enemy,
+	amount: number,
+	source: Player?,
+	crit: boolean?,
+	color: Color3?,
+	heavy: boolean?,
+	incomingElement: string?
+)
+	if enemy.DungeonId and (not source or source:GetAttribute("DungeonId") ~= enemy.DungeonId) then
+		return
+	end
+	if enemy.DungeonId then
+		amount *= DungeonRules.elementMultiplier(enemy.Element, enemy.ElementWeakness, incomingElement)
+	end
 	if not enemy.Alive or amount <= 0 then
 		return
 	end
@@ -937,7 +952,15 @@ local function tickDots(enemy: Enemy)
 			dot.Wait = 0
 			dot.Ticks -= 1
 			local previous = DamageLog.push(dot.Status or "Bleeding", if dot.Status == "Burning" then "Fire" else nil)
-			Enemies.damage(enemy, dot.PerTick, dot.Source, false, dot.Color)
+			Enemies.damage(
+				enemy,
+				dot.PerTick,
+				dot.Source,
+				false,
+				dot.Color,
+				nil,
+				if dot.Status == "Burning" then "Fire" else nil
+			)
 			DamageLog.pop(previous)
 			if dot.Ticks <= 0 then
 				table.remove(enemy.Dots, i)
