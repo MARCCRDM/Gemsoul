@@ -2005,6 +2005,68 @@ local function frontierSuit(family: number)
 				end
 			end
 		end
+		-- Secondary surface detail follows each segment, so mixed sets and previews
+		-- receive the same finish without altering the authored silhouettes.
+		for key, seg in body do
+			local s = seg.Size
+			if key == "Head" then
+				seg = humanHead(seg)
+				s = seg.Size
+				-- Rear service hatch and raised ventilation ribs stay clear of every visor.
+				block(seg, 0, 0.04 * s.Y, 0.51 * s.Z, 0.48 * s.X, 0.32 * s.Y, 0.045, trim)
+				for rib = 1, 2 + math.floor(rarity / 2) do
+					block(seg, 0, (0.19 - rib * 0.065) * s.Y, 0.55 * s.Z, 0.35 * s.X, 0.025, 0.035, edge)
+				end
+				if rarity >= 3 then
+					for _, side in sides() do
+						block(seg, side * s.X * 0.54, s.Y * 0.08, s.Z * 0.06, 0.035, s.Y * 0.2, s.Z * 0.23, ornament)
+					end
+				end
+				if rarity >= 4 then
+					lit(seg, 0, -0.17 * s.Y, 0.55 * s.Z, s.X * 0.2, 0.028, 0.035)
+				end
+			elseif key == "Torso" and rarity >= 2 then
+				-- Low chest clasps: utility tabs, scout chevrons or heavy locking plates.
+				for _, side in sides() do
+					local tilt = if family == 2 then side * 28 else 0
+					block(seg, side * s.X * 0.29, -s.Y * 0.22, -s.Z * 0.65, s.X * 0.13, s.Y * 0.18, 0.055, trim, tilt)
+					block(seg, side * s.X * 0.29, -s.Y * 0.22, -s.Z * 0.69, s.X * 0.07, s.Y * 0.1, 0.025, edge, tilt)
+				end
+				if rarity >= 2 then
+					for rib = 1, 3 do
+						block(seg, 0, (-0.15 - rib * 0.075) * s.Y, s.Z * 0.58, s.X * 0.43, 0.035, 0.04, trim)
+					end
+				end
+				if rarity >= 5 then
+					for _, side in sides() do
+						block(
+							seg,
+							side * s.X * 0.2,
+							s.Y * 0.24,
+							-s.Z * 0.67,
+							s.X * 0.19,
+							0.035,
+							0.035,
+							BRASS,
+							side * 24
+						)
+					end
+				end
+			elseif rarity >= 2 and (string.find(key, "LowerArm") or string.find(key, "LowerLeg")) then
+				-- Layered joint fasteners read as construction, not extra armor bulk.
+				local sign = if string.sub(key, 1, 4) == "Left" then -1 else 1
+				block(seg, sign * s.X * 0.43, s.Y * 0.2, 0, 0.06, s.Y * 0.25, s.Z * 0.36, trim)
+				block(seg, sign * s.X * 0.47, s.Y * 0.2, 0, 0.035, s.Y * 0.13, s.Z * 0.23, edge)
+				if rarity >= 3 then
+					for rib = 1, 2 do
+						block(seg, 0, (-0.22 - rib * 0.08) * s.Y, s.Z * 0.44, s.X * 0.58, 0.028, 0.035, ornament)
+					end
+				end
+				if rarity >= 4 then
+					lit(seg, sign * s.X * 0.495, s.Y * 0.2, 0, 0.025, s.Y * 0.055, s.Z * 0.12)
+				end
+			end
+		end
 	end
 end
 BUILDERS.UtilityMiner = frontierSuit(1)

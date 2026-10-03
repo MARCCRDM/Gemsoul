@@ -148,6 +148,26 @@ function Assets.shield(folder, arm, mount, rarity, accent, finish, family)
 	local function add(x, y, z, sx, sy, sz, color, material)
 		return part(folder, arm, mount, CFrame.new(x, y, z), Vector3.new(sx, sy, sz), color, material)
 	end
+	-- Corner locking tabs and lower rank inlays leave the central gem unobstructed.
+	for _, side in { -1, 1 } do
+		add(side * 0.48, -0.53, -0.235, 0.12, 0.16, 0.055, dark)
+		add(side * 0.48, -0.53, -0.27, 0.055, 0.07, 0.025, steel, Enum.Material.Metal)
+		if rarity >= 3 then
+			for rank = 1, rarity - 2 do
+				add(
+					side * (0.13 + rank * 0.085),
+					-0.72,
+					-0.225,
+					0.035,
+					0.09,
+					0.025,
+					if rarity == 5 then gold else steel,
+					Enum.Material.Metal
+				)
+			end
+		end
+	end
+
 	-- Stepped kite silhouette replaces the smooth oval; plates float over a dark frame.
 	if family == "Prospector" then
 		for _, side in { -1, 1 } do
