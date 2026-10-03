@@ -228,14 +228,12 @@ function CombatVfx.element(position: Vector3, element: string?, big: number?)
 				spike.Size = Vector3.new(0.12, 0.12, 0.1)
 				spike.CFrame = CFrame.lookAt(position, position + out)
 				spike.Parent = fxFolder()
-				TweenService:Create(
-					spike,
-					TweenInfo.new(0.08 + i * 0.01, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-					{
+				TweenService
+					:Create(spike, TweenInfo.new(0.08 + i * 0.01, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 						Size = Vector3.new(0.22, 0.22, length),
 						CFrame = CFrame.lookAt(position + out * length / 2, position + out * length),
-					}
-				):Play()
+					})
+					:Play()
 				task.delay(0.35, function()
 					fade(spike, 0.3)
 				end)

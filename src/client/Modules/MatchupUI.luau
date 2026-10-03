@@ -10,6 +10,7 @@ local HttpService = game:GetService("HttpService")
 
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
+local HudChrome = require(script.Parent.HudChrome)
 
 local MatchupUI = {}
 
@@ -28,8 +29,7 @@ function MatchupUI.new(gui: Instance)
 		Size = UDim2.fromOffset(250, 186),
 		Visible = false,
 	}, gui)
-	UiKit.round(panel, 10)
-	new("UIStroke", { Color = Color3.fromRGB(70, 96, 128), Transparency = 0.45, Thickness = 1 }, panel)
+	HudChrome.dress(panel)
 	local function label(size, color, x, y, w, h, font)
 		local l = text(panel, "", size, color, font or IronUi.Bold)
 		l.TextStrokeColor3, l.TextStrokeTransparency = Color3.new(0, 0, 0), 0.45
@@ -38,7 +38,7 @@ function MatchupUI.new(gui: Instance)
 		l.Position, l.Size = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h)
 		return l
 	end
-	local title = label(11, P.Gold, 10, 5, 230, 16)
+	local title = label(11, HudChrome.Gold, 10, 5, 230, 16, HudChrome.Title)
 	local youHead, foeHead = label(9, YOU_COLOR, 104, 22, 60, 12), label(9, FOE_COLOR, 176, 22, 64, 12)
 	youHead.Text, foeHead.Text = "YOU", "RIVAL"
 	youHead.TextXAlignment, foeHead.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center

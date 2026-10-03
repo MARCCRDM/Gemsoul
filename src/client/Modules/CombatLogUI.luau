@@ -15,13 +15,13 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local HudChrome = require(script.Parent.HudChrome)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 
 local CombatLogUI = {}
 
-local LINES = 7
+local LINES = 6
 local INK = Color3.fromRGB(12, 17, 28)
-local EDGE = Color3.fromRGB(70, 96, 128)
 local TEXT = Color3.fromRGB(226, 232, 242)
 local MUTED = Color3.fromRGB(150, 162, 182)
 local GOLD = Color3.fromRGB(255, 196, 90)
@@ -231,11 +231,10 @@ local function panel(parent, size)
 		BackgroundColor3 = INK,
 		BackgroundTransparency = 0.18,
 		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 12, 1, -186),
+		Position = UDim2.new(0, 12, 1, -12),
 		Size = size,
 	}, parent)
-	make("UICorner", { CornerRadius = UDim.new(0, 8) }, frame)
-	make("UIStroke", { Color = EDGE, Transparency = 0.5, Thickness = 1 }, frame)
+	HudChrome.dress(frame, { Transparency = 0.25, Studs = false })
 	return frame
 end
 
@@ -260,8 +259,8 @@ function CombatLogUI.new(parent: Instance)
 	local self = { Entries = {}, Stats = CombatLogUI.newStats(os.clock()), Showing = "Log", Dirty = true }
 
 	-- The log --------------------------------------------------------------
-	local logPanel = panel(parent, UDim2.fromOffset(400, 34 + LINES * 16))
-	local title = label(logPanel, "COMBAT LOG", 11, GOLD, Enum.Font.GothamBold)
+	local logPanel = panel(parent, UDim2.fromOffset(340, 34 + LINES * 16))
+	local title = label(logPanel, "COMBAT LOG", 11, HudChrome.Gold, HudChrome.Title)
 	title.Position, title.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -100, 0, 20)
 	local detailsButton = button(logPanel, "DETAILS  L", -6)
 	local lineHolder = make("Frame", {
@@ -282,7 +281,7 @@ function CombatLogUI.new(parent: Instance)
 	-- The details -----------------------------------------------------------
 	local detailPanel = panel(parent, UDim2.fromOffset(460, 316))
 	detailPanel.Visible = false
-	local detailTitle = label(detailPanel, "FIGHT DETAILS", 11, GOLD, Enum.Font.GothamBold)
+	local detailTitle = label(detailPanel, "FIGHT DETAILS", 11, HudChrome.Gold, HudChrome.Title)
 	detailTitle.Position, detailTitle.Size = UDim2.fromOffset(12, 4), UDim2.new(1, -180, 0, 20)
 	local backButton = button(detailPanel, "LOG  L", -6)
 	local resetButton = button(detailPanel, "RESET", -86)

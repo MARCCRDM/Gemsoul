@@ -30,6 +30,7 @@ local CombatSound = require(script.Parent.Modules.CombatSound)
 local MatchupUI = require(script.Parent.Modules.MatchupUI)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local UiKit = require(script.Parent.Modules.UiKit)
+local HudChrome = require(script.Parent.Modules.HudChrome)
 if Config.MenuOnly and not Config.CombatEnabled then
 	return
 end
@@ -82,100 +83,89 @@ local function fillGradient(frame, color)
 		Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.25), color:Lerp(Color3.new(0, 0, 0), 0.2)),
 	}, frame)
 end
--- Bottom of the screen: Gem Surges (Q, E, R) on the left, the unit frame
--- (Health, then Stamina, then Charge) in the centre, Rig Maneuvers (1, 2, 3)
--- on the right. Stamina sits right under Health, as every swing, guard,
--- dodge and maneuver spends it.
+-- Bottom of the screen, one stack: the action bar (surges Q/E/R, then
+-- maneuvers 1/2/3) and above it the vitals: Charge on the left, Health in
+-- the middle (draining from both ends) and Stamina on the right.
 local hud = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
-	BackgroundTransparency = 0.12,
+	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -34),
-	Size = UDim2.fromOffset(320, 98),
+	Position = UDim2.new(0.5, 0, 1, -120),
+	Size = UDim2.fromOffset(600, 34),
 }, gui)
-UiKit.round(hud, 10)
-new("UIStroke", { Color = Color3.fromRGB(70, 96, 128), Transparency = 0.45, Thickness = 1 }, hud)
-local nameLabel = text(hud, string.upper(player.DisplayName), 12, P.Text, IronUi.Bold)
+local nameLabel = shadowed(text(hud, string.upper(player.DisplayName), 12, HudChrome.Parchment, HudChrome.Title))
 nameLabel.AutomaticSize, nameLabel.TextWrapped, nameLabel.TextTruncate =
 	Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
-nameLabel.Position, nameLabel.Size = UDim2.fromOffset(12, 6), UDim2.new(0.6, -12, 0, 16)
-local hp = text(hud, "", 11, Color3.fromRGB(150, 225, 255), IronUi.Bold)
+nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+local hp = shadowed(text(hud, "", 10, Color3.fromRGB(150, 225, 255), IronUi.Bold))
 hp.AutomaticSize, hp.TextWrapped = Enum.AutomaticSize.None, false
 hp.TextXAlignment = Enum.TextXAlignment.Right
-hp.Position, hp.Size = UDim2.new(0.4, 0, 0, 6), UDim2.new(0.6, -12, 0, 16)
-local row =
-	new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromScale(0, 0), Size = UDim2.fromScale(1, 1) }, gui)
-local healthTrack = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
-	Position = UDim2.fromOffset(12, 25),
-	Size = UDim2.new(1, -24, 0, 16),
+local healthTrack = new("Frame", { BorderSizePixel = 0 }, hud)
+UiKit.round(healthTrack, 2)
+HudChrome.capBar(healthTrack)
+local healthTrail = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(255, 196, 110),
 	BorderSizePixel = 0,
-}, hud)
-UiKit.round(healthTrack, 4)
-new("UIStroke", { Color = Color3.new(0, 0, 0), Transparency = 0.4, Thickness = 1 }, healthTrack)
-local healthTrail = new(
-	"Frame",
-	{ BackgroundColor3 = Color3.fromRGB(255, 196, 110), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
-	healthTrack
-)
-UiKit.round(healthTrail, 4)
-local healthFill = new(
-	"Frame",
-	{ BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 2 },
-	healthTrack
-)
-UiKit.round(healthFill, 4)
-local healthGradient = new("UIGradient", { Rotation = 90 }, healthFill)
--- Barrier (shield) absorbs, drawn as a pale band after current health.
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromScale(0.5, 0),
+	Size = UDim2.fromScale(1, 1),
+}, healthTrack)
+UiKit.round(healthTrail, 2)
+-- Barrier (shield) absorbs: a pale band either side of current health.
 local shieldFill = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(190, 240, 255),
-	BackgroundTransparency = 0.25,
+	BackgroundTransparency = 0.2,
 	BorderSizePixel = 0,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromScale(0.5, 0),
 	Size = UDim2.fromScale(0, 1),
+	ZIndex = 2,
+}, healthTrack)
+UiKit.round(shieldFill, 2)
+local healthFill = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromScale(0.5, 0),
+	Size = UDim2.fromScale(1, 1),
 	ZIndex = 3,
 }, healthTrack)
-local healthText = shadowed(text(healthTrack, "", 11, P.Text, IronUi.Bold))
+UiKit.round(healthFill, 2)
+local healthGradient = new("UIGradient", { Rotation = 90 }, healthFill)
+local healthText = shadowed(text(healthTrack, "", 10, P.Text, IronUi.Bold))
 healthText.AutomaticSize, healthText.TextWrapped = Enum.AutomaticSize.None, false
 healthText.TextXAlignment, healthText.Size, healthText.ZIndex = Enum.TextXAlignment.Center, UDim2.fromScale(1, 1), 4
 local resourceBars = {}
-local function resourceBar(parent, id, x, y)
+local function resourceBar(parent, id)
 	local color = Tech.Resources[id].Color
-	local label = text(parent, id:upper(), 11, color, IronUi.Bold)
+	local label = shadowed(text(parent, id:upper(), 10, color, IronUi.Bold))
 	label.AutomaticSize, label.TextWrapped = Enum.AutomaticSize.None, false
-	label.Position, label.Size = UDim2.fromOffset(x, y), UDim2.new(1, -2 * x, 0, 12)
-	local value = text(parent, "", 11, P.Text, IronUi.Bold)
+	local value = shadowed(text(parent, "", 10, P.Text, IronUi.Bold))
 	value.AutomaticSize, value.TextWrapped = Enum.AutomaticSize.None, false
-	value.TextXAlignment = Enum.TextXAlignment.Right
-	value.Position, value.Size = UDim2.fromOffset(x, y), UDim2.new(1, -2 * x, 0, 12)
-	local track = new("Frame", {
-		BackgroundColor3 = Color3.fromRGB(28, 32, 46),
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(x, y + 15),
-		Size = UDim2.new(1, -2 * x, 0, 8),
-	}, parent)
-	UiKit.round(track, 3)
+	local track = new("Frame", { BorderSizePixel = 0 }, parent)
+	UiKit.round(track, 2)
+	HudChrome.capBar(track)
 	local fill = new(
 		"Frame",
 		{ BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) },
 		track
 	)
-	UiKit.round(fill, 3)
+	UiKit.round(fill, 2)
 	fillGradient(fill, color)
-	-- Segment ticks every quarter, like a classic resource orb/bar.
+	-- Segment ticks every quarter.
 	for tick = 1, 3 do
 		new("Frame", {
-			BackgroundColor3 = Color3.fromRGB(12, 17, 28),
-			BackgroundTransparency = 0.2,
+			BackgroundColor3 = HudChrome.Ink,
+			BackgroundTransparency = 0.3,
 			BorderSizePixel = 0,
 			Position = UDim2.new(tick / 4, -1, 0, 0),
-			Size = UDim2.new(0, 2, 1, 0),
+			Size = UDim2.new(0, 1, 1, 0),
 			ZIndex = 2,
 		}, track)
 	end
-	resourceBars[id] = { Label = label, Value = value, Fill = fill }
+	resourceBars[id] = { Label = label, Value = value, Track = track, Fill = fill }
 end
-resourceBar(hud, "Stamina", 12, 47)
-resourceBar(hud, "Charge", 12, 71)
+resourceBar(hud, "Charge")
+resourceBar(hud, "Stamina")
 -- Floating callouts under the crosshair (PERFECT, PARRIED, Not enough Charge...).
 local hint = shadowed(text(gui, "", 15, P.Text, IronUi.Bold))
 hint.AutomaticSize, hint.TextWrapped = Enum.AutomaticSize.None, false
@@ -187,15 +177,14 @@ local function centered(parent, size, color)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	return label
 end
-local surgeTray = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1) }, gui)
-local surgeHeader = centered(surgeTray, 11, P.Gold)
-surgeHeader.Text = "SURGE ARRAY"
-surgeHeader.TextXAlignment = Enum.TextXAlignment.Left
-surgeHeader.Position, surgeHeader.Size = UDim2.fromOffset(0, 2), UDim2.new(1, 0, 0, 14)
-local maneuverTray = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1) }, gui)
--- One ability icon: a round gem socket (surges) or a rounded square (maneuvers).
+-- The action bar: Gem Surges (Q, E, R) | ornament | Rig Maneuvers (1, 2, 3).
+local actionBar = HudChrome.actionBar(gui)
+local surgeTray = new("Frame", { BackgroundTransparency = 1 }, actionBar.Frame)
+local maneuverTray = new("Frame", { BackgroundTransparency = 1 }, actionBar.Frame)
+-- One ability icon: a round gem socket (surges) or a square slot
+-- (maneuvers), each in a fine gold bezel.
 local function makeIcon(parent, key, round)
-	local radius = UDim.new(if round then 0.5 else 0.22, 0)
+	local radius = UDim.new(if round then 0.5 else 0.12, 0)
 	local button = new(
 		"TextButton",
 		{ Text = "", AutoButtonColor = false, BackgroundColor3 = P.Inset, BackgroundTransparency = 0.08 },
@@ -210,8 +199,17 @@ local function makeIcon(parent, key, round)
 	badge.Position, badge.Size = UDim2.fromScale(0, 0.64), UDim2.fromScale(1, 0.24)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(70, 82, 110), Color3.fromRGB(30, 34, 50)),
+		Color = ColorSequence.new(Color3.fromRGB(62, 62, 72), Color3.fromRGB(16, 17, 23)),
 	}, button)
+	-- The bezel: a gold ring just outside the element-coloured rim.
+	local bezel = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(1, 7, 1, 7),
+	}, button)
+	new("UICorner", { CornerRadius = if round then radius else UDim.new(0.16, 0) }, bezel)
+	new("UIStroke", { Color = HudChrome.GoldDim, Thickness = 1, Transparency = 0.1 }, bezel)
 	-- Cooldown: a dark wipe that drains from the top as the ability recovers.
 	local shade = new("Frame", {
 		BackgroundColor3 = Color3.new(0, 0, 0),
@@ -244,7 +242,7 @@ local function makeIcon(parent, key, round)
 	UiKit.round(chip, 9)
 	local keyLabel = centered(chip, 11, P.Inset)
 	keyLabel.Text, keyLabel.Size, keyLabel.ZIndex = key, UDim2.fromScale(1, 1), 4
-	local name = centered(parent, 10, P.Text)
+	local name = shadowed(centered(parent, 9, HudChrome.Parchment))
 	timer.TextStrokeTransparency = 0.4
 	return {
 		Button = button,
@@ -260,12 +258,12 @@ local function makeIcon(parent, key, round)
 	}
 end
 local function layoutTray(frame, icons, size)
-	local gap = math.floor(size * 0.16)
-	frame.Size = UDim2.fromOffset(size * 3 + gap * 2, 22 + size + 16)
+	local gap = math.floor(size * 0.2)
+	frame.Size = UDim2.fromOffset(size * 3 + gap * 2, size + 15)
 	for i, icon in icons do
 		local x = (i - 1) * (size + gap)
-		icon.Button.Position, icon.Button.Size = UDim2.fromOffset(x, 22), UDim2.fromOffset(size, size)
-		icon.Name.Position, icon.Name.Size = UDim2.fromOffset(x - gap // 2, 24 + size), UDim2.fromOffset(size + gap, 14)
+		icon.Button.Position, icon.Button.Size = UDim2.fromOffset(x, 0), UDim2.fromOffset(size, size)
+		icon.Name.Position, icon.Name.Size = UDim2.fromOffset(x - gap // 2, size + 3), UDim2.fromOffset(size + gap, 12)
 		icon.Glyph.TextSize = math.floor(size * 0.38)
 	end
 end
@@ -335,9 +333,8 @@ local foeCast = new("Frame", {
 	Size = UDim2.fromOffset(380, 50),
 	Visible = false,
 }, gui)
-UiKit.round(foeCast, 8)
-local foeCastStroke = new("UIStroke", { Color = P.Gold, Thickness = 1.5, Transparency = 0.2 }, foeCast)
-local foeCastName = shadowed(text(foeCast, "", 17, P.Text, IronUi.Bold))
+local foeCastStroke = HudChrome.dress(foeCast, { Top = Color3.fromRGB(46, 34, 34) })
+local foeCastName = shadowed(text(foeCast, "", 16, P.Text, HudChrome.Title))
 foeCastName.AutomaticSize, foeCastName.TextWrapped = Enum.AutomaticSize.None, false
 foeCastName.Position, foeCastName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -100, 0, 22)
 local foeCastTime = shadowed(text(foeCast, "", 12, Color3.fromRGB(200, 210, 225), IronUi.Bold))
@@ -345,15 +342,15 @@ foeCastTime.AutomaticSize, foeCastTime.TextWrapped = Enum.AutomaticSize.None, fa
 foeCastTime.TextXAlignment = Enum.TextXAlignment.Right
 foeCastTime.Position, foeCastTime.Size = UDim2.new(1, -100, 0, 6), UDim2.fromOffset(90, 18)
 local foeCastTrack = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(10, 31),
-	Size = UDim2.new(1, -20, 0, 12),
+	Position = UDim2.fromOffset(12, 31),
+	Size = UDim2.new(1, -24, 0, 10),
 }, foeCast)
-UiKit.round(foeCastTrack, 4)
+UiKit.round(foeCastTrack, 2)
+HudChrome.capBar(foeCastTrack)
 local foeCastFill =
 	new("Frame", { BackgroundColor3 = P.Gold, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, foeCastTrack)
-UiKit.round(foeCastFill, 4)
+UiKit.round(foeCastFill, 2)
 local foeDodge = shadowed(text(gui, "", 18, Color3.fromRGB(255, 90, 80), IronUi.Bold))
 foeDodge.AutomaticSize, foeDodge.TextWrapped = Enum.AutomaticSize.None, false
 foeDodge.TextXAlignment = Enum.TextXAlignment.Center
@@ -419,15 +416,14 @@ local castBar = new("Frame", {
 	BackgroundTransparency = 0.15,
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0.5, 58),
-	Size = UDim2.fromOffset(240, 22),
+	Size = UDim2.fromOffset(260, 24),
 	Visible = false,
 }, gui)
-UiKit.round(castBar, 6)
-new("UIStroke", { Color = Color3.fromRGB(70, 96, 128), Transparency = 0.3, Thickness = 1 }, castBar)
+HudChrome.dress(castBar, { Studs = false, Transparency = 0.12 })
 local castTrack = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(3, 3),
-	Size = UDim2.new(1, -6, 1, -6),
+	Position = UDim2.fromOffset(4, 4),
+	Size = UDim2.new(1, -8, 1, -8),
 }, castBar)
 local chargeFill = new(
 	"Frame",
@@ -456,56 +452,61 @@ local comboScale = new("UIScale", {}, comboLabel)
 local comboWord = shadowed(text(comboLabel, "COMBO", 10, P.Text, IronUi.Bold))
 comboWord.AutomaticSize, comboWord.Position, comboWord.Size =
 	Enum.AutomaticSize.None, UDim2.fromOffset(2, 26), UDim2.fromOffset(80, 12)
+-- Your target, top centre: its name over a long thin bar that drains from
+-- both ends, the numbers under it.
 local targetCard = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
-	BackgroundTransparency = 0.12,
+	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 16),
-	Size = UDim2.fromOffset(300, 54),
+	Position = UDim2.new(0.5, 0, 0, 14),
+	Size = UDim2.fromOffset(380, 52),
 	Visible = false,
 }, gui)
-UiKit.round(targetCard, 10)
-local targetStroke =
-	new("UIStroke", { Color = Color3.fromRGB(190, 70, 80), Transparency = 0.4, Thickness = 1 }, targetCard)
-local targetName = text(targetCard, "", 13, P.Text, IronUi.Bold)
+local targetName = shadowed(text(targetCard, "", 15, HudChrome.Parchment, HudChrome.Title))
 targetName.AutomaticSize, targetName.TextWrapped, targetName.TextTruncate =
 	Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
-targetName.Position, targetName.Size = UDim2.fromOffset(12, 5), UDim2.new(1, -96, 0, 18)
-local targetTag = text(targetCard, "", 10, P.Gold, IronUi.Bold)
+targetName.TextXAlignment = Enum.TextXAlignment.Center
+targetName.Position, targetName.Size = UDim2.fromOffset(60, 0), UDim2.new(1, -120, 0, 20)
+local targetTag = shadowed(text(targetCard, "", 10, P.Gold, IronUi.Bold))
 targetTag.AutomaticSize, targetTag.TextWrapped = Enum.AutomaticSize.None, false
 targetTag.TextXAlignment = Enum.TextXAlignment.Right
-targetTag.Position, targetTag.Size = UDim2.new(1, -92, 0, 6), UDim2.fromOffset(80, 16)
+targetTag.Position, targetTag.Size = UDim2.new(1, -86, 0, 4), UDim2.fromOffset(80, 14)
 local targetTrack = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(12, 27),
-	Size = UDim2.new(1, -24, 0, 16),
+	Position = UDim2.fromOffset(8, 24),
+	Size = UDim2.new(1, -16, 0, 10),
 }, targetCard)
-UiKit.round(targetTrack, 4)
-local targetTrail = new(
-	"Frame",
-	{ BackgroundColor3 = Color3.fromRGB(255, 196, 110), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
-	targetTrack
-)
-UiKit.round(targetTrail, 4)
-local targetFill = new(
-	"Frame",
-	{ BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 2 },
-	targetTrack
-)
-UiKit.round(targetFill, 4)
+UiKit.round(targetTrack, 2)
+local targetCaps = HudChrome.capBar(targetTrack)
+local targetTrail = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(255, 196, 110),
+	BorderSizePixel = 0,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromScale(0.5, 0),
+	Size = UDim2.fromScale(1, 1),
+}, targetTrack)
+UiKit.round(targetTrail, 2)
+local targetFill = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.fromScale(0.5, 0),
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 2,
+}, targetTrack)
+UiKit.round(targetFill, 2)
 fillGradient(targetFill, Color3.fromRGB(200, 55, 66))
-local targetText = shadowed(text(targetTrack, "", 11, P.Text, IronUi.Bold))
+local targetText = shadowed(text(targetCard, "", 10, Color3.fromRGB(215, 205, 185), IronUi.Bold))
 targetText.AutomaticSize, targetText.TextWrapped = Enum.AutomaticSize.None, false
-targetText.TextXAlignment, targetText.Size, targetText.ZIndex = Enum.TextXAlignment.Center, UDim2.fromScale(1, 1), 3
+targetText.TextXAlignment = Enum.TextXAlignment.Center
+targetText.Position, targetText.Size = UDim2.fromOffset(0, 37), UDim2.new(1, 0, 0, 13)
 local controlsHint = text(
 	gui,
 	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | 1/2/3 Maneuvers | K Tree | L Log",
-	11,
-	P.Text
+	10,
+	Color3.fromRGB(205, 198, 182)
 )
 controlsHint.AnchorPoint, controlsHint.Position, controlsHint.Size =
-	Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -8), UDim2.new(1, -20, 0, 22)
+	Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -3), UDim2.new(1, -20, 0, 16)
 controlsHint.TextXAlignment = Enum.TextXAlignment.Center
 shadowed(controlsHint)
 local cursorModal =
@@ -521,16 +522,18 @@ local rivalPanel = new("Frame", {
 	Size = UDim2.fromOffset(250, 344),
 	Visible = false,
 }, gui)
-UiKit.round(rivalPanel, 10)
-local rivalStroke =
-	new("UIStroke", { Color = Color3.fromRGB(190, 70, 80), Transparency = 0.35, Thickness = 1 }, rivalPanel)
+local rivalStroke = HudChrome.dress(rivalPanel, { Top = Color3.fromRGB(44, 34, 36) })
+new("UIScale", { Name = "Fit" }, rivalPanel) -- shrinks on short screens
+HudChrome.rule(rivalPanel, 42)
+HudChrome.rule(rivalPanel, 130)
 local function rivalLabel(size, color, x, y, w, h)
 	local label = shadowed(text(rivalPanel, "", size, color, IronUi.Bold))
 	label.AutomaticSize, label.TextWrapped, label.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 	label.Position, label.Size = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h)
 	return label
 end
-local rivalName = rivalLabel(14, P.Text, 12, 8, 160, 18)
+local rivalName = rivalLabel(14, P.Text, 12, 7, 160, 19)
+rivalName.Font = HudChrome.Title
 local rivalTag = rivalLabel(10, Color3.fromRGB(255, 120, 120), 172, 10, 66, 14)
 rivalTag.TextXAlignment = Enum.TextXAlignment.Right
 local rivalInfo = rivalLabel(10, P.Dim, 12, 27, 226, 14)
@@ -634,7 +637,8 @@ local rivalHealth = new("Frame", {
 	Position = UDim2.fromOffset(12, 328),
 	Size = UDim2.new(1, -24, 0, 8),
 }, rivalPanel)
-UiKit.round(rivalHealth, 3)
+UiKit.round(rivalHealth, 2)
+HudChrome.capBar(rivalHealth)
 local rivalHealthFill = new(
 	"Frame",
 	{ BackgroundColor3 = Color3.fromRGB(220, 70, 82), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) },
@@ -677,7 +681,7 @@ local function drawRival(now, viewport)
 	local color = GemConfig.ElementColors[element] or P.Gold
 	rivalName.Text, rivalName.TextColor3 = model:GetAttribute("RivalName") or model.Name, color
 	rivalTag.Text = if model:GetAttribute("RivalSparring") then "SPARRING" else "RIVAL"
-	rivalStroke.Color = color
+	rivalStroke.Color = color:Lerp(HudChrome.GoldDim, 0.45)
 	rivalInfo.Text = string.format(
 		"%s  ·  GEAR SCORE %d",
 		string.upper(GemConfig.elementName(element or "")),
@@ -968,7 +972,7 @@ for slot = 1, Tech.ManeuverSlots do
 end
 local function makeSlot(id, label, key, position)
 	local button, faceBox = IronUi.chunk(
-		row,
+		gui,
 		{ Color = Color3.fromRGB(52, 46, 70), Size = UDim2.fromOffset(80, 70), Radius = 35, Lip = 4, Stripes = "None" }
 	)
 	button.AnchorPoint, button.Position = Vector2.new(0.5, 1), position
@@ -1220,37 +1224,57 @@ RunService.RenderStepped:Connect(function(dt)
 	local portrait = viewport.X < 600
 	local short = viewport.Y < 430 and not portrait
 	local touch = UserInputService.TouchEnabled
-	local iconSize = if portrait
-		then math.clamp(math.floor((viewport.X - 76) / 6.6), 36, 52)
-		elseif short then 50
-		else 62
+	local iconSize = if portrait then math.clamp(math.floor((viewport.X - 100) / 7), 34, 48) elseif short then 44 else 52
 	layoutTray(surgeTray, surgeIcons, iconSize)
 	layoutTray(maneuverTray, maneuverIcons, iconSize)
-	surgeTray.Position, maneuverTray.Position = UDim2.new(0, 16, 1, -12), UDim2.new(1, -16, 1, -12)
-	-- The Health/Charge panel sits between the trays, or above them when narrow.
-	local trayWidth, trayHeight = surgeTray.Size.X.Offset, surgeTray.Size.Y.Offset
-	local between = viewport.X - 2 * (trayWidth + 32)
-	local stacked = portrait or between < 240
-	local hudBottom = if stacked then 22 + trayHeight else 34
-	local hudWidth = if stacked then math.min(300, viewport.X - 32) else math.min(300, between)
-	hud.AnchorPoint, hud.Position, hud.Size =
-		Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -hudBottom), UDim2.fromOffset(hudWidth, 98)
-	-- Touch players get on-screen swing, guard and dodge buttons above the panel.
-	local slotWidth = math.min(80, (viewport.X - 32) / 4 - 8)
-	for index, id in { "Basic", "Heavy", "Block", "Dodge" } do
+	-- One stack at the bottom: the action bar, the vitals above it, your
+	-- buffs above those; on narrow screens Health gets its own row.
+	local barWidth, barHeight = HudChrome.layoutActionBar(actionBar, surgeTray, maneuverTray)
+	local stacked = portrait or (viewport.X < 760 and not short)
+	local hudBottom = 22 + barHeight + 12
+	local hudHeight = HudChrome.layoutVitals(
+		hud,
+		{ Name = nameLabel, Shield = hp, Health = healthTrack, Bars = resourceBars },
+		if stacked
+			then math.max(barWidth, math.min(viewport.X - 40, 420))
+			elseif short then barWidth + 40
+			else math.max(barWidth + 120, 600),
+		stacked
+	)
+	hud.Position = UDim2.new(0.5, 0, 1, -hudBottom)
+	local stackTop = hudBottom + hudHeight
+	-- Touch players get on-screen swing, guard and dodge buttons: a row above
+	-- the stack, or on short screens the two bottom corners beside the bar
+	-- (left swing and guard under the left thumb, dodge and right swing
+	-- under the right).
+	local corners = short and touch
+	local slotWidth = if corners
+		then math.min(80, ((viewport.X - barWidth) / 2 - 40) / 2)
+		else math.min(80, (viewport.X - 32) / 4 - 8)
+	for index, id in { "Basic", "Block", "Dodge", "Heavy" } do
 		local slot = slots[id]
 		slot.Button.Visible = touch
-		slot.Button.Size = UDim2.fromOffset(slotWidth, 70)
-		slot.Button.Position = UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(hudBottom + 108))
+		slot.Button.Size = UDim2.fromOffset(slotWidth, if corners then 64 else 70)
+		local outer = (slotWidth / 2 + 12) + (if index == 2 or index == 3 then slotWidth + 8 else 0)
+		slot.Button.Position = if corners
+			then UDim2.new(if index <= 2 then 0 else 1, if index <= 2 then outer else -outer, 1, -12)
+			else UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(stackTop + 34))
 	end
-	controlsHint.Position = UDim2.new(0.5, 0, 1, -(hudBottom + 106))
-	-- Your buffs and debuffs ride just above the unit frame, wherever it sits.
-	selfStatusRow.Position = UDim2.new(0.5, 0, 1, -(hudBottom + (if touch then 184 else 132)))
-	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 22)
+	rivalPanel.Fit.Scale = math.clamp((viewport.Y - 150) / 420, 0.58, 1)
+	controlsHint.Position = UDim2.new(0.5, 0, 1, -3)
+	-- Your buffs and debuffs ride just above the vitals, wherever they sit.
+	selfStatusRow.Position = UDim2.new(0.5, 0, 1, -(stackTop + (if touch then 112 else 8)))
+	-- The log keeps to the bottom-left corner, clear of the stack.
+	local logRoom = (viewport.X - (if stacked then viewport.X else math.max(barWidth + 120, 600))) / 2 - 24
+	combatLog.LogPanel.Position = UDim2.new(0, 12, 1, -12)
+	combatLog.LogPanel.Size = UDim2.fromOffset(math.clamp(logRoom, 240, 340), combatLog.LogPanel.Size.Y.Offset)
+	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 16)
 	leave.Position, leave.Size =
 		UDim2.new(1, -12, 0, if portrait then 80 else 16), UDim2.fromOffset(if portrait then 130 else 160, 38)
-	targetCard.Size = UDim2.fromOffset(if portrait then math.min(220, viewport.X - 150) else 300, 54)
-	targetName.TextSize = if portrait then 11 else 13
+	targetCard.Size = UDim2.fromOffset(if portrait then math.min(260, viewport.X - 40) else 380, 52)
+	-- Phones: below the corner buttons.
+	targetCard.Position = UDim2.new(0.5, 0, 0, if portrait then 124 else 14)
+	targetName.TextSize = if portrait then 12 else 15
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		local maxHealth = math.max(1, humanoid.MaxHealth)
@@ -1264,10 +1288,9 @@ RunService.RenderStepped:Connect(function(dt)
 		local top = if low then Color3.fromRGB(255, 110, 110) else Color3.fromRGB(240, 90, 100)
 		healthGradient.Color = ColorSequence.new(top, top:Lerp(Color3.new(0, 0, 0), 0.3))
 		local shield = player:GetAttribute("Shield") or 0
-		shieldFill.Position = UDim2.fromScale(ratio, 0)
-		shieldFill.Size = UDim2.fromScale(math.min(shield / maxHealth, 1 - ratio), 1)
+		shieldFill.Size = UDim2.fromScale(math.min(ratio + shield / maxHealth, 1), 1)
 		healthText.Text = string.format("%d / %d", math.ceil(humanoid.Health), math.ceil(humanoid.MaxHealth))
-		hp.Text = if shield > 0 then string.format("◈ SHIELD %d", shield) else ""
+		hp.Text = if shield > 0 then string.format("◈ %d", shield) else ""
 		-- Red edges: pulse below 30% health, flash briefly when hit.
 		local now = os.clock()
 		vignette.Visible = low or now < flashUntil
@@ -1455,7 +1478,9 @@ RunService.RenderStepped:Connect(function(dt)
 		targetName.Text = if opponent then opponent.DisplayName else target.Name
 		targetTag.Text = if lockedTarget then "◎ LOCKED" elseif opponent then "PLAYER" else "ENEMY"
 		targetTag.TextColor3 = if lockedTarget then Color3.fromRGB(101, 210, 228) else P.Dim
-		targetStroke.Color = if lockedTarget then Color3.fromRGB(101, 210, 228) else Color3.fromRGB(190, 70, 80)
+		for _, cap in targetCaps do
+			cap.BackgroundColor3 = if lockedTarget then Color3.fromRGB(101, 210, 228) else HudChrome.Gold
+		end
 		targetFill.Size = UDim2.fromScale(ratio, 1)
 		targetTrail.Size = UDim2.fromScale(targetTrailRatio, 1)
 		targetText.Text = string.format(
