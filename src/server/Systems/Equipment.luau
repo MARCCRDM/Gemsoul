@@ -849,6 +849,105 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 	end
 end
 
+-- A gem in a piece of armor makes it glow with the gem's element, more the
+-- rarer the gem: a light and tint from Common, glowing trims from Uncommon,
+-- and from Rare a shimmering element aura (a ForceField shell) wrapped over
+-- its largest plates, thicker and over more plates up to Legendary.
+--   light brightness, light range, tint, aura plates, aura transparency, motes/s
+local GEM_GLOW = {
+	{ 0.6, 5, 0.08, 0, 1, 2 }, -- Common
+	{ 0.9, 7, 0.14, 0, 1, 4 }, -- Uncommon
+	{ 1.3, 9, 0.2, 3, 0.55, 6 }, -- Rare
+	{ 1.8, 11, 0.26, 6, 0.4, 9 }, -- Ultra Rare
+	{ 2.5, 14, 0.32, 10, 0.25, 14 }, -- Legendary
+}
+local function gemTier(gem): number
+	for index, tier in GemConfig.TierOrder do
+		if tier == gem.Tier then
+			return index
+		end
+	end
+	return 1
+end
+local function gemGlow(component: Instance, gem)
+	local color = GemConfig.ElementColors[gem.Element]
+	if not color then
+		return
+	end
+	local tier = gemTier(gem)
+	local spec = GEM_GLOW[tier]
+	local plates = {}
+	for _, part in component:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" and part.Name ~= "GemAura" then
+			if part.Material == Enum.Material.Neon then
+				if tier >= 2 then
+					part.Color = color -- trims glow in the element's colour
+				end
+			else
+				part.Color = part.Color:Lerp(color, spec[3])
+			end
+			table.insert(plates, part)
+		end
+	end
+	if #plates == 0 then
+		return
+	end
+	table.sort(plates, function(a, b)
+		return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
+	end)
+	local biggest = plates[1]
+	local light = Instance.new("PointLight")
+	light.Name = "GemGlow"
+	light.Color = color
+	light.Brightness = spec[1]
+	light.Range = spec[2]
+	light.Shadows = false
+	light.Parent = biggest
+	-- The aura: a slightly larger shimmering shell over the biggest plates.
+	local shells = 0
+	for _, plate in plates do
+		if shells >= spec[4] then
+			break
+		end
+		if plate:IsA("Part") then
+			local aura = Instance.new("Part")
+			aura.Name = "GemAura"
+			aura.Shape = plate.Shape
+			aura.Size = plate.Size * 1.08 + Vector3.one * 0.06
+			aura.CFrame = plate.CFrame
+			aura.Material = Enum.Material.ForceField
+			aura.Color = color
+			aura.Transparency = spec[5]
+			aura.CanCollide, aura.CanQuery, aura.CanTouch = false, false, false
+			aura.Massless, aura.CastShadow = true, false
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0, weld.Part1 = plate, aura
+			weld.Parent = aura
+			aura.Parent = plate.Parent
+			shells += 1
+		end
+	end
+	local motes = Instance.new("ParticleEmitter")
+	motes.Name = "GemGlow"
+	motes.Texture = SPARK_TEXTURE
+	motes.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35), color)
+	motes.LightEmission = 1
+	motes.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.3, 0.16 + tier * 0.04),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	motes.Transparency = NumberSequence.new(0.05, 1)
+	motes.Lifetime = NumberRange.new(0.6, 1.3)
+	motes.Speed = NumberRange.new(0.3, 1 + tier * 0.2)
+	motes.SpreadAngle = Vector2.new(180, 180)
+	motes.Acceleration = Vector3.new(0, 1.5, 0)
+	motes.Rate = spec[6]
+	motes.Shape = Enum.ParticleEmitterShape.Box
+	motes.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	motes.Parent = biggest
+end
+
 -- Rare+ armor with Elemental Affinity Affixes gets a faint aura in its
 -- affixes' element colours: a soft light and a few slow motes on its biggest
 -- piece. Subtler than a socketed gem's enchantment.
@@ -1195,6 +1294,14 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 				then GemConfig.ElementColors[gem.Element]
 				else GearRolls.Rarities[math.clamp(rarity, 1, #GearRolls.Rarities)].Color
 			rarityShine(component, rarity, color)
+		end
+	end
+	-- Gem-enchanted armor glows in its gem's element, more the rarer the gem.
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+		local component = folder:FindFirstChild(slot)
+		local gem = loadout[slot .. "Gem"]
+		if component and gem and (not only or only == slot) then
+			gemGlow(component, gem)
 		end
 	end
 	return folder
