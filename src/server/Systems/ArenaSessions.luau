@@ -62,6 +62,7 @@ local function leave(player)
 	CombatServer.reset(player)
 	player:SetAttribute("PvPEnabled", false)
 	player:SetAttribute("CombatSession", nil)
+	player:SetAttribute("RaidId", nil)
 	player:SetAttribute("Blocking", false)
 	local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 	if player.Character then
@@ -86,6 +87,7 @@ function ArenaSessions.start()
 			end
 			player:SetAttribute("PvPEnabled", false)
 			player:SetAttribute("CombatSession", nil)
+			player:SetAttribute("RaidId", nil)
 		end)
 	end
 	Players.PlayerAdded:Connect(watch)

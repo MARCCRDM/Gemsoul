@@ -18,6 +18,13 @@
 
 	Win: coins, XP and a kill; a new rival steps in a few seconds later.
 	Lose, leave the Arena or the floor: the rival leaves too.
+
+	Party Raids (Duelist.startRaid, from Raids): the same fighter as a raid
+	boss for a whole party, tougher for every raider and every wave
+	(Shared.Matchmaking.Raid). It picks on one raider at a time (Owner, the
+	nearest, kept a few seconds), turning on the next when they go down or
+	leave. Clear a wave: everyone still standing is paid and a tougher boss
+	steps in; lose everyone: the raid is over.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +36,7 @@ local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Matchup = require(ReplicatedStorage.Shared.Matchup)
+local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
@@ -220,6 +228,16 @@ end
 function Duelist.despawn(owner: Player)
 	local duel = duels[owner]
 	duels[owner] = nil
+	-- A raider leaving: the boss fights on while anyone's left.
+	if duel and duel.Raid then
+		local index = table.find(duel.Raid.Members, owner)
+		if index then
+			table.remove(duel.Raid.Members, index)
+		end
+		if #duel.Raid.Members > 0 then
+			return
+		end
+	end
 	if duel and duel.Enemy.Alive then
 		Enemies.remove(duel.Enemy)
 	end
@@ -238,6 +256,64 @@ local function ownerRoot(owner: Player): (BasePart?, Humanoid?)
 		return root, humanoid
 	end
 	return nil, nil
+end
+
+-- A raid boss: drops raiders who are down or gone and picks who it's after
+-- (Owner): the nearest raider, kept TargetSeconds unless they drop. False
+-- when nobody's left (the raid is over).
+local function raidTarget(duel, now: number): boolean
+	local raid = duel.Raid
+	for i = #raid.Members, 1, -1 do
+		local member = raid.Members[i]
+		local _, humanoid = ownerRoot(member)
+		if
+			not member.Parent
+			or not humanoid
+			or member:GetAttribute("RaidId") ~= raid.Id
+			or member:GetAttribute("CombatSession") ~= "Raid"
+		then
+			table.remove(raid.Members, i)
+			if duels[member] == duel then
+				duels[member] = nil
+			end
+			for _, other in raid.Members do
+				Remotes.Notify:FireClient(other, member.DisplayName .. " is down!")
+			end
+		end
+	end
+	if #raid.Members == 0 then
+		for _, member in raid.All do
+			if member.Parent then
+				member:SetAttribute("RaidId", nil)
+				Remotes.Notify:FireClient(
+					member,
+					string.format("The raid fell to %s on wave %d. Regroup and try again!", duel.Name, raid.Wave)
+				)
+			end
+		end
+		if duel.Enemy.Alive then
+			Enemies.remove(duel.Enemy)
+		end
+		return false
+	end
+	if not table.find(raid.Members, duel.Owner) or now >= (duel.TargetUntil or 0) then
+		local root = duel.Enemy.Root
+		local best, closest = raid.Members[1], math.huge
+		for _, member in raid.Members do
+			local memberRoot = ownerRoot(member)
+			local distance = if memberRoot then (memberRoot.Position - root.Position).Magnitude else math.huge
+			if distance < closest then
+				best, closest = member, distance
+			end
+		end
+		if best ~= duel.Owner then
+			duel.Owner = best
+			duel.Enemy.Model:SetAttribute("RivalOwner", best.UserId)
+			Remotes.CombatFx:FireClient(best, "TechStatus", duel.Name .. " turns on you!")
+		end
+		duel.TargetUntil = now + Matchmaking.Raid.TargetSeconds
+	end
+	return true
 end
 
 -- What the rival is doing, for the player's rival panel (only on change).
@@ -624,6 +700,9 @@ end
 -- Every 0.15s while the rival is alive.
 local function think(enemy, now: number)
 	local duel = enemy.Duel
+	if duel.Raid and not raidTarget(duel, now) then
+		return
+	end
 	local owner = duel.Owner
 	local root, humanoid = enemy.Root, enemy.Humanoid
 	local fallen = owner.Character and owner.Character:FindFirstChildOfClass("Humanoid")
@@ -1206,8 +1285,67 @@ local function think(enemy, now: number)
 	end
 end
 
+-- A raid wave cleared: everyone still in it is paid, then a tougher boss.
+local function raidCleared(duel)
+	local raid = duel.Raid
+	for member, live in duels do
+		if live == duel then
+			duels[member] = nil
+		end
+	end
+	local coins = Matchmaking.raidCoins(raid.Wave)
+	for _, member in raid.Members do
+		if member.Parent then
+			PlayerData.addCoins(member, coins)
+			local profile = PlayerData.get(member)
+			if profile then
+				profile.Stats.Kills += 1
+			end
+			Progress.addXP(member, "SlayBrute")
+			Remotes.Notify:FireClient(
+				member,
+				string.format(
+					"Wave %d cleared! %s is down: +%d coins. A tougher boss arrives in %d seconds…",
+					raid.Wave,
+					duel.Name,
+					coins,
+					Matchmaking.Raid.NextWave
+				)
+			)
+		end
+	end
+	raid.Wave += 1
+	task.delay(Matchmaking.Raid.NextWave, function()
+		local still = {}
+		for _, member in raid.Members do
+			if
+				member.Parent
+				and member:GetAttribute("RaidId") == raid.Id
+				and member:GetAttribute("CombatSession") == "Raid"
+				and ownerRoot(member)
+			then
+				table.insert(still, member)
+			end
+		end
+		raid.Members = still
+		if still[1] then
+			spawnRival(still[1], raid)
+		else
+			for _, member in raid.All do
+				if member.Parent then
+					member:SetAttribute("RaidId", nil)
+				end
+			end
+		end
+	end)
+end
+
 local function onWin(enemy)
 	local duel = enemy.Duel
+	if duel.Raid then
+		raidCleared(duel)
+		return
+	end
 	local owner = duel.Owner
 	duels[owner] = nil
 	if not owner.Parent then
@@ -1241,14 +1379,18 @@ local function onWin(enemy)
 	end)
 end
 
-function spawnRival(owner: Player)
+function spawnRival(owner: Player, raid)
 	if duels[owner] or starting[owner] then
 		return
 	end
 	-- PvP brings a full-strength rival; Training a sparring partner that hits
-	-- for half and gives no rewards.
+	-- for half and gives no rewards; a raid, a boss for the whole party.
 	local session = owner:GetAttribute("CombatSession")
-	if session ~= "PvP" and session ~= "Training" then
+	if raid then
+		if session ~= "Raid" then
+			return
+		end
+	elseif session ~= "PvP" and session ~= "Training" then
 		return
 	end
 	local sparring = session == "Training"
@@ -1263,6 +1405,9 @@ function spawnRival(owner: Player)
 	local rng = Random.new()
 	local loadout = rollLoadout(rng)
 	local name = NAMES[rng:NextInteger(1, #NAMES)]
+	if raid then
+		name = "Warlord " .. name
+	end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
 	away = if away.Magnitude > 1 then away.Unit else Vector3.new(1, 0, 0)
@@ -1292,6 +1437,12 @@ function spawnRival(owner: Player)
 	local rivalHit = (if rivalWeapon then rivalWeapon.Attack.Damage else 18) * Combat.powerMult(rating(mine, "Power"))
 	local ownerHumanoid = owner.Character:FindFirstChildOfClass("Humanoid")
 	local health = Classes.maxHealth(rating(mine, "Health"))
+	-- A raid boss: more health for every raider and wave, and heavier hits.
+	local raidHealth, raidDamage = 1, 1
+	if raid then
+		raidHealth, raidDamage = Matchmaking.raidScale(#raid.Members, raid.Wave)
+		health = math.floor(health * raidHealth)
+	end
 	local kind = {
 		Name = "Rival Duelist",
 		Health = health,
@@ -1320,9 +1471,12 @@ function spawnRival(owner: Player)
 	enemy.Deflect = if rivalKit.Defense.Deflect > 0 then rivalKit.Defense.Deflect else nil
 	enemy.Reflect = if rivalKit.Defense.Reflect > 0 then rivalKit.Defense.Reflect else nil
 	enemy.GuardBreakTime = Actions.Base.Heavy.BreakSeconds
-	-- Every bout starts even: the player steps in at full health too.
-	if ownerHumanoid and ownerHumanoid.Health > 0 then
-		ownerHumanoid.Health = ownerHumanoid.MaxHealth
+	-- Every bout starts even: the player (every raider) steps in at full health too.
+	for _, member in if raid then raid.Members else { owner } do
+		local _, memberHumanoid = ownerRoot(member)
+		if memberHumanoid then
+			memberHumanoid.Health = memberHumanoid.MaxHealth
+		end
 	end
 	-- Its own legs only: the stock Animate script doesn't run on a server rig.
 	local animateScript = rig:FindFirstChild("Animate")
@@ -1344,7 +1498,7 @@ function spawnRival(owner: Player)
 		WeaponGem = loadout.WeaponGem,
 		Session = session,
 		-- (Training's sparring partner hits for half.)
-		Damage = rivalHit * (if sparring then 0.5 else 1),
+		Damage = rivalHit * (if sparring then 0.5 else 1) * raidDamage,
 		Weapon = rivalWeapon,
 		Kit = rivalKit,
 		Crit = Combat.critChance(rating(mine, "Speed"), rivalEffects.CritAdd),
@@ -1381,6 +1535,12 @@ function spawnRival(owner: Player)
 	model:SetAttribute("RivalName", name)
 	model:SetAttribute("RivalElement", element)
 	model:SetAttribute("RivalSparring", sparring)
+	if raid then
+		duel.Raid = raid
+		model:SetAttribute("RaidId", raid.Id)
+		model:SetAttribute("RaidWave", raid.Wave)
+		model:SetAttribute("RaidSize", #raid.Members)
+	end
 	local gear, score = {}, 0
 	for _, slot in Slots.Order do
 		local item = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
@@ -1521,6 +1681,16 @@ function spawnRival(owner: Player)
 	local surgeList = if #names > 0 then table.concat(names, ", ") else "no surges"
 	enemy.Brain = think
 	enemy.OnDeath = onWin
+	if raid then
+		for _, member in raid.Members do
+			duels[member] = duel
+			Remotes.Notify:FireClient(
+				member,
+				string.format("Wave %d: %s storms in with %s. Fight together!", raid.Wave, name, surgeList)
+			)
+		end
+		return
+	end
 	duels[owner] = duel
 	Remotes.Notify:FireClient(
 		owner,
@@ -1528,6 +1698,16 @@ function spawnRival(owner: Player)
 			then string.format("Sparring partner %s steps in (%s). Hits are softened.", name, surgeList)
 			else string.format("%s enters the Arena with %s. Fight!", name, surgeList)
 	)
+end
+
+-- A party raid begins (Raids): its members are already in the Arena, in a
+-- "Raid" session with this RaidId.
+function Duelist.startRaid(members: { Player }, id: string)
+	local raid = { Id = id, Members = table.clone(members), All = table.clone(members), Wave = 1 }
+	if raid.Members[1] then
+		spawnRival(raid.Members[1], raid)
+	end
+	return raid
 end
 
 function Duelist.start()
@@ -1567,7 +1747,13 @@ function Duelist.start()
 	-- Its fighting poses, every frame, bent on the server so every client sees them.
 	RunService.Heartbeat:Connect(function(dt)
 		local now = workspace:GetServerTimeNow()
+		local posed = {}
 		for _, duel in duels do
+			-- (A raid boss is listed once per raider; pose it once.)
+			if posed[duel] then
+				continue
+			end
+			posed[duel] = true
 			local ok, problem = pcall(RivalPose.update, duel.Enemy.Model, dt, now, os.clock())
 			if not ok and not duel.PoseWarned then
 				duel.PoseWarned = true

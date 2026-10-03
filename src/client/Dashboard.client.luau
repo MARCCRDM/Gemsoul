@@ -286,9 +286,9 @@ local function pill(order: number, caption: string, color: Color3, width: number
 	value.TextXAlignment = Enum.TextXAlignment.Left
 	return frame, value
 end
-local _, coinsValue = pill(1, "COINS", P.Gold, 160)
+local _, coinsValue = pill(1, "COINS", P.Gold, 136)
 -- The Season level doubles as the way into the Season Path.
-local seasonFrame, marksValue = pill(2, "SEASON", P.Teal, 170)
+local seasonFrame, marksValue = pill(2, "SEASON", P.Teal, 150)
 local seasonTrack = new("Frame", {
 	BackgroundColor3 = P.Slot,
 	Position = UDim2.new(0, 12, 1, -4),
@@ -324,8 +324,9 @@ end)
 shopButton.LayoutOrder = 3
 shopButton.Size = UDim2.fromOffset(0, 44)
 shopButton.TextSize = 17
--- Who's here: the count of players in the server opens Social.
-local onlineFrame, onlineValue = pill(4, "ONLINE  [P]", P.Good, 130)
+-- Your party (or SOLO) and who's online; opens Social. "+ ADD" opens it too,
+-- on the player list, to invite someone.
+local onlineFrame, onlineValue = pill(4, "PARTY  [P]", P.Good, 160)
 local onlineHit = new("TextButton", {
 	Text = "",
 	BackgroundTransparency = 1,
@@ -337,9 +338,29 @@ IronUi.highlight(onlineHit, onlineFrame)
 onlineHit.Activated:Connect(function()
 	launch(SocialUI.open)
 end)
-local function countOnline()
-	onlineValue.Text = tostring(#Players:GetPlayers())
+local addButton = IronUi.gemButton(onlineFrame, "+ ADD", P.Gold, function()
+	launch(SocialUI.open)
+end)
+addButton.AnchorPoint = Vector2.new(1, 0.5)
+addButton.Position = UDim2.new(1, -6, 0.5, 0)
+addButton.Size = UDim2.fromOffset(58, 28)
+addButton.TextSize = 12
+addButton.AutomaticSize = Enum.AutomaticSize.None
+addButton.ZIndex = 6
+-- Caption and count stay clear of the "+ ADD" button.
+local onlineCaption = onlineFrame:FindFirstChildWhichIsA("TextLabel")
+if onlineCaption then
+	onlineCaption.Size = UDim2.fromOffset(90, 12)
 end
+onlineValue.Size = UDim2.fromOffset(84, 21)
+local function countOnline()
+	local party = SocialUI.party()
+	onlineValue.Text = if party then string.format("%d / 4", #party.Members) else "SOLO"
+	if onlineCaption then
+		onlineCaption.Text = "PARTY  [P]"
+	end
+end
+SocialUI.PartyChanged.Event:Connect(countOnline)
 -- The build, so playtest reports name it (Config.Playtest.Build).
 if Config.Playtest and Config.Playtest.Build then
 	local buildTag =
@@ -489,8 +510,8 @@ end
 local social = panel(root, 970, STRIP_Y, W - 986, STRIP_H, P.Teal)
 local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
 place(socialTitle, 20, 14, 240, 28)
-local socialCopy = label(social, "Train, fight the rival, or duel other players.", 12, LIGHT, IronUi.Body)
-place(socialCopy, 20, 44, 270, 18)
+local socialCopy = label(social, "Train, fight a rival, party raid (3+) or duel.", 12, LIGHT, IronUi.Body)
+place(socialCopy, 20, 44, 280, 18)
 socialCopy.TextWrapped = true
 socialCopy.TextYAlignment = Enum.TextYAlignment.Top
 -- The Surge Array at a glance: the three gem sockets. Click to open the loadout.
@@ -542,8 +563,9 @@ end)
 arenaButton("1v1 QUEUE", P.Gold, 150, 96, function()
 	launch(SocialUI.findDuel)
 end)
-arenaButton("SOCIAL [P]", P.Good, 252, 96, function()
-	launch(SocialUI.open)
+-- A party of three or more: a raid boss together (the leader starts it).
+arenaButton("PARTY RAID", Color3.fromRGB(222, 86, 72), 252, 96, function()
+	launch(SocialUI.raid)
 end)
 arenaButton("TREE [K]", P.Teal, 354, 76, function()
 	launch(AugmentTreeUI.open)

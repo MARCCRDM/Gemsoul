@@ -537,6 +537,14 @@ local function drawArena()
 		SocialUI.close()
 		ArenaScene.enter(false)
 	end, 80)
+	local raiders = if party then #party.Members else 1
+	chip(
+		practice,
+		string.format("RAID %d/%d", raiders, Matchmaking.Raid.Min),
+		if raiders >= Matchmaking.Raid.Min and isLeader() then Color3.fromRGB(222, 86, 72) else P.Edge,
+		SocialUI.raid,
+		100
+	)
 	local rule = text(rows, "Queue duels are rated. Challenges from the player list are friendly.", 12, P.Dim)
 	rule.LayoutOrder = 4
 end
@@ -544,6 +552,19 @@ end
 -- One click from the dashboard: straight into the 1v1 queue.
 function SocialUI.findDuel()
 	run("DuelQueue", "1v1")
+end
+
+-- Your party (the server's last "State"), or nil when you're solo; fires
+-- PartyChanged whenever it changes.
+SocialUI.PartyChanged = Instance.new("BindableEvent")
+function SocialUI.party()
+	return party
+end
+
+-- The leader starts a Party Raid (three or more against a raid boss).
+function SocialUI.raid()
+	SocialUI.close()
+	run("PartyRaid")
 end
 
 function SocialUI.refresh()
@@ -1045,6 +1066,7 @@ remotes:WaitForChild("Party").OnClientEvent:Connect(function(kind: string, a: an
 				chatTab = "Server"
 			end
 		end
+		SocialUI.PartyChanged:Fire(party)
 		SocialUI.refresh()
 	elseif kind == "Invite" then
 		prompt("👥", "Party invite", b .. " invited you to their party.", 60, P.Teal, function(accept)

@@ -692,7 +692,8 @@ local rivalModel, nextRivalScan = nil, 0
 local function findRival()
 	local folder = workspace:FindFirstChild("Enemies")
 	for _, model in folder and folder:GetChildren() or {} do
-		if model:GetAttribute("RivalOwner") == player.UserId then
+		-- Your own rival, or your raid's boss.
+		if require(ReplicatedStorage.Shared.Matchmaking).ownsRival(model, player) then
 			return model
 		end
 	end

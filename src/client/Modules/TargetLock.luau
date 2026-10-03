@@ -172,7 +172,7 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 		if point and eligible(model) then
 			local delta = point - camera.CFrame.Position
 			local distance = (point - ownRoot.Position).Magnitude
-			local rival = player.UserId ~= nil and model:GetAttribute("RivalOwner") == player.UserId
+			local rival = Matchmaking.ownsRival(model, player)
 			if delta.Magnitude > 0.01 and (distance <= Rules.RetainRange or rival) then
 				table.insert(records, {
 					Target = model,
@@ -181,7 +181,7 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 					Allowed = true,
 					Visible = visible(model, point),
 					-- Your Arena rival: always the one to lock.
-					Priority = player.UserId ~= nil and model:GetAttribute("RivalOwner") == player.UserId,
+					Priority = rival,
 					Engaged = (engagedUntil[model] or 0) > now,
 				})
 			end

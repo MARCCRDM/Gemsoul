@@ -13,6 +13,8 @@ source += module('Matchmaking', 'src/shared/Matchmaking.luau')
 source += module('Season', 'src/shared/Season.luau')
 source += 'Duels=(function()\n' + re.sub(r'^local \w+ = (require\([^\n]+\)|game:GetService\([^\n]+\))\n', '', read('src/server/Systems/Duels.luau'), flags=re.M) + '\nend)()\n'
 source += read('tests/duels_cases.luau')
+source += 'local Raids=(function()\n' + re.sub(r'^local \w+ = (require\([^\n]+\)|game:GetService\([^\n]+\))\n', '', read('src/server/Systems/Raids.luau'), flags=re.M) + '\nend)()\n'
+source += read('tests/raids_cases.luau')
 luau = ROOT / '.tools/luau/luau.exe'
 command = [str(luau)] if os.name == 'nt' and luau.exists() else ([shutil.which('lune'), 'run'] if shutil.which('lune') else ['luau'])
 with tempfile.TemporaryDirectory(prefix='gemsoul-duels-') as directory:

@@ -12,6 +12,16 @@
 	                              Size }), longest-waiting first
 	  Matchmaking.lane(slot, team, index, size)  where a fighter stands in a
 	                              lane, and the lane's centre (offsets from the arena floor's centre)
+
+	Party Raids (PvE): a party of at least Raid.Min fights one raid boss.
+	  Matchmaking.Raid                 the rules: size, scaling, rewards
+	  Matchmaking.raidScale(n, wave)   the boss's health and damage multipliers
+	                                   for n raiders on a wave
+	  Matchmaking.raidCoins(wave)      each raider's coins for clearing a wave
+	  Matchmaking.raidCheck(members, leader, busy)  may this party start a
+	                                   raid? (ok, reason)
+	  Matchmaking.ownsRival(model, player)  is this Arena rival yours (your
+	                                   own, or your raid's boss)?
 ]]
 local Matchmaking = {}
 
@@ -31,6 +41,57 @@ Matchmaking.Rewards = {
 	Friendly = { Win = 15, Loss = 5 },
 }
 
+Matchmaking.Raid = {
+	Min = 3, -- raiders needed to start
+	Max = 4, -- a full party
+	HealthPerRaider = 0.85, -- the boss's extra health for each raider past the first
+	HealthPerWave = 0.25, -- and for each wave cleared
+	Damage = 1.2, -- it hits harder than a duelling rival
+	DamagePerWave = 0.1,
+	TargetSeconds = 5, -- it picks on one raider at least this long
+	Coins = 60, -- each raider's coins for wave 1
+	CoinsPerWave = 20,
+	NextWave = 8, -- seconds between waves
+}
+
+function Matchmaking.raidScale(raiders: number, wave: number): (number, number)
+	local r = Matchmaking.Raid
+	local n, w = math.max(1, raiders), math.max(1, wave)
+	local health = (1 + r.HealthPerRaider * (n - 1)) * (1 + r.HealthPerWave * (w - 1))
+	local damage = r.Damage + r.DamagePerWave * (w - 1)
+	return health, damage
+end
+
+function Matchmaking.raidCoins(wave: number): number
+	return Matchmaking.Raid.Coins + Matchmaking.Raid.CoinsPerWave * (math.max(1, wave) - 1)
+end
+
+-- `members`: the party, leader first or not; `busy(player)`: why that member
+-- can't come right now (a string), or nil.
+function Matchmaking.raidCheck(members, leader, busy): (boolean, string?)
+	if not members or members[1] == nil then
+		return false, string.format("Form a party of %d first (Social > Party).", Matchmaking.Raid.Min)
+	end
+	if not table.find(members, leader) then
+		return false, "Only your party's leader can start a raid."
+	end
+	if #members < Matchmaking.Raid.Min then
+		return false,
+			string.format(
+				"A raid needs at least %d in the party (you have %d). Invite more!",
+				Matchmaking.Raid.Min,
+				#members
+			)
+	end
+	for _, member in members do
+		local why = busy(member)
+		if why then
+			return false, why
+		end
+	end
+	return true, nil
+end
+
 -- A match or party id: a string attribute, or nil.
 local function attribute(player, name: string): string?
 	local value = if player and player.GetAttribute then player:GetAttribute(name) else nil
@@ -46,6 +107,18 @@ function Matchmaking.versus(a, b): boolean
 	end
 	local partyA = attribute(a, "PartyId")
 	return partyA == nil or partyA ~= attribute(b, "PartyId")
+end
+
+-- Your own Arena rival, or the boss your raid is fighting.
+function Matchmaking.ownsRival(model, player): boolean
+	if not model or not player then
+		return false
+	end
+	if player.UserId ~= nil and model:GetAttribute("RivalOwner") == player.UserId then
+		return true
+	end
+	local raid = attribute(model, "RaidId")
+	return raid ~= nil and raid == attribute(player, "RaidId")
 end
 
 function Matchmaking.expected(rating: number, other: number): number

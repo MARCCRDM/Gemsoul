@@ -171,6 +171,18 @@ local Progress = {
 		xp[p] = reason
 	end,
 }
+-- Party Raids: the boss is the Duelist's (recorded here); ids are fixed.
+local HttpService = {
+	GenerateGUID = function()
+		return "abcdef1234567890"
+	end,
+}
+local raidsStarted = {}
+local Duelist = {
+	startRaid = function(members, id)
+		table.insert(raidsStarted, { Members = members, Id = id })
+	end,
+}
 local resets = {}
 local CombatServer = {
 	reset = function(p)
