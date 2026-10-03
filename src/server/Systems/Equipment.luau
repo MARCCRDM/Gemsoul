@@ -8,6 +8,7 @@
 	ratings. Socketed gems glow in their own colour: on the weapon, and at
 	the centre of the chest for an armor gem.
 ]]
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -15,6 +16,7 @@ local TweenService = game:GetService("TweenService")
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Tags = require(ReplicatedStorage.Shared.Tags)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local ArmorKits = require(script.Parent.ArmorKits)
 local FrontierAssets = require(script.Parent.FrontierAssets)
@@ -78,29 +80,94 @@ end
 -- Weapons -----------------------------------------------------------------------------
 -- Weapons are built along +Y with the grip at the origin, then mounted in a hand.
 
+-- A socketed gem: a cut stone set in a metal bezel with four prongs, facing
+-- out of the socket (the mount's -Z). A glowing core (SocketedGem, which
+-- carries the gem's light) sits under a glassy faceted crown and a flat
+-- table facet, so it reads as a gem rather than a glowing block. Ultra
+-- Rare two-tone shades show their second colour in the crown; prismatic
+-- stones glow mint-white at the core.
+local SETTING = Color3.fromRGB(176, 150, 96)
 local function gemSocket(folder: Instance, anchor: BasePart, mount: CFrame, at: Vector3, gem, size: number)
-	if gem then
-		local shade = GemConfig.shade(gem)
-		local color = if shade.Prismatic then Color3.fromRGB(120, 255, 200) else shade.Color
-		local stone = neon(
+	local base = mount * CFrame.new(at)
+	-- The bezel: a short metal ring the stone sits in.
+	local bezel = piece(
+		folder,
+		anchor,
+		base * CFrame.new(0, 0, size * 0.14) * CFrame.Angles(0, math.rad(90), 0),
+		Vector3.new(size * 0.32, size * 1.42, size * 1.42),
+		if gem then SETTING else IRON,
+		Enum.Material.Metal,
+		Enum.PartType.Cylinder
+	)
+	bezel.Name = "GemSetting"
+	if not gem then
+		-- An empty socket: the bare setting with a dark hollow.
+		local hollow = piece(
 			folder,
 			anchor,
-			mount * CFrame.new(at) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
-			Vector3.one * size,
-			color
+			base * CFrame.new(0, 0, size * 0.02) * CFrame.Angles(0, math.rad(90), 0),
+			Vector3.new(size * 0.1, size * 1.05, size * 1.05),
+			Color3.fromRGB(24, 26, 32),
+			Enum.Material.SmoothPlastic,
+			Enum.PartType.Cylinder
 		)
-		stone.Name = "SocketedGem"
-	else
-		piece(
-			folder,
-			anchor,
-			mount * CFrame.new(at),
-			Vector3.one * size * 0.8,
-			IRON,
-			Enum.Material.Metal,
-			Enum.PartType.Ball
-		)
+		hollow.Name = "GemSetting"
+		return
 	end
+	local shade = GemConfig.shade(gem)
+	local color = if shade.Prismatic then Color3.fromRGB(120, 255, 200) else shade.Color
+	local crownColor = shade.Color2 or shade.Color
+	-- Four prongs gripping the stone's four points.
+	for i = 0, 3 do
+		local angle = math.rad(i * 90)
+		local prong = piece(
+			folder,
+			anchor,
+			base
+				* CFrame.new(math.cos(angle) * size * 0.5, math.sin(angle) * size * 0.5, -size * 0.26)
+				* CFrame.Angles(0, 0, angle),
+			Vector3.new(size * 0.26, size * 0.12, size * 0.12),
+			SETTING,
+			Enum.Material.Metal
+		)
+		prong.Name = "GemSetting"
+	end
+	-- The glowing heart of the stone.
+	local core = neon(
+		folder,
+		anchor,
+		base * CFrame.new(0, 0, -size * 0.05) * CFrame.Angles(0, 0, math.rad(45)),
+		Vector3.new(size * 0.62, size * 0.62, size * 0.4),
+		color
+	)
+	core.Name = "SocketedGem"
+	-- The crown: a faceted glass shell over the core, turned so its edges
+	-- catch the light.
+	local crown = piece(
+		folder,
+		anchor,
+		base * CFrame.new(0, 0, -size * 0.12) * CFrame.Angles(math.rad(10), math.rad(10), math.rad(45)),
+		Vector3.new(size * 0.78, size * 0.78, size * 0.5),
+		crownColor,
+		Enum.Material.Glass
+	)
+	crown.Name = "GemFacet"
+	crown.Transparency = 0.35
+	crown.Reflectance = 0.3
+	crown.CastShadow = false
+	-- The table: the flat top facet, a lighter flash of the colour.
+	local table_ = piece(
+		folder,
+		anchor,
+		base * CFrame.new(0, 0, -size * 0.38) * CFrame.Angles(0, 0, math.rad(45)),
+		Vector3.new(size * 0.34, size * 0.34, size * 0.05),
+		shade.Color:Lerp(Color3.new(1, 1, 1), 0.6),
+		Enum.Material.Glass
+	)
+	table_.Name = "GemFacet"
+	table_.Transparency = 0.1
+	table_.Reflectance = 0.4
+	table_.CastShadow = false
 end
 
 -- A pointed blade tip: two wedges meeting on the blade's centre line.
@@ -1085,6 +1152,7 @@ local function gemGlow(component: Instance, gem)
 		highlight.OutlineTransparency = spec[2]
 		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
 		highlight.Parent = component
+		CollectionService:AddTag(highlight, Tags.GemOutline)
 	end
 	-- The light, moving the element's way.
 	local pulse = GEM_PULSE[gem.Element] or { 1, 0.5 }

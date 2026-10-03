@@ -20,4 +20,8 @@ return {
 	Spin = "Spin",
 	Bob = "Bob",
 	Laser = "Laser",
+
+	-- Gem outlines on enchanted gear (Highlights): the client keeps only the
+	-- nearest ones on, under Roblox's limit (OutlineBudget).
+	GemOutline = "GemOutline",
 }

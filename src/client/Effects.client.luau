@@ -8,6 +8,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Tags = require(ReplicatedStorage.Shared.Tags)
+-- Gem outlines on gear: only the nearest stay on, under Roblox's limit.
+require(script.Parent.Modules.OutlineBudget).start()
 
 -- Tracks every part with `tag`, remembering where the server placed it.
 local function track(tag: string): { [BasePart]: CFrame }
