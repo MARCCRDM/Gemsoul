@@ -10,6 +10,7 @@
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
@@ -849,17 +850,133 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 	end
 end
 
--- A gem in a piece of armor makes it glow with the gem's element, more the
--- rarer the gem: a light, a tint and glowing trims from Common, and from
--- Uncommon a shimmering element aura (a ForceField shell) wrapped over its
--- largest plates, thicker and over more plates up to Legendary.
---   light brightness, light range, tint, aura plates, aura transparency, motes/s
+-- A gem in a piece of armor enchants it with the gem's element, more the
+-- rarer the gem, so you can tell a rival's element at a glance:
+--   * a glowing veil (a see-through Neon shell) in the element's colour over
+--     its plates, more plates and more solid up to Legendary;
+--   * from Rare, a shimmering ForceField shell on top that ripples;
+--   * glowing trims, a deeper element tint on the metal and a pulsing light;
+--   * the element's own signature particles: flames and embers (Thermal),
+--     falling ice crystals and cold mist (Cryo), crackling sparks (Ion),
+--     rising bubbles and fumes (Corrosive).
+--   light brightness, light range, tint, veil plates, veil transparency,
+--   shimmer plates, signature particles per second
 local GEM_GLOW = {
-	{ 1.2, 8, 0.16, 0, 1, 4 }, -- Common
-	{ 1.6, 10, 0.22, 2, 0.7, 6 }, -- Uncommon
-	{ 2.1, 12, 0.28, 4, 0.55, 9 }, -- Rare
-	{ 2.7, 14, 0.34, 7, 0.4, 12 }, -- Ultra Rare
-	{ 3.5, 17, 0.4, 10, 0.25, 18 }, -- Legendary
+	{ 1.6, 9, 0.18, 3, 0.8, 0, 6 }, -- Common
+	{ 2.2, 11, 0.24, 5, 0.74, 0, 9 }, -- Uncommon
+	{ 2.8, 13, 0.3, 8, 0.68, 4, 13 }, -- Rare
+	{ 3.5, 15, 0.36, 10, 0.62, 6, 18 }, -- Ultra Rare
+	{ 4.5, 18, 0.42, 14, 0.55, 10, 26 }, -- Legendary
+}
+-- Each element's signature: what pours off enchanted armor.
+local SIGNATURE: { [string]: { any } } = {
+	Fire = {
+		{
+			Texture = FIRE_TEXTURE,
+			Colors = { Color3.fromRGB(255, 210, 90), Color3.fromRGB(255, 60, 20) },
+			Size = 0.7,
+			Lifetime = NumberRange.new(0.3, 0.6),
+			Speed = NumberRange.new(1, 2.5),
+			Acceleration = Vector3.new(0, 7, 0),
+			Spread = 25,
+			Transparency = 0.15,
+			Light = 1,
+			Share = 1,
+		},
+		{
+			Texture = SPARK_TEXTURE,
+			Colors = { Color3.fromRGB(255, 230, 140), Color3.fromRGB(255, 90, 30) },
+			Size = 0.22,
+			Lifetime = NumberRange.new(0.8, 1.5),
+			Speed = NumberRange.new(1.5, 3.5),
+			Acceleration = Vector3.new(0, 4, 0),
+			Spread = 60,
+			Transparency = 0,
+			Light = 1,
+			Share = 0.6,
+		},
+	},
+	Frost = {
+		{
+			Texture = SPARK_TEXTURE,
+			Colors = { Color3.fromRGB(240, 252, 255), Color3.fromRGB(90, 180, 255) },
+			Size = 0.32,
+			Lifetime = NumberRange.new(1, 1.8),
+			Speed = NumberRange.new(0.2, 0.7),
+			Acceleration = Vector3.new(0, -2.5, 0),
+			Spread = 180,
+			Transparency = 0,
+			Light = 1,
+			Share = 1,
+			Spin = true,
+		},
+		{
+			Texture = SMOKE_TEXTURE,
+			Colors = { Color3.fromRGB(210, 240, 255), Color3.fromRGB(120, 190, 255) },
+			Size = 1.1,
+			Lifetime = NumberRange.new(1, 1.6),
+			Speed = NumberRange.new(0.2, 0.5),
+			Acceleration = Vector3.new(0, -1.2, 0),
+			Spread = 60,
+			Transparency = 0.6,
+			Light = 0.4,
+			Share = 0.4,
+		},
+	},
+	Shock = {
+		{
+			Texture = SPARK_TEXTURE,
+			Colors = { Color3.fromRGB(255, 255, 230), Color3.fromRGB(255, 215, 30) },
+			Size = 0.35,
+			Lifetime = NumberRange.new(0.06, 0.18),
+			Speed = NumberRange.new(6, 11),
+			Acceleration = Vector3.zero,
+			Spread = 180,
+			Transparency = 0,
+			Light = 1,
+			Share = 1.6,
+			Locked = true,
+		},
+		{
+			Texture = SPARK_TEXTURE,
+			Colors = { Color3.fromRGB(255, 250, 200), Color3.fromRGB(255, 230, 80) },
+			Size = 0.6,
+			Lifetime = NumberRange.new(0.05, 0.1),
+			Speed = NumberRange.new(0, 0.2),
+			Acceleration = Vector3.zero,
+			Spread = 0,
+			Transparency = 0,
+			Light = 1,
+			Share = 0.5,
+			Locked = true,
+		},
+	},
+	Poison = {
+		{
+			Texture = SPARK_TEXTURE,
+			Colors = { Color3.fromRGB(200, 255, 140), Color3.fromRGB(60, 200, 70) },
+			Size = 0.3,
+			Lifetime = NumberRange.new(1, 1.8),
+			Speed = NumberRange.new(0.3, 0.9),
+			Acceleration = Vector3.new(0, 1.8, 0),
+			Spread = 40,
+			Transparency = 0.05,
+			Light = 0.8,
+			Share = 1,
+		},
+		{
+			Texture = SMOKE_TEXTURE,
+			Colors = { Color3.fromRGB(150, 255, 100), Color3.fromRGB(40, 120, 40) },
+			Size = 1,
+			Lifetime = NumberRange.new(1, 1.6),
+			Speed = NumberRange.new(0.2, 0.5),
+			Acceleration = Vector3.new(0, 0.8, 0),
+			Spread = 60,
+			Transparency = 0.55,
+			Light = 0.2,
+			Share = 0.5,
+		},
+	},
 }
 local function gemTier(gem): number
 	for index, tier in GemConfig.TierOrder do
@@ -869,6 +986,30 @@ local function gemTier(gem): number
 	end
 	return 1
 end
+local function shell(
+	plate: Part,
+	name: string,
+	material: Enum.Material,
+	color: Color3,
+	transparency: number,
+	grow: number
+)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Shape = plate.Shape
+	part.Size = plate.Size * grow + Vector3.one * 0.05
+	part.CFrame = plate.CFrame
+	part.Material = material
+	part.Color = color
+	part.Transparency = transparency
+	part.CanCollide, part.CanQuery, part.CanTouch = false, false, false
+	part.Massless, part.CastShadow = true, false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0, weld.Part1 = plate, part
+	weld.Parent = part
+	part.Parent = plate.Parent
+	return part
+end
 local function gemGlow(component: Instance, gem)
 	local color = GemConfig.ElementColors[gem.Element]
 	if not color then
@@ -876,13 +1017,22 @@ local function gemGlow(component: Instance, gem)
 	end
 	local tier = gemTier(gem)
 	local spec = GEM_GLOW[tier]
+	-- Tint toward a deep shade of the element, so pale plates turn the
+	-- element's colour instead of a washed-out pastel.
+	local deep = color:Lerp(Color3.new(0, 0, 0), 0.3)
 	local plates = {}
 	for _, part in component:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" and part.Name ~= "GemAura" then
+		if
+			part:IsA("BasePart")
+			and part.Transparency < 1
+			and part.Name ~= "SocketedGem"
+			and part.Name ~= "GemAura"
+			and part.Name ~= "GemVeil"
+		then
 			if part.Material == Enum.Material.Neon then
 				part.Color = color -- trims glow in the element's colour
 			else
-				part.Color = part.Color:Lerp(color, spec[3])
+				part.Color = part.Color:Lerp(deep, spec[3])
 			end
 			table.insert(plates, part)
 		end
@@ -894,6 +1044,7 @@ local function gemGlow(component: Instance, gem)
 		return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
 	end)
 	local biggest = plates[1]
+	-- The light breathes: brighter, dimmer, brighter.
 	local light = Instance.new("PointLight")
 	light.Name = "GemGlow"
 	light.Color = color
@@ -901,49 +1052,59 @@ local function gemGlow(component: Instance, gem)
 	light.Range = spec[2]
 	light.Shadows = false
 	light.Parent = biggest
-	-- The aura: a slightly larger shimmering shell over the biggest plates.
-	local shells = 0
+	TweenService:Create(
+		light,
+		TweenInfo.new(1.1 - tier * 0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+		{ Brightness = spec[1] * 0.45, Range = spec[2] * 0.8 }
+	):Play()
+	-- The veil and, from Rare, the rippling shimmer over the biggest plates.
+	local veils, shimmers = 0, 0
 	for _, plate in plates do
-		if shells >= spec[4] then
+		if veils >= spec[4] and shimmers >= spec[6] then
 			break
 		end
 		if plate:IsA("Part") then
-			local aura = Instance.new("Part")
-			aura.Name = "GemAura"
-			aura.Shape = plate.Shape
-			aura.Size = plate.Size * 1.08 + Vector3.one * 0.06
-			aura.CFrame = plate.CFrame
-			aura.Material = Enum.Material.ForceField
-			aura.Color = color
-			aura.Transparency = spec[5]
-			aura.CanCollide, aura.CanQuery, aura.CanTouch = false, false, false
-			aura.Massless, aura.CastShadow = true, false
-			local weld = Instance.new("WeldConstraint")
-			weld.Part0, weld.Part1 = plate, aura
-			weld.Parent = aura
-			aura.Parent = plate.Parent
-			shells += 1
+			if veils < spec[4] then
+				shell(plate, "GemVeil", Enum.Material.Neon, color, spec[5], 1.04)
+				veils += 1
+			end
+			if shimmers < spec[6] then
+				shell(plate, "GemAura", Enum.Material.ForceField, color, 0, 1.1)
+				shimmers += 1
+			end
 		end
 	end
-	local motes = Instance.new("ParticleEmitter")
-	motes.Name = "GemGlow"
-	motes.Texture = SPARK_TEXTURE
-	motes.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35), color)
-	motes.LightEmission = 1
-	motes.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0),
-		NumberSequenceKeypoint.new(0.3, 0.16 + tier * 0.04),
-		NumberSequenceKeypoint.new(1, 0),
-	})
-	motes.Transparency = NumberSequence.new(0.05, 1)
-	motes.Lifetime = NumberRange.new(0.6, 1.3)
-	motes.Speed = NumberRange.new(0.3, 1 + tier * 0.2)
-	motes.SpreadAngle = Vector2.new(180, 180)
-	motes.Acceleration = Vector3.new(0, 1.5, 0)
-	motes.Rate = spec[6]
-	motes.Shape = Enum.ParticleEmitterShape.Box
-	motes.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-	motes.Parent = biggest
+	-- The element's signature particles.
+	for _, style in SIGNATURE[gem.Element] or {} do
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Name = "GemSignature"
+		emitter.Texture = style.Texture
+		emitter.Color = ColorSequence.new(style.Colors[1], style.Colors[2])
+		emitter.LightEmission = style.Light
+		local size = style.Size * (0.8 + tier * 0.1)
+		emitter.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, size * 0.4),
+			NumberSequenceKeypoint.new(0.3, size),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		emitter.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, style.Transparency),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		emitter.Lifetime = style.Lifetime
+		emitter.Speed = style.Speed
+		emitter.SpreadAngle = Vector2.new(style.Spread, style.Spread)
+		emitter.Acceleration = style.Acceleration
+		emitter.Rate = spec[7] * style.Share
+		emitter.LockedToPart = style.Locked == true
+		if style.Spin then
+			emitter.RotSpeed = NumberRange.new(-120, 120)
+			emitter.Rotation = NumberRange.new(0, 360)
+		end
+		emitter.Shape = Enum.ParticleEmitterShape.Box
+		emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		emitter.Parent = biggest
+	end
 end
 
 -- Rare+ armor with Elemental Affinity Affixes gets a faint aura in its
