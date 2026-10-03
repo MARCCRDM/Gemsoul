@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MODULES = [
     ('EquipmentBalance', 'src/shared/EquipmentBalance.luau'), ('ExpeditionEconomy', 'src/shared/ExpeditionEconomy.luau'),
     ('CrowdControl', 'src/shared/CrowdControl.luau'), ('StatusEffects', 'src/shared/StatusEffects.luau'),
-    ('ElementCombos', 'src/shared/ElementCombos.luau'), ('GemConfig', 'src/shared/GemConfig.luau'),
+    ('ElementCombos', 'src/shared/ElementCombos.luau'), ('Matchmaking', 'src/shared/Matchmaking.luau'), ('GemConfig', 'src/shared/GemConfig.luau'),
     ('ArmorFamilies', 'src/shared/ArmorFamilies.luau'), ('Actions', 'src/shared/CombatActions.luau'),
     ('GemRoller', 'src/shared/GemRoller.luau'), ('Tech', 'src/shared/CombatTechnology.luau'),
     ('Tree', 'src/shared/AugmentTree.luau'), ('Season', 'src/shared/Season.luau'),
