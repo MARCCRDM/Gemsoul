@@ -22,6 +22,7 @@ local TargetLock = require(script.Parent.Modules.TargetLock)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local StatusBars = require(script.Parent.Modules.StatusBars)
+local FoeCastBar = require(script.Parent.Modules.FoeCastBar)
 local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
 local CombatFx = require(script.Parent.Modules.CombatFx)
 local CombatVfx = require(script.Parent.Modules.CombatVfx)
@@ -323,80 +324,78 @@ local selfStatusRow = new("Frame", {
 }, gui)
 local selfStatuses = StatusBars.strip(selfStatusRow, false)
 local selfStatusIcons = StatusBars.strip(selfStatusRow, true) -- narrow screens: icons only
--- The rival's cast bar (under the target frame), like an RPG's enemy cast
--- bar: what it's winding up and how long until it lands, with a DODGE cue.
+-- Your opponent's cast bar, like an RPG's enemy cast bar, above the
+-- crosshair: what it's casting (in its element's colour), how long until it
+-- lands and how to get out of it. (A bar over its head too: FoeCastBar.)
 local foeCast = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
 	BackgroundTransparency = 0.1,
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 136),
-	Size = UDim2.fromOffset(320, 44),
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 0.5, -70),
+	Size = UDim2.fromOffset(380, 50),
 	Visible = false,
 }, gui)
 UiKit.round(foeCast, 8)
 local foeCastStroke = new("UIStroke", { Color = P.Gold, Thickness = 1.5, Transparency = 0.2 }, foeCast)
-local foeCastName = shadowed(text(foeCast, "", 14, P.Text, IronUi.Bold))
+local foeCastName = shadowed(text(foeCast, "", 17, P.Text, IronUi.Bold))
 foeCastName.AutomaticSize, foeCastName.TextWrapped = Enum.AutomaticSize.None, false
-foeCastName.Position, foeCastName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -90, 0, 18)
+foeCastName.Position, foeCastName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -100, 0, 22)
 local foeCastTime = shadowed(text(foeCast, "", 12, Color3.fromRGB(200, 210, 225), IronUi.Bold))
 foeCastTime.AutomaticSize, foeCastTime.TextWrapped = Enum.AutomaticSize.None, false
 foeCastTime.TextXAlignment = Enum.TextXAlignment.Right
-foeCastTime.Position, foeCastTime.Size = UDim2.new(1, -90, 0, 4), UDim2.fromOffset(80, 18)
+foeCastTime.Position, foeCastTime.Size = UDim2.new(1, -100, 0, 6), UDim2.fromOffset(90, 18)
 local foeCastTrack = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(10, 26),
-	Size = UDim2.new(1, -20, 0, 10),
+	Position = UDim2.fromOffset(10, 31),
+	Size = UDim2.new(1, -20, 0, 12),
 }, foeCast)
 UiKit.round(foeCastTrack, 4)
 local foeCastFill =
 	new("Frame", { BackgroundColor3 = P.Gold, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, foeCastTrack)
 UiKit.round(foeCastFill, 4)
-local foeDodge = shadowed(text(gui, "DODGE!  SPACE", 22, Color3.fromRGB(255, 90, 80), IronUi.Bold))
+local foeDodge = shadowed(text(gui, "", 18, Color3.fromRGB(255, 90, 80), IronUi.Bold))
 foeDodge.AutomaticSize, foeDodge.TextWrapped = Enum.AutomaticSize.None, false
 foeDodge.TextXAlignment = Enum.TextXAlignment.Center
 foeDodge.AnchorPoint, foeDodge.Position, foeDodge.Size =
-	Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 184), UDim2.fromOffset(320, 28)
+	Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0.5, -66), UDim2.fromOffset(380, 24)
 foeDodge.Visible = false
 local lastFoeCast, foeWarned = nil, false
 local function drawFoeCast(model, serverNow)
-	local name = model and model:GetAttribute("ActionName")
-	local start, at = model and model:GetAttribute("ActionStart"), model and model:GetAttribute("ActionAt")
-	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
-	local casting = type(name) == "string"
-		and type(start) == "number"
-		and type(at) == "number"
-		and at - start >= 0.35
-		and serverNow < at + 0.08
-		and humanoid ~= nil
-		and humanoid.Health > 0
-	foeCast.Visible, foeDodge.Visible = casting, false
-	if not casting then
+	-- The rival; in PvP, the nearest other player who is casting.
+	local cast = FoeCastBar.read(model, serverNow)
+	local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not cast and myRoot then
+		local nearest = 60
+		for _, other in Players:GetPlayers() do
+			local root = other ~= player and other.Character and other.Character:FindFirstChild("HumanoidRootPart")
+			local theirs = root and FoeCastBar.read(other.Character, serverNow)
+			if theirs and (root.Position - myRoot.Position).Magnitude < nearest then
+				cast, model, nearest = theirs, other.Character, (root.Position - myRoot.Position).Magnitude
+			end
+		end
+	end
+	foeCast.Visible, foeDodge.Visible = cast ~= nil, false
+	if not cast then
 		return
 	end
 	-- A new cast: hear it wind up.
+	local start = model:GetAttribute("ActionStart")
 	if start ~= lastFoeCast then
 		lastFoeCast, foeWarned = start, false
 		local root = model:FindFirstChild("HumanoidRootPart")
 		CombatSound.play("Cast", if root then root.Position else nil, { Volume = 0.9 })
 	end
-	local color = GemConfig.ElementColors[model:GetAttribute("ActionElement") or ""] or P.Gold
-	local left = math.max(0, at - serverNow)
-	local progress = math.clamp((serverNow - start) / (at - start), 0, 1)
-	foeCastName.Text = string.upper(name)
-	foeCastName.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.3)
-	foeCastTime.Text = string.format("%.1fs", left)
-	foeCastFill.Size = UDim2.fromScale(progress, 1)
-	foeCastFill.BackgroundColor3 = color
-	-- The last moments: the time to hop or roll.
-	local urgent = left <= 0.35
-	foeCastStroke.Color = if urgent then Color3.fromRGB(255, 90, 80) else color
-	foeDodge.Visible = urgent
+	local urgent = FoeCastBar.paint(cast, foeCastName, foeCastTime, foeCastFill, foeCastStroke)
+	-- How to get out of it, red and pulsing in the last moments.
+	foeDodge.Visible = cast.Threat and cast.Hint ~= nil
+	foeDodge.Text = (cast.Hint or "") .. (if cast.Kind == "Nova" or cast.Kind == "Heavy" then "  ·  SPACE" else "")
+	foeDodge.TextColor3 = if urgent then Color3.fromRGB(255, 90, 80) else cast.Color:Lerp(Color3.new(1, 1, 1), 0.4)
+	foeDodge.TextTransparency = if urgent then 0.15 * (1 + math.sin(os.clock() * 30)) else 0.1
 	if urgent and not foeWarned then
 		foeWarned = true
 		CombatSound.play("Warn")
 	end
-	foeDodge.TextTransparency = if urgent then 0.15 * (1 + math.sin(os.clock() * 30)) else 1
 end
 
 -- The combat log (bottom left), with fight details on L.
@@ -1400,6 +1399,7 @@ RunService.RenderStepped:Connect(function(dt)
 		rivalModel and (rivalModel:GetAttribute("RivalName") or rivalModel.Name)
 	)
 	drawFoeCast(rivalModel, serverNow)
+	FoeCastBar.step(serverNow)
 	matchup:draw(rivalModel, viewport, rivalPanel.Visible)
 	CombatFx.auras(serverNow)
 	if rivalModel ~= logRival and rivalModel ~= nil then
