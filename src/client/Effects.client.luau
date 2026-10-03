@@ -10,6 +10,8 @@ local RunService = game:GetService("RunService")
 local Tags = require(ReplicatedStorage.Shared.Tags)
 -- Gem outlines on gear: only the nearest stay on, under Roblox's limit.
 require(script.Parent.Modules.OutlineBudget).start()
+-- Every player's body acts out their fighting (posed here, for everyone).
+require(script.Parent.Modules.BodyPoses).start()
 -- Swing trails on every blade.
 require(script.Parent.Modules.BladeTrails).start()
 -- Night falls in the Arena: the fight and the gear light it.

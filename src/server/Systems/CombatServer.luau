@@ -6,7 +6,6 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
-local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -172,8 +171,9 @@ local function spendStamina(player, st, amount)
 	player:SetAttribute("Stamina", st.Resources.Stamina)
 end
 -- Your body acts out what you do, as the Arena rival's does (RivalPose, the
--- same poses, seen by everyone): a cast's pose through its wind-up, a slash
--- or heavy blow as it lands, the arm drawn back while you charge.
+-- same poses, seen by everyone; every client poses it, see BodyPoses): a
+-- cast's pose through its wind-up, a slash or heavy blow as it lands, the arm
+-- drawn back while you charge, a tuck through a roll, a stagger when stunned.
 local poseSides: { [Player]: number } = {}
 posePlayer = function(player, kind: string?, windup: number, name: string?, element: string?)
 	local character = player.Character
@@ -570,6 +570,10 @@ function applyCC(target, seconds, kind)
 			st.StunUntil = math.max(st.StunUntil, os.clock() + duration)
 			st.StunKind = kind or "Stunned"
 			st.ChargeStarted, st.BlockUntil = nil, 0
+			-- Rocked back on your heels (a real stun, not a tiny stagger).
+			if duration >= 0.3 then
+				posePlayer(target.Player, "Stagger", 0)
+			end
 		else
 			Enemies.addStatus(target.Enemy, "Stun", 1, duration)
 			target.Enemy.StunKind = kind or "Stunned"
@@ -1067,6 +1071,15 @@ local function dodge(player, requested, kind)
 		Remotes.CombatFx:FireClient(player, "Cooldown", "Dodge", k.Rules.DodgeCooldown)
 	end
 	fx("DodgeRoll", player, root.Position, direction, travel, k.Rules.Deflect and not hop)
+	if not hop then
+		posePlayer(player, "Dodge", 0)
+		local character = player.Character
+		if character then
+			-- Lean the way you roll.
+			local right = root.CFrame.RightVector
+			character:SetAttribute("ActionSide", if direction:Dot(right) < 0 then -1 else 1)
+		end
+	end
 	return true
 end
 local function block(player, held, aim)
@@ -1862,13 +1875,9 @@ end
 
 local function tick(dt)
 	local now = os.clock()
-	-- Every player's body acts out their actions (rest stance between them).
-	local serverNow = workspace:GetServerTimeNow()
-	for _, player in Players:GetPlayers() do
-		if player.Character then
-			pcall(RivalPose.update, player.Character, dt or 1 / 60, serverNow, now, true)
-		end
-	end
+	-- Players' bodies are posed on every client (Client BodyPoses) from the
+	-- attributes set here: a character belongs to its own client, so joint
+	-- changes made here would reach the other players late or not at all.
 	for _, player in Players:GetPlayers() do
 		local st, k = state(player), kit(player)
 		local humanoid, root = alive(player)
