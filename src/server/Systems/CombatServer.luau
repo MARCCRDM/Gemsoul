@@ -12,6 +12,7 @@ local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
+local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local Enemies = require(script.Parent.Enemies)
 local DamageLog = require(script.Parent.DamageLog)
@@ -231,6 +232,8 @@ local function canPvP(source, target)
 		return false
 	end
 	local sameTeam = source.Team ~= nil and source.Team == target.Team and not source.Neutral and not target.Neutral
+	-- Duel fighters only fight their opponents; party members never each other.
+	sameTeam = sameTeam or not Matchmaking.versus(source, target)
 	return Actions.canPvP(
 		source,
 		target,

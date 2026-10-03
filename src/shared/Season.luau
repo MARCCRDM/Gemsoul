@@ -17,6 +17,8 @@ Season.XP = {
 	SlayCrawler = 12,
 	SlayBrute = 35,
 	Daily = 50,
+	DuelWin = 40,
+	DuelPlay = 15,
 }
 
 -- XP needed to go from `level` to the next.

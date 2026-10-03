@@ -10,10 +10,14 @@
 	about invites ("Invite", fromId, fromName).
 
 	In a party, a monster's rewards go to every member fighting nearby, not
-	just the top damage dealer (see Enemies).
+	just the top damage dealer (see Enemies). Members never hurt each other
+	(their PartyId attribute; Shared.Matchmaking.versus), share a private
+	chat channel (a TextChannel; its name comes with the state, "Channel"),
+	and a party of two can queue for 2v2 duels (see Duels).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local PlayerData = require(script.Parent.PlayerData)
@@ -26,16 +30,67 @@ local RALLY_POINTS = { Wilds = true, Arena = true, Quarry = true, Quartermaster 
 
 local reply = Shop.reply
 
-type PartyData = { Leader: Player, Members: { Player }, Ready: { [Player]: boolean }, Rally: string? }
+type PartyData = {
+	Id: string,
+	Leader: Player,
+	Members: { Player },
+	Ready: { [Player]: boolean },
+	Rally: string?,
+	Channel: TextChannel?,
+	Voices: { [number]: Instance },
+}
 
 local Party = {}
 
 local memberOf: { [Player]: PartyData } = {}
 local invites: { [Player]: { [Player]: number } } = {} -- invitee -> inviter -> expiry
 
+local partyCount = 0
+
+-- The party's chat channel: created with the party, members added and
+-- removed as they come and go, gone with the party.
+local function syncChannel(party: PartyData)
+	pcall(function()
+		if not party.Channel then
+			local channel = Instance.new("TextChannel")
+			channel.Name = "Party_" .. party.Id
+			channel.Parent = TextChatService
+			party.Channel = channel
+		end
+		local channel = party.Channel :: TextChannel
+		local wanted = {}
+		for _, member in party.Members do
+			wanted[member.UserId] = true
+			if not party.Voices[member.UserId] then
+				party.Voices[member.UserId] = channel:AddUserAsync(member.UserId)
+			end
+		end
+		for userId, source in party.Voices do
+			if not wanted[userId] then
+				source:Destroy()
+				party.Voices[userId] = nil
+			end
+		end
+	end)
+end
+
+local function closeChannel(party: PartyData)
+	if party.Channel then
+		pcall(function()
+			(party.Channel :: TextChannel):Destroy()
+		end)
+		party.Channel = nil
+	end
+	party.Voices = {}
+end
+
 local function push(party: PartyData?)
 	if not party then
 		return
+	end
+	syncChannel(party)
+	for _, member in party.Members do
+		member:SetAttribute("PartyId", party.Id)
 	end
 	local members = {}
 	for _, member in party.Members do
@@ -49,7 +104,12 @@ local function push(party: PartyData?)
 			Ready = party.Ready[member] == true,
 		})
 	end
-	local state = { Leader = party.Leader.UserId, Members = members, Rally = party.Rally }
+	local state = {
+		Leader = party.Leader.UserId,
+		Members = members,
+		Rally = party.Rally,
+		Channel = if party.Channel then party.Channel.Name else nil,
+	}
 	for _, member in party.Members do
 		Remotes.Party:FireClient(member, "State", state)
 	end
@@ -66,13 +126,18 @@ local function leave(player: Player)
 		table.remove(party.Members, index)
 	end
 	party.Ready[player] = nil
+	if player.Parent then
+		player:SetAttribute("PartyId", nil)
+	end
 	Remotes.Party:FireClient(player, "State", nil)
 	if #party.Members <= 1 then
 		-- A party of one is no party.
 		for _, rest in party.Members do
 			memberOf[rest] = nil
+			rest:SetAttribute("PartyId", nil)
 			Remotes.Party:FireClient(rest, "State", nil)
 		end
+		closeChannel(party)
 		return
 	end
 	if party.Leader == player then
@@ -145,7 +210,16 @@ local function respond(player: Player, fromId: any, accept: any)
 	end
 	local party = memberOf[from]
 	if not party then
-		party = { Leader = from, Members = { from }, Ready = {}, Rally = nil }
+		partyCount += 1
+		party = {
+			Id = tostring(partyCount),
+			Leader = from,
+			Members = { from },
+			Ready = {},
+			Rally = nil,
+			Channel = nil,
+			Voices = {},
+		}
 		memberOf[from] = party
 	end
 	if #party.Members >= MAX_SIZE then

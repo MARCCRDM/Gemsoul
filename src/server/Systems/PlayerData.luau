@@ -60,6 +60,7 @@ type Profile = {
 	Stats: { Kills: number, BestGem: number, BestDepth: number? }, -- for Top Players
 	Crates: { [string]: number }, -- unopened crates
 	Boosts: { XPUntil: number }, -- os.time() when 2x XP ends
+	Duel: { Rating: number, Wins: number, Losses: number, Streak: number }?, -- arena duels (see Duels)
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle
 	WelcomeBought: boolean,
 }
@@ -429,6 +430,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Stats = profile.Stats,
 		Crates = profile.Crates,
 		Boosts = profile.Boosts,
+		Duel = profile.Duel, -- arena duel rating and record (see Duels)
 		FirstJoin = profile.FirstJoin,
 		WelcomeBought = profile.WelcomeBought,
 		ServerTime = os.time(),

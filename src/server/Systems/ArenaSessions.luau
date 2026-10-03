@@ -69,6 +69,8 @@ local function leave(player)
 	end
 	return Shop.reply(true, "Back at base.")
 end
+-- Back to the menu (a finished duel uses this too).
+ArenaSessions.leave = leave
 function ArenaSessions.start()
 	Shop.register("ArenaTraining", function(player)
 		return enter(player, false)

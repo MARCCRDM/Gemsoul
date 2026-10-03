@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def read(path):
     return (ROOT / path).read_text(encoding="utf-8")
 rules = "local Rules=(function()\n" + read("src/shared/TargetLockRules.luau") + "\nend)()\n"
+rules += "local Matchmaking=(function()\n" + read("src/shared/Matchmaking.luau") + "\nend)()\n"
 source = read("tests/roblox_primitives.luau") + rules + read("tests/target_lock_cases.luau")
 source += "\ndo\n" + read("tests/target_lock_runtime.luau")
 controller = re.sub(r"^local \w+ = require\([^\n]+\)\n", "", read("src/client/Modules/TargetLock.luau"), flags=re.M)

@@ -5,6 +5,7 @@
 --   CombatInput (event, client -> server): attacks and rig maneuvers
 --   CombatFx (event, server -> clients): hits, damage numbers, cooldowns
 --   Party (event, server -> client): party state and invites
+--   Social (event, server -> client): duel queue, challenges and matches
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local folder = Instance.new("Folder")
@@ -17,6 +18,7 @@ local Remotes = {
 	CombatInput = Instance.new("RemoteEvent"),
 	CombatFx = Instance.new("RemoteEvent"),
 	Party = Instance.new("RemoteEvent"),
+	Social = Instance.new("RemoteEvent"),
 }
 for name, remote in Remotes do
 	remote.Name = name

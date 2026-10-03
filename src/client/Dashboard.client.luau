@@ -24,6 +24,7 @@ local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local SurgeArrayUI = require(script.Parent.Modules.SurgeArrayUI)
 local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
+local SocialUI = require(script.Parent.Modules.SocialUI)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
@@ -323,6 +324,27 @@ end)
 shopButton.LayoutOrder = 3
 shopButton.Size = UDim2.fromOffset(0, 44)
 shopButton.TextSize = 17
+-- Who's here: the count of players in the server opens Social.
+local onlineFrame, onlineValue = pill(4, "ONLINE  [P]", P.Good, 130)
+local onlineHit = new("TextButton", {
+	Text = "",
+	BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 5,
+}, onlineFrame)
+onlineHit:SetAttribute("UiSound", "Open")
+IronUi.highlight(onlineHit, onlineFrame)
+onlineHit.Activated:Connect(function()
+	launch(SocialUI.open)
+end)
+local function countOnline()
+	onlineValue.Text = tostring(#Players:GetPlayers())
+end
+countOnline()
+Players.PlayerAdded:Connect(countOnline)
+Players.PlayerRemoving:Connect(function()
+	task.defer(countOnline)
+end)
 
 -- Mission strip: the Moon Mine, the Market and what's coming ------------------------------------------------
 
@@ -426,7 +448,7 @@ marketButton.TextSize = 15
 local social = panel(root, 970, STRIP_Y, W - 986, STRIP_H, P.Teal)
 local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
 place(socialTitle, 20, 14, 240, 28)
-local socialCopy = label(social, "Practice safely or enter opt-in PvP.", 12, LIGHT, IronUi.Body)
+local socialCopy = label(social, "Train, fight the rival, or duel other players.", 12, LIGHT, IronUi.Body)
 place(socialCopy, 20, 44, 270, 18)
 socialCopy.TextWrapped = true
 socialCopy.TextYAlignment = Enum.TextYAlignment.Top
@@ -465,20 +487,24 @@ local function arenaButton(caption, color, x, w, onClick)
 	b.Position, b.Size, b.TextSize = UDim2.fromOffset(x, 70), UDim2.fromOffset(w, 32), 12
 	return b
 end
-arenaButton("TRAIN", P.Teal, 16, 76, function()
+arenaButton("TRAIN", P.Teal, 16, 60, function()
 	launch(function()
 		ArenaScene.enter(false)
 	end)
 end)
-arenaButton("PVP", P.Gold, 100, 66, function()
+arenaButton("RIVAL", P.Amethyst, 82, 62, function()
 	launch(function()
 		ArenaScene.enter(true)
 	end)
 end)
-arenaButton("LOADOUT [L]", P.Teal, 174, 118, function()
-	launch(SurgeArrayUI.open)
+-- Real players: the rated 1v1 queue, and Social for parties, 2v2 and chat.
+arenaButton("1v1 QUEUE", P.Gold, 150, 96, function()
+	launch(SocialUI.findDuel)
 end)
-arenaButton("TREE [K]", P.Gold, 300, 96, function()
+arenaButton("SOCIAL [P]", P.Good, 252, 96, function()
+	launch(SocialUI.open)
+end)
+arenaButton("TREE [K]", P.Teal, 354, 76, function()
 	launch(AugmentTreeUI.open)
 end)
 
@@ -595,13 +621,25 @@ local KEYS = {
 	T = TradeUI.open,
 	B = ShopUI.toggle,
 	J = SeasonUI.toggle,
+	P = SocialUI.toggle,
 }
-ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObject)
-	if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
-		local action = KEYS[inputObject.KeyCode.Name]
-		if action then
-			launch(action)
+ContextActionService:BindAction(
+	"GemsoulDashboard",
+	function(_, state, inputObject)
+		if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
+			local action = KEYS[inputObject.KeyCode.Name]
+			if action then
+				launch(action)
+			end
 		end
-	end
-	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.K, Enum.KeyCode.L, Enum.KeyCode.M, Enum.KeyCode.T, Enum.KeyCode.B, Enum.KeyCode.J)
+		return Enum.ContextActionResult.Pass
+	end,
+	false,
+	Enum.KeyCode.K,
+	Enum.KeyCode.L,
+	Enum.KeyCode.M,
+	Enum.KeyCode.T,
+	Enum.KeyCode.B,
+	Enum.KeyCode.J,
+	Enum.KeyCode.P
+)

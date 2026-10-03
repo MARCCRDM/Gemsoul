@@ -9,6 +9,7 @@ local CollectionService = game:GetService("CollectionService")
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Rules = require(ReplicatedStorage.Shared.TargetLockRules)
+local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local player = Players.LocalPlayer
 local Lock = {}
 local active, paused, manualUntil, nextScan = false, false, 0, 0
@@ -45,10 +46,12 @@ local function eligible(model)
 	end
 	local opponent = Players:GetPlayerFromCharacter(model)
 	if opponent then
-		local sameTeam = player.Team ~= nil
+		local sameTeam = (
+			player.Team ~= nil
 			and player.Team == opponent.Team
 			and not player.Neutral
 			and not opponent.Neutral
+		) or not Matchmaking.versus(player, opponent)
 		return not player.Character:FindFirstChildOfClass("ForceField")
 			and Actions.canPvP(
 				player,
