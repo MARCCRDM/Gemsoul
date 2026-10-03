@@ -11,14 +11,21 @@
 	               any screen; a "searching" banner while queued.
 	  Duel overlay the face-off (who's on which side, a countdown), FIGHT!,
 	               the time left, and the result (rating change, coins).
+	  Playtests    Invite friends (Roblox's invite prompt), Feedback (a bug or
+	               idea, sent with the build; owners also read everyone's
+	               reports and the most frequent errors there), and client
+	               script errors forwarded to the server automatically.
 
 	The server: Party (Remotes.Party) and Duels (Remotes.Social).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ScriptContext = game:GetService("ScriptContext")
+local SocialService = game:GetService("SocialService")
 local TextChatService = game:GetService("TextChatService")
 local TweenService = game:GetService("TweenService")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local ArenaScene = require(script.Parent.ArenaScene)
 local GemClient = require(script.Parent.GemClient)
@@ -570,6 +577,242 @@ end
 
 window.Close.Activated:Connect(SocialUI.close)
 window.Shade.Activated:Connect(SocialUI.close)
+
+-- Playtest tools: invite friends, feedback (and, for owners, reports) -----------
+
+local function inviteFriends()
+	task.spawn(function()
+		local ok, can = pcall(SocialService.CanSendGameInviteAsync, SocialService, player)
+		if ok and can then
+			pcall(SocialService.PromptGameInvite, SocialService, player)
+		else
+			UiKit.toast("Invites aren't available here (try the published game).", P.Bad)
+		end
+	end)
+end
+
+local tools = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -78, 0, 36),
+	Size = UDim2.fromOffset(420, 34),
+}, panel)
+local toolsList = UiKit.list(tools, 8, true)
+toolsList.HorizontalAlignment = Enum.HorizontalAlignment.Right
+toolsList.VerticalAlignment = Enum.VerticalAlignment.Center
+local buildLabel = text(tools, Config.Playtest and Config.Playtest.Build or "", 11, P.Dim, BOLD)
+buildLabel.AutomaticSize, buildLabel.Size = Enum.AutomaticSize.X, UDim2.fromOffset(0, 34)
+buildLabel.TextYAlignment = Enum.TextYAlignment.Center
+local feedbackButton = chip(tools, "🐞 Feedback", P.Gold, function()
+	SocialUI.feedback()
+end, 110)
+feedbackButton.Size = UDim2.fromOffset(110, 32)
+local inviteButton = chip(tools, "✉ Invite friends", P.Good, inviteFriends, 130)
+inviteButton.Size = UDim2.fromOffset(130, 32)
+
+-- The feedback sheet, over the window.
+local sheet = new("Frame", {
+	BackgroundColor3 = P.Frame,
+	BackgroundTransparency = 0,
+	Position = UDim2.fromOffset(20, 82),
+	Size = UDim2.fromOffset(WIDTH - 40, HEIGHT - 102),
+	Visible = false,
+	ZIndex = 20,
+}, panel)
+UiKit.round(sheet, 12)
+new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, sheet)
+local sheetBody = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(20, 16),
+	Size = UDim2.new(1, -40, 1, -32),
+	ZIndex = 20,
+}, sheet)
+local feedbackKind = "Bug"
+
+local function zify(root: Instance)
+	for _, d in root:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 21
+		end
+	end
+end
+
+local function showForm()
+	clear(sheetBody)
+	local title = heading(sheetBody, "🐞  SEND FEEDBACK")
+	title.TextSize = 16
+	local note = text(
+		sheetBody,
+		"Tell the developer what broke or what you'd love to see. Your report includes the build ("
+			.. (Config.Playtest and Config.Playtest.Build or "dev")
+			.. ") and where you were.",
+		13,
+		P.Dim
+	)
+	note.Position = UDim2.fromOffset(0, 26)
+	local kinds = new(
+		"Frame",
+		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 32) },
+		sheetBody
+	)
+	UiKit.list(kinds, 8, true)
+	for _, kind in { "Bug", "Idea" } do
+		local on = kind == feedbackKind
+		local b = chip(
+			kinds,
+			if kind == "Bug" then "🐞 Bug" else "💡 Idea",
+			if on then P.Gold else P.Edge,
+			function()
+				feedbackKind = kind
+				showForm()
+			end,
+			100
+		)
+		b.BackgroundColor3 = if on then P.Gold:Lerp(P.Frame, 0.4) else P.Frame
+	end
+	local input = new("TextBox", {
+		BackgroundColor3 = P.Inset,
+		Position = UDim2.fromOffset(0, 108),
+		Size = UDim2.new(1, 0, 1, -170),
+		ClearTextOnFocus = false,
+		MultiLine = true,
+		TextWrapped = true,
+		PlaceholderText = if feedbackKind == "Bug"
+			then "What happened, and what were you doing? (e.g. queued 1v1, my opponent left, I got stuck in the Arena)"
+			else "What would make the game better?",
+		PlaceholderColor3 = P.Dim,
+		Text = "",
+		TextColor3 = P.Text,
+		TextSize = 15,
+		Font = IronUi.Body,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+	}, sheetBody)
+	UiKit.round(input, 8)
+	UiKit.pad(input, 10)
+	local actions = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 40),
+	}, sheetBody)
+	UiKit.list(actions, 8, true)
+	local sendFeedback = chip(actions, "Send", P.Good, function()
+		local message = input.Text
+		task.spawn(function()
+			local result = GemClient.request("SendFeedback", feedbackKind, message)
+			UiKit.toast(result.Message or "", if result.Ok then P.Gold else P.Bad)
+			if result.Ok then
+				sheet.Visible = false
+			end
+		end)
+	end, 110)
+	sendFeedback.Size = UDim2.fromOffset(110, 38)
+	local back = chip(actions, "Close", P.Edge, function()
+		sheet.Visible = false
+	end, 90)
+	back.Size = UDim2.fromOffset(90, 38)
+	local reports = chip(actions, "📋 Reports (owners)", P.Teal, function()
+		SocialUI.reports()
+	end, 170)
+	reports.Size = UDim2.fromOffset(170, 38)
+	zify(sheetBody)
+end
+
+local function ago(time: number): string
+	local seconds = math.max(0, os.time() - (time or 0))
+	if seconds < 3600 then
+		return string.format("%dm ago", seconds // 60)
+	elseif seconds < 86400 then
+		return string.format("%dh ago", seconds // 3600)
+	end
+	return string.format("%dd ago", seconds // 86400)
+end
+
+function SocialUI.reports()
+	task.spawn(function()
+		local result = GemClient.request("ReadReports")
+		if not result.Ok then
+			UiKit.toast(result.Message or "Only owners can read reports.", P.Bad)
+			return
+		end
+		clear(sheetBody)
+		local title = heading(sheetBody, "📋  PLAYTEST REPORTS")
+		title.TextSize = 16
+		local close = chip(sheetBody, "Back", P.Edge, showForm, 80)
+		close.AnchorPoint, close.Position = Vector2.new(1, 0), UDim2.fromScale(1, 0)
+		for column, spec in { { "FEEDBACK", result.Feedback or {} }, { "MOST FREQUENT ERRORS", result.Errors or {} } } do
+			local list = new("ScrollingFrame", {
+				BackgroundColor3 = P.Inset,
+				BorderSizePixel = 0,
+				Position = UDim2.new((column - 1) * 0.5, if column == 1 then 0 else 8, 0, 36),
+				Size = UDim2.new(0.5, -8, 1, -36),
+				CanvasSize = UDim2.new(),
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				ScrollBarThickness = 4,
+			}, sheetBody)
+			UiKit.round(list, 8)
+			UiKit.pad(list, 10)
+			UiKit.list(list, 8)
+			heading(list, spec[1] .. "  ·  " .. #spec[2]).LayoutOrder = 0
+			for i, entry in spec[2] do
+				local line = if column == 1
+					then string.format(
+						"<b>%s %s</b>  ·  %s  ·  %s  ·  %s\n%s",
+						if entry.Kind == "Bug" then "🐞" else "💡",
+						escape(entry.Name or "?"),
+						escape(entry.Where or ""),
+						escape(entry.Build or ""),
+						ago(entry.Time),
+						escape(entry.Text or "")
+					)
+					else string.format(
+						'<b>×%d  %s</b>  ·  %s  ·  %s\n%s\n<font color="#B1C1D8">%s</font>',
+						entry.Count or 1,
+						escape(entry.Side or ""),
+						escape(entry.Build or ""),
+						ago(entry.Last),
+						escape(entry.Message or ""),
+						escape(string.sub(entry.Trace or "", 1, 200))
+					)
+				local label = text(list, line, 12, P.Text)
+				label.RichText, label.LayoutOrder = true, i
+			end
+			if #spec[2] == 0 then
+				text(list, "Nothing yet.", 12, P.Dim).LayoutOrder = 1
+			end
+		end
+		zify(sheetBody)
+		sheet.Visible = true
+	end)
+end
+
+function SocialUI.feedback()
+	if not gui.Enabled then
+		SocialUI.open()
+	end
+	showForm()
+	sheet.Visible = true
+end
+
+-- Client script errors go to the server's report log (a few a minute at most).
+do
+	local sent = {}
+	ScriptContext.Error:Connect(function(message, trace)
+		local now = os.clock()
+		while sent[1] and now - sent[1] > 60 do
+			table.remove(sent, 1)
+		end
+		if #sent < 5 then
+			table.insert(sent, now)
+			local folder = ReplicatedStorage:FindFirstChild("Remotes")
+			local report = folder and folder:FindFirstChild("Report")
+			if report then
+				report:FireServer("Error", string.sub(tostring(message), 1, 300), string.sub(tostring(trace), 1, 600))
+			end
+		end
+	end)
+end
 
 -- Popups and the searching banner -----------------------------------------------------
 

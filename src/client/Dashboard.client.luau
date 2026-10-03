@@ -340,6 +340,15 @@ end)
 local function countOnline()
 	onlineValue.Text = tostring(#Players:GetPlayers())
 end
+-- The build, so playtest reports name it (Config.Playtest.Build).
+if Config.Playtest and Config.Playtest.Build then
+	local buildTag =
+		text(gui, Config.Playtest.Build .. "   ·   Feedback & invites in Social [P]", 11, P.Dim, IronUi.Bold)
+	buildTag.AutomaticSize = Enum.AutomaticSize.None
+	buildTag.AnchorPoint, buildTag.Position = Vector2.new(0, 1), UDim2.new(0, 12, 1, -6)
+	buildTag.Size = UDim2.fromOffset(520, 14)
+	buildTag.TextTransparency = 0.25
+end
 countOnline()
 Players.PlayerAdded:Connect(countOnline)
 Players.PlayerRemoving:Connect(function()

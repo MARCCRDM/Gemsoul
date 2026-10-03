@@ -32,6 +32,20 @@ local Config = {
 	DataStoreName = "GemSoul_PlayerData_v1",
 	AutosaveSeconds = 120,
 
+	-- Playtesting with friends on a published server.
+	Playtest = {
+		-- Shown on the dashboard and stamped on every report, so feedback
+		-- names the build it came from. Change it whenever you publish.
+		Build = "Playtest 1 · 2026-10-03",
+		-- UserIds who can read feedback and error reports in game (Social >
+		-- Feedback > Reports). In Studio everyone can.
+		Owners = {},
+		-- UserIds who get the test-admin tools (e.g. regenerating gear).
+		Testers = {},
+		-- Everyone gets the test-admin tools while testing. Turn off for launch.
+		OpenAdmin = true,
+	},
+
 	-- VIP: set this to your game pass id once you create one.
 	VipGamePassId = 0,
 	-- Treat everyone as VIP while testing in Studio so you can walk through the gate.

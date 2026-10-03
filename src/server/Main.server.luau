@@ -55,6 +55,8 @@ Enchanting.start()
 Forge.start()
 Trading.start()
 Party.start()
+-- Playtest feedback and error reports (Social > Feedback).
+require(script.Parent.Systems.Feedback).start()
 StoreServer.start()
 TopPlayers.start()
 Equipment.start()

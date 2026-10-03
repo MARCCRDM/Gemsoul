@@ -16,6 +16,30 @@ A Roblox game (the repo and some code names still say Gemsoul: gems are Saga Sto
 3. Open a Baseplate in Studio → Plugins → Rojo → **Connect**.
 4. Press **Play**. Everything is played from the menu: press **M** (or click MINE) to dig.
 
+## Playtesting with friends (a live server)
+
+1. **Publish:** sync with Rojo, then in Studio **File → Publish to Roblox**.
+2. **Settings, in Studio (Game Settings):**
+   - **Security:** turn on *Enable Studio Access to API Services* so saving works in Studio.
+   - **Places:** set *Max Players* to the group size you want in one server, e.g. 8 to 12. Duels only match players in the same server.
+3. **Who can play:** open the [Creator Dashboard](https://create.roblox.com/dashboard/creations), choose the experience, then **Access/Permissions**. Keep it **Private** and add your testers as **Collaborators**. (Public works too, but then anyone can join.)
+4. **Config:** in `src/shared/Config.luau`, under `Playtest`:
+   - `Build`: give it a new name every time you publish, so reports say which version they came from.
+   - `Owners`: put your own UserId here. Owners can read everyone's reports in game.
+   - `OpenAdmin`: gives every tester the test-admin tools. Turn it off before launch.
+5. **In game:**
+   - **Invite friends** (Social, **P**) opens Roblox's invite prompt, and invited friends land in your server.
+   - **Feedback** sends a bug report or idea, stamped with the build and where the player was.
+   - Server and client script errors are collected automatically and grouped by message.
+   - Owners open **Feedback → Reports** to read everything.
+
+Saves are session-locked (`SessionLock.luau`): only one server can own a player's save at a time. Hopping between servers can't roll progress back or duplicate traded items. A player who rejoins while their old server is still saving waits a few seconds. A lock left by a crashed server expires after 5 minutes.
+
+Before launch:
+- Set `Playtest.OpenAdmin = false`.
+- Set `VipGamePassId` to your real game pass.
+- Consider making the experience public.
+
 ## Menu-first play (right now)
 
 Two switches in `src/shared/Config.luau` set how the game plays today:

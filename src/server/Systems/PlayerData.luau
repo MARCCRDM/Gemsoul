@@ -25,6 +25,10 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Remotes = require(script.Parent.Remotes)
+local SessionLock = require(script.Parent.SessionLock)
+
+-- This server, for session locks (Studio play sessions have no JobId).
+local JOB_ID = if game.JobId ~= "" then game.JobId else "studio-" .. HttpService:GenerateGUID(false)
 
 type Gem = GemConfig.Gem
 type Character = {
@@ -61,6 +65,7 @@ type Profile = {
 	Crates: { [string]: number }, -- unopened crates
 	Boosts: { XPUntil: number }, -- os.time() when 2x XP ends
 	Duel: { Rating: number, Wins: number, Losses: number, Streak: number }?, -- arena duels (see Duels)
+	Session: { JobId: string, Time: number }?, -- which server owns this save (see SessionLock)
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle
 	WelcomeBought: boolean,
 }
@@ -255,7 +260,9 @@ local function sync(player: Player)
 end
 
 -- Saves with UpdateAsync, retrying a couple of times if Roblox is busy.
-local function save(player: Player)
+-- Only while this server holds the session lock (SessionLock); `release`
+-- (leaving, shutting down) clears the lock so the next server can load.
+local function save(player: Player, release: boolean?)
 	local profile = profiles[player]
 	if not profile or not canSave[player] or not store or saving[player] then
 		return false
@@ -263,9 +270,27 @@ local function save(player: Player)
 	saving[player] = true
 	local applied = table.clone(profile.AppliedEquipmentTrades or {})
 	for attempt = 1, 3 do
-		local ok, err = pcall(store.UpdateAsync, store, "player_" .. player.UserId, function()
+		local stolen = false
+		local ok, err = pcall(store.UpdateAsync, store, "player_" .. player.UserId, function(saved)
+			if not SessionLock.mayWrite(saved, JOB_ID) then
+				stolen = true
+				return nil -- another server owns this save now: never overwrite it
+			end
+			if release then
+				SessionLock.release(profile)
+			else
+				SessionLock.stamp(profile, JOB_ID, os.time())
+			end
 			return profile
 		end)
+		if ok and stolen then
+			canSave[player] = false
+			saving[player] = nil
+			warn(
+				("[PlayerData] %s's save is owned by another server; this server stops saving it."):format(player.Name)
+			)
+			return false
+		end
 		if ok then
 			TradeJournal.checkpoint(player.UserId, applied)
 			saving[player] = nil
@@ -299,20 +324,43 @@ local function claimDaily(player: Player, profile: Profile)
 end
 
 local function load(player: Player)
-	local profile, loaded = nil, false
+	local profile, loaded, locked = nil, false, false
 	if store then
-		for attempt = 1, 3 do
-			local ok, result = pcall(store.GetAsync, store, "player_" .. player.UserId)
-			if ok then
-				profile = if result then migrate(result) else newProfile()
+		-- Claim the save (SessionLock). If another server still has it (the
+		-- player just hopped servers and it's saving), wait for it to let go.
+		for attempt = 1, 8 do
+			local record = nil
+			locked = false
+			local ok, result = pcall(store.UpdateAsync, store, "player_" .. player.UserId, function(saved)
+				local allowed = SessionLock.claim(saved, JOB_ID, os.time())
+				if not allowed then
+					locked = true
+					return nil
+				end
+				record = saved
+				return saved -- (nil for a new player: nothing to write yet)
+			end)
+			if ok and not locked then
+				profile = if record then migrate(record) else newProfile()
+				SessionLock.stamp(profile, JOB_ID, os.time())
 				loaded = true
 				break
 			end
-			warn(("[PlayerData] Load attempt %d failed for %s: %s"):format(attempt, player.Name, tostring(result)))
-			task.wait(attempt)
+			if not ok then
+				warn(("[PlayerData] Load attempt %d failed for %s: %s"):format(attempt, player.Name, tostring(result)))
+			end
+			if not player.Parent then
+				return
+			end
+			task.wait(if locked then 4 else attempt)
 		end
 	end
 	if not player.Parent then
+		return
+	end
+	if locked then
+		-- Still open elsewhere: loading a copy here could roll it back.
+		player:Kick("Your save is still open in another server. Please rejoin in a minute.")
 		return
 	end
 	profiles[player] = profile or newProfile()
@@ -374,7 +422,12 @@ function PlayerData.start()
 		task.spawn(load, player)
 	end
 	Players.PlayerRemoving:Connect(function(player)
-		save(player)
+		-- Let an autosave in flight finish, then save and release the lock.
+		local deadline = os.clock() + 15
+		while saving[player] and os.clock() < deadline do
+			task.wait(0.2)
+		end
+		save(player, true)
 		profiles[player] = nil
 		canSave[player] = nil
 		tradeLocks[player] = nil
@@ -385,7 +438,11 @@ function PlayerData.start()
 		for player in profiles do
 			pending += 1
 			task.spawn(function()
-				save(player)
+				local deadline = os.clock() + 10
+				while saving[player] and os.clock() < deadline do
+					task.wait(0.2)
+				end
+				save(player, true)
 				pending -= 1
 			end)
 		end
