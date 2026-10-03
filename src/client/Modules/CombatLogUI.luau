@@ -102,6 +102,13 @@ function CombatLogUI.format(entry): string
 			return string.format("You %s %s's %s", paint("dodged", HEAL, true), who, ability or "attack")
 		end
 		return string.format("%s %s your %s", who, paint("dodged", HURT, true), ability or "attack")
+	elseif entry.Kind == "Combo" then
+		-- An element combo (Shatter, Combustion, Superconduct).
+		local combo = paint(string.upper(entry.Combo or "Combo") .. "!", GOLD, true)
+		if entry.Dir == "In" then
+			return string.format("%s %s on you", combo, if entry.Who then "by " .. who else "")
+		end
+		return string.format("%s on %s", combo, who)
 	elseif entry.Kind == "Miss" then
 		-- A blinded fighter's blow goes wide (Solar Flare).
 		if entry.Dir == "In" then

@@ -22,6 +22,9 @@ Tech.Order = {
 		"ArmorPiercer",
 		"SeismicBreaker",
 		"TremorSlam",
+		"PneumaticJab",
+		"ThrusterLeap",
+		"RiposteStance",
 	},
 	-- Gem Surges come from gems, not the tree: Tech.Surges[element][tier].
 	GemSurges = {
@@ -71,7 +74,13 @@ Tech.DefaultManeuvers = { "HydraulicSlam", "KineticRam", "StimDodge" }
   Ward      after the cast, a barrier { Kind = "Burn" | "Stun", Shield,
             Duration, Power (burn per second, x weapon damage) or Stun
             (seconds) } that punishes anyone who hits you, once a second
-  Leech     you heal this share of the damage it deals ]]
+  Leech     you heal this share of the damage it deals
+  Interrupt cancels a surge the target is casting or pouring and locks
+            its surges for this many seconds (Pneumatic Jab)
+  Leap      leaps up to this many studs at the aimed spot; the blow lands
+            on touchdown (Thruster Leap)
+  Riposte   braced this many seconds: the next blow is turned aside and
+            answered for CounterDamage x weapon damage (Riposte Stance) ]]
 Tech.Catalog = {
 	HydraulicSlam = {
 		Name = "Hydraulic Slam",
@@ -146,6 +155,43 @@ Tech.Catalog = {
 		Range = 7,
 		Icon = "🗡",
 		Description = "Directed energy pulse: 140% damage that bypasses guard and shreds 25% armor for 4s.",
+	},
+	-- Counters: answer a cast, close the gap, turn a blow aside.
+	PneumaticJab = {
+		Name = "Pneumatic Jab",
+		Resource = "Stamina",
+		Cost = 15,
+		Damage = 0.6,
+		Interrupt = 2, -- cancels a surge being cast or poured; surges locked this long
+		Range = 7,
+		Cooldown = 10,
+		Recovery = 0.4,
+		Icon = "👊",
+		Description = "A lightning jab: 60% damage, and it cancels a surge being cast and locks the caster's surges for 2s.",
+	},
+	ThrusterLeap = {
+		Name = "Thruster Leap",
+		Resource = "Stamina",
+		Cost = 25,
+		Damage = 1.1,
+		Leap = 18, -- studs, at the aimed spot
+		Windup = 0.4, -- in the air
+		Range = 7,
+		Cooldown = 12,
+		Recovery = 0.8,
+		Icon = "🚀",
+		Description = "A thruster leap of up to 18 studs at your target, slamming down for 110% damage.",
+	},
+	RiposteStance = {
+		Name = "Riposte Stance",
+		Resource = "Stamina",
+		Cost = 20,
+		Riposte = 1, -- seconds braced
+		CounterDamage = 1.2,
+		Cooldown = 14,
+		Recovery = 0.5,
+		Icon = "🤺",
+		Description = "Brace for 1s: the next blow is turned aside, its attacker staggered for 1s and struck back for 120%.",
 	},
 	ThermalBurst = {
 		Name = "Thermal Burst",

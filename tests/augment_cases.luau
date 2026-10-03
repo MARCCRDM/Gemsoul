@@ -42,7 +42,7 @@ local complete = { Augments = { XP = (Tree.UnlockPoints - Tree.StartingPoints) *
 Tree.initialize(complete)
 local total, seen = 0, {}
 for _, branch in Tree.Branches do
-	check(#Tree.Order[branch] == ({ RigManeuvers = 8, SurgeAmplifiers = 5, PassiveAugments = 10 })[branch], "Branch node count")
+	check(#Tree.Order[branch] == ({ RigManeuvers = 11, SurgeAmplifiers = 5, PassiveAugments = 10 })[branch], "Branch node count")
 	for _, id in Tree.Order[branch] do
 		local n = Tree.Nodes[id]
 		local columns = if Tree.Columns[branch] then #Tree.Columns[branch] else 4
@@ -161,4 +161,4 @@ Progress.addXP(trainee, "Mine", 10)
 check(profiles[trainee].Augments.XP == 300 and profiles[trainee].Augments.Points == 5 and synced == 2, "Second earned point duplicated or missing")
 Progress.addXP(trainee, "Unknown")
 check(profiles[trainee].Augments.XP == 300 and synced == 2, "Unknown XP reason awarded points")
-print("PASS: " .. count .. " Augment Tree checks (18-node graph, migration, points, prerequisites, refunds, authority and live passive effects)")
+print("PASS: " .. count .. " Augment Tree checks (21-node graph, migration, points, prerequisites, refunds, authority and live passive effects)")

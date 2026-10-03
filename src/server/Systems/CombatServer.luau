@@ -11,6 +11,7 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
+local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local Enemies = require(script.Parent.Enemies)
 local DamageLog = require(script.Parent.DamageLog)
@@ -142,6 +143,9 @@ local function state(player)
 			SurgeWardNext = 0,
 			Blind = 0,
 			BlindUntil = 0,
+			RiposteUntil = 0, -- Riposte Stance: braced to turn the next blow aside
+			RiposteDamage = 0,
+			SilenceUntil = 0, -- surges locked by an interrupt
 			NextBlockGem = 0,
 			NextStagger = 0,
 			AfterDodgeUntil = 0,
@@ -320,6 +324,7 @@ local function triggerBlockGem(player, k, st, now)
 end
 local receive
 local wardHitsBack -- (set below, with the surge code)
+local applyCC -- (set below)
 local function rawDamage(target, amount, source, crit, color)
 	if target.Player then
 		target.Humanoid:TakeDamage(amount)
@@ -351,6 +356,26 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		DamageLog.send(player, { Dir = "In", Kind = "Dodge", Who = attackerName })
 		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = DamageLog.nameOf(player) })
 		return 0
+	end
+	if origin and not reflected and now < st.RiposteUntil then
+		-- Riposte Stance: the blow is turned aside, its attacker staggered
+		-- and struck back.
+		st.RiposteUntil = 0
+		local previous = DamageLog.push("Riposte")
+		if source then
+			applyCC({ Player = source }, 1, "Stunned")
+			receive(source, st.RiposteDamage, nil, player, root.Position, false, false, true)
+			DamageLog.send(source, { Dir = "Out", Kind = "Parried", Who = DamageLog.nameOf(player) })
+		elseif enemySource then
+			Enemies.addStatus(enemySource, "Stun", 1, 1)
+			enemySource.StunKind = "Stunned"
+			Enemies.damage(enemySource, st.RiposteDamage, player, false, Color3.fromRGB(255, 196, 90))
+		end
+		DamageLog.pop(previous)
+		fx("BlockSpark", root.Position, false)
+		Remotes.CombatFx:FireClient(player, "HighBlock")
+		Remotes.CombatFx:FireClient(player, "TechStatus", "Riposte!")
+		return 0, true
 	end
 	local resistance = k.Defense.Resistance
 	local defense = rating(k, "Defense") * (if now < st.SunderUntil then 1 - st.Sunder else 1)
@@ -524,7 +549,7 @@ end
 local enemyCC = setmetatable({}, { __mode = "k" })
 local publishStatuses
 -- `kind` names it on the status bar: Frozen (Cryo), Shocked (Ion) or Stunned.
-local function applyCC(target, seconds, kind)
+function applyCC(target, seconds, kind)
 	local tracker
 	if target.Player then
 		tracker = state(target.Player).CC
@@ -690,6 +715,71 @@ function wardHitsBack(kind, power, stun, attacker, owner)
 		4
 	)
 end
+-- What a target is suffering, for element combos (Shared.ElementCombos).
+local function comboFlags(target, now)
+	if target.Player then
+		local v = state(target.Player)
+		return {
+			Frozen = v.StunKind == "Frozen" and now < v.StunUntil,
+			Shredded = now < v.SunderUntil and v.Sunder > 0,
+			Slowed = now < v.SlowUntil and v.Slow > 0,
+		}
+	end
+	local e = target.Enemy :: any
+	return {
+		Frozen = e.StunKind == "Frozen" and now < (e.StunUntil or 0),
+		Shredded = now < (e.SunderUntil or 0) and (e.Sunder or 0) > 0,
+		Slowed = now < (e.SlowUntil or 0) and (e.Slow or 0) > 0,
+	}
+end
+-- A combo went off: the freeze breaks or a stun lands; both sides hear it.
+local function comboLanded(source, target, combo)
+	if combo.EndFreeze then
+		if target.Player then
+			state(target.Player).StunUntil = os.clock()
+		else
+			target.Enemy.StunUntil = os.clock()
+		end
+	end
+	if combo.Stun then
+		applyCC(target, combo.Stun, "Shocked")
+	end
+	fx("TechPulse", nil, target.Root.Position, target.Root.Position, combo.Color, 5)
+	if source then
+		Remotes.CombatFx:FireClient(source, "Combo", combo.Name)
+		DamageLog.send(
+			source,
+			{ Dir = "Out", Kind = "Combo", Combo = combo.Name, Who = DamageLog.nameOf(target.Player or target.Enemy) }
+		)
+	end
+	if target.Player then
+		Remotes.CombatFx:FireClient(target.Player, "Combo", combo.Name)
+		DamageLog.send(
+			target.Player,
+			{ Dir = "In", Kind = "Combo", Combo = combo.Name, Who = DamageLog.nameOf(source) }
+		)
+	end
+end
+-- `player` struck a rival braced in Riposte Stance: the blow is turned
+-- aside and answered. True if it was.
+local function enemyRiposte(player, enemy)
+	local e, now = enemy :: any, os.clock()
+	if not e.RiposteUntil or now >= e.RiposteUntil then
+		return false
+	end
+	e.RiposteUntil = 0
+	local _, root = alive(player)
+	applyCC({ Player = player }, 1, "Stunned")
+	if root then
+		local previous = DamageLog.push("Riposte")
+		receive(player, e.RiposteDamage or 0, nil, nil, enemy.Root.Position, false, false, true, enemy)
+		DamageLog.pop(previous)
+	end
+	DamageLog.send(player, { Dir = "In", Kind = "Parried", Who = DamageLog.nameOf(enemy) })
+	Remotes.CombatFx:FireClient(player, "Parried", 1)
+	fx("BlockSpark", enemy.Root.Position, false)
+	return true
+end
 -- `player` hit a rival that wears a Ward.
 local function enemyWard(player, enemy)
 	local now = os.clock()
@@ -747,6 +837,13 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		damage *= k.Effects.ThermalMult
 		echoDamage = damage
 	end
+	if target.Enemy and enemyRiposte(source, target.Enemy) then
+		return false, true
+	end
+	local _, combo = ElementCombos.check({ Element = element, Heavy = heavy == true }, comboFlags(target, os.clock()))
+	if combo then
+		damage *= combo.Mult or 1
+	end
 	if target.Player then
 		damage, guarded =
 			receive(target.Player, damage, element, source, root.Position, projectile, heavy, false, nil, crit)
@@ -769,6 +866,9 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 			Enemies.addStatus(target.Enemy, "Slow", k.Effects.SlowOnHit, 2)
 		end
 		enemyWard(source, target.Enemy)
+	end
+	if combo and damage > 0 then
+		comboLanded(source, target, combo)
 	end
 	if damage <= 0 or target.Humanoid.Health <= 0 then
 		return damage > 0 and not guarded, guarded
@@ -1063,6 +1163,16 @@ function technologyHitInner(player, k, target, definition, scale)
 		damage *= Combat.CritMult
 	end
 	local color = GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80)
+	if target.Enemy and enemyRiposte(player, target.Enemy) then
+		return
+	end
+	local _, combo = ElementCombos.check(
+		{ Element = definition.Element, Heavy = definition.Heavy == true },
+		comboFlags(target, os.clock())
+	)
+	if combo then
+		damage *= combo.Mult or 1
+	end
 	if target.Player then
 		damage = receive(
 			target.Player,
@@ -1083,6 +1193,17 @@ function technologyHitInner(player, k, target, definition, scale)
 	end
 	if damage <= 0 then
 		return
+	end
+	if combo then
+		comboLanded(player, target, combo)
+	end
+	-- Pneumatic Jab: cancel a cast in progress and lock the caster's surges.
+	if definition.Interrupt then
+		if target.Player then
+			CombatServer.interrupt(target.Player, definition.Interrupt)
+		elseif Enemies.interrupt then
+			Enemies.interrupt(target.Enemy, definition.Interrupt)
+		end
 	end
 	-- Leech (Toxic Cloud): drink part of what it deals.
 	if definition.Leech then
@@ -1163,7 +1284,7 @@ local function technologyStrike(player, definition, aim, scale)
 		or not Combat.canFight(root.Position)
 		or os.clock() < st.StunUntil
 		or blocking(st, os.clock())
-		or st.DodgeMove
+		or (st.DodgeMove and os.clock() < st.DodgeMove.Ends) -- (a leap lands as it ends)
 	then
 		return
 	end
@@ -1371,6 +1492,10 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			Remotes.CombatFx:FireClient(player, "TechStatus", "Socket a gem in surge slot " .. surgeKey)
 			return false
 		end
+		if now < st.SilenceUntil then
+			Remotes.CombatFx:FireClient(player, "TechStatus", "Interrupted: surges locked")
+			return false
+		end
 		definition = Tech.surgeStats(gem, if inArena(player) then nil else Tree.effects(profile))
 		cooldownKey = "Surge" .. surgeKey
 	else
@@ -1415,6 +1540,42 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		local previous = DamageLog.push(definition.Name)
 		CombatServer.heal(player, humanoid.MaxHealth * definition.Heal)
 		DamageLog.pop(previous)
+	elseif definition.Leap then
+		-- Thruster Leap: airborne toward the aimed spot; the blow lands on
+		-- touchdown (its wind-up), wherever that is.
+		local offset = flat(aim - root.Position)
+		local reach = (aim - root.Position) * Vector3.new(1, 0, 1)
+		local direction = if reach.Magnitude > 0.1 then offset else flat(root.CFrame.LookVector)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { player.Character }
+		params.RespectCanCollide = true
+		local distance = math.clamp(reach.Magnitude - 3, 2, definition.Leap)
+		local collision = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * distance, params)
+		local travel = if collision then math.max(0, collision.Distance - 0.2) else distance
+		local airborne = math.max(0.15, (definition.Windup or 0.4) - 0.05)
+		st.DodgeMove = {
+			Kind = "Leap",
+			Root = root,
+			Direction = direction,
+			Speed = travel / airborne,
+			Ends = now + airborne,
+			Lift = 14,
+		}
+		pcall(function()
+			root:SetNetworkOwner(nil)
+		end)
+		fx("DodgeRoll", player, root.Position, direction, travel, false)
+		spendStamina(player, st, cost)
+	elseif definition.Riposte then
+		-- Riposte Stance: braced; the next blow is turned aside (receive).
+		st.RiposteUntil = now + definition.Riposte
+		st.RiposteDamage = k.Weapon.Attack.Damage
+			* Combat.powerMult(rating(k, "Power"))
+			* (definition.CounterDamage or 1)
+			* k.Effects.WeaponAugmentMult
+		fx("BlockRaise", player)
+		spendStamina(player, st, cost)
 	elseif definition.Resource == "Stamina" then
 		spendStamina(player, st, cost)
 	else
@@ -1427,7 +1588,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	st.NextAttack = math.max(st.NextAttack, st.NextTech)
 	st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
 	player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
-	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, cooldown)
+	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, cooldown, recovery)
 	Remotes.CombatFx:FireClient(player, "TechStatus", definition.Name)
 	-- Every cast takes the same time it takes anyone (Actions.castTime):
 	-- the effect lands when the cast completes, the cast bar fills, the
@@ -1577,6 +1738,36 @@ function CombatServer.rivalHitEffects(player, effects)
 		st.SlowUntil = st.CC.Debuffs.Slow.Until
 	end
 end
+-- An interrupt (Pneumatic Jab) on `player`: a surge being cast or poured is
+-- cancelled and their surges lock for `seconds`. True if one was cancelled.
+function CombatServer.interrupt(player, seconds)
+	local st, now = state(player), os.clock()
+	local casting = st.Channel ~= nil
+	for _, pending in st.Pending do
+		if pending.Definition and pending.Definition.Resource == "Charge" then
+			casting = true
+		end
+	end
+	if not casting then
+		return false
+	end
+	st.Channel, st.Pending = nil, {}
+	st.SilenceUntil = now + seconds
+	posePlayer(player, nil, 0)
+	Remotes.CombatFx:FireClient(player, "Interrupted", seconds)
+	return true
+end
+-- An element combo landing on `player` from a rival (Shared.ElementCombos).
+function CombatServer.comboOnPlayer(player, combo, enemy)
+	local _, root = alive(player)
+	if root then
+		comboLanded(nil, { Player = player, Root = root }, combo)
+	end
+end
+-- What `player` is suffering, for a rival's combos.
+function CombatServer.comboFlags(player)
+	return comboFlags({ Player = player }, os.clock())
+end
 -- A rival's surge riders landing on `player`, as a player's land: Blind
 -- (Solar Flare) and Slow (Armor Melt, Cryo Stream).
 function CombatServer.afflict(player, riders)
@@ -1639,6 +1830,8 @@ local function playerStatuses(st, now)
 	add(if st.SurgeWardKind == "Burn" then "BurningWard" else "StaticShell", st.SurgeWardUntil)
 	add(st.StunKind or "Stunned", st.StunUntil)
 	add("Blinded", st.BlindUntil, st.Blind * 100)
+	add("RiposteStance", st.RiposteUntil)
+	add("Silenced", st.SilenceUntil)
 	add("GuardBroken", st.BlockBrokenUntil)
 	for _, dot in st.Dots do
 		add("Burning", dot.Ends)

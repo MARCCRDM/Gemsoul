@@ -684,6 +684,7 @@ local STANCES = {
 	Dodge = { "DODGING", Color3.fromRGB(200, 210, 230) },
 	Surge = { "CASTING ITS SURGE", P.Gold },
 	Maneuver = { "RIG MANEUVER!", Tech.Resources.Stamina.Color },
+	Riposte = { "RIPOSTE STANCE  ·  DON'T SWING", P.Gold },
 }
 local SLOT_SHORT =
 	{ Helmet = "HEAD", Armor = "CHEST", Gloves = "HANDS", Boots = "FEET", Weapon = "WEAPON", Shield = "SHIELD" }
@@ -1684,9 +1685,11 @@ end
 function handlers.TechStatus(message)
 	hint.Text, feedbackUntil = message, os.clock() + 1
 end
-function handlers.TechCooldown(id, duration)
+-- `duration`: this ability's own cooldown; `lockout`: the short pause
+-- before anything else (its Recovery).
+function handlers.TechCooldown(id, duration, lockout)
 	techCooldowns[id] = { Ready = os.clock() + duration, Total = duration }
-	nextAttack = math.max(nextAttack, os.clock() + duration)
+	nextAttack = math.max(nextAttack, os.clock() + (lockout or duration))
 	local definition = Tech.Catalog[id]
 	if definition and definition.Resource == "Stamina" then
 		FirstPerson.swing("Right")
@@ -1755,6 +1758,24 @@ function handlers.TechField(who, color)
 		)
 		panel.Transparency = 0.4
 		fade(panel, 0.5)
+	end
+end
+function handlers.Interrupted(seconds)
+	-- Your cast was jabbed: it's gone and your surges are locked a moment.
+	cast = nil
+	CombatSound.play("GuardBreak", nil, { Volume = 0.6 })
+	CombatVfx.screen("Stun", 0.3)
+	hint.Text, feedbackUntil = string.format("INTERRUPTED  ·  SURGES LOCKED %ds", seconds), os.clock() + 1.4
+end
+function handlers.Combo(name)
+	local combo = require(ReplicatedStorage.Shared.ElementCombos).List[name]
+	if combo then
+		hint.Text, feedbackUntil = combo.Text, os.clock() + 1
+		hint.TextColor3 = combo.Color
+		task.delay(1, function()
+			hint.TextColor3 = P.Text
+		end)
+		CombatFx.shake(0.03, 0.2)
 	end
 end
 function handlers.HighBlock()

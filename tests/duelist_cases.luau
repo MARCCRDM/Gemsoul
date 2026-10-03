@@ -75,6 +75,17 @@ check(DuelistBrain.pickMove(moves, "Lunge", 10, 12, 0.9) == ram, "Rival lunged w
 check(DuelistBrain.pickMove(moves, "Light", 10, 4, 0.1) == slam, "Quick swing swapped for a slow wind-up")
 check(DuelistBrain.pickMove(moves, "Heavy", 10, 4, 0.1) == hammer, "Heavy never used its strongest maneuver")
 check(DuelistBrain.pickMove(moves, "Light", 10, 4, 0.9) == nil, "Rival used a maneuver on every swing")
+-- The counters: a jab for a cast in reach, a leap to close in, a brace instead of a guard.
+local jab = { Id = "PneumaticJab", Power = 0.6, Next = 0 }
+local leap = { Id = "ThrusterLeap", Power = 1.1, Windup = 0.4, Next = 0 }
+local riposte = { Id = "RiposteStance", Power = 0, Next = 0 }
+local counters = { jab, leap, riposte, ram }
+check(DuelistBrain.pickMove(counters, "Interrupt", 10, 4, 0.5) == jab, "Rival didn't jab a cast in reach")
+check(DuelistBrain.pickMove(counters, "Interrupt", 10, 20, 0.5) == nil, "Rival jabbed a cast out of reach")
+check(DuelistBrain.pickMove(counters, "Lunge", 10, 14, 0.9) == leap, "Rival closed in without its Thruster Leap")
+check(DuelistBrain.pickMove(counters, "Guard", 10, 4, 0.1) == riposte, "Rival never braced in Riposte Stance")
+check(DuelistBrain.pickMove(counters, "Guard", 10, 4, 0.9) == nil, "Rival braced instead of every guard")
+check(DuelistBrain.pickMove(counters, "Light", 10, 4, 0.1) ~= jab and DuelistBrain.pickMove(counters, "Light", 10, 4, 0.1) ~= riposte, "Rival wasted a counter on a plain swing")
 slam.Next, hammer.Next, ram.Next = 20, 20, 20
 check(DuelistBrain.pickMove(moves, "Light", 10, 4, 0.1) == nil, "Maneuver used on cooldown")
 -- Its blows meet the player's guard like any monster's: quick ones are

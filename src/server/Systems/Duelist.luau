@@ -25,6 +25,7 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
 local Brain = require(ReplicatedStorage.Shared.DuelistBrain)
+local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Matchup = require(ReplicatedStorage.Shared.Matchup)
@@ -356,9 +357,18 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	if crit then
 		amount *= Combat.CritMult
 	end
+	-- Element combos on you, as yours land on it (Shared.ElementCombos).
+	local _, combo =
+		ElementCombos.check({ Element = element, Heavy = heavy == true }, CombatServer.comboFlags(duel.Owner))
+	if combo then
+		amount *= combo.Mult or 1
+	end
 	local previous = DamageLog.push(ability, element)
 	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy, crit)
 	DamageLog.pop(previous)
+	if combo and type(dealt) == "number" and dealt > 0 then
+		CombatServer.comboOnPlayer(duel.Owner, combo, duel.Enemy)
+	end
 	if type(dealt) == "number" and dealt > 0 and not guarded and gem then
 		CombatServer.enemyProc(duel.Owner, gem, duel.Enemy)
 	end
@@ -493,12 +503,28 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 		setStance(duel, "Dodge")
 		return
 	end
+	if move.Riposte then
+		-- Riposte Stance: braced; your next blow is turned aside (CombatServer).
+		local e = enemy :: any
+		e.RiposteUntil = now + move.Riposte
+		e.RiposteDamage = duel.Damage * (move.CounterDamage or 1)
+		model:SetAttribute("GuardUntil", workspace:GetServerTimeNow() + move.Riposte)
+		setStance(duel, "Riposte")
+		return
+	end
+	if move.Leap then
+		-- Thruster Leap: airborne at you, landing on its wind-up.
+		root.AssemblyLinearVelocity = dir
+				* math.min(move.Leap / (move.Windup or 0.4), math.max(10, distance - 3) / (move.Windup or 0.4))
+			+ Vector3.new(0, 18, 0)
+		fx("DodgeRoll", nil, root.Position, dir, math.min(move.Leap, math.max(2, distance - 3)), false)
+	end
 	if move.Id == "KineticRam" then
 		-- Shoulder-charge in and strike on arrival.
 		root.AssemblyLinearVelocity = dir * math.min(80, distance * 5) + Vector3.new(0, 4, 0)
 		fx("DodgeRoll", nil, root.Position, dir, math.min(14, math.max(2, distance - 3)), false)
 	end
-	if move.Windup then
+	if move.Windup and not move.Leap then
 		fx("Nova", root.Position - Vector3.new(0, 2.5, 0), 4.5, Color3.fromRGB(255, 120, 60), move.Windup)
 	end
 	setStance(duel, if move.Windup then "Heavy" else "Maneuver")
@@ -513,8 +539,9 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 		At = now + castTime,
 		Power = move.Power,
 		Crit = move.Crit,
-		Heavy = move.Windup ~= nil,
+		Heavy = move.Heavy,
 		Hits = move.Hits,
+		Interrupt = move.Interrupt,
 	}
 end
 
@@ -830,7 +857,7 @@ local function think(enemy, now: number)
 		elseif action.Kind == "Move" then
 			fx("Swing", nil, root.Position, dir, Brain.Reach + 1, 150, color, action.Heavy)
 			if distance <= Brain.Reach + 2 then
-				strike(
+				local dealt = strike(
 					duel,
 					damage * action.Power,
 					duel.Element,
@@ -839,6 +866,9 @@ local function think(enemy, now: number)
 					action.Name or "Maneuver",
 					action.Crit
 				)
+				if action.Interrupt and type(dealt) == "number" and dealt > 0 then
+					CombatServer.interrupt(owner, action.Interrupt)
+				end
 			end
 			if (action.Hits or 1) > 1 then
 				-- Multi-hit maneuvers (Servo Flurry) strike again quickly.
@@ -1003,6 +1033,15 @@ local function think(enemy, now: number)
 		duel.NextDefense = now + 0.45 -- considered: a beat before it reacts again
 	end
 	local choice = Brain.decide(view, math.random())
+	-- A cast in reach: jab it (most of the time), as a player would.
+	if
+		view.FoeCasting
+		and choice ~= "Stagger"
+		and math.random() < 0.75
+		and Brain.pickMove(duel.Moves, "Interrupt", now, distance, 0)
+	then
+		choice = "Interrupt"
+	end
 	if choice ~= "Stagger" and now >= duel.NextSurge and view.HealthRatio < 0.6 then
 		for _, surge in duel.Surges do
 			if surge.Kind == "Self" and now >= surge.Next then
@@ -1094,7 +1133,9 @@ local function think(enemy, now: number)
 		press(duel, "LMB")
 		face(root, target.Position)
 	elseif choice == "Surge" then
-		local surge = Brain.pickSurge(duel.Surges, now, distance, view)
+		-- An interrupt (your Pneumatic Jab) locks its surges for a moment.
+		local silenced = now < ((enemy :: any).SilenceUntil or 0)
+		local surge = if silenced then nil else Brain.pickSurge(duel.Surges, now, distance, view)
 		-- A held beam bills a quarter-second at a time, as a player's.
 		local cost = if surge and surge.Cast == "Channel" then (surge.Cost or 0) * 0.25 else surge and surge.Cost or 0
 		if surge and duel.Charge < cost then
@@ -1422,6 +1463,11 @@ function spawnRival(owner: Player)
 			Windup = stats.Windup,
 			Heal = stats.Heal or 0,
 			Hits = stats.Hits,
+			Heavy = stats.Heavy == true, -- breaks guard, as a player's
+			Interrupt = stats.Interrupt,
+			Leap = stats.Leap,
+			Riposte = stats.Riposte,
+			CounterDamage = stats.CounterDamage,
 			-- A player's maneuver numbers: its Stamina cost and recovery.
 			Cost = stats.Cost or 0,
 			Crit = stats.Crit,
@@ -1485,6 +1531,39 @@ function spawnRival(owner: Player)
 end
 
 function Duelist.start()
+	-- Your Pneumatic Jab on a rival mid-cast: the cast is cancelled and its
+	-- surges lock for `seconds`. True if there was a cast to cancel.
+	Enemies.interrupt = function(enemy, seconds: number): boolean
+		local duel = (enemy :: any).Duel
+		local action = duel and duel.Action
+		local casting = duel ~= nil
+			and (
+				duel.Channel ~= nil
+				or (
+					action ~= nil
+					and (
+						action.Kind == "Nova"
+						or action.Kind == "Bolt"
+						or action.Kind == "Buff"
+						or action.Kind == "Channel"
+					)
+				)
+			)
+		if not casting then
+			return false
+		end
+		local now = os.clock()
+		duel.Action, duel.Channel = nil, nil;
+		(enemy :: any).SilenceUntil = now + seconds
+		local model = enemy.Model
+		for _, key in { "ActionName", "ActionKind", "ActionElement", "ActionStart", "ActionAt", "ActionHold" } do
+			model:SetAttribute(key, nil)
+		end
+		setStance(duel, "")
+		duel.NextAttack = now + 0.5
+		Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", "Interrupted " .. duel.Name .. "!")
+		return true
+	end
 	-- Its fighting poses, every frame, bent on the server so every client sees them.
 	RunService.Heartbeat:Connect(function(dt)
 		local now = workspace:GetServerTimeNow()

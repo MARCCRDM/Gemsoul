@@ -202,7 +202,12 @@ function Brain.pickMove(moves, choice: string, now: number, distance: number, ro
 	if choice == "Dodge" then
 		return ready("StimDodge") -- a dodge that also heals
 	elseif choice == "Lunge" then
-		return ready("KineticRam") -- a dash that staggers
+		return ready("ThrusterLeap") or ready("KineticRam") -- close the gap
+	elseif choice == "Interrupt" then
+		-- Jab a cast in progress, if in reach.
+		return if distance <= Brain.Reach + 1 then ready("PneumaticJab") else nil
+	elseif choice == "Guard" and roll < 0.3 then
+		return ready("RiposteStance") -- sometimes brace to turn the blow aside
 	elseif
 		(choice == "Light" or choice == "Heavy" or choice == "Punish")
 		and distance <= Brain.Reach
@@ -214,6 +219,8 @@ function Brain.pickMove(moves, choice: string, now: number, distance: number, ro
 			if
 				now >= move.Next
 				and move.Id ~= "StimDodge"
+				and move.Id ~= "RiposteStance"
+				and move.Id ~= "PneumaticJab"
 				and (choice == "Heavy" or not move.Windup)
 				and (not best or move.Power > best.Power)
 			then

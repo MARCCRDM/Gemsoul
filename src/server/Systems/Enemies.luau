@@ -809,6 +809,8 @@ function Enemies.statuses(enemy: Enemy, now: number)
 	add("Exposed", e.AuraUntil or 0, (e.Aura or 0) * 100)
 	add("Weakened", enemy.WeakenUntil, enemy.Weaken * 100)
 	add("Blinded", e.BlindUntil or 0, (e.Blind or 0) * 100)
+	add("Silenced", e.SilenceUntil or 0)
+	add("RiposteStance", e.RiposteUntil or 0)
 	add(if e.WardKind == "Burn" then "BurningWard" else "StaticShell", e.WardUntil or 0)
 	-- A rival's own buffs.
 	local duel = e.Duel

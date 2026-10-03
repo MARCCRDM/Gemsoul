@@ -34,7 +34,7 @@ Tree.BranchNames =
 -- Columns per branch.
 -- Passive Augments has none: each tier's perks sit centred in a row.
 Tree.Columns = {
-	RigManeuvers = { { Name = "Strikes" }, { Name = "Tactics" } },
+	RigManeuvers = { { Name = "Strikes" }, { Name = "Tactics" }, { Name = "Counters" } },
 	SurgeAmplifiers = { { Name = "Power" }, { Name = "Flow" } },
 }
 
@@ -49,6 +49,9 @@ local layout = {
 		{ "ArmorPiercer", 3, 2, "StimDodge" },
 		{ "SeismicBreaker", 4, 1, "BreachHammer" },
 		{ "TremorSlam", 4, 2, "ArmorPiercer" },
+		{ "PneumaticJab", 2, 3, "ServoFlurry" },
+		{ "ThrusterLeap", 3, 3, "PneumaticJab" },
+		{ "RiposteStance", 4, 3, "ThrusterLeap" },
 	},
 	-- Gem Surges come from the gems in the Surge Array (Q, E, R); this branch
 	-- only strengthens whatever surges are equipped.
