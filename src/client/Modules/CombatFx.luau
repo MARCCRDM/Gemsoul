@@ -117,12 +117,15 @@ local KINDS = {
 	},
 }
 
+-- Scales every flash (ArenaNight raises it: in the dark, the fight lights itself).
+CombatFx.LightBoost = 1
+
 function CombatFx.flash(position: Vector3, color: Color3, brightness: number?, range: number?, seconds: number?)
 	local part = anchor(position)
 	local light = Instance.new("PointLight")
 	light.Color = color
-	light.Brightness = brightness or 3
-	light.Range = range or 12
+	light.Brightness = (brightness or 3) * CombatFx.LightBoost
+	light.Range = math.min((range or 12) * CombatFx.LightBoost, 60)
 	light.Shadows = false
 	light.Parent = part
 	TweenService:Create(light, TweenInfo.new(seconds or 0.25, Enum.EasingStyle.Quad), { Brightness = 0 }):Play()
