@@ -202,6 +202,14 @@ local WEAPONS: { [string]: (Instance, Model, BasePart, BasePart, Color3, any) ->
 -- `right` / `left` are grip points in each hand; mounts are relative to them.
 local HELD_FORWARD = CFrame.Angles(math.rad(-110), 0, 0) -- pointing forward and a little down
 local UPRIGHT = CFrame.Angles(math.rad(-12), 0, 0)
+-- A sword gripped in the fist, blade out past the thumb at right angles to
+-- the forearm (tipped 30 degrees down when the arm hangs), for bodies posed
+-- by RivalPose (models with the FistGrip attribute): in its stance the
+-- blade points up and out at its foe, upright behind the shield on guard,
+-- back over the shoulder winding up, and at the foe as a blow lands.
+-- (UPRIGHT lays the blade back along the forearm, which on a bent arm sticks
+-- it out sideways or behind.)
+local FIST_GRIP = CFrame.Angles(math.rad(-120), 0, 0)
 
 -- The Saga Miner's iconic kit: a blaster in the right hand and a riot
 -- shield on the left forearm. The pistol's energy cell and the shield's rim
@@ -1321,7 +1329,9 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		local roll = GearRolls.get(loadout, "Weapon")
 		local rarity = if roll then roll.Rarity else weapon.RarityTier or 1
 		local finish = if roll then GearRolls.appearance(roll).FinishColor else STEEL
-		local mount = UPRIGHT * CFrame.Angles(0, 0, math.rad(-12))
+		local mount = if character:GetAttribute("FistGrip")
+			then FIST_GRIP
+			else UPRIGHT * CFrame.Angles(0, 0, math.rad(-12))
 		FrontierAssets.sword(weaponFolder, right, mount, rarity, accent, finish)
 		gemSocket(weaponFolder, right, mount, Vector3.new(0, 0.39, -0.18), loadout.WeaponGem, 0.17)
 	elseif weapon.Look == "CleanSidearm" and right then

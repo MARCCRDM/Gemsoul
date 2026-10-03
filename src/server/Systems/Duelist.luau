@@ -215,6 +215,8 @@ local function buildRig(loadout, name: string, at: CFrame): Model?
 	-- Stream the whole body at once, so clients can pose its joints.
 	rig.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	rig:PivotTo(at)
+	-- Its arms are posed (RivalPose), so it holds the sword in its fist.
+	rig:SetAttribute("FistGrip", true)
 	Equipment.dressModel(rig, loadout, math.random(1, 1e6))
 	return rig
 end
