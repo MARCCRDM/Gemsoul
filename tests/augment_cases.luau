@@ -82,7 +82,8 @@ check(Tree.weaponMultiplier(effects, { Look = "Hammer", Attack = { Kind = "Melee
 check(Tree.upgrade(complete, "MobilityAugment") and Tree.upgrade(complete, "MobilityAugment") and close(Tree.effects(complete).Mobility, 0.15), "Passive ranks stack their bonus")
 check(Tree.upgrade(complete, "HydraulicSlam") and Tree.upgrade(complete, "HydraulicSlam"), "Starter node ranks")
 local slam = Tree.techStats(complete, "HydraulicSlam")
-check(close(slam.Damage, 1.6 * 1.2) and close(slam.Cost, 30 * 0.84) and close(slam.Cooldown, 6 * 0.9) and close(Tech.Catalog.HydraulicSlam.Damage, 1.6), "Rank III technology scaling or catalog mutated")
+local base = Tech.Catalog.HydraulicSlam
+check(slam ~= base and close(slam.Damage, base.Damage * 1.2) and close(slam.Cost, base.Cost * 0.84) and close(slam.Cooldown, base.Cooldown * 0.9), "Rank III technology scaling or catalog mutated")
 
 -- Real unlock handlers and live combat: purchases are authoritative and build changes are safe.
 local source, hs, rs, loadout = makePlayer(30, Vector3.zero, nil)
