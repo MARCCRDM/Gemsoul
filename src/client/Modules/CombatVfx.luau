@@ -185,6 +185,127 @@ function CombatVfx.impact(position: Vector3, color: Color3, crit: boolean?, heav
 	end
 end
 
+-- Element signature on a hit ---------------------------------------------------------
+
+local ELEMENT_COLORS = {
+	Fire = Color3.fromRGB(255, 110, 40),
+	Frost = Color3.fromRGB(150, 215, 255),
+	Shock = Color3.fromRGB(255, 230, 80),
+	Poison = Color3.fromRGB(110, 230, 80),
+}
+-- What an elemental hit looks like on top of the impact, so each element
+-- reads at a glance: Thermal bursts into flame, Cryo throws ice spikes and
+-- cold mist, Ion crackles with arcs, Corrosive splashes and fumes.
+local lightningRef: ((Vector3, Vector3, Color3) -> ())? = nil
+function CombatVfx.element(position: Vector3, element: string?, big: number?)
+	local color = element and ELEMENT_COLORS[element]
+	if not color then
+		return
+	end
+	local scale = big or 1
+	if element == "Fire" then
+		-- A ball of flame that swells and burns out, embers flying up.
+		local flame =
+			neon(Vector3.one * 0.8 * scale, CFrame.new(position), Color3.fromRGB(255, 200, 90), 0.1, Enum.PartType.Ball)
+		fade(flame, 0.3, { Size = Vector3.one * 3.2 * scale, Color = Color3.fromRGB(255, 70, 20) })
+		CombatFx.burst(position, color, "Embers", 0.9 * scale)
+		CombatFx.flash(position, color, 4, 12, 0.3)
+	elseif element == "Frost" then
+		-- Ice spikes jutting out of the wound, frost mist around them.
+		for i = 1, math.floor(6 * scale) do
+			local out = Vector3.new(math.random() - 0.5, math.random() * 0.8 - 0.2, math.random() - 0.5)
+			if out.Magnitude > 0.05 then
+				out = out.Unit
+				local length = 0.8 + math.random() * 0.9 * scale
+				local spike = Instance.new("Part")
+				spike.Name = "Vfx"
+				spike.Anchored, spike.CanCollide, spike.CanQuery, spike.CanTouch, spike.CastShadow =
+					true, false, false, false, false
+				spike.Material = Enum.Material.Glass
+				spike.Color = Color3.fromRGB(205, 238, 255)
+				spike.Transparency = 0.2
+				spike.Reflectance = 0.3
+				spike.Size = Vector3.new(0.12, 0.12, 0.1)
+				spike.CFrame = CFrame.lookAt(position, position + out)
+				spike.Parent = fxFolder()
+				TweenService:Create(
+					spike,
+					TweenInfo.new(0.08 + i * 0.01, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					{
+						Size = Vector3.new(0.22, 0.22, length),
+						CFrame = CFrame.lookAt(position + out * length / 2, position + out * length),
+					}
+				):Play()
+				task.delay(0.35, function()
+					fade(spike, 0.3)
+				end)
+			end
+		end
+		CombatFx.burst(position, color, "Frost", 0.8 * scale)
+		CombatFx.burst(position, Color3.fromRGB(220, 240, 255), "Smoke", 0.6 * scale)
+	elseif element == "Shock" then
+		-- Arcs crackling out to the sides.
+		local draw = lightningRef
+		if draw then
+			for _ = 1, 3 do
+				local out = Vector3.new(math.random() - 0.5, math.random() - 0.4, math.random() - 0.5)
+				if out.Magnitude > 0.05 then
+					draw(position, position + out.Unit * (2 + math.random() * 2) * scale, color)
+				end
+			end
+		end
+	elseif element == "Poison" then
+		-- A splash of droplets arcing out and down, and a puff of fumes.
+		for _ = 1, math.floor(8 * scale) do
+			local out = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5)
+			if out.Magnitude > 0.05 then
+				out = out.Unit
+				local drop = neon(Vector3.one * 0.22, CFrame.new(position), color, 0.05, Enum.PartType.Ball)
+				local peak = position + out * 1.2 + Vector3.new(0, 0.8 + math.random() * 0.6, 0)
+				local land = position + out * (2 + math.random() * 1.5) - Vector3.new(0, 2.2, 0)
+				TweenService:Create(
+					drop,
+					TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					{ CFrame = CFrame.new(peak) }
+				):Play()
+				task.delay(0.16, function()
+					fade(drop, 0.3, { CFrame = CFrame.new(land), Size = Vector3.one * 0.1 }, Enum.EasingStyle.Quad)
+				end)
+			end
+		end
+		CombatFx.burst(position, color, "Smoke", 0.9 * scale)
+		CombatFx.burst(position, color, "Drips", 0.8 * scale)
+	end
+end
+
+-- A ground blast's mark: a scorched disc with a glowing rim that cools and fades.
+function CombatVfx.scorch(floor: Vector3, radius: number, color: Color3)
+	local disc = Instance.new("Part")
+	disc.Name = "Vfx"
+	disc.Anchored, disc.CanCollide, disc.CanQuery, disc.CanTouch, disc.CastShadow = true, false, false, false, false
+	disc.Shape = Enum.PartType.Cylinder
+	disc.Material = Enum.Material.SmoothPlastic
+	disc.Color = color:Lerp(Color3.new(0, 0, 0), 0.8)
+	disc.Transparency = 0.35
+	disc.Size = Vector3.new(0.05, radius * 1.4, radius * 1.4)
+	disc.CFrame = CFrame.new(floor + Vector3.new(0, 0.03, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	disc.Parent = fxFolder()
+	local rim = neon(
+		Vector3.new(0.06, radius * 1.45, radius * 1.45),
+		CFrame.new(floor + Vector3.new(0, 0.02, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		color,
+		0.35,
+		Enum.PartType.Cylinder
+	)
+	-- The rim cools first; the scorch lingers a little longer.
+	task.delay(0.4, function()
+		fade(rim, 1.2, { Color = color:Lerp(Color3.new(0, 0, 0), 0.6) })
+	end)
+	task.delay(1.6, function()
+		fade(disc, 1.4)
+	end)
+end
+
 -- Lightning ---------------------------------------------------------------------------
 
 local function jagged(from: Vector3, to: Vector3, kinks: number, wander: number): { Vector3 }
@@ -232,6 +353,8 @@ function CombatVfx.lightning(from: Vector3, to: Vector3, color: Color3)
 	CombatFx.burst(to, color, "Sparks", 1)
 	CombatFx.flash(to, color, 4, 14, 0.2)
 end
+
+lightningRef = CombatVfx.lightning
 
 -- Projectile --------------------------------------------------------------------------
 

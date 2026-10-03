@@ -10,6 +10,8 @@ local RunService = game:GetService("RunService")
 local Tags = require(ReplicatedStorage.Shared.Tags)
 -- Gem outlines on gear: only the nearest stay on, under Roblox's limit.
 require(script.Parent.Modules.OutlineBudget).start()
+-- Swing trails on every blade.
+require(script.Parent.Modules.BladeTrails).start()
 
 -- Tracks every part with `tag`, remembering where the server placed it.
 local function track(tag: string): { [BasePart]: CFrame }

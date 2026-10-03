@@ -1733,9 +1733,12 @@ function handlers.Damage(position: Vector3, amount: number, crit: boolean, color
 	-- Sparks in the hit's colour; crits burst bigger, ring out and shake a little.
 	local tint = color or Color3.new(1, 1, 1)
 	CombatVfx.impact(position - Vector3.new(0, 0.6, 0), tint, crit, amount >= 30)
+	-- An elemental hit shows its element: flame, ice spikes, arcs or a splash.
+	local element = CombatSound.elementOf(color)
+	CombatVfx.element(position - Vector3.new(0, 0.6, 0), element, if crit then 1.4 else 1)
 	-- The blow (a crit rings out, a big one lands heavy), plus its element.
 	CombatSound.play(if crit then "Crit" elseif amount >= 30 then "HeavyHit" else "Hit", position)
-	CombatSound.element("Impact", CombatSound.elementOf(color), position, { Volume = 0.65 })
+	CombatSound.element("Impact", element, position, { Volume = 0.65 })
 	if crit and CombatFx.nearMe(position, 30) then
 		CombatFx.shake(0.012, 0.15)
 		CombatVfx.screen("Crit")
@@ -1815,10 +1818,8 @@ function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: nu
 			fade(wave, 0.3, Vector3.new(0.3, radius * 2.1, radius * 2.1))
 			local after = ring(floor + Vector3.new(0, 0.12, 0), 1, color, 0.35)
 			fade(after, 0.65, Vector3.new(0.2, radius * 2.5, radius * 2.5))
-			-- A scorch that lingers on the ground.
-			local scorch = ring(floor + Vector3.new(0, 0.02, 0), radius * 0.5, Color3.fromRGB(30, 22, 18), 0.35)
-			scorch.Material = Enum.Material.SmoothPlastic
-			fade(scorch, 1.6)
+			-- A scorch mark with a glowing rim that cools, then fades.
+			CombatVfx.scorch(floor, radius, color)
 			local pillar = effectPart(Vector3.new(2, 40, 2), CFrame.new(floor + Vector3.new(0, 20, 0)), color)
 			fade(pillar, 0.45, Vector3.new(radius * 0.8, 46, radius * 0.8))
 			CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Embers", 1.8 + radius / 6)
