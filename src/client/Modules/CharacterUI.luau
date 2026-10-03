@@ -313,6 +313,30 @@ local function frameGear(
 		clone.CFrame = placeOf(part)
 		clone.Parent = model
 	end
+	if key == "Shield" and #model:GetChildren() > 0 then
+		-- A shield follows its forearm's pose, so frame it from its own back
+		-- plate (the biggest part, square to the shield, face towards -Z):
+		-- upright and face on, however the arm was held.
+		local plate, biggest = nil, 0
+		for _, part in model:GetChildren() do
+			local volume = part.Size.X * part.Size.Y * part.Size.Z
+			if volume > biggest then
+				plate, biggest = part, volume
+			end
+		end
+		local square = (plate :: BasePart).CFrame
+		for _, part in model:GetChildren() do
+			part.CFrame = square:ToObjectSpace(part.CFrame)
+		end
+		model.WorldPivot = CFrame.new()
+		local frame, size = model:GetBoundingBox()
+		local camera = new("Camera", { FieldOfView = 30 }, view)
+		local direction = Vector3.new(0.3, 0.12, -1).Unit
+		local distance = math.max(size.X, size.Y) * 2.25 + size.Z
+		camera.CFrame = CFrame.lookAt(frame.Position + direction * distance, frame.Position)
+		view.CurrentCamera = camera
+		return true
+	end
 	if #model:GetChildren() > 0 then
 		local frame, size = model:GetBoundingBox()
 		local camera = new("Camera", { FieldOfView = 30 }, view)
