@@ -26,6 +26,15 @@ local function rebuild(character, equipment)
 	for _, slot in { "Weapon", "Shield", "Gloves" } do
 		local source = equipment:FindFirstChild(slot)
 		if source then
+			-- Each piece in its own model, wearing its gem's highlight (element
+			-- colour, bolder the rarer the gem) just as others see it.
+			local holder = Instance.new("Model")
+			holder.Name = slot
+			holder.Parent = model
+			local highlight = source:FindFirstChild("GemHighlight")
+			if highlight then
+				highlight:Clone().Parent = holder
+			end
 			for _, part in source:GetDescendants() do
 				if part:IsA("BasePart") and part.Transparency < 1 then
 					local weld = part:FindFirstChildWhichIsA("WeldConstraint")
@@ -40,18 +49,20 @@ local function rebuild(character, equipment)
 						or character:FindFirstChild("Right Arm")
 					if anchor then
 						local copy = part:Clone()
-						-- Enchantment particles, beams and lights stay on the real
-						-- gear (others see them); up against the camera they'd
-						-- only smear across the view.
+						-- The element's effect (flames, frost, sparks, gas) stays on,
+						-- thinned out so it doesn't cover the view up close.
 						for _, descendant in copy:GetDescendants() do
+							if descendant:IsA("ParticleEmitter") then
+								descendant.Rate *= 0.45
+							elseif descendant:IsA("PointLight") then
+								descendant.Range *= 0.6
+							end
 							if
 								descendant:IsA("JointInstance")
 								or descendant:IsA("WeldConstraint")
 								or descendant:IsA("Script")
 								or descendant:IsA("LocalScript")
-								or descendant:IsA("ParticleEmitter")
 								or descendant:IsA("Beam")
-								or descendant:IsA("Light")
 							then
 								descendant:Destroy()
 							end
@@ -64,7 +75,7 @@ local function rebuild(character, equipment)
 							copy.Reflectance = math.max(copy.Reflectance, 0.08)
 						end
 						copy.Size *= 0.65
-						copy.Parent = model
+						copy.Parent = holder
 						local offset = anchor.CFrame:ToObjectSpace(part.CFrame)
 						table.insert(
 							pieces,

@@ -858,7 +858,8 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 	end
 end
 
--- A gem in a piece of armor enchants it with the gem's element. Two layers:
+-- A gem in a piece of gear (armor, shield or weapon) enchants it with the
+-- gem's element. Two layers:
 --   * a Highlight around the piece in the element's colour: the rarer the
 --     gem, the brighter and bolder (a faint wash at Common, a blazing outline
 --     and glow at Legendary);
@@ -867,7 +868,8 @@ end
 --       Cryo       a crust of ice crystals on the plate, falling snow and
 --                  cold mist, a slow cold glow
 --       Ion        crackling sparks and flashes, a strobing light
---       Corrosive  dripping toxic goo, rising bubbles and fumes
+--       Corrosive  billowing clouds of green toxic gas, curling wisps and
+--                  rising bubbles
 --     busier and brighter up the tiers.
 --   highlight fill transparency, highlight outline transparency, light
 --   brightness, light range, particles per second, ice crystals (Cryo)
@@ -886,7 +888,6 @@ local GEM_PULSE = {
 	Poison = { 1.0, 0.5 }, -- sickly throb
 }
 -- Each element's signature: what pours off enchanted armor.
-local DRIP_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local SIGNATURE: { [string]: { any } } = {
 	Fire = {
 		{
@@ -971,42 +972,45 @@ local SIGNATURE: { [string]: { any } } = {
 	},
 	Poison = {
 		{
-			-- Goo dripping off the plate.
-			Texture = DRIP_TEXTURE,
-			Colors = { Color3.fromRGB(170, 255, 90), Color3.fromRGB(50, 170, 40) },
-			Size = 0.28,
-			Lifetime = NumberRange.new(0.6, 1),
-			Speed = NumberRange.new(0, 0.3),
-			Acceleration = Vector3.new(0, -14, 0),
-			Spread = 10,
-			Transparency = 0,
-			Light = 0.6,
-			Share = 0.7,
-			Squash = true,
+			-- Billowing clouds of toxic gas.
+			Texture = SMOKE_TEXTURE,
+			Colors = { Color3.fromRGB(170, 255, 90), Color3.fromRGB(40, 140, 40) },
+			Size = 1.7,
+			Lifetime = NumberRange.new(1.6, 2.6),
+			Speed = NumberRange.new(0.3, 0.9),
+			Acceleration = Vector3.new(0, 0.6, 0),
+			Spread = 180,
+			Transparency = 0.4,
+			Light = 0.4,
+			Share = 0.6,
+			Spin = true,
 		},
 		{
+			-- Wisps of gas curling off it.
+			Texture = SMOKE_TEXTURE,
+			Colors = { Color3.fromRGB(200, 255, 140), Color3.fromRGB(90, 200, 70) },
+			Size = 0.7,
+			Lifetime = NumberRange.new(0.8, 1.3),
+			Speed = NumberRange.new(0.8, 1.6),
+			Acceleration = Vector3.new(0, 1.5, 0),
+			Spread = 70,
+			Transparency = 0.3,
+			Light = 0.6,
+			Share = 0.6,
+			Spin = true,
+		},
+		{
+			-- Toxic bubbles rising through it.
 			Texture = SPARK_TEXTURE,
 			Colors = { Color3.fromRGB(210, 255, 150), Color3.fromRGB(70, 210, 80) },
-			Size = 0.28,
+			Size = 0.26,
 			Lifetime = NumberRange.new(1, 1.8),
 			Speed = NumberRange.new(0.3, 0.9),
 			Acceleration = Vector3.new(0, 1.8, 0),
 			Spread = 40,
 			Transparency = 0.05,
 			Light = 0.8,
-			Share = 0.6,
-		},
-		{
-			Texture = SMOKE_TEXTURE,
-			Colors = { Color3.fromRGB(150, 255, 100), Color3.fromRGB(40, 120, 40) },
-			Size = 1,
-			Lifetime = NumberRange.new(1, 1.6),
-			Speed = NumberRange.new(0.2, 0.5),
-			Acceleration = Vector3.new(0, 0.8, 0),
-			Spread = 60,
-			Transparency = 0.6,
-			Light = 0.2,
-			Share = 0.35,
+			Share = 0.4,
 		},
 	},
 }
@@ -1090,7 +1094,7 @@ local function gemGlow(component: Instance, gem)
 		TweenInfo.new(pulse[1], Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
 		{ Brightness = spec[3] * pulse[2] }
 	):Play()
-	if gem.Element == "Frost" then
+	if gem.Element == "Frost" and component.Name ~= "Weapon" then
 		iceCrust(biggest, spec[6], Random.new(#plates * 7 + tier))
 	end
 	-- The element's signature particles.
@@ -1119,13 +1123,6 @@ local function gemGlow(component: Instance, gem)
 		if style.Spin then
 			emitter.RotSpeed = NumberRange.new(-120, 120)
 			emitter.Rotation = NumberRange.new(0, 360)
-		end
-		if style.Squash then
-			-- Drops stretch as they fall.
-			emitter.Squash = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 0),
-				NumberSequenceKeypoint.new(1, 1.5),
-			})
 		end
 		emitter.Shape = Enum.ParticleEmitterShape.Box
 		emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
@@ -1335,7 +1332,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	end
 
 	-- The weapon gets its own folder, so its parts are easy to tell apart.
-	local weaponFolder = Instance.new("Folder")
+	local weaponFolder = Instance.new("Model") -- a Model, to carry its gem's Highlight
 	weaponFolder.Name = "Weapon"
 	weaponFolder.Parent = folder
 	local right = gripAnchor(weaponFolder, character, "Right")
@@ -1465,7 +1462,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 				table.insert(weaponParts, part)
 			end
 		end
-		enchant(weaponParts, loadout.WeaponGem, nil)
+		enchant(weaponParts, loadout.WeaponGem, nil, true)
 	end
 	-- Rarity shine on every piece, in its element's colour.
 	local mainGem = loadout.WeaponGem
@@ -1484,8 +1481,9 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 			rarityShine(component, rarity, color)
 		end
 	end
-	-- Gem-enchanted armor glows in its gem's element, more the rarer the gem.
-	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+	-- Every gem-enchanted piece (armor, shield and weapon) shows its gem's
+	-- element, more the rarer the gem.
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield", "Weapon" } do
 		local component = folder:FindFirstChild(slot)
 		local gem = loadout[slot .. "Gem"]
 		if component and gem and (not only or only == slot) then
