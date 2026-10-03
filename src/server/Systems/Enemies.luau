@@ -21,6 +21,8 @@ local RunService = game:GetService("RunService")
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
+local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local Gems = require(script.Parent.Gems)
 local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
@@ -154,7 +156,15 @@ local enemies: { [Model]: Enemy } = {}
 local folder: Folder
 
 -- Hooks CombatServer fills in (avoids the two modules requiring each other).
-Enemies.hitPlayer = function(_player: Player, _amount: number, _element: string?, _enemy: Enemy, _heavy: boolean?) end
+Enemies.hitPlayer = function(
+	_player: Player,
+	_amount: number,
+	_element: string?,
+	_enemy: Enemy,
+	_heavy: boolean?
+): (number?, boolean?)
+	return nil, nil
+end
 
 local function fx(kind: string, ...)
 	Remotes.CombatFx:FireAllClients(kind, ...)
@@ -612,9 +622,13 @@ function Enemies.addStatus(enemy: Enemy, status: string, amount: number, seconds
 end
 
 -- Damage over time: `total` spread over ticks every half second.
-function Enemies.addDot(enemy: Enemy, total: number, seconds: number, source: Player?, color: Color3)
+-- `status` names it on the status bar ("Burning", "Bleeding").
+function Enemies.addDot(enemy: Enemy, total: number, seconds: number, source: Player?, color: Color3, status: string?)
 	local ticks = math.max(1, math.floor(seconds / 0.5))
-	table.insert(enemy.Dots, { PerTick = total / ticks, Ticks = ticks, Source = source, Color = color })
+	table.insert(
+		enemy.Dots,
+		{ PerTick = total / ticks, Ticks = ticks, Source = source, Color = color, Status = status or "Bleeding" }
+	)
 end
 
 -- A gem burn: `perTick` every second for `seconds`. A new hit refreshes the
@@ -628,15 +642,85 @@ function Enemies.setBurn(enemy: Enemy, perTick: number, seconds: number, source:
 			return
 		end
 	end
-	table.insert(
-		enemy.Dots,
-		{ Key = "GemBurn", PerTick = perTick, Ticks = ticks, Every = 2, Wait = 0, Source = source, Color = color }
-	)
+	table.insert(enemy.Dots, {
+		Key = "GemBurn",
+		Status = "Burning",
+		PerTick = perTick,
+		Ticks = ticks,
+		Every = 2,
+		Wait = 0,
+		Source = source,
+		Color = color,
+	})
 end
 
 function Enemies.taunt(enemy: Enemy, player: Player, seconds: number)
 	enemy.Taunter = player
 	enemy.TauntUntil = os.clock() + seconds
+end
+
+-- Its buffs and debuffs, written to the model's "Statuses" attribute for
+-- clients' status bars (see Shared.StatusEffects). Times are server time.
+local clockOffset
+local function serverTime(t: number): number
+	if not clockOffset then
+		local ok, server = pcall(function()
+			return workspace:GetServerTimeNow()
+		end)
+		clockOffset = if ok and type(server) == "number" then server - os.clock() else 0
+	end
+	return t + clockOffset
+end
+
+function Enemies.statuses(enemy: Enemy, now: number)
+	local list = {}
+	local function add(id: string, ends: number, value: number?)
+		if ends > now then
+			table.insert(list, { Id = id, Ends = serverTime(ends), Value = value or 0 })
+		end
+	end
+	local e = enemy :: any
+	add(e.StunKind or "Stunned", enemy.StunUntil)
+	for _, dot in enemy.Dots do
+		-- Ticks every half second, or every `Every` half-seconds.
+		local every = (dot.Every or 1) * 0.5
+		add(dot.Status or "Bleeding", now + dot.Ticks * every - (dot.Wait or 0) * 0.5)
+	end
+	add("Slowed", enemy.SlowUntil, enemy.Slow * 100)
+	add("ArmorShred", enemy.SunderUntil, enemy.Sunder * 100)
+	add("Vulnerable", enemy.VulnerableUntil, enemy.Vulnerable * 100)
+	add("Exposed", e.AuraUntil or 0, (e.Aura or 0) * 100)
+	add("Weakened", enemy.WeakenUntil, enemy.Weaken * 100)
+	-- A rival's own buffs.
+	local duel = e.Duel
+	if duel then
+		add("CryoShield", duel.CryoUntil or 0)
+		add("ResonanceEcho", duel.EchoUntil or 0)
+	end
+	for kind, ends in e.HealCuts or {} do
+		add(kind, ends)
+	end
+	return list
+end
+
+local function publishStatuses(enemy: Enemy, now: number)
+	local text = StatusEffects.encode(Enemies.statuses(enemy, now), serverTime(now))
+	local value = if text == "" then nil else text
+	if enemy.Model:GetAttribute("Statuses") ~= value then
+		enemy.Model:SetAttribute("Statuses", value)
+	end
+end
+
+-- Anti-heal on an enemy (Grievous Wounds, Mortal Strike), like on players.
+function Enemies.healCut(enemy: Enemy, kind: string)
+	local e = enemy :: any
+	e.HealCuts = e.HealCuts or {}
+	e.HealCuts[kind] = os.clock() + CrowdControl.HealCutSeconds
+end
+
+-- Multiply this enemy's healing by this.
+function Enemies.healingMultiplier(enemy: Enemy): number
+	return CrowdControl.healingMultiplier({ HealCuts = (enemy :: any).HealCuts or {} } :: any, os.clock())
 end
 
 -- How much less damage this enemy deals right now (Poison weakens).
@@ -778,6 +862,9 @@ function Enemies.start(trainingOnly: boolean?)
 						enemy.Brain(enemy, now)
 					else
 						think(enemy, now)
+					end
+					if enemy.Alive then
+						publishStatuses(enemy, now)
 					end
 				end
 			end

@@ -96,4 +96,44 @@ check(HealthRegen.amount(50, 100, false, 2, 1) == 0, "Player healed right after 
 check(HealthRegen.amount(50, 100, false, 6, 1) == 1, "Player never recovered out of combat")
 check(HealthRegen.amount(99.5, 100, false, 6, 1) == 0.5, "Recovery overfilled health")
 check(HealthRegen.amount(0, 100, false, 60, 1) == 0, "A fallen player recovered")
-print("PASS: " .. checks .. " Duelist checks (health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
+-- Status effects: what a fighter is suffering from, shown like an RPG's.
+local encoded = StatusEffects.encode({
+	{ Id = "Slowed", Ends = 20, Value = 30 },
+	{ Id = "Burning", Ends = 15, Value = 0 },
+	{ Id = "Burning", Ends = 18, Value = 0 },
+	{ Id = "Shielded", Ends = 12, Value = 24 },
+	{ Id = "Stunned", Ends = 5, Value = 0 },
+	{ Id = "Nonsense", Ends = 30, Value = 1 },
+}, 10)
+local decoded = StatusEffects.decode(encoded)
+check(#decoded == 3, "Status list kept expired, unknown or repeated effects: " .. encoded)
+check(decoded[1].Id == "Shielded" and decoded[2].Id == "Burning" and decoded[3].Id == "Slowed", "Statuses out of order: " .. encoded)
+check(decoded[2].Ends == 18 and decoded[3].Value == 30, "Status timing or strength lost: " .. encoded)
+check(StatusEffects.label("Slowed") == "Slowed (Cryo)" and StatusEffects.label("Burning") == "Burning (Thermal)", "Status labels missing their element")
+check(StatusEffects.describe("Slowed", 30) == "Moves 30% slower.", "Status description wrong")
+check(#StatusEffects.decode(nil) == 0 and #StatusEffects.decode("") == 0, "Empty status list broke decoding")
+-- The rival's gem afflicts the player like a player's gem would, and the
+-- player's status bar shows it.
+local struck, sh = makePlayer(41, arena, nil)
+local brute = { Alive = true, Root = { Position = arena } }
+now += 30
+CombatServer.enemyProc(struck, { Element = "Frost", Size = 5, Clarity = 5, Cut = 5 }, brute)
+CombatServer.enemyProc(struck, { Element = "Fire", Size = 5, Clarity = 5, Cut = 5 }, brute)
+CombatServer.enemyProc(struck, { Element = "Poison", Size = 5, Clarity = 5, Cut = 5 }, brute)
+CombatServer._tick(0.1)
+local shown = {}
+for _, active in StatusEffects.decode(struck:GetAttribute("Statuses")) do
+	shown[active.Id] = active
+end
+check(shown.Slowed and shown.Slowed.Value > 0, "Cryo hit did not show Slowed: " .. tostring(struck:GetAttribute("Statuses")))
+check(shown.Burning ~= nil, "Thermal hit did not show Burning")
+check(shown.ArmorShred ~= nil, "Corrosive hit did not show Armor Shred")
+local before = sh.Health
+now += 1.2
+CombatServer._tick(1.2)
+check(sh.Health < before, "A rival's burn never hurt the player")
+brute.Alive = false
+now += 0.1
+CombatServer._tick(0.1)
+check(not string.find(struck:GetAttribute("Statuses") or "", "Burning", 1, true), "Burn outlived the rival that set it")
+print("PASS: " .. checks .. " Duelist checks (status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")

@@ -22,6 +22,7 @@ local TargetLock = require(script.Parent.Modules.TargetLock)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local RivalPose = require(script.Parent.Modules.RivalPose)
+local StatusBars = require(script.Parent.Modules.StatusBars)
 local UiKit = require(script.Parent.Modules.UiKit)
 if Config.MenuOnly and not Config.CombatEnabled then
 	return
@@ -307,6 +308,15 @@ incomingMarker.AnchorPoint, incomingMarker.Size = Vector2.new(0.5, 0.5), UDim2.f
 incomingMarker.TextXAlignment = Enum.TextXAlignment.Center
 incomingMarker.Visible = false
 -- Cast bar: heavy-attack charge, surge/maneuver wind-ups and channels.
+-- Your buffs and debuffs, just above the unit frame: "🔥 Burning (Thermal) 3s".
+local selfStatusRow = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -150),
+	Size = UDim2.fromOffset(760, 26),
+}, gui)
+local selfStatuses = StatusBars.strip(selfStatusRow, false)
+local selfStatusIcons = StatusBars.strip(selfStatusRow, true) -- narrow screens: icons only
 local castBar = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
 	BackgroundTransparency = 0.15,
@@ -506,6 +516,13 @@ local rivalStance = rivalLabel(12, P.Text, 0, 0, 250, 26)
 rivalStance.Position, rivalStance.Size = UDim2.fromOffset(0, 300), UDim2.new(1, 0, 0, 24)
 rivalStance.TextXAlignment = Enum.TextXAlignment.Center
 rivalStance.TextYAlignment = Enum.TextYAlignment.Center
+-- The rival's buffs and debuffs, under its panel.
+local rivalStatusRow = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.new(0, 0, 1, 6),
+	Size = UDim2.new(1, 0, 0, 34),
+}, rivalPanel)
+local rivalStatuses = StatusBars.strip(rivalStatusRow, true, Enum.HorizontalAlignment.Right)
 local rivalHealth = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
 	BorderSizePixel = 0,
@@ -1231,6 +1248,13 @@ RunService.RenderStepped:Connect(function(dt)
 	chargeFill.BackgroundColor3 = castColor
 	drawRival(now, viewport)
 	RivalPose.update(rivalModel, dt)
+	local serverNow = workspace:GetServerTimeNow()
+	local mine = player:GetAttribute("Statuses")
+	local narrow = viewport.X < 900
+	selfStatuses:update(if narrow then nil else mine, serverNow)
+	selfStatusIcons:update(if narrow then mine else nil, serverNow)
+	rivalStatuses:update(rivalModel and rivalModel:GetAttribute("Statuses"), serverNow)
+	StatusBars.step(serverNow)
 	local trackedTarget = TargetLock.target()
 	reticle.TextColor3 = if holding
 		then castColor

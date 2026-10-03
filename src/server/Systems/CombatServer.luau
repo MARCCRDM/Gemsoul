@@ -10,6 +10,7 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
+local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local Enemies = require(script.Parent.Enemies)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
@@ -318,10 +319,12 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 						local attacker = state(source)
 						local duration = CrowdControl.ApplyCC(attacker.CC, 0.25, now, true)
 						attacker.StunUntil = math.max(attacker.StunUntil, now + duration)
+						attacker.StunKind = "Stunned"
 						attacker.ChargeStarted, attacker.ComboSide, attacker.ComboCount = nil, nil, 0
 						Remotes.CombatFx:FireClient(source, "Parried", duration)
 					elseif enemySource then
 						Enemies.addStatus(enemySource, "Stun", 1, 0.5)
+						enemySource.StunKind = "Stunned"
 					end
 					Remotes.CombatFx:FireClient(player, "HighBlock")
 				end
@@ -379,7 +382,9 @@ local function addDot(player, source, perTick, duration)
 		{ Source = source, Damage = perTick, Last = now, Ends = now + duration, Next = now + math.min(1, duration) }
 end
 local enemyCC = setmetatable({}, { __mode = "k" })
-local function applyCC(target, seconds)
+local publishStatuses
+-- `kind` names it on the status bar: Frozen (Cryo), Shocked (Ion) or Stunned.
+local function applyCC(target, seconds, kind)
 	local tracker
 	if target.Player then
 		tracker = state(target.Player).CC
@@ -395,9 +400,11 @@ local function applyCC(target, seconds)
 		if target.Player then
 			local st = state(target.Player)
 			st.StunUntil = math.max(st.StunUntil, os.clock() + duration)
+			st.StunKind = kind or "Stunned"
 			st.ChargeStarted, st.BlockUntil = nil, 0
 		else
 			Enemies.addStatus(target.Enemy, "Stun", 1, duration)
+			target.Enemy.StunKind = kind or "Stunned"
 		end
 	end
 end
@@ -422,6 +429,9 @@ local function procGem(source, k, target)
 			end
 		else
 			Enemies.setBurn(target.Enemy, burning, values.Duration, source, GemConfig.ElementColors.Fire)
+			if critical then
+				Enemies.healCut(target.Enemy, "GrievousWounds")
+			end
 		end
 	end
 	if values.Slow then
@@ -432,7 +442,7 @@ local function procGem(source, k, target)
 			Enemies.addStatus(target.Enemy, "Slow", values.Slow, values.Duration)
 		end
 		if math.random() < values.Freeze then
-			applyCC(target, values.FreezeSeconds)
+			applyCC(target, values.FreezeSeconds, "Frozen")
 		end
 	end
 	if values.Sunder then
@@ -448,6 +458,7 @@ local function procGem(source, k, target)
 				CrowdControl.applyHealCut(st.CC, "MortalStrike", now)
 			else
 				Enemies.addStatus(target.Enemy, "Vulnerable", values.VulnerableAmount, values.Duration)
+				Enemies.healCut(target.Enemy, "MortalStrike")
 			end
 		end
 	end
@@ -482,7 +493,7 @@ local function procGem(source, k, target)
 			from = closest
 		end
 		if math.random() < values.Stun then
-			applyCC(target, values.StunSeconds)
+			applyCC(target, values.StunSeconds, "Shocked")
 		end
 		if target.Humanoid.Health > 0 and target.Humanoid.Health < target.Humanoid.MaxHealth * values.Execute then
 			if target.Player then
@@ -819,7 +830,14 @@ local function technologyHit(player, k, target, definition, scale)
 		return
 	end
 	if definition.Stun then
-		applyCC(target, definition.Stun)
+		applyCC(
+			target,
+			definition.Stun,
+			if definition.Element == "Frost"
+				then "Frozen"
+				elseif definition.Element == "Shock" then "Shocked"
+				else "Stunned"
+		)
 	end
 	if definition.Slow then
 		if target.Player then
@@ -857,7 +875,14 @@ local function technologyHit(player, k, target, definition, scale)
 		if target.Player then
 			addDot(target.Player, player, values.BurnDamage * k.Effects.ThermalMult, values.BurnDuration)
 		else
-			Enemies.addDot(target.Enemy, values.BurnDamage * k.Effects.ThermalMult, values.BurnDuration, player, color)
+			Enemies.addDot(
+				target.Enemy,
+				values.BurnDamage * k.Effects.ThermalMult,
+				values.BurnDuration,
+				player,
+				color,
+				"Burning"
+			)
 		end
 	end
 end
@@ -1185,6 +1210,60 @@ end
 function CombatServer.hurt(player, amount, element, enemy, heavy)
 	return receive(player, amount, element, nil, enemy and enemy.Root.Position, false, heavy == true, false, enemy)
 end
+-- os.clock() -> server time, which clients can count down against.
+local clockOffset
+local function serverTime(t)
+	if not clockOffset then
+		local ok, server = pcall(function()
+			return workspace:GetServerTimeNow()
+		end)
+		clockOffset = if ok and type(server) == "number" then server - os.clock() else 0
+	end
+	return t + clockOffset
+end
+CombatServer._serverTime = serverTime
+
+-- The player's buffs and debuffs, for status bars (see Shared.StatusEffects).
+local function playerStatuses(st, now)
+	local list = {}
+	local function add(id, ends, value)
+		if ends > now then
+			table.insert(list, { Id = id, Ends = serverTime(ends), Value = value or 0 })
+		end
+	end
+	if st.Shield > 0 then
+		add("Shielded", st.ShieldUntil, st.Shield)
+	end
+	if st.SiphonCapacity > 0 then
+		add("EnergySiphon", st.SiphonUntil, st.SiphonCapacity)
+	end
+	add("ResonanceEcho", st.EchoUntil)
+	add(st.StunKind or "Stunned", st.StunUntil)
+	add("GuardBroken", st.BlockBrokenUntil)
+	for _, dot in st.Dots do
+		add("Burning", dot.Ends)
+	end
+	add("Slowed", st.SlowUntil, st.Slow * 100)
+	add("ArmorShred", st.SunderUntil, st.Sunder * 100)
+	local debuffs = st.CC.Debuffs
+	if debuffs.Vulnerable then
+		add("Vulnerable", debuffs.Vulnerable.Until, debuffs.Vulnerable.Amount * 100)
+	end
+	if debuffs.Aura then
+		add("Exposed", debuffs.Aura.Until, debuffs.Aura.Amount * 100)
+	end
+	for kind, ends in st.CC.HealCuts do
+		add(kind, ends)
+	end
+	return list
+end
+function publishStatuses(owner: Instance, st, now)
+	local text = StatusEffects.encode(playerStatuses(st, now), serverTime(now))
+	if owner:GetAttribute("Statuses") ~= (if text == "" then nil else text) then
+		owner:SetAttribute("Statuses", if text == "" then nil else text)
+	end
+end
+
 local function tick(_dt)
 	local now = os.clock()
 	for _, player in Players:GetPlayers() do
@@ -1195,6 +1274,9 @@ local function tick(_dt)
 			st.Dots, st.Pending, st.Channel, st.Zones = {}, {}, nil, {}
 			stopDodge(st)
 			player:SetAttribute("Blocking", false)
+			if player:GetAttribute("Statuses") ~= nil then
+				player:SetAttribute("Statuses", nil)
+			end
 			continue
 		end
 		updateResources(player, st, k)
@@ -1290,11 +1372,17 @@ local function tick(_dt)
 			st.NextWard, st.Shield, st.ShieldUntil = now + 8, math.max(st.Shield, k.Effects.Ward), now + 8
 		end
 		for source, dot in st.Dots do
-			if not canPvP(source, player) then
+			-- A burn from a computer fighter (an enemy table) lasts while it lives.
+			local fromEnemy = type(source) == "table"
+			if if fromEnemy then not source.Alive else not canPvP(source, player) then
 				st.Dots[source] = nil
 			elseif now >= dot.Next then
 				local through = math.min(now, dot.Ends)
-				receive(player, dot.Damage * (through - dot.Last), "Fire", source, nil, false, false, false)
+				if fromEnemy then
+					receive(player, dot.Damage * (through - dot.Last), "Fire", nil, nil, false, false, false, source)
+				else
+					receive(player, dot.Damage * (through - dot.Last), "Fire", source, nil, false, false, false)
+				end
 				dot.Last, dot.Next = through, math.min(through + 1, dot.Ends)
 				if through >= dot.Ends then
 					st.Dots[source] = nil
@@ -1303,8 +1391,45 @@ local function tick(_dt)
 		end
 		player:SetAttribute("Shield", math.floor(st.Shield))
 		player:SetAttribute("CombatCharging", st.ChargeStarted ~= nil)
+		publishStatuses(player, st, now)
 	end
 end
+-- A computer fighter's gem landing on a player: the same element effects a
+-- player's gem would apply in PvP (burn, slow and freeze, armor shred).
+function CombatServer.enemyProc(player, gem, enemy)
+	local humanoid, root = alive(player)
+	if not humanoid or not gem then
+		return
+	end
+	local values = GemConfig.actionValues(gem, "Basic", { PvP = true })
+	local st, now = state(player), os.clock()
+	local target = { Player = player, Humanoid = humanoid, Root = root }
+	if values.Burn then
+		addDot(player, enemy, values.Burn, values.Duration)
+		if math.random() < (values.Ignite or 0) then
+			CrowdControl.applyHealCut(st.CC, "GrievousWounds", now)
+		end
+	end
+	if values.Slow then
+		st.Slow = CrowdControl.applyDebuff(st.CC, "Slow", values.Slow, values.Duration, now, true)
+		st.SlowUntil = st.CC.Debuffs.Slow.Until
+		if math.random() < (values.Freeze or 0) then
+			applyCC(target, values.FreezeSeconds, "Frozen")
+		end
+	end
+	if values.Sunder then
+		st.Sunder = CrowdControl.applyDebuff(st.CC, "Sunder", values.Sunder, values.Duration, now, true)
+		st.SunderUntil = st.CC.Debuffs.Sunder.Until
+		if math.random() < (values.Vulnerable or 0) then
+			CrowdControl.applyDebuff(st.CC, "Vulnerable", values.VulnerableAmount, values.Duration, now, true)
+			CrowdControl.applyHealCut(st.CC, "MortalStrike", now)
+		end
+	end
+	if values.Arc and math.random() < (values.Stun or 0) then
+		applyCC(target, values.StunSeconds, "Shocked")
+	end
+end
+
 function CombatServer.heal(player, amount)
 	local humanoid = alive(player)
 	local k = kit(player)
@@ -1337,7 +1462,7 @@ function CombatServer.reset(player)
 end
 function CombatServer.start()
 	Enemies.hitPlayer = function(player, amount, element, enemy, heavy)
-		CombatServer.hurt(player, amount, element, enemy, heavy)
+		return CombatServer.hurt(player, amount, element, enemy, heavy)
 	end
 	Remotes.CombatInput.OnServerEvent:Connect(onInput)
 	Shop.register("SetRigManeuvers", function()
