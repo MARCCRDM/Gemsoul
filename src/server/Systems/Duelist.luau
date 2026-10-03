@@ -30,6 +30,7 @@ local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Matchup = require(ReplicatedStorage.Shared.Matchup)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
+local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
@@ -362,7 +363,7 @@ local function healSelf(duel, share: number, ability: string)
 	local enemy = duel.Enemy
 	local humanoid = enemy.Humanoid
 	local full = humanoid.MaxHealth * share
-	local healing = full * Enemies.healingMultiplier(enemy)
+	local healing = full * Enemies.healingMultiplier(enemy) * (duel.Kit and duel.Kit.Effects.HealingReceived or 1)
 	local restored = math.min(humanoid.MaxHealth - humanoid.Health, healing)
 	humanoid.Health += restored
 	DamageLog.send(
@@ -390,13 +391,20 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 	if surge.Kind == "Self" then
 		animate(duel, "Buff", 0.15)
 		fx("TechPulse", nil, root.Position, root.Position, color, 5)
+		-- Exactly as a player's: Cryo Shield and Energy Siphon are shields
+		-- that soak damage; Resonance Echo repeats its hits.
+		local stats = Tech.surgeStats(surge.Gem) or {}
+		local duration = stats.Duration or 4
 		if surge.Id == "CryoShield" then
-			enemy.GuardUntil, enemy.GuardMult, enemy.Barrier = now + 4, 0.5, true -- a barrier that halves hits
-			duel.CryoUntil = now + 4
+			local amount = 30 + (surge.Gem and surge.Gem.Size or 1) * 3
+			enemy.Shield = math.max(enemy.Shield or 0, amount)
+			enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + duration)
+			duel.CryoUntil = now + duration
 		elseif surge.Id == "EnergySiphon" then
-			healSelf(duel, 0.12, surge.Name)
+			enemy.Shield = math.max(enemy.Shield or 0, stats.Absorb or 0)
+			enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + duration)
 		else -- ResonanceEcho
-			duel.EchoUntil = now + 5
+			duel.EchoUntil = now + duration
 		end
 		return
 	end
@@ -445,7 +453,7 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 		-- Dodge and patch up.
 		local sign = if math.random() < 0.5 then 1 else -1
 		local away = side * sign
-		enemy.DodgeUntil = now + 0.35
+		enemy.DodgeUntil = now + Actions.Base.Hop.PvPInvincible
 		animate(duel, "Dodge", 0, sign)
 		root.AssemblyLinearVelocity = away * 55 + Vector3.new(0, 6, 0)
 		fx("DodgeRoll", nil, root.Position, away, 8, true)
@@ -508,13 +516,37 @@ local function raiseGuard(enemy, duel, now: number, seconds: number)
 		if (duel.Stamina or 0) < Actions.Stamina.BlockMin or now < (enemy.GuardBrokenUntil or 0) then
 			return -- too winded to raise a guard, like a player
 		end
-		enemy.GuardRaisedAt = now
+		-- Freshly raised: a parry window, at most every 1.5s (as a player's
+		-- high block), and its block gem fires (shield, cleanse).
+		enemy.ParrySpent = false
+		if now >= (duel.NextHighBlock or 0) then
+			enemy.GuardRaisedAt = now
+			duel.NextHighBlock = now + 1.5
+		end
+		local kit = duel.Kit
+		if kit and now >= (duel.NextBlockGem or 0) then
+			local defense = kit.Defense
+			if defense.CleanseInterval < math.huge then
+				enemy.Dots, enemy.SlowUntil, enemy.SunderUntil = {}, 0, 0
+			end
+			if defense.Shield > 0 then
+				enemy.Shield = math.max(enemy.Shield or 0, defense.Shield)
+				enemy.ShieldUntil = now + defense.Duration
+			end
+			duel.NextBlockGem = now + defense.Duration + defense.Cooldown
+		end
 		press(duel, "RMB")
 	end
-	-- A guard takes off what a player's PvP block does (it blocks 40%).
+	-- A guard takes off what a player's PvP block does, with its own set's rules.
 	enemy.Barrier = nil
 	enemy.GuardUntil = math.max(enemy.GuardUntil or 0, now + seconds)
-	enemy.GuardMult = Actions.blockMultiplier(Actions.resolve({}, "Sword", 0), true, 1, false, false)
+	enemy.GuardMult = Actions.blockMultiplier(
+		if duel.Kit then duel.Kit.Rules else Actions.resolve({}, "Sword", 0),
+		true,
+		1,
+		false,
+		false
+	)
 	enemy.Model:SetAttribute("GuardUntil", workspace:GetServerTimeNow() + (enemy.GuardUntil - now))
 	setStance(duel, "Guard")
 end
@@ -548,6 +580,25 @@ local function think(enemy, now: number)
 	local dir = if distance > 0.01 then offset.Unit else Vector3.new(0, 0, -1)
 	local side = Vector3.new(-dir.Z, 0, dir.X)
 	refill(duel, now, guarding(enemy, now))
+	local kit = duel.Kit
+	if kit then
+		-- Ward armour: a fresh shield every 8 seconds, as a player's.
+		if kit.Effects.Ward and now >= (duel.NextWard or 0) then
+			duel.NextWard = now + 8
+			enemy.Shield = math.max(enemy.Shield or 0, kit.Effects.Ward)
+			enemy.ShieldUntil = now + 8
+		end
+		-- A Corrosive aura gem shreds you while it blocks close by.
+		local ownerRootPart = ownerRoot(owner)
+		if
+			kit.Defense.Aura > 0
+			and guarding(enemy, now)
+			and ownerRootPart
+			and (ownerRootPart.Position - root.Position).Magnitude <= GemConfig.Rules.AuraRadius
+		then
+			CombatServer.rivalAura(owner, kit.Defense.Aura)
+		end
+	end
 	if guarding(enemy, now) and duel.Stamina <= 0 then
 		dropGuard(enemy, now) -- held until there was nothing left
 	end
@@ -596,14 +647,15 @@ local function think(enemy, now: number)
 			spendStamina(duel, cost)
 			fx("Swing", nil, root.Position, dir, Brain.Reach, if heavy then 140 else 100, color, heavy)
 			if distance <= Brain.Reach + 1.5 then
-				-- Resonance Echo: its swings hit harder for a while.
-				local echo = if now < (duel.EchoUntil or 0) then 1.5 else 1
-				strike(
+				local rules = duel.Kit and duel.Kit.Rules
+				local blow = damage
+					* (if heavy
+						then (rules and rules.HeavyPvPDamage or Actions.Base.Heavy.PvPDamage)
+						else (rules and rules.BasicDamage or 1))
+					* (if winded then Actions.Stamina.WindedDamage else 1)
+				local dealt, guarded = strike(
 					duel,
-					damage
-						* (if heavy then Actions.Base.Heavy.PvPDamage else 1)
-						* echo
-						* (if winded then Actions.Stamina.WindedDamage else 1),
+					blow,
 					duel.Element,
 					heavy,
 					duel.WeaponGem,
@@ -611,6 +663,16 @@ local function think(enemy, now: number)
 					-- Crits by its Speed, as yours are (heavies a little more).
 					math.min(0.75, (duel.Crit or 0) + (if heavy then duel.HeavyCrit or 0 else 0))
 				)
+				if type(dealt) == "number" and dealt > 0 and not guarded then
+					-- Its gear's on-hit effects (Sunder, Slow), as yours land.
+					if duel.Kit then
+						CombatServer.rivalHitEffects(owner, duel.Kit.Effects)
+					end
+					-- Resonance Echo repeats the hit, as a player's does.
+					if now < (duel.EchoUntil or 0) then
+						strike(duel, blow, duel.Element, false, nil, "Resonance Echo")
+					end
+				end
 			end
 			-- Combos: up to three swings in a row.
 			local hits = (action.Hits or 1) + 1
@@ -831,7 +893,7 @@ local function think(enemy, now: number)
 		spendStamina(duel, Actions.Base.Hop.Cost)
 		local sign = if math.random() < 0.5 then 1 else -1
 		local away = side * sign
-		enemy.DodgeUntil = now + 0.35
+		enemy.DodgeUntil = now + Actions.Base.Hop.PvPInvincible
 		animate(duel, "Dodge", 0, sign)
 		setStance(duel, "Dodge")
 		press(duel, "SPACE")
@@ -995,8 +1057,12 @@ function spawnRival(owner: Player)
 	local mine, theirs = Classes.ratings(loadout), Classes.ratings(ownerLoadout)
 	local weapon = Classes.weapon(ownerLoadout.Class, ownerLoadout.Weapon)
 	local rivalWeapon = Classes.weapon(loadout.Class, loadout.Weapon)
-	local rivalEffects = Classes.effects(loadout)
-	local rules = Actions.resolve(Classes.setState(loadout).Counts, "Sword", 1 - (rivalEffects.CooldownMult or 1))
+	-- Its kit comes from the very function that builds a player's (gear
+	-- effects, gem defences, set rules), with no Augment Tree perks, as in
+	-- any Arena fight.
+	local rivalKit = CombatServer.kitFor(loadout, {})
+	local rivalEffects = rivalKit.Effects
+	local rules = rivalKit.Rules
 	local playerHit = (if weapon then weapon.Attack.Damage else 10) * Combat.powerMult(rating(theirs, "Power"))
 	local rivalHit = (if rivalWeapon then rivalWeapon.Attack.Damage else 18) * Combat.powerMult(rating(mine, "Power"))
 	local ownerHumanoid = owner.Character:FindFirstChildOfClass("Humanoid")
@@ -1021,8 +1087,14 @@ function spawnRival(owner: Player)
 		Home = spot,
 	})
 	enemy.Humanoid.AutoRotate = false
-	-- Its armour cuts your hits the way yours cuts its (Enemies.damage).
-	enemy.DefenseMult = Combat.defenseMult(rating(mine, "Defense"))
+	-- It takes hits as you do (Enemies.damage): its armour (cut by Sunder),
+	-- armour passives and gem resistance, and on its guard its gem deflect
+	-- and reflect chances.
+	enemy.DefenseRating = rating(mine, "Defense")
+	enemy.TakenMult = EquipmentBalance.passiveDamageMultiplier(rivalEffects.TakenMult, rivalKit.Defense.Resistance)
+	enemy.Deflect = if rivalKit.Defense.Deflect > 0 then rivalKit.Defense.Deflect else nil
+	enemy.Reflect = if rivalKit.Defense.Reflect > 0 then rivalKit.Defense.Reflect else nil
+	enemy.GuardBreakTime = Actions.Base.Heavy.BreakSeconds
 	-- Every bout starts even: the player steps in at full health too.
 	if ownerHumanoid and ownerHumanoid.Health > 0 then
 		ownerHumanoid.Health = ownerHumanoid.MaxHealth
@@ -1049,6 +1121,7 @@ function spawnRival(owner: Player)
 		-- (Training's sparring partner hits for half.)
 		Damage = rivalHit * (if sparring then 0.5 else 1),
 		Weapon = rivalWeapon,
+		Kit = rivalKit,
 		Crit = Combat.critChance(rating(mine, "Speed"), rivalEffects.CritAdd),
 		HeavyCrit = rules.HeavyCrit,
 		Speed = Classes.walkSpeed(rating(mine, "Speed")) + (rivalEffects.SpeedAdd or 0),
@@ -1072,6 +1145,10 @@ function spawnRival(owner: Player)
 		RetreatUntil = 0,
 	}
 	enemy.Duel = duel
+	-- A reflected blow goes back to whoever struck it, as a player's does.
+	enemy.OnReflect = function(_source, amount: number)
+		strike(duel, amount, nil, false, nil, "Reflect")
+	end
 	-- Its loadout and surge, for the player's rival panel.
 	local model = enemy.Model
 	model:SetAttribute("RivalOwner", owner.UserId)
@@ -1183,7 +1260,7 @@ function spawnRival(owner: Player)
 	local matchup = Matchup.build({
 		Name = owner.DisplayName,
 		Health = math.floor(ownerHumanoid and ownerHumanoid.MaxHealth or 300),
-		Hit = math.floor(playerHit * enemy.DefenseMult + 0.5), -- after its armour
+		Hit = math.floor(playerHit * Combat.defenseMult(enemy.DefenseRating) * enemy.TakenMult + 0.5), -- after its armour
 		Speed = math.floor(ownerHumanoid and ownerHumanoid.WalkSpeed or 16),
 		Element = ownerLoadout.WeaponGem and ownerLoadout.WeaponGem.Element,
 		Surges = yourSurges,

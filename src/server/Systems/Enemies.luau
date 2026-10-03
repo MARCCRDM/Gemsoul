@@ -574,28 +574,52 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	local exposure = 1 + Enemies.exposure(enemy)
 	local blocked = 0
 	local e = enemy :: any
-	-- Armour (a rival duelist's Defense), as a player's cuts what hits them.
-	if e.DefenseMult then
-		amount *= e.DefenseMult
+	local duelist = e.Duel ~= nil
+	-- A rival duelist takes a hit exactly as a player does: its armour
+	-- (Defense, cut by Sunder) and armour passives first (not Sunder as
+	-- extra damage, the way other enemies take it).
+	if e.DefenseRating then
+		local sunder = if now < enemy.SunderUntil then enemy.Sunder else 0
+		amount *= Combat.defenseMult(e.DefenseRating * (1 - sunder)) * (e.TakenMult or 1)
+		exposure -= sunder
 	end
+	local raw = amount
 	if enemy.GuardUntil and now < enemy.GuardUntil then
 		if heavy == true and not e.Barrier then
 			-- A heavy blow smashes through a raised guard and staggers it
-			-- (not a Cryo Shield barrier, which only halves hits).
+			-- (not a Cryo Shield barrier, which only halves hits). A rival
+			-- duelist's guard breaks as a player's does: no stagger, and
+			-- a player's break time.
 			enemy.GuardUntil = 0
-			e.GuardBrokenUntil = now + Enemies.GuardBreakSeconds
-			enemy.StunUntil = math.max(enemy.StunUntil, now + 0.35)
+			e.GuardBrokenUntil = now + (if duelist then e.GuardBreakTime or 0.8 else Enemies.GuardBreakSeconds)
+			if not duelist then
+				enemy.StunUntil = math.max(enemy.StunUntil, now + 0.35)
+			end
 			e.StunKind = "Stunned"
 			enemy.Model:SetAttribute("GuardUntil", 0)
 			fx("BlockSpark", enemy.Root.Position, true)
 			DamageLog.send(source, { Dir = "Out", Kind = "GuardBreak", Who = name })
-		elseif heavy == false and source and e.GuardRaisedAt and now - e.GuardRaisedAt <= Enemies.ParryWindow then
-			-- Timed perfectly: parried, and the attacker is left open.
+		elseif
+			heavy == false
+			and source
+			and e.GuardRaisedAt
+			and now - e.GuardRaisedAt <= (if duelist then 0.3 else Enemies.ParryWindow)
+			and not e.ParrySpent
+		then
+			-- Timed perfectly: parried, and the attacker is left open. A rival
+			-- duelist parries as a player does: once per raise, the blow cut
+			-- to 35% (PvP), the attacker staggered for a quarter second.
 			fx("BlockSpark", enemy.Root.Position, false)
 			e.BlockedAt = now
 			DamageLog.send(source, { Dir = "Out", Kind = "Parried", Who = name })
-			Enemies.parryPlayer(source, 0.45)
-			return
+			if not duelist then
+				Enemies.parryPlayer(source, 0.45)
+				return
+			end
+			e.ParrySpent = true
+			Enemies.parryPlayer(source, 0.25)
+			blocked = amount * 0.65 * exposure
+			amount *= 0.35
 		elseif e.GuardCost and not e.Barrier and not e.GuardCost(amount) then
 			-- Out of Stamina: the guard breaks and the blow lands in full.
 			enemy.GuardUntil = 0
@@ -605,6 +629,14 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 			DamageLog.send(source, { Dir = "Out", Kind = "GuardBreak", Who = name })
 		else
 			local guarded = amount * (e.GuardMult or 0.3)
+			-- Gem defences on a rival duelist's guard, as on a player's:
+			-- a chance to deflect the blow, a chance to reflect it back.
+			if e.Deflect and math.random() < e.Deflect then
+				guarded = 0
+			end
+			if e.Reflect and e.OnReflect and source and math.random() < e.Reflect then
+				e.OnReflect(source, raw)
+			end
 			blocked = (amount - guarded) * exposure
 			amount = guarded
 			if heavy ~= nil then
@@ -614,10 +646,23 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 		end
 	end
 	amount = math.floor(amount * exposure + 0.5)
-	DamageLog.send(
-		source,
-		{ Dir = "Out", Kind = "Hit", Who = name, Amount = amount, Crit = crit == true, Blocked = blocked }
-	)
+	-- Shields (a rival duelist's Cryo Shield, Energy Siphon, block gem or
+	-- Ward) soak the blow first, as a player's do.
+	local absorbed = 0
+	if (e.Shield or 0) > 0 and now < (e.ShieldUntil or 0) then
+		absorbed = math.min(e.Shield, amount)
+		e.Shield -= absorbed
+		amount -= absorbed
+	end
+	DamageLog.send(source, {
+		Dir = "Out",
+		Kind = "Hit",
+		Who = name,
+		Amount = amount,
+		Crit = crit == true,
+		Blocked = blocked,
+		Absorbed = if absorbed > 0 then absorbed else nil,
+	})
 	local humanoid = enemy.Humanoid
 	enemy.LastHit = os.clock()
 	if source then

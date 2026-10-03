@@ -31,14 +31,20 @@ local function alive(player)
 	end
 	return nil, nil
 end
-local function kit(player)
-	local loadout = PlayerData.character(player)
+-- Arena fights are equal ground: only gear and gems count there, so the
+-- Augment Tree's perks (and surge/maneuver ranks) sit out.
+local function inArena(player): boolean
+	return player:GetAttribute("CombatSession") ~= nil
+end
+-- Everything a loadout fights with: its effects, gem defences, ratings and
+-- action rules. `augments` are the Augment Tree's perks ({} for none). The
+-- Arena rival is built by this too, so it fights by exactly a player's rules.
+local function kitFor(loadout, augments)
 	local weapon = loadout and Classes.weapon(loadout.Class, loadout.Weapon)
 	if not weapon or not weapon.Attack then
 		return nil
 	end
 	local effects = Classes.effects(loadout)
-	local augments = Tree.effects(PlayerData.get(player))
 	effects.StaminaRegen = (effects.StaminaRegen or 0) + (augments.StaminaRegen or 0)
 	effects.ChargeRegen = (effects.ChargeRegen or 0) + (augments.ChargeRegen or 0)
 	effects.MobilityMult = 1 + (augments.Mobility or 0)
@@ -100,6 +106,11 @@ local function kit(player)
 		),
 	}
 end
+local function kit(player)
+	local loadout = PlayerData.character(player)
+	return kitFor(loadout, if inArena(player) then {} else Tree.effects(PlayerData.get(player)))
+end
+CombatServer.kitFor = kitFor
 local function rating(k, stat)
 	return k.Ratings[stat].Base + k.Ratings[stat].Bonus
 end
@@ -351,7 +362,8 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 						attacker.ChargeStarted, attacker.ComboSide, attacker.ComboCount = nil, nil, 0
 						Remotes.CombatFx:FireClient(source, "Parried", duration)
 					elseif enemySource then
-						Enemies.addStatus(enemySource, "Stun", 1, 0.5)
+						-- A rival duelist is staggered as a player would be.
+						Enemies.addStatus(enemySource, "Stun", 1, if enemySource.Duel then 0.25 else 0.5)
 						enemySource.StunKind = "Stunned"
 					end
 					Remotes.CombatFx:FireClient(player, "HighBlock")
@@ -1195,7 +1207,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			Remotes.CombatFx:FireClient(player, "TechStatus", "Socket a gem in surge slot " .. surgeKey)
 			return false
 		end
-		definition = Tech.surgeStats(gem, Tree.effects(profile))
+		definition = Tech.surgeStats(gem, if inArena(player) then nil else Tree.effects(profile))
 		cooldownKey = "Surge" .. surgeKey
 	else
 		local base = if typeof(id) == "string" then Tech.Catalog[id] else nil
@@ -1207,7 +1219,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			return false
 		end
 		-- Ranks II and III hit harder, cost less, recover faster and last longer.
-		definition = Tree.techStats(profile, id)
+		definition = if inArena(player) then Tree.scaled(base, 1) else Tree.techStats(profile, id)
 		cooldownKey = id
 	end
 	if not definition then
@@ -1372,6 +1384,24 @@ function CombatServer.blastCC(player, kind, seconds, center, push)
 	local away = flat(root.Position - center)
 	Remotes.CombatFx:FireClient(player, "Blasted", kind, seconds, away * (push or 0))
 end
+-- A rival duelist's gear effects landing on `player`, as a player's land on
+-- their target: Sunder (5s) and SlowOnHit (2s).
+function CombatServer.rivalHitEffects(player, effects)
+	local st, now = state(player), os.clock()
+	if effects.Sunder then
+		st.Sunder = CrowdControl.applyDebuff(st.CC, "Sunder", effects.Sunder, 5, now, true)
+		st.SunderUntil = st.CC.Debuffs.Sunder.Until
+	end
+	if effects.SlowOnHit then
+		st.Slow = CrowdControl.applyDebuff(st.CC, "Slow", effects.SlowOnHit, 2, now, true)
+		st.SlowUntil = st.CC.Debuffs.Slow.Until
+	end
+end
+-- A rival duelist's Corrosive aura while it blocks (a gem defence).
+function CombatServer.rivalAura(player, amount)
+	CrowdControl.applyDebuff(state(player).CC, "Aura", amount, 0.5, os.clock(), true)
+end
+
 function CombatServer.hurt(player, amount, element, enemy, heavy, crit)
 	return receive(
 		player,
