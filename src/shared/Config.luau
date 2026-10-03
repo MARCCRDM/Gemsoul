@@ -10,6 +10,12 @@ local Config = {
 	-- Only this class is playable for now; everyone is set to it (with its
 	-- random equipment set). nil opens all classes again.
 	OnlyClass = "Warrior",
+	-- Whole activities can be switched off (e.g. a combat-only playtest): the
+	-- server refuses them and the dashboard shows them as closed.
+	Features = {
+		Mining = false,
+		Market = false,
+	},
 
 	-- Free mining: each mined node uses one free mine. When the daily or
 	-- weekly allowance runs out, players fund more mine walls with coins.

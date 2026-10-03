@@ -6,6 +6,7 @@ local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Features = require(ReplicatedStorage.Shared.Config).Features or {}
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -172,6 +173,10 @@ draw = function()
 	end
 end
 function TradeUI.open()
+	if Features.Market == false then
+		UiKit.toast("The Market is closed for this playtest.")
+		return
+	end
 	window.Gui.Enabled = true
 	window.Fit()
 	request("TradeState")

@@ -24,6 +24,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Features = require(ReplicatedStorage.Shared.Config).Features or {}
 local MiningSite = require(ReplicatedStorage.Shared.MiningSite)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -670,6 +671,10 @@ local function exitScene()
 end
 
 function MineScene.begin()
+	if Features.Mining == false then
+		UiKit.toast("The Moon Mine is closed for this playtest.", P.Bad)
+		return
+	end
 	if busy or active then
 		return
 	end

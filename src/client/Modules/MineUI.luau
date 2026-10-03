@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Features = require(ReplicatedStorage.Shared.Config).Features or {}
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
@@ -911,6 +912,10 @@ end
 -- Opening -------------------------------------------------------------------------------------------------
 
 function MineUI.open()
+	if Features.Mining == false then
+		UiKit.toast("The Moon Mine is closed for this playtest.", P.Bad)
+		return
+	end
 	tutorialMode = false
 	window.Close.Visible = true
 	window.Gui.Enabled = true

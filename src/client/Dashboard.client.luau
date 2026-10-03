@@ -453,6 +453,38 @@ marketButton.Position = UDim2.new(1, -18, 0.5, 0)
 marketButton.Size = UDim2.fromOffset(0, 42)
 marketButton.TextSize = 15
 
+-- Activities switched off in Config.Features: dimmed under a CLOSED tag.
+do
+	local features = Config.Features or {}
+	local function closed(frame: Frame)
+		local veil = new("TextButton", {
+			Text = "",
+			AutoButtonColor = false,
+			BackgroundColor3 = Color3.fromRGB(6, 8, 14),
+			BackgroundTransparency = 0.06,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 50,
+		}, frame)
+		UiKit.round(veil, 6)
+		local tag = label(veil, "CLOSED", 22, P.Text, IronUi.Heading)
+		tag.TextXAlignment = Enum.TextXAlignment.Center
+		tag.ZIndex = 51
+		tag.Position = UDim2.fromOffset(0, 30)
+		tag.Size = UDim2.new(1, 0, 0, 28)
+		local why = label(veil, "Off for this playtest. Try the Arena!", 13, P.Dim, IronUi.Body)
+		why.TextXAlignment = Enum.TextXAlignment.Center
+		why.ZIndex = 51
+		why.Position = UDim2.fromOffset(0, 62)
+		why.Size = UDim2.new(1, 0, 0, 18)
+	end
+	if features.Mining == false then
+		closed(mine)
+	end
+	if features.Market == false then
+		closed(market)
+	end
+end
+
 -- Training and explicit PvP sessions share the Arena; training visitors are protected.
 local social = panel(root, 970, STRIP_Y, W - 986, STRIP_H, P.Teal)
 local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)

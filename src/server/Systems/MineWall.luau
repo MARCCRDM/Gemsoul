@@ -405,12 +405,21 @@ function MineWall.clear(player: Player)
 end
 
 function MineWall.start()
+	-- Mining switched off (Config.Features): every way in is refused.
+	local function gate(fn)
+		if Config.Features and Config.Features.Mining == false then
+			return function()
+				return reply(false, "The Moon Mine is closed for this playtest.")
+			end
+		end
+		return fn
+	end
 	Shop.register("MineState", mineState)
-	Shop.register("MineStart", mineStart)
-	Shop.register("MineDescend", mineDescend)
-	Shop.register("MineHit", mineHit)
+	Shop.register("MineStart", gate(mineStart))
+	Shop.register("MineDescend", gate(mineDescend))
+	Shop.register("MineHit", gate(mineHit))
 	Shop.register("MineLeave", mineLeave)
-	Shop.register("ExpeditionStart", expeditionStart)
+	Shop.register("ExpeditionStart", gate(expeditionStart))
 	Shop.register("ExpeditionLeave", expeditionLeave)
 	Players.PlayerRemoving:Connect(MineWall.clear)
 	-- A new character (respawn) starts back at base.

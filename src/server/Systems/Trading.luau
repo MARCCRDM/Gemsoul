@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local Logic = require(ReplicatedStorage.Shared.EquipmentTrade)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local PlayerData = require(script.Parent.PlayerData)
@@ -57,11 +58,22 @@ local function view(s, player)
 	}
 end
 function Trading.start()
-	Shop.register("TradeState", function(player)
+	-- The Market switched off (Config.Features): no new offers or deals, but
+	-- looking at and cancelling a trade still work.
+	local closed = Config.Features and Config.Features.Market == false
+	local function register(name: string, fn)
+		if closed and name ~= "TradeState" and name ~= "TradeCancel" then
+			fn = function()
+				return Shop.reply(false, "The Market is closed for this playtest.")
+			end
+		end
+		Shop.register(name, fn)
+	end
+	register("TradeState", function(player)
 		local s = current(player)
 		return Shop.reply(true, "", { Trade = if s then view(s, player) else nil })
 	end)
-	Shop.register("TradeOffer", function(player, targetId, slot, id)
+	register("TradeOffer", function(player, targetId, slot, id)
 		local item = validItem(player, slot, id)
 		local target = if typeof(targetId) == "number"
 				and targetId == targetId
@@ -103,7 +115,7 @@ function Trading.start()
 			{ Trade = view(s, player) }
 		)
 	end)
-	Shop.register("TradeCounter", function(player, sessionId, id)
+	register("TradeCounter", function(player, sessionId, id)
 		local s = current(player)
 		if not s or s.Saving or s.Id ~= sessionId or s.B ~= player then
 			return Shop.reply(false, "No matching incoming offer.")
@@ -117,7 +129,7 @@ function Trading.start()
 		s.Confirmed = {}
 		return Shop.reply(true, "Counteroffer set. Both players must confirm.", { Trade = view(s, player) })
 	end)
-	Shop.register("TradeConfirm", function(player, sessionId, revision)
+	register("TradeConfirm", function(player, sessionId, revision)
 		local s = current(player)
 		if not s or s.Saving or s.Id ~= sessionId or s.Revision ~= revision or not s.Right then
 			return Shop.reply(false, "Wait for both items to be selected.")
@@ -187,7 +199,7 @@ function Trading.start()
 		close(s, message)
 		return Shop.reply(ok, message)
 	end)
-	Shop.register("TradeCancel", function(player, sessionId)
+	register("TradeCancel", function(player, sessionId)
 		local s = current(player)
 		if s and not s.Saving and s.Id == sessionId then
 			close(s, "Trade cancelled.")
