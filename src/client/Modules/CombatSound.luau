@@ -9,8 +9,10 @@
 
 	Roblox only plays uploaded audio, so the files in assets/sounds/combat
 	(made by tools/make_combat_sounds.py; _preview_all.mp3 plays them all)
-	aren't used until they're uploaded: in Creator Hub, Audio, upload each
-	.mp3, copy its id and paste it below. Until then a built-in Roblox sound
+	aren't used until they're uploaded. Easiest: run
+	  python tools/upload_audio.py --key YOUR_API_KEY --user YOUR_USER_ID
+	which uploads them all and fills in the ids below (or upload each .mp3 in
+	Creator Hub, Audio, and paste its id). Until then a built-in Roblox sound
 	stands in, so combat is never silent.
 ]]
 local SoundService = game:GetService("SoundService")
@@ -72,7 +74,7 @@ local FALLBACK = {
 	Heal = { "rbxasset://sounds/electronicpingshort.wav", 1.3, 0.35 },
 	Shield = { "rbxasset://sounds/electronicpingshort.wav", 0.8, 0.35 },
 	Hurt = { "rbxasset://sounds/action_jump_land.mp3", 0.9, 0.6 },
-	Death = { "rbxasset://sounds/uuhhh.mp3", 1, 0.5 },
+	Death = { "rbxasset://sounds/swordlunge.wav", 0.4, 0.6 },
 	Warn = { "rbxasset://sounds/clickfast.wav", 0.8, 0.5 },
 	Kill = { "rbxasset://sounds/victory.wav", 1, 0.35 },
 }
