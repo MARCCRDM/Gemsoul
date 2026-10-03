@@ -1550,14 +1550,19 @@ local function frontierSuit(family: number)
 		-- Catalog identity is stable across saved cosmetic rolls.
 		local design = kit.HelmetDesign or helmetVariant
 		local function block(seg, x, y, z, sx, sy, sz, color, tilt)
-			box(
+			local detail = box(
 				folder,
 				seg,
 				CFrame.new(x, y, z) * CFrame.Angles(0, 0, math.rad(tilt or 0)),
 				Vector3.new(sx, sy, sz),
 				color,
-				SMOOTH
+				if color == cloth or color == trim then SMOOTH else Enum.Material.Metal
 			)
+			if detail then
+				-- Preserve thin etched trim; the legacy builder clamps it to 0.05 studs.
+				detail.Size = Vector3.new(math.max(sx, 0.015), math.max(sy, 0.015), math.max(sz, 0.015))
+				detail.Reflectance = if color == edge or color == BRASS then 0.08 else 0.025
+			end
 		end
 		local function lit(seg, x, y, z, sx, sy, sz)
 			light(folder, seg, CFrame.new(x, y, z), Vector3.new(sx, sy, sz), kit.Accent)
@@ -2002,6 +2007,128 @@ local function frontierSuit(family: number)
 				end
 				if rarity >= 5 then
 					block(foot, 0, s.Y * 0.7, s.Z * 0.12, s.X * 0.59, 0.035, s.Z * 0.35, BRASS)
+				end
+			end
+		end
+		-- Family hardware is visible from the front and three-quarter loadout camera.
+		-- Keep these attached to existing segments so R6, R15 and mixed sets agree.
+		if rarity >= 2 then
+			for key, seg in body do
+				local s = seg.Size
+				local sign = if string.sub(key, 1, 4) == "Left" then -1 else 1
+				if key == "Head" then
+					seg = humanHead(seg)
+					s = seg.Size
+					for _, side in sides() do
+						-- Miner inspection lamps, scout swept rails, tank locking pivots.
+						local tilt = if family == 2 then side * 24 else 0
+						block(
+							seg,
+							side * s.X * 0.45,
+							s.Y * 0.32,
+							-s.Z * 0.48,
+							s.X * 0.14,
+							s.Y * 0.16,
+							0.075,
+							trim,
+							tilt
+						)
+						if family == 3 then
+							cylinder(
+								folder,
+								seg,
+								CFrame.new(side * s.X * 0.45, s.Y * 0.32, -s.Z * 0.53)
+									* CFrame.Angles(0, math.pi / 2, 0),
+								Vector3.new(0.035, s.Y * 0.09, s.Y * 0.09),
+								ornament,
+								Enum.Material.Metal
+							)
+						else
+							block(
+								seg,
+								side * s.X * 0.45,
+								s.Y * 0.32,
+								-s.Z * 0.53,
+								s.X * 0.08,
+								s.Y * 0.055,
+								0.025,
+								if family == 1 then kit.Accent else edge,
+								tilt
+							)
+						end
+					end
+				elseif key == "Torso" then
+					for _, side in sides() do
+						local tilt = if family == 2 then side * -25 else side * -8
+						block(
+							seg,
+							side * s.X * 0.31,
+							s.Y * 0.16,
+							-s.Z * 0.625,
+							s.X * 0.17,
+							s.Y * 0.12,
+							0.035,
+							trim,
+							tilt
+						)
+						for notch = 1, 2 do
+							block(
+								seg,
+								side * s.X * (0.26 + notch * 0.033),
+								s.Y * 0.16,
+								-s.Z * 0.65,
+								0.018,
+								s.Y * 0.085,
+								0.018,
+								ornament,
+								tilt
+							)
+						end
+					end
+				elseif string.find(key, "LowerArm") then
+					local x, y, z = sign * s.X * 0.33, s.Y * 0.04, -s.Z * 0.58
+					-- A framed wrist module, with different instrument faces by family.
+					block(seg, x, y, z, s.X * 0.3, s.Y * 0.38, 0.08, trim)
+					block(seg, x, y, z - 0.05, s.X * 0.23, s.Y * 0.3, 0.035, metal)
+					for line = 1, 3 do
+						block(
+							seg,
+							x,
+							y + s.Y * (0.16 - line * 0.08),
+							z - 0.075,
+							s.X * (if family == 1 then 0.13 elseif family == 2 then 0.06 + line * 0.03 else 0.18),
+							0.022,
+							0.02,
+							if line == 1 then kit.Accent else edge,
+							if family == 2 then sign * 20 else 0
+						)
+					end
+					block(seg, x, y - s.Y * 0.22, z - 0.02, s.X * 0.12, 0.04, 0.045, ornament)
+					if rarity >= 4 then
+						lit(seg, x + sign * s.X * 0.12, y, z - 0.075, 0.018, s.Y * 0.22, 0.02)
+					end
+				elseif string.find(key, "LowerLeg") then
+					-- Split greave face and service ribs; scouts keep the slimmer profile.
+					for _, edgeSide in sides() do
+						block(
+							seg,
+							edgeSide * s.X * 0.17,
+							-s.Y * 0.12,
+							-s.Z * 0.545,
+							s.X * 0.15,
+							s.Y * 0.22,
+							0.025,
+							trim,
+							if family == 2 then edgeSide * 18 else 0
+						)
+					end
+					for line = 1, 3 do
+						block(seg, 0, s.Y * (0.15 - line * 0.065), -s.Z * 0.565, s.X * 0.18, 0.02, 0.02, ornament)
+					end
+				elseif string.find(key, "Foot") then
+					-- Toe bumper and a separated heel latch make the boots read as assemblies.
+					block(seg, 0, -s.Y * 0.1, -s.Z * 0.59, s.X * 0.61, s.Y * 0.18, 0.06, metal)
+					block(seg, 0, s.Y * 0.18, s.Z * 0.435, s.X * 0.28, s.Y * 0.18, 0.035, ornament)
 				end
 			end
 		end

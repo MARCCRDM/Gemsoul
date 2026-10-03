@@ -168,6 +168,16 @@ function Assets.shield(folder, arm, mount, rarity, accent, finish, family)
 		end
 	end
 
+	if rarity >= 2 then
+		for _, side in { -1, 1 } do
+			local fitting = add(side * 0.27, 0.54, -0.235, 0.17, 0.11, 0.035, dark)
+			if family == "Skirmisher" then
+				fitting.CFrame *= CFrame.Angles(0, 0, math.rad(side * 25))
+			end
+			add(side * 0.27, 0.54, -0.26, 0.09, 0.035, 0.02, if rarity == 5 then gold else steel, Enum.Material.Metal)
+		end
+	end
+
 	-- Stepped kite silhouette replaces the smooth oval; plates float over a dark frame.
 	if family == "Prospector" then
 		for _, side in { -1, 1 } do
