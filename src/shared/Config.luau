@@ -39,9 +39,9 @@ local Config = {
 		Build = "Playtest 1 · 2026-10-03",
 		-- UserIds who can read feedback and error reports in game (Social >
 		-- Feedback > Reports). In Studio everyone can.
-		Owners = { 11738957136 }, -- Devvolver
+		Owners = { 11738957136, 11758049015 }, -- Devvolver, VolverDev
 		-- UserIds who get the test-admin tools (e.g. regenerating gear).
-		Testers = {},
+		Testers = { 11758049015 }, -- VolverDev
 		-- Everyone gets the test-admin tools while testing. Turn off for launch.
 		OpenAdmin = true,
 	},
