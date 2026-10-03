@@ -287,7 +287,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	end
 	local st, now = state(player), os.clock()
 	local attackerName = DamageLog.nameOf(source) or DamageLog.nameOf(enemySource)
-	if Actions.invulnerable(st.DodgeStarted, now, k.Rules, pvp) then
+	if Actions.invulnerable(st.DodgeStarted, now, k.Rules, pvp, st.DodgeKind) then
 		DamageLog.send(player, { Dir = "In", Kind = "Dodge", Who = attackerName })
 		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = DamageLog.nameOf(player) })
 		return 0
@@ -731,14 +731,21 @@ local function stopDodge(st)
 	end
 	st.DodgeMove = nil
 end
-local function dodge(player, requested)
+-- `kind`: "Hop" (one tap: short, quick, cheap) or "Roll" (double tap, the
+-- default: long, with a longer dodge window). A roll can cut a hop short,
+-- so tap-tap chains the hop into a roll.
+local function dodge(player, requested, kind)
 	local k = kit(player)
 	local humanoid, root = alive(player)
 	if not k or not humanoid or not Combat.canFight(root.Position) or not Actions.finiteVector(requested) then
 		return false
 	end
+	local hop = kind == "Hop"
 	local st, now = state(player), os.clock()
-	if now < st.NextDodge or now < st.StunUntil or st.DodgeMove or st.Resources.Stamina < Tech.DodgeCost then
+	local cost = if hop then Actions.Base.Hop.Cost else Tech.DodgeCost
+	local busy = st.DodgeMove ~= nil and not (not hop and st.DodgeMove.Kind == "Hop")
+	local ready = if hop then now >= (st.NextHop or 0) else now >= st.NextDodge
+	if not ready or now < st.StunUntil or busy or st.Resources.Stamina < cost then
 		return false
 	end
 	local direction = if Vector3.new(requested.X, 0, requested.Z).Magnitude > 0.1
@@ -748,25 +755,40 @@ local function dodge(player, requested)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { player.Character }
 	params.RespectCanCollide = true
-	local collision = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * k.Rules.DodgeDistance, params)
-	local travel = if collision then math.max(0, collision.Distance - 0.2) else k.Rules.DodgeDistance
-	Tech.spend(st.Resources, "Stamina", Tech.DodgeCost)
+	local distance = if hop then Actions.Base.Hop.Distance else k.Rules.DodgeDistance
+	local duration = if hop then Actions.Base.Hop.Duration else Actions.Base.Dodge.Duration
+	local collision = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * distance, params)
+	local travel = if collision then math.max(0, collision.Distance - 0.2) else distance
+	Tech.spend(st.Resources, "Stamina", cost)
 	player:SetAttribute("Stamina", st.Resources.Stamina)
-	st.NextDodge, st.DodgeStarted = now + k.Rules.DodgeCooldown, now
+	if hop then
+		st.NextHop = now + Actions.Base.Hop.Cooldown
+	else
+		st.NextDodge = now + k.Rules.DodgeCooldown
+		st.NextHop = math.max(st.NextHop or 0, now + Actions.Base.Hop.Cooldown)
+	end
+	st.DodgeStarted, st.DodgeKind = now, if hop then "Hop" else "Roll"
 	st.Channel, st.Pending = nil, {}
 	st.AfterDodgeUntil, st.BlockUntil, st.ChargeStarted = now + Actions.AfterDodgeSeconds, 0, nil
+	if st.DodgeMove then
+		stopDodge(st) -- a roll out of a hop
+	end
 	st.DodgeMove = {
+		Kind = st.DodgeKind,
 		Root = root,
 		Direction = direction,
-		Speed = travel / Actions.Base.Dodge.Duration,
-		Ends = now + Actions.Base.Dodge.Duration,
+		Speed = travel / duration,
+		Ends = now + duration,
+		Lift = if hop then Actions.Base.Hop.Lift else nil,
 	}
 	pcall(function()
 		root:SetNetworkOwner(nil)
 	end)
 	player:SetAttribute("Blocking", false)
-	Remotes.CombatFx:FireClient(player, "Cooldown", "Dodge", k.Rules.DodgeCooldown)
-	fx("DodgeRoll", player, root.Position, direction, travel, k.Rules.Deflect)
+	if not hop then
+		Remotes.CombatFx:FireClient(player, "Cooldown", "Dodge", k.Rules.DodgeCooldown)
+	end
+	fx("DodgeRoll", player, root.Position, direction, travel, k.Rules.Deflect and not hop)
 	return true
 end
 local function block(player, held, aim)
@@ -1252,7 +1274,7 @@ local function onInput(player, action, a, b)
 		st.ChargeStarted = nil
 		attack(player, a, false)
 	elseif action == "Dodge" then
-		dodge(player, a)
+		dodge(player, a, b)
 	elseif action == "Block" and a == true then
 		block(player, true, b)
 	end
@@ -1386,8 +1408,13 @@ local function tick(_dt)
 			if now >= st.DodgeMove.Ends then
 				stopDodge(st)
 			else
-				root.AssemblyLinearVelocity = st.DodgeMove.Direction * st.DodgeMove.Speed
-					+ Vector3.new(0, math.min(root.AssemblyLinearVelocity.Y, 0), 0)
+				local move = st.DodgeMove
+				-- A hop leaves the ground once; a roll stays low.
+				local lift = if move.Lift
+					then (if move.Lifted then root.AssemblyLinearVelocity.Y else move.Lift)
+					else math.min(root.AssemblyLinearVelocity.Y, 0)
+				move.Lifted = true
+				root.AssemblyLinearVelocity = move.Direction * move.Speed + Vector3.new(0, lift, 0)
 			end
 		end
 		if st.ChargeStarted and now - st.ChargeStarted > 3 then

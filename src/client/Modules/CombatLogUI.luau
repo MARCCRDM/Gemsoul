@@ -99,7 +99,7 @@ function CombatLogUI.format(entry): string
 		return string.format("%s is %s%s", who, label, value)
 	elseif entry.Kind == "Dodge" then
 		if entry.Dir == "In" then
-			return string.format("You %s %s's attack", paint("dodged", HEAL, true), who)
+			return string.format("You %s %s's %s", paint("dodged", HEAL, true), who, ability or "attack")
 		end
 		return string.format("%s %s your %s", who, paint("dodged", HURT, true), ability or "attack")
 	elseif entry.Kind == "Heal" then

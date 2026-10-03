@@ -13,10 +13,23 @@ Actions.Base = {
 		Knockback = 12,
 		BreakSeconds = 0.8,
 	},
+	-- Double-tap Space: a long roll.
 	Dodge = { Name = "Dodge", Cooldown = 3, Distance = 15, Duration = 0.25, Invincible = 0.5, PvPInvincible = 0.3 },
+	-- Single tap: a quick hop to the side, cheap and fast but a short dodge window.
+	Hop = {
+		Name = "Hop",
+		Cooldown = 0.6,
+		Distance = 7,
+		Duration = 0.18,
+		Lift = 16,
+		Invincible = 0.28,
+		PvPInvincible = 0.2,
+		Cost = 8,
+	},
 	Block = { Name = "Block", Reduction = 0.5, PvPReduction = 0.4, Arc = 120 },
 }
 Actions.AfterDodgeSeconds = 3
+Actions.DoubleTap = 0.3 -- seconds between Space taps that make a roll
 Actions.BlockLease = 0.6 -- release automatically if focus/disconnection drops an End packet
 Actions.PerfectAt = 0.75
 Actions.PerfectWindow = 0.09
@@ -46,7 +59,7 @@ function Actions.validInput(action, a, b)
 	elseif action == "Block" then
 		return a == false or (a == true and Actions.finiteVector(b))
 	elseif action == "Dodge" then
-		return a == nil or Actions.finiteVector(a)
+		return (a == nil or Actions.finiteVector(a)) and (b == nil or b == "Hop" or b == "Roll")
 	elseif action == "RigManeuver" then
 		return typeof(a) == "string" and #a <= 64 and Actions.finiteVector(b)
 	elseif action == "Surge" then
@@ -125,8 +138,17 @@ function Actions.canPvP(source, target, sourceInArena, targetInArena, sourceOpte
 		and targetOptedIn == true
 		and not sameTeam
 end
-function Actions.invulnerable(started, now, rules, pvp)
-	return started ~= nil and now >= started and now - started < (if pvp then rules.PvPInvincible else rules.Invincible)
+-- `kind` "Hop" has its own, shorter window; otherwise it's a roll.
+function Actions.invulnerable(started, now, rules, pvp, kind)
+	local window = if kind == "Hop"
+		then (if pvp then Actions.Base.Hop.PvPInvincible else Actions.Base.Hop.Invincible)
+		else (if pvp then rules.PvPInvincible else rules.Invincible)
+	return started ~= nil and now >= started and now - started < window
+end
+
+-- Space taps: a second tap within DoubleTap of the last makes a roll.
+function Actions.dodgeKind(lastTap: number?, now: number): string
+	return if lastTap and now - lastTap <= Actions.DoubleTap then "Roll" else "Hop"
 end
 function Actions.blockMultiplier(rules, pvp, facingDot, projectile, heavy)
 	if heavy or facingDot < math.cos(math.rad(rules.BlockArc / 2)) then

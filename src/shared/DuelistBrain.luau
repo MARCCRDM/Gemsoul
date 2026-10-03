@@ -19,7 +19,10 @@
 local Brain = {}
 
 Brain.Reach = 6.5 -- melee range, studs
-Brain.Windup = { Light = 0.3, Heavy = 0.75, Punish = 0.18, Lunge = 0.25, Bolt = 0.45, Nova = 0.9 }
+-- Wind-ups, seconds. Bolts, blasts and heavies are slow enough to see on the
+-- enemy cast bar and dodge (tap Space to hop aside, double-tap to roll).
+Brain.Windup = { Light = 0.3, Heavy = 0.75, Punish = 0.18, Lunge = 0.25, Bolt = 0.7, Nova = 0.9 }
+Brain.BoltRadius = 3.5 -- a bolt hits within this many studs of where it was aimed
 Brain.SurgeRange = 32
 Brain.LungeRange = 18
 
@@ -40,6 +43,12 @@ export type View = {
 	NextRetreat: number,
 	NextLunge: number,
 }
+
+-- A bolt aimed at `aim` hits a player now at `at` (only sideways distance counts).
+function Brain.boltHits(aim: Vector3, at: Vector3): boolean
+	local offset = at - aim
+	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= Brain.BoltRadius
+end
 
 -- `roll` is a random number in [0, 1).
 function Brain.decide(v: View, roll: number): string

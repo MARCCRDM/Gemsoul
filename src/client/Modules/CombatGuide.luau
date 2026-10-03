@@ -67,9 +67,19 @@ function CombatGuide.refresh()
 			),
 		},
 		{
-			"DODGE · Space / Dodge Button · 15 Stamina",
+			"HOP · Tap Space · 8 Stamina",
 			string.format(
-				"%.2g studs · %.2fs cooldown · %.2gs PvE / %.2gs PvP immunity. Rolls in your movement direction.",
+				"A quick %.2g-stud sidestep · %.2gs cooldown · %.2gs PvE / %.2gs PvP immunity. Step out of a bolt or a blast ring.",
+				Actions.Base.Hop.Distance,
+				Actions.Base.Hop.Cooldown,
+				Actions.Base.Hop.Invincible,
+				Actions.Base.Hop.PvPInvincible
+			),
+		},
+		{
+			"ROLL · Double-tap Space · 15 Stamina",
+			string.format(
+				"%.2g studs · %.2fs cooldown · %.2gs PvE / %.2gs PvP immunity. Time it as the enemy's cast bar fills.",
 				rules.DodgeDistance,
 				rules.DodgeCooldown,
 				rules.Invincible,

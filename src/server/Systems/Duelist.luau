@@ -176,10 +176,14 @@ end
 
 -- What its body is doing, for the player's client to pose (see the client's
 -- RivalPose): the action, when its wind-up began and when it lands.
-local function animate(duel, kind: string, windup: number, side: number?)
+-- `name` (a surge, maneuver or "Heavy Blow") shows on the player's enemy
+-- cast bar, so they can see it coming and dodge.
+local function animate(duel, kind: string, windup: number, side: number?, name: string?)
 	local model = duel.Enemy.Model
 	local t = workspace:GetServerTimeNow()
 	duel.Swings = (duel.Swings or 0) + 1
+	model:SetAttribute("ActionName", name)
+	model:SetAttribute("ActionElement", if name then duel.CastElement else nil)
 	model:SetAttribute("ActionKind", kind)
 	model:SetAttribute("ActionStart", t)
 	model:SetAttribute("ActionAt", t + windup)
@@ -313,7 +317,8 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		-- A blast with a warning ring: under the player, or around itself.
 		local center = if surge.SelfCentered then root.Position else target.Position
 		fx("Nova", center - Vector3.new(0, 2.5, 0), surge.Radius, color, Brain.Windup.Nova)
-		animate(duel, "Nova", Brain.Windup.Nova)
+		duel.CastElement = surge.Element
+		animate(duel, "Nova", Brain.Windup.Nova, nil, surge.Name)
 		duel.Action = {
 			Kind = "Nova",
 			Name = surge.Name,
@@ -334,7 +339,8 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 			Element = surge.Element,
 			Gem = surge.Gem,
 		}
-		animate(duel, "Bolt", Brain.Windup.Bolt)
+		duel.CastElement = surge.Element
+		animate(duel, "Bolt", Brain.Windup.Bolt, nil, surge.Name)
 	end
 end
 
@@ -367,7 +373,8 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 		fx("Nova", root.Position - Vector3.new(0, 2.5, 0), 4.5, Color3.fromRGB(255, 120, 60), move.Windup)
 	end
 	setStance(duel, if move.Windup then "Heavy" else "Maneuver")
-	animate(duel, if move.Windup then "Heavy" else "Slash", move.Windup or 0.25)
+	duel.CastElement = nil
+	animate(duel, if move.Windup then "Heavy" else "Slash", move.Windup or 0.25, nil, move.Name)
 	duel.Action = {
 		Kind = "Move",
 		Name = move.Name,
@@ -444,12 +451,22 @@ local function think(enemy, now: number)
 			setStance(duel, "")
 			duel.NextAttack = now + duel.Rate * (0.8 + math.random() * 0.4)
 		elseif action.Kind == "Bolt" then
+			-- Fired at where the player stands now: step or roll aside and it misses.
 			local from = root.Position + Vector3.new(0, 1.5, 0)
-			fx("Shot", nil, from, target.Position, GemConfig.ElementColors[action.Element] or color, "Fireball")
+			local aim = target.Position
+			fx("Shot", nil, from, aim, GemConfig.ElementColors[action.Element] or color, "Fireball")
 			task.delay(math.clamp(distance / 140, 0.05, 0.5), function()
 				local stillRoot = ownerRoot(owner)
-				if duels[owner] == duel and stillRoot then
+				if duels[owner] ~= duel or not stillRoot then
+					return
+				end
+				if Brain.boltHits(aim, stillRoot.Position) then
 					strike(duel, damage * action.Power, action.Element, false, action.Gem, action.Name or "Bolt")
+				else
+					DamageLog.send(
+						owner,
+						{ Dir = "In", Kind = "Dodge", Who = duel.Name, Ability = action.Name, Element = action.Element }
+					)
 				end
 			end)
 			duel.NextAttack = now + 0.4
@@ -586,7 +603,14 @@ local function think(enemy, now: number)
 	elseif choice == "Light" or choice == "Heavy" then
 		local heavy = choice == "Heavy"
 		duel.Action = { Kind = choice, At = now + Brain.Windup[choice], Hits = 1 }
-		animate(duel, if heavy then "Heavy" else "Slash", Brain.Windup[choice])
+		duel.CastElement = duel.Element
+		animate(
+			duel,
+			if heavy then "Heavy" else "Slash",
+			Brain.Windup[choice],
+			nil,
+			if heavy then "Heavy Blow" else nil
+		)
 		setStance(duel, if heavy then "Heavy" else "")
 		press(duel, "LMB")
 		if heavy then

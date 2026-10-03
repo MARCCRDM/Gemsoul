@@ -319,6 +319,71 @@ local selfStatusRow = new("Frame", {
 }, gui)
 local selfStatuses = StatusBars.strip(selfStatusRow, false)
 local selfStatusIcons = StatusBars.strip(selfStatusRow, true) -- narrow screens: icons only
+-- The rival's cast bar (under the target frame), like an RPG's enemy cast
+-- bar: what it's winding up and how long until it lands, with a DODGE cue.
+local foeCast = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
+	BackgroundTransparency = 0.1,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 136),
+	Size = UDim2.fromOffset(320, 44),
+	Visible = false,
+}, gui)
+UiKit.round(foeCast, 8)
+local foeCastStroke = new("UIStroke", { Color = P.Gold, Thickness = 1.5, Transparency = 0.2 }, foeCast)
+local foeCastName = shadowed(text(foeCast, "", 14, P.Text, IronUi.Bold))
+foeCastName.AutomaticSize, foeCastName.TextWrapped = Enum.AutomaticSize.None, false
+foeCastName.Position, foeCastName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -90, 0, 18)
+local foeCastTime = shadowed(text(foeCast, "", 12, Color3.fromRGB(200, 210, 225), IronUi.Bold))
+foeCastTime.AutomaticSize, foeCastTime.TextWrapped = Enum.AutomaticSize.None, false
+foeCastTime.TextXAlignment = Enum.TextXAlignment.Right
+foeCastTime.Position, foeCastTime.Size = UDim2.new(1, -90, 0, 4), UDim2.fromOffset(80, 18)
+local foeCastTrack = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(10, 26),
+	Size = UDim2.new(1, -20, 0, 10),
+}, foeCast)
+UiKit.round(foeCastTrack, 4)
+local foeCastFill =
+	new("Frame", { BackgroundColor3 = P.Gold, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, foeCastTrack)
+UiKit.round(foeCastFill, 4)
+local foeDodge = shadowed(text(gui, "DODGE!  SPACE", 22, Color3.fromRGB(255, 90, 80), IronUi.Bold))
+foeDodge.AutomaticSize, foeDodge.TextWrapped = Enum.AutomaticSize.None, false
+foeDodge.TextXAlignment = Enum.TextXAlignment.Center
+foeDodge.AnchorPoint, foeDodge.Position, foeDodge.Size =
+	Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 184), UDim2.fromOffset(320, 28)
+foeDodge.Visible = false
+local function drawFoeCast(model, serverNow)
+	local name = model and model:GetAttribute("ActionName")
+	local start, at = model and model:GetAttribute("ActionStart"), model and model:GetAttribute("ActionAt")
+	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+	local casting = type(name) == "string"
+		and type(start) == "number"
+		and type(at) == "number"
+		and at - start >= 0.35
+		and serverNow < at + 0.08
+		and humanoid ~= nil
+		and humanoid.Health > 0
+	foeCast.Visible, foeDodge.Visible = casting, false
+	if not casting then
+		return
+	end
+	local color = GemConfig.ElementColors[model:GetAttribute("ActionElement") or ""] or P.Gold
+	local left = math.max(0, at - serverNow)
+	local progress = math.clamp((serverNow - start) / (at - start), 0, 1)
+	foeCastName.Text = string.upper(name)
+	foeCastName.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.3)
+	foeCastTime.Text = string.format("%.1fs", left)
+	foeCastFill.Size = UDim2.fromScale(progress, 1)
+	foeCastFill.BackgroundColor3 = color
+	-- The last moments: the time to hop or roll.
+	local urgent = left <= 0.35
+	foeCastStroke.Color = if urgent then Color3.fromRGB(255, 90, 80) else color
+	foeDodge.Visible = urgent
+	foeDodge.TextTransparency = if urgent then 0.15 * (1 + math.sin(os.clock() * 30)) else 1
+end
+
 -- The combat log (bottom left), with fight details on L.
 local combatLog = CombatLogUI.new(gui)
 local logRival = nil
@@ -421,7 +486,7 @@ targetText.AutomaticSize, targetText.TextWrapped = Enum.AutomaticSize.None, fals
 targetText.TextXAlignment, targetText.Size, targetText.ZIndex = Enum.TextXAlignment.Center, UDim2.fromScale(1, 1), 3
 local controlsHint = text(
 	gui,
-	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Dodge | Q/E/R Gem Surges | 1/2/3 Rig Maneuvers | K Tree | Tab Cursor",
+	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | 1/2/3 Maneuvers | K Tree | L Log",
 	11,
 	P.Text
 )
@@ -770,13 +835,18 @@ local function setBlock(held)
 	input:FireServer("Block", held, aim)
 	nextBlockUpdate = os.clock() + 0.15
 end
+-- Space once: a quick hop. Space twice: a roll (the hop chains into it).
+local lastDodgeTap = nil
 local function dodge()
 	if cursorFree or not canFight() then
 		return
 	end
+	local now = os.clock()
+	local kind = Actions.dodgeKind(lastDodgeTap, now)
+	lastDodgeTap = if kind == "Roll" then nil else now
 	local cd = cooldowns.Dodge
-	if cd and os.clock() < cd.Ready then
-		return
+	if kind == "Roll" and cd and now < cd.Ready then
+		return -- the roll is still cooling down
 	end
 	holding = false
 	blockHeld = false
@@ -788,7 +858,8 @@ local function dodge()
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	input:FireServer(
 		"Dodge",
-		if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then humanoid.MoveDirection else root.CFrame.LookVector
+		if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then humanoid.MoveDirection else root.CFrame.LookVector,
+		kind
 	)
 end
 local function pressInput(obj)
@@ -885,7 +956,7 @@ local function makeSlot(id, label, key, position)
 end
 local attackButton = makeSlot("Basic", "LEFT", "HOLD", UDim2.new(0, 56, 1, -32))
 local heavyButton = makeSlot("Heavy", "RIGHT", "HOLD", UDim2.new(1, -56, 1, -32))
-local dodgeButton = makeSlot("Dodge", "DODGE", "TAP", UDim2.new(1, -56, 1, -210))
+local dodgeButton = makeSlot("Dodge", "DODGE", "TAP·2×", UDim2.new(1, -56, 1, -210))
 local blockButton = makeSlot("Block", "GUARD", "HOLD", UDim2.new(0.5, 0, 1, -32))
 attackButton.InputBegan:Connect(function(obj)
 	if pressInput(obj) and not holding then
@@ -1287,6 +1358,7 @@ RunService.RenderStepped:Connect(function(dt)
 		"Foe",
 		rivalModel and (rivalModel:GetAttribute("RivalName") or rivalModel.Name)
 	)
+	drawFoeCast(rivalModel, serverNow)
 	if rivalModel ~= logRival and rivalModel ~= nil then
 		logRival = rivalModel
 		combatLog:reset() -- a new rival: a new fight
@@ -1365,7 +1437,7 @@ RunService.RenderStepped:Connect(function(dt)
 			remaining = math.max(0, nextAttack - now)
 		end
 		slot.Key.Text = if UserInputService.TouchEnabled
-			then (if id == "Dodge" then "TAP" else "HOLD")
+			then (if id == "Dodge" then "TAP·2×" else "HOLD")
 			else ({ Basic = "LMB", Heavy = "SHIFT+LMB", Block = "HOLD RMB", Dodge = "SPACE" })[id]
 		slot.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
 		local pressed = (id == "Block" and blockHeld)

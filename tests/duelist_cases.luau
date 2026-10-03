@@ -187,4 +187,32 @@ check(fight.Done.Total == 150 and fight.Done.Hits == 3 and fight.Done.Crits == 1
 check(doneRows[1].Name == "Solar Flare" and math.abs(doneRows[1].Share - 0.6) < 1e-6 and doneRows[2].Total == 60, "Per-ability breakdown wrong")
 check(fight.Taken.Total == 30 and fight.Taken.Blocked == 70 and fight.Taken.Absorbed == 10 and fight.Taken.Dodged == 1, "Damage taken tally wrong")
 check(fight.FoeHealed == 15 and fight.Last == 5, "Healing or fight time not tracked")
-print("PASS: " .. checks .. " Duelist checks (combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
+-- Dodging like a fighting game: tap Space to hop, double-tap to roll.
+check(Actions.dodgeKind(nil, 5) == "Hop" and Actions.dodgeKind(4.8, 5) == "Roll" and Actions.dodgeKind(4, 5) == "Hop", "Tap timing wrong")
+check(Actions.validInput("Dodge", Vector3.new(1, 0, 0), "Hop") and Actions.validInput("Dodge", Vector3.new(1, 0, 0), "Roll") and not Actions.validInput("Dodge", Vector3.new(1, 0, 0), "Fly"), "Dodge kinds not validated")
+local hopper, hh, hr = makePlayer(61, arena, nil)
+now += 30
+CombatServer._tick(0.1)
+local hst = CombatServer._state(hopper)
+CombatServer._dodge(hopper, Vector3.new(1, 0, 0), "Hop")
+check(hst.DodgeKind == "Hop" and hst.DodgeMove and hst.DodgeMove.Kind == "Hop", "Tap did not hop")
+check(Actions.invulnerable(hst.DodgeStarted, now + 0.2, { Invincible = 0.5, PvPInvincible = 0.3 }, false, "Hop"), "Hop had no dodge window")
+check(not Actions.invulnerable(hst.DodgeStarted, now + 0.35, { Invincible = 0.5, PvPInvincible = 0.3 }, false, "Hop"), "Hop dodge window as long as a roll")
+local hopStamina = hst.Resources.Stamina
+now += 0.05
+CombatServer._dodge(hopper, Vector3.new(1, 0, 0), "Roll")
+check(hst.DodgeKind == "Roll" and hst.DodgeMove.Kind == "Roll", "Double tap did not chain the hop into a roll")
+check(hst.Resources.Stamina < hopStamina, "Roll was free")
+now += 0.05
+CombatServer._dodge(hopper, Vector3.new(1, 0, 0), "Hop")
+check(hst.DodgeMove.Kind == "Roll", "A hop cut a roll short")
+now += 0.7
+CombatServer._tick(0.7)
+check(not CombatServer._dodge(hopper, Vector3.new(1, 0, 0), "Roll"), "Roll ignored its cooldown")
+CombatServer._dodge(hopper, Vector3.new(1, 0, 0), "Hop")
+check(hst.DodgeKind == "Hop" and hst.DodgeStarted == now, "Hop blocked by the roll's cooldown")
+-- A bolt aimed where you stood misses once you've stepped aside.
+check(DuelistBrain.boltHits(Vector3.new(0, 0, 0), Vector3.new(2, 3, 1)), "Bolt missed a player standing still")
+check(not DuelistBrain.boltHits(Vector3.new(0, 0, 0), Vector3.new(6, 0, 0)), "Bolt hit a player who hopped aside")
+check(DuelistBrain.Windup.Bolt >= 0.6, "Bolt too fast to react to")
+print("PASS: " .. checks .. " Duelist checks (hop and roll, dodgeable bolts, combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
