@@ -1372,8 +1372,19 @@ function CombatServer.blastCC(player, kind, seconds, center, push)
 	local away = flat(root.Position - center)
 	Remotes.CombatFx:FireClient(player, "Blasted", kind, seconds, away * (push or 0))
 end
-function CombatServer.hurt(player, amount, element, enemy, heavy)
-	return receive(player, amount, element, nil, enemy and enemy.Root.Position, false, heavy == true, false, enemy)
+function CombatServer.hurt(player, amount, element, enemy, heavy, crit)
+	return receive(
+		player,
+		amount,
+		element,
+		nil,
+		enemy and enemy.Root.Position,
+		false,
+		heavy == true,
+		false,
+		enemy,
+		crit
+	)
 end
 -- os.clock() -> server time, which clients can count down against.
 local clockOffset
@@ -1645,8 +1656,8 @@ function CombatServer.reset(player)
 	player:SetAttribute("Charge", 0)
 end
 function CombatServer.start()
-	Enemies.hitPlayer = function(player, amount, element, enemy, heavy)
-		return CombatServer.hurt(player, amount, element, enemy, heavy)
+	Enemies.hitPlayer = function(player, amount, element, enemy, heavy, crit)
+		return CombatServer.hurt(player, amount, element, enemy, heavy, crit)
 	end
 	-- A rival parried your swing: you're left open for a moment.
 	Enemies.parryPlayer = function(player, seconds)

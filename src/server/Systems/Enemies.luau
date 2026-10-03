@@ -162,7 +162,8 @@ Enemies.hitPlayer = function(
 	_amount: number,
 	_element: string?,
 	_enemy: Enemy,
-	_heavy: boolean?
+	_heavy: boolean?,
+	_crit: boolean?
 ): (number?, boolean?)
 	return nil, nil
 end

@@ -341,9 +341,15 @@ end
 
 -- Lands a blow on its player; a hit that gets through carries its gem's
 -- element (burn, slow or freeze, armor shred, shock), as a player's would.
-function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ability: string)
+-- `critChance` rolls a critical (1.6x, shown as CRIT and in the log), by
+-- the same chances a player's attacks have.
+function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ability: string, critChance: number?)
+	local crit = math.random() < (critChance or 0)
+	if crit then
+		amount *= Combat.CritMult
+	end
 	local previous = DamageLog.push(ability, element)
-	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy)
+	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy, crit)
 	DamageLog.pop(previous)
 	if type(dealt) == "number" and dealt > 0 and not guarded and gem then
 		CombatServer.enemyProc(duel.Owner, gem, duel.Enemy)
@@ -407,6 +413,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 			Center = center,
 			Radius = surge.Radius,
 			Power = surge.Power,
+			Crit = surge.Crit,
 			Element = surge.Element,
 			Gem = surge.Gem,
 		}
@@ -417,6 +424,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 			Name = surge.Name,
 			At = now + Brain.Windup.Bolt,
 			Power = surge.Power,
+			Crit = surge.Crit,
 			Element = surge.Element,
 			Gem = surge.Gem,
 		}
@@ -461,6 +469,7 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 		Name = move.Name,
 		At = now + (move.Windup or 0.25),
 		Power = move.Power,
+		Crit = move.Crit,
 		Heavy = move.Windup ~= nil,
 		Hits = move.Hits,
 	}
@@ -589,19 +598,18 @@ local function think(enemy, now: number)
 			if distance <= Brain.Reach + 1.5 then
 				-- Resonance Echo: its swings hit harder for a while.
 				local echo = if now < (duel.EchoUntil or 0) then 1.5 else 1
-				-- Crits by its Speed, as yours are.
-				local crit = math.random() < (duel.Crit or 0)
 				strike(
 					duel,
 					damage
 						* (if heavy then Actions.Base.Heavy.PvPDamage else 1)
 						* echo
-						* (if crit then Combat.CritMult else 1)
 						* (if winded then Actions.Stamina.WindedDamage else 1),
 					duel.Element,
 					heavy,
 					duel.WeaponGem,
-					SWING_NAMES[action.Kind] or "Swing"
+					SWING_NAMES[action.Kind] or "Swing",
+					-- Crits by its Speed, as yours are (heavies a little more).
+					math.min(0.75, (duel.Crit or 0) + (if heavy then duel.HeavyCrit or 0 else 0))
 				)
 			end
 			-- Combos: up to three swings in a row.
@@ -630,7 +638,15 @@ local function think(enemy, now: number)
 					return
 				end
 				if Brain.boltHits(aim, stillRoot.Position) then
-					strike(duel, damage * action.Power, action.Element, false, action.Gem, action.Name or "Bolt")
+					strike(
+						duel,
+						damage * action.Power,
+						action.Element,
+						false,
+						action.Gem,
+						action.Name or "Bolt",
+						action.Crit
+					)
 				else
 					DamageLog.send(
 						owner,
@@ -649,13 +665,20 @@ local function think(enemy, now: number)
 					duel.Element,
 					action.Heavy,
 					duel.WeaponGem,
-					action.Name or "Maneuver"
+					action.Name or "Maneuver",
+					action.Crit
 				)
 			end
 			if (action.Hits or 1) > 1 then
 				-- Multi-hit maneuvers (Servo Flurry) strike again quickly.
-				duel.Action =
-					{ Kind = "Move", Name = action.Name, At = now + 0.2, Power = action.Power, Hits = action.Hits - 1 }
+				duel.Action = {
+					Kind = "Move",
+					Name = action.Name,
+					At = now + 0.2,
+					Power = action.Power,
+					Crit = action.Crit,
+					Hits = action.Hits - 1,
+				}
 				animate(duel, "Slash", 0.2)
 				return
 			end
@@ -673,7 +696,8 @@ local function think(enemy, now: number)
 					action.Element,
 					false,
 					action.Gem,
-					action.Name or "Blast"
+					action.Name or "Blast",
+					action.Crit
 				)
 				if type(dealt) == "number" and dealt > 0 and cc then
 					if guarded then
@@ -1026,6 +1050,7 @@ function spawnRival(owner: Player)
 		Damage = rivalHit * (if sparring then 0.5 else 1),
 		Weapon = rivalWeapon,
 		Crit = Combat.critChance(rating(mine, "Speed"), rivalEffects.CritAdd),
+		HeavyCrit = rules.HeavyCrit,
 		Speed = Classes.walkSpeed(rating(mine, "Speed")) + (rivalEffects.SpeedAdd or 0),
 		SwingCooldown = rules.BasicCooldown,
 		Rate = if sparring then rules.BasicCooldown * 1.8 else rules.BasicCooldown,
@@ -1094,6 +1119,7 @@ function spawnRival(owner: Player)
 				Radius = Actions.blastRadius(stats.Radius), -- wide: see Actions.Blast
 				-- A player's surge numbers: its damage, Charge cost and recovery.
 				Power = stats.Damage or 1,
+				Crit = stats.Crit, -- a gem's cut gives its surge a crit chance, as yours
 				Cost = stats.Cost or 0,
 				Cooldown = math.max(stats.Recovery or 1, 2.5),
 				Next = now + 2.5 + slot * 1.5,
@@ -1125,6 +1151,7 @@ function spawnRival(owner: Player)
 			Hits = stats.Hits,
 			-- A player's maneuver numbers: its Stamina cost and recovery.
 			Cost = stats.Cost or 0,
+			Crit = stats.Crit,
 			Cooldown = math.max(stats.Recovery or 1, 1.5),
 			Next = now + 2 + slot,
 		}
