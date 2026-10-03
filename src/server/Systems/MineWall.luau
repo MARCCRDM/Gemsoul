@@ -29,6 +29,7 @@ local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Shop = require(script.Parent.Shop)
+local GearSerials = require(script.Parent.GearSerials)
 
 local reply = Shop.reply
 
@@ -199,7 +200,13 @@ local function recoverGear(player: Player, depth: number)
 		return gear.Name .. " (salvaged)"
 	end
 	PlayerData.setGearQuality(player, kind, gear.Id, rng:NextInteger(quality + 1, maxQuality))
+	-- Found by you (and numbered, if it's Ultra Rare or better).
+	GearSerials.stamp(player, kind, gear.Id)
 	PlayerData.milestone(player, "Recovered")
+	local roll = profile.Character.GearRolls[kind] and profile.Character.GearRolls[kind][gear.Id]
+	if roll and roll.Prismatic and quality == 0 then
+		return "✦ PRISMATIC " .. gear.Name
+	end
 	return gear.Name
 end
 

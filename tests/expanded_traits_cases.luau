@@ -1,7 +1,7 @@
 -- Weighted starting-pool coverage and executable equipment contracts.
 local draws, counts = 0, {}
 for kind, catalog in ExpandedTraits.Catalog do
-	assert(#catalog == (if kind == "Weapons" then 20 else 15), "Unexpected catalog size for " .. kind)
+	assert(#catalog == (if kind == "Weapons" then 20 + #WeaponForge.Catalog else 15), "Unexpected catalog size for " .. kind)
 	local seen, rarityCounts = {}, { 0, 0, 0, 0, 0 }
 	local rng = Random.new(9231)
 	for _ = 1, 10000 do
@@ -12,18 +12,18 @@ for kind, catalog in ExpandedTraits.Catalog do
 		draws += 1
 	end
 	for _, item in catalog do
-		if ExpandedTraits.obtainable(item) then
+		if item.StartPool and ExpandedTraits.obtainable(item) then
 			assert(seen[item.Id], "Starting draw never reached " .. item.Id)
 		else
-			-- Pistols are switched off for now: never drawn.
-			assert(not seen[item.Id], "A disabled pistol was drawn: " .. item.Id)
+			-- Pistols are switched off, and the older swords retired: never drawn.
+			assert(not seen[item.Id], "A retired weapon was drawn: " .. item.Id)
 		end
 		assert(Classes.gear("Warrior", kind, item.Id) == item, "Catalog identity differs")
 		if kind == "Weapons" then
 			assert(
 				(
 					item.Attack.Kind == "Shot"
-					or (item.Attack.Kind == "Melee" and item.Attack.Range <= 8 and item.Attack.Combo == 3)
+					or (item.Attack.Kind == "Melee" and item.Attack.Range <= 10 and item.Attack.Combo == 3)
 				)
 					and item.Attack.Rate > 0
 					and item.Attack.Damage > 0,
@@ -36,6 +36,41 @@ for kind, catalog in ExpandedTraits.Catalog do
 	end
 	counts[kind] = rarityCounts
 end
+-- The Forge: 25 weapons, five kinds in five rarities, each with its own perk.
+assert(#WeaponForge.Catalog == 25, "The Forge should hold 25 weapons")
+local perkKeys, kinds = {}, {}
+for _, weapon in WeaponForge.Catalog do
+	assert(weapon.StartPool and ExpandedTraits.obtainable(weapon), weapon.Id .. " can't be found")
+	assert(weapon.Look == "Forge" .. weapon.WeaponType, weapon.Id .. " lost its look")
+	assert(weapon.ArmorFamily ~= nil, weapon.Id .. " has no set family")
+	local key, value = next(weapon.Passive.Effect)
+	assert(key and WeaponForge.Perks[key] and value > 0, weapon.Id .. " has no working perk")
+	assert(not perkKeys[key], "Two weapons share the perk " .. key)
+	perkKeys[key] = true
+	assert(string.find(weapon.Passive.Text, "%d+%%") ~= nil, weapon.Id .. "'s perk doesn't say how much")
+	kinds[weapon.WeaponType] = (kinds[weapon.WeaponType] or 0) + 1
+	-- Every kind deals about the same damage per second.
+	local dps = weapon.Attack.Damage / weapon.Attack.Rate
+	assert(dps > 25 and dps < 30, weapon.Id .. " is out of line: " .. dps .. " damage per second")
+end
+for _, kind in WeaponForge.Types do
+	assert(kinds[kind.Id] == 5, kind.Id .. " doesn't come in five rarities")
+end
+-- Visible rolls: every finish and visor has a name; about 1 in 100 rolls is
+-- Prismatic; the identity line names finish, Prismatic, serial and finder.
+local prismatic, prng = 0, Random.new(4242)
+for _ = 1, 20000 do
+	local roll = GearRolls.roll(prng)
+	local look = GearRolls.appearance(roll)
+	assert(look.FinishName and look.VisorName, "A roll's finish or visor has no name")
+	if roll.Prismatic then
+		prismatic += 1
+	end
+end
+assert(prismatic > 120 and prismatic < 290, "Prismatic isn't about 1 in 100: " .. prismatic .. " of 20000")
+local identity = GearRolls.identity({ Finish = 5, Prismatic = true, Serial = 12, FoundBy = "Marc" })
+assert(identity == "Solar Gold finish  ·  ✦ PRISMATIC  ·  #12  ·  Found by Marc", "Identity line wrong: " .. identity)
+assert(GearRolls.identity({ Finish = 1 }) == "Ember Copper finish", "A plain roll's identity line wrong")
 local visorSeen = {}
 local visorRng = Random.new(59123)
 for _ = 1, 10000 do
@@ -56,7 +91,7 @@ local previous = seedProfile.Character.Weapon
 assert(not GearRolls.grant(seedProfile, Classes.get("Warrior"), Random.new(434)), "Rejoining rerolled equipment")
 assert(seedProfile.Character.Weapon == previous, "Rejoining changed saved item")
 print(
-	"PASS: 60,000 weighted starter draws; all 95 items and 10 visors reachable; attack contracts and saved rarity valid"
+	"PASS: 60,000 weighted starter draws; every obtainable item and 10 visors reachable; 25 Forge weapons with 25 different perks; named finishes, 1-in-100 Prismatic; attack contracts and saved rarity valid"
 )
 
 local rapid = Classes.gear("Warrior", "Weapons", "MatrixWeapons6")
@@ -192,6 +227,8 @@ for _, weapon in Classes.List.Warrior.Weapons do
 		assert(weapon.Attack)
 	elseif weapon.WeaponType == "Sword" then
 		assert(weapon.Attack.Kind == "Melee" and weapon.Look == "FrontierSword")
+	elseif weapon.Forge then
+		assert(weapon.Attack.Kind == "Melee" and weapon.Look == "Forge" .. weapon.WeaponType, "Forge weapon lost its look")
 	else
 		assert(weapon.Attack.Kind == "Shot" and weapon.Look == "CleanSidearm", "Original pistol changed")
 	end

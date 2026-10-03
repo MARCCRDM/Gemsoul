@@ -219,10 +219,11 @@ function Actions.combo(previousSide, count, lastHit, side, now)
 		then math.min((count or 0) + 1, 3)
 		else 1
 end
-function Actions.resolve(counts, weaponType, cooldownReduction)
+-- `baseCooldown`: the weapon's own swing pace (its Attack.Rate), if it has one.
+function Actions.resolve(counts, weaponType, cooldownReduction, baseCooldown: number?)
 	local result = {
 		BasicDamage = 1,
-		BasicCooldown = if weaponType == "Sword" then 0.65 else 0.45,
+		BasicCooldown = baseCooldown or if weaponType == "Sword" then 0.65 else 0.45,
 		HeavyDamage = 1.8,
 		HeavyPvPDamage = 1.5,
 		HeavyCooldown = 1.2,
@@ -261,6 +262,27 @@ function Actions.resolve(counts, weaponType, cooldownReduction)
 	result.HeavyCooldown *= multiplier
 	result.DodgeCooldown *= multiplier
 	return result
+end
+
+-- The rules a loadout fights by with this weapon: its set bonuses, its own
+-- swing pace (Attack.Rate) and its perk (Shared.WeaponForge: faster swings,
+-- a heavier knockback). `effects`: Classes.effects of the loadout.
+function Actions.forWeapon(counts, weapon, effects)
+	effects = effects or {}
+	local attack = weapon and weapon.Attack or {}
+	local rules = Actions.resolve(
+		counts,
+		if attack.Kind == "Melee" then "Sword" else "Pistol",
+		1 - (effects.CooldownMult or 1),
+		attack.Rate
+	)
+	if effects.AttackSpeed then
+		rules.BasicCooldown /= 1 + effects.AttackSpeed
+	end
+	if effects.Knockback then
+		rules.Knockback *= 1 + effects.Knockback
+	end
+	return rules
 end
 function Actions.finiteVector(v)
 	return typeof(v) == "Vector3"

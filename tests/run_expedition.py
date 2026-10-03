@@ -15,6 +15,7 @@ for name, path in [
     ("ExpeditionEconomy", "src/shared/ExpeditionEconomy.luau"),
     ("GemConfig", "src/shared/GemConfig.luau"),
     ("ArmorFamilies", "src/shared/ArmorFamilies.luau"),
+    ("WeaponForge", "src/shared/WeaponForge.luau"),
     ("ExpandedTraits", "src/shared/ExpandedItemTraits.luau"),
     ("Slots", "src/shared/EquipmentSlots.luau"),
     ("Crafting", "src/shared/Crafting.luau"),
@@ -29,6 +30,7 @@ for name, path in [
     ("Mine", "src/shared/Mine.luau"),
 ]: source += module(name, path)
 source += read("tests/expedition_profiles.luau")
+source += module("GearSerials", "src/server/Systems/GearSerials.luau")
 source += module("Journal", "src/server/Systems/TradeJournal.luau")
 source += module("Trading", "src/server/Systems/Trading.luau")
 source += module("Forge", "src/server/Systems/Forge.luau")

@@ -242,4 +242,241 @@ function Assets.shield(folder, arm, mount, rarity, accent, finish, family)
 	end
 end
 
+--[[
+	The Forge's weapons (Shared.WeaponForge), in the sword's frame: the grip
+	at the hand, the weapon running out along +Y, its face towards -Z. Every
+	rarity adds to the last:
+	  Uncommon   finish-coloured trims and wraps
+	  Rare       extra plates, spikes and a heavier silhouette
+	  Epic       glowing accent edges (the gem's colour)
+	  Legendary  gold filigree and a lit energy core
+	Assets.forge(kind, folder, hand, mount, rarity, accent, finish) builds
+	one hand's weapon ("TwinBlades" is built once per hand).
+]]
+-- `tilt`: degrees about Z, turning a piece in the weapon's face (for curves,
+-- flares and slanted tips).
+local function adder(folder, hand, mount)
+	return function(x, y, z, sx, sy, sz, color, material, tilt)
+		local at = CFrame.new(x, y, z)
+		if tilt then
+			at *= CFrame.Angles(0, 0, math.rad(tilt))
+		end
+		return part(folder, hand, mount, at, Vector3.new(sx, sy, sz), color, material)
+	end
+end
+
+-- A lit core: a neon cell with a glow, for the Legendary tier.
+local function core(add, x, y, z, size, accent)
+	local cell = add(x, y, z, size, size, size, accent, Enum.Material.Neon)
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness = accent, 7, 1.4
+	light.Parent = cell
+	return cell
+end
+
+local FORGE = {}
+
+-- A broad chopping blade with a notched spine.
+function FORGE.Cleaver(add, rarity, accent, finish)
+	add(0, 0, 0, 0.2, 0.7, 0.22, dark)
+	add(0, -0.42, 0, 0.28, 0.16, 0.28, finish)
+	add(0, 0.42, 0, 0.92, 0.16, 0.3, finish)
+	add(0.04, 1.5, 0, 0.62, 2.05, 0.12, steel, Enum.Material.Metal)
+	add(-0.28, 1.45, 0, 0.1, 1.8, 0.16, dark) -- the spine
+	add(0.36, 1.5, 0, 0.05, 2.0, 0.08, steel, Enum.Material.Metal) -- the edge
+	add(0.1, 2.6, 0, 0.66, 0.34, 0.12, steel, Enum.Material.Metal, -28) -- a slanted chisel tip
+	add(0.33, 2.62, 0, 0.05, 0.5, 0.08, steel, Enum.Material.Metal, -28)
+	for i = 1, 3 do
+		add(-0.3, 0.75 + i * 0.4, 0, 0.12, 0.1, 0.18, steel) -- spine notches
+	end
+	if rarity >= 2 then
+		for i = -1, 1 do
+			add(0, i * 0.2, 0, 0.23, 0.05, 0.25, finish)
+		end
+		add(0.04, 1.4, -0.07, 0.36, 1.5, 0.03, finish)
+	end
+	if rarity >= 3 then
+		for _, side in { -1, 1 } do
+			add(side * 0.52, 0.5, 0, 0.14, 0.32, 0.22, dark)
+		end
+		add(-0.42, 2.3, 0, 0.16, 0.5, 0.1, steel, Enum.Material.Metal) -- a back hook
+	end
+	if rarity >= 4 then
+		add(0.39, 1.5, 0, 0.03, 1.9, 0.1, accent, Enum.Material.Neon)
+		add(0.04, 1.4, -0.09, 0.06, 1.4, 0.02, accent, Enum.Material.Neon)
+	end
+	if rarity >= 5 then
+		for _, side in { -1, 1 } do
+			add(side * 0.48, 0.42, 0, 0.1, 0.24, 0.32, gold, Enum.Material.Metal)
+		end
+		add(0, -0.56, 0, 0.18, 0.12, 0.18, gold, Enum.Material.Metal)
+		core(add, 0.04, 0.9, -0.1, 0.16, accent)
+	end
+end
+
+-- A short, hooked blade (one per hand).
+function FORGE.TwinBlades(add, rarity, accent, finish)
+	add(0, 0, 0, 0.18, 0.55, 0.2, dark)
+	add(0, -0.34, 0, 0.22, 0.12, 0.22, finish)
+	add(0, 0.33, 0, 0.5, 0.12, 0.24, finish)
+	-- A blade that sweeps forward as it rises, to a hooked point.
+	add(0, 0.72, 0, 0.26, 0.62, 0.1, steel, Enum.Material.Metal)
+	add(0.06, 1.25, 0, 0.26, 0.6, 0.1, steel, Enum.Material.Metal, -10)
+	add(0.18, 1.74, 0, 0.24, 0.56, 0.1, steel, Enum.Material.Metal, -22)
+	add(0.33, 2.08, 0, 0.14, 0.34, 0.09, steel, Enum.Material.Metal, -38)
+	add(0.14, 0.72, 0, 0.04, 0.6, 0.07, steel, Enum.Material.Metal)
+	add(0.2, 1.24, 0, 0.04, 0.58, 0.07, steel, Enum.Material.Metal, -10)
+	add(0.31, 1.71, 0, 0.04, 0.54, 0.07, steel, Enum.Material.Metal, -22)
+	add(-0.2, 0.62, 0, 0.16, 0.3, 0.08, steel) -- the back hook
+	if rarity >= 2 then
+		add(0, 0.1, 0, 0.21, 0.05, 0.23, finish)
+		add(0, -0.12, 0, 0.21, 0.05, 0.23, finish)
+	end
+	if rarity >= 3 then
+		add(-0.12, 1.3, 0, 0.12, 0.42, 0.08, steel, Enum.Material.Metal, -14) -- a second hook
+		add(0.26, 0.05, 0, 0.06, 0.62, 0.1, finish) -- a knuckle guard
+		add(0, 0.33, -0.14, 0.3, 0.08, 0.05, dark)
+	end
+	if rarity >= 4 then
+		add(0.165, 0.72, 0, 0.025, 0.56, 0.08, accent, Enum.Material.Neon)
+		add(0.225, 1.24, 0, 0.025, 0.54, 0.08, accent, Enum.Material.Neon, -10)
+		add(0.335, 1.7, 0, 0.025, 0.5, 0.08, accent, Enum.Material.Neon, -22)
+	end
+	if rarity >= 5 then
+		add(0, 0.33, 0, 0.6, 0.08, 0.27, gold, Enum.Material.Metal)
+		core(add, 0, 0.62, -0.08, 0.1, accent)
+	end
+end
+
+-- A long shaft with a broad spearhead and wings.
+function FORGE.Lance(add, rarity, accent, finish)
+	add(0, 0.9, 0, 0.16, 4.2, 0.16, dark)
+	add(0, -1.25, 0, 0.22, 0.2, 0.22, finish)
+	add(0, 3.05, 0, 0.7, 0.12, 0.16, finish) -- the wings
+	-- A leaf-shaped head: broad at the base, tapering to the point.
+	add(0, 3.35, 0, 0.42, 0.5, 0.12, steel, Enum.Material.Metal)
+	for _, side in { -1, 1 } do
+		add(side * 0.1, 3.82, 0, 0.2, 0.62, 0.11, steel, Enum.Material.Metal, side * 14)
+	end
+	add(0, 4.18, 0, 0.1, 0.28, 0.08, steel, Enum.Material.Metal)
+	for _, y in { 0.35, 2.4 } do
+		add(0, y, 0, 0.21, 0.12, 0.21, steel, Enum.Material.Metal)
+	end
+	if rarity >= 2 then
+		for i = 0, 3 do
+			add(0, -0.25 + i * 0.16, 0, 0.19, 0.06, 0.19, finish)
+		end
+	end
+	if rarity >= 3 then
+		for _, side in { -1, 1 } do
+			add(side * 0.42, 3.2, 0, 0.12, 0.42, 0.1, steel, Enum.Material.Metal, -side * 30)
+		end
+		add(0, 2.85, -0.12, 0.28, 0.3, 0.05, finish) -- a pennant plate
+	end
+	if rarity >= 4 then
+		add(0, 3.5, -0.075, 0.05, 0.7, 0.03, accent, Enum.Material.Neon)
+		add(0, 1.6, -0.09, 0.04, 1.4, 0.02, accent, Enum.Material.Neon)
+	end
+	if rarity >= 5 then
+		for i = 0, 3 do
+			add(0, 1.2 + i * 0.3, 0, 0.24, 0.05, 0.24, gold, Enum.Material.Metal)
+		end
+		core(add, 0, 3.05, -0.1, 0.14, accent)
+	end
+end
+
+-- A long haft with a double-bitted head.
+function FORGE.Greataxe(add, rarity, accent, finish)
+	add(0, 0.8, 0, 0.18, 3.4, 0.18, dark)
+	add(0, -0.95, 0, 0.24, 0.16, 0.24, finish)
+	add(0, 2.25, 0, 0.32, 0.6, 0.26, finish) -- the eye
+	-- Two crescent bits flaring up and down from narrow necks.
+	for _, side in { -1, 1 } do
+		add(side * 0.36, 2.25, 0, 0.42, 0.5, 0.1, steel, Enum.Material.Metal)
+		add(side * 0.74, 2.25, 0, 0.36, 1.05, 0.1, steel, Enum.Material.Metal)
+		add(side * 0.8, 2.78, 0, 0.3, 0.5, 0.1, steel, Enum.Material.Metal, -side * 28)
+		add(side * 0.8, 1.72, 0, 0.3, 0.5, 0.1, steel, Enum.Material.Metal, side * 28)
+		add(side * 0.94, 2.25, 0, 0.06, 1.1, 0.08, steel, Enum.Material.Metal) -- the edge
+		add(side * 0.98, 2.84, 0, 0.06, 0.5, 0.07, steel, Enum.Material.Metal, -side * 28)
+		add(side * 0.98, 1.66, 0, 0.06, 0.5, 0.07, steel, Enum.Material.Metal, side * 28)
+		add(side * 0.25, 2.25, 0, 0.18, 0.6, 0.13, dark)
+	end
+	add(0, 2.7, 0, 0.12, 0.35, 0.12, steel, Enum.Material.Metal) -- the top spike
+	if rarity >= 2 then
+		for i = 0, 2 do
+			add(0, 0.05 + i * 0.18, 0, 0.21, 0.06, 0.21, finish)
+		end
+	end
+	if rarity >= 3 then
+		add(0, 1.85, 0, 0.12, 0.3, 0.12, steel, Enum.Material.Metal) -- a beard spike
+		for _, side in { -1, 1 } do
+			add(side * 0.55, 2.25, -0.07, 0.12, 0.7, 0.03, dark) -- rivet strips
+		end
+	end
+	if rarity >= 4 then
+		for _, side in { -1, 1 } do
+			add(side * 0.99, 2.25, 0, 0.025, 1.05, 0.09, accent, Enum.Material.Neon)
+			add(side * 1.03, 2.86, 0, 0.025, 0.46, 0.08, accent, Enum.Material.Neon, -side * 28)
+			add(side * 1.03, 1.64, 0, 0.025, 0.46, 0.08, accent, Enum.Material.Neon, side * 28)
+		end
+	end
+	if rarity >= 5 then
+		for _, side in { -1, 1 } do
+			add(side * 0.55, 2.25, -0.06, 0.5, 0.08, 0.02, gold, Enum.Material.Metal)
+		end
+		core(add, 0, 2.25, -0.15, 0.16, accent)
+	end
+end
+
+-- A heavy haft with a piston-capped head.
+function FORGE.Warhammer(add, rarity, accent, finish)
+	add(0, 0.75, 0, 0.2, 3.0, 0.2, dark)
+	add(0, -0.82, 0, 0.26, 0.18, 0.26, finish)
+	add(0, 2.35, 0, 1.25, 0.7, 0.7, steel, Enum.Material.Metal) -- the head
+	for _, side in { -1, 1 } do
+		add(side * 0.68, 2.35, 0, 0.14, 0.82, 0.82, finish) -- the faces
+	end
+	add(0, 2.35, 0, 0.5, 0.74, 0.74, dark) -- a band round the middle
+	if rarity >= 2 then
+		for i = 0, 2 do
+			add(0, 0.0 + i * 0.18, 0, 0.23, 0.06, 0.23, finish)
+		end
+	end
+	if rarity >= 3 then
+		add(0, 2.85, 0, 0.18, 0.36, 0.18, steel, Enum.Material.Metal) -- a top spike
+		for _, side in { -1, 1 } do
+			add(side * 0.4, 2.35, -0.38, 0.12, 0.5, 0.06, dark) -- pistons
+		end
+	end
+	if rarity >= 4 then
+		for _, side in { -1, 1 } do
+			add(side * 0.76, 2.35, 0, 0.03, 0.6, 0.6, accent, Enum.Material.Neon)
+		end
+	end
+	if rarity >= 5 then
+		for _, side in { -1, 1 } do
+			add(side * 0.25, 2.35, 0, 0.06, 0.78, 0.78, gold, Enum.Material.Metal)
+		end
+		core(add, 0, 2.35, -0.38, 0.2, accent)
+	end
+end
+
+-- Where its gem socket sits, in the same frame.
+Assets.ForgeSockets = {
+	Cleaver = Vector3.new(0, 0.42, -0.18),
+	TwinBlades = Vector3.new(0, 0.33, -0.15),
+	Lance = Vector3.new(0, 3.05, 0.12),
+	Greataxe = Vector3.new(0, 2.25, 0.16),
+	Warhammer = Vector3.new(0, 2.35, 0.38),
+}
+
+function Assets.forge(kind: string, folder, hand, mount, rarity, accent, finish)
+	local build = FORGE[kind]
+	if not build then
+		return false
+	end
+	build(adder(folder, hand, mount), math.clamp(rarity or 1, 1, 5), accent, finish)
+	return true
+end
+
 return Assets

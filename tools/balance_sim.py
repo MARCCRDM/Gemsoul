@@ -16,7 +16,7 @@ MODULES = [
     ('ArmorFamilies', 'src/shared/ArmorFamilies.luau'), ('Actions', 'src/shared/CombatActions.luau'),
     ('GemRoller', 'src/shared/GemRoller.luau'), ('Tech', 'src/shared/CombatTechnology.luau'),
     ('Tree', 'src/shared/AugmentTree.luau'), ('Season', 'src/shared/Season.luau'),
-    ('ExpandedTraits', 'src/shared/ExpandedItemTraits.luau'), ('Slots', 'src/shared/EquipmentSlots.luau'),
+    ('WeaponForge', 'src/shared/WeaponForge.luau'), ('ExpandedTraits', 'src/shared/ExpandedItemTraits.luau'), ('Slots', 'src/shared/EquipmentSlots.luau'),
     ('Crafting', 'src/shared/Crafting.luau'), ('GearRolls', 'src/shared/GearRolls.luau'),
     ('Classes', 'src/shared/Classes.luau'), ('Combat', 'src/shared/Combat.luau'),
     ('DuelistBrain', 'src/shared/DuelistBrain.luau'), ('RivalPose', 'src/shared/RivalPose.luau'),

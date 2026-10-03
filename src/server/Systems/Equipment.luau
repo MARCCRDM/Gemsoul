@@ -1424,6 +1424,22 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 			else UPRIGHT * CFrame.Angles(0, 0, math.rad(-12))
 		FrontierAssets.sword(weaponFolder, right, mount, rarity, accent, finish)
 		gemSocket(weaponFolder, right, mount, Vector3.new(0, 0.39, -0.18), loadout.WeaponGem, 0.17)
+	elseif weapon.Forge and right then
+		-- A Forge weapon (Shared.WeaponForge): its own model, finer with rarity.
+		local roll = GearRolls.get(loadout, "Weapon")
+		local rarity = if roll then roll.Rarity else weapon.RarityTier or 1
+		local finish = if roll then GearRolls.appearance(roll).FinishColor else STEEL
+		local mount = if character:GetAttribute("FistGrip")
+			then FIST_GRIP
+			else UPRIGHT * CFrame.Angles(0, 0, math.rad(-12))
+		FrontierAssets.forge(weapon.WeaponType, weaponFolder, right, mount, rarity, accent, finish)
+		gemSocket(weaponFolder, right, mount, FrontierAssets.ForgeSockets[weapon.WeaponType], loadout.WeaponGem, 0.17)
+		if weapon.WeaponType == "TwinBlades" and left then
+			local offMount = if character:GetAttribute("FistGrip")
+				then FIST_GRIP
+				else UPRIGHT * CFrame.Angles(0, 0, math.rad(12))
+			FrontierAssets.forge("TwinBlades", weaponFolder, left, offMount, rarity, accent, finish)
+		end
 	elseif weapon.Look == "CleanSidearm" and right then
 		local roll = GearRolls.get(loadout, "Weapon")
 		local rarity = if roll then roll.Rarity else weapon.RarityTier or 1
@@ -1562,6 +1578,23 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		local gem = loadout[slot .. "Gem"]
 		if component and gem and (not only or only == slot) then
 			gemGlow(component, gem)
+		end
+	end
+	-- A Prismatic roll (about 1 in 100): its coloured plates shimmer through
+	-- every hue (the client's Effects cycle them).
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield", "Weapon" } do
+		local component = folder:FindFirstChild(slot)
+		local roll = GearRolls.get(loadout, slot)
+		if component and roll and roll.Prismatic and (not only or only == slot) then
+			for _, part in component:GetDescendants() do
+				if part:IsA("BasePart") and part.Transparency < 1 and part.Material ~= Enum.Material.Neon then
+					local h, s, v = part.Color:ToHSV()
+					if s > 0.2 and v > 0.25 then
+						part:SetAttribute("PrismaticBase", Color3.fromHSV(h, s, v))
+						CollectionService:AddTag(part, Tags.Prismatic)
+					end
+				end
+			end
 		end
 	end
 	return folder

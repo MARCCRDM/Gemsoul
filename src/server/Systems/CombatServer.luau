@@ -7,6 +7,7 @@ local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local WeaponForge = require(ReplicatedStorage.Shared.WeaponForge)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
@@ -102,11 +103,7 @@ local function kitFor(loadout, augments)
 		Weapon = weapon,
 		Effects = effects,
 		Ratings = Classes.ratings(loadout),
-		Rules = Actions.resolve(
-			Classes.setState(loadout).Counts,
-			if weapon.Attack.Kind == "Melee" then "Sword" else "Pistol",
-			1 - (effects.CooldownMult or 1)
-		),
+		Rules = Actions.forWeapon(Classes.setState(loadout).Counts, weapon, effects),
 	}
 end
 local function kit(player)
@@ -428,6 +425,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				local exhausted = false
 				if not (st.ParrySpent and not parriedBefore) then
 					local cost = math.max(Actions.Stamina.BlockMin, beforeGuard * Actions.Stamina.BlockPerDamage)
+						* (1 - (k.Effects.BlockStamina or 0))
 					if st.Resources.Stamina >= cost then
 						spendStamina(player, st, cost)
 					else
@@ -468,6 +466,16 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				damage *= multiplier
 			end
 		end
+	end
+	-- Retribution (a weapon perk): a melee attacker takes part of its hit back.
+	if k.Effects.Thorns and damage > 0 and not projectile and not reflected and origin then
+		local previous = DamageLog.push("Retribution")
+		if source then
+			receive(source, damage * k.Effects.Thorns, nil, player, root.Position, false, false, true)
+		elseif enemySource and enemySource.Alive then
+			Enemies.damage(enemySource, damage * k.Effects.Thorns, player, false, Color3.fromRGB(255, 196, 90))
+		end
+		DamageLog.pop(previous)
 	end
 	if origin and not reflected and now < st.SurgeWardUntil and now >= st.SurgeWardNext then
 		local attacker = if source
@@ -555,6 +563,11 @@ local publishStatuses
 function applyCC(target, seconds, kind)
 	local tracker
 	if target.Player then
+		-- Unstoppable (a weapon perk): stuns and freezes wear off sooner.
+		local k = kit(target.Player)
+		if k and k.Effects.Tenacity then
+			seconds *= 1 - k.Effects.Tenacity
+		end
 		tracker = state(target.Player).CC
 	else
 		tracker = enemyCC[target.Enemy]
@@ -801,6 +814,54 @@ local function enemyWard(player, enemy)
 	e.WardNext = now + 1
 	wardHitsBack(e.WardKind, e.WardPower or 0, e.WardStun, { Player = player, Root = root }, enemy)
 end
+-- A weapon's perk after a blow lands (Shared.WeaponForge): healing, resources,
+-- stuns, slows, bleeds and burns, on players and computer foes alike.
+-- (Sunder, Bleed and Slow on a computer foe are applied in strike.)
+local function weaponPerksOnHit(source, k, st, target, damage: number, guarded: boolean)
+	local e, now = k.Effects, os.clock()
+	if e.Lifesteal then
+		CombatServer.heal(source, damage * e.Lifesteal)
+	end
+	for _, pair in { { "StaminaOnHit", "Stamina" }, { "ChargeOnHit", "Charge" } } do
+		local amount = e[pair[1]]
+		if amount then
+			local id = pair[2]
+			st.Resources[id] = math.min(Tech.Resources[id].Max, st.Resources[id] + Tech.Resources[id].Max * amount)
+			source:SetAttribute(id, st.Resources[id])
+		end
+	end
+	if e.KillHeal and target.Humanoid.Health <= 0 then
+		local humanoid = alive(source)
+		if humanoid then
+			CombatServer.heal(source, humanoid.MaxHealth * e.KillHeal)
+		end
+	end
+	if guarded or target.Humanoid.Health <= 0 then
+		return
+	end
+	if e.StunOnHit and math.random() < e.StunOnHit then
+		applyCC(target, 0.6, "Shocked")
+	end
+	local burn = e.BurnOnHit and math.random() < e.BurnOnHit
+	if target.Player then
+		local foe = state(target.Player)
+		if e.SlowOnHit then
+			foe.Slow, foe.SlowUntil = math.max(foe.Slow, e.SlowOnHit), now + 2
+		end
+		if e.Sunder then
+			-- Takes that much more damage (as a Vulnerable debuff).
+			CrowdControl.applyDebuff(foe.CC, "Vulnerable", e.Sunder, 5, now, true)
+		end
+		if e.Bleed then
+			addDot(target.Player, source, damage * e.Bleed / 3, 3)
+		end
+		if burn then
+			addDot(target.Player, source, damage * 0.4 / 3, 3)
+		end
+	elseif target.Enemy and burn then
+		Enemies.addDot(target.Enemy, damage * 0.4, 3, source, GemConfig.ElementColors.Fire, "Burning")
+	end
+end
 local function strike(source, k, st, target, heavy, projectile, swing)
 	if not targetAllowed(source, target) then
 		return
@@ -836,6 +897,22 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	if crit then
 		damage *= Combat.CritMult
 	end
+	-- The weapon's perk (Shared.WeaponForge): executes, openers, bloodrage...
+	local ownHumanoid = alive(source)
+	local targetGuarding = if target.Player
+		then blocking(state(target.Player), os.clock())
+		else target.Enemy ~= nil
+			and (target.Enemy :: any).GuardUntil ~= nil
+			and os.clock() < (target.Enemy :: any).GuardUntil
+	damage *= WeaponForge.multiplier(k.Effects, {
+		Heavy = heavy == true,
+		Crit = crit,
+		Combo = swing and swing.Combo or 1,
+		TargetRatio = target.Humanoid.Health / math.max(1, target.Humanoid.MaxHealth),
+		OwnRatio = if ownHumanoid then ownHumanoid.Health / math.max(1, ownHumanoid.MaxHealth) else 1,
+		Versus = versus,
+		TargetGuarding = targetGuarding,
+	})
 	local echoDamage = damage
 	local guarded = false
 	local gem = k.Loadout.WeaponGem
@@ -873,6 +950,9 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 			Enemies.addStatus(target.Enemy, "Slow", k.Effects.SlowOnHit, 2)
 		end
 		enemyWard(source, target.Enemy)
+	end
+	if damage > 0 then
+		weaponPerksOnHit(source, k, st, target, damage, guarded)
 	end
 	if combo and damage > 0 then
 		comboLanded(source, target, combo)
@@ -1155,7 +1235,11 @@ function technologyHitInner(player, k, target, definition, scale)
 	local gem = if definition.Resource == "Charge"
 		then (definition.Gem or surgeGem(k.Loadout, definition.Element))
 		else nil
-	local damage = k.Weapon.Attack.Damage * Combat.powerMult(rating(k, "Power")) * definition.Damage * (scale or 1)
+	local damage = k.Weapon.Attack.Damage
+		* Combat.powerMult(rating(k, "Power"))
+		* definition.Damage
+		* (scale or 1)
+		* (1 + (k.Effects.SurgeBonus or 0)) -- Saga Conduit (a weapon perk)
 	if definition.Resource == "Stamina" then
 		damage *= k.Effects.WeaponAugmentMult
 	end

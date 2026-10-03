@@ -853,11 +853,7 @@ local function rules()
 	end
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local effects = Classes.effects(loadout)
-	return Actions.resolve(
-		Classes.setState(loadout).Counts,
-		if weapon and weapon.Attack.Kind == "Melee" then "Sword" else "Pistol",
-		1 - (effects.CooldownMult or 1)
-	)
+	return Actions.forWeapon(Classes.setState(loadout).Counts, weapon, effects)
 end
 local function beginAttack(side)
 	if beamKey then

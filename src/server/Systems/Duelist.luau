@@ -37,6 +37,7 @@ local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Matchup = require(ReplicatedStorage.Shared.Matchup)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
+local WeaponForge = require(ReplicatedStorage.Shared.WeaponForge)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
@@ -433,6 +434,20 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	if crit then
 		amount *= Combat.CritMult
 	end
+	-- Its weapon's perk, by the same rules as yours (Shared.WeaponForge).
+	local effects = duel.Kit and duel.Kit.Effects
+	if effects then
+		local _, ownerHumanoid = ownerRoot(duel.Owner)
+		amount *= WeaponForge.multiplier(effects, {
+			Heavy = heavy == true,
+			Crit = crit,
+			Combo = 1,
+			TargetRatio = if ownerHumanoid then ownerHumanoid.Health / math.max(1, ownerHumanoid.MaxHealth) else 1,
+			OwnRatio = e.Humanoid.Health / math.max(1, e.Humanoid.MaxHealth),
+			Versus = true,
+			TargetGuarding = duel.Owner:GetAttribute("Blocking") == true,
+		})
+	end
 	-- Element combos on you, as yours land on it (Shared.ElementCombos).
 	local _, combo =
 		ElementCombos.check({ Element = element, Heavy = heavy == true }, CombatServer.comboFlags(duel.Owner))
@@ -447,6 +462,10 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	end
 	if type(dealt) == "number" and dealt > 0 and not guarded and gem then
 		CombatServer.enemyProc(duel.Owner, gem, duel.Enemy)
+	end
+	-- Siphon Edge: its weapon heals it too.
+	if effects and effects.Lifesteal and type(dealt) == "number" and dealt > 0 and e.Alive then
+		e.Humanoid.Health = math.min(e.Humanoid.MaxHealth, e.Humanoid.Health + dealt * effects.Lifesteal)
 	end
 	return dealt, guarded
 end

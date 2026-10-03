@@ -1103,6 +1103,25 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		text(tipBody, ArmorFamilies.EnhancementText[gear.ArmorFamily], 12, P.Dim)
 	end
 	signatureLine(gear)
+	-- A Forge weapon: how it fights.
+	if gear.Forge and gear.Attack then
+		text(
+			tipBody,
+			string.format(
+				"%s  ·  %.2fs swings  ·  %g reach  ·  %d° arc",
+				gear.Blurb or "",
+				gear.Attack.Rate,
+				gear.Attack.Range,
+				gear.Attack.Arc or 90
+			),
+			12,
+			P.Dim
+		)
+	end
+	-- What makes this one its own: finish, Prismatic, serial, finder.
+	if roll then
+		text(tipBody, GearRolls.identity(roll), 12, if roll.Prismatic then P.Gold else P.Teal, BOLD)
+	end
 end
 
 local function drawTooltipContent()
