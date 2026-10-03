@@ -1,4 +1,6 @@
--- Soft camera tracking yields to deliberate look input. Selection is local; hits remain server-validated.
+-- A strong, sticky lock (see TargetLockRules): your Arena rival is always
+-- the target, and the camera keeps pulling toward it (gentler while you're
+-- looking around yourself). Selection is local; hits remain server-validated.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -83,17 +85,19 @@ function Lock.setActive(value)
 	end
 	active = value
 end
+-- The locked target (held through brief cover).
 function Lock.target()
 	local model = state.Target
-	local point = model and pointOf(model)
-	if not active or not point or not eligible(model) or not visible(model, point) then
+	if not active or not model or not pointOf(model) or not eligible(model) then
 		return nil
 	end
 	return model
 end
+-- Where to aim: only while the target is in sight (no aim assist through walls).
 function Lock.point()
 	local model = Lock.target()
-	return model and pointOf(model)
+	local point = model and pointOf(model)
+	return if point and visible(model, point) then point else nil
 end
 UserInputService.InputChanged:Connect(function(input, processed)
 	if processed then
@@ -140,26 +144,27 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 		if point and eligible(model) then
 			local delta = point - camera.CFrame.Position
 			local distance = (point - ownRoot.Position).Magnitude
-			if delta.Magnitude > 0.01 and distance <= Rules.Range then
-				local facing = camera.CFrame.LookVector:Dot(delta.Unit)
-				if facing >= Rules.RetainDot then
-					table.insert(records, {
-						Target = model,
-						Distance = distance,
-						Facing = facing,
-						Allowed = true,
-						Visible = visible(model, point),
-					})
-				end
+			if delta.Magnitude > 0.01 and distance <= Rules.RetainRange then
+				table.insert(records, {
+					Target = model,
+					Distance = distance,
+					Facing = camera.CFrame.LookVector:Dot(delta.Unit),
+					Allowed = true,
+					Visible = visible(model, point),
+					-- Your Arena rival: always the one to lock.
+					Priority = player.UserId ~= nil and model:GetAttribute("RivalOwner") == player.UserId,
+				})
 			end
 		end
 	end
 	local target = Rules.update(state, records, now, now < manualUntil)
 	outline.Adornee, outline.Enabled = target, target ~= nil
-	if target and now >= manualUntil then
+	if target then
+		-- Strong pull; gentler (not released) while you're looking around.
 		local point = pointOf(target)
 		if point then
-			camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, point), 1 - math.exp(-dt * 7))
+			local rate = if now < manualUntil then 4 else 14
+			camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, point), 1 - math.exp(-dt * rate))
 		end
 	end
 end)

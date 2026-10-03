@@ -10,7 +10,7 @@
 	            it raises it is parried
 	  Dodge     sidesteps a charged heavy (which would break its guard) or a
 	            surge wind-up, and anything once its guard is broken
-	  GuardAdvance  closes in shield-first while you shoot from range
+	  GuardAdvance  walks you down shield-first (from mid range, or under fire)
 	  Punish    a fast counter-swing while the player recovers from an attack
 	  Surge     casts its gem's surge: from range, or point-blank when the
 	            player is stunned, slowed or hiding behind their guard
@@ -68,8 +68,8 @@ function Brain.decide(v: View, roll: number): string
 		return "Stagger"
 	end
 	-- Blocked your swing: hit back while you're open.
-	-- (About half the time; otherwise it stays behind the shield.)
-	if v.JustBlocked and v.Distance <= Brain.Reach + 1.5 and (roll < 0.45 or not v.FoeAttacking) then
+	-- (Most of the time; otherwise it stays behind the shield.)
+	if v.JustBlocked and v.Distance <= Brain.Reach + 1.5 and (roll < 0.7 or not v.FoeAttacking) then
 		return "Riposte"
 	end
 	-- Shield already up and you're still swinging: hold it (a heavy is
@@ -123,6 +123,10 @@ function Brain.decide(v: View, roll: number): string
 		return "Lunge"
 	end
 	if v.Distance > Brain.Reach then
+		-- Mid range: walk you down behind the shield; from far, run in.
+		if v.Distance <= Brain.LungeRange + 6 and not v.GuardBroken then
+			return "GuardAdvance"
+		end
 		return "Approach"
 	end
 	if v.Now >= v.NextAttack then
@@ -135,7 +139,7 @@ function Brain.decide(v: View, roll: number): string
 		return if roll < 0.25 then "Heavy" else "Light"
 	end
 	-- Waiting on its next swing up close: shield up rather than open.
-	if v.Distance <= Brain.Reach + 3 and not v.GuardBroken and roll < 0.85 then
+	if v.Distance <= Brain.Reach + 3 and not v.GuardBroken and roll < 0.75 then
 		return "Guard"
 	end
 	return "Strafe"

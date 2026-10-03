@@ -503,7 +503,7 @@ local function think(enemy, now: number)
 	local side = Vector3.new(-dir.Z, 0, dir.X)
 	humanoid.WalkSpeed = duel.Speed
 		* (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
-		* (if guarding(enemy, now) then 0.5 else 1) -- a shield-walk
+		* (if guarding(enemy, now) then 0.7 else 1) -- a shield-walk
 	local color = GemConfig.ElementColors[duel.Element] or Color3.fromRGB(255, 190, 80)
 
 	-- A wind-up in progress: hold still, face the player, then strike.
@@ -547,7 +547,9 @@ local function think(enemy, now: number)
 				return
 			end
 			setStance(duel, "")
-			duel.NextAttack = now + duel.Rate * (0.8 + math.random() * 0.4)
+			-- After a counter it presses straight on.
+			local pace = if action.Kind == "Punish" then 0.5 else 1
+			duel.NextAttack = now + duel.Rate * pace * (0.8 + math.random() * 0.4)
 		elseif action.Kind == "Bolt" then
 			-- Fired at where the player stands now: step or roll aside and it misses.
 			local from = root.Position + Vector3.new(0, 1.5, 0)
@@ -677,13 +679,18 @@ local function think(enemy, now: number)
 	elseif choice == "Guard" then
 		-- Shield up, longer against a flurry, edging sideways behind it.
 		local hold = if view.FoeAggressive then 2.2 else 1.6
+		if not guarding(enemy, now) then
+			-- Just raised: a beat before it can swing (keeping it up doesn't
+			-- push its next attack back, or it would never strike).
+			duel.NextAttack = math.max(duel.NextAttack, now + 0.3)
+		end
 		raiseGuard(enemy, duel, now, hold)
-		duel.NextAttack = math.max(duel.NextAttack, now + 0.6)
 		humanoid:MoveTo(root.Position + side * duel.Weave * 2)
 		face(root, target.Position)
 	elseif choice == "GuardAdvance" then
-		-- Under fire from range: close in behind the shield.
-		raiseGuard(enemy, duel, now, 1.6)
+		-- Walk you down behind the shield (refreshed while it advances; it
+		-- drops the guard to strike once in reach).
+		raiseGuard(enemy, duel, now, 0.8)
 		humanoid:MoveTo(target.Position - dir * 3 + side * duel.Weave)
 		face(root, target.Position)
 	elseif choice == "Riposte" then
@@ -910,7 +917,7 @@ function spawnRival(owner: Player)
 			then 0.5
 			else 1),
 		Speed = 18,
-		Rate = if sparring then 1.4 else 1.05, -- patient: it fights from behind its shield
+		Rate = if sparring then 1.2 else 0.75, -- presses you, and guards in between
 		Action = nil,
 		NextAttack = now + 1.2,
 		NextSurge = now + 3.5,
