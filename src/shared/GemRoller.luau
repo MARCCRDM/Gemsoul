@@ -121,6 +121,17 @@ function GemRoller.roll(rng, luck: number?)
 	}
 end
 
+-- Gives a rolled gem a different element, with that element's surge at the
+-- same tier (a Resonance surge has no element and stays).
+function GemRoller.setElement(gem, element: string)
+	local surges = GemRoller.Surges[element]
+	if surges and gem.SurgeTier and gem.Surge ~= GemRoller.Resonance[gem.SurgeTier] then
+		gem.Surge = surges[gem.SurgeTier] or gem.Surge
+	end
+	gem.Element = element
+	return gem
+end
+
 -- The surge a gem carries: its saved roll, or one seeded from its id.
 function GemRoller.surge(gem): (number, number)
 	if gem.SurgeTier and gem.SurgeRank then

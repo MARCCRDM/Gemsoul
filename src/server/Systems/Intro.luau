@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local GemGenerator = require(script.Parent.GemGenerator)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
@@ -103,9 +104,7 @@ local function prepareLottery(player: Player)
 	end
 	giveStarterKit(player)
 	local reward = Lottery.prepare(profile, Gems.random(), function(element)
-		local gem = newGem("StarterSpin")
-		gem.Element = element
-		return gem
+		return GemRoller.setElement(newGem("StarterSpin"), element)
 	end)
 	PlayerData.sync(player)
 	return reply(true, "Your launch lottery is ready!", { Lottery = reward })

@@ -32,6 +32,8 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
+local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local ArenaSessions = require(script.Parent.ArenaSessions)
@@ -91,28 +93,20 @@ local function rollLoadout(rng: Random)
 	local c = profile.Character
 	c.WeaponQuality = c.WeaponQuality or 1
 	c.ArmorQuality = c.ArmorQuality or 1
+	-- Its gems come from the very lottery a new player spins
+	-- (StarterLottery): a gem in every piece of gear and all three Surge
+	-- slots, the four elements shuffled across them, cut 5-8, at least one
+	-- better than Common. Rolled afresh for every rival.
 	idCounter += 1
-	local gem = GemGenerator.generate(rng, "PvEDrop", { Id = "duel-w" .. idCounter, Time = os.time() })
-	c.WeaponGem = gem
-	c.ItemGems.Weapon[c.Weapon] = gem
-	-- A gem in every armor piece too, like a player's starter lottery, all
-	-- in the rival's element so its whole kit glows one colour (brighter
-	-- the rarer each gem; Equipment's gemGlow).
-	for _, slot in Slots.Order do
-		if slot ~= "Weapon" and c[slot] then
-			local armorGem =
-				GemGenerator.generate(rng, "PvEDrop", { Id = "duel-" .. slot .. idCounter, Time = os.time() })
-			armorGem.Element = gem.Element
-			c[slot .. "Gem"] = armorGem
-			c.ItemGems[slot] = c.ItemGems[slot] or {}
-			c.ItemGems[slot][c[slot]] = armorGem
-		end
-	end
-	-- A full Surge Array, like a player's: three gems rolled like mined ones.
-	for i = 1, 3 do
-		c["Surge" .. i .. "Gem"] =
-			GemGenerator.generate(rng, "PvEDrop", { Id = "duel-s" .. idCounter .. "-" .. i, Time = os.time() })
-	end
+	local drawn = 0
+	local spin = { Intro = {}, Character = c, Gems = {} }
+	Lottery.prepare(spin, rng, function(element)
+		drawn += 1
+		local gem =
+			GemGenerator.generate(rng, "StarterSpin", { Id = "duel-" .. idCounter .. "-" .. drawn, Time = os.time() })
+		return GemRoller.setElement(gem, element)
+	end)
+	Lottery.finish(spin, math.huge)
 	return c
 end
 
@@ -959,7 +953,18 @@ function spawnRival(owner: Player)
 		for stat, amount in roll and roll.Stats or {} do
 			score += if stat == "Critical" or stat == "Cooldown" then amount * 100 else amount
 		end
-		table.insert(gear, string.format("%s|%s|%d", slot, if item then item.Name else "?", roll and roll.Rarity or 1))
+		local gem = loadout[slot .. "Gem"]
+		table.insert(
+			gear,
+			string.format(
+				"%s|%s|%d|%s|%s",
+				slot,
+				if item then item.Name else "?",
+				roll and roll.Rarity or 1,
+				gem and gem.Element or "",
+				gem and gem.Tier or ""
+			)
+		)
 	end
 	model:SetAttribute("RivalGear", table.concat(gear, ";"))
 	model:SetAttribute("RivalScore", math.floor(score + 0.5))

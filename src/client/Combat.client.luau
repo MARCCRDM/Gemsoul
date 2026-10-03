@@ -533,10 +533,15 @@ local rivalName = rivalLabel(14, P.Text, 12, 8, 160, 18)
 local rivalTag = rivalLabel(10, Color3.fromRGB(255, 120, 120), 172, 10, 66, 14)
 rivalTag.TextXAlignment = Enum.TextXAlignment.Right
 local rivalInfo = rivalLabel(10, P.Dim, 12, 27, 226, 14)
-local rivalGear = {}
+-- Each piece: its name in its rarity's colour, and on the right the gem
+-- enchanting it in the element's colour: its element, then one ◆ per tier
+-- (◆ Common up to ◆◆◆◆◆ Legendary).
+local rivalGear, rivalGems = {}, {}
 for i = 1, 6 do
-	local row = rivalLabel(10, P.Text, 12, 44 + (i - 1) * 14, 226, 14)
-	rivalGear[i] = row
+	rivalGear[i] = rivalLabel(10, P.Text, 12, 44 + (i - 1) * 14, 142, 14)
+	local gem = rivalLabel(10, P.Dim, 154, 44 + (i - 1) * 14, 84, 14)
+	gem.TextXAlignment = Enum.TextXAlignment.Right
+	rivalGems[i] = gem
 end
 -- Its three surges (Q, E, R): a socket with a draining cooldown, the name and
 -- its state.
@@ -683,6 +688,16 @@ local function drawRival(now, viewport)
 		local rarity = GearRolls.Rarities[tonumber(parts[3]) or 1] or GearRolls.Rarities[1]
 		row.Text = if parts[2] then (SLOT_SHORT[parts[1]] or parts[1]) .. "  " .. parts[2] else ""
 		row.TextColor3 = rarity.Color
+		local gemElement, gemTier = parts[4], parts[5]
+		local gemLabel = rivalGems[i]
+		if gemElement and gemElement ~= "" then
+			gemLabel.Text = GemConfig.elementName(gemElement)
+				.. " "
+				.. string.rep("◆", table.find(GemConfig.TierOrder, gemTier) or 1)
+			gemLabel.TextColor3 = GemConfig.ElementColors[gemElement] or P.Dim
+		else
+			gemLabel.Text = ""
+		end
 	end
 	-- Surge cooldowns, from server time so they match the real thing.
 	local serverNow = workspace:GetServerTimeNow()
