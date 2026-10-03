@@ -103,93 +103,106 @@ local function rollLoadout(rng: Random)
 	return c
 end
 
--- Places with Roblox's newer avatar joints build rigs from physics joints
--- (AnimationConstraints and ball sockets), which let posed limbs swing
--- loose. The rival gets classic rigid Motor6D joints instead, built from the
--- same rig attachments, so its poses hold exactly.
-local JOINT_NAMES = {
-	Root = true,
-	Waist = true,
-	Neck = true,
-	LeftShoulder = true,
-	LeftElbow = true,
-	LeftWrist = true,
-	RightShoulder = true,
-	RightElbow = true,
-	RightWrist = true,
-	LeftHip = true,
-	LeftKnee = true,
-	LeftAnkle = true,
-	RightHip = true,
-	RightKnee = true,
-	RightAnkle = true,
+-- The rival's body, built part by part: a standard R15 layout (the names
+-- the armor and Roblox's walk/run animations expect) with rigid Motor6D
+-- joints at exactly known spots and no rotation baked into them. Built by
+-- hand rather than by Players:CreateHumanoidModelFromDescription so it can't
+-- come out with loose physics joints or tilted joint frames (either one bends
+-- poses the wrong way and leaves limbs and held gear looking detached).
+-- Positions are relative to the root's centre; feet rest 1.9 studs below its
+-- bottom (the HipHeight).
+local BODY = {
+	-- name, size, centre
+	{ "LowerTorso", Vector3.new(2, 0.4, 1), Vector3.new(0, -0.2, 0) },
+	{ "UpperTorso", Vector3.new(2, 1.6, 1), Vector3.new(0, 0.8, 0) },
+	{ "Head", Vector3.new(1.2, 1.2, 1.2), Vector3.new(0, 2.2, 0) },
+	{ "RightUpperArm", Vector3.new(1, 1.2, 1), Vector3.new(1.5, 0.85, 0) },
+	{ "RightLowerArm", Vector3.new(1, 1, 1), Vector3.new(1.5, -0.15, 0) },
+	{ "RightHand", Vector3.new(1, 0.3, 1), Vector3.new(1.5, -0.75, 0) },
+	{ "LeftUpperArm", Vector3.new(1, 1.2, 1), Vector3.new(-1.5, 0.85, 0) },
+	{ "LeftLowerArm", Vector3.new(1, 1, 1), Vector3.new(-1.5, -0.15, 0) },
+	{ "LeftHand", Vector3.new(1, 0.3, 1), Vector3.new(-1.5, -0.75, 0) },
+	{ "RightUpperLeg", Vector3.new(1, 1.2, 1), Vector3.new(0.5, -0.9, 0) },
+	{ "RightLowerLeg", Vector3.new(1, 1.1, 1), Vector3.new(0.5, -2.05, 0) },
+	{ "RightFoot", Vector3.new(1, 0.3, 1), Vector3.new(0.5, -2.75, 0) },
+	{ "LeftUpperLeg", Vector3.new(1, 1.2, 1), Vector3.new(-0.5, -0.9, 0) },
+	{ "LeftLowerLeg", Vector3.new(1, 1.1, 1), Vector3.new(-0.5, -2.05, 0) },
+	{ "LeftFoot", Vector3.new(1, 0.3, 1), Vector3.new(-0.5, -2.75, 0) },
 }
-local function classicJoints(rig: Model): number
-	local converted = 0
-	for _, constraint in rig:GetDescendants() do
-		if constraint:IsA("AnimationConstraint") and constraint.Attachment0 and constraint.Attachment1 then
-			local a0, a1 = constraint.Attachment0, constraint.Attachment1
-			local part0, part1 = a0.Parent, a1.Parent
-			if part0 and part0:IsA("BasePart") and part1 and part1:IsA("BasePart") then
-				local name = if JOINT_NAMES[constraint.Name]
-					then constraint.Name
-					else (string.gsub(a0.Name, "RigAttachment$", ""))
-				local motor = Instance.new("Motor6D")
-				motor.Name = name
-				motor.Part0, motor.Part1 = part0, part1
-				motor.C0, motor.C1 = a0.CFrame, a1.CFrame
-				motor.Parent = part1
-				constraint:Destroy()
-				converted += 1
-			end
-		end
+local JOINTS = {
+	-- name, parent part, child part, joint position (relative to the root)
+	{ "Root", "HumanoidRootPart", "LowerTorso", Vector3.new(0, 0, 0) },
+	{ "Waist", "LowerTorso", "UpperTorso", Vector3.new(0, 0, 0) },
+	{ "Neck", "UpperTorso", "Head", Vector3.new(0, 1.6, 0) },
+	{ "RightShoulder", "UpperTorso", "RightUpperArm", Vector3.new(1.5, 1.35, 0) },
+	{ "RightElbow", "RightUpperArm", "RightLowerArm", Vector3.new(1.5, 0.35, 0) },
+	{ "RightWrist", "RightLowerArm", "RightHand", Vector3.new(1.5, -0.6, 0) },
+	{ "LeftShoulder", "UpperTorso", "LeftUpperArm", Vector3.new(-1.5, 1.35, 0) },
+	{ "LeftElbow", "LeftUpperArm", "LeftLowerArm", Vector3.new(-1.5, 0.35, 0) },
+	{ "LeftWrist", "LeftLowerArm", "LeftHand", Vector3.new(-1.5, -0.6, 0) },
+	{ "RightHip", "LowerTorso", "RightUpperLeg", Vector3.new(0.5, -0.3, 0) },
+	{ "RightKnee", "RightUpperLeg", "RightLowerLeg", Vector3.new(0.5, -1.5, 0) },
+	{ "RightAnkle", "RightLowerLeg", "RightFoot", Vector3.new(0.5, -2.6, 0) },
+	{ "LeftHip", "LowerTorso", "LeftUpperLeg", Vector3.new(-0.5, -0.3, 0) },
+	{ "LeftKnee", "LeftUpperLeg", "LeftLowerLeg", Vector3.new(-0.5, -1.5, 0) },
+	{ "LeftAnkle", "LeftLowerLeg", "LeftFoot", Vector3.new(-0.5, -2.6, 0) },
+}
+
+local function buildBody(skin: Color3): Model
+	local rig = Instance.new("Model")
+	local parts = {}
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 2, 1)
+	root.Transparency = 1
+	root.CFrame = CFrame.new()
+	root.Parent = rig
+	parts.HumanoidRootPart = root
+	rig.PrimaryPart = root
+	for _, spec in BODY do
+		local part = Instance.new("Part")
+		part.Name = spec[1]
+		part.Size = spec[2]
+		part.CFrame = CFrame.new(spec[3])
+		part.Color = skin
+		part.Material = Enum.Material.SmoothPlastic
+		part.TopSurface, part.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+		part.CanCollide = spec[1] == "UpperTorso" or spec[1] == "LowerTorso" or spec[1] == "Head"
+		part.Parent = rig
+		parts[spec[1]] = part
 	end
-	if converted > 0 then
-		-- The ball sockets only limited the physics joints.
-		for _, socket in rig:GetDescendants() do
-			if socket:IsA("BallSocketConstraint") or socket:IsA("HingeConstraint") then
-				socket:Destroy()
-			end
-		end
+	for _, spec in JOINTS do
+		local part0, part1 = parts[spec[2]], parts[spec[3]]
+		local at = CFrame.new(spec[4])
+		local motor = Instance.new("Motor6D")
+		motor.Name = spec[1]
+		motor.Part0, motor.Part1 = part0, part1
+		motor.C0 = part0.CFrame:Inverse() * at
+		motor.C1 = part1.CFrame:Inverse() * at
+		motor.Parent = part1
 	end
-	return converted
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.HipHeight = 1.9
+	humanoid.AutomaticScalingEnabled = false
+	humanoid.Parent = rig
+	Instance.new("Animator").Parent = humanoid
+	return rig
 end
 
 -- An R15 rig in the rival's gear, standing at `at`.
 local function buildRig(loadout, name: string, at: CFrame): Model?
-	local ok, rig = pcall(function()
-		local description = Instance.new("HumanoidDescription")
-		local skin =
-			Color3.fromHSV(0.06 + math.random() * 0.05, 0.25 + math.random() * 0.35, 0.45 + math.random() * 0.5)
-		description.HeadColor, description.TorsoColor = skin, skin
-		description.LeftArmColor, description.RightArmColor = skin, skin
-		description.LeftLegColor, description.RightLegColor = skin, skin
-		return Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
-	end)
+	local skin = Color3.fromHSV(0.06 + math.random() * 0.05, 0.25 + math.random() * 0.35, 0.45 + math.random() * 0.5)
+	local ok, rig = pcall(buildBody, skin)
 	if not ok or not rig then
 		warn("Duelist rig failed:", rig)
 		return nil
 	end
 	rig.Name = name
-	classicJoints(rig)
 	-- Stream the whole body at once, so clients can pose its joints.
 	rig.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	rig:PivotTo(at)
 	Equipment.dressModel(rig, loadout, math.random(1, 1e6))
-	-- A translucent shield plate that shows while its guard is up.
-	local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart
-	local plate = Instance.new("Part")
-	plate.Name = "GuardPlate"
-	plate.Size = Vector3.new(3.4, 4, 0.2)
-	plate.Material = Enum.Material.ForceField
-	plate.Color = Color3.fromRGB(120, 220, 255)
-	plate.Transparency = 1
-	plate.CanCollide, plate.CanQuery, plate.CanTouch, plate.Massless = false, false, false, true
-	plate.CFrame = root.CFrame * CFrame.new(0, 0.5, -1.6)
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0, weld.Part1 = root, plate
-	weld.Parent = plate
-	plate.Parent = rig
 	return rig
 end
 
@@ -484,7 +497,6 @@ local function think(enemy, now: number)
 		Duelist.despawn(owner)
 		return
 	end
-	duel.Plate.Transparency = if enemy.GuardUntil and now < enemy.GuardUntil then 0.35 else 1
 	local offset = flat(target.Position - root.Position)
 	local distance = offset.Magnitude
 	local dir = if distance > 0.01 then offset.Unit else Vector3.new(0, 0, -1)
@@ -634,7 +646,7 @@ local function think(enemy, now: number)
 		and distance <= Brain.Reach + 4
 		and now >= duel.NextDefense
 	then
-		duel.NextDefense = now + 0.7 -- considered: a beat before it reacts again
+		duel.NextDefense = now + 0.45 -- considered: a beat before it reacts again
 	end
 	local choice = Brain.decide(view, math.random())
 	if choice ~= "Stagger" and now >= duel.NextSurge and view.HealthRatio < 0.6 then
@@ -664,14 +676,14 @@ local function think(enemy, now: number)
 		end
 	elseif choice == "Guard" then
 		-- Shield up, longer against a flurry, edging sideways behind it.
-		local hold = if view.FoeAggressive then 1.5 else 1.1
+		local hold = if view.FoeAggressive then 2.2 else 1.6
 		raiseGuard(enemy, duel, now, hold)
 		duel.NextAttack = math.max(duel.NextAttack, now + 0.6)
 		humanoid:MoveTo(root.Position + side * duel.Weave * 2)
 		face(root, target.Position)
 	elseif choice == "GuardAdvance" then
 		-- Under fire from range: close in behind the shield.
-		raiseGuard(enemy, duel, now, 1.2)
+		raiseGuard(enemy, duel, now, 1.6)
 		humanoid:MoveTo(target.Position - dir * 3 + side * duel.Weave)
 		face(root, target.Position)
 	elseif choice == "Riposte" then
@@ -891,7 +903,6 @@ function spawnRival(owner: Player)
 		Owner = owner,
 		Name = name,
 		Element = element,
-		Plate = rig:FindFirstChild("GuardPlate"),
 		FoeRanged = weapon ~= nil and weapon.Attack.Kind == "Shot",
 		WeaponGem = loadout.WeaponGem,
 		Session = session,
@@ -899,7 +910,7 @@ function spawnRival(owner: Player)
 			then 0.5
 			else 1),
 		Speed = 18,
-		Rate = if sparring then 1.1 else 0.8,
+		Rate = if sparring then 1.4 else 1.05, -- patient: it fights from behind its shield
 		Action = nil,
 		NextAttack = now + 1.2,
 		NextSurge = now + 3.5,

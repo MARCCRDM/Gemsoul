@@ -68,7 +68,8 @@ function Brain.decide(v: View, roll: number): string
 		return "Stagger"
 	end
 	-- Blocked your swing: hit back while you're open.
-	if v.JustBlocked and v.Distance <= Brain.Reach + 1.5 then
+	-- (About half the time; otherwise it stays behind the shield.)
+	if v.JustBlocked and v.Distance <= Brain.Reach + 1.5 and (roll < 0.45 or not v.FoeAttacking) then
 		return "Riposte"
 	end
 	-- Shield already up and you're still swinging: hold it (a heavy is
@@ -91,18 +92,18 @@ function Brain.decide(v: View, roll: number): string
 				return "Dodge"
 			end
 		else
-			-- Quick swings: shield up, more so against a flurry.
-			local guard = if v.FoeAggressive then 0.8 else 0.65
+			-- Quick swings: shield up nearly always, more so against a flurry.
+			local guard = if v.FoeAggressive then 0.92 else 0.85
 			if roll < guard then
 				return "Guard"
-			elseif roll < guard + 0.15 then
+			elseif roll < 0.97 then
 				return "Dodge"
 			end
 		end
 	end
-	-- Being shot at from range: close in behind the shield.
-	if v.FoeRanged and v.FoeRecovering and v.Distance > Brain.Reach + 2 and not v.GuardBroken then
-		if v.Now >= v.NextDefense and roll < 0.55 then
+	-- Facing a gun: close in behind the shield.
+	if v.FoeRanged and v.Distance > Brain.Reach + 2 and not v.GuardBroken then
+		if v.FoeRecovering or roll < 0.8 then
 			return "GuardAdvance"
 		end
 	end
@@ -134,7 +135,7 @@ function Brain.decide(v: View, roll: number): string
 		return if roll < 0.25 then "Heavy" else "Light"
 	end
 	-- Waiting on its next swing up close: shield up rather than open.
-	if v.Distance <= Brain.Reach + 2 and not v.GuardBroken and roll < 0.6 then
+	if v.Distance <= Brain.Reach + 3 and not v.GuardBroken and roll < 0.85 then
 		return "Guard"
 	end
 	return "Strafe"

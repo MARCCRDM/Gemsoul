@@ -37,11 +37,17 @@ local FOLLOW = 0.32 -- how long a strike's follow-through holds, seconds
 -- Angles are radians about the joint's X (positive swings a limb forward and
 -- up, or leans the torso back), Y (twists left) and Z (positive raises the
 -- right arm outward; negative the left).
+-- Fighting stance: shield arm forward, sword held out, knees soft.
 local READY = {
-	RightShoulder = { 0.35, 0, 0.1 },
-	LeftShoulder = { 0.45, 0, -0.2 },
-	RightElbow = { 0.7, 0, 0 },
-	LeftElbow = { 0.8, 0, 0 },
+	RightShoulder = { 0.45, 0, 0.12 },
+	RightElbow = { 0.85, 0, 0 },
+	LeftShoulder = { 0.75, 0, 0.18 },
+	LeftElbow = { 1.0, 0, 0 },
+	Waist = { -0.05, -0.12, 0 },
+	RightHip = { 0.12, 0, 0 },
+	LeftHip = { 0.12, 0, 0 },
+	RightKnee = { -0.18, 0, 0 },
+	LeftKnee = { -0.18, 0, 0 },
 }
 
 local function lerp(a, b, t: number)
@@ -174,15 +180,19 @@ local function frames(kind: string, s: number)
 	return nil, nil
 end
 
+-- Guard: the shield arm raised square in front of the chest and face, the
+-- sword drawn back ready to answer, crouched behind the shield.
 local GUARD = {
-	Waist = { -0.15, 0, 0 },
-	Neck = { -0.1, 0, 0 },
-	RightShoulder = { 1.45, 0, -0.55 },
-	LeftShoulder = { 1.45, 0, 0.55 },
-	RightElbow = { 1.7, 0, 0 },
-	LeftElbow = { 1.7, 0, 0 },
-	RightHip = { 0.25, 0, 0 },
-	RightKnee = { -0.35, 0, 0 },
+	Waist = { -0.18, -0.3, 0 },
+	Neck = { -0.1, 0.15, 0 },
+	LeftShoulder = { 1.35, 0, 0.45 },
+	LeftElbow = { 1.35, 0, 0 },
+	RightShoulder = { 0.55, 0, 0.3 },
+	RightElbow = { 1.25, 0, 0 },
+	RightHip = { 0.35, 0, 0 },
+	LeftHip = { 0.2, 0, 0 },
+	RightKnee = { -0.5, 0, 0 },
+	LeftKnee = { -0.35, 0, 0 },
 }
 
 -- The pose for these attributes at server time `t` (pure, for testing):
