@@ -19,6 +19,13 @@ check(DuelistBrain.decide(view({ FoeCharging = true, FoeHeavy = true }), 0.1) ==
 check(DuelistBrain.decide(view({ FoeAttacking = true, FoeAggressive = true }), 0.75) == "Guard", "Rival didn't turtle against a flurry")
 check(DuelistBrain.decide(view({ FoeCharging = true, GuardBroken = true }), 0.1) == "Dodge", "Rival guarded with a broken guard")
 check(DuelistBrain.decide(view({ JustBlocked = true }), 0.9) == "Riposte", "Rival didn't counter after a block")
+-- Against an idle player it presses the attack instead of waiting.
+check(DuelistBrain.decide(view({ NextAttack = 99, FoeIdle = true }), 0.1) == "Strafe", "Rival turtled against an idle player")
+check(DuelistBrain.decide(view({ NextAttack = 99 }), 0.1) == "Guard", "Rival lost its guard between swings")
+check(DuelistBrain.decide(view({ Distance = 12, FoeIdle = true }), 0.1) == "Approach", "Rival crept in behind its shield at an idle player")
+check(DuelistBrain.decide(view({ FoeIdle = true }), 0.35) == "Heavy", "Rival didn't punish an idle player with heavies")
+check(DuelistBrain.decide(view({ Distance = 4, NextSurge = 0, FoeIdle = true }), 0.5) == "Surge", "Rival saved its surges against an idle player")
+check(DuelistBrain.decide(view({ SinceOffense = 2, FoeRecovering = false }), 0.9) == "Light", "Rival stalled without attacking")
 check(DuelistBrain.decide(view({ JustBlocked = true, Guarding = true, FoeAttacking = true, NextDefense = 20 }), 0.9) == "Guard", "Rival always dropped its shield to counter mid-flurry")
 check(DuelistBrain.decide(view({ JustBlocked = true, Guarding = true, FoeAttacking = true, NextDefense = 20 }), 0.5) == "Riposte", "Rival rarely countered after blocking")
 check(DuelistBrain.decide(view({ Guarding = true, FoeAttacking = true, FoeRecovering = true, NextDefense = 20 }), 0.9) == "Guard", "Rival dropped its guard mid-flurry")

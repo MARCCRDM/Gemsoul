@@ -913,6 +913,14 @@ local function think(enemy, now: number)
 		table.remove(duel.FoeSwings, 1)
 	end
 	local lastSwing = duel.FoeSwings[#duel.FoeSwings]
+	-- Are you doing anything? Not swinging, blocking, charging or casting
+	-- for a moment: it presses the attack instead of waiting on you.
+	local foeBusy = (lastSwing ~= nil and now - lastSwing < 1)
+		or owner:GetAttribute("Blocking") == true
+		or (foe ~= nil and (foe.ChargeStarted ~= nil or #(foe.Pending or {}) > 0 or foe.Channel ~= nil))
+	if foeBusy or not duel.FoeIdleSince then
+		duel.FoeIdleSince = if foeBusy then nil else now
+	end
 	local view = {
 		Now = now,
 		Distance = distance,
@@ -933,6 +941,8 @@ local function think(enemy, now: number)
 		FoeRecovering = foe ~= nil and foe.NextAttack > now + 0.15 and foe.ChargeStarted == nil,
 		FoeVulnerable = foe ~= nil and (now < foe.StunUntil or now < (foe.SlowUntil or 0)),
 		FoeLow = ownerHumanoid ~= nil and ownerHumanoid.Health < ownerHumanoid.MaxHealth * 0.3,
+		FoeIdle = duel.FoeIdleSince ~= nil and now - duel.FoeIdleSince >= Brain.IdleAfter,
+		SinceOffense = now - (duel.LastOffense or now),
 		NextAttack = duel.NextAttack,
 		NextSurge = duel.NextSurge,
 		NextDefense = duel.NextDefense,
@@ -962,6 +972,7 @@ local function think(enemy, now: number)
 	end
 	if move then
 		spendStamina(duel, move.Cost or 0)
+		duel.LastOffense = now
 		humanoid:MoveTo(root.Position)
 		dropGuard(enemy, now)
 		useMove(enemy, duel, move, now, target, dir, side, distance)
@@ -978,7 +989,7 @@ local function think(enemy, now: number)
 		end
 	elseif choice == "Guard" then
 		-- Shield up, longer against a flurry, edging sideways behind it.
-		local hold = if view.FoeAggressive then 2.2 else 1.6
+		local hold = if view.FoeAggressive then 2.2 elseif view.FoeIdle then 0.6 else 1.6
 		if not guarding(enemy, now) then
 			-- Just raised: a beat before it can swing (keeping it up doesn't
 			-- push its next attack back, or it would never strike).
@@ -998,6 +1009,7 @@ local function think(enemy, now: number)
 		duel.RiposteFor = enemy.BlockedAt
 		dropGuard(enemy, now)
 		duel.Action = { Kind = "Punish", At = now + Brain.Windup.Punish, Hits = 1 }
+		duel.LastOffense = now
 		animate(duel, "Slash", Brain.Windup.Punish, nil, nil)
 		setStance(duel, "Counter")
 		press(duel, "LMB")
@@ -1017,6 +1029,7 @@ local function think(enemy, now: number)
 	elseif choice == "Punish" then
 		dropGuard(enemy, now)
 		duel.Action = { Kind = "Punish", At = now + Brain.Windup.Punish, Hits = 1 }
+		duel.LastOffense = now
 		animate(duel, "Slash", Brain.Windup.Punish)
 		setStance(duel, "Counter")
 		press(duel, "LMB")
@@ -1029,6 +1042,7 @@ local function think(enemy, now: number)
 		root.AssemblyLinearVelocity = dir * math.min(80, distance * 5) + Vector3.new(0, 4, 0)
 		fx("DodgeRoll", nil, root.Position, dir, math.min(14, distance - 3), false)
 		duel.Action = { Kind = "Lunge", At = now + Brain.Windup.Lunge, Hits = 1 }
+		duel.LastOffense = now
 		animate(duel, "Slash", Brain.Windup.Lunge)
 		setStance(duel, "Lunge")
 		press(duel, "LMB")
@@ -1042,6 +1056,7 @@ local function think(enemy, now: number)
 		end
 		if surge then
 			duel.Charge -= cost
+			duel.LastOffense = now
 			dropGuard(enemy, now)
 			castSurge(enemy, duel, surge, now, target)
 		else
@@ -1060,6 +1075,7 @@ local function think(enemy, now: number)
 		dropGuard(enemy, now)
 		local heavy = choice == "Heavy"
 		duel.Action = { Kind = choice, At = now + Brain.Windup[choice], Hits = 1 }
+		duel.LastOffense = now
 		duel.CastElement = duel.Element
 		animate(
 			duel,
@@ -1089,8 +1105,13 @@ local function think(enemy, now: number)
 		if now >= duel.NextWeave then
 			duel.Weave, duel.NextWeave = -duel.Weave, now + 1 + math.random() * 1.2
 		end
-		local keep = if distance < 3 then -dir * 3 else Vector3.zero
-		humanoid:MoveTo(root.Position + side * duel.Weave * 4 + keep)
+		if view.FoeIdle then
+			-- You're standing there: it circles in close, ready to swing.
+			humanoid:MoveTo(target.Position - dir * 4 + side * duel.Weave * 2)
+		else
+			local keep = if distance < 3 then -dir * 3 else Vector3.zero
+			humanoid:MoveTo(root.Position + side * duel.Weave * 4 + keep)
+		end
 		face(root, target.Position)
 	end
 	if duel.RetreatUntil and now < duel.RetreatUntil and not duel.Action then
@@ -1243,7 +1264,7 @@ function spawnRival(owner: Player)
 		HeavyCrit = rules.HeavyCrit,
 		Speed = Classes.walkSpeed(rating(mine, "Speed")) + (rivalEffects.SpeedAdd or 0),
 		SwingCooldown = rules.BasicCooldown,
-		Rate = if sparring then rules.BasicCooldown * 1.8 else rules.BasicCooldown,
+		Rate = if sparring then rules.BasicCooldown * 1.35 else rules.BasicCooldown,
 		-- Its own Stamina and Charge, by the same rules as yours.
 		Stamina = Tech.Resources.Stamina.Max,
 		Charge = Tech.Resources.Charge.Max,
@@ -1251,6 +1272,7 @@ function spawnRival(owner: Player)
 		StaminaRestUntil = 0,
 		Action = nil,
 		NextAttack = now + 1.2,
+		LastOffense = now,
 		NextSurge = now + 3.5,
 		Surges = {},
 		Moves = {},

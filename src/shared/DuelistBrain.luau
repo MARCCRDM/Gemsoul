@@ -30,6 +30,8 @@ Brain.Windup = { Light = 0.3, Heavy = 0.75, Punish = 0.18, Lunge = 0.25, Bolt = 
 Brain.BoltRadius = 3.5 -- a bolt hits within this many studs of where it was aimed
 Brain.SurgeRange = 32
 Brain.LungeRange = 18
+Brain.IdleAfter = 1.2 -- seconds of you doing nothing before it presses the attack
+Brain.MaxLull = 1.6 -- the longest it goes without attacking while you're in reach
 
 export type View = {
 	Now: number,
@@ -49,6 +51,8 @@ export type View = {
 	FoeRecovering: boolean, -- just attacked and can't act yet
 	FoeVulnerable: boolean, -- stunned or slowed
 	FoeLow: boolean, -- below 30% health
+	FoeIdle: boolean?, -- not swinging, blocking, casting or charging for a while: press the attack
+	SinceOffense: number?, -- seconds since it last attacked or cast
 	NextAttack: number,
 	NextSurge: number,
 	NextDefense: number,
@@ -107,12 +111,17 @@ function Brain.decide(v: View, roll: number): string
 			return "GuardAdvance"
 		end
 	end
+	-- Never stalls: too long without attacking and it swings as soon as it
+	-- can, whatever you're doing.
+	if (v.SinceOffense or 0) > Brain.MaxLull and v.Distance <= Brain.Reach + 1 and v.Now >= v.NextAttack then
+		return if roll < 0.3 then "Heavy" else "Light"
+	end
 	-- An opening: hit the player while they recover.
 	if v.FoeRecovering and v.Distance <= Brain.Reach + 2 then
 		return "Punish"
 	end
 	if v.Now >= v.NextSurge and v.Distance <= Brain.SurgeRange then
-		if v.Distance >= 8 or v.FoeVulnerable or v.FoeBlocking then
+		if v.Distance >= 8 or v.FoeVulnerable or v.FoeBlocking or v.FoeIdle then
 			return "Surge"
 		end
 	end
@@ -123,8 +132,9 @@ function Brain.decide(v: View, roll: number): string
 		return "Lunge"
 	end
 	if v.Distance > Brain.Reach then
-		-- Mid range: walk you down behind the shield; from far, run in.
-		if v.Distance <= Brain.LungeRange + 6 and not v.GuardBroken then
+		-- Mid range: walk you down behind the shield; from far, or when
+		-- you're standing idle, run straight in.
+		if v.Distance <= Brain.LungeRange + 6 and not v.GuardBroken and not v.FoeIdle then
 			return "GuardAdvance"
 		end
 		return "Approach"
@@ -136,10 +146,12 @@ function Brain.decide(v: View, roll: number): string
 		if v.FoeLow then
 			return if roll < 0.15 then "Heavy" else "Light" -- quick pressure to finish
 		end
-		return if roll < 0.25 then "Heavy" else "Light"
+		-- An idle foe is a free target: more heavies.
+		return if roll < (if v.FoeIdle then 0.4 else 0.25) then "Heavy" else "Light"
 	end
-	-- Waiting on its next swing up close: shield up rather than open.
-	if v.Distance <= Brain.Reach + 3 and not v.GuardBroken and roll < 0.75 then
+	-- Waiting on its next swing up close: shield up rather than open, unless
+	-- you're doing nothing (then it stays on you, ready to swing).
+	if v.Distance <= Brain.Reach + 3 and not v.GuardBroken and not v.FoeIdle and roll < 0.6 then
 		return "Guard"
 	end
 	return "Strafe"
