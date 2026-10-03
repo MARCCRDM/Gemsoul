@@ -14,8 +14,9 @@ What you need (once):
 It uploads, in this order (most important first):
   assets/music/*.mp3          -> src/client/Modules/Music.luau
   assets/sounds/combat/*.mp3  -> src/client/Modules/CombatSound.luau
+  assets/sounds/lottery/*     -> src/client/Modules/LotterySound.luau
   assets/sounds/*.mp3         -> src/client/Modules/UiSound.luau
-then replaces the matching "Name = 0, -- file.mp3" lines with the new ids.
+then replaces the matching "Name = 0, -- file.mp3" (or .ogg) lines with the new ids.
 
 Roblox limits how many audio files an account can upload a month (fewer
 for accounts that aren't ID-verified). Ids already uploaded are remembered
@@ -39,6 +40,7 @@ IDS_FILE = os.path.join(ROOT, "tools", "audio_ids.json")
 GROUPS = [
     ("assets/music", "src/client/Modules/Music.luau"),
     ("assets/sounds/combat", "src/client/Modules/CombatSound.luau"),
+    ("assets/sounds/lottery", "src/client/Modules/LotterySound.luau"),
     ("assets/sounds", "src/client/Modules/UiSound.luau"),
 ]
 API = "https://apis.roblox.com/assets/v1"
@@ -139,7 +141,7 @@ def main():
             continue
         ids = {}
         for name in sorted(os.listdir(directory)):
-            if not name.endswith(".mp3") or name.startswith("_"):
+            if not name.endswith((".mp3", ".ogg")) or name.startswith("_"):
                 continue
             rel = f"{folder}/{name}"
             if rel in known and not args.force:

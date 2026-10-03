@@ -15,6 +15,7 @@ local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
 local UiSound = require(script.Parent.Modules.UiSound)
+local LotterySound = require(script.Parent.Modules.LotterySound)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -409,13 +410,11 @@ local function spotlight(card, celebrate)
 		end
 		local major = card.Index == #cards
 		burst(color, major, rank)
-		UiSound.play(
-			if major or rank >= 4
-				then "Reward"
-				elseif rank == 3 then "Enchant"
-				elseif rank == 2 then "Confirm"
-				else "Equip"
-		)
+		-- The reel locks with a clamp, then the find rings out by rarity.
+		LotterySound.play("Lock")
+		task.delay(0.08, function()
+			LotterySound.reveal(rank)
+		end)
 	end
 end
 local function createCards(entries)
@@ -546,6 +545,9 @@ local function animate(entries, isGem)
 	chapter.Text = if isGem then "02 / 03" else "01 / 03"
 	rackTitle.Text = if isGem then "GEMSTONE MANIFEST" else "EQUIPMENT MANIFEST"
 	spin = { Start = os.clock(), NextSound = 0, Count = 0 }
+	-- The capsule's seal breaks and its reactor starts humming.
+	LotterySound.play("SealBreak")
+	LotterySound.hum(true, 0)
 	for index, card in cards do
 		card.StopAt = (if isGem then 1.8 + index * 0.6 else 2 + index * 0.85) + (if index == #cards then 0.65 else 0)
 	end
@@ -557,6 +559,7 @@ local function close()
 		return
 	end
 	closed = true
+	LotterySound.hum(false) -- (skipped mid-spin: the reactor stops)
 	for _, connection in connections do
 		connection:Disconnect()
 	end
@@ -580,7 +583,7 @@ local function finish()
 		return
 	end
 	close()
-	UiSound.play("Reward")
+	LotterySound.play("Attune")
 	UiKit.toast("Your journey begins. All nine gem sockets are ready.", C.Cyan)
 end
 listen(RunService.RenderStepped, function(dt)
@@ -645,11 +648,15 @@ listen(RunService.RenderStepped, function(dt)
 		end
 	end
 	if nextCard and elapsed >= spin.NextSound then
-		spin.NextSound = elapsed + (if nextCard.StopAt - elapsed < 1 then 0.24 else 0.11)
-		UiSound.play("Hover")
+		-- Soft data blips as the next reel steps, climbing as it slows.
+		local left = nextCard.StopAt - elapsed
+		spin.NextSound = elapsed + (if left < 1 then 0.24 else 0.11)
+		LotterySound.tick(1 - math.clamp(left, 0, 1.5) / 1.5)
+		LotterySound.hum(true, spin.Count / #cards)
 	end
 	if spin.Count == #cards then
 		spin = nil
+		LotterySound.hum(false)
 		primary.Active = true
 		primary.BackgroundColor3 = C.Gold
 		primary.Text = if phase == "Armor" then "UNEARTH MY NINE GEMSTONES" else "ATTUNE & BEGIN YOUR SAGA"

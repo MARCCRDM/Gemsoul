@@ -52,6 +52,13 @@ local UiKit={gui=function(name) return new("ScreenGui",{Name=name}) end,round=fu
 local IronUi={new=new}
 local sounds={}
 local UiSound={play=function(name) table.insert(sounds,name) end}
+local humming=false
+local LotterySound={
+ play=function(name) table.insert(sounds,"Lottery:"..name) end,
+ tick=function() table.insert(sounds,"Lottery:Tick") end,
+ reveal=function(rank) table.insert(sounds,"Lottery:Reveal"..rank) end,
+ hum=function(on) humming=on end,
+}
 local drawn={}
 local Art={}
 function Art.show(parent,gem,slot)

@@ -39,4 +39,7 @@ local before=#requests
 step(1)
 input.InputBegan.Fire({KeyCode=Enum.KeyCode.Space},false)
 check(#requests==before,"Closed intro retained input / animation callbacks")
+check(table.find(sounds,"Lottery:SealBreak") and table.find(sounds,"Lottery:Lock") and table.find(sounds,"Lottery:Tick"),"Lottery missing its vault sounds")
+check(not table.find(sounds,"Hover") and not table.find(sounds,"Reward"),"Lottery still plays menu clicks / the fanfare")
+check(not humming,"Reactor hum kept running after the lottery closed")
 print("PASS: "..checks.." real lottery UI flow, inspection, order, retries, nine rewards and cleanup checks")
