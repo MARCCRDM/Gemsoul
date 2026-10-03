@@ -21,8 +21,10 @@
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Brain = require(ReplicatedStorage.Shared.DuelistBrain)
+local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -744,6 +746,10 @@ function spawnRival(owner: Player)
 		animateScript:Destroy()
 	end
 	animateLegs(enemy.Humanoid)
+	local joints = RivalPose.jointCount(rig)
+	if joints < 10 then
+		warn(string.format("[Duelist] %s's rig has only %d of 10 poseable joints", name, joints))
+	end
 	local now = os.clock()
 	local duel = {
 		Enemy = enemy,
@@ -856,6 +862,17 @@ function spawnRival(owner: Player)
 end
 
 function Duelist.start()
+	-- Its fighting poses, every frame, bent on the server so every client sees them.
+	RunService.Heartbeat:Connect(function(dt)
+		local now = workspace:GetServerTimeNow()
+		for _, duel in duels do
+			local ok, problem = pcall(RivalPose.update, duel.Enemy.Model, dt, now, os.clock())
+			if not ok and not duel.PoseWarned then
+				duel.PoseWarned = true
+				warn("[Duelist] pose update failed: " .. tostring(problem))
+			end
+		end
+	end)
 	ArenaSessions.onEnter = function(player: Player, _pvp: boolean)
 		task.wait(1.5) -- let the arrival protection settle first
 		spawnRival(player)

@@ -1,7 +1,8 @@
 --[[
 	Body language for the Arena rival. The server plays its walk, run and idle
-	animations; this layers the fighting on top by bending its joints (Motor6D
-	C0, set only on this client) from what the server says it is doing:
+	animations and, every frame, this layers the fighting on top by bending
+	its joints (Motor6D C0, or an AnimationConstraint's attachment) from what
+	the rival is doing. Done on the server, so it replicates to every client:
 
 	  ActionKind   Slash, Heavy, Bolt, Nova, Buff, Dodge or Stagger
 	  ActionStart  server time the wind-up began
@@ -211,56 +212,82 @@ function RivalPose.pose(a, t: number): ({ [string]: { number } }, number)
 	return READY, 10
 end
 
--- [model] = { Motors = { [joint] = { Motor, C0 } }, Angles = {...} }
+-- [model] = { Joints = { [joint] = { Object, Property, Rest } }, Angles = {...} }
 -- (Not weak-keyed: a dropped entry would be rebuilt mid-pose.)
 local rigs = {}
 
--- A joint's resting C0, remembered on the joint itself the first time it's
--- seen, so a re-scan never mistakes an already-bent joint for its rest pose
--- (which would stack every pose on top of the last).
-local function restC0(motor: Motor6D): CFrame
-	local rest = motor:GetAttribute("RestC0")
-	if typeof(rest) ~= "CFrame" then
-		rest = motor.C0
-		motor:SetAttribute("RestC0", rest)
+-- A joint and the CFrame that sets its resting offset: a Motor6D's C0, or for
+-- rigs built with AnimationConstraints (Roblox's newer avatar joints) the
+-- constraint's Attachment0. The rest value is remembered on the object the
+-- first time it's seen, so a re-scan never mistakes an already-bent joint for
+-- its rest pose (which would stack every pose on top of the last).
+local function handle(model: Model, joint: string, partName: string)
+	local part = model:FindFirstChild(partName)
+	local object = part and part:FindFirstChild(joint)
+	local target, property
+	if object and object:IsA("Motor6D") then
+		target, property = object, "C0"
+	else
+		local constraint = model:FindFirstChild(joint, true)
+		if constraint and constraint:IsA("AnimationConstraint") and constraint.Attachment0 then
+			target, property = constraint.Attachment0, "CFrame"
+		end
 	end
-	return rest
+	if not target then
+		return nil
+	end
+	local rest = target:GetAttribute("RestPose")
+	if typeof(rest) ~= "CFrame" then
+		rest = (target :: any)[property]
+		target:SetAttribute("RestPose", rest)
+	end
+	return { Object = target, Property = property, Rest = rest }
 end
 
 -- Its joints. With streaming on, the body parts can arrive after the model
 -- itself, so any joint not found yet is looked for again every half second.
-local function rigOf(model: Model)
+local function rigOf(model: Model, clock: number)
 	local rig = rigs[model]
 	if not rig then
-		rig = { Motors = {}, Angles = {}, Found = 0, NextScan = 0 }
+		rig = { Joints = {}, Angles = {}, Found = 0, NextScan = 0 }
 		rigs[model] = rig
 	end
-	local now = os.clock()
-	if rig.Found < JOINT_COUNT and now >= rig.NextScan then
-		rig.NextScan = now + 0.5
+	if rig.Found < JOINT_COUNT and clock >= rig.NextScan then
+		rig.NextScan = clock + 0.5
 		for joint, partName in JOINTS do
-			local entry = rig.Motors[joint]
-			if not entry or entry.Motor.Parent == nil then
-				local part = model:FindFirstChild(partName)
-				local motor = part and part:FindFirstChild(joint)
-				if motor and motor:IsA("Motor6D") then
-					rig.Motors[joint] = { Motor = motor, C0 = restC0(motor) }
-					rig.Angles[joint] = { 0, 0, 0 }
+			local entry = rig.Joints[joint]
+			if not entry or entry.Object.Parent == nil then
+				local found = handle(model, joint, partName)
+				if found then
+					rig.Joints[joint] = found
+					rig.Angles[joint] = rig.Angles[joint] or { 0, 0, 0 }
 				end
 			end
 		end
 		rig.Found = 0
-		for _ in rig.Motors do
+		for _ in rig.Joints do
 			rig.Found += 1
 		end
 	end
 	return rig
 end
 
+-- How many joints it can pose (for diagnostics).
+function RivalPose.jointCount(model: Model): number
+	local count = 0
+	for joint, partName in JOINTS do
+		if handle(model, joint, partName) then
+			count += 1
+		end
+	end
+	return count
+end
+
 local ATTRIBUTES = { "ActionKind", "ActionStart", "ActionAt", "ActionSide", "GuardUntil" }
 
--- Call every frame with the rival's model.
-function RivalPose.update(model: Model?, dt: number)
+-- Call every frame on the server with the rival's model and server time.
+-- Joints only change when they move noticeably, to keep replication light.
+function RivalPose.update(model: Model?, dt: number, now: number, clock: number?)
 	for known in rigs do
 		if not known.Parent then
 			rigs[known] = nil -- gone: forget it
@@ -273,20 +300,26 @@ function RivalPose.update(model: Model?, dt: number)
 	if not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	local rig = rigOf(model)
+	local rig = rigOf(model, clock or now)
 	local attrs = {}
 	for _, name in ATTRIBUTES do
 		attrs[name] = model:GetAttribute(name)
 	end
-	local target, speed = RivalPose.pose(attrs, workspace:GetServerTimeNow())
+	local target, speed = RivalPose.pose(attrs, now)
 	local alpha = 1 - math.exp(-speed * math.min(dt, 0.1))
-	for joint, entry in rig.Motors do
+	for joint, entry in rig.Joints do
 		local angles = rig.Angles[joint]
 		local to = target[joint] or { 0, 0, 0 }
+		local moved = 0
 		for i = 1, 3 do
-			angles[i] += (to[i] - angles[i]) * alpha
+			local step = (to[i] - angles[i]) * alpha
+			angles[i] += step
+			moved = math.max(moved, math.abs(step))
 		end
-		entry.Motor.C0 = entry.C0 * CFrame.Angles(angles[1], angles[2], angles[3])
+		if moved > 0.002 or not entry.Written then
+			entry.Written = true;
+			(entry.Object :: any)[entry.Property] = entry.Rest * CFrame.Angles(angles[1], angles[2], angles[3])
+		end
 	end
 end
 
