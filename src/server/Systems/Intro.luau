@@ -21,6 +21,7 @@ local reply = Shop.reply
 
 local Intro = {}
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
+local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 
 local function newGem(source: string, luck: number?): GemConfig.Gem
 	return GemGenerator.generate(Gems.random(), source, {
@@ -84,10 +85,18 @@ local function giveStarterKit(player: Player)
 	local class = Classes.get(classId)
 	if class and (not character or character.Class ~= classId) then
 		PlayerData.setLoadout(player, classId, Classes.starterWeapon(class, Random.new()).Id, class.Armors[1].Id)
+	elseif class and character and not ExpandedTraits.obtainable(Classes.weapon(classId, character.Weapon)) then
+		-- An older save still holding a weapon that's switched off (a pistol):
+		-- the lottery hands it a fresh weapon roll instead.
+		local weapon = Classes.starterWeapon(class, Random.new())
+		local profile = PlayerData.get(player)
+		local owned = profile and profile.Owned.Weapons[weapon.Id]
+		PlayerData.setGearQuality(player, "Weapons", weapon.Id, owned or 1)
+		PlayerData.equipGear(player, "Weapons", weapon.Id)
 	end
 end
 
--- The ship intro's first step: put on the suit and pick up the pistol and shield.
+-- The ship intro's first step: put on the suit and pick up your starter weapon.
 local function suitUp(player: Player)
 	local intro = PlayerData.intro(player)
 	if not intro or intro.Done then

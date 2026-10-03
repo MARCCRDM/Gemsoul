@@ -8,6 +8,7 @@ local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
+local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
@@ -311,6 +312,24 @@ local function fit()
 		stage.AutomaticCanvasSize, stage.ScrollingDirection = Enum.AutomaticSize.Y, Enum.ScrollingDirection.Y
 	end
 end
+-- The names a slot's reel flashes while it spins: only gear the lottery can
+-- actually hand out (the starting pool, never a switched-off pistol), so the
+-- reel never teases something you can't get.
+local reelPools = {}
+local function reelPool(kind: string)
+	if not reelPools[kind] then
+		local class = Classes.get(GemClient.Profile.Character.Class)
+		local catalog = class and class[kind] or {}
+		local pool = {}
+		for _, item in catalog do
+			if item.StartPool and ExpandedTraits.obtainable(item) then
+				table.insert(pool, item)
+			end
+		end
+		reelPools[kind] = if #pool > 0 then pool else catalog
+	end
+	return reelPools[kind]
+end
 local function describe(entry, isGem)
 	if isGem then
 		local gem = entry.Gem
@@ -606,9 +625,8 @@ listen(RunService.RenderStepped, function(dt)
 					line.Text = (GemConfig.ElementLabels[element] or element):upper()
 					line.TextColor3 = GemConfig.ElementColors[element]:Lerp(C.Dim, 0.3)
 				else
-					local catalog =
-						Classes.get(GemClient.Profile.Character.Class)[Slots.Definitions[card.Entry.Slot].Kind]
-					line.Text = catalog[math.random(1, #catalog)].Name:upper()
+					local pool = reelPool(Slots.Definitions[card.Entry.Slot].Kind)
+					line.Text = if #pool > 0 then pool[math.random(1, #pool)].Name:upper() else ""
 					line.TextColor3 = if card == nextCard then C.Cyan else C.Dim
 				end
 			end

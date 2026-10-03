@@ -5,7 +5,16 @@ Lottery.GearOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet" }
 Lottery.GemOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet", "Surge1", "Surge2", "Surge3" }
 function Lottery.prepare(profile, rng, generate)
 	if profile.Intro.Lottery then
-		return profile.Intro.Lottery
+		-- Already rolled (its gems are kept), but not yet claimed: the gear
+		-- shown is whatever is equipped now (e.g. after a switched-off
+		-- weapon was replaced).
+		local reward = profile.Intro.Lottery
+		if not reward.Granted then
+			for _, entry in reward.Gear do
+				entry.Id = profile.Character[entry.Slot]
+			end
+		end
+		return reward
 	end
 	local reward = { Version = Lottery.Version, Gear = {}, Gems = {}, Granted = false }
 	for _, slot in Lottery.GearOrder do
