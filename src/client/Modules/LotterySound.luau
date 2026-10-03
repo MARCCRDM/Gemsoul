@@ -75,12 +75,15 @@ local FALLBACK = {
 }
 
 local group: SoundGroup? = nil
+local generation = 0
+local active: { [Sound]: boolean } = {}
+local lastTick = -math.huge
 local function bus(): SoundGroup
 	if not group or not group.Parent then
 		local made = Instance.new("SoundGroup")
 		made.Name = "LotterySounds"
 		local reverb = Instance.new("ReverbSoundEffect")
-		reverb.DecayTime, reverb.Density, reverb.Diffusion, reverb.DryLevel, reverb.WetLevel = 1.8, 0.9, 0.9, 0, -12
+		reverb.DecayTime, reverb.Density, reverb.Diffusion, reverb.DryLevel, reverb.WetLevel = 1.15, 0.8, 0.85, 0, -18
 		reverb.Parent = made
 		made.Parent = SoundService
 		group = made
@@ -91,13 +94,24 @@ local function bus(): SoundGroup
 end
 
 local function emit(soundId: string, speed: number, volume: number, delay: number?)
+	local token = generation
 	local sound = Instance.new("Sound")
 	sound.SoundId = soundId
 	sound.PlaybackSpeed = speed
 	sound.Volume = volume
 	sound.SoundGroup = bus()
 	sound.Parent = bus()
+	active[sound] = true
+	sound.Destroying:Once(function()
+		active[sound] = nil
+	end)
+	sound.Ended:Once(function()
+		sound:Destroy()
+	end)
 	local function start()
+		if token ~= generation or not sound.Parent then
+			return
+		end
 		pcall(function()
 			sound:Play()
 		end)
@@ -127,6 +141,11 @@ end
 
 -- A reel steps; `rise` 0..1 climbs the blip as the reel slows to a stop.
 function LotterySound.tick(rise: number?)
+	local now = os.clock()
+	if now - lastTick < 0.065 then
+		return
+	end
+	lastTick = now
 	local r = math.clamp(rise or 0, 0, 1)
 	LotterySound.play("Tick", 1 + r * 0.45 + (math.random() - 0.5) * 0.04, 0.6 + r * 0.4)
 end
@@ -165,6 +184,16 @@ function LotterySound.hum(on: boolean, level: number?)
 	-- It rises as the cards lock in.
 	local current = hum :: Sound
 	current.PlaybackSpeed = 1 + math.clamp(level or 0, 0, 1) * 0.25
+end
+
+-- Cancel queued layers as well as sounds already playing when the intro closes.
+function LotterySound.stop()
+	generation += 1
+	LotterySound.hum(false)
+	for sound in active do
+		sound:Destroy()
+	end
+	lastTick = -math.huge
 end
 
 return LotterySound

@@ -160,6 +160,7 @@ local MIN_GAP =
 	{ Hit = 0.04, Burn = 0.25, Corrode = 0.25, Freeze = 0.25, Zap = 0.08, Warn = 0.4, Hurt = 0.08, Combo = 0.05 }
 local DEFAULT_GAP = 0.03
 local MAX_VOICES = 28
+local CRITICAL = { Parry = true, GuardBreak = true, Hurt = true, NovaWarn = true, Warn = true }
 local lastPlayed: { [string]: number } = {}
 local lastTake: { [string]: string } = {}
 local voices = 0
@@ -172,15 +173,15 @@ local function combatGroup(): SoundGroup
 		made.Name = "CombatSounds"
 		local compressor = Instance.new("CompressorSoundEffect")
 		compressor.Threshold, compressor.Ratio, compressor.Attack, compressor.Release, compressor.GainMakeup =
-			-18, 4, 0.004, 0.18, 4
+			-16, 3, 0.006, 0.14, 1.5
 		compressor.Priority = 2
 		compressor.Parent = made
 		local eq = Instance.new("EqualizerSoundEffect")
-		eq.LowGain, eq.MidGain, eq.HighGain = 2.5, -1, 1.5
+		eq.LowGain, eq.MidGain, eq.HighGain = 1.5, -1.5, 0.5
 		eq.Priority = 1
 		eq.Parent = made
 		local reverb = Instance.new("ReverbSoundEffect")
-		reverb.DecayTime, reverb.Density, reverb.Diffusion, reverb.DryLevel, reverb.WetLevel = 1.1, 0.8, 0.8, 0, -16
+		reverb.DecayTime, reverb.Density, reverb.Diffusion, reverb.DryLevel, reverb.WetLevel = 0.55, 0.7, 0.7, 0, -22
 		reverb.Priority = 0
 		reverb.Parent = made
 		made.Parent = SoundService
@@ -210,8 +211,15 @@ local function takes(name: string): { string }
 	return found
 end
 
-local function emit(soundId: string, speed: number, volume: number, position: Vector3?, delay: number?)
-	if voices >= MAX_VOICES then
+local function emit(
+	soundId: string,
+	speed: number,
+	volume: number,
+	position: Vector3?,
+	delay: number?,
+	critical: boolean?
+)
+	if voices >= (if critical then MAX_VOICES else MAX_VOICES - 6) then
 		return
 	end
 	local sound = Instance.new("Sound")
@@ -236,7 +244,26 @@ local function emit(soundId: string, speed: number, volume: number, position: Ve
 		holder = sound
 	end
 	voices += 1
+	local released = false
+	local function release()
+		if released then
+			return
+		end
+		released = true
+		voices -= 1
+		holder:Destroy()
+	end
+	sound.Ended:Once(release)
+	holder.Destroying:Once(function()
+		if not released then
+			released = true
+			voices -= 1
+		end
+	end)
 	local function start()
+		if released then
+			return
+		end
 		pcall(function()
 			sound:Play()
 		end)
@@ -246,15 +273,17 @@ local function emit(soundId: string, speed: number, volume: number, position: Ve
 	else
 		start()
 	end
-	Debris:AddItem(holder, 3.5 + (delay or 0))
-	task.delay(1.2 + (delay or 0), function()
-		voices -= 1
-	end)
+	Debris:AddItem(holder, 6 + (delay or 0))
 end
 
 -- `options`: Volume (multiplier), Pitch (multiplier).
 function CombatSound.play(name: string, position: Vector3?, options: { Volume: number?, Pitch: number? }?)
 	if CombatSound.Volume <= 0 then
+		return
+	end
+	-- Ignore inaudible remote fights before allocating emitters or consuming cooldowns.
+	local camera = workspace.CurrentCamera
+	if position and camera and (position - camera.CFrame.Position).Magnitude > 160 then
 		return
 	end
 	local now = os.clock()
@@ -272,11 +301,11 @@ function CombatSound.play(name: string, position: Vector3?, options: { Volume: n
 			pick = found[(table.find(found, pick) :: number) % #found + 1]
 		end
 		lastTake[name] = pick
-		emit("rbxassetid://" .. CombatSound.Ids[pick], pitch, volume, position)
+		emit("rbxassetid://" .. CombatSound.Ids[pick], pitch, volume, position, nil, CRITICAL[name])
 		return
 	end
 	for _, layer in FALLBACK[name] or {} do
-		emit(layer[1], layer[2] * pitch, layer[3] * volume, position, layer[4])
+		emit(layer[1], layer[2] * pitch, layer[3] * volume, position, layer[4], CRITICAL[name])
 	end
 end
 

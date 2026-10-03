@@ -54,6 +54,7 @@ local sounds={}
 local UiSound={play=function(name) table.insert(sounds,name) end}
 local humming=false
 local LotterySound={
+ stop=function() end,
  play=function(name) table.insert(sounds,"Lottery:"..name) end,
  tick=function() table.insert(sounds,"Lottery:Tick") end,
  reveal=function(rank) table.insert(sounds,"Lottery:Reveal"..rank) end,

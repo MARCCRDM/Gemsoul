@@ -14,7 +14,6 @@ local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
-local UiSound = require(script.Parent.Modules.UiSound)
 local LotterySound = require(script.Parent.Modules.LotterySound)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
@@ -559,7 +558,7 @@ local function close()
 		return
 	end
 	closed = true
-	LotterySound.hum(false) -- (skipped mid-spin: the reactor stops)
+	LotterySound.stop() -- Stop delayed reveal layers too when skipping mid-spin.
 	for _, connection in connections do
 		connection:Disconnect()
 	end
