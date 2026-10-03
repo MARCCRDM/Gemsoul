@@ -74,6 +74,45 @@ function Actions.swingCost(weapon, heavy: boolean?): number
 		)
 	return if heavy then math.floor(light * Actions.Stamina.HeavyMult + 0.5) else light
 end
+--[[
+	Ground blasts (a cast with a warning ring on the ground): a wide ring,
+	and the closer to its centre you're caught, the harder it hits.
+	  core    (inner 35% of the radius)  full to 77% damage, STUNNED 1.3s at
+	                                     the very centre down to 0.7s, and
+	                                     thrown off your feet
+	  middle  (35-70%)                   77% to 61% damage, STAGGERED 0.55s
+	                                     down to 0.25s
+	  edge    (70-100%)                  61% to 45% damage, no stagger
+	A raised guard takes it down a step (a stun becomes a stagger, a stagger
+	nothing); a dodge's immunity avoids it all. Radius: a surge's own radius
+	x1.6, 9 to 15 studs (a hop gets you from the core to the edge; a roll
+	gets you out).
+]]
+Actions.Blast = {
+	RadiusScale = 1.6,
+	MinRadius = 9,
+	MaxRadius = 15,
+	EdgeDamage = 0.45,
+	StunZone = 0.35,
+	StaggerZone = 0.7,
+	Knockback = 34,
+}
+function Actions.blastRadius(base: number?): number
+	return math.clamp((base or 7) * Actions.Blast.RadiusScale, Actions.Blast.MinRadius, Actions.Blast.MaxRadius)
+end
+-- How a blast lands at `distance` from its centre: damage scale, and the
+-- crowd control ("Stunned", "Staggered" or nil) with its seconds.
+function Actions.blastFalloff(distance: number, radius: number): (number, string?, number)
+	local blast = Actions.Blast
+	local r = math.clamp(distance / math.max(radius, 0.1), 0, 1)
+	local scale = 1 - (1 - blast.EdgeDamage) * r
+	if r <= blast.StunZone then
+		return scale, "Stunned", 1.3 - 0.6 * (r / blast.StunZone)
+	elseif r <= blast.StaggerZone then
+		return scale, "Staggered", 0.55 - 0.3 * ((r - blast.StunZone) / (blast.StaggerZone - blast.StunZone))
+	end
+	return scale, nil, 0
+end
 Actions.AfterDodgeSeconds = 3
 Actions.DoubleTap = 0.3 -- seconds between Space taps that make a roll
 Actions.BlockLease = 0.6 -- release automatically if focus/disconnection drops an End packet

@@ -26,7 +26,7 @@ local Brain = {}
 Brain.Reach = 6.5 -- melee range, studs
 -- Wind-ups, seconds. Bolts, blasts and heavies are slow enough to see on the
 -- enemy cast bar and dodge (tap Space to hop aside, double-tap to roll).
-Brain.Windup = { Light = 0.3, Heavy = 0.75, Punish = 0.18, Lunge = 0.25, Bolt = 0.7, Nova = 0.9 }
+Brain.Windup = { Light = 0.3, Heavy = 0.75, Punish = 0.18, Lunge = 0.25, Bolt = 0.7, Nova = 1.05 } -- (a blast's ring is wide: a moment more to get out)
 Brain.BoltRadius = 3.5 -- a bolt hits within this many studs of where it was aimed
 Brain.SurgeRange = 32
 Brain.LungeRange = 18

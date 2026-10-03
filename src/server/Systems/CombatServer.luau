@@ -1349,6 +1349,19 @@ local function onInput(player, action, a, b)
 	end
 end
 -- A monster or Duelist hit. `heavy` blows break a raised guard, like a player's.
+-- A ground blast caught `player` (Actions.blastFalloff): stun or stagger
+-- them (CrowdControl's diminishing returns apply) and, from the core, throw
+-- them out of it. The player's own client moves their character, so the
+-- push travels with the "Blasted" message.
+function CombatServer.blastCC(player, kind, seconds, center, push)
+	local humanoid, root = alive(player)
+	if not humanoid or not kind or seconds <= 0 then
+		return
+	end
+	applyCC({ Player = player }, seconds, kind)
+	local away = flat(root.Position - center)
+	Remotes.CombatFx:FireClient(player, "Blasted", kind, seconds, away * (push or 0))
+end
 function CombatServer.hurt(player, amount, element, enemy, heavy)
 	return receive(player, amount, element, nil, enemy and enemy.Root.Position, false, heavy == true, false, enemy)
 end

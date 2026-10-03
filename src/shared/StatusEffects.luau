@@ -86,7 +86,8 @@ Status.Catalog = {
 		Debuff = true,
 		Text = "Ion shock: can't move or act.",
 	},
-	Stunned = { Name = "Stunned", Icon = "💫", Color = GOLD, Debuff = true, Text = "Staggered: can't move or act." },
+	Stunned = { Name = "Stunned", Icon = "💫", Color = GOLD, Debuff = true, Text = "Stunned: can't move or act." },
+	Staggered = { Name = "Staggered", Icon = "💥", Color = GOLD, Debuff = true, Text = "Reeling: can't move or act." },
 	GuardBroken = { Name = "Guard Broken", Icon = "💔", Color = RED, Debuff = true, Text = "Can't raise a guard." },
 	Burning = {
 		Name = "Burning",
@@ -154,6 +155,7 @@ Status.Order = {
 	"Frozen",
 	"Shocked",
 	"Stunned",
+	"Staggered",
 	"GuardBroken",
 	"Burning",
 	"Bleeding",

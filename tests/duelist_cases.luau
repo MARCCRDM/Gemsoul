@@ -246,4 +246,18 @@ local thermal = Matchup.build({ Health = 300, Hit = 40, Speed = 20, Element = "F
 	{ Health = 250, Hit = 15, Speed = 18, Element = "Shock", Surges = { { Id = "EnergySiphon", Name = "Energy Siphon", Kind = "Self" } }, Moves = {} })
 check(anyFind(thermal.YourEdges, "cuts its healing") and anyFind(thermal.YourEdges, "win the trade"), "Your edges missing: " .. table.concat(thermal.YourEdges, " | "))
 check(anyFind(thermal.FoeWeak, "Fragile"), "Rival's low health not called out")
+-- Ground blasts: wide, and harder the closer to the centre.
+check(math.abs(Actions.blastRadius(7) - 11.2) < 1e-6 and Actions.blastRadius(3) == 9 and Actions.blastRadius(20) == 15, "Blast radius scaling")
+do
+	local scale, cc, seconds = Actions.blastFalloff(0, 12)
+	check(scale == 1 and cc == "Stunned" and math.abs(seconds - 1.3) < 1e-6, "Blast centre: full damage and a stun")
+	local s2, cc2, sec2 = Actions.blastFalloff(6, 12)
+	check(s2 < scale and cc2 == "Staggered" and sec2 > 0.25 and sec2 < 0.55, "Blast middle: less damage, a stagger")
+	local s3, cc3 = Actions.blastFalloff(11, 12)
+	check(s3 < s2 and s3 >= Actions.Blast.EdgeDamage and cc3 == nil, "Blast edge: a graze, no stagger")
+	local _, _, near = Actions.blastFalloff(1, 12)
+	local _, _, far = Actions.blastFalloff(4, 12)
+	check(near > far, "A stun nearer the centre lasts longer")
+	check(StatusEffects.Catalog.Staggered ~= nil, "Staggered status missing")
+end
 print("PASS: " .. checks .. " Duelist checks (matchup, hop and roll, dodgeable bolts, combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")

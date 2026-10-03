@@ -348,6 +348,7 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	if type(dealt) == "number" and dealt > 0 and not guarded and gem then
 		CombatServer.enemyProc(duel.Owner, gem, duel.Enemy)
 	end
+	return dealt, guarded
 end
 
 -- Heals itself (anti-heal applies) and tells its player in the combat log.
@@ -602,8 +603,34 @@ local function think(enemy, now: number)
 			duel.NextAttack = now + duel.Rate
 			setStance(duel, "")
 		elseif action.Kind == "Nova" then
-			if (flat(target.Position - action.Center)).Magnitude <= action.Radius then
-				strike(duel, damage * action.Power * 1.2, action.Element, false, action.Gem, action.Name or "Blast")
+			-- The closer to the centre, the harder: full damage and a stun at
+			-- the core, a stagger in the middle, a glancing hit at the edge.
+			local distance = flat(target.Position - action.Center).Magnitude
+			if distance <= action.Radius then
+				local scale, cc, seconds = Actions.blastFalloff(distance, action.Radius)
+				local dealt, guarded = strike(
+					duel,
+					damage * action.Power * 1.2 * scale,
+					action.Element,
+					false,
+					action.Gem,
+					action.Name or "Blast"
+				)
+				if type(dealt) == "number" and dealt > 0 and cc then
+					if guarded then
+						-- A raised guard takes it down a step.
+						cc, seconds = if cc == "Stunned" then "Staggered" else nil, 0.4
+					end
+					if cc then
+						CombatServer.blastCC(
+							owner,
+							cc,
+							seconds,
+							action.Center,
+							if cc == "Stunned" then Actions.Blast.Knockback else 0
+						)
+					end
+				end
 			end
 			duel.NextAttack = now + 0.4
 			setStance(duel, "")
@@ -984,7 +1011,7 @@ function spawnRival(owner: Player)
 				Gem = gem,
 				Kind = if SELF_SURGES[id] then "Self" elseif stats.Radius then "Nova" else "Bolt",
 				SelfCentered = stats.Self == true,
-				Radius = math.clamp(stats.Radius or 7, 5, 10),
+				Radius = Actions.blastRadius(stats.Radius), -- wide: see Actions.Blast
 				Power = if stats.Damage then math.clamp(stats.Damage, 0.8, 2.4) else 1,
 				Cooldown = 6 + tier * 1.5,
 				Next = now + 2.5 + slot * 1.5,

@@ -1789,33 +1789,71 @@ function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, 
 	end)
 end
 
+-- A ground blast. With a delay: a warning ring with its zones marked (the
+-- core that stuns, the middle that staggers, the edge that only grazes),
+-- pulsing faster as it comes, then the burst: a flash dome, two shockwaves
+-- racing out along the ground, a pillar of light, embers, smoke and debris,
+-- and a shake that's harder the closer to the centre you are.
 function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: number)
 	local floor = floorUnder(center)
 	if delay and delay > 0 then
-		-- Warning circle, then the blast.
-		local warn = ring(floor, radius, Color3.fromRGB(255, 60, 40), 0.7)
+		local red = Color3.fromRGB(255, 60, 40)
+		local warn = ring(floor, radius, red, 0.7)
+		local middle = ring(
+			floor + Vector3.new(0, 0.04, 0),
+			radius * Actions.Blast.StaggerZone,
+			Color3.fromRGB(255, 130, 40),
+			0.75
+		)
+		local core =
+			ring(floor + Vector3.new(0, 0.08, 0), radius * Actions.Blast.StunZone, Color3.fromRGB(255, 220, 90), 0.55)
 		CombatSound.play("NovaWarn", floor)
-		-- The ring pulses faster as the blast comes.
+		-- The rings pulse faster as the blast comes; the core flickers hardest.
 		task.spawn(function()
 			local stop = os.clock() + delay
 			while warn.Parent and os.clock() < stop do
 				local left = stop - os.clock()
-				warn.Transparency = 0.45 + 0.35 * (0.5 + 0.5 * math.sin(os.clock() * (8 + 30 * (1 - left / delay))))
+				local wave = 0.5 + 0.5 * math.sin(os.clock() * (8 + 30 * (1 - left / delay)))
+				warn.Transparency = 0.45 + 0.35 * wave
+				middle.Transparency = 0.55 + 0.3 * wave
+				core.Transparency = 0.25 + 0.45 * wave
 				task.wait()
 			end
 		end)
 		task.delay(delay, function()
 			warn:Destroy()
-			local blast = ring(floor, 1, color, 0.1)
-			fade(blast, 0.45, Vector3.new(0.2, radius * 2, radius * 2))
+			middle:Destroy()
+			core:Destroy()
+			-- A flash dome bursting out of the centre.
+			local dome = effectPart(Vector3.one * radius * 0.4, CFrame.new(floor), color, Enum.PartType.Ball)
+			dome.Transparency = 0.15
+			fade(dome, 0.35, Vector3.one * radius * 2)
+			-- Two shockwaves racing out along the ground.
+			local wave = ring(floor + Vector3.new(0, 0.1, 0), 1, color:Lerp(Color3.new(1, 1, 1), 0.35), 0.05)
+			fade(wave, 0.3, Vector3.new(0.3, radius * 2.1, radius * 2.1))
+			local after = ring(floor + Vector3.new(0, 0.12, 0), 1, color, 0.35)
+			fade(after, 0.65, Vector3.new(0.2, radius * 2.5, radius * 2.5))
+			-- A scorch that lingers on the ground.
+			local scorch = ring(floor + Vector3.new(0, 0.02, 0), radius * 0.5, Color3.fromRGB(30, 22, 18), 0.35)
+			scorch.Material = Enum.Material.SmoothPlastic
+			fade(scorch, 1.6)
 			local pillar = effectPart(Vector3.new(2, 40, 2), CFrame.new(floor + Vector3.new(0, 20, 0)), color)
-			fade(pillar, 0.4, Vector3.new(radius, 40, radius))
-			CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Embers", 1.5 + radius / 8)
-			CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(120, 110, 100), "Smoke", 1.5)
-			CombatFx.flash(floor + Vector3.new(0, 3, 0), color, 6, radius * 3, 0.4)
-			CombatSound.play("Blast", floor)
-			if CombatFx.nearMe(floor, radius + 14) then
-				CombatFx.shake(0.04, 0.4)
+			fade(pillar, 0.45, Vector3.new(radius * 0.8, 46, radius * 0.8))
+			CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Embers", 1.8 + radius / 6)
+			CombatFx.burst(floor + Vector3.new(0, 0.6, 0), color, "Sparks", 1.5 + radius / 8)
+			CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(120, 110, 100), "Smoke", 1.8 + radius / 10)
+			CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(110, 100, 92), "Shards", 1.4)
+			CombatFx.flash(floor + Vector3.new(0, 3, 0), color, 8, radius * 3, 0.45)
+			CombatSound.play("Blast", floor, { Volume = 1.2 })
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if root then
+				local offset = root.Position - floor
+				local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+				if distance <= radius + 14 then
+					local closeness = 1 - math.clamp(distance / (radius + 14), 0, 1)
+					CombatFx.shake(0.02 + 0.05 * closeness, 0.3 + 0.3 * closeness)
+				end
 			end
 		end)
 		return
@@ -1824,6 +1862,22 @@ function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: nu
 	fade(blast, 0.4, Vector3.new(0.2, radius * 2, radius * 2))
 	CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Sparks", 1 + radius / 10)
 	CombatSound.play("Blast", floor, { Volume = 0.6, Pitch = 1.3 })
+end
+
+-- A ground blast caught you: stunned (and thrown out of it) at its core,
+-- staggered further out.
+function handlers.Blasted(kind: string, seconds: number, push: Vector3?)
+	cancel()
+	cast = nil
+	nextAttack = math.max(nextAttack, os.clock() + seconds)
+	local stunned = kind == "Stunned"
+	hint.Text, feedbackUntil = if stunned then "STUNNED!" else "STAGGERED", os.clock() + seconds + 0.3
+	CombatFx.shake(if stunned then 0.06 else 0.035, if stunned then 0.5 else 0.3)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root and push and push.Magnitude > 0.1 then
+		root.AssemblyLinearVelocity = push + Vector3.new(0, push.Magnitude * 0.45, 0)
+	end
 end
 
 function handlers.Zone(center: Vector3, radius: number, duration: number, color: Color3)
