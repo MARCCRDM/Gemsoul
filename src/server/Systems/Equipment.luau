@@ -860,9 +860,9 @@ end
 
 -- A gem in a piece of gear (armor, shield or weapon) enchants it with the
 -- gem's element. Two layers:
---   * a Highlight around the piece in the element's colour: the rarer the
---     gem, the brighter and bolder (a faint wash at Common, a blazing outline
---     and glow at Legendary);
+--   * a Highlight outline around the piece in the element's colour, the
+--     rarer the gem the bolder (faint at Common, solid at Legendary). Outline
+--     only, no fill, so the armor keeps its own generated colours;
 --   * the element's own effect pouring off its biggest plate:
 --       Thermal    flames licking upward, embers, a flickering heat-glow
 --       Cryo       a crust of ice crystals on the plate, falling snow and
@@ -872,13 +872,14 @@ end
 --                  rising bubbles
 --     busier and brighter up the tiers.
 --   highlight fill transparency, highlight outline transparency, light
---   brightness, light range, particles per second, ice crystals (Cryo)
+--   brightness, light range, particles per second, ice crystals (Cryo).
+--   The light stays soft so it doesn't tint the armor's own colours.
 local GEM_GLOW = {
-	{ 0.88, 0.7, 1.2, 8, 6, 2 }, -- Common
-	{ 0.8, 0.45, 1.7, 10, 9, 3 }, -- Uncommon
-	{ 0.7, 0.25, 2.3, 12, 13, 4 }, -- Rare
-	{ 0.58, 0.08, 3, 14, 18, 6 }, -- Ultra Rare
-	{ 0.42, 0, 4, 17, 26, 8 }, -- Legendary
+	{ 1, 0.75, 0.6, 7, 6, 2 }, -- Common
+	{ 1, 0.55, 0.85, 8, 9, 3 }, -- Uncommon
+	{ 1, 0.35, 1.1, 9, 13, 4 }, -- Rare
+	{ 1, 0.15, 1.4, 10, 18, 6 }, -- Ultra Rare
+	{ 1, 0, 1.8, 12, 26, 8 }, -- Legendary
 }
 -- How each element's light moves: seconds per pulse, and how far it dims.
 local GEM_PULSE = {
