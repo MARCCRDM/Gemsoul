@@ -859,23 +859,26 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 end
 
 -- A gem in a piece of armor enchants it with the gem's element, more the
--- rarer the gem, so you can tell a rival's element at a glance:
---   * a glowing veil (a see-through Neon shell) in the element's colour over
---     its plates, more plates and more solid up to Legendary;
---   * from Rare, a shimmering ForceField shell on top that ripples;
---   * glowing trims, a deeper element tint on the metal and a pulsing light;
---   * the element's own signature particles: flames and embers (Thermal),
---     falling ice crystals and cold mist (Cryo), crackling sparks (Ion),
---     rising bubbles and fumes (Corrosive).
---   light brightness, light range, tint, veil plates, veil transparency,
---   shimmer plates, signature particles per second
+-- rarer the gem, while the armor keeps its own colours and detail:
+--   * its glowing trims turn the element's colour;
+--   * streams of enchanting energy loop around its biggest plates (Beams
+--     whose sparkling texture flows along them; animated on each client, so
+--     nothing replicates per frame), more loops and thicker up the tiers;
+--   * a rippling ForceField shimmer over its plates;
+--   * an enchanting sigil swirling on its biggest plate;
+--   * a breathing light and the element's own signature particles: flames
+--     and embers (Thermal), falling ice crystals and cold mist (Cryo),
+--     crackling sparks (Ion), rising bubbles and fumes (Corrosive).
+--   light brightness, light range, looped plates, loop width, shimmer plates,
+--   shimmer transparency, signature particles per second, sigils per second
 local GEM_GLOW = {
-	{ 1.6, 9, 0.18, 3, 0.8, 0, 6 }, -- Common
-	{ 2.2, 11, 0.24, 5, 0.74, 0, 9 }, -- Uncommon
-	{ 2.8, 13, 0.3, 8, 0.68, 4, 13 }, -- Rare
-	{ 3.5, 15, 0.36, 10, 0.62, 6, 18 }, -- Ultra Rare
-	{ 4.5, 18, 0.42, 14, 0.55, 10, 26 }, -- Legendary
+	{ 1.4, 8, 1, 0.14, 2, 0.35, 5, 0.6 }, -- Common
+	{ 1.9, 10, 1, 0.2, 3, 0.25, 8, 0.9 }, -- Uncommon
+	{ 2.5, 12, 2, 0.24, 5, 0.15, 11, 1.2 }, -- Rare
+	{ 3.1, 14, 3, 0.28, 7, 0.05, 15, 1.6 }, -- Ultra Rare
+	{ 4, 17, 4, 0.34, 10, 0, 20, 2.2 }, -- Legendary
 }
+local VORTEX_TEXTURE = "rbxasset://textures/particles/forcefield_vortex_main.dds"
 -- Each element's signature: what pours off enchanted armor.
 local SIGNATURE: { [string]: { any } } = {
 	Fire = {
@@ -994,20 +997,13 @@ local function gemTier(gem): number
 	end
 	return 1
 end
-local function shell(
-	plate: Part,
-	name: string,
-	material: Enum.Material,
-	color: Color3,
-	transparency: number,
-	grow: number
-)
+local function shell(plate: Part, color: Color3, transparency: number)
 	local part = Instance.new("Part")
-	part.Name = name
+	part.Name = "GemAura"
 	part.Shape = plate.Shape
-	part.Size = plate.Size * grow + Vector3.one * 0.05
+	part.Size = plate.Size * 1.08 + Vector3.one * 0.06
 	part.CFrame = plate.CFrame
-	part.Material = material
+	part.Material = Enum.Material.ForceField
 	part.Color = color
 	part.Transparency = transparency
 	part.CanCollide, part.CanQuery, part.CanTouch = false, false, false
@@ -1016,7 +1012,49 @@ local function shell(
 	weld.Part0, weld.Part1 = plate, part
 	weld.Parent = part
 	part.Parent = plate.Parent
-	return part
+end
+-- A loop of flowing energy around `plate`: two arcs between opposite
+-- corners, one bulging out of its front and one out of its back, so together
+-- they ring it. `twist` tips the loop so several loops cross each other.
+local function energyLoop(plate: BasePart, color: Color3, width: number, twist: number, speed: number)
+	local half = plate.Size / 2
+	local reach = (math.max(half.Z, 0.25) + 0.45) * 1.6
+	local tilt = CFrame.Angles(0, 0, twist)
+	local ends = {
+		(tilt * CFrame.new(-half.X - 0.1, half.Y * 0.6, 0)).Position,
+		(tilt * CFrame.new(half.X + 0.1, -half.Y * 0.6, 0)).Position,
+	}
+	for _, facing in { 1, -1 } do
+		local points = {}
+		for i, at in ends do
+			local attachment = Instance.new("Attachment")
+			attachment.Name = "GemLoop"
+			-- Its axis (X) points out of the plate's front (-Z) or back (+Z).
+			attachment.CFrame = CFrame.new(at) * CFrame.Angles(0, math.rad(90 * facing), 0)
+			attachment.Parent = plate
+			points[i] = attachment
+		end
+		local beam = Instance.new("Beam")
+		beam.Name = "GemLoop"
+		beam.Attachment0, beam.Attachment1 = points[1], points[2]
+		beam.CurveSize0, beam.CurveSize1 = reach, -reach
+		beam.Texture = SPARK_TEXTURE
+		beam.TextureMode = Enum.TextureMode.Wrap
+		beam.TextureLength = 0.8
+		beam.TextureSpeed = speed * facing
+		beam.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.45), color)
+		beam.LightEmission = 1
+		beam.LightInfluence = 0
+		beam.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.6),
+			NumberSequenceKeypoint.new(0.5, 0.05),
+			NumberSequenceKeypoint.new(1, 0.6),
+		})
+		beam.Width0, beam.Width1 = width, width
+		beam.FaceCamera = true
+		beam.Segments = 16
+		beam.Parent = plate
+	end
 end
 local function gemGlow(component: Instance, gem)
 	local color = GemConfig.ElementColors[gem.Element]
@@ -1025,22 +1063,11 @@ local function gemGlow(component: Instance, gem)
 	end
 	local tier = gemTier(gem)
 	local spec = GEM_GLOW[tier]
-	-- Tint toward a deep shade of the element, so pale plates turn the
-	-- element's colour instead of a washed-out pastel.
-	local deep = color:Lerp(Color3.new(0, 0, 0), 0.3)
 	local plates = {}
 	for _, part in component:GetDescendants() do
-		if
-			part:IsA("BasePart")
-			and part.Transparency < 1
-			and part.Name ~= "SocketedGem"
-			and part.Name ~= "GemAura"
-			and part.Name ~= "GemVeil"
-		then
+		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" and part.Name ~= "GemAura" then
 			if part.Material == Enum.Material.Neon then
 				part.Color = color -- trims glow in the element's colour
-			else
-				part.Color = part.Color:Lerp(deep, spec[3])
 			end
 			table.insert(plates, part)
 		end
@@ -1065,23 +1092,49 @@ local function gemGlow(component: Instance, gem)
 		TweenInfo.new(1.1 - tier * 0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
 		{ Brightness = spec[1] * 0.45, Range = spec[2] * 0.8 }
 	):Play()
-	-- The veil and, from Rare, the rippling shimmer over the biggest plates.
-	local veils, shimmers = 0, 0
+	-- Energy looping around the biggest plates: crossing loops on the
+	-- biggest (one more per tier from Uncommon, up to three), one on the rest.
+	for index = 1, math.min(spec[3], #plates) do
+		local loops = if index == 1 then math.clamp(tier - 1, 1, 3) else 1
+		for loop = 1, loops do
+			local twist = math.rad(-35 + (loop - 1) * 70 + index * 25)
+			energyLoop(plates[index], color, spec[4], twist, 0.9 + tier * 0.25)
+		end
+	end
+	-- The rippling shimmer.
+	local shimmers = 0
 	for _, plate in plates do
-		if veils >= spec[4] and shimmers >= spec[6] then
+		if shimmers >= spec[5] then
 			break
 		end
 		if plate:IsA("Part") then
-			if veils < spec[4] then
-				shell(plate, "GemVeil", Enum.Material.Neon, color, spec[5], 1.04)
-				veils += 1
-			end
-			if shimmers < spec[6] then
-				shell(plate, "GemAura", Enum.Material.ForceField, color, 0, 1.1)
-				shimmers += 1
-			end
+			shell(plate, color, spec[6])
+			shimmers += 1
 		end
 	end
+	-- A swirling sigil on its biggest plate.
+	local sigil = Instance.new("ParticleEmitter")
+	sigil.Name = "GemSigil"
+	sigil.Texture = VORTEX_TEXTURE
+	sigil.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.3), color)
+	sigil.LightEmission = 1
+	sigil.LockedToPart = true
+	sigil.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.4),
+		NumberSequenceKeypoint.new(0.4, 1.2 + tier * 0.25),
+		NumberSequenceKeypoint.new(1, 1.6 + tier * 0.3),
+	})
+	sigil.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.3, 0.45),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	sigil.Lifetime = NumberRange.new(1.2, 1.6)
+	sigil.Speed = NumberRange.new(0)
+	sigil.Rotation = NumberRange.new(0, 360)
+	sigil.RotSpeed = NumberRange.new(140, 220)
+	sigil.Rate = spec[8]
+	sigil.Parent = biggest
 	-- The element's signature particles.
 	for _, style in SIGNATURE[gem.Element] or {} do
 		local emitter = Instance.new("ParticleEmitter")
