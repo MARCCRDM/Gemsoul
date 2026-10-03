@@ -1815,6 +1815,44 @@ local function frontierSuit(family: number)
 		end
 		for _, side in { -1, 1 } do
 			local prefix = if side == -1 then "Left" else "Right"
+			-- The shoulder joint, on the torso so it stays put while the arm
+			-- swings around it: a rounded joint where the arm pivots (Roblox's
+			-- shoulder rig point, at the torso's edge) and a sloped cap over it.
+			-- Without them a raised arm leaves a bare corner and looks detached.
+			local torsoSeg, armSeg = raw.Torso, raw[prefix .. "UpperArm"]
+			if torsoSeg and armSeg then
+				local t, a = torsoSeg.Size, armSeg.Size
+				local rig = torsoSeg.Part:FindFirstChild(prefix .. "ShoulderRigAttachment")
+				local joint = if rig
+						and rig:IsA("Attachment")
+						and torsoSeg.Offset == CFrame.identity
+					then rig.Position
+					else Vector3.new(side * t.X / 2, t.Y * 0.35, 0)
+				local ball = box(
+					folder,
+					torsoSeg,
+					CFrame.new(joint.X - side * a.X * 0.08, joint.Y - a.X * 0.06, joint.Z),
+					Vector3.new(a.X * 0.66, a.X * 0.66, a.X * 0.66),
+					cloth,
+					SMOOTH
+				)
+				if ball then
+					(ball :: Part).Shape = Enum.PartType.Ball
+					ball.Name = "ShoulderJoint"
+				end
+				block(
+					torsoSeg,
+					joint.X - side * a.X * 0.12,
+					joint.Y + a.X * 0.2,
+					joint.Z,
+					a.X * 0.62,
+					t.Y * 0.14,
+					t.Z * 0.78,
+					-- A Legendary suit's caps are gilded.
+					if rarity >= 5 then BRASS else metal,
+					side * -24
+				)
+			end
 			local upper = body[prefix .. "UpperArm"]
 			if upper then
 				local s = upper.Size
@@ -1823,17 +1861,6 @@ local function frontierSuit(family: number)
 				-- Sloping shoulder shell; heavier families have more coverage, not wider arms.
 				local span = if family == 3 then 1.42 elseif family == 2 then 1.26 else 1.08
 				block(upper, inward, s.Y * 0.32, 0, s.X * span, s.Y * 0.3, s.Z * 1.16, metal, side * -17)
-				block(
-					upper,
-					inward + side * s.X * 0.4,
-					s.Y * 0.12,
-					0,
-					s.X * 0.19,
-					s.Y * 0.3,
-					s.Z * 0.93,
-					metal,
-					side * -14
-				)
 				if rarity >= 2 then
 					block(upper, inward, s.Y * 0.36, -s.Z * 0.58, s.X * span, 0.055, 0.045, edge, side * -17)
 				end
@@ -1864,9 +1891,6 @@ local function frontierSuit(family: number)
 							trim
 						)
 					end
-				end
-				if rarity >= 5 then
-					block(upper, inward, s.Y * 0.43, 0, s.X * 1.03, 0.055, s.Z * 0.88, BRASS, side * -17)
 				end
 			end
 			local fore = body[prefix .. "LowerArm"]

@@ -111,6 +111,9 @@ local function rig(r15)
 			Name = name,
 			Size = Vector3.new(1, 1, 1),
 			CFrame = CFrame.new(),
+			FindFirstChild = function()
+				return nil
+			end,
 			FindFirstChildOfClass = function()
 				return nil
 			end,
