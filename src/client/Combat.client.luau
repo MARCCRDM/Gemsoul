@@ -23,6 +23,8 @@ local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local RivalPose = require(script.Parent.Modules.RivalPose)
 local StatusBars = require(script.Parent.Modules.StatusBars)
+local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
+local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local UiKit = require(script.Parent.Modules.UiKit)
 if Config.MenuOnly and not Config.CombatEnabled then
 	return
@@ -317,6 +319,22 @@ local selfStatusRow = new("Frame", {
 }, gui)
 local selfStatuses = StatusBars.strip(selfStatusRow, false)
 local selfStatusIcons = StatusBars.strip(selfStatusRow, true) -- narrow screens: icons only
+-- The combat log (bottom left), with fight details on L.
+local combatLog = CombatLogUI.new(gui)
+local logRival = nil
+-- New effects on you or the rival become log lines too.
+local function logStatuses(fresh, text, dir, who)
+	if #fresh == 0 then
+		return
+	end
+	local values = {}
+	for _, status in StatusEffects.decode(text) do
+		values[status.Id] = status.Value
+	end
+	for _, id in fresh do
+		combatLog:add({ Kind = "Status", Dir = dir, Who = who, Status = id, Value = values[id] })
+	end
+end
 local castBar = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
 	BackgroundTransparency = 0.15,
@@ -962,6 +980,15 @@ ContextActionService:BindActionAtPriority("CombatAugmentTree", function(_, state
 	end
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 20, Enum.KeyCode.K)
+ContextActionService:BindActionAtPriority("CombatLogDetails", function(_, state)
+	if not canFight() then
+		return Enum.ContextActionResult.Pass
+	end
+	if state == Enum.UserInputState.Begin then
+		combatLog.toggle()
+	end
+	return Enum.ContextActionResult.Sink
+end, false, Enum.ContextActionPriority.High.Value + 20, Enum.KeyCode.L)
 local SURGE_INPUT = { [Enum.KeyCode.Q] = "Q", [Enum.KeyCode.E] = "E", [Enum.KeyCode.R] = "R" }
 local MANEUVER_INPUT = {
 	[Enum.KeyCode.One] = 1,
@@ -1251,9 +1278,20 @@ RunService.RenderStepped:Connect(function(dt)
 	local serverNow = workspace:GetServerTimeNow()
 	local mine = player:GetAttribute("Statuses")
 	local narrow = viewport.X < 900
-	selfStatuses:update(if narrow then nil else mine, serverNow)
-	selfStatusIcons:update(if narrow then mine else nil, serverNow)
-	rivalStatuses:update(rivalModel and rivalModel:GetAttribute("Statuses"), serverNow)
+	logStatuses(selfStatuses:update(if narrow then nil else mine, serverNow), mine, "In")
+	logStatuses(selfStatusIcons:update(if narrow then mine else nil, serverNow), mine, "In")
+	local theirs = rivalModel and rivalModel:GetAttribute("Statuses")
+	logStatuses(
+		rivalStatuses:update(theirs, serverNow),
+		theirs,
+		"Foe",
+		rivalModel and (rivalModel:GetAttribute("RivalName") or rivalModel.Name)
+	)
+	if rivalModel ~= logRival and rivalModel ~= nil then
+		logRival = rivalModel
+		combatLog:reset() -- a new rival: a new fight
+	end
+	combatLog:step(not narrow)
 	StatusBars.step(serverNow)
 	local trackedTarget = TargetLock.target()
 	reticle.TextColor3 = if holding
@@ -1428,6 +1466,11 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 end
 
 local handlers = {}
+function handlers.Log(entry)
+	if type(entry) == "table" then
+		combatLog:add(entry)
+	end
+end
 function handlers.HitConfirm(crit)
 	hitUntil, hitCritical = os.clock() + 0.18, crit == true
 end

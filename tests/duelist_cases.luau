@@ -136,4 +136,55 @@ brute.Alive = false
 now += 0.1
 CombatServer._tick(0.1)
 check(not string.find(struck:GetAttribute("Statuses") or "", "Burning", 1, true), "Burn outlived the rival that set it")
-print("PASS: " .. checks .. " Duelist checks (status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
+-- The combat log: what hit you, with what, for how much, and how much your
+-- guard and shields stopped.
+local logged, lh, lr = makePlayer(51, arena, nil)
+local kade = { Alive = true, Root = { Position = lr.Position + Vector3.new(0, 0, -4) }, Model = { Name = "Rival", GetAttribute = function(_, key) return if key == "RivalName" then "Kade Vorn" else nil end } }
+local function lastLog(player)
+	for i = #messages, 1, -1 do
+		local m = messages[i]
+		if m.Player == player and m[1] == "Log" then
+			return m[2]
+		end
+	end
+	return nil
+end
+now += 20
+local previous = DamageLog.push("Heavy Blow", "Fire")
+CombatServer.hurt(logged, 50, "Fire", kade, false)
+DamageLog.pop(previous)
+local entry = lastLog(logged)
+check(entry ~= nil and entry.Dir == "In" and entry.Kind == "Hit", "A rival's hit was not logged")
+check(entry.Who == "Kade Vorn" and entry.Ability == "Heavy Blow" and entry.Element == "Fire", "Log lost who or what hit you")
+check(entry.Amount > 0 and entry.Amount <= 50, "Log amount wrong: " .. tostring(entry.Amount))
+CombatServer._block(logged, true, kade.Root.Position)
+now += 0.5
+CombatServer.hurt(logged, 50, nil, kade, false)
+entry = lastLog(logged)
+check(entry.Blocked and entry.Blocked > 0, "Log did not show what the guard blocked")
+CombatServer._block(logged, false, kade.Root.Position)
+check(DamageLog.context() == nil, "Ability context leaked")
+CombatServer.heal(logged, 10)
+entry = lastLog(logged)
+check(entry.Kind == "Heal" and entry.Amount > 0, "A heal was not logged")
+-- The log's lines and the fight details.
+local function plain(text) return (text:gsub("<[^>]+>", "")) end
+check(plain(CombatLogUI.format({ Dir = "Out", Kind = "Hit", Who = "Kade Vorn", Ability = "Swing", Amount = 24, Crit = true })) == "Your Swing hits Kade Vorn for 24 (critical)", "Outgoing hit line wrong")
+check(plain(CombatLogUI.format({ Dir = "In", Kind = "Hit", Who = "Kade Vorn", Ability = "Heavy Blow", Amount = 12, Blocked = 29, GuardBroken = true })) == "Kade Vorn's Heavy Blow hits you for 12 (29 blocked) GUARD BROKEN!", "Incoming hit line wrong")
+check(plain(CombatLogUI.format({ Dir = "In", Kind = "Hit", Ability = "Burning", Amount = 6 })) == "Burning hits you for 6", "Burn tick line wrong")
+check(plain(CombatLogUI.format({ Dir = "Foe", Kind = "Heal", Who = "Kade Vorn", Ability = "Energy Siphon", Amount = 50, Blocked = 22 })) == "Kade Vorn's Energy Siphon heals it for 50 (22 prevented)", "Rival heal line wrong")
+check(plain(CombatLogUI.format({ Kind = "Status", Dir = "Foe", Who = "Kade Vorn", Status = "Slowed", Value = 30 })) == "Kade Vorn is Slowed (Cryo) 30%", "Status line wrong")
+check(plain(CombatLogUI.format({ Dir = "Out", Kind = "Hit", Who = "A<b>", Amount = 1 })):find("A&lt;b&gt;", 1, true) ~= nil, "Names not escaped for RichText")
+local fight = CombatLogUI.newStats(0)
+CombatLogUI.tally(fight, { Dir = "Out", Kind = "Hit", Ability = "Swing", Amount = 20 }, 1)
+CombatLogUI.tally(fight, { Dir = "Out", Kind = "Hit", Ability = "Swing", Amount = 40, Crit = true }, 2)
+CombatLogUI.tally(fight, { Dir = "Out", Kind = "Hit", Ability = "Solar Flare", Amount = 90 }, 3)
+CombatLogUI.tally(fight, { Dir = "In", Kind = "Hit", Who = "Kade", Ability = "Heavy Blow", Amount = 30, Blocked = 70, Absorbed = 10 }, 4)
+CombatLogUI.tally(fight, { Dir = "In", Kind = "Dodge", Who = "Kade" }, 4)
+CombatLogUI.tally(fight, { Dir = "Foe", Kind = "Heal", Amount = 15 }, 5)
+local doneRows = CombatLogUI.rows(fight.Done)
+check(fight.Done.Total == 150 and fight.Done.Hits == 3 and fight.Done.Crits == 1 and fight.Done.Biggest == 90, "Damage done tally wrong")
+check(doneRows[1].Name == "Solar Flare" and math.abs(doneRows[1].Share - 0.6) < 1e-6 and doneRows[2].Total == 60, "Per-ability breakdown wrong")
+check(fight.Taken.Total == 30 and fight.Taken.Blocked == 70 and fight.Taken.Absorbed == 10 and fight.Taken.Dodged == 1, "Damage taken tally wrong")
+check(fight.FoeHealed == 15 and fight.Last == 5, "Healing or fight time not tracked")
+print("PASS: " .. checks .. " Duelist checks (combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")

@@ -12,6 +12,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local Enemies = require(script.Parent.Enemies)
+local DamageLog = require(script.Parent.DamageLog)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -285,7 +286,10 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		return 0
 	end
 	local st, now = state(player), os.clock()
+	local attackerName = DamageLog.nameOf(source) or DamageLog.nameOf(enemySource)
 	if Actions.invulnerable(st.DodgeStarted, now, k.Rules, pvp) then
+		DamageLog.send(player, { Dir = "In", Kind = "Dodge", Who = attackerName })
+		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = DamageLog.nameOf(player) })
 		return 0
 	end
 	local resistance = k.Defense.Resistance
@@ -295,10 +299,12 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		* EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
 	damage *= 1 + CrowdControl.debuff(st.CC, "Vulnerable", now) + CrowdControl.debuff(st.CC, "Aura", now)
 	local guarded = false
+	local beforeGuard, parriedBefore, guardBroken = damage, st.ParrySpent, false
 	if blocking(st, now) and origin and not pierce then
 		local dot = flat(origin - root.Position):Dot(st.BlockDirection or flat(root.CFrame.LookVector))
 		if heavy and dot >= math.cos(math.rad(k.Rules.BlockArc / 2)) then
 			st.BlockUntil, st.BlockBrokenUntil = 0, now + Actions.Base.Heavy.BreakSeconds
+			guardBroken = true
 			player:SetAttribute("Blocking", false)
 			Remotes.CombatFx:FireClient(player, "BlockBroken", Actions.Base.Heavy.BreakSeconds)
 			fx("BlockSpark", root.Position, true)
@@ -337,16 +343,21 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 						then 1
 						elseif element == "Fire" then k.Defense.ReflectThermal
 						else 0
+					local previous = DamageLog.push("Reflect", "Fire")
 					if reflect > 0 and source then
 						receive(source, damage * reflect, "Fire", player, root.Position, false, false, true)
 					elseif reflect > 0 and enemySource then
 						Enemies.damage(enemySource, damage * reflect, player, false, GemConfig.ElementColors.Fire)
 					end
+					DamageLog.pop(previous)
 				end
 				damage *= multiplier
 			end
 		end
 	end
+	local blocked = math.max(0, beforeGuard - damage)
+	local parried = st.ParrySpent and not parriedBefore
+	local beforeAbsorb = damage
 	if now < st.SiphonUntil and st.SiphonCapacity > 0 then
 		local absorbed = math.min(damage, st.SiphonCapacity)
 		st.SiphonCapacity -= absorbed
@@ -358,6 +369,24 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		local absorbed = math.min(st.Shield, damage)
 		st.Shield -= absorbed
 		damage -= absorbed
+	end
+	local entry = {
+		Kind = "Hit",
+		Amount = damage,
+		Element = element,
+		Crit = crit == true,
+		Blocked = blocked,
+		Absorbed = beforeAbsorb - damage,
+		Parried = parried or nil,
+		GuardBroken = guardBroken or nil,
+	}
+	local incoming = table.clone(entry)
+	incoming.Dir, incoming.Who = "In", attackerName
+	DamageLog.send(player, incoming)
+	if not reflected then
+		local outgoing = table.clone(entry)
+		outgoing.Dir, outgoing.Who = "Out", DamageLog.nameOf(player)
+		DamageLog.send(source, outgoing)
 	end
 	if damage > 0 then
 		if origin then
@@ -485,17 +514,20 @@ local function procGem(source, k, target)
 			end
 			visited[closest.Root] = true
 			fx("Arc", from.Root.Position, closest.Root.Position, GemConfig.ElementColors.Shock)
+			local previous = DamageLog.push("Ion Arc", "Shock")
 			if closest.Player then
 				receive(closest.Player, values.Arc, "Shock", source, from.Root.Position, true, false, false)
 			else
 				Enemies.damage(closest.Enemy, values.Arc, source, false, GemConfig.ElementColors.Shock)
 			end
+			DamageLog.pop(previous)
 			from = closest
 		end
 		if math.random() < values.Stun then
 			applyCC(target, values.StunSeconds, "Shocked")
 		end
 		if target.Humanoid.Health > 0 and target.Humanoid.Health < target.Humanoid.MaxHealth * values.Execute then
+			local previous = DamageLog.push("Ion Execute", "Shock")
 			if target.Player then
 				receive(
 					target.Player,
@@ -516,6 +548,7 @@ local function procGem(source, k, target)
 					GemConfig.ElementColors.Shock
 				)
 			end
+			DamageLog.pop(previous)
 		end
 	end
 end
@@ -580,11 +613,13 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		return damage > 0 and not guarded, guarded
 	end
 	if os.clock() < st.EchoUntil then
+		local previous = DamageLog.push("Resonance Echo", element)
 		if target.Player then
 			receive(target.Player, echoDamage, element, source, root.Position, projectile, false, false, nil, false)
 		else
 			Enemies.damage(target.Enemy, echoDamage, source, false, Color3.fromRGB(70, 180, 255))
 		end
+		DamageLog.pop(previous)
 		fx(
 			"Arc",
 			root.Position + Vector3.new(0, 1.5, 0),
@@ -620,8 +655,14 @@ local function attack(player, aim, heavy, swing)
 	if swing then
 		swing.Combo = Actions.combo(st.ComboSide, st.ComboCount, st.ComboAt, swing.Side, now)
 	end
+	local label = if k.Weapon.Attack.Kind == "Melee" then "Swing" else "Shot"
 	local function hit(target, projectile)
+		local previous = DamageLog.push(
+			if heavy then "Heavy " .. label else label,
+			k.Loadout.WeaponGem and k.Loadout.WeaponGem.Element
+		)
 		local success, guarded = strike(player, k, st, target, heavy, projectile, swing)
+		DamageLog.pop(previous)
 		landed = landed or success == true
 		interrupted = interrupted or guarded == true
 	end
@@ -777,7 +818,15 @@ local function surgeGem(loadout, element)
 	end
 	return nil
 end
+local technologyHitInner
+-- Every surge and maneuver hit, labelled for the combat log.
 local function technologyHit(player, k, target, definition, scale)
+	local previous = DamageLog.push(definition.Name, definition.Element)
+	local a, b = technologyHitInner(player, k, target, definition, scale)
+	DamageLog.pop(previous)
+	return a, b
+end
+function technologyHitInner(player, k, target, definition, scale)
 	if not targetAllowed(player, target) then
 		return
 	end
@@ -1095,7 +1144,9 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		if not dodge(player, aim - root.Position) then
 			return false
 		end
+		local previous = DamageLog.push(definition.Name)
 		CombatServer.heal(player, humanoid.MaxHealth * definition.Heal)
+		DamageLog.pop(previous)
 	else
 		Tech.spend(st.Resources, definition.Resource, cost)
 	end
@@ -1378,11 +1429,13 @@ local function tick(_dt)
 				st.Dots[source] = nil
 			elseif now >= dot.Next then
 				local through = math.min(now, dot.Ends)
+				local previous = DamageLog.push("Burning", "Fire")
 				if fromEnemy then
 					receive(player, dot.Damage * (through - dot.Last), "Fire", nil, nil, false, false, false, source)
 				else
 					receive(player, dot.Damage * (through - dot.Last), "Fire", source, nil, false, false, false)
 				end
+				DamageLog.pop(previous)
 				dot.Last, dot.Next = through, math.min(through + 1, dot.Ends)
 				if through >= dot.Ends then
 					st.Dots[source] = nil
@@ -1443,6 +1496,8 @@ function CombatServer.heal(player, amount)
 	if restored > 0 then
 		humanoid.Health += restored
 	end
+	local cut = amount * (1 + (k.Effects.HealingReceived or 0)) - healing
+	DamageLog.send(player, { Dir = "In", Kind = "Heal", Amount = restored, Blocked = cut })
 	return restored
 end
 function CombatServer.reset(player)

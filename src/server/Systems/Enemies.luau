@@ -28,6 +28,7 @@ local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
+local DamageLog = require(script.Parent.DamageLog)
 
 local Enemies = {}
 
@@ -556,14 +557,24 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 		return
 	end
 	local now = os.clock()
+	local name = DamageLog.nameOf(enemy)
 	if enemy.DodgeUntil and now < enemy.DodgeUntil then
+		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = name })
 		return -- slipped out of the way
 	end
+	local exposure = 1 + Enemies.exposure(enemy)
+	local blocked = 0
 	if enemy.GuardUntil and now < enemy.GuardUntil then
-		amount *= enemy.GuardMult or 0.3
+		local guarded = amount * (enemy.GuardMult or 0.3)
+		blocked = (amount - guarded) * exposure
+		amount = guarded
 		fx("BlockSpark", enemy.Root.Position, false)
 	end
-	amount = math.floor(amount * (1 + Enemies.exposure(enemy)) + 0.5)
+	amount = math.floor(amount * exposure + 0.5)
+	DamageLog.send(
+		source,
+		{ Dir = "Out", Kind = "Hit", Who = name, Amount = amount, Crit = crit == true, Blocked = blocked }
+	)
 	local humanoid = enemy.Humanoid
 	enemy.LastHit = os.clock()
 	if source then
@@ -585,6 +596,7 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 	humanoid.Health = math.max(0, humanoid.Health - amount)
 	updateBar(enemy)
 	if humanoid.Health <= 0 then
+		DamageLog.send(source, { Dir = "Out", Kind = "Kill", Who = name })
 		die(enemy)
 	end
 end
@@ -815,7 +827,9 @@ local function tickDots(enemy: Enemy)
 		if dot.Wait >= (dot.Every or 1) then
 			dot.Wait = 0
 			dot.Ticks -= 1
+			local previous = DamageLog.push(dot.Status or "Bleeding", if dot.Status == "Burning" then "Fire" else nil)
 			Enemies.damage(enemy, dot.PerTick, dot.Source, false, dot.Color)
+			DamageLog.pop(previous)
 			if dot.Ticks <= 0 then
 				table.remove(enemy.Dots, i)
 			end

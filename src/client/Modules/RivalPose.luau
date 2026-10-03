@@ -212,7 +212,20 @@ function RivalPose.pose(a, t: number): ({ [string]: { number } }, number)
 end
 
 -- [model] = { Motors = { [joint] = { Motor, C0 } }, Angles = {...} }
-local rigs = setmetatable({}, { __mode = "k" })
+-- (Not weak-keyed: a dropped entry would be rebuilt mid-pose.)
+local rigs = {}
+
+-- A joint's resting C0, remembered on the joint itself the first time it's
+-- seen, so a re-scan never mistakes an already-bent joint for its rest pose
+-- (which would stack every pose on top of the last).
+local function restC0(motor: Motor6D): CFrame
+	local rest = motor:GetAttribute("RestC0")
+	if typeof(rest) ~= "CFrame" then
+		rest = motor.C0
+		motor:SetAttribute("RestC0", rest)
+	end
+	return rest
+end
 
 -- Its joints. With streaming on, the body parts can arrive after the model
 -- itself, so any joint not found yet is looked for again every half second.
@@ -231,7 +244,7 @@ local function rigOf(model: Model)
 				local part = model:FindFirstChild(partName)
 				local motor = part and part:FindFirstChild(joint)
 				if motor and motor:IsA("Motor6D") then
-					rig.Motors[joint] = { Motor = motor, C0 = motor.C0 }
+					rig.Motors[joint] = { Motor = motor, C0 = restC0(motor) }
 					rig.Angles[joint] = { 0, 0, 0 }
 				end
 			end
@@ -248,6 +261,11 @@ local ATTRIBUTES = { "ActionKind", "ActionStart", "ActionAt", "ActionSide", "Gua
 
 -- Call every frame with the rival's model.
 function RivalPose.update(model: Model?, dt: number)
+	for known in rigs do
+		if not known.Parent then
+			rigs[known] = nil -- gone: forget it
+		end
+	end
 	if not model or not model.Parent then
 		return
 	end

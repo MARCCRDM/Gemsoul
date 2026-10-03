@@ -37,6 +37,7 @@ local GemGenerator = require(script.Parent.GemGenerator)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
+local DamageLog = require(script.Parent.DamageLog)
 
 local Duelist = {}
 
@@ -243,6 +244,9 @@ end
 -- Self-buff surges; every other surge is a bolt or, with a radius, a blast.
 local SELF_SURGES = { CryoShield = true, EnergySiphon = true, ResonanceEcho = true }
 
+-- Its basic attacks, as named in the combat log.
+local SWING_NAMES = { Light = "Quick Swing", Heavy = "Heavy Blow", Punish = "Counterstrike", Lunge = "Lunging Strike" }
+
 local function nextSurgeTime(duel, now: number): number
 	local soonest = math.huge
 	for _, surge in duel.Surges do
@@ -253,11 +257,27 @@ end
 
 -- Lands a blow on its player; a hit that gets through carries its gem's
 -- element (burn, slow or freeze, armor shred, shock), as a player's would.
-function strike(duel, amount: number, element: string?, heavy: boolean?, gem)
+function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ability: string)
+	local previous = DamageLog.push(ability, element)
 	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy)
+	DamageLog.pop(previous)
 	if type(dealt) == "number" and dealt > 0 and not guarded and gem then
 		CombatServer.enemyProc(duel.Owner, gem, duel.Enemy)
 	end
+end
+
+-- Heals itself (anti-heal applies) and tells its player in the combat log.
+local function healSelf(duel, share: number, ability: string)
+	local enemy = duel.Enemy
+	local humanoid = enemy.Humanoid
+	local full = humanoid.MaxHealth * share
+	local healing = full * Enemies.healingMultiplier(enemy)
+	local restored = math.min(humanoid.MaxHealth - humanoid.Health, healing)
+	humanoid.Health += restored
+	DamageLog.send(
+		duel.Owner,
+		{ Dir = "Foe", Kind = "Heal", Who = duel.Name, Ability = ability, Amount = restored, Blocked = full - healing }
+	)
 end
 
 function castSurge(enemy, duel, surge, now: number, target: BasePart)
@@ -272,6 +292,10 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 	setStance(duel, "Surge")
 	press(duel, ({ "Q", "E", "R" })[surge.Slot])
 	Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " casts " .. surge.Name .. "!")
+	DamageLog.send(
+		duel.Owner,
+		{ Dir = "Foe", Kind = "Cast", Who = duel.Name, Ability = surge.Name, Element = surge.Element }
+	)
 	if surge.Kind == "Self" then
 		animate(duel, "Buff", 0.15)
 		fx("TechPulse", nil, root.Position, root.Position, color, 5)
@@ -279,9 +303,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 			enemy.GuardUntil, enemy.GuardMult = now + 4, 0.5 -- a barrier that halves hits
 			duel.CryoUntil = now + 4
 		elseif surge.Id == "EnergySiphon" then
-			local humanoid = enemy.Humanoid
-			local healing = humanoid.MaxHealth * 0.12 * Enemies.healingMultiplier(enemy) -- anti-heal applies
-			humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + healing)
+			healSelf(duel, 0.12, surge.Name)
 		else -- ResonanceEcho
 			duel.EchoUntil = now + 5
 		end
@@ -294,6 +316,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		animate(duel, "Nova", Brain.Windup.Nova)
 		duel.Action = {
 			Kind = "Nova",
+			Name = surge.Name,
 			At = now + Brain.Windup.Nova,
 			Center = center,
 			Radius = surge.Radius,
@@ -305,6 +328,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		fx("TechPulse", nil, root.Position, root.Position, color, 3)
 		duel.Action = {
 			Kind = "Bolt",
+			Name = surge.Name,
 			At = now + Brain.Windup.Bolt,
 			Power = surge.Power,
 			Element = surge.Element,
@@ -330,9 +354,7 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 		animate(duel, "Dodge", 0, sign)
 		root.AssemblyLinearVelocity = away * 55 + Vector3.new(0, 6, 0)
 		fx("DodgeRoll", nil, root.Position, away, 8, true)
-		local humanoid = enemy.Humanoid
-		local healing = humanoid.MaxHealth * move.Heal * Enemies.healingMultiplier(enemy)
-		humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + healing)
+		healSelf(duel, move.Heal, move.Name)
 		setStance(duel, "Dodge")
 		return
 	end
@@ -348,6 +370,7 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 	animate(duel, if move.Windup then "Heavy" else "Slash", move.Windup or 0.25)
 	duel.Action = {
 		Kind = "Move",
+		Name = move.Name,
 		At = now + (move.Windup or 0.25),
 		Power = move.Power,
 		Heavy = move.Windup ~= nil,
@@ -401,7 +424,14 @@ local function think(enemy, now: number)
 			if distance <= Brain.Reach + 1.5 then
 				-- Resonance Echo: its swings hit harder for a while.
 				local echo = if now < (duel.EchoUntil or 0) then 1.5 else 1
-				strike(duel, damage * (if heavy then 2 else 1) * echo, duel.Element, heavy, duel.WeaponGem)
+				strike(
+					duel,
+					damage * (if heavy then 2 else 1) * echo,
+					duel.Element,
+					heavy,
+					duel.WeaponGem,
+					SWING_NAMES[action.Kind] or "Swing"
+				)
 			end
 			-- Combos: up to three swings in a row.
 			local hits = (action.Hits or 1) + 1
@@ -419,7 +449,7 @@ local function think(enemy, now: number)
 			task.delay(math.clamp(distance / 140, 0.05, 0.5), function()
 				local stillRoot = ownerRoot(owner)
 				if duels[owner] == duel and stillRoot then
-					strike(duel, damage * action.Power, action.Element, false, action.Gem)
+					strike(duel, damage * action.Power, action.Element, false, action.Gem, action.Name or "Bolt")
 				end
 			end)
 			duel.NextAttack = now + 0.4
@@ -427,11 +457,19 @@ local function think(enemy, now: number)
 		elseif action.Kind == "Move" then
 			fx("Swing", nil, root.Position, dir, Brain.Reach + 1, 150, color, action.Heavy)
 			if distance <= Brain.Reach + 2 then
-				strike(duel, damage * action.Power, duel.Element, action.Heavy, duel.WeaponGem)
+				strike(
+					duel,
+					damage * action.Power,
+					duel.Element,
+					action.Heavy,
+					duel.WeaponGem,
+					action.Name or "Maneuver"
+				)
 			end
 			if (action.Hits or 1) > 1 then
 				-- Multi-hit maneuvers (Servo Flurry) strike again quickly.
-				duel.Action = { Kind = "Move", At = now + 0.2, Power = action.Power, Hits = action.Hits - 1 }
+				duel.Action =
+					{ Kind = "Move", Name = action.Name, At = now + 0.2, Power = action.Power, Hits = action.Hits - 1 }
 				animate(duel, "Slash", 0.2)
 				return
 			end
@@ -439,7 +477,7 @@ local function think(enemy, now: number)
 			setStance(duel, "")
 		elseif action.Kind == "Nova" then
 			if (flat(target.Position - action.Center)).Magnitude <= action.Radius then
-				strike(duel, damage * action.Power * 1.2, action.Element, false, action.Gem)
+				strike(duel, damage * action.Power * 1.2, action.Element, false, action.Gem, action.Name or "Blast")
 			end
 			duel.NextAttack = now + 0.4
 			setStance(duel, "")
