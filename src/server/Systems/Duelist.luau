@@ -83,7 +83,7 @@ end
 local function rollLoadout(rng: Random)
 	local class = Classes.get("Warrior")
 	local profile = {
-		Character = { Class = "Warrior", Weapon = class.Weapons[1].Id, Armor = class.Armors[1].Id },
+		Character = { Class = "Warrior", Weapon = Classes.starterWeapon(class).Id, Armor = class.Armors[1].Id },
 		Owned = {},
 	}
 	Slots.initialize(profile)

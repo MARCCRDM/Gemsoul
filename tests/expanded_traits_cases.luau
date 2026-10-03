@@ -12,7 +12,12 @@ for kind, catalog in ExpandedTraits.Catalog do
 		draws += 1
 	end
 	for _, item in catalog do
-		assert(seen[item.Id], "Starting draw never reached " .. item.Id)
+		if ExpandedTraits.obtainable(item) then
+			assert(seen[item.Id], "Starting draw never reached " .. item.Id)
+		else
+			-- Pistols are switched off for now: never drawn.
+			assert(not seen[item.Id], "A disabled pistol was drawn: " .. item.Id)
+		end
 		assert(Classes.gear("Warrior", kind, item.Id) == item, "Catalog identity differs")
 		if kind == "Weapons" then
 			assert(
@@ -213,3 +218,16 @@ for _, isR15 in { false, true } do
 	end
 end
 print("PASS: all suit families and armor slots gain detail at each rarity on R6/R15 within slot budgets")
+-- Pistols switched off: no starter kit or rolled loadout hands one out.
+assert(not ExpandedTraits.PistolsObtainable, "Pistols should be switched off for now")
+local warrior = Classes.get("Warrior")
+assert(Classes.starterWeapon(warrior).WeaponType ~= "Pistol", "Starter weapon is a pistol")
+local pistolRng = Random.new(77)
+for _ = 1, 400 do
+	local profile = { Character = { Class = "Warrior", Weapon = Classes.starterWeapon(warrior).Id, Armor = warrior.Armors[1].Id }, Owned = {} }
+	Slots.initialize(profile)
+	GearRolls.grant(profile, warrior, pistolRng)
+	local weapon = Classes.weapon("Warrior", profile.Character.Weapon)
+	assert(weapon and weapon.WeaponType ~= "Pistol", "A rolled loadout got a pistol: " .. tostring(profile.Character.Weapon))
+end
+print("PASS: pistols switched off: never drawn, rolled or given as the starter weapon")

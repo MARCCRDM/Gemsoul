@@ -1106,6 +1106,17 @@ local function find(list: { Gear }, id: any): Gear?
 	return nil
 end
 
+-- The weapon a new kit starts with: the first one that can be handed out
+-- right now (with pistols switched off, the first sword).
+function Classes.starterWeapon(class: Class): Gear
+	for _, weapon in class.Weapons do
+		if ExpandedTraits.obtainable(weapon) then
+			return weapon
+		end
+	end
+	return class.Weapons[1]
+end
+
 function Classes.weapon(classId: any, weaponId: any): Gear?
 	local class = Classes.get(classId)
 	return class and find(class.Weapons, weaponId)

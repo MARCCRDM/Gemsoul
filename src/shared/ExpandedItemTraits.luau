@@ -145,7 +145,11 @@ table.insert(Traits.Catalog.Helmets, {
 	Mods = {},
 	ProposedBuff = "Neural Sync +15% Cooldown Reduction",
 	BuffReady = true,
-	Passive = { Name = "Signature", Text = "Rig Maneuvers and Gem Surges recharge 15% faster.", Effect = { CooldownMult = 0.85 } },
+	Passive = {
+		Name = "Signature",
+		Text = "Rig Maneuvers and Gem Surges recharge 15% faster.",
+		Effect = { CooldownMult = 0.85 },
+	},
 })
 table.insert(
 	Traits.Visors,
@@ -1050,11 +1054,21 @@ for _, visor in Traits.Visors do
 	end
 end
 
+-- Pistols are switched off for now: no roll, drop, mine find, starter kit
+-- or reward hands one out (pistols already owned still work). Set to true to
+-- bring them back.
+Traits.PistolsObtainable = false
+
+-- Can this item be handed out right now?
+function Traits.obtainable(gear): boolean
+	return gear ~= nil and (Traits.PistolsObtainable or gear.WeaponType ~= "Pistol")
+end
+
 function Traits.pick(catalog, rng, weights)
 	weights = weights or Traits.Weights
 	local groups = {}
 	for _, gear in catalog do
-		if gear.StartPool then
+		if gear.StartPool and Traits.obtainable(gear) then
 			local rarity = gear.RarityTier
 			groups[rarity] = groups[rarity] or {}
 			table.insert(groups[rarity], gear)

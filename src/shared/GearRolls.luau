@@ -136,7 +136,17 @@ function GearRolls.grant(profile, class, rng)
 		local catalog = class[kind]
 		-- Retire the fixed basic starter; independently roll every equipment category.
 		local gear = (if kind ~= "Weapons" then ArmorFamilies.pick(catalog, rng) else ExpandedTraits.pick(catalog, rng))
-			or catalog[rng:NextInteger(if #catalog > 1 then 2 else 1, #catalog)]
+		if not gear then
+			-- Fallback: any item that can be handed out (never a disabled pistol).
+			local pool = {}
+			for _, item in catalog do
+				if ExpandedTraits.obtainable(item) then
+					table.insert(pool, item)
+				end
+			end
+			pool = if #pool > 0 then pool else catalog
+			gear = pool[rng:NextInteger(if #pool > 1 then 2 else 1, #pool)]
+		end
 		if c[slot] and c[slot .. "Gem"] then
 			c.ItemGems[slot][c[slot]] = c[slot .. "Gem"]
 		end

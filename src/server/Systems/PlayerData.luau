@@ -190,17 +190,20 @@ local function migrate(profile: Profile): Profile
 		profile.Version = 7
 	end
 	if profile.Version < 8 then
-		-- Saga Miners: everyone gets the Saga Pistol & Shield, the new starter
-		-- kit, and wears it instead of the free starter sword.
+		-- Saga Miners: everyone got the Saga Pistol & Shield as the new starter
+		-- kit. With pistols switched off (ExpandedItemTraits.PistolsObtainable)
+		-- old saves get the starter sword instead.
 		local weapons = profile.Owned.Weapons
-		weapons.PistolShield = weapons.PistolShield or 1
+		local warrior = Classes.get("Warrior")
+		local starter = if warrior then Classes.starterWeapon(warrior).Id else "PistolShield"
+		weapons[starter] = weapons[starter] or 1
 		if
 			profile.Character.Class == "Warrior"
 			and profile.Character.Weapon == "Longsword"
 			and weapons.Longsword == 1
 		then
-			profile.Character.Weapon = "PistolShield"
-			profile.Character.WeaponQuality = weapons.PistolShield
+			profile.Character.Weapon = starter
+			profile.Character.WeaponQuality = weapons[starter]
 		end
 		profile.Version = 8
 	end
@@ -335,7 +338,7 @@ local function load(player: Player)
 		if class then
 			local character = profiles[player].Character
 			character.Class = only
-			character.Weapon = character.Weapon or class.Weapons[1].Id
+			character.Weapon = character.Weapon or Classes.starterWeapon(class).Id
 			character.Armor = character.Armor or class.Armors[1].Id
 			-- Family identity is equipped gear, never a saved subclass selection.
 			character.Subclass, character.SubClass, character.Spec = nil, nil, nil
