@@ -454,6 +454,9 @@ function Tree.scaled(definition, rank: number)
 	end
 	if stats.Recovery then
 		stats.Recovery *= 1 + s.Recovery * steps
+		if stats.Cooldown then
+			stats.Cooldown *= 1 + s.Recovery * steps
+		end
 	end
 	if stats.Duration then
 		stats.Duration *= 1 + s.Duration * steps

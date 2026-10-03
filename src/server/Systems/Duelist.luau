@@ -346,6 +346,12 @@ end
 -- `critChance` rolls a critical (1.6x, shown as CRIT and in the log), by
 -- the same chances a player's attacks have.
 function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ability: string, critChance: number?)
+	local e = duel.Enemy :: any
+	if os.clock() < (e.BlindUntil or 0) and (e.Blind or 0) > 0 and math.random() <= e.Blind then
+		-- Blinded (your Solar Flare): the blow goes wide.
+		DamageLog.send(duel.Owner, { Dir = "In", Kind = "Miss", Who = duel.Name, Ability = ability, Element = element })
+		return 0, false
+	end
 	local crit = math.random() < (critChance or 0)
 	if crit then
 		amount *= Combat.CritMult
@@ -357,6 +363,14 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 		CombatServer.enemyProc(duel.Owner, gem, duel.Enemy)
 	end
 	return dealt, guarded
+end
+
+-- What a landed surge carries besides damage (Blind, Slow), as a player's does.
+local function ridersOf(stats)
+	if not (stats.Blind or stats.Slow) then
+		return nil
+	end
+	return { Blind = stats.Blind, BlindTime = stats.BlindTime, Slow = stats.Slow, SlowTime = stats.SlowTime }
 end
 
 -- Heals itself (anti-heal applies) and tells its player in the combat log.
@@ -411,6 +425,9 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 			Element = surge.Element,
 			Gem = surge.Gem,
 			Cloud = surge.Cloud,
+			Riders = surge.Riders,
+			Ward = surge.Ward,
+			Leech = surge.Leech,
 		}
 	else
 		fx("TechPulse", nil, root.Position, root.Position, color, 3)
@@ -424,6 +441,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 			Gem = surge.Gem,
 			Range = surge.Range,
 			Cost = surge.Cost,
+			Riders = surge.Riders,
 		}
 		animate(duel, surge.Pose, surge.CastTime, nil, surge.Name)
 	end
@@ -657,6 +675,14 @@ local function think(enemy, now: number)
 				if type(dealt) == "number" and dealt > 0 and not guarded and zone.Shred then
 					CombatServer.sunder(owner, zone.Shred, zone.Every * 2)
 				end
+				if zone.Leech and type(dealt) == "number" and dealt > 0 then
+					-- It drinks part of what its pool deals (anti-heal applies).
+					local humanoid = enemy.Humanoid
+					humanoid.Health = math.min(
+						humanoid.MaxHealth,
+						humanoid.Health + dealt * zone.Leech * Enemies.healingMultiplier(enemy)
+					)
+				end
 			end
 		end
 	end
@@ -681,7 +707,7 @@ local function think(enemy, now: number)
 					channel.Next = now + 0.25
 					local from = root.Position + Vector3.new(0, 1.5, 0)
 					fx("TechPulse", nil, from, target.Position, GemConfig.ElementColors[channel.Element] or color, 0)
-					strike(
+					local dealt, guarded = strike(
 						duel,
 						duel.Damage * (1 - Enemies.weakness(enemy)) * channel.Power * 0.25,
 						channel.Element,
@@ -690,6 +716,9 @@ local function think(enemy, now: number)
 						channel.Name,
 						channel.Crit
 					)
+					if channel.Riders and type(dealt) == "number" and dealt > 0 and not guarded then
+						CombatServer.afflict(owner, channel.Riders)
+					end
 				end
 			end
 			return
@@ -777,7 +806,7 @@ local function think(enemy, now: number)
 					return
 				end
 				if Brain.boltHits(aim, stillRoot.Position) then
-					strike(
+					local dealt, guarded = strike(
 						duel,
 						damage * action.Power,
 						action.Element,
@@ -786,6 +815,9 @@ local function think(enemy, now: number)
 						action.Name or "Bolt",
 						action.Crit
 					)
+					if action.Riders and type(dealt) == "number" and dealt > 0 and not guarded then
+						CombatServer.afflict(owner, action.Riders)
+					end
 				else
 					DamageLog.send(
 						owner,
@@ -839,6 +871,7 @@ local function think(enemy, now: number)
 				Crit = action.Crit,
 				Element = action.Element,
 				Gem = action.Gem,
+				Riders = action.Riders,
 			}
 			duel.Charge += (action.Cost or 0) * 0.25 -- (the cast already billed this first tick)
 			enemy.Model:SetAttribute("ActionHold", workspace:GetServerTimeNow() + CHANNEL_HOLD)
@@ -847,6 +880,15 @@ local function think(enemy, now: number)
 			-- the core, a stagger in the middle, a glancing hit at the edge.
 			-- (A lingering pool lands evenly and then keeps ticking.)
 			local distance = flat(target.Position - action.Center).Magnitude
+			if action.Ward then
+				-- Its barrier rises as the cast lands (Burning Ward, Static Shell).
+				local ward, e = action.Ward, enemy :: any
+				local size = action.Gem and action.Gem.Size or 1
+				enemy.Shield = math.max(enemy.Shield or 0, ward.Shield + size * 3)
+				enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + ward.Duration)
+				e.WardUntil, e.WardKind, e.WardNext = now + ward.Duration, ward.Kind, 0
+				e.WardPower, e.WardStun = duel.Damage * (ward.Power or 0), ward.Stun
+			end
 			if action.Cloud then
 				duel.Zones = duel.Zones or {}
 				table.insert(duel.Zones, {
@@ -858,6 +900,7 @@ local function think(enemy, now: number)
 					Until = now + action.Cloud.Duration,
 					Power = action.Cloud.Damage,
 					Shred = action.Cloud.Shred,
+					Leech = action.Leech,
 					Element = action.Element,
 					Gem = action.Gem,
 				})
@@ -876,6 +919,9 @@ local function think(enemy, now: number)
 					action.Name or "Blast",
 					action.Crit
 				)
+				if action.Riders and type(dealt) == "number" and dealt > 0 and not guarded then
+					CombatServer.afflict(owner, action.Riders)
+				end
 				if type(dealt) == "number" and dealt > 0 and cc then
 					if guarded then
 						-- A raised guard takes it down a step.
@@ -1345,7 +1391,10 @@ function spawnRival(owner: Player)
 				Power = stats.Damage or 1,
 				Crit = stats.Crit, -- a gem's cut gives its surge a crit chance, as yours
 				Cost = stats.Cost or 0,
-				Cooldown = math.max(stats.Recovery or 1, 2.5),
+				Cooldown = math.max(stats.Cooldown or stats.Recovery or 1, 2.5),
+				Riders = ridersOf(stats),
+				Ward = stats.Ward,
+				Leech = stats.Leech,
 				Next = now + 2.5 + slot * 1.5,
 			}
 			table.insert(duel.Surges, surge)
@@ -1376,7 +1425,7 @@ function spawnRival(owner: Player)
 			-- A player's maneuver numbers: its Stamina cost and recovery.
 			Cost = stats.Cost or 0,
 			Crit = stats.Crit,
-			Cooldown = math.max(stats.Recovery or 1, 1.5),
+			Cooldown = math.max(stats.Cooldown or stats.Recovery or 1, 1.5),
 			Next = now + 2 + slot,
 		}
 		table.insert(duel.Moves, move)

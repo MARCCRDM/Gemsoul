@@ -336,6 +336,9 @@ local function rankRows(node, rank: number): { { string } }
 		if s.Duration then
 			table.insert(rows, { "Duration", seconds(s.Duration) })
 		end
+		if s.Cooldown then
+			table.insert(rows, { "Cooldown", seconds(s.Cooldown) })
+		end
 		if s.Recovery then
 			table.insert(rows, { "Recovery", seconds(s.Recovery) })
 		end

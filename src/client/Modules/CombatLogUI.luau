@@ -102,6 +102,12 @@ function CombatLogUI.format(entry): string
 			return string.format("You %s %s's %s", paint("dodged", HEAL, true), who, ability or "attack")
 		end
 		return string.format("%s %s your %s", who, paint("dodged", HURT, true), ability or "attack")
+	elseif entry.Kind == "Miss" then
+		-- A blinded fighter's blow goes wide (Solar Flare).
+		if entry.Dir == "In" then
+			return string.format("%s's %s %s (blinded)", who, ability or "attack", paint("misses you", HEAL, true))
+		end
+		return string.format("Your %s %s (blinded)", ability or "attack", paint("misses", HURT, true))
 	elseif entry.Kind == "Heal" then
 		local healed = paint(tostring(amount), HEAL, true)
 		if entry.Dir == "Foe" then

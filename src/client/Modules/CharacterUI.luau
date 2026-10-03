@@ -656,7 +656,9 @@ local function gemLines(gem)
 					"CLARITY",
 					gem.Clarity,
 					P.Teal,
-					if surge then string.format("%.1fs cooldown", surge.Recovery) else "longer effects",
+					if surge
+						then string.format("%.1fs cooldown", surge.Cooldown or surge.Recovery)
+						else "longer effects",
 				},
 				{
 					"CUT",
@@ -720,7 +722,7 @@ local function gemLines(gem)
 					if surge.PerSecond then "/s" else ""
 				)
 			)
-			table.insert(parts, string.format("%.1fs cooldown", surge.Recovery))
+			table.insert(parts, string.format("%.1fs cooldown", surge.Cooldown or surge.Recovery))
 			local line = text(card, table.concat(parts, "  ·  "), 11, P.Text)
 			line.AutomaticSize, line.TextWrapped, line.TextTruncate =
 				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd

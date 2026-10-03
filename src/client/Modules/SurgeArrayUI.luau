@@ -109,7 +109,7 @@ local function surgeLine(gem, amps)
 	if definition.Damage then
 		table.insert(parts, string.format("%d%% dmg", math.floor(definition.Damage * 100 + 0.5)))
 	end
-	table.insert(parts, string.format("%.1fs cooldown", definition.Recovery))
+	table.insert(parts, string.format("%.1fs cooldown", definition.Cooldown or definition.Recovery))
 	if definition.Crit > 0 then
 		table.insert(parts, string.format("%d%% crit", math.floor(definition.Crit * 100 + 0.5)))
 	end
@@ -351,10 +351,10 @@ local function maneuverColumn(parent, profile, loadout)
 				if not definition
 					then ""
 					elseif learned then string.format(
-						"Rank %s  ·  %d Stamina  ·  %.1fs",
+						"Rank %s  ·  %d Stamina  ·  %.1fs cooldown",
 						ROMAN[math.max(1, Tree.rank(profile, id))] or "I",
 						math.floor(definition.Cost + 0.5),
-						definition.Recovery
+						definition.Cooldown or definition.Recovery
 					)
 					else "Not learned - unlock it in the Augment Tree",
 				10,

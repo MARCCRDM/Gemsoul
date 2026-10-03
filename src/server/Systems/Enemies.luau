@@ -710,6 +710,7 @@ function Enemies.exposure(enemy: Enemy): number
 end
 
 -- Stun, Slow (fraction), Sunder (fraction, stacks to 3x), Weaken (fraction),
+-- Blind (fraction of its blows that miss),
 -- Vulnerable and Aura (fractions; the strongest applies, they don't stack).
 function Enemies.addStatus(enemy: Enemy, status: string, amount: number, seconds: number)
 	local now = os.clock()
@@ -727,6 +728,10 @@ function Enemies.addStatus(enemy: Enemy, status: string, amount: number, seconds
 		local e = enemy :: any
 		e[status] = math.max(if now < e[untilKey] then e[status] else 0, amount)
 		e[untilKey] = math.max(e[untilKey], now + seconds)
+	elseif status == "Blind" then
+		local e = enemy :: any
+		e.Blind = amount
+		e.BlindUntil = math.max(e.BlindUntil or 0, now + seconds)
 	elseif status == "Weaken" then
 		enemy.Weaken = math.max(if now < enemy.WeakenUntil then enemy.Weaken else 0, amount)
 		enemy.WeakenUntil = now + seconds
@@ -803,6 +808,8 @@ function Enemies.statuses(enemy: Enemy, now: number)
 	add("Vulnerable", enemy.VulnerableUntil, enemy.Vulnerable * 100)
 	add("Exposed", e.AuraUntil or 0, (e.Aura or 0) * 100)
 	add("Weakened", enemy.WeakenUntil, enemy.Weaken * 100)
+	add("Blinded", e.BlindUntil or 0, (e.Blind or 0) * 100)
+	add(if e.WardKind == "Burn" then "BurningWard" else "StaticShell", e.WardUntil or 0)
 	-- A rival's own buffs.
 	local duel = e.Duel
 	if duel then

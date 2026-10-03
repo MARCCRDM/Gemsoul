@@ -137,6 +137,11 @@ local function state(player)
 			Shield = 0,
 			ShieldUntil = 0,
 			NextWard = 0,
+			-- A surge's Ward (Supernova's Burning Ward, Static Field's Static Shell).
+			SurgeWardUntil = 0,
+			SurgeWardNext = 0,
+			Blind = 0,
+			BlindUntil = 0,
 			NextBlockGem = 0,
 			NextStagger = 0,
 			AfterDodgeUntil = 0,
@@ -314,6 +319,7 @@ local function triggerBlockGem(player, k, st, now)
 	fx("BlockGem", player, gem.Element)
 end
 local receive
+local wardHitsBack -- (set below, with the surge code)
 local function rawDamage(target, amount, source, crit, color)
 	if target.Player then
 		target.Humanoid:TakeDamage(amount)
@@ -433,6 +439,16 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				end
 				damage *= multiplier
 			end
+		end
+	end
+	if origin and not reflected and now < st.SurgeWardUntil and now >= st.SurgeWardNext then
+		local attacker = if source
+			then { Player = source, Root = source.Character and source.Character:FindFirstChild("HumanoidRootPart") }
+			elseif enemySource then { Enemy = enemySource, Root = enemySource.Root }
+			else nil
+		if attacker and attacker.Root then
+			st.SurgeWardNext = now + 1
+			wardHitsBack(st.SurgeWardKind, st.SurgeWardPower, st.SurgeWardStun, attacker, player)
 		end
 	end
 	local blocked = math.max(0, beforeGuard - damage)
@@ -648,9 +664,52 @@ local function procGem(source, k, target)
 	end
 end
 
+-- Blinded (Solar Flare): this share of your blows miss.
+local function blindMiss(st, now)
+	return now < st.BlindUntil and st.Blind > 0 and math.random() <= st.Blind
+end
+-- A Ward hits back at whoever struck its owner, at most once a second:
+-- a Burning Ward sets them alight, a Static Shell stuns them.
+function wardHitsBack(kind, power, stun, attacker, owner)
+	if kind == "Burn" then
+		local color = GemConfig.ElementColors.Fire
+		if attacker.Player then
+			addDot(attacker.Player, owner, power, 3)
+		else
+			Enemies.setBurn(attacker.Enemy, power, 3, owner, color)
+		end
+	else
+		applyCC(attacker, stun or 0.6, "Shocked")
+	end
+	fx(
+		"TechPulse",
+		nil,
+		attacker.Root.Position,
+		attacker.Root.Position,
+		GemConfig.ElementColors[if kind == "Burn" then "Fire" else "Shock"],
+		4
+	)
+end
+-- `player` hit a rival that wears a Ward.
+local function enemyWard(player, enemy)
+	local now = os.clock()
+	local e = enemy :: any
+	if not e.WardUntil or now >= e.WardUntil or now < (e.WardNext or 0) then
+		return
+	end
+	local _, root = alive(player)
+	if not root then
+		return
+	end
+	e.WardNext = now + 1
+	wardHitsBack(e.WardKind, e.WardPower or 0, e.WardStun, { Player = player, Root = root }, enemy)
+end
 local function strike(source, k, st, target, heavy, projectile, swing)
 	if not targetAllowed(source, target) then
 		return
+	end
+	if blindMiss(st, os.clock()) then
+		return false, false
 	end
 	local _, root = alive(source)
 	-- A rival duelist is fought by PvP rules, as another player would be.
@@ -709,6 +768,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		if k.Effects.SlowOnHit then
 			Enemies.addStatus(target.Enemy, "Slow", k.Effects.SlowOnHit, 2)
 		end
+		enemyWard(source, target.Enemy)
 	end
 	if damage <= 0 or target.Humanoid.Health <= 0 then
 		return damage > 0 and not guarded, guarded
@@ -973,6 +1033,9 @@ function technologyHitInner(player, k, target, definition, scale)
 		return
 	end
 	local _, root = alive(player)
+	if definition.Resource == "Stamina" and blindMiss(state(player), os.clock()) then
+		return
+	end
 	local gem = if definition.Resource == "Charge"
 		then (definition.Gem or surgeGem(k.Loadout, definition.Element))
 		else nil
@@ -1016,9 +1079,23 @@ function technologyHitInner(player, k, target, definition, scale)
 		)
 	else
 		Enemies.damage(target.Enemy, damage, player, crit, color)
+		enemyWard(player, target.Enemy)
 	end
 	if damage <= 0 then
 		return
+	end
+	-- Leech (Toxic Cloud): drink part of what it deals.
+	if definition.Leech then
+		CombatServer.heal(player, damage * definition.Leech)
+	end
+	if definition.Blind then
+		local seconds = definition.BlindTime or 2.5
+		if target.Player then
+			local victim = state(target.Player)
+			victim.Blind, victim.BlindUntil = definition.Blind, math.max(victim.BlindUntil, os.clock() + seconds)
+		else
+			Enemies.addStatus(target.Enemy, "Blind", definition.Blind, seconds)
+		end
 	end
 	if definition.Stun then
 		applyCC(
@@ -1093,6 +1170,17 @@ local function technologyStrike(player, definition, aim, scale)
 	if definition.Resource == "Charge" and not definition.Gem and not Tech.hasGem(k.Loadout, definition.Element) then
 		return
 	end
+	if definition.Ward then
+		-- The barrier rises as the cast lands (Burning Ward, Static Shell).
+		local ward, now = definition.Ward, os.clock()
+		local size = definition.Gem and definition.Gem.Size or 1
+		st.Shield = math.max(st.Shield, ward.Shield + size * 3)
+		st.ShieldUntil = math.max(st.ShieldUntil, now + ward.Duration)
+		st.SurgeWardUntil, st.SurgeWardKind = now + ward.Duration, ward.Kind
+		st.SurgeWardPower = k.Weapon.Attack.Damage * Combat.powerMult(rating(k, "Power")) * (ward.Power or 0)
+		st.SurgeWardStun = ward.Stun
+		fx("TechField", player, GemConfig.ElementColors[definition.Element] or WHITE)
+	end
 	local origin = root.Position + Vector3.new(0, 1.5, 0)
 	local offset = aim - origin
 	local direction = if offset.Magnitude > 0.01 then offset.Unit else root.CFrame.LookVector
@@ -1150,6 +1238,7 @@ local function technologyStrike(player, definition, aim, scale)
 					Damage = cloud.Damage,
 					Shred = cloud.Shred,
 					ShredTime = cloud.Every * 2,
+					Leech = definition.Leech,
 				},
 			})
 		end
@@ -1331,12 +1420,14 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	else
 		Tech.spend(st.Resources, definition.Resource, cost)
 	end
+	-- A short lockout (Recovery) for everything, and this ability's own cooldown.
 	local recovery = definition.Recovery * (k.Effects.CooldownMult or 1)
-	st.TechCooldowns[cooldownKey], st.NextTech = now + recovery, now + recovery
+	local cooldown = math.max(recovery, (definition.Cooldown or definition.Recovery) * (k.Effects.CooldownMult or 1))
+	st.TechCooldowns[cooldownKey], st.NextTech = now + cooldown, now + recovery
 	st.NextAttack = math.max(st.NextAttack, st.NextTech)
 	st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
 	player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
-	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, recovery)
+	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, cooldown)
 	Remotes.CombatFx:FireClient(player, "TechStatus", definition.Name)
 	-- Every cast takes the same time it takes anyone (Actions.castTime):
 	-- the effect lands when the cast completes, the cast bar fills, the
@@ -1486,6 +1577,18 @@ function CombatServer.rivalHitEffects(player, effects)
 		st.SlowUntil = st.CC.Debuffs.Slow.Until
 	end
 end
+-- A rival's surge riders landing on `player`, as a player's land: Blind
+-- (Solar Flare) and Slow (Armor Melt, Cryo Stream).
+function CombatServer.afflict(player, riders)
+	local st, now = state(player), os.clock()
+	if riders.Blind then
+		st.Blind, st.BlindUntil = riders.Blind, math.max(st.BlindUntil, now + (riders.BlindTime or 2.5))
+	end
+	if riders.Slow then
+		st.Slow = CrowdControl.applyDebuff(st.CC, "Slow", riders.Slow, riders.SlowTime or 0.75, now, true)
+		st.SlowUntil = st.CC.Debuffs.Slow.Until
+	end
+end
 -- A rival duelist's Corrosive aura while it blocks (a gem defence).
 function CombatServer.rivalAura(player, amount)
 	CrowdControl.applyDebuff(state(player).CC, "Aura", amount, 0.5, os.clock(), true)
@@ -1533,7 +1636,9 @@ local function playerStatuses(st, now)
 		add("EnergySiphon", st.SiphonUntil, st.SiphonCapacity)
 	end
 	add("ResonanceEcho", st.EchoUntil)
+	add(if st.SurgeWardKind == "Burn" then "BurningWard" else "StaticShell", st.SurgeWardUntil)
 	add(st.StunKind or "Stunned", st.StunUntil)
+	add("Blinded", st.BlindUntil, st.Blind * 100)
 	add("GuardBroken", st.BlockBrokenUntil)
 	for _, dot in st.Dots do
 		add("Burning", dot.Ends)

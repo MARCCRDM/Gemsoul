@@ -82,7 +82,7 @@ check(Tree.weaponMultiplier(effects, { Look = "Hammer", Attack = { Kind = "Melee
 check(Tree.upgrade(complete, "MobilityAugment") and Tree.upgrade(complete, "MobilityAugment") and close(Tree.effects(complete).Mobility, 0.15), "Passive ranks stack their bonus")
 check(Tree.upgrade(complete, "HydraulicSlam") and Tree.upgrade(complete, "HydraulicSlam"), "Starter node ranks")
 local slam = Tree.techStats(complete, "HydraulicSlam")
-check(close(slam.Damage, 1.8 * 1.2) and close(slam.Cost, 30 * 0.84) and close(Tech.Catalog.HydraulicSlam.Damage, 1.8), "Rank III technology scaling or catalog mutated")
+check(close(slam.Damage, 1.6 * 1.2) and close(slam.Cost, 30 * 0.84) and close(slam.Cooldown, 6 * 0.9) and close(Tech.Catalog.HydraulicSlam.Damage, 1.6), "Rank III technology scaling or catalog mutated")
 
 -- Real unlock handlers and live combat: purchases are authoritative and build changes are safe.
 local source, hs, rs, loadout = makePlayer(30, Vector3.zero, nil)
@@ -137,7 +137,7 @@ do -- it lands when its cast completes
 	local castTime = Actions.castTime(Tech.surgeStats(loadout.Surge1Gem))
 	now += castTime; CombatServer._tick(castTime)
 end
-check(close(1000 - hv.Health, damage * 1.12 * 1.1 * 1.25), "Live Thermal surge with Overcharge, Surge Power and Elemental Mastery")
+check(close(1000 - hv.Health, damage * Tech.Catalog.ThermalBurst.Damage * 1.12 * 1.1 * 1.25), "Live Thermal surge with Overcharge, Surge Power and Elemental Mastery")
 loadout.Surge1Gem = nil
 now += 2
 hv.Health = 1000
