@@ -13,6 +13,9 @@ local function makePlayer(id,position,family)
 	function humanoid:TakeDamage(damage) self.Health=math.max(0,self.Health-damage) end
 	player.Character={HumanoidRootPart=root,FindFirstChild=function(_,key) return if key=="HumanoidRootPart" then root else nil end,FindFirstChildOfClass=function(_,key) return if key=="Humanoid" then humanoid elseif key=="ForceField" and player.Protected then {} else nil end}
 	function player.Character:PivotTo(target) root.Position=target.Position or Vector3.new(0,6,0) end
+	player.Character.Attributes={}
+	function player.Character:GetAttribute(key) return self.Attributes[key] end
+	function player.Character:SetAttribute(key,value) self.Attributes[key]=value end
 	local loadout={Class="Warrior",Weapon="MatrixSwords1",Armor="MinerBulk",GearRolls={}}
 	if family then
 		for _,slot in ArmorFamilies.Slots do loadout[slot]="Armor"..family..slot.."1" end

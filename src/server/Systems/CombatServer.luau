@@ -6,6 +6,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
+local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -31,6 +32,7 @@ local function alive(player)
 	end
 	return nil, nil
 end
+local posePlayer
 -- Arena fights are equal ground: only gear and gems count there, so the
 -- Augment Tree's perks (and surge/maneuver ranks) sit out.
 local function inArena(player): boolean
@@ -158,6 +160,25 @@ local function spendStamina(player, st, amount)
 	st.Resources.Stamina = math.max(0, st.Resources.Stamina - amount)
 	st.StaminaRestUntil = os.clock() + Actions.Stamina.RegenDelay
 	player:SetAttribute("Stamina", st.Resources.Stamina)
+end
+-- Your body acts out what you do, as the Arena rival's does (RivalPose, the
+-- same poses, seen by everyone): a cast's pose through its wind-up, a slash
+-- or heavy blow as it lands, the arm drawn back while you charge.
+local poseSides: { [Player]: number } = {}
+posePlayer = function(player, kind: string?, windup: number, name: string?, element: string?)
+	local character = player.Character
+	if not character then
+		return
+	end
+	local t = workspace:GetServerTimeNow()
+	poseSides[player] = -(poseSides[player] or 1)
+	character:SetAttribute("ActionKind", kind)
+	character:SetAttribute("ActionHold", nil)
+	character:SetAttribute("ActionStart", t)
+	character:SetAttribute("ActionAt", t + windup)
+	character:SetAttribute("ActionSide", poseSides[player])
+	character:SetAttribute("ActionName", name)
+	character:SetAttribute("ActionElement", element)
 end
 local function updateResources(player, st, k)
 	local now = os.clock()
@@ -727,6 +748,8 @@ local function attack(player, aim, heavy, swing)
 	spendStamina(player, st, cost)
 	st.NextAttack = now + (if heavy then k.Rules.HeavyCooldown else k.Rules.BasicCooldown)
 	st.ChargeStarted = nil
+	-- The blow lands now: the body swings through it, as the rival's does.
+	posePlayer(player, if heavy then "Heavy" else "Slash", 0)
 	Remotes.CombatFx:FireClient(player, "Cooldown", if heavy then "Heavy" else "Basic", st.NextAttack - now)
 	local landed, interrupted = false, false
 	if swing then
@@ -1092,7 +1115,8 @@ local function technologyStrike(player, definition, aim, scale)
 		if not definition.Self and not lineClear(origin, center) then
 			return
 		end
-		fx("TechPulse", player, origin, center, color, definition.Radius)
+		local radius = if definition.Cloud then definition.Radius else Actions.blastRadius(definition.Radius)
+		fx("TechPulse", player, origin, center, color, radius)
 		if definition.Cloud then
 			-- A lingering pool that keeps hitting (Toxic Cloud).
 			st.Zones = st.Zones or {}
@@ -1114,12 +1138,32 @@ local function technologyStrike(player, definition, aim, scale)
 				},
 			})
 		end
+		-- A blast lands as anyone's does (Actions.blastFalloff): wide, and
+		-- harder the closer to its centre: a stun at the core, a stagger in
+		-- the middle, a graze at the edge. (A lingering pool keeps its own size.)
 		for _, target in targets(player) do
-			if
-				(target.Root.Position - center).Magnitude <= definition.Radius
-				and lineClear(center, target.Root.Position + Vector3.new(0, 1.5, 0))
-			then
-				technologyHit(player, k, target, definition, scale)
+			local offset = target.Root.Position - center
+			local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			if distance <= radius and lineClear(center, target.Root.Position + Vector3.new(0, 1.5, 0)) then
+				local falloff, cc, seconds = 1, nil, 0
+				if not definition.Cloud then
+					falloff, cc, seconds = Actions.blastFalloff(distance, radius)
+				end
+				technologyHit(player, k, target, definition, (scale or 1) * falloff)
+				if cc and target.Humanoid.Health > 0 then
+					if target.Player then
+						CombatServer.blastCC(
+							target.Player,
+							cc,
+							seconds,
+							center,
+							if cc == "Stunned" then Actions.Blast.Knockback else 0
+						)
+					elseif target.Enemy then
+						Enemies.addStatus(target.Enemy, "Stun", 1, seconds)
+						target.Enemy.StunKind = cc
+					end
+				end
 			end
 		end
 	else
@@ -1191,6 +1235,22 @@ local function technologyStrike(player, definition, aim, scale)
 end
 -- Rig Maneuvers (learned in the Augment Tree, keys 1-3) and Gem Surges (the
 -- gem in Surge Array slot Q, E or R). `surgeKey` marks a surge cast.
+-- A self surge taking effect (when its cast completes).
+local function applyBuff(player, k, st, id, definition)
+	local now = os.clock()
+	if id == "EnergySiphon" then
+		st.SiphonUntil, st.SiphonCapacity = now + definition.Duration, definition.Absorb
+		fx("TechField", player, Tech.Resources.Charge.Color)
+	elseif id == "ResonanceEcho" then
+		st.EchoUntil = now + definition.Duration
+		fx("TechField", player, Tech.Resources.Charge.Color)
+	elseif id == "CryoShield" then
+		local gem = definition.Gem or surgeGem(k.Loadout, "Frost")
+		st.Shield = math.max(st.Shield, 30 + (gem and gem.Size or 1) * 3)
+		st.ShieldUntil = math.max(st.ShieldUntil, now + definition.Duration)
+		fx("TechField", player, GemConfig.ElementColors.Frost)
+	end
+end
 local function triggerTechnology(player, id, aim, surgeKey)
 	local k, st, now = kit(player), state(player), os.clock()
 	local humanoid, root = alive(player)
@@ -1263,40 +1323,44 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
 	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, recovery)
 	Remotes.CombatFx:FireClient(player, "TechStatus", definition.Name)
-	if id == "EnergySiphon" then
-		st.SiphonUntil, st.SiphonCapacity = now + definition.Duration, definition.Absorb
-		fx("TechField", player, Tech.Resources.Charge.Color)
-	elseif id == "ResonanceEcho" then
-		st.EchoUntil = now + definition.Duration
-		fx("TechField", player, Tech.Resources.Charge.Color)
-	elseif id == "CryoShield" then
-		local gem = definition.Gem or surgeGem(k.Loadout, "Frost")
-		st.Shield = math.max(st.Shield, 30 + (gem and gem.Size or 1) * 3)
-		st.ShieldUntil = math.max(st.ShieldUntil, now + definition.Duration)
-		fx("TechField", player, GemConfig.ElementColors.Frost)
+	-- Every cast takes the same time it takes anyone (Actions.castTime):
+	-- the effect lands when the cast completes, the cast bar fills, the
+	-- body poses (seen by everyone) and a ground blast shows its warning
+	-- ring. A dodge or stun cuts it short.
+	local castTime = Actions.castTime(definition)
+	local castKind = Actions.castKind(definition)
+	posePlayer(player, Actions.castPose(definition), castTime, definition.Name, definition.Element)
+	local castSpeed = Actions.castMovement(definition)
+	if castSpeed < 1 then
+		st.CastUntil, st.CastSpeed = now + castTime, castSpeed
+	end
+	if castKind == "Blast" or castKind == "Field" then
+		local origin = root.Position + Vector3.new(0, 1.5, 0)
+		local offset = aim - origin
+		local direction = if offset.Magnitude > 0.01 then offset.Unit else root.CFrame.LookVector
+		local center = if definition.Self
+			then root.Position
+			else origin + direction * math.min(offset.Magnitude, definition.Range or 30)
+		fx(
+			"Nova",
+			center - Vector3.new(0, 2.5, 0),
+			Actions.blastRadius(definition.Radius),
+			GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80),
+			castTime
+		)
+	end
+	if not definition.Damage and definition.Resource == "Charge" then
+		table.insert(st.Pending, { Buff = id, Definition = definition, At = now + castTime })
 	elseif definition.PerSecond then
-		technologyStrike(player, definition, aim, 0.25)
-		st.Channel = { Key = cooldownKey, Definition = definition, Aim = aim, Until = now + 0.5, Next = now + 0.25 }
-	end
-	-- Casting slows you, or roots you for a wind-up (Actions.castMovement).
-	local castSpeed, castSeconds = Actions.castMovement(definition)
-	if castSpeed < 1 and not definition.PerSecond then
-		local seconds = castSeconds or definition.Windup or 0
-		st.CastUntil, st.CastSpeed = now + seconds, castSpeed
-	end
-	if definition.Damage and not definition.PerSecond then
-		if definition.Windup then
-			table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + definition.Windup })
-			fx("TechField", player, Color3.fromRGB(255, 190, 80))
-		else
-			technologyStrike(player, definition, aim)
-			if definition.Hits == 2 then
-				table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + 0.16 })
-			end
+		table.insert(st.Pending, { Channel = cooldownKey, Definition = definition, Aim = aim, At = now + castTime })
+	elseif definition.Damage then
+		table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + castTime })
+		if definition.Hits == 2 then
+			table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + castTime + 0.16 })
 		end
 		-- Arcane Resonance: a chance for the surge to fire a second time, free.
 		if (definition.Echo or 0) > 0 and math.random() < definition.Echo then
-			table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + (definition.Windup or 0) + 0.3 })
+			table.insert(st.Pending, { Definition = definition, Aim = aim, At = now + castTime + 0.3 })
 			Remotes.CombatFx:FireClient(player, "TechStatus", "Arcane Resonance!")
 		end
 	end
@@ -1317,6 +1381,7 @@ local function onInput(player, action, a, b)
 	end
 	if action == "CancelAttack" then
 		st.ChargeStarted = nil
+		posePlayer(player, nil, 0)
 		return
 	end
 	if now - st.InputWindow >= 1 then
@@ -1352,6 +1417,8 @@ local function onInput(player, action, a, b)
 		then
 			st.ChargeStarted = now
 			st.ChargeSide = Actions.side(a)
+			-- The arm draws back while the blow charges.
+			posePlayer(player, "Slash", 3)
 		end
 	elseif action == "ReleaseAttack" and Actions.finiteVector(a) then
 		local started = st.ChargeStarted
@@ -1375,6 +1442,13 @@ end
 -- them (CrowdControl's diminishing returns apply) and, from the core, throw
 -- them out of it. The player's own client moves their character, so the
 -- push travels with the "Blasted" message.
+-- Armor shred on a player (a rival's Toxic Cloud), as a player's cloud shreds.
+function CombatServer.sunder(player, amount, seconds)
+	local victim = state(player)
+	victim.Sunder = CrowdControl.applyDebuff(victim.CC, "Sunder", amount, seconds, os.clock(), true)
+	victim.SunderUntil = victim.CC.Debuffs.Sunder.Until
+end
+
 function CombatServer.blastCC(player, kind, seconds, center, push)
 	local humanoid, root = alive(player)
 	if not humanoid or not kind or seconds <= 0 then
@@ -1470,8 +1544,15 @@ function publishStatuses(owner: Instance, st, now)
 	end
 end
 
-local function tick(_dt)
+local function tick(dt)
 	local now = os.clock()
+	-- Every player's body acts out their actions (rest stance between them).
+	local serverNow = workspace:GetServerTimeNow()
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			pcall(RivalPose.update, player.Character, dt or 1 / 60, serverNow, now, true)
+		end
+	end
 	for _, player in Players:GetPlayers() do
 		local st, k = state(player), kit(player)
 		local humanoid, root = alive(player)
@@ -1493,7 +1574,20 @@ local function tick(_dt)
 			local pending = st.Pending[i]
 			if now >= pending.At then
 				table.remove(st.Pending, i)
-				technologyStrike(player, pending.Definition, pending.Aim)
+				if pending.Buff then
+					applyBuff(player, k, st, pending.Buff, pending.Definition)
+				elseif pending.Channel then
+					technologyStrike(player, pending.Definition, pending.Aim, 0.25)
+					st.Channel = {
+						Key = pending.Channel,
+						Definition = pending.Definition,
+						Aim = pending.Aim,
+						Until = now + 0.5,
+						Next = now + 0.25,
+					}
+				else
+					technologyStrike(player, pending.Definition, pending.Aim)
+				end
 			end
 		end
 		for i = #(st.Zones or {}), 1, -1 do
@@ -1536,6 +1630,14 @@ local function tick(_dt)
 			end
 		end
 		player:SetAttribute("Channeling", st.Channel ~= nil)
+		if st.Channel and player.Character then
+			-- Keep the cast pose while the beam pours, as a rival's does.
+			local hold = player.Character:GetAttribute("ActionHold")
+			local serverNow = workspace:GetServerTimeNow()
+			if type(hold) ~= "number" or hold < serverNow + 0.15 then
+				player.Character:SetAttribute("ActionHold", serverNow + 0.3)
+			end
+		end
 		player:SetAttribute("Charge", st.Resources.Charge)
 		if st.DodgeMove then
 			if now >= st.DodgeMove.Ends then
@@ -1554,6 +1656,13 @@ local function tick(_dt)
 			st.ChargeStarted = nil
 		end
 		player:SetAttribute("Blocking", blocking(st, now))
+		-- The shield comes up for everyone to see, as the rival's does.
+		if player.Character then
+			player.Character:SetAttribute(
+				"GuardUntil",
+				if blocking(st, now) then workspace:GetServerTimeNow() + (st.BlockUntil - now) else 0
+			)
+		end
 		if blocking(st, now) and k.Defense.CleanseInterval < math.huge and now >= st.NextCleanse then
 			cleanse(st)
 			st.NextCleanse = now + k.Defense.CleanseInterval
@@ -1594,7 +1703,7 @@ local function tick(_dt)
 		end
 		for source, dot in st.Dots do
 			-- A burn from a computer fighter (an enemy table) lasts while it lives.
-			local fromEnemy = type(source) == "table"
+			local fromEnemy = type(source) == "table" and source.Alive ~= nil
 			if if fromEnemy then not source.Alive else not canPvP(source, player) then
 				st.Dots[source] = nil
 			elseif now >= dot.Next then

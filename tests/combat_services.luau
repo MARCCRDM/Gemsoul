@@ -37,6 +37,7 @@ local workspace={
 	FindFirstChildWhichIsA=function() return nil end,
 	Raycast=function() return if wallBlocks then {Distance=2} else nil end,
 	Blockcast=function() return if wallDistance then {Distance=wallDistance} else nil end,
+	GetServerTimeNow=function() return os.clock() end,
 }
 CFrame.lookAt=function(position) return {Position=position} end
 local RaycastParams={new=function() return {} end}

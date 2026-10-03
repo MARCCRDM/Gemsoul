@@ -291,13 +291,16 @@ do
  table.remove(playerList,table.find(playerList,s)); table.remove(playerList,table.find(playerList,t))
 end
 do
- -- Casting slows you, or roots you for a wind-up.
+ -- Every cast takes the same time anyone's does (the rival's too) and roots
+ -- you for it; buffs and quick maneuvers leave you free.
  check(Actions.castMovement({Windup=1.2,Damage=2.4,Resource="Charge",Radius=14})==0,"Wind-up does not root")
- check(Actions.castMovement({PerSecond=true,Damage=0.45,Resource="Charge"})==0.4,"Channel does not slow")
- local blast,blastFor=Actions.castMovement({Damage=1,Resource="Charge",Radius=8})
- local bolt,boltFor=Actions.castMovement({Damage=1,Resource="Charge",Range=45})
- check(blast==0.35 and blastFor==0.5 and bolt==0.55 and boltFor==0.35,"Instant cast slows")
+ check(Actions.castMovement({PerSecond=true,Damage=0.45,Resource="Charge"})==0,"Channel does not root")
+ check(Actions.castMovement({Damage=1,Resource="Charge",Radius=8})==0 and Actions.castMovement({Damage=1,Resource="Charge",Range=45})==0,"Cast does not root")
  check(Actions.castMovement({Resource="Charge"})==1 and Actions.castMovement({Resource="Stamina",Damage=1.8})==1,"Buffs or sword maneuvers slow you")
+ check(Actions.castTime({Damage=1,Resource="Charge",Radius=8})==Actions.CastTime.Blast and Actions.castTime({Damage=1,Resource="Charge",Range=45})==Actions.CastTime.Bolt,"Blast/bolt cast time")
+ check(Actions.castTime({Windup=1.2,Damage=2.4,Resource="Charge",Radius=14})==1.2 and Actions.castTime({Resource="Charge"})==Actions.CastTime.Buff,"Wind-up/buff cast time")
+ check(Actions.castTime({PerSecond=true,Damage=0.45,Resource="Charge"})==Actions.CastTime.Channel and Actions.castTime({Resource="Stamina",Damage=1.8})==Actions.CastTime.Move,"Channel/move cast time")
+ check(Actions.castPose({Damage=1,Resource="Charge",Radius=8})=="Nova" and Actions.castPose({Damage=1,Resource="Charge",Range=45})=="Bolt" and Actions.castPose({Resource="Charge"})=="Buff","Cast poses")
 end
 ArenaSessions.start()
 a:SetAttribute("Expedition",true)

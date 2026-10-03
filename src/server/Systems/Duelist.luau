@@ -266,6 +266,7 @@ local function animate(duel, kind: string, windup: number, side: number?, name: 
 	model:SetAttribute("ActionName", name)
 	model:SetAttribute("ActionElement", if name then duel.CastElement else nil)
 	model:SetAttribute("ActionKind", kind)
+	model:SetAttribute("ActionHold", nil)
 	model:SetAttribute("ActionStart", t)
 	model:SetAttribute("ActionAt", t + windup)
 	model:SetAttribute("ActionSide", side or (if duel.Swings % 2 == 0 then -1 else 1))
@@ -388,58 +389,71 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		duel.Owner,
 		{ Dir = "Foe", Kind = "Cast", Who = duel.Name, Ability = surge.Name, Element = surge.Element }
 	)
+	duel.CastElement = surge.Element
 	if surge.Kind == "Self" then
-		animate(duel, "Buff", 0.15)
-		fx("TechPulse", nil, root.Position, root.Position, color, 5)
-		-- Exactly as a player's: Cryo Shield and Energy Siphon are shields
-		-- that soak damage; Resonance Echo repeats its hits.
-		local stats = Tech.surgeStats(surge.Gem) or {}
-		local duration = stats.Duration or 4
-		if surge.Id == "CryoShield" then
-			local amount = 30 + (surge.Gem and surge.Gem.Size or 1) * 3
-			enemy.Shield = math.max(enemy.Shield or 0, amount)
-			enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + duration)
-			duel.CryoUntil = now + duration
-		elseif surge.Id == "EnergySiphon" then
-			enemy.Shield = math.max(enemy.Shield or 0, stats.Absorb or 0)
-			enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + duration)
-		else -- ResonanceEcho
-			duel.EchoUntil = now + duration
-		end
+		animate(duel, surge.Pose, surge.CastTime, nil, surge.Name)
+		duel.Action = { Kind = "Buff", Name = surge.Name, At = now + surge.CastTime, Surge = surge }
 		return
 	end
 	if surge.Kind == "Nova" then
 		-- A blast with a warning ring: under the player, or around itself.
 		local center = if surge.SelfCentered then root.Position else target.Position
-		fx("Nova", center - Vector3.new(0, 2.5, 0), surge.Radius, color, Brain.Windup.Nova)
-		duel.CastElement = surge.Element
-		animate(duel, "Nova", Brain.Windup.Nova, nil, surge.Name)
+		fx("Nova", center - Vector3.new(0, 2.5, 0), surge.Radius, color, surge.CastTime)
+		animate(duel, surge.Pose, surge.CastTime, nil, surge.Name)
 		duel.Action = {
 			Kind = "Nova",
 			Name = surge.Name,
-			At = now + Brain.Windup.Nova,
+			At = now + surge.CastTime,
 			Center = center,
 			Radius = surge.Radius,
 			Power = surge.Power,
 			Crit = surge.Crit,
 			Element = surge.Element,
 			Gem = surge.Gem,
+			Cloud = surge.Cloud,
 		}
 	else
 		fx("TechPulse", nil, root.Position, root.Position, color, 3)
 		duel.Action = {
-			Kind = "Bolt",
+			Kind = if surge.Cast == "Channel" then "Channel" else "Bolt",
 			Name = surge.Name,
-			At = now + Brain.Windup.Bolt,
+			At = now + surge.CastTime,
 			Power = surge.Power,
 			Crit = surge.Crit,
 			Element = surge.Element,
 			Gem = surge.Gem,
+			Range = surge.Range,
+			Cost = surge.Cost,
 		}
-		duel.CastElement = surge.Element
-		animate(duel, "Bolt", Brain.Windup.Bolt, nil, surge.Name)
+		animate(duel, surge.Pose, surge.CastTime, nil, surge.Name)
 	end
 end
+
+-- A self surge lands when its cast completes, exactly as a player's: Cryo
+-- Shield and Energy Siphon are shields that soak damage; Resonance Echo
+-- repeats its hits.
+local function applyBuff(enemy, duel, surge, now: number)
+	local root = enemy.Root
+	local color = GemConfig.ElementColors[surge.Element] or P_GOLD
+	fx("TechPulse", nil, root.Position, root.Position, color, 5)
+	local stats = Tech.surgeStats(surge.Gem) or {}
+	local duration = stats.Duration or 4
+	if surge.Id == "CryoShield" then
+		local amount = 30 + (surge.Gem and surge.Gem.Size or 1) * 3
+		enemy.Shield = math.max(enemy.Shield or 0, amount)
+		enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + duration)
+		duel.CryoUntil = now + duration
+	elseif surge.Id == "EnergySiphon" then
+		enemy.Shield = math.max(enemy.Shield or 0, stats.Absorb or 0)
+		enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + duration)
+	else -- ResonanceEcho
+		duel.EchoUntil = now + duration
+	end
+end
+
+-- How long it holds a beam (a player holds the key; it pours for this long,
+-- or until its Charge runs dry or the player steps out of reach).
+local CHANNEL_HOLD = 1.5
 
 -- Uses one of its Rig Maneuvers (keys 1, 2, 3), like a player would.
 local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Vector3, side: Vector3, distance: number)
@@ -471,11 +485,14 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 	end
 	setStance(duel, if move.Windup then "Heavy" else "Maneuver")
 	duel.CastElement = nil
-	animate(duel, if move.Windup then "Heavy" else "Slash", move.Windup or 0.25, nil, move.Name)
+	-- Same timing as a player's (Actions.castTime): a heavy maneuver's own
+	-- wind-up, otherwise a quick move.
+	local castTime = move.Windup or Actions.CastTime.Move
+	animate(duel, if move.Windup then "Heavy" else "Slash", castTime, nil, move.Name)
 	duel.Action = {
 		Kind = "Move",
 		Name = move.Name,
-		At = now + (move.Windup or 0.25),
+		At = now + castTime,
 		Power = move.Power,
 		Crit = move.Crit,
 		Heavy = move.Windup ~= nil,
@@ -619,6 +636,66 @@ local function think(enemy, now: number)
 		* (if guarding(enemy, now) then 0.7 else 1) -- a shield-walk
 	local color = GemConfig.ElementColors[duel.Element] or Color3.fromRGB(255, 190, 80)
 
+	-- Its lingering pools (Toxic Cloud) tick on the player standing in them.
+	for i = #(duel.Zones or {}), 1, -1 do
+		local zone = duel.Zones[i]
+		if now >= zone.Until then
+			table.remove(duel.Zones, i)
+		elseif now >= zone.Next then
+			zone.Next += zone.Every
+			fx("TechPulse", nil, zone.Center, zone.Center, GemConfig.ElementColors[zone.Element] or color, zone.Radius)
+			if flat(target.Position - zone.Center).Magnitude <= zone.Radius then
+				local dealt, guarded = strike(
+					duel,
+					duel.Damage * (1 - Enemies.weakness(enemy)) * zone.Power,
+					zone.Element,
+					false,
+					zone.Gem,
+					zone.Name,
+					nil
+				)
+				if type(dealt) == "number" and dealt > 0 and not guarded and zone.Shred then
+					CombatServer.sunder(owner, zone.Shred, zone.Every * 2)
+				end
+			end
+		end
+	end
+
+	-- A held beam (Cryo Stream): rooted, it pours a quarter-second at a time,
+	-- billing Charge as a player's does.
+	local channel = duel.Channel
+	if channel then
+		if now < enemy.StunUntil or now >= channel.Until or distance > channel.Range + 2 then
+			duel.Channel = nil
+			enemy.Model:SetAttribute("ActionHold", nil)
+			setStance(duel, "")
+			duel.NextAttack = now + 0.4
+		else
+			humanoid:MoveTo(root.Position)
+			face(root, target.Position)
+			if now >= channel.Next then
+				if duel.Charge < channel.Cost * 0.25 then
+					channel.Until = now
+				else
+					duel.Charge -= channel.Cost * 0.25
+					channel.Next = now + 0.25
+					local from = root.Position + Vector3.new(0, 1.5, 0)
+					fx("TechPulse", nil, from, target.Position, GemConfig.ElementColors[channel.Element] or color, 0)
+					strike(
+						duel,
+						duel.Damage * (1 - Enemies.weakness(enemy)) * channel.Power * 0.25,
+						channel.Element,
+						false,
+						channel.Gem,
+						channel.Name,
+						channel.Crit
+					)
+				end
+			end
+			return
+		end
+	end
+
 	-- A wind-up in progress: hold still, face the player, then strike.
 	local action = duel.Action
 	if action then
@@ -746,12 +823,50 @@ local function think(enemy, now: number)
 			end
 			duel.NextAttack = now + duel.Rate
 			setStance(duel, "")
+		elseif action.Kind == "Buff" then
+			applyBuff(enemy, duel, action.Surge, now)
+			duel.NextAttack = now + 0.3
+			setStance(duel, "")
+		elseif action.Kind == "Channel" then
+			-- The beam starts pouring (its first tick lands now).
+			duel.Channel = {
+				Name = action.Name,
+				Until = now + CHANNEL_HOLD,
+				Next = now,
+				Range = action.Range or Brain.SurgeRange,
+				Cost = action.Cost or 0,
+				Power = action.Power,
+				Crit = action.Crit,
+				Element = action.Element,
+				Gem = action.Gem,
+			}
+			duel.Charge += (action.Cost or 0) * 0.25 -- (the cast already billed this first tick)
+			enemy.Model:SetAttribute("ActionHold", workspace:GetServerTimeNow() + CHANNEL_HOLD)
 		elseif action.Kind == "Nova" then
 			-- The closer to the centre, the harder: full damage and a stun at
 			-- the core, a stagger in the middle, a glancing hit at the edge.
+			-- (A lingering pool lands evenly and then keeps ticking.)
 			local distance = flat(target.Position - action.Center).Magnitude
+			if action.Cloud then
+				duel.Zones = duel.Zones or {}
+				table.insert(duel.Zones, {
+					Name = action.Name,
+					Center = action.Center,
+					Radius = action.Radius,
+					Every = action.Cloud.Every,
+					Next = now + action.Cloud.Every,
+					Until = now + action.Cloud.Duration,
+					Power = action.Cloud.Damage,
+					Shred = action.Cloud.Shred,
+					Element = action.Element,
+					Gem = action.Gem,
+				})
+			end
 			if distance <= action.Radius then
-				local scale, cc, seconds = Actions.blastFalloff(distance, action.Radius)
+				local scale, cc, seconds = 1, nil, 0
+				if not action.Cloud then
+					scale, cc, seconds = Actions.blastFalloff(distance, action.Radius)
+				end
 				local dealt, guarded = strike(
 					duel,
 					damage * action.Power * scale,
@@ -920,11 +1035,13 @@ local function think(enemy, now: number)
 		face(root, target.Position)
 	elseif choice == "Surge" then
 		local surge = Brain.pickSurge(duel.Surges, now, distance, view)
-		if surge and duel.Charge < (surge.Cost or 0) then
+		-- A held beam bills a quarter-second at a time, as a player's.
+		local cost = if surge and surge.Cast == "Channel" then (surge.Cost or 0) * 0.25 else surge and surge.Cost or 0
+		if surge and duel.Charge < cost then
 			surge = nil -- not enough Charge, like a player
 		end
 		if surge then
-			duel.Charge -= surge.Cost or 0
+			duel.Charge -= cost
 			dropGuard(enemy, now)
 			castSurge(enemy, duel, surge, now, target)
 		else
@@ -1193,7 +1310,15 @@ function spawnRival(owner: Player)
 				Gem = gem,
 				Kind = if SELF_SURGES[id] then "Self" elseif stats.Radius then "Nova" else "Bolt",
 				SelfCentered = stats.Self == true,
-				Radius = Actions.blastRadius(stats.Radius), -- wide: see Actions.Blast
+				-- A blast is wide (Actions.Blast); a lingering pool keeps its own size.
+				Radius = if stats.Cloud then stats.Radius else Actions.blastRadius(stats.Radius),
+				-- Cast exactly as a player casts it (Actions.castTime / castPose):
+				-- the same wind-up, the same pose, a held beam, a lingering pool.
+				Cast = Actions.castKind(stats),
+				CastTime = Actions.castTime(stats),
+				Pose = Actions.castPose(stats),
+				Range = stats.Range,
+				Cloud = stats.Cloud,
 				-- A player's surge numbers: its damage, Charge cost and recovery.
 				Power = stats.Damage or 1,
 				Crit = stats.Crit, -- a gem's cut gives its surge a crit chance, as yours

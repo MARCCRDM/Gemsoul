@@ -114,37 +114,60 @@ function Actions.blastFalloff(distance: number, radius: number): (number, string
 	return scale, nil, 0
 end
 --[[
-	Moving while you cast, by what the cast is (Actions.castMovement):
-	  wind-up (Supernova, Solar Flare, Breach Hammer,   ROOTED for the whole
-	    Seismic Breaker)                                wind-up: you plant your
-	                                                    feet to call it down
-	  channel (Cryo Stream)                             walk at 40% while the
-	                                                    beam pours out
-	  instant ground blast (Thermal Burst, Toxic        35% speed for 0.5s as
-	    Cloud, Absolute Zero)                           you throw it
-	  instant bolt, lance, cone or field (Cryo Lance,   55% speed for 0.35s
-	    Ember Lance, Ion Spark, Chain Lightning,
-	    Overload, Armor Melt, Bio-Corrosion, Acid
-	    Spray, Static Field)
-	  self buffs (Cryo Shield, Energy Siphon,           no slow
-	    Resonance Echo), sword maneuvers and Stim Dodge
-	Returns the speed multiplier and how long it lasts (nil seconds: for the
-	wind-up or channel itself).
+	Casting, the same for every fighter (players and the Arena rival alike):
+	what a cast is, how long it takes, and how you can move meanwhile.
+
+	  kind     what it is                          cast    moving
+	  Bolt     bolts, lances, cones, chains        0.7s    rooted
+	  Blast    a ground blast (warning ring)       1.05s   rooted
+	  Field    a blast around yourself             1.05s   rooted
+	  Channel  a held beam (Cryo Stream)           0.4s    rooted while it pours
+	  Buff     a shield or buff on yourself        0.3s    free
+	  Move     a quick Rig Maneuver                0.2s    free
+	  Heavy    a maneuver or surge with its own    its     rooted
+	           wind-up (Breach Hammer, Supernova)  own
 ]]
-function Actions.castMovement(definition): (number, number?)
+Actions.CastTime = { Bolt = 0.7, Blast = 1.05, Field = 1.05, Channel = 0.4, Buff = 0.3, Move = 0.2 }
+function Actions.castKind(definition): string?
 	if not definition then
+		return nil
+	end
+	if definition.Resource ~= "Charge" then
+		return if definition.Windup then "Heavy" else "Move"
+	end
+	if definition.PerSecond then
+		return "Channel"
+	elseif not definition.Damage then
+		return "Buff"
+	elseif definition.Radius then
+		return if definition.Self then "Field" else "Blast"
+	end
+	return "Bolt"
+end
+function Actions.castTime(definition): number
+	if not definition then
+		return 0
+	end
+	return definition.Windup or Actions.CastTime[Actions.castKind(definition) or ""] or 0
+end
+-- The pose a cast shows (RivalPose kinds): Bolt, Nova, Buff, Slash or Heavy.
+function Actions.castPose(definition): string
+	local kind = Actions.castKind(definition)
+	return if kind == "Blast" or kind == "Field"
+		then "Nova"
+		elseif kind == "Buff" then "Buff"
+		elseif kind == "Move" then "Slash"
+		elseif kind == "Heavy" then (if definition.Resource == "Charge" then "Nova" else "Heavy")
+		else "Bolt"
+end
+-- Moving while you cast: the speed multiplier, and for how long (nil: the
+-- whole cast, or while a channel pours).
+function Actions.castMovement(definition): (number, number?)
+	local kind = Actions.castKind(definition)
+	if kind == "Buff" or kind == "Move" or kind == nil then
 		return 1, 0
 	end
-	if definition.Windup then
-		return 0, nil
-	elseif definition.PerSecond then
-		return 0.4, nil
-	elseif definition.Resource ~= "Charge" or not definition.Damage then
-		return 1, 0
-	elseif definition.Radius and not definition.Self then
-		return 0.35, 0.5
-	end
-	return 0.55, 0.35
+	return 0, nil
 end
 Actions.AfterDodgeSeconds = 3
 Actions.DoubleTap = 0.3 -- seconds between Space taps that make a roll

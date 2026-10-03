@@ -96,6 +96,11 @@ check(mirrored.RightShoulder[3] > 0, "Combo swings did not alternate")
 local heavy = RivalPose.pose({ ActionKind = "Heavy", ActionStart = 100, ActionAt = 100.75 }, 100.6)
 check(heavy.LeftShoulder[1] > 2.5 and heavy.RightShoulder[1] > 2.5, "Heavy wind-up was not overhead")
 check(RivalPose.pose({ ActionKind = "Nova", ActionStart = 100, ActionAt = 100.9 }, 100.95).RightKnee[1] < 0, "Blast did not slam down")
+-- A held beam keeps its cast pose while it pours, for the rival and players alike.
+local beam = { ActionKind = "Bolt", ActionStart = 100, ActionAt = 100.4, ActionHold = 102 }
+check(RivalPose.pose(beam, 101.5).RightShoulder[1] > 1.5 and RivalPose.pose(beam, 101.5, true).RightShoulder[1] > 1.5, "Beam pose not held")
+beam.ActionHold = nil
+check(RivalPose.pose(beam, 101.5, true).RightShoulder == nil or RivalPose.pose(beam, 101.5, true).RightShoulder[1] < 1.5, "Cast pose stuck after release")
 check(RivalPose.pose({ ActionKind = "Bolt", ActionStart = 100, ActionAt = 100.45 }, 100.5).RightElbow[1] < 0.3, "Bolt did not thrust the arm")
 check(RivalPose.pose({ ActionKind = "Buff", ActionStart = 100, ActionAt = 100.15 }, 100.4).LeftShoulder[1] > 1.5, "Buff did not raise the hands")
 check(RivalPose.pose({ ActionKind = "Dodge", ActionStart = 100, ActionAt = 100 }, 100.2).RightKnee[1] < -1, "Dodge did not tuck")

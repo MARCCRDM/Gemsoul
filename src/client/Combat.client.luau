@@ -1629,13 +1629,15 @@ function handlers.TechCooldown(id, duration)
 		then Tech.surgeStats(gem, profile and Tree.effects(profile))
 		elseif definition then Tree.techStats(profile, id)
 		else nil
-	if stats and stats.Windup then
-		cast = {
-			Name = stats.Name,
-			Start = os.clock(),
-			Duration = stats.Windup,
-			Color = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else Tech.Resources.Stamina.Color,
-		}
+	-- Every cast takes as long as anyone's (Actions.castTime, the same as
+	-- the rival's): the cast bar fills and, in first person, your hands cast it.
+	local castTime = if stats then Actions.castTime(stats) else 0
+	local castColor = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else Tech.Resources.Stamina.Color
+	if castTime > 0 then
+		cast = { Name = stats.Name, Start = os.clock(), Duration = castTime, Color = castColor }
+	end
+	if gem then
+		FirstPerson.cast(castTime, castColor)
 	end
 end
 function handlers.TechPulse(_who, from, to, color, radius)

@@ -196,8 +196,12 @@ local GUARD = {
 }
 
 -- The pose for these attributes at server time `t` (pure, for testing):
--- { [joint] = { x, y, z } }, plus how snappily to move into it.
-function RivalPose.pose(a, t: number): ({ [string]: { number } }, number)
+-- { [joint] = { x, y, z } }, plus how snappily to move into it. `rest`: a
+-- player's body, which stands as its own animations have it between
+-- actions (no fighting stance).
+local REST = {}
+function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }, number)
+	local base = if rest then REST else READY
 	local kind, start, at = a.ActionKind, a.ActionStart, a.ActionAt
 	if type(kind) == "string" and type(start) == "number" and type(at) == "number" then
 		local windup, strike = frames(kind, if a.ActionSide == -1 then -1 else 1)
@@ -205,13 +209,17 @@ function RivalPose.pose(a, t: number): ({ [string]: { number } }, number)
 			if t < at then
 				-- Ease into the wind-up as it builds.
 				local p = math.clamp((t - start) / math.max(0.05, at - start), 0, 1)
-				return lerp(READY, windup, math.min(1, p * 1.6)), 14
+				return lerp(base, windup, math.min(1, p * 1.6)), 14
 			end
 			local hold = if kind == "Dodge"
 				then 0.4
 				elseif kind == "Stagger" then 0.45
 				elseif kind == "Buff" then 0.6
 				else FOLLOW
+			-- A held beam keeps its cast pose while it pours (ActionHold).
+			if type(a.ActionHold) == "number" then
+				hold = math.max(hold, a.ActionHold - at)
+			end
 			if t < at + hold then
 				return strike, 30 -- the blow itself snaps through
 			end
@@ -220,7 +228,7 @@ function RivalPose.pose(a, t: number): ({ [string]: { number } }, number)
 	if type(a.GuardUntil) == "number" and t < a.GuardUntil then
 		return GUARD, 22
 	end
-	return READY, 10
+	return base, 10
 end
 
 -- [model] = { Joints = { [joint] = { Object, Property, Rest } }, Angles = {...} }
@@ -294,11 +302,11 @@ function RivalPose.jointCount(model: Model): number
 	return count
 end
 
-local ATTRIBUTES = { "ActionKind", "ActionStart", "ActionAt", "ActionSide", "GuardUntil" }
+local ATTRIBUTES = { "ActionKind", "ActionStart", "ActionAt", "ActionSide", "ActionHold", "GuardUntil" }
 
 -- Call every frame on the server with the rival's model and server time.
 -- Joints only change when they move noticeably, to keep replication light.
-function RivalPose.update(model: Model?, dt: number, now: number, clock: number?)
+function RivalPose.update(model: Model?, dt: number, now: number, clock: number?, rest: boolean?)
 	for known in rigs do
 		if not known.Parent then
 			rigs[known] = nil -- gone: forget it
@@ -316,7 +324,7 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 	for _, name in ATTRIBUTES do
 		attrs[name] = model:GetAttribute(name)
 	end
-	local target, speed = RivalPose.pose(attrs, now)
+	local target, speed = RivalPose.pose(attrs, now, rest)
 	local alpha = 1 - math.exp(-speed * math.min(dt, 0.1))
 	for joint, entry in rig.Joints do
 		local angles = rig.Angles[joint]

@@ -132,7 +132,12 @@ check(close(hs.WalkSpeed, expectedSpeed), "Live mobility augment did not change 
 now += 2
 hv.Health = 1000
 loadout.Surge1Gem = { Id = "amp", Element = "Fire", Tier = "Rare", SurgeTier = 1, SurgeRank = 1, Size = 4, Clarity = 5, Cut = 0 }
-check(CombatServer._technology(source, nil, rv.Position, "Q") and close(1000 - hv.Health, damage * 1.12 * 1.1 * 1.25), "Live Thermal surge with Overcharge, Surge Power and Elemental Mastery")
+check(CombatServer._technology(source, nil, rv.Position, "Q"), "Live Thermal surge refused")
+do -- it lands when its cast completes
+	local castTime = Actions.castTime(Tech.surgeStats(loadout.Surge1Gem))
+	now += castTime; CombatServer._tick(castTime)
+end
+check(close(1000 - hv.Health, damage * 1.12 * 1.1 * 1.25), "Live Thermal surge with Overcharge, Surge Power and Elemental Mastery")
 loadout.Surge1Gem = nil
 now += 2
 hv.Health = 1000

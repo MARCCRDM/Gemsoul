@@ -10,6 +10,8 @@ local raised, charge, swingAt, swingSide = 0, 0, -10, "Right"
 local cursorFree = false
 local fireAt, smoothedRaised, smoothedCharge = -10, 0, 0
 local dirty = true
+-- A surge being cast (View.cast): when it began, how long it takes, its colour.
+local castAt, castFor, castColor, castOrb = -10, 0, nil, nil
 local function clearModel()
 	if model then
 		model:Destroy()
@@ -367,6 +369,37 @@ end
 function View.fire()
 	fireAt = os.clock()
 end
+-- A surge's cast, as everyone else sees your body cast it: the shield
+-- lowers, the sword arm draws back and energy gathers into an orb in front
+-- of you over `duration`; then it throws forward and bursts. (A cast with no
+-- wind-up just throws.)
+function View.cast(duration, color)
+	castAt, castFor, castColor = os.clock(), math.max(0, duration or 0), color or Color3.fromRGB(255, 190, 80)
+	if castOrb then
+		castOrb:Destroy()
+	end
+	local orb = Instance.new("Part")
+	orb.Name = "CastOrb"
+	orb.Shape = Enum.PartType.Ball
+	orb.Material = Enum.Material.Neon
+	orb.Color = castColor
+	orb.Anchored, orb.CanCollide, orb.CanQuery, orb.CanTouch, orb.CastShadow = true, false, false, false, false
+	orb.Size = Vector3.new(0.05, 0.05, 0.05)
+	orb.Transparency = 0.15
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness = castColor, 8, 0
+	light.Parent = orb
+	local core = Instance.new("Part")
+	core.Name = "Core"
+	core.Shape = Enum.PartType.Ball
+	core.Material = Enum.Material.Neon
+	core.Color = Color3.new(1, 1, 1)
+	core.Anchored, core.CanCollide, core.CanQuery, core.CanTouch, core.CastShadow = true, false, false, false, false
+	core.Size = Vector3.new(0.03, 0.03, 0.03)
+	core.Parent = orb
+	orb.Parent = workspace.CurrentCamera
+	castOrb = orb
+end
 function View.setCursorFree(value)
 	cursorFree = value
 end
@@ -399,6 +432,11 @@ function View.stop()
 	end
 	saved = nil
 	cursorFree, raised, charge = false, 0, 0
+	if castOrb then
+		castOrb:Destroy()
+		castOrb = nil
+	end
+	castAt = -10
 	fireAt, smoothedRaised, smoothedCharge, swingAt = -10, 0, 0, -10
 end
 function View.start()
@@ -469,20 +507,59 @@ function View.start()
 		local recoil = if fireElapsed >= 0 and fireElapsed < 0.24
 			then math.sin(math.min(1, fireElapsed / 0.045) * math.pi / 2) * math.exp(-fireElapsed * 16)
 			else 0
+		-- Casting: `gather` builds 0..1 over the wind-up, `throw` snaps
+		-- forward and fades after it.
+		local castElapsed = os.clock() - castAt
+		local gather = if castFor > 0 then math.clamp(castElapsed / castFor, 0, 1) else 1
+		local after = castElapsed - castFor
+		local throw = if after >= 0 and after < 0.3
+			then math.sin(math.min(1, after / 0.08) * math.pi / 2) * math.exp(-after * 9)
+			else 0
+		local casting = if castElapsed >= 0 and after < 0 then math.sin(gather * math.pi / 2) else 0
+		local castPose = casting + throw
+		if castOrb then
+			if after >= 0.3 then
+				castOrb:Destroy()
+				castOrb = nil
+			else
+				-- Gathers low in front, pulsing; flies out and swells as it bursts.
+				local pulse = 1 + math.sin(os.clock() * 28) * 0.08
+				local size = if after < 0 then (0.08 + gather * 0.32) * pulse else 0.4 + after * 3.2
+				local fade = if after < 0 then 0.15 else math.clamp(0.15 + after / 0.3, 0, 1)
+				local at = current.CFrame * CFrame.new(-0.05, -0.42 + gather * 0.06, -1.6 - math.max(0, after) * 9)
+				castOrb.Size = Vector3.new(size, size, size)
+				castOrb.Transparency = fade
+				castOrb.CFrame = at
+				local core = castOrb:FindFirstChild("Core") :: BasePart?
+				if core then
+					core.Size = castOrb.Size * 0.55
+					core.Transparency = fade
+					core.CFrame = at
+				end
+				local light = castOrb:FindFirstChildOfClass("PointLight")
+				if light then
+					light.Brightness = (1 - fade) * (if after < 0 then 1 + gather * 2 else 4)
+				end
+			end
+		end
 		for _, piece in pieces do
 			local pose = if piece.Shield
-				then shieldRest:Lerp(shieldRaised, smoothedRaised) * CFrame.new(0, breathe, 0)
+				then shieldRest:Lerp(shieldRaised, smoothedRaised) * CFrame.new(
+					-0.25 * castPose,
+					-0.3 * castPose + breathe,
+					0
+				)
 				elseif piece.Left then CFrame.new(
 					-0.72 + smoothedRaised * 0.4,
 					-0.8 + smoothedRaised * 0.45 + breathe,
 					-1.35
 				) * CFrame.Angles(0, 0, math.rad(-12 + smoothedRaised * 25))
 				else CFrame.new(
-					0.83 - swing * direction * 0.85,
-					-0.78 + smoothedCharge * 0.18 + breathe,
-					-1.25 - swing * 0.35 + recoil * 0.18
+					0.83 - swing * direction * 0.85 + casting * 0.12 - throw * 0.2,
+					-0.78 + smoothedCharge * 0.18 + breathe + casting * 0.08,
+					-1.25 - swing * 0.35 + recoil * 0.18 + casting * 0.2 - throw * 0.35
 				) * CFrame.Angles(
-					math.rad(-smoothedCharge * 15 - recoil * 9),
+					math.rad(-smoothedCharge * 15 - recoil * 9 + casting * 14 - throw * 22),
 					0,
 					math.rad(12 + smoothedCharge * 20 - swing * direction * 85)
 				)
