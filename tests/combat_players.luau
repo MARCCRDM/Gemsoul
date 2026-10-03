@@ -5,7 +5,7 @@ local function makePlayer(id,position,family)
 	function player:GetAttribute(key) return self.Attributes[key] end
 	function player:SetAttribute(key,value) self.Attributes[key]=value end
 	function player:RequestStreamAroundAsync() end
-	local root={Position=position,Size=Vector3.new(2,2,1),Parent=true,AssemblyLinearVelocity=Vector3.zero,AssemblyMass=1,CFrame={LookVector=Vector3.new(0,0,-1)}}
+	local root={Position=position,Size=Vector3.new(2,2,1),Parent=true,AssemblyLinearVelocity=Vector3.zero,AssemblyMass=1,CFrame={LookVector=Vector3.new(0,0,-1),RightVector=Vector3.new(1,0,0)}}
 	function root:ApplyImpulse(impulse) self.Impulse=impulse end
 	function root:SetNetworkOwner(owner) self.ServerOwned=owner==nil end
 	function root:SetNetworkOwnershipAuto() self.ServerOwned=false end

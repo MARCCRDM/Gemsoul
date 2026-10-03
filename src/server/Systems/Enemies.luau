@@ -663,6 +663,18 @@ function Enemies.damage(enemy: Enemy, amount: number, source: Player?, crit: boo
 		Blocked = blocked,
 		Absorbed = if absorbed > 0 then absorbed else nil,
 	})
+	-- Its body reacts (RivalPose): a jolt of the shield arm when the blow
+	-- lands on its guard, a flinch when it gets through.
+	if enemy.Model then
+		local serverNow = workspace:GetServerTimeNow()
+		if blocked > 0 then
+			enemy.Model:SetAttribute("BlockedAt", serverNow)
+		end
+		if amount > 0 and blocked <= amount then
+			enemy.Model:SetAttribute("HurtAt", serverNow)
+			enemy.Model:SetAttribute("HurtSide", if math.random() < 0.5 then -1 else 1)
+		end
+	end
 	local humanoid = enemy.Humanoid
 	enemy.LastHit = os.clock()
 	if source then

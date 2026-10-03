@@ -450,6 +450,21 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		st.Shield -= absorbed
 		damage -= absorbed
 	end
+	-- The body reacts, for everyone to see (RivalPose) and in your own
+	-- first-person view: the shield arm jolts when a blow lands on the
+	-- guard, the body flinches away from a blow that gets through.
+	local character = player.Character
+	if character then
+		local serverNow = workspace:GetServerTimeNow()
+		if blocked > 0 then
+			character:SetAttribute("BlockedAt", serverNow)
+		end
+		if damage > 0 and blocked <= damage then
+			local side = if origin and (origin - root.Position):Dot(root.CFrame.RightVector) < 0 then -1 else 1
+			character:SetAttribute("HurtAt", serverNow)
+			character:SetAttribute("HurtSide", side)
+		end
+	end
 	local entry = {
 		Kind = "Hit",
 		Amount = damage,

@@ -1721,7 +1721,7 @@ function handlers.AttackTiming(stage, side, combo)
 	if weapon and weapon.Attack.Kind == "Shot" then
 		FirstPerson.fire()
 	else
-		FirstPerson.swing(side)
+		FirstPerson.swing(side, stage == "CHARGED" or stage == "PERFECT")
 	end
 end
 

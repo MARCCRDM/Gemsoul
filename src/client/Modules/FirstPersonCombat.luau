@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 local View = {}
 local saved, model, gear, connection, removalConnection
 local pieces, hidden = {}, {}
-local raised, charge, swingAt, swingSide = 0, 0, -10, "Right"
+local raised, charge, swingAt, swingSide, swingHeavy = 0, 0, -10, "Right", false
 local cursorFree = false
 local fireAt, smoothedRaised, smoothedCharge = -10, 0, 0
 local dirty = true
@@ -363,8 +363,47 @@ function View.setPose(blocking, progress)
 	raised = if blocking then 1 else 0
 	charge = math.clamp(progress or 0, 0, 1)
 end
-function View.swing(side)
-	swingAt, swingSide = os.clock(), side or "Right"
+-- `heavy`: a charged blow, a bigger overhead chop.
+function View.swing(side, heavy)
+	swingAt, swingSide, swingHeavy = os.clock(), side or "Right", heavy == true
+end
+
+local function ease(x)
+	x = math.clamp(x, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+-- A swing over time: `arc` sweeps the blade across (negative = drawn back
+-- first), `chop` brings a heavy down from overhead. Anticipation, a fast
+-- strike that overshoots, follow-through, recovery.
+local function swingCurve(e, heavy)
+	local wind, hit, follow, done = 0.05, 0.15, 0.26, 0.42
+	local back = 0.18
+	if heavy then
+		wind, hit, follow, done, back = 0.1, 0.22, 0.34, 0.6, 0.32
+	end
+	if e < 0 or e >= done then
+		return 0, 0
+	end
+	local arc
+	if e < wind then
+		arc = -back * ease(e / wind)
+	elseif e < hit then
+		local p = (e - wind) / (hit - wind)
+		arc = -back + (1.12 + back) * (1 - (1 - p) ^ 2) -- fast, slowing into the hit
+	elseif e < follow then
+		arc = 1.12 - 0.12 * ease((e - hit) / (follow - hit))
+	else
+		arc = 1 - ease((e - follow) / (done - follow))
+	end
+	local chop = if heavy then (if e < wind then -0.5 * ease(e / wind) else math.max(arc, 0)) else 0
+	return arc, chop
+end
+-- A reaction's weight `d` seconds after it happens: up fast, then fades.
+local function impulse(d, length)
+	if type(d) ~= "number" or d < 0 or d >= length then
+		return 0
+	end
+	return if d < 0.05 then d / 0.05 else (1 - (d - 0.05) / (length - 0.05)) ^ 2
 end
 function View.fire()
 	fireAt = os.clock()
@@ -437,7 +476,7 @@ function View.stop()
 		castOrb = nil
 	end
 	castAt = -10
-	fireAt, smoothedRaised, smoothedCharge, swingAt = -10, 0, 0, -10
+	fireAt, smoothedRaised, smoothedCharge, swingAt, swingHeavy = -10, 0, 0, -10, false
 end
 function View.start()
 	if saved then
@@ -497,10 +536,30 @@ function View.start()
 		if not equipment and model then
 			clearModel()
 		end
-		local elapsed = os.clock() - swingAt
-		local swing = if elapsed >= 0 and elapsed < 0.34 then math.sin(elapsed / 0.34 * math.pi) else 0
+		local swing, chop = swingCurve(os.clock() - swingAt, swingHeavy)
 		local direction = if swingSide == "Left" then -1 else 1
 		local breathe = math.sin(os.clock() * 2) * 0.012
+		-- Walking bobs the arms; a blow on your shield knocks it back; a hit
+		-- that gets through jolts the whole view (server-set, see RivalPose).
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local moving = if humanoid then math.clamp(humanoid.MoveDirection.Magnitude, 0, 1) else 0
+		local bobY = math.abs(math.sin(os.clock() * 8)) * 0.035 * moving
+		local bobX = math.sin(os.clock() * 4) * 0.025 * moving
+		local serverNow = workspace:GetServerTimeNow()
+		local blockedAt = character and character:GetAttribute("BlockedAt")
+		local hurtAt = character and character:GetAttribute("HurtAt")
+		local jolt = impulse(if type(blockedAt) == "number" then serverNow - blockedAt else nil, 0.24)
+		local hurt = impulse(if type(hurtAt) == "number" then serverNow - hurtAt else nil, 0.3)
+		local hurtSide = if character and character:GetAttribute("HurtSide") == -1 then -1 else 1
+		-- A charged heavy strains: the blade trembles near full charge.
+		local strain = if smoothedCharge > 0.8 then math.sin(os.clock() * 50) * 0.006 else 0
+		local flinch = if #pieces > 0
+			then CFrame.new(0.05 * hurtSide * hurt + bobX, -0.1 * hurt - bobY, 0.14 * hurt) * CFrame.Angles(
+				math.rad(-7 * hurt),
+				0,
+				math.rad(6 * hurtSide * hurt)
+			)
+			else nil
 		smoothedRaised += (raised - smoothedRaised) * (1 - math.exp(-(dt or 1 / 60) * 18))
 		smoothedCharge += (charge - smoothedCharge) * (1 - math.exp(-(dt or 1 / 60) * 22))
 		local fireElapsed = os.clock() - fireAt
@@ -545,25 +604,29 @@ function View.start()
 		for _, piece in pieces do
 			local pose = if piece.Shield
 				then shieldRest:Lerp(shieldRaised, smoothedRaised) * CFrame.new(
-					-0.25 * castPose,
-					-0.3 * castPose + breathe,
-					0
-				)
+					-0.25 * castPose + 0.05 * jolt,
+					-0.3 * castPose + breathe - 0.08 * jolt,
+					0.28 * jolt
+				) * CFrame.Angles(math.rad(14 * jolt), 0, 0)
 				elseif piece.Left then CFrame.new(
 					-0.72 + smoothedRaised * 0.4,
 					-0.8 + smoothedRaised * 0.45 + breathe,
 					-1.35
 				) * CFrame.Angles(0, 0, math.rad(-12 + smoothedRaised * 25))
 				else CFrame.new(
-					0.83 - swing * direction * 0.85 + casting * 0.12 - throw * 0.2,
-					-0.78 + smoothedCharge * 0.18 + breathe + casting * 0.08,
+					0.83
+						- swing * direction * (if swingHeavy then 0.5 else 0.85)
+						+ casting * 0.12
+						- throw * 0.2
+						+ strain,
+					-0.78 + smoothedCharge * 0.18 + breathe + casting * 0.08 + 0.35 * math.max(-chop, 0) - 0.25 * chop,
 					-1.25 - swing * 0.35 + recoil * 0.18 + casting * 0.2 - throw * 0.35
 				) * CFrame.Angles(
-					math.rad(-smoothedCharge * 15 - recoil * 9 + casting * 14 - throw * 22),
+					math.rad(-smoothedCharge * 15 - recoil * 9 + casting * 14 - throw * 22 - chop * 45 + strain * 300),
 					0,
-					math.rad(12 + smoothedCharge * 20 - swing * direction * 85)
+					math.rad(12 + smoothedCharge * 20 - swing * direction * (if swingHeavy then 50 else 85))
 				)
-			piece.Part.CFrame = current.CFrame * pose * piece.Offset
+			piece.Part.CFrame = current.CFrame * flinch * pose * piece.Offset
 		end
 	end)
 end

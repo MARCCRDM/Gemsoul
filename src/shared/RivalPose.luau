@@ -9,6 +9,8 @@
 	  ActionAt     server time the blow lands (or the cast releases)
 	  ActionSide   1 or -1: which way a slash or a dodge goes
 	  GuardUntil   server time its guard drops
+	  HurtAt       server time it was hit (a flinch), HurtSide which way
+	  BlockedAt    server time a blow landed on its shield (a jolt)
 
 	A slash winds the arm back and whips it across; a heavy goes overhead with
 	both hands and slams down; a bolt gathers and thrusts the palm forward; a
@@ -195,40 +197,149 @@ local GUARD = {
 	LeftKnee = { -0.35, 0, 0 },
 }
 
+-- Smoothstep: slow in, slow out.
+local function ease(x: number): number
+	x = math.clamp(x, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
+-- `layer` added on top of `pose` at weight `w` (hit flinches, shield jolts).
+local function add(pose, layer, w: number)
+	local out = table.clone(pose)
+	for joint, angles in layer do
+		local from = out[joint] or { 0, 0, 0 }
+		out[joint] = { from[1] + angles[1] * w, from[2] + angles[2] * w, from[3] + angles[3] * w }
+	end
+	return out
+end
+
+-- Timing of a blow after its wind-up: the snap through (overshooting the
+-- strike pose a little), the follow-through settling back onto it, then an
+-- eased recovery to the stance.
+local SNAP, OVERSHOOT, RECOVER = 0.07, 0.15, 0.3
+
+-- Hit reactions, layered over whatever the body is doing:
+--   HurtAt     server time it was hit: the torso snaps back, head jerks
+--   HurtSide   1 or -1: which way the hit twists it
+--   BlockedAt  server time a blow landed on its shield: the shield arm
+--              is knocked back and the body braces
+local HURT_TIME, BLOCK_TIME = 0.32, 0.22
+local FLINCH = {
+	Waist = { 0.28, 0.18, 0 },
+	Neck = { 0.32, 0, 0 },
+	RightShoulder = { -0.25, 0, 0.25 },
+	LeftShoulder = { -0.25, 0, -0.25 },
+	RightKnee = { -0.15, 0, 0 },
+	LeftKnee = { -0.15, 0, 0 },
+}
+local JOLT = {
+	LeftShoulder = { -0.35, 0, 0.15 },
+	LeftElbow = { 0.35, 0, 0 },
+	Waist = { 0.15, 0, 0 },
+	RightKnee = { -0.2, 0, 0 },
+	LeftKnee = { -0.2, 0, 0 },
+}
+-- A reaction's weight `d` seconds after it lands: up fast, then fades.
+local function impulse(d: number, length: number): number
+	if d < 0 or d >= length then
+		return 0
+	end
+	if d < 0.05 then
+		return d / 0.05
+	end
+	return (1 - (d - 0.05) / (length - 0.05)) ^ 2
+end
+
+-- Breathing and a slight weight shift in the fighting stance, so it never
+-- stands frozen between blows.
+local function breathe(pose, t: number)
+	local b = math.sin(t * 2.4)
+	local shift = math.sin(t * 0.9)
+	return add(pose, {
+		Waist = { 0.03 * b, 0.05 * shift, 0 },
+		Neck = { -0.02 * b, -0.04 * shift, 0 },
+		RightShoulder = { 0.04 * b, 0, 0 },
+		LeftShoulder = { 0.04 * b, 0, 0 },
+		RightKnee = { -0.04 * (1 + b), 0, 0 },
+		LeftKnee = { -0.04 * (1 + b), 0, 0 },
+	}, 1)
+end
+
+-- The action itself: the pose and how snappily the joints follow it.
+local function actionPose(a, t: number, base)
+	local kind, start, at = a.ActionKind, a.ActionStart, a.ActionAt
+	if type(kind) ~= "string" or type(start) ~= "number" or type(at) ~= "number" or t < start then
+		return nil, 0
+	end
+	local windup, strike = frames(kind, if a.ActionSide == -1 then -1 else 1)
+	if not windup then
+		return nil, 0
+	end
+	if t < at then
+		-- Ease into the wind-up, then coil a little past it just before the
+		-- release (the anticipation that sells the blow). A heavy trembles
+		-- with the strain.
+		local length = math.max(0.05, at - start)
+		local p = (t - start) / length
+		local pose = lerp(base, windup, ease(p * 1.4) * (1 + 0.12 * ease((p - 0.75) / 0.25)))
+		if kind == "Heavy" or kind == "Nova" then
+			local shake = 0.035 * ease((p - 0.5) / 0.5) * math.sin(t * 47)
+			pose = add(pose, { RightShoulder = { shake, 0, 0 }, LeftShoulder = { -shake, 0, 0 } }, 1)
+		end
+		return pose, 18
+	end
+	local hold = if kind == "Dodge" then 0.4 elseif kind == "Stagger" then 0.45 elseif kind == "Buff" then 0.6 else FOLLOW
+	-- A held beam keeps its cast pose while it pours (ActionHold).
+	if type(a.ActionHold) == "number" then
+		hold = math.max(hold, a.ActionHold - at)
+	end
+	local d = t - at
+	if d < SNAP then
+		-- The blow snaps through, past the strike pose.
+		return lerp(windup, strike, ease(d / SNAP) * (1 + OVERSHOOT)), 45
+	elseif d < hold then
+		-- Follow-through: settle back onto the strike pose.
+		return lerp(windup, strike, 1 + OVERSHOOT * (1 - ease((d - SNAP) / math.max(0.05, hold - SNAP)))), 35
+	elseif d < hold + RECOVER then
+		-- Recover to the stance, smoothly.
+		return lerp(strike, base, ease((d - hold) / RECOVER)), 28
+	end
+	return nil, 0
+end
+
 -- The pose for these attributes at server time `t` (pure, for testing):
 -- { [joint] = { x, y, z } }, plus how snappily to move into it. `rest`: a
 -- player's body, which stands as its own animations have it between
--- actions (no fighting stance).
+-- actions (no fighting stance, no breathing).
 local REST = {}
 function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }, number)
-	local base = if rest then REST else READY
-	local kind, start, at = a.ActionKind, a.ActionStart, a.ActionAt
-	if type(kind) == "string" and type(start) == "number" and type(at) == "number" then
-		local windup, strike = frames(kind, if a.ActionSide == -1 then -1 else 1)
-		if windup and t >= start then
-			if t < at then
-				-- Ease into the wind-up as it builds.
-				local p = math.clamp((t - start) / math.max(0.05, at - start), 0, 1)
-				return lerp(base, windup, math.min(1, p * 1.6)), 14
-			end
-			local hold = if kind == "Dodge"
-				then 0.4
-				elseif kind == "Stagger" then 0.45
-				elseif kind == "Buff" then 0.6
-				else FOLLOW
-			-- A held beam keeps its cast pose while it pours (ActionHold).
-			if type(a.ActionHold) == "number" then
-				hold = math.max(hold, a.ActionHold - at)
-			end
-			if t < at + hold then
-				return strike, 30 -- the blow itself snaps through
-			end
+	local base = if rest then REST else breathe(READY, t)
+	local pose, speed = actionPose(a, t, base)
+	if not pose then
+		if type(a.GuardUntil) == "number" and t < a.GuardUntil then
+			pose, speed = if rest then GUARD else breathe(GUARD, t), 22
+		else
+			pose, speed = base, 10
 		end
 	end
-	if type(a.GuardUntil) == "number" and t < a.GuardUntil then
-		return GUARD, 22
+	-- Hit reactions on top.
+	if type(a.HurtAt) == "number" then
+		local w = impulse(t - a.HurtAt, HURT_TIME)
+		if w > 0 then
+			local side = if a.HurtSide == -1 then -1 else 1
+			pose = add(pose, FLINCH, w)
+			pose = add(pose, { Waist = { 0, 0.18 * (side - 1), 0 } }, w)
+			speed = math.max(speed, 40)
+		end
 	end
-	return base, 10
+	if type(a.BlockedAt) == "number" then
+		local w = impulse(t - a.BlockedAt, BLOCK_TIME)
+		if w > 0 then
+			pose = add(pose, JOLT, w)
+			speed = math.max(speed, 40)
+		end
+	end
+	return pose, speed
 end
 
 -- [model] = { Joints = { [joint] = { Object, Property, Rest } }, Angles = {...} }
@@ -302,7 +413,17 @@ function RivalPose.jointCount(model: Model): number
 	return count
 end
 
-local ATTRIBUTES = { "ActionKind", "ActionStart", "ActionAt", "ActionSide", "ActionHold", "GuardUntil" }
+local ATTRIBUTES = {
+	"ActionKind",
+	"ActionStart",
+	"ActionAt",
+	"ActionSide",
+	"ActionHold",
+	"GuardUntil",
+	"HurtAt",
+	"HurtSide",
+	"BlockedAt",
+}
 
 -- Call every frame on the server with the rival's model and server time.
 -- Joints only change when they move noticeably, to keep replication light.

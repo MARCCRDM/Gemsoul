@@ -12,12 +12,14 @@ local part = { Parent=true, LocalTransparencyModifier=0.25, IsA=function(_, kind
 local character = {
  GetDescendants=function() return {part} end,
  FindFirstChild=function() return nil end,
+ FindFirstChildOfClass=function() return nil end,
+ GetAttribute=function() return nil end,
  DescendantRemoving={Connect=function(_, fn) removalCallback=fn; removalDisconnected=false; return {Disconnect=function() removalDisconnected=true end} end},
  DescendantAdded={Connect=function() disconnected=false; return {Disconnect=function() disconnected=true end} end},
 }
 local player = {Character=character, CameraMode="Classic", CameraMinZoomDistance=1, CameraMaxZoomDistance=80}
 local camera = {Parent=true,FieldOfView=62}
-local workspace = {CurrentCamera=camera}
+local workspace = {CurrentCamera=camera, GetServerTimeNow=function() return os.clock() end}
 local input = {MouseEnabled=true, MouseBehavior="Free", MouseIconEnabled=true}
 local run = {
  BindToRenderStep=function(_, name, priority, fn) assert(name=="SagaFirstPerson" and priority==202); bound=fn; bindCount+=1 end,
