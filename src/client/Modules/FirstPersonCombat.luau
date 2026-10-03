@@ -50,40 +50,156 @@ end
 local function scaled(offset, scale: number?)
 	return CFrame.new(offset.Position * (scale or 0.65)) * offset.Rotation
 end
--- The shield's own frame: its main board (the broadest flat piece), whose -Z
--- is the shield's face.
-local function shieldFrame(shield)
-	local board, area = nil, 0
-	for _, part in shield:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 and part.Size.Z < math.min(part.Size.X, part.Size.Y) then
-			if part.Size.X * part.Size.Y > area then
-				board, area = part, part.Size.X * part.Size.Y
+--[[
+	The shield as you see it in your own hands, Elder Scrolls / Blades style:
+	a big kite shield whose back faces you. The worn shield's back is a plain
+	board, so the view builds its own: a planked wooden board tapering to a
+	point, a thick metal rim (in the shield's own metal colour) studded with
+	rivets, the back of its iron boss, two leather arm straps with buckles, a
+	padded arm rest and a grip. Its gem's highlight and element effects ride
+	along. Sizes in studs, in the shield's frame (its face is -Z, away from
+	you; its back +Z, toward you).
+]]
+local SHIELD_W, SHIELD_H = 1.15, 1.0 -- the board's width, and its height above the point
+local function shieldPart(holder, pieces, size, cframe, color, material, shape)
+	local part = Instance.new("Part")
+	part.Name = "ViewShield"
+	part.Size = size
+	part.Color = color
+	part.Material = material
+	if shape then
+		part.Shape = shape
+	end
+	part.Anchored, part.CanCollide, part.CanTouch, part.CanQuery, part.CastShadow = true, false, false, false, false
+	part.Parent = holder
+	table.insert(pieces, { Part = part, Shield = true, Offset = cframe })
+	return part
+end
+local function buildViewShield(holder, source)
+	local pieces = {}
+	-- Its metal: the worn shield's largest metal-looking plate, else steel.
+	local metal, area = Color3.fromRGB(150, 156, 166), 0
+	local emitters = {}
+	for _, part in source:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" then
+			local flat = part.Size.X * part.Size.Y
+			if part.Material ~= Enum.Material.Neon and flat > area and flat < 1.9 then
+				metal, area = part.Color, flat
 			end
+		elseif part:IsA("ParticleEmitter") then
+			table.insert(emitters, part)
 		end
 	end
-	return board and board.CFrame
-end
--- In view the shield is smaller than the sword, and has a back worth seeing:
--- a leather arm strap and grip (the real shield's back is a plain board).
-local SHIELD_SCALE = 0.5
-local function shieldBack(holder, board)
-	local pieces = {}
-	local half = board.Size.Z / 2
-	for _, spec in
+	local W, H = SHIELD_W, SHIELD_H
+	local wood = Color3.fromRGB(104, 70, 44)
+	local seam = Color3.fromRGB(58, 38, 24)
+	local leather = Color3.fromRGB(78, 50, 32)
+	local iron = Color3.fromRGB(70, 72, 78)
+	-- The board: a rectangle on a diamond, so it tapers to a point below.
+	local board = shieldPart(holder, pieces, Vector3.new(W, H, 0.07), CFrame.new(), wood, Enum.Material.Wood)
+	local side = W / math.sqrt(2)
+	shieldPart(
+		holder,
+		pieces,
+		Vector3.new(side, side, 0.07),
+		CFrame.new(0, -H / 2, 0) * CFrame.Angles(0, 0, math.rad(45)),
+		wood,
+		Enum.Material.Wood
+	)
+	-- Plank seams running down the back.
+	for _, x in { -W / 4, 0, W / 4 } do
+		local length = H + (W / 2 - math.abs(x)) * 0.95
+		shieldPart(
+			holder,
+			pieces,
+			Vector3.new(0.025, length, 0.01),
+			CFrame.new(x, H / 2 - length / 2, 0.04),
+			seam,
+			Enum.Material.Wood
+		)
+	end
+	-- The metal rim: top, both sides, and the two edges down to the point.
+	local rim, depth = 0.09, 0.13
+	shieldPart(holder, pieces, Vector3.new(W + rim, rim, depth), CFrame.new(0, H / 2, 0), metal, Enum.Material.Metal)
+	for _, sx in { -1, 1 } do
+		shieldPart(holder, pieces, Vector3.new(rim, H, depth), CFrame.new(sx * W / 2, 0, 0), metal, Enum.Material.Metal)
+		shieldPart(
+			holder,
+			pieces,
+			Vector3.new(side + rim, rim, depth),
+			CFrame.new(sx * W / 4, -H / 2 - W / 4, 0) * CFrame.Angles(0, 0, math.rad(sx * 45)),
+			metal,
+			Enum.Material.Metal
+		)
+	end
+	-- Rivets around the rim.
+	for _, spot in
 		{
-			{ Vector3.new(0.16, 0.95, 0.14), Vector3.new(0, -0.05, half + 0.07) }, -- grip
-			{ Vector3.new(1.0, 0.16, 0.06), Vector3.new(0, 0.42, half + 0.03) }, -- arm strap
-			{ Vector3.new(1.0, 0.16, 0.06), Vector3.new(0, -0.5, half + 0.03) }, -- arm strap
+			Vector2.new(-W / 2, H / 2),
+			Vector2.new(0, H / 2),
+			Vector2.new(W / 2, H / 2),
+			Vector2.new(-W / 2, 0),
+			Vector2.new(W / 2, 0),
+			Vector2.new(-W / 2, -H / 2),
+			Vector2.new(W / 2, -H / 2),
+			Vector2.new(-W / 4, -H / 2 - W / 4),
+			Vector2.new(W / 4, -H / 2 - W / 4),
+			Vector2.new(0, -H / 2 - W / 2 + 0.06),
 		}
 	do
-		local part = Instance.new("Part")
-		part.Name = "ShieldStrap"
-		part.Material = Enum.Material.Leather
-		part.Color = Color3.fromRGB(92, 62, 40) -- leather
-		part.Size = spec[1] * SHIELD_SCALE
-		part.Anchored, part.CanCollide, part.CanTouch, part.CanQuery, part.CastShadow = true, false, false, false, false
-		part.Parent = holder
-		table.insert(pieces, { Part = part, Shield = true, Offset = CFrame.new(spec[2] * SHIELD_SCALE) })
+		shieldPart(
+			holder,
+			pieces,
+			Vector3.one * 0.06,
+			CFrame.new(spot.X, spot.Y, depth / 2),
+			metal:Lerp(Color3.new(1, 1, 1), 0.25),
+			Enum.Material.Metal,
+			Enum.PartType.Ball
+		)
+	end
+	-- The back of the boss, behind the hand.
+	shieldPart(
+		holder,
+		pieces,
+		Vector3.new(0.05, 0.36, 0.36),
+		CFrame.new(0, 0.02, 0.05) * CFrame.Angles(0, math.rad(90), 0),
+		iron,
+		Enum.Material.Metal,
+		Enum.PartType.Cylinder
+	)
+	-- Padded arm rest, two straps with buckles, and the grip.
+	shieldPart(holder, pieces, Vector3.new(0.3, 0.72, 0.07), CFrame.new(0, -0.08, 0.08), leather, Enum.Material.Fabric)
+	for _, y in { 0.2, -0.32 } do
+		shieldPart(
+			holder,
+			pieces,
+			Vector3.new(W * 0.72, 0.11, 0.04),
+			CFrame.new(0, y, 0.12),
+			leather,
+			Enum.Material.Leather
+		)
+		shieldPart(
+			holder,
+			pieces,
+			Vector3.new(0.09, 0.13, 0.03),
+			CFrame.new(W * 0.22, y, 0.145),
+			metal:Lerp(Color3.fromRGB(200, 170, 90), 0.5),
+			Enum.Material.Metal
+		)
+	end
+	shieldPart(
+		holder,
+		pieces,
+		Vector3.new(0.08, 0.34, 0.08),
+		CFrame.new(-0.02, -0.04, 0.2),
+		leather,
+		Enum.Material.Leather
+	)
+	-- Its gem's element effects, thinned out up close.
+	for _, emitter in emitters do
+		local copy = emitter:Clone()
+		copy.Rate *= 0.45
+		copy.Parent = board
 	end
 	return pieces
 end
@@ -127,14 +243,14 @@ local function rebuild(character, equipment)
 	local weapon = equipment:FindFirstChild("Weapon")
 	local frame = weapon and weaponFrame(weapon)
 	local hold = CFrame.Angles(0, 0, math.rad(-14)) * CFrame.Angles(math.rad(-40), 0, 0)
-	local shieldSource = equipment:FindFirstChild("Shield")
-	local board = shieldSource and shieldFrame(shieldSource)
-	-- (Facing set as yaw then pitch: its face turned 30 degrees out to the
+	-- (Facing set as yaw then pitch: its face turned 28 degrees out to the
 	-- left and tipped a little down at rest; square ahead when raised.)
-	shieldRest = CFrame.new(-1.25, -0.82, -1.9)
-		* CFrame.Angles(0, math.rad(30), 0)
-		* CFrame.Angles(math.rad(-7), 0, math.rad(-8))
-	shieldRaised = CFrame.new(-0.55, -0.32, -1.6) * CFrame.Angles(0, math.rad(4), 0)
+	-- At rest it fills the lower-left (its point running off the bottom);
+	-- raised, it covers the left half up to the centre line.
+	shieldRest = CFrame.new(-1.2, -0.62, -1.85)
+		* CFrame.Angles(0, math.rad(28), 0)
+		* CFrame.Angles(math.rad(-6), 0, math.rad(-10))
+	shieldRaised = CFrame.new(-0.58, -0.12, -1.55) * CFrame.Angles(0, math.rad(6), 0)
 	for _, slot in { "Weapon", "Shield", "Gloves" } do
 		local source = equipment:FindFirstChild(slot)
 		if source then
@@ -147,16 +263,11 @@ local function rebuild(character, equipment)
 			if highlight then
 				highlight:Clone().Parent = holder
 			end
-			if slot == "Shield" and board then
-				local boardPart
-				for _, part in source:GetDescendants() do
-					if part:IsA("BasePart") and part.CFrame == board then
-						boardPart = part
-					end
+			if slot == "Shield" then
+				for _, piece in buildViewShield(holder, source) do
+					table.insert(pieces, piece)
 				end
-				for _, strap in shieldBack(holder, boardPart or { Size = Vector3.new(1, 1, 0.22) }) do
-					table.insert(pieces, strap)
-				end
+				continue
 			end
 			for _, part in source:GetDescendants() do
 				if part:IsA("BasePart") and part.Transparency < 1 then
@@ -170,10 +281,6 @@ local function rebuild(character, equipment)
 							local offset = hold * scaled(frame:ToObjectSpace(part.CFrame))
 							table.insert(pieces, { Part = copy, Left = false, Offset = offset })
 						end
-					elseif slot == "Shield" and board then
-						local copy = viewCopy(part, holder, SHIELD_SCALE)
-						local offset = scaled(board:ToObjectSpace(part.CFrame), SHIELD_SCALE)
-						table.insert(pieces, { Part = copy, Shield = true, Offset = offset })
 					elseif slot == "Weapon" and frame and not string.find(anchorName, "Left") then
 						local copy = viewCopy(part, holder)
 						local offset = hold * scaled(frame:ToObjectSpace(part.CFrame))
