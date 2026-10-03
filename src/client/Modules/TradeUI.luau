@@ -75,6 +75,13 @@ local function describe(item)
 			table.insert(parts, "+" .. roll.Stats[stat] .. " " .. stat)
 		end
 	end
+	-- A Forge weapon's perk, and what makes this one its own.
+	if gear and gear.Passive and gear.Passive.Text ~= "" then
+		table.insert(parts, gear.Passive.Name .. ": " .. gear.Passive.Text)
+	end
+	if roll then
+		table.insert(parts, GearRolls.identity(roll))
+	end
 	table.insert(
 		parts,
 		if item.Gem

@@ -24,4 +24,6 @@ return {
 	-- Gem outlines on enchanted gear (Highlights): the client keeps only the
 	-- nearest ones on, under Roblox's limit (OutlineBudget).
 	GemOutline = "GemOutline",
+	-- Coloured plates of a Prismatic roll: their hue shimmers on every client.
+	Prismatic = "Prismatic",
 }

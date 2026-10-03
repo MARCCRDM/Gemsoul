@@ -41,11 +41,7 @@ function CombatGuide.refresh()
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local sets = Classes.setState(loadout)
 	local effects = Classes.effects(loadout)
-	local rules = Actions.resolve(
-		sets.Counts,
-		if weapon and weapon.Attack.Kind == "Melee" then "Sword" else "Pistol",
-		1 - (effects.CooldownMult or 1)
-	)
+	local rules = Actions.forWeapon(sets.Counts, weapon, effects)
 	UiKit.list(body, 10)
 	local rows = {
 		{

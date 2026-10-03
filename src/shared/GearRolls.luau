@@ -24,6 +24,33 @@ local visors = {
 	Color3.fromRGB(237, 102, 198),
 	Color3.fromRGB(100, 235, 174),
 }
+-- Each roll's look, by name, so players can tell (and trade for) them.
+GearRolls.FinishNames = { "Ember Copper", "Polar Steel", "Lagoon Teal", "Nebula Violet", "Solar Gold" }
+GearRolls.VisorNames = { "Arctic Visor", "Amber Visor", "Periwinkle Visor", "Rose Visor", "Mint Visor" }
+-- About 1 in 100 rolls comes out Prismatic: its finish shimmers through every colour.
+GearRolls.PrismaticChance = 0.01
+-- Ultra Rare and Legendary finds are numbered (#12 of everything found).
+GearRolls.SerialFrom = 4
+
+-- One line naming what makes this roll its own: "Solar Gold finish  ·  ✦ PRISMATIC
+-- ·  #12  ·  Found by Marc".
+function GearRolls.identity(roll): string
+	if not roll then
+		return ""
+	end
+	local parts = { (GearRolls.FinishNames[roll.Finish] or "Standard") .. " finish" }
+	if roll.Prismatic then
+		table.insert(parts, "✦ PRISMATIC")
+	end
+	if roll.Serial then
+		table.insert(parts, "#" .. roll.Serial)
+	end
+	if roll.FoundBy then
+		table.insert(parts, "Found by " .. roll.FoundBy)
+	end
+	return table.concat(parts, "  ·  ")
+end
+
 -- Rare+ armor carries Elemental Affinity Affixes. Saved rolls from before
 -- affixes get theirs once (AffixVersion); weapons never roll them.
 GearRolls.AffixVersion = 1
@@ -59,6 +86,9 @@ function GearRolls.roll(rng, fixedRarity, gear)
 		Finish = rng:NextInteger(1, 5),
 		Variant = rng:NextInteger(1, 4),
 	}
+	if rng:NextNumber() < GearRolls.PrismaticChance then
+		roll.Prismatic = true
+	end
 	if gear and ArmorFamilies.ById[gear.Id] then
 		roll.Stats, roll.Points, roll.Modifiers = ArmorFamilies.rollStats(gear, rng)
 		roll.ArmorBudgetVersion = ArmorFamilies.Version
@@ -83,8 +113,12 @@ function GearRolls.appearance(roll)
 			then (ExpandedTraits.Visors[roll.MatrixVisor] or {}).Color or visors[roll.Visor]
 			else visors[roll.Visor],
 		FinishColor = colors[roll.Finish],
+		FinishName = GearRolls.FinishNames[roll.Finish],
+		Prismatic = roll.Prismatic == true,
 		Variant = roll.Variant,
-		VisorName = if roll.MatrixVisor then ExpandedTraits.Visors[roll.MatrixVisor].Name else nil,
+		VisorName = if roll.MatrixVisor
+			then ExpandedTraits.Visors[roll.MatrixVisor].Name
+			else GearRolls.VisorNames[roll.Visor],
 	}
 end
 function GearRolls.ensure(profile, rng)

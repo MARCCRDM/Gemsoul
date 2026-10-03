@@ -989,7 +989,7 @@ for kind, entries in ExpandedTraits.Catalog do
 end
 -- Original pistols keep their ranged attacks; new sword IDs use melee models.
 for _, weapon in Classes.List.Warrior.Weapons do
-	if weapon.WeaponType ~= "Sword" then
+	if weapon.WeaponType ~= "Sword" and not weapon.Forge then
 		weapon.Look = "CleanSidearm"
 		weapon.WeaponType = "Pistol"
 	end

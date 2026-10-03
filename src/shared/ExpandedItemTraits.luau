@@ -2,6 +2,7 @@
 -- Proposed effects remain metadata until their gameplay systems exist.
 local EquipmentBalance = require(script.Parent.EquipmentBalance)
 local ArmorFamilies = require(script.Parent.ArmorFamilies)
+local WeaponForge = require(script.Parent.WeaponForge)
 local Traits = {}
 Traits.Catalog = {}
 Traits.Visors = {}
@@ -1108,5 +1109,13 @@ for _, weapon in Traits.Catalog.Weapons do
 	weapon.ArmorFamily = if weapon.WeaponType == "Sword"
 		then (if tonumber(string.match(weapon.Id, "%d+$")) <= 5 then "Prospector" else "Juggernaut")
 		else "Skirmisher"
+end
+-- The Forge's 25 weapons (Shared.WeaponForge) are what's found and handed
+-- out now; the older swords and sidearms stay valid for saved kits.
+for _, weapon in Traits.Catalog.Weapons do
+	weapon.StartPool = false
+end
+for _, weapon in WeaponForge.Catalog do
+	table.insert(Traits.Catalog.Weapons, weapon)
 end
 return Traits
