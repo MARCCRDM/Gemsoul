@@ -1639,7 +1639,17 @@ function handlers.TechCooldown(id, duration)
 	end
 end
 function handlers.TechPulse(_who, from, to, color, radius)
-	CombatSound.play("Cast", from)
+	-- The cast (its element's own release when it has one) and the landing.
+	local element = CombatSound.elementOf(color)
+	if element then
+		CombatSound.element("Cast", element, from)
+		CombatSound.element("Impact", element, to, { Volume = 0.8 })
+	else
+		CombatSound.play("Cast", from)
+	end
+	if (to - from).Magnitude > 6 then
+		CombatSound.play("Beam", from, { Volume = 0.6 })
+	end
 	-- A flickering beam with a white core, a burst and shockwave where it lands.
 	CombatVfx.beam(from, to, color, radius)
 	if radius > 0 then
@@ -1661,6 +1671,7 @@ function handlers.TechField(who, color)
 		return
 	end
 	CombatSound.play("Shield", root.Position)
+	CombatSound.element("Cast", CombatSound.elementOf(color), root.Position, { Volume = 0.6 })
 	CombatFx.burst(root.Position, color, "Frost", 0.8)
 	CombatVfx.aura(root, color)
 	for index = 1, 6 do
@@ -1687,6 +1698,7 @@ function handlers.Parried(seconds)
 	CombatSound.play("GuardBreak", nil, { Volume = 0.7 })
 	CombatFx.shake(0.02, 0.25)
 	CombatVfx.screen("Stun", seconds)
+	CombatSound.play("Stun", nil, { Volume = 0.7 })
 	cancel()
 	cast = nil
 	nextAttack = math.max(nextAttack, os.clock() + seconds)
@@ -1696,6 +1708,8 @@ function handlers.AttackTiming(stage, side, combo)
 	hint.Text = stage
 	feedbackUntil = os.clock() + 0.9
 	if combo > 1 then
+		-- A ringing tick that climbs with the combo.
+		CombatSound.play("Combo", nil, { Pitch = 1 + (combo - 2) * 0.15 })
 		comboLabel.Text, comboUntil = "x" .. combo, os.clock() + 2
 		comboScale.Scale = 1.4
 		TweenService:Create(comboScale, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
@@ -1717,7 +1731,9 @@ function handlers.Damage(position: Vector3, amount: number, crit: boolean, color
 	-- Sparks in the hit's colour; crits burst bigger, ring out and shake a little.
 	local tint = color or Color3.new(1, 1, 1)
 	CombatVfx.impact(position - Vector3.new(0, 0.6, 0), tint, crit, amount >= 30)
-	CombatSound.play(if crit then "Crit" else "Hit", position)
+	-- The blow (a crit rings out, a big one lands heavy), plus its element.
+	CombatSound.play(if crit then "Crit" elseif amount >= 30 then "HeavyHit" else "Hit", position)
+	CombatSound.element("Impact", CombatSound.elementOf(color), position, { Volume = 0.65 })
 	if crit and CombatFx.nearMe(position, 30) then
 		CombatFx.shake(0.012, 0.15)
 		CombatVfx.screen("Crit")
@@ -1746,6 +1762,9 @@ function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, 
 	end
 	local fireball = look == "Fireball"
 	CombatSound.play(if fireball then "Bolt" else "Shot", from)
+	if fireball then
+		CombatSound.element("Cast", "Fire", from, { Volume = 0.5 })
+	end
 	-- A glowing round (or fireball) with a trail, and an impact where it lands.
 	CombatVfx.projectile(from, to, color, fireball)
 end
@@ -1806,6 +1825,7 @@ function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: nu
 			CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(110, 100, 92), "Shards", 1.4)
 			CombatFx.flash(floor + Vector3.new(0, 3, 0), color, 8, radius * 3, 0.45)
 			CombatSound.play("Blast", floor, { Volume = 1.2 })
+			CombatSound.element("Impact", CombatSound.elementOf(color), floor, { Volume = 0.9 })
 			local character = player.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 			if root then
@@ -1835,6 +1855,7 @@ function handlers.Blasted(kind: string, seconds: number, push: Vector3?)
 	hint.Text, feedbackUntil = if stunned then "STUNNED!" else "STAGGERED", os.clock() + seconds + 0.3
 	CombatFx.shake(if stunned then 0.06 else 0.035, if stunned then 0.5 else 0.3)
 	CombatVfx.screen("Stun", seconds)
+	CombatSound.play(if stunned then "Stun" else "Hurt", nil, { Volume = if stunned then 1 else 0.7 })
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if root and push and push.Magnitude > 0.1 then
@@ -1880,6 +1901,7 @@ function handlers.Buff(who: Player, color: Color3)
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if root then
 		CombatSound.play("Shield", root.Position)
+		CombatSound.element("Cast", CombatSound.elementOf(color), root.Position, { Volume = 0.6 })
 		CombatFx.burst(root.Position, color, "Frost", 1)
 		CombatVfx.aura(root, color)
 	end
@@ -1889,6 +1911,7 @@ function handlers.Arc(from: Vector3, to: Vector3, color: Color3)
 	-- A forked, flickering bolt.
 	CombatVfx.lightning(from, to, color)
 	CombatSound.play("Zap", to)
+	CombatSound.element("Impact", "Shock", to, { Volume = 0.6 })
 end
 
 function handlers.Death(position: Vector3, color: Color3?)
@@ -1922,6 +1945,7 @@ function handlers.BlockBroken(seconds, reason)
 	if reason == "Exhausted" then
 		-- Out of Stamina: the guard can't hold (or can't go up at all).
 		hint.Text, feedbackUntil = "OUT OF STAMINA", os.clock() + 1.2
+		CombatSound.play("Winded")
 		UiKit.toast("Out of Stamina: your guard drops!", Tech.Resources.Stamina.Color)
 	else
 		UiKit.toast("Guard broken!", P.Gold)
