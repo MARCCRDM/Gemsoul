@@ -17,12 +17,75 @@ local function clearModel()
 	model, gear = nil, nil
 	table.clear(pieces)
 end
+-- A copy of one piece of gear for the view: its element effects thinned out
+-- (they'd cover the view up close), anchored, unclickable, 65% size.
+local function viewCopy(part, holder)
+	local copy = part:Clone()
+	for _, descendant in copy:GetDescendants() do
+		if descendant:IsA("ParticleEmitter") then
+			descendant.Rate *= 0.45
+		elseif descendant:IsA("PointLight") then
+			descendant.Range *= 0.6
+		end
+		if
+			descendant:IsA("JointInstance")
+			or descendant:IsA("WeldConstraint")
+			or descendant:IsA("Script")
+			or descendant:IsA("LocalScript")
+			or descendant:IsA("Beam")
+		then
+			descendant:Destroy()
+		end
+	end
+	copy.Anchored, copy.CanCollide, copy.CanTouch, copy.CanQuery, copy.CastShadow = true, false, false, false, false
+	copy.LocalTransparencyModifier = 0
+	-- Preserve authored neon and colors; give metal panels a restrained highlight.
+	if copy.Material == Enum.Material.Metal then
+		copy.Reflectance = math.max(copy.Reflectance, 0.08)
+	end
+	copy.Size *= 0.65
+	copy.Parent = holder
+	return copy
+end
+local function scaled(offset)
+	return CFrame.new(offset.Position * 0.65) * offset.Rotation
+end
+-- The weapon's own frame: its grip point, with +Y running up its longest
+-- piece (the blade), so it can be held at a set angle however it's mounted.
+local function weaponFrame(weapon)
+	local grip = weapon:FindFirstChild("RightGrip")
+	local blade, length = nil, 0
+	for _, part in weapon:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and part.Size.Y > length then
+			if part.Size.Y >= math.max(part.Size.X, part.Size.Z) then
+				blade, length = part, part.Size.Y
+			end
+		end
+	end
+	if not grip or not blade then
+		return nil
+	end
+	-- Which way along the blade is the tip (away from the grip).
+	local rotation = blade.CFrame.Rotation
+	if (blade.CFrame.Position - grip.CFrame.Position):Dot(blade.CFrame.UpVector) < 0 then
+		rotation *= CFrame.Angles(0, 0, math.pi)
+	end
+	return CFrame.new(grip.CFrame.Position) * rotation
+end
 local function rebuild(character, equipment)
 	clearModel()
 	gear = equipment
 	model = Instance.new("Model")
 	model.Name = "FirstPersonLoadout"
 	model.Parent = workspace.CurrentCamera
+	-- The sword is held low in the right fist, blade angled forward and up:
+	-- the hilt and gauntlet low on the right, the tip up and in at about a
+	-- third of the way up the screen, clear of the crosshair. Only the gauntlet that grips it shows with it, in its real
+	-- place around the hilt; forearm plates and the left glove (behind the
+	-- shield) would only be blocks filling the bottom of the view.
+	local weapon = equipment:FindFirstChild("Weapon")
+	local frame = weapon and weaponFrame(weapon)
+	local hold = CFrame.Angles(0, 0, math.rad(-14)) * CFrame.Angles(math.rad(-40), 0, 0)
 	for _, slot in { "Weapon", "Shield", "Gloves" } do
 		local source = equipment:FindFirstChild(slot)
 		if source then
@@ -39,51 +102,34 @@ local function rebuild(character, equipment)
 				if part:IsA("BasePart") and part.Transparency < 1 then
 					local weld = part:FindFirstChildWhichIsA("WeldConstraint")
 					local anchor = weld and weld.Part0
-					local left = anchor and string.find(anchor.Name, "Left") ~= nil
-					if slot == "Shield" then
-						left = true
-					end
-					anchor = anchor
-						or source:FindFirstChild("RightGrip")
-						or character:FindFirstChild("RightHand")
-						or character:FindFirstChild("Right Arm")
-					if anchor then
-						local copy = part:Clone()
-						-- The element's effect (flames, frost, sparks, gas) stays on,
-						-- thinned out so it doesn't cover the view up close.
-						for _, descendant in copy:GetDescendants() do
-							if descendant:IsA("ParticleEmitter") then
-								descendant.Rate *= 0.45
-							elseif descendant:IsA("PointLight") then
-								descendant.Range *= 0.6
+					local anchorName = anchor and anchor.Name or ""
+					if slot == "Gloves" then
+						-- Only the right hand's gauntlet, held with the sword.
+						if frame and (anchorName == "RightHand" or anchorName == "RightGrip") then
+							local copy = viewCopy(part, holder)
+							local offset = hold * scaled(frame:ToObjectSpace(part.CFrame))
+							table.insert(pieces, { Part = copy, Left = false, Offset = offset })
+						end
+					elseif slot == "Weapon" and frame and not string.find(anchorName, "Left") then
+						local copy = viewCopy(part, holder)
+						local offset = hold * scaled(frame:ToObjectSpace(part.CFrame))
+						table.insert(pieces, { Part = copy, Left = false, Offset = offset })
+					else
+						local left = slot == "Shield" or string.find(anchorName, "Left") ~= nil
+						anchor = anchor
+							or source:FindFirstChild("RightGrip")
+							or character:FindFirstChild("RightHand")
+							or character:FindFirstChild("Right Arm")
+						if anchor then
+							local copy = viewCopy(part, holder)
+							local offset = scaled(anchor.CFrame:ToObjectSpace(part.CFrame))
+							if slot == "Shield" then
+								-- On the real arm the shield faces out to the side; held
+								-- up in view it turns to face the enemy ahead.
+								offset = CFrame.Angles(0, math.rad(-70), 0) * offset
 							end
-							if
-								descendant:IsA("JointInstance")
-								or descendant:IsA("WeldConstraint")
-								or descendant:IsA("Script")
-								or descendant:IsA("LocalScript")
-								or descendant:IsA("Beam")
-							then
-								descendant:Destroy()
-							end
+							table.insert(pieces, { Part = copy, Left = left, Offset = offset })
 						end
-						copy.Anchored, copy.CanCollide, copy.CanTouch, copy.CanQuery, copy.CastShadow =
-							true, false, false, false, false
-						copy.LocalTransparencyModifier = 0
-						-- Preserve authored neon and colors; give metal panels a restrained highlight.
-						if copy.Material == Enum.Material.Metal then
-							copy.Reflectance = math.max(copy.Reflectance, 0.08)
-						end
-						copy.Size *= 0.65
-						copy.Parent = holder
-						local offset = anchor.CFrame:ToObjectSpace(part.CFrame)
-						offset = CFrame.new(offset.Position * 0.65) * offset.Rotation
-						if slot == "Shield" then
-							-- On the real arm the shield faces out to the side; held up
-							-- in view it turns to face the enemy ahead (you see its back).
-							offset = CFrame.Angles(0, math.rad(-70), 0) * offset
-						end
-						table.insert(pieces, { Part = copy, Left = left, Offset = offset })
 					end
 				end
 			end
@@ -210,9 +256,9 @@ function View.start()
 					math.rad(-12 + smoothedRaised * 25)
 				)
 				else CFrame.new(
-					0.65 - swing * direction * 0.85,
-					-0.8 + smoothedCharge * 0.18 + breathe,
-					-1.15 - swing * 0.35 + recoil * 0.18
+					0.83 - swing * direction * 0.85,
+					-0.78 + smoothedCharge * 0.18 + breathe,
+					-1.25 - swing * 0.35 + recoil * 0.18
 				) * CFrame.Angles(
 					math.rad(-smoothedCharge * 15 - recoil * 9),
 					0,
