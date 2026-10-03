@@ -499,6 +499,37 @@ local targetText = shadowed(text(targetCard, "", 10, Color3.fromRGB(215, 205, 18
 targetText.AutomaticSize, targetText.TextWrapped = Enum.AutomaticSize.None, false
 targetText.TextXAlignment = Enum.TextXAlignment.Center
 targetText.Position, targetText.Size = UDim2.fromOffset(0, 37), UDim2.new(1, 0, 0, 13)
+-- Its Charge (left) and Stamina (right) under that, when it has them (the
+-- rival, another player): a dry Charge means no surge is coming; a low
+-- Stamina means its guard is about to break.
+local targetPools = {}
+for i, id in { "Charge", "Stamina" } do
+	local left = i == 1
+	local anchor = Vector2.new(if left then 0 else 1, 0)
+	local track = new("Frame", {
+		BorderSizePixel = 0,
+		AnchorPoint = anchor,
+		Position = UDim2.new(if left then 0 else 1, if left then 8 else -8, 0, 54),
+		Size = UDim2.new(0.5, -18, 0, 6),
+	}, targetCard)
+	UiKit.round(track, 2)
+	HudChrome.capBar(track)
+	local fill = new("Frame", {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(if left then 1 else 0, 0),
+		Position = UDim2.fromScale(if left then 1 else 0, 0),
+		Size = UDim2.fromScale(1, 1),
+	}, track)
+	UiKit.round(fill, 2)
+	fillGradient(fill, Tech.Resources[id].Color)
+	local label = shadowed(text(targetCard, "", 9, Tech.Resources[id].Color, IronUi.Bold))
+	label.AutomaticSize, label.TextWrapped = Enum.AutomaticSize.None, false
+	label.TextXAlignment = if left then Enum.TextXAlignment.Left else Enum.TextXAlignment.Right
+	label.AnchorPoint, label.Position, label.Size =
+		anchor, UDim2.new(if left then 0 else 1, if left then 6 else -6, 0, 62), UDim2.new(0.5, -14, 0, 12)
+	targetPools[id] = { Track = track, Fill = fill, Label = label }
+end
 local controlsHint = text(
 	gui,
 	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | 1/2/3 Maneuvers | K Tree | L Log",
@@ -1271,7 +1302,7 @@ RunService.RenderStepped:Connect(function(dt)
 	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 16)
 	leave.Position, leave.Size =
 		UDim2.new(1, -12, 0, if portrait then 80 else 16), UDim2.fromOffset(if portrait then 130 else 160, 38)
-	targetCard.Size = UDim2.fromOffset(if portrait then math.min(260, viewport.X - 40) else 380, 52)
+	targetCard.Size = UDim2.fromOffset(if portrait then math.min(260, viewport.X - 40) else 380, 74)
 	-- Phones: below the corner buttons.
 	targetCard.Position = UDim2.new(0.5, 0, 0, if portrait then 124 else 14)
 	targetName.TextSize = if portrait then 12 else 15
@@ -1489,6 +1520,20 @@ RunService.RenderStepped:Connect(function(dt)
 			math.ceil(enemyHumanoid.MaxHealth),
 			math.ceil(ratio * 100)
 		)
+		for id, pool in targetPools do
+			-- Another player's own attributes, or the rival's published ones.
+			local amount = if opponent then opponent:GetAttribute(id) else target:GetAttribute("Rival" .. id)
+			local maximum = (if opponent then opponent:GetAttribute("Max" .. id) else nil) or Tech.Resources[id].Max
+			pool.Track.Visible, pool.Label.Visible = amount ~= nil, amount ~= nil
+			if amount then
+				local share = math.clamp(amount / math.max(1, maximum), 0, 1)
+				pool.Fill.Size = UDim2.fromScale(share, 1)
+				local low = if share <= 0.2 then (if id == "Stamina" then "GUARD WEAK  ·  " else "  ·  DRY") else ""
+				pool.Label.Text = if id == "Charge"
+					then string.format("CHARGE  %d / %d%s", amount, maximum, low)
+					else string.format("%s%d / %d  STAMINA", low, amount, maximum)
+			end
+		end
 	else
 		lastTarget = nil
 	end
