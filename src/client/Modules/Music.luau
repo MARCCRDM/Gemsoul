@@ -25,7 +25,7 @@ Music.Ids = {
 	Dungeon = 75260701190300, -- dungeon_theme.ogg
 	Fight = 83708484138750, -- fight_theme.ogg
 	Intro = 74920383589616, -- intro_sting.ogg (the splash's music when there's no video yet)
-	Arena = 0, -- Capt Hunchines - Imminent DAY1 instr 5.mp3 (1v1 Arena song)
+	Arena = 129649283919546, -- Capt Hunchines - Imminent DAY1 instr 5.mp3 (1v1 Arena song)
 }
 
 -- Moods that start part-way into their song each time they come on, in seconds.
