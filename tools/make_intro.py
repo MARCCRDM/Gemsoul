@@ -7,9 +7,8 @@ of the theme song (the build into its final drop).
 
 Writes:
   assets/video/saga_intro.mp4   1920x1080, 30 fps, with the music: a shareable
-                                trailer/preview. (The game doesn't need it: the
-                                title screen draws the logo itself, from
-                                tools/make_splash_art.py.)
+                                trailer. (The game's title screen uses
+                                assets/images/saga_title.png instead.)
   assets/music/intro_sting.ogg  the music alone, for the fallback splash
                                 (tools/upload_audio.py fills Music.Ids.Intro)
 
