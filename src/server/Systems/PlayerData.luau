@@ -328,7 +328,9 @@ end
 
 local function load(player: Player)
 	local profile, loaded, locked = nil, false, false
-	if store then
+	-- Playtest fresh start: a new profile every join, the save never touched.
+	local fresh = Config.Playtest and Config.Playtest.FreshStart == true
+	if store and not fresh then
 		-- Claim the save (SessionLock). If another server still has it (the
 		-- player just hopped servers and it's saving), wait for it to let go.
 		for attempt = 1, 8 do
@@ -414,7 +416,9 @@ local function load(player: Player)
 	end
 	sync(player)
 	characterChanged:Fire(player)
-	if not loaded then
+	if fresh then
+		Remotes.Notify:FireClient(player, "Playtest: you start fresh every time you join. Progress isn't saved.")
+	elseif not loaded then
 		Remotes.Notify:FireClient(player, "Progress won't be saved this session (data storage unavailable).")
 	end
 end
