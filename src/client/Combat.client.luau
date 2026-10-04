@@ -2108,8 +2108,9 @@ function handlers.Arc(from: Vector3, to: Vector3, color: Color3)
 end
 
 function handlers.Death(position: Vector3, color: Color3?, element: string?, model: Model?)
-	-- Killed by an element: the body burns, arcs, melts or shatters apart.
-	if not require(script.Parent.Modules.ElementalDeath).play(model, element) then
+	-- The body blows apart: burning, arcing, melting or shattering by the
+	-- element that killed it, a plain blast without one.
+	if not require(script.Parent.Modules.ElementalDeath).play(model, element, color) then
 		CombatVfx.death(position, color or Color3.new(1, 1, 1))
 	end
 	CombatSound.play("Death", position)

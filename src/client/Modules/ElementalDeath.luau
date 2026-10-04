@@ -12,13 +12,19 @@
 	  Frost   frozen solid in a shell of ice, spikes growing out, a beat of
 	          stillness, then it shatters into flying shards
 
-	The element is the last one that hit it (the server keeps it on the
-	model as "LastHitElement"). Purely local and short-lived.
+	  (none)  a plain blast: the body swells, flashes and blows apart
 
-	  ElementalDeath.play(model, element) -> true when it ran
+	Every death ends in a real physical blast: the pieces (plus torn-off
+	chunks) are flung by a shockwave that is strongest at the centre,
+	spin, bounce and roll along the ground, then fade. The element is the
+	last one that hit it (the server keeps it on the model as
+	"LastHitElement"). Purely local and short-lived.
+
+	  ElementalDeath.play(model, element, color) -> true when it ran
 	  ElementalDeath.start()               players' bodies too (on death)
 ]]
 local Players = game:GetService("Players")
+local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
@@ -30,6 +36,8 @@ local CombatVfx = require(script.Parent.CombatVfx)
 
 local ElementalDeath = {}
 ElementalDeath.MaxPieces = 140
+ElementalDeath.Chunks = 18 -- torn-off bits added to every blast
+ElementalDeath.Lifetime = 6 -- seconds before the remains are gone
 
 local played = setmetatable({}, { __mode = "k" }) -- [model] = true, once each
 
@@ -105,7 +113,7 @@ local function copyBody(model: Model)
 			end
 		end
 	end
-	Debris:AddItem(holder, 4)
+	Debris:AddItem(holder, ElementalDeath.Lifetime)
 	return pieces, holder
 end
 
@@ -119,23 +127,79 @@ local function centreOf(pieces, model: Model): (Vector3, number)
 	return centre, floor
 end
 
--- Every piece flies outward from `centre` (and stops being anchored).
-local function blowApart(pieces, centre: Vector3, speed: NumberRange, lift: number)
+local debrisGroup: string? = nil
+local function groupOf(): string?
+	if debrisGroup == nil then
+		local ok, registered = pcall(function()
+			return PhysicsService:IsCollisionGroupRegistered("DeathDebris")
+		end)
+		debrisGroup = if ok and registered then "DeathDebris" else ""
+	end
+	return if debrisGroup ~= "" then debrisGroup else nil
+end
+
+-- Light, bouncy remains: they tumble and skid but barely nudge a player
+-- they land on. Ice skates further and bounces less.
+local BOUNCY = PhysicalProperties.new(0.35, 0.45, 0.45, 1, 1)
+local SLICK = PhysicalProperties.new(0.35, 0.05, 0.2, 1, 1)
+
+-- The shockwave: every piece is thrown out from `centre`, hardest close in
+-- and falling off with distance, with a kick upward and a hard spin. The
+-- pieces become real physics bodies: they fall, hit the ground, bounce
+-- and roll.
+local function blowApart(pieces, centre: Vector3, speed: NumberRange, lift: number, slick: boolean?)
+	local group = groupOf()
 	for _, piece in pieces do
 		local part = piece.Part
 		if part.Parent then
 			local out = part.Position - centre
-			out = Vector3.new(out.X, math.max(out.Y, 0) + 0.3, out.Z)
+			local distance = out.Magnitude
+			out = Vector3.new(out.X, math.max(out.Y, 0) + 0.4, out.Z)
 			if out.Magnitude < 0.05 then
 				out = Vector3.new(math.random() - 0.5, 1, math.random() - 0.5)
 			end
-			part.CanCollide = true
+			-- A little scatter so the blast isn't a perfect sphere.
+			local scatter = Vector3.new(math.random() - 0.5, math.random() * 0.5, math.random() - 0.5) * 0.7
+			local direction = (out.Unit + scatter).Unit
+			local falloff = math.clamp(1.25 - distance / 8, 0.55, 1.25)
+			local power = (speed.Min + math.random() * (speed.Max - speed.Min)) * falloff
 			part.Anchored = false
-			part.AssemblyLinearVelocity = out.Unit * (speed.Min + math.random() * (speed.Max - speed.Min))
-				+ Vector3.new(0, lift * (0.6 + math.random() * 0.8), 0)
+			part.Massless = false
+			part.CanCollide = true
+			part.CustomPhysicalProperties = if slick then SLICK else BOUNCY
+			if group then
+				part.CollisionGroup = group
+			end
+			part.AssemblyLinearVelocity = direction * power + Vector3.new(0, lift * (0.6 + math.random() * 0.8), 0)
 			part.AssemblyAngularVelocity = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5)
-				* 24
+				* (30 + math.random() * 40)
 		end
+	end
+end
+
+-- Torn-off chunks: small blocks in the body's own colours, packed around
+-- the torso, thrown with everything else. Added to `pieces`.
+local function chunks(pieces, centre: Vector3, tint: Color3?, material: Enum.Material?)
+	local count = #pieces
+	for _ = 1, ElementalDeath.Chunks do
+		local from = if count > 0 then pieces[math.random(1, math.min(count, 12))] else nil
+		local color = if from then from.Color else Color3.fromRGB(90, 90, 100)
+		if tint then
+			color = color:Lerp(tint, 0.6)
+		end
+		local size = Vector3.new(0.25 + math.random() * 0.6, 0.25 + math.random() * 0.6, 0.25 + math.random() * 0.6)
+		local at = centre
+			+ Vector3.new((math.random() - 0.5) * 1.6, (math.random() - 0.3) * 2.4, (math.random() - 0.5) * 1.6)
+		local chunk = neon(
+			size,
+			CFrame.new(at) * CFrame.Angles(math.random() * 6, math.random() * 6, math.random() * 6),
+			color,
+			0
+		)
+		chunk.Material = material or Enum.Material.Metal
+		chunk.CastShadow = true
+		Debris:AddItem(chunk, ElementalDeath.Lifetime)
+		table.insert(pieces, { Part = chunk, Home = chunk.CFrame, Color = color })
 	end
 end
 
@@ -196,7 +260,8 @@ function STYLES.Fire(pieces, centre: Vector3, floor: number)
 	ball(centre, Color3.fromRGB(255, 240, 200), 5, 0.3)
 	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), orange, 16, 0.6)
 	CombatVfx.scorch(Vector3.new(centre.X, floor, centre.Z), 6, orange)
-	blowApart(pieces, centre, NumberRange.new(28, 48), 26)
+	chunks(pieces, centre, Color3.fromRGB(60, 36, 26))
+	blowApart(pieces, centre, NumberRange.new(50, 85), 38)
 	for i, piece in pieces do
 		tween(piece.Part, 1.4, { Color = Color3.fromRGB(38, 28, 24) })
 		if i % 7 == 1 then
@@ -209,7 +274,7 @@ function STYLES.Fire(pieces, centre: Vector3, floor: number)
 			smoke.Parent = piece.Part
 		end
 	end
-	fadeOut(pieces, 1.9, 0.8)
+	fadeOut(pieces, 3.6, 1.2)
 end
 
 function STYLES.Shock(pieces, centre: Vector3, floor: number)
@@ -261,12 +326,13 @@ function STYLES.Shock(pieces, centre: Vector3, floor: number)
 			CombatVfx.lightning(centre, centre + out.Unit * (8 + math.random() * 8), ion)
 		end
 	end
-	blowApart(pieces, centre, NumberRange.new(30, 52), 22)
+	chunks(pieces, centre, Color3.fromRGB(40, 42, 52))
+	blowApart(pieces, centre, NumberRange.new(55, 95), 32)
 	for _, piece in pieces do
 		piece.Part.Material = Enum.Material.SmoothPlastic
 		tween(piece.Part, 1.2, { Color = Color3.fromRGB(34, 36, 44) })
 	end
-	fadeOut(pieces, 1.7, 0.8)
+	fadeOut(pieces, 3.4, 1.2)
 end
 
 function STYLES.Poison(pieces, centre: Vector3, floor: number)
@@ -302,6 +368,7 @@ function STYLES.Poison(pieces, centre: Vector3, floor: number)
 		CombatFx.burst(centre - Vector3.new(0, 2, 0), acid, "Embers", 0.8)
 		task.wait(0.2)
 	end
+	task.wait(0.1) -- the melt tweens are done before physics takes over
 	-- The remains burst.
 	local low = Vector3.new(centre.X, floor + 0.8, centre.Z)
 	CombatSound.play("Death", low)
@@ -310,8 +377,9 @@ function STYLES.Poison(pieces, centre: Vector3, floor: number)
 	CombatFx.burst(low, acid, "Embers", 2.4)
 	CombatFx.shake(0.35, 0.3)
 	ball(low, acid, 7, 0.45)
-	blowApart(pieces, low, NumberRange.new(14, 26), 30)
-	fadeOut(pieces, 1.2, 0.8)
+	chunks(pieces, low, acid, Enum.Material.Slate)
+	blowApart(pieces, low, NumberRange.new(32, 58), 48)
+	fadeOut(pieces, 2.8, 1.2)
 end
 
 function STYLES.Frost(pieces, centre: Vector3, floor: number)
@@ -367,15 +435,43 @@ function STYLES.Frost(pieces, centre: Vector3, floor: number)
 	for _, spike in spikes do
 		table.insert(pieces, { Part = spike, Home = spike.CFrame, Color = ice })
 	end
-	blowApart(pieces, centre, NumberRange.new(24, 44), 18)
-	fadeOut(pieces, 1.3, 0.9)
+	chunks(pieces, centre, ice, Enum.Material.Ice)
+	blowApart(pieces, centre, NumberRange.new(48, 82), 26, true)
+	fadeOut(pieces, 3.2, 1.2)
 end
 
--- Plays `element`'s death on `model`; false (and nothing done) for an
--- element without one.
-function ElementalDeath.play(model: Model?, element: string?): boolean
-	local style = element and STYLES[element]
-	if not style or not model or not model.Parent or played[model] then
+-- No element: the body swells and glows, then blows apart.
+function STYLES.Blast(pieces, centre: Vector3, floor: number, color: Color3?)
+	local glow = (color or Color3.fromRGB(255, 200, 140)):Lerp(Color3.new(1, 1, 1), 0.35)
+	for _, piece in pieces do
+		local part = piece.Part
+		tween(part, 0.22, {
+			Color = piece.Color:Lerp(glow, 0.5),
+			CFrame = piece.Home + (part.Position - centre) * 0.12,
+		}, Enum.EasingStyle.Back)
+	end
+	CombatFx.flash(centre, glow, 3, 14, 0.25)
+	task.wait(0.24)
+	CombatSound.play("Death", centre)
+	CombatFx.flash(centre, glow, 9, 34, 0.5)
+	CombatFx.burst(centre, glow, "Sparks", 2.2)
+	CombatFx.burst(centre, Color3.fromRGB(80, 74, 70), "Smoke", 1.6)
+	CombatFx.shake(0.4, 0.3)
+	ball(centre, glow, 7, 0.4)
+	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), glow, 14, 0.5)
+	chunks(pieces, centre)
+	blowApart(pieces, centre, NumberRange.new(45, 80), 34)
+	for _, piece in pieces do
+		tween(piece.Part, 1, { Color = piece.Color })
+	end
+	fadeOut(pieces, 3.4, 1.2)
+end
+
+-- Plays `element`'s death on `model` (no element: a plain blast tinted
+-- `color`); false (and nothing done) without a body to blow up.
+function ElementalDeath.play(model: Model?, element: string?, color: Color3?): boolean
+	local style = STYLES[element or "Blast"] or STYLES.Blast
+	if not model or not model.Parent or played[model] then
 		return false
 	end
 	played[model] = true
@@ -384,7 +480,7 @@ function ElementalDeath.play(model: Model?, element: string?): boolean
 		return false
 	end
 	local centre, floor = centreOf(pieces, model)
-	task.spawn(style, pieces, centre, floor)
+	task.spawn(style, pieces, centre, floor, color)
 	return true
 end
 

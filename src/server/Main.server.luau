@@ -18,6 +18,17 @@ local TopPlayers = require(script.Parent.Systems.TopPlayers)
 local Trading = require(script.Parent.Systems.Trading)
 local Equipment = require(script.Parent.Systems.Equipment)
 
+-- Bodies blown apart on death (client ElementalDeath): the flying pieces hit
+-- the ground and walls but not each other, so a body that starts packed
+-- together doesn't shove itself apart.
+do
+	local PhysicsService = game:GetService("PhysicsService")
+	pcall(function()
+		PhysicsService:RegisterCollisionGroup("DeathDebris")
+		PhysicsService:CollisionGroupSetCollidable("DeathDebris", "DeathDebris", false)
+	end)
+end
+
 -- Menu-only mode plays entirely from the dashboard, so the town isn't built
 -- (nothing to render or stream). The character still spawns on the
 -- place's baseplate so the dashboard can show it wearing its gear.
