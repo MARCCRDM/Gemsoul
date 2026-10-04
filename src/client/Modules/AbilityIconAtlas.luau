@@ -3,6 +3,8 @@
 return {
 	Cell = 128,
 	Columns = 8,
+	-- Where icons sit on the labelled preview, as Roblox stores it (scaled to 1024 wide).
+	Preview = { Width = 1644, Stored = 1024, Margin = 12, PitchX = 204, PitchY = 232, Size = 192 },
 	Index = {
 		HydraulicSlam = 0,
 		ServoFlurry = 1,

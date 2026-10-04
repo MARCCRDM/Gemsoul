@@ -1168,6 +1168,8 @@ def main():
         "return {",
         f"\tCell = {CELL},",
         f"\tColumns = {COLUMNS},",
+        "\t-- Where icons sit on the labelled preview, as Roblox stores it (scaled to 1024 wide).",
+        f"\tPreview = {{ Width = {preview.width}, Stored = 1024, Margin = 12, PitchX = {big + 12}, PitchY = {big + 40}, Size = {big} }},",
         "\tIndex = {",
     ]
     lines += [f"\t\t{name} = {n}," for n, name in enumerate(ORDER)]

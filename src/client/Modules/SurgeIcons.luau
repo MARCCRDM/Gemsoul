@@ -14,6 +14,9 @@ local Icons = {}
 
 -- Roblox id of the uploaded sheet (the number from rbxassetid://12345). 0 = not uploaded yet.
 Icons.ImageId = 88825646209723
+-- Which image that is: "Sheet" (ability_icons.png, 128 px cells) or
+-- "Preview" (ability_icons_preview.png, the labelled contact sheet).
+Icons.Layout = "Preview"
 
 local byName = {}
 for id, definition in Tech.Catalog do
@@ -71,7 +74,6 @@ function Icons.apply(target: GuiObject, definition: any, _color: Color3?): boole
 		made.Size = UDim2.fromScale(1, 1)
 		made.ZIndex = target.ZIndex
 		made.Image = "rbxassetid://" .. Icons.ImageId
-		made.ImageRectSize = Vector2.new(Atlas.Cell, Atlas.Cell)
 		local radius = cornerOf(target)
 		if radius then
 			local corner = Instance.new("UICorner")
@@ -83,7 +85,18 @@ function Icons.apply(target: GuiObject, definition: any, _color: Color3?): boole
 	end
 	local column = index % Atlas.Columns
 	local row = index // Atlas.Columns
-	art.ImageRectOffset = Vector2.new(column * Atlas.Cell, row * Atlas.Cell)
+	if Icons.Layout == "Preview" then
+		-- Each icon's square on the preview, a few pixels in from its edge.
+		local p = Atlas.Preview
+		local k = p.Stored / p.Width
+		local inset = 3
+		art.ImageRectOffset =
+			Vector2.new((p.Margin + column * p.PitchX + inset) * k, (p.Margin + row * p.PitchY + inset) * k)
+		art.ImageRectSize = Vector2.new((p.Size - inset * 2) * k, (p.Size - inset * 2) * k)
+	else
+		art.ImageRectOffset = Vector2.new(column * Atlas.Cell, row * Atlas.Cell)
+		art.ImageRectSize = Vector2.new(Atlas.Cell, Atlas.Cell)
+	end
 	return true
 end
 
