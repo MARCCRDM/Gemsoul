@@ -1738,9 +1738,9 @@ local function frontierSuit(family: number)
 			local s = torso.Size
 			local x, y, z = s.X, s.Y, s.Z
 			block(torso, 0, 0, 0, x * 0.88, y * 0.92, z * 0.84, cloth)
-            -- Stop rigid chest geometry above the waist joint. An UpperTorso-mounted
-            -- apron sweeps through the pelvis whenever the walking animation twists it.
-            -- The articulated lower plates are built on LowerTorso below.
+			-- Stop rigid chest geometry above the waist joint. An UpperTorso-mounted
+			-- apron sweeps through the pelvis whenever the walking animation twists it.
+			-- The articulated lower plates are built on LowerTorso below.
 			for _, side in { -1, 1 } do
 				block(torso, side * x * 0.22, y * 0.14, -z * 0.45, x * 0.43, y * 0.46, z * 0.29, metal, side * -10)
 				block(torso, side * x * 0.38, -y * 0.18, -z * 0.36, x * 0.2, y * 0.34, z * 0.25, metal, side * 14)
@@ -1802,12 +1802,20 @@ local function frontierSuit(family: number)
 		if waist then
 			local s = waist.Size
 			-- A fitted pelvis liner and short overlapping abdominal plates follow the hips.
-            -- Keep the lower edge inside this body segment so thighs can swing independently.
-            block(waist, 0, s.Y * 0.04, 0, s.X * 0.9, s.Y * 0.92, s.Z * 0.8, cloth)
-            for i = 1, 3 do
-                block(waist, 0, s.Y * (0.34 - (i - 1) * 0.22), -s.Z * 0.45,
-                    s.X * (0.78 - (i - 1) * 0.065), s.Y * 0.16, 0.075, trim)
-            end
+			-- Keep the lower edge inside this body segment so thighs can swing independently.
+			block(waist, 0, s.Y * 0.04, 0, s.X * 0.9, s.Y * 0.92, s.Z * 0.8, cloth)
+			for i = 1, 3 do
+				block(
+					waist,
+					0,
+					s.Y * (0.34 - (i - 1) * 0.22),
+					-s.Z * 0.45,
+					s.X * (0.78 - (i - 1) * 0.065),
+					s.Y * 0.16,
+					0.075,
+					trim
+				)
+			end
 			block(waist, 0, s.Y * 0.19, -0.015, s.X * 1.04, 0.16, s.Z * 0.95, trim)
 			block(waist, 0, s.Y * 0.19, -s.Z * 0.54, 0.21, 0.16, 0.075, ornament)
 			if rarity >= 2 then
