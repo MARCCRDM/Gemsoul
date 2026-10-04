@@ -40,4 +40,23 @@ check(Rules.update(s,{c("sniper",80,-0.9,false,true,false,true)},0,false)=="snip
 s=Rules.new()
 check(Rules.update(s,{c("front",10)},0,false)=="front","Front target not locked")
 check(Rules.update(s,{c("front",10),c("other",5,-1,true,true,false,true)},0.1,false)=="front","An attacker stole an existing lock")
-print("PASS: "..checks.." unbreakable rival lock, auto-engage, cover grace and range checks")
+-- Switching: cycles left to right through targets within SwitchRange, and sticks.
+local function b(id, distance, bearing, priority)
+ local x=c(id, distance, 1, true, true, priority); x.Bearing=bearing; return x
+end
+s=Rules.new()
+local pack={b("left",6,-0.6),b("mid",4,0),b("right",8,0.5),b("far",30,0.1)}
+check(Rules.update(s,pack,0,false)=="mid","Nearest target not locked first")
+check(#Rules.switchable(pack)==3,"Switching counted a target outside SwitchRange")
+check(Rules.switch(s,pack)=="right","Switch didn't move to the next target to the right")
+check(Rules.update(s,pack,0.1,false)=="right","Switched target not kept")
+check(Rules.switch(s,pack)=="left","Switch didn't wrap around")
+check(Rules.switch(s,pack)=="mid","Switch didn't cycle back")
+check(Rules.switch(s,{b("far",30,0)})=="mid","Switch jumped to a target outside SwitchRange")
+s=Rules.new()
+local duel={b("rival",9,0,true),b("add",5,0.4)}
+check(Rules.update(s,duel,0,false)=="rival","Rival not locked")
+check(Rules.switch(s,duel)=="add","Couldn't switch off the rival to a nearby target")
+check(Rules.update(s,duel,0.1,false)=="add","Rival priority overrode a switched target")
+check(Rules.update(s,{b("rival",9,0,true)},0.2,false)=="rival","Lock didn't return to the rival once the switched target was gone")
+print("PASS: "..checks.." unbreakable rival lock, auto-engage, cover grace and range checks, plus target switching")

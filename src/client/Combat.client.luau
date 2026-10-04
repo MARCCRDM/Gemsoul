@@ -473,6 +473,23 @@ local targetTag = shadowed(text(targetCard, "", 10, P.Gold, IronUi.Bold))
 targetTag.AutomaticSize, targetTag.TextWrapped = Enum.AutomaticSize.None, false
 targetTag.TextXAlignment = Enum.TextXAlignment.Right
 targetTag.Position, targetTag.Size = UDim2.new(1, -86, 0, 4), UDim2.fromOffset(80, 14)
+-- Under the target bar when several targets are close: X (or tap) switches.
+local switchHint = new("TextButton", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 1, 4),
+	Size = UDim2.fromOffset(230, 18),
+	BackgroundColor3 = Color3.fromRGB(16, 22, 32),
+	BackgroundTransparency = 0.25,
+	TextColor3 = Color3.fromRGB(101, 210, 228),
+	TextSize = 11,
+	Font = IronUi.Bold,
+	AutoButtonColor = false,
+	Visible = false,
+}, targetCard)
+UiKit.round(switchHint, 9)
+switchHint.Activated:Connect(function()
+	TargetLock.switch()
+end)
 local targetTrack = new("Frame", {
 	BorderSizePixel = 0,
 	Position = UDim2.fromOffset(8, 24),
@@ -535,7 +552,7 @@ for i, id in { "Charge", "Stamina" } do
 end
 local controlsHint = text(
 	gui,
-	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | 1/2/3 Maneuvers | K Tree | L Log",
+	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | 1/2/3 Maneuvers | X Switch Target | K Tree | L Log",
 	10,
 	Color3.fromRGB(205, 198, 182)
 )
@@ -1192,6 +1209,16 @@ ContextActionService:BindActionAtPriority("CombatCursor", function(_, state)
 	end
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Tab)
+-- Switch between the targets close around you (within TargetLockRules.SwitchRange).
+ContextActionService:BindActionAtPriority("SwitchTarget", function(_, state)
+	if not canFight() or UserInputService:GetFocusedTextBox() then
+		return Enum.ContextActionResult.Pass
+	end
+	if state == Enum.UserInputState.Begin then
+		TargetLock.switch()
+	end
+	return Enum.ContextActionResult.Sink
+end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.X, Enum.KeyCode.DPadRight)
 UserInputService.WindowFocusReleased:Connect(cancel)
 ContextActionService:BindActionAtPriority("UniversalDodge", function(_, state)
 	if not canFight() or UserInputService:GetFocusedTextBox() then
@@ -1519,6 +1546,13 @@ RunService.RenderStepped:Connect(function(dt)
 		targetName.Text = if opponent then opponent.DisplayName else target.Name
 		targetTag.Text = if lockedTarget then "◎ LOCKED" elseif opponent then "PLAYER" else "ENEMY"
 		targetTag.TextColor3 = if lockedTarget then Color3.fromRGB(101, 210, 228) else P.Dim
+		local nearby = TargetLock.switchCount()
+		switchHint.Visible = lockedTarget ~= nil and nearby >= 2
+		switchHint.Text = string.format(
+			"%s  SWITCH TARGET  ·  %d NEARBY",
+			if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then "TAP" else "X",
+			nearby
+		)
 		for _, cap in targetCaps do
 			cap.BackgroundColor3 = if lockedTarget then Color3.fromRGB(101, 210, 228) else HudChrome.Gold
 		end

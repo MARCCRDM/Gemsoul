@@ -14,7 +14,7 @@ local player = Players.LocalPlayer
 local Lock = {}
 local active, paused, manualUntil, nextScan = false, false, 0, 0
 local engagedUntil = setmetatable({}, { __mode = "k" }) -- [model] = until (os.clock)
-local state, candidates = Rules.new(), {}
+local state, candidates, records = Rules.new(), {}, {}
 local params = RaycastParams.new()
 params.FilterType = Enum.RaycastFilterType.Exclude
 local outline = Instance.new("Highlight")
@@ -80,7 +80,7 @@ local function visible(model, point)
 	return result == nil or result.Instance:IsDescendantOf(model)
 end
 function Lock.reset()
-	state, candidates, nextScan, manualUntil = Rules.new(), {}, 0, 0
+	state, candidates, records, nextScan, manualUntil = Rules.new(), {}, {}, 0, 0
 	outline.Adornee, outline.Enabled = nil, false
 end
 function Lock.setActive(value)
@@ -120,6 +120,19 @@ function Lock.target()
 		return nil
 	end
 	return model
+end
+-- Moves the lock to the next target within SwitchRange (left to right).
+function Lock.switch()
+	if not active then
+		return nil
+	end
+	local target = Rules.switch(state, records)
+	outline.Adornee, outline.Enabled = target, target ~= nil
+	return target
+end
+-- How many targets switching would cycle through (2+ means there's a choice).
+function Lock.switchCount()
+	return if active then #Rules.switchable(records) else 0
 end
 -- Where to aim: only while the target is in sight (no aim assist through walls).
 function Lock.point()
@@ -166,7 +179,7 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 		end
 		nextScan = now + 0.1
 	end
-	local records = {}
+	records = {}
 	for _, model in candidates do
 		local point = pointOf(model)
 		if point and eligible(model) then
@@ -174,7 +187,10 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 			local distance = (point - ownRoot.Position).Magnitude
 			local rival = Matchmaking.ownsRival(model, player)
 			if delta.Magnitude > 0.01 and (distance <= Rules.RetainRange or rival) then
+				local look = camera.CFrame.LookVector
 				table.insert(records, {
+					-- Left (negative) to right across the view, for switching.
+					Bearing = math.atan2(look.X * delta.Z - look.Z * delta.X, look.X * delta.X + look.Z * delta.Z),
 					Target = model,
 					Distance = distance,
 					Facing = camera.CFrame.LookVector:Dot(delta.Unit),
