@@ -128,10 +128,13 @@ end
 -- screens) and scaled to fit the screen, below
 -- Roblox's own top bar (its menu buttons sit in the top-left corner).
 local TOPBAR = 54
+-- A strip along the bottom stays clear for the chat bar (left) and the
+-- owner's DEV button (right), so neither covers the panels.
+local BOTTOM = 44
 local safe = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, TOPBAR),
-	Size = UDim2.new(1, 0, 1, -TOPBAR),
+	Size = UDim2.new(1, 0, 1, -TOPBAR - BOTTOM),
 }, gui)
 local root = new("Frame", {
 	BackgroundTransparency = 1,
@@ -142,8 +145,8 @@ local root = new("Frame", {
 local fitScale = new("UIScale", {}, root)
 local function fit()
 	local screen = gui.AbsoluteSize
-	if screen.X > 0 and screen.Y > TOPBAR then
-		fitScale.Scale = math.min(screen.X / W, (screen.Y - TOPBAR) / H)
+	if screen.X > 0 and screen.Y > TOPBAR + BOTTOM then
+		fitScale.Scale = math.min(screen.X / W, (screen.Y - TOPBAR - BOTTOM) / H)
 	end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
@@ -370,8 +373,10 @@ if Config.Playtest and Config.Playtest.Build then
 	local buildTag =
 		text(gui, Config.Playtest.Build .. "   ·   Feedback & invites in Social [P]", 11, P.Dim, IronUi.Bold)
 	buildTag.AutomaticSize = Enum.AutomaticSize.None
-	buildTag.AnchorPoint, buildTag.Position = Vector2.new(0, 1), UDim2.new(0, 12, 1, -6)
+	-- Bottom centre: the chat bar has the left corner, the DEV button the right.
+	buildTag.AnchorPoint, buildTag.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -15)
 	buildTag.Size = UDim2.fromOffset(520, 14)
+	buildTag.TextXAlignment = Enum.TextXAlignment.Center
 	buildTag.TextTransparency = 0.25
 end
 countOnline()

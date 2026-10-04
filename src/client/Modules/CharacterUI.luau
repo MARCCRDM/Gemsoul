@@ -312,20 +312,23 @@ refreshItemArt = function()
 	end
 end
 
-local statsBox = box(panel, UDim2.fromOffset(592, 330), UDim2.fromOffset(384, 168), P.Inset)
+-- Combat ratings: a slim strip across the header, beside the name.
+local statsBox = box(panel, UDim2.fromOffset(508, 11), UDim2.fromOffset(868, 54), P.Inset)
 local statsCard = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(12, 8),
-	Size = UDim2.new(1, -24, 1, -14),
+	Position = UDim2.fromOffset(6, 6),
+	Size = UDim2.new(1, -12, 1, -12),
 }, statsBox)
 
 -- Backpack and inspector ------------------------------------------------------
 
+-- The bag: equipment and gems as two tabs sharing one tall panel.
 local invTitle = text(panel, "", 13, P.Dim, BOLD)
-invTitle.Position = UDim2.fromOffset(996, 82)
-invTitle.Size = UDim2.fromOffset(380, 18)
+invTitle.Position = UDim2.fromOffset(1188, 82)
+invTitle.Size = UDim2.fromOffset(188, 18)
+invTitle.TextXAlignment = Enum.TextXAlignment.Center
 
-local gridBox = box(panel, UDim2.fromOffset(992, 104), UDim2.fromOffset(384, 190), Color3.fromRGB(10, 9, 8))
+local gridBox = box(panel, UDim2.fromOffset(992, 106), UDim2.fromOffset(384, 392), Color3.fromRGB(10, 9, 8))
 local grid = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
@@ -343,10 +346,11 @@ new("UIGridLayout", {
 }, grid)
 
 -- Spare equipment uses the existing saved ownership records; worn items stay above.
-local equipmentTitle = text(panel, "EQUIPMENT INVENTORY", 13, P.Gold, BOLD)
-equipmentTitle.Position = UDim2.fromOffset(996, 306)
-equipmentTitle.Size = UDim2.fromOffset(380, 18)
-local equipmentBox = box(panel, UDim2.fromOffset(992, 328), UDim2.fromOffset(384, 170), P.Frame)
+local equipmentTitle = text(panel, "EQUIPMENT", 13, P.Gold, BOLD)
+equipmentTitle.Position = UDim2.fromOffset(992, 82)
+equipmentTitle.Size = UDim2.fromOffset(188, 18)
+equipmentTitle.TextXAlignment = Enum.TextXAlignment.Center
+local equipmentBox = box(panel, UDim2.fromOffset(992, 106), UDim2.fromOffset(384, 392), P.Frame)
 local equipmentGrid = new("ScrollingFrame", {
 	Name = "StoredEquipment",
 	BackgroundTransparency = 1,
@@ -371,7 +375,40 @@ equipmentEmpty.AutomaticSize = Enum.AutomaticSize.None
 equipmentEmpty.TextXAlignment = Enum.TextXAlignment.Center
 equipmentEmpty.ZIndex = 3
 
-local tooltip = box(panel, UDim2.fromOffset(592, 82), UDim2.fromOffset(384, 240), P.Inset)
+-- Item details get the whole middle column.
+local tooltip = box(panel, UDim2.fromOffset(592, 82), UDim2.fromOffset(384, 416), P.Inset)
+
+-- Bag tabs: click a title to switch; picking a socket or a gem opens Gems.
+local bagTab = "Equipment"
+local lastPick = nil
+local tabLine = new("Frame", {
+	BackgroundColor3 = P.Gold,
+	Size = UDim2.fromOffset(150, 2),
+	Position = UDim2.fromOffset(1011, 101),
+}, panel)
+local function showBag(tab: string)
+	bagTab = tab
+	local gems = tab == "Gems"
+	gridBox.Visible = gems
+	equipmentBox.Visible = not gems
+	invTitle.TextColor3 = if gems then P.Gold else P.Dim
+	equipmentTitle.TextColor3 = if gems then P.Dim else P.Gold
+	tabLine.Position = UDim2.fromOffset(if gems then 1207 else 1011, 101)
+end
+for _, spec in { { equipmentTitle, "Equipment" }, { invTitle, "Gems" } } do
+	local hit = new("TextButton", {
+		Text = "",
+		BackgroundTransparency = 1,
+		Position = spec[1].Position - UDim2.fromOffset(0, 4),
+		Size = UDim2.fromOffset(188, 24),
+		ZIndex = 5,
+	}, panel)
+	hit:SetAttribute("UiSound", "Tab")
+	hit.Activated:Connect(function()
+		showBag(spec[2])
+	end)
+end
+showBag("Equipment")
 local tooltipStroke = tooltip:FindFirstChildOfClass("UIStroke") :: UIStroke
 UiKit.pad(tooltip, 12)
 local tipArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(58, 58) }, tooltip)
@@ -1425,7 +1462,7 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 	ui.Style.TextColor3 = if roll then GearRolls.Rarities[roll.Rarity].Color else Crafting.Qualities[quality or 1].Color
 	-- The weapon occupies both hand slots; the saved shield contributes nothing.
 	if slotName == "Shield" and gear and not Classes.heldShield(loadout) then
-		ui.Style.Text = "OCCUPIED · TWO-HANDED"
+		ui.Style.Text = "STOWED · 2H"
 		ui.Style.TextColor3 = P.Dim
 	end
 	-- The gem's headline effect (its Size line), e.g. "Heat Shield absorbs 16 damage".
@@ -1530,140 +1567,115 @@ local function statIcon(parent: Instance, name: string, color: Color3)
 end
 
 -- One rating: icon, name, a big number, what gems add, and a two-part bar.
-local function statTile(parent: Instance, name: string, rating: Classes.Rating, x: number, y: number)
+-- Ratings show as whole numbers (the maths behind them can be fractional).
+local function whole(value: number): string
+	return tostring(math.floor(value + 0.5))
+end
+
+-- One compact rating tile for the header strip: icon, name (with a hint),
+-- the number, any gem bonus, and a bar.
+local function statTile(parent: Instance, name: string, rating: Classes.Rating, x: number, hint: string?)
 	local color = STAT_COLORS[name] or P.Teal
 	local total = rating.Base + rating.Bonus
 	local gemColor = if rating.Element then GemConfig.ElementColors[rating.Element] else P.Good
 	local tile = new("Frame", {
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		Position = UDim2.fromOffset(x, y),
-		Size = UDim2.fromOffset(176, 50),
+		Position = UDim2.fromOffset(x, 0),
+		Size = UDim2.fromOffset(152, 42),
 	}, parent)
 	UiKit.round(tile, 6)
 	new("UIGradient", { Rotation = 0, Color = ColorSequence.new(color:Lerp(P.Frame, 0.78), P.Frame) }, tile)
 	new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.6 }, tile)
 	statIcon(tile, name, color)
-	local caption = text(tile, string.upper(name), 11, color:Lerp(Color3.new(1, 1, 1), 0.35), BOLD)
+	local icon = tile:FindFirstChildWhichIsA("Frame")
+	if icon then
+		icon.Position = UDim2.fromOffset(6, 6)
+	end
+	local caption = text(
+		tile,
+		string.upper(name) .. (if hint then "  " .. hint else ""),
+		10,
+		color:Lerp(Color3.new(1, 1, 1), 0.35),
+		BOLD
+	)
 	caption.AutomaticSize = Enum.AutomaticSize.None
-	caption.Position = UDim2.fromOffset(48, 5)
-	caption.Size = UDim2.fromOffset(80, 13)
-	local number = text(tile, tostring(total), 22, Color3.new(1, 1, 1), IronUi.Heading)
+	caption.Position = UDim2.fromOffset(42, 3)
+	caption.Size = UDim2.fromOffset(104, 12)
+	caption.TextTruncate = Enum.TextTruncate.AtEnd
+	local number = text(tile, whole(total), 18, Color3.new(1, 1, 1), IronUi.Heading)
 	number.AutomaticSize = Enum.AutomaticSize.None
-	number.Position = UDim2.fromOffset(48, 17)
-	number.Size = UDim2.fromOffset(70, 22)
+	number.Position = UDim2.fromOffset(42, 15)
+	number.Size = UDim2.fromOffset(56, 18)
 	if rating.Bonus > 0 then
 		local pill = new("TextLabel", {
 			BackgroundColor3 = gemColor,
 			BackgroundTransparency = 0.78,
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -8, 0, 7),
-			Size = UDim2.fromOffset(0, 18),
+			Position = UDim2.new(1, -6, 0, 16),
+			Size = UDim2.fromOffset(0, 15),
 			AutomaticSize = Enum.AutomaticSize.X,
-			Text = "◆ +" .. rating.Bonus,
+			Text = "◆ +" .. whole(rating.Bonus),
 			Font = BOLD,
-			TextSize = 12,
+			TextSize = 10,
 			TextColor3 = gemColor:Lerp(Color3.new(1, 1, 1), 0.3),
 		}, tile)
-		UiKit.round(pill, 9)
-		new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, pill)
+		UiKit.round(pill, 8)
+		new("UIPadding", { PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) }, pill)
 	end
 	local track = new("Frame", {
 		BackgroundColor3 = Color3.fromRGB(40, 36, 52),
-		Position = UDim2.fromOffset(48, 40),
-		Size = UDim2.new(1, -56, 0, 5),
+		Position = UDim2.fromOffset(42, 35),
+		Size = UDim2.new(1, -48, 0, 3),
 	}, tile)
-	UiKit.round(track, 3)
+	UiKit.round(track, 2)
 	local baseShare = math.min(1, rating.Base / RATING_MAX)
 	local base = new("Frame", { BackgroundColor3 = color, Size = UDim2.fromScale(baseShare, 1) }, track)
-	UiKit.round(base, 3)
+	UiKit.round(base, 2)
 	if rating.Bonus > 0 then
 		local extra = new("Frame", {
 			BackgroundColor3 = gemColor,
 			Position = UDim2.fromScale(baseShare, 0),
 			Size = UDim2.fromScale(math.min(1, total / RATING_MAX) - baseShare, 1),
 		}, track)
-		UiKit.round(extra, 3)
+		UiKit.round(extra, 2)
 	end
 	return total
 end
 
--- A small labelled chip for the footer.
-local function footChip(parent: Instance, value: string, color: Color3, order: number): TextLabel
-	local chip = new("TextLabel", {
-		BackgroundColor3 = P.Frame,
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 22),
-		Text = value,
-		Font = BOLD,
-		TextSize = 12,
-		TextColor3 = color,
-		LayoutOrder = order,
-	}, parent)
-	UiKit.round(chip, 11)
-	new(
-		"UIStroke",
-		{ Color = color, Thickness = 1, Transparency = 0.6, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
-		chip
-	)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, chip)
-	return chip
-end
-
 local function drawStats(loadout, class)
 	clear(statsCard)
-	local head = text(statsCard, "COMBAT RATINGS", 13, P.Gold, BOLD)
-	head.AutomaticSize = Enum.AutomaticSize.None
-	head.Size = UDim2.fromOffset(200, 18)
-	head.TextYAlignment = Enum.TextYAlignment.Center
 	if not class then
 		return
 	end
 	local ratings = Classes.ratings(loadout)
+	local hints = {
+		Health = whole(Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)) .. " HP",
+		Speed = string.format("%.1f", Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus)),
+	}
 	local power = 0
 	for i, name in Classes.StatNames do
-		local column, row = (i - 1) % 2, (i - 1) // 2
-		power += statTile(statsCard, name, ratings[name], column * 184, 24 + row * 56)
+		power += statTile(statsCard, name, ratings[name], (i - 1) * 158, hints[name])
 	end
-	-- Power: the four ratings together, one number to compare loadouts by.
+	-- The four ratings together: one number to compare loadouts by.
 	local badge = new("Frame", {
 		BackgroundColor3 = P.Gold,
-		BackgroundTransparency = 0.82,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 0, 0, -2),
-		Size = UDim2.fromOffset(0, 22),
-		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 0.84,
+		Position = UDim2.fromOffset(4 * 158, 0),
+		Size = UDim2.fromOffset(112, 42),
 	}, statsCard)
-	UiKit.round(badge, 11)
+	UiKit.round(badge, 6)
 	new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.4 }, badge)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, badge)
-	UiKit.list(badge, 6, true)
-	local caption = text(badge, "POWER", 11, P.Gold, BOLD)
-	caption.AutomaticSize = Enum.AutomaticSize.X
-	caption.Size = UDim2.fromOffset(0, 22)
-	caption.LayoutOrder = 1
-	local score = text(badge, tostring(power), 16, Color3.new(1, 1, 1), IronUi.Heading)
-	score.AutomaticSize = Enum.AutomaticSize.X
-	score.Size = UDim2.fromOffset(0, 22)
-	score.LayoutOrder = 2
-	-- Footer: what the ratings mean, and how many gems are attuned.
-	local foot = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 132),
-		Size = UDim2.new(1, 0, 0, 22),
-	}, statsCard)
-	UiKit.list(foot, 6, true)
-	footChip(
-		foot,
-		string.format("%d MAX HP", Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)),
-		P.Emerald,
-		1
-	)
-	footChip(
-		foot,
-		string.format("%.1f SPEED", Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus)),
-		P.Amethyst,
-		2
-	)
+	local caption = text(badge, "TOTAL RATING", 10, P.Gold, BOLD)
+	caption.AutomaticSize = Enum.AutomaticSize.None
+	caption.Position = UDim2.fromOffset(0, 3)
+	caption.Size = UDim2.fromOffset(112, 12)
+	caption.TextXAlignment = Enum.TextXAlignment.Center
+	local score = text(badge, whole(power), 22, Color3.new(1, 1, 1), IronUi.Heading)
+	score.AutomaticSize = Enum.AutomaticSize.None
+	score.Position = UDim2.fromOffset(0, 15)
+	score.Size = UDim2.fromOffset(112, 24)
+	score.TextXAlignment = Enum.TextXAlignment.Center
+	-- Gems attuned to the worn gear.
 	local attuned, color = 0, P.Dim
 	for _, slotName in Slots.Order do
 		local gem = socketed(slotName)
@@ -1674,12 +1686,23 @@ local function drawStats(loadout, class)
 			end
 		end
 	end
-	footChip(
-		foot,
-		if attuned > 0 then string.format("◆ %d / %d ATTUNED", attuned, #Slots.Order) else "NO GEMS ATTUNED",
-		color,
-		3
-	)
+	local chip = new("Frame", {
+		BackgroundColor3 = P.Frame,
+		Position = UDim2.fromOffset(4 * 158 + 120, 0),
+		Size = UDim2.fromOffset(104, 42),
+	}, statsCard)
+	UiKit.round(chip, 6)
+	new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.5 }, chip)
+	local top = text(chip, string.format("◆ %d / %d", attuned, #Slots.Order), 16, color, IronUi.Heading)
+	top.AutomaticSize = Enum.AutomaticSize.None
+	top.Position = UDim2.fromOffset(0, 4)
+	top.Size = UDim2.fromOffset(104, 20)
+	top.TextXAlignment = Enum.TextXAlignment.Center
+	local bottom = text(chip, "GEMS ATTUNED", 9, P.Dim, BOLD)
+	bottom.AutomaticSize = Enum.AutomaticSize.None
+	bottom.Position = UDim2.fromOffset(0, 25)
+	bottom.Size = UDim2.fromOffset(104, 12)
+	bottom.TextXAlignment = Enum.TextXAlignment.Center
 end
 
 -- Gem dragging ---------------------------------------------------------------------------
@@ -1905,7 +1928,7 @@ local function drawGrid(profile)
 	table.sort(gems, function(a, b)
 		return GemConfig.value(a) > GemConfig.value(b)
 	end)
-	invTitle.Text = string.format("GEM BACKPACK   %d / %d", #gems, Config.MaxGems)
+	invTitle.Text = string.format("GEMS  ·  %d / %d", #gems, Config.MaxGems)
 	local ids = {}
 	for i, gem in gems do
 		ids[i] = gem.Id .. ":" .. tostring(gem.Cut)
@@ -1967,6 +1990,12 @@ end
 -- Stored equipment data ---------------------------------------------------------------
 local function storedEquipment(profile)
 	local loadout = profile.Character or {}
+	-- Picking a socket or a gem opens the Gems tab (once per pick).
+	local pick = selection and (selection.Kind == "Socket" or selection.Kind == "Gem") and selection or nil
+	if pick and pick ~= lastPick and bagTab ~= "Gems" then
+		showBag("Gems")
+	end
+	lastPick = pick
 	local items = {}
 	for order, slotName in Slots.Order do
 		local kind = Slots.Definitions[slotName].Kind
@@ -2047,7 +2076,7 @@ end
 
 local function drawEquipmentInventory(profile)
 	local items = storedEquipment(profile)
-	equipmentTitle.Text = string.format("EQUIPMENT INVENTORY   %d STORED", #items)
+	equipmentTitle.Text = string.format("EQUIPMENT  ·  %d", #items)
 	equipmentEmpty.Visible = #items == 0
 	local scrollPosition = equipmentGrid.CanvasPosition
 	clear(equipmentGrid)
@@ -2143,8 +2172,9 @@ end
 
 function CharacterUI.refresh()
 	local profile = GemClient.Profile
-	regenerate.Visible = profile ~= nil and profile.CanRegenerateEquipment == true
-	regenerateGems.Visible = regenerate.Visible
+	-- Owner tools live in the DEV panel (DungeonPlaytest), not the header.
+	regenerate.Visible = false
+	regenerateGems.Visible = false
 	if not profile or not gui.Enabled then
 		return
 	end
