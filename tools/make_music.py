@@ -11,6 +11,10 @@ it. The end flows straight back into the start (reverb and delay tails are
 wrapped around), so it loops seamlessly. Upload it with
 tools/upload_audio.py (or by hand) and its id goes in
 src/client/Modules/Music.luau.
+
+The game now uses cuts of its own theme song instead (tools/cut_song.py),
+so this writes _arena_loop.mp3: the leading underscore keeps
+tools/upload_audio.py from uploading it. Rename it to use it again.
 """
 import os
 import sys
@@ -303,9 +307,9 @@ def render():
 def main():
     os.makedirs(OUT, exist_ok=True)
     audio = render()
-    path = os.path.join(OUT, "arena_loop.mp3")
+    path = os.path.join(OUT, "_arena_loop.mp3")
     sf.write(path, audio, SR, format="MP3")
-    print(f"arena_loop.mp3  {len(audio) / SR:.1f} s  {os.path.getsize(path) / 1024:.0f} KB")
+    print(f"_arena_loop.mp3  {len(audio) / SR:.1f} s  {os.path.getsize(path) / 1024:.0f} KB")
 
 
 if __name__ == "__main__":
