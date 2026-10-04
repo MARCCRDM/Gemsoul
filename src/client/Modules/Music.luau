@@ -74,7 +74,8 @@ function Music.play(mood: string)
 		return
 	end
 	current = mood
-	local fade = TweenInfo.new(Music.FadeSeconds, Enum.EasingStyle.Sine)
+	-- Going quiet (a 1v1 before its first action) is quick.
+	local fade = TweenInfo.new(if mood == "Silence" then 0.6 else Music.FadeSeconds, Enum.EasingStyle.Sine)
 	for name, sound in sounds do
 		if name ~= mood then
 			local out = TweenService:Create(sound, fade, { Volume = 0 })
@@ -85,6 +86,9 @@ function Music.play(mood: string)
 			end)
 			out:Play()
 		end
+	end
+	if mood == "Silence" then
+		return -- everything fades out, nothing fades in
 	end
 	local sound = track(mood)
 	if not sound then

@@ -1,8 +1,8 @@
 -- Plays the theme song's loop that fits what you're doing: the menu, the
 -- Outpost, a dungeon or a fight (see Modules.Music). A 1v1 (the rival, Arena
--- PvP or a duel) keeps the music you had until the fight is engaged: your
--- first attack, guard, surge or maneuver, or the first blow either way. Then
--- the Arena song starts (at Music.StartAt).
+-- PvP or a duel) is silent until the fight is engaged: your first attack,
+-- guard, surge or maneuver, or the first blow either way. Then the Arena
+-- song starts (at Music.StartAt).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -35,7 +35,7 @@ local function update()
 	end
 	local mood = Music.moodFor(attributes)
 	if mood == "Arena" and not engaged then
-		return -- the Arena song waits for the first action
+		mood = "Silence" -- quiet until the first action, then the Arena song
 	end
 	Music.play(mood)
 end
