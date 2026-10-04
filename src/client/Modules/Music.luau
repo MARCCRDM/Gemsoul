@@ -7,7 +7,7 @@
 	  Dungeon  the second drop     squad dungeons
 	  Fight    the final drop      raids (and fights, until Arena has an id)
 	  Arena    its own song        1v1s: the rival, PvP and duels; starts at
-	                               StartAt (1:44) every match and loops back there
+	                               StartAt (0:39) every match and loops back there
 
 	Changing mood crossfades between them. Roblox only plays uploaded audio:
 	run tools/upload_audio.py (or upload the .ogg files in Creator Hub,
@@ -29,7 +29,7 @@ Music.Ids = {
 }
 
 -- Moods that start part-way into their song each time they come on, in seconds.
-Music.StartAt = { Arena = 104 } -- 1:44
+Music.StartAt = { Arena = 39 } -- 0:39
 
 -- How loud each mood plays (0 mutes it).
 Music.Volumes = { Menu = 0.3, Outpost = 0.32, Dungeon = 0.42, Fight = 0.45, Arena = 0.45 }
@@ -115,7 +115,7 @@ function Music.play(mood: string)
 			sound:Play()
 		end
 	end
-	-- A song with a start point comes in right away, so 1:44 is heard at 1:44.
+	-- A song with a start point comes in right away, so its start point is heard at once.
 	local fadeIn = if startAt then TweenInfo.new(0.25, Enum.EasingStyle.Sine) else fade
 	TweenService:Create(sound, fadeIn, { Volume = Music.Volumes[mood] or 0.3 }):Play()
 end
