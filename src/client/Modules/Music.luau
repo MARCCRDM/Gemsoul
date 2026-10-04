@@ -7,7 +7,7 @@
 	  Dungeon  the second drop     squad dungeons
 	  Fight    the final drop      raids (and fights, until Arena has an id)
 	  Arena    its own song        1v1s: the rival, PvP and duels; starts at
-	                               StartAt (0:39) every match and loops back there
+	                               StartAt (0:39) once the match is engaged and loops back there
 
 	Changing mood crossfades between them. Roblox only plays uploaded audio:
 	run tools/upload_audio.py (or upload the .ogg files in Creator Hub,
@@ -56,14 +56,11 @@ local function track(mood: string): Sound?
 	made.SoundId = "rbxassetid://" .. id
 	made.Volume = 0
 	local startAt = Music.StartAt[mood]
-	-- A song that starts part-way loops back to that point, not to its intro.
-	made.Looped = startAt == nil
+	-- Every song loops; one with a start point loops back to it, not to its intro.
+	made.Looped = true
 	if startAt then
-		made.Ended:Connect(function()
-			if current == mood then
-				made.TimePosition = startAt
-				made:Play()
-			end
+		made.DidLoop:Connect(function()
+			made.TimePosition = startAt
 		end)
 	end
 	made.Parent = SoundService
