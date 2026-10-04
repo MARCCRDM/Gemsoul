@@ -43,9 +43,12 @@ local function validItem(player, slot, id)
 	return Logic.item(profile, slot, id)
 end
 local function view(s, player)
+	local partner = if player == s.A then s.B else s.A
 	return {
 		Id = s.Id,
-		Partner = (if player == s.A then s.B else s.A).DisplayName,
+		Partner = partner.DisplayName,
+		PartnerId = partner.UserId,
+		PartnerLevel = partner:GetAttribute("SeasonLevel"),
 		Slot = s.Left.Slot,
 		Left = s.Left,
 		Right = s.Right,
