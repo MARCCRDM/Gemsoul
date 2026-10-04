@@ -303,9 +303,14 @@ function STYLES.Shock(pieces, centre: Vector3, floor: number)
 				)
 		end
 		if step % 3 == 1 and #pieces > 1 then
-			local a = pieces[math.random(1, #pieces)].Part.Position
-			local b = pieces[math.random(1, #pieces)].Part.Position
-			CombatVfx.lightning(a, b + (b - a).Unit * 2, if math.random() < 0.5 then ion else white)
+			-- Two different pieces (the same one twice has no direction).
+			local first = math.random(1, #pieces)
+			local second = (first + math.random(1, #pieces - 1) - 1) % #pieces + 1
+			local a = pieces[first].Part.Position
+			local b = pieces[second].Part.Position
+			if (b - a).Magnitude > 0.1 then
+				CombatVfx.lightning(a, b + (b - a).Unit * 2, if math.random() < 0.5 then ion else white)
+			end
 		end
 		if step % 3 == 1 then
 			CombatSound.play("Zap", centre, { Volume = 0.6 })

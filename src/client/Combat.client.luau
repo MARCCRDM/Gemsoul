@@ -1621,11 +1621,20 @@ local function ring(center: Vector3, radius: number, color: Color3, transparency
 	return disc
 end
 
+-- The ground under a spot: not a fighter standing on it (a blast aimed at
+-- an enemy would ring its head) or anything you can walk through.
 local function floorUnder(position: Vector3): Vector3
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { fxFolder, player.Character :: Instance }
-	local hit = workspace:Raycast(position + Vector3.new(0, 4, 0), Vector3.new(0, -30, 0), params)
+	params.RespectCanCollide = true
+	local skip: { Instance } = { fxFolder, workspace:FindFirstChild("Enemies") or fxFolder }
+	for _, other in Players:GetPlayers() do
+		if other.Character then
+			table.insert(skip, other.Character)
+		end
+	end
+	params.FilterDescendantsInstances = skip
+	local hit = workspace:Raycast(position + Vector3.new(0, 4, 0), Vector3.new(0, -80, 0), params)
 	return if hit then hit.Position + Vector3.new(0, 0.15, 0) else position
 end
 
@@ -1794,16 +1803,9 @@ function handlers.TechPulse(_who, from, to, color, radius)
 	-- A flickering beam with a white core, a burst and shockwave where it lands.
 	CombatVfx.beam(from, to, color, radius)
 	if radius > 0 then
-		for _, axis in { CFrame.new(), CFrame.Angles(math.pi / 2, 0, 0), CFrame.Angles(0, 0, math.pi / 2) } do
-			local pulse = effectPart(
-				Vector3.new(0.15, radius * 2, radius * 2),
-				CFrame.new(to) * axis,
-				color,
-				Enum.PartType.Cylinder
-			)
-			pulse.Transparency = 0.88
-			fade(pulse, 0.35, pulse.Size * 1.25)
-		end
+		-- Its reach, flat on the ground under where it lands.
+		local pulse = ring(floorUnder(to), radius, color, 0.7)
+		fade(pulse, 0.35, Vector3.new(0.1, radius * 2.5, radius * 2.5))
 	end
 end
 function handlers.TechField(who, color)
