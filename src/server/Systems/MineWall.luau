@@ -407,6 +407,9 @@ local function expeditionLeave(player: Player)
 	return reply(true, "Back at base.", { Wall = if wall then wallView(wall) else nil, Quota = quotaInfo(player) })
 end
 
+-- Gear found mining (the Saga Outpost's rocks use it too).
+MineWall.recoverGear = recoverGear
+
 function MineWall.clear(player: Player)
 	walls[player] = nil
 end

@@ -99,6 +99,18 @@ function GearRolls.roll(rng, fixedRarity, gear)
 	end
 	return roll
 end
+-- Gear score: every rolled stat on the six worn pieces (percent stats count
+-- as points), as the Armory shows it and the leaderboards rank it.
+function GearRolls.gearScore(loadout): number
+	local score = 0
+	for _, slot in Slots.Order do
+		local roll = GearRolls.get(loadout, slot)
+		for stat, amount in roll and roll.Stats or {} do
+			score += if stat == "Critical" or stat == "Cooldown" then amount * 100 else amount
+		end
+	end
+	return math.floor(score + 0.5)
+end
 function GearRolls.get(loadout, slot, id)
 	local kind = Slots.Definitions[slot].Kind
 	return loadout.GearRolls and loadout.GearRolls[kind] and loadout.GearRolls[kind][id or loadout[slot]]

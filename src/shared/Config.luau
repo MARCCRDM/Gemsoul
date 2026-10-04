@@ -13,8 +13,8 @@ local Config = {
 	-- Whole activities can be switched off (e.g. a combat-only playtest): the
 	-- server refuses them and the dashboard shows them as closed.
 	Features = {
-		Mining = false,
-		Market = false,
+		Mining = true,
+		Market = true,
 	},
 
 	-- Free mining: each mined node uses one free mine. When the daily or

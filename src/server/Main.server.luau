@@ -76,3 +76,7 @@ if Config.CombatEnabled or not Config.MenuOnly then
 	require(script.Parent.Systems.Dungeons).start()
 require(script.Parent.Systems.DungeonQueue).start()
 end
+-- Saga Outpost: the shared mining basin (mine, trade at the Probe, duel).
+if Config.Features == nil or Config.Features.Mining ~= false then
+	require(script.Parent.Systems.OutpostServer).start()
+end

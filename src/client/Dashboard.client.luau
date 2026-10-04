@@ -16,6 +16,8 @@ end
 
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
+local OutpostScene = require(script.Parent.Modules.OutpostScene)
+local OutpostRules = require(ReplicatedStorage.Shared.Outpost)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local MineScene = require(script.Parent.Modules.MineScene)
@@ -383,7 +385,7 @@ local STRIP_Y, STRIP_H = 66, 110
 local mine = panel(root, 16, STRIP_Y, 630, STRIP_H, Color3.fromRGB(230, 130, 40))
 local sector = label(mine, "LUNAR FRONTIER", 11, P.Gold, IronUi.Bold)
 place(sector, 20, 12, 200, 14)
-local mineTitle = label(mine, "MOON MINE", 26, P.Text, IronUi.Heading)
+local mineTitle = label(mine, "SAGA OUTPOST", 26, P.Text, IronUi.Heading)
 place(mineTitle, 18, 28, 240, 32)
 local mineLine1 = label(mine, "", 14, P.Text, IronUi.Body)
 place(mineLine1, 20, 64, 250, 20)
@@ -444,8 +446,8 @@ IronUi.animate(lunarView, function(t)
 	lunarModel:PivotTo(CFrame.Angles(0, math.sin(t * 0.18) * 0.18, -0.12))
 end)
 local digButton = bigButton(mine, "BEGIN EXPEDITION", Color3.fromRGB(255, 167, 46), function()
-	-- Expeditions are on foot: off to the mining site.
-	launch(MineScene.begin)
+	-- On foot to Saga Outpost: the shared mining basin.
+	launch(OutpostScene.enter)
 end)
 digButton.AnchorPoint = Vector2.new(1, 0.5)
 digButton.Position = UDim2.new(1, -54, 0.5, 0)
@@ -617,17 +619,20 @@ local function refresh(profile)
 	end
 	readinessValue.Text = string.format("%d/6 equipped   ·   %d/3 surges", equipped, surges)
 	readinessValue.TextColor3 = if equipped == 6 and surges == 3 then P.Teal else P.Gold
-	local quota = profile.Quota or {}
-	local daily = profile.DailyQuota or Config.DailyQuota
-	local weekly = profile.WeeklyQuota or Config.WeeklyQuota
-	local free = math.max(0, math.min(daily - (quota.UsedToday or 0), weekly - (quota.UsedThisWeek or 0)))
-	allowanceFill.Size = UDim2.fromScale(math.clamp(free / math.max(1, daily), 0, 1), 1)
-	allowanceFill.BackgroundColor3 = if free > 0 then P.Gold else P.Dim
-	mineLine1.Text = if free > 0
-		then string.format("%d of %d free walls left today", free, daily)
-		else "Free walls used up today"
-	local best = profile.Stats and profile.Stats.BestDepth or 0
-	mineLine2.Text = if best > 0 then "Deepest shaft: depth " .. best else "Dig deeper for rarer finds"
+	-- Saga Outpost: the pick in hand and its swings (a free Survey Pick daily).
+	local outpost = profile.Outpost
+	local pickId = outpost and outpost.Active or "Survey"
+	local pick = OutpostRules.Picks[pickId] or OutpostRules.Picks.Survey
+	local swings = if outpost then outpost.Picks[pickId] or 0 else pick.Swings
+	allowanceFill.Size = UDim2.fromScale(math.clamp(swings / pick.Swings, 0, 1), 1)
+	allowanceFill.BackgroundColor3 = if swings > 0 then pick.Color else P.Dim
+	mineLine1.Text = if swings > 0
+		then string.format("%s · %d swings left", pick.Name, swings)
+		else "Pick broken: a new one at PROBE-7"
+	local rocks = outpost and outpost.Rocks or 0
+	mineLine2.Text = if rocks > 0
+		then string.format("%d rocks mined · shared basin", rocks)
+		else "Mine with everyone · trade · duel"
 	for key, socket in surgeSockets do
 		local gem = Tech.surgeGem(profile.Character, key)
 		local definition = gem and Tech.surgeStats(gem)
@@ -680,7 +685,7 @@ task.defer(maybeWelcome)
 local KEYS = {
 	K = AugmentTreeUI.toggle,
 	L = SurgeArrayUI.toggle,
-	M = MineScene.begin,
+	M = OutpostScene.enter,
 	T = TradeUI.open,
 	B = ShopUI.toggle,
 	J = SeasonUI.toggle,

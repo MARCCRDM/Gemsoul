@@ -63,7 +63,8 @@ local pickUntil = 0
 local lastSwing = 0
 
 function MineScene.isActive(): boolean
-	return active
+	-- (The Saga Outpost counts: you're out in the world either way.)
+	return active or require(script.Parent.OutpostScene).isActive()
 end
 
 local function tween(object: Instance, seconds: number, goal: { [string]: any }, style: Enum.EasingStyle?)
