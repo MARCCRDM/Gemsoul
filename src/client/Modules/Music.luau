@@ -5,7 +5,9 @@
 	  Menu     the breakdown       menus and the dashboard
 	  Outpost  the first verse     exploring and mining at the Outpost
 	  Dungeon  the second drop     squad dungeons
-	  Fight    the final drop      Arena fights, duels and raids
+	  Fight    the final drop      raids (and fights, until Arena has an id)
+	  Arena    its own song        1v1s: the rival, PvP and duels; starts at
+	                               StartAt (1:45) every match and loops back there
 
 	Changing mood crossfades between them. Roblox only plays uploaded audio:
 	run tools/upload_audio.py (or upload the .ogg files in Creator Hub,
@@ -23,10 +25,14 @@ Music.Ids = {
 	Dungeon = 75260701190300, -- dungeon_theme.ogg
 	Fight = 83708484138750, -- fight_theme.ogg
 	Intro = 74920383589616, -- intro_sting.ogg (the splash's music when there's no video yet)
+	Arena = 0, -- Capt Hunchines - Imminent DAY1 instr 5.mp3 (1v1 Arena song)
 }
 
+-- Moods that start part-way into their song each time they come on, in seconds.
+Music.StartAt = { Arena = 105 } -- 1:45
+
 -- How loud each mood plays (0 mutes it).
-Music.Volumes = { Menu = 0.3, Outpost = 0.32, Dungeon = 0.42, Fight = 0.45 }
+Music.Volumes = { Menu = 0.3, Outpost = 0.32, Dungeon = 0.42, Fight = 0.45, Arena = 0.45 }
 Music.FadeSeconds = 2
 
 local sounds: { [string]: Sound } = {}
@@ -48,8 +54,18 @@ local function track(mood: string): Sound?
 	local made = Instance.new("Sound")
 	made.Name = mood .. "Music"
 	made.SoundId = "rbxassetid://" .. id
-	made.Looped = true
 	made.Volume = 0
+	local startAt = Music.StartAt[mood]
+	-- A song that starts part-way loops back to that point, not to its intro.
+	made.Looped = startAt == nil
+	if startAt then
+		made.Ended:Connect(function()
+			if current == mood then
+				made.TimePosition = startAt
+				made:Play()
+			end
+		end)
+	end
 	made.Parent = SoundService
 	sounds[mood] = made
 	return made
@@ -77,7 +93,21 @@ function Music.play(mood: string)
 	if not sound then
 		return
 	end
-	if not sound.IsPlaying then
+	local startAt = Music.StartAt[mood]
+	if startAt then
+		-- Every match starts the song at the same moment (once it has loaded,
+		-- or the jump is ignored).
+		sound.TimePosition = startAt
+		sound:Play()
+		task.spawn(function()
+			if not sound.IsLoaded then
+				sound.Loaded:Wait()
+			end
+			if current == mood and sound.TimePosition < startAt then
+				sound.TimePosition = startAt
+			end
+		end)
+	elseif not sound.IsPlaying then
 		-- Pick up where it left off (a paused loop), or start it.
 		if sound.TimePosition > 0 then
 			sound:Resume()
@@ -93,6 +123,15 @@ function Music.moodFor(attributes: { [string]: any }): string
 	if attributes.DungeonId ~= nil then
 		return "Dungeon"
 	elseif attributes.CombatSession ~= nil then
+		-- 1v1s (the rival, Arena PvP and duels) have their own song.
+		local session = attributes.CombatSession
+		if
+			(session == "Training" or session == "PvP" or session == "Duel")
+			and Music.Ids.Arena
+			and Music.Ids.Arena ~= 0
+		then
+			return "Arena"
+		end
 		return "Fight"
 	elseif attributes.Outpost == true then
 		return "Outpost"
