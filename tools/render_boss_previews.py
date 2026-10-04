@@ -6,7 +6,7 @@ root=Path(__file__).resolve().parents[1]
 base=(root/'.tools/render_equipment_details.py').read_text(encoding='utf-8').split("for name, path in")[0]
 ctx={'__file__':str(root/'.tools/render_equipment_details.py')};exec(base,ctx);source=ctx['source']
 source=source.replace('return setmetatable({t={x or 0,y or 0,z or 0}', 'if type(x)=="table" then x,y,z=x.X,x.Y,x.Z end\n return setmetatable({t={x or 0,y or 0,z or 0}')
-source+='\nVector3.zero=Vector3.new(0,0,0)\n'
+source+='\nvmt.__add=function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end\nVector3.zero=Vector3.new(0,0,0)\n'
 source+='local Skins=(function()\n'+(root/'src/server/Systems/BrainrotSkins.luau').read_text(encoding='utf-8')+'\nend)()\n'
 source+='local Rules=(function()\n'+(root/'src/shared/DungeonRules.luau').read_text(encoding='utf-8')+'\nend)()\n'
 duel=(root/'src/server/Systems/Duelist.luau').read_text(encoding='utf-8');source+=duel[duel.index('local BODY ='):duel.index('local JOINTS =')]
@@ -87,3 +87,4 @@ for idx,(meta,parts) in enumerate(models):
  im.save(out/(str(idx+1)+'-'+element+'.png'))
  sheet.paste(im,(30+(idx%2)*790,120+(idx//2)*755))
 sheet.save(out/'all-bosses.png');print(out/'all-bosses.png')
+

@@ -105,6 +105,7 @@ local Random = {
 	end,
 }
 
+vmt.__add=function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end
 Vector3.zero=Vector3.new(0,0,0)
 local Skins=(function()
 -- Reference-guided native creature geometry. See docs/boss-model-references.md.
@@ -202,6 +203,15 @@ local function wood(rig, accent)
 			local b = rig[side .. segment]
 			part(rig, b, "TimberLimb", V(0.29, b.Size.Y + 0.12, 0.3), V(0, 0, 0), oak, BALL)
 		end
+		part(
+			rig,
+			rig[side .. "UpperArm"],
+			"Shoulder",
+			V(0.78, 0.4, 0.4),
+			V(if side == "Left" then 0.3 else -0.3, 0.45, 0),
+			oak,
+			BALL
+		)
 		local hand = rig[side .. "Hand"]
 		part(rig, hand, "Palm", V(0.32, 0.45, 0.26), V(0, -0.02, 0), oak, BALL)
 		for i = 1, 4 do
@@ -242,6 +252,10 @@ local function sneaker(rig, bone, offset)
 end
 local function shark(rig, accent)
 	local t = rig.UpperTorso
+	local build = part
+	local function part(r, bone, name, size, pos, color, shape, rotation)
+		return build(r, bone, name, size, if bone == t then pos + V(0, -1.35, 0) else pos, color, shape, rotation)
+	end
 	local skin = C(82, 111, 126)
 	part(rig, t, "SharkBody", V(2.05, 1.85, 4.25), V(0, -0.1, 0.12), skin, BALL)
 	part(rig, t, "WhiteBelly", V(1.83, 1.1, 3.75), V(0, -0.56, -0.05), C(196, 204, 197), BALL)
@@ -277,7 +291,7 @@ local function shark(rig, accent)
 		end
 		part(
 			rig,
-			rig[if s < 0 then "LeftUpperArm" else "RightUpperArm"],
+			rig[if s < 0 then "LeftUpperLeg" else "RightUpperLeg"],
 			"WalkingPectoralFin",
 			V(0.27, 1.65, 0.85),
 			V(-s * 0.18, -0.9, 0),
@@ -335,6 +349,15 @@ local function tree(rig, accent)
 				)
 			end
 		end
+		part(
+			rig,
+			rig[side .. "UpperArm"],
+			"RootShoulder",
+			V(0.9, 0.55, 0.55),
+			V(if side == "Left" then 0.3 else -0.3, 0.43, 0),
+			bark,
+			BALL
+		)
 		local hand = rig[side .. "Hand"]
 		part(rig, hand, "Palm", V(0.61, 0.38, 0.55), V(0, -0.04, -0.09), skin, BALL)
 		for i = 1, 4 do
