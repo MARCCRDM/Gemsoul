@@ -28,6 +28,9 @@ local new = IronUi.new
 
 local LobbyUI = {}
 LobbyUI.Unlocks = { Clash = 3, Dungeon = 3, Ranked = 10 }
+-- Key art for each card (assets/images/lobby/*.png, painted by
+-- tools/make_lobby_cards.py). 0 = not uploaded yet: the card shows its emblem.
+LobbyUI.Art = { Duel = 0, Clash = 0, Dungeon = 0, Custom = 0, Ranked = 0 }
 
 local GREEN = Color3.fromRGB(62, 220, 120)
 local RED = Color3.fromRGB(232, 72, 72)
@@ -133,8 +136,35 @@ local function card(spec)
 		Color = ColorSequence.new(spec.Color:Lerp(CARD, 0.62), CARD),
 	}, b)
 	local big = spec.H > 300
+	local artId = LobbyUI.Art[spec.Art] or 0
+	if artId ~= 0 then
+		local art = new("ImageLabel", {
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://" .. artId,
+			ScaleType = Enum.ScaleType.Crop,
+			ZIndex = 21,
+		}, b)
+		UiKit.round(art, 10)
+		-- A dark wash where the words sit: the bottom of a tall card, the
+		-- left of a wide one.
+		local shade = new("Frame", {
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = Color3.fromRGB(4, 6, 12),
+			ZIndex = 22,
+		}, b)
+		UiKit.round(shade, 10)
+		new("UIGradient", {
+			Rotation = if big then 90 else 0,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, if big then 1 else 0.1),
+				NumberSequenceKeypoint.new(0.55, if big then 0.75 else 0.55),
+				NumberSequenceKeypoint.new(1, if big then 0.1 else 1),
+			}),
+		}, shade)
+	end
 	local function place(label, x, y, w, h, align)
-		label.Position, label.Size, label.ZIndex = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h), 22
+		label.Position, label.Size, label.ZIndex = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h), 23
 		label.TextXAlignment = align
 		return label
 	end
@@ -166,7 +196,17 @@ local function card(spec)
 	end
 	for _, d in emblem:GetDescendants() do
 		if d:IsA("GuiObject") then
-			d.ZIndex = 22
+			d.ZIndex = 23
+		end
+	end
+	-- The art says it already.
+	emblem.Visible = artId == 0
+	if artId ~= 0 and not big then
+		-- Words where the emblem was.
+		for _, child in b:GetChildren() do
+			if child:IsA("TextLabel") then
+				child.Position -= UDim2.fromOffset(96, 0)
+			end
 		end
 	end
 	-- Locked: a dark veil with how many more duels open it.
@@ -209,6 +249,7 @@ end
 
 card({
 	Title = "1v1 DUEL",
+	Art = "Duel",
 	Kicker = "VS A RIVAL",
 	Sub = "A rival miner with their own random kit. Coins on a win.",
 	Emblem = "Equipment",
@@ -223,6 +264,7 @@ card({
 })
 card({
 	Title = "2v2 CLASH",
+	Art = "Clash",
 	Kicker = "PARTY OF TWO",
 	Sub = "You and a partner against another pair.",
 	Emblem = "Trade",
@@ -238,6 +280,7 @@ card({
 })
 card({
 	Title = "SQUAD DUNGEON",
+	Art = "Dungeon",
 	Kicker = "THREE MINERS",
 	Sub = "Clear the rooms and beat the boss together.",
 	Emblem = "Enchant",
@@ -253,6 +296,7 @@ card({
 })
 card({
 	Title = "CUSTOM",
+	Art = "Custom",
 	Kicker = "YOUR RULES",
 	Sub = "Challenge a player, party up, start a raid.",
 	Emblem = "Coins",
@@ -267,6 +311,7 @@ card({
 })
 card({
 	Title = "1v1 RANKED",
+	Art = "Ranked",
 	Kicker = "RATING 1000",
 	Sub = "Real players from this server. Your rating is on the line.",
 	Emblem = "Equipment",
