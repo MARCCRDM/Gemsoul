@@ -96,3 +96,6 @@ local function squad(n)
 	end
 	return list, party
 end
+
+local studioMode=false
+RunService.IsStudio=function() return studioMode end

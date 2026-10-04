@@ -56,7 +56,7 @@ finish = function(run, won, reason)
 		if memberRun[p] == run then
 			local humanoid = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
 			local eligible = won
-                and not run.Test
+				and not run.Test
 				and p.Parent
 				and p:GetAttribute("DungeonId") == run.Id
 				and humanoid
@@ -64,7 +64,7 @@ finish = function(run, won, reason)
 			memberRun[p] = nil
 			if p.Parent then
 				p:SetAttribute("DungeonId", nil)
- p:SetAttribute("DungeonTest", nil)
+				p:SetAttribute("DungeonTest", nil)
 				p:SetAttribute("DungeonObjective", nil)
 				p:SetAttribute("DungeonRoom", nil)
 				p:SetAttribute("DungeonBoss", nil)
@@ -159,10 +159,12 @@ local function safeSpawnRoom(run, index)
 	end
 end
 local function queue(player, testMode)
- local testing = testMode ~= nil and RunService:IsStudio()
- if testMode ~= nil and not testing then return Shop.reply(false, "Testing is available in Studio only.") end
+	local testing = testMode ~= nil and RunService:IsStudio()
+	if testMode ~= nil and not testing then
+		return Shop.reply(false, "Testing is available in Studio only.")
+	end
 	local party = Party.of(player)
-	local members = if testing then {player} else party and party.Members or {}
+	local members = if testing then { player } else party and party.Members or {}
 	local allReady = party ~= nil
 	for _, p in members do
 		if not party or not party.Ready[p] then
@@ -193,24 +195,32 @@ local function queue(player, testMode)
 		return Shop.reply(false, "All dungeon instances are busy. Try again shortly.")
 	end
 	local id = "D" .. HttpService:GenerateGUID(false)
-	local run =
-		{ Id = id, Members = table.clone(members), PartyId = party and party.Id, Test = testing, Slot = slot, Index = 1, Started = os.clock(), Done = false }
+	local run = {
+		Id = id,
+		Members = table.clone(members),
+		PartyId = party and party.Id,
+		Test = testing,
+		Slot = slot,
+		Index = 1,
+		Started = os.clock(),
+		Done = false,
+	}
 	slots[slot] = true
 	runs[id] = run
 	-- Lock the roster synchronously before any work that could yield.
 	for _, p in run.Members do
 		memberRun[p] = run
 		p:SetAttribute("DungeonId", id)
- p:SetAttribute("DungeonTest", testing)
+		p:SetAttribute("DungeonTest", testing)
 		p:SetAttribute("RaidId", id)
 		p:SetAttribute("PvPEnabled", false)
 		p:SetAttribute("CombatSession", "Raid")
 	end
 	local success, problem = pcall(function()
 		run.Rooms = Rules.generate(Random.new())
-  if testing and testMode == "Sahur" then
-   run.Rooms = {{Index=1,X=0,Z=0,Boss=true,Theme=1,Foes={1},Pillars=2}}
-  end
+		if testing and testMode == "Sahur" then
+			run.Rooms = { { Index = 1, X = 0, Z = 0, Boss = true, Theme = 1, Foes = { 1 }, Pillars = 2 } }
+		end
 		run.World = World.build(id, run.Rooms, Vector3.new(2500 + slot * 1400, 0, 2500))
 		for i, p in run.Members do
 			CombatServer.reset(p)
@@ -218,7 +228,12 @@ local function queue(player, testMode)
 			local h = p.Character:FindFirstChildOfClass("Humanoid")
 			h.Health = h.MaxHealth
 		end
-		announce(run, if testing then "STUDIO TEST — solo enabled, no rewards. Encounter begins in 3 seconds." else "Squad deployed. Five rooms. One elemental Colossus. Stay together.")
+		announce(
+			run,
+			if testing
+				then "STUDIO TEST  -  solo enabled, no rewards. Encounter begins in 3 seconds."
+				else "Squad deployed. Five rooms. One elemental Colossus. Stay together."
+		)
 		task.delay(3, function()
 			if run.Done then
 				return
@@ -241,12 +256,18 @@ local function queue(player, testMode)
 	return Shop.reply(true, "Dungeon queued for your ready squad. Deploying now.")
 end
 function Dungeon.start()
-	Shop.register("PartyDungeon", function(player) return queue(player) end)
- Shop.register("DungeonTest", function(player, mode)
-  if not RunService:IsStudio() then return Shop.reply(false,"Testing is available in Studio only.") end
-  if mode ~= "Sahur" and mode ~= "Full" then return Shop.reply(false,"Choose Sahur or Full.") end
-  return queue(player,mode)
- end)
+	Shop.register("PartyDungeon", function(player)
+		return queue(player)
+	end)
+	Shop.register("DungeonTest", function(player, mode)
+		if not RunService:IsStudio() then
+			return Shop.reply(false, "Testing is available in Studio only.")
+		end
+		if mode ~= "Sahur" and mode ~= "Full" then
+			return Shop.reply(false, "Choose Sahur or Full.")
+		end
+		return queue(player, mode)
+	end)
 	ArenaSessions.onDungeonLeave = function(p)
 		local run = memberRun[p]
 		if not run then
@@ -254,7 +275,7 @@ function Dungeon.start()
 		end
 		memberRun[p] = nil
 		p:SetAttribute("DungeonId", nil)
- p:SetAttribute("DungeonTest", nil)
+		p:SetAttribute("DungeonTest", nil)
 		p:SetAttribute("DungeonRoom", nil)
 		p:SetAttribute("DungeonBoss", nil)
 		p:SetAttribute("DungeonObjective", nil)

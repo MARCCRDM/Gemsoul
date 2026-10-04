@@ -116,3 +116,17 @@ print(
 		.. checks
 		.. " dungeon checks (1,000 connected layouts, roles, elements, queue, readiness, isolation, gates, boss minimum, completion, duplicate rewards, aborts, timeout)"
 )
+
+local tester=squad(1)[1]
+check(not handlers.DungeonTest(tester,"Sahur").Ok,"Live server accepted test request")
+check(not handlers.PartyDungeon(tester,"Sahur").Ok,"Extra queue argument bypassed party minimum")
+studioMode=true
+check(not handlers.DungeonTest(tester,"Bad").Ok,"Invalid test mode accepted")
+check(handlers.DungeonTest(tester,"Sahur").Ok,"Studio solo boss rejected")
+local testId=tester:GetAttribute("DungeonId")
+tick(3)
+check(tester:GetAttribute("DungeonBoss")=="Tung Tung Tung Sahur","Wrong test boss")
+clearRoom(testId,1)
+check(tester:GetAttribute("DungeonId")==nil,"Solo test failed cleanup")
+check(tester:GetAttribute("DungeonTest")==nil,"Test flag leaked")
+print("PASS: Studio test entry, live rejection, solo boss and cleanup")
