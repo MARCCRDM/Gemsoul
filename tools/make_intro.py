@@ -16,7 +16,9 @@ The timeline, about ten seconds (six bars at 145 BPM):
   bar 1     the logo fades up out of the dark as the build rises
   bar 2     the drop hits: a white flash and the logo's shine starts
   bars 2-6  the logo animation loops (pixels kept sharp)
-  last 1.2s everything fades back to the dark
+  last 0.5s the logo settles, clean, and holds: the title screen pauses the
+            video on that frame while the song carries on from bar 86
+            (fight_theme.ogg from 5 bars in) under "CLICK TO ENTER"
 The logo's square clip sits in the middle of a 16:9 frame, its edges
 feathered into the background colour so the join doesn't show.
 """
@@ -38,7 +40,7 @@ BARS = 6
 WIDTH, HEIGHT, FPS = 1920, 1080, 30
 BACKGROUND = np.array([10, 8, 25], np.float32)  # the clip's own deep-space colour
 FEATHER = 170  # pixels of blend at the square's left and right edges
-FADE_OUT = 1.2
+HOLD = 0.5  # seconds of the clean logo at the end, for the title screen to hold
 
 
 def ffmpeg() -> str:
@@ -68,7 +70,8 @@ def music(song: str, tmp: str) -> tuple[str, float]:
     length = int(round(BARS * BAR * rate))
     clip = audio[start : start + length].copy()
     t = np.arange(length) / rate
-    envelope = np.clip(t / 0.15, 0, 1) * np.clip((length / rate - t) / 2.2, 0, 1)
+    # No fade-out: the title screen's loop picks the song up right where this ends.
+    envelope = np.clip(t / 0.15, 0, 1) * np.clip((length / rate - t) / 0.01, 0, 1)
     clip *= envelope[:, None]
     loud = clip[int(BAR * rate) :]
     gain = 10 ** (-14 / 20) / np.sqrt((loud**2).mean())
@@ -134,12 +137,14 @@ def main():
                 # The build: the first frame rises out of the dark.
                 square = images[0]
                 brightness = smooth(t / (BAR * 0.85))
+            elif t >= duration - HOLD:
+                square = images[0]
+                brightness = 1.0
             else:
                 k = int(((t - BAR) % clip_length) * fps) % len(images)
                 square = images[k]
                 brightness = 1.0
             flash = max(0.0, 0.65 * (1 - (t - BAR) / 0.35)) if t >= BAR else 0.0
-            brightness *= smooth((duration - t) / FADE_OUT)
             Image.fromarray(compose(square, brightness, flash)).save(os.path.join(out_dir, f"{i:04d}.png"))
         path = os.path.join(video_dir, "saga_intro.mp4")
         run(
