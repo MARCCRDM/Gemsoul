@@ -1620,6 +1620,11 @@ function Equipment.apply(player: Player)
 		existing:Destroy()
 	end
 	local profile = PlayerData.get(player)
+	-- Players' bodies are posed in a fight (Client BodyPoses), like the
+	-- rival's, so they hold their weapon in the fist as it does: blade out
+	-- past the thumb, which reads right through every swing, cast and guard.
+	-- (Laid along the forearm it pointed backwards in a raised wind-up.)
+	character:SetAttribute("FistGrip", true)
 	local folder = dress(character, loadout, profile and profile.Cosmetics, player.UserId)
 	if not folder then
 		return
