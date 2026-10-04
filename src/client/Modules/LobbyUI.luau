@@ -175,7 +175,7 @@ local function card(spec)
 		emblem = IronUi.emblem(b, spec.Emblem, spec.Color, 120)
 		emblem.Position = UDim2.fromOffset((spec.W - 120) / 2, 80)
 		place(text(b, spec.Kicker, 22, spec.Color, IronUi.Heading), 12, spec.H - 150, spec.W - 24, 26, center)
-		place(text(b, spec.Title, 44, P.Text, IronUi.Heading), 12, spec.H - 122, spec.W - 24, 50, center)
+		place(text(b, spec.Title, 40, P.Text, IronUi.Heading), 12, spec.H - 122, spec.W - 24, 50, center)
 		local sub = place(text(b, spec.Sub, 14, P.Dim, IronUi.Body), 20, spec.H - 66, spec.W - 40, 40, center)
 		sub.TextWrapped = true
 	else
