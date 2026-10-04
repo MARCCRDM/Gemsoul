@@ -3,7 +3,8 @@
 	to a dim, cool night, so the fight is lit by itself. Strikes, surges,
 	parries and deaths flash real light (CombatFx.flash), and every
 	fighter's gear glows: its gem, rarity and affinity lights get a wider,
-	stronger companion and its neon trims bloom. Leaving the Arena restores
+	stronger companion and its neon trims bloom, and every armor plate's
+	edges are traced in light (ArmorEdges). Leaving the Arena restores
 	the daylight. Purely local; the server never sees it.
 
 	  ArenaNight.Mood     the night's Lighting values
@@ -13,6 +14,7 @@ local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
+local ArmorEdges = require(script.Parent.ArmorEdges)
 local CombatFx = require(script.Parent.CombatFx)
 
 local ArenaNight = {}
@@ -53,16 +55,19 @@ ArenaNight.DungeonMood = {
 		EnvironmentSpecularScale = 0.6,
 	},
 	BloomEffect = { Intensity = 0.25, Size = 20, Threshold = 1.4 },
-	ColorCorrectionEffect = { Brightness = 0.02, Contrast = 0.05, Saturation = 0.03, TintColor = Color3.fromRGB(
-		246,
-		248,
-		255
-	) },
-	Atmosphere = { Density = 0.12, Haze = 0.1, Glare = 0, Color = Color3.fromRGB(145, 156, 178), Decay = Color3.fromRGB(
-		92,
-		104,
-		127
-	) },
+	ColorCorrectionEffect = {
+		Brightness = 0.02,
+		Contrast = 0.05,
+		Saturation = 0.03,
+		TintColor = Color3.fromRGB(246, 248, 255),
+	},
+	Atmosphere = {
+		Density = 0.12,
+		Haze = 0.1,
+		Glare = 0,
+		Color = Color3.fromRGB(145, 156, 178),
+		Decay = Color3.fromRGB(92, 104, 127),
+	},
 	SunRaysEffect = { Intensity = 0 },
 }
 ArenaNight.ClockTime = 0 -- moon and stars
@@ -158,6 +163,8 @@ local function nightfall(mood)
 	CombatFx.LightBoost = if mood == ArenaNight.DungeonMood then 1 else ArenaNight.FlashBoost
 	dimLamps()
 	glowGear()
+	-- Traced armor edges in the dark Arena; dungeons are lit enough without.
+	ArmorEdges.setEnabled(mood == ArenaNight.Mood)
 end
 
 local function daybreak()
@@ -166,6 +173,7 @@ local function daybreak()
 	end
 	active = false
 	activeMood = nil
+	ArmorEdges.setEnabled(false)
 	for instance, before in saved or {} do
 		if typeof(instance) == "Instance" and instance.Parent then
 			TweenService:Create(instance, FADE, before):Play()
