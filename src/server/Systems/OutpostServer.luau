@@ -50,6 +50,7 @@ local nodes = {} -- [id] = { Id, Spot, Size, Hp, MaxHp, Model, ClaimedBy, ClaimU
 local freeSpots: { [number]: boolean } = {}
 local nextId = 0
 local lastSwing: { [Player]: number } = {}
+local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
 local function today(): number
@@ -84,10 +85,16 @@ local function stateOf(player: Player)
 		return nil
 	end
 	local o = record(profile)
+	local secrets = 0
+	for _ in o.Secrets or {} do
+		secrets += 1
+	end
 	return {
 		Picks = o.Picks,
 		Active = o.Active,
 		Rocks = o.Rocks,
+		Secrets = secrets,
+		SecretsTotal = #Rules.SecretOrder,
 		FreeIn = (today() + 1) * 86400 - os.time(),
 	}
 end
@@ -306,6 +313,10 @@ end
 local function hit(player: Player, nodeId: any)
 	if player:GetAttribute("Outpost") ~= true or player:GetAttribute("CombatSession") then
 		return reply(false, "Head to the Outpost to mine.")
+	end
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart then
+		return reply(false, "Hop out of the machine to mine.")
 	end
 	local now = os.clock()
 	if now - (lastSwing[player] or 0) < Rules.SwingCooldown then
@@ -545,6 +556,62 @@ local function drawSigns()
 	sign(site.Probe, "PROBE-7", "EXCHANGE  ·  PICKS  ·  MARKET", Color3.fromRGB(110, 220, 255))
 end
 
+-- An Easter egg found: paid once per player (and a bonus for the full set),
+-- told to the whole server. Found again, it just shows its story.
+local function secret(player: Player, id: any)
+	if player:GetAttribute("Outpost") ~= true then
+		return reply(false, "")
+	end
+	local spec = type(id) == "string" and Rules.Secrets[id] or nil
+	local part = spec and secretParts[id]
+	if not spec or not part then
+		return reply(false, "")
+	end
+	local root = rootOf(player)
+	if not root or (root.Position - part.CFrame.Position).Magnitude > 20 then
+		return reply(false, "Get closer.")
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your data is still loading.")
+	end
+	local o = record(profile)
+	o.Secrets = o.Secrets or {}
+	local new = not o.Secrets[id]
+	o.Secrets[id] = true
+	local found = 0
+	for _ in o.Secrets do
+		found += 1
+	end
+	local total = #Rules.SecretOrder
+	local coins, bonus = 0, 0
+	if new then
+		coins = Rules.SecretReward
+		bonus = if found >= total then Rules.SecretBonus else 0
+		PlayerData.addCoins(player, coins + bonus)
+		ChatChannels.announce(
+			"System",
+			string.format("%s discovered a secret: %s! (%d/%d)", player.DisplayName, spec.Name, found, total)
+		)
+		if bonus > 0 then
+			ChatChannels.announce("Loot", player.DisplayName .. " has found every secret on the moon!")
+		end
+	end
+	return reply(true, "", {
+		Secret = {
+			Id = id,
+			Name = spec.Name,
+			Lore = spec.Lore,
+			New = new,
+			Found = found,
+			Total = total,
+			Coins = coins,
+			Bonus = bonus,
+		},
+		State = stateOf(player),
+	})
+end
+
 function OutpostServer.start()
 	site = OutpostWorld.build(Rules.Location, workspace)
 	local folder = Instance.new("Folder")
@@ -573,6 +640,20 @@ function OutpostServer.start()
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt.Parent = spec[1]
 	end
+	-- The hidden Easter eggs: a prompt that says nothing about what it is.
+	for _, part in site.Secrets or {} do
+		local id = part:GetAttribute("SecretId")
+		secretParts[id] = part
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText, prompt.ObjectText = "Inspect", "???"
+		prompt.KeyboardKeyCode = Enum.KeyCode.E
+		prompt.HoldDuration = 0.6
+		prompt.MaxActivationDistance = 14
+		prompt.RequiresLineOfSight = false
+		prompt:SetAttribute("PromptKind", "Secret")
+		prompt:SetAttribute("SecretId", id)
+		prompt.Parent = part
+	end
 	drawSigns()
 	-- Where a finished duel brings an Outpost visitor back to (ArenaSessions.leave).
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
@@ -588,6 +669,7 @@ function OutpostServer.start()
 	Shop.register("OutpostHit", hit)
 	Shop.register("OutpostBuyPick", buy)
 	Shop.register("OutpostEquipPick", equip)
+	Shop.register("OutpostSecret", secret)
 	Shop.register("OutpostState", function(player)
 		return reply(true, "", { State = stateOf(player) })
 	end)
@@ -639,6 +721,7 @@ end
 
 -- For tests.
 OutpostServer._hit, OutpostServer._enter, OutpostServer._buy = hit, enter, buy
+OutpostServer._secret = secret
 OutpostServer._nodes = nodes
 function OutpostServer.site()
 	return site

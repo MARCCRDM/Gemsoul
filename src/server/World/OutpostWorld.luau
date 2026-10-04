@@ -10,7 +10,9 @@
 	  OutpostWorld.build(at, parent) -> {
 	      Model, Spawn (CFrame), Probe (BasePart, the terminal),
 	      Board (BasePart with the leaderboard's face), Gate (BasePart),
-	      Spots ({ CFrame }, where rocks may grow) }
+	      Spots ({ CFrame }, where rocks may grow),
+	      Parking ({ Kind, CFrame }: the Motor Pool bays for the machines),
+	      Secrets ({ BasePart }: the hidden Easter eggs, each with a SecretId) }
 	  OutpostWorld.rock(size, cframe, rng) -> Model   one rock of that size
 	      (Shared.Outpost.Sizes), its main chunk named "Body"
 ]]
@@ -466,40 +468,583 @@ local function sky(parent, at: CFrame)
 	end
 end
 
+-- The quarry beyond the outpost --------------------------------------------------------
+
+local DIRT = Color3.fromRGB(92, 86, 84)
+local CONCRETE = Color3.fromRGB(86, 90, 98)
+local QUARRY = 440 -- where the stepped quarry walls start (Shared.Outpost.Radius)
+
+-- A peak of the mountain range around the quarry.
+local function mountain(parent, at: CFrame, rng: Random)
+	local h = rng:NextNumber(50, 130)
+	local w = rng:NextNumber(34, 74)
+	local d = rng:NextNumber(30, 60)
+	local color = RIM:Lerp(REGOLITH_DARK, rng:NextNumber(0, 0.7))
+	local base = at
+		* CFrame.new(0, h / 2 - 6, 0)
+		* CFrame.Angles(rng:NextNumber(-0.12, 0.12), rng:NextNumber(0, 6.28), rng:NextNumber(-0.12, 0.12))
+	part(parent, base, Vector3.new(w, h, d), color, Enum.Material.Slate)
+	-- A jagged peak: two wedges back to back make a ridge along the top.
+	local peak = rng:NextNumber(0.35, 0.8) * w
+	for side = -1, 1, 2 do
+		part(
+			parent,
+			base * CFrame.new(0, h / 2 + peak / 2, side * d / 4) * CFrame.Angles(0, if side > 0 then 0 else math.pi, 0),
+			Vector3.new(w, peak, d / 2),
+			color,
+			Enum.Material.Slate,
+			"Wedge"
+		)
+	end
+	-- Pale regolith dusting the taller ridges.
+	if h + peak > 120 then
+		for side = -1, 1, 2 do
+			part(
+				parent,
+				base
+					* CFrame.new(0, h / 2 + peak * 0.82, side * d / 16)
+					* CFrame.Angles(0, if side > 0 then 0 else math.pi, 0),
+				Vector3.new(w * 0.99, peak * 0.36, d / 8),
+				REGOLITH:Lerp(Color3.new(1, 1, 1), 0.35),
+				Enum.Material.Sand,
+				"Wedge"
+			)
+		end
+	end
+end
+
+-- Three stepped benches cut into the quarry wall, like an open-pit mine,
+-- with ramps up each one.
+local function benches(parent, at: CFrame)
+	for level = 1, 3 do
+		local r = QUARRY + level * 9
+		local segments = 80
+		for i = 0, segments - 1 do
+			local a = i / segments * math.pi * 2
+			solid(
+				part(
+					parent,
+					at * CFrame.new(math.cos(a) * r, level * 2.5, math.sin(a) * r) * CFrame.Angles(0, -a, 0),
+					Vector3.new(9.5, level * 5, 2 * math.pi * r / segments + 1.5),
+					if level % 2 == 0 then REGOLITH_DARK else RIM,
+					Enum.Material.Slate
+				)
+			)
+		end
+		-- A hazard rail along each bench edge.
+		for i = 0, 39 do
+			local a = (i + 0.5) / 40 * math.pi * 2
+			part(
+				parent,
+				at
+					* CFrame.new(math.cos(a) * (r - 4.6), level * 5 + 0.6, math.sin(a) * (r - 4.6))
+					* CFrame.Angles(0, -a, 0),
+				Vector3.new(0.4, 1.2, 2.4),
+				HAZARD,
+				Enum.Material.SmoothPlastic
+			)
+		end
+	end
+	-- Ramps from the floor up to each bench, at four points round the wall.
+	-- Each runs straight up to its bench's edge, over the lower benches.
+	local feet = {}
+	for quarter = 0, 3 do
+		for level = 1, 3 do
+			local a = quarter * math.pi / 2 + math.rad(20) + (level - 1) * math.rad(5)
+			local length = 22 * level
+			local top = QUARRY + level * 9 - 4.75
+			local r = top - length / 2
+			local centre = (at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)).Position
+			local inward = (at * CFrame.new(math.cos(a) * (r - 10), 0, math.sin(a) * (r - 10))).Position
+			-- A wedge's low edge is at its front: face the front inwards.
+			solid(
+				part(
+					parent,
+					CFrame.lookAt(centre, inward) * CFrame.new(0, level * 2.5, 0),
+					Vector3.new(14, level * 5, length),
+					DIRT,
+					Enum.Material.Slate,
+					"Wedge"
+				)
+			)
+			table.insert(feet, centre)
+		end
+	end
+	return feet
+end
+
+-- A dirt haul road from `from` to `to`, with marker posts along it.
+local function road(parent, from: Vector3, to: Vector3, width: number)
+	local mid = (from + to) / 2
+	local length = (to - from).Magnitude
+	part(
+		parent,
+		CFrame.lookAt(mid, to) * CFrame.new(0, 0.08, 0),
+		Vector3.new(width, 0.16, length),
+		DIRT,
+		Enum.Material.Sand
+	)
+	local steps = math.floor(length / 50)
+	for i = 1, steps do
+		local along = from:Lerp(to, i / (steps + 1))
+		local side = CFrame.lookAt(along, to) * CFrame.new(if i % 2 == 0 then width / 2 + 2 else -width / 2 - 2, 0, 0)
+		part(parent, side * CFrame.new(0, 1.5, 0), Vector3.new(0.6, 3, 0.6), HAZARD, Enum.Material.SmoothPlastic)
+		part(parent, side * CFrame.new(0, 3.2, 0), Vector3.new(0.7, 0.4, 0.7), GLOW, Enum.Material.Neon)
+	end
+end
+
+-- A striped jump ramp for the machines.
+local function jumpRamp(parent, at: CFrame)
+	solid(
+		part(parent, at * CFrame.new(0, 3, 0), Vector3.new(16, 6, 26), HULL_DARK, Enum.Material.DiamondPlate, "Wedge")
+	)
+	for i = -1, 1, 2 do
+		part(
+			parent,
+			at * CFrame.new(i * 7.6, 3.05, 0) * CFrame.Angles(-math.atan2(6, 26), 0, 0),
+			Vector3.new(0.9, 0.2, 26.6),
+			HAZARD,
+			Enum.Material.SmoothPlastic
+		)
+	end
+end
+
+-- The Motor Pool: a concrete apron with marked bays and a canopy, where the
+-- machines park. Returns the parking bays ({ Kind, CFrame }), facing out.
+local function motorPool(parent, at: CFrame)
+	solid(part(parent, at * CFrame.new(0, 0.4, 0), Vector3.new(140, 0.8, 76), CONCRETE, Enum.Material.Concrete))
+	local bays = {
+		{ "Hauler", -50, -14 },
+		{ "Hauler", -27, -14 },
+		{ "Mole", -4, -14 },
+		{ "Mole", 18, -14 },
+		{ "Digger", 42, -14 },
+		{ "Skipper", -20, 20 },
+		{ "Skipper", 0, 20 },
+		{ "Skipper", 20, 20 },
+	}
+	local parking = {}
+	for _, bay in bays do
+		for side = -1, 1, 2 do
+			local width = if bay[1] == "Skipper" then 14 else 22
+			part(
+				parent,
+				at * CFrame.new(bay[2] + side * width / 2, 0.85, bay[3]),
+				Vector3.new(0.5, 0.1, 30),
+				HAZARD,
+				Enum.Material.SmoothPlastic
+			)
+		end
+		local spot = at * CFrame.new(bay[2], 1, bay[3])
+		table.insert(
+			parking,
+			{ Kind = bay[1], CFrame = CFrame.lookAt(spot.Position, spot.Position + at.LookVector * -1) }
+		)
+	end
+	-- The canopy over the back row, on yellow pillars, with floodlights.
+	for x = -60, 60, 30 do
+		part(parent, at * CFrame.new(x, 11, -34), Vector3.new(1.6, 22, 1.6), HAZARD, Enum.Material.Metal)
+	end
+	part(parent, at * CFrame.new(0, 22.5, -26), Vector3.new(132, 1.2, 20), HULL_DARK, Enum.Material.Metal)
+	for x = -54, 54, 18 do
+		local lamp = part(parent, at * CFrame.new(x, 21.7, -24), Vector3.new(6, 0.3, 2), GLOW, Enum.Material.Neon)
+		light(lamp, GLOW, 34, 1.4, true)
+	end
+	-- The sign.
+	local board = part(parent, at * CFrame.new(0, 27, -34.5), Vector3.new(44, 7, 0.6), HULL_DARK, Enum.Material.Metal)
+	board.Name = "MotorPoolSign"
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Back
+	gui.CanvasSize = Vector2.new(880, 140)
+	gui.LightInfluence = 0
+	gui.Parent = board
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.fromScale(1, 0.62)
+	title.Text = "MOTOR POOL"
+	title.TextScaled = true
+	title.Font = Enum.Font.GothamBlack
+	title.TextColor3 = HAZARD
+	title.Parent = gui
+	local sub = Instance.new("TextLabel")
+	sub.BackgroundTransparency = 1
+	sub.Position = UDim2.fromScale(0, 0.6)
+	sub.Size = UDim2.fromScale(1, 0.36)
+	sub.Text = "HOP IN AND DRIVE  ·  JUMP TO GET OUT"
+	sub.TextScaled = true
+	sub.Font = Enum.Font.GothamMedium
+	sub.TextColor3 = Color3.fromRGB(220, 235, 255)
+	sub.Parent = gui
+	-- Fuel drums and tyre stacks round the edge.
+	for i = 0, 5 do
+		local x = -66 + i * 3.2
+		part(
+			parent,
+			at * CFrame.new(x, 2.6, 34),
+			Vector3.new(3.4, 2.6, 2.6),
+			Color3.fromRGB(200, 60, 50),
+			Enum.Material.Metal,
+			"Cylinder",
+			{
+				CFrame = at * CFrame.new(x, 2.6, 34) * CFrame.Angles(0, 0, math.rad(90)),
+			}
+		)
+	end
+	for i = 0, 3 do
+		part(
+			parent,
+			at * CFrame.new(64, 1.4 + i * 1.6, 30) * CFrame.Angles(0, 0, math.rad(90)),
+			Vector3.new(1.5, 7, 7),
+			Color3.fromRGB(26, 26, 30),
+			Enum.Material.Rubber,
+			"Cylinder"
+		)
+	end
+	return parking
+end
+
+-- A secret: something hidden with a prompt-able part named "Secret".
+local function secretMarker(p: BasePart, id: string)
+	p.Name = "Secret"
+	p:SetAttribute("SecretId", id)
+	return p
+end
+
+local function monolith(parent, at: CFrame)
+	local slab = part(
+		parent,
+		at * CFrame.new(0, 9, 0),
+		Vector3.new(2, 18, 8),
+		Color3.fromRGB(8, 8, 10),
+		Enum.Material.Glass,
+		nil,
+		{
+			Reflectance = 0.25,
+		}
+	)
+	solid(slab)
+	light(slab, Color3.fromRGB(120, 90, 255), 14, 0.6)
+	return secretMarker(slab, "Monolith")
+end
+
+local function rubberDuck(parent, at: CFrame)
+	local yellow = Color3.fromRGB(255, 214, 40)
+	local body = part(
+		parent,
+		at * CFrame.new(0, 0.7, 0),
+		Vector3.new(1.6, 1.2, 1.9),
+		yellow,
+		Enum.Material.SmoothPlastic,
+		"Ball"
+	)
+	part(parent, at * CFrame.new(0, 1.6, -0.5), Vector3.one * 1, yellow, Enum.Material.SmoothPlastic, "Ball")
+	part(
+		parent,
+		at * CFrame.new(0, 1.5, -1.1),
+		Vector3.new(0.6, 0.25, 0.5),
+		Color3.fromRGB(255, 130, 30),
+		Enum.Material.SmoothPlastic
+	)
+	part(
+		parent,
+		at * CFrame.new(0.3, 1.8, -0.9),
+		Vector3.one * 0.18,
+		Color3.new(0, 0, 0),
+		Enum.Material.SmoothPlastic,
+		"Ball"
+	)
+	part(
+		parent,
+		at * CFrame.new(-0.3, 1.8, -0.9),
+		Vector3.one * 0.18,
+		Color3.new(0, 0, 0),
+		Enum.Material.SmoothPlastic,
+		"Ball"
+	)
+	return secretMarker(body, "Duck")
+end
+
+local function bomberWreck(parent, at: CFrame, rng: Random)
+	local green = Color3.fromRGB(70, 120, 60)
+	-- The fuselage, nose-down in a furrow, a croc snout for a nose.
+	local hull = at * CFrame.new(0, 3, 0) * CFrame.Angles(math.rad(8), 0, math.rad(12))
+	local body = solid(part(parent, hull, Vector3.new(9, 7, 34), green, Enum.Material.Metal))
+	part(
+		parent,
+		hull * CFrame.new(0, -0.5, -20),
+		Vector3.new(6, 3.4, 9),
+		Color3.fromRGB(86, 140, 70),
+		Enum.Material.SmoothPlastic
+	)
+	for i = -2, 2 do
+		part(
+			parent,
+			hull * CFrame.new(i * 1.1, -2.4, -22),
+			Vector3.new(0.4, 0.8, 0.4),
+			Color3.new(1, 1, 1),
+			Enum.Material.SmoothPlastic,
+			"Wedge"
+		)
+	end
+	part(
+		parent,
+		hull * CFrame.new(1.6, 1.4, -22.5),
+		Vector3.one * 0.9,
+		Color3.fromRGB(255, 220, 60),
+		Enum.Material.Neon,
+		"Ball"
+	)
+	part(
+		parent,
+		hull * CFrame.new(-1.6, 1.4, -22.5),
+		Vector3.one * 0.9,
+		Color3.fromRGB(255, 220, 60),
+		Enum.Material.Neon,
+		"Ball"
+	)
+	-- One wing still on, one snapped off nearby.
+	part(
+		parent,
+		hull * CFrame.new(14, 0, 2) * CFrame.Angles(0, 0, math.rad(-6)),
+		Vector3.new(22, 1, 9),
+		green,
+		Enum.Material.Metal
+	)
+	solid(
+		part(
+			parent,
+			at * CFrame.new(-24, 1, 14) * CFrame.Angles(0.2, 0.9, 0.4),
+			Vector3.new(20, 1, 8),
+			green,
+			Enum.Material.Metal
+		)
+	)
+	part(parent, hull * CFrame.new(0, 5, 15), Vector3.new(1, 8, 6), green, Enum.Material.Metal)
+	-- Scorched ground and smoke.
+	disc(parent, at * CFrame.new(0, 0.1, 6), 24, 0.2, Color3.fromRGB(40, 38, 40), Enum.Material.Slate)
+	local smoke = Instance.new("Smoke")
+	smoke.Color, smoke.Opacity, smoke.RiseVelocity, smoke.Size = Color3.fromRGB(60, 60, 64), 0.15, 4, 6
+	smoke.Parent = body
+	for _ = 1, 8 do
+		solid(
+			part(
+				parent,
+				at
+					* CFrame.new(rng:NextNumber(-30, 30), 0.8, rng:NextNumber(-20, 40))
+					* CFrame.Angles(rng:NextNumber(0, 3), rng:NextNumber(0, 3), 0),
+				Vector3.new(rng:NextNumber(2, 5), 0.8, rng:NextNumber(2, 6)),
+				green:Lerp(Color3.new(0, 0, 0), rng:NextNumber(0.2, 0.6)),
+				Enum.Material.Metal
+			)
+		)
+	end
+	-- The black box, lying by the cockpit.
+	local box = part(
+		parent,
+		at * CFrame.new(5, 0.9, -24),
+		Vector3.new(2, 1.4, 2.6),
+		Color3.fromRGB(255, 110, 30),
+		Enum.Material.SmoothPlastic
+	)
+	light(box, Color3.fromRGB(255, 120, 40), 8, 1)
+	return secretMarker(box, "Bomber")
+end
+
+local function skeleton(parent, at: CFrame)
+	local bone = Color3.fromRGB(226, 220, 200)
+	-- Ribs arching out of the crater floor, a skull at one end.
+	for i = 0, 7 do
+		for side = -1, 1, 2 do
+			part(
+				parent,
+				at * CFrame.new(side * 5, 7, -18 + i * 5) * CFrame.Angles(0, 0, math.rad(side * -24)),
+				Vector3.new(1.4, 15, 1.4),
+				bone,
+				Enum.Material.Marble
+			)
+		end
+	end
+	part(parent, at * CFrame.new(0, 1.4, 0), Vector3.new(2.2, 2.2, 46), bone, Enum.Material.Marble)
+	local skull = solid(part(parent, at * CFrame.new(0, 4, -27), Vector3.new(9, 7, 11), bone, Enum.Material.Marble))
+	for side = -1, 1, 2 do
+		part(
+			parent,
+			at * CFrame.new(side * 2.4, 5, -32.6),
+			Vector3.new(2, 1.6, 0.4),
+			Color3.fromRGB(20, 20, 24),
+			Enum.Material.SmoothPlastic
+		)
+		part(
+			parent,
+			at * CFrame.new(side * 3.6, 7, -30) * CFrame.Angles(math.rad(-40), 0, 0),
+			Vector3.new(1, 6, 1),
+			bone,
+			Enum.Material.Marble
+		)
+	end
+	for i = -3, 3 do
+		part(
+			parent,
+			at * CFrame.new(i * 1.1, 1.2, -32.8),
+			Vector3.new(0.6, 1.6, 0.6),
+			bone,
+			Enum.Material.Marble,
+			"Wedge"
+		)
+	end
+	return secretMarker(skull, "Skeleton")
+end
+
+local function shrine(parent, at: CFrame)
+	local wood = Color3.fromRGB(150, 104, 62)
+	solid(
+		part(
+			parent,
+			at * CFrame.new(0, 0.5, 0),
+			Vector3.new(8, 1, 8),
+			Color3.fromRGB(110, 106, 110),
+			Enum.Material.Cobblestone
+		)
+	)
+	-- The little wooden figure with its bat.
+	local log = solid(
+		part(parent, at * CFrame.new(0, 3.4, 0), Vector3.new(2.4, 4.8, 2.4), wood, Enum.Material.Wood, "Cylinder", {
+			CFrame = at * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		})
+	)
+	part(
+		parent,
+		at * CFrame.new(0.5, 4.2, -1.1),
+		Vector3.one * 0.5,
+		Color3.new(1, 1, 1),
+		Enum.Material.SmoothPlastic,
+		"Ball"
+	)
+	part(
+		parent,
+		at * CFrame.new(-0.5, 4.2, -1.1),
+		Vector3.one * 0.5,
+		Color3.new(1, 1, 1),
+		Enum.Material.SmoothPlastic,
+		"Ball"
+	)
+	part(
+		parent,
+		at * CFrame.new(0, 3.2, -1.15),
+		Vector3.new(1, 0.2, 0.2),
+		Color3.fromRGB(40, 20, 20),
+		Enum.Material.SmoothPlastic
+	)
+	part(
+		parent,
+		at * CFrame.new(1.8, 3.6, -0.4) * CFrame.Angles(0, 0, math.rad(-30)),
+		Vector3.new(0.5, 3.6, 0.5),
+		Color3.fromRGB(120, 80, 46),
+		Enum.Material.Wood
+	)
+	-- Offerings: glowing gems and candles.
+	for i, color in { Color3.fromRGB(255, 90, 90), Color3.fromRGB(90, 200, 255), Color3.fromRGB(120, 255, 140) } do
+		part(parent, at * CFrame.new(-2.6 + i * 1.3, 1.4, -2.6), Vector3.new(0.6, 0.8, 0.6), color, Enum.Material.Neon)
+	end
+	for _, x in { -3.2, 3.2 } do
+		part(
+			parent,
+			at * CFrame.new(x, 1.6, 2.8),
+			Vector3.new(0.4, 1.2, 0.4),
+			Color3.fromRGB(240, 236, 220),
+			Enum.Material.SmoothPlastic
+		)
+		local flame = part(
+			parent,
+			at * CFrame.new(x, 2.4, 2.8),
+			Vector3.one * 0.35,
+			Color3.fromRGB(255, 180, 60),
+			Enum.Material.Neon,
+			"Ball"
+		)
+		light(flame, Color3.fromRGB(255, 170, 70), 10, 1)
+	end
+	return secretMarker(log, "Shrine")
+end
+
+local function footprint(parent, at: CFrame)
+	-- One enormous boot print pressed into the regolith, and its plaque.
+	local dark = Color3.fromRGB(70, 72, 80)
+	part(parent, at * CFrame.new(0, 0.2, 0), Vector3.new(9, 0.2, 22), dark, Enum.Material.Sand)
+	for i = 0, 6 do
+		part(parent, at * CFrame.new(0, 0.32, -9 + i * 3), Vector3.new(8, 0.1, 0.8), REGOLITH_DARK, Enum.Material.Slate)
+	end
+	part(parent, at * CFrame.new(0, 0.2, -12), Vector3.new(8, 0.2, 4), dark, Enum.Material.Sand)
+	part(parent, at * CFrame.new(8, 1.4, 0), Vector3.new(0.5, 2.8, 0.5), STEEL, Enum.Material.Metal)
+	local plaque = solid(
+		part(
+			parent,
+			at * CFrame.new(8, 3, 0) * CFrame.Angles(math.rad(-20), math.rad(-90), 0),
+			Vector3.new(4, 2.4, 0.3),
+			Color3.fromRGB(180, 140, 60),
+			Enum.Material.Metal
+		)
+	)
+	return secretMarker(plaque, "Footprint")
+end
+
 function OutpostWorld.build(at: CFrame, parent: Instance)
 	local root = Instance.new("Model")
 	root.Name = "SagaOutpost"
 	local rng = Random.new(4242)
 	local ground = folder(root, "Ground")
-	-- The basin floor and its regolith, with walls off its edge so no one wanders off.
-	solid(disc(ground, at * CFrame.new(0, -1, 0), 200, 2, REGOLITH, Enum.Material.Slate))
-	for _ = 1, 26 do
-		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(10, 170)
+	-- The quarry floor and its regolith, the stepped benches and the mountain
+	-- range round it, with walls off its edge so no one wanders off.
+	solid(disc(ground, at * CFrame.new(0, -1, 0), 520, 2, REGOLITH, Enum.Material.Slate))
+	for _ = 1, 90 do
+		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(10, 430)
 		disc(
 			ground,
 			at * CFrame.new(math.cos(a) * r, 0.05, math.sin(a) * r),
-			rng:NextNumber(8, 26),
+			rng:NextNumber(10, 34),
 			0.1,
 			REGOLITH:Lerp(REGOLITH_DARK, rng:NextNumber(0.1, 0.5)),
 			Enum.Material.Sand
 		)
 	end
-	for _, c in { { 60, 40, 11 }, { -70, 60, 15 }, { 95, -20, 8 }, { -40, -10, 7 }, { 20, 100, 13 }, { -110, -50, 10 } } do
+	for _, c in
+		{
+			{ 60, 40, 11 },
+			{ -70, 60, 15 },
+			{ 95, -20, 8 },
+			{ -40, -10, 7 },
+			{ 20, 100, 13 },
+			{ -110, -50, 10 },
+			{ 200, -260, 24 },
+			{ -230, -150, 18 },
+			{ 170, 220, 16 },
+			{ -330, 80, 20 },
+			{ 300, -40, 14 },
+			{ -150, 330, 12 },
+			{ 330, 120, 30 },
+			{ 60, 330, 34 },
+			{ -60, -300, 15 },
+			{ 260, 300, 11 },
+		}
+	do
 		crater(ground, at * CFrame.new(c[1], 0, c[2]), c[3])
 	end
-	for i = 0, 47 do
-		local a = i / 48 * math.pi * 2
-		local r = rng:NextNumber(168, 190)
-		rimRock(ground, at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r), rng)
+	local benchRamps = benches(ground, at)
+	for i = 0, 119 do
+		local a = i / 120 * math.pi * 2
+		mountain(
+			ground,
+			at * CFrame.new(math.cos(a) * rng:NextNumber(482, 540), 0, math.sin(a) * rng:NextNumber(482, 540)),
+			rng
+		)
 	end
-	local fence = Instance.new("Part")
-	for i = 0, 23 do
-		local a = i / 24 * math.pi * 2
+	for i = 0, 71 do
+		local a = i / 72 * math.pi * 2
 		local w = solid(
 			part(
 				ground,
-				at * CFrame.new(math.cos(a) * 166, 20, math.sin(a) * 166) * CFrame.Angles(0, -a, 0),
-				Vector3.new(4, 40, 46),
+				at * CFrame.new(math.cos(a) * 474, 40, math.sin(a) * 474) * CFrame.Angles(0, -a, 0),
+				Vector3.new(4, 80, 44),
 				RIM,
 				nil,
 				nil,
@@ -508,7 +1053,93 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		)
 		w.CastShadow = false
 	end
-	fence:Destroy()
+
+	-- Haul roads out from the outpost, a ring road, and jump ramps on them.
+	local roads = folder(root, "Roads")
+	local roadLines = {}
+	for i = 0, 5 do
+		local a = i / 6 * math.pi * 2 + math.rad(30)
+		local from = (at * CFrame.new(math.cos(a) * 60, 0, math.sin(a) * 60)).Position
+		local to = (at * CFrame.new(math.cos(a) * 420, 0, math.sin(a) * 420)).Position
+		road(roads, from, to, 18)
+		table.insert(roadLines, { from, to })
+	end
+	local ring = 260
+	for i = 0, 35 do
+		local a0, a1 = i / 36 * math.pi * 2, (i + 1) / 36 * math.pi * 2
+		local from = (at * CFrame.new(math.cos(a0) * ring, 0, math.sin(a0) * ring)).Position
+		local to = (at * CFrame.new(math.cos(a1) * ring, 0, math.sin(a1) * ring)).Position
+		road(roads, from, to, 16)
+		table.insert(roadLines, { from, to })
+	end
+	local motorAt = at * CFrame.new(0, 0, 150)
+	road(roads, (at * CFrame.new(0, 0, 92)).Position, (motorAt * CFrame.new(0, 0, -38)).Position, 20)
+	local ramps = {}
+	for i, spec in { { 0, 175 }, { 2, 330 }, { 3, 200 }, { 4, 345 }, { 5, 150 } } do
+		local a = spec[1] / 6 * math.pi * 2 + math.rad(30)
+		local p = (at * CFrame.new(math.cos(a) * spec[2], 0, math.sin(a) * spec[2])).Position
+		local outward = (at * CFrame.new(math.cos(a) * (spec[2] + 10), 0, math.sin(a) * (spec[2] + 10))).Position
+		-- Low end towards the outpost, so you hit it driving out.
+		jumpRamp(roads, CFrame.lookAt(p, p + (p - outward)))
+		ramps[i] = p
+	end
+	for i = 0, 11 do
+		local a = i / 12 * math.pi * 2 + math.rad(15)
+		mast(roads, at * CFrame.new(math.cos(a) * 275, 0, math.sin(a) * 275), if i % 2 == 0 then SAGA else GLOW)
+	end
+
+	-- The Motor Pool, south of the landing pad.
+	local motor = folder(root, "MotorPool")
+	local parking = motorPool(motor, motorAt)
+
+	-- Old workings out in the quarry: a second drill rig and container stacks.
+	local works = folder(root, "Workings")
+	local rigAt = at * CFrame.new(300, 0, -200)
+	for i = 0, 3 do
+		local a = i / 4 * math.pi * 2 + math.pi / 4
+		part(
+			works,
+			rigAt
+				* CFrame.new(math.cos(a) * 7, 16, math.sin(a) * 7)
+				* CFrame.Angles(math.sin(a) * 0.18, 0, -math.cos(a) * 0.18),
+			Vector3.new(1.4, 32, 1.4),
+			HAZARD,
+			Enum.Material.Metal
+		)
+	end
+	part(works, rigAt * CFrame.new(0, 33, 0), Vector3.new(10, 2, 10), HULL_DARK, Enum.Material.Metal)
+	part(works, rigAt * CFrame.new(0, 14, 0), Vector3.new(2, 28, 2), STEEL, Enum.Material.Metal)
+	disc(works, rigAt * CFrame.new(0, 0.15, 0), 9, 0.3, Color3.fromRGB(30, 30, 34), Enum.Material.Slate)
+	for _, c in { { -280, -60 }, { 120, -330 }, { -200, 240 }, { 340, 60 } } do
+		for k = 0, 2 do
+			part(
+				works,
+				at
+					* CFrame.new(c[1], 4 + (if k == 2 then 8 else 0), c[2] + (if k == 1 then 9 else 0))
+					* CFrame.Angles(0, 0.2 * k, 0),
+				Vector3.new(20, 8, 8),
+				({ Color3.fromRGB(190, 70, 50), Color3.fromRGB(60, 110, 170), HAZARD })[k + 1],
+				Enum.Material.CorrodedMetal
+			)
+		end
+	end
+
+	-- The secrets.
+	local secrets = folder(root, "Secrets")
+	local duckAngle = math.rad(135)
+	local hidden = {
+		monolith(secrets, at * CFrame.new(-300, 0, -282) * CFrame.Angles(0, math.rad(40), 0)),
+		rubberDuck(
+			secrets,
+			at
+				* CFrame.new(math.cos(duckAngle) * (QUARRY + 27), 15, math.sin(duckAngle) * (QUARRY + 27))
+				* CFrame.Angles(0, -duckAngle + math.pi / 2, 0)
+		),
+		bomberWreck(secrets, at * CFrame.new(-262, 0, 300) * CFrame.Angles(0, math.rad(-35), 0), rng),
+		skeleton(secrets, at * CFrame.new(330, 0, 120) * CFrame.Angles(0, math.rad(70), 0)),
+		shrine(secrets, at * CFrame.new(-70, 0, -405) * CFrame.Angles(0, math.rad(180), 0)),
+		footprint(secrets, at * CFrame.new(60, 0, 330) * CFrame.Angles(0, math.rad(20), 0)),
+	}
 
 	-- The outpost along the north edge.
 	local base = folder(root, "Outpost")
@@ -786,14 +1417,37 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ (at * CFrame.new(-95, 0, -60)).Position, 30 },
 		{ (at * CFrame.new(118, 0, -40)).Position, 24 },
 		{ (at * CFrame.new(-110, 0, 40)).Position, 16 },
+		{ motorAt.Position, 84 },
+		{ rigAt.Position, 16 },
 	}
+	for _, secret in hidden do
+		table.insert(keepOut, { secret.CFrame.Position, 26 })
+	end
+	for _, p in ramps do
+		table.insert(keepOut, { p, 24 })
+	end
+	for _, p in benchRamps do
+		table.insert(keepOut, { p, 40 })
+	end
+	-- Off the roads too (distance from each road's centre line).
+	local function onRoad(p: Vector3): boolean
+		for _, line in roadLines do
+			local a, b = line[1] * Vector3.new(1, 0, 1), line[2] * Vector3.new(1, 0, 1)
+			local q = p * Vector3.new(1, 0, 1)
+			local t = math.clamp((q - a):Dot(b - a) / (b - a):Dot(b - a), 0, 1)
+			if (a + (b - a) * t - q).Magnitude < 14 then
+				return true
+			end
+		end
+		return false
+	end
 	local spots = {}
 	local tries = 0
-	while #spots < 70 and tries < 4000 do
+	while #spots < 170 and tries < 12000 do
 		tries += 1
-		local a, r = rng:NextNumber(0, math.pi * 2), math.sqrt(rng:NextNumber(0.02, 1)) * 150
+		local a, r = rng:NextNumber(0, math.pi * 2), math.sqrt(rng:NextNumber(0.01, 1)) * (QUARRY - 25)
 		local p = (at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)).Position
-		local ok = true
+		local ok = not onRoad(p)
 		for _, k in keepOut do
 			if (p - k[1]).Magnitude < k[2] then
 				ok = false
@@ -801,7 +1455,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			end
 		end
 		for _, s in spots do
-			if (s.Position - p).Magnitude < 9 then
+			if (s.Position - p).Magnitude < 12 then
 				ok = false
 				break
 			end
@@ -819,6 +1473,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Board = face,
 		Gate = gatePad,
 		Spots = spots,
+		Parking = parking,
+		Secrets = hidden,
 	}
 end
 

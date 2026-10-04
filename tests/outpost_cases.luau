@@ -448,11 +448,50 @@ check(not handlers.OutpostBuyPick(ana, "Plasma").Ok, "Bought a pick without the 
 profiles[ana].Outpost.FreeDay -= 1
 check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings, "No free pick the next day")
 
+-- The secrets: six hidden props, each with a prompt; found once for coins.
+check(#site.Secrets == #Rules.SecretOrder, "Not every secret was hidden")
+check(#site.Parking == 8, "The Motor Pool should have 8 bays")
+local secretIds = {}
+for _, part in site.Secrets do
+	local id = part:GetAttribute("SecretId")
+	secretIds[id] = part
+	check(Rules.Secrets[id] ~= nil, "A secret with no story: " .. tostring(id))
+	check(part:FindFirstChildOfClass("ProximityPrompt") ~= nil, id .. " has no prompt")
+	local p = part.CFrame.Position - Rules.Location.Position
+	check(R.Vector2.new(p.X, p.Z).Magnitude < 470, id .. " is outside the walls")
+end
+local duck = secretIds.Duck
+anaRoot.CFrame = R.CFrame.new(Rules.Location.Position)
+check(not handlers.OutpostSecret(ana, "Duck").Ok, "Found a secret from across the quarry")
+check(not handlers.OutpostSecret(ana, "Nope").Ok, "Found a secret that doesn't exist")
+anaRoot.CFrame = duck.CFrame * R.CFrame.new(0, 0, 4)
+local coinsBefore = profiles[ana].Coins
+local announcedBefore = #announced
+local first = handlers.OutpostSecret(ana, "Duck")
+check(first.Ok and first.Secret.New and first.Secret.Found == 1 and first.Secret.Coins == Rules.SecretReward, "The first find didn't pay")
+check(profiles[ana].Coins == coinsBefore + Rules.SecretReward, "Secret coins weren't added")
+check(#announced == announcedBefore + 1, "The find wasn't announced")
+check(first.State.Secrets == 1 and first.State.SecretsTotal == #Rules.SecretOrder, "The HUD count is wrong")
+local again = handlers.OutpostSecret(ana, "Duck")
+check(again.Ok and not again.Secret.New and profiles[ana].Coins == coinsBefore + Rules.SecretReward, "A secret paid twice")
+-- The full set pays the bonus.
+for _, id in Rules.SecretOrder do
+	anaRoot.CFrame = secretIds[id].CFrame * R.CFrame.new(0, 0, 4)
+	handlers.OutpostSecret(ana, id)
+end
+check(profiles[ana].Coins == coinsBefore + Rules.SecretReward * #Rules.SecretOrder + Rules.SecretBonus, "The full-set bonus wasn't paid once")
+
 -- Only Ultra Rare and Legendary finds are called out to the server.
-check(gemsAwarded > 0 and #announced == 0, "A Rare find was announced to the server")
+local lootCalls = 0
+for _, call in announced do
+	if string.find(call[2], "unearthed") then
+		lootCalls += 1
+	end
+end
+check(gemsAwarded > 0 and lootCalls == 0, "A Rare find was announced to the server")
 
 -- Leaving.
 check(handlers.OutpostLeave(ana).Ok and ana:GetAttribute("Outpost") == nil, "Couldn't leave")
 check(ana.Character:FindFirstChild("OutpostPick") == nil and anaRoot:FindFirstChild("OutpostDuel") == nil, "Left with the mining kit on")
 
-print("PASS: " .. checks .. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, daily pick, enter/leave)")
+print("PASS: " .. checks .. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, daily pick, secrets, enter/leave)")

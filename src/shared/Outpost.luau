@@ -19,13 +19,18 @@
 	  Outpost.claimHolder(node, userId, now) may this player hit this rock?
 	                                         (its first hitter keeps it a while)
 	  Outpost.freePickDue(lastDay, today)    is today's free pick still to come?
+	  Outpost.Machines / Outpost.MachineOrder   the big machines anyone can drive
+	                                         (just for getting around: no tools)
+	  Outpost.Secrets / Outpost.SecretOrder  the hidden Easter eggs
+	  Outpost.drive(spec, speed, yaw, throttle, steer, dt) -> speed, yaw
+	                                         one step of a machine's driving
 ]]
 local Outpost = {}
 
 -- Where the basin is in the world (its centre, on the ground).
 Outpost.Location = CFrame.new(0, 0, 7000)
-Outpost.Radius = 150 -- the walkable floor
-Outpost.NodeCount = 46 -- rocks out at once
+Outpost.Radius = 440 -- the drivable floor (a quarry about a kilometre across)
+Outpost.NodeCount = 110 -- rocks out at once
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from
 Outpost.SwingCooldown = 0.32
@@ -125,6 +130,81 @@ function Outpost.rollSize(roll: number): string
 	end
 	return Outpost.SizeOrder[1]
 end
+
+-- Big machines parked at the Motor Pool. Anyone can hop in and drive; they
+-- don't dig or haul, they're for crossing the quarry (and showing off).
+-- Speeds in studs a second, Turn in radians a second at full lock.
+-- Tracked machines can turn on the spot.
+Outpost.Machines = {
+	Hauler = { Name = "HX-9 Hauler", Blurb = "Six-wheel dump truck", MaxSpeed = 46, Accel = 16, Turn = 0.9 },
+	Mole = {
+		Name = "Mole Drill Crawler",
+		Blurb = "Tracked rock drill",
+		MaxSpeed = 30,
+		Accel = 12,
+		Turn = 1.1,
+		Tracked = true,
+	},
+	Digger = {
+		Name = "EX-4 Digger",
+		Blurb = "Tracked excavator",
+		MaxSpeed = 24,
+		Accel = 10,
+		Turn = 1.2,
+		Tracked = true,
+	},
+	Skipper = { Name = "Skipper Rover", Blurb = "Fast moon buggy", MaxSpeed = 72, Accel = 34, Turn = 1.9 },
+}
+Outpost.MachineOrder = { "Hauler", "Mole", "Digger", "Skipper" }
+Outpost.ReverseShare = 0.4 -- top speed backing up, as a share of forward
+Outpost.MachineResetSeconds = 90 -- an abandoned machine drives itself home after this
+
+-- One step of driving. Throttle and steer are -1..1 (the seat's input).
+-- Returns the new speed and heading (yaw, radians).
+function Outpost.drive(spec, speed: number, yaw: number, throttle: number, steer: number, dt: number): (number, number)
+	local top = if throttle >= 0 then spec.MaxSpeed else spec.MaxSpeed * Outpost.ReverseShare
+	local want = throttle * top
+	-- Accelerate towards the wanted speed; brake twice as hard as you speed up.
+	local rate = if math.abs(want) < math.abs(speed) or want * speed < 0 then spec.Accel * 2 else spec.Accel
+	local step = math.clamp(want - speed, -rate * dt, rate * dt)
+	speed += step
+	-- Wheels steer with speed (and the other way backing up); tracks turn on the spot.
+	local grip = if spec.Tracked then 1 else math.clamp(math.abs(speed) / 8, 0, 1)
+	local direction = if speed < -0.5 and not spec.Tracked then -1 else 1
+	yaw -= steer * spec.Turn * grip * direction * dt
+	return speed, yaw
+end
+
+-- Easter eggs hidden around the quarry. Each pays once per player.
+Outpost.SecretReward = 75
+Outpost.SecretBonus = 500 -- for finding every one
+Outpost.Secrets = {
+	Monolith = {
+		Name = "The Black Monolith",
+		Lore = "It hums when you touch it. Something was watching this moon long before Saga arrived.",
+	},
+	Duck = {
+		Name = "Commander Quackers",
+		Lore = "A rubber duck, perfectly preserved. Nobody at the outpost will admit it's theirs.",
+	},
+	Bomber = {
+		Name = "The Croc Bomber Wreck",
+		Lore = "Black box, last entry: 'Snout stuck in the throttle again. Going down. Tell the crew-' ... static.",
+	},
+	Skeleton = {
+		Name = "Ancient Moon Beast",
+		Lore = "Ribs taller than a hauler. Whatever this was, it mined with its teeth.",
+	},
+	Shrine = {
+		Name = "Sahur's Shrine",
+		Lore = "Tung. Tung. Tung. Someone keeps leaving fresh offerings. On the moon.",
+	},
+	Footprint = {
+		Name = "The First Footprint",
+		Lore = "The plaque reads: 'One small step for a miner. One giant haul for minerkind.'",
+	},
+}
+Outpost.SecretOrder = { "Monolith", "Duck", "Bomber", "Skeleton", "Shrine", "Footprint" }
 
 function Outpost.damage(pickId: string, crit: boolean): number
 	local pick = Outpost.Picks[pickId] or Outpost.Picks.Survey

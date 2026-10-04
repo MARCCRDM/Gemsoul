@@ -79,5 +79,8 @@ if Config.CombatEnabled or not Config.MenuOnly then
 end
 -- Saga Outpost: the shared mining basin (mine, trade at the Probe, duel).
 if Config.Features == nil or Config.Features.Mining ~= false then
-	require(script.Parent.Systems.OutpostServer).start()
+	local OutpostServer = require(script.Parent.Systems.OutpostServer)
+	OutpostServer.start()
+	-- The Motor Pool's machines, for driving round the quarry.
+	require(script.Parent.Systems.OutpostVehicles).start(OutpostServer.site())
 end

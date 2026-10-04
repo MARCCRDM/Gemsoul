@@ -31,6 +31,8 @@ local Rules = require(ReplicatedStorage.Shared.Outpost)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
+-- Driving the Motor Pool's machines (runs on its own once loaded).
+require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
 local UiKit = require(script.Parent.UiKit)
 
@@ -223,8 +225,10 @@ local function refreshHud()
 		finds.Gear
 	)
 	recordLabel.Text = string.format(
-		"%d rocks mined all-time · free pick refills in %dh",
+		"%d rocks mined · secrets %d/%d · free pick in %dh",
 		state.Rocks or 0,
+		state.Secrets or 0,
+		state.SecretsTotal or #Rules.SecretOrder,
 		math.ceil((state.FreeIn or 0) / 3600)
 	)
 end
@@ -551,6 +555,9 @@ function OutpostScene.reveal(loot, at: Vector3?)
 	end
 	revealCard.Visible = true
 	revealCard.BackgroundTransparency = 0.05
+	revealCard.Size = UDim2.fromOffset(420, 150)
+	extraLabel.Size = UDim2.fromOffset(420, 40)
+	extraLabel.Position = UDim2.fromOffset(0, 94)
 	revealScale.Scale = 0.85
 	tween(revealScale, 0.18, { Scale = 1 }, Enum.EasingStyle.Back)
 	gemLabel.Text, extraLabel.Text = "", ""
@@ -631,6 +638,49 @@ function OutpostScene.reveal(loot, at: Vector3?)
 	end)
 end
 
+-- A secret found: the reveal card, in mystery purple, with its story.
+local SECRET = Color3.fromRGB(190, 120, 255)
+function OutpostScene.showSecret(secret)
+	revealToken += 1
+	local token = revealToken
+	revealCard.Visible = true
+	revealCard.BackgroundTransparency = 0.05
+	-- Taller than a loot card, for the story.
+	revealCard.Size = UDim2.fromOffset(420, 200)
+	extraLabel.Size = UDim2.fromOffset(400, 96)
+	extraLabel.Position = UDim2.fromOffset(10, 94)
+	revealStroke.Color = SECRET
+	reelLabel.Text = if secret.New then "SECRET FOUND!" else "SECRET"
+	reelLabel.TextColor3 = SECRET
+	gemLabel.Text = string.format("%s  (%d/%d)", secret.Name, secret.Found, secret.Total)
+	gemLabel.TextColor3 = Color3.new(1, 1, 1)
+	local reward = if secret.New
+		then "+" .. (secret.Coins + secret.Bonus) .. " coins" .. (if secret.Bonus > 0
+			then "  ·  EVERY SECRET FOUND!"
+			else "")
+		else "Already found"
+	extraLabel.Text = secret.Lore .. "\n" .. reward
+	revealScale.Scale = 0.8
+	tween(revealScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+	if secret.New then
+		LotterySound.reveal(if secret.Bonus > 0 then 5 else 4)
+		require(script.Parent.ChatFrame).loot(
+			"You found a secret: [" .. secret.Name .. "] +" .. (secret.Coins + secret.Bonus) .. " coins"
+		)
+	else
+		sound(PING, 1.5, 0.35)
+	end
+	task.delay(6, function()
+		if token == revealToken then
+			tween(revealCard, 0.3, { BackgroundTransparency = 1 })
+			task.wait(0.3)
+			if token == revealToken then
+				revealCard.Visible = false
+			end
+		end
+	end)
+end
+
 -- Mining -----------------------------------------------------------------------------------------------
 
 local function nearestRock(): Model?
@@ -654,6 +704,11 @@ end
 
 function OutpostScene.swing(nodeId: number?)
 	if not active or player:GetAttribute("CombatSession") then
+		return
+	end
+	-- Not from the driver's seat.
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart then
 		return
 	end
 	local now = os.clock()
@@ -839,6 +894,19 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		OutpostScene.openProbe()
 	elseif kind == "Gate" then
 		require(script.Parent.SocialUI).open()
+	elseif kind == "Secret" then
+		task.spawn(function()
+			local result = GemClient.request("OutpostSecret", prompt:GetAttribute("SecretId"))
+			if result.Ok and result.Secret then
+				if result.State then
+					state = result.State
+					refreshHud()
+				end
+				OutpostScene.showSecret(result.Secret)
+			elseif result.Message and result.Message ~= "" then
+				UiKit.toast(result.Message, P.Bad)
+			end
+		end)
 	elseif kind == "Duel" or kind == "Party" then
 		local target = prompt:GetAttribute("TargetUserId")
 		if target == player.UserId then
