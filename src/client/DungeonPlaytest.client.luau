@@ -17,7 +17,8 @@ gui.DisplayOrder = 120
 gui.Parent = player:WaitForChild("PlayerGui")
 local panel = Instance.new("Frame")
 panel.Size = UDim2.fromOffset(300, 118)
-panel.Position = UDim2.new(0, 16, 1, -140)
+-- Clear of the bottom-left HUD panels (combat log and hints).
+panel.Position = UDim2.new(0, 16, 1, -300)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Parent = gui
 local status = Instance.new("TextLabel")
