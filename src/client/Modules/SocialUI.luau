@@ -485,10 +485,15 @@ local function drawArena()
 	)
 	facts.AutomaticSize = Enum.AutomaticSize.None
 	facts.Position, facts.Size = UDim2.fromOffset(122, 34), UDim2.new(1, -136, 0, 32)
-	local rows = new("Frame", {
+	local rows = new("ScrollingFrame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(10, 78),
 		Size = UDim2.new(1, -20, 1, -86),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 3,
+		BorderSizePixel = 0,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
 	}, arenaCard)
 	UiKit.list(rows, 8)
 	if queued then
@@ -1143,5 +1148,10 @@ end)
 
 player:GetAttributeChangedSignal("DungeonQueue"):Connect(function()
 	SocialUI.refresh()
+end)
+player:GetAttributeChangedSignal("DungeonId"):Connect(function()
+	if player:GetAttribute("DungeonId") then
+		SocialUI.close()
+	end
 end)
 return SocialUI

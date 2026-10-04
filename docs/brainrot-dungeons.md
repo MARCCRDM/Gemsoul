@@ -42,3 +42,13 @@ A cleared dungeon gives each surviving, still-enrolled player **300 coins and Sl
 - `src/server/Systems/BrainrotSkins.luau`: animated creature geometry.
 - `src/client/Dungeon.client.luau`: first-person objective strip.
 - `tests/run_dungeons.py`: deterministic lifecycle/layout tests.
+
+## Raid squad recruitment
+
+The raid button opens Social with a three-slot squad card: the local player and two open teammate slots. Invite Friend opens Roblox's game invitation prompt; once the friend joins the server, use + Party in the player list. Existing party readiness, kicking and leaving remain available.
+
+Fill Random searches among opted-in players in this server. It assembles three solos or a ready duo plus a solo; friend groups are never split. The leader queues a friend party after all its members mark Ready. Selecting random search consents to automatic dungeon deployment when three are matched. Anyone in a searching group can cancel it. Party changes, readiness changes, disconnects and entering another combat activity invalidate the search. Start Party remains the manual ready-party launch, including existing four-person parties.
+
+This implementation does not match across Roblox servers. Developer solo test controls remain separate from public matchmaking.
+
+Validation: tests/run_dungeon_queue.py executes the actual Party and DungeonQueue modules using deterministic service doubles. Covers invitations, three solos, duo plus solo, leader/readiness restrictions, duplicate queue and launch prevention, cancellations, disconnects, occupied players, and preserving existing parties.
