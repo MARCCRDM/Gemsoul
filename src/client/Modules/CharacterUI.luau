@@ -26,6 +26,7 @@ local SurgeArrayUI = require(script.Parent.SurgeArrayUI)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
+local SurgeIcons = require(script.Parent.SurgeIcons)
 
 local player = Players.LocalPlayer
 local P = IronUi.Colors
@@ -638,6 +639,7 @@ local function gemLines(gem)
 			icon.AutomaticSize, icon.Position, icon.Size =
 				Enum.AutomaticSize.None, UDim2.fromOffset(8, 0), UDim2.fromOffset(28, 44)
 			icon.TextXAlignment, icon.TextYAlignment = Enum.TextXAlignment.Center, Enum.TextYAlignment.Center
+			SurgeIcons.apply(icon, surge, color)
 			local title = text(
 				card,
 				string.format(

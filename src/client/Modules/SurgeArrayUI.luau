@@ -17,6 +17,7 @@ local AugmentTreeUI = require(script.Parent.AugmentTreeUI)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
+local SurgeIcons = require(script.Parent.SurgeIcons)
 
 local P = IronUi.Colors
 local BOLD, HEADING = IronUi.Bold, IronUi.Heading
@@ -137,6 +138,7 @@ local function socketCard(parent, key, x, gem, amps)
 	stroke(socket, color, 3, if gem then 0 else 0.4)
 	local glyph = label(socket, if definition then definition.Icon or "◆" else "+", 38, color)
 	glyph.Size, glyph.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	SurgeIcons.apply(glyph, definition, color)
 	local chip = new("Frame", {
 		BackgroundColor3 = P.Gold,
 		Position = UDim2.fromOffset(12, 12),
@@ -277,6 +279,7 @@ local function pouchList(parent, profile, amps)
 		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, dot)
 		local icon = label(dot, definition and definition.Icon or "◆", 13, P.Inset)
 		icon.Size, icon.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+		SurgeIcons.apply(icon, definition, P.Inset)
 		place(
 			label(
 				row,

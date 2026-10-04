@@ -12,6 +12,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local SurgeIcons = require(script.Parent.Modules.SurgeIcons)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
@@ -746,6 +747,7 @@ local function drawRival(now, viewport)
 		row.Name.Text = surgeName or ""
 		row.Name.TextColor3 = surgeColor
 		row.Icon.Text, row.Icon.TextColor3 = model:GetAttribute("RivalSurgeIcon" .. slot) or "◆", surgeColor
+		SurgeIcons.apply(row.Icon, surgeName, surgeColor)
 		row.Tier.Text = if surgeName
 			then string.format(
 				"%s · %s",
@@ -1356,12 +1358,14 @@ RunService.RenderStepped:Connect(function(dt)
 			local color = GemConfig.ElementColors[gem.Element] or P.Gold
 			local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)
 			icon.Glyph.Text, icon.Glyph.TextColor3 = definition.Icon or "◆", color
+			SurgeIcons.apply(icon.Glyph, definition, color)
 			icon.Badge.Text = string.format("T%d · %s", definition.Tier, ROMAN[definition.Rank] or "I")
 			icon.Name.Text = definition.Name
 			local usable = (player:GetAttribute("Charge") or 0) >= cost
 			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key, not usable)
 		else
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
+			SurgeIcons.apply(icon.Glyph, nil, P.Dim)
 			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
 			setIcon(icon, P.Dim, nil, false, false)
 		end
