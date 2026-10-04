@@ -121,6 +121,23 @@ GemConfig.ElementColors = {
 	Poison = Color3.fromRGB(70, 205, 90), -- green
 }
 
+-- The element whose badge colour this is (element hits are tinted with it).
+function GemConfig.elementOfColor(color: Color3?): string?
+	if not color then
+		return nil
+	end
+	for element, tint in GemConfig.ElementColors do
+		if
+			math.abs(tint.R - color.R) < 0.02
+			and math.abs(tint.G - color.G) < 0.02
+			and math.abs(tint.B - color.B) < 0.02
+		then
+			return element
+		end
+	end
+	return nil
+end
+
 GemConfig.SourceLabels = {
 	MiningNode = "Dug from the mine",
 	MiningStore = "Bought at the Mining Store",

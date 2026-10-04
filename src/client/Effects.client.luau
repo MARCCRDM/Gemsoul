@@ -18,6 +18,8 @@ require(script.Parent.Modules.PrismaticShimmer).start()
 require(script.Parent.Modules.BladeTrails).start()
 -- Night falls in the Arena: the fight and the gear light it.
 require(script.Parent.Modules.ArenaNight).start()
+-- A player killed by an element bursts apart in it (fire, shock, acid, ice).
+require(script.Parent.Modules.ElementalDeath).start()
 
 -- Tracks every part with `tag`, remembering where the server placed it.
 local function track(tag: string): { [BasePart]: CFrame }

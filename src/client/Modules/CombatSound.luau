@@ -311,19 +311,7 @@ end
 
 -- Which element a colour is (the game's element colours), if any.
 function CombatSound.elementOf(color: Color3?): string?
-	if not color then
-		return nil
-	end
-	for element, tint in GemConfig.ElementColors do
-		if
-			math.abs(tint.R - color.R) < 0.02
-			and math.abs(tint.G - color.G) < 0.02
-			and math.abs(tint.B - color.B) < 0.02
-		then
-			return element
-		end
-	end
-	return nil
+	return GemConfig.elementOfColor(color)
 end
 
 -- An element's own layer: "Cast" or "Impact" for Fire, Frost, Shock or Poison.

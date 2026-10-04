@@ -553,7 +553,13 @@ end
 
 local function die(enemy: Enemy)
 	enemy.Alive = false
-	fx("Death", enemy.Root.Position, if enemy.Element then GemConfig.ElementColors[enemy.Element] else nil)
+	fx(
+		"Death",
+		enemy.Root.Position,
+		if enemy.Element then GemConfig.ElementColors[enemy.Element] else nil,
+		enemy.Model:GetAttribute("LastHitElement"),
+		enemy.Model
+	)
 	if enemy.OnDeath then
 		enemy.OnDeath(enemy)
 	else
@@ -608,6 +614,11 @@ function Enemies.damage(
 	end
 	if not enemy.Alive or amount <= 0 then
 		return
+	end
+	-- The last elemental blow decides how the body goes (ElementalDeath).
+	local hitElement = incomingElement or GemConfig.elementOfColor(color)
+	if hitElement then
+		enemy.Model:SetAttribute("LastHitElement", hitElement)
 	end
 	local now = os.clock()
 	local name = DamageLog.nameOf(enemy)

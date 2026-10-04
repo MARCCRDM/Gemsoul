@@ -514,6 +514,11 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		if blocked > 0 then
 			character:SetAttribute("BlockedAt", serverNow)
 		end
+		-- The last elemental blow decides how the body goes if it dies
+		-- (ElementalDeath).
+		if damage > 0 and element then
+			character:SetAttribute("LastHitElement", element)
+		end
 		if damage > 0 and blocked <= damage then
 			local side = if origin and (origin - root.Position):Dot(root.CFrame.RightVector) < 0 then -1 else 1
 			character:SetAttribute("HurtAt", serverNow)
