@@ -710,6 +710,10 @@ local SLOT_SHORT =
 	{ Helmet = "HEAD", Armor = "CHEST", Gloves = "HANDS", Boots = "FEET", Weapon = "WEAPON", Shield = "SHIELD" }
 local rivalModel, nextRivalScan = nil, 0
 local function findRival()
+	if player:GetAttribute("DungeonId") then
+		local target = TargetLock.target()
+		return if target and target:GetAttribute("DungeonId") == player:GetAttribute("DungeonId") then target else nil
+	end
 	local folder = workspace:FindFirstChild("Enemies")
 	for _, model in folder and folder:GetChildren() or {} do
 		-- Your own rival, or your raid's boss.
@@ -733,7 +737,10 @@ local function drawRival(now, viewport)
 	local element = model:GetAttribute("RivalElement")
 	local color = GemConfig.ElementColors[element] or P.Gold
 	rivalName.Text, rivalName.TextColor3 = model:GetAttribute("RivalName") or model.Name, color
-	rivalTag.Text = if model:GetAttribute("RivalSparring") then "SPARRING" else "RIVAL"
+	rivalTag.Text = if model:GetAttribute("RaidBandit")
+		then (if model:GetAttribute("AmbientState") == "Combat" then "HOSTILE BANDIT" else "NEUTRAL BANDIT")
+		elseif model:GetAttribute("RivalSparring") then "SPARRING"
+		else "RIVAL"
 	rivalStroke.Color = color:Lerp(HudChrome.GoldDim, 0.45)
 	rivalInfo.Text = string.format(
 		"%s  ·  GEAR SCORE %d",
@@ -825,7 +832,8 @@ local function drawRival(now, viewport)
 	end
 	rivalMoves.Text = table.concat(moveNames, "  ·  ")
 	local stance = STANCES[model:GetAttribute("Stance") or ""]
-	rivalStance.Text = if stance then stance[1] else ""
+	local ambient = model:GetAttribute("AmbientState")
+	rivalStance.Text = if ambient and ambient ~= "Combat" then string.upper(ambient) elseif stance then stance[1] else ""
 	rivalStance.TextColor3 = if stance then stance[2] else P.Text
 	rivalHealthFill.Size = UDim2.fromScale(math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1), 1)
 end
@@ -1269,7 +1277,7 @@ RunService.RenderStepped:Connect(function(dt)
 		return
 	end
 	FirstPerson.start()
-	local guideOpen = CombatGuide.isOpen() or AugmentTreeUI.isOpen()
+	local guideOpen = CombatGuide.isOpen() or AugmentTreeUI.isOpen() or player:GetAttribute("DungeonLoot") ~= nil
 	if guideOpen ~= guideWasOpen then
 		cursorFree = guideOpen
 		FirstPerson.setCursorFree(cursorFree)

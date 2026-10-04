@@ -8,9 +8,12 @@ def module(name,p):
  return 'local '+name+'=(function()\n'+s+'\nend)()\n'
 s=read('tests/duels_services.luau').replace('Changed = {}','Changed = {}, CharacterRemoving = signal()')
 s+=module('Rules','src/shared/DungeonRules.luau')
+s+=module('GemRoller','src/shared/GemRoller.luau')
 s+=read('tests/dungeon_services.luau')
 s+=module('Dungeon','src/server/Systems/Dungeons.luau')
 s+=read('tests/dungeon_cases.luau')
+s+=module('Ambient','src/server/Systems/ExpeditionAmbient.luau')
+s+=read('tests/expedition_ambient_cases.luau')
 with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'dungeons.luau';p.write_text(s,encoding='utf-8')
  subprocess.run([str(root/'.tools/luau/luau.exe'),str(p)],check=True)

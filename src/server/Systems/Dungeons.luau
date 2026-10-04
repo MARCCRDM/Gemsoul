@@ -5,6 +5,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Rules = require(ReplicatedStorage.Shared.DungeonRules)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local World = require(script.Parent.Parent.World.DungeonWorld)
 local Party = require(script.Parent.Party)
 local Raids = require(script.Parent.Raids)
@@ -22,6 +23,7 @@ local function canTest(player)
 end
 local runs, memberRun, slots = {}, {}, {}
 local finish
+local beginLoot
 local function living(run)
 	local result = {}
 	for _, p in run.Members do
@@ -72,6 +74,8 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonObjective", nil)
 				p:SetAttribute("DungeonRoom", nil)
 				p:SetAttribute("DungeonBoss", nil)
+				p:SetAttribute("DungeonLoot", nil)
+				p:SetAttribute("DungeonLootDeadline", nil)
 				if eligible then
 					PlayerData.addCoins(p, 300)
 					Progress.addXP(p, "SlayBrute")
@@ -83,6 +87,106 @@ finish = function(run, won, reason)
 	end
 	run.World.Folder:Destroy()
 	slots[run.Slot] = nil
+end
+local function resolveLoot(run)
+	local loot = run.Loot
+	if not loot or loot.Resolved or run.Done then
+		return
+	end
+	loot.Resolved = true
+	local contenders = {}
+	for _, p in loot.Eligible do
+		if p.Parent and memberRun[p] == run and loot.Choices[p] and loot.Choices[p] ~= "Pass" then
+			table.insert(contenders, p)
+		end
+	end
+	local winner, best = nil, -1
+	local rolls, tied = {}, {}
+	local dice = Random.new()
+	for _, p in contenders do
+		local roll = dice:NextInteger(1, 100)
+		table.insert(rolls, p.Name .. " " .. tostring(roll))
+		if roll > best then
+			best = roll
+			tied = { p }
+		elseif roll == best then
+			table.insert(tied, p)
+		end
+	end
+	if #tied > 0 then
+		winner = tied[dice:NextInteger(1, #tied)]
+	end
+	if winner and not run.Test then
+		local rng = Random.new()
+		local rarity = if loot.Tier == 5 then "Legendary" else "UltraRare"
+		local band = GemRoller.ByRarity[rarity]
+		local gem = {
+			Source = "PvEDrop",
+			Found = os.time(),
+			CutMethod = "Natural",
+			Id = PlayerData.newGemId(),
+			Element = loot.Element,
+			Tier = rarity,
+			SurgeTier = 4,
+			SurgeRank = 3,
+			Size = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
+			Clarity = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
+			Cut = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
+		}
+		gem.Surge = (if rng:NextNumber() < 0.5 then GemRoller.SurgeVariants else GemRoller.Surges)[gem.Element][4]
+		if not PlayerData.addGem(winner, gem) then
+			PlayerData.addCoins(winner, 500)
+			Remotes.Notify:FireClient(winner, "Gem pouch full: boss gem converted to 500 coins.")
+		end
+	end
+	announce(
+		run,
+		if winner
+			then "BOSS LOOT: " .. winner.Name .. " wins the " .. loot.Element .. " gem. " .. table.concat(rolls, " · ")
+			else "Boss loot passed by the squad."
+	)
+	for _, p in loot.Eligible do
+		p:SetAttribute("DungeonLoot", nil)
+		p:SetAttribute("DungeonLootDeadline", nil)
+	end
+	task.delay(5, function()
+		finish(run, true, "Colossus defeated. Expedition complete.")
+	end)
+end
+beginLoot = function(run, room)
+	if run.Loot or run.Done then
+		return
+	end
+	Duelist.removeDungeon(run.Id) -- clear hostile actors during the reward decision
+	if run.Test then
+		finish(run, true, "Owner expedition complete. No rewards.")
+		return
+	end
+	local eligible = living(run)
+	run.Loot = {
+		Eligible = eligible,
+		Choices = {},
+		Tier = room.GearTier,
+		Element = Rules.Roster[room.Theme].Element,
+		Deadline = os.clock() + 30,
+	}
+	for _, p in eligible do
+		p:SetAttribute(
+			"DungeonLoot",
+			(if room.GearTier == 5 then "Legendary" else "Ultra Rare")
+				.. " "
+				.. GemConfig.elementName(run.Loot.Element)
+				.. " Gem · Tier 4 / Rank III"
+		)
+		p:SetAttribute("DungeonLootDeadline", workspace:GetServerTimeNow() + 30)
+	end
+	announce(
+		run,
+		"BOSS DEFEATED · Claim, roll, or pass on the gem. Multiple claims are resolved by a fair party roll. 30 seconds."
+	)
+	task.delay(30, function()
+		resolveLoot(run)
+	end)
 end
 local function spawnRoom(run, index)
 	if run.Done then
@@ -127,11 +231,20 @@ local function spawnRoom(run, index)
 			Room = index,
 			GearTier = room.GearTier or (if room.Boss then 4 else 1),
 			Center = center,
+			OpenWorld = run.OpenWorld,
+			Bandit = room.Bandit,
+			MinPlayers = if run.Test then 1 else Rules.Min,
 			Spot = center + Vector3.new(math.cos(angle) * 14, if room.Boss then 7 else 4, math.sin(angle) * 14),
 			Spec = Rules.Roster[kind],
 			Boss = room.Boss,
 			OnDeath = function()
-				if run.Done or run.Index ~= index then
+				if run.Done or (not run.OpenWorld and run.Index ~= index) then
+					return
+				end
+				if run.OpenWorld then
+					if room.Boss then
+						beginLoot(run, room)
+					end
 					return
 				end
 				run.Remaining -= 1
@@ -212,6 +325,7 @@ local function queue(player, testMode)
 		Members = table.clone(members),
 		PartyId = party and party.Id,
 		Test = testing,
+		OpenWorld = not (testing and testMode == "Sahur"),
 		Slot = slot,
 		Index = 1,
 		Started = os.clock(),
@@ -229,14 +343,23 @@ local function queue(player, testMode)
 		p:SetAttribute("CombatSession", "Raid")
 	end
 	local success, problem = pcall(function()
-		run.Rooms = Rules.generate(Random.new())
+		run.Rooms = if run.OpenWorld then Rules.generateOpen(Random.new()) else Rules.generate(Random.new())
 		if testing and testMode == "Sahur" then
 			run.Rooms = { { Index = 1, X = 0, Z = 0, Boss = true, Theme = 1, Foes = { 1 }, Pillars = 2 } }
 		end
-		run.World = World.build(id, run.Rooms, Vector3.new(2500 + slot * 1400, 0, 2500))
+		run.World = (if run.OpenWorld then World.buildOpen else World.build)(
+			id,
+			run.Rooms,
+			Vector3.new(2500 + slot * 1400, 0, 2500)
+		)
 		for i, p in run.Members do
 			CombatServer.reset(p)
-			p.Character:PivotTo(CFrame.new(run.World.Centers[1] + Vector3.new((i - 2.5) * 5, 4, -22)))
+			p.Character:PivotTo(
+				CFrame.new(
+					(run.World.Arrival or run.World.Centers[1])
+						+ Vector3.new((i - 2.5) * 5, 4, if run.OpenWorld then 0 else -22)
+				)
+			)
 			local h = p.Character:FindFirstChildOfClass("Humanoid")
 			h.Health = h.MaxHealth
 		end
@@ -244,7 +367,7 @@ local function queue(player, testMode)
 			run,
 			if testing
 				then "OWNER TEST  -  solo enabled, no rewards. Encounter begins in 3 seconds."
-				else "Squad deployed. Five rooms. One elemental Colossus. Stay together."
+				else "Expedition deployed. Explore the open field. Monsters are hostile; bandits retaliate only. Find the Colossus."
 		)
 		task.delay(3, function()
 			if run.Done then
@@ -254,7 +377,22 @@ local function queue(player, testMode)
 				finish(run, false, "Three players are required to begin. Queue cancelled.")
 				return
 			end
-			safeSpawnRoom(run, 1)
+			if run.OpenWorld then
+				for index = 1, #run.Rooms do
+					if run.Done then
+						break
+					end
+					safeSpawnRoom(run, index)
+				end
+				if not run.Done then
+					announce(
+						run,
+						"OPEN EXPEDITION · Explore camps and ore fields. Defeat the central Colossus. Bandits are neutral until attacked."
+					)
+				end
+			else
+				safeSpawnRoom(run, 1)
+			end
 		end)
 	end)
 	if not success then
@@ -271,6 +409,34 @@ function Dungeon.queueParty(player)
 	return queue(player)
 end
 function Dungeon.start()
+	Shop.register("DungeonLootChoice", function(player, choice)
+		local run = memberRun[player]
+		local loot = run and run.Loot
+		if not loot or loot.Resolved or not table.find(loot.Eligible, player) then
+			return Shop.reply(false, "No eligible boss loot.")
+		end
+		if os.clock() >= loot.Deadline then
+			resolveLoot(run)
+			return Shop.reply(false, "Loot voting has ended.")
+		end
+		if choice ~= "Claim" and choice ~= "Roll" and choice ~= "Pass" then
+			return Shop.reply(false, "Choose Claim, Roll or Pass.")
+		end
+		if loot.Choices[player] then
+			return Shop.reply(false, "Your choice is already locked.")
+		end
+		loot.Choices[player] = choice
+		local complete = true
+		for _, p in loot.Eligible do
+			if p.Parent and memberRun[p] == run and not loot.Choices[p] then
+				complete = false
+			end
+		end
+		if complete then
+			resolveLoot(run)
+		end
+		return Shop.reply(true, "Choice locked: " .. choice)
+	end)
 	Shop.register("PartyDungeon", function(player)
 		return queue(player)
 	end)
@@ -293,6 +459,8 @@ function Dungeon.start()
 		p:SetAttribute("DungeonTest", nil)
 		p:SetAttribute("DungeonRoom", nil)
 		p:SetAttribute("DungeonBoss", nil)
+		p:SetAttribute("DungeonLoot", nil)
+		p:SetAttribute("DungeonLootDeadline", nil)
 		p:SetAttribute("DungeonObjective", nil)
 		if #living(run) == 0 then
 			finish(run, false, "The squad has left the dungeon.")
@@ -331,7 +499,7 @@ function Dungeon.start()
 				finish(run, false, "Squad defeated. Regroup and try again.")
 				continue
 			end
-			if os.clock() - run.Started > Rules.TimeLimit then
+			if not run.Loot and os.clock() - run.Started > Rules.TimeLimit then
 				finish(run, false, "Dungeon time limit reached.")
 				continue
 			end
@@ -339,7 +507,13 @@ function Dungeon.start()
 				local party = Party.of(p)
 				local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
 				local close = false
-				if root then
+				if root and run.OpenWorld then
+					local offset = root.Position - run.World.Origin
+					close = math.abs(offset.X) < Rules.OpenRadius
+						and math.abs(offset.Z) < Rules.OpenRadius
+						and math.abs(offset.Y) < 80
+				end
+				if root and not run.OpenWorld then
 					for _, center in run.World.Centers do
 						local offset = root.Position - center
 						if math.abs(offset.X) < 62 and math.abs(offset.Z) < 62 and math.abs(offset.Y) < 40 then
@@ -352,7 +526,7 @@ function Dungeon.start()
 					ArenaSessions.leave(p)
 				end
 			end
-			if run.Cleared and not run.Done and run.Index < #run.Rooms then
+			if not run.OpenWorld and run.Cleared and not run.Done and run.Index < #run.Rooms then
 				local center = run.World.Centers[run.Index + 1]
 				for _, p in living(run) do
 					local root = p.Character:FindFirstChild("HumanoidRootPart")

@@ -15,6 +15,7 @@ local Random = {
 	new = function(seed)
 		local state = seed or 53
 		return {
+			NextNumber = function(_,a,b) state=(state*16807)%2147483647; return (a or 0)+state/2147483647*((b or 1)-(a or 0)) end,
 			NextInteger = function(_, a, b)
 				state = (state * 16807) % 2147483647
 				return a + state % (b - a + 1)
@@ -91,6 +92,7 @@ local function squad(n)
 	end
 	local party = { Id = tostring(nextPlayer), Leader = list[1], Members = list, Ready = {} }
 	for _, p in list do
+		p.Name=p.DisplayName
 		parties[p] = party
 		party.Ready[p] = true
 	end
@@ -104,3 +106,13 @@ local permittedTester=nil
 local Feedback={isOwner=function(p) return studioMode or p==permittedTester end}
 game={CreatorType="Group",CreatorId=-1}
 Enum={CreatorType={User="User"}}
+
+World.buildOpen=function(id,rooms,origin)
+ local world=World.build(id,rooms,origin)
+ world.Origin=origin;world.Arrival=origin+Vector3.new(0,0,-225);world.Radius=Rules.OpenRadius
+ return world
+end
+local awarded={}
+PlayerData.newGemId=function() serial+=1;return "gem"..serial end
+PlayerData.addGem=function(p,g) table.insert(awarded,{Player=p,Gem=g});return true end
+os.time=function() return 100000 end

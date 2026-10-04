@@ -747,7 +747,9 @@ end
 -- Every 0.15s while the rival is alive.
 local function think(enemy, now: number)
 	local duel = enemy.Duel
-	if duel.Dungeon and duel.Dungeon.OpenWorld and ExpeditionAmbient.step(duel, now) then return end
+	if duel.Dungeon and duel.Dungeon.OpenWorld and ExpeditionAmbient.step(duel, now) then
+		return
+	end
 	if duel.Raid and not raidTarget(duel, now) then
 		return
 	end
@@ -1459,7 +1461,9 @@ function spawnRival(owner: Player, raid, encounter)
 	local loadout = rollLoadout(rng)
 	if encounter then
 		encounter.GearTier = encounter.GearTier or (if encounter.Boss then 4 else 1)
-		if not encounter.Bandit then DungeonLoadout.apply(loadout, encounter.Spec, encounter.GearTier, rng) end
+		if not encounter.Bandit then
+			DungeonLoadout.apply(loadout, encounter.Spec, encounter.GearTier, rng)
+		end
 	end
 	local name = NAMES[rng:NextInteger(1, #NAMES)]
 	if raid then
@@ -1472,7 +1476,9 @@ function spawnRival(owner: Player, raid, encounter)
 			.. DungeonLoadout.Labels[encounter.GearTier]
 			.. "]"
 	end
-	if encounter and encounter.Bandit then name = "Space Bandit " .. name end
+	if encounter and encounter.Bandit then
+		name = "Space Bandit " .. NAMES[rng:NextInteger(1, #NAMES)]
+	end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
 	away = if away.Magnitude > 1 then away.Unit else Vector3.new(1, 0, 0)
@@ -1492,7 +1498,9 @@ function spawnRival(owner: Player, raid, encounter)
 	end
 	if encounter and encounter.Bandit then
 		for _, part in rig:GetDescendants() do
-			if part:IsA("BasePart") and part.Transparency < 1 then part.Color = part.Color:Lerp(Color3.fromRGB(170,45,50), .48) end
+			if part:IsA("BasePart") and part.Transparency < 1 then
+				part.Color = part.Color:Lerp(Color3.fromRGB(170, 45, 50), 0.48)
+			end
 		end
 	elseif encounter then
 		-- Remove cosmetic equipment, retaining the entire jointed animation skeleton.
@@ -1631,6 +1639,7 @@ function spawnRival(owner: Player, raid, encounter)
 		enemy.DungeonId = raid.Id
 		enemy.ElementWeakness = encounter.Spec.Weakness
 		enemy.Model:SetAttribute("DungeonId", raid.Id)
+		enemy.Model:SetAttribute("RaidBandit", encounter.Bandit == true)
 		enemy.Model:SetAttribute("ElementWeakness", encounter.Spec.Weakness)
 		enemy.Model:SetAttribute("ElementResistance", encounter.Spec.Element)
 	end
@@ -1824,8 +1833,13 @@ function Duelist.startRaid(members: { Player }, id: string)
 end
 
 function Duelist.spawnDungeon(members, id, encounter)
-	local raid =
-		{ Id = id, Members = table.clone(members), All = table.clone(members), Wave = encounter.Room, Dungeon = true }
+	local raid = {
+		Id = id,
+		Members = table.clone(members),
+		All = table.clone(members),
+		Wave = if encounter.OpenWorld then 1 else encounter.Room,
+		Dungeon = true,
+	}
 	return spawnRival(members[1], raid, encounter)
 end
 function Duelist.removeDungeon(id)

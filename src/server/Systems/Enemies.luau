@@ -590,6 +590,19 @@ function Enemies.damage(
 	if enemy.DungeonId and (not source or source:GetAttribute("DungeonId") ~= enemy.DungeonId) then
 		return
 	end
+	local encounter = enemy.Duel and enemy.Duel.Dungeon
+	if encounter and encounter.OpenWorld and encounter.Boss then
+		local count = 0
+		for _, member in enemy.Duel.Raid.Members do
+			local h = member.Character and member.Character:FindFirstChildOfClass("Humanoid")
+			if member.Parent and member:GetAttribute("DungeonId") == enemy.DungeonId and h and h.Health > 0 then
+				count += 1
+			end
+		end
+		if count < (encounter.MinPlayers or 3) then
+			return
+		end
+	end
 	if enemy.DungeonId then
 		amount *= DungeonRules.elementMultiplier(enemy.Element, enemy.ElementWeakness, incomingElement)
 	end

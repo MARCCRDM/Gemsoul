@@ -49,14 +49,15 @@ local function clearRoom(runId, index)
 	end
 	return count
 end
-for room = 1, 4 do
-	check(clearRoom(id, room) >= 2, "Missing room fighters")
-	check(worlds[id].Gates[room].Destroyed, "Gate stayed closed")
-	for _, p in team do
-		p.Root.Position = worlds[id].Centers[room + 1] + Vector3.new(0, 4, 0)
-	end
-	tick(0.5)
+-- All camps are live together; no gate or room-clearing prerequisite.
+local camps,bandits=0,0
+for _,e in spawned do
+ if e.Id==id then camps+=1;if e.Encounter.Bandit then bandits+=1 end;check(e.Encounter.OpenWorld,"Sequential encounter leaked") end
 end
+check(camps>=19 and bandits>=6,"Open map population missing")
+for _,p in team do p.Root.Position=worlds[id].Origin+Vector3.new(100,4,80) end
+tick(.5)
+check(team[1]:GetAttribute("DungeonId")==id,"Free exploration returned player to town")
 local boss
 for _, e in spawned do
 	if e.Id == id and e.Encounter.Boss then
@@ -64,7 +65,17 @@ for _, e in spawned do
 	end
 end
 check(boss ~= nil, "Final boss not spawned")
-clearRoom(id, 5)
+clearRoom(id, 10)
+check(team[1]:GetAttribute("DungeonLoot")~=nil,"Boss loot prompt missing")
+check(not handlers.DungeonLootChoice(second[1],"Claim").Ok,"Other squad stole loot")
+check(not handlers.DungeonLootChoice(team[1],"Invalid").Ok,"Invalid choice accepted")
+check(handlers.DungeonLootChoice(team[1],"Claim").Ok,"Claim refused")
+check(not handlers.DungeonLootChoice(team[1],"Roll").Ok,"Duplicate choice accepted")
+check(handlers.DungeonLootChoice(team[2],"Roll").Ok,"Roll refused")
+check(handlers.DungeonLootChoice(team[3],"Pass").Ok,"Pass refused")
+check(#awarded==1 and awarded[1].Player~=team[3],"Loot duplicated or awarded to passer")
+check(awarded[1].Gem.SurgeTier==4 and awarded[1].Gem.SurgeRank==3,"Boss gem quality")
+tick(5)
 for _, p in team do
 	check(profiles[p].Coins == 300, "Completion reward missing")
 	check(p:GetAttribute("DungeonId") == nil, "Session leaked")
@@ -92,20 +103,11 @@ local lost = squad(3)
 handlers.PartyDungeon(lost[1])
 tick(3)
 local lostId = lost[1]:GetAttribute("DungeonId")
-for room = 1, 4 do
-	clearRoom(lostId, room)
-	if room == 4 then
-		ArenaSessions.leave(lost[3])
-	end
-	for i = 1, 2 do
-		lost[i].Root.Position = worlds[lostId].Centers[room + 1] + Vector3.new(0, 4, 0)
-	end
-	if room < 4 then
-		lost[3].Root.Position = worlds[lostId].Centers[room + 1] + Vector3.new(0, 4, 0)
-	end
-	tick(0.5)
-end
-check(lost[1]:GetAttribute("DungeonId") == nil, "Boss started below three survivors")
+ArenaSessions.leave(lost[3])
+for i=1,2 do lost[i].Root.Position=worlds[lostId].Origin end
+tick(.5)
+check(lost[1]:GetAttribute("DungeonId")==lostId,"Losing a member prematurely destroyed open map")
+for i=1,2 do ArenaSessions.leave(lost[i]) end
 local timeout = squad(3)
 handlers.PartyDungeon(timeout[1])
 tick(3)
@@ -114,7 +116,7 @@ check(timeout[1]:GetAttribute("DungeonId") == nil, "Timeout leaked")
 print(
 	"PASS: "
 		.. checks
-		.. " dungeon checks (1,000 connected layouts, roles, elements, queue, readiness, isolation, gates, boss minimum, completion, duplicate rewards, aborts, timeout)"
+		.. " dungeon checks (1,000 connected layouts, roles, elements, queue, readiness, isolation, open exploration, loot choices, completion, duplicate rewards, aborts, timeout)"
 )
 
 local tester=squad(1)[1]
@@ -145,3 +147,38 @@ outsider:SetAttribute("CanTestDungeon",true)
 check(not handlers.DungeonTest(outsider,"Sahur").Ok,"Forged permission attribute bypassed server authorization")
 check(not handlers.PartyDungeon(tester).Ok,"Owner bypassed normal queue minimum")
 print("PASS: published owner tests, unauthorized rejection, reward suppression, normal queue minimum")
+
+for seed=1,1000 do
+ local camps=Rules.generateOpen(Random.new(seed))
+ check(#camps==10 and camps[10].Boss,"Open boss layout")
+ local neutral=0
+ for i,camp in camps do
+  if camp.Bandit then neutral+=1 end
+  check(math.abs(camp.X*Rules.Spacing)<Rules.OpenRadius-30 and math.abs(camp.Z*Rules.Spacing)<Rules.OpenRadius-30,"Camp outside map")
+  check(camp.GearTier>=1 and camp.GearTier<=5,"Invalid camp difficulty")
+ end
+ check(neutral==3,"Bandit camp count")
+end
+print("PASS: 1,000 open-map populations, camp bounds, randomized difficulty and bandit groups")
+
+-- An unanswered offer expires safely; a full pouch gets the disclosed coin fallback.
+local quiet=squad(3)
+handlers.PartyDungeon(quiet[1]);tick(3)
+local quietId=quiet[1]:GetAttribute("DungeonId")
+local before=#awarded
+clearRoom(quietId,10);tick(30);tick(5)
+check(#awarded==before and quiet[1]:GetAttribute("DungeonId")==nil,"Unanswered loot leaked or awarded")
+local full=squad(3)
+handlers.PartyDungeon(full[1]);tick(3)
+local fullId=full[1]:GetAttribute("DungeonId")
+clearRoom(fullId,10)
+local add=PlayerData.addGem
+PlayerData.addGem=function() return false end
+handlers.DungeonLootChoice(full[1],"Claim")
+handlers.DungeonLootChoice(full[2],"Pass")
+handlers.DungeonLootChoice(full[3],"Pass")
+PlayerData.addGem=add
+tick(5)
+check(profiles[full[1]].Coins==800,"Full pouch fallback lost reward")
+check(not handlers.DungeonLootChoice(full[1],"Roll").Ok,"Resolved loot replay accepted")
+print("PASS: loot timeout, full inventory compensation, single claimant and replay rejection")
