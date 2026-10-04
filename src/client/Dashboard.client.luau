@@ -678,7 +678,15 @@ local function maybeWelcome()
 		return
 	end
 	welcomed = true
-	task.delay(3, ShopUI.showWelcome)
+	-- Not over the first duel: once it's done and you're in the lobby.
+	task.spawn(function()
+		task.wait(3)
+		while player:GetAttribute("CombatSession") ~= nil do
+			task.wait(1)
+		end
+		task.wait(2)
+		ShopUI.showWelcome()
+	end)
 end
 player.PlayerGui.ChildRemoved:Connect(function(child)
 	if child.Name == "Intro" then

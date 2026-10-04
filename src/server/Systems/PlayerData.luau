@@ -64,7 +64,7 @@ type Profile = {
 	Stats: { Kills: number, BestGem: number, BestDepth: number? }, -- for Top Players
 	Crates: { [string]: number }, -- unopened crates
 	Boosts: { XPUntil: number }, -- os.time() when 2x XP ends
-	Duel: { Rating: number, Wins: number, Losses: number, Streak: number }?, -- arena duels (see Duels)
+	Duel: { Rating: number, Wins: number, Losses: number, Streak: number, Played: number?, RivalWins: number? }?, -- arena duels (see Duels); Played counts rival duels too
 	-- Saga Outpost mining: swings left on each pick, the one in hand, the
 	-- day the free Survey Pick was last issued, rocks mined (see OutpostServer).
 	Outpost: { Picks: { [string]: number }, Active: string, FreeDay: number, Rocks: number }?,

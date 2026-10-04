@@ -74,6 +74,7 @@ local function publish(player: Player)
 	if record then
 		player:SetAttribute("DuelRating", record.Rating)
 		player:SetAttribute("DuelWins", record.Wins)
+		player:SetAttribute("DuelsPlayed", (record :: any).Played or 0)
 	end
 	local profile = PlayerData.get(player)
 	if profile and profile.Season then
@@ -278,6 +279,10 @@ function finish(match, winner: number?, reason: string)
 				record.Wins += if won then 1 else 0
 				record.Losses += if won then 0 else 1
 				record.Streak = if won then record.Streak + 1 else 0
+			end
+			if record then
+				-- Every finished duel counts toward the lobby's unlocks.
+				(record :: any).Played = ((record :: any).Played or 0) + 1
 			end
 			local coins = if winner == nil then 0 elseif won then rewards.Win else rewards.Loss
 			if member.Parent then

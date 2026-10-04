@@ -79,6 +79,29 @@ local NAMES = {
 local WIN_COINS = 25
 local REMATCH_DELAY = 6
 
+-- Counts a finished 1v1 against a rival (won or lost) in the player's duel
+-- record: Played (every duel, rival or player; unlocks lobby modes) and
+-- RivalWins. Player-vs-player Wins and Losses stay for the ranked boards.
+local function duelsPlayed(owner: Player): number
+	local profile = PlayerData.get(owner)
+	local record = profile and profile.Duel :: any
+	return if record then record.Played or 0 else 0
+end
+local function countDuel(owner: Player, won: boolean)
+	local profile = PlayerData.get(owner)
+	if not profile then
+		return
+	end
+	profile.Duel = profile.Duel or { Rating = Matchmaking.StartRating, Wins = 0, Losses = 0, Streak = 0 }
+	local record = profile.Duel :: any
+	record.Played = (record.Played or 0) + 1
+	if won then
+		record.RivalWins = (record.RivalWins or 0) + 1
+	end
+	owner:SetAttribute("DuelsPlayed", record.Played)
+	PlayerData.sync(owner)
+end
+
 -- [owner] = { Enemy, Owner, Name, Element, Damage, ... } for the live rival.
 local duels: { [Player]: any } = {}
 local starting: { [Player]: boolean } = {}
@@ -757,6 +780,9 @@ local function think(enemy, now: number)
 	local root, humanoid = enemy.Root, enemy.Humanoid
 	local fallen = owner.Character and owner.Character:FindFirstChildOfClass("Humanoid")
 	if fallen and fallen.Health <= 0 then
+		if not duel.Raid and not duel.Dungeon then
+			countDuel(owner, false)
+		end
 		Remotes.Notify:FireClient(owner, string.format("Defeated by %s. Enter the PvP Arena for a rematch.", duel.Name))
 		Duelist.despawn(owner)
 		return
@@ -1407,6 +1433,12 @@ local function onWin(enemy)
 		return
 	end
 	local session = duel.Session
+	countDuel(owner, true)
+	if duel.Intro then
+		-- The first-duel intro is one match; the client heads to the lobby.
+		Remotes.Notify:FireClient(owner, string.format("You beat %s! Welcome to the Saga Outpost.", duel.Name))
+		return
+	end
 	if session == "Training" then
 		-- Sparring: no rewards, just another partner.
 		Remotes.Notify:FireClient(owner, string.format("Sparring won against %s. A new partner steps in…", duel.Name))
@@ -1606,6 +1638,8 @@ function spawnRival(owner: Player, raid, encounter)
 		FoeRanged = weapon ~= nil and weapon.Attack.Kind == "Shot",
 		WeaponGem = loadout.WeaponGem,
 		Session = session,
+		-- A new player's first duel (a sparring match): one match, then the lobby.
+		Intro = not raid and not encounter and session == "Training" and duelsPlayed(owner) == 0,
 		-- (Training's sparring partner hits for half.)
 		Damage = rivalHit * (if sparring then 0.5 else 1) * raidDamage,
 		Weapon = rivalWeapon,
