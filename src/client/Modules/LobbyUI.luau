@@ -30,7 +30,13 @@ local LobbyUI = {}
 LobbyUI.Unlocks = { Clash = 3, Dungeon = 3, Ranked = 10 }
 -- Key art for each card (assets/images/lobby/*.png, painted by
 -- tools/make_lobby_cards.py). 0 = not uploaded yet: the card shows its emblem.
-LobbyUI.Art = { Duel = 0, Clash = 0, Dungeon = 0, Custom = 0, Ranked = 0 }
+LobbyUI.Art = {
+	Duel = 104755259743768,
+	Clash = 103356099904456,
+	Dungeon = 85958638729400,
+	Custom = 87326833954623,
+	Ranked = 108455735818338,
+}
 
 local GREEN = Color3.fromRGB(62, 220, 120)
 local RED = Color3.fromRGB(232, 72, 72)
