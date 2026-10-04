@@ -18,11 +18,11 @@ local Music = {}
 
 -- Roblox ids of the uploaded tracks (the number from rbxassetid://12345). 0 = not uploaded yet.
 Music.Ids = {
-	Menu = 0, -- menu_theme.ogg
-	Outpost = 0, -- outpost_theme.ogg
-	Dungeon = 0, -- dungeon_theme.ogg
-	Fight = 0, -- fight_theme.ogg
-	Intro = 0, -- intro_sting.ogg (the splash's music when there's no video yet)
+	Menu = 82248033426754, -- menu_theme.ogg
+	Outpost = 71113976425409, -- outpost_theme.ogg
+	Dungeon = 75260701190300, -- dungeon_theme.ogg
+	Fight = 83708484138750, -- fight_theme.ogg
+	Intro = 74920383589616, -- intro_sting.ogg (the splash's music when there's no video yet)
 }
 
 -- How loud each mood plays (0 mutes it).
