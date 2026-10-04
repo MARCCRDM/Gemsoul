@@ -20,7 +20,7 @@ local UserInputService = game:GetService("UserInputService")
 local IronUi = require(script.Parent.Modules.IronUi)
 local Music = require(script.Parent.Modules.Music)
 
-local IMAGE_ID = 0 -- saga_title.png
+local IMAGE_ID = 123729911771910 -- saga_title.png
 local LENGTH = 9.9 -- seconds of intro: six bars of the song
 local BAR = 4 * 60 / 144.94
 local DROP = BAR -- the drop lands one bar in

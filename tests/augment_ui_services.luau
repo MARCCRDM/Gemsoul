@@ -25,6 +25,9 @@ local function new(class, props, parent)
 		values.signals[key] = values.signals[key] or signal()
 		return values.signals[key]
 	end
+	function methods:FindFirstChild(name)
+		for _, child in values.children do if child.Name == name and not child.Destroyed then return child end end
+	end
 	function methods:FindFirstChildOfClass(key)
 		for _, child in values.children do if child.ClassName == key and not child.Destroyed then return child end end
 	end

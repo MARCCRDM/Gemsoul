@@ -13,7 +13,7 @@ local Atlas = require(script.Parent.AbilityIconAtlas)
 local Icons = {}
 
 -- Roblox id of the uploaded sheet (the number from rbxassetid://12345). 0 = not uploaded yet.
-Icons.ImageId = 0
+Icons.ImageId = 88825646209723
 
 local byName = {}
 for id, definition in Tech.Catalog do
