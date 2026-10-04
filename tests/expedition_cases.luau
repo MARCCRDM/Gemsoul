@@ -58,8 +58,8 @@ a.Owned.Weapons[b.Character.Weapon] = 1
 left, right = Logic.item(a, "Weapon", a.Character.Weapon), Logic.item(b, "Weapon", b.Character.Weapon)
 check(not Logic.exchange(a, b, left, right), "Trade overwrote an owned model")
 -- Real server handlers: no trade without both confirmations; stale revisions are invalid.
-local pa = {UserId = 11, DisplayName = "A", Parent = true}
-local pb = {UserId = 12, DisplayName = "B", Parent = true}
+local pa = {UserId = 11, DisplayName = "A", Parent = true, GetAttribute = function() return nil end}
+local pb = {UserId = 12, DisplayName = "B", Parent = true, GetAttribute = function() return nil end}
 registry[11], registry[12] = pa, pb
 profiles[pa], profiles[pb] = profile(2), profile(3)
 Trading.start()
