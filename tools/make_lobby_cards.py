@@ -1,15 +1,15 @@
 """
 Renders the key art for the lobby's PLAY menu cards from the game's own
-fighters: Frontier-armoured Saga miners posed by RivalPose (exported by the
-scratch harness animshots.luau as JSON, one file per weapon), rasterised in
+fighters: Frontier-armoured Saga miners posed by RivalPose (exported by
+tools/card_poses.luau as JSON), rasterised in
 3D with a coloured backlight, rim light, glowing trims, bloom and a glossy
 arena floor that reflects them.
 
     pip install numpy pillow
     python tools/make_lobby_cards.py <poses-dir>
 
-<poses-dir> holds key_Cleaver.json, key_Greataxe.json, key_Warhammer.json
-and key_Lance.json. Writes assets/images/lobby/<card>.png (2x the card) and
+<poses-dir> holds key_Sword.json (animshots.luau with the Sword and the
+"stance" option: a planted lunge for every pose). Writes assets/images/lobby/<card>.png (2x the card) and
 preview.png. Upload the five PNGs and put their ids in LobbyUI.Art.
 """
 import json
@@ -332,11 +332,36 @@ def pose(frames, name, index=0):
     return matches[min(index, len(matches) - 1)]["Parts"]
 
 
+def forward_blade(frames, name, index=0):
+    """The pose with its sword turned through the grip, so a thrust points the
+    blade ahead instead of back along the forearm."""
+    matches = [f for f in frames if f["Name"].startswith(name)]
+    frame = matches[min(index, len(matches) - 1)]
+    grip = frame.get("Grip")
+    if not grip:
+        return frame["Parts"]
+    g = np.array(grip, np.float32)
+    out = []
+    for p in frame["Parts"]:
+        if len(p) > 20 and p[20]:
+            q = list(p)
+            pos = 2 * g - np.array(p[0:3], np.float32)
+            q[0:3] = [float(v) for v in pos]
+            # Turn the part half round (about its own up axis) to match.
+            q[3:6] = [-v for v in p[3:6]]
+            q[6:9] = [-v for v in p[6:9]]
+            out.append(q)
+        else:
+            out.append(p)
+    return out
+
+
 def duel(poses, w, h):
     s = Scene(w, h, eye=(2.2, 2.2, 16.5), target=(0, 3.4, 0), fov=36, accent=GOLD, seed=11)
-    a = pose(poses["Cleaver"], "Slash · strike")
-    b = pose(poses["Greataxe"], "Guard (blocking) · held")
-    s.fighters([(a, (-2.5, 0.6), -90), (b, (2.5, -0.6), 90)])
+    # A thrust: the blade pointing straight at the defender.
+    a = forward_blade(poses["Sword"], "Bolt cast · release")
+    b = pose(poses["Sword"], "Guard (blocking) · held")
+    s.fighters([(a, (-2.5, 0.6), -90), (b, (3.0, -0.6), 90)])
     s.backdrop((0.02, 0.02, 0.06), (0.16, 0.1, 0.06), planet=(w * 0.76, h * 0.17, w * 0.13, (0.9, 0.75, 0.55)), shafts=((0.5, 0.07, 0.35), (0.3, 0.04, 0.2)))
     cx, cy = s.project(np.array([[0.0, 4.2, 0.0]], np.float32))[0][:2]
     s.glow(cx, cy, w * 0.16, GOLD * 1.2 + 0.2, 0.9)
@@ -348,10 +373,10 @@ def duel(poses, w, h):
 def clash(poses, w, h):
     s = Scene(w, h, eye=(0, 2.8, 12.5), target=(0, 3.0, 0), fov=32, accent=TEAL, seed=12)
     specs = [
-        (pose(poses["Cleaver"], "Slash · strike"), (-2.4, 0.6), -90),
-        (pose(poses["Warhammer"], "Heavy · wind-up"), (-6.2, -1.4), -75),
-        (pose(poses["Lance"], "Guard (blocking) · held"), (2.4, -0.6), 90),
-        (pose(poses["Greataxe"], "Charging a heavy · held"), (6.2, 1.2), 100),
+        (forward_blade(poses["Sword"], "Bolt cast · release"), (-2.4, 0.6), -90),
+        (pose(poses["Sword"], "Heavy · wind-up"), (-6.2, -1.4), -75),
+        (pose(poses["Sword"], "Guard (blocking) · held"), (2.4, -0.6), 90),
+        (pose(poses["Sword"], "Charging a heavy · held"), (6.2, 1.2), 100),
     ]
     s.fighters(specs)
     s.backdrop((0.01, 0.03, 0.06), (0.05, 0.14, 0.18), planet=(w * 0.52, h * 0.2, h * 0.16, (0.55, 0.85, 0.95)), shafts=((0.5, 0.05, 0.3),))
@@ -365,9 +390,9 @@ def clash(poses, w, h):
 def dungeon(poses, w, h):
     s = Scene(w, h, eye=(0, 3.4, 9), target=(0, 3.4, -10), fov=34, accent=AMETHYST, seed=13)
     specs = [
-        (pose(poses["Warhammer"], "Stance"), (-2.8, -0.4), 172),
-        (pose(poses["Cleaver"], "Charging a heavy · held"), (0.2, -1.8), 184),
-        (pose(poses["Lance"], "Stance", 1), (3.0, -0.2), 192),
+        (pose(poses["Sword"], "Stance"), (-2.8, -0.4), 8),
+        (pose(poses["Sword"], "Charging a heavy · held"), (0.2, -1.8), -4),
+        (pose(poses["Sword"], "Stance", 1), (3.0, -0.2), -10),
     ]
     # The dungeon gate: two dark pillars and a lintel round a portal.
     s.block((-5.2, 6, -16), (2.2, 12, 2.2), (0.12, 0.08, 0.16))
@@ -390,10 +415,10 @@ def custom(poses, w, h):
     s.block((0, 4.5, -1.5), (0.8, 9, 0.8), (0.1, 0.12, 0.12))
     s.block((0, 9.2, -1.5), (1.2, 0.6, 1.2), (0.2, 0.9, 0.6), neon=True)
     specs = [
-        (pose(poses["Cleaver"], "Stance"), (-3.0, 0.6), -60),
-        (pose(poses["Lance"], "Buff · arms wide"), (-6.6, -1.2), -80),
-        (pose(poses["Warhammer"], "Stance", 2), (3.0, 0.4), 60),
-        (pose(poses["Greataxe"], "Stance", 1), (6.6, -1.4), 85),
+        (pose(poses["Sword"], "Stance"), (-3.0, 0.6), -140),
+        (pose(poses["Sword"], "Buff · arms wide"), (-6.6, -1.2), -120),
+        (pose(poses["Sword"], "Stance", 2), (3.0, 0.4), 140),
+        (pose(poses["Sword"], "Stance", 1), (6.6, -1.4), 120),
     ]
     s.fighters(specs)
     s.backdrop((0.01, 0.03, 0.03), (0.04, 0.14, 0.11), planet=(w * 0.86, h * 0.22, h * 0.14, (0.7, 0.95, 0.85)))
@@ -412,9 +437,9 @@ def ranked(poses, w, h):
     # The podium.
     s.block((0, 0.5, 0), (5.0, 1.0, 5.0), (0.12, 0.06, 0.07))
     s.block((0, 1.05, 0), (5.2, 0.12, 5.2), (1.0, 0.3, 0.3), neon=True)
-    champion = pose(poses["Greataxe"], "Ground blast · arms up")
+    champion = pose(poses["Sword"], "Ground blast · arms up")
     parts = [p[:1] + [p[1] + 1.1] + p[2:] for p in champion]
-    s.fighters([(parts, (0, 0), 20)])
+    s.fighters([(parts, (0, 0), 195)])
     s.backdrop((0.03, 0.0, 0.01), (0.2, 0.04, 0.05), shafts=((0.32, 0.05, 0.5), (0.68, 0.05, 0.5), (0.5, 0.08, 0.35)))
     s.embers(60, RED, (0, 1, 0.05, 0.85))
     hx, hy = s.project(np.array([[0.0, 9.5, 0.0]], np.float32))[0][:2]
@@ -434,7 +459,7 @@ CARDS = {
 def main():
     folder = sys.argv[1] if len(sys.argv) > 1 else "."
     poses = {}
-    for weapon in ("Cleaver", "Greataxe", "Warhammer", "Lance"):
+    for weapon in ("Sword",):
         with open(os.path.join(folder, f"key_{weapon}.json")) as f:
             poses[weapon] = json.load(f)
     os.makedirs(OUT, exist_ok=True)
