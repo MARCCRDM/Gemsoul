@@ -56,6 +56,7 @@ finish = function(run, won, reason)
 		if memberRun[p] == run then
 			local humanoid = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
 			local eligible = won
+                and not run.Test
 				and p.Parent
 				and p:GetAttribute("DungeonId") == run.Id
 				and humanoid
@@ -63,6 +64,7 @@ finish = function(run, won, reason)
 			memberRun[p] = nil
 			if p.Parent then
 				p:SetAttribute("DungeonId", nil)
+ p:SetAttribute("DungeonTest", nil)
 				p:SetAttribute("DungeonObjective", nil)
 				p:SetAttribute("DungeonRoom", nil)
 				p:SetAttribute("DungeonBoss", nil)
@@ -84,7 +86,7 @@ local function spawnRoom(run, index)
 	end
 	local members = living(run)
 	local room = run.Rooms[index]
-	if room.Boss and #members < Rules.Min then
+	if room.Boss and #members < (if run.Test then 1 else Rules.Min) then
 		finish(run, false, "Boss entry requires three surviving squad members. Regroup and queue again.")
 		return
 	end
@@ -156,17 +158,19 @@ local function safeSpawnRoom(run, index)
 		finish(run, false, "The encounter failed to load. Please queue again.")
 	end
 end
-local function queue(player)
+local function queue(player, testMode)
+ local testing = testMode ~= nil and RunService:IsStudio()
+ if testMode ~= nil and not testing then return Shop.reply(false, "Testing is available in Studio only.") end
 	local party = Party.of(player)
-	local members = party and party.Members or {}
+	local members = if testing then {player} else party and party.Members or {}
 	local allReady = party ~= nil
 	for _, p in members do
-		if not party.Ready[p] then
+		if not party or not party.Ready[p] then
 			allReady = false
 		end
 	end
 	local ok, why = Rules.canEnter(#members, party ~= nil and party.Leader == player, allReady)
-	if not ok then
+	if not ok and not testing then
 		return Shop.reply(false, why)
 	end
 	for _, p in members do
@@ -190,19 +194,23 @@ local function queue(player)
 	end
 	local id = "D" .. HttpService:GenerateGUID(false)
 	local run =
-		{ Id = id, Members = table.clone(members), PartyId = party.Id, Slot = slot, Index = 1, Started = os.clock(), Done = false }
+		{ Id = id, Members = table.clone(members), PartyId = party and party.Id, Test = testing, Slot = slot, Index = 1, Started = os.clock(), Done = false }
 	slots[slot] = true
 	runs[id] = run
 	-- Lock the roster synchronously before any work that could yield.
 	for _, p in run.Members do
 		memberRun[p] = run
 		p:SetAttribute("DungeonId", id)
+ p:SetAttribute("DungeonTest", testing)
 		p:SetAttribute("RaidId", id)
 		p:SetAttribute("PvPEnabled", false)
 		p:SetAttribute("CombatSession", "Raid")
 	end
 	local success, problem = pcall(function()
 		run.Rooms = Rules.generate(Random.new())
+  if testing and testMode == "Sahur" then
+   run.Rooms = {{Index=1,X=0,Z=0,Boss=true,Theme=1,Foes={1},Pillars=2}}
+  end
 		run.World = World.build(id, run.Rooms, Vector3.new(2500 + slot * 1400, 0, 2500))
 		for i, p in run.Members do
 			CombatServer.reset(p)
@@ -210,12 +218,12 @@ local function queue(player)
 			local h = p.Character:FindFirstChildOfClass("Humanoid")
 			h.Health = h.MaxHealth
 		end
-		announce(run, "Squad deployed. Five rooms. One elemental Colossus. Stay together.")
+		announce(run, if testing then "STUDIO TEST — solo enabled, no rewards. Encounter begins in 3 seconds." else "Squad deployed. Five rooms. One elemental Colossus. Stay together.")
 		task.delay(3, function()
 			if run.Done then
 				return
 			end
-			if #living(run) < Rules.Min then
+			if #living(run) < (if run.Test then 1 else Rules.Min) then
 				finish(run, false, "Three players are required to begin. Queue cancelled.")
 				return
 			end
@@ -233,7 +241,12 @@ local function queue(player)
 	return Shop.reply(true, "Dungeon queued for your ready squad. Deploying now.")
 end
 function Dungeon.start()
-	Shop.register("PartyDungeon", queue)
+	Shop.register("PartyDungeon", function(player) return queue(player) end)
+ Shop.register("DungeonTest", function(player, mode)
+  if not RunService:IsStudio() then return Shop.reply(false,"Testing is available in Studio only.") end
+  if mode ~= "Sahur" and mode ~= "Full" then return Shop.reply(false,"Choose Sahur or Full.") end
+  return queue(player,mode)
+ end)
 	ArenaSessions.onDungeonLeave = function(p)
 		local run = memberRun[p]
 		if not run then
@@ -241,6 +254,7 @@ function Dungeon.start()
 		end
 		memberRun[p] = nil
 		p:SetAttribute("DungeonId", nil)
+ p:SetAttribute("DungeonTest", nil)
 		p:SetAttribute("DungeonRoom", nil)
 		p:SetAttribute("DungeonBoss", nil)
 		p:SetAttribute("DungeonObjective", nil)
@@ -297,7 +311,7 @@ function Dungeon.start()
 						end
 					end
 				end
-				if not party or party.Id ~= run.PartyId or not close then
+				if (not run.Test and (not party or party.Id ~= run.PartyId)) or not close then
 					ArenaSessions.leave(p)
 				end
 			end
