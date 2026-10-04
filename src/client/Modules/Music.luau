@@ -32,7 +32,8 @@ Music.Ids = {
 Music.StartAt = { Arena = 39 } -- 0:39
 
 -- How loud each mood plays (0 mutes it).
-Music.Volumes = { Menu = 0.3, Outpost = 0.32, Dungeon = 0.42, Fight = 0.45, Arena = 0.45 }
+-- Mining, dungeons and boss fights sit low under the action.
+Music.Volumes = { Menu = 0.3, Outpost = 0.16, Dungeon = 0.2, Fight = 0.22, Arena = 0.45 }
 Music.FadeSeconds = 2
 
 local sounds: { [string]: Sound } = {}
@@ -136,8 +137,8 @@ function Music.moodFor(attributes: { [string]: any }): string
 			return "Arena"
 		end
 		return "Fight"
-	elseif attributes.Outpost == true then
-		return "Outpost"
+	elseif attributes.Outpost == true or attributes.Expedition == true then
+		return "Outpost" -- mining, at the Outpost or down the mine
 	end
 	return "Menu"
 end

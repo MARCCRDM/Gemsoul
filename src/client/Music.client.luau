@@ -10,7 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local Music = require(script.Parent.Modules.Music)
 
 local player = Players.LocalPlayer
-local WATCHED = { "DungeonId", "CombatSession", "Outpost" }
+local WATCHED = { "DungeonId", "CombatSession", "Outpost", "Expedition" }
 local FIGHT_KEYS = {
 	[Enum.KeyCode.Q] = true,
 	[Enum.KeyCode.E] = true,
