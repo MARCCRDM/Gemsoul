@@ -34,6 +34,7 @@ local LotterySound = require(script.Parent.LotterySound)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
+local ThirdPerson = require(script.Parent.ThirdPerson)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
@@ -982,6 +983,7 @@ local function showWorld()
 	if humanoid then
 		camera.CameraSubject = humanoid
 	end
+	ThirdPerson.enter()
 	setWalking(true)
 	hud.Enabled = player:GetAttribute("CombatSession") == nil
 end
@@ -1004,6 +1006,7 @@ local function exitScene()
 	probe.Gui.Enabled = false
 	revealCard.Visible = false
 	setWalking(false)
+	ThirdPerson.exit()
 	if hiddenDashboard then
 		hiddenDashboard.Enabled = true
 		hiddenDashboard = nil

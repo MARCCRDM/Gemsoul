@@ -29,6 +29,7 @@ local MiningSite = require(ReplicatedStorage.Shared.MiningSite)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local Scenes = require(script.Parent.Scenes)
+local ThirdPerson = require(script.Parent.ThirdPerson)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
@@ -633,6 +634,7 @@ local function enterScene(result)
 	if humanoid then
 		camera.CameraSubject = humanoid
 	end
+	ThirdPerson.enter()
 	setWalking(true)
 	makePick()
 	buildRocks()
@@ -664,6 +666,7 @@ local function exitScene()
 	pickParts = {}
 	shoulder = nil
 	setWalking(false)
+	ThirdPerson.exit()
 	Scenes.spaceLighting()
 	if hiddenGui then
 		hiddenGui.Enabled = true
