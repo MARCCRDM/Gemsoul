@@ -22,6 +22,7 @@ Music.Ids = {
 	Outpost = 0, -- outpost_theme.ogg
 	Dungeon = 0, -- dungeon_theme.ogg
 	Fight = 0, -- fight_theme.ogg
+	Intro = 0, -- intro_sting.ogg (the splash's music when there's no video yet)
 }
 
 -- How loud each mood plays (0 mutes it).

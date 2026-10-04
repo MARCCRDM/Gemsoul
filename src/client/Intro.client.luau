@@ -21,6 +21,10 @@ end
 if GemClient.Profile.Intro and GemClient.Profile.Intro.Done then
 	return
 end
+-- After the splash intro.
+while game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Splash") do
+	task.wait(0.1)
+end
 local new = IronUi.new
 -- A clean launch screen: deep navy, one gold call to action, a cyan accent,
 -- and each reward's rarity colour carrying the moment.

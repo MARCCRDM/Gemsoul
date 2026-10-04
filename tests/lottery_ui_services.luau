@@ -46,7 +46,9 @@ end
 local run={RenderStepped=signal()}
 local input={InputBegan=signal()}
 local tween={Create=function(_,obj,_,props) return {Play=function() for k,v in props do obj[k]=v end end} end}
-local services={RunService=run,TweenService=tween,UserInputService=input,ReplicatedStorage={}}
+-- No splash intro in the test: the launch intro starts straight away.
+local players={LocalPlayer={PlayerGui={FindFirstChild=function() return nil end}}}
+local services={RunService=run,TweenService=tween,UserInputService=input,ReplicatedStorage={},Players=players}
 local game={GetService=function(_,id) return services[id] end}
 local UiKit={gui=function(name) return new("ScreenGui",{Name=name}) end,round=function() end,toast=function() end}
 local IronUi={new=new}

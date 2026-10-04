@@ -7,7 +7,11 @@ local Music = require(script.Parent.Modules.Music)
 local player = Players.LocalPlayer
 local WATCHED = { "DungeonId", "CombatSession", "Outpost" }
 
+local splashOver = false
 local function update()
+	if not splashOver then
+		return
+	end
 	local attributes = {}
 	for _, name in WATCHED do
 		attributes[name] = player:GetAttribute(name)
@@ -17,4 +21,13 @@ end
 for _, name in WATCHED do
 	player:GetAttributeChangedSignal(name):Connect(update)
 end
-task.delay(2, update) -- after the intro has a moment to load
+-- Starts once the splash intro (which has its own music) is over.
+task.spawn(function()
+	local playerGui = player:WaitForChild("PlayerGui")
+	task.wait(1)
+	while playerGui:FindFirstChild("Splash") do
+		task.wait(0.2)
+	end
+	splashOver = true
+	update()
+end)
