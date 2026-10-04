@@ -111,13 +111,21 @@ local function spawnRoom(run, index)
 				.. GemConfig.elementName(spec.Element)
 				.. " · weak to "
 				.. GemConfig.elementName(spec.Weakness)
-			else string.format("Room %d/%d · defeat %d fighters", index, #run.Rooms, #room.Foes)
+			else string.format(
+				"Room %d/%d · %s enemies · gear tier %d/5 · defeat %d fighters",
+				index,
+				#run.Rooms,
+				GemConfig.elementName(spec.Element),
+				room.GearTier or 1,
+				#room.Foes
+			)
 	)
 	for n, kind in room.Foes do
 		local center = run.World.Centers[index]
 		local angle = (n - 1) / #room.Foes * math.pi * 2
 		local enemy = Duelist.spawnDungeon(members, run.Id, {
 			Room = index,
+			GearTier = room.GearTier or (if room.Boss then 4 else 1),
 			Center = center,
 			Spot = center + Vector3.new(math.cos(angle) * 14, if room.Boss then 7 else 4, math.sin(angle) * 14),
 			Spec = Rules.Roster[kind],

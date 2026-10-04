@@ -567,7 +567,71 @@ local function croc(rig, accent)
 		p.Material = Enum.Material.Neon
 	end
 end
-function Skins.apply(rig, spec, accent, boss)
+-- Creature-fitted armor preserves faces and signature silhouettes while exposing sockets.
+local function armor(rig, spec, accent, tier)
+	local metal = C(48 + 12 * tier, 55 + 10 * tier, 63 + 9 * tier)
+	local trim = if tier == 5 then C(230, 184, 72) elseif tier == 4 then C(163, 110, 216) else C(116, 141, 164)
+	local t = rig.UpperTorso
+	local horizontal = spec.Shape == "Shark" or spec.Shape == "Crocodile"
+	local function plate(bone, name, size, pos)
+		part(rig, bone, name, size, pos, metal)
+		part(rig, bone, name .. "Trim", V(size.X + 0.04, 0.07, 0.07), pos + V(0, size.Y / 2, -size.Z / 2 - 0.02), trim)
+		local stone = part(
+			rig,
+			bone,
+			name .. "Socket",
+			V(0.16 + tier * 0.025, 0.2 + tier * 0.025, 0.12),
+			pos + V(0, 0, -size.Z / 2 - 0.05),
+			accent,
+			BALL
+		)
+		stone.Material = Enum.Material.Neon
+		for _, side in { -1, 1 } do
+			part(
+				rig,
+				bone,
+				name .. "Rivet",
+				V(0.07, 0.07, 0.07),
+				pos + V(side * size.X * 0.35, size.Y * 0.3, -size.Z / 2 - 0.04),
+				trim,
+				BALL
+			)
+		end
+	end
+	if horizontal then
+		local y = if spec.Shape == "Shark" then -0.72 else 0.43
+		plate(t, "ArmoredCarapace", V(1.65, 0.22, 1.2), V(0, y, 0.75))
+		plate(t, "CranialArmor", V(0.72, 0.14, 0.55), V(0, y + 0.12, -1))
+		for _, side in { -1, 1 } do
+			plate(t, "FlankGuard", V(0.18, 0.55, 0.8), V(side * 0.88, y - 0.3, 0.8))
+			plate(t, "TailGreave", V(0.2, 0.27, 0.5), V(side * 0.27, y - 0.2, 2.3))
+		end
+		plate(t, "AegisPlate", V(0.78, 0.13, 0.6), V(0, y + 0.1, 1.65))
+	else
+		local crownY = if spec.Shape == "Wood" then 2.35 else 2.15
+		plate(t, "HelmetCrown", V(1.8, 0.22, 1.5), V(0, crownY, 0))
+		plate(t, "ChestArmor", V(1.35, 0.8, 0.2), V(0, -0.6, -0.79))
+		for _, side in { "Left", "Right" } do
+			plate(rig[side .. "LowerArm"], side .. "Gauntlet", V(0.48, 0.58, 0.43), V(0, -0.15, 0))
+			plate(rig[side .. "LowerLeg"], side .. "Greave", V(0.5, 0.7, 0.4), V(0, -0.13, 0))
+		end
+		plate(rig.LeftLowerArm, "ElementShield", V(0.95, 1.2, 0.18), V(0, 0, -0.4))
+	end
+	if tier >= 4 then
+		for _, side in { -1, 1 } do
+			part(
+				rig,
+				t,
+				"EliteArmorCrest",
+				V(0.13, 0.48, 0.28),
+				V(side * 0.72, if horizontal then 0.55 else 2.65, 0.25),
+				trim,
+				"Wedge"
+			)
+		end
+	end
+end
+function Skins.apply(rig, spec, accent, boss, gearTier)
 	for _, p in rig:GetChildren() do
 		if p:IsA("BasePart") then
 			p.Transparency = 1
@@ -582,6 +646,7 @@ function Skins.apply(rig, spec, accent, boss)
 	else
 		croc(rig, accent)
 	end
+	armor(rig, spec, accent, gearTier or (if boss then 4 else 1))
 	if boss then
 		rig:ScaleTo(1.8)
 	end
@@ -1148,10 +1213,11 @@ function Dungeon.generate(rng)
 	for i, room in rooms do
 		room.Index = i
 		room.Boss = i == Dungeon.RoomCount
+		room.GearTier = if room.Boss then rng:NextInteger(4, 5) else math.min(3, math.ceil(i / 1.5))
 		room.Theme = if room.Boss then boss else rng:NextInteger(1, #Dungeon.Roster)
 		room.Foes = {}
 		for n = 1, if room.Boss then 1 else rng:NextInteger(2, 3) do
-			table.insert(room.Foes, if room.Boss then boss else rng:NextInteger(1, #Dungeon.Roster))
+			table.insert(room.Foes, room.Theme)
 		end
 		room.Pillars = rng:NextInteger(2, 4)
 	end

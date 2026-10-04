@@ -57,6 +57,7 @@ local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local DamageLog = require(script.Parent.DamageLog)
 
+local DungeonLoadout = require(ReplicatedStorage.Shared.DungeonLoadout)
 local BrainrotSkins = require(script.Parent.BrainrotSkins)
 local Duelist = {}
 local dungeonActors = {}
@@ -1441,30 +1442,19 @@ function spawnRival(owner: Player, raid, encounter)
 	local rng = Random.new()
 	local loadout = rollLoadout(rng)
 	if encounter then
-		local spec = encounter.Spec
-		for _, candidate in Classes.get("Warrior").Weapons do
-			if (candidate.Attack.Kind == "Shot") == (spec.Shape == "Crocodile") then
-				loadout.Weapon = candidate.Id
-				break
-			end
-		end
-		for _, key in { "WeaponGem", "Surge1Gem", "Surge2Gem", "Surge3Gem" } do
-			local gem = loadout[key]
-			GemRoller.setElement(gem, spec.Element)
-			if key ~= "WeaponGem" then
-				local slot = tonumber(string.sub(key, 6, 6)) or 1
-				local tier = if encounter.Boss then slot + 1 else math.min(slot, 2)
-				gem.SurgeTier, gem.SurgeRank = tier, if encounter.Boss then 3 else 1
-				gem.Surge = Tech.Surges[spec.Element][tier]
-			end
-		end
+		encounter.GearTier = encounter.GearTier or (if encounter.Boss then 4 else 1)
+		DungeonLoadout.apply(loadout, encounter.Spec, encounter.GearTier, rng)
 	end
 	local name = NAMES[rng:NextInteger(1, #NAMES)]
 	if raid then
 		name = "Warlord " .. name
 	end
 	if encounter then
-		name = (if encounter.Boss then "Colossus " else "") .. encounter.Spec.Name
+		name = (if encounter.Boss then "Colossus " else "")
+			.. encounter.Spec.Name
+			.. " ["
+			.. DungeonLoadout.Labels[encounter.GearTier]
+			.. "]"
 	end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
@@ -1490,7 +1480,13 @@ function spawnRival(owner: Player, raid, encounter)
 				child:Destroy()
 			end
 		end
-		BrainrotSkins.apply(rig, encounter.Spec, GemConfig.ElementColors[encounter.Spec.Element], encounter.Boss)
+		BrainrotSkins.apply(
+			rig,
+			encounter.Spec,
+			GemConfig.ElementColors[encounter.Spec.Element],
+			encounter.Boss,
+			encounter.GearTier
+		)
 	end
 	-- Equal ground: it's a new player with its own random kit, built by
 	-- exactly the rules that build yours. Its health, swing damage, armour,

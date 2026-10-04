@@ -70,10 +70,11 @@ function Dungeon.generate(rng)
 	for i, room in rooms do
 		room.Index = i
 		room.Boss = i == Dungeon.RoomCount
+		room.GearTier = if room.Boss then rng:NextInteger(4, 5) else math.min(3, math.ceil(i / 1.5))
 		room.Theme = if room.Boss then boss else rng:NextInteger(1, #Dungeon.Roster)
 		room.Foes = {}
 		for n = 1, if room.Boss then 1 else rng:NextInteger(2, 3) do
-			table.insert(room.Foes, if room.Boss then boss else rng:NextInteger(1, #Dungeon.Roster))
+			table.insert(room.Foes, room.Theme)
 		end
 		room.Pillars = rng:NextInteger(2, 4)
 	end
