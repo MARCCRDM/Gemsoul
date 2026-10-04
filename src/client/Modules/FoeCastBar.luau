@@ -81,6 +81,88 @@ local function make(className: string, props, parent: Instance?)
 	return object
 end
 
+-- Drawn from UI geometry so the caution icon never depends on an emoji font.
+function FoeCastBar.widget(parent, width, compact)
+	local panel = make("Frame", {
+		Name = "CastWarning",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(width, if compact then 64 else 88),
+	}, parent)
+	local icon = make("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0),
+		Size = UDim2.fromOffset(30, 28),
+	}, panel)
+	local edges = {}
+	for _, points in { { 15, 2, 1, 26 }, { 1, 26, 29, 26 }, { 29, 26, 15, 2 } } do
+		local dx, dy = points[3] - points[1], points[4] - points[2]
+		table.insert(
+			edges,
+			make("Frame", {
+				BorderSizePixel = 0,
+				BackgroundColor3 = FoeCastBar.Gold,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset((points[1] + points[3]) / 2, (points[2] + points[4]) / 2),
+				Size = UDim2.fromOffset(math.sqrt(dx * dx + dy * dy), 2),
+				Rotation = math.deg(math.atan2(dy, dx)),
+			}, icon)
+		)
+	end
+	for _, rect in { { 14, 10, 3, 8 }, { 14, 21, 3, 3 } } do
+		table.insert(
+			edges,
+			make("Frame", {
+				BorderSizePixel = 0,
+				BackgroundColor3 = FoeCastBar.Gold,
+				Position = UDim2.fromOffset(rect[1], rect[2]),
+				Size = UDim2.fromOffset(rect[3], rect[4]),
+			}, icon)
+		)
+	end
+	local function label(y, height, size)
+		return make("TextLabel", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(0, y),
+			Size = UDim2.new(1, 0, 0, height),
+			Font = Enum.Font.GothamBold,
+			TextSize = size,
+			TextColor3 = Color3.fromRGB(230, 237, 245),
+			TextStrokeTransparency = 0.25,
+			TextStrokeColor3 = Color3.new(0, 0, 0),
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Text = "",
+		}, panel)
+	end
+	local name = label(30, 18, if compact then 11 else 13)
+	local track = make("Frame", {
+		BorderSizePixel = 0,
+		BackgroundColor3 = Color3.fromRGB(24, 30, 43),
+		Position = UDim2.new(0, 20, 0, 50),
+		Size = UDim2.new(1, -65, 0, 3),
+	}, panel)
+	local fill = make("Frame", { BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, track)
+	local stroke = make("UIStroke", { Thickness = 1, Transparency = 0.6 }, track)
+	local time = label(45, 14, 10)
+	time.Position, time.Size = UDim2.new(1, -43, 0, 45), UDim2.fromOffset(43, 14)
+	local hint = label(65, 16, 10)
+	hint.Visible = not compact
+	return { Panel = panel, Name = name, Time = time, Fill = fill, Stroke = stroke, Edges = edges, Hint = hint }
+end
+
+function FoeCastBar.draw(entry, cast, compact)
+	local urgent = FoeCastBar.paint(cast, entry.Name, entry.Time, entry.Fill, entry.Stroke)
+	-- Only the small symbol pulses; the cast name stays steady and readable.
+	local color = if urgent then Color3.fromRGB(255, 100, 80) else FoeCastBar.Gold
+	for _, edge in entry.Edges do
+		edge.BackgroundColor3 = color
+		edge.BackgroundTransparency = if urgent then 0.12 * (1 + math.sin(os.clock() * 10)) else 0
+	end
+	entry.Hint.Visible = not compact and cast.Threat and cast.Hint ~= nil
+	entry.Hint.Text = cast.Hint or ""
+	return urgent
+end
+
 local function boardFor(owner: Instance, root: BasePart)
 	local entry = boards[owner]
 	if entry and entry.Root == root and entry.Board.Parent then
@@ -92,51 +174,15 @@ local function boardFor(owner: Instance, root: BasePart)
 	local board = make("BillboardGui", {
 		Name = "FoeCastBar",
 		Adornee = root,
-		Size = UDim2.fromOffset(220, 46),
-		StudsOffset = Vector3.new(0, 7, 0), -- above the status icons
-		MaxDistance = 140,
-		AlwaysOnTop = true,
+		Size = UDim2.fromOffset(170, 64),
+		StudsOffset = Vector3.new(0, 7, 0),
+		MaxDistance = 80,
+		AlwaysOnTop = false,
 		ResetOnSpawn = false,
 		Enabled = false,
 	}, Players.LocalPlayer:FindFirstChildOfClass("PlayerGui"))
-	local panel = make("Frame", {
-		BackgroundColor3 = Color3.fromRGB(10, 14, 24),
-		BackgroundTransparency = 0.15,
-		Size = UDim2.fromScale(1, 1),
-	}, board)
-	make("UICorner", { CornerRadius = UDim.new(0, 6) }, panel)
-	local stroke = make("UIStroke", { Thickness = 2, Transparency = 0.1 }, panel)
-	local label = make("TextLabel", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(8, 3),
-		Size = UDim2.new(1, -60, 0, 20),
-		Font = Enum.Font.GothamBlack,
-		TextSize = 15,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextStrokeTransparency = 0.4,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	}, panel)
-	local time = make("TextLabel", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -8, 0, 3),
-		Size = UDim2.fromOffset(50, 20),
-		Font = Enum.Font.GothamBold,
-		TextSize = 13,
-		TextColor3 = Color3.fromRGB(220, 228, 240),
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextStrokeTransparency = 0.4,
-	}, panel)
-	local track = make("Frame", {
-		BackgroundColor3 = Color3.fromRGB(30, 34, 48),
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(8, 27),
-		Size = UDim2.new(1, -16, 0, 11),
-	}, panel)
-	make("UICorner", { CornerRadius = UDim.new(0, 4) }, track)
-	local fill = make("Frame", { BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, track)
-	make("UICorner", { CornerRadius = UDim.new(0, 4) }, fill)
-	entry = { Root = root, Board = board, Fill = fill, Name = label, Time = time, Stroke = stroke }
+	entry = FoeCastBar.widget(board, 170, true)
+	entry.Root, entry.Board = root, board
 	boards[owner] = entry
 	return entry
 end
@@ -155,7 +201,7 @@ function FoeCastBar.paint(cast, name: TextLabel, time: TextLabel, fill: Frame, s
 end
 
 -- Every frame, with server time.
-function FoeCastBar.step(serverNow: number)
+function FoeCastBar.step(serverNow: number, hudModel: Model?)
 	if os.clock() >= nextScan then
 		nextScan = os.clock() + 0.25
 		local seen = {}
@@ -184,9 +230,9 @@ function FoeCastBar.step(serverNow: number)
 	end
 	for owner, entry in boards do
 		local cast = FoeCastBar.read(modelOf(owner), serverNow)
-		entry.Board.Enabled = cast ~= nil
+		entry.Board.Enabled = cast ~= nil and modelOf(owner) ~= hudModel
 		if cast then
-			FoeCastBar.paint(cast, entry.Name, entry.Time, entry.Fill, entry.Stroke)
+			FoeCastBar.draw(entry, cast, true)
 		end
 	end
 end

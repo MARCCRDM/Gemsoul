@@ -1,0 +1,123 @@
+ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  built with gcc 14.2.0 (Rev1, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.100 / 61. 19.100
+  libavformat    61.  7.100 / 61.  7.100
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  4.100 / 10.  4.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\docs\combat-reel\silent-v2.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf61.7.100
+  Duration: 00:00:16.00, start: 0.000000, bitrate: 3833 kb/s
+  Stream #0:0[0x1](und): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(progressive), 1280x720, 3832 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+      Metadata:
+        handler_name    : VideoHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 libx264
+Input #1, ogg, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\music\fight_theme.ogg':
+  Duration: 00:00:26.49, start: 0.000000, bitrate: 128 kb/s
+  Stream #1:0: Audio: vorbis, 44100 Hz, stereo, fltp, 160 kb/s
+      Metadata:
+        encoder         : Lavc61.3.100 libvorbis
+Input #2, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\cast_fire.mp3':
+  Duration: 00:00:01.07, start: 0.025057, bitrate: 108 kb/s
+  Stream #2:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 108 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #3, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\impact_fire.mp3':
+  Duration: 00:00:00.60, start: 0.025057, bitrate: 119 kb/s
+  Stream #3:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 119 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #4, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\death.mp3':
+  Duration: 00:00:01.54, start: 0.025057, bitrate: 126 kb/s
+  Stream #4:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 126 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #5, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\cast_frost.mp3':
+  Duration: 00:00:01.02, start: 0.025057, bitrate: 97 kb/s
+  Stream #5:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 97 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #6, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\impact_frost.mp3':
+  Duration: 00:00:00.63, start: 0.025057, bitrate: 106 kb/s
+  Stream #6:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 106 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #7, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\death.mp3':
+  Duration: 00:00:01.54, start: 0.025057, bitrate: 126 kb/s
+  Stream #7:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 126 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #8, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\cast_poison.mp3':
+  Duration: 00:00:01.02, start: 0.025057, bitrate: 76 kb/s
+  Stream #8:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 76 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #9, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\impact_poison.mp3':
+  Duration: 00:00:00.57, start: 0.025057, bitrate: 84 kb/s
+  Stream #9:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 84 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #10, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\death.mp3':
+  Duration: 00:00:01.54, start: 0.025057, bitrate: 126 kb/s
+  Stream #10:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 126 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #11, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\cast_shock.mp3':
+  Duration: 00:00:01.02, start: 0.025057, bitrate: 94 kb/s
+  Stream #11:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 94 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #12, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\impact_shock.mp3':
+  Duration: 00:00:00.52, start: 0.025057, bitrate: 125 kb/s
+  Stream #12:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 125 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Input #13, mp3, from 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\assets\sounds\combat\death.mp3':
+  Duration: 00:00:01.54, start: 0.025057, bitrate: 126 kb/s
+  Stream #13:0: Audio: mp3 (mp3float), 44100 Hz, mono, fltp, 126 kb/s
+      Metadata:
+        encoder         : LAME3.100
+Stream mapping:
+  Stream #1:0 (vorbis) -> atrim:default
+  Stream #2:0 (mp3float) -> volume:default
+  Stream #3:0 (mp3float) -> volume:default
+  Stream #4:0 (mp3float) -> volume:default
+  Stream #5:0 (mp3float) -> volume:default
+  Stream #6:0 (mp3float) -> volume:default
+  Stream #7:0 (mp3float) -> volume:default
+  Stream #8:0 (mp3float) -> volume:default
+  Stream #9:0 (mp3float) -> volume:default
+  Stream #10:0 (mp3float) -> volume:default
+  Stream #11:0 (mp3float) -> volume:default
+  Stream #12:0 (mp3float) -> volume:default
+  Stream #13:0 (mp3float) -> volume:default
+  Stream #0:0 -> #0:0 (copy)
+  alimiter:default -> Stream #0:1 (aac)
+Press [q] to stop, [?] for help
+Output #0, mp4, to 'C:\Users\clapr\OneDrive\Documents\GitHub\Gemsoul\docs\combat-reel\Saga-Miners-Elemental-Finishers.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf61.7.100
+  Stream #0:0(und): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(progressive), 1280x720, q=2-31, 3832 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+      Metadata:
+        handler_name    : VideoHandler
+        vendor_id       : [0][0][0][0]
+        encoder         : Lavc61.19.100 libx264
+  Stream #0:1: Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 192 kb/s
+      Metadata:
+        encoder         : Lavc61.19.100 aac
+frame=  314 fps=0.0 q=-1.0 size=    6400KiB time=00:00:12.95 bitrate=4046.5kbits/s speed=  25x    [mp4 @ 000001fe66568a00] Starting second pass: moving the moov atom to the beginning of the file
+[out#0/mp4 @ 000001fe663993c0] video:7485KiB audio:380KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.141418%
+frame=  384 fps=0.0 q=-1.0 Lsize=    7876KiB time=00:00:16.00 bitrate=4032.8kbits/s speed=  25x    
+[aac @ 000001fe665880c0] Qavg: 641.063

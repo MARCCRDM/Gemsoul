@@ -325,41 +325,12 @@ local selfStatusRow = new("Frame", {
 }, gui)
 local selfStatuses = StatusBars.strip(selfStatusRow, false)
 local selfStatusIcons = StatusBars.strip(selfStatusRow, true) -- narrow screens: icons only
--- Your opponent's cast bar, like an RPG's enemy cast bar, above the
--- crosshair: what it's casting (in its element's colour), how long until it
--- lands and how to get out of it. (A bar over its head too: FoeCastBar.)
-local foeCast = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(12, 17, 28),
-	BackgroundTransparency = 0.1,
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 0.5, -70),
-	Size = UDim2.fromOffset(380, 50),
-	Visible = false,
-}, gui)
-local foeCastStroke = HudChrome.dress(foeCast, { Top = Color3.fromRGB(46, 34, 34) })
-local foeCastName = shadowed(text(foeCast, "", 16, P.Text, HudChrome.Title))
-foeCastName.AutomaticSize, foeCastName.TextWrapped = Enum.AutomaticSize.None, false
-foeCastName.Position, foeCastName.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -100, 0, 22)
-local foeCastTime = shadowed(text(foeCast, "", 12, Color3.fromRGB(200, 210, 225), IronUi.Bold))
-foeCastTime.AutomaticSize, foeCastTime.TextWrapped = Enum.AutomaticSize.None, false
-foeCastTime.TextXAlignment = Enum.TextXAlignment.Right
-foeCastTime.Position, foeCastTime.Size = UDim2.new(1, -100, 0, 6), UDim2.fromOffset(90, 18)
-local foeCastTrack = new("Frame", {
-	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(12, 31),
-	Size = UDim2.new(1, -24, 0, 10),
-}, foeCast)
-UiKit.round(foeCastTrack, 2)
-HudChrome.capBar(foeCastTrack)
-local foeCastFill =
-	new("Frame", { BackgroundColor3 = P.Gold, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, foeCastTrack)
-UiKit.round(foeCastFill, 2)
-local foeDodge = shadowed(text(gui, "", 18, Color3.fromRGB(255, 90, 80), IronUi.Bold))
-foeDodge.AutomaticSize, foeDodge.TextWrapped = Enum.AutomaticSize.None, false
-foeDodge.TextXAlignment = Enum.TextXAlignment.Center
-foeDodge.AnchorPoint, foeDodge.Position, foeDodge.Size =
-	Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0.5, -66), UDim2.fromOffset(380, 24)
-foeDodge.Visible = false
+-- Compact warning tucked below the top target frame, clear of the crosshair.
+local foeWarning = FoeCastBar.widget(gui, 220, false)
+local foeCast = foeWarning.Panel
+foeCast.AnchorPoint = Vector2.new(0.5, 0)
+foeCast.Position = UDim2.new(0.5, 0, 0, 84)
+foeCast.Visible = false
 local lastFoeCast, foeWarned = nil, false
 local function drawFoeCast(model, serverNow)
 	-- The rival; in PvP, the nearest other player who is casting.
@@ -375,7 +346,7 @@ local function drawFoeCast(model, serverNow)
 			end
 		end
 	end
-	foeCast.Visible, foeDodge.Visible = cast ~= nil, false
+	foeCast.Visible = cast ~= nil
 	if not cast then
 		return
 	end
@@ -386,16 +357,12 @@ local function drawFoeCast(model, serverNow)
 		local root = model:FindFirstChild("HumanoidRootPart")
 		CombatSound.play("Cast", if root then root.Position else nil, { Volume = 0.9 })
 	end
-	local urgent = FoeCastBar.paint(cast, foeCastName, foeCastTime, foeCastFill, foeCastStroke)
-	-- How to get out of it, red and pulsing in the last moments.
-	foeDodge.Visible = cast.Threat and cast.Hint ~= nil
-	foeDodge.Text = (cast.Hint or "") .. (if cast.Kind == "Nova" or cast.Kind == "Heavy" then "  ·  SPACE" else "")
-	foeDodge.TextColor3 = if urgent then Color3.fromRGB(255, 90, 80) else cast.Color:Lerp(Color3.new(1, 1, 1), 0.4)
-	foeDodge.TextTransparency = if urgent then 0.15 * (1 + math.sin(os.clock() * 30)) else 0.1
+	local urgent = FoeCastBar.draw(foeWarning, cast, false)
 	if urgent and not foeWarned then
 		foeWarned = true
 		CombatSound.play("Warn")
 	end
+	return model
 end
 
 -- The combat log (bottom left), with fight details on L.
@@ -1497,8 +1464,8 @@ RunService.RenderStepped:Connect(function(dt)
 		"Foe",
 		rivalModel and (rivalModel:GetAttribute("RivalName") or rivalModel.Name)
 	)
-	drawFoeCast(rivalModel, serverNow)
-	FoeCastBar.step(serverNow)
+	local warningModel = drawFoeCast(rivalModel, serverNow)
+	FoeCastBar.step(serverNow, warningModel)
 	matchup:draw(rivalModel, viewport, rivalPanel.Visible)
 	CombatFx.auras(serverNow)
 	if rivalModel ~= logRival and rivalModel ~= nil then
