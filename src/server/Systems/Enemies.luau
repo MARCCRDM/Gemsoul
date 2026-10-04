@@ -22,6 +22,7 @@ local Combat = require(ReplicatedStorage.Shared.Combat)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
+local Aggro = require(ReplicatedStorage.Shared.Aggro)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local Gems = require(script.Parent.Gems)
 local Party = require(script.Parent.Party)
@@ -131,6 +132,11 @@ export type Enemy = {
 	LastAttack: number,
 	Damage: { [Player]: number },
 	Threat: { [Player]: number },
+	ThreatAt: { [Player]: number }, -- when each player last added threat
+	Aggro: Aggro.State, -- who it's after (Shared.Aggro)
+	LastSource: Player?, -- the last player to hit it, and when
+	LastSourceAt: number,
+	LastThink: number,
 	StunUntil: number,
 	SlowUntil: number,
 	Slow: number,
@@ -416,6 +422,11 @@ local function spawn(kindId: string, home: Vector3, facing: Vector3?)
 		LastAttack = 0,
 		Damage = {},
 		Threat = {},
+		ThreatAt = {},
+		Aggro = Aggro.new(),
+		LastSource = nil,
+		LastSourceAt = 0,
+		LastThink = 0,
 		StunUntil = 0,
 		SlowUntil = 0,
 		Slow = 0,
@@ -462,6 +473,11 @@ function Enemies.adopt(model: Model, kind, opts: { Element: string?, Title: stri
 		LastAttack = 0,
 		Damage = {},
 		Threat = {},
+		ThreatAt = {},
+		Aggro = Aggro.new(),
+		LastSource = nil,
+		LastSourceAt = 0,
+		LastThink = 0,
 		StunUntil = 0,
 		SlowUntil = 0,
 		Slow = 0,
@@ -699,7 +715,8 @@ function Enemies.damage(
 		enemy.Damage[source] = (enemy.Damage[source] or 0) + amount
 		local loadout = PlayerData.character(source)
 		local bonus = if loadout then Classes.effects(loadout).ThreatGeneration or 0 else 0
-		enemy.Threat[source] = (enemy.Threat[source] or 0) + amount * (1 + bonus)
+		Aggro.add(enemy.Threat, enemy.ThreatAt, source, amount * (1 + bonus), os.clock())
+		enemy.LastSource, enemy.LastSourceAt = source, os.clock()
 	end
 	fx("Damage", enemy.Root.Position + Vector3.new(0, enemy.Root.Size.Y / 2 + 1, 0), amount, crit == true, color)
 	if enemy.Kind.Dummy then
@@ -731,6 +748,7 @@ function Enemies.addStatus(enemy: Enemy, status: string, amount: number, seconds
 	local now = os.clock()
 	if status == "Stun" then
 		enemy.StunUntil = math.max(enemy.StunUntil, now + seconds)
+		Enemies.controlThreat(enemy)
 	elseif status == "Slow" then
 		enemy.Slow = if now < enemy.SlowUntil then math.max(enemy.Slow, amount) else amount
 		enemy.SlowUntil = math.max(enemy.SlowUntil, now + seconds)
@@ -784,6 +802,16 @@ function Enemies.setBurn(enemy: Enemy, perTick: number, seconds: number, source:
 		Source = source,
 		Color = color,
 	})
+end
+
+-- Stunning or interrupting it makes it angry: a spike of threat for the
+-- player whose blow did it (the stun or interrupt rides on that blow).
+function Enemies.controlThreat(enemy: Enemy)
+	local now = os.clock()
+	local source = enemy.LastSource
+	if source and source.Parent and now - enemy.LastSourceAt < 0.5 then
+		Aggro.add(enemy.Threat, enemy.ThreatAt, source, enemy.Humanoid.MaxHealth * Aggro.ControlThreat, now)
+	end
 end
 
 function Enemies.taunt(enemy: Enemy, player: Player, seconds: number)
@@ -876,34 +904,43 @@ local function fighterRoot(player: Player): BasePart?
 	return nil
 end
 
+-- Who it attacks: a taunter, else Shared.Aggro's choice (most threat, with
+-- the overtake, low-health and unreachable rules) among players it can see.
 local function pickTarget(enemy: Enemy): (Player?, BasePart?)
 	local now = os.clock()
 	if enemy.Taunter and now < enemy.TauntUntil then
 		local root = fighterRoot(enemy.Taunter)
 		if root then
+			enemy.Aggro.Target, enemy.Aggro.Since = enemy.Taunter, now
 			return enemy.Taunter, root
 		end
 	end
-	local best, bestRoot, bestDistance = nil, nil, enemy.Kind.Aggro
-	local bestThreat = -1
+	Aggro.fade(enemy.Threat, enemy.ThreatAt, now - (enemy.LastThink or now), now)
+	enemy.LastThink = now
+	-- Once hurt, a monster keeps chasing a bit further.
+	local reach = enemy.Kind.Aggro * (if now - enemy.LastHit < 6 then 1.6 else 1)
+	local candidates, roots = {}, {}
 	for _, player in Players:GetPlayers() do
 		local root = fighterRoot(player)
 		if root then
 			local distance = (root.Position - enemy.Root.Position).Magnitude
-			-- Once hurt, a monster keeps chasing a bit further.
-			local reach = enemy.Kind.Aggro * (if now - enemy.LastHit < 6 then 1.6 else 1)
 			local threat = enemy.Threat[player] or 0
-			if
-				distance < reach
-				and (root.Position - enemy.Home).Magnitude < LEASH
-				and (threat > bestThreat or (threat == bestThreat and distance < bestDistance))
-			then
-				bestThreat = threat
-				best, bestRoot, bestDistance = player, root, distance
+			-- Players who've hurt it are chased anywhere inside its leash.
+			if (distance < reach or threat > 0) and (root.Position - enemy.Home).Magnitude < LEASH then
+				local humanoid = player.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
+				roots[player] = root
+				table.insert(candidates, {
+					Key = player,
+					Threat = threat,
+					Distance = distance,
+					InReach = distance <= enemy.Kind.Reach + 1,
+					HealthRatio = humanoid.Health / math.max(1, humanoid.MaxHealth),
+				})
 			end
 		end
 	end
-	return best, bestRoot
+	local target = Aggro.choose(enemy.Aggro, candidates, now)
+	return target, target and roots[target]
 end
 
 local function think(enemy: Enemy, now: number)
@@ -926,6 +963,8 @@ local function think(enemy: Enemy, now: number)
 			if humanoid.Health >= humanoid.MaxHealth then
 				table.clear(enemy.Damage)
 				table.clear(enemy.Threat)
+				table.clear(enemy.ThreatAt)
+				enemy.Aggro = Aggro.new()
 			end
 		end
 		return

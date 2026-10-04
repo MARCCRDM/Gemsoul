@@ -32,6 +32,7 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
 local Brain = require(ReplicatedStorage.Shared.DuelistBrain)
+local Aggro = require(ReplicatedStorage.Shared.Aggro)
 local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
@@ -273,8 +274,7 @@ local function ownerRoot(owner: Player): (BasePart?, Humanoid?)
 end
 
 -- A raid boss: drops raiders who are down or gone and picks who it's after
--- (Owner): the nearest raider, kept TargetSeconds unless they drop. False
--- when nobody's left (the raid is over).
+-- (Owner) by threat (Shared.Aggro). False when nobody's left (the raid is over).
 local function raidTarget(duel, now: number): boolean
 	local raid = duel.Raid
 	for i = #raid.Members, 1, -1 do
@@ -310,22 +310,36 @@ local function raidTarget(duel, now: number): boolean
 		end
 		return false
 	end
-	if not table.find(raid.Members, duel.Owner) or now >= (duel.TargetUntil or 0) then
-		local root = duel.Enemy.Root
-		local best, closest = raid.Members[1], math.huge
-		for _, member in raid.Members do
-			local memberRoot = ownerRoot(member)
-			local distance = if memberRoot then (memberRoot.Position - root.Position).Magnitude else math.huge
-			if distance < closest then
-				best, closest = member, distance
-			end
+	-- Shared.Aggro decides: whoever is hurting it most (overtaking by 10% up
+	-- close, 30% from range), a raider low on health, or the nearest one it
+	-- can reach when its target keeps out of reach. Raid time is server time.
+	local enemy = duel.Enemy
+	local clock = os.clock()
+	Aggro.fade(enemy.Threat, enemy.ThreatAt, clock - (enemy.LastThink or clock), clock)
+	enemy.LastThink = clock
+	local root = enemy.Root
+	local candidates = {}
+	for _, member in raid.Members do
+		local memberRoot, humanoid = ownerRoot(member)
+		if memberRoot and humanoid then
+			local distance = (memberRoot.Position - root.Position).Magnitude
+			table.insert(candidates, {
+				Key = member,
+				Threat = enemy.Threat[member] or 0,
+				Distance = distance,
+				InReach = distance <= Brain.Reach + 1.5,
+				HealthRatio = humanoid.Health / math.max(1, humanoid.MaxHealth),
+			})
 		end
-		if best ~= duel.Owner then
-			duel.Owner = best
-			duel.Enemy.Model:SetAttribute("RivalOwner", best.UserId)
-			Remotes.CombatFx:FireClient(best, "TechStatus", duel.Name .. " turns on you!")
-		end
-		duel.TargetUntil = now + Matchmaking.Raid.TargetSeconds
+	end
+	if enemy.Aggro.Target == nil and table.find(raid.Members, duel.Owner) then
+		enemy.Aggro.Target, enemy.Aggro.Since = duel.Owner, clock
+	end
+	local best = Aggro.choose(enemy.Aggro, candidates, clock) or raid.Members[1]
+	if best ~= duel.Owner then
+		duel.Owner = best
+		enemy.Model:SetAttribute("RivalOwner", best.UserId)
+		Remotes.CombatFx:FireClient(best, "TechStatus", duel.Name .. " turns on you!")
 	end
 	return true
 end
@@ -1849,6 +1863,7 @@ function Duelist.start()
 		setStance(duel, "")
 		duel.NextAttack = now + 0.5
 		Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", "Interrupted " .. duel.Name .. "!")
+		Enemies.controlThreat(enemy)
 		return true
 	end
 	-- Its fighting poses, every frame, bent on the server so every client sees them.

@@ -48,7 +48,6 @@ Matchmaking.Raid = {
 	HealthPerWave = 0.25, -- and for each wave cleared
 	Damage = 1.2, -- it hits harder than a duelling rival
 	DamagePerWave = 0.1,
-	TargetSeconds = 5, -- it picks on one raider at least this long
 	Coins = 60, -- each raider's coins for wave 1
 	CoinsPerWave = 20,
 	NextWave = 8, -- seconds between waves
