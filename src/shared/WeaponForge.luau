@@ -183,6 +183,12 @@ function WeaponForge.multiplier(effects, context): number
 	return multiplier
 end
 
+-- Whether the Forge weapons are handed out (starter kits, the regenerate
+-- tool, mine and Outpost loot, the Arena rival). Off: the original swords
+-- (Frontier Sword and family) are what rolls, as before the Forge. Forge
+-- weapons players already own stay valid either way.
+WeaponForge.Enabled = false
+
 WeaponForge.Catalog = {}
 for _, kind in WeaponForge.Types do
 	for rarity = 1, 5 do
@@ -193,7 +199,7 @@ for _, kind in WeaponForge.Types do
 			Name = kind.Names[rarity],
 			Tier = rarity,
 			RarityTier = rarity,
-			StartPool = true,
+			StartPool = WeaponForge.Enabled,
 			Forge = true,
 			Style = "Frontier",
 			Look = "Forge" .. kind.Id,

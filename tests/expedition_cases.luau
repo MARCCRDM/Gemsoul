@@ -115,18 +115,21 @@ for _ = 1, 1000 do
  end
 end
 for _, kind in Slots.Kinds do check(foundKinds[kind], "No equipment recovery for " .. kind) end
--- Gear found in the mine is stamped with its finder (Forge weapons included).
-local stamped, forgeFound = 0, false
+-- Gear found in the mine is stamped with its finder (and weapons follow the Forge setting).
+local stamped, forgeFound, swordFound = 0, false, false
 for kind, rolls in profiles[miner].Character.GearRolls do
  for id, roll in rolls do
   if profiles[miner].Owned[kind][id] and profiles[miner].Owned[kind][id] > 1 then
    if roll.FoundBy then stamped += 1 end
   end
-  if string.find(id, "^Forge") then forgeFound = true end
+  if profiles[miner].Owned[kind][id] and string.find(id, "^Forge") then forgeFound = true end
+  if profiles[miner].Owned[kind][id] and string.find(id, "^MatrixSwords") then swordFound = true end
  end
 end
 check(stamped > 10, "Mined gear wasn't stamped with its finder")
-check(forgeFound, "The mine never gave a Forge weapon")
+-- The mine hands out Forge weapons only while the Forge is on; else the original swords.
+check(forgeFound == WeaponForge.Enabled, "The mine gave the wrong weapons for the Forge setting")
+check(WeaponForge.Enabled or swordFound, "The mine never gave an original sword")
 local mined = grant(miner, {Depth = 1, Tutorial = true}, {Kind = "Gem"})
 check(mined.Gem and mined.Gem.Cut, "Tutorial mining awarded a rough gem")
 print("PASS: " .. cases .. " expedition checks (10,000 gem rolls, migration, loot, trade consent and retired actions)")

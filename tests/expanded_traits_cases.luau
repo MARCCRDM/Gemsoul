@@ -36,11 +36,18 @@ for kind, catalog in ExpandedTraits.Catalog do
 	end
 	counts[kind] = rarityCounts
 end
+-- With the Forge off, the original swords are what rolls (the Frontier Sword among them).
+for _, weapon in ExpandedTraits.Catalog.Weapons do
+	if weapon.WeaponType == "Sword" then
+		assert(weapon.StartPool == not WeaponForge.Enabled, weapon.Id .. " rolls in the wrong mode")
+	end
+end
 -- The Forge: 25 weapons, five kinds in five rarities, each with its own perk.
 assert(#WeaponForge.Catalog == 25, "The Forge should hold 25 weapons")
 local perkKeys, kinds = {}, {}
 for _, weapon in WeaponForge.Catalog do
-	assert(weapon.StartPool and ExpandedTraits.obtainable(weapon), weapon.Id .. " can't be found")
+	-- Rolled only while the Forge is switched on (WeaponForge.Enabled).
+	assert(weapon.StartPool == WeaponForge.Enabled and ExpandedTraits.obtainable(weapon), weapon.Id .. " rolls in the wrong mode")
 	assert(weapon.Look == "Forge" .. weapon.WeaponType, weapon.Id .. " lost its look")
 	assert(weapon.ArmorFamily ~= nil, weapon.Id .. " has no set family")
 	local key, value = next(weapon.Passive.Effect)

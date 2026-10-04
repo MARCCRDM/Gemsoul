@@ -1110,10 +1110,14 @@ for _, weapon in Traits.Catalog.Weapons do
 		then (if tonumber(string.match(weapon.Id, "%d+$")) <= 5 then "Prospector" else "Juggernaut")
 		else "Skirmisher"
 end
--- The Forge's 25 weapons (Shared.WeaponForge) are what's found and handed
--- out now; the older swords and sidearms stay valid for saved kits.
-for _, weapon in Traits.Catalog.Weapons do
-	weapon.StartPool = false
+-- The Forge's 25 weapons (Shared.WeaponForge) join the catalog so saved
+-- kits stay valid. While WeaponForge.Enabled is off they never roll, and the
+-- original swords (Frontier Sword and family) are what's handed out; when
+-- it's on, the Forge weapons replace the swords in the rolls.
+if WeaponForge.Enabled then
+	for _, weapon in Traits.Catalog.Weapons do
+		weapon.StartPool = false
+	end
 end
 for _, weapon in WeaponForge.Catalog do
 	table.insert(Traits.Catalog.Weapons, weapon)
