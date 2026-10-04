@@ -7,7 +7,7 @@
 	  Dungeon  the second drop     squad dungeons
 	  Fight    the final drop      raids (and fights, until Arena has an id)
 	  Arena    its own song        1v1s: the rival, PvP and duels; starts at
-	                               StartAt (1:45) every match and loops back there
+	                               StartAt (1:44) every match and loops back there
 
 	Changing mood crossfades between them. Roblox only plays uploaded audio:
 	run tools/upload_audio.py (or upload the .ogg files in Creator Hub,
@@ -29,7 +29,7 @@ Music.Ids = {
 }
 
 -- Moods that start part-way into their song each time they come on, in seconds.
-Music.StartAt = { Arena = 105 } -- 1:45
+Music.StartAt = { Arena = 104 } -- 1:44
 
 -- How loud each mood plays (0 mutes it).
 Music.Volumes = { Menu = 0.3, Outpost = 0.32, Dungeon = 0.42, Fight = 0.45, Arena = 0.45 }
