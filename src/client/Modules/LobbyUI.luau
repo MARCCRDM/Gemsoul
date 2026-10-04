@@ -3,11 +3,9 @@
 	your Inventory (the main dashboard), the Store, the Ranks and Social, and
 	the PLAY menu that picks what to play:
 
-	  CASUAL   1v1 Duel        a rival miner, coins on a win (always open)
-	           2v2 Clash       you and a partner vs another pair
-	           Squad Dungeon   three miners, a dungeon and its boss
-	           Custom          challenge a player, party up, raid (Social)
-	  RANKED   1v1 Ranked      real players, rating on the line
+	  PRACTICE  1v1 Practice    a rival miner, coins on a win (always open)
+	            Squad Dungeon   three miners, a dungeon and its boss
+	  RANKED    1v1 Ranked      real players, rating on the line
 
 	Modes unlock as you play duels (Unlocks). The Inventory opens the full
 	dashboard over the lobby, with a BACK TO LOBBY button to close it.
@@ -27,14 +25,12 @@ local P = IronUi.Colors
 local new = IronUi.new
 
 local LobbyUI = {}
-LobbyUI.Unlocks = { Clash = 3, Dungeon = 3, Ranked = 10 }
+LobbyUI.Unlocks = { Dungeon = 3, Ranked = 10 }
 -- Key art for each card (assets/images/lobby/*.png, painted by
 -- tools/make_lobby_cards.py). 0 = not uploaded yet: the card shows its emblem.
 LobbyUI.Art = {
 	Duel = 104755259743768,
-	Clash = 103356099904456,
 	Dungeon = 85958638729400,
-	Custom = 87326833954623,
 	Ranked = 108455735818338,
 }
 
@@ -113,9 +109,9 @@ local function heading(value, color, x, align)
 	l.Position, l.Size, l.ZIndex = UDim2.fromOffset(x, 0), UDim2.fromOffset(420, 44), 21
 	return l
 end
-heading("CASUAL", P.Text, 0, Enum.TextXAlignment.Left)
+heading("PRACTICE", P.Text, 0, Enum.TextXAlignment.Left)
 heading("RANKED", RED, 700, Enum.TextXAlignment.Right)
--- The divider between casual and ranked.
+-- The divider between practice and ranked.
 new("Frame", {
 	Position = UDim2.fromOffset(806, 60),
 	Size = UDim2.fromOffset(2, 500),
@@ -254,10 +250,10 @@ local function card(spec)
 end
 
 card({
-	Title = "1v1 DUEL",
+	Title = "1v1 PRACTICE",
 	Art = "Duel",
 	Kicker = "VS A RIVAL",
-	Sub = "A rival miner with their own random kit. Coins on a win.",
+	Sub = "Warm up against a rival miner with their own random kit. Coins on a win.",
 	Emblem = "Equipment",
 	Color = P.Gold,
 	X = 0,
@@ -269,22 +265,6 @@ card({
 	end,
 })
 card({
-	Title = "2v2 CLASH",
-	Art = "Clash",
-	Kicker = "PARTY OF TWO",
-	Sub = "You and a partner against another pair.",
-	Emblem = "Trade",
-	Color = P.Teal,
-	X = 362,
-	Y = 60,
-	W = 420,
-	H = 156,
-	Unlock = "Clash",
-	Go = function()
-		run("DuelQueue", "2v2")
-	end,
-})
-card({
 	Title = "SQUAD DUNGEON",
 	Art = "Dungeon",
 	Kicker = "THREE MINERS",
@@ -292,27 +272,12 @@ card({
 	Emblem = "Enchant",
 	Color = P.Amethyst,
 	X = 362,
-	Y = 232,
+	Y = 60,
 	W = 420,
-	H = 156,
+	H = 500,
 	Unlock = "Dungeon",
 	Go = function()
 		run("DungeonFind")
-	end,
-})
-card({
-	Title = "CUSTOM",
-	Art = "Custom",
-	Kicker = "YOUR RULES",
-	Sub = "Challenge a player, party up, start a raid.",
-	Emblem = "Coins",
-	Color = P.Emerald,
-	X = 362,
-	Y = 404,
-	W = 420,
-	H = 156,
-	Go = function()
-		require(script.Parent.SocialUI).open()
 	end,
 })
 card({
