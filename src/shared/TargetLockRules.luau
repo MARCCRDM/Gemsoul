@@ -1,22 +1,23 @@
 -- Pure selection rules; presentation never grants permission to damage a target.
--- The lock is sticky and automatic:
---   * a priority target (your Arena rival) is taken the moment it's there,
---     from any angle, and never let go for distance or cover, only when it
---     dies or becomes ineligible
---   * anything that engages you (hits you) is locked at once if you have no
---     target, wherever it is
---   * any other lock holds through turning, mouse and touch look, and up to
+-- The lock is automatic and goes for the nearest enemy:
+--   * with no target, it takes whatever is attacking you (nearest first,
+--     wherever it is), else the nearest enemy ahead of you, else your Arena
+--     rival wherever it is
+--   * with a target, it moves to any enemy that gets nearer than it by
+--     SwitchMargin studs, as long as that one is in sight or attacking you
+--   * the target holds through turning, mouse and touch look, and up to
 --     HiddenGrace seconds of cover; it lets go when the target dies, leaves
---     RetainRange or stays hidden
+--     RetainRange or stays hidden. Your rival is never let go for distance
+--     or cover, only when it dies or becomes ineligible
 --   * with several targets within SwitchRange, Rules.switch cycles through
---     them left to right; a target you switched to is kept like any other
---     lock and wins over the rival and attackers until it's lost
+--     them left to right; a target you switched to is kept until it's lost
 local Rules = {
 	Range = 90, -- picking up a new target in front of you
 	RetainRange = 140, -- keeping an ordinary one
 	AcquireDot = math.cos(math.rad(45)),
 	HiddenGrace = 4,
 	SwitchRange = 10, -- studs: the targets around you that switching cycles through
+	SwitchMargin = 2, -- studs: how much nearer another enemy must be to take the lock
 }
 function Rules.new()
 	return { Target = nil, HiddenSince = nil, Priority = false, Pinned = false }
@@ -33,10 +34,14 @@ local function holdable(candidate)
 	return candidate.Allowed and candidate.Distance > 0 and candidate.Distance <= Rules.RetainRange
 end
 -- Keeps the current target if it can still be held (in range, and not
--- hidden longer than HiddenGrace).
+-- hidden longer than HiddenGrace). The rival is held at any range, in cover.
 local function keep(state, candidates, now)
 	for _, candidate in candidates do
 		if candidate.Target == state.Target then
+			if candidate.Priority and candidate.Allowed then
+				state.HiddenSince = nil
+				return true
+			end
 			if holdable(candidate) then
 				if candidate.Visible then
 					state.HiddenSince = nil
@@ -79,6 +84,24 @@ function Rules.switch(state, candidates)
 	state.Target, state.HiddenSince, state.Pinned = pick.Target, nil, true
 	return state.Target
 end
+-- The nearest enemy that can take the lock from a current target: in range
+-- and in sight, or attacking you.
+local function nearestRival(candidates, exclude)
+	local best
+	for _, candidate in candidates do
+		if
+			candidate.Target ~= exclude
+			and candidate.Allowed
+			and candidate.Distance > 0
+			and candidate.Distance <= Rules.Range
+			and (candidate.Visible or candidate.Engaged)
+			and (not best or candidate.Distance < best.Distance)
+		then
+			best = candidate
+		end
+	end
+	return best
+end
 -- `_turning` is kept for callers; turning never breaks the lock.
 function Rules.update(state, candidates, now, _turning)
 	-- A target you switched to holds until it's lost.
@@ -88,24 +111,23 @@ function Rules.update(state, candidates, now, _turning)
 		end
 		state.Target, state.HiddenSince, state.Pinned = nil, nil, false
 	end
-	-- Your rival takes the lock from anything else, and keeps it.
-	for _, candidate in candidates do
-		if candidate.Priority and candidate.Allowed then
-			if state.Target ~= candidate.Target then
-				state.Target, state.HiddenSince = candidate.Target, nil
-			end
-			state.Priority = true
-			return state.Target
-		end
-	end
 	state.Priority = false
-	if state.Target then
-		if keep(state, candidates, now) then
-			return state.Target
+	if state.Target and keep(state, candidates, now) then
+		-- Held, unless another enemy is clearly nearer.
+		local current
+		for _, candidate in candidates do
+			if candidate.Target == state.Target then
+				current = candidate
+			end
 		end
-		state.Target, state.HiddenSince = nil, nil
+		local nearer = nearestRival(candidates, state.Target)
+		if nearer and nearer.Distance < current.Distance - Rules.SwitchMargin then
+			state.Target, state.HiddenSince = nearer.Target, nil
+		end
+		return state.Target
 	end
-	-- Whatever is attacking you, wherever it is.
+	state.Target, state.HiddenSince = nil, nil
+	-- Whatever is attacking you, nearest first, wherever it is.
 	local engaged
 	for _, candidate in candidates do
 		if candidate.Engaged and holdable(candidate) and (not engaged or candidate.Distance < engaged.Distance) then
@@ -116,6 +138,7 @@ function Rules.update(state, candidates, now, _turning)
 		state.Target = engaged.Target
 		return state.Target
 	end
+	-- The nearest enemy ahead of you.
 	local closest
 	for _, candidate in candidates do
 		if
@@ -129,7 +152,17 @@ function Rules.update(state, candidates, now, _turning)
 			closest = candidate
 		end
 	end
-	state.Target = closest and closest.Target or nil
-	return state.Target
+	if closest then
+		state.Target = closest.Target
+		return state.Target
+	end
+	-- Your Arena rival, wherever it is.
+	for _, candidate in candidates do
+		if candidate.Priority and candidate.Allowed then
+			state.Target = candidate.Target
+			return state.Target
+		end
+	end
+	return nil
 end
 return Rules
