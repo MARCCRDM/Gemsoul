@@ -99,3 +99,8 @@ end
 
 local studioMode=false
 RunService.IsStudio=function() return studioMode end
+
+local permittedTester=nil
+local Feedback={isOwner=function(p) return studioMode or p==permittedTester end}
+game={CreatorType="Group",CreatorId=-1}
+Enum={CreatorType={User="User"}}

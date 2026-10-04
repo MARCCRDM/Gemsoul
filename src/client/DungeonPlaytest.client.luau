@@ -1,12 +1,15 @@
--- Studio-only entry points; the server independently enforces Studio and suppresses rewards.
-local RunService = game:GetService("RunService")
-if not RunService:IsStudio() then
-	return
-end
+-- Owner-only test controls. Authorization is independently checked on every server request.
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local request = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Request")
 local player = Players.LocalPlayer
+-- Permissions can arrive after this script starts; never infer authorization locally.
+while player:GetAttribute("CanTestDungeon") == nil do
+	player:GetAttributeChangedSignal("CanTestDungeon"):Wait()
+end
+if player:GetAttribute("CanTestDungeon") ~= true then
+	return
+end
 local gui = Instance.new("ScreenGui")
 gui.Name = "DungeonPlaytest"
 gui.ResetOnSpawn = false
@@ -25,7 +28,7 @@ status.TextColor3 = Color3.fromRGB(255, 210, 126)
 status.TextWrapped = true
 status.TextSize = 13
 status.Font = Enum.Font.GothamBold
-status.Text = "STUDIO DUNGEON TEST / NO REWARDS"
+status.Text = "OWNER DUNGEON TEST / NO REWARDS"
 status.Parent = panel
 local busy = false
 local function run(mode)

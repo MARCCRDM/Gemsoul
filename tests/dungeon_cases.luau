@@ -131,3 +131,17 @@ check(tester:GetAttribute("DungeonId")==nil,"Solo test failed cleanup")
 check(tester:GetAttribute("DungeonTest")==nil,"Test flag leaked")
 check(profiles[tester].Coins==0,"Studio test awarded coins")
 print("PASS: Studio test entry, live rejection, solo boss and cleanup")
+
+studioMode=false
+permittedTester=tester
+check(handlers.DungeonTest(tester,"Sahur").Ok,"Authorized live tester rejected")
+local liveId=tester:GetAttribute("DungeonId")
+tick(3)
+clearRoom(liveId,1)
+check(profiles[tester].Coins==0,"Live test awarded coins")
+check(tester:GetAttribute("DungeonId")==nil,"Live test did not clean up")
+local outsider=squad(1)[1]
+outsider:SetAttribute("CanTestDungeon",true)
+check(not handlers.DungeonTest(outsider,"Sahur").Ok,"Forged permission attribute bypassed server authorization")
+check(not handlers.PartyDungeon(tester).Ok,"Owner bypassed normal queue minimum")
+print("PASS: published owner tests, unauthorized rejection, reward suppression, normal queue minimum")

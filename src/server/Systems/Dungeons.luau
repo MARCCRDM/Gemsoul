@@ -15,7 +15,11 @@ local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local Feedback = require(script.Parent.Feedback)
 local Dungeon = {}
+local function canTest(player)
+	return Feedback.isOwner(player) or (game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId)
+end
 local runs, memberRun, slots = {}, {}, {}
 local finish
 local function living(run)
@@ -159,9 +163,9 @@ local function safeSpawnRoom(run, index)
 	end
 end
 local function queue(player, testMode)
-	local testing = testMode ~= nil and RunService:IsStudio()
+	local testing = testMode ~= nil and canTest(player)
 	if testMode ~= nil and not testing then
-		return Shop.reply(false, "Testing is available in Studio only.")
+		return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
 	end
 	local party = Party.of(player)
 	local members = if testing then { player } else party and party.Members or {}
@@ -231,7 +235,7 @@ local function queue(player, testMode)
 		announce(
 			run,
 			if testing
-				then "STUDIO TEST  -  solo enabled, no rewards. Encounter begins in 3 seconds."
+				then "OWNER TEST  -  solo enabled, no rewards. Encounter begins in 3 seconds."
 				else "Squad deployed. Five rooms. One elemental Colossus. Stay together."
 		)
 		task.delay(3, function()
@@ -260,8 +264,8 @@ function Dungeon.start()
 		return queue(player)
 	end)
 	Shop.register("DungeonTest", function(player, mode)
-		if not RunService:IsStudio() then
-			return Shop.reply(false, "Testing is available in Studio only.")
+		if not canTest(player) then
+			return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
 		end
 		if mode ~= "Sahur" and mode ~= "Full" then
 			return Shop.reply(false, "Choose Sahur or Full.")
@@ -284,6 +288,7 @@ function Dungeon.start()
 		end
 	end
 	local function watch(p)
+		p:SetAttribute("CanTestDungeon", canTest(p))
 		p.CharacterRemoving:Connect(function()
 			if memberRun[p] then
 				ArenaSessions.leave(p)

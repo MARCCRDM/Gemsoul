@@ -40,7 +40,9 @@ objective.TextColor3 = Color3.fromRGB(225, 237, 246)
 objective.Parent = frame
 local function refresh()
 	gui.Enabled = player:GetAttribute("DungeonId") ~= nil
-	title.Text = if player:GetAttribute("DungeonTest") then "STUDIO DUNGEON TEST / NO REWARDS" else string.format("SQUAD DUNGEON  •  ROOM %d / 5", player:GetAttribute("DungeonRoom") or 1)
+	title.Text = if player:GetAttribute("DungeonTest")
+		then "OWNER DUNGEON TEST / NO REWARDS"
+		else string.format("SQUAD DUNGEON  •  ROOM %d / 5", player:GetAttribute("DungeonRoom") or 1)
 	objective.Text = player:GetAttribute("DungeonObjective") or "Your squad is deploying…"
 end
 for _, attribute in { "DungeonId", "DungeonRoom", "DungeonObjective" } do
