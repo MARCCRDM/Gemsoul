@@ -8,7 +8,8 @@ ctx={'__file__':str(root/'.tools/render_equipment_details.py')};exec(base,ctx);s
 source=source.replace('return setmetatable({t={x or 0,y or 0,z or 0}', 'if type(x)=="table" then x,y,z=x.X,x.Y,x.Z end\n return setmetatable({t={x or 0,y or 0,z or 0}')
 source+='\nvmt.__add=function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end\nVector3.zero=Vector3.new(0,0,0)\n'
 source+='local Skins=(function()\n'+(root/'src/server/Systems/BrainrotSkins.luau').read_text(encoding='utf-8')+'\nend)()\n'
-source+='local Rules=(function()\n'+(root/'src/shared/DungeonRules.luau').read_text(encoding='utf-8')+'\nend)()\n'
+source+='local ElementMatchup=(function()\n'+(root/'src/shared/ElementMatchup.luau').read_text(encoding='utf-8')+'\nend)()\n'
+source+='local Rules=(function()\n'+(root/'src/shared/DungeonRules.luau').read_text(encoding='utf-8').replace('local ElementMatchup = require(script.Parent.ElementMatchup)\n','')+'\nend)()\n'
 duel=(root/'src/server/Systems/Duelist.luau').read_text(encoding='utf-8');source+=duel[duel.index('local BODY ='):duel.index('local JOINTS =')]
 source+='''
 local colors={Fire=Color3.fromRGB(238,62,54),Frost=Color3.fromRGB(64,150,255),Poison=Color3.fromRGB(70,205,90),Shock=Color3.fromRGB(255,212,40)}

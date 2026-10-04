@@ -32,6 +32,7 @@ local Remotes = require(script.Parent.Remotes)
 local DamageLog = require(script.Parent.DamageLog)
 
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Enemies = {}
 
 -- The Wilds: just outside the south gate, either side of the country road.
@@ -609,14 +610,20 @@ function Enemies.damage(
 			return
 		end
 	end
+	-- Elements against its armor (ElementMatchup): a dungeon creature by its
+	-- own element and weakness, a rival miner by its armor gem.
+	local hitElement = incomingElement or GemConfig.elementOfColor(color)
+	local matchMult, matchTag = 1, nil
 	if enemy.DungeonId then
-		amount *= DungeonRules.elementMultiplier(enemy.Element, enemy.ElementWeakness, incomingElement)
+		matchMult, matchTag = DungeonRules.elementMultiplier(enemy.Element, enemy.ElementWeakness, hitElement)
+	elseif (enemy :: any).ArmorElement then
+		matchMult, matchTag = ElementMatchup.multiplier(hitElement, (enemy :: any).ArmorElement)
 	end
+	amount *= matchMult
 	if not enemy.Alive or amount <= 0 then
 		return
 	end
 	-- The last elemental blow decides how the body goes (ElementalDeath).
-	local hitElement = incomingElement or GemConfig.elementOfColor(color)
 	if hitElement then
 		enemy.Model:SetAttribute("LastHitElement", hitElement)
 	end
@@ -742,7 +749,14 @@ function Enemies.damage(
 		Aggro.add(enemy.Threat, enemy.ThreatAt, source, amount * (1 + bonus), os.clock())
 		enemy.LastSource, enemy.LastSourceAt = source, os.clock()
 	end
-	fx("Damage", enemy.Root.Position + Vector3.new(0, enemy.Root.Size.Y / 2 + 1, 0), amount, crit == true, color)
+	fx(
+		"Damage",
+		enemy.Root.Position + Vector3.new(0, enemy.Root.Size.Y / 2 + 1, 0),
+		amount,
+		crit == true,
+		color,
+		matchTag
+	)
 	if enemy.Kind.Dummy then
 		-- Dummies never break; they just count.
 		humanoid.Health = math.max(1, humanoid.Health - amount)

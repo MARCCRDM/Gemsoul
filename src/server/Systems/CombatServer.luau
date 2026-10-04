@@ -10,6 +10,7 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local WeaponForge = require(ReplicatedStorage.Shared.WeaponForge)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
@@ -328,13 +329,20 @@ end
 local receive
 local wardHitsBack -- (set below, with the surge code)
 local applyCC -- (set below)
-local function rawDamage(target, amount, source, crit, color)
+local function rawDamage(target, amount, source, crit, color, matchTag)
 	if target.Player then
 		target.Humanoid:TakeDamage(amount)
 		if source then
 			Remotes.CombatFx:FireClient(source, "HitConfirm", crit == true)
 		end
-		fx("Damage", target.Root.Position + Vector3.new(0, 3, 0), math.floor(amount + 0.5), crit == true, color)
+		fx(
+			"Damage",
+			target.Root.Position + Vector3.new(0, 3, 0),
+			math.floor(amount + 0.5),
+			crit == true,
+			color,
+			matchTag
+		)
 	else
 		Enemies.damage(target.Enemy, amount, source, crit, color)
 	end
@@ -380,9 +388,15 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		Remotes.CombatFx:FireClient(player, "TechStatus", "Riposte!")
 		return 0, true
 	end
+	-- Elements against your armor gem (ElementMatchup): its own element is
+	-- resisted, the element that beats it lands harder.
+	local armorGem = PlayerData.character(player)
+	local matchMult, matchTag =
+		ElementMatchup.multiplier(element, armorGem and armorGem.ArmorGem and armorGem.ArmorGem.Element)
 	local resistance = k.Defense.Resistance
 	local defense = rating(k, "Defense") * (if now < st.SunderUntil then 1 - st.Sunder else 1)
 	local damage = amount
+		* matchMult
 		* Combat.defenseMult(defense)
 		* EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
 	damage *= 1 + CrowdControl.debuff(st.CC, "Vulnerable", now) + CrowdControl.debuff(st.CC, "Aura", now)
@@ -552,7 +566,8 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 			damage,
 			source,
 			crit == true,
-			GemConfig.ElementColors[element] or WHITE
+			GemConfig.ElementColors[element] or WHITE,
+			matchTag
 		)
 	end
 	return damage, guarded

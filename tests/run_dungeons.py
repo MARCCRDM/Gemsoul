@@ -7,6 +7,7 @@ def module(name,p):
  s=re.sub(r'^local \w+\s*=\s*(?:require\([^\n]+\)|game:GetService\([^\n]+\))\n','',read(p),flags=re.M)
  return 'local '+name+'=(function()\n'+s+'\nend)()\n'
 s=read('tests/duels_services.luau').replace('Changed = {}','Changed = {}, CharacterRemoving = signal()')
+s+=module('ElementMatchup','src/shared/ElementMatchup.luau')
 s+=module('Rules','src/shared/DungeonRules.luau')
 s+=module('GemRoller','src/shared/GemRoller.luau')
 s+=read('tests/dungeon_services.luau')

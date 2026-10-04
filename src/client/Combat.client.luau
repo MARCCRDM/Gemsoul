@@ -1639,7 +1639,7 @@ local function floorUnder(position: Vector3): Vector3
 end
 
 local numbers = 0
-local function damageNumber(position: Vector3, amount: number, crit: boolean, color: Color3?)
+local function damageNumber(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?)
 	if numbers >= 24 then
 		return -- plenty on screen already
 	end
@@ -1657,9 +1657,15 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		Font = Enum.Font.GothamBlack,
-		Text = (if crit then "CRIT " else "") .. tostring(amount),
+		-- RESIST / WEAK!: the element against the target's armor (ElementMatchup).
+		Text = (if crit then "CRIT " else "")
+			.. tostring(amount)
+			.. (if matchTag == "Weak" then " WEAK!" elseif matchTag == "Resist" then " RESIST" else ""),
 		TextSize = if crit then 32 else 24,
-		TextColor3 = color or Color3.new(1, 1, 1),
+		TextColor3 = if matchTag == "Resist"
+			then Color3.fromRGB(165, 168, 180)
+			elseif matchTag == "Weak" then Color3.fromRGB(255, 150, 60)
+			else color or Color3.new(1, 1, 1),
 		TextStrokeTransparency = 0.2,
 	}, board)
 	local punch = new("UIScale", { Scale = 1.35 }, label)
@@ -1884,8 +1890,8 @@ function handlers.AttackTiming(stage, side, combo)
 	end
 end
 
-function handlers.Damage(position: Vector3, amount: number, crit: boolean, color: Color3?)
-	damageNumber(position, amount, crit, color)
+function handlers.Damage(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?)
+	damageNumber(position, amount, crit, color, matchTag)
 	if amount <= 0 then
 		return
 	end

@@ -1,4 +1,6 @@
 -- Deterministic dungeon layout and encounter rules. No Roblox services.
+local ElementMatchup = require(script.Parent.ElementMatchup)
+
 local Dungeon = {}
 Dungeon.Min = 3
 Dungeon.Max = 4
@@ -92,14 +94,11 @@ function Dungeon.canEnter(count, leader, allReady)
 	end
 	return true
 end
+-- A creature's element resists itself and its weakness hurts it, by the
+-- same numbers as everyone's armor (ElementMatchup). Returns the multiplier
+-- and "Resist" / "Weak".
 function Dungeon.elementMultiplier(main, weakness, incoming)
-	if incoming == weakness then
-		return 1.3
-	end
-	if incoming == main then
-		return 0.7
-	end
-	return 1
+	return ElementMatchup.versus(incoming, main, weakness)
 end
 -- Open expedition camps: shared bounded map, no room gates.
 Dungeon.OpenRadius = 260
@@ -129,10 +128,16 @@ function Dungeon.generateOpen(rng)
 		table.insert(camps, camp)
 	end
 	local boss = rng:NextInteger(1, #Dungeon.Roster)
-	table.insert(
-		camps,
-		{ Index = 10, X = 0, Z = 0, Theme = boss, Boss = true, GearTier = rng:NextInteger(4, 5), Foes = { boss }, Pillars = 0 }
-	)
+	table.insert(camps, {
+		Index = 10,
+		X = 0,
+		Z = 0,
+		Theme = boss,
+		Boss = true,
+		GearTier = rng:NextInteger(4, 5),
+		Foes = { boss },
+		Pillars = 0,
+	})
 	return camps
 end
 return Dungeon

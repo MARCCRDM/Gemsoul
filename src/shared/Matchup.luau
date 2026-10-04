@@ -4,7 +4,8 @@
 
 	Matchup.build(you, foe) with, for each side:
 	  Name, Health (max), Hit (damage per quick hit on the other, after
-	  armor), Speed (walk speed), Element (weapon gem), Surges (list of
+	  armor), Speed (walk speed), Element (weapon gem), ArmorElement
+	  (armor gem), Surges (list of
 	  { Id, Name, Kind = "Bolt" | "Nova" | "Self" }), Moves (maneuver ids)
 	returns {
 	  Rows = { { Stat, You, Foe, Better = "You" | "Foe" | nil } },
@@ -12,7 +13,11 @@
 	  YourEdges = { strings }, YourWeak = { strings },
 	}
 ]]
+local ElementMatchup = require(script.Parent.ElementMatchup)
+
 local Matchup = {}
+
+local ELEMENT_NAME = { Fire = "Thermal", Frost = "Cryo", Shock = "Ion", Poison = "Corrosive" }
 
 local CLEAR = 1.12 -- a stat counts as an edge when it's this much better
 
@@ -153,6 +158,30 @@ function Matchup.build(you, foe)
 	end
 	if not ELEMENT_EDGE[you.Element] then
 		add(result.YourWeak, "No weapon gem: your hits carry no element")
+	end
+	-- Elements against armor (ElementMatchup).
+	local function armorLine(attack, armor, whose)
+		local mult, tag = ElementMatchup.multiplier(attack, armor)
+		if not tag then
+			return nil, nil
+		end
+		local a, b = ELEMENT_NAME[attack] or attack, ELEMENT_NAME[armor] or armor
+		if tag == "Resist" then
+			return tag, string.format("%s %s armor resists %s hits (%d%%)", whose, b, a, math.floor(mult * 100 + 0.5))
+		end
+		return tag, string.format("%s %s armor is weak to %s (%d%% damage)", whose, b, a, math.floor(mult * 100 + 0.5))
+	end
+	local tag, line = armorLine(you.Element, foe.ArmorElement, "Its")
+	if tag == "Resist" then
+		add(result.YourWeak, line)
+	elseif tag == "Weak" then
+		add(result.YourEdges, line)
+	end
+	tag, line = armorLine(foe.Element, you.ArmorElement, "Your")
+	if tag == "Resist" then
+		add(result.FoeWeak, line)
+	elseif tag == "Weak" then
+		add(result.FoeEdges, line)
 	end
 	if #result.YourWeak == 0 then
 		add(
