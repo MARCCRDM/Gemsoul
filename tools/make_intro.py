@@ -6,9 +6,10 @@ of the theme song (the build into its final drop).
     python tools/make_intro.py path/to/song.m4a path/to/logo.mp4
 
 Writes:
-  assets/video/saga_intro.mp4   1920x1080, 30 fps, with the music: upload in
-                                Creator Hub (Video) and put its id in
-                                src/client/Splash.client.luau (VIDEO_ID)
+  assets/video/saga_intro.mp4   1920x1080, 30 fps, with the music: a shareable
+                                trailer/preview. (The game doesn't need it: the
+                                title screen draws the logo itself, from
+                                tools/make_splash_art.py.)
   assets/music/intro_sting.ogg  the music alone, for the fallback splash
                                 (tools/upload_audio.py fills Music.Ids.Intro)
 
