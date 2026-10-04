@@ -1,6 +1,6 @@
 --[[
 	Top Players: global leaderboards for the best gem ever owned, monsters
-	slain and Season level. Each player's scores are written to ordered data
+	slain, Season level, gear score (Gear) and duel wins (Wins). Each player's scores are written to ordered data
 	stores every couple of minutes; the top ten are read back and cached.
 
 	If data stores aren't available (e.g. Studio without API access), the
@@ -15,11 +15,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Season = require(ReplicatedStorage.Shared.Season)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 
 local REFRESH_SECONDS = 120
-local BOARDS = { "Gem", "Slain", "Level" }
+local BOARDS = { "Gem", "Slain", "Level", "Gear", "Wins" }
 
 local TopPlayers = {}
 
@@ -50,6 +51,8 @@ local function scores(player: Player): { [string]: number }?
 		Gem = profile.Stats.BestGem,
 		Slain = profile.Stats.Kills,
 		Level = (Season.levelFor(profile.Season.XP)),
+		Gear = GearRolls.gearScore(profile.Character),
+		Wins = profile.Duel and profile.Duel.Wins or 0,
 	}
 end
 
@@ -110,6 +113,14 @@ local function refresh()
 		global = false
 		localBoards()
 	end
+end
+
+-- A board's top rows ({ Name, Value }), best first (e.g. for the Outpost's billboard).
+function TopPlayers.board(name: string)
+	if not global then
+		localBoards()
+	end
+	return cache[name] or {}
 end
 
 function TopPlayers.start()

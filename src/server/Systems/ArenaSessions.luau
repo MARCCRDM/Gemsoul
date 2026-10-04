@@ -69,7 +69,14 @@ local function leave(player)
 	player:SetAttribute("RaidId", nil)
 	player:SetAttribute("Blocking", false)
 	local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+	-- Came from the Saga Outpost (a duel challenged there): back to it.
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local outpost = landmarks and landmarks:GetAttribute("OutpostSpawn")
 	if player.Character then
+		if player:GetAttribute("Outpost") and typeof(outpost) == "CFrame" then
+			player.Character:PivotTo(outpost)
+			return Shop.reply(true, "Back at the Outpost.")
+		end
 		player.Character:PivotTo(if spawn then spawn.CFrame + Vector3.new(0, 4, 0) else CFrame.new(0, 6, 0))
 	end
 	return Shop.reply(true, "Back at base.")
