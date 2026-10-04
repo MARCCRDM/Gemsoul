@@ -44,6 +44,7 @@ end
 -- action rules. `augments` are the Augment Tree's perks ({} for none). The
 -- Arena rival is built by this too, so it fights by exactly a player's rules.
 local function kitFor(loadout, augments)
+	loadout = Classes.activeLoadout(loadout)
 	local weapon = loadout and Classes.weapon(loadout.Class, loadout.Weapon)
 	if not weapon or not weapon.Attack then
 		return nil

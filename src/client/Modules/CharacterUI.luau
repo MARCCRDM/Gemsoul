@@ -1421,14 +1421,16 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 		then string.upper(GearRolls.Rarities[roll.Rarity].Name)
 		else (if gear then string.upper(gear.Style) else "")
 	ui.Style.TextColor3 = if roll then GearRolls.Rarities[roll.Rarity].Color else Crafting.Qualities[quality or 1].Color
-	-- A two-handed weapon leaves the shield on your back.
+	-- The weapon occupies both hand slots; the saved shield contributes nothing.
 	if slotName == "Shield" and gear and not Classes.heldShield(loadout) then
-		ui.Style.Text = "STOWED · TWO-HANDED"
+		ui.Style.Text = "OCCUPIED · TWO-HANDED"
 		ui.Style.TextColor3 = P.Dim
 	end
 	-- The gem's headline effect (its Size line), e.g. "Heat Shield absorbs 16 damage".
 	local headline = gem and GemConfig.lines(gem, slotName, { Affinity = wornAffinities() })[1]
-	ui.Bonus.Text = if headline then headline.Text else ""
+	ui.Bonus.Text = if slotName == "Shield" and not Classes.heldShield(loadout)
+		then "Shield and gem inactive while both hands are occupied"
+		else if headline then headline.Text else ""
 	ui.Bonus.TextColor3 = if gem then GemConfig.ElementColors[gem.Element] else P.Dim
 	local stroke = ui.Box:FindFirstChildOfClass("UIStroke") :: UIStroke
 	-- The tile glows in its element's colour (its gem's, else the weapon

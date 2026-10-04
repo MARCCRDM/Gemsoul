@@ -204,6 +204,37 @@ BAT_GUARD.RightShoulder = { 1.35, 0, -0.55 }
 BAT_GUARD.RightElbow = { 1.15, 0, 0 }
 BAT_GUARD.LeftShoulder = { 1.2, 0, 0.3 }
 BAT_GUARD.LeftElbow = { 1.45, 0, 0 }
+-- Both-hand guards share the same raise/recoil/recovery path in every world view.
+local WEAPON_GUARDS = {
+	TwinBlades = { RightShoulder = { 1.3, 0, -0.65 }, RightElbow = { 1.3, 0, 0 }, LeftShoulder = { 1.3, 0, 0.65 }, LeftElbow = {
+		1.3,
+		0,
+		0,
+	} },
+	Lance = { RightShoulder = { 1.1, 0, -0.55 }, RightElbow = { 1.1, 0, 0 }, LeftShoulder = { 1.45, 0, 0.35 }, LeftElbow = {
+		0.85,
+		0,
+		0,
+	} },
+	Greataxe = { RightShoulder = { 1.35, 0, -0.7 }, RightElbow = { 1.05, 0, 0 }, LeftShoulder = { 1.45, 0, 0.5 }, LeftElbow = {
+		1.1,
+		0,
+		0,
+	} },
+	Warhammer = { RightShoulder = { 1.25, 0, -0.6 }, RightElbow = { 1.2, 0, 0 }, LeftShoulder = { 1.4, 0, 0.45 }, LeftElbow = {
+		1.1,
+		0,
+		0,
+	} },
+}
+for _, guard in WEAPON_GUARDS do
+	for joint, angles in GUARD do
+		if not guard[joint] then
+			guard[joint] = angles
+		end
+	end
+end
+
 -- Smoothstep: slow in, slow out.
 local function ease(x: number): number
 	x = math.clamp(x, 0, 1)
@@ -326,7 +357,8 @@ local REST = {}
 function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }, number)
 	local base = if rest then REST else breathe(READY, t)
 	local bat = a.CombatPoseProfile == "SahurBat"
-	local guard = if bat then BAT_GUARD else GUARD
+	local weaponGuard = if a.WeaponBlock then WEAPON_GUARDS[a.CombatWeaponType] else nil
+	local guard = weaponGuard or (if bat then BAT_GUARD else GUARD)
 	local pose, speed = actionPose(a, t, base)
 	if not pose then
 		if type(a.GuardUntil) == "number" and t < a.GuardUntil then
@@ -348,7 +380,7 @@ function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }
 	if type(a.BlockedAt) == "number" then
 		local w = impulse(t - a.BlockedAt, BLOCK_TIME)
 		if w > 0 then
-			pose = add(pose, if bat then BAT_JOLT else JOLT, w)
+			pose = add(pose, if bat or weaponGuard then BAT_JOLT else JOLT, w)
 			speed = math.max(speed, 40)
 		end
 	end
@@ -427,6 +459,8 @@ function RivalPose.jointCount(model: Model): number
 end
 
 local ATTRIBUTES = {
+	"CombatWeaponType",
+	"WeaponBlock",
 	"CombatPoseProfile",
 	"ActionKind",
 	"ActionStart",

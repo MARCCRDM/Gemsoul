@@ -10,7 +10,7 @@
 	  Greataxe   (Juggernaut)  slow, heavy, a wide arc
 	  Warhammer  (Prospector)  slowest, hardest, knocks foes back
 
-	They all deal about the same damage per second; what changes is how
+	Two-handed types deal higher base damage per second to offset their lost shield; what changes is how
 	(reach, arc, pace) and what their perk does. Perk effects are read by
 	CombatServer from Passive.Effect (see WeaponForge.Perks for every key).
 
@@ -38,28 +38,28 @@ WeaponForge.Types = {
 	{
 		Id = "TwinBlades",
 		Family = "Skirmisher",
-		Attack = { Kind = "Melee", Damage = 12, Rate = 0.44, Range = 6, Arc = 85, Combo = 3 },
+		Attack = { Kind = "Melee", Damage = 14, Rate = 0.44, Range = 6, Arc = 85, Combo = 3 },
 		Names = { "Scrapper Fangs", "Ion Twinfangs", "Viper Duet", "Phantom Shears", "Nebula Reapers" },
 		Blurb = "A blade in each hand: quick, light cuts.",
 	},
 	{
 		Id = "Lance",
 		Family = "Skirmisher",
-		Attack = { Kind = "Melee", Damage = 17, Rate = 0.62, Range = 10, Arc = 40, Combo = 3 },
+		Attack = { Kind = "Melee", Damage = 20, Rate = 0.62, Range = 10, Arc = 40, Combo = 3 },
 		Names = { "Survey Pike", "Frostline Lance", "Arcspire Lance", "Voidpiercer", "Saga Starlance" },
 		Blurb = "Long reach, a narrow thrust: hit them before they reach you.",
 	},
 	{
 		Id = "Greataxe",
 		Family = "Juggernaut",
-		Attack = { Kind = "Melee", Damage = 26, Rate = 0.95, Range = 8.5, Arc = 140, Combo = 3 },
+		Attack = { Kind = "Melee", Damage = 31, Rate = 0.95, Range = 8.5, Arc = 140, Combo = 3 },
 		Names = { "Pit Splitter", "Ember Reaver", "Bloodrage Maw", "Titan Cleft", "Worldbreaker" },
 		Blurb = "Slow, brutal, and wide: every swing sweeps around you.",
 	},
 	{
 		Id = "Warhammer",
 		Family = "Prospector",
-		Attack = { Kind = "Melee", Damage = 29, Rate = 1.05, Range = 7, Arc = 90, Combo = 3 },
+		Attack = { Kind = "Melee", Damage = 35, Rate = 1.05, Range = 7, Arc = 90, Combo = 3 },
 		Names = { "Stone Knocker", "Piston Maul", "Thunder Gavel", "Gravitas Hammer", "Singularity Maul" },
 		Blurb = "The slowest and hardest: blows that send foes flying.",
 	},
@@ -198,6 +198,8 @@ for _, kind in WeaponForge.Types do
 			Style = "Frontier",
 			Look = "Forge" .. kind.Id,
 			WeaponType = kind.Id,
+			Hands = if kind.Id == "Cleaver" then 1 else 2,
+			WeaponBlock = kind.Id ~= "Cleaver",
 			ArmorFamily = kind.Family,
 			Mods = {},
 			BuffReady = true,

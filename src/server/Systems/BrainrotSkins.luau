@@ -458,7 +458,7 @@ local function croc(rig, accent)
 	end
 end
 -- Creature-fitted armor preserves faces and signature silhouettes while exposing sockets.
-local function armor(rig, spec, accent, tier)
+local function armor(rig, spec, accent, tier, hasShield)
 	local metal = C(48 + 12 * tier, 55 + 10 * tier, 63 + 9 * tier)
 	local trim = if tier == 5 then C(230, 184, 72) elseif tier == 4 then C(163, 110, 216) else C(116, 141, 164)
 	local t = rig.UpperTorso
@@ -505,7 +505,9 @@ local function armor(rig, spec, accent, tier)
 			plate(rig[side .. "LowerArm"], side .. "Gauntlet", V(0.48, 0.58, 0.43), V(0, -0.15, 0))
 			plate(rig[side .. "LowerLeg"], side .. "Greave", V(0.5, 0.7, 0.4), V(0, -0.13, 0))
 		end
-		plate(rig.LeftLowerArm, "ElementShield", V(0.95, 1.2, 0.18), V(0, 0, -0.4))
+		if hasShield ~= false then
+			plate(rig.LeftLowerArm, "ElementShield", V(0.95, 1.2, 0.18), V(0, 0, -0.4))
+		end
 	end
 	if tier >= 4 then
 		for _, side in { -1, 1 } do
@@ -521,7 +523,7 @@ local function armor(rig, spec, accent, tier)
 		end
 	end
 end
-function Skins.apply(rig, spec, accent, boss, gearTier)
+function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	for _, p in rig:GetChildren() do
 		if p:IsA("BasePart") then
 			p.Transparency = 1
@@ -536,7 +538,7 @@ function Skins.apply(rig, spec, accent, boss, gearTier)
 	else
 		croc(rig, accent)
 	end
-	armor(rig, spec, accent, gearTier or (if boss then 4 else 1))
+	armor(rig, spec, accent, gearTier or (if boss then 4 else 1), hasShield)
 	if boss then
 		rig:ScaleTo(1.8)
 	end

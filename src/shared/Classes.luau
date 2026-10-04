@@ -1021,11 +1021,13 @@ Classes.List.Warrior.RigManeuvers = {}
 Classes.List.Warrior.Ultimate = nil
 Classes.List.Warrior.Specs = {}
 function Classes.setState(loadout)
+	loadout = Classes.activeLoadout(loadout)
 	return ArmorFamilies.setState(loadout, function(slot, id)
 		return Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, id)
 	end)
 end
 function Classes.armorBonuses(loadout)
+	loadout = Classes.activeLoadout(loadout)
 	local bonuses = table.clone(Classes.setState(loadout).Bonuses)
 	for _, slot in ArmorFamilies.Slots do
 		local roll = GearRolls.get(loadout, slot)
@@ -1040,6 +1042,7 @@ end
 -- Elemental Affinity Affixes from every equipped armor piece, summed per affix:
 -- { [affixId]: bonus }. Feed it to GemConfig.stats / GemConfig.lines.
 function Classes.affinities(loadout): { [string]: number }
+	loadout = Classes.activeLoadout(loadout)
 	local totals = {}
 	for _, slot in ArmorFamilies.Slots do
 		local roll = GearRolls.get(loadout, slot)
@@ -1059,6 +1062,7 @@ function Classes.gear(classId: string, kind: string, id: string?)
 	return nil
 end
 function Classes.effects(loadout)
+	loadout = Classes.activeLoadout(loadout)
 	local effects = {}
 	for _, slot in Slots.Order do
 		local gear = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
@@ -1134,6 +1138,25 @@ end
 -- Weapons that take both hands (a blade in each, or one big two-handed
 -- weapon): no shield is worn with them, and shield moves can't be used.
 Classes.TwoHanded = { TwinBlades = true, Greataxe = true, Warhammer = true, Lance = true }
+
+-- Keep the saved shield for swapping back to one hand, but remove every active
+-- contribution while both hands are occupied. Never mutate inventory here.
+function Classes.activeLoadout(loadout)
+	if not loadout then
+		return loadout
+	end
+	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
+	if
+		weapon
+		and Classes.TwoHanded[weapon.WeaponType]
+		and (loadout.Shield or loadout.ShieldGem or loadout.ShieldQuality)
+	then
+		local active = table.clone(loadout)
+		active.Shield, active.ShieldGem, active.ShieldQuality = nil, nil, nil
+		return active
+	end
+	return loadout
+end
 
 -- The shield a loadout actually carries: its Shield, unless the weapon needs
 -- both hands.
@@ -1221,6 +1244,7 @@ end
 -- Element is the gem that gives the largest bonus, for colouring it.
 export type Rating = { Base: number, Bonus: number, Element: string? }
 function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
+	loadout = Classes.activeLoadout(loadout)
 	local stats = Classes.stats(loadout.Class, loadout.Weapon, loadout.Armor)
 	local ratings = {}
 	for _, name in Classes.StatNames do
@@ -1233,6 +1257,9 @@ function Classes.ratings(loadout: { [string]: any }): { [string]: Rating }
 		end
 	end
 	for _, slot in { "Helmet", "Gloves", "Boots", "Shield" } do
+		if slot == "Shield" and not loadout.Shield then
+			continue
+		end
 		local gear = Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
 		for stat, value in gear and gear.Mods or {} do
 			ratings[stat].Base += value

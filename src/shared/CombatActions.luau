@@ -282,6 +282,12 @@ function Actions.forWeapon(counts, weapon, effects)
 	if effects.Knockback then
 		rules.Knockback *= 1 + effects.Knockback
 	end
+	if weapon and weapon.WeaponBlock then
+		rules.BlockReduction = 0.30
+		rules.BlockPvPReduction = 0.25
+		rules.BlockArc = 90
+		rules.Deflect = false
+	end
 	return rules
 end
 function Actions.finiteVector(v)

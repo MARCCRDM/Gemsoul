@@ -67,6 +67,10 @@ end
 
 local function equipGear(player: Player, kind: any, gearId: any)
 	local profile = PlayerData.get(player)
+	local weapon = profile and Classes.weapon(profile.Character.Class, profile.Character.Weapon)
+	if kind == "Shields" and weapon and Classes.TwoHanded[weapon.WeaponType] then
+		return reply(false, "Both hand slots are occupied. Equip a one-handed weapon to use a shield.")
+	end
 	local gear = gearFor(profile and profile.Character.Class, kind, gearId)
 	if not gear or not PlayerData.equipGear(player, kind, gearId) then
 		return reply(false, "Recover that equipment in the mine or trade for it.")

@@ -328,7 +328,19 @@ local function rebuild(character, equipment)
 					local anchorName = anchor and anchor.Name or ""
 					if slot == "Gloves" then
 						-- Only the right hand's gauntlet, held with the sword.
-						if frame and (anchorName == "RightHand" or anchorName == "RightGrip") then
+						if character:GetAttribute("CombatWeaponType") == "TwinBlades" and anchorName == "LeftHand" then
+							local copy = viewCopy(part, holder)
+							table.insert(
+								pieces,
+								{ Part = copy, Left = true, Offset = scaled(anchor.CFrame:ToObjectSpace(part.CFrame)) }
+							)
+						elseif frame and character:GetAttribute("WeaponBlock") and anchorName == "LeftHand" then
+							local copy = viewCopy(part, holder)
+							local offset = hold
+								* CFrame.new(0, 0.6, 0)
+								* scaled(anchor.CFrame:ToObjectSpace(part.CFrame))
+							table.insert(pieces, { Part = copy, Left = false, Support = true, Offset = offset })
+						elseif frame and (anchorName == "RightHand" or anchorName == "RightGrip") then
 							local copy = viewCopy(part, holder)
 							local offset = hold * scaled(frame:ToObjectSpace(part.CFrame))
 							table.insert(pieces, { Part = copy, Left = false, Offset = offset })
@@ -626,6 +638,21 @@ function View.start()
 					0,
 					math.rad(12 + smoothedCharge * 20 - swing * direction * (if swingHeavy then 50 else 85))
 				)
+			if character and character:GetAttribute("WeaponBlock") and not piece.Shield then
+				local kind = character:GetAttribute("CombatWeaponType")
+				local twin = kind == "TwinBlades"
+				local side = if piece.Left then -1 else 1
+				local weaponGuard = if twin
+					then CFrame.new(side * 0.35, -0.28, -1.55) * CFrame.Angles(math.rad(-12), 0, math.rad(-side * 42))
+					else CFrame.new(0.35, -0.28, -1.65) * CFrame.Angles(
+						math.rad(-12),
+						0,
+						math.rad(if kind == "Lance" then 72 else 62)
+					)
+				pose = pose:Lerp(weaponGuard, smoothedRaised)
+					* CFrame.new(0, -0.06 * jolt * smoothedRaised, 0.22 * jolt * smoothedRaised)
+					* CFrame.Angles(math.rad(10 * jolt * smoothedRaised), 0, 0)
+			end
 			piece.Part.CFrame = current.CFrame * flinch * pose * piece.Offset
 		end
 	end)

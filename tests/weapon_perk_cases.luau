@@ -136,3 +136,30 @@ check(Classes.heldShield({ Class = "Warrior", Weapon = "MatrixSwords1", Shield =
 check(Classes.heldShield(nil) == nil, "No loadout should mean no shield")
 
 print("PASS: " .. checks .. " Forge weapon checks (pace, reach, executes, openers, bloodrage, lifesteal, resources, kills, vulnerability, slows, bleeds, thorns, armor)")
+
+-- An occupied offhand must contribute neither hidden ratings nor passive/gem effects.
+for _,kind in {"TwinBlades","Lance","Greataxe","Warhammer"} do
+ local full={Class="Warrior",Weapon=forge(kind,3),Shield=shieldId,ShieldQuality=4,
+ ShieldGem={Element="Fire",Tier="Legendary",Size=10,Clarity=10,Cut=10},
+ GearRolls={Shields={[shieldId]={Rarity=5,Stats={Defense=200},Affixes={{Id="ThermalDamage",Bonus=.5}}}}}}
+ local empty=table.clone(full);empty.Shield=nil;empty.ShieldGem=nil;empty.ShieldQuality=nil
+ local actual,expected=Classes.ratings(full),Classes.ratings(empty)
+ for stat,r in actual do check(r.Base==expected[stat].Base and r.Bonus==expected[stat].Bonus,kind.." inherited shield ratings") end
+ local k,without=CombatServer.kitFor(full,{}),CombatServer.kitFor(empty,{})
+ check(k.Defense.Resistance==without.Defense.Resistance and k.Defense.Shield==without.Defense.Shield,"Inactive shield gem affected defense")
+ check(k.Effects.Ward==without.Effects.Ward,"Inactive shield passive applied")
+ check(k.Loadout.Shield==nil and full.Shield==shieldId,"Shield must be inactive without deleting saved gear")
+ check(k.Rules.BlockReduction==.3 and k.Rules.BlockPvPReduction==.25 and k.Rules.BlockArc==90,"Weapon block used shield mitigation")
+ local weapon=Classes.weapon("Warrior",full.Weapon)
+ local dps=weapon.Attack.Damage/weapon.Attack.Rate
+ check(dps>30 and dps<34,"Two-hand sustained base DPS outside intended range")
+ local attrs={WeaponBlock=true,CombatWeaponType=kind,GuardUntil=101}
+ local guard=RivalPose.pose(attrs,100.05)
+ check(guard.RightShoulder[1]>1 and guard.LeftShoulder[1]>1,"Weapon guard failed to raise both arms")
+ attrs.BlockedAt=100
+ check(RivalPose.pose(attrs,100.05).RightShoulder[1]<guard.RightShoulder[1],"Weapon guard did not recoil")
+ check(RivalPose.pose(attrs,102).RightShoulder[1]<1,"Weapon guard failed to recover")
+ full.Weapon=forge("Cleaver",3)
+ check(Classes.activeLoadout(full).Shield==shieldId,"Returning to one hand failed to restore shield")
+end
+print("PASS: two-hand offhand exclusion, damage budgets, guard, recoil, recovery and saved-shield restoration")

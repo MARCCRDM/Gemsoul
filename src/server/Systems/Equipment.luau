@@ -1319,6 +1319,11 @@ end
 -- Builds the gear folder for a loadout on a character (not parented yet).
 -- `only` limits it to one slot, for item previews.
 local function dress(character: Model, loadout, cosmetics, userId: number, only: string?): Folder?
+	if not only then
+		local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
+		character:SetAttribute("CombatWeaponType", weapon and weapon.WeaponType or "OneHanded")
+		character:SetAttribute("WeaponBlock", weapon and weapon.WeaponBlock == true or false)
+	end
 	local class = Classes.get(loadout.Class)
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local armor = Classes.armor(loadout.Class, loadout.Armor)

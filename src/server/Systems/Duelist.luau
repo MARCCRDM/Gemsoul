@@ -1485,7 +1485,8 @@ function spawnRival(owner: Player, raid, encounter)
 			encounter.Spec,
 			GemConfig.ElementColors[encounter.Spec.Element],
 			encounter.Boss,
-			encounter.GearTier
+			encounter.GearTier,
+			Classes.heldShield(loadout) ~= nil
 		)
 	end
 	-- Equal ground: it's a new player with its own random kit, built by
