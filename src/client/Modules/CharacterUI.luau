@@ -1421,6 +1421,11 @@ local function drawSlot(ui: Slot, slotName: string, gear, class, quality: number
 		then string.upper(GearRolls.Rarities[roll.Rarity].Name)
 		else (if gear then string.upper(gear.Style) else "")
 	ui.Style.TextColor3 = if roll then GearRolls.Rarities[roll.Rarity].Color else Crafting.Qualities[quality or 1].Color
+	-- A two-handed weapon leaves the shield on your back.
+	if slotName == "Shield" and gear and not Classes.heldShield(loadout) then
+		ui.Style.Text = "STOWED · TWO-HANDED"
+		ui.Style.TextColor3 = P.Dim
+	end
 	-- The gem's headline effect (its Size line), e.g. "Heat Shield absorbs 16 damage".
 	local headline = gem and GemConfig.lines(gem, slotName, { Affinity = wornAffinities() })[1]
 	ui.Bonus.Text = if headline then headline.Text else ""

@@ -126,4 +126,13 @@ local hard = hit(forge("Cleaver", 1), 1000)
 check(math.abs(hard / soft - 0.88) < 0.02, "Titan Hide didn't cut damage 12%")
 lt.Weapon = "MatrixSwords1"
 
+-- Two-handed weapons leave no hand for a shield.
+local shieldId = Classes.get("Warrior").Shields[1].Id
+for _, kind in { "TwinBlades", "Greataxe", "Warhammer", "Lance" } do
+	check(Classes.heldShield({ Class = "Warrior", Weapon = forge(kind, 3), Shield = shieldId }) == nil, kind .. " kept a shield")
+end
+check(Classes.heldShield({ Class = "Warrior", Weapon = forge("Cleaver", 3), Shield = shieldId }) ~= nil, "A one-handed cleaver lost its shield")
+check(Classes.heldShield({ Class = "Warrior", Weapon = "MatrixSwords1", Shield = shieldId }) ~= nil, "Sword and board lost its shield")
+check(Classes.heldShield(nil) == nil, "No loadout should mean no shield")
+
 print("PASS: " .. checks .. " Forge weapon checks (pace, reach, executes, openers, bloodrage, lifesteal, resources, kills, vulnerability, slows, bleeds, thorns, armor)")

@@ -1628,7 +1628,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	if now < st.NextAttack or now < st.NextTech or now < (st.TechCooldowns[cooldownKey] or 0) or st.Channel then
 		return false
 	end
-	if definition.Shield and not Classes.gear(k.Loadout.Class, "Shields", k.Loadout.Shield) then
+	if definition.Shield and not Classes.heldShield(k.Loadout) then
 		return false
 	end
 	local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)

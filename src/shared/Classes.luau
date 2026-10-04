@@ -1131,6 +1131,23 @@ function Classes.weapon(classId: any, weaponId: any): Gear?
 	return class and find(class.Weapons, weaponId)
 end
 
+-- Weapons that take both hands (a blade in each, or one big two-handed
+-- weapon): no shield is worn with them, and shield moves can't be used.
+Classes.TwoHanded = { TwinBlades = true, Greataxe = true, Warhammer = true, Lance = true }
+
+-- The shield a loadout actually carries: its Shield, unless the weapon needs
+-- both hands.
+function Classes.heldShield(loadout): Gear?
+	if not loadout then
+		return nil
+	end
+	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
+	if weapon and Classes.TwoHanded[weapon.WeaponType] then
+		return nil
+	end
+	return Classes.gear(loadout.Class, "Shields", loadout.Shield)
+end
+
 function Classes.armor(classId: any, armorId: any): Gear?
 	local class = Classes.get(classId)
 	return class and find(class.Armors, armorId)

@@ -1449,7 +1449,12 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	elseif buildWeapon and right and left then
 		buildWeapon(weaponFolder, character, right, left, accent, loadout.WeaponGem)
 	end
-	local shieldItem = (not only or only == "Shield") and Classes.gear(loadout.Class, "Shields", loadout.Shield)
+	-- A two-handed weapon leaves no hand for the shield (a preview of the
+	-- shield on its own still shows it).
+	local shieldItem = if only == "Shield"
+		then Classes.gear(loadout.Class, "Shields", loadout.Shield)
+		elseif not only then Classes.heldShield(loadout)
+		else nil
 	if shieldItem then
 		local component = Instance.new("Model")
 		component.Name = "Shield"

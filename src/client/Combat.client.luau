@@ -1366,7 +1366,7 @@ RunService.RenderStepped:Connect(function(dt)
 			setIcon(icon, P.Dim, nil, false, false)
 		end
 	end
-	local shielded = loadout and Classes.gear(loadout.Class, "Shields", loadout.Shield)
+	local shielded = Classes.heldShield(loadout)
 	for slot, icon in maneuverIcons do
 		local id = maneuverOn(slot)
 		local definition = id and Tree.techStats(profile, id)
