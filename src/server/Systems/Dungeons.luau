@@ -267,6 +267,9 @@ local function queue(player, testMode)
 	end
 	return Shop.reply(true, "Dungeon queued for your ready squad. Deploying now.")
 end
+function Dungeon.queueParty(player)
+	return queue(player)
+end
 function Dungeon.start()
 	Shop.register("PartyDungeon", function(player)
 		return queue(player)

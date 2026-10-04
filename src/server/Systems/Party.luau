@@ -150,6 +150,45 @@ function Party.of(player: Player): PartyData?
 	return memberOf[player]
 end
 
+-- Assemble only the players selected by the dungeon matchmaker. Validate before
+-- mutating; no existing friend group may be split or silently recruited.
+function Party.matchDungeon(members)
+	if #members ~= 3 then
+		return nil
+	end
+	local seen, old = {}, {}
+	for _, p in members do
+		if seen[p] or not p.Parent then
+			return nil
+		end
+		seen[p] = true
+		local group = memberOf[p]
+		if group then
+			old[group] = true
+		end
+	end
+	for group in old do
+		for _, p in group.Members do
+			if not seen[p] then
+				return nil
+			end
+		end
+	end
+	partyCount += 1
+	local party =
+		{ Id = tostring(partyCount), Leader = members[1], Members = table.clone(members), Ready = {}, Voices = {} }
+	-- Reserve the entire roster before chat synchronization can yield.
+	for _, p in members do
+		memberOf[p] = party
+		party.Ready[p] = true
+	end
+	for group in old do
+		closeChannel(group)
+	end
+	push(party)
+	return party
+end
+
 -- Party members (including `player`) whose characters are within `radius`.
 function Party.nearby(player: Player, position: Vector3, radius: number): { Player }
 	local party = memberOf[player]

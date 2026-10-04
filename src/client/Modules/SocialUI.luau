@@ -384,16 +384,16 @@ end
 -- Party card.
 local function drawParty()
 	clear(partyCard)
-	local title = heading(partyCard, "👥  PARTY")
+	local title = heading(partyCard, "RAID SQUAD")
 	title.Position = UDim2.fromOffset(14, 10)
 	local count = if party then #party.Members else 1
-	local tally = text(partyCard, string.format("%d/%d", count, MAX_PARTY), 12, P.Dim, BOLD)
+	local tally = text(partyCard, string.format("%d/%d", count, math.max(3, count)), 12, P.Dim, BOLD)
 	tally.AutomaticSize, tally.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Right
 	tally.Position, tally.Size = UDim2.new(1, -74, 0, 10), UDim2.fromOffset(60, 18)
 	local members = if party
 		then party.Members
 		else { { UserId = player.UserId, Name = player.DisplayName, Class = "Solo", Ready = false } }
-	for i = 1, MAX_PARTY do
+	for i = 1, math.max(3, count) do
 		local member = members[i]
 		local slot = new("Frame", {
 			BackgroundColor3 = if member then P.Slot else P.Frame,
@@ -405,13 +405,19 @@ local function drawParty()
 		local crown = if member and party and member.UserId == party.Leader then "👑 " else ""
 		local name = text(
 			slot,
-			if member then crown .. member.Name else "Empty slot",
+			if member then crown .. member.Name else "Open teammate slot",
 			13,
 			if member then P.Text else P.Dim,
 			if member then BOLD else IronUi.Body
 		)
 		name.AutomaticSize, name.TextTruncate = Enum.AutomaticSize.None, Enum.TextTruncate.AtEnd
 		name.Position, name.Size = UDim2.fromOffset(10, 8), UDim2.new(1, -110, 0, 18)
+		if not member then
+			local invite = chip(slot, "Invite friend", P.Teal, function()
+				pcall(SocialService.PromptGameInvite, SocialService, player)
+			end, 96)
+			invite.Position = UDim2.new(1, -102, 0, 3)
+		end
 		if member and party then
 			local ready = text(
 				slot,
@@ -451,7 +457,7 @@ local function drawParty()
 			run("PartyLeave")
 		end, 110)
 	else
-		local hint = text(actions, "Invite players to party up, chat and queue 2v2.", 12, P.Dim)
+		local hint = text(actions, "Invite friends above, then use + Party when they join.", 12, P.Dim)
 		hint.Size = UDim2.new(1, 0, 1, 0)
 	end
 end
@@ -545,8 +551,28 @@ local function drawArena()
 		SocialUI.raid,
 		100
 	)
-	local rule = text(rows, "Dungeons: 3–4 players. Everyone marks Ready; the leader queues.", 12, P.Dim)
+	local rule = text(rows, "Raid squad: you + 2 teammates. Random search fills this server.", 12, P.Dim)
 	rule.LayoutOrder = 4
+	local raidActions =
+		new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), LayoutOrder = 5 }, rows)
+	UiKit.list(raidActions, 8, true)
+	local searching = player:GetAttribute("DungeonQueue") == true
+	chip(
+		raidActions,
+		if searching then "CANCEL SEARCH" else "FILL RANDOM",
+		if searching then P.Bad else P.Teal,
+		function()
+			run(if searching then "DungeonCancel" else "DungeonFind")
+		end,
+		145
+	)
+	chip(raidActions, "START PARTY", P.Gold, function()
+		run("PartyDungeon")
+	end, 125)
+	if searching then
+		local waiting = text(rows, "Searching this server... Full squads deploy automatically.", 12, P.Gold)
+		waiting.LayoutOrder = 6
+	end
 end
 
 -- One click from the dashboard: straight into the 1v1 queue.
@@ -563,8 +589,7 @@ end
 
 -- The leader starts a Party Raid (three or more against a raid boss).
 function SocialUI.raid()
-	SocialUI.close()
-	run("PartyDungeon")
+	SocialUI.open()
 end
 
 function SocialUI.refresh()
@@ -1116,4 +1141,7 @@ GemClient.Changed:Connect(function()
 	end
 end)
 
+player:GetAttributeChangedSignal("DungeonQueue"):Connect(function()
+	SocialUI.refresh()
+end)
 return SocialUI
