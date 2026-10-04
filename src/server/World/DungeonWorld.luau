@@ -126,4 +126,55 @@ function World.build(id, rooms, origin)
 	end
 	return { Folder = folder, Centers = centers, Gates = gates }
 end
+function World.buildOpen(id, camps, origin)
+ local folder = Instance.new("Folder")
+ folder.Name = "Dungeon_" .. id
+ folder.Parent = workspace
+ local radius = Rules.OpenRadius
+ block(folder, "ExpeditionBedrock", Vector3.new(radius*2, 4, radius*2), origin-Vector3.new(0,1,0), Color3.fromRGB(78,87,101))
+ local centers, ore = {}, {}
+ local rng = Random.new()
+ -- Broken perimeter escarpment, leaving the entire interior traversable.
+ for i=1,48 do
+  local angle = i/48*math.pi*2
+  local at = origin + Vector3.new(math.cos(angle)*(radius-8), 8, math.sin(angle)*(radius-8))
+  local rock = block(folder,"RimRock",Vector3.new(28,rng:NextInteger(16,30),24),at,Color3.fromRGB(53,62,80))
+  rock.CFrame *= CFrame.Angles(0,angle,.12)
+ end
+ for i,camp in camps do
+  local center=origin+Vector3.new(camp.X*Rules.Spacing,0,camp.Z*Rules.Spacing)
+  centers[i]=center
+  local color=GemConfig.ElementColors[Rules.Roster[camp.Theme].Element]
+  ore[i]=center+Vector3.new(0,3,0)
+  for n=1,5 do
+   local angle=n*math.pi*2/5
+   local crystal=block(folder,"FeedingOre",Vector3.new(3,5+n%3,3),center+Vector3.new(math.cos(angle)*4,3,math.sin(angle)*4),color,Enum.Material.Neon)
+   crystal.CFrame *= CFrame.Angles(.2,angle,.2)
+  end
+  fillLight(folder,center+Vector3.new(0,20,0),48,1.5)
+  if camp.Bandit then
+   block(folder,"BanditSupplyCrate",Vector3.new(6,4,4),center+Vector3.new(12,2,8),Color3.fromRGB(102,39,43),Enum.Material.Metal)
+   block(folder,"BanditBeacon",Vector3.new(1,9,1),center+Vector3.new(15,4,5),Color3.fromRGB(223,62,62),Enum.Material.Neon)
+  elseif camp.Boss then
+   local plinth=block(folder,"ColossusPlateau",Vector3.new(58,2,58),center,Color3.fromRGB(98,105,117))
+   for n=1,8 do
+    local a=n*math.pi/4
+    block(folder,"AncientMonolith",Vector3.new(5,16,5),center+Vector3.new(math.cos(a)*38,8,math.sin(a)*38),Color3.fromRGB(48,56,74))
+   end
+  end
+ end
+ -- Low scattered outcrops, kept away from camps and the arrival clearing.
+ for i=1,60 do
+  local at=origin+Vector3.new(rng:NextInteger(-225,225),1,rng:NextInteger(-200,220))
+  local clear=true
+  for _,center in centers do if (at-center).Magnitude<34 then clear=false break end end
+  if clear then
+   local rock=block(folder,"OpenWorldOutcrop",Vector3.new(rng:NextInteger(4,10),rng:NextInteger(3,7),rng:NextInteger(4,10)),at,Color3.fromRGB(65,76,92))
+   rock.CFrame *= CFrame.Angles(0,rng:NextNumber()*math.pi,.15)
+  end
+ end
+ local arrival=origin+Vector3.new(0,0,-225)
+ fillLight(folder,arrival+Vector3.new(0,15,0),48,2)
+ return {Folder=folder,Centers=centers,Gates={},Ore=ore,Origin=origin,Arrival=arrival,Radius=radius}
+end
 return World

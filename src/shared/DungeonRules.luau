@@ -101,4 +101,24 @@ function Dungeon.elementMultiplier(main, weakness, incoming)
 	end
 	return 1
 end
+-- Open expedition camps: shared bounded map, no room gates.
+Dungeon.OpenRadius = 260
+Dungeon.WatchRadius = 11 -- approximately ten feet in Roblox scale
+Dungeon.AggroRadius = 32
+Dungeon.LeashRadius = 75
+function Dungeon.generateOpen(rng)
+ local camps = {}
+ for i = 1, 9 do
+  local angle = (i - 1) / 9 * math.pi * 2 + rng:NextNumber(-.12, .12)
+  local radius = rng:NextInteger(110, 175)
+  local theme = rng:NextInteger(1, #Dungeon.Roster)
+  local camp = { Index = i, X = math.cos(angle)*radius/Dungeon.Spacing, Z = math.sin(angle)*radius/Dungeon.Spacing,
+   Theme = theme, Boss = false, Bandit = i % 3 == 0, GearTier = rng:NextInteger(1, 4), Foes = {}, Pillars = 0 }
+  for n = 1, rng:NextInteger(2, 3) do table.insert(camp.Foes, theme) end
+  table.insert(camps, camp)
+ end
+ local boss = rng:NextInteger(1, #Dungeon.Roster)
+ table.insert(camps, {Index=10, X=0, Z=0, Theme=boss, Boss=true, GearTier=rng:NextInteger(4,5), Foes={boss}, Pillars=0})
+ return camps
+end
 return Dungeon

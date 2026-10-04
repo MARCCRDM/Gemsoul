@@ -60,6 +60,7 @@ local DamageLog = require(script.Parent.DamageLog)
 
 local DungeonLoadout = require(ReplicatedStorage.Shared.DungeonLoadout)
 local BrainrotSkins = require(script.Parent.BrainrotSkins)
+local ExpeditionAmbient = require(script.Parent.ExpeditionAmbient)
 local Duelist = {}
 local dungeonActors = {}
 
@@ -746,6 +747,7 @@ end
 -- Every 0.15s while the rival is alive.
 local function think(enemy, now: number)
 	local duel = enemy.Duel
+	if duel.Dungeon and duel.Dungeon.OpenWorld and ExpeditionAmbient.step(duel, now) then return end
 	if duel.Raid and not raidTarget(duel, now) then
 		return
 	end
@@ -1457,7 +1459,7 @@ function spawnRival(owner: Player, raid, encounter)
 	local loadout = rollLoadout(rng)
 	if encounter then
 		encounter.GearTier = encounter.GearTier or (if encounter.Boss then 4 else 1)
-		DungeonLoadout.apply(loadout, encounter.Spec, encounter.GearTier, rng)
+		if not encounter.Bandit then DungeonLoadout.apply(loadout, encounter.Spec, encounter.GearTier, rng) end
 	end
 	local name = NAMES[rng:NextInteger(1, #NAMES)]
 	if raid then
@@ -1470,6 +1472,7 @@ function spawnRival(owner: Player, raid, encounter)
 			.. DungeonLoadout.Labels[encounter.GearTier]
 			.. "]"
 	end
+	if encounter and encounter.Bandit then name = "Space Bandit " .. name end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
 	away = if away.Magnitude > 1 then away.Unit else Vector3.new(1, 0, 0)
@@ -1487,7 +1490,11 @@ function spawnRival(owner: Player, raid, encounter)
 		end
 		return
 	end
-	if encounter then
+	if encounter and encounter.Bandit then
+		for _, part in rig:GetDescendants() do
+			if part:IsA("BasePart") and part.Transparency < 1 then part.Color = part.Color:Lerp(Color3.fromRGB(170,45,50), .48) end
+		end
+	elseif encounter then
 		-- Remove cosmetic equipment, retaining the entire jointed animation skeleton.
 		for _, child in rig:GetChildren() do
 			if child:IsA("Folder") or child:IsA("Accessory") then

@@ -72,7 +72,13 @@ end
 
 -- Wind-up and strike poses for each action; `s` mirrors a slash or dodge.
 local function frames(kind: string, s: number)
-	if kind == "Drill" then
+	if kind == "Mine" then
+  return {Waist={.15,-.2,0},RightShoulder={2.7,0,.2},RightElbow={1,0,0},LeftShoulder={1.1,0,-.3}},
+   {Waist={-.35,.15,0},RightShoulder={.6,0,-.2},RightElbow={.1,0,0},LeftShoulder={.5,0,-.3}}
+ elseif kind == "Feed" then
+  return {Waist={-.2,0,0},Neck={.1,0,0},RightShoulder={.5,0,.2},LeftShoulder={.5,0,-.2}},
+   {Waist={-.55,0,0},Neck={-.35,0,0},RightShoulder={.9,0,.2},LeftShoulder={.9,0,-.2}}
+ elseif kind == "Drill" then
 		return {
 			Waist = { 0.12, -0.55, 0 },
 			RightShoulder = { 1.2, -0.3, 0.65 },
