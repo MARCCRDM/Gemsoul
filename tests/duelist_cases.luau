@@ -141,6 +141,28 @@ check(flinch.Waist and flinch.Waist[1] > 0.2 and flinch.Neck[1] > 0.2, "Hit did 
 check(RivalPose.pose({ HurtAt = 100 }, 100.5, true).Waist == nil, "Flinch did not fade")
 local jolt = RivalPose.pose({ GuardUntil = 101, BlockedAt = 100 }, 100.05)
 check(jolt.LeftShoulder[1] < RivalPose.pose({ GuardUntil = 101 }, 100.05).LeftShoulder[1], "Blocked blow did not jolt the shield")
+-- Tung Tung shares the exact fighter attack/reaction timing, with a bat guard.
+for _,kind in {"Slash","Heavy","Bolt","Nova","Buff","Dodge","Stagger"} do
+ for _,offset in {0,.15,.29,.35,.6,.95,1.5} do
+  local attrs={ActionKind=kind,ActionStart=100,ActionAt=100.3,ActionSide=-1}
+  local normal,normalSpeed=RivalPose.pose(attrs,100+offset)
+  attrs.CombatPoseProfile="SahurBat"
+  local sahur,sahurSpeed=RivalPose.pose(attrs,100+offset)
+  check(sahurSpeed==normalSpeed,"Sahur action response diverged from combat timing")
+  for joint,angles in normal do
+   for axis=1,3 do check(math.abs(sahur[joint][axis]-angles[axis])<1e-8,"Sahur attack diverged: "..kind.." / "..joint) end
+  end
+ end
+end
+local batGuard={CombatPoseProfile="SahurBat",GuardUntil=101}
+local braced=RivalPose.pose(batGuard,100.05)
+check(braced.RightShoulder[1]>1.2 and braced.RightShoulder[3]<-.4,"Sahur failed to brace his bat")
+batGuard.BlockedAt=100
+local batJolt=RivalPose.pose(batGuard,100.05)
+check(batJolt.RightShoulder[1]<braced.RightShoulder[1],"Blocked blow did not recoil Sahur's bat")
+check(RivalPose.pose(batGuard,102).RightShoulder[1]<1,"Sahur stayed in guard after expiry")
+local sahurHurt=RivalPose.pose({CombatPoseProfile="SahurBat",HurtAt=100},100.06)
+check(sahurHurt.Waist[1]>0.15,"Sahur timber body did not flinch")
 -- Health recovery is the same for everyone: none mid-fight in the Arena.
 check(HealthRegen.amount(50, 100, true, 60, 1) == 0, "Player healed during an Arena fight")
 check(HealthRegen.amount(50, 100, false, 2, 1) == 0, "Player healed right after taking damage")

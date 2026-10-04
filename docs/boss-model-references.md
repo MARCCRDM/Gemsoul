@@ -16,3 +16,11 @@ Element colors are restrained accents on the bat, dorsal edge, spores and engine
 Run `tools/render_boss_previews.py` with numpy and Pillow installed. It executes the actual Luau skin builders, exports their geometry and renders the four previews in `docs/boss-previews/`. Transparent driver parts are excluded. These are neutral-pose geometry renders with simplified lighting, not Roblox Studio screenshots.
 
 Studio playtesting is still required for moving silhouettes, terrain clearance, camera proximity and multiplayer readability. Imported production meshes and custom creature-specific animation clips would be a separate asset pass.
+
+## Tung Tung combat animation pass
+
+- The bat now uses the same -120-degree fist mount as the Warrior weapons, so its barrel follows the existing slash and overhead-heavy poses instead of hanging backward from the fist.
+- `CombatPoseProfile = SahurBat` selects a bat guard and right-arm block recoil in the shared RivalPose module. All seven existing action timelines and ordinary hit reactions remain shared.
+- Existing server-played R15 idle/walk/run tracks and the dungeon actor pose loop are retained. The continuous timber body follows Waist; the face intentionally stays with the log rather than bending independently at Neck.
+- `tools/render_sahur_poses.py` renders the actual Motor6D hierarchy and skin attachment transforms at ready, heavy wind-up, heavy impact and guard. The sheet omits live locomotion tracks and temporal smoothing; it is a geometry diagnostic, not proof of Roblox runtime playback.
+- Combat regression suite passes, including Sahur action parity at seven timestamps per action, bat guard, block recoil and body flinch. Rojo build succeeds. Studio multiplayer playback and animation asset loading are not verified in this environment.

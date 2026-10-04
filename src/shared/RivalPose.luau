@@ -197,6 +197,13 @@ local GUARD = {
 	LeftKnee = { -0.35, 0, 0 },
 }
 
+-- Sahur uses the same action frames and timeline as a Warrior. With no shield,
+-- brace the bat across the chest and raise the free hand to protect the face.
+local BAT_GUARD = table.clone(GUARD)
+BAT_GUARD.RightShoulder = { 1.35, 0, -0.55 }
+BAT_GUARD.RightElbow = { 1.15, 0, 0 }
+BAT_GUARD.LeftShoulder = { 1.2, 0, 0.3 }
+BAT_GUARD.LeftElbow = { 1.45, 0, 0 }
 -- Smoothstep: slow in, slow out.
 local function ease(x: number): number
 	x = math.clamp(x, 0, 1)
@@ -239,6 +246,10 @@ local JOLT = {
 	RightKnee = { -0.2, 0, 0 },
 	LeftKnee = { -0.2, 0, 0 },
 }
+local BAT_JOLT = table.clone(JOLT)
+BAT_JOLT.RightShoulder = { -0.35, 0, -0.15 }
+BAT_JOLT.RightElbow = { 0.25, 0, 0 }
+
 -- A reaction's weight `d` seconds after it lands: up fast, then fades.
 local function impulse(d: number, length: number): number
 	if d < 0 or d >= length then
@@ -314,10 +325,12 @@ end
 local REST = {}
 function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }, number)
 	local base = if rest then REST else breathe(READY, t)
+	local bat = a.CombatPoseProfile == "SahurBat"
+	local guard = if bat then BAT_GUARD else GUARD
 	local pose, speed = actionPose(a, t, base)
 	if not pose then
 		if type(a.GuardUntil) == "number" and t < a.GuardUntil then
-			pose, speed = if rest then GUARD else breathe(GUARD, t), 22
+			pose, speed = if rest then guard else breathe(guard, t), 22
 		else
 			pose, speed = base, 10
 		end
@@ -335,7 +348,7 @@ function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }
 	if type(a.BlockedAt) == "number" then
 		local w = impulse(t - a.BlockedAt, BLOCK_TIME)
 		if w > 0 then
-			pose = add(pose, JOLT, w)
+			pose = add(pose, if bat then BAT_JOLT else JOLT, w)
 			speed = math.max(speed, 40)
 		end
 	end
@@ -414,6 +427,7 @@ function RivalPose.jointCount(model: Model): number
 end
 
 local ATTRIBUTES = {
+	"CombatPoseProfile",
 	"ActionKind",
 	"ActionStart",
 	"ActionAt",
