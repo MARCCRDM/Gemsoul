@@ -13,6 +13,21 @@ local function block(parent, name, size, at, color, material)
 	p.Parent = parent
 	return p
 end
+-- Neutral fixtures reveal material and facial detail without washing out element colors.
+local function fillLight(parent, at, range, brightness)
+	local fixture =
+		block(parent, "CombatFill", Vector3.new(5, 0.25, 2), at, Color3.fromRGB(215, 228, 245), Enum.Material.Neon)
+	fixture.CanCollide = false
+	fixture.CanTouch = false
+	fixture.CanQuery = false
+	fixture.CastShadow = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(225, 233, 247)
+	light.Range = range
+	light.Brightness = brightness
+	light.Shadows = false
+	light.Parent = fixture
+end
 function World.build(id, rooms, origin)
 	local folder = Instance.new("Folder")
 	folder.Name = "Dungeon_" .. id
@@ -23,7 +38,9 @@ function World.build(id, rooms, origin)
 		local center = origin + Vector3.new(room.X * Rules.Spacing, 0, room.Z * Rules.Spacing)
 		centers[i] = center
 		local color = GemConfig.ElementColors[Rules.Roster[room.Theme].Element]
-		block(folder, "RoomFloor", Vector3.new(64, 2, 64), center, Color3.fromRGB(45, 53, 65))
+		block(folder, "RoomFloor", Vector3.new(64, 2, 64), center, Color3.fromRGB(65, 74, 88))
+		fillLight(folder, center + Vector3.new(-16, 16, 0), 48, 1.7)
+		fillLight(folder, center + Vector3.new(16, 16, 0), 48, 1.7)
 		local doors = {}
 		for _, index in { i - 1, i + 1 } do
 			local neighbor = rooms[index]
@@ -70,6 +87,7 @@ function World.build(id, rooms, origin)
 			glow.Color = color
 			glow.Range = 35
 			glow.Brightness = 1.4
+			glow.Shadows = false
 			glow.Parent = light
 		end
 		if i > 1 then
@@ -77,6 +95,7 @@ function World.build(id, rooms, origin)
 			local delta = center - previous
 			local midpoint = (center + previous) / 2
 			local horizontal = delta.X ~= 0
+			fillLight(folder, midpoint + Vector3.new(0, 11, 0), 30, 1.4)
 			block(
 				folder,
 				"Corridor",

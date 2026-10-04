@@ -129,4 +129,5 @@ check(tester:GetAttribute("DungeonBoss")=="Tung Tung Tung Sahur","Wrong test bos
 clearRoom(testId,1)
 check(tester:GetAttribute("DungeonId")==nil,"Solo test failed cleanup")
 check(tester:GetAttribute("DungeonTest")==nil,"Test flag leaked")
+check(profiles[tester].Coins==0,"Studio test awarded coins")
 print("PASS: Studio test entry, live rejection, solo boss and cleanup")

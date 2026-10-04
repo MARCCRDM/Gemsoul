@@ -42,6 +42,29 @@ ArenaNight.Mood = {
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
+-- Dungeon silhouettes must remain readable between combat flashes.
+ArenaNight.DungeonMood = {
+	Lighting = {
+		Brightness = 2,
+		Ambient = Color3.fromRGB(112, 119, 135),
+		OutdoorAmbient = Color3.fromRGB(140, 149, 165),
+		ExposureCompensation = 0.15,
+		EnvironmentDiffuseScale = 0.8,
+		EnvironmentSpecularScale = 0.6,
+	},
+	BloomEffect = { Intensity = 0.25, Size = 20, Threshold = 1.4 },
+	ColorCorrectionEffect = { Brightness = 0.02, Contrast = 0.05, Saturation = 0.03, TintColor = Color3.fromRGB(
+		246,
+		248,
+		255
+	) },
+	Atmosphere = { Density = 0.12, Haze = 0.1, Glare = 0, Color = Color3.fromRGB(145, 156, 178), Decay = Color3.fromRGB(
+		92,
+		104,
+		127
+	) },
+	SunRaysEffect = { Intensity = 0 },
+}
 ArenaNight.ClockTime = 0 -- moon and stars
 ArenaNight.LampScale = 0.3 -- the Arena's own ceiling lamps, dimmed
 ArenaNight.FlashBoost = 1.5 -- combat flashes, brighter and wider
@@ -51,13 +74,14 @@ ArenaNight.GlowBrightness, ArenaNight.GlowRange = 1.1, 1.6
 local FADE = TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 
 local active = false
+local activeMood = nil
 local saved = nil -- [instance] = { [property] = value }, plus ClockTime
 local lamps = {} -- [PointLight] = original Brightness
 local glows = {} -- [source PointLight] = companion PointLight
 
-local function targets()
-	local list = { [Lighting] = ArenaNight.Mood.Lighting }
-	for className, goal in ArenaNight.Mood do
+local function targets(mood)
+	local list = { [Lighting] = mood.Lighting }
+	for className, goal in mood do
 		if className ~= "Lighting" then
 			local effect = Lighting:FindFirstChildOfClass(className)
 			if effect then
@@ -115,22 +139,23 @@ local function dimLamps()
 	end
 end
 
-local function nightfall()
-	if active then
+local function nightfall(mood)
+	if active and activeMood == mood then
 		return
 	end
 	active = true
-	saved = { ClockTime = Lighting.ClockTime }
-	for instance, goal in targets() do
+	activeMood = mood
+	saved = saved or { ClockTime = Lighting.ClockTime }
+	for instance, goal in targets(mood) do
 		local before = {}
 		for property in goal do
 			before[property] = (instance :: any)[property]
 		end
-		saved[instance] = before
+		saved[instance] = saved[instance] or before
 		TweenService:Create(instance, FADE, goal):Play()
 	end
 	Lighting.ClockTime = ArenaNight.ClockTime
-	CombatFx.LightBoost = ArenaNight.FlashBoost
+	CombatFx.LightBoost = if mood == ArenaNight.DungeonMood then 1 else ArenaNight.FlashBoost
 	dimLamps()
 	glowGear()
 end
@@ -140,6 +165,7 @@ local function daybreak()
 		return
 	end
 	active = false
+	activeMood = nil
 	for instance, before in saved or {} do
 		if typeof(instance) == "Instance" and instance.Parent then
 			TweenService:Create(instance, FADE, before):Play()
@@ -171,12 +197,13 @@ function ArenaNight.start()
 	local player = Players.LocalPlayer
 	local function follow()
 		if player:GetAttribute("CombatSession") ~= nil then
-			nightfall()
+			nightfall(if player:GetAttribute("DungeonId") then ArenaNight.DungeonMood else ArenaNight.Mood)
 		else
 			daybreak()
 		end
 	end
 	player:GetAttributeChangedSignal("CombatSession"):Connect(follow)
+	player:GetAttributeChangedSignal("DungeonId"):Connect(follow)
 	follow()
 	-- New fighters, re-equipped gear and streamed-in lamps.
 	task.spawn(function()
