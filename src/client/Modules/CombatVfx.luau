@@ -338,7 +338,8 @@ local function drawBolt(points: { Vector3 }, color: Color3, width: number, life:
 end
 function CombatVfx.lightning(from: Vector3, to: Vector3, color: Color3)
 	local distance = (to - from).Magnitude
-	if distance < 0.5 then
+	-- (distance ~= distance: a NaN end point draws nothing.)
+	if distance < 0.5 or distance ~= distance or distance > 1000 then
 		return
 	end
 	local kinks = math.clamp(math.floor(distance / 3.5), 3, 7)
@@ -360,6 +361,26 @@ function CombatVfx.lightning(from: Vector3, to: Vector3, color: Color3)
 end
 
 lightningRef = CombatVfx.lightning
+
+local floorRay = RaycastParams.new()
+floorRay.FilterType = Enum.RaycastFilterType.Exclude
+floorRay.RespectCanCollide = true
+local function floorBelow(at: Vector3): Vector3
+	-- The ground under it, not a fighter standing there.
+	local skip: { Instance } = { fxFolder() }
+	for _, other in Players:GetPlayers() do
+		if other.Character then
+			table.insert(skip, other.Character)
+		end
+	end
+	local enemies = workspace:FindFirstChild("Enemies")
+	if enemies then
+		table.insert(skip, enemies)
+	end
+	floorRay.FilterDescendantsInstances = skip
+	local hit = workspace:Raycast(at + Vector3.new(0, 4, 0), Vector3.new(0, -80, 0), floorRay)
+	return if hit then hit.Position else at - Vector3.new(0, 2.6, 0)
+end
 
 -- Projectile --------------------------------------------------------------------------
 
@@ -433,7 +454,7 @@ function CombatVfx.beam(from: Vector3, to: Vector3, color: Color3, radius: numbe
 	if radius and radius > 0 then
 		local floorRing = neon(
 			Vector3.new(0.12, 1, 1),
-			CFrame.new(to) * CFrame.Angles(0, 0, math.rad(90)),
+			CFrame.new(floorBelow(to) + Vector3.new(0, 0.1, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 			color,
 			0.25,
 			Enum.PartType.Cylinder
@@ -484,25 +505,6 @@ local function disc(at: Vector3, diameter: number, color: Color3, transparency: 
 		transparency,
 		Enum.PartType.Cylinder
 	)
-end
-
-local floorRay = RaycastParams.new()
-floorRay.FilterType = Enum.RaycastFilterType.Exclude
-local function floorBelow(at: Vector3): Vector3
-	-- The ground under it, not a fighter standing there.
-	local skip: { Instance } = { fxFolder() }
-	for _, other in Players:GetPlayers() do
-		if other.Character then
-			table.insert(skip, other.Character)
-		end
-	end
-	local enemies = workspace:FindFirstChild("Enemies")
-	if enemies then
-		table.insert(skip, enemies)
-	end
-	floorRay.FilterDescendantsInstances = skip
-	local hit = workspace:Raycast(at + Vector3.new(0, 1, 0), Vector3.new(0, -12, 0), floorRay)
-	return if hit then hit.Position else at - Vector3.new(0, 2.6, 0)
 end
 
 -- A soft puff of flame that swells, rises and burns down from white-hot
