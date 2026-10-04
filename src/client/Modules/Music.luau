@@ -115,7 +115,9 @@ function Music.play(mood: string)
 			sound:Play()
 		end
 	end
-	TweenService:Create(sound, fade, { Volume = Music.Volumes[mood] or 0.3 }):Play()
+	-- A song with a start point comes in right away, so 1:44 is heard at 1:44.
+	local fadeIn = if startAt then TweenInfo.new(0.25, Enum.EasingStyle.Sine) else fade
+	TweenService:Create(sound, fadeIn, { Volume = Music.Volumes[mood] or 0.3 }):Play()
 end
 
 -- Which mood fits what the player is doing (from their attributes).
