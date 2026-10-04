@@ -198,6 +198,7 @@ local function makeIcon(parent, key, round)
 	glyph.Position, glyph.Size = UDim2.fromScale(0, 0.1), UDim2.fromScale(1, 0.56)
 	local badge = centered(button, 10, P.Gold)
 	badge.Position, badge.Size = UDim2.fromScale(0, 0.64), UDim2.fromScale(1, 0.24)
+	badge.ZIndex, badge.TextStrokeTransparency = 2, 0.3
 	new("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new(Color3.fromRGB(62, 62, 72), Color3.fromRGB(16, 17, 23)),
@@ -298,6 +299,7 @@ local function setIcon(icon, color, cd, usable, active, lacking)
 	icon.Stroke.Thickness = if active then 3 else 2
 	icon.Stroke.Transparency = if (usable or active) and remaining <= 0 then 0 else 0.55
 	icon.Glyph.TextTransparency = if usable then 0 else 0.5
+	SurgeIcons.dim(icon.Button, not usable)
 	icon.Badge.TextColor3 = if lacking then Color3.fromRGB(255, 120, 120) else P.Gold
 end
 local reticle = text(gui, "·", 24, P.Text, IronUi.Bold)
@@ -1357,15 +1359,17 @@ RunService.RenderStepped:Connect(function(dt)
 		if definition then
 			local color = GemConfig.ElementColors[gem.Element] or P.Gold
 			local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)
-			icon.Glyph.Text, icon.Glyph.TextColor3 = definition.Icon or "◆", color
-			SurgeIcons.apply(icon.Glyph, definition, color)
+			icon.Glyph.Text, icon.Glyph.TextColor3 = "◆", color
+			if SurgeIcons.apply(icon.Button, definition) then
+				icon.Glyph.Text = ""
+			end
 			icon.Badge.Text = string.format("T%d · %s", definition.Tier, ROMAN[definition.Rank] or "I")
 			icon.Name.Text = definition.Name
 			local usable = (player:GetAttribute("Charge") or 0) >= cost
 			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key, not usable)
 		else
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
-			SurgeIcons.apply(icon.Glyph, nil, P.Dim)
+			SurgeIcons.apply(icon.Button, nil)
 			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
 			setIcon(icon, P.Dim, nil, false, false)
 		end
@@ -1377,7 +1381,10 @@ RunService.RenderStepped:Connect(function(dt)
 		local color = Tech.Resources.Stamina.Color
 		if definition then
 			local learned = Tree.isLearned(profile, id)
-			icon.Glyph.Text, icon.Glyph.TextColor3 = definition.Icon or "✦", color
+			icon.Glyph.Text, icon.Glyph.TextColor3 = "✦", color
+			if SurgeIcons.apply(icon.Button, id) then
+				icon.Glyph.Text = ""
+			end
 			icon.Name.Text = definition.Name
 			icon.Badge.Text = if learned then string.format("%d ST", math.floor(definition.Cost + 0.5)) else "LOCKED"
 			local affordable = (player:GetAttribute("Stamina") or 0) >= definition.Cost
@@ -1385,6 +1392,7 @@ RunService.RenderStepped:Connect(function(dt)
 			setIcon(icon, color, techCooldowns[id], usable, false, learned and not affordable)
 		else
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
+			SurgeIcons.apply(icon.Button, nil)
 			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
 			setIcon(icon, P.Dim, nil, false, false)
 		end

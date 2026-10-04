@@ -645,19 +645,9 @@ for _, id in Tech.NewSurges do
 	check(RivalPose.pose(a, 103, true).RightShoulder == nil, "Pose did not recover: " .. id)
 end
 st = reset()
--- Every ability shows a single glyph like the originals, never a letter code.
-local seenIcons = {}
+-- Abilities show painted icons (SurgeIcons), not text glyphs.
 for id, def in Tech.Catalog do
-	if def.Icon ~= nil then
-		check(type(def.Icon) == "string" and def.Icon ~= "", "Missing icon: " .. id)
-		check(not string.match(def.Icon, "^[%u%d]+$"), "Letter-code icon: " .. id)
-	end
-end
-for _, id in Tech.NewSurges do
-	local icon = Tech.Catalog[id] and Tech.Catalog[id].Icon
-	check(icon ~= nil, "New surge has no icon: " .. id)
-	check(not seenIcons[icon], "Duplicate new surge icon: " .. id)
-	seenIcons[icon] = true
+	check(def.Icon == nil, "Text glyph left on ability: " .. id)
 end
 print(
 	"PASS: "

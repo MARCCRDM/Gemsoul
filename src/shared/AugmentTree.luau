@@ -210,7 +210,7 @@ for _, branch in Tree.Branches do
 			Id = id,
 			Name = d.Name,
 			Description = d.Description,
-			Icon = d.Icon,
+			Icon = d.Icon or "✦",
 			Element = d.Element,
 			Effect = d.Effect,
 			Amount = d.Amount,

@@ -136,7 +136,7 @@ local function socketCard(parent, key, x, gem, amps)
 	}, card)
 	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, socket)
 	stroke(socket, color, 3, if gem then 0 else 0.4)
-	local glyph = label(socket, if definition then definition.Icon or "◆" else "+", 38, color)
+	local glyph = label(socket, if definition then "◆" else "+", 38, color)
 	glyph.Size, glyph.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
 	SurgeIcons.apply(glyph, definition, color)
 	local chip = new("Frame", {
@@ -277,7 +277,7 @@ local function pouchList(parent, profile, amps)
 			Size = UDim2.fromOffset(24, 24),
 		}, row)
 		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, dot)
-		local icon = label(dot, definition and definition.Icon or "◆", 13, P.Inset)
+		local icon = label(dot, "◆", 13, P.Inset)
 		icon.Size, icon.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
 		SurgeIcons.apply(icon, definition, P.Inset)
 		place(
@@ -341,9 +341,16 @@ local function maneuverColumn(parent, profile, loadout)
 		UiKit.round(chip, 6)
 		local keyText = label(chip, tostring(slot), 14, P.Inset)
 		keyText.Size, keyText.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+		local art = new("Frame", {
+			BackgroundColor3 = P.Inset,
+			Position = UDim2.fromOffset(44, 9),
+			Size = UDim2.fromOffset(30, 30),
+		}, row)
+		UiKit.round(art, 6)
+		art.Visible = SurgeIcons.apply(art, id)
 		place(
-			label(row, if definition then (definition.Icon or "") .. "  " .. definition.Name else "Empty", 14, P.Text),
-			46,
+			label(row, if definition then definition.Name else "Empty", 14, P.Text),
+			if art.Visible then 82 else 46,
 			6,
 			280,
 			18
@@ -390,7 +397,7 @@ local function maneuverColumn(parent, profile, loadout)
 		local definition = Tech.Catalog[id]
 		local on = equipped[selectedSlot] == id
 		local b = new("TextButton", {
-			Text = (definition.Icon or "") .. " " .. definition.Name,
+			Text = definition.Name,
 			TextSize = 11,
 			Font = BOLD,
 			TextColor3 = if on then P.Inset else P.Text,
@@ -398,6 +405,16 @@ local function maneuverColumn(parent, profile, loadout)
 			LayoutOrder = order,
 		}, list)
 		UiKit.round(b, 6)
+		local art = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(20, 20) }, b)
+		UiKit.round(art, 4)
+		if SurgeIcons.apply(art, id) then
+			-- Padding moves children too: -25 puts the icon 3px in from the edge.
+			art.Position = UDim2.fromOffset(-25, 3)
+			b.TextXAlignment = Enum.TextXAlignment.Left
+			new("UIPadding", { PaddingLeft = UDim.new(0, 28) }, b)
+		else
+			art:Destroy()
+		end
 		b.Activated:Connect(function()
 			if not on then
 				request("EquipManeuver", selectedSlot, id)

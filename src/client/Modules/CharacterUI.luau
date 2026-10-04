@@ -672,9 +672,9 @@ local function gemLines(gem)
 			local card = new("Frame", { BackgroundColor3 = P.Frame, Size = UDim2.new(1, -8, 0, 44) }, tipBody)
 			UiKit.round(card, 6)
 			new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.5 }, card)
-			local icon = text(card, surge.Icon or "◆", 20, color, BOLD)
+			local icon = text(card, "◆", 20, color, BOLD)
 			icon.AutomaticSize, icon.Position, icon.Size =
-				Enum.AutomaticSize.None, UDim2.fromOffset(8, 0), UDim2.fromOffset(28, 44)
+				Enum.AutomaticSize.None, UDim2.fromOffset(5, 6), UDim2.fromOffset(32, 32)
 			icon.TextXAlignment, icon.TextYAlignment = Enum.TextXAlignment.Center, Enum.TextYAlignment.Center
 			SurgeIcons.apply(icon, surge, color)
 			local title = text(

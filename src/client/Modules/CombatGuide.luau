@@ -127,8 +127,7 @@ function CombatGuide.refresh()
 		local key = table.find(equipped, id)
 		card(
 			string.format(
-				"%s %s · %d Stamina%s",
-				definition.Icon,
+				"%s · %d Stamina%s",
 				definition.Name,
 				math.floor(definition.Cost + 0.5),
 				if key and learned then " · KEY " .. key else ""
@@ -152,9 +151,8 @@ function CombatGuide.refresh()
 		if definition then
 			card(
 				string.format(
-					"%s %s · %s · Tier %d · Rank %d · %g Charge%s",
+					"%s  %s · Tier %d · Rank %d · %g Charge%s",
 					key,
-					definition.Icon,
 					definition.Name,
 					definition.Tier,
 					definition.Rank,

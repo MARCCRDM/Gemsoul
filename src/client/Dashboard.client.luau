@@ -30,6 +30,7 @@ local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
 local SocialUI = require(script.Parent.Modules.SocialUI)
 local UiKit = require(script.Parent.Modules.UiKit)
+local SurgeIcons = require(script.Parent.Modules.SurgeIcons)
 
 local player = Players.LocalPlayer
 local new, text = IronUi.new, IronUi.text
@@ -645,7 +646,8 @@ local function refresh(profile)
 		local definition = gem and Tech.surgeStats(gem)
 		local color = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else LIGHT
 		socket.Ring.Color, socket.Ring.Transparency = color, if gem then 0 else 0.4
-		socket.Glyph.Text, socket.Glyph.TextColor3 = if definition then definition.Icon or "◆" else "+", color
+		socket.Glyph.Text, socket.Glyph.TextColor3 = if definition then "◆" else "+", color
+		SurgeIcons.apply(socket.Glyph, definition)
 	end
 end
 GemClient.Changed:Connect(refresh)

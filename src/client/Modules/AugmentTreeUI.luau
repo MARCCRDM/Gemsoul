@@ -19,6 +19,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
+local SurgeIcons = require(script.Parent.SurgeIcons)
 
 local UI = {}
 local player = Players.LocalPlayer
@@ -98,7 +99,14 @@ end
 	Learned nodes glow in their branch colour; locked ones are grey.
 	state: "learned" | "open" | "locked"
 ]]
-local function medallion(parent: Instance, icon: string, size: number, color: Color3, state: string): Frame
+local function medallion(
+	parent: Instance,
+	icon: string,
+	size: number,
+	color: Color3,
+	state: string,
+	ability: string?
+): Frame
 	local lit = state == "learned"
 	local ring = new("Frame", {
 		BackgroundColor3 = if lit then BRONZE elseif state == "open" then Color3.fromRGB(92, 84, 112) else LOCKED_FILL,
@@ -135,6 +143,11 @@ local function medallion(parent: Instance, icon: string, size: number, color: Co
 		centered(fixed(text(disc, icon, math.floor(size * 0.42), if state == "locked" then MUTED else P.Text)))
 	glyph.Size = UDim2.fromScale(1, 1)
 	glyph.TextTransparency = if state == "locked" then 0.35 else 0
+	-- Maneuvers and surges show their painted ability icon.
+	if ability and SurgeIcons.apply(disc, ability) then
+		glyph.Text = ""
+		SurgeIcons.dim(disc, state == "locked")
+	end
 	return ring
 end
 
@@ -446,7 +459,8 @@ local function drawDetail(data)
 		node.Icon,
 		80,
 		color,
-		if learned then "learned" elseif parentMet and levelMet then "open" else "locked"
+		if learned then "learned" elseif parentMet and levelMet then "open" else "locked",
+		node.Id
 	)
 	badge.Position = UDim2.fromOffset(0, 2)
 	local kind = fixed(
@@ -787,7 +801,7 @@ local function drawSheet(data)
 			UiKit.round(halo, medal)
 			stroke(halo, P.Gold, 2, 0)
 		end
-		local medallionFrame = medallion(holder, node.Icon, medal, nodeColor(node), state)
+		local medallionFrame = medallion(holder, node.Icon, medal, nodeColor(node), state, node.Id)
 		medallionFrame.AnchorPoint = Vector2.new(0.5, 0)
 		medallionFrame.Position = UDim2.new(0.5, 0, 0, 5)
 		medallionFrame.ZIndex = 3
