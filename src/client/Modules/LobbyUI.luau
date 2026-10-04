@@ -453,6 +453,7 @@ local back = new("TextButton", {
 UiKit.round(back, 8)
 new("UIStroke", { Color = GREEN, Thickness = 2 }, back)
 
+local wanted = false -- whether the lobby HUD should be up (LobbyUI.setVisible)
 local function showDashboard(on: boolean)
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
 	if dashboard and dashboard:IsA("ScreenGui") then
@@ -463,6 +464,7 @@ local function showDashboard(on: boolean)
 	if dashboardShown then
 		picker.Visible = false
 	end
+	gui.Enabled = wanted and not dashboardShown
 end
 back.Activated:Connect(function()
 	showDashboard(false)
@@ -484,6 +486,7 @@ end)
 -- Public -----------------------------------------------------------------------------------------------
 
 function LobbyUI.setVisible(on: boolean)
+	wanted = on
 	if not on then
 		LobbyUI.closePicker()
 		if dashboardShown then

@@ -509,8 +509,20 @@ function View.start()
 	player.CameraMinZoomDistance, player.CameraMaxZoomDistance = 0.5, 0.5
 	player.CameraMode = Enum.CameraMode.LockFirstPerson
 	camera.FieldOfView = 75
+	-- Only a change to the gear's own parts rebuilds the view model: hit
+	-- effects, sounds, trails and shields come and go on the character all
+	-- fight long, and rebuilding for each of them stuttered.
+	local function gearPart(part): boolean
+		if not part:IsA("BasePart") then
+			return false
+		end
+		local gearFolder = player.Character and player.Character:FindFirstChild("GemsoulGear")
+		return gearFolder ~= nil and part:IsDescendantOf(gearFolder)
+	end
 	local function track(part)
-		dirty = true
+		if gearPart(part) then
+			dirty = true
+		end
 		if part:IsA("BasePart") and hidden[part] == nil then
 			hidden[part] = part.LocalTransparencyModifier
 		end
@@ -522,7 +534,9 @@ function View.start()
 		end
 		connection = character.DescendantAdded:Connect(track)
 		removalConnection = character.DescendantRemoving:Connect(function(part)
-			dirty = true
+			if gearPart(part) or part.Name == "GemsoulGear" then
+				dirty = true
+			end
 			if hidden[part] ~= nil then
 				part.LocalTransparencyModifier = hidden[part]
 				hidden[part] = nil

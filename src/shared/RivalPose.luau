@@ -73,25 +73,45 @@ end
 -- Wind-up and strike poses for each action; `s` mirrors a slash or dodge.
 local function frames(kind: string, s: number)
 	if kind == "Mine" then
-		return { Waist = { 0.15, -0.2, 0 }, RightShoulder = { 2.7, 0, 0.2 }, RightElbow = { 1, 0, 0 }, LeftShoulder = {
-			1.1,
-			0,
-			-0.3,
-		} }, { Waist = { -0.35, 0.15, 0 }, RightShoulder = { 0.6, 0, -0.2 }, RightElbow = { 0.1, 0, 0 }, LeftShoulder = {
-			0.5,
-			0,
-			-0.3,
-		} }
+		return {
+			Waist = { 0.15, -0.2, 0 },
+			RightShoulder = { 2.7, 0, 0.2 },
+			RightElbow = { 1, 0, 0 },
+			LeftShoulder = {
+				1.1,
+				0,
+				-0.3,
+			},
+		}, {
+			Waist = { -0.35, 0.15, 0 },
+			RightShoulder = { 0.6, 0, -0.2 },
+			RightElbow = { 0.1, 0, 0 },
+			LeftShoulder = {
+				0.5,
+				0,
+				-0.3,
+			},
+		}
 	elseif kind == "Feed" then
-		return { Waist = { -0.2, 0, 0 }, Neck = { 0.1, 0, 0 }, RightShoulder = { 0.5, 0, 0.2 }, LeftShoulder = {
-			0.5,
-			0,
-			-0.2,
-		} }, { Waist = { -0.55, 0, 0 }, Neck = { -0.35, 0, 0 }, RightShoulder = { 0.9, 0, 0.2 }, LeftShoulder = {
-			0.9,
-			0,
-			-0.2,
-		} }
+		return {
+			Waist = { -0.2, 0, 0 },
+			Neck = { 0.1, 0, 0 },
+			RightShoulder = { 0.5, 0, 0.2 },
+			LeftShoulder = {
+				0.5,
+				0,
+				-0.2,
+			},
+		}, {
+			Waist = { -0.55, 0, 0 },
+			Neck = { -0.35, 0, 0 },
+			RightShoulder = { 0.9, 0, 0.2 },
+			LeftShoulder = {
+				0.9,
+				0,
+				-0.2,
+			},
+		}
 	elseif kind == "Drill" then
 		return {
 			Waist = { 0.12, -0.55, 0 },
@@ -575,12 +595,17 @@ local ATTRIBUTES = {
 	"BlockedAt",
 }
 
--- Call every frame on the server with the rival's model and server time.
--- Joints only change when they move noticeably, to keep replication light.
+-- Call every frame (clients pose every body: Client.BodyPoses) with the
+-- model and server time. Joints only change when they move noticeably.
+local nextSweep = 0
 function RivalPose.update(model: Model?, dt: number, now: number, clock: number?, rest: boolean?)
-	for known in rigs do
-		if not known.Parent then
-			rigs[known] = nil -- gone: forget it
+	local tick = clock or now
+	if tick >= nextSweep then
+		nextSweep = tick + 1
+		for known in rigs do
+			if not known.Parent then
+				rigs[known] = nil -- gone: forget it
+			end
 		end
 	end
 	if not model or not model.Parent then

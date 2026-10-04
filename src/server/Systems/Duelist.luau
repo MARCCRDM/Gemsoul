@@ -449,10 +449,17 @@ local function animateLegs(humanoid: Humanoid)
 	end)
 end
 
+-- Turns it toward `target`. With its FaceAlign constraint it turns smoothly
+-- (physics, every frame) instead of snapping on each think tick.
 local function face(root: BasePart, target: Vector3)
 	local look = flat(target - root.Position)
 	if look.Magnitude > 0.1 then
-		root.CFrame = CFrame.lookAt(root.Position, root.Position + look)
+		local align = root:FindFirstChild("FaceAlign")
+		if align and align:IsA("AlignOrientation") then
+			align.CFrame = CFrame.lookAt(Vector3.zero, look)
+		else
+			root.CFrame = CFrame.lookAt(root.Position, root.Position + look)
+		end
 	end
 end
 
@@ -1625,6 +1632,22 @@ function spawnRival(owner: Player, raid, encounter)
 		animateScript:Destroy()
 	end
 	animateLegs(enemy.Humanoid)
+	rig:SetAttribute("Posed", true) -- clients pose it (BodyPoses)
+	-- Smooth turning toward its target (see face).
+	do
+		local root = enemy.Root
+		local attachment = Instance.new("Attachment")
+		attachment.Name = "FaceAttachment"
+		attachment.Parent = root
+		local align = Instance.new("AlignOrientation")
+		align.Name = "FaceAlign"
+		align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		align.Attachment0 = attachment
+		align.Responsiveness = 40
+		align.MaxTorque = 1e7
+		align.CFrame = root.CFrame.Rotation
+		align.Parent = root
+	end
 	local joints = RivalPose.jointCount(rig)
 	if joints < 10 then
 		warn(string.format("[Duelist] %s's rig has only %d of 10 poseable joints", name, joints))
@@ -1922,30 +1945,14 @@ function Duelist.start()
 		return true
 	end
 	-- Its fighting poses, every frame, bent on the server so every client sees them.
-	RunService.Heartbeat:Connect(function(dt)
-		local now = workspace:GetServerTimeNow()
-		local posed = {}
-		local actors = {}
-		for _, duel in duels do
-			table.insert(actors, duel)
-		end
-		for enemy, duel in dungeonActors do
-			if enemy.Alive then
-				table.insert(actors, duel)
-			else
+	-- Its fighting poses are drawn on every client (BodyPoses, from the
+	-- model's "Posed" attribute and its action attributes), at the screen's
+	-- frame rate. Posed here they were streamed joint by joint at the network
+	-- rate: choppy, and heavy on bandwidth. Dead dungeon fighters drop off.
+	RunService.Heartbeat:Connect(function()
+		for enemy in dungeonActors do
+			if not enemy.Alive then
 				dungeonActors[enemy] = nil
-			end
-		end
-		for _, duel in actors do
-			-- (A raid boss is listed once per raider; pose it once.)
-			if posed[duel] then
-				continue
-			end
-			posed[duel] = true
-			local ok, problem = pcall(RivalPose.update, duel.Enemy.Model, dt, now, os.clock())
-			if not ok and not duel.PoseWarned then
-				duel.PoseWarned = true
-				warn("[Duelist] pose update failed: " .. tostring(problem))
 			end
 		end
 	end)

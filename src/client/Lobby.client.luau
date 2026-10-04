@@ -21,14 +21,24 @@ local UiKit = require(script.Parent.Modules.UiKit)
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- The lobby HUD: in the Outpost, not fighting, not inside a menu.
+-- The lobby HUD: in the Outpost, not fighting, not inside a menu. Checked
+-- a few times a second, and only applied when it changes.
+local shown = nil
+local nextCheck = 0
 RunService.Heartbeat:Connect(function()
-	LobbyUI.setVisible(
-		OutpostScene.isActive()
-			and player:GetAttribute("CombatSession") == nil
-			and player:GetAttribute("MatchId") == nil
-			and not playerGui:FindFirstChild("Intro")
-	)
+	local now = os.clock()
+	if now < nextCheck then
+		return
+	end
+	nextCheck = now + 0.2
+	local on = OutpostScene.isActive()
+		and player:GetAttribute("CombatSession") == nil
+		and player:GetAttribute("MatchId") == nil
+		and not playerGui:FindFirstChild("Intro")
+	if on ~= shown then
+		shown = on
+		LobbyUI.setVisible(on)
+	end
 end)
 
 -- A respawn in the lobby puts you back in the Outpost, not at the old base.
