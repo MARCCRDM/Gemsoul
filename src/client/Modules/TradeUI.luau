@@ -883,6 +883,12 @@ function TradeUI.open()
 	end)
 end
 
+-- Opens the Market with a trade partner already picked (from chat, say).
+function TradeUI.openWith(userId: number)
+	target = userId
+	TradeUI.open()
+end
+
 local function close()
 	window.Gui.Enabled = false
 end

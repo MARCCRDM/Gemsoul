@@ -55,6 +55,7 @@ Enchanting.start()
 Forge.start()
 Trading.start()
 Party.start()
+require(script.Parent.Systems.ChatChannels).start()
 -- Playtest feedback and error reports (Social > Feedback).
 require(script.Parent.Systems.Feedback).start()
 StoreServer.start()
@@ -74,7 +75,7 @@ if Config.CombatEnabled or not Config.MenuOnly then
 	-- Party Raids: a party of three or more against a raid boss.
 	require(script.Parent.Systems.Raids).start()
 	require(script.Parent.Systems.Dungeons).start()
-require(script.Parent.Systems.DungeonQueue).start()
+	require(script.Parent.Systems.DungeonQueue).start()
 end
 -- Saga Outpost: the shared mining basin (mine, trade at the Probe, duel).
 if Config.Features == nil or Config.Features.Mining ~= false then

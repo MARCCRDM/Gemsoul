@@ -30,6 +30,7 @@ local Rules = require(ReplicatedStorage.Shared.Outpost)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
+local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
 local MineWall = require(script.Parent.MineWall)
 local PlayerData = require(script.Parent.PlayerData)
@@ -283,6 +284,13 @@ local function loot(player: Player, node, profile)
 			result.Rarity = gem.Tier
 			result.Text = GemConfig.displayName(gem)
 			PlayerData.milestone(player, "Mined")
+			-- Ultra Rare and Legendary finds are called out to the whole server.
+			if (GemConfig.TierRank[gem.Tier] or 0) >= 4 then
+				ChatChannels.announce(
+					"Loot",
+					string.format("%s unearthed [%s] at the Outpost!", player.DisplayName, result.Text)
+				)
+			end
 		else
 			result.Full = true
 		end

@@ -157,6 +157,8 @@ local MineWall = {
 	end,
 }
 local Progress = { addXP = function() end }
+local announced = {}
+local ChatChannels = { announce = function(kind, text) table.insert(announced, { kind, text }) end }
 local TopPlayers = {
 	board = function(name)
 		return { { Name = "Ana", Value = if name == "Gear" then 210 else 7 } }
@@ -195,7 +197,7 @@ local function load(path, name, extra)
 	return fn()
 end
 local Rules = load("src/shared/Outpost.luau", "Outpost", {})
-local GemConfig = { displayName = function()
+local GemConfig = { TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }, displayName = function()
 	return "Rare Shock Gem"
 end }
 local Mine = load("src/shared/Mine.luau", "Mine", {})
@@ -237,6 +239,7 @@ local Server = (function()
 				Mine = Mine,
 				OutpostWorld = World,
 				Gems = Gems,
+				ChatChannels = ChatChannels,
 				MineWall = MineWall,
 				PlayerData = PlayerData,
 				Progress = Progress,
@@ -444,6 +447,9 @@ check(not handlers.OutpostBuyPick(ana, "Plasma").Ok, "Bought a pick without the 
 -- Tomorrow, a fresh Survey Pick.
 profiles[ana].Outpost.FreeDay -= 1
 check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings, "No free pick the next day")
+
+-- Only Ultra Rare and Legendary finds are called out to the server.
+check(gemsAwarded > 0 and #announced == 0, "A Rare find was announced to the server")
 
 -- Leaving.
 check(handlers.OutpostLeave(ana).Ok and ana:GetAttribute("Outpost") == nil, "Couldn't leave")

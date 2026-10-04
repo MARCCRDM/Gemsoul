@@ -564,6 +564,20 @@ function OutpostScene.reveal(loot, at: Vector3?)
 	if loot.Full then
 		table.insert(extras, "Gem pouch full: sell or socket gems!")
 	end
+	-- The find goes into the chat frame's Loot tab too.
+	local found = {}
+	if loot.Gem and loot.Text then
+		table.insert(found, "[" .. loot.Text .. "]")
+	end
+	if loot.Gear then
+		table.insert(found, "[" .. tostring(loot.Gear) .. "]")
+	end
+	if loot.Coins then
+		table.insert(found, loot.Coins .. " coins")
+	end
+	if #found > 0 then
+		require(script.Parent.ChatFrame).loot("You receive loot: " .. table.concat(found, ", "))
+	end
 	task.spawn(function()
 		if rank > 0 then
 			-- Spin: fast at first, slowing, ticking higher as it slows.

@@ -16,6 +16,8 @@ end
 
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
+-- The chat frame runs on its own once loaded (dashboard and Outpost).
+require(script.Parent.Modules.ChatFrame)
 local OutpostScene = require(script.Parent.Modules.OutpostScene)
 local OutpostRules = require(ReplicatedStorage.Shared.Outpost)
 local GemClient = require(script.Parent.Modules.GemClient)
