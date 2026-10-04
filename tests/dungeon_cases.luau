@@ -49,15 +49,17 @@ local function clearRoom(runId, index)
 	end
 	return count
 end
--- All camps are live together; no gate or room-clearing prerequisite.
-local camps,bandits=0,0
-for _,e in spawned do
- if e.Id==id then camps+=1;if e.Encounter.Bandit then bandits+=1 end;check(e.Encounter.OpenWorld,"Sequential encounter leaked") end
+-- Public queues use gated pathway progression, not the experimental open map.
+local function reachBoss(runId,members)
+ for room=1,4 do
+  check(clearRoom(runId,room)>=2,"Missing pathway encounter")
+  check(worlds[runId].Gates[room].Destroyed,"Pathway gate stayed sealed")
+  for _,p in members do p.Root.Position=worlds[runId].Centers[room+1]+Vector3.new(0,4,0) end
+  tick(.5)
+ end
 end
-check(camps>=19 and bandits>=6,"Open map population missing")
-for _,p in team do p.Root.Position=worlds[id].Origin+Vector3.new(100,4,80) end
-tick(.5)
-check(team[1]:GetAttribute("DungeonId")==id,"Free exploration returned player to town")
+for _,e in spawned do if e.Id==id then check(not e.Encounter.OpenWorld and e.Encounter.Room==1,"Public queue enabled open world") end end
+reachBoss(id,team)
 local boss
 for _, e in spawned do
 	if e.Id == id and e.Encounter.Boss then
@@ -65,7 +67,7 @@ for _, e in spawned do
 	end
 end
 check(boss ~= nil, "Final boss not spawned")
-clearRoom(id, 10)
+clearRoom(id, 5)
 check(team[1]:GetAttribute("DungeonLoot")~=nil,"Boss loot prompt missing")
 check(not handlers.DungeonLootChoice(second[1],"Claim").Ok,"Other squad stole loot")
 check(not handlers.DungeonLootChoice(team[1],"Invalid").Ok,"Invalid choice accepted")
@@ -104,7 +106,7 @@ handlers.PartyDungeon(lost[1])
 tick(3)
 local lostId = lost[1]:GetAttribute("DungeonId")
 ArenaSessions.leave(lost[3])
-for i=1,2 do lost[i].Root.Position=worlds[lostId].Origin end
+for i=1,2 do lost[i].Root.Position=worlds[lostId].Centers[1] end
 tick(.5)
 check(lost[1]:GetAttribute("DungeonId")==lostId,"Losing a member prematurely destroyed open map")
 for i=1,2 do ArenaSessions.leave(lost[i]) end
@@ -116,7 +118,7 @@ check(timeout[1]:GetAttribute("DungeonId") == nil, "Timeout leaked")
 print(
 	"PASS: "
 		.. checks
-		.. " dungeon checks (1,000 connected layouts, roles, elements, queue, readiness, isolation, open exploration, loot choices, completion, duplicate rewards, aborts, timeout)"
+		.. " dungeon checks (1,000 connected layouts, roles, elements, queue, readiness, isolation, pathway progression, loot choices, completion, duplicate rewards, aborts, timeout)"
 )
 
 local tester=squad(1)[1]
@@ -166,12 +168,12 @@ local quiet=squad(3)
 handlers.PartyDungeon(quiet[1]);tick(3)
 local quietId=quiet[1]:GetAttribute("DungeonId")
 local before=#awarded
-clearRoom(quietId,10);tick(30);tick(5)
+reachBoss(quietId,quiet);clearRoom(quietId,5);tick(30);tick(5)
 check(#awarded==before and quiet[1]:GetAttribute("DungeonId")==nil,"Unanswered loot leaked or awarded")
 local full=squad(3)
 handlers.PartyDungeon(full[1]);tick(3)
 local fullId=full[1]:GetAttribute("DungeonId")
-clearRoom(fullId,10)
+reachBoss(fullId,full);clearRoom(fullId,5)
 local add=PlayerData.addGem
 PlayerData.addGem=function() return false end
 handlers.DungeonLootChoice(full[1],"Claim")
@@ -182,3 +184,20 @@ tick(5)
 check(profiles[full[1]].Coins==800,"Full pouch fallback lost reward")
 check(not handlers.DungeonLootChoice(full[1],"Roll").Ok,"Resolved loot replay accepted")
 print("PASS: loot timeout, full inventory compensation, single claimant and replay rejection")
+
+-- Explicit owner-only open-world mode remains available alongside Full/Pathway.
+check(not handlers.DungeonTest(outsider,"OpenWorld").Ok,"Public open-world test bypass")
+check(handlers.DungeonTest(tester,"OpenWorld").Ok,"Owner open-world test rejected")
+local openId=tester:GetAttribute("DungeonId")
+tick(3)
+local population=0
+for _,e in spawned do if e.Id==openId then check(e.Encounter.OpenWorld,"Wrong test mode");population+=1 end end
+check(population>=19,"Open-world test population missing")
+check(worlds[openId].Origin~=nil,"Open-world builder not selected")
+clearRoom(openId,10)
+check(tester:GetAttribute("DungeonId")==nil and profiles[tester].Coins==0,"Open test cleanup/rewards")
+check(handlers.DungeonTest(tester,"Full").Ok,"Pathway test rejected")
+local pathId=tester:GetAttribute("DungeonId");tick(3)
+for _,e in spawned do if e.Id==pathId then check(not e.Encounter.OpenWorld and e.Encounter.Room==1,"Full should mean pathway") end end
+ArenaSessions.leave(tester)
+print("PASS: public pathway default, owner-only open-world mode, separate pathway test and reward suppression")

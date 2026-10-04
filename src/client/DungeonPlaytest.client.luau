@@ -41,7 +41,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 186)
+panel.Size = UDim2.fromOffset(300, 218)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -83,8 +83,9 @@ local function run(action: string, ...)
 end
 
 local buttons = {
-	{ "F7 / DUNGEON", "DungeonTest", "Full" },
+	{ "F7 / PATHWAY", "DungeonTest", "Full" },
 	{ "F8 / TUNG TUNG", "DungeonTest", "Sahur" },
+	{ "OPEN WORLD DUNGEON TEST", "DungeonTest", "OpenWorld" },
 	{ "EXIT TEST", "ArenaLeave" },
 	{ "REGENERATE LOADOUT", "AdminRegenerateEquipment" },
 	{ "REROLL 3 GEMS", "AdminRegenerateGems" },
@@ -94,7 +95,7 @@ for i, item in buttons do
 	local wide = i >= 3
 	b.Size = UDim2.fromOffset(if wide then 288 else 141, 26)
 	b.Position = UDim2.fromOffset(if i == 2 then 153 else 6, if i <= 2 then 44 else 44 + (i - 2) * 32)
-	b.BackgroundColor3 = if i >= 4 then Color3.fromRGB(70, 46, 84) else Color3.fromRGB(39, 61, 79)
+	b.BackgroundColor3 = if i >= 5 then Color3.fromRGB(70, 46, 84) else Color3.fromRGB(39, 61, 79)
 	b.TextColor3 = Color3.fromRGB(240, 245, 250)
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 12

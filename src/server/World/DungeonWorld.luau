@@ -33,12 +33,12 @@ function World.build(id, rooms, origin)
 	folder.Name = "Dungeon_" .. id
 	folder.Parent = workspace
 	local centers, gates = {}, {}
-	local wallColor = Color3.fromRGB(27, 37, 49)
+	local wallColor = Color3.fromRGB(76, 69, 66)
 	for i, room in rooms do
 		local center = origin + Vector3.new(room.X * Rules.Spacing, 0, room.Z * Rules.Spacing)
 		centers[i] = center
 		local color = GemConfig.ElementColors[Rules.Roster[room.Theme].Element]
-		block(folder, "RoomFloor", Vector3.new(64, 2, 64), center, Color3.fromRGB(65, 74, 88))
+		block(folder, "CanyonClearing", Vector3.new(64, 2, 64), center, Color3.fromRGB(103, 97, 83))
 		fillLight(folder, center + Vector3.new(-16, 16, 0), 48, 1.7)
 		fillLight(folder, center + Vector3.new(16, 16, 0), 48, 1.7)
 		local doors = {}
@@ -52,11 +52,11 @@ function World.build(id, rooms, origin)
 			local dx, dz = d[1], d[2]
 			if doors[dx .. ":" .. dz] then
 				for _, sign in { -1, 1 } do
-					local at = center + Vector3.new(dx * 32 + dz * sign * 20, 7, dz * 32 + dx * sign * 20)
+					local at = center + Vector3.new(dx * 32 + dz * sign * 20, 4.5, dz * 32 + dx * sign * 20)
 					block(
 						folder,
-						"DoorWall",
-						if dx ~= 0 then Vector3.new(2, 14, 24) else Vector3.new(24, 14, 2),
+						"TrailCliff",
+						if dx ~= 0 then Vector3.new(5, 9, 24) else Vector3.new(24, 9, 5),
 						at,
 						wallColor
 					)
@@ -64,12 +64,46 @@ function World.build(id, rooms, origin)
 			else
 				block(
 					folder,
-					"Wall",
-					if dx ~= 0 then Vector3.new(2, 14, 64) else Vector3.new(64, 14, 2),
-					center + Vector3.new(dx * 32, 7, dz * 32),
+					"CanyonRidge",
+					if dx ~= 0 then Vector3.new(5, 9, 64) else Vector3.new(64, 9, 5),
+					center + Vector3.new(dx * 32, 4.5, dz * 32),
 					wallColor
 				)
+				for segment = 1, 7 do
+					local offset = (segment - 4) * 10
+					local rock = block(
+						folder,
+						"RidgeCrown",
+						if dx ~= 0 then Vector3.new(7, 4 + segment % 3, 11) else Vector3.new(11, 4 + segment % 3, 7),
+						center + Vector3.new(dx * 34 + dz * offset, 9, dz * 34 + dx * offset),
+						Color3.fromRGB(86 + segment % 3 * 5, 79, 73)
+					)
+					rock.CFrame *= CFrame.Angles(0.04 * (segment % 3 - 1), 0, 0.06 * (segment % 2))
+				end
 			end
+		end
+		-- Broken geological silhouettes outside the playable clearing, clear combat floor inside.
+		for n = 1, 7, 2 do
+			local angle = n * math.pi / 4
+			local ridge = block(
+				folder,
+				"DistantCrag",
+				Vector3.new(9, 12 + n % 3 * 4, 8),
+				center + Vector3.new(math.cos(angle) * 43, 6, math.sin(angle) * 43),
+				Color3.fromRGB(66, 65, 73)
+			)
+			ridge.CFrame *= CFrame.Angles(0.12, angle, 0.18)
+		end
+		for n = 1, 3 do
+			local crystal = block(
+				folder,
+				"CanyonOre",
+				Vector3.new(1.5, 3 + n, 1.5),
+				center + Vector3.new(25 + n, 2, 18 + n),
+				color,
+				Enum.Material.Neon
+			)
+			crystal.CFrame *= CFrame.Angles(0.15, n, 0.2)
 		end
 		for n = 1, room.Pillars do
 			local angle = (n - 1) * math.pi / 2 + math.pi / 4
@@ -98,7 +132,7 @@ function World.build(id, rooms, origin)
 			fillLight(folder, midpoint + Vector3.new(0, 11, 0), 30, 1.4)
 			block(
 				folder,
-				"Corridor",
+				"ConnectingTrail",
 				if horizontal then Vector3.new(30, 2, 16) else Vector3.new(16, 2, 30),
 				midpoint,
 				wallColor
@@ -106,9 +140,9 @@ function World.build(id, rooms, origin)
 			for _, sign in { -1, 1 } do
 				block(
 					folder,
-					"CorridorWall",
-					if horizontal then Vector3.new(30, 12, 2) else Vector3.new(2, 12, 30),
-					midpoint + Vector3.new(if horizontal then 0 else sign * 9, 6, if horizontal then sign * 9 else 0),
+					"TrailRidge",
+					if horizontal then Vector3.new(30, 9, 4) else Vector3.new(4, 9, 30),
+					midpoint + Vector3.new(if horizontal then 0 else sign * 9, 4.5, if horizontal then sign * 9 else 0),
 					wallColor
 				)
 			end
@@ -221,6 +255,14 @@ function World.buildOpen(id, camps, origin)
 	end
 	local arrival = origin + Vector3.new(0, 0, -225)
 	fillLight(folder, arrival + Vector3.new(0, 15, 0), 48, 2)
-	return { Folder = folder, Centers = centers, Gates = {}, Ore = ore, Origin = origin, Arrival = arrival, Radius = radius }
+	return {
+		Folder = folder,
+		Centers = centers,
+		Gates = {},
+		Ore = ore,
+		Origin = origin,
+		Arrival = arrival,
+		Radius = radius,
+	}
 end
 return World

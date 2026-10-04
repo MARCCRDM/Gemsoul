@@ -254,7 +254,7 @@ local function spawnRoom(run, index)
 				end
 				run.Cleared = true
 				if room.Boss then
-					finish(run, true, "Dungeon cleared! The Colossus has fallen.")
+					beginLoot(run, room)
 					return
 				end
 				local gate = run.World.Gates[index]
@@ -325,7 +325,7 @@ local function queue(player, testMode)
 		Members = table.clone(members),
 		PartyId = party and party.Id,
 		Test = testing,
-		OpenWorld = not (testing and testMode == "Sahur"),
+		OpenWorld = testing and testMode == "OpenWorld",
 		Slot = slot,
 		Index = 1,
 		Started = os.clock(),
@@ -367,7 +367,7 @@ local function queue(player, testMode)
 			run,
 			if testing
 				then "OWNER TEST  -  solo enabled, no rewards. Encounter begins in 3 seconds."
-				else "Expedition deployed. Explore the open field. Monsters are hostile; bandits retaliate only. Find the Colossus."
+				else "PATHWAY DUNGEON · Clear five linked canyon encounters. Follow the trail to the Colossus."
 		)
 		task.delay(3, function()
 			if run.Done then
@@ -444,8 +444,8 @@ function Dungeon.start()
 		if not canTest(player) then
 			return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
 		end
-		if mode ~= "Sahur" and mode ~= "Full" then
-			return Shop.reply(false, "Choose Sahur or Full.")
+		if mode ~= "Sahur" and mode ~= "Full" and mode ~= "OpenWorld" then
+			return Shop.reply(false, "Choose Pathway, Open World, or Sahur.")
 		end
 		return queue(player, mode)
 	end)

@@ -1,6 +1,8 @@
 # Open raid expedition
 
-The normal dungeon queue now deploys a ready party of 3–4 into a bounded, private open map. The owner Full test runs the same map solo without rewards; the Sahur test remains a focused boss test.
+The normal dungeon queue deploys a ready party of 3–4 into the Pathway Dungeon: five staged canyon clearings joined by trails, with encounter gates. F7 / Pathway tests this route solo without rewards. The open map is preserved as an owner-only DEV option named Open World Dungeon Test; it is not used by matchmaking. The Sahur test remains a focused boss test.
+
+Both dungeon layouts retain boss loot decisions in normal rewarded runs. Open-world and other owner tests give no rewards. The open-map details below describe the experimental mode.
 
 - A 520-stud-wide traversable field replaces sequential rooms and gates. Nine randomized camps surround an elemental Colossus clearing. Ore clusters, rocky outcrops, rim cliffs, bandit supplies and ancient monoliths mark the space.
 - Six monster camps and three space-bandit camps contain 2–3 actors each. Monster gear follows its element and randomized camp rarity; bandits retain the rival bot's randomly generated player-style equipment with red tinting.
