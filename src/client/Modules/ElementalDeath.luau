@@ -218,7 +218,7 @@ local function ring(at: Vector3, color: Color3, radius: number, seconds: number)
 		Vector3.new(0.12, 1, 1),
 		CFrame.new(at) * CFrame.Angles(0, 0, math.rad(90)),
 		color,
-		0.15,
+		0.55,
 		Enum.PartType.Cylinder
 	)
 	tween(disc, seconds, { Size = Vector3.new(0.05, radius * 2, radius * 2), Transparency = 1 })
@@ -226,7 +226,7 @@ local function ring(at: Vector3, color: Color3, radius: number, seconds: number)
 end
 
 local function ball(at: Vector3, color: Color3, radius: number, seconds: number)
-	local sphere = neon(Vector3.one * 1.5, CFrame.new(at), color, 0.05, Enum.PartType.Ball)
+	local sphere = neon(Vector3.one * 1.5, CFrame.new(at), color, 0.25, Enum.PartType.Ball)
 	tween(sphere, seconds, { Size = Vector3.one * radius * 2, Transparency = 1 })
 	Debris:AddItem(sphere, seconds + 0.1)
 end
@@ -256,9 +256,9 @@ function STYLES.Fire(pieces, centre: Vector3, floor: number)
 	CombatFx.burst(centre, orange, "Embers", 2.4)
 	CombatFx.burst(centre, Color3.fromRGB(255, 220, 140), "Sparks", 2)
 	CombatFx.shake(0.5, 0.35)
-	ball(centre, orange, 9, 0.55)
-	ball(centre, Color3.fromRGB(255, 240, 200), 5, 0.3)
-	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), orange, 16, 0.6)
+	ball(centre, orange, 5, 0.45)
+	ball(centre, Color3.fromRGB(255, 240, 200), 3, 0.25)
+	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), orange, 10, 0.45)
 	CombatVfx.scorch(Vector3.new(centre.X, floor, centre.Z), 6, orange)
 	chunks(pieces, centre, Color3.fromRGB(60, 36, 26))
 	blowApart(pieces, centre, NumberRange.new(50, 85), 38)
@@ -302,7 +302,7 @@ function STYLES.Shock(pieces, centre: Vector3, floor: number)
 					(math.random() - 0.5) * jitter
 				)
 		end
-		if step % 2 == 1 and #pieces > 1 then
+		if step % 3 == 1 and #pieces > 1 then
 			local a = pieces[math.random(1, #pieces)].Part.Position
 			local b = pieces[math.random(1, #pieces)].Part.Position
 			CombatVfx.lightning(a, b + (b - a).Unit * 2, if math.random() < 0.5 then ion else white)
@@ -318,8 +318,8 @@ function STYLES.Shock(pieces, centre: Vector3, floor: number)
 	CombatFx.flash(centre, white, 12, 40, 0.5)
 	CombatFx.burst(centre, ion, "Sparks", 2.8)
 	CombatFx.shake(0.45, 0.3)
-	ball(centre, white, 7, 0.35)
-	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), ion, 18, 0.5)
+	ball(centre, white, 4, 0.3)
+	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), ion, 10, 0.4)
 	for _ = 1, 6 do
 		local out = Vector3.new(math.random() - 0.5, math.random() * 0.6, math.random() - 0.5)
 		if out.Magnitude > 0.05 then
@@ -341,8 +341,8 @@ function STYLES.Poison(pieces, centre: Vector3, floor: number)
 	local puddle = neon(
 		Vector3.new(0.1, 1, 1),
 		CFrame.new(centre.X, floor + 0.06, centre.Z) * CFrame.Angles(0, 0, math.rad(90)),
-		acid,
-		0.25,
+		acid:Lerp(Color3.new(0, 0, 0), 0.3),
+		0.5,
 		Enum.PartType.Cylinder
 	)
 	tween(puddle, 1.1, { Size = Vector3.new(0.1, 11, 11) })
@@ -376,7 +376,7 @@ function STYLES.Poison(pieces, centre: Vector3, floor: number)
 	CombatFx.flash(low, acid, 8, 30, 0.5)
 	CombatFx.burst(low, acid, "Embers", 2.4)
 	CombatFx.shake(0.35, 0.3)
-	ball(low, acid, 7, 0.45)
+	ball(low, acid, 4, 0.4)
 	chunks(pieces, low, acid, Enum.Material.Slate)
 	blowApart(pieces, low, NumberRange.new(32, 58), 48)
 	fadeOut(pieces, 2.8, 1.2)
@@ -416,7 +416,7 @@ function STYLES.Frost(pieces, centre: Vector3, floor: number)
 	CombatFx.flash(centre, ice, 10, 36, 0.45)
 	CombatFx.burst(centre, ice, "Shards", 2.6)
 	CombatFx.shake(0.45, 0.3)
-	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), deep, 15, 0.5)
+	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), deep, 9, 0.4)
 	-- Extra splinters from the biggest pieces.
 	for i = 1, math.min(#pieces, 24) do
 		local source = pieces[i].Part
@@ -457,8 +457,8 @@ function STYLES.Blast(pieces, centre: Vector3, floor: number, color: Color3?)
 	CombatFx.burst(centre, glow, "Sparks", 2.2)
 	CombatFx.burst(centre, Color3.fromRGB(80, 74, 70), "Smoke", 1.6)
 	CombatFx.shake(0.4, 0.3)
-	ball(centre, glow, 7, 0.4)
-	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), glow, 14, 0.5)
+	ball(centre, glow, 4, 0.35)
+	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), glow, 9, 0.4)
 	chunks(pieces, centre)
 	blowApart(pieces, centre, NumberRange.new(45, 80), 34)
 	for _, piece in pieces do

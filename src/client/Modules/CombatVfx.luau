@@ -30,10 +30,14 @@
 	      colour and blur), "Crit" and "Parry" (a bright pop)
 ]]
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 local CombatFx = require(script.Parent.CombatFx)
+local GemConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GemConfig"))
 
 local CombatVfx = {}
 
@@ -147,10 +151,10 @@ function CombatVfx.impact(position: Vector3, color: Color3, crit: boolean?, heav
 		Vector3.new(0.08, 1, 1),
 		facing * CFrame.Angles(0, math.rad(90), 0),
 		color:Lerp(WHITE, 0.3),
-		0.2,
+		0.55,
 		Enum.PartType.Cylinder
 	)
-	fade(ring, 0.25, { Size = Vector3.new(0.02, 4.5 * big, 4.5 * big) })
+	fade(ring, 0.2, { Size = Vector3.new(0.02, 3.4 * big, 3.4 * big) })
 	-- Streaks flying out.
 	for _ = 1, math.floor(7 * big) do
 		local out = Vector3.new(math.random() - 0.5, math.random() - 0.35, math.random() - 0.5)
@@ -318,14 +322,17 @@ local function jagged(from: Vector3, to: Vector3, kinks: number, wander: number)
 	table.insert(points, to)
 	return points
 end
-local function drawBolt(points: { Vector3 }, color: Color3, width: number, life: number)
+local function drawBolt(points: { Vector3 }, color: Color3, width: number, life: number, glows: boolean)
 	for i = 1, #points - 1 do
 		local a, b = points[i], points[i + 1]
 		local length = (b - a).Magnitude
 		local cf = CFrame.lookAt((a + b) / 2, b)
-		local glow = neon(Vector3.new(width * 2.6, width * 2.6, length), cf, color, 0.45)
-		local core = neon(Vector3.new(width, width, length), cf, WHITE, 0)
-		fade(glow, life)
+		-- A white core in a coloured glow (a thin fork is just the colour).
+		if glows then
+			local glow = neon(Vector3.new(width * 2.6, width * 2.6, length), cf, color, 0.45)
+			fade(glow, life)
+		end
+		local core = neon(Vector3.new(width, width, length), cf, if glows then WHITE else color, 0)
 		fade(core, life * 0.8)
 	end
 end
@@ -334,17 +341,17 @@ function CombatVfx.lightning(from: Vector3, to: Vector3, color: Color3)
 	if distance < 0.5 then
 		return
 	end
-	local kinks = math.clamp(math.floor(distance / 2.5), 3, 9)
+	local kinks = math.clamp(math.floor(distance / 3.5), 3, 7)
 	-- Two strokes a moment apart, so it flickers.
 	for flicker = 0, 1 do
 		task.delay(flicker * 0.06, function()
 			local points = jagged(from, to, kinks, 1.8)
-			drawBolt(points, color, 0.12, 0.16)
+			drawBolt(points, color, 0.12, 0.16, true)
 			-- Forks off the main bolt.
 			for _ = 1, 2 do
 				local start = points[math.random(2, #points - 1)]
 				local reach = Vector3.new(math.random() - 0.5, math.random() - 0.6, math.random() - 0.5) * 5
-				drawBolt(jagged(start, start + reach, 2, 1.2), color, 0.06, 0.12)
+				drawBolt(jagged(start, start + reach, 2, 1.2), color, 0.06, 0.12, false)
 			end
 		end)
 	end
@@ -410,6 +417,10 @@ end
 -- Beam --------------------------------------------------------------------------------
 
 function CombatVfx.beam(from: Vector3, to: Vector3, color: Color3, radius: number?)
+	-- An element's surge flies and lands its own way.
+	if CombatVfx.surge(from, to, GemConfig.elementOfColor(color), radius) then
+		return
+	end
 	local distance = (to - from).Magnitude
 	if distance > 0.1 then
 		local cf = CFrame.lookAt((from + to) / 2, to)
@@ -431,6 +442,500 @@ function CombatVfx.beam(from: Vector3, to: Vector3, color: Color3, radius: numbe
 	end
 end
 
+-- Element surges -----------------------------------------------------------------------
+--
+-- Each element's surge travels and lands its own way, so a cast reads at a
+-- glance from across the arena:
+--   Fire    a fireball streaking out, a rolling flame trail that rises and
+--           reddens behind it, a fireball bloom and a ring of fire
+--   Frost   an ice lance with a frost-mist wake and glittering crystals,
+--           landing in a cluster of ice spikes that shatter
+--   Shock   a thick forked bolt that flickers three times, landing in a
+--           ball of sparks (bolts out of the sky over an area)
+--   Poison  a glob of acid lobbed in an arc, dripping as it flies, splashing
+--           into a bubbling, spreading pool
+
+local HOT = Color3.fromRGB(255, 226, 140)
+local EMBER = Color3.fromRGB(200, 38, 16)
+local ICE = Color3.fromRGB(205, 238, 255)
+local ACID_LIGHT = Color3.fromRGB(190, 255, 140)
+local SOOT = Color3.fromRGB(90, 34, 20)
+
+-- Too many effect parts alive (a big fight): skip the optional extras.
+local function busy(): boolean
+	return #fxFolder():GetChildren() > 450
+end
+
+local function move(part: BasePart, seconds: number, goal: { [string]: any }, style: Enum.EasingStyle?)
+	TweenService:Create(part, TweenInfo.new(seconds, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal)
+		:Play()
+end
+
+local function jitter(amount: number): Vector3
+	return Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * amount
+end
+
+-- A flat disc lying on the ground (a cylinder on its side).
+local function disc(at: Vector3, diameter: number, color: Color3, transparency: number): Part
+	return neon(
+		Vector3.new(0.08, diameter, diameter),
+		CFrame.new(at) * CFrame.Angles(0, 0, math.rad(90)),
+		color,
+		transparency,
+		Enum.PartType.Cylinder
+	)
+end
+
+local floorRay = RaycastParams.new()
+floorRay.FilterType = Enum.RaycastFilterType.Exclude
+local function floorBelow(at: Vector3): Vector3
+	-- The ground under it, not a fighter standing there.
+	local skip: { Instance } = { fxFolder() }
+	for _, other in Players:GetPlayers() do
+		if other.Character then
+			table.insert(skip, other.Character)
+		end
+	end
+	local enemies = workspace:FindFirstChild("Enemies")
+	if enemies then
+		table.insert(skip, enemies)
+	end
+	floorRay.FilterDescendantsInstances = skip
+	local hit = workspace:Raycast(at + Vector3.new(0, 1, 0), Vector3.new(0, -12, 0), floorRay)
+	return if hit then hit.Position else at - Vector3.new(0, 2.6, 0)
+end
+
+-- A soft puff of flame that swells, rises and burns down from white-hot
+-- to a dull ember as it fades.
+local function flamePuff(at: Vector3, size: number, rise: number, seconds: number)
+	local puff = neon(Vector3.one * size * 0.7, CFrame.new(at), HOT, 0.25, Enum.PartType.Ball)
+	fade(puff, seconds, {
+		Size = Vector3.one * size * 1.5,
+		Color = SOOT,
+		CFrame = CFrame.new(at + Vector3.new(0, rise, 0)),
+	}, Enum.EasingStyle.Quad)
+end
+
+-- A glowing ribbon streaming behind a moving part (a Roblox Trail): smooth,
+-- tapering and fading from `head` to `tail` colour.
+local function ribbon(part: BasePart, width: number, head: Color3, tail: Color3, life: number)
+	local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+	a0.Position, a1.Position = Vector3.new(0, width / 2, 0), Vector3.new(0, -width / 2, 0)
+	a0.Parent, a1.Parent = part, part
+	local trail = Instance.new("Trail")
+	trail.Attachment0, trail.Attachment1 = a0, a1
+	trail.Color = ColorSequence.new(head, tail)
+	trail.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.05),
+		NumberSequenceKeypoint.new(0.6, 0.55),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	trail.WidthScale = NumberSequence.new(1, 0.15)
+	trail.Lifetime = life
+	trail.MinLength = 0.05
+	trail.LightEmission = 1
+	trail.FaceCamera = true
+	trail.Parent = part
+end
+
+-- A flying head arrives: it vanishes but its trail streams on to the end.
+local function retire(part: BasePart, life: number)
+	part.Transparency = 1
+	Debris:AddItem(part, life + 0.05)
+end
+
+-- An ice spike stabbing up out of `base` along `direction`, then breaking
+-- off and falling apart.
+local function iceSpike(base: Vector3, direction: Vector3, length: number, width: number, hold: number)
+	local spike = Instance.new("Part")
+	spike.Name = "Vfx"
+	spike.Anchored, spike.CanCollide, spike.CanQuery, spike.CanTouch, spike.CastShadow =
+		true, false, false, false, false
+	spike.Material = Enum.Material.Glass
+	spike.Color = ICE
+	spike.Transparency = 0.15
+	spike.Reflectance = 0.35
+	spike.Size = Vector3.new(width * 0.4, width * 0.4, 0.1)
+	spike.CFrame = CFrame.lookAt(base, base + direction)
+	spike.Parent = fxFolder()
+	move(spike, 0.12, {
+		Size = Vector3.new(width, width, length),
+		CFrame = CFrame.lookAt(base + direction * length * 0.5, base + direction * length),
+	}, Enum.EasingStyle.Back)
+	local glint = neon(Vector3.new(width * 0.3, width * 0.3, 0.1), spike.CFrame, WHITE, 0.2)
+	move(glint, 0.12, {
+		Size = Vector3.new(width * 0.25, width * 0.25, length * 0.9),
+		CFrame = CFrame.lookAt(base + direction * length * 0.5, base + direction * length),
+	}, Enum.EasingStyle.Back)
+	task.delay(hold, function()
+		-- Shatter: it drops and crumbles.
+		fade(spike, 0.3, {
+			Size = Vector3.new(width * 0.2, width * 0.2, length * 0.4),
+			CFrame = spike.CFrame * CFrame.Angles(math.random() - 0.5, 0, math.random() - 0.5) - Vector3.new(0, 1, 0),
+		})
+		fade(glint, 0.15)
+	end)
+end
+
+-- Small glittering ice chips flung out (and falling) from `at`.
+local function iceChips(at: Vector3, count: number, reach: number)
+	for _ = 1, count do
+		local out = jitter(1) + Vector3.new(0, 0.35, 0)
+		if out.Magnitude > 0.05 then
+			out = out.Unit
+			local chip = neon(
+				Vector3.one * (0.12 + math.random() * 0.18),
+				CFrame.new(at) * CFrame.Angles(math.random() * 6, math.random() * 6, 0),
+				if math.random() < 0.5 then WHITE else ICE,
+				0.1
+			)
+			chip.Material = Enum.Material.Glass
+			fade(chip, 0.45 + math.random() * 0.2, {
+				CFrame = CFrame.new(at + out * reach * (0.6 + math.random() * 0.6) - Vector3.new(0, 1.2, 0))
+					* CFrame.Angles(math.random() * 6, math.random() * 6, 0),
+			}, Enum.EasingStyle.Quad)
+		end
+	end
+end
+
+-- Acid droplets thrown up and out, falling back down.
+local function acidSplash(at: Vector3, count: number, reach: number)
+	local color = ELEMENT_COLORS.Poison
+	for _ = 1, count do
+		local out = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5)
+		if out.Magnitude > 0.05 then
+			out = out.Unit
+			local size = 0.18 + math.random() * 0.22
+			local drop = neon(
+				Vector3.one * size,
+				CFrame.new(at),
+				color:Lerp(ACID_LIGHT, math.random() * 0.5),
+				0.05,
+				Enum.PartType.Ball
+			)
+			local peak = at + out * reach * 0.45 + Vector3.new(0, 0.8 + math.random() * 1.4, 0)
+			local land = at + out * reach * (0.8 + math.random() * 0.5) - Vector3.new(0, 1.6, 0)
+			move(drop, 0.16, { CFrame = CFrame.new(peak) }, Enum.EasingStyle.Quad)
+			task.delay(0.16, function()
+				fade(drop, 0.3, { CFrame = CFrame.new(land), Size = Vector3.one * size * 0.4 }, Enum.EasingStyle.Quad)
+			end)
+		end
+	end
+end
+
+-- Landings ------------------------------------------------------------------
+
+local LAND = {}
+
+function LAND.Fire(at: Vector3, radius: number)
+	local color = ELEMENT_COLORS.Fire
+	local big = 1 + radius / 6
+	-- The fireball bloom: a white-hot core inside a swelling ball of flame.
+	local core = neon(Vector3.one * 0.8, CFrame.new(at), WHITE, 0, Enum.PartType.Ball)
+	fade(core, 0.18, { Size = Vector3.one * 2.4 * big, Color = HOT })
+	local ball = neon(Vector3.one * 1.2, CFrame.new(at), HOT, 0.05, Enum.PartType.Ball)
+	fade(ball, 0.42, { Size = Vector3.one * 4.6 * big, Color = EMBER }, Enum.EasingStyle.Sine)
+	for _ = 1, math.floor(5 * big) do
+		flamePuff(
+			at + jitter(1.6 * big),
+			1.2 + math.random() * big,
+			1 + math.random() * 1.5,
+			0.35 + math.random() * 0.15
+		)
+	end
+	CombatFx.burst(at, color, "Embers", 1.2 * big)
+	CombatFx.burst(at + Vector3.new(0, 1, 0), Color3.fromRGB(70, 56, 50), "Smoke", 0.9 * big)
+	CombatFx.flash(at, color, 6, 16 + radius * 2, 0.4)
+	if radius > 0 then
+		-- A ring of fire racing out along the ground and burning down.
+		local floor = floorBelow(at)
+		-- A ring of fire racing out along the ground, then flaring up and
+		-- burning down: a glowing ring with flames licking up all round it.
+		local blaze = disc(floor + Vector3.new(0, 0.1, 0), 1, Color3.fromRGB(255, 150, 50), 0.5)
+		move(blaze, 0.22, { Size = Vector3.new(0.12, radius * 2, radius * 2) })
+		task.delay(0.22, function()
+			fade(blaze, 0.35, { Size = Vector3.new(0.04, radius * 2.2, radius * 2.2), Color = EMBER })
+		end)
+		local count = math.clamp(math.floor(radius * 1.5), 6, 16)
+		for i = 1, count do
+			local angle = i / count * math.pi * 2
+			local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			task.delay(0.18 + (i % 3) * 0.03, function()
+				local spot = floor + out * radius + Vector3.new(0, 0.5, 0)
+				flamePuff(spot, 1.3, 1.6, 0.35)
+				CombatFx.burst(spot, color, "Embers", 0.4)
+			end)
+		end
+	end
+end
+
+function LAND.Frost(at: Vector3, radius: number)
+	local color = ELEMENT_COLORS.Frost
+	local big = 1 + radius / 8
+	local burst = neon(Vector3.one * 0.8, CFrame.new(at), WHITE, 0, Enum.PartType.Ball)
+	fade(burst, 0.2, { Size = Vector3.one * 3 * big, Color = color })
+	-- A cluster of ice spikes bursting out where it struck.
+	for _ = 1, math.floor(7 * big) do
+		local out = jitter(1) + Vector3.new(0, 0.25, 0)
+		if out.Magnitude > 0.05 then
+			iceSpike(at, out.Unit, 1.2 + math.random() * 1.4 * big, 0.28, 0.35 + math.random() * 0.15)
+		end
+	end
+	iceChips(at, math.floor(10 * big), 3 * big)
+	CombatFx.burst(at, color, "Frost", 1.2 * big)
+	CombatFx.burst(at, ICE, "Smoke", 0.8 * big)
+	CombatFx.flash(at, color, 5, 14 + radius * 2, 0.35)
+	if radius > 0 then
+		-- The ground freezes: a frost disc and a ring of spikes erupting
+		-- from it, angled outward, that shatter a moment later.
+		local floor = floorBelow(at)
+		-- A sheet of frost (ice, not light) spreading over the ground.
+		local frost = disc(floor + Vector3.new(0, 0.05, 0), 1, Color3.fromRGB(170, 215, 245), 0.55)
+		frost.Material = Enum.Material.Ice
+		move(frost, 0.25, { Size = Vector3.new(0.08, radius * 2, radius * 2) })
+		local rim = disc(floor + Vector3.new(0, 0.07, 0), 1, ICE, 0.5)
+		fade(rim, 0.45, { Size = Vector3.new(0.04, radius * 2.3, radius * 2.3) })
+		task.delay(0.6, function()
+			fade(frost, 0.5)
+		end)
+		local count = math.clamp(math.floor(radius * 1.6), 6, 18)
+		for i = 1, count do
+			local angle = i / count * math.pi * 2 + math.random() * 0.3
+			local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			local reach = radius * (0.55 + (i % 2) * 0.35)
+			task.delay(reach / radius * 0.18, function()
+				iceSpike(
+					floor + out * reach,
+					(out * 0.45 + Vector3.new(0, 1, 0)).Unit,
+					1.6 + math.random() * 1.6,
+					0.45,
+					0.5
+				)
+			end)
+		end
+	end
+end
+
+function LAND.Shock(at: Vector3, radius: number)
+	local color = ELEMENT_COLORS.Shock
+	local big = 1 + radius / 8
+	local ball = neon(Vector3.one * 0.6, CFrame.new(at), WHITE, 0, Enum.PartType.Ball)
+	fade(ball, 0.16, { Size = Vector3.one * 2.6 * big, Color = color })
+	-- Arcs crawling out from the strike.
+	for _ = 1, math.floor(3 * big) do
+		local out = jitter(1) + Vector3.new(0, -0.15, 0)
+		if out.Magnitude > 0.05 then
+			CombatVfx.lightning(at, at + out.Unit * (2.5 + math.random() * 2.5) * big, color)
+		end
+	end
+	CombatFx.burst(at, color, "Sparks", 1.6 * big)
+	CombatFx.flash(at, WHITE, 8, 18 + radius * 2, 0.25)
+	if radius > 0 then
+		-- Bolts out of the sky across the area, one after another.
+		local floor = floorBelow(at)
+		for i = 1, math.clamp(math.floor(radius * 0.5), 3, 6) do
+			task.delay(0.03 + i * 0.05, function()
+				local angle, reach = math.random() * math.pi * 2, math.sqrt(math.random()) * radius
+				local spot = floor + Vector3.new(math.cos(angle) * reach, 0.2, math.sin(angle) * reach)
+				CombatVfx.lightning(
+					spot + Vector3.new((math.random() - 0.5) * 4, 22, (math.random() - 0.5) * 4),
+					spot,
+					color
+				)
+				local scorch = disc(spot + Vector3.new(0, 0.04, 0), 1.6, WHITE, 0.1)
+				fade(scorch, 0.35, { Size = Vector3.new(0.05, 3.2, 3.2), Color = color })
+			end)
+		end
+		local wave = disc(floor + Vector3.new(0, 0.08, 0), 1, color:Lerp(WHITE, 0.4), 0.5)
+		fade(wave, 0.35, { Size = Vector3.new(0.04, radius * 2.2, radius * 2.2) })
+	end
+end
+
+function LAND.Poison(at: Vector3, radius: number)
+	local color = ELEMENT_COLORS.Poison
+	local big = 1 + radius / 8
+	local glob = neon(Vector3.one * 1, CFrame.new(at), ACID_LIGHT, 0.1, Enum.PartType.Ball)
+	fade(glob, 0.3, { Size = Vector3.one * 3.2 * big, Color = color }, Enum.EasingStyle.Sine)
+	acidSplash(at, math.floor(12 * big), 3 * big)
+	CombatFx.burst(at, color, "Smoke", 1.1 * big)
+	CombatFx.burst(at, color, "Drips", 1 * big)
+	CombatFx.flash(at, color, 4, 14 + radius * 2, 0.4)
+	-- A pool of acid spreading where it lands, bubbling, then drying up.
+	local floor = floorBelow(at)
+	local size = if radius > 0 then radius * 2 else 4
+	local pool = disc(floor + Vector3.new(0, 0.05, 0), 1, color:Lerp(Color3.new(0, 0, 0), 0.35), 0.55)
+	move(pool, 0.4, { Size = Vector3.new(0.08, size, size) }, Enum.EasingStyle.Sine)
+	local sheen = disc(floor + Vector3.new(0, 0.07, 0), 1, ACID_LIGHT, 0.88)
+	move(sheen, 0.5, { Size = Vector3.new(0.06, size * 0.7, size * 0.7) }, Enum.EasingStyle.Sine)
+	if not busy() then
+		for i = 1, math.floor(6 * big) do
+			task.delay(0.15 + i * 0.09, function()
+				local angle, reach = math.random() * math.pi * 2, math.sqrt(math.random()) * size * 0.45
+				local spot = floor + Vector3.new(math.cos(angle) * reach, 0.1, math.sin(angle) * reach)
+				local bubble = neon(Vector3.one * 0.25, CFrame.new(spot), ACID_LIGHT, 0.2, Enum.PartType.Ball)
+				fade(
+					bubble,
+					0.4,
+					{ Size = Vector3.one * 0.8, CFrame = CFrame.new(spot + Vector3.new(0, 0.5, 0)) },
+					Enum.EasingStyle.Sine
+				)
+			end)
+		end
+	end
+	task.delay(0.9, function()
+		fade(pool, 0.9)
+		fade(sheen, 0.6)
+	end)
+end
+
+-- Flights -------------------------------------------------------------------
+
+local function travelTime(distance: number, speed: number): number
+	return math.clamp(distance / speed, 0.06, 0.32)
+end
+
+local FLY = {}
+
+function FLY.Fire(from: Vector3, to: Vector3, landed: () -> ())
+	local distance = (to - from).Magnitude
+	local travel = travelTime(distance, 110)
+	local head = neon(Vector3.one * 1.5, CFrame.new(from), ELEMENT_COLORS.Fire, 0.15, Enum.PartType.Ball)
+	local core = neon(Vector3.one * 0.8, CFrame.new(from), HOT, 0, Enum.PartType.Ball)
+	-- A streaming tail of flame, white-hot at the head and burning down.
+	ribbon(head, 1.3, HOT, EMBER, 0.2)
+	move(head, travel, { CFrame = CFrame.new(to) }, Enum.EasingStyle.Linear)
+	move(core, travel, { CFrame = CFrame.new(to) }, Enum.EasingStyle.Linear)
+	-- Embers shed from the tail, drifting up as they burn out.
+	local puffs = math.clamp(math.floor(distance / 4), 2, 8)
+	for i = 1, puffs do
+		local t = (i - 0.5) / puffs
+		task.delay(travel * t, function()
+			CombatFx.burst(from:Lerp(to, t), ELEMENT_COLORS.Fire, "Embers", 0.45)
+		end)
+	end
+	CombatFx.burst(from, ELEMENT_COLORS.Fire, "Embers", 0.6)
+	task.delay(travel, function()
+		retire(head, 0.2)
+		core:Destroy()
+		landed()
+	end)
+end
+
+function FLY.Frost(from: Vector3, to: Vector3, landed: () -> ())
+	local distance = (to - from).Magnitude
+	local travel = travelTime(distance, 130)
+	local facing = CFrame.lookAt(from, to)
+	local arrive = CFrame.lookAt(to, to + (to - from).Unit)
+	local lance = Instance.new("Part")
+	lance.Name = "Vfx"
+	lance.Anchored, lance.CanCollide, lance.CanQuery, lance.CanTouch, lance.CastShadow =
+		true, false, false, false, false
+	lance.Material = Enum.Material.Glass
+	lance.Color, lance.Transparency, lance.Reflectance = ICE, 0.1, 0.4
+	lance.Size = Vector3.new(0.4, 0.4, 2.8)
+	lance.CFrame = facing
+	lance.Parent = fxFolder()
+	local glow = neon(Vector3.new(0.16, 0.16, 3.2), facing, WHITE, 0)
+	ribbon(glow, 0.55, WHITE, ICE, 0.25)
+	move(lance, travel, { CFrame = arrive }, Enum.EasingStyle.Linear)
+	move(glow, travel, { CFrame = arrive }, Enum.EasingStyle.Linear)
+	-- A wake of frost mist and glittering crystals hanging in the air.
+	local steps = math.clamp(math.floor(distance / 2.5), 3, 12)
+	for i = 1, steps do
+		local t = (i - 0.5) / steps
+		task.delay(travel * t, function()
+			local at = from:Lerp(to, t)
+			-- A wisp of cold mist and frost glitter in its wake.
+			CombatFx.burst(at, ICE, "Smoke", 0.35)
+			CombatFx.burst(at, ICE, "Frost", 0.3)
+			if i % 2 == 0 then
+				local crystal = neon(
+					Vector3.one * 0.18,
+					CFrame.new(at + jitter(0.9)) * CFrame.Angles(math.random() * 6, math.random() * 6, 0),
+					WHITE,
+					0
+				)
+				crystal.Material = Enum.Material.Glass
+				fade(crystal, 0.6, {
+					CFrame = crystal.CFrame * CFrame.Angles(2, 1, 0) - Vector3.new(0, 0.6, 0),
+				}, Enum.EasingStyle.Sine)
+			end
+		end)
+	end
+	task.delay(travel, function()
+		lance:Destroy()
+		retire(glow, 0.25)
+		landed()
+	end)
+end
+
+function FLY.Shock(from: Vector3, to: Vector3, landed: () -> ())
+	local color = ELEMENT_COLORS.Shock
+	-- A thick bolt, flickering three times, with a glow along it.
+	CombatVfx.lightning(from, to, color)
+	local distance = (to - from).Magnitude
+	local cf = CFrame.lookAt((from + to) / 2, to)
+	local glow = neon(Vector3.new(1, 1, distance), cf, color, 0.7)
+	fade(glow, 0.3, { Size = Vector3.new(0.1, 0.1, distance) })
+	CombatFx.burst(from, color, "Sparks", 0.7)
+	landed()
+end
+
+function FLY.Poison(from: Vector3, to: Vector3, landed: () -> ())
+	local color = ELEMENT_COLORS.Poison
+	local distance = (to - from).Magnitude
+	local travel = math.clamp(distance / 70, 0.12, 0.45)
+	local height = math.clamp(distance * 0.18, 0.8, 6)
+	local glob = neon(Vector3.one * 1.5, CFrame.new(from), color, 0.1, Enum.PartType.Ball)
+	local core = neon(Vector3.one * 0.75, CFrame.new(from), ACID_LIGHT, 0, Enum.PartType.Ball)
+	ribbon(core, 0.7, ACID_LIGHT, color, 0.18)
+	-- Lobbed in an arc, wobbling, dripping as it goes.
+	local started = os.clock()
+	local lastDrip = 0
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		local t = math.min(1, (os.clock() - started) / travel)
+		local at = from:Lerp(to, t) + Vector3.new(0, math.sin(t * math.pi) * height, 0)
+		local wobble = 1 + math.sin(t * 40) * 0.12
+		glob.CFrame, core.CFrame = CFrame.new(at), CFrame.new(at)
+		glob.Size = Vector3.new(1.5 * wobble, 1.5 / wobble, 1.5 * wobble)
+		if t - lastDrip > 0.12 then
+			lastDrip = t
+			local drop = neon(Vector3.one * 0.22, CFrame.new(at), color, 0.1, Enum.PartType.Ball)
+			fade(
+				drop,
+				0.35,
+				{ CFrame = CFrame.new(at - Vector3.new(0, 1.8, 0)), Size = Vector3.new(0.12, 0.4, 0.12) },
+				Enum.EasingStyle.Quad
+			)
+		end
+		if t >= 1 then
+			connection:Disconnect()
+			glob:Destroy()
+			retire(core, 0.18)
+			landed()
+		end
+	end)
+end
+
+-- A surge's flight and landing in its element's style. Returns false for a
+-- colour that isn't an element (the plain beam is drawn instead).
+function CombatVfx.surge(from: Vector3, to: Vector3, element: string?, radius: number?): boolean
+	local land = element and LAND[element]
+	if not land then
+		return false
+	end
+	local size = radius or 0
+	if (to - from).Magnitude < 1.5 then
+		land(to, size)
+	else
+		FLY[element](from, to, function()
+			land(to, size)
+		end)
+	end
+	return true
+end
+
 -- Aura (buffs, shields) ---------------------------------------------------------------
 
 function CombatVfx.aura(root: BasePart, color: Color3)
@@ -439,19 +944,19 @@ function CombatVfx.aura(root: BasePart, color: Color3)
 		Vector3.new(0.1, 1, 1),
 		CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90)),
 		color,
-		0.15,
+		0.55,
 		Enum.PartType.Cylinder
 	)
-	fade(floorRing, 0.6, { Size = Vector3.new(0.05, 9, 9) })
+	fade(floorRing, 0.5, { Size = Vector3.new(0.05, 8, 8) })
 	-- A soft column of light (a cylinder stood on end).
 	local column = neon(
 		Vector3.new(7, 3.2, 3.2),
 		CFrame.new(base + Vector3.new(0, 3.5, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 		color,
-		0.8,
+		0.9,
 		Enum.PartType.Cylinder
 	)
-	fade(column, 0.7, { Size = Vector3.new(9, 0.4, 0.4) })
+	fade(column, 0.5, { Size = Vector3.new(9, 0.4, 0.4) })
 	-- Motes spiralling up around you.
 	for i = 1, 14 do
 		local angle = i * math.pi * 2 / 7
@@ -463,6 +968,69 @@ function CombatVfx.aura(root: BasePart, color: Color3)
 		end)
 	end
 	CombatFx.flash(root.CFrame.Position, color, 3, 14, 0.5)
+	-- The element wraps the body its own way.
+	local element = GemConfig.elementOfColor(color)
+	local centre = root.CFrame.Position
+	if element == "Fire" then
+		-- Flames spiralling up around you.
+		for i = 1, 12 do
+			task.delay(i * 0.03, function()
+				local angle = i * 0.9
+				flamePuff(
+					base + Vector3.new(math.cos(angle) * 1.7, 0.6 + i * 0.35, math.sin(angle) * 1.7),
+					0.9,
+					1.4,
+					0.4
+				)
+			end)
+		end
+	elseif element == "Frost" then
+		-- A shell of ice panels forms around you, then shatters off.
+		for i = 1, 8 do
+			local angle = i / 8 * math.pi * 2
+			local at = CFrame.new(centre) * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0, -2)
+			local panel = neon(Vector3.new(1.4, 0.2, 0.08), at * CFrame.new(0, -2, 0), ICE, 0.3)
+			panel.Material = Enum.Material.Glass
+			panel.Reflectance = 0.3
+			move(panel, 0.18, { Size = Vector3.new(1.5, 4.6, 0.12), CFrame = at }, Enum.EasingStyle.Back)
+			task.delay(0.45, function()
+				fade(panel, 0.3, { CFrame = at * CFrame.new(0, -0.6, -1.6) * CFrame.Angles(0.6, 0, 0) })
+				iceChips(at.Position, 3, 2)
+			end)
+		end
+	elseif element == "Shock" then
+		-- Arcs snapping around you.
+		for i = 0, 5 do
+			task.delay(i * 0.07, function()
+				local a = math.random() * math.pi * 2
+				local b = a + 1.5 + math.random()
+				local y1, y2 = (math.random() - 0.3) * 4, (math.random() - 0.3) * 4
+				CombatVfx.lightning(
+					centre + Vector3.new(math.cos(a) * 1.8, y1, math.sin(a) * 1.8),
+					centre + Vector3.new(math.cos(b) * 1.8, y2, math.sin(b) * 1.8),
+					ELEMENT_COLORS.Shock
+				)
+			end)
+		end
+	elseif element == "Poison" then
+		-- Bubbles welling up out of a pool at your feet.
+		local pool = disc(base + Vector3.new(0, 0.05, 0), 1, ELEMENT_COLORS.Poison, 0.35)
+		move(pool, 0.3, { Size = Vector3.new(0.08, 6, 6) }, Enum.EasingStyle.Sine)
+		task.delay(0.6, function()
+			fade(pool, 0.6)
+		end)
+		for i = 1, 10 do
+			task.delay(i * 0.05, function()
+				local angle = math.random() * math.pi * 2
+				local at = base + Vector3.new(math.cos(angle) * 1.6, 0.3, math.sin(angle) * 1.6)
+				local bubble = neon(Vector3.one * 0.3, CFrame.new(at), ACID_LIGHT, 0.2, Enum.PartType.Ball)
+				fade(bubble, 0.55, {
+					Size = Vector3.one * 0.7,
+					CFrame = CFrame.new(at + Vector3.new(0, 2.5 + math.random() * 2, 0)),
+				}, Enum.EasingStyle.Sine)
+			end)
+		end
+	end
 end
 
 -- Parry and guard ---------------------------------------------------------------------
