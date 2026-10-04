@@ -1413,6 +1413,9 @@ local function technologyStrike(player, definition, aim, scale)
 		then root.Position
 		else origin + direction * math.min(offset.Magnitude, definition.Range)
 	local color = GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80)
+	if definition.Signature and lineClear(origin, center) then
+		fx("AbilitySignature", player, origin, center, color, definition.Signature, definition.Radius or 3)
+	end
 	if definition.Cone then
 		-- A cone in front, out to Range (Acid Spray).
 		local half = math.cos(math.rad(definition.Cone / 2))

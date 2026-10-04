@@ -324,8 +324,9 @@ check(lines[1] == "Surge: Ember Lance (Apprentice · Rank I)" and lines[2] == st
 -- (The combat doubles pin math.random, so this uses its own generator.)
 local seed = 7
 local function nextNumber()
-	seed = (seed * 1103515245 + 12345) % 2147483648
-	return seed / 2147483648
+	-- Park-Miller stays exactly representable in Luau doubles.
+	seed = (seed * 16807) % 2147483647
+	return seed / 2147483647
 end
 local rng = { NextInteger = function(_, a, b) return a + math.floor(nextNumber() * (b - a + 1)) end, NextNumber = nextNumber }
 local counts, resonance, middle, bad = {}, 0, 0, nil
@@ -385,4 +386,54 @@ check(CombatServer._technology(source, nil, rv.Position, "R"),"Live Surge refuse
 land(Actions.castTime(Tech.surgeStats(loadout.Surge3Gem)))
 check(hv.Health<1000,"Live Surge did not draw from its R capacitor")
 loadout.Surge3Gem = nil
-print("PASS: " .. checks .. " live technology/resource checks (maneuvers, all 16 gem surges and both Resonance surges by slot, gem metrics, ranks, amplifiers, Overcharge, channels, wind-ups, PvP and walls)")
+
+-- Expansion: every new surge goes through the production server, not a catalog-only check.
+check(#Tech.Order.GemSurges == 36 and #Tech.NewSurges == 18, "Gem surge roster was not doubled")
+check(#Tech.Order.RigManeuvers == 11 and #Tree.Order.RigManeuvers == 11, "Maneuver scope changed")
+local rolled = {}
+for _ = 1, 50000 do local gem = GemRoller.roll(rng, 0); rolled[gem.Surge] = true end
+for _, id in Tech.NewSurges do
+	local d = Tech.Catalog[id]
+	check(rolled[id], "New surge cannot drop: " .. id)
+	st = reset()
+	rs.Position, rv.Position = arena, arena + Vector3.new(0, 0, -5)
+	hs.Health = 500
+	local tier = if d.Element then table.find(Tech.SurgeVariants[d.Element], id) else (if id == "NullPrism" then 3 else 2)
+	local gem = surgeGem(d.Element or "Shock", tier, 1, { Surge = id })
+	local stats = Tech.surgeStats(gem)
+	st.Resources.Charge = stats.Cost - 0.01
+	check(not cast(), "Insufficient Charge accepted: " .. id)
+	st.Resources.Charge = 100
+	check(cast() and close(st.Resources.Charge, 100 - stats.Cost), "Charge cost: " .. id)
+	check(hv.Health == 1000, "Damage preceded cast release: " .. id)
+	check(source.Character:GetAttribute("ActionKind") == d.Animation, "Replicated animation: " .. id)
+	landSurge()
+	check(hv.Health < 1000, "No server damage: " .. id)
+	if d.Slow then check(CombatServer._state(victim).SlowUntil > now, "Missing slow: " .. id) end
+	if d.Shred then check(CombatServer._state(victim).SunderUntil > now, "Missing shred: " .. id) end
+	if d.Leech then check(hs.Health > 500, "Missing leech: " .. id) end
+	if d.Cloud then check(st.Zones and #st.Zones > 0, "Missing pool: " .. id) end
+	check(not cast(), "Cooldown bypass: " .. id)
+	st = reset()
+	surgeGem(d.Element or "Shock", tier, 1, { Surge = id })
+	wallBlocks = true
+	check(cast(), "Cast rejected before wall check: " .. id)
+	landSurge()
+	check(hv.Health == 1000, "New surge hit through wall: " .. id)
+	wallBlocks = false
+	if d.Element then
+		GemRoller.setElement(gem, "Frost")
+		check(gem.Surge == Tech.SurgeVariants.Frost[tier], "Element conversion lost variant: " .. id)
+	else
+		GemRoller.setElement(gem, "Fire")
+		check(gem.Surge == id, "Resonance changed with element: " .. id)
+	end
+	local a = { ActionKind = d.Animation, ActionStart = 100, ActionAt = 101 }
+	local windup = RivalPose.pose(a, 100.8, true)
+	local release = RivalPose.pose(a, 101.08, true)
+	check(windup.RightShoulder and release.RightShoulder and windup.RightShoulder[1] ~= release.RightShoulder[1], "Static/missing pose: " .. id)
+	check(RivalPose.pose(a, 103, true).RightShoulder == nil, "Pose did not recover: " .. id)
+end
+st = reset()
+print("PASS: " .. checks .. " live technology/resource checks including every new gem surge, drops, animations, costs, walls and cooldowns")
+

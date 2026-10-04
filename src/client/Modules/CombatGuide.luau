@@ -175,24 +175,36 @@ function CombatGuide.refresh()
 	for _, element in GemConfig.Elements do
 		local names = {}
 		for tier, id in Tech.Surges[element] do
-			table.insert(names, string.format("T%d %s", tier, Tech.Catalog[id].Name))
+			local alternate = Tech.SurgeVariants[element][tier]
+			table.insert(
+				names,
+				string.format("T%d  %s  /  %s", tier, Tech.Catalog[id].Name, Tech.Catalog[alternate].Name)
+			)
 		end
 		local line = text(
 			body,
-			string.upper(GemConfig.elementName(element)) .. " · " .. table.concat(names, " · "),
+			string.upper(GemConfig.elementName(element)) .. " · 8 SURGES\n" .. table.concat(names, "\n"),
 			12,
 			GemConfig.ElementColors[element]
 		)
-		line.Size, line.TextWrapped = UDim2.new(1, -12, 0, 18), true
+		line.Size, line.TextWrapped = UDim2.new(1, -12, 0, 96), true
 	end
 	local resonance = {}
 	for tier, id in Tech.Resonance do
-		table.insert(resonance, string.format("T%d %s", tier, Tech.Catalog[id].Name))
+		table.insert(
+			resonance,
+			string.format(
+				"T%d  %s  /  %s",
+				tier,
+				Tech.Catalog[id].Name,
+				Tech.Catalog[Tech.ResonanceVariants[tier]].Name
+			)
+		)
 	end
 	table.sort(resonance)
 	local resonanceLine =
-		text(body, "RESONANCE (any element) · " .. table.concat(resonance, " · "), 12, Tech.Resources.Charge.Color)
-	resonanceLine.Size, resonanceLine.TextWrapped = UDim2.new(1, -12, 0, 18), true
+		text(body, "RESONANCE · ANY ELEMENT\n" .. table.concat(resonance, "\n"), 12, Tech.Resources.Charge.Color)
+	resonanceLine.Size, resonanceLine.TextWrapped = UDim2.new(1, -12, 0, 64), true
 	local augments = text(
 		body,
 		"PASSIVE AUGMENTS · Your equipped gear applies these bonuses automatically.",

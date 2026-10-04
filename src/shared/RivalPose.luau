@@ -72,7 +72,69 @@ end
 
 -- Wind-up and strike poses for each action; `s` mirrors a slash or dodge.
 local function frames(kind: string, s: number)
-	if kind == "Slash" then
+	if kind == "Drill" then
+		return {
+			Waist = { 0.12, -0.55, 0 },
+			RightShoulder = { 1.2, -0.3, 0.65 },
+			RightElbow = { 1.65, 0, 0 },
+			LeftShoulder = { 0.8, 0, -0.3 },
+			LeftElbow = { 1.2, 0, 0 },
+		}, {
+			Waist = { -0.18, 0.35, 0 },
+			RightShoulder = { 1.65, 0.12, -0.08 },
+			RightElbow = { 0.02, 0, 0 },
+			LeftShoulder = { 0.5, 0, -0.5 },
+			LeftElbow = { 0.8, 0, 0 },
+		}
+	elseif kind == "Sweep" then
+		return {
+			Waist = { 0.05, -0.8, 0.08 },
+			RightShoulder = { 1.7, -0.4, 1.05 },
+			RightElbow = { 0.7, 0, 0 },
+			LeftShoulder = { 0.9, 0, -0.5 },
+			LeftElbow = { 1.1, 0, 0 },
+		}, {
+			Waist = { -0.1, 0.8, -0.08 },
+			RightShoulder = { 1.4, 0.4, -1.0 },
+			RightElbow = { 0.15, 0, 0 },
+			LeftShoulder = { 0.6, 0, -0.75 },
+			LeftElbow = { 0.6, 0, 0 },
+		}
+	elseif kind == "Erupt" then
+		return {
+			Waist = { 0.3, 0, 0 },
+			RightShoulder = { 2.8, 0, 0.5 },
+			LeftShoulder = { 2.8, 0, -0.5 },
+			RightElbow = { 1.1, 0, 0 },
+			LeftElbow = { 1.1, 0, 0 },
+			RightKnee = { -0.25, 0, 0 },
+			LeftKnee = { -0.25, 0, 0 },
+		}, {
+			Waist = { -0.5, 0, 0 },
+			RightShoulder = { 0.3, 0, 0.4 },
+			LeftShoulder = { 0.3, 0, -0.4 },
+			RightElbow = { 0.1, 0, 0 },
+			LeftElbow = { 0.1, 0, 0 },
+			RightHip = { 0.55, 0, 0 },
+			LeftHip = { 0.55, 0, 0 },
+			RightKnee = { -0.85, 0, 0 },
+			LeftKnee = { -0.85, 0, 0 },
+		}
+	elseif kind == "Cross" then
+		return {
+			Waist = { 0.18, 0, 0 },
+			RightShoulder = { 1.3, 0.5, -0.65 },
+			LeftShoulder = { 1.3, -0.5, 0.65 },
+			RightElbow = { 1.45, 0, 0 },
+			LeftElbow = { 1.45, 0, 0 },
+		}, {
+			Waist = { -0.2, 0, 0 },
+			RightShoulder = { 1.7, -0.3, 0.9 },
+			LeftShoulder = { 1.7, 0.3, -0.9 },
+			RightElbow = { 0.15, 0, 0 },
+			LeftElbow = { 0.15, 0, 0 },
+		}
+	elseif kind == "Slash" then
 		return {
 			Waist = { 0, -0.55 * s, 0 },
 			RightShoulder = { 2.3, 0, 0.7 * s },
@@ -206,26 +268,46 @@ BAT_GUARD.LeftShoulder = { 1.2, 0, 0.3 }
 BAT_GUARD.LeftElbow = { 1.45, 0, 0 }
 -- Both-hand guards share the same raise/recoil/recovery path in every world view.
 local WEAPON_GUARDS = {
-	TwinBlades = { RightShoulder = { 1.3, 0, -0.65 }, RightElbow = { 1.3, 0, 0 }, LeftShoulder = { 1.3, 0, 0.65 }, LeftElbow = {
-		1.3,
-		0,
-		0,
-	} },
-	Lance = { RightShoulder = { 1.1, 0, -0.55 }, RightElbow = { 1.1, 0, 0 }, LeftShoulder = { 1.45, 0, 0.35 }, LeftElbow = {
-		0.85,
-		0,
-		0,
-	} },
-	Greataxe = { RightShoulder = { 1.35, 0, -0.7 }, RightElbow = { 1.05, 0, 0 }, LeftShoulder = { 1.45, 0, 0.5 }, LeftElbow = {
-		1.1,
-		0,
-		0,
-	} },
-	Warhammer = { RightShoulder = { 1.25, 0, -0.6 }, RightElbow = { 1.2, 0, 0 }, LeftShoulder = { 1.4, 0, 0.45 }, LeftElbow = {
-		1.1,
-		0,
-		0,
-	} },
+	TwinBlades = {
+		RightShoulder = { 1.3, 0, -0.65 },
+		RightElbow = { 1.3, 0, 0 },
+		LeftShoulder = { 1.3, 0, 0.65 },
+		LeftElbow = {
+			1.3,
+			0,
+			0,
+		},
+	},
+	Lance = {
+		RightShoulder = { 1.1, 0, -0.55 },
+		RightElbow = { 1.1, 0, 0 },
+		LeftShoulder = { 1.45, 0, 0.35 },
+		LeftElbow = {
+			0.85,
+			0,
+			0,
+		},
+	},
+	Greataxe = {
+		RightShoulder = { 1.35, 0, -0.7 },
+		RightElbow = { 1.05, 0, 0 },
+		LeftShoulder = { 1.45, 0, 0.5 },
+		LeftElbow = {
+			1.1,
+			0,
+			0,
+		},
+	},
+	Warhammer = {
+		RightShoulder = { 1.25, 0, -0.6 },
+		RightElbow = { 1.2, 0, 0 },
+		LeftShoulder = { 1.4, 0, 0.45 },
+		LeftElbow = {
+			1.1,
+			0,
+			0,
+		},
+	},
 }
 for _, guard in WEAPON_GUARDS do
 	for joint, angles in GUARD do
@@ -324,7 +406,7 @@ local function actionPose(a, t: number, base)
 		local length = math.max(0.05, at - start)
 		local p = (t - start) / length
 		local pose = lerp(base, windup, ease(p * 1.4) * (1 + 0.12 * ease((p - 0.75) / 0.25)))
-		if kind == "Heavy" or kind == "Nova" then
+		if kind == "Heavy" or kind == "Nova" or kind == "Erupt" then
 			local shake = 0.035 * ease((p - 0.5) / 0.5) * math.sin(t * 47)
 			pose = add(pose, { RightShoulder = { shake, 0, 0 }, LeftShoulder = { -shake, 0, 0 } }, 1)
 		end

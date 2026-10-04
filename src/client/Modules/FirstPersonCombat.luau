@@ -12,6 +12,7 @@ local fireAt, smoothedRaised, smoothedCharge = -10, 0, 0
 local dirty = true
 -- A surge being cast (View.cast): when it began, how long it takes, its colour.
 local castAt, castFor, castColor, castOrb = -10, 0, nil, nil
+local castAnimation = nil
 local function clearModel()
 	if model then
 		model:Destroy()
@@ -424,7 +425,8 @@ end
 -- lowers, the sword arm draws back and energy gathers into an orb in front
 -- of you over `duration`; then it throws forward and bursts. (A cast with no
 -- wind-up just throws.)
-function View.cast(duration, color)
+function View.cast(duration, color, animation)
+	castAnimation = animation
 	castAt, castFor, castColor = os.clock(), math.max(0, duration or 0), color or Color3.fromRGB(255, 190, 80)
 	if castOrb then
 		castOrb:Destroy()
@@ -652,6 +654,24 @@ function View.start()
 				pose = pose:Lerp(weaponGuard, smoothedRaised)
 					* CFrame.new(0, -0.06 * jolt * smoothedRaised, 0.22 * jolt * smoothedRaised)
 					* CFrame.Angles(math.rad(10 * jolt * smoothedRaised), 0, 0)
+			end
+			if castAnimation and castPose > 0 then
+				local side = if piece.Left or piece.Shield then -1 else 1
+				local motion = CFrame.new()
+				if castAnimation == "Drill" then
+					motion = CFrame.new(0.1 * side * casting, 0.08 * casting, 0.25 * casting - 0.7 * throw)
+						* CFrame.Angles(0, 0, side * (casting * 0.3 - throw * 0.2))
+				elseif castAnimation == "Sweep" then
+					motion = CFrame.new(side * 0.22 * casting - 0.7 * throw, 0.12 * castPose, -0.2 * throw)
+						* CFrame.Angles(0, 0.45 * casting - 0.7 * throw, -0.35 * throw)
+				elseif castAnimation == "Erupt" then
+					motion = CFrame.new(0, 0.5 * casting - 0.65 * throw, -0.18 * throw)
+						* CFrame.Angles(-0.4 * casting + 0.6 * throw, 0, side * 0.12 * castPose)
+				elseif castAnimation == "Cross" then
+					motion = CFrame.new(-side * 0.28 * casting + side * 0.3 * throw, 0.22 * castPose, -0.38 * throw)
+						* CFrame.Angles(0, 0, side * (0.45 * casting - 0.5 * throw))
+				end
+				pose = motion * pose
 			end
 			piece.Part.CFrame = current.CFrame * flinch * pose * piece.Offset
 		end

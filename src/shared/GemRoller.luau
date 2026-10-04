@@ -49,6 +49,13 @@ GemRoller.Surges = {
 -- Resonance surges have no element: an Apprentice or Adept gem of any element
 -- carries one instead of its own surge this often.
 GemRoller.Resonance = { [2] = "EnergySiphon", [3] = "ResonanceEcho" }
+GemRoller.SurgeVariants = {
+	Fire = { "CinderDrill", "FurnaceCrescent", "MagmaFault", "SolarExecution" },
+	Frost = { "FrostNeedle", "GlacierFan", "PermafrostSpire", "ShatterCrown" },
+	Poison = { "CausticDart", "VitriolSweep", "LeechBloom", "Dissolution" },
+	Shock = { "ArcNeedle", "CircuitCleave", "ThunderPylon", "Railstorm" },
+}
+GemRoller.ResonanceVariants = { [2] = "ResonantReaver", [3] = "NullPrism" }
 GemRoller.ResonanceChance = 0.12
 
 local function pick(rng, list)
@@ -105,9 +112,10 @@ function GemRoller.roll(rng, luck: number?)
 	local rarity = GemRoller.rollRarity(rng, luck)
 	local rules = GemRoller.ByRarity[rarity]
 	local tier = pick(rng, rules.Tiers)
-	local surge = GemRoller.Surges[element][tier]
+	local alternate = rng:NextNumber() < 0.5
+	local surge = (if alternate then GemRoller.SurgeVariants else GemRoller.Surges)[element][tier]
 	if GemRoller.Resonance[tier] and rng:NextNumber() < GemRoller.ResonanceChance then
-		surge = GemRoller.Resonance[tier]
+		surge = (if alternate then GemRoller.ResonanceVariants else GemRoller.Resonance)[tier]
 	end
 	return {
 		Element = element,
@@ -124,8 +132,15 @@ end
 -- Gives a rolled gem a different element, with that element's surge at the
 -- same tier (a Resonance surge has no element and stays).
 function GemRoller.setElement(gem, element: string)
-	local surges = GemRoller.Surges[element]
-	if surges and gem.SurgeTier and gem.Surge ~= GemRoller.Resonance[gem.SurgeTier] then
+	local oldVariants = GemRoller.SurgeVariants[gem.Element]
+	local alternate = oldVariants and oldVariants[gem.SurgeTier] == gem.Surge
+	local surges = (if alternate then GemRoller.SurgeVariants else GemRoller.Surges)[element]
+	if
+		surges
+		and gem.SurgeTier
+		and gem.Surge ~= GemRoller.Resonance[gem.SurgeTier]
+		and gem.Surge ~= GemRoller.ResonanceVariants[gem.SurgeTier]
+	then
 		gem.Surge = surges[gem.SurgeTier] or gem.Surge
 	end
 	gem.Element = element

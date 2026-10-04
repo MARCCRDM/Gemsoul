@@ -152,6 +152,9 @@ function Actions.castTime(definition): number
 end
 -- The pose a cast shows (RivalPose kinds): Bolt, Nova, Buff, Slash or Heavy.
 function Actions.castPose(definition): string
+	if definition.Animation then
+		return definition.Animation
+	end
 	local kind = Actions.castKind(definition)
 	return if kind == "Blast" or kind == "Field"
 		then "Nova"

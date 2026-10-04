@@ -1707,7 +1707,55 @@ function handlers.TechCooldown(id, duration, lockout)
 		cast = { Name = stats.Name, Start = os.clock(), Duration = castTime, Color = castColor }
 	end
 	if gem then
-		FirstPerson.cast(castTime, castColor)
+		FirstPerson.cast(castTime, castColor, stats.Animation)
+	end
+end
+local signatureLive = 0
+function handlers.AbilitySignature(_who, from, to, color, pattern, radius)
+	local camera = workspace.CurrentCamera
+	if not camera or (camera.CFrame.Position - to).Magnitude > 160 or signatureLive >= 80 then
+		return
+	end
+	local delta = to - from
+	if delta.Magnitude < 0.05 then
+		return
+	end
+	local axis = CFrame.lookAt(from, to)
+	local count = if pattern == "Helix" then 16 else 10
+	local spread = math.clamp(radius or 3, 2, 9)
+	for i = 1, count do
+		local p = i / count
+		local at, size
+		if pattern == "Rail" then
+			at = axis
+				* CFrame.new(math.cos(p * math.pi * 4) * 0.4, math.sin(p * math.pi * 4) * 0.4, -delta.Magnitude * p)
+			size = Vector3.new(0.09, 0.09, 0.8 + p)
+		elseif pattern == "Crescent" then
+			local angle = (p - 0.5) * math.pi * 0.9
+			at = axis
+				* CFrame.new(math.sin(angle) * 5, -0.4, -math.cos(angle) * 5)
+				* CFrame.Angles(0, -angle, math.pi / 4)
+			size = Vector3.new(0.12, 0.35, 1.4)
+		elseif pattern == "Spikes" then
+			local angle = p * math.pi * 2
+			at = CFrame.new(to + Vector3.new(math.cos(angle) * spread * 0.55, -1, math.sin(angle) * spread * 0.55))
+				* CFrame.Angles(0.2, angle, 0.22)
+			size = Vector3.new(0.22, 1 + (i % 3) * 0.65, 0.22)
+		elseif pattern == "Helix" then
+			local strand = if i % 2 == 0 then 0 else math.pi
+			local angle = p * math.pi * 4 + strand
+			at = axis * CFrame.new(math.cos(angle) * 0.8, math.sin(angle) * 0.8, -delta.Magnitude * p)
+			size = Vector3.new(0.18, 0.18, 0.65)
+		else
+			return
+		end
+		local shard = effectPart(size, at, color)
+		shard.Transparency = 0.25
+		signatureLive += 1
+		fade(shard, 0.35, size * 1.5)
+		task.delay(0.4, function()
+			signatureLive = math.max(0, signatureLive - 1)
+		end)
 	end
 end
 function handlers.TechPulse(_who, from, to, color, radius)

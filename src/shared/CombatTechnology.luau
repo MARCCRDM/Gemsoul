@@ -48,10 +48,11 @@ Tech.Order = {
 		"ResonanceEcho",
 	},
 }
--- The 16 elemental gem surges by element and surge tier (1-4), and the two
--- Resonance surges (tiers 2 and 3) any gem may carry. See GemRoller.
+-- Original and alternate surges at each tier. Saved gems retain their IDs.
 Tech.Surges = GemRoller.Surges
 Tech.Resonance = GemRoller.Resonance
+Tech.SurgeVariants = GemRoller.SurgeVariants
+Tech.ResonanceVariants = GemRoller.ResonanceVariants
 Tech.TierNames = GemRoller.TierNames
 Tech.SurgeSlots = 3 -- Q, E, R
 -- The Surge Array keys and the saved capacitor sockets they cast from
@@ -482,6 +483,349 @@ Tech.Catalog = {
 		Description = "Flash-freeze the aimed area: everything in it is frozen solid, then slowed.",
 	},
 }
+-- Arsenal expansion: shared definitions drive progression, casts and presentation.
+Tech.NewSurges = {}
+local expansion = {
+	CinderDrill = {
+		Name = "Cinder Drill",
+		Resource = "Charge",
+		Damage = 1.05,
+		Cost = 18,
+		Cooldown = 5,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Drill",
+		Signature = "Rail",
+		Icon = "➤",
+		Description = "A narrow thermal drill burns through enemies in a line.",
+		Element = "Fire",
+		Piercing = true,
+	},
+	FurnaceCrescent = {
+		Name = "Furnace Crescent",
+		Resource = "Charge",
+		Damage = 1.65,
+		Cost = 27,
+		Cooldown = 9,
+		Recovery = 0.6,
+		Range = 15,
+		Animation = "Sweep",
+		Signature = "Crescent",
+		Icon = "✂",
+		Description = "Sweep a furnace-hot arc through the frontline.",
+		Element = "Fire",
+		Cone = 95,
+	},
+	MagmaFault = {
+		Name = "Magma Fault",
+		Resource = "Charge",
+		Damage = 2.1,
+		Cost = 36,
+		Cooldown = 14,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Erupt",
+		Signature = "Spikes",
+		Icon = "✹",
+		Description = "Rupture the ground into a short-lived magma damage zone.",
+		Element = "Fire",
+		Radius = 7,
+		Cloud = { Duration = 3, Every = 1, Damage = 0.25 },
+		Duration = 3,
+	},
+	SolarExecution = {
+		Name = "Solar Execution",
+		Resource = "Charge",
+		Damage = 3.4,
+		Cost = 48,
+		Cooldown = 21,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Cross",
+		Signature = "Helix",
+		Icon = "✦",
+		Description = "Charge a thermal lance that finishes a badly wounded target.",
+		Element = "Fire",
+		Pierce = true,
+		Execute = 0.12,
+		Windup = 1.1,
+	},
+	FrostNeedle = {
+		Name = "Frost Needle",
+		Resource = "Charge",
+		Damage = 1.05,
+		Cost = 18,
+		Cooldown = 5,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Drill",
+		Signature = "Rail",
+		Icon = "➤",
+		Description = "A precise cryo needle slows the target.",
+		Element = "Frost",
+		Slow = 0.25,
+		SlowTime = 2,
+	},
+	GlacierFan = {
+		Name = "Glacier Fan",
+		Resource = "Charge",
+		Damage = 1.65,
+		Cost = 27,
+		Cooldown = 9,
+		Recovery = 0.6,
+		Range = 15,
+		Animation = "Sweep",
+		Signature = "Crescent",
+		Icon = "✂",
+		Description = "Cast a fan of ice that slows a crowded frontline.",
+		Element = "Frost",
+		Cone = 100,
+		Slow = 0.3,
+		SlowTime = 2.5,
+	},
+	PermafrostSpire = {
+		Name = "Permafrost Spire",
+		Resource = "Charge",
+		Damage = 2.1,
+		Cost = 36,
+		Cooldown = 14,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Erupt",
+		Signature = "Spikes",
+		Icon = "✹",
+		Description = "Raise a cryo spire that briefly freezes its impact area.",
+		Element = "Frost",
+		Radius = 6,
+		Stun = 0.6,
+		Slow = 0.3,
+		SlowTime = 3,
+	},
+	ShatterCrown = {
+		Name = "Shatter Crown",
+		Resource = "Charge",
+		Damage = 3.4,
+		Cost = 48,
+		Cooldown = 21,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Cross",
+		Signature = "Helix",
+		Icon = "✦",
+		Description = "A crown of fractured ice slows enemies and exposes their armor.",
+		Element = "Frost",
+		Radius = 9,
+		Slow = 0.45,
+		SlowTime = 4,
+		Shred = 0.15,
+		ShredTime = 4,
+		Windup = 1.2,
+	},
+	CausticDart = {
+		Name = "Caustic Dart",
+		Resource = "Charge",
+		Damage = 1.05,
+		Cost = 18,
+		Cooldown = 5,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Drill",
+		Signature = "Rail",
+		Icon = "➤",
+		Description = "Inject a corrosive dart that weakens armor.",
+		Element = "Poison",
+		Shred = 0.1,
+		ShredTime = 3,
+	},
+	VitriolSweep = {
+		Name = "Vitriol Sweep",
+		Resource = "Charge",
+		Damage = 1.65,
+		Cost = 27,
+		Cooldown = 9,
+		Recovery = 0.6,
+		Range = 15,
+		Animation = "Sweep",
+		Signature = "Crescent",
+		Icon = "✂",
+		Description = "Sweep a caustic blade through a fan of enemies.",
+		Element = "Poison",
+		Cone = 90,
+		Shred = 0.15,
+		ShredTime = 3,
+	},
+	LeechBloom = {
+		Name = "Leech Bloom",
+		Resource = "Charge",
+		Damage = 2.1,
+		Cost = 36,
+		Cooldown = 14,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Erupt",
+		Signature = "Spikes",
+		Icon = "✹",
+		Description = "Bloom a corrosive pool that returns a share of its damage as health.",
+		Element = "Poison",
+		Radius = 6,
+		Leech = 0.2,
+		Cloud = { Duration = 3, Every = 1, Damage = 0.2 },
+		Duration = 3,
+	},
+	Dissolution = {
+		Name = "Dissolution",
+		Resource = "Charge",
+		Damage = 3.4,
+		Cost = 48,
+		Cooldown = 21,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Cross",
+		Signature = "Helix",
+		Icon = "✦",
+		Description = "Concentrate a drilling acid beam to bypass guard and dissolve armor.",
+		Element = "Poison",
+		Pierce = true,
+		Shred = 0.3,
+		ShredTime = 5,
+		Windup = 1.1,
+	},
+	ArcNeedle = {
+		Name = "Arc Needle",
+		Resource = "Charge",
+		Damage = 1.05,
+		Cost = 18,
+		Cooldown = 5,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Drill",
+		Signature = "Rail",
+		Icon = "➤",
+		Description = "A fast ion needle disrupts a surge cast.",
+		Element = "Shock",
+		Interrupt = 1,
+	},
+	CircuitCleave = {
+		Name = "Circuit Cleave",
+		Resource = "Charge",
+		Damage = 1.65,
+		Cost = 27,
+		Cooldown = 9,
+		Recovery = 0.6,
+		Range = 15,
+		Animation = "Sweep",
+		Signature = "Crescent",
+		Icon = "✂",
+		Description = "Sweep a circuit blade across enemies for a brief stun.",
+		Element = "Shock",
+		Cone = 100,
+		Stun = 0.25,
+	},
+	ThunderPylon = {
+		Name = "Thunder Pylon",
+		Resource = "Charge",
+		Damage = 2.1,
+		Cost = 36,
+		Cooldown = 14,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Erupt",
+		Signature = "Spikes",
+		Icon = "✹",
+		Description = "Erupt an ion pylon that stuns the impact area.",
+		Element = "Shock",
+		Radius = 7,
+		Stun = 0.45,
+	},
+	Railstorm = {
+		Name = "Railstorm",
+		Resource = "Charge",
+		Damage = 3.4,
+		Cost = 48,
+		Cooldown = 21,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Cross",
+		Signature = "Helix",
+		Icon = "✦",
+		Description = "Discharge a piercing rail beam that interrupts enemies along its line.",
+		Element = "Shock",
+		Piercing = true,
+		Interrupt = 2,
+		Windup = 1.1,
+	},
+	ResonantReaver = {
+		Name = "Resonant Reaver",
+		Resource = "Charge",
+		Damage = 1.5,
+		Cost = 28,
+		Cooldown = 10,
+		Recovery = 0.6,
+		Range = 14,
+		Animation = "Sweep",
+		Signature = "Crescent",
+		Icon = "✂",
+		Description = "A neutral resonance sweep converts part of its damage into health.",
+		Cone = 90,
+		Leech = 0.2,
+	},
+	NullPrism = {
+		Name = "Null Prism",
+		Resource = "Charge",
+		Damage = 2.2,
+		Cost = 37,
+		Cooldown = 15,
+		Recovery = 0.6,
+		Range = 35,
+		Animation = "Cross",
+		Signature = "Helix",
+		Icon = "✦",
+		Description = "A neutral prism pulse interrupts the target and weakens its armor.",
+		Interrupt = 2,
+		Shred = 0.15,
+		ShredTime = 3,
+	},
+}
+for id, definition in expansion do
+	Tech.Catalog[id] = definition
+end
+table.insert(Tech.Order.GemSurges, "CinderDrill")
+table.insert(Tech.NewSurges, "CinderDrill")
+table.insert(Tech.Order.GemSurges, "FurnaceCrescent")
+table.insert(Tech.NewSurges, "FurnaceCrescent")
+table.insert(Tech.Order.GemSurges, "MagmaFault")
+table.insert(Tech.NewSurges, "MagmaFault")
+table.insert(Tech.Order.GemSurges, "SolarExecution")
+table.insert(Tech.NewSurges, "SolarExecution")
+table.insert(Tech.Order.GemSurges, "FrostNeedle")
+table.insert(Tech.NewSurges, "FrostNeedle")
+table.insert(Tech.Order.GemSurges, "GlacierFan")
+table.insert(Tech.NewSurges, "GlacierFan")
+table.insert(Tech.Order.GemSurges, "PermafrostSpire")
+table.insert(Tech.NewSurges, "PermafrostSpire")
+table.insert(Tech.Order.GemSurges, "ShatterCrown")
+table.insert(Tech.NewSurges, "ShatterCrown")
+table.insert(Tech.Order.GemSurges, "CausticDart")
+table.insert(Tech.NewSurges, "CausticDart")
+table.insert(Tech.Order.GemSurges, "VitriolSweep")
+table.insert(Tech.NewSurges, "VitriolSweep")
+table.insert(Tech.Order.GemSurges, "LeechBloom")
+table.insert(Tech.NewSurges, "LeechBloom")
+table.insert(Tech.Order.GemSurges, "Dissolution")
+table.insert(Tech.NewSurges, "Dissolution")
+table.insert(Tech.Order.GemSurges, "ArcNeedle")
+table.insert(Tech.NewSurges, "ArcNeedle")
+table.insert(Tech.Order.GemSurges, "CircuitCleave")
+table.insert(Tech.NewSurges, "CircuitCleave")
+table.insert(Tech.Order.GemSurges, "ThunderPylon")
+table.insert(Tech.NewSurges, "ThunderPylon")
+table.insert(Tech.Order.GemSurges, "Railstorm")
+table.insert(Tech.NewSurges, "Railstorm")
+table.insert(Tech.Order.GemSurges, "ResonantReaver")
+table.insert(Tech.NewSurges, "ResonantReaver")
+table.insert(Tech.Order.GemSurges, "NullPrism")
+table.insert(Tech.NewSurges, "NullPrism")
+
 Tech.PassiveAugments = {
 	{ Name = "Blade Calibration", Description = "Slashing weapon damage." },
 	{ Name = "Cleaver Calibration", Description = "Cleaving weapon damage." },
