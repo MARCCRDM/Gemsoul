@@ -616,8 +616,8 @@ function Enemies.damage(
 	local matchMult, matchTag = 1, nil
 	if enemy.DungeonId then
 		matchMult, matchTag = DungeonRules.elementMultiplier(enemy.Element, enemy.ElementWeakness, hitElement)
-	elseif (enemy :: any).ArmorElement then
-		matchMult, matchTag = ElementMatchup.multiplier(hitElement, (enemy :: any).ArmorElement)
+	elseif (enemy :: any).ArmorProfile then
+		matchMult, matchTag = ElementMatchup.against(hitElement, (enemy :: any).ArmorProfile)
 	end
 	amount *= matchMult
 	if not enemy.Alive or amount <= 0 then

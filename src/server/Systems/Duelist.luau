@@ -43,6 +43,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
@@ -1618,8 +1619,8 @@ function spawnRival(owner: Player, raid, encounter)
 	enemy.TakenMult = EquipmentBalance.passiveDamageMultiplier(rivalEffects.TakenMult, rivalKit.Defense.Resistance)
 	enemy.Deflect = if rivalKit.Defense.Deflect > 0 then rivalKit.Defense.Deflect else nil
 	enemy.Reflect = if rivalKit.Defense.Reflect > 0 then rivalKit.Defense.Reflect else nil
-	-- Its armor gem's element resists and is weak like yours (ElementMatchup).
-	enemy.ArmorElement = loadout.ArmorGem and loadout.ArmorGem.Element
+	-- Its armor gems resist and leave it weak as yours do (ElementMatchup).
+	enemy.ArmorProfile = ElementMatchup.profile(loadout)
 	enemy.GuardBreakTime = Actions.Base.Heavy.BreakSeconds
 	-- Every bout starts even: the player (every raider) steps in at full health too.
 	for _, member in if encounter then {} elseif raid then raid.Members else { owner } do
@@ -1842,7 +1843,7 @@ function spawnRival(owner: Player, raid, encounter)
 		Hit = math.floor(playerHit * Combat.defenseMult(enemy.DefenseRating) * enemy.TakenMult + 0.5), -- after its armour
 		Speed = math.floor(ownerHumanoid and ownerHumanoid.WalkSpeed or 16),
 		Element = ownerLoadout.WeaponGem and ownerLoadout.WeaponGem.Element,
-		ArmorElement = ownerLoadout.ArmorGem and ownerLoadout.ArmorGem.Element,
+		Armor = ElementMatchup.profile(ownerLoadout),
 		Surges = yourSurges,
 		Moves = ownerLoadout.Maneuvers or Tech.DefaultManeuvers,
 	}, {
@@ -1852,7 +1853,7 @@ function spawnRival(owner: Player, raid, encounter)
 		Hit = math.floor(duel.Damage * Combat.defenseMult(rating(theirs, "Defense")) + 0.5),
 		Speed = duel.Speed,
 		Element = element,
-		ArmorElement = loadout.ArmorGem and loadout.ArmorGem.Element,
+		Armor = ElementMatchup.profile(loadout),
 		Surges = duel.Surges,
 		Moves = foeMoves,
 	})

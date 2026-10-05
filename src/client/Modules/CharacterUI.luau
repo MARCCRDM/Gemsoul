@@ -17,6 +17,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local Season = require(ReplicatedStorage.Shared.Season)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
@@ -563,6 +564,49 @@ local function elementGist(element: string): string
 	return (string.match(effect, "^([^:]+)") or effect)
 end
 
+-- The gem card's sections: a panel with a header in the section's colour,
+-- then one row per stat (what it does, and the grade that drives it).
+local function cardSection(title: string, color: Color3): Frame
+	local section = new("Frame", {
+		BackgroundColor3 = color:Lerp(P.Frame, 0.88),
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, tipBody)
+	UiKit.round(section, 8)
+	new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.6 }, section)
+	new("UIPadding", {
+		PaddingLeft = UDim.new(0, 10),
+		PaddingRight = UDim.new(0, 10),
+		PaddingTop = UDim.new(0, 7),
+		PaddingBottom = UDim.new(0, 8),
+	}, section)
+	UiKit.list(section, 3)
+	text(section, title, 12, color, BOLD).LayoutOrder = 0
+	return section
+end
+local function statRow(section: Instance, value: string, grade: string?, color: Color3?, size: number?)
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = #section:GetChildren(),
+	}, section)
+	local label = text(row, value, size or 12, color or P.Text)
+	label.Size = UDim2.new(1, if grade then -84 else 0, 0, 0)
+	if grade then
+		local tag = text(row, grade, 10, P.Dim, BOLD)
+		tag.AutomaticSize = Enum.AutomaticSize.None
+		tag.AnchorPoint, tag.Position, tag.Size = Vector2.new(1, 0), UDim2.new(1, 0, 0, 1), UDim2.fromOffset(82, 14)
+		tag.TextXAlignment = Enum.TextXAlignment.Right
+	end
+	return row
+end
+local function gradeTag(metric: string?, value: number?): string?
+	return if metric and value
+		then string.format("%s %d", string.upper(GemConfig.MetricLabels[metric] or metric), value)
+		else nil
+end
+
 local function gemLines(gem)
 	local tierColor = GemConfig.TierColors[gem.Tier]
 	-- Focus the center column on the selected stone. Gear selections restore
@@ -720,6 +764,21 @@ local function gemLines(gem)
 				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 			line.Size = UDim2.new(1, -8, 0, 15)
 		end
+		local weak = ElementMatchup.weakTo(gem.Element)
+		local resist = text(
+			tipBody,
+			string.format(
+				"ARMOR RESIST  ·  %s %d%% per piece  ·  weak to %s",
+				GemConfig.elementName(gem.Element),
+				math.floor(ElementMatchup.gemResist(gem) * 100 + 0.5),
+				if weak then GemConfig.elementName(weak) else "none"
+			),
+			11,
+			P.Dim
+		)
+		resist.AutomaticSize, resist.TextWrapped, resist.TextTruncate =
+			Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
+		resist.Size = UDim2.new(1, -8, 0, 15)
 		return
 	end
 	gemMetric(info, "SIZE  ·  MAGNITUDE", gem.Size, tierColor, 68)
@@ -756,37 +815,116 @@ local function gemLines(gem)
 		local button = actionButton(controls, control.Label, false, control.Run)
 		button.LayoutOrder = i
 	end
-	text(
-		tipBody,
-		string.format("%s   |   %s   |   Sells for %d coins", state, GemConfig.shade(gem).Name, GemConfig.value(gem)),
-		12,
-		P.Text
-	)
 	local color = GemConfig.ElementColors[gem.Element]
-	-- The surge this gem casts from a Surge Array slot.
-	local surge = Tech.surgeLines(gem)
-	if #surge > 0 then
-		text(tipBody, string.upper(surge[1]), 12, P.Gold, BOLD)
-		text(tipBody, table.concat(surge, "  ·  ", 2), 12, P.Text)
+	-- At a glance: its cut, its shade and what it sells for.
+	local facts = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 22) }, tipBody)
+	UiKit.list(facts, 6, true)
+	for order, fact in
+		{
+			{ state, P.Text },
+			{ GemConfig.shade(gem).Name, color },
+			{ string.format("Sells for %d coins", GemConfig.value(gem)), P.Gold },
+		}
+	do
+		local chip = text(facts, fact[1], 11, fact[2], BOLD)
+		chip.AutomaticSize, chip.Size, chip.LayoutOrder = Enum.AutomaticSize.X, UDim2.fromOffset(0, 22), order
+		chip.BackgroundColor3, chip.BackgroundTransparency = fact[2], 0.86
+		chip.TextXAlignment = Enum.TextXAlignment.Center
+		UiKit.round(chip, 5)
+		new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, chip)
+	end
+	-- The surge it casts from a Surge Array slot.
+	local surge = gem.Cut and Tech.surgeStats(gem)
+	if surge then
+		local section = cardSection(
+			string.format(
+				"SURGE  ·  %s  ·  %s %s",
+				string.upper(surge.Name),
+				string.upper(Tech.TierNames[surge.Tier] or ""),
+				({ "I", "II", "III" })[surge.Rank] or "I"
+			),
+			P.Gold
+		)
+		if surge.Damage then
+			statRow(section, string.format("%d%% base damage", math.floor(surge.Damage * 100 + 0.5)))
+			statRow(section, string.format("+%d%% damage", (gem.Size or 0) * 3), gradeTag("Size", gem.Size))
+		else
+			statRow(section, string.format("%gs effect", math.floor(surge.Duration * 10 + 0.5) / 10))
+		end
+		statRow(section, string.format("%.1fs recovery", surge.Recovery), gradeTag("Clarity", gem.Clarity))
+		statRow(section, string.format("%g%% crit chance", surge.Crit * 100), gradeTag("Cut", gem.Cut))
+		statRow(section, "Sockets into any Surge Slot", nil, P.Dim, 11)
 	end
 	local affinity = wornAffinities()
-	for _, section in { { "Weapon", "IN A WEAPON" }, { "Armor", "IN ARMOR OR SHIELD" } } do
-		local name = GemConfig.enchantment(gem, section[1])
-		text(tipBody, string.format("%s  ·  %s", section[2], string.upper(name)), 12, color, BOLD)
-		effectRows(tipBody, gem, section[1], color, affinity)
-		if section[1] == "Weapon" then
-			-- PvP tag: the reduced numbers a player target feels.
-			local pvp = {}
-			for _, line in GemConfig.lines(gem, "Weapon", { Affinity = affinity, PvP = true }) do
-				table.insert(pvp, line.Text)
-			end
-			text(tipBody, "PVP  ·  " .. table.concat(pvp, "  ·  "), 11, P.Dim)
+	-- In a weapon: what its hits add.
+	local weaponName = GemConfig.enchantment(gem, "Weapon")
+	local weapon = cardSection("IN A WEAPON  ·  " .. string.upper(weaponName), color)
+	for _, line in GemConfig.lines(gem, "Weapon", { Affinity = affinity }) do
+		statRow(weapon, line.Text, gradeTag(line.Metric, line.Grade))
+	end
+	local pvp = {}
+	for _, line in GemConfig.lines(gem, "Weapon", { Affinity = affinity, PvP = true }) do
+		table.insert(pvp, line.Text)
+	end
+	statRow(weapon, "Against players: " .. table.concat(pvp, "  ·  "), nil, P.Dim, 11)
+	-- In armor or a shield: its defence, and the element it resists.
+	local armorName = GemConfig.enchantment(gem, "Armor")
+	local armor = cardSection("IN ARMOR OR SHIELD  ·  " .. string.upper(armorName), color)
+	for _, line in GemConfig.lines(gem, "Armor", { Affinity = affinity }) do
+		statRow(armor, line.Text, gradeTag(line.Metric, line.Grade))
+	end
+	local element = GemConfig.elementName(gem.Element)
+	statRow(
+		armor,
+		string.format(
+			"Resists %s: take %d%% less %s damage",
+			element,
+			math.floor(ElementMatchup.gemResist(gem) * 100 + 0.5),
+			element
+		),
+		"EACH PIECE",
+		P.Good
+	)
+	local weak = ElementMatchup.weakTo(gem.Element)
+	if weak then
+		statRow(
+			armor,
+			string.format(
+				"If %s is your main armor element, %s hits you for %d%%",
+				element,
+				GemConfig.elementName(weak),
+				math.floor(ElementMatchup.Weak * 100 + 0.5)
+			),
+			nil,
+			P.Bad:Lerp(P.Text, 0.25)
+		)
+	end
+	-- What the armor you're wearing resists right now.
+	local worn = ElementMatchup.profile(GemClient.Profile and GemClient.Profile.Character)
+	local parts = {}
+	for _, name in GemConfig.Elements do
+		local share = worn.Resist[name]
+		if share and share > 0 then
+			table.insert(parts, string.format("%s %d%%", GemConfig.elementName(name), math.floor(share * 100 + 0.5)))
 		end
 	end
+	local weakNow = worn.Main and ElementMatchup.weakTo(worn.Main)
+	statRow(
+		armor,
+		string.format(
+			"Your armor now: %s%s  (max %d%% each)",
+			if #parts > 0 then table.concat(parts, ", ") else "no resistances",
+			if weakNow then "  ·  weak to " .. GemConfig.elementName(weakNow) else "",
+			math.floor(ElementMatchup.Cap * 100 + 0.5)
+		),
+		nil,
+		P.Dim,
+		11
+	)
 	for id, bonus in affinity do
 		local affix = GemConfig.AffixById[id]
 		if affix and affix.Element == gem.Element then
-			text(tipBody, "Boosted by your armor  ·  " .. GemConfig.affixText(id, bonus), 12, color)
+			statRow(armor, "Boosted by your armor  ·  " .. GemConfig.affixText(id, bonus), nil, color, 11)
 		end
 	end
 	tooltipStroke.Color = tierColor

@@ -4,8 +4,8 @@
 
 	Matchup.build(you, foe) with, for each side:
 	  Name, Health (max), Hit (damage per quick hit on the other, after
-	  armor), Speed (walk speed), Element (weapon gem), ArmorElement
-	  (armor gem), Surges (list of
+	  armor), Speed (walk speed), Element (weapon gem), Armor
+	  (ElementMatchup.profile of its armor gems), Surges (list of
 	  { Id, Name, Kind = "Bolt" | "Nova" | "Self" }), Moves (maneuver ids)
 	returns {
 	  Rows = { { Stat, You, Foe, Better = "You" | "Foe" | nil } },
@@ -159,25 +159,27 @@ function Matchup.build(you, foe)
 	if not ELEMENT_EDGE[you.Element] then
 		add(result.YourWeak, "No weapon gem: your hits carry no element")
 	end
-	-- Elements against armor (ElementMatchup).
+	-- Elements against armor (ElementMatchup): what each side's weapon
+	-- element does to the other's armor gems.
 	local function armorLine(attack, armor, whose)
-		local mult, tag = ElementMatchup.multiplier(attack, armor)
+		local mult, tag = ElementMatchup.against(attack, armor)
 		if not tag then
 			return nil, nil
 		end
-		local a, b = ELEMENT_NAME[attack] or attack, ELEMENT_NAME[armor] or armor
+		local percent = math.floor(mult * 100 + 0.5)
+		local name = ELEMENT_NAME[attack] or attack
 		if tag == "Resist" then
-			return tag, string.format("%s %s armor resists %s hits (%d%%)", whose, b, a, math.floor(mult * 100 + 0.5))
+			return tag, string.format("%s armor resists %s: it lands at %d%%", whose, name, percent)
 		end
-		return tag, string.format("%s %s armor is weak to %s (%d%% damage)", whose, b, a, math.floor(mult * 100 + 0.5))
+		return tag, string.format("%s armor is weak to %s: it lands at %d%%", whose, name, percent)
 	end
-	local tag, line = armorLine(you.Element, foe.ArmorElement, "Its")
+	local tag, line = armorLine(you.Element, foe.Armor, "Its")
 	if tag == "Resist" then
 		add(result.YourWeak, line)
 	elseif tag == "Weak" then
 		add(result.YourEdges, line)
 	end
-	tag, line = armorLine(foe.Element, you.ArmorElement, "Your")
+	tag, line = armorLine(foe.Element, you.Armor, "Your")
 	if tag == "Resist" then
 		add(result.FoeWeak, line)
 	elseif tag == "Weak" then

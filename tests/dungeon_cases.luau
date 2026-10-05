@@ -18,6 +18,42 @@ for _, spec in Rules.Roster do
 	check(Rules.elementMultiplier(spec.Element, spec.Weakness, spec.Weakness) == 1.25, "Weakness")
 	check(Rules.elementMultiplier(spec.Element, spec.Weakness, nil) == 1, "Physical should remain neutral")
 end
+-- Armor gems: each resists its own element by quality; the main element is
+-- weak to the element that beats it (ElementMatchup).
+do
+	local function gem(element, grade)
+		return { Element = element, Size = grade, Clarity = grade, Cut = grade }
+	end
+	local near = function(a, b)
+		return math.abs(a - b) < 1e-6
+	end
+	check(near(ElementMatchup.gemResist(gem("Fire", 1)), 0.035), "Lowest-grade gem resists 3.5%")
+	check(near(ElementMatchup.gemResist(gem("Fire", 10)), 0.08), "Top-grade gem resists 8%")
+	local one = ElementMatchup.profile({ ArmorGem = gem("Fire", 10) })
+	check(one.Main == "Fire" and near(ElementMatchup.against("Fire", one), 0.92), "One Thermal gem resists 8%")
+	check(near(ElementMatchup.against("Poison", one), 1.25), "Thermal armor is weak to Corrosive")
+	check(
+		near(ElementMatchup.against("Frost", one), 1) and select(2, ElementMatchup.against("Frost", one)) == nil,
+		"Neutral"
+	)
+	check(near(ElementMatchup.against(nil, one), 1), "Physical neutral")
+	local full = {}
+	for _, slot in ElementMatchup.Slots do
+		full[slot .. "Gem"] = gem("Fire", 10)
+	end
+	check(near(ElementMatchup.profile(full).Resist.Fire, 0.35), "Five top gems capped at 35%")
+	-- Mixed: two Thermal, one Corrosive; Thermal is main, Corrosive softened.
+	local mixed = ElementMatchup.profile({
+		HelmetGem = gem("Fire", 10),
+		ArmorGem = gem("Fire", 10),
+		BootsGem = gem("Poison", 10),
+	})
+	check(mixed.Main == "Fire", "Main element is the most resisted")
+	check(near(ElementMatchup.against("Poison", mixed), 0.92 * 1.25), "Resisting your weakness softens it")
+	check(near(ElementMatchup.against("Fire", ElementMatchup.profile({})), 1), "No armor gems: neutral")
+	local rough = ElementMatchup.gemResist({ Element = "Frost", Size = 10, Clarity = 10 })
+	check(near(rough, 0.08), "A rough gem grades on Size and Clarity")
+end
 Dungeon.start()
 local solo = squad(1)
 check(not handlers.PartyDungeon(solo[1]).Ok, "Solo queued")

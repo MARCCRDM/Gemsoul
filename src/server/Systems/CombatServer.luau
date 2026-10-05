@@ -388,11 +388,9 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		Remotes.CombatFx:FireClient(player, "TechStatus", "Riposte!")
 		return 0, true
 	end
-	-- Elements against your armor gem (ElementMatchup): its own element is
-	-- resisted, the element that beats it lands harder.
-	local armorGem = PlayerData.character(player)
-	local matchMult, matchTag =
-		ElementMatchup.multiplier(element, armorGem and armorGem.ArmorGem and armorGem.ArmorGem.Element)
+	-- Elements against your armor gems (ElementMatchup): each resists its
+	-- own element; your main one is weak to the element that beats it.
+	local matchMult, matchTag = ElementMatchup.against(element, ElementMatchup.profile(PlayerData.character(player)))
 	local resistance = k.Defense.Resistance
 	local defense = rating(k, "Defense") * (if now < st.SunderUntil then 1 - st.Sunder else 1)
 	local damage = amount
