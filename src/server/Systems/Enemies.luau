@@ -77,7 +77,7 @@ local KINDS: { [string]: Kind } = {
 		Rate = 1.2,
 		Aggro = 38,
 		Coins = 6,
-		DropChance = 0.35,
+		DropChance = 0.05, -- monsters pay coins; a gem is a rare bonus
 		Luck = 0.15,
 		Respawn = 20,
 	},
@@ -90,7 +90,7 @@ local KINDS: { [string]: Kind } = {
 		Rate = 2,
 		Aggro = 32,
 		Coins = 22,
-		DropChance = 1,
+		DropChance = 0.15,
 		Luck = 0.6,
 		Respawn = 40,
 	},

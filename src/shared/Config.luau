@@ -29,8 +29,9 @@ local Config = {
 	DailyRewardBase = 75,
 	DailyRewardPerStreak = 25,
 	DailyStreakMax = 7,
-	-- Tamsin at the Market buys stones for coins at this share of their value
-	MarketSellRate = 0.5,
+	-- The shop buys gems at this share of their value: a quick sale, but
+	-- trading with other players pays better.
+	MarketSellRate = 0.25,
 
 	MineHoldSeconds = 1,
 

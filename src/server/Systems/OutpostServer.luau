@@ -276,14 +276,17 @@ local function popNode(node, player: Player)
 	task.delay(Rules.Sizes[node.Size].Respawn, spawnNode)
 end
 
--- What a popped rock pays: coins always, a gem by chance, gear rarely.
+-- What a popped rock pays: a gem by chance, a few coins by chance (mining
+-- is for gems, not a coin mint), gear rarely.
 local function loot(player: Player, node, profile)
 	local spec = Rules.Sizes[node.Size]
 	local roll = Gems.random()
 	local result = { Size = node.Size, Name = spec.Name }
-	local coins = roll:NextInteger(spec.Coins[1], spec.Coins[2])
-	PlayerData.addCoins(player, coins)
-	result.Coins = coins
+	if roll:NextNumber() < (spec.CoinChance or 1) then
+		local coins = roll:NextInteger(spec.Coins[1], spec.Coins[2])
+		PlayerData.addCoins(player, coins)
+		result.Coins = coins
+	end
 	if roll:NextNumber() < spec.Gem then
 		local gem = Gems.award(player, "MiningNode", { Luck = Mine.luck(spec.Depth) + (spec.Luck or 0) })
 		if gem then

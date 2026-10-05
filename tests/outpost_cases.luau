@@ -209,7 +209,7 @@ for i = 0, 9999 do
 	counts[size] = (counts[size] or 0) + 1
 end
 check(counts.Pebble > counts.Boulder and counts.Boulder > counts.Monolith and counts.Monolith > counts.Geode and counts.Geode > 0, "Rock sizes aren't weighted rarest-last")
-check(Rules.damage("Survey", false) == 1 and Rules.damage("Survey", true) == 2 and Rules.damage("Plasma", false) == 2, "Swing damage wrong")
+check(Rules.damage("Survey", false) == 1 and Rules.damage("Survey", true) == 2 and Rules.damage("Plasma", false) == Rules.Picks.Plasma.Power, "Swing damage wrong")
 check(Rules.tension(10, 10) == 0 and Rules.tension(0, 10) == 1 and math.abs(Rules.tension(3, 4) - 0.25) < 1e-9, "Tension wrong")
 check(Rules.claimHolder({}, 1, 0) and Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 1, 5), "Claim refused its holder")
 check(not Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 2, 5) and Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 2, 10), "Claim didn't hold or expire")
@@ -353,7 +353,7 @@ local function makePlayer(id, name)
 		return self.Changed[k]
 	end
 	function p:RequestStreamAroundAsync() end
-	profiles[p] = { Coins = 500 }
+	profiles[p] = { Coins = 5000 }
 	table.insert(playerList, p)
 	Players.PlayerAdded:Fire(p)
 	return p, root
@@ -408,8 +408,9 @@ for _ = 1, 40 do
 		break
 	end
 end
-check(result and result.Loot and result.Loot.Coins > 0, "Popping a rock paid nothing")
-check(profiles[ana].Coins == coinsBefore + result.Loot.Coins, "Coins not paid")
+-- A rock pays coins only by chance now (mining is for gems).
+check(result and result.Loot ~= nil, "Popping a rock returned no loot")
+check(profiles[ana].Coins == coinsBefore + (result.Loot.Coins or 0), "Coins not paid")
 check(Server._nodes[target.Id] == nil and target.Model:GetAttribute("Popped") == 1, "The rock didn't pop")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined a popped rock")
 check(profiles[ana].Outpost.Rocks == 1, "Rock not counted")
