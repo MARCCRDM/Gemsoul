@@ -160,10 +160,9 @@ local function socketCard(parent, key, x, gem, amps)
 			label(
 				card,
 				string.format(
-					"%s  ·  RANK %s  ·  %s SURGE",
-					if definition.Element then GemConfig.elementName(definition.Element):upper() else "RESONANCE",
-					ROMAN[definition.Rank],
-					string.upper(Tech.TierNames[definition.Tier] or "")
+					"%s SURGE  ·  RANK %s",
+					string.upper(Tech.TierNames[definition.Tier] or ""),
+					ROMAN[definition.Rank]
 				),
 				11,
 				color
@@ -178,7 +177,7 @@ local function socketCard(parent, key, x, gem, amps)
 			label(
 				card,
 				string.format(
-					"%s  ·  Size %d  ·  Clarity %d  ·  Cut %d",
+					"%s  ·  S%d  ·  C%d  ·  Cut %d",
 					GemConfig.TierLabels[gem.Tier] or gem.Tier,
 					gem.Size or 0,
 					gem.Clarity or 0,
@@ -211,7 +210,7 @@ local function socketCard(parent, key, x, gem, amps)
 			request("UnsocketSurge", key)
 		end)
 	else
-		local hint = place(label(card, "Pick a cut gem below", 11, P.Dim, IronUi.Body), 10, 140, 176, 16)
+		local hint = place(label(card, "Pick a gem below", 11, P.Dim, IronUi.Body), 10, 140, 176, 16)
 		hint.TextXAlignment = Enum.TextXAlignment.Center
 	end
 	clickable(card, function()
@@ -256,7 +255,7 @@ local function pouchList(parent, profile, amps)
 	end)
 	if #gems == 0 then
 		local empty = place(
-			label(scroller, "No cut gems yet. Mine some on an expedition, then cut them.", 12, P.Dim, IronUi.Body),
+			label(scroller, "No gems yet. Mine rocks at the Outpost to find some.", 12, P.Dim, IronUi.Body),
 			0,
 			0,
 			600,
@@ -284,7 +283,12 @@ local function pouchList(parent, profile, amps)
 			label(
 				row,
 				if definition
-					then string.format("%s  ·  T%d · %s", definition.Name, definition.Tier, ROMAN[definition.Rank])
+					then string.format(
+						"%s  ·  %s %s",
+						definition.Name,
+						Tech.TierNames[definition.Tier] or "",
+						ROMAN[definition.Rank]
+					)
 					else "Unknown surge",
 				13,
 				P.Text
@@ -366,12 +370,12 @@ local function maneuverColumn(parent, profile, loadout)
 						math.floor(definition.Cost + 0.5),
 						definition.Cooldown or definition.Recovery
 					)
-					else "Not learned - unlock it in the Augment Tree",
+					else "Not learned yet: unlock it in the Augment Tree",
 				10,
 				if learned then P.Dim else P.Bad,
 				IronUi.Body
 			),
-			46,
+			if art.Visible then 82 else 46,
 			26,
 			280,
 			16
@@ -397,24 +401,27 @@ local function maneuverColumn(parent, profile, loadout)
 		local definition = Tech.Catalog[id]
 		local on = equipped[selectedSlot] == id
 		local b = new("TextButton", {
-			Text = definition.Name,
-			TextSize = 11,
-			Font = BOLD,
-			TextColor3 = if on then P.Inset else P.Text,
+			Text = "",
+			AutoButtonColor = false,
 			BackgroundColor3 = if on then P.Gold else P.Frame,
 			LayoutOrder = order,
 		}, list)
 		UiKit.round(b, 6)
-		local art = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(20, 20) }, b)
+		-- The icon and the name sit side by side (no padding tricks).
+		local art = new("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(3, 3),
+			Size = UDim2.fromOffset(20, 20),
+		}, b)
 		UiKit.round(art, 4)
-		if SurgeIcons.apply(art, id) then
-			-- Padding moves children too: -25 puts the icon 3px in from the edge.
-			art.Position = UDim2.fromOffset(-25, 3)
-			b.TextXAlignment = Enum.TextXAlignment.Left
-			new("UIPadding", { PaddingLeft = UDim.new(0, 28) }, b)
-		else
+		local hasArt = SurgeIcons.apply(art, id)
+		if not hasArt then
 			art:Destroy()
 		end
+		local name = label(b, definition.Name, 11, if on then P.Inset else P.Text)
+		name.Position = UDim2.fromOffset(if hasArt then 28 else 8, 0)
+		name.Size = UDim2.new(1, if hasArt then -32 else -12, 1, 0)
+		name.TextXAlignment = Enum.TextXAlignment.Left
 		b.Activated:Connect(function()
 			if not on then
 				request("EquipManeuver", selectedSlot, id)

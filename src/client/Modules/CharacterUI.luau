@@ -24,6 +24,7 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemArt = require(script.Parent.GemArt)
 local GearArt = require(script.Parent.GearArt)
 local SurgeArrayUI = require(script.Parent.SurgeArrayUI)
+local AugmentTreeUI = require(script.Parent.AugmentTreeUI)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -282,6 +283,22 @@ boardHint.Size = UDim2.fromOffset(124, 46)
 boardHint.TextXAlignment = Enum.TextXAlignment.Center
 boardHint.AutomaticSize = Enum.AutomaticSize.None
 boardHint.TextWrapped = true
+-- The Augment Tree (skills and surge boosts), under it.
+local treeHint = boardHint:Clone()
+treeHint.Text = "AUGMENT TREE\nSKILLS  [K]"
+treeHint.TextColor3 = P.Gold
+treeHint.Position = UDim2.fromOffset(406, 342)
+treeHint.Parent = doll
+treeHint.Activated:Connect(AugmentTreeUI.open)
+for _, hint in { boardHint, treeHint } do
+	new("UIStroke", {
+		Color = hint.TextColor3,
+		Thickness = 1,
+		Transparency = 0.55,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, hint)
+	IronUi.highlight(hint)
+end
 
 local frameGear, previewFor, equipmentIcon = GearArt.frame, GearArt.preview, GearArt.icon
 
@@ -323,93 +340,233 @@ local statsCard = new("Frame", {
 
 -- Backpack and inspector ------------------------------------------------------
 
--- The bag: equipment and gems as two tabs sharing one tall panel.
-local invTitle = text(panel, "", 13, P.Dim, BOLD)
-invTitle.Position = UDim2.fromOffset(1188, 82)
-invTitle.Size = UDim2.fromOffset(188, 18)
-invTitle.TextXAlignment = Enum.TextXAlignment.Center
+-- The bag: one panel, three views picked from a row of tabs, each with a
+-- row of quick filters under it and a line saying what the view is for.
+--   GEAR    spare equipment                       filter by slot
+--   GEMS    gems, to socket into gear              filter by element
+--   POWERS  the surge each gem carries, for Q E R  filter by element
+local BAG_X, BAG_W = 992, 384
+local BAG_TOP, BAG_BOTTOM = 166, 498
+local BAG_TABS = {
+	{
+		Id = "Equipment",
+		Label = "GEAR",
+		Color = P.Gold,
+		Caption = "Spare gear. Pick a piece to compare it with what you wear.",
+	},
+	{
+		Id = "Gems",
+		Label = "GEMS",
+		Color = P.Teal,
+		Caption = "Socket a gem into your gear for its stats and element resist.",
+	},
+	{
+		Id = "Powers",
+		Label = "POWERS",
+		Color = P.Amethyst,
+		Caption = "Every gem carries a surge power. Slot up to three on Q · E · R.",
+	},
+}
+local BAG_FILTERS = {
+	Equipment = {
+		{ "All", "ALL" },
+		{ "Helmet", "HEAD" },
+		{ "Armor", "BODY" },
+		{ "Gloves", "HANDS" },
+		{ "Boots", "FEET" },
+		{ "Weapon", "WEAPON" },
+		{ "Shield", "SHIELD" },
+	},
+	Gems = {
+		{ "All", "ALL" },
+		{ "Fire", "THERMAL" },
+		{ "Frost", "CRYO" },
+		{ "Shock", "ION" },
+		{ "Poison", "CORROSIVE" },
+	},
+}
+BAG_FILTERS.Powers = BAG_FILTERS.Gems
+local bagFilter = { Equipment = "All", Gems = "All", Powers = "All" }
 
-local gridBox = box(panel, UDim2.fromOffset(992, 106), UDim2.fromOffset(384, 392), Color3.fromRGB(10, 9, 8))
-local grid = new("ScrollingFrame", {
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(4, 4),
-	Size = UDim2.new(1, -8, 1, -8),
-	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollBarThickness = 5,
-	ScrollBarImageColor3 = P.Edge,
-}, gridBox)
+local function bagBox(fill: Color3): Frame
+	return box(panel, UDim2.fromOffset(BAG_X, BAG_TOP), UDim2.fromOffset(BAG_W, BAG_BOTTOM - BAG_TOP), fill)
+end
+local function bagScroll(parent: Instance, name: string?): ScrollingFrame
+	return new("ScrollingFrame", {
+		Name = name,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(4, 4),
+		Size = UDim2.new(1, -8, 1, -8),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 5,
+		ScrollBarImageColor3 = P.Edge,
+	}, parent)
+end
+local function bagEmpty(parent: Instance): TextLabel
+	local l = text(parent, "", 13, P.Dim)
+	l.Position = UDim2.fromOffset(20, 40)
+	l.Size = UDim2.new(1, -40, 0, 70)
+	l.AutomaticSize = Enum.AutomaticSize.None
+	l.TextWrapped = true
+	l.TextXAlignment = Enum.TextXAlignment.Center
+	l.ZIndex = 3
+	return l
+end
+
+local gridBox = bagBox(Color3.fromRGB(10, 9, 8))
+local grid = bagScroll(gridBox)
 new("UIGridLayout", {
 	CellSize = UDim2.fromOffset(CELL, CELL),
 	CellPadding = UDim2.fromOffset(GAP, GAP),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, grid)
+local gemsEmpty = bagEmpty(gridBox)
 
--- Spare equipment uses the existing saved ownership records; worn items stay above.
-local equipmentTitle = text(panel, "EQUIPMENT", 13, P.Gold, BOLD)
-equipmentTitle.Position = UDim2.fromOffset(992, 82)
-equipmentTitle.Size = UDim2.fromOffset(188, 18)
-equipmentTitle.TextXAlignment = Enum.TextXAlignment.Center
-local equipmentBox = box(panel, UDim2.fromOffset(992, 106), UDim2.fromOffset(384, 392), P.Frame)
-local equipmentGrid = new("ScrollingFrame", {
-	Name = "StoredEquipment",
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(4, 4),
-	Size = UDim2.new(1, -8, 1, -8),
-	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollBarThickness = 5,
-	ScrollBarImageColor3 = P.Edge,
-}, equipmentBox)
+-- Spare equipment uses the existing saved ownership records; worn items stay on the board.
+local equipmentBox = bagBox(P.Frame)
+local equipmentGrid = bagScroll(equipmentBox, "StoredEquipment")
 new("UIGridLayout", {
 	CellSize = UDim2.fromOffset(116, 108),
 	CellPadding = UDim2.fromOffset(6, 6),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, equipmentGrid)
-local equipmentEmpty =
-	text(equipmentBox, "No spare equipment yet.\nRecover loot in the Moon Mine or visit the Market.", 13, P.Dim)
-equipmentEmpty.Position = UDim2.fromOffset(20, 38)
-equipmentEmpty.Size = UDim2.new(1, -40, 0, 70)
-equipmentEmpty.AutomaticSize = Enum.AutomaticSize.None
-equipmentEmpty.TextXAlignment = Enum.TextXAlignment.Center
-equipmentEmpty.ZIndex = 3
+local equipmentEmpty = bagEmpty(equipmentBox)
+
+-- Powers: the surge on each gem, as a list (what it is matters more than the stone).
+local powerBox = bagBox(P.Frame)
+local powerList = bagScroll(powerBox, "PowerList")
+UiKit.list(powerList, 6)
+local powersEmpty = bagEmpty(powerBox)
+
+-- The tab row: a segmented control with a count on each tab.
+local tabBar = new("Frame", {
+	BackgroundColor3 = P.Frame,
+	Position = UDim2.fromOffset(BAG_X, 82),
+	Size = UDim2.fromOffset(BAG_W, 34),
+}, panel)
+UiKit.round(tabBar, 8)
+new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.5 }, tabBar)
+local tabButtons: { [string]: { Button: TextButton, Name: TextLabel, Count: TextLabel, Stroke: UIStroke } } = {}
+local filterRow = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(BAG_X, 122),
+	Size = UDim2.fromOffset(BAG_W, 22),
+}, panel)
+local filterLayout = UiKit.list(filterRow, 4, true)
+filterLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+local bagCaption = text(panel, "", 11, P.Dim)
+bagCaption.AutomaticSize = Enum.AutomaticSize.None
+bagCaption.Position, bagCaption.Size = UDim2.fromOffset(BAG_X + 2, 148), UDim2.fromOffset(BAG_W - 4, 14)
+bagCaption.TextTruncate = Enum.TextTruncate.AtEnd
+
+local bagTab = "Equipment"
+local lastPick = nil
+local redrawBag: () -> () = function() end -- set once the views can draw
+
+local function tabSpec(id: string)
+	for _, spec in BAG_TABS do
+		if spec.Id == id then
+			return spec
+		end
+	end
+	return BAG_TABS[1]
+end
+
+local function drawFilters()
+	clear(filterRow)
+	local spec = tabSpec(bagTab)
+	for order, entry in BAG_FILTERS[bagTab] do
+		local key, label = entry[1], entry[2]
+		local on = bagFilter[bagTab] == key
+		local tint = GemConfig.ElementColors[key] or spec.Color
+		local chip = new("TextButton", {
+			Text = label,
+			TextSize = 10,
+			Font = BOLD,
+			AutoButtonColor = false,
+			TextColor3 = if on then P.Frame else tint:Lerp(P.Text, 0.35),
+			BackgroundColor3 = if on then tint else P.Slot,
+			BackgroundTransparency = if on then 0.05 else 0.2,
+			Size = UDim2.fromOffset(0, 22),
+			AutomaticSize = Enum.AutomaticSize.X,
+			LayoutOrder = order,
+		}, filterRow)
+		UiKit.round(chip, 11)
+		new("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, chip)
+		new("UIStroke", {
+			Color = tint,
+			Thickness = 1,
+			Transparency = if on then 1 else 0.6,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}, chip)
+		chip:SetAttribute("UiSound", "Tab")
+		chip.Activated:Connect(function()
+			if bagFilter[bagTab] ~= key then
+				bagFilter[bagTab] = key
+				drawFilters()
+				redrawBag()
+			end
+		end)
+	end
+end
+
+local function showBag(tab: string)
+	bagTab = tab
+	gridBox.Visible = tab == "Gems"
+	equipmentBox.Visible = tab == "Equipment"
+	powerBox.Visible = tab == "Powers"
+	for id, ui in tabButtons do
+		local spec = tabSpec(id)
+		local on = id == tab
+		ui.Button.BackgroundColor3 = spec.Color
+		ui.Button.BackgroundTransparency = if on then 0.78 else 1
+		ui.Stroke.Transparency = if on then 0.1 else 1
+		ui.Name.TextColor3 = if on then spec.Color else P.Dim
+		ui.Count.TextColor3 = if on then P.Text else P.Dim
+	end
+	bagCaption.Text = tabSpec(tab).Caption
+	drawFilters()
+	redrawBag()
+end
+
+for i, spec in BAG_TABS do
+	local w = (BAG_W - 8 - 8) / 3
+	local b = new("TextButton", {
+		Name = spec.Label .. "Tab",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(4 + (i - 1) * (w + 4), 4),
+		Size = UDim2.fromOffset(w, 26),
+	}, tabBar)
+	UiKit.round(b, 6)
+	local stroke = new("UIStroke", { Color = spec.Color, Thickness = 1.5, Transparency = 1 }, b)
+	local name = text(b, spec.Label, 13, P.Dim, IronUi.Heading)
+	name.AutomaticSize = Enum.AutomaticSize.None
+	name.Size = UDim2.new(0.62, 0, 1, 0)
+	name.TextXAlignment = Enum.TextXAlignment.Right
+	local count = text(b, "", 11, P.Dim, BOLD)
+	count.AutomaticSize = Enum.AutomaticSize.None
+	count.Position, count.Size = UDim2.new(0.62, 6, 0, 0), UDim2.new(0.38, -6, 1, 0)
+	count.TextXAlignment = Enum.TextXAlignment.Left
+	b:SetAttribute("UiSound", "Tab")
+	b.Activated:Connect(function()
+		showBag(spec.Id)
+	end)
+	tabButtons[spec.Id] = { Button = b, Name = name, Count = count, Stroke = stroke }
+end
+local function setTabCount(id: string, count: number)
+	local ui = tabButtons[id]
+	if ui then
+		ui.Count.Text = tostring(count)
+	end
+end
+showBag("Equipment")
 
 -- Item details get the whole middle column.
 local tooltip = box(panel, UDim2.fromOffset(592, 82), UDim2.fromOffset(384, 416), P.Inset)
-
--- Bag tabs: click a title to switch; picking a socket or a gem opens Gems.
-local bagTab = "Equipment"
-local lastPick = nil
-local tabLine = new("Frame", {
-	BackgroundColor3 = P.Gold,
-	Size = UDim2.fromOffset(150, 2),
-	Position = UDim2.fromOffset(1011, 101),
-}, panel)
-local function showBag(tab: string)
-	bagTab = tab
-	local gems = tab == "Gems"
-	gridBox.Visible = gems
-	equipmentBox.Visible = not gems
-	invTitle.TextColor3 = if gems then P.Gold else P.Dim
-	equipmentTitle.TextColor3 = if gems then P.Dim else P.Gold
-	tabLine.Position = UDim2.fromOffset(if gems then 1207 else 1011, 101)
-end
-for _, spec in { { equipmentTitle, "Equipment" }, { invTitle, "Gems" } } do
-	local hit = new("TextButton", {
-		Text = "",
-		BackgroundTransparency = 1,
-		Position = spec[1].Position - UDim2.fromOffset(0, 4),
-		Size = UDim2.fromOffset(188, 24),
-		ZIndex = 5,
-	}, panel)
-	hit:SetAttribute("UiSound", "Tab")
-	hit.Activated:Connect(function()
-		showBag(spec[2])
-	end)
-end
-showBag("Equipment")
 local tooltipStroke = tooltip:FindFirstChildOfClass("UIStroke") :: UIStroke
 UiKit.pad(tooltip, 12)
 local tipArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(58, 58) }, tooltip)
@@ -1208,7 +1365,8 @@ local function drawTooltipContent()
 	if key ~= detailsKey then
 		detailsKey, showDetails = key, false
 	end
-	tooltip.Size = UDim2.fromOffset(384, 240)
+	-- Nothing picked: the portrait, loadout and the how-it-works guide fill the column.
+	tooltip.Size = UDim2.fromOffset(384, if selection == nil then 416 else 240)
 	statsBox.Visible = true
 	local showArt = selection ~= nil and (selection.Kind == "Gem" or selection.Kind == "Socket")
 	tipArt.Visible = showArt
@@ -1309,7 +1467,7 @@ local function drawTooltipContent()
 		if #others == 0 then
 			text(
 				tipBody,
-				"No other " .. string.lower(slotLabel) .. " yet. Recover gear in the Moon Mine or the Market.",
+				"No other " .. string.lower(slotLabel) .. " yet. Win duels and dungeons, or trade at PROBE-7.",
 				12,
 				P.Dim
 			)
@@ -1434,14 +1592,11 @@ local function drawTooltipContent()
 			Position = UDim2.fromOffset(164, 14),
 			Size = UDim2.new(1, -176, 1, -28),
 		}, card)
-		local nameLabel = text(info, string.upper(player.DisplayName), 18, P.Text, BOLD)
-		nameLabel.AutomaticSize, nameLabel.TextWrapped, nameLabel.TextTruncate =
-			Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
-		nameLabel.Size = UDim2.new(1, 0, 0, 22)
+		-- (Your name is in the header above; the card leads with your class.)
 		local class = loadout.Class and Classes.get(loadout.Class)
-		local classLabel = text(info, string.upper(class and class.Name or "Miner"), 12, P.Teal, BOLD)
+		local classLabel = text(info, string.upper(class and class.Name or "Miner"), 16, P.Teal, BOLD)
 		classLabel.AutomaticSize = Enum.AutomaticSize.None
-		classLabel.Position, classLabel.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, 16)
+		classLabel.Position, classLabel.Size = UDim2.fromOffset(0, 8), UDim2.new(1, 0, 0, 20)
 		-- Overall gear score: every rolled stat on the six worn pieces.
 		local score = 0
 		for _, slotName in Slots.Order do
@@ -1534,14 +1689,49 @@ local function drawTooltipContent()
 			})
 		end
 		gridRow("MANEUVERS", maneuverCells)
-		local stats = profile and profile.Stats or {}
 		local augmentLevel = Tree.level(profile and profile.Augments and profile.Augments.XP or 0)
 		local seasonLevel = Season.levelFor(profile and profile.Season and profile.Season.XP or 0)
-		gridRow("RECORDS", {
+		gridRow("PROGRESS", {
 			{ "Augment Lv " .. augmentLevel, P.Gold },
 			{ "Season Lv " .. seasonLevel, P.Teal },
-			{ "Depth " .. (stats.BestDepth or 0) .. "  ·  " .. (stats.Kills or 0) .. " kills", P.Text },
+			{ (profile and profile.Duel and profile.Duel.Wins or 0) .. " duel wins", P.Text },
 		})
+		-- How the Inventory works, in three lines.
+		local guide = new("Frame", {
+			BackgroundColor3 = P.Frame,
+			BackgroundTransparency = 0.2,
+			Size = UDim2.new(1, -8, 0, 108),
+			LayoutOrder = 100,
+		}, tipBody)
+		UiKit.round(guide, 6)
+		UiKit.pad(guide, 8)
+		UiKit.list(guide, 6)
+		local guideTitle = text(guide, "HOW IT WORKS", 10, P.Dim, BOLD)
+		guideTitle.LayoutOrder = 0
+		for order, step in
+			{
+				{ "GEAR", P.Gold, "Wear your best piece in every slot." },
+				{ "GEMS", P.Teal, "Socket into gear for stats and resist." },
+				{ "POWERS", P.Amethyst, "Gem surges. Slot three on Q · E · R." },
+			}
+		do
+			local line = new("Frame", {
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 18),
+				LayoutOrder = order,
+			}, guide)
+			local tag = text(line, step[1], 10, P.Frame, BOLD)
+			tag.AutomaticSize = Enum.AutomaticSize.None
+			tag.BackgroundTransparency, tag.BackgroundColor3 = 0, step[2]
+			tag.Size = UDim2.fromOffset(58, 18)
+			tag.TextXAlignment = Enum.TextXAlignment.Center
+			UiKit.round(tag, 4)
+			local what = text(line, step[3], 11, P.Text)
+			what.AutomaticSize = Enum.AutomaticSize.None
+			what.Position, what.Size = UDim2.fromOffset(66, 0), UDim2.new(1, -66, 1, 0)
+			what.TextWrapped, what.TextTruncate = false, Enum.TextTruncate.AtEnd
+			what.TextYAlignment = Enum.TextYAlignment.Center
+		end
 		if hint ~= "" then
 			text(tipBody, (string.gsub(hint, "^%s+", "")), 12, P.Dim)
 		end
@@ -1549,7 +1739,31 @@ local function drawTooltipContent()
 	end
 	gemLines(gem)
 	detailsButton()
-	if gem.Cut then
+	local loadout = GemClient.Profile and GemClient.Profile.Character or {}
+	local onKey = nil
+	for _, key in { "Q", "E", "R" } do
+		local keyed = Tech.surgeGem(loadout, key)
+		if keyed and keyed.Id == gem.Id then
+			onKey = key
+		end
+	end
+	if gem.Cut and onKey then
+		-- On a key already: take it off, or open the Surge Array.
+		actionButton(tipActions, "REMOVE FROM " .. onKey, false, function()
+			selection = nil
+			request("UnsocketSurge", onKey)
+		end)
+		actionButton(tipActions, "SURGE ARRAY", true, function()
+			SurgeArrayUI.open()
+		end)
+	elseif gem.Cut and bagTab == "Powers" then
+		-- Powers: put its surge on a key.
+		for _, key in { "Q", "E", "R" } do
+			actionButton(tipActions, "SET ON " .. key, true, function()
+				request("SocketSurge", gem.Id, key)
+			end)
+		end
+	elseif gem.Cut then
 		for _, key in Slots.Order do
 			local b = actionButton(tipActions, string.upper(Slots.Definitions[key].Label), true, function()
 				request("SocketGem", gem.Id, key)
@@ -2067,13 +2281,31 @@ local function highlight()
 	end
 end
 
-local function drawGrid(profile)
-	local gems = table.clone(profile.Gems)
+-- The pouch's gems that pass the element filter, best first.
+local function filteredGems(profile, filter: string)
+	local gems = {}
+	for _, gem in profile.Gems do
+		if filter == "All" or gem.Element == filter then
+			table.insert(gems, gem)
+		end
+	end
 	table.sort(gems, function(a, b)
 		return GemConfig.value(a) > GemConfig.value(b)
 	end)
-	invTitle.Text = string.format("GEMS  ·  %d / %d", #gems, Config.MaxGems)
-	local ids = {}
+	return gems
+end
+
+local function drawGrid(profile)
+	local filter = bagFilter.Gems
+	local gems = filteredGems(profile, filter)
+	setTabCount("Gems", #profile.Gems)
+	tabButtons.Gems.Count.Text = string.format("%d/%d", #profile.Gems, Config.MaxGems)
+	gemsEmpty.Text = if #profile.Gems == 0
+		then "No gems yet.\nMine rocks at the Outpost to find some."
+		elseif #gems == 0 then string.format("No %s gems in your bag.", GemConfig.ElementLabels[filter] or filter)
+		else ""
+	gemsEmpty.Visible = #gems == 0
+	local ids = { filter }
 	for i, gem in gems do
 		ids[i] = gem.Id .. ":" .. tostring(gem.Cut)
 	end
@@ -2088,7 +2320,7 @@ local function drawGrid(profile)
 	table.clear(pending)
 	table.clear(cellsById)
 	-- Empty cells fill out the grid so it always reads as a bag.
-	local cells = math.max(#gems, COLUMNS * 3)
+	local cells = if #gems == 0 then 0 else math.max(#gems, COLUMNS * 5)
 	cells = math.ceil(cells / COLUMNS) * COLUMNS
 	for i = 1, cells do
 		local gem = gems[i]
@@ -2108,6 +2340,16 @@ local function drawGrid(profile)
 			local grade = text(cell, "Q" .. tostring(gem.Cut or 0), 11, P.Gold, BOLD)
 			grade.Position = UDim2.fromOffset(3, CELL - 13)
 			grade.ZIndex = 3
+			-- Its element at a glance, top right.
+			local pip = new("Frame", {
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -4, 0, 4),
+				Size = UDim2.fromOffset(8, 8),
+				BackgroundColor3 = GemConfig.ElementColors[gem.Element] or P.Dim,
+				ZIndex = 3,
+			}, cell)
+			UiKit.round(pip, 4)
+			new("UIStroke", { Color = P.Frame, Thickness = 1 }, pip)
 			if not gem.Cut then
 				local rough = text(cell, "R", 11, P.Dim, BOLD)
 				rough.Position = UDim2.fromOffset(4, 2)
@@ -2136,10 +2378,11 @@ local function storedEquipment(profile)
 	local loadout = profile.Character or {}
 	-- Picking a socket or a gem opens the Gems tab (once per pick).
 	local pick = selection and (selection.Kind == "Socket" or selection.Kind == "Gem") and selection or nil
-	if pick and pick ~= lastPick and bagTab ~= "Gems" then
+	local fresh = pick ~= nil and pick ~= lastPick
+	lastPick = pick
+	if fresh and bagTab == "Equipment" then
 		showBag("Gems")
 	end
-	lastPick = pick
 	local items = {}
 	for order, slotName in Slots.Order do
 		local kind = Slots.Definitions[slotName].Kind
@@ -2219,8 +2462,21 @@ local function requestPreviews(profile, force: boolean?)
 end
 
 local function drawEquipmentInventory(profile)
-	local items = storedEquipment(profile)
-	equipmentTitle.Text = string.format("EQUIPMENT  ·  %d", #items)
+	local all = storedEquipment(profile)
+	local filter = bagFilter.Equipment
+	local items = {}
+	for _, item in all do
+		if filter == "All" or item.Slot == filter then
+			table.insert(items, item)
+		end
+	end
+	setTabCount("Equipment", #all)
+	equipmentEmpty.Text = if #all == 0
+		then "No spare gear yet.\nWin duels and dungeons, or trade at PROBE-7."
+		else string.format(
+			"No spare %s.",
+			string.lower(Slots.Definitions[filter] and Slots.Definitions[filter].Label or filter)
+		)
 	equipmentEmpty.Visible = #items == 0
 	local scrollPosition = equipmentGrid.CanvasPosition
 	clear(equipmentGrid)
@@ -2314,6 +2570,147 @@ local function drawEquipmentInventory(profile)
 	equipmentGrid.CanvasPosition = scrollPosition
 end
 
+-- Powers ------------------------------------------------------------------------------
+-- The surge on each gem, as a list: the three on your keys first, then your
+-- bag's, strongest first. Picking one shows it; Q / E / R put it on a key.
+local ROMAN = { "I", "II", "III" }
+local function powerRow(order: number, gem, keyName: string?, onClick: () -> ())
+	local surge = gem and Tech.surgeStats(gem)
+	local tint = gem and GemConfig.ElementColors[gem.Element] or P.Dim
+	local chosen = gem ~= nil and selection ~= nil and selection.Kind == "Gem" and selection.Gem.Id == gem.Id
+	local row = new("TextButton", {
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = if chosen then Color3.fromRGB(44, 36, 58) else P.Slot,
+		Size = UDim2.new(1, -8, 0, 48),
+		LayoutOrder = order,
+	}, powerList)
+	UiKit.round(row, 6)
+	new("UIStroke", {
+		Color = if chosen then P.Gold elseif gem then GemConfig.TierColors[gem.Tier] or P.Edge else P.Edge,
+		Thickness = if chosen then 2 else 1,
+		Transparency = if chosen then 0 else 0.55,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, row)
+	local x = 8
+	if keyName then
+		local key = text(row, keyName, 14, P.Frame, IronUi.Heading)
+		key.AutomaticSize = Enum.AutomaticSize.None
+		key.BackgroundTransparency, key.BackgroundColor3 = 0, P.Gold
+		key.Position, key.Size = UDim2.fromOffset(x, 12), UDim2.fromOffset(24, 24)
+		key.TextXAlignment = Enum.TextXAlignment.Center
+		UiKit.round(key, 5)
+		x += 32
+	end
+	local icon = new("Frame", {
+		BackgroundColor3 = tint:Lerp(P.Frame, 0.7),
+		Position = UDim2.fromOffset(x, 6),
+		Size = UDim2.fromOffset(36, 36),
+	}, row)
+	UiKit.round(icon, 18)
+	new("UIStroke", { Color = tint, Thickness = 1.5, Transparency = if gem then 0.1 else 0.6 }, icon)
+	local glyph = text(icon, if surge then "◆" else "+", 16, tint, BOLD)
+	glyph.AutomaticSize = Enum.AutomaticSize.None
+	glyph.Size = UDim2.fromScale(1, 1)
+	glyph.TextXAlignment = Enum.TextXAlignment.Center
+	if surge then
+		SurgeIcons.apply(glyph, surge)
+	end
+	x += 46
+	local name = text(row, if surge then surge.Name else "Empty", 14, if surge then P.Text else P.Dim, BOLD)
+	name.AutomaticSize = Enum.AutomaticSize.None
+	name.Position, name.Size = UDim2.fromOffset(x, 6), UDim2.new(1, -x - 84, 0, 18)
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	local detail = text(
+		row,
+		if surge
+			then string.format("%s · Rank %s", Tech.TierNames[surge.Tier] or "", ROMAN[surge.Rank] or "I")
+			else "Pick a power below, then press " .. (keyName or "Q"),
+		11,
+		if surge then P.Dim else P.Dim,
+		IronUi.Body
+	)
+	detail.AutomaticSize = Enum.AutomaticSize.None
+	detail.Position, detail.Size = UDim2.fromOffset(x, 25), UDim2.new(1, -x - 84, 0, 16)
+	detail.TextTruncate = Enum.TextTruncate.AtEnd
+	if gem then
+		local element = text(row, string.upper(GemConfig.ElementLabels[gem.Element] or gem.Element), 10, tint, BOLD)
+		element.AutomaticSize = Enum.AutomaticSize.None
+		element.AnchorPoint = Vector2.new(1, 0)
+		element.Position, element.Size = UDim2.new(1, -10, 0, 8), UDim2.fromOffset(80, 14)
+		element.TextXAlignment = Enum.TextXAlignment.Right
+		local rarity = text(
+			row,
+			string.upper(GemConfig.TierLabels[gem.Tier] or gem.Tier),
+			10,
+			GemConfig.TierColors[gem.Tier] or P.Dim,
+			BOLD
+		)
+		rarity.AutomaticSize = Enum.AutomaticSize.None
+		rarity.AnchorPoint = Vector2.new(1, 0)
+		rarity.Position, rarity.Size = UDim2.new(1, -10, 0, 26), UDim2.fromOffset(80, 14)
+		rarity.TextXAlignment = Enum.TextXAlignment.Right
+	end
+	IronUi.highlight(row)
+	row.Activated:Connect(onClick)
+	return row
+end
+
+local function powerHeading(order: number, caption: string)
+	local l = text(powerList, caption, 11, P.Gold, BOLD)
+	l.AutomaticSize = Enum.AutomaticSize.None
+	l.Size = UDim2.new(1, -8, 0, 16)
+	l.LayoutOrder = order
+	return l
+end
+
+local function drawPowers(profile)
+	local scrollPosition = powerList.CanvasPosition
+	clear(powerList)
+	setTabCount("Powers", #profile.Gems)
+	if bagTab ~= "Powers" then
+		return
+	end
+	local loadout = profile.Character or {}
+	powerHeading(1, "ON YOUR KEYS")
+	for i, key in { "Q", "E", "R" } do
+		local gem = Tech.surgeGem(loadout, key)
+		powerRow(1 + i, gem, key, function()
+			if gem then
+				selection = { Kind = "Gem", Gem = gem }
+				CharacterUI.refresh()
+			else
+				SurgeArrayUI.open()
+			end
+		end)
+	end
+	local gems = filteredGems(profile, bagFilter.Powers)
+	table.sort(gems, function(a, b)
+		local _, ta, ra = Tech.surgeOf(a)
+		local _, tb, rb = Tech.surgeOf(b)
+		if ta ~= tb then
+			return ta > tb
+		end
+		if ra ~= rb then
+			return ra > rb
+		end
+		return GemConfig.value(a) > GemConfig.value(b)
+	end)
+	powerHeading(10, string.format("IN YOUR BAG  ·  %d", #gems))
+	for i, gem in gems do
+		powerRow(10 + i, gem, nil, function()
+			selection = { Kind = "Gem", Gem = gem }
+			CharacterUI.refresh()
+		end)
+	end
+	powersEmpty.Visible = #gems == 0
+	powersEmpty.Position = UDim2.fromOffset(20, 236)
+	powersEmpty.Text = if #profile.Gems == 0
+		then "No gems yet. Every gem you mine carries a power."
+		else string.format("No %s powers in your bag.", GemConfig.ElementLabels[bagFilter.Powers] or "")
+	powerList.CanvasPosition = scrollPosition
+end
+
 function CharacterUI.refresh()
 	local profile = GemClient.Profile
 	-- Owner tools live in the DEV panel (DungeonPlaytest), not the header.
@@ -2326,20 +2723,29 @@ function CharacterUI.refresh()
 	local class = loadout.Class and Classes.List[loadout.Class]
 	title.Text = string.upper(player.DisplayName)
 	local sets = Classes.setState(loadout).Active
-	subtitle.Text = string.format(
-		"Warrior · Prospector %d/6 · Skirmisher %d/6 · Juggernaut %d/6",
-		sets.Prospector.Count,
-		sets.Skirmisher.Count,
-		sets.Juggernaut.Count
-	)
+	local best, bestCount = nil, 0
+	for _, family in ArmorFamilies.Order do
+		local state = sets[family]
+		if state and state.Count > bestCount then
+			best, bestCount = family, state.Count
+		end
+	end
+	subtitle.Text = (if class then class.Name else "Miner")
+		.. (if best then string.format("  ·  %s set %d/6", best, bestCount) else "")
 	subtitle.TextColor3 = if class then class.Color else P.Dim
 
-	-- Keep the selected gem only while it's still in the pouch.
+	-- Keep the selected gem only while it's still in the pouch (or on a key).
 	if selection and selection.Kind == "Gem" then
 		local still = nil
 		for _, gem in profile.Gems do
 			if gem.Id == selection.Gem.Id then
 				still = gem
+			end
+		end
+		for _, key in { "Q", "E", "R" } do
+			local keyed = Tech.surgeGem(profile.Character or {}, key)
+			if keyed and keyed.Id == selection.Gem.Id then
+				still = keyed
 			end
 		end
 		selection = if still then { Kind = "Gem", Gem = still } else nil
@@ -2357,8 +2763,19 @@ function CharacterUI.refresh()
 	drawStats(loadout, class)
 	drawGrid(profile)
 	drawEquipmentInventory(profile)
+	drawPowers(profile)
 	requestPreviews(profile)
 	drawTooltip()
+end
+
+-- A tab or filter change redraws just the bag.
+redrawBag = function()
+	local profile = GemClient.Profile
+	if profile and gui.Enabled then
+		drawGrid(profile)
+		drawEquipmentInventory(profile)
+		drawPowers(profile)
+	end
 end
 
 -- Redraw the spare items as their 3D previews arrive (a burst becomes one redraw).

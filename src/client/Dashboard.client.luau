@@ -1,49 +1,46 @@
--- Saga Miners command deck: live equipment, sockets and backpack alongside
--- expeditions, the Market, and clearly marked future social spaces.
+-- The Inventory: your character, worn gear and sockets, and the bag (gear,
+-- gems and their powers). Opened from the lobby's INVENTORY tile, over the
+-- Outpost; everything else (play, store, ranks, social) lives in the lobby.
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
-local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Season = require(ReplicatedStorage.Shared.Season)
-local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 if not Config.MenuOnly then
 	return
 end
 
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
-local TradeUI = require(script.Parent.Modules.TradeUI)
--- The chat frame runs on its own once loaded (dashboard and Outpost).
+-- These run on their own once loaded (chat, trades, the Outpost, the
+-- Arena and Social), whether or not the Inventory shows them.
 require(script.Parent.Modules.ChatFrame)
-local OutpostScene = require(script.Parent.Modules.OutpostScene)
+require(script.Parent.Modules.TradeUI)
+require(script.Parent.Modules.OutpostScene)
+require(script.Parent.Modules.ArenaScene)
+require(script.Parent.Modules.SocialUI)
 local OutpostRules = require(ReplicatedStorage.Shared.Outpost)
 local ChargeMeter = require(script.Parent.Modules.ChargeMeter)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local MineScene = require(script.Parent.Modules.MineScene)
-local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local SurgeArrayUI = require(script.Parent.Modules.SurgeArrayUI)
 local SeasonUI = require(script.Parent.Modules.SeasonUI)
 local ShopUI = require(script.Parent.Modules.ShopUI)
-local SocialUI = require(script.Parent.Modules.SocialUI)
 local UiKit = require(script.Parent.Modules.UiKit)
-local SurgeIcons = require(script.Parent.Modules.SurgeIcons)
 
 local player = Players.LocalPlayer
 local new, text = IronUi.new, IronUi.text
 local P = IronUi.Colors
-local CHUNKY = IronUi.Chunky
-local LIGHT = P.Dim
 
 local function launch(action)
 	CharacterUI.cancelDrag()
 	action()
 end
-local W, H = 1432, 720
+local W, H = 1432, 606
 
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false)
@@ -228,36 +225,6 @@ local function place(object: GuiObject, x: number, y: number, w: number, h: numb
 	object.Size = UDim2.fromOffset(w, h)
 end
 
--- A little gold key-hint chip (e.g. "M"), on a button's corner.
-local function keyChip(parent: Instance, key: string): TextLabel
-	local chip = new("TextLabel", {
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -12, 0, 12),
-		Size = UDim2.fromOffset(26, 26),
-		BackgroundColor3 = P.Slot,
-		Text = key,
-		Font = CHUNKY,
-		TextSize = 15,
-		TextColor3 = P.Dim,
-		ZIndex = 6,
-	}, parent)
-	chip.Visible = UserInputService.KeyboardEnabled
-	UiKit.round(chip, 4)
-	new(
-		"UIStroke",
-		{ Color = P.Edge, Transparency = 0.5, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
-		chip
-	)
-	return chip
-end
-
-local function bigButton(parent: Instance, caption: string, color: Color3, onClick: () -> ()): TextButton
-	local b = IronUi.gemButton(parent, caption, color, onClick)
-	b.Size = UDim2.fromOffset(0, 52)
-	b.TextSize = 22
-	return b
-end
-
 -- Header ----------------------------------------------------------------------------------------------------
 
 local logo = IronUi.badge(root, "◆", 44, P.Gold)
@@ -295,6 +262,17 @@ local function pill(order: number, caption: string, color: Color3, width: number
 	value.TextXAlignment = Enum.TextXAlignment.Left
 	return frame, value
 end
+-- The free pick's charge (it refills while you're away; see ChargeMeter).
+local pickFrame, pickValue = pill(0, "FREE PICK", ChargeMeter.Charging, 136)
+local pickTrack = new("Frame", {
+	BackgroundColor3 = P.Slot,
+	Position = UDim2.new(0, 12, 1, -4),
+	Size = UDim2.new(1, -24, 0, 2),
+}, pickFrame)
+UiKit.round(pickTrack, 2)
+local pickFill = new("Frame", { BackgroundColor3 = ChargeMeter.Charging, Size = UDim2.fromScale(1, 1) }, pickTrack)
+UiKit.round(pickFill, 2)
+local pickCaption = pickFrame:FindFirstChildWhichIsA("TextLabel")
 local _, coinsValue = pill(1, "COINS", P.Gold, 136)
 -- The Season level doubles as the way into the Season Path.
 local seasonFrame, marksValue = pill(2, "SEASON", P.Teal, 150)
@@ -327,53 +305,9 @@ IronUi.highlight(seasonHit, seasonFrame)
 seasonHit.Activated:Connect(function()
 	launch(SeasonUI.toggle)
 end)
-local shopButton = IronUi.gemButton(wallet, "Supply Depot  [B]", P.Amethyst, function()
-	launch(ShopUI.toggle)
-end)
-shopButton.LayoutOrder = 3
-shopButton.Size = UDim2.fromOffset(0, 44)
-shopButton.TextSize = 17
--- Your party (or SOLO) and who's online; opens Social. "+ ADD" opens it too,
--- on the player list, to invite someone.
-local onlineFrame, onlineValue = pill(4, "PARTY  [P]", P.Good, 160)
-local onlineHit = new("TextButton", {
-	Text = "",
-	BackgroundTransparency = 1,
-	Size = UDim2.fromScale(1, 1),
-	ZIndex = 5,
-}, onlineFrame)
-onlineHit:SetAttribute("UiSound", "Open")
-IronUi.highlight(onlineHit, onlineFrame)
-onlineHit.Activated:Connect(function()
-	launch(SocialUI.open)
-end)
-local addButton = IronUi.gemButton(onlineFrame, "+ ADD", P.Gold, function()
-	launch(SocialUI.open)
-end)
-addButton.AnchorPoint = Vector2.new(1, 0.5)
-addButton.Position = UDim2.new(1, -6, 0.5, 0)
-addButton.Size = UDim2.fromOffset(58, 28)
-addButton.TextSize = 12
-addButton.AutomaticSize = Enum.AutomaticSize.None
-addButton.ZIndex = 6
--- Caption and count stay clear of the "+ ADD" button.
-local onlineCaption = onlineFrame:FindFirstChildWhichIsA("TextLabel")
-if onlineCaption then
-	onlineCaption.Size = UDim2.fromOffset(90, 12)
-end
-onlineValue.Size = UDim2.fromOffset(84, 21)
-local function countOnline()
-	local party = SocialUI.party()
-	onlineValue.Text = if party then string.format("%d / 4", #party.Members) else "SOLO"
-	if onlineCaption then
-		onlineCaption.Text = "PARTY  [P]"
-	end
-end
-SocialUI.PartyChanged.Event:Connect(countOnline)
 -- The build, so playtest reports name it (Config.Playtest.Build).
 if Config.Playtest and Config.Playtest.Build then
-	local buildTag =
-		text(gui, Config.Playtest.Build .. "   ·   Feedback & invites in Social [P]", 11, P.Dim, IronUi.Bold)
+	local buildTag = text(gui, Config.Playtest.Build .. "   ·   Feedback in Social", 11, P.Dim, IronUi.Bold)
 	buildTag.AutomaticSize = Enum.AutomaticSize.None
 	-- Bottom centre: the chat bar has the left corner, the DEV button the right.
 	buildTag.AnchorPoint, buildTag.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -15)
@@ -381,211 +315,9 @@ if Config.Playtest and Config.Playtest.Build then
 	buildTag.TextXAlignment = Enum.TextXAlignment.Center
 	buildTag.TextTransparency = 0.25
 end
-countOnline()
-Players.PlayerAdded:Connect(countOnline)
-Players.PlayerRemoving:Connect(function()
-	task.defer(countOnline)
-end)
-
--- Mission strip: the Moon Mine, the Market and what's coming ------------------------------------------------
-
-local STRIP_Y, STRIP_H = 66, 110
-
-local mine = panel(root, 16, STRIP_Y, 630, STRIP_H, Color3.fromRGB(230, 130, 40))
-local sector = label(mine, "LUNAR FRONTIER", 11, P.Gold, IronUi.Bold)
-place(sector, 20, 12, 200, 14)
-local mineTitle = label(mine, "SAGA OUTPOST", 26, P.Text, IronUi.Heading)
-place(mineTitle, 18, 28, 240, 32)
-local mineLine1 = label(mine, "", 14, P.Text, IronUi.Body)
-place(mineLine1, 20, 64, 250, 20)
-local mineLine2 = label(mine, "", 12, ChargeMeter.Charging, IronUi.Bold)
-place(mineLine2, 20, 84, 250, 18)
--- The free pick's charge.
-local allowanceTrack = new("Frame", {
-	BackgroundColor3 = P.Slot,
-	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(20, 102),
-	Size = UDim2.fromOffset(236, 5),
-}, mine)
-UiKit.round(allowanceTrack, 2)
-local allowanceGlow = new("UIStroke", { Color = ChargeMeter.Charged, Thickness = 1, Transparency = 1 }, allowanceTrack)
-local allowanceFill = new("Frame", {
-	BackgroundColor3 = P.Gold,
-	BorderSizePixel = 0,
-	Size = UDim2.fromScale(0, 1),
-}, allowanceTrack)
-UiKit.round(allowanceFill, 2)
--- A small lit moon between the details and the button.
-local moon = new("Frame", {
-	Position = UDim2.fromOffset(266, 17),
-	Size = UDim2.fromOffset(76, 76),
-	BackgroundColor3 = Color3.fromRGB(53, 88, 130),
-}, mine)
-UiKit.round(moon, 38)
-new("UIStroke", { Color = P.Teal, Thickness = 2, Transparency = 0.25 }, moon)
-local lunarView = new("ViewportFrame", {
-	BackgroundTransparency = 1,
-	Size = UDim2.fromScale(1, 1),
-	Ambient = Color3.fromRGB(54, 71, 100),
-	LightColor = Color3.fromRGB(203, 229, 255),
-	LightDirection = Vector3.new(-1, -0.4, -0.7),
-}, moon)
-UiKit.round(lunarView, 38)
-local lunarWorld = new("WorldModel", {}, lunarView)
-local lunarModel = new("Model", {}, lunarWorld)
-new("Part", {
-	Shape = Enum.PartType.Ball,
-	Size = Vector3.new(5, 5, 5),
-	Anchored = true,
-	Color = Color3.fromRGB(101, 124, 155),
-	Material = Enum.Material.Slate,
-}, lunarModel)
-for _, spec in { { -0.8, 0.7, -2.05, 0.9 }, { 0.85, -0.3, -2.15, 0.65 }, { -0.6, -1.1, -1.9, 0.55 } } do
-	new("Part", {
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(spec[4], spec[4], spec[4] * 0.2),
-		Position = Vector3.new(spec[1], spec[2], spec[3]),
-		Anchored = true,
-		Color = Color3.fromRGB(40, 55, 77),
-		Material = Enum.Material.Slate,
-	}, lunarModel)
-end
-local lunarCamera = new("Camera", { FieldOfView = 38 }, lunarView)
-lunarCamera.CFrame = CFrame.lookAt(Vector3.new(0, 0, -9), Vector3.zero)
-lunarView.CurrentCamera = lunarCamera
-IronUi.animate(lunarView, function(t)
-	lunarModel:PivotTo(CFrame.Angles(0, math.sin(t * 0.18) * 0.18, -0.12))
-end)
-local digButton = bigButton(mine, "BEGIN EXPEDITION", Color3.fromRGB(255, 167, 46), function()
-	-- On foot to Saga Outpost: the shared mining basin.
-	launch(OutpostScene.enter)
-end)
-digButton.AnchorPoint = Vector2.new(1, 0.5)
-digButton.Position = UDim2.new(1, -54, 0.5, 0)
-digButton.Size = UDim2.fromOffset(0, 50)
-digButton.TextSize = 19
-IronUi.shine(digButton, 6)
-local digHint = keyChip(mine, "M")
-digHint.AnchorPoint = Vector2.new(1, 0.5)
-digHint.Position = UDim2.new(1, -16, 0.5, 0)
-
--- Market keeps the existing player-to-player trade system.
-local market = panel(root, 658, STRIP_Y, 300, STRIP_H, P.Gold)
-local marketIcon = IronUi.emblem(market, "Trade", P.Gold, 34)
-marketIcon.Position = UDim2.fromOffset(18, 14)
-local marketTitle = label(market, "MARKET", 21, P.Text, IronUi.Heading)
-place(marketTitle, 60, 16, 120, 30)
-local marketCopy = label(market, "Swap gear with other miners. Both confirm.", 12, LIGHT, IronUi.Body)
-place(marketCopy, 20, 56, 150, 40)
-marketCopy.TextWrapped = true
-marketCopy.TextYAlignment = Enum.TextYAlignment.Top
-local marketButton = IronUi.gemButton(market, "OPEN  [T]", P.Gold, function()
-	launch(TradeUI.open)
-end)
-marketButton.AnchorPoint = Vector2.new(1, 0.5)
-marketButton.Position = UDim2.new(1, -18, 0.5, 0)
-marketButton.Size = UDim2.fromOffset(0, 42)
-marketButton.TextSize = 15
-
--- Activities switched off in Config.Features: dimmed under a CLOSED tag.
-do
-	local features = Config.Features or {}
-	local function closed(frame: Frame)
-		local veil = new("TextButton", {
-			Text = "",
-			AutoButtonColor = false,
-			BackgroundColor3 = Color3.fromRGB(6, 8, 14),
-			BackgroundTransparency = 0.06,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = 50,
-		}, frame)
-		UiKit.round(veil, 6)
-		local tag = label(veil, "CLOSED", 22, P.Text, IronUi.Heading)
-		tag.TextXAlignment = Enum.TextXAlignment.Center
-		tag.ZIndex = 51
-		tag.Position = UDim2.fromOffset(0, 30)
-		tag.Size = UDim2.new(1, 0, 0, 28)
-		local why = label(veil, "Off for this playtest. Try the Arena!", 13, P.Dim, IronUi.Body)
-		why.TextXAlignment = Enum.TextXAlignment.Center
-		why.ZIndex = 51
-		why.Position = UDim2.fromOffset(0, 62)
-		why.Size = UDim2.new(1, 0, 0, 18)
-	end
-	if features.Mining == false then
-		closed(mine)
-	end
-	if features.Market == false then
-		closed(market)
-	end
-end
-
--- Training and explicit PvP sessions share the Arena; training visitors are protected.
-local social = panel(root, 970, STRIP_Y, W - 986, STRIP_H, P.Teal)
-local socialTitle = label(social, "COMBAT ARENA", 19, P.Text, IronUi.Heading)
-place(socialTitle, 20, 14, 240, 28)
-local socialCopy = label(social, "Train, fight a rival, party raid (3+) or duel.", 12, LIGHT, IronUi.Body)
-place(socialCopy, 20, 44, 280, 18)
-socialCopy.TextWrapped = true
-socialCopy.TextYAlignment = Enum.TextYAlignment.Top
--- The Surge Array at a glance: the three gem sockets. Click to open the loadout.
-local surgeStrip = new("TextButton", {
-	Text = "",
-	AutoButtonColor = false,
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -16, 0, 8),
-	Size = UDim2.fromOffset(126, 56),
-}, social)
-local surgeSockets = {}
-for i, key in { "Q", "E", "R" } do
-	local circle = new("Frame", {
-		BackgroundColor3 = P.Inset,
-		Position = UDim2.fromOffset((i - 1) * 46, 0),
-		Size = UDim2.fromOffset(34, 34),
-	}, surgeStrip)
-	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, circle)
-	local ring = new("UIStroke", { Color = LIGHT, Thickness = 2, Transparency = 0.4 }, circle)
-	local glyph = label(circle, "+", 15, LIGHT, IronUi.Bold)
-	glyph.Size, glyph.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
-	glyph.TextYAlignment = Enum.TextYAlignment.Center
-	-- The key, centred under its socket.
-	local keyLabel = label(surgeStrip, key, 10, P.Gold, IronUi.Bold)
-	place(keyLabel, (i - 1) * 46, 38, 34, 12)
-	keyLabel.TextXAlignment = Enum.TextXAlignment.Center
-	surgeSockets[key] = { Ring = ring, Glyph = glyph }
-end
-surgeStrip.Activated:Connect(function()
-	launch(SurgeArrayUI.open)
-end)
-local function arenaButton(caption, color, x, w, onClick)
-	local b = IronUi.gemButton(social, caption, color, onClick)
-	b.Position, b.Size, b.TextSize = UDim2.fromOffset(x, 70), UDim2.fromOffset(w, 32), 12
-	return b
-end
-arenaButton("TRAIN", P.Teal, 16, 60, function()
-	launch(function()
-		ArenaScene.enter(false)
-	end)
-end)
-arenaButton("RIVAL", P.Amethyst, 82, 62, function()
-	launch(function()
-		ArenaScene.enter(true)
-	end)
-end)
--- Real players: the rated 1v1 queue, and Social for parties, 2v2 and chat.
-arenaButton("1v1 QUEUE", P.Gold, 150, 96, function()
-	launch(SocialUI.findDuel)
-end)
--- A party of three or more: a raid boss together (the leader starts it).
-arenaButton("PARTY RAID", Color3.fromRGB(222, 86, 72), 252, 96, function()
-	launch(SocialUI.raid)
-end)
-arenaButton("TREE [K]", P.Teal, 354, 76, function()
-	launch(AugmentTreeUI.open)
-end)
 
 -- The armory fills the rest: equipment, sockets, stats, backpack and spare gear.
-CharacterUI.mount(root, gui, UDim2.fromOffset(16, STRIP_Y + STRIP_H + 12))
+CharacterUI.mount(root, gui, UDim2.fromOffset(16, 66))
 
 local function commas(n: number): string
 	local s = tostring(math.floor(n))
@@ -598,25 +330,19 @@ local function commas(n: number): string
 	end
 end
 
--- Saga Outpost: the pick in hand, and the free pick's charge (ticks below).
+-- The free pick's charge, ticking below.
 local function refreshMining(profile)
 	local outpost = profile.Outpost
 	local charged, nextIn = ChargeMeter.read(outpost and outpost.Picks, outpost and outpost.SurveyAt)
-	local pickId = outpost and outpost.Active or "Survey"
-	local pick = OutpostRules.Picks[pickId] or OutpostRules.Picks.Survey
-	local swings = if pickId == "Survey" then charged elseif outpost then outpost.Picks[pickId] or 0 else 0
-	local rocks = outpost and outpost.Rocks or 0
-	mineLine1.Text = if pickId ~= "Survey" and swings > 0
-		then string.format("%s · %d swings", pick.Name, swings)
-		elseif charged > 0 then string.format("Free pick ready · %d rocks mined", rocks)
-		else "Out of swings · picks at PROBE-7"
-	mineLine2.Text = if nextIn
-		then string.format("⚡ Free pick %d/%d · +1 in %s", charged, ChargeMeter.Full, OutpostRules.clock(nextIn))
-		else string.format("⚡ Free pick %d/%d · fully charged", charged, ChargeMeter.Full)
-	mineLine2.TextColor3 = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
-	allowanceFill.Size = UDim2.fromScale(math.clamp(charged / ChargeMeter.Full, 0, 1), 1)
-	allowanceFill.BackgroundColor3 = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
-	allowanceGlow.Transparency = if nextIn then 1 else 0.2
+	local color = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
+	pickValue.Text = string.format("%d/%d", charged, ChargeMeter.Full)
+	pickValue.TextColor3 = if charged > 0 then Color3.new(1, 1, 1) else P.Bad
+	if pickCaption then
+		pickCaption.Text = if nextIn then "FREE PICK  +" .. OutpostRules.clock(nextIn) else "FREE PICK  FULL"
+		pickCaption.TextColor3 = color
+	end
+	pickFill.Size = UDim2.fromScale(math.clamp(charged / ChargeMeter.Full, 0, 1), 1)
+	pickFill.BackgroundColor3 = color
 end
 task.spawn(function()
 	while true do
@@ -631,7 +357,7 @@ local function refresh(profile)
 	if not profile then
 		return
 	end
-	hello.Text = "EXPEDITION COMMAND  /  " .. string.upper(player.DisplayName)
+	hello.Text = "INVENTORY  /  " .. string.upper(player.DisplayName)
 	coinsValue.Text = commas(profile.Coins or 0)
 	local seasonData = profile.Season or { XP = 0, Claimed = {} }
 	local level, into, need = Season.levelFor(seasonData.XP or 0)
@@ -657,17 +383,9 @@ local function refresh(profile)
 			surges += 1
 		end
 	end
-	readinessValue.Text = string.format("%d/6 equipped   ·   %d/3 surges", equipped, surges)
+	readinessValue.Text = string.format("%d/6 gear   ·   %d/3 powers on keys", equipped, surges)
 	readinessValue.TextColor3 = if equipped == 6 and surges == 3 then P.Teal else P.Gold
 	refreshMining(profile)
-	for key, socket in surgeSockets do
-		local gem = Tech.surgeGem(profile.Character, key)
-		local definition = gem and Tech.surgeStats(gem)
-		local color = if gem then GemConfig.ElementColors[gem.Element] or P.Gold else LIGHT
-		socket.Ring.Color, socket.Ring.Transparency = color, if gem then 0 else 0.4
-		socket.Glyph.Text, socket.Glyph.TextColor3 = if definition then "◆" else "+", color
-		SurgeIcons.apply(socket.Glyph, definition)
-	end
 end
 GemClient.Changed:Connect(refresh)
 if GemClient.Profile then
@@ -717,33 +435,18 @@ end)
 GemClient.Changed:Connect(maybeWelcome)
 task.defer(maybeWelcome)
 
--- Equipment and enchantment are on the dashboard; only destinations need shortcuts.
+-- Shortcuts for the Inventory's own windows.
 local KEYS = {
 	K = AugmentTreeUI.toggle,
 	L = SurgeArrayUI.toggle,
-	M = OutpostScene.enter,
-	T = TradeUI.open,
-	B = ShopUI.toggle,
 	J = SeasonUI.toggle,
-	P = SocialUI.toggle,
 }
-ContextActionService:BindAction(
-	"GemsoulDashboard",
-	function(_, state, inputObject)
-		if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
-			local action = KEYS[inputObject.KeyCode.Name]
-			if action then
-				launch(action)
-			end
+ContextActionService:BindAction("GemsoulDashboard", function(_, state, inputObject)
+	if state == Enum.UserInputState.Begin and gui.Enabled and not introOpen() then
+		local action = KEYS[inputObject.KeyCode.Name]
+		if action then
+			launch(action)
 		end
-		return Enum.ContextActionResult.Pass
-	end,
-	false,
-	Enum.KeyCode.K,
-	Enum.KeyCode.L,
-	Enum.KeyCode.M,
-	Enum.KeyCode.T,
-	Enum.KeyCode.B,
-	Enum.KeyCode.J,
-	Enum.KeyCode.P
-)
+	end
+	return Enum.ContextActionResult.Pass
+end, false, Enum.KeyCode.K, Enum.KeyCode.L, Enum.KeyCode.J)

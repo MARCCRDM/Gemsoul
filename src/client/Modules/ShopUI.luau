@@ -1036,7 +1036,7 @@ local function drawPasses()
 	local sName = label(s, string.upper(Season.Name), 22, WHITE, HEADING)
 	place(sName, 24, 198, half - 48, 34)
 	benefitList(s, {
-		"Earn XP from expeditions, sales and daily visits",
+		"Earn XP from mining, duels and daily visits",
 		"Coins, caches, cut gems and cosmetics every level",
 		"Exclusive trims and back pieces at levels 5 to 30",
 	}, seasonColor, 244)

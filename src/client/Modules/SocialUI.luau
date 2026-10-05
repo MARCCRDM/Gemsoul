@@ -90,7 +90,7 @@ local function statusOf(other: Player): (string, Color3)
 	elseif other:GetAttribute("CombatSession") then
 		return "In the Arena", P.Teal
 	elseif other:GetAttribute("Expedition") then
-		return "On an expedition", P.Dim
+		return "Mining", P.Dim
 	end
 	return "In the menu", P.Good
 end
