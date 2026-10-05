@@ -865,10 +865,10 @@ end
 --   reflectance, glow brightness, glow range, sparkles per second
 local SHINE = {
 	{ 0, 0, 0, 0 }, -- Common: plain
-	{ 0.06, 0.45, 5, 0 }, -- Uncommon: glowing trims, a faint glow
-	{ 0.14, 0.8, 7, 2 }, -- Rare
-	{ 0.22, 1.2, 9, 4 }, -- Ultra Rare
-	{ 0.32, 1.8, 12, 8 }, -- Legendary
+	{ 0.03, 0.25, 5, 0 }, -- Uncommon: glowing trims, a faint glow
+	{ 0.06, 0.4, 6, 1 }, -- Rare
+	{ 0.09, 0.6, 7, 2 }, -- Ultra Rare
+	{ 0.12, 0.9, 9, 4 }, -- Legendary (kept soft: metal mirrors the sky)
 }
 local SHINY = {
 	[Enum.Material.Metal] = true,
@@ -947,11 +947,11 @@ end
 --   brightness, light range, particles per second, ice crystals (Cryo).
 --   The light stays soft so it doesn't tint the armor's own colours.
 local GEM_GLOW = {
-	{ 1, 0.75, 0.6, 7, 6, 2 }, -- Common
-	{ 1, 0.55, 0.85, 8, 9, 3 }, -- Uncommon
-	{ 1, 0.35, 1.1, 9, 13, 4 }, -- Rare
-	{ 1, 0.15, 1.4, 10, 18, 6 }, -- Ultra Rare
-	{ 1, 0, 1.8, 12, 26, 8 }, -- Legendary
+	{ 1, 0.85, 0.35, 6, 4, 2 }, -- Common
+	{ 1, 0.75, 0.5, 7, 6, 3 }, -- Uncommon
+	{ 1, 0.6, 0.65, 8, 8, 4 }, -- Rare
+	{ 1, 0.45, 0.8, 9, 11, 5 }, -- Ultra Rare
+	{ 1, 0.3, 1, 10, 15, 6 }, -- Legendary
 }
 -- How each element's light moves: seconds per pulse, and how far it dims.
 local GEM_PULSE = {

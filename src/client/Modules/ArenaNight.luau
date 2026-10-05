@@ -24,9 +24,10 @@ ArenaNight.Mood = {
 		OutdoorAmbient = Color3.fromRGB(40, 42, 60),
 		ExposureCompensation = -0.15,
 		EnvironmentDiffuseScale = 0.25,
-		EnvironmentSpecularScale = 0.6,
+		EnvironmentSpecularScale = 0.3,
 	},
-	BloomEffect = { Intensity = 1.1, Size = 30, Threshold = 1.05 },
+	-- Only the brightest things bloom, and softly: the fight stays readable.
+	BloomEffect = { Intensity = 0.45, Size = 20, Threshold = 1.6 },
 	ColorCorrectionEffect = {
 		Brightness = -0.03,
 		Contrast = 0.18,
@@ -53,23 +54,26 @@ ArenaNight.DungeonMood = {
 		EnvironmentSpecularScale = 0.6,
 	},
 	BloomEffect = { Intensity = 0.25, Size = 20, Threshold = 1.4 },
-	ColorCorrectionEffect = { Brightness = 0.02, Contrast = 0.05, Saturation = 0.03, TintColor = Color3.fromRGB(
-		246,
-		248,
-		255
-	) },
-	Atmosphere = { Density = 0.12, Haze = 0.1, Glare = 0, Color = Color3.fromRGB(145, 156, 178), Decay = Color3.fromRGB(
-		92,
-		104,
-		127
-	) },
+	ColorCorrectionEffect = {
+		Brightness = 0.02,
+		Contrast = 0.05,
+		Saturation = 0.03,
+		TintColor = Color3.fromRGB(246, 248, 255),
+	},
+	Atmosphere = {
+		Density = 0.12,
+		Haze = 0.1,
+		Glare = 0,
+		Color = Color3.fromRGB(145, 156, 178),
+		Decay = Color3.fromRGB(92, 104, 127),
+	},
 	SunRaysEffect = { Intensity = 0 },
 }
 ArenaNight.ClockTime = 0 -- moon and stars
 ArenaNight.LampScale = 0.3 -- the Arena's own ceiling lamps, dimmed
-ArenaNight.FlashBoost = 1.5 -- combat flashes, brighter and wider
+ArenaNight.FlashBoost = 1.1 -- combat flashes, a little brighter and wider
 -- The companion glow on each gear light: brightness added, range multiplier.
-ArenaNight.GlowBrightness, ArenaNight.GlowRange = 1.1, 1.6
+ArenaNight.GlowBrightness, ArenaNight.GlowRange = 0.35, 1.2
 
 local FADE = TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 

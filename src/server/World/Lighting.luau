@@ -31,9 +31,9 @@ return function(space: boolean?)
 			atmosphere.Glare = 0
 		end
 		local bloom = getOrCreate(Lighting, "BloomEffect")
-		bloom.Intensity = 0.6
-		bloom.Size = 24
-		bloom.Threshold = 1.6
+		bloom.Intensity = 0.4
+		bloom.Size = 20
+		bloom.Threshold = 1.8
 		return
 	end
 	Lighting.ClockTime = 14.5
@@ -44,7 +44,7 @@ return function(space: boolean?)
 	Lighting.Ambient = Color3.fromRGB(110, 108, 118)
 	Lighting.OutdoorAmbient = Color3.fromRGB(150, 148, 160)
 	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 1
+	Lighting.EnvironmentSpecularScale = 0.5
 
 	local atmosphere = getOrCreate(Lighting, "Atmosphere")
 	atmosphere.Density = 0.3

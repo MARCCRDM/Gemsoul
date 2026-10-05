@@ -394,9 +394,9 @@ local function refreshExtras(entry)
 			entry.Highlight.Parent = entry.Model
 		end
 		entry.Highlight.FillColor = tint or outline
-		entry.Highlight.FillTransparency = if tint then 0.55 else 0.9
+		entry.Highlight.FillTransparency = if tint then 0.75 else 0.95
 		entry.Highlight.OutlineColor = outline or Color3.new(1, 1, 1)
-		entry.Highlight.OutlineTransparency = if outline then 0.1 else 0.6
+		entry.Highlight.OutlineTransparency = if outline then 0.35 else 0.8
 	elseif entry.Highlight then
 		entry.Highlight:Destroy()
 		entry.Highlight = nil
