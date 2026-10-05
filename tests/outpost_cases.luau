@@ -213,6 +213,12 @@ local GemConfig = {
 local Mine = load("src/shared/Mine.luau", "Mine", {})
 
 -- The rules ---------------------------------------------------------------------------
+-- Ring mixes: the Common Field never grows a Geode, the Crystal Crown never a Pebble.
+for i = 0, 999 do
+	local roll = i / 1000
+	check(Rules.rollSize(roll, "Common") ~= "Geode" and Rules.rollSize(roll, "Common") ~= "Monolith", "Common grew big rock")
+	check(Rules.rollSize(roll, "Crystal") ~= "Pebble" and Rules.rollSize(roll, "Crystal") ~= "Boulder", "Crystal grew small rock")
+end
 local counts = {}
 for i = 0, 9999 do
 	local size = Rules.rollSize(i / 10000)
@@ -361,12 +367,33 @@ Server.start()
 local site = Server.site()
 check(site and site.Model.Parent == workspaceRoot, "The Outpost wasn't built")
 check(#site.Spots >= Rules.NodeCount, "Not enough room for the rocks")
+-- The Skyport: compact, every spot on a mining ring, each ring with room.
+do
+	local perZone = {}
+	local centre = Rules.Location.Position
+	for i, spot in site.Spots do
+		local zone = site.Zones[i]
+		check(Rules.Zones[zone] ~= nil, "A rock spot off the rings: " .. tostring(zone))
+		perZone[zone] = (perZone[zone] or 0) + 1
+		local offset = spot.Position - centre
+		check(
+			R.Vector3.new(offset.X, 0, offset.Z).Magnitude < Rules.Radius,
+			"A rock spot off the island"
+		)
+	end
+	for _, zone in Rules.ZoneOrder do
+		check((perZone[zone] or 0) >= 8, zone .. " ring has too little room: " .. tostring(perZone[zone]))
+	end
+end
 local nodeCount = 0
 for _ in Server._nodes do
 	nodeCount += 1
 end
 check(nodeCount == Rules.NodeCount, "Rocks out: " .. nodeCount)
 for _, node in Server._nodes do
+	-- A ring only grows its own mix.
+	local zone = site.Zones[node.Spot]
+	check((Rules.Zones[zone].Weights[node.Size] or 0) > 0, node.Size .. " grew on the " .. zone .. " ring")
 	local model = node.Model
 	check(
 		model:GetAttribute("Hp") == Rules.Sizes[node.Size].Hp and model.PrimaryPart ~= nil,
@@ -532,7 +559,7 @@ check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings
 
 -- The secrets: six hidden props, each with a prompt; found once for coins.
 check(#site.Secrets == #Rules.SecretOrder, "Not every secret was hidden")
-check(#site.Parking == 8, "The Motor Pool should have 8 bays")
+check(#site.Parking == 0, "The Skyport has no Motor Pool")
 local secretIds = {}
 for _, part in site.Secrets do
 	local id = part:GetAttribute("SecretId")

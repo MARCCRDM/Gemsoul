@@ -232,7 +232,8 @@ local function spawnNode()
 	local index = spots[rng:NextInteger(1, #spots)]
 	freeSpots[index] = nil
 	nextId += 1
-	local size = Rules.rollSize(rng:NextNumber())
+	-- Each ring grows its own mix (Shared.Outpost.Zones).
+	local size = Rules.rollSize(rng:NextNumber(), site.Zones and site.Zones[index])
 	local spec = Rules.Sizes[size]
 	local model = OutpostWorld.rock(size, site.Spots[index], rng)
 	model.Name = "Rock" .. nextId
@@ -733,7 +734,7 @@ function OutpostServer.start()
 						and not player:GetAttribute("DungeonId")
 					then
 						local offset = root.Position - centre
-						local far = Vector3.new(offset.X, 0, offset.Z).Magnitude > Rules.Radius + 250
+						local far = Vector3.new(offset.X, 0, offset.Z).Magnitude > Rules.Radius + 60
 						local fell = root.Position.Y < site.Spawn.Position.Y - 120
 						if far or fell then
 							local character = player.Character :: Model

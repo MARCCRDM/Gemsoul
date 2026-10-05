@@ -11,6 +11,7 @@
 	                       vendor kiosks and the Saga Stone pylon.
 	  Scenes.spacePickaxe(hand) the space pickaxe, welded to a hand.
 	  Scenes.spaceLighting()  a black, starry sky with cool light.
+	  Scenes.outpostLighting()  the Skyport: a bright, hazy afternoon with clouds.
 	  Scenes.terraformLighting()  the same sky with a thin new atmosphere.
 
 	Each builder returns a table with the Model and named spots (CFrames) for
@@ -635,6 +636,54 @@ function Scenes.spaceLighting()
 	local clouds = terrain and terrain:FindFirstChildOfClass("Clouds")
 	if clouds then
 		clouds.Enabled = false
+	end
+end
+
+-- The Skyport (the Outpost): a bright afternoon over a sea of cloud, warm
+-- sun and soft haze, with the planets and the ring station hanging in it.
+function Scenes.outpostLighting()
+	Lighting.ClockTime = 14.6
+	Lighting.GeographicLatitude = 28
+	Lighting.Brightness = 2.6
+	Lighting.ExposureCompensation = 0.05
+	Lighting.Ambient = Color3.fromRGB(118, 116, 126)
+	Lighting.OutdoorAmbient = Color3.fromRGB(170, 166, 176)
+	Lighting.EnvironmentDiffuseScale = 1
+	Lighting.EnvironmentSpecularScale = 0.35
+	Lighting.GlobalShadows = true
+	local function get(className: string, parent: Instance?): any
+		local holder = parent or Lighting
+		local found = holder:FindFirstChildOfClass(className)
+		if not found then
+			found = Instance.new(className)
+			found.Parent = holder
+		end
+		return found
+	end
+	local atmosphere = get("Atmosphere")
+	atmosphere.Density = 0.3
+	atmosphere.Offset = 0.15
+	atmosphere.Color = Color3.fromRGB(205, 220, 242)
+	atmosphere.Decay = Color3.fromRGB(128, 150, 186)
+	atmosphere.Glare = 0.15
+	atmosphere.Haze = 1.4
+	local sky = get("Sky")
+	sky.StarCount = 0
+	sky.CelestialBodiesShown = true
+	local bloom = get("BloomEffect")
+	bloom.Intensity, bloom.Size, bloom.Threshold = 0.3, 20, 2
+	local grade = get("ColorCorrectionEffect")
+	grade.Brightness, grade.Contrast, grade.Saturation = 0.03, 0.06, 0.12
+	grade.TintColor = Color3.fromRGB(255, 249, 238)
+	local rays = get("SunRaysEffect")
+	rays.Intensity, rays.Spread = 0.06, 0.8
+	local terrain = workspace:FindFirstChildOfClass("Terrain")
+	if terrain then
+		local clouds = get("Clouds", terrain)
+		clouds.Enabled = true
+		clouds.Cover = 0.62
+		clouds.Density = 0.55
+		clouds.Color = Color3.new(1, 1, 1)
 	end
 end
 

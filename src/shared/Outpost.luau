@@ -13,7 +13,7 @@
 
 	  Outpost.Sizes / Outpost.SizeOrder      the rocks
 	  Outpost.Picks / Outpost.PickOrder      the picks
-	  Outpost.rollSize(roll)                 a new rock's size, 0 <= roll < 1
+	  Outpost.rollSize(roll, zone?)          a new rock's size (a ring's mix), 0 <= roll < 1
 	  Outpost.damage(pick, crit)             how many layers a swing chips
 	  Outpost.tension(hp, maxHp)             0 (fresh) .. 1 (about to pop): how
 	                                         loud and high the hit sound rings
@@ -29,10 +29,11 @@
 ]]
 local Outpost = {}
 
--- Where the basin is in the world (its centre, on the ground).
+-- Where the Skyport is in the world (its centre, on the ground): a compact
+-- floating island, with rocks growing on three mining rings.
 Outpost.Location = CFrame.new(0, 0, 7000)
-Outpost.Radius = 440 -- the drivable floor (a quarry about a kilometre across)
-Outpost.NodeCount = 110 -- rocks out at once
+Outpost.Radius = 112 -- the island's walkable radius
+Outpost.NodeCount = 34 -- rocks out at once, across the three rings
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from
 Outpost.SwingCooldown = 0.32
@@ -44,7 +45,7 @@ Outpost.Sizes = {
 	Pebble = {
 		Name = "Regolith Chunk",
 		Hp = 4,
-		Respawn = 40,
+		Respawn = 20,
 		Weight = 44,
 		Scale = 3.6,
 		Depth = 2,
@@ -56,7 +57,7 @@ Outpost.Sizes = {
 	Boulder = {
 		Name = "Crystal Boulder",
 		Hp = 7,
-		Respawn = 75,
+		Respawn = 35,
 		Weight = 34,
 		Scale = 6,
 		Depth = 5,
@@ -68,7 +69,7 @@ Outpost.Sizes = {
 	Monolith = {
 		Name = "Saga Monolith",
 		Hp = 11,
-		Respawn = 120,
+		Respawn = 60,
 		Weight = 17,
 		Scale = 8.5,
 		Depth = 9,
@@ -80,7 +81,7 @@ Outpost.Sizes = {
 	Geode = {
 		Name = "Star Geode",
 		Hp = 16,
-		Respawn = 240,
+		Respawn = 120,
 		Weight = 5,
 		Scale = 7,
 		Depth = 14,
@@ -122,14 +123,27 @@ Outpost.Picks = {
 }
 Outpost.PickOrder = { "Survey", "Titan", "Plasma" }
 
-function Outpost.rollSize(roll: number): string
+-- The mining rings: each grows its own mix of rocks (size weights).
+Outpost.Zones = {
+	Common = { Name = "Common Field", Weights = { Pebble = 62, Boulder = 38 } },
+	Deep = { Name = "Deep Vein", Weights = { Boulder = 58, Monolith = 42 } },
+	Crystal = { Name = "Crystal Crown", Weights = { Monolith = 68, Geode = 32 } },
+}
+Outpost.ZoneOrder = { "Common", "Deep", "Crystal" }
+
+-- A rock size from a 0..1 roll: the zone's mix, or every size's own Weight.
+function Outpost.rollSize(roll: number, zone: string?): string
+	local mix = zone and Outpost.Zones[zone] and Outpost.Zones[zone].Weights
+	local function weight(id: string): number
+		return if mix then mix[id] or 0 else Outpost.Sizes[id].Weight
+	end
 	local total = 0
 	for _, id in Outpost.SizeOrder do
-		total += Outpost.Sizes[id].Weight
+		total += weight(id)
 	end
 	local pick = roll * total
 	for _, id in Outpost.SizeOrder do
-		pick -= Outpost.Sizes[id].Weight
+		pick -= weight(id)
 		if pick < 0 then
 			return id
 		end

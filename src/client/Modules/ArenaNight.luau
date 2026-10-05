@@ -1,6 +1,6 @@
 --[[
-	Night in the Arena: while you're in an Arena session the lighting drops
-	to a dim, cool night, so the fight is lit by itself. Strikes, surges,
+	The Arena's light: while you're in an Arena session the lighting turns to
+	a golden late afternoon (it used to be night; too dark to read). Strikes, surges,
 	parries and deaths flash real light (CombatFx.flash), and every
 	fighter's gear glows: its gem, rarity and affinity lights get a wider,
 	stronger companion and its neon trims bloom. Leaving the Arena restores
@@ -18,28 +18,30 @@ local CombatFx = require(script.Parent.CombatFx)
 local ArenaNight = {}
 
 ArenaNight.Mood = {
+	-- A golden late afternoon: bright enough to read every move, low sun so
+	-- strikes and surges still light the fighters.
 	Lighting = {
-		Brightness = 0.45,
-		Ambient = Color3.fromRGB(30, 32, 46),
-		OutdoorAmbient = Color3.fromRGB(40, 42, 60),
-		ExposureCompensation = -0.15,
-		EnvironmentDiffuseScale = 0.25,
+		Brightness = 1.8,
+		Ambient = Color3.fromRGB(96, 92, 104),
+		OutdoorAmbient = Color3.fromRGB(128, 122, 134),
+		ExposureCompensation = 0,
+		EnvironmentDiffuseScale = 0.7,
 		EnvironmentSpecularScale = 0.3,
 	},
 	-- Only the brightest things bloom, and softly: the fight stays readable.
-	BloomEffect = { Intensity = 0.45, Size = 20, Threshold = 1.6 },
+	BloomEffect = { Intensity = 0.4, Size = 20, Threshold = 1.8 },
 	ColorCorrectionEffect = {
-		Brightness = -0.03,
-		Contrast = 0.18,
-		Saturation = 0.15,
-		TintColor = Color3.fromRGB(222, 228, 255),
+		Brightness = 0.02,
+		Contrast = 0.12,
+		Saturation = 0.12,
+		TintColor = Color3.fromRGB(255, 242, 226),
 	},
 	Atmosphere = {
-		Density = 0.32,
-		Haze = 0.4,
-		Glare = 0,
-		Color = Color3.fromRGB(22, 26, 40),
-		Decay = Color3.fromRGB(10, 12, 22),
+		Density = 0.28,
+		Haze = 1,
+		Glare = 0.2,
+		Color = Color3.fromRGB(232, 210, 186),
+		Decay = Color3.fromRGB(150, 124, 112),
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
@@ -69,7 +71,7 @@ ArenaNight.DungeonMood = {
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
-ArenaNight.ClockTime = 0 -- moon and stars
+ArenaNight.ClockTime = 16.8 -- low golden sun
 ArenaNight.LampScale = 0.3 -- the Arena's own ceiling lamps, dimmed
 ArenaNight.FlashBoost = 1.1 -- combat flashes, a little brighter and wider
 -- The companion glow on each gear light: brightness added, range multiplier.

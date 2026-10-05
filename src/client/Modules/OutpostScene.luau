@@ -1024,7 +1024,7 @@ local function showWorld()
 		dashboard.Enabled = false
 		hiddenDashboard = dashboard
 	end
-	Scenes.spaceLighting()
+	Scenes.outpostLighting()
 	local camera = workspace.CurrentCamera
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	camera.CameraType = Enum.CameraType.Custom
