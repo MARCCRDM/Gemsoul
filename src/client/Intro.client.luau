@@ -42,7 +42,7 @@ local C = {
 }
 local gui = UiKit.gui("Intro", 15)
 -- Full bleed: the starfield runs under the Roblox top bar too.
-gui.IgnoreGuiInset = true
+gui.IgnoreGuiInset = false
 local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BorderSizePixel = 0 }, gui)
 new("UIGradient", { Rotation = 115, Color = ColorSequence.new(C.Ink, Color3.fromRGB(16, 22, 42)) }, back)
 local function frame(parent, props)
@@ -106,8 +106,8 @@ end
 local panel = frame(back, {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.new(0.5, 0, 0.5, 14),
-	Size = UDim2.new(1, -40, 1, -76),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(1, -24, 1, -16),
 })
 new("UISizeConstraint", { MaxSize = Vector2.new(1200, 880) }, panel)
 local brand = label(panel, "SAGA MINERS  ·  LAUNCH", 11, C.Cyan)
@@ -313,35 +313,39 @@ local function fit()
 	local w, h = panel.AbsoluteSize.X, panel.AbsoluteSize.Y
 	local short = h < 480
 	local narrow = w < 650
-	local header = if short then 70 elseif narrow then 92 else 106
+	local header = if short then 48 elseif narrow then 92 else 106
 	-- Short (phone) screens: the quiet buttons flank the main one in a single
 	-- footer row, so the gems get the height.
-	local oneRow = short and w >= 640
+	local oneRow = short and w >= 480
 	footer.Size = UDim2.new(1, 0, 0, if oneRow then 48 else 96)
 	primary.Size = UDim2.new(if oneRow then 0.4 else 1, 0, 0, if oneRow then 44 else 52)
 	for _, b in { skip, motion } do
 		b.Position = UDim2.new(b.AnchorPoint.X, 0, 0, if oneRow then 8 else 64)
 	end
-	skip.Size = UDim2.fromOffset(if oneRow then 168 else 214, 28)
+	skip.Size = UDim2.fromOffset(if oneRow then math.min(168, w * 0.28) else math.min(214, w * 0.58), 28)
 	skip.Text = if oneRow then "Skip · keep rewards" else "Skip reveal · keep all rewards"
-	local bodyHeight = math.max(80, h - header - (if oneRow then 60 else 108))
-	title.TextSize = if w < 420 then 20 elseif w < 500 then 24 elseif short then 26 else 34
-	title.Position, title.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, if short then 34 else 42)
+	local bodyHeight = math.max(80, h - header - (if oneRow then 54 else 108))
+	title.TextSize = if w < 420 then 20 elseif w < 500 then 24 elseif short then 20 else 34
+	title.Position, title.Size =
+		UDim2.fromOffset(0, if short then 18 else 24), UDim2.new(1, 0, 0, if short then 26 else 42)
 	subtitle.Visible = not short
 	subtitle.Position = UDim2.fromOffset(0, if narrow then 62 else 70)
 	stepper.Visible = w >= 560
 	body.Position, body.Size = UDim2.fromOffset(0, header), UDim2.new(1, 0, 0, bodyHeight)
 	local portrait = narrow and h > w
-	horizontal = portrait or bodyHeight < 300
+	horizontal = false
 	if portrait then
-		local heroHeight = math.max(100, bodyHeight - 140)
+		local heroHeight = math.max(100, bodyHeight * 0.32)
 		hero.Position, hero.Size = UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, heroHeight)
 		rack.Position, rack.Size =
 			UDim2.fromOffset(0, heroHeight + 12), UDim2.new(1, 0, 0, bodyHeight - heroHeight - 12)
 	else
-		hero.Position, hero.Size = UDim2.fromOffset(0, 0), UDim2.new(0.52, -10, 1, 0)
-		rack.Position, rack.Size = UDim2.new(0.52, 12, 0, 0), UDim2.new(0.48, -12, 1, 0)
+		hero.Position, hero.Size = UDim2.fromOffset(0, 0), UDim2.new(if short then 0.34 else 0.42, -10, 1, 0)
+		rack.Position, rack.Size =
+			UDim2.new(if short then 0.34 else 0.42, 12, 0, 0), UDim2.new(if short then 0.66 else 0.58, -12, 1, 0)
 	end
+	stage.Position = UDim2.fromOffset(0, if short then 26 else 38)
+	stage.Size = UDim2.new(1, 0, 1, if short then -26 else -38)
 	local compact = portrait or short
 	heroKicker.Visible = not compact
 	crest.Visible = not compact
@@ -349,17 +353,31 @@ local function fit()
 		UDim2.fromOffset(12, if compact then 6 else 46), UDim2.new(1, -24, 1, if compact then -62 else -128)
 	heroName.Position, heroName.Size =
 		UDim2.new(0, 20, 1, if compact then -52 else -70), UDim2.new(1, -40, 0, if compact then 26 else 34)
-	heroName.TextSize = if compact then 20 else 28
+	heroName.TextSize = if compact then 14 else 28
 	heroMeta.Position, heroMeta.Size = UDim2.new(0, 20, 1, if compact then -26 else -34), UDim2.new(1, -40, 0, 18)
 	local rows = if phase == "Gems" then 3 else 2
+	local cellHeight = math.max(1, (stage.AbsoluteSize.Y - (rows - 1) * 10 - 4) / rows)
+	for _, card in cards do
+		local tiny = cellHeight < 110
+		card.Art.Position = UDim2.fromOffset(4, if tiny then 18 else 26)
+		card.Art.Size = if tiny then UDim2.new(0.3, -4, 1, -22) else UDim2.new(1, -12, 1, -70)
+		card.Name.Position = if tiny then UDim2.new(0.31, 2, 0, 19) else UDim2.new(0, 12, 1, -40)
+		card.Name.Size = if tiny then UDim2.new(0.69, -6, 0, 14) else UDim2.new(1, -24, 0, 16)
+		card.Name.TextSize = if tiny then 9 else 11
+		card.Rarity.Position = if tiny then UDim2.new(0.31, 2, 1, -16) else UDim2.new(0, 12, 1, -22)
+		card.Rarity.Size = if tiny then UDim2.new(0.69, -6, 0, 12) else UDim2.new(1, -24, 0, 13)
+		card.Rarity.TextSize = if tiny then 8 else 10
+	end
 	if horizontal then
 		grid.FillDirection, grid.FillDirectionMaxCells = Enum.FillDirection.Vertical, 1
 		grid.CellSize = UDim2.fromOffset(124, math.max(84, stage.AbsoluteSize.Y - 5))
 		stage.AutomaticCanvasSize, stage.ScrollingDirection = Enum.AutomaticSize.X, Enum.ScrollingDirection.X
 	else
 		grid.FillDirection, grid.FillDirectionMaxCells = Enum.FillDirection.Horizontal, 3
-		grid.CellSize = UDim2.new(1 / 3, -7, 0, math.max(116, (stage.AbsoluteSize.Y - (rows - 1) * 10) / rows))
-		stage.AutomaticCanvasSize, stage.ScrollingDirection = Enum.AutomaticSize.Y, Enum.ScrollingDirection.Y
+		grid.CellSize = UDim2.new(1 / 3, -7, 0, math.max(1, (stage.AbsoluteSize.Y - (rows - 1) * 10 - 4) / rows))
+		stage.AutomaticCanvasSize, stage.ScrollingDirection = Enum.AutomaticSize.None, Enum.ScrollingDirection.Y
+		stage.CanvasSize, stage.CanvasPosition = UDim2.new(), Vector2.zero
+		stage.ScrollingEnabled = false
 	end
 end
 -- The names a slot's reel flashes while it spins: only gear the lottery can
@@ -596,13 +614,7 @@ local function showCard(card)
 	card.Frame:SetAttribute("RewardName", name)
 	spotlight(card, true)
 	local position = card.Frame.AbsolutePosition - stage.AbsolutePosition + stage.CanvasPosition
-	if horizontal then
-		stage.CanvasPosition =
-			Vector2.new(math.max(0, position.X - (stage.AbsoluteSize.X - card.Frame.AbsoluteSize.X) * 0.5), 0)
-	else
-		stage.CanvasPosition =
-			Vector2.new(0, math.max(0, position.Y + card.Frame.AbsoluteSize.Y - stage.AbsoluteSize.Y))
-	end
+	stage.CanvasPosition = Vector2.zero
 end
 local function animate(entries, isGem)
 	phase = if isGem then "Gems" else "Armor"

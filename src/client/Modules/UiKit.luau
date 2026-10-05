@@ -143,10 +143,11 @@ local toastCount = 0
 -- the fight in the middle and the thumb buttons on the right.
 local function phone(): boolean
 	local camera = workspace.CurrentCamera
-	return camera ~= nil and camera.ViewportSize.Y > 0 and camera.ViewportSize.Y < 500
+	return game:GetService("UserInputService").TouchEnabled
+		or (camera ~= nil and camera.ViewportSize.Y > 0 and camera.ViewportSize.Y < 540)
 end
 local TOAST_LIMIT = 3
-local PHONE_TOAST_LIMIT = 2
+local PHONE_TOAST_LIMIT = 1
 
 function UiKit.toast(message: string, color: Color3?)
 	if type(message) ~= "string" or message == "" then
@@ -179,11 +180,11 @@ function UiKit.toast(message: string, color: Color3?)
 	local accent = color or K.Gold
 	local small = phone()
 	local layout = toastHolder:FindFirstChildOfClass("UIListLayout")
-	toastHolder.AnchorPoint = if small then Vector2.zero else Vector2.new(0.5, 0)
-	toastHolder.Position = if small then UDim2.fromOffset(12, 60) else UDim2.new(0.5, 0, 0, 56)
+	toastHolder.AnchorPoint = if small then Vector2.new(1, 0) else Vector2.new(0.5, 0)
+	toastHolder.Position = if small then UDim2.new(1, -12, 0, 10) else UDim2.new(0.5, 0, 0, 12)
 	toastHolder.Size = if small then UDim2.new(0.45, 0, 0, 0) else UDim2.new(0.9, 0, 0, 0)
 	if layout then
-		layout.HorizontalAlignment = if small then Enum.HorizontalAlignment.Left else Enum.HorizontalAlignment.Center
+		layout.HorizontalAlignment = if small then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Center
 	end
 	-- Only the newest few stay; the oldest goes first.
 	local shown = {}
@@ -237,12 +238,12 @@ function UiKit.toast(message: string, color: Color3?)
 	label.Size = UDim2.fromOffset(0, 0)
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.Font = Enum.Font.GothamMedium
-	label.TextSize = if small then 13 else 18
+	label.TextSize = if small then 12 else 14
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Text = message
 	label.TextWrapped = small
 	if small then
-		label.Size = UDim2.fromOffset(330, 0)
+		label.Size = UDim2.fromOffset(math.min(280, math.max(150, toastGui.AbsoluteSize.X * 0.45 - 30)), 0)
 		label.AutomaticSize = Enum.AutomaticSize.Y
 		label.TextXAlignment = Enum.TextXAlignment.Left
 	end

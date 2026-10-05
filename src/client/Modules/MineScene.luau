@@ -588,7 +588,10 @@ function MineScene.swing(index: number)
 				found.Gems += 1
 				local color = GemConfig.TierColors[loot.Gem.Tier] or CRYSTAL
 				floatText(target + Vector3.new(0, 1.5, 0), "GEM!  " .. (loot.Text or ""), color, 24)
-				UiKit.toast("Found " .. (loot.Text or "a gem") .. "!", color)
+				require(script.Parent.OutpostScene).reveal(
+					{ Gem = loot.Gem, Text = loot.Text, Coins = loot.Coins },
+					nil
+				)
 				sound("rbxasset://sounds/electronicpingshort.wav", 1.2, 0.5)
 			elseif loot.Kind == "Full" then
 				floatText(target + Vector3.new(0, 1.5, 0), "POUCH FULL", P.Bad, 22)

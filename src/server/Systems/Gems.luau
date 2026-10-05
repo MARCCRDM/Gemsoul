@@ -20,7 +20,7 @@ local rng = Random.new()
 
 -- Recovers an enchant-ready gem for the player. Returns the gem, or nil if their
 -- inventory is full.
-function Gems.award(player: Player, source: string, opts: { Luck: number? }?): GemConfig.Gem?
+function Gems.award(player: Player, source: string, opts: { Luck: number?, Silent: boolean? }?): GemConfig.Gem?
 	local gem = GemGenerator.generate(rng, source, {
 		Id = PlayerData.newGemId(),
 		Time = os.time(),
@@ -30,17 +30,19 @@ function Gems.award(player: Player, source: string, opts: { Luck: number? }?): G
 		Remotes.Notify:FireClient(player, "Your gem pouch is full! Sell or use some gems first.")
 		return nil
 	end
-	Remotes.Notify:FireClient(
-		player,
-		string.format(
-			"Found: %s  |  Size %d, Clarity %d, Cut %d  |  worth ~%d coins",
-			GemConfig.displayName(gem),
-			gem.Size,
-			gem.Clarity,
-			gem.Cut or 0,
-			GemConfig.value(gem)
+	if not (opts and opts.Silent) then
+		Remotes.Notify:FireClient(
+			player,
+			string.format(
+				"Found: %s  |  Size %d, Clarity %d, Cut %d  |  worth ~%d coins",
+				GemConfig.displayName(gem),
+				gem.Size,
+				gem.Clarity,
+				gem.Cut or 0,
+				GemConfig.value(gem)
+			)
 		)
-	)
+	end
 	return gem
 end
 

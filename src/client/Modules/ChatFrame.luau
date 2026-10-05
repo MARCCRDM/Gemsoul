@@ -42,7 +42,7 @@ local unread: { [string]: number } = {}
 local partyChannel: string? = nil
 local whisperChannels: { [number]: string } = {} -- partner UserId -> channel name
 local lastActivity = 0
-local collapsed = false
+local collapsed = UserInputService.TouchEnabled
 local autoCollapsed = false -- folded by itself over the dashboard
 
 local function hex(color: Color3): string
@@ -70,7 +70,12 @@ local frame = new("Frame", {
 UiKit.round(frame, 8)
 local frameStroke = new("UIStroke", { Color = P.Edge, Transparency = 0.6 }, frame)
 
-local tabsRow = new("Frame", {
+local tabsRow = new("ScrollingFrame", {
+	AutomaticCanvasSize = Enum.AutomaticSize.X,
+	CanvasSize = UDim2.new(),
+	ScrollingDirection = Enum.ScrollingDirection.X,
+	ScrollBarThickness = 0,
+	BorderSizePixel = 0,
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(6, 4),
 	Size = UDim2.new(1, -40, 0, 24),
@@ -367,6 +372,22 @@ drawTabs = function()
 	end
 end
 
+local function fitChat()
+	local mobile = UserInputService.TouchEnabled or gui.AbsoluteSize.X < 700 or gui.AbsoluteSize.Y < 540
+	local width = math.min(WIDTH, math.max(240, gui.AbsoluteSize.X - 24))
+	frame.AnchorPoint = if mobile then Vector2.zero else Vector2.new(0, 1)
+	frame.Position = if mobile then UDim2.fromOffset(12, 124) else UDim2.new(0, 16, 1, -6)
+	frame.Size = UDim2.fromOffset(
+		if mobile and collapsed then 76 else width,
+		if collapsed then (if mobile then 44 else 32) else math.min(HEIGHT, gui.AbsoluteSize.Y - 140)
+	)
+	tabsRow.Visible = not (mobile and collapsed)
+	collapse.Size =
+		UDim2.fromOffset(if mobile and collapsed then 64 elseif mobile then 36 else 26, if mobile then 36 else 22)
+	collapse.Text = if mobile and collapsed then "CHAT" elseif collapsed then "+" else "–"
+end
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitChat)
+
 function ChatFrame.setCollapsed(value: boolean)
 	collapsed = value
 	if not value then
@@ -378,6 +399,7 @@ function ChatFrame.setCollapsed(value: boolean)
 	lfgRow.Visible = not value and activeTab == "LFG"
 	frame.Size = UDim2.fromOffset(WIDTH, if value then 32 else HEIGHT)
 	collapse.Text = if value then "+" else "–"
+	fitChat()
 	if not value then
 		redraw()
 	end
@@ -876,7 +898,7 @@ function ChatFrame.refresh()
 	if onDashboard and not active and not collapsed then
 		ChatFrame.setCollapsed(true)
 		autoCollapsed = true
-	elseif not onDashboard and autoCollapsed then
+	elseif not onDashboard and autoCollapsed and not UserInputService.TouchEnabled then
 		autoCollapsed = false
 		ChatFrame.setCollapsed(false)
 	end
@@ -889,6 +911,7 @@ function ChatFrame.refresh()
 	end
 end
 
+ChatFrame.setCollapsed(collapsed)
 setSpeaking("General")
 drawTabs()
 redraw()

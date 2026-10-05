@@ -30,6 +30,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
+local GemArt = require(script.Parent.GemArt)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
@@ -138,11 +139,11 @@ end
 -- HUD ---------------------------------------------------------------------------------------------
 
 local hud = UiKit.gui("OutpostHud", 5)
-hud.IgnoreGuiInset = true
+hud.IgnoreGuiInset = false
 hud.Enabled = false
 local card = new("Frame", {
-	Position = UDim2.fromOffset(16, 70),
-	Size = UDim2.fromOffset(300, 240),
+	Position = UDim2.fromOffset(12, 12),
+	Size = UDim2.fromOffset(300, 100),
 	BackgroundColor3 = Color3.fromRGB(14, 18, 30),
 	BackgroundTransparency = 0.12,
 }, hud)
@@ -162,22 +163,10 @@ local function text(parent, value, size, color, font, x, y, w, h, align)
 	}, parent)
 	return l
 end
-text(card, "SAGA OUTPOST", 22, P.Gold, IronUi.Heading, 14, 10, 270, 26)
-text(
-	card,
-	"Lunar basin · mine, trade at PROBE-7, duel",
-	11,
-	Color3.fromRGB(170, 190, 215),
-	IronUi.Body,
-	14,
-	36,
-	280,
-	14
-)
-local pickName = text(card, "Survey Pick", 15, Color3.new(1, 1, 1), IronUi.Bold, 14, 58, 200, 18)
-local pickSwings = text(card, "60 swings", 13, P.Gold, IronUi.Bold, 186, 58, 100, 18, Enum.TextXAlignment.Right)
+local pickName = text(card, "Survey Pick", 15, Color3.new(1, 1, 1), IronUi.Bold, 14, 8, 170, 18)
+local pickSwings = text(card, "60 swings", 13, P.Gold, IronUi.Bold, 186, 8, 100, 18, Enum.TextXAlignment.Right)
 local track = new("Frame", {
-	Position = UDim2.fromOffset(14, 80),
+	Position = UDim2.fromOffset(14, 30),
 	Size = UDim2.fromOffset(272, 8),
 	BackgroundColor3 = Color3.fromRGB(34, 40, 56),
 }, card)
@@ -186,7 +175,7 @@ local fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.G
 UiKit.round(fill, 4)
 -- The free pick's charge, always shown (with the free pick in hand it is
 -- the pick's bar too).
-local charge = ChargeMeter.new(card, 14, 94, 272)
+local charge = ChargeMeter.new(card, 14, 46, 272)
 local findsLabel = text(card, "", 13, Color3.fromRGB(215, 228, 245), IronUi.Bold, 14, 144, 272, 18)
 local recordLabel = text(card, "", 11, Color3.fromRGB(150, 170, 195), IronUi.Body, 14, 164, 272, 14)
 local buttons = new("Frame", {
@@ -208,8 +197,18 @@ local hint = text(
 	Enum.TextXAlignment.Center
 )
 hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 0, 1, -18)
+hint.Position = UDim2.new(0.5, 0, 1, -148)
 hint.TextStrokeTransparency = 0.4
+
+-- Keep the field clear; navigation lives in the lobby dock and world prompts.
+findsLabel.Visible, recordLabel.Visible, buttons.Visible = false, false, false
+hint.Visible = not UserInputService.TouchEnabled
+local function fitOutpostHud()
+	local width = hud.AbsoluteSize.X
+	card.Size = UDim2.fromOffset(math.min(300, math.max(240, width - 24)), 100)
+end
+hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitOutpostHud)
+fitOutpostHud()
 
 -- The free pick's charge ticks up between server updates.
 local function refreshCharge()
@@ -499,10 +498,10 @@ end
 -- The reveal: a lottery for every find ----------------------------------------------------------
 
 local reveal = UiKit.gui("OutpostReveal", 20)
-reveal.IgnoreGuiInset = true
+reveal.IgnoreGuiInset = false
 local revealCard = new("Frame", {
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 172),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.48),
 	Size = UDim2.fromOffset(420, 150),
 	BackgroundColor3 = Color3.fromRGB(12, 14, 24),
 	BackgroundTransparency = 0.05,
@@ -517,6 +516,19 @@ local gemLabel = text(revealCard, "", 18, Color3.new(1, 1, 1), IronUi.Bold, 0, 6
 local extraLabel =
 	text(revealCard, "", 14, Color3.fromRGB(210, 222, 240), IronUi.Bold, 0, 94, 420, 40, Enum.TextXAlignment.Center)
 extraLabel.TextWrapped = true
+local rewardArt = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(12, 34),
+	Size = UDim2.fromOffset(104, 104),
+	ClipsDescendants = true,
+}, revealCard)
+local rewardFit = new("UIScale", {}, reveal)
+local function fitReward()
+	local size = reveal.AbsoluteSize
+	rewardFit.Scale = math.min(1, math.max(0.1, (size.X - 32) / 420), math.max(0.1, (size.Y - 100) / 200))
+end
+reveal:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitReward)
+fitReward()
 local revealToken = 0
 
 -- In the world: the gem rises out of the rubble in a beam of its colour.
@@ -586,7 +598,31 @@ function OutpostScene.reveal(loot, at: Vector3?)
 	revealScale.Scale = 0.85
 	tween(revealScale, 0.18, { Scale = 1 }, Enum.EasingStyle.Back)
 	gemLabel.Text, extraLabel.Text = "", ""
+	rewardArt:ClearAllChildren()
+	rewardArt.Visible = true
+	reelLabel.Position, reelLabel.Size, reelLabel.TextSize = UDim2.fromOffset(124, 12), UDim2.fromOffset(284, 26), 20
+	gemLabel.Position, gemLabel.Size = UDim2.fromOffset(124, 42), UDim2.fromOffset(284, 38)
+	gemLabel.TextWrapped = true
+	extraLabel.Position, extraLabel.Size, extraLabel.TextSize = UDim2.fromOffset(124, 82), UDim2.fromOffset(284, 60), 12
+	if loot.Gem then
+		GemArt.viewport(rewardArt, loot.Gem, true)
+	else
+		IronUi.emblem(rewardArt, if loot.Gear then "Equipment" else "Coins", P.Gold, 88)
+	end
 	local extras = {}
+	if loot.Gem then
+		local gem = loot.Gem
+		table.insert(
+			extras,
+			string.format(
+				"Size %d/10  Clarity %d/10  Cut %d/10\nValue ~%d coins",
+				gem.Size,
+				gem.Clarity,
+				gem.Cut or 0,
+				GemConfig.value(gem)
+			)
+		)
+	end
 	if loot.Coins then
 		table.insert(extras, "+" .. loot.Coins .. " coins")
 	end
@@ -668,6 +704,9 @@ local SECRET = Color3.fromRGB(190, 120, 255)
 function OutpostScene.showSecret(secret)
 	revealToken += 1
 	local token = revealToken
+	rewardArt.Visible = false
+	reelLabel.Position, reelLabel.Size = UDim2.fromOffset(0, 14), UDim2.fromOffset(420, 44)
+	gemLabel.Position, gemLabel.Size = UDim2.fromOffset(0, 64), UDim2.fromOffset(420, 24)
 	revealCard.Visible = true
 	revealCard.BackgroundTransparency = 0.05
 	-- Taller than a loot card, for the story.

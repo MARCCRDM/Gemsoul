@@ -39,7 +39,7 @@ local RED = Color3.fromRGB(232, 72, 72)
 local CARD = Color3.fromRGB(16, 20, 32)
 
 local gui = UiKit.gui("LobbyHud", 6)
-gui.IgnoreGuiInset = true
+gui.IgnoreGuiInset = false
 gui.Enabled = false
 -- Above the dashboard, so BACK TO LOBBY sits on top of it.
 local top = UiKit.gui("LobbyTop", 30)
@@ -99,7 +99,8 @@ local stageScale = new("UIScale", {}, stage)
 local function fitStage()
 	local screen = gui.AbsoluteSize
 	if screen.X > 0 then
-		stageScale.Scale = math.min(1, (screen.X - 32) / 1120, (screen.Y - 48) / 560)
+		stageScale.Scale = math.min(1, (screen.X - 32) / 1120, (screen.Y - 24) / 612)
+		stage.Position = UDim2.new(0.5, 0, 0.5, 26 * stageScale.Scale)
 	end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitStage)
@@ -346,7 +347,8 @@ bar = new("Frame", {
 	Size = UDim2.fromOffset(420, 168),
 	BackgroundTransparency = 1,
 }, gui)
-local tag = text(bar, "PLAY A DUEL", 15, P.Text, IronUi.Heading)
+local tag = text(bar, "", 15, P.Text, IronUi.Heading)
+tag.Visible = false
 tag.AnchorPoint = Vector2.new(0.5, 0)
 tag.Position = UDim2.new(0.5, 0, 0, 0)
 tag.Size = UDim2.fromOffset(130, 26)
@@ -356,7 +358,7 @@ local play = new("TextButton", {
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 32),
 	Size = UDim2.fromOffset(260, 58),
-	Text = "PLAY",
+	Text = "",
 	TextSize = 34,
 	Font = IronUi.Heading,
 	TextColor3 = Color3.new(1, 1, 1),
@@ -369,6 +371,9 @@ new("UIGradient", {
 	Rotation = 90,
 	Color = ColorSequence.new(Color3.fromRGB(58, 176, 104), Color3.fromRGB(22, 82, 52)),
 }, play)
+local playCaption = text(play, "PLAY", 24, Color3.new(1, 1, 1), IronUi.Heading)
+playCaption.Size = UDim2.fromScale(1, 1)
+playCaption.TextStrokeTransparency = 1
 IronUi.juice(play)
 play.Activated:Connect(LobbyUI.openPicker)
 
@@ -402,6 +407,31 @@ local function tile(label: string, emblem: string, color: Color3, onClick: () ->
 	b.Activated:Connect(onClick)
 	return b
 end
+
+local function fitDock()
+	local size = gui.AbsoluteSize
+	local mobile = game:GetService("UserInputService").TouchEnabled or size.Y < 540
+	local width = math.min(420, math.max(240, size.X - 180))
+	bar.Size = UDim2.fromOffset(width, if mobile then 104 else 126)
+	bar.Position = UDim2.new(0.5, 0, 1, -12)
+	play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(math.min(220, width), 44)
+	tiles.Position, tiles.Size = UDim2.new(0.5, 0, 0, 52), UDim2.fromOffset(width, if mobile then 48 else 68)
+	for _, button in tiles:GetChildren() do
+		if button:IsA("TextButton") then
+			button.Size = UDim2.fromOffset((width - 30) / 4, if mobile then 48 else 68)
+			for _, child in button:GetChildren() do
+				if child:IsA("TextLabel") then
+					child.TextSize = if mobile then 10 else 12
+					child.Position = UDim2.new(0.5, 0, 1, -4)
+				elseif child:IsA("GuiObject") then
+					child.Visible = not mobile
+				end
+			end
+		end
+	end
+end
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitDock)
+task.defer(fitDock)
 
 -- Inventory: the full dashboard, over the lobby.
 local dashboardShown = false

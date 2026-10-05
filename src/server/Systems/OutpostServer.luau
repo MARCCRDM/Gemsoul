@@ -293,7 +293,7 @@ local function loot(player: Player, node, profile)
 		result.Coins = coins
 	end
 	if roll:NextNumber() < spec.Gem then
-		local gem = Gems.award(player, "MiningNode", { Luck = Mine.luck(spec.Depth) + (spec.Luck or 0) })
+		local gem = Gems.award(player, "MiningNode", { Luck = Mine.luck(spec.Depth) + (spec.Luck or 0), Silent = true })
 		if gem then
 			result.Gem = gem
 			result.Rarity = gem.Tier
