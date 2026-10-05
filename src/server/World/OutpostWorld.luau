@@ -18,6 +18,27 @@
 ]]
 local OutpostWorld = {}
 
+-- Imported art (ServerStorage.Assets) when it's there; plain parts when not.
+local AssetKit = (function()
+	local ok, kit = pcall(function()
+		return require(script.Parent:FindFirstChild("AssetKit"))
+	end)
+	if ok and kit then
+		return kit
+	end
+	return {
+		has = function()
+			return false
+		end,
+		pick = function()
+			return nil
+		end,
+		place = function()
+			return nil, nil
+		end,
+	}
+end)()
+
 local REGOLITH = Color3.fromRGB(122, 124, 132)
 local REGOLITH_DARK = Color3.fromRGB(78, 80, 90)
 local RIM = Color3.fromRGB(96, 94, 104)
@@ -87,6 +108,30 @@ end
 
 -- One rock: a heap of tilted slabs with crystals breaking through, sized and
 -- coloured by its kind.
+-- Kit rocks for each size of mining rock, and the tint they get.
+local ROCK_KIT = {
+	Pebble = {
+		"rock_smallA",
+		"rock_smallB",
+		"rock_smallC",
+		"rock_smallD",
+		"rock_smallE",
+		"rock_smallG",
+		"rock_smallH",
+		"rock_smallTopA",
+		"rock_smallTopB",
+	},
+	Boulder = { "rock_largeA", "rock_largeB", "rock_largeC", "rock_largeD", "rock_largeE", "rock_largeF" },
+	Monolith = { "rock_tallA", "rock_tallB", "rock_tallC", "rock_tallD", "rock_tallG", "rock_tallH", "rock_tallI" },
+	Geode = { "rock_crystalsLargeA", "rock_crystalsLargeB", "rock_crystals", "meteor_detailed" },
+}
+local ROCK_TINT = {
+	Pebble = Color3.fromRGB(168, 160, 150),
+	Boulder = Color3.fromRGB(132, 130, 142),
+	Monolith = Color3.fromRGB(104, 98, 114),
+	Geode = Color3.fromRGB(100, 78, 128),
+}
+
 function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 	local model = Instance.new("Model")
 	model.Name = "Rock"
@@ -98,6 +143,60 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 	})[size] or { 3, REGOLITH, GLOW, 2 }
 	local s, stone, crystal, crystals = spec[1], spec[2], spec[3], spec[4]
 	local tall = if size == "Monolith" then 1.7 else 1
+	-- The kit's rock (when imported) is the shape; an invisible Body is what
+	-- you hit, and the glowing crystals still say how rich it is.
+	local kitName = AssetKit.pick(ROCK_KIT[size] or {}, rng)
+	if kitName then
+		local body = solid(
+			part(
+				model,
+				cframe * CFrame.new(0, s * 0.42 * tall, 0),
+				Vector3.new(s, s * 0.85 * tall, s * 0.9),
+				stone,
+				nil,
+				nil,
+				{ Transparency = 1 }
+			)
+		)
+		body.Name = "Body"
+		model.PrimaryPart = body
+		AssetKit.place(model, kitName, cframe, {
+			Width = if size == "Monolith" then nil else s * 1.2,
+			Height = if size == "Monolith" then s * tall else nil,
+			Yaw = rng:NextNumber(0, 6.28),
+			Sink = 0.2,
+			Color = ROCK_TINT[size],
+		})
+		for _ = 1, math.ceil(crystals / 2) do
+			local a = rng:NextNumber(0, math.pi * 2)
+			local len = s * rng:NextNumber(0.3, 0.55)
+			local c = part(
+				model,
+				cframe
+					* CFrame.new(math.cos(a) * s * 0.28, s * rng:NextNumber(0.55, 0.95) * tall, math.sin(a) * s * 0.28)
+					* CFrame.Angles(0, -a, 0)
+					* CFrame.Angles(0, 0, -rng:NextNumber(0.2, 0.8)),
+				Vector3.new(len * 0.32, len, len * 0.32),
+				crystal,
+				Enum.Material.Neon,
+				"Wedge"
+			)
+			c.Name = "Crystal"
+		end
+		if size == "Geode" then
+			local core = part(
+				model,
+				cframe * CFrame.new(0, s * 0.62, 0),
+				Vector3.one * s * 0.32,
+				Color3.fromRGB(255, 200, 255),
+				Enum.Material.Neon,
+				"Ball"
+			)
+			core.Name = "Crystal"
+		end
+		light(body, crystal, s * 3, if size == "Geode" then 2.4 else 1.1)
+		return model
+	end
 	local body = part(
 		model,
 		cframe
@@ -754,8 +853,56 @@ local function underside(parent, centre: CFrame, radius: number, depth: number, 
 end
 
 -- A tree: a leaning trunk and a few rounded crowns.
+local TREES = { "tree_oak", "tree_default", "tree_detailed", "tree_fat", "tree_plateau", "tree_blocks", "tree_thin" }
+-- Outcrops round the rim.
+local RIM_ROCKS = {
+	"stone_largeA",
+	"stone_largeB",
+	"stone_largeC",
+	"stone_largeD",
+	"stone_largeE",
+	"stone_largeF",
+	"cliff_blockHalf_rock",
+	"cliff_blockQuarter_rock",
+}
+-- Ground cover: { names, min height, max height } (studs).
+local PLANTS = {
+	{ { "grass", "grass_large", "grass_leafs", "grass_leafsLarge" }, 1.2, 2.2 },
+	{ { "grass", "grass_large", "grass_leafs", "grass_leafsLarge" }, 1.2, 2.2 },
+	{
+		{ "flower_purpleA", "flower_purpleB", "flower_redA", "flower_redB", "flower_yellowA", "flower_yellowB" },
+		1,
+		1.8,
+	},
+	{ { "plant_bush", "plant_bushDetailed", "plant_bushLarge", "plant_bushSmall", "plant_flatTall" }, 2.5, 4.5 },
+	{ { "mushroom_redGroup", "mushroom_tanGroup", "mushroom_redTall" }, 1, 2 },
+	{ { "rock_smallFlatA", "rock_smallFlatB", "rock_smallFlatC", "stone_smallA", "stone_smallC" }, 0.8, 1.6 },
+	{ { "stump_round", "stump_old", "log" }, 1.5, 2.5 },
+}
+-- Sci-fi kit set pieces: { name, x, z, height, yaw degrees }.
+local PROPS = {
+	{ "satelliteDish_large", 94, -34, 12, 200 },
+	{ "machine_generator", -98, 76, 5, 30 },
+	{ "barrels", -66, 84, 4, 10 },
+	{ "rover", 20, 86, 5, -60 },
+	{ "machine_wirelessCable", -102, 40, 7, 80 },
+	{ "turret_double", -92, -64, 7, 130 },
+	{ "satelliteDish", -30, -100, 7, 10 },
+}
 local function tree(parent, at: CFrame, rng: Random, scale: number?)
 	local k = scale or 1
+	local kitName = AssetKit.pick(TREES, rng)
+	if kitName then
+		local m =
+			AssetKit.place(parent, kitName, at, { Height = rng:NextNumber(20, 28) * k, Yaw = rng:NextNumber(0, 6.28) })
+		if m then
+			-- Leaves let you walk under them; the trunk stops you.
+			solid(
+				part(parent, at * CFrame.new(0, 6, 0), Vector3.new(2.6, 12, 2.6), BARK, nil, nil, { Transparency = 1 })
+			)
+			return
+		end
+	end
 	local lean = at * CFrame.Angles(rng:NextNumber(-0.12, 0.12), rng:NextNumber(0, 6.28), rng:NextNumber(-0.12, 0.12))
 	solid(part(parent, lean * CFrame.new(0, 7 * k, 0), Vector3.new(2 * k, 14 * k, 2 * k), BARK, Enum.Material.Wood))
 	for i = 1, 4 do
@@ -774,6 +921,31 @@ end
 
 -- A column: sandstone, some broken off, some capped with a glowing tech ring.
 local function column(parent, at: CFrame, height: number, tech: boolean, broken: boolean)
+	local kitName = if broken then "statue_columnDamaged" else "statue_column"
+	local m, size = AssetKit.place(parent, kitName, at, {
+		Height = if broken then height * 0.7 else height + 2,
+		Collide = true,
+	})
+	if m and size then
+		if tech then
+			local r = math.max(size.X, size.Z) * 0.33
+			disc(parent, at * CFrame.new(0, size.Y * 0.6, 0), r, 1.2, STEEL, Enum.Material.Metal)
+			disc(parent, at * CFrame.new(0, size.Y * 0.6, 0), r + 0.1, 0.3, GLOW, Enum.Material.Neon)
+			if not broken then
+				local crystal = part(
+					parent,
+					at * CFrame.new(0, size.Y + 2.6, 0) * CFrame.Angles(0, math.rad(45), math.rad(45)),
+					Vector3.new(1.6, 1.6, 1.6),
+					GLOW,
+					Enum.Material.Neon,
+					nil,
+					{ Transparency = 0.15 }
+				)
+				light(crystal, GLOW, 12, 0.6)
+			end
+		end
+		return m
+	end
 	solid(part(parent, at * CFrame.new(0, 0.6, 0), Vector3.new(5, 1.2, 5), STONE_DARK, Enum.Material.Sandstone))
 	local shaft = solid(
 		part(
@@ -1112,6 +1284,19 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		local a = rng:NextNumber(0, math.pi * 2)
 		local r = rng:NextNumber(ISLAND - 14, ISLAND - 4)
 		local p = at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)
+		local rimKit = AssetKit.pick(RIM_ROCKS, rng)
+		if
+			rimKit
+			and AssetKit.place(decor, rimKit, p, {
+				Width = rng:NextNumber(7, 12),
+				Yaw = rng:NextNumber(0, 6.28),
+				Collide = true,
+				Sink = 0.4,
+				Color = STONE_DARK:Lerp(MOSS, rng:NextNumber(0, 0.25)),
+			})
+		then
+			continue
+		end
 		solid(
 			part(
 				decor,
@@ -1123,6 +1308,64 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 				Enum.Material.Rock
 			)
 		)
+	end
+
+	-- Ground cover from the Nature kit, kept off the rings, the paths, the
+	-- pad, the court and the stations.
+	local keepClear = {
+		{ Vector3.new(0, 0, 74), 16 },
+		{ Vector3.new(0, 0, 12), 23 },
+		{ Vector3.new(-82, 0, 60), 14 },
+		{ Vector3.new(84, 0, 60), 14 },
+		{ Vector3.new(70, 0, -56), 14 },
+	}
+	for _, spec in RINGS do
+		table.insert(keepClear, { spec.At, spec.Radius + 4 })
+	end
+	local function clear(x: number, z: number): boolean
+		local here = Vector3.new(x, 0, z)
+		for _, spot in keepClear do
+			if (here - Vector3.new(spot[1].X, 0, spot[1].Z)).Magnitude < spot[2] then
+				return false
+			end
+		end
+		local from = Vector3.new(0, 0, 12)
+		for _, target in { RINGS[1].At, RINGS[2].At, RINGS[3].At, Vector3.new(0, 0, 74) } do
+			local line = Vector3.new(target.X, 0, target.Z) - from
+			local t = math.clamp((here - from):Dot(line) / line:Dot(line), 0, 1)
+			if (here - (from + line * t)).Magnitude < 6 then
+				return false
+			end
+		end
+		return true
+	end
+	if AssetKit.has("grass") or AssetKit.has("grass_large") then
+		local placed, tries = 0, 0
+		while placed < 90 and tries < 600 do
+			tries += 1
+			local a = rng:NextNumber(0, math.pi * 2)
+			local r = math.sqrt(rng:NextNumber(0, 1)) * (ISLAND - 8)
+			local x, z = math.cos(a) * r, math.sin(a) * r
+			local group = PLANTS[rng:NextInteger(1, #PLANTS)]
+			local name = AssetKit.pick(group[1], rng)
+			if name and clear(x, z) then
+				AssetKit.place(decor, name, at * CFrame.new(x, 0, z), {
+					Height = rng:NextNumber(group[2], group[3]),
+					Yaw = rng:NextNumber(0, 6.28),
+					Sink = 0.1,
+				})
+				placed += 1
+			end
+		end
+	end
+
+	-- Sci-fi set pieces round the edge: dishes, a generator, a rover, a turret.
+	for _, prop in PROPS do
+		AssetKit.place(decor, prop[1], at * CFrame.new(prop[2], 0, prop[3]), {
+			Height = prop[4],
+			Yaw = math.rad(prop[5]),
+			Collide = true,
+		})
 	end
 
 	-- The Probe (market), the leaderboard and the Arena Uplink, round the plaza.
