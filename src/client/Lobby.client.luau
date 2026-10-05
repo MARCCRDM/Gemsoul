@@ -128,4 +128,32 @@ task.spawn(function()
 			break
 		end
 	end
+	-- Never stranded: whenever you're free (no fight, match, dungeon,
+	-- expedition or intro, and alive), you belong in the Outpost. If you
+	-- aren't there for a few seconds in a row (a menu, a failed request, a
+	-- fight that didn't send you back), you're put back.
+	local function free(): boolean
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		return humanoid ~= nil
+			and humanoid.Health > 0
+			and not playerGui:FindFirstChild("Splash")
+			and not playerGui:FindFirstChild("Intro")
+			and player:GetAttribute("CombatSession") == nil
+			and player:GetAttribute("MatchId") == nil
+			and player:GetAttribute("DungeonId") == nil
+			and player:GetAttribute("Expedition") == nil
+	end
+	local away = 0
+	while true do
+		task.wait(1)
+		if free() and not (OutpostScene.isActive() and player:GetAttribute("Outpost")) then
+			away += 1
+			if away >= 3 then
+				OutpostScene.ensure()
+			end
+		else
+			away = 0
+		end
+	end
 end)

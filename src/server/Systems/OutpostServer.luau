@@ -714,6 +714,37 @@ function OutpostServer.start()
 		watch(player)
 	end
 	Players.PlayerAdded:Connect(watch)
+
+	-- Never stranded in the world: someone in the Outpost (not fighting)
+	-- who has fallen through the floor or wandered far outside the basin is
+	-- put back at the spawn.
+	task.spawn(function()
+		local centre = Rules.Location.Position
+		while true do
+			task.wait(2)
+			if site then
+				for _, player in Players:GetPlayers() do
+					local root = rootOf(player)
+					if
+						root
+						and player:GetAttribute("Outpost")
+						and not player:GetAttribute("CombatSession")
+						and not player:GetAttribute("MatchId")
+						and not player:GetAttribute("DungeonId")
+					then
+						local offset = root.Position - centre
+						local far = Vector3.new(offset.X, 0, offset.Z).Magnitude > Rules.Radius + 250
+						local fell = root.Position.Y < site.Spawn.Position.Y - 120
+						if far or fell then
+							local character = player.Character :: Model
+							character:PivotTo(site.Spawn)
+							root.AssemblyLinearVelocity = Vector3.zero
+						end
+					end
+				end
+			end
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		lastSwing[player] = nil
 		for _, node in nodes do

@@ -1093,10 +1093,49 @@ function OutpostScene.isActive(): boolean
 	return active
 end
 
+-- Never stranded: puts you back in the basin if anything knocked you out of
+-- it (the scene closed, or the server no longer has you there). `respawn`
+-- also walks you back to the spawn when you're already in (UNSTUCK).
+local lastEnsure = 0
+function OutpostScene.ensure(respawn: boolean?)
+	if busy or os.clock() - lastEnsure < 2 then
+		return
+	end
+	if active and player:GetAttribute("Outpost") and not respawn then
+		return
+	end
+	lastEnsure = os.clock()
+	busy = true
+	task.spawn(function()
+		local result = GemClient.request("OutpostEnter")
+		busy = false
+		if not result.Ok then
+			if respawn then
+				UiKit.toast(result.Message, P.Bad)
+			end
+			return
+		end
+		if active then
+			state = result.State or state
+			showWorld()
+			refreshHud()
+		else
+			enterScene(result)
+		end
+	end)
+end
+
 -- HUD buttons.
 for _, spec in
 	{
-		{ "LEAVE", Color3.fromRGB(170, 70, 70), OutpostScene.leave },
+		-- Stuck behind a rock or off a ledge? Back to the Outpost spawn.
+		{
+			"UNSTUCK",
+			Color3.fromRGB(170, 120, 70),
+			function()
+				OutpostScene.ensure(true)
+			end,
+		},
 		{
 			"SOCIAL",
 			P.Teal,
