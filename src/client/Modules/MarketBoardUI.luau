@@ -221,6 +221,32 @@ local function itemIcon(parent, payload, x, y, size)
 end
 
 -- Everything you could put up (not worn, not socketed), in payload shape.
+-- Whether you already have this gear model (you can hold one of each).
+local function ownsModel(payload): boolean
+	local profile = GemClient.Profile
+	local def = payload.Kind == "Gear" and Slots.Definitions[payload.Slot]
+	return def ~= nil
+		and def ~= false
+		and profile ~= nil
+		and profile.Owned ~= nil
+		and profile.Owned[def.Kind] ~= nil
+		and profile.Owned[def.Kind][payload.Id] ~= nil
+end
+
+-- A greyed-out action saying why it can't be done.
+local function waiting(parent, value, x, y, w, h)
+	local f = new("Frame", {
+		BackgroundColor3 = P.Slot,
+		BackgroundTransparency = 0.3,
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(w, h),
+	}, parent)
+	UiKit.round(f, 8)
+	new("UIStroke", { Color = P.Edge, Transparency = 0.5 }, f)
+	label(f, value, 12, P.Dim, BOLD, 0, 0, w, h, Enum.TextXAlignment.Center)
+	return f
+end
+
 local function myItems()
 	local profile = GemClient.Profile
 	local items = {}
@@ -338,7 +364,7 @@ local function listingCard(parent, row, order)
 	line.TextYAlignment = Enum.TextYAlignment.Top
 	label(card, "by " .. (row.SellerName or "?"), 11, P.Dim, BODY, 72, 56, 124, 14)
 	if row.Mode == "Sell" then
-		label(card, "🪙 " .. tostring(row.Price), 18, P.Gold, BOLD, 10, 74, 140, 24)
+		label(card, tostring(row.Price) .. " coins", 18, P.Gold, BOLD, 10, 74, 140, 24)
 	else
 		label(card, "⇄ FOR TRADE", 14, TRADE, BOLD, 10, 74, 120, 22)
 		label(card, "Wants: " .. (Rules.WantLabels[row.Want] or "Any offer"), 11, P.Dim, BODY, 10, 96, 186, 14)
@@ -367,6 +393,12 @@ local function listingCard(parent, row, order)
 	elseif row.Mode == "Sell" then
 		local coins = GemClient.Profile and GemClient.Profile.Coins or 0
 		local afford = coins >= row.Price
+		local owned = ownsModel(row.Item)
+		if owned then
+			-- One copy of each gear model per player (for now).
+			waiting(card, "YOU OWN THIS MODEL", 10, 124, 184, 34)
+			return
+		end
 		button(
 			card,
 			if afford then "BUY" else "NOT ENOUGH COINS",
@@ -381,6 +413,8 @@ local function listingCard(parent, row, order)
 				end
 			end
 		)
+	elseif ownsModel(row.Item) then
+		waiting(card, "YOU OWN THIS MODEL", 10, 124, 184, 34)
 	else
 		button(card, "MAKE AN OFFER", TRADE, 10, 124, 184, 34, function()
 			offerFor = row
@@ -391,7 +425,7 @@ end
 
 local function drawBrowse()
 	filters(content, 0, true)
-	button(content, "↻", Color3.fromRGB(70, 76, 100), 820, -2, 40, 30, function()
+	button(content, "REFRESH", Color3.fromRGB(70, 76, 100), 764, -2, 96, 30, function()
 		task.spawn(function()
 			refresh()
 			draw()
@@ -774,7 +808,7 @@ local function drawMine()
 		label(card, itemLine(entry.Item), 12, P.Dim, BODY, 84, 34, 420, 16)
 		local status = if not row
 			then "Settling…"
-			elseif row.Mode == "Sell" then "🪙 " .. row.Price .. "  ·  " .. timeLeft(row)
+			elseif row.Mode == "Sell" then row.Price .. " coins  ·  " .. timeLeft(row)
 			else "⇄ For trade  ·  wants "
 				.. string.lower(Rules.WantLabels[row.Want] or "any offer")
 				.. "  ·  "
@@ -867,7 +901,7 @@ draw = function()
 	)
 	label(
 		bar,
-		"🪙 " .. tostring(GemClient.Profile.Coins or 0),
+		tostring(GemClient.Profile.Coins or 0) .. " coins",
 		18,
 		P.Gold,
 		BOLD,
