@@ -295,15 +295,14 @@ local function rebuild(character, equipment)
 	-- (Facing set as yaw then pitch: its face turned 28 degrees out to the
 	-- left and tipped a little down at rest; square ahead when raised.)
 	-- At rest it fills the lower-left (its point running off the bottom);
-	-- raised, it covers the left half, short of the centre line.
+	-- raised, it moves across the centre line to protect the chest.
 	shieldRest = CFrame.new(-1.2, -0.62, -1.85)
 		* CFrame.Angles(0, math.rad(28), 0)
 		* CFrame.Angles(math.rad(-6), 0, math.rad(-10))
-	-- Raised it stays angled (turned 25 degrees, tipped back) so it reads as
-	-- a shield held up, not a wall, and keeps the centre of the view clear.
-	shieldRaised = CFrame.new(-0.72, -0.25, -1.95)
-		* CFrame.Angles(0, math.rad(25), 0)
-		* CFrame.Angles(math.rad(-10), 0, math.rad(-10))
+	-- Square the shield toward incoming blows; its upper edge leaves sight over it.
+	shieldRaised = CFrame.new(-0.18, -0.3, -1.95)
+		* CFrame.Angles(0, math.rad(8), 0)
+		* CFrame.Angles(math.rad(-5), 0, math.rad(-3))
 	for _, slot in { "Weapon", "Shield", "Gloves" } do
 		local source = equipment:FindFirstChild(slot)
 		if source then
@@ -654,6 +653,13 @@ function View.start()
 					0,
 					math.rad(12 + smoothedCharge * 20 - swing * direction * (if swingHeavy then 50 else 85))
 				)
+			-- Tuck the weapon and its gauntlet below the shield during a shield guard.
+			-- Weapon-only guards below retain their raised two-hand bracing pose.
+			if not piece.Shield and not piece.Left and character and not character:GetAttribute("WeaponBlock") then
+				local lowered = CFrame.new(1.02, -1.3 + breathe, -1.12)
+					* CFrame.Angles(math.rad(-32), math.rad(12), math.rad(28))
+				pose = pose:Lerp(lowered, smoothedRaised)
+			end
 			if character and character:GetAttribute("WeaponBlock") and not piece.Shield then
 				local kind = character:GetAttribute("CombatWeaponType")
 				local twin = kind == "TwinBlades"

@@ -285,14 +285,14 @@ local function frames(kind: string, s: number)
 end
 
 -- Guard: the shield arm raised square in front of the chest and face, the
--- sword drawn back ready to answer, crouched behind the shield.
+-- weapon lowered beside the hip, crouched behind the shield.
 local GUARD = {
 	Waist = { -0.18, -0.3, 0 },
 	Neck = { -0.1, 0.15, 0 },
-	LeftShoulder = { 1.35, 0, 0.45 },
-	LeftElbow = { 1.35, 0, 0 },
-	RightShoulder = { 0.55, 0, 0.3 },
-	RightElbow = { 1.25, 0, 0 },
+	LeftShoulder = { 1.4, -0.25, 0.7 },
+	LeftElbow = { 1.4, 0, 0 },
+	RightShoulder = { 0.12, 0.12, -0.12 },
+	RightElbow = { 0.4, 0, 0 },
 	RightHip = { 0.35, 0, 0 },
 	LeftHip = { 0.2, 0, 0 },
 	RightKnee = { -0.5, 0, 0 },
