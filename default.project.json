@@ -7,6 +7,18 @@
         "$path": "src/shared"
       }
     },
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "Orientation": {
+        "$path": "src/first/Orientation.client.luau"
+      }
+    },
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$properties": {
+        "ScreenOrientation": "LandscapeSensor"
+      }
+    },
     "ServerScriptService": {
       "Server": {
         "$path": "src/server"
