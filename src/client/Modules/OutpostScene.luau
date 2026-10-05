@@ -956,9 +956,9 @@ local function drawProbe()
 			text(box, "IN HAND", 14, spec.Color, IronUi.Bold, 14, 206, 210, 20)
 		end
 	end
-	local market = IronUi.gemButton(probeBody, "OPEN THE MARKET  ·  TRADE GEAR", P.Gold, function()
+	local market = IronUi.gemButton(probeBody, "OPEN THE MARKET  ·  BUY, SELL & TRADE", P.Gold, function()
 		probe.Gui.Enabled = false
-		require(script.Parent.TradeUI).open()
+		require(script.Parent.MarketBoardUI).open()
 	end)
 	market.Position, market.Size = UDim2.fromOffset(0, 266), UDim2.fromOffset(720, 44)
 end

@@ -65,6 +65,7 @@ Intro.start()
 Enchanting.start()
 Forge.start()
 Trading.start()
+require(script.Parent.Systems.MarketBoard).start()
 Party.start()
 require(script.Parent.Systems.ChatChannels).start()
 -- Playtest feedback and error reports (Social > Feedback).

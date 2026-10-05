@@ -68,6 +68,8 @@ type Profile = {
 	-- Saga Outpost mining: swings left on each pick, the one in hand, when
 	-- the free Survey Pick's charge clock started, rocks mined (see OutpostServer).
 	Outpost: { Picks: { [string]: number }, Active: string, SurveyAt: number?, Rocks: number }?,
+	-- Items waiting on the Market board (see Shared.Market): entry id -> entry.
+	Market: { Escrow: { [string]: any } }?,
 	Session: { JobId: string, Time: number }?, -- which server owns this save (see SessionLock)
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle
 	WelcomeBought: boolean,
@@ -496,6 +498,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Boosts = profile.Boosts,
 		Duel = profile.Duel, -- arena duel rating and record (see Duels)
 		Outpost = profile.Outpost, -- Saga Outpost picks and record (see OutpostServer)
+		Market = profile.Market, -- listings and offers in escrow (see MarketBoard)
 		FirstJoin = profile.FirstJoin,
 		WelcomeBought = profile.WelcomeBought,
 		ServerTime = os.time(),

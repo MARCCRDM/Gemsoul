@@ -19,7 +19,7 @@ local Season = require(ReplicatedStorage.Shared.Season)
 
 local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
-local TradeUI = require(script.Parent.Modules.TradeUI)
+local MarketBoardUI = require(script.Parent.Modules.MarketBoardUI)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
 local GemClient = require(script.Parent.Modules.GemClient)
 local InventoryUI = require(script.Parent.Modules.InventoryUI)
@@ -178,7 +178,7 @@ end)
 
 local menu = if MENU_ONLY
 	then {
-		{ "⇄", "Trade", "T", TradeUI.open },
+		{ "⇄", "Market", "T", MarketBoardUI.open },
 		{
 			"⚒️",
 			"Equipment",
@@ -409,7 +409,7 @@ local KEYS = {
 }
 if MENU_ONLY then
 	KEYS.M = MineUI.toggle
-	KEYS.T = TradeUI.open
+	KEYS.T = MarketBoardUI.open
 	KEYS.C = function()
 		CharacterUI.open()
 	end
