@@ -62,9 +62,21 @@ status.Font = Enum.Font.GothamBold
 status.Text = "OWNER TOOLS · DUNGEON TESTS GIVE NO REWARDS"
 status.Parent = panel
 
+-- Touch screens: the bottom-right corner is the thumb's (Combat's buttons),
+-- so the DEV button moves up under LEAVE and its panel opens downward.
+if game:GetService("UserInputService").TouchEnabled then
+	toggle.AnchorPoint, toggle.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 62)
+	panel.AnchorPoint, panel.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 96)
+	toggle.Text = "DEV  ▾"
+end
+local function arrow(open: boolean): string
+	local touch = game:GetService("UserInputService").TouchEnabled
+	return if open == touch then "DEV  ▴" else "DEV  ▾"
+end
+
 toggle.Activated:Connect(function()
 	panel.Visible = not panel.Visible
-	toggle.Text = if panel.Visible then "DEV  ▾" else "DEV  ▴"
+	toggle.Text = arrow(panel.Visible)
 end)
 
 local busy = false

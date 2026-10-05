@@ -697,7 +697,11 @@ local function drawRival(now, viewport)
 	end
 	local model = rivalModel
 	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
-	rivalPanel.Visible = humanoid ~= nil and humanoid.Health > 0 and viewport.X >= 700
+	-- (Touch screens keep the fight clear: the top card says enough.)
+	rivalPanel.Visible = humanoid ~= nil
+		and humanoid.Health > 0
+		and viewport.X >= 700
+		and not UserInputService.TouchEnabled
 	if not rivalPanel.Visible then
 		return
 	end
@@ -1220,6 +1224,108 @@ player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 	cooldowns, techCooldowns = {}, {}
 	nextAttack = 0
 end)
+-- Touch screens: every action under the right thumb, the left side left
+-- to the move stick. ATTACK sits in the bottom-right corner; the three
+-- surges ring it closest (Q left, E diagonal, R above); guard, maneuvers,
+-- heavy and dodge make the outer ring. Your vitals sit bottom-centre, left
+-- of the ring. Returns the vitals' top (from the bottom) and their centre.
+local thumbReady = false
+local THUMB_NAMES = { Basic = "ATTACK", Heavy = "HEAVY", Block = "GUARD", Dodge = "DODGE" }
+local function layoutThumb(viewport: Vector2): (number, number)
+	if not thumbReady then
+		thumbReady = true
+		for _, icon in surgeIcons do
+			icon.Button.Parent = gui
+			icon.Name.Visible = false
+		end
+		for _, icon in maneuverIcons do
+			icon.Button.Parent = gui
+			icon.Name.Visible = false
+		end
+		-- Thumb buttons are round.
+		for _, slot in slots do
+			for _, d in slot.Button:GetDescendants() do
+				if d:IsA("UICorner") then
+					d.CornerRadius = UDim.new(0.5, 0)
+				end
+			end
+			local own = slot.Button:FindFirstChildOfClass("UICorner")
+			if own then
+				own.CornerRadius = UDim.new(0.5, 0)
+			end
+		end
+	end
+	local k = math.clamp(viewport.Y / 380, 0.8, 1.3)
+	local A, S, M = math.floor(84 * k), math.floor(60 * k), math.floor(46 * k)
+	local margin = math.floor(16 * k)
+	-- The ring's centre, measured from the bottom-right corner.
+	local cx, cy = margin + A / 2, margin + A / 2
+	local function at(button: GuiObject, size: number, radius: number, degrees: number)
+		local a = math.rad(degrees)
+		button.AnchorPoint = Vector2.new(0.5, 0.5)
+		button.Size = UDim2.fromOffset(size, size)
+		button.Position =
+			UDim2.new(1, -cx + math.floor(radius * math.cos(a)), 1, -cy - math.floor(radius * math.sin(a)))
+	end
+	-- The big ATTACK button.
+	local attack = slots.Basic
+	at(attack.Button, A, 0, 0)
+	-- Surges, closest.
+	local inner = A / 2 + S / 2 + 10 * k
+	for i, icon in surgeIcons do
+		icon.Button.Visible = true
+		at(icon.Button, S, inner, ({ 180, 135, 90 })[i])
+		icon.Glyph.TextSize = math.floor(S * 0.38)
+		icon.Badge.TextSize = math.floor(9 * k)
+	end
+	-- The outer ring, left to top: guard, maneuvers (only those you can use),
+	-- heavy, dodge.
+	local outer = inner + S / 2 + M / 2 + 20 * k
+	local ring = { slots.Block.Button }
+	for _, icon in maneuverIcons do
+		icon.Button.Visible = not icon.Locked
+		if icon.Button.Visible then
+			table.insert(ring, icon.Button)
+			icon.Glyph.TextSize = math.floor(M * 0.38)
+			icon.Badge.TextSize = math.floor(8 * k)
+		end
+	end
+	table.insert(ring, slots.Heavy.Button)
+	table.insert(ring, slots.Dodge.Button)
+	local from, to = 186, 84
+	for i, button in ring do
+		local t = if #ring > 1 then (i - 1) / (#ring - 1) else 0
+		at(button, M, outer, from + (to - from) * t)
+	end
+	-- The round buttons: name centred, cooldown above it, no key hint.
+	for id, slot in slots do
+		local size = if id == "Basic" then A else M
+		slot.Button.Visible = true
+		slot.Key.Visible = false
+		slot.Name.Text = if id == "Block" and player:GetAttribute("Blocking") then "GUARD UP" else THUMB_NAMES[id]
+		slot.Name.TextSize = if id == "Basic" then math.floor(15 * k) else math.floor(10 * k)
+		slot.Name.Position = UDim2.new(0, 2, 0.5, -math.floor(size * 0.12))
+		slot.Name.Size = UDim2.new(1, -4, 0, math.floor(size * 0.3))
+		slot.Timer.Position = UDim2.new(0, 2, 0, math.floor(size * 0.06))
+		slot.Timer.Size = UDim2.new(1, -4, 0, math.floor(size * 0.3))
+		slot.Timer.TextSize = math.floor(size * 0.24)
+	end
+	-- Vitals: between the move stick's side (the left fifth) and the ring.
+	local left = viewport.X * 0.2
+	local right = viewport.X - (cx + outer + M / 2 + 12)
+	local width = math.clamp(right - left, 260, 470)
+	local centre = math.max(left + width / 2, math.min(right - width / 2, viewport.X / 2))
+	local stacked = width < 400
+	local height = HudChrome.layoutVitals(
+		hud,
+		{ Name = nameLabel, Shield = hp, Health = healthTrack, Bars = resourceBars },
+		width,
+		stacked
+	)
+	hud.Position = UDim2.new(0, centre, 1, -margin)
+	return margin + height, centre
+end
+
 local lastActive = false
 RunService.RenderStepped:Connect(function(dt)
 	-- The combat HUD never draws over the menu dashboard.
@@ -1259,53 +1365,61 @@ RunService.RenderStepped:Connect(function(dt)
 	local portrait = viewport.X < 600
 	local short = viewport.Y < 430 and not portrait
 	local touch = UserInputService.TouchEnabled
-	local iconSize = if portrait then math.clamp(math.floor((viewport.X - 100) / 7), 34, 48) elseif short then 44 else 52
-	layoutTray(surgeTray, surgeIcons, iconSize)
-	layoutTray(maneuverTray, maneuverIcons, iconSize)
-	-- One stack at the bottom: the action bar, the vitals above it, your
-	-- buffs above those; on narrow screens Health gets its own row.
-	local barWidth, barHeight = HudChrome.layoutActionBar(actionBar, surgeTray, maneuverTray)
-	local stacked = portrait or (viewport.X < 760 and not short)
-	local hudBottom = 22 + barHeight + 12
-	local hudHeight = HudChrome.layoutVitals(
-		hud,
-		{ Name = nameLabel, Shield = hp, Health = healthTrack, Bars = resourceBars },
-		if stacked
+	actionBar.Frame.Visible = not touch
+	treeButton.Visible = not touch
+	local stackTop, centreX = 0, nil
+	local logRoom = 0
+	if touch then
+		stackTop, centreX = layoutThumb(viewport)
+	else
+		local iconSize = if portrait
+			then math.clamp(math.floor((viewport.X - 100) / 7), 34, 48)
+			elseif short then 44
+			else 52
+		layoutTray(surgeTray, surgeIcons, iconSize)
+		layoutTray(maneuverTray, maneuverIcons, iconSize)
+		-- One stack at the bottom: the action bar, the vitals above it, your
+		-- buffs above those; on narrow screens Health gets its own row.
+		local barWidth, barHeight = HudChrome.layoutActionBar(actionBar, surgeTray, maneuverTray)
+		local stacked = portrait or (viewport.X < 760 and not short)
+		local hudBottom = 22 + barHeight + 12
+		local vitalsWidth = if stacked
 			then math.max(barWidth, math.min(viewport.X - 40, 420))
 			elseif short then barWidth + 40
-			else math.max(barWidth + 120, 600),
-		stacked
-	)
-	hud.Position = UDim2.new(0.5, 0, 1, -hudBottom)
-	local stackTop = hudBottom + hudHeight
-	-- Touch players get on-screen swing, guard and dodge buttons: a row above
-	-- the stack, or on short screens the two bottom corners beside the bar
-	-- (left swing and guard under the left thumb, dodge and right swing
-	-- under the right).
-	local corners = short and touch
-	local slotWidth = if corners
-		then math.min(80, ((viewport.X - barWidth) / 2 - 40) / 2)
-		else math.min(80, (viewport.X - 32) / 4 - 8)
-	for index, id in { "Basic", "Block", "Dodge", "Heavy" } do
-		local slot = slots[id]
-		slot.Button.Visible = touch
-		slot.Button.Size = UDim2.fromOffset(slotWidth, if corners then 64 else 70)
-		local outer = (slotWidth / 2 + 12) + (if index == 2 or index == 3 then slotWidth + 8 else 0)
-		slot.Button.Position = if corners
-			then UDim2.new(if index <= 2 then 0 else 1, if index <= 2 then outer else -outer, 1, -12)
-			else UDim2.new(0.5, (index - 2.5) * (slotWidth + 8), 1, -(stackTop + 34))
+			else math.max(barWidth + 120, 600)
+		local hudHeight = HudChrome.layoutVitals(
+			hud,
+			{ Name = nameLabel, Shield = hp, Health = healthTrack, Bars = resourceBars },
+			vitalsWidth,
+			stacked
+		)
+		hud.Position = UDim2.new(0.5, 0, 1, -hudBottom)
+		stackTop = hudBottom + hudHeight
+		-- Mouse and keyboard: no on-screen buttons.
+		for _, slot in slots do
+			slot.Button.Visible = false
+		end
+		logRoom = (viewport.X - (if stacked then viewport.X else vitalsWidth)) / 2 - 24
 	end
 	rivalPanel.Fit.Scale = math.clamp((viewport.Y - 150) / 420, 0.58, 1)
 	controlsHint.Position = UDim2.new(0.5, 0, 1, -3)
 	-- Your buffs and debuffs ride just above the vitals, wherever they sit.
-	selfStatusRow.Position = UDim2.new(0.5, 0, 1, -(stackTop + (if touch then 112 else 8)))
-	-- The log keeps to the bottom-left corner, clear of the stack.
-	local logRoom = (viewport.X - (if stacked then viewport.X else math.max(barWidth + 120, 600))) / 2 - 24
+	selfStatusRow.Position = if centreX
+		then UDim2.new(0, centreX, 1, -(stackTop + 6))
+		else UDim2.new(0.5, 0, 1, -(stackTop + 8))
+	-- The log keeps to the bottom-left corner, clear of the stack (touch
+	-- screens leave that corner to the move stick).
+	combatLog.LogPanel.Visible = not touch and combatLog.LogPanel.Visible
 	combatLog.LogPanel.Position = UDim2.new(0, 12, 1, -12)
 	combatLog.LogPanel.Size = UDim2.fromOffset(math.clamp(logRoom, 240, 340), combatLog.LogPanel.Size.Y.Offset)
 	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 16)
 	leave.Position, leave.Size =
-		UDim2.new(1, -12, 0, if portrait then 80 else 16), UDim2.fromOffset(if portrait then 130 else 160, 38)
+		UDim2.new(1, -12, 0, if portrait then 80 else 16),
+		if touch
+			then UDim2.fromOffset(110, 34)
+			elseif portrait then UDim2.fromOffset(130, 38)
+			else UDim2.fromOffset(160, 38)
+	leave.Text = if touch then "LEAVE" else "LEAVE ARENA"
 	targetCard.Size = UDim2.fromOffset(if portrait then math.min(260, viewport.X - 40) else 380, 74)
 	-- Phones: below the corner buttons.
 	targetCard.Position = UDim2.new(0.5, 0, 0, if portrait then 124 else 14)
@@ -1389,6 +1503,7 @@ RunService.RenderStepped:Connect(function(dt)
 			end
 			icon.Name.Text = definition.Name
 			icon.Badge.Text = if learned then string.format("%d ST", math.floor(definition.Cost + 0.5)) else "LOCKED"
+			icon.Locked = not learned
 			local affordable = (player:GetAttribute("Stamina") or 0) >= definition.Cost
 			local usable = learned and affordable and (not definition.Shield or shielded ~= nil)
 			setIcon(icon, color, techCooldowns[id], usable, false, learned and not affordable)
@@ -1396,6 +1511,7 @@ RunService.RenderStepped:Connect(function(dt)
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
 			SurgeIcons.apply(icon.Button, nil)
 			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
+			icon.Locked = true
 			setIcon(icon, P.Dim, nil, false, false)
 		end
 	end

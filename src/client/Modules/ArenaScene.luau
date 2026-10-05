@@ -46,7 +46,10 @@ function ArenaScene.enter(pvp)
 	task.spawn(function()
 		local result = GemClient.request(if pvp then "ArenaPvP" else "ArenaTraining")
 		busy = false
-		UiKit.toast(result.Message, if result.Ok then UiKit.Colors.Good else UiKit.Colors.Bad)
+		-- Walking in says it all; only a refusal needs words.
+		if not result.Ok then
+			UiKit.toast(result.Message, UiKit.Colors.Bad)
+		end
 		refresh()
 	end)
 end

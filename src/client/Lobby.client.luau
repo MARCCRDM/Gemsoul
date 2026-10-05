@@ -80,7 +80,7 @@ end
 
 -- The intro duel: one match against a sparring rival, then the lobby.
 local function firstDuel()
-	UiKit.toast("Your first duel! Beat the rival, then the Outpost lobby opens.", Color3.fromRGB(255, 202, 91))
+	UiKit.toast("First duel: beat the rival to open the lobby.", Color3.fromRGB(255, 202, 91))
 	ArenaScene.enter(false)
 	if not waitFor(function()
 		return player:GetAttribute("CombatSession") ~= nil

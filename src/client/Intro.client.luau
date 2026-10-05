@@ -314,7 +314,17 @@ local function fit()
 	local short = h < 480
 	local narrow = w < 650
 	local header = if short then 70 elseif narrow then 92 else 106
-	local bodyHeight = math.max(80, h - header - 108)
+	-- Short (phone) screens: the quiet buttons flank the main one in a single
+	-- footer row, so the gems get the height.
+	local oneRow = short and w >= 640
+	footer.Size = UDim2.new(1, 0, 0, if oneRow then 48 else 96)
+	primary.Size = UDim2.new(if oneRow then 0.4 else 1, 0, 0, if oneRow then 44 else 52)
+	for _, b in { skip, motion } do
+		b.Position = UDim2.new(b.AnchorPoint.X, 0, 0, if oneRow then 8 else 64)
+	end
+	skip.Size = UDim2.fromOffset(if oneRow then 168 else 214, 28)
+	skip.Text = if oneRow then "Skip · keep rewards" else "Skip reveal · keep all rewards"
+	local bodyHeight = math.max(80, h - header - (if oneRow then 60 else 108))
 	title.TextSize = if w < 420 then 20 elseif w < 500 then 24 elseif short then 26 else 34
 	title.Position, title.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, if short then 34 else 42)
 	subtitle.Visible = not short
@@ -344,7 +354,7 @@ local function fit()
 	local rows = if phase == "Gems" then 3 else 2
 	if horizontal then
 		grid.FillDirection, grid.FillDirectionMaxCells = Enum.FillDirection.Vertical, 1
-		grid.CellSize = UDim2.fromOffset(124, math.max(96, stage.AbsoluteSize.Y - 5))
+		grid.CellSize = UDim2.fromOffset(124, math.max(84, stage.AbsoluteSize.Y - 5))
 		stage.AutomaticCanvasSize, stage.ScrollingDirection = Enum.AutomaticSize.X, Enum.ScrollingDirection.X
 	else
 		grid.FillDirection, grid.FillDirectionMaxCells = Enum.FillDirection.Horizontal, 3
@@ -373,17 +383,12 @@ end
 local function describe(entry, isGem)
 	if isGem then
 		local gem = entry.Gem
-		local detail = (GemConfig.ElementLabels[gem.Element] or gem.Element) .. " / CUT " .. gem.Cut
-		-- A surge capacitor gem: name the ability it casts.
+		local element = GemConfig.ElementLabels[gem.Element] or gem.Element
+		-- A surge gem names the power it casts; a gear gem its cut.
 		local surge = SURGE_KEYS[entry.Slot] and Tech.surgeStats(gem)
-		if surge then
-			detail ..= string.format(
-				"  /  %s (Rank %s · %s)",
-				surge.Name,
-				({ "I", "II", "III" })[surge.Rank] or "I",
-				Tech.TierNames[surge.Tier] or ""
-			)
-		end
+		local detail = if surge
+			then string.format("%s  ·  %s %s", element, surge.Name, ({ "I", "II", "III" })[surge.Rank] or "I")
+			else string.format("%s  ·  CUT %d", element, gem.Cut or 0)
 		return GemConfig.shade(gem).Name,
 			GemConfig.TierColors[gem.Tier],
 			GemConfig.TierLabels[gem.Tier] or gem.Tier,
@@ -662,7 +667,6 @@ local function finish()
 	end
 	close()
 	LotterySound.play("Attune")
-	UiKit.toast("Your journey begins. All nine gem sockets are ready.", C.Cyan)
 end
 listen(RunService.RenderStepped, function(dt)
 	if closed then

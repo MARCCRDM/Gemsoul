@@ -30,6 +30,13 @@ local BACKGROUND = Color3.fromRGB(12, 11, 23) -- the art's own edge colour
 local GOLD = Color3.fromRGB(255, 202, 91)
 
 local player = Players.LocalPlayer
+-- Phones and tablets play sideways: landscape either way up, never portrait.
+pcall(function()
+	(player:WaitForChild("PlayerGui") :: PlayerGui).ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
+end)
+pcall(function()
+	game:GetService("StarterGui").ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
+end)
 local gui = Instance.new("ScreenGui")
 gui.Name = "Splash"
 gui.DisplayOrder = 500

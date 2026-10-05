@@ -137,8 +137,29 @@ end
 -- Toasts: short messages that stack at the top of the screen and fade out.
 local toastGui: ScreenGui? = nil
 local toastHolder: Frame? = nil
+local toastCount = 0
+
+-- Phones (a short landscape screen): small toasts in the top-left, clear of
+-- the fight in the middle and the thumb buttons on the right.
+local function phone(): boolean
+	local camera = workspace.CurrentCamera
+	return camera ~= nil and camera.ViewportSize.Y > 0 and camera.ViewportSize.Y < 500
+end
+local TOAST_LIMIT = 3
+local PHONE_TOAST_LIMIT = 2
 
 function UiKit.toast(message: string, color: Color3?)
+	if type(message) ~= "string" or message == "" then
+		return
+	end
+	-- The same message twice in a row is one message.
+	if toastHolder then
+		for _, child in toastHolder:GetChildren() do
+			if child:IsA("Frame") and child:GetAttribute("Message") == message then
+				return
+			end
+		end
+	end
 	UiSound.play(if UiSound.isAlert(color) then "Error" else "Notify")
 	if not toastHolder then
 		toastGui = UiKit.gui("Toasts", 20)
@@ -156,10 +177,34 @@ function UiKit.toast(message: string, color: Color3?)
 	-- A chunky dark pill: coloured rim and edge stripe, white outlined text.
 	-- It pops in, then fades and floats away.
 	local accent = color or K.Gold
+	local small = phone()
+	local layout = toastHolder:FindFirstChildOfClass("UIListLayout")
+	toastHolder.AnchorPoint = if small then Vector2.zero else Vector2.new(0.5, 0)
+	toastHolder.Position = if small then UDim2.fromOffset(12, 60) else UDim2.new(0.5, 0, 0, 56)
+	toastHolder.Size = if small then UDim2.new(0.45, 0, 0, 0) else UDim2.new(0.9, 0, 0, 0)
+	if layout then
+		layout.HorizontalAlignment = if small then Enum.HorizontalAlignment.Left else Enum.HorizontalAlignment.Center
+	end
+	-- Only the newest few stay; the oldest goes first.
+	local shown = {}
+	for _, child in toastHolder:GetChildren() do
+		if child:IsA("Frame") then
+			table.insert(shown, child)
+		end
+	end
+	table.sort(shown, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	for i = 1, #shown - ((if small then PHONE_TOAST_LIMIT else TOAST_LIMIT) - 1) do
+		shown[i]:Destroy()
+	end
+	toastCount += 1
 	local toast = Instance.new("Frame")
 	toast.AutomaticSize = Enum.AutomaticSize.XY
 	toast.Size = UDim2.fromOffset(0, 0)
 	toast.BackgroundColor3 = Color3.new(1, 1, 1)
+	toast.LayoutOrder = toastCount
+	toast:SetAttribute("Message", message)
 	toast.Parent = toastHolder
 	UiKit.round(toast, 14)
 	local shade = Instance.new("UIGradient")
@@ -173,17 +218,17 @@ function UiKit.toast(message: string, color: Color3?)
 	rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	rim.Parent = toast
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 10)
-	padding.PaddingBottom = UDim.new(0, 10)
-	padding.PaddingLeft = UDim.new(0, 26)
-	padding.PaddingRight = UDim.new(0, 18)
+	padding.PaddingTop = UDim.new(0, if small then 6 else 10)
+	padding.PaddingBottom = UDim.new(0, if small then 6 else 10)
+	padding.PaddingLeft = UDim.new(0, if small then 18 else 26)
+	padding.PaddingRight = UDim.new(0, if small then 12 else 18)
 	padding.Parent = toast
 	local constraint = Instance.new("UISizeConstraint")
-	constraint.MaxSize = Vector2.new(620, math.huge)
+	constraint.MaxSize = Vector2.new(if small then 360 else 620, math.huge)
 	constraint.Parent = toast
 	local stripe = Instance.new("Frame")
 	stripe.BackgroundColor3 = accent
-	stripe.Position = UDim2.new(0, -18, 0, -2)
+	stripe.Position = UDim2.new(0, if small then -12 else -18, 0, -2)
 	stripe.Size = UDim2.new(0, 6, 1, 4)
 	stripe.Parent = toast
 	UiKit.round(stripe, 3)
@@ -192,10 +237,15 @@ function UiKit.toast(message: string, color: Color3?)
 	label.Size = UDim2.fromOffset(0, 0)
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.Font = Enum.Font.GothamMedium
-	label.TextSize = 18
+	label.TextSize = if small then 13 else 18
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Text = message
-	label.TextWrapped = false
+	label.TextWrapped = small
+	if small then
+		label.Size = UDim2.fromOffset(330, 0)
+		label.AutomaticSize = Enum.AutomaticSize.Y
+		label.TextXAlignment = Enum.TextXAlignment.Left
+	end
 	label.Parent = toast
 	local ink = Instance.new("UIStroke")
 	ink.Color = Color3.fromRGB(12, 8, 18)
@@ -208,7 +258,10 @@ function UiKit.toast(message: string, color: Color3?)
 	pop.Parent = toast
 	TweenService:Create(pop, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 
-	task.delay(4, function()
+	task.delay(if small then 3 else 4, function()
+		if not toast.Parent then
+			return
+		end
 		local fade = TweenInfo.new(0.5)
 		TweenService:Create(toast, fade, { BackgroundTransparency = 1 }):Play()
 		TweenService:Create(stripe, fade, { BackgroundTransparency = 1 }):Play()

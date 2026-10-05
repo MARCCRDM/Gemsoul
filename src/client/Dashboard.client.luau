@@ -142,10 +142,19 @@ local root = new("Frame", {
 	Size = UDim2.fromOffset(W, H),
 }, safe)
 local fitScale = new("UIScale", {}, root)
+local buildTag: TextLabel? = nil
 local function fit()
 	local screen = gui.AbsoluteSize
-	if screen.X > 0 and screen.Y > TOPBAR + BOTTOM then
-		fitScale.Scale = math.min(screen.X / W, (screen.Y - TOPBAR - BOTTOM) / H)
+	-- Phones (a short landscape screen): no bottom strip (no build tag, and
+	-- the DEV button sits up top), so the panels can be bigger.
+	local phone = screen.Y > 0 and screen.Y < 500
+	local bottom = if phone then 6 else BOTTOM
+	safe.Size = UDim2.new(1, 0, 1, -TOPBAR - bottom)
+	if buildTag then
+		buildTag.Visible = not phone
+	end
+	if screen.X > 0 and screen.Y > TOPBAR + bottom then
+		fitScale.Scale = math.min(screen.X / W, (screen.Y - TOPBAR - bottom) / H)
 	end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
@@ -307,13 +316,15 @@ seasonHit.Activated:Connect(function()
 end)
 -- The build, so playtest reports name it (Config.Playtest.Build).
 if Config.Playtest and Config.Playtest.Build then
-	local buildTag = text(gui, Config.Playtest.Build .. "   ·   Feedback in Social", 11, P.Dim, IronUi.Bold)
-	buildTag.AutomaticSize = Enum.AutomaticSize.None
+	local tag = text(gui, Config.Playtest.Build .. "   ·   Feedback in Social", 11, P.Dim, IronUi.Bold)
+	tag.AutomaticSize = Enum.AutomaticSize.None
 	-- Bottom centre: the chat bar has the left corner, the DEV button the right.
-	buildTag.AnchorPoint, buildTag.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -15)
-	buildTag.Size = UDim2.fromOffset(520, 14)
-	buildTag.TextXAlignment = Enum.TextXAlignment.Center
-	buildTag.TextTransparency = 0.25
+	tag.AnchorPoint, tag.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -15)
+	tag.Size = UDim2.fromOffset(520, 14)
+	tag.TextXAlignment = Enum.TextXAlignment.Center
+	tag.TextTransparency = 0.25
+	buildTag = tag
+	fit()
 end
 
 -- The armory fills the rest: equipment, sockets, stats, backpack and spare gear.
