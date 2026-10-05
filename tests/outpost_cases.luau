@@ -158,7 +158,11 @@ local MineWall = {
 }
 local Progress = { addXP = function() end }
 local announced = {}
-local ChatChannels = { announce = function(kind, text) table.insert(announced, { kind, text }) end }
+local ChatChannels = {
+	announce = function(kind, text)
+		table.insert(announced, { kind, text })
+	end,
+}
 local TopPlayers = {
 	board = function(name)
 		return { { Name = "Ana", Value = if name == "Gear" then 210 else 7 } }
@@ -183,11 +187,14 @@ local function load(path, name, extra)
 		Random = Rand,
 		task = fakeTask,
 		typeof = R.typeof or typeof,
-		os = { clock = function()
-			return now
-		end, time = function()
-			return 86400 * 20000 + now
-		end },
+		os = {
+			clock = function()
+				return now
+			end,
+			time = function()
+				return 86400 * 20000 + now
+			end,
+		},
 		script = { Parent = { Parent = {} } },
 		require = function(m)
 			return extra[m]
@@ -197,9 +204,12 @@ local function load(path, name, extra)
 	return fn()
 end
 local Rules = load("src/shared/Outpost.luau", "Outpost", {})
-local GemConfig = { TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }, displayName = function()
-	return "Rare Shock Gem"
-end }
+local GemConfig = {
+	TierRank = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 },
+	displayName = function()
+		return "Rare Shock Gem"
+	end,
+}
 local Mine = load("src/shared/Mine.luau", "Mine", {})
 
 -- The rules ---------------------------------------------------------------------------
@@ -208,12 +218,41 @@ for i = 0, 9999 do
 	local size = Rules.rollSize(i / 10000)
 	counts[size] = (counts[size] or 0) + 1
 end
-check(counts.Pebble > counts.Boulder and counts.Boulder > counts.Monolith and counts.Monolith > counts.Geode and counts.Geode > 0, "Rock sizes aren't weighted rarest-last")
-check(Rules.damage("Survey", false) == 1 and Rules.damage("Survey", true) == 2 and Rules.damage("Plasma", false) == Rules.Picks.Plasma.Power, "Swing damage wrong")
-check(Rules.tension(10, 10) == 0 and Rules.tension(0, 10) == 1 and math.abs(Rules.tension(3, 4) - 0.25) < 1e-9, "Tension wrong")
-check(Rules.claimHolder({}, 1, 0) and Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 1, 5), "Claim refused its holder")
-check(not Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 2, 5) and Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 2, 10), "Claim didn't hold or expire")
-check(Rules.freePickDue(nil, 5) and Rules.freePickDue(4, 5) and not Rules.freePickDue(5, 5), "Free pick timing wrong")
+check(
+	counts.Pebble > counts.Boulder
+		and counts.Boulder > counts.Monolith
+		and counts.Monolith > counts.Geode
+		and counts.Geode > 0,
+	"Rock sizes aren't weighted rarest-last"
+)
+check(
+	Rules.damage("Survey", false) == 1
+		and Rules.damage("Survey", true) == 2
+		and Rules.damage("Plasma", false) == Rules.Picks.Plasma.Power,
+	"Swing damage wrong"
+)
+check(
+	Rules.tension(10, 10) == 0 and Rules.tension(0, 10) == 1 and math.abs(Rules.tension(3, 4) - 0.25) < 1e-9,
+	"Tension wrong"
+)
+check(
+	Rules.claimHolder({}, 1, 0) and Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 1, 5),
+	"Claim refused its holder"
+)
+check(
+	not Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 2, 5)
+		and Rules.claimHolder({ ClaimedBy = 1, ClaimUntil = 10 }, 2, 10),
+	"Claim didn't hold or expire"
+)
+do
+	local full, step = Rules.Picks.Survey.Swings, Rules.FreeSwingSeconds
+	local s, since = Rules.refillSurvey(10, 1000, 1000 + step * 3 + 5)
+	check(s == 13 and since == 1000 + step * 3, "Free pick refill wrong")
+	s = Rules.refillSurvey(full - 1, 0, step * 100)
+	check(s == full, "Free pick overfilled")
+	local _, waiting = Rules.refillSurvey(full, 0, 500)
+	check(waiting == 500, "A full free pick kept its clock running")
+end
 for _, id in Rules.SizeOrder do
 	local s = Rules.Sizes[id]
 	check(s.Hp > 0 and s.Respawn > 0 and s.Coins[2] >= s.Coins[1], id .. " rock incomplete")
@@ -257,12 +296,14 @@ local Server = (function()
 	local scriptStub = { Parent = setmetatable({ Parent = { World = named } }, { __index = named }) }
 	replicated.Name = "ReplicatedStorage"
 	local env = setmetatable({
-		game = { GetService = function(_, name)
-			if name == "ReplicatedStorage" then
-				return replicated
-			end
-			return ({ CollectionService = CollectionService, Players = Players })[name]
-		end },
+		game = {
+			GetService = function(_, name)
+				if name == "ReplicatedStorage" then
+					return replicated
+				end
+				return ({ CollectionService = CollectionService, Players = Players })[name]
+			end,
+		},
 		workspace = workspaceRoot,
 		Instance = R.Instance,
 		CFrame = R.CFrame,
@@ -274,11 +315,14 @@ local Server = (function()
 		Random = Rand,
 		task = fakeTask,
 		typeof = R.typeof or typeof,
-		os = { clock = function()
-			return now
-		end, time = function()
-			return 86400 * 20000 + math.floor(now)
-		end },
+		os = {
+			clock = function()
+				return now
+			end,
+			time = function()
+				return 86400 * 20000 + math.floor(now)
+			end,
+		},
 		script = scriptStub,
 		require = env_require,
 	}, { __index = _G })
@@ -313,13 +357,19 @@ end
 check(nodeCount == Rules.NodeCount, "Rocks out: " .. nodeCount)
 for _, node in Server._nodes do
 	local model = node.Model
-	check(model:GetAttribute("Hp") == Rules.Sizes[node.Size].Hp and model.PrimaryPart ~= nil, "A rock without health or a body")
+	check(
+		model:GetAttribute("Hp") == Rules.Sizes[node.Size].Hp and model.PrimaryPart ~= nil,
+		"A rock without health or a body"
+	)
 	local prompt = model.PrimaryPart:FindFirstChildOfClass("ProximityPrompt")
 	check(prompt and prompt:GetAttribute("PromptKind") == "Mine", "A rock without its Mine prompt")
 	break
 end
 check(site.Probe:FindFirstChildOfClass("ProximityPrompt") ~= nil, "The Probe has no prompt")
-check(replicated:FindFirstChild("Landmarks") and replicated.Landmarks:GetAttribute("OutpostSpawn") ~= nil, "No way back from a duel")
+check(
+	replicated:FindFirstChild("Landmarks") and replicated.Landmarks:GetAttribute("OutpostSpawn") ~= nil,
+	"No way back from a duel"
+)
 
 -- Players: an R15-ish body with a root and a right hand.
 local function makePlayer(id, name)
@@ -365,9 +415,15 @@ check(not handlers.OutpostHit(ana, 1).Ok, "Mined without being at the Outpost")
 local entered = handlers.OutpostEnter(ana)
 check(entered.Ok and ana:GetAttribute("Outpost") == true, "Couldn't enter the Outpost")
 check((anaRoot.CFrame.Position - site.Spawn.Position).Magnitude < 12, "Not brought to the landing pad")
-check(entered.State.Picks.Survey == Rules.Picks.Survey.Swings and entered.State.Active == "Survey", "No free Survey Pick")
+check(
+	entered.State.Picks.Survey == Rules.Picks.Survey.Swings and entered.State.Active == "Survey",
+	"No free Survey Pick"
+)
 check(ana.Character:FindFirstChild("OutpostPick") ~= nil, "No pick in hand")
-check(anaRoot:FindFirstChild("OutpostDuel") and anaRoot:FindFirstChild("OutpostParty"), "No duel/party prompts on the miner")
+check(
+	anaRoot:FindFirstChild("OutpostDuel") and anaRoot:FindFirstChild("OutpostParty"),
+	"No duel/party prompts on the miner"
+)
 handlers.OutpostEnter(ben)
 
 -- Pick a rock and stand by it.
@@ -387,7 +443,10 @@ standBy(anaRoot, target)
 local first = handlers.OutpostHit(ana, target.Id)
 check(first.Ok and first.Hp < target.MaxHp, "A swing didn't chip the rock")
 check(first.State.Picks.Survey == Rules.Picks.Survey.Swings - 1, "The swing didn't wear the pick")
-check(target.Model:GetAttribute("LastHitBy") == 1 and target.Model:GetAttribute("ClaimedBy") == 1, "Others can't see who's mining it")
+check(
+	target.Model:GetAttribute("LastHitBy") == 1 and target.Model:GetAttribute("ClaimedBy") == 1,
+	"Others can't see who's mining it"
+)
 check(ana.Character:GetAttribute("ActionKind") == "Heavy", "No chop for others to see")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Swung faster than the pick allows")
 -- Ben can't steal it while Ana is on it, but can once she walks away.
@@ -430,6 +489,7 @@ check(after == before + 1, "A mined rock never grew back")
 local nextRock = select(2, next(Server._nodes))
 standBy(anaRoot, nextRock)
 profiles[ana].Outpost.Picks.Survey = 1
+profiles[ana].Outpost.SurveyAt = 86400 * 20000 + math.floor(now) -- (no swings regained meanwhile)
 advance(Rules.ClaimSeconds + 1)
 local last = handlers.OutpostHit(ana, nextRock.Id)
 check(last.Ok and last.PickBroke == "Survey Pick", "The pick didn't break at zero")
@@ -441,13 +501,19 @@ anaRoot.CFrame = R.CFrame.new(site.Probe.CFrame.Position + R.Vector3.new(0, 0, 6
 local coins = profiles[ana].Coins
 local bought = handlers.OutpostBuyPick(ana, "Titan")
 check(bought.Ok and profiles[ana].Coins == coins - Rules.Picks.Titan.Price, "Buying a pick didn't charge for it")
-check(bought.State.Active == "Titan" and bought.State.Picks.Titan == Rules.Picks.Titan.Swings, "The bought pick isn't in hand")
+check(
+	bought.State.Active == "Titan" and bought.State.Picks.Titan == Rules.Picks.Titan.Swings,
+	"The bought pick isn't in hand"
+)
 check(not handlers.OutpostBuyPick(ana, "Survey").Ok, "The free pick was for sale")
 profiles[ana].Coins = 10
 check(not handlers.OutpostBuyPick(ana, "Plasma").Ok, "Bought a pick without the coins")
--- Tomorrow, a fresh Survey Pick.
-profiles[ana].Outpost.FreeDay -= 1
-check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings, "No free pick the next day")
+-- Time passes: the free pick regains its swings.
+profiles[ana].Outpost.Picks.Survey = 0
+profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * 5
+check(handlers.OutpostState(ana).State.Picks.Survey == 5, "The free pick didn't regain swings over time")
+profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * Rules.Picks.Survey.Swings
+check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings, "The free pick didn't refill")
 
 -- The secrets: six hidden props, each with a prompt; found once for coins.
 check(#site.Secrets == #Rules.SecretOrder, "Not every secret was hidden")
@@ -469,18 +535,27 @@ anaRoot.CFrame = duck.CFrame * R.CFrame.new(0, 0, 4)
 local coinsBefore = profiles[ana].Coins
 local announcedBefore = #announced
 local first = handlers.OutpostSecret(ana, "Duck")
-check(first.Ok and first.Secret.New and first.Secret.Found == 1 and first.Secret.Coins == Rules.SecretReward, "The first find didn't pay")
+check(
+	first.Ok and first.Secret.New and first.Secret.Found == 1 and first.Secret.Coins == Rules.SecretReward,
+	"The first find didn't pay"
+)
 check(profiles[ana].Coins == coinsBefore + Rules.SecretReward, "Secret coins weren't added")
 check(#announced == announcedBefore + 1, "The find wasn't announced")
 check(first.State.Secrets == 1 and first.State.SecretsTotal == #Rules.SecretOrder, "The HUD count is wrong")
 local again = handlers.OutpostSecret(ana, "Duck")
-check(again.Ok and not again.Secret.New and profiles[ana].Coins == coinsBefore + Rules.SecretReward, "A secret paid twice")
+check(
+	again.Ok and not again.Secret.New and profiles[ana].Coins == coinsBefore + Rules.SecretReward,
+	"A secret paid twice"
+)
 -- The full set pays the bonus.
 for _, id in Rules.SecretOrder do
 	anaRoot.CFrame = secretIds[id].CFrame * R.CFrame.new(0, 0, 4)
 	handlers.OutpostSecret(ana, id)
 end
-check(profiles[ana].Coins == coinsBefore + Rules.SecretReward * #Rules.SecretOrder + Rules.SecretBonus, "The full-set bonus wasn't paid once")
+check(
+	profiles[ana].Coins == coinsBefore + Rules.SecretReward * #Rules.SecretOrder + Rules.SecretBonus,
+	"The full-set bonus wasn't paid once"
+)
 
 -- Only Ultra Rare and Legendary finds are called out to the server.
 local lootCalls = 0
@@ -493,6 +568,13 @@ check(gemsAwarded > 0 and lootCalls == 0, "A Rare find was announced to the serv
 
 -- Leaving.
 check(handlers.OutpostLeave(ana).Ok and ana:GetAttribute("Outpost") == nil, "Couldn't leave")
-check(ana.Character:FindFirstChild("OutpostPick") == nil and anaRoot:FindFirstChild("OutpostDuel") == nil, "Left with the mining kit on")
+check(
+	ana.Character:FindFirstChild("OutpostPick") == nil and anaRoot:FindFirstChild("OutpostDuel") == nil,
+	"Left with the mining kit on"
+)
 
-print("PASS: " .. checks .. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, daily pick, secrets, enter/leave)")
+print(
+	"PASS: "
+		.. checks
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, daily pick, secrets, enter/leave)"
+)

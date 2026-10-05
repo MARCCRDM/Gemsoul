@@ -7,8 +7,9 @@
 	Rocks come in four sizes. Bigger ones take more hits, hide better finds
 	and take longer to grow back once mined out (like ore nodes in an MMO).
 	Swinging wears your pick: every swing costs one point of durability, and
-	a pick at zero breaks. A free Survey Pick is issued every day; better
-	picks are bought at the Probe with coins.
+	a pick at zero breaks. The free Survey Pick regains a swing every
+	FreeSwingSeconds (up to its full 60), so there's a little mining every
+	time you come back; better picks are bought at the Probe.
 
 	  Outpost.Sizes / Outpost.SizeOrder      the rocks
 	  Outpost.Picks / Outpost.PickOrder      the picks
@@ -18,7 +19,8 @@
 	                                         loud and high the hit sound rings
 	  Outpost.claimHolder(node, userId, now) may this player hit this rock?
 	                                         (its first hitter keeps it a while)
-	  Outpost.freePickDue(lastDay, today)    is today's free pick still to come?
+	  Outpost.refillSurvey(swings, since, now) the free pick's swings regained
+	                                         since `since` -> swings, since
 	  Outpost.Machines / Outpost.MachineOrder   the big machines anyone can drive
 	                                         (just for getting around: no tools)
 	  Outpost.Secrets / Outpost.SecretOrder  the hidden Easter eggs
@@ -228,8 +230,19 @@ function Outpost.claimHolder(node, userId: number, now: number): boolean
 	return node.ClaimedBy == nil or node.ClaimedBy == userId or now >= (node.ClaimUntil or 0)
 end
 
-function Outpost.freePickDue(lastDay: number?, today: number): boolean
-	return lastDay == nil or lastDay < today
+-- The free Survey Pick regains one swing this often, up to its full Swings.
+Outpost.FreeSwingSeconds = 120
+function Outpost.refillSurvey(swings: number, since: number, now: number): (number, number)
+	local full = Outpost.Picks.Survey.Swings
+	if swings >= full then
+		return swings, now -- full: the clock waits until a swing is spent
+	end
+	local gained = math.floor((now - since) / Outpost.FreeSwingSeconds)
+	if gained <= 0 then
+		return swings, since
+	end
+	local total = math.min(full, swings + gained)
+	return total, if total >= full then now else since + gained * Outpost.FreeSwingSeconds
 end
 
 return Outpost

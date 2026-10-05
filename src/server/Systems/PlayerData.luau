@@ -67,7 +67,7 @@ type Profile = {
 	Duel: { Rating: number, Wins: number, Losses: number, Streak: number, Played: number?, RivalWins: number? }?, -- arena duels (see Duels); Played counts rival duels too
 	-- Saga Outpost mining: swings left on each pick, the one in hand, the
 	-- day the free Survey Pick was last issued, rocks mined (see OutpostServer).
-	Outpost: { Picks: { [string]: number }, Active: string, FreeDay: number, Rocks: number }?,
+	Outpost: { Picks: { [string]: number }, Active: string, SurveyAt: number?, Rocks: number }?,
 	Session: { JobId: string, Time: number }?, -- which server owns this save (see SessionLock)
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle
 	WelcomeBought: boolean,

@@ -226,11 +226,13 @@ local function refreshHud()
 		finds.Gear
 	)
 	recordLabel.Text = string.format(
-		"%d rocks mined · secrets %d/%d · free pick in %dh",
+		"%d rocks mined · secrets %d/%d · %s",
 		state.Rocks or 0,
 		state.Secrets or 0,
 		state.SecretsTotal or #Rules.SecretOrder,
-		math.ceil((state.FreeIn or 0) / 3600)
+		if state.NextSwingIn
+			then string.format("free pick +1 swing in %d:%02d", state.NextSwingIn // 60, state.NextSwingIn % 60)
+			else "free pick full"
 	)
 end
 

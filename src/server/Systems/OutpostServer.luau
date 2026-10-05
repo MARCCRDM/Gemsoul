@@ -57,16 +57,21 @@ local function today(): number
 	return math.floor(os.time() / 86400)
 end
 
--- A player's Outpost record, the free daily pick topped up, a working pick in hand.
+-- A player's Outpost record, the free pick's regained swings added, a
+-- working pick in hand.
 local function record(profile)
-	profile.Outpost = profile.Outpost or { Picks = {}, Active = "Survey", FreeDay = 0, Rocks = 0 }
+	profile.Outpost = profile.Outpost or { Picks = {}, Active = "Survey", Rocks = 0 }
 	local o = profile.Outpost
 	o.Picks = o.Picks or {}
 	o.Rocks = o.Rocks or 0
-	if Rules.freePickDue(o.FreeDay, today()) then
+	if o.SurveyAt == nil then
+		-- A new miner (or one from before the refill) starts with it full.
 		o.Picks.Survey = math.max(o.Picks.Survey or 0, Rules.Picks.Survey.Swings)
-		o.FreeDay = today()
 	end
+	local swings
+	swings, o.SurveyAt = Rules.refillSurvey(o.Picks.Survey or 0, o.SurveyAt or os.time(), os.time())
+	-- (A worn-out pick stays gone until a swing comes back.)
+	o.Picks.Survey = if swings > 0 then swings else o.Picks.Survey
 	if (o.Picks[o.Active] or 0) <= 0 then
 		for i = #Rules.PickOrder, 1, -1 do
 			local id = Rules.PickOrder[i]
@@ -95,7 +100,10 @@ local function stateOf(player: Player)
 		Rocks = o.Rocks,
 		Secrets = secrets,
 		SecretsTotal = #Rules.SecretOrder,
-		FreeIn = (today() + 1) * 86400 - os.time(),
+		-- Seconds until the free pick regains its next swing (nil when full).
+		NextSwingIn = if (o.Picks.Survey or 0) < Rules.Picks.Survey.Swings
+			then math.max(0, (o.SurveyAt or os.time()) + Rules.FreeSwingSeconds - os.time())
+			else nil,
 	}
 end
 
