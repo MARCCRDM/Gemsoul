@@ -723,12 +723,8 @@ local function gemLines(gem)
 			SurgeIcons.apply(icon, surge, color)
 			local title = text(
 				card,
-				string.format(
-					"GEM SURGE  ·  %s  ·  %s %s",
-					string.upper(surge.Name),
-					string.upper(Tech.TierNames[surge.Tier] or ""),
-					({ "I", "II", "III" })[surge.Rank] or "I"
-				),
+				-- The surge and its power (rank); its tier names the ability.
+				string.format("%s  ·  RANK %s", string.upper(surge.Name), ({ "I", "II", "III" })[surge.Rank] or "I"),
 				11,
 				color,
 				BOLD
@@ -736,7 +732,7 @@ local function gemLines(gem)
 			title.AutomaticSize, title.TextWrapped, title.TextTruncate =
 				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 			title.Position, title.Size = UDim2.fromOffset(42, 6), UDim2.new(1, -50, 0, 14)
-			local parts = {}
+			local parts = { (Tech.TierNames[surge.Tier] or "") .. " surge" }
 			if surge.Damage then
 				table.insert(parts, string.format("%d%% damage", math.floor(surge.Damage * 100 + 0.5)))
 			elseif surge.Duration then
@@ -838,12 +834,22 @@ local function gemLines(gem)
 	if surge then
 		local section = cardSection(
 			string.format(
-				"SURGE  ·  %s  ·  %s %s",
+				"SURGE  ·  %s  ·  RANK %s",
 				string.upper(surge.Name),
-				string.upper(Tech.TierNames[surge.Tier] or ""),
 				({ "I", "II", "III" })[surge.Rank] or "I"
 			),
 			P.Gold
+		)
+		statRow(
+			section,
+			string.format(
+				"%s surge  ·  rank %d of 3 (each rank: more damage, faster, cheaper)",
+				Tech.TierNames[surge.Tier] or "",
+				surge.Rank or 1
+			),
+			nil,
+			P.Dim,
+			11
 		)
 		if surge.Damage then
 			statRow(section, string.format("%d%% base damage", math.floor(surge.Damage * 100 + 0.5)))

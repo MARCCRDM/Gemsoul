@@ -878,10 +878,10 @@ function Tech.surgeLines(gem, amps): { string }
 	local size = math.clamp(gem.Size or 1, 1, 10)
 	local lines = {
 		string.format(
-			"Surge: %s (%s · Rank %s)",
+			"Surge: %s (Rank %s · %s surge)",
 			d.Name,
-			Tech.TierNames[d.Tier] or "",
-			({ "I", "II", "III" })[d.Rank]
+			({ "I", "II", "III" })[d.Rank],
+			Tech.TierNames[d.Tier] or ""
 		),
 	}
 	if d.Damage then

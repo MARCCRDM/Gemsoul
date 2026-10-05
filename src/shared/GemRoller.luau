@@ -28,15 +28,41 @@ GemRoller.Rarities = {
 	{ Name = "Legendary", Weight = 5 },
 }
 
--- What each rarity can carry: surge tiers, surge ranks and the 1-10 band its
--- metrics roll in (low grades in the band are likelier).
+-- What each rarity can carry: surge tiers (which surge), the chance of each
+-- surge rank (its power, I / II / III) and the 1-10 band its metrics roll in
+-- (low grades in the band are likelier). Every surge exists at every rank:
+-- rarer gems just roll the higher ranks more often (a Legendary is never I).
 GemRoller.ByRarity = {
-	Common = { Tiers = { 1 }, Ranks = { 1 }, Metrics = { 1, 4 } },
-	Uncommon = { Tiers = { 1, 2 }, Ranks = { 1, 2 }, Metrics = { 2, 6 } },
-	Rare = { Tiers = { 2, 3 }, Ranks = { 2, 3 }, Metrics = { 4, 8 } },
-	UltraRare = { Tiers = { 3, 4 }, Ranks = { 3 }, Metrics = { 6, 10 } },
-	Legendary = { Tiers = { 4 }, Ranks = { 3 }, Metrics = { 8, 10 } },
+	Common = { Tiers = { 1 }, RankWeights = { 70, 25, 5 }, Metrics = { 1, 4 } },
+	Uncommon = { Tiers = { 1, 2 }, RankWeights = { 50, 35, 15 }, Metrics = { 2, 6 } },
+	Rare = { Tiers = { 2, 3 }, RankWeights = { 30, 45, 25 }, Metrics = { 4, 8 } },
+	UltraRare = { Tiers = { 3, 4 }, RankWeights = { 15, 45, 40 }, Metrics = { 6, 10 } },
+	Legendary = { Tiers = { 4 }, RankWeights = { 0, 35, 65 }, Metrics = { 8, 10 } },
 }
+-- The ranks each rarity can roll (from its weights).
+for _, rules in GemRoller.ByRarity do
+	rules.Ranks = {}
+	for rank, weight in rules.RankWeights do
+		if weight > 0 then
+			table.insert(rules.Ranks, rank)
+		end
+	end
+end
+-- A rank by its weights; `roll` is 0-1.
+local function rankFor(rules, roll: number): number
+	local total = 0
+	for _, weight in rules.RankWeights do
+		total += weight
+	end
+	local at = roll * total
+	for rank, weight in rules.RankWeights do
+		at -= weight
+		if at < 0 and weight > 0 then
+			return rank
+		end
+	end
+	return rules.Ranks[#rules.Ranks]
+end
 
 -- Each element's surge at each tier (ids in CombatTechnology's catalog).
 GemRoller.TierNames = { "Novice", "Apprentice", "Adept", "Master" }
@@ -122,7 +148,7 @@ function GemRoller.roll(rng, luck: number?)
 		Tier = rarity,
 		Surge = surge,
 		SurgeTier = tier,
-		SurgeRank = pick(rng, rules.Ranks),
+		SurgeRank = rankFor(rules, rng:NextNumber()),
 		Size = grade(rng, rules.Metrics),
 		Clarity = grade(rng, rules.Metrics),
 		Cut = grade(rng, rules.Metrics),
@@ -158,7 +184,7 @@ function GemRoller.surge(gem): (number, number)
 		seed = (seed * 31 + string.byte(gem.Id, i)) % 2147483647
 	end
 	local tier = rules.Tiers[seed % #rules.Tiers + 1]
-	local rank = rules.Ranks[(seed // 7) % #rules.Ranks + 1]
+	local rank = rankFor(rules, ((seed // 7) % 1000) / 1000)
 	return tier, rank
 end
 

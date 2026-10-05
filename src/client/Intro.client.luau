@@ -377,7 +377,12 @@ local function describe(entry, isGem)
 		-- A surge capacitor gem: name the ability it casts.
 		local surge = SURGE_KEYS[entry.Slot] and Tech.surgeStats(gem)
 		if surge then
-			detail ..= string.format("  /  %s (%s)", surge.Name, Tech.TierNames[surge.Tier] or "")
+			detail ..= string.format(
+				"  /  %s (Rank %s · %s)",
+				surge.Name,
+				({ "I", "II", "III" })[surge.Rank] or "I",
+				Tech.TierNames[surge.Tier] or ""
+			)
 		end
 		return GemConfig.shade(gem).Name,
 			GemConfig.TierColors[gem.Tier],

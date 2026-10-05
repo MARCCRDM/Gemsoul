@@ -160,10 +160,10 @@ local function socketCard(parent, key, x, gem, amps)
 			label(
 				card,
 				string.format(
-					"%s  ·  %s  ·  RANK %s",
+					"%s  ·  RANK %s  ·  %s SURGE",
 					if definition.Element then GemConfig.elementName(definition.Element):upper() else "RESONANCE",
-					string.upper(Tech.TierNames[definition.Tier] or ""),
-					ROMAN[definition.Rank]
+					ROMAN[definition.Rank],
+					string.upper(Tech.TierNames[definition.Tier] or "")
 				),
 				11,
 				color

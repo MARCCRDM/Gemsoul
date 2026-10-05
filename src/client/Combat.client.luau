@@ -743,9 +743,9 @@ local function drawRival(now, viewport)
 		SurgeIcons.apply(row.Icon, surgeName, surgeColor)
 		row.Tier.Text = if surgeName
 			then string.format(
-				"%s · %s",
-				string.upper(Tech.TierNames[model:GetAttribute("RivalSurgeTier" .. slot) or 1] or ""),
-				ROMAN[model:GetAttribute("RivalSurgeRank" .. slot) or 1] or "I"
+				"RANK %s · %s",
+				ROMAN[model:GetAttribute("RivalSurgeRank" .. slot) or 1] or "I",
+				string.upper(Tech.TierNames[model:GetAttribute("RivalSurgeTier" .. slot) or 1] or "")
 			)
 			else ""
 		local remaining = math.max(0, (model:GetAttribute("SurgeReadyAt" .. slot) or 0) - serverNow)

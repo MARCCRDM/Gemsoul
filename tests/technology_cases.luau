@@ -491,7 +491,7 @@ local lines = Tech.surgeLines({
 	Cut = 4,
 })
 check(
-	lines[1] == "Surge: Ember Lance (Apprentice · Rank I)"
+	lines[1] == "Surge: Ember Lance (Rank I · Apprentice surge)"
 		and lines[2] == string.format("%d%% base damage", math.floor(Tech.Catalog.EmberLance.Damage * 100 + 0.5))
 		and lines[3] == "Size 5 (+15% damage)"
 		and lines[5] == "Cut 4 (2% crit chance)"
@@ -513,10 +513,13 @@ local rng = {
 	NextNumber = nextNumber,
 }
 local counts, resonance, middle, bad = {}, 0, 0, nil
+local combos, legendaryOne = {}, false
 for _ = 1, 20000 do
 	local g = GemRoller.roll(rng, 0)
 	local rules = GemRoller.ByRarity[g.Tier]
 	counts[g.Tier] = (counts[g.Tier] or 0) + 1
+	combos[g.SurgeTier .. ":" .. g.SurgeRank] = true
+	legendaryOne = legendaryOne or (g.Tier == "Legendary" and g.SurgeRank == 1)
 	if not table.find(rules.Tiers, g.SurgeTier) or not table.find(rules.Ranks, g.SurgeRank) then
 		bad = "tier/rank outside its rarity"
 	end
@@ -541,12 +544,14 @@ check(
 	"Rarity weights 40/25/20/10/5"
 )
 check(math.abs(resonance / middle - GemRoller.ResonanceChance) < 0.02, "Resonance share")
-check(
-	GemRoller.ByRarity.Rare.Ranks[2] == 3
-		and GemRoller.ByRarity.UltraRare.Ranks[1] == 3
-		and GemRoller.ByRarity.Legendary.Metrics[1] == 8,
-	"Directive rarity table"
-)
+local everyCombo = true
+for tier = 1, 4 do
+	for rank = 1, 3 do
+		everyCombo = everyCombo and combos[tier .. ":" .. rank] == true
+	end
+end
+check(everyCombo, "Every surge tier rolls at every rank (I-III)")
+check(not legendaryOne and GemRoller.ByRarity.Legendary.Metrics[1] == 8, "Legendary never Rank I")
 -- Overcharge perks multiply their element's surges.
 for _, id in { "CleaverCalibration", "ChargeRecycler", "IonOvercharge" } do
 	profiles[source].Augments.Unlocked[id] = true
