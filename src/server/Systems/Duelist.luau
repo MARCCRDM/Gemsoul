@@ -960,6 +960,12 @@ local function think(enemy, now: number)
 					math.min(0.75, (duel.Crit or 0) + (if heavy then duel.HeavyCrit or 0 else 0))
 				)
 				if type(dealt) == "number" and dealt > 0 and not guarded then
+					-- Landing its weapon builds its Charge, as yours does.
+					local chargeRule = Tech.Resources.Charge
+					duel.Charge = math.min(
+						chargeRule.Max,
+						(duel.Charge or 0) + (if heavy then chargeRule.OnHeavy else chargeRule.OnHit)
+					)
 					-- Its gear's on-hit effects (Sunder, Slow), as yours land.
 					if duel.Kit then
 						CombatServer.rivalHitEffects(owner, duel.Kit.Effects)
@@ -1672,12 +1678,12 @@ function spawnRival(owner: Player, raid, encounter)
 		Kit = rivalKit,
 		Crit = Combat.critChance(rating(mine, "Speed"), rivalEffects.CritAdd),
 		HeavyCrit = rules.HeavyCrit,
-		Speed = Classes.walkSpeed(rating(mine, "Speed")) + (rivalEffects.SpeedAdd or 0),
+		Speed = Classes.combatSpeed(rating(mine, "Speed")) + (rivalEffects.SpeedAdd or 0),
 		SwingCooldown = rules.BasicCooldown,
 		Rate = if sparring then rules.BasicCooldown * 1.35 else rules.BasicCooldown,
 		-- Its own Stamina and Charge, by the same rules as yours.
 		Stamina = Tech.Resources.Stamina.Max,
-		Charge = Tech.Resources.Charge.Max,
+		Charge = Tech.Resources.Charge.Start,
 		ResourceAt = os.clock(),
 		StaminaRestUntil = 0,
 		Action = nil,
@@ -1841,7 +1847,7 @@ function spawnRival(owner: Player, raid, encounter)
 		Name = owner.DisplayName,
 		Health = math.floor(ownerHumanoid and ownerHumanoid.MaxHealth or 300),
 		Hit = math.floor(playerHit * Combat.defenseMult(enemy.DefenseRating) * enemy.TakenMult + 0.5), -- after its armour
-		Speed = math.floor(ownerHumanoid and ownerHumanoid.WalkSpeed or 16),
+		Speed = math.floor(Classes.combatSpeed(rating(theirs, "Speed")) * 10 + 0.5) / 10, -- your speed in the fight
 		Element = ownerLoadout.WeaponGem and ownerLoadout.WeaponGem.Element,
 		Armor = ElementMatchup.profile(ownerLoadout),
 		Surges = yourSurges,

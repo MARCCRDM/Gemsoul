@@ -119,7 +119,7 @@ end
 local function state(player)
 	if not states[player] then
 		states[player] = {
-			Resources = { Stamina = 100, Charge = 100 },
+			Resources = { Stamina = 100, Charge = Tech.Resources.Charge.Start },
 			ResourceAt = os.clock(),
 			TechCooldowns = {},
 			NextTech = 0,
@@ -975,6 +975,11 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	end
 	if damage > 0 then
 		weaponPerksOnHit(source, k, st, target, damage, guarded)
+		-- Landing the weapon builds Charge for your surges (with a gem to use it).
+		if not guarded and Tech.hasGem(k.Loadout) then
+			local rule = Tech.Resources.Charge
+			st.Resources.Charge = math.min(rule.Max, st.Resources.Charge + (if heavy then rule.OnHeavy else rule.OnHit))
+		end
 	end
 	if combo and damage > 0 then
 		comboLanded(source, target, combo)
@@ -1708,6 +1713,9 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	end
 	-- A short lockout (Recovery) for everything, and this ability's own cooldown.
 	local recovery = definition.Recovery * (k.Effects.CooldownMult or 1)
+	if definition.Resource == "Charge" then
+		recovery = math.max(recovery, Tech.SurgeLockout)
+	end
 	local cooldown = math.max(recovery, (definition.Cooldown or definition.Recovery) * (k.Effects.CooldownMult or 1))
 	st.TechCooldowns[cooldownKey], st.NextTech = now + cooldown, now + recovery
 	st.NextAttack = math.max(st.NextAttack, st.NextTech)
@@ -2118,7 +2126,7 @@ local function tick(dt)
 				end
 			end
 		end
-		local speed = Classes.walkSpeed(rating(k, "Speed")) * k.Effects.MobilityMult
+		local speed = Classes.combatSpeed(rating(k, "Speed")) * k.Effects.MobilityMult
 		-- Casting: rooted through a wind-up, slowed while a beam pours out or
 		-- just after a throw (Actions.castMovement).
 		local casting = if st.Channel
@@ -2229,7 +2237,7 @@ function CombatServer.reset(player)
 	player:SetAttribute("CombatCharging", false)
 	player:SetAttribute("Channeling", false)
 	player:SetAttribute("Stamina", 100)
-	player:SetAttribute("Charge", 0)
+	player:SetAttribute("Charge", Tech.Resources.Charge.Start)
 end
 function CombatServer.start()
 	Enemies.hitPlayer = function(player, amount, element, enemy, heavy, crit)

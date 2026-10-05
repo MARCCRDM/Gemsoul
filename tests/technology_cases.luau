@@ -26,7 +26,10 @@ local function reset()
 	loadout.WeaponGem, loadout.ArmorGem = nil, nil
 	loadout.Surge1Gem, loadout.Surge2Gem, loadout.Surge3Gem = nil, nil, nil
 	wallBlocks = false
-	return CombatServer._state(source)
+	local st = CombatServer._state(source)
+	-- A fight starts part-charged; the checks below measure each spend from full.
+	st.Resources.Charge = Tech.Resources.Charge.Max
+	return st
 end
 local function fire(id)
 	return CombatServer._technology(source, id, rv.Position)
@@ -223,6 +226,14 @@ st.Resources.Stamina = 14
 check(not CombatServer._dodge(source, Vector3.new(0, 0, -1)), "Free ordinary dodge")
 st = reset()
 check(not cast("Q") and st.Resources.Charge == 100, "Empty surge slot consumed Charge")
+-- The Charge economy: a fight starts part-full; surges can't follow each other
+-- faster than the lockout, however short their own recovery.
+CombatServer.reset(source)
+check(CombatServer._state(source).Resources.Charge == Tech.Resources.Charge.Start, "A fight starts at Charge.Start")
+st = reset()
+surgeGem("Shock", 1, 3, { Clarity = 10 })
+check(cast("Q") and st.NextTech - now >= Tech.SurgeLockout - 1e-6, "Surge lockout floor")
+st = reset()
 check(not fire("ThermalBurst"), "Surge cast as a learned technique")
 surgeGem("Fire", 1)
 check(not cast("E"), "Surge from an empty slot")
@@ -262,7 +273,8 @@ check(
 	hv.Health < health
 		and close(
 			st.Resources.Charge,
-			math.min(Tech.Resources.Charge.Max, charge + 0.25 * 7) - Tech.Catalog.CryoStream.Cost * 0.25
+			math.min(Tech.Resources.Charge.Max, charge + 0.25 * Tech.Resources.Charge.Regen)
+				- Tech.Catalog.CryoStream.Cost * 0.25
 		),
 	"Stream pulse billing or damage"
 )
@@ -294,7 +306,11 @@ surgeGem("Fire", 1)
 st.Resources.Stamina, st.Resources.Charge = 50, 50
 now += 0.5
 CombatServer._tick(0.5)
-check(close(st.Resources.Stamina, 56) and close(st.Resources.Charge, 53.5), "Resource regeneration")
+check(
+	close(st.Resources.Stamina, 50 + 0.5 * Tech.Resources.Stamina.Regen)
+		and close(st.Resources.Charge, 50 + 0.5 * Tech.Resources.Charge.Regen),
+	"Resource regeneration"
+)
 loadout.Surge1Gem = nil
 now += 0.1
 CombatServer._tick(0.1)
@@ -412,8 +428,8 @@ check(close((1000 - hv.Health) / plain, 1.3 / 1.12), "Gem Size damage")
 local clear = Tech.surgeStats({ Id = "f", Element = "Frost", SurgeTier = 1, SurgeRank = 1, Clarity = 10 })
 local cloudy = Tech.surgeStats({ Id = "f", Element = "Frost", SurgeTier = 1, SurgeRank = 1, Clarity = 1 })
 check(
-	close(clear.Stun, 0.7)
-		and close(cloudy.Stun, 0.52)
+	close(clear.Stun, Tech.Catalog.CryoLance.Stun * 1.4)
+		and close(cloudy.Stun, Tech.Catalog.CryoLance.Stun * 1.04)
 		and clear.Recovery < cloudy.Recovery
 		and clear.Range > cloudy.Range,
 	"Gem Clarity duration, recovery and reach"

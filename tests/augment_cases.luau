@@ -127,8 +127,8 @@ loadout.WeaponGem = { Element = "Fire", Size = 4, Clarity = 5, Cut = 5 }
 st.Resources.Stamina, st.Resources.Charge, st.ResourceAt = 50, 50, now
 st.StaminaRestUntil = 0 -- past the swing's regen pause (Actions.Stamina.RegenDelay)
 now += 0.5; CombatServer._tick(0.5)
-check(close(st.Resources.Stamina, 56.9) and close(st.Resources.Charge, 54.025), "Live recyclers did not change regeneration")
-local expectedSpeed = Classes.walkSpeed(Classes.ratings(loadout).Speed.Base + Classes.ratings(loadout).Speed.Bonus) * 1.05
+check(close(st.Resources.Stamina, 56.9) and close(st.Resources.Charge, 50 + 0.5 * Tech.Resources.Charge.Regen * 1.15), "Live recyclers did not change regeneration")
+local expectedSpeed = Classes.combatSpeed(Classes.ratings(loadout).Speed.Base + Classes.ratings(loadout).Speed.Bonus) * 1.05
 check(close(hs.WalkSpeed, expectedSpeed), "Live mobility augment did not change movement")
 now += 2
 hv.Health = 1000

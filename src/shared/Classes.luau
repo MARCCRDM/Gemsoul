@@ -1301,6 +1301,14 @@ function Classes.walkSpeed(speedRating: number): number
 	return math.max(12 + speedRating * 0.1, 12)
 end
 
+-- Speed in a fight: slower and closer together than walking about, so
+-- spacing and footwork matter and better gear is an edge, not an escape
+-- (about 13 for starter gear, at most 16).
+Classes.CombatSpeedMax = 16
+function Classes.combatSpeed(speedRating: number): number
+	return math.clamp(11 + speedRating * 0.05, 11, Classes.CombatSpeedMax)
+end
+
 function Classes.maxHealth(healthRating: number): number
 	return math.floor(60 + healthRating * 0.6)
 end
