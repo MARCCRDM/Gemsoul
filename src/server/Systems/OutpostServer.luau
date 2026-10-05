@@ -4,7 +4,7 @@
 	rocks, sees each other swing, trades at the Probe and challenges each
 	other to duels. Request actions:
 
-	  "OutpostEnter"           go to the Outpost (a free Survey Pick each day)
+	  "OutpostEnter"           go to the Outpost (the free Survey Pick recharges)
 	  "OutpostLeave"           back to base
 	  "OutpostHit", nodeId     swing at a rock (wears your pick; the last hit
 	                           pops it and pays out)
@@ -53,10 +53,6 @@ local lastSwing: { [Player]: number } = {}
 local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
-local function today(): number
-	return math.floor(os.time() / 86400)
-end
-
 -- A player's Outpost record, the free pick's regained swings added, a
 -- working pick in hand.
 local function record(profile)
@@ -100,10 +96,10 @@ local function stateOf(player: Player)
 		Rocks = o.Rocks,
 		Secrets = secrets,
 		SecretsTotal = #Rules.SecretOrder,
-		-- Seconds until the free pick regains its next swing (nil when full).
-		NextSwingIn = if (o.Picks.Survey or 0) < Rules.Picks.Survey.Swings
-			then math.max(0, (o.SurveyAt or os.time()) + Rules.FreeSwingSeconds - os.time())
-			else nil,
+		-- The free pick's charge clock (Outpost.surveyCharge projects it), and
+		-- seconds until its next swing (nil when full).
+		SurveyAt = o.SurveyAt,
+		NextSwingIn = select(2, Rules.surveyCharge(o.Picks.Survey or 0, o.SurveyAt or os.time(), os.time())),
 	}
 end
 
@@ -354,9 +350,14 @@ local function hit(player: Player, nodeId: any)
 	local o = record(profile)
 	local pickId = o.Active
 	if (o.Picks[pickId] or 0) <= 0 then
+		local _, nextIn = Rules.surveyCharge(o.Picks.Survey or 0, o.SurveyAt or os.time(), os.time())
 		return reply(
 			false,
-			"Your pick is broken! Get a new one at the Probe.",
+			if pickId == "Survey" and nextIn
+				then "Free pick recharging: +1 swing in "
+					.. Rules.clock(nextIn)
+					.. ". Buy a pick at the Probe to keep mining."
+				else "Your pick is broken! Get a new one at the Probe.",
 			{ NoPick = true, State = stateOf(player) }
 		)
 	end

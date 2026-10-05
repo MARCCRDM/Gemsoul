@@ -65,8 +65,8 @@ type Profile = {
 	Crates: { [string]: number }, -- unopened crates
 	Boosts: { XPUntil: number }, -- os.time() when 2x XP ends
 	Duel: { Rating: number, Wins: number, Losses: number, Streak: number, Played: number?, RivalWins: number? }?, -- arena duels (see Duels); Played counts rival duels too
-	-- Saga Outpost mining: swings left on each pick, the one in hand, the
-	-- day the free Survey Pick was last issued, rocks mined (see OutpostServer).
+	-- Saga Outpost mining: swings left on each pick, the one in hand, when
+	-- the free Survey Pick's charge clock started, rocks mined (see OutpostServer).
 	Outpost: { Picks: { [string]: number }, Active: string, SurveyAt: number?, Rocks: number }?,
 	Session: { JobId: string, Time: number }?, -- which server owns this save (see SessionLock)
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle

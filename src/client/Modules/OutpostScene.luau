@@ -28,6 +28,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
@@ -46,6 +47,7 @@ local OutpostScene = {}
 local NODE_TAG = "OutpostNode"
 local active, busy = false, false
 local state = nil -- picks and record, from the server
+local probeCharge = nil -- the free pick's meter at PROBE-7, while drawn
 local finds = { Gems = 0, Coins = 0, Gear = 0, Rocks = 0 }
 local nextSwing = 0
 local hiddenDashboard: ScreenGui? = nil
@@ -140,7 +142,7 @@ hud.IgnoreGuiInset = true
 hud.Enabled = false
 local card = new("Frame", {
 	Position = UDim2.fromOffset(16, 70),
-	Size = UDim2.fromOffset(300, 196),
+	Size = UDim2.fromOffset(300, 240),
 	BackgroundColor3 = Color3.fromRGB(14, 18, 30),
 	BackgroundTransparency = 0.12,
 }, hud)
@@ -182,11 +184,14 @@ local track = new("Frame", {
 UiKit.round(track, 4)
 local fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = P.Gold }, track)
 UiKit.round(fill, 4)
-local findsLabel = text(card, "", 13, Color3.fromRGB(215, 228, 245), IronUi.Bold, 14, 96, 272, 18)
-local recordLabel = text(card, "", 11, Color3.fromRGB(150, 170, 195), IronUi.Body, 14, 116, 272, 14)
+-- The free pick's charge, always shown (with the free pick in hand it is
+-- the pick's bar too).
+local charge = ChargeMeter.new(card, 14, 94, 272)
+local findsLabel = text(card, "", 13, Color3.fromRGB(215, 228, 245), IronUi.Bold, 14, 144, 272, 18)
+local recordLabel = text(card, "", 11, Color3.fromRGB(150, 170, 195), IronUi.Body, 14, 164, 272, 14)
 local buttons = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(14, 142),
+	Position = UDim2.fromOffset(14, 188),
 	Size = UDim2.fromOffset(272, 40),
 }, card)
 UiKit.list(buttons, 8, true)
@@ -206,6 +211,22 @@ hint.AnchorPoint = Vector2.new(0.5, 1)
 hint.Position = UDim2.new(0.5, 0, 1, -18)
 hint.TextStrokeTransparency = 0.4
 
+-- The free pick's charge ticks up between server updates.
+local function refreshCharge()
+	if not state then
+		return
+	end
+	local swings, nextIn, progress = ChargeMeter.read(state.Picks, state.SurveyAt)
+	charge.set(swings, nextIn, progress)
+	if probeCharge then
+		probeCharge.set(swings, nextIn, progress)
+	end
+	if state.Active == "Survey" then
+		pickSwings.Text = if swings > 0 then swings .. " swings" else "RECHARGING"
+		pickSwings.TextColor3 = if swings > 0 then ChargeMeter.Charging else P.Bad
+	end
+end
+
 local function refreshHud()
 	if not state then
 		return
@@ -213,11 +234,15 @@ local function refreshHud()
 	local id = state.Active
 	local spec = Rules.Picks[id] or Rules.Picks.Survey
 	local left = state.Picks[id] or 0
-	pickName.Text = spec.Name .. (if spec.Power > 1 then "  ×" .. spec.Power else "")
+	local free = id == "Survey"
+	pickName.Text = spec.Name .. (if free then "  · FREE" elseif spec.Power > 1 then "  ×" .. spec.Power else "")
 	pickSwings.Text = if left > 0 then left .. " swings" else "BROKEN"
 	pickSwings.TextColor3 = if left > 0 then P.Gold else Color3.fromRGB(255, 90, 90)
+	-- A bought pick wears out; the free one is the charge meter below.
+	track.Visible = not free
 	fill.Size = UDim2.fromScale(math.clamp(left / spec.Swings, 0, 1), 1)
 	fill.BackgroundColor3 = if left / spec.Swings > 0.3 then spec.Color else Color3.fromRGB(255, 110, 90)
+	refreshCharge()
 	findsLabel.Text = string.format(
 		"This trip: %d gem%s · %d coins · %d gear",
 		finds.Gems,
@@ -226,13 +251,10 @@ local function refreshHud()
 		finds.Gear
 	)
 	recordLabel.Text = string.format(
-		"%d rocks mined · secrets %d/%d · %s",
+		"%d rocks mined · secrets %d/%d",
 		state.Rocks or 0,
 		state.Secrets or 0,
-		state.SecretsTotal or #Rules.SecretOrder,
-		if state.NextSwingIn
-			then string.format("free pick +1 swing in %d:%02d", state.NextSwingIn // 60, state.NextSwingIn % 60)
-			else "free pick full"
+		state.SecretsTotal or #Rules.SecretOrder
 	)
 end
 
@@ -759,7 +781,14 @@ function OutpostScene.swing(nodeId: number?)
 			return
 		end
 		if result.PickBroke then
-			UiKit.toast("Your " .. result.PickBroke .. " broke! Get another at PROBE-7.", P.Bad)
+			UiKit.toast(
+				if result.PickBroke == Rules.Picks.Survey.Name
+					then "Free pick out of charge! +1 swing every "
+						.. Rules.FreeSwingSeconds // 60
+						.. " min, or buy a pick at PROBE-7."
+					else "Your " .. result.PickBroke .. " broke! Get another at PROBE-7.",
+				P.Bad
+			)
 			sound(CLANG, 0.6, 0.6)
 			sound(THUD, 0.5, 0.5)
 		end
@@ -784,6 +813,7 @@ local probeBody = new("Frame", {
 }, probe.Panel)
 local function drawProbe()
 	probeBody:ClearAllChildren()
+	probeCharge = nil
 	if not state then
 		return
 	end
@@ -802,7 +832,19 @@ local function drawProbe()
 			box
 		)
 		text(box, spec.Name, 20, spec.Color, IronUi.Heading, 14, 12, 210, 24)
-		text(box, string.format("%d swings", spec.Swings), 14, Color3.new(1, 1, 1), IronUi.Bold, 14, 44, 210, 18)
+		text(
+			box,
+			if spec.Price > 0
+				then string.format("%d swings", spec.Swings)
+				else string.format("%d swings · recharges", spec.Swings),
+			14,
+			Color3.new(1, 1, 1),
+			IronUi.Bold,
+			14,
+			44,
+			210,
+			18
+		)
 		text(
 			box,
 			if spec.Power > 1 then "Chips 2 layers a swing" else "Chips 1 layer a swing",
@@ -827,7 +869,10 @@ local function drawProbe()
 		)
 		text(
 			box,
-			if owned > 0 then string.format("You have: %d swings", owned) else "You have none",
+			if spec.Price == 0
+				then string.format("Free · +1 swing every %d min", Rules.FreeSwingSeconds // 60)
+				elseif owned > 0 then string.format("You have: %d swings", owned)
+				else "You have none",
 			13,
 			if owned > 0 then P.Good else Color3.fromRGB(150, 160, 180),
 			IronUi.Bold,
@@ -854,7 +899,7 @@ local function drawProbe()
 			end)
 			buy.Position, buy.Size = UDim2.fromOffset(14, 150), UDim2.fromOffset(202, 38)
 		else
-			text(box, "Free: issued every day", 13, P.Gold, IronUi.Bold, 14, 160, 210, 18)
+			probeCharge = ChargeMeter.new(box, 14, 144, 202)
 		end
 		if owned > 0 and state.Active ~= id then
 			local equip = IronUi.gemButton(box, "TAKE IN HAND", Color3.fromRGB(110, 120, 140), function()
@@ -882,6 +927,7 @@ function OutpostScene.openProbe()
 	probe.Gui.Enabled = true
 	probe.Fit()
 	drawProbe()
+	refreshCharge()
 end
 
 -- Prompts: rocks, the Probe, the gate, other miners -----------------------------------------------------
@@ -1095,6 +1141,14 @@ for _, model in CollectionService:GetTagged(NODE_TAG) do
 	watchRock(model)
 end
 CollectionService:GetInstanceAddedSignal(NODE_TAG):Connect(watchRock)
+task.spawn(function()
+	while true do
+		task.wait(1)
+		if active then
+			refreshCharge()
+		end
+	end
+end)
 RunService.RenderStepped:Connect(function()
 	if not active then
 		return

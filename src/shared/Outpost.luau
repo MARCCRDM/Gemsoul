@@ -245,4 +245,25 @@ function Outpost.refillSurvey(swings: number, since: number, now: number): (numb
 	return total, if total >= full then now else since + gained * Outpost.FreeSwingSeconds
 end
 
+-- The free pick as a charge at `now`: swings, seconds until the next one
+-- (nil when full) and the progress toward it (0..1, 1 when full).
+function Outpost.surveyCharge(swings: number, since: number, now: number): (number, number?, number)
+	local full = Outpost.Picks.Survey.Swings
+	local charged, from = Outpost.refillSurvey(swings, since, now)
+	if charged >= full then
+		return charged, nil, 1
+	end
+	local into = math.clamp(now - from, 0, Outpost.FreeSwingSeconds)
+	return charged, math.max(0, math.ceil(Outpost.FreeSwingSeconds - into)), into / Outpost.FreeSwingSeconds
+end
+
+-- "1:42" (or "1:59:36") for a countdown in seconds.
+function Outpost.clock(seconds: number): string
+	seconds = math.max(0, math.floor(seconds))
+	if seconds >= 3600 then
+		return string.format("%d:%02d:%02d", seconds // 3600, seconds // 60 % 60, seconds % 60)
+	end
+	return string.format("%d:%02d", seconds // 60, seconds % 60)
+end
+
 return Outpost

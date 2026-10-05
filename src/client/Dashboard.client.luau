@@ -20,6 +20,7 @@ local TradeUI = require(script.Parent.Modules.TradeUI)
 require(script.Parent.Modules.ChatFrame)
 local OutpostScene = require(script.Parent.Modules.OutpostScene)
 local OutpostRules = require(ReplicatedStorage.Shared.Outpost)
+local ChargeMeter = require(script.Parent.Modules.ChargeMeter)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local MineScene = require(script.Parent.Modules.MineScene)
@@ -397,15 +398,17 @@ local mineTitle = label(mine, "SAGA OUTPOST", 26, P.Text, IronUi.Heading)
 place(mineTitle, 18, 28, 240, 32)
 local mineLine1 = label(mine, "", 14, P.Text, IronUi.Body)
 place(mineLine1, 20, 64, 250, 20)
-local mineLine2 = label(mine, "", 12, P.Dim, IronUi.Body)
+local mineLine2 = label(mine, "", 12, ChargeMeter.Charging, IronUi.Bold)
 place(mineLine2, 20, 84, 250, 18)
+-- The free pick's charge.
 local allowanceTrack = new("Frame", {
 	BackgroundColor3 = P.Slot,
 	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(20, 104),
-	Size = UDim2.fromOffset(236, 3),
+	Position = UDim2.fromOffset(20, 102),
+	Size = UDim2.fromOffset(236, 5),
 }, mine)
 UiKit.round(allowanceTrack, 2)
+local allowanceGlow = new("UIStroke", { Color = ChargeMeter.Charged, Thickness = 1, Transparency = 1 }, allowanceTrack)
 local allowanceFill = new("Frame", {
 	BackgroundColor3 = P.Gold,
 	BorderSizePixel = 0,
@@ -595,6 +598,35 @@ local function commas(n: number): string
 	end
 end
 
+-- Saga Outpost: the pick in hand, and the free pick's charge (ticks below).
+local function refreshMining(profile)
+	local outpost = profile.Outpost
+	local charged, nextIn = ChargeMeter.read(outpost and outpost.Picks, outpost and outpost.SurveyAt)
+	local pickId = outpost and outpost.Active or "Survey"
+	local pick = OutpostRules.Picks[pickId] or OutpostRules.Picks.Survey
+	local swings = if pickId == "Survey" then charged elseif outpost then outpost.Picks[pickId] or 0 else 0
+	local rocks = outpost and outpost.Rocks or 0
+	mineLine1.Text = if pickId ~= "Survey" and swings > 0
+		then string.format("%s · %d swings", pick.Name, swings)
+		elseif charged > 0 then string.format("Free pick ready · %d rocks mined", rocks)
+		else "Out of swings · picks at PROBE-7"
+	mineLine2.Text = if nextIn
+		then string.format("⚡ Free pick %d/%d · +1 in %s", charged, ChargeMeter.Full, OutpostRules.clock(nextIn))
+		else string.format("⚡ Free pick %d/%d · fully charged", charged, ChargeMeter.Full)
+	mineLine2.TextColor3 = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
+	allowanceFill.Size = UDim2.fromScale(math.clamp(charged / ChargeMeter.Full, 0, 1), 1)
+	allowanceFill.BackgroundColor3 = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
+	allowanceGlow.Transparency = if nextIn then 1 else 0.2
+end
+task.spawn(function()
+	while true do
+		task.wait(1)
+		if GemClient.Profile then
+			refreshMining(GemClient.Profile)
+		end
+	end
+end)
+
 local function refresh(profile)
 	if not profile then
 		return
@@ -627,20 +659,7 @@ local function refresh(profile)
 	end
 	readinessValue.Text = string.format("%d/6 equipped   ·   %d/3 surges", equipped, surges)
 	readinessValue.TextColor3 = if equipped == 6 and surges == 3 then P.Teal else P.Gold
-	-- Saga Outpost: the pick in hand and its swings (a free Survey Pick daily).
-	local outpost = profile.Outpost
-	local pickId = outpost and outpost.Active or "Survey"
-	local pick = OutpostRules.Picks[pickId] or OutpostRules.Picks.Survey
-	local swings = if outpost then outpost.Picks[pickId] or 0 else pick.Swings
-	allowanceFill.Size = UDim2.fromScale(math.clamp(swings / pick.Swings, 0, 1), 1)
-	allowanceFill.BackgroundColor3 = if swings > 0 then pick.Color else P.Dim
-	mineLine1.Text = if swings > 0
-		then string.format("%s · %d swings left", pick.Name, swings)
-		else "Pick broken: a new one at PROBE-7"
-	local rocks = outpost and outpost.Rocks or 0
-	mineLine2.Text = if rocks > 0
-		then string.format("%d rocks mined · shared basin", rocks)
-		else "Mine with everyone · trade · duel"
+	refreshMining(profile)
 	for key, socket in surgeSockets do
 		local gem = Tech.surgeGem(profile.Character, key)
 		local definition = gem and Tech.surgeStats(gem)

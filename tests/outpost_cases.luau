@@ -252,6 +252,17 @@ do
 	check(s == full, "Free pick overfilled")
 	local _, waiting = Rules.refillSurvey(full, 0, 500)
 	check(waiting == 500, "A full free pick kept its clock running")
+	-- As a charge: 10 swings, 30s into the next one.
+	local swings, nextIn, progress = Rules.surveyCharge(10, 1000, 1000 + 30)
+	check(swings == 10 and nextIn == step - 30 and math.abs(progress - 30 / step) < 1e-9, "Charge reading wrong")
+	swings, nextIn, progress = Rules.surveyCharge(10, 1000, 1000 + step * 2 + 1)
+	check(swings == 12 and nextIn == step - 1, "Charge didn't count regained swings")
+	swings, nextIn, progress = Rules.surveyCharge(full, 0, 999)
+	check(swings == full and nextIn == nil and progress == 1, "A full charge still counts down")
+	check(
+		Rules.clock(102) == "1:42" and Rules.clock(-3) == "0:00" and Rules.clock(7176) == "1:59:36",
+		"Clock text wrong"
+	)
 end
 for _, id in Rules.SizeOrder do
 	local s = Rules.Sizes[id]
@@ -444,6 +455,10 @@ local first = handlers.OutpostHit(ana, target.Id)
 check(first.Ok and first.Hp < target.MaxHp, "A swing didn't chip the rock")
 check(first.State.Picks.Survey == Rules.Picks.Survey.Swings - 1, "The swing didn't wear the pick")
 check(
+	first.State.SurveyAt ~= nil and first.State.NextSwingIn == Rules.FreeSwingSeconds,
+	"The HUD didn't get the charge clock"
+)
+check(
 	target.Model:GetAttribute("LastHitBy") == 1 and target.Model:GetAttribute("ClaimedBy") == 1,
 	"Others can't see who's mining it"
 )
@@ -576,5 +591,5 @@ check(
 print(
 	"PASS: "
 		.. checks
-		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, daily pick, secrets, enter/leave)"
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, free pick charge, secrets, enter/leave)"
 )
