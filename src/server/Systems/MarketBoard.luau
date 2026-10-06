@@ -31,6 +31,7 @@ local Rules = require(ReplicatedStorage.Shared.Market)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local Equipment = require(script.Parent.Equipment)
 
 local MarketBoard = {}
 
@@ -367,6 +368,27 @@ end
 
 local handlers = {}
 
+-- 3D pictures of the gear on the board and of offers on your listings
+-- (Equipment.marketPreviews: "Slot|M:<listing>" and "Slot|M:<listing>:<offer>").
+function handlers.MarketPreviews(player: Player)
+	local items, count = {}, 0
+	local function add(tag, payload)
+		if payload and payload.Kind == "Gear" and count < 40 then
+			items[tag] = payload
+			count += 1
+		end
+	end
+	for _, row in browse() do
+		add(row.Id, row.Item)
+		if row.Seller == player.UserId then
+			for _, offer in row.Offers or {} do
+				add(row.Id .. ":" .. offer.Id, offer.Item)
+			end
+		end
+	end
+	return Shop.reply(true, "", { Done = Equipment.marketPreviews(player, items) })
+end
+
 function handlers.MarketBrowse(player: Player)
 	local rows = browse()
 	return Shop.reply(true, "", { Listings = rows, Shared = getBoard().Shared, Now = os.time() })
@@ -693,7 +715,7 @@ function MarketBoard.start()
 			if closed then
 				return Shop.reply(false, "The Market is closed for this playtest.")
 			end
-			if action ~= "MarketBrowse" and not mayTrade(player) then
+			if action ~= "MarketBrowse" and action ~= "MarketPreviews" and not mayTrade(player) then
 				return Shop.reply(false, "The Market needs your save to be working. Rejoin and try again.")
 			end
 			local args = table.pack(...)

@@ -76,7 +76,7 @@ for _ = 1, 20000 do
 end
 assert(prismatic > 120 and prismatic < 290, "Prismatic isn't about 1 in 100: " .. prismatic .. " of 20000")
 local identity = GearRolls.identity({ Finish = 5, Prismatic = true, Serial = 12, FoundBy = "Marc" })
-assert(identity == "Solar Gold finish  ·  ✦ PRISMATIC  ·  #12  ·  Found by Marc", "Identity line wrong: " .. identity)
+assert(identity == "Solar Gold finish  ·  ✦ PRISMATIC  ·  #12  ·  Original owner: Marc", "Identity line wrong: " .. identity)
 assert(GearRolls.identity({ Finish = 1 }) == "Ember Copper finish", "A plain roll's identity line wrong")
 local visorSeen = {}
 local visorRng = Random.new(59123)

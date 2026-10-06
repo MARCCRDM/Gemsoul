@@ -245,12 +245,46 @@ local function resetQuotaIfNeeded(profile: Profile)
 end
 
 -- Push the profile to the leaderboard, attributes and the owning client.
+-- Where things came from: every gem remembers who mined it (MinedBy) and
+-- every piece of gear its original owner (roll.FoundBy). Stamped the first
+-- time an item reaches a profile, then carried through trades and the Market.
+local function stampOrigins(player: Player, profile: Profile)
+	local name, now = player.DisplayName, os.time()
+	local function gem(g)
+		if type(g) == "table" and g.Id and g.MinedBy == nil then
+			g.MinedBy, g.MinedById, g.MinedAt = name, player.UserId, g.Found or now
+		end
+	end
+	for _, g in profile.Gems do
+		gem(g)
+	end
+	local c = profile.Character
+	for key, value in c do
+		if type(key) == "string" and string.sub(key, -3) == "Gem" then
+			gem(value)
+		end
+	end
+	for _, list in c.ItemGems or {} do
+		for _, g in list do
+			gem(g)
+		end
+	end
+	for _, rolls in c.GearRolls or {} do
+		for _, roll in rolls do
+			if type(roll) == "table" and roll.FoundBy == nil then
+				roll.FoundBy, roll.FoundById, roll.FoundAt = name, player.UserId, now
+			end
+		end
+	end
+end
+
 local function sync(player: Player)
 	local profile = profiles[player]
 	if not profile then
 		return
 	end
 	resetQuotaIfNeeded(profile)
+	stampOrigins(player, profile)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
 		leaderstats.Coins.Value = profile.Coins

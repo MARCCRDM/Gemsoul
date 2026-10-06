@@ -822,7 +822,15 @@ local function gemLines(gem)
 		gist.AutomaticSize = Enum.AutomaticSize.None
 		gist.Position, gist.Size = UDim2.fromOffset(0, 104), UDim2.new(1, 0, 0, 34)
 		gist.TextYAlignment = Enum.TextYAlignment.Top
-		local worth = text(info, string.format("Worth %d coins", GemConfig.value(gem)), 11, P.Gold, BOLD)
+		local worth = text(
+			info,
+			string.format("Worth %d coins", GemConfig.value(gem))
+				.. (if gem.MinedBy then "  ·  Mined by " .. gem.MinedBy else ""),
+			11,
+			P.Gold,
+			BOLD
+		)
+		worth.TextTruncate = Enum.TextTruncate.AtEnd
 		worth.AutomaticSize = Enum.AutomaticSize.None
 		worth.Position, worth.Size = UDim2.fromOffset(0, 142), UDim2.new(1, 0, 0, 16)
 		local surge = gem.Cut and Tech.surgeStats(gem)

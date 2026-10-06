@@ -11,6 +11,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -20,6 +21,7 @@ local Rules = require(ReplicatedStorage.Shared.Market)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GearArt = require(script.Parent.GearArt)
+local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -57,6 +59,7 @@ local listings, shared, serverNow, fetchedAt = {}, true, os.time(), 0
 local sellPick = nil -- { Kind, Slot?, Id }
 local sellMode, sellPrice, sellWant = "Sell", 100, "Any"
 local offerFor = nil -- a listing we're picking an offer for
+local inspect = nil -- a listing shown up close
 local busy = false
 local draw
 
@@ -193,19 +196,38 @@ local function itemLine(payload): string
 		.. (if payload.Gem then "  ·  ◆ socketed" else "")
 end
 
-local function itemIcon(parent, payload, x, y, size)
+-- The item's picture. Gems are drawn in 3D from their data; gear comes
+-- from the server's 3D previews: your own pieces by their key, Market
+-- pieces as "M:<listing>[:<offer>]" (MarketPreviews). A drawn silhouette
+-- stands in until a preview arrives.
+local function itemIcon(parent, payload, x, y, size, preview: string?)
 	local stage = new("Frame", {
 		BackgroundColor3 = itemColor(payload):Lerp(P.Frame, 0.78),
 		Position = UDim2.fromOffset(x, y),
 		Size = UDim2.fromOffset(size, size),
+		ClipsDescendants = true,
 	}, parent)
 	UiKit.round(stage, 8)
 	new("UIStroke", { Color = itemColor(payload), Thickness = 1.5, Transparency = 0.2 }, stage)
 	if payload.Kind == "Gem" then
-		local swatch = UiKit.swatch(stage, GemConfig.shade(payload.Gem), math.floor(size * 0.46))
-		swatch.AnchorPoint = Vector2.new(0.5, 0.5)
-		swatch.Position = UDim2.fromScale(0.5, 0.5)
-	else
+		local ok = pcall(GemArt.viewport, stage, payload.Gem, size >= 120)
+		if not ok then
+			local swatch = UiKit.swatch(stage, GemConfig.shade(payload.Gem), math.floor(size * 0.46))
+			swatch.AnchorPoint = Vector2.new(0.5, 0.5)
+			swatch.Position = UDim2.fromScale(0.5, 0.5)
+		end
+		return stage
+	end
+	local view = new("ViewportFrame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Ambient = Color3.fromRGB(185, 190, 210),
+		LightColor = Color3.fromRGB(255, 235, 201),
+		LightDirection = Vector3.new(-0.4, -1, -0.6),
+	}, stage)
+	local drawn = preview ~= nil and GearArt.draw(view, payload.Slot, preview, false)
+	view.Visible = drawn == true
+	if not drawn then
 		local holder = new("Frame", {
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -219,6 +241,131 @@ local function itemIcon(parent, payload, x, y, size)
 		end
 	end
 	return stage
+end
+
+-- Everything there is to know about a piece, line by line, in the
+-- inventory's style: stats in green, the perk in gold, affixes and the
+-- socket in their element's colour, then the roll's finish and serial.
+local function detailLines(payload)
+	local lines = {}
+	local function add(value, size, color, font)
+		table.insert(lines, { value, size, color, font or BODY })
+	end
+	if payload.Kind == "Gem" then
+		local gem = payload.Gem
+		add(GemConfig.displayName(gem), 16, itemColor(payload), BOLD)
+		add(
+			(GemConfig.TierLabels[gem.Tier] or gem.Tier) .. " gem  ·  " .. GemConfig.elementName(gem.Element),
+			12,
+			P.Dim,
+			BOLD
+		)
+		local surge = surgeName(gem)
+		add(
+			if surge then "Power: " .. surge .. " (on Q · E · R)" else "Rough: cut it to unlock its power",
+			13,
+			P.Gold,
+			BOLD
+		)
+		for _, metric in GemConfig.MetricOrder do
+			local grade = gem[metric]
+			if grade then
+				add(
+					string.format(
+						"%s %s/10  ·  %s",
+						GemConfig.MetricLabels[metric],
+						tostring(grade),
+						string.lower(GemConfig.MetricRoles[metric])
+					),
+					13,
+					P.Good,
+					BOLD
+				)
+			end
+		end
+		local ok, worth = pcall(GemConfig.value, gem)
+		if ok and worth then
+			add("Worth about " .. worth .. " coins", 12, P.Dim)
+		end
+		if gem.MinedBy then
+			add("Mined by " .. gem.MinedBy, 12, Color3.fromRGB(150, 160, 185))
+		end
+		if payload.Where then
+			add("Now " .. payload.Where .. " (listing takes it out)", 12, P.Dim)
+		end
+		return lines
+	end
+	local gear = gearOf(payload)
+	local roll = payload.Roll
+	local rarity = GearRolls.Rarities[roll and roll.Rarity or 1] or GearRolls.Rarities[1]
+	local def = Slots.Definitions[payload.Slot]
+	add(itemName(payload), 16, rarity.Color, BOLD)
+	add(
+		rarity.Name .. " " .. (def and def.Label or payload.Slot) .. "  ·  Quality " .. tostring(payload.Quality or 1),
+		12,
+		P.Dim,
+		BOLD
+	)
+	for _, stat in { "Health", "Power", "Defense", "Speed" } do
+		if roll and roll.Stats and roll.Stats[stat] then
+			add("+" .. roll.Stats[stat] .. " " .. stat, 14, P.Good, BOLD)
+		end
+	end
+	if gear and gear.Passive and gear.Passive.Text and gear.Passive.Text ~= "" then
+		add(gear.Passive.Name .. ": " .. gear.Passive.Text, 13, P.Gold)
+	end
+	for _, affix in roll and roll.Affixes or {} do
+		local affixDef = GemConfig.AffixById[affix.Id]
+		if affixDef then
+			add(
+				GemConfig.affixText(affix.Id, affix.Bonus),
+				13,
+				GemConfig.ElementColors[affixDef.Element] or P.Teal,
+				BOLD
+			)
+		end
+	end
+	if payload.Gem then
+		add(
+			"◆ " .. GemConfig.displayName(payload.Gem) .. "  (comes with it)",
+			13,
+			GemConfig.ElementColors[payload.Gem.Element] or P.Teal,
+			BOLD
+		)
+	else
+		add("◇ Empty gem socket", 13, P.Dim)
+	end
+	if roll then
+		local ok, identity = pcall(GearRolls.identity, roll)
+		if ok and identity then
+			add(identity, 11, Color3.fromRGB(150, 160, 185))
+		end
+	end
+	return lines
+end
+
+-- The details in a scrolling box.
+local function details(parent, payload, x, y, w, h, skipHeader: boolean?)
+	local box = scroller(parent, x, y, w, h)
+	UiKit.list(box, 3)
+	for i, line in detailLines(payload) do
+		if skipHeader and i <= 2 then
+			continue
+		end
+		new("TextLabel", {
+			BackgroundTransparency = 1,
+			Text = line[1],
+			TextSize = line[2],
+			TextColor3 = line[3],
+			Font = line[4],
+			Size = UDim2.fromOffset(w - 10, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			LayoutOrder = i,
+		}, box)
+	end
+	return box
 end
 
 -- Everything you could put up (not worn, not socketed), in payload shape.
@@ -291,6 +438,11 @@ end
 
 -- Requests -------------------------------------------------------------------------
 
+-- Redraw only when it can't wipe a price being typed.
+local function calm(): boolean
+	return window.Gui.Enabled and not busy and UserInputService:GetFocusedTextBox() == nil
+end
+
 local function refresh()
 	local result = GemClient.request("MarketBrowse")
 	if result.Ok then
@@ -351,8 +503,21 @@ local function listingCard(parent, row, order)
 	}, parent)
 	UiKit.round(card, 8)
 	new("UIStroke", { Color = itemColor(row.Item), Transparency = 0.45 }, card)
-	itemIcon(card, row.Item, 10, 10, 54)
+	itemIcon(card, row.Item, 10, 10, 54, "M:" .. row.Id)
 	label(card, itemName(row.Item), 14, itemColor(row.Item), BOLD, 72, 10, 124, 18)
+	-- Tap the card (above its button) to see everything about the piece.
+	local look = new("TextButton", {
+		Text = "",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(204, 118),
+		ZIndex = 4,
+	}, card)
+	look:SetAttribute("UiSound", "Tab")
+	IronUi.highlight(look)
+	look.Activated:Connect(function()
+		inspect = row
+		draw()
+	end)
 	local line = label(card, itemLine(row.Item), 11, P.Dim, BODY, 72, 28, 124, 30)
 	line.TextWrapped = true
 	line.TextYAlignment = Enum.TextYAlignment.Top
@@ -464,12 +629,62 @@ local function drawBrowse()
 	end
 end
 
+-- One listing up close: the piece in 3D, everything about it, and what
+-- you can do with it.
+local function drawInspect()
+	local row = inspect
+	local box = panel(content, 0, 0, 860, 490)
+	itemIcon(box, row.Item, 16, 16, 260, if row.Item.Kind == "Gear" then "M:" .. row.Id else nil)
+	details(box, row.Item, 296, 16, 430, 456)
+	button(box, "BACK", Color3.fromRGB(80, 84, 110), 744, 16, 100, 34, function()
+		inspect = nil
+		draw()
+	end)
+	label(box, "Listed by " .. (row.SellerName or "?") .. "  ·  " .. timeLeft(row), 13, P.Dim, BODY, 16, 290, 260, 18)
+	if row.Mode == "Sell" then
+		label(box, tostring(row.Price) .. " coins", 26, P.Gold, BOLD, 16, 316, 260, 32)
+	else
+		label(box, "⇄ FOR TRADE", 20, TRADE, BOLD, 16, 316, 260, 28)
+		label(box, "Wants: " .. (Rules.WantLabels[row.Want] or "Any offer"), 13, P.Dim, BODY, 16, 346, 260, 18)
+	end
+	if row.Seller == Players.LocalPlayer.UserId then
+		button(box, "YOURS · MANAGE", Color3.fromRGB(80, 84, 110), 16, 420, 260, 52, function()
+			inspect = nil
+			tab = "Mine"
+			draw()
+		end)
+	elseif row.Mode == "Sell" then
+		local afford = (GemClient.Profile and GemClient.Profile.Coins or 0) >= row.Price
+		button(
+			box,
+			if afford then "BUY FOR " .. row.Price .. " COINS" else "NOT ENOUGH COINS",
+			if afford then READY else Color3.fromRGB(90, 70, 70),
+			16,
+			420,
+			260,
+			52,
+			function()
+				if afford and act("MarketBuy", row.Id) then
+					inspect = nil
+					draw()
+				end
+			end
+		)
+	else
+		button(box, "MAKE AN OFFER", TRADE, 16, 420, 260, 52, function()
+			inspect = nil
+			offerFor = row
+			draw()
+		end)
+	end
+end
+
 -- The offer picker: one of your items for someone's trade listing.
 local function drawOfferPicker()
 	local row = offerFor
 	local box = panel(content, 0, 0, 860, 490)
 	label(box, "MAKE AN OFFER", 13, TRADE, BOLD, 16, 12, 400, 18)
-	itemIcon(box, row.Item, 16, 40, 60)
+	itemIcon(box, row.Item, 16, 40, 60, "M:" .. row.Id)
 	label(box, itemName(row.Item), 17, itemColor(row.Item), BOLD, 88, 42, 500, 22)
 	label(box, itemLine(row.Item) .. "  ·  by " .. (row.SellerName or "?"), 12, P.Dim, BODY, 88, 66, 560, 16)
 	label(
@@ -511,7 +726,7 @@ local function drawOfferPicker()
 			UiKit.round(cell, 8)
 			new("UIStroke", { Color = itemColor(item), Transparency = if fits then 0.4 else 0.8 }, cell)
 			IronUi.highlight(cell)
-			itemIcon(cell, item, 8, 8, 54)
+			itemIcon(cell, item, 8, 8, 54, item.Id)
 			label(cell, itemName(item), 13, if fits then itemColor(item) else P.Dim, BOLD, 70, 10, 122, 18)
 			local l = label(cell, if fits then "Offer this" else "Not what they want", 11, P.Dim, BODY, 70, 30, 122, 30)
 			l.TextWrapped = true
@@ -578,7 +793,7 @@ local function drawSell()
 				Transparency = if picked then 0 else 0.5,
 			}, cell)
 			IronUi.highlight(cell)
-			itemIcon(cell, item, 8, 8, 54)
+			itemIcon(cell, item, 8, 8, 54, item.Id)
 			label(cell, itemName(item), 13, itemColor(item), BOLD, 70, 8, 164, 18)
 			local l = label(cell, itemLine(item), 11, P.Dim, BODY, 70, 27, 164, 34)
 			l.TextWrapped = true
@@ -626,21 +841,27 @@ local function drawSell()
 		return
 	end
 	local item = sellPick
-	itemIcon(form, item, 14, 14, 64)
+	itemIcon(form, item, 14, 14, 64, item.Id)
 	label(form, itemName(item), 15, itemColor(item), BOLD, 88, 16, 244, 20)
 	local l = label(form, itemLine(item), 11, P.Dim, BODY, 88, 38, 244, 36)
 	l.TextWrapped = true
 	l.TextYAlignment = Enum.TextYAlignment.Top
-	chip(form, "SELL FOR COINS", sellMode == "Sell", GOLD, 14, 92, 154, function()
+	-- Everything about it (buyers see the same).
+	local info = details(form, item, 14, 84, 322, 104, true)
+	info.BackgroundTransparency = 0.5
+	info.BackgroundColor3 = P.Inset
+	UiKit.round(info, 6)
+	UiKit.pad(info, 6)
+	chip(form, "SELL FOR COINS", sellMode == "Sell", GOLD, 14, 196, 154, function()
 		sellMode = "Sell"
 		draw()
 	end)
-	chip(form, "OPEN TO TRADE", sellMode == "Trade", TRADE, 176, 92, 154, function()
+	chip(form, "OPEN TO TRADE", sellMode == "Trade", TRADE, 176, 196, 154, function()
 		sellMode = "Trade"
 		draw()
 	end)
 	if sellMode == "Sell" then
-		label(form, "PRICE (COINS)", 11, P.Dim, BOLD, 14, 130, 200, 14)
+		label(form, "PRICE (COINS)", 11, P.Dim, BOLD, 14, 232, 200, 14)
 		local box = new("TextBox", {
 			Text = tostring(sellPrice),
 			PlaceholderText = "Price",
@@ -649,8 +870,8 @@ local function drawSell()
 			Font = BOLD,
 			TextColor3 = P.Gold,
 			BackgroundColor3 = P.Inset,
-			Position = UDim2.fromOffset(14, 148),
-			Size = UDim2.fromOffset(316, 42),
+			Position = UDim2.fromOffset(14, 250),
+			Size = UDim2.fromOffset(316, 40),
 		}, form)
 		UiKit.round(box, 6)
 		new("UIStroke", { Color = P.Edge, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, box)
@@ -661,7 +882,7 @@ local function drawSell()
 		end)
 		local x = 14
 		for _, step in { -100, -10, 10, 100, 1000 } do
-			chip(form, (if step > 0 then "+" else "") .. step, false, GOLD, x, 198, 58, function()
+			chip(form, (if step > 0 then "+" else "") .. step, false, GOLD, x, 298, 58, function()
 				sellPrice = math.clamp(sellPrice + step, Rules.MinPrice, Rules.MaxPrice)
 				draw()
 			end)
@@ -676,7 +897,7 @@ local function drawSell()
 				P.Dim,
 				BODY,
 				14,
-				230,
+				330,
 				316,
 				14
 			)
@@ -688,15 +909,15 @@ local function drawSell()
 			P.Good,
 			BOLD,
 			14,
-			250,
+			348,
 			316,
 			16
 		)
 	else
-		label(form, "WHAT DO YOU WANT FOR IT?", 11, P.Dim, BOLD, 14, 130, 300, 14)
+		label(form, "WHAT DO YOU WANT FOR IT?", 11, P.Dim, BOLD, 14, 232, 300, 14)
 		for i, want in Rules.Wants do
 			local col, rowY = (i - 1) % 2, (i - 1) // 2
-			chip(form, want.Label, sellWant == want.Id, TRADE, 14 + col * 162, 150 + rowY * 34, 154, function()
+			chip(form, want.Label, sellWant == want.Id, TRADE, 14 + col * 162, 250 + rowY * 34, 154, function()
 				sellWant = want.Id
 				draw()
 			end)
@@ -708,32 +929,22 @@ local function drawSell()
 			P.Dim,
 			BODY,
 			14,
-			222,
+			322,
 			316,
 			46
 		)
 		t.TextWrapped = true
 	end
-	local note = label(
-		form,
-		"While it's listed the item is out of your bag. Cancel anytime to get it back. Listings last 48 hours.",
-		11,
-		P.Dim,
-		BODY,
-		14,
-		300,
-		316,
-		44
-	)
+	local note = label(form, "Out of your bag while listed · lasts 48 hours", 11, P.Dim, BODY, 14, 372, 316, 16)
 	note.TextWrapped = true
 	button(
 		form,
 		if sellMode == "Sell" then "LIST FOR " .. sellPrice .. " COINS" else "LIST FOR TRADE",
 		if sellMode == "Sell" then GOLD else TRADE,
 		14,
-		392,
+		394,
 		316,
-		48,
+		46,
 		function()
 			local value = if sellMode == "Sell" then sellPrice else sellWant
 			if act("MarketList", item.Kind, item.Slot, item.Id, sellMode, value) then
@@ -789,7 +1000,7 @@ local function drawMine()
 		}, list)
 		UiKit.round(card, 8)
 		new("UIStroke", { Color = itemColor(entry.Item), Transparency = 0.5 }, card)
-		itemIcon(card, entry.Item, 12, 12, 60)
+		itemIcon(card, entry.Item, 12, 12, 60, "M:" .. entry.Listing)
 		label(card, itemName(entry.Item), 15, itemColor(entry.Item), BOLD, 84, 12, 420, 20)
 		label(card, itemLine(entry.Item), 12, P.Dim, BODY, 84, 34, 420, 16)
 		local status = if not row
@@ -811,7 +1022,7 @@ local function drawMine()
 				Size = UDim2.fromOffset(816, 54),
 			}, card)
 			UiKit.round(strip, 6)
-			itemIcon(strip, offer.Item, 6, 5, 44)
+			itemIcon(strip, offer.Item, 6, 5, 44, "M:" .. entry.Listing .. ":" .. offer.Id)
 			label(strip, (offer.FromName or "?") .. " offers", 11, P.Dim, BODY, 58, 6, 300, 14)
 			label(strip, itemName(offer.Item), 14, itemColor(offer.Item), BOLD, 58, 20, 420, 18)
 			label(strip, itemLine(offer.Item), 11, P.Dim, BODY, 58, 37, 420, 14)
@@ -844,7 +1055,7 @@ local function drawMine()
 		label(card, itemName(entry.Item), 14, itemColor(entry.Item), BOLD, 76, 26, 300, 18)
 		label(card, "⇄", 22, TRADE, BOLD, 380, 22, 30, 30)
 		if row then
-			itemIcon(card, row.Item, 414, 10, 56)
+			itemIcon(card, row.Item, 414, 10, 56, "M:" .. row.Id)
 			label(card, "for " .. (row.SellerName or "?") .. "'s", 11, P.Dim, BODY, 480, 10, 200, 14)
 			label(card, itemName(row.Item), 14, itemColor(row.Item), BOLD, 480, 26, 220, 18)
 		else
@@ -903,6 +1114,8 @@ draw = function()
 	end)
 	if offerFor then
 		drawOfferPicker()
+	elseif inspect and tab == "Browse" then
+		drawInspect()
 	elseif tab == "Sell" then
 		drawSell()
 	elseif tab == "Mine" then
@@ -918,7 +1131,7 @@ function MarketBoardUI.open(which: string?)
 		return
 	end
 	tab = which or tab
-	offerFor = nil
+	offerFor, inspect = nil, nil
 	window.Gui.Enabled = true
 	window.Fit()
 	draw()
@@ -926,6 +1139,13 @@ function MarketBoardUI.open(which: string?)
 		refresh()
 		if window.Gui.Enabled then
 			draw()
+		end
+		-- 3D pictures: your own gear, then the gear on the board.
+		for _, action in { "GearPreviews", "MarketPreviews" } do
+			local result = GemClient.request(action)
+			if result.Ok and calm() then
+				draw()
+			end
 		end
 	end)
 end
@@ -949,14 +1169,18 @@ RunService.Heartbeat:Connect(function(dt)
 	elapsed = 0
 	task.spawn(function()
 		refresh()
-		-- Not while typing a price.
-		if window.Gui.Enabled and not busy and not offerFor and tab ~= "Sell" then
+		if calm() and not offerFor then
+			draw()
+		end
+		-- New gear on the board gets its 3D picture.
+		local result = GemClient.request("MarketPreviews")
+		if result.Ok and calm() and not offerFor then
 			draw()
 		end
 	end)
 end)
 GemClient.Changed:Connect(function()
-	if window.Gui.Enabled and not busy and tab ~= "Sell" then
+	if calm() then
 		draw()
 	end
 end)

@@ -1688,14 +1688,11 @@ local function previewKey(loadout, slot: string, id: string, quality: number): s
 	}, "|")
 end
 
--- Builds previews for every owned item not being worn. Returns true when
--- they're all up to date.
-function Equipment.previews(player: Player): boolean
-	local profile = PlayerData.get(player)
-	local loadout = PlayerData.character(player)
+-- The (hidden) folder in a player's PlayerGui that previews are built into.
+local function previewStore(player: Player): Instance?
 	local playerGui = player:FindFirstChildOfClass("PlayerGui")
-	if not profile or not loadout or not playerGui or building[player] then
-		return false
+	if not playerGui then
+		return nil
 	end
 	local store = playerGui:FindFirstChild(PREVIEW_GUI)
 	if not store then
@@ -1706,26 +1703,17 @@ function Equipment.previews(player: Player): boolean
 		gui.Parent = playerGui
 		store = gui
 	end
-	local wanted = {}
-	for _, slot in Slots.Order do
-		local kind = Slots.Definitions[slot].Kind
-		for id, quality in profile.Owned[kind] or {} do
-			if id ~= loadout[slot] and Classes.gear(loadout.Class, kind, id) then
-				wanted[slot .. "|" .. id] = { Slot = slot, Id = id, Quality = quality }
-			end
-		end
-	end
-	for _, child in (store :: Instance):GetChildren() do
-		local item = wanted[child.Name]
-		if item and child:GetAttribute("Key") == previewKey(loadout, item.Slot, item.Id, item.Quality) then
-			wanted[child.Name] = nil
-		else
-			child:Destroy()
-		end
-	end
-	if next(wanted) == nil then
-		return true
-	end
+	return store
+end
+
+-- Market previews ("Slot|M:...") belong to marketPreviews, not the bag.
+local function isMarket(name: string): boolean
+	return string.find(name, "|M:", 1, true) ~= nil
+end
+
+-- Dresses the mannequin in each wanted piece and keeps just that piece.
+-- wanted[name] = { Slot, Id, Quality, Roll, Gem, Key }.
+local function buildPreviews(player: Player, store: Instance, loadout, wanted)
 	building[player] = true
 	local rig = mannequin()
 	if not rig then
@@ -1735,18 +1723,21 @@ function Equipment.previews(player: Player): boolean
 	task.wait()
 	local origin = rig:GetPivot()
 	for name, item in wanted do
+		local kind = Slots.Definitions[item.Slot].Kind
 		local trial = table.clone(loadout)
-		local gems = loadout.ItemGems and loadout.ItemGems[item.Slot]
+		trial.GearRolls = table.clone(loadout.GearRolls or {})
+		trial.GearRolls[kind] = table.clone(trial.GearRolls[kind] or {})
+		trial.GearRolls[kind][item.Id] = item.Roll
 		trial[item.Slot] = item.Id
 		trial[item.Slot .. "Quality"] = item.Quality
-		trial[item.Slot .. "Gem"] = gems and gems[item.Id]
+		trial[item.Slot .. "Gem"] = item.Gem
 		local ok, folder = pcall(dress, rig, trial, nil, player.UserId, item.Slot)
 		local source = ok and folder and folder:FindFirstChild(item.Slot)
 		if source then
 			local preview = Instance.new("Folder")
 			preview.Name = name
 			preview:SetAttribute("Slot", item.Slot)
-			preview:SetAttribute("Key", previewKey(loadout, item.Slot, item.Id, item.Quality))
+			preview:SetAttribute("Key", item.Key)
 			local parts = {}
 			for _, part in source:GetDescendants() do
 				if part:IsA("BasePart") and part.Transparency < 1 then
@@ -1776,6 +1767,99 @@ function Equipment.previews(player: Player): boolean
 	rig:Destroy()
 	building[player] = nil
 	return true
+end
+
+-- Builds previews for every owned item not being worn. Returns true when
+-- they're all up to date.
+function Equipment.previews(player: Player): boolean
+	local profile = PlayerData.get(player)
+	local loadout = PlayerData.character(player)
+	local store = previewStore(player)
+	if not profile or not loadout or not store or building[player] then
+		return false
+	end
+	local wanted = {}
+	for _, slot in Slots.Order do
+		local kind = Slots.Definitions[slot].Kind
+		for id, quality in profile.Owned[kind] or {} do
+			if id ~= loadout[slot] and Classes.gear(loadout.Class, kind, id) then
+				local gems = loadout.ItemGems and loadout.ItemGems[slot]
+				wanted[slot .. "|" .. id] = {
+					Slot = slot,
+					Id = id,
+					Quality = quality,
+					Roll = GearRolls.get(loadout, slot, id),
+					Gem = gems and gems[id],
+					Key = previewKey(loadout, slot, id, quality),
+				}
+			end
+		end
+	end
+	for _, child in (store :: Instance):GetChildren() do
+		local item = wanted[child.Name]
+		if item and child:GetAttribute("Key") == item.Key then
+			wanted[child.Name] = nil
+		elseif not isMarket(child.Name) then
+			child:Destroy()
+		end
+	end
+	if next(wanted) == nil then
+		return true
+	end
+	return buildPreviews(player, store :: Instance, loadout, wanted)
+end
+
+-- Previews of gear that isn't yours (Market listings and offers), from the
+-- piece itself: items[tag] = { Slot, Id, Quality, Roll, Gem }. Each is
+-- built as "Slot|M:<tag>" (GearArt.draw(view, slot, "M:" .. tag)); market
+-- previews no longer asked for are dropped.
+function Equipment.marketPreviews(player: Player, items): boolean
+	local loadout = PlayerData.character(player)
+	local store = previewStore(player)
+	if not loadout or not store or building[player] then
+		return false
+	end
+	local wanted = {}
+	for tag, item in items do
+		local kind = Slots.Definitions[item.Slot] and Slots.Definitions[item.Slot].Kind
+		if kind and Classes.gear(loadout.Class, kind, item.Id) then
+			local roll = item.Roll
+			wanted[item.Slot .. "|M:" .. tag] = {
+				Slot = item.Slot,
+				Id = item.Id,
+				Quality = item.Quality or 1,
+				Roll = roll,
+				Gem = item.Gem,
+				Key = table.concat({
+					tostring(item.Quality),
+					if roll
+						then string.format(
+							"%s-%s-%s-%s",
+							tostring(roll.Rarity),
+							tostring(roll.Finish),
+							tostring(roll.Helmet),
+							tostring(roll.Variant)
+						)
+						else "-",
+					if item.Gem then tostring(item.Gem.Id) else "-",
+				}, "|"),
+			}
+		end
+	end
+	for _, child in (store :: Instance):GetChildren() do
+		if isMarket(child.Name) then
+			local item = wanted[child.Name]
+			if item and child:GetAttribute("Key") == item.Key then
+				wanted[child.Name] = nil
+			else
+				child:Destroy()
+			end
+		end
+	end
+	if next(wanted) == nil then
+		return true
+	end
+	return buildPreviews(player, store :: Instance, loadout, wanted)
 end
 
 local function watch(player: Player)

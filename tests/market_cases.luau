@@ -178,7 +178,18 @@ local Remotes = {
 }
 local MarketBoard = load("src/server/Systems/MarketBoard.luau", {
 	game = game,
-	script = { Parent = { PlayerData = PlayerData, Remotes = Remotes, Shop = Shop } },
+	script = {
+		Parent = {
+			PlayerData = PlayerData,
+			Remotes = Remotes,
+			Shop = Shop,
+			Equipment = {
+				marketPreviews = function()
+					return true
+				end,
+			},
+		},
+	},
 })
 MarketBoard.start()
 
