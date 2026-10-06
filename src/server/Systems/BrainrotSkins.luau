@@ -95,44 +95,19 @@ local function glowingEye(rig, t, x: number)
 end
 local function wood(rig, _accent)
 	local t = rig.UpperTorso
-	local log, grain, endGrain = C(214, 167, 110), C(171, 122, 73), C(234, 199, 143)
-	local limb = C(190, 139, 86)
-	-- The log, standing up: round, a little taller than a person's torso and head.
-	part(rig, t, "SahurLog", V(4.1, 1.9, 1.9), V(0, 0.55, 0), log, CYL, A(0, 0, math.pi / 2))
-	for i = 1, 22 do
-		local a = i * math.pi * 2 / 22
-		part(
-			rig,
-			t,
-			"WoodGrain",
-			V(0.03, 2.9 + (i % 4) * 0.25, 0.03),
-			V(math.cos(a) * 0.945, 0.45 + (i % 3) * 0.12, math.sin(a) * 0.945),
-			if i % 3 == 0 then C(190, 141, 88) else grain
-		)
-	end
-	-- Sawn ends: the top shows its growth rings.
-	part(rig, t, "LogTop", V(0.04, 1.86, 1.86), V(0, 2.6, 0), endGrain, CYL, A(0, 0, math.pi / 2))
-	for i, size in { 1.4, 0.95, 0.5 } do
-		part(
-			rig,
-			t,
-			"GrowthRing",
-			V(0.045 + i * 0.004, size, size),
-			V(0, 2.6, 0),
-			if i % 2 == 1 then C(196, 150, 96) else endGrain,
-			CYL,
-			A(0, 0, math.pi / 2)
-		)
-	end
-	part(rig, t, "LogBottom", V(0.04, 1.86, 1.86), V(0, -1.5, 0), endGrain, CYL, A(0, 0, math.pi / 2))
+	local log = C(214, 170, 118)
+	local limb = log
+	-- The log: one smooth, plain wooden cylinder (Roblox's Wood material
+	-- gives it its grain), standing up.
+	local body = part(rig, t, "SahurLog", V(4.1, 1.9, 1.9), V(0, 0.55, 0), log, CYL, A(0, 0, math.pi / 2))
+	body.Material = Enum.Material.Wood
 	-- The face.
 	glowingEye(rig, t, -0.42)
 	glowingEye(rig, t, 0.42)
 	for _, s in { -1, 1 } do
 		part(rig, t, "HeavyBrow", V(0.66, 0.17, 0.16), V(s * 0.42, 2.04, -0.92), C(58, 34, 18), nil, A(0, 0, s * 0.26))
-		part(rig, t, "Cheek", V(0.36, 0.26, 0.14), V(s * 0.58, 0.86, -0.9), C(204, 152, 96), BALL)
 	end
-	part(rig, t, "Nose", V(0.3, 0.42, 0.3), V(0, 1.12, -0.96), C(198, 147, 90), BALL)
+	part(rig, t, "Nose", V(0.3, 0.42, 0.3), V(0, 1.12, -0.96), log, BALL).Material = Enum.Material.Wood
 	-- A wide grin, its corners turned up: short dark strokes along a curve.
 	for i = -4, 3 do
 		local x0, x1 = i * 0.12, (i + 1) * 0.12
@@ -154,8 +129,8 @@ local function wood(rig, _accent)
 	for _, side in { "Left", "Right" } do
 		for _, segment in { "UpperArm", "LowerArm", "UpperLeg", "LowerLeg" } do
 			local b = rig[side .. segment]
-			part(rig, b, "WoodenLimb", V(b.Size.Y + 0.14, 0.3, 0.3), V(0, 0, 0), limb, CYL, upright)
-			part(rig, b, "LimbJoint", V(0.34, 0.34, 0.34), V(0, b.Size.Y / 2, 0), limb, BALL)
+			part(rig, b, "WoodenLimb", V(b.Size.Y + 0.14, 0.34, 0.34), V(0, 0, 0), limb, CYL, upright)
+			part(rig, b, "LimbJoint", V(0.36, 0.36, 0.36), V(0, b.Size.Y / 2, 0), limb, BALL)
 		end
 		part(
 			rig,
@@ -189,6 +164,14 @@ local function wood(rig, _accent)
 	part(rig, h, "BatTaper", V(0.6, 0.3, 0.3), V(0, -1.1, 0), C(205, 152, 88), CYL, A(0, 0, math.pi / 2))
 	part(rig, h, "BatBarrel", V(1.5, 0.44, 0.44), V(0, -1.95, 0), C(214, 163, 98), CYL, A(0, 0, math.pi / 2))
 	part(rig, h, "BatEnd", V(0.44, 0.24, 0.44), V(0, -2.7, 0), C(214, 163, 98), BALL)
+	-- Limbs and bat in the same plain wood as the log.
+	local WOODEN = { WoodenLimb = true, LimbJoint = true, ShoulderStick = true, Palm = true, Finger = true }
+	WOODEN.WoodenFoot, WOODEN.Toes = true, true
+	for _, p in rig:GetDescendants() do
+		if p:IsA("BasePart") and (WOODEN[p.Name] or string.sub(p.Name, 1, 3) == "Bat") then
+			p.Material = Enum.Material.Wood
+		end
+	end
 end
 local function sneaker(rig, bone, offset)
 	local blue = C(24, 105, 213)
