@@ -152,6 +152,9 @@ UserInputService.InputChanged:Connect(function(input, processed)
 	end
 end)
 RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value + 1, function(dt)
+	if (player:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
+		return
+	end
 	if not active then
 		return
 	end

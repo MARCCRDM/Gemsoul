@@ -545,6 +545,20 @@ local function actionPose(a, t: number, base)
 	if not windup then
 		return nil, 0
 	end
+	if kind == "Deploy" then
+		-- A planted step and uncoiling shoulders, not an attack's snap/overshoot.
+		local elapsed = t - start
+		if elapsed < 0.22 then
+			return lerp(base, windup, ease(elapsed / 0.22)), 24
+		end
+		if elapsed < 0.70 then
+			return lerp(windup, strike, ease((elapsed - 0.22) / 0.48)), 24
+		end
+		if elapsed < 1.20 then
+			return lerp(strike, base, ease((elapsed - 0.70) / 0.50)), 20
+		end
+		return nil, 0
+	end
 	stageCast(kind, windup, strike)
 	local style = CAST_STYLE[kind]
 	local snapTime = if style then style.Snap else SNAP

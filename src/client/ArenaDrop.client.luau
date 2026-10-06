@@ -1,35 +1,46 @@
--- Helmet POV throughout insertion. Camera follows the local pod, never an exterior shot.
+-- First-person insertion: deterministic local presentation, authoritative server staging.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Motion = require(ReplicatedStorage.Shared.InsertionMotion)
+local Pod = require(script.Parent.Modules.InsertionPod)
 local player = Players.LocalPlayer
-local savedCamera, savedType, savedSubject, savedFov
-local hidden = {}
-local hudSaved = {}
+local pods, hidden, hudSaved = {}, {}, {}
+local savedCamera, savedType, savedSubject, savedFov, generation, entered, eyeHeight
+local characterConnection
 local gui = Instance.new("ScreenGui")
-gui.Name, gui.ResetOnSpawn, gui.DisplayOrder = "ArenaInsertion", false, 40
+gui.Name, gui.ResetOnSpawn, gui.DisplayOrder, gui.IgnoreGuiInset = "ArenaInsertion", false, 40, true
+local veil = Instance.new("Frame")
+veil.Size, veil.BackgroundColor3, veil.BorderSizePixel = UDim2.fromScale(1, 1), Color3.new(0, 0, 0), 0
+veil.ZIndex, veil.Parent = 2, gui
 local label = Instance.new("TextLabel")
-label.AnchorPoint, label.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -26)
-label.Size = UDim2.new(0.8, 0, 0, 56)
-label.BackgroundColor3, label.BackgroundTransparency = Color3.fromRGB(7, 12, 20), 0.2
-label.TextColor3, label.Font, label.TextSize = Color3.fromRGB(110, 230, 255), Enum.Font.GothamBold, 18
-label.TextWrapped = true
-label.Parent = gui
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = label
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(65, 160, 190)
-stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-stroke.Parent = label
+label.AnchorPoint, label.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -34)
+label.Size, label.BackgroundTransparency = UDim2.new(0.78, 0, 0, 28), 1
+label.TextColor3, label.Font, label.TextSize = Color3.fromRGB(155, 226, 235), Enum.Font.GothamMedium, 14
+label.TextWrapped, label.ZIndex, label.Parent = true, 3, gui
+local function hideBody(object)
+	if object:IsA("BasePart") then
+		if hidden[object] == nil then
+			hidden[object] = object.LocalTransparencyModifier
+		end
+		object.LocalTransparencyModifier = 1
+	elseif object:IsA("Highlight") and object.Name == "InsertionSilhouette" then
+		object.Enabled = false
+	end
+end
 local function restore()
+	if characterConnection then
+		characterConnection:Disconnect()
+		characterConnection = nil
+	end
 	if savedCamera then
 		savedCamera.CameraType = savedType
 		savedCamera.FieldOfView = savedFov
 		savedCamera.CameraSubject = if savedSubject and savedSubject.Parent
 			then savedSubject
 			else (player.Character and player.Character:FindFirstChildOfClass("Humanoid"))
-		savedCamera = nil
 	end
+	savedCamera, generation = nil, nil
 	for object, value in hidden do
 		if object.Parent then
 			object.LocalTransparencyModifier = value
@@ -44,19 +55,93 @@ local function restore()
 	table.clear(hudSaved)
 	gui.Enabled = false
 end
+local function discover(object)
+	if object.Name == "OrbitalInsertion" and object:IsA("Folder") and not pods[object] then
+		pods[object] = Pod.new(object)
+	end
+end
+workspace.ChildAdded:Connect(discover)
+for _, object in workspace:GetChildren() do
+	discover(object)
+end
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
+-- Let Roblox's camera produce the destination POV during the final half-second.
+-- The later callback eases toward it, avoiding a one-frame snap back to gameplay.
+RunService:BindToRenderStep("InsertionCameraHandoff", Enum.RenderPriority.Camera.Value - 1, function()
+	local ends = player:GetAttribute("ArenaDropUntil")
+	if savedCamera and type(ends) == "number" and ends - workspace:GetServerTimeNow() < 0.5 then
+		savedCamera.CameraType = Enum.CameraType.Custom
+	end
+end)
 RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.Value + 2, function()
-	local ends, focus = player:GetAttribute("ArenaDropUntil"), player:GetAttribute("ArenaDropFocus")
+	local now = workspace:GetServerTimeNow()
+	for marker, pod in pods do
+		if not marker.Parent then
+			pod.destroy()
+			pods[marker] = nil
+		else
+			pod.update(now)
+		end
+	end
+	local ends = player:GetAttribute("ArenaDropUntil")
 	local camera = workspace.CurrentCamera
-	if type(ends) ~= "number" or ends <= workspace:GetServerTimeNow() or typeof(focus) ~= "Vector3" or not camera then
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local head = character and character:FindFirstChild("Head")
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if
+		type(ends) ~= "number"
+		or ends <= now
+		or not camera
+		or not root
+		or not head
+		or not humanoid
+		or humanoid.Health <= 0
+	then
 		restore()
 		return
 	end
-	if not savedCamera then
-		savedCamera, savedType, savedSubject, savedFov =
-			camera, camera.CameraType, camera.CameraSubject, camera.FieldOfView
+	if savedCamera and (savedCamera ~= camera or savedSubject ~= humanoid) then
+		restore()
 	end
+	if not savedCamera then
+		savedCamera, savedType, savedSubject, savedFov = camera, camera.CameraType, humanoid, camera.FieldOfView
+		generation, entered, eyeHeight = ends, now, math.clamp(head.Position.Y - root.Position.Y, 1.2, 2.5)
+		for _, object in character:GetDescendants() do
+			hideBody(object)
+		end
+		characterConnection = character.DescendantAdded:Connect(hideBody)
+	elseif generation ~= ends then
+		generation, entered = ends, now
+	end
+	local start = character:GetAttribute("ArenaDropStart")
+	local origin = character:GetAttribute("ArenaDropOrigin")
+	-- Attributes may arrive in different packets: never invent a time or height.
+	if typeof(origin) ~= "CFrame" then
+		gui.Enabled = true
+		veil.BackgroundTransparency = 0
+		label.Text = "INSERTION LINK"
+		return
+	end
+	local t = if type(start) == "number" then now - start else Motion.Ready + 1
+	local pose = Motion.sample(t)
+	local ownDrop = type(start) == "number"
+	local eye = origin
+		* CFrame.new(0, eyeHeight + (if ownDrop then pose.Height - pose.Impact * 0.2 + pose.Bob else 0), -pose.Step)
+	if not ownDrop then
+		eye = root.CFrame * CFrame.new(0, eyeHeight, 0)
+	end
+	local animation = eye * CFrame.Angles(pose.Pitch, 0, pose.Impact * 0.009)
+	local remaining = ends - now
+	if remaining < 0.5 then
+		local blend = Motion.smooth(1 - remaining / 0.5)
+		animation = animation:Lerp(camera.CFrame, blend)
+	else
+		camera.CameraType = Enum.CameraType.Scriptable
+	end
+	camera.CFrame = animation
+	camera.FieldOfView = savedFov + pose.Fov
 	for _, name in { "CombatHud", "LobbyHud", "Toasts" } do
 		local hud = player.PlayerGui:FindFirstChild(name)
 		if hud and hud:IsA("ScreenGui") then
@@ -66,54 +151,23 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.V
 			hud.Enabled = false
 		end
 	end
-	camera.CameraType = Enum.CameraType.Scriptable
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local head = character and character:FindFirstChild("Head")
-	if not root or not head then
-		restore()
-		return
-	end
-	local now = workspace:GetServerTimeNow()
-	local start = character:GetAttribute("ArenaDropStart")
-	local elapsed = if type(start) == "number" then now - start else 10
-	local descent = math.clamp(elapsed / 0.72, 0, 1)
-	local height = if elapsed < 0.72 then 100 * (1 - descent * descent) else 0
-	local impactAge = elapsed - 0.72
-	local kick = if impactAge >= 0 then math.exp(-impactAge * 9) else 0
-	local pitch = math.sin(math.max(impactAge, 0) * 32) * 0.035 * kick
-	local eye = root.Position + Vector3.new(0, head.Position.Y - root.Position.Y + height - kick * 0.22, 0)
-	camera.CFrame = CFrame.lookAt(eye, eye + root.CFrame.LookVector) * CFrame.Angles(pitch, 0, pitch * 0.3)
-	camera.FieldOfView = savedFov
-		+ (if elapsed >= 0 and elapsed < 0.72 then math.sin(descent * math.pi) * 5 else kick * 2)
-	if character then
-		for _, object in character:GetDescendants() do
-			if object:IsA("BasePart") then
-				if hidden[object] == nil then
-					hidden[object] = object.LocalTransparencyModifier
-				end
-				object.LocalTransparencyModifier = 1
-			end
-		end
-	end
-	local view = camera:FindFirstChild("FirstPersonLoadout")
-	if view then
-		for _, object in view:GetDescendants() do
-			if object:IsA("BasePart") then
-				if hidden[object] == nil then
-					hidden[object] = object.LocalTransparencyModifier
-				end
-				object.LocalTransparencyModifier = if elapsed < 1.45 then 1 else 0
-			end
+	for object in hidden do
+		if object.Parent then
+			object.LocalTransparencyModifier = 1
+		else
+			hidden[object] = nil
 		end
 	end
 	gui.Enabled = true
-	local remaining = ends - workspace:GetServerTimeNow()
-	label.Text = if remaining > 1.8
-		then (if elapsed < 0
-			then "DROP QUEUED  /  BRACE"
-			elseif elapsed < 0.72 then "ORBITAL DESCENT  /  BRACE"
-			elseif elapsed < 1.1 then "IMPACT  /  RELEASING HATCH"
-			else "VISUAL CONTACT  /  STAND BY")
-		else "WEAPONS LIVE IN " .. math.ceil(remaining)
+	-- Helmet wakes inside the already-present pod; the height change is covered.
+	veil.BackgroundTransparency = Motion.smooth((now - entered) / 0.32)
+	label.Text = if remaining < 1
+		then "SAFETIES RELEASING"
+		elseif not ownDrop or t >= Motion.Ready then "RIVAL INBOUND  /  HOLD POSITION"
+		elseif t < 0 then "HARNESS LOCKED"
+		elseif t < Motion.Landing then "DESCENT  /  BRACE"
+		elseif t < Motion.Hatch then "CONTACT  /  PRESSURE RELEASE"
+		elseif t < Motion.Exit then "HATCH CLEAR"
+		else "WEAPONS READY"
+	label.TextTransparency = if remaining < 0.35 then 1 - remaining / 0.35 else 0.08
 end)

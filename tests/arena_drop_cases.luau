@@ -22,4 +22,32 @@ check(ArenaDrop.forRival("PvP", nil, nil), "PvP arena lost insertion")
 check(not ArenaDrop.forRival("Raid", {}, nil), "Raid received arena insertion")
 check(not ArenaDrop.forRival("Training", nil, {}), "Dungeon encounter received arena insertion")
 check(not ArenaDrop.forRival(nil, nil, nil), "Lobby received arena insertion")
+-- Camera and shell must never pop at a phase boundary, including impact onset.
+for _, boundary in { 0, Motion.Landing, Motion.Hatch, Motion.Exit, Motion.Exit + Motion.ExitDuration, Motion.Ready } do
+	local before, after = Motion.sample(boundary - 0.00001), Motion.sample(boundary + 0.00001)
+	for _, field in { "Height", "Impact", "Step", "Pitch", "Hatch", "Draw", "Fov" } do
+		check(math.abs(before[field] - after[field]) < 0.01, "Insertion discontinuity: " .. field .. " at " .. boundary)
+	end
+end
+check(Motion.sample(-10).Height == Motion.Altitude, "Queued pod does not hold at altitude")
+check(
+	Motion.sample(100).Height == 0 and Motion.sample(100).Step == 3,
+	"Late client cannot reconstruct completed landing"
+)
+check(Motion.sample(Motion.Exit).Hatch > 0.7, "Fighter exits before hatch clears")
+check(Motion.sample(Motion.Ready).Draw == 1, "Weapon draw not finished before handoff")
+for count = 1, 4 do
+	local lastReady = Motion.Lead + (count - 1) * Motion.Spacing + Motion.Ready
+	check(ArenaDrop.duration(count) - lastReady >= 0.64, "Combat starts before final weapon is ready")
+end
+for _, fps in { 30, 60, 144 } do
+	local previous = Motion.sample(-1 / fps)
+	for frame = 0, math.ceil(Motion.Ready * fps) do
+		local sample = Motion.sample(frame / fps)
+		check(sample.Height <= previous.Height + 0.00001, "Pod reverses direction during descent")
+		check(sample.Step >= previous.Step - 0.00001, "Exit movement reverses")
+		check(sample.Draw >= previous.Draw - 0.00001, "Weapon draw reverses")
+		previous = sample
+	end
+end
 print("PASS: " .. checks .. " orbital insertion protection and timing checks")

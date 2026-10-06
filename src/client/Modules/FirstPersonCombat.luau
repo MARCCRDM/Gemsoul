@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMotion)
 local player = Players.LocalPlayer
 local View = {}
 local saved, model, gear, connection, removalConnection
@@ -20,13 +21,23 @@ local function clearModel()
 	model, gear = nil, nil
 	table.clear(pieces)
 end
+-- A staged character is invisible in the world; its viewmodel still uses authored materials.
+local function authoredTransparency(part)
+	local staged = part:GetAttribute("InsertionTransparency")
+	return if type(staged) == "number" then staged else part.Transparency
+end
 -- A copy of one piece of gear for the view: its element effects thinned out
 -- (they'd cover the view up close), anchored, unclickable, 65% size.
 local function viewCopy(part, holder, scale: number?)
 	local copy = part:Clone()
+	copy.Transparency = authoredTransparency(part)
 	for _, descendant in copy:GetDescendants() do
 		if descendant:IsA("ParticleEmitter") then
 			descendant.Rate *= 0.45
+			local enabled = descendant:GetAttribute("InsertionEnabled")
+			if type(enabled) == "boolean" then
+				descendant.Enabled = enabled
+			end
 		elseif descendant:IsA("PointLight") then
 			descendant.Range *= 0.6
 		end
@@ -102,7 +113,7 @@ local function buildViewShield(holder, source)
 	local glow
 	local emitters = {}
 	for _, part in source:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" then
+		if part:IsA("BasePart") and authoredTransparency(part) < 1 and part.Name ~= "SocketedGem" then
 			local flat = part.Size.X * part.Size.Y
 			if part.Material == Enum.Material.Neon then
 				glow = glow or part.Color
@@ -262,7 +273,7 @@ local function weaponFrame(weapon)
 	local grip = weapon:FindFirstChild("RightGrip")
 	local blade, length = nil, 0
 	for _, part in weapon:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 and part.Size.Y > length then
+		if part:IsA("BasePart") and authoredTransparency(part) < 1 and part.Size.Y > length then
 			if part.Size.Y >= math.max(part.Size.X, part.Size.Z) then
 				blade, length = part, part.Size.Y
 			end
@@ -322,7 +333,7 @@ local function rebuild(character, equipment)
 				continue
 			end
 			for _, part in source:GetDescendants() do
-				if part:IsA("BasePart") and part.Transparency < 1 then
+				if part:IsA("BasePart") and authoredTransparency(part) < 1 then
 					local weld = part:FindFirstChildWhichIsA("WeldConstraint")
 					local anchor = weld and weld.Part0
 					local anchorName = anchor and anchor.Name or ""
@@ -620,6 +631,15 @@ function View.start()
 		local bobY = math.abs(math.sin(os.clock() * 8)) * 0.035 * moving
 		local bobX = math.sin(os.clock() * 4) * 0.025 * moving
 		local serverNow = workspace:GetServerTimeNow()
+		local insertionStart = character and character:GetAttribute("ArenaDropStart")
+		local insertionUntil = player:GetAttribute("ArenaDropUntil")
+		local insertion = if type(insertionStart) == "number"
+				and type(insertionUntil) == "number"
+				and insertionUntil > serverNow
+			then Motion.sample(serverNow - insertionStart)
+			else nil
+		local draw = if insertion then 1 - insertion.Draw else 0
+		local insertionPose = CFrame.new(0, -0.85 * draw, 0.35 * draw) * CFrame.Angles(-0.3 * draw, 0, 0)
 		local blockedAt = character and character:GetAttribute("BlockedAt")
 		local hurtAt = character and character:GetAttribute("HurtAt")
 		local jolt = impulse(if type(blockedAt) == "number" then serverNow - blockedAt else nil, 0.24)
@@ -763,7 +783,7 @@ function View.start()
 				end
 				pose = motion * pose
 			end
-			piece.Part.CFrame = current.CFrame * flinch * pose * piece.Offset
+			piece.Part.CFrame = current.CFrame * insertionPose * flinch * pose * piece.Offset
 		end
 	end)
 end
