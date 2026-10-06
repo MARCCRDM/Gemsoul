@@ -154,6 +154,19 @@ check(flinch.Waist and flinch.Waist[1] > 0.2 and flinch.Neck[1] > 0.2, "Hit did 
 check(RivalPose.pose({ HurtAt = 100 }, 100.5, true).Waist == nil, "Flinch did not fade")
 local jolt = RivalPose.pose({ GuardUntil = 101, BlockedAt = 100 }, 100.05)
 check(jolt.LeftShoulder[1] < RivalPose.pose({ GuardUntil = 101 }, 100.05).LeftShoulder[1], "Blocked blow did not jolt the shield")
+-- Cast silhouettes brace their legs and recover; every style is finite across release.
+for _, kind in { "Bolt", "Drill", "Sweep", "Nova", "Erupt", "Cross", "Buff" } do
+ local attrs = { ActionKind=kind, ActionStart=100, ActionAt=100.7 }
+ local coiled = RivalPose.pose(attrs, 100.65, true)
+ check(coiled.RightKnee and coiled.RightKnee[1] < 0, kind .. " lacks a braced wind-up")
+ for _, time in { 100, 100.35, 100.699, 100.7, 100.74, 100.82, 101, 101.4 } do
+  local pose = RivalPose.pose(attrs, time, true)
+  for _, angles in pose do
+   for _, angle in angles do check(angle == angle and math.abs(angle) < 4, kind .. " has an invalid joint angle") end
+  end
+ end
+ check(next((RivalPose.pose(attrs, 102, true))) == nil, kind .. " failed to return to idle")
+end
 -- Tung Tung shares the exact fighter attack/reaction timing, with a bat guard.
 for _,kind in {"Slash","Heavy","Bolt","Nova","Buff","Dodge","Stagger"} do
  for _,offset in {0,.15,.29,.35,.6,.95,1.5} do

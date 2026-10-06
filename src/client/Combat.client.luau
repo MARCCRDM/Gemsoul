@@ -1859,7 +1859,7 @@ function handlers.TechCooldown(id, duration, lockout)
 		cast = { Name = stats.Name, Start = os.clock(), Duration = castTime, Color = castColor }
 	end
 	if gem then
-		FirstPerson.cast(castTime, castColor, stats.Animation)
+		FirstPerson.cast(castTime, castColor, Actions.castPose(stats))
 	end
 end
 local signatureLive = 0

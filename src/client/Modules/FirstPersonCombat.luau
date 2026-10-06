@@ -426,7 +426,7 @@ end
 -- of you over `duration`; then it throws forward and bursts. (A cast with no
 -- wind-up just throws.)
 function View.cast(duration, color, animation)
-	castAnimation = animation
+	castAnimation = animation or "Bolt"
 	castAt, castFor, castColor = os.clock(), math.max(0, duration or 0), color or Color3.fromRGB(255, 190, 80)
 	if castOrb then
 		castOrb:Destroy()
@@ -599,10 +599,17 @@ function View.start()
 		local castElapsed = os.clock() - castAt
 		local gather = if castFor > 0 then math.clamp(castElapsed / castFor, 0, 1) else 1
 		local after = castElapsed - castFor
-		local throw = if after >= 0 and after < 0.3
-			then math.sin(math.min(1, after / 0.08) * math.pi / 2) * math.exp(-after * 9)
+		local release = if castAnimation == "Nova" or castAnimation == "Erupt" then 0.1 else 0.085
+		local throw = if after >= 0 and after < release
+			then ease(after / release)
+			elseif after >= release and after < 0.18 then 1
+			elseif after >= 0.18 and after < 0.46 then 1 - ease((after - 0.18) / 0.28)
 			else 0
-		local casting = if castElapsed >= 0 and after < 0 then math.sin(gather * math.pi / 2) else 0
+		-- Retain the gathered pose at release, then blend into the strike: no pop to idle.
+		local casting = if castElapsed >= 0 and after < 0
+			then math.sin(gather * math.pi / 2)
+			elseif after >= 0 and after < release and castFor > 0 then 1 - ease(after / release)
+			else 0
 		local castPose = casting + throw
 		if castOrb then
 			if after >= 0.3 then
@@ -679,14 +686,30 @@ function View.start()
 			if castAnimation and castPose > 0 then
 				local side = if piece.Left or piece.Shield then -1 else 1
 				local motion = CFrame.new()
-				if castAnimation == "Drill" then
+				if castAnimation == "Bolt" then
+					motion = CFrame.new(
+						side * 0.18 * casting,
+						0.14 * casting - 0.08 * throw,
+						0.3 * casting - 0.55 * throw
+					) * CFrame.Angles(
+						-0.2 * casting + 0.2 * throw,
+						side * (0.2 * casting - 0.15 * throw),
+						side * 0.18 * casting
+					)
+				elseif castAnimation == "Buff" then
+					motion = CFrame.new(
+						-side * 0.15 * casting + side * 0.2 * throw,
+						0.12 * casting + 0.3 * throw,
+						-0.15 * throw
+					) * CFrame.Angles(-0.18 * throw, 0, side * (0.2 * casting - 0.3 * throw))
+				elseif castAnimation == "Drill" then
 					motion = CFrame.new(0.1 * side * casting, 0.08 * casting, 0.25 * casting - 0.7 * throw)
 						* CFrame.Angles(0, 0, side * (casting * 0.3 - throw * 0.2))
 				elseif castAnimation == "Sweep" then
-					motion = CFrame.new(side * 0.22 * casting - 0.7 * throw, 0.12 * castPose, -0.2 * throw)
+					motion = CFrame.new(side * 0.3 * casting - 0.8 * throw, 0.12 * castPose, -0.2 * throw)
 						* CFrame.Angles(0, 0.45 * casting - 0.7 * throw, -0.35 * throw)
-				elseif castAnimation == "Erupt" then
-					motion = CFrame.new(0, 0.5 * casting - 0.65 * throw, -0.18 * throw)
+				elseif castAnimation == "Erupt" or castAnimation == "Nova" then
+					motion = CFrame.new(0, 0.52 * casting - 0.68 * throw, -0.18 * throw)
 						* CFrame.Angles(-0.4 * casting + 0.6 * throw, 0, side * 0.12 * castPose)
 				elseif castAnimation == "Cross" then
 					motion = CFrame.new(-side * 0.28 * casting + side * 0.3 * throw, 0.22 * castPose, -0.38 * throw)

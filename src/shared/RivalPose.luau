@@ -431,6 +431,43 @@ local function breathe(pose, t: number)
 	}, 1)
 end
 
+-- Cast silhouettes: coil through the hips, brace, then release with the whole body.
+-- Presentation only: ActionAt remains the server's authoritative release time.
+local CAST_STYLE = {
+	Bolt = { Twist = -0.5, Lean = -0.2, Snap = 0.07, Follow = 0.24 },
+	Drill = { Twist = -0.65, Lean = -0.28, Snap = 0.075, Follow = 0.26 },
+	Sweep = { Twist = -0.95, Lean = -0.16, Snap = 0.11, Follow = 0.3 },
+	Nova = { Twist = 0, Lean = -0.65, Snap = 0.1, Follow = 0.32 },
+	Erupt = { Twist = 0, Lean = -0.6, Snap = 0.09, Follow = 0.32 },
+	Cross = { Twist = -0.12, Lean = -0.28, Snap = 0.1, Follow = 0.28 },
+	Buff = { Twist = 0, Lean = 0.16, Snap = 0.12, Follow = 0.38 },
+}
+local function stageCast(kind, windup, strike)
+	local style = CAST_STYLE[kind]
+	if not style then
+		return
+	end
+	windup.Waist = { if kind == "Nova" or kind == "Erupt" then 0.32 else 0.12, style.Twist, 0 }
+	windup.Neck = { -0.08, -style.Twist * 0.3, 0 }
+	windup.RightHip, windup.LeftHip = { 0.25, 0, 0 }, { 0.12, 0, 0 }
+	windup.RightKnee, windup.LeftKnee = { -0.32, 0, 0 }, { -0.2, 0, 0 }
+	strike.Waist = { style.Lean, -style.Twist * 0.75, 0 }
+	strike.Neck = { -style.Lean * 0.2, style.Twist * 0.25, 0 }
+	-- Keep existing ground-slam leg poses; directional casts drive off the rear leg.
+	strike.RightHip = strike.RightHip or { 0.38, 0, 0 }
+	strike.LeftHip = strike.LeftHip or { -0.12, 0, 0 }
+	strike.RightKnee = strike.RightKnee or { -0.42, 0, 0 }
+	strike.LeftKnee = strike.LeftKnee or { -0.08, 0, 0 }
+	if kind == "Bolt" or kind == "Drill" then
+		windup.RightShoulder = { 1.35, -0.35, 0.85 }
+		windup.RightElbow = { 1.75, 0, 0 }
+		strike.RightShoulder = { 1.85, 0.18, -0.18 }
+	elseif kind == "Buff" then
+		windup.RightShoulder, windup.LeftShoulder = { 0.95, 0.3, -0.25 }, { 0.95, -0.3, 0.25 }
+		strike.RightShoulder, strike.LeftShoulder = { 2.1, -0.2, 0.7 }, { 2.1, 0.2, -0.7 }
+	end
+end
+
 -- The action itself: the pose and how snappily the joints follow it.
 local function actionPose(a, t: number, base)
 	local kind, start, at = a.ActionKind, a.ActionStart, a.ActionAt
@@ -441,6 +478,9 @@ local function actionPose(a, t: number, base)
 	if not windup then
 		return nil, 0
 	end
+	stageCast(kind, windup, strike)
+	local style = CAST_STYLE[kind]
+	local snapTime = if style then style.Snap else SNAP
 	if t < at then
 		-- Ease into the wind-up, then coil a little past it just before the
 		-- release (the anticipation that sells the blow). A heavy trembles
@@ -454,18 +494,22 @@ local function actionPose(a, t: number, base)
 		end
 		return pose, 18
 	end
-	local hold = if kind == "Dodge" then 0.4 elseif kind == "Stagger" then 0.45 elseif kind == "Buff" then 0.6 else FOLLOW
+	local hold = if kind == "Dodge"
+		then 0.4
+		elseif kind == "Stagger" then 0.45
+		elseif kind == "Buff" then 0.6
+		else (if style then style.Follow else FOLLOW)
 	-- A held beam keeps its cast pose while it pours (ActionHold).
 	if type(a.ActionHold) == "number" then
 		hold = math.max(hold, a.ActionHold - at)
 	end
 	local d = t - at
-	if d < SNAP then
+	if d < snapTime then
 		-- The blow snaps through, past the strike pose.
-		return lerp(windup, strike, ease(d / SNAP) * (1 + OVERSHOOT)), 45
+		return lerp(windup, strike, ease(d / snapTime) * (1 + OVERSHOOT)), 45
 	elseif d < hold then
 		-- Follow-through: settle back onto the strike pose.
-		return lerp(windup, strike, 1 + OVERSHOOT * (1 - ease((d - SNAP) / math.max(0.05, hold - SNAP)))), 35
+		return lerp(windup, strike, 1 + OVERSHOOT * (1 - ease((d - snapTime) / math.max(0.05, hold - snapTime)))), 35
 	elseif d < hold + RECOVER then
 		-- Recover to the stance, smoothly.
 		return lerp(strike, base, ease((d - hold) / RECOVER)), 28
