@@ -1,8 +1,8 @@
--- Shared arena establishing shot; participants see both insertions from the same side.
+-- Helmet POV throughout insertion. Camera follows the local pod, never an exterior shot.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
-local savedCamera, savedType, savedSubject
+local savedCamera, savedType, savedSubject, savedFov
 local hidden = {}
 local hudSaved = {}
 local gui = Instance.new("ScreenGui")
@@ -24,6 +24,7 @@ stroke.Parent = label
 local function restore()
 	if savedCamera then
 		savedCamera.CameraType = savedType
+		savedCamera.FieldOfView = savedFov
 		savedCamera.CameraSubject = if savedSubject and savedSubject.Parent
 			then savedSubject
 			else (player.Character and player.Character:FindFirstChildOfClass("Humanoid"))
@@ -45,7 +46,7 @@ local function restore()
 end
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
-RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Last.Value + 10, function()
+RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.Value + 2, function()
 	local ends, focus = player:GetAttribute("ArenaDropUntil"), player:GetAttribute("ArenaDropFocus")
 	local camera = workspace.CurrentCamera
 	if type(ends) ~= "number" or ends <= workspace:GetServerTimeNow() or typeof(focus) ~= "Vector3" or not camera then
@@ -53,7 +54,8 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Last.Val
 		return
 	end
 	if not savedCamera then
-		savedCamera, savedType, savedSubject = camera, camera.CameraType, camera.CameraSubject
+		savedCamera, savedType, savedSubject, savedFov =
+			camera, camera.CameraType, camera.CameraSubject, camera.FieldOfView
 	end
 	for _, name in { "CombatHud", "LobbyHud", "Toasts" } do
 		local hud = player.PlayerGui:FindFirstChild(name)
@@ -65,18 +67,32 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Last.Val
 		end
 	end
 	camera.CameraType = Enum.CameraType.Scriptable
-	-- A broad side angle keeps both entry points visible; no impact shake or aim movement.
-	local aspect = camera.ViewportSize.X / math.max(1, camera.ViewportSize.Y)
-	local distance = if aspect < 1.3 then 72 else 52
-	camera.CFrame = CFrame.lookAt(focus + Vector3.new(distance * 0.8, 18, distance * 0.7), focus + Vector3.new(0, 3, 0))
 	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local head = character and character:FindFirstChild("Head")
+	if not root or not head then
+		restore()
+		return
+	end
+	local now = workspace:GetServerTimeNow()
+	local start = character:GetAttribute("ArenaDropStart")
+	local elapsed = if type(start) == "number" then now - start else 10
+	local descent = math.clamp(elapsed / 0.72, 0, 1)
+	local height = if elapsed < 0.72 then 100 * (1 - descent * descent) else 0
+	local impactAge = elapsed - 0.72
+	local kick = if impactAge >= 0 then math.exp(-impactAge * 9) else 0
+	local pitch = math.sin(math.max(impactAge, 0) * 32) * 0.035 * kick
+	local eye = root.Position + Vector3.new(0, head.Position.Y - root.Position.Y + height - kick * 0.22, 0)
+	camera.CFrame = CFrame.lookAt(eye, eye + root.CFrame.LookVector) * CFrame.Angles(pitch, 0, pitch * 0.3)
+	camera.FieldOfView = savedFov
+		+ (if elapsed >= 0 and elapsed < 0.72 then math.sin(descent * math.pi) * 5 else kick * 2)
 	if character then
 		for _, object in character:GetDescendants() do
 			if object:IsA("BasePart") then
 				if hidden[object] == nil then
 					hidden[object] = object.LocalTransparencyModifier
 				end
-				object.LocalTransparencyModifier = 0
+				object.LocalTransparencyModifier = 1
 			end
 		end
 	end
@@ -87,13 +103,17 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Last.Val
 				if hidden[object] == nil then
 					hidden[object] = object.LocalTransparencyModifier
 				end
-				object.LocalTransparencyModifier = 1
+				object.LocalTransparencyModifier = if elapsed < 1.45 then 1 else 0
 			end
 		end
 	end
 	gui.Enabled = true
 	local remaining = ends - workspace:GetServerTimeNow()
 	label.Text = if remaining > 1.8
-		then "ORBITAL INSERTION  /  STAND BY"
+		then (if elapsed < 0
+			then "DROP QUEUED  /  BRACE"
+			elseif elapsed < 0.72 then "ORBITAL DESCENT  /  BRACE"
+			elseif elapsed < 1.1 then "IMPACT  /  RELEASING HATCH"
+			else "VISUAL CONTACT  /  STAND BY")
 		else "WEAPONS LIVE IN " .. math.ceil(remaining)
 end)

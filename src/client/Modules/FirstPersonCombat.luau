@@ -577,7 +577,7 @@ function View.start()
 			end
 		end)
 	end
-	RunService:BindToRenderStep("SagaFirstPerson", Enum.RenderPriority.Camera.Value + 2, function(dt)
+	RunService:BindToRenderStep("SagaFirstPerson", Enum.RenderPriority.Camera.Value + 3, function(dt)
 		local current = workspace.CurrentCamera
 		for part in hidden do
 			if part.Parent then

@@ -73,7 +73,9 @@ function Drop.begin(models, viewers, dropModels)
 		root.AssemblyLinearVelocity = Vector3.zero
 		model:SetAttribute("ArenaDropUntil", ends)
 		local saved, effects = {}, {}
-		local dropping = table.find(order, model) ~= nil
+		local slot = table.find(order, model)
+		local dropping = slot ~= nil
+		model:SetAttribute("ArenaDropStart", if slot then ends - duration + 0.25 + (slot - 1) * 2.6 else nil)
 		if dropping then
 			for _, object in model:GetDescendants() do
 				if object:IsA("BasePart") or object:IsA("Decal") then
@@ -120,6 +122,7 @@ function Drop.begin(models, viewers, dropModels)
 				root.Anchored = anchored
 			end
 			model:SetAttribute("ArenaDropUntil", nil)
+			model:SetAttribute("ArenaDropStart", nil)
 			active[model] = nil
 			local owner = Players:GetPlayerFromCharacter(model)
 			if owner and owner:GetAttribute("ArenaDropUntil") == ends then
