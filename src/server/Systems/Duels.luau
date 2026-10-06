@@ -364,6 +364,7 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 		for index, member in team do
 			dequeue(member)
 			matchOf[member] = match
+			ArenaDrop.prepare(member)
 			CombatServer.reset(member)
 			member:SetAttribute("MatchId", match.Id)
 			member:SetAttribute("MatchTeam", t)

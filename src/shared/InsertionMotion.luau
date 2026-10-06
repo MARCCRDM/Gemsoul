@@ -2,12 +2,13 @@
 -- Sampling is independent of frame rate; late clients join the current phase.
 local Motion = {
 	Lead = 0.45,
-	Spacing = 1.75,
-	Landing = 0.72,
-	Hatch = 0.91,
-	Exit = 1.18,
+	Spacing = 2.45,
+	Landing = 1.45,
+	Hatch = 1.62,
+	ShellBurst = 2.03,
+	Exit = 2.12,
 	ExitDuration = 0.5,
-	Ready = 2.1,
+	Ready = 3.05,
 	Altitude = 82,
 	SmokeAfter = 6,
 	Handoff = 0.4,
@@ -21,18 +22,24 @@ function Motion.duration(count)
 end
 -- Cosmetic shell rupture: one outward throw, followed by gravity and a fade.
 function Motion.blast(t)
-	local age = math.max(0, t - Motion.Hatch)
+	local age = math.max(0, t - Motion.ShellBurst)
 	local travel = 1 - math.exp(-age * 5)
 	return {
 		Travel = travel,
 		Lift = 10 * age - 14 * age * age,
 		Spin = math.min(age, 1.6),
 		Fade = Motion.smooth((age - 0.65) / 0.95),
-		Flash = if t >= Motion.Hatch then math.exp(-age * 15) else 0,
+		Flash = if t >= Motion.ShellBurst then math.exp(-age * 15) else 0,
 	}
 end
 function Motion.smokeSpread(t)
 	return 2 + 28 * Motion.smooth((t - Motion.Landing) / 1.5)
+end
+function Motion.audio(t)
+    local p=math.clamp(t/Motion.Landing,0,1)
+    local air=if t>=0 and t<Motion.Landing then Motion.smooth(t/.2)*(1-Motion.smooth((t-Motion.Landing+.12)/.12)) else 0
+    local rumble=if t<0 then 0 elseif t<Motion.Landing then Motion.smooth(t/.25)*(.35+.65*p) else math.exp(-(t-Motion.Landing)*9)
+    return {Air=air,Pitch=.65+p*1.1,Rumble=if t<Motion.Landing+.65 then rumble else 0}
 end
 function Motion.sample(t)
 	local descent = Motion.smooth(t / Motion.Landing)

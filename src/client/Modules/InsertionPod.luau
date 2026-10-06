@@ -167,6 +167,21 @@ function Pod.new(marker)
 	local hatchSound = Instance.new("Sound")
 	hatchSound.SoundId, hatchSound.Volume, hatchSound.PlaybackSpeed = "rbxasset://sounds/collide.wav", 0.7, 0.6
 	hatchSound.RollOffMaxDistance, hatchSound.Parent = 90, door
+    local descent=Instance.new("Sound")
+    descent.Name,descent.SoundId="DescentAir","rbxasset://sounds/action_falling.mp3"
+    descent.Looped,descent.Volume,descent.RollOffMaxDistance=true,0,160
+    descent.Parent=pieces[1].Part
+    local rumble=descent:Clone()
+    rumble.Name,rumble.PlaybackSpeed,rumble.Parent="InsertionRumble",.28,pieces[1].Part
+    local bass=Instance.new("EqualizerSoundEffect")
+    bass.LowGain,bass.MidGain,bass.HighGain=6,-10,-24
+    bass.Parent=rumble
+    local rupture=Instance.new("Sound")
+    rupture.Name,rupture.SoundId="ShellRupture","rbxasset://sounds/action_jump_land.mp3"
+    rupture.Volume,rupture.PlaybackSpeed,rupture.RollOffMaxDistance=.85,.42,130
+    rupture.Parent=pieces[1].Part
+    local group=game:GetService("SoundService"):FindFirstChild("CombatSounds")
+    for _,sound in {impact,hatchSound,descent,rumble,rupture} do sound.SoundGroup=group end
 	for _, entry in pieces do
 		entry.Transparency = entry.Part.Transparency
 	end
@@ -174,7 +189,7 @@ function Pod.new(marker)
 	local cabin = Instance.new("PointLight")
 	cabin.Color, cabin.Range, cabin.Brightness = color, 9, 0.85
 	cabin.Parent = pieces[1].Part
-	local landed, opened = false, false
+	local landed, opened, ruptured, audioStarted, audioStopped = false, false, false, false, false
 	local lastSmokeFade = -1
 	local result = {}
 	function result.update(now)
@@ -212,6 +227,17 @@ function Pod.new(marker)
 		end
 		local pose = Motion.sample(t)
 		local blast = Motion.blast(t)
+        local audio=Motion.audio(t)
+        if t>=0 and t<Motion.Landing+.65 and not audioStarted then
+            audioStarted=true
+            descent:Play(); rumble:Play()
+        end
+        descent.Volume,descent.PlaybackSpeed=audio.Air*.38,audio.Pitch
+        rumble.Volume=audio.Rumble*.55
+        if t>=Motion.Landing+.65 and not audioStopped then
+            audioStopped=true
+            descent:Stop(); rumble:Stop()
+        end
 		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit) / 0.8))
 		local floor = origin * CFrame.new(0, -3, 0)
 		local frame = floor + Vector3.new(0, pose.Height - pose.Impact * 0.14, 0)
@@ -226,7 +252,7 @@ function Pod.new(marker)
 			if entry.Hatch then
 				local h = pose.Hatch
 				offset = CFrame.new(0, h * 1.6, -h * 6.5) * CFrame.Angles(-h * 1.1, 0, h * 0.16) * offset
-			elseif not entry.Fixed and t >= Motion.Hatch then
+			elseif not entry.Fixed and t >= Motion.ShellBurst then
 				-- Side armor separates away from the fighter; the roof and spine arc backward.
 				local x = entry.Side * blast.Travel * 11
 				local z = if entry.Side ~= 0 then blast.Travel * 2 else blast.Travel * 9
@@ -250,10 +276,10 @@ function Pod.new(marker)
 			local life = math.max(0.1, ends + Motion.SmokeAfter - now)
 			emitter.Lifetime = NumberRange.new(life * 0.9, life)
 			if now < ends + Motion.SmokeAfter then
-				emitter:Emit(if compact then 38 else 64)
+				emitter:Emit(if compact then 48 else 88)
 				for _, node in smokeNodes do
 					node.Emitter.Lifetime = NumberRange.new(life * 0.95, life)
-					node.Emitter:Emit(if compact then 5 else 8)
+					node.Emitter:Emit(if compact then 6 else 11)
 				end
 			end
 			if t < Motion.Landing + 0.45 then
@@ -263,11 +289,21 @@ function Pod.new(marker)
 		if not opened and t >= Motion.Hatch then
 			opened = true
 			if t < Motion.Hatch + 0.4 then
-				sparks:Emit(if compact then 18 else 30)
-				flame:Emit(if compact then 5 else 8)
-				hatchSound:Play()
+                hatchSound:Play()
 			end
 		end
+        -- Door has already cleared forward before the rest of the shell detonates.
+        if not ruptured and t>=Motion.ShellBurst then
+            ruptured=true
+            if t<Motion.ShellBurst+.35 then
+                sparks:Emit(if compact then 18 else 30)
+                flame:Emit(if compact then 5 else 8)
+                emitter.Lifetime=NumberRange.new(math.max(.1,ends+Motion.SmokeAfter-now))
+                emitter:Emit(if compact then 14 else 24)
+                rupture:Play()
+            end
+        end
+        result.Ready=true
 	end
 	function result.destroy()
 		model:Destroy()

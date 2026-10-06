@@ -28,6 +28,7 @@ local function enter(player, pvp)
 		return Shop.reply(false, "The Arena isn't ready yet.")
 	end
 	busy[player] = true
+	ArenaDrop.prepare(player)
 	local angle = math.rad((player.UserId % 8) * 45)
 	local spot = center + Vector3.new(math.cos(angle) * 22, 4, math.sin(angle) * 22)
 	local ok = pcall(function()
@@ -39,6 +40,7 @@ local function enter(player, pvp)
 	end)
 	busy[player] = nil
 	if not ok then
+		ArenaDrop.cancel(character)
 		return Shop.reply(false, "Couldn't enter the Arena. Try again.")
 	end
 	player:SetAttribute("PvPEnabled", pvp == true)
@@ -63,6 +65,7 @@ local function leave(player)
 		ArenaDrop.cancel(player.Character)
 	end
 	player:SetAttribute("ArenaInserted", nil)
+	player:SetAttribute("ArenaDropPreparing", nil)
 	if ArenaSessions.onDungeonLeave then
 		ArenaSessions.onDungeonLeave(player)
 	end

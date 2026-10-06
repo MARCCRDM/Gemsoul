@@ -25,6 +25,55 @@ function Drop.cancel(model)
 		finish()
 	end
 end
+-- Cover and hide before a teleport or asynchronous rival build, not after it.
+function Drop.prepare(player)
+    local model=player.Character
+    local root=model and model:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    Drop.cancel(model)
+    local anchored=root.Anchored
+    root.Anchored=true
+    local saved,effects,connections={},{},{}
+    local deadline=workspace:GetServerTimeNow()+15
+    player:SetAttribute("ArenaDropPreparing",deadline)
+    player:SetAttribute("ArenaDropUntil",deadline)
+    model:SetAttribute("ArenaDropUntil",deadline)
+    local function hide(object)
+        if object:IsA("BasePart") or object:IsA("Decal") then
+            saved[object]=object.Transparency
+            object:SetAttribute("InsertionTransparency",object.Transparency)
+            object.Transparency=1
+        elseif object:IsA("ParticleEmitter") or object:IsA("Trail") then
+            effects[object]=object.Enabled
+            object:SetAttribute("InsertionEnabled",object.Enabled)
+            object.Enabled=false
+        end
+    end
+    for _,object in model:GetDescendants() do hide(object) end
+    table.insert(connections,model.DescendantAdded:Connect(hide))
+    local finished=false
+    local function cleanup()
+        if finished then return end
+        finished=true
+        for _,connection in connections do connection:Disconnect() end
+        for object,value in saved do
+            if object.Parent then object.Transparency=value; object:SetAttribute("InsertionTransparency",nil) end
+        end
+        for object,value in effects do
+            if object.Parent then object.Enabled=value; object:SetAttribute("InsertionEnabled",nil) end
+        end
+        if root.Parent then root.Anchored=anchored end
+        model:SetAttribute("ArenaDropUntil",nil)
+        if player:GetAttribute("ArenaDropPreparing")==deadline then player:SetAttribute("ArenaDropPreparing",nil) end
+        if player:GetAttribute("ArenaDropUntil")==deadline then player:SetAttribute("ArenaDropUntil",nil) end
+        active[model]=nil
+    end
+    active[model]=cleanup
+    table.insert(connections,model.AncestryChanged:Connect(function(_,parent) if not parent then cleanup() end end))
+    local humanoid=model:FindFirstChildOfClass("Humanoid")
+    if humanoid then table.insert(connections,humanoid.Died:Connect(cleanup)) end
+    task.delay(15,cleanup)
+end
 function Drop.begin(models, viewers, dropModels)
 	local RunService = game:GetService("RunService")
 	local order = table.clone(dropModels or models)

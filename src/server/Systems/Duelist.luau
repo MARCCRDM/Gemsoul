@@ -1977,7 +1977,6 @@ function Duelist.start()
 		end
 	end)
 	ArenaSessions.onEnter = function(player: Player, _pvp: boolean)
-		task.wait(1.5) -- let the arrival protection settle first
 		spawnRival(player)
 	end
 	ArenaSessions.onLeave = function(player: Player)

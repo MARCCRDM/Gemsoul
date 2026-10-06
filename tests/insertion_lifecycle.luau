@@ -68,7 +68,7 @@ local workspace = {
 local created = {}
 local function object(class)
 	local attrs, signals = {}, {}
-	local o = { ClassName = class, Parent = workspace, AncestryChanged = signal() }
+	local o = { ClassName = class, Parent = workspace, AncestryChanged = signal(), DescendantAdded = signal() }
 	table.insert(created, o)
 	function o:SetAttribute(k, v)
 		attrs[k] = v
@@ -220,4 +220,18 @@ check(lf.X == 20 and lf.Z == -8 and lf.Y == 3, "First fighter not facing opponen
 check(rf.X == -20 and rf.Z == 7 and rf.Y == 6, "Second fighter not facing opponent horizontally")
 Drop.cancel(left)
 Drop.cancel(right)
+local staged,sr,sa,se=actor()
+local entrant=object("Player"); entrant.Character=staged; owners[staged]=entrant
+Drop.prepare(entrant)
+check(sr.Anchored and sa.Transparency==1 and not se.Enabled,"Preparation exposed character before teleport")
+check(entrant:GetAttribute("ArenaDropPreparing")>now,"Preparation did not cover loading")
+local duration2=Drop.begin({staged},{entrant})
+check(sa:GetAttribute("InsertionTransparency")==.35,"Preparation-to-drop lost original armor visibility")
+check(entrant:GetAttribute("ArenaDropPreparing")==nil,"Preparation cover did not release to pod")
+advance(duration2+.1)
+check(not sr.Anchored and sa.Transparency==.35 and se.Enabled,"Prepared fighter failed to restore after insertion")
+Drop.prepare(entrant); Drop.cancel(staged)
+check(not sr.Anchored and entrant:GetAttribute("ArenaDropPreparing")==nil,"Failed entry left preparation frozen")
+Drop.prepare(entrant); advance(15.1)
+check(not sr.Anchored and entrant:GetAttribute("ArenaDropUntil")==nil,"Preparation timeout retained protection")
 print("PASS: " .. checks .. " real insertion lifecycle checks")

@@ -43,11 +43,13 @@ function ArenaScene.enter(pvp)
 		return
 	end
 	busy = true
+	player:SetAttribute("LocalInsertionPending",workspace:GetServerTimeNow()+15)
 	task.spawn(function()
 		local result = GemClient.request(if pvp then "ArenaPvP" else "ArenaTraining")
 		busy = false
 		-- Walking in says it all; only a refusal needs words.
 		if not result.Ok then
+			player:SetAttribute("LocalInsertionPending",nil)
 			UiKit.toast(result.Message, UiKit.Colors.Bad)
 		end
 		refresh()
