@@ -728,7 +728,9 @@ local ATTRIBUTES = {
 -- Call every frame (clients pose every body: Client.BodyPoses) with the
 -- model and server time. Joints only change when they move noticeably.
 local nextSweep = 0
-function RivalPose.update(model: Model?, dt: number, now: number, clock: number?, rest: boolean?)
+-- `guarding`: known to be blocking right now (a player's own "Blocking"
+-- flag), whatever GuardUntil says.
+function RivalPose.update(model: Model?, dt: number, now: number, clock: number?, rest: boolean?, guarding: boolean?)
 	local tick = clock or now
 	if tick >= nextSweep then
 		nextSweep = tick + 1
@@ -749,6 +751,9 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 	local attrs = {}
 	for _, name in ATTRIBUTES do
 		attrs[name] = model:GetAttribute(name)
+	end
+	if guarding and not (type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now) then
+		attrs.GuardUntil = now + 0.25
 	end
 	local target, speed = RivalPose.pose(attrs, now, rest)
 	local alpha = 1 - math.exp(-speed * math.min(dt, 0.1))
