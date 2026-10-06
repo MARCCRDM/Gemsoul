@@ -227,7 +227,8 @@ local function name(payloadOwner: Player): string
 end
 
 local function finishChange(player: Player)
-	PlayerData.sync(player)
+	-- (a gem may have left a socket, or worn gear changed: refresh the character)
+	PlayerData.augmentsChanged(player)
 	if not practice() then
 		task.spawn(PlayerData.save, player)
 	end
@@ -476,7 +477,7 @@ function handlers.MarketBuy(player: Player, listingId)
 	if profile.Coins < row.Price then
 		return Shop.reply(false, string.format("You need %d coins.", row.Price))
 	end
-	local why = Rules.cantReceive(profile, row.Item, Config.MaxGems)
+	local why = Rules.cantReceive(profile, row.Item, Config.MaxGems, Config.MaxGear)
 	if why then
 		return Shop.reply(false, why)
 	end
@@ -533,7 +534,8 @@ function handlers.MarketOffer(player: Player, listingId, kind, slot, id)
 	if #(row.Offers or {}) >= Rules.MaxOffers then
 		return Shop.reply(false, "That listing has all the offers it can take.")
 	end
-	local why = Rules.whyNot(profile, kind, slot, id) or Rules.cantReceive(profile, row.Item, Config.MaxGems)
+	local why = Rules.whyNot(profile, kind, slot, id)
+		or Rules.cantReceive(profile, row.Item, Config.MaxGems, Config.MaxGear)
 	if why then
 		return Shop.reply(false, why)
 	end
@@ -628,7 +630,7 @@ function handlers.MarketAccept(player: Player, listingId, offerId)
 	if not row or row.State ~= "Open" or not offer then
 		return Shop.reply(false, "That offer is gone.")
 	end
-	local why = Rules.cantReceive(profile, offer.Item, Config.MaxGems)
+	local why = Rules.cantReceive(profile, offer.Item, Config.MaxGems, Config.MaxGear)
 	if why then
 		return Shop.reply(false, why)
 	end

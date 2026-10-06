@@ -2363,6 +2363,8 @@ function ArmorKits.build(
 	slot: string?,
 	itemId: string?
 )
+	-- A second copy ("Model#2") looks like its model.
+	itemId = if itemId then string.match(itemId, "^([^#]+)") or itemId else nil
 	local cleanLook = CLEAN_ALIASES[look] or (if CLEAN_LOOKS[look] then look else nil)
 	local palette = KITS[cleanLook or look] or KITS.Plate
 	local kit: Kit = {

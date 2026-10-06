@@ -93,6 +93,7 @@ local Slots = load("src/shared/EquipmentSlots.luau", {})
 local Rules = load("src/shared/Market.luau", { script = { Parent = { EquipmentSlots = Slots } } })
 local Config = {
 	MaxGems = 10,
+	MaxGear = 12,
 	Features = { Market = true },
 	Playtest = { FreshStart = false },
 }
@@ -153,6 +154,7 @@ local PlayerData = {
 		return saveWorks
 	end,
 	sync = function() end,
+	augmentsChanged = function() end,
 	milestone = function() end,
 }
 local handlers = {}
@@ -227,29 +229,50 @@ local function escrowCount(p)
 	end
 	return n
 end
--- Every gem id is in exactly one place: a bag, an escrow, or a socket.
+-- Every gem id is in exactly one player's hands (bag, socket, gear or
+-- escrow), and the number of pieces of each gear model never changes.
 local function census()
 	local seen = {}
-	local function mark(id)
-		check(not seen[id], "item duplicated: " .. id)
-		seen[id] = true
-	end
 	for _, p in players do
-		local prof = profiles[p]
+		local prof, mine = profiles[p], {}
+		local function gemAt(g)
+			if type(g) == "table" and g.Id then
+				mine[g.Id] = true
+			end
+		end
+		local function gear(model)
+			model = Slots.model(model)
+			seen["gear:" .. model] = (seen["gear:" .. model] or 0) + 1
+		end
 		for _, g in prof.Gems do
-			mark(g.Id)
+			gemAt(g)
 		end
 		for _, entry in prof.Market and prof.Market.Escrow or {} do
 			if entry.Item.Kind == "Gem" then
-				mark(entry.Item.Gem.Id)
+				gemAt(entry.Item.Gem)
 			else
-				mark("gear:" .. entry.Item.Id)
+				gear(entry.Item.Id)
+				gemAt(entry.Item.Gem)
 			end
 		end
-		for kind, owned in prof.Owned do
-			for id in owned do
-				mark("gear:" .. id)
+		for key, value in prof.Character do
+			if type(key) == "string" and string.sub(key, -3) == "Gem" then
+				gemAt(value)
 			end
+		end
+		for _, list in prof.Character.ItemGems or {} do
+			for _, g in list do
+				gemAt(g)
+			end
+		end
+		for _, owned in prof.Owned do
+			for key in owned do
+				gear(key)
+			end
+		end
+		for id in mine do
+			check(not seen[id], "gem duplicated: " .. id)
+			seen[id] = true
 		end
 	end
 	return seen
@@ -257,11 +280,11 @@ end
 local everything = census()
 local function conserved(where)
 	local seen = census()
-	for id in everything do
-		check(seen[id], where .. ": item lost: " .. id)
+	for id, v in everything do
+		check(seen[id] == v, where .. ": item lost or changed: " .. id)
 	end
 	for id in seen do
-		check(everything[id], where .. ": item appeared: " .. id)
+		check(everything[id] ~= nil, where .. ": item appeared: " .. id)
 	end
 end
 
@@ -348,8 +371,33 @@ check(not call(bob, "MarketWithdraw", trade.Id).Ok, "nothing left to withdraw")
 conserved("after the trade")
 
 -- 5. Withdraw and decline.
+-- A socketed gem can be listed: it comes out of its socket (W7's, at Cat's).
 r = call(cat, "MarketList", "Gem", nil, "socketed", "Trade", "Any")
-check(not r.Ok, "a socketed gem isn't in the bag, so it can't be listed")
+check(r.Ok, "a socketed gem can be listed: " .. tostring(r.Message))
+check(profiles[cat].Character.ItemGems.Weapon.W7 == nil and profiles[cat].Owned.Weapons.W7 == 3, "gem out, gear kept")
+local sock = call(ann, "MarketBrowse").Listings
+for _, row in sock do
+	if row.Item.Kind == "Gem" and row.Item.Gem.Id == "socketed" then
+		check(call(cat, "MarketCancel", row.Id).Ok, "cancel the socketed gem listing")
+	end
+end
+check(has(cat, "socketed"), "cancelled: the gem comes home to the bag")
+-- Gems on Q/E/R (surge sockets) and in worn gear list too.
+profiles[cat].Character.Surge1Gem = gem("onq", "Rare", 2)
+profiles[cat].Character.Weapon = "W9"
+profiles[cat].Character.WeaponGem = gem("worn", "Common", 1)
+profiles[cat].Character.ItemGems.Weapon.W9 = profiles[cat].Character.WeaponGem
+everything = census() -- (two gems added by hand)
+check(call(cat, "MarketList", "Gem", nil, "onq", "Sell", 7).Ok, "a gem on Q can be listed")
+check(profiles[cat].Character.Surge1Gem == nil, "it left the Q socket")
+check(call(cat, "MarketList", "Gem", nil, "worn", "Sell", 7).Ok, "a gem in worn gear can be listed")
+check(profiles[cat].Character.WeaponGem == nil and profiles[cat].Character.ItemGems.Weapon.W9 == nil, "socket emptied")
+for _, row in call(cat, "MarketBrowse").Listings do
+	if row.Seller == 3 then
+		call(cat, "MarketCancel", row.Id)
+	end
+end
+check(has(cat, "onq") and has(cat, "worn"), "both home in the bag")
 r = call(bob, "MarketList", "Gem", nil, "sapphire", "Trade", "Any")
 check(r.Ok, "bob lists sapphire for trade")
 local sap = call(cat, "MarketBrowse").Listings[1]
@@ -383,7 +431,41 @@ Config.Playtest.FreshStart = false
 canTrade[ann] = nil
 conserved("at the end")
 
--- 8. Limits.
+-- 8. Copies: buying a model you already own gives you a second copy.
+profiles[bob].Owned.Weapons.W9 = 1
+profiles[bob].Character.GearRolls.Weapons.W9 = { Rarity = 1 }
+profiles[cat].Character.Weapon = "W0"
+profiles[cat].Owned.Weapons.W0 = 1
+profiles[cat].Character.GearRolls.Weapons.W9 = { Rarity = 3 }
+everything = census() -- (gear added by hand)
+r = call(cat, "MarketList", "Gear", "Weapon", "W9", "Sell", 40)
+check(r.Ok, "list W9: " .. tostring(r.Message))
+local w9
+for _, row in call(bob, "MarketBrowse").Listings do
+	if row.Item.Id == "W9" then
+		w9 = row
+	end
+end
+r = call(bob, "MarketBuy", w9.Id)
+check(r.Ok, "bob buys a model he already owns: " .. tostring(r.Message))
+check(
+	profiles[bob].Owned.Weapons.W9 == 1 and profiles[bob].Owned.Weapons["W9#2"] == 2,
+	"his first copy stays, the new one is W9#2"
+)
+check(profiles[bob].Character.GearRolls.Weapons["W9#2"] ~= nil, "the copy keeps its own roll")
+conserved("after buying a copy")
+-- And a copy can be listed and bought back by someone who has the model.
+r = call(bob, "MarketList", "Gear", "Weapon", "W9#2", "Sell", 40)
+check(r.Ok, "list the copy")
+for _, row in call(cat, "MarketBrowse").Listings do
+	if row.Item.Id == "W9#2" then
+		check(call(cat, "MarketBuy", row.Id).Ok, "cat buys it back")
+	end
+end
+check(profiles[cat].Owned.Weapons.W9 == 2, "it arrives as W9 when the key is free")
+conserved("after the copy came back")
+
+-- 9. Limits.
 for i = 1, Rules.MaxListings + 1 do
 	table.insert(profiles[cat].Gems, gem("lot" .. i))
 end
@@ -396,6 +478,30 @@ for i = 1, Rules.MaxListings + 1 do
 end
 check(listed == Rules.MaxListings, "listing cap")
 conserved("after the cap")
+
+-- 10. Face to face (Shared.EquipmentTrade): swapping two copies of one model.
+local Trade = load("src/shared/EquipmentTrade.luau", { script = { Parent = { EquipmentSlots = Slots } } })
+local function owner(weapon, roll)
+	return {
+		Owned = { Weapons = { [weapon] = 2, W1 = 1 } },
+		Character = {
+			Weapon = "W1",
+			GearRolls = { Weapons = { [weapon] = roll, W1 = {} } },
+			ItemGems = { Weapon = {} },
+		},
+	}
+end
+local pa, pb = owner("Saber", { Rarity = 5 }), owner("Saber", { Rarity = 1 })
+pb.Owned.Weapons["Saber#2"] = 3
+pb.Character.GearRolls.Weapons["Saber#2"] = { Rarity = 2 }
+local left, right = Trade.item(pa, "Weapon", "Saber"), Trade.item(pb, "Weapon", "Saber#2")
+local ok, message = Trade.exchange(pa, pb, left, right)
+check(ok, "same-model trade allowed: " .. tostring(message))
+check(pa.Owned.Weapons.Saber == 3 and pa.Character.GearRolls.Weapons.Saber.Rarity == 2, "A got B's copy")
+check(pb.Owned.Weapons.Saber == 2 and pb.Owned.Weapons["Saber#2"] == 2, "B keeps his Saber and gets A's as Saber#2")
+check(pb.Character.GearRolls.Weapons["Saber#2"].Rarity == 5, "with its own roll")
+check(Slots.model("Saber#2") == "Saber" and Slots.model("Saber") == "Saber", "model of a key")
+check(Slots.freeKey({ Saber = 1, ["Saber#2"] = 1 }, "Saber#2") == "Saber#3", "next free key")
 
 print(
 	("PASS: %d Market checks (escrow, sales, tax, races, trades, offers, cancel, expiry, saving, limits, no dupes)"):format(

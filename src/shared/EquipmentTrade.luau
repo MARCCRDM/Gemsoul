@@ -51,11 +51,6 @@ function Trade.validate(a, b, left, right)
 	if not equal(Trade.item(a, left.Slot, left.Id), left) or not equal(Trade.item(b, right.Slot, right.Id), right) then
 		return false, "An offered item changed. Start a new trade."
 	end
-	local slot = left.Slot
-	local kind = Slots.Definitions[slot].Kind
-	if (left.Id ~= right.Id) and (a.Owned[kind][right.Id] or b.Owned[kind][left.Id]) then
-		return false, "A player already owns that model. Choose another item."
-	end
 	return true
 end
 function Trade.exchange(a, b, left, right)
@@ -72,11 +67,13 @@ function Trade.exchange(a, b, left, right)
 	end
 	local function receive(profile, outgoing, incoming)
 		local c = profile.Character
-		profile.Owned[kind][incoming.Id] = incoming.Quality
-		c.GearRolls[kind][incoming.Id] = incoming.Roll
-		c.ItemGems[slot][incoming.Id] = incoming.Gem
+		-- A copy of a model they already own gets its own key (Slots.freeKey).
+		local key = Slots.freeKey(profile.Owned[kind], incoming.Id)
+		profile.Owned[kind][key] = incoming.Quality
+		c.GearRolls[kind][key] = incoming.Roll
+		c.ItemGems[slot][key] = incoming.Gem
 		if c[slot] == outgoing.Id then
-			c[slot] = incoming.Id
+			c[slot] = key
 			c[slot .. "Quality"] = incoming.Quality
 			c[slot .. "Gem"] = incoming.Gem
 		end

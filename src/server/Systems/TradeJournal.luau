@@ -119,13 +119,15 @@ function Journal.recover(userId, profile)
 			profile.Owned[kind][outgoing.Id] = nil
 			c.GearRolls[kind][outgoing.Id] = nil
 			c.ItemGems[slot][outgoing.Id] = nil
-			profile.Owned[kind][incoming.Id] = incoming.Quality
-			c.GearRolls[kind][incoming.Id] = copy(incoming.Roll)
-			c.ItemGems[slot][incoming.Id] = copy(incoming.Gem)
+			-- A copy of a model they already own gets its own key (Slots.freeKey).
+			local key = Slots.freeKey(profile.Owned[kind], incoming.Id)
+			profile.Owned[kind][key] = incoming.Quality
+			c.GearRolls[kind][key] = copy(incoming.Roll)
+			c.ItemGems[slot][key] = copy(incoming.Gem)
 			if wasEquipped or c[slot] == outgoing.Id then
-				c[slot] = incoming.Id
+				c[slot] = key
 				c[slot .. "Quality"] = incoming.Quality
-				c[slot .. "Gem"] = c.ItemGems[slot][incoming.Id]
+				c[slot .. "Gem"] = c.ItemGems[slot][key]
 			end
 		end
 		Journal.mark(profile, id)

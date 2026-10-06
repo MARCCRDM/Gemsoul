@@ -25,6 +25,7 @@ local Config = {
 	-- Economy
 	StartingCoins = 300,
 	MaxGems = 200, -- inventory limit
+	MaxGear = 80, -- pieces of gear a player can hold (worn included)
 	-- Daily reward: base coins, plus more per day of streak (up to a week).
 	DailyRewardBase = 75,
 	DailyRewardPerStreak = 25,

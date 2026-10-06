@@ -1053,6 +1053,7 @@ function Classes.affinities(loadout): { [string]: number }
 	return totals
 end
 function Classes.gear(classId: string, kind: string, id: string?)
+	id = Slots.model(id) -- a copy ("Model#2") is that model
 	local class = Classes.List[classId]
 	for _, gear in class and class[kind] or {} do
 		if gear.Id == id then
@@ -1102,6 +1103,7 @@ function Classes.get(classId: any): Class?
 end
 
 local function find(list: { Gear }, id: any): Gear?
+	id = Slots.model(id) -- a copy ("Model#2") is that model
 	for _, gear in list do
 		if gear.Id == id then
 			return gear

@@ -142,8 +142,9 @@ function GearRolls.ensure(profile, rng)
 		for id in profile.Owned[kind] or {} do
 			if not c.GearRolls[kind][id] then
 				local fixedRarity, item
+				local model = Slots.model(id)
 				for _, gear in ExpandedTraits.Catalog[kind] or {} do
-					if gear.Id == id then
+					if gear.Id == model then
 						fixedRarity = gear.RarityTier
 						item = gear
 						break
@@ -151,7 +152,7 @@ function GearRolls.ensure(profile, rng)
 				end
 				if not item then
 					for _, gear in ExpandedTraits.LegacyCatalog[kind] or {} do
-						if gear.Id == id then
+						if gear.Id == model then
 							fixedRarity, item = gear.RarityTier, gear
 							break
 						end
@@ -165,7 +166,7 @@ function GearRolls.ensure(profile, rng)
 				c.GearRolls[kind][id] = roll
 			end
 			if kind ~= "Weapons" then
-				GearRolls.addAffixes(c.GearRolls[kind][id], rng, ArmorFamilies.ById[id])
+				GearRolls.addAffixes(c.GearRolls[kind][id], rng, ArmorFamilies.ById[Slots.model(id)])
 			end
 		end
 	end

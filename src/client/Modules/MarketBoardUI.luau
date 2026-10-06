@@ -182,7 +182,8 @@ local function itemLine(payload): string
 		local gem = payload.Gem
 		local tier = GemConfig.TierLabels[gem.Tier] or gem.Tier
 		local surge = surgeName(gem)
-		return tier .. " gem" .. (if surge then "  ·  Power: " .. surge else "  ·  Rough")
+		local line = tier .. " gem" .. (if surge then "  ·  Power: " .. surge else "  ·  Rough")
+		return if payload.Where then line .. "  ·  " .. payload.Where else line
 	end
 	local rarity = GearRolls.Rarities[payload.Roll and payload.Roll.Rarity or 1] or GearRolls.Rarities[1]
 	local def = Slots.Definitions[payload.Slot]
@@ -221,32 +222,6 @@ local function itemIcon(parent, payload, x, y, size)
 end
 
 -- Everything you could put up (not worn, not socketed), in payload shape.
--- Whether you already have this gear model (you can hold one of each).
-local function ownsModel(payload): boolean
-	local profile = GemClient.Profile
-	local def = payload.Kind == "Gear" and Slots.Definitions[payload.Slot]
-	return def ~= nil
-		and def ~= false
-		and profile ~= nil
-		and profile.Owned ~= nil
-		and profile.Owned[def.Kind] ~= nil
-		and profile.Owned[def.Kind][payload.Id] ~= nil
-end
-
--- A greyed-out action saying why it can't be done.
-local function waiting(parent, value, x, y, w, h)
-	local f = new("Frame", {
-		BackgroundColor3 = P.Slot,
-		BackgroundTransparency = 0.3,
-		Position = UDim2.fromOffset(x, y),
-		Size = UDim2.fromOffset(w, h),
-	}, parent)
-	UiKit.round(f, 8)
-	new("UIStroke", { Color = P.Edge, Transparency = 0.5 }, f)
-	label(f, value, 12, P.Dim, BOLD, 0, 0, w, h, Enum.TextXAlignment.Center)
-	return f
-end
-
 local function myItems()
 	local profile = GemClient.Profile
 	local items = {}
@@ -257,6 +232,25 @@ local function myItems()
 		table.insert(items, { Kind = "Gem", Id = gem.Id, Gem = gem })
 	end
 	local c = profile.Character or {}
+	-- Socketed gems too: listing one takes it out of its socket.
+	for i, slot in Slots.SurgeOrder do
+		local gem = c[slot .. "Gem"]
+		if type(gem) == "table" then
+			table.insert(items, { Kind = "Gem", Id = gem.Id, Gem = gem, Where = "on " .. ({ "Q", "E", "R" })[i] })
+		end
+	end
+	for _, slot in Slots.Order do
+		local label = Slots.Definitions[slot].Label
+		local gem = c[slot .. "Gem"]
+		if type(gem) == "table" then
+			table.insert(items, { Kind = "Gem", Id = gem.Id, Gem = gem, Where = "in your " .. label })
+		end
+		for key, spare in c.ItemGems and c.ItemGems[slot] or {} do
+			if type(spare) == "table" and key ~= c[slot] then
+				table.insert(items, { Kind = "Gem", Id = spare.Id, Gem = spare, Where = "in a spare " .. label })
+			end
+		end
+	end
 	for _, slot in Slots.Order do
 		local kind = Slots.Definitions[slot].Kind
 		for id, quality in profile.Owned and profile.Owned[kind] or {} do
@@ -393,12 +387,6 @@ local function listingCard(parent, row, order)
 	elseif row.Mode == "Sell" then
 		local coins = GemClient.Profile and GemClient.Profile.Coins or 0
 		local afford = coins >= row.Price
-		local owned = ownsModel(row.Item)
-		if owned then
-			-- One copy of each gear model per player (for now).
-			waiting(card, "YOU OWN THIS MODEL", 10, 124, 184, 34)
-			return
-		end
 		button(
 			card,
 			if afford then "BUY" else "NOT ENOUGH COINS",
@@ -413,8 +401,6 @@ local function listingCard(parent, row, order)
 				end
 			end
 		)
-	elseif ownsModel(row.Item) then
-		waiting(card, "YOU OWN THIS MODEL", 10, 124, 184, 34)
 	else
 		button(card, "MAKE AN OFFER", TRADE, 10, 124, 184, 34, function()
 			offerFor = row

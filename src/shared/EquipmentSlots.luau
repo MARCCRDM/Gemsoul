@@ -16,6 +16,38 @@ Slots.Kinds = { "Weapons", "Shields", "Helmets", "Armors", "Gloves", "Boots" }
 Slots.ByKind =
 	{ Weapons = "Weapon", Shields = "Shield", Helmets = "Helmet", Armors = "Armor", Gloves = "Gloves", Boots = "Boots" }
 Slots.Catalog = {}
+
+-- Gear copies: a player can own several of one model. The first copy is
+-- keyed by the model id ("ScrapHelmet"), more copies by "ScrapHelmet#2",
+-- "#3"... Everything that looks a model up goes through Slots.model(key).
+function Slots.model(key: any): any
+	if type(key) ~= "string" then
+		return key
+	end
+	return string.match(key, "^([^#]+)#") or key
+end
+-- The key a new copy of `model` gets in one owned list (model id -> quality).
+function Slots.freeKey(owned: { [string]: any }, model: string): string
+	model = Slots.model(model)
+	if owned[model] == nil then
+		return model
+	end
+	local n = 2
+	while owned[model .. "#" .. n] ~= nil do
+		n += 1
+	end
+	return model .. "#" .. n
+end
+-- How many pieces of gear a profile holds (all slots, worn included).
+function Slots.gearCount(profile): number
+	local n = 0
+	for _, kind in Slots.Kinds do
+		for _ in profile.Owned and profile.Owned[kind] or {} do
+			n += 1
+		end
+	end
+	return n
+end
 local variants = {
 	{ "Scrap", "SuitScrap", "Utility", 1 },
 	{ "Survey", "SuitZeroG", "Mobility", 2 },

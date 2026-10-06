@@ -173,21 +173,23 @@ local function ownedItems(which)
 	local character = GemClient.Profile.Character
 	local def = Slots.Definitions[which]
 	local items = {}
+	-- Every copy you own (a second copy of a model is "Model#2", Slots.freeKey).
 	for order, gear in Classes.get(character.Class)[def.Kind] do
-		local quality = GemClient.Profile.Owned[def.Kind][gear.Id]
-		if quality then
-			local worn = character[which] == gear.Id
-			table.insert(items, {
-				Id = gear.Id,
-				Slot = which,
-				Quality = quality,
-				Roll = character.GearRolls and character.GearRolls[def.Kind][gear.Id],
-				Gem = if worn
-					then character[which .. "Gem"]
-					else character.ItemGems and character.ItemGems[which] and character.ItemGems[which][gear.Id],
-				Worn = worn,
-				Order = order,
-			})
+		for key, quality in GemClient.Profile.Owned[def.Kind] do
+			if Slots.model(key) == gear.Id then
+				local worn = character[which] == key
+				table.insert(items, {
+					Id = key,
+					Slot = which,
+					Quality = quality,
+					Roll = character.GearRolls and character.GearRolls[def.Kind][key],
+					Gem = if worn
+						then character[which .. "Gem"]
+						else character.ItemGems and character.ItemGems[which] and character.ItemGems[which][key],
+					Worn = worn,
+					Order = order,
+				})
+			end
 		end
 	end
 	table.sort(items, function(a, b)

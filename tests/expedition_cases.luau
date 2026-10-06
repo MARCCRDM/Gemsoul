@@ -54,9 +54,16 @@ left, right = Logic.item(a, "Weapon", a.Character.Weapon), Logic.item(b, "Weapon
 a.Character.GearRolls.Weapons[left.Id].Stats.Health = 99
 check(not Logic.exchange(a, b, left, right), "Changed stats accepted without a new offer")
 a, b = profile(2), profile(3)
+-- Receiving a model you already own adds a second copy ("Model#2"); your own
+-- copy is never overwritten.
 a.Owned.Weapons[b.Character.Weapon] = 1
+a.Character.GearRolls.Weapons[b.Character.Weapon] = { Rarity = 1, Stats = {} }
+local mineBefore = a.Character.GearRolls.Weapons[b.Character.Weapon]
 left, right = Logic.item(a, "Weapon", a.Character.Weapon), Logic.item(b, "Weapon", b.Character.Weapon)
-check(not Logic.exchange(a, b, left, right), "Trade overwrote an owned model")
+check(Logic.exchange(a, b, left, right), "Trade of a model you own failed")
+check(a.Owned.Weapons[right.Id] == 1 and a.Character.GearRolls.Weapons[right.Id] == mineBefore, "Trade overwrote an owned model")
+check(a.Owned.Weapons[right.Id .. "#2"] == right.Quality, "Incoming copy not kept as a second copy")
+check(a.Character.Weapon == right.Id .. "#2", "Worn slot not moved to the incoming copy")
 -- Real server handlers: no trade without both confirmations; stale revisions are invalid.
 local pa = {UserId = 11, DisplayName = "A", Parent = true, GetAttribute = function() return nil end}
 local pb = {UserId = 12, DisplayName = "B", Parent = true, GetAttribute = function() return nil end}

@@ -87,6 +87,35 @@ local function gemIndex(profile, id)
 	return nil
 end
 
+-- Where a gem is: "Bag" (index), "Socket" (a worn piece's or a Q/E/R surge
+-- socket: the Character key), or "Spare" (in a spare piece: slot, gear key).
+local function findGem(profile, id)
+	local i = gemIndex(profile, id)
+	if i then
+		return "Bag", i
+	end
+	local c = profile.Character or {}
+	for _, slot in Slots.SurgeOrder do
+		local gem = c[slot .. "Gem"]
+		if type(gem) == "table" and gem.Id == id then
+			return "Socket", slot
+		end
+	end
+	for _, slot in Slots.Order do
+		local gem = c[slot .. "Gem"]
+		if type(gem) == "table" and gem.Id == id then
+			return "Socket", slot
+		end
+		for key, spare in c.ItemGems and c.ItemGems[slot] or {} do
+			if type(spare) == "table" and spare.Id == id and key ~= c[slot] then
+				return "Spare", slot, key
+			end
+		end
+	end
+	return nil
+end
+Market.findGem = findGem
+
 local function gearKind(slot)
 	local def = Slots.Definitions[slot]
 	return def and def.Kind
@@ -98,7 +127,7 @@ function Market.whyNot(profile, kind: any, slot: any, id: any): string?
 		return "Pick an item."
 	end
 	if kind == "Gem" then
-		return if gemIndex(profile, id) then nil else "That gem isn't in your bag."
+		return if findGem(profile, id) then nil else "You don't have that gem."
 	elseif kind == "Gear" then
 		local gearType = gearKind(slot)
 		if not gearType then
@@ -123,7 +152,22 @@ function Market.take(profile, kind: any, slot: any, id: any)
 		return nil, why
 	end
 	if kind == "Gem" then
-		local gem = table.remove(profile.Gems, gemIndex(profile, id))
+		-- Socketed gems come out of their socket.
+		local where, a, b = findGem(profile, id)
+		local c = profile.Character
+		local gem
+		if where == "Bag" then
+			gem = table.remove(profile.Gems, a)
+		elseif where == "Socket" then
+			gem = c[a .. "Gem"]
+			c[a .. "Gem"] = nil
+			if c.ItemGems and c.ItemGems[a] and c[a] ~= nil then
+				c.ItemGems[a][c[a]] = nil
+			end
+		else
+			gem = c.ItemGems[a][b]
+			c.ItemGems[a][b] = nil
+		end
 		return { Kind = "Gem", Gem = gem }
 	end
 	local gearType = gearKind(slot)
@@ -147,7 +191,7 @@ function Market.take(profile, kind: any, slot: any, id: any)
 end
 
 -- Why the profile can't take this payload in, or nil when it can.
-function Market.cantReceive(profile, payload, maxGems: number): string?
+function Market.cantReceive(profile, payload, maxGems: number, maxGear: number?): string?
 	if type(payload) ~= "table" then
 		return "That item is gone."
 	end
@@ -158,7 +202,7 @@ function Market.cantReceive(profile, payload, maxGems: number): string?
 		if #(profile.Gems or {}) >= maxGems then
 			return "Your gem bag is full."
 		end
-		if gemIndex(profile, payload.Gem.Id) then
+		if findGem(profile, payload.Gem.Id) then
 			return "You already have that gem."
 		end
 		return nil
@@ -167,8 +211,8 @@ function Market.cantReceive(profile, payload, maxGems: number): string?
 		if not gearType then
 			return "That item is gone."
 		end
-		if profile.Owned[gearType] and profile.Owned[gearType][payload.Id] then
-			return "You already own that model."
+		if Slots.gearCount(profile) >= (maxGear or math.huge) then
+			return "Your gear bag is full."
 		end
 		return nil
 	end
@@ -190,13 +234,15 @@ function Market.give(profile, payload, maxGems: number, force: boolean?): boolea
 	local gearType = gearKind(payload.Slot)
 	local c = profile.Character
 	profile.Owned[gearType] = profile.Owned[gearType] or {}
-	profile.Owned[gearType][payload.Id] = payload.Quality or 1
+	-- Its own key: another copy of a model you have is "Model#2" (Slots.freeKey).
+	local key = Slots.freeKey(profile.Owned[gearType], payload.Id)
+	profile.Owned[gearType][key] = payload.Quality or 1
 	c.GearRolls = c.GearRolls or {}
 	c.GearRolls[gearType] = c.GearRolls[gearType] or {}
-	c.GearRolls[gearType][payload.Id] = copy(payload.Roll)
+	c.GearRolls[gearType][key] = copy(payload.Roll)
 	c.ItemGems = c.ItemGems or {}
 	c.ItemGems[payload.Slot] = c.ItemGems[payload.Slot] or {}
-	c.ItemGems[payload.Slot][payload.Id] = copy(payload.Gem)
+	c.ItemGems[payload.Slot][key] = copy(payload.Gem)
 	return true
 end
 

@@ -1447,7 +1447,7 @@ local function drawTooltipContent()
 		if showDetails and slotName == "Helmet" and loadout.Helmet then
 			local traits = if roll
 				then GearRolls.appearance(roll)
-				else SuitTraits.forSuit(player.UserId, loadout.Helmet)
+				else SuitTraits.forSuit(player.UserId, Slots.model(loadout.Helmet))
 			text(
 				tipBody,
 				traits.HelmetName

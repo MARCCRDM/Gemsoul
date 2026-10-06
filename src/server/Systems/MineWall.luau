@@ -194,17 +194,20 @@ local function recoverGear(player: Player, depth: number)
 	if not gear then
 		return nil
 	end
-	local quality = profile.Owned[kind][gear.Id] or 0
-	if quality >= maxQuality then
+	-- A full gear bag turns the find into coins instead.
+	if Slots.gearCount(profile) >= (Config.MaxGear or 80) then
 		PlayerData.addCoins(player, gear.RarityTier * 5)
-		return gear.Name .. " (salvaged)"
+		return gear.Name .. " (bag full: salvaged)"
 	end
-	PlayerData.setGearQuality(player, kind, gear.Id, rng:NextInteger(quality + 1, maxQuality))
+	-- Every find is its own piece with its own roll, even a model you have
+	-- (it's kept as another copy, Slots.freeKey).
+	local key = Slots.freeKey(profile.Owned[kind], gear.Id)
+	PlayerData.setGearQuality(player, kind, key, rng:NextInteger(1, maxQuality))
 	-- Found by you (and numbered, if it's Ultra Rare or better).
-	GearSerials.stamp(player, kind, gear.Id)
+	GearSerials.stamp(player, kind, key)
 	PlayerData.milestone(player, "Recovered")
-	local roll = profile.Character.GearRolls[kind] and profile.Character.GearRolls[kind][gear.Id]
-	if roll and roll.Prismatic and quality == 0 then
+	local roll = profile.Character.GearRolls[kind] and profile.Character.GearRolls[kind][key]
+	if roll and roll.Prismatic then
 		return "✦ PRISMATIC " .. gear.Name
 	end
 	return gear.Name
