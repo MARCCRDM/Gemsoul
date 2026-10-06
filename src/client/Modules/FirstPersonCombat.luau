@@ -388,10 +388,10 @@ end
 -- first), `chop` brings a heavy down from overhead. Anticipation, a fast
 -- strike that overshoots, follow-through, recovery.
 local function swingCurve(e, heavy)
-	local wind, hit, follow, done = 0.05, 0.15, 0.26, 0.42
+	local wind, hit, follow, done = 0.055, 0.16, 0.24, 0.46
 	local back = 0.18
 	if heavy then
-		wind, hit, follow, done, back = 0.1, 0.22, 0.34, 0.6, 0.32
+		wind, hit, follow, done, back = 0.09, 0.22, 0.33, 0.6, 0.32
 	end
 	if e < 0 or e >= done then
 		return 0, 0
@@ -407,7 +407,8 @@ local function swingCurve(e, heavy)
 	else
 		arc = 1 - ease((e - follow) / (done - follow))
 	end
-	local chop = if heavy then (if e < wind then -0.5 * ease(e / wind) else math.max(arc, 0)) else 0
+	-- Light cuts travel diagonally; the heavy keeps its distinct overhead chop.
+	local chop = if heavy then (if e < wind then -0.5 * ease(e / wind) else math.max(arc, 0)) else arc * 0.3
 	return arc, chop
 end
 -- A reaction's weight `d` seconds after it happens: up fast, then fades.
@@ -647,7 +648,7 @@ function View.start()
 						- throw * 0.2
 						+ strain,
 					-0.78 + smoothedCharge * 0.18 + breathe + casting * 0.08 + 0.35 * math.max(-chop, 0) - 0.25 * chop,
-					-1.25 - swing * 0.35 + recoil * 0.18 + casting * 0.2 - throw * 0.35
+					-1.25 - swing * (if swingHeavy then 0.42 else 0.28) + recoil * 0.18 + casting * 0.2 - throw * 0.35
 				) * CFrame.Angles(
 					math.rad(-smoothedCharge * 15 - recoil * 9 + casting * 14 - throw * 22 - chop * 45 + strain * 300),
 					0,

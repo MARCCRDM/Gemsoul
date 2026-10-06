@@ -1194,6 +1194,9 @@ local function block(player, held, aim)
 	if held == false then
 		st.BlockUntil = 0
 		player:SetAttribute("Blocking", false)
+		if player.Character then
+			player.Character:SetAttribute("GuardUntil", 0)
+		end
 		return true
 	end
 	local k = kit(player)
@@ -1223,6 +1226,11 @@ local function block(player, held, aim)
 	st.Channel, st.Pending = nil, {}
 	st.BlockDirection, st.BlockUntil, st.ChargeStarted = flat(aim - root.Position), now + Actions.BlockLease, nil
 	player:SetAttribute("Blocking", true)
+	if player.Character then
+		player.Character:SetAttribute("GuardUntil", workspace:GetServerTimeNow() + Actions.BlockLease)
+		player.Character:SetAttribute("ActionKind", nil)
+		player.Character:SetAttribute("ActionHold", nil)
+	end
 	if not wasBlocking then
 		st.ParrySpent = false
 		st.BlockRaisedAt = if now >= (st.NextHighBlock or 0) then now else nil

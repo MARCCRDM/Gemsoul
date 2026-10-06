@@ -176,14 +176,16 @@ local function frames(kind: string, s: number)
 		}
 	elseif kind == "Slash" then
 		return {
-			Waist = { 0, -0.55 * s, 0 },
-			RightShoulder = { 2.3, 0, 0.7 * s },
+			Waist = { 0.08, -0.48 * s, -0.06 * s },
+			Neck = { -0.04, 0.18 * s, 0 },
+			RightShoulder = { 1.9, -0.35 * s, 0.85 * s },
 			RightElbow = { 0.9, 0, 0 },
 			LeftShoulder = { 0.6, 0, -0.3 },
 			LeftElbow = { 0.9, 0, 0 },
 		}, {
-			Waist = { -0.15, 0.6 * s, 0 },
-			RightShoulder = { 1.2, 0, -0.7 * s },
+			Waist = { -0.18, 0.58 * s, 0.08 * s },
+			Neck = { 0.04, -0.18 * s, 0 },
+			RightShoulder = { 0.95, 0.45 * s, -0.95 * s },
 			RightElbow = { 0.15, 0, 0 },
 			LeftShoulder = { 0.3, 0, -0.4 },
 			LeftElbow = { 0.6, 0, 0 },
@@ -481,11 +483,14 @@ function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }
 	local bat = a.CombatPoseProfile == "SahurBat"
 	local weaponGuard = if a.WeaponBlock then WEAPON_GUARDS[a.CombatWeaponType] else nil
 	local guard = weaponGuard or (if bat then BAT_GUARD else GUARD)
-	local pose, speed = actionPose(a, t, base)
-	if not pose then
-		if type(a.GuardUntil) == "number" and t < a.GuardUntil then
-			pose, speed = if rest then guard else breathe(guard, t), 22
-		else
+	-- Guard is authoritative: stale charge/cast attributes must never hide it.
+	-- The server drops GuardUntil when an attack, dodge or guard break wins.
+	local pose, speed
+	if type(a.GuardUntil) == "number" and t < a.GuardUntil then
+		pose, speed = if rest then guard else breathe(guard, t), 26
+	else
+		pose, speed = actionPose(a, t, base)
+		if not pose then
 			pose, speed = base, 10
 		end
 	end
