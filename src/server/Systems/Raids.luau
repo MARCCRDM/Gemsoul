@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local CombatServer = require(script.Parent.CombatServer)
+local ArenaDrop = require(script.Parent.ArenaDrop)
 local Duelist = require(script.Parent.Duelist)
 local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
@@ -25,7 +26,7 @@ local reply = Shop.reply
 
 local Raids = {}
 
-Raids.Delay = 2.5 -- seconds between arriving and the boss stepping in
+Raids.Delay = 0.25 -- staging only; the shared pod timeline supplies the entrance
 
 -- Why this member can't come right now, or nil.
 function Raids.busy(player: Player): string?
@@ -63,6 +64,10 @@ local function start(player: Player)
 	end
 	local members = table.clone((party :: any).Members)
 	local id = "R" .. string.sub(HttpService:GenerateGUID(false), 1, 8)
+	-- Conceal the entire squad before streaming or teleporting any member.
+	for _, member in members do
+		ArenaDrop.prepare(member)
+	end
 	-- In a ring on the floor, facing in.
 	for index, member in members do
 		local angle = (index - 1) / #members * math.pi * 2
@@ -74,6 +79,7 @@ local function start(player: Player)
 		if character then
 			character:PivotTo(CFrame.lookAt(spot, center + Vector3.new(0, 4, 0)))
 			local protection = Instance.new("ForceField")
+			protection.Visible = false
 			protection.Parent = character
 			Debris:AddItem(protection, 3)
 		end

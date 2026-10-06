@@ -74,6 +74,16 @@ check(id ~= id2, "Instances share IDs")
 check((worlds[id].Centers[1] - worlds[id2].Centers[1]).Magnitude > 1000, "Instances overlap")
 tick(3)
 check(#spawned >= 4, "Fighters not spawned")
+check(#encounterDrops == 2, "Expected one pod timeline per squad, not one per enemy")
+for _, drop in encounterDrops do
+	check(
+		drop.IncludeParty and not drop.Background and #drop.Foes >= 2,
+		"First pathway encounter must drop squad and enemies"
+	)
+	for _, p in drop.Members do
+		check(preparedDrops[p], "Dungeon player not concealed for teleport")
+	end
+end
 local function clearRoom(runId, index)
 	local count = 0
 	for _, e in table.clone(spawned) do
@@ -94,6 +104,8 @@ local function reachBoss(runId, members)
 			p.Root.Position = worlds[runId].Centers[room + 1] + Vector3.new(0, 4, 0)
 		end
 		tick(0.5)
+		local drop = encounterDrops[#encounterDrops]
+		check(not drop.IncludeParty and not drop.Background and #drop.Foes > 0, "Later rooms must drop only enemies")
 	end
 end
 for _, e in spawned do
@@ -247,9 +259,19 @@ print("PASS: loot timeout, full inventory compensation, single claimant and repl
 
 -- Explicit owner-only open-world mode remains available alongside Full/Pathway.
 check(not handlers.DungeonTest(outsider, "OpenWorld").Ok, "Public open-world test bypass")
+local beforeOpenDrops = #encounterDrops
 check(handlers.DungeonTest(tester, "OpenWorld").Ok, "Owner open-world test rejected")
 local openId = tester:GetAttribute("DungeonId")
 tick(3)
+local entry = encounterDrops[beforeOpenDrops + 1]
+check(
+	entry.IncludeParty and not entry.Background and #entry.Foes == 0,
+	"Open-world squad needs one arrival at landing zone"
+)
+check(#encounterDrops > beforeOpenDrops + 1, "Open-world enemies missing pod arrivals")
+for i = beforeOpenDrops + 2, #encounterDrops do
+	check(encounterDrops[i].Background and not encounterDrops[i].IncludeParty, "Ambient camp stole squad camera")
+end
 local population = 0
 for _, e in spawned do
 	if e.Id == openId then

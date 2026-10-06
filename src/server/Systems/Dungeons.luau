@@ -11,6 +11,7 @@ local Party = require(script.Parent.Party)
 local Raids = require(script.Parent.Raids)
 local Duelist = require(script.Parent.Duelist)
 local ArenaSessions = require(script.Parent.ArenaSessions)
+local ArenaDrop = require(script.Parent.ArenaDrop)
 local CombatServer = require(script.Parent.CombatServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
@@ -224,6 +225,7 @@ local function spawnRoom(run, index)
 				#room.Foes
 			)
 	)
+	local arrivals = {}
 	for n, kind in room.Foes do
 		local center = run.World.Centers[index]
 		local angle = (n - 1) / #room.Foes * math.pi * 2
@@ -274,7 +276,10 @@ local function spawnRoom(run, index)
 			finish(run, false, "The encounter could not start. Your squad has been returned safely.")
 			return
 		end
+		table.insert(arrivals, enemy.Model)
 	end
+	ArenaDrop.encounter(members, arrivals, not run.Inserted, run.OpenWorld)
+	run.Inserted = true
 end
 local function safeSpawnRoom(run, index)
 	local ok, problem = pcall(spawnRoom, run, index)
@@ -343,6 +348,9 @@ local function queue(player, testMode)
 		p:SetAttribute("CombatSession", "Raid")
 	end
 	local success, problem = pcall(function()
+		for _, p in run.Members do
+			ArenaDrop.prepare(p)
+		end
 		run.Rooms = if run.OpenWorld then Rules.generateOpen(Random.new()) else Rules.generate(Random.new())
 		if testing and testMode == "Sahur" then
 			run.Rooms = { { Index = 1, X = 0, Z = 0, Boss = true, Theme = 1, Foes = { 1 }, Pillars = 2 } }
@@ -354,22 +362,20 @@ local function queue(player, testMode)
 		)
 		for i, p in run.Members do
 			CombatServer.reset(p)
-			p.Character:PivotTo(
-				CFrame.new(
-					(run.World.Arrival or run.World.Centers[1])
-						+ Vector3.new((i - 2.5) * 5, 4, if run.OpenWorld then 0 else -22)
-				)
-			)
+			local spot = (run.World.Arrival or run.World.Centers[1])
+				+ Vector3.new((i - (#run.Members + 1) / 2) * 7, 4, if run.OpenWorld then 0 else -22)
+			local target = run.World.Origin or run.World.Centers[1]
+			p.Character:PivotTo(CFrame.lookAt(spot, Vector3.new(target.X, spot.Y, target.Z)))
 			local h = p.Character:FindFirstChildOfClass("Humanoid")
 			h.Health = h.MaxHealth
 		end
 		announce(
 			run,
 			if testing
-				then "OWNER TEST  -  solo enabled, no rewards. Encounter begins in 3 seconds."
+				then "OWNER TEST  -  solo enabled, no rewards. Orbital deployment inbound."
 				else "PATHWAY DUNGEON · Clear five linked canyon encounters. Follow the trail to the Colossus."
 		)
-		task.delay(3, function()
+		task.delay(0.25, function()
 			if run.Done then
 				return
 			end
@@ -378,6 +384,8 @@ local function queue(player, testMode)
 				return
 			end
 			if run.OpenWorld then
+				ArenaDrop.encounter(living(run), {}, true)
+				run.Inserted = true
 				for index = 1, #run.Rooms do
 					if run.Done then
 						break

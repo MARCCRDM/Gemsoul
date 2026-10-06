@@ -58,7 +58,7 @@ Duelist.spawnDungeon = function(members, id, encounter)
 	if failSpawn then
 		return nil
 	end
-	local e = { Id = id, Encounter = encounter, Members = members }
+	local e = { Id = id, Encounter = encounter, Members = members, Model = {} }
 	table.insert(spawned, e)
 	return e
 end

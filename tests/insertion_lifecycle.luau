@@ -137,6 +137,7 @@ local function actor(anchored)
 	local board = object("BillboardGui")
 	board.Enabled = true
 	local hum = object("Humanoid")
+	hum.Health = 100
 	hum.NameDisplayDistance, hum.HealthDisplayDistance = 100, 100
 	hum.Died = signal()
 	function m:FindFirstChild(name)
@@ -147,6 +148,9 @@ local function actor(anchored)
 	end
 	function m:GetDescendants()
 		return { root, armor, particles, board }
+	end
+	function m:GetScale()
+		return self.Scale or 1
 	end
 	return m, root, armor, particles, hum, board
 end
@@ -273,4 +277,57 @@ check(
 	oa.Transparency == 0 and oa:GetAttribute("InsertionTransparency") == nil,
 	"Reveal restored a stale value: weapon left invisible"
 )
+-- Cooperative formations face the enemy, never the average of their own squad.
+local ally, allyRoot = actor()
+local mate = object("Player")
+mate.Character = ally
+owners[ally] = mate
+sr.Position, allyRoot.Position = vec(-10, 4, -22), vec(10, 4, -22)
+local boss, bossRoot = actor()
+bossRoot.Position = vec(14, 7, 0)
+boss.Scale = 1.8
+local squadTime = Drop.encounter({ entrant, mate }, { boss }, true)
+check(
+	staged:GetAttribute("ArenaDropStart") ~= nil and ally:GetAttribute("ArenaDropStart") ~= nil,
+	"Squad missed first insertion"
+)
+check(boss:GetAttribute("ArenaDropStart") ~= nil, "Boss did not drop with squad")
+check(
+	staged:GetAttribute("ArenaDropOrigin").Facing.X == 14 and ally:GetAttribute("ArenaDropOrigin").Facing.X == 14,
+	"Squad aimed at teammates"
+)
+check(
+	boss:GetAttribute("ArenaDropOrigin").Facing.X == 0 and boss:GetAttribute("ArenaDropOrigin").Facing.Z == -22,
+	"Boss did not face squad"
+)
+local scaled = false
+for _, item in created do
+	if item.ClassName == "Folder" and item:GetAttribute("Scale") == 1.8 then
+		scaled = true
+	end
+end
+check(scaled, "Boss pod did not inherit model scale")
+advance(squadTime + 0.1)
+check(not sr.Anchored and not allyRoot.Anchored and not bossRoot.Anchored, "Squad insertion failed to unlock")
+Drop.encounter({ entrant, mate }, { boss }, false)
+check(
+	staged:GetAttribute("ArenaDropStart") == nil
+		and ally:GetAttribute("ArenaDropStart") == nil
+		and sa.Transparency == 0.35,
+	"Next wave redropped/hid survivors"
+)
+check(boss:GetAttribute("ArenaDropStart") ~= nil, "Next wave lacked boss pod")
+Drop.cancel(staged)
+Drop.cancel(ally)
+Drop.cancel(boss)
+local ambientTime = Drop.encounter({ entrant, mate }, { boss }, false, true)
+check(
+	not sr.Anchored and not allyRoot.Anchored and entrant:GetAttribute("ArenaDropUntil") == nil,
+	"Ambient pod stole player controls"
+)
+check(bossRoot.Anchored and boss:GetAttribute("ArenaDropStart") ~= nil, "Ambient actor failed to stage")
+boss:Destroy()
+check(boss:GetAttribute("ArenaDropUntil") == nil and not bossRoot.Anchored, "Destroyed encounter kept staging active")
+advance(ambientTime + 0.1)
+check(Drop.encounter({ entrant }, {}, false) == 0 and not sr.Anchored, "Empty wave locked party")
 print("PASS: " .. checks .. " real insertion lifecycle checks")

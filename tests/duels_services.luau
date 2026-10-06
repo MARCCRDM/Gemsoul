@@ -272,11 +272,20 @@ local function respawn(...)
 	end
 end
 -- The drop pod (ArenaDrop) is presentation; duels only need its timing.
+local preparedDrops, encounterDrops = {}, {}
 local ArenaDrop = {
 	duration = function()
 		return 0
 	end,
-	prepare = function() end,
+	prepare = function(p)
+		preparedDrops[p] = true
+	end,
 	begin = function() end,
 	cancel = function() end,
+	encounter = function(members, foes, includeParty, background)
+		table.insert(
+			encounterDrops,
+			{ Members = members, Foes = foes, IncludeParty = includeParty, Background = background }
+		)
+	end,
 }

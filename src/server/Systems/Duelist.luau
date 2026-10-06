@@ -1883,6 +1883,8 @@ function spawnRival(owner: Player, raid, encounter)
 				string.format("Wave %d: %s storms in with %s. Fight together!", raid.Wave, name, surgeList)
 			)
 		end
+		ArenaDrop.encounter(raid.Members, { model }, not raid.Inserted)
+		raid.Inserted = true
 		return
 	end
 	duels[owner] = duel

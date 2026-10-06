@@ -7,10 +7,11 @@ function Pod.new(marker)
 	local pieces = {}
 	local compact = game:GetService("UserInputService").TouchEnabled
 	local smokeNodes = {}
+	local scale = marker:GetAttribute("Scale") or 1
 	local color = marker:GetAttribute("Tint") or Color3.fromRGB(70, 220, 255)
 	local function panel(name, size, offset, tint, material)
 		local p = Instance.new("Part")
-		p.Name, p.Size, p.Color = name, size, tint
+		p.Name, p.Size, p.Color = name, size * scale, tint
 		p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery, p.CastShadow = true, false, false, false, false
 		p.Material = material or Enum.Material.Metal
 		p.CFrame = CFrame.new(0, -10000, 0)
@@ -241,7 +242,7 @@ function Pod.new(marker)
 			rumble:Stop()
 		end
 		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit - releaseDelay) / 0.8))
-		local floor = origin * CFrame.new(0, -3, 0)
+		local floor = origin * CFrame.new(0, -3 * scale, 0)
 		local frame = floor + Vector3.new(0, pose.Height - pose.Impact * 0.14, 0)
 		for _, node in smokeNodes do
 			local radius = Motion.smokeSpread(t)
@@ -263,7 +264,7 @@ function Pod.new(marker)
 					* entry.Offset
 					* CFrame.Angles(blast.Spin * 0.9, entry.Side * blast.Spin, entry.Side * blast.Spin * 1.3)
 			end
-			entry.Part.CFrame = frame * offset
+			entry.Part.CFrame = frame * (CFrame.new(offset.Position * scale) * offset.Rotation)
 			local f = if entry.Hatch then math.max(fade, Motion.smooth((t - Motion.Hatch - 0.35) / 0.7)) else fade
 			if not entry.Fixed and not entry.Hatch then
 				f = math.max(f, blast.Fade)

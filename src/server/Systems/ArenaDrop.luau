@@ -4,7 +4,7 @@ local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMoti
 local Drop = {}
 local active = setmetatable({}, { __mode = "k" })
 -- Onboarding and repeat Arena rivals use the same insertion sequence.
--- Dungeon and raid encounters retain their own spawning flow.
+-- Cooperative encounters batch their actors through encounter() below.
 function Drop.forRival(session, raid, encounter)
 	return (session == "PvP" or session == "Training") and not raid and not encounter
 end
@@ -151,7 +151,7 @@ function Drop.prepare(player)
 	end
 	task.delay(15, cleanup)
 end
-function Drop.begin(models, viewers, dropModels)
+function Drop.begin(models, viewers, dropModels, sides)
 	local RunService = game:GetService("RunService")
 	local order = table.clone(dropModels or models)
 	for i = #order, 2, -1 do
@@ -187,12 +187,13 @@ function Drop.begin(models, viewers, dropModels)
 		end
 		-- Aim at opposing fighters, not the arena center or a stale spawn rotation.
 		local owner = Players:GetPlayerFromCharacter(model)
-		local team = owner and owner:GetAttribute("MatchTeam")
+		local team = if sides then sides[model] else owner and owner:GetAttribute("MatchTeam")
 		local target, targets = Vector3.zero, 0
 		for _, other in models do
 			local otherRoot = other:FindFirstChild("HumanoidRootPart")
 			local otherOwner = Players:GetPlayerFromCharacter(other)
-			local sameTeam = team ~= nil and otherOwner and otherOwner:GetAttribute("MatchTeam") == team
+			local otherTeam = if sides then sides[other] else otherOwner and otherOwner:GetAttribute("MatchTeam")
+			local sameTeam = team ~= nil and otherTeam == team
 			if other ~= model and otherRoot and not sameTeam then
 				target += positions[other]
 				targets += 1
@@ -277,7 +278,7 @@ function Drop.begin(models, viewers, dropModels)
 			end
 			reveal()
 			if root.Parent then
-                root.CFrame = destination
+				root.CFrame = destination
 				root.Anchored = anchored
 			end
 			model:SetAttribute("ArenaDropUntil", nil)
@@ -341,6 +342,7 @@ function Drop.begin(models, viewers, dropModels)
 		marker:SetAttribute("Origin", origin)
 		marker:SetAttribute("ReleaseDelay", releaseDelay)
 		marker:SetAttribute("Tint", colorOf(model))
+		marker:SetAttribute("Scale", math.clamp(model:GetScale(), 0.5, 3))
 		marker:SetAttribute("Ends", ends)
 		marker:SetAttribute("InsertionResidual", true)
 		local actor = Instance.new("ObjectValue")
@@ -396,5 +398,35 @@ function Drop.begin(models, viewers, dropModels)
 		end
 	end)
 	return duration
+end
+-- One shared timeline per encounter. Survivors watch the next wave from the
+-- ground; ambient open-world arrivals never seize the squad's camera/input.
+function Drop.encounter(members, foes, includeParty, background)
+	local actors, viewers, drops, sides = {}, {}, {}, {}
+	if not background then
+		for _, member in members do
+			local model = member.Character
+			local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+			if member.Parent and model and model.Parent and humanoid and humanoid.Health > 0 then
+				table.insert(actors, model)
+				table.insert(viewers, member)
+				sides[model] = 1
+				if includeParty then
+					table.insert(drops, model)
+				end
+			end
+		end
+	end
+	for _, model in foes do
+		if model.Parent and model:FindFirstChild("HumanoidRootPart") then
+			table.insert(actors, model)
+			table.insert(drops, model)
+			sides[model] = 2
+		end
+	end
+	if #drops == 0 then
+		return 0
+	end
+	return Drop.begin(actors, viewers, drops, sides)
 end
 return Drop

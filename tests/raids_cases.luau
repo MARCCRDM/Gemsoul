@@ -31,7 +31,10 @@ check(
 	not Matchmaking.ownsRival(stub({ RivalOwner = 9, RaidId = "R1" }), stub({ UserId = 7, RaidId = "R2" })),
 	"Another raid's boss counted as yours"
 )
-check(not Matchmaking.ownsRival(stub({ RivalOwner = 9 }), stub({ UserId = 7 })), "Someone else's rival counted as yours")
+check(
+	not Matchmaking.ownsRival(stub({ RivalOwner = 9 }), stub({ UserId = 7 })),
+	"Someone else's rival counted as yours"
+)
 
 -- The request ------------------------------------------------------------------------
 local ra, rb, rc, rd = makePlayer(301, "Ria"), makePlayer(302, "Bo"), makePlayer(303, "Cass"), makePlayer(304, "Dev")
@@ -45,11 +48,15 @@ parties[rc] = raidParty
 check(not handlers.PartyRaid(rb).Ok, "A member who isn't the leader started a raid")
 rc:SetAttribute("Expedition", true)
 local away = handlers.PartyRaid(ra)
-check(not away.Ok and string.find(away.Message, "Cass", 1, true), "Started without a member who's away (or didn't say who)")
+check(
+	not away.Ok and string.find(away.Message, "Cass", 1, true),
+	"Started without a member who's away (or didn't say who)"
+)
 rc:SetAttribute("Expedition", nil)
 local started = handlers.PartyRaid(ra)
 check(started.Ok, "A ready party of three couldn't start: " .. tostring(started.Message))
 for _, member in { ra, rb, rc } do
+	check(preparedDrops[member], "Raider was not concealed before deployment")
 	check(member:GetAttribute("CombatSession") == "Raid", member.DisplayName .. " not in the raid session")
 	check(member:GetAttribute("RaidId") == ra:GetAttribute("RaidId"), member.DisplayName .. " has another raid id")
 	check(member:GetAttribute("PvPEnabled") == false, member.DisplayName .. " can be hurt by players")
@@ -69,4 +76,8 @@ for _, member in fullParty.Members do
 end
 check(handlers.PartyRaid(rd).Ok, "A party of four couldn't raid")
 
-print("PASS: " .. (checks - before) .. " raid checks (size rules, scaling, who owns the boss, leader-only, busy members, arrival, boss)")
+print(
+	"PASS: "
+		.. (checks - before)
+		.. " raid checks (size rules, scaling, who owns the boss, leader-only, busy members, arrival, boss)"
+)
