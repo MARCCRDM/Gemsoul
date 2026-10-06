@@ -1225,13 +1225,25 @@ player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 	cooldowns, techCooldowns = {}, {}
 	nextAttack = 0
 end)
--- Touch screens: every action under the right thumb, the left side left
--- to the move stick. ATTACK sits in the bottom-right corner; the three
--- surges ring it closest (Q left, E diagonal, R above); guard, maneuvers,
--- heavy and dodge make the outer ring. Your vitals sit bottom-centre, left
--- of the ring. Returns the vitals' top (from the bottom) and their centre.
+-- Touch screens: the fighting actions under the right thumb, the left side
+-- left to the move stick. ATTACK sits in the bottom-right corner; the three
+-- surges ring it closest (Q left, E diagonal, R above); GUARD, HEAVY and
+-- DODGE make one even outer arc, all round. Your vitals sit bottom-centre,
+-- left of the ring, with your maneuvers (round too) in a row just above
+-- them. Returns the top of that stack (from the bottom) and its centre.
 local thumbReady = false
 local THUMB_NAMES = { Basic = "ATTACK", Heavy = "HEAVY", Block = "GUARD", Dodge = "DODGE" }
+local function roundAll(button: GuiObject)
+	for _, d in button:GetDescendants() do
+		if d:IsA("UICorner") then
+			d.CornerRadius = UDim.new(0.5, 0)
+		end
+	end
+	local own = button:FindFirstChildOfClass("UICorner")
+	if own then
+		own.CornerRadius = UDim.new(0.5, 0)
+	end
+end
 local function layoutThumb(viewport: Vector2): (number, number)
 	if not thumbReady then
 		thumbReady = true
@@ -1243,22 +1255,18 @@ local function layoutThumb(viewport: Vector2): (number, number)
 			icon.Button.Parent = gui
 			icon.Name.Visible = false
 		end
-		-- Thumb buttons are round.
 		for _, slot in slots do
-			for _, d in slot.Button:GetDescendants() do
-				if d:IsA("UICorner") then
-					d.CornerRadius = UDim.new(0.5, 0)
-				end
-			end
-			local own = slot.Button:FindFirstChildOfClass("UICorner")
-			if own then
-				own.CornerRadius = UDim.new(0.5, 0)
-			end
+			roundAll(slot.Button)
 		end
 	end
+	-- Maneuver buttons are round on touch screens, ability art included
+	-- (the art is added later, when an ability is set).
+	for _, icon in maneuverIcons do
+		roundAll(icon.Button)
+	end
 	local k = math.clamp(viewport.Y / 380, 0.8, 1.3)
-	local A, S, M = math.floor(84 * k), math.floor(60 * k), math.floor(46 * k)
-	local margin = math.floor(16 * k)
+	local A, S, M, G = math.floor(86 * k), math.floor(58 * k), math.floor(50 * k), math.floor(56 * k)
+	local margin = math.floor(14 * k)
 	-- The ring's centre, measured from the bottom-right corner.
 	local cx, cy = margin + A / 2, margin + A / 2
 	local function at(button: GuiObject, size: number, radius: number, degrees: number)
@@ -1268,39 +1276,23 @@ local function layoutThumb(viewport: Vector2): (number, number)
 		button.Position =
 			UDim2.new(1, -cx + math.floor(radius * math.cos(a)), 1, -cy - math.floor(radius * math.sin(a)))
 	end
-	-- The big ATTACK button.
-	local attack = slots.Basic
-	at(attack.Button, A, 0, 0)
+	at(slots.Basic.Button, A, 0, 0)
 	-- Surges, closest.
-	local inner = A / 2 + S / 2 + 10 * k
+	local inner = A / 2 + S / 2 + 8 * k
 	for i, icon in surgeIcons do
 		icon.Button.Visible = true
 		at(icon.Button, S, inner, ({ 180, 135, 90 })[i])
 		icon.Glyph.TextSize = math.floor(S * 0.38)
 		icon.Badge.TextSize = math.floor(9 * k)
 	end
-	-- The outer ring, left to top: guard, maneuvers (only those you can use),
-	-- heavy, dodge.
-	local outer = inner + S / 2 + M / 2 + 20 * k
-	local ring = { slots.Block.Button }
-	for _, icon in maneuverIcons do
-		icon.Button.Visible = not icon.Locked
-		if icon.Button.Visible then
-			table.insert(ring, icon.Button)
-			icon.Glyph.TextSize = math.floor(M * 0.38)
-			icon.Badge.TextSize = math.floor(8 * k)
-		end
-	end
-	table.insert(ring, slots.Heavy.Button)
-	table.insert(ring, slots.Dodge.Button)
-	local from, to = 186, 84
-	for i, button in ring do
-		local t = if #ring > 1 then (i - 1) / (#ring - 1) else 0
-		at(button, M, outer, from + (to - from) * t)
-	end
+	-- The outer arc: guard low by the thumb, heavy, dodge on top.
+	local outer = inner + S / 2 + G / 2 + 8 * k
+	at(slots.Block.Button, G, outer, 184)
+	at(slots.Heavy.Button, M, outer, 140)
+	at(slots.Dodge.Button, M, outer, 97)
 	-- The round buttons: name centred, cooldown above it, no key hint.
 	for id, slot in slots do
-		local size = if id == "Basic" then A else M
+		local size = if id == "Basic" then A elseif id == "Block" then G else M
 		slot.Button.Visible = true
 		slot.Key.Visible = false
 		slot.Name.Text = if id == "Block" and player:GetAttribute("Blocking") then "GUARD UP" else THUMB_NAMES[id]
@@ -1313,8 +1305,8 @@ local function layoutThumb(viewport: Vector2): (number, number)
 	end
 	-- Vitals: between the move stick's side (the left fifth) and the ring.
 	local left = viewport.X * 0.2
-	local right = viewport.X - (cx + outer + M / 2 + 12)
-	local width = math.clamp(right - left, 260, 470)
+	local right = viewport.X - (cx + outer + G / 2 + 14 * k)
+	local width = math.clamp(right - left, 240, 420)
 	local centre = math.max(left + width / 2, math.min(right - width / 2, viewport.X / 2))
 	local stacked = width < 400
 	local height = HudChrome.layoutVitals(
@@ -1324,7 +1316,28 @@ local function layoutThumb(viewport: Vector2): (number, number)
 		stacked
 	)
 	hud.Position = UDim2.new(0, centre, 1, -margin)
-	return margin + height, centre
+	local top = margin + height
+	-- Maneuvers: a row of round buttons just above the vitals (those you can use).
+	local shown = {}
+	for _, icon in maneuverIcons do
+		icon.Button.Visible = not icon.Locked
+		if icon.Button.Visible then
+			table.insert(shown, icon)
+		end
+	end
+	local Mv, gap = math.floor(46 * k), math.floor(12 * k)
+	for i, icon in shown do
+		local x = centre + (i - (#shown + 1) / 2) * (Mv + gap)
+		icon.Button.AnchorPoint = Vector2.new(0.5, 1)
+		icon.Button.Size = UDim2.fromOffset(Mv, Mv)
+		icon.Button.Position = UDim2.new(0, math.floor(x), 1, -(top + 10 * k))
+		icon.Glyph.TextSize = math.floor(Mv * 0.38)
+		icon.Badge.TextSize = math.floor(8 * k)
+	end
+	if #shown > 0 then
+		top += 10 * k + Mv
+	end
+	return top, centre
 end
 
 local lastActive = false
@@ -1370,6 +1383,9 @@ RunService.RenderStepped:Connect(function(dt)
 	treeButton.Visible = not touch
 	local stackTop, centreX = 0, nil
 	local logRoom = 0
+	-- Callouts sit under the crosshair; on touch screens above it, clear
+	-- of the maneuver row on short phones.
+	hint.Position = if touch then UDim2.new(0.5, 0, 0.5, -64) else UDim2.new(0.5, 0, 0.5, 30)
 	if touch then
 		stackTop, centreX = layoutThumb(viewport)
 	else
@@ -1417,7 +1433,7 @@ RunService.RenderStepped:Connect(function(dt)
 	leave.Position, leave.Size =
 		UDim2.new(1, -12, 0, if portrait then 80 else 16),
 		if touch
-			then UDim2.fromOffset(110, 34)
+			then UDim2.fromOffset(96, 30)
 			elseif portrait then UDim2.fromOffset(130, 38)
 			else UDim2.fromOffset(160, 38)
 	leave.Text = if touch then "LEAVE" else "LEAVE ARENA"

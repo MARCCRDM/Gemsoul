@@ -41,7 +41,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 218)
+panel.Size = UDim2.fromOffset(300, 262)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -131,5 +131,74 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		run("DungeonTest", "Full")
 	elseif input.KeyCode == Enum.KeyCode.F8 then
 		run("DungeonTest", "Sahur")
+	end
+end)
+
+-- POSE CHECK: how the nearest other fighter's body is being posed on this
+-- screen (Shared.RivalPose), to tell why a foe might not visibly swing or
+-- guard: joints found (Motor6Ds), frames posed, resets (something else put a
+-- bent joint back), the largest bend now and the action it's showing.
+local RivalPose = require(game:GetService("ReplicatedStorage").Shared.RivalPose)
+local poseLine = Instance.new("TextLabel")
+poseLine.Size = UDim2.new(1, -12, 0, 46)
+poseLine.Position = UDim2.fromOffset(6, 210)
+poseLine.BackgroundTransparency = 1
+poseLine.TextColor3 = Color3.fromRGB(160, 230, 255)
+poseLine.TextWrapped = true
+poseLine.TextXAlignment = Enum.TextXAlignment.Left
+poseLine.TextSize = 11
+poseLine.Font = Enum.Font.GothamMedium
+poseLine.Text = "POSE CHECK: open near a fighter"
+poseLine.Parent = panel
+
+local function nearestFighter(): Model?
+	local own = player.Character
+	local eye = own and own:FindFirstChild("HumanoidRootPart")
+	if not eye then
+		return nil
+	end
+	local best, bestDistance = nil, 220
+	local function consider(model)
+		local root = model and model:FindFirstChild("HumanoidRootPart")
+		if model and model ~= own and root and root:IsA("BasePart") then
+			local distance = (root.Position - eye.Position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = model, distance
+			end
+		end
+	end
+	for _, other in Players:GetPlayers() do
+		consider(other.Character)
+	end
+	local enemies = workspace:FindFirstChild("Enemies")
+	for _, model in if enemies then enemies:GetChildren() else {} do
+		consider(model)
+	end
+	return best
+end
+
+task.spawn(function()
+	while true do
+		task.wait(0.5)
+		if panel.Visible then
+			local model = nearestFighter()
+			local info = model and RivalPose.inspect(model)
+			poseLine.Text = if not model
+				then "POSE CHECK: no fighter nearby"
+				elseif not info then string.format(
+					"POSE CHECK %s: NOT POSED (BodyPoses never reached it)",
+					model.Name
+				)
+				else string.format(
+					"POSE CHECK %s: joints %d (%d motor) · frames %d · resets %d · bend %.2f · %s",
+					model.Name,
+					info.Found,
+					info.Motors,
+					info.Updates,
+					info.Resets,
+					info.Bend,
+					info.Action or "idle"
+				)
+		end
 	end
 end)

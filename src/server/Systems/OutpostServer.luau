@@ -211,13 +211,15 @@ local function socialPrompts(player: Player, on: boolean)
 			old:Destroy()
 		end
 	end
-	if not on then
+	-- Never on someone in a fight: they're busy, and in a duel the prompts
+	-- popped up over the foe every time the fighters closed in.
+	if not on or player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil then
 		return
 	end
 	for _, spec in
 		{
-			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G },
-			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F },
+			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G, Vector2.new(0, -34) },
+			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F, Vector2.new(0, 34) },
 		}
 	do
 		local prompt = Instance.new("ProximityPrompt")
@@ -228,6 +230,8 @@ local function socialPrompts(player: Player, on: boolean)
 		prompt.HoldDuration = 0.25
 		prompt.MaxActivationDistance = 10
 		prompt.RequiresLineOfSight = false
+		-- One above the other, not drawn on top of each other.
+		prompt.UIOffset = spec[5]
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt:SetAttribute("TargetUserId", player.UserId)
 		prompt.Parent = root
@@ -703,9 +707,14 @@ function OutpostServer.start()
 	end)
 
 	local function watch(player: Player)
-		player:GetAttributeChangedSignal("CombatSession"):Connect(function()
+		-- A fight takes the social prompts off (and its end puts them back,
+		-- for someone still at the Outpost).
+		local function fightChanged()
 			refreshKit(player)
-		end)
+			socialPrompts(player, player:GetAttribute("Outpost") == true)
+		end
+		player:GetAttributeChangedSignal("CombatSession"):Connect(fightChanged)
+		player:GetAttributeChangedSignal("MatchId"):Connect(fightChanged)
 		player.CharacterAdded:Connect(function(character)
 			-- Back on your feet at the Outpost after a respawn.
 			if player:GetAttribute("Outpost") then

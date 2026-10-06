@@ -676,10 +676,18 @@ end
 local function rigOf(model: Model, clock: number)
 	local rig = rigs[model]
 	if not rig then
-		rig = { Joints = {}, Angles = {}, Found = 0, NextScan = 0 }
+		rig = { Joints = {}, Angles = {}, Found = 0, NextScan = 0, Resets = 0, Updates = 0 }
 		rigs[model] = rig
 	end
-	if rig.Found < JOINT_COUNT and clock >= rig.NextScan then
+	-- A joint can be replaced under us (a rebuilt body): look again then too.
+	local lost = false
+	for _, entry in rig.Joints do
+		if entry.Object.Parent == nil then
+			lost = true
+			break
+		end
+	end
+	if (rig.Found < JOINT_COUNT or lost) and clock >= rig.NextScan then
 		rig.NextScan = clock + 0.5
 		for joint, partName in JOINTS do
 			local entry = rig.Joints[joint]
@@ -697,6 +705,33 @@ local function rigOf(model: Model, clock: number)
 		end
 	end
 	return rig
+end
+
+-- What posing a body has done so far (for diagnostics, the DEV panel):
+-- joints found (and whether as Motor6Ds), frames posed, how often something
+-- else reset a bent joint, the largest bend now (radians) and the action.
+function RivalPose.inspect(model: Model)
+	local rig = rigs[model]
+	if not rig then
+		return nil
+	end
+	local motors, bend = 0, 0
+	for joint, entry in rig.Joints do
+		if entry.Property == "C0" then
+			motors += 1
+		end
+		for _, angle in rig.Angles[joint] do
+			bend = math.max(bend, math.abs(angle))
+		end
+	end
+	return {
+		Found = rig.Found,
+		Motors = motors,
+		Updates = rig.Updates,
+		Resets = rig.Resets,
+		Bend = bend,
+		Action = rig.Action,
+	}
 end
 
 -- How many joints it can pose (for diagnostics).
@@ -756,6 +791,10 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 		attrs.GuardUntil = now + 0.25
 	end
 	local target, speed = RivalPose.pose(attrs, now, rest)
+	rig.Updates += 1
+	rig.Action = if type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now
+		then "Guard"
+		else (if type(attrs.ActionKind) == "string" then attrs.ActionKind else nil)
 	local alpha = 1 - math.exp(-speed * math.min(dt, 0.1))
 	for joint, entry in rig.Joints do
 		local angles = rig.Angles[joint]
@@ -766,9 +805,21 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 			angles[i] += step
 			moved = math.max(moved, math.abs(step))
 		end
-		if moved > 0.002 or not entry.Written then
-			entry.Written = true;
-			(entry.Object :: any)[entry.Property] = entry.Rest * CFrame.Angles(angles[1], angles[2], angles[3])
+		-- Written when it moves, or when something else has put the joint
+		-- back since (counted: RivalPose.inspect shows it).
+		local current = (entry.Object :: any)[entry.Property]
+		local overridden = entry.Last ~= nil
+			and (
+				(current.Position - entry.Last.Position).Magnitude > 1e-3
+				or (current.LookVector - entry.Last.LookVector).Magnitude > 1e-3
+				or (current.UpVector - entry.Last.UpVector).Magnitude > 1e-3
+			)
+		if overridden then
+			rig.Resets += 1
+		end
+		if moved > 0.002 or not entry.Last or overridden then
+			entry.Last = entry.Rest * CFrame.Angles(angles[1], angles[2], angles[3]);
+			(entry.Object :: any)[entry.Property] = entry.Last
 		end
 	end
 end
