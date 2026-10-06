@@ -31,6 +31,14 @@ end
 vmt.__div = function(a, b)
 	return vec(a.X / b, a.Y / b, a.Z / b)
 end
+vmt.__sub = function(a, b)
+	return vec(a.X - b.X, a.Y - b.Y, a.Z - b.Z)
+end
+vmt.__index = function(a, key)
+	if key == "Magnitude" then
+		return math.sqrt(a.X * a.X + a.Y * a.Y + a.Z * a.Z)
+	end
+end
 local Vector3 = { zero = vec(0, 0, 0), new = vec }
 local cmt = {}
 local CFrame = {
@@ -41,20 +49,27 @@ local CFrame = {
 cmt.__mul = function(a, b)
 	return CFrame.new(a.X + b.X, a.Y + b.Y, a.Z + b.Z)
 end
+CFrame.lookAt = function(position, target)
+	local cf = CFrame.new(position.X, position.Y, position.Z)
+	cf.Facing = target
+	return cf
+end
 local Color3 = {
 	fromRGB = function(...)
 		return { ... }
 	end,
 }
-local Enum = { Material = { Neon = "Neon" }, HighlightDepthMode = { AlwaysOnTop = "AlwaysOnTop" } }
+local Enum = { Material = { Neon = "Neon" }, HighlightDepthMode = { Occluded = "Occluded" } }
 local workspace = {
 	GetServerTimeNow = function()
 		return now
 	end,
 }
+local created = {}
 local function object(class)
 	local attrs, signals = {}, {}
 	local o = { ClassName = class, Parent = workspace, AncestryChanged = signal() }
+	table.insert(created, o)
 	function o:SetAttribute(k, v)
 		attrs[k] = v
 		if signals[k] then
@@ -156,6 +171,18 @@ advance(0.2)
 check(not ar.Anchored and not br.Anchored, "normal finish left actors frozen")
 check(player:GetAttribute("ArenaDropUntil") == nil, "normal finish retained input lock")
 check(a:GetAttribute("ArenaDropOrigin") == nil, "normal finish retained camera origin")
+local lingering = {}
+for _, item in created do
+	if item:GetAttribute("InsertionResidual") and item.Parent then
+		table.insert(lingering, item)
+	end
+end
+check(#lingering == 4, "Smoke markers and silhouettes did not survive combat unlock")
+advance(Motion.SmokeAfter + 0.1)
+for _, item in lingering do
+	check(item.Parent == nil, "Residual effect did not expire")
+end
+
 -- Session exit before landing restores properties and disconnects future movement.
 Drop.begin({ a, b }, { player })
 player:SetAttribute("CombatSession", nil)
@@ -184,4 +211,13 @@ Drop.begin({ fixed }, {})
 fh.Died:Fire()
 check(fr.Anchored, "cleanup lost preexisting anchored state")
 check(fixed:GetAttribute("ArenaDropUntil") == nil, "death retained protection")
+local left, lr = actor()
+local right, rr = actor()
+lr.Position, rr.Position = vec(-20, 3, 7), vec(20, 6, -8)
+Drop.begin({ left, right }, {})
+local lf, rf = left:GetAttribute("ArenaDropOrigin").Facing, right:GetAttribute("ArenaDropOrigin").Facing
+check(lf.X == 20 and lf.Z == -8 and lf.Y == 3, "First fighter not facing opponent horizontally")
+check(rf.X == -20 and rf.Z == 7 and rf.Y == 6, "Second fighter not facing opponent horizontally")
+Drop.cancel(left)
+Drop.cancel(right)
 print("PASS: " .. checks .. " real insertion lifecycle checks")

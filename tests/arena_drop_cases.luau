@@ -12,7 +12,7 @@ CombatServer._input(p, "BeginAttack", "Right")
 check(CombatServer._state(p).ChargeStarted == nil, "Insertion accepted an attack charge")
 CombatServer._input(p, "Block", true, root.Position + Vector3.new(0, 0, -4))
 check(p:GetAttribute("Blocking") ~= true, "Insertion accepted a guard action")
-check(ArenaDrop.duration(2) > 5.2, "Second pod exits after protection ends")
+check(ArenaDrop.duration(2) < 5, "Two-player insertion should finish within five seconds")
 check(ArenaDrop.duration(4) > ArenaDrop.duration(2), "Team insertion does not scale")
 p:SetAttribute("ArenaDropUntil", nil)
 ArenaDrop.cancel(p.Character)
@@ -38,8 +38,13 @@ check(Motion.sample(Motion.Exit).Hatch > 0.7, "Fighter exits before hatch clears
 check(Motion.sample(Motion.Ready).Draw == 1, "Weapon draw not finished before handoff")
 for count = 1, 4 do
 	local lastReady = Motion.Lead + (count - 1) * Motion.Spacing + Motion.Ready
-	check(ArenaDrop.duration(count) - lastReady >= 0.64, "Combat starts before final weapon is ready")
+	check(
+		ArenaDrop.duration(count) - lastReady >= Motion.Handoff - 0.0001,
+		"Combat starts before final weapon is ready"
+	)
 end
+check(Motion.sample(Motion.Landing + 0.29).Impact == 0, "Impact repeats after the initial compression")
+check(Motion.SmokeAfter >= 3, "Smoke clears before combat can establish")
 for _, fps in { 30, 60, 144 } do
 	local previous = Motion.sample(-1 / fps)
 	for frame = 0, math.ceil(Motion.Ready * fps) do

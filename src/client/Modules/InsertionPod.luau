@@ -84,10 +84,20 @@ function Pod.new(marker)
 	local emitter = Instance.new("ParticleEmitter")
 	emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
 	emitter.Color = ColorSequence.new(Color3.fromRGB(95, 110, 125), Color3.fromRGB(40, 49, 60))
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 8) })
-	emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
-	emitter.Lifetime, emitter.Speed = NumberRange.new(1, 2.2), NumberRange.new(6, 12)
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 3),
+		NumberSequenceKeypoint.new(0.4, 9),
+		NumberSequenceKeypoint.new(1, 14),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.28),
+		NumberSequenceKeypoint.new(0.55, 0.45),
+		NumberSequenceKeypoint.new(0.8, 0.78),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Lifetime, emitter.Speed = NumberRange.new(5, 6), NumberRange.new(2, 4)
 	emitter.SpreadAngle, emitter.Rate = Vector2.new(150, 65), 0
+	emitter.Drag = 1.4
 	emitter.Parent = pieces[1].Part
 	local light = Instance.new("PointLight")
 	light.Color, light.Range, light.Brightness = Color3.fromRGB(255, 180, 80), 18, 0
@@ -113,6 +123,14 @@ function Pod.new(marker)
 			return
 		end
 		local t = now - start
+		local ends = marker:GetAttribute("Ends") or now
+		local fadeAfterFight = Motion.smooth((now - ends) / Motion.SmokeAfter)
+		local actor = marker:FindFirstChild("Actor")
+		local outline = actor and actor.Value and actor.Value:FindFirstChild("InsertionSilhouette")
+		if outline then
+			outline.FillTransparency = 0.72 + 0.28 * fadeAfterFight
+			outline.OutlineTransparency = 0.05 + 0.95 * fadeAfterFight
+		end
 		local pose = Motion.sample(t)
 		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit) / 0.8))
 		local floor = origin * CFrame.new(0, -3, 0)
@@ -132,15 +150,19 @@ function Pod.new(marker)
 		light.Brightness = if t >= Motion.Landing then 4 * math.exp(-(t - Motion.Landing) * 9) else 0.2
 		if not landed and t >= Motion.Landing then
 			landed = true
+			-- One impact burst. Its lifespan reaches beyond combat unlock even for pod one.
+			local life = math.max(0.1, ends + Motion.SmokeAfter - now)
+			emitter.Lifetime = NumberRange.new(life * 0.9, life)
+			if now < ends + Motion.SmokeAfter then
+				emitter:Emit(42)
+			end
 			if t < Motion.Landing + 0.45 then
-				emitter:Emit(30)
 				impact:Play()
 			end
 		end
 		if not opened and t >= Motion.Hatch then
 			opened = true
 			if t < Motion.Hatch + 0.4 then
-				emitter:Emit(12)
 				hatchSound:Play()
 			end
 		end

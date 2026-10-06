@@ -57,6 +57,26 @@ function Drop.begin(models, viewers, dropModels)
 		if not root then
 			continue
 		end
+		-- Aim at opposing fighters, not the arena center or a stale spawn rotation.
+		local owner = Players:GetPlayerFromCharacter(model)
+		local team = owner and owner:GetAttribute("MatchTeam")
+		local target, targets = Vector3.zero, 0
+		for _, other in models do
+			local otherRoot = other:FindFirstChild("HumanoidRootPart")
+			local otherOwner = Players:GetPlayerFromCharacter(other)
+			local sameTeam = team ~= nil and otherOwner and otherOwner:GetAttribute("MatchTeam") == team
+			if other ~= model and otherRoot and not sameTeam then
+				target += otherRoot.Position
+				targets += 1
+			end
+		end
+		if targets > 0 then
+			target /= targets
+			target = Vector3.new(target.X, root.Position.Y, target.Z)
+			if (target - root.Position).Magnitude > 0.01 then
+				root.CFrame = CFrame.lookAt(root.Position, target)
+			end
+		end
 		local anchored = root.Anchored
 		root.Anchored = true
 		model:SetAttribute("ActionKind", nil)
@@ -99,13 +119,19 @@ function Drop.begin(models, viewers, dropModels)
 		local connections = {}
 		local resources = {}
 		local cleanup
-		cleanup = function()
+		cleanup = function(normalFinish)
 			if finished then
 				return
 			end
 			finished = true
 			for _, object in resources do
-				object:Destroy()
+				if normalFinish == true and object:GetAttribute("InsertionResidual") then
+					task.delay(Motion.SmokeAfter, function()
+						object:Destroy()
+					end)
+				else
+					object:Destroy()
+				end
 			end
 			for _, connection in connections do
 				connection:Disconnect()
@@ -173,6 +199,9 @@ function Drop.begin(models, viewers, dropModels)
 		marker:SetAttribute("Origin", origin)
 		marker:SetAttribute("Tint", colorOf(model))
 		marker:SetAttribute("Ends", ends)
+		marker:SetAttribute("InsertionResidual", true)
+		local actor = Instance.new("ObjectValue")
+		actor.Name, actor.Value, actor.Parent = "Actor", model, marker
 		marker.Parent = workspace
 		table.insert(state.Resources, marker)
 		local revealed = false
@@ -196,8 +225,9 @@ function Drop.begin(models, viewers, dropModels)
 						local outline = Instance.new("Highlight")
 						outline.Name, outline.Adornee = "InsertionSilhouette", model
 						outline.FillColor, outline.OutlineColor = colorOf(model), colorOf(model)
-						outline.FillTransparency, outline.OutlineTransparency = 0.9, 0.1
-						outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+						outline.FillTransparency, outline.OutlineTransparency = 0.72, 0.05
+						outline.DepthMode = Enum.HighlightDepthMode.Occluded
+						outline:SetAttribute("InsertionResidual", true)
 						outline.Parent = model
 						table.insert(state.Resources, outline)
 					end
@@ -214,7 +244,7 @@ function Drop.begin(models, viewers, dropModels)
 
 	task.delay(duration, function()
 		for _, cleanup in cleanups do
-			cleanup()
+			cleanup(true)
 		end
 		for _, viewer in viewers do
 			if viewer:GetAttribute("ArenaDropUntil") == ends then
