@@ -118,14 +118,23 @@ local function memoryBoard()
 		end
 		return result
 	end
+	-- Pages through the board, newest first (settled rows stay for weeks, so
+	-- the first page alone could hide older open listings).
 	function board.range(count)
-		local done, items = pcall(map.GetRangeAsync, map, Enum.SortDirection.Ascending, count)
-		if not done then
-			error("board unavailable")
-		end
-		local out = {}
-		for _, item in items do
-			table.insert(out, item.value)
+		local out, after = {}, nil
+		while #out < count do
+			local done, items =
+				pcall(map.GetRangeAsync, map, Enum.SortDirection.Ascending, math.min(200, count - #out), after)
+			if not done then
+				error("board unavailable")
+			end
+			for _, item in items do
+				table.insert(out, item.value)
+			end
+			if #items < 200 then
+				break
+			end
+			after = items[#items].key
 		end
 		return out
 	end
@@ -294,6 +303,16 @@ local function settle(player: Player)
 				home = true
 			end
 		elseif entry.Role == "Offer" then
+			-- Close an expired listing first (atomically), so it can't be
+			-- accepted after this offer's item has come home.
+			if row and row.State == "Open" and os.time() >= row.Expires then
+				row = b.update(entry.Listing, function(old)
+					if old and old.State == "Open" and os.time() >= old.Expires then
+						old.State = "Expired"
+					end
+					return old
+				end)
+			end
 			local mine = nil
 			for _, offer in row and row.Offers or {} do
 				if offer.Id == entry.OfferId then
@@ -307,10 +326,22 @@ local function settle(player: Player)
 				table.insert(notes, (row.SellerName or "The seller") .. " accepted your offer. Trade complete!")
 				continue
 			end
-			local open = row and row.State == "Open" and os.time() < row.Expires
-			if not open or not mine then
+			if not row or row.State ~= "Open" or not mine then
 				home = true
 			end
+		elseif entry.Role == "Buy" then
+			-- A purchase the server didn't get to finish (a crash): the item
+			-- if the claim went through, else the coins back.
+			if row and row.State == "Sold" and row.Buyer == player.UserId then
+				Rules.give(profile, row.Item, Config.MaxGems, true)
+				table.insert(notes, "Your purchase arrived: it's in your bag.")
+			else
+				profile.Coins += entry.Price or 0
+				table.insert(notes, "A purchase didn't go through: your coins are back.")
+			end
+			escrow[entryId] = nil
+			changed = true
+			continue
 		end
 		if home then
 			Rules.give(profile, entry.Item, Config.MaxGems, true)
@@ -352,7 +383,7 @@ local function browse()
 	if browseCache and os.clock() - browseAt < 3 then
 		return browseCache
 	end
-	local rows = getBoard().range(200)
+	local rows = getBoard().range(1000)
 	local open = {}
 	for _, row in rows do
 		if row.State == "Open" and os.time() < row.Expires then
@@ -386,7 +417,8 @@ function handlers.MarketPreviews(player: Player)
 			end
 		end
 	end
-	return Shop.reply(true, "", { Done = Equipment.marketPreviews(player, items) })
+	local done, built = Equipment.marketPreviews(player, items)
+	return Shop.reply(true, "", { Done = done, Built = built or 0 })
 end
 
 function handlers.MarketBrowse(player: Player)
@@ -503,9 +535,28 @@ function handlers.MarketBuy(player: Player, listingId)
 	if why then
 		return Shop.reply(false, why)
 	end
-	profile.Coins -= row.Price -- held while the claim runs
+	-- The coins wait in escrow (saved) while the claim runs: if the server
+	-- stops mid-way, settling up delivers the item or gives the coins back.
+	local escrow = Rules.escrow(profile)
+	local entryId = "b_" .. listingId
+	if escrow[entryId] then
+		return Shop.reply(false, "That purchase is already going through.")
+	end
+	profile.Coins -= row.Price
+	escrow[entryId] = { Role = "Buy", Listing = listingId, Price = row.Price, At = os.time() }
+	local function refund(message)
+		escrow[entryId] = nil
+		profile.Coins += row.Price
+		finishChange(player)
+		invalidate()
+		return Shop.reply(false, message)
+	end
+	if not persist(player) then
+		return refund("Your save couldn't be reached, so nothing was bought.")
+	end
 	local won = false
-	local claimed = b.update(listingId, function(old)
+	local reached, claimed = pcall(b.update, listingId, function(old)
+		won = false
 		if old and old.State == "Open" and os.time() < old.Expires and old.Price == row.Price then
 			old.State = "Sold"
 			old.Buyer = player.UserId
@@ -515,12 +566,19 @@ function handlers.MarketBuy(player: Player, listingId)
 		end
 		return old
 	end)
-	if not won or not claimed then
-		profile.Coins += row.Price
-		PlayerData.sync(player)
-		invalidate()
-		return Shop.reply(false, "Someone else bought it first. Your coins weren't spent.")
+	if not reached then
+		-- Unknown whether it went through: settling up (in a few seconds)
+		-- finds out and delivers the item or returns the coins.
+		finishChange(player)
+		return Shop.reply(
+			false,
+			"The Market didn't answer. If the purchase went through it arrives shortly; if not, your coins come back."
+		)
 	end
+	if not won or not claimed then
+		return refund("Someone else bought it first. Your coins weren't spent.")
+	end
+	escrow[entryId] = nil
 	Rules.give(profile, claimed.Item, Config.MaxGems, true)
 	PlayerData.milestone(player, "Traded")
 	invalidate()
@@ -584,6 +642,7 @@ function handlers.MarketOffer(player: Player, listingId, kind, slot, id)
 	end
 	local added = false
 	local ok, updated = pcall(b.update, listingId, function(old)
+		added = false
 		if old and old.State == "Open" and os.time() < old.Expires and #(old.Offers or {}) < Rules.MaxOffers then
 			old.Offers = old.Offers or {}
 			table.insert(
@@ -612,6 +671,7 @@ function handlers.MarketWithdraw(player: Player, listingId)
 	end
 	local removed = false
 	local row = getBoard().update(listingId, function(old)
+		removed = false
 		if old and old.State == "Open" then
 			for i, offer in old.Offers or {} do
 				if offer.Id == entry.OfferId then
@@ -649,8 +709,8 @@ function handlers.MarketAccept(player: Player, listingId, offerId)
 			offer = o
 		end
 	end
-	if not row or row.State ~= "Open" or not offer then
-		return Shop.reply(false, "That offer is gone.")
+	if not row or row.State ~= "Open" or os.time() >= row.Expires or not offer then
+		return Shop.reply(false, "That offer is gone (or the listing has ended).")
 	end
 	local why = Rules.cantReceive(profile, offer.Item, Config.MaxGems, Config.MaxGear)
 	if why then
@@ -658,7 +718,8 @@ function handlers.MarketAccept(player: Player, listingId, offerId)
 	end
 	local won = false
 	local done = b.update(listingId, function(old)
-		if old and old.State == "Open" and old.Seller == player.UserId then
+		won = false
+		if old and old.State == "Open" and os.time() < old.Expires and old.Seller == player.UserId then
 			for _, o in old.Offers or {} do
 				if o.Id == offerId then
 					old.State = "Traded"
@@ -692,6 +753,7 @@ function handlers.MarketDecline(player: Player, listingId, offerId)
 	end
 	local from = nil
 	getBoard().update(listingId, function(old)
+		from = nil
 		if old and old.State == "Open" and old.Seller == player.UserId then
 			for i, o in old.Offers or {} do
 				if o.Id == offerId then
@@ -717,6 +779,10 @@ function MarketBoard.start()
 			end
 			if action ~= "MarketBrowse" and action ~= "MarketPreviews" and not mayTrade(player) then
 				return Shop.reply(false, "The Market needs your save to be working. Rejoin and try again.")
+			end
+			-- Looking (and building pictures) changes nothing: no turn needed.
+			if action == "MarketBrowse" or action == "MarketPreviews" then
+				return handler(player, ...)
 			end
 			local args = table.pack(...)
 			return withTurn(player, function()

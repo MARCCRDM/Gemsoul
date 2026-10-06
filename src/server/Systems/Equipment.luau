@@ -1813,7 +1813,7 @@ end
 -- piece itself: items[tag] = { Slot, Id, Quality, Roll, Gem }. Each is
 -- built as "Slot|M:<tag>" (GearArt.draw(view, slot, "M:" .. tag)); market
 -- previews no longer asked for are dropped.
-function Equipment.marketPreviews(player: Player, items): boolean
+function Equipment.marketPreviews(player: Player, items): (boolean, number?)
 	local loadout = PlayerData.character(player)
 	local store = previewStore(player)
 	if not loadout or not store or building[player] then
@@ -1856,10 +1856,15 @@ function Equipment.marketPreviews(player: Player, items): boolean
 			end
 		end
 	end
-	if next(wanted) == nil then
-		return true
+	local count = 0
+	for _ in wanted do
+		count += 1
 	end
-	return buildPreviews(player, store :: Instance, loadout, wanted)
+	if count == 0 then
+		return true, 0
+	end
+	local done = buildPreviews(player, store :: Instance, loadout, wanted)
+	return done, if done then count else 0
 end
 
 local function watch(player: Player)

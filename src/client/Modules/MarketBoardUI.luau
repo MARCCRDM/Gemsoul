@@ -131,8 +131,10 @@ local function chip(parent, value, on, color, x, y, w, callback)
 	return c
 end
 
-local function scroller(parent, x, y, w, h)
-	return new("ScrollingFrame", {
+-- Scroll positions by list, kept across redraws (a redraw rebuilds the list).
+local scrolled: { [string]: Vector2 } = {}
+local function scroller(parent, x, y, w, h, remember: string?)
+	local frame = new("ScrollingFrame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(x, y),
 		Size = UDim2.fromOffset(w, h),
@@ -141,6 +143,21 @@ local function scroller(parent, x, y, w, h)
 		ScrollBarThickness = 4,
 		ScrollBarImageColor3 = P.Edge,
 	}, parent)
+	if remember then
+		local saved = scrolled[remember]
+		if saved then
+			-- (after the list is filled, so the canvas is tall enough)
+			task.defer(function()
+				if frame.Parent then
+					frame.CanvasPosition = saved
+				end
+			end)
+		end
+		frame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+			scrolled[remember] = frame.CanvasPosition
+		end)
+	end
+	return frame
 end
 
 -- Items ---------------------------------------------------------------------------
@@ -443,13 +460,26 @@ local function calm(): boolean
 	return window.Gui.Enabled and not busy and UserInputService:GetFocusedTextBox() == nil
 end
 
-local function refresh()
-	local result = GemClient.request("MarketBrowse")
-	if result.Ok then
-		listings = result.Listings or {}
-		shared = result.Shared ~= false
-		serverNow, fetchedAt = result.Now or os.time(), os.clock()
+-- What the board looks like, to tell whether a refresh changed anything.
+local function signature(rows): string
+	local parts = {}
+	for _, row in rows do
+		table.insert(parts, row.Id .. ":" .. row.State .. ":" .. #(row.Offers or {}))
 	end
+	return table.concat(parts, "|")
+end
+
+-- Fetches the board; true when it changed.
+local function refresh(): boolean
+	local result = GemClient.request("MarketBrowse")
+	if not result.Ok then
+		return false
+	end
+	local before = signature(listings)
+	listings = result.Listings or {}
+	shared = result.Shared ~= false
+	serverNow, fetchedAt = result.Now or os.time(), os.clock()
+	return signature(listings) ~= before
 end
 
 local function act(action, ...)
@@ -618,7 +648,7 @@ local function drawBrowse()
 		)
 		return
 	end
-	local grid = scroller(content, 0, 50, 860, 440)
+	local grid = scroller(content, 0, 50, 860, 440, "browse")
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(204, 168),
 		CellPadding = UDim2.fromOffset(9, 9),
@@ -705,7 +735,7 @@ local function drawOfferPicker()
 		draw()
 	end)
 	filters(box, 112, false)
-	local grid = scroller(box, 16, 146, 828, 332)
+	local grid = scroller(box, 16, 146, 828, 332, "picker")
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(198, 70),
 		CellPadding = UDim2.fromOffset(8, 8),
@@ -769,7 +799,7 @@ local function drawSell()
 		180,
 		18
 	)
-	local grid = scroller(content, 0, 36, 500, 454)
+	local grid = scroller(content, 0, 36, 500, 454, "sell")
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(242, 70),
 		CellPadding = UDim2.fromOffset(8, 8),
@@ -969,7 +999,7 @@ end
 local function drawMine()
 	local profile = GemClient.Profile
 	local escrow = profile and profile.Market and profile.Market.Escrow or {}
-	local list = scroller(content, 0, 0, 860, 490)
+	local list = scroller(content, 0, 0, 860, 490, "mine")
 	UiKit.list(list, 8)
 	local order = 0
 	local function heading(value)
@@ -979,7 +1009,11 @@ local function drawMine()
 	end
 	local sells, offers = {}, {}
 	for _, entry in escrow do
-		table.insert(if entry.Role == "Sell" then sells else offers, entry)
+		if entry.Role == "Sell" then
+			table.insert(sells, entry)
+		elseif entry.Role == "Offer" then
+			table.insert(offers, entry)
+		end -- ("Buy": a purchase going through, nothing to show)
 	end
 	table.sort(sells, function(a, b)
 		return (a.At or 0) > (b.At or 0)
@@ -1143,7 +1177,7 @@ function MarketBoardUI.open(which: string?)
 		-- 3D pictures: your own gear, then the gear on the board.
 		for _, action in { "GearPreviews", "MarketPreviews" } do
 			local result = GemClient.request(action)
-			if result.Ok and calm() then
+			if result.Ok and (result.Built ~= 0) and calm() then
 				draw()
 			end
 		end
@@ -1168,13 +1202,13 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	elapsed = 0
 	task.spawn(function()
-		refresh()
-		if calm() and not offerFor then
+		-- Redraw only when something changed (a redraw rebuilds the lists).
+		if refresh() and calm() and not offerFor then
 			draw()
 		end
 		-- New gear on the board gets its 3D picture.
 		local result = GemClient.request("MarketPreviews")
-		if result.Ok and calm() and not offerFor then
+		if result.Ok and (result.Built or 0) > 0 and calm() and not offerFor then
 			draw()
 		end
 	end)

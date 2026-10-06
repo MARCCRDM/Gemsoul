@@ -498,6 +498,220 @@ end
 check(listed == Rules.MaxListings, "listing cap")
 conserved("after the cap")
 
+-- 11. Audit: a board we can make misbehave the way MemoryStores can.
+local function fakeBoard()
+	local rows, hooks = {}, {}
+	local b = { Shared = true, Hooks = hooks, Rows = rows }
+	function b.get(id)
+		local row = rows[id]
+		return row and Rules.copy(row)
+	end
+	function b.update(id, fn)
+		if hooks.failBefore then
+			hooks.failBefore = nil
+			error("board unavailable")
+		end
+		if hooks.retry then
+			-- MemoryStores may run a transform on a stale copy, then again.
+			local interfere = hooks.retry
+			hooks.retry = nil
+			fn(rows[id] and Rules.copy(rows[id]))
+			interfere(id)
+		end
+		local result = fn(rows[id] and Rules.copy(rows[id]))
+		if result ~= nil then
+			rows[id] = Rules.copy(result)
+		end
+		if hooks.failAfter then
+			hooks.failAfter = nil
+			error("board unavailable (after writing)")
+		end
+		return result
+	end
+	function b.range(count)
+		local ids = {}
+		for id in rows do
+			table.insert(ids, id)
+		end
+		table.sort(ids)
+		local out = {}
+		for i = 1, math.min(count, #ids) do
+			table.insert(out, Rules.copy(rows[ids[i]]))
+		end
+		return out
+	end
+	return b
+end
+local fb = fakeBoard()
+MarketBoard.useBoard(fb)
+for _, p in players do
+	MarketBoard.reconcile(p) -- (the old board's listings come home)
+end
+everything = census()
+local dan = newPlayer(4, "Dan")
+profiles[dan] = profile(1000)
+table.insert(profiles[dan].Gems, gem("opal", "Rare", 4))
+table.insert(profiles[dan].Gems, gem("jade", "Uncommon", 2))
+profiles[ann].Coins, profiles[bob].Coins = 1000, 1000
+everything = census()
+local function listingOf(itemId)
+	for id, row in fb.Rows do
+		if row.Item.Kind == "Gem" and row.Item.Gem.Id == itemId and row.State == "Open" then
+			return id
+		end
+	end
+	return nil
+end
+
+-- 11a. A buyer who loses on the transform's second run is not told they won.
+check(call(dan, "MarketList", "Gem", nil, "opal", "Sell", 100).Ok, "dan lists opal")
+local opal = listingOf("opal")
+fb.Hooks.retry = function(id)
+	fb.Rows[id].State = "Sold"
+	fb.Rows[id].Buyer, fb.Rows[id].BuyerName = 3, "Cat"
+end
+r = call(bob, "MarketBuy", opal)
+check(not r.Ok, "the buyer who lost the race is refused")
+check(profiles[bob].Coins == 1000 and not has(bob, "opal"), "...keeps his coins, gets no copy")
+fb.Rows[opal].State, fb.Rows[opal].Buyer = "Open", nil -- (undo the stand-in buyer)
+
+-- 11b. The server goes quiet before the sale is written: coins come back.
+fb.Hooks.failBefore = true
+r = call(bob, "MarketBuy", opal)
+check(not r.Ok and profiles[bob].Coins == 900, "no answer: the coins wait in escrow")
+MarketBoard.reconcile(bob)
+check(profiles[bob].Coins == 1000 and not has(bob, "opal"), "settling up returns the coins")
+check(escrowCount(bob) == 0, "nothing left in escrow")
+
+-- 11c. ...after the sale is written: the item arrives on settling up.
+fb.Hooks.failAfter = true
+r = call(bob, "MarketBuy", opal)
+check(not r.Ok and profiles[bob].Coins == 900 and not has(bob, "opal"), "no answer: coins held, no item yet")
+MarketBoard.reconcile(bob)
+check(has(bob, "opal") and profiles[bob].Coins == 900, "settling up delivers the item, paid once")
+MarketBoard.reconcile(dan)
+check(profiles[dan].Coins == 1000 + Rules.payout(100), "the seller is paid once")
+conserved("after a buy the server didn't finish")
+
+-- 11d. An offer on a listing that expires: once the offerer settles, the
+-- seller can't accept it any more (no copy of the item).
+check(call(dan, "MarketList", "Gem", nil, "jade", "Trade", "Any").Ok, "dan lists jade for trade")
+local jade = listingOf("jade")
+table.insert(profiles[ann].Gems, gem("amber", "Common", 1))
+everything = census()
+check(call(ann, "MarketOffer", jade, "Gem", nil, "amber").Ok, "ann offers amber")
+now += Rules.ListingSeconds + 10
+MarketBoard.reconcile(ann)
+check(has(ann, "amber") and escrowCount(ann) == 0, "expired: ann's amber comes home")
+local offerId = fb.Rows[jade].Offers[1] and fb.Rows[jade].Offers[1].Id
+r = call(dan, "MarketAccept", jade, offerId)
+check(not r.Ok and not has(dan, "amber"), "the seller can't accept after the offer came home")
+MarketBoard.reconcile(dan)
+check(has(dan, "jade"), "...and his jade comes home too")
+conserved("after an expired trade listing")
+
+-- 11e. Accepting right before expiry still works (and only once).
+check(call(dan, "MarketList", "Gem", nil, "jade", "Trade", "Any").Ok, "dan lists jade again")
+jade = listingOf("jade")
+check(call(ann, "MarketOffer", jade, "Gem", nil, "amber").Ok, "ann offers amber again")
+offerId = fb.Rows[jade].Offers[1].Id
+check(call(dan, "MarketAccept", jade, offerId).Ok and has(dan, "amber"), "accepted in time")
+check(not call(dan, "MarketAccept", jade, offerId).Ok, "not twice")
+MarketBoard.reconcile(ann)
+check(has(ann, "jade") and not has(ann, "amber"), "ann got jade")
+conserved("after an accepted trade")
+
+-- 12. A busy board: hundreds of settled rows don't hide an older open listing.
+do
+	local map, data = {}, {}
+	function map:GetAsync(k)
+		return data[k] and Rules.copy(data[k])
+	end
+	function map:UpdateAsync(k, fn)
+		local v = fn(data[k] and Rules.copy(data[k]))
+		if v ~= nil then
+			data[k] = Rules.copy(v)
+		end
+		return v
+	end
+	function map:GetRangeAsync(_, count, after)
+		local keys = {}
+		for k in data do
+			if not after or k > after then
+				table.insert(keys, k)
+			end
+		end
+		table.sort(keys)
+		local out = {}
+		for i = 1, math.min(count, #keys) do
+			table.insert(out, { key = keys[i], value = Rules.copy(data[keys[i]]) })
+		end
+		return out
+	end
+	local handlers2 = {}
+	local Shop2 = {
+		register = function(name, fn)
+			handlers2[name] = fn
+		end,
+		reply = Shop.reply,
+	}
+	local services2 = table.clone(services)
+	services2.MemoryStoreService = {
+		GetSortedMap = function()
+			return map
+		end,
+	}
+	local Board2 = load("src/server/Systems/MarketBoard.luau", {
+		game = {
+			GetService = function(_, n)
+				return services2[n]
+			end,
+		},
+		script = {
+			Parent = {
+				PlayerData = PlayerData,
+				Remotes = Remotes,
+				Shop = Shop2,
+				Equipment = {
+					marketPreviews = function()
+						return true, 0
+					end,
+				},
+			},
+		},
+	})
+	Board2.start()
+	data["9000000000_old"] = {
+		Id = "9000000000_old",
+		State = "Open",
+		Expires = now + 3600,
+		Mode = "Sell",
+		Price = 5,
+		Seller = 9,
+		Item = { Kind = "Gem", Gem = gem("old") },
+		Offers = {},
+	}
+	for i = 1, 250 do
+		local k = string.format("%010d_s%03d", 100 + i, i)
+		data[k] = {
+			Id = k,
+			State = "Sold",
+			Expires = now + 3600,
+			Mode = "Sell",
+			Price = 1,
+			Seller = 9,
+			Item = { Kind = "Gem", Gem = gem("s" .. i) },
+			Offers = {},
+		}
+	end
+	now += 5
+	local seen = false
+	for _, row in handlers2.MarketBrowse(ann).Listings do
+		seen = seen or row.Id == "9000000000_old"
+	end
+	check(seen, "an open listing behind 250 settled rows is still on the board")
+end
+
 -- 10. Face to face (Shared.EquipmentTrade): swapping two copies of one model.
 local Trade = load("src/shared/EquipmentTrade.luau", { script = { Parent = { EquipmentSlots = Slots } } })
 local function owner(weapon, roll)
