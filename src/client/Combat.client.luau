@@ -699,6 +699,7 @@ local function drawRival(now, viewport)
 	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
 	-- (Touch screens keep the fight clear: the top card says enough.)
 	rivalPanel.Visible = humanoid ~= nil
+		and (model:GetAttribute("ArenaDropUntil") or 0)<=workspace:GetServerTimeNow()
 		and humanoid.Health > 0
 		and viewport.X >= 700
 		and not UserInputService.TouchEnabled
@@ -1622,6 +1623,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local target = lockedTarget or (hit and hit.Instance:FindFirstAncestorOfClass("Model"))
 	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
 	targetCard.Visible = enemyHumanoid ~= nil
+		and (target:GetAttribute("ArenaDropUntil") or 0)<=workspace:GetServerTimeNow()
 		and enemyHumanoid.Health > 0
 		and target ~= player.Character
 		and not game:GetService("CollectionService"):HasTag(target, "Vendor")

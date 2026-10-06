@@ -34,54 +34,122 @@ function Drop.cancel(model)
 		finish()
 	end
 end
+-- Names/health bars are presentation too: geometry transparency does not hide them.
+local function concealLabels(model)
+	local saved = {}
+	local function hide(object)
+		if object:IsA("BillboardGui") then
+			saved[object] = object.Enabled
+			object.Enabled = false
+		end
+	end
+	for _, object in model:GetDescendants() do
+		hide(object)
+	end
+	local connection = model.DescendantAdded:Connect(hide)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local nameDistance = humanoid and humanoid.NameDisplayDistance
+	local healthDistance = humanoid and humanoid.HealthDisplayDistance
+	if humanoid then
+		humanoid.NameDisplayDistance = 0
+		humanoid.HealthDisplayDistance = 0
+	end
+	return function()
+		connection:Disconnect()
+		for object, value in saved do
+			if object.Parent then
+				object.Enabled = value
+			end
+		end
+		if humanoid and humanoid.Parent then
+			if nameDistance ~= nil then
+				humanoid.NameDisplayDistance = nameDistance
+			end
+			if healthDistance ~= nil then
+				humanoid.HealthDisplayDistance = healthDistance
+			end
+		end
+	end
+end
 -- Cover and hide before a teleport or asynchronous rival build, not after it.
 function Drop.prepare(player)
-    local model=player.Character
-    local root=model and model:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    Drop.cancel(model)
-    local anchored=root.Anchored
-    root.Anchored=true
-    local saved,effects,connections={},{},{}
-    local deadline=workspace:GetServerTimeNow()+15
-    player:SetAttribute("ArenaDropPreparing",deadline)
-    player:SetAttribute("ArenaDropUntil",deadline)
-    model:SetAttribute("ArenaDropUntil",deadline)
-    local function hide(object)
-        if object:IsA("BasePart") or object:IsA("Decal") then
-            saved[object]=object.Transparency
-            object:SetAttribute("InsertionTransparency",object.Transparency)
-            object.Transparency=1
-        elseif object:IsA("ParticleEmitter") or object:IsA("Trail") then
-            effects[object]=object.Enabled
-            object:SetAttribute("InsertionEnabled",object.Enabled)
-            object.Enabled=false
-        end
-    end
-    for _,object in model:GetDescendants() do hide(object) end
-    table.insert(connections,model.DescendantAdded:Connect(hide))
-    local finished=false
-    local function cleanup()
-        if finished then return end
-        finished=true
-        for _,connection in connections do connection:Disconnect() end
-        for object,value in saved do
-            if object.Parent then object.Transparency=restored(object,value); object:SetAttribute("InsertionTransparency",nil) end
-        end
-        for object,value in effects do
-            if object.Parent then object.Enabled=value; object:SetAttribute("InsertionEnabled",nil) end
-        end
-        if root.Parent then root.Anchored=anchored end
-        model:SetAttribute("ArenaDropUntil",nil)
-        if player:GetAttribute("ArenaDropPreparing")==deadline then player:SetAttribute("ArenaDropPreparing",nil) end
-        if player:GetAttribute("ArenaDropUntil")==deadline then player:SetAttribute("ArenaDropUntil",nil) end
-        active[model]=nil
-    end
-    active[model]=cleanup
-    table.insert(connections,model.AncestryChanged:Connect(function(_,parent) if not parent then cleanup() end end))
-    local humanoid=model:FindFirstChildOfClass("Humanoid")
-    if humanoid then table.insert(connections,humanoid.Died:Connect(cleanup)) end
-    task.delay(15,cleanup)
+	local model = player.Character
+	local root = model and model:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	Drop.cancel(model)
+	local restoreLabels = concealLabels(model)
+	local anchored = root.Anchored
+	root.Anchored = true
+	local saved, effects, connections = {}, {}, {}
+	local deadline = workspace:GetServerTimeNow() + 15
+	player:SetAttribute("ArenaDropPreparing", deadline)
+	player:SetAttribute("ArenaDropUntil", deadline)
+	model:SetAttribute("ArenaDropUntil", deadline)
+	local function hide(object)
+		if object:IsA("BasePart") or object:IsA("Decal") then
+			saved[object] = object.Transparency
+			object:SetAttribute("InsertionTransparency", object.Transparency)
+			object.Transparency = 1
+		elseif object:IsA("ParticleEmitter") or object:IsA("Trail") then
+			effects[object] = object.Enabled
+			object:SetAttribute("InsertionEnabled", object.Enabled)
+			object.Enabled = false
+		end
+	end
+	for _, object in model:GetDescendants() do
+		hide(object)
+	end
+	table.insert(connections, model.DescendantAdded:Connect(hide))
+	local finished = false
+	local function cleanup()
+		if finished then
+			return
+		end
+		finished = true
+		restoreLabels()
+		for _, connection in connections do
+			connection:Disconnect()
+		end
+		for object, value in saved do
+			if object.Parent then
+				object.Transparency = restored(object, value)
+				object:SetAttribute("InsertionTransparency", nil)
+			end
+		end
+		for object, value in effects do
+			if object.Parent then
+				object.Enabled = value
+				object:SetAttribute("InsertionEnabled", nil)
+			end
+		end
+		if root.Parent then
+			root.Anchored = anchored
+		end
+		model:SetAttribute("ArenaDropUntil", nil)
+		if player:GetAttribute("ArenaDropPreparing") == deadline then
+			player:SetAttribute("ArenaDropPreparing", nil)
+		end
+		if player:GetAttribute("ArenaDropUntil") == deadline then
+			player:SetAttribute("ArenaDropUntil", nil)
+		end
+		active[model] = nil
+	end
+	active[model] = cleanup
+	table.insert(
+		connections,
+		model.AncestryChanged:Connect(function(_, parent)
+			if not parent then
+				cleanup()
+			end
+		end)
+	)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		table.insert(connections, humanoid.Died:Connect(cleanup))
+	end
+	task.delay(15, cleanup)
 end
 function Drop.begin(models, viewers, dropModels)
 	local RunService = game:GetService("RunService")
@@ -93,11 +161,13 @@ function Drop.begin(models, viewers, dropModels)
 	local duration = Drop.duration(#order)
 	local began = workspace:GetServerTimeNow()
 	local ends = began + duration
+	local positions = {}
 	local middle = Vector3.zero
 	local count = 0
 	for _, model in models do
 		local root = model:FindFirstChild("HumanoidRootPart")
 		if root then
+			positions[model] = root.Position
 			middle += root.Position
 			count += 1
 		end
@@ -124,7 +194,7 @@ function Drop.begin(models, viewers, dropModels)
 			local otherOwner = Players:GetPlayerFromCharacter(other)
 			local sameTeam = team ~= nil and otherOwner and otherOwner:GetAttribute("MatchTeam") == team
 			if other ~= model and otherRoot and not sameTeam then
-				target += otherRoot.Position
+				target += positions[other]
 				targets += 1
 			end
 		end
@@ -135,6 +205,7 @@ function Drop.begin(models, viewers, dropModels)
 				root.CFrame = CFrame.lookAt(root.Position, target)
 			end
 		end
+		local restoreLabels = concealLabels(model)
 		local anchored = root.Anchored
 		root.Anchored = true
 		model:SetAttribute("ActionKind", nil)
@@ -144,7 +215,13 @@ function Drop.begin(models, viewers, dropModels)
 		local saved, effects = {}, {}
 		local slot = table.find(order, model)
 		local dropping = slot ~= nil
-		model:SetAttribute("ArenaDropOrigin", root.CFrame)
+		local destination = root.CFrame
+		local landing = if dropping then destination * CFrame.new(0, 0, Motion.ExitDistance) else destination
+		model:SetAttribute("ArenaDropOrigin", landing)
+		model:SetAttribute("ArenaDropReleaseDelay", if slot then Motion.releaseDelay(slot, #order) else 0)
+		if dropping then
+			root.CFrame = landing
+		end
 		model:SetAttribute("ArenaDropStart", if slot then began + Motion.Lead + (slot - 1) * Motion.Spacing else nil)
 		if dropping then
 			for _, object in model:GetDescendants() do
@@ -185,6 +262,7 @@ function Drop.begin(models, viewers, dropModels)
 				return
 			end
 			finished = true
+			restoreLabels()
 			for _, object in resources do
 				if normalFinish == true and object:GetAttribute("InsertionResidual") then
 					task.delay(Motion.SmokeAfter, function()
@@ -199,11 +277,13 @@ function Drop.begin(models, viewers, dropModels)
 			end
 			reveal()
 			if root.Parent then
+                root.CFrame = destination
 				root.Anchored = anchored
 			end
 			model:SetAttribute("ArenaDropUntil", nil)
 			model:SetAttribute("ArenaDropStart", nil)
 			model:SetAttribute("ArenaDropOrigin", nil)
+			model:SetAttribute("ArenaDropReleaseDelay", nil)
 			active[model] = nil
 			local owner = Players:GetPlayerFromCharacter(model)
 			if owner and owner:GetAttribute("ArenaDropUntil") == ends then
@@ -254,10 +334,12 @@ function Drop.begin(models, viewers, dropModels)
 		end
 		local start = model:GetAttribute("ArenaDropStart")
 		local origin = model:GetAttribute("ArenaDropOrigin")
+		local releaseDelay = model:GetAttribute("ArenaDropReleaseDelay") or 0
 		local marker = Instance.new("Folder")
 		marker.Name = "OrbitalInsertion"
 		marker:SetAttribute("Start", start)
 		marker:SetAttribute("Origin", origin)
+		marker:SetAttribute("ReleaseDelay", releaseDelay)
 		marker:SetAttribute("Tint", colorOf(model))
 		marker:SetAttribute("Ends", ends)
 		marker:SetAttribute("InsertionResidual", true)
@@ -275,14 +357,14 @@ function Drop.begin(models, viewers, dropModels)
 				end
 				local now = workspace:GetServerTimeNow()
 				local t = now - start
-				if t >= Motion.Exit then
-					state.Root.CFrame = origin * CFrame.new(0, 0, -Motion.sample(t).Step)
+				if t >= Motion.Exit + releaseDelay then
+					state.Root.CFrame = origin * CFrame.new(0, 0, -Motion.sample(t, releaseDelay).Step)
 					if not revealed then
 						revealed = true
 						state.Reveal()
 						model:SetAttribute("ActionKind", "Deploy")
-						model:SetAttribute("ActionStart", start + Motion.Exit)
-						model:SetAttribute("ActionAt", start + Motion.Exit + 0.35)
+						model:SetAttribute("ActionStart", start + Motion.Exit + releaseDelay)
+						model:SetAttribute("ActionAt", start + Motion.Exit + releaseDelay + 0.35)
 						local outline = Instance.new("Highlight")
 						outline.Name, outline.Adornee = "InsertionSilhouette", model
 						outline.FillColor, outline.OutlineColor = colorOf(model), colorOf(model)

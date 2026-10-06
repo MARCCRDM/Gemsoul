@@ -37,7 +37,7 @@ check(
 check(Motion.sample(Motion.Exit).Hatch > 0.7, "Fighter exits before hatch clears")
 check(Motion.sample(Motion.Ready).Draw == 1, "Weapon draw not finished before handoff")
 for count = 1, 4 do
-	local lastReady = Motion.Lead + (count - 1) * Motion.Spacing + Motion.Ready
+	local lastReady = Motion.Lead + (count - 1) * Motion.Spacing + Motion.releaseDelay(count, count) + Motion.Ready
 	check(
 		ArenaDrop.duration(count) - lastReady >= Motion.Handoff - 0.0001,
 		"Combat starts before final weapon is ready"
@@ -52,13 +52,31 @@ check(Motion.blast(Motion.ShellBurst + 1).Flash < 0.001, "Explosion flash blocks
 check(Motion.smokeSpread(Motion.Landing) == 2, "Smoke starts detached from impact")
 check(Motion.smokeSpread(Motion.Landing + 1.5) >= 30, "Impact smoke does not reach across arena")
 check(Motion.SmokeAfter >= 6, "Arena smoke does not linger into combat")
-check(Motion.Landing>=1.4,"Descent is too short for its audio build")
-check(Motion.sample(Motion.ShellBurst).Hatch==1,"Shell explodes before door finishes ejecting")
-check(Motion.blast(Motion.Hatch+.2).Travel==0,"Door and shell are exploding together")
-check(Motion.audio(-.1).Air==0 and Motion.audio(-.1).Rumble==0,"Descent audio begins before launch")
-check(Motion.audio(.5).Air>0 and Motion.audio(.5).Rumble>0,"Missing descent layers")
-check(Motion.audio(Motion.Landing).Air==0,"Air rush continues after impact")
-check(Motion.audio(Motion.Landing+.7).Rumble==0,"Rumble does not release after impact")
+check(Motion.Landing >= 1.4, "Descent is too short for its audio build")
+check(Motion.sample(Motion.ShellBurst).Hatch == 1, "Shell explodes before door finishes ejecting")
+check(Motion.blast(Motion.Hatch + 0.2).Travel == 0, "Door and shell are exploding together")
+check(Motion.audio(-0.1).Air == 0 and Motion.audio(-0.1).Rumble == 0, "Descent audio begins before launch")
+check(Motion.audio(0.5).Air > 0 and Motion.audio(0.5).Rumble > 0, "Missing descent layers")
+check(Motion.audio(Motion.Landing).Air == 0, "Air rush continues after impact")
+check(Motion.audio(Motion.Landing + 0.7).Rumble == 0, "Rumble does not release after impact")
+check(Motion.Spacing <= 0.25, "Drops no longer land on a close double beat")
+for count = 2, 4 do
+	local lastDoorOpen = Motion.Lead + (count - 1) * Motion.Spacing + Motion.Hatch + 0.35
+	local lastExit = 0
+	for slot = 1, count do
+		local start = Motion.Lead + (slot - 1) * Motion.Spacing
+		local delay = Motion.releaseDelay(slot, count)
+		local exitAt = start + Motion.Exit + delay
+		check(exitAt > lastDoorOpen, "A fighter exits before all opponents can see through their open doors")
+		check(exitAt > lastExit, "Fighters do not emerge in order")
+		check(
+			Motion.sample(Motion.Ready + delay, delay).Step == Motion.ExitDistance,
+			"Delayed exit never reaches spawn"
+		)
+		check(Motion.sample(Motion.Exit + delay - 0.01, delay).Step == 0, "Delayed fighter moved before exit cue")
+		lastExit = exitAt
+	end
+end
 for _, fps in { 30, 60, 144 } do
 	local previous = Motion.sample(-1 / fps)
 	for frame = 0, math.ceil(Motion.Ready * fps) do

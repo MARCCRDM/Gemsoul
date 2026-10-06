@@ -294,6 +294,8 @@ function StatusBars.step(now: number)
 		end
 	end
 	for owner, entry in overheads do
+		local model = entry.Root.Parent
+		entry.Board.Enabled = model ~= nil and (model:GetAttribute("ArenaDropUntil") or 0) <= now
 		local text = owner:GetAttribute("Statuses")
 		local fresh = entry.Strip:update(text, now)
 		for _, id in fresh do

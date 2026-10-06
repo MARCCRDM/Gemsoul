@@ -15,16 +15,13 @@ function Pod.new(marker)
 		p.Material = material or Enum.Material.Metal
 		p.CFrame = CFrame.new(0, -10000, 0)
 		p.Parent = model
-		table.insert(
-			pieces,
-			{
-				Part = p,
-				Offset = offset,
-				Hatch = string.find(name, "Hatch") ~= nil and name ~= "HatchHeader",
-				Fixed = name == "ArmoredBase" or name == "LandingSkid",
-				Side = if math.abs(offset.Position.X) > 1 then (if offset.Position.X > 0 then 1 else -1) else 0,
-			}
-		)
+		table.insert(pieces, {
+			Part = p,
+			Offset = offset,
+			Hatch = string.find(name, "Hatch") ~= nil and name ~= "HatchHeader",
+			Fixed = name == "ArmoredBase" or name == "LandingSkid",
+			Side = if math.abs(offset.Position.X) > 1 then (if offset.Position.X > 0 then 1 else -1) else 0,
+		})
 		return p
 	end
 	local steel = Color3.fromRGB(37, 45, 55)
@@ -167,21 +164,23 @@ function Pod.new(marker)
 	local hatchSound = Instance.new("Sound")
 	hatchSound.SoundId, hatchSound.Volume, hatchSound.PlaybackSpeed = "rbxasset://sounds/collide.wav", 0.7, 0.6
 	hatchSound.RollOffMaxDistance, hatchSound.Parent = 90, door
-    local descent=Instance.new("Sound")
-    descent.Name,descent.SoundId="DescentAir","rbxasset://sounds/action_falling.mp3"
-    descent.Looped,descent.Volume,descent.RollOffMaxDistance=true,0,160
-    descent.Parent=pieces[1].Part
-    local rumble=descent:Clone()
-    rumble.Name,rumble.PlaybackSpeed,rumble.Parent="InsertionRumble",.28,pieces[1].Part
-    local bass=Instance.new("EqualizerSoundEffect")
-    bass.LowGain,bass.MidGain,bass.HighGain=6,-10,-24
-    bass.Parent=rumble
-    local rupture=Instance.new("Sound")
-    rupture.Name,rupture.SoundId="ShellRupture","rbxasset://sounds/action_jump_land.mp3"
-    rupture.Volume,rupture.PlaybackSpeed,rupture.RollOffMaxDistance=.85,.42,130
-    rupture.Parent=pieces[1].Part
-    local group=game:GetService("SoundService"):FindFirstChild("CombatSounds")
-    for _,sound in {impact,hatchSound,descent,rumble,rupture} do sound.SoundGroup=group end
+	local descent = Instance.new("Sound")
+	descent.Name, descent.SoundId = "DescentAir", "rbxasset://sounds/action_falling.mp3"
+	descent.Looped, descent.Volume, descent.RollOffMaxDistance = true, 0, 160
+	descent.Parent = pieces[1].Part
+	local rumble = descent:Clone()
+	rumble.Name, rumble.PlaybackSpeed, rumble.Parent = "InsertionRumble", 0.28, pieces[1].Part
+	local bass = Instance.new("EqualizerSoundEffect")
+	bass.LowGain, bass.MidGain, bass.HighGain = 6, -10, -24
+	bass.Parent = rumble
+	local rupture = Instance.new("Sound")
+	rupture.Name, rupture.SoundId = "ShellRupture", "rbxasset://sounds/action_jump_land.mp3"
+	rupture.Volume, rupture.PlaybackSpeed, rupture.RollOffMaxDistance = 0.85, 0.42, 130
+	rupture.Parent = pieces[1].Part
+	local group = game:GetService("SoundService"):FindFirstChild("CombatSounds")
+	for _, sound in { impact, hatchSound, descent, rumble, rupture } do
+		sound.SoundGroup = group
+	end
 	for _, entry in pieces do
 		entry.Transparency = entry.Part.Transparency
 	end
@@ -198,6 +197,7 @@ function Pod.new(marker)
 			return
 		end
 		local t = now - start
+		local releaseDelay = marker:GetAttribute("ReleaseDelay") or 0
 		local ends = marker:GetAttribute("Ends") or now
 		local fadeAfterFight = Motion.smooth((now - ends) / Motion.SmokeAfter)
 		-- Absolute fade also handles viewers who stream in after the impact.
@@ -225,20 +225,22 @@ function Pod.new(marker)
 			outline.FillTransparency = 0.55 + 0.45 * fadeAfterFight
 			outline.OutlineTransparency = 0.05 + 0.95 * fadeAfterFight
 		end
-		local pose = Motion.sample(t)
-		local blast = Motion.blast(t)
-        local audio=Motion.audio(t)
-        if t>=0 and t<Motion.Landing+.65 and not audioStarted then
-            audioStarted=true
-            descent:Play(); rumble:Play()
-        end
-        descent.Volume,descent.PlaybackSpeed=audio.Air*.38,audio.Pitch
-        rumble.Volume=audio.Rumble*.55
-        if t>=Motion.Landing+.65 and not audioStopped then
-            audioStopped=true
-            descent:Stop(); rumble:Stop()
-        end
-		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit) / 0.8))
+		local pose = Motion.sample(t, releaseDelay)
+		local blast = Motion.blast(t, releaseDelay)
+		local audio = Motion.audio(t)
+		if t >= 0 and t < Motion.Landing + 0.65 and not audioStarted then
+			audioStarted = true
+			descent:Play()
+			rumble:Play()
+		end
+		descent.Volume, descent.PlaybackSpeed = audio.Air * 0.38, audio.Pitch
+		rumble.Volume = audio.Rumble * 0.55
+		if t >= Motion.Landing + 0.65 and not audioStopped then
+			audioStopped = true
+			descent:Stop()
+			rumble:Stop()
+		end
+		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit - releaseDelay) / 0.8))
 		local floor = origin * CFrame.new(0, -3, 0)
 		local frame = floor + Vector3.new(0, pose.Height - pose.Impact * 0.14, 0)
 		for _, node in smokeNodes do
@@ -246,13 +248,13 @@ function Pod.new(marker)
 			node.Part.CFrame = floor * CFrame.new(math.cos(node.Angle) * radius, 1.6, math.sin(node.Angle) * radius)
 		end
 		-- The whole shell uses the same absolute sample as the camera.
-		local fade = Motion.smooth((t - Motion.Ready - 1) / 0.8)
+		local fade = Motion.smooth((t - Motion.Ready - releaseDelay - 1) / 0.8)
 		for _, entry in pieces do
 			local offset = entry.Offset
 			if entry.Hatch then
 				local h = pose.Hatch
 				offset = CFrame.new(0, h * 1.6, -h * 6.5) * CFrame.Angles(-h * 1.1, 0, h * 0.16) * offset
-			elseif not entry.Fixed and t >= Motion.ShellBurst then
+			elseif not entry.Fixed and t >= Motion.ShellBurst + releaseDelay then
 				-- Side armor separates away from the fighter; the roof and spine arc backward.
 				local x = entry.Side * blast.Travel * 11
 				local z = if entry.Side ~= 0 then blast.Travel * 2 else blast.Travel * 9
@@ -289,21 +291,21 @@ function Pod.new(marker)
 		if not opened and t >= Motion.Hatch then
 			opened = true
 			if t < Motion.Hatch + 0.4 then
-                hatchSound:Play()
+				hatchSound:Play()
 			end
 		end
-        -- Door has already cleared forward before the rest of the shell detonates.
-        if not ruptured and t>=Motion.ShellBurst then
-            ruptured=true
-            if t<Motion.ShellBurst+.35 then
-                sparks:Emit(if compact then 18 else 30)
-                flame:Emit(if compact then 5 else 8)
-                emitter.Lifetime=NumberRange.new(math.max(.1,ends+Motion.SmokeAfter-now))
-                emitter:Emit(if compact then 14 else 24)
-                rupture:Play()
-            end
-        end
-        result.Ready=true
+		-- Door has already cleared forward before the rest of the shell detonates.
+		if not ruptured and t >= Motion.ShellBurst + releaseDelay then
+			ruptured = true
+			if t < Motion.ShellBurst + releaseDelay + 0.35 then
+				sparks:Emit(if compact then 18 else 30)
+				flame:Emit(if compact then 5 else 8)
+				emitter.Lifetime = NumberRange.new(math.max(0.1, ends + Motion.SmokeAfter - now))
+				emitter:Emit(if compact then 14 else 24)
+				rupture:Play()
+			end
+		end
+		result.Ready = true
 	end
 	function result.destroy()
 		model:Destroy()

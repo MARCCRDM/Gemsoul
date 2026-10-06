@@ -47,7 +47,9 @@ local CFrame = {
 	end,
 }
 cmt.__mul = function(a, b)
-	return CFrame.new(a.X + b.X, a.Y + b.Y, a.Z + b.Z)
+	local cf = CFrame.new(a.X + b.X, a.Y + b.Y, a.Z + b.Z)
+	cf.Facing = a.Facing
+	return cf
 end
 CFrame.lookAt = function(position, target)
 	local cf = CFrame.new(position.X, position.Y, position.Z)
@@ -132,7 +134,10 @@ local function actor(anchored)
 	armor.Transparency = 0.35
 	local particles = object("ParticleEmitter")
 	particles.Enabled = true
+	local board = object("BillboardGui")
+	board.Enabled = true
 	local hum = object("Humanoid")
+	hum.NameDisplayDistance, hum.HealthDisplayDistance = 100, 100
 	hum.Died = signal()
 	function m:FindFirstChild(name)
 		return if name == "HumanoidRootPart" then root else nil
@@ -141,9 +146,9 @@ local function actor(anchored)
 		return if name == "Humanoid" then hum else nil
 	end
 	function m:GetDescendants()
-		return { root, armor, particles }
+		return { root, armor, particles, board }
 	end
-	return m, root, armor, particles, hum
+	return m, root, armor, particles, hum, board
 end
 local checks = 0
 local function check(value, message)
@@ -151,13 +156,21 @@ local function check(value, message)
 	assert(value, message)
 end
 -- MODULES HERE
-local a, ar, armor, particles = actor()
+local a, ar, armor, particles, ah, ab = actor()
 local b, br = actor()
 local player = object("Player")
 owners[a] = player
 player:SetAttribute("CombatSession", "Training")
 local duration = Drop.begin({ a, b }, { player })
 check(ar.Anchored and br.Anchored, "actors not staged")
+check(
+	not ab.Enabled and ah.NameDisplayDistance == 0 and ah.HealthDisplayDistance == 0,
+	"Name/health visible before landing"
+)
+local streamedBoard = object("BillboardGui")
+streamedBoard.Enabled = true
+a.DescendantAdded:Fire(streamedBoard)
+check(not streamedBoard.Enabled, "Late streamed nameplate visible during insertion")
 check(armor.Transparency == 1 and not particles.Enabled, "actor visible before hatch release")
 check(player:GetAttribute("ArenaDropUntil") == now + duration, "viewer protection mismatch")
 check(
@@ -166,9 +179,13 @@ check(
 )
 advance(duration - 0.1)
 check(armor.Transparency == 0.35 and particles.Enabled, "actor not restored after exit")
-check(ar.CFrame.Z == -3 and br.CFrame.Z == -3, "exit did not reach authoritative endpoint")
+check(ar.CFrame.Z == 0 and br.CFrame.Z == 0, "exit moved fighter away from default spawn")
 advance(0.2)
 check(not ar.Anchored and not br.Anchored, "normal finish left actors frozen")
+check(
+	ab.Enabled and streamedBoard.Enabled and ah.NameDisplayDistance == 100 and ah.HealthDisplayDistance == 100,
+	"Names/health not restored at combat start"
+)
 check(player:GetAttribute("ArenaDropUntil") == nil, "normal finish retained input lock")
 check(a:GetAttribute("ArenaDropOrigin") == nil, "normal finish retained camera origin")
 local lingering = {}
@@ -220,31 +237,40 @@ check(lf.X == 20 and lf.Z == -8 and lf.Y == 3, "First fighter not facing opponen
 check(rf.X == -20 and rf.Z == 7 and rf.Y == 6, "Second fighter not facing opponent horizontally")
 Drop.cancel(left)
 Drop.cancel(right)
-local staged,sr,sa,se=actor()
-local entrant=object("Player"); entrant.Character=staged; owners[staged]=entrant
+local staged, sr, sa, se = actor()
+local entrant = object("Player")
+entrant.Character = staged
+owners[staged] = entrant
 Drop.prepare(entrant)
-check(sr.Anchored and sa.Transparency==1 and not se.Enabled,"Preparation exposed character before teleport")
-check(entrant:GetAttribute("ArenaDropPreparing")>now,"Preparation did not cover loading")
-local duration2=Drop.begin({staged},{entrant})
-check(sa:GetAttribute("InsertionTransparency")==.35,"Preparation-to-drop lost original armor visibility")
-check(entrant:GetAttribute("ArenaDropPreparing")==nil,"Preparation cover did not release to pod")
-advance(duration2+.1)
-check(not sr.Anchored and sa.Transparency==.35 and se.Enabled,"Prepared fighter failed to restore after insertion")
-Drop.prepare(entrant); Drop.cancel(staged)
-check(not sr.Anchored and entrant:GetAttribute("ArenaDropPreparing")==nil,"Failed entry left preparation frozen")
-Drop.prepare(entrant); advance(15.1)
-check(not sr.Anchored and entrant:GetAttribute("ArenaDropUntil")==nil,"Preparation timeout retained protection")
+check(sr.Anchored and sa.Transparency == 1 and not se.Enabled, "Preparation exposed character before teleport")
+check(entrant:GetAttribute("ArenaDropPreparing") > now, "Preparation did not cover loading")
+local duration2 = Drop.begin({ staged }, { entrant })
+check(sa:GetAttribute("InsertionTransparency") == 0.35, "Preparation-to-drop lost original armor visibility")
+check(entrant:GetAttribute("ArenaDropPreparing") == nil, "Preparation cover did not release to pod")
+advance(duration2 + 0.1)
+check(not sr.Anchored and sa.Transparency == 0.35 and se.Enabled, "Prepared fighter failed to restore after insertion")
+Drop.prepare(entrant)
+Drop.cancel(staged)
+check(not sr.Anchored and entrant:GetAttribute("ArenaDropPreparing") == nil, "Failed entry left preparation frozen")
+Drop.prepare(entrant)
+advance(15.1)
+check(not sr.Anchored and entrant:GetAttribute("ArenaDropUntil") == nil, "Preparation timeout retained protection")
 -- Gear shown or hidden while staged (the Outpost brings a duellist's weapon
 -- back out for the fight a moment after the pod has saved it hidden) changes
 -- the staged record, and the reveal restores that, not the stale value.
-local outpost,_,oa=actor()
-local duellist=object("Player"); duellist.Character=outpost; owners[outpost]=duellist
-oa.Transparency=1 -- put away while mining
+local outpost, _, oa = actor()
+local duellist = object("Player")
+duellist.Character = outpost
+owners[outpost] = duellist
+oa.Transparency = 1 -- put away while mining
 Drop.prepare(duellist)
-local duration3=Drop.begin({outpost},{duellist})
-check(oa.Transparency==1 and oa:GetAttribute("InsertionTransparency")==1,"Pod did not stage the put-away weapon")
-oa:SetAttribute("InsertionTransparency",0) -- as OutpostServer does while staged
-check(oa.Transparency==1,"Weapon showed mid-drop")
-advance(duration3+.1)
-check(oa.Transparency==0 and oa:GetAttribute("InsertionTransparency")==nil,"Reveal restored a stale value: weapon left invisible")
+local duration3 = Drop.begin({ outpost }, { duellist })
+check(oa.Transparency == 1 and oa:GetAttribute("InsertionTransparency") == 1, "Pod did not stage the put-away weapon")
+oa:SetAttribute("InsertionTransparency", 0) -- as OutpostServer does while staged
+check(oa.Transparency == 1, "Weapon showed mid-drop")
+advance(duration3 + 0.1)
+check(
+	oa.Transparency == 0 and oa:GetAttribute("InsertionTransparency") == nil,
+	"Reveal restored a stale value: weapon left invisible"
+)
 print("PASS: " .. checks .. " real insertion lifecycle checks")

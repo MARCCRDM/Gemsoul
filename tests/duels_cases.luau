@@ -65,7 +65,7 @@ check(match ~= nil and match == Duels.matchOf(ben) and match.Ranked, "Queue didn
 check(ana:GetAttribute("CombatSession") == "Duel" and ana:GetAttribute("PvPEnabled") == true, "Not put in a duel session")
 check(ana:GetAttribute("MatchId") == match.Id and ana:GetAttribute("MatchTeam") ~= ben:GetAttribute("MatchTeam"), "Match ids or teams wrong")
 check(ana:GetAttribute("DuelQueue") == nil and last(ana, "Queue")[2] == nil, "Still shown as queued")
-check((ana.Root.Position - ben.Root.Position).Magnitude > 15, "Not placed facing off in a lane")
+check(math.abs((ana.Root.Position - ben.Root.Position).Magnitude-40)<.001, "Online 1v1 must use the default 40-stud face-off spots")
 check(resets[ana] and resets[ben], "Combat state not reset for the duel")
 local info = last(ana, "Match")[2]
 check(info.Mode == "1v1" and info.Ranked and #info.Teams == 2 and info.Teams[2][1].Name == "Ben", "Match info wrong")

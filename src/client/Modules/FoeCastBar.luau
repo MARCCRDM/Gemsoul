@@ -230,7 +230,9 @@ function FoeCastBar.step(serverNow: number, hudModel: Model?)
 	end
 	for owner, entry in boards do
 		local cast = FoeCastBar.read(modelOf(owner), serverNow)
-		entry.Board.Enabled = cast ~= nil and modelOf(owner) ~= hudModel
+		entry.Board.Enabled = cast ~= nil
+			and modelOf(owner) ~= hudModel
+			and (modelOf(owner):GetAttribute("ArenaDropUntil") or 0) <= serverNow
 		if cast then
 			FoeCastBar.draw(entry, cast, true)
 		end

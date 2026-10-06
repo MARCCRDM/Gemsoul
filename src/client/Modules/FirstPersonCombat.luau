@@ -655,7 +655,7 @@ function View.start()
 		local insertion = if type(insertionStart) == "number"
 				and type(insertionUntil) == "number"
 				and insertionUntil > serverNow
-			then Motion.sample(serverNow - insertionStart)
+			then Motion.sample(serverNow - insertionStart, character:GetAttribute("ArenaDropReleaseDelay") or 0)
 			else nil
 		local draw = if insertion then 1 - insertion.Draw else 0
 		local insertionPose = if #pieces > 0

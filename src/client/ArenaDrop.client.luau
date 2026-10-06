@@ -88,15 +88,18 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.V
 			pod.update(now)
 		end
 	end
-    local preparation=player:GetAttribute("ArenaDropPreparing")
-    local requested=player:GetAttribute("LocalInsertionPending")
-    local ends = player:GetAttribute("ArenaDropUntil")
-    if (type(preparation)=="number" and preparation>now) or (type(requested)=="number" and requested>now and type(ends)~="number") then
-        gui.Enabled=true
-        veil.BackgroundTransparency=0
-        label.Text,label.TextTransparency="INSERTION LINK  /  SECURING HARNESS",0
-        return
-    end
+	local preparation = player:GetAttribute("ArenaDropPreparing")
+	local requested = player:GetAttribute("LocalInsertionPending")
+	local ends = player:GetAttribute("ArenaDropUntil")
+	if
+		(type(preparation) == "number" and preparation > now)
+		or (type(requested) == "number" and requested > now and type(ends) ~= "number")
+	then
+		gui.Enabled = true
+		veil.BackgroundTransparency = 0
+		label.Text, label.TextTransparency = "INSERTION LINK  /  SECURING HARNESS", 0
+		return
+	end
 	local camera = workspace.CurrentCamera
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -137,22 +140,26 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.V
 		return
 	end
 	local t = if type(start) == "number" then now - start else Motion.Ready + 1
-    if type(start)=="number" then
-        local ready=false
-        for marker,pod in pods do
-            local actor=marker:FindFirstChild("Actor")
-            if actor and actor.Value==character and pod.Ready and marker:GetAttribute("Start")==start then ready=true; break end
-        end
-        if not ready then
-            entered=now
-            gui.Enabled=true
-            veil.BackgroundTransparency=0
-            label.Text="INSERTION LINK  /  PRESSURIZING"
-            return
-        end
-    end
-    player:SetAttribute("LocalInsertionPending",nil)
-	local pose = Motion.sample(t)
+	if type(start) == "number" then
+		local ready = false
+		for marker, pod in pods do
+			local actor = marker:FindFirstChild("Actor")
+			if actor and actor.Value == character and pod.Ready and marker:GetAttribute("Start") == start then
+				ready = true
+				break
+			end
+		end
+		if not ready then
+			entered = now
+			gui.Enabled = true
+			veil.BackgroundTransparency = 0
+			label.Text = "INSERTION LINK  /  PRESSURIZING"
+			return
+		end
+	end
+	player:SetAttribute("LocalInsertionPending", nil)
+	local releaseDelay = character:GetAttribute("ArenaDropReleaseDelay") or 0
+	local pose = Motion.sample(t, releaseDelay)
 	local ownDrop = type(start) == "number"
 	local eye = origin
 		* CFrame.new(0, eyeHeight + (if ownDrop then pose.Height - pose.Impact * 0.2 + pose.Bob else 0), -pose.Step)
@@ -190,11 +197,11 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.V
 	veil.BackgroundTransparency = Motion.smooth((now - entered) / 0.32)
 	label.Text = if remaining < 1
 		then "SAFETIES RELEASING"
-		elseif not ownDrop or t >= Motion.Ready then "RIVAL INBOUND  /  HOLD POSITION"
+		elseif not ownDrop or t >= Motion.Ready + releaseDelay then "RIVAL INBOUND  /  HOLD POSITION"
 		elseif t < 0 then "HARNESS LOCKED"
 		elseif t < Motion.Landing then "DESCENT  /  BRACE"
 		elseif t < Motion.Hatch then "CONTACT  /  PRESSURE RELEASE"
-		elseif t < Motion.Exit then "HATCH CLEAR"
+		elseif t < Motion.Exit + releaseDelay then "HATCH CLEAR"
 		else "WEAPONS READY"
 	label.TextTransparency = if remaining < 0.35 then 1 - remaining / 0.35 else 0.08
 end)
