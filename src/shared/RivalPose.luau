@@ -71,8 +71,15 @@ local function lerp(a, b, t: number)
 end
 
 -- Wind-up and strike poses for each action; `s` mirrors a slash or dodge.
-<<<<<<< HEAD
-local function frames(kind: string, s: number)
+-- The shield arm held up in front during a sword's blows: forearm across the
+-- chest, twisted so the shield's face (mounted on the outside of the forearm)
+-- points forward rather than out to the side.
+local SHIELD_UP = {
+	LeftShoulder = { 1.15, 0, 0.5 },
+	LeftElbow = { 1.3, 1.45, 0 },
+}
+
+local function frames(kind: string, s: number, shield: boolean?)
 	if kind == "Deploy" then
 		return {
 			Waist = { -0.32, 0, 0 },
@@ -98,18 +105,6 @@ local function frames(kind: string, s: number)
 			LeftKnee = { -0.45, 0, 0 },
 		}
 	elseif kind == "Mine" then
-=======
--- The shield arm held up in front during a sword's blows: forearm across the
--- chest, twisted so the shield's face (mounted on the outside of the forearm)
--- points forward rather than out to the side.
-local SHIELD_UP = {
-	LeftShoulder = { 1.15, 0, 0.5 },
-	LeftElbow = { 1.3, 1.45, 0 },
-}
-
-local function frames(kind: string, s: number, shield: boolean?)
-	if kind == "Mine" then
->>>>>>> 0e359bbb2aa9ae1a0cd23ed4b1d467ccf29bafb6
 		return {
 			Waist = { 0.15, -0.2, 0 },
 			RightShoulder = { 2.7, 0, 0.2 },

@@ -1886,7 +1886,7 @@ function spawnRival(owner: Player, raid, encounter)
 		return
 	end
 	duels[owner] = duel
-	if not raid and not encounter and owner.Character then
+	if ArenaDrop.forRival(session, raid, encounter) and owner.Character then
 		local first = not owner:GetAttribute("ArenaInserted")
 		owner:SetAttribute("ArenaInserted", true)
 		ArenaDrop.begin({ owner.Character, model }, { owner }, if first then nil else { model })

@@ -99,6 +99,9 @@ function ArenaSessions.start()
 	Shop.register("ArenaLeave", leave)
 	local function watch(player)
 		player.CharacterAdded:Connect(function()
+			player:SetAttribute("ArenaInserted", nil)
+			player:SetAttribute("ArenaDropUntil", nil)
+			player:SetAttribute("ArenaDropFocus", nil)
 			if ArenaSessions.onLeave then
 				ArenaSessions.onLeave(player)
 			end

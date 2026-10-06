@@ -3,6 +3,11 @@ local Players = game:GetService("Players")
 local Debris = game:GetService("Debris")
 local Drop = {}
 local active = setmetatable({}, { __mode = "k" })
+-- Onboarding and repeat Arena rivals use the same insertion sequence.
+-- Dungeon and raid encounters retain their own spawning flow.
+function Drop.forRival(session, raid, encounter)
+	return (session == "PvP" or session == "Training") and not raid and not encounter
+end
 function Drop.duration(count)
 	return 1 + count * 2.6
 end
