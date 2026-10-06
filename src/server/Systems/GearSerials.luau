@@ -30,11 +30,13 @@ function GearSerials.stamp(player: Player, kind: string, gearId: string)
 	local profile = PlayerData.get(player)
 	local rolls = profile and profile.Character.GearRolls and profile.Character.GearRolls[kind]
 	local roll = rolls and rolls[gearId]
-	if not roll or roll.FoundBy then
+	if not roll or roll.Serial then
 		return
 	end
-	roll.FoundBy = player.DisplayName
-	roll.FoundAt = os.time()
+	-- (PlayerData may have stamped the owner already when the find synced.)
+	roll.FoundBy = roll.FoundBy or player.DisplayName
+	roll.FoundById = roll.FoundById or player.UserId
+	roll.FoundAt = roll.FoundAt or os.time()
 	if (roll.Rarity or 1) < GearRolls.SerialFrom then
 		PlayerData.sync(player)
 		return

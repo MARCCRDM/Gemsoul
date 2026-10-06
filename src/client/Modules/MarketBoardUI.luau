@@ -287,6 +287,9 @@ local function detailLines(payload)
 		if ok and worth then
 			add("Worth about " .. worth .. " coins", 12, P.Dim)
 		end
+		if gem.MinedBy then
+			add("Mined by " .. gem.MinedBy, 12, Color3.fromRGB(150, 160, 185))
+		end
 		if payload.Where then
 			add("Now " .. payload.Where .. " (listing takes it out)", 12, P.Dim)
 		end

@@ -46,7 +46,7 @@ function GearRolls.identity(roll): string
 		table.insert(parts, "#" .. roll.Serial)
 	end
 	if roll.FoundBy then
-		table.insert(parts, "Found by " .. roll.FoundBy)
+		table.insert(parts, "Original owner: " .. roll.FoundBy)
 	end
 	return table.concat(parts, "  ·  ")
 end
