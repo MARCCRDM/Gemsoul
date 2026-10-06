@@ -40,6 +40,17 @@ local function near(model: Model, eye: Vector3?): boolean
 	return root == nil or not root:IsA("BasePart") or (root.Position - eye).Magnitude <= BodyPoses.Range
 end
 
+-- A body whose posing fails is reported once (in the developer console),
+-- not swallowed silently.
+local reported = setmetatable({}, { __mode = "k" })
+local function pose(model: Model, ...)
+	local ok, problem = pcall(RivalPose.update, model, ...)
+	if not ok and not reported[model] then
+		reported[model] = true
+		warn("[BodyPoses] couldn't pose " .. model:GetFullName() .. ": " .. tostring(problem))
+	end
+end
+
 function BodyPoses.step(dt: number)
 	local now, clock = workspace:GetServerTimeNow(), os.clock()
 	local camera = workspace.CurrentCamera
@@ -48,7 +59,9 @@ function BodyPoses.step(dt: number)
 		local character = player.Character
 		if character and near(character, eye) then
 			local fighting = player:GetAttribute("CombatSession") ~= nil
-			pcall(RivalPose.update, character, dt, now, clock, not fighting)
+			-- The server's "Blocking" flag on the player backs up GuardUntil, so
+			-- a foe's shield is up for as long as they hold their guard.
+			pose(character, dt, now, clock, not fighting, player:GetAttribute("Blocking") == true)
 		end
 	end
 	-- The Arena rival, raid bosses and dungeon fighters: the server marks
@@ -57,7 +70,7 @@ function BodyPoses.step(dt: number)
 	local enemies = workspace:FindFirstChild("Enemies")
 	for _, model in if enemies then enemies:GetChildren() else {} do
 		if model:GetAttribute("Posed") and model:IsA("Model") and near(model, eye) then
-			pcall(RivalPose.update, model, dt, now, clock)
+			pose(model, dt, now, clock)
 		end
 	end
 end

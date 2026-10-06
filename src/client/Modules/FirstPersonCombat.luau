@@ -11,6 +11,8 @@ local raised, charge, swingAt, swingSide, swingHeavy = 0, 0, -10, "Right", false
 local cursorFree = false
 local fireAt, smoothedRaised, smoothedCharge = -10, 0, 0
 local dirty = true
+-- How many of the gear's parts were showing at the last look (see the render step).
+local shownParts, nextShownCheck = -1, 0
 -- A surge being cast (View.cast): when it began, how long it takes, its colour.
 local castAt, castFor, castColor, castOrb = -10, 0, nil, nil
 local castAnimation = nil
@@ -538,6 +540,7 @@ function View.stop()
 	fireAt, smoothedRaised, smoothedCharge, swingAt, swingHeavy = -10, 0, 0, -10, false
 end
 function View.start()
+	shownParts, nextShownCheck = -1, 0
 	if saved then
 		return
 	end
@@ -602,6 +605,22 @@ function View.start()
 			UserInputService.MouseIconEnabled = cursorFree
 		end
 		local equipment = character and character:FindFirstChild("GemsoulGear")
+		-- The server hides and shows gear by its transparency, not by adding or
+		-- removing parts (the Outpost puts your weapon away while you mine and
+		-- brings it back for a fight), and only parts showing are copied into
+		-- view: rebuild whenever that changes, or the sword never comes back.
+		if equipment and os.clock() >= nextShownCheck then
+			nextShownCheck = os.clock() + 0.25
+			local shown = 0
+			for _, part in equipment:GetDescendants() do
+				if part:IsA("BasePart") and part.Transparency < 1 then
+					shown += 1
+				end
+			end
+			if shown ~= shownParts then
+				shownParts, dirty = shown, true
+			end
+		end
 		if equipment and (dirty or equipment ~= gear or not model or model.Parent ~= current) then
 			rebuild(character, equipment)
 			dirty = false
