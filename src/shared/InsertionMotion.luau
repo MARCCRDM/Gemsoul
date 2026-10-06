@@ -9,7 +9,7 @@ local Motion = {
 	ExitDuration = 0.5,
 	Ready = 2.1,
 	Altitude = 82,
-	SmokeAfter = 4,
+	SmokeAfter = 6,
 	Handoff = 0.4,
 }
 function Motion.smooth(x)
@@ -18,6 +18,21 @@ function Motion.smooth(x)
 end
 function Motion.duration(count)
 	return Motion.Lead + math.max(0, count - 1) * Motion.Spacing + Motion.Ready + Motion.Handoff
+end
+-- Cosmetic shell rupture: one outward throw, followed by gravity and a fade.
+function Motion.blast(t)
+	local age = math.max(0, t - Motion.Hatch)
+	local travel = 1 - math.exp(-age * 5)
+	return {
+		Travel = travel,
+		Lift = 10 * age - 14 * age * age,
+		Spin = math.min(age, 1.6),
+		Fade = Motion.smooth((age - 0.65) / 0.95),
+		Flash = if t >= Motion.Hatch then math.exp(-age * 15) else 0,
+	}
+end
+function Motion.smokeSpread(t)
+	return 2 + 28 * Motion.smooth((t - Motion.Landing) / 1.5)
 end
 function Motion.sample(t)
 	local descent = Motion.smooth(t / Motion.Landing)

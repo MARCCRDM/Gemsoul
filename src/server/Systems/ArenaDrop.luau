@@ -225,7 +225,7 @@ function Drop.begin(models, viewers, dropModels)
 						local outline = Instance.new("Highlight")
 						outline.Name, outline.Adornee = "InsertionSilhouette", model
 						outline.FillColor, outline.OutlineColor = colorOf(model), colorOf(model)
-						outline.FillTransparency, outline.OutlineTransparency = 0.72, 0.05
+						outline.FillTransparency, outline.OutlineTransparency = 0.55, 0.05
 						outline.DepthMode = Enum.HighlightDepthMode.Occluded
 						outline:SetAttribute("InsertionResidual", true)
 						outline.Parent = model

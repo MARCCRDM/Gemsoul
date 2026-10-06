@@ -5,6 +5,8 @@ function Pod.new(marker)
 	local model = Instance.new("Model")
 	model.Name = "InsertionPresentation"
 	local pieces = {}
+	local compact = game:GetService("UserInputService").TouchEnabled
+	local smokeNodes = {}
 	local color = marker:GetAttribute("Tint") or Color3.fromRGB(70, 220, 255)
 	local function panel(name, size, offset, tint, material)
 		local p = Instance.new("Part")
@@ -15,7 +17,13 @@ function Pod.new(marker)
 		p.Parent = model
 		table.insert(
 			pieces,
-			{ Part = p, Offset = offset, Hatch = string.find(name, "Hatch") ~= nil and name ~= "HatchHeader" }
+			{
+				Part = p,
+				Offset = offset,
+				Hatch = string.find(name, "Hatch") ~= nil and name ~= "HatchHeader",
+				Fixed = name == "ArmoredBase" or name == "LandingSkid",
+				Side = if math.abs(offset.Position.X) > 1 then (if offset.Position.X > 0 then 1 else -1) else 0,
+			}
 		)
 		return p
 	end
@@ -99,14 +107,65 @@ function Pod.new(marker)
 	emitter.SpreadAngle, emitter.Rate = Vector2.new(150, 65), 0
 	emitter.Drag = 1.4
 	emitter.Parent = pieces[1].Part
+	-- The impact cloud spreads across the floor, independent of shell debris.
+	-- Fixed burst counts bound particle work, including multi-fighter matches.
+	for i = 1, (if compact then 6 else 8) do
+		local node = Instance.new("Part")
+		node.Name, node.Size, node.Transparency = "ImpactSmoke", Vector3.new(0.2, 0.2, 0.2), 1
+		node.Anchored, node.CanCollide, node.CanTouch, node.CanQuery = true, false, false, false
+		node.CFrame = CFrame.new(0, -10000, 0)
+		node.Parent = model
+		local smoke = emitter:Clone()
+		smoke.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 4),
+			NumberSequenceKeypoint.new(0.25, 14),
+			NumberSequenceKeypoint.new(1, 22),
+		})
+		smoke.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.38),
+			NumberSequenceKeypoint.new(0.45, 0.50),
+			NumberSequenceKeypoint.new(0.8, 0.82),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		smoke.LockedToPart = true
+		smoke.Speed, smoke.Drag = NumberRange.new(0.3, 1.1), 0.8
+		smoke.Rotation, smoke.RotSpeed = NumberRange.new(0, 360), NumberRange.new(-12, 12)
+		smoke.Parent = node
+		table.insert(
+			smokeNodes,
+			{ Part = node, Emitter = smoke, Angle = (i - 1) * math.pi * 2 / (if compact then 6 else 8) }
+		)
+	end
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	sparks.Color = ColorSequence.new(Color3.fromRGB(255, 235, 160), Color3.fromRGB(255, 105, 25))
+	sparks.LightEmission, sparks.Rate = 1, 0
+	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) })
+	sparks.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+	sparks.Speed, sparks.Lifetime = NumberRange.new(14, 25), NumberRange.new(0.35, 0.7)
+	sparks.SpreadAngle, sparks.Acceleration = Vector2.new(150, 150), Vector3.new(0, -35, 0)
+	sparks.Parent = pieces[1].Part
+	local flame = Instance.new("ParticleEmitter")
+	flame.Texture = "rbxasset://textures/particles/fire_main.dds"
+	flame.Color = ColorSequence.new(Color3.fromRGB(255, 205, 95), Color3.fromRGB(235, 65, 15))
+	flame.LightEmission, flame.Rate = 1, 0
+	flame.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 3),
+		NumberSequenceKeypoint.new(0.3, 7),
+		NumberSequenceKeypoint.new(1, 10),
+	})
+	flame.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+	flame.Speed, flame.Lifetime, flame.SpreadAngle =
+		NumberRange.new(4, 8), NumberRange.new(0.18, 0.32), Vector2.new(130, 130)
+	flame.Parent = pieces[1].Part
 	local light = Instance.new("PointLight")
-	light.Color, light.Range, light.Brightness = Color3.fromRGB(255, 180, 80), 18, 0
+	light.Color, light.Range, light.Brightness = Color3.fromRGB(255, 180, 80), 28, 0
 	light.Parent = pieces[1].Part
 	local impact = Instance.new("Sound")
 	impact.SoundId, impact.Volume, impact.PlaybackSpeed = "rbxasset://sounds/action_jump_land.mp3", 0.8, 0.55
 	impact.RollOffMaxDistance, impact.Parent = 130, pieces[1].Part
 	local hatchSound = Instance.new("Sound")
-	hatchSound.SoundId, hatchSound.Volume, hatchSound.PlaybackSpeed = "rbxasset://sounds/collide.wav", 0.45, 0.8
+	hatchSound.SoundId, hatchSound.Volume, hatchSound.PlaybackSpeed = "rbxasset://sounds/collide.wav", 0.7, 0.6
 	hatchSound.RollOffMaxDistance, hatchSound.Parent = 90, door
 	for _, entry in pieces do
 		entry.Transparency = entry.Part.Transparency
@@ -116,6 +175,7 @@ function Pod.new(marker)
 	cabin.Color, cabin.Range, cabin.Brightness = color, 9, 0.85
 	cabin.Parent = pieces[1].Part
 	local landed, opened = false, false
+	local lastSmokeFade = -1
 	local result = {}
 	function result.update(now)
 		local start, origin = marker:GetAttribute("Start"), marker:GetAttribute("Origin")
@@ -125,16 +185,40 @@ function Pod.new(marker)
 		local t = now - start
 		local ends = marker:GetAttribute("Ends") or now
 		local fadeAfterFight = Motion.smooth((now - ends) / Motion.SmokeAfter)
+		-- Absolute fade also handles viewers who stream in after the impact.
+		-- Quantize updates so changing transparency sequences does not allocate every frame.
+		local smokeFade = math.floor(fadeAfterFight * 20) / 20
+		if smokeFade ~= lastSmokeFade then
+			lastSmokeFade = smokeFade
+			local function fadeSequence(a, b, c)
+				return NumberSequence.new({
+					NumberSequenceKeypoint.new(0, a + (1 - a) * smokeFade),
+					NumberSequenceKeypoint.new(0.55, b + (1 - b) * smokeFade),
+					NumberSequenceKeypoint.new(0.8, c + (1 - c) * smokeFade),
+					NumberSequenceKeypoint.new(1, 1),
+				})
+			end
+			emitter.Transparency = fadeSequence(0.28, 0.45, 0.78)
+			local broad = fadeSequence(0.38, 0.5, 0.82)
+			for _, node in smokeNodes do
+				node.Emitter.Transparency = broad
+			end
+		end
 		local actor = marker:FindFirstChild("Actor")
 		local outline = actor and actor.Value and actor.Value:FindFirstChild("InsertionSilhouette")
 		if outline then
-			outline.FillTransparency = 0.72 + 0.28 * fadeAfterFight
+			outline.FillTransparency = 0.55 + 0.45 * fadeAfterFight
 			outline.OutlineTransparency = 0.05 + 0.95 * fadeAfterFight
 		end
 		local pose = Motion.sample(t)
+		local blast = Motion.blast(t)
 		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit) / 0.8))
 		local floor = origin * CFrame.new(0, -3, 0)
 		local frame = floor + Vector3.new(0, pose.Height - pose.Impact * 0.14, 0)
+		for _, node in smokeNodes do
+			local radius = Motion.smokeSpread(t)
+			node.Part.CFrame = floor * CFrame.new(math.cos(node.Angle) * radius, 1.6, math.sin(node.Angle) * radius)
+		end
 		-- The whole shell uses the same absolute sample as the camera.
 		local fade = Motion.smooth((t - Motion.Ready - 1) / 0.8)
 		for _, entry in pieces do
@@ -142,19 +226,35 @@ function Pod.new(marker)
 			if entry.Hatch then
 				local h = pose.Hatch
 				offset = CFrame.new(0, h * 1.6, -h * 6.5) * CFrame.Angles(-h * 1.1, 0, h * 0.16) * offset
+			elseif not entry.Fixed and t >= Motion.Hatch then
+				-- Side armor separates away from the fighter; the roof and spine arc backward.
+				local x = entry.Side * blast.Travel * 11
+				local z = if entry.Side ~= 0 then blast.Travel * 2 else blast.Travel * 9
+				local y = math.max(0.15 - entry.Offset.Position.Y, blast.Lift)
+				offset = CFrame.new(x, y, z)
+					* entry.Offset
+					* CFrame.Angles(blast.Spin * 0.9, entry.Side * blast.Spin, entry.Side * blast.Spin * 1.3)
 			end
 			entry.Part.CFrame = frame * offset
 			local f = if entry.Hatch then math.max(fade, Motion.smooth((t - Motion.Hatch - 0.35) / 0.7)) else fade
+			if not entry.Fixed and not entry.Hatch then
+				f = math.max(f, blast.Fade)
+			end
 			entry.Part.Transparency = entry.Transparency + (1 - entry.Transparency) * f
 		end
-		light.Brightness = if t >= Motion.Landing then 4 * math.exp(-(t - Motion.Landing) * 9) else 0.2
+		light.Brightness = (if t >= Motion.Landing then 4 * math.exp(-(t - Motion.Landing) * 9) else 0.2)
+			+ blast.Flash * 6
 		if not landed and t >= Motion.Landing then
 			landed = true
 			-- One impact burst. Its lifespan reaches beyond combat unlock even for pod one.
 			local life = math.max(0.1, ends + Motion.SmokeAfter - now)
 			emitter.Lifetime = NumberRange.new(life * 0.9, life)
 			if now < ends + Motion.SmokeAfter then
-				emitter:Emit(42)
+				emitter:Emit(if compact then 38 else 64)
+				for _, node in smokeNodes do
+					node.Emitter.Lifetime = NumberRange.new(life * 0.95, life)
+					node.Emitter:Emit(if compact then 5 else 8)
+				end
 			end
 			if t < Motion.Landing + 0.45 then
 				impact:Play()
@@ -163,6 +263,8 @@ function Pod.new(marker)
 		if not opened and t >= Motion.Hatch then
 			opened = true
 			if t < Motion.Hatch + 0.4 then
+				sparks:Emit(if compact then 18 else 30)
+				flame:Emit(if compact then 5 else 8)
 				hatchSound:Play()
 			end
 		end

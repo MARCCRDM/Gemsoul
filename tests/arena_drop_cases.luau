@@ -45,6 +45,13 @@ for count = 1, 4 do
 end
 check(Motion.sample(Motion.Landing + 0.29).Impact == 0, "Impact repeats after the initial compression")
 check(Motion.SmokeAfter >= 3, "Smoke clears before combat can establish")
+check(Motion.blast(Motion.Hatch - 0.01).Travel == 0, "Shell ruptures before release")
+check(Motion.blast(Motion.Hatch + 0.1).Travel > 0, "Shell never blows outward")
+check(Motion.blast(Motion.Hatch + 1.7).Fade == 1, "Debris persists in combat viewport")
+check(Motion.blast(Motion.Hatch + 1).Flash < 0.001, "Explosion flash blocks sustained combat")
+check(Motion.smokeSpread(Motion.Landing) == 2, "Smoke starts detached from impact")
+check(Motion.smokeSpread(Motion.Landing + 1.5) >= 30, "Impact smoke does not reach across arena")
+check(Motion.SmokeAfter >= 6, "Arena smoke does not linger into combat")
 for _, fps in { 30, 60, 144 } do
 	local previous = Motion.sample(-1 / fps)
 	for frame = 0, math.ceil(Motion.Ready * fps) do
