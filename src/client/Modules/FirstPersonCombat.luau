@@ -384,32 +384,66 @@ local function ease(x)
 	x = math.clamp(x, 0, 1)
 	return x * x * (3 - 2 * x)
 end
--- A swing over time: `arc` sweeps the blade across (negative = drawn back
--- first), `chop` brings a heavy down from overhead. Anticipation, a fast
--- strike that overshoots, follow-through, recovery.
-local function swingCurve(e, heavy)
-	local wind, hit, follow, done = 0.055, 0.16, 0.24, 0.46
-	local back = 0.18
-	if heavy then
-		wind, hit, follow, done, back = 0.09, 0.22, 0.33, 0.6, 0.32
+-- The weapon in view, keyframed (camera space). At rest it's held low on
+-- the right, blade up and a little forward; charging a heavy draws it up
+-- and back over the shoulder.
+-- (Built on first use: CFrame isn't touched while the module loads.)
+local REST, RAISED, SWINGS
+local function keyframes()
+	if SWINGS then
+		return
 	end
-	if e < 0 or e >= done then
-		return 0, 0
+	REST = CFrame.new(0.83, -0.78, -1.25) * CFrame.Angles(0, 0, math.rad(12))
+	RAISED = CFrame.new(0.62, -0.2, -1.1) * CFrame.Angles(math.rad(38), math.rad(-8), math.rad(-6))
+	local function pose(x, y, z, pitch, yaw, roll)
+		return CFrame.new(x, y, z) * CFrame.Angles(math.rad(pitch), math.rad(yaw), math.rad(roll))
 	end
-	local arc
-	if e < wind then
-		arc = -back * ease(e / wind)
-	elseif e < hit then
-		local p = (e - wind) / (hit - wind)
-		arc = -back + (1.12 + back) * (1 - (1 - p) ^ 2) -- fast, slowing into the hit
-	elseif e < follow then
-		arc = 1.12 - 0.12 * ease((e - hit) / (follow - hit))
-	else
-		arc = 1 - ease((e - follow) / (done - follow))
+	-- A swing: { time, pose } keys, eased from one to the next. A light cut
+	-- winds up over the shoulder, cuts across the middle of the view with the
+	-- tip leading, follows through low on the far side and comes back; the
+	-- backhand mirrors it. A heavy starts from the raised charge and chops
+	-- straight down through the centre.
+	SWINGS = {
+		Right = {
+			{ 0, REST },
+			{ 0.07, pose(1.12, -0.48, -1.12, 12, -16, -28) },
+			{ 0.15, pose(0.1, -0.42, -1.45, -18, 20, 76) },
+			{ 0.23, pose(-0.5, -0.72, -1.25, -32, 24, 100) },
+			{ 0.46, REST },
+		},
+		Left = {
+			{ 0, REST },
+			{ 0.07, pose(-0.22, -0.42, -1.18, 10, 18, 62) },
+			{ 0.15, pose(0.68, -0.55, -1.45, -22, -22, -72) },
+			{ 0.23, pose(1.18, -0.86, -1.22, -36, -24, -100) },
+			{ 0.46, REST },
+		},
+		Heavy = {
+			{ 0, RAISED },
+			{ 0.05, RAISED * CFrame.new(0, 0.06, 0.05) * CFrame.Angles(math.rad(8), 0, 0) },
+			{ 0.12, pose(0.3, 0.0, -1.25, 12, -4, 14) },
+			{ 0.21, pose(0.2, -0.55, -1.2, -36, 0, 22) },
+			{ 0.34, pose(0.26, -0.78, -1.2, -48, 4, 26) },
+			{ 0.62, REST },
+		},
+	}
+end
+-- The pose `e` seconds into a swing (nil once it's over). Into the hit it
+-- snaps (fast, slowing into the blow); everywhere else it eases.
+local function sample(keys, e)
+	if e <= 0 or e >= keys[#keys][1] then
+		return nil
 	end
-	-- Light cuts travel diagonally; the heavy keeps its distinct overhead chop.
-	local chop = if heavy then (if e < wind then -0.5 * ease(e / wind) else math.max(arc, 0)) else arc * 0.3
-	return arc, chop
+	for i = 2, #keys do
+		if e <= keys[i][1] then
+			local a, b = keys[i - 1], keys[i]
+			local p = (e - a[1]) / (b[1] - a[1])
+			local hit = if keys == SWINGS.Heavy then i == 3 or i == 4 else i == 3
+			local w = if hit then 1 - (1 - p) ^ 3 else p * p * (3 - 2 * p)
+			return a[2]:Lerp(b[2], w)
+		end
+	end
+	return nil
 end
 -- A reaction's weight `d` seconds after it happens: up fast, then fades.
 local function impulse(d, length)
@@ -564,8 +598,20 @@ function View.start()
 		if not equipment and model then
 			clearModel()
 		end
-		local swing, chop = swingCurve(os.clock() - swingAt, swingHeavy)
-		local direction = if swingSide == "Left" then -1 else 1
+		local swingElapsed = os.clock() - swingAt
+		-- How far a swing is under way (0..1..0): the shield leans into it.
+		local swingPose, swingWeight = nil, 0
+		if #pieces > 0 then
+			keyframes()
+			local swingKeys = if swingHeavy
+				then SWINGS.Heavy
+				elseif swingSide == "Left" then SWINGS.Left
+				else SWINGS.Right
+			swingPose = sample(swingKeys, swingElapsed)
+			if swingPose then
+				swingWeight = math.sin(math.clamp(swingElapsed / swingKeys[#swingKeys][1], 0, 1) * math.pi)
+			end
+		end
 		local breathe = math.sin(os.clock() * 2) * 0.012
 		-- Walking bobs the arms; a blow on your shield knocks it back; a hit
 		-- that gets through jolts the whole view (server-set, see RivalPose).
@@ -638,28 +684,28 @@ function View.start()
 		end
 		for _, piece in pieces do
 			local pose = if piece.Shield
-				then shieldRest:Lerp(shieldRaised, smoothedRaised) * CFrame.new(
-					-0.25 * castPose + 0.05 * jolt,
-					-0.3 * castPose + breathe - 0.08 * jolt,
-					0.28 * jolt
-				) * CFrame.Angles(math.rad(14 * jolt), 0, 0)
+				-- (A swing dips the shield down and out of the blade's way.)
+				then CFrame.new(-0.2 * swingWeight, -0.32 * swingWeight, 0.04 * swingWeight) * shieldRest:Lerp(
+					shieldRaised,
+					smoothedRaised
+				) * CFrame.new(-0.25 * castPose + 0.05 * jolt, -0.3 * castPose + breathe - 0.08 * jolt, 0.28 * jolt) * CFrame.Angles(
+					math.rad(14 * jolt),
+					0,
+					math.rad(8 * swingWeight)
+				)
 				elseif piece.Left then CFrame.new(
 					-0.72 + smoothedRaised * 0.4,
 					-0.8 + smoothedRaised * 0.45 + breathe,
 					-1.35
 				) * CFrame.Angles(0, 0, math.rad(-12 + smoothedRaised * 25))
 				else CFrame.new(
-					0.83
-						- swing * direction * (if swingHeavy then 0.5 else 0.85)
-						+ casting * 0.12
-						- throw * 0.2
-						+ strain,
-					-0.78 + smoothedCharge * 0.18 + breathe + casting * 0.08 + 0.35 * math.max(-chop, 0) - 0.25 * chop,
-					-1.25 - swing * (if swingHeavy then 0.42 else 0.28) + recoil * 0.18 + casting * 0.2 - throw * 0.35
-				) * CFrame.Angles(
-					math.rad(-smoothedCharge * 15 - recoil * 9 + casting * 14 - throw * 22 - chop * 45 + strain * 300),
+					casting * 0.12 - throw * 0.2 + strain,
+					breathe + casting * 0.08,
+					recoil * 0.18 + casting * 0.2 - throw * 0.35
+				) * (swingPose or REST:Lerp(RAISED, ease(smoothedCharge))) * CFrame.Angles(
+					math.rad(-recoil * 9 + casting * 14 - throw * 22 + strain * 300),
 					0,
-					math.rad(12 + smoothedCharge * 20 - swing * direction * (if swingHeavy then 50 else 85))
+					0
 				)
 			-- Tuck the weapon and its gauntlet below the shield during a shield guard.
 			-- Weapon-only guards below retain their raised two-hand bracing pose.
