@@ -41,9 +41,35 @@ local REPLY_SOUNDS = {
 	ClaimSeason = "Reward",
 }
 
+-- The server turns away requests less than 0.2s apart (Shop.handle:
+-- "Slow down!"), so requests are spaced out here: each takes the next free
+-- slot, and one that's turned away anyway is sent once more.
+-- (Spam, like a held click, isn't queued up: past a second's backlog a
+-- request is dropped as before.)
+local SPACING = 0.22
+local nextSlot = 0
+local function pace(): boolean
+	local now = os.clock()
+	local slot = math.max(now, nextSlot)
+	if slot - now > 1 then
+		return false
+	end
+	nextSlot = slot + SPACING
+	if slot > now then
+		task.wait(slot - now)
+	end
+	return true
+end
+
 -- Returns the server's reply: { Ok: boolean, Message: string, ... }.
 function GemClient.request(action: string, ...): { [string]: any }
+	if not pace() then
+		return { Ok = false, Message = "Slow down!" }
+	end
 	local ok, result = pcall(requestFunction.InvokeServer, requestFunction, action, ...)
+	if ok and typeof(result) == "table" and result.Message == "Slow down!" and pace() then
+		ok, result = pcall(requestFunction.InvokeServer, requestFunction, action, ...)
+	end
 	if not ok or typeof(result) ~= "table" then
 		return { Ok = false, Message = "Couldn't reach the server. Try again." }
 	end
