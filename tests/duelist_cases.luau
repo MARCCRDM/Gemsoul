@@ -101,6 +101,19 @@ check(gh.Health > before - 100 and guardian:GetAttribute("Blocking") == true, "G
 CombatServer._block(guardian, true, rival.Root.Position)
 CombatServer.hurt(guardian, 100, nil, rival, true)
 check(guardian:GetAttribute("Blocking") == false, "Rival's heavy blow did not break the guard")
+-- Guard replication is immediate, not dependent on the next resource tick.
+now += 5
+CombatServer._block(guardian, true, rival.Root.Position)
+check((guardian.Character:GetAttribute("GuardUntil") or 0) > workspace:GetServerTimeNow(), "Remote guard was not published immediately")
+check(guardian.Character:GetAttribute("ActionKind") == nil, "A stale action survived raising guard")
+CombatServer._block(guardian, false, rival.Root.Position)
+check(guardian.Character:GetAttribute("GuardUntil") == 0, "Remote guard remained up after release")
+-- Long held casts and charging poses must not mask an active shield.
+for _, kind in { "Slash", "Heavy", "Bolt", "Nova" } do
+ local guard = RivalPose.pose({ ActionKind=kind, ActionStart=100, ActionAt=103, ActionHold=105, GuardUntil=102 }, 101, true)
+ check(guard.LeftShoulder[1] > 1.2 and guard.LeftElbow[1] > 1.2, "Stale " .. kind .. " masked shield guard")
+ check(guard.RightShoulder[1] < 0.5, "Guard did not lower the sword")
+end
 -- Its body language: wind-up, strike, then back to a ready stance.
 local swing = { ActionKind = "Slash", ActionStart = 100, ActionAt = 100.3, ActionSide = 1 }
 local windup = RivalPose.pose(swing, 100.25)
@@ -128,7 +141,7 @@ check(RivalPose.pose({ GuardUntil = 101 }, 101.5).LeftShoulder[1] < 1, "Guard po
 check(RivalPose.pose({ ActionKind = "Bogus", ActionStart = 100, ActionAt = 100 }, 100).RightShoulder ~= nil, "Unknown action broke the pose")
 -- Anticipation, overshoot, recovery and hit reactions.
 local coil = RivalPose.pose(swing, 100.29)
-check(coil.RightShoulder[1] > 2.3, "Slash did not coil past its wind-up before release")
+check(coil.RightShoulder[1] > windup.RightShoulder[1], "Slash did not coil past its wind-up before release")
 local snapped = RivalPose.pose(swing, 100.37)
 check(snapped.RightShoulder[3] < -0.7, "Slash did not overshoot its strike")
 local recovering = RivalPose.pose(swing, 100.3 + 0.32 + 0.15)

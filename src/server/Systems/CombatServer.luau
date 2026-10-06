@@ -181,6 +181,7 @@ posePlayer = function(player, kind: string?, windup: number, name: string?, elem
 	end
 	local t = workspace:GetServerTimeNow()
 	poseSides[player] = -(poseSides[player] or 1)
+	character:SetAttribute("GuardUntil", 0)
 	character:SetAttribute("ActionKind", kind)
 	character:SetAttribute("ActionHold", nil)
 	character:SetAttribute("ActionStart", t)
@@ -1039,6 +1040,9 @@ local function attack(player, aim, heavy, swing)
 	st.ChargeStarted = nil
 	-- The blow lands now: the body swings through it, as the rival's does.
 	posePlayer(player, if heavy then "Heavy" else "Slash", 0)
+	if swing and player.Character then
+		player.Character:SetAttribute("ActionSide", if swing.Side == "Left" then -1 else 1)
+	end
 	Remotes.CombatFx:FireClient(player, "Cooldown", if heavy then "Heavy" else "Basic", st.NextAttack - now)
 	local landed, interrupted = false, false
 	if swing then
@@ -1827,6 +1831,9 @@ local function onInput(player, action, a, b)
 			st.ChargeSide = Actions.side(a)
 			-- The arm draws back while the blow charges.
 			posePlayer(player, "Slash", 3)
+			if player.Character then
+				player.Character:SetAttribute("ActionSide", if st.ChargeSide == "Left" then -1 else 1)
+			end
 		end
 	elseif action == "ReleaseAttack" and Actions.finiteVector(a) then
 		local started = st.ChargeStarted
