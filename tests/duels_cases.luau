@@ -37,9 +37,11 @@ check(not Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ Mat
 check(Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ MatchId = "D1", MatchTeam = 2 })), "Opponents can't fight")
 local a1 = Matchmaking.lane(1, 1, 1, 1)
 local b1 = Matchmaking.lane(1, 2, 1, 1)
-check((a1 - b1).Magnitude == 16, "Opponents don't face off 16 studs apart")
+check(math.abs((a1 - b1).Magnitude - 40) < 1e-6, "Opponents don't face off 40 studs apart, as in the intro")
+check((a1 + b1).Magnitude < 1e-6, "Opponents aren't across the floor's centre")
 local t1, t2 = Matchmaking.lane(2, 1, 1, 2), Matchmaking.lane(2, 1, 2, 2)
-check(math.abs(t1.X - t2.X) == 5 and t1.Z == t2.Z, "Teammates don't stand side by side")
+local o1 = Matchmaking.lane(2, 2, 1, 2)
+check(math.abs((t1 - t2).Magnitude - 5) < 1e-6 and math.abs((t1.X - t2.X) * (o1.X - t1.X) + (t1.Z - t2.Z) * (o1.Z - t1.Z)) < 1e-6, "Teammates don't stand side by side")
 for slot = 1, Matchmaking.Lanes do
 	for team = 1, 2 do
 		for index = 1, 2 do

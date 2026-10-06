@@ -9,10 +9,14 @@ local function makePlayer(id,position,family)
 	function root:ApplyImpulse(impulse) self.Impulse=impulse end
 	function root:SetNetworkOwner(owner) self.ServerOwned=owner==nil end
 	function root:SetNetworkOwnershipAuto() self.ServerOwned=false end
-	local humanoid={Health=1000,MaxHealth=1000,WalkSpeed=16}
+	local humanoid={Health=1000,MaxHealth=1000,WalkSpeed=16,Died=signal()}
 	function humanoid:TakeDamage(damage) self.Health=math.max(0,self.Health-damage) end
 	player.Character={HumanoidRootPart=root,FindFirstChild=function(_,key) return if key=="HumanoidRootPart" then root else nil end,FindFirstChildOfClass=function(_,key) return if key=="Humanoid" then humanoid elseif key=="ForceField" and player.Protected then {} else nil end}
 	function player.Character:PivotTo(target) root.Position=target.Position or Vector3.new(0,6,0) end
+	-- What the Arena drop pod (ArenaDrop) uses to stage a body.
+	function player.Character:GetDescendants() return {} end
+	player.Character.DescendantAdded=signal()
+	player.Character.AncestryChanged=signal()
 	player.Character.Attributes={}
 	function player.Character:GetAttribute(key) return self.Attributes[key] end
 	function player.Character:SetAttribute(key,value) self.Attributes[key]=value end

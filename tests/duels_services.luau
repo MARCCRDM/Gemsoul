@@ -271,3 +271,12 @@ local function respawn(...)
 		p.Humanoid.Health = p.Humanoid.MaxHealth
 	end
 end
+-- The drop pod (ArenaDrop) is presentation; duels only need its timing.
+local ArenaDrop = {
+	duration = function()
+		return 0
+	end,
+	prepare = function() end,
+	begin = function() end,
+	cancel = function() end,
+}

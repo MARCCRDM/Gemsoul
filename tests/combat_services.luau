@@ -1,3 +1,15 @@
+-- Plain Luau has no task library: delayed work (the drop pod's clean-up)
+-- never runs here, and spawned work runs at once.
+local task = task or {
+	delay = function() end,
+	defer = function(fn, ...)
+		fn(...)
+	end,
+	spawn = function(fn, ...)
+		fn(...)
+	end,
+	wait = function() end,
+}
 -- Clock, physics and remotes are deterministic; rules/handlers are the production modules.
 local now = 100
 local os = { clock = function() return now end }

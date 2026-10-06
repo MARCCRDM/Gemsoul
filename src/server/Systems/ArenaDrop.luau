@@ -19,6 +19,15 @@ local function colorOf(model)
 	end
 	return Color3.fromRGB(70, 220, 255)
 end
+-- What a hidden part goes back to. Its InsertionTransparency attribute is the
+-- record: other systems that show or hide gear while it's staged (the Outpost
+-- brings the weapon back out for a fight) update that, not Transparency, so
+-- the reveal never restores a stale value (a duel from the Outpost used to
+-- leave both fighters' swords invisible).
+local function restored(object, saved)
+	local value = object:GetAttribute("InsertionTransparency")
+	return if type(value) == "number" then value else saved
+end
 function Drop.cancel(model)
 	local finish = active[model]
 	if finish then
@@ -57,7 +66,7 @@ function Drop.prepare(player)
         finished=true
         for _,connection in connections do connection:Disconnect() end
         for object,value in saved do
-            if object.Parent then object.Transparency=value; object:SetAttribute("InsertionTransparency",nil) end
+            if object.Parent then object.Transparency=restored(object,value); object:SetAttribute("InsertionTransparency",nil) end
         end
         for object,value in effects do
             if object.Parent then object.Enabled=value; object:SetAttribute("InsertionEnabled",nil) end
@@ -153,7 +162,7 @@ function Drop.begin(models, viewers, dropModels)
 		local function reveal()
 			for object, value in saved do
 				if object.Parent then
-					object.Transparency = value
+					object.Transparency = restored(object, value)
 					object:SetAttribute("InsertionTransparency", nil)
 				end
 			end
@@ -163,6 +172,9 @@ function Drop.begin(models, viewers, dropModels)
 					object:SetAttribute("InsertionEnabled", nil)
 				end
 			end
+			-- Once: the clean-up reveals again, and by then the record is gone.
+			table.clear(saved)
+			table.clear(effects)
 		end
 		local finished = false
 		local connections = {}

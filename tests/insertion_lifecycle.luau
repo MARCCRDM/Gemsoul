@@ -234,4 +234,17 @@ Drop.prepare(entrant); Drop.cancel(staged)
 check(not sr.Anchored and entrant:GetAttribute("ArenaDropPreparing")==nil,"Failed entry left preparation frozen")
 Drop.prepare(entrant); advance(15.1)
 check(not sr.Anchored and entrant:GetAttribute("ArenaDropUntil")==nil,"Preparation timeout retained protection")
+-- Gear shown or hidden while staged (the Outpost brings a duellist's weapon
+-- back out for the fight a moment after the pod has saved it hidden) changes
+-- the staged record, and the reveal restores that, not the stale value.
+local outpost,_,oa=actor()
+local duellist=object("Player"); duellist.Character=outpost; owners[outpost]=duellist
+oa.Transparency=1 -- put away while mining
+Drop.prepare(duellist)
+local duration3=Drop.begin({outpost},{duellist})
+check(oa.Transparency==1 and oa:GetAttribute("InsertionTransparency")==1,"Pod did not stage the put-away weapon")
+oa:SetAttribute("InsertionTransparency",0) -- as OutpostServer does while staged
+check(oa.Transparency==1,"Weapon showed mid-drop")
+advance(duration3+.1)
+check(oa.Transparency==0 and oa:GetAttribute("InsertionTransparency")==nil,"Reveal restored a stale value: weapon left invisible")
 print("PASS: " .. checks .. " real insertion lifecycle checks")

@@ -48,11 +48,15 @@ local function restore()
 	end
 	table.clear(hidden)
 	for hud, enabled in hudSaved do
-		if hud.Parent then
+		if hud.Parent and hud.Name ~= "LobbyHud" then
 			hud.Enabled = enabled
 		end
 	end
 	table.clear(hudSaved)
+	-- The lobby bar isn't put back as it was when the drop began: a duel from
+	-- the Outpost starts with it still up, and restoring that left PLAY and the
+	-- lobby tiles over the fight's HUD. The lobby decides (LobbyUI).
+	require(script.Parent.Modules.LobbyUI).refresh()
 	gui.Enabled = false
 end
 local function discover(object)

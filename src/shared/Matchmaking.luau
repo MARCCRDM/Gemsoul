@@ -11,7 +11,7 @@
 	  Matchmaking.pair(entries, now)  pairs queue entries ({ Rating, Since,
 	                              Size }), longest-waiting first
 	  Matchmaking.lane(slot, team, index, size)  where a fighter stands in a
-	                              lane, and the lane's centre (offsets from the arena floor's centre)
+	                              lane, and the point it faces (offsets from the arena floor's centre)
 
 	Party Raids (PvE): a party of at least Raid.Min fights one raid boss.
 	  Matchmaking.Raid                 the rules: size, scaling, rewards
@@ -170,19 +170,18 @@ function Matchmaking.pair(entries, now: number)
 	return pairs
 end
 
--- Lanes sit around the floor's centre; the two teams face off 16 studs apart,
--- teammates side by side.
-local LANE_CENTRES = {
-	Vector3.new(-12, 0, -12),
-	Vector3.new(12, 0, 12),
-	Vector3.new(12, 0, -12),
-	Vector3.new(-12, 0, 12),
-}
+-- Fighters enter as in the Arena intro (you and the rival): across the
+-- floor from each other through its centre, 40 studs apart, facing in. Each
+-- match at once (its slot) gets its own line through the centre, turned 45
+-- degrees from the last; teammates stand side by side, 5 studs apart.
+Matchmaking.FaceOff = 20 -- each team's distance from the centre
 function Matchmaking.lane(slot: number, team: number, index: number, size: number): (Vector3, Vector3)
-	local centre = LANE_CENTRES[(slot - 1) % #LANE_CENTRES + 1]
+	local angle = math.rad(((slot - 1) % Matchmaking.Lanes) * 45)
+	local axis = Vector3.new(math.sin(angle), 0, math.cos(angle))
+	local beside = Vector3.new(axis.Z, 0, -axis.X)
 	local side = if team == 1 then -1 else 1
 	local across = if size > 1 then (index - (size + 1) / 2) * 5 else 0
-	return centre + Vector3.new(across, 0, side * 8), centre
+	return axis * (side * Matchmaking.FaceOff) + beside * across, Vector3.new(0, 0, 0)
 end
 
 return Matchmaking

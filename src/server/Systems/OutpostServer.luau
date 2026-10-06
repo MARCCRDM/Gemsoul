@@ -148,6 +148,21 @@ local function pickModel(player: Player)
 	model.Parent = character
 end
 
+-- A part's transparency as it should be. While an Arena drop has the body
+-- staged (hidden in its pod, ArenaDrop) the real value waits in the
+-- InsertionTransparency attribute until the reveal, so that is what changes.
+local function shownAs(part: BasePart): number
+	local staged = part:GetAttribute("InsertionTransparency")
+	return if type(staged) == "number" then staged else part.Transparency
+end
+local function setShown(part: BasePart, value: number)
+	if type(part:GetAttribute("InsertionTransparency")) == "number" then
+		part:SetAttribute("InsertionTransparency", value)
+	else
+		part.Transparency = value
+	end
+end
+
 local function weaponVisible(player: Player, visible: boolean)
 	local character = player.Character
 	local gear = character and character:FindFirstChild("GemsoulGear")
@@ -157,12 +172,12 @@ local function weaponVisible(player: Player, visible: boolean)
 			if visible then
 				local was = part:GetAttribute("OutpostTransparency")
 				if was ~= nil then
-					part.Transparency = was
+					setShown(part, was)
 					part:SetAttribute("OutpostTransparency", nil)
 				end
 			elseif part:GetAttribute("OutpostTransparency") == nil then
-				part:SetAttribute("OutpostTransparency", part.Transparency)
-				part.Transparency = 1
+				part:SetAttribute("OutpostTransparency", shownAs(part))
+				setShown(part, 1)
 			end
 		end
 	end

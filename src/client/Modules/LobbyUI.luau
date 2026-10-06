@@ -495,6 +495,11 @@ function LobbyUI.setVisible(on: boolean)
 	gui.Enabled = on and not dashboardShown
 end
 
+-- Puts the lobby HUD back as it should be (after something else hid it).
+function LobbyUI.refresh()
+	gui.Enabled = wanted and not dashboardShown
+end
+
 function LobbyUI.dashboardOpen(): boolean
 	return dashboardShown
 end
