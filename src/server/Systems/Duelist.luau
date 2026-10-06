@@ -63,6 +63,9 @@ local DamageLog = require(script.Parent.DamageLog)
 local DungeonLoadout = require(ReplicatedStorage.Shared.DungeonLoadout)
 local BrainrotSkins = require(script.Parent.BrainrotSkins)
 local ExpeditionAmbient = require(script.Parent.ExpeditionAmbient)
+local CombatEvents = require(script.Parent.CombatEvents)
+local Shop = require(script.Parent.Shop)
+local Tutorial = require(ReplicatedStorage.Shared.CombatTutorial)
 local Duelist = {}
 local dungeonActors = {}
 
@@ -106,6 +109,12 @@ end
 
 -- [owner] = { Enemy, Owner, Name, Element, Damage, ... } for the live rival.
 local duels: { [Player]: any } = {}
+-- Combat training's progress, off the player (see the training block below).
+local function clearTutorial(owner: Player)
+	owner:SetAttribute("TutorialStep", nil)
+	owner:SetAttribute("TutorialCount", nil)
+	owner:SetAttribute("TutorialGoal", nil)
+end
 local starting: { [Player]: boolean } = {}
 local idCounter = 0
 
@@ -269,6 +278,9 @@ function Duelist.despawn(owner: Player)
 	end
 	local duel = duels[owner]
 	duels[owner] = nil
+	if duel and duel.Tutorial then
+		clearTutorial(owner)
+	end
 	-- A raider leaving: the boss fights on while anyone's left.
 	if duel and duel.Raid then
 		local index = table.find(duel.Raid.Members, owner)
@@ -777,6 +789,157 @@ local function dropGuard(enemy, now: number)
 end
 
 -- Every 0.15s while the rival is alive.
+-- Combat training (Shared.CombatTutorial) ------------------------------------
+-- A new player's first spar is scripted: the partner plays along with each
+-- lesson (stands as a target, throws slow swings to block, telegraphed heavy
+-- blows to dodge) and the player's progress is published on them
+-- (TutorialStep / TutorialCount / TutorialGoal) for the client's panel.
+-- Nobody falls before the last lesson, the real spar.
+local function canDo(duel, step): boolean
+	if step.Event == "Surge" then
+		local loadout = PlayerData.character(duel.Owner)
+		for key in Tech.SurgeSockets do
+			if Tech.surgeGem(loadout, key) then
+				return true
+			end
+		end
+		return false
+	end
+	return true
+end
+
+local function publishTutorial(duel)
+	local t, owner = duel.Tutorial, duel.Owner
+	local step = Tutorial.step(t.Step)
+	owner:SetAttribute("TutorialStep", t.Step)
+	owner:SetAttribute("TutorialCount", t.Count)
+	owner:SetAttribute("TutorialGoal", if step then step.Goal else 0)
+end
+
+local function setTutorialStep(duel, index: number)
+	local t, enemy, now = duel.Tutorial, duel.Enemy, os.clock()
+	t.Step, t.Count, t.Advancing, t.Swing = index, 0, false, nil
+	t.Next = now + 1.2 -- a beat before the partner acts
+	duel.Action = nil
+	local step = Tutorial.step(index)
+	-- Each lesson starts fresh: both at full health.
+	enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
+	local _, ownerHumanoid = ownerRoot(duel.Owner)
+	if ownerHumanoid then
+		ownerHumanoid.Health = ownerHumanoid.MaxHealth
+	end
+	if step and step.Partner == "Fight" then
+		-- The real spar: the partner fights (softened) and can be beaten.
+		enemy.Training = nil
+		duel.NextAttack = now + 1.2
+	end
+	publishTutorial(duel)
+end
+
+local function startTutorial(duel)
+	duel.Tutorial = { Step = 1, Count = 0 }
+	duel.Enemy.Training = true
+	setTutorialStep(duel, 1)
+end
+
+-- One more of what the current lesson asks for; the next lesson follows a
+-- moment after the last one needed.
+local function tutorialProgress(duel, event: string)
+	local t = duel.Tutorial
+	local step = t and Tutorial.step(t.Step)
+	if not step or t.Advancing then
+		return
+	end
+	if step.Event ~= event and not (step.Event == "Hit" and event == "Heavy") then
+		return
+	end
+	t.Count += 1
+	publishTutorial(duel)
+	if t.Count < step.Goal or step.Event == "Win" then
+		return
+	end
+	t.Advancing = true
+	local index = t.Step
+	local nextIndex = Tutorial.nextStep(index, function(s)
+		return canDo(duel, s)
+	end)
+	task.delay(1.6, function()
+		if duels[duel.Owner] == duel and duel.Tutorial == t and t.Step == index and nextIndex then
+			setTutorialStep(duel, nextIndex)
+		end
+	end)
+end
+
+-- The partner during a lesson (everything but the real spar). True when it
+-- has acted (the regular brain sits this tick out).
+local function tutorialThink(duel, enemy, now: number, target: BasePart, distance: number, dir: Vector3): boolean
+	local t = duel.Tutorial
+	local step = Tutorial.step(t.Step)
+	if not step or step.Partner == "Fight" then
+		return false
+	end
+	local root, humanoid = enemy.Root, enemy.Humanoid
+	dropGuard(enemy, now)
+	-- Nobody falls in a lesson.
+	local _, ownerHumanoid = ownerRoot(duel.Owner)
+	if ownerHumanoid and ownerHumanoid.Health < ownerHumanoid.MaxHealth * 0.4 then
+		ownerHumanoid.Health = ownerHumanoid.MaxHealth * 0.6
+	end
+	humanoid:MoveTo(root.Position)
+	face(root, target.Position)
+	local swing = t.Swing
+	if swing then
+		if now < swing.At then
+			return true
+		end
+		t.Swing = nil
+		local heavy = swing.Kind == "Heavy"
+		local color = GemConfig.ElementColors[duel.Element] or P_GOLD
+		fx("Swing", nil, root.Position, dir, Brain.Reach, if heavy then 140 else 100, color, heavy)
+		local dealt, guarded = 0, false
+		if distance <= Brain.Reach + 1.5 then
+			dealt, guarded = strike(
+				duel,
+				duel.Damage * (if heavy then 0.35 else 0.2),
+				duel.Element,
+				heavy,
+				nil,
+				if heavy then "Heavy Blow" else "Quick Swing",
+				0
+			)
+		end
+		local hit = type(dealt) == "number" and dealt > 0
+		if guarded and not heavy then
+			tutorialProgress(duel, "Block")
+		elseif heavy and not hit and not guarded and (t.LastDodge or 0) >= swing.Start - 0.3 then
+			tutorialProgress(duel, "Dodge")
+		end
+		setStance(duel, "")
+		t.Next = now + (if heavy then 2.2 else 1.6)
+		return true
+	end
+	if step.Partner == "Stand" then
+		return true -- a target: it faces you and takes it
+	end
+	-- Swing / HeavyBlow: it closes in, then winds up slowly and plainly.
+	if distance > Brain.Reach then
+		humanoid:MoveTo(target.Position - dir * 3)
+		return true
+	end
+	if now >= (t.Next or 0) then
+		local heavy = step.Partner == "HeavyBlow"
+		local windup = if heavy then 1.3 else 0.85
+		t.Swing = { Kind = if heavy then "Heavy" else "Light", At = now + windup, Start = now }
+		animate(duel, if heavy then "Heavy" else "Slash", windup, nil, if heavy then "Heavy Blow" else nil)
+		setStance(duel, if heavy then "Heavy" else "")
+		press(duel, "LMB")
+		if heavy then
+			fx("Nova", root.Position - Vector3.new(0, 2.5, 0), 3.5, Color3.fromRGB(255, 120, 60), windup)
+		end
+	end
+	return true
+end
+
 local function think(enemy, now: number)
 	local duel = enemy.Duel
 	if (enemy.Model:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
@@ -846,6 +1009,9 @@ local function think(enemy, now: number)
 	humanoid.WalkSpeed = duel.Speed
 		* (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
 		* (if guarding(enemy, now) then 0.7 else 1) -- a shield-walk
+	if duel.Tutorial and tutorialThink(duel, enemy, now, target, distance, dir) then
+		return
+	end
 	local color = GemConfig.ElementColors[duel.Element] or Color3.fromRGB(255, 190, 80)
 
 	-- Its lingering pools (Toxic Cloud) tick on the player standing in them.
@@ -1453,6 +1619,7 @@ local function onWin(enemy)
 	local session = duel.Session
 	countDuel(owner, true)
 	if duel.Intro then
+		clearTutorial(owner)
 		-- The first-duel intro is one match; the client heads to the lobby.
 		Remotes.Notify:FireClient(owner, string.format("You beat %s! Welcome to the Saga Outpost.", duel.Name))
 		return
@@ -1888,6 +2055,9 @@ function spawnRival(owner: Player, raid, encounter)
 		return
 	end
 	duels[owner] = duel
+	if duel.Intro then
+		startTutorial(duel)
+	end
 	if ArenaDrop.forRival(session, raid, encounter) and owner.Character then
 		local first = not owner:GetAttribute("ArenaInserted")
 		owner:SetAttribute("ArenaInserted", true)
@@ -1932,6 +2102,26 @@ function Duelist.removeDungeon(id)
 	end
 end
 function Duelist.start()
+	-- Combat training counts what the player does (CombatServer's events),
+	-- and can be skipped straight to the spar.
+	CombatEvents.listen(function(player, kind)
+		local duel = duels[player]
+		if not duel or not duel.Tutorial then
+			return
+		end
+		if kind == "Dodge" then
+			duel.Tutorial.LastDodge = os.clock()
+		else
+			tutorialProgress(duel, kind)
+		end
+	end)
+	Shop.register("TutorialSkip", function(player)
+		local duel = duels[player]
+		if duel and duel.Tutorial and duel.Tutorial.Step < Tutorial.count() then
+			setTutorialStep(duel, Tutorial.count())
+		end
+		return Shop.reply(true, "")
+	end)
 	-- Your Pneumatic Jab on a rival mid-cast: the cast is cancelled and its
 	-- surges lock for `seconds`. True if there was a cast to cancel.
 	Enemies.interrupt = function(enemy, seconds: number): boolean

@@ -699,7 +699,7 @@ local function drawRival(now, viewport)
 	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
 	-- (Touch screens keep the fight clear: the top card says enough.)
 	rivalPanel.Visible = humanoid ~= nil
-		and (model:GetAttribute("ArenaDropUntil") or 0)<=workspace:GetServerTimeNow()
+		and (model:GetAttribute("ArenaDropUntil") or 0) <= workspace:GetServerTimeNow()
 		and humanoid.Health > 0
 		and viewport.X >= 700
 		and not UserInputService.TouchEnabled
@@ -979,6 +979,7 @@ local surgeIcons, maneuverIcons = {}, {}
 for i, key in SURGE_KEYS do
 	local icon = makeIcon(surgeTray, key, true)
 	surgeIcons[i] = icon
+	icon.Button:SetAttribute("TutorialTarget", "Surge")
 	icon.Button.InputBegan:Connect(function(obj)
 		if pressInput(obj) then
 			if obj.UserInputType == Enum.UserInputType.Touch then
@@ -1006,6 +1007,8 @@ local function makeSlot(id, label, key, position)
 		{ Color = Color3.fromRGB(52, 46, 70), Size = UDim2.fromOffset(80, 70), Radius = 35, Lip = 4, Stripes = "None" }
 	)
 	button.AnchorPoint, button.Position = Vector2.new(0.5, 1), position
+	-- What combat training points at (Training.client).
+	button:SetAttribute("TutorialTarget", id)
 	local name = text(faceBox, label, 12, P.Text, IronUi.Bold)
 	name.Position = UDim2.fromOffset(4, 40)
 	name.Size = UDim2.new(1, -8, 0, 26)
@@ -1639,7 +1642,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local target = lockedTarget or (hit and hit.Instance:FindFirstAncestorOfClass("Model"))
 	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
 	targetCard.Visible = enemyHumanoid ~= nil
-		and (target:GetAttribute("ArenaDropUntil") or 0)<=workspace:GetServerTimeNow()
+		and (target:GetAttribute("ArenaDropUntil") or 0) <= workspace:GetServerTimeNow()
 		and enemyHumanoid.Health > 0
 		and target ~= player.Character
 		and not game:GetService("CollectionService"):HasTag(target, "Vendor")
