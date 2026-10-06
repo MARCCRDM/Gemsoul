@@ -38,6 +38,10 @@ local Config = {
 
 	-- Saving (needs "Enable Studio Access to API Services" to work in Studio).
 	DataStoreName = "GemSoul_PlayerData_v1",
+	-- The Market board and mailboxes. Raise it (and publish) to start the
+	-- Market empty: every listed or offered item goes back to its owner the
+	-- next time they join, and old mailbox notes are left behind.
+	MarketVersion = 1,
 	AutosaveSeconds = 120,
 
 	-- Playtesting with friends on a published server.
