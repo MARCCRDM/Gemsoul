@@ -43,8 +43,8 @@ local FOLLOW = 0.32 -- how long a strike's follow-through holds, seconds
 local READY = {
 	RightShoulder = { 0.45, 0, 0.12 },
 	RightElbow = { 0.85, 0, 0 },
-	LeftShoulder = { 0.75, 0, 0.18 },
-	LeftElbow = { 1.0, 0, 0 },
+	LeftShoulder = { 0.9, 0, 0.3 },
+	LeftElbow = { 1.15, 1.45, 0 },
 	Waist = { -0.05, -0.12, 0 },
 	RightHip = { 0.12, 0, 0 },
 	LeftHip = { 0.12, 0, 0 },
@@ -71,6 +71,7 @@ local function lerp(a, b, t: number)
 end
 
 -- Wind-up and strike poses for each action; `s` mirrors a slash or dodge.
+<<<<<<< HEAD
 local function frames(kind: string, s: number)
 	if kind == "Deploy" then
 		return {
@@ -97,6 +98,18 @@ local function frames(kind: string, s: number)
 			LeftKnee = { -0.45, 0, 0 },
 		}
 	elseif kind == "Mine" then
+=======
+-- The shield arm held up in front during a sword's blows: forearm across the
+-- chest, twisted so the shield's face (mounted on the outside of the forearm)
+-- points forward rather than out to the side.
+local SHIELD_UP = {
+	LeftShoulder = { 1.15, 0, 0.5 },
+	LeftElbow = { 1.3, 1.45, 0 },
+}
+
+local function frames(kind: string, s: number, shield: boolean?)
+	if kind == "Mine" then
+>>>>>>> 0e359bbb2aa9ae1a0cd23ed4b1d467ccf29bafb6
 		return {
 			Waist = { 0.15, -0.2, 0 },
 			RightShoulder = { 2.7, 0, 0.2 },
@@ -199,20 +212,54 @@ local function frames(kind: string, s: number)
 			LeftElbow = { 0.15, 0, 0 },
 		}
 	elseif kind == "Slash" then
+		-- Cocked back over the shoulder (blade up behind the head), then a flat
+		-- cut across the body driven by the hips; the shield stays up in front.
 		return {
-			Waist = { 0.08, -0.48 * s, -0.06 * s },
-			Neck = { -0.04, 0.18 * s, 0 },
-			RightShoulder = { 1.9, -0.35 * s, 0.85 * s },
-			RightElbow = { 0.9, 0, 0 },
-			LeftShoulder = { 0.6, 0, -0.3 },
-			LeftElbow = { 0.9, 0, 0 },
+			Waist = { 0.05, -0.6 * s, -0.05 * s },
+			Neck = { -0.04, 0.3 * s, 0 },
+			RightShoulder = { 1.6, -0.25 * (1 + s), 0.9 * s },
+			RightElbow = { 1.45 + 0.15 * s, 0, 0 },
+			LeftShoulder = if shield then SHIELD_UP.LeftShoulder else { 0.6, 0, -0.3 },
+			LeftElbow = if shield then SHIELD_UP.LeftElbow else { 0.9, 0, 0 },
+			RightHip = { 0.22, 0, 0 },
+			LeftHip = { 0.05, 0, 0 },
+			RightKnee = { -0.28, 0, 0 },
+			LeftKnee = { -0.15, 0, 0 },
 		}, {
-			Waist = { -0.18, 0.58 * s, 0.08 * s },
-			Neck = { 0.04, -0.18 * s, 0 },
-			RightShoulder = { 0.95, 0.45 * s, -0.95 * s },
-			RightElbow = { 0.15, 0, 0 },
-			LeftShoulder = { 0.3, 0, -0.4 },
-			LeftElbow = { 0.6, 0, 0 },
+			Waist = { -0.1, 0.6 * s, 0.05 * s },
+			Neck = { 0.04, -0.3 * s, 0 },
+			RightShoulder = { 1.43, 0, -0.9 * s },
+			RightElbow = { 0.18, 0, 0 },
+			LeftShoulder = if shield then SHIELD_UP.LeftShoulder else { 0.3, 0, -0.4 },
+			LeftElbow = if shield then SHIELD_UP.LeftElbow else { 0.6, 0, 0 },
+			RightHip = { 0.42, 0, 0 },
+			LeftHip = { -0.15, 0, 0 },
+			RightKnee = { -0.45, 0, 0 },
+			LeftKnee = { -0.08, 0, 0 },
+		}
+	elseif kind == "Heavy" and shield then
+		-- One-handed overhead chop: the sword goes up and back behind the head
+		-- and slams down, while the shield stays braced in front.
+		return {
+			Waist = { 0.25, -0.15, 0 },
+			Neck = { 0.12, 0, 0 },
+			RightShoulder = { 3.2, 0, 0.15 },
+			RightElbow = { 2.0, 0, 0 },
+			LeftShoulder = { 1.25, 0, 0.45 },
+			LeftElbow = { 1.45, 1.45, 0 },
+			RightHip = { 0.15, 0, 0 },
+			RightKnee = { -0.2, 0, 0 },
+		}, {
+			Waist = { -0.5, 0.15, 0 },
+			Neck = { -0.2, 0, 0 },
+			RightShoulder = { 0.8, 0, -0.15 },
+			RightElbow = { 0.1, 0, 0 },
+			LeftShoulder = SHIELD_UP.LeftShoulder,
+			LeftElbow = SHIELD_UP.LeftElbow,
+			RightHip = { 0.5, 0, 0 },
+			LeftHip = { -0.2, 0, 0 },
+			RightKnee = { -0.6, 0, 0 },
+			LeftKnee = { -0.3, 0, 0 },
 		}
 	elseif kind == "Heavy" then
 		return {
@@ -310,15 +357,15 @@ local function frames(kind: string, s: number)
 	return nil, nil
 end
 
--- Guard: the shield arm raised square in front of the chest and face, the
--- weapon lowered beside the hip, crouched behind the shield.
+-- Guard: the shield arm raised square in front of the chest and face (its
+-- face turned forward), the sword held ready at the side, crouched behind the shield.
 local GUARD = {
 	Waist = { -0.18, -0.3, 0 },
 	Neck = { -0.1, 0.15, 0 },
-	LeftShoulder = { 1.4, -0.25, 0.7 },
-	LeftElbow = { 1.4, 0, 0 },
-	RightShoulder = { 0.12, 0.12, -0.12 },
-	RightElbow = { 0.4, 0, 0 },
+	LeftShoulder = { 1.35, 0, 0.55 },
+	LeftElbow = { 1.4, 1.45, 0 },
+	RightShoulder = { 0.45, 0, 0.1 },
+	RightElbow = { 0.95, 0, 0 },
 	RightHip = { 0.35, 0, 0 },
 	LeftHip = { 0.2, 0, 0 },
 	RightKnee = { -0.5, 0, 0 },
@@ -498,7 +545,8 @@ local function actionPose(a, t: number, base)
 	if type(kind) ~= "string" or type(start) ~= "number" or type(at) ~= "number" or t < start then
 		return nil, 0
 	end
-	local windup, strike = frames(kind, if a.ActionSide == -1 then -1 else 1)
+	local shield = not a.WeaponBlock
+	local windup, strike = frames(kind, if a.ActionSide == -1 then -1 else 1, shield)
 	if not windup then
 		return nil, 0
 	end

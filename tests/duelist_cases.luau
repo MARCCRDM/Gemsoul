@@ -125,7 +125,11 @@ check(after.RightShoulder[1] < 1 and after.RightElbow[1] < 1, "Rival stayed froz
 local mirrored = RivalPose.pose({ ActionKind = "Slash", ActionStart = 100, ActionAt = 100.3, ActionSide = -1 }, 100.35)
 check(mirrored.RightShoulder[3] > 0, "Combo swings did not alternate")
 local heavy = RivalPose.pose({ ActionKind = "Heavy", ActionStart = 100, ActionAt = 100.75 }, 100.6)
-check(heavy.LeftShoulder[1] > 2.5 and heavy.RightShoulder[1] > 2.5, "Heavy wind-up was not overhead")
+check(heavy.RightShoulder[1] > 2.5, "Heavy wind-up was not overhead")
+check(heavy.LeftShoulder[1] > 1 and heavy.LeftShoulder[1] < 2 and heavy.LeftElbow[2] > 1, "Heavy flung the shield away instead of keeping it up")
+local twoHanded = RivalPose.pose({ ActionKind = "Heavy", ActionStart = 100, ActionAt = 100.75, WeaponBlock = true }, 100.6)
+check(twoHanded.LeftShoulder[1] > 2.5 and twoHanded.RightShoulder[1] > 2.5, "Two-handed heavy wind-up was not overhead")
+check(windup.LeftElbow[2] > 1 and strike.LeftElbow[2] > 1, "Slash let the shield swing out to the side")
 check(RivalPose.pose({ ActionKind = "Nova", ActionStart = 100, ActionAt = 100.9 }, 100.95).RightKnee[1] < 0, "Blast did not slam down")
 -- A held beam keeps its cast pose while it pours, for the rival and players alike.
 local beam = { ActionKind = "Bolt", ActionStart = 100, ActionAt = 100.4, ActionHold = 102 }
