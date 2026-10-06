@@ -340,11 +340,15 @@ r = call(ann, "MarketList", "Gear", "Weapon", "W7", "Sell", 300)
 check(r.Ok, "list W7")
 check(profiles[ann].Owned.Weapons.W7 == nil and profiles[ann].Character.ItemGems.Weapon.W7 == nil, "gear leaves")
 local w7 = call(cat, "MarketBrowse").Listings[1]
-check(w7.Item.Roll.Rarity == 4 and w7.Item.Gem.Id == "socketed", "roll and gem travel with the gear")
+check(w7.Item.Roll.Rarity == 4 and w7.Item.Gem == nil, "the roll travels with the gear, the gem doesn't")
+check(has(ann, "socketed"), "listing gear put its gem back in the seller's bag")
 r = call(ann, "MarketCancel", w7.Id)
 check(r.Ok and profiles[ann].Owned.Weapons.W7 == 3, "cancel: the gear is back")
 check(profiles[ann].Character.GearRolls.Weapons.W7.Rarity == 4, "cancel: its roll is back")
-check(profiles[ann].Character.ItemGems.Weapon.W7.Id == "socketed", "cancel: its gem is back")
+check(
+	profiles[ann].Character.ItemGems.Weapon.W7 == nil and has(ann, "socketed"),
+	"cancel: gear empty, gem stays in the bag"
+)
 check(not call(bob, "MarketBuy", w7.Id).Ok, "a cancelled listing can't be bought")
 check(#call(bob, "MarketBrowse").Listings == 0, "the board is empty again")
 conserved("after cancel")
@@ -376,23 +380,27 @@ check(not call(bob, "MarketAccept", trade.Id, catOffer).Ok, "only the seller acc
 r = call(ann, "MarketAccept", trade.Id, catOffer)
 check(r.Ok and has(ann, "emerald"), "ann gets the emerald")
 check(profiles[cat].Owned.Weapons.W7 == 3 and escrowCount(cat) == 0, "cat got W7 (settled at once)")
-check(profiles[cat].Character.ItemGems.Weapon.W7.Id == "socketed", "W7's gem went to cat")
+check(profiles[cat].Character.ItemGems.Weapon.W7 == nil, "W7 arrived with an empty socket")
+check(has(ann, "socketed"), "W7's old gem stayed with ann")
 check(has(bob, "sapphire") and escrowCount(bob) == 0, "bob's offer came home")
 check(not call(bob, "MarketWithdraw", trade.Id).Ok, "nothing left to withdraw")
 conserved("after the trade")
 
 -- 5. Withdraw and decline.
--- A socketed gem can be listed: it comes out of its socket (W7's, at Cat's).
-r = call(cat, "MarketList", "Gem", nil, "socketed", "Trade", "Any")
+-- A socketed gem can be listed: it comes out of its socket (one put in
+-- Cat's spare W7 here).
+profiles[cat].Character.ItemGems.Weapon.W7 = gem("spare", "Uncommon", 2)
+everything = census() -- (a gem added by hand)
+r = call(cat, "MarketList", "Gem", nil, "spare", "Trade", "Any")
 check(r.Ok, "a socketed gem can be listed: " .. tostring(r.Message))
 check(profiles[cat].Character.ItemGems.Weapon.W7 == nil and profiles[cat].Owned.Weapons.W7 == 3, "gem out, gear kept")
 local sock = call(ann, "MarketBrowse").Listings
 for _, row in sock do
-	if row.Item.Kind == "Gem" and row.Item.Gem.Id == "socketed" then
+	if row.Item.Kind == "Gem" and row.Item.Gem.Id == "spare" then
 		check(call(cat, "MarketCancel", row.Id).Ok, "cancel the socketed gem listing")
 	end
 end
-check(has(cat, "socketed"), "cancelled: the gem comes home to the bag")
+check(has(cat, "spare"), "cancelled: the gem comes home to the bag")
 -- Gems on Q/E/R (surge sockets) and in worn gear list too.
 profiles[cat].Character.Surge1Gem = gem("onq", "Rare", 2)
 profiles[cat].Character.Weapon = "W9"

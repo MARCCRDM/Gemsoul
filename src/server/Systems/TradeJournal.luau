@@ -4,6 +4,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local Logic = require(ReplicatedStorage.Shared.EquipmentTrade)
 local Journal = {}
 local ok, store = pcall(DataStoreService.GetDataStore, DataStoreService, Config.DataStoreName .. "_EquipmentTrades")
 if not ok then
@@ -119,15 +120,17 @@ function Journal.recover(userId, profile)
 			profile.Owned[kind][outgoing.Id] = nil
 			c.GearRolls[kind][outgoing.Id] = nil
 			c.ItemGems[slot][outgoing.Id] = nil
+			-- (As in EquipmentTrade.exchange: your gem stays with you, in your bag.)
+			Logic.keepGem(profile, outgoing.Gem)
 			-- A copy of a model they already own gets its own key (Slots.freeKey).
 			local key = Slots.freeKey(profile.Owned[kind], incoming.Id)
 			profile.Owned[kind][key] = incoming.Quality
 			c.GearRolls[kind][key] = copy(incoming.Roll)
-			c.ItemGems[slot][key] = copy(incoming.Gem)
+			c.ItemGems[slot][key] = nil
 			if wasEquipped or c[slot] == outgoing.Id then
 				c[slot] = key
 				c[slot .. "Quality"] = incoming.Quality
-				c[slot .. "Gem"] = c.ItemGems[slot][key]
+				c[slot .. "Gem"] = nil
 			end
 		end
 		Journal.mark(profile, id)

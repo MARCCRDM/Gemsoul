@@ -1,4 +1,5 @@
--- Non-yielding two-item exchange. Item rolls and socketed gems travel with the item.
+-- Non-yielding two-item exchange. Item rolls travel with the item; socketed
+-- gems go back to their owner's bag (gear changes hands with an empty socket).
 local Slots = require(script.Parent.EquipmentSlots)
 local Trade = {}
 local function copy(value)
@@ -53,6 +54,19 @@ function Trade.validate(a, b, left, right)
 	end
 	return true
 end
+-- Puts a gem that came out of traded gear into the profile's gem bag.
+function Trade.keepGem(profile, gem)
+	if type(gem) ~= "table" then
+		return
+	end
+	profile.Gems = profile.Gems or {}
+	for _, held in profile.Gems do
+		if held.Id == gem.Id then
+			return
+		end
+	end
+	table.insert(profile.Gems, copy(gem))
+end
 function Trade.exchange(a, b, left, right)
 	local valid, message = Trade.validate(a, b, left, right)
 	if not valid then
@@ -60,10 +74,13 @@ function Trade.exchange(a, b, left, right)
 	end
 	local slot = left.Slot
 	local kind = Slots.Definitions[slot].Kind
+	-- Gear changes hands with an empty socket: each side's gem goes back to
+	-- its own gem bag first.
 	local function remove(profile, item)
 		profile.Owned[kind][item.Id] = nil
 		profile.Character.GearRolls[kind][item.Id] = nil
 		profile.Character.ItemGems[slot][item.Id] = nil
+		Trade.keepGem(profile, item.Gem)
 	end
 	local function receive(profile, outgoing, incoming)
 		local c = profile.Character
@@ -71,17 +88,17 @@ function Trade.exchange(a, b, left, right)
 		local key = Slots.freeKey(profile.Owned[kind], incoming.Id)
 		profile.Owned[kind][key] = incoming.Quality
 		c.GearRolls[kind][key] = incoming.Roll
-		c.ItemGems[slot][key] = incoming.Gem
+		c.ItemGems[slot][key] = nil
 		if c[slot] == outgoing.Id then
 			c[slot] = key
 			c[slot .. "Quality"] = incoming.Quality
-			c[slot .. "Gem"] = incoming.Gem
+			c[slot .. "Gem"] = nil
 		end
 	end
 	remove(a, left)
 	remove(b, right)
 	receive(a, left, right)
 	receive(b, right, left)
-	return true, "Trade complete. Equipment and attached enchantments exchanged."
+	return true, "Trade complete. Socketed gems went back to their owners' bags."
 end
 return Trade

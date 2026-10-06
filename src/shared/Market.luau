@@ -12,7 +12,9 @@
 
 	An item on the move (a "payload"):
 	  { Kind = "Gem", Gem = <gem> }
-	  { Kind = "Gear", Slot = "Weapon", Id = <gear id>, Quality, Roll, Gem? }
+	  { Kind = "Gear", Slot = "Weapon", Id = <gear id>, Quality, Roll }
+	Gear always moves with an empty socket: its gem goes back to the owner's
+	gem bag first (Market.stripGem), so no one gets a gem along with a piece.
 ]]
 local Slots = require(script.Parent.EquipmentSlots)
 
@@ -178,8 +180,10 @@ function Market.take(profile, kind: any, slot: any, id: any)
 		Id = id,
 		Quality = profile.Owned[gearType][id],
 		Roll = copy(c.GearRolls and c.GearRolls[gearType] and c.GearRolls[gearType][id]),
-		Gem = copy(c.ItemGems and c.ItemGems[slot] and c.ItemGems[slot][id]),
+		-- Gear changes hands with an empty socket: its gem goes back to the
+		-- owner's bag (Market.stripGem), never along with the piece.
 	}
+	Market.stripGem(profile, slot, id)
 	profile.Owned[gearType][id] = nil
 	if c.GearRolls and c.GearRolls[gearType] then
 		c.GearRolls[gearType][id] = nil
@@ -242,8 +246,33 @@ function Market.give(profile, payload, maxGems: number, force: boolean?): boolea
 	c.GearRolls[gearType][key] = copy(payload.Roll)
 	c.ItemGems = c.ItemGems or {}
 	c.ItemGems[payload.Slot] = c.ItemGems[payload.Slot] or {}
-	c.ItemGems[payload.Slot][key] = copy(payload.Gem)
+	c.ItemGems[payload.Slot][key] = nil
+	-- (A listing from before gems were stripped: its gem goes to the bag.)
+	if type(payload.Gem) == "table" and not findGem(profile, payload.Gem.Id) then
+		table.insert(profile.Gems, copy(payload.Gem))
+	end
 	return true
+end
+
+-- Takes the gem out of a piece of gear (worn or spare) and puts it in the
+-- owner's gem bag. Returns the gem, if there was one.
+function Market.stripGem(profile, slot: string, id: string)
+	local c = profile.Character
+	local gem = c.ItemGems and c.ItemGems[slot] and c.ItemGems[slot][id]
+	if c[slot] == id then
+		gem = gem or c[slot .. "Gem"]
+		c[slot .. "Gem"] = nil
+	end
+	if c.ItemGems and c.ItemGems[slot] then
+		c.ItemGems[slot][id] = nil
+	end
+	if type(gem) == "table" then
+		profile.Gems = profile.Gems or {}
+		if not gemIndex(profile, gem.Id) then
+			table.insert(profile.Gems, gem)
+		end
+	end
+	return gem
 end
 
 -- Which bag tab an item belongs to: "Gear", "Gems" or "Powers" (cut gems,

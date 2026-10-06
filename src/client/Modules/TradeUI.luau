@@ -24,7 +24,7 @@ local PANEL = Color3.fromRGB(16, 18, 32)
 
 local window = IronUi.window("EquipmentTrade", 10, 900, 620, "⇄", GOLD)
 window.Title.Text = "MARKET"
-window.Subtitle.Text = "Trade gear face to face. Rolls, finishes and socketed gems travel with every item."
+window.Subtitle.Text = "Trade gear face to face. Rolls and finishes go with the item; socketed gems stay yours."
 local content = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(20, 80),
@@ -306,7 +306,7 @@ local function tooltip(parent, item, width)
 	end
 	if item.Gem then
 		line(
-			"◆ " .. GemConfig.displayName(item.Gem) .. "  (cut " .. tostring(item.Gem.Cut) .. ")",
+			"◆ " .. GemConfig.displayName(item.Gem) .. "  (stays with its owner)",
 			13,
 			GemConfig.ElementColors[item.Gem.Element] or P.Teal,
 			BOLD

@@ -327,7 +327,7 @@ local function detailLines(payload)
 	end
 	if payload.Gem then
 		add(
-			"◆ " .. GemConfig.displayName(payload.Gem) .. "  (comes with it)",
+			"◆ " .. GemConfig.displayName(payload.Gem) .. "  (stays yours: back to your bag when listed)",
 			13,
 			GemConfig.ElementColors[payload.Gem.Element] or P.Teal,
 			BOLD
