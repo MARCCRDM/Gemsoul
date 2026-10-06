@@ -116,6 +116,7 @@ local Players = {
 		return players
 	end,
 	PlayerRemoving = removing,
+	PlayerAdded = signal(),
 }
 local services = {
 	Players = Players,
@@ -528,6 +529,9 @@ local function fakeBoard()
 		end
 		return result
 	end
+	function b.remove(id)
+		rows[id] = nil
+	end
 	function b.range(count)
 		local ids = {}
 		for id in rows do
@@ -600,10 +604,11 @@ local jade = listingOf("jade")
 table.insert(profiles[ann].Gems, gem("amber", "Common", 1))
 everything = census()
 check(call(ann, "MarketOffer", jade, "Gem", nil, "amber").Ok, "ann offers amber")
+local offerId = fb.Rows[jade].Offers[1].Id
 now += Rules.ListingSeconds + 10
 MarketBoard.reconcile(ann)
 check(has(ann, "amber") and escrowCount(ann) == 0, "expired: ann's amber comes home")
-local offerId = fb.Rows[jade].Offers[1] and fb.Rows[jade].Offers[1].Id
+check(fb.Rows[jade] == nil, "the expired listing left the board")
 r = call(dan, "MarketAccept", jade, offerId)
 check(not r.Ok and not has(dan, "amber"), "the seller can't accept after the offer came home")
 MarketBoard.reconcile(dan)
@@ -633,6 +638,9 @@ do
 			data[k] = Rules.copy(v)
 		end
 		return v
+	end
+	function map:RemoveAsync(k)
+		data[k] = nil
 	end
 	function map:GetRangeAsync(_, count, after)
 		local keys = {}
@@ -711,6 +719,76 @@ do
 	end
 	check(seen, "an open listing behind 250 settled rows is still on the board")
 end
+
+-- 13. Finished listings leave the board; what's owed waits in mailboxes.
+local function openRows()
+	local n, total = 0, 0
+	for _, row in fb.Rows do
+		total += 1
+		if row.State == "Open" then
+			n += 1
+		end
+	end
+	return n, total
+end
+for _, p in players do
+	MarketBoard.reconcile(p)
+end
+local open0, total0 = openRows()
+check(open0 == total0, "only open listings are on the board")
+-- 13a. A seller who's offline when it sells is paid when they're back.
+table.insert(profiles[dan].Gems, gem("pearl", "Rare", 3))
+everything = census()
+check(call(dan, "MarketList", "Gem", nil, "pearl", "Sell", 60).Ok, "dan lists pearl")
+local pearl = listingOf("pearl")
+local danCoins = profiles[dan].Coins
+table.remove(players, table.find(players, dan))
+byId[4] = nil -- (dan logs off)
+check(call(bob, "MarketBuy", pearl).Ok and has(bob, "pearl"), "bob buys pearl while dan is away")
+check(fb.Rows[pearl] == nil, "the sale left the board at once")
+table.insert(players, dan)
+byId[4] = dan -- (dan is back)
+MarketBoard.reconcile(dan)
+check(profiles[dan].Coins == danCoins + Rules.payout(60) and escrowCount(dan) == 0, "dan is paid from his mailbox")
+MarketBoard.reconcile(dan)
+check(profiles[dan].Coins == danCoins + Rules.payout(60), "...once")
+conserved("after an offline sale")
+-- 13b. Cancelling a listing that already sold (and left the board) doesn't
+-- bring the item back: the mailbox says it sold.
+table.insert(profiles[dan].Gems, gem("ruby2", "Rare", 3))
+everything = census()
+check(call(dan, "MarketList", "Gem", nil, "ruby2", "Sell", 70).Ok, "dan lists ruby2")
+local ruby2 = listingOf("ruby2")
+table.remove(players, table.find(players, dan))
+byId[4] = nil
+check(call(bob, "MarketBuy", ruby2).Ok, "bob buys ruby2")
+table.insert(players, dan)
+byId[4] = dan
+danCoins = profiles[dan].Coins
+r = call(dan, "MarketCancel", ruby2)
+check(not r.Ok and not has(dan, "ruby2"), "too late to cancel: no copy comes back")
+check(profiles[dan].Coins == danCoins + Rules.payout(70), "...and dan is paid instead")
+conserved("after cancelling a sold listing")
+-- 13c. Withdrawing an offer that was already accepted doesn't bring it back.
+table.insert(profiles[dan].Gems, gem("onyx", "Rare", 3))
+table.insert(profiles[ann].Gems, gem("topaz", "Rare", 3))
+everything = census()
+check(call(dan, "MarketList", "Gem", nil, "onyx", "Trade", "Any").Ok, "dan lists onyx for trade")
+local onyx = listingOf("onyx")
+check(call(ann, "MarketOffer", onyx, "Gem", nil, "topaz").Ok, "ann offers topaz")
+local topazOffer = fb.Rows[onyx].Offers[1].Id
+table.remove(players, table.find(players, ann))
+byId[1] = nil -- (ann is away when dan accepts)
+check(call(dan, "MarketAccept", onyx, topazOffer).Ok and has(dan, "topaz"), "dan accepts topaz")
+check(fb.Rows[onyx] == nil, "the trade left the board")
+table.insert(players, ann)
+byId[1] = ann
+r = call(ann, "MarketWithdraw", onyx)
+check(not has(ann, "topaz") and has(ann, "onyx"), "too late to withdraw: ann gets onyx, not topaz back")
+check(escrowCount(ann) == 0, "nothing left in ann's escrow")
+conserved("after withdrawing an accepted offer")
+local open1, total1 = openRows()
+check(open1 == total1, "still only open listings on the board")
 
 -- 10. Face to face (Shared.EquipmentTrade): swapping two copies of one model.
 local Trade = load("src/shared/EquipmentTrade.luau", { script = { Parent = { EquipmentSlots = Slots } } })

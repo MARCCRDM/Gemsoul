@@ -2,14 +2,23 @@
 	The Market board, across every server: listings for coins or for trade
 	offers (see Shared.Market for the rules and how items move).
 
-	Listings live in a MemoryStore sorted map, so every server sees the same
-	board and a sale is one atomic update (two buyers can never both win).
-	The item itself waits in escrow in its owner's saved profile; each
-	player's escrow is settled against the board ("reconcile") when they
-	join, every few seconds while they have something up, and right after
-	anything happens to their listing (another server nudges them through
-	MessagingService). A settled entry leaves escrow in the same profile
-	change that pays out or hands the item back, so it can only happen once.
+	Open listings live in a MemoryStore sorted map, so every server sees the
+	same board and a sale is one atomic update (two buyers can never both
+	win). The item itself waits in escrow in its owner's saved profile.
+
+	When a listing ends it leaves the board: what each player is owed ("sold
+	for 100", "your offer was taken: here's the item") goes to their mailbox
+	in a DataStore first (durable, no expiry), and only then is the row
+	removed, so the board (whose size Roblox caps by players online) holds
+	just what's for sale. A finished row stays only if that bookkeeping
+	couldn't finish (a crash); it expires after a week.
+
+	Each player's escrow is settled ("reconcile") when they join, every few
+	seconds while they have something up, and right after anything happens
+	to their listing (another server nudges them through MessagingService):
+	from the row while it's there, else from their mailbox. A settled entry
+	leaves escrow in the same profile change that pays out or hands the item
+	over, so it can only happen once.
 
 	Requests (Remotes.Request):
 	  "MarketBrowse"                         -> { Listings }
@@ -35,7 +44,7 @@ local Equipment = require(script.Parent.Equipment)
 
 local MarketBoard = {}
 
-local KEEP_SETTLED = 45 * 24 * 3600 -- MemoryStore's longest: settled listings stay for late sellers
+local KEEP_SETTLED = 7 * 24 * 3600 -- a finished row left behind by a crash (normally removed at once)
 local TOPIC = "MarketBoard_v1"
 
 -- The board -------------------------------------------------------------------
@@ -54,6 +63,9 @@ local function localBoard()
 			rows[id] = Rules.copy(new)
 		end
 		return new
+	end
+	function board.remove(id)
+		rows[id] = nil
 	end
 	function board.range(count)
 		local ids = {}
@@ -138,6 +150,9 @@ local function memoryBoard()
 		end
 		return out
 	end
+	function board.remove(id)
+		pcall(map.RemoveAsync, map, id)
+	end
 	board.Shared = true
 	return board
 end
@@ -156,6 +171,87 @@ end
 -- Lets the tests (or a later swap) use another board.
 function MarketBoard.useBoard(b)
 	board = b
+end
+
+-- Mailboxes -------------------------------------------------------------------
+
+-- What a player is owed from listings that ended, by listing id:
+--   { Kind = "Sold", Price, BuyerName }          (their listing sold)
+--   { Kind = "Traded", Item, FromName }          (they accepted an offer)
+--   { Kind = "Accepted", OfferId, Item, SellerName }  (their offer was taken)
+--   { Kind = "Bought", Item }                    (their purchase)
+local function localMail()
+	local boxes = {}
+	local m = { Shared = false }
+	function m.add(userId, listingId, note)
+		boxes[userId] = boxes[userId] or {}
+		boxes[userId][listingId] = Rules.copy(note)
+		return true
+	end
+	function m.read(userId)
+		return Rules.copy(boxes[userId] or {})
+	end
+	function m.remove(userId, ids)
+		for _, id in ids do
+			if boxes[userId] then
+				boxes[userId][id] = nil
+			end
+		end
+		return true
+	end
+	return m
+end
+
+local function dataMail()
+	local ok, store = pcall(function()
+		return game:GetService("DataStoreService"):GetDataStore("MarketMail_v1")
+	end)
+	if not ok or not store then
+		return nil
+	end
+	if not pcall(store.GetAsync, store, "probe") then
+		return nil -- (Studio without API access)
+	end
+	local m = { Shared = true }
+	function m.add(userId, listingId, note)
+		return (
+			pcall(store.UpdateAsync, store, "mail_" .. userId, function(box)
+				box = box or {}
+				box[listingId] = note
+				return box
+			end)
+		)
+	end
+	function m.read(userId)
+		local done, box = pcall(store.GetAsync, store, "mail_" .. userId)
+		if not done then
+			error("mailbox unavailable")
+		end
+		return box or {}
+	end
+	function m.remove(userId, ids)
+		return (
+			pcall(store.UpdateAsync, store, "mail_" .. userId, function(box)
+				box = box or {}
+				for _, id in ids do
+					box[id] = nil
+				end
+				return box
+			end)
+		)
+	end
+	return m
+end
+
+local mail = nil
+local function getMail()
+	if not mail then
+		mail = dataMail() or localMail()
+	end
+	return mail
+end
+function MarketBoard.useMail(m)
+	mail = m
 end
 
 -- Newest first: ids sort by time left to the year 2286, then a random tail.
@@ -244,75 +340,124 @@ local function finishChange(player: Player)
 	end
 end
 
+-- Takes a finished listing off the board: first every other party gets a
+-- mailbox note of what they're owed, then the row goes. (The caller has
+-- already saved its own side.) If a note can't be written the row stays,
+-- and everyone settles from it as before.
+local function finalize(row, selfId: number?)
+	local m = getMail()
+	local ok = true
+	local function send(userId, note)
+		if userId and userId ~= selfId then
+			ok = m.add(userId, row.Id, note) and ok
+		end
+	end
+	if row.State == "Sold" then
+		send(row.Seller, { Kind = "Sold", Price = row.Price, BuyerName = row.BuyerName, At = os.time() })
+		send(row.Buyer, { Kind = "Bought", Item = row.Item, At = os.time() })
+	elseif row.State == "Traded" then
+		local accepted = nil
+		for _, offer in row.Offers or {} do
+			if offer.Id == row.Accepted then
+				accepted = offer
+			end
+		end
+		if not accepted then
+			return false
+		end
+		send(row.Seller, { Kind = "Traded", Item = accepted.Item, FromName = accepted.FromName, At = os.time() })
+		send(
+			accepted.From,
+			{ Kind = "Accepted", OfferId = accepted.Id, Item = row.Item, SellerName = row.SellerName, At = os.time() }
+		)
+	end
+	-- (Cancelled and expired rows need no notes: whatever is in escrow for
+	-- them simply goes home.)
+	if ok then
+		getBoard().remove(row.Id)
+	end
+	return ok
+end
+
 -- Settling up ------------------------------------------------------------------
 
--- Settles one player's escrow against the board: pays out sales, takes in
--- accepted trades, hands back what's no longer up.
+-- Settles one player's escrow against the board (or, for listings no
+-- longer on it, their mailbox): pays out sales, takes in accepted trades and
+-- purchases, hands back what's no longer up.
+local prunedThisSession: { [Player]: boolean } = {}
 local function settle(player: Player)
 	local profile = PlayerData.get(player)
-	local escrow = profile and profile.Market and profile.Market.Escrow
-	if not escrow or next(escrow) == nil then
+	local escrow = profile and profile.Market and profile.Market.Escrow or {}
+	local firstLook = not prunedThisSession[player]
+	if next(escrow) == nil and not firstLook then
 		return
 	end
 	local b = getBoard()
-	local changed, notes = false, {}
+	local box = nil -- the mailbox, read only when needed
+	local function mailbox()
+		if box == nil then
+			box = getMail().read(player.UserId)
+		end
+		return box
+	end
+	local changed, notes, finished, consumed = false, {}, {}, {}
+	local function closeIfExpired(row, listingId)
+		if row and row.State == "Open" and os.time() >= row.Expires then
+			return b.update(listingId, function(old)
+				if old and old.State == "Open" and os.time() >= old.Expires then
+					old.State = "Expired"
+				end
+				return old
+			end)
+		end
+		return row
+	end
 	for entryId, entry in escrow do
-		local row = b.get(entry.Listing)
-		local home = false
-		if entry.Role == "Sell" then
-			if row and row.State == "Open" and os.time() >= row.Expires then
-				row = b.update(entry.Listing, function(old)
-					if old and old.State == "Open" and os.time() >= old.Expires then
-						old.State = "Expired"
-					end
-					return old
-				end)
+		local listingId = entry.Listing
+		local row = b.get(listingId)
+		local note = nil
+		if not row then
+			note = mailbox()[listingId]
+			if note then
+				table.insert(consumed, listingId)
 			end
-			if not row or row.Seller ~= player.UserId then
+		end
+		local home, got, coins, message = false, nil, 0, nil
+		if entry.Role == "Sell" then
+			row = closeIfExpired(row, listingId)
+			if row and row.Seller ~= player.UserId then
 				home = true
-			elseif row.State == "Sold" then
-				local coins = Rules.payout(row.Price)
-				profile.Coins += coins
-				escrow[entryId] = nil
-				changed = true
-				table.insert(
-					notes,
-					string.format(
-						"Sold to %s for %d coins (+%d after tax).",
-						row.BuyerName or "a player",
-						row.Price,
-						coins
-					)
-				)
+			elseif row and row.State == "Open" then
 				continue
-			elseif row.State == "Traded" then
-				local accepted = nil
+			elseif (row and row.State == "Sold") or (not row and note and note.Kind == "Sold") then
+				local price = if row then row.Price else note.Price
+				coins = Rules.payout(price)
+				message = string.format(
+					"Sold to %s for %d coins (+%d after tax).",
+					(if row then row.BuyerName else note.BuyerName) or "a player",
+					price,
+					coins
+				)
+			elseif row and row.State == "Traded" then
 				for _, offer in row.Offers or {} do
 					if offer.Id == row.Accepted then
-						accepted = offer
+						got = offer.Item
+						message = "Trade complete: you got " .. (offer.FromName or "their") .. "'s item."
 					end
 				end
-				if accepted then
-					Rules.give(profile, accepted.Item, Config.MaxGems, true)
-					escrow[entryId] = nil
-					changed = true
-					table.insert(notes, "Trade complete: you got " .. (accepted.FromName or "their") .. "'s item.")
+				if not got then
+					continue -- (a malformed row: leave it for now)
 				end
-				continue
-			elseif row.State ~= "Open" then
+			elseif not row and note and note.Kind == "Traded" then
+				got = note.Item
+				message = "Trade complete: you got " .. (note.FromName or "their") .. "'s item."
+			else
 				home = true
 			end
 		elseif entry.Role == "Offer" then
 			-- Close an expired listing first (atomically), so it can't be
 			-- accepted after this offer's item has come home.
-			if row and row.State == "Open" and os.time() >= row.Expires then
-				row = b.update(entry.Listing, function(old)
-					if old and old.State == "Open" and os.time() >= old.Expires then
-						old.State = "Expired"
-					end
-					return old
-				end)
-			end
+			row = closeIfExpired(row, listingId)
 			local mine = nil
 			for _, offer in row and row.Offers or {} do
 				if offer.Id == entry.OfferId then
@@ -320,46 +465,81 @@ local function settle(player: Player)
 				end
 			end
 			if row and row.State == "Traded" and row.Accepted == entry.OfferId then
-				Rules.give(profile, row.Item, Config.MaxGems, true)
-				escrow[entryId] = nil
-				changed = true
-				table.insert(notes, (row.SellerName or "The seller") .. " accepted your offer. Trade complete!")
+				got = row.Item
+			elseif not row and note and note.Kind == "Accepted" and note.OfferId == entry.OfferId then
+				got = note.Item
+			elseif row and row.State == "Open" and mine then
 				continue
-			end
-			if not row or row.State ~= "Open" or not mine then
+			else
 				home = true
+			end
+			if got then
+				message = ((if row then row.SellerName else note.SellerName) or "The seller")
+					.. " accepted your offer. Trade complete!"
 			end
 		elseif entry.Role == "Buy" then
 			-- A purchase the server didn't get to finish (a crash): the item
 			-- if the claim went through, else the coins back.
 			if row and row.State == "Sold" and row.Buyer == player.UserId then
-				Rules.give(profile, row.Item, Config.MaxGems, true)
-				table.insert(notes, "Your purchase arrived: it's in your bag.")
+				got = row.Item
+			elseif not row and note and note.Kind == "Bought" then
+				got = note.Item
 			else
-				profile.Coins += entry.Price or 0
-				table.insert(notes, "A purchase didn't go through: your coins are back.")
+				coins = entry.Price or 0
+				message = "A purchase didn't go through: your coins are back."
 			end
-			escrow[entryId] = nil
-			changed = true
-			continue
+			if got then
+				message = "Your purchase arrived: it's in your bag."
+			end
 		end
 		if home then
-			Rules.give(profile, entry.Item, Config.MaxGems, true)
-			escrow[entryId] = nil
-			changed = true
-			table.insert(
-				notes,
-				if entry.Role == "Sell"
-					then "A listing ended unsold: the item is back in your bag."
-					else "An offer wasn't taken: your item is back in your bag."
-			)
+			got = entry.Item
+			message = if entry.Role == "Sell"
+				then "A listing ended unsold: the item is back in your bag."
+				else "An offer wasn't taken: your item is back in your bag."
+		end
+		if got then
+			Rules.give(profile, got, Config.MaxGems, true)
+		end
+		profile.Coins += coins
+		escrow[entryId] = nil
+		changed = true
+		if message then
+			table.insert(notes, message)
+		end
+		-- A finished row this player settled from: take it off the board once
+		-- they're saved (finalize, below).
+		if row and row.State ~= "Open" then
+			finished[row.Id] = row
+		end
+	end
+	-- Notes nobody is waiting on any more (already settled from the row, or
+	-- from before a rejoin) are cleared the first time we look each session.
+	if firstLook then
+		prunedThisSession[player] = true
+		local ok, all = pcall(mailbox)
+		if ok then
+			for listingId in all do
+				local wanted = escrow["s_" .. listingId] or escrow["o_" .. listingId] or escrow["b_" .. listingId]
+				if not wanted and not table.find(consumed, listingId) then
+					table.insert(consumed, listingId)
+				end
+			end
 		end
 	end
 	if changed then
 		finishChange(player)
-		for _, note in notes do
-			Remotes.Notify:FireClient(player, note)
+		for _, message in notes do
+			Remotes.Notify:FireClient(player, message)
 		end
+	end
+	if next(finished) and persist(player) then
+		for _, row in finished do
+			finalize(row, player.UserId)
+		end
+	end
+	if #consumed > 0 and (not changed or practice() or persist(player)) then
+		getMail().remove(player.UserId, consumed)
 	end
 end
 
@@ -500,15 +680,23 @@ function handlers.MarketCancel(player: Player, listingId)
 		end
 		return old
 	end)
-	if row and row.State ~= "Cancelled" and row.State ~= "Expired" then
-		settle(player) -- it sold or traded just now: settle that instead
-		return Shop.reply(false, "Too late: it already " .. string.lower(row.State) .. ".")
+	if not row or (row.State ~= "Cancelled" and row.State ~= "Expired") then
+		-- Off the board already, or it sold / traded just now: settle what
+		-- really happened (the mailbox knows) instead.
+		settle(player)
+		invalidate()
+		local still = Rules.escrow(profile)[entryId]
+		return Shop.reply(
+			false,
+			if still then "Try again in a moment." else "That listing already ended (see your messages)."
+		)
 	end
 	Rules.escrow(profile)[entryId] = nil
 	Rules.give(profile, entry.Item, Config.MaxGems, true)
 	invalidate()
 	finishChange(player)
-	for _, offer in row and row.Offers or {} do
+	getBoard().remove(listingId) -- (offers on it simply go home)
+	for _, offer in row.Offers or {} do
 		nudge(offer.From)
 	end
 	return Shop.reply(true, "Listing cancelled. The item is back in your bag.")
@@ -583,6 +771,11 @@ function handlers.MarketBuy(player: Player, listingId)
 	PlayerData.milestone(player, "Traded")
 	invalidate()
 	finishChange(player)
+	-- Saved with the item, the sale comes off the board (the seller's
+	-- payout waits in their mailbox).
+	if persist(player) then
+		finalize(claimed, player.UserId)
+	end
 	nudge(claimed.Seller)
 	for _, offer in claimed.Offers or {} do
 		nudge(offer.From)
@@ -683,9 +876,15 @@ function handlers.MarketWithdraw(player: Player, listingId)
 		end
 		return old
 	end)
-	if not removed and row and row.State == "Traded" and row.Accepted == entry.OfferId then
+	if not removed then
+		-- Accepted, closed or off the board: settle what really happened
+		-- (it may have been accepted: the mailbox knows).
 		settle(player)
-		return Shop.reply(false, "Too late: they accepted it. The trade is done.")
+		invalidate()
+		if Rules.escrow(profile)[entryId] then
+			return Shop.reply(false, "Try again in a moment.")
+		end
+		return Shop.reply(true, "That listing already ended (see your messages).")
 	end
 	Rules.escrow(profile)[entryId] = nil
 	Rules.give(profile, entry.Item, Config.MaxGems, true)
@@ -740,6 +939,11 @@ function handlers.MarketAccept(player: Player, listingId, offerId)
 	PlayerData.milestone(player, "Traded")
 	invalidate()
 	finishChange(player)
+	-- Saved with the offered item, the trade comes off the board (the
+	-- offerer's new item waits in their mailbox; other offers go home).
+	if persist(player) then
+		finalize(done, player.UserId)
+	end
 	for _, o in done.Offers or {} do
 		nudge(o.From)
 	end
@@ -813,8 +1017,19 @@ function MarketBoard.start()
 			end
 		end
 	end)
+	-- A first settle when someone joins (escrow, and old mailbox notes).
+	Players.PlayerAdded:Connect(function(player)
+		for _ = 1, 30 do
+			if PlayerData.get(player) or not player.Parent then
+				break
+			end
+			task.wait(1)
+		end
+		reconcile(player)
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		turns[player] = nil
+		prunedThisSession[player] = nil
 	end)
 end
 
