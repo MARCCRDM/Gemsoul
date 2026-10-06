@@ -65,16 +65,17 @@ end
 -- brows, a small nose, a wide grin) and glowing red eyes, on thin wooden
 -- limbs, a plain baseball bat in hand. No armor: the log is the look.
 local SAHUR_EYE = C(255, 36, 24)
+-- A big bulging eyeball with a glowing red iris (a white-hot centre), a
+-- soft red glow around it, a red light on the face and embers drifting off.
 local function glowingEye(rig, t, x: number)
-	local y, z = 1.55, -0.86
-	part(rig, t, "EyeSocket", V(0.66, 0.74, 0.24), V(x, y, z), C(46, 26, 15), BALL)
-	local iris = part(rig, t, "GlowingEye", V(0.48, 0.54, 0.16), V(x, y, z - 0.1), SAHUR_EYE, BALL)
+	local y = 1.95
+	part(rig, t, "Eyeball", V(0.58, 0.58, 0.58), V(x, y, -0.62), C(244, 240, 232), BALL)
+	local iris = part(rig, t, "GlowingEye", V(0.32, 0.32, 0.32), V(x, y - 0.02, -0.79), SAHUR_EYE, BALL)
 	iris.Material = Enum.Material.Neon
-	local core = part(rig, t, "EyeCore", V(0.18, 0.22, 0.08), V(x, y + 0.02, z - 0.17), C(255, 196, 170), BALL)
+	local core = part(rig, t, "EyeCore", V(0.12, 0.12, 0.12), V(x, y, -0.94), C(255, 205, 180), BALL)
 	core.Material = Enum.Material.Neon
-	local halo = part(rig, t, "EyeHalo", V(0.86, 0.92, 0.06), V(x, y, z - 0.12), SAHUR_EYE, BALL)
-	halo.Material, halo.Transparency = Enum.Material.Neon, 0.72
-	-- The glow: a red light on the face and embers drifting off each eye.
+	local halo = part(rig, t, "EyeHalo", V(0.7, 0.7, 0.7), V(x, y, -0.62), SAHUR_EYE, BALL)
+	halo.Material, halo.Transparency = Enum.Material.Neon, 0.78
 	local light = Instance.new("PointLight")
 	light.Color, light.Range, light.Brightness, light.Shadows = SAHUR_EYE, 9, 3.5, false
 	light.Parent = iris
@@ -83,42 +84,47 @@ local function glowingEye(rig, t, x: number)
 	embers.Texture = "rbxasset://textures/particles/sparkles_main.dds"
 	embers.Color = ColorSequence.new(C(255, 70, 40), C(255, 20, 10))
 	embers.LightEmission, embers.LightInfluence = 1, 0
-	embers.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.32), NumberSequenceKeypoint.new(1, 0) })
+	embers.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.28), NumberSequenceKeypoint.new(1, 0) })
 	embers.Transparency = NumberSequence.new(0.1, 1)
 	embers.Lifetime = NumberRange.new(0.35, 0.8)
-	embers.Rate = 16
+	embers.Rate = 14
 	embers.Speed = NumberRange.new(0.8, 2.2)
 	embers.SpreadAngle = Vector2.new(35, 35)
 	embers.Acceleration = Vector3.new(0, 2.5, 0)
 	embers.EmissionDirection = Enum.NormalId.Front
 	embers.Parent = iris
 end
+-- Tung Tung Tung Sahur: a tall, slim, warm orange-brown wooden log with big
+-- bulging eyes high on it (glowing red here), thin raised brows, a long nose
+-- and a wide calm smile; long thin wooden arms and legs, a baseball bat.
 local function wood(rig, _accent)
 	local t = rig.UpperTorso
-	local log = C(214, 170, 118)
+	local log = C(188, 113, 54)
 	local limb = log
-	-- The log: one smooth, plain wooden cylinder (Roblox's Wood material
-	-- gives it its grain), standing up.
-	local body = part(rig, t, "SahurLog", V(4.1, 1.9, 1.9), V(0, 0.55, 0), log, CYL, A(0, 0, math.pi / 2))
+	local body = part(rig, t, "SahurLog", V(4.2, 1.55, 1.55), V(0, 0.6, 0), log, CYL, A(0, 0, math.pi / 2))
 	body.Material = Enum.Material.Wood
-	-- The face.
-	glowingEye(rig, t, -0.42)
-	glowingEye(rig, t, 0.42)
+	-- The face, high on the log (its front is 0.78 out).
+	glowingEye(rig, t, -0.33)
+	glowingEye(rig, t, 0.33)
 	for _, s in { -1, 1 } do
-		part(rig, t, "HeavyBrow", V(0.66, 0.17, 0.16), V(s * 0.42, 2.04, -0.92), C(58, 34, 18), nil, A(0, 0, s * 0.26))
+		part(rig, t, "Brow", V(0.42, 0.08, 0.08), V(s * 0.35, 2.36, -0.75), C(74, 40, 18), nil, A(0, 0, -s * 0.14))
 	end
-	part(rig, t, "Nose", V(0.3, 0.42, 0.3), V(0, 1.12, -0.96), log, BALL).Material = Enum.Material.Wood
-	-- A wide grin, its corners turned up: short dark strokes along a curve.
-	for i = -4, 3 do
-		local x0, x1 = i * 0.12, (i + 1) * 0.12
-		local y0, y1 = 0.66 + x0 * x0 * 0.9, 0.66 + x1 * x1 * 0.9
+	local bridge =
+		part(rig, t, "NoseBridge", V(0.6, 0.24, 0.24), V(0, 1.6, -0.8), C(172, 101, 47), CYL, A(0, 0, math.pi / 2))
+	bridge.Material = Enum.Material.Wood
+	local tip = part(rig, t, "NoseTip", V(0.32, 0.32, 0.32), V(0, 1.33, -0.86), C(172, 101, 47), BALL)
+	tip.Material = Enum.Material.Wood
+	-- A wide, calm smile: short dark strokes along a curve, corners up.
+	for i = -5, 4 do
+		local x0, x1 = i * 0.105, (i + 1) * 0.105
+		local y0, y1 = 1.05 + x0 * x0 * 0.6, 1.05 + x1 * x1 * 0.6
 		part(
 			rig,
 			t,
-			"Grin",
-			V(math.sqrt((x1 - x0) ^ 2 + (y1 - y0) ^ 2) + 0.03, 0.085, 0.06),
-			V((x0 + x1) / 2, (y0 + y1) / 2, -0.95),
-			C(42, 21, 12),
+			"Smile",
+			V(math.sqrt((x1 - x0) ^ 2 + (y1 - y0) ^ 2) + 0.03, 0.07, 0.06),
+			V((x0 + x1) / 2, (y0 + y1) / 2, -0.78 + math.abs((x0 + x1) / 2) * 0.12),
+			C(66, 30, 12),
 			nil,
 			A(0, 0, math.atan2(y1 - y0, x1 - x0))
 		)
@@ -129,15 +135,15 @@ local function wood(rig, _accent)
 	for _, side in { "Left", "Right" } do
 		for _, segment in { "UpperArm", "LowerArm", "UpperLeg", "LowerLeg" } do
 			local b = rig[side .. segment]
-			part(rig, b, "WoodenLimb", V(b.Size.Y + 0.14, 0.34, 0.34), V(0, 0, 0), limb, CYL, upright)
-			part(rig, b, "LimbJoint", V(0.36, 0.36, 0.36), V(0, b.Size.Y / 2, 0), limb, BALL)
+			part(rig, b, "WoodenLimb", V(b.Size.Y + 0.14, 0.3, 0.3), V(0, 0, 0), limb, CYL, upright)
+			part(rig, b, "LimbJoint", V(0.32, 0.32, 0.32), V(0, b.Size.Y / 2, 0), limb, BALL)
 		end
 		part(
 			rig,
 			rig[side .. "UpperArm"],
 			"ShoulderStick",
-			V(0.72, 0.24, 0.24),
-			V(if side == "Left" then 0.34 else -0.34, 0.45, 0),
+			V(0.8, 0.26, 0.26),
+			V(if side == "Left" then 0.36 else -0.36, 0.45, 0),
 			limb,
 			CYL
 		)
@@ -160,10 +166,10 @@ local function wood(rig, _accent)
 		return build(r, bone, name, size, V(0, 0, 0), color, shape, mount)
 	end
 	part(rig, h, "BatKnob", V(0.12, 0.26, 0.26), V(0, 0.22, 0), C(150, 96, 45), CYL, A(0, 0, math.pi / 2))
-	part(rig, h, "BatHandle", V(1.1, 0.17, 0.17), V(0, -0.3, 0), C(176, 122, 64), CYL, A(0, 0, math.pi / 2))
-	part(rig, h, "BatTaper", V(0.6, 0.3, 0.3), V(0, -1.1, 0), C(205, 152, 88), CYL, A(0, 0, math.pi / 2))
-	part(rig, h, "BatBarrel", V(1.5, 0.44, 0.44), V(0, -1.95, 0), C(214, 163, 98), CYL, A(0, 0, math.pi / 2))
-	part(rig, h, "BatEnd", V(0.44, 0.24, 0.44), V(0, -2.7, 0), C(214, 163, 98), BALL)
+	part(rig, h, "BatHandle", V(1.1, 0.17, 0.17), V(0, -0.3, 0), C(196, 150, 96), CYL, A(0, 0, math.pi / 2))
+	part(rig, h, "BatTaper", V(0.6, 0.3, 0.3), V(0, -1.1, 0), C(222, 180, 122), CYL, A(0, 0, math.pi / 2))
+	part(rig, h, "BatBarrel", V(1.5, 0.44, 0.44), V(0, -1.95, 0), C(228, 188, 130), CYL, A(0, 0, math.pi / 2))
+	part(rig, h, "BatEnd", V(0.44, 0.24, 0.44), V(0, -2.7, 0), C(228, 188, 130), BALL)
 	-- Limbs and bat in the same plain wood as the log.
 	local WOODEN = { WoodenLimb = true, LimbJoint = true, ShoulderStick = true, Palm = true, Finger = true }
 	WOODEN.WoodenFoot, WOODEN.Toes = true, true
