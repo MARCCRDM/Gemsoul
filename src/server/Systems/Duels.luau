@@ -1,3 +1,4 @@
+local ArenaDrop = require(script.Parent.ArenaDrop)
 --[[
 	Player duels in the Arena: queues, challenges and matches.
 
@@ -338,6 +339,12 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 	end
 	nextId += 1
 	local now = os.clock()
+	local count = 0
+	for _, team in teams do
+		count += #team
+	end
+	local countdown = math.max(Matchmaking.Countdown, ArenaDrop.duration(count))
+	local entrants, audience = {}, {}
 	local match = {
 		Id = "D" .. nextId,
 		Mode = mode,
@@ -346,12 +353,12 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 		Out = {},
 		Slot = slot,
 		State = "Countdown",
-		StartsAt = now + Matchmaking.Countdown,
-		Ends = now + Matchmaking.Countdown + Matchmaking.TimeLimit,
+		StartsAt = now + countdown,
+		Ends = now + countdown + Matchmaking.TimeLimit,
 		Connections = {},
 	}
 	matches[match.Id] = match
-	local startsAt = serverNow() + Matchmaking.Countdown
+	local startsAt = serverNow() + countdown
 	local info = teamsInfo(match)
 	for t, team in teams do
 		for index, member in team do
@@ -368,10 +375,12 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 				local at = floor + spot + Vector3.new(0, 3, 0)
 				member.Character:PivotTo(CFrame.lookAt(at, floor + centre + Vector3.new(0, 3, 0)))
 				humanoid.Health = humanoid.MaxHealth
+				table.insert(entrants, member.Character)
+				table.insert(audience, member)
 				local shield = Instance.new("ForceField")
-				shield.Visible = true
+				shield.Visible = false
 				shield.Parent = member.Character
-				Debris:AddItem(shield, Matchmaking.Countdown)
+				Debris:AddItem(shield, countdown)
 				table.insert(
 					match.Connections,
 					humanoid.Died:Connect(function()
@@ -390,6 +399,7 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 			})
 		end
 	end
+	ArenaDrop.begin(entrants, audience)
 	return true, nil
 end
 

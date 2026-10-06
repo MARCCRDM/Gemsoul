@@ -1,3 +1,4 @@
+local ArenaDrop = require(script.Parent.ArenaDrop)
 -- Joining the PvP Arena is explicit; training visitors cannot receive player damage.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +45,7 @@ local function enter(player, pvp)
 	CombatServer.reset(player)
 	player:SetAttribute("CombatSession", if pvp then "PvP" else "Training")
 	local protection = Instance.new("ForceField")
+	protection.Visible = false
 	protection.Parent = character
 	Debris:AddItem(protection, 3)
 	if ArenaSessions.onEnter then
@@ -57,6 +59,10 @@ local function enter(player, pvp)
 	)
 end
 local function leave(player)
+	if player.Character then
+		ArenaDrop.cancel(player.Character)
+	end
+	player:SetAttribute("ArenaInserted", nil)
 	if ArenaSessions.onDungeonLeave then
 		ArenaSessions.onDungeonLeave(player)
 	end

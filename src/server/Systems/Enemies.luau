@@ -594,6 +594,12 @@ function Enemies.damage(
 	heavy: boolean?,
 	incomingElement: string?
 )
+	if enemy.Model and (enemy.Model:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
+		return
+	end
+	if source and (source:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
+		return
+	end
 	if enemy.DungeonId and (not source or source:GetAttribute("DungeonId") ~= enemy.DungeonId) then
 		return
 	end

@@ -1,3 +1,4 @@
+local ArenaDrop = require(script.Parent.ArenaDrop)
 --[[
 	The PvP Duelist: entering the PvP Arena brings a computer rival with its
 	own random loadout (rolled like a new player's: six pieces of gear, a gem
@@ -778,6 +779,9 @@ end
 -- Every 0.15s while the rival is alive.
 local function think(enemy, now: number)
 	local duel = enemy.Duel
+	if (enemy.Model:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
+		return
+	end
 	if duel.Dungeon and duel.Dungeon.OpenWorld and ExpeditionAmbient.step(duel, now) then
 		return
 	end
@@ -1882,11 +1886,16 @@ function spawnRival(owner: Player, raid, encounter)
 		return
 	end
 	duels[owner] = duel
+	if not raid and not encounter and owner.Character then
+		local first = not owner:GetAttribute("ArenaInserted")
+		owner:SetAttribute("ArenaInserted", true)
+		ArenaDrop.begin({ owner.Character, model }, { owner }, if first then nil else { model })
+	end
 	Remotes.Notify:FireClient(
 		owner,
 		if sparring
 			then string.format("Sparring partner %s steps in (%s). Hits are softened.", name, surgeList)
-			else string.format("%s enters the Arena with %s. Fight!", name, surgeList)
+			else string.format("%s inbound with %s. Prepare for impact.", name, surgeList)
 	)
 end
 

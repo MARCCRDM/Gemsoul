@@ -245,6 +245,16 @@ local function canPvP(source, target)
 	)
 end
 local function targetAllowed(source, target)
+	if (source:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
+		return false
+	end
+	if
+		target.Enemy
+		and target.Enemy.Model
+		and (target.Enemy.Model:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow()
+	then
+		return false
+	end
 	local _, root = alive(source)
 	if not root or not Combat.canFight(root.Position) then
 		return false
@@ -349,6 +359,9 @@ local function rawDamage(target, amount, source, crit, color, matchTag)
 	end
 end
 receive = function(player, amount, element, source, origin, projectile, heavy, reflected, enemySource, crit, pierce)
+	if (player:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
+		return 0, false
+	end
 	local humanoid, root = alive(player)
 	local k = kit(player)
 	if not humanoid or not root or not k or amount <= 0 or not Combat.canFight(root.Position) then
@@ -1805,6 +1818,9 @@ local function onInput(player, action, a, b)
 	end
 	local humanoid, root = alive(player)
 	if not humanoid or not Combat.canFight(root.Position) then
+		return
+	end
+	if (player:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
 		return
 	end
 	local currentKit = kit(player)
