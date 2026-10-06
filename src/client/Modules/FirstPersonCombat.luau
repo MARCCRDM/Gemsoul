@@ -658,7 +658,9 @@ function View.start()
 			then Motion.sample(serverNow - insertionStart)
 			else nil
 		local draw = if insertion then 1 - insertion.Draw else 0
-		local insertionPose = CFrame.new(0, -0.85 * draw, 0.35 * draw) * CFrame.Angles(-0.3 * draw, 0, 0)
+		local insertionPose = if #pieces > 0
+			then CFrame.new(0, -0.85 * draw, 0.35 * draw) * CFrame.Angles(-0.3 * draw, 0, 0)
+			else nil
 		local blockedAt = character and character:GetAttribute("BlockedAt")
 		local hurtAt = character and character:GetAttribute("HurtAt")
 		local jolt = impulse(if type(blockedAt) == "number" then serverNow - blockedAt else nil, 0.24)
