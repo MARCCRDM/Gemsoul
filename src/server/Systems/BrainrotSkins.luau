@@ -61,88 +61,122 @@ local function barefoot(rig, bone, color, scale)
 		)
 	end
 end
-local function wood(rig, accent)
+-- Tung Tung Tung Sahur: a pale wooden log with a big round face (heavy
+-- brows, a small nose, a wide grin) and glowing red eyes, on thin wooden
+-- limbs, a plain baseball bat in hand. No armor: the log is the look.
+local SAHUR_EYE = C(255, 36, 24)
+local function glowingEye(rig, t, x: number)
+	local y, z = 1.55, -0.86
+	part(rig, t, "EyeSocket", V(0.66, 0.74, 0.24), V(x, y, z), C(46, 26, 15), BALL)
+	local iris = part(rig, t, "GlowingEye", V(0.48, 0.54, 0.16), V(x, y, z - 0.1), SAHUR_EYE, BALL)
+	iris.Material = Enum.Material.Neon
+	local core = part(rig, t, "EyeCore", V(0.18, 0.22, 0.08), V(x, y + 0.02, z - 0.17), C(255, 196, 170), BALL)
+	core.Material = Enum.Material.Neon
+	local halo = part(rig, t, "EyeHalo", V(0.86, 0.92, 0.06), V(x, y, z - 0.12), SAHUR_EYE, BALL)
+	halo.Material, halo.Transparency = Enum.Material.Neon, 0.72
+	-- The glow: a red light on the face and embers drifting off each eye.
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness, light.Shadows = SAHUR_EYE, 9, 3.5, false
+	light.Parent = iris
+	local embers = Instance.new("ParticleEmitter")
+	embers.Name = "EyeEmbers"
+	embers.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	embers.Color = ColorSequence.new(C(255, 70, 40), C(255, 20, 10))
+	embers.LightEmission, embers.LightInfluence = 1, 0
+	embers.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.32), NumberSequenceKeypoint.new(1, 0) })
+	embers.Transparency = NumberSequence.new(0.1, 1)
+	embers.Lifetime = NumberRange.new(0.35, 0.8)
+	embers.Rate = 16
+	embers.Speed = NumberRange.new(0.8, 2.2)
+	embers.SpreadAngle = Vector2.new(35, 35)
+	embers.Acceleration = Vector3.new(0, 2.5, 0)
+	embers.EmissionDirection = Enum.NormalId.Front
+	embers.Parent = iris
+end
+local function wood(rig, _accent)
 	local t = rig.UpperTorso
-	local oak = C(108, 67, 35)
-	part(rig, t, "ContinuousTimberBody", V(3.8, 1.72, 1.5), V(0, 0.5, 0), oak, CYL, A(0, 0, math.pi / 2))
-	-- Fine vertical grain follows the cylinder instead of reading as armor plates.
-	for i = 1, 26 do
-		local a = i * math.pi * 2 / 26
-		local len = 2.7 + (i % 5) * 0.19
+	local log, grain, endGrain = C(214, 167, 110), C(171, 122, 73), C(234, 199, 143)
+	local limb = C(190, 139, 86)
+	-- The log, standing up: round, a little taller than a person's torso and head.
+	part(rig, t, "SahurLog", V(4.1, 1.9, 1.9), V(0, 0.55, 0), log, CYL, A(0, 0, math.pi / 2))
+	for i = 1, 22 do
+		local a = i * math.pi * 2 / 22
 		part(
 			rig,
 			t,
 			"WoodGrain",
-			V(0.028, len, 0.025),
-			V(math.cos(a) * 0.865, 0.5, math.sin(a) * 0.755),
-			if i % 3 == 0 then C(192, 137, 70) else C(130, 82, 37),
-			nil,
-			A(0, 0, math.sin(i) * 0.025)
+			V(0.03, 2.9 + (i % 4) * 0.25, 0.03),
+			V(math.cos(a) * 0.945, 0.45 + (i % 3) * 0.12, math.sin(a) * 0.945),
+			if i % 3 == 0 then C(190, 141, 88) else grain
 		)
 	end
-	eyes(rig, t, 1.35, -0.75, 0.4, 1, accent)
-	part(rig, t, "NoseBridge", V(0.27, 0.65, 0.3), V(0, 1, -0.82), C(187, 132, 65), BALL)
-	part(rig, t, "NoseTip", V(0.42, 0.3, 0.33), V(0, 0.76, -1), C(193, 138, 71), BALL)
+	-- Sawn ends: the top shows its growth rings.
+	part(rig, t, "LogTop", V(0.04, 1.86, 1.86), V(0, 2.6, 0), endGrain, CYL, A(0, 0, math.pi / 2))
+	for i, size in { 1.4, 0.95, 0.5 } do
+		part(
+			rig,
+			t,
+			"GrowthRing",
+			V(0.045 + i * 0.004, size, size),
+			V(0, 2.6, 0),
+			if i % 2 == 1 then C(196, 150, 96) else endGrain,
+			CYL,
+			A(0, 0, math.pi / 2)
+		)
+	end
+	part(rig, t, "LogBottom", V(0.04, 1.86, 1.86), V(0, -1.5, 0), endGrain, CYL, A(0, 0, math.pi / 2))
+	-- The face.
+	glowingEye(rig, t, -0.42)
+	glowingEye(rig, t, 0.42)
 	for _, s in { -1, 1 } do
+		part(rig, t, "HeavyBrow", V(0.66, 0.17, 0.16), V(s * 0.42, 2.04, -0.92), C(58, 34, 18), nil, A(0, 0, s * 0.26))
+		part(rig, t, "Cheek", V(0.36, 0.26, 0.14), V(s * 0.58, 0.86, -0.9), C(204, 152, 96), BALL)
+	end
+	part(rig, t, "Nose", V(0.3, 0.42, 0.3), V(0, 1.12, -0.96), C(198, 147, 90), BALL)
+	-- A wide grin, its corners turned up: short dark strokes along a curve.
+	for i = -4, 3 do
+		local x0, x1 = i * 0.12, (i + 1) * 0.12
+		local y0, y1 = 0.66 + x0 * x0 * 0.9, 0.66 + x1 * x1 * 0.9
 		part(
 			rig,
 			t,
-			"ExpressiveBrow",
-			V(0.62, 0.15, 0.2),
-			V(s * 0.4, 1.57, -0.89),
-			C(108, 69, 30),
-			BALL,
-			A(0, 0, s * 0.32)
-		)
-		part(rig, t, "SmileCheek", V(0.44, 0.3, 0.2), V(s * 0.44, 0.59, -0.71), C(180, 120, 57), BALL)
-	end
-	part(rig, t, "Snarl", V(0.92, 0.36, 0.18), V(0, 0.46, -0.76), C(69, 40, 22), BALL)
-	for i = -3, 3 do
-		part(
-			rig,
-			t,
-			"SplinterFang",
-			V(0.095, 0.17 + (math.abs(i) % 2) * 0.08, 0.1),
-			V(i * 0.115, 0.5, -0.88),
-			C(212, 185, 130),
-			"Wedge",
-			A(0, 0, math.pi)
-		)
-	end
-	for i = 1, 5 do
-		local fissure = part(
-			rig,
-			t,
-			"EmberFissure",
-			V(0.035, 0.4 + (i % 2) * 0.2, 0.03),
-			V(-0.65 + i * 0.21, -0.3 + (i % 2) * 0.27, -0.755),
-			accent,
+			"Grin",
+			V(math.sqrt((x1 - x0) ^ 2 + (y1 - y0) ^ 2) + 0.03, 0.085, 0.06),
+			V((x0 + x1) / 2, (y0 + y1) / 2, -0.95),
+			C(42, 21, 12),
 			nil,
-			A(0, 0, (i % 2 - 0.5) * 0.6)
+			A(0, 0, math.atan2(y1 - y0, x1 - x0))
 		)
-		fissure.Material = Enum.Material.Neon
 	end
+	-- Thin wooden limbs (cylinders: a Ball part is always a sphere, which
+	-- left them as strings of beads), joined to the log by short sticks.
+	local upright = A(0, 0, math.pi / 2)
 	for _, side in { "Left", "Right" } do
 		for _, segment in { "UpperArm", "LowerArm", "UpperLeg", "LowerLeg" } do
 			local b = rig[side .. segment]
-			part(rig, b, "TimberLimb", V(0.29, b.Size.Y + 0.12, 0.3), V(0, 0, 0), oak, BALL)
+			part(rig, b, "WoodenLimb", V(b.Size.Y + 0.14, 0.3, 0.3), V(0, 0, 0), limb, CYL, upright)
+			part(rig, b, "LimbJoint", V(0.34, 0.34, 0.34), V(0, b.Size.Y / 2, 0), limb, BALL)
 		end
 		part(
 			rig,
 			rig[side .. "UpperArm"],
-			"Shoulder",
-			V(0.78, 0.4, 0.4),
-			V(if side == "Left" then 0.3 else -0.3, 0.45, 0),
-			oak,
-			BALL
+			"ShoulderStick",
+			V(0.72, 0.24, 0.24),
+			V(if side == "Left" then 0.34 else -0.34, 0.45, 0),
+			limb,
+			CYL
 		)
 		local hand = rig[side .. "Hand"]
-		part(rig, hand, "Palm", V(0.32, 0.45, 0.26), V(0, -0.02, 0), oak, BALL)
+		part(rig, hand, "Palm", V(0.34, 0.34, 0.34), V(0, -0.02, 0), limb, BALL)
 		for i = 1, 4 do
-			part(rig, hand, "Finger", V(0.07, 0.33, 0.08), V((i - 2.5) * 0.075, -0.28, -0.06), oak, BALL)
+			part(rig, hand, "Finger", V(0.3, 0.07, 0.07), V((i - 2.5) * 0.075, -0.24, -0.06), limb, CYL, upright)
 		end
-		barefoot(rig, rig[side .. "Foot"], oak, 1)
+		-- A plain wooden foot.
+		local foot = rig[side .. "Foot"]
+		part(rig, foot, "WoodenFoot", V(0.5, 0.3, 0.95), V(0, 0, -0.18), limb)
+		part(rig, foot, "Toes", V(0.5, 0.5, 0.5), V(0, -0.05, -0.62), limb, BALL)
 	end
+	-- The bat: a plain wooden baseball bat, knob, handle and barrel.
 	local h = rig.RightHand
 	local build = part
 	local grip = A(math.rad(-120), 0, 0)
@@ -150,22 +184,11 @@ local function wood(rig, accent)
 		local mount = grip * CFrame.new(0, -pos.Y, 0) * (rotation or CFrame.identity)
 		return build(r, bone, name, size, V(0, 0, 0), color, shape, mount)
 	end
-	part(rig, h, "BatGrip", V(0.95, 0.18, 0.18), V(0, -0.3, -0.28), C(119, 70, 29), CYL, A(0, 0, math.pi / 2))
-	part(rig, h, "BatBarrel", V(1.8, 0.43, 0.43), V(0, -1.48, -0.28), C(190, 132, 60), CYL, A(0, 0, math.pi / 2))
-	part(rig, h, "BatEnd", V(0.43, 0.28, 0.43), V(0, -2.34, -0.28), C(190, 132, 60), BALL)
-	for i = 1, 3 do
-		local p = part(
-			rig,
-			h,
-			"ThermalBatBand",
-			V(0.05, 0.445, 0.445),
-			V(0, -0.9 - i * 0.35, -0.28),
-			accent,
-			CYL,
-			A(0, 0, math.pi / 2)
-		)
-		p.Material = Enum.Material.Neon
-	end
+	part(rig, h, "BatKnob", V(0.12, 0.26, 0.26), V(0, 0.22, 0), C(150, 96, 45), CYL, A(0, 0, math.pi / 2))
+	part(rig, h, "BatHandle", V(1.1, 0.17, 0.17), V(0, -0.3, 0), C(176, 122, 64), CYL, A(0, 0, math.pi / 2))
+	part(rig, h, "BatTaper", V(0.6, 0.3, 0.3), V(0, -1.1, 0), C(205, 152, 88), CYL, A(0, 0, math.pi / 2))
+	part(rig, h, "BatBarrel", V(1.5, 0.44, 0.44), V(0, -1.95, 0), C(214, 163, 98), CYL, A(0, 0, math.pi / 2))
+	part(rig, h, "BatEnd", V(0.44, 0.24, 0.44), V(0, -2.7, 0), C(214, 163, 98), BALL)
 end
 local function sneaker(rig, bone, offset)
 	local blue = C(24, 105, 213)
@@ -538,7 +561,10 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	else
 		croc(rig, accent)
 	end
-	armor(rig, spec, accent, gearTier or (if boss then 4 else 1), hasShield)
+	-- Tung Tung wears no armor: the log is the look.
+	if spec.Shape ~= "Wood" then
+		armor(rig, spec, accent, gearTier or (if boss then 4 else 1), hasShield)
+	end
 	if boss then
 		rig:ScaleTo(1.8)
 	end
