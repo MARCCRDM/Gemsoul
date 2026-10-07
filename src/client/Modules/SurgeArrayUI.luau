@@ -220,7 +220,8 @@ local function socketCard(parent, key, x, gem, amps)
 end
 
 local function pouchList(parent, profile, amps)
-	local heading = place(label(parent, "GEM POUCH  ·  SOCKET INTO " .. selectedKey, 13, P.Gold), 0, 272, 620, 18)
+	local role = if selectedKey == "R" then "SHIFT" else "ATTACK / DEFENSE"
+	local heading = place(label(parent, "GEM POUCH  ·  " .. selectedKey .. "  ·  " .. role, 13, P.Gold), 0, 272, 620, 18)
 	heading.TextXAlignment = Enum.TextXAlignment.Left
 	local scroller = new("ScrollingFrame", {
 		BackgroundTransparency = 1,
@@ -238,7 +239,7 @@ local function pouchList(parent, profile, amps)
 	}, scroller)
 	local gems = {}
 	for _, gem in profile.Gems or {} do
-		if gem.Cut ~= nil then
+		if gem.Cut ~= nil and Tech.canSocket(gem, selectedKey, profile.Character or {}) then
 			table.insert(gems, gem)
 		end
 	end
@@ -255,7 +256,7 @@ local function pouchList(parent, profile, amps)
 	end)
 	if #gems == 0 then
 		local empty = place(
-			label(scroller, "No gems yet. Mine rocks at the Outpost to find some.", 12, P.Dim, IronUi.Body),
+			label(scroller, "No compatible gems. Mine for " .. role .. " Surges; duplicates cannot share Q/E.", 12, P.Dim, IronUi.Body),
 			0,
 			0,
 			600,
@@ -265,7 +266,8 @@ local function pouchList(parent, profile, amps)
 		return
 	end
 	for order, gem in gems do
-		local definition = Tech.surgeStats(gem, amps)
+		local projected = if Tech.Prototype then Tech.prototypeGem(gem, selectedKey) else gem
+		local definition = projected and Tech.surgeStats(projected, amps)
 		local color = GemConfig.ElementColors[gem.Element] or P.Gold
 		local row = new("Frame", { BackgroundColor3 = P.Inset, LayoutOrder = order }, scroller)
 		UiKit.round(row, 8)
@@ -431,6 +433,21 @@ local function maneuverColumn(parent, profile, loadout)
 end
 
 local function amplifierBox(parent, amps)
+	if Tech.Prototype then
+		local card = box(parent, UDim2.fromOffset(646, 336), UDim2.fromOffset(340, 164), P.Inset, 12)
+		place(label(card, "SURGE LOADOUT", 13, P.Gold), 14, 10, 312, 18)
+		for i, text in {
+			"Q / E: Attack or Defense · no duplicates",
+			"R: Shift · neutral Shift when empty",
+			"Shift travel stays fixed across rarity.",
+			"Shift grants no invulnerability.",
+			"Amplifiers and reactions are off in this test.",
+		} do
+			local line = place(label(card, text, 11, P.Text, IronUi.Body), 14, 34 + (i - 1) * 23, 312, 20)
+			line.TextXAlignment = Enum.TextXAlignment.Left
+		end
+		return
+	end
 	local x = 646
 	local card = box(parent, UDim2.fromOffset(x, 336), UDim2.fromOffset(340, 164), P.Inset, 12)
 	stroke(card, Color3.fromRGB(84, 160, 255), 1, 0.4)

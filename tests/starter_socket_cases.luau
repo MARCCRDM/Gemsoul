@@ -1,5 +1,13 @@
 local checks=0
 local function check(ok,msg) checks+=1; assert(ok,msg) end
+table.insert(profile.Gems, {Id="shift", Element="Shock", Surge="VectorDash", Cut=5})
+check(PlayerData.socketGem(player,"shift","Surge1")==nil,"Shift accepted into Attack/Defense")
+check(PlayerData.findGem(player,"shift")~=nil,"Rejected socket consumed gem")
+PlayerData.removeGem(player,"shift")
+table.insert(profile.Gems, {Id="attack", Element="Fire", Surge="CinderCleave", Cut=5})
+check(PlayerData.socketGem(player,"attack","Surge3")==nil,"Attack accepted into Shift")
+check(PlayerData.findGem(player,"attack")~=nil,"Rejected attack consumed gem")
+PlayerData.removeGem(player,"attack")
 check(PlayerData.socketGem(player,"a","Surge1").Id=="a","Surge socket failed without gear item")
 check(#profile.Gems==1 and profile.Character.Surge1Gem.Id=="a","Surge gem duplicated")
 check(PlayerData.socketGem(player,"a","Surge2")==nil,"Equipped surge gem socketed twice")

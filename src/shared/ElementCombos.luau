@@ -15,6 +15,9 @@
 	    returns id, { Mult = number?, EndFreeze = boolean?, Stun = number? }
 ]]
 local ElementCombos = {}
+-- Prototype starts with readable standalone abilities. Retain the archived
+-- reaction rules for explicit comparison tests, but disable them in live play.
+ElementCombos.Enabled = false
 
 ElementCombos.List = {
 	Shatter = {
@@ -39,6 +42,7 @@ ElementCombos.List = {
 }
 
 function ElementCombos.check(hit, target)
+	if not ElementCombos.Enabled then return nil, nil end
 	if not hit or not target then
 		return nil, nil
 	end

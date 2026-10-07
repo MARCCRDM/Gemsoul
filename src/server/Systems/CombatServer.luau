@@ -458,7 +458,8 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 						if retaliate or deflect then
 							local counter = if deflect then amount * 0.5 else k.Weapon.Attack.Damage * 0.65
 							if deflect then multiplier = 0 end
-							if source and (deflect or (source.Character and (source.Character.HumanoidRootPart.Position - root.Position).Magnitude <= 9)) then
+							local sourceRoot = source and source.Character and source.Character:FindFirstChild("HumanoidRootPart")
+							if sourceRoot and (deflect or (sourceRoot.Position - root.Position).Magnitude <= 9) then
 								receive(source, counter, if deflect then element else "Fire", player, root.Position, false, false, true)
 							elseif enemySource and (deflect or (enemySource.Root.Position - root.Position).Magnitude <= 9) then
 								Enemies.damage(enemySource, counter, player, false, GemConfig.ElementColors.Fire)

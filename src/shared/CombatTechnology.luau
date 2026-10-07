@@ -828,6 +828,7 @@ function Tech.prototypeGem(gem, key)
 	return projected
 end
 function Tech.canSocket(gem, key, loadout)
+	if key ~= "Q" and key ~= "E" and key ~= "R" then return false end
 	if not Tech.Prototype then return true end
 	local projected = Tech.prototypeGem(gem, key)
 	local d = projected and Tech.PrototypeCatalog[projected.Surge]
@@ -960,8 +961,13 @@ function Tech.surgeLines(gem, amps): { string }
 	else
 		table.insert(lines, string.format("%gs effect", math.floor((d.Duration or d.MoveTime or 0) * 10 + 0.5) / 10))
 	end
-	table.insert(lines, string.format("Clarity %d (%.1fs recovery)", gem.Clarity or 0, d.Recovery))
-	table.insert(lines, string.format("Cut %d (%g%% crit chance)", gem.Cut or 0, d.Crit * 100))
+	if d.Prototype then
+		table.insert(lines, string.format("%.1fs recovery · %gs cooldown", d.Recovery, d.Cooldown))
+		if d.Role == "Shift" then table.insert(lines, "Fixed travel; no invulnerability.") end
+	else
+		table.insert(lines, string.format("Clarity %d (%.1fs recovery)", gem.Clarity or 0, d.Recovery))
+		table.insert(lines, string.format("Cut %d (%g%% crit chance)", gem.Cut or 0, d.Crit * 100))
+	end
 	table.insert(lines, if d.Role == "Shift" then "Shift: R only." elseif d.Role then d.Role .. ": Q or E." else "Legacy Surge: projects into the prototype on equip.")
 	return lines
 end

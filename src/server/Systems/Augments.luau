@@ -52,7 +52,7 @@ function Augments.start()
 		end
 		local gem = PlayerData.socketSurge(player, gemId, key)
 		if not gem then
-			return Shop.reply(false, "Choose a cut gem from your pouch.")
+			return Shop.reply(false, "Choose a cut gem: Q/E accept distinct Attack or Defense Surges; R accepts Shift only.")
 		end
 		local id, tier, rank = Tech.surgeOf(gem)
 		local surge = id and Tech.Catalog[id]

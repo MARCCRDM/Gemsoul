@@ -23,6 +23,7 @@ local Economy = require(ReplicatedStorage.Shared.ExpeditionEconomy)
 local TradeJournal = require(script.Parent.TradeJournal)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Remotes = require(script.Parent.Remotes)
 local SessionLock = require(script.Parent.SessionLock)
@@ -622,6 +623,10 @@ function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem
 	end
 	local gem = PlayerData.findGem(player, gemId)
 	if not gem or gem.Cut == nil then
+		return nil
+	end
+	local surgeKey = ({ Surge1 = "Q", Surge2 = "E", Surge3 = "R" })[slot or "Weapon"]
+	if surgeKey and not Tech.canSocket(gem, surgeKey, profile.Character) then
 		return nil
 	end
 	PlayerData.removeGem(player, gemId)

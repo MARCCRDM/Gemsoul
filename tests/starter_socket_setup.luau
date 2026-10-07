@@ -1,6 +1,6 @@
 type Gem = any
 local player={}
-local profile={Character={Class="Warrior",Weapon="gun",ItemGems={Weapon={}}},Gems={{Id="a",Cut=5},{Id="b",Cut=7}}}
+local profile={Character={Class="Warrior",Weapon="gun",ItemGems={Weapon={}}},Gems={{Id="a",Element="Fire",Cut=5},{Id="b",Element="Frost",Cut=7}}}
 local profiles={[player]=profile}
 local SOCKET_KEYS={Weapon="WeaponGem",Surge1="Surge1Gem",Surge2="Surge2Gem",Surge3="Surge3Gem"}
 local Slots={SurgeDefinitions={Surge1={},Surge2={},Surge3={}}}

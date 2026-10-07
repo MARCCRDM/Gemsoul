@@ -8,6 +8,9 @@ local function generate(element) counter+=1; return {Id="starter"..counter,Eleme
 local plan=Lottery.prepare(profile,rng,generate)
 check(#plan.Gear==6 and plan.Gear[1].Slot=="Boots" and plan.Gear[6].Slot=="Helmet","Equipment reveal order")
 check(#plan.Gems==9 and counter==9,"Insufficient starter gems")
+check(GemRoller.prototypeRole(plan.Gems[7].Gem.Surge)=="Attack","Starter Q needs Attack")
+check(GemRoller.prototypeRole(plan.Gems[8].Gem.Surge)=="Defense","Starter E needs Defense")
+check(GemRoller.prototypeRole(plan.Gems[9].Gem.Surge)=="Shift","Starter R needs Shift")
 check(#profile.Gems==0 and profile.Character.WeaponGem==nil,"Prepared rewards granted early")
 check(Lottery.prepare(profile,rng,generate)==plan and counter==9,"Reconnect or repeated request rerolled")
 local elements,ids={},{}

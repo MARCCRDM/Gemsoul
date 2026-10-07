@@ -20,14 +20,16 @@ Icons.Layout = "Preview"
 
 local byName = {}
 for id, definition in Tech.Catalog do
-	byName[definition.Name] = id
+	byName[definition.Name] = definition.IconSource or id
 end
 
 -- The catalog id for a definition, an id, or a display name.
 function Icons.idOf(definition: any): string?
 	if type(definition) == "string" then
-		return if Atlas.Index[definition] then definition else byName[definition]
+		local entry = Tech.Catalog[definition]
+		return if entry and entry.IconSource then entry.IconSource elseif Atlas.Index[definition] then definition else byName[definition]
 	elseif type(definition) == "table" then
+		if definition.IconSource then return definition.IconSource end
 		if definition.Id and Atlas.Index[definition.Id] then
 			return definition.Id
 		end

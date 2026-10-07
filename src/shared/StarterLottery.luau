@@ -1,4 +1,5 @@
 -- Server-owned, persisted onboarding rewards. Animation never determines a reward.
+local GemRoller = require(script.Parent.GemRoller)
 local Lottery = {}
 Lottery.Version = 1
 Lottery.GearOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet" }
@@ -27,6 +28,10 @@ function Lottery.prepare(profile, rng, generate)
 	end
 	for index, slot in Lottery.GemOrder do
 		local gem = generate(elements[(index - 1) % #elements + 1])
+		local roleIndex = ({Surge1 = 1, Surge2 = 2, Surge3 = 3})[slot]
+		if GemRoller.Prototype and roleIndex then
+			gem.Surge = GemRoller.PrototypeIds[gem.Element][roleIndex]
+		end
 		gem.Cut, gem.CutMethod = rng:NextInteger(5, 8), "Starter"
 		if index == #Lottery.GemOrder then
 			local upgraded = false
