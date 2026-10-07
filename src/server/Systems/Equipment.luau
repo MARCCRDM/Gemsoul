@@ -617,6 +617,44 @@ WEAPONS.Halberd = function(folder, _character, right, _left, accent, gem)
 	gemSocket(folder, right, m, Vector3.new(0, 4.6, 0), gem, 0.26)
 end
 
+-- The bring-a-friend reward (Shared.Referrals): a spear carrying a black and
+-- gold war banner, its emblem lit in the weapon's accent.
+WEAPONS.Standard = function(folder, _character, right, _left, accent, gem)
+	local gold = Color3.fromRGB(214, 160, 52)
+	local cloth = Color3.fromRGB(18, 18, 22)
+	local m = UPRIGHT * CFrame.new(0, -1.4, 0)
+	piece(folder, right, m * CFrame.new(0, 2, 0), Vector3.new(0.2, 6.4, 0.2), IRON, Enum.Material.Metal)
+	piece(folder, right, m * CFrame.new(0, -1.15, 0), Vector3.new(0.3, 0.2, 0.3), gold, Enum.Material.Metal)
+	-- Spearhead over a gold collar.
+	piece(folder, right, m * CFrame.new(0, 5.3, 0), Vector3.new(0.3, 0.12, 0.3), gold, Enum.Material.Metal)
+	piece(folder, right, m * CFrame.new(0, 5.95, 0), Vector3.new(0.3, 1.2, 0.08), STEEL, Enum.Material.Metal)
+	neon(folder, right, m * CFrame.new(0, 5.95, -0.045), Vector3.new(0.05, 1, 0.02), accent)
+	-- The banner hangs from a crossbar: black cloth, gold edging, two tails.
+	local bar = m * CFrame.new(0.85, 4.9, 0)
+	piece(folder, right, bar, Vector3.new(1.9, 0.12, 0.12), gold, Enum.Material.Metal)
+	local flag =
+		piece(folder, right, bar * CFrame.new(0, -1.05, 0), Vector3.new(1.6, 2, 0.05), cloth, Enum.Material.Fabric)
+	flag.Name = "Banner"
+	for _, x in { -0.4, 0.4 } do
+		piece(folder, right, bar * CFrame.new(x, -2.3, 0), Vector3.new(0.75, 0.55, 0.05), cloth, Enum.Material.Fabric)
+	end
+	for _, x in { -0.83, 0.83 } do
+		piece(folder, right, bar * CFrame.new(x, -1.25, 0), Vector3.new(0.07, 2.4, 0.07), gold, Enum.Material.Metal)
+	end
+	-- The emblem: a glowing diamond with a bar through it, both faces.
+	for _, z in { -0.04, 0.04 } do
+		neon(
+			folder,
+			right,
+			bar * CFrame.new(0, -0.95, z) * CFrame.Angles(0, 0, math.rad(45)),
+			Vector3.new(0.5, 0.5, 0.03),
+			gold
+		)
+		neon(folder, right, bar * CFrame.new(0, -0.95, z * 1.3), Vector3.new(1.1, 0.08, 0.03), accent)
+	end
+	gemSocket(folder, right, m, Vector3.new(0, 5.15, -0.14), gem, 0.22)
+end
+
 -- Back pieces (cosmetics) ---------------------------------------------------------------------
 -- Built behind the torso; `m` is the middle of the back, facing backward.
 
@@ -656,28 +694,6 @@ end
 -- The Crusader's Standard (bring-a-friend reward): a black war banner on an
 -- iron pole, a gold crossbar and spear finial, gold edging and a glowing
 -- gold emblem. Its own colours, whatever your class.
-BACKS.Standard = function(folder, torso, m, glow, _accent)
-	local gold = Color3.fromRGB(214, 160, 52)
-	local cloth = Color3.fromRGB(18, 18, 22)
-	piece(folder, torso, m * CFrame.new(0.6, 1.5, -0.3), Vector3.new(0.16, 5.4, 0.16), IRON, Enum.Material.Metal)
-	-- Spear finial and crossbar.
-	piece(folder, torso, m * CFrame.new(0.6, 4.35, -0.3), Vector3.new(0.3, 0.12, 0.3), gold, Enum.Material.Metal)
-	piece(folder, torso, m * CFrame.new(0.6, 4.65, -0.3) * CFrame.Angles(0, 0, math.rad(45)), Vector3.new(0.3, 0.3, 0.1), gold, Enum.Material.Metal)
-	piece(folder, torso, m * CFrame.new(0.6 - 0.8, 3.8, -0.3), Vector3.new(1.9, 0.12, 0.12), gold, Enum.Material.Metal)
-	-- The banner: black cloth with gold edging, cut into two tails below.
-	local flag = piece(folder, torso, m * CFrame.new(0.6 - 0.8, 2.75, -0.3), Vector3.new(1.6, 2, 0.05), cloth, Enum.Material.Fabric)
-	flag.Name = "Banner"
-	for _, x in { -0.4, 0.4 } do
-		piece(folder, torso, m * CFrame.new(0.6 - 0.8 + x, 1.5, -0.3), Vector3.new(0.75, 0.55, 0.05), cloth, Enum.Material.Fabric)
-	end
-	for _, x in { -0.83, 0.83 } do
-		piece(folder, torso, m * CFrame.new(0.6 - 0.8 + x, 2.55, -0.3), Vector3.new(0.07, 2.4, 0.07), gold, Enum.Material.Metal)
-	end
-	-- The emblem: a glowing diamond with a bar through it.
-	neon(folder, torso, m * CFrame.new(0.6 - 0.8, 2.85, -0.33) * CFrame.Angles(0, 0, math.rad(45)), Vector3.new(0.5, 0.5, 0.04), glow)
-	neon(folder, torso, m * CFrame.new(0.6 - 0.8, 2.85, -0.34), Vector3.new(1.1, 0.08, 0.04), glow)
-end
-
 BACKS.Geode = function(folder, torso, m, glow, _accent)
 	piece(
 		folder,

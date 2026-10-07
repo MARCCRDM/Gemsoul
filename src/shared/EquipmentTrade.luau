@@ -1,6 +1,7 @@
 -- Non-yielding two-item exchange. Item rolls travel with the item; socketed
 -- gems go back to their owner's bag (gear changes hands with an empty socket).
 local Slots = require(script.Parent.EquipmentSlots)
+local Referrals = require(script.Parent.Referrals)
 local Trade = {}
 local function copy(value)
 	if type(value) ~= "table" then
@@ -48,6 +49,9 @@ end
 function Trade.validate(a, b, left, right)
 	if a == b or not left or not right or left.Slot ~= right.Slot then
 		return false, "Choose two items from the same equipment slot."
+	end
+	if left.Id == Referrals.Reward or right.Id == Referrals.Reward then
+		return false, "Bring-a-friend rewards can't be traded."
 	end
 	if not equal(Trade.item(a, left.Slot, left.Id), left) or not equal(Trade.item(b, right.Slot, right.Id), right) then
 		return false, "An offered item changed. Start a new trade."

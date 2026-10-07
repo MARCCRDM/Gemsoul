@@ -131,6 +131,11 @@ function GearArt.icon(parent, slotName, gear, color)
 	elseif slotName == "Shield" then
 		part(5, 3, 19, 14)
 		part(8, 13, 13, 11, 45)
+	elseif gear.Look == "Standard" then
+		part(5, 0, 3, 26)
+		part(8, 3, 16, 12)
+		part(8, 15, 7, 5)
+		part(17, 15, 7, 5)
 	elseif gear.Look == "FrontierSword" then
 		part(12, 0, 5, 18)
 		part(6, 17, 17, 3)

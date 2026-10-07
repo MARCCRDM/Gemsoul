@@ -4,7 +4,7 @@
 	ReferredByPlayerId). That's recorded against the inviter in a DataStore,
 	so it counts even when they're offline or in another server; each friend
 	counts once. Once enough friends have joined, the inviter earns the
-	reward cosmetic: on their next join, or when they press CHECK CLAIM.
+	reward weapon: on their next join, or when they press CHECK CLAIM.
 
 	Request actions:
 	  "ReferralState"   refresh from the store, grant the reward if earned;
@@ -14,7 +14,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local Classes = require(ReplicatedStorage.Shared.Classes)
 local ReferralRules = require(ReplicatedStorage.Shared.Referrals)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
@@ -49,6 +49,10 @@ local function countFor(userId: number): number?
 	return if type(entry) == "table" and type(entry.Count) == "number" then entry.Count else 0
 end
 
+local function ownsReward(profile): boolean
+	return profile.Owned ~= nil and profile.Owned.Weapons ~= nil and profile.Owned.Weapons[ReferralRules.Reward] ~= nil
+end
+
 -- Grants the reward when it's earned; stores the count on the profile.
 local function settle(player: Player): (boolean, number?)
 	local profile = PlayerData.get(player) :: any
@@ -60,10 +64,10 @@ local function settle(player: Player): (boolean, number?)
 	if count then
 		profile.Referrals.Count = math.max(profile.Referrals.Count or 0, count)
 	end
-	local reward = Cosmetics.List[ReferralRules.Reward]
+	local reward = Classes.weapon("Warrior", ReferralRules.Reward)
 	local granted = false
-	if reward and ReferralRules.earned(profile.Referrals.Count) and not profile.Cosmetics.Owned[reward.Id] then
-		profile.Cosmetics.Owned[reward.Id] = true
+	if reward and ReferralRules.earned(profile.Referrals.Count) and not ownsReward(profile) then
+		PlayerData.setGearQuality(player, "Weapons", reward.Id, 1)
 		profile.Referrals.ClaimedAt = os.time()
 		granted = true
 	end
@@ -119,10 +123,10 @@ local function state(player: Player)
 	end
 	local granted = settle(player)
 	local count = profile.Referrals and profile.Referrals.Count or 0
-	local claimed = profile.Cosmetics.Owned[ReferralRules.Reward] == true
-	local reward = Cosmetics.List[ReferralRules.Reward]
+	local claimed = ownsReward(profile)
+	local reward = Classes.weapon("Warrior", ReferralRules.Reward)
 	local message = if granted
-		then string.format("%s unlocked! Find them in the Store under Backs.", reward and reward.Name or "Reward")
+		then string.format("%s unlocked! Equip it from your Inventory.", reward and reward.Name or "Reward")
 		elseif claimed then "Already yours. Thanks for bringing a friend!"
 		else "Not yet: your invited friend needs to join. It unlocks automatically."
 	return reply(claimed, message, { Count = count, Needed = ReferralRules.Needed, Claimed = claimed })

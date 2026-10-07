@@ -296,27 +296,6 @@ function BACKS.Banner(root: Frame, _size: number, color: Color3)
 	round(emblem, 2)
 end
 
--- The Crusader's Standard: black and gold, whatever its glow.
-function BACKS.Standard(root: Frame, _size: number, color: Color3)
-	local pole = piece(root, 0.26, 0.52, 0.05, 0.9, Color3.fromRGB(96, 100, 112))
-	round(pole, 2)
-	local tip = piece(root, 0.26, 0.06, 0.09, 0.09, P.Gold, 45)
-	round(tip, 1)
-	local bar = piece(root, 0.52, 0.16, 0.56, 0.04, P.Gold)
-	round(bar, 2)
-	local flag = piece(root, 0.52, 0.44, 0.48, 0.5, Color3.fromRGB(20, 20, 24))
-	round(flag, 2)
-	local edge = Instance.new("UIStroke")
-	edge.Color, edge.Thickness = P.Gold, 2
-	edge.Parent = flag
-	for _, x in { 0.39, 0.65 } do
-		local tail = piece(root, x, 0.72, 0.18, 0.18, Color3.fromRGB(20, 20, 24), 45)
-		round(tail, 1)
-	end
-	local emblem = piece(flag, 0.5, 0.48, 0.32, 0.26, color, 45)
-	round(emblem, 2)
-end
-
 function BACKS.Geode(root: Frame, size: number, color: Color3)
 	local shell = piece(root, 0.5, 0.52, 0.8, 0.8, WHITE)
 	round(shell, size)

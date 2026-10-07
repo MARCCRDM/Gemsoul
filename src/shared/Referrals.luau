@@ -1,9 +1,9 @@
 --[[
 	Bring a friend: invite a friend (Roblox's own game invite) and, once they
-	join through it, you earn an exclusive cosmetic. Pure, for the server
+	join through it, you earn an exclusive weapon, the Crusader's Standard. Pure, for the server
 	(Systems/Referrals), the client (Modules/ReferralUI) and tests.
 
-	  Referrals.Reward                    the cosmetic you earn
+	  Referrals.Reward                    the weapon you earn (a Weapons id)
 	  Referrals.Needed                    friends who must join through you
 	  Referrals.referrer(joinData, userId) -> the inviter's UserId, or nil
 	                                       (no invite, or your own)
@@ -13,7 +13,7 @@
 ]]
 local Referrals = {}
 
-Referrals.Reward = "BackStandard"
+Referrals.Reward = "CrusaderStandard"
 Referrals.Needed = 1
 
 function Referrals.referrer(joinData, userId: number): number?

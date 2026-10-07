@@ -20,7 +20,6 @@ export type Cosmetic = {
 	Price: number?, -- coins in the Shop; nil = crate / season only
 	Color: Color3, -- the trim colour, or the back piece's glow
 	Look: string?, -- how Equipment builds a back piece
-	Exclusive: string?, -- earned one way only ("Referral": Shared.Referrals); never in crates
 }
 
 local Cosmetics = {}
@@ -39,7 +38,6 @@ Cosmetics.Order = {
 	"BackCape",
 	"BackWings",
 	"BackHalo",
-	"BackStandard",
 }
 
 Cosmetics.List = {
@@ -160,16 +158,6 @@ Cosmetics.List = {
 		Rarity = "UltraRare",
 		Color = Color3.fromRGB(255, 220, 120),
 		Look = "Halo",
-	},
-	BackStandard = {
-		Id = "BackStandard",
-		Kind = "Back",
-		Name = "Crusader's Standard",
-		Description = "A black-and-gold war banner. Only those who brought a friend into the Saga carry it.",
-		Rarity = "Rare",
-		Color = Color3.fromRGB(255, 196, 70),
-		Look = "Standard",
-		Exclusive = "Referral",
 	},
 } :: { [string]: Cosmetic }
 

@@ -801,8 +801,6 @@ local function drawCosmetics(kind: string)
 			chip(status, "OWNED", P.Good, false)
 		elseif cosmetic.Price then
 			coinAmount(status, cosmetic.Price, 14, P.Gold)
-		elseif cosmetic.Exclusive == "Referral" then
-			chip(status, "INVITE A FRIEND", P.Teal, false)
 		else
 			chip(status, "CRATE / SEASON", P.Dim, false)
 		end
@@ -882,7 +880,6 @@ local function drawCosmetics(kind: string)
 		if owned[cosmetic.Id]
 			then (if worn == cosmetic.Id then "Equipped on your suit." else "In your collection.")
 			elseif cosmetic.Price then "Sold here for coins."
-			elseif cosmetic.Exclusive == "Referral" then "Earned by inviting a friend who joins."
 			else "Found in supply caches and on the Season Path.",
 		12,
 		if owned[cosmetic.Id] then P.Good else P.Gold,
@@ -914,11 +911,6 @@ local function drawCosmetics(kind: string)
 		b = priceButton(actions, cosmetic.Price, 180, 46, function()
 			run(b, "UNLOCKED", "BuyCosmetic", cosmetic.Id)
 		end)
-	elseif cosmetic.Exclusive == "Referral" then
-		local b = IronUi.gemButton(actions, "INVITE A FRIEND", P.Teal, function()
-			require(script.Parent.ReferralUI).open()
-		end)
-		b:SetAttribute("UiSound", "Tab")
 	else
 		local b = IronUi.gemButton(actions, "VIEW SUPPLY CACHES", P.Amethyst, function()
 			tab = "Featured"

@@ -155,7 +155,7 @@ local function unownedOf(profile, rarity: string): string?
 	local choices = {}
 	for _, id in Cosmetics.Order do
 		local cosmetic = Cosmetics.List[id]
-		if cosmetic.Rarity == rarity and not cosmetic.Exclusive and not profile.Cosmetics.Owned[id] then
+		if cosmetic.Rarity == rarity and not profile.Cosmetics.Owned[id] then
 			table.insert(choices, id)
 		end
 	end

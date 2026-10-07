@@ -90,7 +90,9 @@ local function load(path, env)
 end
 
 local Slots = load("src/shared/EquipmentSlots.luau", {})
-local Rules = load("src/shared/Market.luau", { script = { Parent = { EquipmentSlots = Slots } } })
+local Referrals = load("src/shared/Referrals.luau", {})
+local Rules =
+	load("src/shared/Market.luau", { script = { Parent = { EquipmentSlots = Slots, Referrals = Referrals } } })
 local Config = {
 	MaxGems = 10,
 	MaxGear = 12,
@@ -791,7 +793,8 @@ local open1, total1 = openRows()
 check(open1 == total1, "still only open listings on the board")
 
 -- 10. Face to face (Shared.EquipmentTrade): swapping two copies of one model.
-local Trade = load("src/shared/EquipmentTrade.luau", { script = { Parent = { EquipmentSlots = Slots } } })
+local Trade =
+	load("src/shared/EquipmentTrade.luau", { script = { Parent = { EquipmentSlots = Slots, Referrals = Referrals } } })
 local function owner(weapon, roll)
 	return {
 		Owned = { Weapons = { [weapon] = 2, W1 = 1 } },
@@ -813,6 +816,14 @@ check(pb.Owned.Weapons.Saber == 2 and pb.Owned.Weapons["Saber#2"] == 2, "B keeps
 check(pb.Character.GearRolls.Weapons["Saber#2"].Rarity == 5, "with its own roll")
 check(Slots.model("Saber#2") == "Saber" and Slots.model("Saber") == "Saber", "model of a key")
 check(Slots.freeKey({ Saber = 1, ["Saber#2"] = 1 }, "Saber#2") == "Saber#3", "next free key")
+
+-- The bring-a-friend weapon can't be sold or swapped.
+local recruiter = { Owned = { Weapons = { [Referrals.Reward] = 1 } }, Character = {} }
+check(Rules.whyNot(recruiter, "Gear", "Weapon", Referrals.Reward) ~= nil, "the referral weapon can be listed")
+check(
+	not Trade.validate({}, {}, { Slot = "Weapon", Id = Referrals.Reward }, { Slot = "Weapon", Id = "MatrixSwords1" }),
+	"the referral weapon can be traded"
+)
 
 print(
 	("PASS: %d Market checks (escrow, sales, tax, races, trades, offers, cancel, expiry, saving, limits, no dupes)"):format(
