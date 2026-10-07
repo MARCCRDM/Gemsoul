@@ -14,9 +14,12 @@
 	  GearPresets.PartOrder                { "Armor", "Weapon" }
 	  GearPresets.capture(character, name, part?) -> what's worn now (only
 	                                        that part's pieces when given)
-	  GearPresets.clean(presets)           -> { Armor = {..}, Weapon = {..} },
+	  GearPresets.clean(presets)           -> { Armor = {..}, Weapon = {..},
+	                                        Active = { Armor = n, Weapon = n } },
 	                                        repaired (an old single list of
 	                                        full presets is split in two)
+	The active slot of each kind is the loadout you're on: changing gear
+	saves into it, and picking another slot switches to that loadout.
 	  GearPresets.name(value, slot, part?) -> a safe preset name
 	  GearPresets.plan(profile, preset)    -> { steps }, { missing } to wear it
 	  GearPresets.matches(character, preset) -> already wearing it?
@@ -131,12 +134,27 @@ end
 -- Drops anything malformed from the saved presets (old saves, tampering).
 -- An old save was one list of full presets: each is split into an armor
 -- loadout and a weapon loadout in the same slot.
+local function activeOf(value)
+	local out = { Armor = 1, Weapon = 1 }
+	for _, part in GearPresets.PartOrder do
+		local slot = type(value) == "table" and value[part]
+		if type(slot) == "number" and slot == math.floor(slot) and slot >= 1 and slot <= GearPresets.Count then
+			out[part] = slot
+		end
+	end
+	return out
+end
+
 function GearPresets.clean(presets)
 	if type(presets) ~= "table" then
-		return { Armor = {}, Weapon = {} }
+		return { Armor = {}, Weapon = {}, Active = activeOf(nil) }
 	end
-	if presets.Armor ~= nil or presets.Weapon ~= nil then
-		return { Armor = cleanList(presets.Armor, "Armor"), Weapon = cleanList(presets.Weapon, "Weapon") }
+	if presets.Armor ~= nil or presets.Weapon ~= nil or presets.Active ~= nil then
+		return {
+			Armor = cleanList(presets.Armor, "Armor"),
+			Weapon = cleanList(presets.Weapon, "Weapon"),
+			Active = activeOf(presets.Active),
+		}
 	end
 	local armor, weapon = cleanList(presets, "Armor"), cleanList(presets, "Weapon")
 	for slot = 1, GearPresets.Count do
@@ -147,7 +165,7 @@ function GearPresets.clean(presets)
 			weapon[slot].Name = GearPresets.name(nil, slot, "Weapon")
 		end
 	end
-	return { Armor = armor, Weapon = weapon }
+	return { Armor = armor, Weapon = weapon, Active = activeOf(nil) }
 end
 
 local function gemIn(list, id)

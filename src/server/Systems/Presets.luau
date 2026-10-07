@@ -5,7 +5,14 @@
 	Two kinds (Shared.GearPresets.Parts): "Armor" loadouts and "Weapon"
 	loadouts, three slots each.
 
+	Each kind has an active slot: the loadout you're on. Every change to
+	your gear, gems, surges or maneuvers saves into it (never mid-match), so
+	a loadout is simply what you built while it was selected.
+
 	Request actions:
+	  "LoadoutSelect", part, slot       switch to that loadout: wear it, or,
+	                                    when it's empty, start it from what
+	                                    you wear now
 	  "PresetSave", part, slot, name?   save what you wear now (that part's
 	                                    pieces) into slot 1-3
 	  "PresetRename", part, slot, name
@@ -38,15 +45,42 @@ local function partOf(value: any): string?
 	return if typeof(value) == "string" and GearPresets.Parts[value] then value else nil
 end
 
--- The player's loadouts of one part (repaired and stored back on the profile).
-function Presets.list(player: Player, part: string)
-	local profile = PlayerData.get(player)
+-- All of the player's loadouts, repaired and stored back on the profile.
+local function all(player: Player)
+	local profile = PlayerData.get(player) :: any
 	if not profile then
-		return {}
+		return nil
 	end
-	local p: any = profile
-	p.Presets = GearPresets.clean(p.Presets)
-	return p.Presets[part] or {}
+	profile.Presets = GearPresets.clean(profile.Presets)
+	return profile.Presets
+end
+
+-- The player's loadouts of one part.
+function Presets.list(player: Player, part: string)
+	local presets = all(player)
+	return presets and presets[part] or {}
+end
+
+function Presets.active(player: Player, part: string): number
+	local presets = all(player)
+	return presets and presets.Active[part] or 1
+end
+
+-- Saves what the player wears into the active loadout of each kind.
+-- Skipped while a loadout is being put on, and during matches.
+local applying: { [Player]: boolean } = {}
+function Presets.captureActive(player: Player)
+	local profile = PlayerData.get(player)
+	local presets = all(player)
+	if not profile or not presets or applying[player] or player:GetAttribute("MatchId") then
+		return
+	end
+	for _, part in GearPresets.PartOrder do
+		local slot = presets.Active[part]
+		local list = presets[part]
+		local name = if list[slot] then list[slot].Name else GearPresets.name(nil, slot, part)
+		list[slot] = GearPresets.capture(profile.Character, name, part)
+	end
 end
 
 -- Out of fights only (the same rule as changing surges).
@@ -68,6 +102,10 @@ function Presets.wear(player: Player, part: string, slot: number): (boolean, str
 	if not profile or not preset then
 		return false, "That preset is empty.", 0
 	end
+	-- Wearing a loadout makes it the active one; the steps below don't save
+	-- into anything while they run.
+	all(player).Active[part] = slot
+	applying[player] = true
 	local steps, missing = GearPresets.plan(profile, preset)
 	local done = 0
 	for _, step in steps do
@@ -104,6 +142,7 @@ function Presets.wear(player: Player, part: string, slot: number): (boolean, str
 			end
 		end
 	end
+	applying[player] = nil
 	PlayerData.sync(player)
 	local message = if #missing > 0
 		then string.format("%s on. Missing: %s.", preset.Name, table.concat(missing, ", "))
@@ -151,7 +190,38 @@ local function apply(player: Player, part: any, slot: any)
 	return reply(ok, message)
 end
 
+local function selectLoadout(player: Player, part: any, slot: any)
+	local kind, index = partOf(part), slotOf(slot)
+	local profile = PlayerData.get(player)
+	if not profile or not kind or not index then
+		return reply(false, "Pick a loadout slot.")
+	end
+	if not canChange(player) then
+		return reply(false, "Switch loadouts in town, or between rounds of a Ranked match.")
+	end
+	local label = GearPresets.Parts[kind].Label
+	if Presets.list(player, kind)[index] then
+		local ok, message = Presets.wear(player, kind, index)
+		return reply(ok, message)
+	end
+	-- An empty slot: a new loadout, starting from what you wear. Changes
+	-- you make now are saved into it.
+	all(player).Active[kind] = index
+	Presets.captureActive(player)
+	PlayerData.sync(player)
+	return reply(
+		true,
+		string.format("New %s loadout %d: swap pieces in and it saves as you go.", string.lower(label), index)
+	)
+end
+
 function Presets.start()
+	Shop.register("LoadoutSelect", selectLoadout)
+	-- Every change to what you wear saves into the active loadouts.
+	PlayerData.CharacterChanged:Connect(function(player)
+		Presets.captureActive(player)
+		PlayerData.sync(player)
+	end)
 	Shop.register("PresetSave", save)
 	Shop.register("PresetRename", rename)
 	Shop.register("PresetApply", apply)

@@ -94,6 +94,8 @@ function Augments.start()
 			return Shop.reply(false, "Learn " .. node.Name .. " in the Augment Tree first.")
 		end
 		PlayerData.setManeuver(player, slot, id)
+		require(script.Parent.Presets).captureActive(player) -- the active weapon loadout keeps it
+		PlayerData.sync(player)
 		return Shop.reply(true, string.format("%s on key %d.", node.Name, slot))
 	end)
 	Shop.register("ResetAugments", function(player)
