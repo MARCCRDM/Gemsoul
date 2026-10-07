@@ -301,14 +301,10 @@ local function samePick(a: Pick?, b: Pick?): boolean
 	end
 	return a.Slot == b.Slot and a.Id == b.Id and a.Key == b.Key
 end
--- Picking on the left shows it in OVERVIEW; picking in a bag highlights it
--- there, and picking it again opens OVERVIEW.
-local function select(pick: Pick?, fromBag: boolean?)
-	local again = samePick(selection, pick)
+-- Picking anything (a worn piece, a key, a bag item) opens its details in a
+-- popup over the Inventory; closing it clears the pick.
+local function select(pick: Pick?)
 	selection = pick
-	if not fromBag or again then
-		tab = "Overview"
-	end
 	draw()
 end
 
@@ -851,13 +847,13 @@ local function drawGems()
 				gemArt(art, gem)
 			end,
 			function()
-				select({ Kind = "Gem", Gem = gem }, true)
+				select({ Kind = "Gem", Gem = gem })
 			end,
 			{ Kind = "Gem", Gem = gem }
 		)
 	end
 	footer.Text = if selection and selection.Kind == "Gem"
-		then string.upper(gemName(selection.Gem)) .. "  ·  TAP AGAIN FOR DETAILS, OR DRAG IT ONTO A SOCKET"
+		then string.upper(gemName(selection.Gem)) .. "  ·  TAP FOR DETAILS, OR DRAG IT ONTO A SOCKET"
 		else "DRAG A GEM ONTO A GEAR SOCKET OR A Q · E · R KEY"
 end
 
@@ -949,7 +945,7 @@ local function drawArmor()
 					gearArt(art, item.Slot, item.Id, false, color)
 				end,
 				function()
-					select({ Kind = "Spare", Slot = item.Slot, Id = item.Id }, true)
+					select({ Kind = "Spare", Slot = item.Slot, Id = item.Id })
 				end,
 				{ Kind = "Spare", Slot = item.Slot, Id = item.Id }
 			)
@@ -959,8 +955,8 @@ local function drawArmor()
 		emptyNote(page, "No spare gear here.\nRecover more in the mine or trade for it.")
 	end
 	footer.Text = if selection and selection.Kind == "Spare"
-		then "TAP AGAIN TO COMPARE AND EQUIP, OR DRAG IT ONTO ITS SLOT"
-		else "DRAG SPARE GEAR ONTO ITS SLOT, OR PICK IT TO COMPARE"
+		then "TAP FOR DETAILS AND EQUIP, OR DRAG IT ONTO ITS SLOT"
+		else "DRAG SPARE GEAR ONTO ITS SLOT, OR TAP IT TO COMPARE"
 end
 
 -- OVERVIEW: what's picked, or a summary.
@@ -1007,8 +1003,10 @@ local function header(parent: Instance, title: string, sub: string, color: Color
 	at(tile, 0, 0, 72, 72)
 	stroke(tile, color, 1.5)
 	paint(tile)
-	at(label(top, title, 18, color:Lerp(C.Text, 0.4), HEADING), 86, 10, 430, 26)
-	at(label(top, sub, 11, color, BOLD), 86, 40, 430, 18)
+	local name = label(top, title, 18, color:Lerp(C.Text, 0.4), HEADING)
+	name.Position, name.Size = UDim2.fromOffset(86, 10), UDim2.new(1, -86, 0, 26)
+	local kind = label(top, sub, 11, color, BOLD)
+	kind.Position, kind.Size = UDim2.fromOffset(86, 40), UDim2.new(1, -86, 0, 18)
 end
 local function emblem(kind: string, color: Color3)
 	return function(tile: Frame)
@@ -1040,7 +1038,9 @@ local function ratingDelta(loadout, slot: string, id: string)
 	end
 	return chips
 end
-local function drawOverview()
+-- Draws `pick`'s details (or, with no pick, the build summary) into
+-- `container`. False when the pick no longer exists.
+local function drawOverview(container: Instance, pick: Pick?): boolean
 	local loadout = loadoutNow()
 	local holder = new("ScrollingFrame", {
 		BackgroundTransparency = 1,
@@ -1050,20 +1050,20 @@ local function drawOverview()
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		Size = UDim2.fromScale(1, 1),
-	}, page)
+	}, container)
 	local list = UiKit.list(holder, 10)
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	new("UIPadding", { PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 2) }, holder)
-	local pick = selection
-	footer.Text = "PICK A PIECE, A GEM OR A SURGE KEY TO SEE IT HERE"
+	if container == page then
+		footer.Text = "TAP A PIECE, A GEM OR A SURGE KEY FOR ITS DETAILS"
+	end
 	if pick and (pick.Kind == "Worn" or pick.Kind == "Spare") then
 		local slot = pick.Slot :: string
 		local id = if pick.Kind == "Spare" then pick.Id else loadout[slot]
 		local gear = gearOf(loadout, slot, id)
 		if not gear then
-			selection = nil
-			clear(page)
-			return drawOverview()
+			holder:Destroy()
+			return false
 		end
 		local rarity = rarityOf(loadout, slot, id)
 		local color = rarityColor(rarity)
@@ -1112,6 +1112,7 @@ local function drawOverview()
 			"PICK A GEM",
 			false,
 			function()
+				selection = nil
 				tab = "Gems"
 				draw()
 			end,
@@ -1142,7 +1143,7 @@ local function drawOverview()
 		else
 			actions(holder, 9, { pickGem })
 		end
-		return
+		return true
 	end
 	if pick and pick.Kind == "Gem" then
 		local gem = pick.Gem
@@ -1189,7 +1190,7 @@ local function drawOverview()
 		else
 			line(holder, 2, "A rough gem: cut it before it can be socketed.", 12, C.Dim)
 		end
-		return
+		return true
 	end
 	if pick and pick.Kind == "Key" then
 		local key = pick.Key :: string
@@ -1222,13 +1223,14 @@ local function drawOverview()
 					"PICK A GEM",
 					true,
 					function()
+						selection = nil
 						tab = "Gems"
 						draw()
 					end,
 				},
 			})
 		end
-		return
+		return true
 	end
 	-- Nothing picked: the build at a glance.
 	local class = loadout.Class and Classes.get(loadout.Class)
@@ -1269,7 +1271,97 @@ local function drawOverview()
 		12,
 		C.Dim
 	)
+	return true
 end
+
+-- Details popup: a smaller window over the Inventory for whatever you tap.
+-- Tap outside it, the ✕ or Esc to close.
+local POP_W, POP_H = 480, 420
+local shade = new("TextButton", {
+	Text = "",
+	AutoButtonColor = false,
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BackgroundTransparency = 0.45,
+	Position = UDim2.fromOffset(-16, -16),
+	Size = UDim2.new(1, 32, 1, 32),
+	ZIndex = 20,
+	Visible = false,
+}, root)
+round(shade, 8)
+shade:SetAttribute("UiSound", "Back")
+-- (A button too, so taps on the window don't reach the shade.)
+local popCard = new("TextButton", {
+	Text = "",
+	AutoButtonColor = false,
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0, 16 + PANEL_H / 2),
+	Size = UDim2.fromOffset(POP_W, POP_H),
+}, shade)
+round(popCard, 6)
+stroke(popCard, P.Gold, 1.5)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(30, 24, 52), C.Panel) }, popCard)
+brackets(popCard, P.Gold, 12, 6)
+local popTitle = at(label(popCard, "DETAILS", 11, C.Dim, BOLD), 20, 12, POP_W - 80, 22)
+local popBody = new("Frame", { BackgroundTransparency = 1, ClipsDescendants = true }, popCard)
+popBody.Position, popBody.Size = UDim2.fromOffset(20, 42), UDim2.new(1, -32, 1, -58)
+local function closeDetails()
+	if selection then
+		selection = nil
+		draw()
+	end
+end
+local popClose = new("TextButton", {
+	Text = "✕",
+	TextSize = 16,
+	Font = HEADING,
+	TextColor3 = C.Text,
+	AutoButtonColor = true,
+	BackgroundColor3 = P.Frame,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -12, 0, 10),
+	Size = UDim2.fromOffset(30, 28),
+}, popCard)
+round(popClose, 5)
+stroke(popClose, C.PanelEdge, 1)
+popClose:SetAttribute("UiSound", "Back")
+popClose.Activated:Connect(closeDetails)
+shade.Activated:Connect(closeDetails)
+
+local POP_TITLE = { Worn = "WORN GEAR", Spare = "SPARE GEAR", Gem = "GEM", Key = "SURGE KEY" }
+local function drawPopup()
+	clear(popBody)
+	local pick = selection
+	if pick and not drawOverview(popBody, pick) then
+		selection = nil
+		pick = nil
+	end
+	shade.Visible = pick ~= nil
+	if not pick then
+		return
+	end
+	popTitle.Text = POP_TITLE[pick.Kind] or "DETAILS"
+	-- As tall as its contents (up to POP_H; longer ones scroll).
+	local holder = popBody:FindFirstChildWhichIsA("ScrollingFrame")
+	local layout = holder and holder:FindFirstChildWhichIsA("UIListLayout")
+	if layout then
+		local function fit()
+			popCard.Size = UDim2.fromOffset(POP_W, math.clamp(layout.AbsoluteContentSize.Y + 72, 200, POP_H))
+		end
+		fit()
+		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(fit)
+	end
+end
+UserInputService.InputBegan:Connect(function(input)
+	if
+		shade.Visible
+		and (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB)
+		and hostGui
+		and hostGui.Enabled
+	then
+		closeDetails()
+	end
+end)
 
 -- Bottom bar -----------------------------------------------------------------------------------------------
 
@@ -1290,7 +1382,9 @@ for order, spec in
 			"INVENTORY",
 			true,
 			function()
-				select(nil)
+				selection = nil
+				tab = "Overview"
+				draw()
 			end,
 		},
 		{ "SURGE ARRAY  [L]", false, openModule("SurgeArrayUI", "toggle") },
@@ -1479,7 +1573,7 @@ local function drawRight()
 	elseif tab == "Armor" then
 		drawArmor()
 	else
-		drawOverview()
+		drawOverview(page, nil)
 	end
 	local fresh = page:FindFirstChildWhichIsA("ScrollingFrame", true)
 	if keep and fresh then
@@ -1513,6 +1607,7 @@ function draw()
 		end
 		drawLeft()
 		drawRight()
+		drawPopup()
 	end)
 end
 
@@ -1587,6 +1682,9 @@ function InventoryScreen.mount(parent: GuiObject, host: ScreenGui, position: UDi
 			draw()
 		else
 			InventoryScreen.cancelDrag()
+			-- Reopening starts without a popup.
+			selection = nil
+			shade.Visible = false
 		end
 	end)
 	draw()
