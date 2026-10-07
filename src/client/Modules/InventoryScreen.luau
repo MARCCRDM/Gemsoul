@@ -308,12 +308,45 @@ local function select(pick: Pick?)
 	draw()
 end
 
--- Left: portrait and ratings -------------------------------------------------------------------------
+-- Left: a character sheet --------------------------------------------------------------------------------
+-- Armor down the left, weapon / shield / surges down the right, and your
+-- fighter in the middle with the ratings under them.
 
+local COL_W, CARD_H, ROW_GAP = 230, 91, 9
+local BODY_Y = 80
+local LEFT_COL, MID_X, RIGHT_COL = 18, 260, LEFT_W - 18 - COL_W
+local MID_W = RIGHT_COL - 10 - MID_X
+local STAGE_H = 236
+
+local nameLabel = at(label(left, "", 26, C.Text, HEADING), 20, 14, 420, 32)
+local subtitle = at(label(left, "", 12, C.Dim, BOLD), 20, 48, 440, 18)
+subtitle.RichText = true
+
+-- The stage: your fighter, full height, on a lit plinth.
 local portrait = box(left, P.Frame, 6)
-at(portrait, 20, 16, 62, 62)
-stroke(portrait, P.Gold, 1.5)
+at(portrait, MID_X, BODY_Y, MID_W, STAGE_H)
+stroke(portrait, C.PanelEdge, 1)
 portrait.ClipsDescendants = true
+new("UIGradient", {
+	Rotation = 90,
+	Color = ColorSequence.new(Color3.fromRGB(40, 33, 70), Color3.fromRGB(14, 12, 26)),
+}, portrait)
+brackets(portrait, P.Gold, 10, 5)
+local plinth = new("Frame", {
+	BorderSizePixel = 0,
+	BackgroundColor3 = P.Gold,
+	BackgroundTransparency = 0.55,
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -18),
+	Size = UDim2.fromOffset(150, 3),
+}, portrait)
+new("UIGradient", {
+	Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	}),
+}, plinth)
 local portraitView = new("ViewportFrame", {
 	BackgroundTransparency = 1,
 	Size = UDim2.fromScale(1, 1),
@@ -321,9 +354,8 @@ local portraitView = new("ViewportFrame", {
 	LightColor = Color3.fromRGB(255, 240, 215),
 	LightDirection = Vector3.new(-0.5, -0.8, 0.6),
 }, portrait)
-local nameLabel = at(label(left, "", 26, C.Text, HEADING), 96, 16, 520, 32)
-local subtitle = at(label(left, "", 12, C.Dim, BOLD), 96, 50, 600, 18)
-subtitle.RichText = true
+local stageTag = at(label(portrait, "", 10, P.Gold, BOLD), 12, 8, MID_W - 24, 14)
+stageTag.TextXAlignment = Enum.TextXAlignment.Center
 
 local function drawPortrait()
 	portraitView:ClearAllChildren()
@@ -351,18 +383,22 @@ local function drawPortrait()
 		end
 		copy:PivotTo(CFrame.new())
 		copy.Parent = world
-		local head = copy:FindFirstChild("Head")
-		local focus = if head and head:IsA("BasePart")
-			then head.Position - Vector3.new(0, 0.4, 0)
-			else Vector3.new(0, 1.5, 0)
-		camera.CFrame = CFrame.lookAt(focus + Vector3.new(0.8, 0.3, -5.5), focus)
+		-- The whole fighter, a little turned, filling the stage.
+		local bounds, size = copy:GetBoundingBox()
+		local focus = bounds.Position + Vector3.new(0, size.Y * 0.04, 0)
+		local distance = (size.Y * 0.62) / math.tan(math.rad(camera.FieldOfView / 2))
+		camera.CFrame = CFrame.lookAt(focus + Vector3.new(distance * 0.3, size.Y * 0.08, -distance), focus)
 	end)
 end
 
 local statTiles = {}
+local TILE_GAP = 6
+local TILE_W = math.floor((MID_W - 2 * TILE_GAP) / 3)
+local TILE_H = math.floor((PANEL_H - 12 - BODY_Y - STAGE_H - 8 - TILE_GAP) / 2)
 for i, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 	local tile = box(left, C.Card, 4)
-	at(tile, 20 + (i - 1) * 130, 92, 120, 62)
+	local column, row = (i - 1) % 3, (i - 1) // 3
+	at(tile, MID_X + column * (TILE_W + TILE_GAP), BODY_Y + STAGE_H + 8 + row * (TILE_H + TILE_GAP), TILE_W, TILE_H)
 	stroke(tile, STAT[name]:Lerp(C.PanelEdge, 0.55), 1)
 	new("Frame", {
 		BorderSizePixel = 0,
@@ -370,44 +406,42 @@ for i, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		Size = UDim2.new(0, 2, 1, -16),
 		Position = UDim2.fromOffset(0, 8),
 	}, tile)
-	at(label(tile, string.upper(name), 10, STAT[name]:Lerp(C.Text, 0.3), BOLD), 12, 8, 100, 14)
-	local value = at(label(tile, "0", 22, C.Text, HEADING), 12, 22, 100, 24)
+	at(label(tile, string.upper(name), 9, STAT[name]:Lerp(C.Text, 0.3), BOLD), 10, 6, TILE_W - 16, 12)
+	local value = at(label(tile, "0", 20, C.Text, HEADING), 10, 19, TILE_W - 16, 22)
 	local track = box(tile, C.Track, 2)
-	at(track, 12, 50, 96, 3)
+	at(track, 10, TILE_H - 9, TILE_W - 20, 3)
 	local fill = box(track, STAT[name], 2)
 	fill.Size = UDim2.fromScale(0, 1)
 	-- What gems add on top (Health, Power, Defense, Speed).
-	local bonus = at(label(tile, "", 10, P.Good, BOLD), 60, 26, 52, 16)
+	local bonus = at(label(tile, "", 9, P.Good, BOLD), TILE_W - 56, 23, 48, 14)
 	bonus.TextXAlignment = Enum.TextXAlignment.Right
 	statTiles[name] = { Value = value, Fill = fill, Bonus = bonus }
 end
 
--- Left: the 3 x 3 grid -------------------------------------------------------------------------------------
-
-local GRID_X, GRID_Y, CELL_W, CELL_H, GAP = 20, 168, 250, 94, 10
+-- The two columns of slots.
+local CELL_W = COL_W
 local function cellAt(column: number, row: number): Frame
 	local cell = box(left, C.Card, 4)
-	at(cell, GRID_X + (column - 1) * (CELL_W + GAP), GRID_Y + (row - 1) * (CELL_H + GAP), CELL_W, CELL_H)
+	at(cell, if column == 1 then LEFT_COL else RIGHT_COL, BODY_Y + (row - 1) * (CARD_H + ROW_GAP), CELL_W, CARD_H)
 	return cell
 end
 
--- Loadout tabs: tap 1-3 to switch (an empty slot starts a new loadout).
+-- Loadout tabs in the header: tap 1-3 to switch (an empty slot starts a
+-- new loadout).
 local pickers = {}
-local function loadoutPicker(part: string, column: number)
-	local cell = cellAt(column, 1)
-	cell.BackgroundColor3 = P.Frame
-	stroke(cell, C.PanelEdge, 1)
-	brackets(cell, P.Gold, 8, 4)
-	at(label(cell, string.upper(GearPresets.Parts[part].Label) .. " LOADOUT", 11, C.Dim, BOLD), 14, 8, 220, 14)
+local function loadoutPicker(part: string, x: number)
+	local cell = new("Frame", { BackgroundTransparency = 1 }, left)
+	at(cell, x, 10, 150, 64)
+	at(label(cell, string.upper(GearPresets.Parts[part].Label) .. " LOADOUT", 9, C.Dim, BOLD), 0, 0, 150, 12)
 	local chips = {}
 	for slot = 1, GearPresets.Count do
 		local chip = new("TextButton", { Text = "", AutoButtonColor = true, BackgroundColor3 = C.Card }, cell)
-		at(chip, 14 + (slot - 1) * 76, 28, 68, 36)
+		at(chip, (slot - 1) * 50, 15, 46, 34)
 		round(chip, 6)
 		local edge = stroke(chip, C.PanelEdge, 1.5)
-		local number = at(label(chip, tostring(slot), 16, C.Text, HEADING), 0, 2, 68, 20)
+		local number = at(label(chip, tostring(slot), 15, C.Text, HEADING), 0, 2, 46, 18)
 		number.TextXAlignment = Enum.TextXAlignment.Center
-		local state = at(label(chip, "", 9, C.Dim, BOLD), 0, 20, 68, 12)
+		local state = at(label(chip, "", 8, C.Dim, BOLD), 0, 19, 46, 12)
 		state.TextXAlignment = Enum.TextXAlignment.Center
 		chip:SetAttribute("UiSound", "Tab")
 		chip.Activated:Connect(function()
@@ -415,11 +449,11 @@ local function loadoutPicker(part: string, column: number)
 		end)
 		chips[slot] = { Button = chip, Stroke = edge, Number = number, State = state }
 	end
-	local hint = at(label(cell, "", 10, C.Dim, BODY), 14, 70, 222, 16)
+	local hint = at(label(cell, "", 9, C.Faint, BODY), 0, 52, 150, 12)
 	pickers[part] = { Chips = chips, Hint = hint }
 end
-loadoutPicker("Armor", 1)
-loadoutPicker("Weapon", 3)
+loadoutPicker("Armor", LEFT_W - 18 - 150 - 168)
+loadoutPicker("Weapon", LEFT_W - 18 - 150)
 
 -- The worn pieces.
 local wornCards = {}
@@ -436,10 +470,10 @@ local function wornCard(slot: string, column: number, row: number)
 	at(art, 10, 24, 62, 62)
 	stroke(art, C.PanelEdge, 1, 0.3)
 	-- Long names (with their gem's prefix) wrap onto a second line.
-	local name = at(label(cell, "", 13, C.Text, BOLD), 82, 26, 156, 34)
+	local name = at(label(cell, "", 13, C.Text, BOLD), 82, 26, CELL_W - 92, 34)
 	name.TextWrapped = true
 	name.TextYAlignment = Enum.TextYAlignment.Bottom
-	local rarity = at(label(cell, "", 10, C.Dim, BOLD), 82, 62, 156, 14)
+	local rarity = at(label(cell, "", 10, C.Dim, BOLD), 82, 62, CELL_W - 92, 14)
 	local socket = box(cell, P.Frame, 12)
 	at(socket, CELL_W - 30, 6, 22, 22)
 	local socketEdge = stroke(socket, C.PanelEdge, 1.2)
@@ -477,29 +511,34 @@ local function wornCard(slot: string, column: number, row: number)
 		end,
 	})
 end
-wornCard("Helmet", 2, 1)
-wornCard("Weapon", 1, 2)
-wornCard("Armor", 2, 2)
-wornCard("Shield", 3, 2)
+wornCard("Helmet", 1, 1)
+wornCard("Armor", 1, 2)
 wornCard("Gloves", 1, 3)
-wornCard("Boots", 2, 3)
+wornCard("Boots", 1, 4)
+wornCard("Weapon", 2, 1)
+wornCard("Shield", 2, 2)
 
 -- The Surge Array: Q / E / R keys, each showing its gem.
-local surgeCell = cellAt(3, 3)
-surgeCell.BackgroundColor3 = P.Frame
+local surgeCell = box(left, P.Frame, 4)
+at(surgeCell, RIGHT_COL, BODY_Y + 2 * (CARD_H + ROW_GAP), CELL_W, 2 * CARD_H + ROW_GAP)
 stroke(surgeCell, C.PanelEdge, 1)
-at(label(surgeCell, "SURGE ARRAY", 10, C.Dim, BOLD), 12, 6, 160, 14)
+brackets(surgeCell, P.Teal, 8, 4)
+at(label(surgeCell, "SURGE ARRAY", 10, C.Dim, BOLD), 12, 8, 160, 14)
+local KEY_W = math.floor((CELL_W - 24 - 2 * 6) / 3)
 local surgeKeys = {}
 for i, key in { "Q", "E", "R" } do
 	local keyBox = new("TextButton", { Text = "", BackgroundColor3 = C.Card, AutoButtonColor = true }, surgeCell)
-	at(keyBox, 12 + (i - 1) * 77, 24, 71, 62)
+	at(keyBox, 12 + (i - 1) * (KEY_W + 6), 28, KEY_W, 2 * CARD_H + ROW_GAP - 40)
 	round(keyBox, 4)
 	keyBox:SetAttribute("UiSound", "Click")
 	local edge = stroke(keyBox, C.PanelEdge, 1.5)
 	local art = new("Frame", { BackgroundTransparency = 1 }, keyBox)
-	at(art, 18, 4, 36, 36)
-	local letter = at(label(keyBox, key, 12, C.Text, HEADING), 4, 2, 20, 16)
-	local name = at(label(keyBox, "", 9, C.Dim, BOLD), 3, 42, 65, 16)
+	at(art, math.floor((KEY_W - 56) / 2), 28, 56, 56)
+	local letter = at(label(keyBox, key, 16, C.Text, HEADING), 0, 4, KEY_W, 20)
+	letter.TextXAlignment = Enum.TextXAlignment.Center
+	local name = at(label(keyBox, "", 10, C.Dim, BOLD), 4, 92, KEY_W - 8, 40)
+	name.TextWrapped = true
+	name.TextYAlignment = Enum.TextYAlignment.Top
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	keyBox.Activated:Connect(function()
 		if os.clock() >= suppressClickUntil then
@@ -1038,6 +1077,145 @@ local function ratingDelta(loadout, slot: string, id: string)
 	end
 	return chips
 end
+-- Overview pieces: an armor set's progress and tiers, and a surge key.
+local SET_STAT = {
+	Health = "%s HP",
+	Power = "%s Power",
+	Defense = "%s Defense",
+	Speed = "%s Speed",
+	Critical = "%s%% crit",
+	Cooldown = "%s%% cooldown",
+	HealingReceived = "%s%% healing",
+	DamageAfterDodge = "%s%% dmg after dodge",
+	DamageReduction = "%s%% damage taken",
+	ThreatGeneration = "%s%% threat",
+}
+local SET_PERCENT = {
+	Critical = true,
+	Cooldown = true,
+	HealingReceived = true,
+	DamageAfterDodge = true,
+	DamageReduction = true,
+	ThreatGeneration = true,
+}
+local function setBonusText(bonus): string
+	local parts = {}
+	for stat, amount in bonus do
+		local shown = if SET_PERCENT[stat] then amount * 100 else amount
+		local sign = if stat == "DamageReduction" or stat == "Cooldown" then "-" else "+"
+		table.insert(
+			parts,
+			string.format(SET_STAT[stat] or ("%s " .. stat), sign .. tostring(math.floor(shown * 10 + 0.5) / 10))
+		)
+	end
+	table.sort(parts)
+	return table.concat(parts, "  ·  ")
+end
+local function setCard(parent: Instance, order: number, family: string, count: number, tier: number)
+	local spec = ArmorFamilies.Families[family]
+	local tint = spec and spec.Color or P.Gold
+	local card = new("Frame", {
+		BackgroundColor3 = C.Card,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = order,
+	}, parent)
+	round(card, 4)
+	stroke(card, tint:Lerp(C.PanelEdge, 0.4), 1)
+	new("UIPadding", {
+		PaddingLeft = UDim.new(0, 12),
+		PaddingRight = UDim.new(0, 12),
+		PaddingTop = UDim.new(0, 8),
+		PaddingBottom = UDim.new(0, 10),
+	}, card)
+	UiKit.list(card, 4).SortOrder = Enum.SortOrder.LayoutOrder
+	local top = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 18), LayoutOrder = 0 }, card)
+	at(label(top, string.upper(family), 13, tint, HEADING), 0, 0, 160, 18)
+	-- Six pips, lit up to the pieces worn.
+	for i = 1, 6 do
+		local pip = box(top, if i <= count then tint else C.Track, 2)
+		pip.AnchorPoint = Vector2.new(1, 0.5)
+		pip.Position = UDim2.new(1, -(6 - i) * 14 - 34, 0.5, 0)
+		pip.Size = UDim2.fromOffset(10, 6)
+	end
+	local tally = at(label(top, string.format("%d/6", count), 11, C.Text, BOLD), 0, 0, 30, 18)
+	tally.AnchorPoint = Vector2.new(1, 0)
+	tally.Position = UDim2.new(1, 0, 0, 0)
+	tally.TextXAlignment = Enum.TextXAlignment.Right
+	for index, need in { 2, 4, 6 } do
+		local on = tier == need
+		local reached = count >= need
+		local row = label(
+			card,
+			string.format("%d  %s", need, setBonusText(ArmorFamilies.Sets[family][need] or {})),
+			11,
+			if on then C.Text elseif reached then C.Dim else C.Faint,
+			if on then BOLD else BODY
+		)
+		row.Size = UDim2.new(1, 0, 0, 0)
+		row.AutomaticSize = Enum.AutomaticSize.Y
+		row.TextWrapped = true
+		row.TextTruncate = Enum.TextTruncate.None
+		row.LayoutOrder = index
+		row.RichText = false
+	end
+	if count >= 2 and ArmorFamilies.EnhancementText[family] then
+		local perk = line(card, 4, ArmorFamilies.EnhancementText[family], 10, tint:Lerp(C.Text, 0.35))
+		perk.LayoutOrder = 4
+	end
+end
+local function surgeRow(parent: Instance, order: number, key: string, gem)
+	local surge = gem and Tech.surgeStats(gem)
+	local tint = if gem then gemColor(gem) else C.PanelEdge
+	local row = new("TextButton", {
+		Text = "",
+		AutoButtonColor = true,
+		BackgroundColor3 = C.Card,
+		Size = UDim2.new(1, 0, 0, 46),
+		LayoutOrder = order,
+	}, parent)
+	round(row, 4)
+	stroke(row, tint, 1, if gem then 0.2 else 0.5)
+	row:SetAttribute("UiSound", "Click")
+	local letter = at(label(row, key, 16, if gem then C.Text else C.Faint, HEADING), 10, 0, 22, 46)
+	letter.TextXAlignment = Enum.TextXAlignment.Center
+	local art = new("Frame", { BackgroundTransparency = 1 }, row)
+	at(art, 38, 5, 36, 36)
+	if gem then
+		gemArt(art, gem)
+	end
+	at(
+		label(row, if surge then surge.Name else "Empty", 13, if gem then tint:Lerp(C.Text, 0.3) else C.Faint, BOLD),
+		84,
+		6,
+		260,
+		18
+	)
+	at(
+		label(
+			row,
+			if surge
+				then string.format(
+					"%s %s  ·  %ss cooldown",
+					whole(surge.Cost or 0),
+					surge.Resource or "Charge",
+					whole(surge.Cooldown or 0)
+				)
+				else "Drag a cut gem here to cast its surge",
+			10,
+			C.Dim,
+			BODY
+		),
+		84,
+		24,
+		300,
+		16
+	)
+	row.Activated:Connect(function()
+		select({ Kind = "Key", Key = key })
+	end)
+end
+
 -- Draws `pick`'s details (or, with no pick, the build summary) into
 -- `container`. False when the pick no longer exists.
 local function drawOverview(container: Instance, pick: Pick?): boolean
@@ -1234,43 +1412,56 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 	end
 	-- Nothing picked: the build at a glance.
 	local class = loadout.Class and Classes.get(loadout.Class)
+	local state = if loadout.Class then Classes.setState(loadout) else { Active = {} }
 	header(holder, class and class.Name or "Miner", "YOUR BUILD", P.Gold, emblem("Equipment", P.Gold))
-	local sets = {}
-	local active = loadout.Class and Classes.setState(loadout).Active or {}
-	for _, family in ArmorFamilies.Order do
-		local state = active[family]
-		if state and state.Count > 0 then
-			table.insert(sets, { string.format("%s %d/6", family, state.Count), P.Gold })
+
+	-- Armor sets: progress to 6, and what each tier gives (the highest
+	-- reached replaces the lower ones).
+	line(holder, 1, "ARMOR SETS", 10, C.Dim, BOLD)
+	local shownSets = 0
+	for index, family in ArmorFamilies.Order do
+		local active = state.Active[family]
+		local count = if active then active.Count else 0
+		if count > 0 then
+			shownSets += 1
+			setCard(holder, 1 + index, family, count, active.Tier)
 		end
 	end
-	line(holder, 1, "ARMOR SETS", 10, C.Dim, BOLD)
-	chipRow(holder, 2, if #sets > 0 then sets else { { "None yet", C.Dim } })
-	local keys = {}
-	for _, key in { "Q", "E", "R" } do
-		local gem = Tech.surgeGem(loadout, key)
-		local surge = gem and Tech.surgeStats(gem)
-		table.insert(
-			keys,
-			{ key .. "  " .. (if surge then surge.Name else "Empty"), if gem then gemColor(gem) else C.Dim }
-		)
+	if shownSets == 0 then
+		line(holder, 2, "Wear matching pieces of one family (2 / 4 / 6) for set bonuses.", 12, C.Dim)
 	end
-	line(holder, 3, "SURGES", 10, C.Dim, BOLD)
-	chipRow(holder, 4, keys)
-	line(holder, 5, "LOADOUTS", 10, C.Dim, BOLD)
-	line(
-		holder,
-		6,
-		"Tap 1, 2 or 3 to switch loadouts. An empty one starts from what you wear; every change you make saves into the loadout you're on. Ranked swaps them between rounds.",
-		12,
-		C.Text
-	)
-	line(
-		holder,
-		7,
-		"Drag gems onto gear sockets or Q · E · R keys. Changing gear enchantments needs Vey at the Arcanum.",
-		12,
-		C.Dim
-	)
+
+	-- Surges on Q / E / R.
+	line(holder, 10, "SURGE ARRAY", 10, C.Dim, BOLD)
+	for index, key in { "Q", "E", "R" } do
+		surgeRow(holder, 10 + index, key, Tech.surgeGem(loadout, key))
+	end
+
+	-- Gems in gear.
+	local attuned, elements = 0, {}
+	for _, slot in Slots.Order do
+		local gem = loadout[slot .. "Gem"]
+		if gem then
+			attuned += 1
+			elements[gem.Element] = (elements[gem.Element] or 0) + 1
+		end
+	end
+	line(holder, 20, "GEAR GEMS", 10, C.Dim, BOLD)
+	local chips =
+		{ { string.format("%d / %d sockets attuned", attuned, #Slots.Order), if attuned > 0 then C.Text else C.Dim } }
+	for _, element in GemConfig.Elements do
+		if elements[element] then
+			table.insert(
+				chips,
+				{
+					string.format("%s ×%d", GemConfig.elementName(element), elements[element]),
+					GemConfig.ElementColors[element],
+				}
+			)
+		end
+	end
+	chipRow(holder, 21, chips)
+	line(holder, 22, "Tap any piece, key or gem for details. Drag gems onto sockets or Q · E · R.", 11, C.Faint)
 	return true
 end
 
@@ -1423,6 +1614,9 @@ local function drawLeft()
 			best, bestCount = family, state.Count
 		end
 	end
+	stageTag.Text = if best
+		then string.format("%s SET  ·  %d / 6", string.upper(best), bestCount)
+		else "NO ARMOR SET YET"
 	subtitle.Text = string.upper(class and class.Name or "Miner")
 		.. (
 			if best
@@ -1469,7 +1663,7 @@ local function drawLeft()
 			chip.State.Text = if on then "ON" elseif saved then "SAVED" else "NEW"
 			chip.State.TextColor3 = if on then P.Gold elseif saved then C.Dim else C.Faint
 		end
-		picker.Hint.Text = string.format("Loadout %d  ·  your changes save into it", current)
+		picker.Hint.Text = string.format("On loadout %d  ·  autosaves", current)
 	end
 
 	-- Worn pieces (art redrawn only when the piece or its gem changes).
