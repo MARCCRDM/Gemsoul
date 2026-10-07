@@ -130,6 +130,37 @@ function Lock.switch()
 	outline.Adornee, outline.Enabled = target, target ~= nil
 	return target
 end
+-- Locks this target directly (a tap in the target list); it stays pinned.
+function Lock.select(model)
+	if not active then
+		return nil
+	end
+	local target = Rules.pick(state, records, model)
+	outline.Adornee, outline.Enabled = target, target ~= nil
+	return target
+end
+-- Who you're fighting: hostile targets close by (FoeRange), attacking you,
+-- or your Arena rival, nearest first. Empty outside fights.
+Lock.FoeRange = 45
+function Lock.foes(): { Model }
+	if not active then
+		return {}
+	end
+	local list = {}
+	for _, record in records do
+		if record.Allowed and (record.Distance <= Lock.FoeRange or record.Engaged or record.Priority) then
+			table.insert(list, record)
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.Distance < b.Distance
+	end)
+	local models = {}
+	for i, record in list do
+		models[i] = record.Target
+	end
+	return models
+end
 -- How many targets switching would cycle through (2+ means there's a choice).
 function Lock.switchCount()
 	return if active then #Rules.switchable(records) else 0
