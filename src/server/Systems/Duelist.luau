@@ -527,7 +527,10 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 		amount *= combo.Mult or 1
 	end
 	local previous = DamageLog.push(ability, element)
+	local victim = duel.Owner.Character and duel.Owner.Character:FindFirstChildOfClass("Humanoid")
+	local healthBefore = victim and victim.Health or 0
 	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy, crit)
+	dealt = if victim then math.max(0, healthBefore - victim.Health) else 0
 	DamageLog.pop(previous)
 	if combo and type(dealt) == "number" and dealt > 0 then
 		CombatServer.comboOnPlayer(duel.Owner, combo, duel.Enemy)
@@ -537,7 +540,7 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	end
 	-- Siphon Edge: its weapon heals it too.
 	if effects and effects.Lifesteal and type(dealt) == "number" and dealt > 0 and e.Alive then
-		e.Humanoid.Health = math.min(e.Humanoid.MaxHealth, e.Humanoid.Health + dealt * effects.Lifesteal)
+		e.Humanoid.Health = math.min(e.Humanoid.MaxHealth, e.Humanoid.Health + dealt * effects.Lifesteal * Enemies.healingMultiplier(e) * (1 + (effects.HealingReceived or 0)))
 	end
 	return dealt, guarded
 end
@@ -555,7 +558,7 @@ local function healSelf(duel, share: number, ability: string)
 	local enemy = duel.Enemy
 	local humanoid = enemy.Humanoid
 	local full = humanoid.MaxHealth * share
-	local healing = full * Enemies.healingMultiplier(enemy) * (duel.Kit and duel.Kit.Effects.HealingReceived or 1)
+	local healing = full * Enemies.healingMultiplier(enemy) * (1 + (duel.Kit and duel.Kit.Effects.HealingReceived or 0))
 	local restored = math.min(humanoid.MaxHealth - humanoid.Health, healing)
 	humanoid.Health += restored
 	DamageLog.send(
@@ -1040,7 +1043,7 @@ local function think(enemy, now: number)
 					local humanoid = enemy.Humanoid
 					humanoid.Health = math.min(
 						humanoid.MaxHealth,
-						humanoid.Health + dealt * zone.Leech * Enemies.healingMultiplier(enemy)
+						humanoid.Health + dealt * zone.Leech * Enemies.healingMultiplier(enemy) * (1 + (duel.Kit and duel.Kit.Effects.HealingReceived or 0))
 					)
 				end
 			end

@@ -9,7 +9,7 @@ for _, style in Lottery.Styles do
 			return {Id="choice"..calls, Element=chosen, Tier="Legendary", Size=10, Clarity=10, Cut=10}
 		end
 		local kit = Lottery.prepareChoice(fresh, style, element, factory)
-		check(kit.Version==2 and #kit.Gear==6 and #kit.Gems==2, "Chosen kit structure")
+		check(kit.Version==3 and #kit.Gear==6 and #kit.Gems==3, "Chosen kit structure")
 		for _, gear in kit.Gear do
 			check(gear.Id==(if gear.Slot=="Weapon" then "SwordShield" else "Armor"..style..gear.Slot.."1"), "Wrong chosen family")
 		end
@@ -18,9 +18,9 @@ for _, style in Lottery.Styles do
 			check(entry.Gem.Size==1 and entry.Gem.Clarity==1 and entry.Gem.Cut==1 and entry.Gem.SurgeRank==1, "Random starter advantage")
 			check(Tech.canSocket(entry.Gem, if index==1 then "Q" else "E", {}), "Invalid starter role")
 		end
-		check(Lottery.prepareChoice(fresh,"Juggernaut","Poison",factory)==kit and calls==2,"Choice rerolled on retry")
+		check(Lottery.prepareChoice(fresh,"Juggernaut","Poison",factory)==kit and calls==3,"Choice rerolled on retry")
 		check(Lottery.finish(fresh,200),"Choice claim failed")
-		check(fresh.Character.Surge3Gem==nil and Tech.surgeGem(fresh.Character,"R").Surge=="DefaultShift","Neutral Shift missing")
+		check(fresh.Character.Surge3Gem~=nil and Tech.surgeOf(fresh.Character.Surge3Gem)==GemRoller.StarterSurges[element][3],"Third starter Surge missing")
 		check(fresh.Character.WeaponGem==nil and fresh.Character.ArmorGem==nil,"Starter equipment enchanted")
 		check(Lottery.finish(fresh,200) and #fresh.Gems==0,"Choice duplicated on retry")
 	end
@@ -35,9 +35,6 @@ local function generate(element) counter+=1; return {Id="starter"..counter,Eleme
 local plan=Lottery.prepare(profile,rng,generate)
 check(#plan.Gear==6 and plan.Gear[1].Slot=="Boots" and plan.Gear[6].Slot=="Helmet","Equipment reveal order")
 check(#plan.Gems==9 and counter==9,"Insufficient starter gems")
-check(GemRoller.prototypeRole(plan.Gems[7].Gem.Surge)=="Attack","Starter Q needs Attack")
-check(GemRoller.prototypeRole(plan.Gems[8].Gem.Surge)=="Defense","Starter E needs Defense")
-check(GemRoller.prototypeRole(plan.Gems[9].Gem.Surge)=="Shift","Starter R needs Shift")
 check(#profile.Gems==0 and profile.Character.WeaponGem==nil,"Prepared rewards granted early")
 check(Lottery.prepare(profile,rng,generate)==plan and counter==9,"Reconnect or repeated request rerolled")
 local elements,ids={},{}

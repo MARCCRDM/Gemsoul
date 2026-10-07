@@ -20,6 +20,8 @@ for name, path in [
     ('ElementCombos', 'src/shared/ElementCombos.luau'),
 ]:
     source += module(name, path)
+    if name == "GemRoller":
+        source += "GemRoller.Prototype = true; GemRoller.RaritySurges = false\n"
 source += (ROOT / 'tests/surge_prototype_cases.luau').read_text(encoding='utf-8')
 with tempfile.TemporaryDirectory(prefix='gemsoul-surge-prototype-') as directory:
     script = Path(directory) / 'prototype.luau'

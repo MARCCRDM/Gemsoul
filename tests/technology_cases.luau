@@ -693,7 +693,7 @@ end
 -- Live play: the prototype is on (run_combat switches it off for these
 -- archived checks), and an old surge gem casts its element's prototype
 -- surge for its role.
-check(GemRoller.LivePrototype == true, "The surge prototype is off in live play")
+check(GemRoller.LivePrototype == false, "The retired surge prototype is still on in live play")
 GemRoller.Prototype, Tech.Prototype = true, true
 local projected = Tech.surgeGem({ Surge1Gem = { Id = "old", Element = "Fire", Surge = "ThermalBurst" } }, "Q")
 check(

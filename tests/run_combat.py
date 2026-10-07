@@ -23,8 +23,13 @@ source+=module('AugmentSystem','src/server/Systems/Augments.luau')
 source+=module('Progress','src/server/Systems/Progress.luau')
 source+=read('tests/combat_cases.luau')
 source+='\ndo\n'+read('tests/arena_drop_cases.luau')+'\nend\n'
+source+='\ndo\n'+read('tests/restored_surge_live_cases.luau')+'\nend\n'
+# Preserve the archived scaling contract as an explicit compatibility test.
+# The restored live model is exercised above and by run_restored_surges.py.
+source+='\nTech.RaritySurges=false; GemRoller.RaritySurges=false\n'
 source+='\ndo\n'+read('tests/technology_cases.luau')+'\nend\n'
 source+='\ndo\n'+read('tests/augment_cases.luau')+'\nend\n'
+source+='\nTech.RaritySurges=true; GemRoller.RaritySurges=true\n'
 source+='\ndo\n'+read('tests/duelist_cases.luau')+'\nend\n'
 source+=read('tests/combat_tutorial_cases.luau')
 source+='\ndo\n'+read('tests/weapon_perk_cases.luau')+'\nend\n'

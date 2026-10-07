@@ -1001,6 +1001,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		return false, true
 	end
 	local _, combo = ElementCombos.check({ Element = element, Heavy = heavy == true }, comboFlags(target, os.clock()))
+	local healthBefore = target.Humanoid.Health
 	if combo then
 		damage *= combo.Mult or 1
 	end
@@ -1029,7 +1030,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		enemyWard(source, target.Enemy)
 	end
 	if damage > 0 then
-		weaponPerksOnHit(source, k, st, target, damage, guarded)
+		weaponPerksOnHit(source, k, st, target, math.max(0, healthBefore - target.Humanoid.Health), guarded)
 		-- Landing the weapon builds Charge for your surges (with a gem to use it).
 		if not guarded and Tech.hasGem(k.Loadout) then
 			local rule = Tech.Resources.Charge
@@ -1371,6 +1372,7 @@ function technologyHitInner(player, k, target, definition, scale)
 		damage *= combo.Mult or 1
 	end
 	local guarded = false
+	local healthBefore = target.Humanoid.Health
 	if target.Player then
 		damage, guarded = receive(
 			target.Player,
@@ -1405,7 +1407,7 @@ function technologyHitInner(player, k, target, definition, scale)
 	end
 	-- Leech (Toxic Cloud): drink part of what it deals.
 	if definition.Leech then
-		CombatServer.heal(player, damage * definition.Leech)
+		CombatServer.heal(player, math.max(0, healthBefore - target.Humanoid.Health) * definition.Leech)
 	end
 	if definition.Blind then
 		local seconds = definition.BlindTime or 2.5

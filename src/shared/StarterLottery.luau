@@ -58,7 +58,7 @@ function Lottery.prepare(profile, rng, generate)
 		if GemRoller.RaritySurges and roleIndex then
 			local used = {}
 			for _, entry in reward.Gems do
-				if string.sub(entry.Slot, 1, 5) == "Surge" then used[entry.Gem.Surge] = true end
+				if string.sub(entry.Slot, 1, 5) == "Surge" and entry.Gem.Surge then used[entry.Gem.Surge] = true end
 			end
 			if used[gem.Surge] then
 				for _, id in GemRoller.Pools[gem.Element] do
