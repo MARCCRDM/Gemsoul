@@ -28,6 +28,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
 local GemArt = require(script.Parent.GemArt)
@@ -1009,8 +1010,13 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		if target == player.UserId then
 			return
 		end
+		if kind == "Duel" then
+			local other = Players:GetPlayerByUserId(target)
+			ChallengeChooser.open(target, other and other.DisplayName)
+			return
+		end
 		task.spawn(function()
-			local result = GemClient.request(if kind == "Duel" then "DuelChallenge" else "PartyInvite", target)
+			local result = GemClient.request("PartyInvite", target)
 			if result.Message and result.Message ~= "" then
 				UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
 			end

@@ -3,26 +3,31 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	Player duels in the Arena: queues, challenges and matches.
 
 	Request actions:
-	  "DuelQueue", mode       join the 1v1 queue, or (party leader of two)
-	                          the 2v2 queue for the whole party
+	  "DuelQueue", mode       join a queue: "1v1" (Ranked), "casual" (Casual),
+	                          or (party leader of two) "2v2" for the party
 	  "DuelCancel"            leave the queue (any member cancels a party's)
-	  "DuelChallenge", userId challenge someone in the server to a friendly 1v1
+	  "DuelChallenge", userId, stats   challenge someone in the server to a
+	                          1v1: stats "Full" (everything earned) or "Even"
 	  "DuelRespond", userId, accept   answer a challenge
 	  "DuelLeave"             forfeit the current duel
 
 	The Social remote tells clients:
 	  "Queue", { Mode, Since, Waiting } | nil   your queue state
-	  "Challenge", fromId, fromName, rating     someone challenged you
-	  "Match", { Id, Mode, Ranked, StartsAt, Ends, Team, Teams }
+	  "Challenge", fromId, fromName, rating, stats   someone challenged you
+	  "Match", { Id, Mode, Ranked, Rules, StartsAt, Ends, Team, Teams }
 	  "Fight"                                   the countdown is over
-	  "MatchEnd", { Won, Draw, Reason, Rating, Delta, Coins, Ranked }
+	  "MatchEnd", { Won, Draw, Reason, Rating, Delta, Coins, Ranked, Rules }
 	  "Feed", text                              a duel result, for everyone's chat
 
 	A match: both sides are moved into one of the Arena's lanes, shielded and
 	facing off for a countdown, then fight until a side is down (or the time
 	runs out: the healthier side wins). Duel fighters only hurt their
 	opponents (Shared.Matchmaking.versus). Leaving the Arena, the session or
-	the game forfeits. Queue matches are rated (Elo); challenges are friendly.
+	the game forfeits. Each match plays by a PvP rule (Shared.PvPRules):
+	Ranked queues are rated (Elo) on even stats with rarity capped; Casual is
+	unrated on even stats; a challenge plays the challenger's choice of full
+	progression or even stats. Fighters carry it as MatchStats /
+	MatchRarityCap, which the combat kit and stats read.
 	Each player's rating, wins and losses save in their profile (Duel).
 ]]
 local Players = game:GetService("Players")
@@ -31,6 +36,7 @@ local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
+local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local Season = require(ReplicatedStorage.Shared.Season)
 local CombatServer = require(script.Parent.CombatServer)
 local ArenaSessions = require(script.Parent.ArenaSessions)
@@ -49,7 +55,8 @@ local queue = {}
 -- [id] = { Id, Mode, Ranked, Teams, Out, Slot, State, StartsAt, Ends, Connections }
 local matches = {}
 local matchOf: { [Player]: any } = {}
-local challenges: { [Player]: { [Player]: number } } = {} -- target -> challenger -> expiry
+-- target -> challenger -> { Expiry, Stats }
+local challenges: { [Player]: { [Player]: { Expiry: number, Stats: string } } } = {}
 local nextId = 0
 
 local function serverNow(): number
@@ -233,6 +240,8 @@ local function release(match)
 			if member.Parent then
 				member:SetAttribute("MatchId", nil)
 				member:SetAttribute("MatchTeam", nil)
+				member:SetAttribute("MatchStats", nil)
+				member:SetAttribute("MatchRarityCap", nil)
 				if member:GetAttribute("CombatSession") == "Duel" then
 					ArenaSessions.leave(member)
 				end
@@ -256,7 +265,7 @@ function finish(match, winner: number?, reason: string)
 	end
 	match.State = "Done"
 	local ratings = { teamRating(match.Teams[1]), teamRating(match.Teams[2]) }
-	local rewards = if match.Ranked then Matchmaking.Rewards.Ranked else Matchmaking.Rewards.Friendly
+	local rewards = match.Rules.Rewards
 	local names = {}
 	for t, team in match.Teams do
 		local list = {}
@@ -302,6 +311,7 @@ function finish(match, winner: number?, reason: string)
 					Delta = after - before,
 					Coins = coins,
 					Opponents = names[if t == 1 then 2 else 1],
+					Rules = { Name = match.Rules.Name, Stats = match.Rules.Stats },
 				})
 			end
 		end
@@ -311,18 +321,20 @@ function finish(match, winner: number?, reason: string)
 		Remotes.Social:FireAllClients(
 			"Feed",
 			string.format(
-				"⚔ %s defeated %s in a %s %s.",
+				"⚔ %s defeated %s in a %s duel (%s).",
 				names[winner],
 				names[if winner == 1 then 2 else 1],
 				if match.Ranked then "ranked" else "friendly",
-				match.Mode
+				match.Rules.Name
 			)
 		)
 	end
 	task.delay(Matchmaking.EndPause, release, match)
 end
 
-local function startMatch(mode: string, teams, ranked: boolean): (boolean, string?)
+-- `rules`: the PvP rule it plays by (Shared.PvPRules.profile).
+local function startMatch(mode: string, teams, rules): (boolean, string?)
+	local ranked = rules.Rated
 	local slot = freeSlot()
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
 	local floor = landmarks and landmarks:GetAttribute("ArenaFloor")
@@ -349,6 +361,7 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 		Id = "D" .. nextId,
 		Mode = mode,
 		Ranked = ranked,
+		Rules = rules,
 		Teams = teams,
 		Out = {},
 		Slot = slot,
@@ -366,6 +379,10 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 			matchOf[member] = match
 			ArenaDrop.prepare(member)
 			CombatServer.reset(member)
+			-- The rule its stats follow (CombatServer's kit, Equipment's stats)
+			-- before the health is topped up below.
+			member:SetAttribute("MatchStats", rules.Stats)
+			member:SetAttribute("MatchRarityCap", rules.RarityCap)
 			member:SetAttribute("MatchId", match.Id)
 			member:SetAttribute("MatchTeam", t)
 			member:SetAttribute("PvPEnabled", true)
@@ -393,6 +410,7 @@ local function startMatch(mode: string, teams, ranked: boolean): (boolean, strin
 				Id = match.Id,
 				Mode = mode,
 				Ranked = ranked,
+				Rules = { Name = rules.Name, Stats = rules.Stats, Label = PvPRules.label(rules) },
 				StartsAt = startsAt,
 				Ends = startsAt + Matchmaking.TimeLimit,
 				Team = t,
@@ -463,7 +481,9 @@ function Duels.pairUp()
 				return
 			end
 			local a, b = entries[pair[1]], entries[pair[2]]
-			local ok, problem = startMatch(mode, { table.clone(a.Players), table.clone(b.Players) }, true)
+			local kind = Matchmaking.Modes[mode].Kind or "Ranked"
+			local ok, problem =
+				startMatch(mode, { table.clone(a.Players), table.clone(b.Players) }, PvPRules.profile(kind))
 			if not ok then
 				-- Someone became busy: drop whoever it was from the queue.
 				for _, entry in { a, b } do
@@ -485,8 +505,9 @@ local function byUserId(userId: any): Player?
 	return if typeof(userId) == "number" then Players:GetPlayerByUserId(userId) else nil
 end
 
-local function challenge(player: Player, userId: any)
+local function challenge(player: Player, userId: any, stats: any)
 	local target = byUserId(userId)
+	stats = if stats == "Full" then "Full" else "Even"
 	if not target or target == player then
 		return reply(false, "That player isn't here.")
 	end
@@ -497,14 +518,15 @@ local function challenge(player: Player, userId: any)
 		end
 	end
 	challenges[target] = challenges[target] or {}
-	challenges[target][player] = os.clock() + Matchmaking.ChallengeSeconds
+	challenges[target][player] = { Expiry = os.clock() + Matchmaking.ChallengeSeconds, Stats = stats }
 	local record = Duels.record(player)
 	Remotes.Social:FireClient(
 		target,
 		"Challenge",
 		player.UserId,
 		player.DisplayName,
-		if record then record.Rating else Matchmaking.StartRating
+		if record then record.Rating else Matchmaking.StartRating,
+		stats
 	)
 	return reply(true, "Challenged " .. target.DisplayName .. " to a duel.")
 end
@@ -512,18 +534,18 @@ end
 local function respond(player: Player, userId: any, accept: any)
 	local from = byUserId(userId)
 	local pending = challenges[player]
-	local expiry = from and pending and pending[from]
+	local offer = from and pending and pending[from]
 	if pending and from then
 		pending[from] = nil
 	end
-	if not from or not expiry or os.clock() > expiry then
+	if not from or not offer or os.clock() > offer.Expiry then
 		return reply(false, "That challenge has expired.")
 	end
 	if accept ~= true then
 		Remotes.Notify:FireClient(from, player.DisplayName .. " declined your duel.")
 		return reply(true, "Challenge declined.")
 	end
-	local ok, problem = startMatch("1v1", { { from }, { player } }, false)
+	local ok, problem = startMatch("1v1", { { from }, { player } }, PvPRules.profile("Challenge", offer.Stats))
 	if not ok then
 		return reply(false, problem or "The duel couldn't start.")
 	end
@@ -550,8 +572,8 @@ local function step()
 		end
 	end
 	for _, pending in challenges do
-		for from, expiry in pending do
-			if now > expiry then
+		for from, offer in pending do
+			if now > offer.Expiry then
 				pending[from] = nil
 			end
 		end

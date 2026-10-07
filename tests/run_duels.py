@@ -9,6 +9,7 @@ def module(name, path):
     return f'local {name}=(function()\n{source}\nend)()\n'
 
 source = read('tests/duels_services.luau')
+source += module('PvPRules', 'src/shared/PvPRules.luau')
 source += module('Matchmaking', 'src/shared/Matchmaking.luau')
 source += module('Season', 'src/shared/Season.luau')
 source += 'Duels=(function()\n' + re.sub(r'^local \w+ = (require\([^\n]+\)|game:GetService\([^\n]+\))\n', '', read('src/server/Systems/Duels.luau'), flags=re.M) + '\nend)()\n'

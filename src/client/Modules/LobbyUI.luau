@@ -26,14 +26,16 @@ local P = IronUi.Colors
 local new = IronUi.new
 
 local LobbyUI = {}
-LobbyUI.Unlocks = { Dungeon = 3, Ranked = 10 }
+LobbyUI.Unlocks = { Dungeon = 3, Casual = 3, Ranked = 10 }
 -- Key art for each card (assets/images/lobby/*.png, painted by
 -- tools/make_lobby_cards.py). 0 = not uploaded yet: the card shows its emblem.
+-- Casual reuses the duel art (same fight, nothing on the line).
 LobbyUI.Art = {
 	Duel = 104755259743768,
 	Dungeon = 85958638729400,
 	Ranked = 108455735818338,
 }
+LobbyUI.Art.Casual = LobbyUI.Art.Duel
 
 local GREEN = Color3.fromRGB(62, 220, 120)
 local RED = Color3.fromRGB(232, 72, 72)
@@ -112,8 +114,8 @@ local function heading(value, color, x, align)
 	return l
 end
 heading("PRACTICE", P.Text, 0, Enum.TextXAlignment.Left)
-heading("RANKED", RED, 700, Enum.TextXAlignment.Right)
--- The divider between practice and ranked.
+heading("VS PLAYERS", RED, 700, Enum.TextXAlignment.Right)
+-- The divider between practice and the player modes.
 new("Frame", {
 	Position = UDim2.fromOffset(806, 60),
 	Size = UDim2.fromOffset(2, 500),
@@ -282,17 +284,34 @@ card({
 		run("DungeonFind")
 	end,
 })
+-- Player modes: both fight on even stats (Shared.PvPRules), stacked.
+card({
+	Title = "1v1 CASUAL",
+	Art = "Casual",
+	Kicker = "EVEN STATS · NO RATING",
+	Sub = "Real players, same base stats. Just for the fight.",
+	Emblem = "Equipment",
+	Color = P.Teal,
+	X = 830,
+	Y = 60,
+	W = 290,
+	H = 240,
+	Unlock = "Casual",
+	Go = function()
+		run("DuelQueue", "casual")
+	end,
+})
 card({
 	Title = "1v1 RANKED",
 	Art = "Ranked",
 	Kicker = "RATING 1000",
-	Sub = "Real players from this server. Your rating is on the line.",
+	Sub = "Even stats, gear capped at Ultra Rare. Rating on the line.",
 	Emblem = "Equipment",
 	Color = RED,
 	X = 830,
-	Y = 60,
+	Y = 320,
 	W = 290,
-	H = 500,
+	H = 240,
 	Unlock = "Ranked",
 	Go = function()
 		run("DuelQueue", "1v1")

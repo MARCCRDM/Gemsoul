@@ -27,7 +27,9 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
+local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local ArenaScene = require(script.Parent.ArenaScene)
+local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -372,7 +374,7 @@ local function drawPlayers()
 				invite.Position = UDim2.new(1, -84, 0, 4)
 			end
 			local duel = chip(row, "⚔ Duel", P.Gold, function()
-				run("DuelChallenge", other.UserId)
+				ChallengeChooser.open(other.UserId, other.DisplayName)
 			end, 76)
 			duel.Position = UDim2.new(1, -84, 0, 32)
 			duel.Active, duel.AutoButtonColor = free, free
@@ -1021,7 +1023,13 @@ local function showFaceoff(info)
 	match = info
 	result.Visible = false
 	local mine, theirs = info.Teams[info.Team], info.Teams[if info.Team == 1 then 2 else 1]
-	faceKind.Text = string.format("%s %s", if info.Ranked then "RANKED" else "FRIENDLY", string.upper(info.Mode))
+	-- What the fight counts (Shared.PvPRules): the kind, then its stats.
+	local rules = info.Rules
+	local kind = if info.Ranked
+		then "RANKED 1V1"
+		elseif rules and rules.Name then string.upper(rules.Name)
+		else "FRIENDLY " .. string.upper(info.Mode)
+	faceKind.Text = if rules and rules.Label then kind .. "  ·  " .. rules.Label else kind
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
 	faceoff.Visible = true
 end
@@ -1038,7 +1046,10 @@ local function showResult(info)
 		else ""
 	local change = if info.Ranked
 		then string.format("Rating %d (%s%d)", info.Rating, if info.Delta >= 0 then "+" else "", info.Delta)
-		else "Friendly duel (unrated)"
+		else string.format(
+			"%s (unrated)",
+			if info.Rules and info.Rules.Name then info.Rules.Name else "Friendly duel"
+		)
 	resultLine.Text = string.format("%svs %s\n%s  ·  +%d coins", why, info.Opponents or "?", change, info.Coins or 0)
 	result.Visible = true
 	task.delay(Matchmaking.EndPause + 0.5, function()
@@ -1104,7 +1115,7 @@ remotes:WaitForChild("Party").OnClientEvent:Connect(function(kind: string, a: an
 		end)
 	end
 end)
-remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: any, b: any, c: any)
+remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: any, b: any, c: any, d: any)
 	if kind == "Queue" then
 		queued = a
 		SocialUI.refresh()
@@ -1112,7 +1123,12 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 		prompt(
 			"⚔",
 			"Duel challenge",
-			string.format("%s (rating %d) challenges you to a friendly 1v1.", b, c or 0),
+			string.format(
+				"%s (rating %d) challenges you to a 1v1 on %s.",
+				b,
+				c or 0,
+				string.lower(PvPRules.label(PvPRules.profile("Challenge", d)))
+			),
 			Matchmaking.ChallengeSeconds,
 			P.Gold,
 			function(accept)

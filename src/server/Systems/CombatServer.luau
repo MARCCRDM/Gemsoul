@@ -7,6 +7,7 @@ local EquipmentBalance = require(ReplicatedStorage.Shared.EquipmentBalance)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local WeaponForge = require(ReplicatedStorage.Shared.WeaponForge)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -109,9 +110,17 @@ local function kitFor(loadout, augments)
 		Rules = Actions.forWeapon(Classes.setState(loadout).Counts, weapon, effects),
 	}
 end
+-- A duel's PvP rule (Shared.PvPRules, set by Duels): Ranked caps gear above
+-- Ultra Rare; a full-progression challenge brings the Augment Tree's perks
+-- into the Arena, where every other session fights without them.
 local function kit(player)
 	local loadout = PlayerData.character(player)
-	return kitFor(loadout, if inArena(player) then {} else Tree.effects(PlayerData.get(player)))
+	local rules = PvPRules.forAttributes(player:GetAttribute("MatchStats"), player:GetAttribute("MatchRarityCap"))
+	if rules and rules.RarityCap then
+		loadout = PvPRules.capLoadout(loadout, rules.RarityCap)
+	end
+	local full = rules ~= nil and rules.Stats == "Full"
+	return kitFor(loadout, if inArena(player) and not full then {} else Tree.effects(PlayerData.get(player)))
 end
 CombatServer.kitFor = kitFor
 local function rating(k, stat)

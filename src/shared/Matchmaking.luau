@@ -25,9 +25,12 @@
 ]]
 local Matchmaking = {}
 
+-- Queues. `Kind` is the PvP rule each plays by (Shared.PvPRules): Casual is
+-- unrated practice on even stats; Ranked is rated, even stats, rarity capped.
 Matchmaking.Modes = {
-	["1v1"] = { Name = "1v1 Duel", Size = 1 },
-	["2v2"] = { Name = "2v2 Party Duel", Size = 2 },
+	["1v1"] = { Name = "1v1 Ranked", Size = 1, Kind = "Ranked" },
+	["2v2"] = { Name = "2v2 Party Duel", Size = 2, Kind = "Ranked" },
+	["casual"] = { Name = "1v1 Casual", Size = 1, Kind = "Casual" },
 }
 Matchmaking.StartRating = 1000
 Matchmaking.K = 32
@@ -36,10 +39,7 @@ Matchmaking.TimeLimit = 120 -- seconds: then the healthier side wins
 Matchmaking.EndPause = 4 -- seconds on the result before heading back
 Matchmaking.ChallengeSeconds = 30
 Matchmaking.Lanes = 4 -- duels running side by side in the Arena
-Matchmaking.Rewards = {
-	Ranked = { Win = 40, Loss = 10 },
-	Friendly = { Win = 15, Loss = 5 },
-}
+-- Coins for a duel: by its PvP rule (Shared.PvPRules.Kinds).
 
 Matchmaking.Raid = {
 	Min = 3, -- raiders needed to start

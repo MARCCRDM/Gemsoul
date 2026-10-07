@@ -13,6 +13,7 @@ local ChatRules = require(ReplicatedStorage.Shared.ChatRules)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -549,8 +550,10 @@ local function run(line: string)
 		task.spawn(GemClient.request, "ChatRoll", command.Max)
 	elseif kind == "Invite" or kind == "Duel" then
 		local target = findPlayer(command.Target)
-		if target then
-			act(if kind == "Invite" then "PartyInvite" else "DuelChallenge", target.UserId)
+		if target and kind == "Invite" then
+			act("PartyInvite", target.UserId)
+		elseif target then
+			ChallengeChooser.open(target.UserId, target.DisplayName)
 		end
 	elseif kind == "Trade" then
 		local target = command.Target and findPlayer(command.Target)
@@ -705,7 +708,7 @@ openMenu = function(userId: number)
 		act("PartyInvite", other.UserId)
 	end)
 	popupItem("Challenge to a duel", Color3.fromRGB(255, 120, 110), 4, function()
-		act("DuelChallenge", other.UserId)
+		ChallengeChooser.open(other.UserId, other.DisplayName)
 	end)
 	popupItem("Trade", ChatRules.Channels.Trade.Color, 5, function()
 		TradeUI.openWith(other.UserId)

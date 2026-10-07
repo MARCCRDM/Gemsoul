@@ -23,6 +23,7 @@ local FrontierAssets = require(script.Parent.FrontierAssets)
 local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 
@@ -1309,10 +1310,18 @@ local function applyStats(character: Model, loadout, profile)
 	if not humanoid then
 		return
 	end
+	-- In a duel, its PvP rule (Shared.PvPRules): Ranked fights gear capped at
+	-- Ultra Rare; even stats leave the Augment Tree out.
+	local owner = Players:GetPlayerFromCharacter(character)
+	local rules = owner
+		and PvPRules.forAttributes(owner:GetAttribute("MatchStats"), owner:GetAttribute("MatchRarityCap"))
+	if rules and rules.RarityCap then
+		loadout = PvPRules.capLoadout(loadout, rules.RarityCap)
+	end
 	local ratings = Classes.ratings(loadout)
 	-- Agile armor (Fleet) adds a little on top.
 	local extra = Classes.effects(loadout).SpeedAdd or 0
-	local augments = Tree.effects(profile)
+	local augments = if rules and rules.Stats == "Even" then {} else Tree.effects(profile)
 	humanoid.WalkSpeed = (Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus) + extra)
 		* (1 + (augments.Mobility or 0))
 	local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
@@ -1894,6 +1903,17 @@ local function watch(player: Player)
 		task.wait(0.2)
 		dressWhenReady(character)
 	end)
+	-- A duel's PvP rule (set at the match start, cleared at the end) changes
+	-- health and speed, so restat the body when it does.
+	for _, key in { "MatchStats", "MatchRarityCap" } do
+		player:GetAttributeChangedSignal(key):Connect(function()
+			local character = player.Character
+			local loadout = PlayerData.character(player)
+			if character and loadout then
+				applyStats(character, loadout, PlayerData.get(player))
+			end
+		end)
+	end
 end
 
 function Equipment.start()

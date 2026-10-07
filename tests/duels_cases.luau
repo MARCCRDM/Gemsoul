@@ -10,7 +10,10 @@ Duels.start()
 check(math.abs(Matchmaking.expected(1000, 1000) - 0.5) < 1e-9, "Even ratings aren't a coin flip")
 check(Matchmaking.rated(1000, 1000, true) == 1016 and Matchmaking.rated(1000, 1000, false) == 984, "Elo step")
 check(Matchmaking.rated(1400, 1000, true) < 1400 + 5, "An expected win paid like an upset")
-check(Matchmaking.window(0) == 100 and Matchmaking.window(20) == 600 and Matchmaking.window(999) == 1000, "Rating window")
+check(
+	Matchmaking.window(0) == 100 and Matchmaking.window(20) == 600 and Matchmaking.window(999) == 1000,
+	"Rating window"
+)
 local entries = {
 	{ Rating = 1000, Since = 0, Size = 1 },
 	{ Rating = 1500, Since = 1, Size = 1 },
@@ -20,7 +23,10 @@ local entries = {
 local pairs = Matchmaking.pair(entries, 5)
 check(#pairs == 1 and pairs[1][1] == 1 and pairs[1][2] == 3, "Closest rating within the window, sizes kept apart")
 check(#Matchmaking.pair(entries, 30) == 1, "A wide gap paired before the window allowed it")
-check(#Matchmaking.pair({ entries[1], { Rating = 1500, Since = 0, Size = 1 } }, 20) == 1, "A long wait never widened the window")
+check(
+	#Matchmaking.pair({ entries[1], { Rating = 1500, Since = 0, Size = 1 } }, 20) == 1,
+	"A long wait never widened the window"
+)
 local function stub(attrs)
 	return {
 		GetAttribute = function(_, k)
@@ -32,16 +38,29 @@ check(Matchmaking.versus(stub({}), stub({})), "Two strangers can't fight in the 
 check(not Matchmaking.versus(stub({ PartyId = "1" }), stub({ PartyId = "1" })), "Party members can hurt each other")
 check(Matchmaking.versus(stub({ PartyId = "1" }), stub({ PartyId = "2" })), "Different parties can't fight")
 check(not Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({})), "A duellist hit an outsider")
-check(not Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ MatchId = "D2", MatchTeam = 2 })), "Duellists in different matches fight")
-check(not Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ MatchId = "D1", MatchTeam = 1 })), "Teammates fight")
-check(Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ MatchId = "D1", MatchTeam = 2 })), "Opponents can't fight")
+check(
+	not Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ MatchId = "D2", MatchTeam = 2 })),
+	"Duellists in different matches fight"
+)
+check(
+	not Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ MatchId = "D1", MatchTeam = 1 })),
+	"Teammates fight"
+)
+check(
+	Matchmaking.versus(stub({ MatchId = "D1", MatchTeam = 1 }), stub({ MatchId = "D1", MatchTeam = 2 })),
+	"Opponents can't fight"
+)
 local a1 = Matchmaking.lane(1, 1, 1, 1)
 local b1 = Matchmaking.lane(1, 2, 1, 1)
 check(math.abs((a1 - b1).Magnitude - 40) < 1e-6, "Opponents don't face off 40 studs apart, as in the intro")
 check((a1 + b1).Magnitude < 1e-6, "Opponents aren't across the floor's centre")
 local t1, t2 = Matchmaking.lane(2, 1, 1, 2), Matchmaking.lane(2, 1, 2, 2)
 local o1 = Matchmaking.lane(2, 2, 1, 2)
-check(math.abs((t1 - t2).Magnitude - 5) < 1e-6 and math.abs((t1.X - t2.X) * (o1.X - t1.X) + (t1.Z - t2.Z) * (o1.Z - t1.Z)) < 1e-6, "Teammates don't stand side by side")
+check(
+	math.abs((t1 - t2).Magnitude - 5) < 1e-6
+		and math.abs((t1.X - t2.X) * (o1.X - t1.X) + (t1.Z - t2.Z) * (o1.Z - t1.Z)) < 1e-6,
+	"Teammates don't stand side by side"
+)
 for slot = 1, Matchmaking.Lanes do
 	for team = 1, 2 do
 		for index = 1, 2 do
@@ -62,27 +81,65 @@ check(handlers.DuelQueue(ben, "1v1").Ok, "Ben not queued")
 advance(0.25)
 local match = Duels.matchOf(ana)
 check(match ~= nil and match == Duels.matchOf(ben) and match.Ranked, "Queue didn't start a ranked match")
-check(ana:GetAttribute("CombatSession") == "Duel" and ana:GetAttribute("PvPEnabled") == true, "Not put in a duel session")
-check(ana:GetAttribute("MatchId") == match.Id and ana:GetAttribute("MatchTeam") ~= ben:GetAttribute("MatchTeam"), "Match ids or teams wrong")
+check(
+	ana:GetAttribute("CombatSession") == "Duel" and ana:GetAttribute("PvPEnabled") == true,
+	"Not put in a duel session"
+)
+check(
+	ana:GetAttribute("MatchId") == match.Id and ana:GetAttribute("MatchTeam") ~= ben:GetAttribute("MatchTeam"),
+	"Match ids or teams wrong"
+)
 check(ana:GetAttribute("DuelQueue") == nil and last(ana, "Queue")[2] == nil, "Still shown as queued")
-check(math.abs((ana.Root.Position - ben.Root.Position).Magnitude-40)<.001, "Online 1v1 must use the default 40-stud face-off spots")
+check(
+	math.abs((ana.Root.Position - ben.Root.Position).Magnitude - 40) < 0.001,
+	"Online 1v1 must use the default 40-stud face-off spots"
+)
 check(resets[ana] and resets[ben], "Combat state not reset for the duel")
 local info = last(ana, "Match")[2]
 check(info.Mode == "1v1" and info.Ranked and #info.Teams == 2 and info.Teams[2][1].Name == "Ben", "Match info wrong")
-check(not handlers.DuelQueue(ana, "1v1").Ok and not handlers.DuelChallenge(ana, ben.UserId).Ok, "Queued or challenged mid-duel")
+-- Ranked: even stats, rarity capped at Ultra Rare, said on the match screen.
+check(
+	ana:GetAttribute("MatchStats") == "Even" and ana:GetAttribute("MatchRarityCap") == PvPRules.UltraRare,
+	"Ranked isn't even stats with rarity capped"
+)
+check(
+	info.Rules and info.Rules.Stats == "Even" and string.find(info.Rules.Label, "RARITY CAPPED", 1, true),
+	"Ranked rules not shown"
+)
+check(
+	not handlers.DuelQueue(ana, "1v1").Ok and not handlers.DuelChallenge(ana, ben.UserId).Ok,
+	"Queued or challenged mid-duel"
+)
 advance(Matchmaking.Countdown)
 check(match.State == "Fight" and last(ana, "Fight") ~= nil, "Countdown never ended")
 kill(ben)
 check(match.State == "Done", "A knockout didn't end the match")
 local won, lost = last(ana, "MatchEnd")[2], last(ben, "MatchEnd")[2]
 check(won.Won and not lost.Won and won.Delta == 16 and lost.Delta == -16, "Rating change wrong")
-check(profiles[ana].Duel.Rating == 1016 and profiles[ana].Duel.Wins == 1 and profiles[ben].Duel.Losses == 1, "Record not saved")
-check(profiles[ana].Coins == Matchmaking.Rewards.Ranked.Win and profiles[ben].Coins == Matchmaking.Rewards.Ranked.Loss, "Rewards wrong")
+check(
+	profiles[ana].Duel.Rating == 1016 and profiles[ana].Duel.Wins == 1 and profiles[ben].Duel.Losses == 1,
+	"Record not saved"
+)
+check(
+	profiles[ana].Coins == PvPRules.Kinds.Ranked.Rewards.Win
+		and profiles[ben].Coins == PvPRules.Kinds.Ranked.Rewards.Loss,
+	"Rewards wrong"
+)
 check(xp[ana] == "DuelWin" and xp[ben] == "DuelPlay" and Season.XP[xp[ana]] > Season.XP[xp[ben]], "XP wrong")
 check(ana:GetAttribute("DuelRating") == 1016, "Public rating not updated")
-check(last(ana, "Feed") ~= nil and string.find(last(ana, "Feed")[2], "Ana defeated Ben", 1, true), "No result in the chat feed")
+check(
+	last(ana, "Feed") ~= nil and string.find(last(ana, "Feed")[2], "Ana defeated Ben", 1, true),
+	"No result in the chat feed"
+)
 advance(Matchmaking.EndPause)
-check(Duels.matchOf(ana) == nil and ana:GetAttribute("MatchId") == nil and ana:GetAttribute("CombatSession") == nil, "Not released after the match")
+check(
+	Duels.matchOf(ana) == nil and ana:GetAttribute("MatchId") == nil and ana:GetAttribute("CombatSession") == nil,
+	"Not released after the match"
+)
+check(
+	ana:GetAttribute("MatchStats") == nil and ana:GetAttribute("MatchRarityCap") == nil,
+	"PvP rule kept after the match"
+)
 check(ana.Humanoid.Health == ana.Humanoid.MaxHealth, "Winner not healed on the way back")
 respawn(ben)
 
@@ -99,9 +156,19 @@ check(not handlers.DuelRespond(ben, 999, true).Ok, "Accepted a challenge nobody 
 check(handlers.DuelRespond(ben, ana.UserId, true).Ok, "Challenge not accepted")
 match = Duels.matchOf(ben)
 check(match and not match.Ranked, "A challenge started a ranked match")
+-- No choice given: even stats, no rarity cap; the small challenge reward.
+check(
+	last(ben, "Challenge")[5] == "Even"
+		and ben:GetAttribute("MatchStats") == "Even"
+		and ben:GetAttribute("MatchRarityCap") == nil,
+	"A plain challenge wasn't even stats"
+)
 advance(Matchmaking.Countdown)
 ben:SetAttribute("CombatSession", nil) -- the Leave button
-check(match.State == "Done" and last(ana, "MatchEnd")[2].Won and last(ana, "MatchEnd")[2].Reason == "Left", "Leaving didn't forfeit")
+check(
+	match.State == "Done" and last(ana, "MatchEnd")[2].Won and last(ana, "MatchEnd")[2].Reason == "Left",
+	"Leaving didn't forfeit"
+)
 check(last(ana, "MatchEnd")[2].Delta == 0 and profiles[ana].Duel.Rating == 1016, "A friendly duel changed the rating")
 advance(Matchmaking.EndPause)
 -- An expired challenge can't be accepted.
@@ -109,13 +176,26 @@ check(handlers.DuelChallenge(ana, ben.UserId).Ok, "Second challenge refused")
 advance(Matchmaking.ChallengeSeconds + 1)
 check(not handlers.DuelRespond(ben, ana.UserId, true).Ok, "Accepted an expired challenge")
 
--- Time limit: the healthier side wins -------------------------------------------
-check(handlers.DuelChallenge(ana, ben.UserId).Ok and handlers.DuelRespond(ben, ana.UserId, true).Ok, "Third duel")
+-- Time limit: the healthier side wins (a full-progression challenge) -----------
+local coinsBefore = profiles[ben].Coins
+check(
+	handlers.DuelChallenge(ana, ben.UserId, "Full").Ok and last(ben, "Challenge")[5] == "Full",
+	"Full challenge not offered"
+)
+check(handlers.DuelRespond(ben, ana.UserId, true).Ok, "Third duel")
 match = Duels.matchOf(ana)
+check(
+	ana:GetAttribute("MatchStats") == "Full" and last(ana, "Match")[2].Rules.Label == "FULL PROGRESSION",
+	"Full progression not applied"
+)
 advance(Matchmaking.Countdown)
 ana.Humanoid.Health = 100
 advance(Matchmaking.TimeLimit)
-check(match.State == "Done" and last(ben, "MatchEnd")[2].Won and last(ben, "MatchEnd")[2].Reason == "Time", "Time limit winner wrong")
+check(
+	match.State == "Done" and last(ben, "MatchEnd")[2].Won and last(ben, "MatchEnd")[2].Reason == "Time",
+	"Time limit winner wrong"
+)
+check(profiles[ben].Coins - coinsBefore == PvPRules.Kinds.Challenge.Rewards.Win, "Challenge reward wrong")
 advance(Matchmaking.EndPause)
 
 -- 2v2: a party of two queues together; only its leader can queue it -----------
@@ -144,6 +224,53 @@ parties[ben] = nil
 partyAB.Members = { ana }
 advance(0.25)
 check(ana:GetAttribute("DuelQueue") == nil, "A broken party stayed queued")
+
+-- Casual: matched like Ranked, but unrated, even stats and no rarity cap -------
+local eve, fay = makePlayer(5, "Eve"), makePlayer(6, "Fay")
+check(handlers.DuelQueue(eve, "casual").Ok and handlers.DuelQueue(fay, "casual").Ok, "Casual queue refused")
+advance(0.25)
+match = Duels.matchOf(eve)
+check(match and match == Duels.matchOf(fay) and not match.Ranked, "Casual didn't start an unrated match")
+check(
+	eve:GetAttribute("MatchStats") == "Even" and eve:GetAttribute("MatchRarityCap") == nil,
+	"Casual isn't even stats without a cap"
+)
+local eveCoins, fayCoins = profiles[eve].Coins, profiles[fay].Coins
+advance(Matchmaking.Countdown)
+kill(fay)
+check(
+	last(eve, "MatchEnd")[2].Delta == 0 and profiles[eve].Duel.Rating == Matchmaking.StartRating,
+	"Casual changed a rating"
+)
+check(
+	profiles[eve].Coins - eveCoins == PvPRules.Kinds.Casual.Rewards.Win
+		and profiles[fay].Coins - fayCoins == PvPRules.Kinds.Casual.Rewards.Loss,
+	"Casual rewards wrong"
+)
+advance(Matchmaking.EndPause)
+respawn(fay)
+
+-- The rules themselves: profiles, labels and the rarity cap --------------------
+check(
+	PvPRules.profile("Challenge", "Full").Stats == "Full" and PvPRules.profile("Challenge").Stats == "Even",
+	"Challenge stats choice"
+)
+check(PvPRules.profile("Casual", "Full").Stats == "Even", "Casual let full progression in")
+check(PvPRules.label(PvPRules.profile("Casual")) == "EVEN STATS", "Casual label")
+do
+	local roll5 = { Rarity = 5, Stats = { Health = 20, Power = 10 } }
+	local roll3 = { Rarity = 3, Stats = { Health = 9 } }
+	local loadout = { Armor = "a", GearRolls = { Armors = { a = roll5, b = roll3 } } }
+	local capped = PvPRules.capLoadout(loadout, PvPRules.UltraRare)
+	local a = capped.GearRolls.Armors.a
+	check(a.Rarity == 4 and a.Stats.Health == 16 and a.Stats.Power == 8, "A Legendary roll wasn't scaled to Ultra Rare")
+	check(capped.GearRolls.Armors.b == roll3, "A roll under the cap was changed")
+	check(
+		roll5.Rarity == 5 and roll5.Stats.Health == 20 and loadout.GearRolls.Armors.a == roll5,
+		"Capping changed the saved loadout"
+	)
+	check(PvPRules.capLoadout(loadout, nil) == loadout, "No cap still copied the loadout")
+end
 
 -- Lanes: more duels than lanes wait for a free one -----------------------------
 local extra = {}
@@ -174,4 +301,8 @@ for i = 2, 10 do
 end
 check(running == 2 * Matchmaking.Lanes, "A freed lane wasn't reused")
 
-print("PASS: " .. checks .. " duel checks (Elo, pairing, lanes, who can hit whom, queue, challenges, 2v2 parties, knockouts, forfeits, time limit, rewards)")
+print(
+	"PASS: "
+		.. checks
+		.. " duel checks (Elo, pairing, lanes, who can hit whom, queue, challenges, 2v2 parties, knockouts, forfeits, time limit, rewards)"
+)
