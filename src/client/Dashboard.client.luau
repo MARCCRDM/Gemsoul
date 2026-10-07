@@ -419,32 +419,12 @@ player.PlayerGui.ChildAdded:Connect(function(child)
 		gui.Enabled = false
 	end
 end)
-local welcomed = false
-local function maybeWelcome()
-	local profile = GemClient.Profile
-	if welcomed or introOpen() or not profile or not profile.Intro or not profile.Intro.Done then
-		return
-	end
-	welcomed = true
-	-- Not over the first duel: once it's done and you're in the lobby.
-	task.spawn(function()
-		task.wait(3)
-		while player:GetAttribute("CombatSession") ~= nil do
-			task.wait(1)
-		end
-		task.wait(2)
-		ShopUI.showWelcome()
-	end)
-end
 player.PlayerGui.ChildRemoved:Connect(function(child)
 	if child.Name == "Intro" then
 		syncVisibility()
 		CharacterUI.open()
-		maybeWelcome()
 	end
 end)
-GemClient.Changed:Connect(maybeWelcome)
-task.defer(maybeWelcome)
 
 -- Shortcuts for the Inventory's own windows.
 local KEYS = {

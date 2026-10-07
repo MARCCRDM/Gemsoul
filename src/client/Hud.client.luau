@@ -384,24 +384,11 @@ local function introOpen(): boolean
 end
 gui.Enabled = not introOpen()
 
--- New players: offer the Welcome Bundle once the intro is done.
-local welcomed = false
-local function maybeWelcome()
-	local profile = GemClient.Profile
-	if welcomed or introOpen() or not profile or not profile.Intro or not profile.Intro.Done then
-		return
-	end
-	welcomed = true
-	task.delay(3, ShopUI.showWelcome)
-end
 player.PlayerGui.ChildRemoved:Connect(function(child)
 	if child.Name == "Intro" then
 		gui.Enabled = true
-		maybeWelcome()
 	end
 end)
-GemClient.Changed:Connect(maybeWelcome)
-task.defer(maybeWelcome)
 
 -- Keys (C is bound by the character screen, K by combat).
 local KEYS = {
