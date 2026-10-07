@@ -1835,8 +1835,34 @@ local function drawTooltipContent()
 end
 
 -- The inspector body takes the whole panel unless there are action buttons.
+-- Back from an item to the overview card (stats, loadout, presets).
+local overview = new("TextButton", {
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, 4, 0, -4),
+	Size = UDim2.fromOffset(96, 22),
+	Text = "◂ OVERVIEW",
+	TextSize = 11,
+	Font = BOLD,
+	TextColor3 = P.Frame,
+	BackgroundColor3 = P.Gold,
+	Visible = false,
+	ZIndex = 5,
+}, tooltip)
+UiKit.round(overview, 4)
+overview.Activated:Connect(function()
+	selection = nil
+	drawTooltip()
+end)
+UserInputService.InputBegan:Connect(function(input, processed)
+	if input.KeyCode == Enum.KeyCode.Escape and not processed and selection ~= nil and gui.Enabled then
+		selection = nil
+		drawTooltip()
+	end
+end)
+
 function drawTooltip()
 	drawTooltipContent()
+	overview.Visible = selection ~= nil
 	local hasActions = false
 	for _, child in tipActions:GetChildren() do
 		if child:IsA("GuiObject") then
