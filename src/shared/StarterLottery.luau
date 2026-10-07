@@ -4,6 +4,29 @@ local Lottery = {}
 Lottery.Version = 1
 Lottery.GearOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet" }
 Lottery.GemOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet", "Surge1", "Surge2", "Surge3" }
+Lottery.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
+function Lottery.validChoice(style, element)
+	return table.find(Lottery.Styles, style) ~= nil and GemRoller.PrototypeIds[element] ~= nil
+end
+-- Explicit choice is persisted before the reveal. Retrying never rerolls it.
+function Lottery.prepareChoice(profile, style, element, generate)
+	if profile.Intro.Lottery then return profile.Intro.Lottery end
+	if not Lottery.validChoice(style, element) then return nil end
+	local reward = { Version = 2, Style = style, Element = element, Gear = {}, Gems = {}, Granted = false }
+	for _, slot in Lottery.GearOrder do
+		table.insert(reward.Gear, { Slot = slot, Id = if slot == "Weapon" then "SwordShield" else "Armor" .. style .. slot .. "1" })
+	end
+	for index, slot in {"Surge1", "Surge2"} do
+		local gem = generate(element)
+		gem.Element, gem.Tier = element, "Common"
+		gem.Size, gem.Clarity, gem.Cut = 1, 1, 1
+		gem.SurgeTier, gem.SurgeRank, gem.CutMethod = 1, 1, "Starter"
+		gem.Surge = GemRoller.PrototypeIds[element][index]
+		table.insert(reward.Gems, { Slot = slot, Gem = gem })
+	end
+	profile.Intro.Lottery = reward
+	return reward
+end
 function Lottery.prepare(profile, rng, generate)
 	if profile.Intro.Lottery then
 		-- Already rolled (its gems are kept), but not yet claimed: the gear

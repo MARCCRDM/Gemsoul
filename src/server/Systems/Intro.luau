@@ -22,6 +22,9 @@ local reply = Shop.reply
 local Intro = {}
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 
 local function newGem(source: string, luck: number?): GemConfig.Gem
 	return GemGenerator.generate(Gems.random(), source, {
@@ -106,17 +109,32 @@ local function suitUp(player: Player)
 	return reply(true, "Suited up.")
 end
 
-local function prepareLottery(player: Player)
+local function prepareLottery(player: Player, style, element)
 	local profile = PlayerData.get(player)
 	if not profile or profile.Intro.Done then
 		return reply(false, "Your starter kit is already claimed.")
 	end
+	if not profile.Intro.Lottery and not Lottery.validChoice(style, element) then
+		return reply(false, "Choose an armor style and starter element first.")
+	end
 	giveStarterKit(player)
-	local reward = Lottery.prepare(profile, Gems.random(), function(element)
-		return GemRoller.setElement(newGem("StarterSpin"), element)
+	local reward = Lottery.prepareChoice(profile, style, element, function(chosenElement)
+		return GemRoller.setElement(newGem("StarterKit"), chosenElement)
 	end)
+	if reward.Version == 2 then
+		for _, entry in reward.Gear do
+			local kind = Slots.Definitions[entry.Slot].Kind
+			PlayerData.setGearQuality(player, kind, entry.Id, 1)
+			local roll = GearRolls.roll(Random.new(1701), 1, ArmorFamilies.ById[entry.Id])
+			roll.Prismatic = nil
+			roll.Finish = ({Prospector=5, Skirmisher=3, Juggernaut=1})[reward.Style]
+			roll.Visor, roll.Variant = 2, 1
+			profile.Character.GearRolls[kind][entry.Id] = roll
+			PlayerData.equipGear(player, kind, entry.Id)
+		end
+	end
 	PlayerData.sync(player)
-	return reply(true, "Your launch lottery is ready!", { Lottery = reward })
+	return reply(true, "Your chosen starter kit is ready!", { Lottery = reward })
 end
 local function quickStart(player: Player)
 	local profile = PlayerData.get(player)
@@ -135,7 +153,7 @@ local function quickStart(player: Player)
 		return reply(false, message)
 	end
 	PlayerData.augmentsChanged(player)
-	return reply(true, "Nine gemstones attuned. Welcome to Saga Miners!", { Lottery = profile.Intro.Lottery })
+	return reply(true, "Starter kit equipped. Q: Attack · E: Defense · R: Shift.", { Lottery = profile.Intro.Lottery })
 end
 
 local function firstStone(player: Player)

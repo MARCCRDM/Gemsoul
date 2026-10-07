@@ -1,5 +1,32 @@
 local checks=0
 local function check(ok,msg) checks+=1; assert(ok,msg) end
+for _, style in Lottery.Styles do
+	for _, element in {"Fire", "Frost", "Shock", "Poison"} do
+		local fresh = {Intro={}, Character={ItemGems={}}, Gems={}}
+		local calls = 0
+		local function factory(chosen)
+			calls += 1
+			return {Id="choice"..calls, Element=chosen, Tier="Legendary", Size=10, Clarity=10, Cut=10}
+		end
+		local kit = Lottery.prepareChoice(fresh, style, element, factory)
+		check(kit.Version==2 and #kit.Gear==6 and #kit.Gems==2, "Chosen kit structure")
+		for _, gear in kit.Gear do
+			check(gear.Id==(if gear.Slot=="Weapon" then "SwordShield" else "Armor"..style..gear.Slot.."1"), "Wrong chosen family")
+		end
+		for index, entry in kit.Gems do
+			check(entry.Gem.Element==element and entry.Gem.Tier=="Common", "Starter element/rarity")
+			check(entry.Gem.Size==1 and entry.Gem.Clarity==1 and entry.Gem.Cut==1 and entry.Gem.SurgeRank==1, "Random starter advantage")
+			check(Tech.canSocket(entry.Gem, if index==1 then "Q" else "E", {}), "Invalid starter role")
+		end
+		check(Lottery.prepareChoice(fresh,"Juggernaut","Poison",factory)==kit and calls==2,"Choice rerolled on retry")
+		check(Lottery.finish(fresh,200),"Choice claim failed")
+		check(fresh.Character.Surge3Gem==nil and Tech.surgeGem(fresh.Character,"R").Surge=="DefaultShift","Neutral Shift missing")
+		check(fresh.Character.WeaponGem==nil and fresh.Character.ArmorGem==nil,"Starter equipment enchanted")
+		check(Lottery.finish(fresh,200) and #fresh.Gems==0,"Choice duplicated on retry")
+	end
+end
+check(Lottery.prepareChoice({Intro={}},"Invalid","Fire",function() error("Should not generate") end)==nil,"Invalid style accepted")
+check(Lottery.prepareChoice({Intro={}},"Prospector","Invalid",function() error("Should not generate") end)==nil,"Invalid element accepted")
 local profile={Intro={Done=false},Character={ItemGems={}},Gems={}}
 for _,slot in Lottery.GearOrder do profile.Character[slot]=slot.."Item" end
 local counter=0
