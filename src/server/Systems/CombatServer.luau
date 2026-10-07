@@ -20,6 +20,7 @@ local DamageLog = require(script.Parent.DamageLog)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local CombatEvents = require(script.Parent.CombatEvents)
 local CombatServer = {}
 local states = {}
 local WHITE = Color3.new(1, 1, 1)
@@ -1111,6 +1112,9 @@ local function attack(player, aim, heavy, swing)
 		end
 		fx("Shot", player, origin, origin + ray * along, color, k.Weapon.Look)
 	end
+	if landed then
+		CombatEvents.fire(player, if heavy then "Heavy" else "Hit")
+	end
 	if swing then
 		if landed and not interrupted then
 			st.ComboSide, st.ComboCount, st.ComboAt = swing.Side, swing.Combo, now
@@ -1187,6 +1191,7 @@ local function dodge(player, requested, kind)
 		Ends = now + duration,
 		Lift = if hop then Actions.Base.Hop.Lift else nil,
 	}
+	CombatEvents.fire(player, "Dodge")
 	pcall(function()
 		root:SetNetworkOwner(nil)
 	end)
@@ -1755,6 +1760,9 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	local castTime = Actions.castTime(definition)
 	local castKind = Actions.castKind(definition)
 	posePlayer(player, Actions.castPose(definition), castTime, definition.Name, definition.Element)
+	if surgeKey then
+		CombatEvents.fire(player, "Surge")
+	end
 	local castSpeed = Actions.castMovement(definition)
 	if castSpeed < 1 then
 		st.CastUntil, st.CastSpeed = now + castTime, castSpeed

@@ -763,9 +763,11 @@ function Enemies.damage(
 		color,
 		matchTag
 	)
-	if enemy.Kind.Dummy then
-		-- Dummies never break; they just count.
-		humanoid.Health = math.max(1, humanoid.Health - amount)
+	if enemy.Kind.Dummy or (enemy :: any).Training then
+		-- Dummies never break; they just count. (A sparring partner in
+		-- combat training keeps a quarter of its health until the real spar.)
+		local floor = if (enemy :: any).Training then humanoid.MaxHealth * 0.25 else 1
+		humanoid.Health = math.max(floor, humanoid.Health - amount)
 		updateBar(enemy)
 		return
 	end
