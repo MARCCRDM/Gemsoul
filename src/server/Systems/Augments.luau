@@ -6,11 +6,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 local Augments = {}
 local function canChange(player)
-	if player:GetAttribute("CombatSession") or player:GetAttribute("Expedition") then
-		return false
-	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	return not root or not Combat.canFight(root.Position)
+	return Combat.canChangeBuild(player)
 end
 function Augments.start()
 	Shop.register("LearnAugment", function(player, id)
@@ -19,7 +15,7 @@ function Augments.start()
 			return Shop.reply(false, "Profile unavailable.")
 		end
 		if not canChange(player) then
-			return Shop.reply(false, "Return to the dashboard or town to change augments.")
+			return Shop.reply(false, "You can't change augments during a fight or an expedition.")
 		end
 		local ok, message = Tree.learn(profile, id)
 		if ok then
@@ -34,7 +30,7 @@ function Augments.start()
 			return Shop.reply(false, "Profile unavailable.")
 		end
 		if not canChange(player) then
-			return Shop.reply(false, "Return to the dashboard or town to change augments.")
+			return Shop.reply(false, "You can't change augments during a fight or an expedition.")
 		end
 		local ok, message = Tree.upgrade(profile, id)
 		if ok then
@@ -48,11 +44,14 @@ function Augments.start()
 			return Shop.reply(false, "Pick a gem and a surge slot.")
 		end
 		if not canChange(player) then
-			return Shop.reply(false, "Return to the dashboard or town to change your surges.")
+			return Shop.reply(false, "You can't change your surges during a fight or an expedition.")
 		end
 		local gem = PlayerData.socketSurge(player, gemId, key)
 		if not gem then
-			return Shop.reply(false, "Choose a cut gem: Q/E accept distinct Attack or Defense Surges; R accepts Shift only.")
+			return Shop.reply(
+				false,
+				"Choose a cut gem: Q/E accept distinct Attack or Defense Surges; R accepts Shift only."
+			)
 		end
 		local id, tier, rank = Tech.surgeOf(gem)
 		local surge = id and Tech.Catalog[id]
@@ -67,7 +66,7 @@ function Augments.start()
 			return Shop.reply(false, "Pick a surge slot.")
 		end
 		if not canChange(player) then
-			return Shop.reply(false, "Return to the dashboard or town to change your surges.")
+			return Shop.reply(false, "You can't change your surges during a fight or an expedition.")
 		end
 		local gem = PlayerData.unsocketSurge(player, key)
 		if not gem then
@@ -104,7 +103,7 @@ function Augments.start()
 			return Shop.reply(false, "Profile unavailable.")
 		end
 		if not canChange(player) then
-			return Shop.reply(false, "Return to the dashboard or town to change augments.")
+			return Shop.reply(false, "You can't change augments during a fight or an expedition.")
 		end
 		local ok, message = Tree.respec(profile)
 		PlayerData.augmentsChanged(player)

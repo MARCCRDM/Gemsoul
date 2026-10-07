@@ -79,11 +79,7 @@ local function clickable(parent, onClick)
 	return b
 end
 local function canChange()
-	if player:GetAttribute("CombatSession") or player:GetAttribute("Expedition") then
-		return false
-	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	return not root or not Combat.canFight(root.Position)
+	return Combat.canChangeBuild(player)
 end
 local function request(action, ...)
 	if busy then
@@ -515,7 +511,7 @@ function SurgeArrayUI.refresh()
 	amplifierBox(body, amps)
 	if not canChange() then
 		local lock = place(
-			label(body, "Return to the dashboard or town to change your loadout.", 11, P.Bad, IronUi.Body),
+			label(body, "You can't change your loadout during a fight or an expedition.", 11, P.Bad, IronUi.Body),
 			0,
 			HEIGHT - 116,
 			620,

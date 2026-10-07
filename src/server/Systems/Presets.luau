@@ -85,11 +85,7 @@ end
 
 -- Out of fights only (the same rule as changing surges).
 local function canChange(player: Player): boolean
-	if player:GetAttribute("CombatSession") or player:GetAttribute("Expedition") or player:GetAttribute("MatchId") then
-		return false
-	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	return not root or not Combat.canFight(root.Position)
+	return Combat.canChangeBuild(player)
 end
 
 --[[
@@ -190,7 +186,7 @@ local function apply(player: Player, part: any, slot: any)
 		return reply(false, "Pick a loadout slot.")
 	end
 	if not canChange(player) then
-		return reply(false, "Switch loadouts in town, or between rounds of a Ranked match.")
+		return reply(false, "You can't switch loadouts during a fight or an expedition.")
 	end
 	local ok, message = Presets.wear(player, kind, index)
 	return reply(ok, message)
@@ -203,7 +199,7 @@ local function selectLoadout(player: Player, part: any, slot: any)
 		return reply(false, "Pick a loadout slot.")
 	end
 	if not canChange(player) then
-		return reply(false, "Switch loadouts in town, or between rounds of a Ranked match.")
+		return reply(false, "You can't switch loadouts during a fight or an expedition.")
 	end
 	local label = GearPresets.Parts[kind].Label
 	if Presets.list(player, kind)[index] then

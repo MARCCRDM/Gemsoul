@@ -14,6 +14,35 @@ local function check(value, message)
 end
 
 local GearPresets = luau.load(fs.readFile(ROOT .. "/src/shared/GearPresets.luau"), { debugName = "GearPresets" })()
+-- The real rule for when a build can change (Combat.canChangeBuild).
+local Combat = luau.load(fs.readFile(ROOT .. "/src/shared/Combat.luau"), {
+	debugName = "Combat",
+	environment = setmetatable({
+		game = {
+			GetService = function()
+				return {
+					FindFirstChild = function()
+						return nil
+					end,
+				}
+			end,
+		},
+		script = { Parent = { EquipmentBalance = "EquipmentBalance" } },
+		Color3 = {
+			fromRGB = function(r, g, b)
+				return { R = r, G = g, B = b }
+			end,
+		},
+		Vector3 = {
+			new = function(x, y, z)
+				return { X = x, Y = y, Z = z, Magnitude = math.sqrt(x * x + y * y + z * z) }
+			end,
+		},
+		require = function()
+			return {}
+		end,
+	}, { __index = _G }),
+})()
 
 -- Stand-ins -------------------------------------------------------------------
 local handlers = {}
@@ -59,6 +88,7 @@ local PlayerData = {
 local attributes = {}
 local player = {
 	Parent = "Players",
+	Character = nil,
 	GetAttribute = function(_, key)
 		return attributes[key]
 	end,
@@ -89,11 +119,7 @@ local stubs = {
 		end,
 		TwoHanded = {},
 	},
-	Combat = {
-		canFight = function()
-			return false
-		end,
-	},
+	Combat = Combat,
 	GearPresets = GearPresets,
 	AugmentTree = {
 		Nodes = {},
@@ -191,6 +217,20 @@ check(profile.Presets.Armor[1].Gear.Helmet == "CrusaderHelmet", "A mid-match cha
 check(not handlers.LoadoutSelect(player, "Armor", 2).Ok, "Switched loadouts by hand mid-match")
 attributes.MatchId = nil
 
+-- In the Outpost lobby (far outside the town walls) loadouts still switch;
+-- out in the field they don't.
+local root = { Position = { X = 0, Y = 0, Z = 7000 } }
+player.Character = {
+	FindFirstChild = function(_, name)
+		return if name == "HumanoidRootPart" then root else nil
+	end,
+}
+attributes.Outpost = true
+check(handlers.LoadoutSelect(player, "Armor", 1).Ok, "Couldn't switch loadouts in the Outpost lobby")
+attributes.Outpost = nil
+check(not handlers.LoadoutSelect(player, "Armor", 1).Ok, "Switched loadouts out in the field")
+player.Character = nil
+
 -- Bad requests.
 check(
 	not handlers.LoadoutSelect(player, "Boots", 1).Ok and not handlers.LoadoutSelect(player, "Armor", 4).Ok,
@@ -199,5 +239,7 @@ check(
 check(GearPresets.clean(profile.Presets).Active.Weapon == 3, "The active slots don't survive a repair")
 
 print(
-	"PASS: " .. checks .. " live loadout checks (switching, new loadouts, autosave, separate kinds, no mid-match saves)"
+	"PASS: "
+		.. checks
+		.. " live loadout checks (switching, new loadouts, autosave, separate kinds, no mid-match saves, lobby)"
 )

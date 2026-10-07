@@ -99,4 +99,8 @@ end
 local Players = { LocalPlayer = player }
 local game = { GetService = function(_, key) return if key == "Players" then Players else {} end }
 local Combat = { canFight = function() return false end }
+-- In town (no fight zone): only a fight, a match or an expedition locks the build.
+function Combat.canChangeBuild(who)
+	return not (who:GetAttribute("CombatSession") or who:GetAttribute("Expedition") or who:GetAttribute("MatchId"))
+end
 local task = { spawn = function(callback) callback() end }

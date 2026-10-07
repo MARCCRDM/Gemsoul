@@ -310,11 +310,7 @@ local busy = false
 local nextAction: string? = nil -- "LearnAugment" | "UpgradeAugment" when the button can act
 
 local function canChange()
-	if player:GetAttribute("CombatSession") or player:GetAttribute("Expedition") then
-		return false
-	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	return not root or not Combat.canFight(root.Position)
+	return Combat.canChangeBuild(player)
 end
 
 local function rankOf(data, id: string): number
@@ -584,7 +580,7 @@ local function drawDetail(data)
 	requirement(levelMet, string.format("%s tier  ·  Augment Level %d", Tree.TierNames[node.Tier], levelNeeded), 1)
 	local prerequisite = Tree.prerequisiteText(selected)
 	if not changeable then
-		requirement(false, "Return to the dashboard or town to change augments", 2)
+		requirement(false, "You can't change augments during a fight or an expedition", 2)
 	elseif prerequisite then
 		requirement(parentMet, prerequisite, 2)
 	else

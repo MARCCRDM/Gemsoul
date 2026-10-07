@@ -76,4 +76,18 @@ function Combat.canFight(position: Vector3): boolean
 	return Vector3.new(position.X, 0, position.Z).Magnitude > Combat.TownRadius or Combat.inArena(position)
 end
 
+-- Can this player change their build (surges, augments, loadouts) now? Never
+-- in a fight, a match or an expedition; yes in town and in the Outpost (the
+-- lobby, a safe space far outside the town walls); not out in the field.
+function Combat.canChangeBuild(player: Player): boolean
+	if player:GetAttribute("CombatSession") or player:GetAttribute("Expedition") or player:GetAttribute("MatchId") then
+		return false
+	end
+	if player:GetAttribute("Outpost") == true then
+		return true
+	end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	return not root or not Combat.canFight((root :: BasePart).Position)
+end
+
 return Combat
