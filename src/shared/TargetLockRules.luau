@@ -11,6 +11,8 @@
 --     or cover, only when it dies or becomes ineligible
 --   * with several targets within SwitchRange, Rules.switch cycles through
 --     them left to right; a target you switched to is kept until it's lost
+--   * Rules.pick locks a target chosen directly (the target list), pinned
+--     the same way
 local Rules = {
 	Range = 90, -- picking up a new target in front of you
 	RetainRange = 140, -- keeping an ordinary one
@@ -82,6 +84,17 @@ function Rules.switch(state, candidates)
 	end
 	local pick = nearby[index % #nearby + 1]
 	state.Target, state.HiddenSince, state.Pinned = pick.Target, nil, true
+	return state.Target
+end
+-- Locks a chosen target (tapped in the target list); it stays there
+-- (pinned) like a switch. Only a target that could be held is taken.
+function Rules.pick(state, candidates, model)
+	for _, candidate in candidates do
+		if candidate.Target == model and holdable(candidate) then
+			state.Target, state.HiddenSince, state.Pinned = model, nil, true
+			return model
+		end
+	end
 	return state.Target
 end
 -- The nearest enemy that can take the lock from a current target: in range

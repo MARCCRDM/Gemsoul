@@ -24,6 +24,7 @@ local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local StatusBars = require(script.Parent.Modules.StatusBars)
 local FoeCastBar = require(script.Parent.Modules.FoeCastBar)
+require(script.Parent.Modules.FoeBars) -- overhead health and the target list
 local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
 local CombatFx = require(script.Parent.Modules.CombatFx)
 local CombatVfx = require(script.Parent.Modules.CombatVfx)
@@ -1642,7 +1643,9 @@ RunService.RenderStepped:Connect(function(dt)
 	local lockedTarget = trackedTarget
 	local target = lockedTarget or (hit and hit.Instance:FindFirstAncestorOfClass("Model"))
 	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
+	-- Touch screens: the foe's health rides over its head (FoeBars) instead.
 	targetCard.Visible = enemyHumanoid ~= nil
+		and not UserInputService.TouchEnabled
 		and (target:GetAttribute("ArenaDropUntil") or 0) <= workspace:GetServerTimeNow()
 		and enemyHumanoid.Health > 0
 		and target ~= player.Character
