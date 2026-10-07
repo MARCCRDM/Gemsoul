@@ -13,7 +13,7 @@
 ]]
 local Referrals = {}
 
-Referrals.Reward = "BackComrade"
+Referrals.Reward = "BackStandard"
 Referrals.Needed = 1
 
 function Referrals.referrer(joinData, userId: number): number?

@@ -1,6 +1,6 @@
 -- lune run tests/referrals_cases.luau <repo>
 -- Bring a friend (Shared.Referrals, Systems/Referrals): a friend who joins
--- through your invite is counted once, you earn the Comrade Wings (online
+-- through your invite is counted once, you earn the Crusader's Standard (online
 -- now, or on your next join), self-invites and junk don't count, and crates
 -- never hand the reward out.
 local fs = require("@lune/fs")
@@ -66,7 +66,7 @@ end
 local handlers = {}
 local stubs = {
 	Cosmetics = {
-		List = { [Rules.Reward] = { Id = Rules.Reward, Name = "Comrade Wings" } },
+		List = { [Rules.Reward] = { Id = Rules.Reward, Name = "Crusader's Standard" } },
 	},
 	Referrals = Rules,
 	PlayerData = {

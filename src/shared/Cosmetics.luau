@@ -39,7 +39,7 @@ Cosmetics.Order = {
 	"BackCape",
 	"BackWings",
 	"BackHalo",
-	"BackComrade",
+	"BackStandard",
 }
 
 Cosmetics.List = {
@@ -161,14 +161,14 @@ Cosmetics.List = {
 		Color = Color3.fromRGB(255, 220, 120),
 		Look = "Halo",
 	},
-	BackComrade = {
-		Id = "BackComrade",
+	BackStandard = {
+		Id = "BackStandard",
 		Kind = "Back",
-		Name = "Comrade Wings",
-		Description = "Earned by bringing a friend into the Saga. Only recruiters wear these.",
+		Name = "Crusader's Standard",
+		Description = "A black-and-gold war banner. Only those who brought a friend into the Saga carry it.",
 		Rarity = "Rare",
-		Color = Color3.fromRGB(60, 210, 240),
-		Look = "Wings",
+		Color = Color3.fromRGB(255, 196, 70),
+		Look = "Standard",
 		Exclusive = "Referral",
 	},
 } :: { [string]: Cosmetic }

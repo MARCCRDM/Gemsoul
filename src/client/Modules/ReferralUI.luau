@@ -1,6 +1,6 @@
 --[[
 	Bring a friend (Shared.Referrals): invite a friend with Roblox's own game
-	invite; once they join through it you earn the Comrade Wings. The server
+	invite; once they join through it you earn the Crusader's Standard. The server
 	(Systems/Referrals) counts the join and grants the reward, even while
 	you're away; CHECK CLAIM asks it now.
 
@@ -77,9 +77,9 @@ local info = new(
 )
 local kicker = label(info, "FREE  ·  BACK COSMETIC", 11, TEAL)
 kicker.Size = UDim2.new(1, 0, 0, 16)
-local title = label(info, string.upper(reward and reward.Name or "Comrade Wings"), 28, P.Text, IronUi.Heading)
+local title = label(info, string.upper(reward and reward.Name or "Crusader's Standard"), 23, P.Text, IronUi.Heading)
 title.Position, title.Size = UDim2.fromOffset(0, 18), UDim2.new(1, 0, 0, 34)
-local pitch = label(info, "Bring a friend to the Saga. Fly together forever.", 15, P.Text, IronUi.Body)
+local pitch = label(info, "Bring a friend into the Saga. Carry the war banner.", 15, P.Text, IronUi.Body)
 pitch.Position, pitch.Size = UDim2.fromOffset(0, 56), UDim2.new(1, 0, 0, 40)
 -- The one step, ticked off when it's done.
 local step = new("Frame", {
@@ -97,7 +97,7 @@ local progress = label(step, "0 / 1", 13, P.Dim, IronUi.Heading)
 progress.AnchorPoint, progress.Position, progress.Size =
 	Vector2.new(1, 0), UDim2.new(1, -12, 0, 0), UDim2.fromOffset(52, 44)
 progress.TextXAlignment = Enum.TextXAlignment.Right
-local wear = label(info, "Wear them from the Store, under Backs.", 11, P.Dim, IronUi.Body)
+local wear = label(info, "Carry it from the Store, under Backs.", 11, P.Dim, IronUi.Body)
 wear.Position, wear.Size = UDim2.fromOffset(0, 160), UDim2.new(1, 0, 0, 16)
 
 -- The buttons and the status line.
