@@ -107,7 +107,16 @@ local function strut(holder, pieces, a: Vector2, b: Vector2, width, depth, z, co
 		material
 	)
 end
-local function buildViewShield(holder, source)
+local function hasVisibleParts(source): boolean
+	for _, part in if source then source:GetDescendants() else {} do
+		if part:IsA("BasePart") and authoredTransparency(part) < 1 then
+			return true
+		end
+	end
+	return false
+end
+-- `plain`: no copied effects (a weapon's own, which its blade already shows).
+local function buildViewShield(holder, source, plain: boolean?)
 	local pieces = {}
 	-- Its metal: the worn shield's largest metal-looking plate, else steel;
 	-- its glow: the gem's highlight colour, else its trim, else teal.
@@ -258,7 +267,7 @@ local function buildViewShield(holder, source)
 		)
 	end
 	-- Its gem's element effects, thinned out up close.
-	for _, emitter in emitters do
+	for _, emitter in if plain then {} else emitters do
 		local copy = emitter:Clone()
 		copy.Rate *= 0.45
 		copy.Parent = board
@@ -334,6 +343,7 @@ local function rebuild(character, equipment)
 				end
 				continue
 			end
+			local builtInShield = false
 			for _, part in source:GetDescendants() do
 				if part:IsA("BasePart") and authoredTransparency(part) < 1 then
 					local weld = part:FindFirstChildWhichIsA("WeldConstraint")
@@ -358,6 +368,11 @@ local function rebuild(character, equipment)
 							local offset = hold * scaled(frame:ToObjectSpace(part.CFrame))
 							table.insert(pieces, { Part = copy, Left = false, Offset = offset })
 						end
+					elseif slot == "Weapon" and (anchorName == "LeftLowerArm" or anchorName == "Left Arm") then
+						-- A shield built into the weapon's look (Sword and Shield)
+						-- rides the forearm: shown as the view's shield below, never
+						-- copied up against the camera.
+						builtInShield = true
 					elseif slot == "Weapon" and frame and not string.find(anchorName, "Left") then
 						local copy = viewCopy(part, holder)
 						local offset = hold * scaled(frame:ToObjectSpace(part.CFrame))
@@ -379,6 +394,11 @@ local function rebuild(character, equipment)
 							table.insert(pieces, { Part = copy, Left = left, Offset = offset })
 						end
 					end
+				end
+			end
+			if builtInShield and not hasVisibleParts(equipment:FindFirstChild("Shield")) then
+				for _, piece in buildViewShield(holder, source, true) do
+					table.insert(pieces, piece)
 				end
 			end
 		end
