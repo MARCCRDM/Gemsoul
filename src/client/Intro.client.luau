@@ -309,19 +309,19 @@ local choices = frame(body, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C
 local STYLES = {
 	{
 		Id = "Prospector",
-		Color = Color3.fromRGB(218, 159, 76),
+		Color = GemConfig.ElementColors.Poison, -- its gem (Corrosive), as in its art
 		Role = "BALANCED  ·  SUSTAIN",
 		Lines = { "Health and Power on every piece", "Set: +Health, +Power, faster cooldowns", "2+ pieces: +10% attack damage" },
 	},
 	{
 		Id = "Skirmisher",
-		Color = Color3.fromRGB(72, 174, 186),
+		Color = GemConfig.ElementColors.Shock, -- Ion
 		Role = "MOBILE  ·  CRITICAL",
 		Lines = { "Speed and Critical chance", "Set: +Speed, +Crit, faster cooldowns", "2+ pieces: +15% attack speed" },
 	},
 	{
 		Id = "Juggernaut",
-		Color = Color3.fromRGB(104, 139, 189),
+		Color = GemConfig.ElementColors.Fire, -- Thermal
 		Role = "HEAVY  ·  DEFENSIVE",
 		Lines = { "Health and Defense", "Set: +Health, +Defense, less damage taken", "2+ pieces: +25% heavy damage" },
 	},
@@ -361,8 +361,8 @@ heading(choices, "2", "STARTER ELEMENT  ·  three surges for Q / E / R", 0.62, 0
 
 local styleButtons, elementButtons = {}, {}
 local refreshChoices -- (below)
--- (The launch button sits over the bottom of this area.)
-local CTA_ROOM = 64
+-- (The launch button has its own row under the body: nothing to leave.)
+local CTA_ROOM = 0
 local styleArea = frame(choices, {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, 28),
@@ -471,25 +471,65 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 	row.Name = element
 	UiKit.round(row, 10)
 	local edge = new("UIStroke", { Color = C.Line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, row)
+	-- A bar of the element's colour down the left edge, lit when picked.
+	local bar = frame(row, {
+		BackgroundColor3 = color,
+		BackgroundTransparency = 0.7,
+		Position = UDim2.fromOffset(0, 8),
+		Size = UDim2.new(0, 4, 1, -16),
+		ZIndex = 22,
+	})
+	UiKit.round(bar, 2)
+	-- The gem on a soft disc of its colour.
+	local disc = frame(row, {
+		BackgroundColor3 = color,
+		BackgroundTransparency = 0.86,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 12, 0.5, 0),
+		Size = UDim2.fromOffset(64, 64),
+		ZIndex = 22,
+	})
+	UiKit.round(disc, 32)
 	local holder = frame(row, {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 6, 0.5, 0),
-		Size = UDim2.fromOffset(58, 58),
-		ZIndex = 22,
+		Position = UDim2.new(0, 12, 0.5, 0),
+		Size = UDim2.fromOffset(64, 64),
+		ZIndex = 23,
 	})
 	Art.show(holder, { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }, nil, color, false)
-	local name = text(row, string.upper(GemConfig.elementName(element)), 15, color, Enum.Font.GothamBlack)
-	name.Position, name.Size = UDim2.new(0, 70, 0, 6), UDim2.new(0.5, -70, 0, 20)
+	local name = text(row, string.upper(GemConfig.elementName(element)), 17, color, Enum.Font.GothamBlack)
+	name.Position, name.Size = UDim2.new(0, 88, 0, 8), UDim2.new(0.5, -88, 0, 22)
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	local blurb = text(row, ELEMENTS[element], 10, C.Dim, Enum.Font.GothamMedium)
-	blurb.Position, blurb.Size = UDim2.new(0.5, 0, 0, 8), UDim2.new(0.5, -10, 0, 16)
-	blurb.TextXAlignment = Enum.TextXAlignment.Right
-	local surges = text(row, table.concat(surgeNames(element), "  ·  "), 11, C.Text, Enum.Font.GothamMedium)
-	surges.Position, surges.Size = UDim2.new(0, 70, 0, 30), UDim2.new(1, -80, 1, -36)
-	surges.TextXAlignment, surges.TextYAlignment = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
-	surges.TextWrapped = true
-	elementButtons[element] = { Button = row, Stroke = edge, Surges = surges, Color = color }
+	local blurb = text(row, ELEMENTS[element], 11, C.Dim, Enum.Font.GothamMedium)
+	blurb.Position, blurb.Size = UDim2.new(0, 88, 0, 30), UDim2.new(1, -98, 0, 16)
+	blurb.TextXAlignment = Enum.TextXAlignment.Left
+	-- Its three surges as key chips: which one lands on Q, E and R.
+	local chips = frame(row, {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 88, 1, -8),
+		Size = UDim2.new(1, -98, 0, 24),
+		ZIndex = 22,
+	})
+	local surgeLabels = {}
+	for index, surgeName in surgeNames(element) do
+		local chip = frame(chips, {
+			BackgroundColor3 = C.Ink,
+			Position = UDim2.new((index - 1) / 3, if index == 1 then 0 else 3, 0, 0),
+			Size = UDim2.new(1 / 3, -4, 1, 0),
+			ZIndex = 23,
+		})
+		UiKit.round(chip, 6)
+		new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.6 }, chip)
+		local key = text(chip, ({ "Q", "E", "R" })[index], 11, color, Enum.Font.GothamBlack)
+		key.Position, key.Size = UDim2.fromOffset(6, 0), UDim2.new(0, 12, 1, 0)
+		local label = text(chip, surgeName, 10, C.Dim, Enum.Font.GothamBold)
+		label.Position, label.Size = UDim2.fromOffset(20, 0), UDim2.new(1, -24, 1, 0)
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		table.insert(surgeLabels, label)
+	end
+	elementButtons[element] = { Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Color = color }
 	listen(row.Activated, function()
 		if not savedKit and not busy then
 			chosenElement = element
@@ -533,7 +573,10 @@ function refreshChoices()
 		row.Stroke.Color = if on then row.Color else C.Line
 		row.Stroke.Thickness = if on then 2.5 else 1
 		row.Button.BackgroundColor3 = if on then C.Card:Lerp(row.Color, 0.14) else C.Card
-		row.Surges.TextColor3 = if on then C.Text else C.Dim
+		for _, label in row.Surges do
+			label.TextColor3 = if on then C.Text else C.Dim
+		end
+		row.Bar.BackgroundTransparency = if on then 0 else 0.7
 		if on then
 			elementColor = row.Color
 		end
