@@ -18,6 +18,7 @@ local Players = game:GetService("Players")
 
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
@@ -412,17 +413,35 @@ local function fitDock()
 	local size = gui.AbsoluteSize
 	local mobile = game:GetService("UserInputService").TouchEnabled or size.Y < 540
 	local width = math.min(420, math.max(240, size.X - 180))
-	bar.Size = UDim2.fromOffset(width, if mobile then 104 else 126)
 	bar.Position = UDim2.new(0.5, 0, 1, -12)
-	play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(math.min(220, width), 44)
-	tiles.Position, tiles.Size = UDim2.new(0.5, 0, 0, 52), UDim2.fromOffset(width, if mobile then 48 else 68)
+	-- Every tile fits the bar's width, however many there are (five tiles in
+	-- a width worked out for four spilled off to the sides). On a phone they're
+	-- short buttons with the name in the middle (no emblem over an empty gap).
+	local count = 0
 	for _, button in tiles:GetChildren() do
 		if button:IsA("TextButton") then
-			button.Size = UDim2.fromOffset((width - 30) / 4, if mobile then 48 else 68)
+			count += 1
+		end
+	end
+	local compact = MobileLayout.dock(size, count)
+	if mobile then
+		width = compact.W
+	end
+	local gap = if mobile then compact.Gap else 10
+	local tileHeight = if mobile then compact.TileHeight else 68
+	bar.Size = UDim2.fromOffset(width, 44 + 8 + tileHeight)
+	play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(math.min(220, width), 44)
+	tiles.Position, tiles.Size = UDim2.new(0.5, 0, 0, 52), UDim2.fromOffset(width, tileHeight)
+	tileList.Padding = UDim.new(0, gap)
+	local tileWidth = math.floor((width - gap * math.max(0, count - 1)) / math.max(1, count))
+	for _, button in tiles:GetChildren() do
+		if button:IsA("TextButton") then
+			button.Size = UDim2.fromOffset(tileWidth, tileHeight)
 			for _, child in button:GetChildren() do
 				if child:IsA("TextLabel") then
-					child.TextSize = if mobile then 10 else 12
-					child.Position = UDim2.new(0.5, 0, 1, -4)
+					child.TextSize = if mobile then 11 else 12
+					child.AnchorPoint = if mobile then Vector2.new(0.5, 0.5) else Vector2.new(0.5, 1)
+					child.Position = if mobile then UDim2.fromScale(0.5, 0.5) else UDim2.new(0.5, 0, 1, -4)
 				elseif child:IsA("GuiObject") then
 					child.Visible = not mobile
 				end

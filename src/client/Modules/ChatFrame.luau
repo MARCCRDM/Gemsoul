@@ -15,6 +15,7 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local MobileLayout = require(script.Parent.MobileLayout)
 local TradeUI = require(script.Parent.TradeUI)
 local UiKit = require(script.Parent.UiKit)
 
@@ -50,6 +51,16 @@ local function hex(color: Color3): string
 end
 local function escape(value: string): string
 	return (string.gsub(string.gsub(string.gsub(value, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+end
+-- Rich-text tags stripped, entities decoded: the words of a marked-up line.
+function ChatFrame.plain(value: string): string
+	local stripped = string.gsub(value, "<[^<>]->", "")
+	stripped = string.gsub(stripped, "&lt;", "<")
+	stripped = string.gsub(stripped, "&gt;", ">")
+	stripped = string.gsub(stripped, "&quot;", '"')
+	stripped = string.gsub(stripped, "&apos;", "'")
+	stripped = string.gsub(stripped, "&amp;", "&")
+	return stripped
 end
 -- [Item names] in a message stand out like item links.
 local function linkify(value: string): string
@@ -372,15 +383,22 @@ drawTabs = function()
 	end
 end
 
+-- On a phone the chat lives in the top-left corner (MobileLayout): a CHAT
+-- button under the pick card and, opened, a column down the left side that
+-- stops above the lobby dock and leaves the middle of the screen clear. While
+-- it's open the pick card steps aside (the "ChatOpen" attribute).
 local function fitChat()
 	local mobile = UserInputService.TouchEnabled or gui.AbsoluteSize.X < 700 or gui.AbsoluteSize.Y < 540
 	local width = math.min(WIDTH, math.max(240, gui.AbsoluteSize.X - 24))
 	frame.AnchorPoint = if mobile then Vector2.zero else Vector2.new(0, 1)
-	frame.Position = if mobile then UDim2.fromOffset(12, 124) else UDim2.new(0, 16, 1, -6)
-	frame.Size = UDim2.fromOffset(
-		if mobile and collapsed then 76 else width,
-		if collapsed then (if mobile then 44 else 32) else math.min(HEIGHT, gui.AbsoluteSize.Y - 140)
-	)
+	if mobile then
+		local rect = MobileLayout.chat(gui.AbsoluteSize, not collapsed)
+		frame.Position, frame.Size = UDim2.fromOffset(rect.X, rect.Y), UDim2.fromOffset(rect.W, rect.H)
+	else
+		frame.Position = UDim2.new(0, 16, 1, -6)
+		frame.Size = UDim2.fromOffset(width, if collapsed then 32 else math.min(HEIGHT, gui.AbsoluteSize.Y - 140))
+	end
+	player:SetAttribute("ChatOpen", if mobile and not collapsed and gui.Enabled then true else nil)
 	tabsRow.Visible = not (mobile and collapsed)
 	collapse.Size =
 		UDim2.fromOffset(if mobile and collapsed then 64 elseif mobile then 36 else 26, if mobile then 36 else 22)
@@ -788,7 +806,9 @@ TextChatService.MessageReceived:Connect(function(message)
 	local who = if speaker then speaker.DisplayName elseif source then source.Name else "?"
 	local body = linkify(escape(message.Text))
 	if name == "RBXSystem" then
-		push("System", body)
+		-- Roblox's own lines ("Your friend ... has joined") come already
+		-- marked up: keep the words, not the tags (escaped, they showed raw).
+		push("System", linkify(escape(ChatFrame.plain(message.Text))))
 		return
 	end
 	local whisperA, whisperB = string.match(name, "^Whisper_(%d+)_(%d+)$")
@@ -875,6 +895,7 @@ function ChatFrame.refresh()
 	local show, onDashboard = wanted()
 	if show ~= gui.Enabled then
 		gui.Enabled = show
+		fitChat()
 		setDefaultChat(not show)
 		if not show then
 			closePopup()

@@ -33,6 +33,7 @@ local GemClient = require(script.Parent.GemClient)
 local GemArt = require(script.Parent.GemArt)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
+local MobileLayout = require(script.Parent.MobileLayout)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
@@ -203,11 +204,19 @@ hint.TextStrokeTransparency = 0.4
 -- Keep the field clear; navigation lives in the lobby dock and world prompts.
 findsLabel.Visible, recordLabel.Visible, buttons.Visible = false, false, false
 hint.Visible = not UserInputService.TouchEnabled
+-- On a phone the card is drawn smaller (it sat over a third of the screen),
+-- with the CHAT button just under it (MobileLayout), and it steps
+-- aside while the chat is open over that corner.
+local cardScale = new("UIScale", { Scale = 1 }, card)
 local function fitOutpostHud()
-	local width = hud.AbsoluteSize.X
-	card.Size = UDim2.fromOffset(math.min(300, math.max(240, width - 24)), 100)
+	local size = hud.AbsoluteSize
+	local mobile = UserInputService.TouchEnabled or size.Y < 540
+	card.Size = UDim2.fromOffset(math.min(300, math.max(240, size.X - 24)), 100)
+	cardScale.Scale = if mobile then MobileLayout.CardScale else 1
+	card.Visible = not (mobile and player:GetAttribute("ChatOpen") == true)
 end
 hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitOutpostHud)
+player:GetAttributeChangedSignal("ChatOpen"):Connect(fitOutpostHud)
 fitOutpostHud()
 
 -- The free pick's charge ticks up between server updates.

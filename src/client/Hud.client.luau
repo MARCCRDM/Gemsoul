@@ -39,6 +39,10 @@ local new = IronUi.new
 -- The hub replaces Roblox's player list (coins, Marks and gems show here;
 -- players are listed in the Party window).
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
+-- Roblox's own health bar (the yellow-to-red bar at the top right) too: the
+-- fight HUD shows your health, and in the lobby it only ever looked like a
+-- stray loading bar.
+pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Health, false)
 
 -- Menu-only mode uses the full-screen dashboard (Dashboard.client) instead.
 if Config.MenuOnly then

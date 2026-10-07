@@ -283,6 +283,15 @@ local hudList = new("Frame", {
 }, hudGui)
 UiKit.list(hudList, 6)
 local hudBars: { [number]: Frame } = {}
+-- In a fight the fight HUD has the bars that matter, and on a phone the
+-- teammates' cards sat right on the DODGE and HEAVY buttons: hidden until
+-- the fight's over.
+local function fitPartyHud()
+	hudGui.Enabled = player:GetAttribute("CombatSession") == nil and player:GetAttribute("MatchId") == nil
+end
+player:GetAttributeChangedSignal("CombatSession"):Connect(fitPartyHud)
+player:GetAttributeChangedSignal("MatchId"):Connect(fitPartyHud)
+fitPartyHud()
 
 local markers: { [number]: BillboardGui } = {}
 

@@ -218,8 +218,8 @@ local function socialPrompts(player: Player, on: boolean)
 	end
 	for _, spec in
 		{
-			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G, Vector2.new(0, -34) },
-			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F, Vector2.new(0, 34) },
+			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G, Vector2.new(0, -120) },
+			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F, Vector2.new(0, -36) },
 		}
 	do
 		local prompt = Instance.new("ProximityPrompt")
@@ -230,7 +230,9 @@ local function socialPrompts(player: Player, on: boolean)
 		prompt.HoldDuration = 0.25
 		prompt.MaxActivationDistance = 10
 		prompt.RequiresLineOfSight = false
-		-- One above the other, not drawn on top of each other.
+		-- One above the other (a full prompt's height apart, so they never
+		-- overlap), and both up over the miner rather than down by their feet,
+		-- clear of the lobby's PLAY button and tiles.
 		prompt.UIOffset = spec[5]
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt:SetAttribute("TargetUserId", player.UserId)
