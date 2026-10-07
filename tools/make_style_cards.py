@@ -26,7 +26,7 @@ from make_lobby_cards import Scene, forward_blade, pose  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 OUT = os.path.join(ROOT, "assets", "images", "intro")
-W, H = 240, 260  # the card's art area; rendered at 2x
+W, H = 240, 196  # the card's art area (about its shape); rendered at 2x
 
 AMBER = np.array((255, 176, 70), np.float32) / 255
 TEAL = np.array((60, 210, 240), np.float32) / 255
@@ -49,8 +49,21 @@ def hero(frames, w, h, name, yaw, accent, seed, back, spark=None, planet=None, b
 
 
 def prospector(frames, w, h):
-    # Balanced: shield up, blade levelled at the foe.
-    return hero(frames, w, h, "Charging a heavy · held", -160, AMBER, 21, (0.2, 0.12, 0.05), planet=(w * 0.82, h * 0.14, w * 0.11, (0.95, 0.75, 0.5)))
+    # Casting: arms raised, an amber surge gathering overhead, a rune ring
+    # burning at his feet.
+    s = Scene(w, h, eye=(0.6, 1.6, 10.6), target=(0, 3.6, 0), fov=44, accent=AMBER, seed=21)
+    s.fighters([(pose(frames, "Ground blast · arms up"), (0, 0), 180)])
+    s.backdrop((0.03, 0.02, 0.02), (0.2, 0.12, 0.05), planet=(w * 0.84, h * 0.12, w * 0.09, (0.95, 0.75, 0.5)), shafts=((0.5, 0.12, 0.5),))
+    ox, oy = s.project(np.array([[0.0, 7.3, 0.0]], np.float32))[0][:2]
+    s.glow(ox, oy, w * 0.2, AMBER + 0.35, 1.4)
+    s.glow(ox, oy, w * 0.06, np.array((1, 1, 0.9), np.float32), 1.5)
+    s.sparks(ox, oy, w * 0.28, 60, AMBER + 0.1)
+    fx, fy = s.project(np.array([[0.0, 0.05, 0.0]], np.float32))[0][:2]
+    edge = s.project(np.array([[2.4, 0.05, 0.0]], np.float32))[0][0]
+    rx = abs(edge - fx)
+    s.ring(fx, fy, rx, rx * 0.28, AMBER + 0.2, max(3, w / 180))
+    s.embers(60, AMBER, (0.2, 0.8, 0.1, 0.95))
+    return s.finish()
 
 
 def skirmisher(frames, w, h):
