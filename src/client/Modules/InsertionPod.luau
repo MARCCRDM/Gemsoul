@@ -243,7 +243,7 @@ function Pod.new(marker)
 		end
 		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit - releaseDelay) / 0.8))
 		local floor = origin * CFrame.new(0, -3 * scale, 0)
-		local frame = floor + Vector3.new(0, pose.Height - pose.Impact * 0.14, 0)
+		local frame = floor * CFrame.new(0, pose.Height - pose.Impact * 0.14, pose.Approach)
 		for _, node in smokeNodes do
 			local radius = Motion.smokeSpread(t)
 			node.Part.CFrame = floor * CFrame.new(math.cos(node.Angle) * radius, 1.6, math.sin(node.Angle) * radius)

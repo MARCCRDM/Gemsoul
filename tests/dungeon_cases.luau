@@ -77,8 +77,8 @@ check(#spawned >= 4, "Fighters not spawned")
 check(#encounterDrops == 2, "Expected one pod timeline per squad, not one per enemy")
 for _, drop in encounterDrops do
 	check(
-		drop.IncludeParty and not drop.Background and #drop.Foes >= 2,
-		"First pathway encounter must drop squad and enemies"
+		drop.IncludeParty and not drop.Background and drop.GroundedFoes and #drop.Foes >= 2,
+		"First pathway encounter must drop only squad, with enemies already on ground"
 	)
 	for _, p in drop.Members do
 		check(preparedDrops[p], "Dungeon player not concealed for teleport")
@@ -98,14 +98,14 @@ end
 -- Public queues use gated pathway progression, not the experimental open map.
 local function reachBoss(runId, members)
 	for room = 1, 4 do
+		local dropsBefore = #encounterDrops
 		check(clearRoom(runId, room) >= 2, "Missing pathway encounter")
 		check(worlds[runId].Gates[room].Destroyed, "Pathway gate stayed sealed")
 		for _, p in members do
 			p.Root.Position = worlds[runId].Centers[room + 1] + Vector3.new(0, 4, 0)
 		end
 		tick(0.5)
-		local drop = encounterDrops[#encounterDrops]
-		check(not drop.IncludeParty and not drop.Background and #drop.Foes > 0, "Later rooms must drop only enemies")
+		check(#encounterDrops == dropsBefore, "Later dungeon room or boss replayed pod sequence")
 	end
 end
 for _, e in spawned do
@@ -268,10 +268,7 @@ check(
 	entry.IncludeParty and not entry.Background and #entry.Foes == 0,
 	"Open-world squad needs one arrival at landing zone"
 )
-check(#encounterDrops > beforeOpenDrops + 1, "Open-world enemies missing pod arrivals")
-for i = beforeOpenDrops + 2, #encounterDrops do
-	check(encounterDrops[i].Background and not encounterDrops[i].IncludeParty, "Ambient camp stole squad camera")
-end
+check(#encounterDrops == beforeOpenDrops + 1, "Open-world enemies received pods")
 local population = 0
 for _, e in spawned do
 	if e.Id == openId then

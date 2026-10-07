@@ -401,7 +401,7 @@ function Drop.begin(models, viewers, dropModels, sides)
 end
 -- One shared timeline per encounter. Survivors watch the next wave from the
 -- ground; ambient open-world arrivals never seize the squad's camera/input.
-function Drop.encounter(members, foes, includeParty, background)
+function Drop.encounter(members, foes, includeParty, background, groundedFoes)
 	local actors, viewers, drops, sides = {}, {}, {}, {}
 	if not background then
 		for _, member in members do
@@ -420,7 +420,11 @@ function Drop.encounter(members, foes, includeParty, background)
 	for _, model in foes do
 		if model.Parent and model:FindFirstChild("HumanoidRootPart") then
 			table.insert(actors, model)
-			table.insert(drops, model)
+			-- Dungeon defenders are already present. Pause their AI during the
+			-- squad's arrival, without hiding them or giving them a pod.
+			if not groundedFoes then
+				table.insert(drops, model)
+			end
 			sides[model] = 2
 		end
 	end

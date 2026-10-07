@@ -12,7 +12,12 @@ CombatServer._input(p, "BeginAttack", "Right")
 check(CombatServer._state(p).ChargeStarted == nil, "Insertion accepted an attack charge")
 CombatServer._input(p, "Block", true, root.Position + Vector3.new(0, 0, -4))
 check(p:GetAttribute("Blocking") ~= true, "Insertion accepted a guard action")
-check(ArenaDrop.duration(2) < 6.5, "Two-player insertion exceeded the extended descent budget")
+for count = 1, 5 do
+	check(
+		ArenaDrop.duration(count) >= 2.5 and ArenaDrop.duration(count) <= 3,
+		"Insertion exceeded 2.5-3 second deployment budget"
+	)
+end
 check(ArenaDrop.duration(4) > ArenaDrop.duration(2), "Team insertion does not scale")
 p:SetAttribute("ArenaDropUntil", nil)
 ArenaDrop.cancel(p.Character)
@@ -25,11 +30,14 @@ check(not ArenaDrop.forRival(nil, nil, nil), "Lobby received arena insertion")
 -- Camera and shell must never pop at a phase boundary, including impact onset.
 for _, boundary in { 0, Motion.Landing, Motion.Hatch, Motion.Exit, Motion.Exit + Motion.ExitDuration, Motion.Ready } do
 	local before, after = Motion.sample(boundary - 0.00001), Motion.sample(boundary + 0.00001)
-	for _, field in { "Height", "Impact", "Step", "Pitch", "Hatch", "Draw", "Fov" } do
+	for _, field in { "Height", "Approach", "Impact", "Step", "Pitch", "Hatch", "Draw", "Fov" } do
 		check(math.abs(before[field] - after[field]) < 0.01, "Insertion discontinuity: " .. field .. " at " .. boundary)
 	end
 end
 check(Motion.sample(-10).Height == Motion.Altitude, "Queued pod does not hold at altitude")
+check(Motion.Altitude > 82 and Motion.Approach > 0, "Insertion did not start farther away")
+check(Motion.sample(-10).Approach == Motion.Approach, "Queued pod approach is not held")
+check(Motion.sample(Motion.Landing).Approach == 0, "Approach misses landing spot")
 check(
 	Motion.sample(100).Height == 0 and Motion.sample(100).Step == 3,
 	"Late client cannot reconstruct completed landing"
@@ -52,7 +60,7 @@ check(Motion.blast(Motion.ShellBurst + 1).Flash < 0.001, "Explosion flash blocks
 check(Motion.smokeSpread(Motion.Landing) == 2, "Smoke starts detached from impact")
 check(Motion.smokeSpread(Motion.Landing + 1.5) >= 30, "Impact smoke does not reach across arena")
 check(Motion.SmokeAfter >= 6, "Arena smoke does not linger into combat")
-check(Motion.Landing >= 1.4, "Descent is too short for its audio build")
+check(Motion.Landing >= 0.8 and Motion.Landing <= 1.1, "Descent is not fast enough for short deployment")
 check(Motion.sample(Motion.ShellBurst).Hatch == 1, "Shell explodes before door finishes ejecting")
 check(Motion.blast(Motion.Hatch + 0.2).Travel == 0, "Door and shell are exploding together")
 check(Motion.audio(-0.1).Air == 0 and Motion.audio(-0.1).Rumble == 0, "Descent audio begins before launch")
@@ -61,7 +69,7 @@ check(Motion.audio(Motion.Landing).Air == 0, "Air rush continues after impact")
 check(Motion.audio(Motion.Landing + 0.7).Rumble == 0, "Rumble does not release after impact")
 check(Motion.Spacing <= 0.25, "Drops no longer land on a close double beat")
 for count = 2, 4 do
-	local lastDoorOpen = Motion.Lead + (count - 1) * Motion.Spacing + Motion.Hatch + 0.35
+	local lastDoorOpen = Motion.Lead + (count - 1) * Motion.Spacing + Motion.Hatch + Motion.HatchDuration
 	local lastExit = 0
 	for slot = 1, count do
 		local start = Motion.Lead + (slot - 1) * Motion.Spacing
@@ -82,6 +90,7 @@ for _, fps in { 30, 60, 144 } do
 	for frame = 0, math.ceil(Motion.Ready * fps) do
 		local sample = Motion.sample(frame / fps)
 		check(sample.Height <= previous.Height + 0.00001, "Pod reverses direction during descent")
+		check(sample.Approach <= previous.Approach + 0.00001, "Pod reverses its approach")
 		check(sample.Step >= previous.Step - 0.00001, "Exit movement reverses")
 		check(sample.Draw >= previous.Draw - 0.00001, "Weapon draw reverses")
 		previous = sample

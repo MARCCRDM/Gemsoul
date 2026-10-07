@@ -282,10 +282,16 @@ local ArenaDrop = {
 	end,
 	begin = function() end,
 	cancel = function() end,
-	encounter = function(members, foes, includeParty, background)
+	encounter = function(members, foes, includeParty, background, groundedFoes)
 		table.insert(
 			encounterDrops,
-			{ Members = members, Foes = foes, IncludeParty = includeParty, Background = background }
+			{
+				Members = members,
+				Foes = foes,
+				IncludeParty = includeParty,
+				Background = background,
+				GroundedFoes = groundedFoes,
+			}
 		)
 	end,
 }

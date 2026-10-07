@@ -278,8 +278,10 @@ local function spawnRoom(run, index)
 		end
 		table.insert(arrivals, enemy.Model)
 	end
-	ArenaDrop.encounter(members, arrivals, not run.Inserted, run.OpenWorld)
-	run.Inserted = true
+	if not run.Inserted and not run.OpenWorld then
+		ArenaDrop.encounter(members, arrivals, true, false, true)
+		run.Inserted = true
+	end
 end
 local function safeSpawnRoom(run, index)
 	local ok, problem = pcall(spawnRoom, run, index)
@@ -375,7 +377,7 @@ local function queue(player, testMode)
 				then "OWNER TEST  -  solo enabled, no rewards. Orbital deployment inbound."
 				else "PATHWAY DUNGEON · Clear five linked canyon encounters. Follow the trail to the Colossus."
 		)
-		task.delay(0.25, function()
+		task.delay(0.1, function()
 			if run.Done then
 				return
 			end
@@ -384,8 +386,6 @@ local function queue(player, testMode)
 				return
 			end
 			if run.OpenWorld then
-				ArenaDrop.encounter(living(run), {}, true)
-				run.Inserted = true
 				for index = 1, #run.Rooms do
 					if run.Done then
 						break
@@ -393,6 +393,9 @@ local function queue(player, testMode)
 					safeSpawnRoom(run, index)
 				end
 				if not run.Done then
+					-- Populate the world before the squad descends; NPCs never use pods.
+					ArenaDrop.encounter(living(run), {}, true)
+					run.Inserted = true
 					announce(
 						run,
 						"OPEN EXPEDITION · Explore camps and ore fields. Defeat the central Colossus. Bandits are neutral until attacked."

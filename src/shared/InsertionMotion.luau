@@ -1,19 +1,21 @@
 -- One absolute-time choreography for server staging, local pods and helmet POV.
 -- Sampling is independent of frame rate; late clients join the current phase.
 local Motion = {
-	Lead = 0.45,
-	Spacing = 0.22,
-	ExitSpacing = 0.32,
+	Lead = 0.2,
+	Spacing = 0.05,
+	ExitSpacing = 0.05,
 	ExitDistance = 3,
-	Landing = 1.45,
-	Hatch = 1.62,
-	ShellBurst = 2.03,
-	Exit = 2.12,
-	ExitDuration = 0.5,
-	Ready = 3.05,
-	Altitude = 82,
+	Landing = 0.95,
+	Hatch = 1.04,
+	HatchDuration = 0.2,
+	ShellBurst = 1.3,
+	Exit = 1.38,
+	ExitDuration = 0.32,
+	Ready = 2,
+	Altitude = 125,
+	Approach = 22,
 	SmokeAfter = 6,
-	Handoff = 0.4,
+	Handoff = 0.35,
 }
 function Motion.smooth(x)
 	x = math.clamp(x, 0, 1)
@@ -63,12 +65,13 @@ function Motion.sample(t, releaseDelay)
 	local stride = math.sin(exit * math.pi * 2) * math.sin(exit * math.pi)
 	return {
 		Height = Motion.Altitude * (1 - descent),
+		Approach = Motion.Approach * (1 - descent),
 		Impact = impact,
 		Step = exit * Motion.ExitDistance,
 		Bob = stride * 0.035,
-		Pitch = impact * 0.065 - math.sin(exit * math.pi) * 0.018,
-		Hatch = Motion.smooth((t - Motion.Hatch) / 0.35),
-		Draw = Motion.smooth((released - Motion.Exit - 0.08) / 0.62),
+		Pitch = -math.sin(descent * math.pi) * 0.18 + impact * 0.065 - math.sin(exit * math.pi) * 0.018,
+		Hatch = Motion.smooth((t - Motion.Hatch) / Motion.HatchDuration),
+		Draw = Motion.smooth((released - Motion.Exit - 0.04) / 0.34),
 		Fov = math.sin(descent * math.pi) * 3 + impact * 1.2,
 	}
 end

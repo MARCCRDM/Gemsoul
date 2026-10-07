@@ -162,14 +162,18 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.V
 	local pose = Motion.sample(t, releaseDelay)
 	local ownDrop = type(start) == "number"
 	local eye = origin
-		* CFrame.new(0, eyeHeight + (if ownDrop then pose.Height - pose.Impact * 0.2 + pose.Bob else 0), -pose.Step)
+		* CFrame.new(
+			0,
+			eyeHeight + (if ownDrop then pose.Height - pose.Impact * 0.2 + pose.Bob else 0),
+			pose.Approach - pose.Step
+		)
 	if not ownDrop then
 		eye = root.CFrame * CFrame.new(0, eyeHeight, 0)
 	end
 	local animation = eye * CFrame.Angles(pose.Pitch, 0, pose.Impact * 0.009)
 	local remaining = ends - now
-	if remaining < 0.5 then
-		local blend = Motion.smooth(1 - remaining / 0.5)
+	if remaining < Motion.Handoff then
+		local blend = Motion.smooth(1 - remaining / Motion.Handoff)
 		animation = animation:Lerp(camera.CFrame, blend)
 	else
 		camera.CameraType = Enum.CameraType.Scriptable

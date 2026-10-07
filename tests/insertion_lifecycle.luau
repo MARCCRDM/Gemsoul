@@ -320,6 +320,33 @@ check(boss:GetAttribute("ArenaDropStart") ~= nil, "Next wave lacked boss pod")
 Drop.cancel(staged)
 Drop.cancel(ally)
 Drop.cancel(boss)
+-- Dungeon defenders remain visible on the ground while players deploy.
+local createdBefore = #created
+local groundDuration = Drop.encounter({ entrant, mate }, { boss }, true, false, true)
+check(
+	boss:GetAttribute("ArenaDropStart") == nil and bossRoot.Transparency == 0.1,
+	"Dungeon enemy hidden or given a pod"
+)
+check(
+	bossRoot.Anchored and boss:GetAttribute("ArenaDropUntil") > now,
+	"Dungeon enemy could attack before squad deployment"
+)
+check(
+	staged:GetAttribute("ArenaDropStart") ~= nil and ally:GetAttribute("ArenaDropStart") ~= nil,
+	"Dungeon squad lost its pods"
+)
+local newMarkers = 0
+for i = createdBefore + 1, #created do
+	if created[i].ClassName == "Folder" and created[i].Name == "OrbitalInsertion" then
+		newMarkers += 1
+	end
+end
+check(newMarkers == 2, "Dungeon spawned more pods than players")
+advance(groundDuration + 0.1)
+check(
+	not bossRoot.Anchored and boss:GetAttribute("ArenaDropUntil") == nil,
+	"Grounded enemy did not activate after deployment"
+)
 local ambientTime = Drop.encounter({ entrant, mate }, { boss }, false, true)
 check(
 	not sr.Anchored and not allyRoot.Anchored and entrant:GetAttribute("ArenaDropUntil") == nil,
