@@ -234,10 +234,6 @@ for _, weapon in Classes.List.Warrior.Weapons do
 	if weapon.WeaponType == nil then
 		-- Migrated Wizard/Archer/Tank items retain their original weapon models.
 		assert(weapon.Attack)
-	elseif weapon.Exclusive then
-		-- Earned one way only (the bring-a-friend Crusader's Standard): its own
-		-- model, never drawn or dropped.
-		assert(weapon.Attack.Kind == "Melee" and weapon.Look ~= "CleanSidearm" and not weapon.StartPool)
 	elseif weapon.WeaponType == "Sword" then
 		assert(weapon.Attack.Kind == "Melee" and weapon.Look == "FrontierSword")
 	elseif weapon.Forge then

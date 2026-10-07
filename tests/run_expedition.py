@@ -24,7 +24,6 @@ for name, path in [
     ("Economy", "src/shared/ExpeditionEconomy.luau"),
     ("GemRoller", "src/shared/GemRoller.luau"),
     ("GemGenerator", "src/server/Systems/GemGenerator.luau"),
-    ("Referrals", "src/shared/Referrals.luau"),
     ("Logic", "src/shared/EquipmentTrade.luau"),
     ("Store", "src/shared/Store.luau"),
     ("Season", "src/shared/Season.luau"),

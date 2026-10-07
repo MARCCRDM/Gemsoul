@@ -1,8 +1,8 @@
 -- lune run tests/referrals_cases.luau <repo>
 -- Bring a friend (Shared.Referrals, Systems/Referrals): a friend who joins
--- through your invite is counted once, you earn the Crusader's Standard weapon (online
+-- through your invite is counted once, you earn the Crusader Gold weapon skin (online
 -- now, or on your next join), self-invites and junk don't count, and it
--- never drops.
+-- is never sold or dropped.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -31,21 +31,22 @@ check(fresh and entry.Count == 2, "A second friend wasn't counted")
 check(Rules.record({ Friends = { x = "yes" }, Count = 99 }, 5).Count == 1, "A tampered record was trusted")
 check(not Rules.earned(0) and Rules.earned(Rules.Needed), "Earned threshold wrong")
 
--- The weapon: exclusive, never drops, never in crates ---------------------------
-local classesSource = fs.readFile(ROOT .. "/src/shared/Classes.luau")
-local entryAt = string.find(classesSource, 'Id = "' .. Rules.Reward .. '"', 1, true)
-check(entryAt ~= nil, "The reward isn't a weapon in Classes")
-local weaponEntry = string.sub(classesSource, entryAt, (string.find(classesSource, "})", entryAt, true)))
-check(string.find(weaponEntry, 'Exclusive = "Referral"', 1, true) ~= nil, "The reward isn't marked exclusive")
-check(string.find(weaponEntry, 'WeaponType = "Sword"', 1, true) ~= nil, "The reward would be turned into a pistol")
-check(string.find(weaponEntry, "StartPool", 1, true) == nil, "The reward can be drawn as a starter or a drop")
+-- The skin: exclusive, never sold or in crates, works on any weapon ------------
+local cosmeticsSource = fs.readFile(ROOT .. "/src/shared/Cosmetics.luau")
+local orderBlock = string.match(cosmeticsSource, "Cosmetics.Order = (%b{})")
+check(orderBlock and not string.find(orderBlock, Rules.Reward, 1, true), "The skin is sold or drops from crates")
+local entryAt = string.find(cosmeticsSource, Rules.Reward .. " = {", 1, true)
+check(entryAt ~= nil, "The reward isn't a cosmetic")
+local skinEntry = string.sub(cosmeticsSource, entryAt, (string.find(cosmeticsSource, "},", entryAt, true)))
+check(string.find(skinEntry, 'Kind = "Skin"', 1, true) ~= nil, "The reward isn't a weapon skin")
+check(string.find(skinEntry, 'Exclusive = "Referral"', 1, true) ~= nil, "The reward isn't marked exclusive")
+check(string.find(skinEntry, "Price", 1, true) == nil, "The skin has a price")
+local look = string.match(skinEntry, 'Look = "(%w+)"')
+local equipmentSource = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
+check(look and string.find(equipmentSource, "SKINS." .. look .. " =", 1, true) ~= nil, "The skin has no look")
 check(
-	string.find(fs.readFile(ROOT .. "/src/shared/ExpandedItemTraits.luau"), Rules.Reward, 1, true) == nil,
-	"The reward is in the mine-drop catalog"
-)
-check(
-	string.find(fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau"), "WEAPONS.Standard =", 1, true) ~= nil,
-	"The reward has no 3D model"
+	string.find(fs.readFile(ROOT .. "/src/server/Systems/StoreServer.luau"), 'kind ~= "Skin"', 1, true) ~= nil,
+	"A skin can't be equipped"
 )
 
 -- Server flow, with a fake DataStore and players --------------------------------
@@ -70,16 +71,14 @@ local function makePlayer(userId, referredBy)
 			return { ReferredByPlayerId = referredBy }
 		end,
 	}
-	profiles[player] = { Owned = { Weapons = {} } }
+	profiles[player] = { Cosmetics = { Owned = {} } }
 	return player
 end
 local handlers = {}
 local stubs = {
-	Classes = {
-		weapon = function(class, id)
-			return if class == "Warrior" and id == Rules.Reward
-				then { Id = Rules.Reward, Name = "Crusader's Standard" }
-				else nil
+	Cosmetics = {
+		get = function(id)
+			return if id == Rules.Reward then { Id = Rules.Reward, Kind = "Skin", Name = "Crusader Gold" } else nil
 		end,
 	},
 	Referrals = Rules,
@@ -90,8 +89,8 @@ local stubs = {
 		sync = function()
 			syncs += 1
 		end,
-		setGearQuality = function(player, kind, id, quality)
-			profiles[player].Owned[kind][id] = quality
+		setCosmetic = function(player, kind, id)
+			profiles[player].Cosmetics[kind] = id
 		end,
 	},
 	Shop = {
@@ -171,10 +170,13 @@ local inviter = makePlayer(1, 0)
 local friend = makePlayer(2, 1)
 join(friend)
 check(stored["1"] and stored["1"].Count == 1, "The friend's join wasn't recorded")
-check(not profiles[friend].Owned.Weapons[Rules.Reward], "The invited friend got the inviter's reward")
+check(not profiles[friend].Cosmetics.Owned[Rules.Reward], "The invited friend got the inviter's reward")
 -- The inviter comes back: the reward is theirs.
 join(inviter)
-check(profiles[inviter].Owned.Weapons[Rules.Reward] == 1, "The inviter didn't get the reward on joining")
+check(
+	profiles[inviter].Cosmetics.Owned[Rules.Reward] == true and profiles[inviter].Cosmetics.Skin == Rules.Reward,
+	"The inviter didn't get (and wear) the skin on joining"
+)
 local state = handlers.ReferralState(inviter)
 check(state.Ok and state.Claimed and state.Count == 1, "CHECK CLAIM didn't confirm the reward")
 -- Rejoining doesn't count twice.
@@ -185,14 +187,14 @@ local host = makePlayer(10, 0)
 join(host)
 check(not handlers.ReferralState(host).Claimed, "Claimed with no friend joined")
 join(makePlayer(11, 10))
-check(profiles[host].Owned.Weapons[Rules.Reward] == 1, "An online inviter wasn't rewarded at once")
+check(profiles[host].Cosmetics.Owned[Rules.Reward] == true, "An online inviter wasn't rewarded at once")
 -- Inviting yourself doesn't count.
 local cheat = makePlayer(20, 20)
 join(cheat)
-check(stored["20"] == nil and not profiles[cheat].Owned.Weapons[Rules.Reward], "A self-invite counted")
+check(stored["20"] == nil and not profiles[cheat].Cosmetics.Owned[Rules.Reward], "A self-invite counted")
 
 print(
 	"PASS: "
 		.. checks
-		.. " bring-a-friend checks (referrer, once per friend, offline and online inviters, self-invites, exclusive weapon)"
+		.. " bring-a-friend checks (referrer, once per friend, offline and online inviters, self-invites, exclusive weapon skin)"
 )

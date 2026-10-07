@@ -17,7 +17,6 @@
 	gem bag first (Market.stripGem), so no one gets a gem along with a piece.
 ]]
 local Slots = require(script.Parent.EquipmentSlots)
-local Referrals = require(script.Parent.Referrals)
 
 local Market = {}
 
@@ -138,9 +137,6 @@ function Market.whyNot(profile, kind: any, slot: any, id: any): string?
 		end
 		if not (profile.Owned[gearType] and profile.Owned[gearType][id]) then
 			return "You don't own that item."
-		end
-		if id == Referrals.Reward then
-			return "Bring-a-friend rewards can't be sold."
 		end
 		if profile.Character[slot] == id then
 			return "Take it off first: you can't sell what you're wearing."

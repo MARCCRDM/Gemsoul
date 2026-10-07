@@ -994,25 +994,6 @@ for _, weapon in Classes.List.Warrior.Weapons do
 		weapon.WeaponType = "Pistol"
 	end
 end
--- The bring-a-friend reward (Shared.Referrals): a war-banner spear. Never in
--- the start pool, drops or crates, and it can't be traded; balanced with the
--- starter swords, so it's a badge, not an edge.
-table.insert(Classes.List.Warrior.Weapons, {
-	Id = "CrusaderStandard",
-	Name = "Crusader's Standard",
-	Tier = 3,
-	RarityTier = 3,
-	Style = "Exclusive",
-	Exclusive = "Referral",
-	Look = "Standard",
-	WeaponType = "Sword",
-	Description = "A gold-crowned war banner on a spear shaft. Only recruiters carry it.",
-	Mods = {},
-	BuffReady = true,
-	ProposedBuff = "Three-strike spear combo with long reach.",
-	Passive = { Name = "Recruiter", Text = "Earned by bringing a friend into the Saga.", Effect = {} },
-	Attack = { Kind = "Melee", Damage = 17, Rate = 0.7, Range = 8, Arc = 70, Combo = 3 },
-})
 -- Every player is a Warrior; retain other-class items so migration never erases gear.
 for classId, class in Classes.List do
 	if classId ~= "Warrior" then

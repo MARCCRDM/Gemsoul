@@ -4,7 +4,7 @@
 	  "BuyCosmetic", id            coins for a trim or back piece
 	  "BuyCrate", id, count?       coins for 1, 5 or 10 crates (bulk is cheaper)
 	  "OpenCrate", id, count?      open up to 10 of your crates; returns each result
-	  "EquipCosmetic", kind, id?   wear a trim / back piece you own (nil takes it off)
+	  "EquipCosmetic", kind, id?   wear a trim / back piece / weapon skin you own (nil takes it off)
 	  "ClaimSeason", level|"all"   claim Season Path rewards you've reached
 	Robux: when an id is set in Store.RobuxProducts, buying that Developer
 	Product grants the same bundle or crate (ProcessReceipt below).
@@ -231,7 +231,7 @@ end
 
 local function equipCosmetic(player: Player, kind: any, id: any)
 	local profile = PlayerData.get(player)
-	if not profile or (kind ~= "Trim" and kind ~= "Back") then
+	if not profile or (kind ~= "Trim" and kind ~= "Back" and kind ~= "Skin") then
 		return reply(false, "Pick something to wear.")
 	end
 	if id ~= nil then

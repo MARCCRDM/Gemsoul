@@ -60,7 +60,7 @@ type Profile = {
 	-- Firsts that guide new players: "Mined", "Cut", "Sold", "Crafted", "Enchanted".
 	Milestones: { [string]: boolean },
 	Daily: { Day: number, Streak: number }, -- daily reward
-	Cosmetics: { Owned: { [string]: boolean }, Trim: string?, Back: string? },
+	Cosmetics: { Owned: { [string]: boolean }, Trim: string?, Back: string?, Skin: string? },
 	Season: { XP: number, Claimed: { [string]: boolean } }, -- claimed levels, as strings
 	Stats: { Kills: number, BestGem: number, BestDepth: number? }, -- for Top Players
 	Crates: { [string]: number }, -- unopened crates

@@ -5,6 +5,8 @@
 	  Trims  recolour your class glow (armor trim, eye slits, weapon edges).
 	         Enchanted gear still takes on its gem's element.
 	  Backs  something worn on your back: packs, banners, capes, wings, halos.
+	  Skins  restyle whatever weapon you hold. Earned only (never sold or in
+	         crates), so they stay out of Cosmetics.Order.
 
 	Some are sold in the Shop for coins; the rest come from Geode Crates and
 	the Season Path. Equipment draws them on your avatar.
@@ -13,13 +15,14 @@ local GemConfig = require(script.Parent.GemConfig)
 
 export type Cosmetic = {
 	Id: string,
-	Kind: "Trim" | "Back",
+	Kind: "Trim" | "Back" | "Skin",
 	Name: string,
 	Description: string,
 	Rarity: string, -- a gem tier: Common, Uncommon, Rare, UltraRare
 	Price: number?, -- coins in the Shop; nil = crate / season only
 	Color: Color3, -- the trim colour, or the back piece's glow
-	Look: string?, -- how Equipment builds a back piece
+	Look: string?, -- how Equipment builds a back piece or applies a skin
+	Exclusive: string?, -- earned one way only ("Referral": Shared.Referrals)
 }
 
 local Cosmetics = {}
@@ -158,6 +161,18 @@ Cosmetics.List = {
 		Rarity = "UltraRare",
 		Color = Color3.fromRGB(255, 220, 120),
 		Look = "Halo",
+	},
+	-- The bring-a-friend reward (Shared.Referrals). Not in Order: never sold,
+	-- never in crates.
+	SkinCrusader = {
+		Id = "SkinCrusader",
+		Kind = "Skin",
+		Name = "Crusader Gold",
+		Description = "Burnished gold and obsidian, white-hot edges and a trail of sparks. On any weapon.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(255, 214, 110),
+		Look = "Crusader",
+		Exclusive = "Referral",
 	},
 } :: { [string]: Cosmetic }
 

@@ -617,42 +617,71 @@ WEAPONS.Halberd = function(folder, _character, right, _left, accent, gem)
 	gemSocket(folder, right, m, Vector3.new(0, 4.6, 0), gem, 0.26)
 end
 
--- The bring-a-friend reward (Shared.Referrals): a spear carrying a black and
--- gold war banner, its emblem lit in the weapon's accent.
-WEAPONS.Standard = function(folder, _character, right, _left, accent, gem)
-	local gold = Color3.fromRGB(214, 160, 52)
-	local cloth = Color3.fromRGB(18, 18, 22)
-	local m = UPRIGHT * CFrame.new(0, -1.4, 0)
-	piece(folder, right, m * CFrame.new(0, 2, 0), Vector3.new(0.2, 6.4, 0.2), IRON, Enum.Material.Metal)
-	piece(folder, right, m * CFrame.new(0, -1.15, 0), Vector3.new(0.3, 0.2, 0.3), gold, Enum.Material.Metal)
-	-- Spearhead over a gold collar.
-	piece(folder, right, m * CFrame.new(0, 5.3, 0), Vector3.new(0.3, 0.12, 0.3), gold, Enum.Material.Metal)
-	piece(folder, right, m * CFrame.new(0, 5.95, 0), Vector3.new(0.3, 1.2, 0.08), STEEL, Enum.Material.Metal)
-	neon(folder, right, m * CFrame.new(0, 5.95, -0.045), Vector3.new(0.05, 1, 0.02), accent)
-	-- The banner hangs from a crossbar: black cloth, gold edging, two tails.
-	local bar = m * CFrame.new(0.85, 4.9, 0)
-	piece(folder, right, bar, Vector3.new(1.9, 0.12, 0.12), gold, Enum.Material.Metal)
-	local flag =
-		piece(folder, right, bar * CFrame.new(0, -1.05, 0), Vector3.new(1.6, 2, 0.05), cloth, Enum.Material.Fabric)
-	flag.Name = "Banner"
-	for _, x in { -0.4, 0.4 } do
-		piece(folder, right, bar * CFrame.new(x, -2.3, 0), Vector3.new(0.75, 0.55, 0.05), cloth, Enum.Material.Fabric)
+-- Weapon skins (cosmetics): restyle whatever weapon is held, after its
+-- rarity, quality and gem have had their say.
+local SKINS = {}
+
+SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
+	local gold = Color3.fromRGB(226, 172, 58)
+	local obsidian = Color3.fromRGB(20, 18, 26)
+	local biggest, biggestSize = nil, 0
+	for _, part in weaponFolder:GetDescendants() do
+		if not part:IsA("BasePart") or part.Transparency >= 1 or part.Name == "SocketedGem" then
+			continue
+		end
+		CollectionService:RemoveTag(part, Tags.Prismatic)
+		local _, _, value = part.Color:ToHSV()
+		if part.Material == Enum.Material.Neon then
+			part.Color = color -- white-hot edges
+		elseif value < 0.45 or part.Material == Enum.Material.Wood or part.Material == Enum.Material.Leather then
+			part.Color, part.Material, part.Reflectance = obsidian, Enum.Material.SmoothPlastic, 0.2
+		else
+			part.Color, part.Material, part.Reflectance = gold, Enum.Material.Foil, 0.25
+		end
+		local size = part.Size.X * part.Size.Y * part.Size.Z
+		if size > biggestSize then
+			biggest, biggestSize = part, size
+		end
 	end
-	for _, x in { -0.83, 0.83 } do
-		piece(folder, right, bar * CFrame.new(x, -1.25, 0), Vector3.new(0.07, 2.4, 0.07), gold, Enum.Material.Metal)
+	if not biggest then
+		return
 	end
-	-- The emblem: a glowing diamond with a bar through it, both faces.
-	for _, z in { -0.04, 0.04 } do
-		neon(
-			folder,
-			right,
-			bar * CFrame.new(0, -0.95, z) * CFrame.Angles(0, 0, math.rad(45)),
-			Vector3.new(0.5, 0.5, 0.03),
-			gold
-		)
-		neon(folder, right, bar * CFrame.new(0, -0.95, z * 1.3), Vector3.new(1.1, 0.08, 0.03), accent)
-	end
-	gemSocket(folder, right, m, Vector3.new(0, 5.15, -0.14), gem, 0.22)
+	-- Sparks drifting off the blade, a warm glow, and a gold trail along its
+	-- length that streaks through every swing.
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Name = "SkinSparks"
+	sparks.Color = ColorSequence.new(color, gold)
+	sparks.LightEmission = 1
+	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.12), NumberSequenceKeypoint.new(1, 0) })
+	sparks.Transparency = NumberSequence.new(0.1, 1)
+	sparks.Lifetime = NumberRange.new(0.4, 0.8)
+	sparks.Rate = 14
+	sparks.Speed = NumberRange.new(0.5, 1.5)
+	sparks.SpreadAngle = Vector2.new(180, 180)
+	sparks.Acceleration = Vector3.new(0, 1.5, 0)
+	sparks.Parent = biggest
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness, light.Shadows = color, 6, 0.8, false
+	light.Parent = biggest
+	local size = biggest.Size
+	local axis = if size.Y >= size.X and size.Y >= size.Z
+		then Vector3.yAxis * size.Y
+		elseif size.X >= size.Z then Vector3.xAxis * size.X
+		else Vector3.zAxis * size.Z
+	local tip, base = Instance.new("Attachment"), Instance.new("Attachment")
+	tip.Name, base.Name = "SkinTrailTip", "SkinTrailBase"
+	tip.Position, base.Position = axis * 0.5, axis * -0.5
+	tip.Parent, base.Parent = biggest, biggest
+	local trail = Instance.new("Trail")
+	trail.Name = "SkinTrail"
+	trail.Attachment0, trail.Attachment1 = tip, base
+	trail.Color = ColorSequence.new(color, gold)
+	trail.LightEmission = 1
+	trail.Transparency = NumberSequence.new(0.35, 1)
+	trail.Lifetime = 0.2
+	trail.MinLength = 0.05
+	trail.FaceCamera = true
+	trail.Parent = biggest
 end
 
 -- Back pieces (cosmetics) ---------------------------------------------------------------------
@@ -1660,6 +1689,12 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 				end
 			end
 		end
+	end
+	-- A weapon skin (cosmetic) goes on last, over everything else.
+	local skin = cosmetics and Cosmetics.get(cosmetics.Skin)
+	local applySkin = skin and skin.Look and SKINS[skin.Look]
+	if applySkin and (not only or only == "Weapon") then
+		applySkin(weaponFolder, skin.Color)
 	end
 	return folder
 end
