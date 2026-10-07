@@ -259,7 +259,7 @@ local primary = new("TextButton", {
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.fromScale(0.5, 0),
 	Size = UDim2.new(1, 0, 0, 52),
-	Text = "REVEAL MY STARTER KIT",
+	Text = "BEGIN MY SAGA",
 	TextSize = 16,
 	Font = Enum.Font.GothamBold,
 	TextColor3 = C.Ink,
@@ -303,7 +303,7 @@ local function listen(signal, fn)
 end
 local savedKit = GemClient.Profile.Intro and GemClient.Profile.Intro.Lottery
 local chosenStyle, chosenElement = savedKit and savedKit.Style or "Prospector", savedKit and savedKit.Element or "Fire"
-if savedKit then primary.Text = "CONTINUE MY SAVED REVEAL" end
+if savedKit then primary.Text = "CLAIM MY STARTER KIT" end
 -- The starter-kit choice: an armor style (three cards) and a starter element
 -- (four rows), then a line saying exactly what you'll get.
 local choices = frame(body, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, ZIndex = 20 })
@@ -746,7 +746,9 @@ local function fit()
 		UDim2.fromOffset(0, if short then 18 else 24), UDim2.new(1, 0, 0, if short then 26 else 42)
 	subtitle.Visible = not short
 	subtitle.Position = UDim2.fromOffset(0, if narrow then 62 else 70)
-	stepper.Visible = w >= 560
+	-- (No reveal steps any more: you pick your kit and go.)
+	stepper.Visible = false
+	motion.Visible = false
 	body.Position, body.Size = UDim2.fromOffset(0, header), UDim2.new(1, 0, 0, bodyHeight)
 	-- Short screens (phones): the compact picker.
 	layoutChoices(bodyHeight < 420, bodyHeight >= 560)
@@ -1193,7 +1195,7 @@ listen(primary.Activated, function()
 	end
 	if phase == "Welcome" then
 		busy = true
-		primary.Text = "OPENING YOUR CAPSULE…"
+		primary.Text = "EQUIPPING YOUR KIT…"
 		local result = GemClient.request("PrepareStarterLottery", chosenStyle, chosenElement)
 		if closed then
 			return
@@ -1204,10 +1206,11 @@ listen(primary.Activated, function()
 			UiKit.toast(result.Message)
 			return
 		end
+		-- No lottery: you chose the kit, so it's claimed straight away and
+		-- you're in.
 		reward = result.Lottery
-		choices.Visible = false
-		skip.Visible = true
-		animate(reward.Gear, false)
+		primary.Text = "BEGIN MY SAGA" -- (what a failed claim falls back to)
+		finish()
 	elseif phase == "Armor" then
 		animate(reward.Gems, true)
 	else
