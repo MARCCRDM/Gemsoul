@@ -5,7 +5,10 @@
 -- forward to place every part. "stance" bends the legs into a planted lunge.
 -- Run from the repo root (or set GEMSOUL_ROOT). CARD_LOOK picks the armor
 -- (HeavyVanguard, UtilityMiner, FrontierRanger), CARD_FAMILY the shield's
--- family and CARD_ACCENT ("r,g,b") the trim colour.
+-- family and CARD_ACCENT ("r,g,b") the trim colour. CARD_RARITY=5 dresses
+-- the fighter piece by piece in that family's legendary armor (as the game
+-- builds it), and CARD_GEM ("r,g,b") socket-glows every trim in one gem
+-- colour, as a socketed gem does.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -98,7 +101,31 @@ if process.env.CARD_ACCENT then
 	accent = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
 end
 local folder = Instance.new("Folder"); folder.Parent = body
-ArmorKits.build(folder, body, process.env.CARD_LOOK or "HeavyVanguard", accent, 3)
+local RARITY = tonumber(process.env.CARD_RARITY or "") or nil
+local FAMILY = process.env.CARD_FAMILY or "Juggernaut"
+if RARITY then
+	-- Each piece as Equipment builds it: its own item id, quality and roll.
+	local ArmorFamilies, GearRolls = req("ArmorFamilies"), req("GearRolls")
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
+		local id = "Armor" .. FAMILY .. slot .. RARITY
+		local item = ArmorFamilies.ById[id]
+		-- (Lune has no Random: a small seeded generator with the same calls.)
+		local seed = 1701
+		local function nextFloat()
+			seed = (seed * 1103515245 + 12345) % 2147483648
+			return seed / 2147483648
+		end
+		local rng = {
+			NextInteger = function(_, lo, hi) return lo + math.floor(nextFloat() * (hi - lo + 1)) end,
+			NextNumber = function(_, lo, hi) lo, hi = lo or 0, hi or 1; return lo + nextFloat() * (hi - lo) end,
+		}
+		local roll = GearRolls.roll(rng, RARITY, item)
+		local piece = Instance.new("Model"); piece.Name = slot; piece.Parent = folder
+		ArmorKits.build(piece, body, process.env.CARD_LOOK or "HeavyVanguard", accent, RARITY, GearRolls.appearance(roll), slot, id)
+	end
+else
+	ArmorKits.build(folder, body, process.env.CARD_LOOK or "HeavyVanguard", accent, 3)
+end
 -- The weapon in the right hand, the shield on the left forearm, as Equipment mounts them.
 local function anchorAt(part, offset, name)
 	local a = Instance.new("Part"); a.Name = name; a.Size = Vector3.one * 0.05; a.Transparency = 1
@@ -113,7 +140,7 @@ local right = anchorAt(parts.RightHand, CFrame.new(0, -0.1, 0), "RightGrip")
 local before = {}
 for _, d in folder:GetDescendants() do d:SetAttribute("Pre", true) end
 if WEAPON == "Sword" then
-	Assets.sword(folder, right, mount, 4, accent, finish)
+	Assets.sword(folder, right, mount, RARITY or 4, accent, finish)
 else
 	Assets.forge(WEAPON, folder, right, mount, 4, accent, finish)
 end
@@ -128,7 +155,7 @@ else
 	local arm = parts.LeftLowerArm
 	local turn = if FIST then 110 else 90
 	local smount = CFrame.new(-(arm.Size.X / 2 + 0.2), 0, 0) * CFrame.Angles(0, math.rad(turn), 0)
-	Assets.shield(folder, arm, smount, 4, accent, finish, process.env.CARD_FAMILY or "Juggernaut")
+	Assets.shield(folder, arm, smount, RARITY or 4, accent, finish, FAMILY)
 end
 -- Every part gets an id (instance handles aren't stable table keys here).
 local byId, nextId = {}, 0
@@ -183,6 +210,16 @@ local function solve()
 	for id in bound do place(id) end
 end
 
+-- One gem colour on every glowing trim, as Equipment's gem glow does.
+if process.env.CARD_GEM then
+	local r, g, b = string.match(process.env.CARD_GEM, "(%d+),(%d+),(%d+)")
+	local gem = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+	for _, d in body:GetDescendants() do
+		if d:IsA("BasePart") and d.Material == roblox.Enum.Material.Neon then
+			d.Color = gem
+		end
+	end
+end
 local function export(label)
 	solve()
 	local list = {}
