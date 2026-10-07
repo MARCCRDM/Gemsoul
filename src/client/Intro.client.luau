@@ -351,10 +351,20 @@ local function text(parent, value, size, color, font, props)
 	end
 	return l
 end
+-- Every piece has a full layout and a compact one (short phone screens):
+-- fit() switches them with layoutChoices.
+local relayout, compactMode = {}, false
+local function place(apply)
+	table.insert(relayout, apply)
+	apply(false)
+end
 local function heading(parent, number, value, x, width)
 	local h = text(parent, number .. "  " .. value, 13, C.Dim, Enum.Font.GothamBold)
-	h.Position, h.Size = UDim2.new(x, 0, 0, 0), UDim2.new(width, 0, 0, 20)
 	h.TextXAlignment = Enum.TextXAlignment.Left
+	place(function(compact)
+		h.TextSize = if compact then 11 else 13
+		h.Position, h.Size = UDim2.new(x, 0, 0, 0), UDim2.new(width, 0, 0, if compact then 16 else 20)
+	end)
 end
 heading(choices, "1", "ARMOR STYLE  ·  sword, shield and a full set", 0, 0.6)
 heading(choices, "2", "STARTER ELEMENT  ·  three surges for Q / E / R", 0.62, 0.38)
@@ -363,12 +373,12 @@ local styleButtons, elementButtons = {}, {}
 local refreshChoices -- (below)
 -- (The launch button has its own row under the body: nothing to leave.)
 local CTA_ROOM = 0
-local styleArea = frame(choices, {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 28),
-	Size = UDim2.new(0.6, -8, 1, -28 - 52 - CTA_ROOM),
-	ZIndex = 21,
-})
+local styleArea = frame(choices, { BackgroundTransparency = 1, ZIndex = 21 })
+place(function(compact)
+	local top, bottom = if compact then 20 else 28, if compact then 36 else 52
+	styleArea.Position = UDim2.fromOffset(0, top)
+	styleArea.Size = UDim2.new(0.6, -8, 1, -top - bottom - CTA_ROOM)
+end)
 for i, style in STYLES do
 	local card = new("TextButton", {
 		Text = "",
@@ -377,6 +387,7 @@ for i, style in STYLES do
 		Position = UDim2.new((i - 1) / 3, if i == 1 then 0 else 5, 0, 0),
 		Size = UDim2.new(1 / 3, -7, 1, 0),
 		ZIndex = 21,
+		ClipsDescendants = true,
 	}, styleArea)
 	card.Name = style.Id
 	UiKit.round(card, 10)
@@ -391,8 +402,6 @@ for i, style in STYLES do
 		BackgroundColor3 = C.Ink,
 		Image = if artId ~= 0 then "rbxassetid://" .. artId else "",
 		ScaleType = Enum.ScaleType.Crop,
-		Position = UDim2.fromOffset(8, 12),
-		Size = UDim2.new(1, -16, 0, 176),
 		Visible = artId ~= 0,
 		ZIndex = 22,
 	}, card)
@@ -402,8 +411,6 @@ for i, style in STYLES do
 	-- A crest: the family's initial in a diamond of its colour.
 	local crest = frame(card, {
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 22),
-		Size = UDim2.fromOffset(46, 46),
 		Rotation = 45,
 		BackgroundColor3 = style.Color:Lerp(C.Ink, 0.55),
 		ZIndex = 22,
@@ -412,34 +419,52 @@ for i, style in STYLES do
 	UiKit.round(crest, 8)
 	new("UIStroke", { Color = style.Color, Thickness = 2 }, crest)
 	local initial = text(card, string.sub(style.Id, 1, 1), 26, style.Color, Enum.Font.GothamBlack)
-	initial.AnchorPoint, initial.Position, initial.Size = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 27), UDim2.fromOffset(60, 36)
+	initial.AnchorPoint = Vector2.new(0.5, 0)
 	initial.TextXAlignment = Enum.TextXAlignment.Center
 	initial.Visible = artId == 0
 	local name = text(card, string.upper(style.Id), 18, C.Text, Enum.Font.GothamBlack)
-	name.Position, name.Size = UDim2.fromOffset(0, 86 + Y0), UDim2.new(1, 0, 0, 22)
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	local role = text(card, style.Role, 10, style.Color, Enum.Font.GothamBold)
-	role.Position, role.Size = UDim2.fromOffset(0, 110 + Y0), UDim2.new(1, 0, 0, 14)
 	role.TextXAlignment = Enum.TextXAlignment.Center
-	frame(card, {
-		BackgroundColor3 = C.Line,
-		Position = UDim2.new(0, 14, 0, 132 + Y0),
-		Size = UDim2.new(1, -28, 0, 1),
-		ZIndex = 22,
-	})
-	for line, value in style.Lines do
+	local divider = frame(card, { BackgroundColor3 = C.Line, ZIndex = 22 })
+	local perks = {}
+	for _, value in style.Lines do
 		local dot = text(card, "◆", 8, style.Color, Enum.Font.GothamBold)
-		dot.Position, dot.Size = UDim2.new(0, 14, 0, 144 + Y0 + (line - 1) * STEP), UDim2.fromOffset(10, 14)
 		local row = text(card, value, 11, C.Dim, Enum.Font.GothamMedium, { TextWrapped = true })
-		row.Position, row.Size = UDim2.new(0, 28, 0, 142 + Y0 + (line - 1) * STEP), UDim2.new(1, -40, 0, 30)
 		row.TextYAlignment = Enum.TextYAlignment.Top
+		table.insert(perks, { dot, row })
 	end
 	local kit = text(card, "Helmet · Chest · Gloves · Boots\nShield · Sword", 10, C.Faint, Enum.Font.GothamMedium)
-	kit.AnchorPoint, kit.Position, kit.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -40), UDim2.new(1, -24, 0, 28)
+	kit.AnchorPoint = Vector2.new(0.5, 1)
 	kit.TextXAlignment, kit.TextWrapped = Enum.TextXAlignment.Center, true
-	kit.Visible = artId == 0 -- (the art shows the kit)
 	local pick = text(card, "SELECTED", 10, C.Ink, Enum.Font.GothamBlack)
 	pick.AnchorPoint, pick.Position, pick.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10), UDim2.fromOffset(92, 20)
+	-- Full: art (or crest) up top, then name, role and the perks. Compact:
+	-- the art fills the card above the name and role; the perks go.
+	place(function(compact)
+		if compact then
+			art.Position, art.Size = UDim2.fromOffset(6, 8), UDim2.new(1, -12, 1, -52)
+			crest.Position, crest.Size = UDim2.new(0.5, 0, 0.5, -42), UDim2.fromOffset(34, 34)
+			initial.Position, initial.Size, initial.TextSize = UDim2.new(0.5, 0, 0.5, -38), UDim2.fromOffset(40, 28), 18
+			name.Position, name.Size, name.TextSize = UDim2.new(0, 0, 1, -42), UDim2.new(1, 0, 0, 18), 14
+			role.Position, role.Size, role.TextSize = UDim2.new(0, 0, 1, -22), UDim2.new(1, 0, 0, 12), 9
+		else
+			art.Position, art.Size = UDim2.fromOffset(8, 12), UDim2.new(1, -16, 0, 176)
+			crest.Position, crest.Size = UDim2.new(0.5, 0, 0, 22), UDim2.fromOffset(46, 46)
+			initial.Position, initial.Size, initial.TextSize = UDim2.new(0.5, 0, 0, 27), UDim2.fromOffset(60, 36), 26
+			name.Position, name.Size, name.TextSize = UDim2.fromOffset(0, 86 + Y0), UDim2.new(1, 0, 0, 22), 18
+			role.Position, role.Size, role.TextSize = UDim2.fromOffset(0, 110 + Y0), UDim2.new(1, 0, 0, 14), 10
+		end
+		divider.Visible = not compact
+		divider.Position, divider.Size = UDim2.new(0, 14, 0, 132 + Y0), UDim2.new(1, -28, 0, 1)
+		for line, pair in perks do
+			pair[1].Visible, pair[2].Visible = not compact, not compact
+			pair[1].Position, pair[1].Size = UDim2.new(0, 14, 0, 144 + Y0 + (line - 1) * STEP), UDim2.fromOffset(10, 14)
+			pair[2].Position, pair[2].Size = UDim2.new(0, 28, 0, 142 + Y0 + (line - 1) * STEP), UDim2.new(1, -40, 0, 30)
+		end
+		kit.Visible = artId == 0 and not compact -- (the art shows the kit)
+		kit.Position, kit.Size = UDim2.new(0.5, 0, 1, -40), UDim2.new(1, -24, 0, 28)
+	end)
 	pick.BackgroundTransparency, pick.BackgroundColor3 = 0, style.Color
 	pick.TextXAlignment = Enum.TextXAlignment.Center
 	UiKit.round(pick, 10)
@@ -452,12 +477,12 @@ for i, style in STYLES do
 	end)
 end
 
-local elementArea = frame(choices, {
-	BackgroundTransparency = 1,
-	Position = UDim2.new(0.62, 0, 0, 28),
-	Size = UDim2.new(0.38, 0, 1, -28 - 52 - CTA_ROOM),
-	ZIndex = 21,
-})
+local elementArea = frame(choices, { BackgroundTransparency = 1, ZIndex = 21 })
+place(function(compact)
+	local top, bottom = if compact then 20 else 28, if compact then 36 else 52
+	elementArea.Position = UDim2.new(0.62, 0, 0, top)
+	elementArea.Size = UDim2.new(0.38, 0, 1, -top - bottom - CTA_ROOM)
+end)
 for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 	local color = GemConfig.ElementColors[element]
 	local row = new("TextButton", {
@@ -467,6 +492,7 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 		Position = UDim2.new(0, 0, (i - 1) / 4, if i == 1 then 0 else 4),
 		Size = UDim2.new(1, 0, 1 / 4, -6),
 		ZIndex = 21,
+		ClipsDescendants = true,
 	}, elementArea)
 	row.Name = element
 	UiKit.round(row, 10)
@@ -485,34 +511,22 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 		BackgroundColor3 = color,
 		BackgroundTransparency = 0.86,
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.fromOffset(64, 64),
 		ZIndex = 22,
 	})
 	UiKit.round(disc, 32)
 	local holder = frame(row, {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.fromOffset(64, 64),
 		ZIndex = 23,
 	})
 	Art.show(holder, { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }, nil, color, false)
 	local name = text(row, string.upper(GemConfig.elementName(element)), 17, color, Enum.Font.GothamBlack)
-	name.Position, name.Size = UDim2.new(0, 88, 0, 8), UDim2.new(0.5, -88, 0, 22)
 	name.TextXAlignment = Enum.TextXAlignment.Left
 	local blurb = text(row, ELEMENTS[element], 11, C.Dim, Enum.Font.GothamMedium)
-	blurb.Position, blurb.Size = UDim2.new(0, 88, 0, 30), UDim2.new(1, -98, 0, 16)
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
 	-- Its three surges as key chips: which one lands on Q, E and R.
-	local chips = frame(row, {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 88, 1, -8),
-		Size = UDim2.new(1, -98, 0, 24),
-		ZIndex = 22,
-	})
-	local surgeLabels = {}
+	local chips = frame(row, { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), ZIndex = 22 })
+	local surgeLabels, chipKeys = {}, {}
 	for index, surgeName in surgeNames(element) do
 		local chip = frame(chips, {
 			BackgroundColor3 = C.Ink,
@@ -523,12 +537,33 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 		UiKit.round(chip, 6)
 		new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.6 }, chip)
 		local key = text(chip, ({ "Q", "E", "R" })[index], 11, color, Enum.Font.GothamBlack)
-		key.Position, key.Size = UDim2.fromOffset(6, 0), UDim2.new(0, 12, 1, 0)
 		local label = text(chip, surgeName, 10, C.Dim, Enum.Font.GothamBold)
-		label.Position, label.Size = UDim2.fromOffset(20, 0), UDim2.new(1, -24, 1, 0)
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		table.insert(surgeLabels, label)
+		table.insert(chipKeys, key)
 	end
+	-- Full: a big gem, name, what it does, then the chips. Compact: a small
+	-- gem, the name and the chips under it.
+	place(function(compact)
+		local gem = if compact then 34 else 64
+		local left = if compact then 8 else 12
+		local textX = left + gem + (if compact then 8 else 12)
+		disc.Position, disc.Size = UDim2.new(0, left, 0.5, 0), UDim2.fromOffset(gem, gem)
+		holder.Position, holder.Size = UDim2.new(0, left, 0.5, 0), UDim2.fromOffset(gem, gem)
+		name.TextSize = if compact then 13 else 17
+		name.Position, name.Size = UDim2.new(0, textX, 0, if compact then 3 else 8), UDim2.new(0.5, -textX, 0, if compact then 16 else 22)
+		blurb.Visible = not compact
+		blurb.Position, blurb.Size = UDim2.new(0, textX, 0, 30), UDim2.new(1, -textX - 10, 0, 16)
+		chips.Position = UDim2.new(0, textX, 1, if compact then -4 else -8)
+		chips.Size = UDim2.new(1, -textX - (if compact then 6 else 10), 0, if compact then 18 else 24)
+		for index, label in surgeLabels do
+			local key = chipKeys[index]
+			key.TextSize, label.TextSize = if compact then 9 else 11, if compact then 9 else 10
+			key.Position, key.Size = UDim2.fromOffset(if compact then 4 else 6, 0), UDim2.new(0, if compact then 9 else 12, 1, 0)
+			label.Position = UDim2.fromOffset(if compact then 14 else 20, 0)
+			label.Size = UDim2.new(1, if compact then -16 else -24, 1, 0)
+		end
+	end)
 	elementButtons[element] = { Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Color = color }
 	listen(row.Activated, function()
 		if not savedKit and not busy then
@@ -539,17 +574,28 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 end
 
 -- What you're about to get.
-local summary = frame(choices, {
-	BackgroundColor3 = C.Panel,
-	Position = UDim2.new(0, 0, 1, -44 - CTA_ROOM),
-	Size = UDim2.new(1, 0, 0, 44),
-	ZIndex = 21,
-})
+local summary = frame(choices, { BackgroundColor3 = C.Panel, ZIndex = 21, ClipsDescendants = true })
 UiKit.round(summary, 8)
 local summaryEdge = new("UIStroke", { Color = C.Line, Thickness = 1 }, summary)
 local summaryText = text(summary, "", 13, C.Text, Enum.Font.GothamBold, { RichText = true })
-summaryText.Position, summaryText.Size = UDim2.fromOffset(16, 0), UDim2.new(1, -32, 1, 0)
 summaryText.TextXAlignment = Enum.TextXAlignment.Left
+place(function(compact)
+	local height = if compact then 30 else 44
+	summary.Position, summary.Size = UDim2.new(0, 0, 1, -height - CTA_ROOM), UDim2.new(1, 0, 0, height)
+	summaryText.TextSize = if compact then 11 else 13
+	summaryText.Position = UDim2.fromOffset(if compact then 10 else 16, 0)
+	summaryText.Size = UDim2.new(1, if compact then -20 else -32, 1, 0)
+end)
+local function layoutChoices(compact)
+	if compact == compactMode then
+		return
+	end
+	compactMode = compact
+	for _, apply in relayout do
+		apply(compact)
+	end
+	refreshChoices()
+end
 
 local function hex(color)
 	return string.format("#%02x%02x%02x", color.R * 255, color.G * 255, color.B * 255)
@@ -562,7 +608,7 @@ function refreshChoices()
 		card.Stroke.Thickness = if on then 2.5 else 1
 		card.Button.BackgroundColor3 = if on then C.Card:Lerp(card.Color, 0.14) else C.Card
 		card.Name.TextColor3 = if on then C.Text else C.Dim
-		card.Pick.Visible = on
+		card.Pick.Visible = on and not compactMode -- (compact: the glowing border says it)
 		if on then
 			styleColor = card.Color
 		end
@@ -627,6 +673,8 @@ local function fit()
 	subtitle.Position = UDim2.fromOffset(0, if narrow then 62 else 70)
 	stepper.Visible = w >= 560
 	body.Position, body.Size = UDim2.fromOffset(0, header), UDim2.new(1, 0, 0, bodyHeight)
+	-- Short screens (phones): the compact picker.
+	layoutChoices(bodyHeight < 420)
 	local portrait = narrow and h > w
 	horizontal = false
 	if portrait then
