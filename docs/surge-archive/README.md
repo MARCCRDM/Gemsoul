@@ -10,7 +10,7 @@ kept so nothing is lost. The rework adds to the catalog; it does not delete.
 | How gems roll them | `src/shared/GemRoller.luau` (`Surges`, `SurgeVariants`, `Resonance`, `ResonanceVariants`) |
 | Icons | `assets/images/ability_icons.png` (cell = `Icon` in the inventory), map in `src/client/Modules/AbilityIconAtlas.luau`, made by `tools/make_ability_icons.py` |
 | Effects and sounds | `src/client/Modules/CombatVfx.luau`, `CombatFx.luau`, `CombatSound.luau`; `assets/sounds/combat/` |
-| The exact code and assets | git tag `surges-legacy-v1` |
+| The exact code and assets | commit `88a6299` on `main` (local tag `surges-legacy-v1`) |
 
 Rules during the rework:
 
@@ -21,4 +21,4 @@ Rules during the rework:
   icon disappears.
 - To regenerate the inventory: `lune run tools/archive_surges.luau .`
 - To see or restore the old version of any file:
-  `git show surges-legacy-v1:<path>` or `git checkout surges-legacy-v1 -- <path>`.
+  `git show 88a6299:<path>` or `git checkout 88a6299 -- <path>`.
