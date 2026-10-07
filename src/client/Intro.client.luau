@@ -148,7 +148,7 @@ setStep(1)
 local title = label(panel, "YOUR LEGEND BEGINS", 34)
 title.Position, title.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, 42)
 local subtitle =
-	label(panel, "A full loadout. Nine gemstones. A build that starts with you.", 14, C.Dim, Enum.Font.Gotham)
+	label(panel, "Choose your armor style and element. Change your build later.", 14, C.Dim, Enum.Font.Gotham)
 subtitle.Position, subtitle.Size = UDim2.fromOffset(0, 70), UDim2.new(1, 0, 0, 22)
 local body = frame(panel, { BackgroundTransparency = 1 })
 -- The spotlight: the latest reward, big.
@@ -217,7 +217,7 @@ heroKicker.ZIndex = 5
 local heroArt = frame(hero, { BackgroundTransparency = 1, ZIndex = 2 })
 local heroName = label(hero, "A NEW WARRIOR AWAKENS", 28)
 heroName.ZIndex = 5
-local heroMeta = label(hero, "6 EQUIPMENT PIECES  ·  9 GEMSTONES", 12, C.Dim, Enum.Font.GothamMedium)
+local heroMeta = label(hero, "6 EQUIPMENT PIECES  ·  2 STARTER GEMS", 12, C.Dim, Enum.Font.GothamMedium)
 heroMeta.ZIndex = 5
 local scan =
 	frame(hero, { Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = C.Cyan, BackgroundTransparency = 0.85, ZIndex = 4 })
@@ -257,7 +257,7 @@ local primary = new("TextButton", {
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.fromScale(0.5, 0),
 	Size = UDim2.new(1, 0, 0, 52),
-	Text = "IGNITE THE LOTTERY",
+	Text = "REVEAL MY STARTER KIT",
 	TextSize = 16,
 	Font = Enum.Font.GothamBold,
 	TextColor3 = C.Ink,
@@ -299,6 +299,43 @@ local horizontal = false
 local function listen(signal, fn)
 	table.insert(connections, signal:Connect(fn))
 end
+local savedKit = GemClient.Profile.Intro and GemClient.Profile.Intro.Lottery
+local chosenStyle, chosenElement = savedKit and savedKit.Style or "Prospector", savedKit and savedKit.Element or "Fire"
+if savedKit then primary.Text = "CONTINUE MY SAVED REVEAL" end
+local choices = frame(body, {Size=UDim2.fromScale(1,1), BackgroundColor3=C.Ink, ZIndex=20})
+local function choiceHeading(text, y)
+	local heading = label(choices, text, 14, C.Dim)
+	heading.Position, heading.Size, heading.ZIndex = UDim2.fromScale(0, y), UDim2.fromScale(1, .1), 21
+end
+choiceHeading("1  ARMOR STYLE · Common sword, shield and full armor", 0)
+choiceHeading("2  STARTER ELEMENT · One Attack + one Defense gem", .43)
+local styleButtons, elementButtons = {}, {}
+local styleColors = {Prospector=C.Gold, Skirmisher=C.Cyan, Juggernaut=Color3.fromRGB(232,125,75)}
+local function refreshChoices()
+	for id, button in styleButtons do
+		button.BackgroundColor3 = if id == chosenStyle then styleColors[id] else C.Card
+		button.TextColor3 = if id == chosenStyle then C.Ink else C.Text
+	end
+	for id, button in elementButtons do
+		button.BackgroundColor3 = if id == chosenElement then GemConfig.ElementColors[id] else C.Card
+		button.TextColor3 = if id == chosenElement then C.Ink else C.Text
+	end
+end
+for i, entry in {{"Prospector", "PROSPECTOR\nAmber · Balanced"}, {"Skirmisher", "SKIRMISHER\nTeal · Mobile"}, {"Juggernaut", "JUGGERNAUT\nHeavy · Defensive"}} do
+	local button = new("TextButton", {Position=UDim2.fromScale((i-1)/3,.13), Size=UDim2.new(1/3,-8,.25,0), Text=entry[2], TextSize=16, TextWrapped=true, Font=Enum.Font.GothamBold, ZIndex=21}, choices)
+	UiKit.round(button, 10)
+	styleButtons[entry[1]] = button
+	listen(button.Activated, function() if not savedKit and not busy then chosenStyle=entry[1]; refreshChoices() end end)
+end
+for i, element in {"Fire", "Frost", "Shock", "Poison"} do
+	local button = new("TextButton", {Position=UDim2.fromScale((i-1)/4,.56), Size=UDim2.new(.25,-8,.2,0), Text=GemConfig.elementName(element), TextSize=15, Font=Enum.Font.GothamBold, ZIndex=21}, choices)
+	UiKit.round(button, 10)
+	elementButtons[element] = button
+	listen(button.Activated, function() if not savedKit and not busy then chosenElement=element; refreshChoices() end end)
+end
+choiceHeading("Fixed starter stats · R: free neutral Shift · Mine to discover new abilities", .83)
+refreshChoices()
+skip.Visible = false
 local SURGE_KEYS = {}
 for key, slot in Tech.SurgeSockets do
 	SURGE_KEYS[slot] = key
@@ -626,14 +663,14 @@ local function animate(entries, isGem)
 	paintHero(if isGem then C.Gold else C.Cyan, 0)
 	heroRecord = Art.show(heroArt, nil, nil, if isGem then C.Gold else C.Cyan, true)
 	heroStart = os.clock()
-	heroName.Text = if isGem then "CHARGING THE CORE" else "ASSEMBLING YOUR LOADOUT"
-	heroMeta.Text = "EVERY REEL IS LIVE"
+	heroName.Text = if isGem then "YOUR FIRST TWO SURGES" else "ASSEMBLING YOUR LOADOUT"
+	heroMeta.Text = "YOUR CHOICES · YOUR STARTER KIT"
 	heroMeta.TextColor3 = C.Dim
 	heroKicker.Text = if isGem then "GEMSTONE RESONANCE" else "EQUIPMENT RELEASE"
 	heroKicker.TextColor3 = C.Cyan
 	title.Text = if isGem then "POWER, UNEARTHED." else "YOUR LOADOUT. REVEALED."
 	subtitle.Text = if isGem
-		then "Nine gemstones. Every socket gets its spark."
+		then "One Attack. One Defense. A neutral Shift on R."
 		else "Boots first. Helmet last. Every piece is yours."
 	setStep(if isGem then 2 else 1)
 	rackTitle.Text = if isGem then "GEMSTONES" else "EQUIPMENT"
@@ -666,7 +703,7 @@ local function finish()
 	end
 	busy = true
 	local previous = primary.Text
-	primary.Text = "ATTUNING YOUR LOADOUT…"
+	primary.Text = "EQUIPPING YOUR LOADOUT…"
 	local result = GemClient.request("FinishStarterLottery")
 	if closed then
 		return
@@ -718,7 +755,10 @@ listen(RunService.RenderStepped, function(dt)
 			card.NextTick = elapsed + interval
 			for index, line in card.Lines do
 				local middle = index == 2
-				if phase == "Gems" then
+				if reward and reward.Version == 2 then
+					line.Text = (describe(card.Entry, phase == "Gems")):upper()
+					line.TextColor3 = if middle then C.Cyan else C.Faint
+				elseif phase == "Gems" then
 					local element = GemConfig.Elements[math.random(1, #GemConfig.Elements)]
 					line.Text = (GemConfig.ElementLabels[element] or element):upper()
 					line.TextColor3 = GemConfig.ElementColors[element]:Lerp(C.Text, if middle then 0.15 else 0)
@@ -757,11 +797,11 @@ listen(RunService.RenderStepped, function(dt)
 		primary.BackgroundColor3 = C.Gold
 		primary.TextColor3 = C.Ink
 		buttonStroke.Transparency = 0.45
-		primary.Text = if phase == "Armor" then "UNEARTH MY NINE GEMSTONES" else "ATTUNE & BEGIN YOUR SAGA"
+		primary.Text = if phase == "Armor" then "REVEAL MY STARTER GEMS" else "EQUIP & BEGIN YOUR SAGA"
 		title.Text = if phase == "Armor" then "BUILT FOR YOUR JOURNEY." else "YOUR SAGA STARTS NOW."
 		subtitle.Text = if phase == "Armor"
 			then "Inspect any piece. Your gemstones are next."
-			else "Six enchanted sockets. Three Gem Surges ready on Q · E · R."
+			else "Q: Attack · E: Defense · R: neutral Shift. Mine to expand your build."
 		setStep(if phase == "Gems" then 3 else 2)
 		heroKicker.Text = "COMPLETE  ·  SELECT ANY REWARD TO INSPECT"
 	end
@@ -773,7 +813,7 @@ listen(primary.Activated, function()
 	if phase == "Welcome" then
 		busy = true
 		primary.Text = "OPENING YOUR CAPSULE…"
-		local result = GemClient.request("PrepareStarterLottery")
+		local result = GemClient.request("PrepareStarterLottery", chosenStyle, chosenElement)
 		if closed then
 			return
 		end
@@ -784,6 +824,8 @@ listen(primary.Activated, function()
 			return
 		end
 		reward = result.Lottery
+		choices.Visible = false
+		skip.Visible = true
 		animate(reward.Gear, false)
 	elseif phase == "Armor" then
 		animate(reward.Gems, true)
