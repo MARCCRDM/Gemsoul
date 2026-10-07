@@ -3,7 +3,9 @@
 -- An R15 body in Frontier armor with a weapon (Sword, or a Forge weapon) and
 -- a shield, posed by the game's own RivalPose.update, then the joints solved
 -- forward to place every part. "stance" bends the legs into a planted lunge.
--- Run from the repo root (or set GEMSOUL_ROOT).
+-- Run from the repo root (or set GEMSOUL_ROOT). CARD_LOOK picks the armor
+-- (HeavyVanguard, UtilityMiner, FrontierRanger), CARD_FAMILY the shield's
+-- family and CARD_ACCENT ("r,g,b") the trim colour.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -91,8 +93,12 @@ end
 
 local body, parts, motors = buildBody()
 local accent, finish = Color3.fromRGB(80, 210, 255), Color3.fromRGB(70, 110, 160)
+if process.env.CARD_ACCENT then
+	local r, g, b = string.match(process.env.CARD_ACCENT, "(%d+),(%d+),(%d+)")
+	accent = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+end
 local folder = Instance.new("Folder"); folder.Parent = body
-ArmorKits.build(folder, body, "HeavyVanguard", accent, 3)
+ArmorKits.build(folder, body, process.env.CARD_LOOK or "HeavyVanguard", accent, 3)
 -- The weapon in the right hand, the shield on the left forearm, as Equipment mounts them.
 local function anchorAt(part, offset, name)
 	local a = Instance.new("Part"); a.Name = name; a.Size = Vector3.one * 0.05; a.Transparency = 1
@@ -122,7 +128,7 @@ else
 	local arm = parts.LeftLowerArm
 	local turn = if FIST then 110 else 90
 	local smount = CFrame.new(-(arm.Size.X / 2 + 0.2), 0, 0) * CFrame.Angles(0, math.rad(turn), 0)
-	Assets.shield(folder, arm, smount, 4, accent, finish, "Juggernaut")
+	Assets.shield(folder, arm, smount, 4, accent, finish, process.env.CARD_FAMILY or "Juggernaut")
 end
 -- Every part gets an id (instance handles aren't stable table keys here).
 local byId, nextId = {}, 0

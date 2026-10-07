@@ -326,6 +326,10 @@ local STYLES = {
 		Lines = { "Health and Defense", "Set: +Health, +Defense, less damage taken", "2+ pieces: +25% heavy damage" },
 	},
 }
+-- Each style's key art (assets/images/intro/style_*.png, rendered by
+-- tools/make_style_cards.py from the game's own fighters). 0 = not uploaded
+-- yet: the card shows its crest and text only.
+local STYLE_ART = { Prospector = 0, Skirmisher = 0, Juggernaut = 0 }
 local ELEMENTS = {
 	Fire = "Burn and burst",
 	Frost = "Slow, freeze and shield",
@@ -378,6 +382,23 @@ for i, style in STYLES do
 	UiKit.round(card, 10)
 	local edge = new("UIStroke", { Color = C.Line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, card)
 	frame(card, { BackgroundColor3 = style.Color, Size = UDim2.new(1, 0, 0, 4), ZIndex = 22 })
+	-- The fighter's key art leads the card when it's uploaded; until then a
+	-- crest does, and the text sits higher.
+	local artId = STYLE_ART[style.Id] or 0
+	local Y0 = if artId ~= 0 then 112 else 0
+	local STEP = if artId ~= 0 then 28 else 34
+	local art = new("ImageLabel", {
+		BackgroundColor3 = C.Ink,
+		Image = if artId ~= 0 then "rbxassetid://" .. artId else "",
+		ScaleType = Enum.ScaleType.Crop,
+		Position = UDim2.fromOffset(8, 12),
+		Size = UDim2.new(1, -16, 0, 176),
+		Visible = artId ~= 0,
+		ZIndex = 22,
+	}, card)
+	art.Name = "StyleArt"
+	UiKit.round(art, 8)
+	new("UIStroke", { Color = style.Color, Thickness = 1, Transparency = 0.4 }, art)
 	-- A crest: the family's initial in a diamond of its colour.
 	local crest = frame(card, {
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -386,34 +407,37 @@ for i, style in STYLES do
 		Rotation = 45,
 		BackgroundColor3 = style.Color:Lerp(C.Ink, 0.55),
 		ZIndex = 22,
+		Visible = artId == 0,
 	})
 	UiKit.round(crest, 8)
 	new("UIStroke", { Color = style.Color, Thickness = 2 }, crest)
 	local initial = text(card, string.sub(style.Id, 1, 1), 26, style.Color, Enum.Font.GothamBlack)
 	initial.AnchorPoint, initial.Position, initial.Size = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 27), UDim2.fromOffset(60, 36)
 	initial.TextXAlignment = Enum.TextXAlignment.Center
+	initial.Visible = artId == 0
 	local name = text(card, string.upper(style.Id), 18, C.Text, Enum.Font.GothamBlack)
-	name.Position, name.Size = UDim2.fromOffset(0, 86), UDim2.new(1, 0, 0, 22)
+	name.Position, name.Size = UDim2.fromOffset(0, 86 + Y0), UDim2.new(1, 0, 0, 22)
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	local role = text(card, style.Role, 10, style.Color, Enum.Font.GothamBold)
-	role.Position, role.Size = UDim2.fromOffset(0, 110), UDim2.new(1, 0, 0, 14)
+	role.Position, role.Size = UDim2.fromOffset(0, 110 + Y0), UDim2.new(1, 0, 0, 14)
 	role.TextXAlignment = Enum.TextXAlignment.Center
 	frame(card, {
 		BackgroundColor3 = C.Line,
-		Position = UDim2.new(0, 14, 0, 132),
+		Position = UDim2.new(0, 14, 0, 132 + Y0),
 		Size = UDim2.new(1, -28, 0, 1),
 		ZIndex = 22,
 	})
 	for line, value in style.Lines do
 		local dot = text(card, "◆", 8, style.Color, Enum.Font.GothamBold)
-		dot.Position, dot.Size = UDim2.new(0, 14, 0, 144 + (line - 1) * 34), UDim2.fromOffset(10, 14)
+		dot.Position, dot.Size = UDim2.new(0, 14, 0, 144 + Y0 + (line - 1) * STEP), UDim2.fromOffset(10, 14)
 		local row = text(card, value, 11, C.Dim, Enum.Font.GothamMedium, { TextWrapped = true })
-		row.Position, row.Size = UDim2.new(0, 28, 0, 142 + (line - 1) * 34), UDim2.new(1, -40, 0, 30)
+		row.Position, row.Size = UDim2.new(0, 28, 0, 142 + Y0 + (line - 1) * STEP), UDim2.new(1, -40, 0, 30)
 		row.TextYAlignment = Enum.TextYAlignment.Top
 	end
 	local kit = text(card, "Helmet · Chest · Gloves · Boots\nShield · Sword", 10, C.Faint, Enum.Font.GothamMedium)
 	kit.AnchorPoint, kit.Position, kit.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -40), UDim2.new(1, -24, 0, 28)
 	kit.TextXAlignment, kit.TextWrapped = Enum.TextXAlignment.Center, true
+	kit.Visible = artId == 0 -- (the art shows the kit)
 	local pick = text(card, "SELECTED", 10, C.Ink, Enum.Font.GothamBlack)
 	pick.AnchorPoint, pick.Position, pick.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10), UDim2.fromOffset(92, 20)
 	pick.BackgroundTransparency, pick.BackgroundColor3 = 0, style.Color
