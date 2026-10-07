@@ -19,6 +19,9 @@ local Trading = require(script.Parent.Systems.Trading)
 local Equipment = require(script.Parent.Systems.Equipment)
 -- Everyone's body is the rival's rig, before anyone spawns (FighterRig).
 require(script.Parent.Systems.FighterRig).start()
+-- Bodies pass through each other (nobody stands on their foe) and nobody
+-- jumps in a fight (FighterBodies).
+require(script.Parent.Systems.FighterBodies).start()
 
 -- Bodies blown apart on death (client ElementalDeath): the flying pieces hit
 -- the ground and walls but not each other, so a body that starts packed

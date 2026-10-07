@@ -12,6 +12,8 @@ local Tags = require(ReplicatedStorage.Shared.Tags)
 require(script.Parent.Modules.OutlineBudget).start()
 -- Every player's body acts out their fighting (posed here, for everyone).
 require(script.Parent.Modules.BodyPoses).start()
+-- Your body keeps clear of everyone else's, and doesn't jump in a fight.
+require(script.Parent.Modules.FighterSpacing).start()
 -- Prismatic gear shimmers through every colour.
 require(script.Parent.Modules.PrismaticShimmer).start()
 -- Swing trails on every blade.
