@@ -11,6 +11,7 @@ local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -311,18 +312,29 @@ local STYLES = {
 		Id = "Prospector",
 		Color = GemConfig.ElementColors.Poison, -- its gem (Corrosive), as in its art
 		Role = "BALANCED  ·  SUSTAIN",
+		-- A quick read of the style (ArmorFamilies: Primary stats per piece
+		-- and set bonuses), out of 5.
+		Profile = { Health = 4, Power = 4, Defense = 3, Speed = 3 },
+		Gem = "Poison",
+		Tip = "Trade blows and outlast them. Steady damage, quick to recover.",
 		Lines = { "Health and Power on every piece", "Set: +Health, +Power, faster cooldowns", "2+ pieces: +10% attack damage" },
 	},
 	{
 		Id = "Skirmisher",
 		Color = GemConfig.ElementColors.Shock, -- Ion
 		Role = "MOBILE  ·  CRITICAL",
+		Profile = { Health = 2, Power = 4, Defense = 2, Speed = 5 },
+		Gem = "Shock",
+		Tip = "Strike, dodge, strike again. Speed and crits win the race.",
 		Lines = { "Speed and Critical chance", "Set: +Speed, +Crit, faster cooldowns", "2+ pieces: +15% attack speed" },
 	},
 	{
 		Id = "Juggernaut",
 		Color = GemConfig.ElementColors.Fire, -- Thermal
 		Role = "HEAVY  ·  DEFENSIVE",
+		Profile = { Health = 5, Power = 3, Defense = 5, Speed = 2 },
+		Gem = "Fire",
+		Tip = "Hold the line. Block their best, then punish with heavy hits.",
 		Lines = { "Health and Defense", "Set: +Health, +Defense, less damage taken", "2+ pieces: +25% heavy damage" },
 	},
 }
@@ -353,10 +365,11 @@ local function text(parent, value, size, color, font, props)
 end
 -- Every piece has a full layout and a compact one (short phone screens):
 -- fit() switches them with layoutChoices.
-local relayout, compactMode = {}, false
+-- Rich (tall screens): extra detail fills the cards and rows.
+local relayout, compactMode, richMode = {}, false, false
 local function place(apply)
 	table.insert(relayout, apply)
-	apply(false)
+	apply(false, false)
 end
 local function heading(parent, number, value, x, width)
 	local h = text(parent, number .. "  " .. value, 13, C.Dim, Enum.Font.GothamBold)
@@ -439,9 +452,41 @@ for i, style in STYLES do
 	kit.TextXAlignment, kit.TextWrapped = Enum.TextXAlignment.Center, true
 	local pick = text(card, "SELECTED", 10, C.Ink, Enum.Font.GothamBlack)
 	pick.AnchorPoint, pick.Position, pick.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10), UDim2.fromOffset(92, 20)
+	-- Rich extras: the style profile, its signature gem and how it plays.
+	local extras = frame(card, { BackgroundTransparency = 1, ZIndex = 22 })
+	local profileTitle = text(extras, "STYLE PROFILE", 9, C.Dim, Enum.Font.GothamBold)
+	profileTitle.Position, profileTitle.Size = UDim2.fromOffset(14, 0), UDim2.new(1, -28, 0, 12)
+	for index, stat in { "Health", "Power", "Defense", "Speed" } do
+		local y = 16 + (index - 1) * 17
+		local statName = text(extras, string.upper(stat), 9, C.Dim, Enum.Font.GothamBold)
+		statName.Position, statName.Size = UDim2.fromOffset(14, y), UDim2.fromOffset(62, 12)
+		for pip = 1, 5 do
+			local lit = pip <= (style.Profile[stat] or 0)
+			frame(extras, {
+				BackgroundColor3 = if lit then style.Color else C.Line,
+				BackgroundTransparency = if lit then 0 else 0.3,
+				Position = UDim2.new((pip - 1) / 5 * 0.62, 78, 0, y + 2),
+				Size = UDim2.new(0.62 / 5, -3, 0, 8),
+				ZIndex = 23,
+			})
+		end
+	end
+	local gemLine = text(
+		extras,
+		string.format('SIGNATURE GEM  <font color="%s">◆ %s</font>', string.format("#%02x%02x%02x", GemConfig.ElementColors[style.Gem].R * 255, GemConfig.ElementColors[style.Gem].G * 255, GemConfig.ElementColors[style.Gem].B * 255), string.upper(GemConfig.elementName(style.Gem))),
+		9,
+		C.Dim,
+		Enum.Font.GothamBold,
+		{ RichText = true }
+	)
+	gemLine.Position, gemLine.Size = UDim2.fromOffset(14, 90), UDim2.new(1, -28, 0, 14)
+	local tip = text(extras, style.Tip, 11, C.Text, Enum.Font.GothamMedium, { TextWrapped = true })
+	tip.Position, tip.Size = UDim2.fromOffset(14, 110), UDim2.new(1, -28, 0, 30)
+	tip.TextYAlignment = Enum.TextYAlignment.Top
 	-- Full: art (or crest) up top, then name, role and the perks. Compact:
 	-- the art fills the card above the name and role; the perks go.
-	place(function(compact)
+	place(function(compact, rich)
+		local Y0 = if artId ~= 0 then (if rich then 152 else 112) else 0
 		if compact then
 			art.Position, art.Size = UDim2.fromOffset(6, 8), UDim2.new(1, -12, 1, -52)
 			crest.Position, crest.Size = UDim2.new(0.5, 0, 0.5, -42), UDim2.fromOffset(34, 34)
@@ -449,7 +494,7 @@ for i, style in STYLES do
 			name.Position, name.Size, name.TextSize = UDim2.new(0, 0, 1, -42), UDim2.new(1, 0, 0, 18), 14
 			role.Position, role.Size, role.TextSize = UDim2.new(0, 0, 1, -22), UDim2.new(1, 0, 0, 12), 9
 		else
-			art.Position, art.Size = UDim2.fromOffset(8, 12), UDim2.new(1, -16, 0, 176)
+			art.Position, art.Size = UDim2.fromOffset(8, 12), UDim2.new(1, -16, 0, if rich then 216 else 176)
 			crest.Position, crest.Size = UDim2.new(0.5, 0, 0, 22), UDim2.fromOffset(46, 46)
 			initial.Position, initial.Size, initial.TextSize = UDim2.new(0.5, 0, 0, 27), UDim2.fromOffset(60, 36), 26
 			name.Position, name.Size, name.TextSize = UDim2.fromOffset(0, 86 + Y0), UDim2.new(1, 0, 0, 22), 18
@@ -462,13 +507,16 @@ for i, style in STYLES do
 			pair[1].Position, pair[1].Size = UDim2.new(0, 14, 0, 144 + Y0 + (line - 1) * STEP), UDim2.fromOffset(10, 14)
 			pair[2].Position, pair[2].Size = UDim2.new(0, 28, 0, 142 + Y0 + (line - 1) * STEP), UDim2.new(1, -40, 0, 30)
 		end
-		kit.Visible = artId == 0 and not compact -- (the art shows the kit)
+		kit.Visible = artId == 0 and not compact and not rich -- (the art shows the kit)
 		kit.Position, kit.Size = UDim2.new(0.5, 0, 1, -40), UDim2.new(1, -24, 0, 28)
+		extras.Visible = rich
+		extras.Position = UDim2.fromOffset(0, 142 + Y0 + 2 * STEP + 40)
+		extras.Size = UDim2.new(1, 0, 0, 144)
 	end)
 	pick.BackgroundTransparency, pick.BackgroundColor3 = 0, style.Color
 	pick.TextXAlignment = Enum.TextXAlignment.Center
 	UiKit.round(pick, 10)
-	styleButtons[style.Id] = { Button = card, Stroke = edge, Name = name, Pick = pick, Color = style.Color }
+	styleButtons[style.Id] = { Button = card, Stroke = edge, Name = name, Pick = pick, Color = style.Color, Art = art }
 	listen(card.Activated, function()
 		if not savedKit and not busy then
 			chosenStyle = style.Id
@@ -522,8 +570,15 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 	Art.show(holder, { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }, nil, color, false)
 	local name = text(row, string.upper(GemConfig.elementName(element)), 17, color, Enum.Font.GothamBlack)
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	local blurb = text(row, ELEMENTS[element], 11, C.Dim, Enum.Font.GothamMedium)
+	local beats, weak = ElementMatchup.Beats[element], ElementMatchup.weakTo(element)
+	local blurb = text(row, ELEMENTS[element], 11, C.Dim, Enum.Font.GothamMedium, { RichText = true })
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
+	local plain, matchup = ELEMENTS[element], string.format(
+		'%s   <font color="#5ad17a">▲ beats %s</font>   <font color="#ff6b6b">▼ weak to %s</font>',
+		ELEMENTS[element],
+		GemConfig.elementName(beats or ""),
+		GemConfig.elementName(weak or "")
+	)
 	-- Its three surges as key chips: which one lands on Q, E and R.
 	local chips = frame(row, { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), ZIndex = 22 })
 	local surgeLabels, chipKeys = {}, {}
@@ -539,12 +594,23 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 		local key = text(chip, ({ "Q", "E", "R" })[index], 11, color, Enum.Font.GothamBlack)
 		local label = text(chip, surgeName, 10, C.Dim, Enum.Font.GothamBold)
 		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.TextYAlignment = Enum.TextYAlignment.Center
+		-- (Rich: its cost and cooldown under the name.)
+		local surge = Tech.Catalog[GemRoller.StarterSurges[element][index]]
+		local detail = text(
+			chip,
+			if surge then string.format("%d Charge  ·  %ds", surge.Cost or 0, surge.Cooldown or 0) else "",
+			9,
+			C.Faint,
+			Enum.Font.GothamMedium
+		)
+		detail.TextXAlignment = Enum.TextXAlignment.Left
 		table.insert(surgeLabels, label)
-		table.insert(chipKeys, key)
+		table.insert(chipKeys, { key, detail })
 	end
 	-- Full: a big gem, name, what it does, then the chips. Compact: a small
 	-- gem, the name and the chips under it.
-	place(function(compact)
+	place(function(compact, rich)
 		local gem = if compact then 34 else 64
 		local left = if compact then 8 else 12
 		local textX = left + gem + (if compact then 8 else 12)
@@ -553,18 +619,24 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 		name.TextSize = if compact then 13 else 17
 		name.Position, name.Size = UDim2.new(0, textX, 0, if compact then 3 else 8), UDim2.new(0.5, -textX, 0, if compact then 16 else 22)
 		blurb.Visible = not compact
+		blurb.Text = if rich then matchup else plain
 		blurb.Position, blurb.Size = UDim2.new(0, textX, 0, 30), UDim2.new(1, -textX - 10, 0, 16)
+		local chipH = if compact then 18 elseif rich then 38 else 24
 		chips.Position = UDim2.new(0, textX, 1, if compact then -4 else -8)
-		chips.Size = UDim2.new(1, -textX - (if compact then 6 else 10), 0, if compact then 18 else 24)
+		chips.Size = UDim2.new(1, -textX - (if compact then 6 else 10), 0, chipH)
 		for index, label in surgeLabels do
-			local key = chipKeys[index]
+			local key, detail = chipKeys[index][1], chipKeys[index][2]
+			detail.Visible = rich
+			detail.Position, detail.Size = UDim2.fromOffset(20, 19), UDim2.new(1, -24, 0, 14)
+			label.TextYAlignment = if rich then Enum.TextYAlignment.Bottom else Enum.TextYAlignment.Center
 			key.TextSize, label.TextSize = if compact then 9 else 11, if compact then 9 else 10
 			key.Position, key.Size = UDim2.fromOffset(if compact then 4 else 6, 0), UDim2.new(0, if compact then 9 else 12, 1, 0)
 			label.Position = UDim2.fromOffset(if compact then 14 else 20, 0)
-			label.Size = UDim2.new(1, if compact then -16 else -24, 1, 0)
+			label.Size = UDim2.new(1, if compact then -16 else -24, if rich then 0 else 1, if rich then 18 else 0)
+			key.Size = UDim2.new(0, if compact then 9 else 12, if rich then 0 else 1, if rich then 18 else 0)
 		end
 	end)
-	elementButtons[element] = { Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Color = color }
+	elementButtons[element] = { Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Disc = disc, Color = color }
 	listen(row.Activated, function()
 		if not savedKit and not busy then
 			chosenElement = element
@@ -586,13 +658,14 @@ place(function(compact)
 	summaryText.Position = UDim2.fromOffset(if compact then 10 else 16, 0)
 	summaryText.Size = UDim2.new(1, if compact then -20 else -32, 1, 0)
 end)
-local function layoutChoices(compact)
-	if compact == compactMode then
+local function layoutChoices(compact, rich)
+	rich = rich and not compact
+	if compact == compactMode and rich == richMode then
 		return
 	end
-	compactMode = compact
+	compactMode, richMode = compact, rich
 	for _, apply in relayout do
-		apply(compact)
+		apply(compact, rich)
 	end
 	refreshChoices()
 end
@@ -605,10 +678,11 @@ function refreshChoices()
 	for id, card in styleButtons do
 		local on = id == chosenStyle
 		card.Stroke.Color = if on then card.Color else C.Line
-		card.Stroke.Thickness = if on then 2.5 else 1
 		card.Button.BackgroundColor3 = if on then C.Card:Lerp(card.Color, 0.14) else C.Card
 		card.Name.TextColor3 = if on then C.Text else C.Dim
 		card.Pick.Visible = on and not compactMode -- (compact: the glowing border says it)
+		card.Art.ImageTransparency = if on then 0 else 0.4
+		card.Stroke.Thickness = if on then 3 else 1
 		if on then
 			styleColor = card.Color
 		end
@@ -623,6 +697,7 @@ function refreshChoices()
 			label.TextColor3 = if on then C.Text else C.Dim
 		end
 		row.Bar.BackgroundTransparency = if on then 0 else 0.7
+		row.Disc.BackgroundTransparency = if on then 0.6 else 0.86
 		if on then
 			elementColor = row.Color
 		end
@@ -674,7 +749,7 @@ local function fit()
 	stepper.Visible = w >= 560
 	body.Position, body.Size = UDim2.fromOffset(0, header), UDim2.new(1, 0, 0, bodyHeight)
 	-- Short screens (phones): the compact picker.
-	layoutChoices(bodyHeight < 420)
+	layoutChoices(bodyHeight < 420, bodyHeight >= 560)
 	local portrait = narrow and h > w
 	horizontal = false
 	if portrait then

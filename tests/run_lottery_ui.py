@@ -7,6 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def read(path): return (ROOT/path).read_text(encoding="utf-8")
 source=read("tests/roblox_primitives.luau")
 source+="\nlocal GemRoller=(function()\n"+read("src/shared/GemRoller.luau")+"\nend)()\n"
+source+="\nlocal ElementMatchup=(function()\n"+read("src/shared/ElementMatchup.luau")+"\nend)()\n"
 source+="\nlocal Lottery=(function()\n"+re.sub(r"^local \w+ = require\([^\n]+\)\n","",read("src/shared/StarterLottery.luau"),flags=re.M)+"\nend)()\n"
 source+="\nlocal Tech=(function()\n"+re.sub(r"^local \w+ = require\([^\n]+\)\n","",read("src/shared/CombatTechnology.luau"),flags=re.M)+"\nend)()\n"
 source+=read("tests/lottery_ui_services.luau")
