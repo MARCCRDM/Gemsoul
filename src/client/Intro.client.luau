@@ -10,6 +10,7 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -302,38 +303,228 @@ end
 local savedKit = GemClient.Profile.Intro and GemClient.Profile.Intro.Lottery
 local chosenStyle, chosenElement = savedKit and savedKit.Style or "Prospector", savedKit and savedKit.Element or "Fire"
 if savedKit then primary.Text = "CONTINUE MY SAVED REVEAL" end
-local choices = frame(body, {Size=UDim2.fromScale(1,1), BackgroundColor3=C.Ink, ZIndex=20})
-local function choiceHeading(text, y)
-	local heading = label(choices, text, 14, C.Dim)
-	heading.Position, heading.Size, heading.ZIndex = UDim2.fromScale(0, y), UDim2.fromScale(1, .1), 21
+-- The starter-kit choice: an armor style (three cards) and a starter element
+-- (four rows), then a line saying exactly what you'll get.
+local choices = frame(body, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, ZIndex = 20 })
+local STYLES = {
+	{
+		Id = "Prospector",
+		Color = Color3.fromRGB(218, 159, 76),
+		Role = "BALANCED  ·  SUSTAIN",
+		Lines = { "Health and Power on every piece", "Set: +Health, +Power, faster cooldowns", "2+ pieces: +10% attack damage" },
+	},
+	{
+		Id = "Skirmisher",
+		Color = Color3.fromRGB(72, 174, 186),
+		Role = "MOBILE  ·  CRITICAL",
+		Lines = { "Speed and Critical chance", "Set: +Speed, +Crit, faster cooldowns", "2+ pieces: +15% attack speed" },
+	},
+	{
+		Id = "Juggernaut",
+		Color = Color3.fromRGB(104, 139, 189),
+		Role = "HEAVY  ·  DEFENSIVE",
+		Lines = { "Health and Defense", "Set: +Health, +Defense, less damage taken", "2+ pieces: +25% heavy damage" },
+	},
+}
+local ELEMENTS = {
+	Fire = "Burn and burst",
+	Frost = "Slow, freeze and shield",
+	Shock = "Stun and chain",
+	Poison = "Shred armor, wear them down",
+}
+local function surgeNames(element)
+	local names = {}
+	for _, id in GemRoller.StarterSurges[element] or {} do
+		table.insert(names, Tech.Catalog[id] and Tech.Catalog[id].Name or id)
+	end
+	return names
 end
-choiceHeading("1  ARMOR STYLE · Common sword, shield and full armor", 0)
-choiceHeading("2  STARTER ELEMENT · Three beginner Surge gems", .43)
+local function text(parent, value, size, color, font, props)
+	local l = label(parent, value, size, color, font)
+	l.ZIndex = 22
+	for key, v in props or {} do
+		l[key] = v
+	end
+	return l
+end
+local function heading(parent, number, value, x, width)
+	local h = text(parent, number .. "  " .. value, 13, C.Dim, Enum.Font.GothamBold)
+	h.Position, h.Size = UDim2.new(x, 0, 0, 0), UDim2.new(width, 0, 0, 20)
+	h.TextXAlignment = Enum.TextXAlignment.Left
+end
+heading(choices, "1", "ARMOR STYLE  ·  sword, shield and a full set", 0, 0.6)
+heading(choices, "2", "STARTER ELEMENT  ·  three surges for Q / E / R", 0.62, 0.38)
+
 local styleButtons, elementButtons = {}, {}
-local styleColors = {Prospector=C.Gold, Skirmisher=C.Cyan, Juggernaut=Color3.fromRGB(232,125,75)}
-local function refreshChoices()
-	for id, button in styleButtons do
-		button.BackgroundColor3 = if id == chosenStyle then styleColors[id] else C.Card
-		button.TextColor3 = if id == chosenStyle then C.Ink else C.Text
+local refreshChoices -- (below)
+-- (The launch button sits over the bottom of this area.)
+local CTA_ROOM = 64
+local styleArea = frame(choices, {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 28),
+	Size = UDim2.new(0.6, -8, 1, -28 - 52 - CTA_ROOM),
+	ZIndex = 21,
+})
+for i, style in STYLES do
+	local card = new("TextButton", {
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = C.Card,
+		Position = UDim2.new((i - 1) / 3, if i == 1 then 0 else 5, 0, 0),
+		Size = UDim2.new(1 / 3, -7, 1, 0),
+		ZIndex = 21,
+	}, styleArea)
+	card.Name = style.Id
+	UiKit.round(card, 10)
+	local edge = new("UIStroke", { Color = C.Line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, card)
+	frame(card, { BackgroundColor3 = style.Color, Size = UDim2.new(1, 0, 0, 4), ZIndex = 22 })
+	-- A crest: the family's initial in a diamond of its colour.
+	local crest = frame(card, {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 22),
+		Size = UDim2.fromOffset(46, 46),
+		Rotation = 45,
+		BackgroundColor3 = style.Color:Lerp(C.Ink, 0.55),
+		ZIndex = 22,
+	})
+	UiKit.round(crest, 8)
+	new("UIStroke", { Color = style.Color, Thickness = 2 }, crest)
+	local initial = text(card, string.sub(style.Id, 1, 1), 26, style.Color, Enum.Font.GothamBlack)
+	initial.AnchorPoint, initial.Position, initial.Size = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 27), UDim2.fromOffset(60, 36)
+	initial.TextXAlignment = Enum.TextXAlignment.Center
+	local name = text(card, string.upper(style.Id), 18, C.Text, Enum.Font.GothamBlack)
+	name.Position, name.Size = UDim2.fromOffset(0, 86), UDim2.new(1, 0, 0, 22)
+	name.TextXAlignment = Enum.TextXAlignment.Center
+	local role = text(card, style.Role, 10, style.Color, Enum.Font.GothamBold)
+	role.Position, role.Size = UDim2.fromOffset(0, 110), UDim2.new(1, 0, 0, 14)
+	role.TextXAlignment = Enum.TextXAlignment.Center
+	frame(card, {
+		BackgroundColor3 = C.Line,
+		Position = UDim2.new(0, 14, 0, 132),
+		Size = UDim2.new(1, -28, 0, 1),
+		ZIndex = 22,
+	})
+	for line, value in style.Lines do
+		local dot = text(card, "◆", 8, style.Color, Enum.Font.GothamBold)
+		dot.Position, dot.Size = UDim2.new(0, 14, 0, 144 + (line - 1) * 34), UDim2.fromOffset(10, 14)
+		local row = text(card, value, 11, C.Dim, Enum.Font.GothamMedium, { TextWrapped = true })
+		row.Position, row.Size = UDim2.new(0, 28, 0, 142 + (line - 1) * 34), UDim2.new(1, -40, 0, 30)
+		row.TextYAlignment = Enum.TextYAlignment.Top
 	end
-	for id, button in elementButtons do
-		button.BackgroundColor3 = if id == chosenElement then GemConfig.ElementColors[id] else C.Card
-		button.TextColor3 = if id == chosenElement then C.Ink else C.Text
+	local kit = text(card, "Helmet · Chest · Gloves · Boots\nShield · Sword", 10, C.Faint, Enum.Font.GothamMedium)
+	kit.AnchorPoint, kit.Position, kit.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -40), UDim2.new(1, -24, 0, 28)
+	kit.TextXAlignment, kit.TextWrapped = Enum.TextXAlignment.Center, true
+	local pick = text(card, "SELECTED", 10, C.Ink, Enum.Font.GothamBlack)
+	pick.AnchorPoint, pick.Position, pick.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10), UDim2.fromOffset(92, 20)
+	pick.BackgroundTransparency, pick.BackgroundColor3 = 0, style.Color
+	pick.TextXAlignment = Enum.TextXAlignment.Center
+	UiKit.round(pick, 10)
+	styleButtons[style.Id] = { Button = card, Stroke = edge, Name = name, Pick = pick, Color = style.Color }
+	listen(card.Activated, function()
+		if not savedKit and not busy then
+			chosenStyle = style.Id
+			refreshChoices()
+		end
+	end)
+end
+
+local elementArea = frame(choices, {
+	BackgroundTransparency = 1,
+	Position = UDim2.new(0.62, 0, 0, 28),
+	Size = UDim2.new(0.38, 0, 1, -28 - 52 - CTA_ROOM),
+	ZIndex = 21,
+})
+for i, element in { "Fire", "Frost", "Shock", "Poison" } do
+	local color = GemConfig.ElementColors[element]
+	local row = new("TextButton", {
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = C.Card,
+		Position = UDim2.new(0, 0, (i - 1) / 4, if i == 1 then 0 else 4),
+		Size = UDim2.new(1, 0, 1 / 4, -6),
+		ZIndex = 21,
+	}, elementArea)
+	row.Name = element
+	UiKit.round(row, 10)
+	local edge = new("UIStroke", { Color = C.Line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, row)
+	local holder = frame(row, {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 6, 0.5, 0),
+		Size = UDim2.fromOffset(58, 58),
+		ZIndex = 22,
+	})
+	Art.show(holder, { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }, nil, color, false)
+	local name = text(row, string.upper(GemConfig.elementName(element)), 15, color, Enum.Font.GothamBlack)
+	name.Position, name.Size = UDim2.new(0, 70, 0, 6), UDim2.new(0.5, -70, 0, 20)
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	local blurb = text(row, ELEMENTS[element], 10, C.Dim, Enum.Font.GothamMedium)
+	blurb.Position, blurb.Size = UDim2.new(0.5, 0, 0, 8), UDim2.new(0.5, -10, 0, 16)
+	blurb.TextXAlignment = Enum.TextXAlignment.Right
+	local surges = text(row, table.concat(surgeNames(element), "  ·  "), 11, C.Text, Enum.Font.GothamMedium)
+	surges.Position, surges.Size = UDim2.new(0, 70, 0, 30), UDim2.new(1, -80, 1, -36)
+	surges.TextXAlignment, surges.TextYAlignment = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
+	surges.TextWrapped = true
+	elementButtons[element] = { Button = row, Stroke = edge, Surges = surges, Color = color }
+	listen(row.Activated, function()
+		if not savedKit and not busy then
+			chosenElement = element
+			refreshChoices()
+		end
+	end)
+end
+
+-- What you're about to get.
+local summary = frame(choices, {
+	BackgroundColor3 = C.Panel,
+	Position = UDim2.new(0, 0, 1, -44 - CTA_ROOM),
+	Size = UDim2.new(1, 0, 0, 44),
+	ZIndex = 21,
+})
+UiKit.round(summary, 8)
+local summaryEdge = new("UIStroke", { Color = C.Line, Thickness = 1 }, summary)
+local summaryText = text(summary, "", 13, C.Text, Enum.Font.GothamBold, { RichText = true })
+summaryText.Position, summaryText.Size = UDim2.fromOffset(16, 0), UDim2.new(1, -32, 1, 0)
+summaryText.TextXAlignment = Enum.TextXAlignment.Left
+
+local function hex(color)
+	return string.format("#%02x%02x%02x", color.R * 255, color.G * 255, color.B * 255)
+end
+function refreshChoices()
+	local styleColor = C.Gold
+	for id, card in styleButtons do
+		local on = id == chosenStyle
+		card.Stroke.Color = if on then card.Color else C.Line
+		card.Stroke.Thickness = if on then 2.5 else 1
+		card.Button.BackgroundColor3 = if on then C.Card:Lerp(card.Color, 0.14) else C.Card
+		card.Name.TextColor3 = if on then C.Text else C.Dim
+		card.Pick.Visible = on
+		if on then
+			styleColor = card.Color
+		end
 	end
+	local elementColor = C.Cyan
+	for id, row in elementButtons do
+		local on = id == chosenElement
+		row.Stroke.Color = if on then row.Color else C.Line
+		row.Stroke.Thickness = if on then 2.5 else 1
+		row.Button.BackgroundColor3 = if on then C.Card:Lerp(row.Color, 0.14) else C.Card
+		row.Surges.TextColor3 = if on then C.Text else C.Dim
+		if on then
+			elementColor = row.Color
+		end
+	end
+	summaryEdge.Color = styleColor:Lerp(elementColor, 0.5)
+	local names = surgeNames(chosenElement)
+	summaryText.Text = string.format(
+		'<font color="#8a9cb2">YOUR KIT</font>   <font color="%s">%s</font> armor  +  sword & shield   ·   <font color="%s">%s</font>  %s',
+		hex(styleColor),
+		string.upper(chosenStyle),
+		hex(elementColor),
+		string.upper(GemConfig.elementName(chosenElement)),
+		if #names == 3 then string.format("Q %s  ·  E %s  ·  R %s", names[1], names[2], names[3]) else ""
+	)
 end
-for i, entry in {{"Prospector", "PROSPECTOR\nAmber · Balanced"}, {"Skirmisher", "SKIRMISHER\nTeal · Mobile"}, {"Juggernaut", "JUGGERNAUT\nHeavy · Defensive"}} do
-	local button = new("TextButton", {Position=UDim2.fromScale((i-1)/3,.13), Size=UDim2.new(1/3,-8,.25,0), Text=entry[2], TextSize=16, TextWrapped=true, Font=Enum.Font.GothamBold, ZIndex=21}, choices)
-	UiKit.round(button, 10)
-	styleButtons[entry[1]] = button
-	listen(button.Activated, function() if not savedKit and not busy then chosenStyle=entry[1]; refreshChoices() end end)
-end
-for i, element in {"Fire", "Frost", "Shock", "Poison"} do
-	local button = new("TextButton", {Position=UDim2.fromScale((i-1)/4,.56), Size=UDim2.new(.25,-8,.2,0), Text=GemConfig.elementName(element), TextSize=15, Font=Enum.Font.GothamBold, ZIndex=21}, choices)
-	UiKit.round(button, 10)
-	elementButtons[element] = button
-	listen(button.Activated, function() if not savedKit and not busy then chosenElement=element; refreshChoices() end end)
-end
-choiceHeading("Common starter gems · Any Surge on Q / E / R · Mine for new abilities and rarities", .83)
 refreshChoices()
 skip.Visible = false
 local SURGE_KEYS = {}
