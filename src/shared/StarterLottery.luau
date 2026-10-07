@@ -55,6 +55,17 @@ function Lottery.prepare(profile, rng, generate)
 		if GemRoller.Prototype and roleIndex then
 			gem.Surge = GemRoller.PrototypeIds[gem.Element][roleIndex]
 		end
+		if GemRoller.RaritySurges and roleIndex then
+			local used = {}
+			for _, entry in reward.Gems do
+				if string.sub(entry.Slot, 1, 5) == "Surge" then used[entry.Gem.Surge] = true end
+			end
+			if used[gem.Surge] then
+				for _, id in GemRoller.Pools[gem.Element] do
+					if not used[id] then gem.Surge = id; break end
+				end
+			end
+		end
 		gem.Cut, gem.CutMethod = rng:NextInteger(5, 8), "Starter"
 		if index == #Lottery.GemOrder then
 			local upgraded = false
