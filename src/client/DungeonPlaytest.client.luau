@@ -190,10 +190,10 @@ task.spawn(function()
 					model.Name
 				)
 				else string.format(
-					"POSE CHECK %s: joints %d (%d motor) · frames %d · resets %d · bend %.2f · %s",
+					"POSE CHECK %s: %d joints (%s) · frames %d · resets %d · bend %.2f · %s",
 					model.Name,
 					info.Found,
-					info.Motors,
+					info.Kind,
 					info.Updates,
 					info.Resets,
 					info.Bend,

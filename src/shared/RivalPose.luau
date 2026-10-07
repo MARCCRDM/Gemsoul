@@ -648,16 +648,53 @@ local rigs = {}
 -- constraint's Attachment0. The rest value is remembered on the object the
 -- first time it's seen, so a re-scan never mistakes an already-bent joint for
 -- its rest pose (which would stack every pose on top of the last).
+-- R6 bodies (an avatar type that allows them): their joints sit on the Torso
+-- under other names, and there are no elbows or knees. The waist bends the
+-- whole body at the root.
+local R6 = {
+	Waist = { "HumanoidRootPart", "RootJoint" },
+	Neck = { "Torso", "Neck" },
+	RightShoulder = { "Torso", "Right Shoulder" },
+	LeftShoulder = { "Torso", "Left Shoulder" },
+	RightHip = { "Torso", "Right Hip" },
+	LeftHip = { "Torso", "Left Hip" },
+}
+
+local function active(object: Instance?): boolean
+	return object ~= nil and (object :: any).Enabled ~= false
+end
+
+-- The joint that actually moves this limb: an enabled Motor6D (its C0), or
+-- the AnimationConstraint that replaced it (its Attachment0) when the
+-- place uses Roblox's upgraded avatar joints, which can leave the old,
+-- switched-off Motor6D in place: bending that one moved nothing on
+-- players' avatars while the rival's own rig worked.
 local function handle(model: Model, joint: string, partName: string)
 	local part = model:FindFirstChild(partName)
 	local object = part and part:FindFirstChild(joint)
+	if not object and not part then
+		-- An R6 body.
+		local r6 = R6[joint]
+		local holder = r6 and model:FindFirstChild(r6[1])
+		object = holder and holder:FindFirstChild(r6[2])
+	end
 	local target, property
-	if object and object:IsA("Motor6D") then
+	if object and object:IsA("Motor6D") and active(object) then
 		target, property = object, "C0"
 	else
-		local constraint = model:FindFirstChild(joint, true)
-		if constraint and constraint:IsA("AnimationConstraint") and constraint.Attachment0 then
+		local constraint = if object and object:IsA("AnimationConstraint") then object else nil
+		if not constraint then
+			for _, d in model:GetDescendants() do
+				if d.Name == joint and d:IsA("AnimationConstraint") then
+					constraint = d
+					break
+				end
+			end
+		end
+		if constraint and active(constraint) and constraint.Attachment0 then
 			target, property = constraint.Attachment0, "CFrame"
+		elseif object and object:IsA("Motor6D") then
+			target, property = object, "C0" -- (switched off, but it's all there is)
 		end
 	end
 	if not target then
@@ -668,7 +705,7 @@ local function handle(model: Model, joint: string, partName: string)
 		rest = (target :: any)[property]
 		target:SetAttribute("RestPose", rest)
 	end
-	return { Object = target, Property = property, Rest = rest }
+	return { Object = target, Property = property, Rest = rest, R6 = R6[joint] ~= nil and part == nil }
 end
 
 -- Its joints. With streaming on, the body parts can arrive after the model
@@ -715,10 +752,14 @@ function RivalPose.inspect(model: Model)
 	if not rig then
 		return nil
 	end
-	local motors, bend = 0, 0
+	local motors, constraints, r6, bend = 0, 0, 0, 0
 	for joint, entry in rig.Joints do
-		if entry.Property == "C0" then
+		if entry.R6 then
+			r6 += 1
+		elseif entry.Property == "C0" then
 			motors += 1
+		else
+			constraints += 1
 		end
 		for _, angle in rig.Angles[joint] do
 			bend = math.max(bend, math.abs(angle))
@@ -730,6 +771,9 @@ function RivalPose.inspect(model: Model)
 		Updates = rig.Updates,
 		Resets = rig.Resets,
 		Bend = bend,
+		-- How the body's joints were found: R15 Motor6Ds, upgraded joints
+		-- (AnimationConstraints) or an R6 body.
+		Kind = if r6 > 0 then "R6" elseif constraints > motors then "upgraded joints" else "Motor6D",
 		Action = rig.Action,
 	}
 end
@@ -790,6 +834,24 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 	if guarding and not (type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now) then
 		attrs.GuardUntil = now + 0.25
 	end
+	-- A player's blow is announced as it lands (no wind-up), so it reaches
+	-- other screens after it's over and showed as a twitch at most. An
+	-- instant slash or heavy is replayed from the moment it's seen here,
+	-- behind a short wind-up. (The hit itself is the server's; only the
+	-- body is a moment behind. The rival announces its wind-ups ahead.)
+	local start, at = attrs.ActionStart, attrs.ActionAt
+	if
+		(attrs.ActionKind == "Slash" or attrs.ActionKind == "Heavy")
+		and type(start) == "number"
+		and type(at) == "number"
+		and at - start < 0.05
+	then
+		if rig.SeenStart ~= start then
+			rig.SeenStart, rig.SeenAt = start, math.min(now, at + 1)
+		end
+		local lead = if attrs.ActionKind == "Heavy" then 0.3 else 0.18
+		attrs.ActionStart, attrs.ActionAt = rig.SeenAt, rig.SeenAt + lead
+	end
 	local target, speed = RivalPose.pose(attrs, now, rest)
 	rig.Updates += 1
 	rig.Action = if type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now
@@ -805,6 +867,8 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 			angles[i] += step
 			moved = math.max(moved, math.abs(step))
 		end
+		-- The bend turns about the parent's own axes at the joint, so a rig
+		-- whose joint frames are rotated (R6, some avatars) bends the same way.
 		-- Written when it moves, or when something else has put the joint
 		-- back since (counted: RivalPose.inspect shows it).
 		local current = (entry.Object :: any)[entry.Property]
@@ -818,7 +882,9 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 			rig.Resets += 1
 		end
 		if moved > 0.002 or not entry.Last or overridden then
-			entry.Last = entry.Rest * CFrame.Angles(angles[1], angles[2], angles[3]);
+			entry.Last = CFrame.new(entry.Rest.Position)
+				* CFrame.Angles(angles[1], angles[2], angles[3])
+				* entry.Rest.Rotation;
 			(entry.Object :: any)[entry.Property] = entry.Last
 		end
 	end
