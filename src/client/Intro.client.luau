@@ -329,7 +329,7 @@ local STYLES = {
 -- Each style's key art (assets/images/intro/style_*.png, rendered by
 -- tools/make_style_cards.py from the game's own fighters). 0 = not uploaded
 -- yet: the card shows its crest and text only.
-local STYLE_ART = { Prospector = 0, Skirmisher = 0, Juggernaut = 0 }
+local STYLE_ART = { Prospector = 72266295660132, Skirmisher = 84192854197420, Juggernaut = 76447015122752 }
 local ELEMENTS = {
 	Fire = "Burn and burst",
 	Frost = "Slow, freeze and shield",
