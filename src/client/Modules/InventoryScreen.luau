@@ -480,7 +480,31 @@ local function wornCard(slot: string, column: number, row: number)
 	local socketIcon = label(socket, "+", 12, C.Faint, BOLD)
 	socketIcon.Size = UDim2.fromScale(1, 1)
 	socketIcon.TextXAlignment = Enum.TextXAlignment.Center
+	-- Tap a piece to choose a replacement (the ARMOR tab, filtered to this
+	-- slot); DETAILS opens its details.
 	hit.Activated:Connect(function()
+		if os.clock() >= suppressClickUntil then
+			selection = nil
+			tab, armorFilter = "Armor", slot
+			draw()
+		end
+	end)
+	local details = new("TextButton", {
+		Text = "DETAILS",
+		TextSize = 9,
+		Font = BOLD,
+		TextColor3 = C.Dim,
+		BackgroundColor3 = P.Frame,
+		AutoButtonColor = true,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -8, 1, -6),
+		Size = UDim2.fromOffset(58, 18),
+		ZIndex = 4,
+	}, cell)
+	round(details, 4)
+	stroke(details, C.PanelEdge, 1)
+	details:SetAttribute("UiSound", "Click")
+	details.Activated:Connect(function()
 		if os.clock() >= suppressClickUntil then
 			select({ Kind = "Worn", Slot = slot })
 		end
@@ -952,6 +976,29 @@ local function spareItems()
 	end)
 	return items
 end
+-- How much your total rating changes if you put this piece on.
+local function ratingGain(loadout, slot: string, id: string): number
+	if not loadout.Class then
+		return 0
+	end
+	local function total(l)
+		local sum = 0
+		local ratings = Classes.ratings(l)
+		for _, stat in Classes.StatNames do
+			sum += ratings[stat].Base + ratings[stat].Bonus
+		end
+		return sum
+	end
+	local trial = table.clone(loadout)
+	trial[slot] = id
+	local profile = profileNow()
+	trial[slot .. "Quality"] = profile and profile.Owned and profile.Owned[Slots.Definitions[slot].Kind][id]
+	trial[slot .. "Gem"] = (loadout.ItemGems and loadout.ItemGems[slot] and loadout.ItemGems[slot][id]) or nil
+	local ok, gain = pcall(function()
+		return total(trial) - total(loadout)
+	end)
+	return if ok then math.floor(gain + 0.5) else 0
+end
 local function armorKey(): string
 	local parts = { "Armor", armorFilter, pickKey(), tostring(previewVersion) }
 	for _, item in spareItems() do
@@ -966,13 +1013,14 @@ local function drawArmor()
 	end)
 	local grid = scroller(page, 36)
 	local all = spareItems()
+	local loadout = loadoutNow()
 	requestPreviews(all)
 	local shown = 0
 	for order, item in all do
 		if armorFilter == "All" or armorFilter == item.Slot then
 			shown += 1
 			local color = rarityColor(item.Rarity)
-			bagCard(
+			local card = bagCard(
 				grid,
 				order,
 				item.Gear.Name,
@@ -988,14 +1036,57 @@ local function drawArmor()
 				end,
 				{ Kind = "Spare", Slot = item.Slot, Id = item.Id }
 			)
+			-- Better or worse than what you wear, and one tap to put it on.
+			local gain = ratingGain(loadout, item.Slot, item.Id)
+			local delta = at(
+				label(
+					card,
+					if gain > 0 then "▲ +" .. gain elseif gain < 0 then "▼ " .. gain else "= 0",
+					10,
+					if gain > 0 then C.Good elseif gain < 0 then C.Bad else C.Dim,
+					BOLD
+				),
+				66,
+				66,
+				40,
+				18
+			)
+			delta.TextXAlignment = Enum.TextXAlignment.Center
+			local equip = new("TextButton", {
+				Text = "EQUIP",
+				TextSize = 10,
+				Font = HEADING,
+				TextColor3 = P.Frame,
+				BackgroundColor3 = if gain > 0 then C.Good else P.Gold,
+				AutoButtonColor = true,
+				Position = UDim2.fromOffset(110, 64),
+				Size = UDim2.fromOffset(52, 22),
+			}, card)
+			round(equip, 4)
+			equip:SetAttribute("UiSound", "Confirm")
+			equip.Activated:Connect(function()
+				request("EquipGear", Slots.Definitions[item.Slot].Kind, item.Id)
+			end)
 		end
 	end
 	if shown == 0 then
-		emptyNote(page, "No spare gear here.\nRecover more in the mine or trade for it.")
+		emptyNote(
+			page,
+			if armorFilter == "All"
+				then "No spare gear here.\nRecover more in the mine or trade for it."
+				else "No other "
+					.. string.lower(SLOT_LABEL[armorFilter] or "gear")
+					.. " to swap in yet.\nRecover more in the mine or trade for it."
+		)
 	end
-	footer.Text = if selection and selection.Kind == "Spare"
-		then "TAP FOR DETAILS AND EQUIP, OR DRAG IT ONTO ITS SLOT"
-		else "DRAG SPARE GEAR ONTO ITS SLOT, OR TAP IT TO COMPARE"
+	local worn = armorFilter ~= "All" and gearOf(loadout, armorFilter)
+	footer.Text = if armorFilter ~= "All"
+		then string.format(
+			"CHOOSING %s  ·  WEARING %s  ·  TAP EQUIP TO SWAP",
+			SLOT_LABEL[armorFilter] or "",
+			string.upper(worn and worn.Name or "NOTHING")
+		)
+		else "TAP EQUIP TO PUT A PIECE ON  ·  ▲ / ▼ = YOUR RATING CHANGE"
 end
 
 -- OVERVIEW: what's picked, or a summary.
@@ -1364,7 +1455,37 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 				})
 			end
 			actions(holder, 5, keys)
-			line(holder, 6, "Or drag it onto a gear socket to enchant that piece.", 11, C.Dim)
+			-- Or into a worn piece, one tap (no dragging needed).
+			line(holder, 6, "SOCKET INTO GEAR", 10, C.Dim, BOLD)
+			local sockets =
+				new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 64), LayoutOrder = 7 }, holder)
+			new("UIGridLayout", {
+				CellSize = UDim2.new(1 / 3, -6, 0, 28),
+				CellPadding = UDim2.fromOffset(6, 6),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, sockets)
+			for index, slot in Slots.Order do
+				local worn = gearOf(loadout, slot)
+				local taken = loadout[slot .. "Gem"] ~= nil
+				local b = new("TextButton", {
+					Text = SLOT_LABEL[slot] .. (if taken then " ◆" else ""),
+					TextSize = 10,
+					Font = BOLD,
+					TextColor3 = if worn then C.Text else C.Faint,
+					BackgroundColor3 = C.Card,
+					AutoButtonColor = worn ~= nil,
+					LayoutOrder = index,
+				}, sockets)
+				round(b, 4)
+				stroke(b, if worn then color else C.PanelEdge, 1, 0.4)
+				b:SetAttribute("UiSound", "Confirm")
+				b.Activated:Connect(function()
+					if worn then
+						request("SocketGem", gem.Id, slot)
+					end
+				end)
+			end
+			line(holder, 8, "◆ = already holds a gem (it goes back to your pouch).", 10, C.Faint)
 		else
 			line(holder, 2, "A rough gem: cut it before it can be socketed.", 12, C.Dim)
 		end
@@ -1451,13 +1572,10 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 		{ { string.format("%d / %d sockets attuned", attuned, #Slots.Order), if attuned > 0 then C.Text else C.Dim } }
 	for _, element in GemConfig.Elements do
 		if elements[element] then
-			table.insert(
-				chips,
-				{
-					string.format("%s ×%d", GemConfig.elementName(element), elements[element]),
-					GemConfig.ElementColors[element],
-				}
-			)
+			table.insert(chips, {
+				string.format("%s ×%d", GemConfig.elementName(element), elements[element]),
+				GemConfig.ElementColors[element],
+			})
 		end
 	end
 	chipRow(holder, 21, chips)
@@ -1672,7 +1790,8 @@ local function drawLeft()
 		local gem = loadout[slot .. "Gem"]
 		local rarity = if gear then rarityOf(loadout, slot) else 1
 		local color = rarityColor(rarity)
-		local picked = selection and selection.Kind == "Worn" and selection.Slot == slot
+		local picked = (selection and selection.Kind == "Worn" and selection.Slot == slot)
+			or (tab == "Armor" and armorFilter == slot)
 		card.Name.Text = if gear then GemConfig.itemName(gear.Name, gem, slot) else "Empty"
 		card.Name.TextColor3 = if gear and rarity > 1 then color:Lerp(C.Text, 0.3) else C.Text
 		card.Rarity.Text = if gear then rarityName(rarity) else ""
