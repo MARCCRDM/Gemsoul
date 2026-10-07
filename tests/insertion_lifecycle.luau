@@ -222,10 +222,16 @@ check(player:GetAttribute("ArenaDropUntil") == newEnds and ar.Anchored, "old cle
 advance(0.2)
 check(not ar.Anchored, "replacement cleanup failed")
 -- The survivor does not descend again when only a replacement rival arrives.
+local survivorFacing = CFrame.new(4, 3, 2)
+ar.CFrame = survivorFacing
 Drop.begin({ a, b }, { player }, { b })
+check(ar.CFrame == survivorFacing, "Replacement forcibly turned grounded survivor")
 check(a:GetAttribute("ArenaDropStart") == nil and armor.Transparency == 0.35, "survivor was hidden or dropped again")
 check(b:GetAttribute("ArenaDropStart") ~= nil, "replacement did not receive insertion")
+local turnedWhileWaiting = CFrame.new(4, 3, 3)
+ar.CFrame = turnedWhileWaiting
 Drop.cancel(a)
+check(ar.CFrame == turnedWhileWaiting, "Rival cleanup snapped survivor back to old POV")
 Drop.cancel(b)
 local fixed, fr, _, _, fh = actor(true)
 Drop.begin({ fixed }, {})

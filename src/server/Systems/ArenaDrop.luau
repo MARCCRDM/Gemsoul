@@ -185,6 +185,8 @@ function Drop.begin(models, viewers, dropModels, sides)
 		if not root then
 			continue
 		end
+		local slot = table.find(order, model)
+		local dropping = slot ~= nil
 		-- Aim at opposing fighters, not the arena center or a stale spawn rotation.
 		local owner = Players:GetPlayerFromCharacter(model)
 		local team = if sides then sides[model] else owner and owner:GetAttribute("MatchTeam")
@@ -199,7 +201,7 @@ function Drop.begin(models, viewers, dropModels, sides)
 				targets += 1
 			end
 		end
-		if targets > 0 then
+		if dropping and targets > 0 then
 			target /= targets
 			target = Vector3.new(target.X, root.Position.Y, target.Z)
 			if (target - root.Position).Magnitude > 0.01 then
@@ -214,8 +216,6 @@ function Drop.begin(models, viewers, dropModels, sides)
 		root.AssemblyLinearVelocity = Vector3.zero
 		model:SetAttribute("ArenaDropUntil", ends)
 		local saved, effects = {}, {}
-		local slot = table.find(order, model)
-		local dropping = slot ~= nil
 		local destination = root.CFrame
 		local landing = if dropping then destination * CFrame.new(0, 0, Motion.ExitDistance) else destination
 		model:SetAttribute("ArenaDropOrigin", landing)
@@ -278,7 +278,9 @@ function Drop.begin(models, viewers, dropModels, sides)
 			end
 			reveal()
 			if root.Parent then
-				root.CFrame = destination
+				if dropping then
+					root.CFrame = destination
+				end
 				root.Anchored = anchored
 			end
 			model:SetAttribute("ArenaDropUntil", nil)

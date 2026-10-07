@@ -67,6 +67,15 @@ check(Motion.audio(-0.1).Air == 0 and Motion.audio(-0.1).Rumble == 0, "Descent a
 check(Motion.audio(0.5).Air > 0 and Motion.audio(0.5).Rumble > 0, "Missing descent layers")
 check(Motion.audio(Motion.Landing).Air == 0, "Air rush continues after impact")
 check(Motion.audio(Motion.Landing + 0.7).Rumble == 0, "Rumble does not release after impact")
+check(
+	Motion.audio(-0.1).Whistle == 0 and Motion.audio(Motion.Landing).Whistle == 0,
+	"Descent whine leaked outside flight"
+)
+check(
+	Motion.audio(Motion.Landing * 0.7).Whistle > Motion.audio(Motion.Landing * 0.1).Whistle,
+	"Whine did not build toward impact"
+)
+check(Motion.audio(Motion.Landing * 0.8).Pitch > Motion.audio(Motion.Landing).Pitch, "Air rush lacks final pitch dive")
 check(Motion.Spacing <= 0.25, "Drops no longer land on a close double beat")
 for count = 2, 4 do
 	local lastDoorOpen = Motion.Lead + (count - 1) * Motion.Spacing + Motion.Hatch + Motion.HatchDuration

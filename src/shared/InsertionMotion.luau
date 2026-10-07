@@ -53,7 +53,14 @@ function Motion.audio(t)
 		then 0
 		elseif t < Motion.Landing then Motion.smooth(t / 0.25) * (0.35 + 0.65 * p)
 		else math.exp(-(t - Motion.Landing) * 9)
-	return { Air = air, Pitch = 0.65 + p * 1.1, Rumble = if t < Motion.Landing + 0.65 then rumble else 0 }
+	return {
+		Air = air,
+		Pitch = 0.65 + p * 1.3 - Motion.smooth((p - 0.83) / 0.17) * 0.8,
+		Whistle = air * Motion.smooth(p / 0.65),
+		WhistlePitch = 0.6 + p * 1.6,
+		Rumble = if t < Motion.Landing + 0.65 then rumble else 0,
+		RumblePitch = 0.24 + p * 0.13,
+	}
 end
 function Motion.sample(t, releaseDelay)
 	local released = t - (releaseDelay or 0)

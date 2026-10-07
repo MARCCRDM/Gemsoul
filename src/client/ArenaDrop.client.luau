@@ -29,6 +29,7 @@ local function hideBody(object)
 	end
 end
 local function restore()
+	local ownedCamera = savedCamera ~= nil
 	if characterConnection then
 		characterConnection:Disconnect()
 		characterConnection = nil
@@ -56,7 +57,9 @@ local function restore()
 	-- The lobby bar isn't put back as it was when the drop began: a duel from
 	-- the Outpost starts with it still up, and restoring that left PLAY and the
 	-- lobby tiles over the fight's HUD. The lobby decides (LobbyUI).
-	require(script.Parent.Modules.LobbyUI).refresh()
+	if ownedCamera then
+		require(script.Parent.Modules.LobbyUI).refresh()
+	end
 	gui.Enabled = false
 end
 local function discover(object)
@@ -70,11 +73,11 @@ for _, object in workspace:GetChildren() do
 end
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
--- Let Roblox's camera produce the destination POV during the final half-second.
+-- Let Roblox's camera produce the destination POV during the handoff window.
 -- The later callback eases toward it, avoiding a one-frame snap back to gameplay.
 RunService:BindToRenderStep("InsertionCameraHandoff", Enum.RenderPriority.Camera.Value - 1, function()
 	local ends = player:GetAttribute("ArenaDropUntil")
-	if savedCamera and type(ends) == "number" and ends - workspace:GetServerTimeNow() < 0.5 then
+	if savedCamera and type(ends) == "number" and ends - workspace:GetServerTimeNow() < Motion.Handoff then
 		savedCamera.CameraType = Enum.CameraType.Custom
 	end
 end)
@@ -120,6 +123,13 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.V
 	if savedCamera and (savedCamera ~= camera or savedSubject ~= humanoid) then
 		restore()
 	end
+	local start = character:GetAttribute("ArenaDropStart")
+	-- A replacement rival owns the pod, not our camera. Keep normal first-person
+	-- rendering, body hiding and HUD ownership throughout its arrival.
+	if type(start) ~= "number" then
+		restore()
+		return
+	end
 	if not savedCamera then
 		savedCamera, savedType, savedSubject, savedFov = camera, camera.CameraType, humanoid, camera.FieldOfView
 		generation, entered, eyeHeight = ends, now, math.clamp(head.Position.Y - root.Position.Y, 1.2, 2.5)
@@ -130,7 +140,6 @@ RunService:BindToRenderStep("ArenaInsertionCamera", Enum.RenderPriority.Camera.V
 	elseif generation ~= ends then
 		generation, entered = ends, now
 	end
-	local start = character:GetAttribute("ArenaDropStart")
 	local origin = character:GetAttribute("ArenaDropOrigin")
 	-- Attributes may arrive in different packets: never invent a time or height.
 	if typeof(origin) ~= "CFrame" then

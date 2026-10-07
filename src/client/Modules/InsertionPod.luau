@@ -1,6 +1,17 @@
 -- Local cosmetic pods: no replicated part tweens compete with helmet movement.
 local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMotion)
 local Pod = {}
+-- Warm the built-in clips once, before the short first deployment needs them.
+task.spawn(function()
+	pcall(function()
+		game:GetService("ContentProvider"):PreloadAsync({
+			"rbxasset://sounds/action_falling.mp3",
+			"rbxasset://sounds/swordlunge.wav",
+			"rbxasset://sounds/action_jump_land.mp3",
+			"rbxasset://sounds/collide.wav",
+		})
+	end)
+end)
 function Pod.new(marker)
 	local model = Instance.new("Model")
 	model.Name = "InsertionPresentation"
@@ -167,8 +178,15 @@ function Pod.new(marker)
 	hatchSound.RollOffMaxDistance, hatchSound.Parent = 90, door
 	local descent = Instance.new("Sound")
 	descent.Name, descent.SoundId = "DescentAir", "rbxasset://sounds/action_falling.mp3"
-	descent.Looped, descent.Volume, descent.RollOffMaxDistance = true, 0, 160
+	descent.Looped, descent.Volume = true, 0
+	descent.RollOffMinDistance, descent.RollOffMaxDistance = 28, 230
 	descent.Parent = pieces[1].Part
+	local whistle = descent:Clone()
+	whistle.Name, whistle.SoundId = "DescentWhine", "rbxasset://sounds/swordlunge.wav"
+	whistle.Parent = pieces[1].Part
+	local turbine = Instance.new("EqualizerSoundEffect")
+	turbine.LowGain, turbine.MidGain, turbine.HighGain = -18, 4, 2
+	turbine.Parent = whistle
 	local rumble = descent:Clone()
 	rumble.Name, rumble.PlaybackSpeed, rumble.Parent = "InsertionRumble", 0.28, pieces[1].Part
 	local bass = Instance.new("EqualizerSoundEffect")
@@ -179,7 +197,7 @@ function Pod.new(marker)
 	rupture.Volume, rupture.PlaybackSpeed, rupture.RollOffMaxDistance = 0.85, 0.42, 130
 	rupture.Parent = pieces[1].Part
 	local group = game:GetService("SoundService"):FindFirstChild("CombatSounds")
-	for _, sound in { impact, hatchSound, descent, rumble, rupture } do
+	for _, sound in { impact, hatchSound, descent, whistle, rumble, rupture } do
 		sound.SoundGroup = group
 	end
 	for _, entry in pieces do
@@ -232,13 +250,16 @@ function Pod.new(marker)
 		if t >= 0 and t < Motion.Landing + 0.65 and not audioStarted then
 			audioStarted = true
 			descent:Play()
+			whistle:Play()
 			rumble:Play()
 		end
-		descent.Volume, descent.PlaybackSpeed = audio.Air * 0.38, audio.Pitch
-		rumble.Volume = audio.Rumble * 0.55
+		descent.Volume, descent.PlaybackSpeed = audio.Air * 0.65, audio.Pitch
+		whistle.Volume, whistle.PlaybackSpeed = audio.Whistle * 0.28, audio.WhistlePitch
+		rumble.Volume, rumble.PlaybackSpeed = audio.Rumble * 0.62, audio.RumblePitch
 		if t >= Motion.Landing + 0.65 and not audioStopped then
 			audioStopped = true
 			descent:Stop()
+			whistle:Stop()
 			rumble:Stop()
 		end
 		cabin.Brightness = 0.85 * (1 - Motion.smooth((t - Motion.Exit - releaseDelay) / 0.8))
