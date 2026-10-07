@@ -27,6 +27,7 @@ local FoeCastBar = require(script.Parent.Modules.FoeCastBar)
 local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
 local CombatFx = require(script.Parent.Modules.CombatFx)
 local CombatVfx = require(script.Parent.Modules.CombatVfx)
+local BladeTrails = require(script.Parent.Modules.BladeTrails)
 local CombatSound = require(script.Parent.Modules.CombatSound)
 local MatchupUI = require(script.Parent.Modules.MatchupUI)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
@@ -2047,9 +2048,12 @@ function handlers.Damage(position: Vector3, amount: number, crit: boolean, color
 	end
 end
 
--- A fan of glowing blades across the swing's arc.
+-- A swing. A fighter whose blade you can see draws its own slash along the
+-- blade's real path (BladeTrails), so it always matches the body; otherwise
+-- (your own sword in first person, a body without a blade) a crescent sweeps
+-- the arc, the same way the body cut (ActionSide: 1 from the right).
 function handlers.Swing(
-	_who: Player,
+	who: Player?,
 	origin: Vector3,
 	direction: Vector3,
 	range: number,
@@ -2058,8 +2062,12 @@ function handlers.Swing(
 	big: boolean
 )
 	CombatSound.play(if big then "HeavySwing" else "Swing", origin)
-	-- A crescent trail swept across the arc, alternating sides swing to swing.
-	CombatVfx.slash(origin, direction, range, arc, color, big)
+	if BladeTrails.cutsAt(origin) then
+		return
+	end
+	local body = who and who.Character
+	local side = body and body:GetAttribute("ActionSide")
+	CombatVfx.slash(origin, direction, range, arc, color, big, if side == -1 then -1 else 1)
 end
 
 function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, look: string?)
@@ -2230,6 +2238,9 @@ end
 
 function handlers.EnemySwing(from: Vector3, to: Vector3, color: Color3)
 	CombatSound.play("Swing", from, { Pitch = 0.85 })
+	if BladeTrails.cutsAt(from) then
+		return -- its blade draws its own slash
+	end
 	local offset = to - from
 	CombatVfx.slash(
 		from,

@@ -72,12 +72,12 @@ local function lerp(a, b, t: number)
 end
 
 -- Wind-up and strike poses for each action; `s` mirrors a slash or dodge.
--- The shield arm held up in front during a sword's blows: forearm across the
--- chest, twisted so the shield's face (mounted on the outside of the forearm)
--- points forward rather than out to the side.
+-- The shield arm held up in front during a sword's blows, as in the guard
+-- (GUARD): the forearm upright before the chest, the shield's face square to
+-- the front.
 local SHIELD_UP = {
-	LeftShoulder = { 1.15, 0, 0.5 },
-	LeftElbow = { 1.3, 1.45, 0 },
+	LeftShoulder = { 1.4, -0.55, 0.55 },
+	LeftElbow = { 2.05, 0.45, 0 },
 }
 
 local function frames(kind: string, s: number, shield: boolean?)
@@ -208,53 +208,88 @@ local function frames(kind: string, s: number, shield: boolean?)
 			LeftElbow = { 0.15, 0, 0 },
 		}
 	elseif kind == "Slash" then
-		-- Cocked back over the shoulder (blade up behind the head), then a flat
-		-- cut across the body driven by the hips; the shield stays up in front.
+		-- Shaped from the sword's real path (fist grip, blade out past the
+		-- thumb): the tip sweeps a wide arc across the front of the body at
+		-- chest height, so the slash drawn along it (Client.BladeTrails) reads
+		-- as a cut at the foe. Hips and shoulders drive it; the head stays on
+		-- the foe; the front foot steps in; the shield stays up.
+		-- s = 1, the forehand: cocked high behind the right shoulder, cutting
+		-- down and across to low on the left. s = -1, the backhand: from
+		-- behind the left shoulder, flat across to the right.
+		local leftShoulder = if shield then SHIELD_UP.LeftShoulder else { 0.6, 0, -0.3 }
+		local leftElbow = if shield then SHIELD_UP.LeftElbow else { 0.9, 0, 0 }
+		if s >= 0 then
+			return {
+				Waist = { 0, -0.77, 0.19 },
+				Neck = { -0.04, 0.45, 0 },
+				RightShoulder = { -0.96, -1.19, -1.69 },
+				RightElbow = { 2.31, 1.55, 0 },
+				LeftShoulder = leftShoulder,
+				LeftElbow = leftElbow,
+				RightHip = { 0.1, 0, 0 },
+				LeftHip = { 0.18, 0, 0 },
+				RightKnee = { -0.3, 0, 0 },
+				LeftKnee = { -0.2, 0, 0 },
+			}, {
+				Waist = { -0.18, 0.71, 0.3 },
+				Neck = { 0.06, -0.45, 0 },
+				RightShoulder = { 0.48, 0.08, -0.02 },
+				RightElbow = { 1.41, 1.6, 0 },
+				LeftShoulder = leftShoulder,
+				LeftElbow = leftElbow,
+				RightHip = { 0.55, 0, 0 },
+				LeftHip = { -0.25, 0, 0 },
+				RightKnee = { -0.6, 0, 0 },
+				LeftKnee = { -0.1, 0, 0 },
+			}
+		end
 		return {
-			Waist = { 0.05, -0.6 * s, -0.05 * s },
-			Neck = { -0.04, 0.3 * s, 0 },
-			RightShoulder = { 1.6, -0.25 * (1 + s), 0.9 * s },
-			RightElbow = { 1.45 + 0.15 * s, 0, 0 },
-			LeftShoulder = if shield then SHIELD_UP.LeftShoulder else { 0.6, 0, -0.3 },
-			LeftElbow = if shield then SHIELD_UP.LeftElbow else { 0.9, 0, 0 },
-			RightHip = { 0.22, 0, 0 },
-			LeftHip = { 0.05, 0, 0 },
-			RightKnee = { -0.28, 0, 0 },
-			LeftKnee = { -0.15, 0, 0 },
+			Waist = { -0.01, 0.67, 0.22 },
+			Neck = { -0.04, -0.55, 0 },
+			RightShoulder = { 1.11, 0.08, -0.81 },
+			RightElbow = { 0.97, 1.6, 0 },
+			LeftShoulder = leftShoulder,
+			LeftElbow = leftElbow,
+			RightHip = { 0.15, 0, 0 },
+			LeftHip = { 0.1, 0, 0 },
+			RightKnee = { -0.25, 0, 0 },
+			LeftKnee = { -0.25, 0, 0 },
 		}, {
-			Waist = { -0.1, 0.6 * s, 0.05 * s },
-			Neck = { 0.04, -0.3 * s, 0 },
-			RightShoulder = { 1.43, 0, -0.9 * s },
-			RightElbow = { 0.18, 0, 0 },
-			LeftShoulder = if shield then SHIELD_UP.LeftShoulder else { 0.3, 0, -0.4 },
-			LeftElbow = if shield then SHIELD_UP.LeftElbow else { 0.6, 0, 0 },
-			RightHip = { 0.42, 0, 0 },
-			LeftHip = { -0.15, 0, 0 },
-			RightKnee = { -0.45, 0, 0 },
-			LeftKnee = { -0.08, 0, 0 },
+			Waist = { -0.09, -0.66, 0.04 },
+			Neck = { 0.04, 0.45, 0 },
+			RightShoulder = { 0.82, 0.12, 2.0 },
+			RightElbow = { 2.16, 1.6, 0 },
+			LeftShoulder = leftShoulder,
+			LeftElbow = leftElbow,
+			RightHip = { 0.5, 0, 0 },
+			LeftHip = { -0.2, 0, 0 },
+			RightKnee = { -0.55, 0, 0 },
+			LeftKnee = { -0.1, 0, 0 },
 		}
 	elseif kind == "Heavy" and shield then
-		-- One-handed overhead chop: the sword goes up and back behind the head
-		-- and slams down, while the shield stays braced in front.
+		-- One-handed overhead chop, shaped from the sword's real path: raised
+		-- high with the blade back over the head, the tip comes over the top
+		-- and slams down to the ground in front, the body folding into it;
+		-- the shield stays braced in front.
 		return {
-			Waist = { 0.25, -0.15, 0 },
+			Waist = { 0.14, -0.02, 0 },
 			Neck = { 0.12, 0, 0 },
-			RightShoulder = { 3.2, 0, 0.15 },
-			RightElbow = { 2.0, 0, 0 },
-			LeftShoulder = { 1.25, 0, 0.45 },
-			LeftElbow = { 1.45, 1.45, 0 },
+			RightShoulder = { 2.36, 0.84, 0.2 },
+			RightElbow = { 1.07, -1.07, 0 },
+			LeftShoulder = SHIELD_UP.LeftShoulder,
+			LeftElbow = SHIELD_UP.LeftElbow,
 			RightHip = { 0.15, 0, 0 },
 			RightKnee = { -0.2, 0, 0 },
 		}, {
-			Waist = { -0.5, 0.15, 0 },
+			Waist = { -0.47, 0.14, 0.08 },
 			Neck = { -0.2, 0, 0 },
-			RightShoulder = { 0.8, 0, -0.15 },
-			RightElbow = { 0.1, 0, 0 },
+			RightShoulder = { 0.64, 0.66, -1.17 },
+			RightElbow = { 2.08, -1.6, 0 },
 			LeftShoulder = SHIELD_UP.LeftShoulder,
 			LeftElbow = SHIELD_UP.LeftElbow,
-			RightHip = { 0.5, 0, 0 },
-			LeftHip = { -0.2, 0, 0 },
-			RightKnee = { -0.6, 0, 0 },
+			RightHip = { 0.6, 0, 0 },
+			LeftHip = { -0.25, 0, 0 },
+			RightKnee = { -0.7, 0, 0 },
 			LeftKnee = { -0.3, 0, 0 },
 		}
 	elseif kind == "Heavy" then
@@ -359,8 +394,8 @@ end
 local GUARD = {
 	Waist = { -0.15, -0.08, 0 },
 	Neck = { -0.08, 0.05, 0 },
-	LeftShoulder = { 1.4, -0.55, 0.55 },
-	LeftElbow = { 2.05, 0.8, 0 },
+	LeftShoulder = SHIELD_UP.LeftShoulder,
+	LeftElbow = SHIELD_UP.LeftElbow,
 	RightShoulder = { 0.45, 0, 0.1 },
 	RightElbow = { 0.95, 0, 0 },
 	RightHip = { 0.35, 0, 0 },
@@ -830,6 +865,16 @@ local ATTRIBUTES = {
 	"BlockedAt",
 }
 
+-- Blows a blade cuts with.
+local STRIKES = { Slash = true, Heavy = true, Sweep = true, Cross = true }
+
+-- Whether this body's blade is cutting through a blow right now (as posed
+-- here, so a player's blow replayed late counts when it shows).
+function RivalPose.striking(model: Model): boolean
+	local rig = rigs[model]
+	return rig ~= nil and rig.Striking == true
+end
+
 local function velocityOf(root: BasePart): Vector3
 	return root.AssemblyLinearVelocity
 end
@@ -884,6 +929,13 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 	end
 	local target, speed = RivalPose.pose(attrs, now, rest)
 	rig.Updates += 1
+	-- The moment a blade blow cuts through (for its slash: Client.BladeTrails).
+	local struck = attrs.ActionAt
+	rig.Striking = STRIKES[attrs.ActionKind] == true
+		and type(struck) == "number"
+		and now >= struck - 0.02
+		and now <= struck + SNAP + 0.1
+		and not (type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now)
 	local guardUp = type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now
 	rig.Action = if guardUp then "Guard" else (if type(attrs.ActionKind) == "string" then attrs.ActionKind else nil)
 	local step = math.min(dt, 0.1)

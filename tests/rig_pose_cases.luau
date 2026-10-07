@@ -122,9 +122,9 @@ do
 	-- Seen late: 0.25 s after it landed.
 	run(model, { ActionKind = "Slash", ActionStart = 100, ActionAt = 100, ActionSide = 1 }, 100.25, 100.4)
 	local raised = armDown(shoulder)
-	check(raised.Y > -0.6, "A late swing didn't show its wind-up")
+	check(raised.Y > -0.85, "A late swing didn't show its wind-up")
 	run(model, {}, 100.4, 100.62)
 	local swung = armDown(shoulder)
-	check(swung.X < raised.X - 0.3, "A late swing didn't cut across")
+	check((swung - raised).Magnitude > 0.5, "A late swing didn't cut through")
 end
 print("PASS: " .. checks .. " rig pose checks (R15, upgraded joints, R6, late swings)")

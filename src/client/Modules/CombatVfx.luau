@@ -5,6 +5,9 @@
 	  slash(origin, direction, range, arc, color, heavy, side)
 	      a crescent trail swept across a swing's arc: a white-hot edge
 	      inside a glow in the weapon's colour, sweeping one way or the other
+	  cut(tipFrom, tipTo, innerFrom, innerTo, color, heavy)
+	      one stretch of the cut a real blade traced: BladeTrails draws a
+	      fighter's swing with these, along the sword's own path
 	  impact(position, color, crit, heavy)
 	      a hit: a flash core, sparks, streaks flying out, a shockwave ring
 	      facing you, and for a crit a spinning gold star
@@ -135,6 +138,49 @@ function CombatVfx.slash(
 		previous = point
 	end
 	CombatFx.flash((frame * CFrame.new(0, lift, -radius)).Position, color, if heavy then 3 else 1.6, range + 6, 0.18)
+end
+
+-- One stretch of a cut traced by a real blade (BladeTrails): the band the
+-- blade swept between two frames, `tipFrom`/`tipTo` its tip and
+-- `innerFrom`/`innerTo` a point part way down it. A glow in the weapon's
+-- colour across the band and a white-hot edge along the tip, fading fast, so
+-- the slash is drawn exactly where the sword went.
+function CombatVfx.cut(
+	tipFrom: Vector3,
+	tipTo: Vector3,
+	innerFrom: Vector3,
+	innerTo: Vector3,
+	color: Color3,
+	heavy: boolean?
+)
+	local motion = tipTo - tipFrom
+	local length = motion.Magnitude
+	if length < 0.05 then
+		return
+	end
+	local outer = (tipFrom + tipTo) / 2
+	local inner = (innerFrom + innerTo) / 2
+	local across = outer - inner
+	local width = across.Magnitude
+	if width < 0.05 then
+		return
+	end
+	-- Flat in the plane the blade swept: long along the motion, wide along the blade.
+	local frame = CFrame.lookAt((outer + inner) / 2, (outer + inner) / 2 + motion, across.Unit)
+	local life = if heavy then 0.26 else 0.2
+	local glow = neon(Vector3.new(0.05, width, length + 0.1), frame, color, 0.45)
+	fade(
+		glow,
+		life,
+		{ Size = Vector3.new(0.02, width * 0.35, length + 0.1), CFrame = frame * CFrame.new(0, width * 0.32, 0) }
+	)
+	local edge = neon(
+		Vector3.new(0.08, if heavy then 0.2 else 0.14, length + 0.12),
+		CFrame.lookAt(outer, outer + motion, across.Unit),
+		WHITE,
+		0.05
+	)
+	fade(edge, life * 0.7, { Size = Vector3.new(0.02, 0.03, length + 0.12) })
 end
 
 -- Impact ------------------------------------------------------------------------------
