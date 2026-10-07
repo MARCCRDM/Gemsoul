@@ -35,6 +35,7 @@ local JOINTS = {
 }
 local JOINT_COUNT = 10
 local FOLLOW = 0.32 -- how long a strike's follow-through holds, seconds
+local STRIDE_LENGTH = 4.5 -- studs walked per full guarded stride (two steps)
 
 -- Angles are radians about the joint's X (positive swings a limb forward and
 -- up, or leans the torso back), Y (twists left) and Z (positive raises the
@@ -352,13 +353,14 @@ local function frames(kind: string, s: number, shield: boolean?)
 	return nil, nil
 end
 
--- Guard: the shield arm raised square in front of the chest and face (its
--- face turned forward), the sword held ready at the side, crouched behind the shield.
+-- Guard: square to the foe, the shield forearm raised upright in front of the
+-- chest with its face turned straight forward, the sword drawn back low behind
+-- it ready to answer, crouched behind the shield.
 local GUARD = {
-	Waist = { -0.18, -0.3, 0 },
-	Neck = { -0.1, 0.15, 0 },
-	LeftShoulder = { 1.35, 0, 0.55 },
-	LeftElbow = { 1.4, 1.45, 0 },
+	Waist = { -0.15, -0.08, 0 },
+	Neck = { -0.08, 0.05, 0 },
+	LeftShoulder = { 1.4, -0.55, 0.55 },
+	LeftElbow = { 2.05, 0.8, 0 },
 	RightShoulder = { 0.45, 0, 0.1 },
 	RightElbow = { 0.95, 0, 0 },
 	RightHip = { 0.35, 0, 0 },
@@ -439,6 +441,30 @@ local function add(pose, layer, w: number)
 		out[joint] = { from[1] + angles[1] * w, from[2] + angles[2] * w, from[3] + angles[3] * w }
 	end
 	return out
+end
+
+-- Walking behind the guard: short, braced steps that keep the shield square.
+-- `phase` runs through a stride (radians), `forward` and `side` are how much of
+-- the walk is forward (negative: backing off) and sideways (positive: to its
+-- right), `amount` 0..1 how fast. Pure, for testing: offsets to add on top of
+-- the guard (RivalPose.update does, while the guard's up and the body moves).
+function RivalPose.guardStep(phase: number, forward: number, side: number, amount: number)
+	local swing, lift = math.sin(phase), math.cos(phase)
+	local rightUp, leftUp = math.max(0, lift), math.max(0, -lift)
+	local stride = 0.42 * amount * forward
+	local shuffle = 0.16 * amount * side
+	local step = 0.22 * amount * math.abs(side) -- sidesteps lift the foot too
+	local bob = 0.035 * amount * math.cos(2 * phase)
+	return {
+		RightHip = { stride * swing + step * rightUp, 0, shuffle * swing },
+		LeftHip = { -stride * swing + step * leftUp, 0, shuffle * swing },
+		RightKnee = { -0.55 * amount * rightUp, 0, 0 },
+		LeftKnee = { -0.55 * amount * leftUp, 0, 0 },
+		Waist = { bob, 0.05 * amount * forward * swing, 0 },
+		-- The arms ride the step a little but the shield stays put.
+		LeftShoulder = { 0.6 * bob, 0, 0 },
+		RightShoulder = { bob, 0, 0 },
+	}
 end
 
 -- Timing of a blow after its wind-up: the snap through (overshooting the
@@ -804,6 +830,10 @@ local ATTRIBUTES = {
 	"BlockedAt",
 }
 
+local function velocityOf(root: BasePart): Vector3
+	return root.AssemblyLinearVelocity
+end
+
 -- Call every frame (clients pose every body: Client.BodyPoses) with the
 -- model and server time. Joints only change when they move noticeably.
 local nextSweep = 0
@@ -854,10 +884,35 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 	end
 	local target, speed = RivalPose.pose(attrs, now, rest)
 	rig.Updates += 1
-	rig.Action = if type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now
-		then "Guard"
-		else (if type(attrs.ActionKind) == "string" then attrs.ActionKind else nil)
-	local alpha = 1 - math.exp(-speed * math.min(dt, 0.1))
+	local guardUp = type(attrs.GuardUntil) == "number" and attrs.GuardUntil > now
+	rig.Action = if guardUp then "Guard" else (if type(attrs.ActionKind) == "string" then attrs.ActionKind else nil)
+	local step = math.min(dt, 0.1)
+	-- Walking with the guard up: its own braced steps (RivalPose.guardStep),
+	-- in place of the body's walk animation, which would swing the shield arm
+	-- about (held off by RivalPose.holdGuards).
+	local root = model:FindFirstChild("HumanoidRootPart")
+	local pace = 0
+	local moving, velocity = false, nil
+	if guardUp and root and root:IsA("BasePart") then
+		moving, velocity = pcall(velocityOf, root)
+	end
+	if moving and velocity then
+		local v = root.CFrame:VectorToObjectSpace(velocity)
+		pace = math.sqrt(v.X * v.X + v.Z * v.Z)
+		if pace > 0.5 then
+			rig.Forward, rig.Side = -v.Z / pace, v.X / pace
+		else
+			pace = 0
+		end
+	end
+	local follow = 1 - math.exp(-10 * step)
+	rig.Stride = (rig.Stride or 0) + (math.min(1, pace / 6) - (rig.Stride or 0)) * follow
+	rig.Phase = ((rig.Phase or 0) + pace * step * 2 * math.pi / STRIDE_LENGTH) % (2 * math.pi)
+	if rig.Stride > 0.01 then
+		target = add(target, RivalPose.guardStep(rig.Phase, rig.Forward or 1, rig.Side or 0, rig.Stride), 1)
+	end
+	rig.Hold = (rig.Hold or 0) + ((if guardUp then 1 else 0) - (rig.Hold or 0)) * (1 - math.exp(-14 * step))
+	local alpha = 1 - math.exp(-speed * step)
 	for joint, entry in rig.Joints do
 		local angles = rig.Angles[joint]
 		local to = target[joint] or { 0, 0, 0 }
@@ -886,6 +941,33 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 				* CFrame.Angles(angles[1], angles[2], angles[3])
 				* entry.Rest.Rotation;
 			(entry.Object :: any)[entry.Property] = entry.Last
+		end
+	end
+end
+
+-- The body's own animations (its walk, run and idle) bend the same joints on
+-- top of the pose. While the guard's up they're held off, so the shield stays
+-- square and the legs take the guarded steps instead; eased in and out with
+-- the guard. Call after animations are applied each frame
+-- (RunService.Stepped; Client.BodyPoses does).
+function RivalPose.holdGuards()
+	for model, rig in rigs do
+		local w = rig.Hold
+		if w and w > 0.01 and model.Parent then
+			if rig.Root == nil then
+				local lowerTorso = model:FindFirstChild("LowerTorso")
+				local motor = lowerTorso and lowerTorso:FindFirstChild("Root")
+				rig.Root = if motor and motor:IsA("Motor6D") then motor else false
+			end
+			for _, entry in rig.Joints do
+				local object = entry.Object
+				if object:IsA("Motor6D") then
+					object.Transform = object.Transform:Lerp(CFrame.identity, w)
+				end
+			end
+			if rig.Root then
+				rig.Root.Transform = rig.Root.Transform:Lerp(CFrame.identity, w)
+			end
 		end
 	end
 end

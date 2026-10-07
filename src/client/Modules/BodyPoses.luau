@@ -77,6 +77,11 @@ end
 
 function BodyPoses.start()
 	RunService.RenderStepped:Connect(BodyPoses.step)
+	-- After the bodies' own animations: a raised guard holds them off
+	-- (walking with the shield up takes guarded steps, not the walk's arm swing).
+	RunService.Stepped:Connect(function()
+		pcall(RivalPose.holdGuards)
+	end)
 end
 
 return BodyPoses
