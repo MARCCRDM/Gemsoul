@@ -108,41 +108,47 @@ function Presets.wear(player: Player, part: string, slot: number): (boolean, str
 	applying[player] = true
 	local steps, missing = GearPresets.plan(profile, preset)
 	local done = 0
-	for _, step in steps do
-		if step.Kind == "Gear" then
-			local weapon = Classes.weapon(profile.Character.Class, profile.Character.Weapon)
-			local blocked = step.Slot == "Shield" and weapon and Classes.TwoHanded[weapon.WeaponType]
-			if not blocked and PlayerData.equipGear(player, step.GearKind, step.Id) then
-				done += 1
-			else
-				table.insert(missing, step.Slot)
-			end
-		elseif step.Kind == "Surge" then
-			-- A gem on another surge key comes off it first (into the pouch).
-			-- Looked up now, not from the plan: an earlier step may have
-			-- already sent it back to the pouch.
-			if not PlayerData.findGem(player, step.GemId) then
-				for key, surgeSlot in GearPresets.SurgeSlots do
-					local gem = (profile.Character :: any)[surgeSlot .. "Gem"]
-					if key ~= step.Key and gem and gem.Id == step.GemId then
-						PlayerData.unsocketSurge(player, key)
+	-- (Protected: a failing step must never leave autosave switched off.)
+	local ok, problem = pcall(function()
+		for _, step in steps do
+			if step.Kind == "Gear" then
+				local weapon = Classes.weapon(profile.Character.Class, profile.Character.Weapon)
+				local blocked = step.Slot == "Shield" and weapon and Classes.TwoHanded[weapon.WeaponType]
+				if not blocked and PlayerData.equipGear(player, step.GearKind, step.Id) then
+					done += 1
+				else
+					table.insert(missing, step.Slot)
+				end
+			elseif step.Kind == "Surge" then
+				-- A gem on another surge key comes off it first (into the pouch).
+				-- Looked up now, not from the plan: an earlier step may have
+				-- already sent it back to the pouch.
+				if not PlayerData.findGem(player, step.GemId) then
+					for key, surgeSlot in GearPresets.SurgeSlots do
+						local gem = (profile.Character :: any)[surgeSlot .. "Gem"]
+						if key ~= step.Key and gem and gem.Id == step.GemId then
+							PlayerData.unsocketSurge(player, key)
+						end
 					end
 				end
-			end
-			if PlayerData.socketSurge(player, step.GemId, step.Key) then
-				done += 1
-			else
-				table.insert(missing, "Surge " .. step.Key)
-			end
-		elseif step.Kind == "Maneuver" then
-			local node = Tree.Nodes[step.Id]
-			if node and node.Branch == "RigManeuvers" and Tree.isLearned(profile, step.Id) then
-				PlayerData.setManeuver(player, step.Index, step.Id)
-				done += 1
+				if PlayerData.socketSurge(player, step.GemId, step.Key) then
+					done += 1
+				else
+					table.insert(missing, "Surge " .. step.Key)
+				end
+			elseif step.Kind == "Maneuver" then
+				local node = Tree.Nodes[step.Id]
+				if node and node.Branch == "RigManeuvers" and Tree.isLearned(profile, step.Id) then
+					PlayerData.setManeuver(player, step.Index, step.Id)
+					done += 1
+				end
 			end
 		end
-	end
+	end)
 	applying[player] = nil
+	if not ok then
+		warn("[Presets] wearing a loadout failed: " .. tostring(problem))
+	end
 	PlayerData.sync(player)
 	local message = if #missing > 0
 		then string.format("%s on. Missing: %s.", preset.Name, table.concat(missing, ", "))
@@ -218,9 +224,20 @@ end
 function Presets.start()
 	Shop.register("LoadoutSelect", selectLoadout)
 	-- Every change to what you wear saves into the active loadouts.
+	-- A burst of changes (putting a loadout on) is one save and one sync.
+	local queued: { [Player]: boolean } = {}
 	PlayerData.CharacterChanged:Connect(function(player)
-		Presets.captureActive(player)
-		PlayerData.sync(player)
+		if queued[player] then
+			return
+		end
+		queued[player] = true
+		task.defer(function()
+			queued[player] = nil
+			if player.Parent ~= nil then
+				Presets.captureActive(player)
+				PlayerData.sync(player)
+			end
+		end)
 	end)
 	Shop.register("PresetSave", save)
 	Shop.register("PresetRename", rename)

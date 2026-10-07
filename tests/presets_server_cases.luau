@@ -58,6 +58,7 @@ local PlayerData = {
 }
 local attributes = {}
 local player = {
+	Parent = "Players",
 	GetAttribute = function(_, key)
 		return attributes[key]
 	end,
@@ -127,6 +128,15 @@ local env = setmetatable({
 	}) },
 	require = function(name)
 		return stubs[name]
+	end,
+	-- Deferred work runs straight away here, so checks can follow each change.
+	task = {
+		defer = function(fn, ...)
+			fn(...)
+		end,
+	},
+	warn = function(...)
+		error(table.concat({ ... }, " "))
 	end,
 }, { __index = _G })
 local Presets =

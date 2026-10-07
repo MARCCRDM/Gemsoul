@@ -29,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
@@ -284,6 +285,8 @@ type Pick = { Kind: string, Slot: string?, Id: string?, Gem: any?, Key: string? 
 local selection: Pick? = nil
 local tab = "Overview"
 local armorFilter = "All"
+local gemFilter = "All"
+local previewVersion = 0
 local dropTargets: { any } = {}
 local drag: { Item: any, Start: Vector2, Active: boolean, Touch: boolean, Ghost: Frame? }? = nil
 local suppressClickUntil = 0
@@ -346,6 +349,10 @@ local function drawPortrait()
 				d.Anchored = true
 			end
 		end
+		local humanoid = copy:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		end
 		copy:PivotTo(CFrame.new())
 		copy.Parent = world
 		local head = copy:FindFirstChild("Head")
@@ -361,23 +368,22 @@ for i, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 	local tile = box(left, C.Card, 4)
 	at(tile, 20 + (i - 1) * 130, 92, 120, 62)
 	stroke(tile, STAT[name]:Lerp(C.PanelEdge, 0.55), 1)
-	new(
-		"Frame",
-		{
-			BorderSizePixel = 0,
-			BackgroundColor3 = STAT[name],
-			Size = UDim2.new(0, 2, 1, -16),
-			Position = UDim2.fromOffset(0, 8),
-		},
-		tile
-	)
+	new("Frame", {
+		BorderSizePixel = 0,
+		BackgroundColor3 = STAT[name],
+		Size = UDim2.new(0, 2, 1, -16),
+		Position = UDim2.fromOffset(0, 8),
+	}, tile)
 	at(label(tile, string.upper(name), 10, STAT[name]:Lerp(C.Text, 0.3), BOLD), 12, 8, 100, 14)
 	local value = at(label(tile, "0", 22, C.Text, HEADING), 12, 22, 100, 24)
 	local track = box(tile, C.Track, 2)
 	at(track, 12, 50, 96, 3)
 	local fill = box(track, STAT[name], 2)
 	fill.Size = UDim2.fromScale(0, 1)
-	statTiles[name] = { Value = value, Fill = fill }
+	-- What gems add on top (Health, Power, Defense, Speed).
+	local bonus = at(label(tile, "", 10, P.Good, BOLD), 60, 26, 52, 16)
+	bonus.TextXAlignment = Enum.TextXAlignment.Right
+	statTiles[name] = { Value = value, Fill = fill, Bonus = bonus }
 end
 
 -- Left: the 3 x 3 grid -------------------------------------------------------------------------------------
@@ -433,8 +439,11 @@ local function wornCard(slot: string, column: number, row: number)
 	local art = box(cell, P.Frame, 4)
 	at(art, 10, 24, 62, 62)
 	stroke(art, C.PanelEdge, 1, 0.3)
-	local name = at(label(cell, "", 13, C.Text, BOLD), 82, 34, 160, 18)
-	local rarity = at(label(cell, "", 10, C.Dim, BOLD), 82, 56, 160, 14)
+	-- Long names (with their gem's prefix) wrap onto a second line.
+	local name = at(label(cell, "", 13, C.Text, BOLD), 82, 26, 156, 34)
+	name.TextWrapped = true
+	name.TextYAlignment = Enum.TextYAlignment.Bottom
+	local rarity = at(label(cell, "", 10, C.Dim, BOLD), 82, 62, 156, 14)
 	local socket = box(cell, P.Frame, 12)
 	at(socket, CELL_W - 30, 6, 22, 22)
 	local socketEdge = stroke(socket, C.PanelEdge, 1.2)
@@ -653,6 +662,9 @@ UserInputService.InputEnded:Connect(function(input)
 		current.Ghost:Destroy()
 	end
 	lightTargets(nil)
+	if dirty then
+		draw()
+	end
 	if current.Active then
 		suppressClickUntil = os.clock() + 0.25
 		local target = targetAt(pointOf(input, current.Touch), current.Item)
@@ -721,10 +733,91 @@ local function emptyNote(parent: Instance, text: string)
 	note.TextWrapped = true
 end
 
+-- A row of filter chips; `current` is lit gold.
+local function filterRow(entries: { any }, current: string, onPick: (string) -> ())
+	local chips = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 26) }, page)
+	UiKit.list(chips, 6, true)
+	for i, entry in entries do
+		local on = current == entry[1]
+		local chip = new("TextButton", {
+			Text = entry[2],
+			TextSize = 10,
+			Font = BOLD,
+			TextColor3 = if on then P.Frame else (entry[3] or C.Dim),
+			BackgroundColor3 = if on then P.Gold else C.Card,
+			Size = UDim2.fromOffset(0, 26),
+			AutomaticSize = Enum.AutomaticSize.X,
+			LayoutOrder = i,
+		}, chips)
+		round(chip, 4)
+		stroke(chip, if on then P.Gold else C.PanelEdge, 1)
+		new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, chip)
+		chip:SetAttribute("UiSound", "Tab")
+		chip.Activated:Connect(function()
+			onPick(entry[1])
+		end)
+	end
+end
+
+local function pickKey(): string
+	local pick = selection
+	if not pick then
+		return "-"
+	end
+	return pick.Kind .. ":" .. tostring(pick.Slot or pick.Key or pick.Id or (pick.Gem and pick.Gem.Id))
+end
+
+-- The pouch, best first, through the element filter.
+local function shownGems()
+	local profile = profileNow()
+	local gems = {}
+	for _, gem in profile and profile.Gems or {} do
+		local keep = gemFilter == "All"
+			or (gemFilter == "Rough" and gem.Cut == nil)
+			or (gem.Cut ~= nil and gem.Element == gemFilter)
+		if keep then
+			table.insert(gems, gem)
+		end
+	end
+	table.sort(gems, function(a, b)
+		local ra, rb = gemRarity(a), gemRarity(b)
+		if ra ~= rb then
+			return ra > rb
+		end
+		if (a.Cut ~= nil) ~= (b.Cut ~= nil) then
+			return a.Cut ~= nil
+		end
+		if (a.Element or "") ~= (b.Element or "") then
+			return (a.Element or "") < (b.Element or "")
+		end
+		return a.Id < b.Id
+	end)
+	return gems
+end
+local function gemsKey(): string
+	local parts = { "Gems", gemFilter, pickKey() }
+	for _, gem in shownGems() do
+		table.insert(parts, gem.Id .. ":" .. tostring(gem.Cut))
+	end
+	return table.concat(parts, ",")
+end
+
 -- GEMS: every gem in the pouch, best first.
 local function drawGems()
 	local profile = profileNow()
-	local gems = table.clone(profile and profile.Gems or {})
+	local entries = { { "All", "ALL" } }
+	for _, element in GemConfig.Elements do
+		table.insert(
+			entries,
+			{ element, string.upper(GemConfig.elementName(element)), GemConfig.ElementColors[element] }
+		)
+	end
+	table.insert(entries, { "Rough", "ROUGH" })
+	filterRow(entries, gemFilter, function(id)
+		gemFilter = id
+		draw()
+	end)
+	local gems = shownGems()
 	table.sort(gems, function(a, b)
 		local ra, rb = gemRarity(a), gemRarity(b)
 		if ra ~= rb then
@@ -735,9 +828,14 @@ local function drawGems()
 		end
 		return (a.Element or "") < (b.Element or "")
 	end)
-	local grid = scroller(page, 0)
+	local grid = scroller(page, 36)
 	if #gems == 0 then
-		emptyNote(page, "No gems yet.\nMine rocks at the Outpost to find some.")
+		emptyNote(
+			page,
+			if profile and #(profile.Gems or {}) > 0
+				then "No gems match this filter."
+				else "No gems yet.\nMine rocks at the Outpost to find some."
+		)
 	end
 	for order, gem in gems do
 		local tierColor = GemConfig.TierColors[gem.Tier] or C.Text
@@ -819,30 +917,18 @@ local function spareItems()
 	end)
 	return items
 end
-local function drawArmor()
-	local chips = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 26) }, page)
-	UiKit.list(chips, 6, true)
-	for i, filter in FILTERS do
-		local on = armorFilter == filter[1]
-		local chip = new("TextButton", {
-			Text = filter[2],
-			TextSize = 10,
-			Font = BOLD,
-			TextColor3 = if on then P.Frame else C.Dim,
-			BackgroundColor3 = if on then P.Gold else C.Card,
-			Size = UDim2.fromOffset(0, 26),
-			AutomaticSize = Enum.AutomaticSize.X,
-			LayoutOrder = i,
-		}, chips)
-		round(chip, 4)
-		stroke(chip, if on then P.Gold else C.PanelEdge, 1)
-		new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, chip)
-		chip:SetAttribute("UiSound", "Tab")
-		chip.Activated:Connect(function()
-			armorFilter = filter[1]
-			draw()
-		end)
+local function armorKey(): string
+	local parts = { "Armor", armorFilter, pickKey(), tostring(previewVersion) }
+	for _, item in spareItems() do
+		table.insert(parts, item.Id .. ":" .. item.Rarity)
 	end
+	return table.concat(parts, ",")
+end
+local function drawArmor()
+	filterRow(FILTERS, armorFilter, function(id)
+		armorFilter = id
+		draw()
+	end)
 	local grid = scroller(page, 36)
 	local all = spareItems()
 	requestPreviews(all)
@@ -1022,6 +1108,14 @@ local function drawOverview()
 		else
 			line(holder, 6, "Empty. Drag a cut gem from GEMS onto this piece.", 12, C.Dim)
 		end
+		local pickGem = {
+			"PICK A GEM",
+			false,
+			function()
+				tab = "Gems"
+				draw()
+			end,
+		}
 		if pick.Kind == "Spare" then
 			line(holder, 7, "IF EQUIPPED", 10, C.Dim, BOLD)
 			chipRow(holder, 8, ratingDelta(loadout, slot, id :: string))
@@ -1043,7 +1137,10 @@ local function drawOverview()
 						request("UnsocketGem", slot)
 					end,
 				},
+				pickGem,
 			})
+		else
+			actions(holder, 9, { pickGem })
 		end
 		return
 	end
@@ -1120,6 +1217,16 @@ local function drawOverview()
 		else
 			header(holder, "Key " .. key .. " is empty", "SURGE ARRAY", C.Dim, emblem("Enchant", C.Dim))
 			line(holder, 1, "Drag a cut gem from GEMS onto this key to cast its surge with " .. key .. ".", 12, C.Dim)
+			actions(holder, 2, {
+				{
+					"PICK A GEM",
+					true,
+					function()
+						tab = "Gems"
+						draw()
+					end,
+				},
+			})
 		end
 		return
 	end
@@ -1236,6 +1343,11 @@ local function drawLeft()
 		local value = if ratings then ratings[name].Base + ratings[name].Bonus else 0
 		total += value
 		statTiles[name].Value.Text = whole(value)
+		local bonus = if ratings then ratings[name].Bonus else 0
+		statTiles[name].Bonus.Text = if bonus >= 0.5 then "◆ +" .. whole(bonus) else ""
+		statTiles[name].Bonus.TextColor3 = if ratings and ratings[name].Element
+			then GemConfig.ElementColors[ratings[name].Element] or P.Good
+			else P.Good
 		statTiles[name].Fill.Size = UDim2.fromScale(math.clamp(value / 140, 0, 1), 1)
 	end
 	statTiles.Rating.Value.Text = whole(total)
@@ -1322,13 +1434,46 @@ local function drawLeft()
 	end
 end
 
-local function drawRight()
-	clear(page)
+-- Tabs carry counts; they're rebuilt only when the tab or a count changes.
+local tabsKey = ""
+local function drawTabs()
+	local profile = profileNow()
+	local spare = #spareItems()
+	local gems = #(profile and profile.Gems or {})
+	local key = string.format("%s|%d|%d", tab, spare, gems)
+	if key == tabsKey then
+		return
+	end
+	tabsKey = key
 	clear(tabHolder)
-	IronUi.tabs(tabHolder, { { "Overview", "OVERVIEW" }, { "Armor", "ARMOR" }, { "Gems", "GEMS" } }, tab, function(id)
-		tab = id
-		draw()
-	end)
+	IronUi.tabs(
+		tabHolder,
+		{
+			{ "Overview", "OVERVIEW" },
+			{ "Armor", string.format("ARMOR  %d", spare) },
+			{ "Gems", string.format("GEMS  %d/%d", gems, Config.MaxGems) },
+		},
+		tab,
+		function(id)
+			tab = id
+			draw()
+		end
+	)
+end
+
+-- A bag page is rebuilt only when what it shows changes, and keeps its
+-- scroll position when it is.
+local pageKey, pageTab = "", ""
+local function drawRight()
+	drawTabs()
+	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
+	if key ~= nil and key == pageKey and pageTab == tab then
+		return
+	end
+	local old = page:FindFirstChildWhichIsA("ScrollingFrame", true)
+	local keep = if old and pageTab == tab then old.CanvasPosition else nil
+	pageKey, pageTab = key or "", tab
+	clear(page)
 	if tab == "Gems" then
 		drawGems()
 	elseif tab == "Armor" then
@@ -1336,17 +1481,39 @@ local function drawRight()
 	else
 		drawOverview()
 	end
+	local fresh = page:FindFirstChildWhichIsA("ScrollingFrame", true)
+	if keep and fresh then
+		task.defer(function()
+			fresh.CanvasPosition = keep
+		end)
+	end
 end
 
+-- Draws are coalesced (a burst of profile updates is one redraw) and only
+-- happen while the Inventory is on screen; otherwise it redraws on opening.
+local drawQueued, dirty, portraitDirty = false, true, true
+local function visible(): boolean
+	return hostGui ~= nil and hostGui.Enabled
+end
 function draw()
-	if drag and drag.Active then
-		return -- don't rebuild under a drag
-	end
-	if not profileNow() then
+	if drawQueued then
 		return
 	end
-	drawLeft()
-	drawRight()
+	drawQueued = true
+	task.defer(function()
+		drawQueued = false
+		if (drag and drag.Active) or not visible() or not profileNow() then
+			dirty = true
+			return
+		end
+		dirty = false
+		if portraitDirty then
+			portraitDirty = false
+			drawPortrait()
+		end
+		drawLeft()
+		drawRight()
+	end)
 end
 
 function InventoryScreen.refresh()
@@ -1366,7 +1533,7 @@ local function gearChanged()
 		for _, card in wornCards do
 			card.Shown = ""
 		end
-		drawPortrait()
+		portraitDirty = true
 		draw()
 	end)
 end
@@ -1391,6 +1558,7 @@ local function previewsChanged()
 	previewRedraw = true
 	task.delay(0.3, function()
 		previewRedraw = false
+		previewVersion += 1
 		if tab == "Armor" then
 			draw()
 		end
@@ -1415,13 +1583,12 @@ function InventoryScreen.mount(parent: GuiObject, host: ScreenGui, position: UDi
 	root.Parent = parent
 	host:GetPropertyChangedSignal("Enabled"):Connect(function()
 		if host.Enabled then
-			drawPortrait()
+			portraitDirty = true
 			draw()
 		else
 			InventoryScreen.cancelDrag()
 		end
 	end)
-	drawPortrait()
 	draw()
 end
 
