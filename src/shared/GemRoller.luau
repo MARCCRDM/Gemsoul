@@ -17,6 +17,22 @@
 	server and every client agree without a migration (GemRoller.surge).
 ]]
 local GemRoller = {}
+-- Reversible combat prototype. Legacy IDs remain saved and archived.
+GemRoller.Prototype = true
+GemRoller.PrototypeIds = {
+	Fire = { "CinderCleave", "HeatReversal", "FurnaceRush" },
+	Frost = { "FrostNeedle", "CryoAegis", "GlacierRetreat" },
+	Shock = { "ArcThrust", "StaticCatch", "VectorDash" },
+	Poison = { "BreachCut", "PurgeShell", "SeepStep" },
+}
+function GemRoller.prototypeRole(id)
+	for _, ids in GemRoller.PrototypeIds do
+		for index, candidate in ids do
+			if id == candidate then return ({ "Attack", "Defense", "Shift" })[index] end
+		end
+	end
+	return nil
+end
 
 GemRoller.Elements = { "Fire", "Frost", "Poison", "Shock" }
 
@@ -143,6 +159,7 @@ function GemRoller.roll(rng, luck: number?)
 	if GemRoller.Resonance[tier] and rng:NextNumber() < GemRoller.ResonanceChance then
 		surge = (if alternate then GemRoller.ResonanceVariants else GemRoller.Resonance)[tier]
 	end
+	if GemRoller.Prototype then surge = pick(rng, GemRoller.PrototypeIds[element]) end
 	return {
 		Element = element,
 		Tier = rarity,
@@ -158,6 +175,12 @@ end
 -- Gives a rolled gem a different element, with that element's surge at the
 -- same tier (a Resonance surge has no element and stays).
 function GemRoller.setElement(gem, element: string)
+	local role = GemRoller.prototypeRole(gem.Surge)
+	if role and GemRoller.PrototypeIds[element] then
+		local index = if role == "Attack" then 1 elseif role == "Defense" then 2 else 3
+		gem.Surge, gem.Element = GemRoller.PrototypeIds[element][index], element
+		return gem
+	end
 	local oldVariants = GemRoller.SurgeVariants[gem.Element]
 	local alternate = oldVariants and oldVariants[gem.SurgeTier] == gem.Surge
 	local surges = (if alternate then GemRoller.SurgeVariants else GemRoller.Surges)[element]

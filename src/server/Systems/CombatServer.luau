@@ -446,8 +446,25 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 			fx("BlockSpark", root.Position, true)
 		else
 			local multiplier, covered = Actions.blockMultiplier(k.Rules, pvp, dot, projectile, heavy)
-			if covered then
-				guarded = true
+				if covered then
+					guarded = true
+					local empowered = now < (st.PrototypeGuardUntil or 0)
+					local timed = st.BlockRaisedAt and now - st.BlockRaisedAt <= 0.3
+					local catchMelee = empowered and st.PrototypeGuard == "StaticCatch" and not projectile
+					if empowered and not reflected then
+						st.PrototypeGuardUntil = 0 -- one covered hit consumes the window
+						local retaliate = st.PrototypeGuard == "HeatReversal" and timed
+						local deflect = st.PrototypeGuard == "StaticCatch" and projectile and timed
+						if retaliate or deflect then
+							local counter = if deflect then amount * 0.5 else k.Weapon.Attack.Damage * 0.65
+							if deflect then multiplier = 0 end
+							if source and (deflect or (source.Character and (source.Character.HumanoidRootPart.Position - root.Position).Magnitude <= 9)) then
+								receive(source, counter, if deflect then element else "Fire", player, root.Position, false, false, true)
+							elseif enemySource and (deflect or (enemySource.Root.Position - root.Position).Magnitude <= 9) then
+								Enemies.damage(enemySource, counter, player, false, GemConfig.ElementColors.Fire)
+							end
+						end
+					end
 				if
 					not projectile
 					and not reflected
@@ -477,6 +494,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				if not (st.ParrySpent and not parriedBefore) then
 					local cost = math.max(Actions.Stamina.BlockMin, beforeGuard * Actions.Stamina.BlockPerDamage)
 						* (1 - (k.Effects.BlockStamina or 0))
+					if catchMelee then cost *= 0.5 end
 					if st.Resources.Stamina >= cost then
 						spendStamina(player, st, cost)
 					else
@@ -1351,14 +1369,15 @@ function technologyHitInner(player, k, target, definition, scale)
 	if combo then
 		damage *= combo.Mult or 1
 	end
+	local guarded = false
 	if target.Player then
-		damage = receive(
+		damage, guarded = receive(
 			target.Player,
 			damage,
 			definition.Element,
 			player,
 			root.Position,
-			definition.Resource == "Charge",
+			definition.Resource == "Charge" and not definition.Cone,
 			definition.Heavy == true,
 			false,
 			nil,
@@ -1416,7 +1435,7 @@ function technologyHitInner(player, k, target, definition, scale)
 			Enemies.addStatus(target.Enemy, "Slow", definition.Slow, definition.SlowTime or 0.75)
 		end
 	end
-	if definition.Shred then
+	if definition.Shred and not (definition.Prototype and guarded) then
 		local now = os.clock()
 		if target.Player then
 			local victim = state(target.Player)
@@ -1439,7 +1458,7 @@ function technologyHitInner(player, k, target, definition, scale)
 			end
 		end
 	end
-	if definition.Element == "Fire" and gem then
+	if definition.Element == "Fire" and gem and not definition.Prototype then
 		local values = GemConfig.stats(gem, "Weapon", { Affinity = k.Affinity, PvP = target.Player ~= nil })
 		if target.Player then
 			addDot(target.Player, player, values.BurnDamage * k.Effects.ThermalMult, values.BurnDuration)
@@ -1646,7 +1665,27 @@ end
 -- A self surge taking effect (when its cast completes).
 local function applyBuff(player, k, st, id, definition)
 	local now = os.clock()
-	if id == "EnergySiphon" then
+	if id == "HeatReversal" or id == "StaticCatch" then
+		st.PrototypeGuard, st.PrototypeGuardUntil = id, now + definition.Duration
+		fx("TechField", player, GemConfig.ElementColors[definition.Element])
+	elseif id == "CryoAegis" then
+		st.Shield, st.ShieldUntil = definition.Absorb, now + definition.Duration
+		fx("TechField", player, GemConfig.ElementColors.Frost)
+	elseif id == "PurgeShell" then
+		-- Fixed prototype priority: shred, slow, then oldest remaining DoT.
+		if now < st.SunderUntil then
+			st.Sunder, st.SunderUntil, st.CC.Debuffs.Sunder = 0, 0, nil
+		elseif now < st.SlowUntil then
+			st.Slow, st.SlowUntil, st.CC.Debuffs.Slow = 0, 0, nil
+		else
+			local oldest, endsAt = nil, math.huge
+			for source, dot in st.Dots do
+				if dot.Ends > now and dot.Ends < endsAt then oldest, endsAt = source, dot.Ends end
+			end
+			if oldest then st.Dots[oldest] = nil end
+		end
+		fx("TechField", player, GemConfig.ElementColors.Poison)
+	elseif id == "EnergySiphon" then
 		st.SiphonUntil, st.SiphonCapacity = now + definition.Duration, definition.Absorb
 		fx("TechField", player, Tech.Resources.Charge.Color)
 	elseif id == "ResonanceEcho" then
@@ -1673,6 +1712,10 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		local gem = Tech.surgeGem(k.Loadout, surgeKey)
 		if not gem then
 			Remotes.CombatFx:FireClient(player, "TechStatus", "Socket a gem in surge slot " .. surgeKey)
+			return false
+		end
+		if not Tech.canSocket(gem, surgeKey, k.Loadout) then
+			Remotes.CombatFx:FireClient(player, "TechStatus", "Q/E: unique Attack or Defense. R: Shift only.")
 			return false
 		end
 		if now < st.SilenceUntil then
@@ -1716,7 +1759,28 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		Remotes.CombatFx:FireClient(player, "TechStatus", "Not enough " .. definition.Resource)
 		return false
 	end
-	if id == "StimDodge" then
+	if definition.Shift then
+		local forward = flat(root.CFrame.LookVector)
+		local direction = flat(aim - root.Position)
+		if definition.Shift == "Forward" then direction = forward
+		elseif definition.Shift == "Back" then direction = -forward
+		elseif definition.Shift == "Side" then
+			local side = Vector3.new(-forward.Z, 0, forward.X)
+			direction = side * (if side:Dot(direction) < 0 then -1 else 1)
+		end
+		local params = RaycastParams.new()
+		params.FilterType, params.FilterDescendantsInstances = Enum.RaycastFilterType.Exclude, { player.Character }
+		params.RespectCanCollide = true
+		local hit = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * definition.Distance, params)
+		local distance = if hit then math.max(0, hit.Distance - 0.5) else definition.Distance
+		if distance < 1 then return false end -- failed placement is free
+		st.DodgeMove = { Kind = "Shift", Root = root, Direction = direction, Speed = distance / definition.MoveTime, Ends = now + definition.MoveTime }
+		-- Do not set DodgeStarted: Shift grants no dodge invulnerability.
+		if id == "SeepStep" then st.Slow, st.SlowUntil, st.CC.Debuffs.Slow = 0, 0, nil end
+		pcall(function() root:SetNetworkOwner(nil) end)
+		fx("DodgeRoll", player, root.Position, direction, distance, false)
+		Tech.spend(st.Resources, definition.Resource, cost)
+	elseif id == "StimDodge" then
 		if not dodge(player, aim - root.Position) then
 			return false
 		end
@@ -1765,11 +1829,11 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		Tech.spend(st.Resources, definition.Resource, cost)
 	end
 	-- A short lockout (Recovery) for everything, and this ability's own cooldown.
-	local recovery = definition.Recovery * (k.Effects.CooldownMult or 1)
+	local recovery = definition.Recovery * (if definition.Prototype then 1 else (k.Effects.CooldownMult or 1))
 	if definition.Resource == "Charge" then
 		recovery = math.max(recovery, Tech.SurgeLockout)
 	end
-	local cooldown = math.max(recovery, (definition.Cooldown or definition.Recovery) * (k.Effects.CooldownMult or 1))
+	local cooldown = math.max(recovery, (definition.Cooldown or definition.Recovery) * (if definition.Prototype then 1 else (k.Effects.CooldownMult or 1)))
 	st.TechCooldowns[cooldownKey], st.NextTech = now + cooldown, now + recovery
 	st.NextAttack = math.max(st.NextAttack, st.NextTech)
 	st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
@@ -1805,7 +1869,9 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			castTime
 		)
 	end
-	if not definition.Damage and definition.Resource == "Charge" then
+	if definition.Shift then
+		-- Movement was resolved above; no delayed damage or buff payload.
+	elseif not definition.Damage and definition.Resource == "Charge" then
 		table.insert(st.Pending, { Buff = id, Definition = definition, At = now + castTime })
 	elseif definition.PerSecond then
 		table.insert(st.Pending, { Channel = cooldownKey, Definition = definition, Aim = aim, At = now + castTime })

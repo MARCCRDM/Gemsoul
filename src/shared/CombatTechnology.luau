@@ -66,7 +66,8 @@ Tech.SurgeSlots = 3 -- Q, E, R
 Tech.SurgeSockets = { Q = "Surge1", E = "Surge2", R = "Surge3" }
 function Tech.surgeGem(loadout, key: string)
 	local slot = Tech.SurgeSockets[key]
-	return if slot and loadout then loadout[slot .. "Gem"] else nil
+	local gem = if slot and loadout then loadout[slot .. "Gem"] else nil
+	return if GemRoller.Prototype then Tech.prototypeGem(gem, key) else gem
 end
 Tech.ManeuverSlots = 3 -- 1, 2, 3
 Tech.DefaultManeuvers = { "HydraulicSlam", "KineticRam", "StimDodge" }
@@ -786,6 +787,58 @@ table.insert(Tech.NewSurges, "ResonantReaver")
 table.insert(Tech.Order.GemSurges, "NullPrism")
 table.insert(Tech.NewSurges, "NullPrism")
 
+-- Prototype tuning: geometry and Shift cooldowns are not rarity multipliers.
+Tech.Prototype = GemRoller.Prototype
+Tech.PrototypeCatalog = {
+	CinderCleave = { Name = "Cinder Cleave", Element = "Fire", Role = "Attack", Damage = 1.5, Range = 8, Cone = 75, Windup = 0.55, Cost = 24, Cooldown = 7, IconSource = "FurnaceCrescent" },
+	FrostNeedle = { Name = "Frost Needle", Element = "Frost", Role = "Attack", Damage = 0.9, Range = 32, Slow = 0.15, SlowTime = 1.5, Windup = 0.4, Cost = 20, Cooldown = 7, IconSource = "FrostNeedle" },
+	ArcThrust = { Name = "Arc Thrust", Element = "Shock", Role = "Attack", Damage = 1.15, Range = 11, Cone = 22, Windup = 0.35, Cost = 22, Cooldown = 6, IconSource = "ArcNeedle" },
+	BreachCut = { Name = "Breach Cut", Element = "Poison", Role = "Attack", Damage = 1.05, Range = 8, Cone = 45, Shred = 0.1, ShredTime = 3, Windup = 0.5, Cost = 24, Cooldown = 8, IconSource = "ArmorMelt" },
+	HeatReversal = { Name = "Heat Reversal", Element = "Fire", Role = "Defense", Duration = 2, Shield = true, Cost = 20, Cooldown = 10, IconSource = "Supernova" },
+	CryoAegis = { Name = "Cryo Aegis", Element = "Frost", Role = "Defense", Duration = 3, Absorb = 18, Cost = 24, Cooldown = 12, IconSource = "CryoShield" },
+	StaticCatch = { Name = "Static Catch", Element = "Shock", Role = "Defense", Duration = 2, Shield = true, Cost = 18, Cooldown = 9, IconSource = "StaticField" },
+	PurgeShell = { Name = "Purge Shell", Element = "Poison", Role = "Defense", Duration = 0, Cost = 16, Cooldown = 9, IconSource = "BioCorrosion" },
+	FurnaceRush = { Name = "Furnace Rush", Element = "Fire", Role = "Shift", Shift = "Forward", Distance = 15, MoveTime = 0.32, Cost = 10, Cooldown = 9, IconSource = "CinderDrill" },
+	GlacierRetreat = { Name = "Glacier Retreat", Element = "Frost", Role = "Shift", Shift = "Back", Distance = 12, MoveTime = 0.3, Cost = 9, Cooldown = 9, IconSource = "GlacierFan" },
+	VectorDash = { Name = "Vector Dash", Element = "Shock", Role = "Shift", Shift = "Aim", Distance = 13, MoveTime = 0.22, Cost = 10, Cooldown = 9, IconSource = "CircuitCleave" },
+	SeepStep = { Name = "Seep Step", Element = "Poison", Role = "Shift", Shift = "Side", Distance = 9, MoveTime = 0.25, Cost = 9, Cooldown = 9, IconSource = "VitriolSweep" },
+	DefaultShift = { Name = "Basic Shift", Role = "Shift", Shift = "Aim", Distance = 11, MoveTime = 0.28, Cost = 9, Cooldown = 9, IconSource = "ThrusterLeap" },
+}
+for id, definition in Tech.PrototypeCatalog do
+	definition.Resource, definition.Recovery = "Charge", 0.9
+	definition.Range = definition.Range or 1
+	definition.Windup = definition.Windup or 0.15
+	definition.Prototype = true
+	definition.Description = definition.Role .. " Surge: " .. definition.Name
+	definition.Icon = Tech.Catalog[definition.IconSource] and Tech.Catalog[definition.IconSource].Icon or "◆"
+	if Tech.Prototype then Tech.Catalog[id] = definition end
+end
+-- Non-destructive legacy projection: saved originals stay in the archive/save.
+function Tech.prototypeGem(gem, key)
+	if not gem then
+		return if key == "R" then { Surge = "DefaultShift", SurgeTier = 1, SurgeRank = 1, Size = 1, Clarity = 1, Cut = 1 } else nil
+	end
+	if Tech.PrototypeCatalog[gem.Surge] then return gem end
+	local ids = GemRoller.PrototypeIds[gem.Element]
+	if not ids then return nil end
+	local old = Tech.Catalog[gem.Surge]
+	local index = if key == "R" then 3 elseif old and (old.Ward or not old.Damage) then 2 else 1
+	local projected = table.clone(gem)
+	projected.Surge, projected.LegacySurge = ids[index], gem.Surge
+	return projected
+end
+function Tech.canSocket(gem, key, loadout)
+	if not Tech.Prototype then return true end
+	local projected = Tech.prototypeGem(gem, key)
+	local d = projected and Tech.PrototypeCatalog[projected.Surge]
+	if not d or (key == "R") ~= (d.Role == "Shift") then return false end
+	if key ~= "R" and loadout then
+		local other = Tech.surgeGem(loadout, if key == "Q" then "E" else "Q")
+		if other and other.Surge == projected.Surge then return false end
+	end
+	return true
+end
+
 Tech.PassiveAugments = {
 	{ Name = "Blade Calibration", Description = "Slashing weapon damage." },
 	{ Name = "Cleaver Calibration", Description = "Cleaving weapon damage." },
@@ -833,6 +886,16 @@ function Tech.surgeStats(gem, amps)
 	end
 	amps = amps or {}
 	local d = table.clone(base)
+	if d.Prototype then
+		d.Id, d.Tier, d.Rank, d.Gem = id, tier, rank, gem
+		d.Crit, d.Echo = 0, 0
+		if d.Role == "Shift" then
+			d.Cost *= 1 - (rank - 1) * 0.025
+		elseif d.Damage then
+			d.Damage *= 1 + (rank - 1) * 0.08
+		end
+		return d
+	end
 	local scale = Tech.Ranks[rank] or Tech.Ranks[1]
 	local clarity = math.clamp(gem.Clarity or 1, 1, 10)
 	local cut = math.clamp(gem.Cut or 0, 0, 10)
@@ -895,11 +958,11 @@ function Tech.surgeLines(gem, amps): { string }
 		table.insert(lines, string.format("%d%% base damage", math.floor(d.Damage * 100 + 0.5)))
 		table.insert(lines, string.format("Size %d (+%d%% damage)", size, size * 3))
 	else
-		table.insert(lines, string.format("%gs effect", math.floor(d.Duration * 10 + 0.5) / 10))
+		table.insert(lines, string.format("%gs effect", math.floor((d.Duration or d.MoveTime or 0) * 10 + 0.5) / 10))
 	end
 	table.insert(lines, string.format("Clarity %d (%.1fs recovery)", gem.Clarity or 0, d.Recovery))
 	table.insert(lines, string.format("Cut %d (%g%% crit chance)", gem.Cut or 0, d.Crit * 100))
-	table.insert(lines, "Sockets into any Surge Slot.")
+	table.insert(lines, if d.Role == "Shift" then "Shift: R only." elseif d.Role then d.Role .. ": Q or E." else "Legacy Surge: projects into the prototype on equip.")
 	return lines
 end
 
