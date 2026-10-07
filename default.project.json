@@ -29,6 +29,9 @@
         "Client": {
           "$path": "src/client"
         }
+      },
+      "$properties": {
+        "LoadCharacterAppearance": false
       }
     },
     "TextChatService": {

@@ -1868,7 +1868,7 @@ function Equipment.marketPreviews(player: Player, items): (boolean, number?)
 end
 
 local function watch(player: Player)
-	player.CharacterAppearanceLoaded:Connect(function()
+	local function dressWhenReady(character)
 		-- The profile may still be loading on the first spawn.
 		for _ = 1, 20 do
 			if PlayerData.character(player) then
@@ -1876,7 +1876,19 @@ local function watch(player: Player)
 			end
 			task.wait(0.5)
 		end
-		Equipment.apply(player)
+		if player.Character == character then
+			Equipment.apply(player)
+		end
+	end
+	player.CharacterAppearanceLoaded:Connect(function(character)
+		dressWhenReady(character)
+	end)
+	-- Every body is the rival's rig (FighterRig) with no avatar appearance
+	-- loaded, so the appearance event may never come: dress on spawn too
+	-- (dressing twice just replaces the gear).
+	player.CharacterAdded:Connect(function(character)
+		task.wait(0.2)
+		dressWhenReady(character)
 	end)
 end
 
