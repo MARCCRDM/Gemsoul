@@ -84,15 +84,22 @@ local Classes={get=function() return class end,gear=function(_,_,id) return {Nam
 local color=Color3.new(0.3,0.7,0.9)
 local GearRolls={Rarities={{Name="Rare",Color=color}}}
 local GemConfig={Elements={"Fire","Frost","Shock","Poison"},ElementLabels={Fire="Thermal",Frost="Cryo",Shock="Ion",Poison="Corrosive"},ElementColors={Fire=color,Frost=color,Shock=color,Poison=color},TierLabels={Common="Common",Uncommon="Uncommon"},TierColors={Common=color,Uncommon=color},shade=function(gem) return {Name=gem.Element.." gem"} end}
+function GemConfig.elementName(element) return GemConfig.ElementLabels[element] or element end
 local profile={Intro={Done=false},Character=character,Gems={}}
 local count=0
-local reward=Lottery.prepare(profile,{NextInteger=function(_,a) return a end},function(element) count+=1; return {Id="g"..count,Element=element,Tier="Common"} end)
-local requests={}
+local reward=nil
+local requests,prepareArgs={},nil
 local failPrepare,failFinish=false,false
 local GemClient={Profile=profile,Changed=signal()}
-function GemClient.request(action)
+-- The real server keeps the first choice; a retry never rerolls it.
+function GemClient.request(action,...)
  table.insert(requests,action)
- if action=="PrepareStarterLottery" then return {Ok=not failPrepare,Message="Retry",Lottery=reward} end
+ if action=="PrepareStarterLottery" then
+  if failPrepare then return {Ok=false,Message="Retry"} end
+  prepareArgs={...}
+  reward=Lottery.prepareChoice(profile,prepareArgs[1],prepareArgs[2],function(element) count+=1; return {Id="g"..count,Element=element,Tier="Common"} end)
+  return {Ok=reward~=nil,Message="Retry",Lottery=reward}
+ end
  if failFinish then return {Ok=false,Message="Retry claim"} end
  return {Ok=Lottery.finish(profile,200)}
 end

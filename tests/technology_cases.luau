@@ -162,7 +162,11 @@ check(
 	hv.Health == 1000 and st.StunUntil > now and hs.Health < 1000 and foe.RiposteUntil == 0,
 	"Riposte didn't turn the blow aside"
 )
--- Element combos (Shared.ElementCombos), pure and live.
+-- Element combos (Shared.ElementCombos), pure and live. They're off in live
+-- play for the prototype; the archived rules are checked switched on.
+check(ElementCombos.Enabled == false, "Element combos are on in live play")
+check(ElementCombos.check({ Heavy = true }, { Frozen = true }) == nil, "A combo fired while combos are off")
+ElementCombos.Enabled = true
 check(ElementCombos.check({ Heavy = true }, { Frozen = true }) == "Shatter", "Shatter rule")
 check(ElementCombos.check({ Element = "Fire" }, { Shredded = true }) == "Combustion", "Combustion rule")
 check(ElementCombos.check({ Element = "Shock" }, { Slowed = true }) == "Superconduct", "Superconduct rule")
@@ -179,6 +183,17 @@ check(
 	close(1000 - hv.Health, expected * Tech.Catalog.HydraulicSlam.Damage * ElementCombos.List.Shatter.Mult)
 		and foe.StunUntil <= now,
 	"Shatter: heavy on Frozen"
+)
+-- Off (live play): the same blow is plain damage and the freeze holds.
+ElementCombos.Enabled = false
+st = reset()
+foe = CombatServer._state(victim)
+foe.StunKind, foe.StunUntil = "Frozen", now + 3
+check(fire("HydraulicSlam"), "Slam refused")
+land(MOVE)
+check(
+	close(1000 - hv.Health, expected * Tech.Catalog.HydraulicSlam.Damage) and foe.StunUntil > now,
+	"Shatter fired while combos are off"
 )
 st = reset()
 st = reset()
@@ -511,7 +526,7 @@ check(
 		and lines[2] == string.format("%d%% base damage", math.floor(Tech.Catalog.EmberLance.Damage * 100 + 0.5))
 		and lines[3] == "Size 5 (+15% damage)"
 		and lines[5] == "Cut 4 (2% crit chance)"
-		and lines[6] == "Sockets into any Surge Slot.",
+		and lines[6] == "Legacy Surge: projects into the prototype on equip.",
 	"Gem surge tooltip"
 )
 -- GemRoller: rarity bands, ranks, metrics and the Resonance share.
@@ -613,6 +628,11 @@ end
 for _, id in Tech.NewSurges do
 	local d = Tech.Catalog[id]
 	check(rolled[id], "New surge cannot drop: " .. id)
+	-- An id the prototype reused (Frost Needle) now holds the prototype
+	-- surge; that one is checked in surge_prototype_cases.
+	if d.Prototype then
+		continue
+	end
 	st = reset()
 	rs.Position, rv.Position = arena, arena + Vector3.new(0, 0, -5)
 	hs.Health = 500
@@ -670,6 +690,18 @@ st = reset()
 for id, def in Tech.Catalog do
 	check(def.Icon == nil, "Text glyph left on ability: " .. id)
 end
+-- Live play: the prototype is on (run_combat switches it off for these
+-- archived checks), and an old surge gem casts its element's prototype
+-- surge for its role.
+check(GemRoller.LivePrototype == true, "The surge prototype is off in live play")
+GemRoller.Prototype, Tech.Prototype = true, true
+local projected = Tech.surgeGem({ Surge1Gem = { Id = "old", Element = "Fire", Surge = "ThermalBurst" } }, "Q")
+check(
+	projected and projected.Surge == "CinderCleave" and projected.LegacySurge == "ThermalBurst",
+	"An old Thermal Burst gem didn't become Cinder Cleave"
+)
+check(Tech.surgeGem({}, "R").Surge == "DefaultShift", "An empty R doesn't fall back to the neutral Shift")
+GemRoller.Prototype, Tech.Prototype = false, false
 print(
 	"PASS: "
 		.. checks

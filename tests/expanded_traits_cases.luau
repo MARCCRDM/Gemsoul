@@ -56,9 +56,11 @@ for _, weapon in WeaponForge.Catalog do
 	perkKeys[key] = true
 	assert(string.find(weapon.Passive.Text, "%d+%%") ~= nil, weapon.Id .. "'s perk doesn't say how much")
 	kinds[weapon.WeaponType] = (kinds[weapon.WeaponType] or 0) + 1
-	-- Every kind deals about the same damage per second.
+	-- One-handed kinds deal about the same damage per second; two-handed
+	-- kinds a little more, to make up for the shield they give up.
 	local dps = weapon.Attack.Damage / weapon.Attack.Rate
-	assert(dps > 25 and dps < 30, weapon.Id .. " is out of line: " .. dps .. " damage per second")
+	local low, high = if Classes.TwoHanded[weapon.WeaponType] then 30 else 25, if Classes.TwoHanded[weapon.WeaponType] then 35 else 30
+	assert(dps > low and dps < high, weapon.Id .. " is out of line: " .. dps .. " damage per second")
 end
 for _, kind in WeaponForge.Types do
 	assert(kinds[kind.Id] == 5, kind.Id .. " doesn't come in five rarities")

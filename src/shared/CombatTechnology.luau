@@ -810,7 +810,6 @@ for id, definition in Tech.PrototypeCatalog do
 	definition.Windup = definition.Windup or 0.15
 	definition.Prototype = true
 	definition.Description = definition.Role .. " Surge: " .. definition.Name
-	definition.Icon = Tech.Catalog[definition.IconSource] and Tech.Catalog[definition.IconSource].Icon or "◆"
 	if Tech.Prototype then Tech.Catalog[id] = definition end
 end
 -- Non-destructive legacy projection: saved originals stay in the archive/save.
