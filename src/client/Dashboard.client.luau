@@ -1,6 +1,6 @@
--- The Inventory: your character, worn gear and sockets, and the bag (gear,
--- gems and their powers). Opened from the lobby's INVENTORY tile, over the
--- Outpost; everything else (play, store, ranks, social) lives in the lobby.
+-- The Inventory: your character, worn gear and sockets, loadouts, and the
+-- bags (Modules/InventoryScreen). Opened from the lobby's INVENTORY tile, over
+-- the Outpost; everything else (play, store, ranks, social) lives in the lobby.
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,7 +13,7 @@ if not Config.MenuOnly then
 	return
 end
 
-local CharacterUI = require(script.Parent.Modules.CharacterUI)
+local InventoryScreen = require(script.Parent.Modules.InventoryScreen)
 -- These run on their own once loaded (chat, trades, the Outpost, the
 -- Arena and Social), whether or not the Inventory shows them.
 require(script.Parent.Modules.ChatFrame)
@@ -37,7 +37,7 @@ local new, text = IronUi.new, IronUi.text
 local P = IronUi.Colors
 
 local function launch(action)
-	CharacterUI.cancelDrag()
+	InventoryScreen.cancelDrag()
 	action()
 end
 local W, H = 1432, 606
@@ -58,9 +58,9 @@ local backdrop = new("Frame", {
 new("UIGradient", {
 	Rotation = 110,
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(19, 23, 38)),
-		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(8, 8, 19)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 22, 36)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 17, 44)),
+		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(11, 8, 22)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 14, 38)),
 	}),
 }, backdrop)
 local pattern = new("TextLabel", {
@@ -82,47 +82,26 @@ for i = 1, 42 do
 	local x, y = stars:NextNumber(), stars:NextNumber()
 	local size = if i % 7 == 0 then 4 else 2
 	local star = new("Frame", {
-		BackgroundColor3 = if i % 3 == 0 then P.Amethyst else P.Teal,
-		BackgroundTransparency = 0.65,
+		BackgroundColor3 = Color3.fromRGB(220, 210, 255),
+		BackgroundTransparency = 0.8,
 		Size = UDim2.fromOffset(size, size),
 		Position = UDim2.fromScale(x, y),
 	}, backdrop)
 	if i % 7 == 0 then
 		new("Frame", {
-			BackgroundColor3 = P.Teal,
+			BackgroundColor3 = Color3.fromRGB(220, 210, 255),
 			BackgroundTransparency = 0.7,
 			Position = UDim2.fromOffset(-3, 1),
 			Size = UDim2.fromOffset(10, 2),
 		}, star)
 		new("Frame", {
-			BackgroundColor3 = P.Teal,
+			BackgroundColor3 = Color3.fromRGB(220, 210, 255),
 			BackgroundTransparency = 0.7,
 			Position = UDim2.fromOffset(1, -3),
 			Size = UDim2.fromOffset(2, 10),
 		}, star)
 	end
 end
--- Large atmospheric arcs frame the layout without competing with its text.
-for i, spec in { { 0.08, 0.24, 560, P.Amethyst }, { 0.93, 0.8, 720, P.Teal } } do
-	local arc = new("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(spec[1], spec[2]),
-		Size = UDim2.fromOffset(spec[3], spec[3]),
-	}, backdrop)
-	UiKit.round(arc, spec[3] / 2)
-	new("UIStroke", { Color = spec[4], Thickness = 2, Transparency = 0.84 }, arc)
-	local glint = new(
-		"Frame",
-		{ BackgroundColor3 = spec[4], Size = UDim2.fromOffset(8, 8), Position = UDim2.fromScale(0.5, 0), Rotation = 45 },
-		arc
-	)
-	UiKit.round(glint, 2)
-	IronUi.animate(arc, function(t)
-		arc.Rotation = t * (if i == 1 then 3 else -2)
-	end)
-end
-
 -- The layout is designed at 1432x720 (wide and short, to suit landscape
 -- screens) and scaled to fit the screen, below
 -- Roblox's own top bar (its menu buttons sit in the top-left corner).
@@ -241,7 +220,7 @@ logo.Position = UDim2.fromOffset(18, 8)
 logo.Rotation = 0
 local title = IronUi.wordmark(root)
 place(title, 76, 4, 400, 40)
-local hello = label(root, "", 13, P.Gold, IronUi.Bold)
+local hello = label(root, "", 13, InventoryScreen.Colors.Accent, IronUi.Bold)
 place(hello, 77, 40, 400, 18)
 local readiness = label(root, "LOADOUT", 11, P.Dim, IronUi.Bold)
 place(readiness, 500, 10, 230, 16)
@@ -258,12 +237,12 @@ local wallet = new("Frame", {
 UiKit.list(wallet, 10, true)
 local function pill(order: number, caption: string, color: Color3, width: number): (Frame, TextLabel)
 	local frame = new("Frame", {
-		BackgroundColor3 = P.Frame,
+		BackgroundColor3 = InventoryScreen.Colors.Panel,
 		Size = UDim2.fromOffset(width, 44),
 		LayoutOrder = order,
 	}, wallet)
-	UiKit.round(frame, 6)
-	new("UIStroke", { Color = IronUi.mute(color), Thickness = 1, Transparency = 0.45 }, frame)
+	UiKit.round(frame, 12)
+	new("UIStroke", { Color = InventoryScreen.Colors.PanelEdge, Thickness = 1 }, frame)
 	local ic = label(frame, caption, 12, color, IronUi.Bold)
 	place(ic, 12, 6, width - 24, 12)
 	local value = label(frame, "0", 21, Color3.new(1, 1, 1), IronUi.Heading)
@@ -327,8 +306,8 @@ if Config.Playtest and Config.Playtest.Build then
 	fit()
 end
 
--- The armory fills the rest: equipment, sockets, stats, backpack and spare gear.
-CharacterUI.mount(root, gui, UDim2.fromOffset(16, 66))
+-- The Inventory fills the rest: loadout on the left, bags on the right.
+InventoryScreen.mount(root, gui, UDim2.fromOffset(16, 66))
 
 local function commas(n: number): string
 	local s = tostring(math.floor(n))
@@ -422,7 +401,7 @@ end)
 player.PlayerGui.ChildRemoved:Connect(function(child)
 	if child.Name == "Intro" then
 		syncVisibility()
-		CharacterUI.open()
+		InventoryScreen.refresh()
 	end
 end)
 

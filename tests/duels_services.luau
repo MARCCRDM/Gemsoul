@@ -179,13 +179,17 @@ local PlayerData = {
 -- Gear presets: what each player wore through Presets.wear (the pivot).
 local worn = {}
 local Presets = {
-	list = function(p)
-		return profiles[p] and profiles[p].Presets or {}
+	list = function(p, part)
+		local all = profiles[p] and profiles[p].Presets
+		return all and all[part] or {}
 	end,
-	wear = function(p, slot)
-		worn[p] = slot
-		local preset = profiles[p].Presets[slot]
-		profiles[p].Character = { WeaponGem = { Element = preset.Element } }
+	wear = function(p, part, slot)
+		worn[p] = worn[p] or {}
+		worn[p][part] = slot
+		local preset = profiles[p].Presets[part][slot]
+		if preset.Element then
+			profiles[p].Character = { WeaponGem = { Element = preset.Element } }
+		end
 		return true, preset.Name, 1
 	end,
 }

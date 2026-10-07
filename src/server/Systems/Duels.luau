@@ -10,8 +10,9 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	                          1v1: stats "Full" (everything earned) or "Even"
 	  "DuelRespond", userId, accept   answer a challenge
 	  "DuelLeave"             forfeit the current duel
-	  "DuelPivot", slot?      between Ranked rounds: lock in gear preset
-	                          `slot` (1-3), or nil to keep what you wear
+	  "DuelPivot", armor?, weapon?   between Ranked rounds: lock in an armor
+	                          loadout and a weapon loadout (slots 1-3; nil
+	                          keeps what you wear)
 
 	The Social remote tells clients:
 	  "Queue", { Mode, Since, Waiting } | nil   your queue state
@@ -570,14 +571,19 @@ local function reveal(match)
 	for t, team in match.Teams do
 		picks[t] = {}
 		for _, member in team do
-			local slot = r.Picks[member]
-			local preset = slot and Presets.list(member)[slot]
-			if preset then
-				Presets.wear(member, slot)
+			local chosen = r.Picks[member] or {}
+			local names = {}
+			for _, part in GearPresets.PartOrder do
+				local slot = chosen[part]
+				local preset = slot and Presets.list(member, part)[slot]
+				if preset then
+					Presets.wear(member, part, slot)
+					table.insert(names, preset.Name)
+				end
 			end
 			table.insert(picks[t], {
 				Name = member.DisplayName,
-				Preset = if preset then preset.Name else nil,
+				Preset = if #names > 0 then table.concat(names, " + ") else nil,
 				Locked = r.Locked[member] == true,
 			})
 		end
@@ -607,7 +613,7 @@ local function reveal(match)
 	end)
 end
 
-local function pivot(player: Player, slot: any)
+local function pivot(player: Player, armor: any, weapon: any)
 	local match = matchOf[player]
 	local r = match and match.Rounds
 	if not r or match.State ~= "Pivot" then
@@ -616,12 +622,13 @@ local function pivot(player: Player, slot: any)
 	if r.Locked[player] then
 		return reply(false, "Your pick is locked in.")
 	end
-	if slot ~= nil then
-		if typeof(slot) ~= "number" or not Presets.list(player)[slot] then
-			return reply(false, "That preset is empty.")
+	local chosen = { Armor = armor, Weapon = weapon }
+	for part, slot in chosen do
+		if typeof(slot) ~= "number" or not Presets.list(player, part)[slot] then
+			return reply(false, "That loadout is empty.")
 		end
 	end
-	r.Picks[player] = slot
+	r.Picks[player] = chosen
 	r.Locked[player] = true
 	local team = player:GetAttribute("MatchTeam")
 	tell(match, function()

@@ -285,7 +285,8 @@ do
 	local gus, hal = makePlayer(60, "Gus"), makePlayer(61, "Hal")
 	profiles[gus].Character = { WeaponGem = { Element = "Fire" } }
 	profiles[hal].Character = { ArmorGem = { Element = "Shock" } }
-	profiles[gus].Presets = { [2] = { Name = "Frost Kit", Element = "Frost" } }
+	profiles[gus].Presets =
+		{ Weapon = { [2] = { Name = "Frost Kit", Element = "Frost" } }, Armor = { [1] = { Name = "Plate" } } }
 	handlers.DuelQueue(gus, "1v1")
 	handlers.DuelQueue(hal, "1v1")
 	advance(0.25)
@@ -296,7 +297,7 @@ do
 		"A round isn't Rounds.Time long"
 	)
 	check(next(m.Shields) ~= nil, "Fighters aren't shielded in the countdown")
-	check(handlers.DuelPivot(gus, 2).Ok == false, "A preset switched mid-countdown")
+	check(handlers.DuelPivot(gus, nil, 2).Ok == false, "A preset switched mid-countdown")
 	advance(Matchmaking.Countdown)
 	check(m.State == "Fight" and next(m.Shields) == nil, "Shields stayed up into the fight")
 	-- Round 1: Hal takes a lethal blow and is downed, not killed.
@@ -312,14 +313,18 @@ do
 	lethalBlow(gus)
 	check(gus.Humanoid.Health > 1 and m.State == "Pivot", "A blow landed in the pivot window")
 	-- Preset swap only, both lock, then the reveal.
-	check(not handlers.DuelPivot(gus, 1).Ok, "An empty preset was accepted")
-	check(handlers.DuelPivot(gus, 2).Ok and m.State == "Pivot", "Gus's lock revealed before Hal locked")
+	check(not handlers.DuelPivot(gus, nil, 1).Ok, "An empty weapon loadout was accepted")
+	check(not handlers.DuelPivot(gus, 2, nil).Ok, "An empty armor loadout was accepted")
+	check(handlers.DuelPivot(gus, 1, 2).Ok and m.State == "Pivot", "Gus's lock revealed before Hal locked")
 	check(not handlers.DuelPivot(gus, nil).Ok, "A locked pick changed")
 	check(last(hal, "Round")[2].Phase == "Locked" and worn[gus] == nil, "Gus's pick was worn before the reveal")
 	check(handlers.DuelPivot(hal, nil).Ok, "Hal couldn't keep his setup")
 	local revealed = last(hal, "Round")[2]
 	check(m.State == "Countdown" and revealed.Phase == "Reveal" and revealed.Round == 2, "No reveal after both locked")
-	check(worn[gus] == 2 and revealed.Picks.Theirs[1].Preset == "Frost Kit", "Gus's preset wasn't worn and shown")
+	check(
+		worn[gus].Weapon == 2 and worn[gus].Armor == 1 and revealed.Picks.Theirs[1].Preset == "Plate + Frost Kit",
+		"Gus's loadouts weren't worn and shown"
+	)
 	check(revealed.Picks.Mine[1].Preset == nil, "Hal kept his setup but a preset was shown")
 	check(hal.Humanoid.Health == hal.Humanoid.MaxHealth, "Hal wasn't healed for round 2")
 	-- Round 2 times out even: a drawn round. Round 3: Hal wins it 1-1... then

@@ -70,19 +70,34 @@ check(kinds["Maneuver:3"] and kinds["Maneuver:3"].Id == "KineticRam", "The maneu
 check(steps[1].Kind == "Gear" and steps[1].Slot == "Weapon", "The weapon isn't worn first (before the shield)")
 check(not GearPresets.matches(profile.Character, other), "A different setup matches")
 
--- Repairing a saved list.
+-- Repairing saved loadouts; an old single list of full presets is split.
 local cleaned = GearPresets.clean({
-	{ Name = "  <b>Tank</b>  ", Gear = { Weapon = "Sword", Helmet = 7 }, Surges = { Q = "x", Z = "y" } },
+	{
+		Name = "  <b>Tank</b>  ",
+		Gear = { Weapon = "Sword", Helmet = "ScrapHelmet", Boots = 7 },
+		Surges = { Q = "x", Z = "y" },
+	},
 	"junk",
 	{ Name = string.rep("L", 40), Gear = {} },
 	{ Name = "Fourth", Gear = {} },
 })
-check(cleaned[1].Name == "bTank/b" and cleaned[1].Gear.Helmet == nil, "A name or gear wasn't cleaned")
-check(cleaned[1].Surges.Z == nil and cleaned[1].Surges.Q == "x", "Surge keys weren't cleaned")
-check(cleaned[2] == nil and #cleaned[3].Name == GearPresets.NameLength, "Junk kept or a long name not cut")
-check(cleaned[4] == nil, "More presets than slots kept")
-check(GearPresets.name("", 2) == "Preset 2" and GearPresets.name(nil, 1) == "Preset 1", "Default names")
-check(#GearPresets.clean(nil) == 0, "Nothing saved isn't an empty list")
+check(cleaned.Armor[1].Gear.Helmet == "ScrapHelmet" and cleaned.Armor[1].Gear.Weapon == nil, "Armor kept a weapon")
+check(cleaned.Armor[1].Gear.Boots == nil and next(cleaned.Armor[1].Surges) == nil, "Armor kept junk or surges")
+check(cleaned.Weapon[1].Gear.Weapon == "Sword" and cleaned.Weapon[1].Gear.Helmet == nil, "Weapon loadout wrong")
+check(cleaned.Weapon[1].Surges.Q == "x" and cleaned.Weapon[1].Surges.Z == nil, "Surge keys weren't cleaned")
+check(cleaned.Armor[1].Name == "Armor 1" and cleaned.Weapon[1].Name == "Weapons 1", "Split loadouts not renamed")
+check(cleaned.Armor[2] == nil and cleaned.Weapon[4] == nil, "Junk or a fourth slot kept")
+local again = GearPresets.clean({ Armor = { [2] = { Name = string.rep("L", 40), Gear = {} } }, Weapon = "junk" })
+check(#again.Armor[2].Name == GearPresets.NameLength and next(again.Weapon) == nil, "New-shape repair")
+check(GearPresets.name("", 2, "Weapon") == "Weapons 2" and GearPresets.name(nil, 1) == "Preset 1", "Default names")
+check(next(GearPresets.clean(nil).Armor) == nil, "Nothing saved isn't empty")
+-- Capturing one part only.
+local armorOnly = GearPresets.capture(profile.Character, "A", "Armor")
+check(armorOnly.Gear.Helmet and not armorOnly.Gear.Weapon and next(armorOnly.Surges) == nil, "Armor capture")
+local weaponOnly = GearPresets.capture(profile.Character, "W", "Weapon")
+check(weaponOnly.Gear.Weapon and not weaponOnly.Gear.Helmet and weaponOnly.Surges.Q == "g-shock", "Weapon capture")
+check(GearPresets.matches(profile.Character, armorOnly) and #GearPresets.plan(profile, weaponOnly) == 0, "Part match")
+check(GearPresets.label(armorOnly) == "4 pieces", "Armor label")
 
 -- Scouting: every element worn, once, sorted.
 local character = { WeaponGem = fire, HelmetGem = fire, Surge2Gem = poison, ArmorGem = shock }

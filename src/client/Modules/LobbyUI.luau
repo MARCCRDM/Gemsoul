@@ -502,6 +502,11 @@ end
 back.Activated:Connect(function()
 	showDashboard(false)
 end)
+-- The Inventory has its own Back to Lobby (Modules/InventoryScreen).
+back.Visible = false
+function LobbyUI.closeDashboard()
+	showDashboard(false)
+end
 
 tile("INVENTORY", "Equipment", P.Gold, function()
 	showDashboard(true)

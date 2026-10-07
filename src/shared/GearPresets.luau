@@ -3,15 +3,21 @@
 	Inventory any time out of a fight, and between rounds of a Ranked match
 	(the pivot window; no free editing there, only a preset).
 
-	A preset remembers the six gear pieces (each piece keeps its own socketed
-	gem, so the gems come along), the three Surge gems (Q / E / R) and the
-	three Rig Maneuvers (1 / 2 / 3). Pure: the server applies the plan, the
-	client shows it, tests check it.
+	Two kinds, three slots each, switched on their own:
+	  Armor loadouts    helmet, chest suit, gloves, boots
+	  Weapon loadouts   weapon, shield, the three Surge gems (Q / E / R) and
+	                    the three Rig Maneuvers (1 / 2 / 3)
+	Each piece keeps its own socketed gem, so the gems come along. Pure: the
+	server applies the plan, the client shows it, tests check it.
 
-	  GearPresets.Count                    preset slots per player
-	  GearPresets.capture(character, name) -> a preset of what's worn now
-	  GearPresets.clean(presets)           -> the saved list, repaired
-	  GearPresets.name(value, slot)        -> a safe preset name
+	  GearPresets.Count                    slots per kind
+	  GearPresets.PartOrder                { "Armor", "Weapon" }
+	  GearPresets.capture(character, name, part?) -> what's worn now (only
+	                                        that part's pieces when given)
+	  GearPresets.clean(presets)           -> { Armor = {..}, Weapon = {..} },
+	                                        repaired (an old single list of
+	                                        full presets is split in two)
+	  GearPresets.name(value, slot, part?) -> a safe preset name
 	  GearPresets.plan(profile, preset)    -> { steps }, { missing } to wear it
 	  GearPresets.matches(character, preset) -> already wearing it?
 	  GearPresets.elements(character)      -> { "Fire", ... } the elements of
@@ -33,24 +39,34 @@ GearPresets.GearKinds = {
 }
 GearPresets.SurgeSlots = { Q = "Surge1", E = "Surge2", R = "Surge3" }
 GearPresets.SurgeOrder = { "Q", "E", "R" }
+GearPresets.PartOrder = { "Armor", "Weapon" }
+GearPresets.Parts = {
+	Armor = { Label = "Armor", Gear = { "Helmet", "Armor", "Gloves", "Boots" }, Powers = false },
+	Weapon = { Label = "Weapons", Gear = { "Weapon", "Shield" }, Powers = true },
+}
 
-function GearPresets.name(value: any, slot: number): string
+function GearPresets.name(value: any, slot: number, part: string?): string
 	local text = if type(value) == "string" then value else ""
 	text = string.gsub(text, "[%c<>]", "")
 	text = string.gsub(text, "^%s+", "")
 	text = string.gsub(text, "%s+$", "")
 	if text == "" then
-		return "Preset " .. slot
+		local spec = part and GearPresets.Parts[part]
+		return (if spec then spec.Label else "Preset") .. " " .. slot
 	end
 	return string.sub(text, 1, GearPresets.NameLength)
 end
 
-function GearPresets.capture(character, name: string?)
+function GearPresets.capture(character, name: string?, part: string?)
+	local spec = part and GearPresets.Parts[part]
 	local gear, surges = {}, {}
-	for _, slot in GearPresets.GearSlots do
+	for _, slot in if spec then spec.Gear else GearPresets.GearSlots do
 		if type(character[slot]) == "string" then
 			gear[slot] = character[slot]
 		end
+	end
+	if spec and not spec.Powers then
+		return { Name = name or spec.Label, Gear = gear, Surges = {}, Maneuvers = {} }
 	end
 	for key, slot in GearPresets.SurgeSlots do
 		local gem = character[slot .. "Gem"]
@@ -67,8 +83,9 @@ function GearPresets.capture(character, name: string?)
 	return { Name = name or "Preset", Gear = gear, Surges = surges, Maneuvers = maneuvers }
 end
 
--- Drops anything malformed from a saved list (old saves, tampering).
-function GearPresets.clean(presets)
+-- One list of presets, repaired; `part` keeps only its pieces.
+local function cleanList(presets, part: string?)
+	local spec = part and GearPresets.Parts[part]
 	local out = {}
 	if type(presets) ~= "table" then
 		return out
@@ -77,23 +94,31 @@ function GearPresets.clean(presets)
 		local preset = presets[slot]
 		if type(preset) == "table" and type(preset.Gear) == "table" then
 			local clean = {
-				Name = GearPresets.name(preset.Name, slot),
+				Name = GearPresets.name(preset.Name, slot, part),
 				Gear = {},
 				Surges = {},
 				Maneuvers = {},
 			}
-			for _, gearSlot in GearPresets.GearSlots do
+			for _, gearSlot in if spec then spec.Gear else GearPresets.GearSlots do
 				if type(preset.Gear[gearSlot]) == "string" then
 					clean.Gear[gearSlot] = preset.Gear[gearSlot]
 				end
 			end
 			for key in GearPresets.SurgeSlots do
-				if type(preset.Surges) == "table" and type(preset.Surges[key]) == "string" then
+				if
+					(not spec or spec.Powers)
+					and type(preset.Surges) == "table"
+					and type(preset.Surges[key]) == "string"
+				then
 					clean.Surges[key] = preset.Surges[key]
 				end
 			end
 			for i = 1, 3 do
-				if type(preset.Maneuvers) == "table" and type(preset.Maneuvers[i]) == "string" then
+				if
+					(not spec or spec.Powers)
+					and type(preset.Maneuvers) == "table"
+					and type(preset.Maneuvers[i]) == "string"
+				then
 					clean.Maneuvers[i] = preset.Maneuvers[i]
 				end
 			end
@@ -101,6 +126,28 @@ function GearPresets.clean(presets)
 		end
 	end
 	return out
+end
+
+-- Drops anything malformed from the saved presets (old saves, tampering).
+-- An old save was one list of full presets: each is split into an armor
+-- loadout and a weapon loadout in the same slot.
+function GearPresets.clean(presets)
+	if type(presets) ~= "table" then
+		return { Armor = {}, Weapon = {} }
+	end
+	if presets.Armor ~= nil or presets.Weapon ~= nil then
+		return { Armor = cleanList(presets.Armor, "Armor"), Weapon = cleanList(presets.Weapon, "Weapon") }
+	end
+	local armor, weapon = cleanList(presets, "Armor"), cleanList(presets, "Weapon")
+	for slot = 1, GearPresets.Count do
+		if armor[slot] then
+			armor[slot].Name = GearPresets.name(nil, slot, "Armor")
+		end
+		if weapon[slot] then
+			weapon[slot].Name = GearPresets.name(nil, slot, "Weapon")
+		end
+	end
+	return { Armor = armor, Weapon = weapon }
 end
 
 local function gemIn(list, id)
@@ -208,6 +255,13 @@ function GearPresets.elements(character): { string }
 end
 
 function GearPresets.label(preset): string
+	if next(preset.Surges) == nil and next(preset.Maneuvers) == nil then
+		local pieces = 0
+		for _ in preset.Gear do
+			pieces += 1
+		end
+		return string.format("%d piece%s", pieces, if pieces == 1 then "" else "s")
+	end
 	local pieces, surges = 0, 0
 	for _ in preset.Gear do
 		pieces += 1

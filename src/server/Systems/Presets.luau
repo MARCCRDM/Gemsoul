@@ -2,12 +2,16 @@
 	Gear presets (Shared.GearPresets): save what you're wearing to a slot,
 	rename it, and switch to it in one tap.
 
-	Request actions:
-	  "PresetSave", slot, name?   save what you wear now into slot 1-3
-	  "PresetRename", slot, name
-	  "PresetApply", slot         wear it (out of a fight: the Inventory)
+	Two kinds (Shared.GearPresets.Parts): "Armor" loadouts and "Weapon"
+	loadouts, three slots each.
 
-	Between rounds of a Ranked match, Duels wears the picked preset through
+	Request actions:
+	  "PresetSave", part, slot, name?   save what you wear now (that part's
+	                                    pieces) into slot 1-3
+	  "PresetRename", part, slot, name
+	  "PresetApply", part, slot         wear it (out of a fight: the Inventory)
+
+	Between rounds of a Ranked match, Duels wears the picked loadouts through
 	Presets.wear (the pivot window), so no free editing happens mid-match.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,15 +34,19 @@ local function slotOf(value: any): number?
 	return nil
 end
 
--- The player's presets (repaired and stored back on the profile).
-function Presets.list(player: Player)
+local function partOf(value: any): string?
+	return if typeof(value) == "string" and GearPresets.Parts[value] then value else nil
+end
+
+-- The player's loadouts of one part (repaired and stored back on the profile).
+function Presets.list(player: Player, part: string)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return {}
 	end
 	local p: any = profile
 	p.Presets = GearPresets.clean(p.Presets)
-	return p.Presets
+	return p.Presets[part] or {}
 end
 
 -- Out of fights only (the same rule as changing surges).
@@ -54,9 +62,9 @@ end
 	Wears preset `slot`. Returns ok, a message, and how many changes it made.
 	Pieces that are gone (sold, traded) are skipped and named.
 ]]
-function Presets.wear(player: Player, slot: number): (boolean, string, number)
+function Presets.wear(player: Player, part: string, slot: number): (boolean, string, number)
 	local profile = PlayerData.get(player)
-	local preset = profile and Presets.list(player)[slot]
+	local preset = profile and Presets.list(player, part)[slot]
 	if not profile or not preset then
 		return false, "That preset is empty.", 0
 	end
@@ -103,42 +111,43 @@ function Presets.wear(player: Player, slot: number): (boolean, string, number)
 	return true, message, done
 end
 
-local function save(player: Player, slot: any, name: any)
+local function save(player: Player, part: any, slot: any, name: any)
 	local profile = PlayerData.get(player)
-	local index = slotOf(slot)
-	if not profile or not index then
-		return reply(false, "Pick a preset slot.")
+	local kind, index = partOf(part), slotOf(slot)
+	if not profile or not kind or not index then
+		return reply(false, "Pick a loadout slot.")
 	end
-	local list = Presets.list(player)
+	local list = Presets.list(player, kind)
 	local keep = if list[index] then list[index].Name else nil
 	list[index] = GearPresets.capture(
 		profile.Character,
-		GearPresets.name(if typeof(name) == "string" and name ~= "" then name else keep, index)
+		GearPresets.name(if typeof(name) == "string" and name ~= "" then name else keep, index, kind),
+		kind
 	)
 	PlayerData.sync(player)
 	return reply(true, "Saved " .. list[index].Name .. ".")
 end
 
-local function rename(player: Player, slot: any, name: any)
-	local index = slotOf(slot)
-	local list = Presets.list(player)
+local function rename(player: Player, part: any, slot: any, name: any)
+	local kind, index = partOf(part), slotOf(slot)
+	local list = if kind then Presets.list(player, kind) else {}
 	if not index or not list[index] then
-		return reply(false, "Save a preset there first.")
+		return reply(false, "Save a loadout there first.")
 	end
-	list[index].Name = GearPresets.name(name, index)
+	list[index].Name = GearPresets.name(name, index, kind)
 	PlayerData.sync(player)
 	return reply(true, "Renamed to " .. list[index].Name .. ".")
 end
 
-local function apply(player: Player, slot: any)
-	local index = slotOf(slot)
-	if not index then
-		return reply(false, "Pick a preset slot.")
+local function apply(player: Player, part: any, slot: any)
+	local kind, index = partOf(part), slotOf(slot)
+	if not kind or not index then
+		return reply(false, "Pick a loadout slot.")
 	end
 	if not canChange(player) then
-		return reply(false, "Switch presets in town, or between rounds of a Ranked match.")
+		return reply(false, "Switch loadouts in town, or between rounds of a Ranked match.")
 	end
-	local ok, message = Presets.wear(player, index)
+	local ok, message = Presets.wear(player, kind, index)
 	return reply(ok, message)
 end
 

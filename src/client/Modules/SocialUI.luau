@@ -1020,7 +1020,7 @@ local pivotPanel = new("Frame", {
 	BackgroundColor3 = P.Frame,
 	BackgroundTransparency = 0.08,
 	Position = UDim2.fromScale(0.5, 0.48),
-	Size = UDim2.fromOffset(620, 330),
+	Size = UDim2.fromOffset(620, 370),
 	Visible = false,
 }, overlay)
 UiKit.round(pivotPanel, 14)
@@ -1043,80 +1043,125 @@ local scoutRow = new("Frame", {
 }, pivotPanel)
 local scoutList = UiKit.list(scoutRow, 8, true)
 scoutList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-pivotLabel("SWITCH PRESET  ·  both lock in, then both picks are shown", 11, P.Dim, BOLD, 160, 14)
-local pickRow = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 180),
-	Size = UDim2.new(1, -32, 0, 76),
+pivotLabel("SWITCH LOADOUTS  ·  both lock in, then both picks are shown", 11, P.Dim, BOLD, 160, 14)
+-- Two rows, one per loadout kind (Shared.GearPresets.Parts): KEEP, 1, 2, 3.
+local pickRows = {}
+for index, part in GearPresets.PartOrder do
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(16, 180 + (index - 1) * 46),
+		Size = UDim2.new(1, -32, 0, 40),
+	}, pivotPanel)
+	local caption = text(row, string.upper(GearPresets.Parts[part].Label), 12, P.Dim, BOLD)
+	caption.AutomaticSize = Enum.AutomaticSize.None
+	caption.Size = UDim2.fromOffset(90, 40)
+	caption.TextYAlignment = Enum.TextYAlignment.Center
+	local chips = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(96, 0),
+		Size = UDim2.new(1, -96, 1, 0),
+	}, row)
+	UiKit.list(chips, 8, true)
+	pickRows[part] = chips
+end
+local lockButton = new("TextButton", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 276),
+	Size = UDim2.fromOffset(200, 34),
+	Text = "LOCK IN",
+	TextSize = 15,
+	Font = HEADING,
+	TextColor3 = P.Frame,
+	BackgroundColor3 = P.Gold,
 }, pivotPanel)
-local pickList = UiKit.list(pickRow, 10, true)
-pickList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-local pivotStatus = pivotLabel("", 13, P.Text, BOLD, 270, 18)
-local pivotTheirs = pivotLabel("", 12, P.Dim, BOLD, 294, 16)
+UiKit.round(lockButton, 8)
+local pivotStatus = pivotLabel("", 13, P.Text, BOLD, 318, 18)
+local pivotTheirs = pivotLabel("", 12, P.Dim, BOLD, 340, 16)
 local pivotEnds = 0
 local pivotLocked = false
+local picked = { Armor = nil, Weapon = nil }
 
 local function fitPivot()
 	local screen = overlay.AbsoluteSize
 	if screen.X > 0 then
-		pivotScale.Scale = math.min(1, (screen.X - 24) / 620, (screen.Y - 24) / 330)
+		pivotScale.Scale = math.min(1, (screen.X - 24) / 620, (screen.Y - 24) / 370)
 	end
 end
 overlay:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPivot)
 
-local function drawPicks()
-	clear(pickRow)
+local drawPicks
+local function pickChip(part: string, parent: Instance, order: number, slot: number?, caption: string, enabled: boolean)
+	local chosen = picked[part] == slot
+	local b = new("TextButton", {
+		Text = caption,
+		TextSize = 13,
+		Font = BOLD,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextColor3 = if chosen then P.Frame elseif enabled then P.Text else P.Dim,
+		BackgroundColor3 = if chosen then P.Gold else P.Inset,
+		AutoButtonColor = enabled and not pivotLocked,
+		Size = UDim2.fromOffset(if slot then 110 else 80, 40),
+		LayoutOrder = order,
+	}, parent)
+	UiKit.round(b, 8)
+	new("UIStroke", { Color = if chosen then P.Gold else P.Edge, Thickness = 1.2 }, b)
+	b.Activated:Connect(function()
+		if pivotLocked or not enabled then
+			return
+		end
+		picked[part] = slot
+		drawPicks()
+	end)
+end
+
+function drawPicks()
 	local profile = GemClient.Profile
 	local presets = GearPresets.clean(profile and profile.Presets)
 	local loadout = profile and profile.Character or {}
-	local options = { { Slot = nil, Name = "KEEP", Line = "what you wear" } }
-	for index = 1, GearPresets.Count do
-		local preset = presets[index]
-		if preset then
-			table.insert(options, {
-				Slot = index,
-				Name = string.upper(preset.Name),
-				Line = if GearPresets.matches(loadout, preset) then "worn now" else GearPresets.label(preset),
-			})
+	for _, part in GearPresets.PartOrder do
+		clear(pickRows[part])
+		pickChip(part, pickRows[part], 0, nil, "KEEP", true)
+		for index = 1, GearPresets.Count do
+			local preset = presets[part][index]
+			local caption = if preset then preset.Name else index .. " · empty"
+			if preset and GearPresets.matches(loadout, preset) then
+				caption ..= " ✓"
+			end
+			pickChip(part, pickRows[part], index, index, caption, preset ~= nil)
 		end
 	end
-	for order, option in options do
-		local b = new("TextButton", {
-			Text = "",
-			AutoButtonColor = not pivotLocked,
-			BackgroundColor3 = (if option.Slot then P.Gold else P.Teal):Lerp(P.Frame, 0.75),
-			Size = UDim2.fromOffset(132, 76),
-			LayoutOrder = order,
-		}, pickRow)
-		UiKit.round(b, 8)
-		new("UIStroke", { Color = if option.Slot then P.Gold else P.Teal, Thickness = 1.5 }, b)
-		local head = text(b, option.Name, 14, P.Text, HEADING)
-		head.AutomaticSize, head.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-		head.Position, head.Size = UDim2.fromOffset(6, 14), UDim2.new(1, -12, 0, 22)
-		head.TextTruncate = Enum.TextTruncate.AtEnd
-		local sub = text(b, option.Line, 11, P.Dim)
-		sub.AutomaticSize, sub.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-		sub.Position, sub.Size = UDim2.fromOffset(6, 42), UDim2.new(1, -12, 0, 18)
-		b.Activated:Connect(function()
-			if pivotLocked then
-				return
-			end
-			pivotLocked = true
-			pivotStatus.Text = "LOCKED IN: " .. option.Name .. "  ·  waiting for your opponent"
-			pivotStatus.TextColor3 = P.Good
-			for _, child in pickRow:GetChildren() do
-				if child:IsA("TextButton") then
-					child.BackgroundTransparency = if child == b then 0 else 0.6
-				end
-			end
-			run("DuelPivot", option.Slot)
-		end)
-	end
-	if #options == 1 then
-		pivotStatus.Text = "No presets saved: set some up in the Inventory."
-		pivotStatus.TextColor3 = P.Dim
-	end
+	lockButton.Text = if pivotLocked then "LOCKED IN" else "LOCK IN"
+	lockButton.AutoButtonColor = not pivotLocked
+	lockButton.BackgroundColor3 = if pivotLocked then P.Good else P.Gold
 end
+lockButton.Activated:Connect(function()
+	if pivotLocked then
+		return
+	end
+	pivotLocked = true
+	local names = {}
+	for _, part in GearPresets.PartOrder do
+		if picked[part] then
+			table.insert(names, GearPresets.Parts[part].Label .. " " .. picked[part])
+		end
+	end
+	pivotStatus.Text = "LOCKED IN: "
+		.. (if #names > 0 then table.concat(names, " + ") else "keeping your setup")
+		.. "  ·  waiting for your opponent"
+	pivotStatus.TextColor3 = P.Good
+	drawPicks()
+	local armor, weapon = picked.Armor, picked.Weapon
+	task.spawn(function()
+		local result = GemClient.request("DuelPivot", armor, weapon)
+		if not result.Ok then
+			-- Refused (window closed, a loadout emptied): pick again.
+			pivotLocked = false
+			pivotStatus.Text = result.Message or "Couldn't lock in."
+			pivotStatus.TextColor3 = P.Bad
+			drawPicks()
+		end
+	end)
+end)
 
 local function showPivot(info)
 	faceoff.Visible, fightTimer.Visible, result.Visible = false, false, false
@@ -1155,7 +1200,8 @@ local function showPivot(info)
 	end
 	pivotEnds = info.Ends
 	pivotLocked = false
-	pivotStatus.Text = "Pick one. Your gear can't be edited mid-match."
+	picked.Armor, picked.Weapon = nil, nil
+	pivotStatus.Text = "Pick your loadouts. Gear can't be edited mid-match."
 	pivotStatus.TextColor3 = P.Text
 	pivotTheirs.Text = "Opponent: choosing…"
 	drawPicks()
