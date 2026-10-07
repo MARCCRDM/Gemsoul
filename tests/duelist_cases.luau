@@ -111,7 +111,7 @@ check(guardian.Character:GetAttribute("GuardUntil") == 0, "Remote guard remained
 -- Long held casts and charging poses must not mask an active shield.
 for _, kind in { "Slash", "Heavy", "Bolt", "Nova" } do
  local guard = RivalPose.pose({ ActionKind=kind, ActionStart=100, ActionAt=103, ActionHold=105, GuardUntil=102 }, 101, true)
- check(guard.LeftShoulder[1] > 1.2 and guard.LeftElbow[1] > 1.2, "Stale " .. kind .. " masked shield guard")
+ check(guard.LeftShoulder[1] > 2 and guard.LeftShoulder[3] > 1, "Stale " .. kind .. " masked shield guard")
  check(guard.RightShoulder[1] < 0.5, "Guard did not lower the sword")
 end
 -- Its body language: wind-up, strike, then back to a ready stance.
@@ -126,10 +126,10 @@ local mirrored = RivalPose.pose({ ActionKind = "Slash", ActionStart = 100, Actio
 check(mirrored.Waist[2] < -0.4, "Combo swings did not alternate")
 local heavy = RivalPose.pose({ ActionKind = "Heavy", ActionStart = 100, ActionAt = 100.75 }, 100.6)
 check(heavy.RightShoulder[1] > 2, "Heavy wind-up was not overhead")
-check(heavy.LeftShoulder[1] > 1 and heavy.LeftShoulder[1] < 2 and heavy.LeftElbow[1] > 1.5, "Heavy flung the shield away instead of keeping it up")
+check(heavy.LeftShoulder[1] > 2 and heavy.LeftShoulder[3] > 1, "Heavy flung the shield away instead of keeping it up")
 local twoHanded = RivalPose.pose({ ActionKind = "Heavy", ActionStart = 100, ActionAt = 100.75, WeaponBlock = true }, 100.6)
 check(twoHanded.LeftShoulder[1] > 2.5 and twoHanded.RightShoulder[1] > 2.5, "Two-handed heavy wind-up was not overhead")
-check(windup.LeftElbow[1] > 1.5 and strike.LeftElbow[1] > 1.5, "Slash let the shield drop from in front")
+check(windup.LeftShoulder[1] > 2 and strike.LeftShoulder[1] > 2, "Slash let the shield drop from in front")
 check(RivalPose.pose({ ActionKind = "Nova", ActionStart = 100, ActionAt = 100.9 }, 100.95).RightKnee[1] < 0, "Blast did not slam down")
 -- A held beam keeps its cast pose while it pours, for the rival and players alike.
 local beam = { ActionKind = "Bolt", ActionStart = 100, ActionAt = 100.4, ActionHold = 102 }
@@ -140,8 +140,8 @@ check(RivalPose.pose({ ActionKind = "Bolt", ActionStart = 100, ActionAt = 100.45
 check(RivalPose.pose({ ActionKind = "Buff", ActionStart = 100, ActionAt = 100.15 }, 100.4).LeftShoulder[1] > 1.5, "Buff did not raise the hands")
 check(RivalPose.pose({ ActionKind = "Dodge", ActionStart = 100, ActionAt = 100 }, 100.2).RightKnee[1] < -1, "Dodge did not tuck")
 check(RivalPose.pose({ ActionKind = "Stagger", ActionStart = 100, ActionAt = 100 }, 100.2).Waist[1] > 0.3, "Stagger did not rock back")
-check(RivalPose.pose({ GuardUntil = 101 }, 100.5).LeftShoulder[1] > 1.2 and RivalPose.pose({ GuardUntil = 101 }, 100.5).LeftElbow[1] > 1.2, "Guard did not raise the shield")
-check(RivalPose.pose({ GuardUntil = 101 }, 101.5).LeftShoulder[1] < 1, "Guard pose stuck after it dropped")
+check(RivalPose.pose({ GuardUntil = 101 }, 100.5).LeftShoulder[1] > 2 and RivalPose.pose({ GuardUntil = 101 }, 100.5).LeftShoulder[3] > 1, "Guard did not raise the shield")
+check(RivalPose.pose({ GuardUntil = 101 }, 101.5).LeftShoulder[1] < 1.5, "Guard pose stuck after it dropped")
 check(RivalPose.pose({ ActionKind = "Bogus", ActionStart = 100, ActionAt = 100 }, 100).RightShoulder ~= nil, "Unknown action broke the pose")
 -- Anticipation, overshoot, recovery and hit reactions.
 local coil = RivalPose.pose(swing, 100.29)

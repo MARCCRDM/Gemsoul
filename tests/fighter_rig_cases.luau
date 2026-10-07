@@ -70,6 +70,29 @@ local face = shieldFace()
 check(face.Z < -0.9 and math.abs(face.X) < 0.25, "The guard's shield doesn't face forward")
 local look = placed("UpperTorso").LookVector
 check(look.Z < -0.95, "The guard turns the body away from the front")
+-- ...stood upright in the middle of the body (stood on end across the
+-- forearm on a FistGrip body), as your own shield looks in first person.
+local shieldAt = placed("LeftLowerArm") * CFrame.new(-0.7, 0, 0) * SHIELD_MOUNT * CFrame.Angles(0, 0, math.rad(-90))
+local fromRoot = rig.HumanoidRootPart.CFrame:PointToObjectSpace(shieldAt.Position)
+check(shieldAt.UpVector.Y > 0.9, "The guard's shield isn't upright")
+check(math.abs(fromRoot.X) < 0.5 and fromRoot.Y > 0.8 and fromRoot.Y < 1.8 and fromRoot.Z < -1, "The guard's shield isn't centred in front of the chest")
+-- The sword tucked low at the hip under the shield, pointing ahead.
+do
+	local chain = { RightUpperArm = { "UpperTorso", "RightShoulder" }, RightLowerArm = { "RightUpperArm", "RightElbow" },
+		RightHand = { "RightLowerArm", "RightWrist" } }
+	local function at(name)
+		if name == "UpperTorso" then
+			return placed("UpperTorso")
+		end
+		local link = chain[name]
+		local m = rig[name][link[2]]
+		return at(link[1]) * m.C0 * m.C1:Inverse()
+	end
+	local tip = rig.HumanoidRootPart.CFrame:PointToObjectSpace(
+		(at("RightHand") * CFrame.new(0, -0.1, 0) * CFrame.Angles(math.rad(-120), 0, 0) * CFrame.new(0, 2.8, 0)).Position
+	)
+	check(tip.Y < 0.8 and tip.Z < -2.5, "The guard doesn't tuck the sword low and ahead")
+end
 -- Walking with the guard up: the legs step, the shield stays square.
 local hip = rig.RightUpperLeg.RightHip
 local lowest, highest = math.huge, -math.huge

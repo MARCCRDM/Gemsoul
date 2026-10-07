@@ -40,12 +40,13 @@ local STRIDE_LENGTH = 4.5 -- studs walked per full guarded stride (two steps)
 -- Angles are radians about the joint's X (positive swings a limb forward and
 -- up, or leans the torso back), Y (twists left) and Z (positive raises the
 -- right arm outward; negative the left).
--- Fighting stance: shield arm forward, sword held out, knees soft.
+-- Fighting stance: the shield held upright before the belly (a lower guard),
+-- sword held out, knees soft.
 local READY = {
 	RightShoulder = { 0.45, 0, 0.12 },
 	RightElbow = { 0.85, 0, 0 },
-	LeftShoulder = { 0.9, 0, 0.3 },
-	LeftElbow = { 1.15, 1.45, 0 },
+	LeftShoulder = { 1.29, -0.96, 0.93 },
+	LeftElbow = { 0.94, -0.15, 0 },
 	Waist = { -0.05, -0.12, 0 },
 	RightHip = { 0.12, 0, 0 },
 	LeftHip = { 0.12, 0, 0 },
@@ -73,11 +74,12 @@ end
 
 -- Wind-up and strike poses for each action; `s` mirrors a slash or dodge.
 -- The shield arm held up in front during a sword's blows, as in the guard
--- (GUARD): the forearm upright before the chest, the shield's face square to
--- the front.
+-- (GUARD): the forearm level across the chest, so the shield (stood on end
+-- across it: Equipment) stands upright in the middle of the body, its face
+-- square to the front, as your own looks in first person.
 local SHIELD_UP = {
-	LeftShoulder = { 1.4, -0.55, 0.55 },
-	LeftElbow = { 2.05, 0.45, 0 },
+	LeftShoulder = { 2.4, -0.74, 1.37 },
+	LeftElbow = { 0.84, 0.42, 0 },
 }
 
 local function frames(kind: string, s: number, shield: boolean?)
@@ -388,16 +390,17 @@ local function frames(kind: string, s: number, shield: boolean?)
 	return nil, nil
 end
 
--- Guard: square to the foe, the shield forearm raised upright in front of the
--- chest with its face turned straight forward, the sword drawn back low behind
--- it ready to answer, crouched behind the shield.
+-- Guard: square to the foe behind the shield, centred upright in front of the
+-- chest with its face straight ahead (SHIELD_UP); the sword tucked low at the
+-- right hip, its blade pointing ahead and down, ready to answer; crouched.
+-- What you see of it matches your own guard in first person.
 local GUARD = {
-	Waist = { -0.15, -0.08, 0 },
-	Neck = { -0.08, 0.05, 0 },
+	Waist = { -0.15, -0.05, 0 },
+	Neck = { -0.08, 0.03, 0 },
 	LeftShoulder = SHIELD_UP.LeftShoulder,
 	LeftElbow = SHIELD_UP.LeftElbow,
-	RightShoulder = { 0.45, 0, 0.1 },
-	RightElbow = { 0.95, 0, 0 },
+	RightShoulder = { -0.5, 0.95, 0.65 },
+	RightElbow = { 1.7, -1.6, 0 },
 	RightHip = { 0.35, 0, 0 },
 	LeftHip = { 0.2, 0, 0 },
 	RightKnee = { -0.5, 0, 0 },
