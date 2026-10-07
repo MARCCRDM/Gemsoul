@@ -27,6 +27,8 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
+local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local ArenaScene = require(script.Parent.ArenaScene)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
@@ -1011,6 +1013,176 @@ local resultFoot = text(result, "Returning to the menu…", 12, P.Dim)
 resultFoot.AutomaticSize, resultFoot.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
 resultFoot.Position, resultFoot.Size = UDim2.new(0, 0, 1, -34), UDim2.new(1, 0, 0, 18)
 
+-- The pivot window between Ranked rounds: the round's result, what the
+-- opponent fought with (scouting), and your presets to lock one in.
+local pivotPanel = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = P.Frame,
+	BackgroundTransparency = 0.08,
+	Position = UDim2.fromScale(0.5, 0.48),
+	Size = UDim2.fromOffset(620, 330),
+	Visible = false,
+}, overlay)
+UiKit.round(pivotPanel, 14)
+local pivotStroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, pivotPanel)
+local pivotScale = new("UIScale", {}, pivotPanel)
+local function pivotLabel(value, size, color, font, y, h)
+	local l = text(pivotPanel, value, size, color, font)
+	l.AutomaticSize, l.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
+	l.Position, l.Size = UDim2.fromOffset(16, y), UDim2.new(1, -32, 0, h)
+	return l
+end
+local pivotTitle = pivotLabel("", 30, P.Gold, HEADING, 14, 36)
+local pivotScore = pivotLabel("", 15, P.Text, BOLD, 52, 20)
+local pivotTimer = pivotLabel("", 13, P.Dim, BOLD, 74, 18)
+pivotLabel("THEY FOUGHT WITH", 11, P.Dim, BOLD, 102, 14)
+local scoutRow = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(16, 120),
+	Size = UDim2.new(1, -32, 0, 26),
+}, pivotPanel)
+local scoutList = UiKit.list(scoutRow, 8, true)
+scoutList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+pivotLabel("SWITCH PRESET  ·  both lock in, then both picks are shown", 11, P.Dim, BOLD, 160, 14)
+local pickRow = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(16, 180),
+	Size = UDim2.new(1, -32, 0, 76),
+}, pivotPanel)
+local pickList = UiKit.list(pickRow, 10, true)
+pickList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local pivotStatus = pivotLabel("", 13, P.Text, BOLD, 270, 18)
+local pivotTheirs = pivotLabel("", 12, P.Dim, BOLD, 294, 16)
+local pivotEnds = 0
+local pivotLocked = false
+
+local function fitPivot()
+	local screen = overlay.AbsoluteSize
+	if screen.X > 0 then
+		pivotScale.Scale = math.min(1, (screen.X - 24) / 620, (screen.Y - 24) / 330)
+	end
+end
+overlay:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPivot)
+
+local function drawPicks()
+	clear(pickRow)
+	local profile = GemClient.Profile
+	local presets = GearPresets.clean(profile and profile.Presets)
+	local loadout = profile and profile.Character or {}
+	local options = { { Slot = nil, Name = "KEEP", Line = "what you wear" } }
+	for index = 1, GearPresets.Count do
+		local preset = presets[index]
+		if preset then
+			table.insert(options, {
+				Slot = index,
+				Name = string.upper(preset.Name),
+				Line = if GearPresets.matches(loadout, preset) then "worn now" else GearPresets.label(preset),
+			})
+		end
+	end
+	for order, option in options do
+		local b = new("TextButton", {
+			Text = "",
+			AutoButtonColor = not pivotLocked,
+			BackgroundColor3 = (if option.Slot then P.Gold else P.Teal):Lerp(P.Frame, 0.75),
+			Size = UDim2.fromOffset(132, 76),
+			LayoutOrder = order,
+		}, pickRow)
+		UiKit.round(b, 8)
+		new("UIStroke", { Color = if option.Slot then P.Gold else P.Teal, Thickness = 1.5 }, b)
+		local head = text(b, option.Name, 14, P.Text, HEADING)
+		head.AutomaticSize, head.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
+		head.Position, head.Size = UDim2.fromOffset(6, 14), UDim2.new(1, -12, 0, 22)
+		head.TextTruncate = Enum.TextTruncate.AtEnd
+		local sub = text(b, option.Line, 11, P.Dim)
+		sub.AutomaticSize, sub.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
+		sub.Position, sub.Size = UDim2.fromOffset(6, 42), UDim2.new(1, -12, 0, 18)
+		b.Activated:Connect(function()
+			if pivotLocked then
+				return
+			end
+			pivotLocked = true
+			pivotStatus.Text = "LOCKED IN: " .. option.Name .. "  ·  waiting for your opponent"
+			pivotStatus.TextColor3 = P.Good
+			for _, child in pickRow:GetChildren() do
+				if child:IsA("TextButton") then
+					child.BackgroundTransparency = if child == b then 0 else 0.6
+				end
+			end
+			run("DuelPivot", option.Slot)
+		end)
+	end
+	if #options == 1 then
+		pivotStatus.Text = "No presets saved: set some up in the Inventory."
+		pivotStatus.TextColor3 = P.Dim
+	end
+end
+
+local function showPivot(info)
+	faceoff.Visible, fightTimer.Visible, result.Visible = false, false, false
+	if match then
+		match.Score = info.Wins
+		match.Round = info.Round
+	end
+	local color = if info.Winner == "You" then P.Good elseif info.Winner == "Them" then P.Bad else P.Dim
+	pivotTitle.Text = string.format(
+		"ROUND %d  ·  %s",
+		info.Round,
+		if info.Winner == "You" then "WON" elseif info.Winner == "Them" then "LOST" else "DRAW"
+	)
+	pivotTitle.TextColor3, pivotStroke.Color = color, color
+	pivotScore.Text = string.format(
+		"You %d  –  %d Them  ·  first to %d",
+		info.Wins.Mine,
+		info.Wins.Theirs,
+		Matchmaking.Rounds.ToWin
+	)
+	clear(scoutRow)
+	for order, element in info.Scout or {} do
+		local tint = GemConfig.ElementColors[element] or P.Text
+		local tag = text(scoutRow, string.upper(GemConfig.elementName(element)), 12, tint, BOLD)
+		tag.AutomaticSize = Enum.AutomaticSize.None
+		tag.Size, tag.LayoutOrder = UDim2.fromOffset(104, 26), order
+		tag.TextXAlignment = Enum.TextXAlignment.Center
+		tag.BackgroundColor3, tag.BackgroundTransparency = tint, 0.82
+		UiKit.round(tag, 6)
+	end
+	if not info.Scout or #info.Scout == 0 then
+		local none = text(scoutRow, "No elements: no gems in their gear", 12, P.Dim, BOLD)
+		none.AutomaticSize = Enum.AutomaticSize.None
+		none.Size = UDim2.fromOffset(300, 26)
+		none.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	pivotEnds = info.Ends
+	pivotLocked = false
+	pivotStatus.Text = "Pick one. Your gear can't be edited mid-match."
+	pivotStatus.TextColor3 = P.Text
+	pivotTheirs.Text = "Opponent: choosing…"
+	drawPicks()
+	fitPivot()
+	pivotPanel.Visible = true
+end
+
+-- Both locked: the picks, then the next round's face-off.
+local function showReveal(info)
+	pivotPanel.Visible = false
+	if not match then
+		return
+	end
+	match.Score, match.Round = info.Wins, info.Round
+	match.StartsAt, match.Ends = info.StartsAt, info.Ends
+	local function picked(list)
+		local out = {}
+		for _, entry in list or {} do
+			table.insert(out, entry.Name .. "\n" .. (if entry.Preset then "→ " .. entry.Preset else "kept setup"))
+		end
+		return table.concat(out, "\n")
+	end
+	faceKind.Text = string.format("ROUND %d  ·  YOU %d – %d THEM", info.Round, info.Wins.Mine, info.Wins.Theirs)
+	faceLeft.Text, faceRight.Text = picked(info.Picks.Mine), picked(info.Picks.Theirs)
+	faceoff.Visible = true
+end
+
 local function names(list): string
 	local out = {}
 	for _, entry in list or {} do
@@ -1031,12 +1203,17 @@ local function showFaceoff(info)
 		else "FRIENDLY " .. string.upper(info.Mode)
 	faceKind.Text = if rules and rules.Label then kind .. "  ·  " .. rules.Label else kind
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
+	if info.Rounds then
+		info.Score, info.Round = { Mine = 0, Theirs = 0 }, 1
+		faceKind.Text ..= string.format("  ·  FIRST TO %d", info.Rounds.ToWin)
+	end
+	pivotPanel.Visible = false
 	faceoff.Visible = true
 end
 
 local function showResult(info)
 	match = nil
-	faceoff.Visible, fightTimer.Visible = false, false
+	faceoff.Visible, fightTimer.Visible, pivotPanel.Visible = false, false, false
 	local color = if info.Draw then P.Dim elseif info.Won then P.Good else P.Bad
 	resultTitle.Text = if info.Draw then "DRAW" elseif info.Won then "VICTORY" else "DEFEAT"
 	resultTitle.TextColor3, resultStroke.Color = color, color
@@ -1044,13 +1221,17 @@ local function showResult(info)
 		then "Time's up  ·  "
 		elseif info.Reason == "Left" or info.Reason == "Forfeit" then "Forfeit  ·  "
 		else ""
+	local rounds = if info.Rounds
+		then string.format("Rounds %d – %d  ·  ", info.Rounds.Mine, info.Rounds.Theirs)
+		else ""
 	local change = if info.Ranked
 		then string.format("Rating %d (%s%d)", info.Rating, if info.Delta >= 0 then "+" else "", info.Delta)
 		else string.format(
 			"%s (unrated)",
 			if info.Rules and info.Rules.Name then info.Rules.Name else "Friendly duel"
 		)
-	resultLine.Text = string.format("%svs %s\n%s  ·  +%d coins", why, info.Opponents or "?", change, info.Coins or 0)
+	resultLine.Text =
+		string.format("%s%svs %s\n%s  ·  +%d coins", why, rounds, info.Opponents or "?", change, info.Coins or 0)
 	result.Visible = true
 	task.delay(Matchmaking.EndPause + 0.5, function()
 		if not match then
@@ -1072,8 +1253,19 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		else
 			faceoff.Visible = false
 		end
-		fightTimer.Visible = left <= 0
-		fightTimer.Text = "⚔ " .. clock(match.Ends - now)
+		fightTimer.Visible = left <= 0 and not pivotPanel.Visible
+		fightTimer.Text = if match.Score
+			then string.format(
+				"R%d  ·  %d – %d  ·  ⚔ %s",
+				match.Round or 1,
+				match.Score.Mine,
+				match.Score.Theirs,
+				clock(match.Ends - now)
+			)
+			else "⚔ " .. clock(match.Ends - now)
+	end
+	if pivotPanel.Visible then
+		pivotTimer.Text = string.format("Next round in %s", clock(pivotEnds - now))
 	end
 	banner.Visible = queued ~= nil
 	if queued then
@@ -1141,6 +1333,16 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 		showFaceoff(a)
 	elseif kind == "Fight" then
 		UiKit.toast("FIGHT!", P.Gold)
+	elseif kind == "Round" then
+		if a.Phase == "Pivot" then
+			showPivot(a)
+		elseif a.Phase == "Locked" then
+			if match and a.Team ~= match.Team then
+				pivotTheirs.Text = "Opponent: LOCKED IN"
+			end
+		elseif a.Phase == "Reveal" then
+			showReveal(a)
+		end
 	elseif kind == "MatchEnd" then
 		showResult(a)
 		SocialUI.refresh()

@@ -533,6 +533,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Duel = profile.Duel, -- arena duel rating and record (see Duels)
 		Outpost = profile.Outpost, -- Saga Outpost picks and record (see OutpostServer)
 		Market = profile.Market, -- listings and offers in escrow (see MarketBoard)
+		Presets = (profile :: any).Presets, -- saved gear setups (see Presets)
 		FirstJoin = profile.FirstJoin,
 		WelcomeBought = profile.WelcomeBought,
 		ServerTime = os.time(),

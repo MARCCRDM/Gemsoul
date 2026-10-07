@@ -10,12 +10,21 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	                          1v1: stats "Full" (everything earned) or "Even"
 	  "DuelRespond", userId, accept   answer a challenge
 	  "DuelLeave"             forfeit the current duel
+	  "DuelPivot", slot?      between Ranked rounds: lock in gear preset
+	                          `slot` (1-3), or nil to keep what you wear
 
 	The Social remote tells clients:
 	  "Queue", { Mode, Since, Waiting } | nil   your queue state
 	  "Challenge", fromId, fromName, rating, stats   someone challenged you
 	  "Match", { Id, Mode, Ranked, Rules, StartsAt, Ends, Team, Teams }
 	  "Fight"                                   the countdown is over
+	  "Round", { Phase = "Pivot", Round, Winner, Reason, Wins, Team, Ends, Scout }
+	                                            a Ranked round is over: pick a
+	                                            preset (Scout: the elements the
+	                                            other side fought with)
+	  "Round", { Phase = "Locked", Team }       a side locked its pick
+	  "Round", { Phase = "Reveal", Round, Wins, Team, StartsAt, Ends, Picks }
+	                                            both picks, then the countdown
 	  "MatchEnd", { Won, Draw, Reason, Rating, Delta, Coins, Ranked, Rules }
 	  "Feed", text                              a duel result, for everyone's chat
 
@@ -28,13 +37,17 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	unrated on even stats; a challenge plays the challenger's choice of full
 	progression or even stats. Fighters carry it as MatchStats /
 	MatchRarityCap, which the combat kit and stats read.
+	1v1 Ranked plays rounds (Shared.Matchmaking.Rounds): first to two, three
+	at most. A lethal blow downs the loser of a round instead of killing them
+	(CombatServer.onLethal). Between rounds, the pivot window: preset swaps
+	only (Presets.wear), both lock at once, then the picks are revealed.
 	Each player's rating, wins and losses save in their profile (Duel).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 
+local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local Season = require(ReplicatedStorage.Shared.Season)
@@ -42,6 +55,7 @@ local CombatServer = require(script.Parent.CombatServer)
 local ArenaSessions = require(script.Parent.ArenaSessions)
 local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
+local Presets = require(script.Parent.Presets)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -255,6 +269,9 @@ local function release(match)
 	for _, connection in match.Connections do
 		connection:Disconnect()
 	end
+	for _, shield in match.Shields do
+		shield:Destroy()
+	end
 	matches[match.Id] = nil
 end
 
@@ -312,6 +329,9 @@ function finish(match, winner: number?, reason: string)
 					Coins = coins,
 					Opponents = names[if t == 1 then 2 else 1],
 					Rules = { Name = match.Rules.Name, Stats = match.Rules.Stats },
+					Rounds = if match.Rounds
+						then { Mine = match.Rounds.Wins[t], Theirs = match.Rounds.Wins[if t == 1 then 2 else 1] }
+						else nil,
 				})
 			end
 		end
@@ -330,6 +350,62 @@ function finish(match, winner: number?, reason: string)
 		)
 	end
 	task.delay(Matchmaking.EndPause, release, match)
+end
+
+-- A shield (no damage) on a fighter until the next fight starts.
+local function shield(match, member: Player)
+	local character = member.Character
+	if not character then
+		return
+	end
+	if match.Shields[member] then
+		match.Shields[member]:Destroy()
+	end
+	local field = Instance.new("ForceField")
+	field.Visible = false
+	field.Parent = character
+	match.Shields[member] = field
+end
+
+local function dropShields(match)
+	for member, field in match.Shields do
+		field:Destroy()
+		match.Shields[member] = nil
+	end
+end
+
+-- Puts every fighter on their lane spot, at full health and shielded.
+local function stage(match)
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local floor = landmarks and landmarks:GetAttribute("ArenaFloor")
+	for t, team in match.Teams do
+		for index, member in team do
+			local humanoid, root = alive(member)
+			local spot, centre = Matchmaking.lane(match.Slot, t, index, #team)
+			if humanoid and root and typeof(floor) == "Vector3" then
+				local at = floor + spot + Vector3.new(0, 3, 0)
+				member.Character:PivotTo(CFrame.lookAt(at, floor + centre + Vector3.new(0, 3, 0)))
+				humanoid.Health = humanoid.MaxHealth
+				shield(match, member)
+			end
+		end
+	end
+end
+
+-- The elements each side carries (gems in gear and on the Surge Array).
+local function elementsOf(team): { string }
+	local seen, list = {}, {}
+	for _, member in team do
+		local character = PlayerData.character(member)
+		for _, element in if character then GearPresets.elements(character) else {} do
+			if not seen[element] then
+				seen[element] = true
+				table.insert(list, element)
+			end
+		end
+	end
+	table.sort(list)
+	return list
 end
 
 -- `rules`: the PvP rule it plays by (Shared.PvPRules.profile).
@@ -356,6 +432,8 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 		count += #team
 	end
 	local countdown = math.max(Matchmaking.Countdown, ArenaDrop.duration(count))
+	local rounds = Matchmaking.playsRounds(mode, rules.Kind)
+	local limit = if rounds then Matchmaking.Rounds.Time else Matchmaking.TimeLimit
 	local entrants, audience = {}, {}
 	local match = {
 		Id = "D" .. nextId,
@@ -367,14 +445,18 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 		Slot = slot,
 		State = "Countdown",
 		StartsAt = now + countdown,
-		Ends = now + countdown + Matchmaking.TimeLimit,
+		Ends = now + countdown + limit,
 		Connections = {},
+		Shields = {},
+		-- Rounds (1v1 Ranked): wins per team, rounds played, the pivot's
+		-- picks and locks, and what each side was scouted carrying.
+		Rounds = if rounds then { Wins = { 0, 0 }, Played = 0, Picks = {}, Locked = {}, PivotEnds = 0 } else nil,
 	}
 	matches[match.Id] = match
 	local startsAt = serverNow() + countdown
 	local info = teamsInfo(match)
 	for t, team in teams do
-		for index, member in team do
+		for _, member in team do
 			dequeue(member)
 			matchOf[member] = match
 			ArenaDrop.prepare(member)
@@ -387,18 +469,10 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 			member:SetAttribute("MatchTeam", t)
 			member:SetAttribute("PvPEnabled", true)
 			member:SetAttribute("CombatSession", "Duel")
-			local humanoid, root = alive(member)
-			local spot, centre = Matchmaking.lane(slot, t, index, #team)
-			if humanoid and root then
-				local at = floor + spot + Vector3.new(0, 3, 0)
-				member.Character:PivotTo(CFrame.lookAt(at, floor + centre + Vector3.new(0, 3, 0)))
-				humanoid.Health = humanoid.MaxHealth
+			local humanoid = alive(member)
+			if humanoid then
 				table.insert(entrants, member.Character)
 				table.insert(audience, member)
-				local shield = Instance.new("ForceField")
-				shield.Visible = false
-				shield.Parent = member.Character
-				Debris:AddItem(shield, countdown)
 				table.insert(
 					match.Connections,
 					humanoid.Died:Connect(function()
@@ -406,13 +480,19 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 					end)
 				)
 			end
+		end
+	end
+	stage(match)
+	for t, team in teams do
+		for _, member in team do
 			Remotes.Social:FireClient(member, "Match", {
 				Id = match.Id,
 				Mode = mode,
 				Ranked = ranked,
 				Rules = { Name = rules.Name, Stats = rules.Stats, Label = PvPRules.label(rules) },
+				Rounds = if rounds then { ToWin = Matchmaking.Rounds.ToWin, Max = Matchmaking.Rounds.Max } else nil,
 				StartsAt = startsAt,
-				Ends = startsAt + Matchmaking.TimeLimit,
+				Ends = startsAt + limit,
 				Team = t,
 				Teams = info,
 			})
@@ -420,6 +500,159 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 	end
 	ArenaDrop.begin(entrants, audience)
 	return true, nil
+end
+
+-- Rounds (1v1 Ranked) ------------------------------------------------------------
+
+local function other(t: number): number
+	return if t == 1 then 2 else 1
+end
+
+local function tell(match, payload: (number) -> any)
+	for t, team in match.Teams do
+		for _, member in team do
+			if member.Parent then
+				Remotes.Social:FireClient(member, "Round", payload(t))
+			end
+		end
+	end
+end
+
+-- A round is over: `winner` took it (nil: a drawn round). The match ends
+-- when a side has enough, else the pivot window opens.
+local function endRound(match, winner: number?, reason: string)
+	local r = match.Rounds
+	if not r or (match.State ~= "Fight" and match.State ~= "RoundOver") then
+		return
+	end
+	r.Played += 1
+	if winner then
+		r.Wins[winner] += 1
+	end
+	-- Scouting: what each side fought with in the round just played.
+	local scout = { elementsOf(match.Teams[1]), elementsOf(match.Teams[2]) }
+	local result = Matchmaking.roundsOver(r.Wins, r.Played)
+	if result then
+		finish(match, if result == "Draw" then nil else result :: number, reason)
+		return
+	end
+	match.State = "Pivot"
+	r.Picks, r.Locked = {}, {}
+	r.PivotEnds = os.clock() + Matchmaking.Rounds.Pivot
+	local ends = serverNow() + Matchmaking.Rounds.Pivot
+	for _, team in match.Teams do
+		for _, member in team do
+			shield(match, member)
+			CombatServer.reset(member)
+		end
+	end
+	tell(match, function(t)
+		return {
+			Phase = "Pivot",
+			Round = r.Played,
+			Winner = if winner == nil then "Draw" elseif winner == t then "You" else "Them",
+			Reason = reason,
+			Wins = { Mine = r.Wins[t], Theirs = r.Wins[other(t)] },
+			Team = t,
+			Ends = ends,
+			Scout = scout[other(t)],
+		}
+	end)
+end
+
+-- Both locked (or the window closed): wear the picks, show them, count down.
+local function reveal(match)
+	local r = match.Rounds
+	if not r or match.State ~= "Pivot" then
+		return
+	end
+	local picks = {}
+	for t, team in match.Teams do
+		picks[t] = {}
+		for _, member in team do
+			local slot = r.Picks[member]
+			local preset = slot and Presets.list(member)[slot]
+			if preset then
+				Presets.wear(member, slot)
+			end
+			table.insert(picks[t], {
+				Name = member.DisplayName,
+				Preset = if preset then preset.Name else nil,
+				Locked = r.Locked[member] == true,
+			})
+		end
+	end
+	local countdown = Matchmaking.Rounds.Reveal + Matchmaking.Countdown
+	local now = os.clock()
+	match.State = "Countdown"
+	match.StartsAt = now + countdown
+	match.Ends = match.StartsAt + Matchmaking.Rounds.Time
+	for _, team in match.Teams do
+		for _, member in team do
+			CombatServer.reset(member)
+		end
+	end
+	stage(match)
+	local startsAt = serverNow() + countdown
+	tell(match, function(t)
+		return {
+			Phase = "Reveal",
+			Round = r.Played + 1,
+			Wins = { Mine = r.Wins[t], Theirs = r.Wins[other(t)] },
+			Team = t,
+			StartsAt = startsAt,
+			Ends = startsAt + Matchmaking.Rounds.Time,
+			Picks = { Mine = picks[t], Theirs = picks[other(t)] },
+		}
+	end)
+end
+
+local function pivot(player: Player, slot: any)
+	local match = matchOf[player]
+	local r = match and match.Rounds
+	if not r or match.State ~= "Pivot" then
+		return reply(false, "You can only switch presets between rounds.")
+	end
+	if r.Locked[player] then
+		return reply(false, "Your pick is locked in.")
+	end
+	if slot ~= nil then
+		if typeof(slot) ~= "number" or not Presets.list(player)[slot] then
+			return reply(false, "That preset is empty.")
+		end
+	end
+	r.Picks[player] = slot
+	r.Locked[player] = true
+	local team = player:GetAttribute("MatchTeam")
+	tell(match, function()
+		return { Phase = "Locked", Team = team }
+	end)
+	for _, side in match.Teams do
+		for _, member in side do
+			if not r.Locked[member] and not match.Out[member] then
+				return reply(true, "Locked in. Waiting for your opponent…")
+			end
+		end
+	end
+	reveal(match)
+	return reply(true, "Both locked in.")
+end
+
+-- A lethal blow in a round match: the fighter is downed (1 health) and the
+-- round goes to the other side. Between rounds, nothing lands.
+local function lethal(player: Player, humanoid: Humanoid): boolean
+	local match = matchOf[player]
+	if not match or not match.Rounds or match.State == "Done" then
+		return false
+	end
+	if match.State == "Fight" then
+		humanoid.Health = 1
+		match.State = "RoundOver"
+		local team = player:GetAttribute("MatchTeam")
+		local winner = if team == 1 then 2 elseif team == 2 then 1 else nil
+		task.defer(endRound, match, winner, "Defeated")
+	end
+	return true
 end
 
 -- Queue ----------------------------------------------------------------------
@@ -581,6 +814,7 @@ local function step()
 	for _, match in matches do
 		if match.State == "Countdown" and now >= match.StartsAt then
 			match.State = "Fight"
+			dropShields(match)
 			for _, team in match.Teams do
 				for _, member in team do
 					Remotes.Social:FireClient(member, "Fight")
@@ -599,7 +833,13 @@ local function step()
 				end
 			end
 			local winner = if share[1] > share[2] + 0.01 then 1 elseif share[2] > share[1] + 0.01 then 2 else nil
-			finish(match, winner, "Time")
+			if match.Rounds then
+				endRound(match, winner, "Time")
+			else
+				finish(match, winner, "Time")
+			end
+		elseif match.State == "Pivot" and now >= match.Rounds.PivotEnds then
+			reveal(match)
 		end
 	end
 end
@@ -618,6 +858,8 @@ function Duels.start()
 	end)
 	Shop.register("DuelChallenge", challenge)
 	Shop.register("DuelRespond", respond)
+	Shop.register("DuelPivot", pivot)
+	CombatServer.onLethal(lethal)
 	Shop.register("DuelLeave", function(player)
 		local match = matchOf[player]
 		if not match or match.State == "Done" then

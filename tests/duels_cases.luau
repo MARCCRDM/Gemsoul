@@ -272,6 +272,113 @@ do
 	check(PvPRules.capLoadout(loadout, nil) == loadout, "No cap still copied the loadout")
 end
 
+-- 1v1 Ranked rounds: first to two, a pivot window between rounds --------------
+check(Matchmaking.playsRounds("1v1", "Ranked"), "1v1 Ranked doesn't play rounds")
+check(not Matchmaking.playsRounds("1v1", "Challenge"), "An Outpost challenge plays rounds")
+check(not Matchmaking.playsRounds("casual", "Casual") and not Matchmaking.playsRounds("2v2", "Ranked"), "Rounds leak")
+check(Matchmaking.roundsOver({ 1, 0 }, 1) == nil, "One round decided the match")
+check(Matchmaking.roundsOver({ 2, 0 }, 2) == 1 and Matchmaking.roundsOver({ 1, 2 }, 3) == 2, "First to two")
+check(Matchmaking.roundsOver({ 1, 1 }, 3) == "Draw", "Even after three rounds isn't a draw")
+check(Matchmaking.roundsOver({ 1, 0 }, 3) == 1, "Three rounds max")
+check(Matchmaking.roundsOver({ 1, 0 }, 2) == nil, "A drawn round ended a catchable match")
+do
+	local gus, hal = makePlayer(60, "Gus"), makePlayer(61, "Hal")
+	profiles[gus].Character = { WeaponGem = { Element = "Fire" } }
+	profiles[hal].Character = { ArmorGem = { Element = "Shock" } }
+	profiles[gus].Presets = { [2] = { Name = "Frost Kit", Element = "Frost" } }
+	handlers.DuelQueue(gus, "1v1")
+	handlers.DuelQueue(hal, "1v1")
+	advance(0.25)
+	local m = Duels.matchOf(gus)
+	check(m and m.Rounds and last(gus, "Match")[2].Rounds.ToWin == 2, "1v1 Ranked started without rounds")
+	check(
+		last(gus, "Match")[2].Ends - last(gus, "Match")[2].StartsAt == Matchmaking.Rounds.Time,
+		"A round isn't Rounds.Time long"
+	)
+	check(next(m.Shields) ~= nil, "Fighters aren't shielded in the countdown")
+	check(handlers.DuelPivot(gus, 2).Ok == false, "A preset switched mid-countdown")
+	advance(Matchmaking.Countdown)
+	check(m.State == "Fight" and next(m.Shields) == nil, "Shields stayed up into the fight")
+	-- Round 1: Hal takes a lethal blow and is downed, not killed.
+	lethalBlow(hal)
+	check(hal.Humanoid.Health == 1 and m.State == "Pivot", "A lethal blow killed instead of ending the round")
+	local pivot = last(gus, "Round")[2]
+	check(pivot.Phase == "Pivot" and pivot.Winner == "You" and pivot.Wins.Mine == 1, "Round 1 not Gus's")
+	check(last(hal, "Round")[2].Winner == "Them", "Hal wasn't told he lost the round")
+	check(table.find(last(hal, "Round")[2].Scout, "Fire") and #last(hal, "Round")[2].Scout == 1, "Hal can't scout Fire")
+	check(table.find(pivot.Scout, "Shock"), "Gus can't scout Shock")
+	check(next(m.Shields) ~= nil, "Nobody is shielded in the pivot")
+	-- Between rounds nothing lands.
+	lethalBlow(gus)
+	check(gus.Humanoid.Health > 1 and m.State == "Pivot", "A blow landed in the pivot window")
+	-- Preset swap only, both lock, then the reveal.
+	check(not handlers.DuelPivot(gus, 1).Ok, "An empty preset was accepted")
+	check(handlers.DuelPivot(gus, 2).Ok and m.State == "Pivot", "Gus's lock revealed before Hal locked")
+	check(not handlers.DuelPivot(gus, nil).Ok, "A locked pick changed")
+	check(last(hal, "Round")[2].Phase == "Locked" and worn[gus] == nil, "Gus's pick was worn before the reveal")
+	check(handlers.DuelPivot(hal, nil).Ok, "Hal couldn't keep his setup")
+	local revealed = last(hal, "Round")[2]
+	check(m.State == "Countdown" and revealed.Phase == "Reveal" and revealed.Round == 2, "No reveal after both locked")
+	check(worn[gus] == 2 and revealed.Picks.Theirs[1].Preset == "Frost Kit", "Gus's preset wasn't worn and shown")
+	check(revealed.Picks.Mine[1].Preset == nil, "Hal kept his setup but a preset was shown")
+	check(hal.Humanoid.Health == hal.Humanoid.MaxHealth, "Hal wasn't healed for round 2")
+	-- Round 2 times out even: a drawn round. Round 3: Hal wins it 1-1... then
+	-- the match is level after three rounds, a draw.
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	check(m.State == "Fight", "Round 2 didn't start")
+	advance(Matchmaking.Rounds.Time)
+	check(m.State == "Pivot" and m.Rounds.Played == 2, "Round 2's time didn't end it")
+	check(last(gus, "Round")[2].Winner == "Draw", "Even health at time isn't a drawn round")
+	check(table.find(last(hal, "Round")[2].Scout, "Frost"), "Scouting didn't update to Gus's new preset")
+	-- Nobody locks: the window closes on its own.
+	advance(Matchmaking.Rounds.Pivot)
+	check(m.State == "Countdown", "The pivot window never closed")
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	local ratingBefore = profiles[hal].Duel.Rating
+	lethalBlow(gus)
+	check(m.State == "Done", "Three rounds didn't end the match")
+	local ended = last(hal, "MatchEnd")[2]
+	check(ended.Draw and ended.Rounds.Mine == 1 and ended.Rounds.Theirs == 1, "1-1 after three rounds isn't a draw")
+	check(profiles[hal].Duel.Rating == ratingBefore, "A drawn match moved the rating")
+	advance(Matchmaking.EndPause)
+	check(not Duels.matchOf(gus) and not next(m.Shields), "Shields left after the match")
+	respawn(gus, hal)
+	-- A clean 2-0, and a forfeit in the pivot window.
+	handlers.DuelQueue(gus, "1v1")
+	handlers.DuelQueue(hal, "1v1")
+	advance(0.25)
+	m = Duels.matchOf(gus)
+	advance(Matchmaking.Countdown)
+	lethalBlow(hal)
+	handlers.DuelPivot(gus, nil)
+	handlers.DuelPivot(hal, nil)
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(hal)
+	ended = last(gus, "MatchEnd")[2]
+	check(m.State == "Done" and ended.Won and ended.Rounds.Mine == 2 and ended.Rounds.Theirs == 0, "2-0 not a win")
+	check(ended.Delta > 0, "A ranked round win wasn't rated")
+	advance(Matchmaking.EndPause)
+	respawn(gus, hal)
+	handlers.DuelQueue(gus, "1v1")
+	handlers.DuelQueue(hal, "1v1")
+	advance(0.25)
+	m = Duels.matchOf(gus)
+	advance(Matchmaking.Countdown)
+	lethalBlow(gus)
+	check(handlers.DuelLeave(gus).Ok and m.State == "Done" and last(hal, "MatchEnd")[2].Won, "Pivot forfeit")
+	advance(Matchmaking.EndPause)
+	respawn(gus, hal)
+	-- Outpost challenges don't play rounds: a lethal blow is a knockout.
+	handlers.DuelChallenge(gus, hal.UserId, "Even")
+	handlers.DuelRespond(hal, gus.UserId, true)
+	m = Duels.matchOf(gus)
+	advance(Matchmaking.Countdown)
+	lethalBlow(hal)
+	check(m.Rounds == nil and m.State == "Done", "A challenge played rounds")
+	advance(Matchmaking.EndPause)
+	respawn(gus, hal)
+end
+
 -- Lanes: more duels than lanes wait for a free one -----------------------------
 local extra = {}
 for i = 1, 10 do

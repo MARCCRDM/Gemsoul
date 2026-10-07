@@ -350,9 +350,21 @@ end
 local receive
 local wardHitsBack -- (set below, with the surge code)
 local applyCC -- (set below)
+-- Round matches (Duels): a blow that would kill a fighter downs them instead,
+-- so they stay in the Arena for the next round. `lethalHook(player,
+-- humanoid)` returns true when it took the blow.
+local lethalHook: ((Player, Humanoid) -> boolean)? = nil
+function CombatServer.onLethal(hook)
+	lethalHook = hook
+end
+local function spared(player, humanoid, amount): boolean
+	return lethalHook ~= nil and amount >= humanoid.Health and lethalHook(player, humanoid)
+end
 local function rawDamage(target, amount, source, crit, color, matchTag)
 	if target.Player then
-		target.Humanoid:TakeDamage(amount)
+		if not spared(target.Player, target.Humanoid, amount) then
+			target.Humanoid:TakeDamage(amount)
+		end
 		if source then
 			Remotes.CombatFx:FireClient(source, "HitConfirm", crit == true)
 		end
@@ -1419,7 +1431,9 @@ function technologyHitInner(player, k, target, definition, scale)
 	if definition.Execute and target.Humanoid and target.Humanoid.Health > 0 then
 		if target.Humanoid.Health < target.Humanoid.MaxHealth * definition.Execute then
 			if target.Player then
-				target.Humanoid.Health = 0
+				if not spared(target.Player, target.Humanoid, math.huge) then
+					target.Humanoid.Health = 0
+				end
 			else
 				Enemies.damage(target.Enemy, target.Humanoid.MaxHealth * 10, player, true, color)
 			end

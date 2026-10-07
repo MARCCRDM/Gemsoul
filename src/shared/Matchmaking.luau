@@ -8,6 +8,10 @@
 	  Matchmaking.rated(r, s, won)  r's new rating after a rated match
 	  Matchmaking.window(seconds)   how far apart in rating two entries may be
 	                              matched, widening the longer they wait
+	  Matchmaking.Rounds          1v1 Ranked's rounds: first to 2, max 3,
+	                              with a pivot window between rounds
+	  Matchmaking.playsRounds(mode, kind)  does this match play rounds?
+	  Matchmaking.roundsOver(wins, played)  the match winner, "Draw" or nil
 	  Matchmaking.pair(entries, now)  pairs queue entries ({ Rating, Since,
 	                              Size }), longest-waiting first
 	  Matchmaking.lane(slot, team, index, size)  where a fighter stands in a
@@ -28,7 +32,7 @@ local Matchmaking = {}
 -- Queues. `Kind` is the PvP rule each plays by (Shared.PvPRules): Casual is
 -- unrated practice on even stats; Ranked is rated, even stats, rarity capped.
 Matchmaking.Modes = {
-	["1v1"] = { Name = "1v1 Ranked", Size = 1, Kind = "Ranked" },
+	["1v1"] = { Name = "1v1 Ranked", Size = 1, Kind = "Ranked", Rounds = true },
 	["2v2"] = { Name = "2v2 Party Duel", Size = 2, Kind = "Ranked" },
 	["casual"] = { Name = "1v1 Casual", Size = 1, Kind = "Casual" },
 }
@@ -39,6 +43,17 @@ Matchmaking.TimeLimit = 120 -- seconds: then the healthier side wins
 Matchmaking.EndPause = 4 -- seconds on the result before heading back
 Matchmaking.ChallengeSeconds = 30
 Matchmaking.Lanes = 4 -- duels running side by side in the Arena
+-- 1v1 Ranked plays rounds: first to two round wins, three rounds at most.
+-- Between rounds, a pivot window: each side may switch to one of their gear
+-- presets (no free editing), both lock at once, then the picks are revealed.
+-- Each side sees the elements the other fought with in the round just played.
+Matchmaking.Rounds = {
+	ToWin = 2,
+	Max = 3,
+	Time = 90, -- seconds a round lasts: then the healthier side takes it
+	Pivot = 30, -- seconds to pick a preset between rounds
+	Reveal = 3, -- seconds the picks show before the countdown
+}
 -- Coins for a duel: by its PvP rule (Shared.PvPRules.Kinds).
 
 Matchmaking.Raid = {
@@ -122,6 +137,33 @@ function Matchmaking.ownsRival(model, player): boolean
 	end
 	local raid = attribute(model, "RaidId")
 	return raid ~= nil and raid == attribute(player, "RaidId")
+end
+
+-- Whether a match of `mode` under PvP rule `kind` plays rounds.
+function Matchmaking.playsRounds(mode: string, kind: string?): boolean
+	local spec = Matchmaking.Modes[mode]
+	return spec ~= nil and spec.Rounds == true and kind == "Ranked"
+end
+
+-- After `played` rounds with `wins` = { team 1, team 2 }: the match winner
+-- (1 or 2), "Draw", or nil (play on). A drawn round counts as played.
+function Matchmaking.roundsOver(wins, played: number): (number | string)?
+	local rules = Matchmaking.Rounds
+	if wins[1] >= rules.ToWin then
+		return 1
+	elseif wins[2] >= rules.ToWin then
+		return 2
+	elseif played >= rules.Max then
+		return if wins[1] > wins[2] then 1 elseif wins[2] > wins[1] then 2 else "Draw"
+	end
+	-- Nobody can catch up any more (a draw round left one side out of reach).
+	local left = rules.Max - played
+	if wins[1] > wins[2] + left then
+		return 1
+	elseif wins[2] > wins[1] + left then
+		return 2
+	end
+	return nil
 end
 
 function Matchmaking.expected(rating: number, other: number): number

@@ -79,11 +79,19 @@ local task = {
 	spawn = function(fn, ...)
 		fn(...)
 	end,
+	defer = function(fn, ...)
+		fn(...)
+	end,
 	wait = function() end,
 }
 local Instance = {
 	new = function(className)
-		return { ClassName = className }
+		local object = { ClassName = className }
+		function object:Destroy()
+			self.Destroyed = true
+			self.Parent = nil
+		end
+		return object
 	end,
 }
 local workspace = {
@@ -164,6 +172,22 @@ local PlayerData = {
 		profiles[p].Coins += n
 	end,
 	sync = function() end,
+	character = function(p)
+		return profiles[p] and profiles[p].Character
+	end,
+}
+-- Gear presets: what each player wore through Presets.wear (the pivot).
+local worn = {}
+local Presets = {
+	list = function(p)
+		return profiles[p] and profiles[p].Presets or {}
+	end,
+	wear = function(p, slot)
+		worn[p] = slot
+		local preset = profiles[p].Presets[slot]
+		profiles[p].Character = { WeaponGem = { Element = preset.Element } }
+		return true, preset.Name, 1
+	end,
 }
 -- The XP reason each player last earned.
 local Progress = {
@@ -184,11 +208,23 @@ local Duelist = {
 	end,
 }
 local resets = {}
+local lethalHook
 local CombatServer = {
 	reset = function(p)
 		resets[p] = (resets[p] or 0) + 1
 	end,
+	onLethal = function(hook)
+		lethalHook = hook
+	end,
 }
+-- A blow that would kill `p`, as CombatServer's damage applies it.
+local function lethalBlow(p)
+	if lethalHook and lethalHook(p, p.Humanoid) then
+		return
+	end
+	p.Humanoid.Health = 0
+	p.Humanoid.Died.Fire()
+end
 local ArenaSessions = {
 	leave = function(p)
 		p:SetAttribute("CombatSession", nil)
@@ -283,15 +319,12 @@ local ArenaDrop = {
 	begin = function() end,
 	cancel = function() end,
 	encounter = function(members, foes, includeParty, background, groundedFoes)
-		table.insert(
-			encounterDrops,
-			{
-				Members = members,
-				Foes = foes,
-				IncludeParty = includeParty,
-				Background = background,
-				GroundedFoes = groundedFoes,
-			}
-		)
+		table.insert(encounterDrops, {
+			Members = members,
+			Foes = foes,
+			IncludeParty = includeParty,
+			Background = background,
+			GroundedFoes = groundedFoes,
+		})
 	end,
 }

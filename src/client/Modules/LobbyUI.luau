@@ -305,7 +305,7 @@ card({
 	Title = "1v1 RANKED",
 	Art = "Ranked",
 	Kicker = "RATING 1000",
-	Sub = "Even stats, gear capped at Ultra Rare. Rating on the line.",
+	Sub = "First to 2 rounds. Swap presets between rounds. Rating on the line.",
 	Emblem = "Equipment",
 	Color = RED,
 	X = 830,

@@ -21,6 +21,7 @@ local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local Season = require(ReplicatedStorage.Shared.Season)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
 local GemArt = require(script.Parent.GemArt)
 local GearArt = require(script.Parent.GearArt)
 local SurgeArrayUI = require(script.Parent.SurgeArrayUI)
@@ -1704,41 +1705,90 @@ local function drawTooltipContent()
 			{ "Season Lv " .. seasonLevel, P.Teal },
 			{ (profile and profile.Duel and profile.Duel.Wins or 0) .. " duel wins", P.Text },
 		})
-		-- How the Inventory works, in three lines.
-		local guide = new("Frame", {
+		-- Gear presets (Shared.GearPresets): save what you wear, wear a saved
+		-- setup in one tap. Ranked switches between rounds use these.
+		local presetBox = new("Frame", {
 			BackgroundColor3 = P.Frame,
 			BackgroundTransparency = 0.2,
-			Size = UDim2.new(1, -8, 0, 108),
+			Size = UDim2.new(1, -8, 0, 122),
 			LayoutOrder = 100,
 		}, tipBody)
-		UiKit.round(guide, 6)
-		UiKit.pad(guide, 8)
-		UiKit.list(guide, 6)
-		local guideTitle = text(guide, "HOW IT WORKS", 10, P.Dim, BOLD)
-		guideTitle.LayoutOrder = 0
-		for order, step in
-			{
-				{ "GEAR", P.Gold, "Wear your best piece in every slot." },
-				{ "GEMS", P.Teal, "Socket into gear for stats and resist." },
-				{ "POWERS", P.Amethyst, "Gem surges. Slot three on Q · E · R." },
-			}
-		do
+		UiKit.round(presetBox, 6)
+		UiKit.pad(presetBox, 8)
+		UiKit.list(presetBox, 6)
+		local presetTitle = text(presetBox, "PRESETS  ·  tap a name to rename", 10, P.Dim, BOLD)
+		presetTitle.LayoutOrder = 0
+		local presets = GearPresets.clean(profile and (profile :: any).Presets)
+		for index = 1, GearPresets.Count do
+			local preset = presets[index]
+			local worn = preset ~= nil and GearPresets.matches(loadout, preset)
 			local line = new("Frame", {
-				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, 18),
-				LayoutOrder = order,
-			}, guide)
-			local tag = text(line, step[1], 10, P.Frame, BOLD)
+				BackgroundColor3 = if worn then P.Gold else P.Inset,
+				BackgroundTransparency = if worn then 0.82 else 0.3,
+				Size = UDim2.new(1, 0, 0, 24),
+				LayoutOrder = index,
+			}, presetBox)
+			UiKit.round(line, 4)
+			local tag = text(line, tostring(index), 11, P.Frame, BOLD)
 			tag.AutomaticSize = Enum.AutomaticSize.None
-			tag.BackgroundTransparency, tag.BackgroundColor3 = 0, step[2]
-			tag.Size = UDim2.fromOffset(58, 18)
+			tag.BackgroundTransparency, tag.BackgroundColor3 = 0, if preset then P.Gold else P.Dim
+			tag.Size = UDim2.fromOffset(22, 24)
 			tag.TextXAlignment = Enum.TextXAlignment.Center
 			UiKit.round(tag, 4)
-			local what = text(line, step[3], 11, P.Text)
-			what.AutomaticSize = Enum.AutomaticSize.None
-			what.Position, what.Size = UDim2.fromOffset(66, 0), UDim2.new(1, -66, 1, 0)
-			what.TextWrapped, what.TextTruncate = false, Enum.TextTruncate.AtEnd
-			what.TextYAlignment = Enum.TextYAlignment.Center
+			local name = new("TextBox", {
+				Text = if preset then preset.Name else "Empty",
+				PlaceholderText = "Preset " .. index,
+				ClearTextOnFocus = false,
+				TextEditable = preset ~= nil,
+				TextSize = 12,
+				Font = BOLD,
+				TextColor3 = if preset then P.Text else P.Dim,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(30, 0),
+				Size = UDim2.new(1, -196, 1, 0),
+			}, line)
+			name.FocusLost:Connect(function()
+				if preset and name.Text ~= preset.Name then
+					request("PresetRename", index, name.Text)
+				end
+			end)
+			local summary = text(
+				line,
+				if worn then "WORN" elseif preset then GearPresets.label(preset) else "",
+				10,
+				if worn then P.Gold else P.Dim,
+				BOLD
+			)
+			summary.AutomaticSize = Enum.AutomaticSize.None
+			summary.AnchorPoint = Vector2.new(1, 0)
+			summary.Position, summary.Size = UDim2.new(1, -112, 0, 0), UDim2.fromOffset(92, 24)
+			summary.TextXAlignment = Enum.TextXAlignment.Right
+			local function small(label: string, x: number, color: Color3, enabled: boolean, onClick: () -> ())
+				local b = new("TextButton", {
+					Text = label,
+					TextSize = 10,
+					Font = BOLD,
+					TextColor3 = if enabled then P.Frame else P.Dim,
+					BackgroundColor3 = color,
+					BackgroundTransparency = if enabled then 0 else 0.75,
+					AutoButtonColor = enabled,
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(1, x, 0.5, 0),
+					Size = UDim2.fromOffset(50, 18),
+				}, line)
+				UiKit.round(b, 4)
+				if enabled then
+					b.Activated:Connect(onClick)
+				end
+			end
+			small("WEAR", -58, P.Gold, preset ~= nil and not worn, function()
+				request("PresetApply", index)
+			end)
+			small("SAVE", -4, P.Teal, true, function()
+				request("PresetSave", index)
+			end)
 		end
 		if hint ~= "" then
 			text(tipBody, (string.gsub(hint, "^%s+", "")), 12, P.Dim)
