@@ -523,6 +523,10 @@ end)
 tile("SOCIAL", "Trade", P.Teal, function()
 	require(script.Parent.SocialUI).toggle()
 end)
+-- Bring a friend: a free exclusive back piece (Modules/ReferralUI).
+tile("INVITE", "Trade", Color3.fromRGB(60, 210, 240), function()
+	require(script.Parent.ReferralUI).toggle()
+end)
 
 -- Public -----------------------------------------------------------------------------------------------
 

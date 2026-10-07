@@ -77,6 +77,7 @@ require(script.Parent.Systems.ChatChannels).start()
 -- Playtest feedback and error reports (Social > Feedback).
 require(script.Parent.Systems.Feedback).start()
 StoreServer.start()
+require(script.Parent.Systems.Referrals).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.
