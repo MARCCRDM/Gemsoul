@@ -1,0 +1,1377 @@
+{
+  "Abilities": [
+    {
+      "Definition": {
+        "Cooldown": 8,
+        "Cost": 15,
+        "Damage": 1.6,
+        "Description": "Directed energy pulse: 160% damage that bypasses guard and shreds 25% armor for 4s.",
+        "Name": "Armor Piercer",
+        "Pierce": true,
+        "Range": 7,
+        "Recovery": 0.45,
+        "Resource": "Stamina",
+        "Shred": 0.25,
+        "ShredTime": 4
+      },
+      "Icon": 5,
+      "Id": "ArmorPiercer",
+      "Kind": "Rig Maneuver",
+      "Name": "Armor Piercer",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DungeonRules.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 10,
+        "Cost": 22,
+        "Damage": 3.5,
+        "Description": "One-second hydraulic wind-up, then a 350% overhead strike that breaks guard.",
+        "Heavy": true,
+        "Name": "Breach Hammer",
+        "Range": 7,
+        "Recovery": 1,
+        "Resource": "Stamina",
+        "Windup": 1
+      },
+      "Icon": 4,
+      "Id": "BreachHammer",
+      "Kind": "Rig Maneuver",
+      "Name": "Breach Hammer",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DungeonRules.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 6,
+        "Cost": 15,
+        "Damage": 2,
+        "Description": "Hydraulic strike; 200% weapon damage and breaks guard.",
+        "Heavy": true,
+        "Name": "Hydraulic Slam",
+        "Range": 7,
+        "Recovery": 0.45,
+        "Resource": "Stamina"
+      },
+      "Icon": 0,
+      "Id": "HydraulicSlam",
+      "Kind": "Rig Maneuver",
+      "Name": "Hydraulic Slam",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/client/Modules/AugmentTreeUI.luau",
+        "src/server/Systems/PlayerData.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DungeonRules.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 8,
+        "Cost": 14,
+        "Damage": 1.65,
+        "Description": "Shield-mounted kinetic pulse; 165% weapon damage and stagger.",
+        "Name": "Kinetic Ram",
+        "Range": 5,
+        "Recovery": 0.45,
+        "Resource": "Stamina",
+        "Shield": true,
+        "Stun": 0.5
+      },
+      "Icon": 2,
+      "Id": "KineticRam",
+      "Kind": "Rig Maneuver",
+      "Name": "Kinetic Ram",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/server/Systems/Duelist.luau",
+        "src/server/Systems/PlayerData.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DuelistBrain.luau",
+        "src/shared/DungeonRules.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 10,
+        "Cost": 8,
+        "Damage": 0.6,
+        "Description": "A lightning jab: 60% damage, and it cancels a surge being cast and locks the caster's surges for 2s.",
+        "Interrupt": 2,
+        "Name": "Pneumatic Jab",
+        "Range": 7,
+        "Recovery": 0.4,
+        "Resource": "Stamina"
+      },
+      "Icon": 6,
+      "Id": "PneumaticJab",
+      "Kind": "Rig Maneuver",
+      "Name": "Pneumatic Jab",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DuelistBrain.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 14,
+        "Cost": 10,
+        "CounterDamage": 1,
+        "Description": "Brace for 1s: the next blow is turned aside, its attacker staggered for 1s and struck back for 100%.",
+        "Name": "Riposte Stance",
+        "Recovery": 0.5,
+        "Resource": "Stamina",
+        "Riposte": 1
+      },
+      "Icon": 8,
+      "Id": "RiposteStance",
+      "Kind": "Rig Maneuver",
+      "Name": "Riposte Stance",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/server/Systems/CombatServer.luau",
+        "src/server/Systems/Enemies.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DuelistBrain.luau",
+        "src/shared/StatusEffects.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 16,
+        "Cost": 26,
+        "Damage": 3.8,
+        "Description": "Long wind-up, then a 380% ground-breaker that smashes guard and staggers.",
+        "Heavy": true,
+        "Name": "Seismic Breaker",
+        "Range": 8,
+        "Recovery": 1.2,
+        "Resource": "Stamina",
+        "Stun": 0.6,
+        "Windup": 1.2
+      },
+      "Icon": 18,
+      "Id": "SeismicBreaker",
+      "Kind": "Rig Maneuver",
+      "Name": "Seismic Breaker",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DungeonRules.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 5,
+        "Cost": 12,
+        "Damage": 0.9,
+        "Description": "Two servo-assisted strikes, each dealing 90% weapon damage.",
+        "Hits": 2,
+        "Name": "Servo Flurry",
+        "Range": 7,
+        "Recovery": 0.45,
+        "Resource": "Stamina"
+      },
+      "Icon": 1,
+      "Id": "ServoFlurry",
+      "Kind": "Rig Maneuver",
+      "Name": "Servo Flurry",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DungeonRules.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 12,
+        "Cost": 15,
+        "Description": "Dodge with a medical injector restoring 8% maximum Health.",
+        "Heal": 0.08,
+        "Name": "Stim Dodge",
+        "Recovery": 0.4,
+        "Resource": "Stamina"
+      },
+      "Icon": 3,
+      "Id": "StimDodge",
+      "Kind": "Rig Maneuver",
+      "Name": "Stim Dodge",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/server/Systems/CombatServer.luau",
+        "src/server/Systems/Duelist.luau",
+        "src/server/Systems/PlayerData.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DuelistBrain.luau",
+        "src/shared/DungeonRules.luau",
+        "src/shared/Matchup.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 12,
+        "Cost": 14,
+        "Damage": 2.5,
+        "Description": "A thruster leap of up to 18 studs at your target, slamming down for 250% damage.",
+        "Leap": 18,
+        "Name": "Thruster Leap",
+        "Range": 7,
+        "Recovery": 0.45,
+        "Resource": "Stamina",
+        "Windup": 0.4
+      },
+      "Icon": 7,
+      "Id": "ThrusterLeap",
+      "Kind": "Rig Maneuver",
+      "Name": "Thruster Leap",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DuelistBrain.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 14,
+        "Cost": 20,
+        "Damage": 2.3,
+        "Description": "Ground slam: 230% damage and a 1s stun.",
+        "Name": "Tremor Slam",
+        "Range": 8,
+        "Recovery": 0.6,
+        "Resource": "Stamina",
+        "Stun": 1
+      },
+      "Icon": 19,
+      "Id": "TremorSlam",
+      "Kind": "Rig Maneuver",
+      "Name": "Tremor Slam",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/AugmentTree.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/DungeonRules.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Absorb": 35,
+        "Cooldown": 10,
+        "Cost": 28,
+        "Description": "An absorption field soaks up 35 incoming damage for four seconds and turns it into Charge.",
+        "Duration": 4,
+        "Name": "Energy Siphon",
+        "Recovery": 1,
+        "Resource": "Charge"
+      },
+      "Element": "Any",
+      "Icon": 13,
+      "Id": "EnergySiphon",
+      "Kind": "Gem Surge",
+      "Line": "Resonance",
+      "Name": "Energy Siphon",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/client/Modules/CombatFx.luau",
+        "src/client/Modules/StatusBars.luau",
+        "src/server/Systems/CombatServer.luau",
+        "src/server/Systems/Duelist.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau",
+        "src/shared/Matchup.luau",
+        "src/shared/StatusEffects.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Sweep",
+        "Cone": 90,
+        "Cooldown": 10,
+        "Cost": 28,
+        "Damage": 1.5,
+        "Description": "A neutral resonance sweep converts part of its damage into health.",
+        "Leech": 0.2,
+        "Name": "Resonant Reaver",
+        "Range": 14,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Crescent"
+      },
+      "Element": "Any",
+      "Icon": 45,
+      "Id": "ResonantReaver",
+      "Kind": "Gem Surge",
+      "Line": "Resonance variant",
+      "Name": "Resonant Reaver",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Cross",
+        "Cooldown": 15,
+        "Cost": 37,
+        "Damage": 2.2,
+        "Description": "A neutral prism pulse interrupts the target and weakens its armor.",
+        "Interrupt": 2,
+        "Name": "Null Prism",
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Shred": 0.15,
+        "ShredTime": 3,
+        "Signature": "Helix"
+      },
+      "Element": "Any",
+      "Icon": 46,
+      "Id": "NullPrism",
+      "Kind": "Gem Surge",
+      "Line": "Resonance variant",
+      "Name": "Null Prism",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 16,
+        "Cost": 40,
+        "Description": "Stored gem resonance makes every weapon strike hit twice for two seconds.",
+        "Duration": 2,
+        "Name": "Resonance Echo",
+        "Recovery": 1,
+        "Resource": "Charge"
+      },
+      "Element": "Any",
+      "Icon": 14,
+      "Id": "ResonanceEcho",
+      "Kind": "Gem Surge",
+      "Line": "Resonance",
+      "Name": "Resonance Echo",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/client/Modules/CombatFx.luau",
+        "src/server/Systems/CombatServer.luau",
+        "src/server/Systems/Duelist.luau",
+        "src/server/Systems/Enemies.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau",
+        "src/shared/StatusEffects.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Drill",
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 1.05,
+        "Description": "A narrow thermal drill burns through enemies in a line.",
+        "Element": "Fire",
+        "Name": "Cinder Drill",
+        "Piercing": true,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Rail"
+      },
+      "Element": "Fire",
+      "Icon": 29,
+      "Id": "CinderDrill",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Cinder Drill",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 0.9,
+        "Description": "Socket-powered plasma detonation at the aimed surface.",
+        "Element": "Fire",
+        "Name": "Thermal Burst",
+        "Radius": 8,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge"
+      },
+      "Element": "Fire",
+      "Icon": 9,
+      "Id": "ThermalBurst",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Thermal Burst",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/Classes.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 7,
+        "Cost": 25,
+        "Damage": 1.5,
+        "Description": "A superheated plasma bolt that sets its target burning.",
+        "Element": "Fire",
+        "Name": "Ember Lance",
+        "Range": 45,
+        "Recovery": 0.8,
+        "Resource": "Charge"
+      },
+      "Element": "Fire",
+      "Icon": 10,
+      "Id": "EmberLance",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Ember Lance",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Sweep",
+        "Cone": 95,
+        "Cooldown": 9,
+        "Cost": 27,
+        "Damage": 1.65,
+        "Description": "Sweep a furnace-hot arc through the frontline.",
+        "Element": "Fire",
+        "Name": "Furnace Crescent",
+        "Range": 15,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Crescent"
+      },
+      "Element": "Fire",
+      "Icon": 30,
+      "Id": "FurnaceCrescent",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Furnace Crescent",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Erupt",
+        "Cloud": {
+          "Damage": 0.25,
+          "Duration": 3,
+          "Every": 1
+        },
+        "Cooldown": 14,
+        "Cost": 36,
+        "Damage": 2.1,
+        "Description": "Rupture the ground into a short-lived magma damage zone.",
+        "Duration": 3,
+        "Element": "Fire",
+        "Name": "Magma Fault",
+        "Radius": 7,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Spikes"
+      },
+      "Element": "Fire",
+      "Icon": 31,
+      "Id": "MagmaFault",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Magma Fault",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Blind": 0.35,
+        "BlindTime": 2.5,
+        "Cooldown": 12,
+        "Cost": 35,
+        "Damage": 1.55,
+        "Description": "A searing flash at the aimed spot: 155% damage and Blinds (35% of attacks miss) for 2.5s.",
+        "Element": "Fire",
+        "Name": "Solar Flare",
+        "Radius": 12,
+        "Range": 35,
+        "Recovery": 1,
+        "Resource": "Charge",
+        "Windup": 0.6
+      },
+      "Element": "Fire",
+      "Icon": 11,
+      "Id": "SolarFlare",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Solar Flare",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Cross",
+        "Cooldown": 21,
+        "Cost": 48,
+        "Damage": 3.4,
+        "Description": "Charge a thermal lance that finishes a badly wounded target.",
+        "Element": "Fire",
+        "Execute": 0.12,
+        "Name": "Solar Execution",
+        "Pierce": true,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Helix",
+        "Windup": 1.1
+      },
+      "Element": "Fire",
+      "Icon": 32,
+      "Id": "SolarExecution",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Solar Execution",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 20,
+        "Cost": 45,
+        "Damage": 2,
+        "Description": "A colossal plasma blast, then a Burning Ward: a barrier that burns anyone who hits you.",
+        "Element": "Fire",
+        "Name": "Supernova",
+        "Radius": 14,
+        "Range": 30,
+        "Recovery": 1.2,
+        "Resource": "Charge",
+        "Ward": {
+          "Duration": 6,
+          "Kind": "Burn",
+          "Power": 0.1,
+          "Shield": 15
+        },
+        "Windup": 1.2
+      },
+      "Element": "Fire",
+      "Icon": 12,
+      "Id": "Supernova",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Supernova",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Combat.client.luau",
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/server/Systems/CombatServer.luau",
+        "src/shared/CombatActions.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 0.95,
+        "Description": "A cryogenic lance that freezes its target in place for a moment.",
+        "Element": "Frost",
+        "Name": "Cryo Lance",
+        "Range": 45,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Stun": 0.4
+      },
+      "Element": "Frost",
+      "Icon": 15,
+      "Id": "CryoLance",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Cryo Lance",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Drill",
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 1.05,
+        "Description": "A precise cryo needle slows the target.",
+        "Element": "Frost",
+        "Name": "Frost Needle",
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Rail",
+        "Slow": 0.25,
+        "SlowTime": 2
+      },
+      "Element": "Frost",
+      "Icon": 33,
+      "Id": "FrostNeedle",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Frost Needle",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 8,
+        "Cost": 18,
+        "Damage": 1.65,
+        "Description": "Hold to channel a slowing cryogenic beam; costs 18 Charge per second.",
+        "Element": "Frost",
+        "Name": "Cryo Stream",
+        "PerSecond": true,
+        "Range": 24,
+        "Recovery": 0.25,
+        "Resource": "Charge",
+        "Slow": 0.3
+      },
+      "Element": "Frost",
+      "Icon": 16,
+      "Id": "CryoStream",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Cryo Stream",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Sweep",
+        "Cone": 100,
+        "Cooldown": 9,
+        "Cost": 27,
+        "Damage": 1.65,
+        "Description": "Cast a fan of ice that slows a crowded frontline.",
+        "Element": "Frost",
+        "Name": "Glacier Fan",
+        "Range": 15,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Crescent",
+        "Slow": 0.3,
+        "SlowTime": 2.5
+      },
+      "Element": "Frost",
+      "Icon": 34,
+      "Id": "GlacierFan",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Glacier Fan",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 14,
+        "Cost": 30,
+        "Description": "Cryogenic barrier absorbs damage for four seconds.",
+        "Duration": 4,
+        "Element": "Frost",
+        "Name": "Cryo Shield",
+        "Recovery": 0.6,
+        "Resource": "Charge"
+      },
+      "Element": "Frost",
+      "Icon": 17,
+      "Id": "CryoShield",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Cryo Shield",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/client/Modules/CombatFx.luau",
+        "src/server/Systems/CombatServer.luau",
+        "src/server/Systems/Duelist.luau",
+        "src/server/Systems/Enemies.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau",
+        "src/shared/Matchup.luau",
+        "src/shared/StatusEffects.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Erupt",
+        "Cooldown": 14,
+        "Cost": 36,
+        "Damage": 2.1,
+        "Description": "Raise a cryo spire that briefly freezes its impact area.",
+        "Element": "Frost",
+        "Name": "Permafrost Spire",
+        "Radius": 6,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Spikes",
+        "Slow": 0.3,
+        "SlowTime": 3,
+        "Stun": 0.6
+      },
+      "Element": "Frost",
+      "Icon": 35,
+      "Id": "PermafrostSpire",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Permafrost Spire",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 20,
+        "Cost": 45,
+        "Damage": 3.8,
+        "Description": "Flash-freeze the aimed area: everything in it is frozen solid, then slowed.",
+        "Element": "Frost",
+        "Name": "Absolute Zero",
+        "Radius": 10,
+        "Range": 30,
+        "Recovery": 1.2,
+        "Resource": "Charge",
+        "Slow": 0.4,
+        "Stun": 1.5
+      },
+      "Element": "Frost",
+      "Icon": 28,
+      "Id": "AbsoluteZero",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Absolute Zero",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Cross",
+        "Cooldown": 21,
+        "Cost": 48,
+        "Damage": 3.4,
+        "Description": "A crown of fractured ice slows enemies and exposes their armor.",
+        "Element": "Frost",
+        "Name": "Shatter Crown",
+        "Radius": 9,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Shred": 0.15,
+        "ShredTime": 4,
+        "Signature": "Helix",
+        "Slow": 0.45,
+        "SlowTime": 4,
+        "Windup": 1.2
+      },
+      "Element": "Frost",
+      "Icon": 36,
+      "Id": "ShatterCrown",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Shatter Crown",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cone": 70,
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 1,
+        "Description": "A cone of corrosive spray that eats 15% of armor for five seconds.",
+        "Element": "Poison",
+        "Name": "Acid Spray",
+        "Range": 12,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Shred": 0.15,
+        "ShredTime": 5
+      },
+      "Element": "Poison",
+      "Icon": 20,
+      "Id": "AcidSpray",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Acid Spray",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Drill",
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 1.05,
+        "Description": "Inject a corrosive dart that weakens armor.",
+        "Element": "Poison",
+        "Name": "Caustic Dart",
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Shred": 0.1,
+        "ShredTime": 3,
+        "Signature": "Rail"
+      },
+      "Element": "Poison",
+      "Icon": 37,
+      "Id": "CausticDart",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Caustic Dart",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 9,
+        "Cost": 25,
+        "Damage": 1.1,
+        "Description": "Corrosive bolt: shreds 30% armor and slows the target 30% for 2s.",
+        "Element": "Poison",
+        "Name": "Armor Melt",
+        "Range": 40,
+        "Recovery": 0.8,
+        "Resource": "Charge",
+        "Shred": 0.3,
+        "ShredTime": 5,
+        "Slow": 0.3,
+        "SlowTime": 2
+      },
+      "Element": "Poison",
+      "Icon": 21,
+      "Id": "ArmorMelt",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Armor Melt",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Sweep",
+        "Cone": 90,
+        "Cooldown": 9,
+        "Cost": 27,
+        "Damage": 1.65,
+        "Description": "Sweep a caustic blade through a fan of enemies.",
+        "Element": "Poison",
+        "Name": "Vitriol Sweep",
+        "Range": 15,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Shred": 0.15,
+        "ShredTime": 3,
+        "Signature": "Crescent"
+      },
+      "Element": "Poison",
+      "Icon": 38,
+      "Id": "VitriolSweep",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Vitriol Sweep",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Erupt",
+        "Cloud": {
+          "Damage": 0.2,
+          "Duration": 3,
+          "Every": 1
+        },
+        "Cooldown": 14,
+        "Cost": 36,
+        "Damage": 2.1,
+        "Description": "Bloom a corrosive pool that returns a share of its damage as health.",
+        "Duration": 3,
+        "Element": "Poison",
+        "Leech": 0.2,
+        "Name": "Leech Bloom",
+        "Radius": 6,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Spikes"
+      },
+      "Element": "Poison",
+      "Icon": 39,
+      "Id": "LeechBloom",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Leech Bloom",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cloud": {
+          "Damage": 0.35,
+          "Duration": 5,
+          "Every": 1,
+          "Shred": 0.1
+        },
+        "Cooldown": 14,
+        "Cost": 35,
+        "Damage": 0.4,
+        "Description": "A lingering toxic pool; you drain half of the damage it deals as Health.",
+        "Duration": 5,
+        "Element": "Poison",
+        "Leech": 0.5,
+        "Name": "Toxic Cloud",
+        "Radius": 9,
+        "Range": 30,
+        "Recovery": 1,
+        "Resource": "Charge",
+        "Shred": 0.1,
+        "ShredTime": 2
+      },
+      "Element": "Poison",
+      "Icon": 22,
+      "Id": "ToxicCloud",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Toxic Cloud",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 20,
+        "Cost": 45,
+        "Damage": 3.55,
+        "Description": "Infect one target; its corrosion and half the hit spread to every enemy within 10 studs.",
+        "Element": "Poison",
+        "Name": "Bio-Corrosion",
+        "Range": 40,
+        "Recovery": 1.2,
+        "Resource": "Charge",
+        "Shred": 0.2,
+        "ShredTime": 6,
+        "Spread": 10
+      },
+      "Element": "Poison",
+      "Icon": 23,
+      "Id": "BioCorrosion",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Bio-Corrosion",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Cross",
+        "Cooldown": 21,
+        "Cost": 48,
+        "Damage": 3.4,
+        "Description": "Concentrate a drilling acid beam to bypass guard and dissolve armor.",
+        "Element": "Poison",
+        "Name": "Dissolution",
+        "Pierce": true,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Shred": 0.3,
+        "ShredTime": 5,
+        "Signature": "Helix",
+        "Windup": 1.1
+      },
+      "Element": "Poison",
+      "Icon": 40,
+      "Id": "Dissolution",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Dissolution",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Drill",
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 1.05,
+        "Description": "A fast ion needle disrupts a surge cast.",
+        "Element": "Shock",
+        "Interrupt": 1,
+        "Name": "Arc Needle",
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Rail"
+      },
+      "Element": "Shock",
+      "Icon": 41,
+      "Id": "ArcNeedle",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Arc Needle",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Chain": 1,
+        "ChainRange": 12,
+        "Cooldown": 6,
+        "Cost": 24,
+        "Damage": 1.25,
+        "Description": "A quick ion bolt that jolts its target (a brief stun) and arcs to one more enemy.",
+        "Element": "Shock",
+        "Name": "Ion Spark",
+        "Range": 40,
+        "Recovery": 0.5,
+        "Resource": "Charge",
+        "Stun": 0.25
+      },
+      "Element": "Shock",
+      "Icon": 24,
+      "Id": "IonSpark",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Ion Spark",
+      "Tier": 1,
+      "TierName": "Novice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Sweep",
+        "Cone": 100,
+        "Cooldown": 9,
+        "Cost": 27,
+        "Damage": 1.65,
+        "Description": "Sweep a circuit blade across enemies for a brief stun.",
+        "Element": "Shock",
+        "Name": "Circuit Cleave",
+        "Range": 15,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Crescent",
+        "Stun": 0.25
+      },
+      "Element": "Shock",
+      "Icon": 42,
+      "Id": "CircuitCleave",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Circuit Cleave",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 10,
+        "Cost": 30,
+        "Damage": 0.5,
+        "Description": "A static burst around you, then a Static Shell: a barrier that shocks anyone who hits you.",
+        "Element": "Shock",
+        "Name": "Static Field",
+        "Radius": 8,
+        "Range": 0,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Self": true,
+        "Stun": 0.5,
+        "Ward": {
+          "Duration": 5,
+          "Kind": "Stun",
+          "Shield": 15,
+          "Stun": 0.4
+        }
+      },
+      "Element": "Shock",
+      "Icon": 25,
+      "Id": "StaticField",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Static Field",
+      "Tier": 2,
+      "TierName": "Apprentice",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Chain": 3,
+        "ChainRange": 14,
+        "Cooldown": 12,
+        "Cost": 30,
+        "Damage": 4,
+        "Description": "A bolt that bounces to up to three more enemies.",
+        "Element": "Shock",
+        "Name": "Chain Lightning",
+        "Range": 40,
+        "Recovery": 1,
+        "Resource": "Charge"
+      },
+      "Element": "Shock",
+      "Icon": 26,
+      "Id": "ChainLightning",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Chain Lightning",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/Classes.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Erupt",
+        "Cooldown": 14,
+        "Cost": 36,
+        "Damage": 2.1,
+        "Description": "Erupt an ion pylon that stuns the impact area.",
+        "Element": "Shock",
+        "Name": "Thunder Pylon",
+        "Radius": 7,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Spikes",
+        "Stun": 0.45
+      },
+      "Element": "Shock",
+      "Icon": 43,
+      "Id": "ThunderPylon",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Thunder Pylon",
+      "Tier": 3,
+      "TierName": "Adept",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Cooldown": 20,
+        "Cost": 45,
+        "Damage": 2.4,
+        "Description": "A 240% ion blast that instantly finishes a target left below 20% health.",
+        "Element": "Shock",
+        "Execute": 0.2,
+        "Name": "Overload",
+        "Range": 40,
+        "Recovery": 1.2,
+        "Resource": "Charge"
+      },
+      "Element": "Shock",
+      "Icon": 27,
+      "Id": "Overload",
+      "Kind": "Gem Surge",
+      "Line": "Base",
+      "Name": "Overload",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/Classes.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    },
+    {
+      "Definition": {
+        "Animation": "Cross",
+        "Cooldown": 21,
+        "Cost": 48,
+        "Damage": 3.4,
+        "Description": "Discharge a piercing rail beam that interrupts enemies along its line.",
+        "Element": "Shock",
+        "Interrupt": 2,
+        "Name": "Railstorm",
+        "Piercing": true,
+        "Range": 35,
+        "Recovery": 0.6,
+        "Resource": "Charge",
+        "Signature": "Helix",
+        "Windup": 1.1
+      },
+      "Element": "Shock",
+      "Icon": 44,
+      "Id": "Railstorm",
+      "Kind": "Gem Surge",
+      "Line": "Variant",
+      "Name": "Railstorm",
+      "Tier": 4,
+      "TierName": "Master",
+      "UsedIn": [
+        "src/client/Modules/AbilityIconAtlas.luau",
+        "src/shared/CombatTechnology.luau",
+        "src/shared/GemRoller.luau"
+      ]
+    }
+  ],
+  "Icons": "assets/images/ability_icons.png (Index = cell; Cell = 128 px, 8 columns)",
+  "Note": "Catalog before the Attack / Defense / Shift rework. Generated by tools/archive_surges.luau."
+}
