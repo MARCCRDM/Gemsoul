@@ -1351,7 +1351,7 @@ function technologyHitInner(player, k, target, definition, scale)
 			st.HarmonyElement, st.HarmonyUntil = definition.Element, now + 5
 		end
 	end
-	if gem then
+	if gem and not definition.RarityScaled then
 		damage *= 1 + math.clamp(gem.Size or 1, 1, 10) * 0.03
 	end
 	-- A surge gem's Cut sets its critical chance.
@@ -1494,7 +1494,7 @@ local function technologyStrike(player, definition, aim, scale)
 	if definition.Ward then
 		-- The barrier rises as the cast lands (Burning Ward, Static Shell).
 		local ward, now = definition.Ward, os.clock()
-		local size = definition.Gem and definition.Gem.Size or 1
+		local size = if definition.RarityScaled then 0 else (definition.Gem and definition.Gem.Size or 1)
 		st.Shield = math.max(st.Shield, ward.Shield + size * 3)
 		st.ShieldUntil = math.max(st.ShieldUntil, now + ward.Duration)
 		st.SurgeWardUntil, st.SurgeWardKind = now + ward.Duration, ward.Kind
@@ -1694,7 +1694,7 @@ local function applyBuff(player, k, st, id, definition)
 		fx("TechField", player, Tech.Resources.Charge.Color)
 	elseif id == "CryoShield" then
 		local gem = definition.Gem or surgeGem(k.Loadout, "Frost")
-		st.Shield = math.max(st.Shield, 30 + (gem and gem.Size or 1) * 3)
+		st.Shield = math.max(st.Shield, definition.Absorb or (30 + (gem and gem.Size or 1) * 3))
 		st.ShieldUntil = math.max(st.ShieldUntil, now + definition.Duration)
 		fx("TechField", player, GemConfig.ElementColors.Frost)
 	end
@@ -1716,14 +1716,14 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			return false
 		end
 		if not Tech.canSocket(gem, surgeKey, k.Loadout) then
-			Remotes.CombatFx:FireClient(player, "TechStatus", "Q/E: unique Attack or Defense. R: Shift only.")
+			Remotes.CombatFx:FireClient(player, "TechStatus", "Equip three different Surge abilities on Q, E and R.")
 			return false
 		end
 		if now < st.SilenceUntil then
 			Remotes.CombatFx:FireClient(player, "TechStatus", "Interrupted: surges locked")
 			return false
 		end
-		definition = Tech.surgeStats(gem, if inArena(player) then nil else Tree.effects(profile))
+		definition = Tech.surgeStats(gem, if inArena(player) then nil else Tree.effects(profile), player:GetAttribute("MatchRarityCap") ~= nil)
 		cooldownKey = "Surge" .. surgeKey
 	else
 		local base = if typeof(id) == "string" then Tech.Catalog[id] else nil

@@ -750,9 +750,9 @@ local function drawRival(now, viewport)
 		SurgeIcons.apply(row.Icon, surgeName, surgeColor)
 		row.Tier.Text = if surgeName
 			then string.format(
-				"RANK %s · %s",
-				ROMAN[model:GetAttribute("RivalSurgeRank" .. slot) or 1] or "I",
-				string.upper(Tech.TierNames[model:GetAttribute("RivalSurgeTier" .. slot) or 1] or "")
+				"%s %s",
+				string.upper(model:GetAttribute("RivalSurgeRarity" .. slot) or "Common"),
+				"SURGE"
 			)
 			else ""
 		local remaining = math.max(0, (model:GetAttribute("SurgeReadyAt" .. slot) or 0) - serverNow)
@@ -956,7 +956,7 @@ local function triggerSurge(key)
 		hint.Text, feedbackUntil = "Socket a gem in surge slot " .. key .. " (Loadout)", os.clock() + 1.2
 		return
 	end
-	local definition = Tech.surgeStats(gem, Tree.effects(GemClient.Profile))
+	local definition = Tech.surgeStats(gem, Tree.effects(GemClient.Profile), player:GetAttribute("MatchRarityCap") ~= nil)
 	if definition and definition.PerSecond then
 		beamKey, nextBeamUpdate = key, os.clock() + 0.2
 	end
@@ -1493,7 +1493,7 @@ RunService.RenderStepped:Connect(function(dt)
 	for i, key in SURGE_KEYS do
 		local icon = surgeIcons[i]
 		local gem = Tech.surgeGem(loadout, key)
-		local definition = gem and Tech.surgeStats(gem, amps)
+		local definition = gem and Tech.surgeStats(gem, amps, player:GetAttribute("MatchRarityCap") ~= nil)
 		if definition then
 			local color = GemConfig.ElementColors[gem.Element] or P.Gold
 			local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)
@@ -1501,7 +1501,7 @@ RunService.RenderStepped:Connect(function(dt)
 			if SurgeIcons.apply(icon.Button, definition) then
 				icon.Glyph.Text = ""
 			end
-			icon.Badge.Text = string.format("T%d · %s", definition.Tier, ROMAN[definition.Rank] or "I")
+			icon.Badge.Text = Tech.rarityLabel(gem)
 			icon.Name.Text = definition.Name
 			local usable = (player:GetAttribute("Charge") or 0) >= cost
 			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key, not usable)
@@ -1873,7 +1873,7 @@ function handlers.TechCooldown(id, duration, lockout)
 	local key = string.match(id, "^Surge(%a)$")
 	local gem = key and Tech.surgeGem(profile and profile.Character, key)
 	local stats = if gem
-		then Tech.surgeStats(gem, profile and Tree.effects(profile))
+		then Tech.surgeStats(gem, profile and Tree.effects(profile), player:GetAttribute("MatchRarityCap") ~= nil)
 		elseif definition then Tree.techStats(profile, id)
 		else nil
 	-- Every cast takes as long as anyone's (Actions.castTime, the same as

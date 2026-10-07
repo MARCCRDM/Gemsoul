@@ -217,7 +217,7 @@ heroKicker.ZIndex = 5
 local heroArt = frame(hero, { BackgroundTransparency = 1, ZIndex = 2 })
 local heroName = label(hero, "A NEW WARRIOR AWAKENS", 28)
 heroName.ZIndex = 5
-local heroMeta = label(hero, "6 EQUIPMENT PIECES  ·  2 STARTER GEMS", 12, C.Dim, Enum.Font.GothamMedium)
+local heroMeta = label(hero, "6 EQUIPMENT PIECES  ·  3 STARTER GEMS", 12, C.Dim, Enum.Font.GothamMedium)
 heroMeta.ZIndex = 5
 local scan =
 	frame(hero, { Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = C.Cyan, BackgroundTransparency = 0.85, ZIndex = 4 })
@@ -308,7 +308,7 @@ local function choiceHeading(text, y)
 	heading.Position, heading.Size, heading.ZIndex = UDim2.fromScale(0, y), UDim2.fromScale(1, .1), 21
 end
 choiceHeading("1  ARMOR STYLE · Common sword, shield and full armor", 0)
-choiceHeading("2  STARTER ELEMENT · One Attack + one Defense gem", .43)
+choiceHeading("2  STARTER ELEMENT · Three beginner Surge gems", .43)
 local styleButtons, elementButtons = {}, {}
 local styleColors = {Prospector=C.Gold, Skirmisher=C.Cyan, Juggernaut=Color3.fromRGB(232,125,75)}
 local function refreshChoices()
@@ -333,7 +333,7 @@ for i, element in {"Fire", "Frost", "Shock", "Poison"} do
 	elementButtons[element] = button
 	listen(button.Activated, function() if not savedKit and not busy then chosenElement=element; refreshChoices() end end)
 end
-choiceHeading("Fixed starter stats · R: free neutral Shift · Mine to discover new abilities", .83)
+choiceHeading("Common starter gems · Any Surge on Q / E / R · Mine for new abilities and rarities", .83)
 refreshChoices()
 skip.Visible = false
 local SURGE_KEYS = {}
@@ -442,7 +442,7 @@ local function describe(entry, isGem)
 		-- A surge gem names the power it casts; a gear gem its cut.
 		local surge = SURGE_KEYS[entry.Slot] and Tech.surgeStats(gem)
 		local detail = if surge
-			then string.format("%s  ·  %s %s", element, surge.Name, ({ "I", "II", "III" })[surge.Rank] or "I")
+			then string.format("%s  ·  %s %s", element, surge.Name, Tech.rarityLabel(entry.Gem))
 			else string.format("%s  ·  CUT %d", element, gem.Cut or 0)
 		return GemConfig.shade(gem).Name,
 			GemConfig.TierColors[gem.Tier],
@@ -663,14 +663,14 @@ local function animate(entries, isGem)
 	paintHero(if isGem then C.Gold else C.Cyan, 0)
 	heroRecord = Art.show(heroArt, nil, nil, if isGem then C.Gold else C.Cyan, true)
 	heroStart = os.clock()
-	heroName.Text = if isGem then "YOUR FIRST TWO SURGES" else "ASSEMBLING YOUR LOADOUT"
+	heroName.Text = if isGem then "YOUR FIRST THREE SURGES" else "ASSEMBLING YOUR LOADOUT"
 	heroMeta.Text = "YOUR CHOICES · YOUR STARTER KIT"
 	heroMeta.TextColor3 = C.Dim
 	heroKicker.Text = if isGem then "GEMSTONE RESONANCE" else "EQUIPMENT RELEASE"
 	heroKicker.TextColor3 = C.Cyan
 	title.Text = if isGem then "POWER, UNEARTHED." else "YOUR LOADOUT. REVEALED."
 	subtitle.Text = if isGem
-		then "One Attack. One Defense. A neutral Shift on R."
+		then "Three Common Surges. Three flexible slots: Q / E / R."
 		else "Boots first. Helmet last. Every piece is yours."
 	setStep(if isGem then 2 else 1)
 	rackTitle.Text = if isGem then "GEMSTONES" else "EQUIPMENT"
@@ -755,7 +755,7 @@ listen(RunService.RenderStepped, function(dt)
 			card.NextTick = elapsed + interval
 			for index, line in card.Lines do
 				local middle = index == 2
-				if reward and reward.Version == 2 then
+				if reward and reward.Version >= 2 then
 					line.Text = (describe(card.Entry, phase == "Gems")):upper()
 					line.TextColor3 = if middle then C.Cyan else C.Faint
 				elseif phase == "Gems" then
@@ -801,7 +801,7 @@ listen(RunService.RenderStepped, function(dt)
 		title.Text = if phase == "Armor" then "BUILT FOR YOUR JOURNEY." else "YOUR SAGA STARTS NOW."
 		subtitle.Text = if phase == "Armor"
 			then "Inspect any piece. Your gemstones are next."
-			else "Q: Attack · E: Defense · R: neutral Shift. Mine to expand your build."
+			else "Q / E / R: three different Surges. Mine to expand your build."
 		setStep(if phase == "Gems" then 3 else 2)
 		heroKicker.Text = "COMPLETE  ·  SELECT ANY REWARD TO INSPECT"
 	end

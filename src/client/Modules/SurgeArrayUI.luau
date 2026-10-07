@@ -156,9 +156,9 @@ local function socketCard(parent, key, x, gem, amps)
 			label(
 				card,
 				string.format(
-					"%s SURGE  ·  RANK %s",
-					string.upper(Tech.TierNames[definition.Tier] or ""),
-					ROMAN[definition.Rank]
+					"%s · %s",
+					string.upper(Tech.rarityLabel(gem)),
+					"SURGE"
 				),
 				11,
 				color
@@ -216,7 +216,7 @@ local function socketCard(parent, key, x, gem, amps)
 end
 
 local function pouchList(parent, profile, amps)
-	local role = if selectedKey == "R" then "SHIFT" else "ATTACK / DEFENSE"
+	local role = "ANY SURGE"
 	local heading = place(label(parent, "GEM POUCH  ·  " .. selectedKey .. "  ·  " .. role, 13, P.Gold), 0, 272, 620, 18)
 	heading.TextXAlignment = Enum.TextXAlignment.Left
 	local scroller = new("ScrollingFrame", {
@@ -252,7 +252,7 @@ local function pouchList(parent, profile, amps)
 	end)
 	if #gems == 0 then
 		local empty = place(
-			label(scroller, "No compatible gems. Mine for " .. role .. " Surges; duplicates cannot share Q/E.", 12, P.Dim, IronUi.Body),
+			label(scroller, "No compatible gems. Mine for new Surges; each equipped ability must be different.", 12, P.Dim, IronUi.Body),
 			0,
 			0,
 			600,
@@ -284,8 +284,8 @@ local function pouchList(parent, profile, amps)
 					then string.format(
 						"%s  ·  %s %s",
 						definition.Name,
-						Tech.TierNames[definition.Tier] or "",
-						ROMAN[definition.Rank]
+						Tech.rarityLabel(gem),
+						""
 					)
 					else "Unknown surge",
 				13,
@@ -429,15 +429,15 @@ local function maneuverColumn(parent, profile, loadout)
 end
 
 local function amplifierBox(parent, amps)
-	if Tech.Prototype then
+	if Tech.RaritySurges then
 		local card = box(parent, UDim2.fromOffset(646, 336), UDim2.fromOffset(340, 164), P.Inset, 12)
 		place(label(card, "SURGE LOADOUT", 13, P.Gold), 14, 10, 312, 18)
 		for i, text in {
-			"Q / E: Attack or Defense · no duplicates",
-			"R: Shift · neutral Shift when empty",
-			"Shift travel stays fixed across rarity.",
-			"Shift grants no invulnerability.",
-			"Amplifiers and reactions are off in this test.",
+			"Q / E / R: any three different Surges",
+			"36 abilities · every ability at every rarity",
+			"Rarity improves one ability property.",
+			"Range and control timing stay fixed.",
+			"Size, Clarity and Cut do not scale Surges.",
 		} do
 			local line = place(label(card, text, 11, P.Text, IronUi.Body), 14, 34 + (i - 1) * 23, 312, 20)
 			line.TextXAlignment = Enum.TextXAlignment.Left

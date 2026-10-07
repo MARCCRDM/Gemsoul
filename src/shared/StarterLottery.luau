@@ -12,16 +12,16 @@ end
 function Lottery.prepareChoice(profile, style, element, generate)
 	if profile.Intro.Lottery then return profile.Intro.Lottery end
 	if not Lottery.validChoice(style, element) then return nil end
-	local reward = { Version = 2, Style = style, Element = element, Gear = {}, Gems = {}, Granted = false }
+	local reward = { Version = 3, Style = style, Element = element, Gear = {}, Gems = {}, Granted = false }
 	for _, slot in Lottery.GearOrder do
 		table.insert(reward.Gear, { Slot = slot, Id = if slot == "Weapon" then "SwordShield" else "Armor" .. style .. slot .. "1" })
 	end
-	for index, slot in {"Surge1", "Surge2"} do
+	for index, slot in {"Surge1", "Surge2", "Surge3"} do
 		local gem = generate(element)
 		gem.Element, gem.Tier = element, "Common"
 		gem.Size, gem.Clarity, gem.Cut = 1, 1, 1
 		gem.SurgeTier, gem.SurgeRank, gem.CutMethod = 1, 1, "Starter"
-		gem.Surge = GemRoller.PrototypeIds[element][index]
+		gem.Surge = GemRoller.StarterSurges[element][index]
 		table.insert(reward.Gems, { Slot = slot, Gem = gem })
 	end
 	profile.Intro.Lottery = reward

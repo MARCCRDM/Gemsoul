@@ -889,7 +889,7 @@ local function gemLines(gem)
 			local title = text(
 				card,
 				-- The surge and its power (rank); its tier names the ability.
-				string.format("%s  ·  RANK %s", string.upper(surge.Name), ({ "I", "II", "III" })[surge.Rank] or "I"),
+				string.format("%s  ·  RANK %s", string.upper(surge.Name), Tech.rarityLabel(gem)),
 				11,
 				color,
 				BOLD
@@ -897,7 +897,7 @@ local function gemLines(gem)
 			title.AutomaticSize, title.TextWrapped, title.TextTruncate =
 				Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 			title.Position, title.Size = UDim2.fromOffset(42, 6), UDim2.new(1, -50, 0, 14)
-			local parts = { (Tech.TierNames[surge.Tier] or "") .. " surge" }
+			local parts = { Tech.rarityLabel(surge.Gem) .. " surge" }
 			if surge.Damage then
 				table.insert(parts, string.format("%d%% damage", math.floor(surge.Damage * 100 + 0.5)))
 			elseif surge.Duration then
@@ -999,31 +999,27 @@ local function gemLines(gem)
 	if surge then
 		local section = cardSection(
 			string.format(
-				"SURGE  ·  %s  ·  RANK %s",
+				"SURGE  ·  %s  ·  %s",
 				string.upper(surge.Name),
-				({ "I", "II", "III" })[surge.Rank] or "I"
+				Tech.rarityLabel(gem)
 			),
 			P.Gold
 		)
 		statRow(
 			section,
-			string.format(
-				"%s surge  ·  rank %d of 3 (each rank: more damage, faster, cheaper)",
-				Tech.TierNames[surge.Tier] or "",
-				surge.Rank or 1
-			),
+			"Rarity improves one property. Range and timing stay fixed.",
 			nil,
 			P.Dim,
 			11
 		)
 		if surge.Damage then
 			statRow(section, string.format("%d%% base damage", math.floor(surge.Damage * 100 + 0.5)))
-			statRow(section, string.format("+%d%% damage", (gem.Size or 0) * 3), gradeTag("Size", gem.Size))
+			-- Gem metrics affect equipment enchantments, not Surge power.
 		else
 			statRow(section, string.format("%gs effect", math.floor(surge.Duration * 10 + 0.5) / 10))
 		end
-		statRow(section, string.format("%.1fs recovery", surge.Recovery), gradeTag("Clarity", gem.Clarity))
-		statRow(section, string.format("%g%% crit chance", surge.Crit * 100), gradeTag("Cut", gem.Cut))
+		statRow(section, string.format("%.1fs recovery", surge.Recovery), nil)
+		statRow(section, string.format("%g%% crit chance", surge.Crit * 100), nil)
 		statRow(section, "Sockets into any Surge Slot", nil, P.Dim, 11)
 	end
 	local affinity = wornAffinities()
@@ -2658,7 +2654,7 @@ local function powerRow(order: number, gem, keyName: string?, onClick: () -> ())
 	local detail = text(
 		row,
 		if surge
-			then string.format("%s · Rank %s", Tech.TierNames[surge.Tier] or "", ROMAN[surge.Rank] or "I")
+			then Tech.rarityLabel(surge.Gem)
 			else "Pick a power below, then press " .. (keyName or "Q"),
 		11,
 		if surge then P.Dim else P.Dim,

@@ -18,7 +18,8 @@
 ]]
 local GemRoller = {}
 -- Reversible combat prototype. Legacy IDs remain saved and archived.
-GemRoller.Prototype = true
+GemRoller.Prototype = false
+GemRoller.RaritySurges = true
 GemRoller.PrototypeIds = {
 	Fire = { "CinderCleave", "HeatReversal", "FurnaceRush" },
 	Frost = { "FrostNeedle", "CryoAegis", "GlacierRetreat" },
@@ -99,6 +100,27 @@ GemRoller.SurgeVariants = {
 }
 GemRoller.ResonanceVariants = { [2] = "ResonantReaver", [3] = "NullPrism" }
 GemRoller.ResonanceChance = 0.12
+-- Eight original abilities per element, plus four neutral Resonance abilities.
+-- Ability identity is independent of rarity: even Common can roll any ability.
+GemRoller.Pools = {}
+for element, base in GemRoller.Surges do
+	local pool = table.clone(base)
+	for _, id in GemRoller.SurgeVariants[element] do table.insert(pool, id) end
+	GemRoller.Pools[element] = pool
+end
+GemRoller.NeutralPool = {"EnergySiphon", "ResonanceEcho", "ResonantReaver", "NullPrism"}
+GemRoller.StarterSurges = {
+	Fire = {"ThermalBurst", "EmberLance", "CinderDrill"},
+	Frost = {"CryoLance", "CryoShield", "FrostNeedle"},
+	Shock = {"IonSpark", "StaticField", "ArcNeedle"},
+	Poison = {"AcidSpray", "ArmorMelt", "CausticDart"},
+}
+GemRoller.RestoredIds = {
+	CinderCleave="FurnaceCrescent", HeatReversal="Supernova", FurnaceRush="CinderDrill",
+	CryoAegis="CryoShield", GlacierRetreat="GlacierFan", ArcThrust="ArcNeedle",
+	StaticCatch="StaticField", VectorDash="CircuitCleave", BreachCut="ArmorMelt",
+	PurgeShell="BioCorrosion", SeepStep="VitriolSweep", DefaultShift="EnergySiphon",
+}
 
 local function pick(rng, list)
 	return list[rng:NextInteger(1, #list)]
@@ -160,6 +182,9 @@ function GemRoller.roll(rng, luck: number?)
 		surge = (if alternate then GemRoller.ResonanceVariants else GemRoller.Resonance)[tier]
 	end
 	if GemRoller.Prototype then surge = pick(rng, GemRoller.PrototypeIds[element]) end
+	if GemRoller.RaritySurges then
+		surge = pick(rng, if rng:NextNumber() < GemRoller.ResonanceChance then GemRoller.NeutralPool else GemRoller.Pools[element])
+	end
 	return {
 		Element = element,
 		Tier = rarity,
@@ -175,6 +200,13 @@ end
 -- Gives a rolled gem a different element, with that element's surge at the
 -- same tier (a Resonance surge has no element and stays).
 function GemRoller.setElement(gem, element: string)
+	if GemRoller.RaritySurges then
+		local oldPool = GemRoller.Pools[gem.Element]
+		local index = oldPool and table.find(oldPool, gem.Surge)
+		if index and GemRoller.Pools[element] then gem.Surge = GemRoller.Pools[element][index] end
+		gem.Element = element
+		return gem
+	end
 	local role = GemRoller.prototypeRole(gem.Surge)
 	if role and GemRoller.PrototypeIds[element] then
 		local index = if role == "Attack" then 1 elseif role == "Defense" then 2 else 3

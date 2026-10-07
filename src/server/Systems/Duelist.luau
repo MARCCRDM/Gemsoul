@@ -634,7 +634,7 @@ local function applyBuff(enemy, duel, surge, now: number)
 	local stats = Tech.surgeStats(surge.Gem) or {}
 	local duration = stats.Duration or 4
 	if surge.Id == "CryoShield" then
-		local amount = 30 + (surge.Gem and surge.Gem.Size or 1) * 3
+		local amount = stats.Absorb or (30 + (surge.Gem and surge.Gem.Size or 1) * 3)
 		enemy.Shield = math.max(enemy.Shield or 0, amount)
 		enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + duration)
 		duel.CryoUntil = now + duration
@@ -1252,7 +1252,7 @@ local function think(enemy, now: number)
 			if action.Ward then
 				-- Its barrier rises as the cast lands (Burning Ward, Static Shell).
 				local ward, e = action.Ward, enemy :: any
-				local size = action.Gem and action.Gem.Size or 1
+				local size = if Tech.RaritySurges then 0 else (action.Gem and action.Gem.Size or 1)
 				enemy.Shield = math.max(enemy.Shield or 0, ward.Shield + size * 3)
 				enemy.ShieldUntil = math.max(enemy.ShieldUntil or 0, now + ward.Duration)
 				e.WardUntil, e.WardKind, e.WardNext = now + ward.Duration, ward.Kind, 0
@@ -1960,6 +1960,7 @@ function spawnRival(owner: Player, raid, encounter)
 			model:SetAttribute("RivalSurgeElement" .. slot, surge.Element)
 			model:SetAttribute("RivalSurgeTier" .. slot, tier)
 			model:SetAttribute("RivalSurgeRank" .. slot, rank)
+			model:SetAttribute("RivalSurgeRarity" .. slot, Tech.rarityLabel(gem))
 			model:SetAttribute("SurgeCooldown" .. slot, surge.Cooldown)
 			model:SetAttribute("SurgeReadyAt" .. slot, workspace:GetServerTimeNow() + (surge.Next - now))
 		end

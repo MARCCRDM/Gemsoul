@@ -151,11 +151,11 @@ function CombatGuide.refresh()
 		if definition then
 			card(
 				string.format(
-					"%s  %s · Tier %d · Rank %d · %g Charge%s",
+					"%s  %s · %s%s · %g Charge%s",
 					key,
 					definition.Name,
-					definition.Tier,
-					definition.Rank,
+					Tech.rarityLabel(gem),
+					"",
 					math.floor(definition.Cost * 10 + 0.5) / 10,
 					if definition.PerSecond then "/s" else ""
 				),
@@ -166,7 +166,7 @@ function CombatGuide.refresh()
 			card(
 				key .. " · Empty socket",
 				P.Dim,
-				"Socket a cut gem in the Surge Array (L). Its element and surge tier pick the ability; Size, Clarity and Cut set damage, duration and critical chance."
+				"Socket three different Surge abilities on Q / E / R. Every ability can roll at every rarity; rarity improves one property. Ranked normalizes Surge rarity."
 			)
 		end
 	end
@@ -176,7 +176,7 @@ function CombatGuide.refresh()
 			local alternate = Tech.SurgeVariants[element][tier]
 			table.insert(
 				names,
-				string.format("T%d  %s  /  %s", tier, Tech.Catalog[id].Name, Tech.Catalog[alternate].Name)
+				string.format("%s  /  %s", Tech.Catalog[id].Name, Tech.Catalog[alternate].Name)
 			)
 		end
 		local line = text(
@@ -192,8 +192,7 @@ function CombatGuide.refresh()
 		table.insert(
 			resonance,
 			string.format(
-				"T%d  %s  /  %s",
-				tier,
+				"%s  /  %s",
 				Tech.Catalog[id].Name,
 				Tech.Catalog[Tech.ResonanceVariants[tier]].Name
 			)

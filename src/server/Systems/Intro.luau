@@ -121,7 +121,7 @@ local function prepareLottery(player: Player, style, element)
 	local reward = Lottery.prepareChoice(profile, style, element, function(chosenElement)
 		return GemRoller.setElement(newGem("StarterKit"), chosenElement)
 	end)
-	if reward.Version == 2 then
+	if reward.Version >= 2 then
 		for _, entry in reward.Gear do
 			local kind = Slots.Definitions[entry.Slot].Kind
 			PlayerData.setGearQuality(player, kind, entry.Id, 1)
@@ -153,7 +153,7 @@ local function quickStart(player: Player)
 		return reply(false, message)
 	end
 	PlayerData.augmentsChanged(player)
-	return reply(true, "Starter kit equipped. Q: Attack · E: Defense · R: Shift.", { Lottery = profile.Intro.Lottery })
+	return reply(true, "Starter kit equipped. Q / E / R: your Gem Surges.", { Lottery = profile.Intro.Lottery })
 end
 
 local function firstStone(player: Player)

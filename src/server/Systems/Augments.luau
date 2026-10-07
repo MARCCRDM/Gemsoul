@@ -50,7 +50,7 @@ function Augments.start()
 		if not gem then
 			return Shop.reply(
 				false,
-				"Choose a cut gem: Q/E accept distinct Attack or Defense Surges; R accepts Shift only."
+				"Choose a cut gem with a different Surge ability. Q, E and R accept any Surge."
 			)
 		end
 		local id, tier, rank = Tech.surgeOf(gem)

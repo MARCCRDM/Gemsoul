@@ -828,7 +828,16 @@ function Tech.prototypeGem(gem, key)
 end
 function Tech.canSocket(gem, key, loadout)
 	if key ~= "Q" and key ~= "E" and key ~= "R" then return false end
-	if not Tech.Prototype then return true end
+	if not Tech.Prototype then
+		if not gem then return false end
+		local id = Tech.surgeOf(gem)
+		if not id then return false end
+		for otherKey in Tech.SurgeSockets do
+			local other = loadout and Tech.surgeGem(loadout, otherKey)
+			if otherKey ~= key and other and Tech.surgeOf(other) == id then return false end
+		end
+		return true
+	end
 	local projected = Tech.prototypeGem(gem, key)
 	local d = projected and Tech.PrototypeCatalog[projected.Surge]
 	if not d or (key == "R") ~= (d.Role == "Shift") then return false end
@@ -854,7 +863,10 @@ Tech.PassiveAugments = {
 -- The surge a gem casts: its id, surge tier and rank. Rolled gems save the id;
 -- older gems take their element's surge at their tier.
 function Tech.surgeOf(gem): (string?, number, number)
+	if not gem then return nil, 1, 1 end
 	local tier, rank = GemRoller.surge(gem)
+	local restored = GemRoller.RestoredIds[gem.Surge]
+	if not Tech.Prototype and restored then return restored, tier, rank end
 	local saved = gem.Surge and Tech.Catalog[gem.Surge]
 	if saved and saved.Resource == "Charge" then
 		return gem.Surge, tier, rank
@@ -873,12 +885,17 @@ end
 	           +0.5 points per grade
 	amps: Surge Amplifier effects from the Augment Tree (Tree.effects).
 ]]
+Tech.RaritySurges = GemRoller.RaritySurges
+Tech.RarityScale = {Common=1, Uncommon=1.05, Rare=1.10, UltraRare=1.15, Legendary=1.20}
+function Tech.rarityLabel(gem)
+	return if gem and gem.Tier == "UltraRare" then "Ultra Rare" else (gem and gem.Tier or "Common")
+end
 Tech.Ranks = {
 	{ Damage = 1, Recovery = 1, Cost = 1 },
 	{ Damage = 1.25, Recovery = 0.9, Cost = 0.92 },
 	{ Damage = 1.5, Recovery = 0.8, Cost = 0.84 },
 }
-function Tech.surgeStats(gem, amps)
+function Tech.surgeStats(gem, amps, normalized)
 	local id, tier, rank = Tech.surgeOf(gem)
 	local base = id and Tech.Catalog[id]
 	if not base then
@@ -886,6 +903,25 @@ function Tech.surgeStats(gem, amps)
 	end
 	amps = amps or {}
 	local d = table.clone(base)
+	if Tech.RaritySurges then
+		d.Id, d.Tier, d.Rank, d.Gem = id, tier, rank, gem
+		d.RarityScaled, d.Rarity = true, gem.Tier or "Common"
+		d.Crit, d.Echo = 0, 0
+		d.Cooldown = d.Cooldown or d.Recovery
+		local factor = if normalized then 1 else (Tech.RarityScale[d.Rarity] or 1)
+		-- One property scales. Geometry, timing and control duration never do.
+		if id == "CryoShield" then
+			d.Absorb = 30 * factor
+		elseif d.Damage then
+			d.Damage *= factor
+			if d.Cloud then d.Cloud = table.clone(d.Cloud); d.Cloud.Damage *= factor end
+		elseif d.Absorb then
+			d.Absorb *= factor
+		else
+			d.Cost *= 1 - (factor - 1) * 0.5
+		end
+		return d
+	end
 	if d.Prototype then
 		d.Id, d.Tier, d.Rank, d.Gem = id, tier, rank, gem
 		d.Crit, d.Echo = 0, 0
@@ -944,6 +980,13 @@ function Tech.surgeLines(gem, amps): { string }
 	local d = Tech.surgeStats(gem, amps)
 	if not d then
 		return {}
+	end
+	if d.RarityScaled then
+		local lines = {"Surge: " .. d.Name .. " · " .. Tech.rarityLabel(gem), string.format("%g Charge · %gs cooldown", d.Cost, d.Cooldown)}
+		if d.Damage then table.insert(lines, string.format("%g%% base damage", math.floor(d.Damage * 100 + .5))) end
+		if d.Absorb then table.insert(lines, string.format("%g absorption", d.Absorb)) end
+		table.insert(lines, "Equip in Q, E or R · no duplicate abilities.")
+		return lines
 	end
 	local size = math.clamp(gem.Size or 1, 1, 10)
 	local lines = {
