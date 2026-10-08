@@ -342,4 +342,4 @@ check(
 	"Second replay has stale run identity"
 )
 
-print("PASS: " .. checks .. " tutorial checks (beats in order, scripted gems, rock reach, sockets, skip kit)")
+print("PASS: " .. checks .. " tutorial checks (real-mining rewards, progression, sockets, migration, skip and replay)")

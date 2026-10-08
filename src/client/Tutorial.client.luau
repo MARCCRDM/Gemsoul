@@ -122,7 +122,12 @@ local function run()
    end
   end
   if beat.Id~="Mine" then
-   if target and target.AbsoluteSize.X>0 and LobbyUI.dashboardOpen() or target and beat.Id=="OpenInventory" then
+   if not LobbyUI.dashboardOpen() and string.sub(beat.Id,1,6)=="Socket" then
+    target=LobbyUI.tile("INVENTORY")
+    title.Text="Reopen Inventory to continue."
+    body.Text="Your gems are saved. Open Inventory, then follow the highlighted gem and socket."
+   end
+   if target and target.AbsoluteSize.X>0 and (LobbyUI.dashboardOpen() or beat.Id=="OpenInventory" or string.sub(beat.Id,1,6)=="Socket") then
     local p,s=target.AbsolutePosition,target.AbsoluteSize
     local x,y,w,h=p.X-8,p.Y-8,s.X+16,s.Y+16
     local element=({SocketArmor="Fire",SocketWeapon="Frost",SocketShield="Shock"})[beat.Id]

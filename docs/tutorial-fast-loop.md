@@ -1,21 +1,16 @@
-# Fast Loop onboarding
+# Mining and enchanting tutorial (v3)
 
-The existing mining/socket tutorial now continues through the full loop:
+Scope: teach the mining/enchanting loop only. No tutorial Surge controls, matchmaking, combat, Market purchase or extra world rocks.
 
-1. Five nearby personal rocks grant Thermal/Cryo/Ion Common gear gems, Common Ember Lance, and Uncommon Chain Lightning. Mining displays world bursts without the large reveal card.
-2. Inventory opens on Gems; socket Chest, Sword, Shield with target highlights. Real rating gains flash; signature armor shows its actual enchantment effect instead of a fictional Health gain.
-3. Equip Q then E. Close inventory; both icons remain visible while approaching the queue pad.
-4. Personal glowing pad starts a server-timed three-second practice queue.
-5. Practice partner: one hit, one slow blocked swing, Q finisher. Common sword kit, wooden weapon appearance, no shield. Charge supplied for the final lesson. Existing pod entrances and ability effects retained.
-6. One-time 50 coins and Common Prospector chest reward. Return button fades back to Outpost.
-7. PROBE-7 private Market stock: three Common pieces at 15 coins each, one tutorial purchase. Close Market, press PLAY. Mode gates open.
+1. Enter the existing Outpost mining area next to an available real rock.
+2. Click, tap or press E for each normal pick swing. Existing reach, cooldown, pick wear, shared claims, hit feedback and rock health rules apply.
+3. The first three real rock breaks guarantee Common Thermal, Cryo and Ion gems, through the server mining reward path.
+4. A brief gem introduction explains element color and removable equipment enchantments.
+5. Open Inventory. Highlight the source gem and target socket together for Chest, Sword and Shield. Real rating changes flash; armor reports its actual perk improvement.
+6. Close Inventory. All tutorial guidance is destroyed; modes are available.
 
-State and rewards are server owned. Reconnecting during Fight allows requeue; finished accounts are not restarted. Skip grants missing gems, Q/E if empty, and the one-time victory kit, and leaves practice. The older combat-only skip has its own request name to avoid overwriting onboarding Skip.
+A darkened four-panel spotlight leaves the target visible and interactive. A world highlight and direction/distance label guide mining. Brief descriptions explain each action. Closing Inventory early offers a reopen instruction.
 
-## Validation
+DEV > RESTART INTRO / TUTORIAL replays this flow. Owned items and progression are retained; occupied sockets are cleared into the pouch after capacity checks. Skip stops guidance without fabricating rewards. Completed accounts remain completed; older in-progress tutorials migrate to the gem introduction if three gems were already found.
 
-Run `tests/run_tutorial.py` for ordered progression, reach checks, duplicate rewards, queue timing, Q/E requirements, purchase validation and skip. Run `tests/run_combat.py` for the existing combat regression suite.
-
-Studio validation still required: fresh account on desktop and touch; complete each beat; reconnect during mining, inventory and fight; skip during fight; inspect wooden rival and Q impact timing; confirm PROBE-7 proximity and viewport layout. No live publishing is performed by this change.
-
-The proposed beat estimates total 210 seconds (3.5 minutes); under three minutes remains a playtest target, not a measured claim.
+Validation: tests/run_tutorial.py checks progression, real-mining reward hook, retired remote rejection, migration, skip and authorized replays. The production Outpost interaction is reused. Studio desktop/touch walkthrough remains required for camera framing, spotlight/input behavior and rock spawn placement. Changes are not published automatically.
