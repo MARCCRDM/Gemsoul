@@ -612,6 +612,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		end
 	end
 	local blocked = math.max(0, beforeGuard - damage)
+ if blocked > 0 and origin and not reflected then CombatEvents.fire(player,"Block") end
 	local parried = st.ParrySpent and not parriedBefore
 	local beforeAbsorb = damage
 	damage = ArmorSignatures.absorb(st, damage, now)

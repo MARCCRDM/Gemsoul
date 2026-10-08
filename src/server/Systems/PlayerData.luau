@@ -25,6 +25,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Season = require(ReplicatedStorage.Shared.Season)
+local TrainingRewards = require(ReplicatedStorage.Shared.TrainingRewards)
 local Remotes = require(script.Parent.Remotes)
 local SessionLock = require(script.Parent.SessionLock)
 
@@ -56,6 +57,7 @@ type Profile = {
 	Character: Character,
 	Intro: Intro,
 	Tutorial: any?,
+	TrainingRewards: any?,
 	Materials: { [string]: number }, -- crafting materials by id (see Crafting.Materials)
 	Owned: Owned,
 	-- Firsts that guide new players: "Mined", "Cut", "Sold", "Crafted", "Enchanted".
@@ -515,6 +517,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 	return {
 		Augments = profile.Augments,
 		Coins = profile.Coins,
+		TrainingRewards = profile.TrainingRewards,
 		Marks = profile.Marks,
 		Gems = profile.Gems,
 		Quota = profile.Quota,
@@ -764,6 +767,17 @@ function PlayerData.setGearQuality(player: Player, kind: string, gearId: string,
 end
 
 -- Records a first (see Profile.Milestones). Only syncs when it's new.
+function PlayerData.training(player, event, detail)
+ local profile=profiles[player]
+ if not profile then return end
+ local earned,changed=TrainingRewards.record(profile,event,detail)
+ if not changed then return end
+ for _,objective in earned do
+  Remotes.Notify:FireClient(player,"TRAINING COMPLETE: "..objective.Name.."  +"..objective.Coins.." coins")
+ end
+ sync(player)
+end
+
 function PlayerData.milestone(player: Player, name: string)
 	local profile = profiles[player]
 	if profile and not profile.Milestones[name] then

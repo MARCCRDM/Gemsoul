@@ -41,6 +41,12 @@ local function socketGem(player: Player, gemId: any, slot: any)
 	if not gem then
 		return reply(false, "Choose an available gem from your pouch and an equipment socket.")
 	end
+ if Slots.SurgeDefinitions[slot] then
+  PlayerData.training(player,"EquipSurge")
+ else
+  PlayerData.training(player,"Enchant")
+  PlayerData.training(player,"Slot",slot)
+ end
 	PlayerData.milestone(player, "Enchanted")
 	if not gem.EnchantmentXPGranted then
 		gem.EnchantmentXPGranted = true

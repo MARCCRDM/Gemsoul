@@ -1685,6 +1685,7 @@ local function onWin(enemy)
 	end
 	local session = duel.Session
 	countDuel(owner, true)
+	CombatEvents.fire(owner, "RivalWin")
 	if duel.FastTutorial then
 		clearTutorial(owner)
 		require(script.Parent.Intro).tutorialVictory(owner)
@@ -2208,6 +2209,7 @@ function Duelist.start()
 	-- Combat training counts what the player does (CombatServer's events),
 	-- and can be skipped straight to the spar.
 	CombatEvents.listen(function(player, kind, detail)
+  if kind == "Block" then return end -- scripted partner already counts its confirmed blocks
 		local duel = duels[player]
 		if not duel or not duel.Tutorial then
 			return

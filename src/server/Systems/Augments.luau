@@ -66,6 +66,7 @@ function Augments.start()
 		if not gem then
 			return Shop.reply(false, "Choose a cut gem with a different Surge ability. Q, E and R accept any Surge.")
 		end
+		PlayerData.training(player,"EquipSurge")
 		local id, tier, rank = Tech.surgeOf(gem)
 		local surge = id and Tech.Catalog[id]
 		return Shop.reply(

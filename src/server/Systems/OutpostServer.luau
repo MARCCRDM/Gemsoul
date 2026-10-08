@@ -426,6 +426,7 @@ local function hit(player: Player, nodeId: any)
 	if node.Hp <= 0 then
 		result.Loot = loot(player, node, profile)
 		popNode(node, player)
+		PlayerData.training(player, "Mine")
 	end
 	PlayerData.sync(player)
 	return reply(true, "", result)
