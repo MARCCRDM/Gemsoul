@@ -1,3 +1,4 @@
+local ArmorSignatures = require(game:GetService("ReplicatedStorage").Shared.ArmorSignatures)
 local ArenaDrop = require(script.Parent.ArenaDrop)
 --[[
 	The PvP Duelist: entering the PvP Arena brings a computer rival with its
@@ -495,7 +496,15 @@ end
 -- element (burn, slow or freeze, armor shred, shock), as a player's would.
 -- `critChance` rolls a critical (1.6x, shown as CRIT and in the log), by
 -- the same chances a player's attacks have.
-function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ability: string, critChance: number?)
+local function armorOutput(duel, charge, heal)
+ local now, e = os.clock(), duel.Enemy
+ duel.Charge = (duel.Charge or 0) + ArmorSignatures.budget(duel, "Charge", math.min(charge, 100 - (duel.Charge or 0)), 30, now)
+ if heal > 0 and e.Alive then
+  heal *= Enemies.healingMultiplier(e) * (1 + (duel.Kit.Effects.HealingReceived or 0))
+  e.Humanoid.Health += ArmorSignatures.budget(duel, "Healing", math.min(heal, e.Humanoid.MaxHealth - e.Humanoid.Health), e.Humanoid.MaxHealth * 0.15, now)
+ end
+end
+function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ability: string, critChance: number?, swordHit: boolean?)
 	local e = duel.Enemy :: any
 	if os.clock() < (e.BlindUntil or 0) and (e.Blind or 0) > 0 and math.random() <= e.Blind then
 		-- Blinded (your Solar Flare): the blow goes wide.
@@ -526,12 +535,17 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	if combo then
 		amount *= combo.Mult or 1
 	end
+	if swordHit then amount *= ArmorSignatures.attackMultiplier(duel, os.clock()) end
 	local previous = DamageLog.push(ability, element)
 	local victim = duel.Owner.Character and duel.Owner.Character:FindFirstChildOfClass("Humanoid")
 	local healthBefore = victim and victim.Health or 0
 	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy, crit)
 	dealt = if victim then math.max(0, healthBefore - victim.Health) else 0
 	DamageLog.pop(previous)
+	if swordHit then
+		local charge, heal = ArmorSignatures.hit(duel, duel.Kit.Signatures, os.clock(), dealt, heavy)
+		armorOutput(duel, charge, heal)
+	end
 	if combo and type(dealt) == "number" and dealt > 0 then
 		CombatServer.comboOnPlayer(duel.Owner, combo, duel.Enemy)
 	end
@@ -1001,7 +1015,7 @@ local function think(enemy, now: number)
 	-- the guard (Enemies.damage asks), just as for a player.
 	enemy.GuardCost = enemy.GuardCost
 		or function(amount: number): boolean
-			local cost = math.max(Actions.Stamina.BlockMin, amount * Actions.Stamina.BlockPerDamage)
+			local cost = math.max(Actions.Stamina.BlockMin, amount * Actions.Stamina.BlockPerDamage) * ArmorSignatures.guardMultiplier(duel.Kit.Signatures)
 			if duel.Stamina >= cost then
 				spendStamina(duel, cost)
 				return true
@@ -1009,7 +1023,14 @@ local function think(enemy, now: number)
 			spendStamina(duel, duel.Stamina)
 			return false
 		end
-	humanoid.WalkSpeed = duel.Speed
+ enemy.ArmorTimedBlock = function()
+  armorOutput(duel, ArmorSignatures.timedBlock(duel, duel.Kit.Signatures, os.clock()), 0)
+ end
+ enemy.ArmorDodge = function()
+  duel.Stamina = math.min(100, duel.Stamina + ArmorSignatures.dodged(duel, duel.Kit.Signatures, os.clock(), duel.ArmorDodgeCost, enemy.DodgeUntil))
+ end
+ enemy.ArmorAbsorb = function(amount) return ArmorSignatures.absorb(duel, amount, os.clock()) end
+	humanoid.WalkSpeed = duel.Speed * ArmorSignatures.speed(duel, now)
 		* (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
 		* (if guarding(enemy, now) then 0.7 else 1) -- a shield-walk
 	if duel.Tutorial and tutorialThink(duel, enemy, now, target, distance, dir) then
@@ -1130,7 +1151,8 @@ local function think(enemy, now: number)
 					duel.WeaponGem,
 					SWING_NAMES[action.Kind] or "Swing",
 					-- Crits by its Speed, as yours are (heavies a little more).
-					math.min(0.75, (duel.Crit or 0) + (if heavy then duel.HeavyCrit or 0 else 0))
+					math.min(0.75, (duel.Crit or 0) + (if heavy then duel.HeavyCrit or 0 else 0)),
+					duel.Weapon.WeaponType == "Sword"
 				)
 				if type(dealt) == "number" and dealt > 0 and not guarded then
 					-- Landing its weapon builds its Charge, as yours does.
@@ -1445,6 +1467,7 @@ local function think(enemy, now: number)
 		face(root, target.Position)
 	elseif choice == "Dodge" and duel.Stamina >= Actions.Base.Hop.Cost then
 		spendStamina(duel, Actions.Base.Hop.Cost)
+		duel.ArmorDodgeCost = Actions.Base.Hop.Cost
 		local sign = if math.random() < 0.5 then 1 else -1
 		local away = side * sign
 		enemy.DodgeUntil = now + Actions.Base.Hop.PvPInvincible

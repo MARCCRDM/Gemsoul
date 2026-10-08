@@ -1,3 +1,4 @@
+local ArmorSignatures = require(game:GetService("ReplicatedStorage").Shared.ArmorSignatures)
 --[[
 	The Market board: browse what everyone has up (any server), buy for
 	coins or make a trade offer; put your own gear and gems up; and answer
@@ -331,6 +332,8 @@ local function detailLines(payload)
 	if gear and gear.Passive and gear.Passive.Text and gear.Passive.Text ~= "" then
 		add(gear.Passive.Name .. ": " .. gear.Passive.Text, 13, P.Gold)
 	end
+	local sigName, sigText = ArmorSignatures.describe(roll, payload.Gem)
+	if sigName ~= "" then add("SIGNATURE - " .. sigName .. ": " .. sigText, 13, P.Gold) end
 	for _, affix in roll and roll.Affixes or {} do
 		local affixDef = GemConfig.AffixById[affix.Id]
 		if affixDef then

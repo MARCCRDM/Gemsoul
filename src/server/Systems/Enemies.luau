@@ -636,6 +636,7 @@ function Enemies.damage(
 	local now = os.clock()
 	local name = DamageLog.nameOf(enemy)
 	if enemy.DodgeUntil and now < enemy.DodgeUntil then
+		if (enemy :: any).ArmorDodge and heavy ~= nil then (enemy :: any).ArmorDodge() end
 		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = name })
 		return -- slipped out of the way
 	end
@@ -685,6 +686,7 @@ function Enemies.damage(
 				return
 			end
 			e.ParrySpent = true
+			if e.ArmorTimedBlock then e.ArmorTimedBlock() end
 			Enemies.parryPlayer(source, 0.25)
 			blocked = amount * 0.65 * exposure
 			amount *= 0.35
@@ -717,10 +719,12 @@ function Enemies.damage(
 	-- Shields (a rival duelist's Cryo Shield, Energy Siphon, block gem or
 	-- Ward) soak the blow first, as a player's do.
 	local absorbed = 0
+	if e.ArmorAbsorb then amount, absorbed = e.ArmorAbsorb(amount) end
 	if (e.Shield or 0) > 0 and now < (e.ShieldUntil or 0) then
-		absorbed = math.min(e.Shield, amount)
-		e.Shield -= absorbed
-		amount -= absorbed
+		local shieldAbsorb = math.min(e.Shield, amount)
+		e.Shield -= shieldAbsorb
+		amount -= shieldAbsorb
+		absorbed += shieldAbsorb
 	end
 	DamageLog.send(source, {
 		Dir = "Out",

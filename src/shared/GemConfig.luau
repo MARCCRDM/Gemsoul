@@ -499,6 +499,9 @@ function GemConfig.enchantment(
 	if slot == "Surge1" or slot == "Surge2" or slot == "Surge3" then
 		return "Surge Capacitor", "Powers " .. (GemConfig.ElementLabels[gem.Element] or gem.Element) .. " Gem Surges."
 	end
+	if GemConfig.side(slot) == "Defense" then
+		return "Signature Enchantment", "Strengthens this armor piece's signature using Size, Clarity and Cut. Inspect the armor for exact values."
+	end
 	local side = GemConfig.side(slot)
 	local name = GemConfig.EnchantNames[if side == "Offense" then "Weapon" else "Armor"][gem.Element] or "Enchanted"
 	local parts = {}
@@ -630,10 +633,10 @@ end
 GemConfig.ItemAffixes = {
 	Weapon = { Fire = "Thermal", Frost = "Cryogenic", Shock = "Ionized", Poison = "Corrosive" },
 	Armor = {
-		Fire = "of Thermal Shielding",
-		Frost = "of Cryo Insulation",
-		Shock = "of Ion Shielding",
-		Poison = "of Corrosion Warding",
+		Fire = "[Thermal Enchanted]",
+		Frost = "[Cryo Enchanted]",
+		Shock = "[Ion Enchanted]",
+		Poison = "[Corrosive Enchanted]",
 	},
 }
 

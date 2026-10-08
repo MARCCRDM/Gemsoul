@@ -22,6 +22,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
 local CombatEvents = require(script.Parent.CombatEvents)
+local ArmorSignatures = require(ReplicatedStorage.Shared.ArmorSignatures)
 local CombatServer = {}
 local states = {}
 local WHITE = Color3.new(1, 1, 1)
@@ -46,7 +47,7 @@ end
 -- Everything a loadout fights with: its effects, gem defences, ratings and
 -- action rules. `augments` are the Augment Tree's perks ({} for none). The
 -- Arena rival is built by this too, so it fights by exactly a player's rules.
-local function kitFor(loadout, augments)
+local function kitFor(loadout, augments, ranked)
 	loadout = Classes.activeLoadout(loadout)
 	local weapon = loadout and Classes.weapon(loadout.Class, loadout.Weapon)
 	if not weapon or not weapon.Attack then
@@ -81,7 +82,9 @@ local function kitFor(loadout, augments)
 	local recharge, cooldownCut = 0, 0
 	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 		local gem = loadout[slot .. "Gem"]
-		if gem then
+		local kind = ArmorSignatures.Slots[slot]
+		local roll = loadout.GearRolls and loadout.GearRolls[kind] and loadout.GearRolls[kind][loadout[slot]]
+		if gem and not (roll and roll.SignatureVersion == 1) then
 			local v = GemConfig.stats(gem, slot, { Affinity = affinity })
 			defense.Shield += v.ShieldAmount or 0
 			defense.Duration += v.ShieldDuration or 0
@@ -101,6 +104,7 @@ local function kitFor(loadout, augments)
 	end
 	defense.Cooldown = math.max(GemConfig.Rules.ShieldMinCooldown, defense.Cooldown - cooldownCut) / (1 + recharge)
 	return {
+		Signatures = ArmorSignatures.loadout(loadout, ranked),
 		Affinity = affinity,
 		Defense = defense,
 		Loadout = loadout,
@@ -120,7 +124,7 @@ local function kit(player)
 		loadout = PvPRules.capLoadout(loadout, rules.RarityCap)
 	end
 	local full = rules ~= nil and rules.Stats == "Full"
-	return kitFor(loadout, if inArena(player) and not full then {} else Tree.effects(PlayerData.get(player)))
+	return kitFor(loadout, if inArena(player) and not full then {} else Tree.effects(PlayerData.get(player)), rules and rules.RarityCap ~= nil)
 end
 CombatServer.kitFor = kitFor
 local function rating(k, stat)
@@ -171,6 +175,20 @@ local function state(player)
 		}
 	end
 	return states[player]
+end
+-- Shared signature outputs are capped after anti-heal and healing bonuses.
+local function armorOutput(player, st, k, charge, healing)
+ local now = os.clock()
+ charge = ArmorSignatures.budget(st, "Charge", math.min(charge, 100 - st.Resources.Charge), 30, now)
+ st.Resources.Charge += charge
+ player:SetAttribute("Charge", st.Resources.Charge)
+ local hum = alive(player)
+ if hum and healing > 0 then
+  healing *= (1 + (k.Effects.HealingReceived or 0)) * CrowdControl.healingMultiplier(st.CC, now)
+  healing = ArmorSignatures.budget(st, "Healing", math.min(healing, hum.MaxHealth - hum.Health), hum.MaxHealth * 0.15, now)
+  hum.Health += healing
+  if healing > 0 then DamageLog.send(player, { Dir = "In", Kind = "Heal", Ability = "Armor Life Steal", Amount = healing }) end
+ end
 end
 -- Spends Stamina (swings, guarding, maneuvers, dodges) and holds off its
 -- regeneration for a moment, so it never refills mid-flurry.
@@ -400,6 +418,11 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	local st, now = state(player), os.clock()
 	local attackerName = DamageLog.nameOf(source) or DamageLog.nameOf(enemySource)
 	if Actions.invulnerable(st.DodgeStarted, now, k.Rules, pvp, st.DodgeKind) then
+  if origin and not reflected then
+   local refund = ArmorSignatures.dodged(st, k.Signatures, now, st.ArmorDodgeCost, st.DodgeStarted)
+   st.Resources.Stamina = math.min(100, st.Resources.Stamina + refund)
+   player:SetAttribute("Stamina", st.Resources.Stamina)
+  end
 		DamageLog.send(player, { Dir = "In", Kind = "Dodge", Who = attackerName })
 		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = DamageLog.nameOf(player) })
 		return 0
@@ -474,6 +497,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 					and not st.ParrySpent
 				then
 					st.ParrySpent = true
+					armorOutput(player, st, k, ArmorSignatures.timedBlock(st, k.Signatures, now), 0)
 					multiplier = math.min(multiplier, if pvp then 0.35 else 0.25)
 					if source then
 						local attacker = state(source)
@@ -494,7 +518,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				local exhausted = false
 				if not (st.ParrySpent and not parriedBefore) then
 					local cost = math.max(Actions.Stamina.BlockMin, beforeGuard * Actions.Stamina.BlockPerDamage)
-						* (1 - (k.Effects.BlockStamina or 0))
+						* (1 - (k.Effects.BlockStamina or 0)) * ArmorSignatures.guardMultiplier(k.Signatures)
 					if catchMelee then cost *= 0.5 end
 					if st.Resources.Stamina >= cost then
 						spendStamina(player, st, cost)
@@ -560,6 +584,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	local blocked = math.max(0, beforeGuard - damage)
 	local parried = st.ParrySpent and not parriedBefore
 	local beforeAbsorb = damage
+	damage = ArmorSignatures.absorb(st, damage, now)
 	if now < st.SiphonUntil and st.SiphonCapacity > 0 then
 		local absorbed = math.min(damage, st.SiphonCapacity)
 		st.SiphonCapacity -= absorbed
@@ -989,6 +1014,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		Versus = versus,
 		TargetGuarding = targetGuarding,
 	})
+	if not projectile and k.Weapon.WeaponType == "Sword" then damage *= ArmorSignatures.attackMultiplier(st, os.clock()) end
 	local echoDamage = damage
 	local guarded = false
 	local gem = k.Loadout.WeaponGem
@@ -1029,6 +1055,10 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		end
 		enemyWard(source, target.Enemy)
 	end
+	if not projectile and k.Weapon.WeaponType == "Sword" then
+  local charge, heal = ArmorSignatures.hit(st, k.Signatures, os.clock(), math.max(0, healthBefore - target.Humanoid.Health), heavy)
+  armorOutput(source, st, k, charge, heal)
+ end
 	if damage > 0 then
 		weaponPerksOnHit(source, k, st, target, math.max(0, healthBefore - target.Humanoid.Health), guarded)
 		-- Landing the weapon builds Charge for your surges (with a gem to use it).
@@ -1218,6 +1248,7 @@ local function dodge(player, requested, kind)
 		st.NextDodge = now + k.Rules.DodgeCooldown
 		st.NextHop = math.max(st.NextHop or 0, now + Actions.Base.Hop.Cooldown)
 	end
+	st.ArmorDodgeCost = cost
 	st.DodgeStarted, st.DodgeKind = now, if hop then "Hop" else "Roll"
 	st.Channel, st.Pending = nil, {}
 	st.AfterDodgeUntil, st.BlockUntil, st.ChargeStarted = now + Actions.AfterDodgeSeconds, 0, nil
@@ -2269,7 +2300,7 @@ local function tick(dt)
 			else speed
 				* (if now < st.SlowUntil then 1 - st.Slow else 1)
 				* (if blocking(st, now) then 0.6 else 1)
-				* casting
+				* casting * ArmorSignatures.speed(st, now)
 		player:SetAttribute("CastRooted", casting == 0)
 		if now >= st.ShieldUntil then
 			st.Shield = 0

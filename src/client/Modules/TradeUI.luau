@@ -1,3 +1,4 @@
+local ArmorSignatures = require(game:GetService("ReplicatedStorage").Shared.ArmorSignatures)
 -- The Market: face-to-face equipment trading. Pick a miner, pick an item from
 -- your gear (shown in 3D with its full tooltip), send the offer; both players
 -- see both items side by side and mark READY before anything changes hands.
@@ -298,6 +299,8 @@ local function tooltip(parent, item, width)
 	if gear and gear.Passive and gear.Passive.Text ~= "" then
 		line(gear.Passive.Name .. ": " .. gear.Passive.Text, 13, P.Gold)
 	end
+	local sigName, sigText = ArmorSignatures.describe(roll, item.Gem)
+	if sigName ~= "" then line("SIGNATURE - " .. sigName .. ": " .. sigText, 13, P.Gold) end
 	for _, affix in roll and roll.Affixes or {} do
 		local def = GemConfig.AffixById[affix.Id]
 		if def then

@@ -20,6 +20,7 @@
 	  ElementMatchup.versus(attack, element, weakness?) -> number, tag (creatures)
 	  ElementMatchup.weakTo(element) -> the element that beats it
 ]]
+local ArmorSignatures = require(script.Parent.ArmorSignatures)
 local ElementMatchup = {}
 
 ElementMatchup.Resist = 0.75 -- a creature against its own element
@@ -63,7 +64,9 @@ function ElementMatchup.profile(loadout)
 	if loadout then
 		for _, slot in ElementMatchup.Slots do
 			local gem = loadout[slot .. "Gem"]
-			if gem and gem.Element then
+			local kind = ArmorSignatures.Slots[slot]
+			local roll = loadout.GearRolls and loadout.GearRolls[kind] and loadout.GearRolls[kind][loadout[slot]]
+			if gem and gem.Element and not (roll and roll.SignatureVersion == 1) then
 				resist[gem.Element] = (resist[gem.Element] or 0) + ElementMatchup.gemResist(gem)
 			end
 		end

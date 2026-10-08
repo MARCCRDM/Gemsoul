@@ -1,3 +1,4 @@
+local ArmorSignatures = require(game:GetService("ReplicatedStorage").Shared.ArmorSignatures)
 --[[
  Classic RPG armory: equipped item models surround a character silhouette,
  a compact gemstone backpack sits beneath it, and an inspector handles
@@ -928,12 +929,7 @@ local function gemLines(gem)
 		local weak = ElementMatchup.weakTo(gem.Element)
 		local resist = text(
 			tipBody,
-			string.format(
-				"ARMOR RESIST  ·  %s %d%% per piece  ·  weak to %s",
-				GemConfig.elementName(gem.Element),
-				math.floor(ElementMatchup.gemResist(gem) * 100 + 0.5),
-				if weak then GemConfig.elementName(weak) else "none"
-			),
+			"ARMOR: strengthens its signature; no automatic elemental resistance",
 			11,
 			P.Dim
 		)
@@ -1034,38 +1030,14 @@ local function gemLines(gem)
 		table.insert(pvp, line.Text)
 	end
 	statRow(weapon, "Against players: " .. table.concat(pvp, "  ·  "), nil, P.Dim, 11)
-	-- In armor or a shield: its defence, and the element it resists.
-	local armorName = GemConfig.enchantment(gem, "Armor")
-	local armor = cardSection("IN ARMOR OR SHIELD  ·  " .. string.upper(armorName), color)
-	for _, line in GemConfig.lines(gem, "Armor", { Affinity = affinity }) do
-		statRow(armor, line.Text, gradeTag(line.Metric, line.Grade))
-	end
-	local element = GemConfig.elementName(gem.Element)
-	statRow(
-		armor,
-		string.format(
-			"Resists %s: take %d%% less %s damage",
-			element,
-			math.floor(ElementMatchup.gemResist(gem) * 100 + 0.5),
-			element
-		),
-		"EACH PIECE",
-		P.Good
-	)
-	local weak = ElementMatchup.weakTo(gem.Element)
-	if weak then
-		statRow(
-			armor,
-			string.format(
-				"If %s is your main armor element, %s hits you for %d%%",
-				element,
-				GemConfig.elementName(weak),
-				math.floor(ElementMatchup.Weak * 100 + 0.5)
-			),
-			nil,
-			P.Bad:Lerp(P.Text, 0.25)
-		)
-	end
+ local armor = cardSection("IN ARMOR - SIGNATURE STRENGTH", color)
+ statRow(armor, "Strengthens the armor's rolled signature. Matching affinities improve the enchantment contribution.", nil, P.Text, 12)
+ for slot, kind in ArmorSignatures.Slots do
+  local loadout = GemClient.Profile and GemClient.Profile.Character
+  local roll = loadout and GearRolls.get(loadout, slot)
+  local name, description = ArmorSignatures.describe(roll, gem)
+  if name ~= "" then statRow(armor, slot .. " - " .. name .. ": " .. description, nil, P.Text, 11) end
+ end
 	-- What the armor you're wearing resists right now.
 	local worn = ElementMatchup.profile(GemClient.Profile and GemClient.Profile.Character)
 	local parts = {}
@@ -1227,6 +1199,7 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		-- The gem in this piece: name, one quality bar and what it adds.
 		GemArt.viewport(well, gem, false)
 		local gemName, effect = GemConfig.enchantment(gem, slotName)
+		if roll and roll.Signature then gemName, effect = ArmorSignatures.describe(roll, gem) end
 		local title = text(socket, string.format("%s  ·  %s", GemConfig.shade(gem).Name, gemName), 13, gemColor, BOLD)
 		title.AutomaticSize = Enum.AutomaticSize.None
 		title.Position = UDim2.fromOffset(66, 5)
@@ -1307,6 +1280,8 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		text(tipBody, "STATS  ·  " .. table.concat(parts, "  ·  "), 12, P.Gold, BOLD)
 	end
 
+	local sigName, sigText = ArmorSignatures.describe(roll, gem)
+	if sigName ~= "" then text(tipBody, "SIGNATURE - " .. sigName .. ": " .. sigText, 12, P.Gold, BOLD) end
 	-- Elemental affinities this piece rolled, in their element's colour.
 	for _, affix in roll and roll.Affixes or {} do
 		local def = GemConfig.AffixById[affix.Id]
@@ -1315,7 +1290,7 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		end
 	end
 
-	if gem then
+	if gem and not (roll and roll.Signature) then
 		effectRows(tipBody, gem, slotName, GemConfig.ElementColors[gem.Element] or P.Teal, wornAffinities())
 	end
 	if gear.ArmorFamily then

@@ -2,6 +2,7 @@
 local Slots = require(script.Parent.EquipmentSlots)
 local ExpandedTraits = require(script.Parent.ExpandedItemTraits)
 local ArmorFamilies = require(script.Parent.ArmorFamilies)
+local ArmorSignatures = require(script.Parent.ArmorSignatures)
 local GearRolls = {}
 GearRolls.Rarities = {
 	{ Name = "Common", Weight = 40, Color = Color3.fromRGB(205, 216, 225) },
@@ -96,6 +97,11 @@ function GearRolls.roll(rng, fixedRarity, gear)
 	end
 	if gear and not gear.Attack and not gear.WeaponType then
 		GearRolls.addAffixes(roll, rng, gear)
+		for slot, kind in ArmorSignatures.Slots do
+			for _, candidate in ExpandedTraits.Catalog[kind] or {} do
+				if candidate.Id == gear.Id then ArmorSignatures.ensure(roll, slot, rng); break end
+			end
+		end
 	end
 	return roll
 end
@@ -167,6 +173,7 @@ function GearRolls.ensure(profile, rng)
 			end
 			if kind ~= "Weapons" then
 				GearRolls.addAffixes(c.GearRolls[kind][id], rng, ArmorFamilies.ById[Slots.model(id)])
+				ArmorSignatures.ensure(c.GearRolls[kind][id], slot, rng)
 			end
 		end
 	end

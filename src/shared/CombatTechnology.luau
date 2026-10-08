@@ -7,7 +7,7 @@ Tech.Resources = {
 	-- Charge fills slowly on its own and faster as your weapon lands hits
 	-- (OnHit / OnHeavy), so surges come between blows rather than in a
 	-- stream. A fight starts part-full (Start), not with a full bar.
-	Charge = { Max = 100, Start = 40, Regen = 3, OnHit = 3, OnHeavy = 7, Color = Color3.fromRGB(70, 130, 255) },
+	Charge = { Max = 100, Start = 0, Regen = 3, OnHit = 3, OnHeavy = 7, Color = Color3.fromRGB(70, 130, 255) },
 }
 -- After any surge, no other surge (or swing) for at least this long, however
 -- much Rank and Clarity shorten its recovery: no back-to-back casting.
