@@ -128,7 +128,7 @@ local function prepareLottery(player: Player, style, element)
 			PlayerData.setGearQuality(player, kind, entry.Id, 1)
 			local roll = GearRolls.roll(Random.new(1701), 1, ArmorFamilies.ById[entry.Id])
 			roll.Prismatic = nil
-			roll.Finish = ({Prospector=5, Skirmisher=3, Juggernaut=1})[reward.Style]
+			roll.Finish = ({ Prospector = 5, Skirmisher = 3, Juggernaut = 1 })[reward.Style]
 			roll.Visor, roll.Variant = 2, 1
 			profile.Character.GearRolls[kind][entry.Id] = roll
 			PlayerData.equipGear(player, kind, entry.Id)
@@ -228,6 +228,7 @@ local function tutorialBegin(player: Player)
 		tutorialKit(player)
 		profile.Intro.Done = true
 		state.Step, state.Mined, state.Done, state.Rocks = 1, 0, false, {}
+		state.Version = 2
 		PlayerData.sync(player)
 	end
 	return tutorialReply(profile, true, "Welcome to the Saga.")
@@ -279,6 +280,9 @@ local function tutorialStep(player: Player, beatId: any)
 	if not profile or type(beatId) ~= "string" then
 		return reply(false, "Try again.")
 	end
+	if beatId == "Return" and player:GetAttribute("CombatSession") then
+		return reply(false, "Return to the Outpost first.")
+	end
 	local ok = Tutorial.advance(profile, beatId)
 	if ok then
 		PlayerData.sync(player)
@@ -308,11 +312,133 @@ local function tutorialSkip(player: Player)
 				PlayerData.socketSurge(player, gem.Id, "Q")
 			end
 		end
+		for _, gem in table.clone(profile.Gems) do
+			if gem.Surge == Tutorial.Gems[4].Surge and not profile.Character.Surge1Gem then
+				PlayerData.socketSurge(player, gem.Id, "Q")
+			end
+			if gem.Surge == Tutorial.Gems[5].Surge and not profile.Character.Surge2Gem then
+				PlayerData.socketSurge(player, gem.Id, "E")
+			end
+		end
+		if not state.Won then
+			state.Won = true
+			PlayerData.addCoins(player, 50)
+			PlayerData.setGearQuality(player, "Armors", "ArmorProspectorArmor1", 1)
+		end
 		Tutorial.skip(profile)
+		if player:GetAttribute("FastTutorial") then
+			require(script.Parent.ArenaSessions).leave(player)
+		end
 		PlayerData.augmentsChanged(player)
 		PlayerData.sync(player)
 	end
 	return tutorialReply(profile, true, "Tutorial skipped. Good luck out there.")
+end
+
+-- Private onboarding stock: never competes with or enters the player market.
+local STOCK = { "ArmorProspectorHelmet1", "ArmorJuggernautGloves1", "ArmorProspectorBoots1" }
+function Intro.tutorialStock(player)
+	local profile = PlayerData.get(player)
+	local beat = profile and Tutorial.beat(profile)
+	if not beat or (beat.Id ~= "OpenMarket" and beat.Id ~= "Buy") then
+		return nil
+	end
+	local rows = {}
+	for i, id in STOCK do
+		local family = ArmorFamilies.ById[id]
+		table.insert(
+			rows,
+			{
+				Id = "Tutorial:" .. i,
+				Seller = 0,
+				SellerName = "PROBE-7",
+				Mode = "Sell",
+				State = "Open",
+				Price = 15,
+				Expires = os.time() + 3600,
+				Item = {
+					Kind = "Gear",
+					Slot = ({ "Helmet", "Gloves", "Boots" })[i],
+					Id = id,
+					Quality = 1,
+					Roll = GearRolls.roll(Random.new(i), 1, family),
+				},
+				Offers = {},
+			}
+		)
+	end
+	return rows
+end
+function Intro.tutorialBuy(player, listingId)
+	local rows = Intro.tutorialStock(player)
+	local profile = PlayerData.get(player)
+	if not rows or Tutorial.beat(profile).Id ~= "Buy" then
+		return reply(false, "Follow the tutorial first.")
+	end
+	for _, row in rows do
+		if row.Id == listingId then
+			if profile.Coins < row.Price then
+				return reply(false, "Not enough coins.")
+			end
+			local market = require(ReplicatedStorage.Shared.Market)
+			if market.cantReceive(profile, row.Item, Config.MaxGems, Config.MaxGear) then
+				return reply(false, "Make room in your inventory.")
+			end
+			if not market.give(profile, row.Item, Config.MaxGems) then
+				return reply(false, "Couldn't add that item.")
+			end
+			profile.Coins -= row.Price
+			Tutorial.state(profile).Purchased = true
+			Tutorial.advance(profile, "Buy")
+			PlayerData.sync(player)
+			return reply(true, "Added to your inventory.")
+		end
+	end
+	return reply(false, "Pick a tutorial item.")
+end
+function Intro.tutorialVictory(player)
+	local profile = PlayerData.get(player)
+	if not profile or not Tutorial.beat(profile) or Tutorial.beat(profile).Id ~= "Fight" then
+		return
+	end
+	local state = Tutorial.state(profile)
+	if state.Won then
+		return
+	end
+	state.Won = true
+	PlayerData.addCoins(player, 50)
+	PlayerData.setGearQuality(player, "Armors", "ArmorProspectorArmor1", 1)
+	Tutorial.advance(profile, "Fight")
+	PlayerData.sync(player)
+end
+local function tutorialQueue(player)
+	local profile = PlayerData.get(player)
+	local beat = profile and Tutorial.beat(profile)
+	if not beat or (beat.Id ~= "Queue" and beat.Id ~= "Fight") then
+		return reply(false, "Not yet.")
+	end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	if
+		not root
+		or typeof(spawn) ~= "CFrame"
+		or (root.Position - (spawn * CFrame.new(0, 0, -10)).Position).Magnitude > 18
+	then
+		return reply(false, "Step onto the Rival pad.")
+	end
+	local state = Tutorial.state(profile)
+	if not state.QueueAt or state.QueueAt > os.time() then
+		state.QueueAt = os.time()
+		return reply(true, "Queued.", { Waiting = true })
+	end
+	if os.time() - state.QueueAt < 3 then
+		return reply(true, "Queued.", { Waiting = true })
+	end
+	state.Queued = true
+	Tutorial.advance(profile, "Queue")
+	PlayerData.sync(player)
+	return require(script.Parent.ArenaSessions).enterTraining(player)
 end
 
 local function finishIntro(player: Player)
@@ -334,6 +460,7 @@ function Intro.start()
 	Shop.register("FinishIntro", finishIntro)
 	Shop.register("SuitUp", suitUp)
 	Shop.register("QuickStart", quickStart)
+	Shop.register("TutorialQueue", tutorialQueue)
 	Shop.register("TutorialBegin", tutorialBegin)
 	Shop.register("TutorialMine", tutorialMine)
 	Shop.register("TutorialStep", tutorialStep)

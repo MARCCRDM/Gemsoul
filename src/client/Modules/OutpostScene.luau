@@ -600,6 +600,7 @@ function OutpostScene.reveal(loot, at: Vector3?)
 	if at then
 		worldReveal(at + Vector3.new(0, 1, 0), color, math.max(rank, 1))
 	end
+	if loot.Tutorial then return end
 	revealCard.Visible = true
 	revealCard.BackgroundTransparency = 0.05
 	revealCard.Size = UDim2.fromOffset(420, 150)

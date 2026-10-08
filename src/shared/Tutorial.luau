@@ -41,7 +41,15 @@ Tutorial.Beats = {
 		Mobile = "And the Ion gem onto your Shield.",
 	},
 	{ Id = "SurgeQ", Prompt = "Drag Ember Lance onto Q.", Mobile = "Tap Ember Lance, then Q." },
+	{ Id = "SurgeE", Prompt = "Drag Chain Lightning onto E.", Mobile = "Tap Chain Lightning, then E." },
 	{ Id = "CloseInventory", Prompt = "Close your Inventory.", Mobile = "Tap Close." },
+	{ Id = "Queue", Prompt = "Step onto the glowing Rival pad." },
+	{ Id = "Fight", Prompt = "Follow the combat prompts." },
+	{ Id = "Return", Prompt = "Return to the Outpost." },
+	{ Id = "OpenMarket", Prompt = "Open the Market." },
+	{ Id = "Buy", Prompt = "Buy one Common item." },
+	{ Id = "CloseMarket", Prompt = "Close the Market." },
+	{ Id = "Play", Prompt = "You're ready. Go." },
 }
 Tutorial.ById = {}
 for index, beat in Tutorial.Beats do
@@ -85,13 +93,27 @@ function Tutorial.beat(profile)
 	return if state.Done then nil else Tutorial.Beats[state.Step]
 end
 
-local SOCKETS =
-	{ SocketArmor = "ArmorGem", SocketWeapon = "WeaponGem", SocketShield = "ShieldGem", SurgeQ = "Surge1Gem" }
+local SOCKETS = {
+	SocketArmor = "ArmorGem",
+	SocketWeapon = "WeaponGem",
+	SocketShield = "ShieldGem",
+	SurgeQ = "Surge1Gem",
+	SurgeE = "Surge2Gem",
+}
 
 function Tutorial.met(profile, beatId: string): boolean
 	local state = Tutorial.state(profile)
 	if beatId == "Mine" then
 		return state.Mined >= #Tutorial.Gems
+	end
+	if beatId == "Queue" then
+		return state.Queued == true
+	end
+	if beatId == "Fight" then
+		return state.Won == true
+	end
+	if beatId == "Buy" then
+		return state.Purchased == true
 	end
 	local key = SOCKETS[beatId]
 	if key then

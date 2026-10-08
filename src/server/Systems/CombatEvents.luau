@@ -12,13 +12,13 @@ local CombatEvents = {}
 
 local listeners = {}
 
-function CombatEvents.listen(fn: (Player, string) -> ())
+function CombatEvents.listen(fn: (Player, string, string?) -> ())
 	table.insert(listeners, fn)
 end
 
-function CombatEvents.fire(player: Player, kind: string)
+function CombatEvents.fire(player: Player, kind: string, detail: string?)
 	for _, fn in listeners do
-		task.spawn(fn, player, kind)
+		task.spawn(fn, player, kind, detail)
 	end
 end
 

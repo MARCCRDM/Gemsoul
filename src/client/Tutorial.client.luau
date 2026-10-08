@@ -16,6 +16,10 @@ local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
+local ArmorSignatures = require(ReplicatedStorage.Shared.ArmorSignatures)
+local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local SurgeIcons = require(script.Parent.Modules.SurgeIcons)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local LobbyUI = require(script.Parent.Modules.LobbyUI)
@@ -248,7 +252,7 @@ local function buildRock(index: number, at: Vector3)
 		mining = false
 		if result.Ok then
 			if result.Gem then
-				OutpostScene.reveal({ Gem = result.Gem }, base.Position)
+				OutpostScene.reveal({ Gem = result.Gem, Tutorial = true }, base.Position)
 			end
 			for _, part in model:GetDescendants() do
 				if part:IsA("BasePart") then
@@ -297,6 +301,7 @@ local function finish(message: string?)
 end
 
 local stepping = false
+local lastSocketBeat = nil
 local function tryStep(beatId: string)
 	if stepping then
 		return
@@ -308,17 +313,101 @@ local function tryStep(beatId: string)
 	end)
 end
 
+local action = new("TextButton", {
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -100),
+	Size = UDim2.fromOffset(280, 54),
+	BackgroundColor3 = GOLD,
+	TextColor3 = P.Background or Color3.new(0, 0, 0),
+	Font = IronUi.Heading,
+	TextSize = 22,
+	Text = "",
+	Visible = false,
+}, gui)
+UiKit.round(action, 12)
+local preview = new("Frame", {Visible=false, BackgroundTransparency=1, AnchorPoint=Vector2.new(0.5,1), Position=UDim2.new(0.5,0,1,-30), Size=UDim2.fromOffset(156,64)}, gui)
+local previewKeys = {}
+for i, key in {"Q", "E"} do
+ local icon = new("TextLabel", {Size=UDim2.fromOffset(60,60), Position=UDim2.fromOffset((i-1)*82,0), Text=key, BackgroundColor3=Color3.fromRGB(12,20,30)}, preview)
+ UiKit.round(icon,10)
+ new("TextLabel", {Size=UDim2.fromOffset(20,20), Text=key, TextSize=16, Font=IronUi.Heading, BackgroundColor3=GOLD, ZIndex=4}, icon)
+ previewKeys[key] = icon
+end
+local pad
+local queueBusy = false
+local function queue()
+	if queueBusy then
+		return
+	end
+	queueBusy = true
+	task.spawn(function()
+		say("Rival Match — Tutorial. Nothing is lost.")
+		local result = GemClient.request("TutorialQueue")
+		if result.Ok and result.Waiting then
+			task.wait(3)
+			result = GemClient.request("TutorialQueue")
+		end
+		if not result.Ok then
+			UiKit.toast(result.Message or "Try the pad again.")
+		end
+		queueBusy = false
+	end)
+end
+local function marketOpen()
+	local screen = player.PlayerGui:FindFirstChild("MarketBoard")
+	return screen ~= nil and screen.Enabled
+end
+action.Activated:Connect(function()
+	local beat = current()
+	if not beat then
+		return
+	end
+	if beat.Id == "Return" then
+		local fade = new(
+			"Frame",
+			{ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, ZIndex = 100 },
+			gui
+		)
+		TweenService:Create(fade, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
+		task.wait(0.2)
+		GemClient.request("ArenaLeave")
+		OutpostScene.ensure()
+		TweenService:Create(fade, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
+		task.delay(0.3, function()
+			fade:Destroy()
+		end)
+	elseif beat.Id == "OpenMarket" then
+		require(script.Parent.Modules.MarketBoardUI).open()
+	elseif beat.Id == "Play" then
+		tryStep("Play")
+		LobbyUI.openPicker()
+	end
+end)
+
 local function update()
+ preview.Visible = false
 	if closing then
 		return
 	end
 	if finished() then
-		finish("Nice. Time for your first fight.")
+		finish("You’re ready. Go!")
 		return
 	end
 	local beat = current()
 	if not beat then
 		return
+	end
+	action.Visible = beat.Id == "Return" or beat.Id == "OpenMarket" or beat.Id == "Play"
+	action.Text = if beat.Id == "Return"
+		then "RETURN TO OUTPOST"
+		elseif beat.Id == "OpenMarket" then "OPEN MARKET"
+		else "▶ PLAY"
+	bar.Visible = beat.Id ~= "Fight" or player:GetAttribute("CombatSession") == nil
+	if pad then
+		pad.Transparency = if beat.Id == "Queue"
+				or (beat.Id == "Fight" and not player:GetAttribute("CombatSession"))
+			then 0.2
+			else 1
 	end
 	for i, dot in dotFrames do
 		dot.BackgroundColor3 = if i < beat.Index then P.Good elseif i == beat.Index then GOLD else P.Dim
@@ -330,9 +419,65 @@ local function update()
 		point(nil)
 		return
 	end
-	say(text)
+	if not queueBusy then
+		say(text)
+	end
 	local open = LobbyUI.dashboardOpen()
-	if beat.Id == "OpenInventory" then
+ preview.Visible = not open and player:GetAttribute("CombatSession") == nil and (beat.Id == "Queue" or beat.Id == "Fight")
+ if preview.Visible then
+  for i, key in {"Q", "E"} do
+   local gem = GemClient.Profile.Character["Surge" .. i .. "Gem"]
+   if gem then SurgeIcons.apply(previewKeys[key], Tech.surgeStats(gem), GemConfig.ElementColors[gem.Element]) end
+  end
+ end
+	if beat.Id == "Queue" or (beat.Id == "Fight" and not player:GetAttribute("CombatSession")) then
+		point(nil)
+		if not pad and spawnFrame() then
+			local at = ground((spawnFrame() * CFrame.new(0, 0, -10)).Position)
+			pad = new(
+				"Part",
+				{
+					Name = "TutorialRivalPad",
+					Anchored = true,
+					CanCollide = false,
+					Material = Enum.Material.Neon,
+					Color = GOLD,
+					Size = Vector3.new(7, 0.2, 7),
+					Position = at + Vector3.new(0, 0.15, 0),
+				},
+				rocks
+			)
+		end
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if
+			pad
+			and root
+			and (Vector3.new(root.Position.X, pad.Position.Y, root.Position.Z) - pad.Position).Magnitude < 4
+		then
+			queue()
+		end
+	elseif beat.Id == "Fight" then
+		point(nil)
+	elseif beat.Id == "Return" then
+		point(nil)
+		if not player:GetAttribute("CombatSession") and OutpostScene.isActive() then
+			tryStep(beat.Id)
+		end
+	elseif beat.Id == "OpenMarket" then
+		point(nil)
+		if marketOpen() then
+			tryStep(beat.Id)
+		end
+	elseif beat.Id == "Buy" then
+		point(nil)
+	elseif beat.Id == "CloseMarket" then
+		point(nil)
+		if not marketOpen() then
+			tryStep(beat.Id)
+		end
+	elseif beat.Id == "Play" then
+		point(action)
+	elseif beat.Id == "OpenInventory" then
 		point(LobbyUI.tile("INVENTORY"))
 		if open then
 			tryStep(beat.Id)
@@ -343,9 +488,37 @@ local function update()
 			tryStep(beat.Id)
 		end
 	else
-		point(nil)
+		local wanted = (
+			{ SocketArmor = "Armor", SocketWeapon = "Weapon", SocketShield = "Shield", SurgeQ = "Q", SurgeE = "E" }
+		)[beat.Id]
+		local target
+		if wanted then
+			for _, object in player.PlayerGui:GetDescendants() do
+				if object:IsA("GuiObject") and object:GetAttribute("TutorialSocket") == wanted then
+					target = object
+					break
+				end
+			end
+		end
+		point(target)
 		-- A socket beat: ticked off the moment the profile shows it.
 		if Tutorial.met(GemClient.Profile, beat.Id) then
+			if lastSocketBeat ~= beat.Id then
+				lastSocketBeat = beat.Id
+				local slot = if beat.Id == "SocketArmor"
+					then "Armor"
+					elseif beat.Id == "SocketShield" then "Shield"
+					else nil
+				if slot then
+					local c = GemClient.Profile.Character
+					local kind = ArmorSignatures.Slots[slot]
+					local roll = c.GearRolls and c.GearRolls[kind] and c.GearRolls[kind][c[slot]]
+					local name, effect = ArmorSignatures.describe(roll, c[slot .. "Gem"])
+					if name ~= "" then
+						UiKit.toast(name .. ": " .. effect, P.Good)
+					end
+				end
+			end
 			tryStep(beat.Id)
 		end
 	end

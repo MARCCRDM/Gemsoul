@@ -604,7 +604,7 @@ function handlers.MarketPreviews(player: Player)
 end
 
 function handlers.MarketBrowse(player: Player)
-	local rows = browse()
+	local rows = require(script.Parent.Intro).tutorialStock(player) or browse()
 	return Shop.reply(true, "", { Listings = rows, Shared = getBoard().Shared, Now = os.time() })
 end
 
@@ -705,6 +705,9 @@ function handlers.MarketCancel(player: Player, listingId)
 end
 
 function handlers.MarketBuy(player: Player, listingId)
+ if type(listingId) == "string" and string.sub(listingId, 1, 9) == "Tutorial:" then
+  return require(script.Parent.Intro).tutorialBuy(player, listingId)
+ end
 	local profile = PlayerData.get(player)
 	if typeof(listingId) ~= "string" then
 		return Shop.reply(false, "Pick a listing.")

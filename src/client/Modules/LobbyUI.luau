@@ -238,7 +238,11 @@ local function card(spec)
 	end)
 	b.Activated:Connect(function()
 		local need = spec.Unlock and LobbyUI.Unlocks[spec.Unlock] or 0
-		local left = need - played()
+		local left = if GemClient.Profile
+				and GemClient.Profile.Tutorial
+				and GemClient.Profile.Tutorial.Done
+			then 0
+			else need - played()
 		if left > 0 then
 			UiKit.toast(
 				string.format("Complete %d more duel%s to unlock %s.", left, if left == 1 then "" else "s", spec.Title),
@@ -337,7 +341,11 @@ local function refreshCards()
 	local count = played()
 	for _, entry in cards do
 		local need = entry.Spec.Unlock and LobbyUI.Unlocks[entry.Spec.Unlock] or 0
-		local left = need - count
+		local left = if GemClient.Profile
+				and GemClient.Profile.Tutorial
+				and GemClient.Profile.Tutorial.Done
+			then 0
+			else need - count
 		entry.Veil.Visible = left > 0
 		entry.Lock.Text =
 			string.format("LOCKED\nComplete %d more duel%s to unlock", left, if left == 1 then "" else "s")

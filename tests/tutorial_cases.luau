@@ -87,7 +87,13 @@ local profile = {
 	Owned = kinds(),
 	Gems = {},
 }
-local player = { UserId = 1, Character = nil }
+local player = {
+	UserId = 1,
+	Character = nil,
+	GetAttribute = function()
+		return nil
+	end,
+}
 local equipped = {}
 local nextGem = 0
 local handlers = {}
@@ -137,6 +143,9 @@ local stubs = {
 		end,
 		equipGear = function(_, kind, id)
 			equipped[kind .. id] = true
+		end,
+		addCoins = function(_, n)
+			profile.Coins = (profile.Coins or 0) + n
 		end,
 		newGemId = function()
 			nextGem += 1
@@ -195,6 +204,20 @@ local stubs = {
 		end,
 	}) },
 	Tutorial = Tutorial,
+	ArenaSessions = {
+		enterTraining = function()
+			return { Ok = true }
+		end,
+	},
+	Market = {
+		cantReceive = function()
+			return nil
+		end,
+		give = function(_, item)
+			profile.PurchasedItem = item
+			return true
+		end,
+	},
 }
 local landmarks = {
 	GetAttribute = function()
@@ -293,7 +316,35 @@ check(handlers.TutorialStep(player, "SocketShield").Ok, "The shield socket didn'
 check(not handlers.TutorialStep(player, "SurgeQ").Ok, "Q ticked off empty")
 profile.Character.Surge1Gem = profile.Gems[4]
 check(handlers.TutorialStep(player, "SurgeQ").Ok, "Q didn't tick off")
-check(handlers.TutorialStep(player, "CloseInventory").Ok and profile.Tutorial.Done, "The tutorial didn't finish")
+check(not handlers.TutorialStep(player, "SurgeE").Ok, "Empty E accepted")
+profile.Character.Surge2Gem = profile.Gems[5]
+check(handlers.TutorialStep(player, "SurgeE").Ok, "E not accepted")
+check(handlers.TutorialStep(player, "CloseInventory").Ok and not profile.Tutorial.Done, "Ended before combat")
+check(not handlers.TutorialStep(player, "Queue").Ok, "Client bypassed queue")
+player.Character = {
+	FindFirstChild = function()
+		return { Position = v3(100, 5, 90) }
+	end,
+}
+check(handlers.TutorialQueue(player).Waiting, "No queue countdown")
+check(handlers.TutorialQueue(player).Waiting, "Countdown bypassed")
+profile.Tutorial.QueueAt = os.time() - 4
+check(handlers.TutorialQueue(player).Ok and Tutorial.beat(profile).Id == "Fight", "Queue didn't enter practice")
+check(not handlers.TutorialStep(player, "Fight").Ok, "Client forged victory")
+Intro.tutorialVictory(player)
+check(profile.Coins == 50 and Tutorial.beat(profile).Id == "Return", "Victory rewards missing")
+Intro.tutorialVictory(player)
+check(profile.Coins == 50, "Victory paid twice")
+check(handlers.TutorialStep(player, "Return").Ok, "Return failed")
+check(handlers.TutorialStep(player, "OpenMarket").Ok, "Market failed")
+check(not handlers.TutorialStep(player, "Buy").Ok, "Client forged purchase")
+local stock = Intro.tutorialStock(player)
+check(#stock == 3 and stock[1].Price <= 50, "Starter stock unavailable")
+check(not Intro.tutorialBuy(player, "Tutorial:999").Ok, "Invalid stock accepted")
+check(Intro.tutorialBuy(player, "Tutorial:1").Ok and profile.Coins == 35 and profile.PurchasedItem, "Purchase failed")
+check(not Intro.tutorialBuy(player, "Tutorial:1").Ok and profile.Coins == 35, "Purchase repeated")
+check(handlers.TutorialStep(player, "CloseMarket").Ok, "Close market failed")
+check(handlers.TutorialStep(player, "Play").Ok and profile.Tutorial.Done, "Play didn't finish")
 
 -- Skip from the very start: the whole kit, Ember Lance on Q.
 profile = {

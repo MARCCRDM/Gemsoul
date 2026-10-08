@@ -80,7 +80,7 @@ local skip = new("TextButton", {
 UiKit.round(skip, 6)
 skip.Activated:Connect(function()
 	skip.Text = "SKIPPING…"
-	GemClient.request("TutorialSkip")
+	GemClient.request("CombatTutorialSkip")
 end)
 
 -- The pulse around the controls the lesson's about (up to three: Q, E, R).
@@ -141,7 +141,14 @@ local function refresh()
 		header.Text = string.format("COMBAT TRAINING  ·  %d / %d", index, Tutorial.count())
 		title.Text = step.Title
 		body.Text = Tutorial.text(step, touch())
-		skip.Visible = index < Tutorial.count()
+		if player:GetAttribute("FastTutorial") then
+			header.Text = "RIVAL MATCH · PRACTICE"
+			body.Text = if step.Id == "Attack"
+				then "Tap to attack."
+				elseif step.Id == "Block" then "Hold Guard. Block this."
+				else (if touch() then "Tap Q to Surge." else "Press Q to Surge.")
+		end
+		skip.Visible = index < Tutorial.count() and not player:GetAttribute("FastTutorial")
 		skip.Text = "SKIP TRAINING ›"
 		stroke.Color, title.TextColor3 = GOLD, TEXT
 		-- A fresh lesson pops in.

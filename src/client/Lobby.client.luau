@@ -132,7 +132,7 @@ task.spawn(function()
 		waitFor(tutorialDone, 3600)
 		task.wait(1.5)
 	end
-	if duelsPlayed() == 0 and not veteran() then
+	if duelsPlayed() == 0 and not veteran() and not GemClient.Profile.Tutorial then
 		firstDuel()
 	end
 	for _ = 1, 5 do

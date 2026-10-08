@@ -1913,6 +1913,7 @@ end
 
 -- One compact rating tile for the header strip: icon, name (with a hint),
 -- the number, any gem bonus, and a bar.
+local previousStatTotals = {}
 local function statTile(parent: Instance, name: string, rating: Classes.Rating, x: number, hint: string?)
 	local color = STAT_COLORS[name] or P.Teal
 	local total = rating.Base + rating.Bonus
@@ -1942,6 +1943,11 @@ local function statTile(parent: Instance, name: string, rating: Classes.Rating, 
 	caption.Size = UDim2.fromOffset(104, 12)
 	caption.TextTruncate = Enum.TextTruncate.AtEnd
 	local number = text(tile, whole(total), 18, Color3.new(1, 1, 1), IronUi.Heading)
+ if previousStatTotals[name] and total > previousStatTotals[name] then
+  number.TextColor3 = Color3.fromRGB(85,255,140)
+  TweenService:Create(number, TweenInfo.new(1), { TextColor3 = Color3.new(1,1,1) }):Play()
+ end
+ previousStatTotals[name] = total
 	number.AutomaticSize = Enum.AutomaticSize.None
 	number.Position = UDim2.fromOffset(42, 15)
 	number.Size = UDim2.fromOffset(56, 18)

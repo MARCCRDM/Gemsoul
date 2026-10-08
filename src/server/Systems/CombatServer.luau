@@ -1941,7 +1941,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	local castKind = Actions.castKind(definition)
 	posePlayer(player, Actions.castPose(definition), castTime, definition.Name, definition.Element)
 	if surgeKey then
-		CombatEvents.fire(player, "Surge")
+		CombatEvents.fire(player, "Surge", surgeKey)
 	end
 	local castSpeed = Actions.castMovement(definition)
 	if castSpeed < 1 then
@@ -2456,6 +2456,10 @@ function CombatServer.heal(player, amount)
 	local cut = amount * (1 + (k.Effects.HealingReceived or 0)) - healing
 	DamageLog.send(player, { Dir = "In", Kind = "Heal", Amount = restored, Blocked = cut })
 	return restored
+end
+function CombatServer.tutorialCharge(player)
+ state(player).Resources.Charge = 100
+ player:SetAttribute("Charge", 100)
 end
 function CombatServer.reset(player)
 	if states[player] then

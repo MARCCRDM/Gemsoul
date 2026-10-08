@@ -67,6 +67,7 @@ local ExpeditionAmbient = require(script.Parent.ExpeditionAmbient)
 local CombatEvents = require(script.Parent.CombatEvents)
 local Shop = require(script.Parent.Shop)
 local Tutorial = require(ReplicatedStorage.Shared.CombatTutorial)
+local Onboarding = require(ReplicatedStorage.Shared.Tutorial)
 local Duelist = {}
 local dungeonActors = {}
 
@@ -115,6 +116,7 @@ local function clearTutorial(owner: Player)
 	owner:SetAttribute("TutorialStep", nil)
 	owner:SetAttribute("TutorialCount", nil)
 	owner:SetAttribute("TutorialGoal", nil)
+	owner:SetAttribute("FastTutorial", nil)
 end
 local starting: { [Player]: boolean } = {}
 local idCounter = 0
@@ -852,7 +854,7 @@ local function publishTutorial(duel)
 	local step = Tutorial.step(t.Step)
 	owner:SetAttribute("TutorialStep", t.Step)
 	owner:SetAttribute("TutorialCount", t.Count)
-	owner:SetAttribute("TutorialGoal", if step then step.Goal else 0)
+	owner:SetAttribute("TutorialGoal", if step then (if duel.FastTutorial then 1 else step.Goal) else 0)
 end
 
 local function setTutorialStep(duel, index: number)
@@ -861,6 +863,9 @@ local function setTutorialStep(duel, index: number)
 	t.Next = now + 1.2 -- a beat before the partner acts
 	duel.Action = nil
 	local step = Tutorial.step(index)
+	if duel.FastTutorial and step and step.Id == "Surge" then
+		CombatServer.tutorialCharge(duel.Owner)
+	end
 	-- Each lesson starts fresh: both at full health.
 	enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
 	local _, ownerHumanoid = ownerRoot(duel.Owner)
@@ -894,13 +899,13 @@ local function tutorialProgress(duel, event: string)
 	end
 	t.Count += 1
 	publishTutorial(duel)
-	if t.Count < step.Goal or step.Event == "Win" then
+	if t.Count < (if duel.FastTutorial then 1 else step.Goal) or step.Event == "Win" then
 		return
 	end
 	t.Advancing = true
 	local index = t.Step
 	local nextIndex = Tutorial.nextStep(index, function(s)
-		return canDo(duel, s)
+		return canDo(duel, s) and (not duel.FastTutorial or s.Id == "Block" or s.Id == "Surge")
 	end)
 	task.delay(1.6, function()
 		if duels[duel.Owner] == duel and duel.Tutorial == t and t.Step == index and nextIndex then
@@ -939,7 +944,7 @@ local function tutorialThink(duel, enemy, now: number, target: BasePart, distanc
 		if distance <= Brain.Reach + 1.5 then
 			dealt, guarded = strike(
 				duel,
-				duel.Damage * (if heavy then 0.35 else 0.2),
+				(if duel.FastTutorial then 2 else duel.Damage * (if heavy then 0.35 else 0.2)),
 				duel.Element,
 				heavy,
 				nil,
@@ -1680,6 +1685,12 @@ local function onWin(enemy)
 	end
 	local session = duel.Session
 	countDuel(owner, true)
+	if duel.FastTutorial then
+		clearTutorial(owner)
+		require(script.Parent.Intro).tutorialVictory(owner)
+		Remotes.Notify:FireClient(owner, "Victory! +50 Coins · +1 Common Armor Piece")
+		return
+	end
 	if duel.Intro then
 		clearTutorial(owner)
 		-- The first-duel intro is one match; the client heads to the lobby.
@@ -1738,6 +1749,13 @@ function spawnRival(owner: Player, raid, encounter)
 	starting[owner] = true
 	local rng = Random.new()
 	local loadout = rollLoadout(rng)
+	local tutorialProfile = PlayerData.get(owner)
+	local tutorialBeat = tutorialProfile and Onboarding.beat(tutorialProfile)
+	local fastTutorial = session == "Training" and tutorialBeat ~= nil and tutorialBeat.Id == "Fight"
+	if fastTutorial then
+		loadout =
+			{ Class = "Warrior", Weapon = "SwordShield", Armor = "ArmorSkirmisherArmor1", GearRolls = {}, ItemGems = {} }
+	end
 	if encounter then
 		encounter.GearTier = encounter.GearTier or (if encounter.Boss then 4 else 1)
 		if not encounter.Bandit then
@@ -1763,6 +1781,24 @@ function spawnRival(owner: Player, raid, encounter)
 	away = if away.Magnitude > 1 then away.Unit else Vector3.new(1, 0, 0)
 	local spot = if encounter then encounter.Spot else center + away * 18 + Vector3.new(0, 4, 0)
 	local rig = buildRig(loadout, name, CFrame.lookAt(spot, Vector3.new(root.Position.X, spot.Y, root.Position.Z)))
+	if fastTutorial and rig then
+		local shield = rig:FindFirstChild("Shield", true)
+		if shield then
+			shield:Destroy()
+		end
+		local weaponModel = rig:FindFirstChild("Weapon", true)
+		if weaponModel then
+			for _, part in weaponModel:GetDescendants() do
+				if part:IsA("BasePart") then
+					part.Material = Enum.Material.Wood
+					part.Color = Color3.fromRGB(125, 83, 45)
+				end
+				if part:IsA("Light") or part:IsA("ParticleEmitter") or part:IsA("Trail") then
+					part:Destroy()
+				end
+			end
+		end
+	end
 	starting[owner] = nil
 	if
 		not rig
@@ -2118,7 +2154,11 @@ function spawnRival(owner: Player, raid, encounter)
 		return
 	end
 	duels[owner] = duel
-	if duel.Intro then
+	local onboarding = PlayerData.get(owner)
+	local beat = onboarding and Onboarding.beat(onboarding)
+	duel.FastTutorial = session == "Training" and beat ~= nil and beat.Id == "Fight"
+	owner:SetAttribute("FastTutorial", duel.FastTutorial)
+	if duel.Intro or duel.FastTutorial then
 		startTutorial(duel)
 	end
 	if ArenaDrop.forRival(session, raid, encounter) and owner.Character then
@@ -2167,9 +2207,21 @@ end
 function Duelist.start()
 	-- Combat training counts what the player does (CombatServer's events),
 	-- and can be skipped straight to the spar.
-	CombatEvents.listen(function(player, kind)
+	CombatEvents.listen(function(player, kind, detail)
 		local duel = duels[player]
 		if not duel or not duel.Tutorial then
+			return
+		end
+		if duel.FastTutorial and kind == "Surge" then
+			local step = Tutorial.step(duel.Tutorial.Step)
+			if step and step.Id == "Surge" and detail == "Q" then
+				task.delay(0.8, function()
+					if duels[player] == duel and duel.Enemy.Alive then
+						duel.Enemy.Training = nil
+						Enemies.damage(duel.Enemy, duel.Enemy.Humanoid.MaxHealth * 100, player)
+					end
+				end)
+			end
 			return
 		end
 		if kind == "Dodge" then
@@ -2178,9 +2230,9 @@ function Duelist.start()
 			tutorialProgress(duel, kind)
 		end
 	end)
-	Shop.register("TutorialSkip", function(player)
+	Shop.register("CombatTutorialSkip", function(player)
 		local duel = duels[player]
-		if duel and duel.Tutorial and duel.Tutorial.Step < Tutorial.count() then
+		if duel and duel.Tutorial and not duel.FastTutorial and duel.Tutorial.Step < Tutorial.count() then
 			setTutorialStep(duel, Tutorial.count())
 		end
 		return Shop.reply(true, "")

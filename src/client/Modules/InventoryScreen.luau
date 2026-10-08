@@ -210,6 +210,7 @@ local function gemColor(gem): Color3
 	return GemConfig.ElementColors[gem.Element] or C.Text
 end
 local function gemName(gem): string
+ if gem.Role == "Core" then return GemConfig.elementName(gem.Element) .. " Core" end
 	if gem.Cut then
 		local surge = Tech.surgeStats(gem)
 		if surge then
@@ -552,6 +553,7 @@ local function wornCard(slot: string, column: number, row: number)
 			select({ Kind = "Worn", Slot = slot })
 		end
 	end)
+	cell:SetAttribute("TutorialSocket", slot)
 	wornCards[slot] = {
 		Cell = cell,
 		Stroke = edge,
@@ -598,6 +600,7 @@ for i, key in { "Q", "E", "R" } do
 	at(keyBox, 12 + (i - 1) * (KEY_W + 6), 28, KEY_W, 2 * CARD_H + ROW_GAP - 40)
 	round(keyBox, 4)
 	keyBox:SetAttribute("UiSound", "Click")
+ keyBox:SetAttribute("TutorialSocket", key)
 	local edge = stroke(keyBox, C.PanelEdge, 1.5)
 	local art = new("Frame", { BackgroundTransparency = 1 }, keyBox)
 	at(art, math.floor((KEY_W - 56) / 2), 28, 56, 56)
@@ -947,7 +950,7 @@ local function drawGems()
 			gemName(gem),
 			tierColor,
 			rarityName(gemRarity(gem)),
-			if gem.Cut then string.upper(GemConfig.elementName(gem.Element)) else "ROUGH",
+			if gem.Role == "Core" then "ENCHANT GEAR" elseif gem.Role == "Surge" then "ACTIVE ABILITY" elseif gem.Cut then string.upper(GemConfig.elementName(gem.Element)) else "ROUGH",
 			if gem.Cut then gemColor(gem) else C.Faint,
 			function(art)
 				gemArt(art, gem)
@@ -1932,6 +1935,10 @@ end
 -- scroll position when it is.
 local pageKey, pageTab = "", ""
 local function drawRight()
+ local profile = profileNow()
+ if profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
+  tab, gemFilter = "Gems", "All"
+ end
 	drawTabs()
 	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
 	if key ~= nil and key == pageKey and pageTab == tab then
