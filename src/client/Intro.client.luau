@@ -12,6 +12,7 @@ local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
+local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -26,6 +27,12 @@ end
 -- After the splash intro.
 while game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Splash") do
 	task.wait(0.1)
+end
+-- The tutorial (Shared.Tutorial) replaces the starter picker: the server
+-- hands out the kit and Tutorial.client takes it from here.
+if Tutorial.Enabled then
+	GemClient.request("TutorialBegin")
+	return
 end
 local new = IronUi.new
 -- A clean launch screen: deep navy, one gold call to action, a cyan accent,

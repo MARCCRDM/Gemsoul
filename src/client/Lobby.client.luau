@@ -116,6 +116,22 @@ task.spawn(function()
 			and intro.Done == true
 	end, 3600)
 	task.wait(0.5)
+	-- The tutorial (Tutorial.client) starts in the Outpost: go there first
+	-- and let it run.
+	local function tutorialDone(): boolean
+		local tutorial = GemClient.Profile.Tutorial
+		return tutorial == nil or tutorial.Done == true
+	end
+	if not tutorialDone() then
+		for _ = 1, 5 do
+			OutpostScene.enter()
+			if waitFor(OutpostScene.isActive, 6) then
+				break
+			end
+		end
+		waitFor(tutorialDone, 3600)
+		task.wait(1.5)
+	end
 	if duelsPlayed() == 0 and not veteran() then
 		firstDuel()
 	end
