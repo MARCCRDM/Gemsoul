@@ -314,6 +314,10 @@ function finish(match, winner: number?, reason: string)
 			end
 			local coins = if winner == nil then 0 elseif won then rewards.Win else rewards.Loss
 			if member.Parent then
+                if #match.Teams[1] == 1 and #match.Teams[2] == 1 then
+                    PlayerData.training(member, "PvPPlayed")
+                    if won then PlayerData.training(member, "PvPWin") end
+                end
 				if coins > 0 then
 					PlayerData.addCoins(member, coins)
 				end

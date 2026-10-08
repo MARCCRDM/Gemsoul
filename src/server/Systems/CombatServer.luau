@@ -614,6 +614,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	local blocked = math.max(0, beforeGuard - damage)
  if blocked > 0 and origin and not reflected then CombatEvents.fire(player,"Block") end
 	local parried = st.ParrySpent and not parriedBefore
+ if parried then CombatEvents.fire(player, "TimedBlock") end
 	local beforeAbsorb = damage
 	damage = ArmorSignatures.absorb(st, damage, now)
 	if now < st.SiphonUntil and st.SiphonCapacity > 0 then

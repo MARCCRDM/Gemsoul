@@ -425,6 +425,7 @@ local function settle(player: Player)
 			end
 		end
 		local home, got, coins, message = false, nil, 0, nil
+        local sold = false
 		if entry.Role == "Sell" then
 			row = closeIfExpired(row, listingId)
 			if row and row.Seller ~= player.UserId then
@@ -434,6 +435,7 @@ local function settle(player: Player)
 			elseif (row and row.State == "Sold") or (not row and note and note.Kind == "Sold") then
 				local price = if row then row.Price else note.Price
 				coins = Rules.payout(price)
+                sold = true
 				message = string.format(
 					"Sold to %s for %d coins (+%d after tax).",
 					(if row then row.BuyerName else note.BuyerName) or "a player",
@@ -505,6 +507,8 @@ local function settle(player: Player)
 		end
 		profile.Coins += coins
 		escrow[entryId] = nil
+        if sold then PlayerData.training(player, "MarketSale") end
+        if entry.Role == "Buy" and got and not home then PlayerData.training(player, "MarketBuy") end
 		changed = true
 		if message then
 			table.insert(notes, message)
@@ -773,6 +777,7 @@ function handlers.MarketBuy(player: Player, listingId)
 	end
 	escrow[entryId] = nil
 	Rules.give(profile, claimed.Item, Config.MaxGems, true)
+    PlayerData.training(player, "MarketBuy")
 	PlayerData.milestone(player, "Traded")
 	invalidate()
 	finishChange(player)

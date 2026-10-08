@@ -78,6 +78,7 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonLoot", nil)
 				p:SetAttribute("DungeonLootDeadline", nil)
 				if eligible then
+                    PlayerData.training(p, "DungeonComplete")
 					PlayerData.addCoins(p, 300)
 					Progress.addXP(p, "SlayBrute")
 				end
@@ -243,6 +244,9 @@ local function spawnRoom(run, index)
 				if run.Done or (not run.OpenWorld and run.Index ~= index) then
 					return
 				end
+                if room.Boss and not run.Test then
+                    for _, member in living(run) do PlayerData.training(member, "Boss") end
+                end
 				if run.OpenWorld then
 					if room.Boss then
 						beginLoot(run, room)

@@ -20,13 +20,26 @@ Training.record(p,"Slot","Weapon");Training.record(p,"Slot","Shield")
 check(p.Coins==235,"Distinct gear reward")
 for _,event in {"EquipSurge","Heavy","Block","Surge","RivalWin"} do Training.record(p,event) end
 check(p.Coins==390,"Total reward budget must be 290")
-for _,o in Training.Objectives do check(p.TrainingRewards.Paid[o.Id],"Missing paid flag: "..o.Id) end
+local extraEvents={"MineGem","RareGem","LegendGem","TimedBlock","PvPPlayed","PvPWin","Boss","DungeonComplete","MarketBuy","MarketSale"}
+for _,event in extraEvents do Training.record(p,event) end
+local total=100
+local ids={}
+for _,o in Training.Objectives do
+ check(not ids[o.Id],"Duplicate task ID");ids[o.Id]=true
+ check(o.Category~=nil,"Missing category")
+ total+=o.Coins
+ check(p.TrainingRewards.Paid[o.Id],"Missing paid flag: "..o.Id)
+end
+check(p.Coins==total,"Expanded payout budget")
+for _,event in extraEvents do Training.record(p,event) end
+check(p.Coins==total,"Expanded task replay paid twice")
 -- Simulate persistence by rebuilding all tables and reset only onboarding.
 local function copy(v) if type(v)~="table" then return v end;local t={};for k,x in v do t[k]=copy(x) end;return t end
 local rejoined=copy(p);rejoined.Tutorial={Step=1,Done=false,Run=99}
 for _,event in {"Mine","Enchant","EquipSurge","Hit","Heavy","Block","Surge","RivalWin"} do Training.record(rejoined,event) end
 for _,slot in {"Armor","Weapon","Shield"} do Training.record(rejoined,"Slot",slot) end
-check(rejoined.Coins==390,"Reconnect or Dev replay repaid rewards")
+for _,event in extraEvents do Training.record(rejoined,event) end
+check(rejoined.Coins==total,"Reconnect or Dev replay repaid rewards")
 local outOfOrder={Coins=0}
 Training.record(outOfOrder,"RivalWin")
 check(outOfOrder.Coins==50 and not outOfOrder.TrainingRewards.Paid.FirstRock,"Objectives forced into order")

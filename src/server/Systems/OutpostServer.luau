@@ -427,6 +427,12 @@ local function hit(player: Player, nodeId: any)
 		result.Loot = loot(player, node, profile)
 		popNode(node, player)
 		PlayerData.training(player, "Mine")
+        if result.Loot and result.Loot.Gem then
+            PlayerData.training(player, "MineGem")
+            local rank = GemConfig.TierRank[result.Loot.Gem.Tier] or 0
+            if rank >= 3 then PlayerData.training(player, "RareGem") end
+            if rank >= 5 then PlayerData.training(player, "LegendGem") end
+        end
 	end
 	PlayerData.sync(player)
 	return reply(true, "", result)

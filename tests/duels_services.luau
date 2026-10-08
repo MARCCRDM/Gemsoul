@@ -164,7 +164,9 @@ local Shop = {
 	end,
 }
 local profiles, xp = {}, {}
+local taskEvents = {}
 local PlayerData = {
+ training = function(p,event) taskEvents[p]=taskEvents[p] or {};taskEvents[p][event]=(taskEvents[p][event] or 0)+1 end,
 	get = function(p)
 		return profiles[p]
 	end,

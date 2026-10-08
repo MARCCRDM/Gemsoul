@@ -157,6 +157,7 @@ local PlayerData = {
 	sync = function() end,
 	augmentsChanged = function() end,
 	milestone = function() end,
+ training = function() end,
 }
 local handlers = {}
 local Shop = {

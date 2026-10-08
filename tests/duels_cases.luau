@@ -418,3 +418,8 @@ print(
 		.. checks
 		.. " duel checks (Elo, pairing, lanes, who can hit whom, queue, challenges, 2v2 parties, knockouts, forfeits, time limit, rewards)"
 )
+
+local playedTasks,wonTasks=0,0
+for _,events in taskEvents do playedTasks+=events.PvPPlayed or 0;wonTasks+=events.PvPWin or 0 end
+assert(playedTasks>0 and wonTasks>0,"Finished 1v1 matches must emit task events")
+print("PASS: real PvP completion emits participation and victory task events")

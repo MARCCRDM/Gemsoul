@@ -773,7 +773,7 @@ function PlayerData.training(player, event, detail)
  local earned,changed=TrainingRewards.record(profile,event,detail)
  if not changed then return end
  for _,objective in earned do
-  Remotes.Notify:FireClient(player,"TRAINING COMPLETE: "..objective.Name.."  +"..objective.Coins.." coins")
+  Remotes.Notify:FireClient(player,"TASK COMPLETE: "..objective.Name.."  +"..objective.Coins.." coins")
  end
  sync(player)
 end
