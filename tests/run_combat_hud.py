@@ -32,13 +32,14 @@ local GemConfig={ElementColors={}}
 local UiKit={gui=function() return {} end}
 local head={Name="Head",Size=Vector3.new(2,8,2),IsA=function(_,k) return k=="BasePart" end}
 local hum={Health=100,MaxHealth=100}
-local legacy=Instance.new("BillboardGui");legacy.Name="HealthBar";legacy.Parent=head
+local legacy=Instance.new("BillboardGui");legacy.Name="HealthBar";legacy.Parent=head;legacy.Enabled=false
+local descendants={legacy}
 local model={Name="Boss",Parent=true}
 local drop=0
 function model:GetAttribute(k) return if k=="ArenaDropUntil" then drop elseif k=="RivalName" then "Tung Tung" else nil end
 function model:FindFirstChild(k) return if k=="Head" then head else nil end
 function model:FindFirstChildOfClass() return hum end
-function model:GetDescendants() return {legacy} end
+function model:GetDescendants() return descendants end
 local foes={model}
 local TargetLock={foes=function() return foes end,target=function() return model end,select=function() end}
 '''
@@ -56,8 +57,11 @@ head.Size=Vector3.new(2,12,2);now+=.2;render(.1)
 assert(board.StudsOffsetWorldSpace.Y>6,"Scaled boss offset stale")
 legacy.Enabled=true;now+=.2;render(.1)
 assert(not legacy.Enabled,"Server update restored duplicate bar")
+local late=Instance.new("BillboardGui");late.Name="HealthBar";late.Parent=head
+ table.insert(descendants,late);now+=.2;render(.1)
+assert(not late.Enabled,"Late legacy bar remained visible")
 foes={};now+=.2;render(.1)
-assert(board.Destroyed and legacy.Enabled,"Nameplate cleanup failed")
+assert(board.Destroyed and not legacy.Enabled,"Nameplate cleanup failed")
 print("PASS: single enemy bar, head-relative world placement, scaled bosses and cleanup")
 '''
 with tempfile.TemporaryDirectory(prefix='gemsoul-hud-') as d:

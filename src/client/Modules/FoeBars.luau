@@ -77,7 +77,6 @@ type Bar = {
 	Shown: number,
 	Trailing: number,
 	Label: TextLabel,
-	Hidden: { BillboardGui },
 }
 local bars: { [Model]: Bar } = {}
 
@@ -87,11 +86,11 @@ local function barFor(model: Model): Bar?
 		return nil
 	end
 	local bar = bars[model]
-	if bar then
-		for _, legacy in bar.Hidden do
-			if legacy.Parent then
-				legacy.Enabled = false
-			end
+	-- Rescan even when the nameplate exists: legacy boards can arrive late or
+	-- be re-enabled by replicated entrance state.
+	for _, child in model:GetDescendants() do
+		if child:IsA("BillboardGui") and child.Name == "HealthBar" then
+			child.Enabled = false
 		end
 	end
 	if bar and bar.Board.Adornee == head and bar.Board.Parent then
@@ -131,13 +130,6 @@ local function barFor(model: Model): Bar?
 		},
 		board
 	)
-	local hidden = {}
-	for _, child in model:GetDescendants() do
-		if child:IsA("BillboardGui") and child.Name == "HealthBar" and child.Enabled then
-			child.Enabled = false
-			table.insert(hidden, child)
-		end
-	end
 	corner(back, 3)
 	local stroke = make("UIStroke", { Color = EDGE, Thickness = 1 }, back)
 	local inner = make("Frame", {
@@ -158,7 +150,6 @@ local function barFor(model: Model): Bar?
 	end
 	bar = {
 		Label = label,
-		Hidden = hidden,
 		Board = board,
 		Back = back,
 		Fill = fill,
@@ -287,11 +278,6 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		for model, bar in bars do
 			if not keep[model] then
-				for _, legacy in bar.Hidden do
-					if legacy.Parent then
-						legacy.Enabled = not dropping(model)
-					end
-				end
 				bar.Board:Destroy()
 				bars[model] = nil
 			end

@@ -58,7 +58,7 @@ local function concealLabels(model)
 		connection:Disconnect()
 		for object, value in saved do
 			if object.Parent then
-				object.Enabled = value
+				object.Enabled = value and object.Name ~= "HealthBar"
 			end
 		end
 		if humanoid and humanoid.Parent then

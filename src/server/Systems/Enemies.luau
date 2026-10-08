@@ -206,6 +206,8 @@ end
 local function healthBar(root: BasePart, name: string, color: Color3, height: number): Frame
 	local board = Instance.new("BillboardGui")
 	board.Name = "HealthBar"
+	-- FoeBars owns the visible nameplate. Keep this backing frame for health updates.
+	board.Enabled = false
 	board.Size = UDim2.fromOffset(120, 30)
 	board.StudsOffsetWorldSpace = Vector3.new(0, height, 0)
 	board.MaxDistance = 90
