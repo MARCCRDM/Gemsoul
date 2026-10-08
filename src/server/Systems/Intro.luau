@@ -242,6 +242,8 @@ function Intro.tutorialMined(player)
  local state = Tutorial.state(profile)
  local gem = tutorialGem(state.Mined + 1)
  if not PlayerData.addGem(player, gem) then return nil end
+ state.GemIds = state.GemIds or {}
+ state.GemIds[gem.Element] = gem.Id
  state.Mined += 1
  Tutorial.advance(profile, "Mine")
  PlayerData.sync(player)

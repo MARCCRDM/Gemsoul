@@ -897,6 +897,16 @@ local function shownGems()
 		end
 		return a.Id < b.Id
 	end)
+ local tutorial = profile and profile.Tutorial
+ if tutorial and not tutorial.Done then
+  local teaching = {}
+  for _, gem in gems do
+   if (tutorial.GemIds and tutorial.GemIds[gem.Element] == gem.Id) or (not tutorial.GemIds and gem.Role == "Core") then
+    table.insert(teaching, gem)
+   end
+  end
+  if #teaching > 0 then gems = teaching end
+ end
 	return gems
 end
 local function gemsKey(): string
@@ -961,6 +971,7 @@ local function drawGems()
 			{ Kind = "Gem", Gem = gem }
 		)
   gemCard:SetAttribute("TutorialGem", gem.Element)
+  gemCard:SetAttribute("TutorialGemId", gem.Id)
 	end
 	footer.Text = if selection and selection.Kind == "Gem"
 		then string.upper(gemName(selection.Gem)) .. "  ·  TAP FOR DETAILS, OR DRAG IT ONTO A SOCKET"

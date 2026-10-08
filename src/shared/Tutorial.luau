@@ -23,13 +23,47 @@ Tutorial.Enabled = true
 
 -- Thermal, Cryo and Ion are what players call Fire, Frost and Shock.
 Tutorial.Beats = {
- {Id="Mine", Prompt="Click a rock to swing your pick.", Mobile="Tap to swing your pick.", Detail="Walk to the highlighted rock. Each click, tap or E press is one swing. Break three rocks to find three gems."},
- {Id="GemIntro", Prompt="You found your first gems.", Detail="Color tells you the element. Socket a gem into equipment to enchant it. You can move it later."},
- {Id="OpenInventory", Prompt="Open Inventory.", Mobile="Tap Inventory.", Detail="Your mined gems are in the Gems tab. Let's put them to use."},
- {Id="SocketArmor", Prompt="Drag the Thermal gem onto your Chest.", Mobile="Tap the Thermal gem, then CHEST.", Detail="Enchanting strengthens your armor's unique perk. Read the green effect confirmation."},
- {Id="SocketWeapon", Prompt="Drag the Cryo gem onto your Sword.", Mobile="Tap the Cryo gem, then WEAPON.", Detail="A weapon enchantment improves your sword. The inventory shows what changes."},
- {Id="SocketShield", Prompt="Drag the Ion gem onto your Shield.", Mobile="Tap the Ion gem, then SHIELD.", Detail="This enchantment strengthens your shield's guard perk."},
- {Id="CloseInventory", Prompt="Close Inventory. You're ready.", Mobile="Tap Back to Lobby.", Detail="That's the loop: mine gems, enchant your gear, and try new combinations."},
+	{
+		Id = "Mine",
+		Prompt = "Click a rock to swing your pick.",
+		Mobile = "Tap to swing your pick.",
+		Detail = "Walk to the highlighted rock. Each click, tap or E press is one swing. Break three rocks to find three gems.",
+	},
+	{
+		Id = "GemIntro",
+		Prompt = "Three gems. Your first power-up!",
+		Detail = "Color tells you the element. Socket a gem into equipment to enchant it. You can move it later.",
+	},
+	{
+		Id = "OpenInventory",
+		Prompt = "Let’s put those gems to work!",
+		Mobile = "Tap Inventory.",
+		Detail = "Click Inventory below. Your three new gems are waiting in the Gems tab.",
+	},
+	{
+		Id = "SocketArmor",
+		Prompt = "Drag the Thermal gem onto your Chest.",
+		Mobile = "Tap the Thermal gem, then CHEST.",
+		Detail = "Enchanting strengthens your armor's unique perk. Read the green effect confirmation.",
+	},
+	{
+		Id = "SocketWeapon",
+		Prompt = "Drag the Cryo gem onto your Sword.",
+		Mobile = "Tap the Cryo gem, then WEAPON.",
+		Detail = "A weapon enchantment improves your sword. The inventory shows what changes.",
+	},
+	{
+		Id = "SocketShield",
+		Prompt = "Drag the Ion gem onto your Shield.",
+		Mobile = "Tap the Ion gem, then SHIELD.",
+		Detail = "This enchantment strengthens your shield's guard perk.",
+	},
+	{
+		Id = "CloseInventory",
+		Prompt = "Loadout upgraded. You’re ready!",
+		Mobile = "Tap Back to Lobby.",
+		Detail = "That's the loop: mine gems, enchant your gear, and try new combinations.",
+	},
 }
 Tutorial.ById = {}
 for index, beat in Tutorial.Beats do
@@ -39,9 +73,9 @@ end
 
 -- Guaranteed finds from three real Outpost rocks; no tutorial-only geometry.
 Tutorial.Gems = {
- {Element="Fire", Tier="Common", Role="Core"},
- {Element="Frost", Tier="Common", Role="Core"},
- {Element="Shock", Tier="Common", Role="Core"},
+	{ Element = "Fire", Tier = "Common", Role = "Core" },
+	{ Element = "Frost", Tier = "Common", Role = "Core" },
+	{ Element = "Shock", Tier = "Common", Role = "Core" },
 }
 
 function Tutorial.state(profile)
@@ -51,12 +85,12 @@ function Tutorial.state(profile)
 		state = { Step = 1, Mined = 0, Done = profile.Intro ~= nil and profile.Intro.Done == true }
 		profile.Tutorial = state
 	end
- if state.Version ~= 3 then
-  -- Existing completed accounts stay completed. In-progress old tutorials
-  -- restart only their guidance, retaining earned items and mined count.
-  state.Step = if (state.Mined or 0) >= 3 then 2 else 1
-  state.Version = 3
- end
+	if state.Version ~= 3 then
+		-- Existing completed accounts stay completed. In-progress old tutorials
+		-- restart only their guidance, retaining earned items and mined count.
+		state.Step = if (state.Mined or 0) >= 3 then 2 else 1
+		state.Version = 3
+	end
 	state.Step = math.clamp(math.floor(tonumber(state.Step) or 1), 1, #Tutorial.Beats + 1)
 	state.Mined = math.clamp(math.floor(tonumber(state.Mined) or 0), 0, #Tutorial.Gems)
 	return state

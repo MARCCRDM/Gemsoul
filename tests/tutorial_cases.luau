@@ -281,6 +281,9 @@ for index = 1, 3 do
  check(result and result.Gem, "Server mining hook failed")
 end
 check(#profile.Gems == 3, "Expected three gems")
+for _, gem in profile.Gems do
+ check(profile.Tutorial.GemIds[gem.Element] == gem.Id, "Guide lost the exact earned gem")
+end
 check(Intro.tutorialMined(player) == nil, "Granted extra tutorial loot")
 for i, spec in Tutorial.Gems do
 	local gem = profile.Gems[i]
