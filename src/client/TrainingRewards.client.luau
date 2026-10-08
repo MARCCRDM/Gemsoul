@@ -50,7 +50,7 @@ new("UIGradient",{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,
 local heading=label(panel,"OBJECTIVES",UDim2.fromOffset(20,14),UDim2.new(1,-85,0,30),24,Color3.fromRGB(239,246,255));heading.Font=Enum.Font.GothamBold
 local summary=label(panel,"",UDim2.fromOffset(20,47),UDim2.new(1,-40,0,20),12,gold)
 local overallFill=bar(panel,UDim2.fromOffset(20,75),UDim2.new(1,-40,0,4),gold)
-label(panel,"LEARN. EXPLORE. EARN.",UDim2.fromOffset(20,86),UDim2.new(1,-40,0,18),10,muted)
+local kicker=label(panel,"LEARN. EXPLORE. EARN.",UDim2.fromOffset(20,86),UDim2.new(1,-40,0,18),10,muted)
 local close=button(panel,"X",UDim2.new(1,-58,0,14),UDim2.fromOffset(44,44));stroke(close,muted,.85)
 local categories=new("ScrollingFrame",{Position=UDim2.fromOffset(16,110),Size=UDim2.new(1,-32,0,50),BackgroundTransparency=1,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.X,CanvasSize=UDim2.new(),ScrollBarThickness=2,ScrollingDirection=Enum.ScrollingDirection.X},panel)
 new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},categories)
@@ -58,8 +58,36 @@ local filterBar=new("Frame",{Position=UDim2.fromOffset(16,164),Size=UDim2.new(1,
 new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},filterBar)
 local list=new("ScrollingFrame",{Position=UDim2.fromOffset(16,220),Size=UDim2.new(1,-32,1,-252),BackgroundTransparency=1,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(),ScrollBarThickness=3,ScrollBarImageColor3=cyan,ScrollingDirection=Enum.ScrollingDirection.Y},panel)
 new("UIListLayout",{Padding=UDim.new(0,10),SortOrder=Enum.SortOrder.LayoutOrder},list)
-label(panel,"Rewards delivered automatically · No expiry",UDim2.new(0,20,1,-25),UDim2.new(1,-40,0,18),11)
+local footer=label(panel,"Rewards delivered automatically · No expiry",UDim2.new(0,20,1,-25),UDim2.new(1,-40,0,18),11)
 local empty=label(list,"Nothing here yet. Try All tasks or another category.",UDim2.new(),UDim2.new(1,-12,0,70),15)
+local view="Home"
+local back=button(panel,"< Back",UDim2.new(1,-156,0,14),UDim2.fromOffset(90,44))
+local home=new("ScrollingFrame",{Position=UDim2.fromOffset(16,110),Size=UDim2.new(1,-32,1,-142),BackgroundTransparency=1,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(),ScrollBarThickness=3},panel)
+new("UIListLayout",{Padding=UDim.new(0,14),SortOrder=Enum.SortOrder.LayoutOrder},home)
+local missions=new("ScrollingFrame",{Position=UDim2.fromOffset(16,110),Size=UDim2.new(1,-32,1,-142),BackgroundTransparency=1,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(),ScrollBarThickness=3},panel)
+new("UIListLayout",{Padding=UDim.new(0,14),SortOrder=Enum.SortOrder.LayoutOrder},missions)
+local function choice(parent,title,description,accent,order)
+ local card=button(parent,"",UDim2.new(),UDim2.new(1,-8,0,132));card.LayoutOrder=order
+ gradient(card,Color3.fromRGB(30,48,65),Color3.fromRGB(17,29,43));stroke(card,accent,.55)
+ local name=label(card,title,UDim2.fromOffset(18,14),UDim2.new(1,-36,0,30),22,accent);name.Font=Enum.Font.GothamBold
+ label(card,description,UDim2.fromOffset(18,50),UDim2.new(1,-36,0,65),14)
+ return card
+end
+local tasksChoice=choice(home,"TASKS  >","Learn the mechanics, reach milestones, and earn one-time rewards.",gold,1)
+local missionsChoice=choice(home,"MISSIONS  >","Choose a dungeon run and take on elemental bosses with your party.",cyan,2)
+local pathway=choice(missions,"PATHWAY","Party dungeon · 3–4 players\nFight through connected areas and defeat an elemental boss. Select to queue your party.",gold,1)
+local openWorld=choice(missions,"OPEN WORLD","Testing · An open exploration dungeon. Available through the DEV menu for authorized playtesters.",muted,2)
+openWorld.Active=false;openWorld.AutoButtonColor=false
+local missionStatus=label(missions,"",UDim2.new(),UDim2.new(1,-12,0,65),14,gold);missionStatus.LayoutOrder=3
+local queuing=false
+pathway.Activated:Connect(function()
+ if queuing then return end
+ queuing=true;missionStatus.Text="Checking your party..."
+ local result=GemClient.request("PartyDungeon")
+ missionStatus.Text=result.Message or "Unable to queue. Please try again."
+ queuing=false
+ if result.Ok then shade.Visible=false end
+end)
 local category,filter="All","Active"
 local rows,categoryButtons,filterButtons={},{},{}
 local refresh
@@ -114,8 +142,20 @@ refresh=function()
   row.Pin.Active=not complete;row.Pin.AutoButtonColor=not complete
   row.Pin.TextColor3=if complete then green elseif nextTask==o then gold else Color3.new(1,1,1)
  end
+ categories.Visible=view=="Tasks"
+ filterBar.Visible=view=="Tasks"
+ list.Visible=view=="Tasks"
+ home.Visible=view=="Home"
+ missions.Visible=view=="Missions"
+ back.Visible=view~="Home"
+ heading.Text=if view=="Home" then "OBJECTIVES" else string.upper(view)
+ heading.Size=UDim2.new(1,if view=="Home" then -85 else -185,0,30)
+ kicker.Text=if view=="Tasks" then "LEARN. EXPLORE. EARN." elseif view=="Missions" then "CHOOSE YOUR NEXT RUN" else "WHAT WILL YOU DO NEXT?"
+ footer.Text=if view=="Tasks" then "Rewards delivered automatically · No expiry" elseif view=="Missions" then "Party requirements are checked when you queue." else "Choose Tasks or Missions to get started."
+ overallFill.Parent.Visible=view=="Tasks"
  empty.Visible=visible==0
  summary.Text=done.." OF "..#Rules.Objectives.." COMPLETED  ·  YOUR JOURNEY"
+ if view~="Tasks" then summary.Text=if view=="Home" then "Your goals. Your next adventure." else "Dungeon runs and boss encounters" end
  overallFill.Size=UDim2.fromScale(done/#Rules.Objectives,1)
  launchTitle.Text="OBJECTIVES  ·  "..done.." / "..#Rules.Objectives
  trackedLabel.Text=if nextTask then nextTask.Name else "All tasks complete!"
@@ -130,7 +170,10 @@ refresh=function()
   b.TextColor3=if filter==name then cyan else muted
  end
 end
-launch.Activated:Connect(function() shade.Visible=not shade.Visible;refresh() end)
+tasksChoice.Activated:Connect(function() view="Tasks";refresh() end)
+missionsChoice.Activated:Connect(function() view="Missions";refresh() end)
+back.Activated:Connect(function() view="Home";refresh() end)
+launch.Activated:Connect(function() view="Home";shade.Visible=not shade.Visible;refresh() end)
 close.Activated:Connect(function() shade.Visible=false end)
 GemClient.Changed:Connect(refresh)
 local elapsed=0
@@ -152,7 +195,9 @@ RunService.Heartbeat:Connect(function(dt)
   row.Status.Position=UDim2.new(0,16,1,-41)
   row.Fill.Parent.Position=UDim2.new(0,16,1,-15)
  end
- launch.Size=UDim2.fromOffset(math.min(240,math.max(190,size.X*.30)),94)
+ launch.Size=UDim2.fromOffset(164,48)
+ launch.Text="OBJECTIVES"
+ launchTitle.Visible=false;trackedLabel.Visible=false;trackedProgress.Visible=false;trackBar.Visible=false
  launch.Position=UDim2.new(1,-12,0,if size.Y<500 then 64 else 150)
 end)
 refresh()
