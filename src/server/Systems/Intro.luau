@@ -346,26 +346,23 @@ function Intro.tutorialStock(player)
 	local rows = {}
 	for i, id in STOCK do
 		local family = ArmorFamilies.ById[id]
-		table.insert(
-			rows,
-			{
-				Id = "Tutorial:" .. i,
-				Seller = 0,
-				SellerName = "PROBE-7",
-				Mode = "Sell",
-				State = "Open",
-				Price = 15,
-				Expires = os.time() + 3600,
-				Item = {
-					Kind = "Gear",
-					Slot = ({ "Helmet", "Gloves", "Boots" })[i],
-					Id = id,
-					Quality = 1,
-					Roll = GearRolls.roll(Random.new(i), 1, family),
-				},
-				Offers = {},
-			}
-		)
+		table.insert(rows, {
+			Id = "Tutorial:" .. i,
+			Seller = 0,
+			SellerName = "PROBE-7",
+			Mode = "Sell",
+			State = "Open",
+			Price = 15,
+			Expires = os.time() + 3600,
+			Item = {
+				Kind = "Gear",
+				Slot = ({ "Helmet", "Gloves", "Boots" })[i],
+				Id = id,
+				Quality = 1,
+				Roll = GearRolls.roll(Random.new(i), 1, family),
+			},
+			Offers = {},
+		})
 	end
 	return rows
 end
@@ -441,6 +438,53 @@ local function tutorialQueue(player)
 	return require(script.Parent.ArenaSessions).enterTraining(player)
 end
 
+-- Explicit developer replay: keep owned gear, coins, ranks and existing gems.
+local function restartTutorial(player)
+	if not TestAdmin.allowed(player.UserId) then
+		return reply(false, "This test tool is restricted to test admins.")
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	if player:GetAttribute("MatchId") or player:GetAttribute("Expedition") then
+		return reply(false, "Leave your match or expedition first.")
+	end
+	local occupied = 0
+	for _, slot in { "Armor", "Weapon", "Shield", "Surge1", "Surge2", "Surge3" } do
+		if profile.Character[slot .. "Gem"] then
+			occupied += 1
+		end
+	end
+	for _, slot in { "Armor", "Weapon", "Shield" } do
+		local id = if slot == "Weapon" then "SwordShield" else "Armor" .. TUTORIAL_STYLE .. slot .. "1"
+		local gems = profile.Character.ItemGems and profile.Character.ItemGems[slot]
+		if profile.Character[slot] ~= id and gems and gems[id] then
+			occupied += 1
+		end
+	end
+	if #profile.Gems + occupied + #Tutorial.Gems > Config.MaxGems then
+		return reply(false, "Make room for your socketed gems plus five tutorial gems first.")
+	end
+	if player:GetAttribute("CombatSession") then
+		require(script.Parent.ArenaSessions).leave(player)
+	end
+	for _, slot in { "Armor", "Weapon", "Shield", "Surge1", "Surge2", "Surge3" } do
+		PlayerData.unsocketGem(player, slot)
+	end
+	tutorialKit(player)
+	-- Starter equipment may already have gems saved on it from an earlier test.
+	for _, slot in { "Armor", "Weapon", "Shield" } do
+		PlayerData.unsocketGem(player, slot)
+	end
+	local run = ((profile.Tutorial and profile.Tutorial.Run) or 0) + 1
+	profile.Tutorial = { Version = 2, Step = 1, Mined = 0, Done = false, Rocks = {}, Run = run, DevReplay = true }
+	profile.Intro.Done = true
+	PlayerData.augmentsChanged(player)
+	PlayerData.sync(player)
+	return reply(true, "Tutorial restarted. Your existing items and progress are kept.")
+end
+
 local function finishIntro(player: Player)
 	return quickStart(player)
 end
@@ -460,6 +504,7 @@ function Intro.start()
 	Shop.register("FinishIntro", finishIntro)
 	Shop.register("SuitUp", suitUp)
 	Shop.register("QuickStart", quickStart)
+	Shop.register("AdminRestartTutorial", restartTutorial)
 	Shop.register("TutorialQueue", tutorialQueue)
 	Shop.register("TutorialBegin", tutorialBegin)
 	Shop.register("TutorialMine", tutorialMine)

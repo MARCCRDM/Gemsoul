@@ -359,4 +359,30 @@ check(#profile.Gems == 5, "Skip didn't hand out all five gems")
 check(profile.Character.Surge1Gem ~= nil, "Skip didn't put Ember Lance on Q")
 check(handlers.TutorialSkip(player).Ok and #profile.Gems == 5, "Skipping twice handed things out twice")
 
+check(not handlers.AdminRestartTutorial(player).Ok, "Non-admin could restart tutorial")
+stubs.TestAdmin.allowed = function()
+	return true
+end
+stubs.PlayerData.unsocketGem = function(_, slot)
+	local gem = profile.Character[slot .. "Gem"]
+	if gem then
+		table.insert(profile.Gems, gem)
+		profile.Character[slot .. "Gem"] = nil
+	end
+	return gem
+end
+local coinsBefore = profile.Coins
+local gemCount = #profile.Gems
+check(handlers.AdminRestartTutorial(player).Ok, "Admin replay failed")
+check(
+	not profile.Tutorial.Done and profile.Tutorial.Step == 1 and profile.Tutorial.Mined == 0,
+	"Replay didn't reset beats"
+)
+check(profile.Coins == coinsBefore and #profile.Gems >= gemCount, "Replay discarded existing progress")
+local run = profile.Tutorial.Run
+check(
+	handlers.AdminRestartTutorial(player).Ok and profile.Tutorial.Run == run + 1,
+	"Second replay has stale run identity"
+)
+
 print("PASS: " .. checks .. " tutorial checks (beats in order, scripted gems, rock reach, sockets, skip kit)")

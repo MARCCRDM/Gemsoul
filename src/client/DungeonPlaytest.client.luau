@@ -41,7 +41,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 262)
+panel.Size = UDim2.fromOffset(300, 294)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -91,6 +91,15 @@ local function run(action: string, ...)
 		return request:InvokeServer(action, table.unpack(args, 1, args.n))
 	end)
 	status.Text = if ok and result then result.Message else "Request failed. Finish the intro, then retry."
+	if ok and result and result.Ok and action == "AdminRestartTutorial" then
+		require(script.Parent.Modules.LobbyUI).closeDashboard()
+		require(script.Parent.Modules.LobbyUI).closePicker()
+		task.delay(0.35, function()
+			require(script.Parent.Modules.OutpostScene).ensure(true)
+		end)
+		panel.Visible = false
+		toggle.Text = arrow(false)
+	end
 	busy = false
 end
 
@@ -101,6 +110,7 @@ local buttons = {
 	{ "EXIT TEST", "ArenaLeave" },
 	{ "REGENERATE LOADOUT", "AdminRegenerateEquipment" },
 	{ "REROLL 3 GEMS", "AdminRegenerateGems" },
+	{ "RESTART INTRO / TUTORIAL", "AdminRestartTutorial" },
 }
 for i, item in buttons do
 	local b = Instance.new("TextButton")
@@ -141,7 +151,7 @@ end)
 local RivalPose = require(game:GetService("ReplicatedStorage").Shared.RivalPose)
 local poseLine = Instance.new("TextLabel")
 poseLine.Size = UDim2.new(1, -12, 0, 46)
-poseLine.Position = UDim2.fromOffset(6, 210)
+poseLine.Position = UDim2.fromOffset(6, 242)
 poseLine.BackgroundTransparency = 1
 poseLine.TextColor3 = Color3.fromRGB(160, 230, 255)
 poseLine.TextWrapped = true
