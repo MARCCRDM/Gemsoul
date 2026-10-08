@@ -47,20 +47,34 @@ local summary=label(panel,"",UDim2.fromOffset(20,47),UDim2.new(1,-40,0,20),12,go
 local overallFill=bar(panel,UDim2.fromOffset(20,75),UDim2.new(1,-40,0,4),gold)
 local kicker=label(panel,"LEARN. EXPLORE. EARN.",UDim2.fromOffset(20,86),UDim2.new(1,-40,0,18),10,muted)
 local close=button(panel,"X",UDim2.new(1,-58,0,14),UDim2.fromOffset(44,44));stroke(close,muted,.85)
-local list=new("ScrollingFrame",{Position=UDim2.fromOffset(20,126),Size=UDim2.new(1,-40,1,-163),BackgroundTransparency=1,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(),ScrollBarThickness=3,ScrollBarImageColor3=cyan,ScrollingDirection=Enum.ScrollingDirection.Y},panel)
+local list=new("ScrollingFrame",{Position=UDim2.fromOffset(20,220),Size=UDim2.new(1,-40,1,-252),BackgroundTransparency=1,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(),ScrollBarThickness=3,ScrollBarImageColor3=cyan,ScrollingDirection=Enum.ScrollingDirection.Y},panel)
 new("UIListLayout",{Padding=UDim.new(0,10),SortOrder=Enum.SortOrder.LayoutOrder},list)
 local footer=label(panel,"Rewards delivered automatically · No expiry",UDim2.new(0,20,1,-25),UDim2.new(1,-40,0,18),11)
 local empty=label(list,"All tasks complete! Every reward has been delivered.",UDim2.new(),UDim2.new(1,-12,0,70),15)
 local rows={}
 local refresh
-local lastPage
+local category,filter="Mining","Active"
+local categoryButtons,filterButtons={},{}
+local categories=new("ScrollingFrame",{Position=UDim2.fromOffset(20,110),Size=UDim2.new(1,-40,0,48),BackgroundTransparency=1,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.X,CanvasSize=UDim2.new(),ScrollBarThickness=2,ScrollingDirection=Enum.ScrollingDirection.X},panel)
+new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},categories)
+local filters=new("Frame",{Position=UDim2.fromOffset(20,164),Size=UDim2.new(1,-40,0,44),BackgroundTransparency=1},panel)
+new("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},filters)
+for i,name in {"All","Mining","Equipment","Combat","PvP","PvE","Market"} do
+ local b=button(categories,name,UDim2.new(),UDim2.fromOffset(if name=="Equipment" then 108 else 80,44));b.LayoutOrder=i;categoryButtons[name]=b
+ b.Activated:Connect(function() category=name;list.CanvasPosition=Vector2.zero;refresh() end)
+end
+for i,name in {"Active","Completed","All tasks"} do
+ local b=button(filters,name,UDim2.new(),UDim2.new(1/3,-6,1,0));b.LayoutOrder=i;filterButtons[name]=b
+ b.Activated:Connect(function() filter=name;list.CanvasPosition=Vector2.zero;refresh() end)
+end
 for i,o in Rules.Objectives do
  local accent=categoryColors[o.Category] or gold
  local row=new("Frame",{Size=UDim2.new(1,-10,0,146),BackgroundColor3=Color3.fromRGB(21,32,46),BorderSizePixel=0,LayoutOrder=i},list);UiKit.round(row,10)
  gradient(row,Color3.fromRGB(255,255,255),Color3.fromRGB(205,218,235))
  local outline=stroke(row,accent,.85)
+ local stripe=new("Frame",{Position=UDim2.fromOffset(0,15),Size=UDim2.new(0,3,1,-30),BackgroundColor3=accent,BorderSizePixel=0},row);UiKit.round(stripe,2)
 
- label(row,"TASK",UDim2.fromOffset(16,10),UDim2.new(1,-130,0,16),10,accent)
+ label(row,string.upper(o.Category),UDim2.fromOffset(16,10),UDim2.new(1,-130,0,16),10,accent)
  local title=label(row,o.Name,UDim2.fromOffset(16,30),UDim2.new(1,-132,0,27),17,Color3.fromRGB(240,246,255));title.Font=Enum.Font.GothamBold
  local reward=new("Frame",{Position=UDim2.new(1,-104,0,12),Size=UDim2.fromOffset(88,42),BackgroundColor3=Color3.fromRGB(50,43,28),BorderSizePixel=0},row);UiKit.round(reward,8);stroke(reward,gold,.78)
  local amount=label(reward,"+"..o.Coins,UDim2.fromOffset(0,3),UDim2.new(1,0,0,20),16,gold);amount.TextXAlignment=Enum.TextXAlignment.Center;amount.Font=Enum.Font.GothamBold
@@ -75,30 +89,39 @@ refresh=function()
  local p=GemClient.Profile
  local state=p and p.TrainingRewards or {}
  local paid,counts=state.Paid or {},state.Counts or {}
- local page,index,done,total=Rules.currentPage(paid)
- if page~=lastPage then list.CanvasPosition=Vector2.zero;lastPage=page end
+ local done,visible=0,0
  for _,o in Rules.Objectives do
   local row=rows[o.Id];local complete=paid[o.Id]==true
-  row.Frame.Visible=page~=nil and Rules.pageOf(o)==page
+  if complete then done+=1 end
+  row.Frame.Visible=(category=="All" or category==o.Category) and (filter=="All tasks" or (filter=="Completed")==complete)
+  if row.Frame.Visible then visible+=1 end
   local count=math.min(o.Goal,counts[o.Event] or 0)
   row.Status.Text=if complete then "COMPLETED  ·  Reward received" else count.." / "..o.Goal.." completed"
   row.Status.TextColor3=if complete then green else muted
   row.Fill.Size=UDim2.fromScale(if complete then 1 else count/o.Goal,1)
   row.Fill.BackgroundColor3=if complete then green else cyan
   row.Outline.Transparency=.88
-  row.Frame.BackgroundColor3=if complete then Color3.fromRGB(20,41,43) else Color3.fromRGB(28,40,56)
+  row.Frame.BackgroundColor3=Color3.fromRGB(21,32,46)
  end
- heading.Text=page or "COMPLETE"
- heading.Size=UDim2.new(1,-85,0,30)
- heading.TextSize=if panel.AbsoluteSize.X<480 then 18 else 24
- kicker.Text=if page then "Complete this page to continue." else "You have completed your journey."
- footer.Text=if page and index<#Rules.Pages then "UP NEXT  ·  "..Rules.Pages[index+1] else "Rewards arrive automatically"
- empty.Visible=page==nil
- summary.Text="OBJECTIVES  /  "..index.." OF "..#Rules.Pages.."  ·  "..done.." / "..total.." complete"
- overallFill.Size=UDim2.fromScale(if total>0 then done/total else 1,1)
+ heading.Text="TASKS"
+ kicker.Text="LEARN. EXPLORE. EARN."
+ footer.Text="Rewards delivered automatically · No expiry"
+ empty.Visible=visible==0
+ empty.Text="No tasks in this view. Choose another category or filter."
+ summary.Text=done.." OF "..#Rules.Objectives.." COMPLETED  ·  YOUR JOURNEY"
+ overallFill.Size=UDim2.fromScale(done/#Rules.Objectives,1)
+ for name,b in categoryButtons do
+  b.TextColor3=if category==name then Color3.fromRGB(15,23,34) else muted
+  b.BackgroundColor3=if category==name then gold else Color3.fromRGB(27,41,56)
+ end
+ for name,b in filterButtons do
+  b.BackgroundColor3=if filter==name then Color3.fromRGB(35,65,78) else Color3.fromRGB(19,30,44)
+  b.TextColor3=if filter==name then cyan else muted
+ end
 end
 launch.Activated:Connect(function()
  shade.Visible=not shade.Visible
+ if shade.Visible then category="Mining";filter="Active" end
  list.CanvasPosition=Vector2.zero
  refresh()
 end)

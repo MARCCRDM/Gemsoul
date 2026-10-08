@@ -19,3 +19,6 @@ Pure Luau reward tests cover duplicate payouts, stable old rewards, unique equip
 
 ## Sequential Tasks UI
 Objectives opens the task checklist directly, starting with Mining and resuming at the first unfinished page. The Tasks/Missions selection and Back navigation have been removed. Tasks has no filters, category tabs, or tracking. It displays the first unfinished page in Mining, Equipment, Combat, PvP, PvE, Market, Discoveries order. Rare and Legendary finds belong to Discoveries so luck does not block basic learning. All current-page items remain visible until completion, then the view advances and scrolls to the top. Previously earned later-page credit remains valid. The tracking endpoint is removed; old saved tracking fields are ignored.
+
+## Restored navigation
+The category-tab task cards and Active/Completed/All tasks filters are restored. Objectives opens this window directly with Mining selected. There is no Tasks/Missions selection screen and no automatic page advance in the UI. Rewards and saved completion remain unchanged. Tracking remains removed.
