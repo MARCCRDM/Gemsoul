@@ -415,7 +415,49 @@ for i, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 	-- What gems add on top (Health, Power, Defense, Speed).
 	local bonus = at(label(tile, "", 9, P.Good, BOLD), TILE_W - 56, 23, 48, 14)
 	bonus.TextXAlignment = Enum.TextXAlignment.Right
-	statTiles[name] = { Value = value, Fill = fill, Bonus = bonus }
+	statTiles[name] = { Value = value, Fill = fill, Bonus = bonus, Tile = tile }
+end
+
+-- Every change you make shows: a stat that goes up flashes green with its
+-- gain for a second (down: red). The first draw only sets the baseline.
+local lastStat: { [string]: number } = {}
+local function flashStat(name: string, value: number)
+	local before = lastStat[name]
+	lastStat[name] = value
+	local tile = statTiles[name]
+	if before == nil or math.abs(value - before) < 0.5 or not tile then
+		return
+	end
+	local gain = value - before
+	local color = if gain > 0 then P.Good else P.Bad
+	tile.Value.TextColor3 = color
+	game:GetService("TweenService")
+		:Create(tile.Value, TweenInfo.new(1.1, Enum.EasingStyle.Quad), { TextColor3 = C.Text })
+		:Play()
+	local pop = at(
+		label(
+			tile.Tile,
+			string.format("%s%d", if gain > 0 then "+" else "", math.floor(gain + 0.5)),
+			14,
+			color,
+			HEADING
+		),
+		TILE_W - 64,
+		4,
+		56,
+		16
+	)
+	pop.TextXAlignment = Enum.TextXAlignment.Right
+	pop.ZIndex = 5
+	game:GetService("TweenService")
+		:Create(pop, TweenInfo.new(1.1, Enum.EasingStyle.Quad), {
+			Position = pop.Position - UDim2.fromOffset(0, 8),
+			TextTransparency = 1,
+		})
+		:Play()
+	task.delay(1.2, function()
+		pop:Destroy()
+	end)
 end
 
 -- The two columns of slots.
@@ -1755,8 +1797,10 @@ local function drawLeft()
 			then GemConfig.ElementColors[ratings[name].Element] or P.Good
 			else P.Good
 		statTiles[name].Fill.Size = UDim2.fromScale(math.clamp(value / 140, 0, 1), 1)
+		flashStat(name, value)
 	end
 	statTiles.Rating.Value.Text = whole(total)
+	flashStat("Rating", total)
 	statTiles.Rating.Fill.Size = UDim2.fromScale(math.clamp(total / 560, 0, 1), 1)
 	local attuned = 0
 	for _, slot in Slots.Order do

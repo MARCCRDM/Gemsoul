@@ -25,6 +25,7 @@ local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
+local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
 
 local function newGem(source: string, luck: number?): GemConfig.Gem
 	return GemGenerator.generate(Gems.random(), source, {
@@ -170,6 +171,150 @@ local function firstStone(player: Player)
 	return reply(true, "Recovered a naturally cut gem. It is ready to enchant your equipment.", { Gem = gem })
 end
 
+-- The tutorial (Shared.Tutorial) -------------------------------------------------
+
+-- Everyone starts in the same Common kit; armor identity comes later, from
+-- boss drops. (Skirmisher pieces, a sword and a shield.)
+local TUTORIAL_STYLE = "Skirmisher"
+local function tutorialKit(player: Player)
+	local profile = PlayerData.get(player)
+	giveStarterKit(player)
+	for _, slot in Lottery.GearOrder do
+		local id = if slot == "Weapon" then "SwordShield" else "Armor" .. TUTORIAL_STYLE .. slot .. "1"
+		local kind = Slots.Definitions[slot].Kind
+		if not profile.Owned[kind][id] then
+			PlayerData.setGearQuality(player, kind, id, 1)
+			local family = ArmorFamilies.ById[id]
+			if family then
+				local roll = GearRolls.roll(Random.new(1701), 1, family)
+				roll.Prismatic = nil
+				roll.Finish, roll.Visor, roll.Variant = 3, 2, 1
+				profile.Character.GearRolls[kind][id] = roll
+			end
+		end
+		PlayerData.equipGear(player, kind, id)
+	end
+end
+
+-- The scripted gem a tutorial rock drops (the nth one mined).
+local function tutorialGem(index: number): GemConfig.Gem
+	local spec = Tutorial.Gems[index]
+	local gem = GemRoller.setElement(newGem("Tutorial"), spec.Element)
+	gem.Tier = spec.Tier
+	local grade = if spec.Tier == "Common" then 3 else 5
+	gem.Size, gem.Clarity, gem.Cut = math.min(gem.Size or grade, FIRST_STONE_MAX_SIZE), grade, grade
+	gem.CutMethod = "Starter"
+	gem.Role = spec.Role
+	if spec.Surge then
+		gem.Surge = spec.Surge
+		gem.SurgeTier, gem.SurgeRank = 1, if spec.Tier == "Common" then 1 else 2
+	end
+	return gem
+end
+
+local function tutorialReply(profile, ok: boolean, message: string, extra)
+	local data = extra or {}
+	data.Tutorial = Tutorial.state(profile)
+	return reply(ok, message, data)
+end
+
+local function tutorialBegin(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	local state = Tutorial.state(profile)
+	if not profile.Intro.Done then
+		tutorialKit(player)
+		profile.Intro.Done = true
+		state.Step, state.Mined, state.Done, state.Rocks = 1, 0, false, {}
+		PlayerData.sync(player)
+	end
+	return tutorialReply(profile, true, "Welcome to the Saga.")
+end
+
+-- Mines tutorial rock `index` (1-5) if you're standing by it.
+local function tutorialMine(player: Player, index: any)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	local state = Tutorial.state(profile)
+	local beat = Tutorial.beat(profile)
+	if not beat or beat.Id ~= "Mine" then
+		return tutorialReply(profile, false, "Nothing to mine here.")
+	end
+	if type(index) ~= "number" or not Tutorial.Rocks[index] then
+		return tutorialReply(profile, false, "Pick a rock.")
+	end
+	state.Rocks = type(state.Rocks) == "table" and state.Rocks or {}
+	if state.Rocks[tostring(index)] then
+		return tutorialReply(profile, false, "Already mined.")
+	end
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if typeof(spawn) ~= "CFrame" or not root then
+		return tutorialReply(profile, false, "Head to the Outpost first.")
+	end
+	local at = (spawn * CFrame.new(Tutorial.Rocks[index])).Position
+	local flat = Vector3.new(root.Position.X - at.X, 0, root.Position.Z - at.Z)
+	if flat.Magnitude > Tutorial.MineReach then
+		return tutorialReply(profile, false, "Get closer to the rock.")
+	end
+	local gem = tutorialGem(state.Mined + 1)
+	if not PlayerData.addGem(player, gem) then
+		return tutorialReply(profile, false, "Your gem pouch is full.")
+	end
+	state.Rocks[tostring(index)] = true
+	state.Mined += 1
+	Tutorial.advance(profile, "Mine")
+	PlayerData.sync(player)
+	return tutorialReply(profile, true, "Gem found!", { Gem = gem })
+end
+
+-- Ticks off the current beat once it's done (the server checks).
+local function tutorialStep(player: Player, beatId: any)
+	local profile = PlayerData.get(player)
+	if not profile or type(beatId) ~= "string" then
+		return reply(false, "Try again.")
+	end
+	local ok = Tutorial.advance(profile, beatId)
+	if ok then
+		PlayerData.sync(player)
+	end
+	return tutorialReply(profile, ok, if ok then "Done." else "Not yet.")
+end
+
+-- Skip: you still get the whole kit (any gems not yet mined, with the
+-- Surge on Q), then straight on.
+local function tutorialSkip(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	if not profile.Intro.Done then
+		tutorialBegin(player)
+	end
+	local state = Tutorial.state(profile)
+	if not state.Done then
+		while state.Mined < #Tutorial.Gems do
+			local gem = tutorialGem(state.Mined + 1)
+			if not PlayerData.addGem(player, gem) then
+				break
+			end
+			state.Mined += 1
+			if gem.Surge == Tutorial.Gems[4].Surge and not profile.Character.Surge1Gem then
+				PlayerData.socketSurge(player, gem.Id, "Q")
+			end
+		end
+		Tutorial.skip(profile)
+		PlayerData.augmentsChanged(player)
+		PlayerData.sync(player)
+	end
+	return tutorialReply(profile, true, "Tutorial skipped. Good luck out there.")
+end
+
 local function finishIntro(player: Player)
 	return quickStart(player)
 end
@@ -189,6 +334,10 @@ function Intro.start()
 	Shop.register("FinishIntro", finishIntro)
 	Shop.register("SuitUp", suitUp)
 	Shop.register("QuickStart", quickStart)
+	Shop.register("TutorialBegin", tutorialBegin)
+	Shop.register("TutorialMine", tutorialMine)
+	Shop.register("TutorialStep", tutorialStep)
+	Shop.register("TutorialSkip", tutorialSkip)
 end
 
 return Intro

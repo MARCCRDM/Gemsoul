@@ -425,7 +425,13 @@ local function tile(label: string, emblem: string, color: Color3, onClick: () ->
 	name.Size = UDim2.new(1, -6, 0, 16)
 	IronUi.juice(b)
 	b.Activated:Connect(onClick)
+	b.Name = label
 	return b
+end
+
+-- A dock tile by its label (the tutorial points at INVENTORY).
+function LobbyUI.tile(label: string): GuiButton?
+	return tiles:FindFirstChild(label) :: GuiButton?
 end
 
 local function fitDock()

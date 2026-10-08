@@ -1,3 +1,5 @@
+-- The tutorial is off here: these checks drive the starter picker it replaces.
+local Tutorial = { Enabled = false }
 local now=0
 local os={clock=function() return now end}
 local function signal()

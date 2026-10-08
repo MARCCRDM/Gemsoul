@@ -55,6 +55,7 @@ type Profile = {
 	Quota: { Day: number, UsedToday: number, Week: number, UsedThisWeek: number },
 	Character: Character,
 	Intro: Intro,
+	Tutorial: any?,
 	Materials: { [string]: number }, -- crafting materials by id (see Crafting.Materials)
 	Owned: Owned,
 	-- Firsts that guide new players: "Mined", "Cut", "Sold", "Crafted", "Enchanted".
@@ -522,6 +523,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Saving = canSave[player] == true,
 		Character = profile.Character,
 		Intro = profile.Intro,
+		Tutorial = profile.Tutorial,
 		Materials = profile.Materials,
 		Owned = profile.Owned,
 		Milestones = profile.Milestones,
