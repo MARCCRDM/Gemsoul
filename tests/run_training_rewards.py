@@ -45,6 +45,17 @@ Training.record(outOfOrder,"RivalWin")
 check(outOfOrder.Coins==50 and not outOfOrder.TrainingRewards.Paid.FirstRock,"Objectives forced into order")
 local _,changed=Training.record(outOfOrder,"RivalWin")
 check(not changed,"Completed action should not keep syncing")
+local paid={}
+check(Training.currentPage(paid)=="Mining","Mining must be first")
+paid.PvPWin=true
+check(Training.currentPage(paid)=="Mining","Later credit must not skip unfinished mining")
+for _,o in Training.Objectives do if Training.pageOf(o)=="Mining" then paid[o.Id]=true end end
+check(Training.currentPage(paid)=="Equipment","Completed mining must advance automatically")
+check(not paid.LegendFind and Training.pageOf({Id="LegendFind"})=="Discoveries","Legendary must not gate learning")
+for _,page in Training.Pages do
+ for _,o in Training.Objectives do if Training.pageOf(o)==page then paid[o.Id]=true end end
+end
+check(Training.currentPage(paid)==nil,"All-complete state")
 print("PASS: "..checks.." training reward checks: payouts, repeated actions, unique slots, persistence, replay and any-order progression")
 """
 with tempfile.TemporaryDirectory(prefix="gemsoul-rewards-") as d:

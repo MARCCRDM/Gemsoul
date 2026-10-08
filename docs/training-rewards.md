@@ -3,10 +3,10 @@
 19 tasks across Mining, Equipment, Combat, PvP, PvE and Market. These replace the nine-row Training panel while preserving existing completion IDs and rewards. Weekly tasks and a dedicated Missions screen are not part of this update.
 
 ## Experience
-- Open Objectives in the Outpost. Choose a category and Active, Completed, or All tasks.
-- Track one task; selection saves with the profile. Completing it automatically selects the next unfinished task for display.
+- Open Objectives in the Outpost to go directly to the first unfinished task page.
+- Tasks shows the first unfinished page and advances automatically when its objectives are complete.
 - Rewards arrive automatically once per account. No claim button or forced task order.
-- The panel fits the viewport, category tabs scroll horizontally, task cards scroll vertically, and action buttons have 44px touch targets.
+- The panel fits the viewport, task cards scroll vertically, and action buttons have 44px touch targets.
 - Hide the HUD during combat, guided tutorial, and Inventory to avoid overlays.
 
 ## Award rules
@@ -16,3 +16,6 @@ Mining rarity rewards require a real mining drop; higher rarity can complete bot
 
 ## Verification
 Pure Luau reward tests cover duplicate payouts, stable old rewards, unique equipment slots, saved/rejoined profiles and any-order completion. Compile and Rojo build validate source integration. Studio/device visual testing remains necessary: small landscape phone, portrait phone, desktop, category navigation, saved tracking, Market mailbox settlement and a real dungeon clear.
+
+## Sequential Tasks UI
+Objectives opens the task checklist directly, starting with Mining and resuming at the first unfinished page. The Tasks/Missions selection and Back navigation have been removed. Tasks has no filters, category tabs, or tracking. It displays the first unfinished page in Mining, Equipment, Combat, PvP, PvE, Market, Discoveries order. Rare and Legendary finds belong to Discoveries so luck does not block basic learning. All current-page items remain visible until completion, then the view advances and scrolls to the top. Previously earned later-page credit remains valid. The tracking endpoint is removed; old saved tracking fields are ignored.

@@ -21,6 +21,22 @@ Training.Objectives = {
  {Id="MarketBuy",Category="Market",Event="MarketBuy",Goal=1,Coins=35,Name="Find your upgrade",Hint="Complete a purchase from another player on the Market."},
  {Id="MarketSale",Category="Market",Event="MarketSale",Goal=1,Coins=75,Name="Open for business",Hint="Sell an item to another player. Earn this when the sale payment arrives."},
 }
+-- Sequential presentation only; valid gameplay still earns credit in any order.
+Training.Pages={"Mining","Equipment","Combat","PvP","PvE","Market","Discoveries"}
+function Training.pageOf(objective)
+ if objective.Id=="RareFind" or objective.Id=="LegendFind" then return "Discoveries" end
+ return objective.Category
+end
+function Training.currentPage(paid)
+ for index,name in Training.Pages do
+  local total,done=0,0
+  for _,o in Training.Objectives do
+   if Training.pageOf(o)==name then total+=1;if paid[o.Id] then done+=1 end end
+  end
+  if done<total then return name,index,done,total end
+ end
+ return nil,#Training.Pages,0,0
+end
 function Training.state(profile)
  profile.TrainingRewards = profile.TrainingRewards or {Counts={},Paid={},Slots={}}
  local s=profile.TrainingRewards
