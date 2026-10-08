@@ -944,7 +944,7 @@ local function drawGems()
 	end
 	for order, gem in gems do
 		local tierColor = GemConfig.TierColors[gem.Tier] or C.Text
-		bagCard(
+		local gemCard = bagCard(
 			grid,
 			order,
 			gemName(gem),
@@ -960,6 +960,7 @@ local function drawGems()
 			end,
 			{ Kind = "Gem", Gem = gem }
 		)
+  gemCard:SetAttribute("TutorialGem", gem.Element)
 	end
 	footer.Text = if selection and selection.Kind == "Gem"
 		then string.upper(gemName(selection.Gem)) .. "  ·  TAP FOR DETAILS, OR DRAG IT ONTO A SOCKET"
@@ -1777,6 +1778,7 @@ end)
 backButton.AnchorPoint = Vector2.new(1, 0)
 backButton.Position = UDim2.new(1, 0, 0, PANEL_H + 8)
 backButton:SetAttribute("UiSound", "Back")
+backButton:SetAttribute("TutorialSocket", "CloseInventory")
 
 -- Drawing --------------------------------------------------------------------------------------------------
 

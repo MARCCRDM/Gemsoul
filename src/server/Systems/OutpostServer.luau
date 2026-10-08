@@ -305,6 +305,13 @@ end
 -- What a popped rock pays: a gem by chance, a few coins by chance (mining
 -- is for gems, not a coin mint), gear rarely.
 local function loot(player: Player, node, profile)
+ local tutorialLoot = require(script.Parent.Intro).tutorialMined(player)
+ if tutorialLoot then
+  record(profile).Rocks += 1
+  Progress.addXP(player, "Mine")
+  PlayerData.milestone(player, "Mined")
+  return tutorialLoot
+ end
 	local spec = Rules.Sizes[node.Size]
 	local roll = Gems.random()
 	local result = { Size = node.Size, Name = spec.Name }
@@ -482,7 +489,32 @@ local function enter(player: Player)
 		player:RequestStreamAroundAsync(site.Spawn.Position)
 	end)
 	local character = player.Character :: Model
-	character:PivotTo(site.Spawn * CFrame.new(rng:NextNumber(-6, 6), 0, rng:NextNumber(-4, 4)))
+ local spawn = site.Spawn * CFrame.new(rng:NextNumber(-6, 6), 0, rng:NextNumber(-4, 4))
+ local profile = PlayerData.get(player)
+ local tutorial = require(ReplicatedStorage.Shared.Tutorial).beat(profile)
+ if tutorial and tutorial.Id == "Mine" then
+  local closest, distance = nil, math.huge
+  for _, node in nodes do
+   local body = node.Model.PrimaryPart
+   if node.Ready and body and not node.ClaimedBy then
+    local d = (body.Position - site.Spawn.Position).Magnitude
+    if d < distance then closest, distance = body, d end
+   end
+  end
+  if closest then
+   local rock = closest.Position
+   local direction = Vector3.new(site.Spawn.Position.X-rock.X,0,site.Spawn.Position.Z-rock.Z)
+   direction = if direction.Magnitude > 0.1 then direction.Unit else Vector3.new(0,0,1)
+   local at = rock + direction * 9
+   local params = RaycastParams.new()
+   params.FilterType = Enum.RaycastFilterType.Exclude
+   params.FilterDescendantsInstances = {character, nodesFolder}
+   local floor = workspace:Raycast(at + Vector3.new(0,60,0), Vector3.new(0,-150,0), params)
+   if floor then at = floor.Position + Vector3.new(0,4,0) end
+   spawn = CFrame.lookAt(at, Vector3.new(rock.X,at.Y,rock.Z))
+  end
+ end
+ character:PivotTo(spawn)
 	player:SetAttribute("Outpost", true)
 	refreshKit(player)
 	socialPrompts(player, true)

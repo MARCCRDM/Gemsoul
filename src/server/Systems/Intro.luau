@@ -228,50 +228,24 @@ local function tutorialBegin(player: Player)
 		tutorialKit(player)
 		profile.Intro.Done = true
 		state.Step, state.Mined, state.Done, state.Rocks = 1, 0, false, {}
-		state.Version = 2
+		state.Version = 3
 		PlayerData.sync(player)
 	end
 	return tutorialReply(profile, true, "Welcome to the Saga.")
 end
 
--- Mines tutorial rock `index` (1-5) if you're standing by it.
-local function tutorialMine(player: Player, index: any)
-	local profile = PlayerData.get(player)
-	if not profile then
-		return reply(false, "Your profile is still loading.")
-	end
-	local state = Tutorial.state(profile)
-	local beat = Tutorial.beat(profile)
-	if not beat or beat.Id ~= "Mine" then
-		return tutorialReply(profile, false, "Nothing to mine here.")
-	end
-	if type(index) ~= "number" or not Tutorial.Rocks[index] then
-		return tutorialReply(profile, false, "Pick a rock.")
-	end
-	state.Rocks = type(state.Rocks) == "table" and state.Rocks or {}
-	if state.Rocks[tostring(index)] then
-		return tutorialReply(profile, false, "Already mined.")
-	end
-	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if typeof(spawn) ~= "CFrame" or not root then
-		return tutorialReply(profile, false, "Head to the Outpost first.")
-	end
-	local at = (spawn * CFrame.new(Tutorial.Rocks[index])).Position
-	local flat = Vector3.new(root.Position.X - at.X, 0, root.Position.Z - at.Z)
-	if flat.Magnitude > Tutorial.MineReach then
-		return tutorialReply(profile, false, "Get closer to the rock.")
-	end
-	local gem = tutorialGem(state.Mined + 1)
-	if not PlayerData.addGem(player, gem) then
-		return tutorialReply(profile, false, "Your gem pouch is full.")
-	end
-	state.Rocks[tostring(index)] = true
-	state.Mined += 1
-	Tutorial.advance(profile, "Mine")
-	PlayerData.sync(player)
-	return tutorialReply(profile, true, "Gem found!", { Gem = gem })
+-- Called only after OutpostServer validates and breaks a real shared rock.
+function Intro.tutorialMined(player)
+ local profile = PlayerData.get(player)
+ local beat = profile and Tutorial.beat(profile)
+ if not beat or beat.Id ~= "Mine" then return nil end
+ local state = Tutorial.state(profile)
+ local gem = tutorialGem(state.Mined + 1)
+ if not PlayerData.addGem(player, gem) then return nil end
+ state.Mined += 1
+ Tutorial.advance(profile, "Mine")
+ PlayerData.sync(player)
+ return {Gem=gem, Tutorial=true, Rarity=gem.Tier}
 end
 
 -- Ticks off the current beat once it's done (the server checks).
@@ -290,49 +264,13 @@ local function tutorialStep(player: Player, beatId: any)
 	return tutorialReply(profile, ok, if ok then "Done." else "Not yet.")
 end
 
--- Skip: you still get the whole kit (any gems not yet mined, with the
--- Surge on Q), then straight on.
-local function tutorialSkip(player: Player)
-	local profile = PlayerData.get(player)
-	if not profile then
-		return reply(false, "Your profile is still loading.")
-	end
-	if not profile.Intro.Done then
-		tutorialBegin(player)
-	end
-	local state = Tutorial.state(profile)
-	if not state.Done then
-		while state.Mined < #Tutorial.Gems do
-			local gem = tutorialGem(state.Mined + 1)
-			if not PlayerData.addGem(player, gem) then
-				break
-			end
-			state.Mined += 1
-			if gem.Surge == Tutorial.Gems[4].Surge and not profile.Character.Surge1Gem then
-				PlayerData.socketSurge(player, gem.Id, "Q")
-			end
-		end
-		for _, gem in table.clone(profile.Gems) do
-			if gem.Surge == Tutorial.Gems[4].Surge and not profile.Character.Surge1Gem then
-				PlayerData.socketSurge(player, gem.Id, "Q")
-			end
-			if gem.Surge == Tutorial.Gems[5].Surge and not profile.Character.Surge2Gem then
-				PlayerData.socketSurge(player, gem.Id, "E")
-			end
-		end
-		if not state.Won then
-			state.Won = true
-			PlayerData.addCoins(player, 50)
-			PlayerData.setGearQuality(player, "Armors", "ArmorProspectorArmor1", 1)
-		end
-		Tutorial.skip(profile)
-		if player:GetAttribute("FastTutorial") then
-			require(script.Parent.ArenaSessions).leave(player)
-		end
-		PlayerData.augmentsChanged(player)
-		PlayerData.sync(player)
-	end
-	return tutorialReply(profile, true, "Tutorial skipped. Good luck out there.")
+-- Skip ends guidance without fabricating mining rewards or touching equipment.
+local function tutorialSkip(player)
+ local profile = PlayerData.get(player)
+ if not profile then return reply(false, "Your profile is still loading.") end
+ Tutorial.skip(profile)
+ PlayerData.sync(player)
+ return reply(true, "Tutorial skipped. You're ready to explore.")
 end
 
 -- Private onboarding stock: never competes with or enters the player market.
@@ -464,7 +402,7 @@ local function restartTutorial(player)
 		end
 	end
 	if #profile.Gems + occupied + #Tutorial.Gems > Config.MaxGems then
-		return reply(false, "Make room for your socketed gems plus five tutorial gems first.")
+		return reply(false, "Make room for your socketed gems plus three tutorial gems first.")
 	end
 	if player:GetAttribute("CombatSession") then
 		require(script.Parent.ArenaSessions).leave(player)
@@ -478,7 +416,7 @@ local function restartTutorial(player)
 		PlayerData.unsocketGem(player, slot)
 	end
 	local run = ((profile.Tutorial and profile.Tutorial.Run) or 0) + 1
-	profile.Tutorial = { Version = 2, Step = 1, Mined = 0, Done = false, Rocks = {}, Run = run, DevReplay = true }
+	profile.Tutorial = { Version = 3, Step = 1, Mined = 0, Done = false, Rocks = {}, Run = run, DevReplay = true }
 	profile.Intro.Done = true
 	PlayerData.augmentsChanged(player)
 	PlayerData.sync(player)
@@ -507,7 +445,7 @@ function Intro.start()
 	Shop.register("AdminRestartTutorial", restartTutorial)
 	Shop.register("TutorialQueue", tutorialQueue)
 	Shop.register("TutorialBegin", tutorialBegin)
-	Shop.register("TutorialMine", tutorialMine)
+	Shop.register("TutorialMine", function() return reply(false, "Click a rock in the mining area.") end)
 	Shop.register("TutorialStep", tutorialStep)
 	Shop.register("TutorialSkip", tutorialSkip)
 end

@@ -67,12 +67,7 @@ check(not Tutorial.advance(fresh, "OpenInventory"), "A later beat was ticked off
 check(not Tutorial.advance(fresh, "Mine"), "Mining was ticked off before five gems")
 local veteran = { Intro = { Done = true }, Character = {} }
 check(Tutorial.beat(veteran) == nil, "An older save is sent through the tutorial again")
-check(#Tutorial.Gems == 5 and #Tutorial.Rocks == 5, "Five rocks, five gems")
-check(
-	Tutorial.Gems[4].Surge == "EmberLance" and Tutorial.Gems[5].Surge == "ChainLightning",
-	"The Surges aren't fun ones"
-)
-check(Tutorial.Gems[5].Tier == "Uncommon", "The last gem isn't the stronger Uncommon")
+check(#Tutorial.Gems == 3 and Tutorial.Rocks == nil, "Use three finds from real rocks")
 for _, beat in Tutorial.Beats do
 	check(#beat.Prompt <= 60 and #(beat.Mobile or "") <= 60, "A prompt runs past two lines: " .. beat.Id)
 end
@@ -264,15 +259,6 @@ local env = {
 local Intro = load("src/server/Systems/Intro.luau", env)
 Intro.start()
 
-local function standAt(index)
-	local at = (spawnAt * CFrame.new(Tutorial.Rocks[index])).Position
-	player.Character = {
-		FindFirstChild = function()
-			return { Position = v3(at.X + 2, at.Y, at.Z) }
-		end,
-	}
-end
-
 local begun = handlers.TutorialBegin(player)
 check(begun.Ok and profile.Intro.Done and profile.Tutorial.Step == 1, "Begin didn't start the tutorial")
 check(equipped.ArmorsArmorSkirmisherArmor1, "No starter chest was put on")
@@ -290,13 +276,12 @@ check(not handlers.TutorialMine(player, 1).Ok and #profile.Gems == 0, "Mined a r
 check(not handlers.TutorialMine(player, 9).Ok, "Mined a rock that doesn't exist")
 check(not handlers.TutorialStep(player, "OpenInventory").Ok, "Skipped ahead of mining")
 
-for index = 1, 5 do
-	standAt(index)
-	local result = handlers.TutorialMine(player, index)
-	check(result.Ok and result.Gem ~= nil, "Rock " .. index .. " dropped nothing")
-	check(not handlers.TutorialMine(player, index).Ok, "Rock " .. index .. " was mined twice")
+for index = 1, 3 do
+ local result = Intro.tutorialMined(player)
+ check(result and result.Gem, "Server mining hook failed")
 end
-check(#profile.Gems == 5, "Didn't get exactly five gems")
+check(#profile.Gems == 3, "Expected three gems")
+check(Intro.tutorialMined(player) == nil, "Granted extra tutorial loot")
 for i, spec in Tutorial.Gems do
 	local gem = profile.Gems[i]
 	check(gem.Element == spec.Element and gem.Tier == spec.Tier, "Gem " .. i .. " isn't the scripted one")
@@ -305,6 +290,7 @@ for i, spec in Tutorial.Gems do
 end
 check(profile.Tutorial.Step == 2, "Mining five didn't move on")
 
+check(handlers.TutorialStep(player, "GemIntro").Ok, "Gem introduction missing")
 check(handlers.TutorialStep(player, "OpenInventory").Ok, "Opening the Inventory didn't tick off")
 check(not handlers.TutorialStep(player, "SocketArmor").Ok, "The chest socket ticked off with nothing in it")
 profile.Character.ArmorGem = profile.Gems[1]
@@ -313,38 +299,10 @@ profile.Character.WeaponGem = profile.Gems[2]
 check(handlers.TutorialStep(player, "SocketWeapon").Ok, "The sword socket didn't tick off")
 profile.Character.ShieldGem = profile.Gems[3]
 check(handlers.TutorialStep(player, "SocketShield").Ok, "The shield socket didn't tick off")
-check(not handlers.TutorialStep(player, "SurgeQ").Ok, "Q ticked off empty")
-profile.Character.Surge1Gem = profile.Gems[4]
-check(handlers.TutorialStep(player, "SurgeQ").Ok, "Q didn't tick off")
-check(not handlers.TutorialStep(player, "SurgeE").Ok, "Empty E accepted")
-profile.Character.Surge2Gem = profile.Gems[5]
-check(handlers.TutorialStep(player, "SurgeE").Ok, "E not accepted")
-check(handlers.TutorialStep(player, "CloseInventory").Ok and not profile.Tutorial.Done, "Ended before combat")
-check(not handlers.TutorialStep(player, "Queue").Ok, "Client bypassed queue")
-player.Character = {
-	FindFirstChild = function()
-		return { Position = v3(100, 5, 90) }
-	end,
-}
-check(handlers.TutorialQueue(player).Waiting, "No queue countdown")
-check(handlers.TutorialQueue(player).Waiting, "Countdown bypassed")
-profile.Tutorial.QueueAt = os.time() - 4
-check(handlers.TutorialQueue(player).Ok and Tutorial.beat(profile).Id == "Fight", "Queue didn't enter practice")
-check(not handlers.TutorialStep(player, "Fight").Ok, "Client forged victory")
-Intro.tutorialVictory(player)
-check(profile.Coins == 50 and Tutorial.beat(profile).Id == "Return", "Victory rewards missing")
-Intro.tutorialVictory(player)
-check(profile.Coins == 50, "Victory paid twice")
-check(handlers.TutorialStep(player, "Return").Ok, "Return failed")
-check(handlers.TutorialStep(player, "OpenMarket").Ok, "Market failed")
-check(not handlers.TutorialStep(player, "Buy").Ok, "Client forged purchase")
-local stock = Intro.tutorialStock(player)
-check(#stock == 3 and stock[1].Price <= 50, "Starter stock unavailable")
-check(not Intro.tutorialBuy(player, "Tutorial:999").Ok, "Invalid stock accepted")
-check(Intro.tutorialBuy(player, "Tutorial:1").Ok and profile.Coins == 35 and profile.PurchasedItem, "Purchase failed")
-check(not Intro.tutorialBuy(player, "Tutorial:1").Ok and profile.Coins == 35, "Purchase repeated")
-check(handlers.TutorialStep(player, "CloseMarket").Ok, "Close market failed")
-check(handlers.TutorialStep(player, "Play").Ok and profile.Tutorial.Done, "Play didn't finish")
+check(handlers.TutorialStep(player, "CloseInventory").Ok and profile.Tutorial.Done, "Enchanting should finish tutorial")
+check(Tutorial.ById.SurgeQ == nil and Tutorial.ById.Queue == nil and Tutorial.ById.Play == nil, "Removed beats remain")
+local migrated={Intro={Done=true}, Tutorial={Version=2,Step=12,Mined=5,Done=false},Character={}}
+check(Tutorial.beat(migrated).Id == "GemIntro", "Old in-progress save stranded")
 
 -- Skip from the very start: the whole kit, Ember Lance on Q.
 profile = {
@@ -354,10 +312,9 @@ profile = {
 	Gems = {},
 }
 local skipped = handlers.TutorialSkip(player)
-check(skipped.Ok and profile.Tutorial.Done and profile.Intro.Done, "Skip didn't finish the tutorial")
-check(#profile.Gems == 5, "Skip didn't hand out all five gems")
-check(profile.Character.Surge1Gem ~= nil, "Skip didn't put Ember Lance on Q")
-check(handlers.TutorialSkip(player).Ok and #profile.Gems == 5, "Skipping twice handed things out twice")
+check(skipped.Ok and profile.Tutorial.Done, "Skip did not finish")
+check(#profile.Gems == 0, "Skip fabricated mining rewards")
+check(handlers.TutorialSkip(player).Ok and #profile.Gems == 0, "Repeated skip changed inventory")
 
 check(not handlers.AdminRestartTutorial(player).Ok, "Non-admin could restart tutorial")
 stubs.TestAdmin.allowed = function()
