@@ -497,14 +497,30 @@ end
 -- `critChance` rolls a critical (1.6x, shown as CRIT and in the log), by
 -- the same chances a player's attacks have.
 local function armorOutput(duel, charge, heal)
- local now, e = os.clock(), duel.Enemy
- duel.Charge = (duel.Charge or 0) + ArmorSignatures.budget(duel, "Charge", math.min(charge, 100 - (duel.Charge or 0)), 30, now)
- if heal > 0 and e.Alive then
-  heal *= Enemies.healingMultiplier(e) * (1 + (duel.Kit.Effects.HealingReceived or 0))
-  e.Humanoid.Health += ArmorSignatures.budget(duel, "Healing", math.min(heal, e.Humanoid.MaxHealth - e.Humanoid.Health), e.Humanoid.MaxHealth * 0.15, now)
- end
+	local now, e = os.clock(), duel.Enemy
+	duel.Charge = (duel.Charge or 0)
+		+ ArmorSignatures.budget(duel, "Charge", math.min(charge, 100 - (duel.Charge or 0)), 30, now)
+	if heal > 0 and e.Alive then
+		heal *= Enemies.healingMultiplier(e) * (1 + (duel.Kit.Effects.HealingReceived or 0))
+		e.Humanoid.Health += ArmorSignatures.budget(
+			duel,
+			"Healing",
+			math.min(heal, e.Humanoid.MaxHealth - e.Humanoid.Health),
+			e.Humanoid.MaxHealth * 0.15,
+			now
+		)
+	end
 end
-function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ability: string, critChance: number?, swordHit: boolean?)
+function strike(
+	duel,
+	amount: number,
+	element: string?,
+	heavy: boolean?,
+	gem,
+	ability: string,
+	critChance: number?,
+	swordHit: boolean?
+)
 	local e = duel.Enemy :: any
 	if os.clock() < (e.BlindUntil or 0) and (e.Blind or 0) > 0 and math.random() <= e.Blind then
 		-- Blinded (your Solar Flare): the blow goes wide.
@@ -535,7 +551,9 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	if combo then
 		amount *= combo.Mult or 1
 	end
-	if swordHit then amount *= ArmorSignatures.attackMultiplier(duel, os.clock()) end
+	if swordHit then
+		amount *= ArmorSignatures.attackMultiplier(duel, os.clock())
+	end
 	local previous = DamageLog.push(ability, element)
 	local victim = duel.Owner.Character and duel.Owner.Character:FindFirstChildOfClass("Humanoid")
 	local healthBefore = victim and victim.Health or 0
@@ -554,7 +572,11 @@ function strike(duel, amount: number, element: string?, heavy: boolean?, gem, ab
 	end
 	-- Siphon Edge: its weapon heals it too.
 	if effects and effects.Lifesteal and type(dealt) == "number" and dealt > 0 and e.Alive then
-		e.Humanoid.Health = math.min(e.Humanoid.MaxHealth, e.Humanoid.Health + dealt * effects.Lifesteal * Enemies.healingMultiplier(e) * (1 + (effects.HealingReceived or 0)))
+		e.Humanoid.Health = math.min(
+			e.Humanoid.MaxHealth,
+			e.Humanoid.Health
+				+ dealt * effects.Lifesteal * Enemies.healingMultiplier(e) * (1 + (effects.HealingReceived or 0))
+		)
 	end
 	return dealt, guarded
 end
@@ -1015,7 +1037,8 @@ local function think(enemy, now: number)
 	-- the guard (Enemies.damage asks), just as for a player.
 	enemy.GuardCost = enemy.GuardCost
 		or function(amount: number): boolean
-			local cost = math.max(Actions.Stamina.BlockMin, amount * Actions.Stamina.BlockPerDamage) * ArmorSignatures.guardMultiplier(duel.Kit.Signatures)
+			local cost = math.max(Actions.Stamina.BlockMin, amount * Actions.Stamina.BlockPerDamage)
+				* ArmorSignatures.guardMultiplier(duel.Kit.Signatures)
 			if duel.Stamina >= cost then
 				spendStamina(duel, cost)
 				return true
@@ -1023,14 +1046,21 @@ local function think(enemy, now: number)
 			spendStamina(duel, duel.Stamina)
 			return false
 		end
- enemy.ArmorTimedBlock = function()
-  armorOutput(duel, ArmorSignatures.timedBlock(duel, duel.Kit.Signatures, os.clock()), 0)
- end
- enemy.ArmorDodge = function()
-  duel.Stamina = math.min(100, duel.Stamina + ArmorSignatures.dodged(duel, duel.Kit.Signatures, os.clock(), duel.ArmorDodgeCost, enemy.DodgeUntil))
- end
- enemy.ArmorAbsorb = function(amount) return ArmorSignatures.absorb(duel, amount, os.clock()) end
-	humanoid.WalkSpeed = duel.Speed * ArmorSignatures.speed(duel, now)
+	enemy.ArmorTimedBlock = function()
+		armorOutput(duel, ArmorSignatures.timedBlock(duel, duel.Kit.Signatures, os.clock()), 0)
+	end
+	enemy.ArmorDodge = function()
+		duel.Stamina = math.min(
+			100,
+			duel.Stamina
+				+ ArmorSignatures.dodged(duel, duel.Kit.Signatures, os.clock(), duel.ArmorDodgeCost, enemy.DodgeUntil)
+		)
+	end
+	enemy.ArmorAbsorb = function(amount)
+		return ArmorSignatures.absorb(duel, amount, os.clock())
+	end
+	humanoid.WalkSpeed = duel.Speed
+		* ArmorSignatures.speed(duel, now)
 		* (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
 		* (if guarding(enemy, now) then 0.7 else 1) -- a shield-walk
 	if duel.Tutorial and tutorialThink(duel, enemy, now, target, distance, dir) then
@@ -1064,7 +1094,11 @@ local function think(enemy, now: number)
 					local humanoid = enemy.Humanoid
 					humanoid.Health = math.min(
 						humanoid.MaxHealth,
-						humanoid.Health + dealt * zone.Leech * Enemies.healingMultiplier(enemy) * (1 + (duel.Kit and duel.Kit.Effects.HealingReceived or 0))
+						humanoid.Health
+							+ dealt
+								* zone.Leech
+								* Enemies.healingMultiplier(enemy)
+								* (1 + (duel.Kit and duel.Kit.Effects.HealingReceived or 0))
 					)
 				end
 			end
@@ -1152,7 +1186,7 @@ local function think(enemy, now: number)
 					SWING_NAMES[action.Kind] or "Swing",
 					-- Crits by its Speed, as yours are (heavies a little more).
 					math.min(0.75, (duel.Crit or 0) + (if heavy then duel.HeavyCrit or 0 else 0)),
-					duel.Weapon.WeaponType == "Sword"
+					ArmorSignatures.isSword(duel.Weapon)
 				)
 				if type(dealt) == "number" and dealt > 0 and not guarded then
 					-- Landing its weapon builds its Charge, as yours does.
@@ -1415,7 +1449,9 @@ local function think(enemy, now: number)
 		end
 	end
 	-- Like a player, it reaches for a maneuver (1, 2, 3) when one fits.
-	local move = choice ~= "Stagger" and Brain.pickMove(duel.Moves, choice, now, distance, math.random())
+	local move = (Tech.ManeuversEnabled or duel.Dungeon or duel.Raid)
+		and choice ~= "Stagger"
+		and Brain.pickMove(duel.Moves, choice, now, distance, math.random())
 	if move and duel.Stamina < (move.Cost or 0) then
 		move = nil -- can't afford it, like a player
 	end

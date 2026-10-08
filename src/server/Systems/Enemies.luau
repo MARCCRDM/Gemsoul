@@ -207,7 +207,7 @@ local function healthBar(root: BasePart, name: string, color: Color3, height: nu
 	local board = Instance.new("BillboardGui")
 	board.Name = "HealthBar"
 	board.Size = UDim2.fromOffset(120, 30)
-	board.StudsOffset = Vector3.new(0, height, 0)
+	board.StudsOffsetWorldSpace = Vector3.new(0, height, 0)
 	board.MaxDistance = 90
 	board.AlwaysOnTop = true
 	board.Parent = root
@@ -456,7 +456,16 @@ function Enemies.adopt(model: Model, kind, opts: { Element: string?, Title: stri
 	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 	humanoid.BreakJointsOnDeath = false
 	local color = if opts.Element then GemConfig.ElementColors[opts.Element] else Color3.new(1, 1, 1)
-	local bar = healthBar(root, opts.Title or kind.Name, color, 3.5)
+	model:SetAttribute("CombatTitle", opts.Title or kind.Name)
+	local head = model:FindFirstChild("Head")
+	local bar = healthBar(
+		root,
+		opts.Title or kind.Name,
+		color,
+		if head and head:IsA("BasePart")
+			then head.Position.Y - root.Position.Y + head.Size.Y / 2 + 1.5
+			else root.Size.Y / 2 + 2
+	)
 	model:SetAttribute("Enemy", kind.Name)
 	model.Parent = folder
 	pcall(root.SetNetworkOwner, root, nil)
@@ -636,7 +645,9 @@ function Enemies.damage(
 	local now = os.clock()
 	local name = DamageLog.nameOf(enemy)
 	if enemy.DodgeUntil and now < enemy.DodgeUntil then
-		if (enemy :: any).ArmorDodge and heavy ~= nil then (enemy :: any).ArmorDodge() end
+		if (enemy :: any).ArmorDodge and heavy ~= nil then
+			(enemy :: any).ArmorDodge()
+		end
 		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = name })
 		return -- slipped out of the way
 	end
@@ -686,7 +697,9 @@ function Enemies.damage(
 				return
 			end
 			e.ParrySpent = true
-			if e.ArmorTimedBlock then e.ArmorTimedBlock() end
+			if e.ArmorTimedBlock then
+				e.ArmorTimedBlock()
+			end
 			Enemies.parryPlayer(source, 0.25)
 			blocked = amount * 0.65 * exposure
 			amount *= 0.35
@@ -719,7 +732,9 @@ function Enemies.damage(
 	-- Shields (a rival duelist's Cryo Shield, Energy Siphon, block gem or
 	-- Ward) soak the blow first, as a player's do.
 	local absorbed = 0
-	if e.ArmorAbsorb then amount, absorbed = e.ArmorAbsorb(amount) end
+	if e.ArmorAbsorb then
+		amount, absorbed = e.ArmorAbsorb(amount)
+	end
 	if (e.Shield or 0) > 0 and now < (e.ShieldUntil or 0) then
 		local shieldAbsorb = math.min(e.Shield, amount)
 		e.Shield -= shieldAbsorb
@@ -908,6 +923,10 @@ function Enemies.statuses(enemy: Enemy, now: number)
 	-- A rival's own buffs.
 	local duel = e.Duel
 	if duel then
+		local armor = duel.ArmorBuffs
+		if armor and (armor.Barrier or 0) > 0 then
+			add("Shielded", armor.BarrierUntil or 0, armor.Barrier)
+		end
 		add("CryoShield", duel.CryoUntil or 0)
 		add("ResonanceEcho", duel.EchoUntil or 0)
 	end

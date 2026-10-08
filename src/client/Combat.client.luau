@@ -59,7 +59,11 @@ local comboUntil, flashUntil, fightSince = 0, 0, 0
 local holding, blockHeld, chargeStarted, nextAttack, nextBlockUpdate = false, false, 0, 0, 0
 local gui = UiKit.gui("CombatHud", 5)
 -- Low-health / damage vignette: four soft red edges, drawn under everything.
-local vignette = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, gui)
+local damageGui = UiKit.gui("CombatDamageOverlay", 4)
+damageGui.IgnoreGuiInset = true
+damageGui.ScreenInsets = Enum.ScreenInsets.None
+damageGui.ClipToDeviceSafeArea = false
+local vignette = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, damageGui)
 for _, edge in
 	{
 		{ UDim2.fromScale(0, 0), UDim2.new(1, 0, 0.18, 0), 90 },
@@ -183,7 +187,7 @@ end
 -- The action bar: Gem Surges (Q, E, R) | ornament | Rig Maneuvers (1, 2, 3).
 local actionBar = HudChrome.actionBar(gui)
 local surgeTray = new("Frame", { BackgroundTransparency = 1 }, actionBar.Frame)
-local maneuverTray = new("Frame", { BackgroundTransparency = 1 }, actionBar.Frame)
+local maneuverTray = new("Frame", { BackgroundTransparency = 1, Visible = Tech.ManeuversEnabled }, actionBar.Frame)
 -- One ability icon: a round gem socket (surges) or a square slot
 -- (maneuvers), each in a fine gold bezel.
 local function makeIcon(parent, key, round)
@@ -521,7 +525,7 @@ for i, id in { "Charge", "Stamina" } do
 end
 local controlsHint = text(
 	gui,
-	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | 1/2/3 Maneuvers | X Switch Target | K Tree | L Log",
+	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | X Switch Target | K Tree | L Log",
 	10,
 	Color3.fromRGB(205, 198, 182)
 )
@@ -700,11 +704,7 @@ local function drawRival(now, viewport)
 	local model = rivalModel
 	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
 	-- (Touch screens keep the fight clear: the top card says enough.)
-	rivalPanel.Visible = humanoid ~= nil
-		and (model:GetAttribute("ArenaDropUntil") or 0) <= workspace:GetServerTimeNow()
-		and humanoid.Health > 0
-		and viewport.X >= 700
-		and not UserInputService.TouchEnabled
+	rivalPanel.Visible = false -- FoeBars owns the single overhead name and health display.
 	if not rivalPanel.Visible then
 		return
 	end
@@ -936,11 +936,6 @@ end
 local function loadoutOf()
 	return GemClient.Profile and GemClient.Profile.Character
 end
--- The Rig Maneuver on key 1, 2 or 3 (set in the Loadout).
-local function maneuverOn(slot)
-	local loadout = loadoutOf()
-	return (loadout and loadout.Maneuvers or Tech.DefaultManeuvers)[slot]
-end
 local function techReady(key)
 	local cd = techCooldowns[key]
 	return not cd or os.clock() >= cd.Ready
@@ -961,15 +956,6 @@ local function triggerSurge(key)
 		beamKey, nextBeamUpdate = key, os.clock() + 0.2
 	end
 	input:FireServer("Surge", key, aimPoint())
-end
-local function triggerManeuver(slot)
-	if cursorFree or not canFight() or holding or blockHeld then
-		return
-	end
-	local id = maneuverOn(slot)
-	if id and techReady(id) then
-		input:FireServer("RigManeuver", id, aimPoint())
-	end
 end
 local function stopBeam(key)
 	if beamKey and (key == nil or key == beamKey) then
@@ -994,13 +980,6 @@ for i, key in SURGE_KEYS do
 		if pressInput(obj) then
 			stopBeam(key)
 		end
-	end)
-end
-for slot = 1, Tech.ManeuverSlots do
-	local icon = makeIcon(maneuverTray, tostring(slot), false)
-	maneuverIcons[slot] = icon
-	icon.Button.Activated:Connect(function()
-		triggerManeuver(slot)
 	end)
 end
 local function makeSlot(id, label, key, position)
@@ -1132,22 +1111,13 @@ ContextActionService:BindActionAtPriority("CombatLogDetails", function(_, state)
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 20, Enum.KeyCode.L)
 local SURGE_INPUT = { [Enum.KeyCode.Q] = "Q", [Enum.KeyCode.E] = "E", [Enum.KeyCode.R] = "R" }
-local MANEUVER_INPUT = {
-	[Enum.KeyCode.One] = 1,
-	[Enum.KeyCode.Two] = 2,
-	[Enum.KeyCode.Three] = 3,
-	[Enum.KeyCode.KeypadOne] = 1,
-	[Enum.KeyCode.KeypadTwo] = 2,
-	[Enum.KeyCode.KeypadThree] = 3,
-}
 UserInputService.InputBegan:Connect(function(obj, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
 		return
 	end
 	if SURGE_INPUT[obj.KeyCode] then
 		triggerSurge(SURGE_INPUT[obj.KeyCode])
-	elseif MANEUVER_INPUT[obj.KeyCode] then
-		triggerManeuver(MANEUVER_INPUT[obj.KeyCode])
+
 	elseif obj.UserInputType == Enum.UserInputType.MouseButton1 then
 		local offHand = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
@@ -1351,6 +1321,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
 	local fight = canFight() == true and not (dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled)
 	gui.Enabled = fight
+	damageGui.Enabled = fight
 	-- The lock stays on through menus and a free cursor; only its camera pull pauses.
 	TargetLock.setActive(fight)
 	TargetLock.setPaused(CombatGuide.isOpen() or AugmentTreeUI.isOpen())
@@ -1512,31 +1483,6 @@ RunService.RenderStepped:Connect(function(dt)
 			setIcon(icon, P.Dim, nil, false, false)
 		end
 	end
-	local shielded = Classes.heldShield(loadout)
-	for slot, icon in maneuverIcons do
-		local id = maneuverOn(slot)
-		local definition = id and Tree.techStats(profile, id)
-		local color = Tech.Resources.Stamina.Color
-		if definition then
-			local learned = Tree.isLearned(profile, id)
-			icon.Glyph.Text, icon.Glyph.TextColor3 = "✦", color
-			if SurgeIcons.apply(icon.Button, id) then
-				icon.Glyph.Text = ""
-			end
-			icon.Name.Text = definition.Name
-			icon.Badge.Text = if learned then string.format("%d ST", math.floor(definition.Cost + 0.5)) else "LOCKED"
-			icon.Locked = not learned
-			local affordable = (player:GetAttribute("Stamina") or 0) >= definition.Cost
-			local usable = learned and affordable and (not definition.Shield or shielded ~= nil)
-			setIcon(icon, color, techCooldowns[id], usable, false, learned and not affordable)
-		else
-			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
-			SurgeIcons.apply(icon.Button, nil)
-			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
-			icon.Locked = true
-			setIcon(icon, P.Dim, nil, false, false)
-		end
-	end
 	if beamKey and os.clock() >= nextBeamUpdate then
 		input:FireServer("Surge", beamKey, aimPoint())
 		nextBeamUpdate = os.clock() + 0.2
@@ -1644,12 +1590,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local target = lockedTarget or (hit and hit.Instance:FindFirstAncestorOfClass("Model"))
 	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
 	-- Touch screens: the foe's health rides over its head (FoeBars) instead.
-	targetCard.Visible = enemyHumanoid ~= nil
-		and not UserInputService.TouchEnabled
-		and (target:GetAttribute("ArenaDropUntil") or 0) <= workspace:GetServerTimeNow()
-		and enemyHumanoid.Health > 0
-		and target ~= player.Character
-		and not game:GetService("CollectionService"):HasTag(target, "Vendor")
+	targetCard.Visible = false -- no duplicate desktop target health panel
 	if targetCard.Visible then
 		local opponent = Players:GetPlayerFromCharacter(target)
 		local ratio = math.clamp(enemyHumanoid.Health / math.max(1, enemyHumanoid.MaxHealth), 0, 1)

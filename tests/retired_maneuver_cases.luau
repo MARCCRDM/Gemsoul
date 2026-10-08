@@ -1,0 +1,10 @@
+local p, h, r = makePlayer(991, arena, nil)
+local s = CombatServer._state(p)
+local pending = #s.Pending
+CombatServer._input(p, "RigManeuver", "HydraulicSlam", r.Position)
+assert(#s.Pending == pending and s.Resources.Stamina == 100, "Retired maneuver cast accepted")
+assert(not registered.LearnAugment(p, "ServoFlurry").Ok, "Retired maneuver purchase accepted")
+assert(not registered.UpgradeAugment(p, "HydraulicSlam").Ok, "Retired maneuver upgrade accepted")
+assert(not registered.EquipManeuver(p, 1, "HydraulicSlam").Ok, "Retired maneuver equip accepted")
+p:SetAttribute("PvPEnabled", false)
+print("PASS: retired maneuvers reject casts, purchases, upgrades and equipment")

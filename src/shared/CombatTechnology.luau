@@ -2,6 +2,7 @@
 -- recovery, regeneration and unspecified damage are first-playtest tuning.
 local GemRoller = require(script.Parent.GemRoller)
 local Tech = {}
+Tech.ManeuversEnabled = false -- archived data is retained; controls and player casts are retired.
 Tech.Resources = {
 	Stamina = { Max = 100, Start = 100, Regen = 12, Color = Color3.fromRGB(65, 195, 112) },
 	-- Charge fills slowly on its own and faster as your weapon lands hits

@@ -124,7 +124,11 @@ local function kit(player)
 		loadout = PvPRules.capLoadout(loadout, rules.RarityCap)
 	end
 	local full = rules ~= nil and rules.Stats == "Full"
-	return kitFor(loadout, if inArena(player) and not full then {} else Tree.effects(PlayerData.get(player)), rules and rules.RarityCap ~= nil)
+	return kitFor(
+		loadout,
+		if inArena(player) and not full then {} else Tree.effects(PlayerData.get(player)),
+		rules and rules.RarityCap ~= nil
+	)
 end
 CombatServer.kitFor = kitFor
 local function rating(k, stat)
@@ -178,17 +182,25 @@ local function state(player)
 end
 -- Shared signature outputs are capped after anti-heal and healing bonuses.
 local function armorOutput(player, st, k, charge, healing)
- local now = os.clock()
- charge = ArmorSignatures.budget(st, "Charge", math.min(charge, 100 - st.Resources.Charge), 30, now)
- st.Resources.Charge += charge
- player:SetAttribute("Charge", st.Resources.Charge)
- local hum = alive(player)
- if hum and healing > 0 then
-  healing *= (1 + (k.Effects.HealingReceived or 0)) * CrowdControl.healingMultiplier(st.CC, now)
-  healing = ArmorSignatures.budget(st, "Healing", math.min(healing, hum.MaxHealth - hum.Health), hum.MaxHealth * 0.15, now)
-  hum.Health += healing
-  if healing > 0 then DamageLog.send(player, { Dir = "In", Kind = "Heal", Ability = "Armor Life Steal", Amount = healing }) end
- end
+	local now = os.clock()
+	charge = ArmorSignatures.budget(st, "Charge", math.min(charge, 100 - st.Resources.Charge), 30, now)
+	st.Resources.Charge += charge
+	player:SetAttribute("Charge", st.Resources.Charge)
+	local hum = alive(player)
+	if hum and healing > 0 then
+		healing *= (1 + (k.Effects.HealingReceived or 0)) * CrowdControl.healingMultiplier(st.CC, now)
+		healing = ArmorSignatures.budget(
+			st,
+			"Healing",
+			math.min(healing, hum.MaxHealth - hum.Health),
+			hum.MaxHealth * 0.15,
+			now
+		)
+		hum.Health += healing
+		if healing > 0 then
+			DamageLog.send(player, { Dir = "In", Kind = "Heal", Ability = "Armor Life Steal", Amount = healing })
+		end
+	end
 end
 -- Spends Stamina (swings, guarding, maneuvers, dodges) and holds off its
 -- regeneration for a moment, so it never refills mid-flurry.
@@ -418,11 +430,11 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	local st, now = state(player), os.clock()
 	local attackerName = DamageLog.nameOf(source) or DamageLog.nameOf(enemySource)
 	if Actions.invulnerable(st.DodgeStarted, now, k.Rules, pvp, st.DodgeKind) then
-  if origin and not reflected then
-   local refund = ArmorSignatures.dodged(st, k.Signatures, now, st.ArmorDodgeCost, st.DodgeStarted)
-   st.Resources.Stamina = math.min(100, st.Resources.Stamina + refund)
-   player:SetAttribute("Stamina", st.Resources.Stamina)
-  end
+		if origin and not reflected then
+			local refund = ArmorSignatures.dodged(st, k.Signatures, now, st.ArmorDodgeCost, st.DodgeStarted)
+			st.Resources.Stamina = math.min(100, st.Resources.Stamina + refund)
+			player:SetAttribute("Stamina", st.Resources.Stamina)
+		end
 		DamageLog.send(player, { Dir = "In", Kind = "Dodge", Who = attackerName })
 		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = DamageLog.nameOf(player) })
 		return 0
@@ -469,26 +481,41 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 			fx("BlockSpark", root.Position, true)
 		else
 			local multiplier, covered = Actions.blockMultiplier(k.Rules, pvp, dot, projectile, heavy)
-				if covered then
-					guarded = true
-					local empowered = now < (st.PrototypeGuardUntil or 0)
-					local timed = st.BlockRaisedAt and now - st.BlockRaisedAt <= 0.3
-					local catchMelee = empowered and st.PrototypeGuard == "StaticCatch" and not projectile
-					if empowered and not reflected then
-						st.PrototypeGuardUntil = 0 -- one covered hit consumes the window
-						local retaliate = st.PrototypeGuard == "HeatReversal" and timed
-						local deflect = st.PrototypeGuard == "StaticCatch" and projectile and timed
-						if retaliate or deflect then
-							local counter = if deflect then amount * 0.5 else k.Weapon.Attack.Damage * 0.65
-							if deflect then multiplier = 0 end
-							local sourceRoot = source and source.Character and source.Character:FindFirstChild("HumanoidRootPart")
-							if sourceRoot and (deflect or (sourceRoot.Position - root.Position).Magnitude <= 9) then
-								receive(source, counter, if deflect then element else "Fire", player, root.Position, false, false, true)
-							elseif enemySource and (deflect or (enemySource.Root.Position - root.Position).Magnitude <= 9) then
-								Enemies.damage(enemySource, counter, player, false, GemConfig.ElementColors.Fire)
-							end
+			if covered then
+				guarded = true
+				local empowered = now < (st.PrototypeGuardUntil or 0)
+				local timed = st.BlockRaisedAt and now - st.BlockRaisedAt <= 0.3
+				local catchMelee = empowered and st.PrototypeGuard == "StaticCatch" and not projectile
+				if empowered and not reflected then
+					st.PrototypeGuardUntil = 0 -- one covered hit consumes the window
+					local retaliate = st.PrototypeGuard == "HeatReversal" and timed
+					local deflect = st.PrototypeGuard == "StaticCatch" and projectile and timed
+					if retaliate or deflect then
+						local counter = if deflect then amount * 0.5 else k.Weapon.Attack.Damage * 0.65
+						if deflect then
+							multiplier = 0
+						end
+						local sourceRoot = source
+							and source.Character
+							and source.Character:FindFirstChild("HumanoidRootPart")
+						if sourceRoot and (deflect or (sourceRoot.Position - root.Position).Magnitude <= 9) then
+							receive(
+								source,
+								counter,
+								if deflect then element else "Fire",
+								player,
+								root.Position,
+								false,
+								false,
+								true
+							)
+						elseif
+							enemySource and (deflect or (enemySource.Root.Position - root.Position).Magnitude <= 9)
+						then
+							Enemies.damage(enemySource, counter, player, false, GemConfig.ElementColors.Fire)
 						end
 					end
+				end
 				if
 					not projectile
 					and not reflected
@@ -518,8 +545,11 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				local exhausted = false
 				if not (st.ParrySpent and not parriedBefore) then
 					local cost = math.max(Actions.Stamina.BlockMin, beforeGuard * Actions.Stamina.BlockPerDamage)
-						* (1 - (k.Effects.BlockStamina or 0)) * ArmorSignatures.guardMultiplier(k.Signatures)
-					if catchMelee then cost *= 0.5 end
+						* (1 - (k.Effects.BlockStamina or 0))
+						* ArmorSignatures.guardMultiplier(k.Signatures)
+					if catchMelee then
+						cost *= 0.5
+					end
 					if st.Resources.Stamina >= cost then
 						spendStamina(player, st, cost)
 					else
@@ -1014,7 +1044,9 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		Versus = versus,
 		TargetGuarding = targetGuarding,
 	})
-	if not projectile and k.Weapon.WeaponType == "Sword" then damage *= ArmorSignatures.attackMultiplier(st, os.clock()) end
+	if not projectile and ArmorSignatures.isSword(k.Weapon) then
+		damage *= ArmorSignatures.attackMultiplier(st, os.clock())
+	end
 	local echoDamage = damage
 	local guarded = false
 	local gem = k.Loadout.WeaponGem
@@ -1055,10 +1087,11 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		end
 		enemyWard(source, target.Enemy)
 	end
-	if not projectile and k.Weapon.WeaponType == "Sword" then
-  local charge, heal = ArmorSignatures.hit(st, k.Signatures, os.clock(), math.max(0, healthBefore - target.Humanoid.Health), heavy)
-  armorOutput(source, st, k, charge, heal)
- end
+	if not projectile and ArmorSignatures.isSword(k.Weapon) then
+		local charge, heal =
+			ArmorSignatures.hit(st, k.Signatures, os.clock(), math.max(0, healthBefore - target.Humanoid.Health), heavy)
+		armorOutput(source, st, k, charge, heal)
+	end
 	if damage > 0 then
 		weaponPerksOnHit(source, k, st, target, math.max(0, healthBefore - target.Humanoid.Health), guarded)
 		-- Landing the weapon builds Charge for your surges (with a gem to use it).
@@ -1714,9 +1747,13 @@ local function applyBuff(player, k, st, id, definition)
 		else
 			local oldest, endsAt = nil, math.huge
 			for source, dot in st.Dots do
-				if dot.Ends > now and dot.Ends < endsAt then oldest, endsAt = source, dot.Ends end
+				if dot.Ends > now and dot.Ends < endsAt then
+					oldest, endsAt = source, dot.Ends
+				end
 			end
-			if oldest then st.Dots[oldest] = nil end
+			if oldest then
+				st.Dots[oldest] = nil
+			end
 		end
 		fx("TechField", player, GemConfig.ElementColors.Poison)
 	elseif id == "EnergySiphon" then
@@ -1756,7 +1793,11 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			Remotes.CombatFx:FireClient(player, "TechStatus", "Interrupted: surges locked")
 			return false
 		end
-		definition = Tech.surgeStats(gem, if inArena(player) then nil else Tree.effects(profile), player:GetAttribute("MatchRarityCap") ~= nil)
+		definition = Tech.surgeStats(
+			gem,
+			if inArena(player) then nil else Tree.effects(profile),
+			player:GetAttribute("MatchRarityCap") ~= nil
+		)
 		cooldownKey = "Surge" .. surgeKey
 	else
 		local base = if typeof(id) == "string" then Tech.Catalog[id] else nil
@@ -1796,8 +1837,10 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	if definition.Shift then
 		local forward = flat(root.CFrame.LookVector)
 		local direction = flat(aim - root.Position)
-		if definition.Shift == "Forward" then direction = forward
-		elseif definition.Shift == "Back" then direction = -forward
+		if definition.Shift == "Forward" then
+			direction = forward
+		elseif definition.Shift == "Back" then
+			direction = -forward
 		elseif definition.Shift == "Side" then
 			local side = Vector3.new(-forward.Z, 0, forward.X)
 			direction = side * (if side:Dot(direction) < 0 then -1 else 1)
@@ -1807,11 +1850,23 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		params.RespectCanCollide = true
 		local hit = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * definition.Distance, params)
 		local distance = if hit then math.max(0, hit.Distance - 0.5) else definition.Distance
-		if distance < 1 then return false end -- failed placement is free
-		st.DodgeMove = { Kind = "Shift", Root = root, Direction = direction, Speed = distance / definition.MoveTime, Ends = now + definition.MoveTime }
+		if distance < 1 then
+			return false
+		end -- failed placement is free
+		st.DodgeMove = {
+			Kind = "Shift",
+			Root = root,
+			Direction = direction,
+			Speed = distance / definition.MoveTime,
+			Ends = now + definition.MoveTime,
+		}
 		-- Do not set DodgeStarted: Shift grants no dodge invulnerability.
-		if id == "SeepStep" then st.Slow, st.SlowUntil, st.CC.Debuffs.Slow = 0, 0, nil end
-		pcall(function() root:SetNetworkOwner(nil) end)
+		if id == "SeepStep" then
+			st.Slow, st.SlowUntil, st.CC.Debuffs.Slow = 0, 0, nil
+		end
+		pcall(function()
+			root:SetNetworkOwner(nil)
+		end)
 		fx("DodgeRoll", player, root.Position, direction, distance, false)
 		Tech.spend(st.Resources, definition.Resource, cost)
 	elseif id == "StimDodge" then
@@ -1867,7 +1922,11 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	if definition.Resource == "Charge" then
 		recovery = math.max(recovery, Tech.SurgeLockout)
 	end
-	local cooldown = math.max(recovery, (definition.Cooldown or definition.Recovery) * (if definition.Prototype then 1 else (k.Effects.CooldownMult or 1)))
+	local cooldown = math.max(
+		recovery,
+		(definition.Cooldown or definition.Recovery)
+			* (if definition.Prototype then 1 else (k.Effects.CooldownMult or 1))
+	)
 	st.TechCooldowns[cooldownKey], st.NextTech = now + cooldown, now + recovery
 	st.NextAttack = math.max(st.NextAttack, st.NextTech)
 	st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
@@ -1960,6 +2019,9 @@ local function onInput(player, action, a, b)
 	end
 	updateResources(player, st, currentKit)
 	if action == "RigManeuver" then
+		if not Tech.ManeuversEnabled then
+			return
+		end
 		triggerTechnology(player, a, b)
 	elseif action == "Surge" then
 		if a == "Q" or a == "E" or a == "R" then
@@ -2118,8 +2180,14 @@ local function playerStatuses(st, now)
 			table.insert(list, { Id = id, Ends = serverTime(ends), Value = value or 0 })
 		end
 	end
-	if st.Shield > 0 then
-		add("Shielded", st.ShieldUntil, st.Shield)
+	local armor = st.ArmorBuffs
+	local barrier = if armor and now < (armor.BarrierUntil or 0) then armor.Barrier or 0 else 0
+	if st.Shield > 0 or barrier > 0 then
+		add(
+			"Shielded",
+			math.max(if st.Shield > 0 then st.ShieldUntil else 0, if barrier > 0 then armor.BarrierUntil else 0),
+			st.Shield + barrier
+		)
 	end
 	if st.SiphonCapacity > 0 then
 		add("EnergySiphon", st.SiphonUntil, st.SiphonCapacity)
@@ -2300,7 +2368,8 @@ local function tick(dt)
 			else speed
 				* (if now < st.SlowUntil then 1 - st.Slow else 1)
 				* (if blocking(st, now) then 0.6 else 1)
-				* casting * ArmorSignatures.speed(st, now)
+				* casting
+				* ArmorSignatures.speed(st, now)
 		player:SetAttribute("CastRooted", casting == 0)
 		if now >= st.ShieldUntil then
 			st.Shield = 0
@@ -2328,7 +2397,9 @@ local function tick(dt)
 				end
 			end
 		end
-		player:SetAttribute("Shield", math.floor(st.Shield))
+		local armor = st.ArmorBuffs
+		local barrier = if armor and now < (armor.BarrierUntil or 0) then armor.Barrier or 0 else 0
+		player:SetAttribute("Shield", math.floor(st.Shield + barrier))
 		player:SetAttribute("CombatCharging", st.ChargeStarted ~= nil)
 		publishStatuses(player, st, now)
 	end
@@ -2416,10 +2487,7 @@ function CombatServer.start()
 	end
 	Remotes.CombatInput.OnServerEvent:Connect(onInput)
 	Shop.register("SetRigManeuvers", function()
-		return Shop.reply(
-			false,
-			"Put Rig Maneuvers on keys 1, 2 and 3 and gems in the Surge Array (Q, E, R) from the Loadout."
-		)
+		return Shop.reply(false, "Rig Maneuvers are retired. Equip gems in the Surge Array (Q, E, R) from the Loadout.")
 	end)
 	local function watch(player)
 		player.CharacterAdded:Connect(function()

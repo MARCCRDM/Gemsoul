@@ -1409,14 +1409,18 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 			chipRow(holder, 2, stats)
 		end
 		local signatureName, signatureText = ArmorSignatures.describe(roll, gem)
-  if signatureName ~= "" then
-   line(holder, 3, "SIGNATURE - " .. string.upper(signatureName), 10, C.Gold, BOLD)
-   line(holder, 4, signatureText, 12, C.Text)
-   local affinities = {}
-   for _, affix in roll.Affixes or {} do table.insert(affinities, GemConfig.affixText(affix.Id, affix.Bonus)) end
-   if #affinities > 0 then line(holder, 4, table.concat(affinities, " / "), 11, C.Dim) end
-  end
-  local passive = if signatureName == "" then gear.Passive else nil
+		if signatureName ~= "" then
+			line(holder, 3, "SIGNATURE - " .. string.upper(signatureName), 10, C.Gold, BOLD)
+			line(holder, 4, signatureText, 12, C.Text)
+			local affinities = {}
+			for _, affix in roll.Affixes or {} do
+				table.insert(affinities, GemConfig.affixText(affix.Id, affix.Bonus))
+			end
+			if #affinities > 0 then
+				line(holder, 4, table.concat(affinities, " / "), 11, C.Dim)
+			end
+		end
+		local passive = if signatureName == "" then gear.Passive else nil
 		if passive and passive.Text then
 			line(holder, 3, string.upper(passive.Name or "PASSIVE"), 10, C.Dim, BOLD)
 			line(holder, 4, passive.Text, 12, C.Text)
@@ -1424,7 +1428,9 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 		line(holder, 5, "GEM SOCKET", 10, C.Dim, BOLD)
 		if gem then
 			local name, effect = GemConfig.enchantment(gem, slot)
-			if signatureName ~= "" then name, effect = "Signature enchantment", signatureText end
+			if signatureName ~= "" then
+				name, effect = "Signature enchantment", signatureText
+			end
 			line(holder, 6, string.format("%s: %s", name, effect), 12, gemColor(gem), BOLD)
 		else
 			line(holder, 6, "Empty. Drag a cut gem from GEMS onto this piece.", 12, C.Dim)

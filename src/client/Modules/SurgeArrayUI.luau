@@ -40,7 +40,7 @@ local player = Players.LocalPlayer
 local window = IronUi.window("SurgeArray", 10, WIDTH, HEIGHT, "◆", P.Teal)
 local gui, panel = window.Gui, window.Panel
 window.Title.Text = "SURGE ARRAY"
-window.Subtitle.Text = "Gem Surges on Q · E · R   ·   Rig Maneuvers on 1 · 2 · 3"
+window.Subtitle.Text = "Gem Surges on Q · E · R"
 
 local body = new("Frame", {
 	BackgroundTransparency = 1,
@@ -153,16 +153,7 @@ local function socketCard(parent, key, x, gem, amps)
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	if definition then
 		local tier = place(
-			label(
-				card,
-				string.format(
-					"%s · %s",
-					string.upper(Tech.rarityLabel(gem)),
-					"SURGE"
-				),
-				11,
-				color
-			),
+			label(card, string.format("%s · %s", string.upper(Tech.rarityLabel(gem)), "SURGE"), 11, color),
 			10,
 			138,
 			176,
@@ -217,7 +208,8 @@ end
 
 local function pouchList(parent, profile, amps)
 	local role = "ANY SURGE"
-	local heading = place(label(parent, "GEM POUCH  ·  " .. selectedKey .. "  ·  " .. role, 13, P.Gold), 0, 272, 620, 18)
+	local heading =
+		place(label(parent, "GEM POUCH  ·  " .. selectedKey .. "  ·  " .. role, 13, P.Gold), 0, 272, 620, 18)
 	heading.TextXAlignment = Enum.TextXAlignment.Left
 	local scroller = new("ScrollingFrame", {
 		BackgroundTransparency = 1,
@@ -252,7 +244,13 @@ local function pouchList(parent, profile, amps)
 	end)
 	if #gems == 0 then
 		local empty = place(
-			label(scroller, "No compatible gems. Mine for new Surges; each equipped ability must be different.", 12, P.Dim, IronUi.Body),
+			label(
+				scroller,
+				"No compatible gems. Mine for new Surges; each equipped ability must be different.",
+				12,
+				P.Dim,
+				IronUi.Body
+			),
 			0,
 			0,
 			600,
@@ -281,12 +279,7 @@ local function pouchList(parent, profile, amps)
 			label(
 				row,
 				if definition
-					then string.format(
-						"%s  ·  %s %s",
-						definition.Name,
-						Tech.rarityLabel(gem),
-						""
-					)
+					then string.format("%s  ·  %s %s", definition.Name, Tech.rarityLabel(gem), "")
 					else "Unknown surge",
 				13,
 				P.Text
@@ -432,13 +425,15 @@ local function amplifierBox(parent, amps)
 	if Tech.RaritySurges then
 		local card = box(parent, UDim2.fromOffset(646, 336), UDim2.fromOffset(340, 164), P.Inset, 12)
 		place(label(card, "SURGE LOADOUT", 13, P.Gold), 14, 10, 312, 18)
-		for i, text in {
-			"Q / E / R: any three different Surges",
-			"36 abilities · every ability at every rarity",
-			"Rarity improves one ability property.",
-			"Range and control timing stay fixed.",
-			"Size, Clarity and Cut do not scale Surges.",
-		} do
+		for i, text in
+			{
+				"Q / E / R: any three different Surges",
+				"36 abilities · every ability at every rarity",
+				"Rarity improves one ability property.",
+				"Range and control timing stay fixed.",
+				"Size, Clarity and Cut do not scale Surges.",
+			}
+		do
 			local line = place(label(card, text, 11, P.Text, IronUi.Body), 14, 34 + (i - 1) * 23, 312, 20)
 			line.TextXAlignment = Enum.TextXAlignment.Left
 		end
@@ -507,7 +502,9 @@ function SurgeArrayUI.refresh()
 		socketCard(body, key, (i - 1) * 212, Tech.surgeGem(loadout, key), amps)
 	end
 	pouchList(body, profile, amps)
-	maneuverColumn(body, profile, loadout)
+	if Tech.ManeuversEnabled then
+		maneuverColumn(body, profile, loadout)
+	end
 	amplifierBox(body, amps)
 	if not canChange() then
 		local lock = place(

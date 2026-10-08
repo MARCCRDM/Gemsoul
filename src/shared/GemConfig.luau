@@ -500,7 +500,8 @@ function GemConfig.enchantment(
 		return "Surge Capacitor", "Powers " .. (GemConfig.ElementLabels[gem.Element] or gem.Element) .. " Gem Surges."
 	end
 	if GemConfig.side(slot) == "Defense" then
-		return "Signature Enchantment", "Strengthens this armor piece's signature using Size, Clarity and Cut. Inspect the armor for exact values."
+		return "Signature Enchantment",
+			"Strengthens this armor piece's signature using Size, Clarity and Cut. Inspect the armor for exact values."
 	end
 	local side = GemConfig.side(slot)
 	local name = GemConfig.EnchantNames[if side == "Offense" then "Weapon" else "Armor"][gem.Element] or "Enchanted"
@@ -598,6 +599,13 @@ function GemConfig.affixText(id: string, bonus: number): string
 	local affix = GemConfig.AffixById[id]
 	if not affix then
 		return ""
+	end
+	if affix.Side == "Defense" then
+		return string.format(
+			"%s Affinity: +%s matching signature enchantment",
+			GemConfig.elementName(affix.Element),
+			percent(bonus)
+		)
 	end
 	return string.format("%s Affinity: +%s %s", GemConfig.elementName(affix.Element), percent(bonus), affix.Label)
 end

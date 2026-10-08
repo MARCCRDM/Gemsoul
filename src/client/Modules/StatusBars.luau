@@ -248,9 +248,13 @@ local function overheadFor(owner: Instance, root: BasePart)
 	end
 	local board = make("BillboardGui", {
 		Name = "StatusIcons",
-		Adornee = root,
+		Adornee = owner:FindFirstChild("Head") or root,
 		Size = UDim2.fromOffset(190, 36),
-		StudsOffset = Vector3.new(0, 5.1, 0),
+		StudsOffsetWorldSpace = Vector3.new(
+			0,
+			((owner:FindFirstChild("Head") or root) :: BasePart).Size.Y / 2 + 3.4,
+			0
+		),
 		MaxDistance = 80,
 		AlwaysOnTop = true,
 		ResetOnSpawn = false,

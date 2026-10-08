@@ -207,14 +207,15 @@ pointsCaption.TextXAlignment = Enum.TextXAlignment.Center
 
 local TAB_Y, TAB_H = 78, 56
 local tabs = {}
-for index, id in Tree.Branches do
+local visibleBranches = if Tech.ManeuversEnabled then Tree.Branches else { "SurgeAmplifiers", "PassiveAugments" }
+for index, id in visibleBranches do
 	local meta = BRANCH[id]
 	local tab = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = P.Inset,
-		Position = UDim2.new((index - 1) / 3, if index == 1 then 20 else 7, 0, TAB_Y),
-		Size = UDim2.new(1 / 3, -27, 0, TAB_H),
+		Position = UDim2.new((index - 1) / #visibleBranches, if index == 1 then 20 else 7, 0, TAB_Y),
+		Size = UDim2.new(1 / #visibleBranches, -27, 0, TAB_H),
 	}, panel)
 	tab:SetAttribute("UiSound", "Tab")
 	UiKit.round(tab, 10)
@@ -304,8 +305,8 @@ local reset = new("TextButton", {
 
 -- State ----------------------------------------------------------------------------------
 
-local branch = "RigManeuvers"
-local selected = "HydraulicSlam"
+local branch = if Tech.ManeuversEnabled then "RigManeuvers" else "PassiveAugments"
+local selected = Tree.Order[branch][1]
 local busy = false
 local nextAction: string? = nil -- "LearnAugment" | "UpgradeAugment" when the button can act
 
@@ -898,7 +899,7 @@ function UI.refresh()
 end
 
 function UI.selectBranch(id)
-	if not Tree.Order[id] then
+	if not Tree.Order[id] or (id == "RigManeuvers" and not Tech.ManeuversEnabled) then
 		return
 	end
 	if id ~= branch then

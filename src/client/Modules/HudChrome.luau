@@ -174,6 +174,19 @@ function HudChrome.actionBar(parent: Instance)
 end
 
 function HudChrome.layoutActionBar(bar, surgeTray: Frame, maneuverTray: Frame)
+	if not maneuverTray.Visible then
+		local pad = HudChrome.Pad
+		surgeTray.AnchorPoint = Vector2.zero
+		surgeTray.Position = UDim2.fromOffset(pad, 11)
+		bar.Frame.Size = UDim2.fromOffset(2 * pad + surgeTray.Size.X.Offset, surgeTray.Size.Y.Offset + 15)
+		bar.SurgeTitle.Position = UDim2.fromOffset(bar.Frame.Size.X.Offset / 2, 0)
+		bar.ManeuverTitle.Visible = false
+		local ornament = bar.Frame:FindFirstChild("Ornament")
+		if ornament then
+			ornament.Visible = false
+		end
+		return bar.Frame.Size.X.Offset, bar.Frame.Size.Y.Offset
+	end
 	local pad, divider = HudChrome.Pad, HudChrome.Divider
 	local trayWidth, trayHeight = surgeTray.Size.X.Offset, surgeTray.Size.Y.Offset
 	surgeTray.AnchorPoint, maneuverTray.AnchorPoint = Vector2.zero, Vector2.zero

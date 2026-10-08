@@ -49,7 +49,7 @@ local function nameOf(model: Model): string
 	if other then
 		return other.DisplayName
 	end
-	return model:GetAttribute("RivalName") or model.Name
+	return model:GetAttribute("RivalName") or model:GetAttribute("CombatTitle") or model.Name
 end
 local function tintOf(model: Model): Color3
 	local element = model:GetAttribute("RivalElement")
@@ -76,6 +76,8 @@ type Bar = {
 	Stroke: UIStroke,
 	Shown: number,
 	Trailing: number,
+	Label: TextLabel,
+	Hidden: { BillboardGui },
 }
 local bars: { [Model]: Bar } = {}
 
@@ -85,6 +87,13 @@ local function barFor(model: Model): Bar?
 		return nil
 	end
 	local bar = bars[model]
+	if bar then
+		for _, legacy in bar.Hidden do
+			if legacy.Parent then
+				legacy.Enabled = false
+			end
+		end
+	end
 	if bar and bar.Board.Adornee == head and bar.Board.Parent then
 		return bar
 	end
@@ -94,14 +103,41 @@ local function barFor(model: Model): Bar?
 	local board = make("BillboardGui", {
 		Name = "FoeHealth",
 		Adornee = head,
-		Size = UDim2.fromOffset(84, 9),
-		StudsOffset = Vector3.new(0, if head.Name == "Head" then 1.9 else 3.4, 0),
+		Size = UDim2.fromOffset(220, 48),
+		StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + 1.8, 0),
 		MaxDistance = 90,
 		AlwaysOnTop = true,
 		ResetOnSpawn = false,
 	}, player:FindFirstChildOfClass("PlayerGui"))
-	local back =
-		make("Frame", { BackgroundColor3 = INK, BackgroundTransparency = 0.15, Size = UDim2.fromScale(1, 1) }, board)
+	local label = make("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 30),
+		Text = nameOf(model),
+		TextColor3 = Color3.fromRGB(240, 244, 250),
+		TextSize = 12,
+		Font = Enum.Font.GothamBold,
+		TextWrapped = true,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextStrokeTransparency = 0.35,
+	}, board)
+	local back = make(
+		"Frame",
+		{
+			BackgroundColor3 = INK,
+			BackgroundTransparency = 0.15,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 34),
+			Size = UDim2.fromOffset(104, 10),
+		},
+		board
+	)
+	local hidden = {}
+	for _, child in model:GetDescendants() do
+		if child:IsA("BillboardGui") and child.Name == "HealthBar" and child.Enabled then
+			child.Enabled = false
+			table.insert(hidden, child)
+		end
+	end
 	corner(back, 3)
 	local stroke = make("UIStroke", { Color = EDGE, Thickness = 1 }, back)
 	local inner = make("Frame", {
@@ -118,8 +154,19 @@ local function barFor(model: Model): Bar?
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	end
-	bar = { Board = board, Back = back, Fill = fill, Trail = trail, Stroke = stroke, Shown = 1, Trailing = 1 }
+	bar = {
+		Label = label,
+		Hidden = hidden,
+		Board = board,
+		Back = back,
+		Fill = fill,
+		Trail = trail,
+		Stroke = stroke,
+		Shown = 1,
+		Trailing = 1,
+	}
 	bars[model] = bar
 	return bar
 end
@@ -196,6 +243,7 @@ for i = 1, FoeBars.MaxRows do
 	local track = make("Frame", {
 		BackgroundColor3 = Color3.fromRGB(40, 33, 61),
 		BorderSizePixel = 0,
+		Visible = false, -- health is shown only above the fighter
 		Position = UDim2.fromOffset(35, 21),
 		Size = UDim2.fromOffset(140, 6),
 	}, button)
@@ -239,6 +287,11 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		for model, bar in bars do
 			if not keep[model] then
+				for _, legacy in bar.Hidden do
+					if legacy.Parent then
+						legacy.Enabled = not dropping(model)
+					end
+				end
 				bar.Board:Destroy()
 				bars[model] = nil
 			end
@@ -255,7 +308,12 @@ RunService.RenderStepped:Connect(function(dt)
 		bar.Fill.Size = UDim2.fromScale(share, 1)
 		bar.Trail.Size = UDim2.fromScale(bar.Trailing, 1)
 		local locked = model == target
-		bar.Board.Size = if locked then UDim2.fromOffset(104, 11) else UDim2.fromOffset(84, 9)
+		bar.Back.Size = if locked then UDim2.fromOffset(120, 11) else UDim2.fromOffset(100, 9)
+		bar.Label.Text = nameOf(model)
+		local head = bar.Board.Adornee
+		if head then
+			bar.Board.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + 1.8, 0)
+		end
 		bar.Stroke.Color = if locked then LOCK else EDGE
 		bar.Stroke.Thickness = if locked then 1.5 else 1
 		bar.Fill.BackgroundColor3 = if share <= 0.3 then Color3.fromRGB(255, 96, 96) else HEALTH

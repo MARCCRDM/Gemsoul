@@ -37,7 +37,7 @@ function CombatGuide.refresh()
 		return
 	end
 	window.Subtitle.Text =
-		"Stamina powers every swing, your guard, dodges and Rig Maneuvers (1 / 2 / 3); it refills once you ease off · Charge powers the gems in your Surge Array (Q / E / R)."
+		"Stamina powers every swing, your guard and dodges; it refills once you ease off · Charge powers the gems in your Surge Array (Q / E / R)."
 	local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
 	local sets = Classes.setState(loadout)
 	local effects = Classes.effects(loadout)
@@ -119,28 +119,30 @@ function CombatGuide.refresh()
 		label.Size = UDim2.new(1, -12, 0, 26)
 	end
 	-- Rig Maneuvers: learned in the Augment Tree, put on keys 1-3 in the Loadout.
-	heading("RIG MANEUVERS · STAMINA · KEYS 1 / 2 / 3", Tech.Resources.Stamina.Color)
-	local equipped = loadout.Maneuvers or Tech.DefaultManeuvers
-	for _, id in Tech.Order.RigManeuvers do
-		local definition = Tree.techStats(profile, id)
-		local learned = Tree.isLearned(profile, id)
-		local key = table.find(equipped, id)
-		card(
-			string.format(
-				"%s · %d Stamina%s",
-				definition.Name,
-				math.floor(definition.Cost + 0.5),
-				if key and learned then " · KEY " .. key else ""
-			),
-			if learned and key then P.Gold else P.Dim,
-			definition.Description
-				.. (
-					if not learned
-						then " Unlock this node in your Augment Tree (K)."
-						elseif not key then " Put it on key 1, 2 or 3 in the Loadout (L)."
-						else ""
-				)
-		)
+	if Tech.ManeuversEnabled then
+		heading("RIG MANEUVERS · STAMINA · KEYS 1 / 2 / 3", Tech.Resources.Stamina.Color)
+		local equipped = loadout.Maneuvers or Tech.DefaultManeuvers
+		for _, id in Tech.Order.RigManeuvers do
+			local definition = Tree.techStats(profile, id)
+			local learned = Tree.isLearned(profile, id)
+			local key = table.find(equipped, id)
+			card(
+				string.format(
+					"%s · %d Stamina%s",
+					definition.Name,
+					math.floor(definition.Cost + 0.5),
+					if key and learned then " · KEY " .. key else ""
+				),
+				if learned and key then P.Gold else P.Dim,
+				definition.Description
+					.. (
+						if not learned
+							then " Unlock this node in your Augment Tree (K)."
+							elseif not key then " Put it on key 1, 2 or 3 in the Loadout (L)."
+							else ""
+					)
+			)
+		end
 	end
 	-- Gem Surges: the gem in each Surge Array socket decides the ability.
 	heading("GEM SURGES · CHARGE · Q / E / R", Tech.Resources.Charge.Color)
@@ -174,10 +176,7 @@ function CombatGuide.refresh()
 		local names = {}
 		for tier, id in Tech.Surges[element] do
 			local alternate = Tech.SurgeVariants[element][tier]
-			table.insert(
-				names,
-				string.format("%s  /  %s", Tech.Catalog[id].Name, Tech.Catalog[alternate].Name)
-			)
+			table.insert(names, string.format("%s  /  %s", Tech.Catalog[id].Name, Tech.Catalog[alternate].Name))
 		end
 		local line = text(
 			body,
@@ -191,11 +190,7 @@ function CombatGuide.refresh()
 	for tier, id in Tech.Resonance do
 		table.insert(
 			resonance,
-			string.format(
-				"%s  /  %s",
-				Tech.Catalog[id].Name,
-				Tech.Catalog[Tech.ResonanceVariants[tier]].Name
-			)
+			string.format("%s  /  %s", Tech.Catalog[id].Name, Tech.Catalog[Tech.ResonanceVariants[tier]].Name)
 		)
 	end
 	table.sort(resonance)

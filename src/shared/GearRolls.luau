@@ -99,7 +99,10 @@ function GearRolls.roll(rng, fixedRarity, gear)
 		GearRolls.addAffixes(roll, rng, gear)
 		for slot, kind in ArmorSignatures.Slots do
 			for _, candidate in ExpandedTraits.Catalog[kind] or {} do
-				if candidate.Id == gear.Id then ArmorSignatures.ensure(roll, slot, rng); break end
+				if candidate.Id == gear.Id then
+					ArmorSignatures.ensure(roll, slot, rng)
+					break
+				end
 			end
 		end
 	end

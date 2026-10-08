@@ -10,6 +10,14 @@ local function canChange(player)
 end
 function Augments.start()
 	Shop.register("LearnAugment", function(player, id)
+		if
+			not Tech.ManeuversEnabled
+			and typeof(id) == "string"
+			and Tree.Nodes[id]
+			and Tree.Nodes[id].Branch == "RigManeuvers"
+		then
+			return Shop.reply(false, "Rig Maneuvers are retired. Choose a Surge or passive augment.")
+		end
 		local profile = PlayerData.get(player)
 		if not profile then
 			return Shop.reply(false, "Profile unavailable.")
@@ -25,6 +33,14 @@ function Augments.start()
 	end)
 	-- Raise an unlocked node one rank (Blades-style rank II and III).
 	Shop.register("UpgradeAugment", function(player, id)
+		if
+			not Tech.ManeuversEnabled
+			and typeof(id) == "string"
+			and Tree.Nodes[id]
+			and Tree.Nodes[id].Branch == "RigManeuvers"
+		then
+			return Shop.reply(false, "Rig Maneuvers are retired. Choose a Surge or passive augment.")
+		end
 		local profile = PlayerData.get(player)
 		if not profile then
 			return Shop.reply(false, "Profile unavailable.")
@@ -48,10 +64,7 @@ function Augments.start()
 		end
 		local gem = PlayerData.socketSurge(player, gemId, key)
 		if not gem then
-			return Shop.reply(
-				false,
-				"Choose a cut gem with a different Surge ability. Q, E and R accept any Surge."
-			)
+			return Shop.reply(false, "Choose a cut gem with a different Surge ability. Q, E and R accept any Surge.")
 		end
 		local id, tier, rank = Tech.surgeOf(gem)
 		local surge = id and Tech.Catalog[id]
@@ -75,6 +88,9 @@ function Augments.start()
 		return Shop.reply(true, "Gem back in your pouch.", { Gem = gem })
 	end)
 	Shop.register("EquipManeuver", function(player, slot, id)
+		if not Tech.ManeuversEnabled then
+			return Shop.reply(false, "Rig Maneuvers are retired. Equip gems on Q, E and R.")
+		end
 		local profile = PlayerData.get(player)
 		if
 			not profile

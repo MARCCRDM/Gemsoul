@@ -927,12 +927,7 @@ local function gemLines(gem)
 			line.Size = UDim2.new(1, -8, 0, 15)
 		end
 		local weak = ElementMatchup.weakTo(gem.Element)
-		local resist = text(
-			tipBody,
-			"ARMOR: strengthens its signature; no automatic elemental resistance",
-			11,
-			P.Dim
-		)
+		local resist = text(tipBody, "ARMOR: strengthens its signature; no automatic elemental resistance", 11, P.Dim)
 		resist.AutomaticSize, resist.TextWrapped, resist.TextTruncate =
 			Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 		resist.Size = UDim2.new(1, -8, 0, 15)
@@ -993,21 +988,9 @@ local function gemLines(gem)
 	-- The surge it casts from a Surge Array slot.
 	local surge = gem.Cut and Tech.surgeStats(gem)
 	if surge then
-		local section = cardSection(
-			string.format(
-				"SURGE  ·  %s  ·  %s",
-				string.upper(surge.Name),
-				Tech.rarityLabel(gem)
-			),
-			P.Gold
-		)
-		statRow(
-			section,
-			"Rarity improves one property. Range and timing stay fixed.",
-			nil,
-			P.Dim,
-			11
-		)
+		local section =
+			cardSection(string.format("SURGE  ·  %s  ·  %s", string.upper(surge.Name), Tech.rarityLabel(gem)), P.Gold)
+		statRow(section, "Rarity improves one property. Range and timing stay fixed.", nil, P.Dim, 11)
 		if surge.Damage then
 			statRow(section, string.format("%d%% base damage", math.floor(surge.Damage * 100 + 0.5)))
 			-- Gem metrics affect equipment enchantments, not Surge power.
@@ -1030,42 +1013,29 @@ local function gemLines(gem)
 		table.insert(pvp, line.Text)
 	end
 	statRow(weapon, "Against players: " .. table.concat(pvp, "  ·  "), nil, P.Dim, 11)
- local armor = cardSection("IN ARMOR - SIGNATURE STRENGTH", color)
- statRow(armor, "Strengthens the armor's rolled signature. Matching affinities improve the enchantment contribution.", nil, P.Text, 12)
- for slot, kind in ArmorSignatures.Slots do
-  local loadout = GemClient.Profile and GemClient.Profile.Character
-  local roll = loadout and GearRolls.get(loadout, slot)
-  local name, description = ArmorSignatures.describe(roll, gem)
-  if name ~= "" then statRow(armor, slot .. " - " .. name .. ": " .. description, nil, P.Text, 11) end
- end
-	-- What the armor you're wearing resists right now.
-	local worn = ElementMatchup.profile(GemClient.Profile and GemClient.Profile.Character)
-	local parts = {}
-	for _, name in GemConfig.Elements do
-		local share = worn.Resist[name]
-		if share and share > 0 then
-			table.insert(parts, string.format("%s %d%%", GemConfig.elementName(name), math.floor(share * 100 + 0.5)))
-		end
-	end
-	local weakNow = worn.Main and ElementMatchup.weakTo(worn.Main)
+	local armor = cardSection("IN ARMOR - SIGNATURE STRENGTH", color)
 	statRow(
 		armor,
-		string.format(
-			"Your armor now: %s%s  (max %d%% each)",
-			if #parts > 0 then table.concat(parts, ", ") else "no resistances",
-			if weakNow then "  ·  weak to " .. GemConfig.elementName(weakNow) else "",
-			math.floor(ElementMatchup.Cap * 100 + 0.5)
-		),
+		"Strengthens the armor's rolled signature. Matching affinities improve the enchantment contribution.",
+		nil,
+		P.Text,
+		12
+	)
+	for slot, kind in ArmorSignatures.Slots do
+		local loadout = GemClient.Profile and GemClient.Profile.Character
+		local roll = loadout and GearRolls.get(loadout, slot)
+		local name, description = ArmorSignatures.describe(roll, gem)
+		if name ~= "" then
+			statRow(armor, slot .. " - " .. name .. ": " .. description, nil, P.Text, 11)
+		end
+	end
+	statRow(
+		armor,
+		"One gem powers one equipped use. Weapon enchantments and Q/E/R Surges remain separate.",
 		nil,
 		P.Dim,
 		11
 	)
-	for id, bonus in affinity do
-		local affix = GemConfig.AffixById[id]
-		if affix and affix.Element == gem.Element then
-			statRow(armor, "Boosted by your armor  ·  " .. GemConfig.affixText(id, bonus), nil, color, 11)
-		end
-	end
 	tooltipStroke.Color = tierColor
 end
 
@@ -1199,7 +1169,9 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 		-- The gem in this piece: name, one quality bar and what it adds.
 		GemArt.viewport(well, gem, false)
 		local gemName, effect = GemConfig.enchantment(gem, slotName)
-		if roll and roll.Signature then gemName, effect = ArmorSignatures.describe(roll, gem) end
+		if roll and roll.Signature then
+			gemName, effect = ArmorSignatures.describe(roll, gem)
+		end
 		local title = text(socket, string.format("%s  ·  %s", GemConfig.shade(gem).Name, gemName), 13, gemColor, BOLD)
 		title.AutomaticSize = Enum.AutomaticSize.None
 		title.Position = UDim2.fromOffset(66, 5)
@@ -1281,7 +1253,9 @@ local function itemCard(slotName: string, id: string, gear, roll, gem, worn: boo
 	end
 
 	local sigName, sigText = ArmorSignatures.describe(roll, gem)
-	if sigName ~= "" then text(tipBody, "SIGNATURE - " .. sigName .. ": " .. sigText, 12, P.Gold, BOLD) end
+	if sigName ~= "" then
+		text(tipBody, "SIGNATURE - " .. sigName .. ": " .. sigText, 12, P.Gold, BOLD)
+	end
 	-- Elemental affinities this piece rolled, in their element's colour.
 	for _, affix in roll and roll.Affixes or {} do
 		local def = GemConfig.AffixById[affix.Id]
@@ -1667,7 +1641,9 @@ local function drawTooltipContent()
 				if learned then Tech.Resources.Stamina.Color else P.Dim,
 			})
 		end
-		gridRow("MANEUVERS", maneuverCells)
+		if Tech.ManeuversEnabled then
+			gridRow("MANEUVERS", maneuverCells)
+		end
 		local augmentLevel = Tree.level(profile and profile.Augments and profile.Augments.XP or 0)
 		local seasonLevel = Season.levelFor(profile and profile.Season and profile.Season.XP or 0)
 		gridRow("PROGRESS", {
@@ -2628,9 +2604,7 @@ local function powerRow(order: number, gem, keyName: string?, onClick: () -> ())
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	local detail = text(
 		row,
-		if surge
-			then Tech.rarityLabel(surge.Gem)
-			else "Pick a power below, then press " .. (keyName or "Q"),
+		if surge then Tech.rarityLabel(surge.Gem) else "Pick a power below, then press " .. (keyName or "Q"),
 		11,
 		if surge then P.Dim else P.Dim,
 		IronUi.Body
