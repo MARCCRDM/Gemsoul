@@ -12,6 +12,7 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Season = require(ReplicatedStorage.Shared.Season)
@@ -126,7 +127,7 @@ end
 function TopPlayers.start()
 	global = true
 	for _, board in BOARDS do
-		local ok, store = pcall(DataStoreService.GetOrderedDataStore, DataStoreService, "Gemsoul_Top_" .. board)
+		local ok, store = pcall(DataStoreService.GetOrderedDataStore, DataStoreService, Config.DataStoreName .. "_Top_" .. board)
 		if ok and store then
 			stores[board] = store
 		else

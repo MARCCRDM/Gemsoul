@@ -13,6 +13,7 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local ReferralRules = require(ReplicatedStorage.Shared.Referrals)
@@ -27,7 +28,7 @@ local store = nil
 local function referralStore()
 	if store == nil then
 		local ok, result = pcall(function()
-			return DataStoreService:GetDataStore("Referrals_v1")
+			return DataStoreService:GetDataStore(Config.DataStoreName .. "_Referrals")
 		end)
 		store = if ok then result else false
 	end

@@ -37,18 +37,21 @@ local Config = {
 	MineHoldSeconds = 1,
 
 	-- Saving (needs "Enable Studio Access to API Services" to work in Studio).
-	DataStoreName = "GemSoul_PlayerData_v1",
+	-- Full-player reset, 2026-10-09. Keep this name stable after publishing:
+    -- every account starts fresh once, then saves normally in this generation.
+    -- The previous v1 store remains an inactive recovery backup.
+    DataStoreName = "GemSoul_PlayerData_v2",
 	-- The Market board and mailboxes. Raise it (and publish) to start the
 	-- Market empty: every listed or offered item goes back to its owner the
 	-- next time they join, and old mailbox notes are left behind.
-	MarketVersion = 1,
+	MarketVersion = 2,
 	AutosaveSeconds = 120,
 
 	-- Playtesting with friends on a published server.
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "Playtest 1 · 2026-10-03",
+		Build = "Fresh Start 2 · 2026-10-09",
 		-- UserIds who can read feedback and error reports in game (Social >
 		-- Feedback > Reports). In Studio everyone can.
 		Owners = { 11738957136, 11758049015 }, -- Devvolver, VolverDev
