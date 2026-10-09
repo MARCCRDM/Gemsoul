@@ -11,7 +11,7 @@ for _, style in Lottery.Styles do
 		local kit = Lottery.prepareChoice(fresh, style, element, factory)
 		check(kit.Version==3 and #kit.Gear==6 and #kit.Gems==3, "Chosen kit structure")
 		for _, gear in kit.Gear do
-			check(gear.Id==(if gear.Slot=="Weapon" then "SwordShield" else "Armor"..style..gear.Slot.."1"), "Wrong chosen family")
+			check(gear.Id==(if gear.Slot=="Weapon" then "MatrixSwords1" else "Armor"..style..gear.Slot.."1"), "Wrong chosen family")
 		end
 		for index, entry in kit.Gems do
 			check(entry.Gem.Element==element and entry.Gem.Tier=="Common", "Starter element/rarity")

@@ -351,3 +351,22 @@ do
 	check(StatusEffects.Catalog.Staggered ~= nil, "Staggered status missing")
 end
 print("PASS: " .. checks .. " Duelist checks (matchup, hop and roll, dodgeable bolts, combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
+
+-- Sword elbows bend as hinges instead of twisting a quarter-turn sideways.
+do
+ for _,kind in {"Slash","Heavy"} do
+  for _,side in {-1,1} do
+   for i=0,90 do
+    local pose=RivalPose.pose({ActionKind=kind,ActionStart=100,ActionAt=100.35,ActionSide=side},100+i/60,true)
+    local elbow=pose.RightElbow
+    if elbow then
+     check(math.abs(elbow[2])<0.01,"Sword elbow must not twist sideways")
+     check(elbow[1]>-0.25 and elbow[1]<2.2,"Sword elbow exceeded its recovery range")
+    end
+   end
+  end
+ end
+ local idle=RivalPose.pose({ActionKind="Slash",ActionStart=100,ActionAt=100.35},105,true)
+ check(next(idle)==nil,"Expired combat pose must release the lobby body")
+ print("PASS: sword hinge limits and lobby pose recovery")
+end

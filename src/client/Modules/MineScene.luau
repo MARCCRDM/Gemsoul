@@ -60,6 +60,7 @@ local hiddenGui: ScreenGui? = nil
 local pickParts: { BasePart } = {}
 local shoulder: Motor6D? = nil
 local swingStart = -math.huge
+local shoulderPosed = false
 local pickUntil = 0
 local lastSwing = 0
 
@@ -667,6 +668,9 @@ local function exitScene()
 		part:Destroy()
 	end
 	pickParts = {}
+	if shoulderPosed and shoulder and shoulder.Parent then shoulder.Transform = CFrame.identity end
+ shoulderPosed=false
+ swingStart=-math.huge
 	shoulder = nil
 	setWalking(false)
 	ThirdPerson.exit()
@@ -742,7 +746,7 @@ function MineScene.leave()
 end
 
 -- Each frame: the swing, and putting the pickaxe away afterwards.
-RunService.Stepped:Connect(function()
+RunService.PreSimulation:Connect(function()
 	if not active then
 		return
 	end
@@ -752,13 +756,17 @@ RunService.Stepped:Connect(function()
 		-- Wind up over the shoulder, strike down, recover.
 		local angle
 		if t < 0.35 then
-			angle = 165 * (t / 0.35)
+			angle = 130 * (t / 0.35)
 		elseif t < 0.6 then
-			angle = 165 - 120 * ((t - 0.35) / 0.25)
+			angle = 130 - 85 * ((t - 0.35) / 0.25)
 		else
 			angle = 45 * (1 - (t - 0.6) / 0.4)
 		end
 		shoulder.Transform = CFrame.Angles(math.rad(angle), 0, 0)
+        shoulderPosed=true
+    elseif shoulderPosed then
+        if shoulder and shoulder.Parent then shoulder.Transform=CFrame.identity end
+        shoulderPosed=false
 	end
 	if now > pickUntil and #pickParts > 0 and pickParts[1].Transparency < 1 then
 		holdPick(false)

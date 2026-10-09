@@ -14,7 +14,7 @@ function Lottery.prepareChoice(profile, style, element, generate)
 	if not Lottery.validChoice(style, element) then return nil end
 	local reward = { Version = 3, Style = style, Element = element, Gear = {}, Gems = {}, Granted = false }
 	for _, slot in Lottery.GearOrder do
-		table.insert(reward.Gear, { Slot = slot, Id = if slot == "Weapon" then "SwordShield" else "Armor" .. style .. slot .. "1" })
+		table.insert(reward.Gear, { Slot = slot, Id = if slot == "Weapon" then "MatrixSwords1" else "Armor" .. style .. slot .. "1" })
 	end
 	for index, slot in {"Surge1", "Surge2", "Surge3"} do
 		local gem = generate(element)

@@ -180,7 +180,7 @@ local function tutorialKit(player: Player)
 	local profile = PlayerData.get(player)
 	giveStarterKit(player)
 	for _, slot in Lottery.GearOrder do
-		local id = if slot == "Weapon" then "SwordShield" else "Armor" .. TUTORIAL_STYLE .. slot .. "1"
+		local id = if slot == "Weapon" then "MatrixSwords1" else "Armor" .. TUTORIAL_STYLE .. slot .. "1"
 		local kind = Slots.Definitions[slot].Kind
 		if not profile.Owned[kind][id] then
 			PlayerData.setGearQuality(player, kind, id, 1)
@@ -397,7 +397,7 @@ local function restartTutorial(player)
 		end
 	end
 	for _, slot in { "Armor", "Weapon", "Shield" } do
-		local id = if slot == "Weapon" then "SwordShield" else "Armor" .. TUTORIAL_STYLE .. slot .. "1"
+		local id = if slot == "Weapon" then "MatrixSwords1" else "Armor" .. TUTORIAL_STYLE .. slot .. "1"
 		local gems = profile.Character.ItemGems and profile.Character.ItemGems[slot]
 		if profile.Character[slot] ~= id and gems and gems[id] then
 			occupied += 1

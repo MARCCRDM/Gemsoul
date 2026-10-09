@@ -262,7 +262,7 @@ Intro.start()
 local begun = handlers.TutorialBegin(player)
 check(begun.Ok and profile.Intro.Done and profile.Tutorial.Step == 1, "Begin didn't start the tutorial")
 check(equipped.ArmorsArmorSkirmisherArmor1, "No starter chest was put on")
-check(equipped.ShieldsArmorSkirmisherShield1 and equipped.WeaponsSwordShield, "No starter sword and shield")
+check(equipped.ShieldsArmorSkirmisherShield1 and equipped.WeaponsMatrixSwords1, "No starter sword and shield")
 local begunAgain = handlers.TutorialBegin(player)
 check(begunAgain.Ok and #profile.Gems == 0, "Beginning twice handed things out twice")
 

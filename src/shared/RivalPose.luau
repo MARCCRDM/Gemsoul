@@ -215,17 +215,16 @@ local function frames(kind: string, s: number, shield: boolean?)
 		-- chest height, so the slash drawn along it (Client.BladeTrails) reads
 		-- as a cut at the foe. Hips and shoulders drive it; the head stays on
 		-- the foe; the front foot steps in; the shield stays up.
-		-- s = 1, the forehand: cocked high behind the right shoulder, cutting
-		-- down and across to low on the left. s = -1, the backhand: from
-		-- behind the left shoulder, flat across to the right.
+		-- Compact forehand/backhand arcs stay in front of the torso.
+		-- Elbows bend as hinges; shoulder and waist rotation guide the blade.
 		local leftShoulder = if shield then SHIELD_UP.LeftShoulder else { 0.6, 0, -0.3 }
 		local leftElbow = if shield then SHIELD_UP.LeftElbow else { 0.9, 0, 0 }
 		if s >= 0 then
 			return {
 				Waist = { 0, -0.77, 0.19 },
 				Neck = { -0.04, 0.45, 0 },
-				RightShoulder = { -0.96, -1.19, -1.69 },
-				RightElbow = { 2.31, 1.55, 0 },
+				RightShoulder = { 0.65, -0.55, 0.55 },
+				RightElbow = { 1.65, 0, 0 },
 				LeftShoulder = leftShoulder,
 				LeftElbow = leftElbow,
 				RightHip = { 0.1, 0, 0 },
@@ -235,8 +234,8 @@ local function frames(kind: string, s: number, shield: boolean?)
 			}, {
 				Waist = { -0.18, 0.71, 0.3 },
 				Neck = { 0.06, -0.45, 0 },
-				RightShoulder = { 0.48, 0.08, -0.02 },
-				RightElbow = { 1.41, 1.6, 0 },
+				RightShoulder = { 0.95, 0.35, -0.65 },
+				RightElbow = { 0.45, 0, 0 },
 				LeftShoulder = leftShoulder,
 				LeftElbow = leftElbow,
 				RightHip = { 0.55, 0, 0 },
@@ -249,7 +248,7 @@ local function frames(kind: string, s: number, shield: boolean?)
 			Waist = { -0.01, 0.67, 0.22 },
 			Neck = { -0.04, -0.55, 0 },
 			RightShoulder = { 1.11, 0.08, -0.81 },
-			RightElbow = { 0.97, 1.6, 0 },
+			RightElbow = { 1.15, 0, 0 },
 			LeftShoulder = leftShoulder,
 			LeftElbow = leftElbow,
 			RightHip = { 0.15, 0, 0 },
@@ -259,8 +258,8 @@ local function frames(kind: string, s: number, shield: boolean?)
 		}, {
 			Waist = { -0.09, -0.66, 0.04 },
 			Neck = { 0.04, 0.45, 0 },
-			RightShoulder = { 0.82, 0.12, 2.0 },
-			RightElbow = { 2.16, 1.6, 0 },
+			RightShoulder = { 0.85, -0.35, 0.65 },
+			RightElbow = { 0.5, 0, 0 },
 			LeftShoulder = leftShoulder,
 			LeftElbow = leftElbow,
 			RightHip = { 0.5, 0, 0 },
@@ -277,7 +276,7 @@ local function frames(kind: string, s: number, shield: boolean?)
 			Waist = { 0.14, -0.02, 0 },
 			Neck = { 0.12, 0, 0 },
 			RightShoulder = { 2.36, 0.84, 0.2 },
-			RightElbow = { 1.07, -1.07, 0 },
+			RightElbow = { 1.07, 0, 0 },
 			LeftShoulder = SHIELD_UP.LeftShoulder,
 			LeftElbow = SHIELD_UP.LeftElbow,
 			RightHip = { 0.15, 0, 0 },
@@ -286,7 +285,7 @@ local function frames(kind: string, s: number, shield: boolean?)
 			Waist = { -0.47, 0.14, 0.08 },
 			Neck = { -0.2, 0, 0 },
 			RightShoulder = { 0.64, 0.66, -1.17 },
-			RightElbow = { 2.08, -1.6, 0 },
+			RightElbow = { 0.5, 0, 0 },
 			LeftShoulder = SHIELD_UP.LeftShoulder,
 			LeftElbow = SHIELD_UP.LeftElbow,
 			RightHip = { 0.6, 0, 0 },
@@ -967,7 +966,11 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
 		target = add(target, RivalPose.guardStep(rig.Phase, rig.Forward or 1, rig.Side or 0, rig.Stride), 1)
 	end
 	rig.Hold = (rig.Hold or 0) + ((if guardUp then 1 else 0) - (rig.Hold or 0)) * (1 - math.exp(-14 * step))
-	local alpha = 1 - math.exp(-speed * step)
+	-- Upper-body combat poses own their joints; do not add the walk's arm
+ -- swing on top. Legs keep locomotion unless the guard owns the full body.
+ local upperActive = not rest or next(target) ~= nil
+ rig.UpperHold = (rig.UpperHold or 0) + ((if upperActive then 1 else 0) - (rig.UpperHold or 0)) * (1 - math.exp(-18 * step))
+ local alpha = 1 - math.exp(-speed * step)
 	for joint, entry in rig.Joints do
 		local angles = rig.Angles[joint]
 		local to = target[joint] or { 0, 0, 0 }
@@ -1007,17 +1010,19 @@ end
 -- (RunService.Stepped; Client.BodyPoses does).
 function RivalPose.holdGuards()
 	for model, rig in rigs do
-		local w = rig.Hold
-		if w and w > 0.01 and model.Parent then
+		local w = rig.Hold or 0
+        local upper = rig.UpperHold or 0
+		if math.max(w,upper) > 0.01 and model.Parent then
 			if rig.Root == nil then
 				local lowerTorso = model:FindFirstChild("LowerTorso")
 				local motor = lowerTorso and lowerTorso:FindFirstChild("Root")
 				rig.Root = if motor and motor:IsA("Motor6D") then motor else false
 			end
-			for _, entry in rig.Joints do
+			for joint, entry in rig.Joints do
 				local object = entry.Object
 				if object:IsA("Motor6D") then
-					object.Transform = object.Transform:Lerp(CFrame.identity, w)
+					local weight = if joint=="Waist" or joint=="Neck" or string.find(joint,"Shoulder") or string.find(joint,"Elbow") then math.max(w,upper) else w
+                    object.Transform = object.Transform:Lerp(CFrame.identity, weight)
 				end
 			end
 			if rig.Root then

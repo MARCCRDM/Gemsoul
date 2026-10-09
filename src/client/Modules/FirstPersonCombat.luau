@@ -284,7 +284,10 @@ local function weaponFrame(weapon)
 	local grip = weapon:FindFirstChild("RightGrip")
 	local blade, length = nil, 0
 	for _, part in weapon:GetDescendants() do
-		if part:IsA("BasePart") and authoredTransparency(part) < 1 and part.Size.Y > length then
+        local weld = part:IsA("BasePart") and part:FindFirstChildWhichIsA("WeldConstraint")
+        -- Only the right-hand blade defines its frame, never a built-in shield
+        -- or the offhand blade of a dual-wield model.
+        if part:IsA("BasePart") and weld and weld.Part0 == grip and authoredTransparency(part) < 1 and part.Size.Y > length then
 			if part.Size.Y >= math.max(part.Size.X, part.Size.Z) then
 				blade, length = part, part.Size.Y
 			end
@@ -440,15 +443,15 @@ local function keyframes()
 		Right = {
 			{ 0, REST },
 			{ 0.07, pose(1.12, -0.48, -1.12, 12, -16, -28) },
-			{ 0.15, pose(0.1, -0.42, -1.45, -18, 20, 76) },
-			{ 0.23, pose(-0.5, -0.72, -1.25, -32, 24, 100) },
+			{ 0.15, pose(0.1, -0.42, -1.45, -16, 18, 58) },
+			{ 0.23, pose(-0.25, -0.66, -1.4, -24, 18, 72) },
 			{ 0.46, REST },
 		},
 		Left = {
 			{ 0, REST },
 			{ 0.07, pose(-0.22, -0.42, -1.18, 10, 18, 62) },
-			{ 0.15, pose(0.68, -0.55, -1.45, -22, -22, -72) },
-			{ 0.23, pose(1.18, -0.86, -1.22, -36, -24, -100) },
+			{ 0.15, pose(0.68, -0.55, -1.45, -18, -18, -52) },
+			{ 0.23, pose(1.0, -0.72, -1.4, -26, -18, -70) },
 			{ 0.46, REST },
 		},
 		Heavy = {

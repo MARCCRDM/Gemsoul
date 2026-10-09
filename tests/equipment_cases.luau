@@ -194,3 +194,13 @@ for i, rarity in GearRolls.Rarities do
 	check(math.abs(rarityCounts[i] / 1800 - rarity.Weight / 100) < 0.05, "Rarity distribution outside tolerance")
 end
 print("PASS: 300 random player loadouts; " .. count .. " distinct sets; saved rolls stable; rarity distribution valid")
+
+do
+ local warrior=Classes.get("Warrior")
+ local rng={NextNumber=function() error("Starter must not roll rarity") end,NextInteger=function() error("Starter must not roll weapon") end}
+ local starter=Classes.starterWeapon(warrior,rng)
+ assert(starter.Id=="MatrixSwords1" and starter.RarityTier==1 and starter.Look=="FrontierSword","Starter must be original Common sword")
+ local legacy=Classes.weapon("Warrior","SwordShield")
+ assert(legacy and legacy.Look=="FrontierSword" and legacy.WeaponType=="Sword" and not legacy.StartPool,"Saved legacy sword must use safe original art without new drops")
+ print("PASS: deterministic Common starter and legacy sword compatibility")
+end

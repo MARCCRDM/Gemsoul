@@ -530,13 +530,6 @@ WEAPONS.Crossbow = function(folder, _character, right, _left, accent, gem)
 	gemSocket(folder, right, m, Vector3.new(0, 1.6, -0.18), gem, 0.24)
 end
 
-WEAPONS.SwordShield = function(folder, character, right, _left, accent, gem)
-	sword(folder, right, HELD_FORWARD, accent, nil, 2.8)
-	local arm = bodyPart(character, "LeftLowerArm", "Left Arm")
-	if arm then
-		shield(folder, arm, -1, 1.8, 2.2, accent, gem)
-	end
-end
 
 WEAPONS.MaceShield = function(folder, character, right, _left, accent, gem)
 	local m = HELD_FORWARD
