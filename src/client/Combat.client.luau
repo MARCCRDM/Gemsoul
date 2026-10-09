@@ -1467,7 +1467,7 @@ RunService.RenderStepped:Connect(function(dt)
 		local definition = gem and Tech.surgeStats(gem, amps, player:GetAttribute("MatchRarityCap") ~= nil)
 		if definition then
 			local color = GemConfig.ElementColors[gem.Element] or P.Gold
-			local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)
+			local cost = definition.Cost * (if definition.PerSecond and not definition.Prepaid then 0.25 else 1)
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "◆", color
 			if SurgeIcons.apply(icon.Button, definition) then
 				icon.Glyph.Text = ""

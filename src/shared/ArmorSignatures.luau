@@ -4,13 +4,16 @@ local ArmorSignatures = {}
 ArmorSignatures.Version = 1
 ArmorSignatures.Slots = { Helmet = "Helmets", Armor = "Armors", Gloves = "Gloves", Boots = "Boots", Shield = "Shields" }
 ArmorSignatures.Pools = {
-	Helmet = { "ChargeGain", "Countercharge" },
+	Helmet = { "ChargeGain", "Countercharge", "Conductor", "Momentum", "Recycler" },
 	Armor = { "LifeSteal", "Barrier" },
 	Gloves = { "Riposte" },
 	Boots = { "StaminaRefund", "Pursuit" },
 	Shield = { "GuardEfficiency" },
 }
 ArmorSignatures.Definitions = {
+ Conductor={Name="Conductor",Slot="Helmet",Base=.20,Max=.40,Cooldown=0,Percent=true,Trigger="Bonus weapon-hit Charge; your stamina regenerates 15% slower"},
+ Momentum={Name="Momentum",Slot="Helmet",Base=4,Max=8,Cooldown=0,Unit="Charge",Trigger="Every third damaging sword hit within 5s grants bonus Charge; your stamina regenerates 10% slower"},
+ Recycler={Name="Recycler",Slot="Helmet",Base=1,Max=2,Cooldown=0,Unit="Charge/s",Trigger="Damaging sword hits activate 3s of Charge regeneration; refreshes without stacking; your stamina regenerates 15% slower"},
 	ChargeGain = {
 		Name = "Charge Gain",
 		Slot = "Helmet",
@@ -217,7 +220,14 @@ function ArmorSignatures.hit(st, perks, now, actualDamage, heavy)
 			r.Speed, r.SpeedUntil = speed, now + 2
 		end
 	end
-	return activate(st, perks, "ChargeGain", now) or 0, actualDamage * (perks.LifeSteal and perks.LifeSteal.Value or 0)
+	local bonus=activate(st, perks, "ChargeGain", now) or 0
+ if perks and perks.Momentum then
+  r.Hits=if now>(r.HitUntil or 0) then 1 else (r.Hits or 0)+1
+  r.HitUntil=now+5
+  if r.Hits>=3 then bonus+=perks.Momentum.Value;r.Hits=0 end
+ end
+ if perks and perks.Recycler then r.RecyclerUntil=now+3 end
+ return bonus, actualDamage * (perks.LifeSteal and perks.LifeSteal.Value or 0)
 end
 function ArmorSignatures.dodged(st, perks, now, cost, dodgeId)
 	local r = runtime(st)
@@ -239,5 +249,17 @@ end
 function ArmorSignatures.speed(st, now)
 	local r = runtime(st)
 	return if now < (r.SpeedUntil or 0) then 1 + (r.Speed or 0) else 1
+end
+function ArmorSignatures.chargeMultiplier(perks)
+ return 1+(perks and perks.Conductor and perks.Conductor.Value or 0)
+end
+function ArmorSignatures.staminaMultiplier(perks)
+ if perks and (perks.Conductor or perks.Recycler) then return .85 end
+ return if perks and perks.Momentum then .9 else 1
+end
+function ArmorSignatures.recycler(st,perks,now,elapsed)
+ local untilAt=runtime(st).RecyclerUntil or 0
+ local active=math.clamp(untilAt-(now-elapsed),0,elapsed)
+ return active*(perks and perks.Recycler and perks.Recycler.Value or 0)
 end
 return ArmorSignatures

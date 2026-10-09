@@ -159,7 +159,7 @@ function CombatGuide.refresh()
 					Tech.rarityLabel(gem),
 					"",
 					math.floor(definition.Cost * 10 + 0.5) / 10,
-					if definition.PerSecond then "/s" else ""
+					if definition.PerSecond and not definition.Prepaid then "/s" else ""
 				),
 				GemConfig.ElementColors[gem.Element] or P.Gold,
 				definition.Description

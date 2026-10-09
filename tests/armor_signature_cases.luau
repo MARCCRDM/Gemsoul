@@ -26,7 +26,7 @@ for id, def in ArmorSignatures.Definitions do
 		"Ranked normalization " .. id
 	)
 end
-check(count == 8, "Launch roster must contain eight buffs")
+check(count == 11, "Roster must include the three Charge build perks")
 for slot, pool in ArmorSignatures.Pools do
 	local roll =
 		{ Rarity = 3, Stats = { Health = 80 }, Affixes = { { Id = "kept", Bonus = 0.1 } }, Finish = 3, Serial = 7 }
@@ -143,3 +143,22 @@ check(
 	"Market return changed roll"
 )
 print("PASS: " .. checks .. " armor signatures: rolls, migration, caps, affinities, server strikes and anti-heal")
+
+do
+ local function perk(id,value) return {Id=id,Value=value,Definition=ArmorSignatures.Definitions[id]} end
+ local perks={Conductor=perk("Conductor",.2)}
+ check(near(ArmorSignatures.chargeMultiplier(perks),1.2),"Conductor hit multiplier")
+ check(near(ArmorSignatures.staminaMultiplier(perks),.85),"Conductor stamina tradeoff")
+ local st={};local momentum={Momentum=perk("Momentum",4)}
+ check(ArmorSignatures.hit(st,momentum,0,0,false)==0,"Miss must not build Momentum")
+ check(ArmorSignatures.hit(st,momentum,1,10,false)==0,"Momentum hit one")
+ check(ArmorSignatures.hit(st,momentum,2,10,false)==0,"Momentum hit two")
+ check(ArmorSignatures.hit(st,momentum,3,10,false)==4,"Momentum third hit")
+ local recycler={Recycler=perk("Recycler",2)};st={}
+ ArmorSignatures.hit(st,recycler,10,10,false)
+ ArmorSignatures.hit(st,recycler,11,10,false)
+ check(near(ArmorSignatures.recycler(st,recycler,12,1),2),"Recycler stacks instead of refreshing")
+ check(near(ArmorSignatures.recycler(st,recycler,14.5,1),1),"Recycler expiry overpaid")
+ check(ArmorSignatures.recycler(st,recycler,16,1)==0,"Recycler did not expire")
+ print("PASS: Charge armor triggers, non-stacking regeneration and personal stamina tradeoffs")
+end

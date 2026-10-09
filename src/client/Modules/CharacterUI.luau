@@ -909,7 +909,7 @@ local function gemLines(gem)
 				string.format(
 					"%g Charge%s",
 					math.floor(surge.Cost * 10 + 0.5) / 10,
-					if surge.PerSecond then "/s" else ""
+					if surge.PerSecond and not surge.Prepaid then "/s" else ""
 				)
 			)
 			table.insert(parts, string.format("%.1fs cooldown", surge.Cooldown or surge.Recovery))

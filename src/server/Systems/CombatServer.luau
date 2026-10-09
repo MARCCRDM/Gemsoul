@@ -237,12 +237,17 @@ local function updateResources(player, st, k)
 	for id, rule in Tech.Resources do
 		local regen = rule.Regen * (1 + (k.Effects[id .. "Regen"] or 0))
 		if id == "Stamina" then
+            regen *= ArmorSignatures.staminaMultiplier(k.Signatures)
 			if now < st.BlockUntil and now >= st.BlockBrokenUntil then
 				regen = -Actions.Stamina.GuardDrain -- a raised guard tires you
 			elseif now < (st.StaminaRestUntil or 0) then
 				regen = 0
 			end
 		end
+        if id=="Charge" then
+         local bonus=ArmorSignatures.recycler(st,k.Signatures,now,elapsed)
+         armorOutput(player,st,k,bonus,0)
+        end
 		st.Resources[id] = math.clamp(st.Resources[id] + elapsed * regen, 0, rule.Max)
 		if id == "Stamina" and regen < 0 and st.Resources.Stamina <= 0 then
 			-- Held the guard until there was nothing left: it drops.
@@ -1097,9 +1102,9 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	if damage > 0 then
 		weaponPerksOnHit(source, k, st, target, math.max(0, healthBefore - target.Humanoid.Health), guarded)
 		-- Landing the weapon builds Charge for your surges (with a gem to use it).
-		if not guarded and Tech.hasGem(k.Loadout) then
+		if not guarded and healthBefore > target.Humanoid.Health and Tech.hasGem(k.Loadout) then
 			local rule = Tech.Resources.Charge
-			st.Resources.Charge = math.min(rule.Max, st.Resources.Charge + (if heavy then rule.OnHeavy else rule.OnHit))
+			st.Resources.Charge = math.min(rule.Max, st.Resources.Charge + (if heavy then rule.OnHeavy else rule.OnHit) * ArmorSignatures.chargeMultiplier(k.Signatures))
 		end
 	end
 	if combo and damage > 0 then
@@ -1822,7 +1827,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		return false
 	end
 	if definition.PerSecond and st.Channel and st.Channel.Key == cooldownKey then
-		st.Channel.Aim, st.Channel.Until = aim, now + 0.5
+		st.Channel.Aim, st.Channel.Until = aim, math.min(now + 0.5, st.Channel.Deadline or math.huge)
 		return true
 	end
 	if now < st.NextAttack or now < st.NextTech or now < (st.TechCooldowns[cooldownKey] or 0) or st.Channel then
@@ -1831,7 +1836,7 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	if definition.Shield and not Classes.heldShield(k.Loadout) then
 		return false
 	end
-	local cost = definition.Cost * (if definition.PerSecond then 0.25 else 1)
+	local cost = definition.Cost * (if definition.PerSecond and not definition.Prepaid then 0.25 else 1)
 	if st.Resources[definition.Resource] < cost then
 		Remotes.CombatFx:FireClient(player, "TechStatus", "Not enough " .. definition.Resource)
 		return false
@@ -2257,6 +2262,7 @@ local function tick(dt)
 					technologyStrike(player, pending.Definition, pending.Aim, 0.25)
 					st.Channel = {
 						Key = pending.Channel,
+                        Deadline = if pending.Definition.Prepaid then now + pending.Definition.ChannelDuration else nil,
 						Definition = pending.Definition,
 						Aim = pending.Aim,
 						Until = now + 0.5,
@@ -2298,7 +2304,7 @@ local function tick(dt)
 			if now >= channel.Until or blocking(st, now) or st.DodgeMove or gemGone then
 				st.Channel = nil
 			elseif now >= channel.Next then
-				if Tech.spend(st.Resources, "Charge", definition.Cost * 0.25) then
+				if Tech.spend(st.Resources, "Charge", (if definition.Prepaid then 0 else definition.Cost * 0.25)) then
 					technologyStrike(player, definition, channel.Aim, 0.25)
 					channel.Next = now + 0.25
 				else

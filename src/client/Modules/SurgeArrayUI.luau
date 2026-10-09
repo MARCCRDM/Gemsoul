@@ -102,7 +102,7 @@ local function surgeLine(gem, amps)
 		return nil
 	end
 	local cost = math.floor(definition.Cost * 10 + 0.5) / 10
-	local parts = { string.format("%g Charge%s", cost, if definition.PerSecond then "/s" else "") }
+	local parts = { string.format("%g Charge%s", cost, if definition.PerSecond and not definition.Prepaid then "/s" else "") }
 	if definition.Damage then
 		table.insert(parts, string.format("%d%% dmg", math.floor(definition.Damage * 100 + 0.5)))
 	end

@@ -62,3 +62,38 @@ check(absorbed==0 and gained==0,"Absorbed hit healed attacker")
 leechCase(1000,0,true)
 for root,position in savedPositions do root.Position=position end
 print("PASS: "..checks.." live restored Surge casts, rarity, barriers, duplicate rejection and Ranked normalization")
+
+do
+ check(Tech.Resources.Charge.Start==0 and Tech.Resources.Charge.Regen==0,"Charge must start empty and not regenerate freely")
+ check(Tech.Resources.Charge.OnHit==5 and Tech.Resources.Charge.OnHeavy==10,"Weapon hit rewards")
+ for rarity,band in Tech.ChargeBands do
+  for _,id in GemRoller.Pools.Fire do
+   local d=Tech.surgeStats({Surge=id,Element="Fire",Tier=rarity,SurgeRank=3,SurgeTier=4})
+   check(d.Cost>=band[1] and d.Cost<=band[2],"Surge rarity price out of range")
+  end
+ end
+ now+=30;CombatServer.reset(a)
+ loadout.Surge1Gem={Surge="CryoStream",Element="Frost",Tier="Legendary",SurgeRank=1,SurgeTier=1}
+ a:SetAttribute("MatchRarityCap",nil)
+ local st=CombatServer._state(a)
+ st.Resources.Charge=74
+ check(not CombatServer._technology(a,nil,rb.Position,"Q"),"Legendary channel must require full upfront Charge")
+ st.Resources.Charge=100
+ local d=Tech.surgeStats(loadout.Surge1Gem)
+ check(d.Prepaid and d.ChannelDuration==2,"Channel must have a bounded prepaid duration")
+ check(CombatServer._technology(a,nil,rb.Position,"Q"),"Funded channel rejected")
+ check(st.Resources.Charge==100-d.Cost,"Channel did not bill its full price")
+ now+=Actions.castTime(d);CombatServer._tick(Actions.castTime(d))
+ check(st.Channel~=nil and st.Channel.Deadline~=nil,"Prepaid channel missing expiry")
+ local deadline=st.Channel.Deadline
+ for i=1,12 do
+  now+=.25
+  if st.Channel then CombatServer._technology(a,nil,rb.Position,"Q") end
+  CombatServer._tick(.25)
+ end
+ check(now>=deadline and st.Channel==nil,"Held channel extended past prepaid duration")
+ check(st.Resources.Charge==100-d.Cost,"Prepaid channel charged again or regenerated freely")
+
+ CombatServer.reset(a);CombatServer.reset(b)
+ print("PASS: Charge economy, rarity bands and prepaid Legendary channel gating")
+end

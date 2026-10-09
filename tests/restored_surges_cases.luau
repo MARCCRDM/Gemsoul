@@ -12,6 +12,7 @@ for id in ids do
 		local gem={Surge=id,Tier=rarity.Name,Element=base.Element or "Fire",Size=10,Clarity=10,Cut=10,SurgeRank=3,SurgeTier=4}
 		local stats=Tech.surgeStats(gem)
 		check(stats.Id==id,"Ability identity changed")
+        check(stats.Cost>=Tech.ChargeBands[rarity.Name][1] and stats.Cost<=Tech.ChargeBands[rarity.Name][2],"Rarity cost outside band")
 		check(Atlas.Index[Icons.idOf(stats)]~=nil,"Missing painted icon")
 		for _,key in {"Q","E","R"} do check(Tech.canSocket(gem,key,{}),"Flexible socket rejected") end
 		check(not Tech.canSocket(gem,"E",{Surge1Gem=gem}),"Duplicate accepted")
@@ -26,7 +27,7 @@ for id in ids do
 		local factor=Tech.RarityScale[rarity.Name]
 		if common.Absorb then check(math.abs(stats.Absorb-common.Absorb*factor)<.0001,"Barrier rarity")
 		elseif common.Damage then check(math.abs(stats.Damage-common.Damage*factor)<.0001,"Damage rarity")
-		else check(math.abs(stats.Cost-common.Cost*(1-(factor-1)*.5))<.0001,"Utility rarity") end
+		else check(stats.Cost>=Tech.ChargeBands[rarity.Name][1] and stats.Cost<=Tech.ChargeBands[rarity.Name][2],"Utility rarity cost band") end
 	end
 end
 check(total==36,"Expected original 36 Surges")

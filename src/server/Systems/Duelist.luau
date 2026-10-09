@@ -659,6 +659,7 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 			Gem = surge.Gem,
 			Range = surge.Range,
 			Cost = surge.Cost,
+            Prepaid = surge.Prepaid,
 			Riders = surge.Riders,
 		}
 		animate(duel, surge.Pose, surge.CastTime, nil, surge.Name)
@@ -689,7 +690,7 @@ end
 
 -- How long it holds a beam (a player holds the key; it pours for this long,
 -- or until its Charge runs dry or the player steps out of reach).
-local CHANNEL_HOLD = 1.5
+local CHANNEL_HOLD = 2
 
 -- Uses one of its Rig Maneuvers (keys 1, 2, 3), like a player would.
 local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Vector3, side: Vector3, distance: number)
@@ -764,8 +765,10 @@ local function refill(duel, now: number, guardUp: boolean)
 		then -Actions.Stamina.GuardDrain
 		elseif now < (duel.StaminaRestUntil or 0) then 0
 		else staminaRule.Regen
+    if regen>0 then regen*=ArmorSignatures.staminaMultiplier(duel.Kit and duel.Kit.Signatures) end
+    armorOutput(duel,ArmorSignatures.recycler(duel,duel.Kit and duel.Kit.Signatures,now,elapsed),0)
 	duel.Stamina = math.clamp((duel.Stamina or staminaRule.Max) + regen * elapsed, 0, staminaRule.Max)
-	duel.Charge = math.clamp((duel.Charge or chargeRule.Max) + chargeRule.Regen * elapsed, 0, chargeRule.Max)
+	duel.Charge = math.clamp((duel.Charge or chargeRule.Start) + chargeRule.Regen * elapsed, 0, chargeRule.Max)
 	duel.Enemy.Model:SetAttribute("RivalStamina", math.floor(duel.Stamina))
 	duel.Enemy.Model:SetAttribute("RivalCharge", math.floor(duel.Charge))
 end
@@ -1198,7 +1201,7 @@ local function think(enemy, now: number)
 					local chargeRule = Tech.Resources.Charge
 					duel.Charge = math.min(
 						chargeRule.Max,
-						(duel.Charge or 0) + (if heavy then chargeRule.OnHeavy else chargeRule.OnHit)
+						(duel.Charge or 0) + (if heavy then chargeRule.OnHeavy else chargeRule.OnHit) * ArmorSignatures.chargeMultiplier(duel.Kit and duel.Kit.Signatures)
 					)
 					-- Its gear's on-hit effects (Sunder, Slow), as yours land.
 					if duel.Kit then
@@ -1299,14 +1302,14 @@ local function think(enemy, now: number)
 				Until = now + CHANNEL_HOLD,
 				Next = now,
 				Range = action.Range or Brain.SurgeRange,
-				Cost = action.Cost or 0,
+				Cost = if action.Prepaid then 0 else action.Cost or 0,
 				Power = action.Power,
 				Crit = action.Crit,
 				Element = action.Element,
 				Gem = action.Gem,
 				Riders = action.Riders,
 			}
-			duel.Charge += (action.Cost or 0) * 0.25 -- (the cast already billed this first tick)
+			duel.Charge += (if action.Prepaid then 0 else action.Cost or 0) * 0.25 -- (the cast already billed this first tick)
 			enemy.Model:SetAttribute("ActionHold", workspace:GetServerTimeNow() + CHANNEL_HOLD)
 		elseif action.Kind == "Nova" then
 			-- The closer to the centre, the harder: full damage and a stun at
@@ -1543,7 +1546,7 @@ local function think(enemy, now: number)
 		local silenced = now < ((enemy :: any).SilenceUntil or 0)
 		local surge = if silenced then nil else Brain.pickSurge(duel.Surges, now, distance, view)
 		-- A held beam bills a quarter-second at a time, as a player's.
-		local cost = if surge and surge.Cast == "Channel" then (surge.Cost or 0) * 0.25 else surge and surge.Cost or 0
+		local cost = if surge and surge.Cast == "Channel" and not surge.Prepaid then (surge.Cost or 0) * 0.25 else surge and surge.Cost or 0
 		if surge and duel.Charge < cost then
 			surge = nil -- not enough Charge, like a player
 		end
@@ -2046,6 +2049,7 @@ function spawnRival(owner: Player, raid, encounter)
 				Power = stats.Damage or 1,
 				Crit = stats.Crit, -- a gem's cut gives its surge a crit chance, as yours
 				Cost = stats.Cost or 0,
+                Prepaid = stats.Prepaid,
 				Cooldown = math.max(stats.Cooldown or stats.Recovery or 1, 2.5),
 				Riders = ridersOf(stats),
 				Ward = stats.Ward,
@@ -2085,6 +2089,7 @@ function spawnRival(owner: Player, raid, encounter)
 			CounterDamage = stats.CounterDamage,
 			-- A player's maneuver numbers: its Stamina cost and recovery.
 			Cost = stats.Cost or 0,
+                Prepaid = stats.Prepaid,
 			Crit = stats.Crit,
 			Cooldown = math.max(stats.Cooldown or stats.Recovery or 1, 1.5),
 			Next = now + 2 + slot,

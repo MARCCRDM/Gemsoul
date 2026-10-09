@@ -5,10 +5,8 @@ local Tech = {}
 Tech.ManeuversEnabled = false -- archived data is retained; controls and player casts are retired.
 Tech.Resources = {
 	Stamina = { Max = 100, Start = 100, Regen = 12, Color = Color3.fromRGB(65, 195, 112) },
-	-- Charge fills slowly on its own and faster as your weapon lands hits
-	-- (OnHit / OnHeavy), so surges come between blows rather than in a
-	-- stream. A fight starts part-full (Start), not with a full bar.
-	Charge = { Max = 100, Start = 0, Regen = 3, OnHit = 3, OnHeavy = 7, Color = Color3.fromRGB(70, 130, 255) },
+	-- Charge is earned by landed weapon hits; no free idle regeneration.
+	Charge = { Max = 100, Start = 0, Regen = 0, OnHit = 5, OnHeavy = 10, Color = Color3.fromRGB(70, 130, 255) },
 }
 -- After any surge, no other surge (or swing) for at least this long, however
 -- much Rank and Clarity shorten its recovery: no back-to-back casting.
@@ -887,6 +885,12 @@ end
 	amps: Surge Amplifier effects from the Augment Tree (Tree.effects).
 ]]
 Tech.RaritySurges = GemRoller.RaritySurges
+Tech.ChargeBands={Common={20,30},Uncommon={30,40},Rare={40,55},UltraRare={55,75},Legendary={75,100}}
+function Tech.surgeChargeCost(baseCost,rarity,normalized)
+ local band=Tech.ChargeBands[if normalized then "Common" else rarity] or Tech.ChargeBands.Common
+ local weight=math.clamp(((baseCost or 20)-12)/48,0,1)
+ return math.floor(band[1]+(band[2]-band[1])*weight+0.5)
+end
 Tech.RarityScale = {Common=1, Uncommon=1.05, Rare=1.10, UltraRare=1.15, Legendary=1.20}
 function Tech.rarityLabel(gem)
 	return if gem and gem.Tier == "UltraRare" then "Ultra Rare" else (gem and gem.Tier or "Common")
@@ -921,6 +925,8 @@ function Tech.surgeStats(gem, amps, normalized)
 		else
 			d.Cost *= 1 - (factor - 1) * 0.5
 		end
+        d.Cost=Tech.surgeChargeCost(base.Cost,d.Rarity,normalized)
+        if d.PerSecond then d.Prepaid=true;d.ChannelDuration=2;d.Description="Hold to channel a slowing cryogenic beam for up to 2 seconds. Charge is paid upfront." end
 		return d
 	end
 	if d.Prototype then
