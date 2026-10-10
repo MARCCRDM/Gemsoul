@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+if not require(ReplicatedStorage.Shared.Tutorial).Enabled then return end
 local GemClient = require(script.Parent.Modules.GemClient)
 local UiKit = require(script.Parent.Modules.UiKit)
 

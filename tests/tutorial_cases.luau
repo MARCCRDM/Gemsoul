@@ -59,6 +59,12 @@ local function typeofStub(value)
 end
 
 local Tutorial = load("src/shared/Tutorial.luau", { Vector3 = { new = v3 } })
+check(Tutorial.Enabled == false, "Onboarding should be paused by default")
+local paused = { Intro = { Done = false }, Tutorial = { Version = 3, Step = 1, Mined = 0, Done = false } }
+check(Tutorial.beat(paused) == nil, "Paused onboarding still exposes a mining beat")
+check(not Tutorial.advance(paused, "Mine") and paused.Tutorial.Step == 1, "Paused guidance changed saved progress")
+-- Exercise the retained implementation separately from the live disabled flag.
+Tutorial.Enabled = true
 
 -- Rules ----------------------------------------------------------------------------------
 local fresh = { Intro = { Done = false }, Character = {} }

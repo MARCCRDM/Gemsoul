@@ -238,7 +238,7 @@ local function card(spec)
 	end)
 	b.Activated:Connect(function()
 		local need = spec.Unlock and LobbyUI.Unlocks[spec.Unlock] or 0
-		local left = if GemClient.Profile
+		local left = if not require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled then 0 elseif GemClient.Profile
 				and GemClient.Profile.Tutorial
 				and GemClient.Profile.Tutorial.Done
 			then 0
@@ -341,7 +341,7 @@ local function refreshCards()
 	local count = played()
 	for _, entry in cards do
 		local need = entry.Spec.Unlock and LobbyUI.Unlocks[entry.Spec.Unlock] or 0
-		local left = if GemClient.Profile
+		local left = if not require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled then 0 elseif GemClient.Profile
 				and GemClient.Profile.Tutorial
 				and GemClient.Profile.Tutorial.Done
 			then 0

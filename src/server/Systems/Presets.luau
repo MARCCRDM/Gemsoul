@@ -225,7 +225,7 @@ function Presets.start()
 			return reply(false, "Switch miners in the Outpost, before you queue.")
 		end
 		local profile = PlayerData.get(player)
-		if not profile or not profile.Intro.Done then return reply(false, "Finish your introduction first.") end
+		if not profile or (require(ReplicatedStorage.Shared.Tutorial).Enabled and not profile.Intro.Done) then return reply(false, "Finish your introduction first.") end
 		local ok = PlayerData.selectMiner(player, index)
 		return reply(ok, if ok then "Miner " .. index .. " is active." else "Choose a miner from 1 to 3.")
 	end)

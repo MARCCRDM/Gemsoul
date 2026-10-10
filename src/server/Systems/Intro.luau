@@ -219,6 +219,7 @@ local function tutorialReply(profile, ok: boolean, message: string, extra)
 end
 
 local function tutorialBegin(player: Player)
+	if not Tutorial.Enabled then return reply(false, "Onboarding is currently disabled.") end
 	local profile = PlayerData.get(player)
 	if not profile then
 		return reply(false, "Your profile is still loading.")
@@ -380,6 +381,7 @@ end
 
 -- Explicit developer replay: keep owned gear, coins, ranks and existing gems.
 local function restartTutorial(player)
+	if not Tutorial.Enabled then return reply(false, "Onboarding is currently disabled.") end
 	if not TestAdmin.allowed(player.UserId) then
 		return reply(false, "This test tool is restricted to test admins.")
 	end

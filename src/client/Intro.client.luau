@@ -13,6 +13,7 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
+if not Tutorial.Enabled then return end
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)

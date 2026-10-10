@@ -112,15 +112,14 @@ task.spawn(function()
 		local intro = GemClient.Profile.Intro
 		return not playerGui:FindFirstChild("Splash")
 			and not playerGui:FindFirstChild("Intro")
-			and intro ~= nil
-			and intro.Done == true
+			and (not require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled or (intro ~= nil and intro.Done == true))
 	end, 3600)
 	task.wait(0.5)
 	-- The tutorial (Tutorial.client) starts in the Outpost: go there first
 	-- and let it run.
 	local function tutorialDone(): boolean
 		local tutorial = GemClient.Profile.Tutorial
-		return tutorial == nil or tutorial.Done == true
+		return not require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled or tutorial == nil or tutorial.Done == true
 	end
 	if not tutorialDone() then
 		for _ = 1, 5 do
@@ -132,7 +131,7 @@ task.spawn(function()
 		waitFor(tutorialDone, 3600)
 		task.wait(1.5)
 	end
-	if duelsPlayed() == 0 and not veteran() and not GemClient.Profile.Tutorial then
+	if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled and duelsPlayed() == 0 and not veteran() and not GemClient.Profile.Tutorial then
 		firstDuel()
 	end
 	for _ = 1, 5 do

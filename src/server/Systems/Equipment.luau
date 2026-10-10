@@ -2000,6 +2000,55 @@ function Equipment.start()
 		local done = Equipment.previews(player)
 		return Shop.reply(true, "", { Done = done })
 	end)
+	local rosterBusy, rosterKeys = {}, {}
+	Players.PlayerRemoving:Connect(function(player)
+		rosterBusy[player], rosterKeys[player] = nil, nil
+	end)
+	Shop.register("MinerPreviews", function(player)
+		local profile = PlayerData.get(player)
+		local gui = player:FindFirstChildOfClass("PlayerGui")
+		if not profile or not profile.Miners or not gui or rosterBusy[player] then
+			return Shop.reply(false, "Preview loading.")
+		end
+		rosterBusy[player] = true
+		local ok = pcall(function()
+			local store = gui:FindFirstChild("MinerPreviews")
+			if not store then
+				store = Instance.new("ScreenGui")
+				store.Name, store.Enabled, store.ResetOnSpawn = "MinerPreviews", false, false
+				store.Parent = gui
+			end
+			rosterKeys[player] = rosterKeys[player] or {}
+			for index, miner in profile.Miners.Slots do
+				local loadout = table.clone(if profile.Miners.Active == index then profile.Character else miner.Character)
+				loadout.GearRolls = profile.Character.GearRolls
+				loadout.ItemGems = profile.Character.ItemGems
+				local keys = {}
+				for _, slot in Slots.Order do
+					local id = loadout[slot]
+					if id then table.insert(keys, id .. ":" .. previewKey(loadout, slot, id, loadout[slot .. "Quality"] or 1)) end
+				end
+				local key = table.concat(keys, "|")
+				local name = tostring(index)
+				if rosterKeys[player][index] ~= key or not store:FindFirstChild(name) then
+					local rig = mannequin()
+					if rig then
+						Equipment.dressModel(rig, loadout, player.UserId)
+						for _, child in rig:GetDescendants() do
+							if child:IsA("BaseScript") or child:IsA("Sound") then child:Destroy()
+							elseif child:IsA("BasePart") then child.Anchored = true end
+						end
+						local old = store:FindFirstChild(name)
+						if old then old:Destroy() end
+						rig.Name, rig.Parent = name, store
+						rosterKeys[player][index] = key
+					end
+				end
+			end
+		end)
+		rosterBusy[player] = nil
+		return Shop.reply(ok, "")
+	end)
 end
 
 return Equipment

@@ -59,7 +59,7 @@ status.TextColor3 = Color3.fromRGB(255, 210, 126)
 status.TextWrapped = true
 status.TextSize = 12
 status.Font = Enum.Font.GothamBold
-status.Text = "Replay onboarding below. Saved progress is kept."
+status.Text = "DEV TOOLS · Onboarding is currently paused."
 status.Parent = panel
 
 -- Touch screens: the bottom-right corner is the thumb's (Combat's buttons),
@@ -112,7 +112,9 @@ restart.BackgroundColor3 = Color3.fromRGB(255, 210, 126)
 restart.TextColor3 = Color3.fromRGB(17, 25, 36)
 restart.Font = Enum.Font.GothamBold
 restart.TextSize = 12
-restart.Text = "RESTART INTRO / TUTORIAL"
+restart.Text = if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled then "RESTART INTRO / TUTORIAL" else "INTRO / TUTORIAL PAUSED"
+restart.Active = require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled
+restart.AutoButtonColor = restart.Active
 restart.Parent = panel
 corner(restart, 5)
 restart.Activated:Connect(function()

@@ -4,7 +4,7 @@
 	Pure, for the server (Systems/Intro), the client (Tutorial.client) and
 	tests.
 
-	  Tutorial.Enabled                  off = the old starter picker flow
+	  Tutorial.Enabled                  off = normal spawn; all onboarding suspended
 	  Tutorial.Beats                    in order; each has an Id and a prompt
 	                                    (Mobile is the touch wording)
 	  Tutorial.Gems                     the five scripted gems the rocks drop
@@ -19,7 +19,7 @@
 ]]
 local Tutorial = {}
 
-Tutorial.Enabled = true
+Tutorial.Enabled = false
 
 -- Thermal, Cryo and Ion are what players call Fire, Frost and Shock.
 Tutorial.Beats = {
@@ -97,6 +97,7 @@ function Tutorial.state(profile)
 end
 
 function Tutorial.beat(profile)
+	if not Tutorial.Enabled then return nil end
 	local state = Tutorial.state(profile)
 	return if state.Done then nil else Tutorial.Beats[state.Step]
 end

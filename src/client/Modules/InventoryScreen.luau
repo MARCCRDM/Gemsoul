@@ -28,6 +28,7 @@ local ArmorSignatures = require(game:GetService("ReplicatedStorage").Shared.Armo
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -364,37 +365,22 @@ local stageTag = at(label(portrait, "", 10, P.Gold, BOLD), 12, 8, MID_W - 24, 14
 stageTag.TextXAlignment = Enum.TextXAlignment.Center
 
 local function drawPortrait()
-	portraitView:ClearAllChildren()
-	local character = player.Character
-	if not character then
-		return
-	end
-	pcall(function()
-		local world = new("WorldModel", {}, portraitView)
-		local camera = new("Camera", { FieldOfView = 26 }, portraitView)
-		portraitView.CurrentCamera = camera
-		character.Archivable = true
-		local copy = character:Clone()
-		character.Archivable = false
-		for _, d in copy:GetDescendants() do
-			if d:IsA("BaseScript") or d:IsA("Sound") or d:IsA("BillboardGui") then
-				d:Destroy()
-			elseif d:IsA("BasePart") then
-				d.Anchored = true
-			end
-		end
-		local humanoid = copy:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-		end
-		copy:PivotTo(CFrame.new())
-		copy.Parent = world
-		-- The whole fighter, a little turned, filling the stage.
-		local bounds, size = copy:GetBoundingBox()
-		local focus = bounds.Position + Vector3.new(0, size.Y * 0.04, 0)
-		local distance = (size.Y * 0.62) / math.tan(math.rad(camera.FieldOfView / 2))
-		camera.CFrame = CFrame.lookAt(focus + Vector3.new(distance * 0.3, size.Y * 0.08, -distance), focus)
-	end)
+	-- The fan below renders the three authoritative miner mannequins.
+	portraitView.Visible = false
+	return
+end
+
+local function renderMiner(view: ViewportFrame, source: Model)
+	view:ClearAllChildren()
+	local world = new("WorldModel", {}, view)
+	local copy = source:Clone()
+	copy.Parent = world
+	copy:PivotTo(CFrame.new())
+	local bounds, size = copy:GetBoundingBox()
+	local camera = new("Camera", { FieldOfView = 30 }, view)
+	local distance = math.max(size.Y * 0.65, size.X * 0.9) / math.tan(math.rad(15))
+	camera.CFrame = CFrame.lookAt(bounds.Position + Vector3.new(distance * 0.15, size.Y * 0.03, -distance), bounds.Position)
+	view.CurrentCamera = camera
 end
 
 local statTiles = {}
@@ -476,8 +462,9 @@ end
 
 -- Whole-character roster: each card selects one miner and their progression.
 local minerCards = {}
-local rosterHeader = new("Frame", { BackgroundTransparency = 1 }, root)
-at(rosterHeader, 0, 0, W, 76)
+local rosterHeader = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, portrait)
+at(label(root, "SELECT YOUR MINER", 20, C.Text, HEADING), 18, 12, 500, 28)
+at(label(root, "Choose a miner to bring them forward. Each has their own gear, level and Surges.", 12, C.Dim), 18, 44, 1000, 20)
 local MINER_W = (W - 24) / 3
 for index = 1, MinerRoster.Count do
 	local button = new("TextButton", { Text = "", BackgroundColor3 = C.Card }, rosterHeader)
@@ -497,6 +484,22 @@ for index = 1, MinerRoster.Count do
 		request("MinerSelect", index)
 	end)
 	minerCards[index] = { Button = button, Edge = edge, Name = name, Status = status, State = state, Art = art }
+	button.AnchorPoint = Vector2.new(0.5, 0.5)
+	button.BackgroundTransparency = 1
+	edge.Transparency = 1
+	art.Position, art.Size = UDim2.fromScale(0, 0), UDim2.new(1, 0, 1, -48)
+	name.Position, name.Size = UDim2.new(0, 0, 1, -46), UDim2.new(1, 0, 0, 20)
+	name.TextXAlignment = Enum.TextXAlignment.Center
+	status.Position, status.Size = UDim2.new(0, 0, 1, -24), UDim2.new(1, 0, 0, 18)
+	status.TextXAlignment = Enum.TextXAlignment.Center
+	status.TextSize = 10
+	state.Visible = false
+	local view = new("ViewportFrame", {
+		BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1),
+		Ambient = Color3.fromRGB(160, 165, 185), LightColor = Color3.fromRGB(255, 240, 220),
+		LightDirection = Vector3.new(-0.5, -0.8, -0.6),
+	}, art)
+	minerCards[index].View = view
 end
 
 -- The worn pieces.
@@ -931,7 +934,7 @@ local function shownGems()
 		return a.Id < b.Id
 	end)
  local tutorial = profile and profile.Tutorial
- if tutorial and not tutorial.Done then
+ if require(ReplicatedStorage.Shared.Tutorial).Enabled and tutorial and not tutorial.Done then
   local teaching = {}
   for _, gem in gems do
    if (tutorial.GemIds and tutorial.GemIds[gem.Element] == gem.Id) or (not tutorial.GemIds and gem.Role == "Core") then
@@ -1923,10 +1926,25 @@ local function drawLeft()
 		card.Status.Text = string.format("LEVEL %d   ·   %d / 3 SURGES", level, powers)
 		card.State.Text = if on then "ACTIVE" else "SELECT"
 		card.State.TextColor3 = if on then P.Gold else C.Dim
-		local artKey = tostring(c.Helmet) .. ":" .. tostring(on) .. ":" .. previewVersion
-		if card.ArtKey ~= artKey and c.Helmet then
-			card.ArtKey = artKey
-			gearArt(card.Art, "Helmet", c.Helmet, on == true, C.Accent)
+		local store = player.PlayerGui:FindFirstChild("MinerPreviews")
+		local source = store and store:FindFirstChild(tostring(index))
+		if source and source:IsA("Model") and card.Source ~= source then
+			card.Source = source
+			renderMiner(card.View, source)
+		end
+		local position = ((roster and roster.Active or 1) - index + 1) % 3
+		if card.Position ~= position then
+			local first = card.Position == nil
+			card.Position = position
+			if card.Tween then card.Tween:Cancel() end
+			local goal = {
+				Position = UDim2.fromScale(({ [0] = 0.16, [1] = 0.5, [2] = 0.84 })[position], if on then 0.53 else 0.42),
+				Size = UDim2.fromScale(if on then 0.40 else 0.25, if on then 0.96 else 0.68),
+			}
+			card.Button.ZIndex = if on then 3 else 2
+			card.Tween = TweenService:Create(card.Button, TweenInfo.new(if first then 0 else 0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), goal)
+			card.Tween:Play()
+			TweenService:Create(card.View, TweenInfo.new(0.4), { ImageTransparency = if on then 0 else 0.5 }):Play()
 		end
 		card.Status.TextColor3 = if on then P.Gold else C.Dim
 	end
@@ -2021,7 +2039,7 @@ end
 local pageKey, pageTab = "", ""
 local function drawRight()
  local profile = profileNow()
- if profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
+ if require(ReplicatedStorage.Shared.Tutorial).Enabled and profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
   tab, gemFilter = "Gems", "All"
  end
 	local drawerOpen = contextSlot ~= nil or contextKey ~= nil or tab ~= "Overview"
@@ -2080,6 +2098,7 @@ end
 -- Draws are coalesced (a burst of profile updates is one redraw) and only
 -- happen while the Inventory is on screen; otherwise it redraws on opening.
 local drawQueued, dirty, portraitDirty = false, true, true
+local rosterSignature, rosterRequest = "", false
 local function visible(): boolean
 	return hostGui ~= nil and hostGui.Enabled
 end
@@ -2095,6 +2114,17 @@ function draw()
 			return
 		end
 		dirty = false
+		local profile = profileNow()
+		local signature = game:GetService("HttpService"):JSONEncode({ profile.Miners, profile.Character })
+		if not rosterRequest and signature ~= rosterSignature then
+			rosterRequest = true
+			rosterSignature = signature
+			task.spawn(function()
+				local ok, result = pcall(GemClient.request, "MinerPreviews")
+				rosterRequest = false
+				if not ok or not result or not result.Ok then rosterSignature = "" end
+			end)
+		end
 		if portraitDirty then
 			portraitDirty = false
 			drawPortrait()
@@ -2154,6 +2184,22 @@ local function previewsChanged()
 	end)
 end
 local playerGui = player:WaitForChild("PlayerGui")
+local function watchMiners(store: Instance)
+	local queued = false
+	local function changed()
+		if queued then return end
+		queued = true
+		task.delay(0.15, function()
+			queued = false
+			for _, card in minerCards do card.Source = nil end
+			draw()
+		end)
+	end
+	store.DescendantAdded:Connect(changed)
+	store.ChildRemoved:Connect(changed)
+	changed()
+end
+if playerGui:FindFirstChild("MinerPreviews") then watchMiners(playerGui.MinerPreviews) end
 local function watchPreviews(store: Instance)
 	store.ChildAdded:Connect(previewsChanged)
 end
@@ -2161,6 +2207,7 @@ if playerGui:FindFirstChild("GearPreviews") then
 	watchPreviews(playerGui:FindFirstChild("GearPreviews") :: Instance)
 end
 playerGui.ChildAdded:Connect(function(child)
+	if child.Name == "MinerPreviews" then watchMiners(child) end
 	if child.Name == "GearPreviews" then
 		watchPreviews(child)
 	end
