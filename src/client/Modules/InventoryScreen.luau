@@ -53,9 +53,9 @@ local InventoryScreen = {}
 -- Look: the station's palette (IronUi) -------------------------------------------------------------
 
 InventoryScreen.Colors = {
-	Panel = Color3.fromRGB(17, 14, 31),
-	PanelEdge = Color3.fromRGB(64, 55, 92),
-	Card = P.Inset,
+	Panel = Color3.fromRGB(13, 13, 18),
+	PanelEdge = Color3.fromRGB(42, 42, 56),
+	Card = Color3.fromRGB(20, 20, 29),
 	Track = P.Slot,
 	TabBar = P.Frame,
 	Text = P.Text,
@@ -290,6 +290,8 @@ local selection: Pick? = nil
 local tab = "Overview"
 local armorFilter = "All"
 local gemFilter = "All"
+local contextSlot: string? = nil
+local contextKey: string? = nil
 local previewVersion = 0
 local dropTargets: { any } = {}
 local drag: { Item: any, Start: Vector2, Active: boolean, Touch: boolean, Ghost: Frame? }? = nil
@@ -527,7 +529,8 @@ local function wornCard(slot: string, column: number, row: number)
 	hit.Activated:Connect(function()
 		if os.clock() >= suppressClickUntil then
 			selection = nil
-			tab, armorFilter = "Armor", slot
+			contextSlot, contextKey = slot, nil
+			tab, armorFilter, gemFilter = "Gems", slot, "All"
 			draw()
 		end
 	end)
@@ -585,12 +588,27 @@ wornCard("Boots", 1, 4)
 wornCard("Weapon", 2, 1)
 wornCard("Shield", 2, 2)
 
+-- A single equipment rail leaves the character stage uninterrupted.
+for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
+	local card = wornCards[slot]
+	at(card.Cell, 18, BODY_Y + (index - 1) * 64, CELL_W, 58)
+	at(card.Art, 8, 20, 34, 34)
+	at(card.Name, 50, 20, CELL_W - 60, 30)
+	card.Name.TextSize = 11
+	card.Name.TextYAlignment = Enum.TextYAlignment.Top
+	card.Rarity.Visible = false
+	-- Full equipment details remain in the contextual EQUIPPED tab.
+	for _, child in card.Cell:GetChildren() do
+		if child:IsA("TextButton") and child.Text == "DETAILS" then child.Visible = false end
+	end
+end
+
 -- The Surge Array: Q / E / R keys, each showing its gem.
 local surgeCell = box(left, P.Frame, 4)
 at(surgeCell, RIGHT_COL, BODY_Y + 2 * (CARD_H + ROW_GAP), CELL_W, 2 * CARD_H + ROW_GAP)
 stroke(surgeCell, C.PanelEdge, 1)
 brackets(surgeCell, P.Teal, 8, 4)
-at(label(surgeCell, "SURGE ARRAY", 10, C.Dim, BOLD), 12, 8, 160, 14)
+at(label(surgeCell, "SURGES", 10, C.Dim, BOLD), 12, 23, 92, 14)
 local KEY_W = math.floor((CELL_W - 24 - 2 * 6) / 3)
 local surgeKeys = {}
 for i, key in { "Q", "E", "R" } do
@@ -610,7 +628,10 @@ for i, key in { "Q", "E", "R" } do
 	name.TextXAlignment = Enum.TextXAlignment.Center
 	keyBox.Activated:Connect(function()
 		if os.clock() >= suppressClickUntil then
-			select({ Kind = "Key", Key = key })
+			selection = nil
+			contextSlot, contextKey = nil, key
+			tab, gemFilter = "Gems", "All"
+			draw()
 		end
 	end)
 	surgeKeys[key] = { Box = keyBox, Stroke = edge, Name = name, Letter = letter, Art = art, Shown = "" }
@@ -630,9 +651,23 @@ end
 
 local RIGHT_W = W - RIGHT_X
 local tabHolder = new("Frame", { BackgroundTransparency = 1 }, right)
-at(tabHolder, 16, 12, RIGHT_W - 32, 46)
+at(tabHolder, 16, 48, RIGHT_W - 32, 38)
+local contextTitle = at(label(right, "SHARED STASH", 14, C.Text, HEADING), 16, 10, RIGHT_W - 100, 28)
+local contextClose = new("TextButton", { Text = "BACK", Font = BOLD, TextSize = 11, TextColor3 = C.Dim, BackgroundColor3 = C.Card }, right)
+at(contextClose, RIGHT_W - 76, 10, 60, 28)
+round(contextClose, 4)
+contextClose.Activated:Connect(function()
+	if selection then
+		selection = nil
+		draw()
+		return
+	end
+	contextSlot, contextKey, selection = nil, nil, nil
+	tab, armorFilter = "Overview", "All"
+	draw()
+end)
 local page = new("Frame", { BackgroundTransparency = 1, ClipsDescendants = true }, right)
-at(page, 16, 66, RIGHT_W - 32, PANEL_H - 66 - 40)
+at(page, 16, 94, RIGHT_W - 32, PANEL_H - 94 - 40)
 local footerLine = box(right, C.PanelEdge, 0)
 at(footerLine, 16, PANEL_H - 38, RIGHT_W - 32, 1)
 local footer = at(label(right, "", 10, C.Dim, BOLD), 16, PANEL_H - 32, RIGHT_W - 32, 20)
@@ -878,7 +913,7 @@ local function shownGems()
 		local keep = gemFilter == "All"
 			or (gemFilter == "Rough" and gem.Cut == nil)
 			or (gem.Cut ~= nil and gem.Element == gemFilter)
-		if keep then
+		if keep and (not contextKey or (gem.Cut ~= nil and Tech.surgeStats(gem) ~= nil)) then
 			table.insert(gems, gem)
 		end
 	end
@@ -908,7 +943,7 @@ local function shownGems()
 	return gems
 end
 local function gemsKey(): string
-	local parts = { "Gems", gemFilter, pickKey() }
+	local parts = { "Gems", gemFilter, pickKey(), contextSlot or "", contextKey or "" }
 	for _, gem in shownGems() do
 		table.insert(parts, gem.Id .. ":" .. tostring(gem.Cut))
 	end
@@ -971,7 +1006,9 @@ local function drawGems()
   gemCard:SetAttribute("TutorialGem", gem.Element)
   gemCard:SetAttribute("TutorialGemId", gem.Id)
 	end
-	footer.Text = if selection and selection.Kind == "Gem"
+	footer.Text = if contextKey then "CHOOSE A GEM TO EQUIP ITS SURGE ON " .. contextKey
+		elseif contextSlot then "CHOOSE A GEM TO ENCHANT YOUR " .. SLOT_LABEL[contextSlot]
+		elseif selection and selection.Kind == "Gem"
 		then string.upper(gemName(selection.Gem)) .. "  ·  TAP FOR DETAILS, OR DRAG IT ONTO A SOCKET"
 		else "DRAG A GEM ONTO A GEAR SOCKET OR A Q · E · R KEY"
 end
@@ -1063,7 +1100,7 @@ local function armorKey(): string
 	return table.concat(parts, ",")
 end
 local function drawArmor()
-	filterRow(FILTERS, armorFilter, function(id)
+	filterRow(if contextSlot then { { contextSlot, SLOT_LABEL[contextSlot] } } else FILTERS, armorFilter, function(id)
 		armorFilter = id
 		draw()
 	end)
@@ -1508,6 +1545,17 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 			{ "Cut " .. (if gem.Cut then tostring(gem.Cut) else "rough"), if gem.Cut then C.Text else C.Dim },
 		})
 		local surge = gem.Cut and Tech.surgeStats(gem)
+		if gem.Cut and (contextSlot or contextKey) then
+			local targetSlot, targetKey = contextSlot, contextKey
+			actions(holder, 0, {
+				{ if targetKey then "EQUIP ON " .. targetKey else "ENCHANT " .. SLOT_LABEL[targetSlot], true, function()
+					if targetKey then request("SocketSurge", gem.Id, targetKey)
+					else request("SocketGem", gem.Id, targetSlot) end
+					selection = nil
+					draw()
+				end },
+			})
+		end
 		if surge then
 			line(holder, 2, "SURGE  ·  " .. string.upper(surge.Name), 10, C.Dim, BOLD)
 			line(holder, 3, surge.Description or "", 12, C.Text)
@@ -1515,6 +1563,19 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 				{ string.format("%s %s", whole(surge.Cost or 0), surge.Resource or "Charge"), C.Accent },
 				{ string.format("%ss cooldown", whole(surge.Cooldown or 0)), C.Dim },
 			})
+			if contextSlot or contextKey then
+				if contextSlot then
+					local name, effect = GemConfig.enchantment(gem, contextSlot)
+					local kind = ArmorSignatures.Slots[contextSlot]
+					local roll = kind and loadout.GearRolls and loadout.GearRolls[kind] and loadout.GearRolls[kind][loadout[contextSlot]]
+					local signatureName, signatureEffect = ArmorSignatures.describe(roll, gem)
+					if signatureName ~= "" then name, effect = signatureName, signatureEffect end
+					line(holder, 5, "ENCHANTMENT / " .. SLOT_LABEL[contextSlot], 10, C.Accent, BOLD)
+					line(holder, 6, name .. ": " .. effect, 12, C.Text)
+				end
+				line(holder, 8, "A gem occupies one slot. Replaced gems return to your stash.", 11, C.Dim)
+				return true
+			end
 			local keys = {}
 			for _, key in { "Q", "E", "R" } do
 				table.insert(keys, {
@@ -1711,6 +1772,10 @@ shade.Activated:Connect(closeDetails)
 local POP_TITLE = { Worn = "WORN GEAR", Spare = "SPARE GEAR", Gem = "GEM", Key = "SURGE KEY" }
 local function drawPopup()
 	clear(popBody)
+	if contextSlot or contextKey then
+		shade.Visible = false
+		return
+	end
 	local pick = selection
 	if pick and not drawOverview(popBody, pick) then
 		selection = nil
@@ -1873,7 +1938,7 @@ local function drawLeft()
 		local rarity = if gear then rarityOf(loadout, slot) else 1
 		local color = rarityColor(rarity)
 		local picked = (selection and selection.Kind == "Worn" and selection.Slot == slot)
-			or (tab == "Armor" and armorFilter == slot)
+			or contextSlot == slot
 		card.Name.Text = if gear then GemConfig.itemName(gear.Name, gem, slot) else "Empty"
 		card.Name.TextColor3 = if gear and rarity > 1 then color:Lerp(C.Text, 0.3) else C.Text
 		card.Rarity.Text = if gear then rarityName(rarity) else ""
@@ -1906,7 +1971,7 @@ local function drawLeft()
 		local gem = Tech.surgeGem(loadout, key)
 		local surge = gem and Tech.surgeStats(gem)
 		local tint = if gem then gemColor(gem) else C.PanelEdge
-		local picked = selection and selection.Kind == "Key" and selection.Key == key
+		local picked = contextKey == key or (selection and selection.Kind == "Key" and selection.Key == key)
 		ui.Stroke.Color = if picked then C.Gold else tint
 		ui.Stroke.Thickness = if picked then 2.5 else 1.5
 		ui.Name.Text = if surge then surge.Name else "empty"
@@ -1929,22 +1994,23 @@ local function drawTabs()
 	local profile = profileNow()
 	local spare = #spareItems()
 	local gems = #(profile and profile.Gems or {})
-	local key = string.format("%s|%d|%d", tab, spare, gems)
+	contextTitle.Text = if contextKey then "SURGE / " .. contextKey elseif contextSlot then "LOADOUT / " .. SLOT_LABEL[contextSlot] else "SHARED STASH"
+	local key = string.format("%s|%d|%d|%s|%s", tab, spare, gems, contextSlot or "", contextKey or "")
 	if key == tabsKey then
 		return
 	end
 	tabsKey = key
 	clear(tabHolder)
+	local entries = if contextKey then { { "Gems", "SURGE GEMS" }, { "Overview", "EQUIPPED SURGE" } }
+		elseif contextSlot then { { "Gems", "GEMS" }, { "Armor", "GEAR" }, { "Overview", "EQUIPPED" } }
+		else { { "Overview", "LOADOUT" }, { "Armor", "GEAR " .. spare }, { "Gems", "GEMS " .. gems } }
 	IronUi.tabs(
 		tabHolder,
-		{
-			{ "Overview", "OVERVIEW" },
-			{ "Armor", string.format("SHARED GEAR  %d", spare) },
-			{ "Gems", string.format("SHARED GEMS  %d/%d", gems, Config.MaxGems) },
-		},
+		entries,
 		tab,
 		function(id)
 			tab = id
+			selection = nil
 			draw()
 		end
 	)
@@ -1958,6 +2024,32 @@ local function drawRight()
  if profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
   tab, gemFilter = "Gems", "All"
  end
+	local drawerOpen = contextSlot ~= nil or contextKey ~= nil or tab ~= "Overview"
+	right.Visible = drawerOpen
+	local stageWidth = (if drawerOpen then LEFT_W else W) - MID_X - 18
+	left.Size = UDim2.fromOffset(if drawerOpen then LEFT_W else W, PANEL_H)
+	at(portrait, MID_X, BODY_Y, stageWidth, 250)
+	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
+	at(surgeCell, MID_X, 340, stageWidth, 62)
+	-- Q/E/R stay visible in both the wide stage and drawer layouts.
+	local surgeWidth = (stageWidth - 126) / 3
+	for index, key in { "Q", "E", "R" } do
+		local ui = surgeKeys[key]
+		at(ui.Box, 114 + (index - 1) * (surgeWidth + 4), 7, surgeWidth, 48)
+		at(ui.Letter, 4, 4, 18, 18)
+		at(ui.Art, 24, 4, 38, 38)
+		at(ui.Name, 65, 4, surgeWidth - 70, 40)
+		ui.Name.TextXAlignment = Enum.TextXAlignment.Left
+	end
+	local statWidth = (stageWidth - 5 * TILE_GAP) / 6
+	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
+		local tile = statTiles[name]
+		at(tile.Tile, MID_X + (index - 1) * (statWidth + TILE_GAP), 412, statWidth, 56)
+		tile.Value.Size = UDim2.fromOffset(statWidth - 16, 22)
+		tile.Bonus.Visible = false
+		local track = tile.Fill.Parent
+		at(track, 10, 49, statWidth - 20, 3)
+	end
 	drawTabs()
 	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
 	if key ~= nil and key == pageKey and pageTab == tab then
@@ -1967,12 +2059,15 @@ local function drawRight()
 	local keep = if old and pageTab == tab then old.CanvasPosition else nil
 	pageKey, pageTab = key or "", tab
 	clear(page)
-	if tab == "Gems" then
+	if selection and (contextSlot or contextKey) then
+		drawOverview(page, selection)
+		footer.Text = "BACK TO RETURN TO YOUR ITEMS"
+	elseif tab == "Gems" then
 		drawGems()
 	elseif tab == "Armor" then
 		drawArmor()
 	else
-		drawOverview(page, nil)
+		drawOverview(page, if contextSlot then { Kind = "Worn", Slot = contextSlot } elseif contextKey then { Kind = "Key", Key = contextKey } else nil)
 	end
 	local fresh = page:FindFirstChildWhichIsA("ScrollingFrame", true)
 	if keep and fresh then
