@@ -27,7 +27,8 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
-local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local ArenaScene = require(script.Parent.ArenaScene)
@@ -1043,27 +1044,12 @@ local scoutRow = new("Frame", {
 }, pivotPanel)
 local scoutList = UiKit.list(scoutRow, 8, true)
 scoutList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-pivotLabel("SWITCH LOADOUTS  ·  both lock in, then both picks are shown", 11, P.Dim, BOLD, 160, 14)
--- Two rows, one per loadout kind (Shared.GearPresets.Parts): KEEP, 1, 2, 3.
-local pickRows = {}
-for index, part in GearPresets.PartOrder do
-	local row = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(16, 180 + (index - 1) * 46),
-		Size = UDim2.new(1, -32, 0, 40),
-	}, pivotPanel)
-	local caption = text(row, string.upper(GearPresets.Parts[part].Label), 12, P.Dim, BOLD)
-	caption.AutomaticSize = Enum.AutomaticSize.None
-	caption.Size = UDim2.fromOffset(90, 40)
-	caption.TextYAlignment = Enum.TextYAlignment.Center
-	local chips = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(96, 0),
-		Size = UDim2.new(1, -96, 1, 0),
-	}, row)
-	UiKit.list(chips, 8, true)
-	pickRows[part] = chips
-end
+pivotLabel("COUNTER-PICK  ·  the round loser may switch miners", 12, P.Dim, BOLD, 160, 18)
+local pickRow = new("Frame", {
+	BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 194),
+	Size = UDim2.new(1, -32, 0, 64),
+}, pivotPanel)
+UiKit.list(pickRow, 8, true)
 local lockButton = new("TextButton", {
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 276),
@@ -1079,7 +1065,8 @@ local pivotStatus = pivotLabel("", 13, P.Text, BOLD, 318, 18)
 local pivotTheirs = pivotLabel("", 12, P.Dim, BOLD, 340, 16)
 local pivotEnds = 0
 local pivotLocked = false
-local picked = { Armor = nil, Weapon = nil }
+local picked = nil
+local canSwap = false
 
 local function fitPivot()
 	local screen = overlay.AbsoluteSize
@@ -1090,76 +1077,39 @@ end
 overlay:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPivot)
 
 local drawPicks
-local function pickChip(part: string, parent: Instance, order: number, slot: number?, caption: string, enabled: boolean)
-	local chosen = picked[part] == slot
-	local b = new("TextButton", {
-		Text = caption,
-		TextSize = 13,
-		Font = BOLD,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		TextColor3 = if chosen then P.Frame elseif enabled then P.Text else P.Dim,
-		BackgroundColor3 = if chosen then P.Gold else P.Inset,
-		AutoButtonColor = enabled and not pivotLocked,
-		Size = UDim2.fromOffset(if slot then 110 else 80, 40),
-		LayoutOrder = order,
-	}, parent)
-	UiKit.round(b, 8)
-	new("UIStroke", { Color = if chosen then P.Gold else P.Edge, Thickness = 1.2 }, b)
-	b.Activated:Connect(function()
-		if pivotLocked or not enabled then
-			return
-		end
-		picked[part] = slot
-		drawPicks()
-	end)
-end
-
 function drawPicks()
+	clear(pickRow)
 	local profile = GemClient.Profile
-	local presets = GearPresets.clean(profile and profile.Presets)
-	local loadout = profile and profile.Character or {}
-	for _, part in GearPresets.PartOrder do
-		clear(pickRows[part])
-		pickChip(part, pickRows[part], 0, nil, "KEEP", true)
-		for index = 1, GearPresets.Count do
-			local preset = presets[part][index]
-			local caption = if preset then preset.Name else index .. " · empty"
-			if preset and GearPresets.matches(loadout, preset) then
-				caption ..= " ✓"
-			end
-			pickChip(part, pickRows[part], index, index, caption, preset ~= nil)
-		end
+	local roster = profile and profile.Miners
+	for index = 1, MinerRoster.Count do
+		local miner = roster and roster.Slots[index]
+		local selected = picked == index
+		local enabled = miner ~= nil and (canSwap or index == roster.Active) and not pivotLocked
+		local level = Tree.level(miner and miner.Augments and miner.Augments.XP or 0)
+		local button = new("TextButton", {
+			Text = string.format("MINER %d · LV %d\n%s", index, level, if selected then "SELECTED" elseif enabled then "COUNTER-PICK" else "LOCKED"),
+			TextSize = 13, Font = BOLD, Size = UDim2.fromOffset(184, 62),
+			TextColor3 = if selected then P.Frame elseif enabled then P.Text else P.Dim,
+			BackgroundColor3 = if selected then P.Gold else P.Inset,
+			AutoButtonColor = enabled, LayoutOrder = index,
+		}, pickRow)
+		UiKit.round(button, 8)
+		button.Activated:Connect(function()
+			if enabled then picked = index; drawPicks() end
+		end)
 	end
-	lockButton.Text = if pivotLocked then "LOCKED IN" else "LOCK IN"
+	lockButton.Text = if pivotLocked then "LOCKED IN" else "READY"
 	lockButton.AutoButtonColor = not pivotLocked
-	lockButton.BackgroundColor3 = if pivotLocked then P.Good else P.Gold
 end
 lockButton.Activated:Connect(function()
-	if pivotLocked then
-		return
-	end
+	if pivotLocked then return end
 	pivotLocked = true
-	local names = {}
-	for _, part in GearPresets.PartOrder do
-		if picked[part] then
-			table.insert(names, GearPresets.Parts[part].Label .. " " .. picked[part])
-		end
-	end
-	pivotStatus.Text = "LOCKED IN: "
-		.. (if #names > 0 then table.concat(names, " + ") else "keeping your setup")
-		.. "  ·  waiting for your opponent"
-	pivotStatus.TextColor3 = P.Good
 	drawPicks()
-	local armor, weapon = picked.Armor, picked.Weapon
+	local choice = picked
 	task.spawn(function()
-		local result = GemClient.request("DuelPivot", armor, weapon)
-		if not result.Ok then
-			-- Refused (window closed, a loadout emptied): pick again.
-			pivotLocked = false
-			pivotStatus.Text = result.Message or "Couldn't lock in."
-			pivotStatus.TextColor3 = P.Bad
-			drawPicks()
-		end
+		local response = GemClient.request("DuelPivot", choice)
+		pivotStatus.Text = response.Message or ""
+		if not response.Ok then pivotLocked = false; drawPicks() end
 	end)
 end)
 
@@ -1200,8 +1150,9 @@ local function showPivot(info)
 	end
 	pivotEnds = info.Ends
 	pivotLocked = false
-	picked.Armor, picked.Weapon = nil, nil
-	pivotStatus.Text = "Pick your loadouts. Gear can't be edited mid-match."
+	picked = GemClient.Profile and GemClient.Profile.Miners and GemClient.Profile.Miners.Active or 1
+	canSwap = info.CanSwap == true
+	pivotStatus.Text = if canSwap then "Choose a miner to counter their build, or keep your current miner." else "Round won. Keep your miner; your opponent may counter-pick."
 	pivotStatus.TextColor3 = P.Text
 	pivotTheirs.Text = "Opponent: choosing…"
 	drawPicks()

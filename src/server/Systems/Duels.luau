@@ -56,7 +56,7 @@ local CombatServer = require(script.Parent.CombatServer)
 local ArenaSessions = require(script.Parent.ArenaSessions)
 local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
-local Presets = require(script.Parent.Presets)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -543,6 +543,7 @@ local function endRound(match, winner: number?, reason: string)
 	end
 	match.State = "Pivot"
 	r.Picks, r.Locked = {}, {}
+	r.LastWinner = winner
 	r.PivotEnds = os.clock() + Matchmaking.Rounds.Pivot
 	local ends = serverNow() + Matchmaking.Rounds.Pivot
 	for _, team in match.Teams do
@@ -556,6 +557,7 @@ local function endRound(match, winner: number?, reason: string)
 			Phase = "Pivot",
 			Round = r.Played,
 			Winner = if winner == nil then "Draw" elseif winner == t then "You" else "Them",
+			CanSwap = MinerRoster.canCounter(winner, t),
 			Reason = reason,
 			Wins = { Mine = r.Wins[t], Theirs = r.Wins[other(t)] },
 			Team = t,
@@ -575,19 +577,16 @@ local function reveal(match)
 	for t, team in match.Teams do
 		picks[t] = {}
 		for _, member in team do
-			local chosen = r.Picks[member] or {}
-			local names = {}
-			for _, part in GearPresets.PartOrder do
-				local slot = chosen[part]
-				local preset = slot and Presets.list(member, part)[slot]
-				if preset then
-					Presets.wear(member, part, slot)
-					table.insert(names, preset.Name)
-				end
+			local chosen = r.Picks[member]
+			if chosen and MinerRoster.canCounter(r.LastWinner, t) then
+				PlayerData.selectMiner(member, chosen)
 			end
+			local profile = PlayerData.get(member)
+			local current = profile and profile.Miners and profile.Miners.Active or 1
+
 			table.insert(picks[t], {
 				Name = member.DisplayName,
-				Preset = if #names > 0 then table.concat(names, " + ") else nil,
+				Preset = "Miner " .. current,
 				Locked = r.Locked[member] == true,
 			})
 		end
@@ -617,22 +616,26 @@ local function reveal(match)
 	end)
 end
 
-local function pivot(player: Player, armor: any, weapon: any)
+local function pivot(player: Player, index: any)
 	local match = matchOf[player]
 	local r = match and match.Rounds
 	if not r or match.State ~= "Pivot" then
-		return reply(false, "You can only switch presets between rounds.")
+		return reply(false, "You can only switch miners between rounds.")
 	end
 	if r.Locked[player] then
 		return reply(false, "Your pick is locked in.")
 	end
-	local chosen = { Armor = armor, Weapon = weapon }
-	for part, slot in chosen do
-		if typeof(slot) ~= "number" or not Presets.list(player, part)[slot] then
-			return reply(false, "That loadout is empty.")
-		end
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Miners
+	local chosen = index or (roster and roster.Active)
+	if not MinerRoster.valid(chosen) or not roster or not roster.Slots[chosen] then
+		return reply(false, "Choose one of your three miners.")
+	end
+	if chosen ~= roster.Active and not MinerRoster.canCounter(r.LastWinner, player:GetAttribute("MatchTeam")) then
+		return reply(false, "The round winner keeps their miner. The loser may counter-pick.")
 	end
 	r.Picks[player] = chosen
+
 	r.Locked[player] = true
 	local team = player:GetAttribute("MatchTeam")
 	tell(match, function()

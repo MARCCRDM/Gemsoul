@@ -171,7 +171,7 @@ for player = 1, 300 do
 	for _, slot in Slots.Order do
 		local kind = Slots.Definitions[slot].Kind
 		local roll = GearRolls.get(profile.Character, slot)
-		check(profile.Character[slot] ~= Classes.List.Warrior[kind][1].Id, "Fixed basic starter retained")
+		check(roll.Rarity == 1, "Starter must be Common in every slot")
 		check(roll and roll.Rarity >= 1 and roll.Rarity <= 5, "Missing saved rarity")
 		rarityCounts[roll.Rarity] += 1
 		table.insert(key, profile.Character[slot] .. ":" .. roll.Rarity .. ":" .. roll.Finish .. ":" .. roll.Variant)
@@ -190,10 +190,9 @@ for _ in combinations do
 	count += 1
 end
 check(count >= 290, "Random sets lack diversity")
-for i, rarity in GearRolls.Rarities do
-	check(math.abs(rarityCounts[i] / 1800 - rarity.Weight / 100) < 0.05, "Rarity distribution outside tolerance")
-end
-print("PASS: 300 random player loadouts; " .. count .. " distinct sets; saved rolls stable; rarity distribution valid")
+check(rarityCounts[1] == 1800, "Every starter item must remain Common")
+print("PASS: 300 Common starter kits with varied cosmetics and stable saved rolls")
+
 
 do
  local warrior=Classes.get("Warrior")

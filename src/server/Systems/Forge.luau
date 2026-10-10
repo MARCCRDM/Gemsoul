@@ -17,6 +17,7 @@ local RANGE = 40 -- studs from Hilde or Borin
 local reply = Shop.reply
 
 local Forge = {}
+local Combat = require(game:GetService("ReplicatedStorage").Shared.Combat)
 
 -- Checks a list of gem ids from the client: all distinct and all yours.
 local function pickGems(player: Player, ids: any): { any }?
@@ -66,6 +67,7 @@ local function marketSell(player: Player, ids: any)
 end
 
 local function equipGear(player: Player, kind: any, gearId: any)
+	if not Combat.canChangeBuild(player) then return reply(false, "Change equipment in the Outpost.") end
 	local profile = PlayerData.get(player)
 	local weapon = profile and Classes.weapon(profile.Character.Class, profile.Character.Weapon)
 	if kind == "Shields" and weapon and Classes.TwoHanded[weapon.WeaponType] then

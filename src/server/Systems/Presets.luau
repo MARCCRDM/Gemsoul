@@ -71,6 +71,7 @@ end
 local applying: { [Player]: boolean } = {}
 function Presets.captureActive(player: Player)
 	local profile = PlayerData.get(player)
+	if profile and profile.Miners then return end
 	local presets = all(player)
 	if not profile or not presets or applying[player] or player:GetAttribute("MatchId") then
 		return
@@ -94,6 +95,7 @@ end
 ]]
 function Presets.wear(player: Player, part: string, slot: number): (boolean, string, number)
 	local profile = PlayerData.get(player)
+	if profile and profile.Miners then return false, "Select a complete miner instead.", 0 end
 	local preset = profile and Presets.list(player, part)[slot]
 	if not profile or not preset then
 		return false, "That preset is empty.", 0
@@ -218,6 +220,15 @@ local function selectLoadout(player: Player, part: any, slot: any)
 end
 
 function Presets.start()
+	Shop.register("MinerSelect", function(player, index)
+		if not canChange(player) or player:GetAttribute("DuelQueue") then
+			return reply(false, "Switch miners in the Outpost, before you queue.")
+		end
+		local profile = PlayerData.get(player)
+		if not profile or not profile.Intro.Done then return reply(false, "Finish your introduction first.") end
+		local ok = PlayerData.selectMiner(player, index)
+		return reply(ok, if ok then "Miner " .. index .. " is active." else "Choose a miner from 1 to 3.")
+	end)
 	Shop.register("LoadoutSelect", selectLoadout)
 	-- Every change to what you wear saves into the active loadouts.
 	-- A burst of changes (putting a loadout on) is one save and one sync.

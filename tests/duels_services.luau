@@ -275,7 +275,13 @@ local function makePlayer(id, name)
 		end,
 	}
 	p.Humanoid, p.Root = humanoid, root
-	profiles[p] = { Coins = 0, Season = { XP = 0 } }
+	profiles[p] = { Coins = 0, Season = { XP = 0 }, Character = {}, Augments = {},
+		Miners = { Active = 1, Slots = {
+			{ Name = "Miner 1", Character = {}, Augments = {} },
+			{ Name = "Miner 2", Character = { WeaponGem = { Element = "Frost" } }, Augments = {} },
+			{ Name = "Miner 3", Character = {}, Augments = {} },
+		} },
+	}
 	sent[p] = {}
 	table.insert(playerList, p)
 	Players.PlayerAdded.Fire(p)

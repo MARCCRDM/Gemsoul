@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Rules = require(ReplicatedStorage.Shared.DungeonRules)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local World = require(script.Parent.Parent.World.DungeonWorld)
 local Party = require(script.Parent.Party)
 local Raids = require(script.Parent.Raids)
@@ -25,6 +26,22 @@ end
 local runs, memberRun, slots = {}, {}, {}
 local finish
 local beginLoot
+local function releaseReserve(p)
+	local c = p.Character
+	local root = c and c:FindFirstChild("HumanoidRootPart")
+	if root and p:GetAttribute("DungeonSelecting") then root.Anchored = false end
+	local shield = c and c:FindFirstChild("MinerReserveShield")
+	if shield then shield:Destroy() end
+	p:SetAttribute("DungeonSelecting", nil)
+	p:SetAttribute("DungeonAvailableMiners", nil)
+	p:SetAttribute("DungeonSelectEnds", nil)
+end
+local function reservesPending(run)
+	for p in run.Selecting do
+		if p.Parent and memberRun[p] == run then return true end
+	end
+	return false
+end
 local function living(run)
 	local result = {}
 	for _, p in run.Members do
@@ -33,6 +50,7 @@ local function living(run)
 		if
 			p.Parent
 			and memberRun[p] == run
+			and not p:GetAttribute("DungeonSelecting")
 			and p:GetAttribute("DungeonId") == run.Id
 			and p:GetAttribute("CombatSession") == "Raid"
 			and h
@@ -70,6 +88,7 @@ finish = function(run, won, reason)
 				and humanoid.Health > 0
 			memberRun[p] = nil
 			if p.Parent then
+				releaseReserve(p)
 				p:SetAttribute("DungeonId", nil)
 				p:SetAttribute("DungeonTest", nil)
 				p:SetAttribute("DungeonObjective", nil)
@@ -340,6 +359,8 @@ local function queue(player, testMode)
 		Slot = slot,
 		Index = 1,
 		Started = os.clock(),
+		Defeated = {},
+		Selecting = {},
 		Done = false,
 	}
 	slots[slot] = true
@@ -347,6 +368,7 @@ local function queue(player, testMode)
 	-- Lock the roster synchronously before any work that could yield.
 	for _, p in run.Members do
 		memberRun[p] = run
+		run.Defeated[p] = {}
 		p:SetAttribute("DungeonId", id)
 		p:SetAttribute("DungeonTest", testing)
 		p:SetAttribute("RaidId", id)
@@ -420,10 +442,75 @@ local function queue(player, testMode)
 	end
 	return Shop.reply(true, "Dungeon queued for your ready squad. Deploying now.")
 end
+local function chooseReserve(p, index)
+	local run = memberRun[p]
+	local pending = run and run.Selecting[p]
+	local profile = PlayerData.get(p)
+	if not run or run.Done or not pending or pending.Deploying or not profile then
+		return Shop.reply(false, "No replacement deployment is available.")
+	end
+	if not MinerRoster.valid(index) or run.Defeated[p][index] or not profile.Miners.Slots[index] then
+		return Shop.reply(false, "That miner is already defeated in this run.")
+	end
+	pending.Deploying = true
+	if not PlayerData.selectMiner(p, index) then
+		pending.Deploying = false
+		return Shop.reply(false, "That miner could not be selected.")
+	end
+	task.spawn(function()
+		local ok, problem = pcall(function()
+			local h = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+			if not h or h.Health <= 0 then p:LoadCharacterAsync() end
+			task.wait(0.2) -- allow the new equipment's stats to reach the avatar
+			if run.Done or memberRun[p] ~= run or not p.Parent then return end
+			local c = p.Character
+			local humanoid = c and c:FindFirstChildOfClass("Humanoid")
+			assert(humanoid and humanoid.Health > 0, "Replacement avatar did not load")
+			releaseReserve(p)
+			ArenaDrop.prepare(p)
+			local center = run.World.Centers[run.Index] or run.World.Arrival
+			local position = center + Vector3.new(0, 4, -22)
+			c:PivotTo(CFrame.lookAt(position, center + Vector3.new(0, 4, 0)))
+			p:SetAttribute("RaidId", run.Id)
+			p:SetAttribute("CombatSession", "Raid")
+			CombatServer.reset(p)
+			humanoid.Health = humanoid.MaxHealth
+			run.Selecting[p] = nil
+			ArenaDrop.encounter({ p }, {}, true)
+		end)
+		if not ok then
+			warn("[Dungeon] reserve deployment failed: " .. tostring(problem))
+			if memberRun[p] == run then ArenaSessions.leave(p) end
+		end
+	end)
+	return Shop.reply(true, "Deploying Miner " .. index .. ".")
+end
+local function reserveAfterDefeat(p, humanoid)
+	local run = memberRun[p]
+	local profile = PlayerData.get(p)
+	if not run or run.Done or not profile or not profile.Miners then return false end
+	if run.Selecting[p] then return true end
+	run.Defeated[p][profile.Miners.Active] = true
+	local available = MinerRoster.remaining(profile.Miners, run.Defeated[p])
+	if #available == 0 then return false end
+	run.Selecting[p] = { Ends = os.clock() + 30 }
+	p:SetAttribute("DungeonSelecting", true)
+	p:SetAttribute("DungeonAvailableMiners", table.concat(available, ","))
+	p:SetAttribute("DungeonSelectEnds", workspace:GetServerTimeNow() + 30)
+	if humanoid.Health > 0 then humanoid.Health = 1 end
+	local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+	if root then root.Anchored = true end
+	local shield = Instance.new("ForceField")
+	shield.Name, shield.Visible, shield.Parent = "MinerReserveShield", false, p.Character
+	CombatServer.reset(p)
+	return true
+end
 function Dungeon.queueParty(player)
 	return queue(player)
 end
 function Dungeon.start()
+	Shop.register("DungeonMinerSelect", chooseReserve)
+	CombatServer.onDungeonLethal(reserveAfterDefeat)
 	Shop.register("DungeonLootChoice", function(player, choice)
 		local run = memberRun[player]
 		local loot = run and run.Loot
@@ -470,6 +557,8 @@ function Dungeon.start()
 			return
 		end
 		memberRun[p] = nil
+		run.Selecting[p] = nil
+		releaseReserve(p)
 		p:SetAttribute("DungeonId", nil)
 		p:SetAttribute("DungeonTest", nil)
 		p:SetAttribute("DungeonRoom", nil)
@@ -477,17 +566,27 @@ function Dungeon.start()
 		p:SetAttribute("DungeonLoot", nil)
 		p:SetAttribute("DungeonLootDeadline", nil)
 		p:SetAttribute("DungeonObjective", nil)
-		if #living(run) == 0 then
+		if #living(run) == 0 and not reservesPending(run) then
 			finish(run, false, "The squad has left the dungeon.")
 		end
 	end
 	local function watch(p)
 		p:SetAttribute("CanTestDungeon", canTest(p))
 		p.CharacterRemoving:Connect(function()
-			if memberRun[p] then
+			if memberRun[p] and not p:GetAttribute("DungeonSelecting") then
 				ArenaSessions.leave(p)
 			end
 		end)
+		local function watchDeath(c)
+			local h = c:WaitForChild("Humanoid", 10)
+			if p:GetAttribute("DungeonSelecting") then
+				local root = c:WaitForChild("HumanoidRootPart", 10)
+				if root and p:GetAttribute("DungeonSelecting") then root.Anchored = true end
+			end
+			if h then h.Died:Connect(function() reserveAfterDefeat(p, h) end) end
+		end
+		p.CharacterAdded:Connect(watchDeath)
+		if p.Character then task.spawn(watchDeath, p.Character) end
 	end
 	Players.PlayerAdded:Connect(watch)
 	for _, p in Players:GetPlayers() do
@@ -510,7 +609,14 @@ function Dungeon.start()
 				continue
 			end
 			local alive = living(run)
-			if #alive == 0 then
+			for p, pending in run.Selecting do
+				if not pending.Deploying and os.clock() >= pending.Ends then
+					local profile = PlayerData.get(p)
+					local available = MinerRoster.remaining(profile and profile.Miners, run.Defeated[p])
+					if available[1] then chooseReserve(p, available[1]) end
+				end
+			end
+			if #alive == 0 and not reservesPending(run) then
 				finish(run, false, "Squad defeated. Regroup and try again.")
 				continue
 			end
@@ -541,7 +647,7 @@ function Dungeon.start()
 					ArenaSessions.leave(p)
 				end
 			end
-			if not run.OpenWorld and run.Cleared and not run.Done and run.Index < #run.Rooms then
+			if not run.OpenWorld and run.Cleared and not run.Done and not reservesPending(run) and run.Index < #run.Rooms then
 				local center = run.World.Centers[run.Index + 1]
 				for _, p in living(run) do
 					local root = p.Character:FindFirstChild("HumanoidRootPart")

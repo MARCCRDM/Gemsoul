@@ -182,38 +182,25 @@ function GearRolls.ensure(profile, rng)
 	end
 end
 function GearRolls.grant(profile, class, rng)
-	Slots.initialize(profile)
 	local c = profile.Character
 	if c.RandomLoadoutVersion == 1 then
+		Slots.initialize(profile)
 		GearRolls.ensure(profile, rng)
 		return false
 	end
+	-- One Common starter kit. Do not seed a random second loadout.
+	profile.Owned = profile.Owned or {}
 	for _, slot in Slots.Order do
 		local kind = Slots.Definitions[slot].Kind
-		local catalog = class[kind]
-		-- Retire the fixed basic starter; independently roll every equipment category.
-		local gear = (if kind ~= "Weapons" then ArmorFamilies.pick(catalog, rng) else ExpandedTraits.pick(catalog, rng))
-		if not gear then
-			-- Fallback: any item that can be handed out (never a disabled pistol).
-			local pool = {}
-			for _, item in catalog do
-				if ExpandedTraits.obtainable(item) then
-					table.insert(pool, item)
-				end
-			end
-			pool = if #pool > 0 then pool else catalog
-			gear = pool[rng:NextInteger(if #pool > 1 then 2 else 1, #pool)]
-		end
-		if c[slot] and c[slot .. "Gem"] then
-			c.ItemGems[slot][c[slot]] = c[slot .. "Gem"]
-		end
-		profile.Owned[kind][gear.Id] = profile.Owned[kind][gear.Id] or 1
-		c[slot] = gear.Id
-		c[slot .. "Quality"] = profile.Owned[kind][gear.Id]
-		c[slot .. "Gem"] = c.ItemGems[slot][gear.Id]
+		local id = if slot == "Weapon" then "MatrixSwords1" else "ArmorSkirmisher" .. slot .. "1"
+		profile.Owned[kind] = profile.Owned[kind] or {}
+		profile.Owned[kind][id] = profile.Owned[kind][id] or 1
+		c[slot], c[slot .. "Quality"] = id, profile.Owned[kind][id]
 	end
+	Slots.initialize(profile)
 	GearRolls.ensure(profile, rng)
 	c.RandomLoadoutVersion = 1
 	return true
 end
+
 return GearRolls

@@ -32,7 +32,8 @@ local UserInputService = game:GetService("UserInputService")
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Classes = require(ReplicatedStorage.Shared.Classes)
-local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
+local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
@@ -83,7 +84,8 @@ local SLOT_LABEL =
 	{ Helmet = "HELMET", Armor = "CHEST", Gloves = "GLOVES", Boots = "BOOTS", Weapon = "WEAPON", Shield = "SHIELD" }
 local HEADING, BOLD, BODY = IronUi.Heading, IronUi.Bold, IronUi.Body
 
-local W, H = 1400, 530
+local W, H = 1400, 618
+local ROSTER_H = 88
 local LEFT_W, RIGHT_X, PANEL_H = 810, 826, 480
 
 local function round(object: GuiObject, radius: number)
@@ -279,8 +281,8 @@ local function panel(x: number, y: number, w: number, h: number, accent: Color3)
 	brackets(frame, accent, 12, 6)
 	return frame
 end
-local left = panel(0, 0, LEFT_W, PANEL_H, P.Gold)
-local right = panel(RIGHT_X, 0, W - RIGHT_X, PANEL_H, P.Teal)
+local left = panel(0, ROSTER_H, LEFT_W, PANEL_H, P.Gold)
+local right = panel(RIGHT_X, ROSTER_H, W - RIGHT_X, PANEL_H, P.Teal)
 
 -- Selection and drag state.
 type Pick = { Kind: string, Slot: string?, Id: string?, Gem: any?, Key: string? }
@@ -470,34 +472,30 @@ local function cellAt(column: number, row: number): Frame
 	return cell
 end
 
--- Loadout tabs in the header: tap 1-3 to switch (an empty slot starts a
--- new loadout).
-local pickers = {}
-local function loadoutPicker(part: string, x: number)
-	local cell = new("Frame", { BackgroundTransparency = 1 }, left)
-	at(cell, x, 10, 150, 64)
-	at(label(cell, string.upper(GearPresets.Parts[part].Label) .. " LOADOUT", 9, C.Dim, BOLD), 0, 0, 150, 12)
-	local chips = {}
-	for slot = 1, GearPresets.Count do
-		local chip = new("TextButton", { Text = "", AutoButtonColor = true, BackgroundColor3 = C.Card }, cell)
-		at(chip, (slot - 1) * 50, 15, 46, 34)
-		round(chip, 6)
-		local edge = stroke(chip, C.PanelEdge, 1.5)
-		local number = at(label(chip, tostring(slot), 15, C.Text, HEADING), 0, 2, 46, 18)
-		number.TextXAlignment = Enum.TextXAlignment.Center
-		local state = at(label(chip, "", 8, C.Dim, BOLD), 0, 19, 46, 12)
-		state.TextXAlignment = Enum.TextXAlignment.Center
-		chip:SetAttribute("UiSound", "Tab")
-		chip.Activated:Connect(function()
-			request("LoadoutSelect", part, slot)
-		end)
-		chips[slot] = { Button = chip, Stroke = edge, Number = number, State = state }
-	end
-	local hint = at(label(cell, "", 9, C.Faint, BODY), 0, 52, 150, 12)
-	pickers[part] = { Chips = chips, Hint = hint }
+-- Whole-character roster: each card selects one miner and their progression.
+local minerCards = {}
+local rosterHeader = new("Frame", { BackgroundTransparency = 1 }, root)
+at(rosterHeader, 0, 0, W, 76)
+local MINER_W = (W - 24) / 3
+for index = 1, MinerRoster.Count do
+	local button = new("TextButton", { Text = "", BackgroundColor3 = C.Card }, rosterHeader)
+	at(button, (index - 1) * (MINER_W + 12), 0, MINER_W, 76)
+	round(button, 8)
+	local edge = stroke(button, C.PanelEdge, 1.5)
+	local art = new("Frame", { BackgroundTransparency = 1 }, button)
+	at(art, 8, 7, 62, 62)
+	local name = at(label(button, "MINER " .. index, 17, C.Text, HEADING), 82, 10, 200, 22)
+	local status = at(label(button, "LEVEL 1", 12, C.Dim, BOLD), 82, 38, 270, 18)
+	local state = at(label(button, "SELECT", 11, C.Dim, BOLD), MINER_W - 88, 13, 78, 18)
+	state.TextXAlignment = Enum.TextXAlignment.Right
+	button:SetAttribute("UiSound", "Tab")
+	button.Activated:Connect(function()
+		InventoryScreen.cancelDrag()
+		selection = nil
+		request("MinerSelect", index)
+	end)
+	minerCards[index] = { Button = button, Edge = edge, Name = name, Status = status, State = state, Art = art }
 end
-loadoutPicker("Armor", LEFT_W - 18 - 150 - 168)
-loadoutPicker("Weapon", LEFT_W - 18 - 150)
 
 -- The worn pieces.
 local wornCards = {}
@@ -1015,7 +1013,7 @@ local function spareItems()
 		local kind = Slots.Definitions[slot].Kind
 		for id in (profile and profile.Owned and profile.Owned[kind]) or {} do
 			local gear = gearOf(loadout, slot, id)
-			if gear and id ~= loadout[slot] then
+			if gear and id ~= loadout[slot] and not MinerRoster.owner(profile, slot, id) then
 				table.insert(
 					items,
 					{ Slot = slot, Id = id, Gear = gear, Rarity = rarityOf(loadout, slot, id), Order = order }
@@ -1131,7 +1129,7 @@ local function drawArmor()
 		emptyNote(
 			page,
 			if armorFilter == "All"
-				then "No spare gear here.\nRecover more in the mine or trade for it."
+				then "Your shared stash is empty.\nGear worn by your other miners stays with them."
 				else "No other "
 					.. string.lower(SLOT_LABEL[armorFilter] or "gear")
 					.. " to swap in yet.\nRecover more in the mine or trade for it."
@@ -1677,7 +1675,7 @@ local popCard = new("TextButton", {
 	AutoButtonColor = false,
 	BackgroundColor3 = Color3.new(1, 1, 1),
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.new(0.5, 0, 0, 16 + PANEL_H / 2),
+	Position = UDim2.new(0.5, 0, 0, ROSTER_H + 16 + PANEL_H / 2),
 	Size = UDim2.fromOffset(POP_W, POP_H),
 }, shade)
 round(popCard, 6)
@@ -1748,7 +1746,7 @@ end)
 -- Bottom bar -----------------------------------------------------------------------------------------------
 
 local bar = new("Frame", { BackgroundTransparency = 1 }, root)
-at(bar, 0, PANEL_H + 6, W - 230, 46)
+at(bar, 0, ROSTER_H + PANEL_H + 6, W - 230, 46)
 local barList = UiKit.list(bar, 8, true)
 barList.VerticalAlignment = Enum.VerticalAlignment.Center
 local function openModule(name: string, method: string)
@@ -1787,7 +1785,7 @@ local backButton = chunkButton(root, "BACK TO LOBBY", P.Gold, UDim2.fromOffset(2
 	end
 end)
 backButton.AnchorPoint = Vector2.new(1, 0)
-backButton.Position = UDim2.new(1, 0, 0, PANEL_H + 8)
+backButton.Position = UDim2.new(1, 0, 0, ROSTER_H + PANEL_H + 8)
 backButton:SetAttribute("UiSound", "Back")
 backButton:SetAttribute("TutorialSocket", "CloseInventory")
 
@@ -1796,7 +1794,10 @@ backButton:SetAttribute("TutorialSocket", "CloseInventory")
 local function drawLeft()
 	local profile = profileNow()
 	local loadout = loadoutNow()
-	nameLabel.Text = string.upper(player.DisplayName)
+	nameLabel.Text = "MINER " .. tostring(profile and profile.Miners and profile.Miners.Active or 1)
+	nameLabel.Text ..= "  /  " .. string.upper(player.DisplayName)
+	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	nameLabel.Size = UDim2.fromOffset(LEFT_W - 40, 32)
 	local class = loadout.Class and Classes.get(loadout.Class)
 	local best, bestCount = nil, 0
 	local active = loadout.Class and Classes.setState(loadout).Active or {}
@@ -1843,21 +1844,26 @@ local function drawLeft()
 	statTiles.Attuned.Value.Text = string.format("%d/%d", attuned, #Slots.Order)
 	statTiles.Attuned.Fill.Size = UDim2.fromScale(attuned / #Slots.Order, 1)
 
-	-- Loadouts: the active one glows gold.
-	local presets = GearPresets.clean(profile and profile.Presets)
-	for part, picker in pickers do
-		local current = presets.Active[part]
-		for slot, chip in picker.Chips do
-			local saved = presets[part][slot] ~= nil
-			local on = slot == current
-			chip.Button.BackgroundColor3 = if on then P.Gold:Lerp(P.Frame, 0.72) else C.Card
-			chip.Stroke.Color = if on then P.Gold else C.PanelEdge
-			chip.Stroke.Thickness = if on then 2 else 1.2
-			chip.Number.TextColor3 = if on then P.Gold elseif saved then C.Text else C.Faint
-			chip.State.Text = if on then "ON" elseif saved then "SAVED" else "NEW"
-			chip.State.TextColor3 = if on then P.Gold elseif saved then C.Dim else C.Faint
+	local roster = profile and profile.Miners
+	for index, card in minerCards do
+		local miner = roster and roster.Slots[index]
+		local on = roster and roster.Active == index
+		card.Button.BackgroundColor3 = if on then P.Gold:Lerp(P.Frame, 0.8) else C.Card
+		card.Edge.Color = if on then P.Gold else C.PanelEdge
+		card.Name.TextColor3 = if on then P.Gold else C.Text
+		local level = Tree.level(miner and miner.Augments and miner.Augments.XP or 0)
+		local c = if on then loadout else miner and miner.Character or {}
+		local powers = 0
+		for _, key in Slots.SurgeOrder do if c[key .. "Gem"] then powers += 1 end end
+		card.Status.Text = string.format("LEVEL %d   ·   %d / 3 SURGES", level, powers)
+		card.State.Text = if on then "ACTIVE" else "SELECT"
+		card.State.TextColor3 = if on then P.Gold else C.Dim
+		local artKey = tostring(c.Helmet) .. ":" .. tostring(on) .. ":" .. previewVersion
+		if card.ArtKey ~= artKey and c.Helmet then
+			card.ArtKey = artKey
+			gearArt(card.Art, "Helmet", c.Helmet, on == true, C.Accent)
 		end
-		picker.Hint.Text = string.format("On loadout %d  ·  autosaves", current)
+		card.Status.TextColor3 = if on then P.Gold else C.Dim
 	end
 
 	-- Worn pieces (art redrawn only when the piece or its gem changes).
@@ -1933,8 +1939,8 @@ local function drawTabs()
 		tabHolder,
 		{
 			{ "Overview", "OVERVIEW" },
-			{ "Armor", string.format("ARMOR  %d", spare) },
-			{ "Gems", string.format("GEMS  %d/%d", gems, Config.MaxGems) },
+			{ "Armor", string.format("SHARED GEAR  %d", spare) },
+			{ "Gems", string.format("SHARED GEMS  %d/%d", gems, Config.MaxGems) },
 		},
 		tab,
 		function(id)

@@ -18,6 +18,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local TestAdmin = require(script.Parent.TestAdmin)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Economy = require(ReplicatedStorage.Shared.ExpeditionEconomy)
 local TradeJournal = require(script.Parent.TradeJournal)
@@ -299,6 +300,7 @@ local function sync(player: Player)
 	player:SetAttribute("DailyQuota", Config.DailyQuota)
 	player:SetAttribute("MinedThisWeek", profile.Quota.UsedThisWeek)
 	player:SetAttribute("WeeklyQuota", Config.WeeklyQuota)
+	if profile.Miners then player:SetAttribute("ActiveMiner", profile.Miners.Active) end
 	Remotes.Profile:FireClient(player, PlayerData.snapshot(player))
 end
 
@@ -311,6 +313,7 @@ local function save(player: Player, release: boolean?)
 		return false
 	end
 	saving[player] = true
+	MinerRoster.capture(profile)
 	local applied = table.clone(profile.AppliedEquipmentTrades or {})
 	for attempt = 1, 3 do
 		local stolen = false
@@ -450,6 +453,22 @@ local function load(player: Player)
 	local class = Classes.get(currentProfile.Character.Class)
 	if class then
 		GearRolls.grant(currentProfile, class, Random.new())
+		MinerRoster.initialize(currentProfile, function(index)
+			local c = { Class = class.Id or "Warrior", RandomLoadoutVersion = 1 }
+			local family = if index == 2 then "Prospector" else "Juggernaut"
+			c.Class = currentProfile.Character.Class
+			for _, slot in Slots.Order do
+				local kind = Slots.Definitions[slot].Kind
+				local model = if slot == "Weapon" then "MatrixSwords1" else "Armor" .. family .. slot .. "1"
+				local id = Slots.freeKey(currentProfile.Owned[kind], model)
+				currentProfile.Owned[kind][id] = 1
+				c[slot], c[slot .. "Quality"] = id, 1
+			end
+			local temp = { Augments = {} }
+			Tree.initialize(temp)
+			return c, temp.Augments
+		end)
+		GearRolls.ensure(currentProfile, Random.new())
 	end
 	if loaded then
 		save(player)
@@ -514,7 +533,9 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 	if not profile then
 		return nil
 	end
+	MinerRoster.capture(profile)
 	return {
+		Miners = profile.Miners,
 		Augments = profile.Augments,
 		Coins = profile.Coins,
 		TrainingRewards = profile.TrainingRewards,
@@ -605,7 +626,12 @@ function PlayerData.setLoadout(player: Player, classId: string, weaponId: string
 	end
 	character.Class, character.Weapon, character.Armor = classId, weaponId, armorId
 	-- Picking gear in the intro gives you just those two pieces.
-	profile.Owned = { Weapons = { [weaponId] = 1 }, Armors = { [armorId] = 1 } }
+	if profile.Miners then
+		profile.Owned.Weapons[weaponId] = profile.Owned.Weapons[weaponId] or 1
+		profile.Owned.Armors[armorId] = profile.Owned.Armors[armorId] or 1
+	else
+		profile.Owned = { Weapons = { [weaponId] = 1 }, Armors = { [armorId] = 1 } }
+	end
 	character.WeaponQuality, character.ArmorQuality = 1, 1
 	Slots.initialize(profile)
 	GearRolls.grant(profile, Classes.get(classId), Random.new())
@@ -735,6 +761,8 @@ function PlayerData.equipGear(player: Player, kind: string, gearId: string): boo
 	if not profile or not quality then
 		return false
 	end
+	local owner = MinerRoster.owner(profile, key, gearId)
+	if owner and owner ~= profile.Miners.Active then return false end
 	local character: { [string]: any } = profile.Character
 	character.ItemGems = character.ItemGems or {}
 	character.ItemGems[key] = character.ItemGems[key] or {}
@@ -937,6 +965,18 @@ end
 
 function PlayerData.sync(player: Player)
 	sync(player)
+end
+
+-- Server-only entry point. Inventory, PvP pivot and dungeon deployment each
+-- validate their own session rules before switching the complete character.
+function PlayerData.selectMiner(player: Player, index: number): boolean
+	local profile = profiles[player]
+	if not profile or not MinerRoster.switch(profile, index) then return false end
+	Tree.initialize(profile)
+	player:SetAttribute("ActiveMiner", index)
+	sync(player)
+	characterChanged:Fire(player)
+	return true
 end
 
 return PlayerData

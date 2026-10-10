@@ -275,7 +275,7 @@ end
 -- 1v1 Ranked rounds: first to two, a pivot window between rounds --------------
 check(Matchmaking.playsRounds("1v1", "Ranked"), "1v1 Ranked doesn't play rounds")
 check(not Matchmaking.playsRounds("1v1", "Challenge"), "An Outpost challenge plays rounds")
-check(not Matchmaking.playsRounds("casual", "Casual") and not Matchmaking.playsRounds("2v2", "Ranked"), "Rounds leak")
+check(Matchmaking.playsRounds("casual", "Casual") and not Matchmaking.playsRounds("2v2", "Ranked"), "Rounds leak")
 check(Matchmaking.roundsOver({ 1, 0 }, 1) == nil, "One round decided the match")
 check(Matchmaking.roundsOver({ 2, 0 }, 2) == 1 and Matchmaking.roundsOver({ 1, 2 }, 3) == 2, "First to two")
 check(Matchmaking.roundsOver({ 1, 1 }, 3) == "Draw", "Even after three rounds isn't a draw")
@@ -312,20 +312,17 @@ do
 	-- Between rounds nothing lands.
 	lethalBlow(gus)
 	check(gus.Humanoid.Health > 1 and m.State == "Pivot", "A blow landed in the pivot window")
-	-- Preset swap only, both lock, then the reveal.
-	check(not handlers.DuelPivot(gus, nil, 1).Ok, "An empty weapon loadout was accepted")
-	check(not handlers.DuelPivot(gus, 2, nil).Ok, "An empty armor loadout was accepted")
-	check(handlers.DuelPivot(gus, 1, 2).Ok and m.State == "Pivot", "Gus's lock revealed before Hal locked")
+	-- Only the loser may counter-pick a whole miner; selection is hidden until reveal.
+	check(not handlers.DuelPivot(gus, 2).Ok, "Round winner changed miners")
+	check(not handlers.DuelPivot(hal, 4).Ok, "An invalid miner was accepted")
+	check(handlers.DuelPivot(gus, 1).Ok and m.State == "Pivot", "Winner's ready ended the window early")
 	check(not handlers.DuelPivot(gus, nil).Ok, "A locked pick changed")
-	check(last(hal, "Round")[2].Phase == "Locked" and worn[gus] == nil, "Gus's pick was worn before the reveal")
-	check(handlers.DuelPivot(hal, nil).Ok, "Hal couldn't keep his setup")
+	check(profiles[hal].Miners.Active == 1, "Loser's pick applied before reveal")
+	check(handlers.DuelPivot(hal, 2).Ok, "Loser couldn't counter-pick")
 	local revealed = last(hal, "Round")[2]
 	check(m.State == "Countdown" and revealed.Phase == "Reveal" and revealed.Round == 2, "No reveal after both locked")
-	check(
-		worn[gus].Weapon == 2 and worn[gus].Armor == 1 and revealed.Picks.Theirs[1].Preset == "Plate + Frost Kit",
-		"Gus's loadouts weren't worn and shown"
-	)
-	check(revealed.Picks.Mine[1].Preset == nil, "Hal kept his setup but a preset was shown")
+	check(profiles[hal].Miners.Active == 2 and profiles[gus].Miners.Active == 1, "Whole miner counter-pick failed")
+	check(revealed.Picks.Mine[1].Preset == "Miner 2" and revealed.Picks.Theirs[1].Preset == "Miner 1", "Wrong miners revealed")
 	check(hal.Humanoid.Health == hal.Humanoid.MaxHealth, "Hal wasn't healed for round 2")
 	-- Round 2 times out even: a drawn round. Round 3: Hal wins it 1-1... then
 	-- the match is level after three rounds, a draw.
@@ -334,7 +331,7 @@ do
 	advance(Matchmaking.Rounds.Time)
 	check(m.State == "Pivot" and m.Rounds.Played == 2, "Round 2's time didn't end it")
 	check(last(gus, "Round")[2].Winner == "Draw", "Even health at time isn't a drawn round")
-	check(table.find(last(hal, "Round")[2].Scout, "Frost"), "Scouting didn't update to Gus's new preset")
+	check(table.find(last(gus, "Round")[2].Scout, "Frost"), "Scouting did not update to the counter-picked miner")
 	-- Nobody locks: the window closes on its own.
 	advance(Matchmaking.Rounds.Pivot)
 	check(m.State == "Countdown", "The pivot window never closed")

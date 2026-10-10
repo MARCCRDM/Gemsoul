@@ -34,7 +34,7 @@ local Matchmaking = {}
 Matchmaking.Modes = {
 	["1v1"] = { Name = "1v1 Ranked", Size = 1, Kind = "Ranked", Rounds = true },
 	["2v2"] = { Name = "2v2 Party Duel", Size = 2, Kind = "Ranked" },
-	["casual"] = { Name = "1v1 Casual", Size = 1, Kind = "Casual" },
+	["casual"] = { Name = "1v1 Casual", Size = 1, Kind = "Casual", Rounds = true },
 }
 Matchmaking.StartRating = 1000
 Matchmaking.K = 32
@@ -142,7 +142,7 @@ end
 -- Whether a match of `mode` under PvP rule `kind` plays rounds.
 function Matchmaking.playsRounds(mode: string, kind: string?): boolean
 	local spec = Matchmaking.Modes[mode]
-	return spec ~= nil and spec.Rounds == true and kind == "Ranked"
+	return spec ~= nil and spec.Rounds == true and (kind == "Ranked" or kind == "Casual")
 end
 
 -- After `played` rounds with `wins` = { team 1, team 2 }: the match winner

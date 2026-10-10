@@ -10,6 +10,7 @@ def module(name, path):
     return f"local {name} = (function()\n{source}\nend)()\n"
 source = read("tests/roblox_primitives.luau")
 source += "local Config = {MaxGems=2,MarketSellRate=0.45}\n"
+source += module("MinerRoster", "src/shared/MinerRoster.luau")
 source += module("EquipmentBalance", "src/shared/EquipmentBalance.luau")
 source += module("ExpeditionEconomy", "src/shared/ExpeditionEconomy.luau")
 source += module("CrowdControl", "src/shared/CrowdControl.luau")
@@ -33,6 +34,7 @@ data = read("src/server/Systems/PlayerData.luau")
 source += data[data.index("local SOCKET_KEYS"):data.index("-- The three rig maneuvers")]
 source += data[data.index("local GEAR_KEYS"):data.index("-- Records a first")]
 source += read("tests/equipment_cases.luau")
+source += read("tests/miner_roster_cases.luau")
 source += read("tests/expanded_traits_cases.luau")
 source += read("tests/armor_family_cases.luau")
 source += read("tests/gem_metric_cases.luau")

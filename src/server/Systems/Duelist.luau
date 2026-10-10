@@ -323,7 +323,7 @@ local function raidTarget(duel, now: number): boolean
 		local _, humanoid = ownerRoot(member)
 		if
 			not member.Parent
-			or not humanoid
+			or (not humanoid and not member:GetAttribute("DungeonSelecting"))
 			or member:GetAttribute("RaidId") ~= raid.Id
 			or member:GetAttribute("CombatSession") ~= "Raid"
 		then
@@ -362,7 +362,7 @@ local function raidTarget(duel, now: number): boolean
 	local candidates = {}
 	for _, member in raid.Members do
 		local memberRoot, humanoid = ownerRoot(member)
-		if memberRoot and humanoid then
+		if memberRoot and humanoid and not member:GetAttribute("DungeonSelecting") then
 			local distance = (memberRoot.Position - root.Position).Magnitude
 			table.insert(candidates, {
 				Key = member,
@@ -999,6 +999,7 @@ local function think(enemy, now: number)
 		return
 	end
 	local owner = duel.Owner
+	if owner:GetAttribute("DungeonSelecting") then return end
 	local root, humanoid = enemy.Root, enemy.Humanoid
 	local fallen = owner.Character and owner.Character:FindFirstChildOfClass("Humanoid")
 	if fallen and fallen.Health <= 0 then

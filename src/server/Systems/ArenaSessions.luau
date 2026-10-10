@@ -105,6 +105,7 @@ function ArenaSessions.start()
 	Shop.register("ArenaLeave", leave)
 	local function watch(player)
 		player.CharacterAdded:Connect(function()
+			if player:GetAttribute("DungeonSelecting") then return end
 			player:SetAttribute("ArenaInserted", nil)
 			player:SetAttribute("ArenaDropUntil", nil)
 			player:SetAttribute("ArenaDropFocus", nil)

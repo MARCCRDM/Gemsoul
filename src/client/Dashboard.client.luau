@@ -40,7 +40,7 @@ local function launch(action)
 	InventoryScreen.cancelDrag()
 	action()
 end
-local W, H = 1432, 606
+local W, H = 1432, 694
 
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false)

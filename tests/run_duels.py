@@ -9,6 +9,8 @@ def module(name, path):
     return f'local {name}=(function()\n{source}\nend)()\n'
 
 source = read('tests/duels_services.luau')
+source += module('MinerRoster', 'src/shared/MinerRoster.luau')
+source += 'PlayerData.selectMiner = function(p, index) return MinerRoster.switch(profiles[p], index) end\n'
 source += module('PvPRules', 'src/shared/PvPRules.luau')
 source += module('GearPresets', 'src/shared/GearPresets.luau')
 source += module('Matchmaking', 'src/shared/Matchmaking.luau')

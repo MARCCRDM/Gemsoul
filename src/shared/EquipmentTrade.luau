@@ -1,6 +1,7 @@
 -- Non-yielding two-item exchange. Item rolls travel with the item; socketed
 -- gems go back to their owner's bag (gear changes hands with an empty socket).
 local Slots = require(script.Parent.EquipmentSlots)
+local MinerRoster = require(script.Parent.MinerRoster)
 local Trade = {}
 local function copy(value)
 	if type(value) ~= "table" then
@@ -37,6 +38,8 @@ function Trade.item(profile, slot, id)
 	if not profile or not def or type(id) ~= "string" then
 		return nil
 	end
+	local owner = MinerRoster.owner(profile, slot, id)
+	if owner and owner ~= profile.Miners.Active then return nil end
 	local quality = profile.Owned[def.Kind] and profile.Owned[def.Kind][id]
 	if not quality then
 		return nil
