@@ -387,8 +387,8 @@ local function restartTutorial(player)
 	if not profile then
 		return reply(false, "Your profile is still loading.")
 	end
-	if player:GetAttribute("MatchId") or player:GetAttribute("Expedition") then
-		return reply(false, "Leave your match or expedition first.")
+	if player:GetAttribute("MatchId") or player:GetAttribute("Expedition") or player:GetAttribute("DuelQueue") then
+		return reply(false, "Leave your match, expedition or matchmaking queue first.")
 	end
 	local occupied = 0
 	for _, slot in { "Armor", "Weapon", "Shield", "Surge1", "Surge2", "Surge3" } do

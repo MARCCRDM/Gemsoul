@@ -59,7 +59,7 @@ status.TextColor3 = Color3.fromRGB(255, 210, 126)
 status.TextWrapped = true
 status.TextSize = 12
 status.Font = Enum.Font.GothamBold
-status.Text = "OWNER TOOLS · DUNGEON TESTS GIVE NO REWARDS"
+status.Text = "Replay onboarding below. Saved progress is kept."
 status.Parent = panel
 
 -- Touch screens: the bottom-right corner is the thumb's (Combat's buttons),
@@ -103,6 +103,22 @@ local function run(action: string, ...)
 	busy = false
 end
 
+-- Keep onboarding replay first and visually separate from destructive-looking rerolls.
+local restart = Instance.new("TextButton")
+restart.Name = "RestartIntroTutorial"
+restart.Size = UDim2.fromOffset(288, 34)
+restart.Position = UDim2.fromOffset(6, 44)
+restart.BackgroundColor3 = Color3.fromRGB(255, 210, 126)
+restart.TextColor3 = Color3.fromRGB(17, 25, 36)
+restart.Font = Enum.Font.GothamBold
+restart.TextSize = 12
+restart.Text = "RESTART INTRO / TUTORIAL"
+restart.Parent = panel
+corner(restart, 5)
+restart.Activated:Connect(function()
+	run("AdminRestartTutorial")
+end)
+
 local buttons = {
 	{ "F7 / PATHWAY", "DungeonTest", "Full" },
 	{ "F8 / TUNG TUNG", "DungeonTest", "Sahur" },
@@ -110,13 +126,12 @@ local buttons = {
 	{ "EXIT TEST", "ArenaLeave" },
 	{ "REGENERATE LOADOUT", "AdminRegenerateEquipment" },
 	{ "REROLL 3 GEMS", "AdminRegenerateGems" },
-	{ "RESTART INTRO / TUTORIAL", "AdminRestartTutorial" },
 }
 for i, item in buttons do
 	local b = Instance.new("TextButton")
 	local wide = i >= 3
 	b.Size = UDim2.fromOffset(if wide then 288 else 141, 26)
-	b.Position = UDim2.fromOffset(if i == 2 then 153 else 6, if i <= 2 then 44 else 44 + (i - 2) * 32)
+	b.Position = UDim2.fromOffset(if i == 2 then 153 else 6, if i <= 2 then 84 else 84 + (i - 2) * 32)
 	b.BackgroundColor3 = if i >= 5 then Color3.fromRGB(70, 46, 84) else Color3.fromRGB(39, 61, 79)
 	b.TextColor3 = Color3.fromRGB(240, 245, 250)
 	b.Font = Enum.Font.GothamBold
