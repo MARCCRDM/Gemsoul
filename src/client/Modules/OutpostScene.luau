@@ -144,8 +144,9 @@ local hud = UiKit.gui("OutpostHud", 5)
 hud.IgnoreGuiInset = false
 hud.Enabled = false
 local card = new("Frame", {
+	Name = "PickStatus",
 	Position = UDim2.fromOffset(12, 12),
-	Size = UDim2.fromOffset(300, 100),
+	Size = UDim2.fromOffset(300, 44),
 	BackgroundColor3 = Color3.fromRGB(14, 18, 30),
 	BackgroundTransparency = 0.12,
 }, hud)
@@ -165,8 +166,14 @@ local function text(parent, value, size, color, font, x, y, w, h, align)
 	}, parent)
 	return l
 end
-local pickName = text(card, "Survey Pick", 15, Color3.new(1, 1, 1), IronUi.Bold, 14, 8, 170, 18)
-local pickSwings = text(card, "60 swings", 13, P.Gold, IronUi.Bold, 186, 8, 100, 18, Enum.TextXAlignment.Right)
+local pickName = text(card, "Survey Pick", 13, P.Text, IronUi.Bold, 14, 8, 152, 18)
+local pickSwings = text(card, "60 swings", 12, P.Gold, IronUi.Bold, 168, 8, 88, 18, Enum.TextXAlignment.Right)
+local expandLabel = text(card, "+", 20, P.Dim, IronUi.Bold, 264, 5, 24, 24, Enum.TextXAlignment.Center)
+local togglePick = new("TextButton", {
+	Name = "TogglePickDetails", Text = "", BackgroundTransparency = 1,
+	Size = UDim2.new(1, 0, 0, 44), ZIndex = 5,
+}, card)
+togglePick:SetAttribute("UiSound", "Tab")
 local track = new("Frame", {
 	Position = UDim2.fromOffset(14, 30),
 	Size = UDim2.fromOffset(272, 8),
@@ -178,6 +185,7 @@ UiKit.round(fill, 4)
 -- The free pick's charge, always shown (with the free pick in hand it is
 -- the pick's bar too).
 local charge = ChargeMeter.new(card, 14, 46, 272)
+charge.Frame.Visible = false
 local findsLabel = text(card, "", 13, Color3.fromRGB(215, 228, 245), IronUi.Bold, 14, 144, 272, 18)
 local recordLabel = text(card, "", 11, Color3.fromRGB(150, 170, 195), IronUi.Body, 14, 164, 272, 14)
 local buttons = new("Frame", {
@@ -209,15 +217,61 @@ hint.Visible = not UserInputService.TouchEnabled
 -- with the CHAT button just under it (MobileLayout), and it steps
 -- aside while the chat is open over that corner.
 local cardScale = new("UIScale", { Scale = 1 }, card)
+local expanded = false
+local collapseAt = 0
+local blockingScreens = {
+	Dashboard = true, Shop = true, Season = true, AugmentTree = true,
+	SurgeArray = true, Social = true, ProbeExchange = true, WelcomeBundle = true,
+	Intro = true, Tutorial = true, MarketBoard = true,
+}
+local openScreens = {}
 local function fitOutpostHud()
 	local size = hud.AbsoluteSize
 	local mobile = UserInputService.TouchEnabled or size.Y < 540
-	card.Size = UDim2.fromOffset(math.min(300, math.max(240, size.X - 24)), 100)
-	cardScale.Scale = if mobile then MobileLayout.CardScale else 1
-	card.Visible = not (mobile and player:GetAttribute("ChatOpen") == true)
+	local blocked = next(openScreens) ~= nil or player:GetAttribute("CombatSession") ~= nil
+		or (mobile and player:GetAttribute("ChatOpen") == true)
+	if blocked or not hud.Enabled then expanded = false end
+	card.Size = UDim2.fromOffset(300, if expanded then 100 elseif mobile then 64 else 44)
+	togglePick.Size = UDim2.fromScale(1, 1)
+	track.Position = UDim2.fromOffset(14, if mobile and not expanded then 48 else 30)
+	-- Keep the contents at their designed width; scale the whole card on narrow screens.
+	cardScale.Scale = math.min(if mobile then MobileLayout.CardScale else 1, math.max(0.1, (size.X - 24) / 300))
+	card.Visible = not blocked
+	hint.Visible = not blocked and not UserInputService.TouchEnabled
+	charge.Frame.Visible = expanded
+	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")
+	expandLabel.Text = if expanded then "−" else "+"
 end
+togglePick.Activated:Connect(function()
+	expanded = not expanded
+	collapseAt = os.clock() + 8
+	fitOutpostHud()
+end)
+-- Watch ScreenGui state directly: opening Inventory must hide the world HUD
+-- immediately, even though the player is still physically in the Outpost.
+local function watchScreen(screen)
+	if not screen:IsA("ScreenGui") or (not blockingScreens[screen.Name] and screen.Name ~= "TrainingRewards") then return end
+	local function update()
+		local modal = screen.Name ~= "TrainingRewards" or screen:GetAttribute("BlocksMiningHud") == true
+		openScreens[screen] = if screen.Parent and screen.Enabled and modal then true else nil
+		fitOutpostHud()
+	end
+	local connection = screen:GetPropertyChangedSignal("Enabled"):Connect(update)
+	local modalConnection = screen:GetAttributeChangedSignal("BlocksMiningHud"):Connect(update)
+	screen.Destroying:Once(function()
+		connection:Disconnect()
+		modalConnection:Disconnect()
+		openScreens[screen] = nil
+		fitOutpostHud()
+	end)
+	update()
+end
+player.PlayerGui.ChildAdded:Connect(watchScreen)
+for _, screen in player.PlayerGui:GetChildren() do watchScreen(screen) end
+hud:GetPropertyChangedSignal("Enabled"):Connect(fitOutpostHud)
 hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitOutpostHud)
 player:GetAttributeChangedSignal("ChatOpen"):Connect(fitOutpostHud)
+player:GetAttributeChangedSignal("CombatSession"):Connect(fitOutpostHud)
 fitOutpostHud()
 
 -- The free pick's charge ticks up between server updates.
@@ -233,6 +287,8 @@ local function refreshCharge()
 	if state.Active == "Survey" then
 		pickSwings.Text = if swings > 0 then swings .. " swings" else "RECHARGING"
 		pickSwings.TextColor3 = if swings > 0 then ChargeMeter.Charging else P.Bad
+		fill.Size = UDim2.fromScale(math.clamp(swings / ChargeMeter.Full, 0, 1), 1)
+		fill.BackgroundColor3 = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
 	end
 end
 
@@ -248,7 +304,7 @@ local function refreshHud()
 	pickSwings.Text = if left > 0 then left .. " swings" else "BROKEN"
 	pickSwings.TextColor3 = if left > 0 then P.Gold else Color3.fromRGB(255, 90, 90)
 	-- A bought pick wears out; the free one is the charge meter below.
-	track.Visible = not free
+	track.Visible = not expanded or not free
 	fill.Size = UDim2.fromScale(math.clamp(left / spec.Swings, 0, 1), 1)
 	fill.BackgroundColor3 = if left / spec.Swings > 0.3 then spec.Color else Color3.fromRGB(255, 110, 90)
 	refreshCharge()
@@ -1240,6 +1296,10 @@ task.spawn(function()
 		task.wait(1)
 		if active then
 			refreshCharge()
+			if expanded and os.clock() >= collapseAt then
+				expanded = false
+				fitOutpostHud()
+			end
 		end
 	end
 end)

@@ -37,6 +37,9 @@ local launch=button(gui,"",UDim2.new(1,-16,0,150),UDim2.fromOffset(240,94));laun
 stroke(launch,cyan,.65)
 gradient(launch,Color3.fromRGB(27,47,61),Color3.fromRGB(14,24,38))
 local shade=button(gui,"",UDim2.new(),UDim2.fromScale(1,1));shade.BackgroundColor3=Color3.new();shade.BackgroundTransparency=.25;shade.Visible=false;shade.AutoButtonColor=false
+shade:GetPropertyChangedSignal("Visible"):Connect(function()
+ gui:SetAttribute("BlocksMiningHud",shade.Visible)
+end)
 local panel=new("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(720,620),BackgroundColor3=Color3.fromRGB(12,19,30),BorderSizePixel=0},shade);UiKit.round(panel,14)
 stroke(panel,Color3.fromRGB(94,132,162),.5)
 gradient(panel,Color3.fromRGB(255,255,255),Color3.fromRGB(205,218,235))
