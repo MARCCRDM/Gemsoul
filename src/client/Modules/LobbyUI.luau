@@ -596,6 +596,48 @@ task.defer(refreshNews)
 local function fitDock()
 	local size = gui.AbsoluteSize
 	local mobile = game:GetService("UserInputService").TouchEnabled or size.Y < 540
+	local count = 0
+	for _, button in tiles:GetChildren() do
+		if button:IsA("TextButton") then
+			count += 1
+		end
+	end
+	if mobile then
+		-- Phones: the old bottom dock. PLAY centred above one row of short
+		-- buttons with the name in the middle; no side panels.
+		local compact = MobileLayout.dock(size, count)
+		local width, gap, tileHeight = compact.W, compact.Gap, compact.TileHeight
+		bar.AnchorPoint = Vector2.new(0.5, 1)
+		bar.Position = UDim2.new(0.5, 0, 1, -12)
+		bar.Size = UDim2.fromOffset(width, 44 + 8 + tileHeight)
+		play.AnchorPoint = Vector2.new(0.5, 0)
+		play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(math.min(220, width), 44)
+		playCaption.TextSize = 22
+		modes.Visible, status.Visible, news.Visible = false, false, false
+		tileList.FillDirection = Enum.FillDirection.Horizontal
+		tileList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		tileList.Padding = UDim.new(0, gap)
+		tiles.AnchorPoint = Vector2.new(0.5, 0)
+		tiles.Position, tiles.Size = UDim2.new(0.5, 0, 0, 52), UDim2.fromOffset(width, tileHeight)
+		local tileWidth = math.floor((width - gap * math.max(0, count - 1)) / math.max(1, count))
+		for _, button in tiles:GetChildren() do
+			if button:IsA("TextButton") then
+				button.Size = UDim2.fromOffset(tileWidth, tileHeight)
+				for _, child in button:GetChildren() do
+					if child:IsA("TextLabel") and child.Text ~= "›" then
+						child.TextSize = 11
+						child.AnchorPoint = Vector2.new(0.5, 0.5)
+						child.Position = UDim2.fromScale(0.5, 0.5)
+						child.Size = UDim2.new(1, -6, 1, 0)
+						child.TextXAlignment = Enum.TextXAlignment.Center
+					elseif child:IsA("GuiObject") then
+						child.Visible = false
+					end
+				end
+			end
+		end
+		return
+	end
 	-- Phones: shorter rows, narrower stack, the news shrinks to the daily strip.
 	local width = if mobile then math.min(230, math.floor(size.X * 0.3)) else STACK_W
 	local playHeight = if mobile then 48 else 66
