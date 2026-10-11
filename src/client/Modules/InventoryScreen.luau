@@ -558,13 +558,16 @@ local function wornCard(slot: string, column: number, row: number)
 	local socketIcon = label(socket, "+", 12, C.Faint, BOLD)
 	socketIcon.Size = UDim2.fromScale(1, 1)
 	socketIcon.TextXAlignment = Enum.TextXAlignment.Center
-	-- Tap a piece to choose a replacement (the ARMOR tab, filtered to this
-	-- slot); DETAILS opens its details.
+	-- Tap a slot to open its window (ARMOR / GEMS, filtered to this slot).
+	-- It opens where the slot needs work: an empty slot on ARMOR, a piece
+	-- with an empty socket on GEMS, a full slot on ARMOR to swap the piece.
 	hit.Activated:Connect(function()
 		if os.clock() >= suppressClickUntil then
+			local loadout = loadoutNow()
 			selection = nil
 			contextSlot, contextKey = slot, nil
-			tab, armorFilter, gemFilter = "Gems", slot, "All"
+			armorFilter, gemFilter = slot, "All"
+			tab = if loadout[slot] ~= nil and loadout[slot .. "Gem"] == nil then "Gems" else "Armor"
 			draw()
 		end
 	end)
@@ -1337,6 +1340,11 @@ local function drawArmor()
 			equip:SetAttribute("UiSound", "Confirm")
 			equip.Activated:Connect(function()
 				request("EquipGear", Slots.Definitions[item.Slot].Kind, item.Id)
+				-- A fresh piece with an empty socket: straight on to its gem.
+				if contextSlot == item.Slot and loadoutNow()[item.Slot .. "Gem"] == nil then
+					tab, selection = "Gems", nil
+					draw()
+				end
 			end)
 		end
 	end
@@ -2283,14 +2291,20 @@ local function drawTabs()
 	local spare = #spareItems()
 	local gems = #(profile and profile.Gems or {})
 	contextTitle.Text = if contextKey then "SURGE / " .. contextKey elseif contextSlot then "LOADOUT / " .. SLOT_LABEL[contextSlot] else "SHARED STASH"
-	local key = string.format("%s|%d|%d|%s|%s", tab, spare, gems, contextSlot or "", contextKey or "")
+	local worn = loadoutNow()
+	local key = string.format("%s|%d|%d|%s|%s|%s|%s", tab, spare, gems, contextSlot or "", contextKey or "",
+		tostring(contextSlot and worn[contextSlot]), tostring(contextSlot and worn[contextSlot .. "Gem"]))
 	if key == tabsKey then
 		return
 	end
 	tabsKey = key
 	clear(tabHolder)
 	local entries = if contextKey then { { "Gems", "SURGE GEMS" }, { "Overview", "EQUIPPED SURGE" } }
-		elseif contextSlot then { { "Gems", "GEMS" }, { "Armor", "GEAR" }, { "Overview", "EQUIPPED" } }
+		elseif contextSlot then {
+			{ "Armor", if loadoutNow()[contextSlot] == nil then "ARMOR  •" else "ARMOR" },
+			{ "Gems", if loadoutNow()[contextSlot] ~= nil and loadoutNow()[contextSlot .. "Gem"] == nil then "GEMS  •" else "GEMS" },
+			{ "Overview", "EQUIPPED" },
+		}
 		else { { "Overview", "LOADOUT" }, { "Armor", "GEAR " .. spare }, { "Gems", "GEMS " .. gems } }
 	IronUi.tabs(
 		tabHolder,
