@@ -305,15 +305,15 @@ local modalDismiss = new("TextButton", {
 	Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0),
 	BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), ZIndex = 1,
 }, inventoryModal)
+-- The inventory is docked on the right, always open: no dimmer behind it.
 right.Parent = inventoryModal
-right.AnchorPoint = Vector2.new(0.5, 0.5)
-right.Position = UDim2.new(0.5, 0, 0, PANEL_H / 2)
 right.ZIndex = 2
+modalDismiss.Visible = false
 
 -- Selection and drag state.
 type Pick = { Kind: string, Slot: string?, Id: string?, Gem: any?, Key: string? }
 local selection: Pick? = nil
-local tab = "Overview"
+local tab = "Gems"
 local armorFilter = "All"
 local gemFilter = "All"
 local contextSlot: string? = nil
@@ -637,12 +637,10 @@ wornCard("Shield", 2, 2)
 
 -- The Armory: gear flanks the miner, worn-side by side. Head, chest and
 -- hands on the left; sword, shield and feet on the right.
-local ARMORY_RIGHT_X = W - 18 - CELL_W
-local ARMORY_SIDE = { Helmet = { 1, 1 }, Armor = { 1, 2 }, Gloves = { 1, 3 }, Weapon = { 2, 1 }, Shield = { 2, 2 }, Boots = { 2, 3 } }
+local ARMORY_ROW = { Helmet = 1, Armor = 2, Gloves = 3, Boots = 4, Weapon = 5, Shield = 6 }
 for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
 	local card = wornCards[slot]
-	local side = ARMORY_SIDE[slot]
-	at(card.Cell, if side[1] == 1 then 18 else ARMORY_RIGHT_X, BODY_Y + (side[2] - 1) * 90, CELL_W, 84)
+	at(card.Cell, 18, BODY_Y + (ARMORY_ROW[slot] - 1) * 88, CELL_W, 84)
 	card.Cell:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 8)
 	card.Rail = box(card.Cell, C.PanelEdge, 0)
 	at(card.Rail, 0, 0, 3, 84)
@@ -825,13 +823,13 @@ contextClose.Activated:Connect(function()
 		return
 	end
 	contextSlot, contextKey, selection = nil, nil, nil
-	tab, armorFilter = "Overview", "All"
+	tab, armorFilter = "Gems", "All"
 	draw()
 end)
 local function closeInventoryPicker()
 	InventoryScreen.cancelDrag()
 	contextSlot, contextKey, selection = nil, nil, nil
-	tab, armorFilter = "Overview", "All"
+	tab, armorFilter = "Gems", "All"
 	draw()
 end
 modalDismiss.Activated:Connect(closeInventoryPicker)
@@ -2014,7 +2012,7 @@ for order, spec in
 			true,
 			function()
 				selection = nil
-				tab = "Overview"
+				tab = "Gems"
 				draw()
 			end,
 		},
@@ -2299,13 +2297,13 @@ local function drawTabs()
 	end
 	tabsKey = key
 	clear(tabHolder)
-	local entries = if contextKey then { { "Gems", "SURGE GEMS" }, { "Overview", "EQUIPPED SURGE" } }
+	-- Two tabs only. With a slot picked, a dot marks the one it still needs.
+	local entries = if contextKey then { { "Gems", "SURGE GEMS" } }
 		elseif contextSlot then {
-			{ "Armor", if loadoutNow()[contextSlot] == nil then "ARMOR  •" else "ARMOR" },
 			{ "Gems", if loadoutNow()[contextSlot] ~= nil and loadoutNow()[contextSlot .. "Gem"] == nil then "GEMS  •" else "GEMS" },
-			{ "Overview", "EQUIPPED" },
+			{ "Armor", if loadoutNow()[contextSlot] == nil then "ARMOR  •" else "ARMOR" },
 		}
-		else { { "Overview", "LOADOUT" }, { "Armor", "GEAR " .. spare }, { "Gems", "GEMS " .. gems } }
+		else { { "Gems", "GEMS " .. gems }, { "Armor", "ARMOR " .. spare } }
 	IronUi.tabs(
 		tabHolder,
 		entries,
@@ -2326,18 +2324,22 @@ local function drawRight()
  if require(ReplicatedStorage.Shared.Tutorial).Enabled and profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
   tab, gemFilter = "Gems", "All"
  end
-	local drawerOpen = contextSlot ~= nil or contextKey ~= nil or tab ~= "Overview"
-	inventoryModal.Visible = drawerOpen
-	right.Visible = drawerOpen
-	-- The Armory: the stage between the two gear columns, Q/E/R under it.
-	local stageWidth = ARMORY_RIGHT_X - 12 - MID_X
+	if tab == "Overview" then
+		tab = "Gems"
+	end
+	inventoryModal.Visible = true
+	right.Visible = true
+	contextClose.Visible = contextSlot ~= nil or contextKey ~= nil or selection ~= nil
+	pickerClose.Visible = contextSlot ~= nil or contextKey ~= nil
+	-- Gear down the left, the miner in the middle, the inventory on the right.
+	local stageWidth = RIGHT_X - 12 - MID_X
 	left.Size = UDim2.fromOffset(W, PANEL_H)
-	at(portrait, MID_X, BODY_Y, stageWidth, 360)
+	at(portrait, MID_X, BODY_Y, stageWidth, 318)
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
 	at(surgeCell, MID_X, BODY_Y + 366, stageWidth, 144)
 	at(setSummary, MID_X, BODY_Y + 514, stageWidth, 28)
 	-- Scouting sits under the right-hand stats.
-	at(scouting, ARMORY_RIGHT_X, BODY_Y + 3 * 90 + 8 + 3 * 48 + 2, CELL_W, PANEL_H - (BODY_Y + 3 * 90 + 8 + 3 * 48 + 2))
+	scouting.Visible = false
 	scoutReveal.Position, scoutMix.Position, scoutTip.Position =
 		UDim2.fromOffset(10, 26), UDim2.fromOffset(10, 52), UDim2.fromOffset(10, 76)
 	scoutReveal.Size, scoutMix.Size, scoutTip.Size =
@@ -2362,16 +2364,27 @@ local function drawRight()
 		at(ui.Info, 8, 92, surgeWidth - 16, 16)
 		ui.Info.TextWrapped = true
 	end
-	-- Stats under the gear columns: body stats left, the build's totals right.
-	local statWidth = CELL_W
+	-- Stats: a compact strip between the stage and the surges.
+	local statWidth = math.floor((stageWidth - 5 * 4) / 6)
 	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		local tile = statTiles[name]
-		local column, row = if index <= 3 then 1 else 2, (index - 1) % 3
-		at(tile.Tile, if column == 1 then 18 else ARMORY_RIGHT_X, BODY_Y + 3 * 90 + 8 + row * 48, statWidth, 44)
-		tile.Value.Size = UDim2.fromOffset(statWidth - 16, 22)
+		at(tile.Tile, MID_X + (index - 1) * (statWidth + 4), BODY_Y + 324, statWidth, 36)
+		tile.Tile.BackgroundTransparency = 0.25
+		tile.Tile.ZIndex = 5
+		for _, child in tile.Tile:GetDescendants() do
+			if child:IsA("GuiObject") then
+				child.ZIndex = 6
+			end
+		end
+		local name = tile.Tile:FindFirstChildOfClass("TextLabel")
+		if name then
+			at(name, 8, 3, statWidth - 12, 10)
+			name.TextSize = 8
+		end
+		at(tile.Value, 8, 14, statWidth - 12, 18)
+		tile.Value.TextSize = 15
 		tile.Bonus.Visible = false
-		local track = tile.Fill.Parent
-		at(track, 10, 38, statWidth - 20, 3)
+		tile.Fill.Parent.Visible = false
 	end
 	drawTabs()
 	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
@@ -2409,7 +2422,7 @@ local function visible(): boolean
 end
 local fxElapsed = 0
 game:GetService("RunService").Heartbeat:Connect(function(dt)
-	if not visible() or inventoryModal.Visible then return end
+	if not visible() then return end
 	fxElapsed += dt
 	if fxElapsed < 1 / 30 then return end
 	fxElapsed = 0
