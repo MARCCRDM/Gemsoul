@@ -32,7 +32,13 @@ end
 -- The tutorial (Shared.Tutorial) replaces the starter picker: the server
 -- hands out the kit and Tutorial.client takes it from here.
 if Tutorial.Enabled then
-	GemClient.request("TutorialBegin")
+	-- Retried until the server has the profile (a slow load must not strand you).
+	for attempt = 1, 20 do
+		if GemClient.request("TutorialBegin").Ok then
+			break
+		end
+		task.wait(math.min(attempt, 3))
+	end
 	return
 end
 local new = IronUi.new
