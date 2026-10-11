@@ -1,151 +1,123 @@
--- Pooled elemental border layers. Geometry is clipped to the card and
--- kept at its edges; no image upload or per-frame instance allocation.
+-- Hand-shaped, corner-localized elemental filaments; no tiled border shapes.
 local FX = {}
 local colors = require(game:GetService("ReplicatedStorage").Shared.GemConfig).ElementColors
-
-local function shape(parent)
- local part = Instance.new("Frame")
- part.BorderSizePixel = 0
- part.AnchorPoint = Vector2.new(0.5, 0.5)
- part.Active = false
- part.Parent = parent
- return part
+local function frame(parent)
+ local f=Instance.new("Frame")
+ f.BorderSizePixel=0
+ f.AnchorPoint=Vector2.new(0.5,0.5)
+ f.Active=false
+ f.BackgroundTransparency=1
+ f.Parent=parent
+ return f
 end
-local function round(part, amount)
- local corner = Instance.new("UICorner")
- corner.CornerRadius = UDim.new(amount, 0)
- corner.Parent = part
- return corner
+local function segment(f,a,b,width,color,opacity)
+ local delta=b-a
+ f.Position=UDim2.fromOffset((a.X+b.X)*0.5,(a.Y+b.Y)*0.5)
+ f.Size=UDim2.fromOffset(delta.Magnitude+0.3,width)
+ f.Rotation=math.deg(math.atan2(delta.Y,delta.X))
+ f.BackgroundColor3=color
+ f.BackgroundTransparency=1-opacity
+ f.Visible=true
 end
-local function line(part, a, b, width)
- local delta = b - a
- part.Position = UDim2.fromOffset((a.X + b.X)/2, (a.Y + b.Y)/2)
- part.Size = UDim2.fromOffset(delta.Magnitude, width)
- part.Rotation = math.deg(math.atan2(delta.Y, delta.X))
-end
-
-function FX.create(card: GuiObject, _gemWell: GuiObject)
- local layer = shape(card)
- layer.Name = "ElementalBorderLayer"
- layer.Position = UDim2.fromScale(0.5, 0.5)
- layer.Size = UDim2.fromScale(1, 1)
- layer.BackgroundTransparency = 1
- layer.ClipsDescendants = true
- layer.ZIndex = 2
- layer.Visible = false
- round(layer, 0.08)
- local washes = {}
- for index = 1, 4 do
-  local wash = shape(layer)
-  local horizontal = index <= 2
-  wash.Size = if horizontal then UDim2.new(1,0,0,17) else UDim2.new(0,17,1,0)
-  wash.Position = if horizontal then UDim2.fromScale(0.5, if index == 1 then 0 else 1) else UDim2.fromScale(if index == 3 then 0 else 1,0.5)
-  local gradient = Instance.new("UIGradient")
-  gradient.Rotation = if horizontal then 90 else 0
-  gradient.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(0.5,0), NumberSequenceKeypoint.new(1,1)})
-  gradient.Parent = wash
-  washes[index] = wash
+function FX.create(card: GuiObject,_gemWell: GuiObject)
+ local layer=frame(card)
+ layer.Name="ElementalCornerFX"
+ layer.Position=UDim2.fromScale(0.5,0.5)
+ layer.Size=UDim2.fromScale(1,1)
+ layer.ClipsDescendants=true
+ layer.ZIndex=2
+ layer.Visible=false
+ local lines={}
+ for i=1,64 do
+  local halo,core=frame(layer),frame(layer)
+  for _,part in {halo,core} do
+   local corner=Instance.new("UICorner")
+   corner.CornerRadius=UDim.new(1,0)
+   corner.Parent=part
+   part.Visible=false
+  end
+  lines[i]={Halo=halo,Core=core}
  end
- local shapes = {}
- for index = 1, 18 do
-  local body = shape(layer)
-  local corner = round(body, 0)
-  local gradient = Instance.new("UIGradient")
-  gradient.Rotation = 90
-  gradient.Parent = body
-  local core = shape(layer)
-  local coreCorner = round(core, 0)
-  shapes[index] = { Body=body, Core=core, Corner=corner, CoreCorner=coreCorner, Gradient=gradient }
- end
- return { Layer=layer, Washes=washes, Shapes=shapes }
+ return {Layer=layer,Lines=lines,Used=0}
 end
-
-function FX.update(effect, element, time)
- local color = colors[element]
- effect.Layer.Visible = color ~= nil
- if not color then return end
- -- Use local offsets: ancestor UIScale handles screen/mobile sizing.
- local card = effect.Layer.Parent
- local width, height = card.Size.X.Offset, card.Size.Y.Offset
- if width <= 0 or height <= 0 then return end
- local thermal = element == "Fire"
- local frost = element == "Frost"
- local ion = element == "Shock"
- local accent = if thermal then Color3.fromRGB(255,116,32) elseif frost then Color3.fromRGB(108,218,255) else color
- for _, wash in effect.Washes do
-  wash.BackgroundColor3 = accent
-  wash.BackgroundTransparency = 0.48 + math.sin(time * 1.7) * 0.06
+function FX.update(effect,element,time)
+ local tint=colors[element]
+ effect.Layer.Visible=tint~=nil
+ if not tint then return end
+ local card=effect.Layer.Parent
+ local w,h=card.Size.X.Offset,card.Size.Y.Offset
+ if w<=0 or h<=0 then return end
+ local count=0
+ local function draw(a,b,width,color,alpha)
+  count+=1
+  local item=effect.Lines[count]
+  if not item then return end
+  segment(item.Halo,a,b,width+3,color,alpha*0.12)
+  segment(item.Core,a,b,width,color,alpha)
  end
- for index, piece in effect.Shapes do
-  local body, core = piece.Body, piece.Core
-  local wave = 0.5 + 0.5 * math.sin(time * 2.4 + index * 1.93)
-  local bottom = index % 2 == 0
-  local x = ((index - 1) / 18 + 0.025) * width
-  body.BackgroundColor3 = accent
-  core.BackgroundColor3 = accent:Lerp(Color3.new(1,1,1),0.65)
-  piece.Gradient.Transparency = NumberSequence.new(0)
-  piece.Corner.CornerRadius = UDim.new(0,0)
-  piece.CoreCorner.CornerRadius = UDim.new(0,0)
-  core.Visible = true
-  if thermal then
-   -- Overlapping flame tongues, warm cores, tapered/fading tips.
-   local size = 9 + wave * 15
-   body.Position = UDim2.fromOffset(x + math.sin(time*2+index)*3, if bottom then height+6 else -6)
-   body.Size = UDim2.fromOffset(7 + wave*5,size)
-   body.Rotation = math.sin(time*3+index)*18
-   piece.Corner.CornerRadius = UDim.new(0.5,0)
-   piece.Gradient.Transparency = if bottom then NumberSequence.new(1,0.05) else NumberSequence.new(0.05,1)
-   body.BackgroundTransparency = 0.23
-   core.Size = UDim2.fromOffset(3+wave*3,size*0.48)
-   core.Position = body.Position
-   core.Rotation = body.Rotation
-   piece.CoreCorner.CornerRadius = UDim.new(0.5,0)
-   core.BackgroundColor3 = Color3.fromRGB(255,218,102)
-   core.BackgroundTransparency = 0.28
-  elseif ion then
-   -- Two continuous zigzag arcs with branches at the border.
-   local segment = math.floor((index-1)/2)
-   local tick = math.floor(time*7)
-   local function point(n)
-    local jitter = 2 + (math.sin(n*17.1+tick*0.8)*0.5+0.5)*6
-    return Vector2.new(n*width/9, if bottom then height-jitter else jitter)
+ local function mirror(p,side)
+  return if side==1 then p else Vector2.new(w-p.X,h-p.Y)
+ end
+ if element=="Frost" then
+  -- Sparse dendritic frost grows along opposite edges, with needle branches.
+  local ice=Color3.fromRGB(164,229,246)
+  for side=1,2 do
+   local base=Vector2.new(3,9)
+   for j=1,5 do
+    local nextPoint=Vector2.new(3+(j%2)*1.5,9+j*6)
+    draw(mirror(base,side),mirror(nextPoint,side),0.9,ice,0.52)
+    local branch=Vector2.new(8, nextPoint.Y-4)
+    draw(mirror(nextPoint,side),mirror(branch,side),0.6,ice,0.30+0.12*math.sin(time+ j))
+    base=nextPoint
    end
-   local a,b = point(segment), point(segment+1)
-   line(body,a,b,2)
-   if index % 3 == 0 then
-    local middle = (a+b)*0.5
-    line(core,middle,middle+Vector2.new(7,if bottom then -4 else 4),1)
-   else
-    line(core,a,b,0.8)
+   -- One fine crystal vein across the corner, not a sawtooth tile.
+   draw(mirror(Vector2.new(5,3),side),mirror(Vector2.new(31,3),side),0.7,ice,0.45)
+   draw(mirror(Vector2.new(18,3),side),mirror(Vector2.new(23,7),side),0.6,ice,0.3)
+  end
+ elseif element=="Shock" then
+  -- Short asymmetric arcs, a persistent warm glow and restrained moving forks.
+  local tick=math.floor(time*5)
+  local electric=Color3.fromRGB(255,226,116)
+  for side=1,2 do
+   local prev=Vector2.new(4,8)
+   for j=1,9 do
+    local p=Vector2.new(3+((math.sin(j*19+tick)*0.5+0.5)*4),8+j*(h-21)/9)
+    draw(mirror(prev,side),mirror(p,side),0.85,electric,0.40+0.12*math.sin(time*3+j))
+    if j==3 or j==7 then
+     draw(mirror(p,side),mirror(Vector2.new(10,p.Y-3),side),0.5,electric,0.35)
+    end
+    prev=p
    end
-   body.BackgroundTransparency = 0.3 + wave*0.25
-   core.BackgroundTransparency = 0.2 + wave*0.25
-  elseif frost then
-   -- Faceted crystal teeth grow inward from an icy rim.
-   local size = 7 + (index%4)*3
-   body.Size = UDim2.fromOffset(size,size)
-   body.Position = UDim2.fromOffset(x, if bottom then height-1 else 1)
-   body.Rotation = 45
-   body.BackgroundTransparency = 0.45
-   piece.Gradient.Transparency = NumberSequence.new(0.65,0.05)
-   core.Size = UDim2.fromOffset(1,size*1.7)
-   core.Position = body.Position
-   core.Rotation = 45
-   core.BackgroundTransparency = 0.35 + wave*0.4
-  else
-   -- Slow, overlapping corrosive vapor with small bright bubble cores.
-   local size = 17 + wave*18
-   piece.Corner.CornerRadius = UDim.new(1,0)
-   body.Size = UDim2.fromOffset(size*1.6,size)
-   body.Position = UDim2.fromOffset(x+math.sin(time*0.8+index)*6, if bottom then height+3 else -3)
-   body.Rotation = 0
-   body.BackgroundTransparency = 0.82
-   core.Size = UDim2.fromOffset(3,3)
-   core.Position = UDim2.fromOffset(x, if bottom then height-wave*8 else wave*8)
-   core.Rotation = 0
-   piece.CoreCorner.CornerRadius = UDim.new(1,0)
-   core.BackgroundTransparency = 0.5 + wave*0.3
+   draw(mirror(Vector2.new(8,3),side),mirror(Vector2.new(34,3),side),0.7,electric,0.32)
+  end
+ else
+  -- Layered tapered curves suggest flame tongues / curling chemical vapor.
+  local fire=element=="Fire"
+  local outer=if fire then Color3.fromRGB(255,95,31) else Color3.fromRGB(59,191,116)
+  local inner=if fire then Color3.fromRGB(255,210,110) else Color3.fromRGB(155,227,139)
+  for side=1,2 do
+   for strand=1,3 do
+    local prev
+    for j=0,9 do
+     local t=j/9
+     local curl=math.sin(t*5-time*(if fire then 1.8 else 0.65)+strand)
+     local x=3+strand*0.6+curl*(if fire then 1.8 else 2.2)*math.sin(t*math.pi)
+     local y=h-10-strand*3-t*(h*(if fire then 0.48 else 0.6))
+     local p=mirror(Vector2.new(x,y),side)
+     if prev then
+      local alpha=(1-t)* (if fire then 0.42 else 0.19)
+      local color=outer:Lerp(inner,(1-t)*0.65)
+      draw(prev,p,math.max(0.4,(1-t)*(if fire then 2.8 else 4)),color,alpha)
+     end
+     prev=p
+    end
+   end
   end
  end
+ for i=count+1,effect.Used do
+  effect.Lines[i].Halo.Visible=false
+  effect.Lines[i].Core.Visible=false
+ end
+ effect.Used=math.min(count,#effect.Lines)
 end
 return FX
