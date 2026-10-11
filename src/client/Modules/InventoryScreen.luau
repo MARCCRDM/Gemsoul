@@ -2323,6 +2323,7 @@ end
 -- A bag page is rebuilt only when what it shows changes, and keeps its
 -- scroll position when it is.
 local pageKey, pageTab = "", ""
+local statCard: Frame? = nil
 local function drawRight()
  local profile = profileNow()
  if require(ReplicatedStorage.Shared.Tutorial).Enabled and profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
@@ -2346,57 +2347,62 @@ local function drawRight()
 	-- Gear down the left, the miner in the middle, the inventory on the right.
 	local stageWidth = RIGHT_X - 12 - MID_X
 	left.Size = UDim2.fromOffset(W, PANEL_H)
-	at(portrait, MID_X, BODY_Y, stageWidth, 318)
+	-- The miner takes the height; one stats card and slim Q/E/R under it.
+	local stageH, statsH, surgeH = 386, 30, 96
+	at(portrait, MID_X, BODY_Y, stageWidth, stageH)
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
-	at(surgeCell, MID_X, BODY_Y + 366, stageWidth, 144)
-	at(setSummary, MID_X, BODY_Y + 514, stageWidth, 28)
-	-- Scouting sits under the right-hand stats.
+	at(surgeCell, MID_X, BODY_Y + stageH + statsH + 12, stageWidth, surgeH)
+	at(setSummary, MID_X, BODY_Y + stageH + statsH + surgeH + 14, stageWidth, 20)
 	scouting.Visible = false
-	scoutReveal.Position, scoutMix.Position, scoutTip.Position =
-		UDim2.fromOffset(10, 26), UDim2.fromOffset(10, 52), UDim2.fromOffset(10, 76)
-	scoutReveal.Size, scoutMix.Size, scoutTip.Size =
-		UDim2.fromOffset(CELL_W - 20, 26), UDim2.fromOffset(CELL_W - 20, 24), UDim2.fromOffset(CELL_W - 20, 36)
-	-- Q/E/R stay visible in both the wide stage and drawer layouts.
+	-- Q/E/R: icon, name, gem and costs; the description is in its details.
 	local surgeWidth = (stageWidth - 40) / 3
 	for index, key in { "Q", "E", "R" } do
 		local ui = surgeKeys[key]
-		at(ui.Box, 12 + (index - 1) * (surgeWidth + 8), 25, surgeWidth, 112)
-		at(ui.KeyBadge, surgeWidth - 27, 7, 20, 20)
+		at(ui.Box, 12 + (index - 1) * (surgeWidth + 8), 22, surgeWidth, 66)
+		at(ui.KeyBadge, surgeWidth - 25, 5, 20, 20)
 		at(ui.Letter, 0, 0, 20, 20)
-		at(ui.IconMount, 8, 8, 48, 48)
-		at(ui.GemBadge, 64, 32, surgeWidth - 72, 22)
-		at(ui.Art, 2, 0, 28, 22)
-		at(ui.Element, 33, 0, surgeWidth - 109, 22)
-		at(ui.Name, 64, 9, surgeWidth - 96, 18)
-		at(ui.Description, 8, 61, surgeWidth - 16, 28)
-		local chipWidth = (surgeWidth - 22) / 2
-		at(ui.Charge, 8, 92, chipWidth, 16)
-		at(ui.Cooldown, 14 + chipWidth, 92, chipWidth, 16)
+		at(ui.IconMount, 7, 9, 48, 48)
+		at(ui.Name, 62, 5, surgeWidth - 92, 18)
+		at(ui.GemBadge, 62, 25, surgeWidth - 70, 18)
+		at(ui.Art, 2, 0, 24, 18)
+		at(ui.Element, 29, 0, surgeWidth - 103, 18)
+		ui.Description.Visible = false
+		local chipWidth = (surgeWidth - 76) / 2
+		at(ui.Charge, 62, 47, chipWidth, 14)
+		at(ui.Cooldown, 66 + chipWidth, 47, chipWidth, 14)
 		ui.Name.TextXAlignment = Enum.TextXAlignment.Left
-		at(ui.Info, 8, 92, surgeWidth - 16, 16)
-		ui.Info.TextWrapped = true
+		at(ui.Info, 62, 47, surgeWidth - 70, 14)
+		ui.Info.TextWrapped = false
 	end
-	-- Stats: a compact strip between the stage and the surges.
-	local statWidth = math.floor((stageWidth - 5 * 4) / 6)
+	-- Stats: one card, the six numbers in a row.
+	if not statCard then
+		statCard = box(left, C.Card, 6)
+		stroke(statCard, C.PanelEdge, 1)
+		for _, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
+			local tile = statTiles[name]
+			tile.Tile.Parent = statCard
+			tile.Tile.BackgroundTransparency = 1
+			local edge = tile.Tile:FindFirstChildOfClass("UIStroke")
+			if edge then
+				edge.Enabled = false
+			end
+			tile.Bonus.Visible = false
+			tile.Fill.Parent.Visible = false
+		end
+	end
+	at(statCard, MID_X, BODY_Y + stageH + 6, stageWidth, statsH)
+	local statWidth = math.floor(stageWidth / 6)
 	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		local tile = statTiles[name]
-		at(tile.Tile, MID_X + (index - 1) * (statWidth + 4), BODY_Y + 324, statWidth, 36)
-		tile.Tile.BackgroundTransparency = 0.25
-		tile.Tile.ZIndex = 5
-		for _, child in tile.Tile:GetDescendants() do
-			if child:IsA("GuiObject") then
-				child.ZIndex = 6
-			end
+		at(tile.Tile, (index - 1) * statWidth, 0, statWidth, statsH)
+		local caption = tile.Tile:FindFirstChildOfClass("TextLabel")
+		if caption then
+			at(caption, 10, 0, statWidth - 14, statsH)
+			caption.TextSize = 9
 		end
-		local name = tile.Tile:FindFirstChildOfClass("TextLabel")
-		if name then
-			at(name, 8, 3, statWidth - 12, 10)
-			name.TextSize = 8
-		end
-		at(tile.Value, 8, 14, statWidth - 12, 18)
+		at(tile.Value, 10, 0, statWidth - 18, statsH)
 		tile.Value.TextSize = 15
-		tile.Bonus.Visible = false
-		tile.Fill.Parent.Visible = false
+		tile.Value.TextXAlignment = Enum.TextXAlignment.Right
 	end
 	drawTabs()
 	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
