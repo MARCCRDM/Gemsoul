@@ -22,9 +22,11 @@ local BAND = 7 -- metal frame thickness (px)
 local OUT = 4 -- how much of it sits outside the card's edge (px)
 local CHANNEL = 2 -- energy channel cut into it (px)
 local PLATE = 24 -- corner bracket arm length (px)
-local BITS = 16 -- sparks / spikes / drips per card
-local BOLT = 12 -- lightning segments
+local BITS = 30 -- sparks / spikes / drips per card (half the signature, half the drift)
+local BOLT = 12 -- lightning segments per arc (two arcs at once)
 
+local TAPER = NumberSequence.new(1, 0)
+local SOLID = NumberSequence.new(0)
 local STEEL_LIGHT = Color3.fromRGB(150, 158, 172)
 local STEEL = Color3.fromRGB(78, 85, 98)
 local STEEL_DARK = Color3.fromRGB(26, 29, 36)
@@ -118,10 +120,26 @@ function FX.create(card: GuiObject, _gemWell: GuiObject?)
 		Active = false,
 	}, card)
 
+	-- An aura round the card: soft rings of the element's light outside the
+	-- frame, breathing.
+	local aura = {}
+	for i = 1, 3 do
+		local ring = make("Frame", {
+			Name = "ElementalAura",
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(-OUT - i * 2, -OUT - i * 2),
+			Size = UDim2.new(1, (OUT + i * 2) * 2, 1, (OUT + i * 2) * 2),
+			ZIndex = 7,
+			Active = false,
+		}, layer)
+		make("UICorner", { CornerRadius = UDim.new(0, 6 + i * 2) }, ring)
+		aura[i] = make("UIStroke", { Thickness = 2, Color = Color3.new(1, 1, 1) }, ring)
+	end
+
 	local edges = {}
 	for name in BEVEL do
 		-- Energy bleeding inward off the frame.
-		local glowPos, glowSize = edgeBar(name, BAND, 9)
+		local glowPos, glowSize = edgeBar(name, BAND, 16)
 		local glow = piece("Glow" .. name, layer, { Position = glowPos, Size = glowSize })
 		local glowGradient = make("UIGradient", { Rotation = BEVEL[name] }, glow)
 		-- The metal: lit on the outside, dark on the inside.
@@ -206,11 +224,16 @@ function FX.create(card: GuiObject, _gemWell: GuiObject?)
 	local bits = {}
 	for i = 1, BITS do
 		local bit = piece("Bit", layer, { AnchorPoint = Vector2.new(0.5, 0.5), Visible = false }, 9)
-		bits[i] = { Frame = bit, Corner = make("UICorner", { CornerRadius = UDim.new(0, 1) }, bit) }
+		-- Flames taper: bright at the root, gone at the tip.
+		local taper = make("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new(0),
+		}, bit)
+		bits[i] = { Frame = bit, Corner = make("UICorner", { CornerRadius = UDim.new(0, 1) }, bit), Taper = taper }
 	end
 
 	local bolt = {}
-	for i = 1, BOLT do
+	for i = 1, BOLT * 2 do
 		bolt[i] = piece("Bolt", layer, { AnchorPoint = Vector2.new(0.5, 0.5), Visible = false }, 11)
 	end
 
@@ -239,6 +262,7 @@ function FX.create(card: GuiObject, _gemWell: GuiObject?)
 		Corners = corners,
 		Bits = bits,
 		Bolt = bolt,
+		Aura = aura,
 		Rim = rim,
 		RimStroke = rimStroke,
 		RimGradient = rimGradient,
@@ -274,13 +298,17 @@ local function paint(effect, theme, element: string)
 	for _, vent in effect.Vents do
 		vent.BackgroundColor3 = mid
 	end
+	for _, ring in effect.Aura do
+		ring.Color = mid
+	end
 	for _, corner in effect.Corners do
 		corner.Notch.BackgroundColor3 = hot
 	end
 	for i, bit in effect.Bits do
 		bit.Frame.BackgroundColor3 = if seeded(i, 3) > 0.4 then hot else mid
-		bit.Corner.CornerRadius = if element == "Poison" then UDim.new(1, 0) else UDim.new(0, 1)
+		bit.Corner.CornerRadius = if element == "Poison" or i > BITS / 2 then UDim.new(1, 0) else UDim.new(0, 1)
 		bit.Frame.Rotation = 0
+		bit.Taper.Transparency = SOLID
 	end
 	for _, segment in effect.Bolt do
 		segment.Visible = false
@@ -358,7 +386,10 @@ function FX.update(effect, element: string?, time: number)
 		edge.ChannelGradient.Offset = if name == "Top" or name == "Bottom"
 			then Vector2.new(flow, 0)
 			else Vector2.new(0, flow)
-		edge.Glow.BackgroundTransparency = 0.45 - 0.3 * throb
+		edge.Glow.BackgroundTransparency = 0.3 - 0.25 * throb
+	end
+	for i, ring in effect.Aura do
+		ring.Transparency = 0.35 + i * 0.18 - 0.25 * throb
 	end
 	for _, vent in effect.Vents do
 		vent.BackgroundTransparency = 0.35 - 0.35 * throb
@@ -370,60 +401,95 @@ function FX.update(effect, element: string?, time: number)
 	effect.RimStroke.Transparency = 0.05
 
 	local bits = effect.Bits
-	if element == "Fire" then
-		-- Sparks and slag thrown up off the bottom rail: hard streaks.
-		for i, bit in bits do
-			local f = bit.Frame
-			local period = 0.7 + seeded(i, 1) * 0.8
-			local phase = (t / period + seeded(i, 2)) % 1
-			local x = (0.06 + seeded(i, 6) * 0.88) * w + (seeded(i, 8) - 0.5) * 14 * phase
-			local y = h - BAND - phase * (10 + seeded(i, 7) * 16)
-			f.Position = UDim2.fromOffset(x, y)
-			f.Size = UDim2.fromOffset(2, 3 + 4 * (1 - phase))
-			f.Rotation = (seeded(i, 8) - 0.5) * 30
-			f.BackgroundColor3 = theme.Hot:Lerp(theme.Mid, phase)
-			f.BackgroundTransparency = phase ^ 1.5
-			f.Visible = phase < 0.98
-		end
-	elseif element == "Frost" then
-		-- Ice spikes jutting in off the metal, catching the light.
-		for i, bit in bits do
-			local f = bit.Frame
-			local d = (i - 0.5) / BITS * perimeter + seeded(i, 6) * 10
-			local at, inward = around(d, w, h, BAND)
-			local length = 5 + seeded(i, 7) * 7
-			local p = at + inward * (length / 2)
-			f.Position = UDim2.fromOffset(p.X, p.Y)
-			f.Size = if inward.X == 0 then UDim2.fromOffset(2.5, length) else UDim2.fromOffset(length, 2.5)
-			f.Rotation = (seeded(i, 8) - 0.5) * 24
-			local glint = 0.5 + 0.5 * math.sin(t * 2.5 + i * 1.7)
-			f.BackgroundTransparency = 0.45 - 0.4 * glint
+	local half = BITS / 2
+	for i, bit in bits do
+		local f = bit.Frame
+		local main = i <= half
+		if element == "Fire" then
+			if main then
+				-- Flame tongues licking up off the bottom rail, flickering.
+				local x = (i - 0.5) / half * w
+				local flick = 0.5 + 0.5 * math.sin(t * (9 + seeded(i, 1) * 6) + i * 2.1)
+				local tall = 6 + seeded(i, 7) * 6 + flick * 6
+				f.Position = UDim2.fromOffset(x, h - BAND - tall / 2 + 2)
+				f.Size = UDim2.fromOffset(3 + seeded(i, 6) * 2, tall)
+				bit.Taper.Transparency = SOLID
+				f.Rotation = math.sin(t * 3 + i) * 8
+				f.BackgroundColor3 = theme.Mid:Lerp(theme.Hot, flick * 0.6)
+				f.BackgroundTransparency = 0.1 + 0.3 * (1 - flick)
+				bit.Corner.CornerRadius = UDim.new(1, 0)
+			else
+				bit.Taper.Transparency = SOLID
+				-- Embers rising the height of the card and drifting.
+				local period = 1.6 + seeded(i, 1) * 1.6
+				local phase = (t / period + seeded(i, 2)) % 1
+				local x = (0.05 + seeded(i, 6) * 0.9) * w + math.sin(t * 2 + i) * 6
+				f.Position = UDim2.fromOffset(x, h - BAND - phase * h * 0.9)
+				f.Size = UDim2.fromOffset(2.5, 2.5)
+				f.Rotation = 0
+				f.BackgroundColor3 = theme.Hot:Lerp(theme.Mid, phase)
+				f.BackgroundTransparency = phase ^ 1.3
+			end
 			f.Visible = true
-		end
-	elseif element == "Shock" then
-		-- Sparks spitting off the frame where the current jumps.
-		for i, bit in bits do
-			local f = bit.Frame
-			local slot = math.floor(t * 6 + seeded(i, 2) * 6)
-			local on = seeded(slot * 31 + i, 3) > 0.6
+		elseif element == "Frost" then
+			if main then
+				-- Ice shards jutting in off the metal, catching the light.
+				local d = (i - 0.5) / half * perimeter + seeded(i, 6) * 10
+				local at, inward = around(d, w, h, BAND)
+				local length = 7 + seeded(i, 7) * 10
+				local p = at + inward * (length / 2)
+				f.Position = UDim2.fromOffset(p.X, p.Y)
+				f.Size = if inward.X == 0 then UDim2.fromOffset(3, length) else UDim2.fromOffset(length, 3)
+				f.Rotation = (seeded(i, 8) - 0.5) * 30
+				local glint = 0.5 + 0.5 * math.sin(t * 2.5 + i * 1.7)
+				f.BackgroundColor3 = theme.Mid:Lerp(theme.Hot, glint)
+				f.BackgroundTransparency = 0.35 - 0.3 * glint
+			else
+				-- Snow drifting down across the card.
+				local period = 4 + seeded(i, 1) * 4
+				local phase = (t / period + seeded(i, 2)) % 1
+				local x = (0.05 + seeded(i, 6) * 0.9) * w + math.sin(t * 1.2 + i) * 8
+				f.Position = UDim2.fromOffset(x, BAND + phase * (h - BAND * 2))
+				f.Size = UDim2.fromOffset(2.5, 2.5)
+				f.Rotation = 0
+				f.BackgroundColor3 = theme.Hot
+				f.BackgroundTransparency = 0.2 + 0.7 * math.abs(phase - 0.5) * 2
+			end
+			f.Visible = true
+		elseif element == "Shock" then
+			-- Sparks spitting off the frame where the current jumps.
+			local slot = math.floor(t * 8 + seeded(i, 2) * 6)
+			local on = seeded(slot * 31 + i, 3) > (if main then 0.5 else 0.75)
 			local at, inward = around(seeded(slot * 5 + i, 6) * perimeter, w, h, BAND)
-			local p = at + inward * (2 + seeded(slot, i) * 6)
+			local p = at + inward * (2 + seeded(slot, i) * (if main then 8 else 20))
 			f.Position = UDim2.fromOffset(p.X, p.Y)
-			f.Size = UDim2.fromOffset(2, 2)
+			f.Size = if main then UDim2.fromOffset(3, 3) else UDim2.fromOffset(2, 6)
+			f.Rotation = seeded(slot, i + 3) * 180
+			f.BackgroundColor3 = theme.Hot
 			f.BackgroundTransparency = 0
 			f.Visible = on
-		end
-	else
-		-- Sludge drips off the top rail and stretches as it falls.
-		for i, bit in bits do
-			local f = bit.Frame
-			local period = 2 + seeded(i, 1) * 2
-			local phase = (t / period + seeded(i, 2)) % 1
-			local x = (0.05 + seeded(i, 6) * 0.9) * w
-			local fall = phase * phase * (14 + seeded(i, 7) * 14)
-			f.Position = UDim2.fromOffset(x, BAND + fall)
-			f.Size = UDim2.fromOffset(3.5, 3.5 + 5 * phase)
-			f.BackgroundTransparency = 0.1 + 0.85 * phase ^ 2
+		else
+			if main then
+				-- Sludge drips off the top rail and stretches as it falls.
+				local period = 2 + seeded(i, 1) * 2
+				local phase = (t / period + seeded(i, 2)) % 1
+				local x = (0.05 + seeded(i, 6) * 0.9) * w
+				local fall = phase * phase * (18 + seeded(i, 7) * 22)
+				f.Position = UDim2.fromOffset(x, BAND + fall)
+				f.Size = UDim2.fromOffset(4.5, 4.5 + 7 * phase)
+				f.BackgroundTransparency = 0.05 + 0.85 * phase ^ 2
+			else
+				-- Toxic bubbles rising off the bottom rail, swelling, popping.
+				local period = 1.8 + seeded(i, 1) * 1.8
+				local phase = (t / period + seeded(i, 2)) % 1
+				local x = (0.05 + seeded(i, 6) * 0.9) * w + math.sin(t * 2 + i) * 3
+				local size = 3 + phase * 5
+				f.Position = UDim2.fromOffset(x, h - BAND - phase * 26)
+				f.Size = UDim2.fromOffset(size, size)
+				f.BackgroundColor3 = theme.Hot:Lerp(theme.Mid, 0.4)
+				f.BackgroundTransparency = 0.3 + 0.65 * phase ^ 3
+			end
+			f.Rotation = 0
 			f.Visible = true
 		end
 	end
@@ -436,18 +502,20 @@ function FX.update(effect, element: string?, time: number)
 			effect.NextBolt = t + 0.3 + seeded(effect.BoltSeed, 9) * 0.6
 		end
 		if t < effect.BoltUntil then
-			local seed = effect.BoltSeed
-			local start = seeded(seed, 1) * perimeter
-			local length = 60 + seeded(seed, 2) * 80
 			local flicker = if math.floor(t * 40) % 2 == 0 then 1 else 0.55
-			local previous = nil
-			for i = 0, BOLT do
-				local at, inward = around(start + length * i / BOLT, w, h, BAND / 2)
-				local p = at + inward * (seeded(seed * 17 + i, 4) * 9)
-				if previous then
-					line(effect.Bolt[i], previous, p, 2, theme.Hot, 0.95 * flicker)
+			for arc = 0, 1 do
+				local seed = effect.BoltSeed * 3 + arc
+				local start = seeded(seed, 1) * perimeter
+				local length = 80 + seeded(seed, 2) * 120
+				local previous = nil
+				for i = 0, BOLT do
+					local at, inward = around(start + length * i / BOLT, w, h, BAND / 2)
+					local p = at + inward * (seeded(seed * 17 + i, 4) * 12)
+					if previous then
+						line(effect.Bolt[arc * BOLT + i], previous, p, if arc == 0 then 2.5 else 1.5, theme.Hot, 0.95 * flicker)
+					end
+					previous = p
 				end
-				previous = p
 			end
 		else
 			for _, segment in effect.Bolt do
