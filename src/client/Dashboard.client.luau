@@ -40,7 +40,7 @@ local function launch(action)
 	InventoryScreen.cancelDrag()
 	action()
 end
-local W, H = 1432, 644
+local W, H = 1432, 632
 
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false)
@@ -84,7 +84,7 @@ end
 local TOPBAR = 54
 -- A strip along the bottom stays clear for the chat bar (left) and the
 -- owner's DEV button (right), so neither covers the panels.
-local BOTTOM = 44
+local BOTTOM = 36
 local safe = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, TOPBAR),
@@ -92,8 +92,10 @@ local safe = new("Frame", {
 }, gui)
 local root = new("Frame", {
 	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
+	-- Sits on the bottom strip: spare height goes above, not between the
+	-- menu row and the chat bar.
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.fromScale(0.5, 1),
 	Size = UDim2.fromOffset(W, H),
 }, safe)
 local fitScale = new("UIScale", {}, root)
@@ -202,23 +204,23 @@ local wallet = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
 	-- One row with the menu buttons, just left of BACK TO LOBBY.
-	Position = UDim2.fromOffset(W - 16 - 186, 597),
-	Size = UDim2.fromOffset(0, 40),
+	Position = UDim2.fromOffset(W - 16 - 170, 594),
+	Size = UDim2.fromOffset(0, 34),
 	AutomaticSize = Enum.AutomaticSize.X,
 }, root)
 UiKit.list(wallet, 10, true)
 local function pill(order: number, caption: string, color: Color3, width: number): (Frame, TextLabel)
 	local frame = new("Frame", {
 		BackgroundColor3 = InventoryScreen.Colors.Panel,
-		Size = UDim2.fromOffset(width, 40),
+		Size = UDim2.fromOffset(width, 34),
 		LayoutOrder = order,
 	}, wallet)
 	UiKit.round(frame, 12)
 	new("UIStroke", { Color = InventoryScreen.Colors.PanelEdge, Thickness = 1 }, frame)
 	local ic = label(frame, caption, 10, color, IronUi.Bold)
-	place(ic, 10, 4, width - 20, 11)
-	local value = label(frame, "0", 18, Color3.new(1, 1, 1), IronUi.Heading)
-	place(value, 10, 16, width - 20, 19)
+	place(ic, 10, 3, width - 20, 10)
+	local value = label(frame, "0", 15, Color3.new(1, 1, 1), IronUi.Heading)
+	place(value, 10, 13, width - 20, 17)
 	value.TextXAlignment = Enum.TextXAlignment.Left
 	return frame, value
 end

@@ -1998,8 +1998,8 @@ end)
 -- Bottom bar -----------------------------------------------------------------------------------------------
 
 local bar = new("Frame", { BackgroundTransparency = 1 }, root)
-at(bar, 0, ROSTER_H + PANEL_H + 6, W - 230, 46)
-new("UIScale", { Scale = 0.82 }, bar)
+at(bar, 0, ROSTER_H + PANEL_H + 4, W - 230, 38)
+new("UIScale", { Scale = 0.74 }, bar)
 local barList = UiKit.list(bar, 8, true)
 barList.VerticalAlignment = Enum.VerticalAlignment.Center
 local function openModule(name: string, method: string)
@@ -2030,7 +2030,7 @@ do
 	local b = IronUi.button(bar, spec[1], spec[2], spec[3])
 	b.LayoutOrder = order
 end
-local backButton = chunkButton(root, "BACK TO LOBBY", P.Gold, UDim2.fromOffset(176, 40), function()
+local backButton = chunkButton(root, "BACK TO LOBBY", P.Gold, UDim2.fromOffset(160, 34), function()
 	InventoryScreen.cancelDrag()
 	local LobbyUI = require(script.Parent.LobbyUI) :: any
 	if LobbyUI.closeDashboard then
@@ -2038,7 +2038,7 @@ local backButton = chunkButton(root, "BACK TO LOBBY", P.Gold, UDim2.fromOffset(1
 	end
 end)
 backButton.AnchorPoint = Vector2.new(1, 0)
-backButton.Position = UDim2.new(1, 0, 0, ROSTER_H + PANEL_H + 8)
+backButton.Position = UDim2.new(1, 0, 0, ROSTER_H + PANEL_H + 6)
 backButton:SetAttribute("UiSound", "Back")
 backButton:SetAttribute("TutorialSocket", "CloseInventory")
 
@@ -2348,11 +2348,11 @@ local function drawRight()
 	local stageWidth = RIGHT_X - 12 - MID_X
 	left.Size = UDim2.fromOffset(W, PANEL_H)
 	-- The miner takes the height; one stats card and slim Q/E/R under it.
-	local stageH, statsH, surgeH = 386, 30, 96
+	local stageH, surgeH = 422, 96
 	at(portrait, MID_X, BODY_Y, stageWidth, stageH)
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
-	at(surgeCell, MID_X, BODY_Y + stageH + statsH + 12, stageWidth, surgeH)
-	at(setSummary, MID_X, BODY_Y + stageH + statsH + surgeH + 14, stageWidth, 20)
+	at(surgeCell, MID_X, BODY_Y + stageH + 6, stageWidth, surgeH)
+	at(setSummary, MID_X, BODY_Y + stageH + surgeH + 8, stageWidth, 20)
 	scouting.Visible = false
 	-- Q/E/R: icon, name, gem and costs; the description is in its details.
 	local surgeWidth = (stageWidth - 40) / 3
@@ -2374,7 +2374,7 @@ local function drawRight()
 		at(ui.Info, 62, 47, surgeWidth - 70, 14)
 		ui.Info.TextWrapped = false
 	end
-	-- Stats: one card, the six numbers in a row.
+	-- Stats: one slim card in the stage's lower-left corner, a list.
 	if not statCard then
 		statCard = box(left, C.Card, 6)
 		stroke(statCard, C.PanelEdge, 1)
@@ -2390,11 +2390,18 @@ local function drawRight()
 			tile.Fill.Parent.Visible = false
 		end
 	end
-	at(statCard, MID_X, BODY_Y + stageH + 6, stageWidth, statsH)
-	local statWidth = math.floor(stageWidth / 6)
+	local statsH, statWidth = 24, 132
+	at(statCard, MID_X + 12, BODY_Y + stageH - (6 * statsH + 8) - 12, statWidth, 6 * statsH + 8)
+	statCard.BackgroundTransparency = 0.2
+	statCard.ZIndex = 8
+	for _, d in statCard:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 9
+		end
+	end
 	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		local tile = statTiles[name]
-		at(tile.Tile, (index - 1) * statWidth, 0, statWidth, statsH)
+		at(tile.Tile, 0, 4 + (index - 1) * statsH, statWidth, statsH)
 		local caption = tile.Tile:FindFirstChildOfClass("TextLabel")
 		if caption then
 			at(caption, 10, 0, statWidth - 14, statsH)
