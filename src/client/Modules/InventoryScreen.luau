@@ -86,8 +86,8 @@ local SLOT_LABEL =
 local HEADING, BOLD, BODY = IronUi.Heading, IronUi.Bold, IronUi.Body
 
 local W, H = 1400, 618
-local ROSTER_H = 88
-local LEFT_W, RIGHT_X, PANEL_H = 810, 826, 480
+local ROSTER_H = 0
+local LEFT_W, RIGHT_X, PANEL_H = 810, 826, 568
 
 local function round(object: GuiObject, radius: number)
 	new("UICorner", { CornerRadius = UDim.new(0, radius) }, object)
@@ -284,6 +284,18 @@ local function panel(x: number, y: number, w: number, h: number, accent: Color3)
 end
 local left = panel(0, ROSTER_H, LEFT_W, PANEL_H, P.Gold)
 local right = panel(RIGHT_X, ROSTER_H, W - RIGHT_X, PANEL_H, P.Teal)
+local inventoryModal = new("Frame", {
+	Name = "InventoryPicker", BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1), ZIndex = 50, Visible = false,
+}, root)
+local modalDismiss = new("TextButton", {
+	Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0),
+	BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), ZIndex = 1,
+}, inventoryModal)
+right.Parent = inventoryModal
+right.AnchorPoint = Vector2.new(0.5, 0.5)
+right.Position = UDim2.new(0.5, 0, 0, PANEL_H / 2)
+right.ZIndex = 2
 
 -- Selection and drag state.
 type Pick = { Kind: string, Slot: string?, Id: string?, Gem: any?, Key: string? }
@@ -320,13 +332,14 @@ end
 -- fighter in the middle with the ratings under them.
 
 local COL_W, CARD_H, ROW_GAP = 230, 91, 9
-local BODY_Y = 80
+local BODY_Y = 44
 local LEFT_COL, MID_X, RIGHT_COL = 18, 260, LEFT_W - 18 - COL_W
 local MID_W = RIGHT_COL - 10 - MID_X
 local STAGE_H = 236
 
-local nameLabel = at(label(left, "", 26, C.Text, HEADING), 20, 14, 420, 32)
-local subtitle = at(label(left, "", 12, C.Dim, BOLD), 20, 48, 440, 18)
+local nameLabel = at(label(left, "", 16, C.Text, HEADING), 20, 8, 420, 26)
+local subtitle = at(label(left, "", 11, C.Dim, BOLD), 800, 10, 570, 20)
+subtitle.TextXAlignment = Enum.TextXAlignment.Right
 subtitle.RichText = true
 
 -- The stage: your fighter, full height, on a lit plinth.
@@ -463,8 +476,6 @@ end
 -- Whole-character roster: each card selects one miner and their progression.
 local minerCards = {}
 local rosterHeader = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, portrait)
-at(label(root, "SELECT YOUR MINER", 20, C.Text, HEADING), 18, 12, 500, 28)
-at(label(root, "Choose a miner to bring them forward. Each has their own gear, level and Surges.", 12, C.Dim), 18, 44, 1000, 20)
 local MINER_W = (W - 24) / 3
 for index = 1, MinerRoster.Count do
 	local button = new("TextButton", { Text = "", BackgroundColor3 = C.Card }, rosterHeader)
@@ -594,7 +605,7 @@ wornCard("Shield", 2, 2)
 -- A single equipment rail leaves the character stage uninterrupted.
 for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
 	local card = wornCards[slot]
-	at(card.Cell, 18, BODY_Y + (index - 1) * 64, CELL_W, 58)
+	at(card.Cell, 18, BODY_Y + (index - 1) * 86, CELL_W, 80)
 	at(card.Art, 8, 20, 34, 34)
 	at(card.Name, 50, 20, CELL_W - 60, 30)
 	card.Name.TextSize = 11
@@ -657,7 +668,8 @@ local tabHolder = new("Frame", { BackgroundTransparency = 1 }, right)
 at(tabHolder, 16, 48, RIGHT_W - 32, 38)
 local contextTitle = at(label(right, "SHARED STASH", 14, C.Text, HEADING), 16, 10, RIGHT_W - 100, 28)
 local contextClose = new("TextButton", { Text = "BACK", Font = BOLD, TextSize = 11, TextColor3 = C.Dim, BackgroundColor3 = C.Card }, right)
-at(contextClose, RIGHT_W - 76, 10, 60, 28)
+at(contextClose, RIGHT_W - 118, 10, 60, 28)
+contextTitle.Size = UDim2.fromOffset(RIGHT_W - 148, 28)
 round(contextClose, 4)
 contextClose.Activated:Connect(function()
 	if selection then
@@ -668,6 +680,25 @@ contextClose.Activated:Connect(function()
 	contextSlot, contextKey, selection = nil, nil, nil
 	tab, armorFilter = "Overview", "All"
 	draw()
+end)
+local function closeInventoryPicker()
+	InventoryScreen.cancelDrag()
+	contextSlot, contextKey, selection = nil, nil, nil
+	tab, armorFilter = "Overview", "All"
+	draw()
+end
+modalDismiss.Activated:Connect(closeInventoryPicker)
+local pickerClose = new("TextButton", {
+	Text = "X", Font = BOLD, TextSize = 12, TextColor3 = C.Text, BackgroundColor3 = C.Card,
+}, right)
+at(pickerClose, RIGHT_W - 50, 10, 34, 28)
+round(pickerClose, 4)
+pickerClose.Activated:Connect(closeInventoryPicker)
+UserInputService.InputBegan:Connect(function(input)
+	if hostGui and hostGui.Enabled and inventoryModal.Visible
+		and (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) then
+		closeInventoryPicker()
+	end
 end)
 local page = new("Frame", { BackgroundTransparency = 1, ClipsDescendants = true }, right)
 at(page, 16, 94, RIGHT_W - 32, PANEL_H - 94 - 40)
@@ -2043,12 +2074,13 @@ local function drawRight()
   tab, gemFilter = "Gems", "All"
  end
 	local drawerOpen = contextSlot ~= nil or contextKey ~= nil or tab ~= "Overview"
+	inventoryModal.Visible = drawerOpen
 	right.Visible = drawerOpen
-	local stageWidth = (if drawerOpen then LEFT_W else W) - MID_X - 18
-	left.Size = UDim2.fromOffset(if drawerOpen then LEFT_W else W, PANEL_H)
-	at(portrait, MID_X, BODY_Y, stageWidth, 250)
+	local stageWidth = W - MID_X - 18
+	left.Size = UDim2.fromOffset(W, PANEL_H)
+	at(portrait, MID_X, BODY_Y, stageWidth, 374)
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
-	at(surgeCell, MID_X, 340, stageWidth, 62)
+	at(surgeCell, MID_X, 428, stageWidth, 62)
 	-- Q/E/R stay visible in both the wide stage and drawer layouts.
 	local surgeWidth = (stageWidth - 126) / 3
 	for index, key in { "Q", "E", "R" } do
@@ -2062,7 +2094,7 @@ local function drawRight()
 	local statWidth = (stageWidth - 5 * TILE_GAP) / 6
 	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		local tile = statTiles[name]
-		at(tile.Tile, MID_X + (index - 1) * (statWidth + TILE_GAP), 412, statWidth, 56)
+		at(tile.Tile, MID_X + (index - 1) * (statWidth + TILE_GAP), 500, statWidth, 56)
 		tile.Value.Size = UDim2.fromOffset(statWidth - 16, 22)
 		tile.Bonus.Visible = false
 		local track = tile.Fill.Parent
