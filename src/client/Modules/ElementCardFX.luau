@@ -1,16 +1,14 @@
 --[[
-	Elemental frames: a socketed gem's element frames its card. The inside
-	of the card stays clean; the element lives in a band around the border.
+	Elemental frames: a socketed gem's element is an armoured frame round
+	its card. Heavy gunmetal with a bevel, bolted corner plates and vents;
+	the element is raw energy showing through a channel cut into the metal
+	and venting off it. The inside of the card stays clean.
 
-	  The frame   a glowing band on every edge with the element flowing
-	              along it, a soft inner glow, heavy corner brackets, and a
-	              bright light running round the rim
-	  Thermal     flames lick up off the frame, thickest along the bottom
-	  Cryo        ice shards grow inward from the frame and twinkle; a cold
-	              glint travels round it
-	  Ion         lightning crackles along a stretch of the frame and jumps
-	              to the next; sparks pop at the corners
-	  Corrosive   ooze drips from the top edge and bubbles along the bottom
+	  Thermal     molten channel, sparks and slag thrown off the bottom edge
+	  Cryo        frozen channel, ice spikes jutting in off the metal, a
+	              cold glint racing round
+	  Ion         live channel, lightning arcing along the frame
+	  Corrosive   acid channel, sludge dripping off the top edge
 
 	Built once per card (create), only moved and recoloured each frame
 	(update), so a full inventory makes no new instances.
@@ -20,39 +18,46 @@
 ]]
 local FX = {}
 
-local BAND = 4 -- frame thickness (px)
-local GLOW = 10 -- inner glow depth (px)
-local BITS = 22 -- flames / shards / drips / sparks per card
+local BAND = 7 -- metal frame thickness (px)
+local OUT = 4 -- how much of it sits outside the card's edge (px)
+local CHANNEL = 2 -- energy channel cut into it (px)
+local PLATE = 24 -- corner bracket arm length (px)
+local BITS = 16 -- sparks / spikes / drips per card
 local BOLT = 12 -- lightning segments
+
+local STEEL_LIGHT = Color3.fromRGB(150, 158, 172)
+local STEEL = Color3.fromRGB(78, 85, 98)
+local STEEL_DARK = Color3.fromRGB(26, 29, 36)
+local RIVET = Color3.fromRGB(196, 202, 212)
 
 local THEMES = {
 	Fire = {
-		Hot = Color3.fromRGB(255, 232, 150),
-		Mid = Color3.fromRGB(255, 120, 36),
-		Deep = Color3.fromRGB(170, 34, 10),
-		Spin = 120,
-		Flow = 0.9,
+		Hot = Color3.fromRGB(255, 236, 170),
+		Mid = Color3.fromRGB(255, 110, 24),
+		Deep = Color3.fromRGB(150, 24, 6),
+		Flow = 0.8,
+		Pulse = 3.2,
 	},
 	Frost = {
 		Hot = Color3.fromRGB(240, 252, 255),
-		Mid = Color3.fromRGB(120, 210, 255),
-		Deep = Color3.fromRGB(34, 96, 180),
-		Spin = 45,
+		Mid = Color3.fromRGB(110, 205, 255),
+		Deep = Color3.fromRGB(26, 80, 170),
 		Flow = 0.25,
+		Pulse = 1.2,
 	},
 	Shock = {
-		Hot = Color3.fromRGB(255, 252, 220),
-		Mid = Color3.fromRGB(255, 222, 70),
-		Deep = Color3.fromRGB(160, 116, 10),
-		Spin = 260,
-		Flow = 2.2,
+		Hot = Color3.fromRGB(255, 252, 225),
+		Mid = Color3.fromRGB(255, 214, 50),
+		Deep = Color3.fromRGB(150, 100, 0),
+		Flow = 2.4,
+		Pulse = 9,
 	},
 	Poison = {
-		Hot = Color3.fromRGB(214, 255, 170),
-		Mid = Color3.fromRGB(70, 220, 110),
-		Deep = Color3.fromRGB(16, 92, 48),
-		Spin = 60,
-		Flow = 0.4,
+		Hot = Color3.fromRGB(205, 255, 150),
+		Mid = Color3.fromRGB(60, 215, 95),
+		Deep = Color3.fromRGB(12, 80, 36),
+		Flow = 0.35,
+		Pulse = 1.6,
 	},
 }
 FX.Themes = THEMES
@@ -71,12 +76,12 @@ local function make(class: string, props, parent: Instance): any
 	return object
 end
 
-local function piece(name: string, parent: Instance, props)
+local function piece(name: string, parent: Instance, props, z: number?)
 	local frame = make("Frame", {
 		Name = name,
 		BorderSizePixel = 0,
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		ZIndex = 8,
+		ZIndex = z or 8,
 		Active = false,
 	}, parent)
 	for key, value in props or {} do
@@ -85,98 +90,142 @@ local function piece(name: string, parent: Instance, props)
 	return frame
 end
 
--- The four edges: where each sits and which way its gradient runs.
-local EDGES = {
-	Top = { Pos = UDim2.fromScale(0, 0), Size = UDim2.new(1, 0, 0, BAND), Rotation = 0, GlowRotation = 90 },
-	Bottom = {
-		Pos = UDim2.new(0, 0, 1, -BAND),
-		Size = UDim2.new(1, 0, 0, BAND),
-		Rotation = 180,
-		GlowRotation = -90,
-	},
-	Left = { Pos = UDim2.fromScale(0, 0), Size = UDim2.new(0, BAND, 1, 0), Rotation = 90, GlowRotation = 0 },
-	Right = {
-		Pos = UDim2.new(1, -BAND, 0, 0),
-		Size = UDim2.new(0, BAND, 1, 0),
-		Rotation = -90,
-		GlowRotation = 180,
-	},
-}
+-- A bar along one edge, `inset` px in from it and `thick` px thick.
+local function edgeBar(edge: string, inset: number, thick: number): (UDim2, UDim2)
+	if edge == "Top" then
+		return UDim2.fromOffset(0, inset), UDim2.new(1, 0, 0, thick)
+	elseif edge == "Bottom" then
+		return UDim2.new(0, 0, 1, -inset - thick), UDim2.new(1, 0, 0, thick)
+	elseif edge == "Left" then
+		return UDim2.fromOffset(inset, 0), UDim2.new(0, thick, 1, 0)
+	end
+	return UDim2.new(1, -inset - thick, 0, 0), UDim2.new(0, thick, 1, 0)
+end
+
+-- Gradient rotation that lights the metal from the outer edge in.
+local BEVEL = { Top = 90, Bottom = -90, Left = 0, Right = 180 }
+local ALONG = { Top = 0, Bottom = 180, Left = 90, Right = -90 }
 
 function FX.create(card: GuiObject, _gemWell: GuiObject?)
-	-- Everything sits above the card's content but only along its border.
 	local layer = make("Frame", {
 		Name = "ElementalFrame",
 		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		ClipsDescendants = true,
+		Position = UDim2.fromOffset(-OUT, -OUT),
+		Size = UDim2.new(1, OUT * 2, 1, OUT * 2),
+		ClipsDescendants = false,
 		ZIndex = 8,
 		Visible = false,
 		Active = false,
 	}, card)
 
 	local edges = {}
-	for name, spec in EDGES do
-		-- A soft glow bleeding inward from the edge.
-		local glow = piece("Glow" .. name, layer, {
-			Position = spec.Pos,
-			Size = if name == "Top" or name == "Bottom" then UDim2.new(1, 0, 0, GLOW) else UDim2.new(0, GLOW, 1, 0),
-		})
-		if name == "Bottom" then
-			glow.Position = UDim2.new(0, 0, 1, -GLOW)
-		elseif name == "Right" then
-			glow.Position = UDim2.new(1, -GLOW, 0, 0)
-		end
-		local glowGradient = make("UIGradient", { Rotation = spec.GlowRotation }, glow)
-		-- The band itself, the element flowing along it.
-		local band = piece("Band" .. name, layer, { Position = spec.Pos, Size = spec.Size })
-		local bandGradient = make("UIGradient", { Rotation = spec.Rotation }, band)
-		edges[name] = { Band = band, BandGradient = bandGradient, Glow = glow, GlowGradient = glowGradient }
+	for name in BEVEL do
+		-- Energy bleeding inward off the frame.
+		local glowPos, glowSize = edgeBar(name, BAND, 9)
+		local glow = piece("Glow" .. name, layer, { Position = glowPos, Size = glowSize })
+		local glowGradient = make("UIGradient", { Rotation = BEVEL[name] }, glow)
+		-- The metal: lit on the outside, dark on the inside.
+		local metalPos, metalSize = edgeBar(name, 0, BAND)
+		local metal = piece("Metal" .. name, layer, { Position = metalPos, Size = metalSize })
+		make("UIGradient", {
+			Rotation = BEVEL[name],
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, STEEL_LIGHT),
+				ColorSequenceKeypoint.new(0.35, STEEL),
+				ColorSequenceKeypoint.new(1, STEEL_DARK),
+			}),
+		}, metal)
+		-- The channel cut into the metal, energy flowing along it.
+		local channelPos, channelSize = edgeBar(name, math.floor((BAND - CHANNEL) / 2), CHANNEL)
+		local channel = piece("Channel" .. name, layer, { Position = channelPos, Size = channelSize }, 9)
+		local channelGradient = make("UIGradient", { Rotation = ALONG[name] }, channel)
+		edges[name] = { Glow = glow, GlowGradient = glowGradient, Channel = channel, ChannelGradient = channelGradient }
 	end
 
-	-- Corner brackets: an L of two thick bars at each corner.
+	-- Vents: three slots in the top and bottom rails, glowing inside.
+	local vents = {}
+	for _, edge in { "Top", "Bottom" } do
+		for i = -1, 1 do
+			local vent = piece("Vent", layer, {
+				AnchorPoint = Vector2.new(0.5, if edge == "Top" then 0 else 1),
+				Position = UDim2.new(0.5, i * 16, if edge == "Top" then 0 else 1, if edge == "Top" then 1 else -1),
+				Size = UDim2.fromOffset(10, BAND - 2),
+				BackgroundColor3 = STEEL_DARK,
+			}, 9)
+			local core = piece("VentCore", vent, {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.new(1, -2, 1, -2),
+			}, 10)
+			table.insert(vents, core)
+		end
+	end
+
+	-- Corner brackets: heavy L-shaped armour (staying on the frame, clear of
+	-- the card's text), a rivet in the corner and a hot notch at the tip.
 	local corners = {}
 	for i, corner in { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } } do
 		local x, y = corner[1], corner[2]
-		local across = piece("CornerH", layer, {
-			AnchorPoint = Vector2.new(x, y),
-			Position = UDim2.fromScale(x, y),
-			Size = UDim2.fromOffset(18, BAND + 2),
-		})
-		local down = piece("CornerV", layer, {
-			AnchorPoint = Vector2.new(x, y),
-			Position = UDim2.fromScale(x, y),
-			Size = UDim2.fromOffset(BAND + 2, 18),
-		})
-		corners[i] = { across, down }
+		local arms = {}
+		for _, size in { Vector2.new(PLATE, BAND + 3), Vector2.new(BAND + 3, PLATE) } do
+			local arm = piece("Bracket", layer, {
+				AnchorPoint = Vector2.new(x, y),
+				Position = UDim2.fromScale(x, y),
+				Size = UDim2.fromOffset(size.X, size.Y),
+			}, 10)
+			make("UIGradient", {
+				Rotation = if size.X > size.Y then (if y == 0 then 90 else -90) else (if x == 0 then 0 else 180),
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, STEEL_LIGHT),
+					ColorSequenceKeypoint.new(0.5, STEEL),
+					ColorSequenceKeypoint.new(1, STEEL_DARK),
+				}),
+			}, arm)
+			table.insert(arms, arm)
+		end
+		-- The notch: a short hot slash across the corner's tip.
+		local notch = piece("Notch", layer, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(x, if x == 0 then 6 else -6, y, if y == 0 then 6 else -6),
+			Size = UDim2.fromOffset(9, 2),
+			Rotation = if x == y then -45 else 45,
+		}, 12)
+		local rivet = piece("Rivet", layer, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(x, if x == 0 then PLATE - 5 else 5 - PLATE, y, if y == 0 then 5 else -5),
+			Size = UDim2.fromOffset(3, 3),
+			BackgroundColor3 = RIVET,
+		}, 12)
+		make("UICorner", { CornerRadius = UDim.new(1, 0) }, rivet)
+		local rivet2 = rivet:Clone()
+		rivet2.Position = UDim2.new(x, if x == 0 then 5 else -5, y, if y == 0 then PLATE - 5 else 5 - PLATE)
+		rivet2.Parent = layer
+		corners[i] = { Arms = arms, Notch = notch }
 	end
 
-	-- Flames, shards, drips or sparks living on the frame.
 	local bits = {}
 	for i = 1, BITS do
-		local bit = piece("Bit", layer, { AnchorPoint = Vector2.new(0.5, 0.5), Visible = false })
-		bits[i] = { Frame = bit, Corner = make("UICorner", { CornerRadius = UDim.new(1, 0) }, bit) }
+		local bit = piece("Bit", layer, { AnchorPoint = Vector2.new(0.5, 0.5), Visible = false }, 9)
+		bits[i] = { Frame = bit, Corner = make("UICorner", { CornerRadius = UDim.new(0, 1) }, bit) }
 	end
 
 	local bolt = {}
 	for i = 1, BOLT do
-		local segment = piece("Bolt", layer, { AnchorPoint = Vector2.new(0.5, 0.5), Visible = false })
-		make("UICorner", { CornerRadius = UDim.new(1, 0) }, segment)
-		bolt[i] = segment
+		bolt[i] = piece("Bolt", layer, { AnchorPoint = Vector2.new(0.5, 0.5), Visible = false }, 11)
 	end
 
-	-- The rim: a bright head with a fading tail chasing round the outside.
+	-- The outer edge: a hard dark rim with a hot glint racing round it.
 	local rim = make("Frame", {
 		Name = "ElementalRim",
 		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 9,
+		Position = UDim2.fromOffset(-OUT, -OUT),
+		Size = UDim2.new(1, OUT * 2, 1, OUT * 2),
+		ZIndex = 13,
 		Visible = false,
 		Active = false,
 	}, card)
-	make("UICorner", { CornerRadius = UDim.new(0, 6) }, rim)
 	local rimStroke = make("UIStroke", {
-		Thickness = 2,
+		Thickness = 1.5,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		Color = Color3.new(1, 1, 1),
 	}, rim)
@@ -186,6 +235,7 @@ function FX.create(card: GuiObject, _gemWell: GuiObject?)
 		Card = card,
 		Layer = layer,
 		Edges = edges,
+		Vents = vents,
 		Corners = corners,
 		Bits = bits,
 		Bolt = bolt,
@@ -201,58 +251,54 @@ end
 
 local function paint(effect, theme, element: string)
 	local hot, mid, deep = theme.Hot, theme.Mid, theme.Deep
-	-- Bands: the element in waves, so flowing it along reads as motion.
-	local wave = ColorSequence.new({
+	-- The channel: hot pulses travelling through the element.
+	local surge = ColorSequence.new({
 		ColorSequenceKeypoint.new(0, deep),
-		ColorSequenceKeypoint.new(0.2, mid),
-		ColorSequenceKeypoint.new(0.35, hot),
-		ColorSequenceKeypoint.new(0.5, mid),
-		ColorSequenceKeypoint.new(0.7, deep),
-		ColorSequenceKeypoint.new(0.85, mid),
+		ColorSequenceKeypoint.new(0.15, mid),
+		ColorSequenceKeypoint.new(0.25, hot),
+		ColorSequenceKeypoint.new(0.35, mid),
+		ColorSequenceKeypoint.new(0.6, deep),
+		ColorSequenceKeypoint.new(0.75, mid),
+		ColorSequenceKeypoint.new(0.85, hot),
 		ColorSequenceKeypoint.new(1, deep),
 	})
 	for _, edge in effect.Edges do
-		edge.BandGradient.Color = wave
+		edge.ChannelGradient.Color = surge
 		edge.GlowGradient.Color = ColorSequence.new(mid)
 		edge.GlowGradient.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.45),
-			NumberSequenceKeypoint.new(0.5, 0.85),
+			NumberSequenceKeypoint.new(0, 0.55),
+			NumberSequenceKeypoint.new(0.4, 0.88),
 			NumberSequenceKeypoint.new(1, 1),
 		})
 	end
-	for _, pair in effect.Corners do
-		for _, bar in pair do
-			bar.BackgroundColor3 = hot
-		end
+	for _, vent in effect.Vents do
+		vent.BackgroundColor3 = mid
+	end
+	for _, corner in effect.Corners do
+		corner.Notch.BackgroundColor3 = hot
 	end
 	for i, bit in effect.Bits do
-		local diamond = element == "Frost"
-		bit.Corner.CornerRadius = if diamond then UDim.new(0, 1) else UDim.new(1, 0)
-		bit.Frame.Rotation = if diamond then 45 else 0
-		bit.Frame.BackgroundColor3 = if seeded(i, 3) > 0.5 then hot else mid
+		bit.Frame.BackgroundColor3 = if seeded(i, 3) > 0.4 then hot else mid
+		bit.Corner.CornerRadius = if element == "Poison" then UDim.new(1, 0) else UDim.new(0, 1)
+		bit.Frame.Rotation = 0
 	end
 	for _, segment in effect.Bolt do
 		segment.Visible = false
 	end
+	-- Mostly dark steel; a short hot glint chases round.
 	effect.RimGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, deep),
-		ColorSequenceKeypoint.new(0.44, mid),
+		ColorSequenceKeypoint.new(0, STEEL_DARK),
+		ColorSequenceKeypoint.new(0.46, mid),
 		ColorSequenceKeypoint.new(0.5, hot),
-		ColorSequenceKeypoint.new(0.56, mid),
-		ColorSequenceKeypoint.new(1, deep),
-	})
-	effect.RimGradient.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.6),
-		NumberSequenceKeypoint.new(0.5, 0),
-		NumberSequenceKeypoint.new(1, 0.6),
+		ColorSequenceKeypoint.new(0.54, mid),
+		ColorSequenceKeypoint.new(1, STEEL_DARK),
 	})
 end
 
--- A point on the frame's centre line, `d` px clockwise from the top-left.
--- Also returns the inward direction there.
+-- A point on the frame `d` px clockwise from the top-left, `inset` px in,
+-- and the inward direction there.
 local function around(d: number, w: number, h: number, inset: number): (Vector2, Vector2)
-	local perimeter = 2 * (w + h)
-	d = d % perimeter
+	d = d % (2 * (w + h))
 	if d < w then
 		return Vector2.new(d, inset), Vector2.new(0, 1)
 	end
@@ -278,13 +324,6 @@ local function line(segment: Frame, a: Vector2, b: Vector2, width: number, color
 	segment.Visible = true
 end
 
-local function place(bit, at: Vector2, size: number, alpha: number)
-	bit.Frame.Position = UDim2.fromOffset(at.X, at.Y)
-	bit.Frame.Size = UDim2.fromOffset(size, size)
-	bit.Frame.BackgroundTransparency = 1 - alpha
-	bit.Frame.Visible = alpha > 0.02
-end
-
 function FX.update(effect, element: string?, time: number)
 	local theme = element and THEMES[element]
 	effect.Layer.Visible = theme ~= nil
@@ -305,113 +344,108 @@ function FX.update(effect, element: string?, time: number)
 	if w <= 0 or h <= 0 then
 		return
 	end
+	w, h = w + OUT * 2, h + OUT * 2
 	local t = time
 	local perimeter = 2 * (w + h)
 
-	-- The element flows round the frame; the glow breathes.
+	-- Energy surges through the channel; the glow and vents throb with it.
 	local flow = (t * theme.Flow) % 2 - 1
-	local breathe = 0.5 + 0.5 * math.sin(t * (if element == "Fire" then 3.4 else 1.7))
+	local throb = 0.5 + 0.5 * math.sin(t * theme.Pulse)
+	if element == "Shock" then
+		throb = seeded(math.floor(t * 18), 7) -- a live wire doesn't breathe, it stutters
+	end
 	for name, edge in effect.Edges do
-		edge.BandGradient.Offset = if name == "Top" or name == "Bottom"
+		edge.ChannelGradient.Offset = if name == "Top" or name == "Bottom"
 			then Vector2.new(flow, 0)
 			else Vector2.new(0, flow)
-		edge.Band.BackgroundTransparency = 0.05
-		edge.Glow.BackgroundTransparency = 0.35 - 0.25 * breathe
+		edge.Glow.BackgroundTransparency = 0.45 - 0.3 * throb
 	end
-	-- Fire burns hottest along the bottom.
-	effect.Edges.Bottom.Glow.Size = UDim2.new(1, 0, 0, if element == "Fire" then GLOW + 6 * breathe else GLOW)
-	effect.Edges.Bottom.Glow.Position = UDim2.new(0, 0, 1, -effect.Edges.Bottom.Glow.Size.Y.Offset)
-
-	-- The rim light chases round; Ion stutters like a live wire.
-	local spin = (t * theme.Spin) % 360
-	if element == "Shock" and math.floor(t * 12) % 7 == 0 then
-		spin += 140
+	for _, vent in effect.Vents do
+		vent.BackgroundTransparency = 0.35 - 0.35 * throb
 	end
-	effect.RimGradient.Rotation = spin
-	effect.RimStroke.Transparency = if element == "Shock" then 0.05 + 0.4 * seeded(math.floor(t * 20), 5) else 0.1
-
-	-- Corner brackets pulse.
-	for _, pair in effect.Corners do
-		for _, bar in pair do
-			bar.BackgroundTransparency = 0.15 * (1 - breathe)
-		end
+	for _, corner in effect.Corners do
+		corner.Notch.BackgroundTransparency = 0.3 - 0.3 * throb
 	end
+	effect.RimGradient.Rotation = (t * (if element == "Shock" then 300 else 140)) % 360
+	effect.RimStroke.Transparency = 0.05
 
 	local bits = effect.Bits
 	if element == "Fire" then
-		-- Flames lick inward off the frame, more along the bottom.
+		-- Sparks and slag thrown up off the bottom rail: hard streaks.
 		for i, bit in bits do
-			local period = 0.9 + seeded(i, 1) * 0.9
+			local f = bit.Frame
+			local period = 0.7 + seeded(i, 1) * 0.8
 			local phase = (t / period + seeded(i, 2)) % 1
-			local d = if i <= 10 then w + h + seeded(i, 6) * w else seeded(i, 6) * perimeter
-			local at, inward = around(d, w, h, BAND)
-			local rise = phase * (5 + seeded(i, 7) * 9)
-			local sway = math.sin(phase * 8 + i) * 2
-			local p = at + inward * rise + Vector2.new(inward.Y, inward.X) * sway
-			bit.Frame.BackgroundColor3 = theme.Hot:Lerp(theme.Mid, phase)
-			place(bit, p, (3.5 + seeded(i, 8) * 2.5) * (1 - phase * 0.7), 0.95 * (1 - phase))
+			local x = (0.06 + seeded(i, 6) * 0.88) * w + (seeded(i, 8) - 0.5) * 14 * phase
+			local y = h - BAND - phase * (10 + seeded(i, 7) * 16)
+			f.Position = UDim2.fromOffset(x, y)
+			f.Size = UDim2.fromOffset(2, 3 + 4 * (1 - phase))
+			f.Rotation = (seeded(i, 8) - 0.5) * 30
+			f.BackgroundColor3 = theme.Hot:Lerp(theme.Mid, phase)
+			f.BackgroundTransparency = phase ^ 1.5
+			f.Visible = phase < 0.98
 		end
 	elseif element == "Frost" then
-		-- Ice shards stand on the frame pointing inward and twinkle.
+		-- Ice spikes jutting in off the metal, catching the light.
 		for i, bit in bits do
-			local d = (i - 0.5) / BITS * perimeter + seeded(i, 6) * 8
+			local f = bit.Frame
+			local d = (i - 0.5) / BITS * perimeter + seeded(i, 6) * 10
 			local at, inward = around(d, w, h, BAND)
-			local length = 2.5 + seeded(i, 7) * 3.5
-			local twinkle = 0.5 + 0.5 * math.sin(t * 3 + i * 1.9)
-			place(bit, at + inward * length * 0.6, length, 0.45 + 0.5 * twinkle)
-			bit.Frame.Rotation = 45 + math.sin(t * 0.8 + i) * 8
+			local length = 5 + seeded(i, 7) * 7
+			local p = at + inward * (length / 2)
+			f.Position = UDim2.fromOffset(p.X, p.Y)
+			f.Size = if inward.X == 0 then UDim2.fromOffset(2.5, length) else UDim2.fromOffset(length, 2.5)
+			f.Rotation = (seeded(i, 8) - 0.5) * 24
+			local glint = 0.5 + 0.5 * math.sin(t * 2.5 + i * 1.7)
+			f.BackgroundTransparency = 0.45 - 0.4 * glint
+			f.Visible = true
 		end
 	elseif element == "Shock" then
-		-- Sparks pop round the corners and along the frame.
+		-- Sparks spitting off the frame where the current jumps.
 		for i, bit in bits do
-			local slot = math.floor(t * 4 + seeded(i, 2) * 4)
-			local on = seeded(slot * 31 + i, 3) > 0.55
-			local d = seeded(slot * 5 + i, 6) * perimeter
-			local at, inward = around(d, w, h, BAND / 2)
-			local jitter = (seeded(slot + i, 8) - 0.5) * 6
-			place(
-				bit,
-				at + inward * (2 + seeded(slot, i) * 5) + Vector2.new(inward.Y, inward.X) * jitter,
-				2.5,
-				if on then 1 else 0
-			)
+			local f = bit.Frame
+			local slot = math.floor(t * 6 + seeded(i, 2) * 6)
+			local on = seeded(slot * 31 + i, 3) > 0.6
+			local at, inward = around(seeded(slot * 5 + i, 6) * perimeter, w, h, BAND)
+			local p = at + inward * (2 + seeded(slot, i) * 6)
+			f.Position = UDim2.fromOffset(p.X, p.Y)
+			f.Size = UDim2.fromOffset(2, 2)
+			f.BackgroundTransparency = 0
+			f.Visible = on
 		end
 	else
-		-- Ooze drips from the top edge; bubbles pop along the bottom.
+		-- Sludge drips off the top rail and stretches as it falls.
 		for i, bit in bits do
-			if i <= 12 then
-				local period = 2.4 + seeded(i, 1) * 2
-				local phase = (t / period + seeded(i, 2)) % 1
-				local x = (0.05 + seeded(i, 6) * 0.9) * w
-				local drop = phase * phase * (10 + seeded(i, 7) * 10)
-				place(bit, Vector2.new(x, BAND + drop), 3 + (1 - phase) * 2, 0.9 * (1 - phase))
-			else
-				local period = 1.6 + seeded(i, 1) * 1.6
-				local phase = (t / period + seeded(i, 2)) % 1
-				local x = (0.04 + seeded(i, 6) * 0.92) * w
-				place(bit, Vector2.new(x, h - BAND - phase * 9), 2 + phase * 5, if phase > 0.85 then 0.3 else 0.75)
-			end
+			local f = bit.Frame
+			local period = 2 + seeded(i, 1) * 2
+			local phase = (t / period + seeded(i, 2)) % 1
+			local x = (0.05 + seeded(i, 6) * 0.9) * w
+			local fall = phase * phase * (14 + seeded(i, 7) * 14)
+			f.Position = UDim2.fromOffset(x, BAND + fall)
+			f.Size = UDim2.fromOffset(3.5, 3.5 + 5 * phase)
+			f.BackgroundTransparency = 0.1 + 0.85 * phase ^ 2
+			f.Visible = true
 		end
 	end
 
-	-- Ion: a bolt crackles along a stretch of the frame, then jumps.
+	-- Ion: arcs crackle along a stretch of the frame, then jump.
 	if element == "Shock" then
 		if t >= effect.BoltUntil and t >= effect.NextBolt then
 			effect.BoltSeed += 1
-			effect.BoltUntil = t + 0.22
-			effect.NextBolt = t + 0.35 + seeded(effect.BoltSeed, 9) * 0.7
+			effect.BoltUntil = t + 0.2
+			effect.NextBolt = t + 0.3 + seeded(effect.BoltSeed, 9) * 0.6
 		end
 		if t < effect.BoltUntil then
 			local seed = effect.BoltSeed
 			local start = seeded(seed, 1) * perimeter
-			local length = 50 + seeded(seed, 2) * 70
-			local flicker = if math.floor(t * 40) % 2 == 0 then 1 else 0.6
+			local length = 60 + seeded(seed, 2) * 80
+			local flicker = if math.floor(t * 40) % 2 == 0 then 1 else 0.55
 			local previous = nil
 			for i = 0, BOLT do
 				local at, inward = around(start + length * i / BOLT, w, h, BAND / 2)
-				local p = at + inward * (seeded(seed * 17 + i, 4) * 6)
+				local p = at + inward * (seeded(seed * 17 + i, 4) * 9)
 				if previous then
-					line(effect.Bolt[i], previous, p, 1.8, theme.Hot, 0.95 * flicker)
+					line(effect.Bolt[i], previous, p, 2, theme.Hot, 0.95 * flicker)
 				end
 				previous = p
 			end
