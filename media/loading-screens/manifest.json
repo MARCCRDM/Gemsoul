@@ -1,0 +1,82 @@
+[
+  {
+    "file": "01-socket-your-gems.jpg",
+    "slug": "01-socket-your-gems",
+    "title": "SOCKET YOUR GEMS",
+    "tip": "Gems and armor are married. Every piece has a socket \u2014 drop a gem in and watch it come alive.",
+    "unlock": "always",
+    "week1_weight": 3
+  },
+  {
+    "file": "02-charge-2.jpg",
+    "slug": "02-charge-2",
+    "title": "CHARGE 2.0",
+    "tip": "Charge builds only when you land hits. The bigger the surge, the fuller the bar it drinks.",
+    "unlock": "always",
+    "week1_weight": 3
+  },
+  {
+    "file": "03-stamina-is-your-guard.jpg",
+    "slug": "03-stamina-is-your-guard",
+    "title": "STAMINA IS YOUR GUARD",
+    "tip": "Blocks drain Stamina. Hit zero and your guard shatters \u2014 dodge instead of eating every hit.",
+    "unlock": "always",
+    "week1_weight": 3
+  },
+  {
+    "file": "04-elemental-reactions.jpg",
+    "slug": "04-elemental-reactions",
+    "title": "ELEMENTAL REACTIONS",
+    "tip": "Elements don't just stack \u2014 they collide. Mix Thermal with Cryo and shatter the fight open.",
+    "unlock": "from day 2",
+    "week1_weight": 3
+  },
+  {
+    "file": "05-the-four-elements.jpg",
+    "slug": "05-the-four-elements",
+    "title": "THE FOUR ELEMENTS",
+    "tip": "Thermal burns. Cryo freezes. Ion interrupts. Corrosive rots. Learn the colors, read the fight.",
+    "unlock": "always",
+    "week1_weight": 1
+  },
+  {
+    "file": "06-boss-loot-pick-one.jpg",
+    "slug": "06-boss-loot-pick-one",
+    "title": "BOSS LOOT: PICK ONE",
+    "tip": "Five pieces drop. You take one. The rest go to the Market \u2014 with your name on the commission.",
+    "unlock": "after first dungeon",
+    "week1_weight": 1
+  },
+  {
+    "file": "07-the-market.jpg",
+    "slug": "07-the-market",
+    "title": "THE MARKET IS PLAYER-RUN",
+    "tip": "Every gem and piece you see was mined or fought for by a real player. Your surplus is somebody's dream.",
+    "unlock": "after first duplicate",
+    "week1_weight": 1
+  },
+  {
+    "file": "08-set-bonuses.jpg",
+    "slug": "08-set-bonuses",
+    "title": "SET BONUSES",
+    "tip": "Matching armor sets pay 2, 4 and 6-piece bonuses. Commit to a family, or mix for the right traits.",
+    "unlock": "always",
+    "week1_weight": 1
+  },
+  {
+    "file": "09-pivot-between-rounds.jpg",
+    "slug": "09-pivot-between-rounds",
+    "title": "PIVOT BETWEEN ROUNDS",
+    "tip": "Read their colors. Thirty seconds, three presets \u2014 counter them or lose again.",
+    "unlock": "after first duel",
+    "week1_weight": 1
+  },
+  {
+    "file": "10-mine-deeper.jpg",
+    "slug": "10-mine-deeper",
+    "title": "MINE DEEPER, FIND RARER",
+    "tip": "Surface stones are common. Depth is where the legends glow. Bring a sword \u2014 you won't be alone.",
+    "unlock": "always",
+    "week1_weight": 1
+  }
+]
