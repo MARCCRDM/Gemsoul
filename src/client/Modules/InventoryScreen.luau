@@ -100,7 +100,8 @@ local HEADING, BOLD, BODY = IronUi.Heading, IronUi.Bold, IronUi.Body
 
 local W, H = 1400, 638
 local ROSTER_H = 0
-local LEFT_W, RIGHT_X, PANEL_H = 810, 900, 588
+-- The stash on the right is the gear column's twin: same width, same height.
+local LEFT_W, RIGHT_X, PANEL_H = 810, 1400 - 18 - 300, 588
 
 local function round(object: GuiObject, radius: number)
 	new("UICorner", { CornerRadius = UDim.new(0, radius) }, object)
@@ -808,7 +809,7 @@ for _, text in { scoutReveal, scoutMix, scoutTip } do
 	text.TextYAlignment = Enum.TextYAlignment.Top
 end
 
-local RIGHT_W = W - RIGHT_X
+local RIGHT_W = W - RIGHT_X - 18
 local tabHolder = new("Frame", { BackgroundTransparency = 1 }, right)
 at(tabHolder, 16, 48, RIGHT_W - 32, 38)
 local contextTitle = at(label(right, "SHARED STASH", 14, C.Text, HEADING), 16, 10, RIGHT_W - 100, 28)
@@ -864,7 +865,7 @@ local function scroller(parent: Instance, y: number): ScrollingFrame
 		Size = UDim2.new(1, 0, 1, -y),
 	}, parent)
 	new("UIGridLayout", {
-		CellSize = UDim2.new(1 / 3, -7, 0, 92), -- three across, filling the panel
+		CellSize = UDim2.new(1, -4, 0, 92), -- one card per row in the slim stash
 		CellPadding = UDim2.fromOffset(9, 9),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, frame)
@@ -1052,8 +1053,12 @@ end
 
 -- A row of filter chips; `current` is lit gold.
 local function filterRow(entries: { any }, current: string, onPick: (string) -> ())
-	local chips = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 26) }, page)
-	UiKit.list(chips, 6, true)
+	local chips = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 48) }, page)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(1 / 3, -4, 0, 22),
+		CellPadding = UDim2.fromOffset(6, 4),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, chips)
 	for i, entry in entries do
 		local on = current == entry[1]
 		local chip = new("TextButton", {
@@ -1062,8 +1067,6 @@ local function filterRow(entries: { any }, current: string, onPick: (string) -> 
 			Font = BOLD,
 			TextColor3 = if on then P.Frame else (entry[3] or C.Dim),
 			BackgroundColor3 = if on then P.Gold else C.Card,
-			Size = UDim2.fromOffset(0, 26),
-			AutomaticSize = Enum.AutomaticSize.X,
 			LayoutOrder = i,
 		}, chips)
 		round(chip, 4)
@@ -1155,7 +1158,7 @@ local function drawGems()
 		end
 		return (a.Element or "") < (b.Element or "")
 	end)
-	local grid = scroller(page, 36)
+	local grid = scroller(page, 54)
 	if #gems == 0 then
 		emptyNote(
 			page,
@@ -1189,7 +1192,7 @@ local function drawGems()
 		elseif contextSlot then "CHOOSE A GEM TO ENCHANT YOUR " .. SLOT_LABEL[contextSlot]
 		elseif selection and selection.Kind == "Gem"
 		then string.upper(gemName(selection.Gem)) .. "  ·  TAP FOR DETAILS, OR DRAG IT ONTO A SOCKET"
-		else "DRAG A GEM ONTO A GEAR SOCKET OR A Q · E · R KEY"
+		else "DRAG A GEM ONTO GEAR OR Q · E · R"
 end
 
 -- ARMOR: spare gear, filtered by slot. Its 3D previews come from the server.
@@ -1283,7 +1286,7 @@ local function drawArmor()
 		armorFilter = id
 		draw()
 	end)
-	local grid = scroller(page, 36)
+	local grid = scroller(page, 54)
 	local all = spareItems()
 	local loadout = loadoutNow()
 	requestPreviews(all)
@@ -2333,10 +2336,11 @@ local function drawRight()
 	-- The inventory lines up with the gear column: top of the helmet card to
 	-- the foot of the shield card.
 	local rightH = 5 * 88 + 84
-	at(right, RIGHT_X, ROSTER_H + BODY_Y, W - RIGHT_X - 18, rightH)
-	at(page, 16, 94, W - RIGHT_X - 50, rightH - 94 - 40)
-	at(footerLine, 16, rightH - 38, W - RIGHT_X - 50, 1)
-	at(footer, 16, rightH - 32, W - RIGHT_X - 50, 20)
+	at(right, RIGHT_X, ROSTER_H + BODY_Y, RIGHT_W, rightH)
+	at(page, 12, 94, RIGHT_W - 24, rightH - 94 - 40)
+	at(footerLine, 12, rightH - 38, RIGHT_W - 24, 1)
+	at(footer, 12, rightH - 32, RIGHT_W - 24, 20)
+	footer.TextWrapped = true
 	contextClose.Visible = contextSlot ~= nil or contextKey ~= nil or selection ~= nil
 	pickerClose.Visible = contextSlot ~= nil or contextKey ~= nil
 	-- Gear down the left, the miner in the middle, the inventory on the right.
