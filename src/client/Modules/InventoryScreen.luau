@@ -43,6 +43,7 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GearArt = require(script.Parent.GearArt)
 local InventoryPose = require(script.Parent.InventoryPose)
 local SurgeIcons = require(script.Parent.SurgeIcons)
+local ElementCardFX = require(script.Parent.ElementCardFX)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -681,6 +682,7 @@ for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } 
 	card.GemWell = box(card.Cell, C.Track, 5)
 	at(card.GemWell, 113, 32, 70, 25)
 	card.GemEdge = stroke(card.GemWell, C.PanelEdge, 1, 0.5)
+	card.FX = ElementCardFX.create(card.Cell, card.GemWell)
 	card.GemArt = new("Frame", { BackgroundTransparency = 1 }, card.Cell)
 	at(card.GemArt, 123, 28, 50, 32)
 	card.GemLabel = at(label(card.Cell, "NO GEM", 8, C.Faint, BOLD), 106, 58, 84, 10)
@@ -763,6 +765,9 @@ for i, key in { "Q", "E", "R" } do
 	ui.Icon.Parent = ui.IconMount
 	ui.Icon.Position, ui.Icon.Size = UDim2.fromOffset(3, 3), UDim2.new(1, -6, 1, -6)
 	ui.GemBadge = box(keyBox, C.Track, 4)
+	local gemFXArea = new("Frame", { BackgroundTransparency = 1 }, ui.GemBadge)
+	at(gemFXArea, 2, 0, 28, 22)
+	ui.FX = ElementCardFX.create(keyBox, gemFXArea)
 	ui.Art.Parent = ui.GemBadge
 	ui.Element = label(ui.GemBadge, "", 8, C.Dim, BOLD)
 	ui.Element.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2203,6 +2208,7 @@ local function drawLeft()
 		end
 		card.GemLabel.Text = if gem then string.upper(GemConfig.elementName(gem.Element)) else "NO GEM"
 		card.GemLabel.TextColor3 = if gem then gemColor(gem) else C.Faint
+		card.Element = gem and gem.Element
 		card.GemLabel.BackgroundColor3 = if gem then gemColor(gem) else C.PanelEdge
 		card.GearEdge.Color = color:Lerp(C.PanelEdge, 0.55)
 		card.Stats.TextColor3 = if stats[1] then STAT[stats[1].Name] or C.Text else C.Dim
@@ -2246,6 +2252,7 @@ local function drawLeft()
 		local gem = Tech.surgeGem(loadout, key)
 		local surge = gem and Tech.surgeStats(gem)
 		local tint = if gem then gemColor(gem) else C.PanelEdge
+		ui.ElementFX = gem and gem.Element
 		local picked = contextKey == key or (selection and selection.Kind == "Key" and selection.Key == key)
 		ui.Stroke.Color = if picked then C.Gold elseif ui.Hovered then tint else C.PanelEdge:Lerp(tint, 0.3)
 		ui.Stroke.Thickness = if picked then 2 else 1
@@ -2382,6 +2389,16 @@ local rosterSignature, rosterRequest = "", false
 local function visible(): boolean
 	return hostGui ~= nil and hostGui.Enabled
 end
+local fxElapsed = 0
+game:GetService("RunService").Heartbeat:Connect(function(dt)
+	if not visible() or inventoryModal.Visible then return end
+	fxElapsed += dt
+	if fxElapsed < 1 / 30 then return end
+	fxElapsed = 0
+	local now = os.clock()
+	for _, card in wornCards do ElementCardFX.update(card.FX, card.Element, now) end
+	for _, ui in surgeKeys do ElementCardFX.update(ui.FX, ui.ElementFX, now) end
+end)
 function draw()
 	if drawQueued then
 		return
