@@ -40,7 +40,7 @@ local function launch(action)
 	InventoryScreen.cancelDrag()
 	action()
 end
-local W, H = 1432, 694
+local W, H = 1432, 644
 
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false)
 pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.Backpack, false)
@@ -195,32 +195,35 @@ local readiness = label(root, "LOADOUT", 11, P.Dim, IronUi.Bold)
 place(readiness, 28, 651, 230, 14)
 local readinessValue = label(root, "Syncing equipment…", 14, P.Text, IronUi.Body)
 place(readinessValue, 28, 666, 400, 20)
+-- The gear column already shows what's on; the bottom row stays one line.
+readiness.Visible, readinessValue.Visible = false, false
 
 local wallet = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.fromOffset(W - 16, 646),
-	Size = UDim2.fromOffset(0, 48),
+	-- One row with the menu buttons, just left of BACK TO LOBBY.
+	Position = UDim2.fromOffset(W - 16 - 186, 597),
+	Size = UDim2.fromOffset(0, 40),
 	AutomaticSize = Enum.AutomaticSize.X,
 }, root)
 UiKit.list(wallet, 10, true)
 local function pill(order: number, caption: string, color: Color3, width: number): (Frame, TextLabel)
 	local frame = new("Frame", {
 		BackgroundColor3 = InventoryScreen.Colors.Panel,
-		Size = UDim2.fromOffset(width, 44),
+		Size = UDim2.fromOffset(width, 40),
 		LayoutOrder = order,
 	}, wallet)
 	UiKit.round(frame, 12)
 	new("UIStroke", { Color = InventoryScreen.Colors.PanelEdge, Thickness = 1 }, frame)
-	local ic = label(frame, caption, 12, color, IronUi.Bold)
-	place(ic, 12, 6, width - 24, 12)
-	local value = label(frame, "0", 21, Color3.new(1, 1, 1), IronUi.Heading)
-	place(value, 12, 18, width - 24, 21)
+	local ic = label(frame, caption, 10, color, IronUi.Bold)
+	place(ic, 10, 4, width - 20, 11)
+	local value = label(frame, "0", 18, Color3.new(1, 1, 1), IronUi.Heading)
+	place(value, 10, 16, width - 20, 19)
 	value.TextXAlignment = Enum.TextXAlignment.Left
 	return frame, value
 end
 -- The free pick's charge (it refills while you're away; see ChargeMeter).
-local pickFrame, pickValue = pill(0, "FREE PICK", ChargeMeter.Charging, 136)
+local pickFrame, pickValue = pill(0, "FREE PICK", ChargeMeter.Charging, 120)
 local pickTrack = new("Frame", {
 	BackgroundColor3 = P.Slot,
 	Position = UDim2.new(0, 12, 1, -4),
@@ -230,9 +233,9 @@ UiKit.round(pickTrack, 2)
 local pickFill = new("Frame", { BackgroundColor3 = ChargeMeter.Charging, Size = UDim2.fromScale(1, 1) }, pickTrack)
 UiKit.round(pickFill, 2)
 local pickCaption = pickFrame:FindFirstChildWhichIsA("TextLabel")
-local _, coinsValue = pill(1, "COINS", P.Gold, 136)
+local _, coinsValue = pill(1, "COINS", P.Gold, 100)
 -- The Season level doubles as the way into the Season Path.
-local seasonFrame, marksValue = pill(2, "SEASON", P.Teal, 150)
+local seasonFrame, marksValue = pill(2, "SEASON", P.Teal, 104)
 local seasonTrack = new("Frame", {
 	BackgroundColor3 = P.Slot,
 	Position = UDim2.new(0, 12, 1, -4),

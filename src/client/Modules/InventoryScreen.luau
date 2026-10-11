@@ -1996,6 +1996,7 @@ end)
 
 local bar = new("Frame", { BackgroundTransparency = 1 }, root)
 at(bar, 0, ROSTER_H + PANEL_H + 6, W - 230, 46)
+new("UIScale", { Scale = 0.82 }, bar)
 local barList = UiKit.list(bar, 8, true)
 barList.VerticalAlignment = Enum.VerticalAlignment.Center
 local function openModule(name: string, method: string)
@@ -2026,7 +2027,7 @@ do
 	local b = IronUi.button(bar, spec[1], spec[2], spec[3])
 	b.LayoutOrder = order
 end
-local backButton = chunkButton(root, "BACK TO LOBBY", P.Gold, UDim2.fromOffset(210, 42), function()
+local backButton = chunkButton(root, "BACK TO LOBBY", P.Gold, UDim2.fromOffset(176, 40), function()
 	InventoryScreen.cancelDrag()
 	local LobbyUI = require(script.Parent.LobbyUI) :: any
 	if LobbyUI.closeDashboard then
