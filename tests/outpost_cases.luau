@@ -489,7 +489,7 @@ check(
 	target.Model:GetAttribute("LastHitBy") == 1 and target.Model:GetAttribute("ClaimedBy") == 1,
 	"Others can't see who's mining it"
 )
-check(ana.Character:GetAttribute("ActionKind") == "Heavy", "No chop for others to see")
+check(ana.Character:GetAttribute("ActionKind") == "Mine", "No chop for others to see")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Swung faster than the pick allows")
 -- Ben can't steal it while Ana is on it, but can once she walks away.
 standBy(benRoot, target)

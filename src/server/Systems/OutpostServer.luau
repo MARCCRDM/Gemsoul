@@ -401,11 +401,11 @@ local function hit(player: Player, nodeId: any)
 	model:SetAttribute("LastHitBy", player.UserId)
 	model:SetAttribute("LastCrit", crit)
 	model:SetAttribute("Hp", node.Hp)
-	-- The chop, for everyone to see (Client BodyPoses).
+	-- The pick chop (RivalPose "Mine": overhead and down), for everyone to see.
 	local character = player.Character
 	if character then
 		local t = workspace:GetServerTimeNow()
-		character:SetAttribute("ActionKind", "Heavy")
+		character:SetAttribute("ActionKind", "Mine")
 		character:SetAttribute("ActionStart", t - 0.12)
 		character:SetAttribute("ActionAt", t + 0.05)
 	end

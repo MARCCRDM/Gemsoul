@@ -376,7 +376,7 @@ local function frontierShield(folder, character, accent, gem, finish, rarity, fa
 	-- in front of the body with its face to the foe, as your own does in
 	-- first person.
 	local fist = character:GetAttribute("FistGrip") == true
-	local mount = CFrame.new(-(arm.Size.X / 2 + 0.2), 0, 0)
+	local mount = CFrame.new(-(arm.Size.X / 2 + (if fist then 0.2 else 0.1)), 0, 0)
 		* CFrame.Angles(0, math.rad(if fist then 110 else 90), 0)
 		* CFrame.Angles(0, 0, if fist then math.rad(-90) else 0)
 	FrontierAssets.shield(folder, arm, mount, rarity, accent, finish, family)
