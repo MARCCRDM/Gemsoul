@@ -266,6 +266,30 @@ function IronUi.emblem(parent: Instance, kind: string, color: Color3, size: numb
 		bar(0.32, 0.72, 0.36, 0.055)
 		bar(0.4, 0.81, 0.2, 0.055)
 		bar(0.47, 0.3, 0.06, 0.26)
+	elseif kind == "Market" then
+		-- A trading crate: the box, its lid and a strap.
+		outline(0.16, 0.36, 0.68, 0.46)
+		bar(0.12, 0.26, 0.76, 0.08)
+		bar(0.47, 0.36, 0.06, 0.46)
+	elseif kind == "Ranks" then
+		-- Three rank chevrons stacked up.
+		for i = 0, 2 do
+			local y = 0.2 + i * 0.22
+			bar(0.17, y + 0.06, 0.36, 0.07, -32)
+			bar(0.47, y + 0.06, 0.36, 0.07, 32)
+		end
+	elseif kind == "Social" then
+		-- Two miners, shoulder to shoulder.
+		for _, x in { 0.14, 0.5 } do
+			corner(outline(x + 0.07, 0.16, 0.22, 0.22), UDim.new(1, 0))
+			corner(outline(x, 0.46, 0.36, 0.34), UDim.new(0.3, 0))
+		end
+	elseif kind == "Invite" then
+		-- A miner and a plus.
+		corner(outline(0.16, 0.16, 0.26, 0.26), UDim.new(1, 0))
+		corner(outline(0.08, 0.5, 0.42, 0.34), UDim.new(0.3, 0))
+		bar(0.6, 0.47, 0.3, 0.07)
+		bar(0.715, 0.355, 0.07, 0.3)
 	else
 		for i = 0, 2 do
 			local coin = outline(0.2 + i * 0.1, 0.17 + i * 0.16, 0.45, 0.3)
