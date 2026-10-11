@@ -100,7 +100,7 @@ local HEADING, BOLD, BODY = IronUi.Heading, IronUi.Bold, IronUi.Body
 
 local W, H = 1400, 638
 local ROSTER_H = 0
-local LEFT_W, RIGHT_X, PANEL_H = 810, 826, 588
+local LEFT_W, RIGHT_X, PANEL_H = 810, 900, 588
 
 local function round(object: GuiObject, radius: number)
 	new("UICorner", { CornerRadius = UDim.new(0, radius) }, object)
@@ -410,7 +410,7 @@ local function renderMiner(view: ViewportFrame, source: Model, loadout)
 	local bounds, size = copy:GetBoundingBox()
 	local camera = new("Camera", { FieldOfView = 30 }, view)
 	local distance = math.max(size.Y * 0.65, size.X * 0.9) / math.tan(math.rad(15))
-	camera.CFrame = CFrame.lookAt(bounds.Position + Vector3.new(distance * 0.15, size.Y * 0.03, -distance), bounds.Position)
+	camera.CFrame = CFrame.lookAt(bounds.Position + Vector3.new(distance * 0.08, size.Y * 0.03, -distance), bounds.Position)
 	view.CurrentCamera = camera
 end
 
@@ -2147,8 +2147,8 @@ local function drawLeft()
 			-- The Armory: your active miner fills the stage; the other two wait
 			-- in the top corners, a tap away.
 			local goal = {
-				Position = UDim2.fromScale(({ [0] = 0.09, [1] = 0.5, [2] = 0.91 })[position], if on then 0.52 else 0.21),
-				Size = UDim2.fromScale(if on then 0.46 else 0.15, if on then 1 else 0.4),
+				Position = UDim2.fromScale(({ [0] = 0.09, [1] = 0.5, [2] = 0.91 })[position], if on then 0.5 else 0.21),
+				Size = UDim2.fromScale(if on then 0.62 else 0.15, if on then 1.06 else 0.4),
 			}
 			card.Button.ZIndex = if on then 3 else 2
 			card.Tween = TweenService:Create(card.Button, TweenInfo.new(if first then 0 else 0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), goal)
