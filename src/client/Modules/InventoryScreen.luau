@@ -750,6 +750,38 @@ for i, key in { "Q", "E", "R" } do
 	description.TextYAlignment = Enum.TextYAlignment.Top
 	description.TextTruncate = Enum.TextTruncate.AtEnd
 	surgeKeys[key].Description = description
+	local ui = surgeKeys[key]
+	keyBox.BackgroundColor3 = Color3.new(1, 1, 1)
+	keyBox.AutoButtonColor = false
+	keyBox.ClipsDescendants = true
+	keyBox:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 8)
+	ui.Glow = new("UIGradient", { Rotation = 110, Color = ColorSequence.new(C.Card, C.Panel) }, keyBox)
+	ui.Rail = box(keyBox, C.Accent, 0)
+	ui.Rail.Position, ui.Rail.Size = UDim2.fromOffset(8, 0), UDim2.new(1, -16, 0, 2)
+	ui.IconMount = box(keyBox, Color3.fromRGB(7, 15, 24), 6)
+	ui.IconEdge = stroke(ui.IconMount, C.PanelEdge, 1)
+	ui.Icon.Parent = ui.IconMount
+	ui.Icon.Position, ui.Icon.Size = UDim2.fromOffset(3, 3), UDim2.new(1, -6, 1, -6)
+	ui.GemBadge = box(keyBox, C.Track, 4)
+	ui.Art.Parent = ui.GemBadge
+	ui.Element = label(ui.GemBadge, "", 8, C.Dim, BOLD)
+	ui.Element.TextTruncate = Enum.TextTruncate.AtEnd
+	ui.KeyBadge = box(keyBox, C.Track, 4)
+	ui.Letter.Parent = ui.KeyBadge
+	ui.Charge = box(keyBox, Color3.fromRGB(14, 30, 39), 4)
+	ui.ChargeText = label(ui.Charge, "", 10, C.Accent, BOLD)
+	ui.Cooldown = box(keyBox, Color3.fromRGB(24, 29, 40), 4)
+	ui.CooldownText = label(ui.Cooldown, "", 10, C.Text, BOLD)
+	for _, text in { ui.ChargeText, ui.CooldownText } do
+		text.Size = UDim2.fromScale(1, 1)
+		text.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	ui.Info.Visible = false
+	ui.Name.TextSize = 12
+	ui.Name.TextWrapped = false
+	ui.Name.TextTruncate = Enum.TextTruncate.AtEnd
+	keyBox.MouseEnter:Connect(function() ui.Hovered = true; draw() end)
+	keyBox.MouseLeave:Connect(function() ui.Hovered = false; draw() end)
 	table.insert(dropTargets, {
 		Frame = keyBox,
 		Stroke = edge,
@@ -2215,14 +2247,22 @@ local function drawLeft()
 		local surge = gem and Tech.surgeStats(gem)
 		local tint = if gem then gemColor(gem) else C.PanelEdge
 		local picked = contextKey == key or (selection and selection.Kind == "Key" and selection.Key == key)
-		ui.Stroke.Color = if picked then C.Gold else tint
-		ui.Stroke.Thickness = if picked then 2.5 else 1.5
+		ui.Stroke.Color = if picked then C.Gold elseif ui.Hovered then tint else C.PanelEdge:Lerp(tint, 0.3)
+		ui.Stroke.Thickness = if picked then 2 else 1
+		ui.Rail.BackgroundColor3 = tint
+		ui.IconEdge.Color = tint:Lerp(C.PanelEdge, 0.4)
+		ui.Glow.Color = ColorSequence.new(Color3.fromRGB(22, 34, 48):Lerp(tint, if ui.Hovered then 0.18 else 0.08), C.Panel)
+		ui.Element.Text = if gem then string.upper(GemConfig.elementName(gem.Element)) .. " · " .. rarityName(gemRarity(gem)) else "NO GEM EQUIPPED"
+		ui.Element.TextColor3 = if gem then tint:Lerp(C.Text, 0.4) else C.Dim
+		ui.GemBadge.BackgroundColor3 = C.Track:Lerp(tint, 0.12)
+		ui.ChargeText.Text = if surge then whole(surge.Cost or 0) .. " CHARGE" else "— CHARGE"
+		ui.CooldownText.Text = if surge then whole(surge.Cooldown or 0) .. "s COOLDOWN" else "— COOLDOWN"
 		ui.Name.Text = if surge then surge.Name else "empty"
 		ui.Icon.Text = if surge then "◆" else "+"
 		SurgeIcons.apply(ui.Icon, surge, tint)
 		ui.Description.Text = if surge then surge.Description or "Select for ability details." else "Choose a gem to equip its ability on " .. key .. "."
 		ui.Info.Text = if surge then string.format("%s Charge · %ss cooldown", whole(surge.Cost or 0), whole(surge.Cooldown or 0)) else "Select a gem to equip"
-		ui.Name.TextColor3 = if gem then tint else C.Faint
+		ui.Name.TextColor3 = if gem then C.Text else C.Dim
 		ui.Letter.TextColor3 = if gem then C.Text else C.Faint
 		local shown = if gem then gem.Id else ""
 		if ui.Shown ~= shown then
@@ -2280,15 +2320,21 @@ local function drawRight()
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
 	at(surgeCell, MID_X, 380, stageWidth, 144)
 	-- Q/E/R stay visible in both the wide stage and drawer layouts.
-	local surgeWidth = (stageWidth - 32) / 3
+	local surgeWidth = (stageWidth - 40) / 3
 	for index, key in { "Q", "E", "R" } do
 		local ui = surgeKeys[key]
-		at(ui.Box, 12 + (index - 1) * (surgeWidth + 4), 25, surgeWidth, 112)
-		at(ui.Letter, 4, 4, 18, 18)
-		at(ui.Icon, 26, 6, 40, 40)
-		at(ui.Art, 70, 10, 30, 30)
-		at(ui.Name, 106, 8, surgeWidth - 114, 34)
-		at(ui.Description, 8, 49, surgeWidth - 16, 38)
+		at(ui.Box, 12 + (index - 1) * (surgeWidth + 8), 25, surgeWidth, 112)
+		at(ui.KeyBadge, surgeWidth - 27, 7, 20, 20)
+		at(ui.Letter, 0, 0, 20, 20)
+		at(ui.IconMount, 8, 8, 48, 48)
+		at(ui.GemBadge, 64, 32, surgeWidth - 72, 22)
+		at(ui.Art, 2, 0, 28, 22)
+		at(ui.Element, 33, 0, surgeWidth - 109, 22)
+		at(ui.Name, 64, 9, surgeWidth - 96, 18)
+		at(ui.Description, 8, 61, surgeWidth - 16, 28)
+		local chipWidth = (surgeWidth - 22) / 2
+		at(ui.Charge, 8, 92, chipWidth, 16)
+		at(ui.Cooldown, 14 + chipWidth, 92, chipWidth, 16)
 		ui.Name.TextXAlignment = Enum.TextXAlignment.Left
 		at(ui.Info, 8, 92, surgeWidth - 16, 16)
 		ui.Info.TextWrapped = true
