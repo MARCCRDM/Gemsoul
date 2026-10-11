@@ -865,8 +865,8 @@ local function scroller(parent: Instance, y: number): ScrollingFrame
 		Size = UDim2.new(1, 0, 1, -y),
 	}, parent)
 	new("UIGridLayout", {
-		CellSize = UDim2.new(1, -4, 0, 92), -- one card per row in the slim stash
-		CellPadding = UDim2.fromOffset(9, 9),
+		CellSize = UDim2.new(0.5, -6, 0, 96), -- two compact cards per row
+		CellPadding = UDim2.fromOffset(6, 6),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, frame)
 	new(
@@ -1014,19 +1014,29 @@ local function bagCard(
 	card:SetAttribute("UiSound", "Click")
 	local selected = selection ~= nil and samePick(selection, dragItem)
 	stroke(card, if selected then C.Gold else color, if selected then 2.5 else 1.5, if selected then 0 else 0.2)
+	-- Compact, two to a row: art and element tag on top, name, rarity and
+	-- (for a gem) its Size / Clarity / Cut underneath.
 	local art = box(card, P.Frame, 4)
-	at(art, 8, 8, 52, 52)
+	at(art, 6, 6, 40, 40)
 	paint(art)
-	at(label(card, title, 12, color:Lerp(C.Text, 0.45), BOLD), 66, 12, 98, 30).TextWrapped = true
-	at(label(card, sub, 9, color, BOLD), 66, 44, 98, 14)
+	local name = label(card, title, 11, color:Lerp(C.Text, 0.45), BOLD)
+	name.Position, name.Size = UDim2.fromOffset(6, 50), UDim2.new(1, -12, 0, 14)
+	local rarity = label(card, sub, 8, color, BOLD)
+	rarity.Position, rarity.Size = UDim2.fromOffset(6, 65), UDim2.new(1, -12, 0, 11)
+	local gem = dragItem and dragItem.Gem
+	if gem and gem.Cut then
+		local stats = label(card, string.format("SIZE %s · CLR %s · CUT %s", tostring(gem.Size or "-"), tostring(gem.Clarity or "-"), tostring(gem.Cut or "-")), 8, C.Dim, BOLD)
+		stats.Position, stats.Size = UDim2.fromOffset(6, 79), UDim2.new(1, -12, 0, 11)
+	end
 	local badge = new("TextLabel", {
 		Text = tag,
-		TextSize = 9,
+		TextSize = 8,
 		Font = BOLD,
 		TextColor3 = tagColor,
 		BackgroundColor3 = P.Frame,
-		Position = UDim2.fromOffset(8, 66),
-		Size = UDim2.fromOffset(0, 18),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -6, 0, 6),
+		Size = UDim2.fromOffset(0, 16),
 		AutomaticSize = Enum.AutomaticSize.X,
 	}, card)
 	round(badge, 3)
