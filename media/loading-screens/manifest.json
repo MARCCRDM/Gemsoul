@@ -5,7 +5,8 @@
     "title": "SOCKET YOUR GEMS",
     "tip": "Gems and armor are married. Every piece has a socket \u2014 drop a gem in and watch it come alive.",
     "unlock": "always",
-    "week1_weight": 3
+    "week1_weight": 3,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "02-charge-2.jpg",
@@ -13,7 +14,8 @@
     "title": "CHARGE 2.0",
     "tip": "Charge builds only when you land hits. The bigger the surge, the fuller the bar it drinks.",
     "unlock": "always",
-    "week1_weight": 3
+    "week1_weight": 3,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "03-stamina-is-your-guard.jpg",
@@ -21,7 +23,8 @@
     "title": "STAMINA IS YOUR GUARD",
     "tip": "Blocks drain Stamina. Hit zero and your guard shatters \u2014 dodge instead of eating every hit.",
     "unlock": "always",
-    "week1_weight": 3
+    "week1_weight": 3,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "04-elemental-reactions.jpg",
@@ -29,7 +32,8 @@
     "title": "ELEMENTAL REACTIONS",
     "tip": "Elements don't just stack \u2014 they collide. Mix Thermal with Cryo and shatter the fight open.",
     "unlock": "from day 2",
-    "week1_weight": 3
+    "week1_weight": 3,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "05-the-four-elements.jpg",
@@ -37,7 +41,8 @@
     "title": "THE FOUR ELEMENTS",
     "tip": "Thermal burns. Cryo freezes. Ion interrupts. Corrosive rots. Learn the colors, read the fight.",
     "unlock": "always",
-    "week1_weight": 1
+    "week1_weight": 1,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "06-boss-loot-pick-one.jpg",
@@ -45,7 +50,8 @@
     "title": "BOSS LOOT: PICK ONE",
     "tip": "Five pieces drop. You take one. The rest go to the Market \u2014 with your name on the commission.",
     "unlock": "after first dungeon",
-    "week1_weight": 1
+    "week1_weight": 1,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "07-the-market.jpg",
@@ -53,7 +59,8 @@
     "title": "THE MARKET IS PLAYER-RUN",
     "tip": "Every gem and piece you see was mined or fought for by a real player. Your surplus is somebody's dream.",
     "unlock": "after first duplicate",
-    "week1_weight": 1
+    "week1_weight": 1,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "08-set-bonuses.jpg",
@@ -61,7 +68,8 @@
     "title": "SET BONUSES",
     "tip": "Matching armor sets pay 2, 4 and 6-piece bonuses. Commit to a family, or mix for the right traits.",
     "unlock": "always",
-    "week1_weight": 1
+    "week1_weight": 1,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "09-pivot-between-rounds.jpg",
@@ -69,7 +77,8 @@
     "title": "PIVOT BETWEEN ROUNDS",
     "tip": "Read their colors. Thirty seconds, three presets \u2014 counter them or lose again.",
     "unlock": "after first duel",
-    "week1_weight": 1
+    "week1_weight": 1,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   },
   {
     "file": "10-mine-deeper.jpg",
@@ -77,6 +86,7 @@
     "title": "MINE DEEPER, FIND RARER",
     "tip": "Surface stones are common. Depth is where the legends glow. Bring a sword \u2014 you won't be alone.",
     "unlock": "always",
-    "week1_weight": 1
+    "week1_weight": 1,
+    "art_refs": "Gemsoul repo assets: intro style renders / boss previews / combat reel"
   }
 ]
