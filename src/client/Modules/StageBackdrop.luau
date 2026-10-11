@@ -25,11 +25,12 @@ local SEAM = Color3.fromRGB(110, 150, 170)
 local HORIZON = 0.58 -- where the back wall meets the floor (fraction of height)
 local MOTES = 18
 
--- Where the miners stand (fractions of the stage): left, middle, right.
+-- Where the miners stand (fractions of the stage): the two waiting in the
+-- top corners and the active one in the middle.
 local PEDESTALS = {
-	{ X = 0.16, Y = 0.6, W = 0.15, Main = false },
-	{ X = 0.5, Y = 0.84, W = 0.24, Main = true },
-	{ X = 0.84, Y = 0.6, W = 0.15, Main = false },
+	{ X = 0.09, Y = 0.37, W = 0.1, Main = false },
+	{ X = 0.5, Y = 0.88, W = 0.26, Main = true },
+	{ X = 0.91, Y = 0.37, W = 0.1, Main = false },
 }
 
 local function make(class: string, props, parent: Instance): any

@@ -632,10 +632,14 @@ wornCard("Boots", 1, 4)
 wornCard("Weapon", 2, 1)
 wornCard("Shield", 2, 2)
 
--- A single equipment rail leaves the character stage uninterrupted.
-for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
+-- The Armory: gear flanks the miner, worn-side by side. Head, chest and
+-- hands on the left; sword, shield and feet on the right.
+local ARMORY_RIGHT_X = W - 18 - CELL_W
+local ARMORY_SIDE = { Helmet = { 1, 1 }, Armor = { 1, 2 }, Gloves = { 1, 3 }, Weapon = { 2, 1 }, Shield = { 2, 2 }, Boots = { 2, 3 } }
+for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
 	local card = wornCards[slot]
-	at(card.Cell, 18, BODY_Y + (index - 1) * 90, CELL_W, 84)
+	local side = ARMORY_SIDE[slot]
+	at(card.Cell, if side[1] == 1 then 18 else ARMORY_RIGHT_X, BODY_Y + (side[2] - 1) * 90, CELL_W, 84)
 	card.Cell:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 8)
 	card.Rail = box(card.Cell, C.PanelEdge, 0)
 	at(card.Rail, 0, 0, 3, 84)
@@ -2133,9 +2137,11 @@ local function drawLeft()
 			local first = card.Position == nil
 			card.Position = position
 			if card.Tween then card.Tween:Cancel() end
+			-- The Armory: your active miner fills the stage; the other two wait
+			-- in the top corners, a tap away.
 			local goal = {
-				Position = UDim2.fromScale(({ [0] = 0.16, [1] = 0.5, [2] = 0.84 })[position], if on then 0.53 else 0.42),
-				Size = UDim2.fromScale(if on then 0.40 else 0.25, if on then 0.96 else 0.68),
+				Position = UDim2.fromScale(({ [0] = 0.09, [1] = 0.5, [2] = 0.91 })[position], if on then 0.52 else 0.21),
+				Size = UDim2.fromScale(if on then 0.46 else 0.15, if on then 1 else 0.4),
 			}
 			card.Button.ZIndex = if on then 3 else 2
 			card.Tween = TweenService:Create(card.Button, TweenInfo.new(if first then 0 else 0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), goal)
@@ -2309,11 +2315,19 @@ local function drawRight()
 	local drawerOpen = contextSlot ~= nil or contextKey ~= nil or tab ~= "Overview"
 	inventoryModal.Visible = drawerOpen
 	right.Visible = drawerOpen
-	local stageWidth = 788
+	-- The Armory: the stage between the two gear columns, Q/E/R under it.
+	local stageWidth = ARMORY_RIGHT_X - 12 - MID_X
 	left.Size = UDim2.fromOffset(W, PANEL_H)
-	at(portrait, MID_X, BODY_Y, stageWidth, 326)
+	at(portrait, MID_X, BODY_Y, stageWidth, 360)
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
-	at(surgeCell, MID_X, 380, stageWidth, 144)
+	at(surgeCell, MID_X, BODY_Y + 366, stageWidth, 144)
+	at(setSummary, MID_X, BODY_Y + 514, stageWidth, 28)
+	-- Scouting sits under the right-hand stats.
+	at(scouting, ARMORY_RIGHT_X, BODY_Y + 3 * 90 + 8 + 3 * 48 + 2, CELL_W, PANEL_H - (BODY_Y + 3 * 90 + 8 + 3 * 48 + 2))
+	scoutReveal.Position, scoutMix.Position, scoutTip.Position =
+		UDim2.fromOffset(10, 26), UDim2.fromOffset(10, 52), UDim2.fromOffset(10, 76)
+	scoutReveal.Size, scoutMix.Size, scoutTip.Size =
+		UDim2.fromOffset(CELL_W - 20, 26), UDim2.fromOffset(CELL_W - 20, 24), UDim2.fromOffset(CELL_W - 20, 36)
 	-- Q/E/R stay visible in both the wide stage and drawer layouts.
 	local surgeWidth = (stageWidth - 40) / 3
 	for index, key in { "Q", "E", "R" } do
@@ -2334,14 +2348,16 @@ local function drawRight()
 		at(ui.Info, 8, 92, surgeWidth - 16, 16)
 		ui.Info.TextWrapped = true
 	end
-	local statWidth = 252
+	-- Stats under the gear columns: body stats left, the build's totals right.
+	local statWidth = CELL_W
 	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		local tile = statTiles[name]
-		at(tile.Tile, 1130, BODY_Y + (index - 1) * 62, statWidth, 58)
+		local column, row = if index <= 3 then 1 else 2, (index - 1) % 3
+		at(tile.Tile, if column == 1 then 18 else ARMORY_RIGHT_X, BODY_Y + 3 * 90 + 8 + row * 48, statWidth, 44)
 		tile.Value.Size = UDim2.fromOffset(statWidth - 16, 22)
 		tile.Bonus.Visible = false
 		local track = tile.Fill.Parent
-		at(track, 10, 51, statWidth - 20, 3)
+		at(track, 10, 38, statWidth - 20, 3)
 	end
 	drawTabs()
 	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
