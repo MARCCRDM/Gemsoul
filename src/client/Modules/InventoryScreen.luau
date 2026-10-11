@@ -85,9 +85,9 @@ local SLOT_LABEL =
 	{ Helmet = "HELMET", Armor = "CHEST", Gloves = "GLOVES", Boots = "BOOTS", Weapon = "WEAPON", Shield = "SHIELD" }
 local HEADING, BOLD, BODY = IronUi.Heading, IronUi.Bold, IronUi.Body
 
-local W, H = 1400, 618
+local W, H = 1400, 638
 local ROSTER_H = 0
-local LEFT_W, RIGHT_X, PANEL_H = 810, 826, 568
+local LEFT_W, RIGHT_X, PANEL_H = 810, 826, 588
 
 local function round(object: GuiObject, radius: number)
 	new("UICorner", { CornerRadius = UDim.new(0, radius) }, object)
@@ -265,7 +265,7 @@ local function panel(x: number, y: number, w: number, h: number, accent: Color3)
 	local frame = box(root, Color3.new(1, 1, 1), 6)
 	at(frame, x, y, w, h)
 	stroke(frame, C.PanelEdge, 1)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(26, 21, 46), C.Panel) }, frame)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(18, 29, 37), C.Panel) }, frame)
 	local rail = new("Frame", {
 		BorderSizePixel = 0,
 		BackgroundColor3 = accent,
@@ -344,13 +344,29 @@ subtitle.RichText = true
 
 -- The stage: your fighter, full height, on a lit plinth.
 local portrait = box(left, P.Frame, 6)
+portrait.BackgroundColor3 = Color3.new(1, 1, 1)
 at(portrait, MID_X, BODY_Y, MID_W, STAGE_H)
 stroke(portrait, C.PanelEdge, 1)
 portrait.ClipsDescendants = true
 new("UIGradient", {
 	Rotation = 90,
-	Color = ColorSequence.new(Color3.fromRGB(40, 33, 70), Color3.fromRGB(14, 12, 26)),
+	Color = ColorSequence.new(Color3.fromRGB(24, 43, 53), Color3.fromRGB(8, 14, 21)),
 }, portrait)
+-- Recessed bay panels and floor lines behind the three miners.
+for index = 1, 7 do
+ local rib = new("Frame", {
+  BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(68, 123, 142),
+  BackgroundTransparency = 0.88, Position = UDim2.fromScale(index / 8, 0),
+  Size = UDim2.new(0, 1, 1, 0),
+ }, portrait)
+end
+for index = 1, 4 do
+ new("Frame", {
+  BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(72, 128, 146),
+  BackgroundTransparency = 0.87, Position = UDim2.fromScale(0, 0.70 + index * 0.065),
+  Size = UDim2.new(1, 0, 0, 1),
+ }, portrait)
+end
 brackets(portrait, P.Gold, 10, 5)
 local plinth = new("Frame", {
 	BorderSizePixel = 0,
@@ -605,7 +621,7 @@ wornCard("Shield", 2, 2)
 -- A single equipment rail leaves the character stage uninterrupted.
 for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
 	local card = wornCards[slot]
-	at(card.Cell, 18, BODY_Y + (index - 1) * 86, CELL_W, 80)
+	at(card.Cell, 18, BODY_Y + (index - 1) * 90, CELL_W, 84)
 	at(card.Art, 8, 20, 34, 34)
 	at(card.Name, 50, 20, CELL_W - 60, 30)
 	card.Name.TextSize = 11
@@ -2078,9 +2094,9 @@ local function drawRight()
 	right.Visible = drawerOpen
 	local stageWidth = W - MID_X - 18
 	left.Size = UDim2.fromOffset(W, PANEL_H)
-	at(portrait, MID_X, BODY_Y, stageWidth, 374)
+	at(portrait, MID_X, BODY_Y, stageWidth, 394)
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
-	at(surgeCell, MID_X, 428, stageWidth, 62)
+	at(surgeCell, MID_X, 448, stageWidth, 62)
 	-- Q/E/R stay visible in both the wide stage and drawer layouts.
 	local surgeWidth = (stageWidth - 126) / 3
 	for index, key in { "Q", "E", "R" } do
@@ -2094,7 +2110,7 @@ local function drawRight()
 	local statWidth = (stageWidth - 5 * TILE_GAP) / 6
 	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		local tile = statTiles[name]
-		at(tile.Tile, MID_X + (index - 1) * (statWidth + TILE_GAP), 500, statWidth, 56)
+		at(tile.Tile, MID_X + (index - 1) * (statWidth + TILE_GAP), 520, statWidth, 56)
 		tile.Value.Size = UDim2.fromOffset(statWidth - 16, 22)
 		tile.Bonus.Visible = false
 		local track = tile.Fill.Parent

@@ -58,49 +58,25 @@ local backdrop = new("Frame", {
 new("UIGradient", {
 	Rotation = 110,
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 17, 44)),
-		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(11, 8, 22)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 14, 38)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(11, 22, 29)),
+		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(7, 11, 17)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 25, 32)),
 	}),
 }, backdrop)
-local pattern = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Size = UDim2.fromScale(1, 1),
-	Text = string.rep(string.rep("·        ", 30) .. "\n", 30),
-	TextSize = 14,
-	LineHeight = 2,
-	Font = Enum.Font.GothamBold,
-	TextColor3 = Color3.new(1, 1, 1),
-	TextTransparency = 0.95,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	TextYAlignment = Enum.TextYAlignment.Top,
-}, backdrop)
-pattern.ClipsDescendants = true
--- Sparse pixel stars; fixed placement avoids moving noise behind readable panels.
-local stars = Random.new(7319)
-for i = 1, 42 do
-	local x, y = stars:NextNumber(), stars:NextNumber()
-	local size = if i % 7 == 0 then 4 else 2
-	local star = new("Frame", {
-		BackgroundColor3 = Color3.fromRGB(220, 210, 255),
-		BackgroundTransparency = 0.8,
-		Size = UDim2.fromOffset(size, size),
-		Position = UDim2.fromScale(x, y),
-	}, backdrop)
-	if i % 7 == 0 then
-		new("Frame", {
-			BackgroundColor3 = Color3.fromRGB(220, 210, 255),
-			BackgroundTransparency = 0.7,
-			Position = UDim2.fromOffset(-3, 1),
-			Size = UDim2.fromOffset(10, 2),
-		}, star)
-		new("Frame", {
-			BackgroundColor3 = Color3.fromRGB(220, 210, 255),
-			BackgroundTransparency = 0.7,
-			Position = UDim2.fromOffset(1, -3),
-			Size = UDim2.fromOffset(2, 10),
-		}, star)
-	end
+-- Subtle survey grid: an equipment bay rather than a starfield.
+for index = 0, 24 do
+ new("Frame", {
+  BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(63, 112, 130),
+  BackgroundTransparency = 0.94, Position = UDim2.fromScale(index / 24, 0),
+  Size = UDim2.new(0, 1, 1, 0),
+ }, backdrop)
+end
+for index = 0, 14 do
+ new("Frame", {
+  BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(63, 112, 130),
+  BackgroundTransparency = 0.94, Position = UDim2.fromScale(0, index / 14),
+  Size = UDim2.new(1, 0, 0, 1),
+ }, backdrop)
 end
 -- The layout is designed at 1432x720 (wide and short, to suit landscape
 -- screens) and scaled to fit the screen, below
@@ -215,22 +191,15 @@ end
 
 -- Header ----------------------------------------------------------------------------------------------------
 
-local logo = IronUi.badge(root, "◆", 44, P.Gold)
-logo.Position = UDim2.fromOffset(18, 8)
-logo.Rotation = 0
-local title = IronUi.wordmark(root)
-place(title, 76, 4, 400, 40)
-local hello = label(root, "", 13, InventoryScreen.Colors.Accent, IronUi.Bold)
-place(hello, 77, 40, 400, 18)
 local readiness = label(root, "LOADOUT", 11, P.Dim, IronUi.Bold)
-place(readiness, 500, 10, 230, 16)
+place(readiness, 28, 651, 230, 14)
 local readinessValue = label(root, "Syncing equipment…", 14, P.Text, IronUi.Body)
-place(readinessValue, 500, 30, 270, 22)
+place(readinessValue, 28, 666, 400, 20)
 
 local wallet = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.fromOffset(W - 16, 6),
+	Position = UDim2.fromOffset(W - 16, 646),
 	Size = UDim2.fromOffset(0, 48),
 	AutomaticSize = Enum.AutomaticSize.X,
 }, root)
@@ -307,7 +276,7 @@ if Config.Playtest and Config.Playtest.Build then
 end
 
 -- The Inventory fills the rest: loadout on the left, bags on the right.
-InventoryScreen.mount(root, gui, UDim2.fromOffset(16, 66))
+InventoryScreen.mount(root, gui, UDim2.fromOffset(16, 0))
 
 local function commas(n: number): string
 	local s = tostring(math.floor(n))
@@ -347,7 +316,6 @@ local function refresh(profile)
 	if not profile then
 		return
 	end
-	hello.Text = "INVENTORY  /  " .. string.upper(player.DisplayName)
 	coinsValue.Text = commas(profile.Coins or 0)
 	local seasonData = profile.Season or { XP = 0, Claimed = {} }
 	local level, into, need = Season.levelFor(seasonData.XP or 0)
