@@ -34,6 +34,7 @@ local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
+local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -41,6 +42,7 @@ local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GearArt = require(script.Parent.GearArt)
 local InventoryPose = require(script.Parent.InventoryPose)
+local SurgeIcons = require(script.Parent.SurgeIcons)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -544,6 +546,7 @@ end
 local wornCards = {}
 local function wornCard(slot: string, column: number, row: number)
 	local cell = cellAt(column, row)
+	cell.ClipsDescendants = true
 	cell.BackgroundColor3 = Color3.new(1, 1, 1) -- the gradient carries the colour
 	local edge = stroke(cell, rarityColor(1), 1.5)
 	local glow = new("UIGradient", { Rotation = 0, Color = ColorSequence.new(C.Card, C.Card) }, cell)
@@ -610,6 +613,14 @@ local function wornCard(slot: string, column: number, row: number)
 		Socket = socket,
 		Metadata = metadata,
 	}
+	hit.MouseEnter:Connect(function()
+		wornCards[slot].Hovered = true
+		draw()
+	end)
+	hit.MouseLeave:Connect(function()
+		wornCards[slot].Hovered = false
+		draw()
+	end)
 	table.insert(dropTargets, {
 		Frame = cell,
 		Stroke = edge,
@@ -636,27 +647,48 @@ wornCard("Shield", 2, 2)
 for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
 	local card = wornCards[slot]
 	at(card.Cell, 18, BODY_Y + (index - 1) * 90, CELL_W, 84)
-	at(card.Art, 23, 32, 48, 35)
+	card.Cell:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 8)
+	card.Rail = box(card.Cell, C.PanelEdge, 0)
+	at(card.Rail, 0, 0, 3, 84)
+	at(card.Metadata, 12, 5, CELL_W - 92, 11)
+	card.Badge = box(card.Cell, C.Track, 4)
+	at(card.Badge, CELL_W - 77, 5, 66, 13)
+	card.Rarity.Parent = card.Badge
+	at(card.Rarity, 2, 0, 62, 13)
+	card.Rarity.TextSize = 8
+	card.Rarity.TextXAlignment = Enum.TextXAlignment.Center
+	card.Rarity.TextTruncate = Enum.TextTruncate.AtEnd
+	at(card.Art, 20, 31, 56, 36)
 	at(card.Name, 10, 17, CELL_W - 20, 14)
-	card.Name.TextSize = 10
+	card.Name.TextSize = 11
 	card.Name.TextWrapped = false
 	card.Name.TextTruncate = Enum.TextTruncate.AtEnd
 	card.Name.TextYAlignment = Enum.TextYAlignment.Top
-	card.Rarity.Visible = false
+	card.Rarity.Visible = true
 	card.Socket.Visible = false
 	for _, x in { 98, 198 } do
 		local divider = box(card.Cell, C.PanelEdge, 0)
-		at(divider, x, 34, 1, 32)
+		at(divider, x, 36, 1, 27)
+		divider.BackgroundTransparency = 0.45
 	end
+	card.GemWell = box(card.Cell, C.Track, 5)
+	at(card.GemWell, 122, 32, 52, 27)
+	card.GemEdge = stroke(card.GemWell, C.PanelEdge, 1, 0.5)
 	card.GemArt = new("Frame", { BackgroundTransparency = 1 }, card.Cell)
 	at(card.GemArt, 127, 30, 42, 28)
 	card.GemLabel = at(label(card.Cell, "NO GEM", 8, C.Faint, BOLD), 106, 58, 84, 10)
 	card.GemLabel.TextXAlignment = Enum.TextXAlignment.Center
 	card.EmptyGem = at(label(card.GemArt, "+", 22, C.Faint, BOLD), 0, 0, 42, 36)
 	card.EmptyGem.TextXAlignment = Enum.TextXAlignment.Center
-	at(label(card.Cell, "ITEM STATS", 8, C.Dim, BOLD), 206, 32, 84, 11)
+	local statWell = box(card.Cell, Color3.fromRGB(10, 18, 25), 5)
+	at(statWell, 203, 32, 87, 35)
+	at(label(card.Cell, "ITEM STATS", 8, C.Dim, BOLD), 209, 33, 78, 11)
 	card.Stats = at(label(card.Cell, "—", 10, C.Text, BOLD), 206, 44, 84, 24)
-	card.Trait = at(label(card.Cell, "", 9, C.Gold, BOLD), 10, 70, CELL_W - 20, 12)
+	local perkStrip = box(card.Cell, Color3.fromRGB(42, 35, 22), 0)
+	at(perkStrip, 3, 69, CELL_W - 3, 15)
+	local perkMarker = box(perkStrip, C.Gold, 2)
+	at(perkMarker, 8, 6, 4, 4)
+	card.Trait = at(label(perkStrip, "", 9, C.Gold, BOLD), 18, 1, CELL_W - 30, 13)
 	card.Trait.TextTruncate = Enum.TextTruncate.AtEnd
 	card.Stats.TextYAlignment = Enum.TextYAlignment.Top
 	card.Stats.TextWrapped = false
@@ -672,7 +704,7 @@ local surgeCell = box(left, P.Frame, 4)
 at(surgeCell, RIGHT_COL, BODY_Y + 2 * (CARD_H + ROW_GAP), CELL_W, 2 * CARD_H + ROW_GAP)
 stroke(surgeCell, C.PanelEdge, 1)
 brackets(surgeCell, P.Teal, 8, 4)
-at(label(surgeCell, "SURGES", 10, C.Dim, BOLD), 12, 23, 92, 14)
+at(label(surgeCell, "SURGES · SELECT TO CHANGE", 10, C.Dim, BOLD), 12, 5, 280, 14)
 local KEY_W = math.floor((CELL_W - 24 - 2 * 6) / 3)
 local surgeKeys = {}
 for i, key in { "Q", "E", "R" } do
@@ -700,6 +732,14 @@ for i, key in { "Q", "E", "R" } do
 	end)
 	surgeKeys[key] = { Box = keyBox, Stroke = edge, Name = name, Letter = letter, Art = art, Shown = "" }
 	surgeKeys[key].Info = at(label(keyBox, "", 10, C.Dim, BODY), 10, 60, 160, 30)
+	local icon = label(keyBox, "+", 22, C.Dim, BOLD)
+	icon.TextXAlignment = Enum.TextXAlignment.Center
+	surgeKeys[key].Icon = icon
+	local description = label(keyBox, "", 10, C.Text, BODY)
+	description.TextWrapped = true
+	description.TextYAlignment = Enum.TextYAlignment.Top
+	description.TextTruncate = Enum.TextTruncate.AtEnd
+	surgeKeys[key].Description = description
 	table.insert(dropTargets, {
 		Frame = keyBox,
 		Stroke = edge,
@@ -716,9 +756,17 @@ end
 local setSummary = at(label(left, "", 11, C.Gold, BODY), MID_X, 534, 782, 42)
 setSummary.TextWrapped = true
 setSummary.TextYAlignment = Enum.TextYAlignment.Top
-local buildHelp = at(label(left, "BUILD STATS\nCombined gear, gems and set bonuses.\n\nSelect equipment to see its full perk, enchantment and extra traits.", 11, C.Dim, BODY), 1140, 498, 228, 78)
-buildHelp.TextWrapped = true
-buildHelp.TextYAlignment = Enum.TextYAlignment.Top
+local scouting = box(left, Color3.fromRGB(12, 23, 33), 6)
+at(scouting, 1130, 426, 252, 150)
+stroke(scouting, C.Accent, 1, 0.65)
+at(label(scouting, "OPPONENT SCOUTING", 11, C.Accent, BOLD), 10, 9, 232, 16)
+local scoutReveal = at(label(scouting, "", 10, C.Text, BODY), 10, 29, 232, 34)
+local scoutMix = at(label(scouting, "", 10, C.Dim, BODY), 10, 65, 232, 32)
+local scoutTip = at(label(scouting, "", 10, C.Gold, BODY), 10, 100, 232, 44)
+for _, text in { scoutReveal, scoutMix, scoutTip } do
+	text.TextWrapped = true
+	text.TextYAlignment = Enum.TextYAlignment.Top
+end
 
 local RIGHT_W = W - RIGHT_X
 local tabHolder = new("Frame", { BackgroundTransparency = 1 }, right)
@@ -1950,6 +1998,25 @@ backButton:SetAttribute("TutorialSocket", "CloseInventory")
 local function drawLeft()
 	local profile = profileNow()
 	local loadout = loadoutNow()
+	local counts, names, mix = {}, {}, {}
+	for _, slots in { GearPresets.GearSlots, GearPresets.SurgeSlots } do
+		for _, slot in slots do
+			local gem = loadout[slot .. "Gem"]
+			if gem and gem.Element then counts[gem.Element] = (counts[gem.Element] or 0) + 1 end
+		end
+	end
+	local most, leaders, dominant = 0, 0, nil
+	for _, element in GearPresets.elements(loadout) do
+		local name = string.upper(GemConfig.elementName(element))
+		table.insert(names, name)
+		table.insert(mix, name .. " ×" .. counts[element])
+		if counts[element] > most then most, leaders, dominant = counts[element], 1, name
+		elseif counts[element] == most then leaders += 1 end
+	end
+	scoutReveal.Text = if #names > 0 then "Revealed after a round: " .. table.concat(names, " · ") else "No equipped elements to reveal."
+	scoutMix.Text = if #mix > 0 then "Your mix (gear + Surges): " .. table.concat(mix, " · ") else "Equip gems to shape this miner's elemental mix."
+	scoutTip.Text = (if dominant and leaders == 1 then "Your mix leans " .. dominant .. ". " else "Your mix has no single leading element. ")
+		.. "After a loss, swap miners between rounds to adapt. Counts are private."
 	nameLabel.Text = "MINER " .. tostring(profile and profile.Miners and profile.Miners.Active or 1)
 	nameLabel.Text ..= "  /  " .. string.upper(player.DisplayName)
 	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2054,7 +2121,7 @@ local function drawLeft()
 		card.Name.Text = if gear then gear.Name else "Empty"
 		local roll = GearRolls.get(loadout, slot)
 		local family = gear and ArmorFamilies.ById[loadout[slot]]
-		card.Metadata.Text = SLOT_LABEL[slot] .. " · " .. rarityName(rarity) .. (if family then " · " .. family.ArmorFamily else "")
+		card.Metadata.Text = SLOT_LABEL[slot] .. (if family then " / " .. string.upper(family.ArmorFamily) else " / EQUIPPED")
 		local signature = ArmorSignatures.resolve(roll, gem)
 		if signature then
 			card.Trait.Text = PERK_SHORT[signature.Id] or signature.Definition.Name
@@ -2094,6 +2161,10 @@ local function drawLeft()
 		end
 		card.GemLabel.Text = if gem then string.upper(GemConfig.elementName(gem.Element)) else "NO GEM"
 		card.GemLabel.TextColor3 = if gem then gemColor(gem) else C.Faint
+		card.GemWell.BackgroundColor3 = if gem then C.Track:Lerp(gemColor(gem), 0.12) else C.Track
+		card.GemEdge.Color = if gem then gemColor(gem) else C.PanelEdge
+		card.Rail.BackgroundColor3 = if picked then C.Gold else color:Lerp(C.PanelEdge, 0.2)
+		card.Badge.BackgroundColor3 = C.Track:Lerp(color, 0.12)
 		card.Name.TextColor3 = if gear and rarity > 1 then color:Lerp(C.Text, 0.3) else C.Text
 		card.Rarity.Text = if gear then rarityName(rarity) else ""
 		card.Rarity.TextColor3 = color
@@ -2101,9 +2172,9 @@ local function drawLeft()
 			card.Rarity.Text = "STOWED · TWO-HANDED"
 			card.Rarity.TextColor3 = C.Dim
 		end
-		card.Stroke.Color = if picked then C.Gold else color
-		card.Stroke.Thickness = if picked then 2.5 else (if rarity >= 3 then 2 else 1.5)
-		card.Glow.Color = ColorSequence.new(C.Card:Lerp(color, if rarity >= 2 then 0.16 else 0.04), C.Card)
+		card.Stroke.Color = if picked then C.Gold elseif card.Hovered then color else C.PanelEdge:Lerp(color, 0.22)
+		card.Stroke.Thickness = if picked then 2 else 1
+		card.Glow.Color = ColorSequence.new(Color3.fromRGB(22, 33, 44):Lerp(color, if card.Hovered then 0.14 else 0.04), C.Card)
 		local shown = (loadout[slot] or "") .. "|" .. (if gem then gem.Id else "")
 		if card.Shown ~= shown and loadout[slot] then
 			card.Shown = shown
@@ -2129,6 +2200,9 @@ local function drawLeft()
 		ui.Stroke.Color = if picked then C.Gold else tint
 		ui.Stroke.Thickness = if picked then 2.5 else 1.5
 		ui.Name.Text = if surge then surge.Name else "empty"
+		ui.Icon.Text = if surge then "◆" else "+"
+		SurgeIcons.apply(ui.Icon, surge, tint)
+		ui.Description.Text = if surge then surge.Description or "Select for ability details." else "Choose a gem to equip its ability on " .. key .. "."
 		ui.Info.Text = if surge then string.format("%s Charge · %ss cooldown", whole(surge.Cost or 0), whole(surge.Cooldown or 0)) else "Select a gem to equip"
 		ui.Name.TextColor3 = if gem then tint else C.Faint
 		ui.Letter.TextColor3 = if gem then C.Text else C.Faint
@@ -2184,29 +2258,31 @@ local function drawRight()
 	right.Visible = drawerOpen
 	local stageWidth = 788
 	left.Size = UDim2.fromOffset(W, PANEL_H)
-	at(portrait, MID_X, BODY_Y, stageWidth, 366)
+	at(portrait, MID_X, BODY_Y, stageWidth, 326)
 	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
-	at(surgeCell, MID_X, 420, stageWidth, 104)
+	at(surgeCell, MID_X, 380, stageWidth, 144)
 	-- Q/E/R stay visible in both the wide stage and drawer layouts.
-	local surgeWidth = (stageWidth - 126) / 3
+	local surgeWidth = (stageWidth - 32) / 3
 	for index, key in { "Q", "E", "R" } do
 		local ui = surgeKeys[key]
-		at(ui.Box, 114 + (index - 1) * (surgeWidth + 4), 7, surgeWidth, 90)
+		at(ui.Box, 12 + (index - 1) * (surgeWidth + 4), 25, surgeWidth, 112)
 		at(ui.Letter, 4, 4, 18, 18)
-		at(ui.Art, 24, 4, 38, 38)
-		at(ui.Name, 65, 4, surgeWidth - 70, 40)
+		at(ui.Icon, 26, 6, 40, 40)
+		at(ui.Art, 70, 10, 30, 30)
+		at(ui.Name, 106, 8, surgeWidth - 114, 34)
+		at(ui.Description, 8, 49, surgeWidth - 16, 38)
 		ui.Name.TextXAlignment = Enum.TextXAlignment.Left
-		at(ui.Info, 8, 56, surgeWidth - 16, 28)
+		at(ui.Info, 8, 92, surgeWidth - 16, 16)
 		ui.Info.TextWrapped = true
 	end
 	local statWidth = 252
 	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
 		local tile = statTiles[name]
-		at(tile.Tile, 1130, BODY_Y + (index - 1) * 74, statWidth, 64)
+		at(tile.Tile, 1130, BODY_Y + (index - 1) * 62, statWidth, 58)
 		tile.Value.Size = UDim2.fromOffset(statWidth - 16, 22)
 		tile.Bonus.Visible = false
 		local track = tile.Fill.Parent
-		at(track, 10, 55, statWidth - 20, 3)
+		at(track, 10, 51, statWidth - 20, 3)
 	end
 	drawTabs()
 	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
