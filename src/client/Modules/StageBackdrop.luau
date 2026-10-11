@@ -1,14 +1,12 @@
 --[[
-	The Inventory's miner stage: a war-hangar bay behind the three miners.
+	The Inventory's miner stage: an observation bay over a ringed planet.
 
-	  Back wall   heavy bulkhead panels with lit seams, a hazard band low on
-	              the wall and a gold slit light along the top
-	  Spotlight   a gold beam pouring down on the active miner, with dust
-	              drifting up through it
-	  Emblem      a slow-turning crest ring behind the active miner
-	  Floor       a steel deck in perspective, grid lines running to the
-	              horizon, and a lit pedestal under each miner (the middle
-	              one, the active miner's, largest and brightest)
+	  Viewport    a tall window behind the active miner: deep space, stars, a
+	              ringed planet rising with a lit limb, steel mullions
+	  Bulkheads   dark pillars either side with teal light strips that breathe
+	  Backlight   a soft rim glow (stacked rings) behind the active miner
+	  Floor       a dark, glossy deck with a horizon haze, a lit pedestal under
+	              each miner (the middle one largest, with a pulsing ring)
 
 	Built once (create), only moved each frame (update).
 
@@ -19,10 +17,11 @@ local StageBackdrop = {}
 
 local GOLD = Color3.fromRGB(255, 196, 82)
 local GOLD_HOT = Color3.fromRGB(255, 232, 170)
-local STEEL = Color3.fromRGB(34, 42, 54)
-local STEEL_LIGHT = Color3.fromRGB(70, 82, 98)
+local TEAL = Color3.fromRGB(64, 214, 230)
+local NAVY = Color3.fromRGB(8, 12, 22)
+local STEEL = Color3.fromRGB(22, 28, 38)
 local SEAM = Color3.fromRGB(110, 150, 170)
-local HORIZON = 0.58 -- where the back wall meets the floor (fraction of height)
+local HORIZON = 0.62 -- where the back wall meets the floor (fraction of height)
 local MOTES = 18
 
 -- Where the miners stand (fractions of the stage): the two waiting in the
@@ -32,6 +31,12 @@ local PEDESTALS = {
 	{ X = 0.5, Y = 0.88, W = 0.26, Main = true },
 	{ X = 0.91, Y = 0.37, W = 0.1, Main = false },
 }
+
+local seeded
+local function seededStatic(i: number, salt: number): number
+	local x = math.sin(i * 127.1 + salt * 311.7) * 43758.5453
+	return x - math.floor(x)
+end
 
 local function make(class: string, props, parent: Instance): any
 	local object = Instance.new(class)
@@ -72,171 +77,157 @@ function StageBackdrop.create(stage: GuiObject)
 		ClipsDescendants = true,
 	}, stage)
 
-	-- Back wall: bulkhead panels, alternately lit, with seams between.
-	local wall = slab(root, { Size = UDim2.fromScale(1, HORIZON), BackgroundColor3 = STEEL })
-	make("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(14, 18, 26), STEEL) }, wall)
-	local panels = 9
-	for i = 0, panels - 1 do
-		local panel = slab(wall, {
-			Position = UDim2.fromScale(i / panels, 0.08),
-			Size = UDim2.new(1 / panels, -6, 0.78, 0),
-			BackgroundColor3 = if i % 2 == 0 then STEEL_LIGHT else STEEL,
-			BackgroundTransparency = 0.55,
-		})
-		fade(panel, 90, 0.6, 0.1)
-		-- A lit seam down the panel's edge and two bolts.
-		slab(panel, {
-			Position = UDim2.new(1, 0, 0, 0),
-			Size = UDim2.new(0, 2, 1, 0),
-			BackgroundColor3 = SEAM,
-			BackgroundTransparency = 0.75,
-		})
-		for _, y in { 0.08, 0.92 } do
-			local bolt = slab(panel, {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, y),
-				Size = UDim2.fromOffset(4, 4),
-				BackgroundColor3 = SEAM,
-				BackgroundTransparency = 0.5,
-			})
-			make("UICorner", { CornerRadius = UDim.new(1, 0) }, bolt)
-		end
-	end
-	-- A gold slit light running along the top of the wall.
-	local slit = slab(wall, {
-		Position = UDim2.fromScale(0, 0.03),
-		Size = UDim2.new(1, 0, 0, 2),
-		BackgroundColor3 = GOLD,
-		BackgroundTransparency = 0.35,
-	})
-	fade(slit, 0, 0.9, 0.9, 0)
-	-- A hazard band low on the wall: amber and black chevrons.
-	local hazard = slab(wall, {
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, 0, 0, 7),
-		BackgroundColor3 = Color3.fromRGB(16, 16, 18),
-		ClipsDescendants = true,
-	})
-	for i = 0, 70 do
-		slab(hazard, {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0, i * 16, 0.5, 0),
-			Size = UDim2.fromOffset(7, 26),
-			Rotation = 40,
-			BackgroundColor3 = Color3.fromRGB(214, 150, 30),
-			BackgroundTransparency = 0.45,
-		})
-	end
+	-- The bay: near-black navy, lifting a little toward the floor.
+	local wall = slab(root, { Size = UDim2.fromScale(1, HORIZON), BackgroundColor3 = NAVY })
+	make("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(4, 6, 12), Color3.fromRGB(16, 24, 36)) }, wall)
 
-	-- The floor: a steel deck, darker toward the camera's feet.
-	local floor = slab(root, {
-		Position = UDim2.fromScale(0, HORIZON),
-		Size = UDim2.fromScale(1, 1 - HORIZON),
-		BackgroundColor3 = Color3.fromRGB(20, 26, 34),
+	-- The viewport: space, stars and a ringed planet.
+	local window = slab(root, {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0.06),
+		Size = UDim2.fromScale(0.56, HORIZON - 0.06),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		ClipsDescendants = true,
 	})
 	make("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(40, 50, 62), Color3.fromRGB(8, 11, 16)),
-	}, floor)
-	-- Grid lines running to the horizon (a vanishing point at the centre).
-	for i = -9, 9 do
-		local spread = i / 9
-		local line = slab(floor, {
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.fromScale(0.5 + spread * 0.08, 0),
-			Size = UDim2.new(0, 1, 2.2, 0),
-			Rotation = -spread * 62,
-			BackgroundColor3 = SEAM,
-			BackgroundTransparency = 0.82,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(6, 6, 18)),
+			ColorSequenceKeypoint.new(0.6, Color3.fromRGB(22, 16, 48)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 60, 78)),
+		}),
+	}, window)
+	make("UICorner", { CornerRadius = UDim.new(0, 18) }, window)
+	for i = 1, 46 do
+		local big = i % 9 == 0
+		local star = slab(window, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(seededStatic(i, 7), seededStatic(i, 9) * 0.7),
+			Size = UDim2.fromOffset(if big then 3 else 2, if big then 3 else 2),
+			BackgroundTransparency = 0.2 + seededStatic(i, 11) * 0.6,
 		})
-		fade(line, 90, 0.2, 1)
+		make("UICorner", { CornerRadius = UDim.new(1, 0) }, star)
 	end
-	-- Cross lines, closer together toward the horizon.
-	for i = 1, 6 do
-		local y = (i / 6) ^ 1.8
+	-- The planet: a huge disc rising from the bottom of the window, lit on
+	-- its upper limb, with a thin ring across it.
+	local planet = slab(window, {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.62, 0.58),
+		Size = UDim2.fromScale(1.3, 1.3),
+		SizeConstraint = Enum.SizeConstraint.RelativeXX,
+	})
+	make("UICorner", { CornerRadius = UDim.new(1, 0) }, planet)
+	make("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 220, 230)),
+			ColorSequenceKeypoint.new(0.04, Color3.fromRGB(40, 110, 140)),
+			ColorSequenceKeypoint.new(0.25, Color3.fromRGB(14, 30, 48)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 10, 18)),
+		}),
+	}, planet)
+	make("UIStroke", { Color = TEAL, Thickness = 2, Transparency = 0.35 }, planet)
+	local ring = slab(window, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.78),
+		Size = UDim2.fromScale(1.6, 0.05),
+		Rotation = -9,
+		BackgroundTransparency = 1,
+	})
+	make("UICorner", { CornerRadius = UDim.new(1, 0) }, ring)
+	make("UIStroke", { Color = GOLD_HOT, Thickness = 1.5, Transparency = 0.5 }, ring)
+	-- Mullions and the frame.
+	for _, x in { 1 / 3, 2 / 3 } do
+		slab(window, {
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.fromScale(x, 0),
+			Size = UDim2.new(0, 6, 1, 0),
+			BackgroundColor3 = STEEL,
+		})
+	end
+	make("UIStroke", { Color = Color3.fromRGB(40, 52, 66), Thickness = 6 }, window)
+	-- A haze where the window meets the deck.
+	local haze = slab(window, {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromScale(1, 0.3),
+		BackgroundColor3 = TEAL,
+	})
+	fade(haze, 90, 1, 0.75)
+
+	-- Bulkheads either side, each with a breathing light strip.
+	local strips = {}
+	for _, side in { 0, 1 } do
+		local pillar = slab(root, {
+			AnchorPoint = Vector2.new(side, 0),
+			Position = UDim2.fromScale(if side == 0 then 0.17 else 0.83, 0),
+			Size = UDim2.fromScale(0.035, HORIZON),
+			BackgroundColor3 = STEEL,
+		})
+		make("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(8, 10, 16), Color3.fromRGB(40, 50, 64)) }, pillar)
+		local strip = slab(pillar, {
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.fromScale(0.5, 0.12),
+			Size = UDim2.new(0, 2, 0.76, 0),
+			BackgroundColor3 = TEAL,
+		})
+		fade(strip, 90, 0.9, 0.9, 0)
+		table.insert(strips, strip)
+	end
+
+	-- The floor: a dark glossy deck with the window's light lying on it.
+	local floor = slab(root, {
+		Position = UDim2.fromScale(0, HORIZON),
+		Size = UDim2.fromScale(1, 1 - HORIZON),
+	})
+	make("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(26, 40, 52), Color3.fromRGB(5, 7, 12)),
+	}, floor)
+	local reflection = slab(floor, {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0),
+		Size = UDim2.fromScale(0.56, 0.7),
+		BackgroundColor3 = TEAL,
+	})
+	make("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.88),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, reflection)
+	for i = 1, 4 do
 		slab(floor, {
-			Position = UDim2.fromScale(0, y),
+			Position = UDim2.fromScale(0, (i / 4) ^ 1.8),
 			Size = UDim2.new(1, 0, 0, 1),
 			BackgroundColor3 = SEAM,
-			BackgroundTransparency = 0.86 - 0.04 * i,
+			BackgroundTransparency = 0.9,
 		})
 	end
-	-- A bright line where wall meets floor.
 	local seam = slab(root, {
 		Position = UDim2.fromScale(0, HORIZON),
 		Size = UDim2.new(1, 0, 0, 1),
-		BackgroundColor3 = SEAM,
-		BackgroundTransparency = 0.4,
+		BackgroundColor3 = TEAL,
+		BackgroundTransparency = 0.3,
 	})
-	fade(seam, 0, 1, 1, 0.1)
+	fade(seam, 0, 1, 1, 0)
 
-	-- The spotlight on the active miner: three stacked beams, widest faintest.
+	-- The rim glow behind the active miner: soft stacked discs.
 	local beams = {}
-	for i, width in { 0.36, 0.24, 0.12 } do
-		local beam = slab(root, {
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.fromScale(0.5, 0),
-			Size = UDim2.fromScale(width, 0.92),
-			BackgroundColor3 = GOLD,
-			BackgroundTransparency = 0.86 + i * 0.01,
-		})
-		make("UIGradient", {
-			Rotation = 0,
-			Transparency = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 1),
-				NumberSequenceKeypoint.new(0.5, 0),
-				NumberSequenceKeypoint.new(1, 1),
-			}),
-		}, beam)
-		beams[i] = beam
-	end
-
-	-- The crest behind the active miner: two rings and tick marks.
-	local crest = make("Frame", {
-		Name = "Crest",
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.42),
-		Size = UDim2.fromScale(0.42, 0.42),
-		SizeConstraint = Enum.SizeConstraint.RelativeYY,
-		ZIndex = 0,
-	}, root)
-	crest.Size = UDim2.fromScale(0.95, 0.95)
-	for i, scale in { 1, 0.82 } do
-		local ring = make("Frame", {
-			BackgroundTransparency = 1,
+	for i, scale in { 0.62, 0.46, 0.3 } do
+		local glow = slab(root, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromScale(scale, scale),
-			ZIndex = 0,
-		}, crest)
-		make("UICorner", { CornerRadius = UDim.new(1, 0) }, ring)
-		make("UIStroke", {
-			Color = GOLD,
-			Thickness = if i == 1 then 2 else 1,
-			Transparency = if i == 1 then 0.72 else 0.8,
-		}, ring)
-	end
-	local ticks = make("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 0,
-	}, crest)
-	for i = 0, 23 do
-		local angle = math.rad(i * 15)
-		local long = i % 6 == 0
-		slab(ticks, {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5 + math.sin(angle) * 0.455, 0.5 - math.cos(angle) * 0.455),
-			Size = UDim2.fromOffset(if long then 3 else 2, if long then 12 else 6),
-			Rotation = i * 15,
-			BackgroundColor3 = GOLD,
-			BackgroundTransparency = if long then 0.45 else 0.7,
+			SizeConstraint = Enum.SizeConstraint.RelativeYY,
+			BackgroundColor3 = if i == 3 then GOLD_HOT else TEAL,
+			BackgroundTransparency = 0.9,
 		})
+		make("UICorner", { CornerRadius = UDim.new(1, 0) }, glow)
+		beams[i] = glow
 	end
+	local ticks = make("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(0, 0) }, root)
 
 	-- Pedestals under each miner: a flat steel disc seen from just above,
 	-- a gold rim, and a pool of light around it.
@@ -289,7 +280,7 @@ function StageBackdrop.create(stage: GuiObject)
 		local mote = slab(root, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Size = UDim2.fromOffset(2, 2),
-			BackgroundColor3 = GOLD_HOT,
+			BackgroundColor3 = TEAL:Lerp(GOLD_HOT, 0.5),
 		})
 		make("UICorner", { CornerRadius = UDim.new(1, 0) }, mote)
 		motes[i] = mote
@@ -306,10 +297,10 @@ function StageBackdrop.create(stage: GuiObject)
 		fade(shade, if side == 0 then 0 else 180, 0.15, 1)
 	end
 
-	return { Root = root, Beams = beams, Ticks = ticks, Pedestals = pedestals, Motes = motes }
+	return { Root = root, Beams = beams, Ticks = ticks, Pedestals = pedestals, Motes = motes, Strips = strips }
 end
 
-local function seeded(i: number, salt: number): number
+seeded = function(i: number, salt: number): number
 	local x = math.sin(i * 127.1 + salt * 311.7) * 43758.5453
 	return x - math.floor(x)
 end
@@ -319,8 +310,11 @@ function StageBackdrop.update(backdrop, time: number)
 	local breathe = 0.5 + 0.5 * math.sin(t * 1.3)
 	-- The crest turns slowly; the spotlight breathes.
 	backdrop.Ticks.Rotation = (t * 6) % 360
-	for i, beam in backdrop.Beams do
-		beam.BackgroundTransparency = 0.88 + i * 0.01 - 0.04 * breathe
+	for i, glow in backdrop.Beams do
+		glow.BackgroundTransparency = 0.93 - 0.03 * breathe - (i - 1) * 0.01
+	end
+	for i, strip in backdrop.Strips do
+		strip.BackgroundTransparency = 0.15 + 0.35 * (0.5 + 0.5 * math.sin(t * 1.7 + i * 1.3))
 	end
 	-- The main pedestal's ring pulses outward and fades.
 	for _, pedestal in backdrop.Pedestals do
