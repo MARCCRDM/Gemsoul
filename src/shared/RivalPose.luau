@@ -1032,4 +1032,8 @@ function RivalPose.holdGuards()
 	end
 end
 
+-- The fighting stances, for still poses elsewhere (the Inventory's miners):
+-- the sword grip and shield mount are built for these.
+RivalPose.Stances = { Ready = READY, Guard = GUARD }
+
 return RivalPose

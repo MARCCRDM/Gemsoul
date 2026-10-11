@@ -44,6 +44,7 @@ local GearArt = require(script.Parent.GearArt)
 local InventoryPose = require(script.Parent.InventoryPose)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local ElementCardFX = require(script.Parent.ElementCardFX)
+local StageBackdrop = require(script.Parent.StageBackdrop)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -364,21 +365,8 @@ new("UIGradient", {
 	Rotation = 90,
 	Color = ColorSequence.new(Color3.fromRGB(24, 43, 53), Color3.fromRGB(8, 14, 21)),
 }, portrait)
--- Recessed bay panels and floor lines behind the three miners.
-for index = 1, 7 do
- local rib = new("Frame", {
-  BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(68, 123, 142),
-  BackgroundTransparency = 0.88, Position = UDim2.fromScale(index / 8, 0),
-  Size = UDim2.new(0, 1, 1, 0),
- }, portrait)
-end
-for index = 1, 4 do
- new("Frame", {
-  BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(72, 128, 146),
-  BackgroundTransparency = 0.87, Position = UDim2.fromScale(0, 0.70 + index * 0.065),
-  Size = UDim2.new(1, 0, 0, 1),
- }, portrait)
-end
+-- A war-hangar bay behind the three miners (animated with the card effects).
+local stageBackdrop = StageBackdrop.create(portrait)
 brackets(portrait, P.Gold, 10, 5)
 local plinth = new("Frame", {
 	BorderSizePixel = 0,
@@ -2398,6 +2386,7 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
 	local now = os.clock()
 	for _, card in wornCards do ElementCardFX.update(card.FX, card.Element, now) end
 	for _, ui in surgeKeys do ElementCardFX.update(ui.FX, ui.ElementFX, now) end
+	StageBackdrop.update(stageBackdrop, now)
 end)
 function draw()
 	if drawQueued then
