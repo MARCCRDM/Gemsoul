@@ -595,6 +595,7 @@ local function wornCard(slot: string, column: number, row: number)
 		Rarity = rarity,
 		SocketEdge = socketEdge,
 		SocketIcon = socketIcon,
+		Socket = socket,
 	}
 	table.insert(dropTargets, {
 		Frame = cell,
@@ -622,11 +623,29 @@ wornCard("Shield", 2, 2)
 for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
 	local card = wornCards[slot]
 	at(card.Cell, 18, BODY_Y + (index - 1) * 90, CELL_W, 84)
-	at(card.Art, 8, 20, 34, 34)
-	at(card.Name, 50, 20, CELL_W - 60, 30)
-	card.Name.TextSize = 11
+	at(card.Art, 12, 33, 48, 46)
+	at(card.Name, 10, 17, CELL_W - 20, 14)
+	card.Name.TextSize = 10
+	card.Name.TextWrapped = false
+	card.Name.TextTruncate = Enum.TextTruncate.AtEnd
 	card.Name.TextYAlignment = Enum.TextYAlignment.Top
 	card.Rarity.Visible = false
+	card.Socket.Visible = false
+	for _, x in { 74, 150 } do
+		local divider = box(card.Cell, C.PanelEdge, 0)
+		at(divider, x, 35, 1, 43)
+	end
+	card.GemArt = new("Frame", { BackgroundTransparency = 1 }, card.Cell)
+	at(card.GemArt, 91, 32, 42, 36)
+	card.GemLabel = at(label(card.Cell, "NO GEM", 8, C.Faint, BOLD), 78, 69, 68, 12)
+	card.GemLabel.TextXAlignment = Enum.TextXAlignment.Center
+	card.EmptyGem = at(label(card.GemArt, "+", 22, C.Faint, BOLD), 0, 0, 42, 36)
+	card.EmptyGem.TextXAlignment = Enum.TextXAlignment.Center
+	at(label(card.Cell, "ROLLED STATS", 8, C.Dim, BOLD), 157, 34, 69, 11)
+	card.Stats = at(label(card.Cell, "—", 10, C.Text, BOLD), 157, 47, 68, 32)
+	card.Stats.TextYAlignment = Enum.TextYAlignment.Top
+	card.Stats.TextWrapped = false
+	card.Stats.TextTruncate = Enum.TextTruncate.AtEnd
 	-- Full equipment details remain in the contextual EQUIPPED tab.
 	for _, child in card.Cell:GetChildren() do
 		if child:IsA("TextButton") and child.Text == "DETAILS" then child.Visible = false end
@@ -2004,7 +2023,36 @@ local function drawLeft()
 		local color = rarityColor(rarity)
 		local picked = (selection and selection.Kind == "Worn" and selection.Slot == slot)
 			or contextSlot == slot
-		card.Name.Text = if gear then GemConfig.itemName(gear.Name, gem, slot) else "Empty"
+		card.Name.Text = if gear then gear.Name else "Empty"
+		local roll = GearRolls.get(loadout, slot)
+		local stats = {}
+		for stat, amount in roll and roll.Stats or {} do
+			table.insert(stats, { Name = stat, Amount = amount })
+		end
+		table.sort(stats, function(a, b)
+			if math.abs(a.Amount) ~= math.abs(b.Amount) then return math.abs(a.Amount) > math.abs(b.Amount) end
+			return a.Name < b.Name
+		end)
+		local lines = {}
+		for index = 1, math.min(2, #stats) do
+			table.insert(lines, statText(stats[index].Name, stats[index].Amount))
+		end
+		if #stats > 2 then lines[2] = "+" .. tostring(#stats - 1) .. " more" end
+		card.Stats.Text = if #lines > 0 then table.concat(lines, "\n") else "—"
+		local gemKey = if gem then gem.Id .. ":" .. tostring(gem.Cut) else "empty"
+		if card.GemKey ~= gemKey then
+			card.GemKey = gemKey
+			-- Keep the empty marker separate from the reusable gem viewport.
+			clear(card.GemArt)
+			if gem then
+				gemArt(card.GemArt, gem)
+			else
+				local empty = at(label(card.GemArt, "+", 22, C.Faint, BOLD), 0, 0, 42, 36)
+				empty.TextXAlignment = Enum.TextXAlignment.Center
+			end
+		end
+		card.GemLabel.Text = if gem then string.upper(GemConfig.elementName(gem.Element)) else "NO GEM"
+		card.GemLabel.TextColor3 = if gem then gemColor(gem) else C.Faint
 		card.Name.TextColor3 = if gear and rarity > 1 then color:Lerp(C.Text, 0.3) else C.Text
 		card.Rarity.Text = if gear then rarityName(rarity) else ""
 		card.Rarity.TextColor3 = color
