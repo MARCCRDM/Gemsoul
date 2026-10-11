@@ -166,8 +166,15 @@ end
 local function weaponVisible(player: Player, visible: boolean)
 	local character = player.Character
 	local gear = character and character:FindFirstChild("GemsoulGear")
-	local weapon = gear and gear:FindFirstChild("Weapon")
-	for _, part in weapon and weapon:GetDescendants() or {} do
+	-- The sword and the shield both go away: a miner works with the pick.
+	local stowed = {}
+	for _, name in { "Weapon", "Shield" } do
+		local component = gear and gear:FindFirstChild(name)
+		for _, part in component and component:GetDescendants() or {} do
+			table.insert(stowed, part)
+		end
+	end
+	for _, part in stowed do
 		if part:IsA("BasePart") then
 			if visible then
 				local was = part:GetAttribute("OutpostTransparency")
