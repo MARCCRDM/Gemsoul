@@ -864,7 +864,7 @@ local function scroller(parent: Instance, y: number): ScrollingFrame
 		Size = UDim2.new(1, 0, 1, -y),
 	}, parent)
 	new("UIGridLayout", {
-		CellSize = UDim2.fromOffset(170, 92),
+		CellSize = UDim2.new(1 / 3, -7, 0, 92), -- three across, filling the panel
 		CellPadding = UDim2.fromOffset(9, 9),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, frame)
