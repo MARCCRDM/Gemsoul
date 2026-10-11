@@ -2329,6 +2329,13 @@ local function drawRight()
 	end
 	inventoryModal.Visible = true
 	right.Visible = true
+	-- The inventory lines up with the gear column: top of the helmet card to
+	-- the foot of the shield card.
+	local rightH = 5 * 88 + 84
+	at(right, RIGHT_X, ROSTER_H + BODY_Y, W - RIGHT_X - 18, rightH)
+	at(page, 16, 94, W - RIGHT_X - 50, rightH - 94 - 40)
+	at(footerLine, 16, rightH - 38, W - RIGHT_X - 50, 1)
+	at(footer, 16, rightH - 32, W - RIGHT_X - 50, 20)
 	contextClose.Visible = contextSlot ~= nil or contextKey ~= nil or selection ~= nil
 	pickerClose.Visible = contextSlot ~= nil or contextKey ~= nil
 	-- Gear down the left, the miner in the middle, the inventory on the right.
