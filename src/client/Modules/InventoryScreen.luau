@@ -658,7 +658,14 @@ for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } 
 	card.Rarity.TextSize = 8
 	card.Rarity.TextXAlignment = Enum.TextXAlignment.Center
 	card.Rarity.TextTruncate = Enum.TextTruncate.AtEnd
-	at(card.Art, 20, 31, 56, 36)
+	-- Display mounts stay behind the previews when their contents refresh.
+	card.GearWell = box(card.Cell, Color3.fromRGB(10, 20, 29), 5)
+	at(card.GearWell, 10, 32, 78, 35)
+	card.GearEdge = stroke(card.GearWell, C.PanelEdge, 1, 0.3)
+	new("UIGradient", { Rotation = 100, Color = ColorSequence.new(Color3.fromRGB(190, 220, 235), Color3.fromRGB(80, 100, 125)) }, card.GearWell)
+	card.Art.Parent = card.GearWell
+	at(card.Art, 11, -1, 56, 36)
+	card.Art.BackgroundTransparency = 1
 	at(card.Name, 10, 17, CELL_W - 20, 14)
 	card.Name.TextSize = 11
 	card.Name.TextWrapped = false
@@ -672,20 +679,23 @@ for index, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } 
 		divider.BackgroundTransparency = 0.45
 	end
 	card.GemWell = box(card.Cell, C.Track, 5)
-	at(card.GemWell, 122, 32, 52, 27)
+	at(card.GemWell, 113, 32, 70, 25)
 	card.GemEdge = stroke(card.GemWell, C.PanelEdge, 1, 0.5)
 	card.GemArt = new("Frame", { BackgroundTransparency = 1 }, card.Cell)
-	at(card.GemArt, 127, 30, 42, 28)
+	at(card.GemArt, 123, 28, 50, 32)
 	card.GemLabel = at(label(card.Cell, "NO GEM", 8, C.Faint, BOLD), 106, 58, 84, 10)
 	card.GemLabel.TextXAlignment = Enum.TextXAlignment.Center
+	card.GemLabel.BackgroundTransparency = 0.8
+	round(card.GemLabel, 3)
 	card.EmptyGem = at(label(card.GemArt, "+", 22, C.Faint, BOLD), 0, 0, 42, 36)
 	card.EmptyGem.TextXAlignment = Enum.TextXAlignment.Center
 	local statWell = box(card.Cell, Color3.fromRGB(10, 18, 25), 5)
 	at(statWell, 203, 32, 87, 35)
 	at(label(card.Cell, "ITEM STATS", 8, C.Dim, BOLD), 209, 33, 78, 11)
-	card.Stats = at(label(card.Cell, "—", 10, C.Text, BOLD), 206, 44, 84, 24)
+	card.Stats = at(label(card.Cell, "—", 12, C.Text, BOLD), 206, 44, 84, 24)
 	local perkStrip = box(card.Cell, Color3.fromRGB(42, 35, 22), 0)
 	at(perkStrip, 3, 69, CELL_W - 3, 15)
+	new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 233, 171), Color3.fromRGB(130, 151, 178)), Rotation = 0 }, perkStrip)
 	local perkMarker = box(perkStrip, C.Gold, 2)
 	at(perkMarker, 8, 6, 4, 4)
 	card.Trait = at(label(perkStrip, "", 9, C.Gold, BOLD), 18, 1, CELL_W - 30, 13)
@@ -2161,6 +2171,9 @@ local function drawLeft()
 		end
 		card.GemLabel.Text = if gem then string.upper(GemConfig.elementName(gem.Element)) else "NO GEM"
 		card.GemLabel.TextColor3 = if gem then gemColor(gem) else C.Faint
+		card.GemLabel.BackgroundColor3 = if gem then gemColor(gem) else C.PanelEdge
+		card.GearEdge.Color = color:Lerp(C.PanelEdge, 0.55)
+		card.Stats.TextColor3 = if stats[1] then STAT[stats[1].Name] or C.Text else C.Dim
 		card.GemWell.BackgroundColor3 = if gem then C.Track:Lerp(gemColor(gem), 0.12) else C.Track
 		card.GemEdge.Color = if gem then gemColor(gem) else C.PanelEdge
 		card.Rail.BackgroundColor3 = if picked then C.Gold else color:Lerp(C.PanelEdge, 0.2)
@@ -2174,7 +2187,12 @@ local function drawLeft()
 		end
 		card.Stroke.Color = if picked then C.Gold elseif card.Hovered then color else C.PanelEdge:Lerp(color, 0.22)
 		card.Stroke.Thickness = if picked then 2 else 1
-		card.Glow.Color = ColorSequence.new(Color3.fromRGB(22, 33, 44):Lerp(color, if card.Hovered then 0.14 else 0.04), C.Card)
+		local targetTint = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(29, 42, 56):Lerp(color, if card.Hovered then 0.18 else 0.06)),
+			ColorSequenceKeypoint.new(0.55, Color3.fromRGB(18, 25, 35)),
+			ColorSequenceKeypoint.new(1, C.Card),
+		})
+		card.Glow.Color = targetTint
 		local shown = (loadout[slot] or "") .. "|" .. (if gem then gem.Id else "")
 		if card.Shown ~= shown and loadout[slot] then
 			card.Shown = shown
