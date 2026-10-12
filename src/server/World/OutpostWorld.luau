@@ -818,8 +818,8 @@ local RINGS = {
 -- Clear blue glass with pale facets; fewer overlapping roots keep the
 -- silhouette translucent rather than building into a dark, solid blue mass.
 -- Corner wedges meet at a single point above a four-sided prism.
-local function sapphire(parent, at: CFrame, width: number, height: number, tint: Color3)
-	local tip = height * 0.4
+local function sapphire(parent, at: CFrame, width: number, height: number, tint: Color3, termination: number?)
+	local tip = height * (termination or 0.22)
 	part(
 		parent,
 		at * CFrame.new(0, (height - tip) / 2, 0),
@@ -846,37 +846,32 @@ local function sapphire(parent, at: CFrame, width: number, height: number, tint:
 	end
 end
 
--- Broad interlocking sapphire roots taper into long downward crystal points.
+-- One broad mineral body with a central taper and eight chunky shoulders.
+-- The silhouette is a floating crystal island, not a skirt of hanging needles.
 local function underside(parent, centre: CFrame, radius: number, depth: number, rng: Random)
 	local m = folder(parent, "SapphireFoundation")
-	for ring = 0, 2 do
-		local count = if ring == 0 then 1 else 8 + ring * 4
-		for i = 1, count do
-			local angle = i / count * math.pi * 2 + ring * 0.19
-			local distance = radius * ring * 0.32
-			local height = depth * (1 - ring * 0.22) * rng:NextNumber(0.85, 1.15)
-			local frame = centre
-				* CFrame.new(math.cos(angle) * distance, -1.5, math.sin(angle) * distance)
-				* CFrame.Angles(math.pi, angle, rng:NextNumber(-0.12, 0.12))
-			sapphire(
-				m,
-				frame,
-				radius * rng:NextNumber(0.24, 0.32),
-				height,
-				CLIFF:Lerp(SAPPHIRE, rng:NextNumber(0.15, 0.85))
-			)
-		end
-	end
-	for i = 1, 28 do
-		local angle = i / 28 * math.pi * 2
+	-- The broad core connects the rim to one substantial lower termination.
+	sapphire(
+		m,
+		centre * CFrame.new(0, -1.5, 0) * CFrame.Angles(math.pi, math.pi / 8, 0),
+		radius * 1.35,
+		depth,
+		SAPPHIRE,
+		0.78
+	)
+	for i = 1, 8 do
+		local angle = i / 8 * math.pi * 2
+		local distance = radius * 0.58
+		local frame = centre
+			* CFrame.new(math.cos(angle) * distance, -1.5, math.sin(angle) * distance)
+			* CFrame.Angles(math.pi, angle + math.pi / 4, 0)
 		sapphire(
 			m,
-			centre
-				* CFrame.new(math.cos(angle) * (radius - 3), -1.5, math.sin(angle) * (radius - 3))
-				* CFrame.Angles(math.pi, angle, 0.25),
-			radius * 0.075,
-			depth * rng:NextNumber(0.18, 0.32),
-			SAPPHIRE
+			frame,
+			radius * rng:NextNumber(0.62, 0.7),
+			depth * rng:NextNumber(0.48, 0.61),
+			SAPPHIRE:Lerp(SAPPHIRE_LIGHT, rng:NextNumber(0.04, 0.24)),
+			0.64
 		)
 	end
 end
@@ -1085,7 +1080,7 @@ local function islet(parent, at: CFrame, radius: number, rng: Random, topper: st
 	cap.Transparency, cap.CastShadow = 0.55, false
 	underside(m, at, radius, radius * 1.4, rng)
 	if topper == "Tree" then
-		sapphire(m, at * CFrame.Angles(0, 0.4, 0.12), radius * 0.35, radius * 1.4, SAPPHIRE)
+		sapphire(m, at * CFrame.Angles(0, 0.4, 0.12), radius * 0.55, radius * 0.7, SAPPHIRE)
 	elseif topper == "Column" then
 		column(m, at, rng:NextNumber(10, 18), rng:NextNumber() < 0.5, rng:NextNumber() < 0.4)
 	elseif topper == "Beacon" then
