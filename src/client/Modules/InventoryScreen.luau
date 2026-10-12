@@ -1030,40 +1030,95 @@ local function bagCard(
 	onClick: () -> (),
 	dragItem
 )
-	local card =
-		new("TextButton", { Text = "", AutoButtonColor = true, BackgroundColor3 = C.Card, LayoutOrder = order }, parent)
-	round(card, 4)
+	-- A dark plate lit from its top-left in the rarity's colour, a rarity
+	-- strip along the top, the item in a glowing well, and (for a gem) its
+	-- Size / Clarity / Cut as three small bars.
+	local card = new("TextButton", {
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		LayoutOrder = order,
+		ClipsDescendants = true,
+	}, parent)
+	round(card, 6)
+	new("UIGradient", {
+		Rotation = 60,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, C.Card:Lerp(color, 0.16)),
+			ColorSequenceKeypoint.new(0.55, C.Card),
+			ColorSequenceKeypoint.new(1, C.Card:Lerp(Color3.new(0, 0, 0), 0.25)),
+		}),
+	}, card)
 	card:SetAttribute("UiSound", "Click")
 	local selected = selection ~= nil and samePick(selection, dragItem)
-	stroke(card, if selected then C.Gold else color, if selected then 2.5 else 1.5, if selected then 0 else 0.2)
-	-- Compact, two to a row: art and element tag on top, name, rarity and
-	-- (for a gem) its Size / Clarity / Cut underneath.
-	local art = box(card, P.Frame, 4)
-	at(art, 6, 6, 40, 40)
+	local edge = stroke(card, if selected then C.Gold else color, if selected then 2 else 1, if selected then 0 else 0.55)
+	card.MouseEnter:Connect(function()
+		if not selected then
+			edge.Transparency = 0.1
+		end
+	end)
+	card.MouseLeave:Connect(function()
+		if not selected then
+			edge.Transparency = 0.55
+		end
+	end)
+	local strip = new("Frame", {
+		BorderSizePixel = 0,
+		BackgroundColor3 = color,
+		Size = UDim2.new(1, 0, 0, 2),
+	}, card)
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.7, 0.4),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, strip)
+	-- The well: a dark socket with the tag's colour glowing up from below.
+	local well = new("Frame", { BorderSizePixel = 0, BackgroundColor3 = Color3.new(1, 1, 1) }, card)
+	at(well, 7, 8, 42, 42)
+	round(well, 21)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(P.Frame, P.Frame:Lerp(tagColor, 0.35)),
+	}, well)
+	stroke(well, tagColor, 1, 0.5)
+	local art = new("Frame", { BackgroundTransparency = 1 }, well)
+	at(art, 2, 2, 38, 38)
 	paint(art)
-	local name = label(card, title, 11, color:Lerp(C.Text, 0.45), BOLD)
-	name.Position, name.Size = UDim2.fromOffset(6, 50), UDim2.new(1, -12, 0, 14)
-	local rarity = label(card, sub, 8, color, BOLD)
-	rarity.Position, rarity.Size = UDim2.fromOffset(6, 65), UDim2.new(1, -12, 0, 11)
+	local name = label(card, title, 11, C.Text, BOLD)
+	name.Position, name.Size = UDim2.fromOffset(7, 54), UDim2.new(1, -14, 0, 14)
+	local rarity = label(card, "◆ " .. sub, 8, color, BOLD)
+	rarity.Position, rarity.Size = UDim2.fromOffset(7, 68), UDim2.new(1, -60, 0, 10)
 	local gem = dragItem and dragItem.Gem
 	if gem and gem.Cut then
-		local stats = label(card, string.format("SIZE %s · CLR %s · CUT %s", tostring(gem.Size or "-"), tostring(gem.Clarity or "-"), tostring(gem.Cut or "-")), 8, C.Dim, BOLD)
-		stats.Position, stats.Size = UDim2.fromOffset(6, 79), UDim2.new(1, -12, 0, 11)
+		local bars = new("Frame", { BackgroundTransparency = 1 }, card)
+		bars.Position, bars.Size = UDim2.fromOffset(7, 81), UDim2.new(1, -14, 0, 9)
+		for i, stat in { { "S", gem.Size }, { "C", gem.Clarity }, { "X", gem.Cut } } do
+			local cell = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1 / 3, -4, 1, 0), Position = UDim2.new((i - 1) / 3, 0, 0, 0) }, bars)
+			local letter = label(cell, stat[1] .. " " .. tostring(stat[2] or "-"), 8, C.Dim, BOLD)
+			letter.Size = UDim2.fromOffset(22, 9)
+			local track = box(cell, C.Track, 2)
+			track.Position, track.Size = UDim2.new(0, 24, 0.5, -1.5), UDim2.new(1, -24, 0, 3)
+			local fill = box(track, tagColor, 2)
+			fill.Size = UDim2.fromScale(math.clamp((tonumber(stat[2]) or 0) / 10, 0.05, 1), 1)
+		end
 	end
+	-- The element (or slot): a small tinted pill in the top-right corner.
 	local badge = new("TextLabel", {
 		Text = tag,
 		TextSize = 8,
 		Font = BOLD,
-		TextColor3 = tagColor,
-		BackgroundColor3 = P.Frame,
+		TextColor3 = tagColor:Lerp(Color3.new(1, 1, 1), 0.25),
+		BackgroundColor3 = tagColor,
+		BackgroundTransparency = 0.82,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -6, 0, 6),
-		Size = UDim2.fromOffset(0, 16),
+		Position = UDim2.new(1, -7, 0, 8),
+		Size = UDim2.fromOffset(0, 15),
 		AutomaticSize = Enum.AutomaticSize.X,
 	}, card)
-	round(badge, 3)
-	stroke(badge, tagColor, 1, 0.45)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, badge)
+	round(badge, 8)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, badge)
 	card.Activated:Connect(function()
 		if os.clock() >= suppressClickUntil then
 			onClick()
@@ -1093,16 +1148,18 @@ local function filterRow(entries: { any }, current: string, onPick: (string) -> 
 	}, chips)
 	for i, entry in entries do
 		local on = current == entry[1]
+		local tint = entry[3] or P.Gold
 		local chip = new("TextButton", {
 			Text = entry[2],
 			TextSize = 10,
 			Font = BOLD,
-			TextColor3 = if on then P.Frame else (entry[3] or C.Dim),
-			BackgroundColor3 = if on then P.Gold else C.Card,
+			TextColor3 = if on then Color3.new(1, 1, 1) else tint:Lerp(C.Dim, 0.35),
+			BackgroundColor3 = tint,
+			BackgroundTransparency = if on then 0.6 else 0.94,
 			LayoutOrder = i,
 		}, chips)
-		round(chip, 4)
-		stroke(chip, if on then P.Gold else C.PanelEdge, 1)
+		round(chip, 11)
+		stroke(chip, tint, 1, if on then 0 else 0.75)
 		new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, chip)
 		chip:SetAttribute("UiSound", "Tab")
 		chip.Activated:Connect(function()
@@ -1348,14 +1405,14 @@ local function drawArmor()
 			local delta = at(
 				label(
 					card,
-					if gain > 0 then "▲ +" .. gain .. " RATING" elseif gain < 0 then "▼ " .. gain .. " RATING" else "= SAME RATING",
+					if gain > 0 then "▲ +" .. gain .. " RATING" elseif gain < 0 then "▼ " .. gain .. " RATING" else "= SAME",
 					9,
 					if gain > 0 then C.Good elseif gain < 0 then C.Bad else C.Dim,
 					BOLD
 				),
-				6,
-				79,
-				90,
+				7,
+				80,
+				64,
 				11
 			)
 			local equip = new("TextButton", {
