@@ -44,6 +44,7 @@ local GearArt = require(script.Parent.GearArt)
 local InventoryPose = require(script.Parent.InventoryPose)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local ElementCardFX = require(script.Parent.ElementCardFX)
+local StatRadar = require(script.Parent.StatRadar)
 local StageBackdrop = require(script.Parent.StageBackdrop)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
@@ -324,6 +325,7 @@ local dropTargets: { any } = {}
 local drag: { Item: any, Start: Vector2, Active: boolean, Touch: boolean, Ghost: Frame? }? = nil
 local suppressClickUntil = 0
 local draw -- (below): redraws everything
+local radarStats = nil -- the build in numbers, for the stat radar
 
 local function samePick(a: Pick?, b: Pick?): boolean
 	if a == nil or b == nil or a.Kind ~= b.Kind then
@@ -2131,6 +2133,11 @@ local function drawLeft()
 	end
 	statTiles.Attuned.Value.Text = string.format("%d/%d", attuned, #Slots.Order)
 	statTiles.Attuned.Fill.Size = UDim2.fromScale(attuned / #Slots.Order, 1)
+	-- The radar's numbers (drawn in drawRight).
+	radarStats = { Total = total, Attuned = attuned, Set = bestCount or 0 }
+	for _, name in Classes.StatNames do
+		radarStats[name] = if ratings then ratings[name].Base + ratings[name].Bonus else 0
+	end
 
 	local roster = profile and profile.Miners
 	for index, card in minerCards do
@@ -2334,6 +2341,8 @@ end
 -- scroll position when it is.
 local pageKey, pageTab = "", ""
 local statCard: Frame? = nil
+local radar = nil
+local radarRating: TextLabel? = nil
 local function drawRight()
  local profile = profileNow()
  if require(ReplicatedStorage.Shared.Tutorial).Enabled and profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
@@ -2384,42 +2393,56 @@ local function drawRight()
 		at(ui.Info, 62, 47, surgeWidth - 70, 14)
 		ui.Info.TextWrapped = false
 	end
-	-- Stats: one slim card in the stage's lower-left corner, a list.
+	-- Stats: a radar chart of the build in the stage's lower-left corner.
 	if not statCard then
-		statCard = box(left, C.Card, 6)
+		statCard = box(left, C.Card, 8)
 		stroke(statCard, C.PanelEdge, 1)
-		for _, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
-			local tile = statTiles[name]
-			tile.Tile.Parent = statCard
-			tile.Tile.BackgroundTransparency = 1
-			local edge = tile.Tile:FindFirstChildOfClass("UIStroke")
-			if edge then
-				edge.Enabled = false
-			end
-			tile.Bonus.Visible = false
-			tile.Fill.Parent.Visible = false
+		statCard.BackgroundTransparency = 0.15
+		statCard.ZIndex = 8
+		for _, tile in statTiles do
+			tile.Tile.Visible = false
 		end
+		local caption = label(statCard, "RATING", 9, C.Dim, BOLD)
+		at(caption, 10, 6, 80, 14)
+		caption.ZIndex = 9
+		radarRating = label(statCard, "0", 15, P.Gold, HEADING)
+		at(radarRating :: TextLabel, 60, 3, 130, 20)
+		radarRating.TextXAlignment = Enum.TextXAlignment.Right
+		radarRating.ZIndex = 9
+		radar = StatRadar.create(statCard, {
+			{ Name = "HEALTH", Color = STAT.Health },
+			{ Name = "POWER", Color = STAT.Power },
+			{ Name = "SPEED", Color = STAT.Speed },
+			{ Name = "SET", Color = P.Gold },
+			{ Name = "ATTUNED", Color = STAT.Attuned },
+			{ Name = "DEFENSE", Color = STAT.Defense },
+		}, 52, P.Teal)
+		radar.Frame.Position = UDim2.fromOffset(100 - 52, 30 + 32)
 	end
-	local statsH, statWidth = 24, 132
-	at(statCard, MID_X + 12, BODY_Y + stageH - (6 * statsH + 8) - 12, statWidth, 6 * statsH + 8)
-	statCard.BackgroundTransparency = 0.2
-	statCard.ZIndex = 8
-	for _, d in statCard:GetDescendants() do
-		if d:IsA("GuiObject") then
-			d.ZIndex = 9
+	local cardH = 204
+	at(statCard, MID_X + 12, BODY_Y + stageH - cardH - 12, 200, cardH)
+	if radarStats then
+		local s = radarStats
+		local scale = math.max(150, s.Health, s.Power, s.Defense, s.Speed) * 1.05
+		StatRadar.set(radar, {
+			s.Health / scale,
+			s.Power / scale,
+			s.Speed / scale,
+			s.Set / 6,
+			s.Attuned / #Slots.Order,
+			s.Defense / scale,
+		}, {
+			whole(s.Health),
+			whole(s.Power),
+			whole(s.Speed),
+			s.Set .. "/6",
+			s.Attuned .. "/" .. #Slots.Order,
+			whole(s.Defense),
+		})
+		;(radarRating :: TextLabel).Text = whole(s.Total)
+		if radar.Current[1] == 0 then
+			StatRadar.step(radar, 10) -- the first time, straight to the shape
 		end
-	end
-	for index, name in { "Health", "Power", "Defense", "Speed", "Rating", "Attuned" } do
-		local tile = statTiles[name]
-		at(tile.Tile, 0, 4 + (index - 1) * statsH, statWidth, statsH)
-		local caption = tile.Tile:FindFirstChildOfClass("TextLabel")
-		if caption then
-			at(caption, 10, 0, statWidth - 14, statsH)
-			caption.TextSize = 9
-		end
-		at(tile.Value, 10, 0, statWidth - 18, statsH)
-		tile.Value.TextSize = 15
-		tile.Value.TextXAlignment = Enum.TextXAlignment.Right
 	end
 	drawTabs()
 	local key = if tab == "Gems" then gemsKey() elseif tab == "Armor" then armorKey() else nil
@@ -2465,6 +2488,7 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
 	for _, card in wornCards do ElementCardFX.update(card.FX, card.Element, now) end
 	for _, ui in surgeKeys do ElementCardFX.update(ui.FX, ui.ElementFX, now) end
 	StageBackdrop.update(stageBackdrop, now)
+	if radar then StatRadar.step(radar, 1 / 30) end
 end)
 function draw()
 	if drawQueued then
