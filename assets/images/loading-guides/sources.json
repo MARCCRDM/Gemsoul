@@ -1,0 +1,19 @@
+{
+  "format": "1920x1080 PNG",
+  "type": "Static loading-screen compositions; progress should be drawn live in game",
+  "sources": [
+    "docs/armor-review/Prospector-*-1.png",
+    "assets/images/intro/style_Prospector.png",
+    "assets/images/ability_icons.png",
+    "docs/combat-reel/scene-1.png",
+    ".tools/site-gems.luau (GemShapes geometry)"
+  ],
+  "screens": [
+    "01-mining",
+    "02-gem-uses",
+    "03-enchanting",
+    "04-surges",
+    "05-charge"
+  ],
+  "note": "Composited existing renders and exported game geometry; not Roblox runtime screenshots. No AI-generated imagery."
+}
