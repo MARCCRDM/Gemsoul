@@ -108,7 +108,7 @@ local function fit()
 	local bottom = if phone then 6 else BOTTOM
 	safe.Size = UDim2.new(1, 0, 1, -TOPBAR - bottom)
 	if buildTag then
-		buildTag.Visible = not phone
+		buildTag.Visible = not phone and player:GetAttribute("InventoryVersion") ~= 2
 	end
 	if screen.X > 0 and screen.Y > TOPBAR + bottom then
 		fitScale.Scale = math.min(screen.X / W, (screen.Y - TOPBAR - bottom) / H)
@@ -282,6 +282,29 @@ end
 
 -- The Inventory fills the rest: loadout on the left, bags on the right.
 InventoryScreen.mount(root, gui, UDim2.fromOffset(16, 0))
+
+-- The redesign (Modules/InventoryV2), side by side with the first one: the
+-- DEV panel flips the InventoryVersion attribute (1 or 2) to compare them.
+local InventoryV2 = require(script.Parent.Modules.InventoryV2)
+InventoryV2.mount(gui)
+local function applyVersion()
+	local v2 = player:GetAttribute("InventoryVersion") == 2
+	root.Visible = not v2
+	if buildTag then
+		buildTag.Visible = not v2 and gui.AbsoluteSize.Y >= 500
+	end
+	if v2 then
+		InventoryScreen.cancelDrag()
+	else
+		InventoryV2.cancelDrag()
+	end
+	InventoryV2.setActive(v2)
+	if not v2 then
+		InventoryScreen.refresh()
+	end
+end
+player:GetAttributeChangedSignal("InventoryVersion"):Connect(applyVersion)
+applyVersion()
 
 local function commas(n: number): string
 	local s = tostring(math.floor(n))
