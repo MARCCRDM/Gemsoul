@@ -2512,11 +2512,241 @@ end
 
 -- A bag page is rebuilt only when what it shows changes, and keeps its
 -- scroll position when it is.
-local pageKey, pageTab = "", ""
-local statCard: Frame? = nil
+
 local slotPanel: Frame? = nil
 local slotPanelBody: Frame? = nil
 local slotPanelKey = ""
+local buildSlotPanel, fillSlotPanel
+
+-- The slot window: the picked piece and its gem as two big sockets side by
+-- side (tap one to browse replacements, or drop one from the drawer onto
+-- it), the piece's stats, and its perk with what the gem adds.
+local panelUi = nil
+buildSlotPanel = function()
+	slotPanel = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 10, Visible = false }, left)
+	round(slotPanel :: Frame, 12)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(22, 32, 48), Color3.fromRGB(10, 15, 24)) }, slotPanel)
+	local edge = stroke(slotPanel :: Frame, P.Gold, 1.5, 0.35)
+	local ui = { Edge = edge }
+	local function z(object)
+		object.ZIndex = 11
+		for _, d in object:GetDescendants() do
+			if d:IsA("GuiObject") then
+				d.ZIndex = 11
+			end
+		end
+		return object
+	end
+	ui.Title = z(label(slotPanel, "", 10, C.Dim, BOLD))
+	ui.Title.Position, ui.Title.Size = UDim2.fromOffset(18, 10), UDim2.new(1, -36, 0, 14)
+	ui.Title.TextXAlignment = Enum.TextXAlignment.Center
+	-- One socket: a big square well, a name, a sub line and a detail line.
+	local function socket(xScale: number, onTap: () -> ())
+		local column = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(xScale, 0, 0, 30), Size = UDim2.new(0.5, -16, 0, 176), ZIndex = 11 }, slotPanel)
+		local well = new("TextButton", {
+			Text = "",
+			AutoButtonColor = false,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.fromScale(0.5, 0),
+			Size = UDim2.fromOffset(100, 100),
+			ZIndex = 11,
+		}, column)
+		round(well, 14)
+		local tint = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(P.Frame, P.Frame) }, well)
+		local wellEdge = stroke(well, C.PanelEdge, 2, 0)
+		well:SetAttribute("UiSound", "Click")
+		well.Activated:Connect(function()
+			if os.clock() >= suppressClickUntil then
+				onTap()
+			end
+		end)
+		local art = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(8, 8), Size = UDim2.new(1, -16, 1, -16), ZIndex = 12 }, well)
+		local empty = label(well, "+", 34, C.Faint, HEADING)
+		empty.Size, empty.ZIndex = UDim2.fromScale(1, 1), 12
+		empty.TextXAlignment = Enum.TextXAlignment.Center
+		local name = label(column, "", 13, C.Text, BOLD)
+		name.Position, name.Size, name.ZIndex = UDim2.fromOffset(0, 106), UDim2.new(1, 0, 0, 18), 11
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		local sub = label(column, "", 9, C.Dim, BOLD)
+		sub.Position, sub.Size, sub.ZIndex = UDim2.fromOffset(0, 124), UDim2.new(1, 0, 0, 12), 11
+		sub.TextXAlignment = Enum.TextXAlignment.Center
+		local detail = label(column, "", 11, C.Text, BOLD)
+		detail.Position, detail.Size, detail.ZIndex = UDim2.fromOffset(0, 140), UDim2.new(1, 0, 0, 30), 11
+		detail.TextXAlignment = Enum.TextXAlignment.Center
+		detail.TextWrapped = true
+		return { Well = well, Tint = tint, Edge = wellEdge, Art = art, Empty = empty, Name = name, Sub = sub, Detail = detail }
+	end
+	ui.Armor = socket(0.27, function()
+		selection = nil
+		tab, armorFilter = "Armor", contextSlot or "All"
+		draw()
+	end)
+	ui.Gem = socket(0.73, function()
+		selection = nil
+		tab, gemFilter = "Gems", "All"
+		draw()
+	end)
+	-- The link between them: the gem powers the piece.
+	ui.Link = z(label(slotPanel, "◆", 18, C.Faint, HEADING))
+	ui.Link.AnchorPoint, ui.Link.Position, ui.Link.Size = Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0, 80), UDim2.fromOffset(30, 30)
+	ui.Link.TextXAlignment = Enum.TextXAlignment.Center
+	-- The perk band.
+	local band = new("Frame", { BackgroundColor3 = Color3.fromRGB(30, 26, 16), BackgroundTransparency = 0.2, Position = UDim2.new(0, 14, 0, 208), Size = UDim2.new(1, -28, 0, 86), ZIndex = 11 }, slotPanel)
+	round(band, 8)
+	stroke(band, P.Gold, 1, 0.65)
+	ui.PerkName = label(band, "", 10, P.Gold, BOLD)
+	ui.PerkName.Position, ui.PerkName.Size, ui.PerkName.ZIndex = UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 14), 12
+	ui.PerkText = label(band, "", 11, C.Text, BODY)
+	ui.PerkText.Position, ui.PerkText.Size, ui.PerkText.ZIndex = UDim2.fromOffset(12, 21), UDim2.new(1, -24, 0, 28), 12
+	ui.PerkText.TextWrapped = true
+	ui.PerkText.TextYAlignment = Enum.TextYAlignment.Top
+	ui.PerkValue = label(band, "", 13, C.Good, HEADING)
+	ui.PerkValue.Position, ui.PerkValue.Size, ui.PerkValue.ZIndex = UDim2.fromOffset(12, 50), UDim2.new(1, -24, 0, 30), 12
+	ui.PerkValue.RichText = true
+	ui.PerkValue.TextWrapped = true
+	ui.PerkValue.TextTruncate = Enum.TextTruncate.None
+	ui.PerkValue.TextYAlignment = Enum.TextYAlignment.Top
+	ui.PerkNote = label(band, "", 9, C.Dim, BOLD)
+	ui.PerkNote.AnchorPoint = Vector2.new(1, 0)
+	ui.PerkNote.Position, ui.PerkNote.Size, ui.PerkNote.ZIndex = UDim2.new(1, -12, 0, 7), UDim2.new(0.5, 0, 0, 12), 12
+	ui.PerkNote.TextXAlignment = Enum.TextXAlignment.Right
+	-- The foot: a hint, and REMOVE GEM when there's one to remove.
+	ui.Hint = z(label(slotPanel, "TAP A SOCKET, OR DRAG FROM THE RIGHT ONTO ONE", 9, C.Faint, BOLD))
+	ui.Hint.Position, ui.Hint.Size = UDim2.new(0, 18, 1, -26), UDim2.new(1, -150, 0, 14)
+	ui.Remove = new("TextButton", {
+		Text = "REMOVE GEM",
+		TextSize = 10,
+		Font = HEADING,
+		TextColor3 = C.Text,
+		BackgroundColor3 = C.Card,
+		AutoButtonColor = true,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -14, 1, -10),
+		Size = UDim2.fromOffset(110, 24),
+		ZIndex = 11,
+	}, slotPanel)
+	round(ui.Remove, 6)
+	stroke(ui.Remove, C.PanelEdge, 1)
+	ui.Remove:SetAttribute("UiSound", "Back")
+	ui.Remove.Activated:Connect(function()
+		if contextSlot then
+			request("UnsocketGem", contextSlot)
+		end
+	end)
+	-- Both sockets take drops from the drawer.
+	table.insert(dropTargets, {
+		Frame = ui.Armor.Well,
+		Stroke = ui.Armor.Edge,
+		Accepts = function(item)
+			return slotPanel ~= nil and slotPanel.Visible and item.Kind == "Spare" and item.Slot == contextSlot
+		end,
+		Drop = function(item)
+			request("EquipGear", Slots.Definitions[item.Slot].Kind, item.Id)
+		end,
+	})
+	table.insert(dropTargets, {
+		Frame = ui.Gem.Well,
+		Stroke = ui.Gem.Edge,
+		Accepts = function(item)
+			return slotPanel ~= nil and slotPanel.Visible and contextSlot ~= nil and item.Kind == "Gem" and item.Gem.Cut ~= nil
+		end,
+		Drop = function(item)
+			request("SocketGem", item.Gem.Id, contextSlot)
+		end,
+	})
+	panelUi = ui
+end
+
+fillSlotPanel = function(slot: string)
+	local loadout = loadoutNow()
+	local id = loadout[slot]
+	local gem = loadout[slot .. "Gem"]
+	local key = string.format("%s|%s|%s|%d", slot, tostring(id), tostring(gem and gem.Id), previewVersion)
+	if key == slotPanelKey then
+		return
+	end
+	slotPanelKey = key
+	local ui = panelUi
+	local gear = gearOf(loadout, slot)
+	local rarity = if gear then rarityOf(loadout, slot) else 1
+	local color = rarityColor(rarity)
+	ui.Title.Text = SLOT_LABEL[slot] .. "  ·  EQUIPPED"
+	-- The piece.
+	clear(ui.Armor.Art)
+	ui.Armor.Empty.Visible = gear == nil
+	ui.Armor.Tint.Color = ColorSequence.new(P.Frame, P.Frame:Lerp(color, 0.3))
+	ui.Armor.Edge.Color = if gear then color else C.PanelEdge
+	if gear then
+		gearArt(ui.Armor.Art, slot, id, true, color)
+	end
+	ui.Armor.Name.Text = if gear then gear.Name else "No " .. string.lower(SLOT_LABEL[slot])
+	ui.Armor.Sub.Text = if gear then string.upper(rarityName(rarity)) .. "  ·  TAP TO SWAP" else "TAP TO PICK ONE"
+	ui.Armor.Sub.TextColor3 = if gear then color else C.Dim
+	local roll = GearRolls.get(loadout, slot)
+	local stats = {}
+	for stat, amount in roll and roll.Stats or {} do
+		table.insert(stats, statText(stat, amount))
+	end
+	table.sort(stats)
+	ui.Armor.Detail.Text = table.concat(stats, "   ")
+	ui.Armor.Detail.TextColor3 = C.Good
+	-- The gem.
+	clear(ui.Gem.Art)
+	ui.Gem.Empty.Visible = gem == nil
+	local gColor = if gem then gemColor(gem) else C.PanelEdge
+	ui.Gem.Tint.Color = ColorSequence.new(P.Frame, P.Frame:Lerp(gColor, if gem then 0.45 else 0))
+	ui.Gem.Edge.Color = gColor
+	if gem then
+		gemArt(ui.Gem.Art, gem)
+	end
+	ui.Gem.Name.Text = if gem then gemName(gem) else "Empty socket"
+	ui.Gem.Sub.Text = if gem
+		then string.upper(GemConfig.elementName(gem.Element)) .. "  ·  " .. string.upper(rarityName(gemRarity(gem))) .. "  ·  TAP TO CHANGE"
+		else "TAP TO ADD A GEM"
+	ui.Gem.Sub.TextColor3 = if gem then gColor else C.Dim
+	ui.Gem.Detail.Text = if gem then string.format("SIZE %s  ·  CLARITY %s  ·  CUT %s", tostring(gem.Size or "-"), tostring(gem.Clarity or "-"), tostring(gem.Cut or "-")) else "Enchanting is pure gain"
+	ui.Gem.Detail.TextColor3 = if gem then C.Dim else C.Faint
+	ui.Link.TextColor3 = if gem then gColor else C.Faint
+	ui.Remove.Visible = gem ~= nil
+	-- The perk, with what the gem adds to it.
+	local signature = ArmorSignatures.resolve(roll, gem)
+	if signature then
+		local d = signature.Definition
+		local function fmt(v: number): string
+			return if d.Percent then string.format("%.1f%%", v * 100) else string.format("%.1f %s", v, d.Unit or "")
+		end
+		ui.PerkName.Text = "PERK  ·  " .. string.upper(d.Name)
+		ui.PerkValue.TextSize = 14
+		ui.PerkText.Text = d.Trigger
+		if gem and signature.Value > signature.Base + 1e-6 then
+			ui.PerkValue.Text = string.format('%s  →  <font color="#%s">%s</font>', fmt(signature.Base), gColor:ToHex(), fmt(signature.Value))
+			ui.PerkNote.Text = "ENCHANTED BY " .. string.upper(gemName(gem))
+		else
+			ui.PerkValue.Text = fmt(signature.Base)
+			ui.PerkNote.Text = "ADD A GEM TO STRENGTHEN IT"
+		end
+	else
+		local passive = gear and gear.Passive
+		ui.PerkName.Text = if passive then "PERK  ·  " .. string.upper(passive.Name or "PASSIVE") else "PERK"
+		ui.PerkValue.TextSize = 11
+		ui.PerkText.Text = if passive and passive.Text then passive.Text else "No perk on this piece."
+		if gem then
+			local parts = {}
+			for _, l in GemConfig.lines(gem, slot) do
+				table.insert(parts, l.Text)
+			end
+			ui.PerkValue.Text = string.format('<font color="#%s">%s</font>', gColor:ToHex(), table.concat(parts, "  ·  "))
+			ui.PerkNote.Text = "ENCHANTED BY " .. string.upper(gemName(gem))
+		else
+			ui.PerkValue.Text = ""
+			ui.PerkNote.Text = "ADD A GEM TO ENCHANT IT"
+		end
+	end
+end
+
+local pageKey, pageTab = "", ""
+local statCard: Frame? = nil
 local statChips: Frame? = nil
 local statChipValues: { [string]: TextLabel } = {}
 local radarShown = false
@@ -2645,32 +2875,13 @@ local function drawRight()
 	-- it is, its gem and perk, and the buttons to change them (the drawer
 	-- lists the replacements).
 	if not slotPanel then
-		slotPanel = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 10, Visible = false }, left)
-		round(slotPanel, 10)
-		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(24, 34, 50), Color3.fromRGB(12, 18, 28)) }, slotPanel)
-		stroke(slotPanel, P.Gold, 1.5, 0.2)
-		slotPanelBody = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 14), Size = UDim2.new(1, -24, 1, -24), ZIndex = 11 }, slotPanel)
+		buildSlotPanel()
 	end
 	local reviewing = contextSlot ~= nil and selection == nil
 	slotPanel.Visible = reviewing
 	if reviewing then
-		at(slotPanel, centre - reach + 8, BODY_Y + 56, 2 * reach - 16, stageH - 96)
-		local key = string.format("%s|%s|%s|%d", contextSlot, tostring(loadout[contextSlot]), tostring(loadout[contextSlot .. "Gem"] and loadout[contextSlot .. "Gem"].Id), previewVersion)
-		if key ~= slotPanelKey then
-			slotPanelKey = key
-			clear(slotPanelBody)
-			if not drawOverview(slotPanelBody, { Kind = "Worn", Slot = contextSlot }) then
-				local empty = label(slotPanelBody, "No " .. string.lower(SLOT_LABEL[contextSlot]) .. " equipped.\nPick one from ARMOR on the right.", 13, C.Dim, BOLD)
-				empty.Size = UDim2.fromScale(1, 1)
-				empty.TextXAlignment = Enum.TextXAlignment.Center
-				empty.TextWrapped = true
-			end
-			for _, d in slotPanelBody:GetDescendants() do
-				if d:IsA("GuiObject") then
-					d.ZIndex = 11
-				end
-			end
-		end
+		at(slotPanel, centre - reach + 8, BODY_Y + 52, 2 * reach - 16, stageH - 88)
+		fillSlotPanel(contextSlot :: string)
 	else
 		slotPanelKey = ""
 	end
