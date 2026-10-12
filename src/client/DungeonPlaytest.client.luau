@@ -41,7 +41,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 330)
+panel.Size = UDim2.fromOffset(300, 362)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -190,6 +190,39 @@ for version = 1, 2 do
 end
 paintVersions()
 player:GetAttributeChangedSignal("InventoryVersion"):Connect(paintVersions)
+
+-- ABILITIES: the classic surge array (Q / E / R read the three surge
+-- sockets) or the triad (Q the sword's gem, E the core gem, R the shield's).
+-- Saved on your profile, so the server fights by the same rules.
+local abilityCaption = versionCaption:Clone()
+abilityCaption.Position = UDim2.fromOffset(6, 328)
+abilityCaption.Text = "ABILITIES"
+abilityCaption.Parent = panel
+local abilityButtons = {}
+local function paintAbilities(mode: string?)
+	for id, b in abilityButtons do
+		local on = id == mode
+		b.BackgroundColor3 = if on then Color3.fromRGB(255, 210, 126) else Color3.fromRGB(39, 61, 79)
+		b.TextColor3 = if on then Color3.fromRGB(17, 25, 36) else Color3.fromRGB(240, 245, 250)
+	end
+end
+for i, mode in { "Classic", "Triad" } do
+	local b = Instance.new("TextButton")
+	b.Name = "Abilities" .. mode
+	b.Size = UDim2.fromOffset(92, 26)
+	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 328)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 12
+	b.Text = if mode == "Classic" then "CLASSIC" else "Q·E·R TRIAD"
+	b.Parent = panel
+	corner(b, 5)
+	b.Activated:Connect(function()
+		run("DevAbilities", mode)
+		paintAbilities(mode)
+	end)
+	abilityButtons[mode] = b
+end
+paintAbilities("Triad")
 
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or UserInputService:GetFocusedTextBox() then

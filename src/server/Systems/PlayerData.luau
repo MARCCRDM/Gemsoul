@@ -224,6 +224,30 @@ local function migrate(profile: Profile): Profile
 		profile.Version = 8
 	end
 	Slots.initialize(profile)
+	-- The Q / E / R triad (Shared.GemTraits): Q and R now come from the sword
+	-- and the shield, and the three surge sockets became one core socket (the
+	-- old E socket). Gems left on the retired Q and R sockets go back to the
+	-- pouch; with no room they stay saved where they are. Nothing is lost.
+	if Tech.Traits.active(profile.Character) and not (profile :: any).TriadMoved then
+		local moved, waiting = 0, 0
+		for _, slot in Tech.Traits.ArchivedSockets do
+			local key = slot .. "Gem"
+			local gem = (profile.Character :: any)[key]
+			if gem then
+				if #profile.Gems < Config.MaxGems then
+					table.insert(profile.Gems, gem);
+					(profile.Character :: any)[key] = nil
+					moved += 1
+				else
+					waiting += 1
+				end
+			end
+		end
+		(profile :: any).TriadMoved = waiting == 0
+		if moved > 0 then
+			(profile :: any).TriadNotice = moved
+		end
+	end
 	profile.Version = math.max(profile.Version, 10)
 	Tree.initialize(profile)
 	return profile
@@ -566,6 +590,8 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		WelcomeBought = profile.WelcomeBought,
 		ServerTime = os.time(),
 		CanRegenerateEquipment = TestAdmin.allowed(player.UserId),
+		TriadSeen = (profile :: any).TriadSeen, -- the triad's "what's new" card was read
+		TriadNotice = (profile :: any).TriadNotice, -- old Q / R surge gems moved to the stash
 	}
 end
 
@@ -658,6 +684,9 @@ function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem
 		return nil
 	end
 	local surgeKey = ({ Surge1 = "Q", Surge2 = "E", Surge3 = "R" })[slot or "Weapon"]
+	if surgeKey and Tech.Traits.active(profile.Character) and table.find(Tech.Traits.ArchivedSockets, slot) then
+		return nil -- (retired by the triad: Q is the sword's gem, R the shield's)
+	end
 	if surgeKey and not Tech.canSocket(gem, surgeKey, profile.Character) then
 		return nil
 	end
@@ -704,14 +733,41 @@ end
 	gem goes back to the pouch.
 ]]
 PlayerData.SurgeKeys = { Q = "Surge1", E = "Surge2", R = "Surge3" }
+-- The socket a key reads: with the triad on, Q is the sword's gem, E the
+-- core socket's and R the shield's (Shared.GemTraits).
+local function surgeSlot(player: Player, key: string): string?
+	local profile = profiles[player]
+	if profile and Tech.Traits.active(profile.Character) then
+		return Tech.Traits.Sockets[key]
+	end
+	return PlayerData.SurgeKeys[key]
+end
+PlayerData.surgeSlot = surgeSlot
 function PlayerData.socketSurge(player: Player, gemId: string, key: string): Gem?
-	local slot = PlayerData.SurgeKeys[key]
+	local slot = surgeSlot(player, key)
 	return if slot then PlayerData.socketGem(player, gemId, slot) else nil
 end
 
 function PlayerData.unsocketSurge(player: Player, key: string): Gem?
-	local slot = PlayerData.SurgeKeys[key]
+	local slot = surgeSlot(player, key)
 	return if slot then PlayerData.unsocketGem(player, slot) else nil
+end
+
+-- Is this key's old surge socket retired (a saved preset's Q or R gem)?
+function PlayerData.surgeArchived(player: Player, key: string): boolean
+	local profile = profiles[player]
+	return profile ~= nil and Tech.Traits.active(profile.Character) and key ~= "E"
+end
+
+-- Switches the classic surge array back on (or off) for a player: the DEV
+-- comparison switch. Nothing moves; each key just reads its old socket.
+function PlayerData.setLegacySurges(player: Player, on: boolean)
+	local profile = profiles[player]
+	if profile then
+		profile.Character.LegacySurges = if on then true else nil
+		sync(player)
+		characterChanged:Fire(player)
+	end
 end
 
 -- The Rig Maneuver on key 1, 2 or 3 (validated by the caller). An id already

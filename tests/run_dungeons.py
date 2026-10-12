@@ -11,7 +11,9 @@ s+=module('Slots','src/shared/EquipmentSlots.luau')
 s+=module('MinerRoster','src/shared/MinerRoster.luau')
 s+=module('ElementMatchup','src/shared/ElementMatchup.luau')
 s+=module('Rules','src/shared/DungeonRules.luau')
+s+=module('GemTraits','src/shared/GemTraits.luau')
 s+=module('GemRoller','src/shared/GemRoller.luau')
+s+='\nGemTraits.Enabled = false -- the classic surge array (the triad has its own suites)\n'
 s+='local dungeonLethal\n'
 s+=read('tests/dungeon_services.luau')
 s+='CombatServer.onDungeonLethal=function(hook) dungeonLethal=hook end\nPlayerData.selectMiner=function(p,index) return MinerRoster.switch(profiles[p],index) end\n'

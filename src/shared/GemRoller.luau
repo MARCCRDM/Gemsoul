@@ -16,6 +16,7 @@
 	Gems saved before surges existed get theirs from a seed of their id, so the
 	server and every client agree without a migration (GemRoller.surge).
 ]]
+local GemTraits = require(script.Parent.GemTraits)
 local GemRoller = {}
 -- Reversible combat prototype. Legacy IDs remain saved and archived.
 GemRoller.Prototype = false
@@ -188,6 +189,8 @@ function GemRoller.roll(rng, luck: number?)
 	return {
 		Element = element,
 		Tier = rarity,
+		-- The triad: one Offense, one Ability and one Defense (GemTraits).
+		Traits = GemTraits.roll(rng, element),
 		Surge = surge,
 		SurgeTier = tier,
 		SurgeRank = rankFor(rules, rng:NextNumber()),
@@ -200,6 +203,9 @@ end
 -- Gives a rolled gem a different element, with that element's surge at the
 -- same tier (a Resonance surge has no element and stays).
 function GemRoller.setElement(gem, element: string)
+	if type(gem.Traits) == "table" and gem.Element then
+		gem.Traits = GemTraits.reElement(gem.Traits, gem.Element, element) or gem.Traits
+	end
 	if GemRoller.RaritySurges then
 		local oldPool = GemRoller.Pools[gem.Element]
 		local index = oldPool and table.find(oldPool, gem.Surge)

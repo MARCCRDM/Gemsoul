@@ -8,7 +8,9 @@ def module(name, path):
     text = re.sub(r'^local \w+ = require\([^\n]+\)\n', '', text, flags=re.M)
     return f'local {name}=(function()\n{text}\nend)()\n'
 source=(ROOT/'tests/roblox_primitives.luau').read_text(encoding='utf-8')
+source+=module('GemTraits','src/shared/GemTraits.luau')
 source+=module('GemRoller','src/shared/GemRoller.luau')
+source+='\nGemTraits.Enabled = false -- the classic surge array (the triad has its own suites)\n'
 source+=module('Tech','src/shared/CombatTechnology.luau')
 source+=module('Lottery','src/shared/StarterLottery.luau')
 source+=(ROOT/"tests/starter_lottery_cases.luau").read_text(encoding="utf-8")

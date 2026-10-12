@@ -28,6 +28,7 @@ require(script.Parent.Modules.FoeBars) -- overhead health and the target list
 local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
 local CombatFx = require(script.Parent.Modules.CombatFx)
 local CombatVfx = require(script.Parent.Modules.CombatVfx)
+local TriadVfx = require(script.Parent.Modules.TriadVfx)
 local BladeTrails = require(script.Parent.Modules.BladeTrails)
 local CombatSound = require(script.Parent.Modules.CombatSound)
 local MatchupUI = require(script.Parent.Modules.MatchupUI)
@@ -252,7 +253,22 @@ local function makeIcon(parent, key, round)
 	keyLabel.Text, keyLabel.Size, keyLabel.ZIndex = key, UDim2.fromScale(1, 1), 4
 	local name = shadowed(centered(parent, 9, HudChrome.Parchment))
 	timer.TextStrokeTransparency = 0.4
+	-- An Aura's passive is on while its key is ready: a slow breathing ring.
+	local aura = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(1, 13, 1, 13),
+		Visible = false,
+		ZIndex = 0,
+	}, button)
+	new("UICorner", { CornerRadius = if round then radius else UDim.new(0.18, 0) }, aura)
+	local auraStroke = new("UIStroke", { Color = P.Gold, Thickness = 2, Transparency = 0.4 }, aura)
 	return {
+		Chip = chip,
+		KeyLabel = keyLabel,
+		Aura = aura,
+		AuraStroke = auraStroke,
 		Button = button,
 		Stroke = stroke,
 		Glyph = glyph,
@@ -934,7 +950,8 @@ local function pressInput(obj)
 	return obj.UserInputType == Enum.UserInputType.MouseButton1 or obj.UserInputType == Enum.UserInputType.Touch
 end
 local function loadoutOf()
-	return GemClient.Profile and GemClient.Profile.Character
+	-- (what you fight with: a two-handed weapon leaves the shield behind)
+	return Classes.activeLoadout(GemClient.Profile and GemClient.Profile.Character)
 end
 local function techReady(key)
 	local cd = techCooldowns[key]
@@ -948,7 +965,9 @@ local function triggerSurge(key)
 	local loadout = loadoutOf()
 	local gem = Tech.surgeGem(loadout, key)
 	if not gem then
-		hint.Text, feedbackUntil = "Socket a gem in surge slot " .. key .. " (Loadout)", os.clock() + 1.2
+		hint.Text, feedbackUntil = if Tech.Traits.active(loadout)
+			then string.format("%s comes from your %s's gem: socket one (Inventory)", key, string.lower(Tech.Traits.SocketNames[key]))
+			else "Socket a gem in surge slot " .. key .. " (Loadout)", os.clock() + 1.4
 		return
 	end
 	local definition = Tech.surgeStats(gem, Tree.effects(GemClient.Profile), player:GetAttribute("MatchRarityCap") ~= nil)
@@ -1459,7 +1478,7 @@ RunService.RenderStepped:Connect(function(dt)
 		bar.Value.TextColor3 = if ratio <= 0.2 then P.Gold else P.Text
 	end
 	local profile = GemClient.Profile
-	local loadout = profile and profile.Character
+	local loadout = Classes.activeLoadout(profile and profile.Character)
 	local amps = if profile then Tree.effects(profile) else {}
 	for i, key in SURGE_KEYS do
 		local icon = surgeIcons[i]
@@ -1474,14 +1493,30 @@ RunService.RenderStepped:Connect(function(dt)
 			end
 			icon.Badge.Text = Tech.rarityLabel(gem)
 			icon.Name.Text = definition.Name
-			local usable = (player:GetAttribute("Charge") or 0) >= cost
+			-- The triad: each key wears its lane's colour; R pays Stamina.
+			local keyColor = if definition.Triad then TriadVfx.KeyColors[key] else P.Gold
+			icon.Chip.BackgroundColor3 = keyColor
+			local auraOn = definition.Type == "Aura" and techReady("Surge" .. key)
+			icon.Aura.Visible = auraOn
+			if auraOn then
+				icon.AuraStroke.Color = color
+				icon.AuraStroke.Transparency = 0.35 + 0.3 * math.sin(os.clock() * 3)
+			end
+			local usable = (player:GetAttribute(definition.Resource or "Charge") or 0) >= cost
 			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key, not usable)
 		else
 			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
 			SurgeIcons.apply(icon.Button, nil)
-			icon.Badge.Text, icon.Name.Text = "", "EMPTY"
+			icon.Badge.Text = ""
+			icon.Name.Text = if Tech.Traits.active(loadout) then string.upper(Tech.Traits.SocketNames[key]) .. " GEM" else "EMPTY"
+			icon.Aura.Visible = false
 			setIcon(icon, P.Dim, nil, false, false)
 		end
+	end
+	local trayTitle = if Tech.Traits.active(loadout) then "Q · E · R" else "SURGES"
+	if actionBar.SurgeTitle.Text ~= trayTitle then
+		actionBar.SurgeTitle.Text = trayTitle
+		actionBar.SurgeTitle.Size = UDim2.fromOffset(8 + utf8.len(trayTitle) * 7, 14)
 	end
 	if beamKey and os.clock() >= nextBeamUpdate then
 		input:FireServer("Surge", beamKey, aimPoint())
@@ -1812,7 +1847,7 @@ function handlers.TechCooldown(id, duration, lockout)
 	-- Wind-ups (Solar Flare, Supernova, Breach Hammer...) fill the cast bar.
 	local profile = GemClient.Profile
 	local key = string.match(id, "^Surge(%a)$")
-	local gem = key and Tech.surgeGem(profile and profile.Character, key)
+	local gem = key and Tech.surgeGem(Classes.activeLoadout(profile and profile.Character), key)
 	local stats = if gem
 		then Tech.surgeStats(gem, profile and Tree.effects(profile), player:GetAttribute("MatchRarityCap") ~= nil)
 		elseif definition then Tree.techStats(profile, id)
@@ -2266,6 +2301,58 @@ function handlers.DodgeRoll(who, origin, direction, distance, afterimage)
 	if who == player then
 		holding = false
 	end
+end
+-- The Q / E / R triad's moves (Modules/TriadVfx).
+function handlers.TriadCast(who, id, element, key, castTime)
+	TriadVfx.cast(who, id, element, key, castTime)
+end
+function handlers.TriadAura(who, id, element, kind, seconds)
+	TriadVfx.aura(who, id, element, kind, seconds)
+end
+function handlers.TriadWall(who, kind, frame, width, seconds, element)
+	TriadVfx.wall(who, kind, frame, width, seconds, element)
+	if who == player then
+		CombatFx.shake(0.25, 0.2)
+	end
+end
+function handlers.TriadWallHit(position, kind)
+	TriadVfx.wallHit(position, kind)
+end
+function handlers.TriadSteal(from, to, resource, amount)
+	TriadVfx.steal(from, to, resource, amount)
+	if to == player then
+		hint.Text, feedbackUntil = string.format("+%d %s STOLEN", amount or 0, string.upper(resource)), os.clock() + 0.8
+	end
+end
+function handlers.TriadMark(root, seconds, element)
+	TriadVfx.mark(root, seconds, element)
+end
+function handlers.TriadShatter(position, color)
+	TriadVfx.shatter(position, color)
+end
+function handlers.TriadRoot(position, seconds, element)
+	TriadVfx.root(position, seconds, element)
+end
+function handlers.TriadPhoenix(who, position)
+	TriadVfx.phoenix(who, position)
+end
+function handlers.TriadTrail(from, to, width, seconds, element)
+	TriadVfx.trail(from, to, width, seconds, element)
+end
+function handlers.TriadField(center, radius, seconds, element)
+	TriadVfx.field(center, radius, seconds, element)
+end
+function handlers.TriadPylon(center, reach, seconds, element)
+	TriadVfx.pylon(center, reach, seconds, element)
+end
+function handlers.TriadBreak(position, radius, element)
+	TriadVfx.breakBurst(position, radius, element)
+end
+function handlers.TriadDeflect(from, to)
+	TriadVfx.deflect(from, to)
+end
+function handlers.TriadEmpowerHit(position, kind, final)
+	TriadVfx.empowerHit(position, kind, final)
 end
 fxEvent.OnClientEvent:Connect(function(kind, ...)
 	local handler = handlers[kind]

@@ -920,6 +920,11 @@ function Enemies.statuses(enemy: Enemy, now: number)
 	add("Weakened", enemy.WeakenUntil, enemy.Weaken * 100)
 	add("Blinded", e.BlindUntil or 0, (e.Blind or 0) * 100)
 	add("Silenced", e.SilenceUntil or 0)
+	-- The triad's marks on it (TriadServer).
+	add("Branded", e.TriadBrandUntil or 0)
+	if (e.Chill or 0) > 0 then
+		add("Chilled", e.ChillUntil or 0, e.Chill)
+	end
 	add("RiposteStance", e.RiposteUntil or 0)
 	add(if e.WardKind == "Burn" then "BurningWard" else "StaticShell", e.WardUntil or 0)
 	-- A rival's own buffs.
@@ -1061,16 +1066,10 @@ local function tickDots(enemy: Enemy)
 		if dot.Wait >= (dot.Every or 1) then
 			dot.Wait = 0
 			dot.Ticks -= 1
-			local previous = DamageLog.push(dot.Status or "Bleeding", if dot.Status == "Burning" then "Fire" else nil)
-			Enemies.damage(
-				enemy,
-				dot.PerTick,
-				dot.Source,
-				false,
-				dot.Color,
-				nil,
-				if dot.Status == "Burning" then "Fire" else nil
-			)
+			-- (a burn is Thermal, a poison Corrosive; a bleed has no element)
+			local element = if dot.Status == "Burning" then "Fire" elseif dot.Status == "Poisoned" then "Poison" else nil
+			local previous = DamageLog.push(dot.Status or "Bleeding", element)
+			Enemies.damage(enemy, dot.PerTick, dot.Source, false, dot.Color, nil, element)
 			DamageLog.pop(previous)
 			if dot.Ticks <= 0 then
 				table.remove(enemy.Dots, i)

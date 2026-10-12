@@ -8,8 +8,9 @@ def module(name, path):
     text = re.sub(r'^local ReplicatedStorage = .*\n', '', text, flags=re.M)
     return f'local {name}=(function()\n{text}\nend)()\n'
 source=(ROOT/'tests/roblox_primitives.luau').read_text(encoding='utf-8')
-for name,path in [('GemRoller','src/shared/GemRoller.luau'),('Tech','src/shared/CombatTechnology.luau'),('Atlas','src/client/Modules/AbilityIconAtlas.luau'),('Icons','src/client/Modules/SurgeIcons.luau'),('Lottery','src/shared/StarterLottery.luau')]:
+for name,path in [('GemTraits','src/shared/GemTraits.luau'),('GemRoller','src/shared/GemRoller.luau'),('Tech','src/shared/CombatTechnology.luau'),('Atlas','src/client/Modules/AbilityIconAtlas.luau'),('Icons','src/client/Modules/SurgeIcons.luau'),('Lottery','src/shared/StarterLottery.luau')]:
     source+=module(name,path)
+    if name=='GemTraits': source+='GemTraits.Enabled = false -- the classic surge array\n'
 archive=json.loads((ROOT/'docs/surge-archive/legacy-surges.json').read_text(encoding='utf-8'))
 for entry in archive['Abilities']:
     source+=f'assert(Tech.Catalog[{json.dumps(entry["Id"])}].Name == {json.dumps(entry["Name"])}, "Archive identity changed")\n'

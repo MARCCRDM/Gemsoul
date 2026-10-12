@@ -82,6 +82,25 @@ local HEAVY, HEADING, MEDIUM, BODY = Enum.Font.GothamBlack, Enum.Font.GothamBold
 local SLOT_NAME =
 	{ Helmet = "HELMET", Armor = "CHEST", Gloves = "GLOVES", Boots = "BOOTS", Weapon = "SWORD", Shield = "SHIELD" }
 local KEYS = { "Q", "E", "R" }
+-- The Q / E / R triad (Shared.GemTraits): each key has a job and a colour,
+-- and reads one socket: Q the sword's gem, E the core gem, R the shield's.
+local Traits = Tech.Traits
+local KEY_COLORS = {
+	Q = Color3.fromRGB(255, 138, 92),
+	E = Color3.fromRGB(122, 196, 255),
+	R = Color3.fromRGB(120, 230, 170),
+}
+local LANE_WORDS = { Q = "OFFENSE", E = "ABILITY", R = "DEFENSE" }
+local function triadOn(loadout): boolean
+	return Traits.active(loadout)
+end
+-- A pouch gem as a key would fire it (its trait for that key).
+local function keyGem(gem, key: string, loadout)
+	if gem and triadOn(loadout) and not gem.TraitKey then
+		return Traits.project(gem, key)
+	end
+	return gem
+end
 local GEM_RARITY = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 
@@ -186,6 +205,10 @@ local function gemColor(gem): Color3
 	return GemConfig.ElementColors[gem.Element] or C.Text
 end
 local function gemName(gem): string
+	-- (with the triad a gem is three moves, so it goes by its own name)
+	if Traits.active(GemClient.Profile and GemClient.Profile.Character) then
+		return GemConfig.displayName(gem)
+	end
 	if gem.Cut then
 		local surge = Tech.surgeStats(gem)
 		if surge then
@@ -259,7 +282,9 @@ local function gemsFor(forKey: boolean, filter: string)
 	local profile = profileNow()
 	local list = {}
 	for _, gem in profile and profile.Gems or {} do
-		if gem.Cut ~= nil and (not forKey or Tech.surgeStats(gem) ~= nil) then
+		local fits = not forKey
+			or (if triadOn(loadoutNow()) then Traits.traitFor(gem, "E") ~= nil else Tech.surgeStats(gem) ~= nil)
+		if gem.Cut ~= nil and fits then
 			if filter == "All" or gem.Element == filter then
 				table.insert(list, gem)
 			end
@@ -928,6 +953,54 @@ local function buildRight(canvas: Frame)
 	ui.SurgeGem = place(text(card, "", 11, C.Dim, HEADING), 134, 80, RIGHT_W - 150, 30)
 	ui.SurgeGem.TextWrapped = true
 	ui.SurgeGem.TextYAlignment = Enum.TextYAlignment.Top
+	-- The triad: the gem's three traits, the one this key fires lit. Tap one
+	-- twice to reforge it (a new roll for that trait, for coins and Marks).
+	ui.TraitStrip = new("Frame", { Name = "Traits", BackgroundTransparency = 1, Visible = false }, card)
+	place(ui.TraitStrip, 18, 124, RIGHT_W - 36, 40)
+	ui.TraitChips = {}
+	local chipW = math.floor((RIGHT_W - 36 - 12) / 3)
+	for i, key in KEYS do
+		local chip = new("TextButton", {
+			Name = "Trait" .. key,
+			Text = "",
+			AutoButtonColor = false,
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 0.5,
+		}, ui.TraitStrip)
+		place(chip, (i - 1) * (chipW + 6), 0, chipW, 40)
+		round(chip, 8)
+		local edge = stroke(chip, C.Line, 1, 0.5)
+		local badge = text(chip, key, 11, C.Ink, HEAVY)
+		place(badge, 7, 11, 18, 18)
+		badge.TextXAlignment = Enum.TextXAlignment.Center
+		badge.BackgroundTransparency = 0
+		round(badge, 4)
+		local lane = place(text(chip, "", 8, C.Dim, HEAVY), 31, 5, chipW - 36, 11)
+		local name = place(text(chip, "", 11, C.Text, HEADING), 31, 18, chipW - 36, 16)
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		chip:SetAttribute("UiSound", "Click")
+		local entry = { Chip = chip, Edge = edge, Badge = badge, Lane = lane, Name = name, Key = key }
+		chip.Activated:Connect(function()
+			local gem, owned = ui.TraitGem, ui.TraitOwned
+			if not gem or not owned then
+				return
+			end
+			local laneName = Traits.Lanes[key]
+			if entry.ArmedUntil and os.clock() < entry.ArmedUntil then
+				entry.ArmedUntil = nil
+				request("ReforgeTrait", gem.SourceId or gem.Id, laneName)
+			else
+				entry.ArmedUntil = os.clock() + 4
+				task.delay(4.05, function()
+					if InventoryV2.drawTraits then
+						InventoryV2.drawTraits(ui.TraitGem, ui.TraitKey, ui.TraitOwned)
+					end
+				end)
+			end
+			InventoryV2.drawTraits(gem, ui.TraitKey, owned)
+		end)
+		ui.TraitChips[key] = entry
+	end
 	-- The perk band (or the surge's description).
 	local rule = frame(card, C.Line, 0.92)
 	place(rule, 18, 170, RIGHT_W - 36, 1)
@@ -1065,13 +1138,23 @@ local function buildSurges(canvas: Frame)
 			Frame = card,
 			Stroke = edge,
 			Accepts = function(item: Item)
-				return item.Kind == "Gem" and Tech.surgeStats(item.Gem) ~= nil
+				if item.Kind ~= "Gem" then
+					return false
+				end
+				if triadOn(loadoutNow()) then
+					return Traits.traitFor(item.Gem, key) ~= nil
+				end
+				return Tech.surgeStats(item.Gem) ~= nil
 			end,
 			Drop = function(item: Item)
+				-- (with the triad on, the server sockets it in the sword, the core or the shield)
 				request("SocketSurge", (item.Gem :: any).Id, key)
 			end,
 		})
-		ui.Keys[key] = { Card = card, Edge = edge, Icon = icon, Glyph = glyph, Name = name, Info = info, Line = line }
+		-- The key's job, above its name (OFFENSE / ABILITY / DEFENSE).
+		local lane = place(text(card, "", 9, C.Dim, HEAVY), 68, 4, cardW - 80, 12)
+		lane.TextTransparency = 0.1
+		ui.Keys[key] = { Card = card, Edge = edge, Icon = icon, Glyph = glyph, Name = name, Info = info, Line = line, Badge = badge, Lane = lane }
 	end
 end
 
@@ -1319,10 +1402,14 @@ local function drawLeft(profile, loadout)
 	if weaponGem and weaponGem.Element then
 		attack[weaponGem.Element] = (attack[weaponGem.Element] or 0) + 0.45 + 0.4 * (grade(weaponGem) - 1) / 9
 	end
+	-- The triad: Q is the sword's own gem (counted above) and R the shield's
+	-- (counted with the armor below); E's surge adds to the attack.
+	local triad = triadOn(loadout)
 	for _, key in KEYS do
-		local gem = Tech.surgeGem(loadout, key)
+		local gem = if not triad or key == "E" then Tech.surgeGem(loadout, key) else nil
 		if gem and gem.Element then
-			attack[gem.Element] = (attack[gem.Element] or 0) + 0.12 + 0.1 * (grade(gem) - 1) / 9
+			local weight = if triad then 0.25 else 0.12
+			attack[gem.Element] = (attack[gem.Element] or 0) + weight + 0.1 * (grade(gem) - 1) / 9
 		end
 	end
 	local okProfile, armor = pcall(ElementMatchup.profile, loadout)
@@ -1472,9 +1559,17 @@ local function drawRows(loadout)
 		row.Name.Text = if gear then gear.Name else "Empty"
 		row.Name.TextColor3 = if gear then C.Text else C.Faint
 		local signature = gear and perkOf(loadout, slot, nil, gem)
-		local tail = if signature then "  ·  " .. string.upper(signature.Definition.Name)
+		local tail: string = if signature then "  ·  " .. string.upper(signature.Definition.Name)
 			elseif gear and gear.BuffReady and gear.Passive and gear.Passive.Name and gear.Passive.Name ~= "Signature" then "  ·  " .. string.upper(gear.Passive.Name)
 			else ""
+		-- The triad: the sword gives Q its move, the shield R.
+		local rowKey = if triadOn(loadout) then (if slot == "Weapon" then "Q" elseif slot == "Shield" then "R" else nil) else nil
+		if rowKey and gem then
+			local move = Tech.Catalog[Traits.traitFor(gem, rowKey) or ""]
+			if move then
+				tail = string.format('  ·  <font color="#%s">%s %s</font>', KEY_COLORS[rowKey]:ToHex(), rowKey, string.upper(move.Name))
+			end
+		end
 		row.Meta.Text = if gear
 			then string.format('<font color="#%s">%s</font>  ·  %s%s', color:ToHex(), rarityName(rarity), SLOT_NAME[slot], tail)
 			else SLOT_NAME[slot] .. "  ·  NOTHING WORN"
@@ -1523,16 +1618,30 @@ local function drawKeys(loadout)
 		local surge = gem and Tech.surgeStats(gem)
 		local tint = if gem then gemColor(gem) else C.Faint
 		local picked = state.Detail == key
-		entry.Name.Text = if surge then surge.Name else "Add a surge"
+		local triad = triadOn(loadout)
+		local keyColor = if triad then KEY_COLORS[key] else C.Text
+		entry.Badge.BackgroundColor3 = if triad then keyColor else C.Ink
+		entry.Badge.TextColor3 = if triad then C.Ink else C.Text
+		entry.Lane.Text = if triad then LANE_WORDS[key] .. "  ·  " .. string.upper(Traits.SocketNames[key]) .. " GEM" else ""
+		entry.Lane.TextColor3 = keyColor
+		entry.Name.Position = UDim2.fromOffset(68, if triad then 18 else 14)
+		entry.Info.Position = UDim2.fromOffset(68, if triad then 38 else 36)
+		entry.Name.Text = if surge then surge.Name elseif triad then "No gem in your " .. string.lower(Traits.SocketNames[key]) else "Add a surge"
 		entry.Name.TextColor3 = if surge then C.Text else C.Dim
 		entry.Info.Text = if surge
-			then string.format("%s charge  ·  %s s", whole(surge.Cost or 0), whole(surge.Cooldown or 0))
+			then string.format(
+				"%s %s  ·  %s s%s",
+				whole(surge.Cost or 0),
+				string.lower(surge.Resource or "charge"),
+				whole(surge.Cooldown or 0),
+				if surge.Triad then "  ·  " .. whole((surge.Output or 1) * 100) .. "%" else ""
+			)
 			else "Click to pick a gem"
 		entry.Line.BackgroundColor3 = tint
 		entry.Line.BackgroundTransparency = if gem then 0.15 else 0.7
 		entry.Edge.Color = if picked then C.Gold else C.Line
 		entry.Edge.Transparency = if picked then 0.2 else 0.9
-		local shown = if gem then gem.Id else ""
+		local shown = if gem then gem.Id .. tostring(gem.Surge) else ""
 		if entry.Shown ~= shown then
 			entry.Shown = shown
 			entry.Glyph.Text = if surge then "◆" else "+"
@@ -1726,6 +1835,39 @@ local function drawFilters(show: boolean)
 end
 
 -- The words in the compare box, and the two buttons.
+-- The trait strip: `gem` (a projected key gem or nil), the key it's shown
+-- for, and whether it's yours (so it can be reforged).
+function InventoryV2.drawTraits(gem, key: string?, owned: boolean?)
+	local strip = ui.TraitStrip
+	if not strip then
+		return
+	end
+	local traits = gem and triadOn(loadoutNow()) and Traits.traitsOf(gem)
+	strip.Visible = traits ~= nil
+	ui.TraitGem, ui.TraitKey, ui.TraitOwned = gem, key, owned
+	if not traits then
+		return
+	end
+	local coins, marks = Traits.reforgeCost(gem)
+	for k, entry in ui.TraitChips do
+		local lit = k == key
+		local color = KEY_COLORS[k]
+		local move = Tech.Catalog[traits[Traits.Lanes[k]] or ""]
+		local armed = entry.ArmedUntil and os.clock() < entry.ArmedUntil
+		entry.Badge.BackgroundColor3 = if lit then color else C.Faint
+		entry.Name.Text = if move then move.Name else "?"
+		entry.Name.TextColor3 = if lit then C.Text else C.Dim
+		entry.Lane.Text = if armed
+			then string.format("TAP: REFORGE %s · %d MARKS", commas(coins), marks)
+			else LANE_WORDS[k] .. (if move and move.Rare then "  ·  SIGNATURE" else "")
+		entry.Lane.TextColor3 = if armed then C.Gold elseif lit then color else C.Faint
+		entry.Chip.BackgroundColor3 = if lit then color:Lerp(C.Ink, 0.8) else C.Ink
+		entry.Chip.BackgroundTransparency = if lit then 0.1 else 0.5
+		entry.Edge.Color = if armed then C.Gold elseif lit then color else C.Line
+		entry.Edge.Transparency = if lit or armed then 0.15 else 0.6
+	end
+end
+
 function InventoryV2.drawCompare()
 	if not ui.Compare then
 		return
@@ -1740,7 +1882,7 @@ function InventoryV2.drawCompare()
 	elseif table.find(KEYS, target) then
 		local current = Tech.surgeGem(loadout, target)
 		if item and item.Gem then
-			local surge = Tech.surgeStats(item.Gem)
+			local surge = Tech.surgeStats(keyGem(item.Gem, target, loadout))
 			local now = current and Tech.surgeStats(current)
 			if surge and now and current.Id ~= (item.Gem :: any).Id then
 				-- Against what's on the key now: cheaper and quicker is better.
@@ -1872,7 +2014,11 @@ local function paintStrip(loadout)
 			end
 		else
 			local gem = Tech.surgeGem(loadout, key)
-			entry.Tile.TextColor3 = if on then C.Gold elseif gem then gemColor(gem) else C.Faint
+			local keyColor = if triadOn(loadout) then KEY_COLORS[key] else nil
+			entry.Tile.TextColor3 = if on then (keyColor or C.Gold) elseif gem then (keyColor or gemColor(gem)) else C.Faint
+			if keyColor and on then
+				entry.Edge.Color = keyColor
+			end
 		end
 	end
 end
@@ -1887,6 +2033,9 @@ local function drawDetail(loadout)
 	end
 	paintStrip(loadout)
 	local isKey = table.find(KEYS, target) ~= nil
+	if not isKey then
+		InventoryV2.drawTraits(nil)
+	end
 	for _, name in { "PieceWell", "GemWell" } do
 		ui[name].Holder.Visible = not isKey
 		ui[name].Name.Visible = not isKey
@@ -1901,20 +2050,28 @@ local function drawDetail(loadout)
 	local gold = C.Gold:ToHex()
 	if isKey then
 		local current = Tech.surgeGem(loadout, target)
-		local trying = if pick and pick.Kind == "Gem" then pick.Gem else nil
+		local trying = if pick and pick.Kind == "Gem" then keyGem(pick.Gem, target, loadout) else nil
 		local gem = trying or current
 		local surge = gem and Tech.surgeStats(gem)
 		local tint = if gem then gemColor(gem) else C.Faint
 		ui.SurgeName.Text = if surge then surge.Name else "No surge on " .. target
 		ui.SurgeMeta.Text = (if trying then string.format('<font color="#%s">TRYING ON</font>  ·  ', gold) else "")
 			.. (if surge
-				then string.format('<font color="#%s">%s</font>  ·  %s CHARGE  ·  %s S', tint:ToHex(), string.upper(GemConfig.elementName(gem.Element)), whole(surge.Cost or 0), whole(surge.Cooldown or 0))
+				then string.format(
+					'<font color="#%s">%s</font>  ·  %s %s  ·  %s S%s',
+					tint:ToHex(),
+					string.upper(GemConfig.elementName(gem.Element)),
+					whole(surge.Cost or 0),
+					string.upper(surge.Resource or "Charge"),
+					whole(surge.Cooldown or 0),
+					if surge.Triad then string.format("  ·  %s%% OUTPUT", whole((surge.Output or 1) * 100)) else ""
+				)
 				else "PICK A GEM BELOW")
 		ui.SurgeGem.Text = if trying and current then "Replaces " .. gemName(current) .. " on " .. target
 			elseif gem then "From " .. GemConfig.displayName(gem)
 			else ""
 		ui.SurgeIconEdge.Color = if trying then C.Gold else tint
-		local shown = if gem then gem.Id else ""
+		local shown = if gem then gem.Id .. tostring(gem.Surge) else ""
 		if ui.SurgeShown ~= shown then
 			ui.SurgeShown = shown
 			ui.SurgeGlyph.Text = if surge then "◆" else "+"
@@ -1927,11 +2084,17 @@ local function drawDetail(loadout)
 				SurgeIcons.apply(ui.SurgeGlyph, surge, tint)
 			end
 		end
-		ui.PerkName.Text = if surge then "WHAT IT DOES" else ""
-		ui.PerkText.Text = if surge then surge.Description or "" else "Surges are cast with Q, E and R in a fight. Any cut gem with a surge fits."
+		ui.PerkName.Text = if surge
+			then (if surge.Flourished and surge.Flourish then "WHAT IT DOES  ·  LEGENDARY FLOURISH" else "WHAT IT DOES")
+			else ""
+		ui.PerkText.Text = if surge
+			then (surge.Description or "") .. (if surge.Flourished and surge.Flourish then "  " .. surge.Flourish.Text else "")
+			elseif triadOn(loadout) then string.format("%s fires the %s of the gem in your %s. Any cut gem fits.", target, string.lower(Traits.Lanes[target]), string.lower(Traits.SocketNames[target]))
+			else "Surges are cast with Q, E and R in a fight. Any cut gem with a surge fits."
+		InventoryV2.drawTraits(gem, target, trying == nil)
 		ui.PerkText.Size = UDim2.fromOffset(RIGHT_W - 36, 60)
 		ui.PerkValue.Text = ""
-		drawTabs({ { "Gems", "SURGE GEMS" } })
+		drawTabs({ { "Gems", if triadOn(loadout) then string.upper(Traits.SocketNames[target]) .. " GEMS" else "SURGE GEMS" } })
 		drawFilters(true)
 		local items = {}
 		for _, g in gemsFor(true, state.Filter) do
@@ -1999,6 +2162,13 @@ local function drawDetail(loadout)
 				then string.upper(GemConfig.elementName(gem.Element)) .. "  ·  " .. rarityName(gemRarity(gem))
 				else "ENCHANTING IS PURE GAIN"
 			gw.Sub.TextColor3 = if gem then gemColor(gem) else C.Dim
+		end
+		-- The triad: the sword's gem is your Q, the shield's your R.
+		local slotKey = if triadOn(loadout) then (if slot == "Weapon" then "Q" elseif slot == "Shield" then "R" else nil) else nil
+		local move = slotKey and gem and Tech.Catalog[Traits.traitFor(gem, slotKey) or ""]
+		if move then
+			gw.Sub.Text = slotKey .. "  ·  " .. string.upper(move.Name)
+			gw.Sub.TextColor3 = KEY_COLORS[slotKey]
 		end
 		-- The perk: now, with the gem, or (trying something on) now -> then.
 		local signature = gear and perkOf(loadout, slot, viewId, gem)
@@ -2178,6 +2348,7 @@ do
 end
 
 local queued = false
+local drawIntro -- (below, with the intro card)
 function draw()
 	if queued then
 		return
@@ -2195,7 +2366,112 @@ function draw()
 		drawRows(loadout)
 		drawKeys(loadout)
 		drawDetail(loadout)
+		drawIntro(profile, loadout)
 	end)
+end
+
+-- What's new: the triad, explained once ---------------------------------------------------------------
+
+local function buildIntro(canvas: Frame)
+	local shade = new("TextButton", {
+		Name = "TriadIntro",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.fromRGB(4, 6, 10),
+		BackgroundTransparency = 0.25,
+		Visible = false,
+		ZIndex = 40,
+	}, canvas)
+	place(shade, -400, -200, W + 800, H + 400)
+	local panel = frame(shade, Color3.fromRGB(12, 16, 24), 0.02)
+	panel.ZIndex = 41
+	place(panel, 400 + 300, 200 + 150, 1000, 520)
+	round(panel, 18)
+	stroke(panel, C.Gold, 1.5, 0.35)
+	local function label(value: string, size: number, color: Color3, font: Enum.Font, x: number, y: number, w: number, h: number)
+		local t = place(text(panel, value, size, color, font), x, y, w, h)
+		t.ZIndex = 42
+		t.TextWrapped = true
+		t.TextYAlignment = Enum.TextYAlignment.Top
+		return t
+	end
+	label("NEW  ·  THE TRIAD", 12, C.Gold, HEAVY, 48, 36, 600, 16)
+	label("Every key has a job.", 34, C.Text, HEAVY, 48, 58, 900, 42)
+	label("Every gem carries three moves: an Offense, an Ability and a Defense. The socket a gem sits in decides which one you use.", 14, C.Dim, MEDIUM, 48, 108, 900, 40)
+	local columns = {
+		{ "Q", "OFFENSE", "Your sword's gem", "A sword technique: hit harder, wider or smarter. Pays Charge." },
+		{ "E", "ABILITY", "Your core gem", "Your elemental surge: a strike, a dash or an aura that helps while it's ready. Pays Charge." },
+		{ "R", "DEFENSE", "Your shield's gem", "Survive pressure: walls, shields, cleanses. Pays Stamina, so it works from the first second." },
+	}
+	for i, column in columns do
+		local x = 48 + (i - 1) * 306
+		local card = frame(panel, KEY_COLORS[column[1]]:Lerp(C.Ink, 0.85), 0)
+		card.ZIndex = 42
+		place(card, x, 168, 290, 200)
+		round(card, 14)
+		stroke(card, KEY_COLORS[column[1]], 1.5, 0.3)
+		local badge = place(text(card, column[1], 30, C.Ink, HEAVY), 20, 20, 52, 52)
+		badge.ZIndex = 43
+		badge.TextXAlignment = Enum.TextXAlignment.Center
+		badge.BackgroundTransparency = 0
+		badge.BackgroundColor3 = KEY_COLORS[column[1]]
+		round(badge, 12)
+		local lane = place(text(card, column[2], 12, KEY_COLORS[column[1]], HEAVY), 88, 24, 190, 16)
+		lane.ZIndex = 43
+		local from = place(text(card, column[3], 18, C.Text, HEADING), 88, 44, 190, 22)
+		from.ZIndex = 43
+		local body = place(text(card, column[4], 13, C.Dim, MEDIUM), 20, 92, 250, 90)
+		body.ZIndex = 43
+		body.TextWrapped = true
+		body.TextYAlignment = Enum.TextYAlignment.Top
+		-- A few of the moves, one per element.
+		local lane = Traits.Lanes[column[1]]
+		local names = {}
+		for _, element in { "Fire", "Frost", "Shock", "Poison" } do
+			local move = Tech.Catalog[Traits.Matrix[element][lane][2]]
+			if move then
+				table.insert(names, string.format('<font color="#%s">%s</font>', GemConfig.ElementColors[element]:ToHex(), move.Name))
+			end
+		end
+		local like = place(text(card, "LIKE  " .. table.concat(names, "  ·  "), 11, C.Faint, HEADING), 20, 152, 250, 34)
+		like.ZIndex = 43
+		like.RichText = true
+		like.TextWrapped = true
+		like.TextYAlignment = Enum.TextYAlignment.Top
+	end
+	label("Rarity sets the power: Common 60% · Uncommon 70% · Rare 80% · Ultra Rare 90% · Legendary 100% and a Flourish.", 13, C.Text, HEADING, 48, 388, 900, 18)
+	ui.IntroNote = label("", 13, C.Dim, MEDIUM, 48, 412, 900, 36)
+	local ok = new("TextButton", {
+		Name = "TriadGotIt",
+		Text = "GOT IT",
+		Font = HEAVY,
+		TextSize = 15,
+		TextColor3 = C.Ink,
+		AutoButtonColor = false,
+		BackgroundColor3 = C.Gold,
+		ZIndex = 42,
+	}, panel)
+	place(ok, 1000 - 48 - 200, 450, 200, 46)
+	round(ok, 10)
+	ok:SetAttribute("UiSound", "Confirm")
+	ok.Activated:Connect(function()
+		shade.Visible = false
+		ui.IntroDone = true
+		request("TriadSeen")
+	end)
+	ui.Intro = shade
+end
+drawIntro = function(profile, loadout)
+	if not ui.Intro then
+		return
+	end
+	local show = triadOn(loadout) and profile.TriadSeen ~= true and not ui.IntroDone
+	ui.Intro.Visible = show
+	if show then
+		ui.IntroNote.Text = if (profile.TriadNotice or 0) > 0
+			then string.format("Your old Q and R surge gems (%d) are back in your stash, safe: socket them in a sword, a shield or the core.", profile.TriadNotice)
+			else "Socket gems in your sword, your shield and the core slot to fill Q, E and R."
+	end
 end
 
 -- Mount ------------------------------------------------------------------------------------------------
@@ -2236,6 +2512,7 @@ function InventoryV2.mount(host: ScreenGui)
 	buildLeft(canvas)
 	buildRight(canvas)
 	buildSurges(canvas)
+	buildIntro(canvas)
 	host:GetPropertyChangedSignal("Enabled"):Connect(function()
 		if host.Enabled then
 			draw()

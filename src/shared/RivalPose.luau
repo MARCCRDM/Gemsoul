@@ -267,6 +267,141 @@ local function frames(kind: string, s: number, shield: boolean?)
 			RightKnee = { -0.55, 0, 0 },
 			LeftKnee = { -0.1, 0, 0 },
 		}
+	-- The Q / E / R triad's moves (Shared.GemTraits): sword techniques, a
+	-- blade taking its element, the shield braced or driven into a wall.
+	elseif kind == "Lunge" then
+		-- Coiled low on the back foot, then a long step and a straight thrust.
+		return {
+			Waist = { 0.18, -0.6, 0 },
+			Neck = { -0.05, 0.4, 0 },
+			RightShoulder = { 0.9, -0.3, 0.55 },
+			RightElbow = { 1.7, 0, 0 },
+			LeftShoulder = SHIELD_UP.LeftShoulder,
+			LeftElbow = SHIELD_UP.LeftElbow,
+			RightHip = { 0.2, 0, 0 },
+			LeftHip = { 0.4, 0, 0 },
+			RightKnee = { -0.55, 0, 0 },
+			LeftKnee = { -0.35, 0, 0 },
+		}, {
+			Waist = { -0.32, 0.38, 0 },
+			Neck = { 0.12, -0.3, 0 },
+			RightShoulder = { 1.6, 0.15, -0.05 },
+			RightElbow = { 0.05, 0, 0 },
+			LeftShoulder = { 0.4, 0, -0.6 },
+			LeftElbow = { 0.6, 0, 0 },
+			RightHip = { 0.95, 0, 0 },
+			LeftHip = { -0.45, 0, 0 },
+			RightKnee = { -0.9, 0, 0 },
+			LeftKnee = { -0.1, 0, 0 },
+		}
+	elseif kind == "Spin" then
+		-- Wound right round, then unwound in one full cut.
+		return {
+			Waist = { 0.08, -1.1, 0.1 },
+			Neck = { 0, 0.7, 0 },
+			RightShoulder = { 1.4, -0.6, 1.2 },
+			RightElbow = { 0.5, 0, 0 },
+			LeftShoulder = { 0.9, 0, -0.6 },
+			LeftElbow = { 1, 0, 0 },
+			RightKnee = { -0.45, 0, 0 },
+			LeftKnee = { -0.45, 0, 0 },
+		}, {
+			Waist = { -0.1, 1.25, -0.1 },
+			Neck = { 0, -0.8, 0 },
+			RightShoulder = { 1.5, 0.6, -1.25 },
+			RightElbow = { 0.1, 0, 0 },
+			LeftShoulder = { 1.2, 0, -1.1 },
+			LeftElbow = { 0.3, 0, 0 },
+			RightHip = { 0.3, 0, 0 },
+			LeftHip = { 0.3, 0, 0 },
+			RightKnee = { -0.5, 0, 0 },
+			LeftKnee = { -0.5, 0, 0 },
+		}
+	elseif kind == "Empower" then
+		-- The blade raised upright before the face, then swept down and out,
+		-- alight with the gem's element.
+		return {
+			Waist = { -0.05, -0.2, 0 },
+			Neck = { 0.1, 0.15, 0 },
+			RightShoulder = { 1.9, -0.55, -0.2 },
+			RightElbow = { 1.6, 0, 0 },
+			LeftShoulder = SHIELD_UP.LeftShoulder,
+			LeftElbow = SHIELD_UP.LeftElbow,
+		}, {
+			Waist = { -0.15, 0.3, 0 },
+			Neck = { -0.05, -0.2, 0 },
+			RightShoulder = { 0.6, 0.2, 0.9 },
+			RightElbow = { 0.25, 0, 0 },
+			LeftShoulder = SHIELD_UP.LeftShoulder,
+			LeftElbow = SHIELD_UP.LeftElbow,
+			RightKnee = { -0.25, 0, 0 },
+			LeftKnee = { -0.15, 0, 0 },
+		}
+	elseif kind == "Brace" then
+		-- Crouched behind the shield, the sword drawn back: holding ground.
+		return {
+			Waist = { 0.2, 0.1, 0 },
+			RightShoulder = { 0.4, 0, 0.4 },
+			RightElbow = { 1.2, 0, 0 },
+			LeftShoulder = { 1.6, -0.9, 0.9 },
+			LeftElbow = { 1.1, -0.2, 0 },
+			RightKnee = { -0.35, 0, 0 },
+			LeftKnee = { -0.35, 0, 0 },
+		}, {
+			Waist = { 0.32, -0.08, 0 },
+			Neck = { -0.18, 0, 0 },
+			RightShoulder = { 0.25, 0, 0.5 },
+			RightElbow = { 1.5, 0, 0 },
+			LeftShoulder = { 1.75, -0.75, 1.15 },
+			LeftElbow = { 0.6, 0.35, 0 },
+			RightHip = { 0.45, 0, 0 },
+			LeftHip = { 0.45, 0, 0 },
+			RightKnee = { -0.85, 0, 0 },
+			LeftKnee = { -0.85, 0, 0 },
+		}
+	elseif kind == "Wall" then
+		-- The shield slammed down into the ground: the wall rises from it.
+		return {
+			Waist = { -0.15, 0, 0 },
+			Neck = { 0.1, 0, 0 },
+			RightShoulder = { 0.6, 0, 0.6 },
+			RightElbow = { 1, 0, 0 },
+			LeftShoulder = { 2.6, -0.3, 0.5 },
+			LeftElbow = { 0.5, 0, 0 },
+			RightKnee = { -0.2, 0, 0 },
+		}, {
+			Waist = { 0.55, 0, 0 },
+			Neck = { -0.35, 0, 0 },
+			RightShoulder = { 0.2, 0, 0.7 },
+			RightElbow = { 1.3, 0, 0 },
+			LeftShoulder = { 1.1, -0.4, 0.4 },
+			LeftElbow = { 0.2, 0, 0 },
+			RightHip = { 0.8, 0, 0 },
+			LeftHip = { 0.2, 0, 0 },
+			RightKnee = { -1.2, 0, 0 },
+			LeftKnee = { -0.5, 0, 0 },
+		}
+	elseif kind == "Leap" then
+		-- Tucked for the jump, then landing light and low.
+		return {
+			Waist = { 0.4, 0, 0 },
+			RightShoulder = { 0.3, 0, 0.6 },
+			LeftShoulder = { 0.3, 0, -0.6 },
+			RightHip = { 1.1, 0, 0 },
+			LeftHip = { 0.9, 0, 0 },
+			RightKnee = { -1.4, 0, 0 },
+			LeftKnee = { -1.2, 0, 0 },
+		}, {
+			Waist = { 0.15, 0.2, 0 },
+			RightShoulder = { 0.8, 0, 0.9 },
+			LeftShoulder = { 1.2, 0, -0.9 },
+			RightElbow = { 0.6, 0, 0 },
+			LeftElbow = { 0.8, 0, 0 },
+			RightHip = { 0.6, 0, 0 },
+			LeftHip = { 0.2, 0, 0 },
+			RightKnee = { -0.9, 0, 0 },
+			LeftKnee = { -0.4, 0, 0 },
+		}
 	elseif kind == "Heavy" and shield then
 		-- One-handed overhead chop, shaped from the sword's real path: raised
 		-- high with the blade back over the head, the tip comes over the top
@@ -570,11 +705,17 @@ local CAST_STYLE = {
 	Erupt = { Twist = 0, Lean = -0.6, Snap = 0.09, Follow = 0.32 },
 	Cross = { Twist = -0.12, Lean = -0.28, Snap = 0.1, Follow = 0.28 },
 	Buff = { Twist = 0, Lean = 0.16, Snap = 0.12, Follow = 0.38 },
+	Lunge = { Twist = -0.5, Lean = -0.35, Snap = 0.07, Follow = 0.3 },
+	Spin = { Twist = -1.1, Lean = -0.1, Snap = 0.12, Follow = 0.32 },
+	Empower = { Twist = 0.1, Lean = 0.05, Snap = 0.12, Follow = 0.45 },
+	Brace = { Twist = 0, Lean = 0.2, Snap = 0.1, Follow = 0.6 },
+	Wall = { Twist = 0, Lean = 0.45, Snap = 0.09, Follow = 0.55 },
+	Leap = { Twist = 0, Lean = 0.2, Snap = 0.1, Follow = 0.3 },
 }
 local function stageCast(kind, windup, strike)
 	local style = CAST_STYLE[kind]
-	if not style then
-		return
+	if not style or kind == "Brace" or kind == "Wall" or kind == "Leap" then
+		return -- (those hold their own legs: a crouch, a slam, a jump)
 	end
 	windup.Waist = { if kind == "Nova" or kind == "Erupt" then 0.32 else 0.12, style.Twist, 0 }
 	windup.Neck = { -0.08, -style.Twist * 0.3, 0 }
@@ -868,7 +1009,7 @@ local ATTRIBUTES = {
 }
 
 -- Blows a blade cuts with.
-local STRIKES = { Slash = true, Heavy = true, Sweep = true, Cross = true }
+local STRIKES = { Slash = true, Heavy = true, Sweep = true, Cross = true, Lunge = true, Spin = true }
 
 -- Whether this body's blade is cutting through a blow right now (as posed
 -- here, so a player's blow replayed late counts when it shows).

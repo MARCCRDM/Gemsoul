@@ -1,7 +1,9 @@
 -- Grounded mining technology. Costs follow the approved universe conversion;
 -- recovery, regeneration and unspecified damage are first-playtest tuning.
 local GemRoller = require(script.Parent.GemRoller)
+local GemTraits = require(script.Parent.GemTraits)
 local Tech = {}
+Tech.Traits = GemTraits
 Tech.ManeuversEnabled = false -- archived data is retained; controls and player casts are retired.
 Tech.Resources = {
 	Stamina = { Max = 100, Start = 100, Regen = 12, Color = Color3.fromRGB(65, 195, 112) },
@@ -63,7 +65,13 @@ Tech.SurgeSlots = 3 -- Q, E, R
 -- The Surge Array keys and the saved capacitor sockets they cast from
 -- (Character.Surge1Gem, Surge2Gem, Surge3Gem).
 Tech.SurgeSockets = { Q = "Surge1", E = "Surge2", R = "Surge3" }
+-- With the triad on (GemTraits), each key reads its own socket instead:
+-- Q the sword's gem (its Offense), E the core socket's (its Ability) and R
+-- the shield's (its Defense), as a projected copy carrying that trait.
 function Tech.surgeGem(loadout, key: string)
+	if GemTraits.active(loadout) then
+		return GemTraits.project(GemTraits.socketGem(loadout, key), key)
+	end
 	local slot = Tech.SurgeSockets[key]
 	local gem = if slot and loadout then loadout[slot .. "Gem"] else nil
 	return if GemRoller.Prototype then Tech.prototypeGem(gem, key) else gem
@@ -811,6 +819,11 @@ for id, definition in Tech.PrototypeCatalog do
 	definition.Description = definition.Role .. " Surge: " .. definition.Name
 	if Tech.Prototype then Tech.Catalog[id] = definition end
 end
+-- The triad's 60 moves (GemTraits) join the catalog under their own ids, so
+-- every retired surge keeps its id and numbers.
+for id, definition in GemTraits.Moves do
+	Tech.Catalog[id] = definition
+end
 -- Non-destructive legacy projection: saved originals stay in the archive/save.
 function Tech.prototypeGem(gem, key)
 	if not gem then
@@ -827,6 +840,10 @@ function Tech.prototypeGem(gem, key)
 end
 function Tech.canSocket(gem, key, loadout)
 	if key ~= "Q" and key ~= "E" and key ~= "R" then return false end
+	if GemTraits.active(loadout) then
+		-- Any elemental gem has a trait for every key; the lanes never repeat.
+		return gem ~= nil and GemTraits.traitFor(gem, key) ~= nil
+	end
 	if not Tech.Prototype then
 		if not gem then return false end
 		local id = Tech.surgeOf(gem)
@@ -864,6 +881,9 @@ Tech.PassiveAugments = {
 function Tech.surgeOf(gem): (string?, number, number)
 	if not gem then return nil, 1, 1 end
 	local tier, rank = GemRoller.surge(gem)
+	if GemTraits.Moves[gem.Surge or ""] then
+		return gem.Surge, tier, rank -- a projected trait (GemTraits.project)
+	end
 	local restored = GemRoller.RestoredIds[gem.Surge]
 	if not Tech.Prototype and restored then return restored, tier, rank end
 	local saved = gem.Surge and Tech.Catalog[gem.Surge]
@@ -907,6 +927,12 @@ function Tech.surgeStats(gem, amps, normalized)
 		return nil
 	end
 	amps = amps or {}
+	if base.Triad then
+		local d = GemTraits.stats(id, gem, normalized)
+		d.Id, d.Tier, d.Rank, d.Gem = id, tier, rank, gem
+		d.RarityScaled, d.Rarity = true, gem.Tier or "Common"
+		return d
+	end
 	local d = table.clone(base)
 	if Tech.RaritySurges then
 		d.Id, d.Tier, d.Rank, d.Gem = id, tier, rank, gem
@@ -987,6 +1013,18 @@ function Tech.surgeLines(gem, amps): { string }
 	local d = Tech.surgeStats(gem, amps)
 	if not d then
 		return {}
+	end
+	if d.Triad then
+		local key = d.Key or "?"
+		local lines = {
+			string.format("%s · %s: %s · %s", key, GemTraits.typeOf(d.Id), d.Name, Tech.rarityLabel(gem)),
+			GemTraits.summary(d),
+			d.Description,
+		}
+		if d.Flourished and d.Flourish then
+			table.insert(lines, "Flourish: " .. d.Flourish.Text)
+		end
+		return lines
 	end
 	if d.RarityScaled then
 		local lines = {"Surge: " .. d.Name .. " · " .. Tech.rarityLabel(gem), string.format("%g Charge · %gs cooldown", d.Cost, d.Cooldown)}

@@ -132,6 +132,19 @@ function Actions.castKind(definition): string?
 	if not definition then
 		return nil
 	end
+	if definition.Triad then
+		-- The Q / E / R triad (GemTraits): R pays Stamina but casts like any move.
+		if definition.Dash then
+			return "Move"
+		elseif definition.PerSecond then
+			return "Channel"
+		elseif not definition.Damage then
+			return "Buff"
+		elseif definition.Radius and not definition.Pylon then
+			return if definition.Self then "Field" else "Blast"
+		end
+		return "Bolt" -- (its own Windup, if any, sets how long)
+	end
 	if definition.Resource ~= "Charge" then
 		return if definition.Windup then "Heavy" else "Move"
 	end

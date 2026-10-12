@@ -117,6 +117,8 @@ function Presets.wear(player: Player, part: string, slot: number): (boolean, str
 				else
 					table.insert(missing, step.Slot)
 				end
+			elseif step.Kind == "Surge" and PlayerData.surgeArchived and PlayerData.surgeArchived(player, step.Key) then
+				done += 1 -- (an old Q / R surge socket the triad retired: Q and R ride the gear)
 			elseif step.Kind == "Surge" then
 				-- A gem on another surge key comes off it first (into the pouch).
 				-- Looked up now, not from the plan: an earlier step may have

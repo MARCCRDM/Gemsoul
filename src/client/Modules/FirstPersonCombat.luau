@@ -824,6 +824,35 @@ function View.start()
 				elseif castAnimation == "Cross" then
 					motion = CFrame.new(-side * 0.28 * casting + side * 0.3 * throw, 0.22 * castPose, -0.38 * throw)
 						* CFrame.Angles(0, 0, side * (0.45 * casting - 0.5 * throw))
+				-- The triad's sword techniques and defenses.
+				elseif castAnimation == "Lunge" then
+					-- Drawn back low, then driven straight through.
+					motion = CFrame.new(0.05 * side * casting, -0.1 * casting, 0.35 * casting - 1.05 * throw)
+						* CFrame.Angles(0.12 * casting - 0.1 * throw, 0, side * 0.1 * casting)
+				elseif castAnimation == "Spin" then
+					-- Wound across the body, then whipped all the way round.
+					motion = CFrame.new(side * 0.45 * casting - side * 0.9 * throw, 0.05 * castPose, -0.15 * throw)
+						* CFrame.Angles(0, side * (0.8 * casting - 1.4 * throw), side * -0.25 * throw)
+				elseif castAnimation == "Heavy" then
+					-- Raised high over the head, then chopped down hard.
+					motion = CFrame.new(0, 0.62 * casting - 0.85 * throw, 0.1 * casting - 0.35 * throw)
+						* CFrame.Angles(0.75 * casting - 1.1 * throw, 0, side * 0.08 * castPose)
+				elseif castAnimation == "Empower" then
+					-- The blade lifted before your eyes to take the element, then a flourish.
+					motion = CFrame.new(-side * 0.12 * casting, 0.32 * casting - 0.1 * throw, -0.1 * casting)
+						* CFrame.Angles(0.35 * casting, side * 0.25 * casting, side * (0.5 * casting - 0.6 * throw))
+				elseif castAnimation == "Brace" or castAnimation == "Wall" then
+					-- The shield thrust out in front, the sword drawn in behind it.
+					local push = if castAnimation == "Wall" then 0.55 else 0.3
+					if piece.Shield or piece.Left then
+						motion = CFrame.new(0.1 * castPose, 0.1 * castPose, -push * castPose - 0.25 * throw)
+							* CFrame.Angles(0.1 * castPose, 0, 0)
+					else
+						motion = CFrame.new(0.12 * castPose, -0.12 * castPose, 0.25 * castPose)
+					end
+				elseif castAnimation == "Leap" then
+					motion = CFrame.new(0, -0.25 * casting + 0.2 * throw, 0.3 * casting)
+						* CFrame.Angles(-0.3 * casting, 0, side * 0.2 * throw)
 				end
 				pose = motion * pose
 			end

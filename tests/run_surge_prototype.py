@@ -13,6 +13,7 @@ def module(name, path):
 
 source = (ROOT / 'tests/roblox_primitives.luau').read_text(encoding='utf-8')
 for name, path in [
+    ('GemTraits', 'src/shared/GemTraits.luau'),
     ('GemRoller', 'src/shared/GemRoller.luau'),
     ('Tech', 'src/shared/CombatTechnology.luau'),
     ('Atlas', 'src/client/Modules/AbilityIconAtlas.luau'),
@@ -20,6 +21,8 @@ for name, path in [
     ('ElementCombos', 'src/shared/ElementCombos.luau'),
 ]:
     source += module(name, path)
+    if name == "GemTraits":
+        source += "GemTraits.Enabled = false -- the classic surge array\n"
     if name == "GemRoller":
         source += "GemRoller.Prototype = true; GemRoller.RaritySurges = false\n"
 source += (ROOT / 'tests/surge_prototype_cases.luau').read_text(encoding='utf-8')

@@ -10,7 +10,9 @@ def module(name, path):
     source = re.sub(r"^local \w+ = require\([^\n]+\)\n", "", read(path), flags=re.M)
     return f"local {name}=(function()\n{source}\nend)()\n"
 source = read("tests/roblox_primitives.luau")
+source += module("GemTraits", "src/shared/GemTraits.luau")
 source += module("GemRoller", "src/shared/GemRoller.luau")
+source += '\nGemTraits.Enabled = false -- the classic surge array (the triad has its own suites)\n'
 source += module("Tech", "src/shared/CombatTechnology.luau")
 source += module("Tree", "src/shared/AugmentTree.luau")
 source += read("tests/augment_ui_services.luau")

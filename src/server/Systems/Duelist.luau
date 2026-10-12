@@ -2104,8 +2104,9 @@ function spawnRival(owner: Player, raid, encounter)
 	-- You vs it, for the player's matchup panel: the numbers each side really
 	-- fights with, and each side's strengths and weaknesses.
 	local yourSurges = {}
-	for slot = 1, 3 do
-		local gem = ownerLoadout["Surge" .. slot .. "Gem"]
+	for _, key in { "Q", "E", "R" } do
+		-- (your keys as you fight them: the triad's Q / E / R, or the classic array)
+		local gem = Tech.surgeGem(ownerLoadout, key)
 		local id = gem and Tech.surgeOf(gem)
 		local stats = gem and Tech.surgeStats(gem)
 		if id and stats then

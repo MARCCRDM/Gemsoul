@@ -23,6 +23,7 @@ local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
 local CombatEvents = require(script.Parent.CombatEvents)
 local ArmorSignatures = require(ReplicatedStorage.Shared.ArmorSignatures)
+local TriadServer = require(script.Parent.TriadServer)
 local CombatServer = {}
 local states = {}
 local WHITE = Color3.new(1, 1, 1)
@@ -471,6 +472,13 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		Remotes.CombatFx:FireClient(player, "TechStatus", "Riposte!")
 		return 0, true
 	end
+	-- The triad's defenses (TriadServer): walls, deflectors, untargetable.
+	local triadScale, stopped =
+		TriadServer.incoming(player, st, root, amount, element, source, enemySource, origin, projectile, reflected, now)
+	if stopped then
+		DamageLog.send(player, { Dir = "In", Kind = "Hit", Amount = 0, Blocked = amount, Who = attackerName })
+		return 0, true
+	end
 	-- Elements against your armor gems (ElementMatchup): each resists its
 	-- own element; your main one is weak to the element that beats it.
 	local matchMult, matchTag = ElementMatchup.against(element, ElementMatchup.profile(PlayerData.character(player)))
@@ -480,6 +488,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		* matchMult
 		* Combat.defenseMult(defense)
 		* EquipmentBalance.passiveDamageMultiplier(k.Effects.TakenMult, resistance)
+		* triadScale
 	damage *= 1 + CrowdControl.debuff(st.CC, "Vulnerable", now) + CrowdControl.debuff(st.CC, "Aura", now)
 	local guarded = false
 	local beforeGuard, parriedBefore, guardBroken = damage, st.ParrySpent, false
@@ -496,7 +505,8 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 			if covered then
 				guarded = true
 				local empowered = now < (st.PrototypeGuardUntil or 0)
-				local timed = st.BlockRaisedAt and now - st.BlockRaisedAt <= 0.3
+				local parryWindow = 0.3 * TriadServer.parryWindow(st, now)
+				local timed = st.BlockRaisedAt and now - st.BlockRaisedAt <= parryWindow
 				local catchMelee = empowered and st.PrototypeGuard == "StaticCatch" and not projectile
 				if empowered and not reflected then
 					st.PrototypeGuardUntil = 0 -- one covered hit consumes the window
@@ -532,7 +542,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 					not projectile
 					and not reflected
 					and st.BlockRaisedAt
-					and now - st.BlockRaisedAt <= 0.3
+					and now - st.BlockRaisedAt <= parryWindow
 					and not st.ParrySpent
 				then
 					st.ParrySpent = true
@@ -550,6 +560,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 						Enemies.addStatus(enemySource, "Stun", 1, if enemySource.Duel then 0.25 else 0.5)
 						enemySource.StunKind = "Stunned"
 					end
+					TriadServer.parried(player, st, source, enemySource, now)
 					Remotes.CombatFx:FireClient(player, "HighBlock")
 				end
 				-- Taking the blow on your guard costs Stamina (a parry is free);
@@ -582,6 +593,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 				end
 				if not exhausted then
 					fx("BlockSpark", root.Position, false)
+					TriadServer.guarded(player, st, beforeGuard, source, enemySource, reflected, now)
 					if k.Defense.Deflect > 0 and math.random() < k.Defense.Deflect then
 						multiplier = 0
 					end
@@ -632,7 +644,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	if now < st.SiphonUntil and st.SiphonCapacity > 0 then
 		local absorbed = math.min(damage, st.SiphonCapacity)
 		st.SiphonCapacity -= absorbed
-		st.Resources.Charge = math.min(100, st.Resources.Charge + absorbed * 0.5)
+		st.Resources.Charge = math.min(100, st.Resources.Charge + absorbed * (st.SiphonRate or 0.5))
 		damage -= absorbed
 		player:SetAttribute("Charge", st.Resources.Charge)
 	end
@@ -641,6 +653,10 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		st.Shield -= absorbed
 		damage -= absorbed
 	end
+	if beforeAbsorb > damage then
+		TriadServer.absorbed(player, st, root, now)
+	end
+	damage = TriadServer.lastStand(player, st, humanoid, damage, now)
 	-- The body reacts, for everyone to see (RivalPose) and in your own
 	-- first-person view: the shield arm jolts when a blow lands on the
 	-- guard, the body flinches away from a blow that gets through.
@@ -679,6 +695,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		outgoing.Dir, outgoing.Who = "Out", DamageLog.nameOf(player)
 		DamageLog.send(source, outgoing)
 	end
+	TriadServer.afterIncoming(player, k, st, damage, source, enemySource, projectile, heavy, reflected, now)
 	if damage > 0 then
 		if origin then
 			Remotes.CombatFx:FireClient(player, "IncomingDamage", origin)
@@ -707,6 +724,9 @@ local publishStatuses
 -- `kind` names it on the status bar: Frozen (Cryo), Shocked (Ion) or Stunned.
 function applyCC(target, seconds, kind)
 	local tracker
+	if target.Player and TriadServer.controlImmune(state(target.Player), os.clock()) then
+		return -- Grounding / Purge Shell
+	end
 	if target.Player then
 		-- Unstoppable (a weapon perk): stuns and freezes wear off sooner.
 		local k = kit(target.Player)
@@ -856,7 +876,12 @@ end
 
 -- Blinded (Solar Flare): this share of your blows miss.
 local function blindMiss(st, now)
-	return now < st.BlindUntil and st.Blind > 0 and math.random() <= st.Blind
+	local missed = now < st.BlindUntil and st.Blind > 0 and math.random() <= st.Blind
+	if missed and st.BlindOnce then
+		-- Solar Flare (the triad's): blinded for one swing.
+		st.BlindUntil, st.BlindOnce = 0, false
+	end
+	return missed
 end
 -- A Ward hits back at whoever struck its owner, at most once a second:
 -- a Burning Ward sets them alight, a Static Shell stuns them.
@@ -1039,6 +1064,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 				0.75,
 				Combat.critChance(rating(k, "Speed"), k.Effects.CritAdd) + (if heavy then k.Rules.HeavyCrit else 0)
 			)
+		or TriadServer.takeCrit(st, os.clock())
 	if crit then
 		damage *= Combat.CritMult
 	end
@@ -1061,6 +1087,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 	if not projectile and ArmorSignatures.isSword(k.Weapon) then
 		damage *= ArmorSignatures.attackMultiplier(st, os.clock())
 	end
+	damage *= TriadServer.swingScale(source, k, st, os.clock())
 	local echoDamage = damage
 	local guarded = false
 	local gem = k.Loadout.WeaponGem
@@ -1111,7 +1138,10 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		-- Landing the weapon builds Charge for your surges (with a gem to use it).
 		if not guarded and healthBefore > target.Humanoid.Health and Tech.hasGem(k.Loadout) then
 			local rule = Tech.Resources.Charge
-			st.Resources.Charge = math.min(rule.Max, st.Resources.Charge + (if heavy then rule.OnHeavy else rule.OnHit) * ArmorSignatures.chargeMultiplier(k.Signatures))
+			st.Resources.Charge = math.min(rule.Max, st.Resources.Charge + (if heavy then rule.OnHeavy else rule.OnHit) * ArmorSignatures.chargeMultiplier(k.Signatures) * TriadServer.chargeGain(source, k, st, os.clock()))
+		end
+		if not guarded and target.Humanoid.Health < healthBefore then
+			TriadServer.afterSwing(source, k, st, target, os.clock())
 		end
 	end
 	if combo and damage > 0 then
@@ -1168,7 +1198,8 @@ local function attack(player, aim, heavy, swing)
 	local cost = Actions.swingCost(k.Weapon, heavy)
 	st.Winded = st.Resources.Stamina < cost
 	spendStamina(player, st, cost)
-	st.NextAttack = now + (if heavy then k.Rules.HeavyCooldown else k.Rules.BasicCooldown)
+	st.NextAttack = now
+		+ (if heavy then k.Rules.HeavyCooldown else k.Rules.BasicCooldown) / TriadServer.attackSpeed(player, k, st, now)
 	st.ChargeStarted = nil
 	-- The blow lands now: the body swings through it, as the rival's does.
 	posePlayer(player, if heavy then "Heavy" else "Slash", 0)
@@ -1364,7 +1395,15 @@ local function block(player, held, aim)
 		cleanse(st)
 		st.NextCleanse = now + k.Defense.CleanseInterval
 	end
-	st.Channel, st.Pending = nil, {}
+	st.Channel = nil
+	-- Raising the guard cancels a cast, but not a defense (R) going up.
+	local keep = {}
+	for _, pending in st.Pending do
+		if pending.Triad and pending.Definition.Lane == "Defense" then
+			table.insert(keep, pending)
+		end
+	end
+	st.Pending = keep
 	st.BlockDirection, st.BlockUntil, st.ChargeStarted = flat(aim - root.Position), now + Actions.BlockLease, nil
 	player:SetAttribute("Blocking", true)
 	if player.Character then
@@ -1434,7 +1473,11 @@ function technologyHitInner(player, k, target, definition, scale)
 		damage *= 1 + math.clamp(gem.Size or 1, 1, 10) * 0.03
 	end
 	-- A surge gem's Cut sets its critical chance.
-	local crit = (definition.Crit or 0) > 0 and math.random() < definition.Crit
+	local crit = ((definition.Crit or 0) > 0 and math.random() < definition.Crit)
+		or (definition.Triad == true and TriadServer.takeCrit(state(player), os.clock()))
+	if definition.Triad then
+		damage *= TriadServer.hitScale(player, k, state(player), target, definition, os.clock())
+	end
 	if crit then
 		damage *= Combat.CritMult
 	end
@@ -1458,7 +1501,7 @@ function technologyHitInner(player, k, target, definition, scale)
 			definition.Element,
 			player,
 			root.Position,
-			definition.Resource == "Charge" and not definition.Cone,
+			(definition.Resource == "Charge" or definition.Triad == true) and not definition.Cone,
 			definition.Heavy == true,
 			false,
 			nil,
@@ -1496,24 +1539,30 @@ function technologyHitInner(player, k, target, definition, scale)
 			Enemies.addStatus(target.Enemy, "Blind", definition.Blind, seconds)
 		end
 	end
-	if definition.Stun then
+	if
+		definition.Stun
+		and not definition.StunIfChilled
+		and (not definition.StunChance or math.random() < definition.StunChance)
+	then
 		applyCC(
 			target,
 			definition.Stun,
-			if definition.Element == "Frost"
-				then "Frozen"
-				elseif definition.Element == "Shock" then "Shocked"
-				else "Stunned"
+			definition.StunKind
+				or if definition.Element == "Frost"
+					then "Frozen"
+					elseif definition.Element == "Shock" then "Shocked"
+					else "Stunned"
 		)
 	end
 	if definition.Slow then
+		local slowTime = (definition.SlowTime or 0.75)
+			* (if definition.Triad then TriadServer.slowLonger(player, k, state(player), os.clock()) else 1)
 		if target.Player then
 			local victim = state(target.Player)
-			local slowTime = definition.SlowTime or 0.75
 			victim.Slow = CrowdControl.applyDebuff(victim.CC, "Slow", definition.Slow, slowTime, os.clock(), true)
 			victim.SlowUntil = os.clock() + slowTime
 		else
-			Enemies.addStatus(target.Enemy, "Slow", definition.Slow, definition.SlowTime or 0.75)
+			Enemies.addStatus(target.Enemy, "Slow", definition.Slow, slowTime)
 		end
 	end
 	if definition.Shred and not (definition.Prototype and guarded) then
@@ -1539,7 +1588,21 @@ function technologyHitInner(player, k, target, definition, scale)
 			end
 		end
 	end
-	if definition.Element == "Fire" and gem and not definition.Prototype then
+	if definition.Blind and definition.BlindOnce and target.Player then
+		state(target.Player).BlindOnce = true
+	end
+	if definition.Triad then
+		TriadServer.afterHit(
+			player,
+			k,
+			state(player),
+			target,
+			definition,
+			math.max(0, healthBefore - target.Humanoid.Health),
+			os.clock()
+		)
+	end
+	if definition.Element == "Fire" and gem and not definition.Prototype and not definition.Triad then
 		local values = GemConfig.stats(gem, "Weapon", { Affinity = k.Affinity, PvP = target.Player ~= nil })
 		if target.Player then
 			addDot(target.Player, player, values.BurnDamage * k.Effects.ThermalMult, values.BurnDuration)
@@ -1643,6 +1706,11 @@ local function technologyStrike(player, definition, aim, scale)
 					Shred = cloud.Shred,
 					ShredTime = cloud.Every * 2,
 					Leech = definition.Leech,
+					-- A triad cloud keeps its riders (Toxic Cloud's poison, Leech Bloom's healing).
+					Triad = definition.Triad,
+					Poison = definition.Poison,
+					HealPerEnemy = definition.HealPerEnemy,
+					RarityScaled = definition.RarityScaled,
 				},
 			})
 		end
@@ -1656,6 +1724,9 @@ local function technologyStrike(player, definition, aim, scale)
 				local falloff, cc, seconds = 1, nil, 0
 				if not definition.Cloud then
 					falloff, cc, seconds = Actions.blastFalloff(distance, radius)
+					if definition.Triad then
+						cc = nil -- a triad move's control is its own (Stun, Root, Chill)
+					end
 				end
 				technologyHit(player, k, target, definition, (scale or 1) * falloff)
 				if cc and target.Humanoid.Health > 0 then
@@ -1723,7 +1794,7 @@ local function technologyStrike(player, definition, aim, scale)
 				end
 				struck[best.Root] = true
 				fx("TechPulse", player, from.Root.Position, best.Root.Position, color, 0)
-				technologyHit(player, k, best, definition, (scale or 1) * 0.8 ^ jump)
+				technologyHit(player, k, best, definition, (scale or 1) * (if definition.ChainKeep then 1 else 0.8 ^ jump))
 				from = best
 			end
 			-- Spread: corrosion and half the hit jump to everyone nearby.
@@ -1772,6 +1843,7 @@ local function applyBuff(player, k, st, id, definition)
 		fx("TechField", player, GemConfig.ElementColors.Poison)
 	elseif id == "EnergySiphon" then
 		st.SiphonUntil, st.SiphonCapacity = now + definition.Duration, definition.Absorb
+		st.SiphonRate = nil
 		fx("TechField", player, Tech.Resources.Charge.Color)
 	elseif id == "ResonanceEcho" then
 		st.EchoUntil = now + definition.Duration
@@ -1796,7 +1868,14 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		-- its rank, Size, Clarity and Cut, plus Surge Amplifiers, set the numbers.
 		local gem = Tech.surgeGem(k.Loadout, surgeKey)
 		if not gem then
-			Remotes.CombatFx:FireClient(player, "TechStatus", "Socket a gem in surge slot " .. surgeKey)
+			local triadOn = Tech.Traits.active(k.Loadout)
+			Remotes.CombatFx:FireClient(
+				player,
+				"TechStatus",
+				if triadOn
+					then "Socket a gem in your " .. string.lower(Tech.Traits.SocketNames[surgeKey]) .. " for " .. surgeKey
+					else "Socket a gem in surge slot " .. surgeKey
+			)
 			return false
 		end
 		if not Tech.canSocket(gem, surgeKey, k.Loadout) then
@@ -1830,14 +1909,21 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		return false
 	end
 	id = definition.Id or id
-	if now < st.StunUntil or st.DodgeMove or blocking(st, now) or st.ChargeStarted then
+	-- A defense (R) goes up even with your guard raised or a swing recovering.
+	local defense = definition.Triad == true and definition.Lane == "Defense"
+	if now < st.StunUntil or st.DodgeMove or (blocking(st, now) and not defense) or st.ChargeStarted then
 		return false
 	end
 	if definition.PerSecond and st.Channel and st.Channel.Key == cooldownKey then
 		st.Channel.Aim, st.Channel.Until = aim, math.min(now + 0.5, st.Channel.Deadline or math.huge)
 		return true
 	end
-	if now < st.NextAttack or now < st.NextTech or now < (st.TechCooldowns[cooldownKey] or 0) or st.Channel then
+	if
+		(now < st.NextAttack and not defense)
+		or now < st.NextTech
+		or now < (st.TechCooldowns[cooldownKey] or 0)
+		or st.Channel
+	then
 		return false
 	end
 	if definition.Shield and not Classes.heldShield(k.Loadout) then
@@ -1931,9 +2017,20 @@ local function triggerTechnology(player, id, aim, surgeKey)
 	else
 		Tech.spend(st.Resources, definition.Resource, cost)
 	end
+	-- A triad move queues its own payload (TriadServer): dashes start now.
+	local triadQueued = false
+	if definition.Triad and not definition.PerSecond then
+		if not TriadServer.schedule(player, k, st, definition, aim, now, Actions.castTime(definition)) then
+			st.Resources[definition.Resource] += cost -- nowhere to go: nothing spent
+			player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
+			return false
+		end
+		triadQueued = true
+	end
 	-- A short lockout (Recovery) for everything, and this ability's own cooldown.
 	local recovery = definition.Recovery * (if definition.Prototype then 1 else (k.Effects.CooldownMult or 1))
-	if definition.Resource == "Charge" then
+	local swingRecovery = recovery
+	if definition.Resource == "Charge" or definition.Triad then
 		recovery = math.max(recovery, Tech.SurgeLockout)
 	end
 	local cooldown = math.max(
@@ -1942,7 +2039,8 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			* (if definition.Prototype then 1 else (k.Effects.CooldownMult or 1))
 	)
 	st.TechCooldowns[cooldownKey], st.NextTech = now + cooldown, now + recovery
-	st.NextAttack = math.max(st.NextAttack, st.NextTech)
+	-- The 0.9s lockout is between moves; a triad move frees your sword sooner.
+	st.NextAttack = math.max(st.NextAttack, if definition.Triad then now + swingRecovery else st.NextTech)
 	st.ComboSide, st.ComboCount, st.ComboAt = nil, 0, nil
 	player:SetAttribute(definition.Resource, st.Resources[definition.Resource])
 	Remotes.CombatFx:FireClient(player, "TechCooldown", cooldownKey, cooldown, recovery)
@@ -1976,7 +2074,9 @@ local function triggerTechnology(player, id, aim, surgeKey)
 			castTime
 		)
 	end
-	if definition.Shift then
+	if triadQueued then
+		-- Queued by TriadServer.schedule.
+	elseif definition.Shift then
 		-- Movement was resolved above; no delayed damage or buff payload.
 	elseif not definition.Damage and definition.Resource == "Charge" then
 		table.insert(st.Pending, { Buff = id, Definition = definition, At = now + castTime })
@@ -2116,7 +2216,7 @@ function CombatServer.interrupt(player, seconds)
 	local st, now = state(player), os.clock()
 	local casting = st.Channel ~= nil
 	for _, pending in st.Pending do
-		if pending.Definition and pending.Definition.Resource == "Charge" then
+		if pending.Definition and (pending.Definition.Resource == "Charge" or pending.Triad) then
 			casting = true
 		end
 	end
@@ -2229,6 +2329,7 @@ local function playerStatuses(st, now)
 	for kind, ends in st.CC.HealCuts do
 		add(kind, ends)
 	end
+	TriadServer.statuses(st, now, add)
 	return list
 end
 function publishStatuses(owner: Instance, st, now)
@@ -2257,6 +2358,7 @@ local function tick(dt)
 			continue
 		end
 		updateResources(player, st, k)
+		TriadServer.tick(player, k, st, now, humanoid, root)
 		if now < st.StunUntil then
 			st.Channel, st.Pending = nil, {}
 		end
@@ -2264,7 +2366,9 @@ local function tick(dt)
 			local pending = st.Pending[i]
 			if now >= pending.At then
 				table.remove(st.Pending, i)
-				if pending.Buff then
+				if pending.Triad then
+					TriadServer.resolve(player, k, st, pending)
+				elseif pending.Buff then
 					applyBuff(player, k, st, pending.Buff, pending.Definition)
 				elseif pending.Channel then
 					technologyStrike(player, pending.Definition, pending.Aim, 0.25)
@@ -2308,7 +2412,11 @@ local function tick(dt)
 			local channel = st.Channel
 			local definition = channel.Definition
 			local surgeKey = string.match(channel.Key, "^Surge(%a)$")
-			local gemGone = surgeKey ~= nil and Tech.surgeGem(k.Loadout, surgeKey) ~= definition.Gem
+			-- (a triad key projects a fresh copy of its gem: compare by id)
+			local current = surgeKey and Tech.surgeGem(k.Loadout, surgeKey)
+			local gemGone = surgeKey ~= nil
+				and current ~= definition.Gem
+				and not (current and definition.Gem and current.SourceId ~= nil and current.SourceId == definition.Gem.SourceId)
 			if now >= channel.Until or blocking(st, now) or st.DodgeMove or gemGone then
 				st.Channel = nil
 			elseif now >= channel.Next then
@@ -2386,6 +2494,7 @@ local function tick(dt)
 				* (if blocking(st, now) then 0.6 else 1)
 				* casting
 				* ArmorSignatures.speed(st, now)
+				* TriadServer.speed(st, now)
 		player:SetAttribute("CastRooted", casting == 0)
 		if now >= st.ShieldUntil then
 			st.Shield = 0
@@ -2532,6 +2641,84 @@ function CombatServer.start()
 	end)
 	RunService.Heartbeat:Connect(tick)
 end
+-- What the triad's moves need from here (TriadServer).
+TriadServer.bind({
+	Tech = Tech,
+	Enemies = Enemies,
+	state = state,
+	alive = alive,
+	fx = fx,
+	addDot = addDot,
+	applyCC = function(target, seconds, kind)
+		applyCC(target, seconds, kind)
+	end,
+	targets = targets,
+	targetAllowed = targetAllowed,
+	comboFlags = comboFlags,
+	cleanse = cleanse,
+	powerMult = function(k)
+		return Combat.powerMult(rating(k, "Power"))
+	end,
+	hit = function(player, k, target, definition, scale)
+		return technologyHit(player, k, target, definition, scale)
+	end,
+	strike = function(player, definition, aim, scale)
+		return technologyStrike(player, definition, aim, scale)
+	end,
+	heal = function(player, amount)
+		return CombatServer.heal(player, amount)
+	end,
+	status = function(player, message)
+		Remotes.CombatFx:FireClient(player, "TechStatus", message)
+	end,
+	-- A slow on anyone (players keep CrowdControl's rules).
+	slow = function(target, amount, seconds)
+		local now = os.clock()
+		if target.Player then
+			local victim = state(target.Player)
+			if TriadServer.controlImmune(victim, now) then
+				return
+			end
+			victim.Slow = CrowdControl.applyDebuff(victim.CC, "Slow", amount, seconds, now, true)
+			victim.SlowUntil = victim.CC.Debuffs.Slow.Until
+		elseif target.Enemy then
+			Enemies.addStatus(target.Enemy, "Slow", amount, seconds)
+		end
+	end,
+	-- Direct damage from a move's rider (an arc, a burst, a reflection).
+	damage = function(player, target, amount, element, crit, reflected)
+		if amount <= 0 then
+			return
+		end
+		if target.Player then
+			local _, root = alive(player)
+			receive(
+				target.Player,
+				amount,
+				element,
+				player,
+				root and root.Position,
+				false,
+				false,
+				reflected == true,
+				nil,
+				crit == true
+			)
+		elseif target.Enemy and target.Enemy.Alive then
+			Enemies.damage(target.Enemy, amount, player, crit == true, GemConfig.ElementColors[element] or WHITE, nil, element)
+		end
+	end,
+	-- A damage-over-time tick on `player` (poison).
+	dotDamage = function(player, source, amount, element, label, fromEnemy)
+		local previous = DamageLog.push(label, element)
+		if fromEnemy then
+			receive(player, amount, element, nil, nil, false, false, false, source)
+		else
+			receive(player, amount, element, source, nil, false, false, false)
+		end
+		DamageLog.pop(previous)
+	end,
+})
 CombatServer._technology = triggerTechnology
 CombatServer._attack, CombatServer._dodge, CombatServer._block = attack, dodge, block
 CombatServer._input, CombatServer._state, CombatServer._tick, CombatServer._canPvP = onInput, state, tick, canPvP

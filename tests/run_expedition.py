@@ -22,6 +22,7 @@ for name, path in [
     ("GearRolls", "src/shared/GearRolls.luau"),
     ("Classes", "src/shared/Classes.luau"),
     ("Economy", "src/shared/ExpeditionEconomy.luau"),
+    ("GemTraits", "src/shared/GemTraits.luau"),
     ("GemRoller", "src/shared/GemRoller.luau"),
     ("GemGenerator", "src/server/Systems/GemGenerator.luau"),
     ("Logic", "src/shared/EquipmentTrade.luau"),

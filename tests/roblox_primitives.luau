@@ -34,6 +34,7 @@ local CFrame = {
 	end,
 }
 CFrame.Angles = CFrame.new
+CFrame.lookAt = CFrame.new
 CFrame.identity = CFrame.new()
 local enumMt = {
 	__index = function(_self, key)

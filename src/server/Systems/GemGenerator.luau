@@ -24,6 +24,8 @@ function GemGenerator.generate(rng: Random, source: string, opts: { Luck: number
 		Element = rolled.Element,
 		Tier = rolled.Tier,
 		Surge = rolled.Surge,
+		-- One Offense, one Ability and one Defense (the Q / E / R triad).
+		Traits = rolled.Traits,
 		SurgeTier = rolled.SurgeTier,
 		SurgeRank = rolled.SurgeRank,
 		Clarity = rolled.Clarity,

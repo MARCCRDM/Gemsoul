@@ -185,6 +185,36 @@ Status.Catalog = {
 		Text = "Healing received -20%.",
 	},
 }
+-- The Q / E / R triad's buffs and debuffs (TriadServer).
+local function entry(name, tag, icon, color, debuff, text)
+	return { Name = name, Tag = tag, Icon = icon, Color = color, Debuff = debuff, Text = text }
+end
+local triadEffects = {
+	Empowered = entry("Empowered", nil, "⚔", GOLD, false, "Your next %d swings carry your sword's element."),
+	Overheated = entry("Thermal Burst", "Thermal", "🔥", THERMAL, false, "Deals %d%% more damage."),
+	EmberGuard = entry("Ember Guard", "Thermal", "🛡", THERMAL, false, "Guard up: blocked hits burn back."),
+	FireWall = entry("Fire Wall", "Thermal", "🧱", THERMAL, false, "A wall of fire stops bolts in front of you."),
+	FrozenWall = entry("Frozen Wall", "Cryo", "🧊", CRYO, false, "Every frontal hit stops on the ice."),
+	PhoenixMantle = entry("Phoenix Mantle", "Thermal", "🕊", THERMAL, false, "A fall under 20% health becomes a rebirth."),
+	Regrowth = entry("Regrowth", nil, "✚", CORROSIVE, false, "Healing over time."),
+	IceArmor = entry("Ice Armor", "Cryo", "🧊", CRYO, false, "Takes %d%% less damage."),
+	ColdResolve = entry("Cold Resolve", "Cryo", "❄", CRYO, false, "+%d%% resistance to every element."),
+	FrostRiposte = entry("Frost Riposte", "Cryo", "🤺", CRYO, false, "A timed block freezes the attacker."),
+	StaticCatch = entry("Static Catch", "Ion", "⚡", ION, false, "Wider parry; a parry stuns and steals Charge."),
+	Deflector = entry("Deflector Field", "Ion", "🔰", ION, false, "Bolts bounce back at whoever threw them."),
+	Grounded = entry("Grounded", "Ion", "⏚", ION, false, "Immune to stun, slow and freeze."),
+	Purged = entry("Purge Shell", "Corrosive", "🫧", CORROSIVE, false, "Immune to new debuffs."),
+	CorrosionAura = entry("Corrosion Aura", "Corrosive", "☣", CORROSIVE, false, "Nearby enemies lose Stamina and defense."),
+	ToxicMantle = entry("Toxic Mantle", "Corrosive", "🦂", CORROSIVE, false, "Melee attackers are poisoned for %d%% of their hit."),
+	Untargetable = entry("Untargetable", nil, "👻", GOLD, false, "Nothing can touch you."),
+	Poisoned = entry("Poisoned", "Corrosive", "☠", CORROSIVE, true, "Takes damage every second."),
+	Chilled = entry("Chilled", "Cryo", "❄", CRYO, true, "%d of 3 Chill: at 3 you freeze."),
+	Branded = entry("Branded", "Ion", "🎯", ION, true, "Hits on you arc and steal Charge."),
+	Rooted = entry("Rooted", "Cryo", "🌱", CRYO, true, "Held in place."),
+}
+for id, effect in triadEffects do
+	(Status.Catalog :: any)[id] = effect
+end
 Status.Order = {
 	"Shielded",
 	"EnergySiphon",
@@ -193,6 +223,23 @@ Status.Order = {
 	"BurningWard",
 	"StaticShell",
 	"RiposteStance",
+	"PhoenixMantle",
+	"FrozenWall",
+	"FireWall",
+	"EmberGuard",
+	"IceArmor",
+	"ColdResolve",
+	"Grounded",
+	"Purged",
+	"Deflector",
+	"StaticCatch",
+	"FrostRiposte",
+	"ToxicMantle",
+	"CorrosionAura",
+	"Regrowth",
+	"Overheated",
+	"Empowered",
+	"Untargetable",
 	"Frozen",
 	"Shocked",
 	"Stunned",
@@ -201,7 +248,11 @@ Status.Order = {
 	"Silenced",
 	"Blinded",
 	"Burning",
+	"Poisoned",
 	"Bleeding",
+	"Rooted",
+	"Chilled",
+	"Branded",
 	"Slowed",
 	"ArmorShred",
 	"Vulnerable",

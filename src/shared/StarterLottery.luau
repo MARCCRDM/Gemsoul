@@ -1,5 +1,6 @@
 -- Server-owned, persisted onboarding rewards. Animation never determines a reward.
 local GemRoller = require(script.Parent.GemRoller)
+local GemTraits = require(script.Parent.GemTraits)
 local Lottery = {}
 Lottery.Version = 1
 Lottery.GearOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet" }
@@ -16,12 +17,21 @@ function Lottery.prepareChoice(profile, style, element, generate)
 	for _, slot in Lottery.GearOrder do
 		table.insert(reward.Gear, { Slot = slot, Id = if slot == "Weapon" then "MatrixSwords1" else "Armor" .. style .. slot .. "1" })
 	end
-	for index, slot in {"Surge1", "Surge2", "Surge3"} do
+	-- With the triad on, the chosen element's three stones go where its keys
+	-- are: the sword (Q), the core socket (E) and the shield (R).
+	local slots = if GemTraits.Enabled then { "Weapon", "Surge2", "Shield" } else { "Surge1", "Surge2", "Surge3" }
+	for index, slot in slots do
 		local gem = generate(element)
 		gem.Element, gem.Tier = element, "Common"
 		gem.Size, gem.Clarity, gem.Cut = 1, 1, 1
 		gem.SurgeTier, gem.SurgeRank, gem.CutMethod = 1, 1, "Starter"
 		gem.Surge = GemRoller.StarterSurges[element][index]
+		if GemTraits.Enabled and GemTraits.Matrix[element] then
+			-- A first kit that teaches the grammar: a clean sword technique,
+			-- a bolt, and a shield that soaks.
+			local m = GemTraits.Matrix[element]
+			gem.Traits = { Offense = m.Offense[2], Ability = m.Ability[1], Defense = m.Defense[1] }
+		end
 		table.insert(reward.Gems, { Slot = slot, Gem = gem })
 	end
 	profile.Intro.Lottery = reward
@@ -105,7 +115,9 @@ function Lottery.finish(profile, maxGems)
 	c.ItemGems = c.ItemGems or {}
 	for _, entry in reward.Gems do
 		local key = entry.Slot .. "Gem"
-		if c[key] then
+		-- (the triad retired the Q and R surge sockets: those stones go to the pouch)
+		local retired = GemTraits.active(c) and table.find(GemTraits.ArchivedSockets, entry.Slot) ~= nil
+		if c[key] or retired then
 			table.insert(profile.Gems, entry.Gem)
 		else
 			c[key] = entry.Gem

@@ -7,14 +7,16 @@ def module(name,path):
     source=re.sub(r'^local \w+ = require\([^\n]+\)\n','',read(path),flags=re.M)
     return f'local {name}=(function()\n{source}\nend)()\n'
 source=read('tests/roblox_primitives.luau')+read('tests/combat_services.luau')
-for name,path in [('EquipmentBalance', 'src/shared/EquipmentBalance.luau'), ('ExpeditionEconomy', 'src/shared/ExpeditionEconomy.luau'), ('CrowdControl', 'src/shared/CrowdControl.luau'), ('StatusEffects', 'src/shared/StatusEffects.luau'), ('ElementCombos', 'src/shared/ElementCombos.luau'), ('Matchmaking', 'src/shared/Matchmaking.luau'), ('PvPRules', 'src/shared/PvPRules.luau'), ('GemConfig', 'src/shared/GemConfig.luau'), ('ArmorSignatures', 'src/shared/ArmorSignatures.luau'), ('ElementMatchup', 'src/shared/ElementMatchup.luau'), ('ArmorFamilies', 'src/shared/ArmorFamilies.luau'), ('Actions', 'src/shared/CombatActions.luau'), ('GemRoller', 'src/shared/GemRoller.luau'), ('Tech', 'src/shared/CombatTechnology.luau'), ('Tree', 'src/shared/AugmentTree.luau'), ('Season', 'src/shared/Season.luau'), ('WeaponForge', 'src/shared/WeaponForge.luau'), ('ExpandedTraits', 'src/shared/ExpandedItemTraits.luau'), ('Slots', 'src/shared/EquipmentSlots.luau'), ('Crafting', 'src/shared/Crafting.luau'), ('GearRolls', 'src/shared/GearRolls.luau'), ('Classes', 'src/shared/Classes.luau'), ('Combat', 'src/shared/Combat.luau'), ('DuelistBrain', 'src/shared/DuelistBrain.luau'), ('CombatTutorial', 'src/shared/CombatTutorial.luau'), ('RivalPose', 'src/shared/RivalPose.luau'), ('Matchup', 'src/shared/Matchup.luau'), ('CombatLogUI', 'src/client/Modules/CombatLogUI.luau'), ('HealthRegen', 'src/server/Systems/HealthRegen.luau'), ('CombatEvents', 'src/server/Systems/CombatEvents.luau')]: source+=module(name,path)
+for name,path in [('EquipmentBalance', 'src/shared/EquipmentBalance.luau'), ('ExpeditionEconomy', 'src/shared/ExpeditionEconomy.luau'), ('CrowdControl', 'src/shared/CrowdControl.luau'), ('StatusEffects', 'src/shared/StatusEffects.luau'), ('ElementCombos', 'src/shared/ElementCombos.luau'), ('Matchmaking', 'src/shared/Matchmaking.luau'), ('PvPRules', 'src/shared/PvPRules.luau'), ('GemConfig', 'src/shared/GemConfig.luau'), ('ArmorSignatures', 'src/shared/ArmorSignatures.luau'), ('ElementMatchup', 'src/shared/ElementMatchup.luau'), ('ArmorFamilies', 'src/shared/ArmorFamilies.luau'), ('Actions', 'src/shared/CombatActions.luau'), ('GemTraits', 'src/shared/GemTraits.luau'), ('GemRoller', 'src/shared/GemRoller.luau'), ('Tech', 'src/shared/CombatTechnology.luau'), ('Tree', 'src/shared/AugmentTree.luau'), ('Season', 'src/shared/Season.luau'), ('WeaponForge', 'src/shared/WeaponForge.luau'), ('ExpandedTraits', 'src/shared/ExpandedItemTraits.luau'), ('Slots', 'src/shared/EquipmentSlots.luau'), ('Crafting', 'src/shared/Crafting.luau'), ('GearRolls', 'src/shared/GearRolls.luau'), ('Classes', 'src/shared/Classes.luau'), ('Combat', 'src/shared/Combat.luau'), ('DuelistBrain', 'src/shared/DuelistBrain.luau'), ('CombatTutorial', 'src/shared/CombatTutorial.luau'), ('RivalPose', 'src/shared/RivalPose.luau'), ('Matchup', 'src/shared/Matchup.luau'), ('CombatLogUI', 'src/client/Modules/CombatLogUI.luau'), ('HealthRegen', 'src/server/Systems/HealthRegen.luau'), ('CombatEvents', 'src/server/Systems/CombatEvents.luau')]: source+=module(name,path)
 # These suites check the archived (pre-prototype) surges; the live
 # prototype has its own suite (run_surge_prototype.py).
+source+='\nGemTraits.Enabled = false -- the classic surge array (the triad has its own suites)\n'
 source+='\nGemRoller.LivePrototype = GemRoller.Prototype\nGemRoller.Prototype, Tech.Prototype = false, false\n'
 source+=module('DungeonLoadout','src/shared/DungeonLoadout.luau')
 source+=read('tests/dungeon_loadout_cases.luau')
 source+=read('tests/combat_players.luau')
 source+=module('DamageLog','src/server/Systems/DamageLog.luau')
+source+=module('TriadServer','src/server/Systems/TriadServer.luau')
 source+=module('CombatServer','src/server/Systems/CombatServer.luau')
 source+=module('Motion','src/shared/InsertionMotion.luau')
 source+=module('ArenaDrop','src/server/Systems/ArenaDrop.luau')
@@ -39,6 +41,8 @@ source+='\nTech.RaritySurges=true; GemRoller.RaritySurges=true\n'
 source+='\ndo\n'+read('tests/duelist_cases.luau')+'\nend\n'
 source+=read('tests/combat_tutorial_cases.luau')
 source+='\ndo\n'+read('tests/weapon_perk_cases.luau')+'\nend\n'
+source+='\nGemTraits.Enabled = true -- the Q / E / R triad\n'
+source+=read('tests/triad_live_cases.luau')
 with tempfile.TemporaryDirectory(prefix='gemsoul-combat-') as directory:
     script=Path(directory)/'combat.luau'; script.write_text(source,encoding='utf-8')
     subprocess.run([str(ROOT/'.tools/luau/luau.exe'),str(script)],check=True)
