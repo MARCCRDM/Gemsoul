@@ -315,12 +315,7 @@ local function refreshHud()
 		finds.Coins,
 		finds.Gear
 	)
-	recordLabel.Text = string.format(
-		"%d rocks mined · secrets %d/%d",
-		state.Rocks or 0,
-		state.Secrets or 0,
-		state.SecretsTotal or #Rules.SecretOrder
-	)
+	recordLabel.Text = string.format("%d rocks mined", state.Rocks or 0)
 end
 
 -- Rock labels -------------------------------------------------------------------------------------

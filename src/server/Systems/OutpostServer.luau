@@ -96,7 +96,7 @@ local function stateOf(player: Player)
 		Active = o.Active,
 		Rocks = o.Rocks,
 		Secrets = secrets,
-		SecretsTotal = #Rules.SecretOrder,
+		SecretsTotal = if site then #(site.Secrets or {}) else 0,
 		-- The free pick's charge clock (Outpost.surveyCharge projects it), and
 		-- seconds until its next swing (nil when full).
 		SurveyAt = o.SurveyAt,

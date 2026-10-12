@@ -783,8 +783,7 @@ local SAPPHIRE = Color3.fromRGB(112, 187, 245)
 local SAPPHIRE_LIGHT = Color3.fromRGB(211, 242, 255)
 local ISLAND = 112 -- the island's walkable radius (Shared.Outpost.Radius)
 
--- The mining rings, one per kind of ground (Shared.Outpost.Zones): where
--- they sit, how big, how high the deck is, and their trim colour.
+-- Retain the starter deck; the rest of the island is an open mining field.
 local RINGS = {
 	{
 		Zone = "Common",
@@ -795,24 +794,16 @@ local RINGS = {
 		Height = 2.4,
 		Color = Color3.fromRGB(110, 220, 255),
 	},
-	{
-		Zone = "Deep",
-		Title = "DEEP VEIN",
-		Sub = "Boulders  ·  Monoliths",
-		At = Vector3.new(56, 0, 22),
-		Radius = 24,
-		Height = 2.4,
-		Color = SAGA,
-	},
-	{
-		Zone = "Crystal",
-		Title = "CRYSTAL CROWN",
-		Sub = "Monoliths  ·  Star Geodes",
-		At = Vector3.new(0, 0, -62),
-		Radius = 27,
-		Height = 4.8,
-		Color = Color3.fromRGB(190, 120, 255),
-	},
+}
+
+-- Shared route definitions keep both paving and mining clearance aligned.
+local ROUTES = {
+	Vector3.new(-56, 0, 22), -- starter field
+	Vector3.new(0, 0, -90), -- open mining grounds
+	Vector3.new(0, 0, 74), -- arrival
+	Vector3.new(-82, 0, 60), -- market
+	Vector3.new(84, 0, 60), -- leaderboard
+	Vector3.new(70, 0, -56), -- arena
 }
 
 -- Clear blue glass with pale facets; fewer overlapping roots keep the
@@ -1216,10 +1207,22 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ Transparency = 0.1 }
 	)
 	light(crystal, SAGA, 40, 1.2)
-	for _, target in { RINGS[1].At, RINGS[2].At, RINGS[3].At, Vector3.new(0, 0, 74) } do
+	for _, target in ROUTES do
 		local from = court.Position
 		local to = (at * CFrame.new(target)).Position
 		local length = (to - from).Magnitude
+		local routeFrame = CFrame.lookAt((from + to) / 2, to)
+		for distance = -length / 2 + 8, length / 2 - 4, 12 do
+			for _, side in { -1, 1 } do
+				part(
+					plaza,
+					routeFrame * CFrame.new(side * 3.3, 0.17, distance),
+					Vector3.new(0.22, 0.08, 2.2),
+					GLOW,
+					Enum.Material.Neon
+				)
+			end
+		end
 		part(
 			plaza,
 			CFrame.lookAt((from + to) / 2 + Vector3.new(0, 0.08, 0), to + Vector3.new(0, 0.08, 0)),
@@ -1229,7 +1232,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		)
 	end
 
-	-- The three familiar mining decks retain their existing rock mixes.
+	-- The starter deck stays familiar; the other former decks are open ground.
 	local mining = folder(root, "MiningRings")
 	local spots, zones = {}, {}
 	for _, spec in RINGS do
@@ -1282,12 +1285,6 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			{ -96, 54, 9 },
 			{ 96, 54, 9 },
 			{ 0, -100, 9 },
-			{ -92, 36, 10 },
-			{ 58, 92, 10 },
-			{ -64, -84, 18 },
-			{ 102, -8, 10 },
-			{ 30, -100, 12 },
-			{ -60, 86, 10 },
 		}
 	do
 		table.insert(keepClear, { Vector3.new(p[1], 0, p[2]), p[3] })
@@ -1300,7 +1297,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			end
 		end
 		local from = Vector3.new(0, 0, 12)
-		for _, target in { RINGS[1].At, RINGS[2].At, RINGS[3].At, Vector3.new(0, 0, 74) } do
+		for _, target in ROUTES do
 			local line = Vector3.new(target.X, 0, target.Z) - from
 			local t = math.clamp((here - from):Dot(line) / line:Dot(line), 0, 1)
 			if (here - (from + line * t)).Magnitude < 9 then
@@ -1309,16 +1306,15 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 		return true
 	end
-	-- A spaced field leaves room to circle each rock. Common weights mean
-	-- the extra landscape density does not multiply rare/geode spawn chances.
+	-- All standard rock types now appear naturally across the open field.
 	local fieldSpots = {}
-	for x = -100, 100, 11 do
-		for z = -100, 100, 11 do
+	for x = -100, 100, 12 do
+		for z = -100, 100, 12 do
 			local px, pz = x + rng:NextNumber(-1, 1), z + rng:NextNumber(-1, 1)
 			if px * px + pz * pz <= (ISLAND - 10) ^ 2 and clear(px, pz) then
 				local spot = at * CFrame.new(px, 0.08, pz) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0)
 				table.insert(spots, spot)
-				table.insert(zones, "Common")
+				table.insert(zones, "Field")
 				table.insert(fieldSpots, #spots)
 			end
 		end
@@ -1344,16 +1340,10 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local face = billboard(root, facing(84, 60))
 	local gatePad = gate(root, at * CFrame.new(70, 0, -56))
 
-	-- The secrets, tucked round the rim.
-	local secrets = folder(root, "Secrets")
-	local hidden = {
-		monolith(secrets, at * CFrame.new(-92, 0, 36) * CFrame.Angles(0, math.rad(60), 0)),
-		rubberDuck(secrets, at * CFrame.new(58, 0, 92) * CFrame.Angles(0, math.rad(-30), 0)),
-		bomberWreck(secrets, at * CFrame.new(-64, 0, -84) * CFrame.Angles(0, math.rad(-35), 0), rng),
-		skeleton(secrets, at * CFrame.new(102, 0, -8) * CFrame.Angles(0, math.rad(70), 0)),
-		shrine(secrets, at * CFrame.new(30, 0, -100) * CFrame.Angles(0, math.rad(180), 0)),
-		footprint(secrets, at * CFrame.new(-60, 0, 86) * CFrame.Angles(0, math.rad(20), 0)),
-	}
+	-- Simple destination markers, readable from the main approach.
+	sign(plaza, at * CFrame.new(0, 8, 87), "CORUNDUM KINGDOM", "Mine gems · Build your miner · Enter the arena", GLOW)
+	sign(plaza, at * CFrame.new(-82, 10, 60), "MARKET", "PROBE-7 · Buy and sell", SAGA)
+	sign(plaza, at * CFrame.new(70, 12, -56), "ARENA", "Queue at the uplink", GLOW)
 
 	-- Islets drifting round the island, and the sky: planets and an orbital
 	-- ring station over a bright afternoon.
@@ -1393,7 +1383,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		FieldSpots = fieldSpots,
 		Zones = zones,
 		Parking = {},
-		Secrets = hidden,
+		Secrets = {},
 	}
 end
 
