@@ -1,6 +1,5 @@
 --[[
-	The Arena's light: while you're in an Arena session the lighting turns to
-	a golden late afternoon (it used to be night; too dark to read). Strikes, surges,
+	The Arena's light: clear blue daylight for the sapphire colosseum. Strikes, surges,
 	parries and deaths flash real light (CombatFx.flash), and every
 	fighter's gear glows: its gem, rarity and affinity lights get a wider,
 	stronger companion and its neon trims bloom. Leaving the Arena restores
@@ -18,30 +17,29 @@ local CombatFx = require(script.Parent.CombatFx)
 local ArenaNight = {}
 
 ArenaNight.Mood = {
-	-- A golden late afternoon: bright enough to read every move, low sun so
-	-- strikes and surges still light the fighters.
+	-- Neutral light on fighters; sapphire color comes from the architecture.
 	Lighting = {
-		Brightness = 1.8,
-		Ambient = Color3.fromRGB(96, 92, 104),
-		OutdoorAmbient = Color3.fromRGB(128, 122, 134),
-		ExposureCompensation = 0,
-		EnvironmentDiffuseScale = 0.7,
-		EnvironmentSpecularScale = 0.3,
+		Brightness = 2.2,
+		Ambient = Color3.fromRGB(116, 130, 150),
+		OutdoorAmbient = Color3.fromRGB(151, 167, 185),
+		ExposureCompensation = 0.05,
+		EnvironmentDiffuseScale = 0.85,
+		EnvironmentSpecularScale = 0.6,
 	},
 	-- Only the brightest things bloom, and softly: the fight stays readable.
-	BloomEffect = { Intensity = 0.4, Size = 20, Threshold = 1.8 },
+	BloomEffect = { Intensity = 0.22, Size = 18, Threshold = 1.9 },
 	ColorCorrectionEffect = {
 		Brightness = 0.02,
-		Contrast = 0.12,
-		Saturation = 0.12,
-		TintColor = Color3.fromRGB(255, 242, 226),
+		Contrast = 0.06,
+		Saturation = 0.04,
+		TintColor = Color3.fromRGB(247, 251, 255),
 	},
 	Atmosphere = {
-		Density = 0.28,
-		Haze = 1,
-		Glare = 0.2,
-		Color = Color3.fromRGB(232, 210, 186),
-		Decay = Color3.fromRGB(150, 124, 112),
+		Density = 0.16,
+		Haze = 0.35,
+		Glare = 0.08,
+		Color = Color3.fromRGB(198, 226, 247),
+		Decay = Color3.fromRGB(112, 145, 180),
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
@@ -71,8 +69,9 @@ ArenaNight.DungeonMood = {
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
-ArenaNight.ClockTime = 16.8 -- low golden sun
-ArenaNight.LampScale = 0.3 -- the Arena's own ceiling lamps, dimmed
+ArenaNight.ClockTime = 14.2 -- clear afternoon light on crystal faces
+ArenaNight.DungeonClockTime = 16.8 -- preserve the dungeon's existing mood
+ArenaNight.LampScale = 1 -- four restrained architectural lamps
 ArenaNight.FlashBoost = 1.1 -- combat flashes, a little brighter and wider
 -- The companion glow on each gear light: brightness added, range multiplier.
 ArenaNight.GlowBrightness, ArenaNight.GlowRange = 0.35, 1.2
@@ -160,7 +159,7 @@ local function nightfall(mood)
 		saved[instance] = saved[instance] or before
 		TweenService:Create(instance, FADE, goal):Play()
 	end
-	Lighting.ClockTime = ArenaNight.ClockTime
+	Lighting.ClockTime = if mood == ArenaNight.DungeonMood then ArenaNight.DungeonClockTime else ArenaNight.ClockTime
 	CombatFx.LightBoost = if mood == ArenaNight.DungeonMood then 1 else ArenaNight.FlashBoost
 	dimLamps()
 	glowGear()
