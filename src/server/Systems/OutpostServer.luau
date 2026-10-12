@@ -48,6 +48,7 @@ local site = nil
 local nodesFolder: Folder? = nil
 local nodes = {} -- [id] = { Id, Spot, Size, Hp, MaxHp, Model, ClaimedBy, ClaimUntil, Ready }
 local freeSpots: { [number]: boolean } = {}
+local fieldSpots: { [number]: boolean } = {}
 local nextId = 0
 local lastSwing: { [Player]: number } = {}
 local secretParts: { [string]: BasePart } = {}
@@ -249,10 +250,12 @@ end
 
 -- Rocks ---------------------------------------------------------------------------
 
-local function spawnNode()
+local function spawnNode(field: boolean?)
 	local spots = {}
 	for index in freeSpots do
-		table.insert(spots, index)
+		if (fieldSpots[index] == true) == (field == true) then
+			table.insert(spots, index)
+		end
 	end
 	if #spots == 0 or not site or not nodesFolder then
 		return
@@ -306,7 +309,9 @@ local function popNode(node, player: Player)
 		model:Destroy()
 		freeSpots[node.Spot] = true
 	end)
-	task.delay(Rules.Sizes[node.Size].Respawn, spawnNode)
+	task.delay(Rules.Sizes[node.Size].Respawn, function()
+		spawnNode(fieldSpots[node.Spot] == true)
+	end)
 end
 
 -- What a popped rock pays: a gem by chance, a few coins by chance (mining
@@ -701,8 +706,14 @@ function OutpostServer.start()
 	for index in site.Spots do
 		freeSpots[index] = true
 	end
-	for _ = 1, math.min(Rules.NodeCount, #site.Spots) do
+	for _, index in site.FieldSpots or {} do
+		fieldSpots[index] = true
+	end
+	for _ = 1, math.min(Rules.NodeCount, #site.Spots - #(site.FieldSpots or {})) do
 		spawnNode()
+	end
+	for _ = 1, math.min(Rules.FieldNodeCount, #(site.FieldSpots or {})) do
+		spawnNode(true)
 	end
 	-- Prompts at the Probe (market) and the Arena gate.
 	for _, spec in

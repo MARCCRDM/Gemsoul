@@ -34,6 +34,7 @@ local Outpost = {}
 Outpost.Location = CFrame.new(0, 0, 7000)
 Outpost.Radius = 112 -- the island's walkable radius
 Outpost.NodeCount = 34 -- rocks out at once, across the three rings
+Outpost.FieldNodeCount = 72 -- extra standard nodes throughout Corundum Kingdom
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from
 Outpost.SwingCooldown = 0.32
