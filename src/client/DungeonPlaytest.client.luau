@@ -41,7 +41,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 294)
+panel.Size = UDim2.fromOffset(300, 330)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -149,6 +149,47 @@ for i, item in buttons do
 		end
 	end)
 end
+
+-- INVENTORY V1 / V2: flips the dashboard between the first Inventory and the
+-- redesign (Modules/InventoryV2), to test and compare. This session only.
+local versionCaption = Instance.new("TextLabel")
+versionCaption.Size = UDim2.fromOffset(96, 26)
+versionCaption.Position = UDim2.fromOffset(6, 296)
+versionCaption.BackgroundTransparency = 1
+versionCaption.TextColor3 = Color3.fromRGB(255, 210, 126)
+versionCaption.Font = Enum.Font.GothamBold
+versionCaption.TextSize = 12
+versionCaption.TextXAlignment = Enum.TextXAlignment.Left
+versionCaption.Text = "INVENTORY"
+versionCaption.Parent = panel
+local versionButtons = {}
+local function paintVersions()
+	local current = player:GetAttribute("InventoryVersion") or 1
+	for version, b in versionButtons do
+		local on = version == current
+		b.BackgroundColor3 = if on then Color3.fromRGB(255, 210, 126) else Color3.fromRGB(39, 61, 79)
+		b.TextColor3 = if on then Color3.fromRGB(17, 25, 36) else Color3.fromRGB(240, 245, 250)
+	end
+end
+for version = 1, 2 do
+	local b = Instance.new("TextButton")
+	b.Name = "InventoryV" .. version
+	b.Size = UDim2.fromOffset(92, 26)
+	b.Position = UDim2.fromOffset(104 + (version - 1) * 98, 296)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 12
+	b.Text = if version == 1 then "V1  CURRENT" else "V2  NEW"
+	b.Parent = panel
+	corner(b, 5)
+	b.Activated:Connect(function()
+		player:SetAttribute("InventoryVersion", version)
+		paintVersions()
+		status.Text = "Inventory " .. (if version == 1 then "v1 (current)" else "v2 (redesign)") .. ". Open INVENTORY to see it."
+	end)
+	versionButtons[version] = b
+end
+paintVersions()
+player:GetAttributeChangedSignal("InventoryVersion"):Connect(paintVersions)
 
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
