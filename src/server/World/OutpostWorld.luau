@@ -1341,6 +1341,80 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			end
 		end
 	end
+	-- Environmental art stays off the mining grid and uses the lobby palette.
+	local art = folder(root, "CorundumArt")
+	local artRng = Random.new(8719)
+	local function artBeam(frame: CFrame, from: Vector3, to: Vector3, width: number, color: Color3, material)
+		local a, b = (frame * CFrame.new(from)).Position, (frame * CFrame.new(to)).Position
+		return part(art, CFrame.lookAt((a + b) / 2, b), Vector3.new(width, width, (b - a).Magnitude), color, material)
+	end
+	-- A suspended, double-ended sapphire inside two tilted orbital frames.
+	local monument = at * CFrame.new(0, 0, -150)
+	table.insert(scenicClear, { Vector3.new(0, 0, -150), 13 })
+	solid(disc(art, monument * CFrame.new(0, 0.3, 0), 9, 0.6, STONE_DARK, Enum.Material.Marble))
+	for i = 0, 7 do
+		local angle = i / 8 * math.pi * 2
+		local frame = monument * CFrame.Angles(0, angle, 0)
+		part(art, frame * CFrame.new(0, 0.65, 6), Vector3.new(0.5, 0.08, 2), SAGA, Enum.Material.Neon)
+	end
+	sapphire(art, monument * CFrame.new(0, 25, 0), 9, 11, SAPPHIRE_LIGHT, 0.7)
+	sapphire(art, monument * CFrame.new(0, 25, 0) * CFrame.Angles(math.pi, 0, 0), 9, 11, SAPPHIRE, 0.7)
+	for ring = 1, 2 do
+		local orbit = monument * CFrame.new(0, 25, 0) * CFrame.Angles(math.rad(55), ring * 1.8, 0.3)
+		for segment = 0, 23 do
+			local a, b = segment / 24 * math.pi * 2, (segment + 1) / 24 * math.pi * 2
+			artBeam(
+				orbit,
+				Vector3.new(math.cos(a) * 15, 0, math.sin(a) * 15),
+				Vector3.new(math.cos(b) * 15, 0, math.sin(b) * 15),
+				0.38,
+				if ring == 1 then GLOW else SAGA,
+				Enum.Material.Neon
+			)
+		end
+	end
+	-- Fine branching mineral seams in the outer shelf, flush with the floor.
+	for patch = 0, 7 do
+		local angle = (patch + 0.35) / 8 * math.pi * 2
+		local vein = at * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0.12, 143)
+		local previous = Vector3.new(-6, 0, 0)
+		for step = 1, 5 do
+			local nextPoint = Vector3.new(-6 + step * 2.6, 0, artRng:NextNumber(-2, 2))
+			artBeam(vein, previous, nextPoint, 0.12, GLOW, Enum.Material.Neon)
+			if step % 2 == 0 then
+				artBeam(vein, nextPoint, nextPoint + Vector3.new(1.5, 0, 3), 0.08, SAPPHIRE_LIGHT, Enum.Material.Neon)
+			end
+			previous = nextPoint
+		end
+	end
+	-- Three crystalline lightfalls spill beyond the safety rim into the sky.
+	for _, angle in { 0.65, 2.8, 4.8 } do
+		local fall = at * CFrame.Angles(0, angle, 0) * CFrame.new(0, -3, ISLAND + 7)
+		for ribbon = -2, 2 do
+			local length = 28 + (2 - math.abs(ribbon)) * 9
+			local sheet = part(
+				art,
+				fall * CFrame.new(ribbon * 1.5, -length / 2, 0),
+				Vector3.new(1.1, length, 0.18),
+				SAPPHIRE_LIGHT,
+				Enum.Material.Neon,
+				nil,
+				{ Transparency = 0.73, CastShadow = false }
+			)
+			sheet.Name = "CrystalLightfall"
+		end
+		for shard = 1, 4 do
+			sapphire(
+				art,
+				fall
+					* CFrame.new(artRng:NextNumber(-5, 5), -52 - shard * 5, artRng:NextNumber(-2, 2))
+					* CFrame.Angles(0.3, shard, 0.2),
+				2.5,
+				4,
+				SAPPHIRE_LIGHT
+			)
+		end
+	end
 	-- The field uses real standard mining nodes, not decorative imitation rocks.
 	local keepClear = {
 		{ Vector3.new(0, 0, 74), 16 },
