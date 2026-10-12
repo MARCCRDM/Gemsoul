@@ -7,7 +7,9 @@
 	moved afterwards. The shape eases to new values, so equipping a piece
 	visibly grows or shrinks it.
 
-	  StatRadar.create(parent, axes, radius) -> radar
+	  StatRadar.create(parent, axes, radius, fill, options?) -> radar
+      options.Web = false     no rings or axes (a second shape over another chart)
+      options.Labels = false  no names or values
 	      axes = { { Name = "HEALTH", Color = Color3 }, ... } (clockwise from the top)
 	  StatRadar.set(radar, values, texts)    values 0..1 per axis; texts shown by each name
 	  StatRadar.step(radar, dt)              eases the shape; call every frame
@@ -45,8 +47,10 @@ local function bar(parent: Instance, color: Color3, transparency: number, z: num
 	}, parent)
 end
 
-function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3)
+function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3, options: { [string]: any }?)
 	local count = #axes
+	local showWeb = not (options and options.Web == false)
+	local showLabels = not (options and options.Labels == false)
 	local size = radius * 2
 	local chart = make("Frame", {
 		Name = "StatRadar",
@@ -63,13 +67,13 @@ function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3)
 
 	-- The web: rings and axes.
 	local web = Color3.fromRGB(120, 150, 170)
-	for ring = 1, RINGS do
+	for ring = 1, if showWeb then RINGS else 0 do
 		local r = radius * ring / RINGS
 		for i = 1, count do
 			line(bar(chart, web, if ring == RINGS then 0.55 else 0.8, z), point(i, r), point(i % count + 1, r), 1)
 		end
 	end
-	for i = 1, count do
+	for i = 1, if showWeb then count else 0 do
 		line(bar(chart, web, 0.75, z), centre, point(i, radius), 1)
 	end
 
@@ -90,7 +94,7 @@ function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3)
 
 	-- Names and values round the outside.
 	local labels = {}
-	for i, axis in axes do
+	for i, axis in if showLabels then axes else {} do
 		-- Side labels sit beside their point, reading away from the web, so a
 		-- full stat's dot never lands under its own name.
 		local tip = point(i, radius)
@@ -179,7 +183,9 @@ end
 function StatRadar.set(radar, values: { number }, texts: { string })
 	for i = 1, radar.Count do
 		radar.Target[i] = math.clamp(values[i] or 0, 0.04, 1)
-		radar.Labels[i].Value.Text = texts[i] or ""
+		if radar.Labels[i] then
+			radar.Labels[i].Value.Text = texts[i] or ""
+		end
 	end
 	radar.Dirty = true
 end

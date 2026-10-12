@@ -4,7 +4,9 @@
 	  Top        back to the lobby, the other screens, your coins / season /
 	             free pick
 	  Left       who you are: miner 1 / 2 / 3, name, level, a big rating, four
-	             stat bars and your armor set
+	             stat bars, your armor set, and your elements: a radar of
+	             what you attack with and what you resist, with what you're
+	             strong against and weak to
 	  Centre     your miner, large, on a lit floor
 	  Right      what you wear: six rows (armor, then sword and shield), each
 	             with its gem socket. Click one and the column turns into
@@ -30,6 +32,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local ArmorSignatures = require(ReplicatedStorage.Shared.ArmorSignatures)
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -45,6 +48,7 @@ local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local InventoryPose = require(script.Parent.InventoryPose)
 local IronUi = require(script.Parent.IronUi)
+local StatRadar = require(script.Parent.StatRadar)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
 
@@ -564,6 +568,38 @@ local function buildLeft(canvas: Frame)
 	ui.SetNext = place(text(canvas, "", 12, C.Dim, BODY), x, 514, w, 34)
 	ui.SetNext.TextWrapped = true
 	ui.SetNext.TextYAlignment = Enum.TextYAlignment.Top
+	-- Elements: the radar (attack in gold, resistance in teal) and the verdict.
+	local elementRule = frame(canvas, C.Line, 0.93)
+	place(elementRule, x, 562, w + 90, 1)
+	place(text(canvas, "ELEMENTS", 11, C.Dim, HEADING), x, 574, 120, 16)
+	for i, spec in { { "ATTACK", C.Gold }, { "RESIST", C.Teal } } do
+		local swatch = frame(canvas, spec[2], 0.2)
+		place(swatch, x + 236 + (i - 1) * 84, 579, 14, 6)
+		round(swatch, 3)
+		place(text(canvas, spec[1], 10, C.Dim, HEADING), x + 256 + (i - 1) * 84, 574, 64, 16)
+	end
+	local axes = {}
+	for i, element in ELEMENTS do
+		axes[i] = { Name = string.upper(GemConfig.elementName(element)), Color = GemConfig.ElementColors[element] or C.Text }
+	end
+	local RADIUS = 68
+	ui.AttackRadar = StatRadar.create(canvas, axes, RADIUS, C.Gold)
+	ui.ResistRadar = StatRadar.create(canvas, axes, RADIUS, C.Teal, { Web = false, Labels = false })
+	for _, radar in { ui.AttackRadar, ui.ResistRadar } do
+		radar.Frame.Position = UDim2.fromOffset(x + 56, 626)
+	end
+	place(text(canvas, "Each element beats the next one clockwise.", 10, C.Faint, MEDIUM), x, 806, 260, 14)
+	-- The verdict, beside the radar.
+	ui.Verdict = {}
+	for i, caption in { "STRONG VS", "WEAK TO", "RESISTS" } do
+		local y = 612 + (i - 1) * 62
+		local vx = x + 236
+		place(text(canvas, caption, 10, C.Dim, HEADING), vx, y, 170, 14)
+		local value = place(text(canvas, "", 15, C.Text, HEADING), vx, y + 15, 180, 20)
+		value.RichText = true
+		local detail = place(text(canvas, "", 10, C.Faint, MEDIUM), vx, y + 36, 180, 14)
+		ui.Verdict[i] = { Value = value, Detail = detail }
+	end
 end
 
 local function buildStage(canvas: Frame)
@@ -1135,6 +1171,93 @@ local function drawLeft(profile, loadout)
 		ui.SetBonus.Text = ""
 		ui.SetNext.Text = "Wear two pieces of one family for a set bonus."
 	end
+	-- Elements: what you attack with (the sword's gem, and the surges' a
+	-- little), what your armor gems resist, and the matchups that follow
+	-- (Shared.ElementMatchup, the same rules a fight uses).
+	local function grade(gem): number
+		local total, count = 0, 0
+		for _, metric in { "Size", "Clarity", "Cut" } do
+			if type(gem[metric]) == "number" then
+				total += gem[metric]
+				count += 1
+			end
+		end
+		return if count > 0 then math.clamp(total / count, 1, 10) else 1
+	end
+	local attack = {}
+	local weaponGem = loadout.WeaponGem
+	if weaponGem and weaponGem.Element then
+		attack[weaponGem.Element] = (attack[weaponGem.Element] or 0) + 0.45 + 0.4 * (grade(weaponGem) - 1) / 9
+	end
+	for _, key in KEYS do
+		local gem = Tech.surgeGem(loadout, key)
+		if gem and gem.Element then
+			attack[gem.Element] = (attack[gem.Element] or 0) + 0.12 + 0.1 * (grade(gem) - 1) / 9
+		end
+	end
+	local okProfile, armor = pcall(ElementMatchup.profile, loadout)
+	if not okProfile or not armor then
+		armor = { Resist = {}, Main = nil }
+	end
+	local weakTo = armor.Main and ElementMatchup.weakTo(armor.Main)
+	local attackValues, resistValues, texts = {}, {}, {}
+	for i, element in ELEMENTS do
+		attackValues[i] = math.clamp(attack[element] or 0, 0, 1)
+		local share = armor.Resist[element] or 0
+		resistValues[i] = math.clamp(share / ElementMatchup.Cap, 0, 1)
+		texts[i] = if element == weakTo
+			then "WEAK"
+			elseif share > 0 then string.format("−%d%%", math.floor(share * 100 + 0.5))
+			else ""
+	end
+	StatRadar.set(ui.AttackRadar, attackValues, texts)
+	StatRadar.set(ui.ResistRadar, resistValues, {})
+	if not ui.RadarShown then
+		-- The first time, the shapes start where they belong; changes ease after.
+		ui.RadarShown = true
+		StatRadar.step(ui.AttackRadar, 5)
+		StatRadar.step(ui.ResistRadar, 5)
+	end
+	for i, element in ELEMENTS do
+		local label = ui.AttackRadar.Labels[i]
+		if label then
+			label.Value.TextColor3 = if element == weakTo then C.Bad else C.Teal
+			label.Value.TextSize = 11
+		end
+	end
+	local function named(element: string): string
+		return string.format(
+			'<font color="#%s">%s</font>',
+			(GemConfig.ElementColors[element] or C.Text):ToHex(),
+			string.upper(GemConfig.elementName(element))
+		)
+	end
+	local strong, weak, resists = ui.Verdict[1], ui.Verdict[2], ui.Verdict[3]
+	local victim = weaponGem and weaponGem.Element and ElementMatchup.Beats[weaponGem.Element]
+	if victim then
+		strong.Value.Text = named(victim) .. " ARMOR"
+		strong.Detail.Text = string.format("Your %s sword hits +25%%", GemConfig.elementName(weaponGem.Element))
+	else
+		strong.Value.Text = "—"
+		strong.Detail.Text = "Socket a gem in your sword"
+	end
+	if weakTo then
+		weak.Value.Text = named(weakTo)
+		weak.Detail.Text = string.format("Takes +25%% (your armor is %s)", GemConfig.elementName(armor.Main))
+	else
+		weak.Value.Text = "NOTHING"
+		weak.Detail.Text = "No armor element yet"
+	end
+	local parts = {}
+	for _, element in ELEMENTS do
+		local share = armor.Resist[element] or 0
+		if share > 0 then
+			table.insert(parts, string.format("%s %d%%", named(element), math.floor(share * 100 + 0.5)))
+		end
+	end
+	resists.Value.Text = if #parts > 0 then table.concat(parts, "  ") else "NONE YET"
+	resists.Detail.Text = if #parts > 0 then "Less damage from those" else "Armor gems resist their element"
+
 	-- The miner.
 	local store = player.PlayerGui:FindFirstChild("MinerPreviews")
 	local source = store and store:FindFirstChild(tostring(active))
@@ -1827,6 +1950,13 @@ playerGui.ChildAdded:Connect(function(child)
 		watchStore(child)
 	elseif child.Name == "GearPreviews" then
 		watchPreviews(child)
+	end
+end)
+-- The element radar eases to new values.
+game:GetService("RunService").Heartbeat:Connect(function(dt)
+	if state.Active and gui and gui.Enabled and ui.AttackRadar then
+		StatRadar.step(ui.AttackRadar, dt)
+		StatRadar.step(ui.ResistRadar, dt)
 	end
 end)
 -- The free pick's clock.
