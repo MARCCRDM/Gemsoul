@@ -103,7 +103,10 @@ CombatServer._attack(a, rb.Position, false)
 check(near(ha.Health, 500.05), "Server overkill life steal")
 check(CombatServer._state(a).Resources.Charge >= 3, "Server bonus Charge")
 check(CombatServer.kitFor(la, {}).Defense.Shield == 0, "Legacy armor effects still active")
-check(ElementMatchup.profile(la).Main == nil, "Migrated gems retain old resistance")
+check(
+	near(ElementMatchup.profile(la).Resist[perfect.Element] or 0, ElementMatchup.gemResist(perfect) * 2 * ElementMatchup.PerkShare),
+	"Gems powering perks resist at half strength"
+)
 now += 10
 CombatServer.reset(a)
 CombatServer.reset(b)

@@ -608,7 +608,7 @@ local function buildLeft(canvas: Frame)
 	-- Elements: the radar (attack in gold, resistance in teal) and the verdict.
 	local elementRule = frame(canvas, C.Line, 0.93)
 	place(elementRule, x, 562, w + 90, 1)
-	place(text(canvas, "ELEMENTS", 11, C.Dim, HEADING), x, 574, 120, 16)
+	place(text(canvas, "ELEMENTS", 11, C.Dim, HEADING), x, 574, 80, 16)
 	for i, spec in { { "ATTACK", C.Gold }, { "RESIST", C.Teal } } do
 		local swatch = frame(canvas, spec[2], 0.2)
 		place(swatch, x + 236 + (i - 1) * 84, 579, 14, 6)
@@ -625,14 +625,18 @@ local function buildLeft(canvas: Frame)
 	for _, radar in { ui.AttackRadar, ui.ResistRadar } do
 		radar.Frame.Position = UDim2.fromOffset(x + 56, 626)
 	end
-	place(text(canvas, "Each element beats the next one clockwise.", 10, C.Faint, MEDIUM), x, 806, 260, 14)
+	-- Every gem you wear, by element: the mix behind the shapes.
+	ui.Mix = place(text(canvas, "", 11, C.Dim, HEADING), x, 794, w + 100, 16)
+	ui.Mix.RichText = true
+	place(text(canvas, "Each element beats the next one, clockwise.", 10, C.Faint, MEDIUM), x, 814, w + 100, 14)
 	-- The verdict, beside the radar.
 	ui.Verdict = {}
 	for i, caption in { "STRONG VS", "WEAK TO", "RESISTS" } do
 		local y = 612 + (i - 1) * 62
 		local vx = x + 236
 		place(text(canvas, caption, 10, C.Dim, HEADING), vx, y, 170, 14)
-		local value = place(text(canvas, "", 15, C.Text, HEADING), vx, y + 15, 180, 20)
+		-- (the last row sits beside the Q card, so it stays narrower)
+		local value = place(text(canvas, "", if i == 3 then 12 else 15, C.Text, HEADING), vx, y + 15, if i == 3 then 162 else 220, 20)
 		value.RichText = true
 		local detail = place(text(canvas, "", 10, C.Faint, MEDIUM), vx, y + 36, 180, 14)
 		ui.Verdict[i] = { Value = value, Detail = detail }
@@ -1374,15 +1378,43 @@ local function drawLeft(profile, loadout)
 		weak.Value.Text = "NOTHING"
 		weak.Detail.Text = "No armor element yet"
 	end
-	local parts = {}
-	for _, element in ELEMENTS do
+	local parts, order = {}, table.clone(ELEMENTS)
+	table.sort(order, function(a, b)
+		return (armor.Resist[a] or 0) > (armor.Resist[b] or 0)
+	end)
+	for _, element in order do
 		local share = armor.Resist[element] or 0
 		if share > 0 then
 			table.insert(parts, string.format("%s %d%%", named(element), math.floor(share * 100 + 0.5)))
 		end
 	end
-	resists.Value.Text = if #parts > 0 then table.concat(parts, "  ") else "NONE YET"
-	resists.Detail.Text = if #parts > 0 then "Less damage from those" else "Armor gems resist their element"
+	-- The two strongest fit on the line (the radar shows them all).
+	local shownParts = { parts[1], parts[2] }
+	resists.Value.Text = if #parts > 0 then table.concat(shownParts, "  ") else "NONE YET"
+	resists.Detail.Text = if #parts > 0 then "Half strength from perk pieces" else "Armor gems resist their element"
+	-- The mix: every socketed gem (armor, sword and surges), by element.
+	local counts = {}
+	for _, slot in Slots.Order do
+		local gem = loadout[slot .. "Gem"]
+		if gem and gem.Element then
+			counts[gem.Element] = (counts[gem.Element] or 0) + 1
+		end
+	end
+	for _, key in KEYS do
+		local gem = Tech.surgeGem(loadout, key)
+		if gem and gem.Element then
+			counts[gem.Element] = (counts[gem.Element] or 0) + 1
+		end
+	end
+	local mix = {}
+	for _, element in ELEMENTS do
+		if counts[element] then
+			table.insert(mix, string.format("%s %d", named(element), counts[element]))
+		end
+	end
+	ui.Mix.Text = if #mix > 0
+		then string.format('<font color="#%s">YOUR GEMS</font>   %s', C.Faint:ToHex(), table.concat(mix, "   "))
+		else string.format('<font color="#%s">YOUR GEMS</font>   none socketed yet', C.Faint:ToHex())
 
 	-- The miner.
 	local store = player.PlayerGui:FindFirstChild("MinerPreviews")

@@ -5,6 +5,8 @@
 	  per gem   3.5% (grades all 1) up to 8% (grades all 10) of that
 	            element's damage, by the gem's average grade
 	  total     capped at 35% per element
+	  perk      a gem in a piece with a perk (Shared.ArmorSignatures) powers
+	            the perk and resists at half strength (PerkShare)
 
 	Your main armor element (the one your gems resist most) is weak to the
 	element that beats it: that element does 125%. Thermal beats Cryo, Cryo
@@ -27,6 +29,7 @@ ElementMatchup.Resist = 0.75 -- a creature against its own element
 ElementMatchup.Weak = 1.25
 ElementMatchup.PerGem = { Min = 0.035, Max = 0.08 }
 ElementMatchup.Cap = 0.35
+ElementMatchup.PerkShare = 0.5 -- a gem that also powers its piece's perk
 ElementMatchup.Slots = { "Helmet", "Armor", "Gloves", "Boots", "Shield" }
 ElementMatchup.Beats = { Fire = "Frost", Frost = "Shock", Shock = "Poison", Poison = "Fire" }
 
@@ -66,8 +69,12 @@ function ElementMatchup.profile(loadout)
 			local gem = loadout[slot .. "Gem"]
 			local kind = ArmorSignatures.Slots[slot]
 			local roll = loadout.GearRolls and loadout.GearRolls[kind] and loadout.GearRolls[kind][loadout[slot]]
-			if gem and gem.Element and not (roll and roll.SignatureVersion == 1) then
-				resist[gem.Element] = (resist[gem.Element] or 0) + ElementMatchup.gemResist(gem)
+			if gem and gem.Element then
+				local share = ElementMatchup.gemResist(gem)
+				if roll and roll.SignatureVersion == 1 then
+					share *= ElementMatchup.PerkShare
+				end
+				resist[gem.Element] = (resist[gem.Element] or 0) + share
 			end
 		end
 		-- The main element: resisted most (the chest suit's breaks a tie).
