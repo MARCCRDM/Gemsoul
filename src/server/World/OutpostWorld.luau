@@ -820,15 +820,21 @@ local RINGS = {
 -- Corner wedges meet at a single point above a four-sided prism.
 local function sapphire(parent, at: CFrame, width: number, height: number, tint: Color3, termination: number?)
 	local tip = height * (termination or 0.22)
-	part(
-		parent,
-		at * CFrame.new(0, (height - tip) / 2, 0),
-		Vector3.new(width, height - tip, width),
-		tint,
-		Enum.Material.Glass,
-		nil,
-		{ Reflectance = 0.07, Transparency = 0.48, CastShadow = false }
-	)
+	-- Dense at the surface, progressively clearer toward the termination.
+	local shaft = height - tip
+	for band = 0, 3 do
+		local t = band / 3
+		local body = part(
+			parent,
+			at * CFrame.new(0, shaft * (band + 0.5) / 4, 0),
+			Vector3.new(width, shaft / 4, width),
+			STONE:Lerp(tint, t),
+			Enum.Material.Glass,
+			nil,
+			{ Reflectance = 0.07, Transparency = t * 0.36, CastShadow = false }
+		)
+		body.Name = "SapphireTransition"
+	end
 	for i = 0, 3 do
 		local frame = at * CFrame.Angles(0, i * math.pi / 2, 0)
 		local facet = Instance.new("CornerWedgePart")
@@ -850,6 +856,22 @@ end
 -- The silhouette is a floating crystal island, not a skirt of hanging needles.
 local function underside(parent, centre: CFrame, radius: number, depth: number, rng: Random)
 	local m = folder(parent, "SapphireFoundation")
+	-- A shallow opaque-to-clear bevel joins the circular top to its broad roots.
+	-- It stays below the walkable plane, preserving all existing paths.
+	local bevelDepth = math.min(depth * 0.1, 6)
+	for band = 0, 3 do
+		local t = band / 3
+		local bevel = disc(
+			m,
+			centre * CFrame.new(0, -1.05 - bevelDepth * (band + 0.5) / 4, 0),
+			radius * (1 - t * 0.1),
+			bevelDepth / 4,
+			STONE:Lerp(SAPPHIRE, t),
+			Enum.Material.Glass
+		)
+		bevel.Name = "SapphireShoulder"
+		bevel.Transparency, bevel.Reflectance, bevel.CastShadow = t * 0.24, 0.06, false
+	end
 	-- The broad core connects the rim to one substantial lower termination.
 	sapphire(
 		m,
@@ -1075,9 +1097,9 @@ end
 local function islet(parent, at: CFrame, radius: number, rng: Random, topper: string)
 	local m = folder(parent, "Islet")
 	local crown = disc(m, at * CFrame.new(0, -0.5, 0), radius, 1.4, STONE, Enum.Material.Glass)
-	crown.Transparency, crown.Reflectance, crown.CastShadow = 0.32, 0.08, false
-	local cap = disc(m, at * CFrame.new(0, 0.25, 0), radius * 0.85, 0.2, SAPPHIRE_LIGHT, Enum.Material.Glass)
-	cap.Transparency, cap.CastShadow = 0.55, false
+	crown.Transparency, crown.Reflectance, crown.CastShadow = 0, 0.06, false
+	local cap = disc(m, at * CFrame.new(0, 0.25, 0), radius * 0.85, 0.2, STONE, Enum.Material.Glass)
+	cap.Transparency, cap.CastShadow = 0, false
 	underside(m, at, radius, radius * 1.4, rng)
 	if topper == "Tree" then
 		sapphire(m, at * CFrame.Angles(0, 0.4, 0.12), radius * 0.55, radius * 0.7, SAPPHIRE)
@@ -1135,7 +1157,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 
 	-- Smooth, solid sapphire supports normal movement; facets sit beneath it.
 	local surface = solid(disc(ground, at * CFrame.new(0, -1, 0), ISLAND + 6, 2, STONE, Enum.Material.Glass))
-	surface.Transparency, surface.Reflectance, surface.CastShadow = 0.18, 0.06, false
+	surface.Transparency, surface.Reflectance, surface.CastShadow = 0, 0.06, false
 	for i = 1, 42 do
 		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(16, ISLAND - 6)
 		part(
