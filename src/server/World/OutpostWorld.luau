@@ -781,7 +781,7 @@ local STONE_DARK = Color3.fromRGB(73, 132, 187)
 local CLIFF = Color3.fromRGB(70, 143, 221)
 local SAPPHIRE = Color3.fromRGB(112, 187, 245)
 local SAPPHIRE_LIGHT = Color3.fromRGB(211, 242, 255)
-local ISLAND = 112 -- the island's walkable radius (Shared.Outpost.Radius)
+local ISLAND = 164 -- the island's walkable radius (Shared.Outpost.Radius)
 
 -- Retain the starter deck; the rest of the island is an open mining field.
 local RINGS = {
@@ -799,7 +799,10 @@ local RINGS = {
 -- Shared route definitions keep both paving and mining clearance aligned.
 local ROUTES = {
 	Vector3.new(-56, 0, 22), -- starter field
-	Vector3.new(0, 0, -90), -- open mining grounds
+	Vector3.new(0, 0, -132), -- open mining grounds
+	Vector3.new(132, 0, 12), -- east overlook
+	Vector3.new(-132, 0, 12), -- west overlook
+	Vector3.new(0, 0, 132), -- outer promenade
 	Vector3.new(0, 0, 74), -- arrival
 	Vector3.new(-82, 0, 60), -- market
 	Vector3.new(84, 0, 60), -- leaderboard
@@ -1159,8 +1162,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			Enum.Material.Glass
 		)
 	end
-	underside(ground, at, ISLAND + 6, 70, rng)
-	local rimSegments = 28
+	underside(ground, at, ISLAND + 6, 100, rng)
+	local rimSegments = 40
 	for i = 0, rimSegments - 1 do
 		local a0, a1 = i / rimSegments * math.pi * 2, (i + 1) / rimSegments * math.pi * 2
 		local from = (at * CFrame.new(math.cos(a0) * (ISLAND + 2), 0, math.sin(a0) * (ISLAND + 2))).Position
@@ -1260,6 +1263,84 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	do
 		column(decor, at * CFrame.new(c[1], 0, c[2]), c[3], c[4], c[5])
 	end
+	-- An outer promenade makes the expansion explorable without moving services.
+	local outer = folder(root, "SapphirePromenade")
+	local scenicClear = {}
+	for i = 0, 63 do
+		local a, b = i / 64 * math.pi * 2, (i + 1) / 64 * math.pi * 2
+		local p = (at * CFrame.new(math.cos(a) * 132, 0.09, math.sin(a) * 132)).Position
+		local q = (at * CFrame.new(math.cos(b) * 132, 0.09, math.sin(b) * 132)).Position
+		local frame = CFrame.lookAt((p + q) / 2, q)
+		part(outer, frame, Vector3.new(8, 0.14, (p - q).Magnitude + 0.2), STONE_DARK, Enum.Material.Marble)
+		if i % 2 == 0 then
+			for _, side in { -1, 1 } do
+				part(
+					outer,
+					frame * CFrame.new(side * 3.6, 0.12, 0),
+					Vector3.new(0.2, 0.08, 2),
+					GLOW,
+					Enum.Material.Neon
+				)
+			end
+		end
+	end
+	-- Large mineral clusters outside the path act as landmarks, not ore nodes.
+	for i = 0, 5 do
+		local angle = (i + 0.5) / 6 * math.pi * 2
+		local x, z = math.cos(angle) * 150, math.sin(angle) * 150
+		local anchor = at * CFrame.new(x, 0, z) * CFrame.Angles(0, angle, 0)
+		table.insert(scenicClear, { Vector3.new(x, 0, z), 16 })
+		for j = -1, 1 do
+			local height = if j == 0 then 24 else 13
+			local crystalAt = anchor * CFrame.new(j * 7, 0, math.abs(j) * 3)
+			sapphire(outer, crystalAt, if j == 0 then 11 else 8, height, SAPPHIRE:Lerp(SAPPHIRE_LIGHT, (j + 1) * 0.15))
+			local blocker = solid(
+				part(
+					outer,
+					crystalAt * CFrame.new(0, height * 0.35, 0),
+					Vector3.new(7, height * 0.7, 7),
+					STONE,
+					nil,
+					nil,
+					{ Transparency = 1 }
+				)
+			)
+			blocker.CastShadow = false
+		end
+	end
+	-- Two broad crystal gateways frame the northern mining grounds.
+	for _, x in { -65, 65 } do
+		local archAt = at * CFrame.new(x, 0, -116)
+		for _, side in { -1, 1 } do
+			local foot = archAt * CFrame.new(side * 14, 0, 0)
+			sapphire(outer, foot, 7, 22, SAPPHIRE_LIGHT)
+			solid(part(outer, foot * CFrame.new(0, 9, 0), Vector3.new(6, 18, 6), STONE, Enum.Material.Glass))
+			table.insert(scenicClear, { Vector3.new(x + side * 14, 0, -116), 9 })
+		end
+		part(outer, archAt * CFrame.new(0, 20, 0), Vector3.new(29, 5, 7), STONE, Enum.Material.Glass)
+		part(outer, archAt * CFrame.new(0, 17.4, 0), Vector3.new(23, 0.2, 0.5), GLOW, Enum.Material.Neon)
+	end
+	-- Resting overlooks with benches on the open sides of the promenade.
+	for _, side in { -1, 1 } do
+		local terrace = at * CFrame.new(side * 145, 0, 0)
+		disc(outer, terrace * CFrame.new(0, 0.1, 0), 11, 0.2, STONE_DARK, Enum.Material.Marble)
+		table.insert(scenicClear, { Vector3.new(side * 145, 0, 0), 15 })
+		for _, z in { -6, 6 } do
+			local bench = terrace * CFrame.new(0, 1.8, z)
+			solid(part(outer, bench, Vector3.new(8, 0.6, 2.5), STEEL, Enum.Material.Metal))
+			for _, leg in { -3, 3 } do
+				solid(
+					part(
+						outer,
+						bench * CFrame.new(leg, -0.9, 0),
+						Vector3.new(0.6, 1.8, 2),
+						HULL_DARK,
+						Enum.Material.Metal
+					)
+				)
+			end
+		end
+	end
 	-- The field uses real standard mining nodes, not decorative imitation rocks.
 	local keepClear = {
 		{ Vector3.new(0, 0, 74), 16 },
@@ -1268,6 +1349,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ Vector3.new(84, 0, 60), 14 },
 		{ Vector3.new(70, 0, -56), 14 },
 	}
+	for _, spot in scenicClear do
+		table.insert(keepClear, spot)
+	end
 	for _, spec in RINGS do
 		table.insert(keepClear, { spec.At, spec.Radius + 8 })
 	end
@@ -1291,6 +1375,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 	local function clear(x: number, z: number): boolean
 		local here = Vector3.new(x, 0, z)
+		if math.abs(here.Magnitude - 132) < 10 then
+			return false
+		end
 		for _, spot in keepClear do
 			if (here - Vector3.new(spot[1].X, 0, spot[1].Z)).Magnitude < spot[2] then
 				return false
@@ -1308,8 +1395,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 	-- All standard rock types now appear naturally across the open field.
 	local fieldSpots = {}
-	for x = -100, 100, 12 do
-		for z = -100, 100, 12 do
+	for x = -ISLAND + 12, ISLAND - 12, 12 do
+		for z = -ISLAND + 12, ISLAND - 12, 12 do
 			local px, pz = x + rng:NextNumber(-1, 1), z + rng:NextNumber(-1, 1)
 			if px * px + pz * pz <= (ISLAND - 10) ^ 2 and clear(px, pz) then
 				local spot = at * CFrame.new(px, 0.08, pz) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0)
@@ -1363,7 +1450,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		local a = spec[1]
 		islet(
 			far,
-			at * CFrame.new(math.cos(a) * spec[2], spec[3], math.sin(a) * spec[2]),
+			at * CFrame.new(math.cos(a) * (spec[2] + 95), spec[3], math.sin(a) * (spec[2] + 95)),
 			spec[4],
 			Random.new(i * 31),
 			spec[5]
