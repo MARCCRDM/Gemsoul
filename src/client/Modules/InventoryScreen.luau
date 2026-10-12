@@ -2522,6 +2522,13 @@ local slotPanel: Frame? = nil
 local slotPanelBody: Frame? = nil
 local slotPanelKey = ""
 local buildSlotPanel, fillSlotPanel
+-- Picking a replacement for the open slot: compare it in the slot window.
+local function comparing(): boolean
+	local pick = selection
+	return contextSlot ~= nil
+		and pick ~= nil
+		and ((pick.Kind == "Gem" and pick.Gem.Cut ~= nil) or (pick.Kind == "Spare" and pick.Slot == contextSlot))
+end
 
 -- The slot window: the picked piece and its gem as two big sockets side by
 -- side (tap one to browse replacements, or drop one from the drawer onto
@@ -2633,6 +2640,52 @@ buildSlotPanel = function()
 	round(ui.Remove, 6)
 	stroke(ui.Remove, C.PanelEdge, 1)
 	ui.Remove:SetAttribute("UiSound", "Back")
+	-- Comparing a replacement: confirm it, or keep what's on.
+	ui.Confirm = new("TextButton", {
+		Text = "EQUIP",
+		TextSize = 12,
+		Font = HEADING,
+		TextColor3 = P.Frame,
+		BackgroundColor3 = P.Gold,
+		AutoButtonColor = true,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -14, 1, -10),
+		Size = UDim2.fromOffset(150, 26),
+		ZIndex = 11,
+		Visible = false,
+	}, slotPanel)
+	round(ui.Confirm, 6)
+	ui.Confirm:SetAttribute("UiSound", "Confirm")
+	ui.Cancel = new("TextButton", {
+		Text = "KEEP CURRENT",
+		TextSize = 10,
+		Font = HEADING,
+		TextColor3 = C.Dim,
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -172, 1, -10),
+		Size = UDim2.fromOffset(110, 26),
+		ZIndex = 11,
+		Visible = false,
+	}, slotPanel)
+	ui.Cancel:SetAttribute("UiSound", "Back")
+	ui.Cancel.Activated:Connect(function()
+		selection = nil
+		draw()
+	end)
+	ui.Confirm.Activated:Connect(function()
+		local pick = selection
+		if not pick or not contextSlot then
+			return
+		end
+		if pick.Kind == "Gem" then
+			request("SocketGem", pick.Gem.Id, contextSlot)
+		elseif pick.Kind == "Spare" then
+			request("EquipGear", Slots.Definitions[pick.Slot].Kind, pick.Id)
+		end
+		selection = nil
+		draw()
+	end)
 	ui.Remove.Activated:Connect(function()
 		if contextSlot then
 			request("UnsocketGem", contextSlot)
@@ -2662,32 +2715,51 @@ buildSlotPanel = function()
 	panelUi = ui
 end
 
-fillSlotPanel = function(slot: string)
+fillSlotPanel = function(slot: string, pick)
 	local loadout = loadoutNow()
-	local id = loadout[slot]
-	local gem = loadout[slot .. "Gem"]
-	local key = string.format("%s|%s|%s|%d", slot, tostring(id), tostring(gem and gem.Id), previewVersion)
+	local wornId = loadout[slot]
+	local wornGem = loadout[slot .. "Gem"]
+	-- A replacement picked in the drawer is shown in place, against what's on.
+	local newPiece = pick and pick.Kind == "Spare" and pick.Slot == slot and pick.Id or nil
+	local newGem = pick and pick.Kind == "Gem" and pick.Gem or nil
+	local id = newPiece or wornId
+	local gem = if newGem
+		then newGem
+		elseif newPiece then (loadout.ItemGems and loadout.ItemGems[slot] and loadout.ItemGems[slot][newPiece])
+		else wornGem
+	local key = string.format("%s|%s|%s|%s|%d", slot, tostring(id), tostring(gem and gem.Id), pickKey(), previewVersion)
 	if key == slotPanelKey then
 		return
 	end
 	slotPanelKey = key
 	local ui = panelUi
-	local gear = gearOf(loadout, slot)
-	local rarity = if gear then rarityOf(loadout, slot) else 1
+	local comparing = newPiece ~= nil or newGem ~= nil
+	local gear = gearOf(loadout, slot, id)
+	local rarity = if gear then rarityOf(loadout, slot, id) else 1
 	local color = rarityColor(rarity)
-	ui.Title.Text = SLOT_LABEL[slot] .. "  ·  EQUIPPED"
+	ui.Title.Text = if newPiece then SLOT_LABEL[slot] .. "  ·  TRY ON"
+		elseif newGem then SLOT_LABEL[slot] .. "  ·  TRY THIS GEM"
+		else SLOT_LABEL[slot] .. "  ·  EQUIPPED"
+	ui.Title.TextColor3 = if comparing then P.Gold else C.Dim
 	-- The piece.
 	clear(ui.Armor.Art)
 	ui.Armor.Empty.Visible = gear == nil
 	ui.Armor.Tint.Color = ColorSequence.new(P.Frame, P.Frame:Lerp(color, 0.3))
-	ui.Armor.Edge.Color = if gear then color else C.PanelEdge
+	ui.Armor.Edge.Color = if newPiece then P.Gold elseif gear then color else C.PanelEdge
 	if gear then
-		gearArt(ui.Armor.Art, slot, id, true, color)
+		gearArt(ui.Armor.Art, slot, id, newPiece == nil, color)
 	end
 	ui.Armor.Name.Text = if gear then gear.Name else "No " .. string.lower(SLOT_LABEL[slot])
-	ui.Armor.Sub.Text = if gear then string.upper(rarityName(rarity)) .. "  ·  TAP TO SWAP" else "TAP TO PICK ONE"
-	ui.Armor.Sub.TextColor3 = if gear then color else C.Dim
-	local roll = GearRolls.get(loadout, slot)
+	if newPiece then
+		local gain = ratingGain(loadout, slot, newPiece)
+		local worn = gearOf(loadout, slot)
+		ui.Armor.Sub.Text = (if gain > 0 then "▲ +" .. gain elseif gain < 0 then "▼ " .. gain else "=") .. " RATING  ·  NOW " .. string.upper(worn and worn.Name or "EMPTY")
+		ui.Armor.Sub.TextColor3 = if gain > 0 then C.Good elseif gain < 0 then C.Bad else C.Dim
+	else
+		ui.Armor.Sub.Text = if gear then string.upper(rarityName(rarity)) .. "  ·  TAP TO SWAP" else "TAP TO PICK ONE"
+		ui.Armor.Sub.TextColor3 = if gear then color else C.Dim
+	end
+	local roll = GearRolls.get(loadout, slot, id)
 	local stats = {}
 	for stat, amount in roll and roll.Stats or {} do
 		table.insert(stats, statText(stat, amount))
@@ -2700,20 +2772,40 @@ fillSlotPanel = function(slot: string)
 	ui.Gem.Empty.Visible = gem == nil
 	local gColor = if gem then gemColor(gem) else C.PanelEdge
 	ui.Gem.Tint.Color = ColorSequence.new(P.Frame, P.Frame:Lerp(gColor, if gem then 0.45 else 0))
-	ui.Gem.Edge.Color = gColor
+	ui.Gem.Edge.Color = if newGem then P.Gold else gColor
 	if gem then
 		gemArt(ui.Gem.Art, gem)
 	end
 	ui.Gem.Name.Text = if gem then gemName(gem) else "Empty socket"
-	ui.Gem.Sub.Text = if gem
-		then string.upper(GemConfig.elementName(gem.Element)) .. "  ·  " .. string.upper(rarityName(gemRarity(gem))) .. "  ·  TAP TO CHANGE"
-		else "TAP TO ADD A GEM"
-	ui.Gem.Sub.TextColor3 = if gem then gColor else C.Dim
+	if newGem then
+		ui.Gem.Sub.Text = if wornGem then "REPLACES " .. string.upper(gemName(wornGem)) else "INTO THE EMPTY SOCKET"
+		ui.Gem.Sub.TextColor3 = P.Gold
+	else
+		ui.Gem.Sub.Text = if gem
+			then string.upper(GemConfig.elementName(gem.Element)) .. "  ·  " .. string.upper(rarityName(gemRarity(gem))) .. "  ·  TAP TO CHANGE"
+			else "TAP TO ADD A GEM"
+		ui.Gem.Sub.TextColor3 = if gem then gColor else C.Dim
+	end
 	ui.Gem.Detail.Text = if gem then string.format("SIZE %s  ·  CLARITY %s  ·  CUT %s", tostring(gem.Size or "-"), tostring(gem.Clarity or "-"), tostring(gem.Cut or "-")) else "Enchanting is pure gain"
 	ui.Gem.Detail.TextColor3 = if gem then C.Dim else C.Faint
+	if newPiece then
+		-- Gems live in their piece: say where the current one goes.
+		ui.Gem.Sub.Text = if gem then "THIS PIECE'S GEM" else "THIS PIECE HAS NO GEM"
+		ui.Gem.Sub.TextColor3 = C.Dim
+		local worn = gearOf(loadout, slot)
+		if wornGem and worn then
+			ui.Gem.Detail.Text = gemName(wornGem) .. " stays on " .. worn.Name
+			ui.Gem.Detail.TextColor3 = C.Dim
+		end
+	end
 	ui.Link.TextColor3 = if gem then gColor else C.Faint
-	ui.Remove.Visible = gem ~= nil
-	-- The perk, with what the gem adds to it.
+	-- The foot: confirm a replacement, or remove the gem that's on.
+	ui.Remove.Visible = not comparing and wornGem ~= nil
+	ui.Confirm.Visible = comparing
+	ui.Cancel.Visible = comparing
+	ui.Confirm.Text = if newGem then "ENCHANT " .. SLOT_LABEL[slot] else "EQUIP " .. string.upper(gear and gear.Name or "")
+	ui.Hint.Visible = not comparing
+	-- The perk, with what the gem adds to it (when comparing: now -> then).
 	local signature = ArmorSignatures.resolve(roll, gem)
 	if signature then
 		local d = signature.Definition
@@ -2723,7 +2815,12 @@ fillSlotPanel = function(slot: string)
 		ui.PerkName.Text = "PERK  ·  " .. string.upper(d.Name)
 		ui.PerkValue.TextSize = 14
 		ui.PerkText.Text = d.Trigger
-		if gem and signature.Value > signature.Base + 1e-6 then
+		local current = ArmorSignatures.resolve(GearRolls.get(loadout, slot), wornGem)
+		if comparing and current and current.Id == signature.Id then
+			local better = signature.Value >= current.Value - 1e-6
+			ui.PerkValue.Text = string.format('NOW %s  →  <font color="#%s">%s</font>', fmt(current.Value), (if better then C.Good else C.Bad):ToHex(), fmt(signature.Value))
+			ui.PerkNote.Text = if better then "STRONGER" else "WEAKER"
+		elseif gem and signature.Value > signature.Base + 1e-6 then
 			ui.PerkValue.Text = string.format('%s  →  <font color="#%s">%s</font>', fmt(signature.Base), gColor:ToHex(), fmt(signature.Value))
 			ui.PerkNote.Text = "ENCHANTED BY " .. string.upper(gemName(gem))
 		else
@@ -2741,7 +2838,7 @@ fillSlotPanel = function(slot: string)
 				table.insert(parts, l.Text)
 			end
 			ui.PerkValue.Text = string.format('<font color="#%s">%s</font>', gColor:ToHex(), table.concat(parts, "  ·  "))
-			ui.PerkNote.Text = "ENCHANTED BY " .. string.upper(gemName(gem))
+			ui.PerkNote.Text = if newGem then "WITH " .. string.upper(gemName(gem)) else "ENCHANTED BY " .. string.upper(gemName(gem))
 		else
 			ui.PerkValue.Text = ""
 			ui.PerkNote.Text = "ADD A GEM TO ENCHANT IT"
@@ -2881,11 +2978,11 @@ local function drawRight()
 	if not slotPanel then
 		buildSlotPanel()
 	end
-	local reviewing = contextSlot ~= nil and selection == nil
+	local reviewing = contextSlot ~= nil and (selection == nil or comparing())
 	slotPanel.Visible = reviewing
 	if reviewing then
 		at(slotPanel, centre - reach + 8, BODY_Y + 52, 2 * reach - 16, stageH - 88)
-		fillSlotPanel(contextSlot :: string)
+		fillSlotPanel(contextSlot :: string, if comparing() then selection else nil)
 	else
 		slotPanelKey = ""
 	end
@@ -3011,10 +3108,10 @@ local function drawRight()
 	local keep = if old and pageTab == tab then old.CanvasPosition else nil
 	pageKey, pageTab = key or "", tab
 	clear(page)
-	if selection and not drawOverview(page, selection) then
+	if selection and not comparing() and not drawOverview(page, selection) then
 		selection = nil
 	end
-	if selection then
+	if selection and not comparing() then
 		footer.Text = "✕ TO GO BACK"
 	elseif tab == "Gems" then
 		drawGems()
@@ -3049,6 +3146,16 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
 	for _, ui in surgeKeys do ElementCardFX.update(ui.FX, ui.ElementFX, now) end
 	StageBackdrop.update(stageBackdrop, now)
 	if radar then StatRadar.step(radar, 1 / 30) end
+	-- An empty socket on a worn piece breathes gold: the next thing to do.
+	local worn = loadoutNow()
+	local pulse = 0.5 + 0.5 * math.sin(now * 4)
+	for slot, card in wornCards do
+		if card.Compact and worn[slot] and not worn[slot .. "Gem"] then
+			card.SocketEdge.Color = P.Gold
+			card.SocketEdge.Transparency = 0.6 - 0.6 * pulse
+			card.SocketEdge.Thickness = 1.5
+		end
+	end
 end)
 function draw()
 	if drawQueued then
