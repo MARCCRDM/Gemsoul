@@ -1772,7 +1772,7 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 			line(holder, 3, string.upper(passive.Name or "PASSIVE"), 10, C.Dim, BOLD)
 			line(holder, 4, passive.Text, 12, C.Text)
 		end
-		line(holder, 5, "GEM SOCKET", 10, C.Dim, BOLD)
+		line(holder, 5, if gem then "GEM SOCKET  ·  " .. string.upper(gemName(gem)) else "GEM SOCKET", 10, if gem then gemColor(gem) else C.Dim, BOLD)
 		if gem then
 			local name, effect = GemConfig.enchantment(gem, slot)
 			if signatureName ~= "" then
@@ -1780,14 +1780,25 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 			end
 			line(holder, 6, string.format("%s: %s", name, effect), 12, gemColor(gem), BOLD)
 		else
-			line(holder, 6, "Empty. Drag a cut gem from GEMS onto this piece.", 12, C.Dim)
+			line(holder, 6, "Empty. Pick a gem on the right, or drag one onto this piece.", 12, C.Dim)
 		end
 		local pickGem = {
-			"PICK A GEM",
+			if gem then "CHANGE GEM" else "ADD GEM",
+			gem == nil,
+			function()
+				selection = nil
+				contextSlot, contextKey = slot, nil
+				tab, gemFilter = "Gems", "All"
+				draw()
+			end,
+		}
+		local swapPiece = {
+			"SWAP",
 			false,
 			function()
 				selection = nil
-				tab = "Gems"
+				contextSlot, contextKey = slot, nil
+				tab, armorFilter = "Armor", slot
 				draw()
 			end,
 		}
@@ -1805,17 +1816,18 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 			})
 		elseif gem then
 			actions(holder, 9, {
+				pickGem,
+				swapPiece,
 				{
-					"REMOVE GEM",
+					"REMOVE",
 					false,
 					function()
 						request("UnsocketGem", slot)
 					end,
 				},
-				pickGem,
 			})
 		else
-			actions(holder, 9, { pickGem })
+			actions(holder, 9, { pickGem, swapPiece })
 		end
 		return true
 	end
@@ -2502,6 +2514,9 @@ end
 -- scroll position when it is.
 local pageKey, pageTab = "", ""
 local statCard: Frame? = nil
+local slotPanel: Frame? = nil
+local slotPanelBody: Frame? = nil
+local slotPanelKey = ""
 local statChips: Frame? = nil
 local statChipValues: { [string]: TextLabel } = {}
 local radarShown = false
@@ -2565,7 +2580,7 @@ local function drawRight()
 
 	-- The gear tiles: three a side, close to the body.
 	local centre = stageLeft + stageWidth / 2
-	local reach = math.min(250, stageWidth * 0.2)
+	local reach = math.min(270, stageWidth * 0.25)
 	local loadout = loadoutNow()
 	local spares = spareItems()
 	for slot, card in wornCards do
@@ -2624,6 +2639,40 @@ local function drawRight()
 		card.Upgrade.Visible = better
 		card.Upgrade.Position = UDim2.fromOffset(x + TILE - 14, y - 4)
 		card.Upgrade.Size = UDim2.fromOffset(18, 16)
+	end
+
+	-- The picked slot's review window, centred between the gear tiles: what
+	-- it is, its gem and perk, and the buttons to change them (the drawer
+	-- lists the replacements).
+	if not slotPanel then
+		slotPanel = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 10, Visible = false }, left)
+		round(slotPanel, 10)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(24, 34, 50), Color3.fromRGB(12, 18, 28)) }, slotPanel)
+		stroke(slotPanel, P.Gold, 1.5, 0.2)
+		slotPanelBody = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 14), Size = UDim2.new(1, -24, 1, -24), ZIndex = 11 }, slotPanel)
+	end
+	local reviewing = contextSlot ~= nil and selection == nil
+	slotPanel.Visible = reviewing
+	if reviewing then
+		at(slotPanel, centre - reach + 8, BODY_Y + 56, 2 * reach - 16, stageH - 96)
+		local key = string.format("%s|%s|%s|%d", contextSlot, tostring(loadout[contextSlot]), tostring(loadout[contextSlot .. "Gem"] and loadout[contextSlot .. "Gem"].Id), previewVersion)
+		if key ~= slotPanelKey then
+			slotPanelKey = key
+			clear(slotPanelBody)
+			if not drawOverview(slotPanelBody, { Kind = "Worn", Slot = contextSlot }) then
+				local empty = label(slotPanelBody, "No " .. string.lower(SLOT_LABEL[contextSlot]) .. " equipped.\nPick one from ARMOR on the right.", 13, C.Dim, BOLD)
+				empty.Size = UDim2.fromScale(1, 1)
+				empty.TextXAlignment = Enum.TextXAlignment.Center
+				empty.TextWrapped = true
+			end
+			for _, d in slotPanelBody:GetDescendants() do
+				if d:IsA("GuiObject") then
+					d.ZIndex = 11
+				end
+			end
+		end
+	else
+		slotPanelKey = ""
 	end
 
 	-- Q/E/R: icon, name, gem and costs; the description is in its details.
