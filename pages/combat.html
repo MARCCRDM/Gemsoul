@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Combat — SAGA MINERS</title>
+<meta name="description" content="Saga Miners — a Roblox mining and melee RPG. Mine gems, forge your kit, duel players, fight bosses.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css"></head>
+<body>
+<header><div class="bar">
+<a class="logo" href="../index.html">SAGA MINERS</a>
+<nav><a href="../index.html">Home</a><a href="../elements.html">Elements</a><a href="../gems.html">Gems</a><a href="../combat.html" class=on>Combat</a><a href="../armor.html">Armor</a><a href="../bosses.html">Bosses</a><a href="../market.html">Market</a><a href="../guide.html">Field Guide</a></nav>
+<button id="music">&#9835; THEME</button>
+<audio id="tune" loop src="../menu_theme.ogg"></audio>
+</div></header>
+<main class="wrap">
+<div class="top"><p class="crumb"><a href="../index.html">&#9664; HOME</a></p>
+<h1><span class="grad">COMBAT — THE KIT</span></h1></div>
+<p class="sub">The whole kit is five verbs. Depth lives in your sockets, not your button bar — every move below has a skill expression.</p>
+<table>
+  <tr><th>INPUT</th><th>ACTION</th><th>RESOURCE</th><th>THE SKILL</th></tr>
+  <tr><td>Tap / Hold-Release</td><td>Light / Heavy attack</td><td>Light free · Heavy 15 Stamina</td><td><b>Perfect Release</b>: release the heavy on the beat and the Stamina cost is refunded.</td></tr>
+  <tr><td>Hold Block</td><td>Raise shield</td><td>Stamina per hit absorbed</td><td><b>Timed block</b> — raise just before impact and the cost is halved. At 0 Stamina: guard-break.</td></tr>
+  <tr><td>Dodge</td><td>Directional dash</td><td>20 Stamina</td><td>Universal move with brief i-frames. 1.5s cooldown. Never an unlock.</td></tr>
+  <tr><td>Q</td><td>Strike surge (offense)</td><td>Charge + cooldown</td><td>Only Strike-role Surge gems socket here.</td></tr>
+  <tr><td>E</td><td>Guard surge (defense cast)</td><td>Charge + cooldown</td><td>Unlocks at level 5. Walls, zones, counters.</td></tr>
+  <tr><td>R</td><td>Shift surge (movement)</td><td>Charge + cooldown</td><td>Unlocks at level 10. Repositioning wins duels.</td></tr>
+</table>
+<section>
+  <h2 class="sec">CHARGE 2.0 — EARN YOUR SURGES</h2>
+  <div class="grid g2">
+    <div class="card"><img class="wide" src="images/02-charge-2.jpg" alt="Charge meter">
+      <h3>LANDED HITS ONLY</h3><p>Charge builds only when your attacks connect. The bigger the surge, the more of the bar it drinks. <b>Aggression is the economy</b> — you cannot turtle your way to a wall of ice.</p></div>
+    <div class="card"><img class="wide" src="images/03-stamina-is-your-guard.jpg" alt="Stamina guard">
+      <h3>STAMINA IS YOUR GUARD</h3><p>Three consumers — heavy, block, dodge — one bar. Spend it all and your guard shatters open. Blocking everything is a choice with a bill; dodging everything is a budget. Manage the bar, win the fight.</p></div>
+  </div>
+</section>
+<section>
+  <h2 class="sec">DUELS — FIRST TO 2, PIVOT BETWEEN ROUNDS</h2>
+  <div class="kv">
+    <div class="card"><b>MATCH FORMAT</b>First to 2 round wins, max 3 rounds. Sixty-second rounds in the starter bracket.</div>
+    <div class="card"><b>THE 30-SECOND PIVOT</b>Between rounds you may only swap to one of your 3 saved loadout presets — no mid-match editing. Both lock, then builds reveal.</div>
+    <div class="card"><b>SCOUTING</b>You see the elements your opponent used in the round just played. That's the whole intel game — read the colors, counter-build.</div>
+    <div class="card"><b>NORMALIZED ARENA</b>In Ranked and Casual, Health, Charge and Stamina are fixed, all 9 sockets open regardless of level, passive augments off. Your gear and your reads are the edge.</div>
+    <div class="card"><b>OUTPOST CHALLENGES</b>Direct duels both players accept — full progression counts. Consensual flexing: bring your level 40 chassis to the parking lot.</div>
+    <div class="card"><b>YOUR PRESETS</b>Three builds, saved between fights. A preset is a full kit: armor, gems, the works. Composing them is half the game.</div>
+  </div>
+</section>
+</main>
+<footer>
+<a class="logo" href="../index.html">SAGA MINERS</a><br><br>
+<a href="../index.html">Home</a> <a href="../elements.html">Elements</a> <a href="../gems.html">Gems</a>
+<a href="../combat.html">Combat</a> <a href="../armor.html">Armor</a> <a href="../bosses.html">Bosses</a>
+<a href="../market.html">Market</a> <a href="../guide.html">Field Guide</a>
+<p style="margin-top:14px">A Roblox mining &amp; melee RPG. Every gem was dug by a real player.<br>
+<span style="color:var(--amber);font-weight:800">LOOKING FOR PLAYTESTERS</span> &mdash; this site documents the playtest build.</p>
+</footer>
+<script>const b=document.getElementById('music'),a=document.getElementById('tune');
+b.onclick=()=>{if(a.paused){a.volume=.45;a.play();b.classList.add('playing')}else{a.pause();b.classList.remove('playing')}};</script>
+</body></html>

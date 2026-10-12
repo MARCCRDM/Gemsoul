@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Armor — SAGA MINERS</title>
+<meta name="description" content="Saga Miners — a Roblox mining and melee RPG. Mine gems, forge your kit, duel players, fight bosses.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css"></head>
+<body>
+<header><div class="bar">
+<a class="logo" href="../index.html">SAGA MINERS</a>
+<nav><a href="../index.html">Home</a><a href="../elements.html">Elements</a><a href="../gems.html">Gems</a><a href="../combat.html">Combat</a><a href="../armor.html" class=on>Armor</a><a href="../bosses.html">Bosses</a><a href="../market.html">Market</a><a href="../guide.html">Field Guide</a></nav>
+<button id="music">&#9835; THEME</button>
+<audio id="tune" loop src="../menu_theme.ogg"></audio>
+</div></header>
+<main class="wrap">
+<div class="top"><p class="crumb"><a href="../index.html">&#9664; HOME</a></p>
+<h1><span class="grad">ARMOR — PICK YOUR FAMILY</span></h1></div>
+<p class="sub">Three armor families, five slots, five rarities: <b>75 pieces</b>, each with base stats and one permanent innate trait. No crafting — armor comes from bosses and the Market, full stop.</p>
+<div class="grid g3">
+  <div class="card"><img class="wide" src="images/style_Prospector.png" alt="Prospector">
+    <h3>PROSPECTOR</h3><p>The mining family. Sustain and utility: Stamina, Charge and HP recovery tied to combo hits, timed guards and clean dodges. Traits like <i>Surveyor's Sense</i> — land 3 alternating hits, restore Charge.</p></div>
+  <div class="card"><img class="wide" src="images/style_Skirmisher.png" alt="Skirmisher">
+    <h3>SKIRMISHER</h3><p>The duelist family. Mobility and crit payoffs off flanks, dodges and perfect releases. For players who treat the arena like a fencing mat.</p></div>
+  <div class="card"><img class="wide" src="images/style_Juggernaut.png" alt="Juggernaut">
+    <h3>JUGGERNAUT</h3><p>The wall family. Block-and-heavy payoffs: absorption, knockback reduction, threat and control. When the Juggernaut raises the shield, the fight asks you a question.</p></div>
+</div>
+<section>
+  <h2 class="sec">WHAT A PIECE CARRIES</h2>
+  <div class="grid g2">
+    <div class="card"><img class="wide" src="images/01-armor-families.png" alt="Armor families">
+      <h3>BASE STATS + SET BONUS</h3><p>Budget grows by rarity (10 / 15 / 22 / 30 / 40 points) into Health, Power, Defense, Speed and Crit. Wear <b>4 pieces of a family for the set bonus</b> — the 2-piece and 6-piece tiers are retired.</p></div>
+    <div class="card"><img class="wide" src="images/02-helmet-designs.png" alt="Helmet designs">
+      <h3>ONE INNATE TRAIT, FOREVER</h3><p>Every piece has a permanent, gem-independent trait with its own trigger — timed guards, clean dodges, alternating combos. Remove the gem, keep the identity. Higher rarities get juicier triggers.</p></div>
+  </div>
+</section>
+<section>
+  <h2 class="sec">TRIGGER VOCABULARY</h2>
+  <p class="sub">Traits speak a shared language you learn once: <b>timed guard</b> (block at the last instant), <b>clean dodge</b> (i-frames confirm the avoid), <b>alternating hits</b> (weave your swings), <b>flank</b> (hit from behind). Sustain traits are capped and earned — no free healing exists.</p>
+  <div class="grid g3">
+    <div class="poster"><img src="images/04-shield-designs.png" alt="Shields"></div>
+    <div class="poster"><img src="images/06-boot-designs.png" alt="Boots"></div>
+    <div class="poster"><img src="images/08-set-bonuses.jpg" alt="Set bonuses"></div>
+  </div>
+</section>
+</main>
+<footer>
+<a class="logo" href="../index.html">SAGA MINERS</a><br><br>
+<a href="../index.html">Home</a> <a href="../elements.html">Elements</a> <a href="../gems.html">Gems</a>
+<a href="../combat.html">Combat</a> <a href="../armor.html">Armor</a> <a href="../bosses.html">Bosses</a>
+<a href="../market.html">Market</a> <a href="../guide.html">Field Guide</a>
+<p style="margin-top:14px">A Roblox mining &amp; melee RPG. Every gem was dug by a real player.<br>
+<span style="color:var(--amber);font-weight:800">LOOKING FOR PLAYTESTERS</span> &mdash; this site documents the playtest build.</p>
+</footer>
+<script>const b=document.getElementById('music'),a=document.getElementById('tune');
+b.onclick=()=>{if(a.paused){a.volume=.45;a.play();b.classList.add('playing')}else{a.pause();b.classList.remove('playing')}};</script>
+</body></html>
