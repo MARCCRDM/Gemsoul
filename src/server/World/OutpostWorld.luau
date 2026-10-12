@@ -776,11 +776,11 @@ end
 
 -- The Skyport: a compact floating island ------------------------------------------------
 
-local STONE = Color3.fromRGB(61, 116, 180) -- polished sapphire walking surface
-local STONE_DARK = Color3.fromRGB(24, 57, 110)
-local CLIFF = Color3.fromRGB(17, 36, 89)
-local SAPPHIRE = Color3.fromRGB(33, 91, 207)
-local SAPPHIRE_LIGHT = Color3.fromRGB(102, 198, 255)
+local STONE = Color3.fromRGB(147, 204, 239) -- pale polished sapphire walking surface
+local STONE_DARK = Color3.fromRGB(73, 132, 187)
+local CLIFF = Color3.fromRGB(70, 143, 221)
+local SAPPHIRE = Color3.fromRGB(112, 187, 245)
+local SAPPHIRE_LIGHT = Color3.fromRGB(211, 242, 255)
 local ISLAND = 112 -- the island's walkable radius (Shared.Outpost.Radius)
 
 -- The mining rings, one per kind of ground (Shared.Outpost.Zones): where
@@ -815,7 +815,8 @@ local RINGS = {
 	},
 }
 
--- Opaque faceted crystals: no transparent overdraw or per-crystal lights.
+-- Clear blue glass with pale facets; fewer overlapping roots keep the
+-- silhouette translucent rather than building into a dark, solid blue mass.
 -- Corner wedges meet at a single point above a four-sided prism.
 local function sapphire(parent, at: CFrame, width: number, height: number, tint: Color3)
 	local tip = height * 0.4
@@ -826,7 +827,7 @@ local function sapphire(parent, at: CFrame, width: number, height: number, tint:
 		tint,
 		Enum.Material.Glass,
 		nil,
-		{ Reflectance = 0.12 }
+		{ Reflectance = 0.07, Transparency = 0.48, CastShadow = false }
 	)
 	for i = 0, 3 do
 		local frame = at * CFrame.Angles(0, i * math.pi / 2, 0)
@@ -837,8 +838,10 @@ local function sapphire(parent, at: CFrame, width: number, height: number, tint:
 		facet.Anchored = true
 		facet.CanCollide, facet.CanTouch, facet.CanQuery = false, false, false
 		facet.Material = Enum.Material.Glass
-		facet.Color = tint:Lerp(SAPPHIRE_LIGHT, i * 0.08)
-		facet.Reflectance = 0.12
+		facet.Color = tint:Lerp(SAPPHIRE_LIGHT, 0.18 + i * 0.12)
+		facet.Reflectance = 0.09
+		facet.Transparency = 0.28 + (i % 2) * 0.1
+		facet.CastShadow = false
 		facet.Parent = parent
 	end
 end
@@ -847,7 +850,7 @@ end
 local function underside(parent, centre: CFrame, radius: number, depth: number, rng: Random)
 	local m = folder(parent, "SapphireFoundation")
 	for ring = 0, 2 do
-		local count = if ring == 0 then 1 else 12 + ring * 6
+		local count = if ring == 0 then 1 else 8 + ring * 4
 		for i = 1, count do
 			local angle = i / count * math.pi * 2 + ring * 0.19
 			local distance = radius * ring * 0.32
@@ -858,7 +861,7 @@ local function underside(parent, centre: CFrame, radius: number, depth: number, 
 			sapphire(
 				m,
 				frame,
-				radius * rng:NextNumber(0.32, 0.43),
+				radius * rng:NextNumber(0.24, 0.32),
 				height,
 				CLIFF:Lerp(SAPPHIRE, rng:NextNumber(0.15, 0.85))
 			)
@@ -1076,8 +1079,10 @@ end
 -- A small floating islet off the edge: ground, an underside and something on top.
 local function islet(parent, at: CFrame, radius: number, rng: Random, topper: string)
 	local m = folder(parent, "Islet")
-	disc(m, at * CFrame.new(0, -0.5, 0), radius, 1.4, STONE, Enum.Material.Glass)
-	disc(m, at * CFrame.new(0, 0.25, 0), radius * 0.85, 0.2, SAPPHIRE, Enum.Material.Glass)
+	local crown = disc(m, at * CFrame.new(0, -0.5, 0), radius, 1.4, STONE, Enum.Material.Glass)
+	crown.Transparency, crown.Reflectance, crown.CastShadow = 0.32, 0.08, false
+	local cap = disc(m, at * CFrame.new(0, 0.25, 0), radius * 0.85, 0.2, SAPPHIRE_LIGHT, Enum.Material.Glass)
+	cap.Transparency, cap.CastShadow = 0.55, false
 	underside(m, at, radius, radius * 1.4, rng)
 	if topper == "Tree" then
 		sapphire(m, at * CFrame.Angles(0, 0.4, 0.12), radius * 0.35, radius * 1.4, SAPPHIRE)
@@ -1134,7 +1139,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local ground = folder(root, "Ground")
 
 	-- Smooth, solid sapphire supports normal movement; facets sit beneath it.
-	solid(disc(ground, at * CFrame.new(0, -1, 0), ISLAND + 6, 2, STONE, Enum.Material.Glass))
+	local surface = solid(disc(ground, at * CFrame.new(0, -1, 0), ISLAND + 6, 2, STONE, Enum.Material.Glass))
+	surface.Transparency, surface.Reflectance, surface.CastShadow = 0.18, 0.06, false
 	for i = 1, 42 do
 		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(16, ISLAND - 6)
 		part(
