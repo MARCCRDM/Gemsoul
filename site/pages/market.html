@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market — SAGA MINERS</title>
+<meta name="description" content="Saga Miners — a Roblox mining and melee RPG. Mine gems, forge your kit, duel players, fight bosses.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css"></head>
+<body>
+<header><div class="bar">
+<a class="logo" href="../index.html">SAGA MINERS</a>
+<nav><a href="../index.html">Home</a><a href="../elements.html">Elements</a><a href="../gems.html">Gems</a><a href="../combat.html">Combat</a><a href="../armor.html">Armor</a><a href="../bosses.html">Bosses</a><a href="../market.html" class=on>Market</a><a href="../guide.html">Field Guide</a></nav>
+<button id="music">&#9835; THEME</button>
+<audio id="tune" loop src="../menu_theme.ogg"></audio>
+</div></header>
+<main class="wrap">
+<div class="top"><p class="crumb"><a href="../index.html">&#9664; HOME</a></p>
+<h1><span class="grad">THE MARKET — RUN BY PLAYERS</span></h1></div>
+<p class="sub">There is no vendor. Every gem, every armor piece on the Market was mined or fought for by a real player — and the gems carry the miner's name.</p>
+<div class="grid g3">
+  <div class="card"><img class="wide" src="images/07-the-market.jpg" alt="">
+    <h3>SELL YOUR SURPLUS</h3><p>Duplicate drops, wrong elements, lazy rolls — someone else's build is starving for exactly them. Listings that never sell expire and vendor at a floor price, so the market stays clean.</p></div>
+  <div class="card"><img class="wide" src="images/01-socket-your-gems.jpg" alt="">
+    <h3>BUY YOUR EDGE</h3><p>The Arena is normalized — but gear is the intended edge. PvE players supply, PvPers buy, miners scale. Everyone has a profession.</p></div>
+  <div class="card"><img class="wide" src="images/10-mine-deeper.jpg" alt="">
+    <h3>MINE TO ORDER</h3><p>Deeper veins roll rarer stones. Mining Charges cap at 50 and refill 1 every 2 minutes — bring a plan, not a macro.</p></div>
+</div>
+<section>
+  <h2 class="sec">THE SINKS THAT KEEP IT HONEST</h2>
+  <div class="kv">
+    <div class="card"><b>FUSION</b>Coins sink into upgrading stones — 3 into 1, 27 Commons into an Ultra Rare.</div>
+    <div class="card"><b>RECUT</b>Change a stone's Kind without losing its quality. Priced above Fusion so it never becomes the cheap shortcut.</div>
+    <div class="card"><b>EXPIRED LISTINGS</b>Unsold gear vendors out at a floor price — supply can't pile up forever.</div>
+    <div class="card"><b>COMMISSIONS ARE SELLER-FUNDED</b>Dropper commissions come out of the sale, not minted from thin air. No inflation.</div>
+  </div>
+</section>
+<section class="cta">
+  <h2>YOUR NAME, ON SOMEONE'S LEGENDARY</h2>
+  <p>Mine deep, and the stones you sell carry your signature into other players' kits. The Market remembers who found what — first sale pays the finder's commission.</p>
+</section>
+</main>
+<footer>
+<a class="logo" href="../index.html">SAGA MINERS</a><br><br>
+<a href="../index.html">Home</a> <a href="../elements.html">Elements</a> <a href="../gems.html">Gems</a>
+<a href="../combat.html">Combat</a> <a href="../armor.html">Armor</a> <a href="../bosses.html">Bosses</a>
+<a href="../market.html">Market</a> <a href="../guide.html">Field Guide</a>
+<p style="margin-top:14px">A Roblox mining &amp; melee RPG. Every gem was dug by a real player.<br>
+<span style="color:var(--amber);font-weight:800">LOOKING FOR PLAYTESTERS</span> &mdash; this site documents the playtest build.</p>
+</footer>
+<script>const b=document.getElementById('music'),a=document.getElementById('tune');
+b.onclick=()=>{if(a.paused){a.volume=.45;a.play();b.classList.add('playing')}else{a.pause();b.classList.remove('playing')}};</script>
+</body></html>

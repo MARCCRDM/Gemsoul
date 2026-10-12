@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Elements — SAGA MINERS</title>
+<meta name="description" content="Saga Miners — a Roblox mining and melee RPG. Mine gems, forge your kit, duel players, fight bosses.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css"></head>
+<body>
+<header><div class="bar">
+<a class="logo" href="../index.html">SAGA MINERS</a>
+<nav><a href="../index.html">Home</a><a href="../elements.html" class=on>Elements</a><a href="../gems.html">Gems</a><a href="../combat.html">Combat</a><a href="../armor.html">Armor</a><a href="../bosses.html">Bosses</a><a href="../market.html">Market</a><a href="../guide.html">Field Guide</a></nav>
+<button id="music">&#9835; THEME</button>
+<audio id="tune" loop src="../menu_theme.ogg"></audio>
+</div></header>
+<main class="wrap">
+<div class="top"><p class="crumb"><a href="../index.html">&#9664; HOME</a></p>
+<h1><span class="grad">THE FOUR ELEMENTS</span></h1></div>
+<p class="sub">Every gem, every armor drop, every boss belongs to one of four elements. Read the colors and you read the fight.</p>
+<div class="grid g2">
+  <div class="card el-thermal"><img class="wide" src="images/1-Fire.png" alt="Tung Tung Tung Sahur, the Thermal boss">
+    <span class="chip t">THERMAL</span><span class="chip">BOSS: TUNG TUNG TUNG SAHUR</span><span class="chip">WEAK TO CRYO</span>
+    <h3>BURN &amp; PRESSURE</h3><p>The commitment element. Burns stack pressure over time — fight the Thermal boss and you learn to read windups or cook.
+    <b>On your sword:</b> burn on hit. <b>On your shield:</b> blocked damage reflected back.</p></div>
+  <div class="card el-cryo"><img class="wide" src="images/2-Frost.png" alt="Tralalero Tralala, the Cryo boss">
+    <span class="chip c">CRYO</span><span class="chip">BOSS: TRALALERO TRALALA</span><span class="chip">WEAK TO ION</span>
+    <h3>FREEZE &amp; CONTROL</h3><p>The patience element. Chills slow everything they touch — including you.
+    <b>On your sword:</b> slow on hit. <b>On your shield:</b> an absorb barrier that recharges.</p></div>
+  <div class="card el-ion"><img class="wide" src="images/4-Shock.png" alt="Bombardiro Crocodilo, the Ion boss">
+    <span class="chip i">ION</span><span class="chip">BOSS: BOMBARDIRO CROCODILO</span><span class="chip">WEAK TO CORROSIVE</span>
+    <h3>CHAIN &amp; INTERRUPT</h3><p>The tempo element. Lightning chains between targets and interrupts.
+    <b>On your sword:</b> hits arc to a second target. <b>On your shield:</b> a chance to negate a hit entirely.</p></div>
+  <div class="card el-corrosive"><img class="wide" src="images/3-Poison.png" alt="Brr Brr Patapim, the Corrosive boss">
+    <span class="chip o">CORROSIVE</span><span class="chip">BOSS: BRR BRR PATAPIM</span><span class="chip">WEAK TO THERMAL</span>
+    <h3>ROT &amp; SHRED</h3><p>The attrition element. Corrosion makes everything take more damage.
+    <b>On your sword:</b> targets take +5% damage from all sources. <b>On your shield:</b> cleanse a debuff on block.</p></div>
+</div>
+<section>
+  <h2 class="sec">THE COUNTER CYCLE</h2>
+  <p class="sub">Each element beats the next — counters deal 25% more damage. There is no best element, only the right one for the round you just lost.</p>
+  <div class="cycle">
+    <span class="n" style="border-color:var(--thermal);color:var(--thermal)">THERMAL</span><span class="b">beats &#9654;</span>
+    <span class="n" style="border-color:var(--cryo);color:var(--cryo)">CRYO</span><span class="b">beats &#9654;</span>
+    <span class="n" style="border-color:var(--ion);color:var(--ion)">ION</span><span class="b">beats &#9654;</span>
+    <span class="n" style="border-color:var(--corrosive);color:var(--corrosive)">CORROSIVE</span><span class="b">beats &#9654;</span>
+    <span class="n" style="border-color:var(--thermal);color:var(--thermal)">THERMAL</span>
+  </div>
+</section>
+<section>
+  <h2 class="sec">REACTIONS</h2>
+  <p class="sub">Elements don't just stack — they collide. Mixed-element kits (your starter kit is always 2–3 elements, never mono) can trigger reactions when opposing effects meet. Frozen, then shattered. Burning, then rotted. The combo is the damage.</p>
+  <div class="grid g2">
+    <div class="card"><img class="wide" src="images/04-elemental-reactions.jpg" alt="Elemental reaction"><h3>MIX &amp; COLLIDE</h3><p>Watch for the reaction window when two opposing element effects land on the same target.</p></div>
+    <div class="card"><img class="wide" src="images/05-the-four-elements.jpg" alt="Four elements chart"><h3>READ THE COLORS</h3><p>Opponent gear shows its element per lane. Scouting is literally "what color beat me?"</p></div>
+  </div>
+</section>
+<section>
+  <h2 class="sec">ATTUNEMENT</h2>
+  <p class="sub">Stack matching Core gems in your armor and you attune to the element:
+  <b>2 matching Cores = +10% resist.</b> <b>4 matching Cores (Pure) = +20% resist and +10% to that element's stat</b> — Power for Thermal, Vitality for Cryo, Haste for Ion, Precision for Corrosive. Attunement is the only resistance source in the game, so it's a real identity choice.</p>
+</section>
+</main>
+<footer>
+<a class="logo" href="../index.html">SAGA MINERS</a><br><br>
+<a href="../index.html">Home</a> <a href="../elements.html">Elements</a> <a href="../gems.html">Gems</a>
+<a href="../combat.html">Combat</a> <a href="../armor.html">Armor</a> <a href="../bosses.html">Bosses</a>
+<a href="../market.html">Market</a> <a href="../guide.html">Field Guide</a>
+<p style="margin-top:14px">A Roblox mining &amp; melee RPG. Every gem was dug by a real player.<br>
+<span style="color:var(--amber);font-weight:800">LOOKING FOR PLAYTESTERS</span> &mdash; this site documents the playtest build.</p>
+</footer>
+<script>const b=document.getElementById('music'),a=document.getElementById('tune');
+b.onclick=()=>{if(a.paused){a.volume=.45;a.play();b.classList.add('playing')}else{a.pause();b.classList.remove('playing')}};</script>
+</body></html>

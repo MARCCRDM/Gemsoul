@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bosses — SAGA MINERS</title>
+<meta name="description" content="Saga Miners — a Roblox mining and melee RPG. Mine gems, forge your kit, duel players, fight bosses.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css"></head>
+<body>
+<header><div class="bar">
+<a class="logo" href="../index.html">SAGA MINERS</a>
+<nav><a href="../index.html">Home</a><a href="../elements.html">Elements</a><a href="../gems.html">Gems</a><a href="../combat.html">Combat</a><a href="../armor.html">Armor</a><a href="../bosses.html" class=on>Bosses</a><a href="../market.html">Market</a><a href="../guide.html">Field Guide</a></nav>
+<button id="music">&#9835; THEME</button>
+<audio id="tune" loop src="../menu_theme.ogg"></audio>
+</div></header>
+<main class="wrap">
+<div class="top"><p class="crumb"><a href="../index.html">&#9664; HOME</a></p>
+<h1><span class="grad">THE BOSSES</span></h1></div>
+<p class="sub">One boss per element, each built to teach its element's language. Fighting the Frost boss is the Cryo tutorial nobody has to read.</p>
+<div class="grid g2">
+  <div class="card el-thermal"><img class="wide" src="images/1-Fire.png" alt="">
+    <span class="chip t">THERMAL</span><span class="chip">WEAK TO CRYO</span>
+    <h3>TUNG TUNG TUNG SAHUR</h3><p>Commitment and pressure. Visible windups, punishing damage — the fight that teaches you to respect a telegraph.</p></div>
+  <div class="card el-cryo"><img class="wide" src="images/2-Frost.png" alt="">
+    <span class="chip c">CRYO</span><span class="chip">WEAK TO ION</span>
+    <h3>TRALALERO TRALALA</h3><p>Control and tempo. Slows and freezes punish greedy approaches.</p></div>
+  <div class="card el-ion"><img class="wide" src="images/4-Shock.png" alt="">
+    <span class="chip i">ION</span><span class="chip">WEAK TO CORROSIVE</span>
+    <h3>BOMBARDIRO CROCODILO</h3><p>Chains and interrupts. Position badly and the whole room shares your pain.</p></div>
+  <div class="card el-corrosive"><img class="wide" src="images/3-Poison.png" alt="">
+    <span class="chip o">CORROSIVE</span><span class="chip">WEAK TO THERMAL</span>
+    <h3>BRR BRR PATAPIM</h3><p>Attrition and rot. Long fight, ticking stacks — cleanse or drown.</p></div>
+</div>
+<section>
+  <h2 class="sec">DUNGEONS</h2>
+  <div class="grid g2">
+    <div class="card"><img class="wide" src="images/dungeon.png" alt="">
+      <h3>BOSS DUNGEONS</h3><p>Solo or group, multiple difficulties. Group loot priority goes by contribution — the top contributors pick first.</p></div>
+    <div class="card"><img class="wide" src="images/clash.png" alt="">
+      <h3>PATHWAY DUNGEONS</h3><p>3–4 players, a generated path of rooms, a hard time limit, and a Colossus at the end. Built for a squad night.</p></div>
+  </div>
+</section>
+<section>
+  <h2 class="sec">LOOT: PICK ONE</h2>
+  <div class="grid g2">
+    <div class="card"><img class="wide" src="images/06-boss-loot-pick-one.jpg" alt="Pick one">
+      <h3>FIVE DROP. YOU TAKE ONE.</h3><p>Every kill reveals a pool of 5 armor pieces, rarity-weighted and leaning toward the boss's element. You pick exactly one. The other four flow into the <b>player-run Market</b> — that's where the economy's armor stock comes from. First 3 pools a day grant picks; after that kills pay coins.</p></div>
+    <div class="card"><img class="wide" src="images/07-the-market.jpg" alt="Market">
+      <h3>THE DROPPER COMMISSION</h3><p>When a piece from your pool <b>first sells</b>, the pool's earners collect ~5% of the sale, split by contribution. First sale only — resale is nobody's business. Being a supplier is a profession: your kills keep paying after you log off.</p></div>
+  </div>
+</section>
+</main>
+<footer>
+<a class="logo" href="../index.html">SAGA MINERS</a><br><br>
+<a href="../index.html">Home</a> <a href="../elements.html">Elements</a> <a href="../gems.html">Gems</a>
+<a href="../combat.html">Combat</a> <a href="../armor.html">Armor</a> <a href="../bosses.html">Bosses</a>
+<a href="../market.html">Market</a> <a href="../guide.html">Field Guide</a>
+<p style="margin-top:14px">A Roblox mining &amp; melee RPG. Every gem was dug by a real player.<br>
+<span style="color:var(--amber);font-weight:800">LOOKING FOR PLAYTESTERS</span> &mdash; this site documents the playtest build.</p>
+</footer>
+<script>const b=document.getElementById('music'),a=document.getElementById('tune');
+b.onclick=()=>{if(a.paused){a.volume=.45;a.play();b.classList.add('playing')}else{a.pause();b.classList.remove('playing')}};</script>
+</body></html>
