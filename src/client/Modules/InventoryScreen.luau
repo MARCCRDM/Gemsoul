@@ -320,6 +320,7 @@ local armorFilter = "All"
 local gemFilter = "All"
 local contextSlot: string? = nil
 local contextKey: string? = nil
+local stashOpen = false -- the drawer opened on its own (not for a slot or key)
 local previewVersion = 0
 local dropTargets: { any } = {}
 local drag: { Item: any, Start: Vector2, Active: boolean, Touch: boolean, Ghost: Frame? }? = nil
@@ -843,11 +844,32 @@ contextClose.Activated:Connect(function()
 end)
 local function closeInventoryPicker()
 	InventoryScreen.cancelDrag()
-	contextSlot, contextKey, selection = nil, nil, nil
+	contextSlot, contextKey, selection, stashOpen = nil, nil, nil, false
 	tab, armorFilter = "Gems", "All"
 	draw()
 end
 modalDismiss.Activated:Connect(closeInventoryPicker)
+-- Opens the stash drawer on its own (gems and armor, no slot picked).
+local stashButton = new("TextButton", {
+	Text = "GEMS & ARMOR  ▸",
+	TextSize = 11,
+	Font = HEADING,
+	TextColor3 = C.Text,
+	BackgroundColor3 = C.Card,
+	BackgroundTransparency = 0.1,
+	AutoButtonColor = true,
+	AnchorPoint = Vector2.new(1, 0),
+	Size = UDim2.fromOffset(150, 28),
+	ZIndex = 8,
+}, left)
+round(stashButton, 14)
+stroke(stashButton, P.Teal, 1, 0.3)
+stashButton:SetAttribute("UiSound", "Open")
+stashButton.Activated:Connect(function()
+	stashOpen = true
+	tab = "Gems"
+	draw()
+end)
 local pickerClose = new("TextButton", {
 	Text = "X", Font = BOLD, TextSize = 12, TextColor3 = C.Text, BackgroundColor3 = C.Card,
 }, right)
@@ -2138,8 +2160,13 @@ for order, spec in
 			"INVENTORY",
 			true,
 			function()
+				-- The stash, opened or closed.
 				selection = nil
 				tab = "Gems"
+				stashOpen = not (stashOpen or contextSlot ~= nil or contextKey ~= nil)
+				if not stashOpen then
+					contextSlot, contextKey = nil, nil
+				end
 				draw()
 			end,
 		},
@@ -2281,8 +2308,9 @@ local function drawLeft()
 			-- The Armory: your active miner fills the stage; the other two wait
 			-- in the top corners, a tap away.
 			local goal = {
-				Position = UDim2.fromScale(({ [0] = 0.09, [1] = 0.5, [2] = 0.91 })[position], if on then 0.53 else 0.21),
-				Size = UDim2.fromScale(if on then 0.62 else 0.15, if on then 1.0 else 0.4),
+				Position = UDim2.fromScale(({ [0] = 0.07, [1] = 0.5, [2] = 0.93 })[position], if on then 0.53 else 0.21),
+				-- The active miner keeps one size as the stage widens or narrows.
+				Size = if on then UDim2.new(0, 440, 1, 0) else UDim2.fromScale(0.11, 0.4),
 			}
 			card.Button.ZIndex = if on then 3 else 2
 			card.Tween = TweenService:Create(card.Button, TweenInfo.new(if first then 0 else 0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), goal)
@@ -2474,37 +2502,130 @@ end
 -- scroll position when it is.
 local pageKey, pageTab = "", ""
 local statCard: Frame? = nil
+local statChips: Frame? = nil
+local statChipValues: { [string]: TextLabel } = {}
+local radarShown = false
+local lastOpen = nil -- the drawer's last state, for its slide
+local TILE = 76
+local TILE_SIDE = { Helmet = { 1, 1 }, Armor = { 1, 2 }, Gloves = { 1, 3 }, Weapon = { 2, 1 }, Shield = { 2, 2 }, Boots = { 2, 3 } }
+-- { key, caption, width, colour }
+local STAT_CHIPS = {
+	{ "Total", "RATING", 108, P.Gold },
+	{ "Health", "HP", 84, STAT.Health },
+	{ "Power", "PWR", 84, STAT.Power },
+	{ "Defense", "DEF", 84, STAT.Defense },
+	{ "Speed", "SPD", 84, STAT.Speed },
+	{ "Set", "SET", 78, P.Gold },
+}
 local function drawRight()
  local profile = profileNow()
  if require(ReplicatedStorage.Shared.Tutorial).Enabled and profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
   tab, gemFilter = "Gems", "All"
+  stashOpen = true
  end
 	if tab == "Overview" then
 		tab = "Gems"
 	end
 	inventoryModal.Visible = true
+	-- The Armory: the miner owns the screen. Gear is six small tiles beside
+	-- the body; tapping one slides the drawer (the stash) in from the right,
+	-- and the stage makes room for it. Closed, the screen stays calm.
+	local open = contextSlot ~= nil or contextKey ~= nil or selection ~= nil or stashOpen
+	local drawerH = PANEL_H - BODY_Y
 	right.Visible = true
-	-- The inventory lines up with the gear column: top of the helmet card to
-	-- the foot of the shield card.
-	local rightH = 5 * 88 + 84
-	at(right, RIGHT_X, ROSTER_H + BODY_Y, RIGHT_W, rightH)
-	at(page, 12, 94, RIGHT_W - 24, rightH - 94 - 40)
-	at(footerLine, 12, rightH - 38, RIGHT_W - 24, 1)
-	at(footer, 12, rightH - 32, RIGHT_W - 24, 20)
+	right.Size = UDim2.fromOffset(RIGHT_W, drawerH)
+	local drawerAt = UDim2.fromOffset(if open then RIGHT_X else W + 24, ROSTER_H + BODY_Y)
+	at(page, 12, 94, RIGHT_W - 24, drawerH - 94 - 40)
+	at(footerLine, 12, drawerH - 38, RIGHT_W - 24, 1)
+	at(footer, 12, drawerH - 32, RIGHT_W - 24, 20)
 	footer.TextWrapped = false
 	footer.TextTruncate = Enum.TextTruncate.AtEnd
 	contextClose.Visible = false
-	pickerClose.Visible = contextSlot ~= nil or contextKey ~= nil or selection ~= nil
-	-- Gear down the left, the miner in the middle, the inventory on the right.
-	local stageWidth = RIGHT_X - 12 - MID_X
+	pickerClose.Visible = true
+	local stageLeft = 18
+	local stageWidth = (if open then RIGHT_X - 12 else W - 18) - stageLeft
 	left.Size = UDim2.fromOffset(W, PANEL_H)
-	-- The miner takes the height; one stats card and slim Q/E/R under it.
 	local stageH, surgeH = 422, 96
-	at(portrait, MID_X, BODY_Y, stageWidth, stageH)
-	stageTag.Size = UDim2.fromOffset(stageWidth - 24, 14)
-	at(surgeCell, MID_X, BODY_Y + stageH + 6, stageWidth, surgeH)
-	at(setSummary, MID_X, BODY_Y + stageH + surgeH + 8, stageWidth, 20)
+	local stageSize = UDim2.fromOffset(stageWidth, stageH)
+	if open ~= lastOpen then
+		local first = lastOpen == nil
+		lastOpen = open
+		local info = TweenInfo.new(if first then 0 else 0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		TweenService:Create(right, info, { Position = drawerAt }):Play()
+		TweenService:Create(portrait, info, { Size = stageSize }):Play()
+	end
+	portrait.Position = UDim2.fromOffset(stageLeft, BODY_Y)
+	-- The set count is a chip now (SET); the header names the set.
+	stageTag.Visible = false
+	at(surgeCell, stageLeft, BODY_Y + stageH + 6, stageWidth, surgeH)
+	at(setSummary, stageLeft, BODY_Y + stageH + surgeH + 8, stageWidth, 20)
 	scouting.Visible = false
+	stashButton.Visible = not open
+	stashButton.Position = UDim2.fromOffset(stageLeft + stageWidth - 12, BODY_Y + 12)
+
+	-- The gear tiles: three a side, close to the body.
+	local centre = stageLeft + stageWidth / 2
+	local reach = math.min(250, stageWidth * 0.2)
+	local loadout = loadoutNow()
+	local spares = spareItems()
+	for slot, card in wornCards do
+		local side = TILE_SIDE[slot]
+		local x = if side[1] == 1 then centre - reach - TILE else centre + reach
+		local y = BODY_Y + 70 + (side[2] - 1) * (TILE + 34)
+		local target = UDim2.fromOffset(x, y)
+		if card.TileAt ~= target then
+			card.TileAt = target
+			TweenService:Create(card.Cell, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Position = target }):Play()
+		end
+		if not card.Compact then
+			card.Compact = true
+			card.Cell.Size = UDim2.fromOffset(TILE, TILE)
+			card.Cell.ZIndex = 4
+			for _, child in card.Cell:GetChildren() do
+				if child:IsA("GuiObject") then
+					local keep = child == card.GearWell
+						or child == card.Socket
+						or (child:IsA("TextButton") and child.Text == "")
+						or string.sub(child.Name, 1, 9) == "Elemental"
+					if not keep then
+						child.Visible = false
+					end
+				end
+			end
+			at(card.GearWell, 5, 5, TILE - 10, TILE - 10)
+			at(card.Art, 4, 4, TILE - 18, TILE - 18)
+			card.Socket.Visible = true
+			-- The gem as a diamond in the corner (empty: a dashed outline).
+			card.Socket.AnchorPoint = Vector2.new(0.5, 0.5)
+			card.Socket.Position = UDim2.new(1, -14, 1, -14)
+			card.Socket.Size = UDim2.fromOffset(13, 13)
+			card.Socket.Rotation = 45
+			card.TileLabel = label(left, SLOT_LABEL[slot], 9, C.Dim, BOLD)
+			card.TileLabel.TextXAlignment = Enum.TextXAlignment.Center
+			card.Upgrade = label(left, "▲", 12, C.Good, HEADING)
+			card.Upgrade.TextXAlignment = Enum.TextXAlignment.Center
+			card.Upgrade.ZIndex = 6
+		end
+		card.SocketIcon.Visible = false
+		local gem = loadout[slot .. "Gem"]
+		card.Socket.BackgroundColor3 = if gem then gemColor(gem) else P.Frame
+		card.SocketEdge.Color = if gem then gemColor(gem):Lerp(Color3.new(1, 1, 1), 0.4) else C.Faint
+		card.TileLabel.Position = UDim2.fromOffset(x - 10, y + TILE + 3)
+		card.TileLabel.Size = UDim2.fromOffset(TILE + 20, 12)
+		card.TileLabel.TextColor3 = if contextSlot == slot then P.Gold else C.Dim
+		-- A better piece waiting in the stash: a green arrow on the tile.
+		local better = false
+		for _, item in spares do
+			if item.Slot == slot and ratingGain(loadout, slot, item.Id) > 0 then
+				better = true
+				break
+			end
+		end
+		card.Upgrade.Visible = better
+		card.Upgrade.Position = UDim2.fromOffset(x + TILE - 14, y - 4)
+		card.Upgrade.Size = UDim2.fromOffset(18, 16)
+	end
+
 	-- Q/E/R: icon, name, gem and costs; the description is in its details.
 	local surgeWidth = (stageWidth - 40) / 3
 	for index, key in { "Q", "E", "R" } do
@@ -2514,27 +2635,28 @@ local function drawRight()
 		at(ui.Letter, 0, 0, 20, 20)
 		at(ui.IconMount, 7, 9, 48, 48)
 		at(ui.Name, 62, 5, surgeWidth - 92, 18)
-		at(ui.GemBadge, 62, 25, surgeWidth - 70, 18)
+		at(ui.GemBadge, 62, 25, math.min(220, surgeWidth - 70), 18)
 		at(ui.Art, 2, 0, 24, 18)
-		at(ui.Element, 29, 0, surgeWidth - 103, 18)
+		at(ui.Element, 29, 0, math.min(220, surgeWidth - 70) - 33, 18)
 		ui.Description.Visible = false
-		local chipWidth = (surgeWidth - 76) / 2
+		local chipWidth = math.min(110, (surgeWidth - 76) / 2)
 		at(ui.Charge, 62, 47, chipWidth, 14)
 		at(ui.Cooldown, 66 + chipWidth, 47, chipWidth, 14)
 		ui.Name.TextXAlignment = Enum.TextXAlignment.Left
 		at(ui.Info, 62, 47, surgeWidth - 70, 14)
 		ui.Info.TextWrapped = false
 	end
-	-- Stats: a radar chart of the build in the stage's lower-left corner.
+
+	-- Stats: chips across the top of the stage; RATING opens the radar.
 	if not statCard then
 		statCard = box(left, C.Card, 8)
 		stroke(statCard, C.PanelEdge, 1)
-		statCard.BackgroundTransparency = 0.15
+		statCard.BackgroundTransparency = 0.1
 		statCard.ZIndex = 8
 		for _, tile in statTiles do
 			tile.Tile.Visible = false
 		end
-		local caption = label(statCard, "RATING", 9, C.Dim, BOLD)
+		local caption = label(statCard, "BUILD", 9, C.Dim, BOLD)
 		at(caption, 10, 6, 80, 14)
 		caption.ZIndex = 9
 		radarRating = label(statCard, "0", 15, P.Gold, HEADING)
@@ -2550,11 +2672,48 @@ local function drawRight()
 			{ Name = "DEFENSE", Color = STAT.Defense },
 		}, 46, P.Teal)
 		radar.Frame.Position = UDim2.fromOffset(100 - 46, 30 + 28)
+		statChips = new("Frame", { BackgroundTransparency = 1, ZIndex = 8 }, left)
+		local list = UiKit.list(statChips, 6, true)
+		list.VerticalAlignment = Enum.VerticalAlignment.Center
+		for order, spec in STAT_CHIPS do
+			local chip = new("TextButton", {
+				Text = "",
+				AutoButtonColor = spec[1] == "Total",
+				BackgroundColor3 = C.Card,
+				BackgroundTransparency = 0.15,
+				Size = UDim2.fromOffset(spec[3], 24),
+				LayoutOrder = order,
+				ZIndex = 8,
+			}, statChips)
+			round(chip, 12)
+			stroke(chip, if spec[1] == "Total" then P.Gold else C.PanelEdge, 1, if spec[1] == "Total" then 0.2 else 0)
+			local name = label(chip, spec[2], 9, spec[4], BOLD)
+			at(name, 10, 0, 44, 24)
+			name.ZIndex = 9
+			local value = label(chip, "0", 13, C.Text, HEADING)
+			at(value, 10, 0, spec[3] - 20, 24)
+			value.TextXAlignment = Enum.TextXAlignment.Right
+			value.ZIndex = 9
+			statChipValues[spec[1]] = value
+			if spec[1] == "Total" then
+				chip:SetAttribute("UiSound", "Click")
+				chip.Activated:Connect(function()
+					radarShown = not radarShown
+					draw()
+				end)
+			end
+		end
 	end
+	statChips.Position = UDim2.fromOffset(stageLeft + 12, BODY_Y + 12)
+	statChips.Size = UDim2.fromOffset(stageWidth - 200, 26)
 	local cardH = 204
-	at(statCard, MID_X + 12, BODY_Y + stageH - cardH - 12, 200, cardH)
+	statCard.Visible = radarShown
+	at(statCard, stageLeft + 12, BODY_Y + 44, 200, cardH)
 	if radarStats then
 		local s = radarStats
+		for key, value in statChipValues do
+			value.Text = if key == "Set" then s.Set .. "/6" else whole(s[key] or 0)
+		end
 		local scale = math.max(150, s.Health, s.Power, s.Defense, s.Speed) * 1.05
 		StatRadar.set(radar, {
 			s.Health / scale,
