@@ -248,6 +248,8 @@ function StageBackdrop.create(stage: GuiObject)
 			Position = UDim2.fromScale(spot.X, spot.Y),
 			Size = UDim2.fromScale(spot.W, tall),
 			BackgroundColor3 = Color3.fromRGB(26, 32, 42),
+			-- A floor pad seen from above, not a solid button.
+			BackgroundTransparency = 0.45,
 		})
 		make("UICorner", { CornerRadius = UDim.new(1, 0) }, disc)
 		make("UIGradient", {
@@ -256,7 +258,7 @@ function StageBackdrop.create(stage: GuiObject)
 		}, disc)
 		local rim = make("UIStroke", {
 			Color = GOLD,
-			Thickness = if spot.Main then 2 else 1.5,
+			Thickness = if spot.Main then 1.5 else 1,
 			Transparency = if spot.Main then 0.15 else 0.45,
 		}, disc)
 		-- An energy ring pulsing out from under the main pedestal.

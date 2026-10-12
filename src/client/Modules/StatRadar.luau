@@ -91,14 +91,20 @@ function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3)
 	-- Names and values round the outside.
 	local labels = {}
 	for i, axis in axes do
-		local at = point(i, radius + 16)
+		-- Side labels sit beside their point, reading away from the web, so a
+		-- full stat's dot never lands under its own name.
+		local tip = point(i, radius)
+		local side = (tip - centre).X
+		local align = if side > 4 then 0 elseif side < -4 then 1 else 0.5
+		local at = if align == 0.5 then point(i, radius + 14) else tip + Vector2.new(if align == 0 then 8 else -8, 0)
 		local holder = make("Frame", {
 			BackgroundTransparency = 1,
-			AnchorPoint = Vector2.new(0.5, 0.5),
+			AnchorPoint = Vector2.new(align, 0.5),
 			Position = UDim2.fromOffset(at.X, at.Y),
-			Size = UDim2.fromOffset(70, 24),
+			Size = UDim2.fromOffset(50, 24),
 			ZIndex = z + 3,
 		}, chart)
+		local alignX = if align == 0 then Enum.TextXAlignment.Left elseif align == 1 then Enum.TextXAlignment.Right else Enum.TextXAlignment.Center
 		local name = make("TextLabel", {
 			BackgroundTransparency = 1,
 			Size = UDim2.new(1, 0, 0, 10),
@@ -106,6 +112,7 @@ function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3)
 			TextSize = 9,
 			Font = IronUi.Bold,
 			TextColor3 = axis.Color,
+			TextXAlignment = alignX,
 			ZIndex = z + 3,
 		}, holder)
 		local value = make("TextLabel", {
@@ -116,6 +123,7 @@ function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3)
 			TextSize = 13,
 			Font = IronUi.Heading,
 			TextColor3 = Color3.new(1, 1, 1),
+			TextXAlignment = alignX,
 			ZIndex = z + 3,
 		}, holder)
 		labels[i] = { Name = name, Value = value }
@@ -136,6 +144,36 @@ function StatRadar.create(parent: GuiObject, axes, radius: number, fill: Color3)
 		Dirty = true,
 	}
 	return radar
+end
+
+-- A value that just changed: its number flashes green or red and the
+-- change floats up beside it.
+function StatRadar.flash(radar, index: number, text: string, color: Color3)
+	local label = radar.Labels[index]
+	if not label then
+		return
+	end
+	local TweenService = game:GetService("TweenService")
+	label.Value.TextColor3 = color
+	TweenService:Create(label.Value, TweenInfo.new(1.2, Enum.EasingStyle.Quad), { TextColor3 = Color3.new(1, 1, 1) }):Play()
+	local pop = make("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, -2),
+		Size = UDim2.new(1, 0, 0, 12),
+		Text = text,
+		TextSize = 11,
+		Font = IronUi.Heading,
+		TextColor3 = color,
+		TextXAlignment = label.Value.TextXAlignment,
+		ZIndex = label.Value.ZIndex + 1,
+	}, label.Value.Parent)
+	TweenService:Create(pop, TweenInfo.new(1.1, Enum.EasingStyle.Quad), {
+		Position = UDim2.fromOffset(0, -16),
+		TextTransparency = 1,
+	}):Play()
+	task.delay(1.2, function()
+		pop:Destroy()
+	end)
 end
 
 function StatRadar.set(radar, values: { number }, texts: { string })

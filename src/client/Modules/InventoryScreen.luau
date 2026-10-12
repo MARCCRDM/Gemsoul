@@ -447,6 +447,9 @@ end
 -- Every change you make shows: a stat that goes up flashes green with its
 -- gain for a second (down: red). The first draw only sets the baseline.
 local lastStat: { [string]: number } = {}
+local RADAR_AXIS = { Health = 1, Power = 2, Speed = 3, Defense = 6 }
+local radar = nil -- the stat radar (built in drawRight)
+local radarRating: TextLabel? = nil
 local function flashStat(name: string, value: number)
 	local before = lastStat[name]
 	lastStat[name] = value
@@ -456,6 +459,15 @@ local function flashStat(name: string, value: number)
 	end
 	local gain = value - before
 	local color = if gain > 0 then P.Good else P.Bad
+	local text = string.format("%s%d", if gain > 0 then "+" else "", math.floor(gain + 0.5))
+	-- The stats live on the radar now: flash the value there.
+	local axis = RADAR_AXIS[name]
+	if radar and axis then
+		StatRadar.flash(radar, axis, text, color)
+	elseif name == "Rating" and radarRating then
+		radarRating.TextColor3 = color
+		game:GetService("TweenService"):Create(radarRating, TweenInfo.new(1.1), { TextColor3 = P.Gold }):Play()
+	end
 	tile.Value.TextColor3 = color
 	game:GetService("TweenService")
 		:Create(tile.Value, TweenInfo.new(1.1, Enum.EasingStyle.Quad), { TextColor3 = C.Text })
@@ -817,7 +829,7 @@ at(tabHolder, 16, 48, RIGHT_W - 32, 38)
 local contextTitle = at(label(right, "SHARED STASH", 14, C.Text, HEADING), 16, 10, RIGHT_W - 100, 28)
 local contextClose = new("TextButton", { Text = "BACK", Font = BOLD, TextSize = 11, TextColor3 = C.Dim, BackgroundColor3 = C.Card }, right)
 at(contextClose, RIGHT_W - 118, 10, 60, 28)
-contextTitle.Size = UDim2.fromOffset(RIGHT_W - 148, 28)
+contextTitle.Size = UDim2.fromOffset(RIGHT_W - 70, 28)
 round(contextClose, 4)
 contextClose.Activated:Connect(function()
 	if selection then
@@ -841,7 +853,15 @@ local pickerClose = new("TextButton", {
 }, right)
 at(pickerClose, RIGHT_W - 50, 10, 34, 28)
 round(pickerClose, 4)
-pickerClose.Activated:Connect(closeInventoryPicker)
+pickerClose.Activated:Connect(function()
+	-- One close: a picked item first, then the slot, back to the stash.
+	if selection then
+		selection = nil
+		draw()
+	else
+		closeInventoryPicker()
+	end
+end)
 UserInputService.InputBegan:Connect(function(input)
 	if hostGui and hostGui.Enabled and inventoryModal.Visible
 		and (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) then
@@ -1204,7 +1224,7 @@ local function drawGems()
 		elseif contextSlot then "CHOOSE A GEM TO ENCHANT YOUR " .. SLOT_LABEL[contextSlot]
 		elseif selection and selection.Kind == "Gem"
 		then string.upper(gemName(selection.Gem)) .. "  ·  TAP FOR DETAILS, OR DRAG IT ONTO A SOCKET"
-		else "DRAG A GEM ONTO GEAR OR Q · E · R"
+		else "TAP A GEM, OR DRAG IT ONTO GEAR"
 end
 
 -- ARMOR: spare gear, filtered by slot. Its 3D previews come from the server.
@@ -1328,17 +1348,16 @@ local function drawArmor()
 			local delta = at(
 				label(
 					card,
-					if gain > 0 then "▲ +" .. gain elseif gain < 0 then "▼ " .. gain else "= 0",
-					10,
+					if gain > 0 then "▲ +" .. gain .. " RATING" elseif gain < 0 then "▼ " .. gain .. " RATING" else "= SAME RATING",
+					9,
 					if gain > 0 then C.Good elseif gain < 0 then C.Bad else C.Dim,
 					BOLD
 				),
-				66,
-				66,
-				40,
-				18
+				6,
+				79,
+				90,
+				11
 			)
-			delta.TextXAlignment = Enum.TextXAlignment.Center
 			local equip = new("TextButton", {
 				Text = "EQUIP",
 				TextSize = 10,
@@ -1346,8 +1365,9 @@ local function drawArmor()
 				TextColor3 = P.Frame,
 				BackgroundColor3 = if gain > 0 then C.Good else P.Gold,
 				AutoButtonColor = true,
-				Position = UDim2.fromOffset(110, 64),
-				Size = UDim2.fromOffset(52, 22),
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, -6, 1, -6),
+				Size = UDim2.fromOffset(48, 20),
 			}, card)
 			round(equip, 4)
 			equip:SetAttribute("UiSound", "Confirm")
@@ -1374,11 +1394,10 @@ local function drawArmor()
 	local worn = armorFilter ~= "All" and gearOf(loadout, armorFilter)
 	footer.Text = if armorFilter ~= "All"
 		then string.format(
-			"CHOOSING %s  ·  WEARING %s  ·  TAP EQUIP TO SWAP",
-			SLOT_LABEL[armorFilter] or "",
+			"WEARING %s",
 			string.upper(worn and worn.Name or "NOTHING")
 		)
-		else "TAP EQUIP TO PUT A PIECE ON  ·  ▲ / ▼ = YOUR RATING CHANGE"
+		else "EQUIP TO PUT A PIECE ON"
 end
 
 -- OVERVIEW: what's picked, or a summary.
@@ -1755,6 +1774,39 @@ local function drawOverview(container: Instance, pick: Pick?): boolean
 				end },
 			})
 		end
+		-- Choosing for a worn piece: what the gem does there, nothing else.
+		if gem.Cut and contextSlot then
+			local name, effect = GemConfig.enchantment(gem, contextSlot)
+			local kind = ArmorSignatures.Slots[contextSlot]
+			local roll = kind and loadout.GearRolls and loadout.GearRolls[kind] and loadout.GearRolls[kind][loadout[contextSlot]]
+			local signatureName, signatureEffect = ArmorSignatures.describe(roll, gem)
+			if signatureName ~= "" then
+				name, effect = signatureName, signatureEffect
+			else
+				-- No signature to boost: list what Size, Clarity and Cut give here.
+				local parts = {}
+				for _, l in GemConfig.lines(gem, contextSlot) do
+					table.insert(parts, l.Text)
+				end
+				if #parts > 0 then
+					effect = table.concat(parts, "\n")
+				end
+			end
+			line(holder, 2, "ON YOUR " .. SLOT_LABEL[contextSlot], 10, color, BOLD)
+			line(holder, 3, name, 14, C.Text, BOLD)
+			line(holder, 4, effect, 12, C.Text)
+			local old = loadout[contextSlot .. "Gem"]
+			line(
+				holder,
+				6,
+				if old
+					then "Replaces " .. gemName(old) .. " (it returns to your stash)."
+					else "This socket is empty: enchanting it is pure gain.",
+				11,
+				C.Dim
+			)
+			return true
+		end
 		if surge then
 			line(holder, 2, "SURGE  ·  " .. string.upper(surge.Name), 10, C.Dim, BOLD)
 			line(holder, 3, surge.Description or "", 12, C.Text)
@@ -1971,8 +2023,10 @@ shade.Activated:Connect(closeDetails)
 local POP_TITLE = { Worn = "WORN GEAR", Spare = "SPARE GEAR", Gem = "GEM", Key = "SURGE KEY" }
 local function drawPopup()
 	clear(popBody)
-	if contextSlot or contextKey then
-		shade.Visible = false
+	-- Details now open in the stash panel on the right, so the miner and
+	-- the gear stay in view; the popup stays shut.
+	shade.Visible = false
+	if true then
 		return
 	end
 	local pick = selection
@@ -2150,7 +2204,10 @@ local function drawLeft()
 		local c = if on then loadout else miner and miner.Character or {}
 		local powers = 0
 		for _, key in Slots.SurgeOrder do if c[key .. "Gem"] then powers += 1 end end
-		card.Status.Text = string.format("LEVEL %d   ·   %d / 3 SURGES", level, powers)
+		card.Status.Text = string.format("LV %d  ·  %d/3 SURGES", level, powers)
+		-- The header already names the active miner; only the others are labelled.
+		card.Name.Visible = not on
+		card.Status.Visible = not on
 		card.State.Text = if on then "ACTIVE" else "SELECT"
 		card.State.TextColor3 = if on then P.Gold else C.Dim
 		local store = player.PlayerGui:FindFirstChild("MinerPreviews")
@@ -2167,8 +2224,8 @@ local function drawLeft()
 			-- The Armory: your active miner fills the stage; the other two wait
 			-- in the top corners, a tap away.
 			local goal = {
-				Position = UDim2.fromScale(({ [0] = 0.09, [1] = 0.5, [2] = 0.91 })[position], if on then 0.5 else 0.21),
-				Size = UDim2.fromScale(if on then 0.62 else 0.15, if on then 1.06 else 0.4),
+				Position = UDim2.fromScale(({ [0] = 0.09, [1] = 0.5, [2] = 0.91 })[position], if on then 0.53 else 0.21),
+				Size = UDim2.fromScale(if on then 0.62 else 0.15, if on then 1.0 else 0.4),
 			}
 			card.Button.ZIndex = if on then 3 else 2
 			card.Tween = TweenService:Create(card.Button, TweenInfo.new(if first then 0 else 0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), goal)
@@ -2253,6 +2310,21 @@ local function drawLeft()
 		})
 		card.Glow.Color = targetTint
 		local shown = (loadout[slot] or "") .. "|" .. (if gem then gem.Id else "")
+		if card.Shown ~= nil and card.Shown ~= shown then
+			-- Something changed in this slot: a gold flash says it took.
+			local flash = new("Frame", {
+				BorderSizePixel = 0,
+				BackgroundColor3 = P.Gold,
+				BackgroundTransparency = 0.55,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 20,
+			}, card.Cell)
+			round(flash, 8)
+			TweenService:Create(flash, TweenInfo.new(0.7, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+			task.delay(0.75, function()
+				flash:Destroy()
+			end)
+		end
 		if card.Shown ~= shown and loadout[slot] then
 			card.Shown = shown
 			gearArt(card.Art, slot, loadout[slot], true, color)
@@ -2285,7 +2357,11 @@ local function drawLeft()
 		ui.GemBadge.BackgroundColor3 = C.Track:Lerp(tint, 0.12)
 		ui.ChargeText.Text = if surge then whole(surge.Cost or 0) .. " CHARGE" else "— CHARGE"
 		ui.CooldownText.Text = if surge then whole(surge.Cooldown or 0) .. "s COOLDOWN" else "— COOLDOWN"
-		ui.Name.Text = if surge then surge.Name else "empty"
+		ui.Name.Text = if surge then surge.Name else "Add a surge gem"
+		-- An empty key is one clean prompt, not a row of dashes.
+		ui.GemBadge.Visible = gem ~= nil
+		ui.Charge.Visible = surge ~= nil
+		ui.Cooldown.Visible = surge ~= nil
 		ui.Icon.Text = if surge then "◆" else "+"
 		SurgeIcons.apply(ui.Icon, surge, tint)
 		ui.Description.Text = if surge then surge.Description or "Select for ability details." else "Choose a gem to equip its ability on " .. key .. "."
@@ -2321,8 +2397,8 @@ local function drawTabs()
 	-- Two tabs only. With a slot picked, a dot marks the one it still needs.
 	local entries = if contextKey then { { "Gems", "SURGE GEMS" } }
 		elseif contextSlot then {
-			{ "Gems", if loadoutNow()[contextSlot] ~= nil and loadoutNow()[contextSlot .. "Gem"] == nil then "GEMS  •" else "GEMS" },
-			{ "Armor", if loadoutNow()[contextSlot] == nil then "ARMOR  •" else "ARMOR" },
+			{ "Gems", "GEMS" },
+			{ "Armor", "ARMOR" },
 		}
 		else { { "Gems", "GEMS " .. gems }, { "Armor", "ARMOR " .. spare } }
 	IronUi.tabs(
@@ -2341,8 +2417,6 @@ end
 -- scroll position when it is.
 local pageKey, pageTab = "", ""
 local statCard: Frame? = nil
-local radar = nil
-local radarRating: TextLabel? = nil
 local function drawRight()
  local profile = profileNow()
  if require(ReplicatedStorage.Shared.Tutorial).Enabled and profile and profile.Tutorial and not profile.Tutorial.Done and profile.Tutorial.Step <= 8 then
@@ -2360,9 +2434,10 @@ local function drawRight()
 	at(page, 12, 94, RIGHT_W - 24, rightH - 94 - 40)
 	at(footerLine, 12, rightH - 38, RIGHT_W - 24, 1)
 	at(footer, 12, rightH - 32, RIGHT_W - 24, 20)
-	footer.TextWrapped = true
-	contextClose.Visible = contextSlot ~= nil or contextKey ~= nil or selection ~= nil
-	pickerClose.Visible = contextSlot ~= nil or contextKey ~= nil
+	footer.TextWrapped = false
+	footer.TextTruncate = Enum.TextTruncate.AtEnd
+	contextClose.Visible = false
+	pickerClose.Visible = contextSlot ~= nil or contextKey ~= nil or selection ~= nil
 	-- Gear down the left, the miner in the middle, the inventory on the right.
 	local stageWidth = RIGHT_X - 12 - MID_X
 	left.Size = UDim2.fromOffset(W, PANEL_H)
@@ -2416,8 +2491,8 @@ local function drawRight()
 			{ Name = "SET", Color = P.Gold },
 			{ Name = "ATTUNED", Color = STAT.Attuned },
 			{ Name = "DEFENSE", Color = STAT.Defense },
-		}, 52, P.Teal)
-		radar.Frame.Position = UDim2.fromOffset(100 - 52, 30 + 32)
+		}, 46, P.Teal)
+		radar.Frame.Position = UDim2.fromOffset(100 - 46, 30 + 28)
 	end
 	local cardH = 204
 	at(statCard, MID_X + 12, BODY_Y + stageH - cardH - 12, 200, cardH)
@@ -2453,9 +2528,11 @@ local function drawRight()
 	local keep = if old and pageTab == tab then old.CanvasPosition else nil
 	pageKey, pageTab = key or "", tab
 	clear(page)
-	if selection and (contextSlot or contextKey) then
-		drawOverview(page, selection)
-		footer.Text = "BACK TO RETURN TO YOUR ITEMS"
+	if selection and not drawOverview(page, selection) then
+		selection = nil
+	end
+	if selection then
+		footer.Text = "✕ TO GO BACK"
 	elseif tab == "Gems" then
 		drawGems()
 	elseif tab == "Armor" then
