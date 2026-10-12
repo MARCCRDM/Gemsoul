@@ -278,6 +278,7 @@ end
 -- Root ---------------------------------------------------------------------------------------------------
 
 local root = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H) })
+local showTip, hideTip -- (below) item tooltips on hover
 local hostGui: ScreenGui? = nil
 
 local function panel(x: number, y: number, w: number, h: number, _accent: Color3): Frame
@@ -613,9 +614,11 @@ local function wornCard(slot: string, column: number, row: number)
 	}
 	hit.MouseEnter:Connect(function()
 		wornCards[slot].Hovered = true
+		showTip({ Kind = "Worn", Slot = slot }, cell)
 		draw()
 	end)
 	hit.MouseLeave:Connect(function()
+		hideTip()
 		wornCards[slot].Hovered = false
 		draw()
 	end)
@@ -1058,11 +1061,13 @@ local function bagCard(
 	local selected = selection ~= nil and samePick(selection, dragItem)
 	local edge = stroke(card, if selected then C.Gold else C.PanelEdge, if selected then 1.5 else 1, if selected then 0 else 0.45)
 	card.MouseEnter:Connect(function()
+		showTip(dragItem, card)
 		if not selected then
 			edge.Color, edge.Transparency = color, 0.3
 		end
 	end)
 	card.MouseLeave:Connect(function()
+		hideTip()
 		if not selected then
 			edge.Color, edge.Transparency = C.PanelEdge, 0.45
 		end
@@ -1557,6 +1562,243 @@ local function setBonusText(bonus): string
 	end
 	table.sort(parts)
 	return table.concat(parts, "  ·  ")
+end
+
+-- Item tooltips ------------------------------------------------------------------------------------------
+-- Hover any piece or gem for its full card, the way an RPG shows loot: the
+-- name in its quality colour, what it is, its stats, its perk, its gem, its
+-- set (bonuses you have lit, the rest dim), and for a spare piece how it
+-- compares with what you wear.
+
+do -- (scoped: the module is near Luau's 200-local limit)
+local TIP_W = 290
+local function titled(text: string): string
+	return (string.gsub(string.lower(text), "(%a)([%w]*)", function(first, rest)
+		return string.upper(first) .. rest
+	end))
+end
+local tip = new("Frame", {
+	Name = "ItemTooltip",
+	BackgroundColor3 = Color3.fromRGB(10, 14, 21),
+	BackgroundTransparency = 0.04,
+	Size = UDim2.fromOffset(TIP_W, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	ZIndex = 90,
+	Visible = false,
+	Active = false,
+}, root)
+round(tip, 6)
+local tipEdge = stroke(tip, C.PanelEdge, 1.5, 0)
+new("UIPadding", {
+	PaddingLeft = UDim.new(0, 14),
+	PaddingRight = UDim.new(0, 14),
+	PaddingTop = UDim.new(0, 11),
+	PaddingBottom = UDim.new(0, 12),
+}, tip)
+local tipList = UiKit.list(tip, 3)
+tipList.SortOrder = Enum.SortOrder.LayoutOrder
+local tipOrder = 0
+local function tipLine(text: string, size: number, color: Color3, font: Enum.Font?, gap: number?)
+	tipOrder += 1
+	if gap then
+		new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, gap), LayoutOrder = tipOrder, ZIndex = 90 }, tip)
+		tipOrder += 1
+	end
+	local l = label(tip, text, size, color, font or BODY)
+	-- Height from a width estimate (one line per newline, wrapped by length).
+	local plain = string.gsub(text, "<[^>]+>", "")
+	local perLine = math.max(8, math.floor((TIP_W - 28) / (size * 0.55)))
+	local lines = 0
+	for part in string.gmatch(plain .. "\n", "([^\n]*)\n") do
+		lines += math.max(1, math.ceil(#part / perLine))
+	end
+	l.Size = UDim2.new(1, 0, 0, math.ceil(lines * size * 1.22))
+	l.TextYAlignment = Enum.TextYAlignment.Top
+	l.TextWrapped = true
+	l.TextTruncate = Enum.TextTruncate.None
+	l.RichText = true
+	l.LayoutOrder = tipOrder
+	l.ZIndex = 91
+	return l
+end
+local function tipRule()
+	tipOrder += 1
+	new("Frame", {
+		BorderSizePixel = 0,
+		BackgroundColor3 = C.PanelEdge,
+		BackgroundTransparency = 0.3,
+		Size = UDim2.new(1, 0, 0, 1),
+		LayoutOrder = tipOrder,
+		ZIndex = 91,
+	}, tip)
+end
+local function hex(color: Color3): string
+	return "#" .. color:ToHex()
+end
+
+local function tipGear(slot: string, id: string?, worn: boolean)
+	local loadout = loadoutNow()
+	local gear = gearOf(loadout, slot, id)
+	if not gear then
+		tipLine("Empty " .. string.lower(SLOT_LABEL[slot]), 15, C.Dim, HEADING)
+		tipLine("Click to pick one.", 11, C.Faint)
+		return C.PanelEdge
+	end
+	id = id or loadout[slot]
+	local rarity = rarityOf(loadout, slot, id)
+	local color = rarityColor(rarity)
+	local gem = if worn then loadout[slot .. "Gem"] else (loadout.ItemGems and loadout.ItemGems[slot] and loadout.ItemGems[slot][id])
+	local family = ArmorFamilies.ById[id :: string]
+	tipLine(gear.Name, 16, color, HEADING)
+	tipLine(
+		string.format("%s %s%s", titled(rarityName(rarity)), titled(SLOT_LABEL[slot]), if family then "  ·  " .. family.ArmorFamily .. " set" else ""),
+		11,
+		C.Dim,
+		BOLD
+	)
+	local roll = GearRolls.get(loadout, slot, id)
+	local stats = {}
+	for stat, amount in roll and roll.Stats or {} do
+		table.insert(stats, statText(stat, amount))
+	end
+	table.sort(stats)
+	if #stats > 0 then
+		tipLine(table.concat(stats, "\n"), 15, C.Good, HEADING, 4)
+	end
+	if not worn then
+		local gain = ratingGain(loadout, slot, id :: string)
+		tipLine(
+			if gain > 0 then string.format("▲ +%d rating over what you wear", gain)
+				elseif gain < 0 then string.format("▼ %d rating against what you wear", gain)
+				else "Same rating as what you wear",
+			11,
+			if gain > 0 then C.Good elseif gain < 0 then C.Bad else C.Dim,
+			BOLD
+		)
+	end
+	-- The perk.
+	local signature = ArmorSignatures.resolve(roll, gem)
+	if signature then
+		local d = signature.Definition
+		local function fmt(v: number): string
+			return if d.Percent then string.format("%.1f%%", v * 100) else string.format("%.1f %s", v, d.Unit or "")
+		end
+		tipRule()
+		tipLine(d.Name, 13, P.Gold, BOLD, 2)
+		tipLine(d.Trigger .. "  <b>" .. fmt(signature.Value) .. "</b>", 12, C.Text)
+	elseif gear.Passive and gear.Passive.Text then
+		tipRule()
+		tipLine(gear.Passive.Name or "Perk", 13, P.Gold, BOLD, 2)
+		tipLine(gear.Passive.Text, 12, C.Text)
+	end
+	-- The gem.
+	if gem then
+		local parts = {}
+		for _, l in GemConfig.lines(gem, slot) do
+			table.insert(parts, l.Text)
+		end
+		tipLine(string.format('<font color="%s">◆ %s</font>', hex(gemColor(gem)), gemName(gem)), 13, C.Text, BOLD, 4)
+		if #parts > 0 then
+			tipLine(table.concat(parts, "\n"), 11, gemColor(gem):Lerp(C.Text, 0.35))
+		end
+	else
+		tipLine("◇ Empty socket", 12, C.Faint, BOLD, 4)
+	end
+	-- The set: bonuses you have, bright; the rest, dim.
+	if family and ArmorFamilies.Sets[family.ArmorFamily] then
+		local state = loadout.Class and Classes.setState(loadout).Active[family.ArmorFamily]
+		local count = state and state.Count or 0
+		tipRule()
+		tipLine(string.format("%s set  (%d/6)", family.ArmorFamily, count), 12, P.Gold:Lerp(C.Text, 0.2), BOLD, 2)
+		for _, tier in { 2, 4, 6 } do
+			local bonus = ArmorFamilies.Sets[family.ArmorFamily][tier]
+			if bonus then
+				local on = count >= tier
+				tipLine(string.format("(%d) %s", tier, setBonusText(bonus)), 11, if on then C.Good else C.Faint)
+			end
+		end
+	end
+	tipLine(if worn then "Click to inspect  ·  drop a piece or gem on it" else "Click to try it on  ·  drag onto its slot", 10, C.Faint, BOLD, 4)
+	return color
+end
+
+local function tipGem(gem)
+	local color = gemColor(gem)
+	tipLine(gemName(gem), 16, color, HEADING)
+	tipLine(
+		string.format("%s %s gem", titled(rarityName(gemRarity(gem))), GemConfig.elementName(gem.Element)),
+		11,
+		C.Dim,
+		BOLD
+	)
+	if not gem.Cut then
+		tipLine("Rough: cut it before it can be socketed.", 12, C.Faint, nil, 4)
+		return color
+	end
+	tipLine(string.format("Size %s   ·   Clarity %s   ·   Cut %s", tostring(gem.Size), tostring(gem.Clarity), tostring(gem.Cut)), 12, C.Text, BOLD, 4)
+	for _, use in { { "In armor", "Armor" }, { "In a weapon", "Weapon" } } do
+		local parts = {}
+		for _, l in GemConfig.lines(gem, use[2]) do
+			table.insert(parts, l.Text)
+		end
+		if #parts > 0 then
+			tipRule()
+			tipLine(use[1], 12, P.Gold, BOLD, 2)
+			tipLine(table.concat(parts, "\n"), 11, color:Lerp(C.Text, 0.4))
+		end
+	end
+	local surge = Tech.surgeStats(gem)
+	if surge then
+		tipRule()
+		tipLine("On Q / E / R  ·  " .. surge.Name, 12, P.Gold, BOLD, 2)
+		tipLine(surge.Description or "", 11, C.Text)
+		tipLine(string.format("%s Charge  ·  %ss cooldown", whole(surge.Cost or 0), whole(surge.Cooldown or 0)), 11, C.Dim, BOLD)
+	end
+	tipLine(if contextSlot then "Click to try it on " .. string.lower(SLOT_LABEL[contextSlot]) else "Click for details  ·  drag onto a slot", 10, C.Faint, BOLD, 4)
+	return color
+end
+
+local tipAnchor: GuiObject? = nil
+showTip = function(item, anchor: GuiObject)
+	if drag and drag.Active then
+		return
+	end
+	for _, child in tip:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	tipOrder = 0
+	local color = C.PanelEdge
+	if item.Kind == "Worn" then
+		color = tipGear(item.Slot, nil, true)
+	elseif item.Kind == "Spare" then
+		color = tipGear(item.Slot, item.Id, false)
+	elseif item.Kind == "Gem" then
+		color = tipGem(item.Gem)
+	else
+		return
+	end
+	tipEdge.Color = color
+	tipAnchor = anchor
+	-- Beside the item, on whichever side has room, kept on screen.
+	local scale = if root.Size.X.Offset > 0 then root.AbsoluteSize.X / root.Size.X.Offset else 1
+	local a = (anchor.AbsolutePosition - root.AbsolutePosition) / scale
+	local size = anchor.AbsoluteSize / scale
+	local x = a.X + size.X + 10
+	if x + TIP_W > W - 8 then
+		x = a.X - TIP_W - 10
+	end
+	-- Low on the screen it grows upward from the item's foot instead.
+	local low = a.Y + size.Y / 2 > H / 2
+	tip.AnchorPoint = Vector2.new(0, if low then 1 else 0)
+	tip.Position = UDim2.fromOffset(math.max(8, x), if low then math.min(H - 8, a.Y + size.Y) else math.max(8, a.Y))
+	tip.Visible = true
+end
+hideTip = function()
+	tipAnchor = nil
+	tip.Visible = false
+end
 end
 local function setCard(parent: Instance, order: number, family: string, count: number, tier: number)
 	local spec = ArmorFamilies.Families[family]
@@ -2385,7 +2627,7 @@ local function drawLeft()
 			card.Rarity.Text = "STOWED · TWO-HANDED"
 			card.Rarity.TextColor3 = C.Dim
 		end
-		card.Stroke.Color = if picked then C.Gold elseif card.Hovered then color else C.PanelEdge:Lerp(color, 0.22)
+		card.Stroke.Color = if picked then C.Gold elseif card.Hovered then color:Lerp(Color3.new(1, 1, 1), 0.25) else C.PanelEdge:Lerp(color, 0.65)
 		card.Stroke.Thickness = if picked then 2 else 1
 		local targetTint = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromRGB(29, 42, 56):Lerp(color, if card.Hovered then 0.18 else 0.06)),
@@ -2519,7 +2761,6 @@ end
 -- scroll position when it is.
 
 local slotPanel: Frame? = nil
-local slotPanelBody: Frame? = nil
 local slotPanelKey = ""
 local buildSlotPanel, fillSlotPanel
 -- Picking a replacement for the open slot: compare it in the slot window.
@@ -2533,6 +2774,7 @@ end
 -- The slot window: the picked piece and its gem as two big sockets side by
 -- side (tap one to browse replacements, or drop one from the drawer onto
 -- it), the piece's stats, and its perk with what the gem adds.
+do -- (scoped: the module is near Luau's 200-local limit)
 local panelUi = nil
 buildSlotPanel = function()
 	slotPanel = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 10, Visible = false }, left)
@@ -2846,6 +3088,7 @@ fillSlotPanel = function(slot: string, pick)
 	end
 end
 
+end
 local pageKey, pageTab = "", ""
 local statCard: Frame? = nil
 local statChips: Frame? = nil
