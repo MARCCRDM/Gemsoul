@@ -149,6 +149,10 @@ local function whole(value: number): string
 end
 -- Small engraved corner ticks, as on the station's other panels.
 local function brackets(frame: GuiObject, color: Color3, size: number, inset: number)
+	-- Retired: the screen reads cleaner without corner ornaments.
+	if true then
+		return
+	end
 	for _, corner in { Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1), Vector2.new(1, 1) } do
 		local holder = new("Frame", {
 			BackgroundTransparency = 1,
@@ -276,25 +280,11 @@ end
 local root = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H) })
 local hostGui: ScreenGui? = nil
 
-local function panel(x: number, y: number, w: number, h: number, accent: Color3): Frame
-	local frame = box(root, Color3.new(1, 1, 1), 6)
+local function panel(x: number, y: number, w: number, h: number, _accent: Color3): Frame
+	-- A flat surface with a hairline edge.
+	local frame = box(root, C.Panel, 10)
 	at(frame, x, y, w, h)
-	stroke(frame, C.PanelEdge, 1)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(18, 29, 37), C.Panel) }, frame)
-	local rail = new("Frame", {
-		BorderSizePixel = 0,
-		BackgroundColor3 = accent,
-		Position = UDim2.fromOffset(16, 0),
-		Size = UDim2.new(1, -32, 0, 2),
-	}, frame)
-	new("UIGradient", {
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.8),
-			NumberSequenceKeypoint.new(0.4, 0),
-			NumberSequenceKeypoint.new(1, 0.9),
-		}),
-	}, rail)
-	brackets(frame, accent, 12, 6)
+	stroke(frame, C.PanelEdge, 1, 0.35)
 	return frame
 end
 local left = panel(0, ROSTER_H, LEFT_W, PANEL_H, P.Gold)
@@ -1062,55 +1052,35 @@ local function bagCard(
 		LayoutOrder = order,
 		ClipsDescendants = true,
 	}, parent)
-	round(card, 6)
-	new("UIGradient", {
-		Rotation = 60,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, C.Card:Lerp(color, 0.16)),
-			ColorSequenceKeypoint.new(0.55, C.Card),
-			ColorSequenceKeypoint.new(1, C.Card:Lerp(Color3.new(0, 0, 0), 0.25)),
-		}),
-	}, card)
+	round(card, 8)
+	card.BackgroundColor3 = C.Card
 	card:SetAttribute("UiSound", "Click")
 	local selected = selection ~= nil and samePick(selection, dragItem)
-	local edge = stroke(card, if selected then C.Gold else color, if selected then 2 else 1, if selected then 0 else 0.55)
+	local edge = stroke(card, if selected then C.Gold else C.PanelEdge, if selected then 1.5 else 1, if selected then 0 else 0.45)
 	card.MouseEnter:Connect(function()
 		if not selected then
-			edge.Transparency = 0.1
+			edge.Color, edge.Transparency = color, 0.3
 		end
 	end)
 	card.MouseLeave:Connect(function()
 		if not selected then
-			edge.Transparency = 0.55
+			edge.Color, edge.Transparency = C.PanelEdge, 0.45
 		end
 	end)
-	local strip = new("Frame", {
-		BorderSizePixel = 0,
-		BackgroundColor3 = color,
-		Size = UDim2.new(1, 0, 0, 2),
-	}, card)
-	new("UIGradient", {
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0),
-			NumberSequenceKeypoint.new(0.7, 0.4),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-	}, strip)
 	-- The well: a dark socket with the tag's colour glowing up from below.
 	local well = new("Frame", { BorderSizePixel = 0, BackgroundColor3 = Color3.new(1, 1, 1) }, card)
 	at(well, 7, 8, 42, 42)
 	round(well, 21)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(P.Frame, P.Frame:Lerp(tagColor, 0.35)),
+		Color = ColorSequence.new(P.Frame, P.Frame:Lerp(tagColor, 0.22)),
 	}, well)
-	stroke(well, tagColor, 1, 0.5)
 	local art = new("Frame", { BackgroundTransparency = 1 }, well)
 	at(art, 2, 2, 38, 38)
 	paint(art)
 	local name = label(card, title, 11, C.Text, BOLD)
 	name.Position, name.Size = UDim2.fromOffset(7, 54), UDim2.new(1, -14, 0, 14)
-	local rarity = label(card, "◆ " .. sub, 8, color, BOLD)
+	local rarity = label(card, sub, 8, color, BOLD)
 	rarity.Position, rarity.Size = UDim2.fromOffset(7, 68), UDim2.new(1, -60, 0, 10)
 	local gem = dragItem and dragItem.Gem
 	if gem and gem.Cut then
@@ -1131,16 +1101,13 @@ local function bagCard(
 		Text = tag,
 		TextSize = 8,
 		Font = BOLD,
-		TextColor3 = tagColor:Lerp(Color3.new(1, 1, 1), 0.25),
-		BackgroundColor3 = tagColor,
-		BackgroundTransparency = 0.82,
+		TextColor3 = tagColor:Lerp(C.Dim, 0.2),
+		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -7, 0, 8),
-		Size = UDim2.fromOffset(0, 15),
+		Position = UDim2.new(1, -9, 0, 9),
+		Size = UDim2.fromOffset(0, 12),
 		AutomaticSize = Enum.AutomaticSize.X,
 	}, card)
-	round(badge, 8)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, badge)
 	card.Activated:Connect(function()
 		if os.clock() >= suppressClickUntil then
 			onClick()
@@ -1164,8 +1131,8 @@ end
 local function filterRow(entries: { any }, current: string, onPick: (string) -> ())
 	local chips = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 48) }, page)
 	new("UIGridLayout", {
-		CellSize = UDim2.new(1 / 3, -4, 0, 22),
-		CellPadding = UDim2.fromOffset(6, 4),
+		CellSize = UDim2.new(1 / 3, -4, 0, 21),
+		CellPadding = UDim2.fromOffset(6, 3),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, chips)
 	for i, entry in entries do
@@ -1175,13 +1142,12 @@ local function filterRow(entries: { any }, current: string, onPick: (string) -> 
 			Text = entry[2],
 			TextSize = 10,
 			Font = BOLD,
-			TextColor3 = if on then Color3.new(1, 1, 1) else tint:Lerp(C.Dim, 0.35),
+			TextColor3 = if on then C.Text else tint:Lerp(C.Dim, 0.5),
 			BackgroundColor3 = tint,
-			BackgroundTransparency = if on then 0.6 else 0.94,
+			BackgroundTransparency = if on then 0.78 else 1,
 			LayoutOrder = i,
 		}, chips)
-		round(chip, 11)
-		stroke(chip, tint, 1, if on then 0 else 0.75)
+		round(chip, 6)
 		new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, chip)
 		chip:SetAttribute("UiSound", "Tab")
 		chip.Activated:Connect(function()
@@ -2189,8 +2155,29 @@ for order, spec in
 		{ "STORE", false, openModule("ShopUI", "toggle") },
 	}
 do
-	local b = IronUi.button(bar, spec[1], spec[2], spec[3])
-	b.LayoutOrder = order
+	-- Flat text tabs; the current screen is bright with a gold underline.
+	local b = new("TextButton", {
+		Text = string.gsub(spec[1], "%s+%[", "  ["),
+		TextSize = 17,
+		Font = HEADING,
+		TextColor3 = if spec[2] then C.Text else C.Dim,
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 44),
+		LayoutOrder = order,
+	}, bar)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, b)
+	b:SetAttribute("UiSound", "Click")
+	b.MouseEnter:Connect(function()
+		b.TextColor3 = C.Text
+	end)
+	b.MouseLeave:Connect(function()
+		b.TextColor3 = if spec[2] then C.Text else C.Dim
+	end)
+	b.Activated:Connect(spec[3])
+	if spec[2] then
+		new("Frame", { BorderSizePixel = 0, BackgroundColor3 = P.Gold, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -28, 0, 2) }, b)
+	end
 end
 local backButton = chunkButton(root, "BACK TO LOBBY", P.Gold, UDim2.fromOffset(160, 34), function()
 	InventoryScreen.cancelDrag()
@@ -2498,16 +2485,34 @@ local function drawTabs()
 			{ "Armor", "ARMOR" },
 		}
 		else { { "Gems", "GEMS " .. gems }, { "Armor", "ARMOR " .. spare } }
-	IronUi.tabs(
-		tabHolder,
-		entries,
-		tab,
-		function(id)
-			tab = id
+	-- Flat text tabs; the active one is bright with a gold underline.
+	local width = math.floor((RIGHT_W - 32) / #entries)
+	for index, entry in entries do
+		local on = entry[1] == tab
+		local b = new("TextButton", {
+			Text = entry[2],
+			TextSize = 13,
+			Font = HEADING,
+			TextColor3 = if on then C.Text else C.Dim,
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset((index - 1) * width, 0),
+			Size = UDim2.fromOffset(width, 32),
+		}, tabHolder)
+		b:SetAttribute("UiSound", "Tab")
+		b.Activated:Connect(function()
+			tab = entry[1]
 			selection = nil
 			draw()
-		end
-	)
+		end)
+		new("Frame", {
+			BorderSizePixel = 0,
+			BackgroundColor3 = if on then P.Gold else C.PanelEdge,
+			BackgroundTransparency = if on then 0 else 0.4,
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.new(0, 0, 1, 0),
+			Size = UDim2.new(1, 0, 0, if on then 2 else 1),
+		}, b)
+	end
 end
 
 -- A bag page is rebuilt only when what it shows changes, and keeps its
@@ -2525,8 +2530,8 @@ local panelUi = nil
 buildSlotPanel = function()
 	slotPanel = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 10, Visible = false }, left)
 	round(slotPanel :: Frame, 12)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(22, 32, 48), Color3.fromRGB(10, 15, 24)) }, slotPanel)
-	local edge = stroke(slotPanel :: Frame, P.Gold, 1.5, 0.35)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(20, 29, 42), Color3.fromRGB(13, 19, 29)) }, slotPanel)
+	local edge = stroke(slotPanel :: Frame, C.PanelEdge, 1, 0.2)
 	local ui = { Edge = edge }
 	local function z(object)
 		object.ZIndex = 11
@@ -2554,7 +2559,7 @@ buildSlotPanel = function()
 		}, column)
 		round(well, 14)
 		local tint = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(P.Frame, P.Frame) }, well)
-		local wellEdge = stroke(well, C.PanelEdge, 2, 0)
+		local wellEdge = stroke(well, C.PanelEdge, 1.5, 0)
 		well:SetAttribute("UiSound", "Click")
 		well.Activated:Connect(function()
 			if os.clock() >= suppressClickUntil then
@@ -2592,9 +2597,8 @@ buildSlotPanel = function()
 	ui.Link.AnchorPoint, ui.Link.Position, ui.Link.Size = Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0, 80), UDim2.fromOffset(30, 30)
 	ui.Link.TextXAlignment = Enum.TextXAlignment.Center
 	-- The perk band.
-	local band = new("Frame", { BackgroundColor3 = Color3.fromRGB(30, 26, 16), BackgroundTransparency = 0.2, Position = UDim2.new(0, 14, 0, 208), Size = UDim2.new(1, -28, 0, 86), ZIndex = 11 }, slotPanel)
+	local band = new("Frame", { BackgroundColor3 = C.Card, Position = UDim2.new(0, 14, 0, 208), Size = UDim2.new(1, -28, 0, 86), ZIndex = 11 }, slotPanel)
 	round(band, 8)
-	stroke(band, P.Gold, 1, 0.65)
 	ui.PerkName = label(band, "", 10, P.Gold, BOLD)
 	ui.PerkName.Position, ui.PerkName.Size, ui.PerkName.ZIndex = UDim2.fromOffset(12, 6), UDim2.new(1, -24, 0, 14), 12
 	ui.PerkText = label(band, "", 11, C.Text, BODY)
@@ -2932,26 +2936,29 @@ local function drawRight()
 			{ Name = "DEFENSE", Color = STAT.Defense },
 		}, 46, P.Teal)
 		radar.Frame.Position = UDim2.fromOffset(100 - 46, 30 + 28)
-		statChips = new("Frame", { BackgroundTransparency = 1, ZIndex = 8 }, left)
-		local list = UiKit.list(statChips, 6, true)
+		-- One quiet strip of numbers, divided by hairlines.
+		statChips = new("Frame", { BackgroundColor3 = C.Card, BackgroundTransparency = 0.1, ZIndex = 8, AutomaticSize = Enum.AutomaticSize.X }, left)
+		round(statChips :: Frame, 8)
+		stroke(statChips :: Frame, C.PanelEdge, 1, 0.45)
+		local list = UiKit.list(statChips, 0, true)
 		list.VerticalAlignment = Enum.VerticalAlignment.Center
 		for order, spec in STAT_CHIPS do
 			local chip = new("TextButton", {
 				Text = "",
-				AutoButtonColor = spec[1] == "Total",
-				BackgroundColor3 = C.Card,
-				BackgroundTransparency = 0.15,
-				Size = UDim2.fromOffset(spec[3], 24),
+				AutoButtonColor = false,
+				BackgroundTransparency = 1,
+				Size = UDim2.fromOffset(spec[3], 30),
 				LayoutOrder = order,
 				ZIndex = 8,
 			}, statChips)
-			round(chip, 12)
-			stroke(chip, if spec[1] == "Total" then P.Gold else C.PanelEdge, 1, if spec[1] == "Total" then 0.2 else 0)
-			local name = label(chip, spec[2], 9, spec[4], BOLD)
-			at(name, 10, 0, 44, 24)
+			if order > 1 then
+				new("Frame", { BorderSizePixel = 0, BackgroundColor3 = C.PanelEdge, BackgroundTransparency = 0.3, Position = UDim2.fromOffset(0, 8), Size = UDim2.fromOffset(1, 14), ZIndex = 9 }, chip)
+			end
+			local name = label(chip, spec[2], 9, spec[4]:Lerp(C.Dim, 0.25), BOLD)
+			at(name, 12, 0, 44, 30)
 			name.ZIndex = 9
 			local value = label(chip, "0", 13, C.Text, HEADING)
-			at(value, 10, 0, spec[3] - 20, 24)
+			at(value, 12, 0, spec[3] - 24, 30)
 			value.TextXAlignment = Enum.TextXAlignment.Right
 			value.ZIndex = 9
 			statChipValues[spec[1]] = value
@@ -2965,7 +2972,7 @@ local function drawRight()
 		end
 	end
 	statChips.Position = UDim2.fromOffset(stageLeft + 12, BODY_Y + 12)
-	statChips.Size = UDim2.fromOffset(stageWidth - 200, 26)
+	statChips.Size = UDim2.fromOffset(0, 30)
 	local cardH = 204
 	statCard.Visible = radarShown
 	at(statCard, stageLeft + 12, BODY_Y + 44, 200, cardH)

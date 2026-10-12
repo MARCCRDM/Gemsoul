@@ -249,7 +249,7 @@ function StageBackdrop.create(stage: GuiObject)
 			Size = UDim2.fromScale(spot.W, tall),
 			BackgroundColor3 = Color3.fromRGB(26, 32, 42),
 			-- A floor pad seen from above, not a solid button.
-			BackgroundTransparency = 0.45,
+			BackgroundTransparency = 0.75,
 		})
 		make("UICorner", { CornerRadius = UDim.new(1, 0) }, disc)
 		make("UIGradient", {
@@ -259,7 +259,7 @@ function StageBackdrop.create(stage: GuiObject)
 		local rim = make("UIStroke", {
 			Color = GOLD,
 			Thickness = if spot.Main then 1.5 else 1,
-			Transparency = if spot.Main then 0.15 else 0.45,
+			Transparency = if spot.Main then 0.55 else 0.7,
 		}, disc)
 		-- An energy ring pulsing out from under the main pedestal.
 		local pulse = nil
@@ -313,7 +313,7 @@ function StageBackdrop.update(backdrop, time: number)
 	-- The crest turns slowly; the spotlight breathes.
 	backdrop.Ticks.Rotation = (t * 6) % 360
 	for i, glow in backdrop.Beams do
-		glow.BackgroundTransparency = 0.93 - 0.03 * breathe - (i - 1) * 0.01
+		glow.BackgroundTransparency = 0.955 - 0.02 * breathe - (i - 1) * 0.005
 	end
 	for i, strip in backdrop.Strips do
 		strip.BackgroundTransparency = 0.15 + 0.35 * (0.5 + 0.5 * math.sin(t * 1.7 + i * 1.3))
@@ -328,7 +328,7 @@ function StageBackdrop.update(backdrop, time: number)
 			if stroke then
 				stroke.Transparency = 0.2 + 0.8 * phase
 			end
-			pedestal.Rim.Transparency = 0.25 - 0.2 * breathe
+			pedestal.Rim.Transparency = 0.6 - 0.15 * breathe
 		end
 	end
 	-- Dust rising through the beam and drifting.
