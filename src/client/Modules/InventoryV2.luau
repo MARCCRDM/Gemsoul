@@ -296,6 +296,33 @@ local function sparesFor(slot: string)
 	end)
 	return list
 end
+-- "Health +12 · Power −3": what each stat does if this piece goes on.
+local function statDeltas(loadout, slot: string, id: string): string
+	local before = ratings(loadout)
+	local trial = table.clone(loadout)
+	trial[slot] = id
+	local profile = profileNow()
+	trial[slot .. "Quality"] = profile and profile.Owned and profile.Owned[Slots.Definitions[slot].Kind][id]
+	trial[slot .. "Gem"] = (loadout.ItemGems and loadout.ItemGems[slot] and loadout.ItemGems[slot][id]) or nil
+	local after = ratings(trial)
+	if not before or not after then
+		return ""
+	end
+	local parts = {}
+	for _, stat in Classes.StatNames do
+		local d = (after[stat].Base + after[stat].Bonus) - (before[stat].Base + before[stat].Bonus)
+		if math.abs(d) >= 0.5 then
+			table.insert(parts, string.format(
+				'<font color="#%s">%s %s%s</font>',
+				(if d > 0 then C.Good else C.Bad):ToHex(),
+				stat,
+				if d > 0 then "+" else "−",
+				whole(math.abs(d))
+			))
+		end
+	end
+	return table.concat(parts, "  ·  ")
+end
 local function ratingGain(loadout, slot: string, id: string): number
 	local trial = table.clone(loadout)
 	trial[slot] = id
@@ -365,9 +392,19 @@ local function sameItem(a: Item?, b: Item?): boolean
 	return a.Slot == b.Slot and a.Id == b.Id
 end
 local function openDetail(target: string?)
+	local was = state.Detail
 	state.Detail = target
 	state.Tab = "Gems"
 	state.Pick, state.Hover = nil, nil
+	if InventoryV2.hideTip then
+		InventoryV2.hideTip()
+	end
+	-- The column slides a little as it changes, so the change reads.
+	local panel = if target then ui.Detail else ui.List
+	if panel and (was == nil) ~= (target == nil) then
+		panel.Position = UDim2.fromOffset(if target then 22 else -22, 0)
+		TweenService:Create(panel, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Position = UDim2.new() }):Play()
+	end
 	draw()
 end
 
@@ -641,6 +678,18 @@ local function buildStage(canvas: Frame)
 	}, canvas)
 	place(ui.MinerView, 470, 80, 660, 650)
 	ui.MinerSource = nil
+	ui.MinerYaw = 0
+	-- Drag across the miner to turn them.
+	local turn = new("TextButton", { Name = "TurnMiner", Text = "", AutoButtonColor = false, BackgroundTransparency = 1 }, canvas)
+	place(turn, 560, 110, 480, 600)
+	turn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			ui.Turning = { X = input.Position.X, Touch = input.UserInputType == Enum.UserInputType.Touch }
+		end
+	end)
+	local hint = place(text(canvas, "DRAG TO TURN", 10, C.Faint, HEADING), 700, 728, 200, 14)
+	hint.TextXAlignment = Enum.TextXAlignment.Center
+	hint.TextTransparency = 0.3
 end
 
 -- One equipment row: art, name, rarity / slot / perk, and the gem socket.
@@ -691,11 +740,17 @@ local function buildRow(parent: Instance, slot: string, y: number)
 	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus }
 	row.MouseEnter:Connect(function()
 		entry.Hovered = true
-		draw()
+		InventoryV2.paintRow(slot)
+		if not drag and InventoryV2.showTip then
+			InventoryV2.showTip(slot, row)
+		end
 	end)
 	row.MouseLeave:Connect(function()
 		entry.Hovered = false
-		draw()
+		InventoryV2.paintRow(slot)
+		if InventoryV2.hideTip then
+			InventoryV2.hideTip()
+		end
 	end)
 	table.insert(dropTargets, {
 		Frame = row,
@@ -735,22 +790,81 @@ local function buildRight(canvas: Frame)
 	-- The detail (one piece, or one surge key).
 	local detail = new("Frame", { Name = "Detail", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, column)
 	ui.Detail = detail
-	local crumb = new("TextButton", {
-		Text = "",
+	-- Along the top: back, then every slot and key, so you can hop between
+	-- them without going back to the list.
+	local back = new("TextButton", {
+		Name = "Back",
+		Text = "‹",
+		TextSize = 24,
+		Font = HEADING,
+		TextColor3 = C.Dim,
 		AutoButtonColor = false,
 		BackgroundTransparency = 1,
 	}, detail)
-	place(crumb, 0, 0, RIGHT_W, 18)
-	crumb:SetAttribute("UiSound", "Back")
-	crumb.Activated:Connect(function()
+	place(back, 0, 0, 32, 34)
+	back:SetAttribute("UiSound", "Back")
+	back.MouseEnter:Connect(function()
+		back.TextColor3 = C.Text
+	end)
+	back.MouseLeave:Connect(function()
+		back.TextColor3 = C.Dim
+	end)
+	back.Activated:Connect(function()
 		openDetail(nil)
 	end)
-	ui.Crumb = text(crumb, "", 11, C.Dim, HEADING)
-	ui.Crumb.Size = UDim2.fromScale(1, 1)
-	ui.Crumb.RichText = true
+	ui.Strip = {}
+	local sx = 40
+	for _, slot in Slots.Order do
+		local tile = new("TextButton", {
+			Name = "Hop" .. slot,
+			Text = "",
+			AutoButtonColor = false,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.95,
+		}, detail)
+		place(tile, sx, 0, 34, 34)
+		round(tile, 8)
+		local edge = stroke(tile, C.Line, 1, 0.9)
+		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, tile)
+		tile:SetAttribute("UiSound", "Tab")
+		tile.Activated:Connect(function()
+			if state.Detail ~= slot then
+				openDetail(slot)
+			end
+		end)
+		ui.Strip[slot] = { Tile = tile, Edge = edge, Icon = holder }
+		sx += 38
+		if slot == "Boots" then
+			sx += 8
+		end
+	end
+	sx += 8
+	for _, key in KEYS do
+		local tile = new("TextButton", {
+			Name = "Hop" .. key,
+			Text = key,
+			TextSize = 12,
+			Font = HEAVY,
+			TextColor3 = C.Dim,
+			AutoButtonColor = false,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.95,
+		}, detail)
+		place(tile, sx, 0, 30, 34)
+		round(tile, 8)
+		local edge = stroke(tile, C.Line, 1, 0.9)
+		tile:SetAttribute("UiSound", "Tab")
+		tile.Activated:Connect(function()
+			if state.Detail ~= key then
+				openDetail(key)
+			end
+		end)
+		ui.Strip[key] = { Tile = tile, Edge = edge }
+		sx += 34
+	end
 	-- The card: piece + gem (or the surge), and the perk.
 	local card = frame(detail, Color3.fromRGB(255, 255, 255), 0.965)
-	place(card, 0, 26, RIGHT_W, 262)
+	place(card, 0, 46, RIGHT_W, 262)
 	round(card, 14)
 	stroke(card, C.Line, 1, 0.92)
 	ui.Card = card
@@ -821,9 +935,9 @@ local function buildRight(canvas: Frame)
 	ui.PerkValue.RichText = true
 	-- Tabs and the element filter.
 	ui.Tabs = new("Frame", { BackgroundTransparency = 1 }, detail)
-	place(ui.Tabs, 0, 302, 230, 24)
+	place(ui.Tabs, 0, 320, 230, 24)
 	ui.Filters = new("Frame", { BackgroundTransparency = 1 }, detail)
-	place(ui.Filters, RIGHT_W - 150, 302, 150, 24)
+	place(ui.Filters, RIGHT_W - 150, 320, 150, 24)
 	-- The grid.
 	ui.Grid = new("ScrollingFrame", {
 		Name = "Grid",
@@ -834,10 +948,10 @@ local function buildRight(canvas: Frame)
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 	}, detail)
-	place(ui.Grid, 0, 334, RIGHT_W, 156)
+	place(ui.Grid, 0, 352, RIGHT_W, 144)
 	-- What a pick (or the hovered one) would change, and the buttons.
 	ui.Compare = frame(detail, C.Gold, 0.93)
-	place(ui.Compare, 0, 500, RIGHT_W, 64)
+	place(ui.Compare, 0, 504, RIGHT_W, 60)
 	round(ui.Compare, 10)
 	ui.CompareEdge = stroke(ui.Compare, C.Gold, 1, 0.75)
 	ui.CompareText = text(ui.Compare, "", 12, C.Dim, MEDIUM)
@@ -856,7 +970,7 @@ local function buildRight(canvas: Frame)
 			BackgroundColor3 = if primary then C.Gold else C.Ink,
 			BackgroundTransparency = if primary then 0 else 0.5,
 		}, detail)
-		place(b, x, 576, w, 44)
+		place(b, x, 572, w, 44)
 		round(b, 10)
 		if not primary then
 			stroke(b, C.Faint, 1, 0.2)
@@ -1078,11 +1192,18 @@ local function renderMiner(view: ViewportFrame, source: Model, loadout)
 	local bounds, size = copy:GetBoundingBox()
 	local camera = new("Camera", { FieldOfView = 30 }, view)
 	local distance = math.max(size.Y * 0.62, size.X * 0.9) / math.tan(math.rad(15))
-	camera.CFrame = CFrame.lookAt(
-		bounds.Position + Vector3.new(distance * 0.12, size.Y * 0.04, -distance),
-		bounds.Position
-	)
+	ui.MinerOrbit = { Camera = camera, Focus = bounds.Position, Offset = Vector3.new(distance * 0.12, size.Y * 0.04, -distance) }
+	InventoryV2.aimMiner()
 	view.CurrentCamera = camera
+end
+-- Points the miner's camera from the current turn (MinerYaw).
+function InventoryV2.aimMiner()
+	local orbit = ui.MinerOrbit
+	if not orbit then
+		return
+	end
+	local offset = CFrame.Angles(0, ui.MinerYaw or 0, 0):VectorToWorldSpace(orbit.Offset)
+	orbit.Camera.CFrame = CFrame.lookAt(orbit.Focus + offset, orbit.Focus)
 end
 
 local function flashValue(entry, value: number)
@@ -1142,6 +1263,11 @@ local function drawLeft(profile, loadout)
 		flashValue(entry, value)
 	end
 	ui.Rating.Text = whole(total)
+	if ui.RatingLast and math.abs(total - ui.RatingLast) >= 0.5 then
+		ui.Rating.TextColor3 = if total > ui.RatingLast then C.Good else C.Bad
+		TweenService:Create(ui.Rating, TweenInfo.new(1.2, Enum.EasingStyle.Quad), { TextColor3 = C.Gold }):Play()
+	end
+	ui.RatingLast = total
 	-- The set you wear most of.
 	local best, count = nil, 0
 	local ok, setState = pcall(Classes.setState, loadout)
@@ -1287,6 +1413,22 @@ local function drawWallet(profile)
 	ui.PickCap.Text = if nextIn then "FREE PICK  ·  " .. OutpostRules.clock(nextIn) else "FREE PICK  ·  FULL"
 end
 
+-- A row's frame: gold while it's open, lighter under the pointer.
+function InventoryV2.paintRow(slot: string)
+	local row = ui.Rows and ui.Rows[slot]
+	if not row then
+		return
+	end
+	local picked = state.Detail == slot
+	row.Rail.BackgroundColor3 = if picked then C.Gold else row.Color or C.Faint
+	row.Edge.Color = C.Gold
+	row.Edge.Transparency = if picked then 0.35 elseif row.Hovered then 0.72 else 1
+	row.Tint.Color = if picked
+		then ColorSequence.new(Color3.fromRGB(58, 46, 22), Color3.fromRGB(16, 14, 12))
+		elseif row.Hovered then ColorSequence.new(Color3.fromRGB(32, 40, 54), Color3.fromRGB(14, 18, 27))
+		else ColorSequence.new(Color3.fromRGB(20, 25, 34), Color3.fromRGB(11, 14, 21))
+end
+
 local function drawRows(loadout)
 	for slot, row in ui.Rows do
 		local id = loadout[slot]
@@ -1304,12 +1446,21 @@ local function drawRows(loadout)
 		row.Meta.Text = if gear
 			then string.format('<font color="#%s">%s</font>  ·  %s%s', color:ToHex(), rarityName(rarity), SLOT_NAME[slot], tail)
 			else SLOT_NAME[slot] .. "  ·  NOTHING WORN"
-		row.Rail.BackgroundColor3 = if picked then C.Gold else color
-		row.Edge.Transparency = if picked then 0.35 elseif row.Hovered then 0.8 else 1
-		row.Tint.Color = if picked
-			then ColorSequence.new(Color3.fromRGB(58, 46, 22), Color3.fromRGB(16, 14, 12))
-			elseif row.Hovered then ColorSequence.new(Color3.fromRGB(30, 37, 50), Color3.fromRGB(13, 17, 25))
-			else ColorSequence.new(Color3.fromRGB(20, 25, 34), Color3.fromRGB(11, 14, 21))
+		row.Color = color
+		InventoryV2.paintRow(slot)
+		-- Something changed in this slot (a piece or a gem): a gold flash says it took.
+		local shown = tostring(id) .. "|" .. (if gem then gem.Id else "")
+		if row.Shown ~= nil and row.Shown ~= shown then
+			local flash = frame(row.Row, C.Gold, 0.55)
+			flash.Size = UDim2.fromScale(1, 1)
+			flash.ZIndex = 6
+			round(flash, 10)
+			TweenService:Create(flash, TweenInfo.new(0.8, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+			task.delay(0.85, function()
+				flash:Destroy()
+			end)
+		end
+		row.Shown = shown
 		local artKey = tostring(id) .. "|" .. tostring(row.ArtVersion or 0)
 		if row.ArtKey ~= artKey then
 			row.ArtKey = artKey
@@ -1368,17 +1519,32 @@ end
 
 -- The grid: gems (for a gear slot or a key) or spare pieces (for a gear slot).
 local gridKey = ""
+local gridCells = {}
+-- The pick has a gold frame, the cell under the pointer a lighter one.
+local function paintCells()
+	for _, cell in gridCells do
+		local picked = sameItem(cell.Item, state.Pick)
+		local hovered = sameItem(cell.Item, state.Hover)
+		cell.Edge.Color = if picked then C.Gold else C.Line
+		cell.Edge.Thickness = if picked then 1.5 else 1
+		cell.Edge.Transparency = if picked then 0 elseif hovered then 0.5 else 0.92
+		cell.Button.BackgroundTransparency = if picked then 0.9 elseif hovered then 0.93 else 0.965
+	end
+end
 local function drawGrid(items: { Item }, emptyText: string)
-	local parts = { state.Detail or "", state.Tab, state.Filter, state.Pick and (state.Pick.Id or (state.Pick.Gem and state.Pick.Gem.Id)) or "" }
+	local parts = { state.Detail or "", state.Tab, state.Filter }
 	for _, item in items do
 		table.insert(parts, item.Id or (item.Gem and item.Gem.Id .. ":" .. tostring(item.Gem.Cut)) or "")
 	end
 	local key = table.concat(parts, ",")
 	if key == gridKey then
+		paintCells()
 		return
 	end
 	gridKey = key
+	gridCells = {}
 	clear(ui.Grid)
+	ui.Grid.CanvasPosition = Vector2.zero
 	if #items == 0 then
 		local note = text(ui.Grid, emptyText, 12, C.Faint, MEDIUM)
 		note.Size = UDim2.new(1, 0, 0, 60)
@@ -1386,14 +1552,14 @@ local function drawGrid(items: { Item }, emptyText: string)
 		note.TextXAlignment = Enum.TextXAlignment.Center
 		return
 	end
-	local layout = new("UIGridLayout", {
-		CellSize = UDim2.fromOffset(70, 70),
-		CellPadding = UDim2.fromOffset(9, 9),
+	new("UIGridLayout", {
+		CellSize = UDim2.fromOffset(68, 68),
+		CellPadding = UDim2.fromOffset(8, 8),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, ui.Grid)
-	local _ = layout
 	for order, item in items do
 		local cell = new("TextButton", {
+			Name = "Cell" .. order,
 			Text = "",
 			AutoButtonColor = false,
 			BackgroundColor3 = Color3.new(1, 1, 1),
@@ -1401,16 +1567,15 @@ local function drawGrid(items: { Item }, emptyText: string)
 			LayoutOrder = order,
 		}, ui.Grid)
 		round(cell, 10)
-		local picked = sameItem(item, state.Pick)
-		local edge = stroke(cell, if picked then C.Gold else C.Line, if picked then 1.5 else 1, if picked then 0 else 0.92)
+		local edge = stroke(cell, C.Line, 1, 0.92)
 		local art = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(9, 7), Size = UDim2.new(1, -18, 1, -18) }, cell)
 		local tierColor
 		if item.Kind == "Gem" then
 			gemArt(art, item.Gem)
 			tierColor = rarityColor(gemRarity(item.Gem))
 		else
-			gearArt(art, item.Slot :: string, item.Id :: string, false, rarityColor(rarityOf(loadoutNow(), item.Slot :: string, item.Id)))
 			tierColor = rarityColor(rarityOf(loadoutNow(), item.Slot :: string, item.Id))
+			gearArt(art, item.Slot :: string, item.Id :: string, false, tierColor)
 		end
 		local tier = frame(cell, tierColor)
 		tier.AnchorPoint = Vector2.new(0, 1)
@@ -1420,18 +1585,14 @@ local function drawGrid(items: { Item }, emptyText: string)
 		cell:SetAttribute("UiSound", "Click")
 		cell.MouseEnter:Connect(function()
 			state.Hover = item
-			if not picked then
-				edge.Transparency = 0.6
-			end
+			paintCells()
 			InventoryV2.drawCompare()
 		end)
 		cell.MouseLeave:Connect(function()
 			if sameItem(state.Hover, item) then
 				state.Hover = nil
 			end
-			if not picked then
-				edge.Transparency = 0.92
-			end
+			paintCells()
 			InventoryV2.drawCompare()
 		end)
 		cell.InputBegan:Connect(function(input)
@@ -1446,7 +1607,9 @@ local function drawGrid(items: { Item }, emptyText: string)
 			state.Pick = item
 			draw()
 		end)
+		table.insert(gridCells, { Item = item, Edge = edge, Button = cell })
 	end
+	paintCells()
 end
 
 local function drawTabs(entries: { { string } })
@@ -1546,16 +1709,36 @@ function InventoryV2.drawCompare()
 		local current = Tech.surgeGem(loadout, target)
 		if item and item.Gem then
 			local surge = Tech.surgeStats(item.Gem)
-			textValue = if surge
-				then string.format(
-					"<b>%s</b> on %s: %s charge · %s s cooldown. %s",
+			local now = current and Tech.surgeStats(current)
+			if surge and now and current.Id ~= (item.Gem :: any).Id then
+				-- Against what's on the key now: cheaper and quicker is better.
+				local function change(new: number, old: number, unit: string): string
+					local d = new - old
+					if math.abs(d) < 0.5 then
+						return whole(new) .. unit
+					end
+					return string.format('%s%s <font color="#%s">(%s%s)</font>', whole(new), unit, if d < 0 then good else bad, if d < 0 then "−" else "+", whole(math.abs(d)))
+				end
+				textValue = string.format(
+					"<b>%s</b> instead of %s: %s charge  ·  %s cooldown.%s",
+					surge.Name,
+					now.Name,
+					change(surge.Cost or 0, now.Cost or 0, ""),
+					change(surge.Cooldown or 0, now.Cooldown or 0, " s"),
+					if sameItem(item, state.Pick) then "" else " " .. (surge.Description or "")
+				)
+			elseif surge then
+				textValue = string.format(
+					"<b>%s</b> on %s: %s charge  ·  %s s cooldown.%s",
 					surge.Name,
 					target,
 					whole(surge.Cost or 0),
 					whole(surge.Cooldown or 0),
-					surge.Description or ""
+					if sameItem(item, state.Pick) then "" else " " .. (surge.Description or "")
 				)
-				else "This gem has no surge."
+			else
+				textValue = "This gem has no surge."
+			end
 		else
 			textValue = if current then "Pick a gem below to change " .. target .. ", or drag one onto any key." else "Pick a gem below to put a surge on " .. target .. "."
 		end
@@ -1577,6 +1760,15 @@ function InventoryV2.drawCompare()
 					diffText,
 					if wornGem then ". " .. gemName(wornGem) .. " goes back to your stash." else "."
 				)
+			elseif sameItem(item, state.Pick) then
+				-- Tried on: the card above shows what it does.
+				textValue = string.format(
+					"<b>%s</b>  ·  %s %s%s",
+					gemName(item.Gem),
+					GemConfig.elementName(item.Gem.Element) .. "  ·",
+					(GearRolls.Rarities[gemRarity(item.Gem)] or GearRolls.Rarities[1]).Name,
+					if wornGem then ". Replaces " .. gemName(wornGem) .. ", which goes back to your stash." else ". Goes into the empty socket."
+				)
 			else
 				local lines = {}
 				for _, l in GemConfig.lines(item.Gem, target) do
@@ -1588,13 +1780,15 @@ function InventoryV2.drawCompare()
 			local gain = ratingGain(loadout, target, item.Id :: string)
 			local itsGem = loadout.ItemGems and loadout.ItemGems[target] and loadout.ItemGems[target][item.Id]
 			local after = perkOf(loadout, target, item.Id, itsGem)
+			local deltas = statDeltas(loadout, target, item.Id :: string)
 			textValue = string.format(
-				'<b>%s</b>: rating <font color="#%s">%s%d</font>%s. Gems stay on their piece.',
+				'<b>%s</b>  ·  rating <font color="#%s">%s%d</font>%s\n%s',
 				item.Gear and item.Gear.Name or "This piece",
 				if gain >= 0 then good else bad,
 				if gain >= 0 then "+" else "",
 				gain,
-				if after then ", perk " .. after.Definition.Name .. " " .. perkValue(after) else ""
+				if deltas ~= "" then "  ·  " .. deltas else "",
+				if after then after.Definition.Name .. " " .. perkValue(after) .. ". Its own gem comes with it." else "Gems stay on their piece."
 			)
 		else
 			textValue = if state.Tab == "Pieces"
@@ -1622,10 +1816,36 @@ function InventoryV2.drawCompare()
 		ui.Secondary.Visible = hasGem
 		ui.Secondary.Text = if table.find(KEYS, target) then "CLEAR " .. target else "REMOVE GEM"
 	end
-	ui.Secondary.Position = if ui.Primary.Visible then UDim2.fromOffset(262, 576) else UDim2.fromOffset(0, 576)
+	ui.Secondary.Position = if ui.Primary.Visible then UDim2.fromOffset(262, 572) else UDim2.fromOffset(0, 572)
 	ui.Secondary.Size = if ui.Primary.Visible then UDim2.fromOffset(RIGHT_W - 262, 44) else UDim2.fromOffset(RIGHT_W, 44)
 end
 
+-- The strip of slots and keys along the top of the detail.
+local function paintStrip(loadout)
+	for key, entry in ui.Strip do
+		local on = state.Detail == key
+		entry.Edge.Color = if on then C.Gold else C.Line
+		entry.Edge.Transparency = if on then 0 else 0.9
+		entry.Tile.BackgroundTransparency = if on then 0.88 else 0.95
+		if entry.Icon then
+			local gear = gearOf(loadout, key)
+			local color = if gear then rarityColor(rarityOf(loadout, key)) else C.Faint
+			local iconKey = tostring(loadout[key]) .. "|" .. tostring(on)
+			if entry.Key ~= iconKey then
+				entry.Key = iconKey
+				clear(entry.Icon)
+				if gear then
+					pcall(GearArt.icon, entry.Icon, key, gear, if on then C.Gold else color)
+				end
+			end
+		else
+			local gem = Tech.surgeGem(loadout, key)
+			entry.Tile.TextColor3 = if on then C.Gold elseif gem then gemColor(gem) else C.Faint
+		end
+	end
+end
+
+local previewAsked = ""
 local function drawDetail(loadout)
 	local target = state.Detail
 	ui.List.Visible = target == nil
@@ -1633,6 +1853,7 @@ local function drawDetail(loadout)
 	if not target then
 		return
 	end
+	paintStrip(loadout)
 	local isKey = table.find(KEYS, target) ~= nil
 	for _, name in { "PieceWell", "GemWell" } do
 		ui[name].Holder.Visible = not isKey
@@ -1644,17 +1865,23 @@ local function drawDetail(loadout)
 	ui.SurgeName.Visible = isKey
 	ui.SurgeMeta.Visible = isKey
 	ui.SurgeGem.Visible = isKey
+	local pick = state.Pick
+	local gold = C.Gold:ToHex()
 	if isKey then
-		ui.Crumb.Text = string.format('‹  <font color="#%s">SURGE %s</font>', C.Text:ToHex(), target)
-		local gem = Tech.surgeGem(loadout, target)
+		local current = Tech.surgeGem(loadout, target)
+		local trying = if pick and pick.Kind == "Gem" then pick.Gem else nil
+		local gem = trying or current
 		local surge = gem and Tech.surgeStats(gem)
 		local tint = if gem then gemColor(gem) else C.Faint
 		ui.SurgeName.Text = if surge then surge.Name else "No surge on " .. target
-		ui.SurgeMeta.Text = if surge
-			then string.format('<font color="#%s">%s</font>  ·  %s CHARGE  ·  %s S', tint:ToHex(), string.upper(GemConfig.elementName(gem.Element)), whole(surge.Cost or 0), whole(surge.Cooldown or 0))
-			else "PICK A GEM BELOW"
-		ui.SurgeGem.Text = if gem then "From " .. GemConfig.displayName(gem) else ""
-		ui.SurgeIconEdge.Color = tint
+		ui.SurgeMeta.Text = (if trying then string.format('<font color="#%s">TRYING ON</font>  ·  ', gold) else "")
+			.. (if surge
+				then string.format('<font color="#%s">%s</font>  ·  %s CHARGE  ·  %s S', tint:ToHex(), string.upper(GemConfig.elementName(gem.Element)), whole(surge.Cost or 0), whole(surge.Cooldown or 0))
+				else "PICK A GEM BELOW")
+		ui.SurgeGem.Text = if trying and current then "Replaces " .. gemName(current) .. " on " .. target
+			elseif gem then "From " .. GemConfig.displayName(gem)
+			else ""
+		ui.SurgeIconEdge.Color = if trying then C.Gold else tint
 		local shown = if gem then gem.Id else ""
 		if ui.SurgeShown ~= shown then
 			ui.SurgeShown = shown
@@ -1681,35 +1908,43 @@ local function drawDetail(loadout)
 		drawGrid(items, "No surge gems yet. Cut a gem at the Outpost to unlock its surge.")
 	else
 		local slot = target
-		local gear = gearOf(loadout, slot)
-		local gem = loadout[slot .. "Gem"]
-		local rarity = if gear then rarityOf(loadout, slot) else 1
+		local wornId = loadout[slot]
+		local wornGem = loadout[slot .. "Gem"]
+		-- A pick is tried on in place: its piece (with that piece's own gem),
+		-- or its gem in this piece.
+		local tryPiece = if pick and pick.Kind == "Piece" then pick.Id else nil
+		local tryGem = if pick and pick.Kind == "Gem" then pick.Gem else nil
+		local viewId = tryPiece or wornId
+		local gem = if tryGem then tryGem
+			elseif tryPiece then (loadout.ItemGems and loadout.ItemGems[slot] and loadout.ItemGems[slot][tryPiece])
+			else wornGem
+		local gear = gearOf(loadout, slot, viewId)
+		local rarity = if gear then rarityOf(loadout, slot, viewId) else 1
 		local color = rarityColor(rarity)
-		ui.Crumb.Text = string.format(
-			'‹  <font color="#%s">%s</font>  ·  %s',
-			C.Text:ToHex(),
-			SLOT_NAME[slot],
-			string.upper(gear and gear.Name or "nothing worn")
-		)
 		-- The piece.
 		local well = ui.PieceWell
-		local pieceKey = tostring(loadout[slot]) .. "|" .. tostring(ui.ArtVersion or 0)
+		local pieceKey = tostring(viewId) .. "|" .. tostring(ui.ArtVersion or 0) .. "|" .. tostring(tryPiece ~= nil)
 		if well.Key ~= pieceKey then
 			well.Key = pieceKey
-			if loadout[slot] then
-				gearArt(well.Art, slot, loadout[slot], true, color)
+			if viewId then
+				gearArt(well.Art, slot, viewId, tryPiece == nil, color)
 			else
 				clear(well.Art)
 			end
 		end
 		well.Empty.Visible = gear == nil
-		well.Edge.Color = if state.Tab == "Pieces" then C.Gold else color
-		well.Edge.Transparency = if state.Tab == "Pieces" then 0.2 else 0.5
+		well.Edge.Color = if tryPiece or state.Tab == "Pieces" then C.Gold else color
+		well.Edge.Transparency = if tryPiece then 0 elseif state.Tab == "Pieces" then 0.2 else 0.5
 		well.Name.Text = if gear then gear.Name else "Nothing worn"
-		local roll = GearRolls.get(loadout, slot)
-		local stat = topStat(roll)
-		well.Sub.Text = if gear then rarityName(rarity) .. (if stat then "  ·  " .. string.upper(stat) else "") else "PICK ONE BELOW"
-		well.Sub.TextColor3 = color
+		local stat = topStat(GearRolls.get(loadout, slot, viewId))
+		if tryPiece then
+			local gain = ratingGain(loadout, slot, tryPiece)
+			well.Sub.Text = string.format("TRYING ON  ·  RATING %s%d", if gain >= 0 then "+" else "", gain)
+			well.Sub.TextColor3 = C.Gold
+		else
+			well.Sub.Text = if gear then rarityName(rarity) .. (if stat then "  ·  " .. string.upper(stat) else "") else "PICK ONE BELOW"
+			well.Sub.TextColor3 = color
+		end
 		-- The gem.
 		local gw = ui.GemWell
 		local gemKey = if gem then gem.Id .. ":" .. tostring(gem.Cut) else ""
@@ -1721,23 +1956,42 @@ local function drawDetail(loadout)
 			end
 		end
 		gw.Empty.Visible = gem == nil
-		gw.Edge.Color = if gem then gemColor(gem) else C.Line
+		gw.Edge.Color = if tryGem then C.Gold elseif gem then gemColor(gem) else C.Line
 		gw.Edge.Transparency = if gem then 0 else 0.85
 		gw.Name.Text = if gem then gemName(gem) else "Empty socket"
-		gw.Sub.Text = if gem
-			then string.upper(GemConfig.elementName(gem.Element)) .. "  ·  " .. rarityName(gemRarity(gem))
-			else "ENCHANTING IS PURE GAIN"
-		gw.Sub.TextColor3 = if gem then gemColor(gem) else C.Dim
-		-- The perk.
-		local signature = gear and perkOf(loadout, slot, nil, gem)
+		if tryGem then
+			gw.Sub.Text = "TRYING ON"
+			gw.Sub.TextColor3 = C.Gold
+		else
+			gw.Sub.Text = if gem
+				then string.upper(GemConfig.elementName(gem.Element)) .. "  ·  " .. rarityName(gemRarity(gem))
+				else "ENCHANTING IS PURE GAIN"
+			gw.Sub.TextColor3 = if gem then gemColor(gem) else C.Dim
+		end
+		-- The perk: now, with the gem, or (trying something on) now -> then.
+		local signature = gear and perkOf(loadout, slot, viewId, gem)
+		local current = perkOf(loadout, slot, nil, wornGem)
 		ui.PerkText.Size = UDim2.fromOffset(RIGHT_W - 36, 30)
 		ui.PerkValue.TextSize = 18
 		ui.PerkValue.TextWrapped = false
+		ui.PerkValue.TextYAlignment = Enum.TextYAlignment.Top
+		ui.PerkValue.Position = UDim2.fromOffset(18, 228)
+		ui.PerkValue.Size = UDim2.fromOffset(RIGHT_W - 36, 26)
 		if signature then
 			local d = signature.Definition
 			ui.PerkName.Text = string.upper(d.Name)
 			ui.PerkText.Text = d.Trigger
-			if gem and signature.Value > signature.Base + 1e-6 then
+			if (tryGem or tryPiece) and current and current.Id == signature.Id then
+				local better = signature.Value >= current.Value - 1e-6
+				ui.PerkValue.Text = string.format(
+					'<font color="#%s">NOW %s</font>  <font color="#%s">→</font>  <font color="#%s">%s</font>',
+					C.Dim:ToHex(),
+					perkValue(current),
+					C.Faint:ToHex(),
+					(if better then C.Good else C.Bad):ToHex(),
+					perkValue(signature)
+				)
+			elseif gem and signature.Value > signature.Base + 1e-6 then
 				ui.PerkValue.Text = string.format(
 					'<font color="#%s">%s</font>  <font color="#%s">→</font>  %s',
 					C.Dim:ToHex(),
@@ -1759,8 +2013,11 @@ local function drawDetail(loadout)
 					table.insert(lines, l.Text)
 				end
 				ui.PerkValue.Text = string.format('<font color="#%s">%s</font>', gemColor(gem):ToHex(), table.concat(lines, "  ·  "))
-				ui.PerkValue.TextSize = 13
+				ui.PerkValue.TextSize = 12
 				ui.PerkValue.TextWrapped = true
+				ui.PerkValue.TextTruncate = Enum.TextTruncate.None
+				ui.PerkValue.Position = UDim2.fromOffset(18, 220)
+				ui.PerkValue.Size = UDim2.fromOffset(RIGHT_W - 36, 36)
 			else
 				ui.PerkValue.Text = string.format('<font color="#%s">Add a gem to enchant it</font>', C.Faint:ToHex())
 				ui.PerkValue.TextSize = 13
@@ -1777,7 +2034,10 @@ local function drawDetail(loadout)
 			for _, spare in sparesFor(slot) do
 				table.insert(items, { Kind = "Piece", Slot = slot, Id = spare.Id, Gear = spare.Gear } :: any)
 			end
-			if #items > 0 then
+			-- Spare pieces' 3D art comes from the server: ask once per list.
+			local askKey = slot .. ":" .. #items
+			if #items > 0 and previewAsked ~= askKey then
+				previewAsked = askKey
 				task.spawn(function()
 					pcall(GemClient.request, "GearPreviews")
 				end)
@@ -1791,6 +2051,98 @@ local function drawDetail(loadout)
 		end
 	end
 	InventoryV2.drawCompare()
+end
+
+-- Item cards: hover a worn piece for everything about it, beside the list.
+do
+	local TIP_W = 290
+	local tip: Frame? = nil
+	local tipEdge: UIStroke? = nil
+	function InventoryV2.hideTip()
+		if tip then
+			tip.Visible = false
+		end
+	end
+	function InventoryV2.showTip(slot: string, row: GuiObject)
+		local loadout = loadoutNow()
+		local gear = gearOf(loadout, slot)
+		if not gear or not ui.Canvas then
+			InventoryV2.hideTip()
+			return
+		end
+		if not tip then
+			tip = frame(ui.Canvas, Color3.fromRGB(12, 16, 25), 0.03)
+			local made = tip :: Frame
+			made.Name = "ItemCard"
+			made.ZIndex = 20
+			round(made, 12)
+			tipEdge = stroke(made, C.Line, 1, 0.55)
+		end
+		local card = tip :: Frame
+		clear(card)
+		local rarity = rarityOf(loadout, slot)
+		local color = rarityColor(rarity)
+		if tipEdge then
+			tipEdge.Color = color
+		end
+		local y = 14
+		local function line(value: string, size: number, color3: Color3, font: Enum.Font, h: number, wrap: boolean?)
+			local l = place(text(card, value, size, color3, font), 16, y, TIP_W - 32, h)
+			l.RichText = true
+			l.ZIndex = 21
+			if wrap then
+				l.TextWrapped = true
+				l.TextTruncate = Enum.TextTruncate.None
+				l.TextYAlignment = Enum.TextYAlignment.Top
+			end
+			y += h + 4
+			return l
+		end
+		line(gear.Name, 16, color, HEAVY, 20)
+		line(rarityName(rarity) .. "  ·  " .. SLOT_NAME[slot], 10, C.Dim, HEADING, 12)
+		y += 4
+		local rule = frame(card, C.Line, 0.9)
+		place(rule, 16, y, TIP_W - 32, 1)
+		rule.ZIndex = 21
+		y += 10
+		local roll = GearRolls.get(loadout, slot)
+		local stats = {}
+		for stat, amount in roll and roll.Stats or {} do
+			table.insert(stats, statText(stat, amount))
+		end
+		table.sort(stats)
+		for _, entry in stats do
+			line(entry, 13, C.Good, HEADING, 16)
+		end
+		local gem = loadout[slot .. "Gem"]
+		local signature = perkOf(loadout, slot, nil, gem)
+		if signature then
+			y += 4
+			line(string.upper(signature.Definition.Name), 10, C.Gold, HEADING, 12)
+			line(signature.Definition.Trigger, 11, C.Dim, MEDIUM, 28, true)
+			line(perkValue(signature), 14, C.Good, HEAVY, 18)
+		end
+		y += 4
+		if gem then
+			line(string.format("◆  %s  ·  %s", gemName(gem), GemConfig.elementName(gem.Element)), 12, gemColor(gem), HEADING, 16)
+		else
+			line("◇  Empty gem socket", 12, C.Faint, HEADING, 16)
+		end
+		local family = ArmorFamilies.ById[loadout[slot]]
+		if family and family.ArmorFamily then
+			local ok, setState = pcall(Classes.setState, loadout)
+			local count = ok and setState.Active[family.ArmorFamily] and setState.Active[family.ArmorFamily].Count or 0
+			line(string.format("%s SET  %d/6", string.upper(family.ArmorFamily), count), 10, ArmorFamilies.Families[family.ArmorFamily].Color, HEADING, 12)
+		end
+		line("CLICK TO CHANGE  ·  DROP A GEM TO SOCKET", 9, C.Faint, HEADING, 12)
+		y += 6
+		-- Beside the row, inside the screen.
+		local rowY = (row.Position.Y.Offset or 0) + 96
+		local top = math.clamp(rowY - 8, 70, H - 40 - y)
+		card.Position = UDim2.fromOffset(RIGHT_X - TIP_W - 14, top)
+		card.Size = UDim2.fromOffset(TIP_W, y)
+		card.Visible = true
+	end
 end
 
 local queued = false
@@ -1835,6 +2187,7 @@ function InventoryV2.mount(host: ScreenGui)
 		Size = UDim2.fromOffset(W, H),
 	}, safe)
 	local scale = new("UIScale", {}, canvas)
+	ui.Canvas = canvas
 	local function fit()
 		if not gui then
 			return
@@ -1856,6 +2209,7 @@ function InventoryV2.mount(host: ScreenGui)
 			draw()
 		else
 			InventoryV2.cancelDrag()
+			InventoryV2.hideTip()
 			state.Detail, state.Pick, state.Hover = nil, nil, nil
 		end
 	end)
@@ -1952,11 +2306,53 @@ playerGui.ChildAdded:Connect(function(child)
 		watchPreviews(child)
 	end
 end)
--- The element radar eases to new values.
+-- Backspace steps back out of a piece (as the ‹ does).
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed or UserInputService:GetFocusedTextBox() then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.Backspace and state.Active and gui and gui.Enabled and state.Detail then
+		if state.Pick then
+			state.Pick, state.Hover = nil, nil
+			draw()
+		else
+			openDetail(nil)
+		end
+	end
+end)
+-- Turning the miner: drag across them.
+UserInputService.InputChanged:Connect(function(input)
+	local turning = ui.Turning
+	if not turning then
+		return
+	end
+	if input.UserInputType == Enum.UserInputType.MouseMovement or (turning.Touch and input.UserInputType == Enum.UserInputType.Touch) then
+		local dx = input.Position.X - turning.X
+		turning.X = input.Position.X
+		ui.MinerYaw = (ui.MinerYaw or 0) - dx * 0.012
+		InventoryV2.aimMiner()
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if ui.Turning and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+		ui.Turning = nil
+	end
+end)
+-- The element radar eases to new values, and an empty gem socket on a worn
+-- piece breathes gold: the next thing to do.
 game:GetService("RunService").Heartbeat:Connect(function(dt)
 	if state.Active and gui and gui.Enabled and ui.AttackRadar then
 		StatRadar.step(ui.AttackRadar, dt)
 		StatRadar.step(ui.ResistRadar, dt)
+		local loadout = loadoutNow()
+		local pulse = 0.5 + 0.5 * math.sin(os.clock() * 3.5)
+		for slot, row in ui.Rows or {} do
+			if loadout[slot] and not loadout[slot .. "Gem"] then
+				row.Ring.Color = C.Gold
+				row.Ring.Transparency = 0.75 - 0.55 * pulse
+				row.Plus.TextColor3 = C.Faint:Lerp(C.Gold, pulse * 0.8)
+			end
+		end
 	end
 end)
 -- The free pick's clock.
