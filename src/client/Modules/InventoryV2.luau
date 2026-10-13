@@ -53,6 +53,7 @@ local GemClient = require(script.Parent.GemClient)
 local InventoryPose = require(script.Parent.InventoryPose)
 local IronUi = require(script.Parent.IronUi)
 local StatRadar = require(script.Parent.StatRadar)
+local GemVault = require(script.Parent.GemVault)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
 
@@ -875,7 +876,42 @@ local function buildRight(canvas: Frame)
 		ui.Rows[slot] = buildRow(list, slot, y)
 		y += 80
 	end
-	-- Under the list: what's still empty, and a button straight to it.
+	-- Under the list: every gem you own, in the gem window (GemVault).
+	local gems = new("TextButton", {
+		Name = "GemsButton",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+	}, list)
+	place(gems, 0, y + 12, RIGHT_W, 56)
+	round(gems, 10)
+	new("UIGradient", {
+		Color = ColorSequence.new(Color3.fromRGB(38, 31, 60), Color3.fromRGB(16, 20, 31)),
+	}, gems)
+	local gemsEdge = stroke(gems, Color3.fromRGB(190, 120, 255), 1, 0.55)
+	local gemsIcon = frame(gems, Color3.fromRGB(255, 255, 255), 0.95)
+	place(gemsIcon, 10, 8, 40, 40)
+	round(gemsIcon, 20)
+	ui.GemsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, gemsIcon)
+	place(text(gems, "GEMS", 15, C.Text, HEAVY), 62, 10, 160, 20)
+	ui.GemsCount = place(text(gems, "", 10, C.Dim, HEADING), 62, 31, 220, 14)
+	local review =
+		place(text(gems, "REVIEW  ›", 12, Color3.fromRGB(200, 150, 255), HEAVY), RIGHT_W - 130, 18, 116, 20)
+	review.TextXAlignment = Enum.TextXAlignment.Right
+	gems:SetAttribute("UiSound", "Click")
+	gems.MouseEnter:Connect(function()
+		gemsEdge.Transparency = 0.1
+	end)
+	gems.MouseLeave:Connect(function()
+		gemsEdge.Transparency = 0.55
+	end)
+	gems.Activated:Connect(function()
+		if ui.Canvas then
+			GemVault.open(ui.Canvas)
+		end
+	end)
+	y += 68
+	-- Under that: what's still empty, and a button straight to it.
 	local nudge = frame(list, C.Gold, 0.94)
 	nudge.Name = "Nudge"
 	place(nudge, 0, y + 12, RIGHT_W, 64)
@@ -2557,6 +2593,44 @@ end
 
 local queued = false
 local drawIntro -- (below, with the intro card)
+-- The GEMS button: how many you own, and the best of them on its icon.
+local gemsShown = nil
+local function drawGemsButton(profile, loadout)
+	if not ui.GemsCount then
+		return
+	end
+	local total, socketed, best, bestRank = 0, 0, nil, -1
+	local function count(gem, inSocket: boolean)
+		if type(gem) ~= "table" or not gem.Id then
+			return
+		end
+		total += 1
+		if inSocket then
+			socketed += 1
+		end
+		local rank = (GEM_RARITY[gem.Tier] or 0) * 100 + (gem.Size or 0)
+		if rank > bestRank then
+			best, bestRank = gem, rank
+		end
+	end
+	for _, slot in Slots.Order do
+		count(loadout[slot .. "Gem"], true)
+	end
+	count(loadout.Surge2Gem, true)
+	for _, gem in profile.Gems or {} do
+		count(gem, false)
+	end
+	ui.GemsCount.Text = string.format("%d OWNED  ·  %d SOCKETED  ·  MOVE TREES", total, socketed)
+	local key = best and best.Id or ""
+	if gemsShown ~= key then
+		gemsShown = key
+		clear(ui.GemsIcon)
+		if best then
+			gemArt(ui.GemsIcon, best)
+		end
+	end
+end
+
 function draw()
 	if queued then
 		return
@@ -2572,6 +2646,7 @@ function draw()
 		drawWallet(profile)
 		drawLeft(profile, loadout)
 		drawRows(loadout)
+		drawGemsButton(profile, loadout)
 		drawNudge(profile, loadout)
 		drawKeys(loadout)
 		drawDetail(loadout)
@@ -2728,6 +2803,7 @@ function InventoryV2.mount(host: ScreenGui)
 		else
 			InventoryV2.cancelDrag()
 			InventoryV2.hideTip()
+			GemVault.close()
 			state.Detail, state.Pick, state.Hover = nil, nil, nil
 		end
 	end)
@@ -2740,6 +2816,7 @@ function InventoryV2.setActive(on: boolean)
 	end
 	if not on then
 		InventoryV2.cancelDrag()
+		GemVault.close()
 	end
 	draw()
 end
