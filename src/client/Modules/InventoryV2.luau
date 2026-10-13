@@ -18,12 +18,15 @@
 	Drag a gem from the grid onto any row or Q / E / R card to socket it.
 	The server checks every move (the same requests as the first Inventory).
 
-	A test build next to Modules/InventoryScreen (v1): the DEV panel flips
-	between them (player attribute InventoryVersion, 1 or 2).
+	The default Inventory. The first one (Modules/InventoryScreen, v1) is
+	kept and still built; the DEV panel can switch back to it (player
+	attribute InventoryVersion: 1 for v1, 2 or unset for this one). What v1
+	was and how to restore it: docs/v2-defaults.md.
 
 	  InventoryV2.mount(gui)       builds it inside the Dashboard ScreenGui
 	  InventoryV2.setActive(on)    shows it (and redraws) or hides it
 	  InventoryV2.cancelDrag()
+	  InventoryV2.version(player)  1 or 2: which Inventory this player sees
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -56,6 +59,14 @@ local player = Players.LocalPlayer
 local new = IronUi.new
 
 local InventoryV2 = {}
+
+-- Which Inventory a player gets when nothing has picked one (DEV panel).
+-- Set to 1 to make the first Inventory (Modules/InventoryScreen) the default again.
+InventoryV2.DefaultVersion = 2
+function InventoryV2.version(player: Player): number
+	local picked = player:GetAttribute("InventoryVersion")
+	return if picked == 1 or picked == 2 then picked else InventoryV2.DefaultVersion
+end
 
 -- Look -------------------------------------------------------------------------------------------------
 

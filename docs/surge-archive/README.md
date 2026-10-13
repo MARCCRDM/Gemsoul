@@ -22,3 +22,7 @@ Rules during the rework:
 - To regenerate the inventory: `lune run tools/archive_surges.luau .`
 - To see or restore the old version of any file:
   `git show 88a6299:<path>` or `git checkout 88a6299 -- <path>`.
+
+The Q / E / R triad replaced the classic surge array as the default; what it
+replaced, where the old data went and how to switch back:
+[`docs/v2-defaults.md`](../v2-defaults.md).

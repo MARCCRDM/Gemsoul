@@ -150,8 +150,9 @@ for i, item in buttons do
 	end)
 end
 
--- INVENTORY V1 / V2: flips the dashboard between the first Inventory and the
--- redesign (Modules/InventoryV2), to test and compare. This session only.
+-- INVENTORY V1 / V2: flips the dashboard between the redesign (the default,
+-- Modules/InventoryV2) and the first Inventory (kept, Modules/InventoryScreen),
+-- to test and compare. This session only.
 local versionCaption = Instance.new("TextLabel")
 versionCaption.Size = UDim2.fromOffset(96, 26)
 versionCaption.Position = UDim2.fromOffset(6, 296)
@@ -164,7 +165,7 @@ versionCaption.Text = "INVENTORY"
 versionCaption.Parent = panel
 local versionButtons = {}
 local function paintVersions()
-	local current = player:GetAttribute("InventoryVersion") or 1
+	local current = require(script.Parent.Modules.InventoryV2).version(player)
 	for version, b in versionButtons do
 		local on = version == current
 		b.BackgroundColor3 = if on then Color3.fromRGB(255, 210, 126) else Color3.fromRGB(39, 61, 79)
@@ -178,13 +179,13 @@ for version = 1, 2 do
 	b.Position = UDim2.fromOffset(104 + (version - 1) * 98, 296)
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 12
-	b.Text = if version == 1 then "V1  CURRENT" else "V2  NEW"
+	b.Text = if version == 1 then "V1  OLD" else "V2  CURRENT"
 	b.Parent = panel
 	corner(b, 5)
 	b.Activated:Connect(function()
 		player:SetAttribute("InventoryVersion", version)
 		paintVersions()
-		status.Text = "Inventory " .. (if version == 1 then "v1 (current)" else "v2 (redesign)") .. ". Open INVENTORY to see it."
+		status.Text = "Inventory " .. (if version == 1 then "v1 (old)" else "v2 (default)") .. ". Open INVENTORY to see it."
 	end)
 	versionButtons[version] = b
 end

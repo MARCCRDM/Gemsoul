@@ -14,6 +14,7 @@ if not Config.MenuOnly then
 end
 
 local InventoryScreen = require(script.Parent.Modules.InventoryScreen)
+local InventoryV2 = require(script.Parent.Modules.InventoryV2)
 -- These run on their own once loaded (chat, trades, the Outpost, the
 -- Arena and Social), whether or not the Inventory shows them.
 require(script.Parent.Modules.ChatFrame)
@@ -38,6 +39,7 @@ local P = IronUi.Colors
 
 local function launch(action)
 	InventoryScreen.cancelDrag()
+	InventoryV2.cancelDrag()
 	action()
 end
 local W, H = 1432, 632
@@ -108,7 +110,7 @@ local function fit()
 	local bottom = if phone then 6 else BOTTOM
 	safe.Size = UDim2.new(1, 0, 1, -TOPBAR - bottom)
 	if buildTag then
-		buildTag.Visible = not phone and player:GetAttribute("InventoryVersion") ~= 2
+		buildTag.Visible = not phone and InventoryV2.version(player) ~= 2
 	end
 	if screen.X > 0 and screen.Y > TOPBAR + bottom then
 		fitScale.Scale = math.min(screen.X / W, (screen.Y - TOPBAR - bottom) / H)
@@ -283,12 +285,12 @@ end
 -- The Inventory fills the rest: loadout on the left, bags on the right.
 InventoryScreen.mount(root, gui, UDim2.fromOffset(16, 0))
 
--- The redesign (Modules/InventoryV2), side by side with the first one: the
--- DEV panel flips the InventoryVersion attribute (1 or 2) to compare them.
-local InventoryV2 = require(script.Parent.Modules.InventoryV2)
+-- The redesign (Modules/InventoryV2) is the default; the first Inventory is
+-- still built beside it, and the DEV panel's InventoryVersion (1 or 2)
+-- switches between them (docs/v2-defaults.md).
 InventoryV2.mount(gui)
 local function applyVersion()
-	local v2 = player:GetAttribute("InventoryVersion") == 2
+	local v2 = InventoryV2.version(player) == 2
 	root.Visible = not v2
 	if buildTag then
 		buildTag.Visible = not v2 and gui.AbsoluteSize.Y >= 500
@@ -397,7 +399,11 @@ end)
 player.PlayerGui.ChildRemoved:Connect(function(child)
 	if child.Name == "Intro" then
 		syncVisibility()
-		InventoryScreen.refresh()
+		if InventoryV2.version(player) == 2 then
+			InventoryV2.setActive(true) -- redraws
+		else
+			InventoryScreen.refresh()
+		end
 	end
 end)
 
