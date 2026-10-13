@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- A heater shield: a raised rim, a centre band, a boss with a glint. -->
+  <path stroke="#121212" stroke-width="7" stroke-linejoin="round" d="M18 12 L110 12 L110 56 C110 88 90 110 64 122 C38 110 18 88 18 56 Z"/>
+  <path fill="#bdbdbd" d="M18 12 L110 12 L110 56 C110 88 90 110 64 122 C38 110 18 88 18 56 Z"/>
+  <path fill="#ffffff" d="M18 12 L64 12 L64 122 C38 110 18 88 18 56 Z"/>
+  <!-- inner field -->
+  <path fill="#8c8c8c" d="M28 22 L100 22 L100 56 C100 82 84 100 64 110 C44 100 28 82 28 56 Z"/>
+  <path fill="#e2e2e2" d="M28 22 L64 22 L64 110 C44 100 28 82 28 56 Z"/>
+  <!-- cross band -->
+  <rect x="57" y="22" width="14" height="88" fill="#bdbdbd"/>
+  <rect x="57" y="22" width="7" height="88" fill="#ffffff"/>
+  <rect x="28" y="50" width="72" height="14" fill="#bdbdbd"/>
+  <rect x="28" y="50" width="72" height="7" fill="#ffffff"/>
+  <!-- boss -->
+  <circle cx="64" cy="57" r="14" fill="#121212"/>
+  <circle cx="64" cy="57" r="11" fill="#bdbdbd"/>
+  <path fill="#ffffff" d="M64 46 A11 11 0 0 0 53 57 L64 57 Z"/>
+  <circle cx="60" cy="53" r="3" fill="#ffffff"/>
+  <path fill="#ffffff" opacity="0.8" d="M24 16 L44 16 L40 20 L24 20 Z"/>
+</svg>

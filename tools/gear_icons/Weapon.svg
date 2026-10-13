@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- A sword, point up and leaning: a bevelled blade with its fuller, a
+       swept guard, a wrapped grip and a pommel. -->
+  <g transform="rotate(40 64 64) translate(0 -2)">
+    <g stroke="#121212" stroke-width="7" stroke-linejoin="round">
+      <path d="M64 2 L74 16 L74 86 L54 86 L54 16 Z"/>
+      <path d="M34 84 C40 84 44 88 50 88 L78 88 C84 88 88 84 94 84 L96 92 C88 92 84 98 78 98 L50 98 C44 98 40 92 32 92 Z"/>
+      <rect x="58" y="96" width="12" height="22" rx="3"/>
+      <circle cx="64" cy="122" r="7"/>
+    </g>
+    <path fill="#bdbdbd" d="M64 2 L74 16 L74 86 L64 86 Z"/>
+    <path fill="#ffffff" d="M64 2 L54 16 L54 86 L64 86 Z"/>
+    <rect x="62" y="20" width="4" height="60" rx="2" fill="#8c8c8c"/>
+    <path fill="#e2e2e2" d="M34 84 C40 84 44 88 50 88 L78 88 C84 88 88 84 94 84 L96 92 C88 92 84 98 78 98 L50 98 C44 98 40 92 32 92 Z"/>
+    <path fill="#ffffff" d="M34 84 C40 84 44 88 50 88 L64 88 L64 93 L50 93 C44 93 40 89 33 89 Z"/>
+    <rect x="58" y="96" width="12" height="22" rx="3" fill="#8c8c8c"/>
+    <rect x="58" y="100" width="12" height="3" fill="#3b3b3b"/>
+    <rect x="58" y="106" width="12" height="3" fill="#3b3b3b"/>
+    <rect x="58" y="112" width="12" height="3" fill="#3b3b3b"/>
+    <circle cx="64" cy="122" r="7" fill="#e2e2e2"/>
+    <circle cx="62" cy="120" r="2.5" fill="#ffffff"/>
+  </g>
+</svg>

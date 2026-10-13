@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- A plated boot: greave with a turned cuff, an armoured foot, a toe cap, a sole. -->
+  <path stroke="#121212" stroke-width="7" stroke-linejoin="round" d="M34 8 L84 8 L82 20 L80 66 C92 70 106 74 114 84 C118 90 118 98 116 104 L116 116 L18 116 L18 100 C18 92 24 84 32 80 L36 20 Z"/>
+  <path fill="#bdbdbd" d="M36 20 L80 20 L80 66 C92 70 106 74 114 84 C118 90 118 98 116 104 L18 104 L18 100 C18 92 24 84 32 80 Z"/>
+  <path fill="#ffffff" d="M36 20 L58 20 L58 104 L18 104 L18 100 C18 92 24 84 32 80 Z"/>
+  <path fill="#e2e2e2" d="M34 8 L84 8 L82 22 L36 22 Z"/>
+  <path fill="#ffffff" d="M34 8 L58 8 L58 22 L36 22 Z"/>
+  <!-- toe cap -->
+  <path fill="#e2e2e2" d="M80 72 C94 76 106 80 112 88 C115 92 115 98 114 104 L84 104 C84 92 82 82 80 72 Z"/>
+  <path fill="#3b3b3b" d="M78 70 C82 80 86 92 86 104 L82 104 C82 92 79 81 76 72 Z"/>
+  <!-- greave bands -->
+  <rect x="38" y="34" width="40" height="4" rx="2" fill="#3b3b3b"/>
+  <rect x="38" y="50" width="40" height="4" rx="2" fill="#3b3b3b"/>
+  <!-- sole -->
+  <rect x="18" y="104" width="98" height="12" rx="3" fill="#3b3b3b"/>
+  <rect x="22" y="106" width="90" height="3" fill="#8c8c8c"/>
+  <path fill="#ffffff" opacity="0.8" d="M40 24 L52 24 L50 30 L40 30 Z"/>
+</svg>

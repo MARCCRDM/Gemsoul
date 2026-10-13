@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- A breastplate: pauldrons, a neck guard, a centre ridge, pecs and ab plates. -->
+  <path stroke="#121212" stroke-width="7" stroke-linejoin="round" d="M40 16 L52 12 C55 20 59 24 64 24 C69 24 73 20 76 12 L88 16 L110 26 C118 36 118 50 110 58 L98 58 L98 98 C98 110 84 118 64 118 C44 118 30 110 30 98 L30 58 L18 58 C10 50 10 36 18 26 Z"/>
+  <!-- body -->
+  <path fill="#bdbdbd" d="M30 46 L98 46 L98 98 C98 110 84 118 64 118 C44 118 30 110 30 98 Z"/>
+  <path fill="#ffffff" d="M30 46 L64 46 L64 118 C44 118 30 110 30 98 Z"/>
+  <!-- neck guard -->
+  <path fill="#e2e2e2" d="M40 16 L52 12 C55 20 59 24 64 24 C69 24 73 20 76 12 L88 16 L88 46 L40 46 Z"/>
+  <path fill="#ffffff" d="M40 16 L52 12 C55 20 59 24 64 24 L64 46 L40 46 Z"/>
+  <!-- pauldrons -->
+  <path fill="#ffffff" d="M18 26 L42 16 C46 26 46 40 40 52 L30 58 L18 58 C10 50 10 36 18 26 Z"/>
+  <path fill="#bdbdbd" d="M110 26 L86 16 C82 26 82 40 88 52 L98 58 L110 58 C118 50 118 36 110 26 Z"/>
+  <path fill="#3b3b3b" d="M16 40 C24 40 32 44 38 50 L36 53 C30 47 23 44 15 44 Z"/>
+  <path fill="#3b3b3b" d="M112 40 C104 40 96 44 90 50 L92 53 C98 47 105 44 113 44 Z"/>
+  <!-- ridge, pecs, abs -->
+  <rect x="62" y="28" width="4" height="88" fill="#3b3b3b"/>
+  <path fill="#3b3b3b" d="M36 58 C46 66 54 68 62 64 L62 68 C54 72 45 70 35 62 Z"/>
+  <path fill="#3b3b3b" d="M92 58 C82 66 74 68 66 64 L66 68 C74 72 83 70 93 62 Z"/>
+  <rect x="38" y="80" width="52" height="4" rx="2" fill="#3b3b3b"/>
+  <rect x="40" y="94" width="48" height="4" rx="2" fill="#3b3b3b"/>
+  <path fill="#ffffff" opacity="0.8" d="M22 30 L36 24 L30 34 L18 40 Z"/>
+</svg>

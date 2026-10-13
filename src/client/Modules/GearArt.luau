@@ -96,12 +96,37 @@ end
 -- shapes lit from above (a gradient), a soft shadow under the silhouette,
 -- a lighter edge on top and darker details (visor, plates, fingers, fuller).
 local BLACK, WHITE = Color3.new(0, 0, 0), Color3.new(1, 1, 1)
+-- The vector icons (tools/gear_icons/*.svg, baked by tools/make_gear_icons.js
+-- into assets/images/gear_icons.png): one 256 px cell per slot, grey so the
+-- item's colour tints them. Upload the PNG once (Creator Hub, Images) and put
+-- its id here; until then the drawn icons below stand in.
+GearArt.IconSheet = {
+	ImageId = 0,
+	Cell = 256,
+	Order = { Helmet = 0, Armor = 1, Gloves = 2, Boots = 3, Weapon = 4, Shield = 5 },
+}
 function GearArt.icon(parent, slotName, gear, color)
 	local icon = new(
 		"Frame",
 		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(5, 4), Size = UDim2.fromOffset(28, 26) },
 		parent
 	)
+	local sheet = GearArt.IconSheet
+	local cell = sheet.Order[slotName] or sheet.Order.Weapon
+	if sheet.ImageId ~= 0 then
+		new("ImageLabel", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(28, 28),
+			Image = "rbxassetid://" .. sheet.ImageId,
+			ImageRectOffset = Vector2.new(cell * sheet.Cell, 0),
+			ImageRectSize = Vector2.new(sheet.Cell, sheet.Cell),
+			ImageColor3 = color,
+			ScaleType = Enum.ScaleType.Fit,
+		}, icon)
+		return icon
+	end
 	local art = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
