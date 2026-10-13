@@ -2028,11 +2028,18 @@ function Equipment.start()
 					local id = loadout[slot]
 					if id then table.insert(keys, id .. ":" .. previewKey(loadout, slot, id, loadout[slot .. "Quality"] or 1)) end
 				end
-				local key = table.concat(keys, "|")
+				-- ("fist" marks previews held the fighting way: rebuilt once from older ones)
+				local key = "fist|" .. table.concat(keys, "|")
 				local name = tostring(index)
 				if rosterKeys[player][index] ~= key or not store:FindFirstChild(name) then
 					local rig = mannequin()
 					if rig then
+						-- Held as a player holds it (FistGrip): the Inventory poses
+						-- these in the fighting stances, which are shaped for the
+						-- sword in the fist and the shield on end across the forearm.
+						-- Without it the blade lay along the arm, across the body,
+						-- and the shield stood edge-on.
+						rig:SetAttribute("FistGrip", true)
 						Equipment.dressModel(rig, loadout, player.UserId)
 						for _, child in rig:GetDescendants() do
 							if child:IsA("BaseScript") or child:IsA("Sound") then child:Destroy()

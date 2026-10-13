@@ -8,7 +8,10 @@
 	  Prospector   the ready stance: sword out, shield before the belly
 	  Skirmisher   an aggressive lean: blade raised, weight forward
 	  Juggernaut   the shield guard: shield up across the chest, sword
-	               cocked back to strike
+	               stood up at the side
+
+	The previews are built held as a player holds them (FistGrip, see
+	Equipment's MinerPreviews), which these stances are shaped for.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -30,10 +33,14 @@ LUNGE.LeftHip = { -0.15, 0, -0.08 }
 LUNGE.RightKnee = { -0.55, 0, 0 }
 LUNGE.LeftKnee = { -0.2, 0, 0 }
 
--- The guard with the shield held at the chest, so the helmet still shows.
+-- The guard with the shield held at the chest, so the helmet still shows,
+-- and the sword stood up at the side (cocked back it pointed at the camera
+-- and hid behind the body).
 local BRACE = table.clone(GUARD)
 BRACE.LeftShoulder = { 1.85, -0.85, 1.15 }
 BRACE.LeftElbow = { 0.9, 0.15, 0 }
+BRACE.RightShoulder = READY.RightShoulder
+BRACE.RightElbow = READY.RightElbow
 
 local POSES = { Prospector = READY, Skirmisher = LUNGE, Juggernaut = BRACE }
 
