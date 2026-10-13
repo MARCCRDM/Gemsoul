@@ -4,8 +4,10 @@ The Inventory v2 is now what every player sees. The Q / E / R triad is the way
 abilities work. This note records what each one replaced, where the old version
 still lives, and how to bring it back. Nothing was deleted.
 
-**Before this change:** commit `0492ab7` on `main`, tagged `before-v2-defaults`.
-To see any file as it was: `git show before-v2-defaults:<path>`.
+**Before this change:** commit `0492ab7` on `main`, the last commit with
+Inventory v1 as the default. To see any file as it was:
+`git show 0492ab7:<path>`; to restore one: `git checkout 0492ab7 -- <path>`.
+(To give it a name: `git tag before-v2-defaults 0492ab7 && git push origin before-v2-defaults`.)
 
 | | Now (default) | Replaced (kept) | Switch per player (DEV panel) | Switch for everyone |
 | --- | --- | --- | --- | --- |
