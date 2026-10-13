@@ -6,7 +6,7 @@ flashy moves; for now, the intro picks them for looks and fun, not for depth.
 R is never a shield. It is a wall, or a move that changes the ground around
 you. Shields still exist as R moves on gems mined later.
 
-| Picker: what each key can roll | Reveal: each gem cracks open, then gives up its surge |
+| Picker: what each key can roll | The Starter Vault: a gem slot machine; each reel lands your gem, which cracks into its surge |
 | --- | --- |
 | ![Picker](showcase-kit/picker.png) | ![Reveal](showcase-kit/reveal.png) |
 

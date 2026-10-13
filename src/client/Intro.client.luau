@@ -1167,28 +1167,73 @@ local function close()
 	end
 	gui:Destroy()
 end
--- The roll: a full-screen reveal of the kit. Each key is a tall card with a
--- sealed capsule that shakes while its two possible moves flicker, then
--- bursts open on the gem itself (the real stone going into that socket),
--- and the gem gives up its surge: the move's icon rises out of it. Q, then
--- E, then R. The move you didn't get stays on the card, crossed out. Click
--- to skip ahead.
+-- The roll: the Starter Vault, a gem slot machine. Pull the lever and three
+-- reels (Q, E, R) spin gems of every element and the moves this element
+-- can roll; each one stops on your gem on the payline, the gem cracks, and
+-- the surge it carries takes its place. The marquee lights chase while it
+-- spins and blink when the kit hits. Click to skip ahead.
 local KEYS = {
-	{ Key = "Q", Color = Color3.fromRGB(255, 138, 92), Slot = "SWORD", Gem = "SWORD GEM", Pays = "CHARGE" },
-	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CORE", Gem = "CORE GEM", Pays = "CHARGE" },
-	{ Key = "R", Color = Color3.fromRGB(120, 230, 170), Slot = "DEFENSE", Gem = "SHIELD GEM", Pays = "STAMINA" },
+	{ Key = "Q", Color = Color3.fromRGB(255, 138, 92), Slot = "SWORD", Pays = "CHARGE" },
+	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CORE", Pays = "CHARGE" },
+	{ Key = "R", Color = Color3.fromRGB(120, 230, 170), Slot = "DEFENSE", Pays = "STAMINA" },
 }
-local WELL = 156 -- (px: the gem's window)
+local CELL = 92 -- (px: one symbol on a reel; a window shows three)
+local REEL_W = 200
 local function keycap(parent, key, color, size)
 	-- A physical key: a darker base under a raised cap.
-	local base = frame(parent, { BackgroundColor3 = color:Lerp(C.Ink, 0.55), Size = UDim2.fromOffset(size, size + 6), ZIndex = 45 })
-	UiKit.round(base, 9)
-	local cap = frame(base, { BackgroundColor3 = color, Size = UDim2.fromOffset(size, size), ZIndex = 46 })
-	UiKit.round(cap, 9)
+	local base = frame(parent, { BackgroundColor3 = color:Lerp(C.Ink, 0.55), Size = UDim2.fromOffset(size, size + 5), ZIndex = 46 })
+	UiKit.round(base, 7)
+	local cap = frame(base, { BackgroundColor3 = color, Size = UDim2.fromOffset(size, size), ZIndex = 47 })
+	UiKit.round(cap, 7)
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35), color) }, cap)
-	local glyph = label(cap, key, math.floor(size * 0.58), C.Ink, Enum.Font.GothamBlack)
-	glyph.TextXAlignment, glyph.ZIndex = Enum.TextXAlignment.Center, 47
+	local glyph = label(cap, key, math.floor(size * 0.6), C.Ink, Enum.Font.GothamBlack)
+	glyph.TextXAlignment, glyph.ZIndex = Enum.TextXAlignment.Center, 48
 	return base
+end
+-- A cut gem drawn in UI: a faceted diamond in the element's colours.
+local function gemGlyph(parent, tint: Color3, size: number, z: number)
+	local holder = frame(parent, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(size, size),
+		BackgroundTransparency = 1,
+		ZIndex = z,
+	})
+	local side = math.floor(size * 0.62)
+	local body = frame(holder, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.52),
+		Size = UDim2.fromOffset(side, side),
+		Rotation = 45,
+		BackgroundColor3 = tint,
+		ZIndex = z,
+	})
+	UiKit.round(body, 5)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(tint:Lerp(Color3.new(1, 1, 1), 0.45), tint:Lerp(Color3.new(0, 0, 0), 0.35)),
+	}, body)
+	stroke(body, tint:Lerp(Color3.new(1, 1, 1), 0.6), 0.2, 2)
+	-- The table facet and a glint.
+	local facet = frame(holder, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.4),
+		Size = UDim2.fromOffset(math.floor(side * 0.42), math.floor(side * 0.42)),
+		Rotation = 45,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.55,
+		ZIndex = z + 1,
+	})
+	UiKit.round(facet, 3)
+	local glint = frame(holder, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.36, 0.36),
+		Size = UDim2.fromOffset(math.max(3, math.floor(size * 0.07)), math.max(3, math.floor(size * 0.07))),
+		Rotation = 45,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		ZIndex = z + 2,
+	})
+	return holder
 end
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
@@ -1198,6 +1243,7 @@ local function revealMoves(kit, after)
 	local theme = CardFX.Themes[element]
 	local deep = if theme then theme.Deep else C.Panel
 	local elementName = string.upper(GemConfig.elementName(element))
+	local rng = Random.new()
 
 	local shade = new("TextButton", {
 		Size = UDim2.fromScale(1, 1),
@@ -1208,7 +1254,6 @@ local function revealMoves(kit, after)
 		ZIndex = 40,
 	}, gui)
 	tween(shade, 0.3, { BackgroundTransparency = 0 })
-	-- The element floods up from below.
 	local flood = frame(shade, { BackgroundColor3 = deep, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 40 })
 	new("UIGradient", {
 		Rotation = 270,
@@ -1216,215 +1261,349 @@ local function revealMoves(kit, after)
 	}, flood)
 	tween(flood, 0.6, { BackgroundTransparency = 0 })
 
-	-- Everything sits on one board, scaled to fit the screen.
+	-- One board, scaled to fit the screen.
 	local board = frame(shade, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(900, 590),
+		Size = UDim2.fromOffset(900, 660),
 		BackgroundTransparency = 1,
 		ZIndex = 41,
 	})
-	local fitScale = new("UIScale", { Scale = 1 }, board)
+	local fitScale = new("UIScale", { Scale = 0.8 }, board)
 	local function fitBoard()
 		local size = panel.AbsoluteSize
 		if size.X > 0 and size.Y > 0 then
-			fitScale.Scale = math.min(1.1, size.X / 940, size.Y / 630)
+			fitScale.Scale = math.min(1.1, size.X / 940, size.Y / 690)
 		end
 	end
 	fitBoard()
 	listen(panel:GetPropertyChangedSignal("AbsoluteSize"), fitBoard)
 
-	local kicker = label(board, elementName .. "  ·  STARTER ROLL", 14, color, Enum.Font.GothamBlack)
-	kicker.TextXAlignment, kicker.ZIndex = Enum.TextXAlignment.Center, 42
-	kicker.Position, kicker.Size = UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, 18)
-	local title = label(board, "CRACKING YOUR GEMS", 40, C.Text, Enum.Font.GothamBlack)
-	title.TextXAlignment, title.ZIndex = Enum.TextXAlignment.Center, 42
-	title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 46)
+	-- The cabinet: brushed metal, a marquee, lights all round.
+	local cabinet = frame(board, {
+		Position = UDim2.fromOffset(60, 0),
+		Size = UDim2.fromOffset(760, 580),
+		BackgroundColor3 = Color3.fromRGB(34, 40, 54),
+		ZIndex = 42,
+	})
+	UiKit.round(cabinet, 22)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 80, 102)),
+			ColorSequenceKeypoint.new(0.12, Color3.fromRGB(36, 42, 58)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 22, 32)),
+		}),
+	}, cabinet)
+	stroke(cabinet, C.Gold, 0.15, 3)
+	local inner = frame(cabinet, {
+		Position = UDim2.fromOffset(10, 10),
+		Size = UDim2.new(1, -20, 1, -20),
+		BackgroundTransparency = 1,
+		ZIndex = 42,
+	})
+	UiKit.round(inner, 16)
+	stroke(inner, color, 0.55, 2)
 
-	local cards, effects = {}, {}
+	-- Marquee.
+	local marquee = frame(cabinet, {
+		Position = UDim2.fromOffset(24, 22),
+		Size = UDim2.new(1, -48, 0, 62),
+		BackgroundColor3 = C.Ink,
+		ZIndex = 43,
+	})
+	UiKit.round(marquee, 12)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(deep:Lerp(C.Ink, 0.3), C.Ink) }, marquee)
+	stroke(marquee, color, 0.3, 2)
+	local title = label(marquee, "STARTER VAULT", 34, C.Gold, Enum.Font.GothamBlack)
+	title.TextXAlignment, title.ZIndex = Enum.TextXAlignment.Center, 45
+	title.Position, title.Size = UDim2.fromOffset(0, 4), UDim2.new(1, 0, 0, 38)
+	new("UIStroke", { Color = Color3.fromRGB(120, 60, 0), Thickness = 2, Transparency = 0.2 }, title)
+	local subtitle = label(marquee, elementName .. " KIT  ·  PULLING THE LEVER", 12, color, Enum.Font.GothamBlack)
+	subtitle.TextXAlignment, subtitle.ZIndex = Enum.TextXAlignment.Center, 45
+	subtitle.Position, subtitle.Size = UDim2.fromOffset(0, 41), UDim2.new(1, 0, 0, 16)
+
+	local bulbs = {}
+	local function bulbRow(y)
+		for n = 1, 26 do
+			local bulb = frame(cabinet, {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0, 34 + (n - 1) * (692 / 25), 0, y),
+				Size = UDim2.fromOffset(9, 9),
+				BackgroundColor3 = C.Gold,
+				ZIndex = 44,
+			})
+			UiKit.round(bulb, 9)
+			table.insert(bulbs, bulb)
+		end
+	end
+	bulbRow(10)
+	bulbRow(570)
+
+	-- The reels.
+	local reelTop = 128
+	local startX = (760 - (REEL_W * 3 + 24 * 2)) / 2
+	local reels = {}
 	for index, spec in KEYS do
 		local id = moves[index]
 		local move = Tech.Catalog[id]
 		local pool = pools[index] or { id }
-		local gem = kit.Gems and kit.Gems[index] and kit.Gems[index].Gem
-			or { Id = "starter-" .. element .. index, Element = element, Tier = "Common", Size = 1, Clarity = 1, Cut = 1 }
 		local other = nil
 		for _, candidate in pool do
 			if candidate ~= id then
 				other = candidate
 			end
 		end
-		local x = (index - 1) * 300
-		local card = frame(board, {
-			Position = UDim2.fromOffset(x + 4, 84 + 40),
-			Size = UDim2.fromOffset(284, 426),
-			BackgroundColor3 = C.Card,
-			BackgroundTransparency = 1,
-			ZIndex = 42,
-		})
-		UiKit.round(card, 12)
-		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(spec.Color:Lerp(C.Card, 0.82), C.Ink) }, card)
-		local edge = stroke(card, spec.Color, 0.75, 1)
-		local punch = new("UIScale", { Scale = 1 }, card)
-		task.delay(0.1 + index * 0.09, function()
-			tween(card, 0.35, { Position = UDim2.fromOffset(x + 4, 84), BackgroundTransparency = 0 }, Enum.EasingStyle.Back)
-		end)
+		local x = startX + (index - 1) * (REEL_W + 24)
+		local cap = keycap(cabinet, spec.Key, spec.Color, 28)
+		cap.Position = UDim2.fromOffset(x, reelTop - 38)
+		local slot = label(cabinet, spec.Slot, 14, spec.Color, Enum.Font.GothamBlack)
+		slot.Position, slot.Size, slot.ZIndex = UDim2.fromOffset(x + 36, reelTop - 36), UDim2.fromOffset(REEL_W - 36, 16), 45
+		local pays = label(cabinet, "PAYS " .. spec.Pays, 10, C.Dim, Enum.Font.GothamBold)
+		pays.Position, pays.Size, pays.ZIndex = UDim2.fromOffset(x + 36, reelTop - 20), UDim2.fromOffset(REEL_W - 36, 12), 45
 
-		-- Header: the key, which slot it fires from, what it pays.
-		local cap = keycap(card, spec.Key, spec.Color, 44)
-		cap.Position = UDim2.fromOffset(16, 14)
-		local slot = label(card, spec.Slot, 18, spec.Color, Enum.Font.GothamBlack)
-		slot.Position, slot.Size, slot.ZIndex = UDim2.fromOffset(72, 16), UDim2.new(1, -84, 0, 22), 45
-		local pays = label(card, "PAYS " .. spec.Pays, 11, C.Dim, Enum.Font.GothamBold)
-		pays.Position, pays.Size, pays.ZIndex = UDim2.fromOffset(72, 40), UDim2.new(1, -84, 0, 14), 45
-
-		-- The well: the capsule, then the gem, in 3D.
-		local well = frame(card, {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0, 74 + WELL / 2),
-			Size = UDim2.fromOffset(WELL, WELL),
-			BackgroundColor3 = C.Ink,
+		local window = frame(cabinet, {
+			Position = UDim2.fromOffset(x, reelTop),
+			Size = UDim2.fromOffset(REEL_W, CELL * 3),
+			BackgroundColor3 = Color3.fromRGB(236, 240, 246),
+			ClipsDescendants = true,
 			ZIndex = 44,
 		})
-		UiKit.round(well, WELL)
+		UiKit.round(window, 10)
+		new("UIGradient", { Rotation = 0, Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 160, 178)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(246, 248, 252)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 160, 178)),
+		}) }, window)
+		local windowEdge = stroke(window, Color3.fromRGB(14, 16, 22), 0, 4)
+
+		-- The strip: symbols top to bottom; it runs downward and stops with
+		-- symbol 2 (your gem) on the payline.
+		local count = 26 + index * 9
+		local strip = frame(window, { BackgroundTransparency = 1, Size = UDim2.fromOffset(REEL_W, CELL * count), ZIndex = 45 })
+		local others = {}
+		for _, name in FastStart.Elements do
+			table.insert(others, name)
+		end
+		local finalGem
+		for n = 0, count do
+			local cell = frame(strip, {
+				Position = UDim2.fromOffset(0, (n - 1) * CELL),
+				Size = UDim2.fromOffset(REEL_W, CELL),
+				BackgroundTransparency = 1,
+				ZIndex = 45,
+			})
+			-- (A thin rule between symbols, like printed reel bands.)
+			frame(cell, { BackgroundColor3 = Color3.fromRGB(190, 198, 212), Position = UDim2.new(0, 14, 1, -1), Size = UDim2.new(1, -28, 0, 1), ZIndex = 45 })
+			local pick = if n == 2 then "Gem" elseif rng:NextNumber() < 0.38 then "Move" else "Gem"
+			if pick == "Move" then
+				local candidate = pool[rng:NextInteger(1, #pool)]
+				local tile = frame(cell, {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromOffset(CELL - 22, CELL - 22),
+					BackgroundColor3 = C.Ink,
+					ZIndex = 46,
+				})
+				UiKit.round(tile, 10)
+				stroke(tile, spec.Color, 0.2, 2)
+				Icons.apply(tile, Tech.Catalog[candidate])
+			else
+				local tint = if n == 2 then color else GemConfig.ElementColors[others[rng:NextInteger(1, #others)]] or color
+				local glyph = gemGlyph(cell, tint, CELL - 14, 46)
+				if n == 2 then
+					finalGem = glyph
+				end
+			end
+		end
+		local startY = -(count - 2) * CELL
+		strip.Position = UDim2.fromOffset(0, startY)
+		-- Drum shading over the window.
+		local drum = frame(window, { BackgroundColor3 = Color3.fromRGB(8, 10, 16), Size = UDim2.fromScale(1, 1), ZIndex = 50 })
 		new("UIGradient", {
 			Rotation = 90,
-			Color = ColorSequence.new(color:Lerp(C.Ink, 0.6), C.Ink),
-		}, well)
-		local wellEdge = stroke(well, spec.Color, 0.6, 2)
-		local holder = frame(well, { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 45 })
-		local record = Art.show(holder, nil, nil, color, true)
-		local flash = frame(well, { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 48 })
-		UiKit.round(flash, WELL)
-
-		-- The surge badge: the move's icon, rising out of the gem.
-		local badge = frame(card, {
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.05),
+				NumberSequenceKeypoint.new(0.3, 0.85),
+				NumberSequenceKeypoint.new(0.5, 1),
+				NumberSequenceKeypoint.new(0.7, 0.85),
+				NumberSequenceKeypoint.new(1, 0.05),
+			}),
+		}, drum)
+		-- The payline cell: where the gem cracks and the surge comes out.
+		local hit = frame(window, {
+			Position = UDim2.fromOffset(0, CELL),
+			Size = UDim2.fromOffset(REEL_W, CELL),
+			BackgroundTransparency = 1,
+			ZIndex = 52,
+		})
+		local flash = frame(hit, { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 52 })
+		local badge = frame(hit, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0, 74 + WELL / 2),
-			Size = UDim2.fromOffset(68, 68),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(CELL - 12, CELL - 12),
 			BackgroundColor3 = C.Ink,
 			Visible = false,
-			ZIndex = 49,
+			ZIndex = 54,
 		})
 		UiKit.round(badge, 12)
 		stroke(badge, spec.Color, 0, 3)
-		local badgeScale = new("UIScale", { Scale = 0.2 }, badge)
-		local art = frame(badge, { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(60, 60), BackgroundColor3 = C.Ink, ZIndex = 50 })
-		UiKit.round(art, 9)
-		if not Icons.apply(art, move) then
-			local word = label(art, string.upper(string.sub(move and move.Name or id, 1, 2)), 26, spec.Color, Enum.Font.GothamBlack)
-			word.TextXAlignment, word.ZIndex = Enum.TextXAlignment.Center, 51
+		local badgeScale = new("UIScale", { Scale = 0.3 }, badge)
+		if not Icons.apply(badge, move) then
+			local word = label(badge, string.upper(string.sub(move and move.Name or id, 1, 2)), 28, spec.Color, Enum.Font.GothamBlack)
+			word.TextXAlignment, word.ZIndex = Enum.TextXAlignment.Center, 55
 		end
 
-		-- Under the well: what's inside, the two candidates while it shakes.
-		local caption = label(card, "SEALED " .. spec.Gem, 12, C.Faint, Enum.Font.GothamBlack)
-		caption.TextXAlignment, caption.ZIndex = Enum.TextXAlignment.Center, 45
-		caption.Position, caption.Size = UDim2.fromOffset(12, 270), UDim2.new(1, -24, 0, 16)
-		local rows = {}
-		for n, candidate in pool do
-			local row = frame(card, {
-				Position = UDim2.fromOffset(18, 296 + (n - 1) * 46),
-				Size = UDim2.new(1, -36, 0, 38),
-				BackgroundColor3 = C.Panel,
-				ZIndex = 45,
-			})
-			UiKit.round(row, 8)
-			local rowEdge = stroke(row, C.Line, 0, 1)
-			local mini = frame(row, { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = C.Ink, ZIndex = 46 })
-			UiKit.round(mini, 6)
-			Icons.apply(mini, Tech.Catalog[candidate])
-			local words = label(row, string.upper(Tech.Catalog[candidate] and Tech.Catalog[candidate].Name or candidate), 13, C.Dim, Enum.Font.GothamBlack)
-			words.Position, words.Size, words.ZIndex = UDim2.fromOffset(44, 0), UDim2.new(1, -50, 1, 0), 46
-			rows[n] = { Id = candidate, Frame = row, Edge = rowEdge, Words = words }
-		end
-		-- Once the surge is out: its name, cost, what it does.
-		local name = label(card, "", 24, C.Text, Enum.Font.GothamBlack)
+		-- The result plate under the reel.
+		local plate = frame(cabinet, {
+			Position = UDim2.fromOffset(x, reelTop + CELL * 3 + 14),
+			Size = UDim2.fromOffset(REEL_W, 128),
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 0.25,
+			ZIndex = 44,
+		})
+		UiKit.round(plate, 10)
+		local plateEdge = stroke(plate, C.Line, 0, 1)
+		local name = label(plate, "· · ·", 17, C.Faint, Enum.Font.GothamBlack)
 		name.TextXAlignment, name.ZIndex = Enum.TextXAlignment.Center, 45
-		name.Position, name.Size = UDim2.fromOffset(12, 290), UDim2.new(1, -24, 0, 30)
-		local stats = label(card, "", 12, spec.Color, Enum.Font.GothamBlack)
+		name.Position, name.Size = UDim2.fromOffset(8, 8), UDim2.new(1, -16, 0, 22)
+		name.TextScaled, name.TextTruncate = true, Enum.TextTruncate.None
+		new("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 10 }, name)
+		local stats = label(plate, "", 10, spec.Color, Enum.Font.GothamBlack)
 		stats.TextXAlignment, stats.ZIndex = Enum.TextXAlignment.Center, 45
-		stats.Position, stats.Size = UDim2.fromOffset(12, 322), UDim2.new(1, -24, 0, 16)
-		local about = label(card, "", 13, C.Dim, Enum.Font.GothamMedium)
+		stats.Position, stats.Size = UDim2.fromOffset(8, 31), UDim2.new(1, -16, 0, 14)
+		local about = label(plate, "", 11, C.Dim, Enum.Font.GothamMedium)
 		about.TextXAlignment, about.TextYAlignment, about.ZIndex = Enum.TextXAlignment.Center, Enum.TextYAlignment.Top, 45
 		about.TextWrapped, about.TextTruncate = true, Enum.TextTruncate.AtEnd
-		about.Position, about.Size = UDim2.fromOffset(18, 344), UDim2.new(1, -36, 0, 48)
-		local missed = label(card, "", 11, C.Faint, Enum.Font.GothamBold)
-		missed.TextXAlignment, missed.ZIndex = Enum.TextXAlignment.Center, 45
-		missed.Position, missed.Size = UDim2.new(0, 12, 1, -28), UDim2.new(1, -24, 0, 18)
-		missed.RichText = true
+		about.Position, about.Size = UDim2.fromOffset(10, 49), UDim2.new(1, -20, 0, 52)
+		local missed = label(plate, "", 10, C.Faint, Enum.Font.GothamBold)
+		missed.TextXAlignment, missed.ZIndex, missed.RichText = Enum.TextXAlignment.Center, 45, true
+		missed.Position, missed.Size = UDim2.new(0, 8, 1, -20), UDim2.new(1, -16, 0, 14)
 
-		local effect = CardFX.create(card)
-		CardFX.update(effect, nil, 0)
-		table.insert(effects, effect)
-
-		local entry = { Phase = "Sealed", Record = record, Rows = rows, Color = spec.Color, Well = well, Id = id }
-		-- Beat 1: the capsule bursts and the gem is out.
-		function entry.open(quick)
-			if entry.Phase ~= "Sealed" then
+		local reel = { Strip = strip, Phase = "Idle", LastCell = 0 }
+		-- The reel stops: your gem lands on the payline.
+		function reel.stop(quick)
+			if reel.Phase == "Stopped" or reel.Phase == "Out" then
 				return
 			end
-			entry.Phase = "Gem"
-			well.Rotation = 0
-			record.View:Destroy()
-			entry.Record = Art.show(holder, gem, nil, color, false)
-			flash.BackgroundTransparency = 0
-			tween(flash, 0.4, { BackgroundTransparency = 1 })
-			punch.Scale = 1.07
-			tween(punch, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
-			wellEdge.Transparency = 0
-			caption.Text, caption.TextColor3 = elementName .. " " .. spec.Gem .. "  ·  " .. string.upper(gem.Tier or "Common"), color
-			for _, row in rows do
-				local on = row.Id == id
-				row.Frame.BackgroundColor3 = if on then spec.Color:Lerp(C.Ink, 0.55) else C.Panel
-				row.Edge.Color = if on then spec.Color else C.Line
-				row.Words.TextColor3 = if on then C.Text else C.Faint
-			end
+			reel.Phase = "Stopped"
+			strip.Position = UDim2.fromOffset(0, 0)
+			windowEdge.Color = spec.Color
+			flash.BackgroundTransparency = 0.3
+			tween(flash, 0.3, { BackgroundTransparency = 1 })
 			if not quick then
 				LotterySound.play("Lock")
 			end
 		end
-		-- Beat 2: the gem gives up its surge.
-		function entry.surge(quick)
-			if entry.Phase == "Surge" then
+		-- The gem cracks and its surge takes its place.
+		function reel.reveal(quick)
+			if reel.Phase == "Out" then
 				return
 			end
-			entry.open(true)
-			entry.Phase = "Surge"
-			badge.Visible = true
-			local final = UDim2.new(0.5, 0, 0, 74 + WELL - 6)
-			if quick then
-				badge.Position, badgeScale.Scale = final, 1
-			else
-				tween(badge, 0.4, { Position = final }, Enum.EasingStyle.Back)
-				tween(badgeScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+			reel.stop(true)
+			reel.Phase = "Out"
+			if finalGem then
+				finalGem.Visible = false
+			end
+			-- Shards fly off the cracked gem.
+			if not quick then
+				for n = 1, 6 do
+					local angle = n / 6 * math.pi * 2 + 0.3
+					local shard = frame(hit, {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromOffset(12, 12),
+						Rotation = 45,
+						BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.3),
+						ZIndex = 53,
+					})
+					tween(shard, 0.45, {
+						Position = UDim2.new(0.5, math.cos(angle) * 70, 0.5, math.sin(angle) * 40),
+						Rotation = 45 + 180 * (if n % 2 == 0 then 1 else -1),
+						BackgroundTransparency = 1,
+					})
+				end
+				flash.BackgroundTransparency = 0
+				tween(flash, 0.4, { BackgroundTransparency = 1 })
 				LotterySound.play("Reveal" .. math.clamp(index + 1, 1, 5))
 			end
-			caption.Position = UDim2.fromOffset(12, 74 + WELL + 34)
-			for _, row in rows do
-				row.Frame.Visible = false
+			badge.Visible = true
+			if quick then
+				badgeScale.Scale = 1
+			else
+				tween(badgeScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
 			end
-			name.Text = string.upper(move and move.Name or id)
-			stats.Text = if move then string.format("%d %s   ·   %dS COOLDOWN", move.Cost or 0, spec.Pays, move.Cooldown or 0) else ""
+			plateEdge.Color, plateEdge.Thickness = spec.Color, 2
+			name.Text, name.TextColor3 = string.upper(move and move.Name or id), C.Text
+			stats.Text = if move then string.format("%d %s  ·  %dS", move.Cost or 0, spec.Pays, move.Cooldown or 0) else ""
 			about.Text = move and move.Description or ""
 			if other then
 				local otherMove = Tech.Catalog[other]
-				missed.Text = string.format("the gem's other surge  <s>%s</s>", string.upper(otherMove and otherMove.Name or other))
+				missed.Text = string.format("missed  <s>%s</s>", string.upper(otherMove and otherMove.Name or other))
 			end
-			edge.Color, edge.Transparency, edge.Thickness = spec.Color, 0.1, 2
-			effects[index].Live = true
 		end
-		cards[index] = entry
+		reels[index] = reel
 	end
 
-	-- The CTA, once every gem has given up its surge.
+	-- The payline, across all three windows, with an arrow at each end.
+	local lineY = reelTop + CELL * 1.5
+	local payline = frame(cabinet, {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromOffset(startX - 18, lineY),
+		Size = UDim2.fromOffset(REEL_W * 3 + 48 + 36, 3),
+		BackgroundColor3 = C.Gold,
+		BackgroundTransparency = 0.15,
+		ZIndex = 56,
+	})
+	for _, side in { 0, 1 } do
+		local arrow = frame(cabinet, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(if side == 0 then startX - 22 else startX + REEL_W * 3 + 48 + 22, lineY),
+			Size = UDim2.fromOffset(16, 16),
+			Rotation = 45,
+			BackgroundColor3 = C.Gold,
+			ZIndex = 57,
+		})
+		UiKit.round(arrow, 3)
+	end
+
+	-- The lever, on the cabinet's right.
+	local housing = frame(board, {
+		Position = UDim2.fromOffset(818, 210),
+		Size = UDim2.fromOffset(22, 90),
+		BackgroundColor3 = Color3.fromRGB(46, 54, 72),
+		ZIndex = 41,
+	})
+	UiKit.round(housing, 6)
+	stroke(housing, C.Gold, 0.4, 1)
+	local shaft = frame(board, {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.fromOffset(850, 256),
+		Size = UDim2.fromOffset(8, 150),
+		BackgroundColor3 = Color3.fromRGB(176, 186, 204),
+		ZIndex = 41,
+	})
+	UiKit.round(shaft, 4)
+	local arm = frame(board, { Position = UDim2.fromOffset(836, 250), Size = UDim2.fromOffset(18, 8), BackgroundColor3 = Color3.fromRGB(176, 186, 204), ZIndex = 41 })
+	local knob = frame(board, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(850, 104),
+		Size = UDim2.fromOffset(36, 36),
+		BackgroundColor3 = color,
+		ZIndex = 42,
+	})
+	UiKit.round(knob, 36)
+	new("UIGradient", { Rotation = 45, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.55), color:Lerp(Color3.new(0, 0, 0), 0.3)) }, knob)
+	stroke(knob, C.Ink, 0.3, 2)
+
 	local go = new("TextButton", {
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 530),
-		Size = UDim2.fromOffset(300, 52),
+		Position = UDim2.new(0.5, -20, 0, 598),
+		Size = UDim2.fromOffset(320, 54),
 		BackgroundColor3 = C.Gold,
 		Text = "TO THE FIGHT   ›",
 		TextColor3 = C.Ink,
-		TextSize = 18,
+		TextSize = 19,
 		Font = Enum.Font.GothamBlack,
 		AutoButtonColor = true,
 		ZIndex = 44,
@@ -1433,69 +1612,105 @@ local function revealMoves(kit, after)
 	UiKit.round(go, 10)
 	local goScale = new("UIScale", { Scale = 0.6 }, go)
 
+	-- Lights and ticks.
+	local mode = "Idle"
 	local born = os.clock()
+	local lastTick = 0
 	local live = RunService.RenderStepped:Connect(function()
-		local t = os.clock() - born
-		-- Sealed: the capsule shakes harder as it's about to go, and the two
-		-- candidates flicker, slowing down.
-		local tick = math.floor((t ^ 0.6) * 9)
-		for _, entry in cards do
-			if entry.Phase == "Sealed" then
-				entry.Well.Rotation = math.sin(t * 38) * math.min(6, 1 + t * 2.5)
-				for n, row in entry.Rows do
-					local on = (tick % #entry.Rows) + 1 == n
-					row.Frame.BackgroundColor3 = if on then entry.Color:Lerp(C.Ink, 0.55) else C.Panel
-					row.Edge.Color = if on then entry.Color else C.Line
-					row.Words.TextColor3 = if on then C.Text else C.Faint
-				end
+		local now = os.clock()
+		local t = now - born
+		local step = math.floor(t * (if mode == "Spin" then 16 elseif mode == "Win" then 5 else 4))
+		for n, bulb in bulbs do
+			local on
+			if mode == "Win" then
+				on = step % 2 == 0
+			else
+				on = (n + step) % 4 == 0
 			end
-			Art.pose(entry.Record, t, false)
+			bulb.BackgroundColor3 = if on then (if n % 2 == 0 then color else C.Gold) else Color3.fromRGB(60, 52, 40)
 		end
-		for _, effect in effects do
-			if effect.Live then
-				CardFX.update(effect, element, t)
+		payline.BackgroundTransparency = if mode == "Win" and step % 2 == 1 then 0.6 else 0.15
+		-- A click each time a symbol crosses the payline.
+		for _, reel in reels do
+			if reel.Phase == "Spin" then
+				local cell = math.floor(reel.Strip.Position.Y.Offset / CELL)
+				if cell ~= reel.LastCell then
+					reel.LastCell = cell
+					if now - lastTick > 0.06 then
+						lastTick = now
+						LotterySound.play("Tick")
+					end
+				end
 			end
 		end
 	end)
 
 	local finished = false
-	local function allOut()
+	local function hitKit()
 		if finished then
 			return
 		end
 		finished = true
-		title.Text = "YOUR KIT IS LOCKED IN"
+		mode = "Win"
+		subtitle.Text = elementName .. " KIT  ·  ALL THREE HIT"
+		title.Text = "KIT LOCKED IN"
 		LotterySound.play("Attune")
 		go.Visible = true
 		tween(goScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
 	end
-	-- Q cracks first, then E, then R; each gem's surge follows it out.
-	for index, entry in cards do
-		local openAt = 0.9 + (index - 1) * 0.75
-		task.delay(openAt, function()
-			if shade.Parent then
-				entry.open(false)
-			end
+	-- Pull: the knob drops down the shaft and springs back, then the reels
+	-- run; Q stops first, then E, then R.
+	task.delay(0.35, function()
+		if not shade.Parent or finished then
+			return
+		end
+		tween(knob, 0.18, { Position = UDim2.fromOffset(850, 236) }, Enum.EasingStyle.Quad)
+		LotterySound.play("SealBreak")
+		task.delay(0.22, function()
+			tween(knob, 0.4, { Position = UDim2.fromOffset(850, 104) }, Enum.EasingStyle.Back)
 		end)
-		task.delay(openAt + 0.55, function()
-			if shade.Parent then
-				entry.surge(false)
-				if index == #cards then
-					task.delay(0.35, allOut)
+	end)
+	task.delay(0.55, function()
+		if not shade.Parent or finished then
+			return
+		end
+		mode = "Spin"
+		subtitle.Text = elementName .. " KIT  ·  SPINNING"
+		for index, reel in reels do
+			reel.Phase = "Spin"
+			local spin = 1.2 + (index - 1) * 0.7
+			-- Runs just past the payline, then springs back onto it.
+			tween(reel.Strip, spin, { Position = UDim2.fromOffset(0, math.floor(CELL * 0.3)) }, Enum.EasingStyle.Quart)
+			task.delay(spin, function()
+				if reel.Phase == "Spin" then
+					tween(reel.Strip, 0.18, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Back)
 				end
-			end
-		end)
-	end
-	-- Click during the roll: every gem cracks at once.
+			end)
+			task.delay(spin + 0.18, function()
+				if shade.Parent and reel.Phase == "Spin" then
+					reel.stop(false)
+				end
+			end)
+			task.delay(spin + 0.5, function()
+				if shade.Parent then
+					reel.reveal(false)
+					if index == #reels then
+						task.delay(0.4, hitKit)
+					end
+				end
+			end)
+		end
+	end)
+	-- Click during the roll: every reel stops and pays out at once.
 	listen(shade.Activated, function()
 		if finished then
 			return
 		end
-		for _, entry in cards do
-			entry.surge(true)
+		for _, reel in reels do
+			reel.reveal(true)
 		end
 		LotterySound.play("Lock")
-		allOut()
+		hitKit()
 	end)
 	local done = false
 	listen(go.Activated, function()
