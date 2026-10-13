@@ -6,7 +6,7 @@ flashy moves; for now, the intro picks them for looks and fun, not for depth.
 R is never a shield. It is a wall, or a move that changes the ground around
 you. Shields still exist as R moves on gems mined later.
 
-| Picker: what each key can roll | Reveal: what you rolled |
+| Picker: what each key can roll | Reveal: each gem cracks open, then gives up its surge |
 | --- | --- |
 | ![Picker](showcase-kit/picker.png) | ![Reveal](showcase-kit/reveal.png) |
 
@@ -28,7 +28,7 @@ Each element has two R moves: one **barrier** and one **escape**
 | --- | --- |
 | Ring of Fire | A ring of flame circles you for 4s. Foes who cross it burn and get thrown back. |
 | Ice Pillar | An ice column lifts you out of sword reach for 2.5s, then shatters and slows everyone nearby. |
-| Tesla Fence | Posts strung with arcs. It stops bolts, and foes who walk through are stunned. |
+| Tesla Fence | A curtain of lightning bolts striking down, with arcs jumping between them. It stops bolts, and foes who walk through are stunned. |
 | Hologram Decoy | You blink back and leave a flickering copy of yourself. It explodes in lightning when a foe gets close. |
 | Spore Wall | A hedge of toadstools. It stops bolts and poisons foes who walk through. |
 | Acid Slick | A bubbling acid pool. Foes standing in it are slowed and their armor is shredded. |

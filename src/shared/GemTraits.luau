@@ -227,7 +227,7 @@ M.R_EmberGuard = {
 M.R_FireWall = {
 	Name = "Fire Wall", Element = "Fire", Lane = R, Cost = 24, Cooldown = 14,
 	Wall = { Kind = "Fire", Time = 3, Width = 10, Distance = 5, Burn = { Power = 0.15, Time = 3 } },
-	Animation = "Wall", IconSource = "MagmaFault",
+	Animation = "Wall", IconSource = "ThermalBurst",
 	Description = "A 3s wall of fire in front: it stops bolts and burns whoever crosses it.",
 	Flourish = { Text = "The wall stands for 4.5s.", Wall = { Kind = "Fire", Time = 4.5, Width = 10, Distance = 5, Burn = { Power = 0.15, Time = 3 } } },
 }
@@ -322,7 +322,7 @@ M.E_WintersHold = {
 M.R_FrozenWall = {
 	Name = "Frozen Wall", Element = "Frost", Lane = R, Cost = 26, Cooldown = 14,
 	Wall = { Kind = "Ice", Time = 2.5, Width = 8, Distance = 3.5, Front = true, NoSwing = true },
-	Animation = "Wall", IconSource = "PermafrostSpire",
+	Animation = "Wall", IconSource = "ShatterCrown",
 	Description = "A wall of ice in front: blocks every frontal hit for 2.5s. You can't swing while it stands.",
 	Flourish = { Text = "Whoever hits the wall is slowed 30%.", Wall = { Kind = "Ice", Time = 2.5, Width = 8, Distance = 3.5, Front = true, NoSwing = true, Slow = 0.3 } },
 }
@@ -577,14 +577,14 @@ M.R_ToxicMantle = {
 M.R_RingOfFire = {
 	Name = "Ring of Fire", Element = "Fire", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
 	Ring = { Radius = 7, Time = 4, Burn = { Power = 0.15, Time = 3 }, Push = 45 },
-	Animation = "Wall", IconSource = "Supernova",
+	Animation = "Wall", IconSource = "SolarFlare",
 	Description = "Flames circle you for 4s: whoever crosses the ring catches fire and is thrown back.",
 	Flourish = { Text = "The ring burns for 5.5s.", Ring = { Radius = 7, Time = 5.5, Burn = { Power = 0.15, Time = 3 }, Push = 45 } },
 }
 M.R_IcePillar = {
 	Name = "Ice Pillar", Element = "Frost", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
 	Pillar = { Height = 9, Time = 2.5, Radius = 8, Slow = 0.5, SlowTime = 2 },
-	Animation = "Wall", IconSource = "PermafrostSpire",
+	Animation = "Wall", IconSource = "CryoShield",
 	Description = "An ice column bursts up under you: out of reach for 2.5s, then it shatters and slows everyone near you 50%.",
 	Flourish = {
 		Text = "The shatter freezes them for 0.6s.",
@@ -594,8 +594,8 @@ M.R_IcePillar = {
 M.R_TeslaFence = {
 	Name = "Tesla Fence", Element = "Shock", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
 	Wall = { Kind = "Tesla", Time = 3, Width = 10, Distance = 5, Stun = 0.6 },
-	Animation = "Wall", IconSource = "ThunderPylon",
-	Description = "Two pylons with lightning arcing between them for 3s: it stops bolts and stuns whoever crosses.",
+	Animation = "Wall", IconSource = "IonSpark",
+	Description = "A curtain of lightning strikes down for 3s: it stops bolts and stuns whoever crosses.",
 	Flourish = { Text = "The fence stands for 4.5s.", Wall = { Kind = "Tesla", Time = 4.5, Width = 10, Distance = 5, Stun = 0.6 } },
 }
 M.R_HoloDecoy = {
@@ -609,7 +609,7 @@ M.R_HoloDecoy = {
 M.R_SporeWall = {
 	Name = "Spore Wall", Element = "Poison", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
 	Wall = { Kind = "Spore", Time = 3.5, Width = 10, Distance = 5, Poison = { Power = 0.15, Time = 4 } },
-	Animation = "Wall", IconSource = "ToxicCloud",
+	Animation = "Wall", IconSource = "BioCorrosion",
 	Description = "A wall of toxic fog for 3.5s: it stops bolts and poisons whoever walks through.",
 	Flourish = { Text = "The wall stands for 5s.", Wall = { Kind = "Spore", Time = 5, Width = 10, Distance = 5, Poison = { Power = 0.15, Time = 4 } } },
 }

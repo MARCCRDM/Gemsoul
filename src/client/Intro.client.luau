@@ -20,6 +20,8 @@ local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
 local LotterySound = require(script.Parent.Modules.LotterySound)
+local Icons = require(script.Parent.Modules.SurgeIcons)
+local CardFX = require(script.Parent.Modules.ElementCardFX)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -1165,88 +1167,335 @@ local function close()
 	end
 	gui:Destroy()
 end
--- The reveal: what the kit rolled, one key at a time, before the fight.
-local KEY_COLORS = {
-	Q = Color3.fromRGB(255, 138, 92),
-	E = Color3.fromRGB(122, 196, 255),
-	R = Color3.fromRGB(120, 230, 170),
+-- The roll: a full-screen reveal of the kit. Each key is a tall card with a
+-- sealed capsule that shakes while its two possible moves flicker, then
+-- bursts open on the gem itself (the real stone going into that socket),
+-- and the gem gives up its surge: the move's icon rises out of it. Q, then
+-- E, then R. The move you didn't get stays on the card, crossed out. Click
+-- to skip ahead.
+local KEYS = {
+	{ Key = "Q", Color = Color3.fromRGB(255, 138, 92), Slot = "SWORD", Gem = "SWORD GEM", Pays = "CHARGE" },
+	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CORE", Gem = "CORE GEM", Pays = "CHARGE" },
+	{ Key = "R", Color = Color3.fromRGB(120, 230, 170), Slot = "DEFENSE", Gem = "SHIELD GEM", Pays = "STAMINA" },
 }
-local KEY_LANES = { Q = "SWORD MOVE", E = "CORE ABILITY", R = "DEFENSE" }
+local WELL = 156 -- (px: the gem's window)
+local function keycap(parent, key, color, size)
+	-- A physical key: a darker base under a raised cap.
+	local base = frame(parent, { BackgroundColor3 = color:Lerp(C.Ink, 0.55), Size = UDim2.fromOffset(size, size + 6), ZIndex = 45 })
+	UiKit.round(base, 9)
+	local cap = frame(base, { BackgroundColor3 = color, Size = UDim2.fromOffset(size, size), ZIndex = 46 })
+	UiKit.round(cap, 9)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35), color) }, cap)
+	local glyph = label(cap, key, math.floor(size * 0.58), C.Ink, Enum.Font.GothamBlack)
+	glyph.TextXAlignment, glyph.ZIndex = Enum.TextXAlignment.Center, 47
+	return base
+end
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
-	local color = GemConfig.ElementColors[kit.Element] or C.Gold
-	local shade = frame(gui, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BackgroundTransparency = 1, ZIndex = 40 })
-	tween(shade, 0.25, { BackgroundTransparency = 0.25 })
-	local card = frame(shade, {
+	local pools = Lottery.starterPools(kit.Element)
+	local element = kit.Element
+	local color = GemConfig.ElementColors[element] or C.Gold
+	local theme = CardFX.Themes[element]
+	local deep = if theme then theme.Deep else C.Panel
+	local elementName = string.upper(GemConfig.elementName(element))
+
+	local shade = new("TextButton", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Text = "",
+		ZIndex = 40,
+	}, gui)
+	tween(shade, 0.3, { BackgroundTransparency = 0 })
+	-- The element floods up from below.
+	local flood = frame(shade, { BackgroundColor3 = deep, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 40 })
+	new("UIGradient", {
+		Rotation = 270,
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(0.55, 0.9), NumberSequenceKeypoint.new(1, 1) }),
+	}, flood)
+	tween(flood, 0.6, { BackgroundTransparency = 0 })
+
+	-- Everything sits on one board, scaled to fit the screen.
+	local board = frame(shade, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0.92, 0, 0, 286),
-		BackgroundColor3 = C.Panel,
+		Size = UDim2.fromOffset(900, 590),
+		BackgroundTransparency = 1,
 		ZIndex = 41,
 	})
-	new("UISizeConstraint", { MaxSize = Vector2.new(720, 286) }, card)
-	UiKit.round(card, 14)
-	stroke(card, color, 0.2, 2)
-	local cardScale = new("UIScale", { Scale = 0.85 }, card)
-	tween(cardScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
-	local title = label(card, "YOUR MOVES", 24, C.Text, Enum.Font.GothamBlack)
-	title.TextXAlignment = Enum.TextXAlignment.Center
-	title.Position, title.Size, title.ZIndex = UDim2.fromOffset(0, 16), UDim2.new(1, 0, 0, 30), 42
-	local sub = label(card, string.upper(GemConfig.elementName(kit.Element)) .. " KIT  ·  rolled just for you", 13, color, Enum.Font.GothamBold)
-	sub.TextXAlignment = Enum.TextXAlignment.Center
-	sub.Position, sub.Size, sub.ZIndex = UDim2.fromOffset(0, 46), UDim2.new(1, 0, 0, 18), 42
-	local row = frame(card, { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 76), Size = UDim2.new(1, -32, 0, 136), ZIndex = 41 })
-	new("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 10),
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-	}, row)
-	for index, key in { "Q", "E", "R" } do
-		local move = Tech.Catalog[moves[index]]
-		local keyColor = KEY_COLORS[key]
-		local tile = frame(row, { BackgroundColor3 = C.Card, Size = UDim2.new(1 / 3, -7, 1, 0), ZIndex = 42, LayoutOrder = index })
-		UiKit.round(tile, 10)
-		local edge = stroke(tile, keyColor, 0.3, 1.5)
-		local pop = new("UIScale", { Scale = 0 }, tile)
-		local badge = label(tile, key, 22, C.Ink, Enum.Font.GothamBlack)
-		badge.TextXAlignment = Enum.TextXAlignment.Center
-		badge.BackgroundTransparency, badge.BackgroundColor3 = 0, keyColor
-		badge.Position, badge.Size, badge.ZIndex = UDim2.fromOffset(10, 10), UDim2.fromOffset(34, 34), 43
-		UiKit.round(badge, 8)
-		local lane = label(tile, KEY_LANES[key], 10, keyColor, Enum.Font.GothamBlack)
-		lane.Position, lane.Size, lane.ZIndex = UDim2.fromOffset(52, 12), UDim2.new(1, -60, 0, 12), 43
-		local name = label(tile, if move then string.upper(move.Name) else moves[index], 15, C.Text, Enum.Font.GothamBlack)
-		name.TextWrapped, name.TextTruncate = true, Enum.TextTruncate.None
-		name.TextYAlignment = Enum.TextYAlignment.Top
-		name.Position, name.Size, name.ZIndex = UDim2.fromOffset(52, 26), UDim2.new(1, -60, 0, 36), 43
-		local about = label(tile, move and move.Description or "", 11, C.Dim, Enum.Font.GothamMedium)
+	local fitScale = new("UIScale", { Scale = 1 }, board)
+	local function fitBoard()
+		local size = panel.AbsoluteSize
+		if size.X > 0 and size.Y > 0 then
+			fitScale.Scale = math.min(1.1, size.X / 940, size.Y / 630)
+		end
+	end
+	fitBoard()
+	listen(panel:GetPropertyChangedSignal("AbsoluteSize"), fitBoard)
+
+	local kicker = label(board, elementName .. "  ·  STARTER ROLL", 14, color, Enum.Font.GothamBlack)
+	kicker.TextXAlignment, kicker.ZIndex = Enum.TextXAlignment.Center, 42
+	kicker.Position, kicker.Size = UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, 18)
+	local title = label(board, "CRACKING YOUR GEMS", 40, C.Text, Enum.Font.GothamBlack)
+	title.TextXAlignment, title.ZIndex = Enum.TextXAlignment.Center, 42
+	title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 46)
+
+	local cards, effects = {}, {}
+	for index, spec in KEYS do
+		local id = moves[index]
+		local move = Tech.Catalog[id]
+		local pool = pools[index] or { id }
+		local gem = kit.Gems and kit.Gems[index] and kit.Gems[index].Gem
+			or { Id = "starter-" .. element .. index, Element = element, Tier = "Common", Size = 1, Clarity = 1, Cut = 1 }
+		local other = nil
+		for _, candidate in pool do
+			if candidate ~= id then
+				other = candidate
+			end
+		end
+		local x = (index - 1) * 300
+		local card = frame(board, {
+			Position = UDim2.fromOffset(x + 4, 84 + 40),
+			Size = UDim2.fromOffset(284, 426),
+			BackgroundColor3 = C.Card,
+			BackgroundTransparency = 1,
+			ZIndex = 42,
+		})
+		UiKit.round(card, 12)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(spec.Color:Lerp(C.Card, 0.82), C.Ink) }, card)
+		local edge = stroke(card, spec.Color, 0.75, 1)
+		local punch = new("UIScale", { Scale = 1 }, card)
+		task.delay(0.1 + index * 0.09, function()
+			tween(card, 0.35, { Position = UDim2.fromOffset(x + 4, 84), BackgroundTransparency = 0 }, Enum.EasingStyle.Back)
+		end)
+
+		-- Header: the key, which slot it fires from, what it pays.
+		local cap = keycap(card, spec.Key, spec.Color, 44)
+		cap.Position = UDim2.fromOffset(16, 14)
+		local slot = label(card, spec.Slot, 18, spec.Color, Enum.Font.GothamBlack)
+		slot.Position, slot.Size, slot.ZIndex = UDim2.fromOffset(72, 16), UDim2.new(1, -84, 0, 22), 45
+		local pays = label(card, "PAYS " .. spec.Pays, 11, C.Dim, Enum.Font.GothamBold)
+		pays.Position, pays.Size, pays.ZIndex = UDim2.fromOffset(72, 40), UDim2.new(1, -84, 0, 14), 45
+
+		-- The well: the capsule, then the gem, in 3D.
+		local well = frame(card, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0, 74 + WELL / 2),
+			Size = UDim2.fromOffset(WELL, WELL),
+			BackgroundColor3 = C.Ink,
+			ZIndex = 44,
+		})
+		UiKit.round(well, WELL)
+		new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(color:Lerp(C.Ink, 0.6), C.Ink),
+		}, well)
+		local wellEdge = stroke(well, spec.Color, 0.6, 2)
+		local holder = frame(well, { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 45 })
+		local record = Art.show(holder, nil, nil, color, true)
+		local flash = frame(well, { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 48 })
+		UiKit.round(flash, WELL)
+
+		-- The surge badge: the move's icon, rising out of the gem.
+		local badge = frame(card, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0, 74 + WELL / 2),
+			Size = UDim2.fromOffset(68, 68),
+			BackgroundColor3 = C.Ink,
+			Visible = false,
+			ZIndex = 49,
+		})
+		UiKit.round(badge, 12)
+		stroke(badge, spec.Color, 0, 3)
+		local badgeScale = new("UIScale", { Scale = 0.2 }, badge)
+		local art = frame(badge, { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(60, 60), BackgroundColor3 = C.Ink, ZIndex = 50 })
+		UiKit.round(art, 9)
+		if not Icons.apply(art, move) then
+			local word = label(art, string.upper(string.sub(move and move.Name or id, 1, 2)), 26, spec.Color, Enum.Font.GothamBlack)
+			word.TextXAlignment, word.ZIndex = Enum.TextXAlignment.Center, 51
+		end
+
+		-- Under the well: what's inside, the two candidates while it shakes.
+		local caption = label(card, "SEALED " .. spec.Gem, 12, C.Faint, Enum.Font.GothamBlack)
+		caption.TextXAlignment, caption.ZIndex = Enum.TextXAlignment.Center, 45
+		caption.Position, caption.Size = UDim2.fromOffset(12, 270), UDim2.new(1, -24, 0, 16)
+		local rows = {}
+		for n, candidate in pool do
+			local row = frame(card, {
+				Position = UDim2.fromOffset(18, 296 + (n - 1) * 46),
+				Size = UDim2.new(1, -36, 0, 38),
+				BackgroundColor3 = C.Panel,
+				ZIndex = 45,
+			})
+			UiKit.round(row, 8)
+			local rowEdge = stroke(row, C.Line, 0, 1)
+			local mini = frame(row, { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = C.Ink, ZIndex = 46 })
+			UiKit.round(mini, 6)
+			Icons.apply(mini, Tech.Catalog[candidate])
+			local words = label(row, string.upper(Tech.Catalog[candidate] and Tech.Catalog[candidate].Name or candidate), 13, C.Dim, Enum.Font.GothamBlack)
+			words.Position, words.Size, words.ZIndex = UDim2.fromOffset(44, 0), UDim2.new(1, -50, 1, 0), 46
+			rows[n] = { Id = candidate, Frame = row, Edge = rowEdge, Words = words }
+		end
+		-- Once the surge is out: its name, cost, what it does.
+		local name = label(card, "", 24, C.Text, Enum.Font.GothamBlack)
+		name.TextXAlignment, name.ZIndex = Enum.TextXAlignment.Center, 45
+		name.Position, name.Size = UDim2.fromOffset(12, 290), UDim2.new(1, -24, 0, 30)
+		local stats = label(card, "", 12, spec.Color, Enum.Font.GothamBlack)
+		stats.TextXAlignment, stats.ZIndex = Enum.TextXAlignment.Center, 45
+		stats.Position, stats.Size = UDim2.fromOffset(12, 322), UDim2.new(1, -24, 0, 16)
+		local about = label(card, "", 13, C.Dim, Enum.Font.GothamMedium)
+		about.TextXAlignment, about.TextYAlignment, about.ZIndex = Enum.TextXAlignment.Center, Enum.TextYAlignment.Top, 45
 		about.TextWrapped, about.TextTruncate = true, Enum.TextTruncate.AtEnd
-		about.TextYAlignment = Enum.TextYAlignment.Top
-		about.Position, about.Size, about.ZIndex = UDim2.fromOffset(10, 66), UDim2.new(1, -20, 1, -74), 43
-		task.delay(0.25 + index * 0.3, function()
-			if tile.Parent then
-				tween(pop, 0.32, { Scale = 1 }, Enum.EasingStyle.Back)
-				tween(edge, 0.6, { Transparency = 0.6 })
+		about.Position, about.Size = UDim2.fromOffset(18, 344), UDim2.new(1, -36, 0, 48)
+		local missed = label(card, "", 11, C.Faint, Enum.Font.GothamBold)
+		missed.TextXAlignment, missed.ZIndex = Enum.TextXAlignment.Center, 45
+		missed.Position, missed.Size = UDim2.new(0, 12, 1, -28), UDim2.new(1, -24, 0, 18)
+		missed.RichText = true
+
+		local effect = CardFX.create(card)
+		CardFX.update(effect, nil, 0)
+		table.insert(effects, effect)
+
+		local entry = { Phase = "Sealed", Record = record, Rows = rows, Color = spec.Color, Well = well, Id = id }
+		-- Beat 1: the capsule bursts and the gem is out.
+		function entry.open(quick)
+			if entry.Phase ~= "Sealed" then
+				return
+			end
+			entry.Phase = "Gem"
+			well.Rotation = 0
+			record.View:Destroy()
+			entry.Record = Art.show(holder, gem, nil, color, false)
+			flash.BackgroundTransparency = 0
+			tween(flash, 0.4, { BackgroundTransparency = 1 })
+			punch.Scale = 1.07
+			tween(punch, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+			wellEdge.Transparency = 0
+			caption.Text, caption.TextColor3 = elementName .. " " .. spec.Gem .. "  ·  " .. string.upper(gem.Tier or "Common"), color
+			for _, row in rows do
+				local on = row.Id == id
+				row.Frame.BackgroundColor3 = if on then spec.Color:Lerp(C.Ink, 0.55) else C.Panel
+				row.Edge.Color = if on then spec.Color else C.Line
+				row.Words.TextColor3 = if on then C.Text else C.Faint
+			end
+			if not quick then
 				LotterySound.play("Lock")
 			end
-		end)
+		end
+		-- Beat 2: the gem gives up its surge.
+		function entry.surge(quick)
+			if entry.Phase == "Surge" then
+				return
+			end
+			entry.open(true)
+			entry.Phase = "Surge"
+			badge.Visible = true
+			local final = UDim2.new(0.5, 0, 0, 74 + WELL - 6)
+			if quick then
+				badge.Position, badgeScale.Scale = final, 1
+			else
+				tween(badge, 0.4, { Position = final }, Enum.EasingStyle.Back)
+				tween(badgeScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+				LotterySound.play("Reveal" .. math.clamp(index + 1, 1, 5))
+			end
+			caption.Position = UDim2.fromOffset(12, 74 + WELL + 34)
+			for _, row in rows do
+				row.Frame.Visible = false
+			end
+			name.Text = string.upper(move and move.Name or id)
+			stats.Text = if move then string.format("%d %s   ·   %dS COOLDOWN", move.Cost or 0, spec.Pays, move.Cooldown or 0) else ""
+			about.Text = move and move.Description or ""
+			if other then
+				local otherMove = Tech.Catalog[other]
+				missed.Text = string.format("the gem's other surge  <s>%s</s>", string.upper(otherMove and otherMove.Name or other))
+			end
+			edge.Color, edge.Transparency, edge.Thickness = spec.Color, 0.1, 2
+			effects[index].Live = true
+		end
+		cards[index] = entry
 	end
+
+	-- The CTA, once every gem has given up its surge.
 	local go = new("TextButton", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -16),
-		Size = UDim2.fromOffset(240, 44),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 530),
+		Size = UDim2.fromOffset(300, 52),
 		BackgroundColor3 = C.Gold,
 		Text = "TO THE FIGHT   ›",
 		TextColor3 = C.Ink,
-		TextSize = 16,
+		TextSize = 18,
 		Font = Enum.Font.GothamBlack,
 		AutoButtonColor = true,
-		ZIndex = 42,
+		ZIndex = 44,
 		Visible = false,
-	}, card)
+	}, board)
 	UiKit.round(go, 10)
-	task.delay(1.4, function()
+	local goScale = new("UIScale", { Scale = 0.6 }, go)
+
+	local born = os.clock()
+	local live = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - born
+		-- Sealed: the capsule shakes harder as it's about to go, and the two
+		-- candidates flicker, slowing down.
+		local tick = math.floor((t ^ 0.6) * 9)
+		for _, entry in cards do
+			if entry.Phase == "Sealed" then
+				entry.Well.Rotation = math.sin(t * 38) * math.min(6, 1 + t * 2.5)
+				for n, row in entry.Rows do
+					local on = (tick % #entry.Rows) + 1 == n
+					row.Frame.BackgroundColor3 = if on then entry.Color:Lerp(C.Ink, 0.55) else C.Panel
+					row.Edge.Color = if on then entry.Color else C.Line
+					row.Words.TextColor3 = if on then C.Text else C.Faint
+				end
+			end
+			Art.pose(entry.Record, t, false)
+		end
+		for _, effect in effects do
+			if effect.Live then
+				CardFX.update(effect, element, t)
+			end
+		end
+	end)
+
+	local finished = false
+	local function allOut()
+		if finished then
+			return
+		end
+		finished = true
+		title.Text = "YOUR KIT IS LOCKED IN"
+		LotterySound.play("Attune")
 		go.Visible = true
+		tween(goScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+	end
+	-- Q cracks first, then E, then R; each gem's surge follows it out.
+	for index, entry in cards do
+		local openAt = 0.9 + (index - 1) * 0.75
+		task.delay(openAt, function()
+			if shade.Parent then
+				entry.open(false)
+			end
+		end)
+		task.delay(openAt + 0.55, function()
+			if shade.Parent then
+				entry.surge(false)
+				if index == #cards then
+					task.delay(0.35, allOut)
+				end
+			end
+		end)
+	end
+	-- Click during the roll: every gem cracks at once.
+	listen(shade.Activated, function()
+		if finished then
+			return
+		end
+		for _, entry in cards do
+			entry.surge(true)
+		end
+		LotterySound.play("Lock")
+		allOut()
 	end)
 	local done = false
 	listen(go.Activated, function()
@@ -1254,6 +1503,7 @@ local function revealMoves(kit, after)
 			return
 		end
 		done = true
+		live:Disconnect()
 		shade:Destroy()
 		after()
 	end)
