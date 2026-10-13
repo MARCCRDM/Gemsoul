@@ -59,11 +59,12 @@ local Config = {
 		Testers = { 11758049015 }, -- VolverDev
 		-- Everyone gets the test-admin tools while testing. Turn off for launch.
 		OpenAdmin = true,
-		-- On: every join starts as a brand-new player (zero coins, the
-		-- tutorial) and nothing is saved, so the first-time flow can be
-		-- played again and again. Off (normal testing): saves load and save
-		-- like the live game, and the tutorial runs once per account.
-		FreshStart = false,
+		-- On: every join starts as a brand-new player (zero coins, the fast
+		-- start: style, element, first fight) and nothing is loaded or saved,
+		-- so the first-time flow can be played again and again. Off (normal
+		-- testing, and launch): saves load and save like the live game, and
+		-- the fast start runs once per account.
+		FreshStart = true,
 	},
 
 	-- VIP: set this to your game pass id once you create one.
