@@ -154,17 +154,31 @@ local function buyCrate(player: Player, id: any, count: any)
 	return reply(true, string.format("Bought %d %s%s.", amount, crate.Name, if amount == 1 then "" else "s"))
 end
 
--- A random cosmetic of `rarity` you don't own yet (nil if you own them all).
-local function unownedOf(profile, rarity: string): string?
-	local choices = {}
-	for _, id in Cosmetics.Order do
+-- A random cosmetic of `rarity` you don't own yet, from `crateId`'s pool:
+-- the trims and back pieces in Cosmetics.Order, plus the loot skins and
+-- suits (never sold, never exclusive) for this crate or any crate. Nil if
+-- you own them all.
+local LOOT = table.clone(Cosmetics.Order)
+for _, kind in { "Skin", "Suit" } do
+	for _, id in Cosmetics.ofKind(kind) do
 		local cosmetic = Cosmetics.List[id]
-		if cosmetic.Rarity == rarity and not profile.Cosmetics.Owned[id] then
+		if not cosmetic.Exclusive and not cosmetic.Robux and not cosmetic.Price then
+			table.insert(LOOT, id)
+		end
+	end
+end
+local function unownedOf(profile, rarity: string, crateId: string?): string?
+	local choices = {}
+	for _, id in LOOT do
+		local cosmetic = Cosmetics.List[id]
+		local here = cosmetic.Crate == nil or cosmetic.Crate == crateId
+		if cosmetic.Rarity == rarity and here and not profile.Cosmetics.Owned[id] then
 			table.insert(choices, id)
 		end
 	end
 	return if #choices > 0 then choices[Gems.random():NextInteger(1, #choices)] else nil
 end
+StoreServer.Loot = LOOT
 
 -- Opens one crate: rolls, grants, and describes the result for the reveal.
 local function openOne(player: Player, profile, crate: Store.Crate)
@@ -186,7 +200,7 @@ local function openOne(player: Player, profile, crate: Store.Crate)
 	local rarity = "Common"
 	if chosen.Cosmetic then
 		rarity = chosen.Cosmetic
-		local cosmeticId = unownedOf(profile, chosen.Cosmetic)
+		local cosmeticId = unownedOf(profile, chosen.Cosmetic, crate.Id)
 		reward = if cosmeticId then { Cosmetics = { cosmeticId } } else { Coins = Store.DuplicateRefund * 2 }
 	elseif reward.CutGems or reward.Marks then
 		rarity = "Uncommon"

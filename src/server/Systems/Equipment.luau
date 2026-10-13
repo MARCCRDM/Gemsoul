@@ -677,12 +677,44 @@ SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
 	trail.Parent = biggest
 end
 
+-- A glowing outline round a plate (a cosmetic's seams or a blade's edge).
+local function outline(part: BasePart, color: Color3, thickness: number)
+	local box = Instance.new("SelectionBox")
+	box.Name = "SkinSeam"
+	box.Adornee = part
+	box.Color3 = color
+	box.LineThickness = thickness
+	box.SurfaceTransparency = 1
+	box.Parent = part
+end
+
+-- Which plates take a palette's Accent colour (see Cosmetics.Palette):
+--   Camo     patches, the same on both sides (picked by the plate's size)
+--   Stripes  bands across the body, by height
+--   Trim     the smaller plates: edges, straps, rivets, veins
+local function accented(pattern: string?, part: BasePart, index: number, median: number): boolean
+	local size = part.Size
+	if pattern == "Camo" then
+		local key = math.floor(size.X * 37 + size.Y * 61 + size.Z * 89 + index % 3)
+		return key % 5 < 2
+	elseif pattern == "Stripes" then
+		return math.floor(part.CFrame.Position.Y / 0.55) % 2 == 1
+	elseif pattern == "Trim" then
+		return size.X * size.Y * size.Z < median
+	end
+	return false
+end
+
+local SEAM_LIMIT = 12 -- outlined plates per piece, biggest first
+
 -- Repaints every part under `container` in a cosmetic Palette (skins and
 -- suits): neon takes the glow, dark parts and wood/leather the under-colour,
--- the rest the plate colour and material. Returns the biggest part (for
--- particles and trails).
+-- the rest the plate colour and material (or the Accent, in its Pattern).
+-- Plain blocks get glowing Seams when the palette asks. Returns the biggest
+-- part (for particles, trails and a blade's look).
 local function repaint(container: Instance, palette): BasePart?
 	local biggest, biggestSize = nil, 0
+	local plates = {}
 	for _, part in container:GetDescendants() do
 		if not part:IsA("BasePart") or part.Transparency >= 1 or part.Name == "SocketedGem" then
 			continue
@@ -698,10 +730,43 @@ local function repaint(container: Instance, palette): BasePart?
 		else
 			part.Color, part.Material = palette.Plate, palette.PlateMaterial
 			part.Reflectance = palette.Reflect or 0
+			table.insert(plates, part)
 		end
 		local size = part.Size.X * part.Size.Y * part.Size.Z
 		if size > biggestSize then
 			biggest, biggestSize = part, size
+		end
+	end
+	if palette.Accent and palette.Pattern then
+		local volumes = {}
+		for _, part in plates do
+			table.insert(volumes, part.Size.X * part.Size.Y * part.Size.Z)
+		end
+		table.sort(volumes)
+		local median = volumes[math.ceil(#volumes / 2)] or 0
+		for index, part in plates do
+			if accented(palette.Pattern, part, index, median) then
+				part.Color = palette.Accent
+				part.Material = palette.AccentMaterial or palette.PlateMaterial
+			end
+		end
+	end
+	if palette.Seams then
+		local blocks = {}
+		for _, part in plates do
+			if
+				part.ClassName == "Part"
+				and part.Shape == Enum.PartType.Block
+				and not part:FindFirstChildOfClass("SpecialMesh")
+			then
+				table.insert(blocks, part)
+			end
+		end
+		table.sort(blocks, function(a, b)
+			return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
+		end)
+		for i = 1, math.min(#blocks, SEAM_LIMIT) do
+			outline(blocks[i], palette.Glow, 0.025)
 		end
 	end
 	return biggest
@@ -728,6 +793,16 @@ SKINS.Palette = function(weaponFolder: Instance, color: Color3, palette)
 	local biggest = repaint(weaponFolder, palette)
 	if not biggest then
 		return
+	end
+	-- The blade (the biggest part) is the skin's hero: its own colour and
+	-- material, and a glowing edge.
+	if palette.Blade then
+		biggest.Color = palette.Blade
+		biggest.Material = palette.BladeMaterial or palette.PlateMaterial
+		biggest.Reflectance = palette.Reflect or 0
+	end
+	if palette.Edge then
+		outline(biggest, palette.Glow, 0.04)
 	end
 	if palette.Sparks then
 		drift(biggest, palette.Sparks, 12)
@@ -756,6 +831,226 @@ SKINS.Palette = function(weaponFolder: Instance, color: Color3, palette)
 		trail.FaceCamera = true
 		trail.Parent = biggest
 	end
+end
+
+-- Solar Flare: a palette skin whose blade is on fire, flames licking the
+-- whole length of it.
+SKINS.Solar = function(weaponFolder: Instance, color: Color3, palette)
+	SKINS.Palette(weaponFolder, color, palette)
+	local blade = nil
+	for _, part in weaponFolder:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and part:FindFirstChild("SkinTrailTip") then
+			blade = part
+		end
+	end
+	if not blade then
+		return
+	end
+	local flames = Instance.new("ParticleEmitter")
+	flames.Name = "SkinFlames"
+	flames.Shape = Enum.ParticleEmitterShape.Box
+	flames.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	flames.Color = ColorSequence.new(Color3.fromRGB(255, 236, 160), Color3.fromRGB(255, 80, 20))
+	flames.LightEmission = 1
+	flames.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.28), NumberSequenceKeypoint.new(1, 0) })
+	flames.Transparency = NumberSequence.new(0.2, 1)
+	flames.Lifetime = NumberRange.new(0.25, 0.5)
+	flames.Rate = 36
+	flames.Speed = NumberRange.new(0.8, 2)
+	flames.SpreadAngle = Vector2.new(25, 25)
+	flames.Acceleration = Vector3.new(0, 4, 0)
+	flames.Parent = blade
+	local light = blade:FindFirstChildOfClass("PointLight")
+	if light then
+		light.Range, light.Brightness = 9, 1.4
+	end
+end
+
+-- Shape skins (the Brainrot collection) swap the weapon's model for their
+-- own, held the same way: the old parts are hidden and the new one is built
+-- along the old blade, from the grip outwards.
+local function swapShape(weaponFolder: Instance): (BasePart?, CFrame, number)
+	local grip = weaponFolder:FindFirstChild("RightGrip") :: BasePart?
+	local blade, bladeSize = nil, 0
+	for _, part in weaponFolder:GetDescendants() do
+		if part:IsA("BasePart") and part ~= grip and part.Transparency < 1 then
+			local size = part.Size.X * part.Size.Y * part.Size.Z
+			if size > bladeSize then
+				blade, bladeSize = part, size
+			end
+		end
+	end
+	if not grip or not blade then
+		return nil, CFrame.identity, 0
+	end
+	-- The blade's long axis, pointing away from the hand, sets the new
+	-- weapon's up; its far end sets the length.
+	local rel = grip.CFrame:ToObjectSpace(blade.CFrame)
+	local size = blade.Size
+	local axis = if size.Y >= size.X and size.Y >= size.Z
+		then rel.UpVector
+		elseif size.X >= size.Z then rel.RightVector
+		else rel.LookVector
+	local half = math.max(size.X, size.Y, size.Z) / 2
+	if rel.Position:Dot(axis) < 0 then
+		axis = -axis
+	end
+	local length = math.max(rel.Position:Dot(axis) + half, 2.4)
+	local side = axis:Cross(Vector3.zAxis)
+	if side.Magnitude < 0.1 then
+		side = axis:Cross(Vector3.xAxis)
+	end
+	side = side.Unit
+	local mount = CFrame.fromMatrix(Vector3.zero, side, axis)
+	for _, part in weaponFolder:GetDescendants() do
+		if part:IsA("BasePart") and part ~= grip then
+			part.Transparency = 1
+			for _, effect in part:GetChildren() do
+				if
+					effect:IsA("ParticleEmitter")
+					or effect:IsA("Trail")
+					or effect:IsA("SelectionBox")
+					or effect:IsA("Light")
+				then
+					effect:Destroy()
+				end
+			end
+		elseif part:IsA("Highlight") then
+			part:Destroy()
+		end
+	end
+	return grip, mount, length
+end
+
+local function meshed(part: BasePart, meshType: Enum.MeshType): BasePart
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = meshType
+	mesh.Parent = part
+	return part
+end
+
+-- Bonk Bat: a fat cartoon baseball bat, red tape on the grip.
+SKINS.Bonk = function(weaponFolder: Instance, _color: Color3, palette)
+	local grip, mount, length = swapShape(weaponFolder)
+	if not grip then
+		return
+	end
+	local wood, tape = palette.Plate, palette.Under
+	local handle = length * 0.36
+	meshed(
+		piece(
+			weaponFolder,
+			grip,
+			mount * CFrame.new(0, handle / 2 - 0.25, 0),
+			Vector3.new(0.2, handle, 0.2),
+			tape,
+			Enum.Material.Fabric
+		),
+		Enum.MeshType.Cylinder
+	)
+	meshed(
+		piece(
+			weaponFolder,
+			grip,
+			mount * CFrame.new(0, -0.27, 0),
+			Vector3.new(0.3, 0.1, 0.3),
+			wood,
+			palette.PlateMaterial
+		),
+		Enum.MeshType.Cylinder
+	)
+	-- The barrel swells towards the end, in three steps, then a round cap.
+	local y = handle - 0.25
+	for step, width in { 0.26, 0.36, 0.46 } do
+		local h = (length - handle) / 3
+		local part = piece(
+			weaponFolder,
+			grip,
+			mount * CFrame.new(0, y + h / 2, 0),
+			Vector3.new(width, h + 0.04, width),
+			wood,
+			palette.PlateMaterial
+		)
+		meshed(part, Enum.MeshType.Cylinder)
+		y += h
+		if step == 3 then
+			meshed(
+				piece(
+					weaponFolder,
+					grip,
+					mount * CFrame.new(0, y, 0),
+					Vector3.new(width, 0.24, width),
+					wood,
+					palette.PlateMaterial
+				),
+				Enum.MeshType.Sphere
+			)
+		end
+	end
+	-- A cartoon star band round the sweet spot.
+	meshed(
+		piece(
+			weaponFolder,
+			grip,
+			mount * CFrame.new(0, y - 0.35, 0),
+			Vector3.new(0.48, 0.07, 0.48),
+			palette.Glow,
+			Enum.Material.SmoothPlastic
+		),
+		Enum.MeshType.Cylinder
+	)
+end
+
+-- Banana Blade: a banana, curved like one, stem out of the fist. It still cuts.
+SKINS.Banana = function(weaponFolder: Instance, _color: Color3, palette)
+	local grip, mount, length = swapShape(weaponFolder)
+	if not grip then
+		return
+	end
+	local peel, stem = palette.Plate, palette.Under
+	meshed(
+		piece(
+			weaponFolder,
+			grip,
+			mount * CFrame.new(0, -0.15, 0),
+			Vector3.new(0.16, 0.4, 0.16),
+			stem,
+			Enum.Material.SmoothPlastic
+		),
+		Enum.MeshType.Cylinder
+	)
+	-- Seven plump segments along a gentle arc, thickest in the middle.
+	local segments = 9
+	local bend = math.rad(40)
+	local radius = length / bend
+	for i = 0, segments - 1 do
+		local t = (i + 0.5) / segments
+		local angle = t * bend
+		local x, yy = radius * (1 - math.cos(angle)), radius * math.sin(angle)
+		local thick = 0.26 + 0.12 * math.sin(math.pi * t)
+		local part = piece(
+			weaponFolder,
+			grip,
+			mount * CFrame.new(x, yy, 0) * CFrame.Angles(0, 0, -angle),
+			Vector3.new(thick, length / segments * 2.4, thick),
+			peel,
+			palette.PlateMaterial
+		)
+		meshed(part, Enum.MeshType.Sphere)
+	end
+	-- The dark tip.
+	local x, yy = radius * (1 - math.cos(bend)), radius * math.sin(bend)
+	meshed(
+		piece(
+			weaponFolder,
+			grip,
+			mount * CFrame.new(x, yy, 0),
+			Vector3.new(0.12, 0.14, 0.12),
+			stem,
+			Enum.Material.SmoothPlastic
+		),
+		Enum.MeshType.Sphere
+	)
 end
 
 -- Back pieces (cosmetics) ---------------------------------------------------------------------

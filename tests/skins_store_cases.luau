@@ -296,4 +296,62 @@ check(not handlers.CheckGroup(thePlayer).Ok, "The group reward paid out with no 
 local state = handlers.FreeRewards(thePlayer)
 check(state.Ok and state.Group.Enabled == false and #state.Invites.Tiers == #Referrals.Tiers and state.Streak.Days == 7, "The Free tab's state is incomplete")
 
+-- The full collection's designs -------------------------------------------------------------
+local PATTERNS = { Camo = true, Stripes = true, Trim = true }
+local defaults, earnedHow = 0, true
+for id, cosmetic in Cosmetics.List do
+	local palette = cosmetic.Palette
+	if palette then
+		check(palette.Pattern == nil or PATTERNS[palette.Pattern], id .. " has an unknown pattern")
+		check(
+			(palette.Accent == nil) == (palette.Pattern == nil),
+			id .. " has an accent with no pattern, or the reverse"
+		)
+		check(not (palette.Seams and cosmetic.Kind ~= "Suit"), id .. " asks for seams but isn't a suit")
+		check(
+			not ((palette.Blade or palette.Edge) and cosmetic.Kind ~= "Skin"),
+			id .. " styles a blade but isn't a skin"
+		)
+	end
+	if cosmetic.Exclusive == "Default" then
+		defaults += 1
+	end
+	local earned = cosmetic.Exclusive == "Achievement"
+		or cosmetic.Exclusive == "Ranked"
+		or cosmetic.Exclusive == "Raid"
+		or cosmetic.Exclusive == "Mining"
+	if earned and not cosmetic.How then
+		earnedHow = false
+	end
+	-- Loot drops from a crate that rolls its rarity.
+	local loot = (cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit")
+		and not cosmetic.Exclusive
+		and not cosmetic.Robux
+		and not cosmetic.Price
+	if loot then
+		check(table.find(StoreServer.Loot, id), id .. " is loot but in no crate's pool")
+		local drops = false
+		for crateId, crate in Store.Crates do
+			if cosmetic.Crate == nil or cosmetic.Crate == crateId then
+				for _, roll in crate.Rolls do
+					drops = drops or roll.Cosmetic == cosmetic.Rarity
+				end
+			end
+		end
+		check(drops, id .. " is loot but no crate rolls a " .. cosmetic.Rarity)
+	end
+	check(cosmetic.Crate == nil or Store.Crates[cosmetic.Crate], id .. " names a crate that doesn't exist")
+end
+check(defaults == 2, "Every miner should start with one skin and one suit")
+check(earnedHow, "An earned look doesn't say how it's earned")
+for _, level in { 15, 25 } do
+	for _, id in Season.reward(level).Cosmetics or {} do
+		check(Cosmetics.get(id), "Free track level " .. level .. " gives an unknown cosmetic")
+	end
+end
+check(
+	table.find(Season.reward(15).Cosmetics, "SkinCrater") and table.find(Season.reward(25).Cosmetics, "SuitMoonDust"),
+	"The Season 1 free-track looks are missing"
+)
+
 print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d titles; receipts once each, starter pack, season premium, codes)", checks, skins, suits, titles))

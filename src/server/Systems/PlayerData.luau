@@ -101,6 +101,16 @@ do
 	end
 end
 
+-- Every miner owns the starting looks (Cosmetics, Exclusive "Default").
+local function grantDefaults(profile)
+	profile.Cosmetics = profile.Cosmetics or { Owned = {} }
+	for id, cosmetic in Cosmetics.List do
+		if cosmetic.Exclusive == "Default" then
+			profile.Cosmetics.Owned[id] = true
+		end
+	end
+end
+
 local function newProfile(): Profile
 	local profile = {
 		Version = FastStart.SaveVersion,
@@ -124,6 +134,7 @@ local function newProfile(): Profile
 		WelcomeBought = false,
 	}
 	Tree.initialize(profile)
+	grantDefaults(profile)
 	return profile
 end
 
@@ -257,6 +268,7 @@ local function migrate(profile: Profile): Profile
 	FastStart.migrate(profile)
 	profile.Version = math.max(profile.Version, FastStart.SaveVersion)
 	Tree.initialize(profile)
+	grantDefaults(profile)
 	return profile
 end
 

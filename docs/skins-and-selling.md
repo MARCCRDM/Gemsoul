@@ -48,6 +48,40 @@ is only a few lines of data.
 Free rewards are put on as soon as they're earned, so other players see them.
 The Shop's **Free** tab shows every one, with your progress.
 
+## The designs (the full collection)
+
+There are 26 weapon skins and 21 suits, all of them in `src/shared/Cosmetics.luau`. Renders of every
+one:
+
+- `docs/skin-designs/skins_gallery.png`
+- `docs/skin-designs/suits_gallery.png`
+
+A palette can ask for more than one colour:
+
+| Palette field | What it draws |
+| --- | --- |
+| `Accent` + `Pattern` | A second plate colour. **Camo** is patches, the same on both sides. **Stripes** is bands across the body. **Trim** is the smaller plates: edges, straps, veins. |
+| `Seams` (suits) | The 12 biggest plates of each piece outlined in the glow colour. Used by Neon Runner, Raid Breaker, Circuit Rig and Chrome Knight. |
+| `Blade` + `BladeMaterial` (skins) | The blade's own colour and material: lava for Molten Core, glass for Glacier Shard, neon for Solar Flare. |
+| `Edge` (skins) | The blade outlined in the glow colour. |
+
+Three skins have their own look in `Equipment.luau`:
+
+- **Solar Flare** (`SKINS.Solar`): the palette plus flames along the whole blade.
+- **Bonk Bat** and **Banana Blade** (`SKINS.Bonk`, `SKINS.Banana`): they swap the weapon's model for
+  their own, built along the old blade and held the same way.
+
+Where the new ones come from:
+
+| Source | Items | Works now? |
+| --- | --- | --- |
+| Everyone | Frontier Steel, Frontier Fatigues | Yes: given to every profile on load. |
+| Geode Crate | Rust Bucket, Rust Rig, Camo Ops (skin and suit), Copper Wire, Copper Coil | Yes. Each crate only drops its own items (`Crate`), and the Geode Crate now has a 4% Common roll. |
+| Masterwork Crate | Circuit Rig, Nebula, Nebula Suit (Circuit Board drops from either crate) | Yes |
+| Robux | Glacier Shard 99, Bonk Bat 149, Banana Blade 149, Stealth Black 199, Storm Conductor 299, Biohazard 299, Solar Flare 399 | Once their Developer Products exist (the slots are in `Store.RobuxProducts`). |
+| Season 1 free track | Crater Grey (level 15), Moon Dust (level 25) | Yes |
+| Achievement, Ranked, Raid, Mining | Veteran Steel, Champion's Edge, Champion Plate, Warlord's Edge, Raid Breaker, Geode Crust, Fossil Bone, Fossil Shell, Ore Vein Gold | Not yet. They're in the Shop with how to earn them (`How`), but the systems that grant them are still to build. |
+
 ## To switch selling on
 
 Nothing sells for Robux until you create its product.

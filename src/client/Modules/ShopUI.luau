@@ -786,8 +786,24 @@ local HOW_TO = {
 	Code = "From a promo code. Watch our Discord and socials.",
 	Starter = "Only in the Starter Pack, offered after your first win.",
 	Season = "On the Season Path's premium track. See Passes.",
+	Default = "Every miner has it.",
+	Achievement = "Earned by an achievement.",
+	Ranked = "A ranked season reward.",
+	Raid = "A raid reward.",
+	Mining = "Found while mining, by luck.",
 }
-local GO_TO = { Invite = "Free", Group = "Free", Streak = "Free", Code = "Free", Starter = "Featured", Season = "Passes" }
+local GO_TO = {
+	Invite = "Free",
+	Group = "Free",
+	Streak = "Free",
+	Code = "Free",
+	Starter = "Featured",
+	Season = "Passes",
+	Achievement = "Free",
+	Ranked = "Free",
+	Raid = "Free",
+	Mining = "Free",
+}
 
 local function drawCosmetics(kind: string)
 	local p = profile()
@@ -968,7 +984,7 @@ local function drawCosmetics(kind: string)
 			then (if wornOfKind == cosmetic.Id then "Equipped." else "In your collection.")
 			elseif cosmetic.Robux then "Sold for Robux. Yours to keep, on every miner."
 			elseif cosmetic.Price then "Sold here for coins."
-			elseif cosmetic.Exclusive then (HOW_TO[cosmetic.Exclusive] or "Exclusive.")
+			elseif cosmetic.Exclusive then (cosmetic.How or HOW_TO[cosmetic.Exclusive] or "Exclusive.")
 			else "Found in supply caches and on the Season Path.",
 		12,
 		if owned[cosmetic.Id] then P.Good else P.Gold,

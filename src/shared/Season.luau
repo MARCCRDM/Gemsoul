@@ -32,9 +32,9 @@ end
 local SPECIAL = {
 	[5] = { Cosmetics = { "TrimEmber" } },
 	[10] = { Cosmetics = { "BackGeode" } },
-	[15] = { Cosmetics = { "TrimRoseGold" }, Crates = { MasterworkCrate = 1 } },
+	[15] = { Cosmetics = { "TrimRoseGold", "SkinCrater" }, Crates = { MasterworkCrate = 1 } },
 	[20] = { Cosmetics = { "BackWings" } },
-	[25] = { Cosmetics = { "TrimPrismatic" } },
+	[25] = { Cosmetics = { "TrimPrismatic", "SuitMoonDust" } },
 	[30] = { Cosmetics = { "BackHalo" }, Crates = { MasterworkCrate = 2 } },
 }
 
