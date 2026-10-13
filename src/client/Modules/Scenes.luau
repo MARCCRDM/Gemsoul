@@ -639,15 +639,15 @@ function Scenes.spaceLighting()
 	end
 end
 
--- The Skyport (the Outpost): a bright afternoon over a sea of cloud, warm
--- sun and soft haze, with the planets and the ring station hanging in it.
+-- A warmly lit meadow in low orbit. The atmospheric rim belongs to the
+-- planet's geometry; global haze/clouds would hide it behind a gray void.
 function Scenes.outpostLighting()
-	Lighting.ClockTime = 15.4
+	Lighting.ClockTime = 0
 	Lighting.GeographicLatitude = 28
 	Lighting.Brightness = 2.6
 	Lighting.ExposureCompensation = 0.05
-	Lighting.Ambient = Color3.fromRGB(129, 132, 120)
-	Lighting.OutdoorAmbient = Color3.fromRGB(177, 179, 158)
+	Lighting.Ambient = Color3.fromRGB(148, 151, 135)
+	Lighting.OutdoorAmbient = Color3.fromRGB(183, 186, 168)
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 0.35
 	Lighting.GlobalShadows = true
@@ -661,29 +661,26 @@ function Scenes.outpostLighting()
 		return found
 	end
 	local atmosphere = get("Atmosphere")
-	atmosphere.Density = 0.24
-	atmosphere.Offset = 0.15
+	atmosphere.Density = 0
+	atmosphere.Offset = 0
 	atmosphere.Color = Color3.fromRGB(213, 229, 238)
 	atmosphere.Decay = Color3.fromRGB(128, 150, 186)
-	atmosphere.Glare = 0.15
-	atmosphere.Haze = 1.1
+	atmosphere.Glare = 0
+	atmosphere.Haze = 0
 	local sky = get("Sky")
-	sky.StarCount = 0
-	sky.CelestialBodiesShown = true
+	sky.StarCount = 3000
+	sky.CelestialBodiesShown = false
 	local bloom = get("BloomEffect")
 	bloom.Intensity, bloom.Size, bloom.Threshold = 0.16, 20, 2
 	local grade = get("ColorCorrectionEffect")
 	grade.Brightness, grade.Contrast, grade.Saturation = 0.025, 0.035, 0.08
 	grade.TintColor = Color3.fromRGB(255, 249, 238)
 	local rays = get("SunRaysEffect")
-	rays.Intensity, rays.Spread = 0.06, 0.8
+	rays.Intensity, rays.Spread = 0, 0.8
 	local terrain = workspace:FindFirstChildOfClass("Terrain")
 	if terrain then
 		local clouds = get("Clouds", terrain)
-		clouds.Enabled = true
-		clouds.Cover = 0.45
-		clouds.Density = 0.48
-		clouds.Color = Color3.new(1, 1, 1)
+		clouds.Enabled = false
 	end
 end
 

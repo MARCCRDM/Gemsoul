@@ -45,7 +45,7 @@ function CFrame.lookAt(p,q)
 end
 local UDim2={new=function() return {} end,fromOffset=function() return {} end}
 '''
-for name, path in [('Rules', 'src/shared/Outpost.luau'), ('Meadow', 'src/server/World/OutpostMeadow.luau'), ('World', 'src/server/World/OutpostWorld.luau')]:
+for name, path in [('Rules', 'src/shared/Outpost.luau'), ('Meadow', 'src/server/World/OutpostMeadow.luau'), ('Orbit', 'src/server/World/OutpostOrbit.luau'), ('World', 'src/server/World/OutpostWorld.luau')]:
     code = (ROOT / path).read_text(encoding='utf-8')
     code = re.sub(r'^local \w+ = require\([^\n]+\)\n', '', code, flags=re.M)
     source += f'local {name}=(function()\n{code}\nend)()\n'
@@ -53,10 +53,12 @@ source += r'''
 local origin=CFrame.new(0,0,7000)
 local site=World.build(origin,{})
 assert(site.Model.LandscapeVersion==2,"Old landscape built")
+assert(site.Model.SkySetting=="LowOrbit","Orbital scenery not connected")
 assert(#site.Parking==0 and #site.Secrets==0,"Retired world extras returned")
 assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7074,"Arrival moved")
 assert(site.Probe and site.Board and site.Gate,"Missing lobby services")
 local common, field, grass, triangles = 0,0,0,{}
+local planet, airglow, stars, land, clouds = nil,nil,0,0,0
 for i,spot in site.Spots do
  local p=spot.Position-origin.Position
  assert(math.abs(p.Y)<.001,"Mining node isn't seated on the grass")
@@ -83,6 +85,15 @@ assert(maximum-minimum>25,"Shoreline still circular")
 for _,tree in Meadow.Trees do assert(Meadow.contains(Vector3.new(tree[1],0,tree[2]),5),"Tree outside meadow") end
 for _,p in builtParts do
  assert(p.Size.X>0 and p.Size.Y>0 and p.Size.Z>0,"Degenerate world geometry")
+ assert(math.max(p.Size.X,p.Size.Y,p.Size.Z)<=2048,"Roblox part size limit exceeded")
+ if p.Name=="PlanetOcean" then planet=p end
+ if p.Name=="PlanetAirglow" then airglow=p end
+ if p.Name=="OrbitStar" then stars+=1 end
+ if p.Name=="PlanetLand" then land+=1 end
+ if p.Name=="PlanetCloud" then clouds+=1 end
+ if p.Parent and p.Parent.Name=="OrbitalSky" then
+  assert(not p.CanCollide and not p.CanQuery and not p.CanTouch and not p.CastShadow,"Sky interferes with gameplay")
+ end
  if p.Name=="GrassSurface" and p.CanCollide then
   grass+=1
   assert((p.Transparency or 0)==0,"See-through walking surface")
@@ -100,6 +111,9 @@ for _,p in builtParts do
  end
 end
 assert(grass==64,"Missing floor triangle")
+assert(planet and airglow and stars>=100 and land>0 and clouds>0,"Incomplete orbital backdrop")
+assert(planet.CFrame.t[2]+planet.Size.Y/2 < -150,"Planet intersects floating islands")
+assert(airglow.Size.X>planet.Size.X and airglow.Transparency>.9,"Atmospheric rim hides the planet")
 local function cross(a,b) return a.X*b.Z-a.Z*b.X end
 local function covered(p)
  for _,t in triangles do
@@ -116,6 +130,7 @@ end end
 assert(#builtParts<2800,"Lobby scenery part budget exceeded: "..#builtParts)
 print("PASS: meadow scenery="..#builtParts.." parts; starter spots="..common.."; field spots="..field.."; covered floor samples="..sampled)
 print("PASS: 20,002 basic-node rolls; shoreline/paths/service clearance; opaque level ground; safe nature geometry")
+print("PASS: planet below island; safe scenery physics; size limits; continents, cloud bands and starfield")
 for _,p in builtParts do
  local row={p.Name or p.ClassName,p.ClassName,p.Shape or "Block",p.Material,tostring(p.Transparency or 0)}
  for _,v in {p.Size.X,p.Size.Y,p.Size.Z,p.Color.R,p.Color.G,p.Color.B} do table.insert(row,tostring(v)) end

@@ -14,6 +14,7 @@
 	      (Shared.Outpost.Sizes), its main chunk named "Body"
 ]]
 local Meadow = require(script.Parent.OutpostMeadow)
+local Orbit = require(script.Parent.OutpostOrbit)
 local OutpostWorld = {}
 
 -- Imported art (ServerStorage.Assets) when it's there; plain parts when not.
@@ -1014,6 +1015,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	root.Name = "SagaOutpost"
 	root:SetAttribute("Landscape", "Corundum Meadow")
 	root:SetAttribute("LandscapeVersion", 2)
+	root:SetAttribute("SkySetting", "LowOrbit")
 	local meadow = Meadow.build(root, at)
 	-- Grass and a shallow mineral coast blend into the familiar blue foundation.
 	-- Keep the old circular crystal shoulders tucked beneath the irregular land.
@@ -1077,18 +1079,6 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	do
 		local anchor = at * CFrame.new(math.cos(spec[1]) * spec[2], spec[3], math.sin(spec[1]) * spec[2])
 		islet(far, anchor, spec[4], Random.new(i * 31), spec[5])
-		-- Soft cloud banks below the islets, leaving the walking horizon clear.
-		for puff = -1, 1 do
-			part(
-				far,
-				anchor * CFrame.new(puff * 19, -38 - math.abs(puff) * 4, 5),
-				Vector3.new(58, 15, 36),
-				Color3.fromRGB(239, 242, 229),
-				Enum.Material.SmoothPlastic,
-				"Ball",
-				{ Transparency = 0.28, CastShadow = false }
-			)
-		end
 	end
 	-- Two hand-made kites over the outlooks add a gentle adventure-game accent.
 	local art = folder(root, "MeadowSkyArt")
@@ -1112,7 +1102,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 	end
 	station(far, at * CFrame.new(-260, 420, -900))
-	sky(root, at, true)
+	Orbit.build(root, at)
 	root.Parent = parent
 	return {
 		Model = root,
