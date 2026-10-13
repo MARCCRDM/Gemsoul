@@ -692,32 +692,66 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 		end)
 		CombatFx.burst(floor + Vector3.new(0, 2, 0), ICE, "Frost", 1.6)
 	elseif kind == "Tesla" then
-		-- Tesla Fence: steel posts with crackling arcs strung between them.
+		-- Tesla Fence: a curtain of lightning. Bolts strike down all along
+		-- the wall and never settle (re-drawn jagged every few frames), with
+		-- arcs jumping between them and the ground scorched where they land.
 		CombatSound.play("Zap", floor, { Volume = 1 })
-		CombatSound.element("Impact", "Shock", floor, { Volume = 0.8 })
-		local posts = math.max(3, math.floor(width / 2.5) + 1)
-		local tops = {}
-		for i = 1, posts do
-			local along = (i - 1) / (posts - 1) - 0.5
-			local base = floor + side * along * width
-			local mast = part(Vector3.new(0.45, 0.2, 0.45), CFrame.new(base), Color3.fromRGB(70, 74, 92), 0, nil, Enum.Material.Metal)
-			tween(mast, 0.2, { Size = Vector3.new(0.45, 4.6, 0.45), CFrame = CFrame.new(base + Vector3.new(0, 2.3, 0)) }, Enum.EasingStyle.Back)
-			local coil = part(Vector3.one * 0.2, CFrame.new(base + Vector3.new(0, 4.8, 0)), color, 0.05, Enum.PartType.Ball)
-			tween(coil, 0.25, { Size = Vector3.one * 0.9 }, Enum.EasingStyle.Back)
-			if i % 2 == 1 then
-				light(coil, color, 3, 12)
+		CombatSound.element("Impact", "Shock", floor, { Volume = 0.9 })
+		CombatSound.play("Blast", floor, { Volume = 0.5, Pitch = 1.5 })
+		local hot = color:Lerp(WHITE, 0.55)
+		local count = math.max(3, math.floor(width / 2.4) + 1)
+		local function strand(segments: number, thick: number, tint: Color3, transparency: number)
+			local list = {}
+			for _ = 1, segments do
+				table.insert(list, part(Vector3.new(thick, thick, 0.1), CFrame.new(floor), tint, 1))
 			end
-			table.insert(tops, { Base = base, Mast = mast, Coil = coil })
+			return { Parts = list, Thick = thick, Transparency = transparency }
 		end
-		-- The arcs: three strands between each pair of posts, re-drawn jagged
-		-- every few frames so the fence crackles.
-		local strands = {}
-		for i = 1, posts - 1 do
-			for _, height in { 1.2, 2.6, 4.2 } do
-				local first = part(Vector3.new(0.1, 0.1, 1), CFrame.new(tops[i].Base), color:Lerp(WHITE, 0.5), 1)
-				local second = part(Vector3.new(0.1, 0.1, 1), CFrame.new(tops[i].Base), color:Lerp(WHITE, 0.5), 1)
-				table.insert(strands, { Parts = { first, second }, From = tops[i].Base, To = tops[i + 1].Base, Height = height })
+		-- Lays a strand from `a` to `b` as a jagged line, kinking `jitter`
+		-- studs along `across`.
+		local function zigzag(s, a: Vector3, b: Vector3, jitter: number, shown: boolean, across: Vector3)
+			local n = #s.Parts
+			local previous = a
+			for i, segment in s.Parts do
+				-- (Kinks swing side to side, so it reads as one forked strike.)
+				local swing = (if i % 2 == 0 then 1 else -1) * (0.4 + math.random() * 0.6)
+				local point = if i == n
+					then b
+					else a + (b - a) * (i / n) + across * swing * jitter * 0.5 + facing * (math.random() - 0.5) * jitter * 0.3
+				local length = (point - previous).Magnitude
+				segment.Size = Vector3.new(s.Thick, s.Thick, math.max(0.05, length))
+				-- (Up = facing: a near-vertical look with the default up flips.)
+				segment.CFrame = CFrame.lookAt((previous + point) / 2, point, facing)
+				segment.Transparency = if shown then s.Transparency else 1
+				previous = point
 			end
+		end
+		local bolts, arcs, marks = {}, {}, {}
+		for i = 1, count do
+			local along = (i - 1) / (count - 1) - 0.5
+			local base = floor + side * along * width
+			table.insert(bolts, {
+				Base = base,
+				Top = 8 + math.random() * 1.5,
+				Core = strand(5, 0.14, hot, 0),
+				Glow = strand(5, 0.38, color, 0.7),
+				Live = os.clock() + 0.03 * i, -- (they strike in, one after another)
+			})
+			local mark = disc(base + Vector3.new(0, 0.05, 0), 0.4, color, 1)
+			table.insert(marks, mark)
+			task.delay(0.03 * i, function()
+				mark.Transparency = 0.3
+				tween(mark, 0.15, { Size = Vector3.new(0.06, 1.6, 1.6) })
+				if i % 2 == 1 then
+					CombatFx.burst(base + Vector3.new(0, 0.3, 0), color, "Sparks", 0.7)
+				end
+			end)
+			if i % 3 == 1 then
+				light(mark, color, 3, 14)
+			end
+		end
+		for i = 1, count - 1 do
+			table.insert(arcs, { From = i, Core = strand(4, 0.09, hot, 0.1) })
 		end
 		local ends = os.clock() + seconds
 		local nextDraw = 0
@@ -732,34 +766,46 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 				return
 			end
 			nextDraw = now + 0.05
-			for _, strand in strands do
-				local a = strand.From + Vector3.new(0, strand.Height + (math.random() - 0.5) * 0.5, 0)
-				local b = strand.To + Vector3.new(0, strand.Height + (math.random() - 0.5) * 0.5, 0)
-				local mid = (a + b) / 2 + Vector3.new(0, (math.random() - 0.5) * 0.8, 0) + facing * (math.random() - 0.5) * 0.5
-				local flicker = if math.random() < 0.2 then 0.85 else 0.05
-				for n, from in { a, mid } do
-					local to = if n == 1 then mid else b
-					local segment = strand.Parts[n]
-					segment.Size = Vector3.new(0.09 + math.random() * 0.08, 0.09, (to - from).Magnitude)
-					segment.CFrame = CFrame.lookAt((from + to) / 2, to)
-					segment.Transparency = flicker
+			for _, bolt in bolts do
+				local live = now >= bolt.Live and math.random() > 0.15
+				local top = bolt.Base + Vector3.new((math.random() - 0.5) * 0.8, bolt.Top, 0)
+				zigzag(bolt.Core, top, bolt.Base, 1.6, live, side)
+				-- (The glow follows the core's path, a little wider.)
+				for n, segment in bolt.Glow.Parts do
+					segment.CFrame = bolt.Core.Parts[n].CFrame
+					segment.Size = Vector3.new(bolt.Glow.Thick, bolt.Glow.Thick, bolt.Core.Parts[n].Size.Z)
+					segment.Transparency = if live then bolt.Glow.Transparency else 1
 				end
 			end
-		end)
-		local glow = disc(floor + Vector3.new(0, 0.04, 0), width, color, 0.75)
-		glow.Size = Vector3.new(0.06, 1.6, width)
-		glow.CFrame = CFrame.lookAt(floor, floor + side) * CFrame.Angles(0, math.rad(90), math.rad(90))
-		CombatFx.burst(floor + Vector3.new(0, 2.5, 0), color, "Sparks", 1.5)
-		task.delay(seconds, function()
-			for _, strand in strands do
-				fade(strand.Parts[1], 0.15)
-				fade(strand.Parts[2], 0.15)
+			for _, arc in arcs do
+				local a, b = bolts[arc.From], bolts[arc.From + 1]
+				local height = 1 + math.random() * 4.5
+				local shown = now >= b.Live and math.random() > 0.35
+				zigzag(arc.Core, a.Base + Vector3.new(0, height, 0), b.Base + Vector3.new(0, height + (math.random() - 0.5) * 1.5, 0), 0.4, shown, Vector3.new(0, 1, 0))
 			end
-			for _, top in tops do
-				fade(top.Mast, 0.3, { Size = Vector3.new(0.45, 0.2, 0.45), CFrame = CFrame.new(top.Base) })
-				fade(top.Coil, 0.25, { Size = Vector3.one * 1.6 })
+		end)
+		local glow = disc(floor + Vector3.new(0, 0.04, 0), width, color, 0.7)
+		glow.Size = Vector3.new(0.06, 1.8, width + 1)
+		glow.CFrame = CFrame.lookAt(floor, floor + side) * CFrame.Angles(0, math.rad(90), math.rad(90))
+		CombatFx.flash(floor + Vector3.new(0, 4, 0), color, 8, 28, 0.35)
+		task.delay(seconds, function()
+			for _, bolt in bolts do
+				for _, s in { bolt.Core, bolt.Glow } do
+					for _, segment in s.Parts do
+						fade(segment, 0.15)
+					end
+				end
+			end
+			for _, arc in arcs do
+				for _, segment in arc.Core.Parts do
+					fade(segment, 0.1)
+				end
+			end
+			for _, mark in marks do
+				fade(mark, 0.4)
 			end
 			fade(glow, 0.4)
+			CombatFx.burst(floor + Vector3.new(0, 2, 0), color, "Sparks", 1.2)
 			CombatSound.play("Zap", floor, { Volume = 0.5, Pitch = 0.8 })
 		end)
 	elseif kind == "Spore" then
