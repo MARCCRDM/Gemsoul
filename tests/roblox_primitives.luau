@@ -53,6 +53,9 @@ local builtParts = {}
 local Instance = {
 	new = function(className)
 		local values = { ClassName = className }
+		function values.Destroy()
+			values.Parent = nil
+		end
 		return setmetatable({}, {
 			__index = values,
 			__newindex = function(_self, key, value)

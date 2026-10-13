@@ -6,23 +6,54 @@ Lottery.Version = 1
 Lottery.GearOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet" }
 Lottery.GemOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet", "Surge1", "Surge2", "Surge3" }
 Lottery.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
--- The three moves a starter kit of this element gives Q, E and R (catalog ids).
--- With the triad: a clean sword technique, a bolt, and a shield that soaks.
-function Lottery.starterMoves(element): { string }
-	local m = GemTraits.Enabled and GemTraits.Matrix[element]
-	if m then
-		return { m.Offense[2], m.Ability[1], m.Defense[1] }
+-- What each key of a starter kit of this element can roll (catalog ids):
+-- { Q, E, R }, each a list. With the triad, each key is one of two showcase
+-- moves (GemTraits.Intro: the flashy ones, and R is a wall or an escape,
+-- never a shield). Without it, the element's three classic surges.
+local LANES = { "Offense", "Ability", "Defense" }
+function Lottery.starterPools(element): { { string } }
+	local intro = GemTraits.Enabled and GemTraits.Intro[element]
+	if intro then
+		local pools = {}
+		for _, lane in LANES do
+			table.insert(pools, table.clone(intro[lane]))
+		end
+		return pools
 	end
-	return table.clone(GemRoller.StarterSurges[element] or {})
+	local pools = {}
+	for _, id in GemRoller.StarterSurges[element] or {} do
+		table.insert(pools, { id })
+	end
+	return pools
+end
+-- The kit's three moves, one from each pool. `pick(n)` picks 1..n (the
+-- server's Random); without it, each pool's first.
+function Lottery.rollMoves(element, pick: ((number) -> number)?): { string }
+	local moves = {}
+	for _, pool in Lottery.starterPools(element) do
+		local index = if pick and #pool > 1 then math.clamp(pick(#pool), 1, #pool) else 1
+		table.insert(moves, pool[index])
+	end
+	return moves
+end
+-- The moves a kit gives: what it rolled (saved on the reward), or for one
+-- not rolled yet, each pool's first.
+function Lottery.starterMoves(element, reward): { string }
+	if reward and type(reward.Moves) == "table" and #reward.Moves == 3 then
+		return table.clone(reward.Moves)
+	end
+	return Lottery.rollMoves(element)
 end
 function Lottery.validChoice(style, element)
 	return table.find(Lottery.Styles, style) ~= nil and GemRoller.PrototypeIds[element] ~= nil
 end
 -- Explicit choice is persisted before the reveal. Retrying never rerolls it.
-function Lottery.prepareChoice(profile, style, element, generate)
+-- The moves are rolled here too (`pick`, see rollMoves) and saved with it.
+function Lottery.prepareChoice(profile, style, element, generate, pick: ((number) -> number)?)
 	if profile.Intro.Lottery then return profile.Intro.Lottery end
 	if not Lottery.validChoice(style, element) then return nil end
-	local reward = { Version = 3, Style = style, Element = element, Gear = {}, Gems = {}, Granted = false }
+	local moves = Lottery.rollMoves(element, pick)
+	local reward = { Version = 4, Style = style, Element = element, Gear = {}, Gems = {}, Moves = moves, Granted = false }
 	for _, slot in Lottery.GearOrder do
 		table.insert(reward.Gear, { Slot = slot, Id = if slot == "Weapon" then "MatrixSwords1" else "Armor" .. style .. slot .. "1" })
 	end
@@ -36,8 +67,7 @@ function Lottery.prepareChoice(profile, style, element, generate)
 		gem.SurgeTier, gem.SurgeRank, gem.CutMethod = 1, 1, "Starter"
 		gem.Surge = GemRoller.StarterSurges[element][index]
 		if GemTraits.Enabled and GemTraits.Matrix[element] then
-			-- A first kit that teaches the grammar (Lottery.starterMoves).
-			local moves = Lottery.starterMoves(element)
+			-- Every stone carries the rolled kit, so each key fires its move.
 			gem.Traits = { Offense = moves[1], Ability = moves[2], Defense = moves[3] }
 		end
 		table.insert(reward.Gems, { Slot = slot, Gem = gem })

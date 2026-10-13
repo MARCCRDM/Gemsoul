@@ -49,9 +49,10 @@ local Tech = load("CombatTechnology")
 local Roller = load("GemRoller")
 local Actions = load("CombatActions")
 
--- The matrix: 4 elements x 3 lanes x 5 moves, every one defined once.
+-- The matrix: 4 elements x 3 lanes x 5 moves, plus each element's showcase
+-- defenses (a barrier and an escape), every one defined once.
 local all, seen = Traits.all(), {}
-check(#all == 60, "The matrix holds 60 moves, found " .. #all)
+check(#all == 66, "The matrix holds 66 moves, found " .. #all)
 for _, id in all do
 	check(not seen[id], id .. " sits in the matrix twice")
 	seen[id] = true
@@ -75,6 +76,39 @@ for _, id in all do
 		check(move.Aura ~= nil, id .. " is an Aura with nothing passive")
 	end
 end
+-- The intro pools: two moves per key per element, all of that element and
+-- key, made to be seen: no plain shield, every defense a wall, ring,
+-- pillar, decoy or slick.
+for element, lanes in Traits.Intro do
+	for lane, ids in lanes do
+		check(#ids == 2, element .. " " .. lane .. " needs two intro moves")
+		for _, id in ids do
+			local index = Traits.Index[id]
+			check(index and index.Element == element and index.Lane == lane, id .. " is in the wrong intro pool")
+			local move = Traits.Moves[id]
+			check(move.Absorb == nil, id .. " is a shield: not for the intro")
+			if lane == "Defense" then
+				check(move.Wall or move.Ring or move.Pillar or move.Decoy or move.Slick, id .. " puts nothing into the world")
+				check(Traits.Showcase[id] ~= nil, id .. " has no showcase role")
+			end
+		end
+	end
+end
+-- Each element has one barrier and one escape; a recut keeps the role.
+for _, element in { "Fire", "Frost", "Shock", "Poison" } do
+	local roles = {}
+	for _, id in Traits.Intro[element].Defense do
+		roles[Traits.Showcase[id]] = id
+	end
+	check(roles.Barrier and roles.Escape, element .. " needs a barrier and an escape")
+end
+local recut = Traits.reElement({ Defense = "R_HoloDecoy" }, "Shock", "Fire")
+check(recut.Defense == "R_RingOfFire", "An escape stays an escape on a recut")
+recut = Traits.reElement({ Defense = "R_FireWall" }, "Fire", "Poison")
+check(recut.Defense == "R_SporeWall", "A barrier stays a barrier on a recut")
+recut = Traits.reElement({ Defense = "R_Grounding" }, "Shock", "Frost")
+check(recut.Defense == "R_FrostRiposte", "A plain move keeps its slot on a recut")
+
 -- No old surge was taken: every retired id still resolves to its own definition.
 for _, id in { "EnergySiphon", "ResonanceEcho", "ResonantReaver", "NullPrism", "ThermalBurst", "Overload", "CryoShield" } do
 	check(Tech.Catalog[id] ~= nil and not Tech.Catalog[id].Triad, id .. " must stay in the archive untouched")
@@ -159,4 +193,4 @@ check(not Tech.canSocket({ Id = "plain" }, "E", loadout), "A gem with no element
 local recut = Roller.setElement({ Element = "Fire", Surge = "EmberLance", Traits = { Offense = "Q_FurnaceCrescent", Ability = "E_EmberLance", Defense = "R_PhoenixMantle" } }, "Frost")
 check(recut.Traits.Offense == "Q_GlacierFan" and recut.Traits.Defense == "R_FrostRiposte", "Recut keeps trait slots")
 
-print("PASS: " .. checks .. " triad checks (60 moves, rolls, sockets, stats, casting)")
+print("PASS: " .. checks .. " triad checks (66 moves, intro pools, rolls, sockets, stats, casting)")

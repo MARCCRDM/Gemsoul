@@ -52,7 +52,7 @@ for id in ids do for _,rarity in GemRoller.Rarities do check(seen[rarity.Name..i
 for _,style in Lottery.Styles do for _,element in GemRoller.Elements do
 	local profile={Intro={},Character={},Gems={}}
 	local kit=Lottery.prepareChoice(profile,style,element,function(e) return {Id=e,Element=e} end)
-	check(#kit.Gems==3 and kit.Version==3,"Starter roster")
+	check(#kit.Gems==3 and kit.Version==4,"Starter roster")
 	for index,entry in kit.Gems do check(entry.Gem.Surge==GemRoller.StarterSurges[element][index] and entry.Gem.Tier=="Common","Starter identity") end
 end end
 print("PASS: "..count.." restored Surge checks across all 36 abilities and five rarities")

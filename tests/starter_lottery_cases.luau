@@ -9,7 +9,7 @@ for _, style in Lottery.Styles do
 			return {Id="choice"..calls, Element=chosen, Tier="Legendary", Size=10, Clarity=10, Cut=10}
 		end
 		local kit = Lottery.prepareChoice(fresh, style, element, factory)
-		check(kit.Version==3 and #kit.Gear==6 and #kit.Gems==3, "Chosen kit structure")
+		check(kit.Version==4 and #kit.Gear==6 and #kit.Gems==3 and #kit.Moves==3, "Chosen kit structure")
 		for _, gear in kit.Gear do
 			check(gear.Id==(if gear.Slot=="Weapon" then "MatrixSwords1" else "Armor"..style..gear.Slot.."1"), "Wrong chosen family")
 		end

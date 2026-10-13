@@ -55,22 +55,22 @@ GemTraits.Matrix = {
 	Fire = {
 		Offense = { "Q_CinderCleave", "Q_FurnaceCrescent", "Q_SolarExecution", "Q_CinderDrill", "Q_MagmaFault" },
 		Ability = { "E_EmberLance", "E_Supernova", "E_SolarFlare", "E_HeatHaze", "E_ThermalBurst" },
-		Defense = { "R_HeatShield", "R_EmberGuard", "R_FireWall", "R_Cauterize", "R_PhoenixMantle" },
+		Defense = { "R_HeatShield", "R_EmberGuard", "R_FireWall", "R_Cauterize", "R_PhoenixMantle", "R_RingOfFire" },
 	},
 	Frost = {
 		Offense = { "Q_FrostNeedle", "Q_GlacierFan", "Q_ShatterCrown", "Q_PermafrostSpire", "Q_CryoEdge" },
 		Ability = { "E_CryoLance", "E_CryoStream", "E_AbsoluteZero", "E_GlacierRetreat", "E_WintersHold" },
-		Defense = { "R_FrozenWall", "R_IceArmor", "R_ColdResolve", "R_GlacialBulwark", "R_FrostRiposte" },
+		Defense = { "R_FrozenWall", "R_IceArmor", "R_ColdResolve", "R_GlacialBulwark", "R_FrostRiposte", "R_IcePillar" },
 	},
 	Shock = {
 		Offense = { "Q_ArcNeedle", "Q_CircuitCleave", "Q_Railstorm", "Q_StaticBrand", "Q_OverchargeStrike" },
 		Ability = { "E_IonSpark", "E_ChainLightning", "E_ThunderPylon", "E_VectorDash", "E_Overload" },
-		Defense = { "R_IonShield", "R_StaticCatch", "R_Capacitor", "R_DeflectorField", "R_Grounding" },
+		Defense = { "R_IonShield", "R_StaticCatch", "R_Capacitor", "R_DeflectorField", "R_Grounding", "R_TeslaFence", "R_HoloDecoy" },
 	},
 	Poison = {
 		Offense = { "Q_BreachCut", "Q_CausticDart", "Q_VitriolSweep", "Q_Dissolution", "Q_SappingEdge" },
 		Ability = { "E_AcidSpray", "E_ToxicCloud", "E_ArmorMelt", "E_LeechBloom", "E_SeepStep" },
-		Defense = { "R_RadShield", "R_PurgeShell", "R_CorrosionAura", "R_BioRegrowth", "R_ToxicMantle" },
+		Defense = { "R_RadShield", "R_PurgeShell", "R_CorrosionAura", "R_BioRegrowth", "R_ToxicMantle", "R_SporeWall", "R_AcidSlick" },
 	},
 }
 
@@ -120,7 +120,12 @@ GemTraits.FromSurge = {
 	  Empower         { Kind = Burn | Chill | Sap, Swings, Time, ... }
 	  Absorb/Duration a shield; Ward = burn attackers
 	  Guard           { Kind = Reflect, Share, Time }: a held guard
-	  Wall            { Kind, Time, Width, Distance }
+	  Wall            { Kind, Time, Width, Distance } (Fire, Ice, Tesla, Spore)
+	  Pillar          { Height, Time, Radius, Slow, SlowTime }: lifted out of reach
+	  Ring            { Radius, Time, Burn, Push }: a ring of fire around you
+	  Decoy           { Time, Trigger, Radius, Stun, Damage }: a hologram that bursts
+	  Slick           { Radius, Time, Slow, Shred }: an acid puddle around you
+	  Showcase        a move made to be seen: walls, rings, pillars, decoys
 	  Cleanse         All | Dots | One
 	  Heal            { Share (of max health), Time, BreakOnHeavy }
 	  Phoenix         { Below, Heal, Time }: cheat death once a round
@@ -567,7 +572,82 @@ M.R_ToxicMantle = {
 	Description = "For 5s, melee attackers are poisoned for 25% of the damage they deal you.",
 	Flourish = { Text = "40% instead.", Mantle = { Share = 0.4, Time = 5 } },
 }
+-- The showcase defenses: each element's barrier and escape. Every one
+-- puts something into the world you can see from across the arena.
+M.R_RingOfFire = {
+	Name = "Ring of Fire", Element = "Fire", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
+	Ring = { Radius = 7, Time = 4, Burn = { Power = 0.15, Time = 3 }, Push = 45 },
+	Animation = "Wall", IconSource = "Supernova",
+	Description = "Flames circle you for 4s: whoever crosses the ring catches fire and is thrown back.",
+	Flourish = { Text = "The ring burns for 5.5s.", Ring = { Radius = 7, Time = 5.5, Burn = { Power = 0.15, Time = 3 }, Push = 45 } },
+}
+M.R_IcePillar = {
+	Name = "Ice Pillar", Element = "Frost", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
+	Pillar = { Height = 9, Time = 2.5, Radius = 8, Slow = 0.5, SlowTime = 2 },
+	Animation = "Wall", IconSource = "PermafrostSpire",
+	Description = "An ice column bursts up under you: out of reach for 2.5s, then it shatters and slows everyone near you 50%.",
+	Flourish = {
+		Text = "The shatter freezes them for 0.6s.",
+		Pillar = { Height = 9, Time = 2.5, Radius = 8, Slow = 0.5, SlowTime = 2, Freeze = 0.6 },
+	},
+}
+M.R_TeslaFence = {
+	Name = "Tesla Fence", Element = "Shock", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
+	Wall = { Kind = "Tesla", Time = 3, Width = 10, Distance = 5, Stun = 0.6 },
+	Animation = "Wall", IconSource = "ThunderPylon",
+	Description = "Two pylons with lightning arcing between them for 3s: it stops bolts and stuns whoever crosses.",
+	Flourish = { Text = "The fence stands for 4.5s.", Wall = { Kind = "Tesla", Time = 4.5, Width = 10, Distance = 5, Stun = 0.6 } },
+}
+M.R_HoloDecoy = {
+	Name = "Hologram Decoy", Element = "Shock", Lane = R, Cost = 22, Cooldown = 13, Showcase = true,
+	Dash = { Dir = "Back", Distance = 9, MoveTime = 0.15 }, Untargetable = 0.4,
+	Decoy = { Time = 3, Trigger = 4, Radius = 6, Stun = 1, Damage = 0.6 },
+	Animation = "Dodge", IconSource = "ThrusterLeap",
+	Description = "Blink back 9 studs and leave a hologram of yourself. When a foe gets close (or after 3s) it bursts: 60% damage and a 1s stun.",
+	Flourish = { Text = "The burst stuns for 1.4s.", Decoy = { Time = 3, Trigger = 4, Radius = 6, Stun = 1.4, Damage = 0.6 } },
+}
+M.R_SporeWall = {
+	Name = "Spore Wall", Element = "Poison", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
+	Wall = { Kind = "Spore", Time = 3.5, Width = 10, Distance = 5, Poison = { Power = 0.15, Time = 4 } },
+	Animation = "Wall", IconSource = "ToxicCloud",
+	Description = "A wall of toxic fog for 3.5s: it stops bolts and poisons whoever walks through.",
+	Flourish = { Text = "The wall stands for 5s.", Wall = { Kind = "Spore", Time = 5, Width = 10, Distance = 5, Poison = { Power = 0.15, Time = 4 } } },
+}
+M.R_AcidSlick = {
+	Name = "Acid Slick", Element = "Poison", Lane = R, Cost = 22, Cooldown = 13, Showcase = true,
+	Slick = { Radius = 7, Time = 4, Slow = 0.5, Shred = 0.1 },
+	Animation = "Wall", IconSource = "AcidSpray",
+	Description = "Spill an acid slick around you for 4s: foes on it slide, slowed 50%, and lose 10% defense.",
+	Flourish = { Text = "The slick lasts 5.5s.", Slick = { Radius = 7, Time = 5.5, Slow = 0.5, Shred = 0.1 } },
+}
+
 GemTraits.Moves = M
+
+-- A new player's starter kit rolls each key from these: the moves made to
+-- be seen (walls, rings, pillars, blasts, beams, turrets), never a plain
+-- shield or a number. Two per key per element (Shared.StarterLottery).
+GemTraits.Intro = {
+	Fire = {
+		Offense = { "Q_FurnaceCrescent", "Q_MagmaFault" },
+		Ability = { "E_Supernova", "E_HeatHaze" },
+		Defense = { "R_FireWall", "R_RingOfFire" },
+	},
+	Frost = {
+		Offense = { "Q_GlacierFan", "Q_PermafrostSpire" },
+		Ability = { "E_AbsoluteZero", "E_CryoStream" },
+		Defense = { "R_FrozenWall", "R_IcePillar" },
+	},
+	Shock = {
+		Offense = { "Q_CircuitCleave", "Q_Railstorm" },
+		Ability = { "E_ChainLightning", "E_ThunderPylon" },
+		Defense = { "R_TeslaFence", "R_HoloDecoy" },
+	},
+	Poison = {
+		Offense = { "Q_CausticDart", "Q_VitriolSweep" },
+		Ability = { "E_ToxicCloud", "E_LeechBloom" },
+		Defense = { "R_SporeWall", "R_AcidSlick" },
+	},
+}
 
 -- Lane defaults: what each key pays with and its lockout.
 GemTraits.LaneRules = {
@@ -589,7 +669,7 @@ for id, move in M do
 	end
 end
 
--- The element each move belongs to, and its slot (1-5) in its lane.
+-- The element each move belongs to, and its slot in its lane.
 GemTraits.Index = {}
 for element, lanes in GemTraits.Matrix do
 	for lane, ids in lanes do
@@ -922,14 +1002,32 @@ function GemTraits.reforge(gem, lane: string, roll: number): string?
 end
 
 -- A gem with a new element keeps each trait's slot in its lane.
+-- Each element's showcase defenses by role, so a recut keeps the kind of
+-- move (a barrier stays a barrier) though the lanes differ in length.
+GemTraits.Showcase = {
+	R_FireWall = "Barrier", R_FrozenWall = "Barrier", R_TeslaFence = "Barrier", R_SporeWall = "Barrier",
+	R_RingOfFire = "Escape", R_IcePillar = "Escape", R_HoloDecoy = "Escape", R_AcidSlick = "Escape",
+}
 function GemTraits.reElement(traits, from: string, to: string)
 	if type(traits) ~= "table" or not GemTraits.Matrix[from] or not GemTraits.Matrix[to] then
 		return nil
 	end
 	local out = {}
 	for lane, id in traits do
-		local index = GemTraits.Matrix[from][lane] and table.find(GemTraits.Matrix[from][lane], id)
-		out[lane] = if index then GemTraits.Matrix[to][lane][index] else nil
+		local target = GemTraits.Matrix[to][lane]
+		local role = GemTraits.Showcase[id]
+		if role and target then
+			for _, other in target do
+				if GemTraits.Showcase[other] == role then
+					out[lane] = other
+				end
+			end
+		end
+		if not out[lane] then
+			local index = GemTraits.Matrix[from][lane] and table.find(GemTraits.Matrix[from][lane], id)
+			-- (a slot past the end of a shorter lane takes its last move)
+			out[lane] = if index and target then target[math.min(index, #target)] else nil
+		end
 	end
 	return out
 end

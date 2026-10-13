@@ -4,8 +4,10 @@
 	  1. Pick a fighting style (Prospector, Skirmisher, Juggernaut): the
 	     armor set they start in (Shared.ArmorFamilies).
 	  2. Pick an element (Thermal, Cryo, Ion, Corrosive): the style's own one
-	     is picked already, with the three moves it gives Q / E / R shown.
-	  3. The kit goes on (Shared.StarterLottery, granted by Systems/Intro).
+	     is picked already, with the two showcase moves each of Q / E / R
+	     can roll (GemTraits.Intro).
+	  3. The kit goes on (Shared.StarterLottery, granted by Systems/Intro):
+	     one move rolled per key, shown on a reveal card before the fight.
 	  4. A first fight: an easy sparring match (Systems/Duelist, FirstFight),
 	     with a hint popping up the first time each control is useful
 	     (Client FirstFight). Then the lobby.
@@ -114,7 +116,7 @@ local TEXT = {
 	},
 	Q = { "PRESS Q: %s", "TAP Q: %s", "Your sword gem's move" },
 	E = { "PRESS E: %s", "TAP E: %s", "Your core gem's move" },
-	R = { "PRESS R: %s", "TAP R: %s", "Your shield gem's move (uses Stamina)" },
+	R = { "PRESS R: %s", "TAP R: %s", "Your defense move (uses Stamina)" },
 }
 
 -- The hint's line (what to press) and its reason. `moves` names the Q / E / R moves.

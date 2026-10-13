@@ -119,8 +119,12 @@ local function prepareLottery(player: Player, style, element)
 		return reply(false, "Choose an armor style and starter element first.")
 	end
 	giveStarterKit(player)
+	local rng = Random.new()
 	local reward = Lottery.prepareChoice(profile, style, element, function(chosenElement)
 		return GemRoller.setElement(newGem("StarterKit"), chosenElement)
+	end, function(count)
+		-- Each key: one of its element's two showcase moves.
+		return rng:NextInteger(1, count)
 	end)
 	if reward.Version >= 2 then
 		for _, entry in reward.Gear do

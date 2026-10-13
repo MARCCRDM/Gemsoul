@@ -2350,6 +2350,21 @@ end
 function handlers.TriadBreak(position, radius, element)
 	TriadVfx.breakBurst(position, radius, element)
 end
+function handlers.TriadPillar(who, floor, height, seconds, element)
+	TriadVfx.pillar(who, floor, height, seconds, element)
+end
+function handlers.TriadRing(who, radius, seconds, element)
+	TriadVfx.ring(who, radius, seconds, element)
+end
+function handlers.TriadDecoy(who, center, seconds, element)
+	TriadVfx.decoy(who, center, seconds, element)
+end
+function handlers.TriadDecoyPop(who, center, radius)
+	TriadVfx.decoyPop(who, center, radius)
+end
+function handlers.TriadSlick(center, radius, seconds, element)
+	TriadVfx.slick(center, radius, seconds, element)
+end
 function handlers.TriadDeflect(from, to)
 	TriadVfx.deflect(from, to)
 end

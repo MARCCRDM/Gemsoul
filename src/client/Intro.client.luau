@@ -367,10 +367,26 @@ local ELEMENTS = {
 	Shock = "Stun and chain",
 	Poison = "Shred armor, wear them down",
 }
+-- What each key can roll: { Q, E, R } lists of move ids (one each once a
+-- saved kit has rolled them).
+local function surgePools(element)
+	if savedKit and savedKit.Element == element and type(savedKit.Moves) == "table" then
+		return { { savedKit.Moves[1] }, { savedKit.Moves[2] }, { savedKit.Moves[3] } }
+	end
+	return Lottery.starterPools(element)
+end
+local function moveName(id)
+	return Tech.Catalog[id] and Tech.Catalog[id].Name or id
+end
+-- "Furnace Crescent or Magma Fault".
 local function surgeNames(element)
 	local names = {}
-	for _, id in Lottery.starterMoves(element) do
-		table.insert(names, Tech.Catalog[id] and Tech.Catalog[id].Name or id)
+	for _, pool in surgePools(element) do
+		local list = {}
+		for _, id in pool do
+			table.insert(list, moveName(id))
+		end
+		table.insert(names, table.concat(list, " or "))
 	end
 	return names
 end
@@ -624,11 +640,15 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 		local label = text(chip, surgeName, 10, C.Dim, Enum.Font.GothamBold)
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.TextYAlignment = Enum.TextYAlignment.Center
-		-- (Rich: its cost and cooldown under the name.)
-		local surge = Tech.Catalog[Lottery.starterMoves(element)[index]]
+		label.TextWrapped, label.TextScaled = true, true
+		new("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 7 }, label)
+		-- (Rich: one of two, rolled when you equip; or its cost and cooldown.)
+		local pool = surgePools(element)[index]
+		local surge = #pool == 1 and Tech.Catalog[pool[1]]
 		local detail = text(
 			chip,
-			if surge then string.format("%d %s  ·  %ds", surge.Cost or 0, surge.Resource or "Charge", surge.Cooldown or 0) else "",
+			if surge then string.format("%d %s  ·  %ds", surge.Cost or 0, surge.Resource or "Charge", surge.Cooldown or 0)
+				else "one rolled at random",
 			9,
 			C.Faint,
 			Enum.Font.GothamMedium
@@ -760,7 +780,9 @@ function refreshChoices()
 		string.upper(chosenStyle),
 		hex(elementColor),
 		string.upper(GemConfig.elementName(chosenElement)),
-		if #names == 3 then string.format("Q %s  ·  E %s  ·  R %s", names[1], names[2], names[3]) else ""
+		if #names ~= 3 then ""
+			elseif string.find(table.concat(names), " or ", 1, true) then "Q · E · R: one of two each, rolled as you equip"
+			else string.format("Q %s  ·  E %s  ·  R %s", names[1], names[2], names[3])
 	)
 end
 local function setPickStep(step: string)
@@ -1143,6 +1165,99 @@ local function close()
 	end
 	gui:Destroy()
 end
+-- The reveal: what the kit rolled, one key at a time, before the fight.
+local KEY_COLORS = {
+	Q = Color3.fromRGB(255, 138, 92),
+	E = Color3.fromRGB(122, 196, 255),
+	R = Color3.fromRGB(120, 230, 170),
+}
+local KEY_LANES = { Q = "SWORD MOVE", E = "CORE ABILITY", R = "DEFENSE" }
+local function revealMoves(kit, after)
+	local moves = Lottery.starterMoves(kit.Element, kit)
+	local color = GemConfig.ElementColors[kit.Element] or C.Gold
+	local shade = frame(gui, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BackgroundTransparency = 1, ZIndex = 40 })
+	tween(shade, 0.25, { BackgroundTransparency = 0.25 })
+	local card = frame(shade, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0.92, 0, 0, 286),
+		BackgroundColor3 = C.Panel,
+		ZIndex = 41,
+	})
+	new("UISizeConstraint", { MaxSize = Vector2.new(720, 286) }, card)
+	UiKit.round(card, 14)
+	stroke(card, color, 0.2, 2)
+	local cardScale = new("UIScale", { Scale = 0.85 }, card)
+	tween(cardScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+	local title = label(card, "YOUR MOVES", 24, C.Text, Enum.Font.GothamBlack)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	title.Position, title.Size, title.ZIndex = UDim2.fromOffset(0, 16), UDim2.new(1, 0, 0, 30), 42
+	local sub = label(card, string.upper(GemConfig.elementName(kit.Element)) .. " KIT  ·  rolled just for you", 13, color, Enum.Font.GothamBold)
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+	sub.Position, sub.Size, sub.ZIndex = UDim2.fromOffset(0, 46), UDim2.new(1, 0, 0, 18), 42
+	local row = frame(card, { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 76), Size = UDim2.new(1, -32, 0, 136), ZIndex = 41 })
+	new("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 10),
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+	}, row)
+	for index, key in { "Q", "E", "R" } do
+		local move = Tech.Catalog[moves[index]]
+		local keyColor = KEY_COLORS[key]
+		local tile = frame(row, { BackgroundColor3 = C.Card, Size = UDim2.new(1 / 3, -7, 1, 0), ZIndex = 42, LayoutOrder = index })
+		UiKit.round(tile, 10)
+		local edge = stroke(tile, keyColor, 0.3, 1.5)
+		local pop = new("UIScale", { Scale = 0 }, tile)
+		local badge = label(tile, key, 22, C.Ink, Enum.Font.GothamBlack)
+		badge.TextXAlignment = Enum.TextXAlignment.Center
+		badge.BackgroundTransparency, badge.BackgroundColor3 = 0, keyColor
+		badge.Position, badge.Size, badge.ZIndex = UDim2.fromOffset(10, 10), UDim2.fromOffset(34, 34), 43
+		UiKit.round(badge, 8)
+		local lane = label(tile, KEY_LANES[key], 10, keyColor, Enum.Font.GothamBlack)
+		lane.Position, lane.Size, lane.ZIndex = UDim2.fromOffset(52, 12), UDim2.new(1, -60, 0, 12), 43
+		local name = label(tile, if move then string.upper(move.Name) else moves[index], 15, C.Text, Enum.Font.GothamBlack)
+		name.TextWrapped, name.TextTruncate = true, Enum.TextTruncate.None
+		name.TextYAlignment = Enum.TextYAlignment.Top
+		name.Position, name.Size, name.ZIndex = UDim2.fromOffset(52, 26), UDim2.new(1, -60, 0, 36), 43
+		local about = label(tile, move and move.Description or "", 11, C.Dim, Enum.Font.GothamMedium)
+		about.TextWrapped, about.TextTruncate = true, Enum.TextTruncate.AtEnd
+		about.TextYAlignment = Enum.TextYAlignment.Top
+		about.Position, about.Size, about.ZIndex = UDim2.fromOffset(10, 66), UDim2.new(1, -20, 1, -74), 43
+		task.delay(0.25 + index * 0.3, function()
+			if tile.Parent then
+				tween(pop, 0.32, { Scale = 1 }, Enum.EasingStyle.Back)
+				tween(edge, 0.6, { Transparency = 0.6 })
+				LotterySound.play("Lock")
+			end
+		end)
+	end
+	local go = new("TextButton", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -16),
+		Size = UDim2.fromOffset(240, 44),
+		BackgroundColor3 = C.Gold,
+		Text = "TO THE FIGHT   ›",
+		TextColor3 = C.Ink,
+		TextSize = 16,
+		Font = Enum.Font.GothamBlack,
+		AutoButtonColor = true,
+		ZIndex = 42,
+		Visible = false,
+	}, card)
+	UiKit.round(go, 10)
+	task.delay(1.4, function()
+		go.Visible = true
+	end)
+	local done = false
+	listen(go.Activated, function()
+		if done then
+			return
+		end
+		done = true
+		shade:Destroy()
+		after()
+	end)
+end
 local function finish()
 	if busy or closed then
 		return
@@ -1281,7 +1396,15 @@ listen(primary.Activated, function()
 		-- you're in.
 		reward = result.Lottery
 		primary.Text = "BEGIN MY SAGA" -- (what a failed claim falls back to)
-		finish()
+		if reward and reward.Element then
+			busy = true
+			revealMoves(reward, function()
+				busy = false
+				finish()
+			end)
+		else
+			finish()
+		end
 	elseif phase == "Armor" then
 		animate(reward.Gems, true)
 	else

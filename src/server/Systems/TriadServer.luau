@@ -444,6 +444,8 @@ function TriadServer.applySelf(player, k, st, definition, aim, now)
 			Front = wall.Front,
 			NoSwing = wall.NoSwing,
 			Burn = wall.Burn,
+			Stun = wall.Stun,
+			Poison = wall.Poison,
 			Slow = wall.Slow,
 			Burned = {},
 		}
@@ -459,6 +461,74 @@ function TriadServer.applySelf(player, k, st, definition, aim, now)
 			wall.Time,
 			definition.Element
 		)
+	end
+	if definition.Pillar then
+		-- Ice Pillar: a real column of ice under you (you stand on it);
+		-- swords can't reach you up there (TriadServer.incoming).
+		local pillar = definition.Pillar
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { player.Character, workspace:FindFirstChild("CombatFx") }
+		local down = workspace:Raycast(root.Position, Vector3.new(0, -20, 0), params)
+		local floor = Vector3.new(root.Position.X, if down then down.Position.Y else root.Position.Y - 3, root.Position.Z)
+		local column = Instance.new("Part")
+		column.Name = "IcePillar"
+		column.Anchored, column.CanCollide, column.CanQuery, column.CanTouch = true, true, false, false
+		column.Material, column.Color, column.Transparency = Enum.Material.Ice, Color3.fromRGB(176, 224, 255), 1 -- (clients draw it: TriadVfx.pillar)
+		column.Size = Vector3.new(4.5, pillar.Height, 4.5)
+		column.CFrame = CFrame.new(floor + Vector3.new(0, pillar.Height / 2, 0))
+		column.Parent = workspace
+		game:GetService("Debris"):AddItem(column, pillar.Time + 1)
+		-- (Up onto it: the whole body rides on the root part.)
+		root.CFrame += Vector3.new(0, math.max(0, floor.Y + pillar.Height + 3.2 - root.Position.Y), 0)
+		if t.Pillar and t.Pillar.Part then
+			t.Pillar.Part:Destroy()
+		end
+		t.Pillar = { Until = now + pillar.Time, Center = floor, Rider = pillar, Part = column }
+		api.fx("TriadPillar", player, floor, pillar.Height, pillar.Time, definition.Element)
+	end
+	if definition.Ring then
+		-- Ring of Fire: a ring of flame that moves with you.
+		local ring = definition.Ring
+		TriadServer.zone(player, st, {
+			Kind = "Ring",
+			Center = root.Position,
+			Radius = ring.Radius,
+			Burn = ring.Burn,
+			Push = ring.Push,
+			Until = now + ring.Time,
+			Every = 0.1,
+			Hit = {},
+			Definition = definition,
+		})
+	end
+	if definition.Decoy then
+		-- Hologram Decoy: left where you stood before the blink.
+		local decoy = definition.Decoy
+		TriadServer.zone(player, st, {
+			Kind = "Decoy",
+			Center = t.DashFrom or root.Position,
+			Trigger = decoy.Trigger,
+			Radius = decoy.Radius,
+			Stun = decoy.Stun,
+			Damage = decoy.Damage,
+			Until = now + decoy.Time,
+			Every = 0.1,
+			Definition = definition,
+		})
+	end
+	if definition.Slick then
+		local slick = definition.Slick
+		TriadServer.zone(player, st, {
+			Kind = "Slick",
+			Center = root.Position,
+			Radius = slick.Radius,
+			Slow = slick.Slow,
+			Shred = slick.Shred,
+			Until = now + slick.Time,
+			Every = 0.5,
+			Definition = definition,
+		})
 	end
 	if definition.Heal then
 		local h = definition.Heal
@@ -514,7 +584,8 @@ function TriadServer.applySelf(player, k, st, definition, aim, now)
 		t.Mantle = { Share = definition.Mantle.Share, Until = now + definition.Mantle.Time }
 		aura("Mantle", definition.Mantle.Time)
 	end
-	if not definition.Damage and not definition.Wall then
+	local placed = definition.Wall or definition.Pillar or definition.Ring or definition.Decoy or definition.Slick
+	if not definition.Damage and not placed then
 		api.fx("TechField", player, tint)
 	end
 end
@@ -563,6 +634,12 @@ function TriadServer.zone(player, st, zone)
 		api.fx("TriadField", zone.Center, zone.Radius, zone.Until - os.clock(), definition.Element)
 	elseif zone.Kind == "Pylon" then
 		api.fx("TriadPylon", zone.Center, zone.Reach, zone.Until - os.clock(), definition.Element)
+	elseif zone.Kind == "Ring" then
+		api.fx("TriadRing", player, zone.Radius, zone.Until - os.clock(), definition.Element)
+	elseif zone.Kind == "Decoy" then
+		api.fx("TriadDecoy", player, zone.Center, zone.Until - os.clock(), definition.Element)
+	elseif zone.Kind == "Slick" then
+		api.fx("TriadSlick", zone.Center, zone.Radius, zone.Until - os.clock(), definition.Element)
 	end
 end
 
@@ -803,6 +880,10 @@ function TriadServer.incoming(player, st, root, amount, element, source, enemySo
 		return 0, true
 	end
 	local ranged = projectile or (origin ~= nil and (origin - root.Position).Magnitude > 9)
+	if t.Pillar and now < t.Pillar.Until and not ranged and not reflected then
+		api.fx("TriadWallHit", root.Position - Vector3.new(0, 2, 0), "Ice")
+		return 0, true
+	end
 	local wall = t.Wall
 	if wall and now < wall.Until and origin and not reflected then
 		local ahead = (origin - root.Position) * Vector3.new(1, 0, 1)
@@ -815,8 +896,9 @@ function TriadServer.incoming(player, st, root, amount, element, source, enemySo
 				api.slow(attacker, wall.Slow, 1.5)
 			end
 			return 0, true
-		elseif wall.Kind == "Fire" and ranged and front then
-			api.fx("TriadWallHit", wall.Center + Vector3.new(0, 3, 0), "Fire")
+		elseif wall.Kind ~= "Ice" and ranged and front then
+			-- Fire Wall, Tesla Fence, Spore Wall: bolts stop at it.
+			api.fx("TriadWallHit", wall.Center + Vector3.new(0, 3, 0), wall.Kind)
 			return 0, true
 		end
 	end
@@ -1079,16 +1161,46 @@ function TriadServer.tick(player, k, st, now, humanoid, root)
 	if wall then
 		if now >= wall.Until then
 			t.Wall = nil
-		elseif wall.Burn then
-			-- Fire Wall: whoever crosses it burns (once a second each).
+		elseif wall.Burn or wall.Stun or wall.Poison then
+			-- Crossing it: Fire Wall burns, Tesla Fence stuns, Spore Wall
+			-- poisons (once a second each; a stun once per 1.5s).
 			local side = Vector3.new(-wall.Normal.Z, 0, wall.Normal.X)
 			local from, to = wall.Center - side * wall.Width / 2, wall.Center + side * wall.Width / 2
 			for _, target in api.targets(player) do
 				if inSegment(target.Root.Position, from, to, 3) and api.targetAllowed(player, target) then
 					if now >= (wall.Burned[target.Root] or 0) then
-						wall.Burned[target.Root] = now + 1
-						burn(player, k, target, wall.Burn)
+						wall.Burned[target.Root] = now + (if wall.Stun then 1.5 else 1)
+						if wall.Burn then
+							burn(player, k, target, wall.Burn)
+						end
+						if wall.Poison then
+							poison(player, k, st, target, wall.Poison, now)
+						end
+						if wall.Stun then
+							api.fx("Arc", wall.Center + Vector3.new(0, 4, 0), target.Root.Position, GemConfig.ElementColors.Shock)
+							api.applyCC(target, wall.Stun, "Shocked")
+						end
 					end
+				end
+			end
+		end
+	end
+	local pillar = t.Pillar
+	if pillar and now >= pillar.Until then
+		-- The ice shatters: you drop, and everyone near is slowed (frozen,
+		-- with a Legendary's Flourish).
+		t.Pillar = nil
+		if pillar.Part then
+			pillar.Part:Destroy()
+		end
+		local rider = pillar.Rider
+		api.fx("TriadBreak", pillar.Center + Vector3.new(0, 1, 0), rider.Radius, "Frost")
+		for _, target in api.targets(player) do
+			local offset = (target.Root.Position - pillar.Center) * Vector3.new(1, 0, 1)
+			if offset.Magnitude <= rider.Radius and api.targetAllowed(player, target) then
+				api.slow(target, rider.Slow, rider.SlowTime)
+				if rider.Freeze then
+					api.applyCC(target, rider.Freeze, "Frozen")
 				end
 			end
 		end
@@ -1119,11 +1231,68 @@ function TriadServer.tick(player, k, st, now, humanoid, root)
 	end
 	for i = #t.Zones, 1, -1 do
 		local zone = t.Zones[i]
-		if now >= zone.Until then
+		-- (A decoy always bursts before it goes.)
+		if zone.Burst or (now >= zone.Until and zone.Kind ~= "Decoy") then
 			table.remove(t.Zones, i)
 		elseif now >= zone.Next then
 			zone.Next = now + zone.Every
-			if zone.Kind == "Pylon" then
+			if zone.Kind == "Ring" then
+				-- Ring of Fire follows you; crossing the flame burns and
+				-- throws the foe outward (each at most once a second).
+				zone.Center = root.Position
+				for _, target in api.targets(player) do
+					local offset = (target.Root.Position - zone.Center) * Vector3.new(1, 0, 1)
+					if
+						math.abs(offset.Magnitude - zone.Radius) <= 1.8
+						and math.abs(target.Root.Position.Y - zone.Center.Y) < 8
+						and now >= (zone.Hit[target.Root] or 0)
+						and api.targetAllowed(player, target)
+					then
+						zone.Hit[target.Root] = now + 1
+						burn(player, k, target, zone.Burn)
+						api.push(target, zone.Center, zone.Push)
+						api.fx("TriadWallHit", target.Root.Position, "Fire")
+					end
+				end
+			elseif zone.Kind == "Decoy" then
+				-- Hologram Decoy: bursts when a foe comes close, or at the end.
+				local close = now >= zone.Until
+				if not close then
+					for _, target in api.targets(player) do
+						if (target.Root.Position - zone.Center).Magnitude <= zone.Trigger and api.targetAllowed(player, target) then
+							close = true
+							break
+						end
+					end
+				end
+				if close then
+					zone.Burst = true
+					api.fx("TriadDecoyPop", player, zone.Center, zone.Radius)
+					local blast = table.clone(zone.Definition)
+					blast.Damage, blast.Decoy, blast.Dash, blast.Untargetable = zone.Damage, nil, nil, nil
+					blast.RarityScaled, blast.Crit = true, 0
+					for _, target in api.targets(player) do
+						if (target.Root.Position - zone.Center).Magnitude <= zone.Radius and api.targetAllowed(player, target) then
+							api.hit(player, k, target, blast, 1)
+							api.applyCC(target, zone.Stun, "Shocked")
+						end
+					end
+				end
+			elseif zone.Kind == "Slick" then
+				for _, target in api.targets(player) do
+					local offset = (target.Root.Position - zone.Center) * Vector3.new(1, 0, 1)
+					if offset.Magnitude <= zone.Radius and api.targetAllowed(player, target) then
+						api.slow(target, zone.Slow, 0.75)
+						if target.Player then
+							local victim = api.state(target.Player)
+							victim.Sunder = CrowdControl.applyDebuff(victim.CC, "Sunder", zone.Shred, 0.75, now, true)
+							victim.SunderUntil = victim.CC.Debuffs.Sunder.Until
+						else
+							api.Enemies.addStatus(target.Enemy, "Sunder", zone.Shred, 0.75)
+						end
+					end
+				end
+			elseif zone.Kind == "Pylon" then
 				local best, bestDistance = nil, zone.Reach
 				for _, target in api.targets(player) do
 					local d = (target.Root.Position - zone.Center).Magnitude
@@ -1181,7 +1350,17 @@ function TriadServer.statuses(st, now, add)
 		add("EmberGuard", t.Guard.Until)
 	end
 	if t.Wall then
-		add(if t.Wall.Kind == "Ice" then "FrozenWall" else "FireWall", t.Wall.Until)
+		local names = { Ice = "FrozenWall", Fire = "FireWall", Tesla = "TeslaFence", Spore = "SporeWall" }
+		add(names[t.Wall.Kind] or "FireWall", t.Wall.Until)
+	end
+	if t.Pillar then
+		add("IcePillar", t.Pillar.Until)
+	end
+	for _, zone in t.Zones do
+		local name = ({ Ring = "RingOfFire", Decoy = "HoloDecoy", Slick = "AcidSlick" })[zone.Kind]
+		if name then
+			add(name, zone.Until)
+		end
 	end
 	if t.Regen then
 		add("Regrowth", t.Regen.Until)

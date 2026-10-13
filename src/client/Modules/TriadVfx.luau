@@ -15,6 +15,9 @@
 	  shatter / root / breakBurst      freezes breaking, roots, shield bursts
 	  phoenix(who, at)                 a rebirth in fire
 	  trail / field / pylon            burning ground, ice, a thunder pylon
+	  pillar / ring / decoy / slick    the showcase defenses: an Ice Pillar,
+	                                   a Ring of Fire, a Hologram Decoy (and
+	                                   decoyPop), an Acid Slick
 
 	Built like the rest of the kit (CombatVfx): neon and glass parts, trails,
 	particles and lights, tweened and cleaned up after themselves.
@@ -688,6 +691,123 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 			CombatSound.play("GuardBreak", floor, { Volume = 0.5, Pitch = 1.3 })
 		end)
 		CombatFx.burst(floor + Vector3.new(0, 2, 0), ICE, "Frost", 1.6)
+	elseif kind == "Tesla" then
+		-- Tesla Fence: steel posts with crackling arcs strung between them.
+		CombatSound.play("Zap", floor, { Volume = 1 })
+		CombatSound.element("Impact", "Shock", floor, { Volume = 0.8 })
+		local posts = math.max(3, math.floor(width / 2.5) + 1)
+		local tops = {}
+		for i = 1, posts do
+			local along = (i - 1) / (posts - 1) - 0.5
+			local base = floor + side * along * width
+			local mast = part(Vector3.new(0.45, 0.2, 0.45), CFrame.new(base), Color3.fromRGB(70, 74, 92), 0, nil, Enum.Material.Metal)
+			tween(mast, 0.2, { Size = Vector3.new(0.45, 4.6, 0.45), CFrame = CFrame.new(base + Vector3.new(0, 2.3, 0)) }, Enum.EasingStyle.Back)
+			local coil = part(Vector3.one * 0.2, CFrame.new(base + Vector3.new(0, 4.8, 0)), color, 0.05, Enum.PartType.Ball)
+			tween(coil, 0.25, { Size = Vector3.one * 0.9 }, Enum.EasingStyle.Back)
+			if i % 2 == 1 then
+				light(coil, color, 3, 12)
+			end
+			table.insert(tops, { Base = base, Mast = mast, Coil = coil })
+		end
+		-- The arcs: three strands between each pair of posts, re-drawn jagged
+		-- every few frames so the fence crackles.
+		local strands = {}
+		for i = 1, posts - 1 do
+			for _, height in { 1.2, 2.6, 4.2 } do
+				local first = part(Vector3.new(0.1, 0.1, 1), CFrame.new(tops[i].Base), color:Lerp(WHITE, 0.5), 1)
+				local second = part(Vector3.new(0.1, 0.1, 1), CFrame.new(tops[i].Base), color:Lerp(WHITE, 0.5), 1)
+				table.insert(strands, { Parts = { first, second }, From = tops[i].Base, To = tops[i + 1].Base, Height = height })
+			end
+		end
+		local ends = os.clock() + seconds
+		local nextDraw = 0
+		local connection
+		connection = RunService.Heartbeat:Connect(function()
+			local now = os.clock()
+			if now >= ends then
+				connection:Disconnect()
+				return
+			end
+			if now < nextDraw then
+				return
+			end
+			nextDraw = now + 0.05
+			for _, strand in strands do
+				local a = strand.From + Vector3.new(0, strand.Height + (math.random() - 0.5) * 0.5, 0)
+				local b = strand.To + Vector3.new(0, strand.Height + (math.random() - 0.5) * 0.5, 0)
+				local mid = (a + b) / 2 + Vector3.new(0, (math.random() - 0.5) * 0.8, 0) + facing * (math.random() - 0.5) * 0.5
+				local flicker = if math.random() < 0.2 then 0.85 else 0.05
+				for n, from in { a, mid } do
+					local to = if n == 1 then mid else b
+					local segment = strand.Parts[n]
+					segment.Size = Vector3.new(0.09 + math.random() * 0.08, 0.09, (to - from).Magnitude)
+					segment.CFrame = CFrame.lookAt((from + to) / 2, to)
+					segment.Transparency = flicker
+				end
+			end
+		end)
+		local glow = disc(floor + Vector3.new(0, 0.04, 0), width, color, 0.75)
+		glow.Size = Vector3.new(0.06, 1.6, width)
+		glow.CFrame = CFrame.lookAt(floor, floor + side) * CFrame.Angles(0, math.rad(90), math.rad(90))
+		CombatFx.burst(floor + Vector3.new(0, 2.5, 0), color, "Sparks", 1.5)
+		task.delay(seconds, function()
+			for _, strand in strands do
+				fade(strand.Parts[1], 0.15)
+				fade(strand.Parts[2], 0.15)
+			end
+			for _, top in tops do
+				fade(top.Mast, 0.3, { Size = Vector3.new(0.45, 0.2, 0.45), CFrame = CFrame.new(top.Base) })
+				fade(top.Coil, 0.25, { Size = Vector3.one * 1.6 })
+			end
+			fade(glow, 0.4)
+			CombatSound.play("Zap", floor, { Volume = 0.5, Pitch = 0.8 })
+		end)
+	elseif kind == "Spore" then
+		-- Spore Wall: a hedge of giant toadstools that breathes green spores.
+		CombatSound.play("Corrode", floor, { Volume = 1 })
+		CombatSound.element("Impact", "Poison", floor, { Volume = 0.8 })
+		local caps = {}
+		for i = 1, pieces do
+			local along = (i - 0.5) / pieces - 0.5
+			local base = floor + side * along * width + facing * (math.random() - 0.5) * 0.8
+			local height = 4 + math.sin(i * 1.9) * 1.2 + math.random() * 0.9
+			local girth = width / pieces * 0.6
+			local stalk = part(Vector3.new(girth, 0.2, girth), CFrame.new(base), Color3.fromRGB(150, 176, 120), 0, nil, Enum.Material.SmoothPlastic)
+			local capSize = Vector3.new(width / pieces * 2.1, 1.5, width / pieces * 2.1)
+			local cap = part(Vector3.new(0.2, 0.2, 0.2), CFrame.new(base + Vector3.new(0, 0.2, 0)), color, 0.05, Enum.PartType.Ball, Enum.Material.SmoothPlastic)
+			local glowCap = part(Vector3.new(0.2, 0.2, 0.2), cap.CFrame, ACID, 0.45, Enum.PartType.Ball)
+			task.delay(i * 0.03, function()
+				tween(stalk, 0.3, { Size = Vector3.new(girth, height, girth), CFrame = CFrame.new(base + Vector3.new(0, height / 2, 0)) }, Enum.EasingStyle.Back)
+				tween(cap, 0.32, { Size = capSize, CFrame = CFrame.new(base + Vector3.new(0, height, 0)) }, Enum.EasingStyle.Back)
+				tween(glowCap, 0.32, { Size = capSize * Vector3.new(0.8, 0.6, 0.8), CFrame = CFrame.new(base + Vector3.new(0, height - 0.15, 0)) }, Enum.EasingStyle.Back)
+			end)
+			if i % 2 == 1 and not busy() then
+				local attachment = Instance.new("Attachment")
+				attachment.Position = Vector3.new(0, 0, 0)
+				attachment.Parent = glowCap
+				emitter(attachment, ACID, 9, { Size = 0.45, Speed = 0.8, Acceleration = Vector3.new(0, -0.6, 0), Life = 1.6, Light = 0.4 })
+			end
+			-- They breathe.
+			local pulse = TweenService:Create(glowCap, TweenInfo.new(0.6 + i % 3 * 0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.15 })
+			task.delay(0.35, function()
+				pulse:Play()
+			end)
+			table.insert(caps, { Stalk = stalk, Cap = cap, Glow = glowCap, Pulse = pulse, Base = base })
+		end
+		local fog = disc(floor + Vector3.new(0, 0.05, 0), width, ACID, 0.6)
+		fog.Size = Vector3.new(0.06, 3, width * 1.1)
+		fog.CFrame = CFrame.lookAt(floor, floor + side) * CFrame.Angles(0, math.rad(90), math.rad(90))
+		CombatFx.burst(floor + Vector3.new(0, 1.5, 0), ACID, "Drips", 1.4)
+		task.delay(seconds, function()
+			for _, c in caps do
+				c.Pulse:Cancel()
+				fade(c.Stalk, 0.4, { Size = Vector3.new(0.2, 0.2, 0.2), CFrame = CFrame.new(c.Base) })
+				fade(c.Cap, 0.4, { Size = Vector3.new(0.3, 0.3, 0.3), CFrame = CFrame.new(c.Base + Vector3.new(0, 0.3, 0)) })
+				fade(c.Glow, 0.3)
+			end
+			fade(fog, 0.6)
+			CombatFx.burst(floor + Vector3.new(0, 2, 0), ACID, "Smoke", 1.2)
+		end)
 	else
 		CombatSound.play("Burn", floor, { Volume = 1 })
 		CombatSound.element("Impact", "Fire", floor, { Volume = 0.8 })
@@ -725,11 +845,17 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 	end
 end
 
+local WALL_HIT = {
+	Ice = { ICE, "Shards", "Parry" },
+	Fire = { EMBER, "Embers", "Burn" },
+	Tesla = { GemConfig.ElementColors.Shock, "Sparks", "Zap" },
+	Spore = { ACID, "Drips", "Corrode" },
+}
 function TriadVfx.wallHit(position: Vector3, kind: string)
-	local color = if kind == "Ice" then ICE else EMBER
-	CombatFx.burst(position, color, if kind == "Ice" then "Shards" else "Embers", 0.9)
-	CombatFx.flash(position, color, 4, 10, 0.2)
-	CombatSound.play(if kind == "Ice" then "Parry" else "Burn", position, { Volume = 0.7 })
+	local look = WALL_HIT[kind] or WALL_HIT.Fire
+	CombatFx.burst(position, look[1], look[2], 0.9)
+	CombatFx.flash(position, look[1], 4, 10, 0.2)
+	CombatSound.play(look[3], position, { Volume = 0.7 })
 end
 
 -- Steals, marks, breaks ----------------------------------------------------------------
@@ -981,6 +1107,239 @@ function TriadVfx.empowerHit(position: Vector3, kind: string, final: number?)
 	if final == 1 then
 		ringAt(floorUnder(position), 2.5, color, 0.1, 0.35, 2.5)
 	end
+end
+
+-- The showcase defenses -------------------------------------------------------------
+
+-- Ice Pillar: a column of ice bursts up under the caster (the server's
+-- column is the collision; this is what you see), then shatters.
+function TriadVfx.pillar(who: Player, floor: Vector3, height: number, seconds: number, element: string?)
+	local color = colorOf(element)
+	local column = glass(Vector3.new(4.5, 0.4, 4.5), CFrame.new(floor + Vector3.new(0, 0.2, 0)), ICE, 0.1)
+	column.Material = Enum.Material.Ice
+	tween(column, 0.18, { Size = Vector3.new(4.5, height, 4.5), CFrame = CFrame.new(floor + Vector3.new(0, height / 2, 0)) }, Enum.EasingStyle.Back)
+	local core = part(Vector3.new(1.4, 0.4, 1.4), column.CFrame, WHITE, 0.55)
+	tween(core, 0.18, { Size = Vector3.new(1.4, height * 0.95, 1.4), CFrame = CFrame.new(floor + Vector3.new(0, height / 2, 0)) }, Enum.EasingStyle.Back)
+	light(core, DEEP_ICE, 3, 16)
+	-- Crystals jut from its foot, and a frosted cap crowns it.
+	local bits = { column, core }
+	for i = 1, 7 do
+		local a = i / 7 * math.pi * 2 + math.random() * 0.4
+		local base = floor + Vector3.new(math.cos(a) * 2.6, 0, math.sin(a) * 2.6)
+		local tall = 1.8 + math.random() * 2.4
+		local spike = glass(Vector3.new(0.9, 0.2, 0.9), CFrame.new(base) * CFrame.Angles(math.sin(a) * 0.5, 0, -math.cos(a) * 0.5), if i % 2 == 0 then DEEP_ICE else ICE, 0.15)
+		task.delay(0.05 + i * 0.02, function()
+			tween(spike, 0.15, { Size = Vector3.new(0.9, tall, 0.9), CFrame = spike.CFrame * CFrame.new(0, tall / 2, 0) }, Enum.EasingStyle.Back)
+		end)
+		table.insert(bits, spike)
+	end
+	local cap = glass(Vector3.new(0.4, 5.2, 5.2), CFrame.new(floor + Vector3.new(0, height, 0)) * CFrame.Angles(0, 0, math.rad(90)), WHITE, 0.3)
+	cap.Shape = Enum.PartType.Cylinder
+	cap.Transparency = 1
+	task.delay(0.18, function()
+		cap.Transparency = 0.3
+	end)
+	table.insert(bits, cap)
+	local frost = disc(floor + Vector3.new(0, 0.05, 0), 5, ICE, 0.8)
+	tween(frost, 0.3, { Size = Vector3.new(0.08, 8, 8) })
+	table.insert(bits, frost)
+	CombatFx.burst(floor + Vector3.new(0, 1, 0), ICE, "Frost", 2)
+	ringAt(floor, 4, color, 0.1, 0.45, 4)
+	CombatSound.play("Freeze", floor, { Volume = 1 })
+	CombatSound.play("Blast", floor, { Volume = 0.6, Pitch = 1.4 })
+	if CombatFx.nearMe(floor, 30) then
+		CombatFx.shake(0.4, 0.25)
+	end
+	task.delay(seconds, function()
+		-- Shatter: chunks tumble off as it crumbles (the server's TriadBreak
+		-- adds the burst).
+		for n = 1, 10 do
+			local at = floor + Vector3.new((math.random() - 0.5) * 4, math.random() * height, (math.random() - 0.5) * 4)
+			local chunk = glass(Vector3.new(0.8, 1, 0.7), CFrame.new(at) * CFrame.Angles(math.random() * 6, math.random() * 6, 0), if n % 2 == 0 then DEEP_ICE else ICE, 0.1)
+			local out = (at - floor) * Vector3.new(1, 0, 1)
+			out = if out.Magnitude > 0.1 then out.Unit else Vector3.new(1, 0, 0)
+			fade(chunk, 0.6, { CFrame = CFrame.new(Vector3.new(at.X, floor.Y + 0.3, at.Z) + out * 3) * CFrame.Angles(math.random() * 6, 0, math.random() * 6) }, Enum.EasingStyle.Quad)
+		end
+		for _, bit in bits do
+			fade(bit, 0.25, { Size = bit.Size * 0.6 })
+		end
+		CombatSound.play("GuardBreak", floor, { Volume = 0.8, Pitch = 1.2 })
+	end)
+end
+
+-- Ring of Fire: a wheel of flame that turns around the caster as they move.
+function TriadVfx.ring(who: Player, radius: number, seconds: number, element: string?)
+	local root = rootOf(who)
+	if not root then
+		return
+	end
+	local color = colorOf(element)
+	local count = math.clamp(math.floor(radius * 2.4), 12, 22)
+	local flames = {}
+	local f = follow(root, seconds, "RingOfFire", function(self, age)
+		local spin = age * 1.4
+		for i, entry in self.Parts do
+			local flame = flames[i]
+			if flame then
+				local a = flame.Angle + spin
+				local lick = flame.Height * (0.85 + 0.25 * math.sin(age * 9 + i * 1.7))
+				entry.Offset = CFrame.new(math.cos(a) * radius, -2.9 + lick / 2, math.sin(a) * radius) * CFrame.Angles(0, 0, math.rad(90))
+				if age > 0.2 then
+					entry.Part.Size = Vector3.new(lick, flame.Width, flame.Width)
+				end
+			end
+		end
+	end)
+	for i = 1, count do
+		local a = i / count * math.pi * 2
+		local height = 3 + (i % 3) * 0.6
+		local width = 1.1 + (i % 2) * 0.3
+		local flame = part(Vector3.new(0.2, width, width), root.CFrame, if i % 2 == 0 then EMBER else HOT, if i % 2 == 0 then 0.15 else 0.3, Enum.PartType.Cylinder)
+		tween(flame, 0.2, { Size = Vector3.new(height, width, width) }, Enum.EasingStyle.Back)
+		table.insert(flames, { Angle = a, Height = height, Width = width })
+		hold(f, flame, CFrame.new(math.cos(a) * radius, -2.9, math.sin(a) * radius) * CFrame.Angles(0, 0, math.rad(90)))
+		if i % 3 == 0 and not busy() then
+			local attachment = Instance.new("Attachment")
+			attachment.Parent = flame
+			emitter(attachment, color, 16, { Texture = "rbxasset://textures/particles/fire_main.dds", Size = 1.2, Acceleration = Vector3.new(0, 9, 0), Spread = 20, Life = 0.5 })
+			if i % 6 == 0 then
+				light(attachment, EMBER, 2.5, 14)
+			end
+		end
+	end
+	-- A scorched band on the ground under the flames.
+	local band = part(Vector3.new(0.06, radius * 2 + 1.6, radius * 2 + 1.6), root.CFrame, Color3.fromRGB(90, 30, 10), 0.55, Enum.PartType.Cylinder)
+	table.insert(flames, false)
+	hold(f, band, CFrame.new(0, -2.95, 0) * CFrame.Angles(0, 0, math.rad(90)))
+	CombatFx.burst(root.Position - Vector3.new(0, 2, 0), EMBER, "Embers", 2)
+	ringAt(floorUnder(root.Position), 2, HOT, 0, 0.35, radius)
+	CombatSound.play("Burn", root.Position, { Volume = 1 })
+	CombatSound.element("Cast", "Fire", root.Position, { Volume = 0.8 })
+end
+
+-- Hologram Decoy: a flickering copy of the caster, left where they stood.
+local decoys: { [any]: { BasePart } } = {}
+function TriadVfx.decoy(who: Player, center: Vector3, seconds: number, element: string?)
+	local root = rootOf(who)
+	local character = root and root.Parent
+	if not root or not character then
+		return
+	end
+	local color = colorOf(element)
+	local turn = root.CFrame.Rotation
+	local ghost = {}
+	for _, piece in character:GetDescendants() do
+		if #ghost >= 40 then
+			break
+		end
+		if piece:IsA("BasePart") and piece ~= root and piece.Transparency < 0.9 then
+			local relative = root.CFrame:ToObjectSpace(piece.CFrame)
+			local copy = part(piece.Size, CFrame.new(center) * turn * relative, color:Lerp(Color3.fromRGB(120, 230, 255), 0.5), 0.25, nil, Enum.Material.ForceField)
+			if piece:IsA("Part") then
+				copy.Shape = piece.Shape
+			end
+			table.insert(ghost, copy)
+		end
+	end
+	-- A scan line runs up and down it, and a projector ring glows at its feet.
+	local floor = floorUnder(center)
+	local scan = disc(floor + Vector3.new(0, 0.2, 0), 3.2, color, 0.35)
+	TweenService:Create(scan, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { CFrame = scan.CFrame + Vector3.new(0, 5.4, 0) }):Play()
+	local pad = disc(floor + Vector3.new(0, 0.04, 0), 3.4, color, 0.3)
+	light(pad, color, 2, 10)
+	table.insert(ghost, scan)
+	table.insert(ghost, pad)
+	for _, copy in ghost do
+		TweenService:Create(copy, TweenInfo.new(0.09, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), { Transparency = math.min(0.7, copy.Transparency + 0.2) }):Play()
+	end
+	decoys[who] = ghost
+	CombatFx.burst(center, color, "Sparks", 1.2)
+	CombatSound.play("Zap", center, { Volume = 0.8, Pitch = 1.3 })
+	-- (If the pop never arrives, it fades out on its own.)
+	task.delay(seconds + 1, function()
+		if decoys[who] == ghost then
+			decoys[who] = nil
+			for _, copy in ghost do
+				fade(copy, 0.3)
+			end
+		end
+	end)
+end
+
+-- The decoy goes off: the copy blows apart in a lightning burst.
+function TriadVfx.decoyPop(who: Player, center: Vector3, radius: number)
+	local ghost = decoys[who]
+	decoys[who] = nil
+	for _, copy in ghost or {} do
+		if copy.Parent then
+			fade(copy, 0.2, { Size = copy.Size * 1.4 })
+		end
+	end
+	local color = GemConfig.ElementColors.Shock
+	TriadVfx.breakBurst(center, radius, "Shock")
+	for _ = 1, 6 do
+		local a = math.random() * math.pi * 2
+		local reach = radius * (0.6 + math.random() * 0.4)
+		local from = center
+		for n = 1, 3 do
+			local to = center + Vector3.new(math.cos(a) * reach * n / 3, (math.random() - 0.6) * 2, math.sin(a) * reach * n / 3)
+			local length = (to - from).Magnitude
+			if length > 0.1 then
+				local bolt = part(Vector3.new(0.15, 0.15, length), CFrame.lookAt((from + to) / 2, to), color:Lerp(WHITE, 0.4), 0)
+				fade(bolt, 0.25)
+			end
+			from = to
+		end
+	end
+	CombatSound.play("Zap", center, { Volume = 1 })
+end
+
+-- Acid Slick: a bubbling pool of acid on the ground.
+function TriadVfx.slick(center: Vector3, radius: number, seconds: number, element: string?)
+	local floor = floorUnder(center)
+	local color = colorOf(element)
+	local pool = disc(floor + Vector3.new(0, 0.03, 0), 1, Color3.fromRGB(70, 120, 30), 0.15)
+	pool.Material = Enum.Material.Glass
+	pool.Reflectance = 0.35
+	tween(pool, 0.3, { Size = Vector3.new(0.08, radius * 2, radius * 2) }, Enum.EasingStyle.Back)
+	local sheen = disc(floor + Vector3.new(0, 0.06, 0), 1, ACID, 0.55)
+	tween(sheen, 0.3, { Size = Vector3.new(0.06, radius * 1.7, radius * 1.7) }, Enum.EasingStyle.Back)
+	-- Lobes round the edge, so it reads as a spill and not a circle.
+	local pieces = { pool, sheen }
+	for i = 1, 6 do
+		local a = i / 6 * math.pi * 2 + math.random() * 0.5
+		local size = radius * (0.5 + math.random() * 0.3)
+		local lobe = disc(floor + Vector3.new(math.cos(a) * radius * 0.75, 0.035, math.sin(a) * radius * 0.75), 0.5, color:Lerp(ACID, 0.5), 0.3)
+		tween(lobe, 0.35, { Size = Vector3.new(0.07, size, size) }, Enum.EasingStyle.Back)
+		table.insert(pieces, lobe)
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Parent = sheen
+	emitter(attachment, ACID, 12, { Size = 0.4, Speed = 0.6, Spread = 60, Acceleration = Vector3.new(0, 1.5, 0), Life = 0.8, Light = 0.3 })
+	-- Bubbles swell and pop all over it.
+	local ends = os.clock() + seconds
+	task.spawn(function()
+		while os.clock() < ends and pool.Parent do
+			if not busy() then
+				local a, d = math.random() * math.pi * 2, math.sqrt(math.random()) * radius * 0.9
+				local at = floor + Vector3.new(math.cos(a) * d, 0.1, math.sin(a) * d)
+				local bubble = part(Vector3.one * 0.2, CFrame.new(at), ACID, 0.3, Enum.PartType.Ball, Enum.Material.Glass)
+				tween(bubble, 0.35, { Size = Vector3.one * (0.5 + math.random() * 0.6) })
+				task.delay(0.35, function()
+					fade(bubble, 0.1, { Size = Vector3.one * 1.2 })
+				end)
+			end
+			task.wait(0.12)
+		end
+	end)
+	CombatFx.burst(floor + Vector3.new(0, 0.5, 0), ACID, "Drips", 1.6)
+	CombatSound.play("Corrode", floor, { Volume = 1 })
+	CombatSound.element("Impact", "Poison", floor, { Volume = 0.7 })
+	task.delay(seconds, function()
+		for _, piece in pieces do
+			fade(piece, 0.6)
+		end
+	end)
 end
 
 return TriadVfx

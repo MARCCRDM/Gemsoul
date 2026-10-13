@@ -53,24 +53,46 @@ for _, style in FastStart.Styles do
 	check(element ~= nil and table.find(FastStart.Elements, element) ~= nil, style .. " has no own element")
 	check(Lottery.validChoice(style, element), style .. " + its element must be a valid kit")
 end
--- The moves the picker shows are the moves the kit gives.
+-- The picker shows what each key can roll; the kit gives one of those,
+-- saved with it, on every stone.
 for _, element in FastStart.Elements do
-	local moves = Lottery.starterMoves(element)
-	check(#moves == 3, element .. " should give three moves")
-	for index, id in moves do
-		check(Tech.Catalog[id] ~= nil, id .. " isn't a real move")
+	local pools = Lottery.starterPools(element)
+	check(#pools == 3, element .. " should have three keys")
+	for index, pool in pools do
+		local lane = ({ "Offense", "Ability", "Defense" })[index]
+		check(#pool >= 1, element .. " " .. lane .. " has nothing to roll")
 		if Traits.Enabled then
-			local lane = ({ "Offense", "Ability", "Defense" })[index]
-			check(Traits.Index[id].Lane == lane and Traits.Index[id].Element == element, id .. " is on the wrong key")
+			check(#pool == 2, element .. " " .. lane .. " should roll one of two")
+		end
+		for _, id in pool do
+			check(Tech.Catalog[id] ~= nil, id .. " isn't a real move")
+			if Traits.Enabled then
+				check(Traits.Index[id].Lane == lane and Traits.Index[id].Element == element, id .. " is on the wrong key")
+			end
 		end
 	end
-	local profile = { Intro = {} }
-	local kit = Lottery.prepareChoice(profile, "Juggernaut", element, function()
-		return { Id = "g" }
-	end)
-	if Traits.Enabled then
-		local q = kit.Gems[1].Gem.Traits
-		check(q.Offense == moves[1] and q.Ability == moves[2] and q.Defense == moves[3], element .. " kit gems don't carry the shown moves")
+	for _, roll in { 1, 2 } do
+		local profile = { Intro = {} }
+		local kit = Lottery.prepareChoice(profile, "Juggernaut", element, function()
+			return { Id = "g" }
+		end, function(count)
+			return math.min(roll, count)
+		end)
+		local moves = kit.Moves
+		check(#moves == 3, element .. " kit didn't save its rolled moves")
+		for index, id in moves do
+			check(id == pools[index][math.min(roll, #pools[index])], element .. " rolled outside its pool")
+		end
+		local shown = Lottery.starterMoves(element, kit)
+		check(shown[1] == moves[1] and shown[3] == moves[3], element .. " kit doesn't report what it rolled")
+		if Traits.Enabled then
+			for _, entry in kit.Gems do
+				local t = entry.Gem.Traits
+				check(t.Offense == moves[1] and t.Ability == moves[2] and t.Defense == moves[3], element .. " kit gems don't carry the rolled moves")
+			end
+		end
+		-- Retrying never rerolls.
+		check(Lottery.prepareChoice(profile, "Juggernaut", element, function() return { Id = "h" } end, function() return 1 end) == kit, element .. " kit rerolled on retry")
 	end
 end
 

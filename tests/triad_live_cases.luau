@@ -170,7 +170,54 @@ for _, id in GemTraits.all() do
 		ra.Position, rb.Position = arena + Vector3.new(4, 0, 4), arena + Vector3.new(4, 0, -1)
 	end
 end
+-- The showcase defenses: each one puts something into the fight.
+local function defense(element, id)
+	local st = fresh()
+	loadout.ShieldGem = gem(element, "Rare", { Defense = id })
+	ra.Position = arena + Vector3.new(4, 0, 4)
+	rb.Position = arena + Vector3.new(4, 0, -1)
+	return st, CombatServer._state(b)
+end
+-- Ice Pillar: up on the ice, swords can't reach you; it shatters into a slow.
+local st2, foe = defense("Frost", "R_IcePillar")
+check(cast("R"), "Ice Pillar was rejected")
+settle(0.4)
+check(st2.Triad.Pillar ~= nil, "Ice Pillar didn't rise")
+foe.NextAttack = 0
+CombatServer._attack(b, ra.Position, false)
+check(ha.Health == 1000, "A sword reached you on the Ice Pillar")
+settle(3) -- (2.5s from when the cast lands)
+check(st2.Triad.Pillar == nil, "The Ice Pillar didn't shatter")
+check((foe.SlowUntil or 0) > now and (foe.Slow or 0) > 0, "The shatter didn't slow the foe")
+-- Ring of Fire: crossing the ring burns.
+st2, foe = defense("Fire", "R_RingOfFire")
+rb.Position = ra.Position + Vector3.new(0, 0, -7)
+check(cast("R"), "Ring of Fire was rejected")
+settle(0.5)
+check(next(foe.Dots) ~= nil, "Crossing the Ring of Fire didn't burn")
+-- Tesla Fence: crossing it stuns.
+st2, foe = defense("Shock", "R_TeslaFence")
+check(cast("R"), "Tesla Fence was rejected")
+settle(0.5)
+check((foe.StunUntil or 0) > now, "Crossing the Tesla Fence didn't stun")
+-- Spore Wall: crossing it poisons.
+st2, foe = defense("Poison", "R_SporeWall")
+check(cast("R"), "Spore Wall was rejected")
+settle(0.5)
+check(foe.Triad and next(foe.Triad.Poisons or {}) ~= nil, "Crossing the Spore Wall didn't poison")
+-- Acid Slick: standing on it slows.
+st2, foe = defense("Poison", "R_AcidSlick")
+check(cast("R"), "Acid Slick was rejected")
+settle(0.6)
+check((foe.SlowUntil or 0) > now and (foe.Slow or 0) > 0, "The Acid Slick didn't slow")
+-- Hologram Decoy: the hologram bursts and stuns.
+st2, foe = defense("Shock", "R_HoloDecoy")
+check(cast("R"), "Hologram Decoy was rejected")
+settle(3.4)
+check(hb.Health < 1000, "The decoy's burst did no damage")
+check((foe.StunUntil or 0) > now - 1, "The decoy's burst didn't stun")
+
 CombatServer.reset(a)
 CombatServer.reset(b)
-print("PASS: " .. checks .. " live triad checks (sockets, Stamina R, output, walls, rebirth, empower, steals)")
+print("PASS: " .. checks .. " live triad checks (sockets, Stamina R, output, walls, rebirth, empower, steals, showcase defenses)")
 end

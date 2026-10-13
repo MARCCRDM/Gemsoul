@@ -2664,6 +2664,19 @@ TriadServer.bind({
 	targets = targets,
 	targetAllowed = targetAllowed,
 	comboFlags = comboFlags,
+	-- Throw a target away from `from` (Ring of Fire): a player's own client
+	-- moves them (a short stagger), the server moves a computer enemy.
+	push = function(target, from: Vector3, power: number)
+		local away = flat(target.Root.Position - from)
+		if away.Magnitude < 0.1 then
+			return
+		end
+		if target.Player then
+			Remotes.CombatFx:FireClient(target.Player, "Blasted", "Staggered", 0.25, away.Unit * power)
+		else
+			target.Root.AssemblyLinearVelocity = away.Unit * power + Vector3.new(0, power * 0.35, 0)
+		end
+	end,
 	cleanse = cleanse,
 	powerMult = function(k)
 		return Combat.powerMult(rating(k, "Power"))
