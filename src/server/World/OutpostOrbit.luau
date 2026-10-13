@@ -9,9 +9,13 @@ local function piece(parent, name, cf, size, color, shape, transparency)
 	p.Name, p.CFrame, p.Size, p.Color = name, cf, size, color
 	p.Anchored = true
 	p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = false, false, false, false
-	p.Material = if name == "OrbitStar" or name == "PlanetAirglow" then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	p.Material = if name == "OrbitStar" or name == "PlanetAirglow"
+		then Enum.Material.Neon
+		else Enum.Material.SmoothPlastic
 	p.Transparency = transparency or 0
-	if shape == "Ball" then p.Shape = Enum.PartType.Ball end
+	if shape == "Ball" then
+		p.Shape = Enum.PartType.Ball
+	end
 	p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
 	p.Parent = parent
 	return p
@@ -28,10 +32,22 @@ local function facet(parent, at, a, b, c, color)
 	local right, back = ac:Cross(ab).Unit, bc.Unit
 	local up = bc:Cross(right).Unit
 	local height = math.abs(ab:Dot(up))
-	piece(parent, "PlanetLand", at * CFrame.fromMatrix((a + b) / 2, right, up, back),
-		Vector3.new(1, height, math.abs(ab:Dot(back))), color, "Wedge")
-	piece(parent, "PlanetLand", at * CFrame.fromMatrix((a + c) / 2, -right, up, -back),
-		Vector3.new(1, height, math.abs(ac:Dot(back))), color, "Wedge")
+	piece(
+		parent,
+		"PlanetLand",
+		at * CFrame.fromMatrix((a + b) / 2, right, up, back),
+		Vector3.new(1, height, math.abs(ab:Dot(back))),
+		color,
+		"Wedge"
+	)
+	piece(
+		parent,
+		"PlanetLand",
+		at * CFrame.fromMatrix((a + c) / 2, -right, up, -back),
+		Vector3.new(1, height, math.abs(ac:Dot(back))),
+		color,
+		"Wedge"
+	)
 end
 
 local function tangent(normal)
@@ -48,11 +64,13 @@ function Orbit.build(parent, at: CFrame)
 	piece(m, "PlanetOcean", centre, Vector3.one * (Orbit.Radius * 2), Color3.fromRGB(37, 99, 157), "Ball")
 	-- Curved land patches share vertices and sit just above the ocean sphere.
 	-- Three rings keep the triangles small enough to follow the globe's curve.
-	for index, spec in {
-		{ Vector3.new(-0.39, 1, 0.18).Unit, 0.33, 0.49, 0.2 },
-		{ Vector3.new(0.49, 1, -0.18).Unit, 0.25, 0.38, 1.6 },
-		{ Vector3.new(0.18, 1, 0.71).Unit, 0.29, 0.18, 3.1 },
-	} do
+	for index, spec in
+		{
+			{ Vector3.new(-0.39, 1, 0.18).Unit, 0.33, 0.49, 0.2 },
+			{ Vector3.new(0.49, 1, -0.18).Unit, 0.25, 0.38, 1.6 },
+			{ Vector3.new(0.18, 1, 0.71).Unit, 0.29, 0.18, 3.1 },
+		}
+	do
 		local normal, rx, rz, phase = spec[1], spec[2], spec[3], spec[4]
 		local east, north = tangent(normal)
 		local rings = {}
@@ -87,9 +105,15 @@ function Orbit.build(parent, at: CFrame)
 		for puff = 1, 5 do
 			local normal = Vector3.new(-0.7 + puff * 0.27, 1, -0.85 + band * 0.35 + math.sin(puff * 0.8) * 0.14).Unit
 			local east, north = tangent(normal)
-			piece(m, "PlanetCloud", centre * CFrame.fromMatrix(normal * 1018, east, normal, -north),
+			piece(
+				m,
+				"PlanetCloud",
+				centre * CFrame.fromMatrix(normal * 1018, east, normal, -north),
 				Vector3.new(rng:NextNumber(105, 165), 9, rng:NextNumber(25, 45)),
-				Color3.fromRGB(238, 246, 248), "Ball", rng:NextNumber(0.22, 0.38))
+				Color3.fromRGB(238, 246, 248),
+				"Ball",
+				rng:NextNumber(0.22, 0.38)
+			)
 		end
 	end
 	-- Both spheres remain under Roblox's 2048-stud part-size limit.
@@ -101,8 +125,14 @@ function Orbit.build(parent, at: CFrame)
 		local y = rng:NextNumber(-0.12, 0.95)
 		local horizontal = math.sqrt(1 - y * y)
 		local pos = Vector3.new(math.cos(a) * horizontal, y, math.sin(a) * horizontal) * 1900
-		piece(m, "OrbitStar", at * CFrame.new(pos), Vector3.one * (if i % 12 == 0 then 3.8 else rng:NextNumber(1.1, 2.2)),
-			if i % 7 == 0 then Color3.fromRGB(246, 226, 181) else Color3.fromRGB(204, 223, 245), "Ball")
+		piece(
+			m,
+			"OrbitStar",
+			at * CFrame.new(pos),
+			Vector3.one * (if i % 12 == 0 then 3.8 else rng:NextNumber(1.1, 2.2)),
+			if i % 7 == 0 then Color3.fromRGB(246, 226, 181) else Color3.fromRGB(204, 223, 245),
+			"Ball"
+		)
 	end
 	piece(m, "DistantMoon", at * CFrame.new(950, 530, -1600), Vector3.one * 116, Color3.fromRGB(186, 203, 213), "Ball")
 	return m
