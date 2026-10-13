@@ -94,13 +94,16 @@ local function show(loot, token)
 	local card = new("CanvasGroup", {
 		Name = "GemRarityRoller",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = WHITE,
+		BackgroundColor3 = INK,
 		GroupTransparency = 0,
 		Active = true,
 		ClipsDescendants = true,
 	}, anchor)
 	UiKit.round(card, 16)
-	local paint = new("UIGradient", { Rotation = 115, Color = ColorSequence.new(INK, INK) }, card)
+	-- A CanvasGroup gradient would tint every gem and label after compositing.
+	-- Keep the rarity lighting on its own background layer.
+	local backdrop = panel(card, "RarityBackdrop", 0, 0, WIDTH, HEIGHT, WHITE, 1)
+	local paint = new("UIGradient", { Rotation = 115, Color = ColorSequence.new(INK, INK) }, backdrop)
 	local edge = new("UIStroke", { Color = DIM, Thickness = 2, Transparency = 0.25 }, card)
 	local accent = panel(card, "RarityAccent", 24, 0, WELL, 3, DIM)
 	local heading = label(card, "GEM DISCOVERED", 24, 16, 310, 22, 15)

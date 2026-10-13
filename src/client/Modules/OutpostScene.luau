@@ -957,7 +957,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	if prompt:GetAttribute("PromptKind") ~= "Mine" then return end
 	if miningPrompts[prompt] then miningPrompts[prompt]:Destroy() end
 	local promptGui = new("BillboardGui", {
-		Name = "ClickToMine", Adornee = prompt.Parent, AlwaysOnTop = true,
+		Name = "ClickToMine", Adornee = prompt.Parent, AlwaysOnTop = true, Active = true,
 		Size = UDim2.fromOffset(144, 36), StudsOffsetWorldSpace = Vector3.new(0, 1.6, 0),
 		Enabled = hud.Enabled and next(openScreens) == nil,
 	}, player.PlayerGui)
@@ -966,7 +966,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 		elseif inputType == Enum.ProximityPromptInputType.Gamepad then "X to mine"
 		else "Click to mine"
 	local button = new("TextButton", {
-		Text = instruction, Font = IronUi.Bold, TextSize = 14, TextColor3 = Color3.fromRGB(230, 248, 255),
+		Text = instruction, Font = IronUi.Bold, TextSize = 14, TextColor3 = Color3.fromRGB(230, 248, 255), Active = true,
 		Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(9, 25, 34), BackgroundTransparency = 0.12,
 	}, promptGui)
 	UiKit.round(button, 9)
