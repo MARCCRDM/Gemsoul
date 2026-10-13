@@ -10,6 +10,7 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
@@ -1167,18 +1168,19 @@ local function close()
 	end
 	gui:Destroy()
 end
--- The roll: a full-screen reveal of the kit. Each key is a tall card with a
--- sealed capsule that shakes while its two possible moves flicker, then
--- bursts open on the gem itself (the real stone going into that socket),
--- and the gem gives up its surge: the move's icon rises out of it. Q, then
--- E, then R. The move you didn't get stays on the card, crossed out. Click
--- to skip ahead.
+-- The roll: a full-screen reveal of the kit. Each key is a tall card, and
+-- its circle is a reel: the moves spin through it (the two this key can
+-- roll lighting up below as they pass) and it stops on your gem, the real
+-- stone going into that socket. The gem gives up its surge: the move's
+-- icon rises out of it. Q, then E, then R. The move you didn't get stays on
+-- the card, crossed out. Click to skip ahead.
 local KEYS = {
 	{ Key = "Q", Color = Color3.fromRGB(255, 138, 92), Slot = "SWORD", Gem = "SWORD GEM", Pays = "CHARGE" },
 	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CORE", Gem = "CORE GEM", Pays = "CHARGE" },
 	{ Key = "R", Color = Color3.fromRGB(120, 230, 170), Slot = "DEFENSE", Gem = "SHIELD GEM", Pays = "STAMINA" },
 }
-local WELL = 156 -- (px: the gem's window)
+local WELL = 156 -- (px: the circle, the reel's window)
+local CELL = 108 -- (px: one symbol on the reel)
 local function keycap(parent, key, color, size)
 	-- A physical key: a darker base under a raised cap.
 	local base = frame(parent, { BackgroundColor3 = color:Lerp(C.Ink, 0.55), Size = UDim2.fromOffset(size, size + 6), ZIndex = 45 })
@@ -1198,6 +1200,7 @@ local function revealMoves(kit, after)
 	local theme = CardFX.Themes[element]
 	local deep = if theme then theme.Deep else C.Panel
 	local elementName = string.upper(GemConfig.elementName(element))
+	local rng = Random.new()
 
 	local shade = new("TextButton", {
 		Size = UDim2.fromScale(1, 1),
@@ -1237,7 +1240,7 @@ local function revealMoves(kit, after)
 	local kicker = label(board, elementName .. "  ·  STARTER ROLL", 14, color, Enum.Font.GothamBlack)
 	kicker.TextXAlignment, kicker.ZIndex = Enum.TextXAlignment.Center, 42
 	kicker.Position, kicker.Size = UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, 18)
-	local title = label(board, "CRACKING YOUR GEMS", 40, C.Text, Enum.Font.GothamBlack)
+	local title = label(board, "ROLLING YOUR GEMS", 40, C.Text, Enum.Font.GothamBlack)
 	title.TextXAlignment, title.ZIndex = Enum.TextXAlignment.Center, 42
 	title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 46)
 
@@ -1278,24 +1281,78 @@ local function revealMoves(kit, after)
 		local pays = label(card, "PAYS " .. spec.Pays, 11, C.Dim, Enum.Font.GothamBold)
 		pays.Position, pays.Size, pays.ZIndex = UDim2.fromOffset(72, 40), UDim2.new(1, -84, 0, 14), 45
 
-		-- The well: the capsule, then the gem, in 3D.
-		local well = frame(card, {
+		-- The circle: a round reel window (a CanvasGroup clips to its corner).
+		local well = new("CanvasGroup", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(0.5, 0, 0, 74 + WELL / 2),
 			Size = UDim2.fromOffset(WELL, WELL),
 			BackgroundColor3 = C.Ink,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
 			ZIndex = 44,
-		})
+		}, card)
 		UiKit.round(well, WELL)
+		local wellEdge = stroke(well, spec.Color, 0.6, 2)
+		local back = frame(well, { BackgroundColor3 = C.Ink, Size = UDim2.fromScale(1, 1), ZIndex = 44 })
 		new("UIGradient", {
 			Rotation = 90,
 			Color = ColorSequence.new(color:Lerp(C.Ink, 0.6), C.Ink),
-		}, well)
-		local wellEdge = stroke(well, spec.Color, 0.6, 2)
-		local holder = frame(well, { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 45 })
-		local record = Art.show(holder, nil, nil, color, true)
+		}, back)
+		-- The strip runs downward and stops with cell 2, your gem, in the
+		-- middle of the circle. (Cell 0 sits above it for the spring-back.)
+		local count = 20 + index * 7
+		local strip = frame(well, { BackgroundTransparency = 1, Size = UDim2.fromOffset(WELL, CELL * count), ZIndex = 45 })
+		local lane = (GemTraits.Matrix[element] or {})[GemTraits.Lanes[spec.Key]] or pool
+		local symbols, cells, record = {}, {}, nil
+		for n = 0, count do
+			local cell = frame(strip, {
+				Position = UDim2.fromOffset(0, (n - 1) * CELL),
+				Size = UDim2.fromOffset(WELL, CELL),
+				BackgroundTransparency = 1,
+				ZIndex = 45,
+			})
+			cells[n] = cell
+			if n == 2 then
+				local holder = frame(cell, {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromOffset(CELL + 12, CELL + 12),
+					BackgroundTransparency = 1,
+					ZIndex = 46,
+				})
+				record = Art.show(holder, gem, nil, color, false)
+				symbols[n] = "Gem"
+			else
+				-- Mostly this key's two moves, now and then the rest of the lane.
+				local pick = if rng:NextNumber() < 0.65 then pool[rng:NextInteger(1, #pool)] else lane[rng:NextInteger(1, #lane)]
+				local tile = frame(cell, {
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromOffset(CELL - 22, CELL - 22),
+					BackgroundColor3 = C.Ink,
+					ZIndex = 46,
+				})
+				UiKit.round(tile, 12)
+				Icons.apply(tile, Tech.Catalog[pick])
+				symbols[n] = pick
+			end
+		end
+		local function stripY(n)
+			return WELL / 2 - CELL / 2 - (n - 1) * CELL
+		end
+		strip.Position = UDim2.fromOffset(0, stripY(count))
+		-- Depth: the circle darkens toward its top and bottom.
+		local depth = frame(well, { BackgroundColor3 = C.Ink, Size = UDim2.fromScale(1, 1), ZIndex = 47 })
+		new("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.1),
+				NumberSequenceKeypoint.new(0.25, 1),
+				NumberSequenceKeypoint.new(0.75, 1),
+				NumberSequenceKeypoint.new(1, 0.1),
+			}),
+		}, depth)
 		local flash = frame(well, { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 48 })
-		UiKit.round(flash, WELL)
 
 		-- The surge badge: the move's icon, rising out of the gem.
 		local badge = frame(card, {
@@ -1317,7 +1374,7 @@ local function revealMoves(kit, after)
 		end
 
 		-- Under the well: what's inside, the two candidates while it shakes.
-		local caption = label(card, "SEALED " .. spec.Gem, 12, C.Faint, Enum.Font.GothamBlack)
+		local caption = label(card, spec.Gem, 12, C.Faint, Enum.Font.GothamBlack)
 		caption.TextXAlignment, caption.ZIndex = Enum.TextXAlignment.Center, 45
 		caption.Position, caption.Size = UDim2.fromOffset(12, 270), UDim2.new(1, -24, 0, 16)
 		local rows = {}
@@ -1340,6 +1397,8 @@ local function revealMoves(kit, after)
 		-- Once the surge is out: its name, cost, what it does.
 		local name = label(card, "", 24, C.Text, Enum.Font.GothamBlack)
 		name.TextXAlignment, name.ZIndex = Enum.TextXAlignment.Center, 45
+		name.TextScaled, name.TextTruncate = true, Enum.TextTruncate.None
+		new("UITextSizeConstraint", { MaxTextSize = 24, MinTextSize = 14 }, name)
 		name.Position, name.Size = UDim2.fromOffset(12, 290), UDim2.new(1, -24, 0, 30)
 		local stats = label(card, "", 12, spec.Color, Enum.Font.GothamBlack)
 		stats.TextXAlignment, stats.ZIndex = Enum.TextXAlignment.Center, 45
@@ -1357,16 +1416,27 @@ local function revealMoves(kit, after)
 		CardFX.update(effect, nil, 0)
 		table.insert(effects, effect)
 
-		local entry = { Phase = "Sealed", Record = record, Rows = rows, Color = spec.Color, Well = well, Id = id }
+		local entry = {
+			Phase = "Sealed",
+			Record = record,
+			Rows = rows,
+			Color = spec.Color,
+			Strip = strip,
+			Symbols = symbols,
+			Final = stripY(2),
+			LastCell = nil,
+		}
 		-- Beat 1: the capsule bursts and the gem is out.
 		function entry.open(quick)
 			if entry.Phase ~= "Sealed" then
 				return
 			end
 			entry.Phase = "Gem"
-			well.Rotation = 0
-			record.View:Destroy()
-			entry.Record = Art.show(holder, gem, nil, color, false)
+			strip.Position = UDim2.fromOffset(0, entry.Final)
+			-- Only the gem stays in the circle.
+			for n, cell in cells do
+				cell.Visible = n == 2
+			end
 			flash.BackgroundTransparency = 0
 			tween(flash, 0.4, { BackgroundTransparency = 1 })
 			punch.Scale = 1.07
@@ -1434,16 +1504,26 @@ local function revealMoves(kit, after)
 	local goScale = new("UIScale", { Scale = 0.6 }, go)
 
 	local born = os.clock()
+	local lastTick = 0
 	local live = RunService.RenderStepped:Connect(function()
 		local t = os.clock() - born
-		-- Sealed: the capsule shakes harder as it's about to go, and the two
-		-- candidates flicker, slowing down.
-		local tick = math.floor((t ^ 0.6) * 9)
+		-- Spinning: the move in the middle of the circle lights its row, and
+		-- each one that passes clicks.
+		local now = os.clock()
 		for _, entry in cards do
 			if entry.Phase == "Sealed" then
-				entry.Well.Rotation = math.sin(t * 38) * math.min(6, 1 + t * 2.5)
-				for n, row in entry.Rows do
-					local on = (tick % #entry.Rows) + 1 == n
+				local y = entry.Strip.Position.Y.Offset
+				local middle = math.floor((WELL / 2 - y) / CELL + 1)
+				if middle ~= entry.LastCell then
+					entry.LastCell = middle
+					if now - lastTick > 0.06 and entry.Spinning then
+						lastTick = now
+						LotterySound.play("Tick")
+					end
+				end
+				local showing = entry.Symbols[middle]
+				for _, row in entry.Rows do
+					local on = row.Id == showing
 					row.Frame.BackgroundColor3 = if on then entry.Color:Lerp(C.Ink, 0.55) else C.Panel
 					row.Edge.Color = if on then entry.Color else C.Line
 					row.Words.TextColor3 = if on then C.Text else C.Faint
@@ -1469,15 +1549,29 @@ local function revealMoves(kit, after)
 		go.Visible = true
 		tween(goScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
 	end
-	-- Q cracks first, then E, then R; each gem's surge follows it out.
+	-- All three spin; Q stops first, then E, then R, each on its gem, which
+	-- cracks and lets its surge out.
 	for index, entry in cards do
-		local openAt = 0.9 + (index - 1) * 0.75
+		local spin = 1.2 + (index - 1) * 0.7
+		task.delay(0.4, function()
+			if shade.Parent and entry.Phase == "Sealed" then
+				entry.Spinning = true
+				-- Runs just past the gem, then springs back onto it.
+				tween(entry.Strip, spin, { Position = UDim2.fromOffset(0, entry.Final + math.floor(CELL * 0.25)) }, Enum.EasingStyle.Quart)
+				task.delay(spin, function()
+					if entry.Phase == "Sealed" then
+						tween(entry.Strip, 0.18, { Position = UDim2.fromOffset(0, entry.Final) }, Enum.EasingStyle.Back)
+					end
+				end)
+			end
+		end)
+		local openAt = 0.4 + spin + 0.18
 		task.delay(openAt, function()
 			if shade.Parent then
 				entry.open(false)
 			end
 		end)
-		task.delay(openAt + 0.55, function()
+		task.delay(openAt + 0.5, function()
 			if shade.Parent then
 				entry.surge(false)
 				if index == #cards then
