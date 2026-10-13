@@ -22,7 +22,8 @@ local P = IronUi.Colors
 
 local CrateReveal = {}
 
-local RARITY_NAMES = { Common = "Common", Uncommon = "Uncommon", Rare = "Rare", UltraRare = "Ultra Rare" }
+local RARITY_NAMES =
+	{ Common = "Common", Uncommon = "Uncommon", Rare = "Rare", UltraRare = "Ultra Rare", Legendary = "Legendary" }
 
 local function tween(
 	object: Instance,

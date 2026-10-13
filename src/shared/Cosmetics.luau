@@ -1234,7 +1234,7 @@ function Cosmetics.source(cosmetic: Cosmetic): string
 	elseif cosmetic.Crate then
 		return (string.gsub(cosmetic.Crate, "Crate$", " Crate"))
 	end
-	return "Crates and Season Path"
+	return "Crates & Season"
 end
 
 return Cosmetics

@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local CosmeticView = require(script.Parent.CosmeticView)
 local IronUi = require(script.Parent.IronUi)
 
 local new = IronUi.new
@@ -464,9 +465,12 @@ function ShopArt.icon(parent: Instance, kind: string, cosmeticId: string?, size:
 	if cosmetic and cosmetic.Kind == "Trim" then
 		trim(root, size, cosmetic.Color)
 	elseif cosmetic and cosmetic.Kind == "Skin" then
+		-- The drawing holds the spot until the real thing loads in 3D.
 		skinArt(root, size, cosmetic)
+		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Suit" then
 		suitArt(root, size, cosmetic)
+		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Title" then
 		titleArt(root, size, cosmetic)
 	elseif cosmetic then
