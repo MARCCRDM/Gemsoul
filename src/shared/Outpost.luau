@@ -29,12 +29,11 @@
 ]]
 local Outpost = {}
 
--- Where the Skyport is in the world (its centre, on the ground): a compact
--- floating island, with rocks growing on three mining rings.
+-- Corundum Meadow: an irregular grass island above sapphire foundations.
 Outpost.Location = CFrame.new(0, 0, 7000)
-Outpost.Radius = 164 -- the island's walkable radius
-Outpost.NodeCount = 34 -- rocks out at once, across the three rings
-Outpost.FieldNodeCount = 200 -- extra standard nodes throughout Corundum Kingdom
+Outpost.Radius = 200 -- bounding radius for fall recovery; shoreline is irregular
+Outpost.NodeCount = 18 -- basic rocks near the arrival paths
+Outpost.FieldNodeCount = 140 -- leave breathing room between meadow nodes
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from
 Outpost.SwingCooldown = 0.32
@@ -124,14 +123,15 @@ Outpost.Picks = {
 }
 Outpost.PickOrder = { "Survey", "Titan", "Plasma" }
 
--- The mining rings: each grows its own mix of rocks (size weights).
+-- Only basic chunks/boulders spawn in the lobby, including every respawn.
+-- Retain the deeper definitions for other content and saved references.
 Outpost.Zones = {
-	Field = { Name = "Corundum Kingdom", Weights = { Pebble = 44, Boulder = 34, Monolith = 17, Geode = 5 } },
+	Field = { Name = "Corundum Meadow", Weights = { Pebble = 68, Boulder = 32 } },
 	Common = { Name = "Common Field", Weights = { Pebble = 62, Boulder = 38 } },
 	Deep = { Name = "Deep Vein", Weights = { Boulder = 58, Monolith = 42 } },
 	Crystal = { Name = "Crystal Crown", Weights = { Monolith = 68, Geode = 32 } },
 }
-Outpost.ZoneOrder = { "Common", "Deep", "Crystal" }
+Outpost.ZoneOrder = { "Common", "Field" }
 
 -- A rock size from a 0..1 roll: the zone's mix, or every size's own Weight.
 function Outpost.rollSize(roll: number, zone: string?): string

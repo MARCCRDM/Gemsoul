@@ -1,11 +1,8 @@
 --[[
-	Saga Outpost's world, built by the server so everyone shares it: a wide
-	crater basin on the moon, ringed by jagged rim rock, with a working
-	frontier outpost at its north edge (landing pad and shuttle, habitat
-	modules strung on tubes, a refinery tower, a drill rig over its pit,
-	conveyors, pipes and floodlight masts), the crashed Probe that serves as
-	the market, the leaderboard billboard by the landing pad, the Arena
-	Uplink gate, and planets hanging in the black sky.
+	Corundum Kingdom: an open grass meadow above sapphire foundations.
+	Native geometry gives the island an irregular shoreline, quiet garden
+	paths and a nostalgic floating skyline. Market, spawn and arena services
+	keep their established locations. Shared basic mining nodes fill the grass.
 
 	  OutpostWorld.build(at, parent) -> {
 	      Model, Spawn (CFrame), Probe (BasePart, the terminal),
@@ -16,6 +13,7 @@
 	  OutpostWorld.rock(size, cframe, rng) -> Model   one rock of that size
 	      (Shared.Outpost.Sizes), its main chunk named "Body"
 ]]
+local Meadow = require(script.Parent.OutpostMeadow)
 local OutpostWorld = {}
 
 -- Imported art (ServerStorage.Assets) when it's there; plain parts when not.
@@ -783,32 +781,6 @@ local SAPPHIRE = Color3.fromRGB(112, 187, 245)
 local SAPPHIRE_LIGHT = Color3.fromRGB(211, 242, 255)
 local ISLAND = 164 -- the island's walkable radius (Shared.Outpost.Radius)
 
--- Retain the starter deck; the rest of the island is an open mining field.
-local RINGS = {
-	{
-		Zone = "Common",
-		Title = "COMMON FIELD",
-		Sub = "Pebbles  ·  Boulders",
-		At = Vector3.new(-56, 0, 22),
-		Radius = 24,
-		Height = 2.4,
-		Color = Color3.fromRGB(110, 220, 255),
-	},
-}
-
--- Shared route definitions keep both paving and mining clearance aligned.
-local ROUTES = {
-	Vector3.new(-56, 0, 22), -- starter field
-	Vector3.new(0, 0, -132), -- open mining grounds
-	Vector3.new(132, 0, 12), -- east overlook
-	Vector3.new(-132, 0, 12), -- west overlook
-	Vector3.new(0, 0, 132), -- outer promenade
-	Vector3.new(0, 0, 74), -- arrival
-	Vector3.new(-82, 0, 60), -- market
-	Vector3.new(84, 0, 60), -- leaderboard
-	Vector3.new(70, 0, -56), -- arena
-}
-
 -- Clear blue glass with pale facets; fewer overlapping roots keep the
 -- silhouette translucent rather than building into a dark, solid blue mass.
 -- Corner wedges meet at a single point above a four-sided prism.
@@ -892,16 +864,6 @@ local function underside(parent, centre: CFrame, radius: number, depth: number, 
 	end
 end
 
--- Sci-fi kit set pieces: { name, x, z, height, yaw degrees }.
-local PROPS = {
-	{ "satelliteDish_large", 94, -34, 12, 200 },
-	{ "machine_generator", -98, 76, 5, 30 },
-	{ "barrels", -66, 84, 4, 10 },
-	{ "rover", 20, 86, 5, -60 },
-	{ "machine_wirelessCable", -102, 40, 7, 80 },
-	{ "turret_double", -92, -64, 7, 130 },
-	{ "satelliteDish", -30, -100, 7, 10 },
-}
 -- A column: sapphire, some broken off, some capped with a glowing tech ring.
 local function column(parent, at: CFrame, height: number, tech: boolean, broken: boolean)
 	local kitName = if broken then "statue_columnDamaged" else "statue_column"
@@ -973,24 +935,6 @@ local function column(parent, at: CFrame, height: number, tech: boolean, broken:
 end
 
 -- A low sapphire rim below the existing safety fence.
-local function wall(parent, from: Vector3, to: Vector3, rng: Random)
-	local length = (to - from).Magnitude
-	local look = CFrame.lookAt((from + to) / 2, to)
-	local n = math.max(1, math.floor(length / 5))
-	for i = 0, n - 1 do
-		local z = -length / 2 + (i + 0.5) * length / n
-		part(
-			parent,
-			look
-				* CFrame.new(rng:NextNumber(-0.3, 0.3), rng:NextNumber(1.3, 1.9), z)
-				* CFrame.Angles(0, rng:NextNumber(-0.15, 0.15), 0),
-			Vector3.new(rng:NextNumber(3, 4), rng:NextNumber(2.6, 3.8), length / n + 0.6),
-			STONE_DARK:Lerp(CLIFF, rng:NextNumber(0, 0.5)),
-			Enum.Material.Glass
-		)
-	end
-end
-
 -- A sign floating over a ring's steps.
 local function sign(parent, at: CFrame, title: string, sub: string, color: Color3)
 	local anchor = part(parent, at, Vector3.new(1, 1, 1), color, nil, nil, { Transparency = 1 })
@@ -1013,90 +957,13 @@ local function sign(parent, at: CFrame, title: string, sub: string, color: Color
 	return anchor
 end
 
--- A mining ring: a raised round sapphire deck with a neon inlay, railings
--- with a gap at its steps (facing the plaza), and a sign. Returns where
--- rocks may grow on it.
-local function miningRing(parent, at: CFrame, spec, faceTo: Vector3, rng: Random)
-	local m = folder(parent, "Ring" .. spec.Zone)
-	local r, h, color = spec.Radius, spec.Height, spec.Color
-	-- The deck and its rim.
-	solid(disc(m, at * CFrame.new(0, h / 2, 0), r + 2, h, STONE_DARK, Enum.Material.Glass))
-	solid(disc(m, at * CFrame.new(0, h + 0.05, 0), r, 0.3, STONE_DARK, Enum.Material.Glass))
-	disc(m, at * CFrame.new(0, h + 0.25, 0), r * 0.62, 0.1, color, Enum.Material.Neon, nil)
-	disc(m, at * CFrame.new(0, h + 0.3, 0), r * 0.6, 0.1, STONE, Enum.Material.Glass)
-	-- Steps toward the plaza.
-	local out = (faceTo - at.Position) * Vector3.new(1, 0, 1)
-	local facing = math.atan2(out.X, out.Z)
-	local steps = math.ceil(h / 1.2)
-	for i = 1, steps do
-		local d = r + 2 + (i - 0.5) * 2.4
-		solid(
-			part(
-				m,
-				at * CFrame.Angles(0, facing, 0) * CFrame.new(0, h - i * 1.2 + 0.6, d),
-				Vector3.new(14, 1.2 * (steps - i + 1), 2.4),
-				STONE,
-				Enum.Material.Glass
-			)
-		)
-	end
-	-- Railing posts and neon rails, open at the steps.
-	local posts = math.floor(r * 2 * math.pi / 7)
-	for i = 0, posts - 1 do
-		local a = i / posts * math.pi * 2
-		-- A post's bearing in the same terms as `facing` (the steps' side).
-		local pa = math.atan2(math.cos(a), math.sin(a))
-		local gap = math.abs(math.atan2(math.sin(pa - facing), math.cos(pa - facing))) < math.rad(18)
-		if not gap then
-			local p = at * CFrame.new(math.cos(a) * (r + 1), h, math.sin(a) * (r + 1))
-			solid(part(m, p * CFrame.new(0, 1.6, 0), Vector3.new(0.7, 3.2, 0.7), STEEL, Enum.Material.Metal))
-			local a2 = (i + 1) / posts * math.pi * 2
-			local q = at * CFrame.new(math.cos(a2) * (r + 1), h, math.sin(a2) * (r + 1))
-			local pa2 = math.atan2(math.cos(a2), math.sin(a2))
-			if math.abs(math.atan2(math.sin(pa2 - facing), math.cos(pa2 - facing))) >= math.rad(18) then
-				local mid = (p.Position + q.Position) / 2
-				local len = (q.Position - p.Position).Magnitude
-				local railAt = CFrame.lookAt(mid + Vector3.new(0, 3, 0), q.Position + Vector3.new(0, 3, 0))
-				part(m, railAt, Vector3.new(0.45, 0.45, len), color, Enum.Material.Neon)
-				part(m, railAt * CFrame.new(0, -1.3, 0), Vector3.new(0.3, 0.3, len), STEEL, Enum.Material.Metal)
-			end
-		end
-	end
-	-- Four short tech pylons round the deck, lit in the ring's colour.
-	for i = 0, 3 do
-		local a = i / 4 * math.pi * 2 + math.pi / 4
-		local p = at * CFrame.new(math.cos(a) * (r + 3.5), 0, math.sin(a) * (r + 3.5))
-		solid(part(m, p * CFrame.new(0, 3.5, 0), Vector3.new(1.6, 7, 1.6), HULL, Enum.Material.Metal))
-		local lamp = part(m, p * CFrame.new(0, 7.4, 0), Vector3.new(2, 0.8, 2), color, Enum.Material.Neon)
-		light(lamp, color, 20, 0.8)
-	end
-	sign(m, at * CFrame.Angles(0, facing, 0) * CFrame.new(0, h + 12, r + 4), spec.Title, spec.Sub or "", color)
-	-- Where rocks grow: a loose grid on the deck, clear of the rim.
-	local spots = {}
-	local step = 8.5
-	for x = -r, r, step do
-		for z = -r, r, step do
-			local d = math.sqrt(x * x + z * z)
-			if d <= r - 5 and d >= 3 then
-				local jitter = Vector3.new(rng:NextNumber(-1.5, 1.5), 0, rng:NextNumber(-1.5, 1.5))
-				local p = (at * CFrame.new(x, h + 0.3, z)).Position + jitter
-				table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
-			end
-		end
-	end
-	return spots
-end
-
 -- A small floating islet off the edge: ground, an underside and something on top.
 local function islet(parent, at: CFrame, radius: number, rng: Random, topper: string)
 	local m = folder(parent, "Islet")
-	local crown = disc(m, at * CFrame.new(0, -0.5, 0), radius, 1.4, STONE, Enum.Material.Glass)
-	crown.Transparency, crown.Reflectance, crown.CastShadow = 0, 0.06, false
-	local cap = disc(m, at * CFrame.new(0, 0.25, 0), radius * 0.85, 0.2, STONE, Enum.Material.Glass)
-	cap.Transparency, cap.CastShadow = 0, false
-	underside(m, at, radius, radius * 1.4, rng)
+	Meadow.land(m, at, radius, false)
+	underside(m, at * CFrame.new(0, -5, 0), radius * 0.78, radius * 1.4, rng)
 	if topper == "Tree" then
-		sapphire(m, at * CFrame.Angles(0, 0.4, 0.12), radius * 0.55, radius * 0.7, SAPPHIRE)
+		Meadow.tree(m, at, radius * 0.8, math.floor(radius * 31))
 	elseif topper == "Column" then
 		column(m, at, rng:NextNumber(10, 18), rng:NextNumber() < 0.5, rng:NextNumber() < 0.4)
 	elseif topper == "Beacon" then
@@ -1145,354 +1012,41 @@ end
 function OutpostWorld.build(at: CFrame, parent: Instance)
 	local root = Instance.new("Model")
 	root.Name = "SagaOutpost"
-	root:SetAttribute("Landscape", "Corundum Kingdom")
-	local rng = Random.new(4242)
-	local ground = folder(root, "Ground")
+	root:SetAttribute("Landscape", "Corundum Meadow")
+	root:SetAttribute("LandscapeVersion", 2)
+	local meadow = Meadow.build(root, at)
+	-- Grass and a shallow mineral coast blend into the familiar blue foundation.
+	-- Keep the old circular crystal shoulders tucked beneath the irregular land.
+	underside(root, at * CFrame.new(0, -5, 0), ISLAND * 0.76, 92, Random.new(4242))
 
-	-- Smooth, solid sapphire supports normal movement; facets sit beneath it.
-	local surface = solid(disc(ground, at * CFrame.new(0, -1, 0), ISLAND + 6, 2, STONE, Enum.Material.Glass))
-	surface.Transparency, surface.Reflectance, surface.CastShadow = 0, 0.06, false
-	for i = 1, 42 do
-		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(16, ISLAND - 6)
-		part(
-			ground,
-			at * CFrame.new(math.cos(a) * r, 0.025, math.sin(a) * r) * CFrame.Angles(0, a + 0.4, 0),
-			Vector3.new(rng:NextNumber(5, 15), 0.04, rng:NextNumber(3, 8)),
-			STONE:Lerp(SAPPHIRE_LIGHT, rng:NextNumber(0.05, 0.25)),
-			Enum.Material.Glass
-		)
-	end
-	underside(ground, at, ISLAND + 6, 100, rng)
-	local rimSegments = 40
-	for i = 0, rimSegments - 1 do
-		local a0, a1 = i / rimSegments * math.pi * 2, (i + 1) / rimSegments * math.pi * 2
-		local from = (at * CFrame.new(math.cos(a0) * (ISLAND + 2), 0, math.sin(a0) * (ISLAND + 2))).Position
-		local to = (at * CFrame.new(math.cos(a1) * (ISLAND + 2), 0, math.sin(a1) * (ISLAND + 2))).Position
-		wall(ground, from, to, rng)
-		local fence = solid(
-			part(
-				ground,
-				CFrame.lookAt((from + to) / 2 + Vector3.new(0, 10, 0), to + Vector3.new(0, 10, 0)),
-				Vector3.new(2, 20, (to - from).Magnitude + 1),
-				STONE,
-				nil,
-				nil,
-				{ Transparency = 1 }
-			)
-		)
-		fence.CastShadow = false
-	end
-
-	-- The plaza: a polished landing pad at the front, a round court in the
-	-- middle with the Saga beacon, and the paths to the rings.
 	local plaza = folder(root, "Plaza")
 	local padAt = at * CFrame.new(0, 0, 74)
-	solid(disc(plaza, padAt * CFrame.new(0, 0.2, 0), 13, 0.4, HULL, Enum.Material.Metal))
-	disc(plaza, padAt * CFrame.new(0, 0.45, 0), 11.5, 0.1, HULL_DARK, Enum.Material.DiamondPlate)
-	disc(plaza, padAt * CFrame.new(0, 0.5, 0), 9, 0.1, SAGA, Enum.Material.Neon)
-	disc(plaza, padAt * CFrame.new(0, 0.55, 0), 8.4, 0.1, HULL_DARK, Enum.Material.DiamondPlate)
 	local court = at * CFrame.new(0, 0, 12)
-	solid(disc(plaza, court * CFrame.new(0, 0.15, 0), 20, 0.3, STONE_DARK, Enum.Material.Marble))
-	disc(plaza, court * CFrame.new(0, 0.32, 0), 17, 0.06, GLOW, Enum.Material.Neon)
-	disc(plaza, court * CFrame.new(0, 0.36, 0), 16.4, 0.06, STONE, Enum.Material.Marble)
-	-- The beacon: a steel spire with a slowly glowing Saga crystal.
-	solid(part(plaza, court * CFrame.new(0, 7, 0), Vector3.new(2.4, 14, 2.4), HULL, Enum.Material.Metal))
-	for _, y in { 4, 9 } do
-		disc(plaza, court * CFrame.new(0, y, 0), 2, 0.5, GLOW, Enum.Material.Neon)
-	end
-	local crystal = part(
-		plaza,
-		court * CFrame.new(0, 17, 0) * CFrame.Angles(0, math.rad(45), math.rad(45)),
-		Vector3.new(4, 4, 4),
-		SAGA,
-		Enum.Material.Neon,
-		nil,
-		{ Transparency = 0.1 }
-	)
-	light(crystal, SAGA, 40, 1.2)
-	for _, target in ROUTES do
-		local from = court.Position
-		local to = (at * CFrame.new(target)).Position
-		local length = (to - from).Magnitude
-		local routeFrame = CFrame.lookAt((from + to) / 2, to)
-		for distance = -length / 2 + 8, length / 2 - 4, 12 do
-			for _, side in { -1, 1 } do
-				part(
-					plaza,
-					routeFrame * CFrame.new(side * 3.3, 0.17, distance),
-					Vector3.new(0.22, 0.08, 2.2),
-					GLOW,
-					Enum.Material.Neon
-				)
-			end
-		end
+	local warmStone = Color3.fromRGB(208, 197, 162)
+	disc(plaza, padAt * CFrame.new(0, 0.08, 0), 10, 0.16, warmStone, Enum.Material.Limestone)
+	disc(plaza, court * CFrame.new(0, 0.06, 0), 9, 0.12, warmStone, Enum.Material.Limestone)
+	-- A small familiar sapphire waystone leaves the meadow's horizon open.
+	solid(part(plaza, court * CFrame.new(0, 0.8, 0), Vector3.new(4.2, 1.6, 4.2), STONE_DARK, Enum.Material.Slate))
+	sapphire(plaza, court * CFrame.new(0, 1.6, 0), 2.5, 5, SAPPHIRE_LIGHT)
+	for _, x in { -5, 5 } do
+		local lantern = padAt * CFrame.new(x, 0, -8)
 		part(
 			plaza,
-			CFrame.lookAt((from + to) / 2 + Vector3.new(0, 0.08, 0), to + Vector3.new(0, 0.08, 0)),
-			Vector3.new(7, 0.12, length),
-			STONE_DARK,
-			Enum.Material.Pavement
+			lantern * CFrame.new(0, 1.8, 0),
+			Vector3.new(0.45, 3.6, 0.45),
+			Color3.fromRGB(133, 104, 74),
+			Enum.Material.Wood
+		)
+		part(
+			plaza,
+			lantern * CFrame.new(0, 3.8, 0),
+			Vector3.new(1.1, 0.8, 1.1),
+			Color3.fromRGB(255, 222, 151),
+			Enum.Material.Neon
 		)
 	end
 
-	-- The starter deck stays familiar; the other former decks are open ground.
-	local mining = folder(root, "MiningRings")
-	local spots, zones = {}, {}
-	for _, spec in RINGS do
-		local ringAt = at * CFrame.new(spec.At)
-		for _, spot in miningRing(mining, ringAt, spec, court.Position, rng) do
-			table.insert(spots, spot)
-			table.insert(zones, spec.Zone)
-		end
-	end
-
-	-- Preserve the familiar columns and tech landmarks around the field.
-	local decor = folder(root, "Decor")
-	for _, c in
-		{
-			{ -24, 52, 22, true, false },
-			{ 24, 52, 22, true, false },
-			{ -86, -10, 26, false, false },
-			{ 86, -10, 26, false, true },
-			{ -40, -96, 18, true, true },
-			{ 44, -96, 30, false, false },
-			{ -96, 54, 14, false, true },
-			{ 96, 54, 20, true, false },
-			{ 0, -100, 34, true, false },
-		}
-	do
-		column(decor, at * CFrame.new(c[1], 0, c[2]), c[3], c[4], c[5])
-	end
-	-- An outer promenade makes the expansion explorable without moving services.
-	local outer = folder(root, "SapphirePromenade")
-	local scenicClear = {}
-	for i = 0, 63 do
-		local a, b = i / 64 * math.pi * 2, (i + 1) / 64 * math.pi * 2
-		local p = (at * CFrame.new(math.cos(a) * 132, 0.09, math.sin(a) * 132)).Position
-		local q = (at * CFrame.new(math.cos(b) * 132, 0.09, math.sin(b) * 132)).Position
-		local frame = CFrame.lookAt((p + q) / 2, q)
-		part(outer, frame, Vector3.new(8, 0.14, (p - q).Magnitude + 0.2), STONE_DARK, Enum.Material.Marble)
-		if i % 2 == 0 then
-			for _, side in { -1, 1 } do
-				part(
-					outer,
-					frame * CFrame.new(side * 3.6, 0.12, 0),
-					Vector3.new(0.2, 0.08, 2),
-					GLOW,
-					Enum.Material.Neon
-				)
-			end
-		end
-	end
-	-- Large mineral clusters outside the path act as landmarks, not ore nodes.
-	for i = 0, 5 do
-		local angle = (i + 0.5) / 6 * math.pi * 2
-		local x, z = math.cos(angle) * 150, math.sin(angle) * 150
-		local anchor = at * CFrame.new(x, 0, z) * CFrame.Angles(0, angle, 0)
-		table.insert(scenicClear, { Vector3.new(x, 0, z), 16 })
-		for j = -1, 1 do
-			local height = if j == 0 then 24 else 13
-			local crystalAt = anchor * CFrame.new(j * 7, 0, math.abs(j) * 3)
-			sapphire(outer, crystalAt, if j == 0 then 11 else 8, height, SAPPHIRE:Lerp(SAPPHIRE_LIGHT, (j + 1) * 0.15))
-			local blocker = solid(
-				part(
-					outer,
-					crystalAt * CFrame.new(0, height * 0.35, 0),
-					Vector3.new(7, height * 0.7, 7),
-					STONE,
-					nil,
-					nil,
-					{ Transparency = 1 }
-				)
-			)
-			blocker.CastShadow = false
-		end
-	end
-	-- Two broad crystal gateways frame the northern mining grounds.
-	for _, x in { -65, 65 } do
-		local archAt = at * CFrame.new(x, 0, -116)
-		for _, side in { -1, 1 } do
-			local foot = archAt * CFrame.new(side * 14, 0, 0)
-			sapphire(outer, foot, 7, 22, SAPPHIRE_LIGHT)
-			solid(part(outer, foot * CFrame.new(0, 9, 0), Vector3.new(6, 18, 6), STONE, Enum.Material.Glass))
-			table.insert(scenicClear, { Vector3.new(x + side * 14, 0, -116), 9 })
-		end
-		part(outer, archAt * CFrame.new(0, 20, 0), Vector3.new(29, 5, 7), STONE, Enum.Material.Glass)
-		part(outer, archAt * CFrame.new(0, 17.4, 0), Vector3.new(23, 0.2, 0.5), GLOW, Enum.Material.Neon)
-	end
-	-- Resting overlooks with benches on the open sides of the promenade.
-	for _, side in { -1, 1 } do
-		local terrace = at * CFrame.new(side * 145, 0, 0)
-		disc(outer, terrace * CFrame.new(0, 0.1, 0), 11, 0.2, STONE_DARK, Enum.Material.Marble)
-		table.insert(scenicClear, { Vector3.new(side * 145, 0, 0), 15 })
-		for _, z in { -6, 6 } do
-			local bench = terrace * CFrame.new(0, 1.8, z)
-			solid(part(outer, bench, Vector3.new(8, 0.6, 2.5), STEEL, Enum.Material.Metal))
-			for _, leg in { -3, 3 } do
-				solid(
-					part(
-						outer,
-						bench * CFrame.new(leg, -0.9, 0),
-						Vector3.new(0.6, 1.8, 2),
-						HULL_DARK,
-						Enum.Material.Metal
-					)
-				)
-			end
-		end
-	end
-	-- Environmental art stays off the mining grid and uses the lobby palette.
-	local art = folder(root, "CorundumArt")
-	local artRng = Random.new(8719)
-	local function artBeam(frame: CFrame, from: Vector3, to: Vector3, width: number, color: Color3, material)
-		local a, b = (frame * CFrame.new(from)).Position, (frame * CFrame.new(to)).Position
-		return part(art, CFrame.lookAt((a + b) / 2, b), Vector3.new(width, width, (b - a).Magnitude), color, material)
-	end
-	-- A suspended, double-ended sapphire inside two tilted orbital frames.
-	local monument = at * CFrame.new(0, 0, -150)
-	table.insert(scenicClear, { Vector3.new(0, 0, -150), 13 })
-	solid(disc(art, monument * CFrame.new(0, 0.3, 0), 9, 0.6, STONE_DARK, Enum.Material.Marble))
-	for i = 0, 7 do
-		local angle = i / 8 * math.pi * 2
-		local frame = monument * CFrame.Angles(0, angle, 0)
-		part(art, frame * CFrame.new(0, 0.65, 6), Vector3.new(0.5, 0.08, 2), SAGA, Enum.Material.Neon)
-	end
-	sapphire(art, monument * CFrame.new(0, 25, 0), 9, 11, SAPPHIRE_LIGHT, 0.7)
-	sapphire(art, monument * CFrame.new(0, 25, 0) * CFrame.Angles(math.pi, 0, 0), 9, 11, SAPPHIRE, 0.7)
-	for ring = 1, 2 do
-		local orbit = monument * CFrame.new(0, 25, 0) * CFrame.Angles(math.rad(55), ring * 1.8, 0.3)
-		for segment = 0, 23 do
-			local a, b = segment / 24 * math.pi * 2, (segment + 1) / 24 * math.pi * 2
-			artBeam(
-				orbit,
-				Vector3.new(math.cos(a) * 15, 0, math.sin(a) * 15),
-				Vector3.new(math.cos(b) * 15, 0, math.sin(b) * 15),
-				0.38,
-				if ring == 1 then GLOW else SAGA,
-				Enum.Material.Neon
-			)
-		end
-	end
-	-- Fine branching mineral seams in the outer shelf, flush with the floor.
-	for patch = 0, 7 do
-		local angle = (patch + 0.35) / 8 * math.pi * 2
-		local vein = at * CFrame.Angles(0, angle, 0) * CFrame.new(0, 0.12, 143)
-		local previous = Vector3.new(-6, 0, 0)
-		for step = 1, 5 do
-			local nextPoint = Vector3.new(-6 + step * 2.6, 0, artRng:NextNumber(-2, 2))
-			artBeam(vein, previous, nextPoint, 0.12, GLOW, Enum.Material.Neon)
-			if step % 2 == 0 then
-				artBeam(vein, nextPoint, nextPoint + Vector3.new(1.5, 0, 3), 0.08, SAPPHIRE_LIGHT, Enum.Material.Neon)
-			end
-			previous = nextPoint
-		end
-	end
-	-- Three crystalline lightfalls spill beyond the safety rim into the sky.
-	for _, angle in { 0.65, 2.8, 4.8 } do
-		local fall = at * CFrame.Angles(0, angle, 0) * CFrame.new(0, -3, ISLAND + 7)
-		for ribbon = -2, 2 do
-			local length = 28 + (2 - math.abs(ribbon)) * 9
-			local sheet = part(
-				art,
-				fall * CFrame.new(ribbon * 1.5, -length / 2, 0),
-				Vector3.new(1.1, length, 0.18),
-				SAPPHIRE_LIGHT,
-				Enum.Material.Neon,
-				nil,
-				{ Transparency = 0.73, CastShadow = false }
-			)
-			sheet.Name = "CrystalLightfall"
-		end
-		for shard = 1, 4 do
-			sapphire(
-				art,
-				fall
-					* CFrame.new(artRng:NextNumber(-5, 5), -52 - shard * 5, artRng:NextNumber(-2, 2))
-					* CFrame.Angles(0.3, shard, 0.2),
-				2.5,
-				4,
-				SAPPHIRE_LIGHT
-			)
-		end
-	end
-	-- The field uses real standard mining nodes, not decorative imitation rocks.
-	local keepClear = {
-		{ Vector3.new(0, 0, 74), 16 },
-		{ Vector3.new(0, 0, 12), 23 },
-		{ Vector3.new(-82, 0, 60), 14 },
-		{ Vector3.new(84, 0, 60), 14 },
-		{ Vector3.new(70, 0, -56), 14 },
-	}
-	for _, spot in scenicClear do
-		table.insert(keepClear, spot)
-	end
-	for _, spec in RINGS do
-		table.insert(keepClear, { spec.At, spec.Radius + 8 })
-	end
-	for _, prop in PROPS do
-		table.insert(keepClear, { Vector3.new(prop[2], 0, prop[3]), 10 })
-	end
-	for _, p in
-		{
-			{ -24, 52, 9 },
-			{ 24, 52, 9 },
-			{ -86, -10, 9 },
-			{ 86, -10, 9 },
-			{ -40, -96, 9 },
-			{ 44, -96, 9 },
-			{ -96, 54, 9 },
-			{ 96, 54, 9 },
-			{ 0, -100, 9 },
-		}
-	do
-		table.insert(keepClear, { Vector3.new(p[1], 0, p[2]), p[3] })
-	end
-	local function clear(x: number, z: number): boolean
-		local here = Vector3.new(x, 0, z)
-		if math.abs(here.Magnitude - 132) < 10 then
-			return false
-		end
-		for _, spot in keepClear do
-			if (here - Vector3.new(spot[1].X, 0, spot[1].Z)).Magnitude < spot[2] then
-				return false
-			end
-		end
-		local from = Vector3.new(0, 0, 12)
-		for _, target in ROUTES do
-			local line = Vector3.new(target.X, 0, target.Z) - from
-			local t = math.clamp((here - from):Dot(line) / line:Dot(line), 0, 1)
-			if (here - (from + line * t)).Magnitude < 9 then
-				return false
-			end
-		end
-		return true
-	end
-	-- All standard rock types now appear naturally across the open field.
-	local fieldSpots = {}
-	for x = -ISLAND + 12, ISLAND - 12, 12 do
-		for z = -ISLAND + 12, ISLAND - 12, 12 do
-			local px, pz = x + rng:NextNumber(-1, 1), z + rng:NextNumber(-1, 1)
-			if px * px + pz * pz <= (ISLAND - 10) ^ 2 and clear(px, pz) then
-				local spot = at * CFrame.new(px, 0.08, pz) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0)
-				table.insert(spots, spot)
-				table.insert(zones, "Field")
-				table.insert(fieldSpots, #spots)
-			end
-		end
-	end
-	root:SetAttribute("FieldMiningSpots", #fieldSpots)
-
-	-- Sci-fi set pieces round the edge: dishes, a generator, a rover, a turret.
-	for _, prop in PROPS do
-		AssetKit.place(decor, prop[1], at * CFrame.new(prop[2], 0, prop[3]), {
-			Height = prop[4],
-			Yaw = math.rad(prop[5]),
-			Collide = true,
-		})
-	end
-
-	-- The Probe (market), the leaderboard and the Arena Uplink, round the plaza.
-	-- Out on the flanks, both facing the court, so the view from the pad is open.
+	-- Service locations and return/spawn facing are unchanged.
 	local function facing(x: number, z: number): CFrame
 		local p = (at * CFrame.new(x, 0, z)).Position
 		return CFrame.lookAt(p, Vector3.new(court.Position.X, p.Y, court.Position.Z))
@@ -1500,39 +1054,65 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local probeScreen = probe(root, facing(-82, 60) * CFrame.Angles(0, math.pi, 0))
 	local face = billboard(root, facing(84, 60))
 	local gatePad = gate(root, at * CFrame.new(70, 0, -56))
-
-	-- Simple destination markers, readable from the main approach.
-	sign(plaza, at * CFrame.new(0, 8, 87), "CORUNDUM KINGDOM", "Mine gems · Build your miner · Enter the arena", GLOW)
+	sign(plaza, at * CFrame.new(0, 5, 87), "CORUNDUM KINGDOM", "A little mining. A new adventure.", SAGA)
 	sign(plaza, at * CFrame.new(-82, 10, 60), "MARKET", "PROBE-7 · Buy and sell", SAGA)
 	sign(plaza, at * CFrame.new(70, 12, -56), "ARENA", "Queue at the uplink", GLOW)
+	root:SetAttribute("FieldMiningSpots", #meadow.FieldSpots)
 
-	-- Islets drifting round the island, and the sky: planets and an orbital
-	-- ring station over a bright afternoon.
 	local far = folder(root, "Skyline")
+	pcall(function()
+		far.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	end)
 	for i, spec in
 		{
-			{ 0.2, 190, 30, 16, "Tree" },
-			{ 0.9, 240, 70, 22, "Column" },
-			{ 1.7, 200, 12, 12, "Beacon" },
-			{ 2.4, 280, 50, 26, "Tree" },
-			{ 3.2, 210, -8, 14, "Column" },
-			{ 4.0, 260, 90, 18, "Beacon" },
-			{ 4.8, 220, 40, 20, "Tree" },
-			{ 5.6, 300, 20, 30, "Column" },
+			{ 0.2, 300, 26, 20, "Tree" },
+			{ 0.9, 350, 65, 26, "Tree" },
+			{ 1.7, 310, 12, 14, "Beacon" },
+			{ 2.4, 390, 44, 30, "Tree" },
+			{ 3.2, 320, -8, 18, "Column" },
+			{ 4.0, 370, 86, 22, "Tree" },
+			{ 4.8, 330, 36, 24, "Tree" },
+			{ 5.6, 410, 18, 32, "Column" },
 		}
 	do
-		local a = spec[1]
-		islet(
-			far,
-			at * CFrame.new(math.cos(a) * (spec[2] + 95), spec[3], math.sin(a) * (spec[2] + 95)),
-			spec[4],
-			Random.new(i * 31),
-			spec[5]
-		)
+		local anchor = at * CFrame.new(math.cos(spec[1]) * spec[2], spec[3], math.sin(spec[1]) * spec[2])
+		islet(far, anchor, spec[4], Random.new(i * 31), spec[5])
+		-- Soft cloud banks below the islets, leaving the walking horizon clear.
+		for puff = -1, 1 do
+			part(
+				far,
+				anchor * CFrame.new(puff * 19, -38 - math.abs(puff) * 4, 5),
+				Vector3.new(58, 15, 36),
+				Color3.fromRGB(239, 242, 229),
+				Enum.Material.SmoothPlastic,
+				"Ball",
+				{ Transparency = 0.28, CastShadow = false }
+			)
+		end
+	end
+	-- Two hand-made kites over the outlooks add a gentle adventure-game accent.
+	local art = folder(root, "MeadowSkyArt")
+	for i, spec in { { -137, 34, 31 }, { 133, 42, 20 } } do
+		local kite = at * CFrame.new(spec[1], spec[2], spec[3]) * CFrame.Angles(0.1, i * 0.65, 0.65)
+		local color = if i == 1 then Color3.fromRGB(228, 159, 114) else Color3.fromRGB(245, 217, 153)
+		part(art, kite, Vector3.new(3.5, 4.5, 0.15), color, Enum.Material.Fabric)
+		part(art, kite * CFrame.new(0, 0, -0.1), Vector3.new(0.08, 4.5, 0.08), HULL, Enum.Material.Wood)
+		local from, to = kite.Position, (at * CFrame.new(spec[1] * 0.91, 2, spec[3])).Position
+		tube(art, from, to, 0.025, Color3.fromRGB(222, 219, 192))
+		for tail = 1, 4 do
+			part(
+				art,
+				kite
+					* CFrame.new(math.sin(tail) * 0.6, -2.3 - tail * 1.4, 0)
+					* CFrame.Angles(0, 0, math.sin(tail) * 0.4),
+				Vector3.new(0.4, 1.5, 0.08),
+				color,
+				Enum.Material.Fabric
+			)
+		end
 	end
 	station(far, at * CFrame.new(-260, 420, -900))
 	sky(root, at, true)
-
 	root.Parent = parent
 	return {
 		Model = root,
@@ -1540,9 +1120,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Probe = probeScreen,
 		Board = face,
 		Gate = gatePad,
-		Spots = spots,
-		FieldSpots = fieldSpots,
-		Zones = zones,
+		Spots = meadow.Spots,
+		FieldSpots = meadow.FieldSpots,
+		Zones = meadow.Zones,
 		Parking = {},
 		Secrets = {},
 	}
