@@ -6,6 +6,15 @@ Lottery.Version = 1
 Lottery.GearOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet" }
 Lottery.GemOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet", "Surge1", "Surge2", "Surge3" }
 Lottery.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
+-- The three moves a starter kit of this element gives Q, E and R (catalog ids).
+-- With the triad: a clean sword technique, a bolt, and a shield that soaks.
+function Lottery.starterMoves(element): { string }
+	local m = GemTraits.Enabled and GemTraits.Matrix[element]
+	if m then
+		return { m.Offense[2], m.Ability[1], m.Defense[1] }
+	end
+	return table.clone(GemRoller.StarterSurges[element] or {})
+end
 function Lottery.validChoice(style, element)
 	return table.find(Lottery.Styles, style) ~= nil and GemRoller.PrototypeIds[element] ~= nil
 end
@@ -27,10 +36,9 @@ function Lottery.prepareChoice(profile, style, element, generate)
 		gem.SurgeTier, gem.SurgeRank, gem.CutMethod = 1, 1, "Starter"
 		gem.Surge = GemRoller.StarterSurges[element][index]
 		if GemTraits.Enabled and GemTraits.Matrix[element] then
-			-- A first kit that teaches the grammar: a clean sword technique,
-			-- a bolt, and a shield that soaks.
-			local m = GemTraits.Matrix[element]
-			gem.Traits = { Offense = m.Offense[2], Ability = m.Ability[1], Defense = m.Defense[1] }
+			-- A first kit that teaches the grammar (Lottery.starterMoves).
+			local moves = Lottery.starterMoves(element)
+			gem.Traits = { Offense = moves[1], Ability = moves[2], Defense = moves[3] }
 		end
 		table.insert(reward.Gems, { Slot = slot, Gem = gem })
 	end

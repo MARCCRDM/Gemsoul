@@ -100,16 +100,14 @@ Streets and building plots are painted terrain (cobblestone, pavement, dirt), so
 
 ## New players: the intro
 
-`src/client/Intro.client.luau`, with the 3D sets in `src/client/Modules/Scenes.luau` (built on the client only):
+The fast start (`src/shared/FastStart.luau`), about a minute from joining to fighting:
 
-1. **The lore "video"**: a skippable cinematic in five shots with typewriter captions: the colony on its moon, the pulsing Saga Stone, the rift tearing open, the brainrot alligator bomber flying through, and the title.
-2. **The colony ship**: you wake up to red alarms. Outside the window the alligator bomber loops past, strafing the hull (bolts, blasts, the camera shakes). An objectives list walks you through the mechanics, one station at a time, with your own figure (a copy of your character in its gear) at each:
-   - **Suit up** at the locker: the Scrap Suit, Saga Pistol and Shield (`"SuitUp"`).
-   - **Daily ration** at the dispenser: a slot-machine spin for three cut Saga Stones (`"StarterSpin"`).
-   - **Enchant** at the holo console: your best stone goes into your blaster (`"SocketGem"`).
-   - **Drive off the bomber**: press FIRE five times; it retreats smoking.
-   - **Teleport** from the pad (`"QuickStart"`, which finishes the intro).
-3. **The moon base**: you beam down to the dashboard. Behind it the camera circles the moon base station: domes, corridors, the vendor kiosks (Market, Forge, Enchant, Supply, Mine Lift), the Saga Stone pylon and a planet in the black sky (`src/client/MenuCamera.client.luau`).
+1. **The title screen** (`src/client/Splash.client.luau`), as for everyone.
+2. **How do you fight?** (`src/client/Intro.client.luau`): three style cards, Prospector (balanced), Skirmisher (fast, crits) or Juggernaut (heavy, defensive). The style is the armor set you start in, with a sword and shield; any set can be worn later.
+3. **Pick your element**: Thermal, Cryo, Ion or Corrosive. Your style's own element is picked already; each row shows the three moves it gives Q / E / R. **EQUIP & FIGHT** grants the kit (`Shared/StarterLottery`, `Systems/Intro`).
+4. **The first fight** (`src/client/Lobby.client.luau` sends you in): an easy sparring partner (hits softened), fighting from the first second. A hint pops up the first time each control is useful and goes once you've done it (`src/client/FirstFight.client.luau`): swing, block (as it winds up a swing), dodge (as a Heavy Blow winds up), heavy (while its guard is up), then Q, E and R once you can afford them. Win or lose, you land in the lobby.
+
+Only brand-new accounts get it: saves from before it (profile version below `FastStart.SaveVersion`) that never finished the intro are marked done and keep their gear. `FastStart.Enabled = false` switches it all off. The old mining tutorial (`Shared/Tutorial`) is still there, switched off.
 
 ## Gems
 

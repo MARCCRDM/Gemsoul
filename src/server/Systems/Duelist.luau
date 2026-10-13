@@ -68,6 +68,7 @@ local CombatEvents = require(script.Parent.CombatEvents)
 local Shop = require(script.Parent.Shop)
 local Tutorial = require(ReplicatedStorage.Shared.CombatTutorial)
 local Onboarding = require(ReplicatedStorage.Shared.Tutorial)
+local FastStart = require(ReplicatedStorage.Shared.FastStart)
 local Duelist = {}
 local dungeonActors = {}
 
@@ -117,6 +118,7 @@ local function clearTutorial(owner: Player)
 	owner:SetAttribute("TutorialCount", nil)
 	owner:SetAttribute("TutorialGoal", nil)
 	owner:SetAttribute("FastTutorial", nil)
+	owner:SetAttribute("FirstFight", nil)
 end
 local starting: { [Player]: boolean } = {}
 local idCounter = 0
@@ -281,7 +283,7 @@ function Duelist.despawn(owner: Player)
 	end
 	local duel = duels[owner]
 	duels[owner] = nil
-	if duel and duel.Tutorial then
+	if duel and (duel.Tutorial or duel.FirstFight) then
 		clearTutorial(owner)
 	end
 	-- A raider leaving: the boss fights on while anyone's left.
@@ -2175,8 +2177,18 @@ function spawnRival(owner: Player, raid, encounter)
 	local beat = onboarding and Onboarding.beat(onboarding)
 	duel.FastTutorial = session == "Training" and beat ~= nil and beat.Id == "Fight"
 	owner:SetAttribute("FastTutorial", duel.FastTutorial)
-	if duel.Intro or duel.FastTutorial then
+	if duel.FastTutorial then
 		startTutorial(duel)
+	elseif duel.Intro then
+		if FastStart.Enabled then
+			-- The fast start's first fight (Shared.FastStart): a real spar
+			-- from the first second, the softened partner; the client pops a
+			-- hint up the first time each control is useful.
+			duel.FirstFight = true
+			owner:SetAttribute("FirstFight", true)
+		else
+			startTutorial(duel)
+		end
 	end
 	if ArenaDrop.forRival(session, raid, encounter) and owner.Character then
 		local first = not owner:GetAttribute("ArenaInserted")
