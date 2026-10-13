@@ -53,12 +53,12 @@ source += r'''
 local origin=CFrame.new(0,0,7000)
 local site=World.build(origin,{})
 assert(site.Model.LandscapeVersion==2,"Old landscape built")
-assert(site.Model.SkySetting=="LowOrbit","Orbital scenery not connected")
+assert(site.Model.SkySetting=="DaylightOrbit","Daylight sky scenery not connected")
 assert(#site.Parking==0 and #site.Secrets==0,"Retired world extras returned")
 assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7074,"Arrival moved")
 assert(site.Probe and site.Board and site.Gate,"Missing lobby services")
 local common, field, grass, triangles = 0,0,0,{}
-local planet, airglow, stars, land, clouds = nil,nil,0,0,0
+local planet, airglow, stars, land, clouds, banks = nil,nil,0,0,0,0
 for i,spot in site.Spots do
  local p=spot.Position-origin.Position
  assert(math.abs(p.Y)<.001,"Mining node isn't seated on the grass")
@@ -91,6 +91,10 @@ for _,p in builtParts do
  if p.Name=="OrbitStar" then stars+=1 end
  if p.Name=="PlanetLand" then land+=1 end
  if p.Name=="PlanetCloud" then clouds+=1 end
+ if p.Name=="MeadowCloudBank" then
+  banks+=1
+  assert(p.CFrame.t[2]+p.Size.Y/2 < -24,"Cloud bank obscures the meadow")
+ end
  if p.Parent and p.Parent.Name=="OrbitalSky" then
   assert(not p.CanCollide and not p.CanQuery and not p.CanTouch and not p.CastShadow,"Sky interferes with gameplay")
  end
@@ -111,8 +115,11 @@ for _,p in builtParts do
  end
 end
 assert(grass==64,"Missing floor triangle")
-assert(planet and airglow and stars>=100 and land>0 and clouds>0,"Incomplete orbital backdrop")
-assert(planet.CFrame.t[2]+planet.Size.Y/2 < -150,"Planet intersects floating islands")
+assert(planet and airglow and stars==0 and land>0 and clouds>0 and banks>=24,"Incomplete daylight backdrop / old star field")
+local planetPosition=Vector3.new(unpack(planet.CFrame.t))
+assert((planetPosition-origin.Position).Magnitude-planet.Size.X/2 > 1200,"Planet crowds the meadow")
+assert(planetPosition.Y-planet.Size.Y/2 > 0,"Planet is not a distant sky landmark")
+assert(math.deg(2*math.asin(planet.Size.X/2/(planetPosition-origin.Position).Magnitude))<25,"Planet dominates the sky")
 assert(airglow.Size.X>planet.Size.X and airglow.Transparency>.9,"Atmospheric rim hides the planet")
 local function cross(a,b) return a.X*b.Z-a.Z*b.X end
 local function covered(p)
@@ -130,7 +137,7 @@ end end
 assert(#builtParts<2800,"Lobby scenery part budget exceeded: "..#builtParts)
 print("PASS: meadow scenery="..#builtParts.." parts; starter spots="..common.."; field spots="..field.."; covered floor samples="..sampled)
 print("PASS: 20,002 basic-node rolls; shoreline/paths/service clearance; opaque level ground; safe nature geometry")
-print("PASS: planet below island; safe scenery physics; size limits; continents, cloud bands and starfield")
+print("PASS: distant daylight planet; no star field; cloud banks clear of meadow; safe scenery physics and part sizes")
 for _,p in builtParts do
  local row={p.Name or p.ClassName,p.ClassName,p.Shape or "Block",p.Material,tostring(p.Transparency or 0)}
  for _,v in {p.Size.X,p.Size.Y,p.Size.Z,p.Color.R,p.Color.G,p.Color.B} do table.insert(row,tostring(v)) end
@@ -139,6 +146,50 @@ for _,p in builtParts do
  print("PART|"..table.concat(row,"|"))
 end
 for i,p in site.Spots do print("SPOT|"..p.Position.X.."|"..p.Position.Z.."|"..site.Zones[i]) end
+'''
+# Exercise actual lighting transitions, including a custom Studio sky and repeat
+# entries. Geometry checks above cannot catch clouds staying disabled after space.
+lighting = (ROOT / 'src/client/Modules/Scenes.luau').read_text(encoding='utf-8')
+lighting = lighting[lighting.index('function Scenes.spaceLighting()'):lighting.rindex('return Scenes')]
+source += r'''
+do
+local function holder()
+ local h={Children={}}
+ function h:FindFirstChildOfClass(kind)
+  for _,child in self.Children do if child.ClassName==kind then return child end end
+ end
+ return h
+end
+local Lighting, terrain = holder(), holder()
+local workspace={FindFirstChildOfClass=function() return terrain end}
+local Instance={new=function(kind)
+ local values={ClassName=kind}
+ return setmetatable({}, {__index=values,__newindex=function(o,k,v)
+  if k=="Parent" and v and v~=values.Parent then table.insert(v.Children,o) end
+  values[k]=v
+ end})
+end}
+local Scenes={}
+''' + lighting + r'''
+Scenes.spaceLighting()
+Lighting:FindFirstChildOfClass("Sky").SkyboxUp="custom-night-sky"
+Scenes.outpostLighting()
+local sky=Lighting:FindFirstChildOfClass("Sky")
+local air=Lighting:FindFirstChildOfClass("Atmosphere")
+local clouds=terrain:FindFirstChildOfClass("Clouds")
+assert(Lighting.ClockTime>12 and Lighting.ClockTime<16 and sky.CelestialBodiesShown and sky.StarCount==0,"Night lighting retained")
+assert(air.Density>0 and air.Density<.2 and air.Haze<.4,"Atmosphere hides the planet")
+assert(clouds.Enabled and clouds.Cover>0 and clouds.Cover<.5,"Clouds missing or overcast")
+for face,suffix in {Bk="bk",Dn="dn",Ft="ft",Lf="lf",Rt="rt",Up="up"} do
+ assert(sky["Skybox"..face]=="rbxasset://textures/sky/sky512_"..suffix..".tex","Custom dark sky retained")
+end
+local lights=#Lighting.Children
+Scenes.spaceLighting()
+assert(not clouds.Enabled and not sky.CelestialBodiesShown,"Space transition changed")
+Scenes.outpostLighting()
+assert(clouds.Enabled and sky.CelestialBodiesShown and #Lighting.Children==lights and #terrain.Children==1,"Re-entry lost daylight or duplicated effects")
+print("PASS: daylight/custom-sky reset; space-to-meadow return; reusable lighting and cloud effects")
+end
 '''
 script = ROOT / '.tools/meadow-scene-test.luau'
 try:

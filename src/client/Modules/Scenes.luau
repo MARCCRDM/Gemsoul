@@ -11,7 +11,7 @@
 	                       vendor kiosks and the Saga Stone pylon.
 	  Scenes.spacePickaxe(hand) the space pickaxe, welded to a hand.
 	  Scenes.spaceLighting()  a black, starry sky with cool light.
-	  Scenes.outpostLighting()  the meadow: warm island lighting in low orbit.
+	  Scenes.outpostLighting()  the meadow: blue skies, soft clouds and a distant planet.
 	  Scenes.terraformLighting()  the same sky with a thin new atmosphere.
 
 	Each builder returns a table with the Model and named spots (CFrames) for
@@ -639,17 +639,17 @@ function Scenes.spaceLighting()
 	end
 end
 
--- A warmly lit meadow in low orbit. The atmospheric rim belongs to the
--- planet's geometry; global haze/clouds would hide it behind a gray void.
+-- A comfortable afternoon in the floating meadow. A little atmospheric
+-- depth softens the horizon without hiding its pale neighbouring planet.
 function Scenes.outpostLighting()
-	Lighting.ClockTime = 0
+	Lighting.ClockTime = 14.2
 	Lighting.GeographicLatitude = 28
-	Lighting.Brightness = 2.6
+	Lighting.Brightness = 2.4
 	Lighting.ExposureCompensation = 0.05
-	Lighting.Ambient = Color3.fromRGB(148, 151, 135)
-	Lighting.OutdoorAmbient = Color3.fromRGB(183, 186, 168)
+	Lighting.Ambient = Color3.fromRGB(128, 141, 153)
+	Lighting.OutdoorAmbient = Color3.fromRGB(174, 183, 184)
 	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 0.35
+	Lighting.EnvironmentSpecularScale = 0.3
 	Lighting.GlobalShadows = true
 	local function get(className: string, parent: Instance?): any
 		local holder = parent or Lighting
@@ -661,26 +661,33 @@ function Scenes.outpostLighting()
 		return found
 	end
 	local atmosphere = get("Atmosphere")
-	atmosphere.Density = 0
-	atmosphere.Offset = 0
-	atmosphere.Color = Color3.fromRGB(213, 229, 238)
-	atmosphere.Decay = Color3.fromRGB(128, 150, 186)
-	atmosphere.Glare = 0
-	atmosphere.Haze = 0
+	atmosphere.Density = 0.14
+	atmosphere.Offset = 0.18
+	atmosphere.Color = Color3.fromRGB(213, 232, 245)
+	atmosphere.Decay = Color3.fromRGB(153, 184, 211)
+	atmosphere.Glare = 0.05
+	atmosphere.Haze = 0.24
 	local sky = get("Sky")
-	sky.StarCount = 3000
-	sky.CelestialBodiesShown = false
+	-- Restore Roblox's soft blue cloud sky even if a Studio place used a custom one.
+	for face, suffix in { Bk = "bk", Dn = "dn", Ft = "ft", Lf = "lf", Rt = "rt", Up = "up" } do
+		sky["Skybox" .. face] = "rbxasset://textures/sky/sky512_" .. suffix .. ".tex"
+	end
+	sky.StarCount = 0
+	sky.CelestialBodiesShown = true
+	sky.SunAngularSize = 12
 	local bloom = get("BloomEffect")
-	bloom.Intensity, bloom.Size, bloom.Threshold = 0.16, 20, 2
+	bloom.Intensity, bloom.Size, bloom.Threshold = 0.08, 20, 2
 	local grade = get("ColorCorrectionEffect")
-	grade.Brightness, grade.Contrast, grade.Saturation = 0.025, 0.035, 0.08
-	grade.TintColor = Color3.fromRGB(255, 249, 238)
+	grade.Brightness, grade.Contrast, grade.Saturation = 0.015, 0.035, 0.025
+	grade.TintColor = Color3.fromRGB(255, 251, 243)
 	local rays = get("SunRaysEffect")
-	rays.Intensity, rays.Spread = 0, 0.8
+	rays.Intensity, rays.Spread = 0.025, 0.75
 	local terrain = workspace:FindFirstChildOfClass("Terrain")
 	if terrain then
 		local clouds = get("Clouds", terrain)
-		clouds.Enabled = false
+		clouds.Enabled = true
+		clouds.Cover, clouds.Density = 0.32, 0.42
+		clouds.Color = Color3.fromRGB(255, 251, 244)
 	end
 end
 
