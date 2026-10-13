@@ -2598,6 +2598,15 @@ function CombatServer.reset(player)
 	player:SetAttribute("Shield", 0)
 	player:SetAttribute("CombatCharging", false)
 	player:SetAttribute("Channeling", false)
+	-- Out of the fight, the body stands as itself: no action left posed on
+	-- it (a held cast, a charge, a guard), or it would hold it into the lobby.
+	local character = player.Character
+	if character then
+		for _, key in { "ActionKind", "ActionStart", "ActionAt", "ActionHold", "ActionName", "ActionElement", "ActionSide", "HurtAt", "BlockedAt" } do
+			character:SetAttribute(key, nil)
+		end
+		character:SetAttribute("GuardUntil", 0)
+	end
 	player:SetAttribute("Stamina", 100)
 	player:SetAttribute("Charge", Tech.Resources.Charge.Start)
 end

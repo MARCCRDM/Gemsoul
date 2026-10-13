@@ -126,7 +126,16 @@ function BodyPoses.step(dt: number)
 		local character = player.Character
 		if character and near(character, eye) then
 			local fighting = player:GetAttribute("CombatSession") ~= nil
-			local foe = if player == me then (if focus then focus() else nil) else foeOf(player, enemies)
+			-- (Who it's looking at never stops the posing: any trouble there
+			-- just means no head turn this frame.)
+			local ok, foe = pcall(function()
+				return if player == me then (if focus then focus() else nil) else foeOf(player, enemies)
+			end)
+			local look = nil
+			if ok then
+				local found, point = pcall(lookPoint, character, foe)
+				look = if found then point else nil
+			end
 			-- The server's "Blocking" flag on the player backs up GuardUntil, so
 			-- a foe's shield is up for as long as they hold their guard.
 			pose(
@@ -136,7 +145,7 @@ function BodyPoses.step(dt: number)
 				clock,
 				not fighting,
 				player:GetAttribute("Blocking") == true,
-				lookPoint(character, foe)
+				look
 			)
 		end
 	end
@@ -145,8 +154,10 @@ function BodyPoses.step(dt: number)
 	-- the screen's frame rate instead of the network's.
 	for _, model in enemies do
 		if model:GetAttribute("Posed") and model:IsA("Model") and near(model, eye) then
-			local foe = characterOf(model:GetAttribute("FocusUserId") or model:GetAttribute("RivalOwner"))
-			pose(model, dt, now, clock, nil, nil, lookPoint(model, foe))
+			local found, look = pcall(function()
+				return lookPoint(model, characterOf(model:GetAttribute("FocusUserId") or model:GetAttribute("RivalOwner")))
+			end)
+			pose(model, dt, now, clock, nil, nil, if found then look else nil)
 		end
 	end
 end
