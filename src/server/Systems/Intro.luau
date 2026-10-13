@@ -447,6 +447,33 @@ function Intro.start()
 	Shop.register("SuitUp", suitUp)
 	Shop.register("QuickStart", quickStart)
 	Shop.register("AdminRestartTutorial", restartTutorial)
+	-- Play the first-join flow as a brand-new player, and get your save back
+	-- after (PlayerData.resetAsNewPlayer). Both need a rejoin: the first-join
+	-- flow runs when you join.
+	local function devRejoin(player: Player, change, note: string)
+		if not TestAdmin.allowed(player.UserId) then
+			return reply(false, "This test tool is restricted to test admins.")
+		end
+		if player:GetAttribute("MatchId") or player:GetAttribute("DuelQueue") then
+			return reply(false, "Leave your match or matchmaking queue first.")
+		end
+		local ok, message = change(player)
+		if not ok then
+			return reply(false, message)
+		end
+		task.delay(1.5, function()
+			if player.Parent then
+				player:Kick(message .. " Rejoin to continue." .. note)
+			end
+		end)
+		return reply(true, message .. " Rejoin in a moment…")
+	end
+	Shop.register("DevNewPlayer", function(player)
+		return devRejoin(player, PlayerData.resetAsNewPlayer, " (DEV > RESTORE SAVE brings your old save back.)")
+	end)
+	Shop.register("DevRestoreSave", function(player)
+		return devRejoin(player, PlayerData.restoreDevBackup, "")
+	end)
 	Shop.register("TutorialQueue", tutorialQueue)
 	Shop.register("TutorialBegin", tutorialBegin)
 	Shop.register("TutorialMine", function() return reply(false, "Click a rock in the mining area.") end)

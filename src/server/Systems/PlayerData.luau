@@ -764,6 +764,48 @@ function PlayerData.surgeArchived(player: Player, key: string): boolean
 	return profile ~= nil and Tech.Traits.active(profile.Character) and key ~= "E"
 end
 
+-- DEV (test admins, see Systems/Intro): start over as a brand-new player.
+-- The whole save is kept inside the new one (DevBackup) until
+-- restoreDevBackup puts it back; a second reset keeps the first backup, so
+-- the real save is never lost. Saved here, then the caller has them rejoin
+-- (the first-join flow only runs on joining).
+local function deepCopy(value)
+	if type(value) ~= "table" then
+		return value
+	end
+	local out = {}
+	for key, item in value do
+		out[deepCopy(key)] = deepCopy(item)
+	end
+	return out
+end
+function PlayerData.resetAsNewPlayer(player: Player): (boolean, string)
+	local profile = profiles[player]
+	if not profile then
+		return false, "Your profile is still loading."
+	end
+	local backup = (profile :: any).DevBackup
+	if not backup then
+		backup = deepCopy(profile)
+		backup.DevBackup = nil
+	end
+	local fresh: any = newProfile()
+	fresh.DevBackup = backup
+	profiles[player] = fresh
+	local saved = save(player)
+	return true, if saved or not store then "Reset to a new player." else "Reset (not saved yet; it saves when you leave)."
+end
+function PlayerData.restoreDevBackup(player: Player): (boolean, string)
+	local profile = profiles[player]
+	local backup = profile and (profile :: any).DevBackup
+	if not backup then
+		return false, "No saved backup to restore: you haven't reset to a new player."
+	end
+	profiles[player] = migrate(backup)
+	save(player)
+	return true, "Your old save is back."
+end
+
 -- Switches the classic surge array back on (or off) for a player: the DEV
 -- comparison switch. Nothing moves; each key just reads its old socket.
 function PlayerData.setLegacySurges(player: Player, on: boolean)

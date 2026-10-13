@@ -15,6 +15,7 @@
 	music is Music.Ids.Intro (the build and drop) then Music.Ids.Fight.
 ]]
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -322,4 +323,28 @@ task.delay(DROP, function()
 end)
 task.delay(LENGTH, function()
 	showTitle(false)
+end)
+
+-- A first-time player (the fast start, Shared.FastStart): the drop, the
+-- title for a moment, then straight in: no waiting, no click.
+local started = os.clock()
+task.spawn(function()
+	if not require(ReplicatedStorage.Shared.FastStart).Enabled then
+		return
+	end
+	local GemClient = require(script.Parent.Modules.GemClient)
+	local deadline = os.clock() + 6
+	while not GemClient.Profile and os.clock() < deadline do
+		task.wait(0.1)
+	end
+	local intro = GemClient.Profile and GemClient.Profile.Intro
+	if not intro or intro.Done then
+		return
+	end
+	task.wait(math.max(0, started + DROP + 0.3 - os.clock()))
+	if phase == "Intro" then
+		showTitle(true)
+	end
+	task.wait(1.2)
+	enter()
 end)

@@ -107,6 +107,8 @@ The fast start (`src/shared/FastStart.luau`), about a minute from joining to fig
 3. **Pick your element**: Thermal, Cryo, Ion or Corrosive. Your style's own element is picked already; each row shows the three moves it gives Q / E / R. **EQUIP & FIGHT** grants the kit (`Shared/StarterLottery`, `Systems/Intro`).
 4. **The first fight** (`src/client/Lobby.client.luau` sends you in): an easy sparring partner (hits softened), fighting from the first second. A hint pops up the first time each control is useful and goes once you've done it (`src/client/FirstFight.client.luau`): swing, block (as it winds up a swing), dodge (as a Heavy Blow winds up), heavy (while its guard is up), then Q, E and R once you can afford them. Win or lose, you land in the lobby.
 
+To play it again as a new player: **DEV > PLAY AS A NEW PLAYER** (tap twice). Your save is swapped for a brand-new one and kept inside it as a backup; you're asked to rejoin, and the fast start runs. **DEV > RESTORE SAVE** puts your old save back (rejoin again). First-time players skip the title screen's wait: the music drop, the title for a moment, then straight to the style screen.
+
 Only brand-new accounts get it: saves from before it (profile version below `FastStart.SaveVersion`) that never finished the intro are marked done and keep their gear. `FastStart.Enabled = false` switches it all off. The old mining tutorial (`Shared/Tutorial`) is still there, switched off.
 
 ## Gems

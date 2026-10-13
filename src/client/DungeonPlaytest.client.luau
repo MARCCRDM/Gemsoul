@@ -118,8 +118,43 @@ restart.AutoButtonColor = restart.Active
 restart.Parent = panel
 corner(restart, 5)
 restart.Activated:Connect(function()
-	run("AdminRestartTutorial")
+	if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled then
+		run("AdminRestartTutorial")
+	end
 end)
+-- With the fast start (Shared.FastStart) in place of the tutorial: play the
+-- first join again as a brand-new player (your save is kept as a backup;
+-- RESTORE SAVE puts it back). Each one has you rejoin.
+if not restart.Active and require(game:GetService("ReplicatedStorage").Shared.FastStart).Enabled then
+	restart.Text = "PLAY AS A NEW PLAYER"
+	restart.Active, restart.AutoButtonColor = true, true
+	restart.Size = UDim2.fromOffset(190, 34)
+	local armed = 0
+	restart.Activated:Connect(function()
+		-- Tap twice: it swaps your save out and asks you to rejoin.
+		if os.clock() > armed then
+			armed = os.clock() + 4
+			status.Text = "Tap again to reset to a new player. Your save is kept; RESTORE SAVE brings it back."
+			return
+		end
+		armed = 0
+		run("DevNewPlayer")
+	end)
+	local restore = Instance.new("TextButton")
+	restore.Name = "RestoreSave"
+	restore.Size = UDim2.fromOffset(92, 34)
+	restore.Position = UDim2.fromOffset(202, 44)
+	restore.BackgroundColor3 = Color3.fromRGB(39, 61, 79)
+	restore.TextColor3 = Color3.fromRGB(240, 245, 250)
+	restore.Font = Enum.Font.GothamBold
+	restore.TextSize = 11
+	restore.Text = "RESTORE SAVE"
+	restore.Parent = panel
+	corner(restore, 5)
+	restore.Activated:Connect(function()
+		run("DevRestoreSave")
+	end)
+end
 
 local buttons = {
 	{ "F7 / PATHWAY", "DungeonTest", "Full" },
