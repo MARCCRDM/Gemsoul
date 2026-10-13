@@ -79,8 +79,14 @@ local function waitFor(condition: () -> boolean, timeout: number): boolean
 end
 
 -- The intro duel: one match against a sparring rival, then the lobby.
+local FastStart = require(game:GetService("ReplicatedStorage").Shared.FastStart)
 local function firstDuel()
-	UiKit.toast("Combat training: learn the basics, then spar.", Color3.fromRGB(255, 202, 91))
+	UiKit.toast(
+		if FastStart.Enabled
+			then "Your first fight: an easy sparring partner. Tips pop up as you go."
+			else "Combat training: learn the basics, then spar.",
+		Color3.fromRGB(255, 202, 91)
+	)
 	ArenaScene.enter(false)
 	if not waitFor(function()
 		return player:GetAttribute("CombatSession") ~= nil
@@ -112,7 +118,10 @@ task.spawn(function()
 		local intro = GemClient.Profile.Intro
 		return not playerGui:FindFirstChild("Splash")
 			and not playerGui:FindFirstChild("Intro")
-			and (not require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled or (intro ~= nil and intro.Done == true))
+			and (
+				(not require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled and not FastStart.Enabled)
+				or (intro ~= nil and intro.Done == true)
+			)
 	end, 3600)
 	task.wait(0.5)
 	-- The tutorial (Tutorial.client) starts in the Outpost: go there first
@@ -131,7 +140,13 @@ task.spawn(function()
 		waitFor(tutorialDone, 3600)
 		task.wait(1.5)
 	end
-	if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled and duelsPlayed() == 0 and not veteran() and not GemClient.Profile.Tutorial then
+	-- A first fight for someone new: after the mining tutorial when that's on,
+	-- or straight after the fast start's pick (not for saves that skipped it).
+	local intro = GemClient.Profile.Intro
+	local fresh = duelsPlayed() == 0 and not veteran()
+	if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled and fresh and not GemClient.Profile.Tutorial then
+		firstDuel()
+	elseif FastStart.Enabled and fresh and not (intro and intro.Skipped) then
 		firstDuel()
 	end
 	for _ = 1, 5 do

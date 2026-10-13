@@ -27,6 +27,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Season = require(ReplicatedStorage.Shared.Season)
 local TrainingRewards = require(ReplicatedStorage.Shared.TrainingRewards)
+local FastStart = require(ReplicatedStorage.Shared.FastStart)
 local Remotes = require(script.Parent.Remotes)
 local SessionLock = require(script.Parent.SessionLock)
 
@@ -47,7 +48,7 @@ type Character = {
 }
 -- Gear the player has made or been given: gear id -> quality (1-4).
 type Owned = { [string]: { [string]: number } }
-type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean }
+type Intro = { Spun: boolean, FirstStone: boolean, Done: boolean, Skipped: string? }
 type Profile = {
 	Augments: { [string]: any },
 	Version: number,
@@ -100,7 +101,7 @@ end
 
 local function newProfile(): Profile
 	local profile = {
-		Version = 10,
+		Version = FastStart.SaveVersion,
 		Augments = {},
 		Coins = Config.StartingCoins,
 		Marks = 0,
@@ -249,6 +250,10 @@ local function migrate(profile: Profile): Profile
 		end
 	end
 	profile.Version = math.max(profile.Version, 10)
+	-- The fast start (Shared.FastStart) is for new accounts: a save that's
+	-- been playing without finishing the intro keeps its gear.
+	FastStart.migrate(profile)
+	profile.Version = math.max(profile.Version, FastStart.SaveVersion)
 	Tree.initialize(profile)
 	return profile
 end

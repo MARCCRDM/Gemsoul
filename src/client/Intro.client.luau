@@ -13,7 +13,8 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
-if not Tutorial.Enabled then return end
+local FastStart = require(ReplicatedStorage.Shared.FastStart)
+if not Tutorial.Enabled and not FastStart.Enabled then return end
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -307,6 +308,8 @@ local function ghost(text, anchorX)
 	return b
 end
 local skip = ghost("Skip reveal · keep all rewards", 0)
+local backStep = ghost("‹   Back to styles", 0)
+backStep.Visible = false
 local motion = ghost("Motion: full", 1)
 local cards, connections = {}, {}
 local phase, reward, busy, spin, calm, closed = "Welcome", nil, false, nil, false, false
@@ -316,7 +319,9 @@ local function listen(signal, fn)
 	table.insert(connections, signal:Connect(fn))
 end
 local savedKit = GemClient.Profile.Intro and GemClient.Profile.Intro.Lottery
-local chosenStyle, chosenElement = savedKit and savedKit.Style or "Prospector", savedKit and savedKit.Element or "Fire"
+local chosenStyle = savedKit and savedKit.Style or "Prospector"
+-- (Until you pick one, the element follows the style: its own one.)
+local chosenElement = savedKit and savedKit.Element or FastStart.Recommended[chosenStyle] or "Fire"
 if savedKit then primary.Text = "CLAIM MY STARTER KIT" end
 -- The starter-kit choice: an armor style (three cards) and a starter element
 -- (four rows), then a line saying exactly what you'll get.
@@ -364,7 +369,7 @@ local ELEMENTS = {
 }
 local function surgeNames(element)
 	local names = {}
-	for _, id in GemRoller.StarterSurges[element] or {} do
+	for _, id in Lottery.starterMoves(element) do
 		table.insert(names, Tech.Catalog[id] and Tech.Catalog[id].Name or id)
 	end
 	return names
@@ -381,20 +386,25 @@ end
 -- fit() switches them with layoutChoices.
 -- Rich (tall screens): extra detail fills the cards and rows.
 local relayout, compactMode, richMode = {}, false, false
+-- The fast start's two screens: "Style" (three cards), then "Element"
+-- (four rows, the style's own element picked, with its Q / E / R moves).
+local pickStep = if savedKit then "Element" else "Style"
+local elementTouched = savedKit ~= nil
 local function place(apply)
 	table.insert(relayout, apply)
 	apply(false, false)
 end
-local function heading(parent, number, value, x, width)
+local function heading(parent, number, value, step)
 	local h = text(parent, number .. "  " .. value, 13, C.Dim, Enum.Font.GothamBold)
 	h.TextXAlignment = Enum.TextXAlignment.Left
 	place(function(compact)
+		h.Visible = pickStep == step
 		h.TextSize = if compact then 11 else 13
-		h.Position, h.Size = UDim2.new(x, 0, 0, 0), UDim2.new(width, 0, 0, if compact then 16 else 20)
+		h.Position, h.Size = UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, if compact then 16 else 20)
 	end)
 end
-heading(choices, "1", "ARMOR STYLE  ·  sword, shield and a full set", 0, 0.6)
-heading(choices, "2", "STARTER ELEMENT  ·  three surges for Q / E / R", 0.62, 0.38)
+heading(choices, "1 / 2", "FIGHTING STYLE  ·  the armor you start in, with a sword and shield", "Style")
+heading(choices, "2 / 2", "ELEMENT  ·  your three gems: the moves on Q / E / R", "Element")
 
 local styleButtons, elementButtons = {}, {}
 local refreshChoices -- (below)
@@ -403,8 +413,9 @@ local CTA_ROOM = 0
 local styleArea = frame(choices, { BackgroundTransparency = 1, ZIndex = 21 })
 place(function(compact)
 	local top, bottom = if compact then 20 else 28, if compact then 36 else 52
+	styleArea.Visible = pickStep == "Style"
 	styleArea.Position = UDim2.fromOffset(0, top)
-	styleArea.Size = UDim2.new(0.6, -8, 1, -top - bottom - CTA_ROOM)
+	styleArea.Size = UDim2.new(1, 0, 1, -top - bottom - CTA_ROOM)
 end)
 for i, style in STYLES do
 	local card = new("TextButton", {
@@ -534,6 +545,9 @@ for i, style in STYLES do
 	listen(card.Activated, function()
 		if not savedKit and not busy then
 			chosenStyle = style.Id
+			if not elementTouched then
+				chosenElement = FastStart.Recommended[style.Id] or chosenElement
+			end
 			refreshChoices()
 		end
 	end)
@@ -542,8 +556,9 @@ end
 local elementArea = frame(choices, { BackgroundTransparency = 1, ZIndex = 21 })
 place(function(compact)
 	local top, bottom = if compact then 20 else 28, if compact then 36 else 52
-	elementArea.Position = UDim2.new(0.62, 0, 0, top)
-	elementArea.Size = UDim2.new(0.38, 0, 1, -top - bottom - CTA_ROOM)
+	elementArea.Visible = pickStep == "Element"
+	elementArea.Position = UDim2.new(0, 0, 0, top)
+	elementArea.Size = UDim2.new(1, 0, 1, -top - bottom - CTA_ROOM)
 end)
 for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 	local color = GemConfig.ElementColors[element]
@@ -610,10 +625,10 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.TextYAlignment = Enum.TextYAlignment.Center
 		-- (Rich: its cost and cooldown under the name.)
-		local surge = Tech.Catalog[GemRoller.StarterSurges[element][index]]
+		local surge = Tech.Catalog[Lottery.starterMoves(element)[index]]
 		local detail = text(
 			chip,
-			if surge then string.format("%d Charge  ·  %ds", surge.Cost or 0, surge.Cooldown or 0) else "",
+			if surge then string.format("%d %s  ·  %ds", surge.Cost or 0, surge.Resource or "Charge", surge.Cooldown or 0) else "",
 			9,
 			C.Faint,
 			Enum.Font.GothamMedium
@@ -650,10 +665,17 @@ for i, element in { "Fire", "Frost", "Shock", "Poison" } do
 			key.Size = UDim2.new(0, if compact then 9 else 12, if rich then 0 else 1, if rich then 18 else 0)
 		end
 	end)
-	elementButtons[element] = { Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Disc = disc, Color = color }
+	local tag = text(row, "", 9, C.Ink, Enum.Font.GothamBlack)
+	tag.AnchorPoint = Vector2.new(1, 0)
+	tag.Position, tag.Size = UDim2.new(1, -10, 0, 8), UDim2.fromOffset(170, 18)
+	tag.TextXAlignment = Enum.TextXAlignment.Center
+	tag.BackgroundTransparency, tag.BackgroundColor3 = 0, color
+	UiKit.round(tag, 9)
+	elementButtons[element] =
+		{ Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Disc = disc, Color = color, Tag = tag }
 	listen(row.Activated, function()
 		if not savedKit and not busy then
-			chosenElement = element
+			chosenElement, elementTouched = element, true
 			refreshChoices()
 		end
 	end)
@@ -712,11 +734,25 @@ function refreshChoices()
 		end
 		row.Bar.BackgroundTransparency = if on then 0 else 0.7
 		row.Disc.BackgroundTransparency = if on then 0.6 else 0.86
+		local own = FastStart.Recommended[chosenStyle] == id
+		row.Tag.Visible = own
+		row.Tag.Text = "  " .. string.upper(chosenStyle) .. "'S OWN ELEMENT  "
 		if on then
 			elementColor = row.Color
 		end
 	end
 	summaryEdge.Color = styleColor:Lerp(elementColor, 0.5)
+	-- This screen's words and button.
+	if not reward then
+		title.Text = if pickStep == "Style" then "HOW DO YOU FIGHT?" else "PICK YOUR ELEMENT"
+		subtitle.Text = if pickStep == "Style"
+			then "Your style is the armor you start in. You can wear any set later."
+			else "It powers your Q / E / R moves. Your style's own element is picked; change it if you like."
+		if not busy then
+			primary.Text = if pickStep == "Style" then "NEXT  ·  ELEMENT   ›" else "EQUIP & FIGHT"
+		end
+		backStep.Visible = pickStep == "Element" and not savedKit
+	end
 	local names = surgeNames(chosenElement)
 	summaryText.Text = string.format(
 		'<font color="#8a9cb2">YOUR KIT</font>   <font color="%s">%s</font> armor  +  sword & shield   ·   <font color="%s">%s</font>  %s',
@@ -727,6 +763,18 @@ function refreshChoices()
 		if #names == 3 then string.format("Q %s  ·  E %s  ·  R %s", names[1], names[2], names[3]) else ""
 	)
 end
+local function setPickStep(step: string)
+	pickStep = step
+	for _, apply in relayout do
+		apply(compactMode, richMode)
+	end
+	refreshChoices()
+end
+listen(backStep.Activated, function()
+	if not busy then
+		setPickStep("Style")
+	end
+end)
 refreshChoices()
 skip.Visible = false
 local SURGE_KEYS = {}
@@ -749,9 +797,10 @@ local function fit()
 	local oneRow = short and w >= 480
 	footer.Size = UDim2.new(1, 0, 0, if oneRow then 48 else 96)
 	primary.Size = UDim2.new(if oneRow then 0.4 else 1, 0, 0, if oneRow then 44 else 52)
-	for _, b in { skip, motion } do
+	for _, b in { skip, motion, backStep } do
 		b.Position = UDim2.new(b.AnchorPoint.X, 0, 0, if oneRow then 8 else 64)
 	end
+	backStep.Size = UDim2.fromOffset(if oneRow then math.min(168, w * 0.28) else 214, 28)
 	skip.Size = UDim2.fromOffset(if oneRow then math.min(168, w * 0.28) else math.min(214, w * 0.58), 28)
 	skip.Text = if oneRow then "Skip · keep rewards" else "Skip reveal · keep all rewards"
 	local bodyHeight = math.max(80, h - header - (if oneRow then 54 else 108))
@@ -1207,6 +1256,14 @@ listen(primary.Activated, function()
 	if busy or spin or closed then
 		return
 	end
+	if phase == "Welcome" and pickStep == "Style" then
+		-- On to the element: the style's own one, unless you picked one.
+		if not elementTouched then
+			chosenElement = FastStart.Recommended[chosenStyle] or chosenElement
+		end
+		setPickStep("Element")
+		return
+	end
 	if phase == "Welcome" then
 		busy = true
 		primary.Text = "EQUIPPING YOUR KIT…"
@@ -1249,7 +1306,7 @@ listen(primary.MouseLeave, function()
 	end
 end)
 listen(UserInputService.InputBegan, function(input, processed)
-	if not processed and input.KeyCode == Enum.KeyCode.Space then
+	if not processed and input.KeyCode == Enum.KeyCode.Space and phase ~= "Welcome" then
 		finish()
 	end
 end)
