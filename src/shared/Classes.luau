@@ -1319,8 +1319,12 @@ function Classes.combatSpeed(speedRating: number): number
 	return math.clamp(11 + speedRating * 0.05, 11, Classes.CombatSpeedMax)
 end
 
+-- Everyone's health before gear: raised from 60 so a new player in light
+-- starter gear (the Skirmisher's has no health pieces) isn't knocked out
+-- in a few hits; the rival is built by the same rule, so fights stay even.
+Classes.BaseHealth = 100
 function Classes.maxHealth(healthRating: number): number
-	return math.floor(60 + healthRating * 0.6)
+	return math.floor(Classes.BaseHealth + healthRating * 0.6)
 end
 
 -- The armor one tier below `armorId` in its class's ladder (nil for the first).
