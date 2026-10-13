@@ -296,6 +296,23 @@ function BACKS.Banner(root: Frame, _size: number, color: Color3)
 	round(emblem, 2)
 end
 
+function BACKS.Standard(root: Frame, size: number, color: Color3)
+	local gold = Color3.fromRGB(226, 176, 70)
+	local pole = piece(root, 0.72, 0.5, 0.05, 0.9, Color3.fromRGB(70, 74, 86))
+	round(pole, 2)
+	local finial = piece(root, 0.72, 0.06, 0.09, 0.09, gold, 45)
+	round(finial, 1)
+	local bar = piece(root, 0.48, 0.2, 0.52, 0.04, gold)
+	round(bar, 2)
+	local cloth = piece(root, 0.48, 0.5, 0.44, 0.56, Color3.fromRGB(20, 18, 26))
+	round(cloth, 3)
+	stroke(cloth, gold, math.max(1.5, size / 45))
+	local upright = piece(cloth, 0.5, 0.48, 0.12, 0.56, color)
+	round(upright, 2)
+	local arm = piece(cloth, 0.5, 0.38, 0.5, 0.11, color)
+	round(arm, 2)
+end
+
 function BACKS.Geode(root: Frame, size: number, color: Color3)
 	local shell = piece(root, 0.5, 0.52, 0.8, 0.8, WHITE)
 	round(shell, size)
@@ -368,12 +385,90 @@ local function trim(root: Frame, size: number, color: Color3)
 	round(shine, size)
 end
 
+-- A weapon skin: a sword in the skin's colours, glowing edge and all.
+local function skinArt(root: Frame, size: number, cosmetic)
+	local palette = cosmetic.Palette
+	local plate = if palette then palette.Plate else Color3.fromRGB(226, 172, 58)
+	local under = if palette then palette.Under else Color3.fromRGB(20, 18, 26)
+	local glow = if palette then palette.Glow else cosmetic.Color
+	local halo = piece(root, 0.5, 0.5, 0.9, 0.9, glow)
+	halo.BackgroundTransparency = 0.86
+	round(halo, size)
+	local blade = piece(root, 0.5, 0.42, 0.16, 0.66, WHITE, 45)
+	round(blade, math.max(2, math.floor(size * 0.03)))
+	gradient(blade, plate:Lerp(WHITE, 0.35), plate:Lerp(BLACK, 0.2), 0)
+	stroke(blade, under, math.max(1, size / 55))
+	local edge = piece(blade, 0.86, 0.5, 0.14, 0.92, glow)
+	edge.BackgroundTransparency = 0.05
+	local tip = piece(root, 0.75, 0.17, 0.11, 0.11, plate:Lerp(WHITE, 0.3), 45)
+	round(tip, 1)
+	local guard = piece(root, 0.32, 0.68, 0.34, 0.07, under, 45)
+	round(guard, 2)
+	stroke(guard, glow, math.max(1, size / 70), 0.3)
+	local grip = piece(root, 0.24, 0.76, 0.06, 0.2, under, 45)
+	round(grip, 2)
+	local pommel = piece(root, 0.17, 0.83, 0.09, 0.09, glow)
+	round(pommel, size)
+end
+
+-- An armor suit: a helmet in the suit's colours, visor lit.
+local function suitArt(root: Frame, size: number, cosmetic)
+	local palette = cosmetic.Palette
+	local plate = if palette then palette.Plate else cosmetic.Color
+	local under = if palette then palette.Under else BLACK
+	local glow = if palette then palette.Glow else cosmetic.Color
+	local halo = piece(root, 0.5, 0.52, 0.92, 0.92, glow)
+	halo.BackgroundTransparency = 0.86
+	round(halo, size)
+	local shoulders = piece(root, 0.5, 0.86, 0.86, 0.24, WHITE)
+	round(shoulders, math.floor(size * 0.1))
+	gradient(shoulders, plate:Lerp(WHITE, 0.2), plate:Lerp(BLACK, 0.35))
+	stroke(shoulders, under, math.max(1, size / 50))
+	local dome = piece(root, 0.5, 0.44, 0.58, 0.62, WHITE)
+	round(dome, math.floor(size * 0.24))
+	gradient(dome, plate:Lerp(WHITE, 0.35), plate:Lerp(BLACK, 0.3))
+	stroke(dome, under, math.max(1.5, size / 45))
+	local crest = piece(dome, 0.5, 0.12, 0.12, 0.3, under)
+	round(crest, 2)
+	local visor = piece(dome, 0.5, 0.55, 0.76, 0.16, glow)
+	round(visor, math.floor(size * 0.04))
+	stroke(visor, under, math.max(1, size / 60))
+	local cheek = piece(dome, 0.5, 0.8, 0.5, 0.14, under)
+	round(cheek, 2)
+end
+
+-- A title: its words on a dark tag, in its colour.
+local function titleArt(root: Frame, size: number, cosmetic)
+	local tag = piece(root, 0.5, 0.5, 0.96, 0.34, P.Ink)
+	round(tag, math.floor(size * 0.08))
+	stroke(tag, cosmetic.Color, math.max(1.5, size / 45))
+	local words = new("TextLabel", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.9, 0.7),
+		Font = Enum.Font.GothamBlack,
+		TextScaled = true,
+		TextColor3 = cosmetic.Color,
+		Text = cosmetic.Name,
+	}, tag)
+	local star = piece(root, 0.5, 0.2, 0.16, 0.16, cosmetic.Color, 45)
+	round(star, 2)
+	return words
+end
+
 -- The picture for a reward: a cosmetic's own look, or a drawn icon by kind.
 function ShopArt.icon(parent: Instance, kind: string, cosmeticId: string?, size: number): GuiObject
 	local root = canvas(parent, size, "Icon")
 	local cosmetic = cosmeticId and Cosmetics.get(cosmeticId)
 	if cosmetic and cosmetic.Kind == "Trim" then
 		trim(root, size, cosmetic.Color)
+	elseif cosmetic and cosmetic.Kind == "Skin" then
+		skinArt(root, size, cosmetic)
+	elseif cosmetic and cosmetic.Kind == "Suit" then
+		suitArt(root, size, cosmetic)
+	elseif cosmetic and cosmetic.Kind == "Title" then
+		titleArt(root, size, cosmetic)
 	elseif cosmetic then
 		local draw = BACKS[cosmetic.Look or ""] or BACKS.Pack
 		draw(root, size, cosmetic.Color)

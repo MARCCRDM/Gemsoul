@@ -42,11 +42,16 @@ export type Crate = {
 	Rolls: { CrateRoll },
 }
 
+local Cosmetics = require(script.Parent.Cosmetics)
+
 local Store = {}
 
-Store.Tabs = { "Featured", "Bundles", "Backs", "Trims", "Passes" }
+Store.Tabs = { "Featured", "Free", "Skins", "Suits", "Bundles", "Backs", "Trims", "Passes" }
 Store.TabNames = {
 	Featured = "⭐ Featured",
+	Free = "🎁 Free",
+	Skins = "⚔️ Weapon Skins",
+	Suits = "🛡️ Suits",
 	Bundles = "🎁 Bundles",
 	Backs = "🎒 Back Pieces",
 	Trims = "✨ Trims",
@@ -154,16 +159,84 @@ end
 -- A cosmetic you already own becomes this many coins instead.
 Store.DuplicateRefund = 120
 
--- Direct cosmetic/XP bundles only. Random caches use earned coins, never Robux.
+-- What sells for Robux: direct purchases only, never random (crates use
+-- earned coins). Each key needs its own Developer Product: create it on the
+-- game's page on Roblox (Monetization > Developer Products) at the price in
+-- RobuxPrices, and paste its id here. 0 = not on sale yet (the Shop shows
+-- the price, greyed out). Keys are bundle ids, cosmetic ids (Cosmetics with
+-- a Robux price), StarterPack and SeasonPremium.
 Store.RobuxProducts = {
 	Welcome = 0,
 	Prospector = 0,
 	Forgemaster = 0,
 	Legend = 0,
+	-- Weapon skins
+	SkinPlasma = 0,
+	SkinMolten = 0,
+	SkinToxic = 0,
+	SkinVoid = 0,
+	SkinGalaxy = 0,
+	-- Armor suits
+	SuitChrome = 0,
+	SuitArctic = 0,
+	SuitObsidian = 0,
+	SuitNeon = 0,
+	SuitRoyal = 0,
+	-- One-time offers and passes
+	StarterPack = 0,
+	SeasonPremium = 0,
 }
--- Shown next to the Robux button when the product is on.
-Store.RobuxPrices =
-	{ Welcome = 99, Prospector = 149, Forgemaster = 399, Legend = 999, GeodeCrate = 49, MasterworkCrate = 149 }
+-- The Robux price of each (shown on its button). A cosmetic's price is on
+-- the cosmetic itself (Cosmetics, Robux).
+Store.RobuxPrices = {
+	Welcome = 99,
+	Prospector = 149,
+	Forgemaster = 399,
+	Legend = 999,
+	GeodeCrate = 49,
+	MasterworkCrate = 149,
+	StarterPack = 99,
+	SeasonPremium = 399,
+}
+
+-- The Starter Pack: offered once, right after your first win, for 48 hours.
+-- Its suit is only ever in this pack.
+Store.StarterPack = {
+	Id = "StarterPack",
+	Name = "Starter Pack",
+	Tagline = "Your first win deserves a look. One time only.",
+	Hours = 48,
+	Value = "5X VALUE",
+	Contents = {
+		Cosmetics = { "SuitIgnition", "SkinMolten", "TrimEmber" },
+		Crates = { GeodeCrate = 3 },
+		Coins = 1000,
+	},
+}
+
+-- The Robux price of a product key (a cosmetic's own, or RobuxPrices).
+function Store.robuxPrice(key: string): number?
+	local cosmetic = Cosmetics.get(key)
+	return if cosmetic and cosmetic.Robux then cosmetic.Robux else Store.RobuxPrices[key]
+end
+
+-- The product key a Developer Product id buys (nil if it isn't ours).
+function Store.productKey(productId: number): string?
+	for key, id in Store.RobuxProducts do
+		if id ~= 0 and id == productId then
+			return key
+		end
+	end
+	return nil
+end
+
+-- Is the Starter Pack still on offer? (Offered at `offeredAt`, os.time.)
+function Store.starterOpen(offeredAt: number?, bought: boolean?, now: number): boolean
+	return not bought
+		and type(offeredAt) == "number"
+		and offeredAt > 0
+		and now < offeredAt + Store.StarterPack.Hours * 3600
+end
 
 function Store.bundle(id: any): Bundle?
 	for _, bundle in Store.Bundles do

@@ -4,10 +4,14 @@
 	  "BuyCosmetic", id            coins for a trim or back piece
 	  "BuyCrate", id, count?       coins for 1, 5 or 10 crates (bulk is cheaper)
 	  "OpenCrate", id, count?      open up to 10 of your crates; returns each result
-	  "EquipCosmetic", kind, id?   wear a trim / back piece / weapon skin you own (nil takes it off)
-	  "ClaimSeason", level|"all"   claim Season Path rewards you've reached
+	  "EquipCosmetic", kind, id?   wear a trim / back piece / weapon skin / suit / title you own
+	                               (nil takes it off)
+	  "ClaimSeason", level|"all"   claim Season Path rewards you've reached (and
+	                               the premium track's, if unlocked)
+	  "StarterOffer"               puts the Starter Pack on offer (once, after a win)
 	Robux: when an id is set in Store.RobuxProducts, buying that Developer
-	Product grants the same bundle or crate (ProcessReceipt below).
+	Product grants its bundle, crate, cosmetic, Starter Pack or Season premium
+	(ProcessReceipt below), once per purchase.
 ]]
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -231,7 +235,7 @@ end
 
 local function equipCosmetic(player: Player, kind: any, id: any)
 	local profile = PlayerData.get(player)
-	if not profile or (kind ~= "Trim" and kind ~= "Back" and kind ~= "Skin") then
+	if not profile or (kind ~= "Trim" and kind ~= "Back" and kind ~= "Skin" and kind ~= "Suit" and kind ~= "Title") then
 		return reply(false, "Pick something to wear.")
 	end
 	if id ~= nil then
@@ -260,12 +264,22 @@ local function claimSeason(player: Player, which: any)
 	else
 		return reply(false, "Reach that level first.")
 	end
+	local season = profile.Season :: any
+	season.PremiumClaimed = season.PremiumClaimed or {}
 	local lines = {}
 	for _, l in targets do
 		local key = tostring(l)
-		if not profile.Season.Claimed[key] then
-			profile.Season.Claimed[key] = true
+		if not season.Claimed[key] then
+			season.Claimed[key] = true
 			for _, line in StoreServer.grant(player, Season.reward(l)) do
+				table.insert(lines, line)
+			end
+		end
+		-- The premium track's reward at this level, if you've unlocked it.
+		local premium = Season.premiumReward(l)
+		if season.Premium and premium and not season.PremiumClaimed[key] then
+			season.PremiumClaimed[key] = true
+			for _, line in StoreServer.grant(player, premium) do
 				table.insert(lines, line)
 			end
 		end
@@ -276,27 +290,86 @@ local function claimSeason(player: Player, which: any)
 	return reply(true, "Season rewards: " .. table.concat(lines, ", "), { Lines = lines })
 end
 
--- Robux purchases (only for products you've switched on in Store.RobuxProducts).
+-- The Starter Pack goes on offer the first time the client shows it (after
+-- your first win); it stays on offer for Store.StarterPack.Hours.
+local function starterOffer(player: Player)
+	local profile = PlayerData.get(player) :: any
+	if not profile then
+		return reply(false, "Try again in a moment.")
+	end
+	if not profile.StarterOfferAt and not profile.StarterBought then
+		profile.StarterOfferAt = os.time()
+		PlayerData.sync(player)
+	end
+	return reply(true, "", { OfferedAt = profile.StarterOfferAt, Bought = profile.StarterBought == true })
+end
+
+-- What a Robux product grants (Store.RobuxProducts key). Returns false for
+-- a key it doesn't know.
+function StoreServer.grantProduct(player: Player, key: string): boolean
+	local profile = PlayerData.get(player) :: any
+	if not profile then
+		return false
+	end
+	local bundle = Store.bundle(key)
+	local cosmetic = Cosmetics.get(key)
+	if bundle then
+		if bundle.NewPlayersOnly then
+			profile.WelcomeBought = true
+		end
+		StoreServer.grant(player, bundle.Contents)
+	elseif Store.Crates[key] then
+		StoreServer.grant(player, { Crates = { [key] = 1 } })
+	elseif cosmetic and cosmetic.Robux then
+		-- Bought: yours, and on straight away.
+		profile.Cosmetics.Owned[cosmetic.Id] = true
+		PlayerData.setCosmetic(player, cosmetic.Kind, cosmetic.Id)
+	elseif key == "StarterPack" then
+		profile.StarterBought = true
+		StoreServer.grant(player, Store.StarterPack.Contents)
+		local suit = Store.StarterPack.Contents.Cosmetics and Store.StarterPack.Contents.Cosmetics[1]
+		if suit and Cosmetics.get(suit) then
+			PlayerData.setCosmetic(player, Cosmetics.get(suit).Kind, suit)
+		end
+	elseif key == "SeasonPremium" then
+		profile.Season.Premium = true
+	else
+		return false
+	end
+	PlayerData.sync(player)
+	return true
+end
+
+-- Robux purchases (only for products switched on in Store.RobuxProducts).
+-- Roblox can deliver a receipt more than once: each purchase is granted
+-- once, by its PurchaseId (the last 200 are kept on the profile).
 local function processReceipt(receipt)
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
-	if not player or not PlayerData.get(player) then
+	local profile = player and PlayerData.get(player) :: any
+	if not player or not profile then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	for key, productId in Store.RobuxProducts do
-		if productId ~= 0 and productId == receipt.ProductId then
-			local bundle = Store.bundle(key)
-			if bundle then
-				if bundle.NewPlayersOnly then
-					PlayerData.get(player).WelcomeBought = true
-				end
-				StoreServer.grant(player, bundle.Contents)
-			elseif Store.Crates[key] then
-				StoreServer.grant(player, { Crates = { [key] = 1 } })
-			end
-			return Enum.ProductPurchaseDecision.PurchaseGranted
-		end
+	local key = Store.productKey(receipt.ProductId)
+	if not key then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	return Enum.ProductPurchaseDecision.NotProcessedYet
+	profile.Receipts = profile.Receipts or {}
+	local id = tostring(receipt.PurchaseId)
+	if table.find(profile.Receipts, id) then
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+	if not StoreServer.grantProduct(player, key) then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	table.insert(profile.Receipts, id)
+	while #profile.Receipts > 200 do
+		table.remove(profile.Receipts, 1)
+	end
+	-- Saved now, so a crash can't lose a paid purchase.
+	if PlayerData.save then
+		pcall(PlayerData.save, player)
+	end
+	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 
 function StoreServer.start()
@@ -306,6 +379,7 @@ function StoreServer.start()
 	Shop.register("OpenCrate", openCrate)
 	Shop.register("EquipCosmetic", equipCosmetic)
 	Shop.register("ClaimSeason", claimSeason)
+	Shop.register("StarterOffer", starterOffer)
 	local anyRobux = false
 	for _, id in Store.RobuxProducts do
 		anyRobux = anyRobux or id ~= 0

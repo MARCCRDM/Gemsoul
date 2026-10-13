@@ -39,7 +39,7 @@ local entryAt = string.find(cosmeticsSource, Rules.Reward .. " = {", 1, true)
 check(entryAt ~= nil, "The reward isn't a cosmetic")
 local skinEntry = string.sub(cosmeticsSource, entryAt, (string.find(cosmeticsSource, "},", entryAt, true)))
 check(string.find(skinEntry, 'Kind = "Skin"', 1, true) ~= nil, "The reward isn't a weapon skin")
-check(string.find(skinEntry, 'Exclusive = "Referral"', 1, true) ~= nil, "The reward isn't marked exclusive")
+check(string.find(skinEntry, 'Exclusive = "Invite"', 1, true) ~= nil, "The reward isn't marked exclusive")
 check(string.find(skinEntry, "Price", 1, true) == nil, "The skin has a price")
 local look = string.match(skinEntry, 'Look = "(%w+)"')
 local equipmentSource = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
@@ -76,9 +76,11 @@ local function makePlayer(userId, referredBy)
 end
 local handlers = {}
 local stubs = {
+	Config = { DataStoreName = "Test" },
 	Cosmetics = {
 		get = function(id)
-			return if id == Rules.Reward then { Id = Rules.Reward, Kind = "Skin", Name = "Crusader Gold" } else nil
+			local kinds = { SkinCrusader = "Skin", BackStandard = "Back", SuitCrusader = "Suit", TitleLegend = "Title" }
+			return if kinds[id] then { Id = id, Kind = kinds[id], Name = id } else nil
 		end,
 	},
 	Referrals = Rules,
@@ -193,8 +195,22 @@ local cheat = makePlayer(20, 20)
 join(cheat)
 check(stored["20"] == nil and not profiles[cheat].Cosmetics.Owned[Rules.Reward], "A self-invite counted")
 
+-- The ladder: every tier reached, each worn; the next ones wait.
+check(#Rules.rewardsFor(0) == 0 and #Rules.rewardsFor(1) == 1 and #Rules.rewardsFor(4) == 2, "Tier rewards miscounted")
+check(#Rules.rewardsFor(10) == #Rules.Tiers and Rules.nextTier(10) == nil, "The top tier isn't the last")
+check(Rules.nextTier(3).Friends == 5, "The next tier after 3 friends isn't 5")
+local recruiter = makePlayer(30, 0)
+join(recruiter)
+for friendId = 31, 33 do
+	join(makePlayer(friendId, 30))
+end
+local owned = profiles[recruiter].Cosmetics
+check(owned.Owned.SkinCrusader and owned.Owned.BackStandard, "Three friends didn't unlock the first two tiers")
+check(not owned.Owned.SuitCrusader and not owned.Owned.TitleLegend, "Three friends unlocked a higher tier")
+check(owned.Skin == "SkinCrusader" and owned.Back == "BackStandard", "The tier rewards weren't worn")
+
 print(
 	"PASS: "
 		.. checks
-		.. " bring-a-friend checks (referrer, once per friend, offline and online inviters, self-invites, exclusive weapon skin)"
+		.. " bring-a-friend checks (referrer, once per friend, offline and online inviters, self-invites, exclusive weapon skin, reward tiers)"
 )

@@ -69,6 +69,9 @@ local Config = {
 
 	-- VIP: set this to your game pass id once you create one.
 	VipGamePassId = 0,
+	-- Your Roblox group's id: joining it earns the Starforged weapon skin
+	-- (Shared.FreeRewards). 0 = off (the Free tab says it's coming soon).
+	GroupId = 0,
 	-- Treat everyone as VIP while testing in Studio so you can walk through the gate.
 	VipInStudio = true,
 }

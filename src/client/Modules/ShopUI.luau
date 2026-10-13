@@ -2,6 +2,10 @@
 	The Supply Depot [B]: the station store, styled like the dashboard.
 	  Featured      the Geode Crate: the cache, 1 / 5 / 10 purchase tiles and
 	                its full drop table; then the Masterwork Crate and a bundle
+	  Free          free cosmetics: join the group, bring friends (four tiers),
+	                a 7-day login streak, promo codes
+	  Weapon Skins  restyle any weapon: for Robux, or earned
+	  Suits         restyle your whole armor: for Robux, or earned
 	  Bundles       one card per bundle: contents with drawn icons, price
 	  Back Pieces   a tile grid and a large preview; buy / equip / take off
 	  Trims         the same, for glow colours
@@ -11,14 +15,18 @@
 	Prices are coins; Robux buttons appear for products switched on in
 	Store.RobuxProducts.
 ]]
+local GroupService = game:GetService("GroupService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
+local SocialService = game:GetService("SocialService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
+local Referrals = require(ReplicatedStorage.Shared.Referrals)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Store = require(ReplicatedStorage.Shared.Store)
@@ -41,6 +49,9 @@ local BODY_W, BODY_H = WIDTH - 52, HEIGHT - 156
 local RARITY_NAMES = { Common = "Common", Uncommon = "Uncommon", Rare = "Rare", UltraRare = "Ultra Rare" }
 local TAB_LABELS = {
 	Featured = "Featured",
+	Free = "Free",
+	Skins = "Weapon Skins",
+	Suits = "Suits",
 	Bundles = "Bundles",
 	Backs = "Back Pieces",
 	Trims = "Trims",
@@ -52,7 +63,7 @@ local ShopUI = {}
 local window = IronUi.window("Shop", 10, WIDTH, HEIGHT, "◆", P.Amethyst)
 local gui, panel = window.Gui, window.Panel
 window.Title.Text = "SUPPLY DEPOT"
-window.Subtitle.Text = "Supply caches, station cosmetics and bundles. Everything costs coins."
+window.Subtitle.Text = "Skins, suits, supply caches and bundles. Free rewards for growing the crew."
 
 local tab = "Featured"
 local selected: string? = nil
@@ -320,6 +331,28 @@ end
 
 local function clock(seconds: number): string
 	return string.format("%02d:%02d:%02d", seconds // 3600, (seconds % 3600) // 60, seconds % 60)
+end
+
+-- A Robux buy button for a Store.RobuxProducts key, greyed out (and saying
+-- so) until its Developer Product id is set.
+local function robuxBuy(parent: Instance, key: string, width: number?): TextButton
+	local id = Store.RobuxProducts[key] or 0
+	local price = Store.robuxPrice(key) or 0
+	local live = id ~= 0
+	local b = actionButton(
+		parent,
+		if live then string.format("R$ %d", price) else string.format("R$ %d · SOON", price),
+		if live then Color3.fromRGB(40, 170, 90) else Color3.fromRGB(70, 84, 76),
+		function()
+			if live then
+				MarketplaceService:PromptProductPurchase(player, id)
+			else
+				UiKit.toast("Not on sale yet: its Robux product isn't set up.", P.Dim)
+			end
+		end
+	)
+	b.Size = UDim2.fromOffset(width or 180, 46)
+	return b
 end
 
 local function robuxButton(parent: Instance, key: string)
@@ -738,14 +771,49 @@ end
 
 -- Back pieces and trims -------------------------------------------------------------------------------------
 
+-- What each kind is called, and where an exclusive is earned.
+local KIND_NAMES = { Back = "BACK PIECE", Trim = "TRIM", Skin = "WEAPON SKIN", Suit = "SUIT", Title = "TITLE" }
+local COLLECTION = {
+	Back = "Back piece collection",
+	Trim = "Trim collection",
+	Skin = "Weapon skin collection",
+	Suit = "Suit collection",
+}
+local HOW_TO = {
+	Invite = "Bring friends: their invites unlock it. See the Free tab.",
+	Group = "Join the game's Roblox group. See the Free tab.",
+	Streak = "Log in 7 days in a row. See the Free tab.",
+	Code = "From a promo code. Watch our Discord and socials.",
+	Starter = "Only in the Starter Pack, offered after your first win.",
+	Season = "On the Season Path's premium track. See Passes.",
+}
+local GO_TO = { Invite = "Free", Group = "Free", Streak = "Free", Code = "Free", Starter = "Featured", Season = "Passes" }
+
 local function drawCosmetics(kind: string)
 	local p = profile()
 	local owned = p.Cosmetics and p.Cosmetics.Owned or {}
 	local worn = p.Cosmetics and p.Cosmetics[kind]
 	local ids = {}
-	for _, id in Cosmetics.Order do
-		if Cosmetics.List[id].Kind == kind then
-			table.insert(ids, id)
+	if kind == "Skin" or kind == "Suit" or kind == "Title" then
+		-- On sale first, then the exclusives (Cosmetics.ofKind).
+		ids = Cosmetics.ofKind(kind)
+		if kind == "Skin" then
+			-- (Titles show on the Skins tab, under the skins.)
+			for _, id in Cosmetics.ofKind("Title") do
+				table.insert(ids, id)
+			end
+		end
+	else
+		for _, id in Cosmetics.Order do
+			if Cosmetics.List[id].Kind == kind then
+				table.insert(ids, id)
+			end
+		end
+		-- The earned back pieces, after the ones on sale.
+		for _, id in Cosmetics.ofKind(kind) do
+			if not table.find(ids, id) then
+				table.insert(ids, id)
+			end
 		end
 	end
 	if not selected or not table.find(ids, selected) then
@@ -753,7 +821,15 @@ local function drawCosmetics(kind: string)
 	end
 
 	local GRID_W = 588
-	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(GRID_W, BODY_H) }, body)
+	local grid = new("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(GRID_W + 8, BODY_H - 70),
+		CanvasSize = UDim2.fromOffset(0, 0),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = P.Edge,
+		BorderSizePixel = 0,
+	}, body)
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(138, 150),
 		CellPadding = UDim2.fromOffset(12, 12),
@@ -788,7 +864,7 @@ local function drawCosmetics(kind: string)
 		place(name, 8, 94, 122, 16)
 		name.TextXAlignment = Enum.TextXAlignment.Center
 		name.TextTruncate = Enum.TextTruncate.AtEnd
-		-- Status line: equipped, owned, a price, or where to find it.
+		-- Status line: equipped, owned, a price, or how it's earned.
 		local status = new("Frame", {
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(0, 116),
@@ -799,13 +875,22 @@ local function drawCosmetics(kind: string)
 			chip(status, "EQUIPPED", P.Good)
 		elseif owned[id] then
 			chip(status, "OWNED", P.Good, false)
+		elseif cosmetic.Robux then
+			chip(status, string.format("R$ %d", cosmetic.Robux), Color3.fromRGB(60, 200, 110))
 		elseif cosmetic.Price then
 			coinAmount(status, cosmetic.Price, 14, P.Gold)
+		elseif cosmetic.Exclusive then
+			chip(status, string.upper(Cosmetics.source(cosmetic)), P.Dim, false)
 		else
 			chip(status, "CRATE / SEASON", P.Dim, false)
 		end
 		local rarity = label(tile, string.upper(RARITY_NAMES[cosmetic.Rarity]), 9, color, BOLD)
 		place(rarity, 8, 6, 120, 12)
+		if cosmetic.Exclusive and not owned[id] then
+			local lock = label(tile, "EXCLUSIVE", 9, P.Gold, BOLD)
+			place(lock, 8, 6, 122, 12)
+			lock.TextXAlignment = Enum.TextXAlignment.Right
+		end
 		tile.Activated:Connect(function()
 			selected = id
 			ShopUI.refresh()
@@ -827,7 +912,7 @@ local function drawCosmetics(kind: string)
 	}, body)
 	UiKit.round(footer, 8)
 	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.6 }, footer)
-	local footHead = eyebrow(footer, if kind == "Back" then "Back piece collection" else "Trim collection", P.Gold)
+	local footHead = eyebrow(footer, COLLECTION[kind] or "Collection", P.Gold)
 	place(footHead, 16, 10, 260, 14)
 	local footCount = label(footer, string.format("%d / %d", have, #ids), 14, WHITE, HEADING)
 	footCount.AnchorPoint = Vector2.new(1, 0)
@@ -854,6 +939,8 @@ local function drawCosmetics(kind: string)
 	if not cosmetic then
 		return
 	end
+	local ownKind = cosmetic.Kind
+	local wornOfKind = p.Cosmetics and p.Cosmetics[ownKind]
 	local color = Cosmetics.rarityColor(cosmetic)
 	local side = panelCard(body, color)
 	place(side, GRID_W + 16, 0, BODY_W - GRID_W - 16, BODY_H)
@@ -866,7 +953,7 @@ local function drawCosmetics(kind: string)
 	end)
 	local rarityTag = chip(well, string.upper(RARITY_NAMES[cosmetic.Rarity]), color)
 	rarityTag.Position = UDim2.fromOffset(10, 10)
-	local kindTag = chip(well, if kind == "Back" then "BACK PIECE" else "TRIM", P.Dim, false)
+	local kindTag = chip(well, KIND_NAMES[ownKind] or ownKind, P.Dim, false)
 	kindTag.AnchorPoint = Vector2.new(1, 0)
 	kindTag.Position = UDim2.new(1, -10, 0, 10)
 	local name = label(side, cosmetic.Name, 26, WHITE, HEADING)
@@ -878,15 +965,18 @@ local function drawCosmetics(kind: string)
 	local source = label(
 		side,
 		if owned[cosmetic.Id]
-			then (if worn == cosmetic.Id then "Equipped on your suit." else "In your collection.")
+			then (if wornOfKind == cosmetic.Id then "Equipped." else "In your collection.")
+			elseif cosmetic.Robux then "Sold for Robux. Yours to keep, on every miner."
 			elseif cosmetic.Price then "Sold here for coins."
+			elseif cosmetic.Exclusive then (HOW_TO[cosmetic.Exclusive] or "Exclusive.")
 			else "Found in supply caches and on the Season Path.",
 		12,
 		if owned[cosmetic.Id] then P.Good else P.Gold,
-		CHUNKY
+		CHUNKY,
+		true
 	)
 	source.Position = UDim2.fromOffset(20, 336)
-	source.Size = UDim2.new(1, -40, 0, 16)
+	source.Size = UDim2.new(1, -40, 0, 32)
 	local actions = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 1),
@@ -895,22 +985,32 @@ local function drawCosmetics(kind: string)
 	}, side)
 	UiKit.list(actions, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	if owned[cosmetic.Id] then
-		if worn == cosmetic.Id then
+		if wornOfKind == cosmetic.Id then
 			IronUi.gemButton(actions, "TAKE OFF", Color3.fromRGB(110, 100, 130), function()
-				run(nil, nil, "EquipCosmetic", kind, nil)
+				run(nil, nil, "EquipCosmetic", ownKind, nil)
 			end)
 		else
 			local b
 			b = IronUi.gemButton(actions, "EQUIP", P.Teal, function()
-				run(b, "EQUIPPED", "EquipCosmetic", kind, cosmetic.Id)
+				run(b, "EQUIPPED", "EquipCosmetic", ownKind, cosmetic.Id)
 			end)
 			b:SetAttribute("UiSound", "Confirm")
 		end
+	elseif cosmetic.Robux then
+		robuxBuy(actions, cosmetic.Id, 200)
 	elseif cosmetic.Price then
 		local b
 		b = priceButton(actions, cosmetic.Price, 180, 46, function()
 			run(b, "UNLOCKED", "BuyCosmetic", cosmetic.Id)
 		end)
+	elseif cosmetic.Exclusive then
+		local target = GO_TO[cosmetic.Exclusive] or "Free"
+		local b = IronUi.gemButton(actions, "HOW TO GET IT", P.Amethyst, function()
+			tab = target
+			selected = nil
+			ShopUI.refresh()
+		end)
+		b:SetAttribute("UiSound", "Tab")
 	else
 		local b = IronUi.gemButton(actions, "VIEW SUPPLY CACHES", P.Amethyst, function()
 			tab = "Featured"
@@ -919,6 +1019,178 @@ local function drawCosmetics(kind: string)
 		end)
 		b:SetAttribute("UiSound", "Tab")
 	end
+end
+
+-- Free ----------------------------------------------------------------------------------------------------
+-- Free cosmetics for growing the crew: the group, friends, a login streak
+-- and promo codes. The server's state (FreeRewards) is fetched on opening.
+
+local freeState = nil
+local freeFetching = false
+local function fetchFree()
+	if freeFetching then
+		return
+	end
+	freeFetching = true
+	task.spawn(function()
+		local result = GemClient.request("FreeRewards")
+		freeFetching = false
+		if result.Ok then
+			freeState = result
+			if gui.Enabled and tab == "Free" then
+				ShopUI.refresh()
+			end
+		end
+	end)
+end
+
+-- A card with a title, a line of what it's for, and its reward's icon.
+local function freeCard(x: number, y: number, w: number, h: number, tint: Color3, title: string, blurb: string)
+	local card = panelCard(body, tint)
+	place(card, x, y, w, h)
+	local head = label(card, title, 20, WHITE, HEADING)
+	place(head, 18, 14, w - 36, 26)
+	local line = label(card, blurb, 12, P.Dim, BODY, true)
+	place(line, 18, 42, w - 150, 34)
+	return card
+end
+
+local function rewardIcon(card: Frame, id: string, owned: boolean, x: number, y: number, size: number)
+	local holder = stage(card, Cosmetics.rarityColor(Cosmetics.get(id) :: any))
+	place(holder, x, y, size, size)
+	ShopArt.icon(holder, "Cosmetic", id, size - 16)
+	if owned then
+		local done = chip(holder, "OWNED", P.Good)
+		done.AnchorPoint = Vector2.new(0.5, 1)
+		done.Position = UDim2.new(0.5, 0, 1, -4)
+	end
+	return holder
+end
+
+local function drawFree()
+	if not freeState then
+		-- (Drawn before the request, which can answer at once and redraw.)
+		local wait = label(body, "Checking your free rewards…", 16, P.Dim, CHUNKY)
+		place(wait, 0, 0, BODY_W, 40)
+		fetchFree()
+		return
+	end
+	local state = freeState
+	local half = math.floor((BODY_W - 14) / 2)
+	local cardH = math.floor((BODY_H - 14) / 2)
+
+	-- 1. The group.
+	local group = state.Group or {}
+	local gSkin = Cosmetics.get(group.Reward or FreeRewards.Group.Reward)
+	local gCard = freeCard(0, 0, half, cardH, P.Teal, "JOIN THE GROUP", "Join the game's Roblox group for a free weapon skin.")
+	rewardIcon(gCard, gSkin and gSkin.Id or "SkinStarforged", group.Owned == true, half - 124, 14, 106)
+	local gName = label(gCard, (gSkin and gSkin.Name or "") .. "  ·  weapon skin", 13, P.Gold, CHUNKY)
+	place(gName, 18, 80, half - 160, 18)
+	local gActions = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(18, cardH - 56), Size = UDim2.fromOffset(half - 36, 46) }, gCard)
+	UiKit.list(gActions, 8, true)
+	if group.Owned then
+		chip(gActions, "YOURS: THANKS FOR JOINING!", P.Good)
+	elseif not group.Enabled then
+		chip(gActions, "COMING SOON", P.Dim, false)
+	else
+		IronUi.gemButton(gActions, "JOIN GROUP", P.Teal, function()
+			pcall(function()
+				GroupService:PromptJoinAsync(group.Id)
+			end)
+		end)
+		local b
+		b = IronUi.gemButton(gActions, "CHECK", P.Amethyst, function()
+			freeState = nil
+			run(b, nil, "CheckGroup")
+		end)
+	end
+
+	-- 2. Friends: four tiers.
+	local invites = state.Invites or { Count = 0, Tiers = {} }
+	local iCard = freeCard(half + 14, 0, half, cardH, P.Gold, "BRING FRIENDS", "Invite friends. Each one who joins counts, and the rewards stack up.")
+	local tiers = invites.Tiers or {}
+	local tileW = math.min(66, math.floor((half - 36 - 3 * 8) / 4))
+	local rowW = #tiers * tileW + math.max(0, #tiers - 1) * 8
+	for i, tier in tiers do
+		local x = 18 + (i - 1) * (tileW + 8)
+		rewardIcon(iCard, tier.Reward, tier.Owned, x, 74, tileW)
+		local need = label(iCard, string.format("%d FRIEND%s", tier.Friends, if tier.Friends == 1 then "" else "S"), 10, if tier.Owned then P.Good else P.Text, BOLD)
+		place(need, x - 4, 74 + tileW + 2, tileW + 8, 12)
+		need.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	local nextTier = Referrals.nextTier(invites.Count or 0)
+	local count = label(iCard, if nextTier
+		then string.format("%d / %d friends joined", invites.Count or 0, nextTier.Friends)
+		else string.format("%d friends joined: every reward is yours!", invites.Count or 0), 13, P.Gold, CHUNKY)
+	place(count, rowW + 34, 74, half - rowW - 52, 40)
+	count.TextWrapped = true
+	count.TextYAlignment = Enum.TextYAlignment.Top
+	local iActions = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(18, cardH - 56), Size = UDim2.fromOffset(half - 36, 46) }, iCard)
+	UiKit.list(iActions, 8, true)
+	IronUi.gemButton(iActions, "INVITE FRIENDS", P.Gold, function()
+		pcall(function()
+			SocialService:PromptGameInvite(player)
+		end)
+	end)
+	local check
+	check = IronUi.gemButton(iActions, "CHECK", P.Amethyst, function()
+		freeState = nil
+		run(check, nil, "ReferralState")
+	end)
+
+	-- 3. The login streak.
+	local streak = state.Streak or { Days = 7, Streak = 0 }
+	local sCard = freeCard(0, cardH + 14, half, cardH, P.Emerald, "LOGIN STREAK", string.format("Log in %d days in a row for a free weapon skin.", streak.Days or 7))
+	rewardIcon(sCard, streak.Reward or FreeRewards.Streak.Reward, streak.Owned == true, half - 124, 14, 106)
+	local pipW = math.floor((half - 160 - 6 * 6) / 7)
+	for d = 1, streak.Days or 7 do
+		local lit = streak.Owned or d <= (streak.Streak or 0)
+		local pip = new("Frame", {
+			BackgroundColor3 = if lit then P.Emerald else P.Slot,
+			Position = UDim2.fromOffset(18 + (d - 1) * (pipW + 6), 92),
+			Size = UDim2.fromOffset(pipW, pipW),
+		}, sCard)
+		UiKit.round(pip, 6)
+		local n = label(pip, tostring(d), 14, if lit then P.Ink else P.Dim, HEADING)
+		place(n, 0, 0, pipW, pipW)
+		n.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	local sLine = label(sCard, if streak.Owned
+		then "Yours. Come back anyway: the daily coins keep coming."
+		else string.format("Day %d of %d. Don't break the chain!", streak.Streak or 0, streak.Days or 7), 13, if streak.Owned then P.Good else P.Gold, CHUNKY)
+	place(sLine, 18, cardH - 52, half - 36, 18)
+
+	-- 4. Promo codes.
+	local cCard = freeCard(half + 14, cardH + 14, half, cardH, P.Amethyst, "PROMO CODES", "Codes drop in our Discord, on socials and at like milestones.")
+	local box = new("TextBox", {
+		BackgroundColor3 = P.Inset,
+		Position = UDim2.fromOffset(18, 92),
+		Size = UDim2.fromOffset(half - 36 - 150, 46),
+		Font = BOLD,
+		TextSize = 18,
+		TextColor3 = WHITE,
+		PlaceholderText = "ENTER CODE",
+		PlaceholderColor3 = P.Dim,
+		Text = "",
+		ClearTextOnFocus = false,
+	}, cCard)
+	box.Name = "CodeBox"
+	UiKit.round(box, 8)
+	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.4 }, box)
+	local redeem = IronUi.gemButton(cCard, "REDEEM", P.Amethyst, function()
+		local text = box.Text
+		if FreeRewards.normalizeCode(text) then
+			run(nil, nil, "RedeemCode", text)
+			box.Text = ""
+		else
+			UiKit.toast("Type a code first.", P.Dim)
+		end
+	end)
+	redeem.Name = "Redeem"
+	redeem.Position = UDim2.fromOffset(half - 18 - 138, 92)
+	redeem.Size = UDim2.fromOffset(138, 46)
+	local used = label(cCard, string.format("%d code%s redeemed", state.CodesUsed or 0, if state.CodesUsed == 1 then "" else "s"), 12, P.Dim, CHUNKY)
+	place(used, 18, cardH - 52, half - 36, 18)
 end
 
 -- Passes --------------------------------------------------------------------------------------------------
@@ -1228,10 +1500,154 @@ welcome.Shade.Activated:Connect(function()
 	welcome.Gui.Enabled = false
 end)
 
+-- Starter Pack popup -------------------------------------------------------------------------------------------
+-- Offered once, after your first win, for Store.StarterPack.Hours: a suit
+-- found nowhere else, a weapon skin, a trim, caches and coins, for Robux.
+
+local starter = IronUi.window("StarterPack", 13, 760, 430, "◆", Color3.fromRGB(255, 90, 60))
+starter.Title.Text = "STARTER PACK"
+starter.Subtitle.Text = "Your first win deserves a look. One time only."
+local starterTimer = label(starter.Panel, "", 13, P.Gold, BOLD)
+starterTimer.AnchorPoint = Vector2.new(1, 0)
+starterTimer.Position = UDim2.new(1, -62, 0, 26)
+starterTimer.Size = UDim2.fromOffset(220, 20)
+starterTimer.TextXAlignment = Enum.TextXAlignment.Right
+starterTimer.ZIndex = 4
+local starterBody = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(26, 84),
+	Size = UDim2.fromOffset(708, 322),
+}, starter.Panel)
+
+local function starterSecondsLeft(): number
+	local p = profile()
+	if p.StarterBought or not p.StarterOfferAt then
+		return 0
+	end
+	local offset = (p.ServerTime or os.time()) - os.time()
+	return math.max(0, p.StarterOfferAt + Store.StarterPack.Hours * 3600 - (os.time() + offset))
+end
+
+function ShopUI.showStarter()
+	local pack = Store.StarterPack
+	clear(starterBody)
+	local tint = Color3.fromRGB(255, 90, 60)
+	local items = Store.items(pack.Contents, cosmeticName)
+	-- Left: the suit, big, then everything else.
+	local left = panelCard(starterBody, tint)
+	place(left, 0, 0, 430, 322)
+	local head = eyebrow(left, "Inside the pack", P.Gold)
+	place(head, 18, 16, 300, 14)
+	local hero = stage(left, tint)
+	place(hero, 16, 40, 170, 266)
+	ShopArt.icon(hero, "Cosmetic", pack.Contents.Cosmetics[1], 140).Position = UDim2.new(0.5, 0, 0.5, -16)
+	local heroName = label(hero, cosmeticName(pack.Contents.Cosmetics[1]), 15, WHITE, HEADING)
+	heroName.AnchorPoint = Vector2.new(0, 1)
+	heroName.Position = UDim2.new(0, 6, 1, -30)
+	heroName.Size = UDim2.new(1, -12, 0, 20)
+	heroName.TextXAlignment = Enum.TextXAlignment.Center
+	local only = chip(hero, "ONLY HERE", P.Gold)
+	only.AnchorPoint = Vector2.new(0.5, 1)
+	only.Position = UDim2.new(0.5, 0, 1, -6)
+	local grid = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(198, 40), Size = UDim2.fromOffset(216, 266) }, left)
+	new("UIGridLayout", {
+		CellSize = UDim2.fromOffset(102, 84),
+		CellPadding = UDim2.fromOffset(12, 7),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, grid)
+	local n = 0
+	for _, item in items do
+		if item.Id == pack.Contents.Cosmetics[1] then
+			continue
+		end
+		n += 1
+		local tile = stage(grid, ShopArt.KindColors[item.Kind] or tint)
+		tile.LayoutOrder = n
+		ShopArt.icon(tile, item.Kind, item.Id, 44).Position = UDim2.new(0.5, 0, 0.5, -10)
+		local name = label(tile, item.Text, 11, WHITE, CHUNKY)
+		name.AnchorPoint = Vector2.new(0, 1)
+		name.Position = UDim2.new(0, 4, 1, -4)
+		name.Size = UDim2.new(1, -8, 0, 16)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+	end
+	-- Right: the offer.
+	local side = panelCard(starterBody, tint)
+	place(side, 444, 0, 264, 322)
+	local tag = chip(side, pack.Value, tint:Lerp(WHITE, 0.25))
+	tag.Position = UDim2.fromOffset(16, 16)
+	local name = label(side, string.upper(pack.Name), 24, WHITE, HEADING)
+	place(name, 16, 48, 232, 30)
+	local blurb = label(side, pack.Tagline, 13, P.Dim, BODY, true)
+	place(blurb, 16, 82, 232, 40)
+	local once = chip(side, "ONE TIME OFFER", P.Gold, false)
+	once.Position = UDim2.fromOffset(16, 132)
+	local count = label(side, string.format("%d items, yours to keep", #items), 13, P.Text, CHUNKY)
+	place(count, 16, 166, 232, 18)
+	local buttons = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -18),
+		Size = UDim2.new(1, -28, 0, 46),
+	}, side)
+	UiKit.list(buttons, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
+	robuxBuy(buttons, "StarterPack", 220)
+	local left_ = starterSecondsLeft()
+	starterTimer.Text = if left_ > 0 then "ENDS IN " .. clock(left_) else ""
+	starter.Gui.Enabled = true
+end
+starter.Close.Activated:Connect(function()
+	starter.Gui.Enabled = false
+end)
+starter.Shade.Activated:Connect(function()
+	starter.Gui.Enabled = false
+end)
+
+-- While it's on offer, a button in the Shop's header opens it again.
+local starterButton = IronUi.gemButton(panel, "STARTER PACK", Color3.fromRGB(255, 90, 60), function()
+	ShopUI.showStarter()
+end)
+starterButton.Name = "StarterButton"
+starterButton.AnchorPoint = Vector2.new(1, 0)
+starterButton.Position = UDim2.new(1, -250, 0, 18)
+starterButton.Visible = false
+
+-- After the first win, back out of the fight: put it on offer and show it,
+-- once.
+local starterAsked = false
+local function maybeOfferStarter()
+	local p = profile()
+	local duel = p.Duel or {}
+	local wins = (duel.Wins or 0) + (duel.RivalWins or 0)
+	if starterAsked or wins < 1 or p.StarterBought or p.StarterOfferAt then
+		return
+	end
+	if player:GetAttribute("CombatSession") or player:GetAttribute("FirstFight") then
+		return
+	end
+	starterAsked = true
+	task.spawn(function()
+		task.wait(1.5)
+		local result = GemClient.request("StarterOffer")
+		if result.Ok and not result.Bought then
+			ShopUI.showStarter()
+		end
+	end)
+end
+GemClient.Changed:Connect(maybeOfferStarter)
+player:GetAttributeChangedSignal("CombatSession"):Connect(maybeOfferStarter)
+
 -- Drawing and opening ---------------------------------------------------------------------------------------
 
 local DRAW = {
 	Featured = drawFeatured,
+	Free = drawFree,
+	Skins = function()
+		drawCosmetics("Skin")
+	end,
+	Suits = function()
+		drawCosmetics("Suit")
+	end,
 	Bundles = drawBundles,
 	Backs = function()
 		drawCosmetics("Back")
@@ -1262,6 +1678,7 @@ function ShopUI.open(which: string?)
 	if which and DRAW[which] then
 		tab = which
 	end
+	freeState = nil
 	gui.Enabled = true
 	ShopUI.refresh()
 end
@@ -1298,6 +1715,15 @@ RunService.Heartbeat:Connect(function(dt)
 	if welcome.Gui.Enabled then
 		local left = welcomeSecondsLeft()
 		welcomeTimer.Text = if left > 0 then "ENDS IN " .. clock(left) else "OFFER ENDED"
+	end
+	local starterLeft = starterSecondsLeft()
+	if starter.Gui.Enabled then
+		starterTimer.Text = if starterLeft > 0 then "ENDS IN " .. clock(starterLeft) else "OFFER ENDED"
+	end
+	starterButton.Visible = starterLeft > 0
+	local caption = starterButton:FindFirstChildWhichIsA("TextLabel", true)
+	if starterButton.Visible and caption then
+		caption.Text = "STARTER PACK · " .. clock(starterLeft)
 	end
 end)
 

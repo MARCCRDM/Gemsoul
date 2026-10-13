@@ -677,6 +677,87 @@ SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
 	trail.Parent = biggest
 end
 
+-- Repaints every part under `container` in a cosmetic Palette (skins and
+-- suits): neon takes the glow, dark parts and wood/leather the under-colour,
+-- the rest the plate colour and material. Returns the biggest part (for
+-- particles and trails).
+local function repaint(container: Instance, palette): BasePart?
+	local biggest, biggestSize = nil, 0
+	for _, part in container:GetDescendants() do
+		if not part:IsA("BasePart") or part.Transparency >= 1 or part.Name == "SocketedGem" then
+			continue
+		end
+		CollectionService:RemoveTag(part, Tags.Prismatic)
+		local _, _, value = part.Color:ToHSV()
+		if part.Material == Enum.Material.Neon then
+			part.Color = palette.Glow
+		elseif value < 0.45 or part.Material == Enum.Material.Wood or part.Material == Enum.Material.Leather then
+			part.Color = palette.Under
+			part.Material = palette.UnderMaterial or Enum.Material.SmoothPlastic
+			part.Reflectance = 0
+		else
+			part.Color, part.Material = palette.Plate, palette.PlateMaterial
+			part.Reflectance = palette.Reflect or 0
+		end
+		local size = part.Size.X * part.Size.Y * part.Size.Z
+		if size > biggestSize then
+			biggest, biggestSize = part, size
+		end
+	end
+	return biggest
+end
+
+local function drift(part: BasePart, color: Color3, rate: number)
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Name = "SkinSparks"
+	sparks.Color = ColorSequence.new(color)
+	sparks.LightEmission = 1
+	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.12), NumberSequenceKeypoint.new(1, 0) })
+	sparks.Transparency = NumberSequence.new(0.1, 1)
+	sparks.Lifetime = NumberRange.new(0.5, 1)
+	sparks.Rate = rate
+	sparks.Speed = NumberRange.new(0.4, 1.2)
+	sparks.SpreadAngle = Vector2.new(180, 180)
+	sparks.Acceleration = Vector3.new(0, 1.5, 0)
+	sparks.Parent = part
+end
+
+-- A weapon skin given as a Palette (Cosmetics): repainted, with its sparks,
+-- a glow, and a trail through every swing.
+SKINS.Palette = function(weaponFolder: Instance, color: Color3, palette)
+	local biggest = repaint(weaponFolder, palette)
+	if not biggest then
+		return
+	end
+	if palette.Sparks then
+		drift(biggest, palette.Sparks, 12)
+	end
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness, light.Shadows = palette.Glow, 6, 0.8, false
+	light.Parent = biggest
+	if palette.Trail then
+		local size = biggest.Size
+		local axis = if size.Y >= size.X and size.Y >= size.Z
+			then Vector3.yAxis * size.Y
+			elseif size.X >= size.Z then Vector3.xAxis * size.X
+			else Vector3.zAxis * size.Z
+		local tip, base = Instance.new("Attachment"), Instance.new("Attachment")
+		tip.Name, base.Name = "SkinTrailTip", "SkinTrailBase"
+		tip.Position, base.Position = axis * 0.5, axis * -0.5
+		tip.Parent, base.Parent = biggest, biggest
+		local trail = Instance.new("Trail")
+		trail.Name = "SkinTrail"
+		trail.Attachment0, trail.Attachment1 = tip, base
+		trail.Color = ColorSequence.new(palette.Glow, color)
+		trail.LightEmission = 1
+		trail.Transparency = NumberSequence.new(0.35, 1)
+		trail.Lifetime = 0.2
+		trail.MinLength = 0.05
+		trail.FaceCamera = true
+		trail.Parent = biggest
+	end
+end
+
 -- Back pieces (cosmetics) ---------------------------------------------------------------------
 -- Built behind the torso; `m` is the middle of the back, facing backward.
 
@@ -713,9 +794,27 @@ BACKS.Banner = function(folder, torso, m, glow, accent)
 	neon(folder, torso, m * CFrame.new(0.6, 3.95, -0.3), Vector3.new(0.3, 0.3, 0.3), glow)
 end
 
--- The Crusader's Standard (bring-a-friend reward): a black war banner on an
--- iron pole, a gold crossbar and spear finial, gold edging and a glowing
--- gold emblem. Its own colours, whatever your class.
+-- The Crusader's Standard (bring 3 friends): a black war banner on an iron
+-- pole, a gold crossbar and spear finial, gold edging and a glowing gold
+-- emblem. Its own colours, whatever your class.
+BACKS.Standard = function(folder, torso, m, glow, _accent)
+	local gold = Color3.fromRGB(214, 164, 60)
+	local pole = m * CFrame.new(0.55, 1.5, -0.32)
+	piece(folder, torso, pole, Vector3.new(0.16, 5.4, 0.16), Color3.fromRGB(46, 48, 56), Enum.Material.Metal)
+	piece(folder, torso, pole * CFrame.new(0, 2.75, 0), Vector3.new(0.22, 0.5, 0.22), gold, Enum.Material.Foil)
+	piece(folder, torso, pole * CFrame.new(0, 3.1, 0) * CFrame.Angles(0, 0, math.rad(45)), Vector3.new(0.26, 0.26, 0.1), gold, Enum.Material.Foil)
+	piece(folder, torso, pole * CFrame.new(-0.85, 2.25, 0), Vector3.new(1.9, 0.12, 0.12), gold, Enum.Material.Foil)
+	local cloth = piece(folder, torso, pole * CFrame.new(-0.85, 1.15, 0), Vector3.new(1.6, 2.1, 0.05), Color3.fromRGB(18, 16, 22), Enum.Material.Fabric)
+	cloth.Name = "Banner"
+	for _, x in { -0.8, 0.8 } do
+		piece(folder, torso, pole * CFrame.new(-0.85 + x, 1.15, 0), Vector3.new(0.08, 2.1, 0.07), gold, Enum.Material.Foil)
+	end
+	piece(folder, torso, pole * CFrame.new(-0.85, 0.1, 0), Vector3.new(1.6, 0.08, 0.07), gold, Enum.Material.Foil)
+	-- The emblem: a glowing cross.
+	neon(folder, torso, pole * CFrame.new(-0.85, 1.25, -0.04), Vector3.new(0.16, 0.9, 0.04), glow)
+	neon(folder, torso, pole * CFrame.new(-0.85, 1.4, -0.04), Vector3.new(0.6, 0.16, 0.04), glow)
+end
+
 BACKS.Geode = function(folder, torso, m, glow, _accent)
 	piece(
 		folder,
@@ -1640,6 +1739,20 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		end
 		enchant(weaponParts, loadout.WeaponGem, nil, true)
 	end
+	-- An armor suit (cosmetic): every armor piece repainted in its palette,
+	-- particles drifting off the chest. Gem glows still show over it.
+	local suit = cosmetics and Cosmetics.get(cosmetics.Suit)
+	if suit and suit.Kind == "Suit" and suit.Palette then
+		for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+			local component = folder:FindFirstChild(slot)
+			if component and (not only or only == slot) then
+				local biggest = repaint(component, suit.Palette)
+				if slot == "Armor" and biggest and suit.Palette.Sparks then
+					drift(biggest, suit.Palette.Sparks, 8)
+				end
+			end
+		end
+	end
 	-- Rarity shine on every piece, in its element's colour.
 	local mainGem = loadout.WeaponGem
 	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield", "Weapon" } do
@@ -1671,7 +1784,8 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield", "Weapon" } do
 		local component = folder:FindFirstChild(slot)
 		local roll = GearRolls.get(loadout, slot)
-		if component and roll and roll.Prismatic and (not only or only == slot) then
+		local suited = suit and suit.Palette and slot ~= "Weapon"
+		if component and roll and roll.Prismatic and not suited and (not only or only == slot) then
 			for _, part in component:GetDescendants() do
 				if part:IsA("BasePart") and part.Transparency < 1 and part.Material ~= Enum.Material.Neon then
 					local h, s, v = part.Color:ToHSV()
@@ -1685,9 +1799,9 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	end
 	-- A weapon skin (cosmetic) goes on last, over everything else.
 	local skin = cosmetics and Cosmetics.get(cosmetics.Skin)
-	local applySkin = skin and skin.Look and SKINS[skin.Look]
+	local applySkin = skin and (skin.Look and SKINS[skin.Look] or (skin.Palette and SKINS.Palette))
 	if applySkin and (not only or only == "Weapon") then
-		applySkin(weaponFolder, skin.Color)
+		applySkin(weaponFolder, skin.Color, skin.Palette)
 	end
 	return folder
 end
@@ -1723,6 +1837,37 @@ function Equipment.apply(player: Player)
 	end
 	folder.Parent = character
 	applyStats(character, loadout, profile)
+	Equipment.showTitle(character, profile and profile.Cosmetics and Cosmetics.get(profile.Cosmetics.Title))
+end
+
+-- A title (cosmetic) over the head, in its colour, for everyone to see.
+function Equipment.showTitle(character: Model, title)
+	local head = character:FindFirstChild("Head") :: BasePart?
+	local existing = head and head:FindFirstChild("CosmeticTitle")
+	if existing then
+		existing:Destroy()
+	end
+	if not head or not title or title.Kind ~= "Title" then
+		return
+	end
+	local board = Instance.new("BillboardGui")
+	board.Name = "CosmeticTitle"
+	board.Size = UDim2.fromOffset(220, 26)
+	board.StudsOffset = Vector3.new(0, 2.9, 0)
+	board.MaxDistance = 90
+	board.LightInfluence = 0
+	local text = Instance.new("TextLabel")
+	text.BackgroundTransparency = 1
+	text.Size = UDim2.fromScale(1, 1)
+	text.Font = Enum.Font.GothamBlack
+	text.TextScaled = true
+	text.Text = title.Name
+	text.TextColor3 = title.Color
+	local edge = Instance.new("UIStroke")
+	edge.Color, edge.Thickness, edge.Transparency = Color3.fromRGB(10, 10, 14), 2, 0.1
+	edge.Parent = text
+	text.Parent = board
+	board.Parent = head
 end
 
 -- Item previews ----------------------------------------------------------------------------

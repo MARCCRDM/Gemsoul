@@ -1,6 +1,8 @@
 --[[
 	The Season Path: earn XP by playing, level up, and claim a reward at
-	every level (a free track, like a battle pass). 30 levels.
+	every level (a free track, like a battle pass). 30 levels. The premium
+	track (bought once, for Robux) adds its own rewards at some levels,
+	including cosmetics only found there.
 
 	XP comes from everything you do; a 2x XP boost (from bundles) doubles it.
 ]]
@@ -50,6 +52,23 @@ function Season.reward(level: number): { [string]: any }
 		return { Crates = { GeodeCrate = 1 } }
 	end
 	return { CutGems = 1 }
+end
+
+-- The premium track (Store.RobuxProducts.SeasonPremium): a second reward
+-- at these levels, on top of the free one, for everyone who unlocks it.
+-- Its cosmetics are only ever here.
+Season.Premium = {
+	[1] = { Coins = 500, Crates = { GeodeCrate = 1 } },
+	[5] = { Cosmetics = { "BackCape" }, XPBoostMinutes = 60 },
+	[10] = { Cosmetics = { "SkinLunar" } },
+	[15] = { Crates = { MasterworkCrate = 2 }, Coins = 1000 },
+	[20] = { Cosmetics = { "TitleLunar" } },
+	[25] = { Cosmetics = { "TrimAmethyst" }, Crates = { MasterworkCrate = 1 } },
+	[30] = { Cosmetics = { "SuitLunar" } },
+}
+
+function Season.premiumReward(level: number): { [string]: any }?
+	return Season.Premium[level]
 end
 
 -- Level and progress for a total XP.

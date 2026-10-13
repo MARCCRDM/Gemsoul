@@ -28,6 +28,8 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Season = require(ReplicatedStorage.Shared.Season)
 local TrainingRewards = require(ReplicatedStorage.Shared.TrainingRewards)
 local FastStart = require(ReplicatedStorage.Shared.FastStart)
+local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
+local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Remotes = require(script.Parent.Remotes)
 local SessionLock = require(script.Parent.SessionLock)
 
@@ -379,6 +381,12 @@ local function save(player: Player, release: boolean?)
 	return false
 end
 
+-- Saves now (a Robux purchase, so a crash can't lose it). Does nothing in a
+-- session that may not save (FreshStart, a locked session).
+function PlayerData.save(player: Player)
+	save(player, false)
+end
+
 -- Coins for coming back each day; the streak (up to a week) pays more.
 local function claimDaily(player: Player, profile: Profile)
 	local daily = profile.Daily
@@ -396,6 +404,13 @@ local function claimDaily(player: Player, profile: Profile)
 		player,
 		string.format("Daily reward: +%d coins (day %d streak). Come back tomorrow for more!", reward, daily.Streak)
 	)
+	-- A full week running: the streak's own weapon skin, once, and on.
+	local skin = Cosmetics.get(FreeRewards.Streak.Reward)
+	if skin and FreeRewards.streakEarned(daily.Streak) and not profile.Cosmetics.Owned[skin.Id] then
+		profile.Cosmetics.Owned[skin.Id] = true;
+		(profile.Cosmetics :: any)[skin.Kind] = skin.Id
+		Remotes.Notify:FireClient(player, string.format("%d days running: %s unlocked and equipped!", FreeRewards.Streak.Days, skin.Name))
+	end
 end
 
 local function load(player: Player)
@@ -583,6 +598,8 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Daily = profile.Daily,
 		Cosmetics = profile.Cosmetics,
 		Season = profile.Season,
+		StarterOfferAt = (profile :: any).StarterOfferAt, -- the Starter Pack (Store.StarterPack)
+		StarterBought = (profile :: any).StarterBought,
 		Stats = profile.Stats,
 		Crates = profile.Crates,
 		Boosts = profile.Boosts,

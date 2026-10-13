@@ -79,6 +79,7 @@ require(script.Parent.Systems.ChatChannels).start()
 require(script.Parent.Systems.Feedback).start()
 StoreServer.start()
 require(script.Parent.Systems.Referrals).start()
+require(script.Parent.Systems.FreeRewards).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.

@@ -1,10 +1,17 @@
 --[[
-	Bring a friend: invite a friend (Roblox's own game invite) and, once they
-	join through it, you earn an exclusive weapon skin, Crusader Gold. Pure, for the server
-	(Systems/Referrals), the client (Modules/ReferralUI) and tests.
+	Bring friends: invite them (Roblox's own game invite) and, as they join
+	through it, you climb a ladder of exclusive cosmetics, never sold:
+	  1 friend   Crusader Gold (weapon skin)
+	  3 friends  Crusader's Standard (back piece)
+	  5 friends  Crusader Plate (armor suit)
+	  10 friends CRUSADER LEGEND (title over your head)
+	Pure, for the server (Systems/Referrals), the client (Modules/ReferralUI,
+	the Shop's Free tab) and tests.
 
-	  Referrals.Reward                    the weapon skin you earn (a Cosmetics id)
-	  Referrals.Needed                    friends who must join through you
+	  Referrals.Tiers                     { Friends, Reward } from the first
+	  Referrals.Reward / Needed           the first tier (older callers)
+	  Referrals.rewardsFor(count)         -> every reward earned at `count`
+	  Referrals.nextTier(count)           -> the next tier to reach, or nil
 	  Referrals.referrer(joinData, userId) -> the inviter's UserId, or nil
 	                                       (no invite, or your own)
 	  Referrals.record(entry, friendId)   -> entry, isNew: counts a friend
@@ -13,8 +20,33 @@
 ]]
 local Referrals = {}
 
-Referrals.Reward = "SkinCrusader"
-Referrals.Needed = 1
+Referrals.Tiers = {
+	{ Friends = 1, Reward = "SkinCrusader" },
+	{ Friends = 3, Reward = "BackStandard" },
+	{ Friends = 5, Reward = "SuitCrusader" },
+	{ Friends = 10, Reward = "TitleLegend" },
+}
+Referrals.Reward = Referrals.Tiers[1].Reward
+Referrals.Needed = Referrals.Tiers[1].Friends
+
+function Referrals.rewardsFor(count: number): { string }
+	local rewards = {}
+	for _, tier in Referrals.Tiers do
+		if (count or 0) >= tier.Friends then
+			table.insert(rewards, tier.Reward)
+		end
+	end
+	return rewards
+end
+
+function Referrals.nextTier(count: number)
+	for _, tier in Referrals.Tiers do
+		if (count or 0) < tier.Friends then
+			return tier
+		end
+	end
+	return nil
+end
 
 function Referrals.referrer(joinData, userId: number): number?
 	local id = type(joinData) == "table" and joinData.ReferredByPlayerId or nil

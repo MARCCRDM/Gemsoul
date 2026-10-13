@@ -3,6 +3,8 @@
 	levels, each with a reward to claim. Claim one at a time or all at once.
 	Lists what earns XP, and shows a running 2x XP boost.
 ]]
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
@@ -114,11 +116,36 @@ function SeasonUI.refresh()
 		boost.Position = UDim2.fromOffset(510, 30)
 		boost.Size = UDim2.fromOffset(200, 18)
 	end
+	local premium = season.Premium == true
+	local premiumClaimed = season.PremiumClaimed or {}
 	local unclaimed = 0
 	for l = 1, level do
 		if not season.Claimed[tostring(l)] then
 			unclaimed += 1
 		end
+		if premium and Season.premiumReward(l) and not premiumClaimed[tostring(l)] then
+			unclaimed += 1
+		end
+	end
+	-- The premium track: bought once, for Robux.
+	if not premium then
+		local id = Store.RobuxProducts.SeasonPremium or 0
+		local price = Store.robuxPrice("SeasonPremium") or 0
+		local unlock = button(header, if id ~= 0
+			then string.format("★ UNLOCK PREMIUM  R$ %d", price)
+			else string.format("★ PREMIUM  R$ %d · SOON", price), true, function()
+			if id ~= 0 then
+				MarketplaceService:PromptProductPurchase(Players.LocalPlayer, id)
+			else
+				UiKit.toast("Not on sale yet: its Robux product isn't set up.", P.Dim)
+			end
+		end)
+		unlock.AnchorPoint = Vector2.new(1, 0)
+		unlock.Position = UDim2.new(1, if unclaimed > 0 then -190 else 0, 0, 12)
+	else
+		local tag = text(header, "★ PREMIUM UNLOCKED", 14, P.Gold, BOLD)
+		tag.AnchorPoint = Vector2.new(1, 0)
+		tag.Position = UDim2.new(1, if unclaimed > 0 then -190 else 0, 0, 22)
 	end
 	if unclaimed > 0 then
 		local all = button(header, string.format("CLAIM ALL (%d)", unclaimed), true, function()
@@ -145,7 +172,9 @@ function SeasonUI.refresh()
 	for l = 1, Season.MaxLevel do
 		local reward = Season.reward(l)
 		local reached = l <= level
+		local extra = Season.premiumReward(l)
 		local claimed = season.Claimed[tostring(l)] == true
+			and (not premium or not extra or premiumClaimed[tostring(l)] == true)
 		local special = reward.Cosmetics ~= nil
 		local card = box(
 			strip,
@@ -176,9 +205,28 @@ function SeasonUI.refresh()
 		}, card)
 		glyph.Name = "Icon"
 		local what = text(card, table.concat(Store.describe(reward, cosmeticName), "\n"), 11, P.Text, BOLD)
-		what.Position = UDim2.fromOffset(6, 96)
+		what.Position = UDim2.fromOffset(6, 92)
 		what.Size = UDim2.new(1, -12, 0, 0)
 		what.TextXAlignment = Enum.TextXAlignment.Center
+		-- The premium track's reward at this level: a gold band.
+		if extra then
+			local band = box(card, UDim2.fromOffset(6, 122), UDim2.new(1, -12, 0, 46), Color3.fromRGB(60, 46, 20), 6)
+			local bandStroke = band:FindFirstChildOfClass("UIStroke")
+			if bandStroke then
+				bandStroke.Color, bandStroke.Transparency = P.Gold, if premium then 0.1 else 0.6
+			end
+			local head = text(band, if premium then "★ PREMIUM" else "🔒 PREMIUM", 10, P.Gold, BOLD)
+			head.Position = UDim2.fromOffset(0, 4)
+			head.Size = UDim2.new(1, 0, 0, 12)
+			head.AutomaticSize = Enum.AutomaticSize.None
+			head.TextXAlignment = Enum.TextXAlignment.Center
+			local items = text(band, table.concat(Store.describe(extra, cosmeticName), ", "), 10, if premium then P.Text else P.Dim, BOLD)
+			items.Position = UDim2.fromOffset(4, 18)
+			items.Size = UDim2.new(1, -8, 0, 28)
+			items.AutomaticSize = Enum.AutomaticSize.None
+			items.TextWrapped = true
+			items.TextXAlignment = Enum.TextXAlignment.Center
+		end
 		if claimed then
 			local done = text(card, "✓ CLAIMED", 12, P.Good, BOLD)
 			done.AnchorPoint = Vector2.new(0, 1)
@@ -207,7 +255,7 @@ function SeasonUI.refresh()
 	earn.Position = UDim2.fromOffset(0, 340)
 	local hint = text(
 		body,
-		"Special levels (5, 10, 15, 20, 25, 30) unlock trims and back pieces you can't buy. Wear them from the Shop.",
+		"Special levels (5, 10, 15, 20, 25, 30) unlock trims and back pieces you can't buy. Premium adds a Moonsteel skin, a title and the Lunar Frontier suit.",
 		13,
 		P.Text
 	)

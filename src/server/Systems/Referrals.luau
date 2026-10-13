@@ -4,7 +4,8 @@
 	ReferredByPlayerId). That's recorded against the inviter in a DataStore,
 	so it counts even when they're offline or in another server; each friend
 	counts once. Once enough friends have joined, the inviter earns the
-	reward weapon skin (and wear it): on their next join, or when they press CHECK CLAIM.
+	rewards of every tier reached (Shared.Referrals.Tiers) and wears them: on
+	their next join, or when they press CHECK CLAIM.
 
 	Request actions:
 	  "ReferralState"   refresh from the store, grant the reward if earned;
@@ -65,14 +66,17 @@ local function settle(player: Player): (boolean, number?)
 	if count then
 		profile.Referrals.Count = math.max(profile.Referrals.Count or 0, count)
 	end
-	local reward = Cosmetics.get(ReferralRules.Reward)
-	local granted = false
-	if reward and ReferralRules.earned(profile.Referrals.Count) and not ownsReward(profile) then
-		profile.Cosmetics.Owned[reward.Id] = true
-		-- Show it off straight away.
-		PlayerData.setCosmetic(player, reward.Kind, reward.Id)
-		profile.Referrals.ClaimedAt = os.time()
-		granted = true
+	-- Every tier reached (Referrals.Tiers) that isn't yours yet; each goes
+	-- straight on, to show it off.
+	local granted = nil
+	for _, id in ReferralRules.rewardsFor(profile.Referrals.Count) do
+		local reward = Cosmetics.get(id)
+		if reward and not profile.Cosmetics.Owned[id] then
+			profile.Cosmetics.Owned[id] = true
+			PlayerData.setCosmetic(player, reward.Kind, reward.Id)
+			profile.Referrals.ClaimedAt = os.time()
+			granted = reward
+		end
 	end
 	PlayerData.sync(player)
 	return granted, count
@@ -127,11 +131,15 @@ local function state(player: Player)
 	local granted = settle(player)
 	local count = profile.Referrals and profile.Referrals.Count or 0
 	local claimed = ownsReward(profile)
-	local reward = Cosmetics.get(ReferralRules.Reward)
+	local nextTier = ReferralRules.nextTier(count)
 	local message = if granted
-		then string.format("%s unlocked and on your weapon!", reward and reward.Name or "Reward")
-		elseif claimed then "Already yours. Thanks for bringing a friend!"
-		else "Not yet: your invited friend needs to join. It unlocks automatically."
+		then string.format("%s unlocked and equipped!", granted.Name)
+		elseif nextTier then string.format(
+			"%d / %d friends joined. The next reward unlocks automatically.",
+			count,
+			nextTier.Friends
+		)
+		else "Every reward is yours. Thanks for bringing your friends!"
 	return reply(claimed, message, { Count = count, Needed = ReferralRules.Needed, Claimed = claimed })
 end
 
