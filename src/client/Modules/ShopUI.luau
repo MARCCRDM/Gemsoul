@@ -46,7 +46,8 @@ local WHITE = Color3.new(1, 1, 1)
 local WIDTH, HEIGHT = 1040, 640
 local BODY_X, BODY_Y = 26, 132
 local BODY_W, BODY_H = WIDTH - 52, HEIGHT - 156
-local RARITY_NAMES = { Common = "Common", Uncommon = "Uncommon", Rare = "Rare", UltraRare = "Ultra Rare" }
+local RARITY_NAMES =
+	{ Common = "Common", Uncommon = "Uncommon", Rare = "Rare", UltraRare = "Ultra Rare", Legendary = "Legendary" }
 local TAB_LABELS = {
 	Featured = "Featured",
 	Free = "Free",
@@ -846,8 +847,11 @@ local function drawCosmetics(kind: string)
 		ScrollBarImageColor3 = P.Edge,
 		BorderSizePixel = 0,
 	}, body)
+	-- Skins and suits show in 3D, so their tiles are taller.
+	local tall = kind == "Skin" or kind == "Suit"
+	local stageH = if tall then 112 else 74
 	new("UIGridLayout", {
-		CellSize = UDim2.fromOffset(138, 150),
+		CellSize = UDim2.fromOffset(138, if tall then 186 else 150),
 		CellPadding = UDim2.fromOffset(12, 12),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, grid)
@@ -870,20 +874,21 @@ local function drawCosmetics(kind: string)
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}, tile)
 		IronUi.highlight(tile)
+		local artSize = if cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit" then stageH else 74
 		local holder = new("Frame", {
 			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(32, 18),
-			Size = UDim2.fromOffset(74, 74),
+			Position = UDim2.fromOffset(69 - artSize / 2, 18 + (stageH - artSize) / 2),
+			Size = UDim2.fromOffset(artSize, artSize),
 		}, tile)
-		ShopArt.icon(holder, "Cosmetic", id, 74)
+		ShopArt.icon(holder, "Cosmetic", id, artSize)
 		local name = label(tile, cosmetic.Name, 12, WHITE, CHUNKY)
-		place(name, 8, 94, 122, 16)
+		place(name, 8, stageH + 20, 122, 16)
 		name.TextXAlignment = Enum.TextXAlignment.Center
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		-- Status line: equipped, owned, a price, or how it's earned.
 		local status = new("Frame", {
 			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(0, 116),
+			Position = UDim2.fromOffset(0, stageH + 42),
 			Size = UDim2.new(1, 0, 0, 24),
 		}, tile)
 		UiKit.list(status, 4, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -898,7 +903,11 @@ local function drawCosmetics(kind: string)
 		elseif cosmetic.Exclusive then
 			chip(status, string.upper(Cosmetics.source(cosmetic)), P.Dim, false)
 		else
-			chip(status, "CRATE / SEASON", P.Dim, false)
+			-- Loot: which crate it drops from (long names in smaller type).
+			local where = chip(status, string.upper(Cosmetics.source(cosmetic)), P.Dim, false)
+			if #where.Text > 13 then
+				where.TextSize = 9
+			end
 		end
 		local rarity = label(tile, string.upper(RARITY_NAMES[cosmetic.Rarity]), 9, color, BOLD)
 		place(rarity, 8, 6, 120, 12)

@@ -2291,6 +2291,117 @@ local function buildPreviews(player: Player, store: Instance, loadout, wanted)
 	return true
 end
 
+-- Shop previews of skins and suits, shared by every player and built once:
+-- ReplicatedStorage.CosmeticPreviews[<id>], a folder of anchored parts.
+-- A suit is a whole miner in the standard kit wearing it; a skin, just the
+-- sword. Glowing seams and edges (SelectionBoxes, which a ViewportFrame
+-- can't draw) are baked into thin neon bars.
+local PREVIEW_KIT = {
+	Class = "Warrior",
+	Weapon = "MatrixSwords1",
+	Armor = "ArmorJuggernautArmor3",
+	Helmet = "ArmorJuggernautHelmet3",
+	Gloves = "ArmorJuggernautGloves3",
+	Boots = "ArmorJuggernautBoots3",
+}
+local cosmeticBusy = false
+
+local function bakeSeams(part: BasePart, box: SelectionBox, into: Instance)
+	local t = math.max(box.LineThickness, 0.02)
+	local size = part.Size
+	local hx, hy, hz = size.X / 2, size.Y / 2, size.Z / 2
+	for _, a in { -1, 1 } do
+		for _, b in { -1, 1 } do
+			for _, bar in {
+				{ Vector3.new(0, a * hy, b * hz), Vector3.new(size.X + t, t, t) },
+				{ Vector3.new(a * hx, 0, b * hz), Vector3.new(t, size.Y + t, t) },
+				{ Vector3.new(a * hx, b * hy, 0), Vector3.new(t, t, size.Z + t) },
+			} do
+				local line = Instance.new("Part")
+				line.Name = "Seam"
+				line.Anchored, line.CanCollide, line.CanQuery, line.CanTouch = true, false, false, false
+				line.Material, line.Color = Enum.Material.Neon, box.Color3
+				line.Size = bar[2]
+				line.CFrame = part.CFrame * CFrame.new(bar[1])
+				line.Parent = into
+			end
+		end
+	end
+end
+
+function Equipment.cosmeticPreview(id: string): boolean
+	local cosmetic = Cosmetics.get(id)
+	if not cosmetic or (cosmetic.Kind ~= "Skin" and cosmetic.Kind ~= "Suit") then
+		return false
+	end
+	local store = ReplicatedStorage:FindFirstChild("CosmeticPreviews")
+	if not store then
+		store = Instance.new("Folder")
+		store.Name = "CosmeticPreviews"
+		store.Parent = ReplicatedStorage
+	end
+	if store:FindFirstChild(id) then
+		return true
+	end
+	while cosmeticBusy do
+		task.wait()
+	end
+	if store:FindFirstChild(id) then
+		return true
+	end
+	cosmeticBusy = true
+	local rig = mannequin()
+	if not rig then
+		cosmeticBusy = false
+		return false
+	end
+	task.wait()
+	local origin = rig:GetPivot()
+	local cosmetics = { Owned = {}, [cosmetic.Kind] = id }
+	local ok, folder = pcall(dress, rig, PREVIEW_KIT, cosmetics, 0)
+	local source = ok and folder and (if cosmetic.Kind == "Skin" then folder:FindFirstChild("Weapon") else folder)
+	if source then
+		local preview = Instance.new("Folder")
+		preview.Name = id
+		preview:SetAttribute("Kind", cosmetic.Kind)
+		local parts = {}
+		for _, part in source:GetDescendants() do
+			if part:IsA("BasePart") and part.Transparency < 1 then
+				table.insert(parts, part)
+			end
+		end
+		if cosmetic.Kind == "Suit" then
+			-- Whatever of the body the suit leaves showing.
+			for _, part in rig:GetChildren() do
+				if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "HumanoidRootPart" then
+					table.insert(parts, part:Clone())
+				end
+			end
+		end
+		for _, part in parts do
+			local box = part:FindFirstChildOfClass("SelectionBox")
+			if box then
+				bakeSeams(part, box, preview)
+			end
+			for _, child in part:GetChildren() do
+				child:Destroy()
+			end
+			part.Anchored = true
+			part.Parent = preview
+		end
+		for _, part in preview:GetChildren() do
+			(part :: BasePart).CFrame = origin:ToObjectSpace((part :: BasePart).CFrame)
+		end
+		preview.Parent = store
+	end
+	if ok and folder then
+		folder:Destroy()
+	end
+	rig:Destroy()
+	cosmeticBusy = false
+	return source ~= nil
+end
+
 -- Builds previews for every owned item not being worn. Returns true when
 -- they're all up to date.
 function Equipment.previews(player: Player): boolean
@@ -2434,6 +2545,22 @@ function Equipment.start()
 	PlayerData.CharacterChanged:Connect(Equipment.apply)
 	Players.PlayerRemoving:Connect(function(player)
 		building[player] = nil
+	end)
+	-- The Shop asks for the skins and suits it's showing.
+	Shop.register("CosmeticPreviews", function(_player, ids)
+		if typeof(ids) ~= "table" then
+			return Shop.reply(false, "Nothing to preview.")
+		end
+		local built = 0
+		for i, id in ids do
+			if i > 60 then
+				break
+			end
+			if typeof(id) == "string" and Equipment.cosmeticPreview(id) then
+				built += 1
+			end
+		end
+		return Shop.reply(true, "", { Built = built })
 	end)
 	-- The Armory asks for previews when it opens and when the gear changes.
 	Shop.register("GearPreviews", function(player)
