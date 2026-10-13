@@ -1,5 +1,7 @@
--- The lobby's rarity reel, using the same sliding-strip treatment and native
--- GemArt as the starter roller. Outcomes have already been awarded by the server.
+-- The lobby's gem find: one round display rolls through gems (the same
+-- circle reel as the starter lottery) and lands on yours; its rarity, name,
+-- element and stats sit beside it, the stats as bars that fill once it lands.
+-- Outcomes have already been awarded by the server.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -16,7 +18,12 @@ local new = IronUi.new
 local INK = Color3.fromRGB(9, 17, 27)
 local WHITE = Color3.fromRGB(241, 249, 255)
 local DIM = Color3.fromRGB(155, 177, 199)
-local WIDTH, HEIGHT, WELL, CELL = 660, 342, 612, 124
+local WIDTH, HEIGHT = 660, 342
+local WELL, CELL = 196, 150 -- the round display, and one gem on its reel
+local CX, CY = 152, 166 -- the display's centre on the card
+local INFO = 300 -- where the right-hand column starts
+local GOLD = Color3.fromRGB(255, 206, 92)
+local SEGMENTS = 10
 local queue = {}
 local current = nil
 local generation = 0
@@ -55,23 +62,34 @@ local function burst(parent, rank, color)
 	-- One bounded burst; high rarity adds rays and a second expanding ring.
 	for i = 1, 4 + rank * 4 do
 		local a = i * math.pi * 2 / (4 + rank * 4)
-		local spark =
-			panel(parent, "RaritySpark", WIDTH / 2, 119, 3 + rank, 3 + rank, if i % 3 == 0 then WHITE else color, 7)
+		local spark = panel(parent, "RaritySpark", CX, CY, 3 + rank, 3 + rank, if i % 3 == 0 then WHITE else color, 7)
 		spark.Rotation = 45
 		tween(spark, 0.75 + rank * 0.06, {
-			Position = UDim2.fromOffset(WIDTH / 2 + math.cos(a) * (105 + rank * 17), 119 + math.sin(a) * 79),
+			Position = UDim2.fromOffset(CX + math.cos(a) * (118 + rank * 12), CY + math.sin(a) * (118 + rank * 12)),
 			BackgroundTransparency = 1,
 			Rotation = 135,
 		})
 	end
 	for i = 1, if rank >= 4 then 2 else 1 do
-		local ring = panel(parent, "RarityRing", WIDTH / 2, 119, 32, 32, color, 6)
+		local ring = panel(parent, "RarityRing", CX, CY, 32, 32, color, 6)
 		ring.AnchorPoint = Vector2.new(0.5, 0.5)
 		ring.BackgroundTransparency = 1
 		UiKit.round(ring, 200)
 		local edge = new("UIStroke", { Color = color, Thickness = if rank >= 4 then 2 else 1 }, ring)
-		tween(ring, 0.7 + i * 0.16, { Size = UDim2.fromOffset(130 + i * 38, 130 + i * 38) })
+		tween(ring, 0.7 + i * 0.16, { Size = UDim2.fromOffset(WELL + 30 + i * 40, WELL + 30 + i * 40) })
 		tween(edge, 0.7 + i * 0.16, { Transparency = 1 })
+	end
+end
+
+-- 1161 -> "1,161"
+local function commas(n: number): string
+	local text = tostring(math.floor(n + 0.5))
+	while true do
+		local swapped, count = string.gsub(text, "^(-?%d+)(%d%d%d)", "%1,%2")
+		text = swapped
+		if count == 0 then
+			return text
+		end
 	end
 end
 
@@ -99,14 +117,82 @@ local function show(loot, token)
 		Active = true,
 		ClipsDescendants = true,
 	}, anchor)
-	UiKit.round(card, 16)
+	UiKit.round(card, 18)
 	-- A CanvasGroup gradient would tint every gem and label after compositing.
 	-- Keep the rarity lighting on its own background layer.
 	local backdrop = panel(card, "RarityBackdrop", 0, 0, WIDTH, HEIGHT, WHITE, 1)
-	local paint = new("UIGradient", { Rotation = 115, Color = ColorSequence.new(INK, INK) }, backdrop)
-	local edge = new("UIStroke", { Color = DIM, Thickness = 2, Transparency = 0.25 }, card)
-	local accent = panel(card, "RarityAccent", 24, 0, WELL, 3, DIM)
-	local heading = label(card, "GEM DISCOVERED", 24, 16, 310, 22, 15)
+	local paint = new("UIGradient", {
+		Rotation = 0,
+		Color = ColorSequence.new(INK, INK),
+		Offset = Vector2.new(-0.25, 0),
+	}, backdrop)
+	local edge = new("UIStroke", { Color = DIM, Thickness = 2, Transparency = 0.2 }, card)
+	local accent = panel(card, "RarityAccent", 0, 0, WIDTH, 3, DIM)
+	local divider = panel(card, "ColumnRule", INFO - 22, 28, 1, HEIGHT - 56, DIM)
+	divider.BackgroundTransparency = 0.8
+
+	-- The display: a soft glow, a ring of light that sweeps round it while it
+	-- rolls, and the round window the gems roll through.
+	local glow = panel(card, "DisplayGlow", CX, CY, WELL + 64, WELL + 64, DIM, 2)
+	glow.AnchorPoint, glow.BackgroundTransparency = Vector2.new(0.5, 0.5), 0.9
+	UiKit.round(glow, 400)
+	local halo = panel(card, "DisplayHalo", CX, CY, WELL + 26, WELL + 26, INK, 3)
+	halo.AnchorPoint, halo.BackgroundTransparency = Vector2.new(0.5, 0.5), 1
+	UiKit.round(halo, 400)
+	local haloEdge = new("UIStroke", { Color = WHITE, Thickness = 3 }, halo)
+	local sweep = new("UIGradient", {
+		Rotation = 0,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.35, 0.85),
+			NumberSequenceKeypoint.new(0.65, 0.85),
+			NumberSequenceKeypoint.new(1, 0),
+		}),
+	}, haloEdge)
+	local holder = panel(card, "DisplayHolder", CX, CY, WELL, WELL, INK, 4)
+	holder.AnchorPoint, holder.BackgroundTransparency = Vector2.new(0.5, 0.5), 1
+	local punch = new("UIScale", { Scale = 1 }, holder)
+	local well = new("CanvasGroup", {
+		Name = "RollerWindow",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(14, 24, 36),
+		ClipsDescendants = true,
+		ZIndex = 4,
+	}, holder)
+	UiKit.round(well, WELL)
+	local wellEdge = new("UIStroke", { Color = DIM, Thickness = 2 }, well)
+	local wellPaint = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(INK, INK) }, well)
+	local slots = {}
+	for i = 1, 5 do
+		local cell = panel(well, "ReelCell", 0, 0, WELL, CELL, INK, 5)
+		cell.BackgroundTransparency = 1
+		local art = panel(cell, "Stone", (WELL - 132) / 2, (CELL - 132) / 2, 132, 132, INK, 5)
+		art.BackgroundTransparency = 1
+		slots[i] = { Frame = cell, Art = art }
+	end
+	-- Depth: the window darkens toward its top and bottom, so gems roll in
+	-- and out of the light.
+	local depth = panel(well, "Depth", 0, 0, WELL, WELL, INK, 6)
+	new("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.05),
+			NumberSequenceKeypoint.new(0.3, 1),
+			NumberSequenceKeypoint.new(0.7, 1),
+			NumberSequenceKeypoint.new(1, 0.05),
+		}),
+	}, depth)
+	local flash = panel(well, "LandFlash", 0, 0, WELL, WELL, WHITE, 7)
+	flash.BackgroundTransparency = 1
+	-- The rarity under the display, changing as each gem rolls past.
+	local pill = panel(card, "TierPill", CX - 70, CY + WELL / 2 + 18, 140, 26, INK, 5)
+	UiKit.round(pill, 13)
+	local pillEdge = new("UIStroke", { Color = DIM, Thickness = 1.5 }, pill)
+	local pillText = label(pill, "", 0, 0, 140, 26, 12, DIM)
+	pillText.TextXAlignment = Enum.TextXAlignment.Center
+
+	-- The right-hand column.
+	local heading = label(card, "ROLLING YOUR GEM", INFO, 22, 200, 18, 13, DIM)
 	local action = new("TextButton", {
 		Name = "RevealOrContinue",
 		Text = "REVEAL  ›",
@@ -114,11 +200,12 @@ local function show(loot, token)
 		TextSize = 13,
 		TextColor3 = WHITE,
 		BackgroundColor3 = Color3.fromRGB(36, 52, 69),
-		Position = UDim2.fromOffset(510, 10),
-		Size = UDim2.fromOffset(126, 38),
+		Position = UDim2.fromOffset(WIDTH - 24 - 126, 16),
+		Size = UDim2.fromOffset(126, 36),
 		ZIndex = 8,
 	}, card)
 	UiKit.round(action, 8)
+	local actionEdge = new("UIStroke", { Color = DIM, Thickness = 1.5, Transparency = 0.3 }, action)
 	local skip, dismiss, landed = false, false, false
 	action.Activated:Connect(function()
 		if landed then
@@ -137,48 +224,59 @@ local function show(loot, token)
 	local live = function()
 		return token == generation and gui.Parent ~= nil
 	end
-	local well = panel(card, "RollerWindow", 24, 56, WELL, 128, INK, 3)
-	well.ClipsDescendants = true
-	UiKit.round(well, 10)
-	local slots = {}
-	for i = 1, 7 do
-		local tile = panel(well, "ReelCell", 0, 8, CELL - 8, 112, Color3.fromRGB(20, 32, 46), 3)
-		UiKit.round(tile, 8)
-		local art = panel(tile, "Stone", 18, 2, 80, 80, INK, 4)
-		art.BackgroundTransparency = 1
-		local name = label(tile, "", 0, 85, CELL - 8, 16, 10)
-		name.TextXAlignment = Enum.TextXAlignment.Center
-		local stripe = panel(tile, "TierStripe", 12, 107, CELL - 32, 2, DIM, 4)
-		slots[i] = { Frame = tile, Art = art, Name = name, Stripe = stripe }
+	local status = label(card, "", INFO, 52, 336, 40, 34, DIM)
+	local detail = label(card, "", INFO, 94, 336, 24, 19)
+	local dot = panel(card, "ElementDot", INFO, 128, 10, 10, DIM, 5)
+	UiKit.round(dot, 5)
+	dot.BackgroundTransparency = 1
+	local element = label(card, "", INFO + 16, 123, 300, 20, 13, DIM)
+	-- Size, clarity and cut: ten segments each.
+	local bars = {}
+	for row, key in { "Size", "Clarity", "Cut" } do
+		local y = 158 + (row - 1) * 30
+		label(card, string.upper(key), INFO, y, 70, 16, 11, DIM)
+		local segments = {}
+		for i = 1, SEGMENTS do
+			local segment =
+				panel(card, "StatSegment", INFO + 74 + (i - 1) * 21, y + 2, 17, 12, Color3.fromRGB(32, 45, 60), 5)
+			UiKit.round(segment, 3)
+			segments[i] = segment
+		end
+		local value = label(card, "", INFO + 74 + SEGMENTS * 21 + 8, y, 46, 16, 13, DIM)
+		bars[key] = { Segments = segments, Value = value, Shown = -1 }
 	end
-	-- Fixed selection window and top/bottom pointers; the content moves underneath.
-	local selection = panel(well, "SelectedGem", (WELL - CELL) / 2, 5, CELL, 118, INK, 6)
-	selection.BackgroundTransparency = 1
-	UiKit.round(selection, 9)
-	local selectionEdge = new("UIStroke", { Color = WHITE, Thickness = 2 }, selection)
-	for _, y in { 1, 123 } do
-		local pointer = panel(well, "SelectionPointer", WELL / 2 - 4, y, 8, 8, WHITE, 7)
-		pointer.Rotation = 45
-	end
-	local status = label(card, "ROLLING YOUR GEM", 24, 197, 612, 29, 25, DIM)
-	status.TextXAlignment = Enum.TextXAlignment.Center
-	local detail = label(card, "", 28, 232, 604, 26, 17)
-	detail.TextXAlignment = Enum.TextXAlignment.Center
-	local metrics = label(card, "", 24, 266, 612, 20, 12, DIM)
-	metrics.TextXAlignment = Enum.TextXAlignment.Center
-	local footer = label(card, "", 24, 303, 612, 20, 12, DIM)
-	footer.TextXAlignment = Enum.TextXAlignment.Center
-	local progress = panel(card, "RollProgress", 24, 291, WELL, 2, Color3.fromRGB(42, 57, 72))
+	local valueCaption = label(card, "VALUE", INFO, 254, 70, 16, 11, DIM)
+	valueCaption.TextYAlignment = Enum.TextYAlignment.Center
+	local worth = label(card, "", INFO + 74, 248, 260, 28, 22, GOLD)
+	local progress = panel(card, "RollProgress", INFO, 288, WIDTH - 24 - INFO, 2, Color3.fromRGB(42, 57, 72))
 	local fill = panel(progress, "Fill", 0, 0, 0, 2, DIM)
+	local footer = label(card, "", INFO, 300, WIDTH - 24 - INFO, 20, 12, DIM)
 	local effects = panel(card, "Celebration", 0, 0, WIDTH, HEIGHT, INK, 6)
 	effects.BackgroundTransparency = 1
+
+	local function showBar(key, amount, color)
+		local bar = bars[key]
+		amount = math.clamp(math.floor(amount or 0), 0, SEGMENTS)
+		if bar.Shown == amount and bar.Color == color then
+			return
+		end
+		bar.Shown, bar.Color = amount, color
+		for i, segment in bar.Segments do
+			segment.BackgroundColor3 = if i <= amount then color else Color3.fromRGB(32, 45, 60)
+		end
+		bar.Value.Text = amount .. "/10"
+		bar.Value.TextColor3 = if amount >= SEGMENTS then GOLD else WHITE
+	end
 	local function palette(tier, strength)
 		local color = GemConfig.TierColors[tier] or WHITE
-		edge.Color, accent.BackgroundColor3, selectionEdge.Color, fill.BackgroundColor3 = color, color, color, color
-		paint.Color = ColorSequence.new(color:Lerp(INK, 0.92 - strength * 0.22), INK)
-		status.TextColor3 = color
+		edge.Color, accent.BackgroundColor3, fill.BackgroundColor3 = color, color, color
+		haloEdge.Color, wellEdge.Color, pillEdge.Color, pillText.TextColor3 = color, color, color, color
+		glow.BackgroundColor3, divider.BackgroundColor3, actionEdge.Color = color, color, color
+		paint.Color = ColorSequence.new(color:Lerp(INK, 0.9 - strength * 0.12), INK)
+		wellPaint.Color = ColorSequence.new(color:Lerp(INK, 0.7), INK)
+		pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier)
 	end
-	-- Only seven reel cells are alive. Five templates are built once and recycled,
+	-- Only five reel cells are alive. Five templates are built once and recycled,
 	-- instead of constructing a viewport for every entry in the long strip.
 	local templates = Instance.new("Folder")
 	local views = {}
@@ -198,16 +296,22 @@ local function show(loot, token)
 	gui.Destroying:Once(function()
 		templates:Destroy()
 	end)
-	local sequence = {}
+	-- The strip: rarities rolled like real finds, each with its own stats for
+	-- the bars to flicker through, and the awarded gem at the target.
+	local sequence, teases = {}, {}
 	local target = 23
-	for i = 0, target + 4 do
+	local function grade()
+		return 2 + math.floor(rng:NextNumber() * 8)
+	end
+	for i = 0, target + 3 do
 		sequence[i] = GemRoller.rollRarity(rng)
+		teases[i] = { Size = grade(), Clarity = grade(), Cut = grade() }
 	end
 	sequence[target] = gem.Tier
 	local lastIndex = -1
 	local function render(position, strength)
 		local center = math.floor(position + 0.5)
-		for index = center - 3, center + 3 do
+		for index = center - 2, center + 2 do
 			local slot = slots[index % #slots + 1]
 			local tier = sequence[index] or "Common"
 			if slot.Index ~= index then
@@ -215,16 +319,34 @@ local function show(loot, token)
 				slot.Art:ClearAllChildren()
 				local view = (if index == target then views.Winner else views[tier]):Clone()
 				view.CurrentCamera = view:FindFirstChildOfClass("Camera")
-				view.ZIndex, view.Parent = 4, slot.Art
-				slot.Name.Text = string.upper(GemConfig.TierLabels[tier] or tier)
-				slot.Name.TextColor3 = GemConfig.TierColors[tier] or WHITE
-				slot.Stripe.BackgroundColor3 = slot.Name.TextColor3
+				view.ZIndex, view.Parent = 5, slot.Art
 			end
-			slot.Frame.Position = UDim2.fromOffset(WELL / 2 + (index - position) * CELL - (CELL - 8) / 2, 8)
+			-- The strip rolls downward: later gems come in from the top.
+			slot.Frame.Position = UDim2.fromOffset(0, (WELL - CELL) / 2 + (position - index) * CELL)
 		end
 		if lastIndex ~= center then
 			lastIndex = center
-			palette(sequence[center] or "Common", strength)
+			local tier = sequence[center] or "Common"
+			palette(tier, strength)
+			local tease = teases[center] or teases[0]
+			local color = (GemConfig.TierColors[tier] or WHITE):Lerp(INK, 0.35)
+			-- The big rarity name and the value flick through each gem as it
+			-- rolls past, dimmed, like a slot machine's window.
+			status.Text = string.upper(GemConfig.TierLabels[tier] or tier)
+			status.TextColor3 = color
+			local value = GemConfig.value({
+				Tier = tier,
+				Element = gem.Element,
+				Size = tease.Size,
+				Clarity = tease.Clarity,
+				Cut = tease.Cut,
+			})
+			worth.Text = "≈ " .. commas(value) .. " coins"
+			worth.TextColor3 = GOLD:Lerp(INK, 0.45)
+			for key, bar in bars do
+				showBar(key, tease[key], color)
+				bar.Value.TextColor3 = DIM
+			end
 			LotterySound.tick(strength)
 		end
 	end
@@ -232,8 +354,9 @@ local function show(loot, token)
 	local started = os.clock()
 	while live() and not skip do
 		local p = math.clamp((os.clock() - started) / duration, 0, 1)
-		render(3 + (target - 3) * (1 - (1 - p) ^ 3), p)
+		render(2 + (target - 2) * (1 - (1 - p) ^ 3), p)
 		fill.Size = UDim2.new(p, 0, 1, 0)
+		sweep.Rotation = (os.clock() - started) * (540 - 380 * p)
 		if p >= 1 then
 			break
 		end
@@ -247,16 +370,24 @@ local function show(loot, token)
 	palette(gem.Tier, rank / 5)
 	fill.Size = UDim2.fromScale(1, 1)
 	heading.Text = if rank == 5 then "LEGENDARY DISCOVERY" elseif rank >= 3 then "RARE FIND" else "GEM DISCOVERED"
+	heading.TextColor3 = winningColor
 	status.Text = string.upper(GemConfig.TierLabels[gem.Tier] or gem.Tier)
-	status.TextSize = if rank >= 4 then 32 else 28
-	detail.Text = GemConfig.shade(gem).Name .. "  ·  " .. GemConfig.elementName(gem.Element)
-	metrics.Text = string.format(
-		"SIZE %d/10     CLARITY %d/10     CUT %d/10     ·     VALUE ~%d COINS",
-		gem.Size,
-		gem.Clarity,
-		gem.Cut or 0,
-		GemConfig.value(gem)
-	)
+	status.TextColor3 = winningColor
+	status.TextSize = if rank >= 4 then 36 else 32
+	detail.Text = GemConfig.shade(gem).Name
+	local elementColor = GemConfig.ElementColors[gem.Element] or WHITE
+	dot.BackgroundColor3, dot.BackgroundTransparency = elementColor, 0
+	element.Text = string.upper(GemConfig.elementName(gem.Element))
+	element.TextColor3 = elementColor
+	worth.Text = "≈ " .. commas(GemConfig.value(gem)) .. " coins"
+	worth.TextColor3 = GOLD
+	for _, bar in bars do
+		bar.Shown = -1
+		for _, segment in bar.Segments do
+			segment.BackgroundColor3 = Color3.fromRGB(32, 45, 60)
+		end
+		bar.Value.Text = ""
+	end
 	local extras = { "Added to your gem inventory" }
 	if loot.Coins then
 		table.insert(extras, "+" .. loot.Coins .. " coins")
@@ -269,20 +400,38 @@ local function show(loot, token)
 	action.Text = "CONTINUE  ›"
 	LotterySound.reveal(rank)
 	burst(effects, rank, winningColor)
+	-- The gem lands: a flash in the window and a punch of the whole display.
+	flash.BackgroundTransparency = 0.25
+	tween(flash, 0.45, { BackgroundTransparency = 1 })
+	punch.Scale = 1.12
+	tween(punch, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
 	-- Rare finds earn their own light rays without washing out the text.
 	if rank >= 3 then
-		for i = 1, rank * 2 do
-			local ray = panel(effects, "RarityRay", WIDTH / 2, 119, 2, 32 + rank * 8, winningColor, 6)
-			ray.AnchorPoint = Vector2.new(0.5, 1.8)
-			ray.Rotation = i * 360 / (rank * 2)
-			ray.BackgroundTransparency = 0.55
-			tween(ray, 1.1, { BackgroundTransparency = 1 })
+		for i = 1, rank * 3 do
+			local ray = panel(effects, "RarityRay", CX, CY, 3, WELL / 2 + 24 + rank * 8, winningColor, 3)
+			ray.AnchorPoint = Vector2.new(0.5, 1)
+			ray.Rotation = i * 360 / (rank * 3)
+			ray.BackgroundTransparency = 0.5
+			tween(ray, 1.3, { BackgroundTransparency = 1 })
 		end
 	end
+	-- Then the stats fill in, one segment at a time, row after row.
+	local stats = { Size = gem.Size, Clarity = gem.Clarity, Cut = gem.Cut or 0 }
 	started = os.clock()
 	while live() and not dismiss do
+		local t = os.clock() - started
+		for row, key in { "Size", "Clarity", "Cut" } do
+			local shown = math.clamp(math.floor((t - 0.25 - (row - 1) * 0.18) / 0.04), 0, stats[key])
+			if shown ~= bars[key].Shown then
+				showBar(key, shown, winningColor)
+				if shown > 0 then
+					LotterySound.tick(shown / SEGMENTS)
+				end
+			end
+		end
+		sweep.Rotation = t * 40
 		local hold = if #queue > 0 then 1.5 else 2.6 + rank * 0.2
-		if os.clock() - started >= hold then
+		if t >= hold then
 			break
 		end
 		RunService.RenderStepped:Wait()
