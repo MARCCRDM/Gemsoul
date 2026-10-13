@@ -32,6 +32,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local ArmorSignatures = require(ReplicatedStorage.Shared.ArmorSignatures)
@@ -415,6 +416,27 @@ local gui: ScreenGui? = nil
 local ui: any = {}
 local draw -- (below)
 local dropTargets = {}
+-- What a dragged gem can land on: a worn piece's socket, or a Q / E / R key
+-- (with the triad: any gem with a move for that key), and the request it sends.
+local function acceptsSlot(slot: string, item): boolean
+	return item.Kind == "Gem" and loadoutNow()[slot] ~= nil
+end
+local function acceptsKey(key: string, item): boolean
+	if item.Kind ~= "Gem" then
+		return false
+	end
+	if Traits.active(loadoutNow()) then
+		return Traits.traitFor(item.Gem, key) ~= nil
+	end
+	return Tech.surgeStats(item.Gem) ~= nil
+end
+local function socketInto(target: string, item)
+	if table.find(KEYS, target) then
+		request("SocketSurge", (item.Gem :: any).Id, target)
+	else
+		request("SocketGem", (item.Gem :: any).Id, target)
+	end
+end
 local drag: any = nil
 local suppressClickUntil = 0
 
@@ -823,10 +845,10 @@ local function buildRow(parent: Instance, slot: string, y: number)
 		Frame = row,
 		Stroke = edge,
 		Accepts = function(item: Item)
-			return item.Kind == "Gem" and loadoutNow()[slot] ~= nil
+			return acceptsSlot(slot, item)
 		end,
 		Drop = function(item: Item)
-			request("SocketGem", (item.Gem :: any).Id, slot)
+			socketInto(slot, item)
 		end,
 	})
 	return entry
@@ -928,6 +950,16 @@ local function buildRight(canvas: Frame)
 			end
 		end)
 		ui.Strip[slot] = { Tile = tile, Edge = edge, Icon = holder }
+		table.insert(dropTargets, {
+			Frame = tile,
+			Stroke = edge,
+			Accepts = function(item: Item)
+				return acceptsSlot(slot, item)
+			end,
+			Drop = function(item: Item)
+				socketInto(slot, item)
+			end,
+		})
 		sx += 38
 		if slot == "Boots" then
 			sx += 8
@@ -955,14 +987,41 @@ local function buildRight(canvas: Frame)
 			end
 		end)
 		ui.Strip[key] = { Tile = tile, Edge = edge }
+		table.insert(dropTargets, {
+			Frame = tile,
+			Stroke = edge,
+			Accepts = function(item: Item)
+				return acceptsKey(key, item)
+			end,
+			Drop = function(item: Item)
+				socketInto(key, item)
+			end,
+		})
 		sx += 34
 	end
 	-- The card: piece + gem (or the surge), and the perk.
 	local card = frame(detail, Color3.fromRGB(255, 255, 255), 0.965)
 	place(card, 0, 46, RIGHT_W, 262)
 	round(card, 14)
-	stroke(card, C.Line, 1, 0.92)
+	local cardEdge = stroke(card, C.Line, 1, 0.92)
+	card.Name = "DetailCard"
 	ui.Card = card
+	table.insert(dropTargets, {
+		Frame = card,
+		Stroke = cardEdge,
+		Accepts = function(item: Item)
+			local target = state.Detail
+			if not target then
+				return false
+			end
+			return if table.find(KEYS, target) then acceptsKey(target, item) else acceptsSlot(target, item)
+		end,
+		Drop = function(item: Item)
+			if state.Detail then
+				socketInto(state.Detail, item)
+			end
+		end,
+	})
 	local function well(cx: number, circle: boolean)
 		local holder = frame(card, C.Ink, 0.45)
 		holder.AnchorPoint = Vector2.new(0.5, 0)
@@ -1206,17 +1265,11 @@ local function buildSurges(canvas: Frame)
 			Frame = card,
 			Stroke = edge,
 			Accepts = function(item: Item)
-				if item.Kind ~= "Gem" then
-					return false
-				end
-				if triadOn(loadoutNow()) then
-					return Traits.traitFor(item.Gem, key) ~= nil
-				end
-				return Tech.surgeStats(item.Gem) ~= nil
+				return acceptsKey(key, item)
 			end,
 			Drop = function(item: Item)
 				-- (with the triad on, the server sockets it in the sword, the core or the shield)
-				request("SocketSurge", (item.Gem :: any).Id, key)
+				socketInto(key, item)
 			end,
 		})
 		-- The key's job, above its name (OFFENSE / ABILITY / DEFENSE).
@@ -1229,28 +1282,60 @@ end
 -- Drag and drop ----------------------------------------------------------------------------------------
 -- (as in the first Inventory: mouse in screen space, touch as reported)
 
+-- Where the pointer is, in the screen space the Dashboard's frames use
+-- (it ignores the top-bar inset). The mouse reads in that space already; a
+-- touch is reported from under the top bar, so the inset is added back.
 local function pointOf(input: InputObject, touch: boolean): Vector2
-	return if touch then Vector2.new(input.Position.X, input.Position.Y) else UserInputService:GetMouseLocation()
+	local point = if touch
+		then Vector2.new(input.Position.X, input.Position.Y) + GuiService:GetGuiInset()
+		else UserInputService:GetMouseLocation()
+	if gui and not gui.IgnoreGuiInset then
+		point -= GuiService:GetGuiInset()
+	end
+	return point
 end
+-- On screen for real: it and everything it sits in are visible. (A frame
+-- can be Visible inside a hidden panel: the equipment rows behind the
+-- detail panel must never catch a drop.)
+local function shown(object: Instance?): boolean
+	while object and object:IsA("GuiObject") do
+		if not object.Visible then
+			return false
+		end
+		object = object.Parent
+	end
+	return object ~= nil and (not object:IsA("ScreenGui") or object.Enabled)
+end
+local function inside(f: GuiObject, point: Vector2): boolean
+	local p, size = f.AbsolutePosition, f.AbsoluteSize
+	return point.X >= p.X and point.Y >= p.Y and point.X < p.X + size.X and point.Y < p.Y + size.Y
+end
+-- The drop target under the pointer: the smallest one that takes the item
+-- (a strip tile over the detail card, a key over the panel).
 local function targetAt(point: Vector2, item: Item)
+	local best, bestArea = nil, math.huge
 	for _, target in dropTargets do
 		local f = target.Frame
-		local p, s = f.AbsolutePosition, f.AbsoluteSize
-		if f.Visible and target.Accepts(item) and point.X >= p.X and point.Y >= p.Y and point.X < p.X + s.X and point.Y < p.Y + s.Y then
-			return target
+		if shown(f) and inside(f, point) and target.Accepts(item) then
+			local area = f.AbsoluteSize.X * f.AbsoluteSize.Y
+			if area < bestArea then
+				best, bestArea = target, area
+			end
 		end
 	end
-	return nil
+	return best
 end
-local function lightTargets(item: Item?)
+-- Every place the item could go lights gold; the one under the pointer, brighter.
+local function lightTargets(item: Item?, over: any?)
 	for _, target in dropTargets do
 		if target.Base == nil then
 			target.Base = { target.Stroke.Color, target.Stroke.Transparency, target.Stroke.Thickness }
 		end
-		local ok = item ~= nil and target.Accepts(item)
+		local ok = item ~= nil and shown(target.Frame) and target.Accepts(item)
+		local hot = ok and target == over
 		target.Stroke.Color = if ok then C.Gold else target.Base[1]
-		target.Stroke.Transparency = if ok then 0.1 else target.Base[2]
-		target.Stroke.Thickness = if ok then 2 else target.Base[3]
+		target.Stroke.Transparency = if hot then 0 elseif ok then 0.25 else target.Base[2]
+		target.Stroke.Thickness = if hot then 3 elseif ok then 2 else target.Base[3]
 	end
 	if item == nil then
 		for _, target in dropTargets do
@@ -1264,6 +1349,9 @@ function InventoryV2.cancelDrag()
 	end
 	local was = drag ~= nil
 	drag = nil
+	if ui.Grid then
+		ui.Grid.ScrollingEnabled = true
+	end
 	if was then
 		lightTargets(nil)
 	end
@@ -1303,10 +1391,27 @@ UserInputService.InputChanged:Connect(function(input)
 			gemArt(art, current.Item.Gem)
 		end
 		current.Ghost = ghost
-		lightTargets(current.Item)
+		-- (A touch drag moves the gem, not the grid.)
+		if ui.Grid then
+			ui.Grid.ScrollingEnabled = false
+		end
+		if InventoryV2.hideTip then
+			InventoryV2.hideTip()
+		end
 	end
 	if current.Ghost then
 		current.Ghost.Position = UDim2.fromOffset(point.X, point.Y - (if current.Touch then 40 else 0))
+		local over = targetAt(point, current.Item)
+		if over ~= current.Over or not current.Lit then
+			current.Over, current.Lit = over, true
+			lightTargets(current.Item, over)
+		end
+	end
+end)
+-- Let go outside the window (or it lost focus): drop nothing, end the drag.
+UserInputService.WindowFocusReleased:Connect(function()
+	if drag then
+		InventoryV2.cancelDrag()
 	end
 end)
 UserInputService.InputEnded:Connect(function(input)
@@ -1322,6 +1427,9 @@ UserInputService.InputEnded:Connect(function(input)
 	drag = nil
 	if current.Ghost then
 		current.Ghost:Destroy()
+	end
+	if ui.Grid then
+		ui.Grid.ScrollingEnabled = true
 	end
 	lightTargets(nil)
 	if current.Active then
