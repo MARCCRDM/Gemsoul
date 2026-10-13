@@ -642,12 +642,12 @@ end
 -- The Skyport (the Outpost): a bright afternoon over a sea of cloud, warm
 -- sun and soft haze, with the planets and the ring station hanging in it.
 function Scenes.outpostLighting()
-	Lighting.ClockTime = 14.6
+	Lighting.ClockTime = 15.4
 	Lighting.GeographicLatitude = 28
 	Lighting.Brightness = 2.6
 	Lighting.ExposureCompensation = 0.05
-	Lighting.Ambient = Color3.fromRGB(118, 116, 126)
-	Lighting.OutdoorAmbient = Color3.fromRGB(170, 166, 176)
+	Lighting.Ambient = Color3.fromRGB(129, 132, 120)
+	Lighting.OutdoorAmbient = Color3.fromRGB(177, 179, 158)
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 0.35
 	Lighting.GlobalShadows = true
@@ -661,19 +661,19 @@ function Scenes.outpostLighting()
 		return found
 	end
 	local atmosphere = get("Atmosphere")
-	atmosphere.Density = 0.3
+	atmosphere.Density = 0.24
 	atmosphere.Offset = 0.15
-	atmosphere.Color = Color3.fromRGB(205, 220, 242)
+	atmosphere.Color = Color3.fromRGB(213, 229, 238)
 	atmosphere.Decay = Color3.fromRGB(128, 150, 186)
 	atmosphere.Glare = 0.15
-	atmosphere.Haze = 1.4
+	atmosphere.Haze = 1.1
 	local sky = get("Sky")
 	sky.StarCount = 0
 	sky.CelestialBodiesShown = true
 	local bloom = get("BloomEffect")
-	bloom.Intensity, bloom.Size, bloom.Threshold = 0.3, 20, 2
+	bloom.Intensity, bloom.Size, bloom.Threshold = 0.16, 20, 2
 	local grade = get("ColorCorrectionEffect")
-	grade.Brightness, grade.Contrast, grade.Saturation = 0.03, 0.06, 0.12
+	grade.Brightness, grade.Contrast, grade.Saturation = 0.025, 0.035, 0.08
 	grade.TintColor = Color3.fromRGB(255, 249, 238)
 	local rays = get("SunRaysEffect")
 	rays.Intensity, rays.Spread = 0.06, 0.8
@@ -681,8 +681,8 @@ function Scenes.outpostLighting()
 	if terrain then
 		local clouds = get("Clouds", terrain)
 		clouds.Enabled = true
-		clouds.Cover = 0.62
-		clouds.Density = 0.55
+		clouds.Cover = 0.45
+		clouds.Density = 0.48
 		clouds.Color = Color3.new(1, 1, 1)
 	end
 end
