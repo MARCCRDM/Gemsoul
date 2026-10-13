@@ -273,8 +273,9 @@ local function spawnNode(field: boolean?)
 	model:SetAttribute("Hp", spec.Hp)
 	model:SetAttribute("MaxHp", spec.Hp)
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Mine"
-	prompt.ObjectText = spec.Name
+	prompt.ActionText = "Click to mine"
+	prompt.ObjectText = ""
+	prompt.Style = Enum.ProximityPromptStyle.Custom
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = Rules.Reach + spec.Scale / 2

@@ -35,6 +35,7 @@ local GemArt = require(script.Parent.GemArt)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
 local MobileLayout = require(script.Parent.MobileLayout)
+local MiningReveal = require(script.Parent.MiningReveal)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
@@ -55,7 +56,6 @@ local finds = { Gems = 0, Coins = 0, Gear = 0, Rocks = 0 }
 local nextSwing = 0
 local hiddenDashboard: ScreenGui? = nil
 
-local RARITY_NAMES = { "COMMON", "UNCOMMON", "RARE", "ULTRA-RARE", "LEGENDARY" }
 local RARITY_COLORS = {
 	GemConfig.TierColors.Common,
 	GemConfig.TierColors.Uncommon,
@@ -196,7 +196,7 @@ local buttons = new("Frame", {
 UiKit.list(buttons, 8, true)
 local hint = text(
 	hud,
-	"E / click a rock to mine  ·  G at a miner to duel  ·  F to invite  ·  E at PROBE-7 to trade",
+	"Click to mine  ·  G at a miner to duel  ·  F to invite  ·  E at PROBE-7 to trade",
 	14,
 	Color3.fromRGB(230, 238, 250),
 	IronUi.Bold,
@@ -225,11 +225,13 @@ local blockingScreens = {
 	Intro = true, Tutorial = true, MarketBoard = true,
 }
 local openScreens = {}
+local miningPrompts = {}
 local function fitOutpostHud()
 	local size = hud.AbsoluteSize
 	local mobile = UserInputService.TouchEnabled or size.Y < 540
 	local blocked = next(openScreens) ~= nil or player:GetAttribute("CombatSession") ~= nil
 		or (mobile and player:GetAttribute("ChatOpen") == true)
+	if blocked then MiningReveal.close() end
 	if blocked or not hud.Enabled then expanded = false end
 	card.Size = UDim2.fromOffset(300, if expanded then 100 elseif mobile then 64 else 44)
 	togglePick.Size = UDim2.fromScale(1, 1)
@@ -237,6 +239,9 @@ local function fitOutpostHud()
 	-- Keep the contents at their designed width; scale the whole card on narrow screens.
 	cardScale.Scale = math.min(if mobile then MobileLayout.CardScale else 1, math.max(0.1, (size.X - 24) / 300))
 	card.Visible = not blocked
+	for _, promptGui in miningPrompts do
+		promptGui.Enabled = not blocked and hud.Enabled
+	end
 	hint.Visible = not blocked and not UserInputService.TouchEnabled
 	charge.Frame.Visible = expanded
 	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")
@@ -593,29 +598,26 @@ fitReward()
 local revealToken = 0
 
 -- In the world: the gem rises out of the rubble in a beam of its colour.
-local function worldReveal(at: Vector3, color: Color3, rank: number)
-	local gem = Instance.new("Part")
-	gem.Anchored, gem.CanCollide, gem.CanQuery, gem.CanTouch = true, false, false, false
-	gem.Material = Enum.Material.Neon
-	gem.Color = color
-	gem.Size = Vector3.new(1.2, 1.8, 1.2)
-	gem.CFrame = CFrame.new(at)
-	local mesh = Instance.new("SpecialMesh")
-	mesh.MeshType = Enum.MeshType.Sphere
-	mesh.Scale = Vector3.new(0.8, 1.4, 0.8)
-	mesh.Parent = gem
+local function worldReveal(at: Vector3, color: Color3, rank: number, awardedGem)
+	local gem = GemArt.model(awardedGem, false)
+	gem.Name = "MiningGemDiscovery"
+	gem:PivotTo(CFrame.new(at) * GemArt.pose(awardedGem, 0))
+	for _, part in gem:GetDescendants() do
+		if part:IsA("BasePart") then part.CanQuery, part.CanTouch = false, false end
+	end
 	gem.Parent = workspace
 	local light = Instance.new("PointLight")
-	light.Color, light.Range, light.Brightness = color, 14 + rank * 4, 2 + rank
-	light.Parent = gem
+	light.Color, light.Range, light.Brightness = color, 10 + rank * 4, 1 + rank * 0.6
+	light.Parent = gem:FindFirstChildWhichIsA("BasePart")
 	local beam = Instance.new("Part")
 	beam.Anchored, beam.CanCollide, beam.CanQuery, beam.CanTouch = true, false, false, false
 	beam.Shape = Enum.PartType.Cylinder
 	beam.Material = Enum.Material.Neon
 	beam.Color = color
 	beam.Transparency = 0.35
-	beam.Size = Vector3.new(60, 0.3 + rank * 0.25, 0.3 + rank * 0.25)
-	beam.CFrame = CFrame.new(at + Vector3.new(0, 30, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	local beamHeight = 12 + rank * 8
+	beam.Size = Vector3.new(beamHeight, 0.15 + rank * 0.2, 0.15 + rank * 0.2)
+	beam.CFrame = CFrame.new(at + Vector3.new(0, beamHeight / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
 	beam.Parent = workspace
 	local t0 = os.clock()
 	local spin
@@ -625,140 +627,57 @@ local function worldReveal(at: Vector3, color: Color3, rank: number)
 			spin:Disconnect()
 			return
 		end
-		gem.CFrame = CFrame.new(at + Vector3.new(0, math.min(t, 0.8) * 5 + math.sin(t * 3) * 0.2, 0))
-			* CFrame.Angles(0, t * 4, 0)
+		gem:PivotTo(CFrame.new(at + Vector3.new(0, math.min(t, 0.8) * 5 + math.sin(t * 3) * 0.2, 0))
+			* GemArt.pose(awardedGem, t * 2))
 	end)
 	tween(
 		beam,
 		2.6,
-		{ Transparency = 1, Size = Vector3.new(60, 0.05, 0.05) },
+		{ Transparency = 1, Size = Vector3.new(beamHeight, 0.05, 0.05) },
 		Enum.EasingStyle.Quad,
 		Enum.EasingDirection.In
 	)
 	task.delay(2.4, function()
-		tween(gem, 0.4, { Transparency = 1 })
+		for _, part in gem:GetDescendants() do
+			if part:IsA("BasePart") then tween(part, 0.4, { Transparency = 1 }) end
+		end
 	end)
 	Debris:AddItem(gem, 3)
 	Debris:AddItem(beam, 3)
 end
 
--- On screen: a reel runs through the rarities, slows, and lands on yours.
+-- The gem roller owns its short queue; credit/log each find immediately so
+-- mining another rock never cancels the previous find's session totals.
 function OutpostScene.reveal(loot, at: Vector3?)
-	revealToken += 1
-	local token = revealToken
 	local rank = if loot.Gem then GemConfig.TierRank[loot.Gem.Tier] or 1 else 0
 	local color = if rank > 0 then RARITY_COLORS[rank] else P.Gold
-	if at then
-		worldReveal(at + Vector3.new(0, 1, 0), color, math.max(rank, 1))
+	if at and loot.Gem then
+		worldReveal(at + Vector3.new(0, 1, 0), color, rank, loot.Gem)
 	end
 	if loot.Tutorial then return end
-	revealCard.Visible = true
-	revealCard.BackgroundTransparency = 0.05
-	revealCard.Size = UDim2.fromOffset(420, 150)
-	extraLabel.Size = UDim2.fromOffset(420, 40)
-	extraLabel.Position = UDim2.fromOffset(0, 94)
-	revealScale.Scale = 0.85
-	tween(revealScale, 0.18, { Scale = 1 }, Enum.EasingStyle.Back)
-	gemLabel.Text, extraLabel.Text = "", ""
-	rewardArt:ClearAllChildren()
-	rewardArt.Visible = true
-	reelLabel.Position, reelLabel.Size, reelLabel.TextSize = UDim2.fromOffset(124, 12), UDim2.fromOffset(284, 26), 20
-	gemLabel.Position, gemLabel.Size = UDim2.fromOffset(124, 42), UDim2.fromOffset(284, 38)
-	gemLabel.TextWrapped = true
-	extraLabel.Position, extraLabel.Size, extraLabel.TextSize = UDim2.fromOffset(124, 82), UDim2.fromOffset(284, 60), 12
-	if loot.Gem then
-		GemArt.viewport(rewardArt, loot.Gem, true)
-	else
-		IronUi.emblem(rewardArt, if loot.Gear then "Equipment" else "Coins", P.Gold, 88)
-	end
-	local extras = {}
-	if loot.Gem then
-		local gem = loot.Gem
-		table.insert(
-			extras,
-			string.format(
-				"Size %d/10  Clarity %d/10  Cut %d/10\nValue ~%d coins",
-				gem.Size,
-				gem.Clarity,
-				gem.Cut or 0,
-				GemConfig.value(gem)
-			)
-		)
-	end
-	if loot.Coins then
-		table.insert(extras, "+" .. loot.Coins .. " coins")
-	end
-	if loot.Gear then
-		table.insert(extras, "⚙ " .. tostring(loot.Gear))
-	end
-	if loot.Full then
-		table.insert(extras, "Gem pouch full: sell or socket gems!")
-	end
-	-- The find goes into the chat frame's Loot tab too.
 	local found = {}
-	if loot.Gem and loot.Text then
-		table.insert(found, "[" .. loot.Text .. "]")
-	end
-	if loot.Gear then
-		table.insert(found, "[" .. tostring(loot.Gear) .. "]")
-	end
-	if loot.Coins then
-		table.insert(found, loot.Coins .. " coins")
-	end
+	if loot.Gem then table.insert(found, "[" .. (loot.Text or GemConfig.displayName(loot.Gem)) .. "]") end
+	if loot.Gear then table.insert(found, "[" .. tostring(loot.Gear) .. "]") end
+	if loot.Coins then table.insert(found, loot.Coins .. " coins") end
 	if #found > 0 then
 		require(script.Parent.ChatFrame).loot("You receive loot: " .. table.concat(found, ", "))
 	end
-	task.spawn(function()
-		if rank > 0 then
-			-- Spin: fast at first, slowing, ticking higher as it slows.
-			local steps = 14 + rank * 2
-			for i = 1, steps do
-				if token ~= revealToken then
-					return
-				end
-				local show = ((i - 1) % 5) + 1
-				if i == steps then
-					show = rank
-				end
-				reelLabel.Text = RARITY_NAMES[show]
-				reelLabel.TextColor3 = RARITY_COLORS[show]
-				revealStroke.Color = RARITY_COLORS[show]
-				local rise = i / steps
-				sound(PING, 1.2 + rise * 0.9, 0.12 + rise * 0.18)
-				task.wait(0.03 + rise * rise * 0.12)
-			end
-			LotterySound.reveal(rank)
-			sound(PING, 1, 0.5)
-			sound(PING, 1.5, 0.4, nil, 0.08)
-			if rank >= 3 then
-				sound(PING, 2, 0.4, nil, 0.16)
-			end
-			revealScale.Scale = 1.15
-			tween(revealScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
-			gemLabel.Text = loot.Text or "Gem"
-			gemLabel.TextColor3 = GemConfig.ElementColors[loot.Gem.Element] or Color3.new(1, 1, 1)
-			finds.Gems += 1
-		else
-			reelLabel.Text = if loot.Gear then "SALVAGE!" else "COIN CACHE"
-			reelLabel.TextColor3 = P.Gold
-			revealStroke.Color = P.Gold
-			sound(PING, 1.5, 0.35)
-			sound(PING, 2, 0.3, nil, 0.06)
+	finds.Gems += if loot.Gem then 1 else 0
+	finds.Coins += loot.Coins or 0
+	finds.Gear += if loot.Gear then 1 else 0
+	finds.Rocks += 1
+	refreshHud()
+	if loot.Gem then
+		revealToken += 1
+		revealCard.Visible = false
+		if active and not player:GetAttribute("CombatSession") and next(openScreens) == nil then
+			MiningReveal.push(loot)
 		end
-		extraLabel.Text = table.concat(extras, "   ·   ")
-		finds.Coins += loot.Coins or 0
-		finds.Gear += if loot.Gear then 1 else 0
-		finds.Rocks += 1
-		refreshHud()
-		task.wait(if rank >= 4 then 3.4 else 2.4)
-		if token == revealToken then
-			tween(revealCard, 0.3, { BackgroundTransparency = 1 })
-			task.wait(0.3)
-			if token == revealToken then
-				revealCard.Visible = false
-			end
-		end
-	end)
+	elseif #found > 0 then
+		UiKit.toast(table.concat(found, "  ·  "), P.Gold)
+		sound(PING, 1.5, 0.25)
+	end
+	if loot.Full then UiKit.toast("Gem pouch full: sell or socket gems!", P.Bad) end
 end
 
 -- A secret found: the reveal card, in mystery purple, with its story.
@@ -829,7 +748,7 @@ local function nearestRock(): Model?
 end
 
 function OutpostScene.swing(nodeId: number?)
-	if not active or player:GetAttribute("CombatSession") then
+	if not active or player:GetAttribute("CombatSession") or next(openScreens) ~= nil then
 		return
 	end
 	-- Not from the driver's seat.
@@ -1033,6 +952,32 @@ end
 
 -- Prompts: rocks, the Probe, the gate, other miners -----------------------------------------------------
 
+-- A small, clickable instruction instead of Roblox's large E + rock-name panel.
+ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
+	if prompt:GetAttribute("PromptKind") ~= "Mine" then return end
+	if miningPrompts[prompt] then miningPrompts[prompt]:Destroy() end
+	local promptGui = new("BillboardGui", {
+		Name = "ClickToMine", Adornee = prompt.Parent, AlwaysOnTop = true,
+		Size = UDim2.fromOffset(144, 36), StudsOffsetWorldSpace = Vector3.new(0, 1.6, 0),
+		Enabled = hud.Enabled and next(openScreens) == nil,
+	}, player.PlayerGui)
+	miningPrompts[prompt] = promptGui
+	local instruction = if inputType == Enum.ProximityPromptInputType.Touch then "Tap to mine"
+		elseif inputType == Enum.ProximityPromptInputType.Gamepad then "X to mine"
+		else "Click to mine"
+	local button = new("TextButton", {
+		Text = instruction, Font = IronUi.Bold, TextSize = 14, TextColor3 = Color3.fromRGB(230, 248, 255),
+		Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(9, 25, 34), BackgroundTransparency = 0.12,
+	}, promptGui)
+	UiKit.round(button, 9)
+	new("UIStroke", { Color = Color3.fromRGB(118, 211, 230), Transparency = 0.45 }, button)
+	button.Activated:Connect(function() OutpostScene.swing(prompt:GetAttribute("NodeId")) end)
+end)
+ProximityPromptService.PromptHidden:Connect(function(prompt)
+	local promptGui = miningPrompts[prompt]
+	if promptGui then promptGui:Destroy(); miningPrompts[prompt] = nil end
+end)
+
 ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
 	if who ~= player or not active then
 		return
@@ -1159,6 +1104,9 @@ local function exitScene()
 	hud.Enabled = false
 	probe.Gui.Enabled = false
 	revealCard.Visible = false
+	revealToken += 1
+	MiningReveal.close()
+	fitOutpostHud()
 	setWalking(false)
 	ThirdPerson.exit()
 	if hiddenDashboard then
@@ -1271,6 +1219,8 @@ player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 				showWorld()
 			else
 				hud.Enabled = false
+				MiningReveal.close()
+				fitOutpostHud()
 			end
 		end)
 	end
