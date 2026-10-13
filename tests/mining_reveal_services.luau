@@ -44,6 +44,8 @@ local UDim2 = { new = function(xs, xo, ys, yo) return { X = { Scale = xs, Offset
 UDim2.fromScale = function(x, y) return UDim2.new(x, 0, y, 0) end
 UDim2.fromOffset = function(x, y) return UDim2.new(0, x, 0, y) end
 local ColorSequence = { new = function(...) return { ... } end }
+local NumberSequence = { new = function(...) return { ... } end }
+local NumberSequenceKeypoint = { new = function(t, v) return { Time = t, Value = v } end }
 local TweenInfo = { new = function() return {} end }
 local Random = { new = function() return { NextNumber = function() return 0.01 end } end }
 local methods = {}

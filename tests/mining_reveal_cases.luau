@@ -5,7 +5,7 @@ local function loot(tier, id)
 end
 local function winner()
 	for _, o in objects do
-		if not o.Destroyed and o.Name == "ReelCell" and math.abs(o.Position.X.Offset - 248) < 0.01 then
+		if not o.Destroyed and o.Name == "ReelCell" and math.abs(o.Position.Y.Offset - 23) < 0.01 then
 			for _, child in o:GetChildren() do
 				if child.Name == "Stone" then return child:FindFirstChildOfClass("ViewportFrame").Gem end
 			end
