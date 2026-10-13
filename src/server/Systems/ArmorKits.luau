@@ -1992,57 +1992,170 @@ local function frontierSuit(family: number)
 			local shin = body[prefix .. "LowerLeg"]
 			if shin then
 				local s = shin.Size
-				block(shin, 0, 0, 0, s.X * 0.78, s.Y, s.Z * 0.77, cloth)
-				-- Diamond knee cap and tapered shin shell expose the flex joint.
-				block(shin, 0, s.Y * 0.45, -s.Z * 0.37, s.X * 0.47, s.Y * 0.34, s.Z * 0.32, edge, 45)
-				plate(shin, 0, -s.Y * 0.08, -s.Z * 0.37, s.X * 0.76, s.Y * 0.67, s.Z * 0.29, metal)
+				local width = s.X * (if family == 1 then 0.88 elseif family == 2 then 0.73 else 1.02)
+				block(shin, 0, 0, 0, s.X * 0.78, s.Y * 0.94, s.Z * 0.77, cloth)
+				-- Seat the knee guard in a dark wrap below the flex joint. The face
+				-- overlaps the greave, instead of a floating diamond above the knee.
+				block(shin, 0, s.Y * 0.32, -s.Z * 0.08, width, s.Y * 0.29, s.Z * 0.86, trim)
+				block(shin, 0, s.Y * 0.32, -s.Z * 0.53, width * 0.86, s.Y * 0.24, s.Z * 0.12, metal:Lerp(edge, 0.18))
+				-- The common boots already carry their family's silhouette.
+				if family == 1 then -- Prospector: enclosed work greave and mag-lock clasp.
+					block(shin, 0, -s.Y * 0.09, -s.Z * 0.42, width * 0.86, s.Y * 0.66, s.Z * 0.22, metal)
+					block(shin, 0, -s.Y * 0.23, -s.Z * 0.55, width * 0.88, s.Y * 0.1, s.Z * 0.07, trim)
+					block(
+						shin,
+						side * width * 0.22,
+						-s.Y * 0.23,
+						-s.Z * 0.595,
+						width * 0.2,
+						s.Y * 0.13,
+						s.Z * 0.055,
+						edge
+					)
+				elseif family == 2 then -- Skirmisher: split, swept shin plates and a light cuff.
+					for _, panel in sides() do
+						block(
+							shin,
+							panel * width * 0.22,
+							-s.Y * 0.075,
+							-s.Z * 0.43,
+							width * 0.41,
+							s.Y * (if panel == side then 0.65 else 0.53),
+							s.Z * 0.2,
+							metal,
+							panel * -5
+						)
+					end
+					block(
+						shin,
+						side * width * 0.24,
+						-s.Y * 0.08,
+						-s.Z * 0.54,
+						width * 0.055,
+						s.Y * 0.35,
+						s.Z * 0.025,
+						edge,
+						side * -5
+					)
+				else -- Juggernaut: overlapping lames, with a continuous armored knee.
+					for layer = 0, 2 do
+						local y = s.Y * (0.12 - layer * 0.21)
+						local w = width * (1 - layer * 0.075)
+						block(
+							shin,
+							0,
+							y,
+							-s.Z * (0.44 - layer * 0.025),
+							w * 0.86,
+							s.Y * 0.25,
+							s.Z * 0.25,
+							metal:Lerp(edge, layer * 0.18)
+						)
+						if rarity >= 2 then
+							block(
+								shin,
+								0,
+								y - s.Y * 0.1,
+								-s.Z * (0.575 - layer * 0.025),
+								w * 0.65,
+								s.Y * 0.024,
+								s.Z * 0.03,
+								edge
+							)
+						end
+					end
+				end
 				if rarity >= 2 then
-					block(shin, 0, -s.Y * 0.37, -s.Z * 0.56, s.X * 0.6, 0.055, 0.05, edge)
+					block(shin, 0, s.Y * 0.425, -s.Z * 0.6, width * 0.59, s.Y * 0.028, s.Z * 0.04, edge)
 					for _, fastener in sides() do
-						block(shin, fastener * s.X * 0.2, s.Y * 0.44, -s.Z * 0.56, 0.045, 0.045, 0.035, trim)
+						block(
+							shin,
+							fastener * width * 0.25,
+							s.Y * 0.32,
+							-s.Z * 0.61,
+							width * 0.06,
+							s.Y * 0.04,
+							s.Z * 0.035,
+							trim
+						)
 					end
 				end
 				if rarity >= 3 then
-					for _, edgeSide in { -1, 1 } do
-						block(shin, edgeSide * s.X * 0.28, -s.Y * 0.02, -s.Z * 0.48, 0.04, s.Y * 0.42, 0.08, trim)
-						block(shin, edgeSide * s.X * 0.24, -s.Y * 0.02, -s.Z * 0.54, 0.025, s.Y * 0.36, 0.035, edge)
+					for rib = 1, 2 do
+						block(
+							shin,
+							side * width * 0.47,
+							-s.Y * (0.04 + rib * 0.1),
+							-s.Z * 0.05,
+							s.X * 0.06,
+							s.Y * 0.025,
+							s.Z * 0.49,
+							ornament
+						)
 					end
 				end
 				if rarity >= 4 then
-					lit(shin, 0, s.Y * 0.4, -s.Z * 0.56, s.X * 0.19, 0.04, 0.035)
+					lit(shin, 0, s.Y * 0.32, -s.Z * 0.61, width * 0.18, s.Y * 0.027, s.Z * 0.025)
 				end
 				if rarity >= 5 then
-					block(shin, 0, -s.Y * 0.07, -s.Z * 0.55, 0.055, s.Y * 0.43, 0.04, BRASS)
+					block(shin, 0, s.Y * 0.425, -s.Z * 0.625, width * 0.45, s.Y * 0.023, s.Z * 0.02, BRASS)
 				end
 			end
 			local foot = body[prefix .. "Foot"]
 			if foot then
 				local s = foot.Size
-				block(foot, 0, 0, -s.Z * 0.09, s.X * 0.86, s.Y * 1.1, s.Z * 0.98, trim)
-				block(foot, 0, -s.Y * 0.47, -s.Z * 0.09, s.X * 0.92, 0.07, s.Z * 1.05, cloth)
+				local width = s.X * (if family == 1 then 0.94 elseif family == 2 then 0.79 else 1.06)
+				block(foot, 0, -s.Y * 0.22, -s.Z * 0.09, width * 0.95, s.Y * 0.48, s.Z * 0.98, trim)
+				block(foot, 0, -s.Y * 0.45, -s.Z * 0.09, width, s.Y * 0.17, s.Z * 1.05, cloth)
+				-- Sloped metal toe, separate heel and raised ankle collar; nothing
+				-- bridges the foot and lower-leg welds during a step.
 				wedge(
 					folder,
 					foot,
-					CFrame.new(0, s.Y * 0.25, -s.Z * 0.3),
-					Vector3.new(s.X * 0.81, s.Y * 0.7, s.Z * 0.5),
+					CFrame.new(0, s.Y * 0.2, -s.Z * 0.28),
+					Vector3.new(width * 0.91, s.Y * 0.56, s.Z * 0.59),
 					metal,
-					SMOOTH
+					Enum.Material.Metal
 				)
-				block(foot, 0, s.Y * 0.42, s.Z * 0.13, s.X * 0.79, s.Y * 0.6, s.Z * 0.48, metal)
+				block(foot, 0, s.Y * 0.2, s.Z * 0.15, width * 0.82, s.Y * 0.53, s.Z * 0.43, metal)
+				block(foot, 0, -s.Y * 0.08, -s.Z * 0.585, width * 0.87, s.Y * 0.25, s.Z * 0.07, metal)
+				if family == 1 then
+					block(foot, 0, s.Y * 0.3, -s.Z * 0.16, width * 0.92, s.Y * 0.19, s.Z * 0.12, trim)
+					block(
+						foot,
+						side * width * 0.22,
+						s.Y * 0.41,
+						-s.Z * 0.16,
+						width * 0.23,
+						s.Y * 0.07,
+						s.Z * 0.15,
+						edge
+					)
+				elseif family == 2 then
+					block(foot, side * width * 0.39, s.Y * 0.16, s.Z * 0.22, width * 0.12, s.Y * 0.35, s.Z * 0.27, edge)
+				elseif rarity >= 2 then
+					block(foot, 0, s.Y * 0.26, -s.Z * 0.25, width * 0.89, s.Y * 0.16, s.Z * 0.18, metal)
+					block(foot, 0, s.Y * 0.355, -s.Z * 0.25, width * 0.68, s.Y * 0.035, s.Z * 0.08, edge)
+				end
 				if rarity >= 2 then
-					block(foot, 0, s.Y * 0.15, -s.Z * 0.55, s.X * 0.67, 0.045, 0.04, edge)
 					for tread = 1, 2 do
-						block(foot, 0, -s.Y * 0.47, -s.Z * (0.12 + tread * 0.17), s.X * 0.87, 0.085, 0.055, trim)
+						block(
+							foot,
+							0,
+							-s.Y * 0.46,
+							-s.Z * (0.12 + tread * 0.17),
+							width * 0.98,
+							s.Y * 0.19,
+							s.Z * 0.055,
+							trim
+						)
 					end
 				end
-				if rarity >= 3 then
-					block(foot, 0, s.Y * 0.72, s.Z * 0.12, s.X * 0.49, 0.035, s.Z * 0.24, trim)
-				end
 				if rarity >= 4 then
-					lit(foot, 0, s.Y * 0.35, s.Z * 0.4, s.X * 0.24, 0.035, 0.025)
+					lit(foot, 0, s.Y * 0.2, s.Z * 0.38, width * 0.2, s.Y * 0.08, s.Z * 0.025)
 				end
 				if rarity >= 5 then
-					block(foot, 0, s.Y * 0.7, s.Z * 0.12, s.X * 0.59, 0.035, s.Z * 0.35, BRASS)
+					block(foot, 0, -s.Y * 0.08, -s.Z * 0.63, width * 0.61, s.Y * 0.06, s.Z * 0.02, BRASS)
 				end
 			end
 		end
@@ -2143,28 +2256,6 @@ local function frontierSuit(family: number)
 					if rarity >= 4 then
 						lit(seg, x + sign * s.X * 0.12, y, z - 0.075, 0.018, s.Y * 0.22, 0.02)
 					end
-				elseif string.find(key, "LowerLeg") then
-					-- Split greave face and service ribs; scouts keep the slimmer profile.
-					for _, edgeSide in sides() do
-						block(
-							seg,
-							edgeSide * s.X * 0.17,
-							-s.Y * 0.12,
-							-s.Z * 0.545,
-							s.X * 0.15,
-							s.Y * 0.22,
-							0.025,
-							trim,
-							if family == 2 then edgeSide * 18 else 0
-						)
-					end
-					for line = 1, 3 do
-						block(seg, 0, s.Y * (0.15 - line * 0.065), -s.Z * 0.565, s.X * 0.18, 0.02, 0.02, ornament)
-					end
-				elseif string.find(key, "Foot") then
-					-- Toe bumper and a separated heel latch make the boots read as assemblies.
-					block(seg, 0, -s.Y * 0.1, -s.Z * 0.59, s.X * 0.61, s.Y * 0.18, 0.06, metal)
-					block(seg, 0, s.Y * 0.18, s.Z * 0.435, s.X * 0.28, s.Y * 0.18, 0.035, ornament)
 				end
 			end
 		end
@@ -2215,7 +2306,7 @@ local function frontierSuit(family: number)
 						)
 					end
 				end
-			elseif rarity >= 2 and (string.find(key, "LowerArm") or string.find(key, "LowerLeg")) then
+			elseif rarity >= 2 and string.find(key, "LowerArm") then
 				-- Layered joint fasteners read as construction, not extra armor bulk.
 				local sign = if string.sub(key, 1, 4) == "Left" then -1 else 1
 				block(seg, sign * s.X * 0.43, s.Y * 0.2, 0, 0.06, s.Y * 0.25, s.Z * 0.36, trim)

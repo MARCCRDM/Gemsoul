@@ -1,4 +1,4 @@
-"""Check chest/pelvis geometry ownership and joint clearance using the real armor builder."""
+"""Check chest/pelvis and boot joint clearance using the real armor builder."""
 from pathlib import Path
 import re,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[1]
@@ -11,6 +11,12 @@ for name,path in [('EquipmentBalance','src/shared/EquipmentBalance.luau'),('Expe
 equipment=read('tests/equipment_cases.luau')
 s+=equipment[equipment.index('local function rig(r15)'):equipment.index('local builds = 0')]
 s+=read('tests/armor_articulation_cases.luau')
-with tempfile.TemporaryDirectory() as d:
- p=Path(d)/'articulation.luau';p.write_text(s,encoding='utf-8')
+# Use an existing writable folder: Windows sandbox ACLs can prevent accessing
+# files inside a newly created system TemporaryDirectory.
+with tempfile.NamedTemporaryFile(suffix='.luau',prefix='articulation-',dir=ROOT/'.tools',delete=False) as f:
+ p=Path(f.name)
+try:
+ p.write_text(s,encoding='utf-8')
  subprocess.run([str(ROOT/'.tools/luau/luau.exe'),str(p)],check=True)
+finally:
+ p.unlink(missing_ok=True)
