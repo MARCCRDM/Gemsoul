@@ -11,7 +11,7 @@
 	                       vendor kiosks and the Saga Stone pylon.
 	  Scenes.spacePickaxe(hand) the space pickaxe, welded to a hand.
 	  Scenes.spaceLighting()  a black, starry sky with cool light.
-	  Scenes.outpostLighting()  the Skyport: a bright, hazy afternoon with clouds.
+	  Scenes.outpostLighting()  the meadow: warm island lighting in low orbit.
 	  Scenes.terraformLighting()  the same sky with a thin new atmosphere.
 
 	Each builder returns a table with the Model and named spots (CFrames) for
