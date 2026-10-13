@@ -1015,6 +1015,14 @@ local function think(enemy, now: number)
 		Duelist.despawn(owner)
 		return
 	end
+	-- Whom it's fighting (a raid boss turns between players): every client
+	-- turns its head to theirs (BodyPoses).
+	if enemy.Model:GetAttribute("FocusUserId") ~= owner.UserId then
+		enemy.Model:SetAttribute("FocusUserId", owner.UserId)
+	end
+	-- Its shots are aimed at the player's head, eye to eye.
+	local head = owner.Character and owner.Character:FindFirstChild("Head")
+	local eyes = if head and head:IsA("BasePart") then head.Position else target.Position
 	local offset = flat(target.Position - root.Position)
 	local distance = offset.Magnitude
 	local dir = if distance > 0.01 then offset.Unit else Vector3.new(0, 0, -1)
@@ -1133,7 +1141,7 @@ local function think(enemy, now: number)
 					duel.Charge -= channel.Cost * 0.25
 					channel.Next = now + 0.25
 					local from = root.Position + Vector3.new(0, 1.5, 0)
-					fx("TechPulse", nil, from, target.Position, GemConfig.ElementColors[channel.Element] or color, 0)
+					fx("TechPulse", nil, from, eyes, GemConfig.ElementColors[channel.Element] or color, 0)
 					local dealt, guarded = strike(
 						duel,
 						duel.Damage * (1 - Enemies.weakness(enemy)) * channel.Power * 0.25,
@@ -1230,9 +1238,10 @@ local function think(enemy, now: number)
 			local pace = if action.Kind == "Punish" then 0.5 else 1
 			duel.NextAttack = now + duel.Rate * pace * (0.8 + math.random() * 0.4)
 		elseif action.Kind == "Bolt" then
-			-- Fired at where the player stands now: step or roll aside and it misses.
+			-- Fired at where the player stands now (at their head): step or roll
+			-- aside and it misses. (Brain.boltHits only measures across the ground.)
 			local from = root.Position + Vector3.new(0, 1.5, 0)
-			local aim = target.Position
+			local aim = eyes
 			fx("Shot", nil, from, aim, GemConfig.ElementColors[action.Element] or color, "Fireball")
 			task.delay(math.clamp(distance / 140, 0.05, 0.5), function()
 				local stillRoot = ownerRoot(owner)

@@ -1022,12 +1022,53 @@ local function velocityOf(root: BasePart): Vector3
 	return root.AssemblyLinearVelocity
 end
 
+-- How far the head turns toward a foe (radians): side to side, up and down.
+RivalPose.LookYaw, RivalPose.LookPitch = 1.1, 0.7
+
+-- The neck angles that turn this body's head toward `point` (a foe's head),
+-- measured from its chest so they hold however the waist is twisted
+-- (pitch, yaw; nil when it has no head or the point is right above it).
+function RivalPose.lookAngles(model: Model, point: Vector3)
+	local chest = model:FindFirstChild("UpperTorso") or model:FindFirstChild("Torso")
+	local head = model:FindFirstChild("Head")
+	if not (chest and head and chest:IsA("BasePart") and head:IsA("BasePart")) then
+		return nil
+	end
+	local d = chest.CFrame:VectorToObjectSpace(point - head.CFrame.Position)
+	local across = math.sqrt(d.X * d.X + d.Z * d.Z)
+	if across < 0.5 then
+		return nil
+	end
+	-- Positive yaw turns left, positive pitch looks up (see the angle notes
+	-- above). A joint bends by CFrame.Angles(pitch, yaw, 0): the turn, then
+	-- the tilt about the chest's own side axis; solved exactly for that while
+	-- the foe is ahead, and by heading alone once it's round the side.
+	local u = d.Unit
+	local yaw, pitch
+	if -u.Z > 0.2 then
+		yaw, pitch = math.asin(-u.X), math.atan2(u.Y, -u.Z)
+	else
+		yaw, pitch = math.atan2(-d.X, -d.Z), math.atan2(d.Y, across)
+	end
+	return math.clamp(pitch, -RivalPose.LookPitch, RivalPose.LookPitch),
+		math.clamp(yaw, -RivalPose.LookYaw, RivalPose.LookYaw)
+end
+
 -- Call every frame (clients pose every body: Client.BodyPoses) with the
 -- model and server time. Joints only change when they move noticeably.
 local nextSweep = 0
 -- `guarding`: known to be blocking right now (a player's own "Blocking"
--- flag), whatever GuardUntil says.
-function RivalPose.update(model: Model?, dt: number, now: number, clock: number?, rest: boolean?, guarding: boolean?)
+-- flag), whatever GuardUntil says. `lookAt`: the head of whoever it's
+-- fighting; its own head turns to follow it, on top of the pose.
+function RivalPose.update(
+	model: Model?,
+	dt: number,
+	now: number,
+	clock: number?,
+	rest: boolean?,
+	guarding: boolean?,
+	lookAt: Vector3?
+)
 	local tick = clock or now
 	if tick >= nextSweep then
 		nextSweep = tick + 1
@@ -1111,6 +1152,17 @@ function RivalPose.update(model: Model?, dt: number, now: number, clock: number?
  -- swing on top. Legs keep locomotion unless the guard owns the full body.
  local upperActive = not rest or next(target) ~= nil
  rig.UpperHold = (rig.UpperHold or 0) + ((if upperActive then 1 else 0) - (rig.UpperHold or 0)) * (1 - math.exp(-18 * step))
+ -- Eyes on the foe: added after the upper-body check above, so a turned head
+	-- alone never holds off the body's own walk and idle.
+	local pitch, yaw
+	if rig.Joints.Neck and lookAt then
+		pitch, yaw = RivalPose.lookAngles(model, lookAt)
+	end
+	if pitch and yaw then
+		local neck = target.Neck or { 0, 0, 0 }
+		target = table.clone(target)
+		target.Neck = { neck[1] + pitch, math.clamp(neck[2] + yaw, -1.4, 1.4), neck[3] }
+	end
  local alpha = 1 - math.exp(-speed * step)
 	for joint, entry in rig.Joints do
 		local angles = rig.Angles[joint]

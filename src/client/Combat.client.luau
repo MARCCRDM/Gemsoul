@@ -20,6 +20,8 @@ local CombatGuide = require(script.Parent.Modules.CombatGuide)
 local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local FirstPerson = require(script.Parent.Modules.FirstPersonCombat)
 local TargetLock = require(script.Parent.Modules.TargetLock)
+-- Your head turns to the one you're locked on.
+require(script.Parent.Modules.BodyPoses).setFocus(TargetLock.target)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local StatusBars = require(script.Parent.Modules.StatusBars)

@@ -1,6 +1,7 @@
 -- A strong, sticky lock (see TargetLockRules): your Arena rival is always
--- the target, and the camera keeps pulling toward it (gentler while you're
--- looking around yourself). Selection is local; hits remain server-validated.
+-- the target, and the camera keeps pulling toward its head (gentler while
+-- you're looking around yourself). Selection is local; hits remain
+-- server-validated.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -65,7 +66,13 @@ local function eligible(model)
 	end
 	return model:GetAttribute("Enemy") ~= nil
 end
+-- Where the lock looks and aims: the head (eye to eye), or just above the
+-- root for a body without one.
 local function pointOf(model)
+	local head = model and model:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		return head.Position
+	end
 	local root = rootOf(model)
 	return root and root.Position + Vector3.new(0, math.min(1, root.Size.Y * 0.25), 0)
 end

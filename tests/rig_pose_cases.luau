@@ -127,4 +127,43 @@ do
 	local swung = armDown(shoulder)
 	check((swung - raised).Magnitude > 0.5, "A late swing didn't cut through")
 end
-print("PASS: " .. checks .. " rig pose checks (R15, upgraded joints, R6, late swings)")
+-- Eye to eye: given a foe's head (lookAt), the head turns to it, up or down,
+-- left or right, within the neck's reach; without one it comes back.
+do
+	local model = r15(false)
+	local torso, head = model.UpperTorso, model.Head
+	local neck = motor("Neck", torso, head, Vector3.new(0, 1.6, 0))
+	neck.Parent = head
+	local function facing()
+		return (neck.Part0.CFrame * neck.C0 * neck.C1:Inverse()).LookVector
+	end
+	local function watch(point, rest)
+		local t = 200
+		RivalPose.update(model, 1 / 60, t, 0, rest, nil, point)
+		for _ = 1, 90 do
+			t += 1 / 60
+			RivalPose.update(model, 1 / 60, t, 1, rest, nil, point)
+		end
+	end
+	-- Ahead, to the left and taller (a big rival's head).
+	local up = Vector3.new(-6, 5, -10)
+	watch(up)
+	local look = facing()
+	local want = (up - head.CFrame.Position).Unit
+	check(look.X < -0.3 and look.Y > 0.2, "The head didn't turn up and left to the foe's head")
+	check(look:Dot(want) > 0.97, "The head isn't on the foe's head: " .. tostring(look))
+	-- Ahead and to the right, lower down (a short foe, a crouch).
+	local down = Vector3.new(5, 0.5, -8)
+	watch(down, true)
+	look = facing()
+	check(look.X > 0.3 and look.Y < -0.05, "The head didn't turn right and down (at rest too)")
+	-- Right behind: the neck turns as far as it goes, no further.
+	watch(Vector3.new(0.5, 2.2, 12))
+	local yaw = math.atan2(-facing().X, -facing().Z)
+	check(math.abs(yaw) <= RivalPose.LookYaw + 0.45, "The head spun past the neck's reach")
+	-- Nobody to look at: back to facing ahead.
+	watch(nil)
+	check(facing():Dot(Vector3.new(0, 0, -1)) > 0.97, "The head didn't come back without a foe")
+	check(RivalPose.lookAngles(model, head.CFrame.Position + Vector3.new(0, 5, 0)) == nil, "Straight up has no heading")
+end
+print("PASS: " .. checks .. " rig pose checks (R15, upgraded joints, R6, late swings, eye to eye)")
