@@ -1415,6 +1415,13 @@ local function think(enemy, now: number)
 	if foeBusy or not duel.FoeIdleSince then
 		duel.FoeIdleSince = if foeBusy then nil else now
 	end
+	-- How long you've kept out of its reach: a Lunge only closes a gap you
+	-- hold (Brain.LungeAfter), never one it's already walking in on.
+	if distance > Brain.Reach + 2 then
+		duel.FarSince = duel.FarSince or now
+	else
+		duel.FarSince = nil
+	end
 	local view = {
 		Now = now,
 		Distance = distance,
@@ -1442,6 +1449,7 @@ local function think(enemy, now: number)
 		NextDefense = duel.NextDefense,
 		NextRetreat = duel.NextRetreat,
 		NextLunge = duel.NextLunge,
+		FarFor = now - (duel.FarSince or now),
 	}
 	if
 		(view.FoeCharging or view.FoeCasting or view.FoeAttacking)
@@ -1979,7 +1987,8 @@ function spawnRival(owner: Player, raid, encounter)
 		Moves = {},
 		NextDefense = now,
 		NextRetreat = now + 8,
-		NextLunge = now + 1,
+		-- (No dash as its opener: it walks in first, see Brain.LungeAfter.)
+		NextLunge = now + 6,
 		NextWeave = now,
 		Weave = 1,
 		RetreatUntil = 0,
@@ -2185,6 +2194,7 @@ function spawnRival(owner: Player, raid, encounter)
 			-- from the first second, the softened partner; the client pops a
 			-- hint up the first time each control is useful.
 			duel.FirstFight = true
+			duel.NextLunge = math.huge -- (no dash-ins in a first fight)
 			owner:SetAttribute("FirstFight", true)
 		else
 			startTutorial(duel)

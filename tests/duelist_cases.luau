@@ -35,7 +35,10 @@ check(DuelistBrain.decide(view({ FoeCasting = true }), 0.6) == "Dodge", "Rival i
 check(DuelistBrain.decide(view({ FoeRecovering = true, NextAttack = 20 }), 0.9) == "Punish", "Rival missed an opening")
 check(DuelistBrain.decide(view({ Distance = 4, NextSurge = 0, FoeVulnerable = true }), 0.9) == "Surge", "Rival wasted a stunned target")
 check(DuelistBrain.decide(view({ Distance = 4, NextSurge = 0, FoeBlocking = true }), 0.9) == "Surge", "Rival let a turtle hide")
-check(DuelistBrain.decide(view({ Distance = 12, NextLunge = 0 }), 0.9) == "Lunge", "Rival never lunged in")
+check(DuelistBrain.decide(view({ Distance = 12, NextLunge = 0, FarFor = 3 }), 0.9) == "Lunge", "Rival never lunged in")
+-- Walking in on you (you haven't been holding it off): no dash, it advances.
+check(DuelistBrain.decide(view({ Distance = 12, NextLunge = 0, FarFor = 0 }), 0.9) ~= "Lunge", "Rival opened with a dash")
+check(DuelistBrain.decide(view({ Distance = 12, NextLunge = 0 }), 0.9) ~= "Lunge", "Rival dashed in without a held gap")
 check(DuelistBrain.decide(view({ HealthRatio = 0.2, NextRetreat = 0, FoeLow = true }), 0.5) ~= "Retreat", "Rival retreated from a low foe")
 check(DuelistBrain.decide(view({ FoeCharging = true, NextDefense = 20 }), 0.1) ~= "Guard", "Rival guarded on every swing")
 check(DuelistBrain.decide(view({ Distance = 15, NextSurge = 0 }), 0.5) == "Surge", "Rival never cast from range")

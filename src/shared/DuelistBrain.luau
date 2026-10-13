@@ -15,7 +15,8 @@
 	  Surge     casts its gem's surge: from range, or point-blank when the
 	            player is stunned, slowed or hiding behind their guard
 	  Retreat   backs off briefly when badly hurt (never when the player is low)
-	  Lunge     dashes in from mid range and swings straight away
+	  Lunge     dashes in from mid range and swings straight away, only once
+	            you've kept out of reach a while (a gap-closer, never its opener)
 	  Approach  closes the distance
 	  Light     a quick swing (may chain into a combo)
 	  Heavy     a slow, telegraphed blow that breaks a raised guard
@@ -30,6 +31,7 @@ Brain.Windup = { Light = 0.3, Heavy = 0.75, Punish = 0.18, Lunge = 0.25, Bolt = 
 Brain.BoltRadius = 3.5 -- a bolt hits within this many studs of where it was aimed
 Brain.SurgeRange = 32
 Brain.LungeRange = 18
+Brain.LungeAfter = 2 -- seconds you must stay out of reach before it dashes in
 Brain.IdleAfter = 1.2 -- seconds of you doing nothing before it presses the attack
 Brain.MaxLull = 1.6 -- the longest it goes without attacking while you're in reach
 
@@ -58,6 +60,7 @@ export type View = {
 	NextDefense: number,
 	NextRetreat: number,
 	NextLunge: number,
+	FarFor: number?, -- seconds the foe has stayed out of reach
 }
 
 -- A bolt aimed at `aim` hits a player now at `at` (only sideways distance counts).
@@ -128,7 +131,12 @@ function Brain.decide(v: View, roll: number): string
 	if v.HealthRatio < 0.25 and not v.FoeLow and v.Now >= v.NextRetreat then
 		return "Retreat"
 	end
-	if v.Distance > Brain.Reach + 2 and v.Distance <= Brain.LungeRange and v.Now >= v.NextLunge then
+	if
+		v.Distance > Brain.Reach + 2
+		and v.Distance <= Brain.LungeRange
+		and v.Now >= v.NextLunge
+		and (v.FarFor or 0) >= Brain.LungeAfter
+	then
 		return "Lunge"
 	end
 	if v.Distance > Brain.Reach then
