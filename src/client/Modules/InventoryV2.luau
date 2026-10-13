@@ -477,21 +477,27 @@ local function glow(parent: Instance, cx: number, cy: number, radius: number, co
 end
 
 local function buildTop(canvas: Frame)
+	-- Back to the lobby: a solid gold button, the one way out, never missed.
 	local back = new("TextButton", {
-		Text = "‹  LOBBY",
+		Name = "BackToLobby",
+		Text = "‹   BACK TO LOBBY",
 		TextSize = 13,
-		Font = HEADING,
-		TextColor3 = C.Dim,
-		BackgroundTransparency = 1,
-		TextXAlignment = Enum.TextXAlignment.Left,
+		Font = HEAVY,
+		TextColor3 = Color3.fromRGB(26, 18, 6),
+		AutoButtonColor = false,
+		BackgroundColor3 = C.Gold,
 	}, canvas)
-	place(back, 0, 8, 110, 40)
+	place(back, 0, 8, 186, 40)
+	round(back, 10)
+	local backEdge = stroke(back, Color3.fromRGB(255, 226, 160), 1, 0.6)
 	back:SetAttribute("UiSound", "Back")
 	back.MouseEnter:Connect(function()
-		back.TextColor3 = C.Text
+		back.BackgroundColor3 = Color3.fromRGB(255, 212, 128)
+		backEdge.Transparency = 0.1
 	end)
 	back.MouseLeave:Connect(function()
-		back.TextColor3 = C.Dim
+		back.BackgroundColor3 = C.Gold
+		backEdge.Transparency = 0.6
 	end)
 	back.Activated:Connect(function()
 		InventoryV2.cancelDrag()
@@ -508,40 +514,61 @@ local function buildTop(canvas: Frame)
 		end
 	end
 	local tabs = new("Frame", { BackgroundTransparency = 1 }, canvas)
-	place(tabs, 130, 8, 760, 40)
-	local list = UiKit.list(tabs, 30, true)
+	place(tabs, 216, 8, 820, 40)
+	local list = UiKit.list(tabs, 28, true)
 	list.VerticalAlignment = Enum.VerticalAlignment.Center
+	-- The keyboard keys the Dashboard binds (K, L, J), shown where there's a keyboard.
+	local keyboard = UserInputService.KeyboardEnabled
 	for order, spec in {
 		{ "INVENTORY", nil },
-		{ "SURGES", open("SurgeArrayUI", "toggle") },
-		{ "AUGMENTS", open("AugmentTreeUI", "toggle") },
-		{ "SEASON", open("SeasonUI", "toggle") },
+		{ "SURGES", open("SurgeArrayUI", "toggle"), "L" },
+		{ "AUGMENTS", open("AugmentTreeUI", "toggle"), "K" },
+		{ "SEASON", open("SeasonUI", "toggle"), "J" },
 		{ "MARKET", open("MarketBoardUI", "open") },
 		{ "STORE", open("ShopUI", "toggle") },
 	} do
 		local on = spec[2] == nil
-		local b = new("TextButton", {
-			Text = spec[1],
-			TextSize = 13,
-			Font = HEADING,
-			TextColor3 = if on then C.Text else C.Faint,
+		-- The tab: its name, then (with a keyboard) its key in a small keycap.
+		local slot = new("Frame", {
 			BackgroundTransparency = 1,
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.fromOffset(0, 34),
 			LayoutOrder = order,
 		}, tabs)
+		local inner = UiKit.list(slot, 6, true)
+		inner.VerticalAlignment = Enum.VerticalAlignment.Center
+		local b = new("TextButton", {
+			Text = spec[1],
+			TextSize = 13,
+			Font = HEADING,
+			TextColor3 = if on then C.Text else C.Dim,
+			BackgroundTransparency = 1,
+			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromOffset(0, 34),
+			LayoutOrder = 1,
+		}, slot)
 		b:SetAttribute("UiSound", "Click")
-		if on then
-			local bar = frame(b, C.Gold)
-			bar.AnchorPoint = Vector2.new(0, 1)
-			bar.Position = UDim2.fromScale(0, 1)
-			bar.Size = UDim2.new(1, 0, 0, 2)
-		else
+		local bar = frame(b, C.Gold)
+		bar.AnchorPoint = Vector2.new(0, 1)
+		bar.Position = UDim2.fromScale(0, 1)
+		bar.Size = UDim2.new(1, 0, 0, 2)
+		if spec[3] and keyboard then
+			local cap = text(slot, spec[3], 9, C.Dim, HEAVY)
+			cap.Size = UDim2.fromOffset(16, 16)
+			cap.LayoutOrder = 2
+			cap.TextXAlignment = Enum.TextXAlignment.Center
+			round(cap, 4)
+			stroke(cap, C.Faint, 1, 0.3)
+		end
+		if not on then
+			bar.BackgroundTransparency = 1
 			b.MouseEnter:Connect(function()
 				b.TextColor3 = C.Text
+				bar.BackgroundTransparency = 0.6
 			end)
 			b.MouseLeave:Connect(function()
-				b.TextColor3 = C.Faint
+				b.TextColor3 = C.Dim
+				bar.BackgroundTransparency = 1
 			end)
 			b.Activated:Connect(spec[2])
 		end
@@ -826,6 +853,34 @@ local function buildRight(canvas: Frame)
 		ui.Rows[slot] = buildRow(list, slot, y)
 		y += 80
 	end
+	-- Under the list: what's still empty, and a button straight to it.
+	local nudge = frame(list, C.Gold, 0.94)
+	nudge.Name = "Nudge"
+	place(nudge, 0, y + 12, RIGHT_W, 64)
+	round(nudge, 12)
+	stroke(nudge, C.Gold, 1, 0.75)
+	ui.NudgeTitle = place(text(nudge, "", 12, C.Gold, HEAVY), 16, 12, RIGHT_W - 170, 18)
+	ui.NudgeText = place(text(nudge, "", 10, C.Dim, MEDIUM), 16, 32, RIGHT_W - 170, 22)
+	ui.NudgeText.TextWrapped = true
+	ui.NudgeText.TextYAlignment = Enum.TextYAlignment.Top
+	ui.NudgeGo = new("TextButton", {
+		Name = "FillNext",
+		Text = "FILL NEXT  ›",
+		TextSize = 12,
+		Font = HEAVY,
+		TextColor3 = Color3.fromRGB(26, 18, 6),
+		AutoButtonColor = true,
+		BackgroundColor3 = C.Gold,
+	}, nudge)
+	place(ui.NudgeGo, RIGHT_W - 142, 14, 128, 36)
+	round(ui.NudgeGo, 9)
+	ui.NudgeGo:SetAttribute("UiSound", "Click")
+	ui.NudgeGo.Activated:Connect(function()
+		if ui.NudgeTarget then
+			openDetail(ui.NudgeTarget)
+		end
+	end)
+	ui.Nudge = nudge
 	ui.List = list
 	-- The detail (one piece, or one surge key).
 	local detail = new("Frame", { Name = "Detail", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, column)
@@ -988,7 +1043,7 @@ local function buildRight(canvas: Frame)
 		round(badge, 4)
 		local lane = place(text(chip, "", 8, C.Dim, HEAVY), 31, 5, chipW - 36, 11)
 		local name = place(text(chip, "", 11, C.Text, HEADING), 31, 18, chipW - 36, 16)
-		name.TextTruncate = Enum.TextTruncate.AtEnd
+
 		chip:SetAttribute("UiSound", "Click")
 		local entry = { Chip = chip, Edge = edge, Badge = badge, Lane = lane, Name = name, Key = key }
 		chip.Activated:Connect(function()
@@ -1101,8 +1156,10 @@ end
 -- Q / E / R.
 local function buildSurges(canvas: Frame)
 	ui.Keys = {}
-	local cardW, gap = 230, 14
-	local x0 = 800 - (3 * cardW + 2 * gap) / 2
+	-- Left edge clear of the elements panel; they reach right under the
+	-- equipment column (which ends above them), room for the whole info line.
+	local cardW, gap = 248, 12
+	local x0 = 441
 	for i, key in KEYS do
 		local card = new("TextButton", {
 			Name = "Key" .. key,
@@ -1123,9 +1180,9 @@ local function buildSurges(canvas: Frame)
 		local name = place(text(card, "", 14, C.Text, HEADING), 68, 14, cardW - 80, 18)
 		local info = place(text(card, "", 10, C.Dim, MEDIUM), 68, 36, cardW - 80, 14)
 		local badge = text(card, key, 11, C.Text, HEAVY)
-		badge.AnchorPoint = Vector2.new(0.5, 0.5)
-		badge.Position = UDim2.new(0.5, 0, 0, 0)
-		badge.Size = UDim2.fromOffset(24, 18)
+		badge.Position = UDim2.fromOffset(3, 3)
+		badge.Size = UDim2.fromOffset(20, 18)
+		badge.ZIndex = icon.ZIndex + 2
 		badge.TextXAlignment = Enum.TextXAlignment.Center
 		badge.BackgroundTransparency = 0
 		badge.BackgroundColor3 = C.Ink
@@ -1622,6 +1679,35 @@ local function drawRows(loadout)
 	end
 end
 
+-- The nudge under the list: empty gem sockets (on worn pieces, and the
+-- core socket that gives E its move) and the spare gems that could fill
+-- them. Hidden once every socket holds a gem.
+local NUDGE_ORDER = { "Weapon", "Shield", "Armor", "Helmet", "Gloves", "Boots" }
+local function drawNudge(profile, loadout)
+	local empty, first = {}, nil
+	for _, slot in NUDGE_ORDER do
+		if loadout[slot] ~= nil and loadout[slot .. "Gem"] == nil then
+			table.insert(empty, SLOT_NAME[slot])
+			first = first or slot
+		end
+	end
+	if triadOn(loadout) and loadout.Surge2Gem == nil then
+		table.insert(empty, "CORE (E)")
+		first = first or "E"
+	end
+	local spare = #(profile.Gems or {})
+	ui.Nudge.Visible = #empty > 0
+	ui.NudgeTarget = first
+	if #empty == 0 then
+		return
+	end
+	ui.NudgeTitle.Text = if #empty == 1 then "1 EMPTY GEM SOCKET" else #empty .. " EMPTY GEM SOCKETS"
+	ui.NudgeText.Text = if spare > 0
+		then string.format("%s  ·  %d spare gem%s to fill them", table.concat(empty, ", "), spare, if spare == 1 then "" else "s")
+		else table.concat(empty, ", ") .. "  ·  mine gems at the Outpost to fill them"
+	ui.NudgeGo.Visible = spare > 0
+end
+
 local function drawKeys(loadout)
 	for _, key in KEYS do
 		local entry = ui.Keys[key]
@@ -1645,7 +1731,7 @@ local function drawKeys(loadout)
 				whole(surge.Cost or 0),
 				string.lower(surge.Resource or "charge"),
 				whole(surge.Cooldown or 0),
-				if surge.Triad then "  ·  " .. whole((surge.Output or 1) * 100) .. "%" else ""
+				if surge.Triad then "  ·  " .. whole((surge.Output or 1) * 100) .. "% power" else ""
 			)
 			else "Click to pick a gem"
 		entry.Line.BackgroundColor3 = tint
@@ -1867,10 +1953,13 @@ function InventoryV2.drawTraits(gem, key: string?, owned: boolean?)
 		local armed = entry.ArmedUntil and os.clock() < entry.ArmedUntil
 		entry.Badge.BackgroundColor3 = if lit then color else C.Faint
 		entry.Name.Text = if move then move.Name else "?"
+		-- Smaller for the long names, so the whole name fits the chip.
+		local length = #entry.Name.Text
+		entry.Name.TextSize = if length <= 11 then 11 elseif length <= 13 then 10 else 9
 		entry.Name.TextColor3 = if lit then C.Text else C.Dim
 		entry.Lane.Text = if armed
 			then string.format("TAP: REFORGE %s · %d MARKS", commas(coins), marks)
-			else LANE_WORDS[k] .. (if move and move.Rare then "  ·  SIGNATURE" else "")
+			else LANE_WORDS[k] .. (if move and move.Rare then "  ★" else "") -- (★ a signature move: rolls at half the odds)
 		entry.Lane.TextColor3 = if armed then C.Gold elseif lit then color else C.Faint
 		entry.Chip.BackgroundColor3 = if lit then color:Lerp(C.Ink, 0.8) else C.Ink
 		entry.Chip.BackgroundTransparency = if lit then 0.1 else 0.5
@@ -1925,7 +2014,7 @@ function InventoryV2.drawCompare()
 				textValue = "This gem has no surge."
 			end
 		else
-			textValue = if current then "Pick a gem below to change " .. target .. ", or drag one onto any key." else "Pick a gem below to put a surge on " .. target .. "."
+			textValue = if current then "Pick a gem above to change " .. target .. ", or drag one onto any key." else "Pick a gem above to put a surge on " .. target .. "."
 		end
 	else
 		local wornGem = loadout[target .. "Gem"]
@@ -1978,7 +2067,7 @@ function InventoryV2.drawCompare()
 		else
 			textValue = if state.Tab == "Pieces"
 				then "Pick a spare piece to compare it with what you wear."
-				else "Pick a gem below, or drag one onto any piece."
+				else "Pick a gem above, or drag one onto any piece."
 		end
 	end
 	ui.CompareText.Text = textValue
@@ -2375,6 +2464,7 @@ function draw()
 		drawWallet(profile)
 		drawLeft(profile, loadout)
 		drawRows(loadout)
+		drawNudge(profile, loadout)
 		drawKeys(loadout)
 		drawDetail(loadout)
 		drawIntro(profile, loadout)
