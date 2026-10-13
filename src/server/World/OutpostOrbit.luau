@@ -1,17 +1,15 @@
--- Local scenery at the Outpost: the planet is below the playable island,
--- and every part is decorative. No imported textures or frame callbacks.
+-- A daylight sky garden with a pale neighbouring planet at the horizon.
+-- Cloud banks sit below the islands; all scenery is static and decorative.
 local Orbit = {}
-Orbit.Radius = 1000
-Orbit.Center = Vector3.new(0, -1180, -380)
+Orbit.Radius = 340
+Orbit.Center = Vector3.new(-900, 440, -1550)
 
 local function piece(parent, name, cf, size, color, shape, transparency)
 	local p = Instance.new(if shape == "Wedge" then "WedgePart" else "Part")
 	p.Name, p.CFrame, p.Size, p.Color = name, cf, size, color
 	p.Anchored = true
 	p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = false, false, false, false
-	p.Material = if name == "OrbitStar" or name == "PlanetAirglow"
-		then Enum.Material.Neon
-		else Enum.Material.SmoothPlastic
+	p.Material = Enum.Material.SmoothPlastic
 	p.Transparency = transparency or 0
 	if shape == "Ball" then
 		p.Shape = Enum.PartType.Ball
@@ -60,8 +58,14 @@ function Orbit.build(parent, at: CFrame)
 	m.Name = "OrbitalSky"
 	m.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	m.Parent = parent
-	local centre = at * CFrame.new(Orbit.Center)
-	piece(m, "PlanetOcean", centre, Vector3.one * (Orbit.Radius * 2), Color3.fromRGB(37, 99, 157), "Ball")
+	-- Turn the detailed hemisphere toward the meadow. The whole planet is a
+	-- distant sky landmark now, rather than a huge globe filling the void below.
+	local facing = -Orbit.Center.Unit
+	local east = Vector3.new(0, 1, 0):Cross(facing).Unit
+	local centre = at * CFrame.fromMatrix(Orbit.Center, east, facing, east:Cross(facing))
+	local scale = Orbit.Radius / 1000
+	local landRadius = Orbit.Radius * 1.01
+	piece(m, "PlanetOcean", centre, Vector3.one * (Orbit.Radius * 2), Color3.fromRGB(155, 189, 215), "Ball")
 	-- Curved land patches share vertices and sit just above the ocean sphere.
 	-- Three rings keep the triangles small enough to follow the globe's curve.
 	for index, spec in
@@ -80,17 +84,17 @@ function Orbit.build(parent, at: CFrame)
 				local a = i / 16 * math.pi * 2
 				local coast = 1 + 0.15 * math.sin(3 * a + phase) + 0.1 * math.cos(5 * a - phase)
 				local u, v = math.cos(a) * rx * coast * ring / 3, math.sin(a) * rz * coast * ring / 3
-				table.insert(vertices, (normal + east * u + north * v).Unit * 1010)
+				table.insert(vertices, (normal + east * u + north * v).Unit * landRadius)
 			end
 			rings[ring] = vertices
 		end
 		for ring = 1, 3 do
-			local color = Color3.fromRGB(101, 142, 101):Lerp(Color3.fromRGB(152, 172, 132), (ring - 1) * 0.16)
+			local color = Color3.fromRGB(164, 189, 182):Lerp(Color3.fromRGB(193, 208, 193), (ring - 1) * 0.16)
 			for i = 1, 16 do
 				local nextIndex = i % 16 + 1
 				local a, b = rings[ring][i], rings[ring][nextIndex]
 				if ring == 1 then
-					facet(m, centre, normal * 1010, a, b, color)
+					facet(m, centre, normal * landRadius, a, b, color)
 				else
 					local c, d = rings[ring - 1][i], rings[ring - 1][nextIndex]
 					facet(m, centre, a, b, c, color)
@@ -108,33 +112,44 @@ function Orbit.build(parent, at: CFrame)
 			piece(
 				m,
 				"PlanetCloud",
-				centre * CFrame.fromMatrix(normal * 1018, east, normal, -north),
-				Vector3.new(rng:NextNumber(105, 165), 9, rng:NextNumber(25, 45)),
+				centre * CFrame.fromMatrix(normal * (Orbit.Radius * 1.018), east, normal, -north),
+				Vector3.new(rng:NextNumber(105, 165), 9, rng:NextNumber(25, 45)) * scale,
 				Color3.fromRGB(238, 246, 248),
 				"Ball",
-				rng:NextNumber(0.22, 0.38)
+				rng:NextNumber(0.35, 0.5)
 			)
 		end
 	end
-	-- Both spheres remain under Roblox's 2048-stud part-size limit.
-	piece(m, "PlanetAtmosphere", centre, Vector3.one * 2028, Color3.fromRGB(91, 182, 235), "Ball", 0.94)
-	piece(m, "PlanetAirglow", centre, Vector3.one * 2046, Color3.fromRGB(105, 209, 255), "Ball", 0.96)
-	-- Native sky stars are supplemented by a sparse, static constellation field.
-	for i = 1, 120 do
-		local a = rng:NextNumber(0, math.pi * 2)
-		local y = rng:NextNumber(-0.12, 0.95)
-		local horizontal = math.sqrt(1 - y * y)
-		local pos = Vector3.new(math.cos(a) * horizontal, y, math.sin(a) * horizontal) * 1900
-		piece(
-			m,
-			"OrbitStar",
-			at * CFrame.new(pos),
-			Vector3.one * (if i % 12 == 0 then 3.8 else rng:NextNumber(1.1, 2.2)),
-			if i % 7 == 0 then Color3.fromRGB(246, 226, 181) else Color3.fromRGB(204, 223, 245),
-			"Ball"
-		)
+	piece(
+		m,
+		"PlanetAtmosphere",
+		centre,
+		Vector3.one * (Orbit.Radius * 2.028),
+		Color3.fromRGB(205, 231, 249),
+		"Ball",
+		0.96
+	)
+	piece(m, "PlanetAirglow", centre, Vector3.one * (Orbit.Radius * 2.046), Color3.fromRGB(220, 239, 255), "Ball", 0.98)
+	-- Soft, irregular cloud banks below the meadow give the floating land a
+	-- friendly horizon. Open gaps keep the sapphire undersides in view.
+	for i = 1, 8 do
+		local a = i * math.pi / 4 + rng:NextNumber(-0.18, 0.18)
+		local distance = rng:NextNumber(430, 660)
+		local bank = at
+			* CFrame.new(math.cos(a) * distance, rng:NextNumber(-104, -66), math.sin(a) * distance)
+			* CFrame.Angles(0, -a + 0.3, 0)
+		for puff = 1, 4 do
+			piece(
+				m,
+				"MeadowCloudBank",
+				bank * CFrame.new((puff - 2.5) * 45, rng:NextNumber(-3, 7), rng:NextNumber(-14, 14)),
+				Vector3.new(rng:NextNumber(90, 140), rng:NextNumber(18, 30), rng:NextNumber(62, 90)),
+				Color3.fromRGB(242, 247, 250),
+				"Ball",
+				rng:NextNumber(0.24, 0.38)
+			)
+		end
 	end
-	piece(m, "DistantMoon", at * CFrame.new(950, 530, -1600), Vector3.one * 116, Color3.fromRGB(186, 203, 213), "Ball")
 	return m
 end
 

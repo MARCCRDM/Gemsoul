@@ -1015,7 +1015,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	root.Name = "SagaOutpost"
 	root:SetAttribute("Landscape", "Corundum Meadow")
 	root:SetAttribute("LandscapeVersion", 2)
-	root:SetAttribute("SkySetting", "LowOrbit")
+	root:SetAttribute("SkySetting", "DaylightOrbit")
 	local meadow = Meadow.build(root, at)
 	-- Grass and a shallow mineral coast blend into the familiar blue foundation.
 	-- Keep the old circular crystal shoulders tucked beneath the irregular land.
