@@ -1153,17 +1153,14 @@ local function buildRight(canvas: Frame)
 	ui.SurgeGem = place(text(card, "", 11, C.Dim, HEADING), 134, 80, RIGHT_W - 150, 30)
 	ui.SurgeGem.TextWrapped = true
 	ui.SurgeGem.TextYAlignment = Enum.TextYAlignment.Top
-	-- The triad: the gem's three traits, the one this key fires lit. Tap one
-	-- twice to reforge it (a new roll for that trait, for coins and Marks).
+	-- The triad: a read-only display of the gem's three traits, with this key lit.
 	ui.TraitStrip = new("Frame", { Name = "Traits", BackgroundTransparency = 1, Visible = false }, card)
 	place(ui.TraitStrip, 18, 124, RIGHT_W - 36, 40)
 	ui.TraitChips = {}
 	local chipW = math.floor((RIGHT_W - 36 - 12) / 3)
 	for i, key in KEYS do
-		local chip = new("TextButton", {
+		local chip = new("Frame", {
 			Name = "Trait" .. key,
-			Text = "",
-			AutoButtonColor = false,
 			BackgroundColor3 = C.Ink,
 			BackgroundTransparency = 0.5,
 		}, ui.TraitStrip)
@@ -1178,27 +1175,7 @@ local function buildRight(canvas: Frame)
 		local lane = place(text(chip, "", 8, C.Dim, HEAVY), 31, 5, chipW - 36, 11)
 		local name = place(text(chip, "", 11, C.Text, HEADING), 31, 18, chipW - 36, 16)
 
-		chip:SetAttribute("UiSound", "Click")
 		local entry = { Chip = chip, Edge = edge, Badge = badge, Lane = lane, Name = name, Key = key }
-		chip.Activated:Connect(function()
-			local gem, owned = ui.TraitGem, ui.TraitOwned
-			if not gem or not owned then
-				return
-			end
-			local laneName = Traits.Lanes[key]
-			if entry.ArmedUntil and os.clock() < entry.ArmedUntil then
-				entry.ArmedUntil = nil
-				request("ReforgeTrait", gem.SourceId or gem.Id, laneName)
-			else
-				entry.ArmedUntil = os.clock() + 4
-				task.delay(4.05, function()
-					if InventoryV2.drawTraits then
-						InventoryV2.drawTraits(ui.TraitGem, ui.TraitKey, ui.TraitOwned)
-					end
-				end)
-			end
-			InventoryV2.drawTraits(gem, ui.TraitKey, owned)
-		end)
 		ui.TraitChips[key] = entry
 	end
 	-- The perk band (or the surge's description).
@@ -2115,39 +2092,33 @@ local function drawFilters(show: boolean)
 end
 
 -- The words in the compare box, and the two buttons.
--- The trait strip: `gem` (a projected key gem or nil), the key it's shown
--- for, and whether it's yours (so it can be reforged).
-function InventoryV2.drawTraits(gem, key: string?, owned: boolean?)
+-- The trait strip shows the gem's existing moves and highlights the current key.
+function InventoryV2.drawTraits(gem, key: string?)
 	local strip = ui.TraitStrip
 	if not strip then
 		return
 	end
 	local traits = gem and triadOn(loadoutNow()) and Traits.traitsOf(gem)
 	strip.Visible = traits ~= nil
-	ui.TraitGem, ui.TraitKey, ui.TraitOwned = gem, key, owned
 	if not traits then
 		return
 	end
-	local coins, marks = Traits.reforgeCost(gem)
 	for k, entry in ui.TraitChips do
 		local lit = k == key
 		local color = KEY_COLORS[k]
 		local move = Tech.Catalog[traits[Traits.Lanes[k]] or ""]
-		local armed = entry.ArmedUntil and os.clock() < entry.ArmedUntil
 		entry.Badge.BackgroundColor3 = if lit then color else C.Faint
 		entry.Name.Text = if move then move.Name else "?"
 		-- Smaller for the long names, so the whole name fits the chip.
 		local length = #entry.Name.Text
 		entry.Name.TextSize = if length <= 11 then 11 elseif length <= 13 then 10 else 9
 		entry.Name.TextColor3 = if lit then C.Text else C.Dim
-		entry.Lane.Text = if armed
-			then string.format("TAP: REFORGE %s · %d MARKS", commas(coins), marks)
-			else LANE_WORDS[k] .. (if move and move.Rare then "  ★" else "") -- (★ a signature move: rolls at half the odds)
-		entry.Lane.TextColor3 = if armed then C.Gold elseif lit then color else C.Faint
+		entry.Lane.Text = LANE_WORDS[k] .. (if move and move.Rare then "  ★" else "") -- (★ a signature move: rolls at half the odds)
+		entry.Lane.TextColor3 = if lit then color else C.Faint
 		entry.Chip.BackgroundColor3 = if lit then color:Lerp(C.Ink, 0.8) else C.Ink
 		entry.Chip.BackgroundTransparency = if lit then 0.1 else 0.5
-		entry.Edge.Color = if armed then C.Gold elseif lit then color else C.Line
-		entry.Edge.Transparency = if lit or armed then 0.15 else 0.6
+		entry.Edge.Color = if lit then color else C.Line
+		entry.Edge.Transparency = if lit then 0.15 else 0.6
 	end
 end
 
@@ -2374,7 +2345,7 @@ local function drawDetail(loadout)
 			then (surge.Description or "") .. (if surge.Flourished and surge.Flourish then "  " .. surge.Flourish.Text else "")
 			elseif triadOn(loadout) then string.format("%s fires the %s of the gem in your %s. Any cut gem fits.", target, string.lower(Traits.Lanes[target]), string.lower(Traits.SocketNames[target]))
 			else "Surges are cast with Q, E and R in a fight. Any cut gem with a surge fits."
-		InventoryV2.drawTraits(gem, target, trying == nil)
+		InventoryV2.drawTraits(gem, target)
 		ui.PerkText.Size = UDim2.fromOffset(RIGHT_W - 36, 60)
 		ui.PerkValue.Text = ""
 		drawTabs({ { "Gems", if triadOn(loadout) then string.upper(Traits.SocketNames[target]) .. " GEMS" else "SURGE GEMS" } })

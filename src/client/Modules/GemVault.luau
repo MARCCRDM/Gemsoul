@@ -10,8 +10,7 @@
 	          Q (sword), E (core) and R (shield), and each branch shows every
 	          move that element can roll for that key, with this gem's lit,
 	          the odds under each, and a signature ★. Tap a move for what it
-	          does at this gem's numbers; REFORGE rerolls one branch
-	          ("ReforgeTrait", for coins and Guild Marks; tap twice).
+	          does at this gem's numbers. This view only inspects existing moves.
 
 	Drawn on the Inventory's 1600 x 840 canvas, so it scales with it.
 	  GemVault.open(canvas)   GemVault.close()   GemVault.isOpen()
@@ -77,8 +76,6 @@ local state = {
 	Sort = "Rarity",
 	Selected = nil :: string?,
 	Move = nil :: string?, -- the move whose details are showing
-	Armed = nil :: string?, -- the lane whose REFORGE was tapped once
-	ArmedAt = 0,
 }
 local ui: { [string]: any } = {}
 local spin: RBXScriptConnection? = nil
@@ -282,7 +279,7 @@ local function drawList(entries: { Entry })
 		where.TextXAlignment = Enum.TextXAlignment.Center
 		cell:SetAttribute("UiSound", "Click")
 		cell.Activated:Connect(function()
-			state.Selected, state.Move, state.Armed = gem.Id, nil, nil
+			state.Selected, state.Move = gem.Id, nil
 			draw()
 		end)
 	end
@@ -310,7 +307,6 @@ local function drawTree(parent: Frame, gem)
 	local traits = Traits.traitsOf(gem)
 	local rowH, top = 102, 30
 	local nodeX, nodeY, node = 0, top + rowH * 1.5 - 34, 68
-	local width = parent.Size.X.Offset
 	-- The gem at the root.
 	local root = box(parent, C.Card, nodeX, nodeY, node, node)
 	round(root, node / 2)
@@ -329,7 +325,6 @@ local function drawTree(parent: Frame, gem)
 		text(parent, "This stone has no moves to show.", 13, C.Dim, MEDIUM, spineX + 24, top + rowH, 400, 20)
 		return
 	end
-	local coins, marks = Traits.reforgeCost(gem)
 	for row, key in KEYS do
 		local lane = Traits.Lanes[key]
 		local color = KEY_COLORS[key]
@@ -420,38 +415,6 @@ local function drawTree(parent: Frame, gem)
 				draw()
 			end)
 		end
-		-- Reforge this branch: a new roll from the same list.
-		local armed = state.Armed == lane and os.clock() - state.ArmedAt < 4
-		local reforge = button(parent, if armed then "CONFIRM?" else "REFORGE", width - 112, mid - 24, 112, 30)
-		reforge.TextColor3 = if armed then C.Ink else C.Gold
-		reforge.BackgroundColor3 = if armed then C.Gold else C.Card
-		stroke(reforge, C.Gold, 1, if armed then 0 else 0.6)
-		local cost = text(
-			parent,
-			string.format("%s coins · %d marks", commas(coins), marks),
-			9,
-			C.Faint,
-			MEDIUM,
-			width - 116,
-			mid + 10,
-			120,
-			12
-		)
-		cost.TextXAlignment = Enum.TextXAlignment.Center
-		reforge.Activated:Connect(function()
-			if state.Armed == lane and os.clock() - state.ArmedAt < 4 then
-				state.Armed = nil
-				local result = GemClient.request("ReforgeTrait", gem.Id, lane)
-				ui.Note.Text = result.Message or ""
-				ui.Note.TextColor3 = if result.Ok then C.Good else C.Bad
-				if result.Ok then
-					state.Move = result.Trait
-				end
-			else
-				state.Armed, state.ArmedAt = lane, os.clock()
-			end
-			draw()
-		end)
 	end
 end
 
@@ -720,7 +683,7 @@ function GemVault.open(canvas: Instance, gemId: string?)
 		GemVault.close()
 	end
 	state.Selected = gemId or state.Selected
-	state.Move, state.Armed = nil, nil
+	state.Move = nil
 	ui = {}
 	ui.Root = build(canvas)
 	changed = GemClient.Changed:Connect(function()
