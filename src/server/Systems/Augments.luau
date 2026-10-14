@@ -104,37 +104,6 @@ function Augments.start()
 				else "The triad: Q is your sword's gem, E your core gem, R your shield's."
 		)
 	end)
-	-- Reforge: reroll one trait of a gem (in the pouch or socketed).
-	Shop.register("ReforgeTrait", function(player, gemId, lane)
-		local profile = PlayerData.get(player)
-		if not profile or typeof(gemId) ~= "string" or not Tech.Traits.LaneNames[lane] then
-			return Shop.reply(false, "Pick a gem and a trait.")
-		end
-		if not canChange(player) then
-			return Shop.reply(false, "Not during a fight or an expedition.")
-		end
-		local gem = PlayerData.findGem(player, gemId)
-		if not gem then
-			for key, value in profile.Character do
-				if type(value) == "table" and value.Id == gemId and string.sub(key, -3) == "Gem" then
-					gem = value
-				end
-			end
-		end
-		if not gem or not Tech.Traits.Matrix[gem.Element or ""] then
-			return Shop.reply(false, "That gem can't be reforged.")
-		end
-		local coins, marks = Tech.Traits.reforgeCost(gem)
-		if profile.Coins < coins or profile.Marks < marks then
-			return Shop.reply(false, string.format("Reforging costs %d coins and %d Guild Marks.", coins, marks))
-		end
-		PlayerData.spendCoins(player, coins)
-		PlayerData.spendMarks(player, marks)
-		local id = Tech.Traits.reforge(gem, lane, Random.new():NextNumber())
-		PlayerData.sync(player)
-		local move = id and Tech.Catalog[id]
-		return Shop.reply(true, string.format("Reforged: %s is now %s.", lane, move and move.Name or "?"), { Gem = gem, Trait = id })
-	end)
 	-- The "what's new" card about the triad has been read.
 	Shop.register("TriadSeen", function(player)
 		local profile = PlayerData.get(player)

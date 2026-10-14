@@ -1189,35 +1189,6 @@ function GemTraits.upgradeStarterProfile(profile): number
 	return changed
 end
 
--- Reforge (the Probe market): reroll one trait of a gem for coins and Guild
--- Marks. Rarity and the other two traits stay; the price doubles every time
--- the same gem is reforged, so a perfect roll stays rare.
-GemTraits.ReforgeBase = { Coins = 300, Marks = 2 }
-GemTraits.ReforgeRarity = { Common = 1, Uncommon = 1.5, Rare = 2, UltraRare = 3, Legendary = 4 }
-function GemTraits.reforgeCost(gem): (number, number)
-	local scale = (GemTraits.ReforgeRarity[gem and gem.Tier or "Common"] or 1) * 2 ^ math.clamp((gem and gem.Reforges) or 0, 0, 12)
-	return math.floor(GemTraits.ReforgeBase.Coins * scale + 0.5), math.floor(GemTraits.ReforgeBase.Marks * scale + 0.5)
-end
--- A new trait for one lane (never the one it has). `roll` is 0-1.
-function GemTraits.reforge(gem, lane: string, roll: number): string?
-	local traits = GemTraits.traitsOf(gem)
-	local ids = gem and GemTraits.Matrix[gem.Element] and GemTraits.Matrix[gem.Element][lane]
-	if not traits or not ids then
-		return nil
-	end
-	local others = {}
-	for _, id in ids do
-		if id ~= traits[lane] then
-			table.insert(others, id)
-		end
-	end
-	local picked = pickWeighted(others, roll)
-	gem.Traits = table.clone(traits)
-	gem.Traits[lane] = picked
-	gem.Reforges = (gem.Reforges or 0) + 1
-	return picked
-end
-
 -- A gem with a new element keeps each trait's slot in its lane.
 -- Each element's showcase defenses by role, so a recut keeps the kind of
 -- move (a barrier stays a barrier) though the lanes differ in length.
