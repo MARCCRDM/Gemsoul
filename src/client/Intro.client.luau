@@ -1329,8 +1329,11 @@ local function keycap(parent, key, color, size)
 	glyph.TextXAlignment, glyph.ZIndex = Enum.TextXAlignment.Center, 47
 	return base
 end
--- A cut gem for the reel: a faceted diamond in the element's colour, rimmed
--- in its rarity's. (Only your own gem, the one it stops on, is 3D.)
+-- The reel rolls like a normal gem roll of your element: every rarity at the
+-- usual odds, each in its own shade (Thermal: Ember Red up to Starfire
+-- Ruby). The gems nearest the stop, the ones you watch as it slows, are 3D;
+-- the ones that blur past further up are drawn flat (in the same shades) to
+-- keep it light.
 local REEL_TIERS = { Common = 40, Uncommon = 28, Rare = 18, UltraRare = 9, Legendary = 5 }
 local function reelTier(rng)
 	local roll = rng:NextNumber(0, 100)
@@ -1341,6 +1344,15 @@ local function reelTier(rng)
 		end
 	end
 	return "Common"
+end
+local REEL_3D = 10 -- (cells 0 to this, nearest the stop, are 3D)
+local function shadeOf(element, tier)
+	for _, shade in GemConfig.Shades[element] or {} do
+		if shade.Tier == tier then
+			return shade
+		end
+	end
+	return nil
 end
 local function reelGem(parent, color, tier)
 	local white = Color3.new(1, 1, 1)
@@ -1489,7 +1501,7 @@ local function revealMoves(kit, after)
 		-- middle of the circle. (Cell 0 sits above it for the spring-back.)
 		local count = 20 + index * 7
 		local strip = frame(well, { BackgroundTransparency = 1, Size = UDim2.fromOffset(WELL, CELL * count), ZIndex = 45 })
-		local symbols, cells, record = {}, {}, nil
+		local symbols, cells, record, shadeNames, reelRecords = {}, {}, nil, {}, {}
 		for n = 0, count do
 			local cell = frame(strip, {
 				Position = UDim2.fromOffset(0, (n - 1) * CELL),
@@ -1509,10 +1521,38 @@ local function revealMoves(kit, after)
 				record = Art.show(holder, gem, nil, color, false)
 				symbols[n] = "Gem"
 			else
-				-- Gems of every rarity roll past; what's inside stays hidden.
+				-- Gems of every rarity roll past, each in its own shade of
+				-- the element; what's inside stays hidden.
 				local tier = reelTier(rng)
-				reelGem(cell, color, tier)
+				local look = shadeOf(element, tier)
+				if n <= REEL_3D then
+					local holder = frame(cell, {
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromOffset(CELL, CELL),
+						BackgroundTransparency = 1,
+						ZIndex = 46,
+					})
+					local size = rng:NextInteger(3, 9)
+					local ok, passing = pcall(Art.show, holder, {
+						Id = "reel-" .. index .. "-" .. n,
+						Element = element,
+						Tier = tier,
+						Size = size,
+						Clarity = rng:NextInteger(3, 9),
+						Cut = rng:NextInteger(3, 9),
+					}, nil, color, false)
+					if ok and passing then
+						table.insert(reelRecords, passing)
+					else
+						holder:Destroy()
+						reelGem(cell, if look then look.Color else color, tier)
+					end
+				else
+					reelGem(cell, if look then look.Color else color, tier)
+				end
 				symbols[n] = tier
+				shadeNames[n] = look and look.Name
 			end
 		end
 		local function stripY(n)
@@ -1581,6 +1621,8 @@ local function revealMoves(kit, after)
 			Color = spec.Color,
 			Strip = strip,
 			Symbols = symbols,
+			ShadeNames = shadeNames,
+			ReelRecords = reelRecords,
 			Final = stripY(2),
 			LastCell = nil,
 			Caption = caption,
@@ -1680,11 +1722,19 @@ local function revealMoves(kit, after)
 				-- Under the circle: the rarity of the gem going past.
 				local showing = entry.Symbols[middle]
 				local tierColor = GemConfig.TierColors[showing]
-				if tierColor and showing ~= entry.Shown then
-					entry.Shown = showing
+				-- (by the gem's own name: "SOLAR GARNET  ·  ULTRA-RARE")
+				local shadeName = entry.ShadeNames[middle]
+				if tierColor and middle ~= entry.Shown then
+					entry.Shown = middle
 					local tierName = string.upper(GemConfig.TierLabels[showing] or showing)
-					entry.Caption.Text = tierName .. "  ·  " .. entry.GemWord
+					entry.Caption.Text = if shadeName
+						then string.upper(shadeName) .. "  ·  " .. tierName
+						else tierName .. "  ·  " .. entry.GemWord
 					entry.Caption.TextColor3 = tierColor
+				end
+				-- The 3D gems turn as they pass, like yours.
+				for i, passing in entry.ReelRecords do
+					Art.pose(passing, t + i * 0.7, false)
 				end
 			end
 			Art.pose(entry.Record, t, false)
