@@ -1224,6 +1224,45 @@ function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
 	return nil
 end
 
+-- What each miner wears for itself: a suit and a weapon skin (kept in its
+-- character as Wardrobe = { Suit, Skin }). Trims, backs and titles are the
+-- account's. A miner with no Wardrobe yet wears the account's current look.
+Cosmetics.MinerKinds = { "Suit", "Skin" }
+function Cosmetics.isMinerKind(kind: any): boolean
+	return kind == "Suit" or kind == "Skin"
+end
+function Cosmetics.forMiner(cosmetics: any, character: any): any
+	local look = table.clone(cosmetics or {})
+	local wardrobe = type(character) == "table" and character.Wardrobe
+	if type(wardrobe) == "table" then
+		for _, kind in Cosmetics.MinerKinds do
+			look[kind] = wardrobe[kind]
+		end
+	end
+	return look
+end
+-- Switching miners: the one leaving keeps what it wore (recorded now if it
+-- never had a Wardrobe), and the one arriving puts its own on (or, new to
+-- wardrobes, takes the current look as its own). Looks you no longer own
+-- come off.
+function Cosmetics.leaveMiner(cosmetics: any, character: any)
+	if type(character) == "table" and type(character.Wardrobe) ~= "table" then
+		character.Wardrobe = { Suit = cosmetics.Suit, Skin = cosmetics.Skin }
+	end
+end
+function Cosmetics.joinMiner(cosmetics: any, character: any)
+	if type(character) ~= "table" then
+		return
+	end
+	if type(character.Wardrobe) ~= "table" then
+		character.Wardrobe = { Suit = cosmetics.Suit, Skin = cosmetics.Skin }
+	end
+	for _, kind in Cosmetics.MinerKinds do
+		local id = character.Wardrobe[kind]
+		cosmetics[kind] = if id and cosmetics.Owned and cosmetics.Owned[id] then id else nil
+	end
+end
+
 -- How to get one you don't own, in a few words for the Shop.
 Cosmetics.SourceText = {
 	Invite = "Bring friends",

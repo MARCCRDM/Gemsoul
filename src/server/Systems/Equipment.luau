@@ -2601,7 +2601,9 @@ function Equipment.start()
 					if id then table.insert(keys, id .. ":" .. previewKey(loadout, slot, id, loadout[slot .. "Quality"] or 1)) end
 				end
 				-- What it wears over the gear (a suit, a weapon skin...) too.
-				local look = profile.Cosmetics or {}
+				local look = if profile.Miners.Active == index
+					then profile.Cosmetics or {}
+					else Cosmetics.forMiner(profile.Cosmetics, miner.Character)
 				table.insert(keys, string.format("look:%s/%s/%s/%s", tostring(look.Suit), tostring(look.Skin), tostring(look.Back), tostring(look.Trim)))
 				-- ("fist" marks previews held the fighting way: rebuilt once from older ones)
 				local key = "fist|" .. table.concat(keys, "|")
@@ -2615,7 +2617,7 @@ function Equipment.start()
 						-- Without it the blade lay along the arm, across the body,
 						-- and the shield stood edge-on.
 						rig:SetAttribute("FistGrip", true)
-						Equipment.dressModel(rig, loadout, player.UserId, profile.Cosmetics)
+						Equipment.dressModel(rig, loadout, player.UserId, look)
 						for _, child in rig:GetDescendants() do
 							if child:IsA("BaseScript") or child:IsA("Sound") then child:Destroy()
 							elseif child:IsA("BasePart") then child.Anchored = true end

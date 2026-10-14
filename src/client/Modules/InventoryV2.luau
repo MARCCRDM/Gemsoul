@@ -34,6 +34,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 
+local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local ArmorSignatures = require(ReplicatedStorage.Shared.ArmorSignatures)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
@@ -54,6 +55,8 @@ local InventoryPose = require(script.Parent.InventoryPose)
 local IronUi = require(script.Parent.IronUi)
 local StatRadar = require(script.Parent.StatRadar)
 local GemVault = require(script.Parent.GemVault)
+local Wardrobe = require(script.Parent.Wardrobe)
+local ShopArt = require(script.Parent.ShopArt)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
 
@@ -883,7 +886,9 @@ local function buildRight(canvas: Frame)
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(1, 1, 1),
 	}, list)
-	place(gems, 0, y + 12, RIGHT_W, 56)
+	-- GEMS and SKINS share the row (the Q/E/R cards reach in under this column).
+	local half = (RIGHT_W - 10) / 2
+	place(gems, 0, y + 12, half, 56)
 	round(gems, 10)
 	new("UIGradient", {
 		Color = ColorSequence.new(Color3.fromRGB(38, 31, 60), Color3.fromRGB(16, 20, 31)),
@@ -894,9 +899,8 @@ local function buildRight(canvas: Frame)
 	round(gemsIcon, 20)
 	ui.GemsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, gemsIcon)
 	place(text(gems, "GEMS", 15, C.Text, HEAVY), 62, 10, 160, 20)
-	ui.GemsCount = place(text(gems, "", 10, C.Dim, HEADING), 62, 31, 220, 14)
-	local review =
-		place(text(gems, "REVIEW  ›", 12, Color3.fromRGB(200, 150, 255), HEAVY), RIGHT_W - 130, 18, 116, 20)
+	ui.GemsCount = place(text(gems, "", 10, C.Dim, HEADING), 62, 31, half - 70, 14)
+	local review = place(text(gems, "›", 18, Color3.fromRGB(200, 150, 255), HEAVY), half - 26, 16, 16, 22)
 	review.TextXAlignment = Enum.TextXAlignment.Right
 	gems:SetAttribute("UiSound", "Click")
 	gems.MouseEnter:Connect(function()
@@ -908,6 +912,39 @@ local function buildRight(canvas: Frame)
 	gems.Activated:Connect(function()
 		if ui.Canvas then
 			GemVault.open(ui.Canvas)
+		end
+	end)
+	-- Beside it: the miner's suit and weapon skin, in the Wardrobe.
+	local skins = new("TextButton", {
+		Name = "SkinsButton",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+	}, list)
+	place(skins, half + 10, y + 12, half, 56)
+	round(skins, 10)
+	new("UIGradient", {
+		Color = ColorSequence.new(Color3.fromRGB(56, 30, 48), Color3.fromRGB(16, 20, 31)),
+	}, skins)
+	local skinsEdge = stroke(skins, Color3.fromRGB(255, 120, 190), 1, 0.55)
+	local skinsIcon = frame(skins, Color3.fromRGB(255, 255, 255), 0.95)
+	place(skinsIcon, 10, 8, 40, 40)
+	round(skinsIcon, 20)
+	ui.SkinsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, skinsIcon)
+	place(text(skins, "SKINS", 15, C.Text, HEAVY), 62, 10, 120, 20)
+	ui.SkinsCount = place(text(skins, "", 10, C.Dim, HEADING), 62, 31, half - 70, 14)
+	local wardrobe = place(text(skins, "›", 18, Color3.fromRGB(255, 150, 205), HEAVY), half - 26, 16, 16, 22)
+	wardrobe.TextXAlignment = Enum.TextXAlignment.Right
+	skins:SetAttribute("UiSound", "Click")
+	skins.MouseEnter:Connect(function()
+		skinsEdge.Transparency = 0.1
+	end)
+	skins.MouseLeave:Connect(function()
+		skinsEdge.Transparency = 0.55
+	end)
+	skins.Activated:Connect(function()
+		if ui.Canvas then
+			Wardrobe.open(ui.Canvas)
 		end
 	end)
 	y += 68
@@ -2620,13 +2657,52 @@ local function drawGemsButton(profile, loadout)
 	for _, gem in profile.Gems or {} do
 		count(gem, false)
 	end
-	ui.GemsCount.Text = string.format("%d OWNED  ·  %d SOCKETED  ·  MOVE TREES", total, socketed)
+	ui.GemsCount.Text = string.format("%d OWNED  ·  %d IN USE", total, socketed)
 	local key = best and best.Id or ""
 	if gemsShown ~= key then
 		gemsShown = key
 		clear(ui.GemsIcon)
 		if best then
 			gemArt(ui.GemsIcon, best)
+		end
+	end
+end
+
+-- The SKINS button: what this miner wears, and how many looks you own.
+local skinsShown = nil
+local function drawSkinsButton(profile)
+	if not ui.SkinsCount then
+		return
+	end
+	local cosmetics = profile.Cosmetics or {}
+	local suits, skins = 0, 0
+	for id in cosmetics.Owned or {} do
+		local cosmetic = Cosmetics.get(id)
+		if cosmetic and cosmetic.Kind == "Suit" then
+			suits += 1
+		elseif cosmetic and cosmetic.Kind == "Skin" then
+			skins += 1
+		end
+	end
+	local suit, skin = Cosmetics.get(cosmetics.Suit), Cosmetics.get(cosmetics.Skin)
+	ui.SkinsCount.Text = string.format(
+		"%d SUIT%s  ·  %d SKIN%s",
+		suits,
+		if suits == 1 then "" else "S",
+		skins,
+		if skins == 1 then "" else "S"
+	)
+	local key = tostring(cosmetics.Suit) .. "/" .. tostring(cosmetics.Skin)
+	if skinsShown ~= key then
+		skinsShown = key
+		clear(ui.SkinsIcon)
+		local show = suit or skin
+		if show then
+			ShopArt.icon(ui.SkinsIcon, "Cosmetic", show.Id, 40)
+		else
+			local mark = text(ui.SkinsIcon, "◇", 22, Color3.fromRGB(255, 150, 205), HEAVY)
+			mark.Size = UDim2.fromScale(1, 1)
+			mark.TextXAlignment = Enum.TextXAlignment.Center
 		end
 	end
 end
@@ -2647,6 +2723,7 @@ function draw()
 		drawLeft(profile, loadout)
 		drawRows(loadout)
 		drawGemsButton(profile, loadout)
+		drawSkinsButton(profile)
 		drawNudge(profile, loadout)
 		drawKeys(loadout)
 		drawDetail(loadout)
@@ -2804,6 +2881,7 @@ function InventoryV2.mount(host: ScreenGui)
 			InventoryV2.cancelDrag()
 			InventoryV2.hideTip()
 			GemVault.close()
+			Wardrobe.close()
 			state.Detail, state.Pick, state.Hover = nil, nil, nil
 		end
 	end)
@@ -2817,6 +2895,7 @@ function InventoryV2.setActive(on: boolean)
 	if not on then
 		InventoryV2.cancelDrag()
 		GemVault.close()
+		Wardrobe.close()
 	end
 	draw()
 end

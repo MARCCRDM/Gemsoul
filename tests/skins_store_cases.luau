@@ -365,4 +365,44 @@ check(
 	"The Season 1 free-track looks are missing"
 )
 
+-- Each miner wears its own suit and skin -----------------------------------------------
+do
+	local Roster = shared("MinerRoster")
+	local cosmetics = {
+		Owned = { SuitNeon = true, SuitIgnition = true, SkinMolten = true },
+		Suit = "SuitNeon",
+		Skin = "SkinMolten",
+		Title = "TitleLunar",
+	}
+	local profile = { Character = { Weapon = "A" }, Cosmetics = cosmetics, Augments = {} }
+	Roster.initialize(profile, function(index)
+		return { Weapon = "Starter" .. index }, {}
+	end)
+	local function switch(index)
+		Cosmetics.leaveMiner(profile.Cosmetics, profile.Character)
+		check(Roster.switch(profile, index), "Couldn't switch to miner " .. index)
+		Cosmetics.joinMiner(profile.Cosmetics, profile.Character)
+	end
+	-- An older save: miner 2 has never had a wardrobe, so it starts in the current look.
+	switch(2)
+	check(cosmetics.Suit == "SuitNeon" and cosmetics.Skin == "SkinMolten", "A miner new to wardrobes lost the current look")
+	-- Miner 2 changes its suit and takes its skin off (as PlayerData.setCosmetic does).
+	cosmetics.Suit, profile.Character.Wardrobe.Suit = "SuitIgnition", "SuitIgnition"
+	cosmetics.Skin, profile.Character.Wardrobe.Skin = nil, nil
+	switch(1)
+	check(cosmetics.Suit == "SuitNeon" and cosmetics.Skin == "SkinMolten", "Miner 1 didn't get its own look back")
+	check(cosmetics.Title == "TitleLunar", "A title should stay with the account")
+	switch(2)
+	check(cosmetics.Suit == "SuitIgnition" and cosmetics.Skin == nil, "Miner 2 didn't keep its own look")
+	-- A look you no longer own comes off when its miner comes back.
+	cosmetics.Owned.SuitNeon = nil
+	switch(1)
+	check(cosmetics.Suit == nil and cosmetics.Skin == "SkinMolten", "A look no longer owned was put back on")
+	local other = Cosmetics.forMiner(cosmetics, profile.Miners.Slots[2].Character)
+	check(
+		other.Suit == "SuitIgnition" and other.Skin == nil and other.Title == "TitleLunar",
+		"forMiner shows the wrong look for another miner"
+	)
+end
+
 print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d titles; receipts once each, starter pack, season premium, codes)", checks, skins, suits, titles))

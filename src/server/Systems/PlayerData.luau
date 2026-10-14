@@ -878,6 +878,12 @@ function PlayerData.setCosmetic(player: Player, kind: string, id: string?)
 	local profile = profiles[player]
 	if profile then
 		(profile.Cosmetics :: any)[kind] = id
+		-- Suits and skins are the active miner's own (Cosmetics.forMiner).
+		if Cosmetics.isMinerKind(kind) then
+			local character = profile.Character :: any
+			character.Wardrobe = character.Wardrobe or {}
+			character.Wardrobe[kind] = id
+		end
 		sync(player)
 		characterChanged:Fire(player)
 	end
@@ -1103,7 +1109,11 @@ end
 -- validate their own session rules before switching the complete character.
 function PlayerData.selectMiner(player: Player, index: number): boolean
 	local profile = profiles[player]
-	if not profile or not MinerRoster.switch(profile, index) then return false end
+	if not profile then return false end
+	-- Suits and skins go with the miner: keep this one's, put on the next one's.
+	Cosmetics.leaveMiner(profile.Cosmetics, profile.Character)
+	if not MinerRoster.switch(profile, index) then return false end
+	Cosmetics.joinMiner(profile.Cosmetics, profile.Character)
 	Tree.initialize(profile)
 	player:SetAttribute("ActiveMiner", index)
 	sync(player)
