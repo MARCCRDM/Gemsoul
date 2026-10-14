@@ -99,11 +99,13 @@ now += 5
 CombatServer._block(guardian, true, rival.Root.Position)
 now += 0.5 -- past the parry window
 local before = gh.Health
-CombatServer.hurt(guardian, 100, nil, rival, false)
+Enemies.hitPlayer(guardian, 100, nil, rival, false, false, true)
 check(gh.Health > before - 100 and guardian:GetAttribute("Blocking") == true, "Guard did not reduce a rival's quick swing")
+check(latestIncoming(guardian)[3]==true and latestIncoming(guardian)[4]==false,"Rival light sword feedback lost")
 CombatServer._block(guardian, true, rival.Root.Position)
-CombatServer.hurt(guardian, 100, nil, rival, true)
+Enemies.hitPlayer(guardian, 100, nil, rival, true, false, true)
 check(guardian:GetAttribute("Blocking") == false, "Rival's heavy blow did not break the guard")
+check(latestIncoming(guardian)[3]==true and latestIncoming(guardian)[4]==true,"Rival heavy sword feedback lost")
 -- Guard replication is immediate, not dependent on the next resource tick.
 now += 5
 CombatServer._block(guardian, true, rival.Root.Position)

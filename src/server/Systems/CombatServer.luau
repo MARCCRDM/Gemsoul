@@ -422,7 +422,7 @@ local function rawDamage(target, amount, source, crit, color, matchTag)
 		Enemies.damage(target.Enemy, amount, source, crit, color)
 	end
 end
-receive = function(player, amount, element, source, origin, projectile, heavy, reflected, enemySource, crit, pierce)
+receive = function(player, amount, element, source, origin, projectile, heavy, reflected, enemySource, crit, pierce, swordHit)
 	if player:GetAttribute("DungeonSelecting") then return 0, false end
 	if (player:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
 		return 0, false
@@ -698,7 +698,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	TriadServer.afterIncoming(player, k, st, damage, source, enemySource, projectile, heavy, reflected, now)
 	if damage > 0 then
 		if origin then
-			Remotes.CombatFx:FireClient(player, "IncomingDamage", origin)
+			Remotes.CombatFx:FireClient(player, "IncomingDamage", origin, swordHit == true, heavy == true)
 		end
 		rawDamage(
 			{ Player = player, Humanoid = humanoid, Root = root },
@@ -1105,8 +1105,10 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		damage *= combo.Mult or 1
 	end
 	if target.Player then
-		damage, guarded =
-			receive(target.Player, damage, element, source, root.Position, projectile, heavy, false, nil, crit)
+		damage, guarded = receive(
+			target.Player, damage, element, source, root.Position, projectile, heavy, false, nil, crit, nil,
+			not projectile and ArmorSignatures.isSword(k.Weapon)
+		)
 	else
 		Enemies.damage(
 			target.Enemy,
@@ -2271,7 +2273,7 @@ function CombatServer.rivalAura(player, amount)
 	CrowdControl.applyDebuff(state(player).CC, "Aura", amount, 0.5, os.clock(), true)
 end
 
-function CombatServer.hurt(player, amount, element, enemy, heavy, crit)
+function CombatServer.hurt(player, amount, element, enemy, heavy, crit, swordHit)
 	if enemy and enemy.DungeonId and player:GetAttribute("DungeonId") ~= enemy.DungeonId then
 		return 0, false
 	end
@@ -2285,7 +2287,9 @@ function CombatServer.hurt(player, amount, element, enemy, heavy, crit)
 		heavy == true,
 		false,
 		enemy,
-		crit
+		crit,
+		nil,
+		swordHit
 	)
 end
 -- os.clock() -> server time, which clients can count down against.
@@ -2625,8 +2629,8 @@ function CombatServer.reset(player)
 	player:SetAttribute("Charge", Tech.Resources.Charge.Start)
 end
 function CombatServer.start()
-	Enemies.hitPlayer = function(player, amount, element, enemy, heavy, crit)
-		return CombatServer.hurt(player, amount, element, enemy, heavy, crit)
+	Enemies.hitPlayer = function(player, amount, element, enemy, heavy, crit, swordHit)
+		return CombatServer.hurt(player, amount, element, enemy, heavy, crit, swordHit)
 	end
 	-- A rival parried your swing: you're left open for a moment.
 	Enemies.parryPlayer = function(player, seconds)

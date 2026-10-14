@@ -561,7 +561,7 @@ function strike(
 	local previous = DamageLog.push(ability, element)
 	local victim = duel.Owner.Character and duel.Owner.Character:FindFirstChildOfClass("Humanoid")
 	local healthBefore = victim and victim.Health or 0
-	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy, crit)
+	local dealt, guarded = Enemies.hitPlayer(duel.Owner, amount, element, duel.Enemy, heavy, crit, swordHit)
 	dealt = if victim then math.max(0, healthBefore - victim.Health) else 0
 	DamageLog.pop(previous)
 	if swordHit then

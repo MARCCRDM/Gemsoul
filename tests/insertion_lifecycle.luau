@@ -40,6 +40,7 @@ vmt.__index = function(a, key)
 	end
 end
 local Vector3 = { zero = vec(0, 0, 0), new = vec }
+local Vector2 = { zero = {} }
 local cmt = {}
 local CFrame = {
 	new = function(x, y, z)
@@ -160,6 +161,42 @@ local function check(value, message)
 	assert(value, message)
 end
 -- MODULES HERE
+do
+	-- Entering a match while seated must sever physics before the root anchors.
+	local model, root, _, _, hum = actor()
+	local rider = object("Player")
+	rider.Character = model
+	owners[model] = rider
+	local seat, chassis, weld, unrelated = object("VehicleSeat"), object("Part"), object("Weld"), object("Weld")
+	local drive = { PlaneVelocity = { Moving = true } }
+	local networkReturned = false
+	function chassis:FindFirstChild(name) return if name == "Drive" then drive else nil end
+	function chassis:SetNetworkOwner(owner) networkReturned = owner == nil end
+	seat.Parent = { PrimaryPart = chassis }
+	seat:SetAttribute("OutpostMachine", "Mole")
+	weld.Name, weld.Part0, weld.Part1 = "SeatWeld", seat, root
+	unrelated.Name, unrelated.Part0, unrelated.Part1 = "SeatWeld", seat, chassis
+	function root:IsDescendantOf(other) return other == model end
+	function seat:IsDescendantOf() return false end
+	function chassis:IsDescendantOf() return false end
+	function seat:GetChildren() return { weld, unrelated } end
+	function weld:Destroy()
+		check(not root.Anchored, "Mech assembly anchored before unseating")
+		check(rider:GetAttribute("ArenaDropPreparing") ~= nil, "Reseat guard not active before detach")
+		self.Parent = nil
+	end
+	hum.SeatPart, hum.Sit = seat, true
+	Enum.HumanoidStateType = { GettingUp = "GettingUp" }
+	function hum:ChangeState(state) self.State = state end
+	Drop.prepare(rider)
+	check(weld.Parent == nil and unrelated.Parent ~= nil, "Wrong seat weld removed")
+	check(not hum.Sit and hum.State == "GettingUp", "Humanoid left seated")
+	check(root.Anchored and root.AssemblyLinearVelocity == Vector3.zero, "Character not ready for insertion")
+	check(chassis.AssemblyLinearVelocity == Vector3.zero and networkReturned, "Mech retained motion or client ownership")
+	check(drive.PlaneVelocity == Vector2.zero, "Mech drive kept pushing")
+	Drop.cancel(model)
+	check(not root.Anchored and rider:GetAttribute("ArenaDropPreparing") == nil, "Cancelled seated entry stayed locked")
+end
 local a, ar, armor, particles, ah, ab = actor()
 local b, br = actor()
 local player = object("Player")

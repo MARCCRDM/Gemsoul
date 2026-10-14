@@ -164,7 +164,9 @@ end
 
 local shakeUntil, shakeTotal, shakeStrength = 0, 1, 0
 local shaking = false
+local shakenCamera, baseFrame, shakenFrame = nil, nil, nil
 function CombatFx.shake(strength: number, seconds: number)
+	if strength <= 0 or seconds <= 0 then return end
 	local now = os.clock()
 	-- The stronger of what's running and what's asked for.
 	local current = if now < shakeUntil then shakeStrength * (shakeUntil - now) / shakeTotal else 0
@@ -174,16 +176,47 @@ function CombatFx.shake(strength: number, seconds: number)
 	shakeStrength, shakeTotal, shakeUntil = strength, seconds, now + seconds
 	if not shaking then
 		shaking = true
-		RunService:BindToRenderStep("CombatShake", Enum.RenderPriority.Camera.Value + 1, function()
+		RunService:BindToRenderStep("CombatShakeRestore", Enum.RenderPriority.Camera.Value - 1, function()
+			-- Remove our previous offset before the camera reads its last frame.
+			-- Respect camera changes made by another controller in the meantime.
+			if shakenCamera and shakenCamera.CFrame == shakenFrame then
+				shakenCamera.CFrame = baseFrame
+			end
+			shakenCamera, baseFrame, shakenFrame = nil, nil, nil
+		end)
+		-- After target-lock steering (+1), before first-person arms (+3).
+		RunService:BindToRenderStep("CombatShake", Enum.RenderPriority.Camera.Value + 2, function()
 			local left = shakeUntil - os.clock()
 			if left <= 0 then
+				RunService:UnbindFromRenderStep("CombatShake")
+				RunService:UnbindFromRenderStep("CombatShakeRestore")
+				shaking = false
 				return
 			end
 			local k = shakeStrength * (left / shakeTotal)
 			local camera = workspace.CurrentCamera
+			if not camera then return end
+			-- A brief, smooth impact pulse; sample time rather than random frames
+			-- so high refresh rates don't make the hit feel more frantic.
+			local elapsed = shakeTotal - left
+			shakenCamera, baseFrame = camera, camera.CFrame
 			camera.CFrame = camera.CFrame
-				* CFrame.Angles((math.random() - 0.5) * k, (math.random() - 0.5) * k, (math.random() - 0.5) * k * 0.6)
+				* CFrame.Angles(
+					math.cos(elapsed * 48) * k * 0.5,
+					math.sin(elapsed * 37) * k * 0.3,
+					math.sin(elapsed * 43) * k * 0.16
+				)
+			shakenFrame = camera.CFrame
 		end)
+	end
+end
+
+-- Only the damaged player's server-confirmed hit event calls this.
+function CombatFx.hitShake(swordHit: boolean?, heavy: boolean?)
+	if swordHit then
+		CombatFx.shake(if heavy then 0.1 else 0.065, if heavy then 0.26 else 0.18)
+	else
+		CombatFx.shake(0.018, 0.22)
 	end
 end
 

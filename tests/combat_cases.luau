@@ -56,6 +56,11 @@ local function feedbackCount(kind,recipient)
  for _,message in messages do if message[1]==kind and message.Player==recipient then count+=1 end end
  return count
 end
+local function latestIncoming(recipient)
+ for i=#messages,1,-1 do
+  if messages[i][1]=="IncomingDamage" and messages[i].Player==recipient then return messages[i] end
+ end
+end
 check(feedbackCount("HitConfirm",a)==0 and feedbackCount("IncomingDamage",b)==0,"Rejected attack produced hit feedback")
 CombatServer._input(a,"BeginAttack")
 now+=0.1
@@ -66,7 +71,10 @@ check(feedbackCount("HitConfirm",b)==0,"Victim received attack confirmation")
 check(feedbackCount("IncomingDamage",b)==1,"Victim missing directional feedback")
 check(feedbackCount("IncomingDamage",a)==0,"Attacker received victim feedback")
 for _,message in messages do
- if message[1]=="IncomingDamage" and message.Player==b then check(message[2]==ra.Position,"Incoming indicator lost authoritative origin") end
+ if message[1]=="IncomingDamage" and message.Player==b then
+  check(message[2]==ra.Position,"Incoming indicator lost authoritative origin")
+  check(message[3]==true and message[4]==false,"Light sword hit lost camera feedback classification")
+ end
 end
 CombatServer._input(a,"Attack",rb.Position)
 check(close(hb.Health,1000-damage),"Attack cooldown bypass")
@@ -91,6 +99,7 @@ now+=0.3
 before=hb.Health
 CombatServer._input(a,"ReleaseAttack",rb.Position)
 check(close(before-hb.Health,damage*1.5),"Heavy multiplier/guard break")
+check(latestIncoming(b)[3]==true and latestIncoming(b)[4]==true,"Heavy sword hit lost camera feedback classification")
 check(b:GetAttribute("Blocking")==false and not CombatServer._block(b,true,ra.Position),"Broken guard immediately raised")
 now+=2
 check(CombatServer._dodge(b,Vector3.new(0,0,-1)),"Dodge rejected")
@@ -126,6 +135,7 @@ now+=1
 before=hb.Health
 CombatServer._input(a,"Attack",rb.Position+Vector3.new(0,1.5,0))
 check(hb.Health<before,"Pistol did not hit player")
+check(latestIncoming(b)[3]==false,"Pistol incorrectly triggered sword camera kick")
 local gem={Element="Fire",Tier="Common",Size=4,Clarity=4,Cut=4}
 la.WeaponGem=gem
 now+=1

@@ -1825,14 +1825,14 @@ end
 function handlers.HitConfirm(crit)
 	hitUntil, hitCritical = os.clock() + 0.18, crit == true
 end
-function handlers.IncomingDamage(origin)
+function handlers.IncomingDamage(origin, swordHit, heavy)
 	incomingOrigin, incomingUntil = origin, os.clock() + 0.65
 	if typeof(origin) == "Vector3" then
 		TargetLock.engageNear(origin) -- whatever hit you gets locked
 	end
 	flashUntil = os.clock() + 0.3
 	CombatSound.play("Hurt")
-	CombatFx.shake(0.018, 0.22)
+	CombatFx.hitShake(swordHit, heavy)
 	CombatVfx.screen("Hurt")
 end
 function handlers.TechStatus(message)
