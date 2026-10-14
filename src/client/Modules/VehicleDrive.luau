@@ -12,6 +12,8 @@ local Rules = require(ReplicatedStorage.Shared.Outpost)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
+require(script.Parent.MechAnimation)
+
 local VehicleDrive = {}
 local player = Players.LocalPlayer
 local P = IronUi.Colors
@@ -49,7 +51,7 @@ local speedLabel = IronUi.text(card, "0", 30, P.Text, IronUi.Heading)
 speedLabel.AnchorPoint = Vector2.new(1, 0)
 speedLabel.Position, speedLabel.Size = UDim2.new(1, -14, 0, 4), UDim2.fromOffset(100, 34)
 speedLabel.TextXAlignment = Enum.TextXAlignment.Right
-local unit = IronUi.text(card, "KM/H", 10, P.Dim, IronUi.Bold)
+local unit = IronUi.text(card, "STUDS/S", 10, P.Dim, IronUi.Bold)
 unit.AnchorPoint = Vector2.new(1, 0)
 unit.Position, unit.Size = UDim2.new(1, -14, 0, 36), UDim2.fromOffset(60, 12)
 unit.TextXAlignment = Enum.TextXAlignment.Right
@@ -67,9 +69,9 @@ controls.Position, controls.Size = UDim2.fromOffset(14, 57), UDim2.new(1, -28, 0
 
 local function controlText(): string
 	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return "Thumbstick to drive  ·  Jump to hop out"
+		return "Thumbstick to drive  Â·  Jump to hop out"
 	end
-	return "W/S drive  ·  A/D steer  ·  SPACE to hop out"
+	return "W/S drive  Â·  A/D steer  Â·  SPACE to hop out"
 end
 
 local function finish()
@@ -109,7 +111,7 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 		Zoom = { player.CameraMinZoomDistance, player.CameraMaxZoomDistance },
 	}
 	-- Pull the camera back to fit the machine.
-	local fit = math.max(14, chassis.Size.Z * 1.15)
+	local fit = seat.Parent:GetAttribute("CameraFit") or math.max(14, chassis.Size.Z * 1.15)
 	player.CameraMaxZoomDistance = math.max(player.CameraMaxZoomDistance, fit * 2)
 	player.CameraMinZoomDistance = fit
 	title.Text = string.upper(spec.Name)
