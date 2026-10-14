@@ -1,6 +1,6 @@
 -- lune run tests/arena_streak_cases.luau <repo>
 -- Ranked win streaks (Shared.ArenaStreak, Systems/ArenaStreaks): the
--- milestones, what counts, the Arena Caches (Legendary gems and gear),
+-- milestones, what counts, the Arena Caches (Rare and Ultra-Rare gems and gear),
 -- claiming two and the rest going to the Market from the Arena Vault.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -38,10 +38,23 @@ for i, m in Rules.Milestones do
 	table.insert(wins, m.Wins)
 	check(m.Choices > Rules.Picks, m.Wins .. " offers no real choice")
 	check(m.Quality >= 1 and m.Quality <= 4, m.Wins .. " has a bad gear quality")
+	check(m.UltraRare >= 1 and m.UltraRare <= m.Choices, m.Wins .. " offers no Ultra-Rare piece")
+	local gemTiers, gearTiers = Rules.rarities(m)
+	local ultra = 0
+	for _, list in { gemTiers, gearTiers } do
+		for _, tier in list do
+			check(tier == "Rare" or tier == "UltraRare", m.Wins .. " offers a piece that's neither Rare nor Ultra-Rare")
+			ultra += if tier == "UltraRare" then 1 else 0
+		end
+	end
+	check(#gemTiers + #gearTiers == m.Choices and ultra == m.UltraRare, m.Wins .. "'s rarities don't add up")
 	check(m.Coins > 0 and m.Name, m.Wins .. " is incomplete")
 	if i > 1 then
 		local before = Rules.Milestones[i - 1]
-		check(m.Wins > before.Wins and m.Choices >= before.Choices and m.Coins > before.Coins, m.Wins .. " is no better than the one before")
+		check(
+			m.Wins > before.Wins and m.Choices >= before.Choices and m.UltraRare >= before.UltraRare and m.Coins > before.Coins,
+			m.Wins .. " is no better than the one before"
+		)
 	end
 	if m.Title then
 		local title = Cosmetics.get(m.Title)
@@ -53,8 +66,19 @@ check(#Rules.reached(9, 10) == 1 and Rules.reached(9, 10)[1].Wins == 10, "Reachi
 check(#Rules.reached(10, 11) == 0 and #Rules.reached(0, 9) == 0, "A milestone counted twice or early")
 check(Rules.next(0).Wins == 10 and Rules.next(10).Wins == 20 and Rules.next(100).Wins == 150 and Rules.next(200) == nil, "next() is off")
 check(not Rules.counts({ StreakLastBeaten = 5 }, 5) and Rules.counts({ StreakLastBeaten = 5 }, 6), "The same foe twice running counted")
-check(Rules.vaultPrice({ Kind = "Gear", Quality = 4 }) == Rules.VaultGear[4], "Gear's Market price is off")
-check(Rules.vaultPrice({ Kind = "Gem" }, 100) == Rules.VaultGemFloor and Rules.vaultPrice({ Kind = "Gem" }, 10000) == 30000, "A gem's Market price is off")
+check(Rules.Milestones[#Rules.Milestones].UltraRare == Rules.Milestones[#Rules.Milestones].Choices, "200 wins isn't all Ultra-Rare")
+check(
+	Rules.vaultPrice({ Kind = "Gear", Quality = 4 }, nil, "UltraRare") == Rules.VaultGear.UltraRare[4]
+		and Rules.vaultPrice({ Kind = "Gear", Quality = 1 }, nil, "Rare") == Rules.VaultGear.Rare[1],
+	"Gear's Market price is off"
+)
+check(Rules.VaultGear.UltraRare[1] > Rules.VaultGear.Rare[1], "Ultra-Rare gear isn't priced above Rare")
+check(
+	Rules.vaultPrice({ Kind = "Gem", Gem = { Tier = "Rare" } }, 100) == Rules.VaultGemFloor.Rare
+		and Rules.vaultPrice({ Kind = "Gem", Gem = { Tier = "UltraRare" } }, 100) == Rules.VaultGemFloor.UltraRare
+		and Rules.vaultPrice({ Kind = "Gem" }, 10000, "Rare") == 30000,
+	"A gem's Market price is off"
+)
 
 -- The server, with stand-ins ------------------------------------------------------------------
 local player = { UserId = 7, DisplayName = "Kai", SetAttribute = function() end }
@@ -134,17 +158,42 @@ check(#profile.Duel.StreakCaches == 1 and profile.Coins == Rules.Milestones[1].C
 check(fired[#fired][1] == "StreakReward" and fired[#fired][2].Wins == 10, "The player wasn't told about the cache")
 local cache = profile.Duel.StreakCaches[1]
 check(#cache.Items == Rules.Milestones[1].Choices, "The cache holds the wrong number of pieces")
-local gems, gear = 0, 0
+-- Every gear Id's RarityTier, to check the pieces against.
+local gearTier = {}
+for _, w in shared("ExpandedItemTraits").Catalog.Weapons do
+	gearTier[w.Id] = w.RarityTier
+end
+for _, list in shared("ArmorFamilies").Catalog do
+	for _, piece in list do
+		if type(piece) == "table" and piece.Id then
+			gearTier[piece.Id] = piece.RarityTier
+		end
+	end
+end
+local function cacheRarities(c)
+	local counts, gems, gear = { Rare = 0, UltraRare = 0 }, 0, 0
+	for _, entry in c.Items do
+		local tier = entry.Rarity
+		check(tier == "Rare" or tier == "UltraRare", "A cache piece isn't Rare or Ultra-Rare")
+		counts[tier] += 1
+		if entry.Item.Kind == "Gem" then
+			gems += 1
+			check(entry.Item.Gem.Tier == tier, "A cache gem isn't the rarity it says")
+		else
+			gear += 1
+			check(gearTier[entry.Item.Id] == Rules.GearTier[tier], "A cache piece of gear isn't the rarity it says")
+		end
+	end
+	return counts, gems, gear
+end
+local counts, gems, gear = cacheRarities(cache)
 for _, entry in cache.Items do
-	if entry.Item.Kind == "Gem" then
-		gems += 1
-		check(entry.Item.Gem.Tier == "Legendary", "A cache gem isn't Legendary")
-	else
-		gear += 1
+	if entry.Item.Kind == "Gear" then
 		check(entry.Item.Quality == Rules.Milestones[1].Quality and entry.Item.Slot, "A cache piece of gear is malformed")
 	end
 end
 check(gems >= 1 and gear >= 1, "The cache isn't gems and gear")
+check(counts.UltraRare == Rules.Milestones[1].UltraRare and counts.Rare == Rules.Milestones[1].Choices - counts.UltraRare, "The 10-win cache's rarities are off")
 
 -- A loss ends it; a new streak to 10 the same season pays nothing more.
 check(Server.onRankedResult(player, false, 300) == 0, "A loss didn't end the streak")
@@ -173,7 +222,13 @@ end
 check(gearOwned == 1, "The kept gear didn't arrive")
 check(#vaulted == #cache.Items - 2, "The leftovers didn't all go to the Market")
 for _, v in vaulted do
-	check(v[2] >= Rules.VaultGemFloor and string.find(v[3], Rules.VaultName, 1, true), "A Vault listing is mispriced or unlabelled")
+	local item = v[1]
+	local tier = if item.Kind == "Gem" then item.Gem.Tier else (if gearTier[item.Id] == 4 then "UltraRare" else "Rare")
+	local floor = if item.Kind == "Gem" then Rules.VaultGemFloor[tier] else Rules.VaultGear[tier][item.Quality]
+	check(v[2] >= floor and string.find(v[3], Rules.VaultName, 1, true), "A Vault listing is mispriced or unlabelled")
+	if item.Kind == "Gear" then
+		check(v[2] == Rules.vaultPrice(item, nil, tier), "A Vault gear listing isn't priced for its rarity")
+	end
 end
 check(#profile.Duel.StreakCaches == 0 and not handlers.StreakClaim(player, cache.Id, keep).Ok, "A cache could be claimed twice")
 
@@ -191,6 +246,12 @@ for _, entry in big.Items do
 	end
 end
 check(profile.Cosmetics.Owned.TitleStreak100, "The CENTURION title wasn't given")
+local bigCounts = cacheRarities(big)
+check(bigCounts.UltraRare == Rules.get(100).UltraRare, "The 100-win cache has the wrong number of Ultra-Rares")
+-- 200: every piece Ultra-Rare.
+local top = Server.rollCache(Rules.get(200))
+local topCounts = cacheRarities(top)
+check(#top.Items == 10 and topCounts.UltraRare == 10, "The 200-win cache isn't all Ultra-Rare")
 -- A full gem bag stops the claim before anything moves.
 local config = shared("Config")
 local before = #vaulted
@@ -203,4 +264,4 @@ for _, entry in big.Items do
 end
 check(not handlers.StreakClaim(player, big.Id, { gemPick, gearPick }).Ok and #vaulted == before, "Claimed into a full gem bag")
 
-print(string.format("PASS: %d arena streak checks (milestones 10-200, caches, claims, Arena Vault)", checks))
+print(string.format("PASS: %d arena streak checks (milestones 10-200, Rare and Ultra-Rare caches, claims, Arena Vault)", checks))

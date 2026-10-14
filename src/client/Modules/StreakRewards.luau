@@ -3,8 +3,8 @@
 	(Shared.ArenaStreak, Systems/ArenaStreaks).
 
 	While a cache waits, a gold "ARENA CACHE" button pulses at the top of the
-	screen. It opens the cache: every Legendary piece on a card (gems and
-	gear), tap two to keep, CLAIM. The rest go to the Market from the Arena
+	screen. It opens the cache: every piece on a card (gems and gear, Rare
+	or Ultra-Rare, in that rarity's colour), tap two to keep, CLAIM. The rest go to the Market from the Arena
 	Vault, and the screen says so before you claim. A cache unlocking opens
 	the screen straight away.
 
@@ -29,7 +29,12 @@ local INK = Color3.fromRGB(8, 10, 16)
 local CARD = Color3.fromRGB(20, 24, 36)
 local TEXT = Color3.fromRGB(238, 242, 247)
 local DIM = Color3.fromRGB(150, 160, 180)
-local LEGEND = GemConfig.TierColors.Legendary or GOLD
+
+-- A piece's rarity: its colour and its name on the card.
+local function rarityOf(entry)
+	local tier = entry.Rarity or (entry.Item.Gem and entry.Item.Gem.Tier) or "Rare"
+	return GemConfig.TierColors[tier] or GOLD, string.upper(GemConfig.TierLabels[tier] or tier)
+end
 
 local gui: ScreenGui? = nil
 local launcher: TextButton? = nil
@@ -78,6 +83,7 @@ end
 -- One piece on a card: its picture, name and what it is.
 local function card(parent, entry, onToggle)
 	local item = entry.Item
+	local tint, rarity = rarityOf(entry)
 	local b = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
@@ -85,16 +91,16 @@ local function card(parent, entry, onToggle)
 		Size = UDim2.fromOffset(150, 196),
 	}, parent)
 	UiKit.round(b, 12)
-	local edge = new("UIStroke", { Color = LEGEND, Thickness = 1.5, Transparency = 0.5 }, b)
+	local edge = new("UIStroke", { Color = tint, Thickness = 1.5, Transparency = 0.5 }, b)
 	local art = new("Frame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(15, 10),
 		Size = UDim2.fromOffset(120, 110),
 	}, b)
 	if item.Kind == "Gem" then
-		pcall(Art.show, art, item.Gem, nil, GemConfig.ElementColors[item.Gem.Element] or LEGEND, false)
+		pcall(Art.show, art, item.Gem, nil, GemConfig.ElementColors[item.Gem.Element] or tint, false)
 	else
-		-- The slot's silhouette in Legendary gold, scaled up (Art.show would
+		-- The slot's silhouette in its rarity's colour, scaled up (Art.show would
 		-- draw whatever you're wearing in that slot, not this piece).
 		local holder = new("Frame", {
 			BackgroundTransparency = 1,
@@ -103,14 +109,14 @@ local function card(parent, entry, onToggle)
 			Size = UDim2.fromOffset(38, 36),
 		}, art)
 		new("UIScale", { Scale = 2.8 }, holder)
-		pcall(GearArt.icon, holder, item.Slot, {}, LEGEND)
+		pcall(GearArt.icon, holder, item.Slot, {}, tint)
 	end
 	local name = label(b, entry.Name, 13, TEXT, Enum.Font.GothamBlack)
 	name.Position, name.Size = UDim2.fromOffset(8, 124), UDim2.new(1, -16, 0, 34)
 	local kind = if item.Kind == "Gem"
-		then (if item.Gem.Flawless then "FLAWLESS LEGENDARY GEM" else "LEGENDARY GEM")
-		else string.upper(item.Slot or "Gear") .. "  ·  QUALITY " .. tostring(item.Quality or 1)
-	local sub = label(b, kind, 10, LEGEND, Enum.Font.GothamBold)
+		then (if item.Gem.Flawless then "FLAWLESS " else "") .. rarity .. " GEM"
+		else rarity .. " " .. string.upper(item.Slot or "Gear") .. "  ·  Q" .. tostring(item.Quality or 1)
+	local sub = label(b, kind, 10, tint, Enum.Font.GothamBold)
 	sub.Position, sub.Size = UDim2.fromOffset(8, 160), UDim2.new(1, -16, 0, 14)
 	local tick = label(b, "", 12, INK, Enum.Font.GothamBlack)
 	tick.BackgroundColor3, tick.BackgroundTransparency = GOLD, 0
@@ -122,7 +128,7 @@ local function card(parent, entry, onToggle)
 	end)
 	return function(on: boolean)
 		edge.Thickness, edge.Transparency = if on then 3 else 1.5, if on then 0 else 0.5
-		edge.Color = if on then GOLD else LEGEND
+		edge.Color = if on then GOLD else tint
 		b.BackgroundColor3 = if on then CARD:Lerp(GOLD, 0.12) else CARD
 		tick.Visible, tick.Text = on, "KEEP"
 	end

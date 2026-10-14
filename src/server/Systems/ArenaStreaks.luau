@@ -5,7 +5,7 @@
 	Duels calls ArenaStreaks.onRankedResult after every Ranked 1v1. A win
 	adds to the streak (not over the same player twice running), a loss
 	ends it. Reaching a milestone pays its coins and title at once and opens
-	an Arena Cache: Legendary gems and gear, rolled now and saved with the
+	an Arena Cache: Rare and Ultra-Rare gems and gear, rolled now and saved with the
 	player (profile.Duel.StreakCaches), to claim whenever they like.
 	Claiming keeps ArenaStreak.Picks of them; the rest go up on the Market
 	from the Arena Vault (MarketBoard.vaultList). A leftover the Market
@@ -38,15 +38,13 @@ local Shop = require(script.Parent.Shop)
 local ArenaStreaks = {}
 
 local rng = Random.new()
-local LEGENDARY = 5 -- gear RarityTier
-local GEM_TIER = "Legendary"
 
--- Every Legendary piece of gear: { Kind, Id, Name }.
-local function legendaryGear()
+-- Every piece of gear of one RarityTier: { Kind, Id, Name }.
+local function gearOfTier(tier: number)
 	local pool = {}
 	local function scan(kind: string, list)
 		for _, gear in list or {} do
-			if type(gear) == "table" and gear.RarityTier == LEGENDARY then
+			if type(gear) == "table" and gear.RarityTier == tier then
 				table.insert(pool, { Kind = kind, Id = gear.Id, Name = gear.Name })
 			end
 		end
@@ -62,15 +60,15 @@ local function legendaryGear()
 	end)
 	return pool
 end
-local GEAR_POOL = nil
+local GEAR_POOLS = {} -- rarity name -> its gear
 
--- A Legendary gem, Flawless (every metric 10, the surge at its top rank)
+-- A gem of `rarity`, Flawless (every metric 10, the surge at its top rank)
 -- when the milestone says so.
-local function rollGem(flawless: boolean?)
+local function rollGem(rarity: string, flawless: boolean?)
 	local gem = GemGenerator.generate(rng, "MiningStore", {
 		Id = PlayerData.newGemId(),
 		Time = os.time(),
-		Rarity = GEM_TIER,
+		Rarity = rarity,
 	})
 	if flawless then
 		gem.Size, gem.Clarity, gem.Cut = 10, 10, 10
@@ -80,32 +78,43 @@ local function rollGem(flawless: boolean?)
 	return gem
 end
 
--- The cache for milestone `m`: about half gems, half gear (no piece twice).
-function ArenaStreaks.rollCache(m)
-	GEAR_POOL = GEAR_POOL or legendaryGear()
-	local gems, gear = ArenaStreak.split(m.Choices)
-	local items = {}
-	for _ = 1, gems do
-		local gem = rollGem(m.Flawless)
-		table.insert(items, {
-			Item = { Kind = "Gem", Gem = gem },
-			Name = GemConfig.displayName(gem),
-		})
-	end
-	local order = {}
-	for i = 1, #GEAR_POOL do
-		order[i] = i
-	end
+-- `pool` in a random order.
+local function shuffled(pool)
+	local order = table.clone(pool)
 	for i = #order, 2, -1 do
 		local j = rng:NextInteger(1, i)
 		order[i], order[j] = order[j], order[i]
 	end
-	for n = 1, math.min(gear, #order) do
-		local piece = GEAR_POOL[order[n]]
+	return order
+end
+
+-- The cache for milestone `m`: about half gems, half gear, each piece Rare
+-- or Ultra-Rare (ArenaStreak.rarities), no piece of gear twice.
+function ArenaStreaks.rollCache(m)
+	local gemTiers, gearTiers = ArenaStreak.rarities(m)
+	local items = {}
+	for _, rarity in gemTiers do
+		local gem = rollGem(rarity, m.Flawless)
 		table.insert(items, {
-			Item = { Kind = "Gear", Slot = Slots.ByKind[piece.Kind], Id = piece.Id, Quality = m.Quality },
-			Name = piece.Name,
+			Item = { Kind = "Gem", Gem = gem },
+			Name = GemConfig.displayName(gem),
+			Rarity = rarity,
 		})
+	end
+	local decks = {}
+	for _, rarity in gearTiers do
+		if not decks[rarity] then
+			GEAR_POOLS[rarity] = GEAR_POOLS[rarity] or gearOfTier(ArenaStreak.GearTier[rarity])
+			decks[rarity] = shuffled(GEAR_POOLS[rarity])
+		end
+		local piece = table.remove(decks[rarity])
+		if piece then
+			table.insert(items, {
+				Item = { Kind = "Gear", Slot = Slots.ByKind[piece.Kind], Id = piece.Id, Quality = m.Quality },
+				Name = piece.Name,
+				Rarity = rarity,
+			})
+		end
 	end
 	for i, entry in items do
 		entry.OfferId = tostring(i)
@@ -203,12 +212,15 @@ local function vault(player: Player, duel, leftovers)
 	for _, entry in leftovers do
 		local item = entry.Item
 		local worth = if item.Kind == "Gem" then GemConfig.value(item.Gem) else nil
-		local price = entry.Price or ArenaStreak.vaultPrice(item, worth)
+		local price = entry.Price or ArenaStreak.vaultPrice(item, worth, entry.Rarity)
 		local label = entry.Label
 			or string.format("%s · %s's %d-win cache", ArenaStreak.VaultName, player.DisplayName, entry.Wins or 0)
 		local ok = MarketBoard.vaultList(item, price, label)
 		if not ok then
-			table.insert(waiting, { Item = item, Price = price, Label = label, Wins = entry.Wins })
+			table.insert(
+				waiting,
+				{ Item = item, Price = price, Label = label, Wins = entry.Wins, Rarity = entry.Rarity }
+			)
 		end
 	end
 	duel.VaultPending = if #waiting > 0 then waiting else nil
@@ -219,7 +231,10 @@ local function view(duel)
 	for _, cache in duel.StreakCaches do
 		local items = {}
 		for _, entry in cache.Items do
-			table.insert(items, { OfferId = entry.OfferId, Name = entry.Name, Item = entry.Item })
+			table.insert(
+				items,
+				{ OfferId = entry.OfferId, Name = entry.Name, Item = entry.Item, Rarity = entry.Rarity }
+			)
 		end
 		table.insert(
 			caches,
@@ -295,7 +310,7 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 		if chosen[entry.OfferId] then
 			Market.give(profile, entry.Item, math.huge, true)
 		else
-			table.insert(leftovers, { Item = entry.Item, Wins = cache.Wins })
+			table.insert(leftovers, { Item = entry.Item, Wins = cache.Wins, Rarity = entry.Rarity })
 		end
 	end
 	table.remove(duel.StreakCaches, index)
