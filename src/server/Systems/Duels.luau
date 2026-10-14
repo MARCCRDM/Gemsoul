@@ -58,6 +58,7 @@ local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Progress = require(script.Parent.Progress)
+local ArenaStreaks = require(script.Parent.ArenaStreaks)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
 
@@ -308,6 +309,13 @@ function finish(match, winner: number?, reason: string)
 				record.Losses += if won then 0 else 1
 				record.Streak = if won then record.Streak + 1 else 0
 			end
+			-- Ranked 1v1 win streaks: Arena Caches at 10, 20 ... (ArenaStreaks).
+			local rankedStreak = nil
+			local solo = #match.Teams[1] == 1 and #match.Teams[2] == 1
+			if record and winner and match.Ranked and solo then
+				local foe = match.Teams[if t == 1 then 2 else 1][1]
+				rankedStreak = ArenaStreaks.onRankedResult(member, won, foe and foe.UserId)
+			end
 			if record then
 				-- Every finished duel counts toward the lobby's unlocks.
 				(record :: any).Played = ((record :: any).Played or 0) + 1
@@ -334,6 +342,7 @@ function finish(match, winner: number?, reason: string)
 					Coins = coins,
 					Opponents = names[if t == 1 then 2 else 1],
 					Rules = { Name = match.Rules.Name, Stats = match.Rules.Stats },
+					Streak = rankedStreak,
 					Rounds = if match.Rounds
 						then { Mine = match.Rounds.Wins[t], Theirs = match.Rounds.Wins[if t == 1 then 2 else 1] }
 						else nil,

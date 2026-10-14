@@ -15,10 +15,15 @@ type Gem = GemConfig.Gem
 	opts.Luck: extra luck on top of the source's own (0-1)
 	opts.Id: unique id (the server passes a GUID)
 ]]
-function GemGenerator.generate(rng: Random, source: string, opts: { Luck: number?, Id: string, Time: number }): Gem
+function GemGenerator.generate(
+	rng: Random,
+	source: string,
+	opts: { Luck: number?, Id: string, Time: number, Rarity: string? }
+): Gem
 	local luck = math.clamp((GemConfig.SourceLuck[source] or 0) + (opts.Luck or 0), 0, 1)
 	-- Element, rarity, surge tier, surge rank and metrics (GemRoller).
-	local rolled = GemRoller.roll(rng, luck)
+	-- (opts.Rarity sets the rarity: an Arena Cache's Legendaries.)
+	local rolled = GemRoller.roll(rng, luck, opts.Rarity)
 	return {
 		Id = opts.Id,
 		Element = rolled.Element,

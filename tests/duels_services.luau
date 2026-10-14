@@ -201,6 +201,15 @@ local Progress = {
 		xp[p] = reason
 	end,
 }
+-- Ranked win streaks (Systems/ArenaStreaks has its own suite): each
+-- Ranked 1v1 result, recorded.
+local streakResults = {}
+local ArenaStreaks = {
+	onRankedResult = function(p, won, foe)
+		table.insert(streakResults, { Player = p, Won = won, Foe = foe })
+		return if won then 1 else 0
+	end,
+}
 -- Party Raids: the boss is the Duelist's (recorded here); ids are fixed.
 local HttpService = {
 	GenerateGUID = function()

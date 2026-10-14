@@ -171,10 +171,11 @@ function GemRoller.rollRarity(rng, luck: number?): string
 	return GemRoller.Rarities[#GemRoller.Rarities].Name
 end
 
--- The rolls, as saved gem fields.
-function GemRoller.roll(rng, luck: number?)
+-- The rolls, as saved gem fields. `rarity` (optional) sets the rarity
+-- instead of rolling it (an Arena Cache's Legendaries).
+function GemRoller.roll(rng, luck: number?, rarity: string?)
 	local element = pick(rng, GemRoller.Elements)
-	local rarity = GemRoller.rollRarity(rng, luck)
+	rarity = if rarity and GemRoller.ByRarity[rarity] then rarity else GemRoller.rollRarity(rng, luck)
 	local rules = GemRoller.ByRarity[rarity]
 	local tier = pick(rng, rules.Tiers)
 	local alternate = rng:NextNumber() < 0.5

@@ -265,7 +265,7 @@ end
 
 local reconcile -- forward
 local function nudge(userId: number?)
-	if not userId then
+	if not userId or userId <= 0 then
 		return
 	end
 	local here = Players:GetPlayerByUserId(userId)
@@ -350,7 +350,8 @@ local function finalize(row, selfId: number?)
 	local m = getMail()
 	local ok = true
 	local function send(userId, note)
-		if userId and userId ~= selfId then
+		-- (Seller 0 is the Arena Vault: nobody to pay or tell.)
+		if userId and userId > 0 and userId ~= selfId then
 			ok = m.add(userId, row.Id, note) and ok
 		end
 	end
@@ -982,6 +983,39 @@ function handlers.MarketDecline(player: Player, listingId, offerId)
 	invalidate()
 	nudge(from)
 	return Shop.reply(true, "Offer declined. Their item goes back to them.")
+end
+
+-- Puts an item up for sale from the Arena Vault (an Arena Cache's
+-- leftovers, Systems/ArenaStreaks): no player behind it, so no escrow and
+-- no payout; the buyer gets the item from the row as with any sale.
+-- `label` shows as the seller. Returns whether it went up.
+function MarketBoard.vaultList(payload, price: number, label: string): boolean
+	if Config.Features and Config.Features.Market == false then
+		return false
+	end
+	if type(payload) ~= "table" or not Rules.validPrice(price) then
+		return false
+	end
+	local listingId = newId()
+	local row = {
+		Id = listingId,
+		Seller = 0,
+		SellerName = label,
+		Mode = "Sell",
+		Price = price,
+		Item = payload,
+		Created = os.time(),
+		Expires = os.time() + Rules.ListingSeconds,
+		State = "Open",
+		Offers = {},
+	}
+	local ok = pcall(getBoard().update, listingId, function()
+		return row
+	end)
+	if ok then
+		invalidate()
+	end
+	return ok
 end
 
 function MarketBoard.start()
