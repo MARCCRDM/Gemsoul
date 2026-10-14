@@ -166,4 +166,21 @@ do
 	check(facing():Dot(Vector3.new(0, 0, -1)) > 0.97, "The head didn't come back without a foe")
 	check(RivalPose.lookAngles(model, head.CFrame.Position + Vector3.new(0, 5, 0)) == nil, "Straight up has no heading")
 end
-print("PASS: " .. checks .. " rig pose checks (R15, upgraded joints, R6, late swings, eye to eye)")
+-- Out of a fight: reset puts every joint straight back to rest (a body sent
+-- back to the lobby mid-pose stood crouched), clears its animation
+-- transforms, and the next calm frame keeps it there.
+do
+	local model, shoulder = r15(false)
+	local rest = shoulder.C0
+	run(model, { GuardUntil = 110 }, 100, 101)
+	check(shoulder.C0 ~= rest, "The guard didn't bend the shoulder (nothing to reset)")
+	shoulder.Transform = CFrame.Angles(0.8, 0, 0)
+	RivalPose.reset(model)
+	check(shoulder.C0 == rest, "Reset didn't put the shoulder back to rest")
+	check(shoulder.Transform == CFrame.identity, "Reset left an animation transform on the joint")
+	model:SetAttribute("GuardUntil", nil)
+	RivalPose.update(model, 1 / 60, 102, 2, true)
+	check(shoulder.C0 == rest, "The first calm frame after a reset bent the joint again")
+	check(type(RivalPose.Attributes) == "table" and table.find(RivalPose.Attributes, "ActionKind"), "The pose attributes aren't listed")
+end
+print("PASS: " .. checks .. " rig pose checks (R15, upgraded joints, R6, late swings, eye to eye, reset)")

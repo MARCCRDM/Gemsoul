@@ -1196,6 +1196,34 @@ function RivalPose.update(
 	end
 end
 
+-- Every joint straight back to its rest pose, at once, and the pose's own
+-- state (angles, guard and upper-body holds, guarded stride) forgotten: for
+-- a body coming out of a fight, so nothing it was doing carries over. Its
+-- animation transforms are cleared too, for the body's own animations to
+-- take up again from a clean start.
+function RivalPose.reset(model: Model)
+	local rig = rigs[model]
+	if rig then
+		for joint, entry in rig.Joints do
+			if entry.Object.Parent then
+				(entry.Object :: any)[entry.Property] = entry.Rest
+			end
+			entry.Last = entry.Rest
+			rig.Angles[joint] = { 0, 0, 0 }
+		end
+		rig.Hold, rig.UpperHold, rig.Stride, rig.Phase = 0, 0, 0, 0
+		rig.SeenStart, rig.SeenAt, rig.Striking, rig.Action = nil, nil, false, nil
+	end
+	for _, motor in model:GetDescendants() do
+		if motor:IsA("Motor6D") then
+			motor.Transform = CFrame.identity
+		end
+	end
+end
+
+-- The attributes a body's pose is drawn from (cleared when it leaves a fight).
+RivalPose.Attributes = ATTRIBUTES
+
 -- The body's own animations (its walk, run and idle) bend the same joints on
 -- top of the pose. While the guard's up they're held off, so the shield stays
 -- square and the legs take the guarded steps instead; eased in and out with
