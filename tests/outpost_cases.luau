@@ -140,6 +140,7 @@ local PlayerData = {
 	end,
 	sync = function() end,
 	milestone = function() end,
+	CharacterChanged = signal(),
 }
 local gemsAwarded = 0
 local Gems = {
@@ -183,6 +184,7 @@ local function load(path, name, extra)
 		Enum = R.Enum,
 		NumberRange = R.NumberRange,
 		NumberSequence = R.NumberSequence,
+		NumberSequenceKeypoint = R.NumberSequenceKeypoint,
 		ColorSequence = R.ColorSequence,
 		Random = Rand,
 		task = fakeTask,
@@ -211,6 +213,17 @@ local GemConfig = {
 	end,
 }
 local Mine = load("src/shared/Mine.luau", "Mine", {})
+-- (its one require, script.Parent.Tags, reads as nil here)
+local Tags = load("src/shared/Tags.luau", "Tags", {})
+local PickaxeLooks = load(
+	"src/shared/PickaxeLooks.luau",
+	"PickaxeLooks",
+	setmetatable({}, {
+		__index = function()
+			return Tags
+		end,
+	})
+)
 
 -- The rules ---------------------------------------------------------------------------
 -- Ring mixes: the Common Field never grows a Geode, the Crystal Crown never a Pebble.
@@ -281,7 +294,7 @@ local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
 local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
-	for _, name in { "Outpost", "GemConfig", "Mine" } do
+	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks" } do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
 		stub.Parent = sharedFolder
@@ -293,6 +306,7 @@ local Server = (function()
 				Outpost = Rules,
 				GemConfig = GemConfig,
 				Mine = Mine,
+				PickaxeLooks = PickaxeLooks,
 				OutpostWorld = World,
 				Gems = Gems,
 				ChatChannels = ChatChannels,
@@ -458,6 +472,17 @@ check(
 	"No free Survey Pick"
 )
 check(ana.Character:FindFirstChild("OutpostPick") ~= nil, "No pick in hand")
+check(ana.Character.OutpostPick:GetAttribute("PickSkin") == nil, "A pick skin nobody wears")
+-- A pickaxe skin goes into the hand as soon as it's put on, and comes off.
+profiles[ana].Cosmetics = { Owned = { PickStorm = true }, Pick = "PickStorm" }
+PlayerData.CharacterChanged:Fire(ana)
+local skinned = ana.Character:FindFirstChild("OutpostPick")
+check(skinned and skinned:GetAttribute("PickSkin") == "PickStorm", "A pickaxe skin didn't go into the hand")
+check(skinned:FindFirstChild("PickTip") and #skinned:GetChildren() > 10, "The skinned pick wasn't built")
+profiles[ana].Cosmetics.Pick = "PickVoid" -- (not owned)
+PlayerData.CharacterChanged:Fire(ana)
+check(ana.Character.OutpostPick:GetAttribute("PickSkin") == nil, "A pick skin not owned was put in the hand")
+profiles[ana].Cosmetics = nil
 check(
 	anaRoot:FindFirstChild("OutpostDuel") and anaRoot:FindFirstChild("OutpostParty"),
 	"No duel/party prompts on the miner"

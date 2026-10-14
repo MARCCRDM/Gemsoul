@@ -361,6 +361,16 @@ local services = {
 	Players = setmetatable({ LocalPlayer = localPlayer, GetPlayers = function() return { localPlayer } end,
 		PlayerAdded = signal({}) }, { __index = function(_, k) return game:GetService("Players")[k] end }),
 	PhysicsService = { IsCollisionGroupRegistered = function() return true end },
+	CollectionService = {
+		-- (Prismatic parts take their own colour, as the shimmer gives them.)
+		AddTag = function(_, instance, tag)
+			local base = tag == "Prismatic" and instance:GetAttribute("PrismaticBase")
+			if base then
+				instance.Color = base
+			end
+		end,
+		GetTagged = function() return {} end,
+	},
 }
 local gameProxy = { GetService = function(_, n) return services[n] or game:GetService(n) end }
 roblox.implementMethod("Workspace", "Raycast", function(_, origin, direction)
@@ -483,6 +493,7 @@ local function snapshot()
 					cf.X, cf.Y, cf.Z, r.X, r.Y, r.Z, u.X, u.Y, u.Z, l.X, l.Y, l.Z,
 					d.Size.X, d.Size.Y, d.Size.Z, c.R, c.G, c.B,
 					if d:FindFirstChildOfClass("SpecialMesh") and d:FindFirstChildOfClass("SpecialMesh").MeshType.Name == "Sphere" then "Ellipsoid"
+						elseif d:IsA("WedgePart") then "Wedge"
 						elseif d:IsA("Part") then d.Shape.Name else "Block", t, d.Material.Name,
 				})
 			end
@@ -713,6 +724,82 @@ for name, rows in MOVES do
 		end,
 	}
 end
+
+-- Pickaxe skins (Shared.PickaxeLooks): each one swung down through an arc,
+-- side on, its particles drifting and its trail streaking through the swing.
+local PickaxeLooks = requireScript(shared.PickaxeLooks)
+local PickImpacts = requireScript(client.Modules.PickImpacts)
+local PICKS = { "PickMagma", "PickStorm", "PickVoid", "PickGlacier", "PickPrism", "PickNeon", "PickGilded", "PickGeode", "PickBone", "Standard" }
+scenarios.Picks = {
+	Frames = { 0.12, 0.34, 0.42, 0.5, 0.62 },
+	Rows = PICKS,
+	Run = function(id, me, foe)
+		me.Parent, foe.Parent = nil, nil
+		local shoulder = CF.new(0, 4.2, 0)
+		local function swing(t)
+			-- Held back, then down through the rock in a fifth of a second.
+			local k = math.clamp((t - 0.3) / 0.2, 0, 1)
+			local angle = 0.7 - k * k * 2.6
+			return shoulder * CF.Angles(angle, 0, 0) * CF.new(0, 0.9, 0)
+		end
+		local model = Instance.new("Model"); model.Parent = workspace
+		local start = swing(0)
+		local parts = if id == "Standard"
+			then PickaxeLooks.build(model, start, nil, C3.fromRGB(110, 200, 255), nil, true)
+			else PickaxeLooks.build(model, start, id)
+		local offsets = {}
+		for _, part in parts do
+			offsets[part] = start:ToObjectSpace(part.CFrame)
+		end
+		table.insert(heartbeat, { Fn = function()
+			local frame = swing(now)
+			for part, offset in offsets do
+				part.CFrame = frame * offset
+			end
+		end })
+	end,
+}
+-- Close up, turning on a stand: the profile, three-quarters, the far side.
+scenarios.PickLineup = {
+	Frames = { 0.1, 0.55, 2.1 },
+	Rows = PICKS,
+	Run = function(id, me, foe)
+		me.Parent, foe.Parent = nil, nil
+		local function stand(t)
+			return CF.new(0, 4.4, 0) * CF.Angles(0, t * 1.4, 0) * CF.Angles(0, 0, math.rad(-30))
+				* CF.Angles(0, -math.pi / 2, 0) * CF.new(0, -1.3, 0)
+		end
+		local model = Instance.new("Model"); model.Parent = workspace
+		local start = stand(0)
+		local parts = if id == "Standard"
+			then PickaxeLooks.build(model, start, nil, C3.fromRGB(110, 200, 255), nil, true)
+			else PickaxeLooks.build(model, start, id)
+		local offsets = {}
+		for _, part in parts do
+			offsets[part] = start:ToObjectSpace(part.CFrame)
+		end
+		table.insert(heartbeat, { Fn = function()
+			local frame = stand(now)
+			for part, offset in offsets do
+				part.CFrame = frame * offset
+			end
+		end })
+	end,
+}
+-- Each skin's hit on a rock (PickImpacts), and the critical hits.
+local IMPACTS = { "Magma", "Frost", "Storm", "Void", "Gold", "Prism", "Neon", "Bone", "Geode", "Storm crit", "Magma crit" }
+scenarios.PickHits = {
+	Frames = { 0.05, 0.12, 0.2, 0.3, 0.45, 0.7 },
+	Rows = IMPACTS,
+	Run = function(row, me, foe)
+		foe.Parent = nil
+		local rock = Instance.new("Part"); rock.Name = "Rock"; rock.Anchored = true
+		rock.Size = V3.new(5, 4.4, 5); rock.Color = C3.fromRGB(118, 112, 122); rock.Material = roblox.Enum.Material.Slate
+		rock.CFrame = CF.new(0, 2.2, -8.5) * CF.Angles(0.15, 0.6, 0.1); rock.Parent = workspace
+		local kind, crit = row:match("^(%a+)( ?c?r?i?t?)$")
+		PickImpacts.play(kind, V3.new(0, 3, -5.9), V3.new(0, 3, 0), 0.7, crit == " crit", 1)
+	end,
+}
 
 local only = process.args[3]
 local summary = {}

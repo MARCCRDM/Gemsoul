@@ -412,6 +412,28 @@ local function skinArt(root: Frame, size: number, cosmetic)
 	round(pommel, size)
 end
 
+-- A pickaxe skin: a haft leaning up to the right, the head across it,
+-- its spike and core in the skin's colour.
+local function pickArt(root: Frame, size: number, cosmetic)
+	local glow = cosmetic.Color
+	local halo = piece(root, 0.5, 0.5, 0.9, 0.9, glow)
+	halo.BackgroundTransparency = 0.86
+	round(halo, size)
+	local haft = piece(root, 0.45, 0.55, 0.08, 0.78, glow:Lerp(BLACK, 0.55), 45)
+	round(haft, 2)
+	stroke(haft, BLACK, math.max(1, size / 70), 0.4)
+	local head = piece(root, 0.66, 0.34, 0.66, 0.15, WHITE, -45)
+	round(head, math.floor(size * 0.05))
+	gradient(head, glow:Lerp(WHITE, 0.3), glow:Lerp(BLACK, 0.35), 0)
+	stroke(head, glow:Lerp(BLACK, 0.6), math.max(1, size / 55))
+	local spike = piece(root, 0.37, 0.15, 0.1, 0.1, glow:Lerp(WHITE, 0.4), 45)
+	round(spike, 1)
+	local core = piece(root, 0.66, 0.34, 0.13, 0.13, glow:Lerp(WHITE, 0.55))
+	round(core, size)
+	local pommel = piece(root, 0.2, 0.8, 0.09, 0.09, glow)
+	round(pommel, size)
+end
+
 -- An armor suit: a helmet in the suit's colours, visor lit.
 local function suitArt(root: Frame, size: number, cosmetic)
 	local palette = cosmetic.Palette
@@ -470,6 +492,9 @@ function ShopArt.icon(parent: Instance, kind: string, cosmeticId: string?, size:
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Suit" then
 		suitArt(root, size, cosmetic)
+		CosmeticView.attach(root, cosmetic.Id, size >= 120)
+	elseif cosmetic and cosmetic.Kind == "Pick" then
+		pickArt(root, size, cosmetic)
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Title" then
 		titleArt(root, size, cosmetic)

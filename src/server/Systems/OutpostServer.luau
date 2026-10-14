@@ -29,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
+local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
@@ -109,7 +110,20 @@ local function rootOf(player: Player): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
+-- The pickaxe skin this miner holds, if it owns it and it has a look.
+local function wornPick(profile): string?
+	local cosmetics = profile and profile.Cosmetics
+	local skin = cosmetics and cosmetics.Pick
+	if skin and cosmetics.Owned and cosmetics.Owned[skin] and PickaxeLooks.Looks[skin] then
+		return skin
+	end
+	return nil
+end
+
 -- The pick in hand, seen by everyone; the weapon is put away meanwhile.
+-- It wears the miner's pickaxe skin (Cosmetics Kind "Pick"), if any, and
+-- otherwise its tier's own colour. PickSkin says which, for the hit effect
+-- every client draws (OutpostScene).
 local function pickModel(player: Player)
 	local character = player.Character
 	local hand = character and character:FindFirstChild("RightHand") :: BasePart?
@@ -122,30 +136,12 @@ local function pickModel(player: Player)
 	end
 	local profile = PlayerData.get(player)
 	local spec = Rules.Picks[profile and record(profile).Active or "Survey"] or Rules.Picks.Survey
+	local skin = wornPick(profile)
 	local model = Instance.new("Model")
 	model.Name = "OutpostPick"
 	local grip = hand.CFrame * CFrame.new(0, -0.1, 0) * CFrame.Angles(math.rad(-120), 0, 0)
-	local function add(at: CFrame, size: Vector3, color: Color3, material: Enum.Material?)
-		local p = Instance.new("Part")
-		p.Size, p.Color, p.Material = size, color, material or Enum.Material.Metal
-		p.CFrame = grip * at
-		p.CanCollide, p.CanTouch, p.CanQuery, p.Massless = false, false, false, true
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0, weld.Part1, weld.Parent = hand, p, p
-		p.Parent = model
-		return p
-	end
-	add(CFrame.new(0, 0.9, 0), Vector3.new(0.22, 2.6, 0.22), Color3.fromRGB(60, 56, 54), Enum.Material.Wood)
-	add(CFrame.new(0, 2.1, 0), Vector3.new(0.34, 0.34, 0.34), Color3.fromRGB(40, 42, 50))
-	add(CFrame.new(0, 2.2, -0.55), Vector3.new(0.26, 0.3, 1.2), spec.Color)
-	add(CFrame.new(0, 2.05, -1.25) * CFrame.Angles(math.rad(-25), 0, 0), Vector3.new(0.2, 0.22, 0.5), spec.Color)
-	add(CFrame.new(0, 2.2, 0.4), Vector3.new(0.24, 0.26, 0.6), spec.Color)
-	if spec.Power > 1 then
-		local glow = add(CFrame.new(0, 2.2, -0.55), Vector3.new(0.3, 0.12, 1.0), spec.Color, Enum.Material.Neon)
-		local light = Instance.new("PointLight")
-		light.Color, light.Range, light.Brightness = spec.Color, 8, 1.5
-		light.Parent = glow
-	end
+	PickaxeLooks.build(model, grip, skin, spec.Color, hand, spec.Power > 1)
+	model:SetAttribute("PickSkin", skin)
 	model.Parent = character
 end
 
@@ -799,6 +795,15 @@ function OutpostServer.start()
 		watch(player)
 	end
 	Players.PlayerAdded:Connect(watch)
+	-- A new pickaxe skin (or a switch to a miner with another) goes into
+	-- the hand straight away.
+	PlayerData.CharacterChanged:Connect(function(player: Player)
+		local character = player.Character
+		local pick = character and character:FindFirstChild("OutpostPick")
+		if pick and pick:GetAttribute("PickSkin") ~= wornPick(PlayerData.get(player)) then
+			pickModel(player)
+		end
+	end)
 
 	-- Never stranded in the world: someone in the Outpost (not fighting)
 	-- who has fallen through the floor or wandered far outside the basin is

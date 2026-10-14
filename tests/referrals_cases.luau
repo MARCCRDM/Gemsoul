@@ -44,8 +44,16 @@ check(string.find(skinEntry, "Price", 1, true) == nil, "The skin has a price")
 local look = string.match(skinEntry, 'Look = "(%w+)"')
 local equipmentSource = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
 check(look and string.find(equipmentSource, "SKINS." .. look .. " =", 1, true) ~= nil, "The skin has no look")
+-- Equipping takes a skin by name, or as one of each miner's own looks.
+local storeSource = fs.readFile(ROOT .. "/src/server/Systems/StoreServer.luau")
+local minerKinds = string.match(cosmeticsSource, "function Cosmetics%.isMinerKind%(kind: any%): boolean%s*return ([^\n]+)")
 check(
-	string.find(fs.readFile(ROOT .. "/src/server/Systems/StoreServer.luau"), 'kind ~= "Skin"', 1, true) ~= nil,
+	string.find(storeSource, 'kind ~= "Skin"', 1, true) ~= nil
+		or (
+			string.find(storeSource, "Cosmetics.isMinerKind(kind)", 1, true) ~= nil
+			and minerKinds ~= nil
+			and string.find(minerKinds, 'kind == "Skin"', 1, true) ~= nil
+		),
 	"A skin can't be equipped"
 )
 

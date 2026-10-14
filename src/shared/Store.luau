@@ -46,12 +46,13 @@ local Cosmetics = require(script.Parent.Cosmetics)
 
 local Store = {}
 
-Store.Tabs = { "Featured", "Free", "Skins", "Suits", "Bundles", "Backs", "Trims", "Passes" }
+Store.Tabs = { "Featured", "Free", "Skins", "Suits", "Picks", "Bundles", "Backs", "Trims", "Passes" }
 Store.TabNames = {
 	Featured = "⭐ Featured",
 	Free = "🎁 Free",
 	Skins = "⚔️ Weapon Skins",
 	Suits = "🛡️ Suits",
+	Picks = "⛏️ Pickaxes",
 	Bundles = "🎁 Bundles",
 	Backs = "🎒 Back Pieces",
 	Trims = "✨ Trims",
@@ -190,6 +191,13 @@ Store.RobuxProducts = {
 	SuitStealth = 0,
 	SuitStorm = 0,
 	SuitBiohazard = 0,
+	-- Pickaxe skins
+	PickMagma = 0,
+	PickStorm = 0,
+	PickVoid = 0,
+	PickGlacier = 0,
+	PickPrism = 0,
+	PickNeon = 0,
 	-- One-time offers and passes
 	StarterPack = 0,
 	SeasonPremium = 0,

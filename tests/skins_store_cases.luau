@@ -1,6 +1,6 @@
 -- lune run tests/skins_store_cases.luau <repo>
--- Skins and selling: the cosmetics catalog (every skin and suit can be
--- drawn, every Robux item has a product slot, exclusives are never sold),
+-- Skins and selling: the cosmetics catalog (every skin, suit and pickaxe can
+-- be drawn, every Robux item has a product slot, exclusives are never sold),
 -- Robux receipts (granted once per purchase, each kind of product), the
 -- Season premium track, the Starter Pack window, and promo codes (once each,
 -- expiry, junk, brute force).
@@ -48,8 +48,10 @@ local FreeRewards = shared("FreeRewards")
 
 -- Catalog -----------------------------------------------------------------------------
 local equipment = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
-local KINDS = { Trim = true, Back = true, Skin = true, Suit = true, Title = true }
-local skins, suits, titles = 0, 0, 0
+local KINDS = { Trim = true, Back = true, Skin = true, Suit = true, Pick = true, Title = true }
+local skins, suits, titles, picks = 0, 0, 0, 0
+local impacts = fs.readFile(ROOT .. "/src/client/Modules/PickImpacts.luau")
+local pickaxeSource = fs.readFile(ROOT .. "/src/shared/PickaxeLooks.luau")
 for id, cosmetic in Cosmetics.List do
 	check(cosmetic.Id == id, id .. " has the wrong Id")
 	check(KINDS[cosmetic.Kind], id .. " has an unknown kind")
@@ -67,13 +69,18 @@ for id, cosmetic in Cosmetics.List do
 	elseif cosmetic.Kind == "Suit" then
 		suits += 1
 		check(cosmetic.Palette and cosmetic.Palette.Plate and cosmetic.Palette.Glow and cosmetic.Palette.Under, id .. " has no palette")
+	elseif cosmetic.Kind == "Pick" then
+		picks += 1
+		local impact = string.match(pickaxeSource, "LOOKS%." .. id .. " = {%s*Impact = \"(%w+)\"")
+		check(impact, id .. " has no pickaxe model (PickaxeLooks)")
+		check(string.find(impacts, "function LOOKS." .. impact .. "(", 1, true), id .. "'s hit (" .. tostring(impact) .. ") isn't drawn")
 	elseif cosmetic.Kind == "Title" then
 		titles += 1
 	elseif cosmetic.Kind == "Back" then
 		check(cosmetic.Look and string.find(equipment, "BACKS." .. cosmetic.Look .. " =", 1, true), id .. " can't be built")
 	end
 end
-check(skins >= 8 and suits >= 6 and titles >= 3, "The catalog is thinner than planned")
+check(skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9, "The catalog is thinner than planned")
 -- Every product slot buys something real.
 for key in Store.RobuxProducts do
 	local real = Store.bundle(key) or Store.Crates[key] or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
@@ -335,7 +342,7 @@ for id, cosmetic in Cosmetics.List do
 		earnedHow = false
 	end
 	-- Loot drops from a crate that rolls its rarity.
-	local loot = (cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit")
+	local loot = Cosmetics.isMinerKind(cosmetic.Kind)
 		and not cosmetic.Exclusive
 		and not cosmetic.Robux
 		and not cosmetic.Price
@@ -405,4 +412,106 @@ do
 	)
 end
 
-print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d titles; receipts once each, starter pack, season premium, codes)", checks, skins, suits, titles))
+-- Each miner holds its own pickaxe too --------------------------------------------------
+do
+	local cosmetics = { Owned = { PickMagma = true, PickBone = true }, Pick = "PickMagma" }
+	local one = { Weapon = "A" }
+	local two = { Weapon = "B", Wardrobe = { Pick = "PickBone" } }
+	Cosmetics.leaveMiner(cosmetics, one)
+	check(one.Wardrobe and one.Wardrobe.Pick == "PickMagma", "A miner leaving didn't keep its pickaxe")
+	Cosmetics.joinMiner(cosmetics, two)
+	check(cosmetics.Pick == "PickBone", "A miner arriving didn't take up its own pickaxe")
+	Cosmetics.joinMiner(cosmetics, one)
+	check(cosmetics.Pick == "PickMagma", "Miner 1 didn't get its pickaxe back")
+	check(Cosmetics.forMiner(cosmetics, two).Pick == "PickBone", "forMiner shows the wrong pickaxe")
+	check(Cosmetics.coinPrice(Cosmetics.get("PickMagma")) == Cosmetics.coinPrice(Cosmetics.get("SkinMolten")), "Picks don't take the test price")
+end
+
+-- Every pickaxe builds, in one piece ------------------------------------------------------
+do
+	local tagged = {}
+	local env = setmetatable({
+		game = {
+			GetService = function(_, name)
+				check(name == "CollectionService", "PickaxeLooks wants an unexpected service")
+				return {
+					AddTag = function(_, instance, tag)
+						tagged[instance] = tag
+					end,
+				}
+			end,
+		},
+		Instance = roblox.Instance,
+		Color3 = roblox.Color3,
+		Vector3 = roblox.Vector3,
+		Vector2 = roblox.Vector2,
+		CFrame = roblox.CFrame,
+		Enum = roblox.Enum,
+		ColorSequence = roblox.ColorSequence,
+		NumberSequence = roblox.NumberSequence,
+		NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
+		NumberRange = roblox.NumberRange,
+		script = { Parent = parent },
+		require = function(name)
+			return shared(name)
+		end,
+	}, { __index = _G })
+	local PickaxeLooks = luau.load(pickaxeSource, { debugName = "PickaxeLooks", environment = env })()
+	local Tags = shared("Tags")
+	local function inspect(name, parts, tip, model, frame)
+		check(#parts >= 6, name .. " is barely a pickaxe (" .. #parts .. " parts)")
+		check(tip and tip.Name == "PickTip" and tip.Parent == model, name .. " has no tip")
+		for _, part in parts do
+			check(part.Parent == model and not part.CanCollide and part.Massless and not part.CanQuery, name .. " has a part that gets in the way")
+			-- Held in a hand: nothing reaches past the head (about 3 studs up
+			-- the haft, 2.5 along the spike).
+			local at = frame:PointToObjectSpace(part.CFrame.Position)
+			check(at.Y > -0.6 and at.Y < 3.6 and math.abs(at.Z) < 2.6 and math.abs(at.X) < 1, name .. " has a part out at " .. tostring(at))
+		end
+	end
+	for id, cosmetic in Cosmetics.List do
+		if cosmetic.Kind == "Pick" then
+			local model = roblox.Instance.new("Model")
+			local frame = roblox.CFrame.new(10, 5, -3) * roblox.CFrame.Angles(0.4, 1.1, -0.2)
+			local parts, tip = PickaxeLooks.build(model, frame, id)
+			inspect(id, parts, tip, model, frame)
+			local wedges, glows, trails = 0, 0, 0
+			for _, part in parts do
+				check(part.Anchored, id .. " stands on its own but has a loose part")
+				wedges += if part:IsA("WedgePart") then 1 else 0
+				glows += if part:FindFirstChildOfClass("PointLight") or part:FindFirstChildOfClass("ParticleEmitter") then 1 else 0
+			end
+			trails += if tip:FindFirstChild("PickTrail") then 1 else 0
+			check(wedges >= 2, id .. " has no tapered blade")
+			check(glows >= 1 or id == "PickBone", id .. " has no light or particles")
+			check(trails == 1, id .. " leaves no streak through a swing")
+			-- In a hand: every part welded to it, none anchored.
+			local hand = roblox.Instance.new("Part")
+			local held = roblox.Instance.new("Model")
+			local inHand = PickaxeLooks.build(held, frame, id, nil, hand)
+			for _, part in inHand do
+				local weld = part:FindFirstChildOfClass("WeldConstraint")
+				check(not part.Anchored and weld and weld.Part0 == hand and weld.Part1 == part, id .. " isn't welded to the hand")
+			end
+		end
+	end
+	local prism = 0
+	for _, tag in tagged do
+		check(tag == Tags.Prismatic, "A pickaxe part has an unknown tag")
+		prism += 1
+	end
+	check(prism >= 3, "Prism Shard doesn't shimmer")
+	-- No skin (or one you can't have): the tier's own pick, glowing if bright.
+	local model = roblox.Instance.new("Model")
+	local parts, tip = PickaxeLooks.build(model, roblox.CFrame.new(), "NotAPick", roblox.Color3.fromRGB(255, 0, 0), nil, true)
+	inspect("The standard pick", parts, tip, model, roblox.CFrame.new())
+	local lit, tinted = false, 0
+	for _, part in parts do
+		lit = lit or part:FindFirstChildOfClass("PointLight") ~= nil
+		tinted += if part.Color == roblox.Color3.fromRGB(255, 0, 0) then 1 else 0
+	end
+	check(tinted >= 3, "The standard pick isn't in its tier's colour")
+	check(lit, "A bright pick doesn't glow")
+end
+
+print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d picks, %d titles; receipts once each, starter pack, season premium, codes)", checks, skins, suits, picks, titles))

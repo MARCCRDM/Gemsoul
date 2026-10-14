@@ -933,6 +933,8 @@ local function buildRight(canvas: Frame)
 	ui.SkinsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, skinsIcon)
 	place(text(skins, "SKINS", 15, C.Text, HEAVY), 62, 10, 120, 20)
 	ui.SkinsCount = place(text(skins, "", 10, C.Dim, HEADING), 62, 31, half - 70, 14)
+	ui.SkinsCount.TextScaled = true
+	new("UITextSizeConstraint", { MaxTextSize = 10 }, ui.SkinsCount)
 	local wardrobe = place(text(skins, "›", 18, Color3.fromRGB(255, 150, 205), HEAVY), half - 26, 16, 16, 22)
 	wardrobe.TextXAlignment = Enum.TextXAlignment.Right
 	skins:SetAttribute("UiSound", "Click")
@@ -2675,23 +2677,22 @@ local function drawSkinsButton(profile)
 		return
 	end
 	local cosmetics = profile.Cosmetics or {}
-	local suits, skins = 0, 0
+	local suits, skins, picks = 0, 0, 0
 	for id in cosmetics.Owned or {} do
 		local cosmetic = Cosmetics.get(id)
 		if cosmetic and cosmetic.Kind == "Suit" then
 			suits += 1
 		elseif cosmetic and cosmetic.Kind == "Skin" then
 			skins += 1
+		elseif cosmetic and cosmetic.Kind == "Pick" then
+			picks += 1
 		end
 	end
 	local suit, skin = Cosmetics.get(cosmetics.Suit), Cosmetics.get(cosmetics.Skin)
-	ui.SkinsCount.Text = string.format(
-		"%d SUIT%s  ·  %d SKIN%s",
-		suits,
-		if suits == 1 then "" else "S",
-		skins,
-		if skins == 1 then "" else "S"
-	)
+	local function count(n: number, what: string): string
+		return string.format("%d %s%s", n, what, if n == 1 then "" else "S")
+	end
+	ui.SkinsCount.Text = count(suits, "SUIT") .. "  ·  " .. count(skins, "SKIN") .. "  ·  " .. count(picks, "PICK")
 	local key = tostring(cosmetics.Suit) .. "/" .. tostring(cosmetics.Skin)
 	if skinsShown ~= key then
 		skinsShown = key

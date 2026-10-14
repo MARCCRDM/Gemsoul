@@ -67,7 +67,7 @@ type Profile = {
 	-- Firsts that guide new players: "Mined", "Cut", "Sold", "Crafted", "Enchanted".
 	Milestones: { [string]: boolean },
 	Daily: { Day: number, Streak: number }, -- daily reward
-	Cosmetics: { Owned: { [string]: boolean }, Trim: string?, Back: string?, Skin: string? },
+	Cosmetics: { Owned: { [string]: boolean }, Trim: string?, Back: string?, Skin: string?, Pick: string? },
 	Season: { XP: number, Claimed: { [string]: boolean } }, -- claimed levels, as strings
 	Stats: { Kills: number, BestGem: number, BestDepth: number? }, -- for Top Players
 	Crates: { [string]: number }, -- unopened crates
@@ -880,7 +880,7 @@ function PlayerData.setCosmetic(player: Player, kind: string, id: string?)
 	local profile = profiles[player]
 	if profile then
 		(profile.Cosmetics :: any)[kind] = id
-		-- Suits and skins are the active miner's own (Cosmetics.forMiner).
+		-- Suits, skins and picks are the active miner's own (Cosmetics.forMiner).
 		if Cosmetics.isMinerKind(kind) then
 			local character = profile.Character :: any
 			character.Wardrobe = character.Wardrobe or {}

@@ -28,6 +28,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
@@ -36,6 +37,7 @@ local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
 local MobileLayout = require(script.Parent.MobileLayout)
 local MiningReveal = require(script.Parent.MiningReveal)
+local PickImpacts = require(script.Parent.PickImpacts)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
@@ -505,8 +507,19 @@ local function onRockHit(model: Model)
 	if active then
 		OutpostScene.hitSound(tension, crit, mine, at)
 	end
-	chips(at, color, if mine then 6 + math.floor(tension * 6) else 3, 14 + tension * 10)
-	flash(at, color, 2 + tension * 3, 0.25)
+	-- The hitter's pickaxe skin lands its own way (PickImpacts); a plain
+	-- pick, just chips and a flash of the rock's crystal.
+	local hitter = Players:GetPlayerByUserId(model:GetAttribute("LastHitBy") or 0)
+	local character = hitter and hitter.Character
+	local pick = character and character:FindFirstChild("OutpostPick")
+	local look = pick and PickaxeLooks.Looks[pick:GetAttribute("PickSkin") or ""]
+	local hitterRoot = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local from = hitterRoot and hitterRoot.Position
+	local themed = look ~= nil and PickImpacts.play(look.Impact, at, from, tension, crit, if mine then 1 else 0.5)
+	chips(at, color, if themed then 2 elseif mine then 6 + math.floor(tension * 6) else 3, 14 + tension * 10)
+	if not themed then
+		flash(at, color, 2 + tension * 3, 0.25)
+	end
 	shake(model, 0.25 + tension * 0.5)
 	if mine then
 		cameraKick(0.15 + tension * 0.25 + (if crit then 0.35 else 0))
