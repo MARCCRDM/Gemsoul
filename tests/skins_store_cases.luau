@@ -259,6 +259,17 @@ check(not handlers.ClaimSeason(thePlayer, "all").Ok, "The season paid out twice"
 -- Equipping the new kinds.
 check(handlers.EquipCosmetic(thePlayer, "Title", "TitleLunar").Ok and profile.Cosmetics.Title == "TitleLunar", "A title can't be worn")
 check(not handlers.EquipCosmetic(thePlayer, "Suit", "SuitNeon").Ok, "A suit you don't own was worn")
+-- Testing prices: any skin or suit for a few coins, worn straight away.
+local Config = shared("Config")
+if Config.TestCosmeticPrice then
+	check(Cosmetics.coinPrice(Cosmetics.get("SuitNeon")) == Config.TestCosmeticPrice, "Suits have no testing price")
+	profile.Coins += 100
+	local before = profile.Coins
+	check(handlers.BuyCosmetic(thePlayer, "SuitNeon").Ok and profile.Cosmetics.Owned.SuitNeon, "A suit couldn't be bought for coins while testing")
+	check(profile.Coins == before - Config.TestCosmeticPrice and profile.Cosmetics.Suit == "SuitNeon", "A coin-bought suit wasn't charged or worn")
+	check(not handlers.BuyCosmetic(thePlayer, "SuitNeon").Ok, "A suit was bought twice")
+end
+check(Cosmetics.coinPrice(Cosmetics.get("TitleLunar")) == nil, "Titles must never have a coin price")
 -- The Starter Pack goes on offer once.
 freshProfile()
 local offer = handlers.StarterOffer(thePlayer)

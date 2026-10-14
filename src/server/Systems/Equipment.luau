@@ -2102,8 +2102,8 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 end
 
 -- Dresses any rig (the PvP Duelist) in a loadout, as a player would wear it.
-function Equipment.dressModel(model: Model, loadout, seed: number): Folder?
-	local folder = dress(model, loadout, nil, seed)
+function Equipment.dressModel(model: Model, loadout, seed: number, cosmetics: any?): Folder?
+	local folder = dress(model, loadout, cosmetics, seed)
 	if folder then
 		folder.Parent = model
 	end
@@ -2595,6 +2595,9 @@ function Equipment.start()
 					local id = loadout[slot]
 					if id then table.insert(keys, id .. ":" .. previewKey(loadout, slot, id, loadout[slot .. "Quality"] or 1)) end
 				end
+				-- What it wears over the gear (a suit, a weapon skin...) too.
+				local look = profile.Cosmetics or {}
+				table.insert(keys, string.format("look:%s/%s/%s/%s", tostring(look.Suit), tostring(look.Skin), tostring(look.Back), tostring(look.Trim)))
 				-- ("fist" marks previews held the fighting way: rebuilt once from older ones)
 				local key = "fist|" .. table.concat(keys, "|")
 				local name = tostring(index)
@@ -2607,7 +2610,7 @@ function Equipment.start()
 						-- Without it the blade lay along the arm, across the body,
 						-- and the shield stood edge-on.
 						rig:SetAttribute("FistGrip", true)
-						Equipment.dressModel(rig, loadout, player.UserId)
+						Equipment.dressModel(rig, loadout, player.UserId, profile.Cosmetics)
 						for _, child in rig:GetDescendants() do
 							if child:IsA("BaseScript") or child:IsA("Sound") then child:Destroy()
 							elseif child:IsA("BasePart") then child.Anchored = true end

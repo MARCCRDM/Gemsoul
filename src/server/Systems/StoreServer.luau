@@ -124,16 +124,23 @@ end
 local function buyCosmetic(player: Player, id: any)
 	local cosmetic = Cosmetics.get(id)
 	local profile = PlayerData.get(player)
-	if not cosmetic or not cosmetic.Price or not profile then
+	local price = cosmetic and Cosmetics.coinPrice(cosmetic)
+	if not cosmetic or not price or not profile then
 		return reply(false, "That isn't for sale.")
 	end
 	if profile.Cosmetics.Owned[cosmetic.Id] then
 		return reply(false, "You already own " .. cosmetic.Name .. ".")
 	end
-	if not PlayerData.spendCoins(player, cosmetic.Price) then
-		return reply(false, string.format("You need %d coins.", cosmetic.Price))
+	if not PlayerData.spendCoins(player, price) then
+		return reply(false, string.format("You need %d coins.", price))
 	end
 	profile.Cosmetics.Owned[cosmetic.Id] = true
+	-- A skin or suit goes straight on, as a Robux purchase does.
+	if cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit" then
+		PlayerData.setCosmetic(player, cosmetic.Kind, cosmetic.Id)
+		PlayerData.sync(player)
+		return reply(true, "Unlocked " .. cosmetic.Name .. " and put it on!")
+	end
 	PlayerData.sync(player)
 	return reply(true, "Unlocked " .. cosmetic.Name .. "! Equip it from the Shop.")
 end

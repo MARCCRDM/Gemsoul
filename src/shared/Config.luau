@@ -23,6 +23,10 @@ local Config = {
 	WeeklyQuota = 50,
 
 	-- Economy
+	-- TESTING: every weapon skin and suit can be bought for this many coins
+	-- (Cosmetics.coinPrice), on top of how it's normally had. Set to nil
+	-- before launch: then they're Robux, loot or earned only again.
+	TestCosmeticPrice = 25,
 	StartingCoins = 300,
 	MaxGems = 200, -- inventory limit
 	MaxGear = 80, -- pieces of gear a player can hold (worn included)

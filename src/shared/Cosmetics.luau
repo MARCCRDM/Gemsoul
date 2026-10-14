@@ -27,6 +27,7 @@
 
 	Equipment draws them on your avatar.
 ]]
+local Config = require(script.Parent.Config)
 local GemConfig = require(script.Parent.GemConfig)
 
 -- A skin's or suit's colours (Equipment repaints every part with them):
@@ -1208,6 +1209,19 @@ function Cosmetics.ofKind(kind: string): { string }
 		return x.Name < y.Name
 	end)
 	return ids
+end
+
+-- Its price in coins: a trim's or back piece's own Price, or (while testing,
+-- Config.TestCosmeticPrice) the test price for any weapon skin or suit.
+function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
+	if cosmetic.Price then
+		return cosmetic.Price
+	end
+	local test = Config.TestCosmeticPrice
+	if type(test) == "number" and (cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit") then
+		return test
+	end
+	return nil
 end
 
 -- How to get one you don't own, in a few words for the Shop.

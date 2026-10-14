@@ -896,10 +896,11 @@ local function drawCosmetics(kind: string)
 			chip(status, "EQUIPPED", P.Good)
 		elseif owned[id] then
 			chip(status, "OWNED", P.Good, false)
+		elseif Cosmetics.coinPrice(cosmetic) then
+			-- (A trim's price, or the testing price of any skin or suit.)
+			coinAmount(status, Cosmetics.coinPrice(cosmetic) :: number, 14, P.Gold)
 		elseif cosmetic.Robux then
 			chip(status, string.format("R$ %d", cosmetic.Robux), Color3.fromRGB(60, 200, 110))
-		elseif cosmetic.Price then
-			coinAmount(status, cosmetic.Price, 14, P.Gold)
 		elseif cosmetic.Exclusive then
 			chip(status, string.upper(Cosmetics.source(cosmetic)), P.Dim, false)
 		else
@@ -991,8 +992,9 @@ local function drawCosmetics(kind: string)
 		side,
 		if owned[cosmetic.Id]
 			then (if wornOfKind == cosmetic.Id then "Equipped." else "In your collection.")
-			elseif cosmetic.Robux then "Sold for Robux. Yours to keep, on every miner."
 			elseif cosmetic.Price then "Sold here for coins."
+			elseif Cosmetics.coinPrice(cosmetic) then "TESTING: buy it for coins. It goes straight on."
+			elseif cosmetic.Robux then "Sold for Robux. Yours to keep, on every miner."
 			elseif cosmetic.Exclusive then (cosmetic.How or HOW_TO[cosmetic.Exclusive] or "Exclusive.")
 			else "Found in supply caches and on the Season Path.",
 		12,
@@ -1021,13 +1023,13 @@ local function drawCosmetics(kind: string)
 			end)
 			b:SetAttribute("UiSound", "Confirm")
 		end
-	elseif cosmetic.Robux then
-		robuxBuy(actions, cosmetic.Id, 200)
-	elseif cosmetic.Price then
+	elseif Cosmetics.coinPrice(cosmetic) then
 		local b
-		b = priceButton(actions, cosmetic.Price, 180, 46, function()
+		b = priceButton(actions, Cosmetics.coinPrice(cosmetic) :: number, 180, 46, function()
 			run(b, "UNLOCKED", "BuyCosmetic", cosmetic.Id)
 		end)
+	elseif cosmetic.Robux then
+		robuxBuy(actions, cosmetic.Id, 200)
 	elseif cosmetic.Exclusive then
 		local target = GO_TO[cosmetic.Exclusive] or "Free"
 		local b = IronUi.gemButton(actions, "HOW TO GET IT", P.Amethyst, function()
