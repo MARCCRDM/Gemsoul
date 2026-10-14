@@ -10,7 +10,6 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
-local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
@@ -129,7 +128,17 @@ local panel = frame(back, {
 	Position = UDim2.new(0.5, 0, 0.5, 0),
 	Size = UDim2.new(1, -24, 1, -16),
 })
-new("UISizeConstraint", { MaxSize = Vector2.new(1200, 880) }, panel)
+local panelLimit = new("UISizeConstraint", { MaxSize = Vector2.new(1200, 880) }, panel)
+-- Wide, short phones: the panel stops at about twice its height, so cards
+-- and buttons aren't stretched across the whole screen.
+local function capPanel()
+	local h = back.AbsoluteSize.Y
+	if h > 0 then
+		panelLimit.MaxSize = Vector2.new(math.clamp(h * 2.05, 560, 1200), 880)
+	end
+end
+capPanel()
+back:GetPropertyChangedSignal("AbsoluteSize"):Connect(capPanel)
 local brand = label(panel, "SAGA MINERS  ·  LAUNCH", 11, C.Cyan)
 brand.Position, brand.Size = UDim2.fromOffset(0, 0), UDim2.new(0.5, 0, 0, 18)
 -- The three steps of the launch, top right.
@@ -821,12 +830,12 @@ local function fit()
 	-- footer row, so the gems get the height.
 	local oneRow = short and w >= 480
 	footer.Size = UDim2.new(1, 0, 0, if oneRow then 48 else 96)
-	primary.Size = UDim2.new(if oneRow then 0.4 else 1, 0, 0, if oneRow then 44 else 52)
+	primary.Size = UDim2.new(if oneRow then 0.36 else 1, 0, 0, if oneRow then 44 else 52)
 	for _, b in { skip, motion, backStep } do
 		b.Position = UDim2.new(b.AnchorPoint.X, 0, 0, if oneRow then 8 else 64)
 	end
-	backStep.Size = UDim2.fromOffset(if oneRow then math.min(168, w * 0.28) else 214, 28)
-	skip.Size = UDim2.fromOffset(if oneRow then math.min(168, w * 0.28) else math.min(214, w * 0.58), 28)
+	backStep.Size = UDim2.fromOffset(if oneRow then math.min(168, w * 0.26) else 214, 28)
+	skip.Size = UDim2.fromOffset(if oneRow then math.min(168, w * 0.26) else math.min(214, w * 0.58), 28)
 	skip.Text = if oneRow then "Skip · keep rewards" else "Skip reveal · keep all rewards"
 	local bodyHeight = math.max(80, h - header - (if oneRow then 54 else 108))
 	title.TextSize = if w < 420 then 20 elseif w < 500 then 24 elseif short then 20 else 34
@@ -1169,11 +1178,10 @@ local function close()
 	gui:Destroy()
 end
 -- The roll: a full-screen reveal of the kit. Each key is a tall card, and
--- its circle is a reel: the moves spin through it (the two this key can
--- roll lighting up below as they pass) and it stops on your gem, the real
--- stone going into that socket. The gem gives up its surge: the move's
--- icon rises out of it. Q, then E, then R. The move you didn't get stays on
--- the card, crossed out. Click to skip ahead.
+-- its circle is a reel of gems, every rarity flashing past (named under the
+-- circle as it goes), until it stops on your gem, the real stone going into
+-- that socket. Only then does the gem give up its surge: the move's icon
+-- rises out of it, with its name. Q, then E, then R. Click to skip ahead.
 local KEYS = {
 	{ Key = "Q", Color = Color3.fromRGB(255, 138, 92), Slot = "SWORD", Gem = "SWORD GEM", Pays = "CHARGE" },
 	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CORE", Gem = "CORE GEM", Pays = "CHARGE" },
@@ -1192,9 +1200,60 @@ local function keycap(parent, key, color, size)
 	glyph.TextXAlignment, glyph.ZIndex = Enum.TextXAlignment.Center, 47
 	return base
 end
+-- A cut gem for the reel: a faceted diamond in the element's colour, rimmed
+-- in its rarity's. (Only your own gem, the one it stops on, is 3D.)
+local REEL_TIERS = { Common = 40, Uncommon = 28, Rare = 18, UltraRare = 9, Legendary = 5 }
+local function reelTier(rng)
+	local roll = rng:NextNumber(0, 100)
+	for _, tier in { "Legendary", "UltraRare", "Rare", "Uncommon" } do
+		roll -= REEL_TIERS[tier]
+		if roll < 0 then
+			return tier
+		end
+	end
+	return "Common"
+end
+local function reelGem(parent, color, tier)
+	local white = Color3.new(1, 1, 1)
+	local gem = frame(parent, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(math.floor(CELL * 0.52), math.floor(CELL * 0.52)),
+		BackgroundColor3 = white,
+		Rotation = 45,
+		ZIndex = 46,
+	})
+	UiKit.round(gem, 6)
+	new("UIGradient", {
+		Rotation = -45,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, color:Lerp(white, 0.55)),
+			ColorSequenceKeypoint.new(0.5, color),
+			ColorSequenceKeypoint.new(1, color:Lerp(C.Ink, 0.55)),
+		}),
+	}, gem)
+	stroke(gem, GemConfig.TierColors[tier] or C.Line, 0, 3)
+	local facet = frame(gem, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.46, 0.46),
+		BackgroundColor3 = color:Lerp(white, 0.35),
+		BackgroundTransparency = 0.25,
+		ZIndex = 46,
+	})
+	UiKit.round(facet, 3)
+	local glint = frame(gem, {
+		Position = UDim2.fromScale(0.14, 0.14),
+		Size = UDim2.fromScale(0.2, 0.2),
+		BackgroundColor3 = white,
+		BackgroundTransparency = 0.2,
+		ZIndex = 46,
+	})
+	UiKit.round(glint, 2)
+	return gem
+end
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
-	local pools = Lottery.starterPools(kit.Element)
 	local element = kit.Element
 	local color = GemConfig.ElementColors[element] or C.Gold
 	local theme = CardFX.Themes[element]
@@ -1228,14 +1287,6 @@ local function revealMoves(kit, after)
 		ZIndex = 41,
 	})
 	local fitScale = new("UIScale", { Scale = 1 }, board)
-	local function fitBoard()
-		local size = panel.AbsoluteSize
-		if size.X > 0 and size.Y > 0 then
-			fitScale.Scale = math.min(1.1, size.X / 940, size.Y / 630)
-		end
-	end
-	fitBoard()
-	listen(panel:GetPropertyChangedSignal("AbsoluteSize"), fitBoard)
 
 	local kicker = label(board, elementName .. "  ·  STARTER ROLL", 14, color, Enum.Font.GothamBlack)
 	kicker.TextXAlignment, kicker.ZIndex = Enum.TextXAlignment.Center, 42
@@ -1243,20 +1294,27 @@ local function revealMoves(kit, after)
 	local title = label(board, "ROLLING YOUR GEMS", 40, C.Text, Enum.Font.GothamBlack)
 	title.TextXAlignment, title.ZIndex = Enum.TextXAlignment.Center, 42
 	title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 46)
+	-- Scaled to fit the screen. Short (phone) screens drop the headline, so
+	-- the cards (y 84 down) get the height and stay readable.
+	local function fitBoard()
+		local size = shade.AbsoluteSize - Vector2.new(24, 16)
+		if size.X > 0 and size.Y > 0 then
+			local short = size.Y < 480
+			kicker.Visible, title.Visible = not short, not short
+			local scale = math.min(1.1, size.X / 940, size.Y / (if short then 526 else 630))
+			fitScale.Scale = scale
+			board.Position = UDim2.new(0.5, 0, 0.5, if short then -42 * scale else 0)
+		end
+	end
+	fitBoard()
+	listen(shade:GetPropertyChangedSignal("AbsoluteSize"), fitBoard)
 
 	local cards, effects = {}, {}
 	for index, spec in KEYS do
 		local id = moves[index]
 		local move = Tech.Catalog[id]
-		local pool = pools[index] or { id }
 		local gem = kit.Gems and kit.Gems[index] and kit.Gems[index].Gem
 			or { Id = "starter-" .. element .. index, Element = element, Tier = "Common", Size = 1, Clarity = 1, Cut = 1 }
-		local other = nil
-		for _, candidate in pool do
-			if candidate ~= id then
-				other = candidate
-			end
-		end
 		local x = (index - 1) * 300
 		local card = frame(board, {
 			Position = UDim2.fromOffset(x + 4, 84 + 40),
@@ -1302,7 +1360,6 @@ local function revealMoves(kit, after)
 		-- middle of the circle. (Cell 0 sits above it for the spring-back.)
 		local count = 20 + index * 7
 		local strip = frame(well, { BackgroundTransparency = 1, Size = UDim2.fromOffset(WELL, CELL * count), ZIndex = 45 })
-		local lane = (GemTraits.Matrix[element] or {})[GemTraits.Lanes[spec.Key]] or pool
 		local symbols, cells, record = {}, {}, nil
 		for n = 0, count do
 			local cell = frame(strip, {
@@ -1323,18 +1380,10 @@ local function revealMoves(kit, after)
 				record = Art.show(holder, gem, nil, color, false)
 				symbols[n] = "Gem"
 			else
-				-- Mostly this key's two moves, now and then the rest of the lane.
-				local pick = if rng:NextNumber() < 0.65 then pool[rng:NextInteger(1, #pool)] else lane[rng:NextInteger(1, #lane)]
-				local tile = frame(cell, {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromOffset(CELL - 22, CELL - 22),
-					BackgroundColor3 = C.Ink,
-					ZIndex = 46,
-				})
-				UiKit.round(tile, 12)
-				Icons.apply(tile, Tech.Catalog[pick])
-				symbols[n] = pick
+				-- Gems of every rarity roll past; what's inside stays hidden.
+				local tier = reelTier(rng)
+				reelGem(cell, color, tier)
+				symbols[n] = tier
 			end
 		end
 		local function stripY(n)
@@ -1378,22 +1427,6 @@ local function revealMoves(kit, after)
 		caption.TextXAlignment, caption.ZIndex = Enum.TextXAlignment.Center, 45
 		caption.Position, caption.Size = UDim2.fromOffset(12, 270), UDim2.new(1, -24, 0, 16)
 		local rows = {}
-		for n, candidate in pool do
-			local row = frame(card, {
-				Position = UDim2.fromOffset(18, 296 + (n - 1) * 46),
-				Size = UDim2.new(1, -36, 0, 38),
-				BackgroundColor3 = C.Panel,
-				ZIndex = 45,
-			})
-			UiKit.round(row, 8)
-			local rowEdge = stroke(row, C.Line, 0, 1)
-			local mini = frame(row, { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = C.Ink, ZIndex = 46 })
-			UiKit.round(mini, 6)
-			Icons.apply(mini, Tech.Catalog[candidate])
-			local words = label(row, string.upper(Tech.Catalog[candidate] and Tech.Catalog[candidate].Name or candidate), 13, C.Dim, Enum.Font.GothamBlack)
-			words.Position, words.Size, words.ZIndex = UDim2.fromOffset(44, 0), UDim2.new(1, -50, 1, 0), 46
-			rows[n] = { Id = candidate, Frame = row, Edge = rowEdge, Words = words }
-		end
 		-- Once the surge is out: its name, cost, what it does.
 		local name = label(card, "", 24, C.Text, Enum.Font.GothamBlack)
 		name.TextXAlignment, name.ZIndex = Enum.TextXAlignment.Center, 45
@@ -1407,10 +1440,6 @@ local function revealMoves(kit, after)
 		about.TextXAlignment, about.TextYAlignment, about.ZIndex = Enum.TextXAlignment.Center, Enum.TextYAlignment.Top, 45
 		about.TextWrapped, about.TextTruncate = true, Enum.TextTruncate.AtEnd
 		about.Position, about.Size = UDim2.fromOffset(18, 344), UDim2.new(1, -36, 0, 48)
-		local missed = label(card, "", 11, C.Faint, Enum.Font.GothamBold)
-		missed.TextXAlignment, missed.ZIndex = Enum.TextXAlignment.Center, 45
-		missed.Position, missed.Size = UDim2.new(0, 12, 1, -28), UDim2.new(1, -24, 0, 18)
-		missed.RichText = true
 
 		local effect = CardFX.create(card)
 		CardFX.update(effect, nil, 0)
@@ -1425,6 +1454,8 @@ local function revealMoves(kit, after)
 			Symbols = symbols,
 			Final = stripY(2),
 			LastCell = nil,
+			Caption = caption,
+			GemWord = spec.Gem,
 		}
 		-- Beat 1: the capsule bursts and the gem is out.
 		function entry.open(quick)
@@ -1476,10 +1507,6 @@ local function revealMoves(kit, after)
 			name.Text = string.upper(move and move.Name or id)
 			stats.Text = if move then string.format("%d %s   ·   %dS COOLDOWN", move.Cost or 0, spec.Pays, move.Cooldown or 0) else ""
 			about.Text = move and move.Description or ""
-			if other then
-				local otherMove = Tech.Catalog[other]
-				missed.Text = string.format("the gem's other surge  <s>%s</s>", string.upper(otherMove and otherMove.Name or other))
-			end
 			edge.Color, edge.Transparency, edge.Thickness = spec.Color, 0.1, 2
 			effects[index].Live = true
 		end
@@ -1521,12 +1548,14 @@ local function revealMoves(kit, after)
 						LotterySound.play("Tick")
 					end
 				end
+				-- Under the circle: the rarity of the gem going past.
 				local showing = entry.Symbols[middle]
-				for _, row in entry.Rows do
-					local on = row.Id == showing
-					row.Frame.BackgroundColor3 = if on then entry.Color:Lerp(C.Ink, 0.55) else C.Panel
-					row.Edge.Color = if on then entry.Color else C.Line
-					row.Words.TextColor3 = if on then C.Text else C.Faint
+				local tierColor = GemConfig.TierColors[showing]
+				if tierColor and showing ~= entry.Shown then
+					entry.Shown = showing
+					local tierName = string.upper(GemConfig.TierLabels[showing] or showing)
+					entry.Caption.Text = tierName .. "  ·  " .. entry.GemWord
+					entry.Caption.TextColor3 = tierColor
 				end
 			end
 			Art.pose(entry.Record, t, false)
