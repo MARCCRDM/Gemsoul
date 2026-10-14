@@ -29,11 +29,11 @@
 ]]
 local Outpost = {}
 
--- Corundum Meadow: an irregular grass island above sapphire foundations.
+-- The original moon quarry, with haul roads and a drivable Motor Pool.
 Outpost.Location = CFrame.new(0, 0, 7000)
-Outpost.Radius = 200 -- bounding radius for fall recovery; shoreline is irregular
-Outpost.NodeCount = 18 -- basic rocks near the arrival paths
-Outpost.FieldNodeCount = 140 -- leave breathing room between meadow nodes
+Outpost.Radius = 440 -- quarry rim; recovery allows the surrounding benches
+Outpost.NodeCount = 110 -- basic rocks spread across the quarry
+Outpost.FieldNodeCount = 0 -- this lobby uses the common quarry sites
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from
 Outpost.SwingCooldown = 0.32

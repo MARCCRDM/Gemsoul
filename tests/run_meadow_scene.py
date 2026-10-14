@@ -1,6 +1,7 @@
-"""Exercise the actual meadow/world builders; optionally dump native geometry.
+"""Exercise the retained standalone meadow builders; optionally dump geometry.
 
-This verifies placement and floor construction offline, not Roblox rendering.
+The active lobby is tested in run_moon_quarry_scene.py. This preserves checks
+for the meadow scenery without requiring it to remain the active lobby.
 """
 from pathlib import Path
 import json
@@ -45,30 +46,26 @@ function CFrame.lookAt(p,q)
 end
 local UDim2={new=function() return {} end,fromOffset=function() return {} end}
 '''
-for name, path in [('Rules', 'src/shared/Outpost.luau'), ('Meadow', 'src/server/World/OutpostMeadow.luau'), ('Orbit', 'src/server/World/OutpostOrbit.luau'), ('World', 'src/server/World/OutpostWorld.luau')]:
+for name, path in [('Rules', 'src/shared/Outpost.luau'), ('Meadow', 'src/server/World/OutpostMeadow.luau'), ('Orbit', 'src/server/World/OutpostOrbit.luau')]:
     code = (ROOT / path).read_text(encoding='utf-8')
     code = re.sub(r'^local \w+ = require\([^\n]+\)\n', '', code, flags=re.M)
     source += f'local {name}=(function()\n{code}\nend)()\n'
 source += r'''
 local origin=CFrame.new(0,0,7000)
-local site=World.build(origin,{})
-assert(site.Model.LandscapeVersion==2,"Old landscape built")
-assert(site.Model.SkySetting=="DaylightOrbit","Daylight sky scenery not connected")
-assert(#site.Parking==0 and #site.Secrets==0,"Retired world extras returned")
-assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7074,"Arrival moved")
-assert(site.Probe and site.Board and site.Gate,"Missing lobby services")
+local site=Meadow.build({},origin)
+Orbit.build({},origin)
 local common, field, grass, triangles = 0,0,0,{}
 local planet, airglow, stars, land, clouds, banks = nil,nil,0,0,0,0
 for i,spot in site.Spots do
  local p=spot.Position-origin.Position
  assert(math.abs(p.Y)<.001,"Mining node isn't seated on the grass")
  assert(Meadow.clear(p),"Rock overlaps a path, service, tree or cliff")
- assert(p.Magnitude<Rules.Radius,"Recovery radius excludes valid ground")
+ assert(p.Magnitude<200,"Mining site outside meadow")
  if site.Zones[i]=="Common" then common+=1 else field+=1; assert(site.Zones[i]=="Field") end
  for j=i+1,#site.Spots do assert((spot.Position-site.Spots[j].Position).Magnitude>8.5,"Mining bodies overlap") end
 end
-assert(common>=Rules.NodeCount,"Too few starter positions: "..common)
-assert(field>=Rules.FieldNodeCount,"Too few meadow positions: "..field)
+assert(common>=18,"Too few starter positions: "..common)
+assert(field>=140,"Too few meadow positions: "..field)
 assert(#site.FieldSpots==field)
 local active={}
 for _,index in site.FieldSpots do assert(not active[index] and site.Zones[index]=="Field");active[index]=true end
@@ -146,50 +143,6 @@ for _,p in builtParts do
  print("PART|"..table.concat(row,"|"))
 end
 for i,p in site.Spots do print("SPOT|"..p.Position.X.."|"..p.Position.Z.."|"..site.Zones[i]) end
-'''
-# Exercise actual lighting transitions, including a custom Studio sky and repeat
-# entries. Geometry checks above cannot catch clouds staying disabled after space.
-lighting = (ROOT / 'src/client/Modules/Scenes.luau').read_text(encoding='utf-8')
-lighting = lighting[lighting.index('function Scenes.spaceLighting()'):lighting.rindex('return Scenes')]
-source += r'''
-do
-local function holder()
- local h={Children={}}
- function h:FindFirstChildOfClass(kind)
-  for _,child in self.Children do if child.ClassName==kind then return child end end
- end
- return h
-end
-local Lighting, terrain = holder(), holder()
-local workspace={FindFirstChildOfClass=function() return terrain end}
-local Instance={new=function(kind)
- local values={ClassName=kind}
- return setmetatable({}, {__index=values,__newindex=function(o,k,v)
-  if k=="Parent" and v and v~=values.Parent then table.insert(v.Children,o) end
-  values[k]=v
- end})
-end}
-local Scenes={}
-''' + lighting + r'''
-Scenes.spaceLighting()
-Lighting:FindFirstChildOfClass("Sky").SkyboxUp="custom-night-sky"
-Scenes.outpostLighting()
-local sky=Lighting:FindFirstChildOfClass("Sky")
-local air=Lighting:FindFirstChildOfClass("Atmosphere")
-local clouds=terrain:FindFirstChildOfClass("Clouds")
-assert(Lighting.ClockTime>12 and Lighting.ClockTime<16 and sky.CelestialBodiesShown and sky.StarCount==0,"Night lighting retained")
-assert(air.Density>0 and air.Density<.2 and air.Haze<.4,"Atmosphere hides the planet")
-assert(clouds.Enabled and clouds.Cover>0 and clouds.Cover<.5,"Clouds missing or overcast")
-for face,suffix in {Bk="bk",Dn="dn",Ft="ft",Lf="lf",Rt="rt",Up="up"} do
- assert(sky["Skybox"..face]=="rbxasset://textures/sky/sky512_"..suffix..".tex","Custom dark sky retained")
-end
-local lights=#Lighting.Children
-Scenes.spaceLighting()
-assert(not clouds.Enabled and not sky.CelestialBodiesShown,"Space transition changed")
-Scenes.outpostLighting()
-assert(clouds.Enabled and sky.CelestialBodiesShown and #Lighting.Children==lights and #terrain.Children==1,"Re-entry lost daylight or duplicated effects")
-print("PASS: daylight/custom-sky reset; space-to-meadow return; reusable lighting and cloud effects")
-end
 '''
 script = ROOT / '.tools/meadow-scene-test.luau'
 try:

@@ -11,7 +11,7 @@
 	                       vendor kiosks and the Saga Stone pylon.
 	  Scenes.spacePickaxe(hand) the space pickaxe, welded to a hand.
 	  Scenes.spaceLighting()  a black, starry sky with cool light.
-	  Scenes.outpostLighting()  the meadow: blue skies, soft clouds and a distant planet.
+	  Scenes.outpostLighting()  the moon quarry: cool lighting, stars and distant planets.
 	  Scenes.terraformLighting()  the same sky with a thin new atmosphere.
 
 	Each builder returns a table with the Model and named spots (CFrames) for
@@ -639,55 +639,31 @@ function Scenes.spaceLighting()
 	end
 end
 
--- A comfortable afternoon in the floating meadow. A little atmospheric
--- depth softens the horizon without hiding its pale neighbouring planet.
+-- Restore the original moon-base lighting, including after a bright arena
+-- or meadow visit. Keep the quarry readable beneath its stars and planets.
 function Scenes.outpostLighting()
-	Lighting.ClockTime = 14.2
-	Lighting.GeographicLatitude = 28
-	Lighting.Brightness = 2.4
-	Lighting.ExposureCompensation = 0.05
-	Lighting.Ambient = Color3.fromRGB(128, 141, 153)
-	Lighting.OutdoorAmbient = Color3.fromRGB(174, 183, 184)
+	Scenes.spaceLighting()
+	Lighting.ExposureCompensation = 0
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 0.3
-	Lighting.GlobalShadows = true
-	local function get(className: string, parent: Instance?): any
-		local holder = parent or Lighting
-		local found = holder:FindFirstChildOfClass(className)
-		if not found then
-			found = Instance.new(className)
-			found.Parent = holder
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if sky then
+		for face, suffix in { Bk = "bk", Dn = "dn", Ft = "ft", Lf = "lf", Rt = "rt", Up = "up" } do
+			sky["Skybox" .. face] = "rbxasset://textures/sky/sky512_" .. suffix .. ".tex"
 		end
-		return found
 	end
-	local atmosphere = get("Atmosphere")
-	atmosphere.Density = 0.14
-	atmosphere.Offset = 0.18
-	atmosphere.Color = Color3.fromRGB(213, 232, 245)
-	atmosphere.Decay = Color3.fromRGB(153, 184, 211)
-	atmosphere.Glare = 0.05
-	atmosphere.Haze = 0.24
-	local sky = get("Sky")
-	-- Restore Roblox's soft blue cloud sky even if a Studio place used a custom one.
-	for face, suffix in { Bk = "bk", Dn = "dn", Ft = "ft", Lf = "lf", Rt = "rt", Up = "up" } do
-		sky["Skybox" .. face] = "rbxasset://textures/sky/sky512_" .. suffix .. ".tex"
+	local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
+	if bloom then
+		bloom.Intensity, bloom.Size, bloom.Threshold = 0.08, 20, 2
 	end
-	sky.StarCount = 0
-	sky.CelestialBodiesShown = true
-	sky.SunAngularSize = 12
-	local bloom = get("BloomEffect")
-	bloom.Intensity, bloom.Size, bloom.Threshold = 0.08, 20, 2
-	local grade = get("ColorCorrectionEffect")
-	grade.Brightness, grade.Contrast, grade.Saturation = 0.015, 0.035, 0.025
-	grade.TintColor = Color3.fromRGB(255, 251, 243)
-	local rays = get("SunRaysEffect")
-	rays.Intensity, rays.Spread = 0.025, 0.75
-	local terrain = workspace:FindFirstChildOfClass("Terrain")
-	if terrain then
-		local clouds = get("Clouds", terrain)
-		clouds.Enabled = true
-		clouds.Cover, clouds.Density = 0.32, 0.42
-		clouds.Color = Color3.fromRGB(255, 251, 244)
+	local grade = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+	if grade then
+		grade.Brightness, grade.Contrast, grade.Saturation = 0, 0, 0
+		grade.TintColor = Color3.new(1, 1, 1)
+	end
+	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect")
+	if rays then
+		rays.Intensity = 0
 	end
 end
 
