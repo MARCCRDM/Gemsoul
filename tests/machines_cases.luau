@@ -50,15 +50,15 @@ for _ = 1, 600 do
 end
 check(math.abs(speed + hauler.MaxSpeed * Rules.ReverseShare) < 1e-6, "Reverse isn't limited")
 local _, still = Rules.drive(hauler, 0, 0, 0, 1, 1)
-check(still == 0, "A wheeled machine turned on the spot")
+check(still < 0, "A heavy mech could not pivot on the spot")
 local _, spun = Rules.drive(mole, 0, 0, 0, 1, 1)
 check(spun < 0, "A tracked machine couldn't turn on the spot")
 local _, right = Rules.drive(skipper, 30, 0, 1, 1, 0.1)
 local _, backRight = Rules.drive(skipper, -20, 0, -1, 1, 0.1)
-check(right < 0 and backRight > 0, "Steering doesn't flip when backing up")
+check(right < 0 and backRight < 0, "Mech steering changed direction in reverse")
 local _, slow = Rules.drive(skipper, 2, 0, 0, 1, 0.1)
 local _, fast = Rules.drive(skipper, 30, 0, 0, 1, 0.1)
-check(math.abs(slow) < math.abs(fast), "Wheels steer as hard at a crawl as at speed")
+check(math.abs(slow-fast)<1e-6, "Mech pivot speed depends on travel speed")
 check(skipper.MaxSpeed > hauler.MaxSpeed and hauler.MaxSpeed > Rules.Machines.Digger.MaxSpeed, "Machine speeds out of order")
 for _, kind in Rules.MachineOrder do
 	check(Rules.Machines[kind] ~= nil, "Machine order lists a missing machine")
@@ -83,31 +83,29 @@ for _, kind in Rules.MachineOrder do
 	local _, wantYaw = at:ToOrientation()
 	local _, gotYaw = steer.CFrame:ToOrientation()
 	check(math.abs(wantYaw - gotYaw) < 1e-4, kind .. " would swing round when it spawns")
-	-- Every other part is welded on, massless and non-colliding (the drill to its hub).
-	local hub = model:FindFirstChild("DrillHub")
+	-- Each cosmetic part is connected through a weld or an articulated joint.
+	local connected, joints = {}, {}
 	for _, d in model:GetDescendants() do
-		if d.ClassName == "WeldConstraint" then
-			check(d.Part0 == chassis or d.Part0 == hub, kind .. " has a weld to the wrong part")
+		if d.ClassName == "WeldConstraint" or d.ClassName == "Motor6D" then
+			check(d.Part0 and d.Part1 and d.Part0:IsDescendantOf(model) and d.Part1:IsDescendantOf(model), kind .. " has a detached limb")
+			connected[d.Part1] = true
+			if d.ClassName == "Motor6D" then joints[d.Name] = d end
 		end
 	end
 	local parts = 0
 	for _, d in model:GetDescendants() do
-		if d:IsA("BasePart") and d ~= chassis and d ~= hub then
+		if d:IsA("BasePart") and d ~= chassis then
 			parts += 1
-			local weld = d:FindFirstChildOfClass("WeldConstraint")
-			check(weld ~= nil and weld.Part1 == d, kind .. ": " .. d.Name .. " isn't welded on")
-			check(d.Massless and not d.Anchored, kind .. ": " .. d.Name .. " has weight or is anchored")
-			check(not d.CanCollide or d == seat, kind .. ": " .. d.Name .. " collides")
+			check(connected[d], kind .. ": " .. d.Name .. " is not attached")
+			check(d.Massless and not d.Anchored and not d.CanCollide, kind .. ": cosmetic collision/mass")
 		end
 	end
-	check(parts > 20, kind .. " is too plain (" .. parts .. " parts)")
-	if kind == "Mole" then
-		local motor = model:FindFirstChild("DrillMotor", true)
-		check(hub and not hub.Massless and motor and motor.ActuatorType == R.Enum.ActuatorType.Motor, "The Mole's drill can't spin")
-		check(motor.Attachment0.Parent == chassis and motor.Attachment1.Parent == hub, "The drill isn't hinged to the chassis")
-	else
-		check(hub == nil, kind .. " has a drill")
+	check(parts > 120 and parts < 240, kind .. " detail budget changed")
+	for _, name in {"Waist","LeftHip","LeftKnee","LeftAnkle","RightHip","RightKnee","RightAnkle","LeftShoulder","LeftElbow","RightShoulder","RightElbow"} do
+		check(joints[name] and joints[name]:GetAttribute("MechRest"), kind .. " missing " .. name)
 	end
+	check((joints.ToolRotor ~= nil) == (kind == "Mole"), "Drill rig mismatch")
+	check(model:GetAttribute("Mech") and model:GetAttribute("CameraFit") >= 20, "Mech identity or camera fit missing")
 end
 
-print("PASS: " .. checks .. " machine checks (driving maths, chassis, seats, constraints, welds, the spinning drill)")
+print("PASS: " .. checks .. " machine checks (driving maths, chassis, seats, constraints, welds, articulated mech joints)")

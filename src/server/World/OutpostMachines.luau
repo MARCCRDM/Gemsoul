@@ -1,424 +1,312 @@
---[[
-	The big machines at the Outpost's Motor Pool: an HX-9 Hauler dump truck,
-	a Mole drill crawler (its drill really spins), an EX-4 Digger excavator
-	and a Skipper moon rover. They're for driving around the quarry, nothing
-	more.
-
-	Each machine is one physics assembly: an invisible box "Chassis" that
-	slides on the ground (its PrimaryPart), with the bodywork welded on and
-	massless. A VehicleSeat "Seat" takes the driver's input; the driver's
-	client steers through two constraints on the chassis:
-	  Drive  (LinearVelocity, Plane mode)   horizontal velocity (gravity is free,
-	                                        so it falls off ramps and jumps)
-	  Steer  (AlignOrientation)             heading, kept level
-	The seat carries the machine's kind in its "OutpostMachine" attribute.
-
-	  OutpostMachines.build(kind, cframe) -> Model   standing on `cframe`
-	                                                 (its bottom on the ground)
-]]
+-- Piloted quarry exosuits. Historical machine IDs keep parking and controls
+-- compatible; every body is now a cockpit, articulated arms and walking legs.
+-- One invisible chassis handles collision. Cosmetic limbs use Motor6Ds, with
+-- distance-driven animation on each client (MechAnimation / Shared.MechMotion).
 local OutpostMachines = {}
-
-local YELLOW = Color3.fromRGB(242, 182, 36)
-local ORANGE = Color3.fromRGB(236, 128, 40)
-local DARK = Color3.fromRGB(38, 40, 46)
-local RUBBER = Color3.fromRGB(22, 22, 26)
-local STEEL = Color3.fromRGB(150, 156, 166)
-local GLASS = Color3.fromRGB(70, 110, 150)
-local WHITE = Color3.fromRGB(232, 234, 238)
-local LAMP = Color3.fromRGB(255, 246, 214)
-
--- The chassis box for each machine (width, height, length; forward is -Z).
-local CHASSIS = {
-	Hauler = Vector3.new(15, 5, 30),
-	Mole = Vector3.new(14, 6, 26),
-	Digger = Vector3.new(13, 4, 20),
-	Skipper = Vector3.new(9, 2.4, 13),
+local DARK = Color3.fromRGB(32, 39, 42)
+local STEEL = Color3.fromRGB(137, 151, 153)
+local RUBBER = Color3.fromRGB(20, 25, 27)
+local GLASS = Color3.fromRGB(78, 164, 185)
+local PALE = Color3.fromRGB(204, 219, 214)
+local HAZARD = Color3.fromRGB(242, 182, 65)
+local KITS = {
+	Hauler = { Scale = 1, Armor = Color3.fromRGB(103, 119, 82), Accent = HAZARD, Tool = "Fist" },
+	Mole = { Scale = 1, Armor = Color3.fromRGB(70, 96, 111), Accent = Color3.fromRGB(91, 218, 238), Tool = "Drill" },
+	Digger = { Scale = 0.95, Armor = Color3.fromRGB(167, 107, 64), Accent = HAZARD, Tool = "Claw" },
+	Skipper = {
+		Scale = 0.86,
+		Armor = Color3.fromRGB(161, 176, 163),
+		Accent = Color3.fromRGB(103, 232, 195),
+		Tool = "Scanner",
+	},
 }
 
-local function weld(a: BasePart, b: BasePart)
-	local w = Instance.new("WeldConstraint")
-	w.Part0, w.Part1 = a, b
-	w.Parent = b
-end
-
--- A piece of bodywork welded to `base`, at `offset` from it.
-local function piece(model, base: BasePart, offset: CFrame, size: Vector3, color, material, shape)
-	local p = Instance.new(if shape == "Wedge" then "WedgePart" else "Part")
-	if shape == "Cylinder" then
-		p.Shape = Enum.PartType.Cylinder
-	elseif shape == "Ball" then
-		p.Shape = Enum.PartType.Ball
-	end
-	p.Size = size
-	p.Color = color
-	p.Material = material or Enum.Material.SmoothPlastic
-	p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
-	p.CFrame = base.CFrame * offset
-	p.Anchored = false
-	p.CanCollide, p.CanTouch, p.CanQuery = false, false, false
-	p.Massless = true
-	p.CastShadow = math.max(size.X, size.Y, size.Z) > 2
-	p.Parent = model
-	weld(base, p)
-	return p
-end
-
--- A wheel: a cylinder whose axis runs across the machine, with a hub cap.
-local function wheel(model, base, x: number, y: number, z: number, radius: number, width: number)
-	piece(
-		model,
-		base,
-		CFrame.new(x, y, z),
-		Vector3.new(width, radius * 2, radius * 2),
-		RUBBER,
-		Enum.Material.Rubber,
-		"Cylinder"
-	)
-	piece(
-		model,
-		base,
-		CFrame.new(x + math.sign(x) * (width / 2 + 0.05), y, z),
-		Vector3.new(0.2, radius * 0.9, radius * 0.9),
-		STEEL,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-end
-
--- A crawler track down one side: a rubber belt with tread bars.
-local function track(model, base, x: number, height: number, length: number, bottom: number)
-	piece(
-		model,
-		base,
-		CFrame.new(x, bottom + height / 2, 0),
-		Vector3.new(3.4, height, length),
-		RUBBER,
-		Enum.Material.Rubber
-	)
-	local bars = math.floor(length / 2.4)
-	for i = 0, bars - 1 do
-		local z = -length / 2 + 1.2 + i * 2.4
-		piece(
-			model,
-			base,
-			CFrame.new(x + math.sign(x) * 1.75, bottom + height / 2, z),
-			Vector3.new(0.2, height - 0.6, 0.9),
-			DARK,
-			Enum.Material.Metal
-		)
-	end
-	for _, z in { -length / 2 + height / 2, length / 2 - height / 2 } do
-		piece(
-			model,
-			base,
-			CFrame.new(x, bottom + height / 2, z),
-			Vector3.new(3.6, height * 0.8, height * 0.8),
-			STEEL,
-			Enum.Material.Metal,
-			"Cylinder"
-		)
-	end
-end
-
-local function lamp(model, base, offset: CFrame)
-	local p = piece(model, base, offset, Vector3.new(1.4, 0.9, 0.2), LAMP, Enum.Material.Neon)
-	local l = Instance.new("SpotLight")
-	l.Face, l.Range, l.Brightness, l.Angle = Enum.NormalId.Front, 40, 2, 50
-	l.Color = LAMP
-	l.Parent = p
-	return p
-end
-
--- The bodywork of each machine, around its chassis (bottom at -h/2).
-local BODY = {}
-
-function BODY.Hauler(model, c: BasePart)
-	local b = -2.5 -- chassis bottom
-	piece(model, c, CFrame.new(0, b + 3.5, 0), Vector3.new(12, 2.4, 29), DARK, Enum.Material.Metal)
-	-- The dump bed.
-	piece(model, c, CFrame.new(0, b + 5.4, 5), Vector3.new(15, 1, 19), YELLOW, Enum.Material.Metal)
-	for side = -1, 1, 2 do
-		piece(model, c, CFrame.new(side * 7, b + 8.6, 5), Vector3.new(1, 6.4, 19), YELLOW, Enum.Material.Metal)
-		for i = 0, 3 do
-			piece(
-				model,
-				c,
-				CFrame.new(side * 7.55, b + 8.6, -2 + i * 4.6),
-				Vector3.new(0.3, 6, 0.6),
-				ORANGE,
-				Enum.Material.Metal
-			)
-		end
-	end
-	piece(model, c, CFrame.new(0, b + 9.4, -4.6), Vector3.new(15, 8, 1), YELLOW, Enum.Material.Metal)
-	piece(model, c, CFrame.new(0, b + 8.2, 14.6), Vector3.new(15, 5.6, 0.8), YELLOW, Enum.Material.Metal)
-	piece(model, c, CFrame.new(0, b + 13.6, -7.4), Vector3.new(15, 0.8, 6), YELLOW, Enum.Material.Metal)
-	-- Engine and cab up front.
-	piece(model, c, CFrame.new(1.8, b + 6.4, -12.4), Vector3.new(11, 4.6, 5), YELLOW, Enum.Material.Metal)
-	piece(model, c, CFrame.new(1.8, b + 6.2, -15.0), Vector3.new(9, 3.4, 0.3), DARK, Enum.Material.DiamondPlate)
-	piece(model, c, CFrame.new(-4.6, b + 9, -11), Vector3.new(5.6, 7.4, 6.6), YELLOW, Enum.Material.Metal)
-	piece(model, c, CFrame.new(-4.6, b + 10.4, -14.35), Vector3.new(4.8, 2.6, 0.2), GLASS, Enum.Material.Glass).Transparency =
-		0.35
-	piece(model, c, CFrame.new(-7.45, b + 10.4, -11), Vector3.new(0.2, 2.6, 5.2), GLASS, Enum.Material.Glass).Transparency =
-		0.35
-	piece(
-		model,
-		c,
-		CFrame.new(5.8, b + 11, -12) * CFrame.Angles(0, 0, math.rad(90)),
-		Vector3.new(6, 0.9, 0.9),
-		RUBBER,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-	for _, x in { -6, 6 } do
-		lamp(model, c, CFrame.new(x, b + 6, -15.1))
-	end
-	-- Six big wheels.
-	for _, z in { -10, 4, 10 } do
-		for side = -1, 1, 2 do
-			wheel(model, c, side * 7.4, b + 4, z, 4, 3)
-		end
-	end
-	-- A ladder up to the cab.
-	for i = 0, 3 do
-		piece(model, c, CFrame.new(-7.9, b + 2.2 + i * 1.3, -8), Vector3.new(0.2, 0.2, 1.6), STEEL, Enum.Material.Metal)
-	end
-	return CFrame.new(-4.6, b + 6.1, -10.6) -- the seat
-end
-
-function BODY.Mole(model, c: BasePart)
-	local b = -3
-	for side = -1, 1, 2 do
-		track(model, c, side * 5.6, 5.4, 26, b)
-	end
-	piece(model, c, CFrame.new(0, b + 6.4, 2), Vector3.new(8.4, 6, 20), YELLOW, Enum.Material.Metal)
-	piece(model, c, CFrame.new(0, b + 6.4, 12.2), Vector3.new(8, 4, 0.4), DARK, Enum.Material.DiamondPlate)
-	-- The glass cab on top.
-	piece(model, c, CFrame.new(0, b + 11.2, 5), Vector3.new(6.4, 3.6, 6.4), GLASS, Enum.Material.Glass).Transparency =
-		0.4
-	piece(model, c, CFrame.new(0, b + 13.2, 5), Vector3.new(7, 0.6, 7), YELLOW, Enum.Material.Metal)
-	-- The drill mount.
-	piece(model, c, CFrame.new(0, b + 6, -9.5), Vector3.new(9, 9, 3), DARK, Enum.Material.Metal)
-	for _, x in { -3.4, 3.4 } do
-		lamp(model, c, CFrame.new(x, b + 10.8, -11.1))
-	end
-	piece(model, c, CFrame.new(3, b + 14.4, 8), Vector3.new(0.3, 2.4, 0.3), STEEL, Enum.Material.Metal)
-	local beacon = piece(model, c, CFrame.new(3, b + 15.8, 8), Vector3.one * 0.8, ORANGE, Enum.Material.Neon, "Ball")
-	beacon.Name = "Beacon"
-	return CFrame.new(0, b + 9.8, 5)
-end
-
--- The Mole's drill: a separate spinning assembly on a motor hinge.
-local function drill(model, c: BasePart)
-	local b = -3
-	local hub = Instance.new("Part")
-	hub.Name = "DrillHub"
-	hub.Size = Vector3.new(4, 4, 2)
-	hub.Transparency = 1
-	hub.CanCollide, hub.CanTouch, hub.CanQuery = false, false, false
-	hub.CustomPhysicalProperties = PhysicalProperties.new(0.2, 0.3, 0)
-	hub.CFrame = c.CFrame * CFrame.new(0, b + 6, -12)
-	hub.Parent = model
-	-- Stacked rings narrowing to a point, black and white with spikes.
-	local rings = { { 4.8, 2.4, -1.2 }, { 4, 2.6, -3.6 }, { 3.2, 2.6, -6.2 }, { 2.4, 2.6, -8.8 }, { 1.5, 2.6, -11.2 } }
-	for i, ring in rings do
-		local p = piece(
-			model,
-			hub,
-			CFrame.new(0, 0, ring[3]) * CFrame.Angles(0, math.rad(90), 0),
-			Vector3.new(ring[2], ring[1] * 2, ring[1] * 2),
-			if i % 2 == 0 then WHITE else RUBBER,
-			Enum.Material.Metal,
-			"Cylinder"
-		)
-		p.Name = "Drill"
-		for k = 0, 5 do
-			local a = k / 6 * math.pi * 2 + i * 0.5
-			piece(
-				model,
-				hub,
-				CFrame.new(math.cos(a) * ring[1], math.sin(a) * ring[1], ring[3]) * CFrame.Angles(0, 0, a - math.pi / 2),
-				Vector3.new(0.8, 1.6, 1.4),
-				if i % 2 == 0 then RUBBER else WHITE,
-				Enum.Material.Metal,
-				"Wedge"
-			)
-		end
-	end
-	piece(model, hub, CFrame.new(0, 0, -13), Vector3.one * 1.6, STEEL, Enum.Material.Metal, "Ball")
-	-- The hinge: both attachments' primary axis along the machine's forward.
-	local a0 = Instance.new("Attachment")
-	a0.CFrame = CFrame.new(0, b + 6, -12) * CFrame.Angles(0, math.rad(90), 0)
-	a0.Parent = c
-	local a1 = Instance.new("Attachment")
-	a1.CFrame = CFrame.Angles(0, math.rad(90), 0)
-	a1.Parent = hub
-	local hinge = Instance.new("HingeConstraint")
-	hinge.Name = "DrillMotor"
-	hinge.Attachment0, hinge.Attachment1 = a0, a1
-	hinge.ActuatorType = Enum.ActuatorType.Motor
-	hinge.MotorMaxTorque = 1e5
-	hinge.AngularVelocity = 1.5
-	hinge.Parent = hub
-	return hub
-end
-
-function BODY.Digger(model, c: BasePart)
-	local b = -2
-	for side = -1, 1, 2 do
-		track(model, c, side * 4.8, 3.8, 20, b)
-	end
-	piece(
-		model,
-		c,
-		CFrame.new(0, b + 4.4, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Vector3.new(1.2, 6, 6),
-		DARK,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-	-- The house, counterweight and cab.
-	piece(model, c, CFrame.new(0.6, b + 8, 2), Vector3.new(10.6, 6, 12), ORANGE, Enum.Material.Metal)
-	piece(model, c, CFrame.new(0.6, b + 6.6, 8.8), Vector3.new(10.6, 3.6, 2), DARK, Enum.Material.Metal)
-	piece(model, c, CFrame.new(-3, b + 9.6, -5.6), Vector3.new(4.6, 7, 4.6), ORANGE, Enum.Material.Metal)
-	piece(model, c, CFrame.new(-3, b + 10.6, -7.95), Vector3.new(3.8, 3.4, 0.2), GLASS, Enum.Material.Glass).Transparency =
-		0.35
-	piece(model, c, CFrame.new(3.4, b + 12.4, 4), Vector3.new(0.6, 3, 0.6), RUBBER, Enum.Material.Metal)
-	lamp(model, c, CFrame.new(-3, b + 13.4, -8))
-	-- The boom, stick and bucket, held up as if mid-dig.
-	piece(
-		model,
-		c,
-		CFrame.new(2.4, b + 13, -8.6) * CFrame.Angles(math.rad(32), 0, 0),
-		Vector3.new(2.2, 2.4, 16),
-		ORANGE,
-		Enum.Material.Metal
-	)
-	piece(
-		model,
-		c,
-		CFrame.new(2.4, b + 12.6, -19.2) * CFrame.Angles(math.rad(-58), 0, 0),
-		Vector3.new(1.8, 1.8, 12),
-		ORANGE,
-		Enum.Material.Metal
-	)
-	piece(
-		model,
-		c,
-		CFrame.new(2.4, b + 10.4, -6.6) * CFrame.Angles(math.rad(45), 0, 0),
-		Vector3.new(0.6, 0.6, 8),
-		STEEL,
-		Enum.Material.Metal
-	)
-	piece(model, c, CFrame.new(2.4, b + 4.4, -23), Vector3.new(5.6, 3.6, 3.6), DARK, Enum.Material.Metal)
-	for i = -2, 2 do
-		piece(
-			model,
-			c,
-			CFrame.new(2.4 + i * 1.1, b + 2.2, -24.4),
-			Vector3.new(0.6, 0.8, 0.9),
-			STEEL,
-			Enum.Material.Metal,
-			"Wedge"
-		)
-	end
-	return CFrame.new(-3, b + 6.6, -5.4)
-end
-
-function BODY.Skipper(model, c: BasePart)
-	local b = -1.2
-	piece(model, c, CFrame.new(0, b + 2, 0), Vector3.new(7.6, 0.8, 12.6), WHITE, Enum.Material.Metal)
-	piece(model, c, CFrame.new(0, b + 2.6, -5.6), Vector3.new(7.6, 1.2, 1.6), ORANGE, Enum.Material.Metal)
-	-- The roll cage.
-	for _, x in { -3.4, 3.4 } do
-		for _, z in { -2.6, 3.6 } do
-			piece(model, c, CFrame.new(x, b + 4.8, z), Vector3.new(0.4, 4.8, 0.4), STEEL, Enum.Material.Metal)
-		end
-		piece(model, c, CFrame.new(x, b + 7.2, 0.5), Vector3.new(0.4, 0.4, 6.6), STEEL, Enum.Material.Metal)
-	end
-	for _, z in { -2.6, 3.6 } do
-		piece(model, c, CFrame.new(0, b + 7.2, z), Vector3.new(7.2, 0.4, 0.4), STEEL, Enum.Material.Metal)
-	end
-	local bar = piece(model, c, CFrame.new(0, b + 7.5, -2.6), Vector3.new(5, 0.5, 0.5), ORANGE, Enum.Material.Neon)
-	bar.Name = "LightBar"
-	-- Seats, a spare tyre, an antenna with a flag.
-	for _, x in { -1.6, 1.6 } do
-		piece(model, c, CFrame.new(x, b + 3, 1), Vector3.new(2.4, 1, 2.4), DARK, Enum.Material.Fabric)
-		piece(model, c, CFrame.new(x, b + 4.4, 2.2), Vector3.new(2.4, 2.6, 0.5), DARK, Enum.Material.Fabric)
-	end
-	piece(model, c, CFrame.new(0, b + 3.4, 5.6), Vector3.new(1, 3.4, 3.4), RUBBER, Enum.Material.Rubber, "Cylinder")
-	piece(model, c, CFrame.new(-3.4, b + 10, 4), Vector3.new(0.15, 5.6, 0.15), STEEL, Enum.Material.Metal)
-	piece(model, c, CFrame.new(-2.6, b + 12.1, 4), Vector3.new(1.6, 1, 0.1), ORANGE, Enum.Material.SmoothPlastic)
-	for _, x in { -2.4, 2.4 } do
-		lamp(model, c, CFrame.new(x, b + 2.6, -6.45))
-	end
-	for _, z in { -4.4, 4.4 } do
-		for side = -1, 1, 2 do
-			wheel(model, c, side * 4.6, b + 2.1, z, 2.1, 1.8)
-		end
-	end
-	return CFrame.new(-1.6, b + 3, 1)
-end
-
 function OutpostMachines.build(kind: string, at: CFrame): Model
-	local size = CHASSIS[kind]
-	assert(size and BODY[kind], "No machine called " .. tostring(kind))
+	local kit = KITS[kind]
+	assert(kit, "No mech called " .. tostring(kind))
+	local scale, armor, accent = kit.Scale, kit.Armor, kit.Accent
 	local model = Instance.new("Model")
 	model.Name = kind
+	model:SetAttribute("Mech", true)
+	model:SetAttribute("MechScale", scale)
+	model:SetAttribute("CameraFit", 25 * scale)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 
-	local chassis = Instance.new("Part")
-	chassis.Name = "Chassis"
-	chassis.Size = size
-	chassis.Transparency = 1
-	chassis.CanCollide, chassis.CanTouch, chassis.CanQuery = true, false, true
-	-- Slippery underneath (it slides; the constraints do the driving), and heavy.
+	local function frame(x, y, z, rx, ry, rz)
+		return CFrame.new(x * scale, y * scale, z * scale)
+			* CFrame.Angles(math.rad(rx or 0), math.rad(ry or 0), math.rad(rz or 0))
+	end
+	local function raw(name, cf, size, color, material, shape)
+		local p = Instance.new(if shape == "Wedge" then "WedgePart" else "Part")
+		p.Name, p.CFrame, p.Size = name, cf, size * scale
+		p.Color, p.Material = color, material or Enum.Material.Metal
+		p.Anchored, p.Massless = false, true
+		p.CanCollide, p.CanTouch, p.CanQuery = false, false, false
+		p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+		if shape == "Cylinder" then
+			p.Shape = Enum.PartType.Cylinder
+		end
+		if shape == "Ball" then
+			p.Shape = Enum.PartType.Ball
+		end
+		p.Parent = model
+		return p
+	end
+	local function weld(base, p)
+		local w = Instance.new("WeldConstraint")
+		w.Part0, w.Part1, w.Parent = base, p, p
+	end
+	local function piece(base, name, offset, size, color, material, shape)
+		local p = raw(name, base.CFrame * offset, size, color, material, shape)
+		weld(base, p)
+		return p
+	end
+	local function joint(base, name, pivot, rest)
+		rest = rest or CFrame.identity
+		local p = raw(name .. "Link", base.CFrame * pivot * rest, Vector3.one * 0.35, DARK)
+		p.Transparency = 1
+		local motor = Instance.new("Motor6D")
+		motor.Name, motor.Part0, motor.Part1 = name, base, p
+		motor.C0, motor.C1 = pivot * rest, CFrame.identity
+		motor:SetAttribute("MechRest", rest)
+		motor.Parent = p
+		return p
+	end
+	local function bar(base, name, a, b, width, color)
+		local av, bv = Vector3.new(unpack(a)), Vector3.new(unpack(b))
+		local mid = (av + bv) / 2
+		return piece(
+			base,
+			name,
+			CFrame.lookAt(mid * scale, bv * scale),
+			Vector3.new(width, width, (bv - av).Magnitude),
+			color
+		)
+	end
+	local chassis = raw("Chassis", at * CFrame.new(0, 6 * scale + 0.2, 0), Vector3.new(7.6, 12, 6.2), DARK)
+	chassis.Transparency, chassis.Massless, chassis.CanCollide, chassis.CanQuery = 1, false, true, true
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(1.2, 0.05, 0, 100, 1)
-	chassis.CFrame = at * CFrame.new(0, size.Y / 2 + 0.2, 0)
-	chassis.Parent = model
+	chassis.RootPriority = 127
 	model.PrimaryPart = chassis
+	-- Local offsets below are measured from the chassis centre.
+	local torso = joint(chassis, "Waist", frame(0, 2, 0))
+	piece(torso, "Pelvis", frame(0, 0, 0), Vector3.new(5.4, 1.3, 3.2), DARK)
+	piece(torso, "BeltPlate", frame(0, 0.1, -1.75, -10), Vector3.new(4.2, 1.2, 0.6), armor)
+	piece(torso, "CockpitRear", frame(0, 4.2, 1.65), Vector3.new(5.2, 7.2, 1.1), armor)
+	piece(torso, "CockpitDeck", frame(0, 1.65, -0.25), Vector3.new(5.5, 0.6, 5.7), DARK)
+	piece(torso, "CockpitRoof", frame(0, 8.2, -0.25, 5), Vector3.new(5.9, 0.65, 5.1), armor)
+	piece(torso, "RoofBrow", frame(0, 7.8, -2.7, -12), Vector3.new(5.9, 0.7, 1), armor)
+	-- An open interior behind clear glass, with a protective roll cage.
+	local glass =
+		piece(torso, "CockpitGlass", frame(0, 5, -2.65, -7), Vector3.new(4.6, 5.1, 0.16), GLASS, Enum.Material.Glass)
+	glass.Transparency, glass.CastShadow = 0.65, false
+	for _, side in { -1, 1 } do
+		local pane = piece(
+			torso,
+			"SideGlass",
+			frame(side * 2.5, 5, -0.25),
+			Vector3.new(0.15, 5.2, 4.4),
+			GLASS,
+			Enum.Material.Glass
+		)
+		pane.Transparency, pane.CastShadow = 0.72, false
+		bar(torso, "CockpitPillar", { side * 2.6, 2.2, -3 }, { side * 2.6, 7.8, -2.35 }, 0.3, STEEL)
+		bar(torso, "RearCage", { side * 2.7, 1.9, 1.9 }, { side * 2.7, 8, 1.9 }, 0.4, DARK)
+		piece(
+			torso,
+			"CockpitCheek",
+			frame(side * 2.45, 2.1, -2.5, 12, 0, side * -8),
+			Vector3.new(1.3, 1.6, 1.5),
+			armor,
+			nil,
+			"Wedge"
+		)
+		piece(
+			torso,
+			"WorkLamp",
+			frame(side * 2.45, 7.8, -3.22),
+			Vector3.new(0.65, 0.35, 0.16),
+			PALE,
+			Enum.Material.Neon
+		)
+		-- Backpack power cells, cooling fins and shoulder braces.
+		piece(
+			torso,
+			"PowerCell",
+			frame(side * 1.65, 4.6, 2.8, 0, 0, 90),
+			Vector3.new(4.4, 1.25, 1.25),
+			DARK,
+			nil,
+			"Cylinder"
+		)
+		for y = 3.2, 6, 0.7 do
+			piece(torso, "CoolingFin", frame(side * 1.65, y, 3.55), Vector3.new(1.65, 0.18, 0.55), STEEL)
+		end
+		piece(
+			torso,
+			"PowerStatus",
+			frame(side * 1.65, 6.9, 2.8),
+			Vector3.new(0.8, 0.22, 0.4),
+			accent,
+			Enum.Material.Neon
+		)
+		bar(torso, "ShoulderBrace", { side * 2.8, 4.8, 1 }, { side * 4.55, 5.6, 0 }, 0.65, STEEL)
+	end
+	piece(torso, "Console", frame(0, 3, -1.75, 25), Vector3.new(3.5, 0.6, 1.5), DARK)
+	piece(torso, "InstrumentScreen", frame(0, 3.34, -1.8, 25), Vector3.new(1.6, 0.07, 0.65), accent, Enum.Material.Neon)
+	for _, side in { -1, 1 } do
+		piece(torso, "ControlStick", frame(side * 1.3, 3.6, -1.45, -15), Vector3.new(0.18, 0.8, 0.18), STEEL)
+	end
+	piece(torso, "SeatBack", frame(0, 3.8, 1), Vector3.new(2.4, 3.2, 0.5), RUBBER, Enum.Material.Fabric)
+	for _, side in { -1, 1 } do
+		local prefix = if side < 0 then "Left" else "Right"
+		local shoulder = joint(torso, prefix .. "Shoulder", frame(side * 4.5, 5.4, 0), CFrame.Angles(0, 0, side * 0.08))
+		piece(shoulder, "ShoulderSocket", frame(-side * 0.65, 0, 0), Vector3.new(1.1, 2, 2), STEEL, nil, "Cylinder")
+		piece(
+			shoulder,
+			"ShoulderArmor",
+			frame(side * 0.3, 0.3, 0, 0, 0, side * -10),
+			Vector3.new(3.5, 2.5, 3.7),
+			armor,
+			nil,
+			"Wedge"
+		)
+		piece(shoulder, "ShoulderInset", frame(side * 0.35, 0.1, -1.92), Vector3.new(2.5, 0.65, 0.13), DARK)
+		for i = -1, 1 do
+			piece(
+				shoulder,
+				"HazardStripe",
+				frame(side * 0.35 + i * 0.62, 0.1, -2, 0, 0, -25),
+				Vector3.new(0.25, 0.55, 0.1),
+				accent
+			)
+		end
+		piece(shoulder, "UpperArm", frame(0, -1.5, 0), Vector3.new(1.5, 3, 1.6), DARK)
+		piece(shoulder, "BicepArmor", frame(side * 0.3, -1.45, -0.25, 0, 0, side * 5), Vector3.new(2, 2, 1.9), armor)
+		bar(shoulder, "ArmPiston", { side * 0.85, -0.3, 0.4 }, { side * 0.85, -2.85, 0.4 }, 0.25, STEEL)
+		local forearm = joint(shoulder, prefix .. "Elbow", frame(0, -3, 0), CFrame.Angles(-0.18, 0, 0))
+		piece(forearm, "ElbowHub", frame(0, 0, 0), Vector3.new(2.3, 1.3, 1.3), STEEL, nil, "Cylinder")
+		piece(forearm, "Forearm", frame(0, -1.25, 0), Vector3.new(1.8, 2.5, 2.1), DARK)
+		piece(forearm, "Bracer", frame(0, -1.2, -0.95, -8), Vector3.new(2.5, 2.1, 0.8), armor, nil, "Wedge")
+		piece(forearm, "WristBand", frame(0, -2.45, 0), Vector3.new(2.2, 0.4, 2.3), STEEL)
+		-- The right tool defines each silhouette; left hand is a manipulator.
+		if side == 1 and kit.Tool == "Drill" then
+			local rotor = joint(forearm, "ToolRotor", frame(0, -3, 0), CFrame.identity)
+			for i = 0, 4 do
+				local radius = 1.15 - i * 0.19
+				piece(
+					rotor,
+					"DrillRing",
+					frame(0, -i * 0.55, 0, 0, 0, 90),
+					Vector3.new(0.6, radius * 2, radius * 2),
+					if i % 2 == 0 then STEEL else DARK,
+					nil,
+					"Cylinder"
+				)
+				for tooth = 0, 2 do
+					local angle = tooth * math.pi * 2 / 3 + i * 0.8
+					piece(
+						rotor,
+						"DrillTooth",
+						frame(math.cos(angle) * radius, -i * 0.55, math.sin(angle) * radius, 0, -math.deg(angle), 20),
+						Vector3.new(0.35, 0.5, 0.5),
+						accent,
+						nil,
+						"Wedge"
+					)
+				end
+			end
+		elseif side == 1 and kit.Tool == "Claw" then
+			piece(forearm, "ToolMount", frame(0, -3, 0), Vector3.new(2.7, 0.8, 2.5), DARK)
+			for _, finger in { -1, 1 } do
+				piece(
+					forearm,
+					"GrabberJaw",
+					frame(finger * 1.25, -4, -0.2, 0, 0, finger * -20),
+					Vector3.new(0.65, 2.2, 2),
+					armor,
+					nil,
+					"Wedge"
+				)
+				piece(forearm, "GrabberTip", frame(finger * 0.8, -5, -0.55), Vector3.new(0.9, 0.4, 1.5), STEEL)
+			end
+		else
+			piece(forearm, "Palm", frame(0, -3, 0), Vector3.new(2.2, 1, 1.7), DARK)
+			for finger = -1, 1 do
+				piece(forearm, "Finger", frame(finger * 0.68, -3.75, -0.15, -10), Vector3.new(0.52, 1.1, 0.9), STEEL)
+				piece(forearm, "Knuckle", frame(finger * 0.68, -3.25, -0.8), Vector3.new(0.55, 0.4, 0.35), armor)
+			end
+			piece(
+				forearm,
+				"Thumb",
+				frame(-side * 1.2, -3.25, -0.5, 0, 0, side * 25),
+				Vector3.new(0.55, 1.3, 0.8),
+				STEEL
+			)
+			if side == 1 and kit.Tool == "Scanner" then
+				piece(forearm, "Scanner", frame(0, -1.1, -1.55), Vector3.new(1.7, 1.2, 0.65), DARK)
+				piece(
+					forearm,
+					"ScannerLens",
+					frame(0, -1.1, -1.93, 0, 90),
+					Vector3.new(0.15, 0.8, 0.8),
+					accent,
+					Enum.Material.Neon,
+					"Cylinder"
+				)
+			elseif side == 1 then
+				piece(forearm, "CargoGauntlet", frame(0, -3, -0.65), Vector3.new(2.9, 1.5, 1.3), armor)
+			end
+		end
 
-	local seatAt = BODY[kind](model, chassis)
+		local bend = math.acos(6.8 / 7.2)
+		local thigh = joint(chassis, prefix .. "Hip", frame(side * 2.05, 1.45, 0), CFrame.Angles(bend, 0, 0))
+		piece(thigh, "HipHub", frame(0, 0, 0), Vector3.new(2.5, 1.4, 1.4), STEEL, nil, "Cylinder")
+		piece(thigh, "ThighFrame", frame(0, -1.8, 0), Vector3.new(1.6, 3.6, 1.7), DARK)
+		piece(thigh, "ThighArmor", frame(0, -1.6, -0.7, -8), Vector3.new(2.3, 2.6, 1.4), armor, nil, "Wedge")
+		bar(thigh, "LegPiston", { side * 0.95, -0.25, 0.5 }, { side * 0.95, -3.25, 0.5 }, 0.3, STEEL)
+		local shin = joint(thigh, prefix .. "Knee", frame(0, -3.6, 0), CFrame.Angles(-2 * bend, 0, 0))
+		piece(shin, "KneeHub", frame(0, 0, 0), Vector3.new(2.4, 1.3, 1.3), STEEL, nil, "Cylinder")
+		piece(shin, "KneeCap", frame(0, -0.05, -0.85, -12), Vector3.new(2.4, 1.35, 0.8), armor, nil, "Wedge")
+		piece(shin, "ShinFrame", frame(0, -1.8, 0), Vector3.new(1.5, 3.6, 1.6), DARK)
+		piece(shin, "ShinArmor", frame(0, -1.7, -0.7, 7), Vector3.new(2.25, 2.65, 1.05), armor, nil, "Wedge")
+		for rib = 0, 2 do
+			piece(shin, "ShinRib", frame(0, -1.1 - rib * 0.65, -1.3, 7), Vector3.new(1.8, 0.15, 0.18), STEEL)
+		end
+		local foot = joint(shin, prefix .. "Ankle", frame(0, -3.6, 0), CFrame.Angles(bend, 0, 0))
+		piece(foot, "Ankle", frame(0, 0, 0), Vector3.new(1.8, 0.7, 1.6), STEEL, nil, "Cylinder")
+		piece(foot, "BootSole", frame(0, -0.35, -0.65), Vector3.new(2.7, 0.7, 4.3), RUBBER)
+		piece(foot, "ToeArmor", frame(0, 0.1, -1.55, 0, 180), Vector3.new(2.65, 0.9, 2.4), armor, nil, "Wedge")
+		piece(foot, "Heel", frame(0, 0.15, 1), Vector3.new(2.3, 0.9, 1.2), armor)
+		for tread = 0, 3 do
+			piece(foot, "SoleTread", frame(0, -0.65, -2.1 + tread * 0.95), Vector3.new(2.85, 0.18, 0.35), STEEL)
+		end
+	end
+	-- Asymmetric antennas and a sensor pod keep the silhouette industrial.
+	piece(torso, "SensorPod", frame(-1.7, 8.8, 0.4), Vector3.new(1.3, 0.9, 1.8), DARK)
+	piece(torso, "SensorEye", frame(-1.7, 8.8, -0.55), Vector3.new(0.8, 0.3, 0.15), accent, Enum.Material.Neon)
+	piece(torso, "Antenna", frame(2.25, 9.5, 1.5, 0, 0, -8), Vector3.new(0.12, 3, 0.12), STEEL)
 	local seat = Instance.new("VehicleSeat")
-	seat.Name = "Seat"
-	seat.Size = Vector3.new(2, 1, 2)
-	seat.Transparency = 1
-	seat.CanCollide = false
-	-- Not by touch (walking past shouldn't seat you): the Drive prompt seats you.
-	seat.CanTouch = false
-	seat.MaxSpeed, seat.Torque, seat.TurnSpeed = 0, 0, 0
-	seat.HeadsUpDisplay = false
-	seat.Massless = true
-	seat.CFrame = chassis.CFrame * seatAt
+	seat.Name, seat.Size, seat.Transparency = "Seat", Vector3.new(2, 1, 2), 1
+	seat.CanCollide, seat.CanTouch, seat.CanQuery, seat.Massless = false, false, false, true
+	seat.MaxSpeed, seat.Torque, seat.TurnSpeed, seat.HeadsUpDisplay = 0, 0, 0, false
+	seat.CFrame = torso.CFrame * frame(0, 3.1, 0)
 	seat:SetAttribute("OutpostMachine", kind)
 	seat.Parent = model
-	weld(chassis, seat)
+	weld(torso, seat)
 
 	local attachment = Instance.new("Attachment")
-	attachment.Name = "DriveAttachment"
-	attachment.Parent = chassis
+	attachment.Name, attachment.Parent = "DriveAttachment", chassis
 	local drive = Instance.new("LinearVelocity")
-	drive.Name = "Drive"
-	drive.Attachment0 = attachment
-	drive.RelativeTo = Enum.ActuatorRelativeTo.World
+	drive.Name, drive.Attachment0, drive.RelativeTo = "Drive", attachment, Enum.ActuatorRelativeTo.World
 	drive.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
-	drive.PrimaryTangentAxis = Vector3.new(1, 0, 0)
-	drive.SecondaryTangentAxis = Vector3.new(0, 0, 1)
-	drive.PlaneVelocity = Vector2.zero
-	drive.MaxForce = 6e5
-	drive.Parent = chassis
+	drive.PrimaryTangentAxis, drive.SecondaryTangentAxis = Vector3.new(1, 0, 0), Vector3.new(0, 0, 1)
+	drive.PlaneVelocity, drive.MaxForce, drive.Parent = Vector2.zero, 6e5, chassis
 	local steer = Instance.new("AlignOrientation")
-	steer.Name = "Steer"
-	steer.Mode = Enum.OrientationAlignmentMode.OneAttachment
-	steer.Attachment0 = attachment
+	steer.Name, steer.Mode, steer.Attachment0 = "Steer", Enum.OrientationAlignmentMode.OneAttachment, attachment
 	local _, yaw = at:ToOrientation()
-	steer.CFrame = CFrame.Angles(0, yaw, 0)
-	steer.MaxTorque = 1e8
-	steer.Responsiveness = 30
+	steer.CFrame, steer.MaxTorque, steer.Responsiveness = CFrame.Angles(0, yaw, 0), 1e8, 30
 	steer.Parent = chassis
-
-	if kind == "Mole" then
-		drill(model, chassis)
-	end
 	return model
 end
 

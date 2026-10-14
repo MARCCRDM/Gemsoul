@@ -3,6 +3,7 @@
 -- steers through the chassis constraints, see Client VehicleDrive), and sends
 -- abandoned machines home. Driving only: they don't mine or carry anything.
 local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
@@ -30,14 +31,9 @@ end
 
 -- Who simulates it: the driver (so it handles with no lag), else the server.
 local function owner(machine: Machine, player: Player?)
-	for _, part in { machine.Model.PrimaryPart, machine.Model:FindFirstChild("DrillHub") } do
-		if part and part:IsA("BasePart") then
-			pcall(part.SetNetworkOwner, part, player)
-		end
-	end
-	local motor = machine.Model:FindFirstChild("DrillMotor", true) :: HingeConstraint?
-	if motor then
-		motor.AngularVelocity = if player then 8 else 1.5
+	local chassis = machine.Model.PrimaryPart
+	if chassis then
+		pcall(chassis.SetNetworkOwner, chassis, player)
 	end
 end
 
@@ -54,6 +50,8 @@ local function reset(machine: Machine)
 		steer.CFrame = CFrame.Angles(0, yaw, 0)
 	end
 	chassis.Anchored = false
+	chassis.AssemblyLinearVelocity = Vector3.zero
+	chassis.AssemblyAngularVelocity = Vector3.zero
 	machine.LastUsed = os.clock()
 end
 
@@ -65,6 +63,7 @@ end
 local function spawnMachine(kind: string, bay: CFrame)
 	local model = OutpostMachines.build(kind, bay)
 	model.Parent = folder
+	CollectionService:AddTag(model, "OutpostMech")
 	local seat = model:FindFirstChild("Seat") :: VehicleSeat
 	local machine = { Kind = kind, Bay = bay, Model = model, Seat = seat, LastUsed = os.clock() }
 	table.insert(machines, machine)
@@ -72,11 +71,11 @@ local function spawnMachine(kind: string, bay: CFrame)
 	local spec = Rules.Machines[kind]
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "DrivePrompt"
-	prompt.ActionText = "Drive"
+	prompt.ActionText = "Pilot"
 	prompt.ObjectText = spec.Name
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.HoldDuration = 0.2
-	prompt.MaxActivationDistance = if kind == "Skipper" then 10 else 16
+	prompt.MaxActivationDistance = 18 -- reachable from the ground below the cockpit
 	prompt.RequiresLineOfSight = false
 	prompt:SetAttribute("PromptKind", "Drive")
 	prompt.Parent = seat

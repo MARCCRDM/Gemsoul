@@ -4,6 +4,8 @@ Offline Roblox primitives verify geometry/contracts, not in-engine physics/rende
 """
 from pathlib import Path
 import subprocess
+import json
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 env = {"__file__": str(ROOT / "tests/run_meadow_scene.py")}
@@ -40,6 +42,7 @@ for name, path in [
     ("Rules", "src/shared/Outpost.luau"),
     ("World", "src/server/World/OutpostWorld.luau"),
     ("Machines", "src/server/World/OutpostMachines.luau"),
+    ("Motion", "src/shared/MechMotion.luau"),
 ]:
     source += f"local {name}=(function()\n{(ROOT / path).read_text(encoding='utf-8')}\nend)()\n"
 source += r'''
@@ -102,15 +105,33 @@ for _,bay in site.Parking do
  local vehicle=Machines.build(bay.Kind,bay.CFrame)
  assert(vehicle.PrimaryPart.Name=="Chassis" and vehicle.PrimaryPart.CanCollide,"Vehicle has no physics chassis")
  local seat,drive,steer,drill=nil,nil,nil,nil
+ local joints={}
  for _,object in instances do
   if object.Parent==vehicle and object.Name=="Seat" then seat=object end
   if object.Parent==vehicle.PrimaryPart and object.Name=="Drive" then drive=object end
   if object.Parent==vehicle.PrimaryPart and object.Name=="Steer" then steer=object end
-  if object.Name=="DrillMotor" and object.Parent and object.Parent.Parent==vehicle then drill=object end
+  if object.ClassName=="Motor6D" and object.Parent and object.Parent.Parent==vehicle then
+   joints[object.Name]=object
+   assert(object.Part0 and object.Part1 and object.Part1.Parent==vehicle,"Broken mech joint")
+   if object.Name=="ToolRotor" then drill=object end
+  end
  end
  assert(seat and seat.OutpostMachine==bay.Kind,"Driver seat identity missing")
  assert(drive and steer and drive.VelocityConstraintMode=="Plane","Driving constraints missing")
  if bay.Kind=="Mole" then assert(drill,"Mole drill motor missing") end
+ assert(vehicle.Mech and vehicle.CameraFit>=20,"Mech identity/camera fit missing")
+ for _,name in {"Waist","LeftHip","LeftKnee","LeftAnkle","RightHip","RightKnee","RightAnkle","LeftShoulder","LeftElbow","RightShoulder","RightElbow"} do
+  assert(joints[name],"Missing animated joint: "..name)
+ end
+ assert(seat.Position.Y>8 and seat.Position.Y<14,"Cockpit seat outside frame")
+ local total=0
+ for _,part in builtParts do
+  if part.Parent==vehicle then
+   total+=1
+   if part.Name~="Chassis" then assert(not part.CanCollide and part.Massless,"Cosmetic body obstructs walking") end
+  end
+ end
+ assert(total>120 and total<240,"Mech detail budget changed: "..total)
  local bottom=vehicle.PrimaryPart.Position.Y-vehicle.PrimaryPart.Size.Y/2
  assert(bottom>=.8,"Vehicle spawned in Motor Pool floor")
  assert((bay.CFrame.Position-origin.Position).Magnitude<Rules.Radius,"Vehicle outside recovery boundary")
@@ -120,7 +141,51 @@ for _,size in {"Pebble","Boulder"} do
  local rock=World.rock(size,site.Spots[1],Random.new(55))
  assert(rock.PrimaryPart.Name=="Body" and rock.PrimaryPart.CanCollide,"Mining collision body lost")
 end
-print("PASS: all 8 vehicle assemblies, seats, constraints, drill motors and floor clearance; basic rock builders")
+print("PASS: all 8 mech rigs, cockpit seats, walking joints, tool motors, detail budget and floor clearance; basic rock builders")
+for _,kind in Rules.MachineOrder do
+ local spec=Rules.Machines[kind]
+ local speed,yaw=0,0
+ for i=1,600 do speed,yaw=Rules.drive(spec,speed,yaw,1,0,1/60) end
+ assert(math.abs(speed-spec.MaxSpeed)<.001 and yaw==0,"Mech acceleration/top speed")
+ local _,turn=Rules.drive(spec,0,0,0,1,.1)
+ assert(turn<0,"Mech cannot pivot in place")
+ for i=1,600 do speed=Rules.drive(spec,speed,0,-1,0,1/60) end
+ assert(math.abs(speed+spec.MaxSpeed*Rules.ReverseShare)<.001,"Mech reverse limit")
+end
+local state=Motion.new()
+for i=1,120 do Motion.step(state,1/60,24,0,true) end
+assert(state.Weight>.99,"Walk never blends in")
+local phase=state.Phase
+Motion.step(state,.01,-10,0,true)
+assert(state.Phase<phase or phase<.1,"Reverse gait has wrong direction")
+for _,weight in {0,.2,.6,1} do
+ for sample=0,100 do
+  local poses=Motion.pose({Phase=sample/100*math.pi*2,Weight=weight},1,sample,true)
+  for _,side in {"Left","Right"} do
+   local hip=poses[side.."Hip"]
+   local foot=hip*CFrame.new(0,-3.6,0)*poses[side.."Knee"]*CFrame.new(0,-3.6,0)*poses[side.."Ankle"]
+   assert(foot.Position.Y>=-6.801,"Foot penetrates floor during walk")
+   assert(math.abs(foot.r[5]-1)<.001,"Boot does not stay level")
+   assert(math.abs(foot.Position.Z)<=2.101,"Foot leaves stride bounds")
+  end
+ end
+end
+for i=1,180 do Motion.step(state,1/60,0,0,false) end
+assert(state.Weight<.001,"Empty mech keeps walking")
+print("PASS: all mech drive profiles and 808 IK foot samples; level boots, reverse gait and idle blend")
+-- Actual builder geometry for the optional preview, one of each frame at origin.
+for _,kind in Rules.MachineOrder do
+ local vehicle=Machines.build(kind,CFrame.identity)
+ for _,p in builtParts do
+  if p.Parent==vehicle and (p.Transparency or 0)<.95 then
+   local row={kind,p.Name,p.ClassName,p.Shape or "Block",p.Material,tostring(p.Transparency or 0)}
+   for _,v in {p.Size.X,p.Size.Y,p.Size.Z,p.Color.R,p.Color.G,p.Color.B} do table.insert(row,tostring(v)) end
+   for _,v in p.CFrame.t do table.insert(row,tostring(v)) end
+   for _,v in p.CFrame.r do table.insert(row,tostring(v)) end
+   print("MECH|"..table.concat(row,"|"))
+  end
+ end
+end
 '''
 lighting = (ROOT / "src/client/Modules/Scenes.luau").read_text(encoding="utf-8")
 lighting = lighting[lighting.index("function Scenes.spaceLighting()"):lighting.rindex("return Scenes")]
@@ -173,6 +238,16 @@ end
 script = ROOT / ".tools/moon-quarry-test.luau"
 try:
     script.write_text(source, encoding="utf-8")
-    subprocess.run([str(ROOT / ".tools/luau/luau.exe"), str(script)], check=True)
+    result = subprocess.run([str(ROOT / ".tools/luau/luau.exe"), str(script)], capture_output=True, text=True)
+    for line in result.stdout.splitlines():
+        if not line.startswith("MECH|"):
+            print(line)
+    if result.returncode:
+        print(result.stderr)
+        raise SystemExit(result.returncode)
+    if '--dump-mechs' in sys.argv:
+        target = ROOT / '.tools/mech-geometry.json'
+        target.write_text(json.dumps([line.split('|')[1:] for line in result.stdout.splitlines() if line.startswith('MECH|')]))
+        print(target)
 finally:
     script.unlink(missing_ok=True)

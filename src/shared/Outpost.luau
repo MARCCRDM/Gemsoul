@@ -156,26 +156,40 @@ end
 -- Big machines parked at the Motor Pool. Anyone can hop in and drive; they
 -- don't dig or haul, they're for crossing the quarry (and showing off).
 -- Speeds in studs a second, Turn in radians a second at full lock.
--- Tracked machines can turn on the spot.
+-- All exosuits can pivot in place. Stable IDs preserve the Motor Pool bays.
 Outpost.Machines = {
-	Hauler = { Name = "HX-9 Hauler", Blurb = "Six-wheel dump truck", MaxSpeed = 46, Accel = 16, Turn = 0.9 },
+	Hauler = {
+		Name = "Atlas Hauler Mech",
+		Blurb = "Heavy cargo exosuit",
+		MaxSpeed = 26,
+		Accel = 12,
+		Turn = 0.9,
+		Tracked = true,
+	},
 	Mole = {
-		Name = "Mole Drill Crawler",
-		Blurb = "Tracked rock drill",
-		MaxSpeed = 30,
+		Name = "Mole Drill Mech",
+		Blurb = "Arm-mounted drilling frame",
+		MaxSpeed = 24,
 		Accel = 12,
 		Turn = 1.1,
 		Tracked = true,
 	},
 	Digger = {
-		Name = "EX-4 Digger",
-		Blurb = "Tracked excavator",
-		MaxSpeed = 24,
+		Name = "Forge Utility Mech",
+		Blurb = "Industrial claw exosuit",
+		MaxSpeed = 22,
 		Accel = 10,
 		Turn = 1.2,
 		Tracked = true,
 	},
-	Skipper = { Name = "Skipper Rover", Blurb = "Fast moon buggy", MaxSpeed = 72, Accel = 34, Turn = 1.9 },
+	Skipper = {
+		Name = "Scout Pathfinder Mech",
+		Blurb = "Light exploration frame",
+		MaxSpeed = 36,
+		Accel = 20,
+		Turn = 1.6,
+		Tracked = true,
+	},
 }
 Outpost.MachineOrder = { "Hauler", "Mole", "Digger", "Skipper" }
 Outpost.ReverseShare = 0.4 -- top speed backing up, as a share of forward
@@ -190,7 +204,7 @@ function Outpost.drive(spec, speed: number, yaw: number, throttle: number, steer
 	local rate = if math.abs(want) < math.abs(speed) or want * speed < 0 then spec.Accel * 2 else spec.Accel
 	local step = math.clamp(want - speed, -rate * dt, rate * dt)
 	speed += step
-	-- Wheels steer with speed (and the other way backing up); tracks turn on the spot.
+	-- Pivot-capable frames turn in place; legacy wheeled specs retain speed-based steering.
 	local grip = if spec.Tracked then 1 else math.clamp(math.abs(speed) / 8, 0, 1)
 	local direction = if speed < -0.5 and not spec.Tracked then -1 else 1
 	yaw -= steer * spec.Turn * grip * direction * dt
