@@ -182,6 +182,8 @@ end
 --   { Kind = "Traded", Item, FromName }          (they accepted an offer)
 --   { Kind = "Accepted", OfferId, Item, SellerName }  (their offer was taken)
 --   { Kind = "Bought", Item }                    (their purchase)
+--   { Kind = "Commission", Price, Coins, Label, BuyerName }
+--                                                 (their cut of an Arena Vault sale)
 local function localMail()
 	local boxes = {}
 	local m = { Shared = false }
@@ -264,10 +266,14 @@ end
 -- Nudges -----------------------------------------------------------------------
 
 local reconcile -- forward
+-- Players to settle even with nothing in escrow (a commission waits in their
+-- mailbox): set by a nudge, used up by their next settle.
+local due: { [number]: boolean } = {}
 local function nudge(userId: number?)
 	if not userId or userId <= 0 then
 		return
 	end
+	due[userId] = true
 	local here = Players:GetPlayerByUserId(userId)
 	if here then
 		task.spawn(reconcile, here)
@@ -358,6 +364,18 @@ local function finalize(row, selfId: number?)
 	if row.State == "Sold" then
 		send(row.Seller, { Kind = "Sold", Price = row.Price, BuyerName = row.BuyerName, At = os.time() })
 		send(row.Buyer, { Kind = "Bought", Item = row.Item, At = os.time() })
+		-- An Arena Vault leftover: its cache's owner gets their cut.
+		local cut = row.Commission
+		if type(cut) == "table" and type(cut.UserId) == "number" and type(cut.Rate) == "number" then
+			send(cut.UserId, {
+				Kind = "Commission",
+				Price = row.Price,
+				Coins = math.floor(row.Price * math.clamp(cut.Rate, 0, 1)),
+				Label = row.SellerName,
+				BuyerName = row.BuyerName,
+				At = os.time(),
+			})
+		end
 	elseif row.State == "Traded" then
 		local accepted = nil
 		for _, offer in row.Offers or {} do
@@ -392,7 +410,9 @@ local function settle(player: Player)
 	local profile = PlayerData.get(player)
 	local escrow = profile and profile.Market and profile.Market.Escrow or {}
 	local firstLook = not prunedThisSession[player]
-	if next(escrow) == nil and not firstLook then
+	local nudged = due[player.UserId] == true
+	due[player.UserId] = nil
+	if next(escrow) == nil and not firstLook and not nudged then
 		return
 	end
 	local b = getBoard()
@@ -518,6 +538,44 @@ local function settle(player: Player)
 		-- they're saved (finalize, below).
 		if row and row.State ~= "Open" then
 			finished[row.Id] = row
+		end
+	end
+	-- Commissions (your cut of an Arena Vault sale): paid once each, however
+	-- often the note is seen (a payout remembered by listing, with the save,
+	-- until the note's gone).
+	if firstLook or nudged then
+		local ok, all = pcall(mailbox)
+		if ok then
+			profile.Market = profile.Market or {}
+			local paid = profile.Market.Commissions or {}
+			profile.Market.Commissions = paid
+			for listingId, note in all do
+				if type(note) == "table" and note.Kind == "Commission" then
+					if not paid[listingId] then
+						paid[listingId] = os.time()
+						local coins = math.max(0, math.floor(tonumber(note.Coins) or 0))
+						profile.Coins += coins
+						changed = true
+						table.insert(
+							notes,
+							string.format(
+								"Commission: %s bought a piece from your %s for %d coins. +%d coins.",
+								note.BuyerName or "a player",
+								note.Label or "Arena Vault",
+								tonumber(note.Price) or 0,
+								coins
+							)
+						)
+					end
+					table.insert(consumed, listingId)
+				end
+			end
+			-- (old payout records, long settled, are dropped)
+			for listingId, at in paid do
+				if type(at) ~= "number" or os.time() - at > 60 * 86400 then
+					paid[listingId] = nil
+				end
+			end
 		end
 	end
 	-- Notes nobody is waiting on any more (already settled from the row, or
@@ -788,6 +846,9 @@ function handlers.MarketBuy(player: Player, listingId)
 		finalize(claimed, player.UserId)
 	end
 	nudge(claimed.Seller)
+	if type(claimed.Commission) == "table" then
+		nudge(claimed.Commission.UserId)
+	end
 	for _, offer in claimed.Offers or {} do
 		nudge(offer.From)
 	end
@@ -989,7 +1050,7 @@ end
 -- leftovers, Systems/ArenaStreaks): no player behind it, so no escrow and
 -- no payout; the buyer gets the item from the row as with any sale.
 -- `label` shows as the seller. Returns whether it went up.
-function MarketBoard.vaultList(payload, price: number, label: string): boolean
+function MarketBoard.vaultList(payload, price: number, label: string, commission): boolean
 	if Config.Features and Config.Features.Market == false then
 		return false
 	end
@@ -1001,6 +1062,8 @@ function MarketBoard.vaultList(payload, price: number, label: string): boolean
 		Id = listingId,
 		Seller = 0,
 		SellerName = label,
+		-- { UserId, Rate }: whose cut of the sale it is (Arena Caches).
+		Commission = if type(commission) == "table" then commission else nil,
 		Mode = "Sell",
 		Price = price,
 		Item = payload,
@@ -1044,6 +1107,7 @@ function MarketBoard.start()
 			game:GetService("MessagingService"):SubscribeAsync(TOPIC, function(message)
 				local here = Players:GetPlayerByUserId(tonumber(message.Data) or 0)
 				if here then
+					due[here.UserId] = true
 					reconcile(here)
 				end
 			end)

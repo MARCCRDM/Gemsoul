@@ -5,15 +5,18 @@
 	Duels calls ArenaStreaks.onRankedResult after every Ranked 1v1. A win
 	adds to the streak (not over the same player twice running), a loss
 	ends it. Reaching a milestone pays its coins and title at once and opens
-	an Arena Cache: Rare and Ultra-Rare gems and gear, rolled now and saved with the
-	player (profile.Duel.StreakCaches), to claim whenever they like.
-	Claiming keeps ArenaStreak.Picks of them; the rest go up on the Market
-	from the Arena Vault (MarketBoard.vaultList). A leftover the Market
-	couldn't take right then waits (Duel.VaultPending) and goes up later.
+	an Arena Cache: free gems and six pieces of Rare and Ultra-Rare gear,
+	rolled now and saved with the player (profile.Duel.StreakCaches), to
+	claim whenever they like. Claiming gives every gem and the
+	ArenaStreak.Picks pieces of gear chosen; the other gear goes up on the
+	Market from the Arena Vault (MarketBoard.vaultList), with a commission
+	for the player on each sale (paid through the Market's mailbox). A
+	leftover the Market couldn't take right then waits (Duel.VaultPending)
+	and goes up later.
 
 	Requests (Remotes.Request):
 	  "StreakCaches"                     -> { Caches, Streak, Best, Next }
-	  "StreakClaim", cacheId, { offerId, ... }   keep these, vault the rest
+	  "StreakClaim", cacheId, { offerId, ... }   keep these (gear), vault the rest
 	The Social remote tells the player:
 	  "StreakReward", { Wins, Name, Coins, Title }   a cache just opened
 ]]
@@ -99,6 +102,7 @@ function ArenaStreaks.rollCache(m)
 			Item = { Kind = "Gem", Gem = gem },
 			Name = GemConfig.displayName(gem),
 			Rarity = rarity,
+			Free = true, -- (yours: not one of the picks)
 		})
 	end
 	local decks = {}
@@ -223,7 +227,9 @@ local function vault(player: Player, duel, leftovers)
 		local price = entry.Price or ArenaStreak.vaultPrice(item, worth, entry.Rarity)
 		local label = entry.Label
 			or string.format("%s · %s's %d-win cache", ArenaStreak.VaultName, player.DisplayName, entry.Wins or 0)
-		local ok = MarketBoard.vaultList(item, price, label)
+		-- (your cut of the sale, paid through the Market's mailbox)
+		local commission = { UserId = player.UserId, Rate = ArenaStreak.Commission }
+		local ok = MarketBoard.vaultList(item, price, label, commission)
 		if not ok then
 			table.insert(
 				waiting,
@@ -239,10 +245,13 @@ local function view(duel)
 	for _, cache in duel.StreakCaches do
 		local items = {}
 		for _, entry in cache.Items do
-			table.insert(
-				items,
-				{ OfferId = entry.OfferId, Name = entry.Name, Item = entry.Item, Rarity = entry.Rarity }
-			)
+			table.insert(items, {
+				OfferId = entry.OfferId,
+				Name = entry.Name,
+				Item = entry.Item,
+				Rarity = entry.Rarity,
+				Free = entry.Free,
+			})
 		end
 		table.insert(caches, {
 			Id = cache.Id,
@@ -284,7 +293,14 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	if not cache then
 		return Shop.reply(false, "That cache is already claimed.")
 	end
-	local want = math.min(ArenaStreak.Picks, #cache.Items)
+	-- The picks are gear only (the gems are all yours anyway).
+	local offered = 0
+	for _, entry in cache.Items do
+		if not entry.Free then
+			offered += 1
+		end
+	end
+	local want = math.min(ArenaStreak.Picks, offered)
 	if type(picks) ~= "table" then
 		return Shop.reply(false, string.format("Pick %d to keep.", want))
 	end
@@ -292,7 +308,7 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	for _, id in picks do
 		if type(id) == "string" and not chosen[id] then
 			for _, entry in cache.Items do
-				if entry.OfferId == id then
+				if entry.OfferId == id and not entry.Free then
 					chosen[id] = entry
 					count += 1
 				end
@@ -302,13 +318,16 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	if count ~= want then
 		return Shop.reply(false, string.format("Pick %d to keep.", want))
 	end
-	-- Room for them all first, so nothing's half given.
+	-- Room for them all first (the picks and every free gem), so nothing's
+	-- half given.
 	local gems, gear = 0, 0
-	for _, entry in chosen do
-		if entry.Item.Kind == "Gem" then
-			gems += 1
-		else
-			gear += 1
+	for _, entry in cache.Items do
+		if entry.Free or chosen[entry.OfferId] then
+			if entry.Item.Kind == "Gem" then
+				gems += 1
+			else
+				gear += 1
+			end
 		end
 	end
 	if #(profile.Gems or {}) + gems > (Config.MaxGems or math.huge) then
@@ -319,7 +338,7 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	end
 	local leftovers = {}
 	for _, entry in cache.Items do
-		if chosen[entry.OfferId] then
+		if entry.Free or chosen[entry.OfferId] then
 			Market.give(profile, entry.Item, math.huge, true)
 		else
 			table.insert(leftovers, { Item = entry.Item, Wins = cache.Wins, Rarity = entry.Rarity })
@@ -329,7 +348,8 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	pcall(GearRolls.ensure, profile, rng)
 	PlayerData.sync(player)
 	if cache.Dev then
-		-- (a DEV test cache: the two are yours, the rest never reach the Market)
+		-- (a DEV test cache: the picks and gems are yours, the rest never reach
+		-- the Market)
 		return Shop.reply(
 			true,
 			string.format("DEV cache claimed. The other %d were dropped (test only).", #leftovers),
@@ -339,7 +359,12 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	task.spawn(vault, player, duel, leftovers)
 	return Shop.reply(
 		true,
-		string.format("Claimed! The other %d went to the Market from the %s.", #leftovers, ArenaStreak.VaultName),
+		string.format(
+			"Claimed! The other %d went to the Market from the %s: you get %d%% of each sale.",
+			#leftovers,
+			ArenaStreak.VaultName,
+			math.floor(ArenaStreak.Commission * 100 + 0.5)
+		),
 		view(duel)
 	)
 end

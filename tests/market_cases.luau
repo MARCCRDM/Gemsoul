@@ -190,6 +190,12 @@ local MarketBoard = load("src/server/Systems/MarketBoard.luau", {
 					return true
 				end,
 			},
+			-- (the tutorial's practice stock: none here)
+			Intro = {
+				tutorialStock = function()
+					return nil
+				end,
+			},
 		},
 	},
 })
@@ -686,6 +692,11 @@ do
 						return true, 0
 					end,
 				},
+				Intro = {
+					tutorialStock = function()
+						return nil
+					end,
+				},
 			},
 		},
 	})
@@ -792,7 +803,10 @@ local open1, total1 = openRows()
 check(open1 == total1, "still only open listings on the board")
 
 -- 10. Face to face (Shared.EquipmentTrade): swapping two copies of one model.
-local Trade = load("src/shared/EquipmentTrade.luau", { script = { Parent = { EquipmentSlots = Slots } } })
+local Trade = load("src/shared/EquipmentTrade.luau", {
+	-- (no miners' rosters here: nothing is anyone else's)
+	script = { Parent = { EquipmentSlots = Slots, MinerRoster = { owner = function() return nil end } } },
+})
 local function owner(weapon, roll)
 	return {
 		Owned = { Weapons = { [weapon] = 2, W1 = 1 } },
@@ -815,8 +829,42 @@ check(pb.Character.GearRolls.Weapons["Saber#2"].Rarity == 5, "with its own roll"
 check(Slots.model("Saber#2") == "Saber" and Slots.model("Saber") == "Saber", "model of a key")
 check(Slots.freeKey({ Saber = 1, ["Saber#2"] = 1 }, "Saber#2") == "Saber#3", "next free key")
 
+-- Arena Vault commission: a leftover from someone's Arena Cache sells, and
+-- they get 25% of the price, paid once (however often they settle up).
+do
+	local kai, liv = newPlayer(40, "Kai"), newPlayer(41, "Liv")
+	profiles[kai], profiles[liv] = profile(0), profile(20000)
+	MarketBoard.reconcile(kai)
+	MarketBoard.reconcile(liv)
+	local label = "Arena Vault · Kai's 10-win cache"
+	check(
+		MarketBoard.vaultList({ Kind = "Gear", Slot = "Weapon", Id = "W5", Quality = 2 }, 8000, label, { UserId = 40, Rate = 0.25 }),
+		"A Vault listing with a commission didn't go up"
+	)
+	local id = nil
+	for _, row in call(liv, "MarketBrowse").Listings or {} do
+		if row.SellerName == label then
+			id = row.Id
+			check(row.Commission and row.Commission.UserId == 40, "The listing lost its commission")
+		end
+	end
+	check(id ~= nil, "The Vault listing isn't on the board")
+	local bought = call(liv, "MarketBuy", id)
+	check(bought.Ok and profiles[liv].Coins == 12000, "Buying the Vault piece failed: " .. tostring(bought.Message))
+	MarketBoard.reconcile(kai)
+	check(profiles[kai].Coins == 2000, "The cache's owner didn't get 25% (" .. tostring(profiles[kai].Coins) .. ")")
+	MarketBoard.reconcile(kai)
+	MarketBoard.reconcile(kai)
+	check(profiles[kai].Coins == 2000, "The commission was paid more than once")
+	local told = false
+	for _, message in notes[kai] or {} do
+		told = told or string.find(message, "Commission", 1, true) ~= nil
+	end
+	check(told, "The cache's owner wasn't told about the commission")
+end
+
 print(
-	("PASS: %d Market checks (escrow, sales, tax, races, trades, offers, cancel, expiry, saving, limits, no dupes)"):format(
+	("PASS: %d Market checks (escrow, sales, tax, races, trades, offers, cancel, expiry, saving, limits, no dupes, Arena Vault commission)"):format(
 		checks
 	)
 )

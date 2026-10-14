@@ -36,23 +36,29 @@ local Cosmetics = shared("Cosmetics")
 local wins = {}
 for i, m in Rules.Milestones do
 	table.insert(wins, m.Wins)
-	check(m.Choices > Rules.Picks, m.Wins .. " offers no real choice")
 	check(m.Quality >= 1 and m.Quality <= 4, m.Wins .. " has a bad gear quality")
-	check(m.UltraRare >= 1 and m.UltraRare <= m.Choices, m.Wins .. " offers no Ultra-Rare piece")
+	check(m.Gems >= 1 and (m.GemTier == "Rare" or m.GemTier == "UltraRare"), m.Wins .. " gives no free gem")
+	check(m.UltraRare >= 1 and m.UltraRare <= Rules.GearOffered, m.Wins .. " offers no Ultra-Rare gear")
 	local gemTiers, gearTiers = Rules.rarities(m)
+	check(#gemTiers == m.Gems and #gearTiers == Rules.GearOffered, m.Wins .. " offers the wrong number of pieces")
 	local ultra = 0
-	for _, list in { gemTiers, gearTiers } do
-		for _, tier in list do
-			check(tier == "Rare" or tier == "UltraRare", m.Wins .. " offers a piece that's neither Rare nor Ultra-Rare")
-			ultra += if tier == "UltraRare" then 1 else 0
-		end
+	for _, tier in gearTiers do
+		check(tier == "Rare" or tier == "UltraRare", m.Wins .. " offers gear that's neither Rare nor Ultra-Rare")
+		ultra += if tier == "UltraRare" then 1 else 0
 	end
-	check(#gemTiers + #gearTiers == m.Choices and ultra == m.UltraRare, m.Wins .. "'s rarities don't add up")
+	for _, tier in gemTiers do
+		check(tier == m.GemTier, m.Wins .. "'s free gems aren't its gem rarity")
+	end
+	check(ultra == m.UltraRare, m.Wins .. "'s Ultra-Rare gear doesn't add up")
 	check(m.Coins > 0 and m.Name, m.Wins .. " is incomplete")
 	if i > 1 then
 		local before = Rules.Milestones[i - 1]
 		check(
-			m.Wins > before.Wins and m.Choices >= before.Choices and m.UltraRare >= before.UltraRare and m.Coins > before.Coins,
+			m.Wins > before.Wins
+				and m.Gems >= before.Gems
+				and m.UltraRare >= before.UltraRare
+				and m.Coins > before.Coins
+				and (m.GemTier == "UltraRare" or before.GemTier == "Rare"),
 			m.Wins .. " is no better than the one before"
 		)
 	end
@@ -66,7 +72,9 @@ check(#Rules.reached(9, 10) == 1 and Rules.reached(9, 10)[1].Wins == 10, "Reachi
 check(#Rules.reached(10, 11) == 0 and #Rules.reached(0, 9) == 0, "A milestone counted twice or early")
 check(Rules.next(0).Wins == 10 and Rules.next(10).Wins == 20 and Rules.next(100).Wins == 150 and Rules.next(200) == nil, "next() is off")
 check(not Rules.counts({ StreakLastBeaten = 5 }, 5) and Rules.counts({ StreakLastBeaten = 5 }, 6), "The same foe twice running counted")
-check(Rules.Milestones[#Rules.Milestones].UltraRare == Rules.Milestones[#Rules.Milestones].Choices, "200 wins isn't all Ultra-Rare")
+check(Rules.GearOffered == 6 and Rules.Picks == 3, "The gear isn't a pick of 3 from 6")
+check(Rules.get(200).UltraRare == Rules.GearOffered, "200 wins isn't all Ultra-Rare gear")
+check(Rules.Commission == 0.25 and Rules.commission(10000) == 2500 and Rules.commission(15001) == 3750, "The commission isn't 25%")
 check(
 	Rules.vaultPrice({ Kind = "Gear", Quality = 4 }, nil, "UltraRare") == Rules.VaultGear.UltraRare[4]
 		and Rules.vaultPrice({ Kind = "Gear", Quality = 1 }, nil, "Rare") == Rules.VaultGear.Rare[1],
@@ -109,7 +117,7 @@ local stubs = {
 	},
 	TestAdmin = { allowed = function(id) return id == 7 end },
 	Equipment = { groupPreviews = function(_, group, items) previewCalls[#previewCalls + 1] = { group, items }; return true, 0 end },
-	MarketBoard = { vaultList = function(item, price, label) table.insert(vaulted, { item, price, label }); return true end },
+	MarketBoard = { vaultList = function(item, price, label, commission) table.insert(vaulted, { item, price, label, commission }); return true end },
 	ChatChannels = { announce = function() end },
 }
 for _, name in { "ArenaStreak", "ArmorFamilies", "Config", "Cosmetics", "ExpandedItemTraits", "GearRolls", "GemConfig", "GemRoller", "Market", "Season", "EquipmentSlots" } do
@@ -159,7 +167,10 @@ check(Server.onRankedResult(player, true, 200) == 10, "The tenth win didn't coun
 check(#profile.Duel.StreakCaches == 1 and profile.Coins == Rules.Milestones[1].Coins, "Ten wins didn't open a cache and pay")
 check(fired[#fired][1] == "StreakReward" and fired[#fired][2].Wins == 10, "The player wasn't told about the cache")
 local cache = profile.Duel.StreakCaches[1]
-check(#cache.Items == Rules.Milestones[1].Choices, "The cache holds the wrong number of pieces")
+check(#cache.Items == Rules.Milestones[1].Gems + Rules.GearOffered, "The cache holds the wrong number of pieces")
+for _, entry in cache.Items do
+	check((entry.Free == true) == (entry.Item.Kind == "Gem"), "A cache's gems aren't the free pieces (or gear is)")
+end
 -- Every gear Id's RarityTier, to check the pieces against.
 local gearTier = {}
 for _, w in shared("ExpandedItemTraits").Catalog.Weapons do
@@ -172,12 +183,15 @@ for _, list in shared("ArmorFamilies").Catalog do
 		end
 	end
 end
+-- (counts: the gear's rarities; the gems are checked against their own)
 local function cacheRarities(c)
 	local counts, gems, gear = { Rare = 0, UltraRare = 0 }, 0, 0
 	for _, entry in c.Items do
 		local tier = entry.Rarity
 		check(tier == "Rare" or tier == "UltraRare", "A cache piece isn't Rare or Ultra-Rare")
-		counts[tier] += 1
+		if entry.Item.Kind ~= "Gem" then
+			counts[tier] += 1
+		end
 		if entry.Item.Kind == "Gem" then
 			gems += 1
 			check(entry.Item.Gem.Tier == tier, "A cache gem isn't the rarity it says")
@@ -213,8 +227,8 @@ for _, entry in cache.Items do
 		check(entry.Item.Quality == Rules.Milestones[1].Quality and entry.Item.Slot, "A cache piece of gear is malformed")
 	end
 end
-check(gems >= 1 and gear >= 1, "The cache isn't gems and gear")
-check(counts.UltraRare == Rules.Milestones[1].UltraRare and counts.Rare == Rules.Milestones[1].Choices - counts.UltraRare, "The 10-win cache's rarities are off")
+check(gems == Rules.Milestones[1].Gems and gear == Rules.GearOffered, "The cache isn't its free gems and six pieces of gear")
+check(counts.UltraRare == Rules.Milestones[1].UltraRare and counts.Rare == Rules.GearOffered - counts.UltraRare, "The 10-win cache's rarities are off")
 
 -- A loss ends it; a new streak to 10 the same season pays nothing more.
 check(Server.onRankedResult(player, false, 300) == 0, "A loss didn't end the streak")
@@ -224,29 +238,40 @@ end
 check(profile.Duel.RankedStreak == 10 and #profile.Duel.StreakCaches == 1, "The 10-win cache paid twice in a season")
 check(profile.Duel.BestRankedStreak == 10, "The best streak wasn't kept")
 
--- Claiming: exactly two; they arrive; the rest go to the Vault.
+-- Claiming: exactly three of the gear (the gems aren't picks: they're all
+-- yours); they arrive with every gem; the other gear goes to the Vault with
+-- your commission on it.
 local view = handlers.StreakCaches(player)
 check(view.Ok and #view.Caches == 1 and view.Streak == 10 and view.Next == 20, "The cache list is wrong")
-check(not handlers.StreakClaim(player, cache.Id, { "1" }).Ok, "Claimed with one pick")
-check(not handlers.StreakClaim(player, cache.Id, { "1", "1" }).Ok, "Claimed the same piece twice")
-check(not handlers.StreakClaim(player, "nope", { "1", "2" }).Ok, "Claimed a cache that isn't there")
-local keep = { cache.Items[1].OfferId, cache.Items[#cache.Items].OfferId }
+local gearIds, gemIds = {}, {}
+for _, entry in view.Caches[1].Items do
+	table.insert(if entry.Free then gemIds else gearIds, entry.OfferId)
+end
+check(#gemIds == Rules.Milestones[1].Gems and #gearIds == Rules.GearOffered, "The cache list doesn't mark its free gems")
+check(not handlers.StreakClaim(player, cache.Id, { gearIds[1] }).Ok, "Claimed with one pick")
+check(not handlers.StreakClaim(player, cache.Id, { gearIds[1], gearIds[1], gearIds[1] }).Ok, "Claimed the same piece three times")
+check(not handlers.StreakClaim(player, cache.Id, { gemIds[1], gearIds[1], gearIds[2] }).Ok, "A free gem counted as a pick")
+check(not handlers.StreakClaim(player, "nope", { gearIds[1], gearIds[2], gearIds[3] }).Ok, "Claimed a cache that isn't there")
+local keep = { gearIds[1], gearIds[3], gearIds[6] }
 local result = handlers.StreakClaim(player, cache.Id, keep)
 check(result.Ok, "A fair claim failed: " .. tostring(result.Message))
-check(#profile.Gems == 1, "The kept gem didn't arrive")
+check(#profile.Gems == Rules.Milestones[1].Gems, "The free gems didn't all arrive")
 local gearOwned = 0
 for _, list in profile.Owned do
 	for _ in list do
 		gearOwned += 1
 	end
 end
-check(gearOwned == 1, "The kept gear didn't arrive")
-check(#vaulted == #cache.Items - 2, "The leftovers didn't all go to the Market")
+check(gearOwned == Rules.Picks, "The kept gear didn't arrive")
+check(#vaulted == Rules.GearOffered - Rules.Picks, "The leftovers didn't all go to the Market")
 for _, v in vaulted do
 	local item = v[1]
 	local tier = if item.Kind == "Gem" then item.Gem.Tier else (if gearTier[item.Id] == 4 then "UltraRare" else "Rare")
 	local floor = if item.Kind == "Gem" then Rules.VaultGemFloor[tier] else Rules.VaultGear[tier][item.Quality]
 	check(v[2] >= floor and string.find(v[3], Rules.VaultName, 1, true), "A Vault listing is mispriced or unlabelled")
+	check(item.Kind == "Gear", "A free gem went to the Market")
+	local cut = v[4]
+	check(type(cut) == "table" and cut.UserId == player.UserId and cut.Rate == Rules.Commission, "A Vault listing carries no commission for you")
 	if item.Kind == "Gear" then
 		check(v[2] == Rules.vaultPrice(item, nil, tier), "A Vault gear listing isn't priced for its rarity")
 	end
@@ -259,7 +284,7 @@ profile.Duel.RankedStreak = 99
 profile.Duel.StreakLastBeaten = nil
 Server.onRankedResult(player, true, 999)
 local big = profile.Duel.StreakCaches[1]
-check(big and big.Wins == 100 and #big.Items == 8, "The 100-win cache is wrong")
+check(big and big.Wins == 100 and #big.Items == Rules.get(100).Gems + Rules.GearOffered, "The 100-win cache is wrong")
 for _, entry in big.Items do
 	if entry.Item.Kind == "Gem" then
 		local g = entry.Item.Gem
@@ -272,18 +297,23 @@ check(bigCounts.UltraRare == Rules.get(100).UltraRare, "The 100-win cache has th
 -- 200: every piece Ultra-Rare.
 local top = Server.rollCache(Rules.get(200))
 local topCounts = cacheRarities(top)
-check(#top.Items == 10 and topCounts.UltraRare == 10, "The 200-win cache isn't all Ultra-Rare")
+check(#top.Items == Rules.get(200).Gems + Rules.GearOffered and topCounts.UltraRare == Rules.GearOffered, "The 200-win cache's gear isn't all Ultra-Rare")
 -- A full gem bag stops the claim before anything moves.
 local config = shared("Config")
 local before = #vaulted
 for i = 1, (config.MaxGems or 200) do
 	profile.Gems[i] = { Id = "full" .. i }
 end
-local gemPick, gearPick
+local bigGear = {}
 for _, entry in big.Items do
-	if entry.Item.Kind == "Gem" then gemPick = gemPick or entry.OfferId else gearPick = gearPick or entry.OfferId end
+	if not entry.Free then
+		table.insert(bigGear, entry.OfferId)
+	end
 end
-check(not handlers.StreakClaim(player, big.Id, { gemPick, gearPick }).Ok and #vaulted == before, "Claimed into a full gem bag")
+check(
+	not handlers.StreakClaim(player, big.Id, { bigGear[1], bigGear[2], bigGear[3] }).Ok and #vaulted == before,
+	"Claimed into a full gem bag (the free gems need room too)"
+)
 
 -- DEV test caches: test admins only; first in line; no coins, no title,
 -- nothing marked paid; a new one replaces the last; leftovers never vaulted.
@@ -297,7 +327,7 @@ for _, wins in { 10, 20, 30, 40, 50 } do
 	local reply = handlers.DevStreakCache(player, wins)
 	local m = Rules.get(wins)
 	check(reply.Ok and reply.Caches[1].Wins == wins and reply.Caches[1].Dev, "The " .. wins .. "-win test cache isn't first in line")
-	check(#reply.Caches[1].Items == m.Choices, "The " .. wins .. "-win test cache holds the wrong number of pieces")
+	check(#reply.Caches[1].Items == m.Gems + Rules.GearOffered, "The " .. wins .. "-win test cache holds the wrong number of pieces")
 	check(cacheRarities(profile.Duel.StreakCaches[1]).UltraRare == m.UltraRare, "The " .. wins .. "-win test cache has the wrong Ultra-Rares")
 	check(#profile.Duel.StreakCaches == realCount + 1, "Test caches piled up")
 end
@@ -306,9 +336,15 @@ check(handlers.DevStreakCache(player, 10).Caches[1].Id ~= firstId, "Two test cac
 check(profile.Coins == coinsBefore and profile.Duel.StreakPaid == paidBefore and not profile.Cosmetics.Owned.TitleStreak30, "A test cache paid out")
 local dev = profile.Duel.StreakCaches[1]
 local vaultedBefore = #vaulted
-local devClaim = handlers.StreakClaim(player, dev.Id, { dev.Items[1].OfferId, dev.Items[#dev.Items].OfferId })
-check(devClaim.Ok and #profile.Gems == 1, "A test cache couldn't be claimed")
+local devGear = {}
+for _, entry in dev.Items do
+	if not entry.Free then
+		table.insert(devGear, entry.OfferId)
+	end
+end
+local devClaim = handlers.StreakClaim(player, dev.Id, { devGear[1], devGear[2], devGear[3] })
+check(devClaim.Ok and #profile.Gems == Rules.get(10).Gems, "A test cache couldn't be claimed")
 check(#vaulted == vaultedBefore, "A test cache's leftovers went to the Market")
 check(#profile.Duel.StreakCaches == realCount, "The claimed test cache stayed")
 
-print(string.format("PASS: %d arena streak checks (milestones 10-200, Rare and Ultra-Rare caches, claims, Arena Vault, DEV test caches)", checks))
+print(string.format("PASS: %d arena streak checks (milestones 10-200, free gems + pick 3 of 6 gear, claims, Arena Vault with commission, DEV test caches)", checks))

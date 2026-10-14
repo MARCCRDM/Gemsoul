@@ -3,13 +3,16 @@
 	(Shared.ArenaStreak, Systems/ArenaStreaks).
 
 	While a cache waits, a gold "ARENA CACHE" button pulses at the top of the
-	screen. It opens the cache: every piece on a card (gems and gear, Rare
-	or Ultra-Rare, in that rarity's colour), tap two to keep, CLAIM. The rest
-	go to the Market from the Arena Vault, and the screen says so before you
-	claim. A cache unlocking opens the screen straight away.
+	screen. It opens the cache, every piece on a card in its rarity's colour
+	(Rare or Ultra-Rare), drawn in 3D:
+	  - the gems, free: all yours (marked YOURS);
+	  - six pieces of gear, with their stat rolls, passive and affixes: tap
+	    three to keep, CLAIM. The other three go to the Market from the Arena
+	    Vault, and you get 25% of each sale; the screen says so.
+	A cache unlocking opens the screen straight away.
 
-	The first time a cache opens, it rolls: every card flicks through Rare
-	and Ultra-Rare gems and gear, then they land one by one, left to right,
+	The first time a cache opens, it rolls: every card flicks through 3D
+	gems and the cache's own gear, then they land one by one (gems first)
 	on what the server rolled (an Ultra-Rare lands with a flash). Tap during
 	the roll to land them all at once.
 
@@ -23,6 +26,8 @@ local TweenService = game:GetService("TweenService")
 
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Classes = require(ReplicatedStorage.Shared.Classes)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local Art = require(script.Parent.LotteryArt)
@@ -156,11 +161,42 @@ end
 -- Rolling, the card starts as a reel of 3D pieces (Spin flicks to another)
 -- until Land settles it on the real one. Upgrade swaps in 3D gear once the
 -- previews arrive.
+-- A piece of gear's lines under its name: its stat rolls, its passive and
+-- its affixes (as the Market shows them).
+local function gearLines(item)
+	local roll = item.Roll
+	local stats = {}
+	for _, stat in { "Health", "Power", "Defense", "Speed" } do
+		if roll and roll.Stats and roll.Stats[stat] then
+			table.insert(stats, "+" .. roll.Stats[stat] .. " " .. stat)
+		end
+	end
+	local passive, affixes = nil, 0
+	local def = Slots.Definitions[item.Slot]
+	local profile = GemClient.Profile
+	local class = profile and profile.Character and profile.Character.Class or "Warrior"
+	local ok, gear = pcall(Classes.gear, class, def and def.Kind, item.Id)
+	if ok and gear and gear.Passive and gear.Passive.Name and gear.Passive.Name ~= "" then
+		passive = gear.Passive.Name
+	end
+	for _ in roll and roll.Affixes or {} do
+		affixes += 1
+	end
+	return table.concat(stats, "  ·  "), passive, affixes
+end
+
+local GEAR_H, GEM_H = 250, 196 -- (card heights)
+
 local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string, cacheGear)
 	local item = entry.Item
+	local free = entry.Free == true
 	-- The grid lays out a plain cell; the card sits centred in it, so its
 	-- landing pop grows from the middle rather than the top-left corner.
-	local cell = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(150, 196) }, parent)
+	local cell = new(
+		"Frame",
+		{ BackgroundTransparency = 1, Size = UDim2.fromOffset(150, if item.Kind == "Gear" then GEAR_H else GEM_H) },
+		parent
+	)
 	local b = new("TextButton", {
 		Name = "Piece",
 		Text = "",
@@ -187,12 +223,22 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 	name.Position, name.Size = UDim2.fromOffset(8, 126), UDim2.new(1, -16, 0, 34)
 	local sub = label(b, "", 10, DIM, Enum.Font.GothamBold)
 	sub.Position, sub.Size = UDim2.fromOffset(8, 164), UDim2.new(1, -16, 0, 14)
-	local tick = label(b, "KEEP", 12, INK, Enum.Font.GothamBlack)
-	tick.BackgroundColor3, tick.BackgroundTransparency = GOLD, 0
+	local tick = label(b, if free then "YOURS" else "KEEP", 12, INK, Enum.Font.GothamBlack)
+	tick.BackgroundColor3, tick.BackgroundTransparency = if free then Color3.fromRGB(110, 220, 140) else GOLD, 0
 	tick.AnchorPoint = Vector2.new(0.5, 0)
 	tick.Position, tick.Size = UDim2.new(0.5, 0, 0, 104), UDim2.fromOffset(64, 20)
 	tick.Visible = false
 	UiKit.round(tick, 6)
+	-- Gear: its stats, passive and affixes under the name.
+	local statLine, passiveLine, affixLine
+	if item.Kind == "Gear" then
+		statLine = label(b, "", 11, Color3.fromRGB(120, 230, 150), Enum.Font.GothamBold)
+		statLine.Position, statLine.Size = UDim2.fromOffset(8, 182), UDim2.new(1, -16, 0, 28)
+		passiveLine = label(b, "", 10, GOLD, Enum.Font.GothamBold)
+		passiveLine.Position, passiveLine.Size = UDim2.fromOffset(8, 212), UDim2.new(1, -16, 0, 14)
+		affixLine = label(b, "", 10, Color3.fromRGB(140, 200, 255), Enum.Font.GothamBold)
+		affixLine.Position, affixLine.Size = UDim2.fromOffset(8, 228), UDim2.new(1, -16, 0, 14)
+	end
 
 	-- The card's colours for a rarity.
 	local face, rest = CARD, { 1.5, 0.55 }
@@ -245,6 +291,17 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 			then grades(item.Gem)
 			else string.upper(item.Slot or "Gear") .. "  ·  QUALITY " .. tostring(item.Quality or 1)
 		sub.TextColor3 = if item.Kind == "Gem" and item.Gem.Flawless then GOLD else DIM
+		if statLine then
+			local stats, passive, affixes = gearLines(item)
+			statLine.Text = if stats ~= "" then stats else "Base stats"
+			passiveLine.Text = if passive then "◆ " .. passive else ""
+			affixLine.Text = if affixes > 0
+				then string.format("%d elemental affix%s", affixes, if affixes == 1 then "" else "es")
+				else ""
+		end
+		if free then
+			tick.Visible = true -- (yours, whatever you pick)
+		end
 	end
 
 	-- The reel: a few 3D gems, and up to two of the cache's gear pieces once
@@ -303,7 +360,9 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 		pop.Scale = if ultra then 1.16 else 1.08
 		cell.ZIndex = 3 -- (over its neighbours while it pops)
 		task.delay(0.4, function()
-			cell.ZIndex = 1
+			if cell.Parent then
+				cell.ZIndex = 1
+			end
 		end)
 		TweenService:Create(pop, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 			:Play()
@@ -347,7 +406,9 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 	end
 
 	b.Activated:Connect(function()
-		onToggle(entry.OfferId)
+		if onToggle then
+			onToggle(entry.OfferId)
+		end
 	end)
 	return {
 		Spin = spin,
@@ -361,6 +422,9 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 			end
 		end,
 		Mark = function(on: boolean)
+			if free then
+				return -- (yours already: nothing to pick)
+			end
 			edge.Thickness, edge.Transparency = if on then 3 else rest[1], if on then 0 else rest[2]
 			edge.Color = if on then GOLD else (GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD)
 			b.BackgroundColor3 = if on then face:Lerp(GOLD, 0.14) else face
@@ -371,23 +435,36 @@ end
 
 -- Ask the server for 3D previews of every cache's gear, retrying while it's
 -- busy building something else; then onReady().
-local fetching = false
+-- (Every caller is told when they're ready: a request already running when
+-- the cache opened, say the one started as the cache list loaded, used to
+-- swallow the screen's callback, so its gear never turned 3D.)
+local fetching, waiting = false, {}
 local function fetchPreviews(onReady: (() -> ())?)
+	if onReady then
+		table.insert(waiting, onReady)
+	end
 	if fetching then
 		return
 	end
 	fetching = true
 	task.spawn(function()
-		for _ = 1, 15 do
+		local done = false
+		for _ = 1, 20 do
 			local result = GemClient.request("StreakPreviews")
 			if result.Ok and result.Done then
+				done = true
 				break
 			end
 			task.wait(1)
 		end
+		if not done then
+			warn("[StreakRewards] the Arena Cache's 3D gear previews weren't built in time; showing silhouettes")
+		end
 		fetching = false
-		if onReady then
-			onReady()
+		local callbacks = waiting
+		waiting = {}
+		for _, callback in callbacks do
+			task.spawn(callback)
 		end
 	end)
 end
@@ -414,23 +491,30 @@ function StreakRewards.open()
 		Size = UDim2.fromScale(1, 1),
 		Active = true,
 	}, gui)
-	-- Everything on one board sized to its cards (five to a row), scaled to
-	-- fit the screen (phones included).
-	local rows = math.max(1, math.ceil(#cache.Items / 5))
-	local gridHeight = rows * 196 + (rows - 1) * 14
-	local claimAt = 100 + gridHeight + 28
+	-- Two rows on one board, scaled to fit the screen (phones included): the
+	-- free gems (all yours), then the gear to choose from.
+	local gemEntries, gearEntries = {}, {}
+	for _, entry in cache.Items do
+		table.insert(if entry.Free then gemEntries else gearEntries, entry)
+	end
+	picks = math.min(picks, #gearEntries)
+	local width = math.max(880, #gearEntries * 150 + (#gearEntries - 1) * 12 + 20)
+	local gemTop = 112
+	local gearLabelAt = if #gemEntries > 0 then gemTop + GEM_H + 16 else 92
+	local gearTop = gearLabelAt + 22
+	local claimAt = gearTop + GEAR_H + 20
 	local height = claimAt + 52
 	local board = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(880, height),
+		Size = UDim2.fromOffset(width, height),
 	}, screen)
 	local fit = new("UIScale", {}, board)
 	local function scale()
 		local s = screen and screen.AbsoluteSize
 		if s and s.X > 0 then
-			fit.Scale = math.min(1, (s.X - 24) / 880, (s.Y - 16) / height)
+			fit.Scale = math.min(1, (s.X - 24) / width, (s.Y - 16) / height)
 		end
 	end
 	scale()
@@ -456,41 +540,57 @@ function StreakRewards.open()
 	local sub = label(
 		board,
 		if cache.Dev
-			then string.format(
-				"Keep %d. A test roll: no coins or title, and the other %d are dropped, not sold.",
-				picks,
-				math.max(0, #cache.Items - picks)
-			)
-			else string.format(
-				"Keep %d. The other %d go to the Market from the %s.%s",
-				picks,
-				math.max(0, #cache.Items - picks),
-				ArenaStreak.VaultName,
-				if #extras > 0 then "  (Already yours: " .. table.concat(extras, " and ") .. ".)" else ""
-			),
+			then "A test roll: no coins or title, and the gear you don't keep is dropped, not sold."
+			elseif #extras > 0 then "Already yours: " .. table.concat(extras, " and ") .. "."
+			else "",
 		14,
 		DIM,
 		Enum.Font.GothamMedium
 	)
 	sub.Position, sub.Size = UDim2.fromOffset(0, 64), UDim2.new(1, 0, 0, 20)
 
-	local grid = new("ScrollingFrame", {
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(0, 88),
-		Size = UDim2.new(1, 0, 0, gridHeight + 24), -- (room for a card's landing pop)
-		CanvasSize = UDim2.new(),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 4,
-	}, board)
-	new("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12) }, grid)
-	local layout = new("UIGridLayout", {
-		CellSize = UDim2.fromOffset(150, 196),
-		CellPadding = UDim2.fromOffset(14, 14),
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, grid)
-	local _ = layout
+	-- A row of cards, centred (a plain frame, so a landing pop isn't clipped).
+	local function row(top: number, cardHeight: number)
+		local frame = new("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(0, top),
+			Size = UDim2.new(1, 0, 0, cardHeight),
+		}, board)
+		new("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			Padding = UDim.new(0, 12),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, frame)
+		return frame
+	end
+	local function heading(text: string, top: number, color)
+		local h = label(board, text, 12, color, Enum.Font.GothamBlack)
+		h.Position, h.Size = UDim2.fromOffset(0, top), UDim2.new(1, 0, 0, 16)
+	end
+	local gemRow, gearRow = nil, nil
+	if #gemEntries > 0 then
+		heading(
+			if #gemEntries == 1 then "FREE  ·  THIS GEM IS YOURS" else "FREE  ·  THESE GEMS ARE ALL YOURS",
+			92,
+			Color3.fromRGB(110, 220, 140)
+		)
+		gemRow = row(gemTop, GEM_H)
+	end
+	heading(
+		if cache.Dev
+			then string.format("PICK %d OF %d", picks, #gearEntries)
+			else string.format(
+				"PICK %d OF %d  ·  THE OTHER %d GO TO THE MARKET: YOU GET %d%% OF EACH SALE",
+				picks,
+				#gearEntries,
+				#gearEntries - picks,
+				math.floor(ArenaStreak.Commission * 100 + 0.5)
+			),
+		gearLabelAt,
+		GOLD
+	)
+	gearRow = row(gearTop, GEAR_H)
 
 	local claim
 	local function redraw()
@@ -535,9 +635,14 @@ function StreakRewards.open()
 			})
 		end
 	end
+	-- (The gems land first, then the gear.)
 	local reel = {}
-	for _, entry in cache.Items do
-		cards[entry.OfferId] = card(grid, entry, toggle, rolling, cache.Id, cacheGear)
+	for _, entry in gemEntries do
+		cards[entry.OfferId] = card(gemRow, entry, nil, rolling, cache.Id, cacheGear)
+		table.insert(reel, cards[entry.OfferId])
+	end
+	for _, entry in gearEntries do
+		cards[entry.OfferId] = card(gearRow, entry, toggle, rolling, cache.Id, cacheGear)
 		table.insert(reel, cards[entry.OfferId])
 	end
 	-- The gear's 3D previews (usually built already, see refresh); when they
