@@ -741,18 +741,33 @@ end
 
 -- Mining -----------------------------------------------------------------------------------------------
 
+-- The mech you're piloting, if it can mine (Outpost.Machines, Mine): its
+-- spec. Nil on foot; false in a seat that can't.
+local function pilotedMech(): any
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	if not seat then
+		return nil
+	end
+	local machine = Rules.Machines[seat:GetAttribute("OutpostMachine") or ""]
+	return if machine and machine.Mine then machine else false
+end
+
 local function nearestRock(): Model?
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then
 		return nil
 	end
+	local mech = pilotedMech()
 	local best, bestDistance = nil, math.huge
 	for _, model in CollectionService:GetTagged(NODE_TAG) do
 		local body = model.PrimaryPart
 		if body and model:GetAttribute("Popped") == nil then
 			local spec = Rules.Sizes[model:GetAttribute("Size") or "Pebble"] or Rules.Sizes.Pebble
-			local d = (body.Position - root.Position).Magnitude
-			if d <= Rules.Reach + spec.Scale / 2 and d < bestDistance then
+			local apart = body.Position - root.Position
+			-- (a mech reaches further, measured flat: its cockpit sits high)
+			local d = if mech then Vector3.new(apart.X, 0, apart.Z).Magnitude else apart.Magnitude
+			if d <= (if mech then Rules.MechReach else Rules.Reach) + spec.Scale / 2 and d < bestDistance then
 				best, bestDistance = model, d
 			end
 		end
@@ -764,9 +779,9 @@ function OutpostScene.swing(nodeId: number?)
 	if not active or player:GetAttribute("CombatSession") or next(openScreens) ~= nil then
 		return
 	end
-	-- Not from the driver's seat.
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.SeatPart then
+	-- On foot, or from a mech's cockpit; not from any other seat.
+	local mech = pilotedMech()
+	if mech == false then
 		return
 	end
 	local now = os.clock()
@@ -786,11 +801,11 @@ function OutpostScene.swing(nodeId: number?)
 	if not model then
 		return
 	end
-	nextSwing = now + Rules.SwingCooldown + 0.05
-	-- Face the rock.
+	nextSwing = now + (if mech then mech.Mine.Cooldown else Rules.SwingCooldown) + 0.05
+	-- Face the rock (on foot: a mech turns as you drive it).
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local body = model.PrimaryPart
-	if root and body then
+	if root and body and not mech then
 		local look = Vector3.new(body.Position.X, root.Position.Y, body.Position.Z)
 		if (look - root.Position).Magnitude > 0.5 then
 			root.CFrame = CFrame.lookAt(root.Position, look)

@@ -283,6 +283,17 @@ do
 		"Clock text wrong"
 	)
 end
+-- Mechs mine: faster than a pick, but every strike spends the swings it
+-- lands (never more than you have), so a swing digs the same either way.
+for _, id in Rules.MachineOrder do
+	local mine = Rules.Machines[id].Mine
+	check(mine and mine.Strikes >= 2 and mine.Cooldown > 0, id .. " can't mine")
+	check(mine.Strikes / mine.Cooldown > 1 / Rules.SwingCooldown, id .. " mines slower than a pick")
+	check(Rules.mechStrikes(id, 100) == mine.Strikes, id .. " strikes the wrong amount")
+	check(Rules.mechStrikes(id, 1) == 1 and Rules.mechStrikes(id, 0) == 0, id .. " spends swings you don't have")
+end
+check(Rules.mechStrikes("NotAMech", 10) == 0 and Rules.mechStrikes(nil, 10) == 0, "Something that isn't a mech mined")
+check(Rules.MechReach > Rules.Reach, "A mech reaches less far than a miner")
 for _, id in Rules.SizeOrder do
 	local s = Rules.Sizes[id]
 	check(s.Hp > 0 and s.Respawn > 0 and s.Coins[2] >= s.Coins[1], id .. " rock incomplete")
@@ -516,6 +527,42 @@ check(
 )
 check(ana.Character:GetAttribute("ActionKind") == "Mine", "No chop for others to see")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Swung faster than the pick allows")
+-- From a mech's cockpit: from further off, a strike lands several swings at
+-- once and spends them, and the mech swings for everyone to see.
+do
+	local humanoid = R.Instance.new("Humanoid")
+	humanoid.Parent = ana.Character
+	local mech = R.Instance.new("Model")
+	mech.Name = "Mole"
+	local seat = R.Instance.new("VehicleSeat")
+	seat.Name = "Seat"
+	seat:SetAttribute("OutpostMachine", "Mole")
+	seat.Parent = mech
+	mech.Parent = workspaceRoot
+	humanoid.SeatPart = seat
+	advance(1)
+	local swingsBefore, hpBefore = first.State.Picks.Survey, target.Hp
+	local rock = target.Model.PrimaryPart.CFrame.Position
+	anaRoot.CFrame = R.CFrame.new(rock + R.Vector3.new(Rules.MechReach - 2, 9, 0))
+	local strike = handlers.OutpostHit(ana, target.Id)
+	local strikes = Rules.Machines.Mole.Mine.Strikes
+	check(strike.Ok and strike.Strikes == strikes, "A mech couldn't mine: " .. tostring(strike.Message))
+	check(strike.State.Picks.Survey == swingsBefore - strikes, "A mech strike didn't spend its swings")
+	check(hpBefore - strike.Hp >= strikes, "A mech strike didn't land its swings")
+	check(
+		type(mech:GetAttribute("MechStrikeStart")) == "number" and typeof(mech:GetAttribute("MechStrikeTarget")) == "Vector3",
+		"Nobody sees the mech strike"
+	)
+	anaRoot.CFrame = R.CFrame.new(rock + R.Vector3.new(Rules.MechReach + 30, 9, 0))
+	advance(1)
+	check(not handlers.OutpostHit(ana, target.Id).Ok, "A mech mined from too far off")
+	seat:SetAttribute("OutpostMachine", "NotAMech")
+	standBy(anaRoot, target)
+	advance(1)
+	check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined from a seat that isn't a mech")
+	humanoid.Parent = nil
+	mech.Parent = nil
+end
 -- Ben can't steal it while Ana is on it, but can once she walks away.
 standBy(benRoot, target)
 advance(0.5)

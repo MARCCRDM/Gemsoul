@@ -165,6 +165,7 @@ Outpost.Machines = {
 		Accel = 12,
 		Turn = 0.9,
 		Tracked = true,
+		Mine = { Strikes = 4, Cooldown = 0.75 },
 	},
 	Mole = {
 		Name = "Mole Drill Mech",
@@ -173,6 +174,7 @@ Outpost.Machines = {
 		Accel = 12,
 		Turn = 1.1,
 		Tracked = true,
+		Mine = { Strikes = 3, Cooldown = 0.45 },
 	},
 	Digger = {
 		Name = "Forge Utility Mech",
@@ -181,6 +183,7 @@ Outpost.Machines = {
 		Accel = 10,
 		Turn = 1.2,
 		Tracked = true,
+		Mine = { Strikes = 3, Cooldown = 0.55 },
 	},
 	Skipper = {
 		Name = "Scout Pathfinder Mech",
@@ -189,9 +192,21 @@ Outpost.Machines = {
 		Accel = 20,
 		Turn = 1.6,
 		Tracked = true,
+		Mine = { Strikes = 2, Cooldown = 0.42 },
 	},
 }
 Outpost.MachineOrder = { "Hauler", "Mole", "Digger", "Skipper" }
+
+-- Mechs mine too, from the cockpit. A strike lands Strikes swings' worth of
+-- your pick at once and spends that many swings (fewer if that's all you
+-- have left), so a swing's energy digs the same either way: a mech just
+-- hits harder and sooner (Cooldown: seconds between strikes).
+Outpost.MechReach = 14 -- flat studs from a rock's middle a mech can strike from
+function Outpost.mechStrikes(machineId: string?, swingsLeft: number): number
+	local spec = machineId and Outpost.Machines[machineId]
+	local mine = spec and spec.Mine
+	return if mine then math.max(0, math.min(mine.Strikes, swingsLeft)) else 0
+end
 Outpost.ReverseShare = 0.4 -- top speed backing up, as a share of forward
 Outpost.MachineResetSeconds = 90 -- an abandoned machine drives itself home after this
 

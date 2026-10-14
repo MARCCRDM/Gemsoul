@@ -359,12 +359,18 @@ local function hit(player: Player, nodeId: any)
 	if player:GetAttribute("Outpost") ~= true or player:GetAttribute("CombatSession") then
 		return reply(false, "Head to the Outpost to mine.")
 	end
+	-- On foot with your pick, or from a mech's cockpit (Outpost.Machines,
+	-- Mine): bigger strikes, sooner, each spending its swings.
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.SeatPart then
+	local seat = humanoid and humanoid.SeatPart
+	local machineId = seat and seat:GetAttribute("OutpostMachine")
+	local machine = machineId and Rules.Machines[machineId]
+	local mech = if machine and machine.Mine then seat.Parent else nil
+	if seat and not mech then
 		return reply(false, "Hop out of the machine to mine.")
 	end
 	local now = os.clock()
-	if now - (lastSwing[player] or 0) < Rules.SwingCooldown then
+	if now - (lastSwing[player] or 0) < (if mech then machine.Mine.Cooldown else Rules.SwingCooldown) then
 		return reply(false, "")
 	end
 	local node = type(nodeId) == "number" and nodes[nodeId] or nil
@@ -374,8 +380,12 @@ local function hit(player: Player, nodeId: any)
 	local root = rootOf(player)
 	local body = node.Model.PrimaryPart
 	local spec = Rules.Sizes[node.Size]
-	if not root or not body or (root.Position - body.Position).Magnitude > Rules.Reach + spec.Scale then
-		return reply(false, "Get closer to the rock.")
+	local apart = if root and body then root.Position - body.Position else Vector3.zero
+	local tooFar = if mech
+		then Vector3.new(apart.X, 0, apart.Z).Magnitude > Rules.MechReach + spec.Scale
+		else apart.Magnitude > Rules.Reach + spec.Scale
+	if not root or not body or tooFar then
+		return reply(false, if mech then "Walk the mech up to the rock." else "Get closer to the rock.")
 	end
 	if not Rules.claimHolder(node, player.UserId, now) then
 		local holder = Players:GetPlayerByUserId(node.ClaimedBy)
@@ -400,10 +410,11 @@ local function hit(player: Player, nodeId: any)
 		)
 	end
 	lastSwing[player] = now
-	o.Picks[pickId] -= 1
+	local strikes = if mech then Rules.mechStrikes(machineId, o.Picks[pickId]) else 1
+	o.Picks[pickId] -= strikes
 	local pick = Rules.Picks[pickId]
 	local crit = rng:NextNumber() < Rules.CritChance + pick.Crit
-	node.Hp = math.max(0, node.Hp - Rules.damage(pickId, crit))
+	node.Hp = math.max(0, node.Hp - Rules.damage(pickId, crit) * strikes)
 	node.ClaimedBy, node.ClaimUntil = player.UserId, now + Rules.ClaimSeconds
 	local model = node.Model
 	model:SetAttribute("ClaimedBy", player.UserId)
@@ -412,7 +423,11 @@ local function hit(player: Player, nodeId: any)
 	model:SetAttribute("Hp", node.Hp)
 	-- The pick chop (RivalPose "Mine": overhead and down), for everyone to see.
 	local character = player.Character
-	if character then
+	if mech then
+		-- The mech's own strike (MechAnimation), for everyone to see.
+		mech:SetAttribute("MechStrikeTarget", body.Position + Vector3.new(0, body.Size.Y * 0.3, 0))
+		mech:SetAttribute("MechStrikeStart", workspace:GetServerTimeNow() - 0.1)
+	elseif character then
 		local t = workspace:GetServerTimeNow()
 		character:SetAttribute("ActionKind", "Mine")
 		character:SetAttribute("ActionStart", t - 0.12)
@@ -430,6 +445,7 @@ local function hit(player: Player, nodeId: any)
 		Crit = crit,
 		Tension = Rules.tension(node.Hp, node.MaxHp),
 		PickBroke = if broke then pick.Name else nil,
+		Strikes = strikes,
 		State = stateOf(player),
 	}
 	if node.Hp <= 0 then
