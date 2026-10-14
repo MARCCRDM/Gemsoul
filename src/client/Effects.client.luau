@@ -16,6 +16,8 @@ require(script.Parent.Modules.BodyPoses).start()
 require(script.Parent.Modules.FighterSpacing).start()
 -- Prismatic gear shimmers through every colour.
 require(script.Parent.Modules.PrismaticShimmer).start()
+-- Skin seams and edges show only while their part does (never round the camera).
+require(script.Parent.Modules.SeamVisibility).start()
 -- Swing trails on every blade.
 require(script.Parent.Modules.BladeTrails).start()
 -- Night falls in the Arena: the fight and the gear light it.

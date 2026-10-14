@@ -125,19 +125,30 @@ function CosmeticView.attach(root: GuiObject, id: string, spin: boolean?): boole
 		end
 		view.Visible = true
 	end
+	-- Its parts can replicate after the folder itself: wait for all of them
+	-- (the server counts them in its Parts attribute) before framing it.
+	local function whenWhole(folder: Instance)
+		local function check()
+			local parts = folder:GetAttribute("Parts")
+			if #folder:GetChildren() >= (if type(parts) == "number" then parts else 1) then
+				fill(folder)
+			end
+		end
+		table.insert(connections, folder.ChildAdded:Connect(check))
+		table.insert(connections, folder:GetAttributeChangedSignal("Parts"):Connect(check))
+		check()
+	end
 	local function watch(store: Instance)
 		local ready = store:FindFirstChild(id)
 		if ready then
-			fill(ready)
+			whenWhole(ready)
 			return
 		end
 		table.insert(
 			connections,
 			store.ChildAdded:Connect(function(child)
 				if child.Name == id then
-					-- Its parts replicate just after the folder itself.
-					task.wait()
-					fill(child)
+					whenWhole(child)
 				end
 			end)
 		)

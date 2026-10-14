@@ -685,6 +685,8 @@ local function outline(part: BasePart, color: Color3, thickness: number)
 	box.Color3 = color
 	box.LineThickness = thickness
 	box.SurfaceTransparency = 1
+	box.Visible = part.Transparency < 1
+	CollectionService:AddTag(box, Tags.SkinSeam)
 	box.Parent = part
 end
 
@@ -2392,6 +2394,9 @@ function Equipment.cosmeticPreview(id: string): boolean
 		for _, part in preview:GetChildren() do
 			(part :: BasePart).CFrame = origin:ToObjectSpace((part :: BasePart).CFrame)
 		end
+		-- How many parts make it whole: a client shows it only once they've
+		-- all replicated (framed on the first few, a suit was one dark plate).
+		preview:SetAttribute("Parts", #preview:GetChildren())
 		preview.Parent = store
 	end
 	if ok and folder then

@@ -26,4 +26,8 @@ return {
 	GemOutline = "GemOutline",
 	-- Coloured plates of a Prismatic roll: their hue shimmers on every client.
 	Prismatic = "Prismatic",
+	-- A skin's seam and edge outlines (SelectionBoxes): Roblox draws those even
+	-- round a hidden part, so the client shows each only while its part shows
+	-- (SeamVisibility).
+	SkinSeam = "SkinSeam",
 }

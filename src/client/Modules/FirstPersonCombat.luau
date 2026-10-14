@@ -42,6 +42,11 @@ local function viewCopy(part, holder, scale: number?)
 			end
 		elseif descendant:IsA("PointLight") then
 			descendant.Range *= 0.6
+		elseif descendant:IsA("SelectionBox") and descendant.Parent and descendant.Parent:IsA("BasePart") then
+			-- A skin's seam or edge: round this copy, not the hidden original
+			-- (whose box would wrap the camera).
+			descendant.Adornee = descendant.Parent
+			descendant.LineThickness *= scale or 0.65
 		end
 		if
 			descendant:IsA("JointInstance")
