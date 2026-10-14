@@ -30,6 +30,13 @@ type Driving = {
 	Zoom: { number },
 }
 local driving: Driving? = nil
+local function blocked(): boolean
+	return not player:GetAttribute("Outpost")
+		or player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("ArenaDropPreparing") ~= nil
+		or player:GetAttribute("ArenaDropUntil") ~= nil
+		or player:GetAttribute("Expedition") ~= nil
+end
 
 -- The driving card.
 local gui = UiKit.gui("DriveHud", 6)
@@ -85,11 +92,15 @@ local function finish()
 	pcall(function()
 		d.Drive.PlaneVelocity = Vector2.zero
 	end)
-	player.CameraMinZoomDistance = d.Zoom[1]
-	player.CameraMaxZoomDistance = d.Zoom[2]
+	-- A delayed Seated(false) must not overwrite the combat camera's zoom.
+	if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
+		player.CameraMinZoomDistance = d.Zoom[1]
+		player.CameraMaxZoomDistance = d.Zoom[2]
+	end
 end
 
 local function begin(seat: VehicleSeat, humanoid: Humanoid)
+	if blocked() then finish(); return end
 	local kind = seat:GetAttribute("OutpostMachine")
 	local spec = Rules.Machines[kind]
 	local chassis = seat.Parent and seat.Parent:FindFirstChild("Chassis") :: BasePart?
@@ -126,7 +137,7 @@ function VehicleDrive.step(dt: number)
 	if not d then
 		return
 	end
-	if not d.Seat.Parent or d.Seat.Occupant ~= d.Humanoid then
+	if blocked() or not d.Seat.Parent or d.Seat.Occupant ~= d.Humanoid then
 		finish()
 		return
 	end
@@ -150,12 +161,29 @@ function VehicleDrive.isDriving(): boolean
 	return driving ~= nil
 end
 
+local function refreshSession()
+	if blocked() then
+		finish()
+	elseif not driving then
+		-- A rejected arena request may leave the player legitimately seated.
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		local seat = humanoid and humanoid.SeatPart
+		if seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
+			begin(seat, humanoid)
+		end
+	end
+end
+for _, attribute in { "Outpost", "CombatSession", "ArenaDropPreparing", "ArenaDropUntil", "Expedition" } do
+	player:GetAttributeChangedSignal(attribute):Connect(refreshSession)
+end
+
 local function watch(character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
 	if not humanoid then
 		return
 	end
 	humanoid.Seated:Connect(function(seated: boolean, seat: Instance?)
+		if character ~= player.Character then return end
 		if seated and seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
 			begin(seat, humanoid)
 		else

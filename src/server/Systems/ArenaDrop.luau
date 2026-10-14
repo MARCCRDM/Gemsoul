@@ -1,5 +1,6 @@
 -- Sequential orbital insertion. Server owns staging and combat protection.
 local Players = game:GetService("Players")
+local SeatExit = require(script.Parent.SeatExit)
 local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMotion)
 local Drop = {}
 local active = setmetatable({}, { __mode = "k" })
@@ -79,14 +80,15 @@ function Drop.prepare(player)
 		return
 	end
 	Drop.cancel(model)
-	local restoreLabels = concealLabels(model)
-	local anchored = root.Anchored
-	root.Anchored = true
-	local saved, effects, connections = {}, {}, {}
 	local deadline = workspace:GetServerTimeNow() + 15
 	player:SetAttribute("ArenaDropPreparing", deadline)
 	player:SetAttribute("ArenaDropUntil", deadline)
 	model:SetAttribute("ArenaDropUntil", deadline)
+	SeatExit.detach(model)
+	local restoreLabels = concealLabels(model)
+	local anchored = root.Anchored
+	root.Anchored = true
+	local saved, effects, connections = {}, {}, {}
 	local function hide(object)
 		if object:IsA("BasePart") or object:IsA("Decal") then
 			saved[object] = object.Transparency

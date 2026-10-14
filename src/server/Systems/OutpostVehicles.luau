@@ -101,7 +101,11 @@ function OutpostVehicles.sit(player: Player, seat: Instance): boolean
 	if not machine or not humanoid or humanoid.Health <= 0 or humanoid.SeatPart or machine.Seat.Occupant then
 		return false
 	end
-	if not player:GetAttribute("Outpost") then
+	if not player:GetAttribute("Outpost")
+		or player:GetAttribute("CombatSession")
+		or player:GetAttribute("ArenaDropPreparing")
+		or player:GetAttribute("ArenaDropUntil")
+		or player:GetAttribute("Expedition") then
 		return false
 	end
 	machine.Seat:Sit(humanoid)

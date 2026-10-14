@@ -7,7 +7,7 @@ def module(name, path):
     return f"local {name}=(function()\n{source}\nend)()\n"
 source = (ROOT/'tests/insertion_lifecycle.luau').read_text()
 prefix, cases = source.split('-- MODULES HERE')
-source = prefix + module('Motion','src/shared/InsertionMotion.luau') + module('Drop','src/server/Systems/ArenaDrop.luau') + cases
+source = prefix + module('Motion','src/shared/InsertionMotion.luau') + module('SeatExit','src/server/Systems/SeatExit.luau') + module('Drop','src/server/Systems/ArenaDrop.luau') + cases
 with tempfile.TemporaryDirectory(prefix='gemsoul-insertion-') as directory:
     script = Path(directory)/'lifecycle.luau'
     script.write_text(source)
