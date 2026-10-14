@@ -48,6 +48,9 @@ local HAZARD = Color3.fromRGB(240, 178, 48)
 local GLOW = Color3.fromRGB(110, 220, 255)
 local SAGA = Color3.fromRGB(255, 184, 72)
 local STEEL = Color3.fromRGB(150, 158, 170)
+-- Keep the meadow's basic mining objects readable in the moon lighting:
+-- pale, opaque stone with cyan crystal tips, independent of imported art.
+local MINING_STONE = Color3.fromRGB(184, 192, 198)
 
 local function part(parent, cframe, size, color, material, shape, props)
 	local p = Instance.new(if shape == "Wedge" then "WedgePart" else "Part")
@@ -126,8 +129,8 @@ local ROCK_KIT = {
 	Geode = { "rock_crystalsLargeA", "rock_crystalsLargeB", "rock_crystals", "meteor_detailed" },
 }
 local ROCK_TINT = {
-	Pebble = Color3.fromRGB(168, 160, 150),
-	Boulder = Color3.fromRGB(132, 130, 142),
+	Pebble = MINING_STONE,
+	Boulder = MINING_STONE,
 	Monolith = Color3.fromRGB(104, 98, 114),
 	Geode = Color3.fromRGB(100, 78, 128),
 }
@@ -136,13 +139,15 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 	local model = Instance.new("Model")
 	model.Name = "Rock"
 	local spec = ({
-		Pebble = { 3.6, Color3.fromRGB(128, 126, 134), GLOW, 3 },
-		Boulder = { 6, Color3.fromRGB(104, 106, 120), GLOW, 6 },
+		Pebble = { 3.6, MINING_STONE, GLOW, 3 },
+		Boulder = { 6, MINING_STONE, GLOW, 6 },
 		Monolith = { 8.5, Color3.fromRGB(84, 82, 96), SAGA, 9 },
 		Geode = { 7, Color3.fromRGB(70, 56, 92), Color3.fromRGB(205, 120, 255), 11 },
 	})[size] or { 3, REGOLITH, GLOW, 2 }
 	local s, stone, crystal, crystals = spec[1], spec[2], spec[3], spec[4]
 	local tall = if size == "Monolith" then 1.7 else 1
+	local basic = size == "Pebble" or size == "Boulder"
+	local stoneMaterial = if basic then Enum.Material.SmoothPlastic else Enum.Material.Glass
 	-- The kit's rock (when imported) is the shape; an invisible Body is what
 	-- you hit, and the glowing crystals still say how rich it is.
 	local kitName = AssetKit.pick(ROCK_KIT[size] or {}, rng)
@@ -160,13 +165,23 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 		)
 		body.Name = "Body"
 		model.PrimaryPart = body
-		AssetKit.place(model, kitName, cframe, {
+		local imported = AssetKit.place(model, kitName, cframe, {
 			Width = if size == "Monolith" then nil else s * 1.2,
 			Height = if size == "Monolith" then s * tall else nil,
 			Yaw = rng:NextNumber(0, 6.28),
 			Sink = 0.2,
 			Color = ROCK_TINT[size],
 		})
+		if imported and basic then
+			-- Normalize the cloned rock, leaving the source kit and crystals alone.
+			for _, piece in imported:GetDescendants() do
+				if piece:IsA("BasePart") then
+					piece.Color = stone
+					piece.Material = stoneMaterial
+					piece.Transparency = 0
+				end
+			end
+		end
 		for _ = 1, math.ceil(crystals / 2) do
 			local a = rng:NextNumber(0, math.pi * 2)
 			local len = s * rng:NextNumber(0.3, 0.55)
@@ -204,7 +219,7 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 			* CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 6.28), rng:NextNumber(-0.2, 0.2)),
 		Vector3.new(s, s * 0.85 * tall, s * 0.9),
 		stone,
-		Enum.Material.Glass
+		stoneMaterial
 	)
 	body.Name = "Body"
 	solid(body)
@@ -224,7 +239,7 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 				s * rng:NextNumber(0.45, 0.7)
 			),
 			stone:Lerp(Color3.new(0, 0, 0), rng:NextNumber(0, 0.2)),
-			Enum.Material.Glass
+			stoneMaterial
 		)
 	end
 	-- Crystals: wedges jutting out of the top and sides, glowing.
