@@ -11,10 +11,11 @@
 	    Vault, and you get 25% of each sale; the screen says so.
 	A cache unlocking opens the screen straight away.
 
-	The first time a cache opens, it rolls: every card flicks through 3D
-	gems and the cache's own gear, then they land one by one (gems first)
-	on what the server rolled (an Ultra-Rare lands with a flash). Tap during
-	the roll to land them all at once.
+	The first time a cache opens, its lottery plays first (CacheLottery,
+	the mining find's round reel): each free gem rolls through gems and
+	lands, then each piece of gear rolls through the cache's armor and
+	weapons and lands, its stats filling in beside it. SKIP ALL goes
+	straight to the picks.
 
 	  StreakRewards.start()   StreakRewards.open()   StreakRewards.refresh()
 	  StreakRewards.show(result)   open a cache list the server just sent
@@ -22,18 +23,15 @@
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
-local Classes = require(ReplicatedStorage.Shared.Classes)
-local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local Art = require(script.Parent.LotteryArt)
+local CacheLottery = require(script.Parent.CacheLottery)
 local GearArt = require(script.Parent.GearArt)
 local UiKit = require(script.Parent.UiKit)
-local UiSound = require(script.Parent.UiSound)
 
 local StreakRewards = {}
 
@@ -118,25 +116,6 @@ local function grades(gem): string
 	return string.format("Size %d · Clar %d · Prec %d", gem.Size or 0, gem.Clarity or 0, gem.Cut or 0)
 end
 
--- What the reel flicks through: every Rare and Ultra-Rare gem shade (drawn
--- in 3D from its data) and the cache's own gear (in 3D, from the server's
--- previews, once they're built).
-local REEL = nil
-local function reelGems()
-	if REEL then
-		return REEL
-	end
-	REEL = {}
-	for element, shades in GemConfig.Shades do
-		for _, shade in shades do
-			if shade.Tier == "Rare" or shade.Tier == "UltraRare" then
-				table.insert(REEL, { Element = element, Tier = shade.Tier, Name = shade.Name })
-			end
-		end
-	end
-	return REEL
-end
-
 -- A piece of gear in 3D: the server's preview of it ("Slot|A:<tag>",
 -- ArenaStreaks.previews), framed like the Market's. Nil until it's built.
 local function gearView(parent, slot: string, tag: string): ViewportFrame?
@@ -156,42 +135,18 @@ local function gearView(parent, slot: string, tag: string): ViewportFrame?
 end
 
 -- One piece on a card: its rarity on a ribbon, its picture (3D: the gem
--- from its data, the gear from its server preview), name and what it is.
--- Ultra-Rare cards carry a stronger edge and a tinted face.
--- Rolling, the card starts as a reel of 3D pieces (Spin flicks to another)
--- until Land settles it on the real one. Upgrade swaps in 3D gear once the
--- previews arrive.
--- A piece of gear's lines under its name: its stat rolls, its passive and
--- its affixes (as the Market shows them).
-local function gearLines(item)
-	local roll = item.Roll
-	local stats = {}
-	for _, stat in { "Health", "Power", "Defense", "Speed" } do
-		if roll and roll.Stats and roll.Stats[stat] then
-			table.insert(stats, "+" .. roll.Stats[stat] .. " " .. stat)
-		end
-	end
-	local passive, affixes = nil, 0
-	local def = Slots.Definitions[item.Slot]
-	local profile = GemClient.Profile
-	local class = profile and profile.Character and profile.Character.Class or "Warrior"
-	local ok, gear = pcall(Classes.gear, class, def and def.Kind, item.Id)
-	if ok and gear and gear.Passive and gear.Passive.Name and gear.Passive.Name ~= "" then
-		passive = gear.Passive.Name
-	end
-	for _ in roll and roll.Affixes or {} do
-		affixes += 1
-	end
-	return table.concat(stats, "  ·  "), passive, affixes
-end
+-- from its data, the gear from its server preview), name and what it is;
+-- gear adds its stat rolls, passive and affixes. Ultra-Rare cards carry a
+-- stronger edge and a tinted face. Gear whose preview isn't built yet shows
+-- its silhouette until Upgrade draws it in 3D.
+local gearLines = CacheLottery.gearLines
 
 local GEAR_H, GEM_H = 250, 196 -- (card heights)
 
-local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string, cacheGear)
+local function card(parent, entry, onToggle, cacheId: string)
 	local item = entry.Item
 	local free = entry.Free == true
-	-- The grid lays out a plain cell; the card sits centred in it, so its
-	-- landing pop grows from the middle rather than the top-left corner.
+	-- The row lays out a plain cell; the card sits centred in it.
 	local cell = new(
 		"Frame",
 		{ BackgroundTransparency = 1, Size = UDim2.fromOffset(150, if item.Kind == "Gear" then GEAR_H else GEM_H) },
@@ -209,7 +164,6 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 	UiKit.round(b, 12)
 	-- (Border mode: on a TextButton the stroke would otherwise trace its text.)
 	local edge = new("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
-	local pop = new("UIScale", {}, b)
 	local ribbon = label(b, "", 10, INK, Enum.Font.GothamBlack)
 	ribbon.BackgroundTransparency = 0
 	ribbon.Position, ribbon.Size = UDim2.fromOffset(8, 8), UDim2.new(1, -16, 0, 18)
@@ -257,7 +211,7 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 
 	-- The real piece. Gear without its 3D preview yet shows its silhouette
 	-- (flat) until Upgrade can draw it.
-	local landed, flat = not rolling, false
+	local flat = false
 	local realArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, art)
 	local function drawGear(tint)
 		for _, child in realArt:GetChildren() do
@@ -304,106 +258,7 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 		end
 	end
 
-	-- The reel: a few 3D gems, and up to two of the cache's gear pieces once
-	-- their previews exist, each built once and shown in turn.
-	local options, current, gearAdded = {}, nil, false
-	local function addOption(build, text, tier)
-		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, art)
-		if build(holder) then
-			table.insert(options, { Frame = holder, Name = text, Tier = tier })
-			return true
-		end
-		holder:Destroy()
-		return false
-	end
-	local function addGearOptions()
-		if gearAdded or landed then
-			return
-		end
-		local picks = table.clone(cacheGear or {})
-		for _ = 1, math.min(2, #picks) do
-			local g = table.remove(picks, math.random(1, #picks))
-			-- (done once a piece made it in; until then, try again later)
-			if addOption(function(holder)
-				return gearView(holder, g.Slot, g.Tag) ~= nil
-			end, g.Name, g.Tier) then
-				gearAdded = true
-			end
-		end
-	end
-	local function spin()
-		if #options == 0 then
-			return
-		end
-		local pick = options[math.random(1, #options)]
-		if pick == current and #options > 1 then
-			pick = options[(table.find(options, pick) :: number) % #options + 1]
-		end
-		if current then
-			current.Frame.Visible = false
-		end
-		current = pick
-		pick.Frame.Visible = true
-		paint(pick.Tier)
-		name.Text, name.TextColor3 = pick.Name, DIM
-		sub.Text, sub.TextColor3 = "· · ·", DIM
-	end
-	local function land()
-		landed = true
-		for _, option in options do
-			option.Frame:Destroy()
-		end
-		table.clear(options)
-		showReal()
-		local tint = GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD
-		local ultra = entry.Rarity == "UltraRare"
-		pop.Scale = if ultra then 1.16 else 1.08
-		cell.ZIndex = 3 -- (over its neighbours while it pops)
-		task.delay(0.4, function()
-			if cell.Parent then
-				cell.ZIndex = 1
-			end
-		end)
-		TweenService:Create(pop, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-			:Play()
-		local flash = new("Frame", {
-			BackgroundColor3 = if ultra then tint else Color3.new(1, 1, 1),
-			BackgroundTransparency = if ultra then 0.15 else 0.45,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = 5,
-		}, b)
-		UiKit.round(flash, 12)
-		local fade =
-			TweenService:Create(flash, TweenInfo.new(if ultra then 0.6 else 0.35), { BackgroundTransparency = 1 })
-		fade.Completed:Connect(function()
-			flash:Destroy()
-		end)
-		fade:Play()
-		if ultra then
-			pcall(IronUi.shine, b, 1.6)
-		end
-		UiSound.play(if ultra then "Reward" else "Coin")
-	end
-	if rolling then
-		local pool = reelGems()
-		for i = 1, math.min(3, #pool) do
-			local g = pool[math.random(1, #pool)]
-			addOption(function(holder)
-				return pcall(Art.show, holder, {
-					Id = "reel" .. i,
-					Element = g.Element,
-					Tier = g.Tier,
-					Size = 6,
-					Clarity = 6,
-					Cut = 6,
-				}, nil, GemConfig.ElementColors[g.Element] or GOLD, false)
-			end, g.Name, g.Tier)
-		end
-		addGearOptions()
-		spin()
-	else
-		showReal()
-	end
+	showReal()
 
 	b.Activated:Connect(function()
 		if onToggle then
@@ -411,13 +266,9 @@ local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string,
 		end
 	end)
 	return {
-		Spin = spin,
-		Land = land,
-		-- The gear previews arrived: into the reel, or onto a landed card.
+		-- The gear previews arrived: draw it in 3D.
 		Upgrade = function()
-			if not landed then
-				addGearOptions()
-			elseif flat and item.Kind == "Gear" then
+			if flat and item.Kind == "Gear" then
 				drawGear(GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD)
 			end
 		end,
@@ -491,258 +342,222 @@ function StreakRewards.open()
 		Size = UDim2.fromScale(1, 1),
 		Active = true,
 	}, gui)
-	-- Two rows on one board, scaled to fit the screen (phones included): the
-	-- free gems (all yours), then the gear to choose from.
-	local gemEntries, gearEntries = {}, {}
-	for _, entry in cache.Items do
-		table.insert(if entry.Free then gemEntries else gearEntries, entry)
-	end
-	picks = math.min(picks, #gearEntries)
-	local width = math.max(880, #gearEntries * 150 + (#gearEntries - 1) * 12 + 20)
-	local gemTop = 112
-	local gearLabelAt = if #gemEntries > 0 then gemTop + GEM_H + 16 else 92
-	local gearTop = gearLabelAt + 22
-	local claimAt = gearTop + GEAR_H + 20
-	local height = claimAt + 52
-	local board = new("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(width, height),
-	}, screen)
-	local fit = new("UIScale", {}, board)
-	local function scale()
-		local s = screen and screen.AbsoluteSize
-		if s and s.X > 0 then
-			fit.Scale = math.min(1, (s.X - 24) / width, (s.Y - 16) / height)
-		end
-	end
-	scale()
-	screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(scale)
-
-	local kicker = label(
-		board,
-		string.format("%s%d RANKED WINS IN A ROW", if cache.Dev then "DEV TEST  ·  " else "", cache.Wins),
-		14,
-		GOLD,
-		Enum.Font.GothamBlack
-	)
-	kicker.Size = UDim2.new(1, 0, 0, 18)
-	local title = label(board, "ARENA CACHE  ·  " .. string.upper(cache.Name or ""), 34, TEXT, Enum.Font.GothamBlack)
-	title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 40)
-	local extras = {}
-	if m and m.Coins then
-		table.insert(extras, "+" .. commas(m.Coins) .. " coins")
-	end
-	if m and m.Title then
-		table.insert(extras, "a new title")
-	end
-	local sub = label(
-		board,
-		if cache.Dev
-			then "A test roll: no coins or title, and the gear you don't keep is dropped, not sold."
-			elseif #extras > 0 then "Already yours: " .. table.concat(extras, " and ") .. "."
-			else "",
-		14,
-		DIM,
-		Enum.Font.GothamMedium
-	)
-	sub.Position, sub.Size = UDim2.fromOffset(0, 64), UDim2.new(1, 0, 0, 20)
-
-	-- A row of cards, centred (a plain frame, so a landing pop isn't clipped).
-	local function row(top: number, cardHeight: number)
-		local frame = new("Frame", {
-			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(0, top),
-			Size = UDim2.new(1, 0, 0, cardHeight),
-		}, board)
-		new("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 12),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		}, frame)
-		return frame
-	end
-	local function heading(text: string, top: number, color)
-		local h = label(board, text, 12, color, Enum.Font.GothamBlack)
-		h.Position, h.Size = UDim2.fromOffset(0, top), UDim2.new(1, 0, 0, 16)
-	end
-	local gemRow, gearRow = nil, nil
-	if #gemEntries > 0 then
-		heading(
-			if #gemEntries == 1 then "FREE  ·  THIS GEM IS YOURS" else "FREE  ·  THESE GEMS ARE ALL YOURS",
-			92,
-			Color3.fromRGB(110, 220, 140)
-		)
-		gemRow = row(gemTop, GEM_H)
-	end
-	heading(
-		if cache.Dev
-			then string.format("PICK %d OF %d", picks, #gearEntries)
-			else string.format(
-				"PICK %d OF %d  ·  THE OTHER %d GO TO THE MARKET: YOU GET %d%% OF EACH SALE",
-				picks,
-				#gearEntries,
-				#gearEntries - picks,
-				math.floor(ArenaStreak.Commission * 100 + 0.5)
-			),
-		gearLabelAt,
-		GOLD
-	)
-	gearRow = row(gearTop, GEAR_H)
-
-	local claim
-	local function redraw()
-		for id, c in cards do
-			c.Mark(chosen[id] == true)
-		end
-		local n = #order
-		claim.Text = if rolling
-			then "ROLLING..."
-			elseif n == picks then "CLAIM THESE " .. picks
-			else string.format("PICK %d MORE", picks - n)
-		claim.BackgroundColor3 = if n == picks and not rolling then GOLD else Color3.fromRGB(70, 74, 90)
-	end
-	local skip = false
-	local function toggle(id)
-		if rolling then
-			skip = true -- (a tap lands the whole roll)
-			return
-		end
-		if chosen[id] then
-			chosen[id] = nil
-			table.remove(order, table.find(order, id))
-		else
-			if #order >= picks then
-				-- (the oldest pick gives way)
-				chosen[table.remove(order, 1)] = nil
-			end
-			chosen[id] = true
-			table.insert(order, id)
-		end
-		redraw()
-	end
-	-- The cache's gear, for every card's reel (3D once the previews exist).
-	local cacheGear = {}
-	for _, entry in cache.Items do
-		if entry.Item.Kind == "Gear" then
-			table.insert(cacheGear, {
-				Slot = entry.Item.Slot,
-				Tag = cache.Id .. "/" .. entry.OfferId,
-				Name = entry.Name,
-				Tier = entry.Rarity or "Rare",
-			})
-		end
-	end
-	-- (The gems land first, then the gear.)
-	local reel = {}
-	for _, entry in gemEntries do
-		cards[entry.OfferId] = card(gemRow, entry, nil, rolling, cache.Id, cacheGear)
-		table.insert(reel, cards[entry.OfferId])
-	end
-	for _, entry in gearEntries do
-		cards[entry.OfferId] = card(gearRow, entry, toggle, rolling, cache.Id, cacheGear)
-		table.insert(reel, cards[entry.OfferId])
-	end
-	-- The gear's 3D previews (usually built already, see refresh); when they
-	-- arrive, into the reel or onto the cards that have landed.
-	local shown, previewsIn = screen, false
+	local shown = screen :: Frame
+	-- The gear's 3D previews (usually built already, see refresh), for the
+	-- lottery's reel and then the cards.
+	local previewsIn, drawn = false, {}
 	fetchPreviews(function()
 		previewsIn = true
 		if screen == shown then
-			for _, c in reel do
+			for _, c in drawn do
 				c.Upgrade()
 			end
 		end
 	end)
 
-	claim = new("TextButton", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, claimAt),
-		Size = UDim2.fromOffset(300, 52),
-		Font = Enum.Font.GothamBlack,
-		TextSize = 18,
-		TextColor3 = INK,
-		Text = "",
-	}, board)
-	UiKit.round(claim, 10)
-	claim:SetAttribute("UiSound", "Confirm")
-	claim.Activated:Connect(function()
-		if busy or rolling or #order ~= picks then
-			return
+	-- The pick screen. Two rows on one board, scaled to fit the screen
+	-- (phones included): the free gems (all yours), then the gear to choose
+	-- from.
+	local function pickScreen()
+		local gemEntries, gearEntries = {}, {}
+		for _, entry in cache.Items do
+			table.insert(if entry.Free then gemEntries else gearEntries, entry)
 		end
-		busy = true
-		local result = GemClient.request("StreakClaim", cache.Id, order)
-		busy = false
-		UiKit.toast(result.Message or "", if result.Ok then GOLD else nil)
-		if result.Ok then
-			state = result
-			close()
-			drawLauncher()
+		picks = math.min(picks, #gearEntries)
+		local width = math.max(880, #gearEntries * 150 + (#gearEntries - 1) * 12 + 20)
+		local gemTop = 112
+		local gearLabelAt = if #gemEntries > 0 then gemTop + GEM_H + 16 else 92
+		local gearTop = gearLabelAt + 22
+		local claimAt = gearTop + GEAR_H + 20
+		local height = claimAt + 52
+		local board = new("Frame", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(width, height),
+		}, shown)
+		local fit = new("UIScale", {}, board)
+		local function scale()
+			local s = shown.AbsoluteSize
+			if s.X > 0 then
+				fit.Scale = math.min(1, (s.X - 24) / width, (s.Y - 16) / height)
+			end
 		end
-	end)
-	local later = new("TextButton", {
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 0, 0, 0),
-		Size = UDim2.fromOffset(110, 30),
-		BackgroundColor3 = CARD,
-		Font = Enum.Font.GothamBold,
-		TextSize = 13,
-		TextColor3 = DIM,
-		Text = "LATER",
-	}, board)
-	UiKit.round(later, 8)
-	later.Activated:Connect(function()
-		close()
-		drawLauncher()
-	end)
-	redraw()
-	drawLauncher()
+		scale()
+		shown:GetPropertyChangedSignal("AbsoluteSize"):Connect(scale)
 
-	-- The roll: each card flicks fast, slows as its turn comes, then lands.
-	if rolling then
-		local mine = screen
-		task.spawn(function()
-			-- (The landings wait for the gear's 3D previews, 3 s at most, so
-			-- no piece lands as a flat stand-in; the reel spins meanwhile.)
-			local opened, started = os.clock(), nil
-			local nextFlick, landed = {}, {}
-			local function landsAt(i)
-				return 1.1 + (i - 1) * 0.32
+		local kicker = label(
+			board,
+			string.format("%s%d RANKED WINS IN A ROW", if cache.Dev then "DEV TEST  ·  " else "", cache.Wins),
+			14,
+			GOLD,
+			Enum.Font.GothamBlack
+		)
+		kicker.Size = UDim2.new(1, 0, 0, 18)
+		local title =
+			label(board, "ARENA CACHE  ·  " .. string.upper(cache.Name or ""), 34, TEXT, Enum.Font.GothamBlack)
+		title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 40)
+		local extras = {}
+		if m and m.Coins then
+			table.insert(extras, "+" .. commas(m.Coins) .. " coins")
+		end
+		if m and m.Title then
+			table.insert(extras, "a new title")
+		end
+		local sub = label(
+			board,
+			if cache.Dev
+				then "A test roll: no coins or title, and the gear you don't keep is dropped, not sold."
+				elseif #extras > 0 then "Already yours: " .. table.concat(extras, " and ") .. "."
+				else "",
+			14,
+			DIM,
+			Enum.Font.GothamMedium
+		)
+		sub.Position, sub.Size = UDim2.fromOffset(0, 64), UDim2.new(1, 0, 0, 20)
+
+		-- A row of cards, centred.
+		local function row(top: number, cardHeight: number)
+			local frame = new("Frame", {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(0, top),
+				Size = UDim2.new(1, 0, 0, cardHeight),
+			}, board)
+			new("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				Padding = UDim.new(0, 12),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, frame)
+			return frame
+		end
+		local function heading(text: string, top: number, color)
+			local h = label(board, text, 12, color, Enum.Font.GothamBlack)
+			h.Position, h.Size = UDim2.fromOffset(0, top), UDim2.new(1, 0, 0, 16)
+		end
+		local gemRow, gearRow = nil, nil
+		if #gemEntries > 0 then
+			heading(
+				if #gemEntries == 1 then "FREE  ·  THIS GEM IS YOURS" else "FREE  ·  THESE GEMS ARE ALL YOURS",
+				92,
+				Color3.fromRGB(110, 220, 140)
+			)
+			gemRow = row(gemTop, GEM_H)
+		end
+		heading(
+			if cache.Dev
+				then string.format("PICK %d OF %d", picks, #gearEntries)
+				else string.format(
+					"PICK %d OF %d  ·  THE OTHER %d GO TO THE MARKET: YOU GET %d%% OF EACH SALE",
+					picks,
+					#gearEntries,
+					#gearEntries - picks,
+					math.floor(ArenaStreak.Commission * 100 + 0.5)
+				),
+			gearLabelAt,
+			GOLD
+		)
+		gearRow = row(gearTop, GEAR_H)
+
+		local claim
+		local function redraw()
+			for id, c in cards do
+				c.Mark(chosen[id] == true)
 			end
-			local left = #reel
-			while screen == mine and left > 0 do
-				local now = os.clock()
-				if not started and (previewsIn or skip or now - opened >= 3) then
-					started = now
+			local n = #order
+			claim.Text = if n == picks then "CLAIM THESE " .. picks else string.format("PICK %d MORE", picks - n)
+			claim.BackgroundColor3 = if n == picks then GOLD else Color3.fromRGB(70, 74, 90)
+		end
+		local function toggle(id)
+			if chosen[id] then
+				chosen[id] = nil
+				table.remove(order, table.find(order, id))
+			else
+				if #order >= picks then
+					-- (the oldest pick gives way)
+					chosen[table.remove(order, 1)] = nil
 				end
-				local t = if started then now - started else nil
-				local flicked = false
-				for i, c in reel do
-					if not landed[i] then
-						if skip or (t and t >= landsAt(i)) then
-							landed[i] = true
-							left -= 1
-							c.Land()
-						elseif now >= (nextFlick[i] or 0) then
-							c.Spin()
-							flicked = true
-							local toGo = if t then landsAt(i) - t else 2
-							nextFlick[i] = now + 0.06 + math.max(0, 0.6 - toGo) * 0.3
-						end
-					end
-				end
-				if flicked then
-					UiSound.play("Tab")
-				end
-				task.wait(0.03)
+				chosen[id] = true
+				table.insert(order, id)
 			end
-			if screen == mine then
-				rolling = false
-				redraw()
+			redraw()
+		end
+		for _, entry in gemEntries do
+			cards[entry.OfferId] = card(gemRow, entry, nil, cache.Id)
+			table.insert(drawn, cards[entry.OfferId])
+		end
+		for _, entry in gearEntries do
+			cards[entry.OfferId] = card(gearRow, entry, toggle, cache.Id)
+			table.insert(drawn, cards[entry.OfferId])
+		end
+		if previewsIn then
+			for _, c in drawn do
+				c.Upgrade()
+			end
+		end
+
+		claim = new("TextButton", {
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, claimAt),
+			Size = UDim2.fromOffset(300, 52),
+			Font = Enum.Font.GothamBlack,
+			TextSize = 18,
+			TextColor3 = INK,
+			Text = "",
+		}, board)
+		UiKit.round(claim, 10)
+		claim:SetAttribute("UiSound", "Confirm")
+		claim.Activated:Connect(function()
+			if busy or #order ~= picks then
+				return
+			end
+			busy = true
+			local result = GemClient.request("StreakClaim", cache.Id, order)
+			busy = false
+			UiKit.toast(result.Message or "", if result.Ok then GOLD else nil)
+			if result.Ok then
+				state = result
+				close()
+				drawLauncher()
 			end
 		end)
+		local later = new("TextButton", {
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, 0, 0, 0),
+			Size = UDim2.fromOffset(110, 30),
+			BackgroundColor3 = CARD,
+			Font = Enum.Font.GothamBold,
+			TextSize = 13,
+			TextColor3 = DIM,
+			Text = "LATER",
+		}, board)
+		UiKit.round(later, 8)
+		later.Activated:Connect(function()
+			close()
+			drawLauncher()
+		end)
+		redraw()
+		drawLauncher()
+	end
+
+	-- The first time a cache opens, its lottery plays first (CacheLottery):
+	-- the free gems, then the gear, rolled and landed one by one.
+	if rolling then
+		task.spawn(function()
+			local ok, err = pcall(CacheLottery.play, shown, cache, {
+				Ready = function()
+					return previewsIn
+				end,
+			})
+			if not ok then
+				warn("[StreakRewards] the cache's lottery failed: " .. tostring(err))
+			end
+			if screen == shown then
+				pickScreen()
+			end
+		end)
+	else
+		pickScreen()
 	end
 end
 

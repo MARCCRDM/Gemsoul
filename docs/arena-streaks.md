@@ -53,21 +53,32 @@ All the numbers live in `src/shared/ArenaStreak.luau`.
 
 ## The roll
 
-The first time a cache opens, it rolls. Every card flicks through 3D Rare and
-Ultra-Rare gems and the cache's own armour and weapons in 3D, slowing as its
-turn comes. The cards then land one by one (the gems first) on what the server
-rolled. An Ultra-Rare lands with a pink flash and a shine. CLAIM unlocks once
-everything has landed, and a tap during the roll lands it all at once. The
-pieces are rolled on the server when the milestone is reached, so the
-animation only reveals them.
+The first time a cache opens, its lottery plays before the pick screen
+(`src/client/Modules/CacheLottery.luau`). It works like the mining gem find
+(`MiningReveal`): one round display rolls a reel, slows and lands on one piece
+at a time, with its rarity, name and stats beside it.
+
+- **Gem lottery** (the free gems, first). The reel rolls through gems of every
+  rarity, like a real find, and lands on yours. Size, Clarity and Cut fill in
+  as bars, with the gem's worth.
+- **Gear lottery** (the six armour and weapon pieces, next). The reel rolls
+  through the cache's own pieces in 3D and lands on each in turn. Its quality
+  fills in (out of 4), then its stat rolls, passive and affixes appear, with
+  its Market price and your 25% if it sells.
+
+A strip along the bottom lights each piece as it lands. **REVEAL** lands the
+current piece now, **NEXT** moves on (pieces also move on by themselves), and
+**SKIP ALL** goes straight to the picks. The pieces are rolled on the server
+when the milestone is reached, so the lottery only reveals them. Reopening a
+cache later in the session goes straight to the picks.
 
 Every piece is shown in 3D: gems from their data, gear from a preview the
 server builds on its mannequin (the same as the Market's,
 `Equipment.groupPreviews`, group "A"). Gear has its look (finish, visor and
 roll) rolled when the cache is rolled, at its own tier as the Forge does, so
 the model you see is exactly the piece you get. Previews are built when the
-cache list loads. The landings wait for them, 3 s at most, so nothing lands
-as a flat stand-in.
+cache list loads. The gear lottery waits for them (3 s at most from opening;
+the gem lottery usually covers it), so the reel rolls the real models.
 
 ## Testing it (DEV panel)
 
