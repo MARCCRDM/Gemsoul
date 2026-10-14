@@ -1110,7 +1110,9 @@ local function showWorld()
 	if humanoid then
 		camera.CameraSubject = humanoid
 	end
-	ThirdPerson.enter()
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	ThirdPerson.enter(if typeof(spawn) == "CFrame" then spawn else nil)
 	setWalking(true)
 	hud.Enabled = player:GetAttribute("CombatSession") == nil
 end
