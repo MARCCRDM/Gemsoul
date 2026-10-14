@@ -161,7 +161,17 @@ local function show(loot, token)
 	}, holder)
 	UiKit.round(well, WELL)
 	local wellEdge = new("UIStroke", { Color = DIM, Thickness = 2 }, well)
-	local wellPaint = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(INK, INK) }, well)
+	-- (Never put a gradient on the CanvasGroup itself: it would tint the gem.
+	-- The window's colour is its own layer, under the gems.)
+	local backdrop = panel(well, "WindowColour", 0, 0, WELL, WELL, WHITE, 4)
+	local wellPaint = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(INK, INK) }, backdrop)
+	-- A pool of light behind the stone, in its rarity colour, so it shines.
+	local spot = panel(well, "Spotlight", WELL / 2, WELL / 2, 156, 156, WHITE, 4)
+	spot.AnchorPoint, spot.BackgroundTransparency = Vector2.new(0.5, 0.5), 0.78
+	UiKit.round(spot, 200)
+	local core = panel(well, "SpotCore", WELL / 2, WELL / 2, 92, 92, WHITE, 4)
+	core.AnchorPoint, core.BackgroundTransparency = Vector2.new(0.5, 0.5), 0.8
+	UiKit.round(core, 200)
 	local slots = {}
 	for i = 1, 5 do
 		local cell = panel(well, "ReelCell", 0, 0, WELL, CELL, INK, 5)
@@ -176,10 +186,10 @@ local function show(loot, token)
 	new("UIGradient", {
 		Rotation = 90,
 		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.05),
-			NumberSequenceKeypoint.new(0.3, 1),
-			NumberSequenceKeypoint.new(0.7, 1),
-			NumberSequenceKeypoint.new(1, 0.05),
+			NumberSequenceKeypoint.new(0, 0.3),
+			NumberSequenceKeypoint.new(0.16, 1),
+			NumberSequenceKeypoint.new(0.84, 1),
+			NumberSequenceKeypoint.new(1, 0.3),
 		}),
 	}, depth)
 	local flash = panel(well, "LandFlash", 0, 0, WELL, WELL, WHITE, 7)
@@ -273,7 +283,9 @@ local function show(loot, token)
 		haloEdge.Color, wellEdge.Color, pillEdge.Color, pillText.TextColor3 = color, color, color, color
 		glow.BackgroundColor3, divider.BackgroundColor3, actionEdge.Color = color, color, color
 		paint.Color = ColorSequence.new(color:Lerp(INK, 0.9 - strength * 0.12), INK)
-		wellPaint.Color = ColorSequence.new(color:Lerp(INK, 0.7), INK)
+		wellPaint.Color = ColorSequence.new(color:Lerp(INK, 0.55), color:Lerp(INK, 0.85))
+		spot.BackgroundColor3 = color:Lerp(WHITE, 0.35)
+		core.BackgroundColor3 = color:Lerp(WHITE, 0.7)
 		pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier)
 	end
 	-- Only five reel cells are alive. Five templates are built once and recycled,
@@ -292,7 +304,7 @@ local function show(loot, token)
 		}
 		views[tier] = GemArt.viewport(templates, preview, false)
 	end
-	views.Winner = GemArt.viewport(templates, gem, false)
+	views.Winner = GemArt.viewport(templates, gem, true) -- (every facet)
 	gui.Destroying:Once(function()
 		templates:Destroy()
 	end)
@@ -319,6 +331,9 @@ local function show(loot, token)
 				slot.Art:ClearAllChildren()
 				local view = (if index == target then views.Winner else views[tier]):Clone()
 				view.CurrentCamera = view:FindFirstChildOfClass("Camera")
+				-- Bright, white light: a gem should glitter, not sulk.
+				view.Ambient = Color3.fromRGB(235, 235, 245)
+				view.LightColor = Color3.new(1, 1, 1)
 				view.ZIndex, view.Parent = 5, slot.Art
 			end
 			-- The strip rolls downward: later gems come in from the top.
@@ -400,6 +415,14 @@ local function show(loot, token)
 	action.Text = "CONTINUE  ›"
 	LotterySound.reveal(rank)
 	burst(effects, rank, winningColor)
+	-- Landed: the light behind it swells, and a few glints twinkle on it.
+	spot.BackgroundTransparency, core.BackgroundTransparency = 0.6, 0.62
+	local glints = {}
+	for i, at in { { 0.36, 0.34 }, { 0.66, 0.42 }, { 0.46, 0.66 } } do
+		local glint = panel(well, "Glint", WELL * at[1], WELL * at[2], 10, 10, WHITE, 6)
+		glint.AnchorPoint, glint.Rotation, glint.BackgroundTransparency = Vector2.new(0.5, 0.5), 45, 1
+		glints[i] = glint
+	end
 	-- The gem lands: a flash in the window and a punch of the whole display.
 	flash.BackgroundTransparency = 0.25
 	tween(flash, 0.45, { BackgroundTransparency = 1 })
@@ -430,6 +453,11 @@ local function show(loot, token)
 			end
 		end
 		sweep.Rotation = t * 40
+		for i, glint in glints do
+			local pulse = math.abs(math.sin(t * (2.2 + i * 0.7) + i * 1.9))
+			glint.BackgroundTransparency = 1 - pulse * 0.9
+			glint.Size = UDim2.fromOffset(4 + pulse * 9, 4 + pulse * 9)
+		end
 		local hold = if #queue > 0 then 1.5 else 2.6 + rank * 0.2
 		if t >= hold then
 			break
