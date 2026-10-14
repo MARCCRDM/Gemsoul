@@ -115,16 +115,30 @@ local elbow = rig.LeftLowerArm.LeftElbow
 elbow.Transform = CFrame.Angles(0.8, 0, 0)
 RivalPose.holdGuards()
 check(select(2, elbow.Transform:ToAxisAngle()) < 0.05, "The walk animation still swings the shield arm")
--- ...and left alone once it drops.
+-- ...and, out of the fight (a body back in the lobby: `rest`), left alone:
+-- the body walks and idles on its own animations again. (In a fight the
+-- upper body keeps its fighting stance between blows, so it stays held.)
 rig:SetAttribute("GuardUntil", 0)
 rig.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
 for _ = 1, 60 do
 	t += 1 / 60
-	RivalPose.update(rig, 1 / 60, t, 1)
+	RivalPose.update(rig, 1 / 60, t, 1, true)
 end
 elbow.Transform = CFrame.Angles(0.8, 0, 0)
 RivalPose.holdGuards()
-check(select(2, elbow.Transform:ToAxisAngle()) > 0.75, "The walk animation stays held off after the guard drops")
+check(select(2, elbow.Transform:ToAxisAngle()) > 0.75, "Out of a fight, the walk animation stays held off")
+-- A body sent back mid-pose: reset puts every joint at rest at once.
+rig:SetAttribute("GuardUntil", t + 5)
+for _ = 1, 30 do
+	t += 1 / 60
+	RivalPose.update(rig, 1 / 60, t, 1)
+end
+RivalPose.reset(rig)
+for _, d in rig:GetDescendants() do
+	if d:IsA("Motor6D") and d:GetAttribute("RestPose") then
+		check(d.C0 == d:GetAttribute("RestPose"), "Reset left " .. d.Name .. " bent")
+	end
+end
 -- The blows: the sword (held as Equipment holds it on a FistGrip body:
 -- gripped just below the hand, turned 120 degrees, about 2.8 studs to the
 -- tip) cuts a wide arc in front of the body, the way the slash drawn along it

@@ -27,6 +27,8 @@
 	  BodyPoses.step(dt)       pose every player's body for this frame
 	  BodyPoses.start()        every frame from now on
 	  BodyPoses.setFocus(fn)   fn() -> the model you're locked on, if any
+	  BodyPoses.settle(char)   a body back from a fight: joints at rest, out of
+	                           any stuck state, its animations started afresh
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -164,10 +166,73 @@ function BodyPoses.step(dt: number)
 	end
 end
 
+-- Your body coming back from a fight (or the intro's) to the lobby: the
+-- server moves the same body back rather than spawning a new one, so
+-- whatever it was in the middle of came along (a bent joint, a stride, a
+-- seat, a fall, the arena drop's freeze) and sometimes stuck, leaving it
+-- crouched or twisted. Settled here: every joint back to rest, out of any
+-- seated, fallen or physics state, and its walk and idle animations started
+-- afresh.
+local SETTLE_STATES = {
+	[Enum.HumanoidStateType.Physics] = true,
+	[Enum.HumanoidStateType.PlatformStanding] = true,
+	[Enum.HumanoidStateType.FallingDown] = true,
+	[Enum.HumanoidStateType.Ragdoll] = true,
+}
+function BodyPoses.settle(character: Model?)
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not character or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	pcall(RivalPose.reset, character)
+	humanoid.PlatformStand = false
+	local seated = humanoid:GetState() == Enum.HumanoidStateType.Seated
+	if humanoid.SeatPart == nil and (humanoid.Sit or seated) then
+		humanoid.Sit = false
+		seated = true
+	end
+	if (seated and humanoid.SeatPart == nil) or SETTLE_STATES[humanoid:GetState()] then
+		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	end
+	-- (Its animations: whatever was left playing stops, and the stock Animate
+	-- script restarts, picking up idle or walk from where the body is now.)
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if animator then
+		for _, track in animator:GetPlayingAnimationTracks() do
+			track:Stop(0.1)
+		end
+	end
+	local animate = character:FindFirstChild("Animate")
+	if animate and animate:IsA("LocalScript") and animate.Enabled then
+		animate.Enabled = false
+		task.defer(function()
+			if animate.Parent then
+				animate.Enabled = true
+			end
+		end)
+	end
+end
+
 local started=false
 function BodyPoses.start()
  if started then return end
  started=true
+	-- Out of a fight: settle the body now, and again once the move back has
+	-- landed (a pose written in between can't stick either).
+	local me = Players.LocalPlayer
+	local wasFighting = me:GetAttribute("CombatSession") ~= nil
+	me:GetAttributeChangedSignal("CombatSession"):Connect(function()
+		local fighting = me:GetAttribute("CombatSession") ~= nil
+		if wasFighting and not fighting then
+			BodyPoses.settle(me.Character)
+			task.delay(0.6, function()
+				if me:GetAttribute("CombatSession") == nil then
+					BodyPoses.settle(me.Character)
+				end
+			end)
+		end
+		wasFighting = fighting
+	end)
  -- After Animator evaluation, before joint transforms are committed to physics.
  -- One owner and one phase prevent render/physics fighting over arm poses.
  RunService.PreSimulation:Connect(function(dt)

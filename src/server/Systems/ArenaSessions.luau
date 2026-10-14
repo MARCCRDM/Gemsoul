@@ -7,6 +7,8 @@ local Combat = require(ReplicatedStorage.Shared.Combat)
 local CombatServer = require(script.Parent.CombatServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
+local SeatExit = require(script.Parent.SeatExit)
+local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local ArenaSessions = {}
 -- Hooks set by the Duelist (a computer rival in PvP); nil when not running.
 ArenaSessions.onDungeonLeave = nil
@@ -77,6 +79,35 @@ local function leave(player)
 	player:SetAttribute("CombatSession", nil)
 	player:SetAttribute("RaidId", nil)
 	player:SetAttribute("Blocking", false)
+	-- The same body goes back (no respawn), so free it first: out of any
+	-- seat, unfrozen (the arena drop anchors it), still, and with no fight
+	-- pose left on it for anyone's screen to draw. (The client settles its
+	-- joints and animations as the session ends: BodyPoses.settle.)
+	-- (Never in the way of leaving: anything odd about the body is skipped.)
+	local character = player.Character
+	if character then
+		pcall(SeatExit.detach, character)
+		pcall(function()
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.PlatformStand = false
+				humanoid.Sit = false
+			end
+		end)
+		pcall(function()
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if root and root:IsA("BasePart") then
+				root.Anchored = false
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.AssemblyAngularVelocity = Vector3.zero
+			end
+		end)
+		pcall(function()
+			for _, name in RivalPose.Attributes do
+				character:SetAttribute(name, nil)
+			end
+		end)
+	end
 	local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 	-- Came from the Saga Outpost (a duel challenged there): back to it.
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
