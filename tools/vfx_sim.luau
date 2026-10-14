@@ -729,7 +729,7 @@ end
 -- side on, its particles drifting and its trail streaking through the swing.
 local PickaxeLooks = requireScript(shared.PickaxeLooks)
 local PickImpacts = requireScript(client.Modules.PickImpacts)
-local PICKS = { "PickMagma", "PickStorm", "PickVoid", "PickGlacier", "PickPrism", "PickNeon", "PickGilded", "PickGeode", "PickBone", "Standard" }
+local PICKS = { "PickMagma", "PickStorm", "PickVoid", "PickGlacier", "PickPrism", "PickNeon", "PickGilded", "PickGeode", "PickBone", "PickTwinStar", "Standard" }
 scenarios.Picks = {
 	Frames = { 0.12, 0.34, 0.42, 0.5, 0.62 },
 	Rows = PICKS,
@@ -787,7 +787,7 @@ scenarios.PickLineup = {
 	end,
 }
 -- Each skin's hit on a rock (PickImpacts), and the critical hits.
-local IMPACTS = { "Magma", "Frost", "Storm", "Void", "Gold", "Prism", "Neon", "Bone", "Geode", "Storm crit", "Magma crit" }
+local IMPACTS = { "Magma", "Frost", "Storm", "Void", "Gold", "Prism", "Neon", "Bone", "Geode", "TwinStar", "Storm crit", "Magma crit" }
 scenarios.PickHits = {
 	Frames = { 0.05, 0.12, 0.2, 0.3, 0.45, 0.7 },
 	Rows = IMPACTS,

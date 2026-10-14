@@ -1,6 +1,6 @@
 # Pickaxe skins (2026-10-14)
 
-Nine pickaxe skins, a new cosmetic kind (`Pick`). A skin changes how your pick
+Ten pickaxe skins, a new cosmetic kind (`Pick`). A skin changes how your pick
 looks and how its hits land. It never changes what it does: the pick you mine
 with (Survey, Titan or Plasma) keeps its swings and power. With no skin, you
 hold that pick in its own colour, as before.
@@ -16,6 +16,7 @@ hold that pick in its own colour, as before.
 | Gilded Prospector | Ultra Rare | Masterwork Crate | Polished gold, rubies and an emerald | Coins pop out spinning, a star glints |
 | Amethyst Geode | Rare | Geode Crate | A rough rock knocked open, an amethyst cluster for a spike | Amethyst crystals snap out of the rock |
 | Bone Crusher | Uncommon | Geode Crate | A tusk lashed to a spine, a skull for a hammer | Bone chips and a puff of dust |
+| Twin Star | Legendary | Invite 2 friends (never sold) | Night-blue, twin gold and teal prongs, two stars circling the head | A gold star and a teal one crash together and burst |
 
 Each skin has its own particles, light, and a trail that streaks through every
 swing. A critical hit adds the most to its effect. Everyone at the Outpost sees

@@ -22,6 +22,7 @@ local Referrals = {}
 
 Referrals.Tiers = {
 	{ Friends = 1, Reward = "SkinCrusader" },
+	{ Friends = 2, Reward = "PickTwinStar" },
 	{ Friends = 3, Reward = "BackStandard" },
 	{ Friends = 5, Reward = "SuitCrusader" },
 	{ Friends = 10, Reward = "TitleLegend" },

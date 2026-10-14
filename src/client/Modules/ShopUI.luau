@@ -1139,7 +1139,7 @@ local function drawFree()
 	local invites = state.Invites or { Count = 0, Tiers = {} }
 	local iCard = freeCard(half + 14, 0, half, cardH, P.Gold, "BRING FRIENDS", "Invite friends. Each one who joins counts, and the rewards stack up.")
 	local tiers = invites.Tiers or {}
-	local tileW = math.min(66, math.floor((half - 36 - 3 * 8) / 4))
+	local tileW = math.min(66, math.floor((half - 196 - math.max(0, #tiers - 1) * 8) / math.max(1, #tiers)))
 	local rowW = #tiers * tileW + math.max(0, #tiers - 1) * 8
 	for i, tier in tiers do
 		local x = 18 + (i - 1) * (tileW + 8)

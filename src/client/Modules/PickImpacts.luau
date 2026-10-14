@@ -217,7 +217,11 @@ local function streaks(at: Vector3, out: Vector3, count: number, reach: number, 
 		tween(
 			s,
 			seconds,
-			{ CFrame = aim(at + dir * go, at + dir * (go + 1)), Size = Vector3.new(0.03, 0.03, 0.2), Transparency = 0.6 }
+			{
+				CFrame = aim(at + dir * go, at + dir * (go + 1)),
+				Size = Vector3.new(0.03, 0.03, 0.2),
+				Transparency = 0.6,
+			}
 		)
 	end
 end
@@ -455,6 +459,41 @@ function LOOKS.Geode(at: Vector3, out: Vector3, k: number, crit: boolean, scale:
 		crystals(at, Vector3.yAxis, 5, 2.6, DEEP, AMETHYST, Enum.Material.Glass)
 		ring(at, Vector3.yAxis, AMETHYST, 1, 9, 0.45)
 	end
+end
+
+-- Twin Star: a gold star and a teal one crash together on the hit, burst,
+-- and a white star glints where they met.
+function LOOKS.TwinStar(at: Vector3, out: Vector3, k: number, crit: boolean, scale: number)
+	local GOLD, TEAL = Color3.fromRGB(255, 205, 90), Color3.fromRGB(70, 235, 220)
+	local side = aim(at, at + out).RightVector
+	for n, color in { GOLD, TEAL } do
+		local from = at + side * (if n == 1 then 1.8 else -1.8) * k + Vector3.new(0, 0.8, 0)
+		local star =
+			piece(CFrame.new(from), Vector3.one * 0.5, color, Enum.Material.Neon, 0.35, { Shape = Enum.PartType.Ball })
+		tween(star, 0.12, { CFrame = CFrame.new(at) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		task.delay(0.12, function()
+			tween(star, 0.2, { Size = Vector3.one * 2 * k, Transparency = 1 })
+		end)
+	end
+	task.delay(0.12, function()
+		bloom(at, WHITE, 2.4 * k, 0.25, 0.2)
+		ring(at, out, GOLD, 0.4, 4.5 * k, 0.35)
+		ring(at, out, TEAL, 0.3, 3.2 * k, 0.3)
+		streaks(at, out, math.ceil((8 + 6 * k) * scale), 5 * k, { GOLD, TEAL }, 0.3)
+		local face = aim(at + out * 0.3, at + out)
+		for _, roll in { 0, math.pi / 2 } do
+			local bar =
+				piece(face * CFrame.Angles(0, 0, roll), Vector3.new(0.1, 0.4, 0.1), WHITE, Enum.Material.Neon, 0.35)
+			tween(bar, 0.1, { Size = Vector3.new(0.12, 3 * k, 0.1) }, Enum.EasingStyle.Back)
+			task.delay(0.1, function()
+				tween(bar, 0.22, { Size = Vector3.new(0.02, 0.6, 0.02), Transparency = 1 })
+			end)
+		end
+		if crit then
+			ring(at, Vector3.yAxis, GOLD, 1, 8, 0.45)
+			ring(at, Vector3.yAxis, TEAL, 0.6, 6, 0.4)
+		end
+	end)
 end
 
 PickImpacts.Looks = LOOKS

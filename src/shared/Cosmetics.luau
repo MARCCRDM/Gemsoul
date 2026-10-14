@@ -1257,6 +1257,16 @@ Cosmetics.List = {
 		Color = Color3.fromRGB(240, 228, 200),
 		Crate = "GeodeCrate",
 	},
+	PickTwinStar = {
+		Id = "PickTwinStar",
+		Kind = "Pick",
+		Name = "Twin Star",
+		Description = "Two stars, gold and teal, circle its head: you and your crew. Every hit crashes them together.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(255, 215, 120),
+		Exclusive = "Invite",
+		How = "Invite 2 friends who join the game.",
+	},
 } :: { [string]: Cosmetic }
 
 function Cosmetics.get(id: any): Cosmetic?

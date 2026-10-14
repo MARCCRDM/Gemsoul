@@ -211,20 +211,15 @@ LOOKS.PickMagma = {
 		-- The back: a blunt hammer with a molten face.
 		add(CFrame.new(0, 2.45, 0.55), Vector3.new(0.52, 0.5, 0.5), BASALT, Enum.Material.Basalt)
 		add(CFrame.new(0, 2.45, 0.82), Vector3.new(0.48, 0.46, 0.06), LAVA, Enum.Material.Neon)
-		emitter(
-			head,
-			LAVA,
-			26,
-			{
-				Texture = FIRE,
-				From = HOT,
-				Size = 0.55,
-				Speed = 0.5,
-				Life = 0.45,
-				Acceleration = Vector3.new(0, 5, 0),
-				Spread = 25,
-			}
-		)
+		emitter(head, LAVA, 26, {
+			Texture = FIRE,
+			From = HOT,
+			Size = 0.55,
+			Speed = 0.5,
+			Life = 0.45,
+			Acceleration = Vector3.new(0, 5, 0),
+			Spread = 25,
+		})
 		emitter(head, HOT, 10, { Size = 0.12, Speed = 1.2, Life = 0.9, Acceleration = Vector3.new(0, 3, 0) })
 		emitter(
 			pommel,
@@ -330,21 +325,16 @@ LOOKS.PickGlacier = {
 			12,
 			{ Size = 0.14, Speed = 0.4, Life = 1.2, Acceleration = Vector3.new(0, -1.5, 0), Light = 0.6 }
 		)
-		emitter(
-			head,
-			DEEP,
-			8,
-			{
-				Texture = SMOKE,
-				Size = 0.5,
-				EndSize = 1,
-				Speed = 0.3,
-				Life = 1,
-				Light = 0.2,
-				Alpha = 0.7,
-				Acceleration = Vector3.new(0, -0.6, 0),
-			}
-		)
+		emitter(head, DEEP, 8, {
+			Texture = SMOKE,
+			Size = 0.5,
+			EndSize = 1,
+			Speed = 0.3,
+			Life = 1,
+			Light = 0.2,
+			Alpha = 0.7,
+			Acceleration = Vector3.new(0, -0.6, 0),
+		})
 		emitter(pommel, ICE, 4, { Size = 0.1, Speed = 0.3, Life = 0.8 })
 		glow(head, DEEP, 1.8, 10)
 		trail(tip, Vector3.new(0, 0, 0.7), WHITE, DEEP)
@@ -522,21 +512,16 @@ LOOKS.PickVoid = {
 			NIGHT,
 			Enum.Material.Glass
 		)
-		emitter(
-			head,
-			NIGHT,
-			14,
-			{
-				Texture = SMOKE,
-				Size = 0.4,
-				EndSize = 0.9,
-				Speed = 0.4,
-				Life = 1,
-				Light = 0,
-				Alpha = 0.4,
-				Acceleration = Vector3.new(0, 0.8, 0),
-			}
-		)
+		emitter(head, NIGHT, 14, {
+			Texture = SMOKE,
+			Size = 0.4,
+			EndSize = 0.9,
+			Speed = 0.4,
+			Life = 1,
+			Light = 0,
+			Alpha = 0.4,
+			Acceleration = Vector3.new(0, 0.8, 0),
+		})
 		emitter(head, VIOLET, 10, { Size = 0.12, Speed = 0.8, Life = 0.8 })
 		emitter(pommel, VIOLET, 4, { Size = 0.1, Speed = 0.3, Life = 0.6 })
 		glow(head, VIOLET, 2.2, 11)
@@ -960,6 +945,108 @@ LOOKS.PickGeode = {
 		emitter(pommel, AMETHYST, 3, { Size = 0.08, Speed = 0.3, Life = 0.6 })
 		glow(head, AMETHYST, 1.8, 9)
 		trail(tip :: BasePart, Vector3.new(0, 0, 1.05), PALE, DEEP)
+		return tip :: BasePart
+	end,
+}
+
+-- Twin Star (bring two friends): a night-blue pick split into twin prongs,
+-- gold and teal, two stars circling its head.
+LOOKS.PickTwinStar = {
+	Impact = "TwinStar",
+	Color = Color3.fromRGB(255, 215, 120),
+	Build = function(add: Add): BasePart
+		local NAVY, DEEP = Color3.fromRGB(22, 26, 58), Color3.fromRGB(12, 14, 34)
+		local GOLD, TEAL = Color3.fromRGB(255, 205, 90), Color3.fromRGB(70, 235, 220)
+		local STARLIGHT = Color3.fromRGB(255, 244, 214)
+		add(
+			CFrame.new(0, 1.05, 0),
+			Vector3.new(0.22, 2.5, 0.22),
+			NAVY,
+			Enum.Material.SmoothPlastic,
+			{ Reflectance = 0.15 }
+		)
+		-- A gold stripe and a teal one, side by side up the haft.
+		for side, color in { [-1] = GOLD, [1] = TEAL } do
+			add(CFrame.new(side * 0.115, 1.05, 0), Vector3.new(0.02, 2.3, 0.07), color, Enum.Material.Neon)
+		end
+		for _, y in { 0.1, 0.45 } do
+			add(CFrame.new(0, y, 0), Vector3.new(0.28, 0.1, 0.28), GOLD, Enum.Material.Foil, { Reflectance = 0.3 })
+		end
+		-- The pommel: a little four-point star.
+		local pommel = add(
+			CFrame.new(0, -0.15, 0) * CFrame.Angles(0, 0, math.rad(45)),
+			Vector3.new(0.2, 0.2, 0.08),
+			TEAL,
+			Enum.Material.Neon
+		)
+		add(CFrame.new(0, -0.15, 0), Vector3.new(0.12, 0.3, 0.06), TEAL, Enum.Material.Neon)
+		-- The head: a night-blue block banded in gold.
+		local head = add(CFrame.new(0, 2.45, 0), Vector3.new(0.5, 0.5, 0.56), NAVY, Enum.Material.Metal)
+		add(CFrame.new(0, 2.45, 0), Vector3.new(0.54, 0.12, 0.6), GOLD, Enum.Material.Foil, { Reflectance = 0.35 })
+		-- Two stars circling it, gold and teal, with the specks of their orbit.
+		local stars = {}
+		for n, color in { GOLD, TEAL } do
+			local side = if n == 1 then -1 else 1
+			local star = add(
+				CFrame.new(side * 0.44, 2.62 - n * 0.1, side * 0.12),
+				Vector3.new(0.2, 0.2, 0.2),
+				color,
+				Enum.Material.Neon,
+				{ Shape = Enum.PartType.Ball }
+			)
+			add(
+				CFrame.new(side * 0.44, 2.62 - n * 0.1, side * 0.12),
+				Vector3.new(0.3, 0.3, 0.3),
+				STARLIGHT,
+				Enum.Material.ForceField,
+				{ Shape = Enum.PartType.Ball }
+			)
+			table.insert(stars, star)
+		end
+		for i = 1, 6 do
+			local a = i / 6 * math.pi * 2 + 0.5
+			add(
+				CFrame.new(math.cos(a) * 0.45, 2.52 + math.sin(a) * 0.08, math.sin(a) * 0.45),
+				Vector3.new(0.05, 0.05, 0.05),
+				if i % 2 == 0 then GOLD else TEAL,
+				Enum.Material.Neon,
+				{ Shape = Enum.PartType.Ball }
+			)
+		end
+		-- Twin prongs, gold and teal, splitting off a night-blue neck.
+		add(CFrame.new(0, 2.45, -0.48), Vector3.new(0.32, 0.32, 0.42), DEEP, Enum.Material.Metal)
+		local tip = nil
+		for n, color in { GOLD, TEAL } do
+			local side = if n == 1 then -1 else 1
+			local at = CFrame.new(side * 0.09, 2.42, -1.08) * CFrame.Angles(math.rad(-10), math.rad(-side * 5), 0)
+			local prong = spike(
+				add,
+				at,
+				0.14,
+				0.26,
+				1.0,
+				color,
+				if n == 1 then Enum.Material.Foil else Enum.Material.Glass,
+				{ Reflectance = 0.3 }
+			)
+			add(at * CFrame.new(0, 0.02, 0.05), Vector3.new(0.03, 0.03, 0.85), STARLIGHT, Enum.Material.Neon)
+			if n == 1 then
+				tip = prong
+			end
+		end
+		-- The hammer: a star-white diamond.
+		add(
+			CFrame.new(0, 2.45, 0.48) * CFrame.Angles(0, 0, math.rad(45)),
+			Vector3.new(0.34, 0.34, 0.36),
+			STARLIGHT,
+			Enum.Material.Foil,
+			{ Reflectance = 0.3 }
+		)
+		emitter(stars[1], GOLD, 10, { Size = 0.12, Speed = 0.4, Life = 0.7 })
+		emitter(stars[2], TEAL, 10, { Size = 0.12, Speed = 0.4, Life = 0.7 })
+		emitter(pommel, STARLIGHT, 3, { Size = 0.08, Speed = 0.3, Life = 0.6 })
+		glow(head, STARLIGHT, 1.8, 10)
+		trail(tip :: BasePart, Vector3.new(0, 0, 1.0), GOLD, TEAL)
 		return tip :: BasePart
 	end,
 }

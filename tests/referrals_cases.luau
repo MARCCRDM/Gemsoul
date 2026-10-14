@@ -87,7 +87,8 @@ local stubs = {
 	Config = { DataStoreName = "Test" },
 	Cosmetics = {
 		get = function(id)
-			local kinds = { SkinCrusader = "Skin", BackStandard = "Back", SuitCrusader = "Suit", TitleLegend = "Title" }
+			local kinds =
+				{ SkinCrusader = "Skin", PickTwinStar = "Pick", BackStandard = "Back", SuitCrusader = "Suit", TitleLegend = "Title" }
 			return if kinds[id] then { Id = id, Kind = kinds[id], Name = id } else nil
 		end,
 	},
@@ -204,7 +205,8 @@ join(cheat)
 check(stored["20"] == nil and not profiles[cheat].Cosmetics.Owned[Rules.Reward], "A self-invite counted")
 
 -- The ladder: every tier reached, each worn; the next ones wait.
-check(#Rules.rewardsFor(0) == 0 and #Rules.rewardsFor(1) == 1 and #Rules.rewardsFor(4) == 2, "Tier rewards miscounted")
+check(#Rules.rewardsFor(0) == 0 and #Rules.rewardsFor(1) == 1 and #Rules.rewardsFor(4) == 3, "Tier rewards miscounted")
+check(Rules.rewardsFor(2)[2] == "PickTwinStar", "Two friends don't earn the Twin Star pickaxe")
 check(#Rules.rewardsFor(10) == #Rules.Tiers and Rules.nextTier(10) == nil, "The top tier isn't the last")
 check(Rules.nextTier(3).Friends == 5, "The next tier after 3 friends isn't 5")
 local recruiter = makePlayer(30, 0)
@@ -213,9 +215,9 @@ for friendId = 31, 33 do
 	join(makePlayer(friendId, 30))
 end
 local owned = profiles[recruiter].Cosmetics
-check(owned.Owned.SkinCrusader and owned.Owned.BackStandard, "Three friends didn't unlock the first two tiers")
+check(owned.Owned.SkinCrusader and owned.Owned.PickTwinStar and owned.Owned.BackStandard, "Three friends didn't unlock the first three tiers")
 check(not owned.Owned.SuitCrusader and not owned.Owned.TitleLegend, "Three friends unlocked a higher tier")
-check(owned.Skin == "SkinCrusader" and owned.Back == "BackStandard", "The tier rewards weren't worn")
+check(owned.Skin == "SkinCrusader" and owned.Pick == "PickTwinStar" and owned.Back == "BackStandard", "The tier rewards weren't worn")
 
 print(
 	"PASS: "
