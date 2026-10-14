@@ -31,6 +31,7 @@ local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
 local CombatFx = require(script.Parent.Modules.CombatFx)
 local CombatVfx = require(script.Parent.Modules.CombatVfx)
 local TriadVfx = require(script.Parent.Modules.TriadVfx)
+local MoveVfx = require(script.Parent.Modules.MoveVfx)
 local BladeTrails = require(script.Parent.Modules.BladeTrails)
 local CombatSound = require(script.Parent.Modules.CombatSound)
 local MatchupUI = require(script.Parent.Modules.MatchupUI)
@@ -2305,6 +2306,18 @@ function handlers.DodgeRoll(who, origin, direction, distance, afterimage)
 	end
 end
 -- The Q / E / R triad's moves (Modules/TriadVfx).
+-- A move's own look (Meteor Leap, Storm Call, Toxic Tide...).
+function handlers.TriadShow(who, show, ...)
+	MoveVfx.show(who, show, ...)
+end
+-- Dragged by a move (Viper Lash, Flame Tornado): a hop toward it, no stagger.
+function handlers.Shoved(velocity: Vector3)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root and typeof(velocity) == "Vector3" and velocity.Magnitude > 0.1 then
+		root.AssemblyLinearVelocity = velocity + Vector3.new(0, velocity.Magnitude * 0.45, 0)
+	end
+end
 function handlers.TriadCast(who, id, element, key, castTime)
 	TriadVfx.cast(who, id, element, key, castTime)
 end

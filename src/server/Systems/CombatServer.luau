@@ -1625,8 +1625,9 @@ local function technologyStrike(player, definition, aim, scale)
 		not humanoid
 		or not k
 		or not Combat.canFight(root.Position)
-		or os.clock() < st.StunUntil
-		or blocking(st, os.clock())
+		-- (something already thrown, pinned to where it lands, lands anyway)
+		or (not definition.At and os.clock() < st.StunUntil)
+		or (not definition.At and blocking(st, os.clock()))
 		or (st.DodgeMove and os.clock() < st.DodgeMove.Ends) -- (a leap lands as it ends)
 	then
 		return
@@ -1650,9 +1651,21 @@ local function technologyStrike(player, definition, aim, scale)
 	local direction = if offset.Magnitude > 0.01 then offset.Unit else root.CFrame.LookVector
 	local center = if definition.Self
 		then root.Position
+		elseif definition.At then definition.At
 		else origin + direction * math.min(offset.Magnitude, definition.Range)
 	local color = GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80)
-	if definition.Signature and lineClear(origin, center) then
+	-- A move with its own look (TriadVfx.show) draws that instead of the
+	-- generic bolt, blast and signature.
+	local show = definition.Show
+	local function pulse(from: Vector3, to: Vector3, radius: number)
+		if show then
+			fx("TriadShow", player, show, from, to, radius, definition.Element)
+		else
+			fx("TechPulse", player, from, to, color, radius)
+		end
+	end
+	local width = definition.Width or 2
+	if definition.Signature and not show and lineClear(origin, center) then
 		fx("AbilitySignature", player, origin, center, color, definition.Signature, definition.Radius or 3)
 	end
 	if definition.Cone then
@@ -1682,11 +1695,11 @@ local function technologyStrike(player, definition, aim, scale)
 			end
 		end
 	elseif definition.Radius then
-		if not definition.Self and not lineClear(origin, center) then
+		if not definition.Self and not definition.At and not lineClear(origin, center) then
 			return
 		end
 		local radius = if definition.Cloud then definition.Radius else Actions.blastRadius(definition.Radius)
-		fx("TechPulse", player, origin, center, color, radius)
+		pulse(origin, center, radius)
 		if definition.Cloud then
 			-- A lingering pool that keeps hitting (Toxic Cloud).
 			st.Zones = st.Zones or {}
@@ -1753,7 +1766,7 @@ local function technologyStrike(player, definition, aim, scale)
 			if
 				projection > 0
 				and projection <= along
-				and (v - direction * projection).Magnitude <= 2
+				and (v - direction * projection).Magnitude <= width
 				and lineClear(origin, target.Root.Position + Vector3.new(0, 1.5, 0))
 			then
 				nearest, along = target, projection
@@ -1761,14 +1774,14 @@ local function technologyStrike(player, definition, aim, scale)
 		end
 		if definition.Piercing then
 			-- Pierces: everyone along the line, out to Range (Cryo Lance).
-			fx("TechPulse", player, origin, origin + direction * definition.Range, color, 0)
+			pulse(origin, origin + direction * definition.Range, if show then width else 0)
 			for _, target in targets(player) do
 				local v = target.Root.Position + Vector3.new(0, 1.5, 0) - origin
 				local projection = v:Dot(direction)
 				if
 					projection > 0
 					and projection <= definition.Range
-					and (v - direction * projection).Magnitude <= 2
+					and (v - direction * projection).Magnitude <= width
 					and lineClear(origin, target.Root.Position + Vector3.new(0, 1.5, 0))
 				then
 					technologyHit(player, k, target, definition, scale)
@@ -1776,7 +1789,7 @@ local function technologyStrike(player, definition, aim, scale)
 			end
 			return
 		end
-		fx("TechPulse", player, origin, origin + direction * along, color, 0)
+		pulse(origin, origin + direction * along, if show then (if nearest then 1 else 0) else 0)
 		if nearest then
 			technologyHit(player, k, nearest, definition, scale)
 			-- Chain: bounce on to the nearest new targets, 20% weaker each jump.
@@ -2069,7 +2082,8 @@ local function triggerTechnology(player, id, aim, surgeKey)
 		fx(
 			"Nova",
 			center - Vector3.new(0, 2.5, 0),
-			Actions.blastRadius(definition.Radius),
+			-- (a storm or hail covers its own Radius, not a blast's)
+			if definition.Hail or definition.Storm then definition.Radius else Actions.blastRadius(definition.Radius),
 			GemConfig.ElementColors[definition.Element] or Color3.fromRGB(255, 190, 80),
 			castTime
 		)
@@ -2675,6 +2689,15 @@ TriadServer.bind({
 			Remotes.CombatFx:FireClient(target.Player, "Blasted", "Staggered", 0.25, away.Unit * power)
 		else
 			target.Root.AssemblyLinearVelocity = away.Unit * power + Vector3.new(0, power * 0.35, 0)
+		end
+	end,
+	-- Move a target without staggering it (pulls): a player's own client
+	-- moves them, the server moves a computer enemy.
+	shove = function(target, velocity: Vector3)
+		if target.Player then
+			Remotes.CombatFx:FireClient(target.Player, "Shoved", velocity)
+		else
+			target.Root.AssemblyLinearVelocity = velocity + Vector3.new(0, velocity.Magnitude * 0.45, 0)
 		end
 	end,
 	cleanse = cleanse,

@@ -53,6 +53,46 @@ local function horizontal(v: Vector3): Vector3
 	return if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
 end
 
+local function lerp(a: Vector3, b: Vector3, t: number): Vector3
+	return a + (b - a) * t
+end
+
+-- How far along `direction` a moving payload can go from `from` before a
+-- wall stops it (characters and effects don't).
+local function reach(from: Vector3, direction: Vector3, distance: number): number
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local skip = {}
+	for _, other in game:GetService("Players"):GetPlayers() do
+		if other.Character then
+			table.insert(skip, other.Character)
+		end
+	end
+	for _, name in { "CombatFx", "TriadVfx", "Enemies" } do
+		local f = workspace:FindFirstChild(name)
+		if f then
+			table.insert(skip, f)
+		end
+	end
+	params.FilterDescendantsInstances = skip
+	params.RespectCanCollide = true
+	local hit = workspace:Raycast(from + Vector3.new(0, 1, 0), direction * distance, params)
+	return if hit then math.max(2, hit.Distance - 1) else distance
+end
+
+-- Drags a target toward `to` (Viper Lash, Flame Tornado): it hops there,
+-- without the stagger a blow brings. `cap` limits the speed.
+local function yank(target, to: Vector3, cap: number?)
+	local offset = (to - target.Root.Position) * Vector3.new(1, 0, 1)
+	local distance = offset.Magnitude
+	if distance < 0.8 then
+		return
+	end
+	local speed = math.clamp(math.sqrt(distance * (workspace.Gravity or 196.2) / 0.9), 12, cap or 70)
+	api.shove(target, offset.Unit * speed)
+end
+TriadServer.yank = yank
+
 -- Is the gem's E move an Aura, and ready (its passive is on)?
 local function readyAura(player, k, st, now)
 	local gem = api.Tech.surgeGem(k.Loadout, "E")
@@ -256,6 +296,9 @@ function TriadServer.schedule(player, k, st, definition, aim, now, castTime)
 		api.fx("DodgeRoll", player, root.Position, direction, distance, definition.Untargetable ~= nil)
 		at = now + dash.MoveTime + 0.02
 		t.DashFrom, t.DashTo = root.Position, root.Position + direction * distance
+		if definition.Show then
+			api.fx("TriadShow", player, definition.Show, t.DashFrom, t.DashTo, dash.MoveTime, definition.Element)
+		end
 		if definition.Untargetable then
 			t.UntargetableUntil = now + definition.Untargetable + dash.MoveTime
 		end
@@ -271,6 +314,39 @@ function TriadServer.schedule(player, k, st, definition, aim, now, castTime)
 				Definition = definition,
 			})
 		end
+	end
+	if definition.Pounce then
+		-- Meteor Leap: up and over toward the aim; the blow lands with you.
+		local pounce = definition.Pounce
+		local flat = (aim - root.Position) * Vector3.new(1, 0, 1)
+		local direction = if flat.Magnitude > 0.1 then flat.Unit else horizontal(root.CFrame.LookVector)
+		local params = RaycastParams.new()
+		params.FilterType, params.FilterDescendantsInstances = Enum.RaycastFilterType.Exclude, { player.Character }
+		params.RespectCanCollide = true
+		local want = math.clamp(flat.Magnitude - 1.5, 3, pounce.Distance)
+		local hit = workspace:Blockcast(root.CFrame, Vector3.new(2, 3, 2), direction * want, params)
+		local travel = if hit then math.max(0, hit.Distance - 0.5) else want
+		st.DodgeMove = {
+			Kind = "Leap",
+			Root = root,
+			Direction = direction,
+			Speed = travel / pounce.Time,
+			Ends = now + pounce.Time,
+			Lift = pounce.Lift,
+		}
+		pcall(function()
+			root:SetNetworkOwner(nil)
+		end)
+		at = now + pounce.Time + 0.02
+		api.fx(
+			"TriadShow",
+			player,
+			(definition.Show or "MeteorLeap") .. "Jump",
+			root.Position,
+			root.Position + direction * travel,
+			pounce.Time,
+			definition.Element
+		)
 	end
 	if definition.ConsumeCharge then
 		-- Overcharge Strike: everything you have left goes into the blow.
@@ -296,13 +372,151 @@ function TriadServer.schedule(player, k, st, definition, aim, now, castTime)
 	return true
 end
 
+-- Where a ground-targeted move lands: the aim, out to its Range.
+local function landing(root: BasePart, definition, aim: Vector3): Vector3
+	local origin = root.Position + Vector3.new(0, 1.5, 0)
+	local offset = aim - origin
+	local direction = if offset.Magnitude > 0.01 then offset.Unit else root.CFrame.LookVector
+	return origin + direction * math.min(offset.Magnitude, definition.Range or 30)
+end
+
+-- The moving and lingering payloads (they strike from the world, not at once).
+local MOVING = { Vortex = true, Disc = true, Hail = true, Storm = true, Wave = true }
+local function launch(player, st, definition, aim: Vector3, now: number)
+	local _, root = api.alive(player)
+	local direction = horizontal(aim - root.Position)
+	local from = root.Position
+	if definition.Vortex then
+		local v = definition.Vortex
+		local start = from + direction * 3
+		local distance = reach(start, direction, v.Distance)
+		TriadServer.zone(player, st, {
+			Kind = "Vortex",
+			From = start,
+			To = start + direction * distance,
+			Center = start,
+			Born = now,
+			Travel = v.Time,
+			Radius = v.Radius,
+			Pull = v.Pull,
+			HitEvery = v.Every,
+			End = v.End,
+			EndRadius = v.EndRadius,
+			Hit = {},
+			Until = now + v.Time,
+			Every = 0.05,
+			Definition = definition,
+		})
+	elseif definition.Disc then
+		local d = definition.Disc
+		local start = from + direction * 1.5
+		local distance = reach(start, direction, d.Distance)
+		TriadServer.zone(player, st, {
+			Kind = "Disc",
+			From = start,
+			Far = start + direction * distance,
+			Born = now,
+			Travel = d.Time,
+			Radius = d.Radius,
+			Out = {},
+			Back = {},
+			Until = now + d.Time,
+			Every = 0.03,
+			Definition = definition,
+		})
+	elseif definition.Hail then
+		local center = landing(root, definition, aim)
+		TriadServer.zone(player, st, {
+			Kind = "Hail",
+			Center = center,
+			Radius = definition.Radius,
+			Chill = definition.Hail.Chill,
+			Until = now + definition.Hail.Time,
+			Every = definition.Hail.Every,
+			Definition = definition,
+		})
+	elseif definition.Storm then
+		local center = landing(root, definition, aim)
+		local storm = definition.Storm
+		TriadServer.zone(player, st, {
+			Kind = "Storm",
+			Center = center,
+			Radius = definition.Radius,
+			Strikes = storm.Strikes,
+			Fired = 0,
+			NextBolt = now,
+			BoltEvery = storm.Every,
+			Delay = storm.Delay,
+			BoltRadius = storm.Radius,
+			Stun = storm.Stun,
+			Bolts = {},
+			Until = now + storm.Strikes * storm.Every + storm.Delay + 0.1,
+			Every = 0.05,
+			Definition = definition,
+		})
+	elseif definition.Wave then
+		local w = definition.Wave
+		local distance = reach(from, direction, w.Distance)
+		TriadServer.zone(player, st, {
+			Kind = "Wave",
+			From = from,
+			Direction = direction,
+			Distance = distance,
+			Born = now,
+			Travel = w.Time * distance / w.Distance,
+			Width = w.Width,
+			Push = w.Push,
+			Hit = {},
+			Until = now + w.Time * distance / w.Distance,
+			Every = 0.05,
+			Definition = definition,
+		})
+	end
+end
+
 -- A cast's payload lands.
 function TriadServer.resolve(player, k, st, pending)
 	local definition, now = pending.Definition, os.clock()
 	if pending.First then
 		TriadServer.applySelf(player, k, st, definition, pending.Aim, now)
 	end
+	local _, root = api.alive(player)
+	if definition.Lob and not pending.Landing then
+		-- Toxic Flask: thrown now, lands Lob seconds later where it was aimed.
+		local at = landing(root, definition, pending.Aim)
+		api.fx(
+			"TriadShow",
+			player,
+			(definition.Show or "Lob") .. "Throw",
+			root.Position + Vector3.new(0, 1.5, 0),
+			at,
+			definition.Lob,
+			definition.Element
+		)
+		table.insert(st.Pending, {
+			Triad = true,
+			Definition = definition,
+			Aim = pending.Aim,
+			At = now + definition.Lob,
+			Last = true,
+			Landing = true,
+			Center = at,
+		})
+		return
+	end
+	for key in MOVING do
+		if definition[key] then
+			launch(player, st, definition, pending.Aim, now)
+			return
+		end
+	end
 	local strike = definition
+	if definition.Push or pending.Center or definition.Pounce then
+		-- (pinned: where it lands, and where the throw comes from)
+		strike = table.clone(definition)
+		strike.At = pending.Center
+		strike.PushFrom = pending.Center or (if definition.Self then root.Position else nil)
+	end
 	if pending.Last and definition.LastBurn then
 		strike = table.clone(definition)
 		strike.Burn = definition.LastBurn
@@ -325,6 +539,22 @@ function TriadServer.resolve(player, k, st, pending)
 		end
 	else
 		api.strike(player, strike, pending.Aim, nil)
+	end
+	if pending.Last and (definition.Crater or definition.Puddle) then
+		-- Meteor Leap's burning crater, Toxic Flask's pool.
+		local pool = definition.Crater or definition.Puddle
+		local center = pending.Center or root.Position
+		TriadServer.zone(player, st, {
+			Kind = if definition.Crater then "Crater" else "Puddle",
+			Center = center,
+			Radius = pool.Radius,
+			Burn = pool.Burn,
+			Poison = pool.Poison,
+			Slow = pool.Slow,
+			Until = now + pool.Time,
+			Every = 0.5,
+			Definition = definition,
+		})
 	end
 	if definition.Trail and pending.Last then
 		local _, root = api.alive(player)
@@ -640,6 +870,42 @@ function TriadServer.zone(player, st, zone)
 		api.fx("TriadDecoy", player, zone.Center, zone.Until - os.clock(), definition.Element)
 	elseif zone.Kind == "Slick" then
 		api.fx("TriadSlick", zone.Center, zone.Radius, zone.Until - os.clock(), definition.Element)
+	elseif zone.Kind == "Crater" or zone.Kind == "Puddle" then
+		api.fx("TriadShow", player, zone.Kind, zone.Center, zone.Radius, zone.Until - os.clock(), definition.Element)
+	elseif zone.Kind == "Vortex" then
+		api.fx("TriadShow", player, definition.Show or "Vortex", zone.From, zone.To, zone.Travel, zone.Radius)
+	elseif zone.Kind == "Disc" then
+		api.fx("TriadShow", player, definition.Show or "Disc", zone.From, zone.Far, zone.Travel, zone.Radius)
+	elseif zone.Kind == "Hail" then
+		api.fx(
+			"TriadShow",
+			player,
+			definition.Show or "Hail",
+			zone.Center,
+			zone.Radius,
+			zone.Until - os.clock(),
+			definition.Element
+		)
+	elseif zone.Kind == "Storm" then
+		api.fx(
+			"TriadShow",
+			player,
+			definition.Show or "Storm",
+			zone.Center,
+			zone.Radius,
+			zone.Until - os.clock(),
+			definition.Element
+		)
+	elseif zone.Kind == "Wave" then
+		api.fx(
+			"TriadShow",
+			player,
+			definition.Show or "Wave",
+			zone.From,
+			zone.From + zone.Direction * zone.Distance,
+			zone.Travel,
+			zone.Width
+		)
 	end
 end
 
@@ -737,6 +1003,18 @@ function TriadServer.afterHit(player, k, st, target, definition, dealt: number, 
 			local flags = api.comboFlags(target, now)
 			if flags.Slowed or flags.Frozen then
 				api.applyCC(target, definition.Stun or 0.6, definition.StunKind or "Frozen")
+			end
+		end
+	end
+	if alive and (definition.Push or definition.Pull) then
+		local _, root = api.alive(player)
+		if root then
+			if definition.Pull then
+				-- Viper Lash: dragged in to just in front of you.
+				local toward = horizontal(target.Root.Position - root.Position)
+				yank(target, root.Position + toward * definition.Pull)
+			else
+				api.push(target, definition.PushFrom or root.Position, definition.Push)
 			end
 		end
 	end
@@ -1233,6 +1511,19 @@ function TriadServer.tick(player, k, st, now, humanoid, root)
 		local zone = t.Zones[i]
 		-- (A decoy always bursts before it goes.)
 		if zone.Burst or (now >= zone.Until and zone.Kind ~= "Decoy") then
+			if zone.Kind == "Vortex" and zone.End then
+				-- Flame Tornado blows apart where it stops.
+				local at = zone.To
+				api.fx("TriadShow", player, "VortexEnd", at, zone.EndRadius, zone.Definition.Element)
+				for _, target in api.targets(player) do
+					if
+						(target.Root.Position - at).Magnitude <= zone.EndRadius
+						and api.targetAllowed(player, target)
+					then
+						api.hit(player, k, target, zone.Definition, zone.End)
+					end
+				end
+			end
 			table.remove(t.Zones, i)
 		elseif now >= zone.Next then
 			zone.Next = now + zone.Every
@@ -1292,6 +1583,132 @@ function TriadServer.tick(player, k, st, now, humanoid, root)
 						end
 					end
 				end
+			elseif zone.Kind == "Vortex" then
+				-- Flame Tornado: rolls from From to To, dragging foes into its
+				-- eye and scorching them every HitEvery.
+				local f = math.clamp((now - zone.Born) / zone.Travel, 0, 1)
+				zone.Center = lerp(zone.From, zone.To, f)
+				for _, target in api.targets(player) do
+					local offset = (target.Root.Position - zone.Center) * Vector3.new(1, 0, 1)
+					if
+						offset.Magnitude <= zone.Radius
+						and math.abs(target.Root.Position.Y - zone.Center.Y) < 9
+						and now >= (zone.Hit[target.Root] or 0)
+						and api.targetAllowed(player, target)
+					then
+						zone.Hit[target.Root] = now + zone.HitEvery
+						api.hit(player, k, target, zone.Definition, 1)
+						-- Toward where the eye will be, so it keeps them.
+						local ahead = lerp(zone.From, zone.To, math.min(1, f + 0.15))
+						yank(target, ahead, zone.Pull)
+					end
+				end
+			elseif zone.Kind == "Disc" then
+				-- Frost Chakram: out to Far, then back to the thrower's hand.
+				local f = math.clamp((now - zone.Born) / zone.Travel, 0, 1)
+				local out = f < 0.5
+				local at = if out
+					then lerp(zone.From, zone.Far, math.sin(f * math.pi))
+					else lerp(zone.Far, root.Position, 1 - math.sin(f * math.pi))
+				local struck = if out then zone.Out else zone.Back
+				for _, target in api.targets(player) do
+					if
+						not struck[target.Root]
+						and (target.Root.Position - at).Magnitude <= zone.Radius + 1
+						and api.targetAllowed(player, target)
+					then
+						struck[target.Root] = true
+						api.hit(player, k, target, zone.Definition, 1)
+						api.fx("TriadShatter", target.Root.Position, GemConfig.ElementColors.Frost)
+					end
+				end
+			elseif zone.Kind == "Hail" then
+				for _, target in api.targets(player) do
+					local offset = (target.Root.Position - zone.Center) * Vector3.new(1, 0, 1)
+					if offset.Magnitude <= zone.Radius and api.targetAllowed(player, target) then
+						api.hit(player, k, target, zone.Definition, 1)
+						chill(player, k, st, target, zone.Chill, now)
+					end
+				end
+			elseif zone.Kind == "Storm" then
+				-- Storm Call: each bolt picks the foe nearest the storm's
+				-- centre, is marked on the ground, then strikes there.
+				if zone.Fired < zone.Strikes and now >= zone.NextBolt then
+					zone.Fired += 1
+					zone.NextBolt = now + zone.BoltEvery
+					local best, bestDistance = nil, zone.Radius + 2
+					for _, target in api.targets(player) do
+						local d = ((target.Root.Position - zone.Center) * Vector3.new(1, 0, 1)).Magnitude
+						if d <= bestDistance and api.targetAllowed(player, target) then
+							best, bestDistance = target, d
+						end
+					end
+					local point = if best
+						then best.Root.Position
+						else zone.Center + Vector3.new(
+							(math.random() - 0.5) * zone.Radius,
+							0,
+							(math.random() - 0.5) * zone.Radius
+						)
+					table.insert(
+						zone.Bolts,
+						{ At = now + zone.Delay, Point = point, Last = zone.Fired == zone.Strikes }
+					)
+					api.fx(
+						"TriadShow",
+						player,
+						"StormWarn",
+						point,
+						zone.BoltRadius,
+						zone.Delay,
+						zone.Definition.Element
+					)
+				end
+				for b = #zone.Bolts, 1, -1 do
+					local bolt = zone.Bolts[b]
+					if now >= bolt.At then
+						table.remove(zone.Bolts, b)
+						api.fx(
+							"TriadShow",
+							player,
+							"StormBolt",
+							bolt.Point,
+							zone.BoltRadius,
+							if bolt.Last then 1 else 0,
+							zone.Definition.Element
+						)
+						for _, target in api.targets(player) do
+							local offset = (target.Root.Position - bolt.Point) * Vector3.new(1, 0, 1)
+							if offset.Magnitude <= zone.BoltRadius and api.targetAllowed(player, target) then
+								api.hit(player, k, target, zone.Definition, 1)
+								if bolt.Last and zone.Stun then
+									api.applyCC(target, zone.Stun, "Shocked")
+								end
+							end
+						end
+					end
+				end
+			elseif zone.Kind == "Wave" then
+				-- Toxic Tide: a wall of acid rolling out; whoever it meets is
+				-- hit once and carried along.
+				local f = math.clamp((now - zone.Born) / zone.Travel, 0, 1)
+				local front = zone.Distance * f
+				local side = Vector3.new(-zone.Direction.Z, 0, zone.Direction.X)
+				for _, target in api.targets(player) do
+					local v = (target.Root.Position - zone.From) * Vector3.new(1, 0, 1)
+					local along, across = v:Dot(zone.Direction), math.abs(v:Dot(side))
+					if
+						not zone.Hit[target.Root]
+						and along <= front + 1
+						and along >= front - 3.5
+						and across <= zone.Width / 2
+						and api.targetAllowed(player, target)
+					then
+						zone.Hit[target.Root] = true
+						api.hit(player, k, target, zone.Definition, 1)
+						api.push(target, target.Root.Position - zone.Direction * 4, zone.Push)
+					end
+				end
 			elseif zone.Kind == "Pylon" then
 				local best, bestDistance = nil, zone.Reach
 				for _, target in api.targets(player) do
@@ -1322,6 +1739,9 @@ function TriadServer.tick(player, k, st, now, humanoid, root)
 						else
 							burn(player, k, target, zone.Burn)
 							poison(player, k, st, target, zone.Poison, now)
+							if zone.Slow then
+								api.slow(target, zone.Slow, 0.75)
+							end
 							if zone.Stun and not zone.Stunned then
 								zone.Stunned = true
 								api.applyCC(target, zone.Stun, "Shocked")

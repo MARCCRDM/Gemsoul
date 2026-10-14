@@ -269,6 +269,8 @@ local function migrate(profile: Profile): Profile
 	profile.Version = math.max(profile.Version, FastStart.SaveVersion)
 	Tree.initialize(profile)
 	grantDefaults(profile)
+	-- Starter stones with an old intro move get its replacement.
+	Tech.Traits.upgradeStarterProfile(profile)
 	return profile
 end
 

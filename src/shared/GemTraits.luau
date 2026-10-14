@@ -53,23 +53,23 @@ GemTraits.Caps = { Charge = 20, Stamina = 30, StaminaFloor = 15, PvP = 0.6, Wind
 --[[ Each element's five moves per lane, in matrix order. ]]
 GemTraits.Matrix = {
 	Fire = {
-		Offense = { "Q_CinderCleave", "Q_FurnaceCrescent", "Q_SolarExecution", "Q_CinderDrill", "Q_MagmaFault" },
-		Ability = { "E_EmberLance", "E_Supernova", "E_SolarFlare", "E_HeatHaze", "E_ThermalBurst" },
+		Offense = { "Q_CinderCleave", "Q_FurnaceCrescent", "Q_SolarExecution", "Q_CinderDrill", "Q_MagmaFault", "Q_MeteorLeap" },
+		Ability = { "E_EmberLance", "E_Supernova", "E_SolarFlare", "E_HeatHaze", "E_ThermalBurst", "E_FlameTornado" },
 		Defense = { "R_HeatShield", "R_EmberGuard", "R_FireWall", "R_Cauterize", "R_PhoenixMantle", "R_RingOfFire" },
 	},
 	Frost = {
-		Offense = { "Q_FrostNeedle", "Q_GlacierFan", "Q_ShatterCrown", "Q_PermafrostSpire", "Q_CryoEdge" },
-		Ability = { "E_CryoLance", "E_CryoStream", "E_AbsoluteZero", "E_GlacierRetreat", "E_WintersHold" },
+		Offense = { "Q_FrostNeedle", "Q_GlacierFan", "Q_ShatterCrown", "Q_PermafrostSpire", "Q_CryoEdge", "Q_FrostChakram" },
+		Ability = { "E_CryoLance", "E_CryoStream", "E_AbsoluteZero", "E_GlacierRetreat", "E_WintersHold", "E_Hailstorm" },
 		Defense = { "R_FrozenWall", "R_IceArmor", "R_ColdResolve", "R_GlacialBulwark", "R_FrostRiposte", "R_IcePillar" },
 	},
 	Shock = {
-		Offense = { "Q_ArcNeedle", "Q_CircuitCleave", "Q_Railstorm", "Q_StaticBrand", "Q_OverchargeStrike" },
-		Ability = { "E_IonSpark", "E_ChainLightning", "E_ThunderPylon", "E_VectorDash", "E_Overload" },
+		Offense = { "Q_ArcNeedle", "Q_CircuitCleave", "Q_Railstorm", "Q_StaticBrand", "Q_OverchargeStrike", "Q_ThunderDash", "Q_Skybreaker" },
+		Ability = { "E_IonSpark", "E_ChainLightning", "E_ThunderPylon", "E_VectorDash", "E_Overload", "E_StormCall", "E_IonCannon" },
 		Defense = { "R_IonShield", "R_StaticCatch", "R_Capacitor", "R_DeflectorField", "R_Grounding", "R_TeslaFence", "R_HoloDecoy" },
 	},
 	Poison = {
-		Offense = { "Q_BreachCut", "Q_CausticDart", "Q_VitriolSweep", "Q_Dissolution", "Q_SappingEdge" },
-		Ability = { "E_AcidSpray", "E_ToxicCloud", "E_ArmorMelt", "E_LeechBloom", "E_SeepStep" },
+		Offense = { "Q_BreachCut", "Q_CausticDart", "Q_VitriolSweep", "Q_Dissolution", "Q_SappingEdge", "Q_ViperLash", "Q_ToxicFlask" },
+		Ability = { "E_AcidSpray", "E_ToxicCloud", "E_ArmorMelt", "E_LeechBloom", "E_SeepStep", "E_ToxicTide", "E_Maneater" },
 		Defense = { "R_RadShield", "R_PurgeShell", "R_CorrosionAura", "R_BioRegrowth", "R_ToxicMantle", "R_SporeWall", "R_AcidSlick" },
 	},
 }
@@ -126,6 +126,24 @@ GemTraits.FromSurge = {
 	  Decoy           { Time, Trigger, Radius, Stun, Damage }: a hologram that bursts
 	  Slick           { Radius, Time, Slow, Shred }: an acid puddle around you
 	  Showcase        a move made to be seen: walls, rings, pillars, decoys
+	  Show            the move's own look (TriadVfx.show) instead of the
+	                  generic bolt, blast and slash
+	  Pounce          { Distance, Time, Lift }: leap at the aim; the payload
+	                  lands with you
+	  Push / Pull     throw hit targets away from the blow / yank them to
+	                  this many studs in front of you
+	  Width           a line's width (bolts and beams; 2 by default)
+	  Lob             seconds a thrown payload flies before it lands
+	  Crater/Puddle   { Radius, Time, Burn | Poison, Slow }: left where it lands
+	  Vortex          { Distance, Time, Radius, Every, Pull, End }: a moving
+	                  storm that drags foes along, then bursts (End x Damage)
+	  Disc            { Distance, Time, Radius }: thrown out and back, hits
+	                  each foe once each way
+	  Hail            { Time, Every, Chill }: Damage to all inside, each tick
+	  Storm           { Strikes, Every, Delay, Radius, Stun }: bolts that
+	                  each seek the nearest foe in the area, warned first
+	  Wave            { Distance, Time, Width, Push }: a wall of acid rolling
+	                  out, hitting each foe once and carrying it along
 	  Cleanse         All | Dots | One
 	  Heal            { Share (of max health), Time, BreakOnHeavy }
 	  Phoenix         { Below, Heal, Time }: cheat death once a round
@@ -167,7 +185,7 @@ M.Q_CinderDrill = {
 	Flourish = { Text = "Every stab burns, not just the last.", Burn = { Power = 0.08, Time = 3 } },
 }
 M.Q_MagmaFault = {
-	Name = "Magma Fault", Element = "Fire", Lane = Q, Cost = 30, Cooldown = 10,
+	Name = "Magma Fault", Element = "Fire", Lane = Q, Cost = 30, Cooldown = 10, Show = "MagmaFault",
 	Damage = 1.2, Piercing = true, Range = 14, Trail = { Time = 3, Width = 3, Burn = { Power = 0.1, Time = 2 } },
 	Animation = "Erupt", Signature = "Spikes", IconSource = "MagmaFault",
 	Description = "A ground slash: 120% damage in a line, leaving burning ground for 3s.",
@@ -181,7 +199,7 @@ M.E_EmberLance = {
 	Flourish = { Text = "The bolt pierces through everyone in its line.", Piercing = true },
 }
 M.E_Supernova = {
-	Name = "Supernova", Element = "Fire", Lane = E, Type = "Strike", Cost = 45, Cooldown = 16,
+	Name = "Supernova", Element = "Fire", Lane = E, Type = "Strike", Cost = 45, Cooldown = 16, Show = "Supernova",
 	Damage = 2.2, Radius = 10, Range = 30, Windup = 1, Burn = { Power = 0.1, Time = 3 },
 	IconSource = "Supernova",
 	Description = "A 1-second fuse, then a 220% blast across 10 studs.",
@@ -269,7 +287,7 @@ M.Q_ShatterCrown = {
 	Flourish = { Text = "Shatters a freeze for a 1s stun instead.", Stun = 0.6, StunKind = "Frozen", StunIfChilled = true },
 }
 M.Q_PermafrostSpire = {
-	Name = "Permafrost Spire", Element = "Frost", Lane = Q, Cost = 26, Cooldown = 9,
+	Name = "Permafrost Spire", Element = "Frost", Lane = Q, Cost = 26, Cooldown = 9, Show = "PermafrostSpire",
 	Damage = 0.9, Radius = 3, Range = 20, Root = 0.8,
 	Animation = "Erupt", Signature = "Spikes", IconSource = "PermafrostSpire",
 	Description = "An ice spike under the target: 90% damage and rooted for 0.8s.",
@@ -297,7 +315,7 @@ M.E_CryoStream = {
 	Flourish = { Text = "The beam lasts 3s.", ChannelDuration = 3 },
 }
 M.E_AbsoluteZero = {
-	Name = "Absolute Zero", Element = "Frost", Lane = E, Type = "Strike", Rare = true, Cost = 48, Cooldown = 18,
+	Name = "Absolute Zero", Element = "Frost", Lane = E, Type = "Strike", Rare = true, Cost = 48, Cooldown = 18, Show = "AbsoluteZero",
 	Damage = 1.5, Radius = 10, Range = 30, Windup = 1, Stun = 1.5, StunKind = "Frozen",
 	IconSource = "AbsoluteZero",
 	Description = "A field that freezes everyone inside for 1.5s after a 1s fuse.",
@@ -621,6 +639,115 @@ M.R_AcidSlick = {
 	Flourish = { Text = "The slick lasts 5.5s.", Slick = { Radius = 7, Time = 5.5, Slow = 0.5, Shred = 0.1 } },
 }
 
+-- The intro moves: what a new player's kit rolls (GemTraits.Intro). Every one
+-- pays off against a single opponent, and looks it (TriadVfx.show).
+M.Q_MeteorLeap = {
+	Name = "Meteor Leap", Element = "Fire", Lane = Q, Cost = 28, Cooldown = 9, Show = "MeteorLeap",
+	Pounce = { Distance = 14, Time = 0.5, Lift = 44 },
+	Damage = 1.5, Radius = 6, Self = true, Push = 40, Burn = { Power = 0.12, Time = 3 },
+	Crater = { Radius = 5, Time = 3, Burn = { Power = 0.1, Time = 2 } },
+	Animation = "Leap", IconSource = "MeteorLeap",
+	Description = "Leap up to 14 studs and crash down like a meteor: 150% around you, foes thrown back, and the crater burns for 3s.",
+	Flourish = { Text = "The crater burns for 5s.", Crater = { Radius = 5, Time = 5, Burn = { Power = 0.1, Time = 2 } } },
+}
+M.E_FlameTornado = {
+	Name = "Flame Tornado", Element = "Fire", Lane = E, Type = "Strike", Cost = 36, Cooldown = 14, Show = "FlameTornado",
+	Damage = 0.22, Range = 22, Windup = 0.5, Burn = { Power = 0.08, Time = 2 },
+	Vortex = { Distance = 22, Time = 2.2, Radius = 4.5, Every = 0.35, Pull = 16, End = 4, EndRadius = 6 },
+	Animation = "Spin", IconSource = "FlameTornado",
+	Description = "A tornado of fire tears across 22 studs, dragging foes along and burning them, then bursts at 90%.",
+	Flourish = { Text = "The final burst hits at 130%.", Vortex = { Distance = 22, Time = 2.2, Radius = 4.5, Every = 0.35, Pull = 16, End = 6, EndRadius = 7 } },
+}
+M.Q_FrostChakram = {
+	Name = "Frost Chakram", Element = "Frost", Lane = Q, Cost = 24, Cooldown = 8, Show = "FrostChakram",
+	Damage = 0.85, Range = 16, Windup = 0.3, Chill = 1,
+	Disc = { Distance = 16, Time = 1.1, Radius = 3 },
+	Animation = "Sweep", IconSource = "FrostChakram",
+	Description = "Hurl a spinning blade of ice out 16 studs and back: 85% each way, and every hit Chills (3 Chills freeze).",
+	Flourish = { Text = "Each hit adds 2 Chills.", Chill = 2 },
+}
+M.E_Hailstorm = {
+	Name = "Hailstorm", Element = "Frost", Lane = E, Type = "Strike", Cost = 38, Cooldown = 15, Show = "Hailstorm",
+	Damage = 0.24, Radius = 9, Range = 30, Windup = 0.6,
+	Hail = { Time = 3, Every = 0.5, Chill = 0.75 },
+	Animation = "Nova", IconSource = "Hailstorm",
+	Description = "Ice rains on an area for 3s: 24% every half second, and anyone who stays 2s is frozen solid.",
+	Flourish = { Text = "The storm lasts 4s.", Hail = { Time = 4, Every = 0.5, Chill = 0.75 } },
+}
+M.Q_ThunderDash = {
+	Name = "Thunder Dash", Element = "Shock", Lane = Q, Cost = 26, Cooldown = 8, Show = "ThunderDash",
+	Dash = { Dir = "Aim", Distance = 13, MoveTime = 0.14 }, Untargetable = 0.05,
+	Damage = 1.3, PathHit = true, Stun = 0.45, StunKind = "Shocked",
+	Trail = { Time = 2, Width = 3, Stun = 0.3 },
+	Animation = "Lunge", IconSource = "ThunderDash",
+	Description = "Become lightning: flash 13 studs through your foe for 130% and a stun, leaving a crackling trail.",
+	Flourish = { Text = "Flash 17 studs.", Dash = { Dir = "Aim", Distance = 17, MoveTime = 0.16 } },
+}
+M.Q_Skybreaker = {
+	Name = "Skybreaker", Element = "Shock", Lane = Q, Cost = 30, Cooldown = 10, Show = "Skybreaker",
+	Damage = 1.7, Radius = 4.5, Range = 16, Windup = 0.55, Stun = 0.7, StunKind = "Shocked",
+	Animation = "Heavy", IconSource = "Skybreaker",
+	Description = "Raise your blade to the sky and bring down a bolt of lightning on your foe: 170% and stunned 0.7s.",
+	Flourish = { Text = "Stuns for 1s.", Stun = 1 },
+}
+M.E_StormCall = {
+	Name = "Storm Call", Element = "Shock", Lane = E, Type = "Strike", Cost = 38, Cooldown = 15, Show = "StormCall",
+	Damage = 0.55, Radius = 11, Range = 30, Windup = 0.5,
+	Storm = { Strikes = 5, Every = 0.45, Delay = 0.4, Radius = 3.2, Stun = 0.7 },
+	Animation = "Nova", IconSource = "StormCall",
+	Description = "A storm over the area: 5 bolts hunt the nearest foe, 55% each (marked just before), the last one stuns.",
+	Flourish = { Text = "7 bolts.", Storm = { Strikes = 7, Every = 0.45, Delay = 0.4, Radius = 3.2, Stun = 0.7 } },
+}
+M.E_IonCannon = {
+	Name = "Ion Cannon", Element = "Shock", Lane = E, Type = "Strike", Cost = 42, Cooldown = 16, Show = "IonCannon",
+	Damage = 2.3, Range = 45, Piercing = true, Width = 3.5, Windup = 0.9, Push = 36,
+	Animation = "Bolt", IconSource = "IonCannon",
+	Description = "Charge for a moment, then fire a beam that pierces everything in a 45-stud line: 230% and blown back.",
+	Flourish = { Text = "The beam also stuns for 0.6s.", Stun = 0.6, StunKind = "Shocked" },
+}
+M.Q_ViperLash = {
+	Name = "Viper Lash", Element = "Poison", Lane = Q, Cost = 26, Cooldown = 9, Show = "ViperLash",
+	Damage = 0.9, Range = 16, Width = 3, Pull = 4, Slow = 0.4, SlowTime = 1.5, Poison = { Power = 0.14, Time = 4 },
+	Animation = "Bolt", IconSource = "ViperLash",
+	Description = "A venom whip snaps out 16 studs and drags your foe to you: 90%, poisoned and slowed.",
+	Flourish = { Text = "Reaches 22 studs.", Range = 22 },
+}
+M.Q_ToxicFlask = {
+	Name = "Toxic Flask", Element = "Poison", Lane = Q, Cost = 26, Cooldown = 8, Show = "ToxicFlask",
+	Damage = 1.2, Radius = 5, Range = 22, Lob = 0.4, Poison = { Power = 0.12, Time = 4 },
+	Puddle = { Radius = 5, Time = 3, Slow = 0.35, Poison = { Power = 0.1, Time = 2 } },
+	Animation = "Bolt", IconSource = "ToxicFlask",
+	Description = "Lob a flask of acid: it bursts for 120% and poison, and leaves a pool that slows for 3s.",
+	Flourish = { Text = "The pool lasts 5s.", Puddle = { Radius = 5, Time = 5, Slow = 0.35, Poison = { Power = 0.1, Time = 2 } } },
+}
+M.E_ToxicTide = {
+	Name = "Toxic Tide", Element = "Poison", Lane = E, Type = "Strike", Cost = 38, Cooldown = 15, Show = "ToxicTide",
+	Damage = 1.4, Range = 24, Windup = 0.55, Poison = { Power = 0.12, Time = 4 }, Vulnerable = { Amount = 0.15, Time = 4 },
+	Wave = { Distance = 24, Time = 1.2, Width = 11, Push = 30 },
+	Animation = "Sweep", IconSource = "ToxicTide",
+	Description = "A towering wave of acid rolls out 24 studs: 140%, poisoned, carried along and taking 15% more damage for 4s.",
+	Flourish = { Text = "The wave is 16 studs wide.", Wave = { Distance = 24, Time = 1.2, Width = 16, Push = 30 } },
+}
+M.E_Maneater = {
+	Name = "Maneater", Element = "Poison", Lane = E, Type = "Strike", Cost = 40, Cooldown = 16, Show = "Maneater",
+	Damage = 1.6, Radius = 4.5, Range = 26, Windup = 0.7, Root = 1.3, Poison = { Power = 0.15, Time = 5 },
+	Animation = "Erupt", IconSource = "Maneater",
+	Description = "A giant flytrap bursts from the ground under your foe and snaps shut: 160%, held 1.3s, deeply poisoned.",
+	Flourish = { Text = "You heal 25% of the damage.", Leech = 0.25 },
+}
+
+-- The intro's Q and E moves the old pools gave (and their place in the new
+-- ones): starter stones that still carry one are moved over
+-- (GemTraits.upgradeStarter).
+GemTraits.IntroReplaced = {
+	Q_FurnaceCrescent = "Q_MeteorLeap", E_HeatHaze = "E_FlameTornado",
+	Q_GlacierFan = "Q_FrostChakram", E_CryoStream = "E_Hailstorm",
+	Q_CircuitCleave = "Q_ThunderDash", Q_Railstorm = "Q_Skybreaker",
+	E_ChainLightning = "E_StormCall", E_ThunderPylon = "E_IonCannon",
+	Q_CausticDart = "Q_ViperLash", Q_VitriolSweep = "Q_ToxicFlask",
+	E_ToxicCloud = "E_ToxicTide", E_LeechBloom = "E_Maneater",
+}
+
 GemTraits.Moves = M
 
 -- A new player's starter kit rolls each key from these: the moves made to
@@ -628,23 +755,23 @@ GemTraits.Moves = M
 -- shield or a number. Two per key per element (Shared.StarterLottery).
 GemTraits.Intro = {
 	Fire = {
-		Offense = { "Q_FurnaceCrescent", "Q_MagmaFault" },
-		Ability = { "E_Supernova", "E_HeatHaze" },
+		Offense = { "Q_MeteorLeap", "Q_MagmaFault" },
+		Ability = { "E_Supernova", "E_FlameTornado" },
 		Defense = { "R_FireWall", "R_RingOfFire" },
 	},
 	Frost = {
-		Offense = { "Q_GlacierFan", "Q_PermafrostSpire" },
-		Ability = { "E_AbsoluteZero", "E_CryoStream" },
+		Offense = { "Q_FrostChakram", "Q_PermafrostSpire" },
+		Ability = { "E_AbsoluteZero", "E_Hailstorm" },
 		Defense = { "R_FrozenWall", "R_IcePillar" },
 	},
 	Shock = {
-		Offense = { "Q_CircuitCleave", "Q_Railstorm" },
-		Ability = { "E_ChainLightning", "E_ThunderPylon" },
+		Offense = { "Q_ThunderDash", "Q_Skybreaker" },
+		Ability = { "E_StormCall", "E_IonCannon" },
 		Defense = { "R_TeslaFence", "R_HoloDecoy" },
 	},
 	Poison = {
-		Offense = { "Q_CausticDart", "Q_VitriolSweep" },
-		Ability = { "E_ToxicCloud", "E_LeechBloom" },
+		Offense = { "Q_ViperLash", "Q_ToxicFlask" },
+		Ability = { "E_ToxicTide", "E_Maneater" },
 		Defense = { "R_SporeWall", "R_AcidSlick" },
 	},
 }
@@ -664,7 +791,7 @@ for id, move in M do
 	move.Range = move.Range or 0
 	move.Key = GemTraits.KeyOfLane[move.Lane]
 	-- A sword technique comes out quick: a short wind-up, not a cast.
-	if move.Lane == "Offense" and move.Damage and not move.Windup and not move.Dash then
+	if move.Lane == "Offense" and move.Damage and not move.Windup and not move.Dash and not move.Pounce then
 		move.Windup = if move.Radius or move.Piercing then 0.45 else 0.35
 	end
 end
@@ -739,6 +866,17 @@ local function seeded(gem, salt: number): number
 end
 
 local LANE_SALT = { Offense = 1, Ability = 2, Defense = 3 }
+-- A gem with no saved traits picks from its lanes as they stood before the
+-- intro moves joined them (the first this many), so no one's moves change
+-- under them.
+GemTraits.SeedLength = { Offense = 5, Ability = 5 }
+local function seedPool(ids: { string }, lane: string): { string }
+	local length = GemTraits.SeedLength[lane]
+	if not length or #ids <= length then
+		return ids
+	end
+	return table.move(ids, 1, length, 1, {})
+end
 
 -- A gem's three traits: its saved roll, else seeded from its id (so the
 -- server and every client agree without a migration). A gem whose surge is
@@ -758,7 +896,7 @@ function GemTraits.traitsOf(gem)
 			if keptInfo and keptInfo.Lane == lane and keptInfo.Element == gem.Element then
 				id = kept
 			else
-				id = pickWeighted(ids, seeded(gem, LANE_SALT[lane]))
+				id = pickWeighted(seedPool(ids, lane), seeded(gem, LANE_SALT[lane]))
 			end
 		end
 		out[lane] = id
@@ -906,6 +1044,15 @@ function GemTraits.stats(id: string, gem, normalized: boolean?)
 	d.FrostRiposte = longer(d.FrostRiposte, stretch, { "Time" })
 	d.Pylon = longer(scaleTable(d.Pylon, potency, { "Damage" }), stretch, { "Time" })
 	d.IceField = longer(d.IceField, stretch, { "Time" })
+	if d.Crater then
+		d.Crater = longer(d.Crater, stretch, { "Time" })
+		d.Crater.Burn = scaleTable(d.Crater.Burn, potency, { "Power" })
+	end
+	if d.Puddle then
+		d.Puddle = longer(d.Puddle, stretch, { "Time" })
+		d.Puddle.Poison = scaleTable(d.Puddle.Poison, potency, { "Power" })
+	end
+	d.Hail = longer(d.Hail, stretch, { "Time" })
 	d.EndBurst = scaleTable(d.EndBurst, potency, { "Damage" })
 	d.Empower = scaleTable(d.Empower, potency, { "Power", "Steal", "Bonus" })
 	if d.Empower and d.Empower.Poison then
@@ -934,9 +1081,14 @@ end
 function GemTraits.summary(d): string
 	local parts = {}
 	if d.Damage then
+		local hits = d.Hits
+			or (d.Storm and d.Storm.Strikes)
+			or (d.Hail and math.floor(d.Hail.Time / d.Hail.Every + 0.5))
+			or (d.Disc and 2)
+			or 1
 		table.insert(
 			parts,
-			string.format("%d%% damage%s", math.floor(d.Damage * 100 + 0.5), if (d.Hits or 1) > 1 then " x" .. d.Hits else "")
+			string.format("%d%% damage%s", math.floor(d.Damage * 100 + 0.5), if hits > 1 then " x" .. hits else "")
 		)
 	end
 	if d.Absorb then
@@ -970,6 +1122,71 @@ function GemTraits.all(): { string }
 		end
 	end
 	return list
+end
+
+-- A starter stone still carrying one of the old intro moves gets its
+-- replacement (GemTraits.IntroReplaced) in the same lane. Returns whether
+-- anything changed.
+function GemTraits.upgradeStarter(gem): boolean
+	if type(gem) ~= "table" or gem.CutMethod ~= "Starter" or type(gem.Traits) ~= "table" then
+		return false
+	end
+	local changed = false
+	for lane, id in gem.Traits do
+		local new = GemTraits.IntroReplaced[id]
+		local index = new and GemTraits.Index[new]
+		if index and index.Lane == lane and index.Element == gem.Element then
+			gem.Traits[lane] = new
+			changed = true
+		end
+	end
+	return changed
+end
+
+-- Every starter stone in a save (pouch, worn and spare gear, every miner,
+-- and a kit not yet claimed): upgradeStarter on each. Returns how many changed.
+function GemTraits.upgradeStarterProfile(profile): number
+	local changed = 0
+	local function stone(gem)
+		if GemTraits.upgradeStarter(gem) then
+			changed += 1
+		end
+	end
+	local function character(c)
+		if type(c) ~= "table" then
+			return
+		end
+		for key, value in c do
+			if type(key) == "string" and string.sub(key, -3) == "Gem" and type(value) == "table" then
+				stone(value)
+			end
+		end
+		for _, byId in type(c.ItemGems) == "table" and c.ItemGems or {} do
+			for _, gem in type(byId) == "table" and byId or {} do
+				stone(gem)
+			end
+		end
+	end
+	for _, gem in type(profile.Gems) == "table" and profile.Gems or {} do
+		stone(gem)
+	end
+	character(profile.Character)
+	local miners = profile.Miners
+	for _, miner in type(miners) == "table" and type(miners.Slots) == "table" and miners.Slots or {} do
+		character(miner.Character)
+	end
+	local kit = type(profile.Intro) == "table" and profile.Intro.Lottery
+	if type(kit) == "table" then
+		for _, entry in type(kit.Gems) == "table" and kit.Gems or {} do
+			stone(entry.Gem)
+		end
+		if type(kit.Moves) == "table" then
+			for i, id in kit.Moves do
+				kit.Moves[i] = GemTraits.IntroReplaced[id] or id
+			end
+		end
+	end
+	return changed
 end
 
 -- Reforge (the Probe market): reroll one trait of a gem for coins and Guild

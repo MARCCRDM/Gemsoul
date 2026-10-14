@@ -15,6 +15,11 @@ CAMERAS = {
     "Aura": ((8, 5, 8), (0, 3, 0), 52),
     "Hit": ((8, 5.5, -8), (0, 3.4, -15.5), 50),
     "Death": ((15, 9, -3), (0, 2.5, -16), 60),
+    # The starter moves: wide, to take in a leap, a tornado, a storm.
+    "MovesFire": ((24, 17, 4), (0, 3, -13), 62),
+    "MovesFrost": ((24, 17, 4), (0, 3, -13), 62),
+    "MovesShock": ((24, 19, 4), (0, 5, -15), 66),
+    "MovesPoison": ((24, 17, 4), (0, 3, -13), 62),
 }
 
 def shape_mesh(shape, sx, sy, sz):
@@ -25,13 +30,15 @@ def shape_mesh(shape, sx, sy, sz):
             for k in range(n):
                 a = 2 * math.pi * k / n; v.append((x, hy * math.cos(a), hz * math.sin(a)))
         f = [tuple(range(n - 1, -1, -1)), tuple(range(n, 2 * n))] + [(k, (k + 1) % n, n + (k + 1) % n, n + k) for k in range(n)]
-    elif shape == "Ball":
+    elif shape in ("Ball", "Ellipsoid"):
+        # A Ball is round (its smallest side); a sphere mesh stretches.
         r = min(sx, sy, sz) / 2; v = []; f = []; st, sl = 6, 10
+        rx, ry, rz = (hx, hy, hz) if shape == "Ellipsoid" else (r, r, r)
         for i in range(st + 1):
             th = math.pi * i / st
             for j in range(sl):
                 ph = 2 * math.pi * j / sl
-                v.append((r * math.sin(th) * math.cos(ph), r * math.cos(th), r * math.sin(th) * math.sin(ph)))
+                v.append((rx * math.sin(th) * math.cos(ph), ry * math.cos(th), rz * math.sin(th) * math.sin(ph)))
         for i in range(st):
             for j in range(sl):
                 a = i * sl + j; b = i * sl + (j + 1) % sl; c = (i + 1) * sl + (j + 1) % sl; d = (i + 1) * sl + j

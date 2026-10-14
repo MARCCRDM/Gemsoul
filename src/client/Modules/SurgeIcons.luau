@@ -17,6 +17,26 @@ Icons.ImageId = 88825646209723
 -- Which image that is: "Sheet" (ability_icons.png, 128 px cells) or
 -- "Preview" (ability_icons_preview.png, the labelled contact sheet).
 Icons.Layout = "Preview"
+-- How many icons the uploaded image holds (the atlas's first this many).
+-- The starter moves' icons (MeteorLeap onwards) came later: until the new
+-- sheet is uploaded, each shows the closest older icon (Fallback). After
+-- uploading assets/images/ability_icons.png (1024 x 1024, every icon), set
+-- ImageId to it, Layout = "Sheet" and Uploaded = 59.
+Icons.Uploaded = 47
+Icons.Fallback = {
+	MeteorLeap = "ThrusterLeap",
+	FlameTornado = "SolarFlare",
+	FrostChakram = "GlacierFan",
+	Hailstorm = "AbsoluteZero",
+	ThunderDash = "ArcNeedle",
+	Skybreaker = "IonSpark",
+	StormCall = "ChainLightning",
+	IonCannon = "Overload",
+	ViperLash = "CausticDart",
+	ToxicFlask = "AcidSpray",
+	ToxicTide = "ToxicCloud",
+	Maneater = "LeechBloom",
+}
 
 local byName = {}
 for id, definition in Tech.Catalog do
@@ -58,6 +78,10 @@ function Icons.apply(target: GuiObject, definition: any, _color: Color3?): boole
 	local art = target:FindFirstChild("AbilityArt") :: ImageLabel?
 	local id = Icons.idOf(definition)
 	local index = id and Atlas.Index[id]
+	if index and index >= Icons.Uploaded and Icons.Fallback[id] then
+		-- (not on the uploaded image yet: the closest older icon)
+		index = Atlas.Index[Icons.Fallback[id]]
+	end
 	if index == nil then
 		if art then
 			art:Destroy()

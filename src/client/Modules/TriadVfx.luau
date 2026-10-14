@@ -29,6 +29,7 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 local CombatFx = require(script.Parent.CombatFx)
+local MoveVfx = require(script.Parent.MoveVfx)
 local CombatSound = require(script.Parent.CombatSound)
 local GemConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GemConfig"))
 local CombatTechnology = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CombatTechnology"))
@@ -357,6 +358,8 @@ function TriadVfx.cast(who: Player, id: string?, element: string?, key: string?,
 	key = key or (move and move.Key) or "Q"
 	nameplate(root, key, if move then move.Name else "?", color)
 	sigil(root, key, color, castTime or 0.3)
+	-- What gathers while it's cast (a bolt on your blade, a charging cannon...).
+	MoveVfx.cast(who, id, castTime)
 	CombatSound.element("Cast", element, root.Position, { Volume = 0.7 })
 	if key == "R" then
 		CombatSound.play("Shield", root.Position, { Volume = 0.7, Pitch = 0.9 })

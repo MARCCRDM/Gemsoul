@@ -50,9 +50,10 @@ local Roller = load("GemRoller")
 local Actions = load("CombatActions")
 
 -- The matrix: 4 elements x 3 lanes x 5 moves, plus each element's showcase
--- defenses (a barrier and an escape), every one defined once.
+-- defenses (a barrier and an escape) and the 12 intro moves, every one
+-- defined once.
 local all, seen = Traits.all(), {}
-check(#all == 66, "The matrix holds 66 moves, found " .. #all)
+check(#all == 78, "The matrix holds 78 moves, found " .. #all)
 for _, id in all do
 	check(not seen[id], id .. " sits in the matrix twice")
 	seen[id] = true
@@ -94,6 +95,60 @@ for element, lanes in Traits.Intro do
 		end
 	end
 end
+-- The intro's Q and E: each its own look (a TriadVfx/MoveVfx show), and each
+-- pays off against one opponent (nothing that only arcs, chains or heals per
+-- extra enemy).
+local moveVfx = fs.readFile(ROOT .. "/src/client/Modules/MoveVfx.luau")
+for element, lanes in Traits.Intro do
+	for _, lane in { "Offense", "Ability" } do
+		for _, id in lanes[lane] do
+			local move = Traits.Moves[id]
+			check(type(move.Show) == "string", id .. " has no look of its own")
+			check(string.find(moveVfx, "SHOW." .. move.Show .. " = ", 1, true) ~= nil, id .. "'s look " .. move.Show .. " isn't drawn")
+			check(move.Damage ~= nil, id .. " must hit something")
+			check(move.Chain == nil and move.ArcExtra == nil and move.HealPerEnemy == nil, id .. " only shines against a crowd")
+			check(not move.PerSecond, id .. " is a held channel")
+		end
+	end
+end
+-- Every piece a new move shows has a drawing.
+for _, piece in { "MeteorLeapJump", "Crater", "Puddle", "VortexEnd", "StormWarn", "StormBolt", "ToxicFlaskThrow" } do
+	check(string.find(moveVfx, "SHOW." .. piece .. " = ", 1, true) ~= nil, piece .. " isn't drawn")
+end
+-- The old intro Q/E moves all have a replacement in the same element and lane.
+for old, new in Traits.IntroReplaced do
+	local a, b = Traits.Index[old], Traits.Index[new]
+	check(a and b and a.Element == b.Element and a.Lane == b.Lane, old .. " -> " .. new .. " crosses lanes")
+end
+-- A starter stone carrying an old intro move is moved over; others are left be.
+local starter = { Id = "st", Element = "Shock", CutMethod = "Starter", Traits = { Offense = "Q_Railstorm", Ability = "E_ChainLightning", Defense = "R_TeslaFence" } }
+local found = { Id = "f", Element = "Shock", Traits = { Offense = "Q_Railstorm", Ability = "E_ChainLightning", Defense = "R_TeslaFence" } }
+local save = {
+	Gems = { found },
+	Character = { WeaponGem = starter, ItemGems = { Shield = { x = table.clone(starter) } } },
+	Intro = { Lottery = { Moves = { "Q_Railstorm", "E_ChainLightning", "R_TeslaFence" }, Gems = {} } },
+}
+save.Character.ItemGems.Shield.x.Traits = table.clone(starter.Traits)
+check(Traits.upgradeStarterProfile(save) == 2, "Both starter stones are moved over")
+check(starter.Traits.Offense == "Q_Skybreaker" and starter.Traits.Ability == "E_StormCall" and starter.Traits.Defense == "R_TeslaFence", "Railstorm -> Skybreaker, Chain Lightning -> Storm Call, R kept")
+check(found.Traits.Offense == "Q_Railstorm", "A mined stone keeps what it rolled")
+check(save.Intro.Lottery.Moves[1] == "Q_Skybreaker" and save.Intro.Lottery.Moves[2] == "E_StormCall", "An unclaimed kit gets the new moves")
+check(Traits.upgradeStarterProfile(save) == 0, "Moving over twice changes nothing")
+-- Gems with no saved roll keep picking from the lanes as they stood, so the
+-- new moves never swap anyone's moves under them.
+for n = 1, 400 do
+	for _, element in { "Fire", "Frost", "Shock", "Poison" } do
+		local t = Traits.traitsOf({ Id = "seed-" .. n, Element = element })
+		for _, lane in { "Offense", "Ability" } do
+			check(table.find(Traits.Matrix[element][lane], t[lane]) <= 5, "A seeded gem rolled a new intro move")
+		end
+	end
+end
+-- The numbers say how many hits.
+check(string.find(Traits.summary(Traits.stats("E_StormCall", { Tier = "Common" })), "x5", 1, true) ~= nil, "Storm Call's 5 bolts show")
+check(string.find(Traits.summary(Traits.stats("E_Hailstorm", { Tier = "Legendary" })), "x8", 1, true) ~= nil, "A Legendary Hailstorm's 8 ticks show")
+check(Actions.castKind(Traits.stats("Q_MeteorLeap", { Tier = "Common" })) == "Move", "Meteor Leap moves you as it casts")
+
 -- Each element has one barrier and one escape; a recut keeps the role.
 for _, element in { "Fire", "Frost", "Shock", "Poison" } do
 	local roles = {}
@@ -193,4 +248,4 @@ check(not Tech.canSocket({ Id = "plain" }, "E", loadout), "A gem with no element
 local recut = Roller.setElement({ Element = "Fire", Surge = "EmberLance", Traits = { Offense = "Q_FurnaceCrescent", Ability = "E_EmberLance", Defense = "R_PhoenixMantle" } }, "Frost")
 check(recut.Traits.Offense == "Q_GlacierFan" and recut.Traits.Defense == "R_FrostRiposte", "Recut keeps trait slots")
 
-print("PASS: " .. checks .. " triad checks (66 moves, intro pools, rolls, sockets, stats, casting)")
+print("PASS: " .. checks .. " triad checks (78 moves, intro pools and looks, rolls, sockets, stats, casting)")

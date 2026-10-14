@@ -217,7 +217,141 @@ settle(3.4)
 check(hb.Health < 1000, "The decoy's burst did no damage")
 check((foe.StunUntil or 0) > now - 1, "The decoy's burst didn't stun")
 
+-- The intro moves: each does what it says, against a single foe.
+local function sent(kind, to)
+	local n = 0
+	for _, message in messages do
+		if message[1] == kind and (to == nil or message.Player == to) then
+			n += 1
+		end
+	end
+	return n
+end
+local function shows(name)
+	local n = 0
+	for _, message in messages do
+		if message[1] == "TriadShow" and message[3] == name then
+			n += 1
+		end
+	end
+	return n
+end
+local function intro(element, lane, id, tier)
+	local st = fresh()
+	table.clear(messages)
+	ra.Position = arena + Vector3.new(4, 0, 4)
+	rb.Position = arena + Vector3.new(4, 0, -1)
+	local key = if lane == "Offense" then "Q" else "E"
+	loadout[GemTraits.Sockets[key] .. "Gem"] = gem(element, tier or "Rare", { [lane] = id })
+	check(cast(key), id .. " was rejected")
+	return st, CombatServer._state(b)
+end
+local function zoneOf(st, kind)
+	for _, zone in st.Triad and st.Triad.Zones or {} do
+		if zone.Kind == kind then
+			return zone
+		end
+	end
+	return nil
+end
+-- Meteor Leap: you leap, crash down on them, they're thrown back and the crater burns.
+local st3, foe = intro("Fire", "Offense", "Q_MeteorLeap")
+check(st3.DodgeMove and st3.DodgeMove.Kind == "Leap", "Meteor Leap didn't leap")
+check(shows("MeteorLeapJump") == 1, "The leap has no look")
+settle(0.6)
+check(hb.Health < 1000, "Meteor Leap's crash missed")
+check(sent("Blasted", b) > 0, "Meteor Leap didn't throw the foe back")
+check(next(foe.Dots) ~= nil, "Meteor Leap didn't set the foe burning")
+check(zoneOf(st3, "Crater") ~= nil and shows("Crater") == 1, "Meteor Leap left no crater")
+check(shows("MeteorLeap") == 1, "The crash has no look")
+-- Flame Tornado: rolls through them, scorches them again and again, drags them along, bursts.
+st3, foe = intro("Fire", "Ability", "E_FlameTornado")
+settle(0.6)
+check(zoneOf(st3, "Vortex") ~= nil and shows("FlameTornado") == 1, "Flame Tornado didn't spin up")
+local before = hb.Health
+settle(1)
+check(hb.Health < before, "The tornado didn't scorch the foe inside it")
+check(sent("Shoved", b) >= 2, "The tornado didn't drag the foe along")
+settle(1.6)
+check(shows("VortexEnd") == 1, "The tornado didn't burst at the end")
+check(zoneOf(st3, "Vortex") == nil, "The tornado outlived its run")
+-- Frost Chakram: out and back, a hit and a Chill each way.
+st3, foe = intro("Frost", "Offense", "Q_FrostChakram")
+settle(0.35)
+check(zoneOf(st3, "Disc") ~= nil and shows("FrostChakram") == 1, "Frost Chakram wasn't thrown")
+local hits = 0
+local last = hb.Health
+for _ = 1, 30 do
+	settle(0.05)
+	if hb.Health < last then
+		hits += 1
+		last = hb.Health
+	end
+end
+check(hits == 2, "Frost Chakram should hit going out and coming back, hit " .. hits)
+check(foe.Triad and foe.Triad.Chill == 2, "Each chakram hit Chills")
+-- Hailstorm: ticks on everyone inside; two seconds in, they freeze.
+st3, foe = intro("Frost", "Ability", "E_Hailstorm")
+settle(0.65)
+check(zoneOf(st3, "Hail") ~= nil and shows("Hailstorm") == 1, "Hailstorm didn't start")
+settle(2)
+check(hb.Health < 1000, "The hail did no damage")
+check(foe.StunUntil > now and foe.StunKind == "Frozen", "Two seconds of hail didn't freeze the foe")
+-- Thunder Dash: through them as lightning: a hit and a stun, a crackling trail.
+st3, foe = intro("Shock", "Offense", "Q_ThunderDash")
+check(st3.DodgeMove ~= nil and shows("ThunderDash") == 1, "Thunder Dash didn't dash")
+settle(0.25)
+check(hb.Health < 1000, "Thunder Dash missed the foe it passed through")
+check(foe.StunUntil > now - 0.3, "Thunder Dash didn't stun")
+-- Skybreaker: a bolt from the sky: a big hit and a stun.
+st3, foe = intro("Shock", "Offense", "Q_Skybreaker")
+settle(0.6)
+check(hb.Health < 1000 and foe.StunUntil > now, "Skybreaker didn't strike and stun")
+check(shows("Skybreaker") == 1, "Skybreaker has no look")
+-- Storm Call: 5 warned bolts hunting the foe; the last stuns.
+st3, foe = intro("Shock", "Ability", "E_StormCall")
+settle(0.55)
+check(zoneOf(st3, "Storm") ~= nil and shows("StormCall") == 1, "Storm Call didn't gather")
+settle(2.8)
+check(shows("StormWarn") == 5 and shows("StormBolt") == 5, "Storm Call should warn and strike 5 times")
+check(hb.Health < 1000, "The storm's bolts missed a foe standing still")
+check(foe.StunUntil > now - 1, "The last bolt didn't stun")
+-- Ion Cannon: pierces and blows them back.
+st3, foe = intro("Shock", "Ability", "E_IonCannon")
+settle(1)
+check(hb.Health < 1000 and sent("Blasted", b) > 0, "The Ion Cannon didn't hit and blow back")
+check(shows("IonCannon") == 1, "The Ion Cannon has no look")
+-- Viper Lash: hits, poisons, slows and drags them in.
+st3, foe = intro("Poison", "Offense", "Q_ViperLash")
+settle(0.45)
+check(hb.Health < 1000, "Viper Lash missed")
+check(sent("Shoved", b) == 1, "Viper Lash didn't drag the foe in")
+check(foe.Triad and next(foe.Triad.Poisons or {}) ~= nil and (foe.Slow or 0) > 0, "Viper Lash didn't poison and slow")
+-- Toxic Flask: flies, then bursts where it was aimed and leaves a slowing pool.
+st3, foe = intro("Poison", "Offense", "Q_ToxicFlask")
+settle(0.5)
+check(shows("ToxicFlaskThrow") == 1, "The flask wasn't thrown")
+check(hb.Health == 1000, "The flask hit before it landed")
+settle(0.45)
+check(hb.Health < 1000, "The flask's burst missed")
+check(zoneOf(st3, "Puddle") ~= nil and shows("Puddle") == 1, "The flask left no pool")
+settle(0.6)
+check((foe.Slow or 0) > 0, "The pool didn't slow")
+-- Toxic Tide: hits once, poisons, makes them take more, carries them along.
+st3, foe = intro("Poison", "Ability", "E_ToxicTide")
+settle(0.6)
+check(zoneOf(st3, "Wave") ~= nil and shows("ToxicTide") == 1, "Toxic Tide didn't roll out")
+settle(1.3)
+local tide = 1000 - hb.Health
+check(tide > 0 and sent("Blasted", b) == 1, "The wave should hit and carry the foe once")
+check(foe.CC.Debuffs.Vulnerable ~= nil, "The wave didn't leave them Vulnerable")
+-- Maneater: snaps shut on them: a hit, held in place, poisoned.
+st3, foe = intro("Poison", "Ability", "E_Maneater")
+settle(0.8)
+check(hb.Health < 1000 and shows("Maneater") == 1, "Maneater didn't bite")
+check(foe.Triad and (foe.Triad.RootUntil or 0) > now and next(foe.Triad.Poisons or {}) ~= nil, "Maneater didn't hold and poison")
+
 CombatServer.reset(a)
 CombatServer.reset(b)
-print("PASS: " .. checks .. " live triad checks (sockets, Stamina R, output, walls, rebirth, empower, steals, showcase defenses)")
+print("PASS: " .. checks .. " live triad checks (sockets, Stamina R, output, walls, rebirth, empower, steals, showcase defenses, the 12 intro moves)")
 end

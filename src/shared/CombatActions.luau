@@ -134,7 +134,7 @@ function Actions.castKind(definition): string?
 	end
 	if definition.Triad then
 		-- The Q / E / R triad (GemTraits): R pays Stamina but casts like any move.
-		if definition.Dash then
+		if definition.Dash or definition.Pounce then
 			return "Move"
 		elseif definition.PerSecond then
 			return "Channel"

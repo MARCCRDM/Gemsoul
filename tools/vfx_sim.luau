@@ -482,7 +482,8 @@ local function snapshot()
 				table.insert(parts, {
 					cf.X, cf.Y, cf.Z, r.X, r.Y, r.Z, u.X, u.Y, u.Z, l.X, l.Y, l.Z,
 					d.Size.X, d.Size.Y, d.Size.Z, c.R, c.G, c.B,
-					if d:IsA("Part") then d.Shape.Name else "Block", t, d.Material.Name,
+					if d:FindFirstChildOfClass("SpecialMesh") and d:FindFirstChildOfClass("SpecialMesh").MeshType.Name == "Sphere" then "Ellipsoid"
+						elseif d:IsA("Part") then d.Shape.Name else "Block", t, d.Material.Name,
 				})
 			end
 		elseif d:IsA("PointLight") and d.Enabled and d.Brightness > 0.05 then
@@ -602,6 +603,116 @@ scenarios.Death = {
 		if not ok then table.insert(errors, "death did not play " .. element) end
 	end,
 }
+
+-- The starter moves' own looks (MoveVfx), four per element: each row one
+-- move, landing on the foe 16 studs ahead.
+local MoveVfx = requireScript(client.Modules.MoveVfx)
+local MOVE_FRAMES = { 0.1, 0.25, 0.45, 0.7, 1.1, 1.6 }
+local foeAt, meAt = V3.new(0, 3, -16), V3.new(0, 3, 0)
+local function show(...)
+	MoveVfx.show(nil, ...)
+end
+local MOVES = {
+	MovesFire = {
+		{ "Meteor Leap", function(me)
+			MoveVfx.show(localPlayer, "MeteorLeapJump", meAt, V3.new(0, 3, -12), 0.4)
+			fakeTask.delay(0.4, function()
+				show("MeteorLeap", V3.new(0, 3, -12), V3.new(0, 3, -12), 9.6)
+				show("Crater", V3.new(0, 3, -12), 5, 3)
+			end)
+		end },
+		{ "Flame Tornado", function()
+			show("FlameTornado", V3.new(0, 3, -3), V3.new(0, 3, -22), 1.4, 4.5)
+			fakeTask.delay(1.4, function()
+				show("VortexEnd", V3.new(0, 3, -22), 6)
+			end)
+		end },
+		{ "Magma Fault", function()
+			show("MagmaFault", V3.new(0, 4.5, -1), V3.new(0, 4.5, -15), 2)
+		end },
+		{ "Supernova", function(me)
+			MoveVfx.cast(localPlayer, "E_Supernova", 0.3)
+			fakeTask.delay(0.3, function()
+				show("Supernova", V3.new(0, 4.5, -1), foeAt, 15)
+			end)
+		end },
+	},
+	MovesFrost = {
+		{ "Frost Chakram", function()
+			MoveVfx.show(localPlayer, "FrostChakram", V3.new(0, 3, -1.5), V3.new(0, 3, -17.5), 1.1, 3)
+		end },
+		{ "Hailstorm", function()
+			show("Hailstorm", foeAt, 9, 1.5)
+		end },
+		{ "Permafrost Spire", function()
+			show("PermafrostSpire", V3.new(0, 4.5, -1), foeAt, 9)
+		end },
+		{ "Absolute Zero", function()
+			show("AbsoluteZero", V3.new(0, 4.5, -1), foeAt, 15)
+		end },
+	},
+	MovesShock = {
+		{ "Thunder Dash", function()
+			show("ThunderDash", meAt, V3.new(0, 3, -13), 0.14)
+		end },
+		{ "Skybreaker", function()
+			MoveVfx.cast(localPlayer, "Q_Skybreaker", 0.2)
+			fakeTask.delay(0.2, function()
+				show("Skybreaker", V3.new(0, 4.5, -1), foeAt, 9)
+			end)
+		end },
+		{ "Storm Call", function()
+			show("StormCall", foeAt, 11, 1.5)
+			for n = 0, 2 do
+				fakeTask.delay(0.1 + n * 0.45, function()
+					local at = foeAt + V3.new(n - 1, 0, 0)
+					show("StormWarn", at, 3.2, 0.4)
+					fakeTask.delay(0.4, function()
+						show("StormBolt", at, 3.2, if n == 2 then 1 else 0)
+					end)
+				end)
+			end
+		end },
+		{ "Ion Cannon", function()
+			MoveVfx.cast(localPlayer, "E_IonCannon", 0.3)
+			fakeTask.delay(0.3, function()
+				show("IonCannon", V3.new(0, 4.5, -1), V3.new(0, 4.5, -46), 3.5)
+			end)
+		end },
+	},
+	MovesPoison = {
+		{ "Viper Lash", function()
+			show("ViperLash", V3.new(0.6, 4.5, -1), V3.new(0, 4, -16), 1)
+		end },
+		{ "Toxic Flask", function()
+			show("ToxicFlaskThrow", V3.new(0.6, 4.5, -1), foeAt, 0.4)
+			fakeTask.delay(0.4, function()
+				show("ToxicFlask", V3.new(0, 4.5, -1), foeAt, 9)
+				show("Puddle", foeAt, 5, 3)
+			end)
+		end },
+		{ "Toxic Tide", function()
+			show("ToxicTide", meAt, V3.new(0, 3, -24), 1.2, 11)
+		end },
+		{ "Maneater", function()
+			show("Maneater", V3.new(0, 4.5, -1), foeAt, 9)
+		end },
+	},
+}
+for name, rows in MOVES do
+	local labels, byLabel = {}, {}
+	for _, row in rows do
+		table.insert(labels, row[1])
+		byLabel[row[1]] = row[2]
+	end
+	scenarios[name] = {
+		Frames = MOVE_FRAMES,
+		Rows = labels,
+		Run = function(label, me, foe)
+			byLabel[label](me, foe)
+		end,
+	}
+end
 
 local only = process.args[3]
 local summary = {}

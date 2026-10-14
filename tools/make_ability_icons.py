@@ -1137,6 +1137,196 @@ def NullPrism():
     return i
 
 
+# The starter moves (GemTraits.Intro) ------------------------------------------
+def MeteorLeap():
+    i = Icon("Fire", 61, rays=True)
+    # A blazing rock diving down onto cracked ground.
+    for off, w, h, wave in ((-56, 120, 230, 0.3), (56, 120, 250, -0.3), (0, 190, 320, 0.2)):
+        x, y = 250 + off * 0.707, 290 + off * 0.707
+        i.add(poly(rot(flame(x, y, w, h, wave=wave), 45, (x, y))), ((255, 210, 90), (220, 50, 10)), angle=225, shade=0.3, outline=5)
+    i.add(poly(rot(flame(250, 290, 120, 230, wave=0.2), 45, (250, 290))), ((255, 250, 210), (255, 170, 50)), angle=225, shade=0.2, outline=0, glow=False)
+    i.energy(circle(232, 300, 110), (255, 140, 40), blur=24, strength=0.7, core_strength=0.0)
+    i.add(poly([(40, 430), (190, 400), (256, 420), (330, 396), (472, 430), (472, 490), (40, 490)]), "darkrock", angle=90)
+    crack = union(line([(256, 420), (230, 460), (250, 490)], 10), line([(256, 420), (300, 455)], 8), line([(256, 420), (190, 445)], 8))
+    i.energy(crack, (255, 140, 30), blur=12)
+    i.energy(poly(star(250, 400, 10, 150, 60, jitter=0.25, seed=61)), (255, 170, 60), blur=18, strength=0.7, core_strength=0.3)
+    i.add(circle(230, 300, 84), "darkrock", angle=135)
+    i.dark(line([(196, 270), (236, 300), (222, 340)], 7), 0.0)
+    i.energy(union(line([(190, 262), (232, 298), (214, 344)], 7), line([(232, 298), (282, 292)], 6)), (255, 120, 20), blur=6, core_strength=0.9)
+    sparks(i, 250, 400, 160, 22, 7, 62)
+    return i
+
+
+def FlameTornado():
+    i = Icon("Fire", 63, rays=True)
+    # A funnel of fire: rings widening as they rise, a white-hot core.
+    for k in range(7):
+        y = 440 - k * 56
+        rx = 40 + k * 26
+        i.add(sub(ellipse(C + (k % 2) * 10 - 5, y, rx, 26 + k * 2), ellipse(C + (k % 2) * 10 - 5, y - 6, rx - 22, 16 + k)), ((255, 240, 160), (230, 70, 10)) if k % 2 == 0 else ((255, 200, 90), (200, 40, 10)), angle=90, shade=0.3, outline=5)
+    i.energy(poly([(236, 470), (276, 470), (330, 80), (182, 80)]), (255, 190, 80), blur=20, strength=0.6, core_strength=0.35)
+    for (x, h) in ((150, 120), (370, 140)):
+        i.add(poly(flame(x, 470, 40, h, wave=0.2)), "lava", outline=5, shade=0.3)
+    sparks(i, C, 200, 210, 24, 6, 64)
+    return i
+
+
+def FrostChakram():
+    i = Icon("Frost", 65, rays=True)
+    # A spinning ring-blade of ice with hooked teeth.
+    i.energy(union(arc(C, C, 214, 200, 300, 10), arc(C, C, 214, 20, 120, 10)), blur=10)
+    blade = poly(star(C, C, 6, 190, 118, spin=18, seed=65))
+    i.add(blade, "ice", angle=110)
+    for k in range(6):
+        a = k * 60 + 18
+        tip = (C + 186 * math.cos(math.radians(a - 90)), C + 186 * math.sin(math.radians(a - 90)))
+        hook = [tip, (C + 150 * math.cos(math.radians(a - 70)), C + 150 * math.sin(math.radians(a - 70))), (C + 120 * math.cos(math.radians(a - 88)), C + 120 * math.sin(math.radians(a - 88)))]
+        i.add(poly(hook), "icedeep", angle=110, outline=0, glow=False, alpha=0.7)
+    i.add(ring(C, C, 92, 26), "icedeep", angle=100)
+    i.add(circle(C, C, 52), ((255, 255, 255), (170, 225, 255)))
+    i.energy(circle(C, C, 30), blur=16)
+    return i
+
+
+def Hailstorm():
+    i = Icon("Frost", 67)
+    # A heavy cloud and ice shards hammering down.
+    for k in range(9):
+        x = 100 + (k % 5) * 76 + (k // 5) * 38
+        y = 210 - (k // 5) * 30 - 40
+        i.add(circle(x, y, 74 - (k // 5) * 14), ((210, 225, 245), (110, 130, 170)), angle=90, shade=0.35, glow=False)
+    i.add(poly(rrect(70, 170, 442, 240, 34)), ((190, 205, 230), (100, 120, 160)), angle=90, shade=0.3, glow=False)
+    for k, (x, y) in enumerate(((140, 330), (230, 300), (320, 350), (410, 310), (180, 430), (290, 450), (390, 440))):
+        faceted(i, shard(x, y, 96 if k % 2 == 0 else 74, 30, 20))
+        i.energy(line([(x - 30, y - 110), (x - 12, y - 60)], 5), blur=8, strength=0.6, core_strength=0.4)
+    return i
+
+
+def ThunderDash():
+    i = Icon("Shock", 69, rays=True)
+    # A bolt you ride: one big zigzag rushing right, afterimages behind.
+    for k, alpha in ((2, 0.25), (1, 0.45)):
+        pts = move([(80, 300), (200, 220), (190, 290), (320, 200), (300, 270), (450, 180)], -k * 34, k * 20)
+        i.add(bolt(pts, 40, 10), ((200, 190, 255), (110, 90, 220)), outline=0, glow=False, alpha=alpha)
+    pts = [(80, 300), (200, 220), (190, 290), (320, 200), (300, 270), (450, 180)]
+    i.add(bolt(pts, 54, 12), "sym", angle=100, outline=6)
+    i.energy(line(pts, 8), blur=16, core_strength=0.6)
+    speed_lines(i, [((40, 360), (180, 340)), ((60, 410), (230, 380)), ((90, 450), (260, 420))], 7)
+    sparks(i, 440, 190, 60, 14, 6, 70)
+    return i
+
+
+def Skybreaker():
+    i = Icon("Shock", 71, rays=True)
+    # A sword raised to the sky, and the sky answers.
+    sword(i, C, 330, 320, 0)
+    pts = zigzag((C - 30, -10), (C, 180), 6, 34, 71)
+    i.add(bolt(pts, 48, 18), "sym", angle=100, outline=6)
+    i.energy(line(pts, 8), blur=18, core_strength=0.7)
+    i.energy(poly(star(C, 178, 10, 110, 34, jitter=0.25, seed=72)), blur=16, core_strength=0.6)
+    for side in (-1, 1):
+        fork = zigzag((C, 180), (C + side * 150, 260), 4, 16, 73 + side)
+        i.energy(line(fork, 5), blur=10, core_strength=0.6)
+    return i
+
+
+def StormCall():
+    i = Icon("Shock", 73)
+    # A thundercloud loosing three bolts.
+    for k in range(8):
+        x = 110 + (k % 4) * 96 + (k // 4) * 48
+        y = 160 - (k // 4) * 34
+        i.add(circle(x, y, 72 - (k // 4) * 14), ((150, 140, 200), (50, 44, 90)), angle=90, shade=0.35, glow=False)
+    i.add(poly(rrect(60, 130, 452, 210, 36)), ((120, 110, 180), (44, 40, 80)), angle=90, shade=0.3, glow=False)
+    for k, (x0, x1) in enumerate(((150, 120), (C, 276), (362, 400))):
+        pts = zigzag((x0, 200), (x1, 470 - (k % 2) * 40), 5, 26, 74 + k)
+        i.add(bolt(pts, 34 if k == 1 else 26, 8), "sym", angle=100, outline=5)
+        i.energy(line(pts, 5), blur=12, core_strength=0.6)
+    return i
+
+
+def IonCannon():
+    i = Icon("Shock", 75, rays=True)
+    # A beam as wide as a body, rings blown off it.
+    i.energy(poly([(120, 200), (512, 170), (512, 342), (120, 312)]), (150, 220, 255), blur=24, strength=0.8, core_strength=0.2)
+    i.add(poly([(130, 216), (512, 196), (512, 316), (130, 296)]), ((255, 255, 255), (140, 210, 255)), angle=90, outline=5, shade=0.2)
+    i.energy(poly([(140, 240), (512, 236), (512, 276), (140, 272)]), (255, 255, 255), blur=8)
+    for x in (230, 330, 430):
+        i.add(sub(ellipse(x, C, 30, 96), ellipse(x, C, 16, 76)), "sym", angle=90, outline=4)
+    i.add(circle(120, C, 92), "steel", angle=110)
+    i.add(circle(120, C, 60), ((255, 255, 255), (150, 210, 255)), outline=4)
+    i.energy(circle(120, C, 36), blur=20)
+    return i
+
+
+def ViperLash():
+    i = Icon("Poison", 77)
+    # A venom serpent striking: an S of a body, jaws wide, fangs out.
+    body = bezier((60, 470), (140, 250), (230, 330), 30) + bezier((230, 330), (330, 410), (330, 210), 30)[1:]
+    i.add(line(body, 46), "acid", angle=110)
+    i.dark(line(body[::3], 6), 0.3)
+    head = [(300, 220), (360, 120), (470, 90), (430, 170), (470, 200), (380, 240)]
+    i.add(poly(head), ((200, 255, 120), (60, 170, 30)), angle=120)
+    i.add(poly([(392, 150), (430, 132), (402, 190)]), ((255, 160, 180), (200, 40, 70)), outline=3, glow=False)
+    for (x, y) in ((440, 150), (446, 200)):
+        i.add(poly([(x - 8, y - 4), (x + 8, y - 4), (x, y + 30)]), "bone", outline=3)
+    i.add(circle(372, 150, 12), ((255, 240, 120), (220, 160, 20)), outline=3)
+    sparks(i, 470, 150, 40, 10, 6, 78, (180, 255, 100))
+    for (x, y, r) in ((470, 250, 14), (440, 300, 10)):
+        i.add(poly(drop(x, y, r, False)), "acid", outline=3)
+    return i
+
+
+def ToxicFlask():
+    i = Icon("Poison", 79, rays=True)
+    # A round flask of bubbling acid, about to burst.
+    i.add(circle(C, 316, 150), ((235, 250, 240), (150, 190, 170)), angle=110, shade=0.3)
+    liquid = inter(circle(C, 316, 136), poly([(0, 280), (512, 300), (512, 512), (0, 512)]))
+    i.add(liquid, ((210, 255, 120), (60, 190, 30)), angle=90, outline=0)
+    i.energy(liquid, (150, 255, 80), blur=24, strength=0.5, core_strength=0.15)
+    i.add(poly(rrect(206, 100, 306, 190, 12)), ((235, 250, 240), (150, 190, 170)), angle=90)
+    i.add(poly(rrect(196, 64, 316, 110, 14)), "wood", angle=90)
+    for (x, y, r) in ((210, 360, 24), (290, 330, 16), (250, 410, 12), (320, 390, 20)):
+        i.add(ring(x, y, r, 6), ((250, 255, 220), (170, 230, 120)), outline=0, glow=False)
+    i.add(poly([(200, 230), (236, 210), (230, 300), (196, 300)]), ((255, 255, 255), (230, 245, 240)), outline=0, glow=False, alpha=0.5)
+    sparks(i, C, 140, 150, 14, 6, 80, (180, 255, 100))
+    return i
+
+
+def ToxicTide():
+    i = Icon("Poison", 81)
+    # A curling wave of acid, crested with foam.
+    i.add(band(300, 300, 150, 150, 330, 140, 30), ((200, 255, 120), (40, 150, 30)), angle=90, shade=0.35)
+    i.add(poly([(20, 400), (160, 330), (300, 360), (470, 300), (512, 512), (0, 512)]), ((150, 230, 90), (30, 120, 20)), angle=90)
+    i.energy(band(300, 300, 150, 160, 320, 60, 10), (170, 255, 90), blur=16, strength=0.6, core_strength=0.2)
+    for (x, y, r) in ((170, 210, 34), (220, 160, 30), (290, 140, 28), (360, 150, 24), (420, 186, 20), (130, 270, 26)):
+        i.add(circle(x, y, r), ((250, 255, 230), (190, 240, 160)), angle=100, shade=0.3, glow=False)
+    for (x, y, r) in ((460, 120, 14), (480, 210, 10), (90, 180, 12)):
+        i.add(poly(drop(x, y, r)), "acid", outline=3)
+    return i
+
+
+def Maneater():
+    i = Icon("Poison", 83, rays=True)
+    # A giant flytrap, jaws wide: green lobes, red inside, white teeth.
+    i.add(poly(rrect(236, 330, 276, 490, 16)), ((120, 200, 70), (30, 100, 20)), angle=0)
+    for side in (-1, 1):
+        i.add(poly(rot([(C, 460), (C + side * 150, 400), (C + side * 210, 460), (C + side * 120, 480)], 0)), "acid", angle=90)
+    for side, angle in ((-1, -32), (1, 32)):
+        cx, cy = C + side * 100, 210
+        lobe = ellipse(cx, cy, 120, 150).rotate(-angle, center=(cx, cy))
+        inner = ellipse(cx + side * 10, cy, 92, 120).rotate(-angle, center=(cx, cy))
+        i.add(lobe, ((180, 255, 100), (40, 140, 30)), angle=90)
+        i.add(inner, ((255, 140, 160), (180, 30, 60)), angle=90, outline=0, glow=False)
+        for k in range(7):
+            a = math.radians(-60 + k * 22 + (180 if side < 0 else 0))
+            ex, ey = cx + 112 * math.cos(a), cy + 140 * math.sin(a)
+            tooth = rot([(ex - 8, ey), (ex + 8, ey), (ex - side * 20, ey + 26)], -angle, (cx, cy))
+            i.add(poly(tooth), "bone", outline=3, glow=False)
+    sparks(i, C, 200, 120, 14, 6, 84, (180, 255, 100))
+    return i
+
+
 ORDER = [
     "HydraulicSlam", "ServoFlurry", "KineticRam", "StimDodge", "BreachHammer", "ArmorPiercer", "PneumaticJab", "ThrusterLeap",
     "RiposteStance", "ThermalBurst", "EmberLance", "SolarFlare", "Supernova", "EnergySiphon", "ResonanceEcho", "CryoLance",
@@ -1144,6 +1334,9 @@ ORDER = [
     "IonSpark", "StaticField", "ChainLightning", "Overload", "AbsoluteZero", "CinderDrill", "FurnaceCrescent", "MagmaFault",
     "SolarExecution", "FrostNeedle", "GlacierFan", "PermafrostSpire", "ShatterCrown", "CausticDart", "VitriolSweep", "LeechBloom",
     "Dissolution", "ArcNeedle", "CircuitCleave", "ThunderPylon", "Railstorm", "ResonantReaver", "NullPrism",
+    # The starter moves.
+    "MeteorLeap", "FlameTornado", "FrostChakram", "Hailstorm", "ThunderDash", "Skybreaker", "StormCall", "IonCannon",
+    "ViperLash", "ToxicFlask", "ToxicTide", "Maneater",
 ]
 
 
