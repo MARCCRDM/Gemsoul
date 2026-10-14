@@ -573,31 +573,144 @@ for i, style in STYLES do
 	end)
 end
 
--- Spacious cards retain readable move names on small screens by scrolling.
+-- The four elements, sized to fit the space rather than scroll: side by side
+-- when the screen is wide (Q, E and R then line up across them, to compare),
+-- two by two when it's tall, and each card shrinks to its space (smaller
+-- gem and type, shorter move rows, the extra lines dropped) before the list
+-- ever has to scroll (only on very small portrait screens).
 local elementArea = new("ScrollingFrame", {
-	Name = "ElementChoices", BackgroundTransparency = 1, BorderSizePixel = 0,
-	ZIndex = 21, ScrollBarThickness = 4, ScrollBarImageColor3 = C.Edge,
-	CanvasSize = UDim2.new(), ScrollingDirection = Enum.ScrollingDirection.Y,
+	Name = "ElementChoices",
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 21,
+	ScrollBarThickness = 4,
+	ScrollBarImageColor3 = C.Edge,
+	CanvasSize = UDim2.new(),
+	ScrollingDirection = Enum.ScrollingDirection.Y,
 	ClipsDescendants = true,
 }, choices)
 local elementOrder = { "Fire", "Frost", "Shock", "Poison" }
+local CARD_TALL = 300 -- a card at its fullest
+local CARD_MIN_H, CARD_MIN_W = 160, 145 -- the least a card can show its moves in
+
+-- Lay one element card out inside w x h.
+local function layoutCard(card, w: number, h: number)
+	local roomy = h >= 280
+	local header = math.clamp(math.floor(h * 0.27), 44, 82)
+	local narrow = w < 200
+	local gem = if narrow then 26 else math.clamp(header - 18, 30, 62)
+	card.Disc.Position, card.Disc.Size = UDim2.fromOffset(12, 12), UDim2.fromOffset(gem, gem)
+	card.Holder.Position, card.Holder.Size = UDim2.fromOffset(9, 9), UDim2.fromOffset(gem + 6, gem + 6)
+	local textX = gem + (if narrow then 16 else 24)
+	local showDescription = header >= 60
+	-- The name as big as its line allows (Gotham Black runs ~0.8 em a letter).
+	local nameRoom = w - textX - (if narrow then 22 else 34)
+	card.Name.TextSize =
+		math.clamp(math.floor(nameRoom / (#card.Name.Text * 0.8)), 10, if header >= 60 then 19 else 15)
+	card.Name.Position = UDim2.fromOffset(textX, if showDescription then 13 else math.floor((header - 20) / 2) + 2)
+	card.Name.Size = UDim2.new(1, -textX - (if narrow then 22 else 34), 0, 24)
+	card.Description.Visible = showDescription
+	card.Description.Position, card.Description.Size =
+		UDim2.fromOffset(textX, 39), UDim2.new(1, -textX - 12, 0, math.max(16, header - 42))
+	card.Marker.Position = UDim2.new(1, if narrow then -26 else -34, 0, if narrow then 6 else 10)
+	-- Strong / weak: its own line when there's room, else under the name.
+	local matchup = if roomy then 18 else 0
+	card.Matchup.Visible = roomy or not showDescription
+	card.Matchup.TextSize = if roomy then 11 else 10
+	card.Matchup.Text = if roomy or w >= 300 then card.MatchFull else card.MatchShort
+	if roomy then
+		card.Matchup.Position, card.Matchup.Size = UDim2.fromOffset(14, header + 2), UDim2.new(1, -28, 0, 16)
+	else
+		card.Matchup.Position, card.Matchup.Size = UDim2.fromOffset(textX, header - 18), UDim2.new(1, -textX - 6, 0, 14)
+		card.Matchup.TextSize = if narrow then 9 else 10
+	end
+	local tag = if roomy then 26 else 0
+	card.Tag.Visible = roomy
+	card.Tag.Position, card.Tag.Size = UDim2.new(0, 14, 1, -tag - 4), UDim2.new(1, -28, 0, tag)
+	-- The Q / E / R rows share what's left.
+	local top = header + matchup + (if roomy then 8 else 4)
+	local gap = if h >= 240 then 6 else 4
+	local rowH = math.clamp(math.floor((h - top - tag - 10 - gap * 2) / 3), 30, 58)
+	-- Narrow cards stack a key's two moves, one per line.
+	local optionW = (w - 56) / 2
+	local stacked = optionW < 100 and rowH >= 38
+	local lineH = if stacked then math.floor(rowH / 2) else rowH
+	local iconSize = if stacked then math.clamp(lineH - 4, 14, 22) else math.clamp(rowH - 12, 22, 38)
+	local nameSize = if stacked
+		then math.clamp(math.floor((w - 63 - iconSize) / (card.Longest * 0.62)), 8, 10)
+		elseif w >= 280 and rowH >= 50 then 12
+		elseif w >= 260 and rowH >= 40 then 11
+		elseif w >= 230 then 10
+		else 9
+	for index, row in card.Rows do
+		row.Chip.Position = UDim2.fromOffset(10, top + (index - 1) * (rowH + gap))
+		row.Chip.Size = UDim2.new(1, -20, 0, rowH)
+		row.Key.Position, row.Key.Size = UDim2.fromOffset(4, if rowH >= 40 then 4 else 2), UDim2.fromOffset(24, 18)
+		row.Role.Visible = rowH >= 38
+		row.Role.Position, row.Role.Size = UDim2.fromOffset(0, rowH - 16), UDim2.fromOffset(32, 10)
+		row.Options.Position, row.Options.Size = UDim2.fromOffset(32, 0), UDim2.new(1, -36, 1, 0)
+		local count = #row.Cells
+		for option, cell in row.Cells do
+			if stacked then
+				cell.Frame.Position = UDim2.new(0, 0, (option - 1) / count, 0)
+				cell.Frame.Size = UDim2.fromScale(1, 1 / count)
+			else
+				cell.Frame.Position = UDim2.fromScale((option - 1) / count, 0)
+				cell.Frame.Size = UDim2.fromScale(1 / count, 1)
+			end
+			cell.Icon.Position = UDim2.fromOffset(0, math.floor((lineH - iconSize) / 2))
+			cell.Icon.Size = UDim2.fromOffset(iconSize, iconSize)
+			cell.Name.TextSize = nameSize
+			cell.Name.TextWrapped = not stacked
+			cell.Name.Position, cell.Name.Size = UDim2.fromOffset(iconSize + 5, 1), UDim2.new(1, -iconSize - 7, 1, -2)
+		end
+	end
+end
+
 local function layoutElements()
-	local width = math.max(260, elementArea.AbsoluteSize.X)
-	local columns = if width >= 820 then 2 else 1
-	local gap, inset = 12, 4
-	local cardWidth = math.floor((width - inset * 2 - 8 - gap * (columns - 1)) / columns)
-	local cardHeight = 292
+	local width, height = elementArea.AbsoluteSize.X, elementArea.AbsoluteSize.Y
+	if width <= 0 or height <= 0 then
+		return
+	end
+	local gap, inset = 10, 2
+	-- Every arrangement's card size; the first that fits wins.
+	local function size(columns)
+		local rows = math.ceil(#elementOrder / columns)
+		return math.floor((width - inset * 2 - gap * (columns - 1)) / columns),
+			math.floor((height - inset * 2 - gap * (rows - 1)) / rows)
+	end
+	local w4, h4 = size(4)
+	local w2, h2 = size(2)
+	local columns, cardW, cardH, scroll
+	if w2 >= 380 and h2 >= 250 then
+		columns, cardW, cardH = 2, w2, math.min(h2, CARD_TALL + 20) -- (tall screens: two by two)
+	elseif w4 >= CARD_MIN_W and h4 >= CARD_MIN_H then
+		columns, cardW, cardH = 4, w4, math.min(h4, CARD_TALL + 40) -- (wide: side by side)
+	elseif w2 >= CARD_MIN_W and h2 >= CARD_MIN_H then
+		columns, cardW, cardH = 2, w2, h2
+	else
+		-- Very small (portrait phones): one column, scrolling.
+		local w1 = width - inset * 2 - 8
+		columns, cardW, cardH, scroll = 1, w1, CARD_TALL, true
+	end
+	local rows = math.ceil(#elementOrder / columns)
+	local used = rows * cardH + (rows - 1) * gap
+	-- Centred in the space when there's height to spare.
+	local y0 = if scroll then inset else inset + math.max(0, math.floor((height - inset * 2 - used) / 2))
 	for i, element in elementOrder do
 		local card = elementButtons[element]
 		if card then
-			card.Button.Position = UDim2.fromOffset(inset + ((i - 1) % columns) * (cardWidth + gap), inset + math.floor((i - 1) / columns) * (cardHeight + gap))
-			card.Button.Size = UDim2.fromOffset(cardWidth, cardHeight)
+			local col, row = (i - 1) % columns, math.floor((i - 1) / columns)
+			card.Button.Position = UDim2.fromOffset(inset + col * (cardW + gap), y0 + row * (cardH + gap))
+			card.Button.Size = UDim2.fromOffset(cardW, cardH)
+			layoutCard(card, cardW, cardH)
 		end
 	end
-	elementArea.CanvasSize = UDim2.fromOffset(0, inset * 2 + math.ceil(#elementOrder / columns) * (cardHeight + gap) - gap)
+	elementArea.CanvasSize = if scroll then UDim2.fromOffset(0, inset * 2 + used) else UDim2.new()
+	elementArea.ScrollBarThickness = if scroll then 4 else 0
 end
 place(function(compact)
-	local top, bottom = if compact then 24 else 30, if compact then 42 else 56
+	local top, bottom = if compact then 20 else 26, if compact then 42 else 56
 	elementArea.Visible = pickStep == "Element"
 	elementArea.Position = UDim2.fromOffset(0, top)
 	elementArea.Size = UDim2.new(1, 0, 1, -top - bottom)
@@ -607,66 +720,108 @@ listen(elementArea:GetPropertyChangedSignal("AbsoluteSize"), layoutElements)
 for _, element in elementOrder do
 	local color = GemConfig.ElementColors[element]
 	local row = new("TextButton", {
-		Name = element, Text = "", AutoButtonColor = false,
-		BackgroundColor3 = C.Card, ZIndex = 21, ClipsDescendants = true,
+		Name = element,
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = C.Card,
+		ZIndex = 21,
+		ClipsDescendants = true,
 	}, elementArea)
 	UiKit.round(row, 14)
 	local edge = stroke(row, C.Line, 0, 1)
 	new("UIGradient", { Rotation = 120, Color = ColorSequence.new(C.Text, color:Lerp(C.Text, 0.78)) }, row)
-	local bar = frame(row, { BackgroundColor3 = color, BackgroundTransparency = 0.45,
-		Size = UDim2.new(1, 0, 0, 3), ZIndex = 22 })
-	local disc = frame(row, { Position = UDim2.fromOffset(14, 16), Size = UDim2.fromOffset(62, 62),
-		BackgroundColor3 = color, BackgroundTransparency = 0.86, ZIndex = 22 })
+	local bar = frame(row, {
+		BackgroundColor3 = color,
+		BackgroundTransparency = 0.45,
+		Size = UDim2.new(1, 0, 0, 3),
+		ZIndex = 22,
+	})
+	local disc = frame(row, { BackgroundColor3 = color, BackgroundTransparency = 0.86, ZIndex = 22 })
 	UiKit.round(disc, 16)
 	stroke(disc, color, 0.65, 1)
-	local holder = frame(row, { BackgroundTransparency = 1, Position = UDim2.fromOffset(11, 13),
-		Size = UDim2.fromOffset(68, 68), ZIndex = 23 })
-	Art.show(holder, { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }, nil, color, false)
-	text(row, string.upper(GemConfig.elementName(element)), 19, color, Enum.Font.GothamBlack, {
-		Position = UDim2.fromOffset(88, 16), Size = UDim2.new(1, -132, 0, 25),
-	})
-	text(row, ELEMENTS[element], 12, C.Text, Enum.Font.GothamMedium, {
-		Position = UDim2.fromOffset(88, 43), Size = UDim2.new(1, -102, 0, 32), TextWrapped = true,
-	})
+	local holder = frame(row, { BackgroundTransparency = 1, ZIndex = 23 })
+	Art.show(
+		holder,
+		{ Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 },
+		nil,
+		color,
+		false
+	)
+	local nameLabel = text(row, string.upper(GemConfig.elementName(element)), 19, color, Enum.Font.GothamBlack)
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	local description = text(row, ELEMENTS[element], 12, C.Text, Enum.Font.GothamMedium, { TextWrapped = true })
+	description.TextXAlignment, description.TextYAlignment = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
 	local marker = text(row, "○", 20, C.Dim, Enum.Font.GothamBold, {
-		Position = UDim2.new(1, -36, 0, 15), Size = UDim2.fromOffset(24, 24), TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.fromOffset(24, 24),
+		TextXAlignment = Enum.TextXAlignment.Center,
 	})
 	local beats, weak = ElementMatchup.Beats[element], ElementMatchup.weakTo(element)
-	text(row, string.format("Strong vs %s   /   Weak vs %s", GemConfig.elementName(beats), GemConfig.elementName(weak)), 11, C.Dim, Enum.Font.GothamMedium, {
-		Position = UDim2.fromOffset(16, 84), Size = UDim2.new(1, -32, 0, 18),
-	})
+	local matchup = text(
+		row,
+		string.format("Strong vs %s  /  Weak vs %s", GemConfig.elementName(beats), GemConfig.elementName(weak)),
+		11,
+		C.Dim,
+		Enum.Font.GothamMedium
+	)
+	matchup.TextXAlignment = Enum.TextXAlignment.Left
 	local pools = surgePools(element)
-	local surgeLabels = {}
-	for index, pool in pools do
-		local chip = frame(row, { BackgroundColor3 = C.Ink, BackgroundTransparency = 0.12,
-			Position = UDim2.fromOffset(14, 110 + (index - 1) * 48), Size = UDim2.new(1, -28, 0, 43), ZIndex = 22 })
-		UiKit.round(chip, 8)
-		local key = ({ "Q", "E", "R" })[index]
-		text(chip, key, 15, color, Enum.Font.GothamBlack, {
-			Position = UDim2.fromOffset(8, 4), Size = UDim2.fromOffset(20, 18), TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		text(chip, ({ "STRIKE", "ABILITY", "GUARD" })[index], 7, C.Dim, Enum.Font.GothamBold, {
-			Position = UDim2.fromOffset(2, 26), Size = UDim2.fromOffset(34, 10), TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		local options = frame(chip, { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 0), Size = UDim2.new(1, -46, 1, 0), ZIndex = 23 })
-		for option, id in pool do
-			local move = Tech.Catalog[id]
-			local cell = frame(options, { BackgroundTransparency = 1, Position = UDim2.fromScale((option - 1) / #pool, 0), Size = UDim2.fromScale(1 / #pool, 1), ZIndex = 23 })
-			local icon = text(cell, "◆", 16, color, Enum.Font.GothamBold, {
-				Position = UDim2.fromOffset(0, 6), Size = UDim2.fromOffset(31, 31), ZIndex = 24,
-			})
-			UiKit.round(icon, 6)
-			if move then Icons.apply(icon, move, color) end
-			local name = text(cell, moveName(id), 11, C.Dim, Enum.Font.GothamMedium, {
-				Position = UDim2.fromOffset(36, 3), Size = UDim2.new(1, -40, 1, -6), TextWrapped = true,
-			})
-			table.insert(surgeLabels, name)
+	local surgeLabels, rows = {}, {}
+	local longest = 8 -- (letters in its longest move name)
+	for _, pool in pools do
+		for _, id in pool do
+			longest = math.max(longest, #moveName(id))
 		end
 	end
-	local tag = text(row, "", 10, C.Dim, Enum.Font.GothamBold, {
-		Position = UDim2.fromOffset(16, 255), Size = UDim2.new(1, -32, 0, 30), TextWrapped = true,
-	})
-	elementButtons[element] = { Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Disc = disc, Color = color, Tag = tag, Marker = marker }
+	for index, pool in pools do
+		local chip = frame(row, { BackgroundColor3 = C.Ink, BackgroundTransparency = 0.12, ZIndex = 22 })
+		UiKit.round(chip, 8)
+		local keyLabel = text(chip, ({ "Q", "E", "R" })[index], 15, color, Enum.Font.GothamBlack, {
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		local role = text(chip, ({ "STRIKE", "ABILITY", "GUARD" })[index], 7, C.Dim, Enum.Font.GothamBold, {
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		local options = frame(chip, { BackgroundTransparency = 1, ZIndex = 23 })
+		local cells = {}
+		for option, id in pool do
+			local move = Tech.Catalog[id]
+			local cell = frame(options, {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromScale((option - 1) / #pool, 0),
+				Size = UDim2.fromScale(1 / #pool, 1),
+				ZIndex = 23,
+			})
+			local icon = text(cell, "◆", 16, color, Enum.Font.GothamBold, { ZIndex = 24 })
+			UiKit.round(icon, 6)
+			if move then
+				Icons.apply(icon, move, color)
+			end
+			local name = text(cell, moveName(id), 11, C.Dim, Enum.Font.GothamMedium, { TextWrapped = true })
+			name.TextXAlignment = Enum.TextXAlignment.Left
+			table.insert(surgeLabels, name)
+			table.insert(cells, { Frame = cell, Icon = icon, Name = name })
+		end
+		table.insert(rows, { Chip = chip, Key = keyLabel, Role = role, Options = options, Cells = cells })
+	end
+	local tag = text(row, "", 10, C.Dim, Enum.Font.GothamBold, { TextWrapped = true })
+	elementButtons[element] = {
+		Button = row,
+		Stroke = edge,
+		Surges = surgeLabels,
+		Bar = bar,
+		Disc = disc,
+		Holder = holder,
+		Name = nameLabel,
+		Description = description,
+		Matchup = matchup,
+		MatchFull = matchup.Text,
+		Longest = longest,
+		MatchShort = string.format("▲ %s   ▼ %s", GemConfig.elementName(beats), GemConfig.elementName(weak)),
+		Rows = rows,
+		Color = color,
+		Tag = tag,
+		Marker = marker,
+	}
 	listen(row.Activated, function()
 		if not savedKit and not busy then
 			chosenElement = element
@@ -815,6 +970,7 @@ local function fit()
 	title.Position, title.Size =
 		UDim2.fromOffset(0, if short then 18 else 24), UDim2.new(1, 0, 0, if short then 26 else 42)
 	subtitle.Visible = not short
+	brand.Visible = not short -- (short screens: the title takes its line)
 	subtitle.Position = UDim2.fromOffset(0, if narrow then 62 else 70)
 	-- (No reveal steps any more: you pick your kit and go.)
 	stepper.Visible = false

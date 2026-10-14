@@ -43,17 +43,34 @@ else
  named("Poison").Activated.Fire()
  check(selected("Poison") and not selected("Frost"),"Selection markers are not exclusive")
 end
--- Resize the actual layout callback: no shrinking names into unreadable rows.
-for _,width in {1200,820,819,500,296} do
- area.AbsoluteSize=Vector2.new(width,560)
+-- Resize the actual layout callback: all four fit without scrolling wherever
+-- they can (side by side when wide and short, two by two when tall), never
+-- overlap or overflow, never shrink below a readable card, and only very
+-- small portrait screens scroll (to the last card).
+for _,size in {{1200,365},{1800,600},{1200,620},{960,520},{800,215},{640,200},{296,560}} do
+ local width,height=size[1],size[2]
+ area.AbsoluteSize=Vector2.new(width,height)
  area:GetPropertyChangedSignal("AbsoluteSize").Fire()
- local columns=if width>=820 then 2 else 1
- for i,element in {"Fire","Frost","Shock","Poison"} do
+ local scrolls=area.CanvasSize.Y.Offset>0
+ local boxes={}
+ for _,element in {"Fire","Frost","Shock","Poison"} do
   local card=named(element)
-  check(card.Size.Y.Offset==292,"Cards shrink on small screens")
-  check(card.Position.X.Offset+card.Size.X.Offset<=width,"Card overflows the viewport")
-  check(card.Position.Y.Offset+card.Size.Y.Offset<=area.CanvasSize.Y.Offset,"Last card is not scrollable")
-  check(card.Position.Y.Offset==4+math.floor((i-1)/columns)*304,"Cards overlap after resizing")
+  local x,y,w,h=card.Position.X.Offset,card.Position.Y.Offset,card.Size.X.Offset,card.Size.Y.Offset
+  check(w>=145 and h>=160,"Cards shrink below readable at "..width.."x"..height)
+  check(x>=0 and x+w<=width,"Card overflows the viewport at "..width.."x"..height)
+  if scrolls then
+   check(y+h<=area.CanvasSize.Y.Offset,"Last card is not scrollable at "..width.."x"..height)
+  else
+   check(y>=0 and y+h<=height,"Card doesn't fit at "..width.."x"..height)
+  end
+  for _,b in boxes do
+   check(x+w<=b[1] or b[1]+b[3]<=x or y+h<=b[2] or b[2]+b[4]<=y,"Cards overlap at "..width.."x"..height)
+  end
+  table.insert(boxes,{x,y,w,h})
+ end
+ check(scrolls==(width<400),"Scrolls when all four could fit, or overflows when they can't, at "..width.."x"..height)
+ if width==1200 and height==365 then
+  check(boxes[1][2]==boxes[4][2],"A wide, short screen doesn't put the four side by side")
  end
 end
 local icons=0
