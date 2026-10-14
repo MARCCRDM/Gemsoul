@@ -46,3 +46,25 @@ From 100 wins the gems are **Flawless**.
   can't be reached, they wait and go up when you next join.
 
 All the numbers live in `src/shared/ArenaStreak.luau`.
+
+## The roll
+
+The first time a cache opens, it rolls. Every card flicks through Rare and
+Ultra-Rare gems and gear (real gem shades and real gear names), slowing as its
+turn comes. The cards then land one by one, left to right, on what the server
+rolled. An Ultra-Rare lands with a pink flash and a shine. CLAIM unlocks once
+everything has landed, and a tap during the roll lands it all at once. The
+pieces are rolled on the server when the milestone is reached, so the
+animation only reveals them.
+
+## Testing it (DEV panel)
+
+Test admins get an **ARENA CACHE** row in the DEV panel with
+**10 · 20 · 30 · 40 · 50**. Each button rolls a fresh test cache for that
+milestone and opens it, roll and all (`DevStreakCache` in
+`Systems/ArenaStreaks`).
+
+- Test caches pay no coins or title, and don't count as paid for the season.
+- The two you keep go into your bags, so you can see them in your inventory.
+- The rest are dropped. They never go up on the Market.
+- A new test cache replaces the last one.

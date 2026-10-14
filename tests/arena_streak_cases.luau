@@ -107,6 +107,7 @@ local stubs = {
 			return r
 		end,
 	},
+	TestAdmin = { allowed = function(id) return id == 7 end },
 	MarketBoard = { vaultList = function(item, price, label) table.insert(vaulted, { item, price, label }); return true end },
 	ChatChannels = { announce = function() end },
 }
@@ -264,4 +265,30 @@ for _, entry in big.Items do
 end
 check(not handlers.StreakClaim(player, big.Id, { gemPick, gearPick }).Ok and #vaulted == before, "Claimed into a full gem bag")
 
-print(string.format("PASS: %d arena streak checks (milestones 10-200, Rare and Ultra-Rare caches, claims, Arena Vault)", checks))
+-- DEV test caches: test admins only; first in line; no coins, no title,
+-- nothing marked paid; a new one replaces the last; leftovers never vaulted.
+profile.Gems = {}
+local outsider = { UserId = 8, DisplayName = "Not Admin", SetAttribute = function() end }
+check(not handlers.DevStreakCache(outsider, 10).Ok, "A non-admin rolled a test cache")
+check(not handlers.DevStreakCache(player, 15).Ok and not handlers.DevStreakCache(player, "x").Ok, "A test cache rolled for no milestone")
+local coinsBefore, paidBefore = profile.Coins, profile.Duel.StreakPaid
+local realCount = #profile.Duel.StreakCaches
+for _, wins in { 10, 20, 30, 40, 50 } do
+	local reply = handlers.DevStreakCache(player, wins)
+	local m = Rules.get(wins)
+	check(reply.Ok and reply.Caches[1].Wins == wins and reply.Caches[1].Dev, "The " .. wins .. "-win test cache isn't first in line")
+	check(#reply.Caches[1].Items == m.Choices, "The " .. wins .. "-win test cache holds the wrong number of pieces")
+	check(cacheRarities(profile.Duel.StreakCaches[1]).UltraRare == m.UltraRare, "The " .. wins .. "-win test cache has the wrong Ultra-Rares")
+	check(#profile.Duel.StreakCaches == realCount + 1, "Test caches piled up")
+end
+local firstId = profile.Duel.StreakCaches[1].Id
+check(handlers.DevStreakCache(player, 10).Caches[1].Id ~= firstId, "Two test caches shared an id (the roll wouldn't replay)")
+check(profile.Coins == coinsBefore and profile.Duel.StreakPaid == paidBefore and not profile.Cosmetics.Owned.TitleStreak30, "A test cache paid out")
+local dev = profile.Duel.StreakCaches[1]
+local vaultedBefore = #vaulted
+local devClaim = handlers.StreakClaim(player, dev.Id, { dev.Items[1].OfferId, dev.Items[#dev.Items].OfferId })
+check(devClaim.Ok and #profile.Gems == 1, "A test cache couldn't be claimed")
+check(#vaulted == vaultedBefore, "A test cache's leftovers went to the Market")
+check(#profile.Duel.StreakCaches == realCount, "The claimed test cache stayed")
+
+print(string.format("PASS: %d arena streak checks (milestones 10-200, Rare and Ultra-Rare caches, claims, Arena Vault, DEV test caches)", checks))

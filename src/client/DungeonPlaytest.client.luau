@@ -41,7 +41,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 362)
+panel.Size = UDim2.fromOffset(300, 394)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -99,6 +99,12 @@ local function run(action: string, ...)
 		end)
 		panel.Visible = false
 		toggle.Text = arrow(false)
+	end
+	if ok and result and result.Ok and action == "DevStreakCache" then
+		-- Out of the way, so the cache's roll plays in full view.
+		panel.Visible = false
+		toggle.Text = arrow(false)
+		require(script.Parent.Modules.StreakRewards).show(result)
 	end
 	busy = false
 end
@@ -259,6 +265,30 @@ for i, mode in { "Classic", "Triad" } do
 	abilityButtons[mode] = b
 end
 paintAbilities("Triad")
+
+-- ARENA CACHE: roll a test Arena Cache for one of the first five streak
+-- milestones (Shared.ArenaStreak) and open it, roll and all. Test caches
+-- pay no coins or titles and their leftovers never reach the Market.
+local cacheCaption = versionCaption:Clone()
+cacheCaption.Position = UDim2.fromOffset(6, 360)
+cacheCaption.Text = "ARENA CACHE"
+cacheCaption.Parent = panel
+for i, wins in { 10, 20, 30, 40, 50 } do
+	local b = Instance.new("TextButton")
+	b.Name = "StreakCache" .. wins
+	b.Size = UDim2.fromOffset(34, 26)
+	b.Position = UDim2.fromOffset(104 + (i - 1) * 38, 360)
+	b.BackgroundColor3 = Color3.fromRGB(84, 64, 30)
+	b.TextColor3 = Color3.fromRGB(255, 210, 126)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 12
+	b.Text = tostring(wins)
+	b.Parent = panel
+	corner(b, 5)
+	b.Activated:Connect(function()
+		run("DevStreakCache", wins)
+	end)
+end
 
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or UserInputService:GetFocusedTextBox() then

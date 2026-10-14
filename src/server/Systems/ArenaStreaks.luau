@@ -236,10 +236,14 @@ local function view(duel)
 				{ OfferId = entry.OfferId, Name = entry.Name, Item = entry.Item, Rarity = entry.Rarity }
 			)
 		end
-		table.insert(
-			caches,
-			{ Id = cache.Id, Wins = cache.Wins, Name = cache.Name, Items = items, Picks = ArenaStreak.Picks }
-		)
+		table.insert(caches, {
+			Id = cache.Id,
+			Wins = cache.Wins,
+			Name = cache.Name,
+			Items = items,
+			Picks = ArenaStreak.Picks,
+			Dev = cache.Dev,
+		})
 	end
 	local nextUp = ArenaStreak.next(duel.RankedStreak)
 	return {
@@ -316,6 +320,14 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	table.remove(duel.StreakCaches, index)
 	pcall(GearRolls.ensure, profile, rng)
 	PlayerData.sync(player)
+	if cache.Dev then
+		-- (a DEV test cache: the two are yours, the rest never reach the Market)
+		return Shop.reply(
+			true,
+			string.format("DEV cache claimed. The other %d were dropped (test only).", #leftovers),
+			view(duel)
+		)
+	end
 	task.spawn(vault, player, duel, leftovers)
 	return Shop.reply(
 		true,
@@ -324,9 +336,41 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	)
 end
 
+local devRolls = 0 -- (so each test cache has its own id, and rolls afresh)
+
+-- DEV (test admins): roll a test cache for the milestone at `wins` and put
+-- it first in line, to see the roll and try claiming. No coins, no title,
+-- nothing marked paid, and its leftovers never go up on the Market. One
+-- test cache at a time (a new one replaces the last).
+function ArenaStreaks.devCache(player: Player, wins: any)
+	local TestAdmin = require(script.Parent.TestAdmin)
+	if not TestAdmin.allowed(player.UserId) then
+		return Shop.reply(false, "This test tool is restricted to the test admin.")
+	end
+	local m = ArenaStreak.get(tonumber(wins))
+	if not m then
+		return Shop.reply(false, "No milestone at that streak.")
+	end
+	local duel = record(player)
+	if not duel then
+		return Shop.reply(false, "Your data is still loading.")
+	end
+	for i = #duel.StreakCaches, 1, -1 do
+		if duel.StreakCaches[i].Dev then
+			table.remove(duel.StreakCaches, i)
+		end
+	end
+	local cache = ArenaStreaks.rollCache(m)
+	devRolls += 1
+	cache.Id, cache.Dev = string.format("dev%d_%s", devRolls, cache.Id), true
+	table.insert(duel.StreakCaches, 1, cache)
+	return Shop.reply(true, string.format("Rolled a %d-win test cache (%s).", m.Wins, m.Name), view(duel))
+end
+
 function ArenaStreaks.start()
 	Shop.register("StreakCaches", ArenaStreaks.caches)
 	Shop.register("StreakClaim", ArenaStreaks.claim)
+	Shop.register("DevStreakCache", ArenaStreaks.devCache)
 	-- On joining: the streak on show, and any leftovers still to vault.
 	local function joined(player: Player)
 		task.spawn(function()
