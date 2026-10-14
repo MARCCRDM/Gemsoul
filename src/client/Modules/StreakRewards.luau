@@ -42,6 +42,17 @@ local screen: Frame? = nil
 local state = { Caches = {}, Streak = 0, Next = nil }
 local busy = false
 
+local function commas(n: number): string
+	local text = tostring(math.floor(n + 0.5))
+	while true do
+		local swapped, count = string.gsub(text, "^(-?%d+)(%d%d%d)", "%1,%2")
+		text = swapped
+		if count == 0 then
+			return text
+		end
+	end
+end
+
 local function label(parent, value, size, color, font)
 	local t = new("TextLabel", {
 		BackgroundTransparency = 1,
@@ -80,22 +91,44 @@ function StreakRewards.refresh()
 	end)
 end
 
--- One piece on a card: its picture, name and what it is.
+-- A gem's three grades, short enough for a card.
+local function grades(gem): string
+	if gem.Flawless then
+		return "FLAWLESS  ·  ALL 10s"
+	end
+	return string.format("Size %d · Clar %d · Prec %d", gem.Size or 0, gem.Clarity or 0, gem.Cut or 0)
+end
+
+-- One piece on a card: its rarity on a ribbon, its picture, name and what
+-- it is. Ultra-Rare cards carry a stronger edge and a tinted face.
 local function card(parent, entry, onToggle)
 	local item = entry.Item
 	local tint, rarity = rarityOf(entry)
+	local ultra = rarity ~= "RARE"
+	local face = if ultra then CARD:Lerp(tint, 0.1) else CARD
 	local b = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = CARD,
+		BackgroundColor3 = face,
 		Size = UDim2.fromOffset(150, 196),
 	}, parent)
 	UiKit.round(b, 12)
-	local edge = new("UIStroke", { Color = tint, Thickness = 1.5, Transparency = 0.5 }, b)
+	-- (Border mode: on a TextButton the stroke would otherwise trace its text.)
+	local rest = if ultra then { 2, 0.15 } else { 1.5, 0.55 }
+	local edge = new("UIStroke", {
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Color = tint,
+		Thickness = rest[1],
+		Transparency = rest[2],
+	}, b)
+	local ribbon = label(b, if ultra then "★ " .. rarity .. " ★" else rarity, 10, INK, Enum.Font.GothamBlack)
+	ribbon.BackgroundColor3, ribbon.BackgroundTransparency = tint, 0
+	ribbon.Position, ribbon.Size = UDim2.fromOffset(8, 8), UDim2.new(1, -16, 0, 18)
+	UiKit.round(ribbon, 6)
 	local art = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(15, 10),
-		Size = UDim2.fromOffset(120, 110),
+		Position = UDim2.fromOffset(20, 32),
+		Size = UDim2.fromOffset(110, 90),
 	}, b)
 	if item.Kind == "Gem" then
 		pcall(Art.show, art, item.Gem, nil, GemConfig.ElementColors[item.Gem.Element] or tint, false)
@@ -108,29 +141,30 @@ local function card(parent, entry, onToggle)
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromOffset(38, 36),
 		}, art)
-		new("UIScale", { Scale = 2.8 }, holder)
+		new("UIScale", { Scale = 2.3 }, holder)
 		pcall(GearArt.icon, holder, item.Slot, {}, tint)
 	end
 	local name = label(b, entry.Name, 13, TEXT, Enum.Font.GothamBlack)
 	name.Position, name.Size = UDim2.fromOffset(8, 124), UDim2.new(1, -16, 0, 34)
 	local kind = if item.Kind == "Gem"
-		then (if item.Gem.Flawless then "FLAWLESS " else "") .. rarity .. " GEM"
-		else rarity .. " " .. string.upper(item.Slot or "Gear") .. "  ·  Q" .. tostring(item.Quality or 1)
-	local sub = label(b, kind, 10, tint, Enum.Font.GothamBold)
-	sub.Position, sub.Size = UDim2.fromOffset(8, 160), UDim2.new(1, -16, 0, 14)
-	local tick = label(b, "", 12, INK, Enum.Font.GothamBlack)
+		then grades(item.Gem)
+		else string.upper(item.Slot or "Gear") .. "  ·  QUALITY " .. tostring(item.Quality or 1)
+	local sub = label(b, kind, 10, if item.Kind == "Gem" and item.Gem.Flawless then GOLD else DIM, Enum.Font.GothamBold)
+	sub.Position, sub.Size = UDim2.fromOffset(8, 164), UDim2.new(1, -16, 0, 14)
+	local tick = label(b, "KEEP", 12, INK, Enum.Font.GothamBlack)
 	tick.BackgroundColor3, tick.BackgroundTransparency = GOLD, 0
-	tick.Position, tick.Size = UDim2.new(1, -78, 0, 8), UDim2.fromOffset(70, 20)
+	tick.AnchorPoint = Vector2.new(0.5, 0)
+	tick.Position, tick.Size = UDim2.new(0.5, 0, 0, 100), UDim2.fromOffset(64, 20)
 	tick.Visible = false
 	UiKit.round(tick, 6)
 	b.Activated:Connect(function()
 		onToggle(entry.OfferId)
 	end)
 	return function(on: boolean)
-		edge.Thickness, edge.Transparency = if on then 3 else 1.5, if on then 0 else 0.5
+		edge.Thickness, edge.Transparency = if on then 3 else rest[1], if on then 0 else rest[2]
 		edge.Color = if on then GOLD else tint
-		b.BackgroundColor3 = if on then CARD:Lerp(GOLD, 0.12) else CARD
-		tick.Visible, tick.Text = on, "KEEP"
+		b.BackgroundColor3 = if on then face:Lerp(GOLD, 0.14) else face
+		tick.Visible = on
 	end
 end
 
@@ -150,18 +184,23 @@ function StreakRewards.open()
 		Size = UDim2.fromScale(1, 1),
 		Active = true,
 	}, gui)
-	-- Everything on one board, scaled to fit (phones included).
+	-- Everything on one board sized to its cards (five to a row), scaled to
+	-- fit the screen (phones included).
+	local rows = math.max(1, math.ceil(#cache.Items / 5))
+	local gridHeight = rows * 196 + (rows - 1) * 14
+	local claimAt = 100 + gridHeight + 28
+	local height = claimAt + 52
 	local board = new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(880, 600),
+		Size = UDim2.fromOffset(880, height),
 	}, screen)
 	local fit = new("UIScale", {}, board)
 	local function scale()
 		local s = screen and screen.AbsoluteSize
 		if s and s.X > 0 then
-			fit.Scale = math.min(1, (s.X - 24) / 880, (s.Y - 16) / 600)
+			fit.Scale = math.min(1, (s.X - 24) / 880, (s.Y - 16) / height)
 		end
 	end
 	scale()
@@ -173,7 +212,7 @@ function StreakRewards.open()
 	title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 40)
 	local extras = {}
 	if m and m.Coins then
-		table.insert(extras, string.format("+%d coins", m.Coins))
+		table.insert(extras, "+" .. commas(m.Coins) .. " coins")
 	end
 	if m and m.Title then
 		table.insert(extras, "a new title")
@@ -197,7 +236,7 @@ function StreakRewards.open()
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(0, 100),
-		Size = UDim2.new(1, 0, 0, 420),
+		Size = UDim2.new(1, 0, 0, gridHeight),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 4,
@@ -239,7 +278,7 @@ function StreakRewards.open()
 
 	claim = new("TextButton", {
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 536),
+		Position = UDim2.new(0.5, 0, 0, claimAt),
 		Size = UDim2.fromOffset(300, 52),
 		Font = Enum.Font.GothamBlack,
 		TextSize = 18,
