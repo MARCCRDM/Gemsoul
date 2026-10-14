@@ -3,9 +3,8 @@
 
 	  1. Pick a fighting style (Prospector, Skirmisher, Juggernaut): the
 	     armor set they start in (Shared.ArmorFamilies).
-	  2. Pick an element (Thermal, Cryo, Ion, Corrosive): the style's own one
-	     is picked already, with the two showcase moves each of Q / E / R
-	     can roll (GemTraits.Intro).
+	  2. Independently pick an element (Thermal, Cryo, Ion, Corrosive),
+	     with the two showcase moves each of Q / E / R can roll (GemTraits.Intro).
 	  3. The kit goes on (Shared.StarterLottery, granted by Systems/Intro):
 	     one move rolled per key, shown on a reveal card before the fight.
 	  4. A first fight: an easy sparring match (Systems/Duelist, FirstFight),
@@ -16,7 +15,6 @@
 
 	  FastStart.Enabled                  off = no picker and no first fight
 	  FastStart.Styles / Elements        in the order the screens show them
-	  FastStart.Recommended[style]       the element picked for each style
 	  FastStart.SaveVersion              saves older than this were made before
 	                                     the fast start (see migrate)
 	  FastStart.migrate(profile)         -> true when an old save that never
@@ -31,7 +29,6 @@ FastStart.Enabled = true
 FastStart.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
 FastStart.Elements = { "Fire", "Frost", "Shock", "Poison" }
 -- Each style's own gem (as its armor art shows it).
-FastStart.Recommended = { Prospector = "Poison", Skirmisher = "Shock", Juggernaut = "Fire" }
 
 -- Saves from before the fast start: anyone who has been playing without
 -- finishing the intro (it was switched off) is not sent through it now,

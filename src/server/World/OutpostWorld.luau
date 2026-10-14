@@ -724,7 +724,7 @@ local function jumpRamp(parent, at: CFrame)
 end
 
 -- The Motor Pool: a concrete apron with marked bays and a canopy, where the
--- machines park. Returns the parking bays ({ Kind, CFrame }), facing out.
+-- machines park. Cockpits face the landing pad and player approach.
 local function motorPool(parent, at: CFrame)
 	solid(part(parent, at * CFrame.new(0, 0.4, 0), Vector3.new(140, 0.8, 76), CONCRETE, Enum.Material.Concrete))
 	local bays = {
@@ -752,7 +752,7 @@ local function motorPool(parent, at: CFrame)
 		local spot = at * CFrame.new(bay[2], 1, bay[3])
 		table.insert(
 			parking,
-			{ Kind = bay[1], CFrame = CFrame.lookAt(spot.Position, spot.Position + at.LookVector * -1) }
+			{ Kind = bay[1], CFrame = CFrame.lookAt(spot.Position, spot.Position + at.LookVector) }
 		)
 	end
 	-- The canopy over the back row, on yellow pillars, with floodlights.
