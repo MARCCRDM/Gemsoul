@@ -332,39 +332,35 @@ local function listen(signal, fn)
 end
 local savedKit = GemClient.Profile.Intro and GemClient.Profile.Intro.Lottery
 local chosenStyle = savedKit and savedKit.Style or "Prospector"
--- (Until you pick one, the element follows the style: its own one.)
-local chosenElement = savedKit and savedKit.Element or FastStart.Recommended[chosenStyle] or "Fire"
+-- Only a previously committed kit restores an element. New choices start empty.
+local chosenElement: string? = savedKit and savedKit.Element or nil
 if savedKit then primary.Text = "CLAIM MY STARTER KIT" end
--- The starter-kit choice: an armor style (three cards) and a starter element
--- (four rows), then a line saying exactly what you'll get.
+-- Choose armor and element independently, then review the starter kit.
 local choices = frame(body, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, ZIndex = 20 })
 local STYLES = {
 	{
 		Id = "Prospector",
-		Color = GemConfig.ElementColors.Poison, -- its gem (Corrosive), as in its art
+		Color = GemConfig.ElementColors.Poison, -- card accent only
 		Role = "BALANCED  ·  SUSTAIN",
 		-- A quick read of the style (ArmorFamilies: Primary stats per piece
 		-- and set bonuses), out of 5.
 		Profile = { Health = 4, Power = 4, Defense = 3, Speed = 3 },
-		Gem = "Poison",
 		Tip = "Trade blows and outlast them. Steady damage, quick to recover.",
 		Lines = { "Health and Power on every piece", "Set: +Health, +Power, faster cooldowns", "2+ pieces: +10% attack damage" },
 	},
 	{
 		Id = "Skirmisher",
-		Color = GemConfig.ElementColors.Shock, -- Ion
+		Color = GemConfig.ElementColors.Shock, -- card accent only
 		Role = "MOBILE  ·  CRITICAL",
 		Profile = { Health = 2, Power = 4, Defense = 2, Speed = 5 },
-		Gem = "Shock",
 		Tip = "Strike, dodge, strike again. Speed and crits win the race.",
 		Lines = { "Speed and Critical chance", "Set: +Speed, +Crit, faster cooldowns", "2+ pieces: +15% attack speed" },
 	},
 	{
 		Id = "Juggernaut",
-		Color = GemConfig.ElementColors.Fire, -- Thermal
+		Color = GemConfig.ElementColors.Fire, -- card accent only
 		Role = "HEAVY  ·  DEFENSIVE",
 		Profile = { Health = 5, Power = 3, Defense = 5, Speed = 2 },
-		Gem = "Fire",
 		Tip = "Hold the line. Block their best, then punish with heavy hits.",
 		Lines = { "Health and Defense", "Set: +Health, +Defense, less damage taken", "2+ pieces: +25% heavy damage" },
 	},
@@ -415,9 +411,8 @@ end
 -- Rich (tall screens): extra detail fills the cards and rows.
 local relayout, compactMode, richMode = {}, false, false
 -- The fast start's two screens: "Style" (three cards), then "Element"
--- (four rows, the style's own element picked, with its Q / E / R moves).
+-- (four independent element cards with their Q / E / R move pools).
 local pickStep = if savedKit then "Element" else "Style"
-local elementTouched = savedKit ~= nil
 local function place(apply)
 	table.insert(relayout, apply)
 	apply(false, false)
@@ -432,7 +427,7 @@ local function heading(parent, number, value, step)
 	end)
 end
 heading(choices, "1 / 2", "FIGHTING STYLE  ·  the armor you start in, with a sword and shield", "Style")
-heading(choices, "2 / 2", "ELEMENT  ·  your three gems: the moves on Q / E / R", "Element")
+heading(choices, "2 / 2", "ELEMENT  ·  compare the moves, then choose your powers", "Element")
 
 local styleButtons, elementButtons = {}, {}
 local refreshChoices -- (below)
@@ -505,7 +500,7 @@ for i, style in STYLES do
 	kit.TextXAlignment, kit.TextWrapped = Enum.TextXAlignment.Center, true
 	local pick = text(card, "SELECTED", 10, C.Ink, Enum.Font.GothamBlack)
 	pick.AnchorPoint, pick.Position, pick.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10), UDim2.fromOffset(92, 20)
-	-- Rich extras: the style profile, its signature gem and how it plays.
+	-- Rich extras: the armor profile and how it plays.
 	local extras = frame(card, { BackgroundTransparency = 1, ZIndex = 22 })
 	local profileTitle = text(extras, "STYLE PROFILE", 9, C.Dim, Enum.Font.GothamBold)
 	profileTitle.Position, profileTitle.Size = UDim2.fromOffset(14, 0), UDim2.new(1, -28, 0, 12)
@@ -526,7 +521,7 @@ for i, style in STYLES do
 	end
 	local gemLine = text(
 		extras,
-		string.format('SIGNATURE GEM  <font color="%s">◆ %s</font>', string.format("#%02x%02x%02x", GemConfig.ElementColors[style.Gem].R * 255, GemConfig.ElementColors[style.Gem].G * 255, GemConfig.ElementColors[style.Gem].B * 255), string.upper(GemConfig.elementName(style.Gem))),
+		"PAIR WITH ANY ELEMENT",
 		9,
 		C.Dim,
 		Enum.Font.GothamBold,
@@ -573,145 +568,113 @@ for i, style in STYLES do
 	listen(card.Activated, function()
 		if not savedKit and not busy then
 			chosenStyle = style.Id
-			if not elementTouched then
-				chosenElement = FastStart.Recommended[style.Id] or chosenElement
-			end
 			refreshChoices()
 		end
 	end)
 end
 
-local elementArea = frame(choices, { BackgroundTransparency = 1, ZIndex = 21 })
+-- Spacious cards retain readable move names on small screens by scrolling.
+local elementArea = new("ScrollingFrame", {
+	Name = "ElementChoices", BackgroundTransparency = 1, BorderSizePixel = 0,
+	ZIndex = 21, ScrollBarThickness = 4, ScrollBarImageColor3 = C.Edge,
+	CanvasSize = UDim2.new(), ScrollingDirection = Enum.ScrollingDirection.Y,
+	ClipsDescendants = true,
+}, choices)
+local elementOrder = { "Fire", "Frost", "Shock", "Poison" }
+local function layoutElements()
+	local width = math.max(260, elementArea.AbsoluteSize.X)
+	local columns = if width >= 820 then 2 else 1
+	local gap, inset = 12, 4
+	local cardWidth = math.floor((width - inset * 2 - 8 - gap * (columns - 1)) / columns)
+	local cardHeight = 292
+	for i, element in elementOrder do
+		local card = elementButtons[element]
+		if card then
+			card.Button.Position = UDim2.fromOffset(inset + ((i - 1) % columns) * (cardWidth + gap), inset + math.floor((i - 1) / columns) * (cardHeight + gap))
+			card.Button.Size = UDim2.fromOffset(cardWidth, cardHeight)
+		end
+	end
+	elementArea.CanvasSize = UDim2.fromOffset(0, inset * 2 + math.ceil(#elementOrder / columns) * (cardHeight + gap) - gap)
+end
 place(function(compact)
-	local top, bottom = if compact then 20 else 28, if compact then 36 else 52
+	local top, bottom = if compact then 24 else 30, if compact then 42 else 56
 	elementArea.Visible = pickStep == "Element"
-	elementArea.Position = UDim2.new(0, 0, 0, top)
-	elementArea.Size = UDim2.new(1, 0, 1, -top - bottom - CTA_ROOM)
+	elementArea.Position = UDim2.fromOffset(0, top)
+	elementArea.Size = UDim2.new(1, 0, 1, -top - bottom)
+	layoutElements()
 end)
-for i, element in { "Fire", "Frost", "Shock", "Poison" } do
+listen(elementArea:GetPropertyChangedSignal("AbsoluteSize"), layoutElements)
+for _, element in elementOrder do
 	local color = GemConfig.ElementColors[element]
 	local row = new("TextButton", {
-		Text = "",
-		AutoButtonColor = false,
-		BackgroundColor3 = C.Card,
-		Position = UDim2.new(0, 0, (i - 1) / 4, if i == 1 then 0 else 4),
-		Size = UDim2.new(1, 0, 1 / 4, -6),
-		ZIndex = 21,
-		ClipsDescendants = true,
+		Name = element, Text = "", AutoButtonColor = false,
+		BackgroundColor3 = C.Card, ZIndex = 21, ClipsDescendants = true,
 	}, elementArea)
-	row.Name = element
-	UiKit.round(row, 10)
-	local edge = new("UIStroke", { Color = C.Line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, row)
-	-- A bar of the element's colour down the left edge, lit when picked.
-	local bar = frame(row, {
-		BackgroundColor3 = color,
-		BackgroundTransparency = 0.7,
-		Position = UDim2.fromOffset(0, 8),
-		Size = UDim2.new(0, 4, 1, -16),
-		ZIndex = 22,
-	})
-	UiKit.round(bar, 2)
-	-- The gem on a soft disc of its colour.
-	local disc = frame(row, {
-		BackgroundColor3 = color,
-		BackgroundTransparency = 0.86,
-		AnchorPoint = Vector2.new(0, 0.5),
-		ZIndex = 22,
-	})
-	UiKit.round(disc, 32)
-	local holder = frame(row, {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0, 0.5),
-		ZIndex = 23,
-	})
+	UiKit.round(row, 14)
+	local edge = stroke(row, C.Line, 0, 1)
+	new("UIGradient", { Rotation = 120, Color = ColorSequence.new(C.Text, color:Lerp(C.Text, 0.78)) }, row)
+	local bar = frame(row, { BackgroundColor3 = color, BackgroundTransparency = 0.45,
+		Size = UDim2.new(1, 0, 0, 3), ZIndex = 22 })
+	local disc = frame(row, { Position = UDim2.fromOffset(14, 16), Size = UDim2.fromOffset(62, 62),
+		BackgroundColor3 = color, BackgroundTransparency = 0.86, ZIndex = 22 })
+	UiKit.round(disc, 16)
+	stroke(disc, color, 0.65, 1)
+	local holder = frame(row, { BackgroundTransparency = 1, Position = UDim2.fromOffset(11, 13),
+		Size = UDim2.fromOffset(68, 68), ZIndex = 23 })
 	Art.show(holder, { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }, nil, color, false)
-	local name = text(row, string.upper(GemConfig.elementName(element)), 17, color, Enum.Font.GothamBlack)
-	name.TextXAlignment = Enum.TextXAlignment.Left
+	text(row, string.upper(GemConfig.elementName(element)), 19, color, Enum.Font.GothamBlack, {
+		Position = UDim2.fromOffset(88, 16), Size = UDim2.new(1, -132, 0, 25),
+	})
+	text(row, ELEMENTS[element], 12, C.Text, Enum.Font.GothamMedium, {
+		Position = UDim2.fromOffset(88, 43), Size = UDim2.new(1, -102, 0, 32), TextWrapped = true,
+	})
+	local marker = text(row, "○", 20, C.Dim, Enum.Font.GothamBold, {
+		Position = UDim2.new(1, -36, 0, 15), Size = UDim2.fromOffset(24, 24), TextXAlignment = Enum.TextXAlignment.Center,
+	})
 	local beats, weak = ElementMatchup.Beats[element], ElementMatchup.weakTo(element)
-	local blurb = text(row, ELEMENTS[element], 11, C.Dim, Enum.Font.GothamMedium, { RichText = true })
-	blurb.TextXAlignment = Enum.TextXAlignment.Left
-	local plain, matchup = ELEMENTS[element], string.format(
-		'%s   <font color="#5ad17a">▲ beats %s</font>   <font color="#ff6b6b">▼ weak to %s</font>',
-		ELEMENTS[element],
-		GemConfig.elementName(beats or ""),
-		GemConfig.elementName(weak or "")
-	)
-	-- Its three surges as key chips: which one lands on Q, E and R.
-	local chips = frame(row, { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), ZIndex = 22 })
-	local surgeLabels, chipKeys = {}, {}
-	for index, surgeName in surgeNames(element) do
-		local chip = frame(chips, {
-			BackgroundColor3 = C.Ink,
-			Position = UDim2.new((index - 1) / 3, if index == 1 then 0 else 3, 0, 0),
-			Size = UDim2.new(1 / 3, -4, 1, 0),
-			ZIndex = 23,
+	text(row, string.format("Strong vs %s   /   Weak vs %s", GemConfig.elementName(beats), GemConfig.elementName(weak)), 11, C.Dim, Enum.Font.GothamMedium, {
+		Position = UDim2.fromOffset(16, 84), Size = UDim2.new(1, -32, 0, 18),
+	})
+	local pools = surgePools(element)
+	local surgeLabels = {}
+	for index, pool in pools do
+		local chip = frame(row, { BackgroundColor3 = C.Ink, BackgroundTransparency = 0.12,
+			Position = UDim2.fromOffset(14, 110 + (index - 1) * 48), Size = UDim2.new(1, -28, 0, 43), ZIndex = 22 })
+		UiKit.round(chip, 8)
+		local key = ({ "Q", "E", "R" })[index]
+		text(chip, key, 15, color, Enum.Font.GothamBlack, {
+			Position = UDim2.fromOffset(8, 4), Size = UDim2.fromOffset(20, 18), TextXAlignment = Enum.TextXAlignment.Center,
 		})
-		UiKit.round(chip, 6)
-		new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.6 }, chip)
-		local key = text(chip, ({ "Q", "E", "R" })[index], 11, color, Enum.Font.GothamBlack)
-		local label = text(chip, surgeName, 10, C.Dim, Enum.Font.GothamBold)
-		label.TextXAlignment = Enum.TextXAlignment.Left
-		label.TextYAlignment = Enum.TextYAlignment.Center
-		label.TextWrapped, label.TextScaled = true, true
-		new("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 7 }, label)
-		-- (Rich: one of two, rolled when you equip; or its cost and cooldown.)
-		local pool = surgePools(element)[index]
-		local surge = #pool == 1 and Tech.Catalog[pool[1]]
-		local detail = text(
-			chip,
-			if surge then string.format("%d %s  ·  %ds", surge.Cost or 0, surge.Resource or "Charge", surge.Cooldown or 0)
-				else "one rolled at random",
-			9,
-			C.Faint,
-			Enum.Font.GothamMedium
-		)
-		detail.TextXAlignment = Enum.TextXAlignment.Left
-		table.insert(surgeLabels, label)
-		table.insert(chipKeys, { key, detail })
-	end
-	-- Full: a big gem, name, what it does, then the chips. Compact: a small
-	-- gem, the name and the chips under it.
-	place(function(compact, rich)
-		local gem = if compact then 34 else 64
-		local left = if compact then 8 else 12
-		local textX = left + gem + (if compact then 8 else 12)
-		disc.Position, disc.Size = UDim2.new(0, left, 0.5, 0), UDim2.fromOffset(gem, gem)
-		holder.Position, holder.Size = UDim2.new(0, left, 0.5, 0), UDim2.fromOffset(gem, gem)
-		name.TextSize = if compact then 13 else 17
-		name.Position, name.Size = UDim2.new(0, textX, 0, if compact then 3 else 8), UDim2.new(0.5, -textX, 0, if compact then 16 else 22)
-		blurb.Visible = not compact
-		blurb.Text = if rich then matchup else plain
-		blurb.Position, blurb.Size = UDim2.new(0, textX, 0, 30), UDim2.new(1, -textX - 10, 0, 16)
-		local chipH = if compact then 18 elseif rich then 38 else 24
-		chips.Position = UDim2.new(0, textX, 1, if compact then -4 else -8)
-		chips.Size = UDim2.new(1, -textX - (if compact then 6 else 10), 0, chipH)
-		for index, label in surgeLabels do
-			local key, detail = chipKeys[index][1], chipKeys[index][2]
-			detail.Visible = rich
-			detail.Position, detail.Size = UDim2.fromOffset(20, 19), UDim2.new(1, -24, 0, 14)
-			label.TextYAlignment = if rich then Enum.TextYAlignment.Bottom else Enum.TextYAlignment.Center
-			key.TextSize, label.TextSize = if compact then 9 else 11, if compact then 9 else 10
-			key.Position, key.Size = UDim2.fromOffset(if compact then 4 else 6, 0), UDim2.new(0, if compact then 9 else 12, 1, 0)
-			label.Position = UDim2.fromOffset(if compact then 14 else 20, 0)
-			label.Size = UDim2.new(1, if compact then -16 else -24, if rich then 0 else 1, if rich then 18 else 0)
-			key.Size = UDim2.new(0, if compact then 9 else 12, if rich then 0 else 1, if rich then 18 else 0)
+		text(chip, ({ "STRIKE", "ABILITY", "GUARD" })[index], 7, C.Dim, Enum.Font.GothamBold, {
+			Position = UDim2.fromOffset(2, 26), Size = UDim2.fromOffset(34, 10), TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		local options = frame(chip, { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 0), Size = UDim2.new(1, -46, 1, 0), ZIndex = 23 })
+		for option, id in pool do
+			local move = Tech.Catalog[id]
+			local cell = frame(options, { BackgroundTransparency = 1, Position = UDim2.fromScale((option - 1) / #pool, 0), Size = UDim2.fromScale(1 / #pool, 1), ZIndex = 23 })
+			local icon = text(cell, "◆", 16, color, Enum.Font.GothamBold, {
+				Position = UDim2.fromOffset(0, 6), Size = UDim2.fromOffset(31, 31), ZIndex = 24,
+			})
+			UiKit.round(icon, 6)
+			if move then Icons.apply(icon, move, color) end
+			local name = text(cell, moveName(id), 11, C.Dim, Enum.Font.GothamMedium, {
+				Position = UDim2.fromOffset(36, 3), Size = UDim2.new(1, -40, 1, -6), TextWrapped = true,
+			})
+			table.insert(surgeLabels, name)
 		end
-	end)
-	local tag = text(row, "", 9, C.Ink, Enum.Font.GothamBlack)
-	tag.AnchorPoint = Vector2.new(1, 0)
-	tag.Position, tag.Size = UDim2.new(1, -10, 0, 8), UDim2.fromOffset(170, 18)
-	tag.TextXAlignment = Enum.TextXAlignment.Center
-	tag.BackgroundTransparency, tag.BackgroundColor3 = 0, color
-	UiKit.round(tag, 9)
-	elementButtons[element] =
-		{ Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Disc = disc, Color = color, Tag = tag }
+	end
+	local tag = text(row, "", 10, C.Dim, Enum.Font.GothamBold, {
+		Position = UDim2.fromOffset(16, 255), Size = UDim2.new(1, -32, 0, 30), TextWrapped = true,
+	})
+	elementButtons[element] = { Button = row, Stroke = edge, Surges = surgeLabels, Bar = bar, Disc = disc, Color = color, Tag = tag, Marker = marker }
 	listen(row.Activated, function()
 		if not savedKit and not busy then
-			chosenElement, elementTouched = element, true
+			chosenElement = element
 			refreshChoices()
 		end
 	end)
 end
+layoutElements()
 
 -- What you're about to get.
 local summary = frame(choices, { BackgroundColor3 = C.Panel, ZIndex = 21, ClipsDescendants = true })
@@ -719,8 +682,9 @@ UiKit.round(summary, 8)
 local summaryEdge = new("UIStroke", { Color = C.Line, Thickness = 1 }, summary)
 local summaryText = text(summary, "", 13, C.Text, Enum.Font.GothamBold, { RichText = true })
 summaryText.TextXAlignment = Enum.TextXAlignment.Left
+summaryText.TextWrapped = true
 place(function(compact)
-	local height = if compact then 30 else 44
+	local height = if compact then 36 else 48
 	summary.Position, summary.Size = UDim2.new(0, 0, 1, -height - CTA_ROOM), UDim2.new(1, 0, 0, height)
 	summaryText.TextSize = if compact then 11 else 13
 	summaryText.Position = UDim2.fromOffset(if compact then 10 else 16, 0)
@@ -766,9 +730,10 @@ function refreshChoices()
 		end
 		row.Bar.BackgroundTransparency = if on then 0 else 0.7
 		row.Disc.BackgroundTransparency = if on then 0.6 else 0.86
-		local own = FastStart.Recommended[chosenStyle] == id
-		row.Tag.Visible = own
-		row.Tag.Text = "  " .. string.upper(chosenStyle) .. "'S OWN ELEMENT  "
+		row.Tag.Text = if on then "SELECTED  ·  " .. (if savedKit then "YOUR SAVED KIT" else "ONE MOVE PER KEY, ROLLED WHEN EQUIPPED") else "CHOOSE ELEMENT  ·  ONE MOVE PER KEY"
+		row.Tag.TextColor3 = if on then row.Color else C.Dim
+		row.Marker.Text = if on then "✓" else "○"
+		row.Marker.TextColor3 = if on then row.Color else C.Dim
 		if on then
 			elementColor = row.Color
 		end
@@ -779,11 +744,19 @@ function refreshChoices()
 		title.Text = if pickStep == "Style" then "HOW DO YOU FIGHT?" else "PICK YOUR ELEMENT"
 		subtitle.Text = if pickStep == "Style"
 			then "Your style is the armor you start in. You can wear any set later."
-			else "It powers your Q / E / R moves. Your style's own element is picked; change it if you like."
+			else "Any armor. Any element. Choose the powers for your Q / E / R moves."
 		if not busy then
-			primary.Text = if pickStep == "Style" then "NEXT  ·  ELEMENT   ›" else "EQUIP & FIGHT"
+			primary.Text = if pickStep == "Style" then "NEXT  ·  ELEMENT   ›" elseif chosenElement then "EQUIP & FIGHT" else "CHOOSE AN ELEMENT"
+			local ready = pickStep == "Style" or chosenElement ~= nil
+			primary.Active, primary.Selectable = ready, ready
+			primary.BackgroundColor3 = if ready then C.Gold else C.Line
+			primary.TextColor3 = if ready then C.Ink else C.Dim
 		end
 		backStep.Visible = pickStep == "Element" and not savedKit
+	end
+	if not chosenElement then
+		summaryText.Text = string.format('<font color="#8a9cb2">YOUR KIT</font>   %s armor + sword &amp; shield   ·   Choose any element next', string.upper(chosenStyle))
+		return
 	end
 	local names = surgeNames(chosenElement)
 	summaryText.Text = string.format(
@@ -1745,14 +1718,14 @@ listen(primary.Activated, function()
 		return
 	end
 	if phase == "Welcome" and pickStep == "Style" then
-		-- On to the element: the style's own one, unless you picked one.
-		if not elementTouched then
-			chosenElement = FastStart.Recommended[chosenStyle] or chosenElement
-		end
 		setPickStep("Element")
 		return
 	end
 	if phase == "Welcome" then
+		if not chosenElement then
+			refreshChoices()
+			return
+		end
 		busy = true
 		primary.Text = "EQUIPPING YOUR KIT…"
 		local result = GemClient.request("PrepareStarterLottery", chosenStyle, chosenElement)
@@ -1790,12 +1763,13 @@ listen(motion.Activated, function()
 	motion.Text = if calm then "Motion: calm" else "Motion: full"
 end)
 listen(primary.MouseEnter, function()
-	if not busy and not spin then
+	if not busy and not spin and primary.Active then
 		tween(buttonStroke, 0.15, { Thickness = 2, Transparency = 0 })
 		tween(primary, 0.15, { BackgroundColor3 = Color3.fromRGB(255, 205, 120) })
 	end
 end)
 listen(primary.MouseLeave, function()
+	if not primary.Active then return end
 	tween(buttonStroke, 0.15, { Thickness = 1, Transparency = if spin then 0.8 else 0.45 })
 	if not spin then
 		tween(primary, 0.15, { BackgroundColor3 = C.Gold })

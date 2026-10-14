@@ -46,12 +46,13 @@ check(FastStart.migrate(fresh) == false and fresh.Intro.Done == false, "A new sa
 local PlayerData = fs.readFile(ROOT .. "/src/server/Systems/PlayerData.luau")
 check(string.find(PlayerData, "Version = FastStart.SaveVersion", 1, true) ~= nil, "New profiles start at the fast start's save version")
 
--- The choices: three styles, four elements, each style's own one valid.
+-- All styles can choose all four elements, without a recommended default.
+check(FastStart.Recommended == nil, "Styles must not recommend or default an element")
 for _, style in FastStart.Styles do
 	check(table.find(Lottery.Styles, style) ~= nil, style .. " isn't a starter style")
-	local element = FastStart.Recommended[style]
-	check(element ~= nil and table.find(FastStart.Elements, element) ~= nil, style .. " has no own element")
-	check(Lottery.validChoice(style, element), style .. " + its element must be a valid kit")
+	for _, element in FastStart.Elements do
+		check(Lottery.validChoice(style, element), style .. " + " .. element .. " must be a valid kit")
+	end
 end
 -- The picker shows what each key can roll; the kit gives one of those,
 -- saved with it, on every stone.

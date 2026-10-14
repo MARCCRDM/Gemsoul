@@ -54,6 +54,7 @@ local services={RunService=run,TweenService=tween,UserInputService=input,Replica
 local game={GetService=function(_,id) return services[id] end}
 local UiKit={gui=function(name) return new("ScreenGui",{Name=name}) end,round=function() end,toast=function() end}
 local IronUi={new=new}
+local Icons={apply=function(target,move) target.IconMove=move.Name; return true end}
 local sounds={}
 local UiSound={play=function(name) table.insert(sounds,name) end}
 local humming=false
@@ -97,6 +98,7 @@ local GemClient={Profile=profile,Changed=signal()}
 function GemClient.request(action,...)
  table.insert(requests,action)
  if action=="PrepareStarterLottery" then
+  prepareArgs={...}
   if failPrepare then return {Ok=false,Message="Retry"} end
   prepareArgs={...}
   reward=Lottery.prepareChoice(profile,prepareArgs[1],prepareArgs[2],function(element) count+=1; return {Id="g"..count,Element=element,Tier="Common"} end)
