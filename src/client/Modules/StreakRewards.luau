@@ -97,6 +97,10 @@ function StreakRewards.refresh()
 		if result.Ok then
 			state = result
 			drawLauncher()
+			if #state.Caches > 0 then
+				-- (the gear's 3D previews, built before the cache is opened)
+				StreakRewards.prewarm()
+			end
 		end
 	end)
 end
@@ -109,92 +113,50 @@ local function grades(gem): string
 	return string.format("Size %d · Clar %d · Prec %d", gem.Size or 0, gem.Clarity or 0, gem.Cut or 0)
 end
 
--- What the reel flicks through while a cache rolls: every Rare and
--- Ultra-Rare gem shade, and every Rare and Ultra-Rare piece of gear.
+-- What the reel flicks through: every Rare and Ultra-Rare gem shade (drawn
+-- in 3D from its data) and the cache's own gear (in 3D, from the server's
+-- previews, once they're built).
 local REEL = nil
-local function reelPool()
+local function reelGems()
 	if REEL then
 		return REEL
 	end
-	REEL = { Gems = {}, Gear = {} }
-	for _, shades in GemConfig.Shades do
+	REEL = {}
+	for element, shades in GemConfig.Shades do
 		for _, shade in shades do
 			if shade.Tier == "Rare" or shade.Tier == "UltraRare" then
-				table.insert(REEL.Gems, shade)
-			end
-		end
-	end
-	local ok, Slots = pcall(require, ReplicatedStorage.Shared.EquipmentSlots)
-	local okT, Traits = pcall(require, ReplicatedStorage.Shared.ExpandedItemTraits)
-	local okA, Armor = pcall(require, ReplicatedStorage.Shared.ArmorFamilies)
-	local function scan(kind, list)
-		for _, gear in list or {} do
-			if type(gear) == "table" and (gear.RarityTier == 3 or gear.RarityTier == 4) then
-				table.insert(REEL.Gear, {
-					Slot = ok and Slots.ByKind[kind] or kind,
-					Name = gear.Name,
-					Tier = if gear.RarityTier == 4 then "UltraRare" else "Rare",
-				})
-			end
-		end
-	end
-	if okT then
-		scan("Weapons", Traits.Catalog.Weapons)
-	end
-	if okA and ok then
-		for _, kind in Slots.Kinds do
-			if kind ~= "Weapons" then
-				scan(kind, Armor.Catalog[kind])
+				table.insert(REEL, { Element = element, Tier = shade.Tier, Name = shade.Name })
 			end
 		end
 	end
 	return REEL
 end
 
--- A cut gem drawn flat (quick enough to recolour every reel tick).
-local function flatGem(parent)
-	local white = Color3.new(1, 1, 1)
-	local gem = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(46, 46),
-		BackgroundColor3 = white,
-		Rotation = 45,
+-- A piece of gear in 3D: the server's preview of it ("Slot|A:<tag>",
+-- ArenaStreaks.previews), framed like the Market's. Nil until it's built.
+local function gearView(parent, slot: string, tag: string): ViewportFrame?
+	local view = new("ViewportFrame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Ambient = Color3.fromRGB(185, 190, 210),
+		LightColor = Color3.fromRGB(255, 235, 201),
+		LightDirection = Vector3.new(-0.4, -1, -0.6),
 	}, parent)
-	UiKit.round(gem, 6)
-	local shading = new("UIGradient", { Rotation = -45 }, gem)
-	local edge = new("UIStroke", { Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, gem)
-	local facet = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.46, 0.46),
-		BackgroundTransparency = 0.25,
-	}, gem)
-	UiKit.round(facet, 3)
-	local glint = new("Frame", {
-		Position = UDim2.fromScale(0.14, 0.14),
-		Size = UDim2.fromScale(0.2, 0.2),
-		BackgroundColor3 = white,
-		BackgroundTransparency = 0.2,
-	}, gem)
-	UiKit.round(glint, 2)
-	return function(color: Color3, rim: Color3)
-		shading.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, color:Lerp(white, 0.55)),
-			ColorSequenceKeypoint.new(0.5, color),
-			ColorSequenceKeypoint.new(1, color:Lerp(INK, 0.55)),
-		})
-		facet.BackgroundColor3 = color:Lerp(white, 0.35)
-		edge.Color = rim
-	end,
-		gem
+	local ok, drawn = pcall(GearArt.draw, view, slot, "A:" .. tag, false)
+	if ok and drawn then
+		return view
+	end
+	view:Destroy()
+	return nil
 end
 
--- One piece on a card: its rarity on a ribbon, its picture, name and what
--- it is. Ultra-Rare cards carry a stronger edge and a tinted face.
--- Rolling, the card starts as a reel (spin() flicks it to another random
--- piece) until land() settles it on the real one.
-local function card(parent, entry, onToggle, rolling: boolean?)
+-- One piece on a card: its rarity on a ribbon, its picture (3D: the gem
+-- from its data, the gear from its server preview), name and what it is.
+-- Ultra-Rare cards carry a stronger edge and a tinted face.
+-- Rolling, the card starts as a reel of 3D pieces (Spin flicks to another)
+-- until Land settles it on the real one. Upgrade swaps in 3D gear once the
+-- previews arrive.
+local function card(parent, entry, onToggle, rolling: boolean?, cacheId: string, cacheGear)
 	local item = entry.Item
 	-- The grid lays out a plain cell; the card sits centred in it, so its
 	-- landing pop grows from the middle rather than the top-left corner.
@@ -218,17 +180,17 @@ local function card(parent, entry, onToggle, rolling: boolean?)
 	UiKit.round(ribbon, 6)
 	local art = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(20, 32),
-		Size = UDim2.fromOffset(110, 90),
+		Position = UDim2.fromOffset(12, 30),
+		Size = UDim2.fromOffset(126, 96),
 	}, b)
 	local name = label(b, "", 13, TEXT, Enum.Font.GothamBlack)
-	name.Position, name.Size = UDim2.fromOffset(8, 124), UDim2.new(1, -16, 0, 34)
+	name.Position, name.Size = UDim2.fromOffset(8, 126), UDim2.new(1, -16, 0, 34)
 	local sub = label(b, "", 10, DIM, Enum.Font.GothamBold)
 	sub.Position, sub.Size = UDim2.fromOffset(8, 164), UDim2.new(1, -16, 0, 14)
 	local tick = label(b, "KEEP", 12, INK, Enum.Font.GothamBlack)
 	tick.BackgroundColor3, tick.BackgroundTransparency = GOLD, 0
 	tick.AnchorPoint = Vector2.new(0.5, 0)
-	tick.Position, tick.Size = UDim2.new(0.5, 0, 0, 100), UDim2.fromOffset(64, 20)
+	tick.Position, tick.Size = UDim2.new(0.5, 0, 0, 104), UDim2.fromOffset(64, 20)
 	tick.Visible = false
 	UiKit.round(tick, 6)
 
@@ -247,26 +209,36 @@ local function card(parent, entry, onToggle, rolling: boolean?)
 		return tint
 	end
 
-	-- The real piece.
+	-- The real piece. Gear without its 3D preview yet shows its silhouette
+	-- (flat) until Upgrade can draw it.
+	local landed, flat = not rolling, false
+	local realArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, art)
+	local function drawGear(tint)
+		for _, child in realArt:GetChildren() do
+			child:Destroy()
+		end
+		if gearView(realArt, item.Slot, cacheId .. "/" .. entry.OfferId) then
+			flat = false
+			return
+		end
+		flat = true
+		local holder = new("Frame", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(38, 36),
+		}, realArt)
+		new("UIScale", { Scale = 2.3 }, holder)
+		pcall(GearArt.icon, holder, item.Slot, {}, tint)
+	end
 	local function showReal()
 		local tier = entry.Rarity or (item.Gem and item.Gem.Tier) or "Rare"
 		local tint = paint(tier)
-		for _, child in art:GetChildren() do
-			child:Destroy()
-		end
+		realArt.Visible = true
 		if item.Kind == "Gem" then
-			pcall(Art.show, art, item.Gem, nil, GemConfig.ElementColors[item.Gem.Element] or tint, false)
+			pcall(Art.show, realArt, item.Gem, nil, GemConfig.ElementColors[item.Gem.Element] or tint, false)
 		else
-			-- The slot's silhouette in its rarity's colour, scaled up (Art.show
-			-- would draw whatever you're wearing in that slot, not this piece).
-			local holder = new("Frame", {
-				BackgroundTransparency = 1,
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(38, 36),
-			}, art)
-			new("UIScale", { Scale = 2.3 }, holder)
-			pcall(GearArt.icon, holder, item.Slot, {}, tint)
+			drawGear(tint)
 		end
 		name.Text, name.TextColor3 = entry.Name, TEXT
 		sub.Text = if item.Kind == "Gem"
@@ -275,27 +247,56 @@ local function card(parent, entry, onToggle, rolling: boolean?)
 		sub.TextColor3 = if item.Kind == "Gem" and item.Gem.Flawless then GOLD else DIM
 	end
 
-	-- The reel: a flat gem and one silhouette per slot, shown in turn.
-	local recolour, gemShape, slotIcons = nil, nil, {}
-	local function spin()
-		local pool = reelPool()
-		local gear = #pool.Gear > 0 and math.random() < 0.5
-		local pick = if gear then pool.Gear[math.random(1, #pool.Gear)] else pool.Gems[math.random(1, #pool.Gems)]
-		if not pick then
+	-- The reel: a few 3D gems, and up to two of the cache's gear pieces once
+	-- their previews exist, each built once and shown in turn.
+	local options, current, gearAdded = {}, nil, false
+	local function addOption(build, text, tier)
+		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, art)
+		if build(holder) then
+			table.insert(options, { Frame = holder, Name = text, Tier = tier })
+			return true
+		end
+		holder:Destroy()
+		return false
+	end
+	local function addGearOptions()
+		if gearAdded or landed then
 			return
 		end
-		local tint = paint(pick.Tier)
-		gemShape.Visible = not gear
-		if not gear then
-			recolour(pick.Color, tint)
+		local picks = table.clone(cacheGear or {})
+		for _ = 1, math.min(2, #picks) do
+			local g = table.remove(picks, math.random(1, #picks))
+			-- (done once a piece made it in; until then, try again later)
+			if addOption(function(holder)
+				return gearView(holder, g.Slot, g.Tag) ~= nil
+			end, g.Name, g.Tier) then
+				gearAdded = true
+			end
 		end
-		for key, icon in slotIcons do
-			icon.Visible = gear and key == pick.Slot .. pick.Tier
+	end
+	local function spin()
+		if #options == 0 then
+			return
 		end
+		local pick = options[math.random(1, #options)]
+		if pick == current and #options > 1 then
+			pick = options[(table.find(options, pick) :: number) % #options + 1]
+		end
+		if current then
+			current.Frame.Visible = false
+		end
+		current = pick
+		pick.Frame.Visible = true
+		paint(pick.Tier)
 		name.Text, name.TextColor3 = pick.Name, DIM
 		sub.Text, sub.TextColor3 = "· · ·", DIM
 	end
 	local function land()
+		landed = true
+		for _, option in options do
+			option.Frame:Destroy()
+		end
+		table.clear(options)
 		showReal()
 		local tint = GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD
 		local ultra = entry.Rarity == "UltraRare"
@@ -325,21 +326,21 @@ local function card(parent, entry, onToggle, rolling: boolean?)
 		UiSound.play(if ultra then "Reward" else "Coin")
 	end
 	if rolling then
-		recolour, gemShape = flatGem(art)
-		for _, slot in { "Weapon", "Shield", "Helmet", "Armor", "Gloves", "Boots" } do
-			for _, tier in ArenaStreak.Rarities do
-				local holder = new("Frame", {
-					BackgroundTransparency = 1,
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromOffset(38, 36),
-					Visible = false,
-				}, art)
-				new("UIScale", { Scale = 2.3 }, holder)
-				pcall(GearArt.icon, holder, slot, {}, GemConfig.TierColors[tier] or GOLD)
-				slotIcons[slot .. tier] = holder
-			end
+		local pool = reelGems()
+		for i = 1, math.min(3, #pool) do
+			local g = pool[math.random(1, #pool)]
+			addOption(function(holder)
+				return pcall(Art.show, holder, {
+					Id = "reel" .. i,
+					Element = g.Element,
+					Tier = g.Tier,
+					Size = 6,
+					Clarity = 6,
+					Cut = 6,
+				}, nil, GemConfig.ElementColors[g.Element] or GOLD, false)
+			end, g.Name, g.Tier)
 		end
+		addGearOptions()
 		spin()
 	else
 		showReal()
@@ -351,6 +352,14 @@ local function card(parent, entry, onToggle, rolling: boolean?)
 	return {
 		Spin = spin,
 		Land = land,
+		-- The gear previews arrived: into the reel, or onto a landed card.
+		Upgrade = function()
+			if not landed then
+				addGearOptions()
+			elseif flat and item.Kind == "Gear" then
+				drawGear(GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD)
+			end
+		end,
 		Mark = function(on: boolean)
 			edge.Thickness, edge.Transparency = if on then 3 else rest[1], if on then 0 else rest[2]
 			edge.Color = if on then GOLD else (GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD)
@@ -358,6 +367,33 @@ local function card(parent, entry, onToggle, rolling: boolean?)
 			tick.Visible = on
 		end,
 	}
+end
+
+-- Ask the server for 3D previews of every cache's gear, retrying while it's
+-- busy building something else; then onReady().
+local fetching = false
+local function fetchPreviews(onReady: (() -> ())?)
+	if fetching then
+		return
+	end
+	fetching = true
+	task.spawn(function()
+		for _ = 1, 15 do
+			local result = GemClient.request("StreakPreviews")
+			if result.Ok and result.Done then
+				break
+			end
+			task.wait(1)
+		end
+		fetching = false
+		if onReady then
+			onReady()
+		end
+	end)
+end
+
+function StreakRewards.prewarm()
+	fetchPreviews(nil)
 end
 
 function StreakRewards.open()
@@ -487,11 +523,34 @@ function StreakRewards.open()
 		end
 		redraw()
 	end
+	-- The cache's gear, for every card's reel (3D once the previews exist).
+	local cacheGear = {}
+	for _, entry in cache.Items do
+		if entry.Item.Kind == "Gear" then
+			table.insert(cacheGear, {
+				Slot = entry.Item.Slot,
+				Tag = cache.Id .. "/" .. entry.OfferId,
+				Name = entry.Name,
+				Tier = entry.Rarity or "Rare",
+			})
+		end
+	end
 	local reel = {}
 	for _, entry in cache.Items do
-		cards[entry.OfferId] = card(grid, entry, toggle, rolling)
+		cards[entry.OfferId] = card(grid, entry, toggle, rolling, cache.Id, cacheGear)
 		table.insert(reel, cards[entry.OfferId])
 	end
+	-- The gear's 3D previews (usually built already, see refresh); when they
+	-- arrive, into the reel or onto the cards that have landed.
+	local shown, previewsIn = screen, false
+	fetchPreviews(function()
+		previewsIn = true
+		if screen == shown then
+			for _, c in reel do
+				c.Upgrade()
+			end
+		end
+	end)
 
 	claim = new("TextButton", {
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -540,25 +599,32 @@ function StreakRewards.open()
 	if rolling then
 		local mine = screen
 		task.spawn(function()
-			local started = os.clock()
+			-- (The landings wait for the gear's 3D previews, 3 s at most, so
+			-- no piece lands as a flat stand-in; the reel spins meanwhile.)
+			local opened, started = os.clock(), nil
 			local nextFlick, landed = {}, {}
 			local function landsAt(i)
 				return 1.1 + (i - 1) * 0.32
 			end
 			local left = #reel
 			while screen == mine and left > 0 do
-				local t = os.clock() - started
+				local now = os.clock()
+				if not started and (previewsIn or skip or now - opened >= 3) then
+					started = now
+				end
+				local t = if started then now - started else nil
 				local flicked = false
 				for i, c in reel do
 					if not landed[i] then
-						if skip or t >= landsAt(i) then
+						if skip or (t and t >= landsAt(i)) then
 							landed[i] = true
 							left -= 1
 							c.Land()
-						elseif t >= (nextFlick[i] or 0) then
+						elseif now >= (nextFlick[i] or 0) then
 							c.Spin()
 							flicked = true
-							nextFlick[i] = t + 0.06 + math.max(0, 0.6 - (landsAt(i) - t)) * 0.3
+							local toGo = if t then landsAt(i) - t else 2
+							nextFlick[i] = now + 0.06 + math.max(0, 0.6 - toGo) * 0.3
 						end
 					end
 				end

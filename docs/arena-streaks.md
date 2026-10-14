@@ -49,13 +49,21 @@ All the numbers live in `src/shared/ArenaStreak.luau`.
 
 ## The roll
 
-The first time a cache opens, it rolls. Every card flicks through Rare and
-Ultra-Rare gems and gear (real gem shades and real gear names), slowing as its
+The first time a cache opens, it rolls. Every card flicks through 3D Rare and
+Ultra-Rare gems and the cache's own armour and weapons in 3D, slowing as its
 turn comes. The cards then land one by one, left to right, on what the server
 rolled. An Ultra-Rare lands with a pink flash and a shine. CLAIM unlocks once
 everything has landed, and a tap during the roll lands it all at once. The
 pieces are rolled on the server when the milestone is reached, so the
 animation only reveals them.
+
+Every piece is shown in 3D: gems from their data, gear from a preview the
+server builds on its mannequin (the same as the Market's,
+`Equipment.groupPreviews`, group "A"). Gear has its look (finish, visor and
+roll) rolled when the cache is rolled, at its own tier as the Forge does, so
+the model you see is exactly the piece you get. Previews are built when the
+cache list loads. The landings wait for them, 3 s at most, so nothing lands
+as a flat stand-in.
 
 ## Testing it (DEV panel)
 

@@ -2231,9 +2231,13 @@ local function previewStore(player: Player): Instance?
 	return store
 end
 
--- Market previews ("Slot|M:...") belong to marketPreviews, not the bag.
-local function isMarket(name: string): boolean
-	return string.find(name, "|M:", 1, true) ~= nil
+-- Group previews ("Slot|M:..." for the Market, "Slot|A:..." for Arena
+-- Caches) belong to groupPreviews, not the bag.
+local function isGroup(name: string, group: string?): boolean
+	if group then
+		return string.find(name, "|" .. group .. ":", 1, true) ~= nil
+	end
+	return string.match(name, "|%u:") ~= nil
 end
 
 -- Dresses the mannequin in each wanted piece and keeps just that piece.
@@ -2456,7 +2460,7 @@ function Equipment.previews(player: Player): boolean
 		local item = wanted[child.Name]
 		if item and child:GetAttribute("Key") == item.Key then
 			wanted[child.Name] = nil
-		elseif not isMarket(child.Name) then
+		elseif not isGroup(child.Name) then
 			child:Destroy()
 		end
 	end
@@ -2466,11 +2470,12 @@ function Equipment.previews(player: Player): boolean
 	return buildPreviews(player, store :: Instance, loadout, wanted)
 end
 
--- Previews of gear that isn't yours (Market listings and offers), from the
--- piece itself: items[tag] = { Slot, Id, Quality, Roll, Gem }. Each is
--- built as "Slot|M:<tag>" (GearArt.draw(view, slot, "M:" .. tag)); market
--- previews no longer asked for are dropped.
-function Equipment.marketPreviews(player: Player, items): (boolean, number?)
+-- Previews of gear that isn't yours, from the piece itself, in a group: "M"
+-- for Market listings and offers, "A" for Arena Cache pieces.
+-- items[tag] = { Slot, Id, Quality, Roll, Gem }. Each is built as
+-- "Slot|<group>:<tag>" (GearArt.draw(view, slot, group .. ":" .. tag)); the
+-- group's previews no longer asked for are dropped (other groups are kept).
+function Equipment.groupPreviews(player: Player, group: string, items): (boolean, number?)
 	local loadout = PlayerData.character(player)
 	local store = previewStore(player)
 	if not loadout or not store or building[player] then
@@ -2481,7 +2486,7 @@ function Equipment.marketPreviews(player: Player, items): (boolean, number?)
 		local kind = Slots.Definitions[item.Slot] and Slots.Definitions[item.Slot].Kind
 		if kind and Classes.gear(loadout.Class, kind, item.Id) then
 			local roll = item.Roll
-			wanted[item.Slot .. "|M:" .. tag] = {
+			wanted[item.Slot .. "|" .. group .. ":" .. tag] = {
 				Slot = item.Slot,
 				Id = item.Id,
 				Quality = item.Quality or 1,
@@ -2504,7 +2509,7 @@ function Equipment.marketPreviews(player: Player, items): (boolean, number?)
 		end
 	end
 	for _, child in (store :: Instance):GetChildren() do
-		if isMarket(child.Name) then
+		if isGroup(child.Name, group) then
 			local item = wanted[child.Name]
 			if item and child:GetAttribute("Key") == item.Key then
 				wanted[child.Name] = nil
@@ -2522,6 +2527,11 @@ function Equipment.marketPreviews(player: Player, items): (boolean, number?)
 	end
 	local done = buildPreviews(player, store :: Instance, loadout, wanted)
 	return done, if done then count else 0
+end
+
+-- The Market's previews ("Slot|M:<listing>[:<offer>]").
+function Equipment.marketPreviews(player: Player, items): (boolean, number?)
+	return Equipment.groupPreviews(player, "M", items)
 end
 
 local function watch(player: Player)

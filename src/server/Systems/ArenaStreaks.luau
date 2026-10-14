@@ -45,7 +45,7 @@ local function gearOfTier(tier: number)
 	local function scan(kind: string, list)
 		for _, gear in list or {} do
 			if type(gear) == "table" and gear.RarityTier == tier then
-				table.insert(pool, { Kind = kind, Id = gear.Id, Name = gear.Name })
+				table.insert(pool, { Kind = kind, Id = gear.Id, Name = gear.Name, Def = gear })
 			end
 		end
 	end
@@ -110,7 +110,15 @@ function ArenaStreaks.rollCache(m)
 		local piece = table.remove(decks[rarity])
 		if piece then
 			table.insert(items, {
-				Item = { Kind = "Gear", Slot = Slots.ByKind[piece.Kind], Id = piece.Id, Quality = m.Quality },
+				-- (its look rolled now, at its own tier as the Forge does, so the
+				-- 3D preview is exactly the piece you'll get)
+				Item = {
+					Kind = "Gear",
+					Slot = Slots.ByKind[piece.Kind],
+					Id = piece.Id,
+					Quality = m.Quality,
+					Roll = GearRolls.roll(rng, piece.Def.RarityTier, piece.Def),
+				},
 				Name = piece.Name,
 				Rarity = rarity,
 			})
@@ -336,6 +344,27 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	)
 end
 
+-- 3D pictures of every cache's gear (Equipment.groupPreviews, group "A":
+-- "Slot|A:<cacheId>/<offerId>", drawn by GearArt.draw). Built on the
+-- server's mannequin like the Market's; Done is false while it's busy.
+function ArenaStreaks.previews(player: Player)
+	local duel = record(player)
+	if not duel then
+		return Shop.reply(false, "Your data is still loading.")
+	end
+	local items = {}
+	for _, cache in duel.StreakCaches do
+		for _, entry in cache.Items do
+			if entry.Item.Kind == "Gear" then
+				items[cache.Id .. "/" .. entry.OfferId] = entry.Item
+			end
+		end
+	end
+	local Equipment = require(script.Parent.Equipment)
+	local done, built = Equipment.groupPreviews(player, "A", items)
+	return Shop.reply(true, "", { Done = done, Built = built or 0 })
+end
+
 local devRolls = 0 -- (so each test cache has its own id, and rolls afresh)
 
 -- DEV (test admins): roll a test cache for the milestone at `wins` and put
@@ -371,6 +400,7 @@ function ArenaStreaks.start()
 	Shop.register("StreakCaches", ArenaStreaks.caches)
 	Shop.register("StreakClaim", ArenaStreaks.claim)
 	Shop.register("DevStreakCache", ArenaStreaks.devCache)
+	Shop.register("StreakPreviews", ArenaStreaks.previews)
 	-- On joining: the streak on show, and any leftovers still to vault.
 	local function joined(player: Player)
 		task.spawn(function()

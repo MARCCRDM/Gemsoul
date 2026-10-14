@@ -90,7 +90,7 @@ local profile = {
 	Cosmetics = { Owned = {} },
 	Duel = { Rating = 1000, Wins = 0, Losses = 0, Streak = 0 },
 }
-local handlers, fired, vaulted, nextGem = {}, {}, {}, 0
+local handlers, fired, vaulted, nextGem, previewCalls = {}, {}, {}, 0, {}
 local stubs = {
 	PlayerData = {
 		get = function(p) return if p == player then profile else nil end,
@@ -108,6 +108,7 @@ local stubs = {
 		end,
 	},
 	TestAdmin = { allowed = function(id) return id == 7 end },
+	Equipment = { groupPreviews = function(_, group, items) previewCalls[#previewCalls + 1] = { group, items }; return true, 0 end },
 	MarketBoard = { vaultList = function(item, price, label) table.insert(vaulted, { item, price, label }); return true end },
 	ChatChannels = { announce = function() end },
 }
@@ -188,6 +189,25 @@ local function cacheRarities(c)
 	return counts, gems, gear
 end
 local counts, gems, gear = cacheRarities(cache)
+-- Gear comes with its look rolled (at its own tier, as the Forge rolls), so
+-- its 3D preview is the piece you get; the previews are asked for as group
+-- "A", one per piece, keyed "<cache>/<offer>".
+for _, entry in cache.Items do
+	if entry.Item.Kind == "Gear" then
+		local roll = entry.Item.Roll
+		check(type(roll) == "table" and roll.Rarity == gearTier[entry.Item.Id], "A cache piece of gear has no look rolled at its tier")
+	end
+end
+local previewReply = handlers.StreakPreviews(player)
+local call = previewCalls[#previewCalls]
+check(previewReply.Ok and call and call[1] == "A", "The cache's 3D previews weren't asked for")
+local asked = 0
+for tag, payload in call[2] do
+	asked += 1
+	local offer = string.match(tag, "^" .. cache.Id .. "/(.+)$")
+	check(offer and payload.Kind == "Gear", "A preview isn't keyed <cache>/<offer>")
+end
+check(asked == gear, "Not every piece of gear got a preview")
 for _, entry in cache.Items do
 	if entry.Item.Kind == "Gear" then
 		check(entry.Item.Quality == Rules.Milestones[1].Quality and entry.Item.Slot, "A cache piece of gear is malformed")
