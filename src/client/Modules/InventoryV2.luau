@@ -2603,6 +2603,7 @@ end
 
 local queued = false
 local drawIntro -- (below, with the intro card)
+local introDone = false -- dismissed this session (survives the screen being rebuilt)
 -- The GEMS button: how many you own, and the best of them on its icon.
 local gemsShown = nil
 local function drawGemsButton(profile, loadout)
@@ -2789,7 +2790,7 @@ local function buildIntro(canvas: Frame)
 	ok:SetAttribute("UiSound", "Confirm")
 	ok.Activated:Connect(function()
 		shade.Visible = false
-		ui.IntroDone = true
+		introDone = true
 		request("TriadSeen")
 	end)
 	ui.Intro = shade
@@ -2798,7 +2799,14 @@ drawIntro = function(profile, loadout)
 	if not ui.Intro then
 		return
 	end
-	local show = triadOn(loadout) and profile.TriadSeen ~= true and not ui.IntroDone
+	-- Only for a returning miner whose old surge gems were moved (a new one
+	-- learns Q, E and R in the intro), only on the open Inventory (never
+	-- behind a loading screen), and once.
+	local show = state.Active == true
+		and triadOn(loadout)
+		and profile.TriadSeen ~= true
+		and (profile.TriadNotice or 0) > 0
+		and not introDone
 	ui.Intro.Visible = show
 	if show then
 		ui.IntroNote.Text = if (profile.TriadNotice or 0) > 0
@@ -2865,6 +2873,9 @@ function InventoryV2.setActive(on: boolean)
 		root.Visible = on
 	end
 	if not on then
+		if ui.Intro then
+			ui.Intro.Visible = false
+		end
 		InventoryV2.cancelDrag()
 		GemVault.close()
 		Wardrobe.close()
