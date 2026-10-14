@@ -1,9 +1,9 @@
 --[[
-	Wardrobe: your suits and weapon skins, opened from the Inventory's SKINS
+	Wardrobe: your suits, weapon skins and pickaxes, opened from the Inventory's SKINS
 	button. What you pick here is this miner's own look (each miner keeps its
 	own; see Cosmetics.forMiner), and swaps in one tap.
 
-	  Tabs    SUITS and WEAPON SKINS, with how many of each you own.
+	  Tabs    SUITS, WEAPON SKINS and PICKAXES, with how many of each you own.
 	  Left    the picked look, turning in 3D: its name, rarity, what it is,
 	          where it comes from, and WEAR (or TAKE OFF, or BUY while test
 	          coin prices are on).
@@ -40,11 +40,13 @@ local C = {
 	Accent = Color3.fromRGB(255, 120, 190),
 }
 local HEAVY, HEADING, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
-local KINDS = { "Suit", "Skin" }
-local KIND_TITLE = { Suit = "SUITS", Skin = "WEAPON SKINS" }
+local KINDS = { "Suit", "Skin", "Pick" }
+local KIND_TITLE = { Suit = "SUITS", Skin = "WEAPON SKINS", Pick = "PICKAXES" }
+local KIND_WIDTH = { Suit = 120, Skin = 180, Pick = 150 }
 local KIND_STANDARD = {
 	Suit = "Your armour in its own colours, as crafted.",
 	Skin = "Your weapon in its own colours, as forged.",
+	Pick = "Your pick as it came from the Probe, in its own colour.",
 }
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 
@@ -508,7 +510,7 @@ local function build(canvas: Instance)
 	ui.Tabs = {}
 	local tx = 590
 	for _, kind in KINDS do
-		local w = if kind == "Suit" then 120 else 180
+		local w = KIND_WIDTH[kind]
 		local tab = button(window, KIND_TITLE[kind], tx, 22, w, 32)
 		tab.Name = kind .. "Tab"
 		tab.Font = HEAVY
@@ -563,8 +565,8 @@ function Wardrobe.open(canvas: Instance, kind: string?)
 	if Wardrobe.isOpen() then
 		Wardrobe.close()
 	end
-	if kind == "Suit" or kind == "Skin" then
-		state.Kind = kind
+	if KIND_TITLE[kind or ""] then
+		state.Kind = kind :: string
 	end
 	state.Selected, state.Note = nil, ""
 	ui = {}

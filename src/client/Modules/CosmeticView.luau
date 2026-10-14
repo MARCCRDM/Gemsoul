@@ -1,5 +1,6 @@
 --[[
-	CosmeticView: a skin or suit as it really looks, in 3D, for the Shop.
+	CosmeticView: a skin, suit or pickaxe as it really looks, in 3D, for the
+	Shop and the Wardrobe.
 
 	The server dresses a mannequin once per cosmetic and keeps the parts in
 	ReplicatedStorage.CosmeticPreviews[<id>] (Equipment.cosmeticPreview).
@@ -60,11 +61,13 @@ local function frame(view: ViewportFrame, source: Instance, kind: string, spin: 
 	camera.FieldOfView = 30
 	camera.Parent = view
 	view.CurrentCamera = camera
-	-- Both from the front, turned a little: a suit faces you, and a blade
-	-- shows its flat (it's built across the miner's front).
-	local yaw = if kind == "Suit" then math.rad(200) else math.rad(195)
-	local pitch = math.rad(if kind == "Suit" then 8 else 4)
-	local distance = math.max(size.X, size.Y, size.Z) * (if kind == "Suit" then 1.8 else 2.0) + 0.3
+	-- From the front, turned a little: a suit faces you, and a blade shows
+	-- its flat (it's built across the miner's front). A pickaxe is seen
+	-- side on, head and spike in profile (Equipment builds it so).
+	local yaw = if kind == "Suit" then math.rad(200) elseif kind == "Pick" then math.rad(215) else math.rad(195)
+	local pitch = math.rad(if kind == "Suit" then 8 elseif kind == "Pick" then 10 else 4)
+	local reach = if kind == "Suit" then 1.8 elseif kind == "Pick" then 1.55 else 2.0
+	local distance = math.max(size.X, size.Y, size.Z) * reach + 0.3
 	local function place(angle: number)
 		local offset =
 			Vector3.new(math.sin(angle) * math.cos(pitch), math.sin(pitch), math.cos(angle) * math.cos(pitch))
@@ -85,7 +88,7 @@ end
 -- for cosmetics that have no 3D look (trims, backs, titles).
 function CosmeticView.attach(root: GuiObject, id: string, spin: boolean?): boolean
 	local cosmetic = Cosmetics.get(id)
-	if not cosmetic or (cosmetic.Kind ~= "Skin" and cosmetic.Kind ~= "Suit") then
+	if not cosmetic or not Cosmetics.isMinerKind(cosmetic.Kind) then
 		return false
 	end
 	local view = Instance.new("ViewportFrame")

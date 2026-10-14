@@ -135,8 +135,8 @@ local function buyCosmetic(player: Player, id: any)
 		return reply(false, string.format("You need %d coins.", price))
 	end
 	profile.Cosmetics.Owned[cosmetic.Id] = true
-	-- A skin or suit goes straight on, as a Robux purchase does.
-	if cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit" then
+	-- A skin, suit or pick goes straight on, as a Robux purchase does.
+	if Cosmetics.isMinerKind(cosmetic.Kind) then
 		PlayerData.setCosmetic(player, cosmetic.Kind, cosmetic.Id)
 		PlayerData.sync(player)
 		return reply(true, "Unlocked " .. cosmetic.Name .. " and put it on!")
@@ -162,11 +162,11 @@ local function buyCrate(player: Player, id: any, count: any)
 end
 
 -- A random cosmetic of `rarity` you don't own yet, from `crateId`'s pool:
--- the trims and back pieces in Cosmetics.Order, plus the loot skins and
--- suits (never sold, never exclusive) for this crate or any crate. Nil if
--- you own them all.
+-- the trims and back pieces in Cosmetics.Order, plus the loot skins, suits
+-- and picks (never sold, never exclusive) for this crate or any crate. Nil
+-- if you own them all.
 local LOOT = table.clone(Cosmetics.Order)
-for _, kind in { "Skin", "Suit" } do
+for _, kind in Cosmetics.MinerKinds do
 	for _, id in Cosmetics.ofKind(kind) do
 		local cosmetic = Cosmetics.List[id]
 		if not cosmetic.Exclusive and not cosmetic.Robux and not cosmetic.Price then
@@ -256,7 +256,7 @@ end
 
 local function equipCosmetic(player: Player, kind: any, id: any)
 	local profile = PlayerData.get(player)
-	if not profile or (kind ~= "Trim" and kind ~= "Back" and kind ~= "Skin" and kind ~= "Suit" and kind ~= "Title") then
+	if not profile or (kind ~= "Trim" and kind ~= "Back" and kind ~= "Title" and not Cosmetics.isMinerKind(kind)) then
 		return reply(false, "Pick something to wear.")
 	end
 	if id ~= nil then

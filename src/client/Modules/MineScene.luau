@@ -26,6 +26,7 @@ local TweenService = game:GetService("TweenService")
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Features = require(ReplicatedStorage.Shared.Config).Features or {}
 local MiningSite = require(ReplicatedStorage.Shared.MiningSite)
+local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local Scenes = require(script.Parent.Scenes)
@@ -58,6 +59,7 @@ local hiddenGui: ScreenGui? = nil
 
 -- The pickaxe in the right hand, and the right shoulder that swings it.
 local pickParts: { BasePart } = {}
+local pickAlpha: { [BasePart]: number } = {}
 local shoulder: Motor6D? = nil
 local swingStart = -math.huge
 local shoulderPosed = false
@@ -472,7 +474,13 @@ end
 -- Out for digging (weapon hidden on this screen), or put away.
 local function holdPick(on: boolean)
 	for _, part in pickParts do
-		part.Transparency = if on then 0 else 1
+		-- (a skin's ice and glass keep their own see-through)
+		part.Transparency = if on then pickAlpha[part] or 0 else 1
+		for _, fx in part:GetChildren() do
+			if fx:IsA("ParticleEmitter") or fx:IsA("Trail") or fx:IsA("Light") then
+				fx.Enabled = on
+			end
+		end
 	end
 	for _, part in weaponParts() do
 		part.LocalTransparencyModifier = if on then 1 else 0
@@ -488,8 +496,18 @@ local function makePick()
 	local hand = character and character:FindFirstChild("RightHand") :: BasePart?
 	local upperArm = character and character:FindFirstChild("RightUpperArm")
 	shoulder = upperArm and upperArm:FindFirstChild("RightShoulder") :: Motor6D?
-	if hand then
+	-- Your pickaxe skin if you wear one (Shared.PickaxeLooks, built up
+	-- its haft, so turned to run down the arm), else the space pickaxe.
+	local cosmetics = GemClient.Profile and GemClient.Profile.Cosmetics
+	local skin = cosmetics and cosmetics.Pick
+	if hand and skin and cosmetics.Owned and cosmetics.Owned[skin] and PickaxeLooks.Looks[skin] then
+		pickParts = PickaxeLooks.build(character, hand.CFrame * CFrame.Angles(0, 0, math.pi), skin, nil, hand)
+	elseif hand then
 		pickParts = Scenes.spacePickaxe(hand)
+	end
+	pickAlpha = {}
+	for _, part in pickParts do
+		pickAlpha[part] = part.Transparency
 	end
 	holdPick(false)
 end

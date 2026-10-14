@@ -18,6 +18,7 @@ local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local ArmorKits = require(script.Parent.ArmorKits)
 local FrontierAssets = require(script.Parent.FrontierAssets)
 local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
@@ -2333,7 +2334,7 @@ end
 
 function Equipment.cosmeticPreview(id: string): boolean
 	local cosmetic = Cosmetics.get(id)
-	if not cosmetic or (cosmetic.Kind ~= "Skin" and cosmetic.Kind ~= "Suit") then
+	if not cosmetic or not Cosmetics.isMinerKind(cosmetic.Kind) then
 		return false
 	end
 	local store = ReplicatedStorage:FindFirstChild("CosmeticPreviews")
@@ -2343,6 +2344,24 @@ function Equipment.cosmeticPreview(id: string): boolean
 		store.Parent = ReplicatedStorage
 	end
 	if store:FindFirstChild(id) then
+		return true
+	end
+	if cosmetic.Kind == "Pick" then
+		-- A pickaxe needs no mannequin: built standing, leaning, its head in
+		-- profile (the spike along X; its particles and light don't show
+		-- in a preview, so they go).
+		local preview = Instance.new("Folder")
+		preview.Name = id
+		preview:SetAttribute("Kind", "Pick")
+		local stand = CFrame.Angles(0, 0, math.rad(-30)) * CFrame.Angles(0, -math.pi / 2, 0) * CFrame.new(0, -1.3, 0)
+		local parts = PickaxeLooks.build(preview, stand, id)
+		for _, part in parts do
+			for _, child in part:GetChildren() do
+				child:Destroy()
+			end
+		end
+		preview:SetAttribute("Parts", #parts)
+		preview.Parent = store
 		return true
 	end
 	while cosmeticBusy do

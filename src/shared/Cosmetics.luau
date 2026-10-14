@@ -7,6 +7,8 @@
 	  Backs   something worn on your back: packs, banners, capes, wings, halos.
 	  Skins   restyle whatever weapon you hold (a Palette, or a Look).
 	  Suits   restyle your whole armor, every piece, whatever its style.
+	  Picks   restyle the pickaxe you mine with (Shared.PickaxeLooks builds
+	          each one, and how its hits land); it keeps its tier's power.
 	  Titles  a tag over your head that everyone sees.
 
 	How each is had:
@@ -51,7 +53,7 @@ export type Palette = {
 }
 export type Cosmetic = {
 	Id: string,
-	Kind: "Trim" | "Back" | "Skin" | "Suit" | "Title",
+	Kind: "Trim" | "Back" | "Skin" | "Suit" | "Pick" | "Title",
 	Name: string,
 	Description: string,
 	Rarity: string, -- a gem tier: Common, Uncommon, Rare, UltraRare
@@ -1173,6 +1175,88 @@ Cosmetics.List = {
 		Exclusive = "Season",
 		How = "Season 1 free track, level 25.",
 	},
+	-- Pickaxe skins (Shared.PickaxeLooks has each one's model and hit).
+	PickMagma = {
+		Id = "PickMagma",
+		Kind = "Pick",
+		Name = "Magma Heart",
+		Description = "Basalt split open on a river of lava. It smoulders in your hand and every swing leaves embers.",
+		Rarity = "Legendary",
+		Robux = 199,
+		Color = Color3.fromRGB(255, 110, 20),
+	},
+	PickStorm = {
+		Id = "PickStorm",
+		Kind = "Pick",
+		Name = "Stormbreaker",
+		Description = "A thunder hammer-pick with tesla prongs. Every hit calls lightning down on the rock.",
+		Rarity = "Legendary",
+		Robux = 199,
+		Color = Color3.fromRGB(255, 230, 90),
+	},
+	PickVoid = {
+		Id = "PickVoid",
+		Kind = "Pick",
+		Name = "Void Reaper",
+		Description = "A scythe of night-glass, runes circling the haft. Rock folds into the dark where it bites.",
+		Rarity = "Legendary",
+		Robux = 199,
+		Color = Color3.fromRGB(170, 90, 255),
+	},
+	PickGlacier = {
+		Id = "PickGlacier",
+		Kind = "Pick",
+		Name = "Glacier Fang",
+		Description = "A jagged icicle the length of your arm, steaming cold. Hits burst into frost shards.",
+		Rarity = "UltraRare",
+		Robux = 149,
+		Color = Color3.fromRGB(150, 225, 255),
+	},
+	PickPrism = {
+		Id = "PickPrism",
+		Kind = "Pick",
+		Name = "Prism Shard",
+		Description = "A cut-diamond pick that cycles through every colour, and throws them all when it hits.",
+		Rarity = "UltraRare",
+		Robux = 149,
+		Color = Color3.fromRGB(200, 170, 255),
+	},
+	PickNeon = {
+		Id = "PickNeon",
+		Kind = "Pick",
+		Name = "Neon Runner",
+		Description = "Matte black cut with hot pink and cyan light. Sparks fly in both.",
+		Rarity = "Rare",
+		Robux = 99,
+		Color = Color3.fromRGB(255, 70, 200),
+	},
+	PickGilded = {
+		Id = "PickGilded",
+		Kind = "Pick",
+		Name = "Gilded Prospector",
+		Description = "Polished gold set with rubies and an emerald. Every hit glitters.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(255, 200, 80),
+		Crate = "MasterworkCrate",
+	},
+	PickGeode = {
+		Id = "PickGeode",
+		Kind = "Pick",
+		Name = "Amethyst Geode",
+		Description = "A split geode whose crystals grow into the spike.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(190, 110, 255),
+		Crate = "GeodeCrate",
+	},
+	PickBone = {
+		Id = "PickBone",
+		Kind = "Pick",
+		Name = "Bone Crusher",
+		Description = "A monster's tusk lashed to a spine, with a skull for a hammer.",
+		Rarity = "Uncommon",
+		Color = Color3.fromRGB(240, 228, 200),
+		Crate = "GeodeCrate",
+	},
 } :: { [string]: Cosmetic }
 
 function Cosmetics.get(id: any): Cosmetic?
@@ -1212,24 +1296,32 @@ function Cosmetics.ofKind(kind: string): { string }
 end
 
 -- Its price in coins: a trim's or back piece's own Price, or (while testing,
--- Config.TestCosmeticPrice) the test price for any weapon skin or suit.
+-- Config.TestCosmeticPrice) the test price for any weapon skin, suit or pick.
 function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
 	if cosmetic.Price then
 		return cosmetic.Price
 	end
 	local test = Config.TestCosmeticPrice
-	if type(test) == "number" and (cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit") then
+	if type(test) == "number" and Cosmetics.isMinerKind(cosmetic.Kind) then
 		return test
 	end
 	return nil
 end
 
--- What each miner wears for itself: a suit and a weapon skin (kept in its
--- character as Wardrobe = { Suit, Skin }). Trims, backs and titles are the
--- account's. A miner with no Wardrobe yet wears the account's current look.
-Cosmetics.MinerKinds = { "Suit", "Skin" }
+-- What each miner wears for itself: a suit, a weapon skin and a pickaxe
+-- (kept in its character as Wardrobe = { Suit, Skin, Pick }). Trims, backs
+-- and titles are the account's. A miner with no Wardrobe yet wears the
+-- account's current look.
+Cosmetics.MinerKinds = { "Suit", "Skin", "Pick" }
 function Cosmetics.isMinerKind(kind: any): boolean
-	return kind == "Suit" or kind == "Skin"
+	return kind == "Suit" or kind == "Skin" or kind == "Pick"
+end
+local function currentLook(cosmetics: any): { [string]: string? }
+	local look = {}
+	for _, kind in Cosmetics.MinerKinds do
+		look[kind] = cosmetics[kind]
+	end
+	return look
 end
 function Cosmetics.forMiner(cosmetics: any, character: any): any
 	local look = table.clone(cosmetics or {})
@@ -1247,7 +1339,7 @@ end
 -- come off.
 function Cosmetics.leaveMiner(cosmetics: any, character: any)
 	if type(character) == "table" and type(character.Wardrobe) ~= "table" then
-		character.Wardrobe = { Suit = cosmetics.Suit, Skin = cosmetics.Skin }
+		character.Wardrobe = currentLook(cosmetics)
 	end
 end
 function Cosmetics.joinMiner(cosmetics: any, character: any)
@@ -1255,7 +1347,7 @@ function Cosmetics.joinMiner(cosmetics: any, character: any)
 		return
 	end
 	if type(character.Wardrobe) ~= "table" then
-		character.Wardrobe = { Suit = cosmetics.Suit, Skin = cosmetics.Skin }
+		character.Wardrobe = currentLook(cosmetics)
 	end
 	for _, kind in Cosmetics.MinerKinds do
 		local id = character.Wardrobe[kind]

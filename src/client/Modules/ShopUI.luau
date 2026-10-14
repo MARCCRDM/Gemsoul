@@ -53,6 +53,7 @@ local TAB_LABELS = {
 	Free = "Free",
 	Skins = "Weapon Skins",
 	Suits = "Suits",
+	Picks = "Pickaxes",
 	Bundles = "Bundles",
 	Backs = "Back Pieces",
 	Trims = "Trims",
@@ -773,12 +774,14 @@ end
 -- Back pieces and trims -------------------------------------------------------------------------------------
 
 -- What each kind is called, and where an exclusive is earned.
-local KIND_NAMES = { Back = "BACK PIECE", Trim = "TRIM", Skin = "WEAPON SKIN", Suit = "SUIT", Title = "TITLE" }
+local KIND_NAMES =
+	{ Back = "BACK PIECE", Trim = "TRIM", Skin = "WEAPON SKIN", Suit = "SUIT", Pick = "PICKAXE", Title = "TITLE" }
 local COLLECTION = {
 	Back = "Back piece collection",
 	Trim = "Trim collection",
 	Skin = "Weapon skin collection",
 	Suit = "Suit collection",
+	Pick = "Pickaxe collection",
 }
 local HOW_TO = {
 	Invite = "Bring friends: their invites unlock it. See the Free tab.",
@@ -811,7 +814,7 @@ local function drawCosmetics(kind: string)
 	local owned = p.Cosmetics and p.Cosmetics.Owned or {}
 	local worn = p.Cosmetics and p.Cosmetics[kind]
 	local ids = {}
-	if kind == "Skin" or kind == "Suit" or kind == "Title" then
+	if kind == "Skin" or kind == "Suit" or kind == "Pick" or kind == "Title" then
 		-- On sale first, then the exclusives (Cosmetics.ofKind).
 		ids = Cosmetics.ofKind(kind)
 		if kind == "Skin" then
@@ -847,8 +850,8 @@ local function drawCosmetics(kind: string)
 		ScrollBarImageColor3 = P.Edge,
 		BorderSizePixel = 0,
 	}, body)
-	-- Skins and suits show in 3D, so their tiles are taller.
-	local tall = kind == "Skin" or kind == "Suit"
+	-- Skins, suits and picks show in 3D, so their tiles are taller.
+	local tall = Cosmetics.isMinerKind(kind)
 	local stageH = if tall then 112 else 74
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(138, if tall then 186 else 150),
@@ -874,7 +877,7 @@ local function drawCosmetics(kind: string)
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}, tile)
 		IronUi.highlight(tile)
-		local artSize = if cosmetic.Kind == "Skin" or cosmetic.Kind == "Suit" then stageH else 74
+		local artSize = if Cosmetics.isMinerKind(cosmetic.Kind) then stageH else 74
 		local holder = new("Frame", {
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(69 - artSize / 2, 18 + (stageH - artSize) / 2),
@@ -1674,6 +1677,9 @@ local DRAW = {
 	end,
 	Suits = function()
 		drawCosmetics("Suit")
+	end,
+	Picks = function()
+		drawCosmetics("Pick")
 	end,
 	Bundles = drawBundles,
 	Backs = function()
