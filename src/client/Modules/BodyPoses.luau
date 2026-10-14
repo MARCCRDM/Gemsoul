@@ -137,14 +137,16 @@ function BodyPoses.step(dt: number)
 				look = if found then point else nil
 			end
 			-- The server's "Blocking" flag on the player backs up GuardUntil, so
-			-- a foe's shield is up for as long as they hold their guard.
+			-- a foe's shield is up for as long as they hold their guard. Only in
+			-- a fight: a flag left on after one (a guard move landing just as
+			-- the fight ended) held the guard pose, shield arm up, for good.
 			pose(
 				character,
 				dt,
 				now,
 				clock,
 				not fighting,
-				player:GetAttribute("Blocking") == true,
+				fighting and player:GetAttribute("Blocking") == true,
 				look
 			)
 		end

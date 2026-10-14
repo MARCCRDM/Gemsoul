@@ -658,7 +658,11 @@ function TriadServer.applySelf(player, k, st, definition, aim, now)
 		st.BlockUntil = now + definition.Guard.Time
 		st.BlockRaisedAt = now
 		st.ParrySpent = false
-		player:SetAttribute("Blocking", true)
+		-- (Only in a fight: the fight's own tick lowers it again, and a guard
+		-- landing as the fight ended left the shield arm up for good.)
+		if player:GetAttribute("CombatSession") ~= nil then
+			player:SetAttribute("Blocking", true)
+		end
 		aura("Guard", definition.Guard.Time)
 	end
 	if definition.Wall then
