@@ -1,11 +1,32 @@
 local function signal()
 	local listeners = {}
-	return { Connect=function(_,fn) table.insert(listeners,fn) end, Fire=function(_,...)
-		for _,fn in listeners do fn(...) end
+	return { Connect=function(_,fn)
+		local listener = {Fn=fn, Active=true}
+		table.insert(listeners,listener)
+		return {Disconnect=function() listener.Active=false end}
+	end, Fire=function(_,...)
+		for _,listener in listeners do if listener.Active then listener.Fn(...) end end
 	end }
 end
 local attrs, signals = { Outpost=true }, {}
 local player = { CameraMinZoomDistance=6, CameraMaxZoomDistance=40, CharacterAdded=signal() }
+local playerGui = {ChildAdded=signal(), ChildRemoved=signal(), Children={}}
+function playerGui:GetChildren() return self.Children end
+function player:WaitForChild(name) assert(name=="PlayerGui"); return playerGui end
+local GuiService = {MenuIsOpen=false, Changed=signal()}
+function GuiService:GetPropertyChangedSignal(name) assert(name=="MenuIsOpen"); return self.Changed end
+local function screen(name, enabled, parent)
+	local item = {Name=name,Enabled=enabled,Parent=parent,Changed=signal(),ModalChanged=signal(),Attributes={}}
+	function item:IsA(kind) return kind=="ScreenGui" end
+	function item:GetPropertyChangedSignal(name) assert(name=="Enabled"); return self.Changed end
+	function item:GetAttributeChangedSignal(name) assert(name=="BlocksMiningHud"); return self.ModalChanged end
+	function item:GetAttribute(name) return self.Attributes[name] end
+	function item:setEnabled(value) self.Enabled=value; self.Changed:Fire() end
+	function item:setModal(value) self.Attributes.BlocksMiningHud=value; self.ModalChanged:Fire() end
+	return item
+end
+local dashboard = screen("Dashboard", false, playerGui)
+table.insert(playerGui.Children,dashboard)
 function player:GetAttribute(k) return attrs[k] end
 function player:GetAttributeChangedSignal(k) signals[k]=signals[k] or signal(); return signals[k] end
 function player:SetAttribute(k,v) attrs[k]=v; if signals[k] then signals[k]:Fire() end end
@@ -40,6 +61,57 @@ board()
 check(VehicleDrive.isDriving() and gui.Enabled, "Lobby mech cannot be driven")
 VehicleDrive.step(0.1)
 check(drive.PlaneVelocity.Y==-5, "Valid driving stopped")
+dashboard:setEnabled(true)
+check(VehicleDrive.isDriving() and not gui.Enabled, "Inventory must hide HUD without ejecting rider")
+check(drive.PlaneVelocity==Vector2.zero, "Opening menu did not immediately stop propulsion")
+VehicleDrive.step(0.1)
+check(drive.PlaneVelocity==Vector2.zero and not gui.Enabled, "Menu input continued driving")
+local shop = screen("Shop", true, playerGui)
+playerGui.ChildAdded:Fire(shop)
+dashboard:setEnabled(false)
+check(not gui.Enabled, "Closing inventory revealed HUD under another open menu")
+shop:setEnabled(false)
+check(gui.Enabled and VehicleDrive.isDriving(), "Closing last menu did not restore HUD")
+VehicleDrive.step(0.1)
+check(drive.PlaneVelocity.Y==-5, "Driving did not resume after closing menu")
+local toast = screen("Toasts",true,playerGui)
+playerGui.ChildAdded:Fire(toast)
+check(gui.Enabled, "Nonmodal HUD hid driving card")
+local rewards = screen("TrainingRewards",true,playerGui)
+playerGui.ChildAdded:Fire(rewards)
+check(gui.Enabled, "Nonmodal training notice hid HUD")
+rewards:setModal(true)
+check(not gui.Enabled, "Modal rewards did not hide HUD")
+rewards:setModal(false)
+check(gui.Enabled, "Closing reward modal did not restore HUD")
+GuiService.MenuIsOpen=true; GuiService.Changed:Fire()
+check(not gui.Enabled and drive.PlaneVelocity==Vector2.zero, "Roblox escape menu retained HUD or propulsion")
+dashboard:setEnabled(true)
+GuiService.MenuIsOpen=false; GuiService.Changed:Fire()
+check(not gui.Enabled, "Closing escape menu ignored inventory")
+dashboard:setEnabled(false)
+check(gui.Enabled, "Escape and inventory close did not restore HUD")
+shop:setEnabled(true)
+shop.Parent=nil; playerGui.ChildRemoved:Fire(shop)
+check(gui.Enabled, "Removed menu left stale blocker")
+shop:setEnabled(true)
+check(gui.Enabled, "Removed menu still had active watchers")
+shop.Parent=playerGui; playerGui.ChildAdded:Fire(shop)
+check(not gui.Enabled, "Reparented menu was not watched again")
+shop:setEnabled(false)
+hum.Seated:Fire(false,nil)
+dashboard:setEnabled(true)
+board()
+check(VehicleDrive.isDriving() and not gui.Enabled, "Boarding with menu open revealed HUD")
+dashboard:setEnabled(false)
+check(gui.Enabled, "Boarding beneath menu failed to resume")
+dashboard:setEnabled(true)
+hum.SeatPart,seat.Occupant=nil,nil
+dashboard:setEnabled(false)
+check(not gui.Enabled, "Closing menu after seat exit flashed stale HUD")
+VehicleDrive.step(0.1)
+check(not VehicleDrive.isDriving(), "Lost seat was not cleaned up")
+board()
 player:SetAttribute("ArenaDropPreparing",100)
 check(not VehicleDrive.isDriving() and not gui.Enabled and drive.PlaneVelocity==Vector2.zero, "Arena preparation retained drive/HUD")
 check(player.CameraMinZoomDistance==6 and player.CameraMaxZoomDistance==40, "Mech zoom was not restored")

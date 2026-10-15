@@ -17,6 +17,7 @@ CFrame.new=function(a,b,c) return setmetatable({Position=if type(a)=="table" the
 CFrame.Angles=function() return CFrame.new() end
 local Vector2={new=function(x,y) return {X=x,Y=y} end}
 local UDim2={new=function(...) return {...} end,fromScale=function(...) return {...} end}
+local UDim={new=function(...) return {...} end}
 local NumberRange={new=function(...) return {...} end}
 local NumberSequence={new=function(...) return {...} end}
 local ColorSequence={new=function(...) return {...} end}
@@ -61,6 +62,8 @@ workspace.CurrentCamera={CFrame=CFrame.new()}
 function workspace:GetServerTimeNow() return now end
 local attrs,attrsSignals={Outpost=true},{}
 local player={UserId=42,DisplayName="Observer"}
+local playerGui=new("PlayerGui")
+function player:WaitForChild(name) assert(name=="PlayerGui"); return playerGui end
 local root={Position=Vector3.zero}
 player.Character={FindFirstChild=function() return root end}
 function player:GetAttribute(k) return attrs[k] end
@@ -72,12 +75,18 @@ function Remotes.MiningRoll:FireAllClients(packet) table.insert(packets,packet);
 function Remotes:WaitForChild(k) return self[k] end
 local services={Players={LocalPlayer=player},ReplicatedStorage={WaitForChild=function() return Remotes end},RunService={RenderStepped=signal()},
  Debris={AddItem=function(_,o,t) table.insert(debris,{o,now+t}) end}}
+local remotePlayers={}
+function services.Players:GetPlayerByUserId(id) return remotePlayers[id] end
 local game={GetService=function(_,k) return services[k] end}
 local GemArt={model=function(gem)
 	local model,part=new("Model"),new("Part")
 	model.Gem=gem; part.Parent=model
 	return model,1
 end,pose=function() return CFrame.new() end}
+function GemArt.setupViewport(viewport)
+	local camera=new("Camera"); camera.Parent=viewport; viewport.CurrentCamera=camera
+	return camera
+end
 local function step(seconds)
 	now+=seconds
 	services.RunService.RenderStepped:Fire(seconds)

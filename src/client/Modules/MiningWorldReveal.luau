@@ -1,4 +1,4 @@
--- A shared lottery floating over the mined rock. No screen window or input lock.
+-- A shared boxed lottery following the miner's head. No screen window or input lock.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,6 +14,7 @@ local GOLD = Color3.fromRGB(255, 206, 92)
 local active, templates, seen = {}, {}, {}
 local connection, folder = nil, nil
 local started = false
+local playerGui = player:WaitForChild("PlayerGui")
 
 local function part(parent, name, at)
 	local p = Instance.new("Part")
@@ -39,8 +40,30 @@ local function billboard(anchor, name, offset, size)
 	board.Name, board.Adornee, board.AlwaysOnTop = name, anchor, false
 	board.LightInfluence, board.MaxDistance, board.Active = 0, Roll.Range, false
 	board.Size, board.StudsOffsetWorldSpace = size, offset
-	board.Parent = anchor
+	board.Parent = playerGui
 	return board
+end
+local function frame(parent, name, position, size, color, transparency)
+	local box = Instance.new("Frame")
+	box.Name, box.Position, box.Size = name, position, size
+	box.BorderSizePixel, box.BackgroundColor3, box.BackgroundTransparency = 0, color, transparency or 0
+	box.Active, box.Parent = false, parent
+	return box
+end
+local function edge(parent, color, thickness)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color, stroke.Thickness, stroke.Parent = color, thickness, parent
+	return stroke
+end
+local function aboveMiner(packet, previous)
+	local miner = Players:GetPlayerByUserId(packet.MinerId)
+	local character = miner and miner.Character
+	local head = character and character:FindFirstChild("Head")
+	if head then return head.Position + Vector3.new(0, head.Size.Y / 2 + 3, 0) end
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root then return root.Position + Vector3.new(0, 5.5, 0) end
+	-- Streaming can temporarily hide the miner. Keep the last known head location.
+	return previous or (packet.MinerPosition or packet.Position) + Vector3.new(0, 3.5, 0)
 end
 local function sound(anchor, pitch, volume)
 	local s = Instance.new("Sound")
@@ -70,6 +93,7 @@ local function template(tier)
 	return templates[tier]
 end
 local function destroy(entry)
+	entry.Board:Destroy()
 	entry.Root:Destroy()
 end
 function Reveal.close()
@@ -99,16 +123,16 @@ local function burst(entry)
 	emitter.Transparency = NumberSequence.new(0.05, 1)
 	emitter.Parent = entry.Anchor
 	emitter:Emit(8 + rank * 10)
-	local ring = part(entry.Root, "DiscoveryRing", entry.Packet.Position + Vector3.new(0, 0.2, 0))
+	local ring = part(entry.Root, "DiscoveryRing", entry.Center)
 	ring.Shape, ring.Material, ring.Color = Enum.PartType.Cylinder, Enum.Material.Neon, entry.Color
 	ring.CFrame *= CFrame.Angles(0, 0, math.pi / 2)
 	entry.Ring = ring
 	if rank >= 3 then
-		local beam = part(entry.Root, "RarityBeacon", entry.Packet.Position)
+		local beam = part(entry.Root, "RarityBeacon", entry.Center)
 		beam.Shape, beam.Material, beam.Color = Enum.PartType.Cylinder, Enum.Material.Neon, entry.Color
-		local height = 6 + rank * 2
+		local height = 2 + rank * 0.35
 		beam.Size = Vector3.new(height, 0.15 + rank * 0.05, 0.15 + rank * 0.05)
-		beam.CFrame = CFrame.new(entry.Packet.Position + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2)
+		beam.CFrame = CFrame.new(entry.Center) * CFrame.Angles(0, 0, math.pi / 2)
 		entry.Beam = beam
 	end
 	-- Positional audio: observers hear nearby finds, not the whole server at full volume.
@@ -119,11 +143,12 @@ local function showResult(entry, elapsed)
 	entry.Landed = true
 	for _, cell in entry.Cells do if cell.Model then cell.Model:Destroy(); cell.Model = nil end end
 	entry.Color = gem and GemConfig.TierColors[gem.Tier] or GOLD
+	entry.Edge.Color, entry.SelectionEdge.Color, entry.Accent.BackgroundColor3 = entry.Color, entry.Color, entry.Color
 	entry.Light.Color, entry.Light.Brightness = entry.Color, 0.5 + Roll.rank(packet) * 0.35
 	if gem then
 		local model, radius = GemArt.model(gem, true)
 		entry.Winner = prepare(model, radius)
-		entry.Winner.Name, entry.Winner.Parent = "AwardedGem", entry.Root
+		entry.Winner.Name, entry.Winner.Parent = "AwardedGem", entry.Viewport
 		entry.Heading.Text = string.upper(GemConfig.TierLabels[gem.Tier] or gem.Tier) .. "  ·  " .. GemConfig.shade(gem).Name
 		entry.Heading.TextColor3 = entry.Color
 		entry.Detail.Text = string.upper(GemConfig.elementName(gem.Element))
@@ -143,31 +168,36 @@ local function showResult(entry, elapsed)
 end
 local function step()
 	if not canWatch() then Reveal.close(); return end
-	local now, camera = workspace:GetServerTimeNow(), workspace.CurrentCamera
+	local now = workspace:GetServerTimeNow()
 	for id, expiry in seen do if expiry < now then seen[id] = nil end end
 	for id, entry in active do
 		local sample = Roll.sample(entry.Packet, now)
-		if sample.Done or not entry.Root.Parent or not near(entry.Packet.Position) then
+		local center = aboveMiner(entry.Packet, entry.Center)
+		if sample.Done or not entry.Root.Parent or not near(center) then
 			destroy(entry); active[id] = nil
 			continue
 		end
-		local t, center = sample.Elapsed, entry.Packet.Position + Vector3.new(0, 3.5, 0)
+		local t = sample.Elapsed
+		entry.Center = center
 		entry.Anchor.Position = center
 		if sample.Landed then
 			if not entry.Landed then showResult(entry, t) end
 			if entry.Winner then
-				entry.Winner:PivotTo(CFrame.new(center + Vector3.new(0, 0.3 + math.sin(t * 2.3) * 0.2, 0)) * GemArt.pose(entry.Packet.Gem, t * 1.3))
+				entry.Winner:PivotTo(CFrame.new(0, math.sin(t * 2.3) * 0.1, 0) * GemArt.pose(entry.Packet.Gem, t * 1.3))
 			end
 			local revealAge = t - Roll.Duration
 			if entry.Ring then
 				local diameter = 2 + math.min(revealAge, 1.2) * (5 + Roll.rank(entry.Packet))
 				entry.Ring.Size = Vector3.new(0.06, diameter, diameter)
+				entry.Ring.CFrame = CFrame.new(center) * CFrame.Angles(0, 0, math.pi / 2)
 				entry.Ring.Transparency = math.clamp(revealAge / 1.2, 0.15, 1)
 			end
-			if entry.Beam then entry.Beam.Transparency = math.clamp(0.5 + revealAge / 3, 0.5, 1) end
+			if entry.Beam then
+				entry.Beam.CFrame = CFrame.new(center) * CFrame.Angles(0, 0, math.pi / 2)
+				entry.Beam.Transparency = math.clamp(0.5 + revealAge / 3, 0.5, 1)
+			end
 		else
 			local index = math.floor(sample.Position + 0.5)
-			local right = camera and camera.CFrame.RightVector or Vector3.new(1, 0, 0)
 			for i = -1, 1 do
 				local at = index + i
 				-- Recycle three reel cells: only the incoming stone changes each tick.
@@ -179,11 +209,11 @@ local function step()
 						local model, radius = GemArt.model(entry.Packet.Gem, false)
 						cell.Model = prepare(model, radius)
 					elseif tier ~= "Empty" then cell.Model = template(tier):Clone() end
-					if cell.Model then cell.Model.Parent = entry.Root end
+					if cell.Model then cell.Model.Parent = entry.Viewport end
 				end
 				if cell.Model then
 					local offset = at - sample.Position
-					cell.Model:PivotTo(CFrame.new(center + right * (offset * 2.8) + Vector3.new(0, -math.abs(offset) * 0.4, 0)) * CFrame.Angles(0.15, t * 2, 0.12))
+					cell.Model:PivotTo(CFrame.new(offset * 2.8, -math.abs(offset) * 0.15, 0) * CFrame.Angles(0.15, t * 2, 0.12))
 				end
 			end
 			if entry.Index ~= index then
@@ -192,9 +222,15 @@ local function step()
 				entry.Heading.Text = "ROLLING  ·  " .. string.upper(GemConfig.TierLabels[tier] or "STONE")
 				entry.Heading.TextColor3 = GemConfig.TierColors[tier] or WHITE
 				entry.Light.Color = entry.Heading.TextColor3
-				if near(entry.Packet.Position) then sound(entry.Anchor, 2.2 - sample.Position / Roll.Target * 0.6, 0.045) end
+				entry.Edge.Color, entry.Accent.BackgroundColor3 = entry.Heading.TextColor3, entry.Heading.TextColor3
+				if near(center) then sound(entry.Anchor, 2.2 - sample.Position / Roll.Target * 0.6, 0.045) end
 			end
 		end
+		entry.Box.BackgroundTransparency = 0.08 + sample.Fade * 0.92
+		entry.Well.BackgroundTransparency = 0.12 + sample.Fade * 0.88
+		entry.Viewport.ImageTransparency = sample.Fade
+		entry.Edge.Transparency, entry.SelectionEdge.Transparency = sample.Fade, 0.25 + sample.Fade * 0.75
+		entry.Accent.BackgroundTransparency = sample.Fade
 		for _, text in entry.Labels do
 			text.TextTransparency, text.TextStrokeTransparency = sample.Fade, 0.25 + sample.Fade * 0.75
 		end
@@ -208,12 +244,16 @@ local function step()
 	if next(active) == nil then Reveal.close() end
 end
 function Reveal.receive(packet)
-	if type(packet) ~= "table" or not canWatch() or not near(packet.Position) then return end
+	if type(packet) ~= "table" or not canWatch() then return end
+	local center = aboveMiner(packet)
+	if not near(center) then return end
 	local now = workspace:GetServerTimeNow()
 	if seen[packet.Id] or Roll.sample(packet, now).Done then return end
 	seen[packet.Id] = packet.StartedAt + Roll.lifetime(packet)
 	local count, oldest = 0, nil
-	for _, entry in active do
+	for id, entry in active do
+		-- One readable box per miner; repeated fast finds replace the prior display.
+		if entry.Packet.MinerId == packet.MinerId then destroy(entry); active[id] = nil; continue end
 		count += 1
 		if not oldest or entry.Packet.StartedAt < oldest.Packet.StartedAt then oldest = entry end
 	end
@@ -221,16 +261,31 @@ function Reveal.receive(packet)
 	if not folder then folder = Instance.new("Folder"); folder.Name = "MiningDiscoveries"; folder.Parent = workspace end
 	local root = Instance.new("Model")
 	root.Name, root.Parent = "MiningRoll_" .. packet.Id, folder
-	local anchor = part(root, "RollAnchor", packet.Position + Vector3.new(0, 3.5, 0))
-	local upper = billboard(anchor, "MinerLabel", Vector3.new(0, 2.2, 0), UDim2.new(11, 0, 0.7, 0))
-	local miner = label(upper, 0, 1, 14, WHITE)
+	local anchor = part(root, "RollAnchor", center)
+	local board = billboard(anchor, "Discovery", Vector3.zero, UDim2.new(8, 0, 5, 0))
+	local box = frame(board, "MiningRollBox", UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), Color3.fromRGB(8, 16, 27), 0.08)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius, corner.Parent = UDim.new(0.04, 0), box
+	local border = edge(box, GOLD, 2)
+	local accent = frame(box, "RarityAccent", UDim2.fromScale(0.04, 0.015), UDim2.fromScale(0.92, 0.012), GOLD)
+	local miner = label(box, 0.04, 0.10, 14, WHITE)
 	miner.Text = packet.MinerName .. "  ·  " .. packet.NodeName
-	local board = billboard(anchor, "Discovery", Vector3.new(0, -2.25, 0), UDim2.new(12, 0, 2.3, 0))
-	local heading, detail = label(board, 0, 0.32, 23, WHITE), label(board, 0.34, 0.2, 15, WHITE)
-	local stats, extras = label(board, 0.56, 0.2, 13, WHITE), label(board, 0.79, 0.2, 12, GOLD)
+	local heading = label(box, 0.15, 0.12, 22, WHITE)
+	local well = frame(box, "ReelWindow", UDim2.fromScale(0.04, 0.29), UDim2.fromScale(0.92, 0.39), Color3.fromRGB(17, 30, 45), 0.12)
+	well.ClipsDescendants = true
+	local viewport = Instance.new("ViewportFrame")
+	viewport.Name, viewport.BackgroundTransparency, viewport.Size = "GemReel", 1, UDim2.fromScale(1, 1)
+	viewport.Active, viewport.Parent = false, well
+	local camera = GemArt.setupViewport(viewport, 6)
+	camera.FieldOfView = 35
+	local selection = frame(well, "WinningSlot", UDim2.fromScale(0.36, 0.03), UDim2.fromScale(0.28, 0.94), GOLD, 1)
+	local selectionEdge = edge(selection, GOLD, 1.5)
+	local detail = label(box, 0.70, 0.09, 15, WHITE)
+	local stats, extras = label(box, 0.81, 0.08, 13, WHITE), label(box, 0.90, 0.07, 12, GOLD)
 	local light = Instance.new("PointLight")
 	light.Range, light.Brightness, light.Color, light.Parent = 10, 0.6, WHITE, anchor
 	active[packet.Id] = { Packet = packet, Sequence = Roll.sequence(packet), Root = root, Anchor = anchor, Light = light,
+		Board = board, Box = box, Edge = border, Accent = accent, Well = well, Viewport = viewport, SelectionEdge = selectionEdge, Center = center,
 		Heading = heading, Detail = detail, Stats = stats, Extras = extras, Labels = {miner, heading, detail, stats, extras}, Cells = {{},{},{}} }
 	if not connection then connection = RunService.RenderStepped:Connect(step) end
 	step()

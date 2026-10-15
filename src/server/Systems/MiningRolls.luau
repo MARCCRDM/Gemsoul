@@ -6,6 +6,8 @@ local serial = 0
 function MiningRolls.publish(player, position, loot)
 	if not loot or loot.Tutorial then return end
 	serial += 1
+	local character = player.Character
+	local head = character and (character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart"))
 	-- Share only the discovery, never the player's inventory or saved progression.
 	local gem = nil
 	if loot.Gem then
@@ -19,6 +21,7 @@ function MiningRolls.publish(player, position, loot)
 		Seed = serial * 7919 % 2147483647,
 		StartedAt = workspace:GetServerTimeNow(),
 		Position = position,
+		MinerPosition = head and head.Position or position,
 		MinerId = player.UserId,
 		MinerName = player.DisplayName,
 		NodeName = loot.Name or "Mining rock",

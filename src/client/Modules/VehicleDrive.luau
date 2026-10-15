@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -76,9 +77,9 @@ controls.Position, controls.Size = UDim2.fromOffset(14, 57), UDim2.new(1, -28, 0
 
 local function controlText(): string
 	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return "Thumbstick to drive  Â·  Jump to hop out"
+		return "Thumbstick to drive  |  Jump to hop out"
 	end
-	return "W/S drive  Â·  A/D steer  Â·  SPACE to hop out"
+	return "W/S drive  |  A/D steer  |  SPACE to hop out"
 end
 
 local function finish()
@@ -97,6 +98,48 @@ local function finish()
 		player.CameraMinZoomDistance = d.Zoom[1]
 		player.CameraMaxZoomDistance = d.Zoom[2]
 	end
+end
+
+-- Menus own the screen even while the character remains seated in a mech.
+-- Track instances, so closing one of several overlays does not reveal the HUD.
+local blockingScreens = {
+	Dashboard = true, Shop = true, Season = true, AugmentTree = true,
+	SurgeArray = true, Social = true, ProbeExchange = true, WelcomeBundle = true,
+	Intro = true, Tutorial = true, MarketBoard = true, ChallengeChooser = true,
+	StreakRewards = true, Character = true, Combat = true, Mine = true,
+	Party = true, Referral = true, TopPlayers = true, EquipmentTrade = true,
+}
+local openScreens, screenConnections = {}, {}
+local function menuOpen(): boolean
+	return next(openScreens) ~= nil or GuiService.MenuIsOpen
+end
+local function refreshHud()
+	local hidden = menuOpen()
+	gui.Enabled = driving ~= nil and driving.Seat.Parent ~= nil
+		and driving.Seat.Occupant == driving.Humanoid and not blocked() and not hidden
+	if driving and hidden then
+		driving.Speed = 0
+		driving.Drive.PlaneVelocity = Vector2.zero
+	end
+end
+local function watchScreen(screen)
+	if not screen:IsA("ScreenGui") or (not blockingScreens[screen.Name] and screen.Name ~= "TrainingRewards") then return end
+	if screenConnections[screen] then return end
+	local function update()
+		local modal = screen.Name ~= "TrainingRewards" or screen:GetAttribute("BlocksMiningHud") == true
+		openScreens[screen] = if screen.Parent and screen.Enabled and modal then true else nil
+		refreshHud()
+	end
+	screenConnections[screen] = {
+		screen:GetPropertyChangedSignal("Enabled"):Connect(update),
+		screen:GetAttributeChangedSignal("BlocksMiningHud"):Connect(update),
+	}
+	update()
+end
+local function unwatchScreen(screen)
+	for _, connection in screenConnections[screen] or {} do connection:Disconnect() end
+	screenConnections[screen], openScreens[screen] = nil, nil
+	refreshHud()
 end
 
 local function begin(seat: VehicleSeat, humanoid: Humanoid)
@@ -128,7 +171,7 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 	title.Text = string.upper(spec.Name)
 	blurb.Text = spec.Blurb
 	controls.Text = controlText()
-	gui.Enabled = true
+	refreshHud()
 end
 
 -- One frame of driving.
@@ -139,6 +182,10 @@ function VehicleDrive.step(dt: number)
 	end
 	if blocked() or not d.Seat.Parent or d.Seat.Occupant ~= d.Humanoid then
 		finish()
+		return
+	end
+	if menuOpen() then
+		refreshHud()
 		return
 	end
 	local speed, yaw = Rules.drive(d.Spec, d.Speed, d.Yaw, d.Seat.ThrottleFloat, d.Seat.SteerFloat, dt)
@@ -176,6 +223,12 @@ end
 for _, attribute in { "Outpost", "CombatSession", "ArenaDropPreparing", "ArenaDropUntil", "Expedition" } do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshSession)
 end
+
+local playerGui = player:WaitForChild("PlayerGui")
+playerGui.ChildAdded:Connect(watchScreen)
+playerGui.ChildRemoved:Connect(unwatchScreen)
+for _, screen in playerGui:GetChildren() do watchScreen(screen) end
+GuiService:GetPropertyChangedSignal("MenuIsOpen"):Connect(refreshHud)
 
 local function watch(character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
