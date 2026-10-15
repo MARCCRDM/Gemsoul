@@ -29,6 +29,7 @@ local UserInputService = game:GetService("UserInputService")
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
+local Spar = require(ReplicatedStorage.Shared.Spar)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
@@ -190,7 +191,11 @@ local buttons = new("Frame", {
 UiKit.list(buttons, 8, true)
 local hint = text(
 	hud,
+<<<<<<< HEAD
 	"Click to mine  ·  G duel  ·  F invite  ·  E trade at PROBE-7",
+=======
+	"Click to mine  ·  1 to spar  ·  G at a miner to duel  ·  F to invite  ·  E at PROBE-7 to trade",
+>>>>>>> ad4eaabe618890cba4f78fd37a1fddf78b02062c
 	14,
 	Color3.fromRGB(230, 238, 250),
 	IronUi.Bold,
@@ -226,7 +231,8 @@ local miningPrompts = {}
 local function fitOutpostHud()
 	local size = hud.AbsoluteSize
 	local mobile = UserInputService.TouchEnabled or size.Y < 540
-	local blocked = next(openScreens) ~= nil or player:GetAttribute("CombatSession") ~= nil
+	-- (A fight or a spar has the screen: the pick card and mining prompts go.)
+	local blocked = next(openScreens) ~= nil or Spar.fighting(player)
 		or (mobile and player:GetAttribute("ChatOpen") == true)
 	if blocked or not hud.Enabled then expanded = false end
 	card.Size = UDim2.fromOffset(300, if expanded then 100 elseif mobile then 64 else 44)
@@ -273,6 +279,7 @@ hud:GetPropertyChangedSignal("Enabled"):Connect(fitOutpostHud)
 hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitOutpostHud)
 player:GetAttributeChangedSignal("ChatOpen"):Connect(fitOutpostHud)
 player:GetAttributeChangedSignal("CombatSession"):Connect(fitOutpostHud)
+player:GetAttributeChangedSignal("Spar"):Connect(fitOutpostHud)
 fitOutpostHud()
 
 -- The free pick's charge ticks up between server updates.
@@ -709,7 +716,8 @@ local function nearestRock(): Model?
 end
 
 function OutpostScene.swing(nodeId: number?)
-	if not active or player:GetAttribute("CombatSession") or next(openScreens) ~= nil then
+	-- (Not with your combat kit out: 1 puts it away.)
+	if not active or Spar.fighting(player) or next(openScreens) ~= nil then
 		return
 	end
 	-- On foot, or from a mech's cockpit; not from any other seat.
@@ -1004,7 +1012,7 @@ player.CharacterAdded:Connect(hideOwnPrompts)
 
 -- Click / tap a rock to swing at the nearest one in reach.
 UserInputService.InputBegan:Connect(function(input, processed)
-	if processed or not active or player:GetAttribute("CombatSession") then
+	if processed or not active or Spar.fighting(player) then
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then

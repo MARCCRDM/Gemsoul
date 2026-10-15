@@ -18,6 +18,8 @@ local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
 local LobbyUI = require(script.Parent.Modules.LobbyUI)
 local OutpostScene = require(script.Parent.Modules.OutpostScene)
 local UiKit = require(script.Parent.Modules.UiKit)
+local SparKit = require(script.Parent.Modules.SparKit)
+local Spar = require(game:GetService("ReplicatedStorage").Shared.Spar)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -29,8 +31,11 @@ if not loadingStarted then
 	warn("[Lobby] loading screens off: " .. tostring(loadingProblem))
 end
 
--- The lobby HUD: in the Outpost, not fighting, not inside a menu. Checked
--- a few times a second, and only applied when it changes.
+-- Friendly sparring: 1 swaps your pick for your combat kit (SparKit).
+SparKit.start()
+
+-- The lobby HUD: in the Outpost, not fighting (or sparring), not inside a
+-- menu. Checked a few times a second, and only applied when it changes.
 local shown = nil
 local nextCheck = 0
 RunService.Heartbeat:Connect(function()
@@ -40,8 +45,7 @@ RunService.Heartbeat:Connect(function()
 	end
 	nextCheck = now + 0.2
 	local on = OutpostScene.isActive()
-		and player:GetAttribute("CombatSession") == nil
-		and player:GetAttribute("MatchId") == nil
+		and not Spar.fighting(player)
 		and not playerGui:FindFirstChild("Intro")
 	if on ~= shown then
 		shown = on

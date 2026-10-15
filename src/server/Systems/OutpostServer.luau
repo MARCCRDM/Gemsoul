@@ -30,6 +30,7 @@ local Rules = require(ReplicatedStorage.Shared.Outpost)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
+local Spar = require(ReplicatedStorage.Shared.Spar)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
@@ -188,13 +189,16 @@ local function weaponVisible(player: Player, visible: boolean)
 	end
 end
 
--- Mining kit on while at the Outpost and not in a fight; off otherwise.
+-- Mining kit on while at the Outpost and not in a fight; off otherwise
+-- (a fight, or a friendly spar with the combat kit out: Shared.Spar).
 local function refreshKit(player: Player)
 	local character = player.Character
 	if not character then
 		return
 	end
-	local mining = player:GetAttribute("Outpost") == true and player:GetAttribute("CombatSession") == nil
+	local mining = player:GetAttribute("Outpost") == true
+		and player:GetAttribute("CombatSession") == nil
+		and not Spar.sparring(player)
 	weaponVisible(player, not mining)
 	local pick = character:FindFirstChild("OutpostPick")
 	if mining then
@@ -217,8 +221,14 @@ local function socialPrompts(player: Player, on: boolean)
 		end
 	end
 	-- Never on someone in a fight: they're busy, and in a duel the prompts
-	-- popped up over the foe every time the fighters closed in.
-	if not on or player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil then
+	-- popped up over the foe every time the fighters closed in. (Nor on
+	-- someone sparring, for the same reason.)
+	if
+		not on
+		or player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("MatchId") ~= nil
+		or Spar.sparring(player)
+	then
 		return
 	end
 	for _, spec in
@@ -359,6 +369,9 @@ end
 local function hit(player: Player, nodeId: any)
 	if player:GetAttribute("Outpost") ~= true or player:GetAttribute("CombatSession") then
 		return reply(false, "Head to the Outpost to mine.")
+	end
+	if Spar.sparring(player) then
+		return reply(false, "Press 1 to put your weapon away and mine.")
 	end
 	-- On foot with your pick, or from a mech's cockpit (Outpost.Machines,
 	-- Mine): bigger strikes, sooner, each spending its swings.
@@ -789,6 +802,8 @@ function OutpostServer.start()
 		end
 		player:GetAttributeChangedSignal("CombatSession"):Connect(fightChanged)
 		player:GetAttributeChangedSignal("MatchId"):Connect(fightChanged)
+		-- The combat kit out for a spar, or away again (SparServer).
+		player:GetAttributeChangedSignal("Spar"):Connect(fightChanged)
 		player.CharacterAdded:Connect(function(character)
 			-- Back on your feet at the Outpost after a respawn.
 			if player:GetAttribute("Outpost") then

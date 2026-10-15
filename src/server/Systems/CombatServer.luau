@@ -1,4 +1,5 @@
--- Server-authoritative universal actions. Only opted-in Arena players can damage each other.
+-- Server-authoritative universal actions. Only opted-in Arena players can damage each other,
+-- and in the lobby, players sparring with their kits out (Shared.Spar).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -16,6 +17,7 @@ local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
+local Spar = require(ReplicatedStorage.Shared.Spar)
 local Enemies = require(script.Parent.Enemies)
 local DamageLog = require(script.Parent.DamageLog)
 local PlayerData = require(script.Parent.PlayerData)
@@ -41,9 +43,10 @@ local function alive(player)
 end
 local posePlayer
 -- Arena fights are equal ground: only gear and gems count there, so the
--- Augment Tree's perks (and surge/maneuver ranks) sit out.
+-- Augment Tree's perks (and surge/maneuver ranks) sit out. So do they in a
+-- friendly spar in the lobby.
 local function inArena(player): boolean
-	return player:GetAttribute("CombatSession") ~= nil
+	return player:GetAttribute("CombatSession") ~= nil or Spar.sparring(player)
 end
 -- Everything a loadout fights with: its effects, gem defences, ratings and
 -- action rules. `augments` are the Augment Tree's perks ({} for none). The
@@ -284,6 +287,16 @@ local function canPvP(source, target)
 	if source.Character:FindFirstChildOfClass("ForceField") then
 		return false
 	end
+	-- A spar in the lobby: both kits out, both on their feet.
+	if Spar.sparring(source) or Spar.sparring(target) then
+		return Spar.canHit(
+			source:GetAttribute("Spar"),
+			target:GetAttribute("Spar"),
+			Spar.isDown(source),
+			Spar.isDown(target),
+			source == target
+		)
+	end
 	local sameTeam = source.Team ~= nil and source.Team == target.Team and not source.Neutral and not target.Neutral
 	-- Duel fighters only fight their opponents; party members never each other.
 	sameTeam = sameTeam or not Matchmaking.versus(source, target)
@@ -398,20 +411,28 @@ local applyCC -- (set below)
 -- humanoid)` returns true when it took the blow.
 local lethalHook: ((Player, Humanoid) -> boolean)? = nil
 local dungeonLethalHook = nil
+local sparLethalHook = nil
 function CombatServer.onDungeonLethal(hook)
 	dungeonLethalHook = hook
 end
 function CombatServer.onLethal(hook)
 	lethalHook = hook
 end
-local function spared(player, humanoid, amount): boolean
+-- A sparring player isn't finished, just knocked down (SparServer).
+function CombatServer.onSparLethal(hook)
+	sparLethalHook = hook
+end
+local function spared(player, humanoid, amount, source): boolean
 	if amount < humanoid.Health then return false end
+	if sparLethalHook and Spar.sparring(player) then
+		return sparLethalHook(player, humanoid, source)
+	end
 	if dungeonLethalHook and dungeonLethalHook(player, humanoid) then return true end
 	return lethalHook ~= nil and lethalHook(player, humanoid)
 end
 local function rawDamage(target, amount, source, crit, color, matchTag)
 	if target.Player then
-		if not spared(target.Player, target.Humanoid, amount) then
+		if not spared(target.Player, target.Humanoid, amount, source) then
 			target.Humanoid:TakeDamage(amount)
 		end
 		if source then
@@ -1590,7 +1611,7 @@ function technologyHitInner(player, k, target, definition, scale)
 	if definition.Execute and target.Humanoid and target.Humanoid.Health > 0 then
 		if target.Humanoid.Health < target.Humanoid.MaxHealth * definition.Execute then
 			if target.Player then
-				if not spared(target.Player, target.Humanoid, math.huge) then
+				if not spared(target.Player, target.Humanoid, math.huge, player) then
 					target.Humanoid.Health = 0
 				end
 			else
@@ -2121,6 +2142,10 @@ local function triggerTechnology(player, id, aim, surgeKey)
 end
 local function onInput(player, action, a, b)
 	if player:GetAttribute("DungeonSelecting") then return end
+	-- Knocked down in a spar: nothing until you're back up.
+	if Spar.isDown(player) then
+		return
+	end
 	if not Actions.validInput(action, a, b) then
 		return
 	end

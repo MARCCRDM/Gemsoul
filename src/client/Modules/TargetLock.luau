@@ -11,6 +11,7 @@ local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local Rules = require(ReplicatedStorage.Shared.TargetLockRules)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
+local Spar = require(ReplicatedStorage.Shared.Spar)
 local player = Players.LocalPlayer
 local Lock = {}
 local active, paused, manualUntil, nextScan = false, false, 0, 0
@@ -47,6 +48,17 @@ local function eligible(model)
 		return false
 	end
 	local opponent = Players:GetPlayerFromCharacter(model)
+	if opponent and (Spar.sparring(player) or Spar.sparring(opponent)) then
+		-- A friendly spar in the lobby: both kits out, both on their feet.
+		return not player.Character:FindFirstChildOfClass("ForceField")
+			and Spar.canHit(
+				player:GetAttribute("Spar"),
+				opponent:GetAttribute("Spar"),
+				Spar.isDown(player),
+				Spar.isDown(opponent),
+				false
+			)
+	end
 	if opponent then
 		local sameTeam = (
 			player.Team ~= nil

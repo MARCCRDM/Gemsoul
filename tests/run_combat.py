@@ -12,6 +12,8 @@ for name,path in [('EquipmentBalance', 'src/shared/EquipmentBalance.luau'), ('Ex
 # prototype has its own suite (run_surge_prototype.py).
 source+='\nGemTraits.Enabled = false -- the classic surge array (the triad has its own suites)\n'
 source+='\nGemRoller.LivePrototype = GemRoller.Prototype\nGemRoller.Prototype, Tech.Prototype = false, false\n'
+# (A global: the bundle is at Luau's 200-local limit.)
+source+='Spar=(function()\n'+read('src/shared/Spar.luau')+'\nend)()\n'
 source+=module('DungeonLoadout','src/shared/DungeonLoadout.luau')
 source+=read('tests/dungeon_loadout_cases.luau')
 source+=read('tests/combat_players.luau')

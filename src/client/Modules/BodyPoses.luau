@@ -14,9 +14,10 @@
 	while the Arena rival (the server's own model, posed there) moved fine.
 	Locally it's smooth and on time for everyone.
 
-	In an Arena session (CombatSession) the body holds a fighting stance
-	between blows, as the rival's does; elsewhere it stands as its own
-	animations have it.
+	In an Arena session (CombatSession), or sparring in the lobby with the
+	combat kit out (Shared.Spar), the body holds a fighting stance between
+	blows, as the rival's does; elsewhere it stands as its own animations
+	have it.
 
 	Fighters look each other in the eye: their heads turn to the head of
 	whoever they're fighting. Yours follows your lock (setFocus); the
@@ -39,6 +40,15 @@ local RunService = game:GetService("RunService")
 
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
+local Spar = require(ReplicatedStorage.Shared.Spar)
+-- In a fight: an Arena session, or a spar in the lobby (on your feet).
+local function inFight(player: Player): boolean
+	return player:GetAttribute("CombatSession") ~= nil or Spar.active(player)
+end
+-- (For settling a body as it leaves one, knocked down or not.)
+local function fightOn(player: Player): boolean
+	return player:GetAttribute("CombatSession") ~= nil or Spar.sparring(player)
+end
 
 local BodyPoses = {}
 
@@ -132,6 +142,10 @@ local function foeOf(player: Player, enemies: { Instance }): Model?
 	then
 		return me.Character
 	end
+	-- Sparring in the lobby: they look at you if you're sparring too.
+	if me and me.Character and Spar.active(player) and Spar.active(me) then
+		return me.Character
+	end
 	for _, model in enemies do
 		if model:IsA("Model") and Matchmaking.ownsRival(model, player) then
 			return model
@@ -151,7 +165,7 @@ function BodyPoses.step(dt: number)
 		local character = player.Character
 		if character and (player == me or near(character, eye)) then
 			posing[character] = true
-			local fighting = player:GetAttribute("CombatSession") ~= nil
+			local fighting = inFight(player)
 			-- (Who it's looking at never stops the posing: any trouble there
 			-- just means no head turn this frame.)
 			local ok, foe = pcall(function()
@@ -273,7 +287,7 @@ function BodyPoses.settleOther(player: Player)
 		return
 	end
 	local function still(): boolean
-		return player.Character == character and player:GetAttribute("CombatSession") == nil
+		return player.Character == character and not fightOn(player)
 	end
 	pcall(RivalPose.reset, character)
 	task.delay(BodyPoses.OrphanSnapshot, function()
@@ -304,32 +318,36 @@ function BodyPoses.start()
 	-- Out of a fight: settle the body now, and again once the move back has
 	-- landed (a pose written in between can't stick either).
 	local me = Players.LocalPlayer
-	local wasFighting = me:GetAttribute("CombatSession") ~= nil
-	me:GetAttributeChangedSignal("CombatSession"):Connect(function()
-		local fighting = me:GetAttribute("CombatSession") ~= nil
+	local wasFighting = fightOn(me)
+	local function mineChanged()
+		local fighting = fightOn(me)
 		if wasFighting and not fighting then
 			BodyPoses.settle(me.Character)
 			task.delay(0.6, function()
-				if me:GetAttribute("CombatSession") == nil then
+				if not fightOn(me) then
 					BodyPoses.settle(me.Character)
 				end
 			end)
 		end
 		wasFighting = fighting
-	end)
+	end
+	me:GetAttributeChangedSignal("CombatSession"):Connect(mineChanged)
+	me:GetAttributeChangedSignal("Spar"):Connect(mineChanged)
 	-- Everyone else's, as their fights end (BodyPoses.settleOther).
 	local function watch(player: Player)
 		if player == me then
 			return
 		end
-		local was = player:GetAttribute("CombatSession") ~= nil
-		player:GetAttributeChangedSignal("CombatSession"):Connect(function()
-			local fighting = player:GetAttribute("CombatSession") ~= nil
+		local was = fightOn(player)
+		local function changed()
+			local fighting = fightOn(player)
 			if was and not fighting then
 				BodyPoses.settleOther(player)
 			end
 			was = fighting
-		end)
+		end
+		player:GetAttributeChangedSignal("CombatSession"):Connect(changed)
+		player:GetAttributeChangedSignal("Spar"):Connect(changed)
 	end
 	for _, player in Players:GetPlayers() do
 		watch(player)

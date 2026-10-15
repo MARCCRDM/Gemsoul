@@ -8,7 +8,8 @@
 	a body's width away from everyone else's (Client.FighterSpacing), a soft
 	push that holds the gap without shoving anyone around.
 
-	  FightSpacing.inFight(player)   in a fight: an Arena session, a duel or a raid
+	  FightSpacing.inFight(player)   in a fight: an Arena session, a duel, a raid
+	                                 or a friendly spar in the lobby (Spar)
 	  FightSpacing.gap(otherRoot)    how far apart two bodies' centres stay
 	  FightSpacing.push(mine, other, gap, facing)
 	      pure: how far to move my body (flat) to keep `gap` from `other`
@@ -19,7 +20,9 @@ FightSpacing.Radius = 1.3 -- a body's half-width, about the shoulders
 FightSpacing.Range = 14 -- bodies further off are left alone
 
 function FightSpacing.inFight(player: Player): boolean
-	return player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil
+	return player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("MatchId") ~= nil
+		or player:GetAttribute("Spar") == true
 end
 
 -- A bigger body (a raid boss) keeps you further off.

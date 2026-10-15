@@ -26,8 +26,8 @@ local function model(position,enemy)
 end
 local own=model(Vector3.new(600,0,0),nil)
 local dummy=model(Vector3.new(600,0,-8),"Dummy")
-local player={Character=own,Neutral=true,GetAttribute=function(_, key) if key=="ArenaDropUntil" then return nil end return true end,WaitForChild=function() return {} end}
-local opponent={Character=model(Vector3.new(600,0,-4),nil),Neutral=true,GetAttribute=function(self) return self.OptedIn==true end}
+local player={Character=own,Neutral=true,GetAttribute=function(self, key) if key=="ArenaDropUntil" then return nil elseif key=="Spar" or key=="SparDown" then return self[key] end return true end,WaitForChild=function() return {} end}
+local opponent={Character=model(Vector3.new(600,0,-4),nil),Neutral=true,GetAttribute=function(self, key) if key=="Spar" or key=="SparDown" then return self[key] end return self.OptedIn==true end}
 local players={LocalPlayer=player,GetPlayers=function() return {player,opponent} end,GetPlayerFromCharacter=function(_,m) return if m==opponent.Character then opponent else nil end}
 local blocked=false
 local workspace={CurrentCamera=camera,GetServerTimeNow=function() return os.clock() end,FindFirstChild=function(_,key) return if key=="Enemies" then {GetChildren=function() return {dummy} end} else nil end,Raycast=function() return if blocked then {Instance={IsDescendantOf=function() return false end}} else nil end}

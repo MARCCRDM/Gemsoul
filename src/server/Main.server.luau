@@ -103,6 +103,10 @@ end
 if Config.Features == nil or Config.Features.Mining ~= false then
 	local OutpostServer = require(script.Parent.Systems.OutpostServer)
 	OutpostServer.start()
+	-- Friendly sparring there: 1 swaps the pick for your combat kit.
+	if Config.CombatEnabled or not Config.MenuOnly then
+		require(script.Parent.Systems.SparServer).start()
+	end
 	-- The Motor Pool's machines, for driving round the quarry.
 	require(script.Parent.Systems.OutpostVehicles).start(OutpostServer.site())
 end

@@ -76,6 +76,7 @@ function FighterSpacing.start()
 	end)
 	player:GetAttributeChangedSignal("CombatSession"):Connect(applyJump)
 	player:GetAttributeChangedSignal("MatchId"):Connect(applyJump)
+	player:GetAttributeChangedSignal("Spar"):Connect(applyJump)
 	applyJump()
 end
 
