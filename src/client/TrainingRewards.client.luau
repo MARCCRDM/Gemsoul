@@ -135,7 +135,7 @@ RunService.Heartbeat:Connect(function(dt)
  elapsed+=dt;if elapsed<.25 then return end;elapsed=0
  local p=GemClient.Profile
  local dashboard=player.PlayerGui:FindFirstChild("Dashboard")
- gui.Enabled=p~=nil and (not require(RS.Shared.Tutorial).Enabled or (p.Intro~=nil and p.Intro.Done)) and player:GetAttribute("Outpost")==true and not player:GetAttribute("CombatSession") and not player.PlayerGui:FindFirstChild("Tutorial") and not (dashboard and dashboard.Enabled)
+ gui.Enabled=p~=nil and (not require(RS.Shared.Tutorial).Enabled or (p.Intro~=nil and p.Intro.Done)) and player:GetAttribute("Outpost")==true and not player:GetAttribute("CombatSession") and not player:GetAttribute("Spar") and not player.PlayerGui:FindFirstChild("Tutorial") and not (dashboard and dashboard.Enabled)
  if not gui.Enabled then shade.Visible=false end
  local size=gui.AbsoluteSize
  panel.Size=UDim2.fromOffset(math.min(780,math.max(260,size.X-24)),math.min(650,math.max(300,size.Y-24)))

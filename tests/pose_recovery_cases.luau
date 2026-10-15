@@ -145,6 +145,19 @@ local Posing = setmetatable({
 		return RivalPose.update(model, ...)
 	end,
 }, { __index = RivalPose })
+-- The real sparring rules (a spar is a fight too), on the test clock.
+local Spar = luau.load(fs.readFile(ROOT .. "/src/shared/Spar.luau"), {
+	debugName = "Spar",
+	environment = {
+		type = type,
+		math = math,
+		workspace = {
+			GetServerTimeNow = function()
+				return now
+			end,
+		},
+	},
+})()
 local BodyPoses = luau.load(fs.readFile(ROOT .. "/src/client/Modules/BodyPoses.luau"), {
 	debugName = "BodyPoses",
 	environment = setmetatable({
@@ -153,7 +166,7 @@ local BodyPoses = luau.load(fs.readFile(ROOT .. "/src/client/Modules/BodyPoses.l
 				if name == "Players" then
 					return Players
 				elseif name == "ReplicatedStorage" then
-					return { Shared = { RivalPose = "RivalPose", Matchmaking = "Matchmaking" } }
+					return { Shared = { RivalPose = "RivalPose", Matchmaking = "Matchmaking", Spar = "Spar" } }
 				end
 				return { PreSimulation = { Connect = function() end } }
 			end,
@@ -161,6 +174,9 @@ local BodyPoses = luau.load(fs.readFile(ROOT .. "/src/client/Modules/BodyPoses.l
 		require = function(module)
 			if module == "RivalPose" then
 				return Posing
+			end
+			if module == "Spar" then
+				return Spar
 			end
 			return {
 				versus = function()

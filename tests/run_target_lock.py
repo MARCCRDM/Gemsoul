@@ -11,6 +11,7 @@ rules += "local Matchmaking=(function()\n" + read("src/shared/Matchmaking.luau")
 source = read("tests/roblox_primitives.luau") + rules + read("tests/target_lock_cases.luau")
 source += "\ndo\n" + read("tests/target_lock_runtime.luau")
 controller = re.sub(r"^local \w+ = require\([^\n]+\)\n", "", read("src/client/Modules/TargetLock.luau"), flags=re.M)
+source += "\nlocal Spar=(function()\n" + read("src/shared/Spar.luau") + "\nend)()\n"
 source += "\nlocal Lock=(function()\n" + controller + "\nend)()\n" + read("tests/target_lock_live_cases.luau") + "\nend\n"
 with tempfile.TemporaryDirectory(prefix="gemsoul-target-lock-") as directory:
     script = Path(directory) / "target-lock.luau"

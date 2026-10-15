@@ -11,6 +11,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local Actions = require(ReplicatedStorage.Shared.CombatActions)
+local Spar = require(ReplicatedStorage.Shared.Spar)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local SurgeIcons = require(script.Parent.Modules.SurgeIcons)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
@@ -841,7 +842,8 @@ local function canFight()
 		and root
 		and not player.PlayerGui:FindFirstChild("Intro")
 		and Combat.canFight(root.Position)
-		and (not Config.MenuOnly or ArenaScene.isActive())
+		-- (The lobby fights too while you spar with your kit out, on your feet.)
+		and (not Config.MenuOnly or ArenaScene.isActive() or Spar.active(player))
 end
 local aimParams = RaycastParams.new()
 aimParams.FilterType = Enum.RaycastFilterType.Exclude

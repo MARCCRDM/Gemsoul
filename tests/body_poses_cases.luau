@@ -181,9 +181,22 @@ local FakeRivalPose = {
 	update = function() end,
 	holdGuards = function() end,
 }
+-- The real sparring rules (a spar is a fight too), on the test clock.
+local Spar = luau.load(fs.readFile(ROOT .. "/src/shared/Spar.luau"), {
+	debugName = "Spar",
+	environment = {
+		type = type,
+		math = math,
+		workspace = {
+			GetServerTimeNow = function()
+				return now
+			end,
+		},
+	},
+})()
 local services = {
 	Players = Players,
-	ReplicatedStorage = { Shared = { RivalPose = "RivalPose", Matchmaking = "Matchmaking" } },
+	ReplicatedStorage = { Shared = { RivalPose = "RivalPose", Matchmaking = "Matchmaking", Spar = "Spar" } },
 	RunService = { PreSimulation = signal() },
 }
 local BodyPoses = luau.load(fs.readFile(ROOT .. "/src/client/Modules/BodyPoses.luau"), {
@@ -195,7 +208,7 @@ local BodyPoses = luau.load(fs.readFile(ROOT .. "/src/client/Modules/BodyPoses.l
 			end,
 		},
 		require = function(module)
-			return if module == "RivalPose" then FakeRivalPose else {}
+			return if module == "RivalPose" then FakeRivalPose elseif module == "Spar" then Spar else {}
 		end,
 		Enum = roblox.Enum,
 		task = fakeTask,

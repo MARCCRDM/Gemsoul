@@ -153,6 +153,10 @@ local FALLBACK = {
 	Death = { { S .. "swordlunge.wav", 0.4, 0.6 }, { S .. "action_jump_land.mp3", 0.5, 0.7, 0.05 } },
 	Warn = { { S .. "clickfast.wav", 0.8, 0.5 } },
 	Kill = { { S .. "victory.wav", 1, 0.35 } },
+	-- Friendly sparring in the lobby (SparKit): the kit drawn and put away, a fall.
+	Draw = { { S .. "unsheath.wav", 1, 0.55 }, { S .. "swordslash.wav", 1.4, 0.2, 0.06 } },
+	Sheathe = { { S .. "unsheath.wav", 0.7, 0.4 }, { S .. "action_jump_land.mp3", 1.6, 0.25, 0.08 } },
+	KnockDown = { { S .. "swordlunge.wav", 0.4, 0.55 }, { S .. "action_jump_land.mp3", 0.45, 0.8, 0.12 } },
 }
 
 -- Shortest gap between two plays of the same sound, so a flurry doesn't pile up.

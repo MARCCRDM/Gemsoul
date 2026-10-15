@@ -67,6 +67,9 @@ function FighterBodies.start()
 		player:GetAttributeChangedSignal("MatchId"):Connect(function()
 			FighterBodies.applyJump(player)
 		end)
+		player:GetAttributeChangedSignal("Spar"):Connect(function()
+			FighterBodies.applyJump(player)
+		end)
 	end
 	for _, player in Players:GetPlayers() do
 		joined(player)
