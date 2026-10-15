@@ -1,9 +1,9 @@
 --[[
-	GemVault: every gem you own in one window, opened from the Inventory's
+	GemVault: available gems in one window, opened from the Inventory's
 	GEMS button.
 
-	  Left    every gem, socketed or in the pouch, filtered by element and
-	          sorted by rarity or value; each says where it sits.
+	  Left    loose gems, filtered by element and sorted by rarity or value.
+	          Drag a cut stone out of this window to enchant equipment.
 	  Right   the picked gem: a turning 3D stone, rarity, element, where it
 	          sits, Size / Clarity / Cut as bars, and its value.
 	  Tree    the gem's three moves (Shared.GemTraits): the gem branches into
@@ -19,7 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
-local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
@@ -55,15 +55,6 @@ local KEY_LANE = { Q = "OFFENSE", E = "ABILITY", R = "DEFENSE" }
 local KEY_SOCKET = { Q = "SWORD", E = "CORE", R = "SHIELD" }
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
-local WHERE = {
-	Weapon = "SWORD",
-	Shield = "SHIELD",
-	Helmet = "HELMET",
-	Armor = "CHEST",
-	Gloves = "GLOVES",
-	Boots = "BOOTS",
-	Surge2 = "CORE",
-}
 
 -- The window is drawn at this size, in the middle of the 1600 x 840 canvas.
 local CANVAS_W, CANVAS_H = 1600, 840
@@ -168,34 +159,11 @@ end
 
 type Entry = { Gem: any, Where: string }
 
--- Every gem you own: socketed in your worn gear and core first, then in
--- spare gear, then the pouch.
+-- Socketed gems are inspected on equipment, never offered as loose stones.
 local function allGems(): { Entry }
-	local profile = GemClient.Profile
-	local loadout = profile and profile.Character or {}
-	local list, seen = {}, {}
-	local function add(gem, where: string)
-		if type(gem) == "table" and gem.Id and not seen[gem.Id] then
-			seen[gem.Id] = true
-			table.insert(list, { Gem = gem, Where = where })
-		end
-	end
-	for _, slot in Slots.Order do
-		add(loadout[slot .. "Gem"], WHERE[slot] or string.upper(slot))
-	end
-	add(loadout.Surge2Gem, "CORE")
-	for _, socket in Traits.ArchivedSockets do
-		add(loadout[socket .. "Gem"], "STORED")
-	end
-	for _, byId in loadout.ItemGems or {} do
-		if type(byId) == "table" then
-			for _, gem in byId do
-				add(gem, "SPARE GEAR")
-			end
-		end
-	end
-	for _, gem in profile and profile.Gems or {} do
-		add(gem, "POUCH")
+	local list = {}
+	for _, gem in GemInventory.available(GemClient.Profile) do
+		table.insert(list, { Gem = gem, Where = "POUCH" })
 	end
 	return list
 end
@@ -267,7 +235,7 @@ local function drawList(entries: { Entry })
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		local where = text(
 			cell,
-			entry.Where,
+			if gem.Cut ~= nil then "DRAG TO ENCHANT" else "UNCUT",
 			9,
 			if entry.Where == "POUCH" then C.Faint else C.Gold,
 			HEADING,
@@ -278,6 +246,11 @@ local function drawList(entries: { Entry })
 		)
 		where.TextXAlignment = Enum.TextXAlignment.Center
 		cell:SetAttribute("UiSound", "Click")
+		cell.InputBegan:Connect(function(input)
+			if ui.BeginDrag and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+				ui.BeginDrag(gem, input)
+			end
+		end)
 		cell.Activated:Connect(function()
 			state.Selected, state.Move = gem.Id, nil
 			draw()
@@ -426,7 +399,7 @@ local function drawMove(gem)
 		ui.MoveName.Text = "TAP A MOVE"
 		ui.MoveName.TextColor3 = C.Faint
 		ui.MoveText.Text =
-			"Lit moves are this gem's. The others are what its element can roll for that key; reforging rerolls one."
+			"Lit moves belong to this stone. The others show what another stone of this element can roll."
 		return
 	end
 	local stats = Traits.stats(id, gem)
@@ -450,7 +423,7 @@ draw = function()
 	local entries = shown()
 	-- Keep a gem picked: the last one, else the first on show.
 	local selected = nil
-	for _, entry in allGems() do
+	for _, entry in entries do
 		if entry.Gem.Id == state.Selected then
 			selected = entry
 		end
@@ -469,14 +442,9 @@ draw = function()
 			else C.Card
 	end
 	ui.SortButton.Text = "SORT: " .. string.upper(state.Sort)
-	local total, socketed = 0, 0
-	for _, entry in allGems() do
-		total += 1
-		if entry.Where ~= "POUCH" then
-			socketed += 1
-		end
-	end
-	ui.Count.Text = string.format("%d GEMS  ·  %d SOCKETED", total, socketed)
+	local total = #allGems()
+	ui.Count.Text = string.format("%d AVAILABLE STONES", total)
+	ui.Empty.Text = if total == 0 then "No loose stones. Equipped stones stay on your gear." else "No available stones of this element."
 	drawList(entries)
 	-- The detail.
 	local detail = ui.Detail
@@ -491,7 +459,8 @@ draw = function()
 	end
 	ui.MoveCard.Visible = selected ~= nil
 	if not selected then
-		local none = text(detail, "No gems yet. Mine some in the Outpost.", 16, C.Dim, MEDIUM, 0, 120, 600, 24)
+		local none = text(detail, if total == 0 then "Mine more stones, or remove one from your equipment." else "Choose another element to see your available stones.", 16, C.Dim, MEDIUM, 0, 120, 700, 48)
+		none.TextWrapped = true
 		none.TextXAlignment = Enum.TextXAlignment.Left
 		return
 	end
@@ -533,14 +502,7 @@ draw = function()
 		360,
 		18
 	)
-	local whereWords = if selected.Where == "POUCH"
-		then "In your pouch"
-		elseif selected.Where == "CORE" then "In your core socket: it fires E"
-		elseif selected.Where == "SWORD" then "In your sword: it fires Q"
-		elseif selected.Where == "SHIELD" then "In your shield: it fires R"
-		elseif selected.Where == "SPARE GEAR" then "In a piece you're not wearing"
-		elseif selected.Where == "STORED" then "In an old surge socket"
-		else "In your " .. string.lower(selected.Where)
+	local whereWords = if gem.Cut ~= nil then "Drag onto equipment or Q / E / R to enchant." else "Cut this stone before enchanting equipment."
 	text(detail, whereWords, 12, C.Dim, MEDIUM, 194, 76, 360, 18)
 	-- Its grades and worth.
 	local grades = new(
@@ -649,6 +611,8 @@ local function build(canvas: Instance)
 	new("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2) }, list)
 	ui.Grid = list
 	ui.Empty = text(window, "No gems of that element.", 13, C.Faint, MEDIUM, 28, 100, 300, 20)
+	ui.Empty.Size = UDim2.fromOffset(LIST_W - 24, 56)
+	ui.Empty.TextWrapped = true
 	box(window, C.Line, LIST_W + 40, 86, 1, WIN_H - 110, 0.92)
 	-- The detail.
 	local detail = new("Frame", {
@@ -678,13 +642,14 @@ function GemVault.isOpen(): boolean
 	return ui.Root ~= nil and ui.Root.Parent ~= nil
 end
 
-function GemVault.open(canvas: Instance, gemId: string?)
+function GemVault.open(canvas: Instance, gemId: string?, beginDrag: any?)
 	if GemVault.isOpen() then
 		GemVault.close()
 	end
 	state.Selected = gemId or state.Selected
 	state.Move = nil
 	ui = {}
+	ui.BeginDrag = beginDrag
 	ui.Root = build(canvas)
 	changed = GemClient.Changed:Connect(function()
 		if GemVault.isOpen() then

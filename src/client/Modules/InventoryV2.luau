@@ -41,6 +41,7 @@ local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local OutpostRules = require(ReplicatedStorage.Shared.Outpost)
 local Season = require(ReplicatedStorage.Shared.Season)
@@ -297,7 +298,7 @@ end
 local function gemsFor(forKey: boolean, filter: string)
 	local profile = profileNow()
 	local list = {}
-	for _, gem in profile and profile.Gems or {} do
+	for _, gem in GemInventory.available(profile) do
 		local fits = not forKey
 			or (if triadOn(loadoutNow()) then Traits.traitFor(gem, "E") ~= nil else Tech.surgeStats(gem) ~= nil)
 		if gem.Cut ~= nil and fits then
@@ -423,10 +424,10 @@ local dropTargets = {}
 -- What a dragged gem can land on: a worn piece's socket, or a Q / E / R key
 -- (with the triad: any gem with a move for that key), and the request it sends.
 local function acceptsSlot(slot: string, item): boolean
-	return item.Kind == "Gem" and loadoutNow()[slot] ~= nil
+	return item.Kind == "Gem" and item.Gem.Cut ~= nil and loadoutNow()[slot] ~= nil
 end
 local function acceptsKey(key: string, item): boolean
-	if item.Kind ~= "Gem" then
+	if item.Kind ~= "Gem" or item.Gem.Cut == nil then
 		return false
 	end
 	if Traits.active(loadoutNow()) then
@@ -435,6 +436,9 @@ local function acceptsKey(key: string, item): boolean
 	return Tech.surgeStats(item.Gem) ~= nil
 end
 local function socketInto(target: string, item)
+	-- Profile updates may remove a stone while the pointer is still held.
+	local gem = item.Gem and GemInventory.find(profileNow(), item.Gem.Id)
+	if not gem or gem.Cut == nil then return end
 	if table.find(KEYS, target) then
 		request("SocketSurge", (item.Gem :: any).Id, target)
 	else
@@ -816,11 +820,19 @@ local function buildRow(parent: Instance, slot: string, y: number)
 	place(socket, RIGHT_W - 14, 36, 36, 36)
 	socket.Position = UDim2.fromOffset(RIGHT_W - 14, 36)
 	round(socket, 18)
+	local halo = frame(socket, C.Gold, 0.9)
+	halo.Name = "EmptySocketGlow"
+	halo.Position = UDim2.fromOffset(-5, -5)
+	halo.Size = UDim2.new(1, 10, 1, 10)
+	round(halo, 23)
+	halo.Visible = false
 	local ring = stroke(socket, C.Faint, 1.5, 0.3)
 	local gemHolder = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -4) }, socket)
 	local plus = text(socket, "+", 16, C.Faint, HEADING)
 	plus.Size = UDim2.fromScale(1, 1)
 	plus.TextXAlignment = Enum.TextXAlignment.Center
+	local enchant = place(text(row, "ADD STONE TO ENCHANT  ·  DRAG & DROP", 10, C.Gold, HEADING), 82, 52, RIGHT_W - 96, 14)
+	enchant.Name, enchant.Visible = "EnchantHint", false
 	row:SetAttribute("UiSound", "Click")
 	row.Activated:Connect(function()
 		if os.clock() < suppressClickUntil then
@@ -830,7 +842,7 @@ local function buildRow(parent: Instance, slot: string, y: number)
 			openDetail(slot)
 		end
 	end)
-	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus }
+	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus, Halo = halo, Enchant = enchant }
 	row.MouseEnter:Connect(function()
 		entry.Hovered = true
 		InventoryV2.paintRow(slot)
@@ -879,7 +891,7 @@ local function buildRight(canvas: Frame)
 		ui.Rows[slot] = buildRow(list, slot, y)
 		y += 80
 	end
-	-- Under the list: every gem you own, in the gem window (GemVault).
+	-- Under the list: available stones, in the gem window (GemVault).
 	local gems = new("TextButton", {
 		Name = "GemsButton",
 		Text = "",
@@ -911,7 +923,7 @@ local function buildRight(canvas: Frame)
 	end)
 	gems.Activated:Connect(function()
 		if ui.Canvas then
-			GemVault.open(ui.Canvas)
+			GemVault.open(ui.Canvas, nil, InventoryV2.beginGemDrag)
 		end
 	end)
 	-- Beside it: the miner's suit and weapon skin, in the Wardrobe.
@@ -1412,16 +1424,22 @@ function InventoryV2.cancelDrag()
 	end
 end
 local function startDrag(item: Item, input: InputObject)
+	if drag or not state.Active or not gui or not gui.Enabled then return end
 	local touch = input.UserInputType == Enum.UserInputType.Touch
-	drag = { Item = item, Start = pointOf(input, touch), Active = false, Touch = touch } :: any
+	drag = { Item = item, Start = pointOf(input, touch), Active = false, Touch = touch, Input = input } :: any
+end
+function InventoryV2.beginGemDrag(gem, input: InputObject)
+	if gem.Cut ~= nil and GemInventory.find(profileNow(), gem.Id) then
+		startDrag({ Kind = "Gem", Gem = gem }, input)
+	end
 end
 UserInputService.InputChanged:Connect(function(input)
 	local current = drag :: any
 	if not current or not gui then
 		return
 	end
-	local moving = input.UserInputType == Enum.UserInputType.MouseMovement
-		or (current.Touch and input.UserInputType == Enum.UserInputType.Touch)
+	local moving = (not current.Touch and input.UserInputType == Enum.UserInputType.MouseMovement)
+		or (current.Touch and input == current.Input)
 	if not moving then
 		return
 	end
@@ -1431,6 +1449,13 @@ UserInputService.InputChanged:Connect(function(input)
 			return
 		end
 		current.Active = true
+		-- Reveal the equipment beneath the vault only once this is a real drag.
+		-- A normal click still opens the stone's details.
+		if GemVault.isOpen() then
+			GemVault.close()
+			state.Detail, state.Pick, state.Hover = nil, nil, nil
+			ui.List.Visible, ui.Detail.Visible = true, false
+		end
 		local ghost = frame(gui, C.Ink, 0.15)
 		ghost.Name = "V2DragGhost"
 		ghost.Size = UDim2.fromOffset(60, 60)
@@ -1471,8 +1496,8 @@ UserInputService.InputEnded:Connect(function(input)
 	if not current then
 		return
 	end
-	local ending = input.UserInputType == Enum.UserInputType.MouseButton1
-		or (current.Touch and input.UserInputType == Enum.UserInputType.Touch)
+	local ending = (not current.Touch and input.UserInputType == Enum.UserInputType.MouseButton1)
+		or (current.Touch and input == current.Input)
 	if not ending then
 		return
 	end
@@ -1484,7 +1509,7 @@ UserInputService.InputEnded:Connect(function(input)
 		ui.Grid.ScrollingEnabled = true
 	end
 	lightTargets(nil)
-	if current.Active then
+	if current.Active and input.UserInputState ~= Enum.UserInputState.Cancel and state.Active and gui and gui.Enabled then
 		suppressClickUntil = os.clock() + 0.25
 		local target = targetAt(pointOf(input, current.Touch), current.Item)
 		if target then
@@ -1769,10 +1794,11 @@ function InventoryV2.paintRow(slot: string)
 	local picked = state.Detail == slot
 	row.Rail.BackgroundColor3 = if picked then C.Gold else row.Color or C.Faint
 	row.Edge.Color = C.Gold
-	row.Edge.Transparency = if picked then 0.35 elseif row.Hovered then 0.72 else 1
+	row.Edge.Transparency = if picked then 0.35 elseif row.Hovered then 0.45 elseif row.EmptySocket then 0.65 else 1
 	row.Tint.Color = if picked
 		then ColorSequence.new(Color3.fromRGB(58, 46, 22), Color3.fromRGB(16, 14, 12))
 		elseif row.Hovered then ColorSequence.new(Color3.fromRGB(32, 40, 54), Color3.fromRGB(14, 18, 27))
+		elseif row.EmptySocket then ColorSequence.new(Color3.fromRGB(38, 33, 24), Color3.fromRGB(13, 17, 25))
 		else ColorSequence.new(Color3.fromRGB(20, 25, 34), Color3.fromRGB(11, 14, 21))
 end
 
@@ -1802,6 +1828,10 @@ local function drawRows(loadout)
 			then string.format('<font color="#%s">%s</font>  ·  %s%s', color:ToHex(), rarityName(rarity), SLOT_NAME[slot], tail)
 			else SLOT_NAME[slot] .. "  ·  NOTHING WORN"
 		row.Color = color
+		row.EmptySocket = gear ~= nil and gem == nil
+		row.Enchant.Visible, row.Halo.Visible = row.EmptySocket, row.EmptySocket
+		row.Name.Position = UDim2.fromOffset(82, if row.EmptySocket then 9 else 16)
+		row.Meta.Position = UDim2.fromOffset(82, if row.EmptySocket then 31 else 40)
 		InventoryV2.paintRow(slot)
 		-- Something changed in this slot (a piece or a gem): a gold flash says it took.
 		local shown = tostring(id) .. "|" .. (if gem then gem.Id else "")
@@ -1833,9 +1863,10 @@ local function drawRows(loadout)
 				gemArt(row.Gem, gem)
 			end
 		end
-		row.Plus.Visible = gem == nil
-		row.Ring.Color = if gem then gemColor(gem) else C.Faint
-		row.Ring.Transparency = if gem then 0.1 else 0.5
+		row.Plus.Visible = row.EmptySocket
+		row.Plus.TextColor3 = if row.EmptySocket then C.Gold else C.Faint
+		row.Ring.Color = if gem then gemColor(gem) elseif row.EmptySocket then C.Gold else C.Faint
+		row.Ring.Transparency = if gem then 0.1 elseif row.EmptySocket then 0.25 else 0.5
 	end
 end
 
@@ -1855,7 +1886,7 @@ local function drawNudge(profile, loadout)
 		table.insert(empty, "CORE (E)")
 		first = first or "E"
 	end
-	local spare = #(profile.Gems or {})
+	local spare = #GemInventory.available(profile)
 	ui.Nudge.Visible = #empty > 0
 	ui.NudgeTarget = first
 	if #empty == 0 then
@@ -1893,11 +1924,11 @@ local function drawKeys(loadout)
 				whole(surge.Cooldown or 0),
 				if surge.Triad then "  ·  " .. whole((surge.Output or 1) * 100) .. "% power" else ""
 			)
-			else "Click to pick a gem"
+			else "ADD STONE  ·  CLICK OR DRAG & DROP"
 		entry.Line.BackgroundColor3 = tint
 		entry.Line.BackgroundTransparency = if gem then 0.15 else 0.7
-		entry.Edge.Color = if picked then C.Gold else C.Line
-		entry.Edge.Transparency = if picked then 0.2 else 0.9
+		entry.Edge.Color = if picked or not gem then C.Gold else C.Line
+		entry.Edge.Transparency = if picked then 0.2 elseif not gem then 0.55 else 0.9
 		local shown = if gem then gem.Id .. tostring(gem.Surge) else ""
 		if entry.Shown ~= shown then
 			entry.Shown = shown
@@ -2604,34 +2635,21 @@ end
 local queued = false
 local drawIntro -- (below, with the intro card)
 local introDone = false -- dismissed this session (survives the screen being rebuilt)
--- The GEMS button: how many you own, and the best of them on its icon.
+-- The GEMS button: available stones and the best loose stone on its icon.
 local gemsShown = nil
 local function drawGemsButton(profile, loadout)
 	if not ui.GemsCount then
 		return
 	end
-	local total, socketed, best, bestRank = 0, 0, nil, -1
-	local function count(gem, inSocket: boolean)
-		if type(gem) ~= "table" or not gem.Id then
-			return
-		end
-		total += 1
-		if inSocket then
-			socketed += 1
-		end
+	local best, bestRank = nil, -1
+	local available = GemInventory.available(profile)
+	for _, gem in available do
 		local rank = (GEM_RARITY[gem.Tier] or 0) * 100 + (gem.Size or 0)
 		if rank > bestRank then
 			best, bestRank = gem, rank
 		end
 	end
-	for _, slot in Slots.Order do
-		count(loadout[slot .. "Gem"], true)
-	end
-	count(loadout.Surge2Gem, true)
-	for _, gem in profile.Gems or {} do
-		count(gem, false)
-	end
-	ui.GemsCount.Text = string.format("%d OWNED  ·  %d IN USE", total, socketed)
+	ui.GemsCount.Text = string.format("%d AVAILABLE", #available)
 	local key = best and best.Id or ""
 	if gemsShown ~= key then
 		gemsShown = key
@@ -2892,7 +2910,7 @@ GemClient.Changed:Connect(function()
 	local profile = profileNow()
 	if state.Pick and state.Pick.Kind == "Gem" and profile then
 		local still = false
-		for _, gem in profile.Gems or {} do
+		for _, gem in GemInventory.available(profile) do
 			if gem.Id == (state.Pick.Gem :: any).Id then
 				still = true
 			end
@@ -2968,6 +2986,10 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or UserInputService:GetFocusedTextBox() then
 		return
 	end
+	if input.KeyCode == Enum.KeyCode.Escape and drag then
+		InventoryV2.cancelDrag()
+		return
+	end
 	if input.KeyCode == Enum.KeyCode.Backspace and state.Active and gui and gui.Enabled and state.Detail then
 		if state.Pick then
 			state.Pick, state.Hover = nil, nil
@@ -3006,8 +3028,9 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
 		for slot, row in ui.Rows or {} do
 			if loadout[slot] and not loadout[slot .. "Gem"] then
 				row.Ring.Color = C.Gold
-				row.Ring.Transparency = 0.75 - 0.55 * pulse
-				row.Plus.TextColor3 = C.Faint:Lerp(C.Gold, pulse * 0.8)
+				row.Ring.Transparency = 0.35 - 0.25 * pulse
+				row.Halo.BackgroundTransparency = 0.92 - 0.12 * pulse
+				row.Plus.TextColor3 = C.Gold
 			end
 		end
 	end
