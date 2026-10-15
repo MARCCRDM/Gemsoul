@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local GemClient = require(script.Parent.GemClient)
+local LiveLooks = require(script.Parent.LiveLooks)
 
 local CosmeticView = {}
 
@@ -55,6 +56,7 @@ local function frame(view: ViewportFrame, source: Instance, kind: string, spin: 
 	end
 	model.Parent = world
 	world.Parent = view
+	LiveLooks.watch(model) -- (an animated skin moves here as it does when worn)
 	local box, size = model:GetBoundingBox()
 	local center = box.Position
 	local camera = Instance.new("Camera")

@@ -3,6 +3,7 @@
 -- and light drawn silhouettes as a stand-in.
 local Players = game:GetService("Players")
 local IronUi = require(script.Parent.IronUi)
+local LiveLooks = require(script.Parent.LiveLooks)
 
 local GearArt = {}
 local player = Players.LocalPlayer
@@ -42,6 +43,7 @@ function GearArt.frame(
 		clone.CFrame = placeOf(part)
 		clone.Parent = model
 	end
+	LiveLooks.watch(model) -- (animated skins move here as they do when worn)
 	if key == "Shield" and #model:GetChildren() > 0 then
 		-- A shield follows its forearm's pose, so frame it from its own back
 		-- plate (the biggest part, square to the shield, face towards -Z):

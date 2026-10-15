@@ -29,6 +29,7 @@ local AugmentTreeUI = require(script.Parent.AugmentTreeUI)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
+local LiveLooks = require(script.Parent.LiveLooks)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 
 local player = Players.LocalPlayer
@@ -135,6 +136,9 @@ local function refreshAvatar()
 			d.Anchored = true
 			d.Transparency = math.max(d.Transparency, 0.78)
 			d.Color = Color3.fromRGB(63, 71, 85)
+			-- (A silhouette: its skin's seams and Prismatic plates stay grey.)
+			d:SetAttribute("SeamFx", nil)
+			d:SetAttribute("PrismaticBase", nil)
 		end
 	end
 	local humanoid = copy:FindFirstChildOfClass("Humanoid")
@@ -1528,6 +1532,7 @@ local function drawTooltipContent()
 				end
 				copy:PivotTo(CFrame.new())
 				copy.Parent = world
+				LiveLooks.watch(copy) -- (animated skins move here as they do on you)
 				-- A head-and-shoulders shot, facing the camera.
 				local head = copy:FindFirstChild("Head")
 				local focus

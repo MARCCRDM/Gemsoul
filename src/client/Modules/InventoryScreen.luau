@@ -400,6 +400,9 @@ local function renderMiner(view: ViewportFrame, source: Model, loadout)
 	local copy = source:Clone()
 	copy.Parent = world
 	copy:PivotTo(CFrame.new())
+	-- (Animated skins move here as they do on you. Required here: this
+	-- module has no locals to spare.)
+	require(script.Parent.LiveLooks).watch(copy)
 	local armor = loadout and ArmorFamilies.ById[loadout.Armor]
 	InventoryPose.apply(copy, armor and armor.ArmorFamily)
 	local bounds, size = copy:GetBoundingBox()

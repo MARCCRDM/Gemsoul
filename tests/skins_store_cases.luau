@@ -522,6 +522,7 @@ do
 			Color3 = roblox.Color3,
 			Enum = roblox.Enum,
 			game = { GetService = function() return { Shared = { Tags = stub } } end },
+			script = stub,
 			require = function() return {} end,
 		}, { __index = _G }),
 	})()

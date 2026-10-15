@@ -16,6 +16,8 @@ require(script.Parent.Modules.BodyPoses).start()
 require(script.Parent.Modules.FighterSpacing).start()
 -- Prismatic gear shimmers through every colour.
 require(script.Parent.Modules.PrismaticShimmer).start()
+-- Socketed stones' lights breathe their element's way.
+require(script.Parent.Modules.GemLights).start()
 -- Skin seams and edges show only while their part does (never round the camera).
 require(script.Parent.Modules.SeamVisibility).start()
 -- Swing trails on every blade.

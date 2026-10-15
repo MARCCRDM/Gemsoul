@@ -156,7 +156,7 @@ How the effect gets to the client:
 - `SeamVisibility` reads those attributes once per strip and again only when a restyle changes them.
 - It recolours just the animated strips that are showing and within 120 studs, 20 times a second (a suit has over a hundred strips).
 - A strip restyled to a steady look goes back to its own colour.
-- Shop, Wardrobe and Inventory previews show the trim as it is, in its base colour (previews don't animate).
+- Copies move too: your first-person weapon, the Inventory's miner and item art, the Shop and Wardrobe previews and the lottery's reward art. See "Copies move as the gear does" in `docs/gear-looks.md`.
 
 Three skins have their own look in `Equipment.luau`:
 

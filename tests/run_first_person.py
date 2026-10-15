@@ -31,8 +31,9 @@ local game = {GetService=function(_, name) return services[name] end}
 # The module's requires (shared and sibling), resolved to their real sources.
 setup += "local InsertionMotion=(function()\n" + (ROOT / "src/shared/InsertionMotion.luau").read_text(encoding="utf-8") + "\nend)()\n"
 setup += "local ViewGrip=(function()\n" + (ROOT / "src/client/Modules/ViewGrip.luau").read_text(encoding="utf-8") + "\nend)()\n"
-setup += "local script={Parent={ViewGrip=\"ViewGrip\"}}\n"
-setup += "local require=function(name) if name==\"InsertionMotion\" then return InsertionMotion end if name==\"ViewGrip\" then return ViewGrip end return require(name) end\n"
+setup += "local LiveLooks=(function()\n" + (ROOT / "src/client/Modules/LiveLooks.luau").read_text(encoding="utf-8") + "\nend)()\n"
+setup += "local script={Parent={ViewGrip=\"ViewGrip\",LiveLooks=\"LiveLooks\"}}\n"
+setup += "local require=function(name) if name==\"InsertionMotion\" then return InsertionMotion end if name==\"ViewGrip\" then return ViewGrip end if name==\"LiveLooks\" then return LiveLooks end return require(name) end\n"
 source = setup + "\nlocal View=(function()\n" + (ROOT / "src/client/Modules/FirstPersonCombat.luau").read_text(encoding="utf-8") + "\nend)()\n" + (ROOT / "tests/first_person_cases.luau").read_text(encoding="utf-8")
 with tempfile.TemporaryDirectory(prefix="gemsoul-first-person-") as directory:
     script = Path(directory) / "camera.luau"

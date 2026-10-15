@@ -1,4 +1,4 @@
-"""Skin seams (SelectionBoxes) show only while their part does: never round the camera."""
+"""Skin seams show only while their part does (never round the camera) and animate: on bodies, in first person and in previews."""
 from pathlib import Path
 import subprocess
 import tempfile
@@ -60,7 +60,15 @@ CLOCK = 0
 local Tags = (function()
 ''' + (ROOT / "src/shared/Tags.luau").read_text(encoding="utf-8") + r'''
 end)()
-local require = function(name) if name == "Tags" then return Tags end return require(name) end
+local script = { Parent = { LiveLooks = "LiveLooks" } }
+local LiveLooks = (function()
+''' + (ROOT / "src/client/Modules/LiveLooks.luau").read_text(encoding="utf-8") + r'''
+end)()
+local require = function(name)
+	if name == "Tags" then return Tags end
+	if name == "LiveLooks" then return LiveLooks end
+	return require(name)
+end
 '''
 source = (
     setup
