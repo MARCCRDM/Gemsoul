@@ -16,48 +16,52 @@ local CombatFx = require(script.Parent.CombatFx)
 
 local ArenaNight = {}
 
+-- A matte, grounded look: the sky barely reflects off stone and metal
+-- (EnvironmentSpecularScale), a touch under-exposed so pale stone and
+-- steel don't wash out to white, no haze veil, and only the hottest neon
+-- blooms, tightly. Fighters and their glowing trims carry the colour.
 ArenaNight.Mood = {
 	-- Neutral light on fighters; sapphire color comes from the architecture.
 	Lighting = {
-		Brightness = 2.2,
-		Ambient = Color3.fromRGB(116, 130, 150),
-		OutdoorAmbient = Color3.fromRGB(151, 167, 185),
-		ExposureCompensation = 0.05,
-		EnvironmentDiffuseScale = 0.85,
-		EnvironmentSpecularScale = 0.6,
+		Brightness = 1.8,
+		Ambient = Color3.fromRGB(96, 104, 118),
+		OutdoorAmbient = Color3.fromRGB(128, 138, 152),
+		ExposureCompensation = -0.2,
+		EnvironmentDiffuseScale = 0.7,
+		EnvironmentSpecularScale = 0.15,
 	},
 	-- Only the brightest things bloom, and softly: the fight stays readable.
-	BloomEffect = { Intensity = 0.22, Size = 18, Threshold = 1.9 },
+	BloomEffect = { Intensity = 0.12, Size = 14, Threshold = 2.4 },
 	ColorCorrectionEffect = {
-		Brightness = 0.02,
-		Contrast = 0.06,
-		Saturation = 0.04,
-		TintColor = Color3.fromRGB(247, 251, 255),
+		Brightness = -0.01,
+		Contrast = 0.12,
+		Saturation = -0.06,
+		TintColor = Color3.fromRGB(250, 251, 255),
 	},
 	Atmosphere = {
-		Density = 0.16,
-		Haze = 0.35,
-		Glare = 0.08,
-		Color = Color3.fromRGB(198, 226, 247),
-		Decay = Color3.fromRGB(112, 145, 180),
+		Density = 0.1,
+		Haze = 0,
+		Glare = 0,
+		Color = Color3.fromRGB(180, 205, 228),
+		Decay = Color3.fromRGB(96, 122, 152),
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
 -- Dungeon silhouettes must remain readable between combat flashes.
 ArenaNight.DungeonMood = {
 	Lighting = {
-		Brightness = 2,
-		Ambient = Color3.fromRGB(112, 119, 135),
-		OutdoorAmbient = Color3.fromRGB(140, 149, 165),
-		ExposureCompensation = 0.15,
-		EnvironmentDiffuseScale = 0.8,
-		EnvironmentSpecularScale = 0.6,
+		Brightness = 1.8,
+		Ambient = Color3.fromRGB(104, 110, 126),
+		OutdoorAmbient = Color3.fromRGB(132, 140, 156),
+		ExposureCompensation = 0,
+		EnvironmentDiffuseScale = 0.7,
+		EnvironmentSpecularScale = 0.2,
 	},
-	BloomEffect = { Intensity = 0.25, Size = 20, Threshold = 1.4 },
+	BloomEffect = { Intensity = 0.15, Size = 16, Threshold = 2.2 },
 	ColorCorrectionEffect = {
-		Brightness = 0.02,
-		Contrast = 0.05,
-		Saturation = 0.03,
+		Brightness = 0,
+		Contrast = 0.1,
+		Saturation = -0.03,
 		TintColor = Color3.fromRGB(246, 248, 255),
 	},
 	Atmosphere = {
@@ -74,7 +78,7 @@ ArenaNight.DungeonClockTime = 16.8 -- preserve the dungeon's existing mood
 ArenaNight.LampScale = 1 -- four restrained architectural lamps
 ArenaNight.FlashBoost = 1.1 -- combat flashes, a little brighter and wider
 -- The companion glow on each gear light: brightness added, range multiplier.
-ArenaNight.GlowBrightness, ArenaNight.GlowRange = 0.35, 1.2
+ArenaNight.GlowBrightness, ArenaNight.GlowRange = 0.2, 1.1
 
 local FADE = TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 

@@ -41,7 +41,9 @@ local function viewCopy(part, holder, scale: number?)
 				descendant.Enabled = enabled
 			end
 		elseif descendant:IsA("PointLight") then
+			-- Right at the camera a gem's light would wash the whole view.
 			descendant.Range *= 0.6
+			descendant.Brightness *= 0.5
 		elseif descendant:IsA("SelectionBox") and descendant.Parent and descendant.Parent:IsA("BasePart") then
 			-- A skin's seam or edge: round this copy, not the hidden original
 			-- (whose box would wrap the camera).
@@ -60,9 +62,9 @@ local function viewCopy(part, holder, scale: number?)
 	end
 	copy.Anchored, copy.CanCollide, copy.CanTouch, copy.CanQuery, copy.CastShadow = true, false, false, false, false
 	copy.LocalTransparencyModifier = 0
-	-- Preserve authored neon and colors; give metal panels a restrained highlight.
+	-- Preserve authored neon and colors; give metal panels a faint highlight.
 	if copy.Material == Enum.Material.Metal then
-		copy.Reflectance = math.max(copy.Reflectance, 0.08)
+		copy.Reflectance = math.max(copy.Reflectance, 0.04)
 	end
 	copy.Size *= scale or 0.65
 	copy.Parent = holder
@@ -145,6 +147,9 @@ local function buildViewShield(holder, source, plain: boolean?)
 		glow = highlight.OutlineColor
 	end
 	glow = glow or Color3.fromRGB(80, 220, 235)
+	-- A quarter darker: this close to the camera, full-strength neon blooms
+	-- across half the view.
+	glow = glow:Lerp(Color3.new(0, 0, 0), 0.25)
 	local W, H = SHIELD_W, SHIELD_H
 	local P = Vector2.new
 	local shell = Color3.fromRGB(46, 50, 58):Lerp(metal, 0.2)
@@ -336,14 +341,18 @@ local function rebuild(character, equipment)
 	for _, slot in { "Weapon", "Shield", "Gloves" } do
 		local source = equipment:FindFirstChild(slot)
 		if source then
-			-- Each piece in its own model, wearing its gem's highlight (element
-			-- colour, bolder the rarer the gem) just as others see it.
+			-- Each piece in its own model, wearing a faint copy of its gem's
+			-- highlight (element colour): others see it bold, but right at the
+			-- camera a bold outline wraps half the view in glow.
 			local holder = Instance.new("Model")
 			holder.Name = slot
 			holder.Parent = model
 			local highlight = source:FindFirstChild("GemHighlight")
-			if highlight then
-				highlight:Clone().Parent = holder
+			if highlight and highlight:IsA("Highlight") then
+				local faint = highlight:Clone()
+				faint.FillTransparency = 1
+				faint.OutlineTransparency = math.max(highlight.OutlineTransparency, 0.8)
+				faint.Parent = holder
 			end
 			if slot == "Shield" then
 				for _, piece in buildViewShield(holder, source) do

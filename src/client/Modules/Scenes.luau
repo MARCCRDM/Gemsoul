@@ -645,7 +645,7 @@ function Scenes.outpostLighting()
 	Scenes.spaceLighting()
 	Lighting.ExposureCompensation = 0
 	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 0.3
+	Lighting.EnvironmentSpecularScale = 0.2
 	local sky = Lighting:FindFirstChildOfClass("Sky")
 	if sky then
 		for face, suffix in { Bk = "bk", Dn = "dn", Ft = "ft", Lf = "lf", Rt = "rt", Up = "up" } do
