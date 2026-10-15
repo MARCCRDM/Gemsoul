@@ -6,9 +6,13 @@ flashy moves; for now, the intro picks them for looks and fun, not for depth.
 R is never a shield. It is a wall, or a move that changes the ground around
 you. Shields still exist as R moves on gems mined later.
 
-| Picker: what each key can roll | The roll: each card's circle is a reel that lands on your gem, which gives up its surge |
-| --- | --- |
-| ![Picker](showcase-kit/picker.png) | ![Reveal](showcase-kit/reveal.png) |
+The picker shows each element and its strengths: what its hits do, what it
+beats and what beats it. It never shows the moves. Those stay a surprise
+until the roll.
+
+| Style | Element | The roll: each card's circle is a reel that lands on your gem, which gives up its surge |
+| --- | --- | --- |
+| ![Style](showcase-kit/style.png) | ![Element](showcase-kit/picker.png) | ![Reveal](showcase-kit/reveal.png) |
 
 ## The pools
 

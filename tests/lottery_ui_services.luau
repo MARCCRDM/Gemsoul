@@ -23,6 +23,8 @@ local UDim2={new=function(xs,xo,ys,yo) return {X={Scale=xs or 0,Offset=xo or 0},
 UDim2.fromScale=function(x,y) return UDim2.new(x,0,y,0) end
 UDim2.fromOffset=function(x,y) return UDim2.new(0,x,0,y) end
 local ColorSequence={new=function(...) return {...} end}
+local NumberSequence={new=function(...) return {...} end}
+local NumberSequenceKeypoint={new=function(...) return {...} end}
 local TweenInfo={new=function() return {} end}
 local task={delay=function() end}
 local objects={}

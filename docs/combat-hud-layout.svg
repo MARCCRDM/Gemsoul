@@ -13,7 +13,7 @@
 <rect x="12" y="148" width="142" height="58" rx="9" fill="#101c29" stroke="#779df5"/><text x="22" y="169" class="title">Thermal Burst</text>
 <text x="22" y="189" class="small">F · COOLDOWN 2.4s</text>
 <rect x="158" y="155" width="44" height="44" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="168" y="176" class="title">›</text>
-<rect x="12" y="214" width="142" height="30" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="22" y="235" class="title">AUGMENT TREE</text>
+
 <rect x="440" y="250" width="400" height="220" rx="28" fill="none" stroke="#456175" stroke-dasharray="7 7"/><text x="494" y="283" class="small">KEEP OPPONENT / ATTACK TELLS READABLE</text><text x="632" y="368" font-size="28">·</text><text x="512" y="453" class="small">Brief hit and direction markers only</text>
 <rect x="500" y="544" width="280" height="118" rx="9" fill="#101c29" stroke="#65c8dc"/><text x="510" y="565" class="title">HP 240 / 300 · SHIELD 0</text>
 <rect x="512" y="579" width="256" height="6" fill="#33404d"/><rect x="512" y="579" width="204.8" height="6" fill="#dc4e5e"/>

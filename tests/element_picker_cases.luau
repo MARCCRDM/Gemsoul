@@ -2,15 +2,18 @@ local function named(name)
  for _,obj in objects do if not obj.Destroyed and obj.Name==name then return obj end end
  error("Missing object "..name)
 end
-local primary=find("TextButton", if resuming then "EQUIP & FIGHT" else "NEXT  ·  ELEMENT   ›")
+local primary=find("TextButton", if resuming then "EQUIP & FIGHT" else "CONTINUE   ›")
 local back=find("TextButton","‹   Back to styles")
 local area=named("ElementChoices")
-local function selected(element)
- for _,child in named(element).children do
-  if child.ClassName=="TextLabel" and child.Text=="✓" then return true end
+-- A card is chosen when its tick shows.
+local function ticked(obj)
+ for _,child in obj.children do
+  if child.ClassName=="TextLabel" and child.Text=="✓" and child.Visible~=false then return true end
+  if ticked(child) then return true end
  end
  return false
 end
+local function selected(element) return ticked(named(element)) end
 check(#requests==0,"Opening the picker must not request a kit")
 for _,obj in objects do
  if obj.Text then
@@ -73,12 +76,32 @@ for _,size in {{1200,365},{1800,600},{1200,620},{960,520},{800,215},{640,200},{2
   check(boxes[1][2]==boxes[4][2],"A wide, short screen doesn't put the four side by side")
  end
 end
+-- The element cards show the element and its strengths, never the moves:
+-- those are a surprise, rolled as you equip.
 local icons=0
 for _,obj in objects do if obj.IconMove then icons+=1 end end
-check(icons>=12,"Ability pools must show existing ability icons")
+check(icons==0,"The element picker shows move icons")
+for _,element in {"Fire","Frost","Shock","Poison"} do
+ for _,pool in Lottery.starterPools(element) do
+  for _,id in pool do
+   local move=Tech.Catalog[id]
+   for _,obj in objects do
+    if move and obj.Text and not obj.Destroyed and obj.Visible~=false then
+     check(not string.find(obj.Text,move.Name,1,true),"The element picker names the move "..move.Name)
+    end
+   end
+  end
+ end
+ local texts={}
+ local function gather(o) for _,c in o.children do if c.Text then table.insert(texts,c.Text) end gather(c) end end
+ gather(named(element))
+ local all=table.concat(texts,"\n")
+ check(string.find(all,"STRENGTHS",1,true)~=nil,element.." card has no strengths")
+ check(string.find(all,"STRONG VS",1,true)~=nil and string.find(all,"WEAK VS",1,true)~=nil,element.." card has no matchup")
+end
 failPrepare=true
 primary.Activated.Fire()
 check(primary.Text=="RETRY THE LAUNCH" and not profile.Intro.Done,"Network failure must leave the picker retryable")
 check(prepareArgs[1]==(if resuming then "Juggernaut" else "Skirmisher"),"Wrong armor sent to server")
 check(prepareArgs[2]==(if resuming then "Frost" else "Poison"),"Wrong explicit element sent to server")
-print("PASS: "..checks.." starter picker checks ("..(if resuming then "saved kit" else "fresh choice")..", no automatic element, independent armor, disabled confirmation, responsive cards, icons and retry)")
+print("PASS: "..checks.." starter picker checks ("..(if resuming then "saved kit" else "fresh choice")..", no automatic element, independent armor, disabled confirmation, responsive cards, strengths without moves and retry)")

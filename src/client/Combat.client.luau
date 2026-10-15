@@ -968,12 +968,19 @@ local function triggerSurge(key)
 	local loadout = loadoutOf()
 	local gem = Tech.surgeGem(loadout, key)
 	if not gem then
-		hint.Text, feedbackUntil = if Tech.Traits.active(loadout)
-			then string.format("%s comes from your %s's gem: socket one (Inventory)", key, string.lower(Tech.Traits.SocketNames[key]))
-			else "Socket a gem in surge slot " .. key .. " (Loadout)", os.clock() + 1.4
+		hint.Text, feedbackUntil =
+			if Tech.Traits.active(loadout)
+				then string.format(
+					"%s comes from your %s's gem: socket one (Inventory)",
+					key,
+					string.lower(Tech.Traits.SocketNames[key])
+				)
+				else "Socket a gem in surge slot " .. key .. " (Loadout)",
+			os.clock() + 1.4
 		return
 	end
-	local definition = Tech.surgeStats(gem, Tree.effects(GemClient.Profile), player:GetAttribute("MatchRarityCap") ~= nil)
+	local definition =
+		Tech.surgeStats(gem, Tree.effects(GemClient.Profile), player:GetAttribute("MatchRarityCap") ~= nil)
 	if definition and definition.PerSecond then
 		beamKey, nextBeamUpdate = key, os.clock() + 0.2
 	end
@@ -1080,13 +1087,7 @@ local function cancel()
 end
 UserInputService.WindowFocusReleased:Connect(cancel)
 
-local function toggleGuide()
-	cancel()
-	AugmentTreeUI.close()
-	CombatGuide.toggle()
-	cursorFree = CombatGuide.isOpen()
-	FirstPerson.setCursorFree(cursorFree)
-end
+-- (The tree has no button on screen: K opens it.)
 local function toggleTree()
 	cancel()
 	CombatGuide.close()
@@ -1094,26 +1095,6 @@ local function toggleTree()
 	cursorFree = AugmentTreeUI.isOpen()
 	FirstPerson.setCursorFree(cursorFree)
 end
-local treeButton = new("TextButton", {
-	Text = "AUGMENT TREE · K",
-	TextSize = 12,
-	TextColor3 = P.Gold,
-	BackgroundColor3 = P.Inset,
-	Position = UDim2.fromOffset(58, 21),
-	Size = UDim2.fromOffset(150, 30),
-}, gui)
-UiKit.round(treeButton, 8)
-treeButton.Activated:Connect(toggleTree)
-local guideButton = new("TextButton", {
-	Text = "?",
-	TextSize = 22,
-	TextColor3 = P.Gold,
-	BackgroundColor3 = P.Inset,
-	Position = UDim2.fromOffset(12, 16),
-	Size = UDim2.fromOffset(38, 40),
-}, gui)
-UiKit.round(guideButton, 10)
-guideButton.Activated:Connect(toggleGuide)
 ContextActionService:BindActionAtPriority("CombatAugmentTree", function(_, state)
 	if not canFight() then
 		return Enum.ContextActionResult.Pass
@@ -1139,7 +1120,6 @@ UserInputService.InputBegan:Connect(function(obj, processed)
 	end
 	if SURGE_INPUT[obj.KeyCode] then
 		triggerSurge(SURGE_INPUT[obj.KeyCode])
-
 	elseif obj.UserInputType == Enum.UserInputType.MouseButton1 then
 		local offHand = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
@@ -1407,7 +1387,6 @@ RunService.RenderStepped:Connect(function(dt)
 		shown.LayoutW, shown.LayoutH, shown.LayoutTouch, shown.LayoutAt =
 			viewport.X, viewport.Y, touch, os.clock() + 0.25
 		actionBar.Frame.Visible = not touch
-		treeButton.Visible = not touch
 		local stackTop, centreX = 0, nil
 		local logRoom = 0
 		-- Callouts sit under the crosshair; on touch screens above it, clear

@@ -12,7 +12,7 @@ Implemented from the approved Combat Terminology & Universe Conversion brief. Co
 
 The capacities and regeneration rates are initial tuning; the brief specifies costs but not regeneration. Unsocketing every gem clears Charge. Ordinary Dodge costs 15 Stamina. Charges, barriers and timed effects belong to the combat session and reset when it ends.
 
-LMB attacks, Q/E choose swing sides, RMB guards, and Space dodges. **Z cycles Rig Maneuvers; R triggers the selected maneuver. X cycles Gem Surges; F triggers the selected surge.** Hold F for Cryo Stream and release to stop. Touch has matching trigger and cycle buttons. Tab frees the desktop cursor. K opens the Augment Tree. The ? button opens the combat guide. The dashboard also has a visible AUGMENT TREE button.
+LMB attacks, Q/E choose swing sides, RMB guards, and Space dodges. **Z cycles Rig Maneuvers; R triggers the selected maneuver. X cycles Gem Surges; F triggers the selected surge.** Hold F for Cryo Stream and release to stop. Touch has matching trigger and cycle buttons. Tab frees the desktop cursor. K opens the Augment Tree. The fight screen has no tree or guide buttons; the dashboard has a visible AUGMENT TREE button.
 
 The stored **Charge resource** is distinct from the **attack wind-up timing indicator**. Holding a normal weapon attack does not spend Charge.
 

@@ -14,7 +14,9 @@ local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
 local FastStart = require(ReplicatedStorage.Shared.FastStart)
-if not Tutorial.Enabled and not FastStart.Enabled then return end
+if not Tutorial.Enabled and not FastStart.Enabled then
+	return
+end
 local Art = require(script.Parent.Modules.LotteryArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
@@ -335,70 +337,64 @@ local savedKit = GemClient.Profile.Intro and GemClient.Profile.Intro.Lottery
 local chosenStyle = savedKit and savedKit.Style or "Prospector"
 -- Only a previously committed kit restores an element. New choices start empty.
 local chosenElement: string? = savedKit and savedKit.Element or nil
-if savedKit then primary.Text = "CLAIM MY STARTER KIT" end
+if savedKit then
+	primary.Text = "CLAIM MY STARTER KIT"
+end
 -- Choose armor and element independently, then review the starter kit.
-local choices = frame(body, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, ZIndex = 20 })
+local choices = frame(body, { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 20 })
 local STYLES = {
 	{
 		Id = "Prospector",
 		Color = GemConfig.ElementColors.Poison, -- card accent only
-		Role = "BALANCED  ·  SUSTAIN",
+		Role = "BALANCED",
 		-- A quick read of the style (ArmorFamilies: Primary stats per piece
 		-- and set bonuses), out of 5.
 		Profile = { Health = 4, Power = 4, Defense = 3, Speed = 3 },
 		Tip = "Trade blows and outlast them. Steady damage, quick to recover.",
-		Lines = { "Health and Power on every piece", "Set: +Health, +Power, faster cooldowns", "2+ pieces: +10% attack damage" },
+		Bonus = "+10% attack damage",
 	},
 	{
 		Id = "Skirmisher",
 		Color = GemConfig.ElementColors.Shock, -- card accent only
-		Role = "MOBILE  ·  CRITICAL",
+		Role = "MOBILE",
 		Profile = { Health = 2, Power = 4, Defense = 2, Speed = 5 },
 		Tip = "Strike, dodge, strike again. Speed and crits win the race.",
-		Lines = { "Speed and Critical chance", "Set: +Speed, +Crit, faster cooldowns", "2+ pieces: +15% attack speed" },
+		Bonus = "+15% attack speed",
 	},
 	{
 		Id = "Juggernaut",
 		Color = GemConfig.ElementColors.Fire, -- card accent only
-		Role = "HEAVY  ·  DEFENSIVE",
+		Role = "HEAVY",
 		Profile = { Health = 5, Power = 3, Defense = 5, Speed = 2 },
 		Tip = "Hold the line. Block their best, then punish with heavy hits.",
-		Lines = { "Health and Defense", "Set: +Health, +Defense, less damage taken", "2+ pieces: +25% heavy damage" },
+		Bonus = "+25% heavy damage",
 	},
 }
+local STATS = { "Health", "Power", "Defense", "Speed" }
 -- Each style's key art (assets/images/intro/style_*.png, rendered by
 -- tools/make_style_cards.py from the game's own fighters). 0 = not uploaded
--- yet: the card shows its crest and text only.
+-- yet: the card shows its colour instead.
 local STYLE_ART = { Prospector = 72266295660132, Skirmisher = 84192854197420, Juggernaut = 76447015122752 }
+-- Each element in a few words, and what its hits do (Shared.StatusEffects).
+-- The moves themselves are a surprise: they're rolled as you equip.
 local ELEMENTS = {
-	Fire = "Burn and burst",
-	Frost = "Slow, freeze and shield",
-	Shock = "Stun and chain",
-	Poison = "Shred armor, wear them down",
+	Fire = {
+		Blurb = "Burn and burst",
+		Strengths = { "Burns them every second", "Critical burns cut their healing" },
+	},
+	Frost = {
+		Blurb = "Slow, freeze and shield",
+		Strengths = { "Every hit slows them down", "Can freeze them solid", "Shields you from harm" },
+	},
+	Shock = {
+		Blurb = "Stun and chain",
+		Strengths = { "Arcs chain to the next enemy", "Can stun them in place" },
+	},
+	Poison = {
+		Blurb = "Shred armor, wear them down",
+		Strengths = { "Shreds their armor", "Can leave them vulnerable", "Cuts their healing" },
+	},
 }
--- What each key can roll: { Q, E, R } lists of move ids (one each once a
--- saved kit has rolled them).
-local function surgePools(element)
-	if savedKit and savedKit.Element == element and type(savedKit.Moves) == "table" then
-		return { { savedKit.Moves[1] }, { savedKit.Moves[2] }, { savedKit.Moves[3] } }
-	end
-	return Lottery.starterPools(element)
-end
-local function moveName(id)
-	return Tech.Catalog[id] and Tech.Catalog[id].Name or id
-end
--- "Furnace Crescent or Magma Fault".
-local function surgeNames(element)
-	local names = {}
-	for _, pool in surgePools(element) do
-		local list = {}
-		for _, id in pool do
-			table.insert(list, moveName(id))
-		end
-		table.insert(names, table.concat(list, " or "))
-	end
-	return names
-end
 local function text(parent, value, size, color, font, props)
 	local l = label(parent, value, size, color, font)
 	l.ZIndex = 22
@@ -407,178 +403,209 @@ local function text(parent, value, size, color, font, props)
 	end
 	return l
 end
--- Every piece has a full layout and a compact one (short phone screens):
--- fit() switches them with layoutChoices.
--- Rich (tall screens): extra detail fills the cards and rows.
+local function hex(color)
+	return string.format("#%02x%02x%02x", color.R * 255, color.G * 255, color.B * 255)
+end
+-- A small rounded tag sized to its words.
+local function tag(parent, value, color)
+	local pill = frame(parent, {
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.2,
+		Size = UDim2.fromOffset(#value * 7 + 22, 22),
+		ZIndex = 25,
+	})
+	UiKit.round(pill, 999)
+	stroke(pill, color, 0.35, 1)
+	local words = text(pill, value, 10, color, Enum.Font.GothamBold, { ZIndex = 26 })
+	words.TextXAlignment = Enum.TextXAlignment.Center
+	return pill
+end
+-- The selected mark, top right: an empty ring, filled with a tick once chosen.
+local function checkMark(parent)
+	local ring = frame(parent, {
+		AnchorPoint = Vector2.new(1, 0),
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.3,
+		Size = UDim2.fromOffset(26, 26),
+		ZIndex = 26,
+	})
+	UiKit.round(ring, 999)
+	local edge = stroke(ring, C.Edge, 0, 1.5)
+	local tick = text(ring, "✓", 15, C.Ink, Enum.Font.GothamBlack, { ZIndex = 27, Visible = false })
+	tick.TextXAlignment = Enum.TextXAlignment.Center
+	return { Ring = ring, Edge = edge, Tick = tick }
+end
+local function setCheck(check, on, color)
+	check.Ring.BackgroundColor3 = if on then color else C.Ink
+	check.Ring.BackgroundTransparency = if on then 0 else 0.3
+	check.Edge.Color = if on then color else C.Edge
+	check.Tick.Visible = on
+end
+-- Every piece lays itself out from its own size: compactMode and richMode
+-- (short and tall screens) only pick the words.
 local relayout, compactMode, richMode = {}, false, false
--- The fast start's two screens: "Style" (three cards), then "Element"
--- (four independent element cards with their Q / E / R move pools).
+-- The fast start's two screens: "Style" (three fighters), then "Element"
+-- (the four elements and what each is good at).
 local pickStep = if savedKit then "Element" else "Style"
 local function place(apply)
 	table.insert(relayout, apply)
 	apply(false, false)
 end
-local function heading(parent, number, value, step)
-	local h = text(parent, number .. "  " .. value, 13, C.Dim, Enum.Font.GothamBold)
-	h.TextXAlignment = Enum.TextXAlignment.Left
-	place(function(compact)
-		h.Visible = pickStep == step
-		h.TextSize = if compact then 11 else 13
-		h.Position, h.Size = UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, if compact then 16 else 20)
-	end)
-end
-heading(choices, "1 / 2", "FIGHTING STYLE  ·  the armor you start in, with a sword and shield", "Style")
-heading(choices, "2 / 2", "ELEMENT  ·  compare the moves, then choose your powers", "Element")
 
 local styleButtons, elementButtons = {}, {}
 local refreshChoices -- (below)
--- (The launch button has its own row under the body: nothing to leave.)
-local CTA_ROOM = 0
+
+-- Style: three tall fighter cards, the key art leading each.
 local styleArea = frame(choices, { BackgroundTransparency = 1, ZIndex = 21 })
-place(function(compact)
-	local top, bottom = if compact then 20 else 28, if compact then 36 else 52
+local function layoutStyleCard(card, w: number, h: number)
+	local small = h < 360
+	local artH = math.floor(h * (if small then 0.55 else 0.56))
+	card.Art.Size = UDim2.new(1, 0, 0, artH)
+	card.Role.Position = UDim2.fromOffset(12, 12)
+	card.Check.Ring.Position = UDim2.new(1, -12, 0, 12)
+	local nameH = if small then 22 else 32
+	local y = artH - nameH - (if small then 2 else 6)
+	card.Name.TextSize = if small then 19 else math.clamp(math.floor(w / 12), 22, 30)
+	card.Name.Position, card.Name.Size = UDim2.fromOffset(16, y), UDim2.new(1, -32, 0, nameH)
+	y = artH + (if small then 6 else 10)
+	local tipH = if small or w < 240 then 0 else 36
+	card.Tip.Visible = tipH > 0
+	card.Tip.Position, card.Tip.Size = UDim2.fromOffset(16, y), UDim2.new(1, -32, 0, tipH)
+	card.Tip.TextSize = if w >= 330 then 13 else 12
+	y += tipH + (if tipH > 0 then 8 else 0)
+	-- The stat bars share what's left above the set bonus.
+	local bonusH = if small then 0 else 30
+	card.Bonus.Visible = bonusH > 0
+	card.Bonus.Position, card.Bonus.Size = UDim2.new(0, 16, 1, -bonusH - 6), UDim2.new(1, -32, 0, bonusH)
+	local rowH = math.clamp(math.floor((h - y - bonusH - 14) / #STATS), 0, 22)
+	local labelW = if w >= 300 then 74 else 62
+	for index, row in card.Stats do
+		local show = rowH >= 11
+		row.Label.Visible = show
+		row.Label.TextSize = if rowH >= 18 then 10 else 9
+		row.Label.Position = UDim2.fromOffset(16, y + (index - 1) * rowH)
+		row.Label.Size = UDim2.fromOffset(labelW, rowH)
+		local barW = w - 32 - labelW
+		for pip, segment in row.Pips do
+			segment.Visible = show
+			segment.Position = UDim2.fromOffset(
+				16 + labelW + math.floor((pip - 1) * barW / 5),
+				y + (index - 1) * rowH + math.floor(rowH / 2) - 3
+			)
+			segment.Size = UDim2.fromOffset(math.floor(barW / 5) - 4, 6)
+		end
+	end
+end
+local function layoutStyles()
+	local width, height = styleArea.AbsoluteSize.X, styleArea.AbsoluteSize.Y
+	if width <= 0 or height <= 0 then
+		return
+	end
+	local gap = if width < 700 then 8 else 14
+	local cardW = math.floor((width - gap * 2) / 3)
+	local cardH = math.min(height, 560)
+	local y0 = math.floor((height - cardH) / 2)
+	for i, style in STYLES do
+		local card = styleButtons[style.Id]
+		if card then
+			card.Button.Position = UDim2.fromOffset((i - 1) * (cardW + gap), y0)
+			card.Button.Size = UDim2.fromOffset(cardW, cardH)
+			layoutStyleCard(card, cardW, cardH)
+		end
+	end
+end
+place(function()
 	styleArea.Visible = pickStep == "Style"
-	styleArea.Position = UDim2.fromOffset(0, top)
-	styleArea.Size = UDim2.new(1, 0, 1, -top - bottom - CTA_ROOM)
+	styleArea.Position, styleArea.Size = UDim2.new(), UDim2.fromScale(1, 1)
+	layoutStyles()
 end)
-for i, style in STYLES do
+listen(styleArea:GetPropertyChangedSignal("AbsoluteSize"), layoutStyles)
+for _, style in STYLES do
 	local card = new("TextButton", {
+		Name = style.Id,
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = C.Card,
-		Position = UDim2.new((i - 1) / 3, if i == 1 then 0 else 5, 0, 0),
-		Size = UDim2.new(1 / 3, -7, 1, 0),
 		ZIndex = 21,
 		ClipsDescendants = true,
 	}, styleArea)
-	card.Name = style.Id
-	UiKit.round(card, 10)
-	local edge = new("UIStroke", { Color = C.Line, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, card)
-	frame(card, { BackgroundColor3 = style.Color, Size = UDim2.new(1, 0, 0, 4), ZIndex = 22 })
-	-- The fighter's key art leads the card when it's uploaded; until then a
-	-- crest does, and the text sits higher.
+	UiKit.round(card, 12)
+	local edge = stroke(card, C.Line, 0, 1)
 	local artId = STYLE_ART[style.Id] or 0
-	local Y0 = if artId ~= 0 then 112 else 0
-	local STEP = if artId ~= 0 then 28 else 34
 	local art = new("ImageLabel", {
-		BackgroundColor3 = C.Ink,
+		Name = "StyleArt",
+		BackgroundColor3 = style.Color:Lerp(C.Ink, 0.82),
+		BorderSizePixel = 0,
 		Image = if artId ~= 0 then "rbxassetid://" .. artId else "",
 		ScaleType = Enum.ScaleType.Crop,
-		Visible = artId ~= 0,
 		ZIndex = 22,
 	}, card)
-	art.Name = "StyleArt"
-	UiKit.round(art, 8)
-	new("UIStroke", { Color = style.Color, Thickness = 1, Transparency = 0.4 }, art)
-	-- A crest: the family's initial in a diamond of its colour.
-	local crest = frame(card, {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Rotation = 45,
-		BackgroundColor3 = style.Color:Lerp(C.Ink, 0.55),
-		ZIndex = 22,
-		Visible = artId == 0,
+	-- The art fades into the card, under the name.
+	local scrim = frame(art, {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromScale(1, 0.6),
+		BackgroundColor3 = C.Card,
+		ZIndex = 23,
 	})
-	UiKit.round(crest, 8)
-	new("UIStroke", { Color = style.Color, Thickness = 2 }, crest)
-	local initial = text(card, string.sub(style.Id, 1, 1), 26, style.Color, Enum.Font.GothamBlack)
-	initial.AnchorPoint = Vector2.new(0.5, 0)
-	initial.TextXAlignment = Enum.TextXAlignment.Center
-	initial.Visible = artId == 0
-	local name = text(card, string.upper(style.Id), 18, C.Text, Enum.Font.GothamBlack)
-	name.TextXAlignment = Enum.TextXAlignment.Center
-	local role = text(card, style.Role, 10, style.Color, Enum.Font.GothamBold)
-	role.TextXAlignment = Enum.TextXAlignment.Center
-	local divider = frame(card, { BackgroundColor3 = C.Line, ZIndex = 22 })
-	local perks = {}
-	for _, value in style.Lines do
-		local dot = text(card, "◆", 8, style.Color, Enum.Font.GothamBold)
-		local row = text(card, value, 11, C.Dim, Enum.Font.GothamMedium, { TextWrapped = true })
-		row.TextYAlignment = Enum.TextYAlignment.Top
-		table.insert(perks, { dot, row })
-	end
-	local kit = text(card, "Helmet · Chest · Gloves · Boots\nShield · Sword", 10, C.Faint, Enum.Font.GothamMedium)
-	kit.AnchorPoint = Vector2.new(0.5, 1)
-	kit.TextXAlignment, kit.TextWrapped = Enum.TextXAlignment.Center, true
-	local pick = text(card, "SELECTED", 10, C.Ink, Enum.Font.GothamBlack)
-	pick.AnchorPoint, pick.Position, pick.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10), UDim2.fromOffset(92, 20)
-	-- Rich extras: the armor profile and how it plays.
-	local extras = frame(card, { BackgroundTransparency = 1, ZIndex = 22 })
-	local profileTitle = text(extras, "STYLE PROFILE", 9, C.Dim, Enum.Font.GothamBold)
-	profileTitle.Position, profileTitle.Size = UDim2.fromOffset(14, 0), UDim2.new(1, -28, 0, 12)
-	for index, stat in { "Health", "Power", "Defense", "Speed" } do
-		local y = 16 + (index - 1) * 17
-		local statName = text(extras, string.upper(stat), 9, C.Dim, Enum.Font.GothamBold)
-		statName.Position, statName.Size = UDim2.fromOffset(14, y), UDim2.fromOffset(62, 12)
+	new("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.55, 0.45),
+			NumberSequenceKeypoint.new(1, 0),
+		}),
+	}, scrim)
+	local role = tag(card, style.Role, style.Color)
+	local check = checkMark(card)
+	local name = text(card, string.upper(style.Id), 28, C.Text, Enum.Font.GothamBlack, { ZIndex = 25 })
+	local tip = text(card, style.Tip, 13, C.Dim, Enum.Font.Gotham, { TextWrapped = true })
+	tip.TextYAlignment = Enum.TextYAlignment.Top
+	local stats = {}
+	for _, stat in STATS do
+		local statLabel = text(card, string.upper(stat), 10, C.Dim, Enum.Font.GothamBold)
+		local pips = {}
 		for pip = 1, 5 do
-			local lit = pip <= (style.Profile[stat] or 0)
-			frame(extras, {
-				BackgroundColor3 = if lit then style.Color else C.Line,
-				BackgroundTransparency = if lit then 0 else 0.3,
-				Position = UDim2.new((pip - 1) / 5 * 0.62, 78, 0, y + 2),
-				Size = UDim2.new(0.62 / 5, -3, 0, 8),
-				ZIndex = 23,
-			})
+			local segment = frame(card, { BackgroundColor3 = C.Line, ZIndex = 23 })
+			UiKit.round(segment, 3)
+			pips[pip] = segment
 		end
+		table.insert(stats, { Label = statLabel, Pips = pips, Value = style.Profile[stat] or 0 })
 	end
-	local gemLine = text(
-		extras,
-		"PAIR WITH ANY ELEMENT",
-		9,
-		C.Dim,
+	local bonus = text(
+		card,
+		string.format('<font color="#8a9cb2">2-PIECE BONUS</font>   %s', style.Bonus),
+		12,
+		style.Color,
 		Enum.Font.GothamBold,
 		{ RichText = true }
 	)
-	gemLine.Position, gemLine.Size = UDim2.fromOffset(14, 90), UDim2.new(1, -28, 0, 14)
-	local tip = text(extras, style.Tip, 11, C.Text, Enum.Font.GothamMedium, { TextWrapped = true })
-	tip.Position, tip.Size = UDim2.fromOffset(14, 110), UDim2.new(1, -28, 0, 30)
-	tip.TextYAlignment = Enum.TextYAlignment.Top
-	-- Full: art (or crest) up top, then name, role and the perks. Compact:
-	-- the art fills the card above the name and role; the perks go.
-	place(function(compact, rich)
-		local Y0 = if artId ~= 0 then (if rich then 152 else 112) else 0
-		if compact then
-			art.Position, art.Size = UDim2.fromOffset(6, 8), UDim2.new(1, -12, 1, -52)
-			crest.Position, crest.Size = UDim2.new(0.5, 0, 0.5, -42), UDim2.fromOffset(34, 34)
-			initial.Position, initial.Size, initial.TextSize = UDim2.new(0.5, 0, 0.5, -38), UDim2.fromOffset(40, 28), 18
-			name.Position, name.Size, name.TextSize = UDim2.new(0, 0, 1, -42), UDim2.new(1, 0, 0, 18), 14
-			role.Position, role.Size, role.TextSize = UDim2.new(0, 0, 1, -22), UDim2.new(1, 0, 0, 12), 9
-		else
-			art.Position, art.Size = UDim2.fromOffset(8, 12), UDim2.new(1, -16, 0, if rich then 216 else 176)
-			crest.Position, crest.Size = UDim2.new(0.5, 0, 0, 22), UDim2.fromOffset(46, 46)
-			initial.Position, initial.Size, initial.TextSize = UDim2.new(0.5, 0, 0, 27), UDim2.fromOffset(60, 36), 26
-			name.Position, name.Size, name.TextSize = UDim2.fromOffset(0, 86 + Y0), UDim2.new(1, 0, 0, 22), 18
-			role.Position, role.Size, role.TextSize = UDim2.fromOffset(0, 110 + Y0), UDim2.new(1, 0, 0, 14), 10
-		end
-		divider.Visible = not compact
-		divider.Position, divider.Size = UDim2.new(0, 14, 0, 132 + Y0), UDim2.new(1, -28, 0, 1)
-		for line, pair in perks do
-			pair[1].Visible, pair[2].Visible = not compact, not compact
-			pair[1].Position, pair[1].Size = UDim2.new(0, 14, 0, 144 + Y0 + (line - 1) * STEP), UDim2.fromOffset(10, 14)
-			pair[2].Position, pair[2].Size = UDim2.new(0, 28, 0, 142 + Y0 + (line - 1) * STEP), UDim2.new(1, -40, 0, 30)
-		end
-		kit.Visible = artId == 0 and not compact and not rich -- (the art shows the kit)
-		kit.Position, kit.Size = UDim2.new(0.5, 0, 1, -40), UDim2.new(1, -24, 0, 28)
-		extras.Visible = rich
-		extras.Position = UDim2.fromOffset(0, 142 + Y0 + 2 * STEP + 40)
-		extras.Size = UDim2.new(1, 0, 0, 144)
-	end)
-	pick.BackgroundTransparency, pick.BackgroundColor3 = 0, style.Color
-	pick.TextXAlignment = Enum.TextXAlignment.Center
-	UiKit.round(pick, 10)
-	styleButtons[style.Id] = { Button = card, Stroke = edge, Name = name, Pick = pick, Color = style.Color, Art = art }
+	styleButtons[style.Id] = {
+		Button = card,
+		Stroke = edge,
+		Art = art,
+		Scrim = scrim,
+		Role = role,
+		Check = check,
+		Name = name,
+		Tip = tip,
+		Stats = stats,
+		Bonus = bonus,
+		Color = style.Color,
+	}
 	listen(card.Activated, function()
 		if not savedKit and not busy then
 			chosenStyle = style.Id
 			refreshChoices()
+			layoutStyles()
 		end
 	end)
 end
 
--- The four elements, sized to fit the space rather than scroll: side by side
--- when the screen is wide (Q, E and R then line up across them, to compare),
--- two by two when it's tall, and each card shrinks to its space (smaller
--- gem and type, shorter move rows, the extra lines dropped) before the list
--- ever has to scroll (only on very small portrait screens).
+-- Element: four cards, each the element's gem, what it's about and its
+-- strengths, and which element it beats and which beats it. Side by side
+-- when the screen is wide, two by two when it's tall, a scrolling column
+-- only on very small portrait screens.
 local elementArea = new("ScrollingFrame", {
 	Name = "ElementChoices",
 	BackgroundTransparency = 1,
@@ -591,80 +618,103 @@ local elementArea = new("ScrollingFrame", {
 	ClipsDescendants = true,
 }, choices)
 local elementOrder = { "Fire", "Frost", "Shock", "Poison" }
-local CARD_TALL = 300 -- a card at its fullest
-local CARD_MIN_H, CARD_MIN_W = 160, 145 -- the least a card can show its moves in
+local CARD_TALL = 410 -- a card at its fullest
+local CARD_MIN_H, CARD_MIN_W = 190, 150
 
--- Lay one element card out inside w x h.
+-- Lay one element card out inside w x h: the gem on top (tall cards) or at
+-- the left (wide ones), and as much of the rest as fits.
 local function layoutCard(card, w: number, h: number)
-	local roomy = h >= 280
-	local header = math.clamp(math.floor(h * 0.27), 44, 82)
+	local wide = w > h * 1.15
+	local pad = if w < 200 then 12 else 16
+	-- Narrow cards (phones): each strength may take two lines.
 	local narrow = w < 200
-	local gem = if narrow then 26 else math.clamp(header - 18, 30, 62)
-	card.Disc.Position, card.Disc.Size = UDim2.fromOffset(12, 12), UDim2.fromOffset(gem, gem)
-	card.Holder.Position, card.Holder.Size = UDim2.fromOffset(9, 9), UDim2.fromOffset(gem + 6, gem + 6)
-	local textX = gem + (if narrow then 16 else 24)
-	local showDescription = header >= 60
-	-- The name as big as its line allows (Gotham Black runs ~0.8 em a letter).
-	local nameRoom = w - textX - (if narrow then 22 else 34)
-	card.Name.TextSize =
-		math.clamp(math.floor(nameRoom / (#card.Name.Text * 0.8)), 10, if header >= 60 then 19 else 15)
-	card.Name.Position = UDim2.fromOffset(textX, if showDescription then 13 else math.floor((header - 20) / 2) + 2)
-	card.Name.Size = UDim2.new(1, -textX - (if narrow then 22 else 34), 0, 24)
-	card.Description.Visible = showDescription
-	card.Description.Position, card.Description.Size =
-		UDim2.fromOffset(textX, 39), UDim2.new(1, -textX - 12, 0, math.max(16, header - 42))
-	card.Marker.Position = UDim2.new(1, if narrow then -26 else -34, 0, if narrow then 6 else 10)
-	-- Strong / weak: its own line when there's room, else under the name.
-	local matchup = if roomy then 18 else 0
-	card.Matchup.Visible = roomy or not showDescription
-	card.Matchup.TextSize = if roomy then 11 else 10
-	card.Matchup.Text = if roomy or w >= 300 then card.MatchFull else card.MatchShort
-	if roomy then
-		card.Matchup.Position, card.Matchup.Size = UDim2.fromOffset(14, header + 2), UDim2.new(1, -28, 0, 16)
-	else
-		card.Matchup.Position, card.Matchup.Size = UDim2.fromOffset(textX, header - 18), UDim2.new(1, -textX - 6, 0, 14)
-		card.Matchup.TextSize = if narrow then 9 else 10
+	local lineH = if narrow then 26 elseif w < 220 then 17 else 20
+	local lineSize = if narrow then 10 elseif w < 220 then 11 else 12
+	-- The matchup: two pills, side by side when there's width.
+	local pillRow = w >= 300
+	local pillH = 26
+	local pillsH = if pillRow then pillH else pillH * 2 + 6
+	card.Strong.Frame.Size = if pillRow then UDim2.new(0.5, -pad - 3, 0, pillH) else UDim2.new(1, -pad * 2, 0, pillH)
+	card.Weak.Frame.Size = card.Strong.Frame.Size
+	card.Strong.Frame.Position = if pillRow
+		then UDim2.new(0, pad, 1, -pad - pillH)
+		else UDim2.new(0, pad, 1, -pad - pillsH)
+	card.Weak.Frame.Position = if pillRow
+		then UDim2.new(0.5, 3, 1, -pad - pillH)
+		else UDim2.new(0, pad, 1, -pad - pillH)
+	for _, pill in { card.Strong, card.Weak } do
+		pill.Label.TextSize = if narrow then 9 else 10
+		pill.Label.Text = if narrow then pill.Short else pill.Full
 	end
-	local tag = if roomy then 26 else 0
-	card.Tag.Visible = roomy
-	card.Tag.Position, card.Tag.Size = UDim2.new(0, 14, 1, -tag - 4), UDim2.new(1, -28, 0, tag)
-	-- The Q / E / R rows share what's left.
-	local top = header + matchup + (if roomy then 8 else 4)
-	local gap = if h >= 240 then 6 else 4
-	local rowH = math.clamp(math.floor((h - top - tag - 10 - gap * 2) / 3), 30, 58)
-	-- Narrow cards stack a key's two moves, one per line.
-	local optionW = (w - 56) / 2
-	local stacked = optionW < 100 and rowH >= 38
-	local lineH = if stacked then math.floor(rowH / 2) else rowH
-	local iconSize = if stacked then math.clamp(lineH - 4, 14, 22) else math.clamp(rowH - 12, 22, 38)
-	local nameSize = if stacked
-		then math.clamp(math.floor((w - 63 - iconSize) / (card.Longest * 0.62)), 8, 10)
-		elseif w >= 280 and rowH >= 50 then 12
-		elseif w >= 260 and rowH >= 40 then 11
-		elseif w >= 230 then 10
-		else 9
-	for index, row in card.Rows do
-		row.Chip.Position = UDim2.fromOffset(10, top + (index - 1) * (rowH + gap))
-		row.Chip.Size = UDim2.new(1, -20, 0, rowH)
-		row.Key.Position, row.Key.Size = UDim2.fromOffset(4, if rowH >= 40 then 4 else 2), UDim2.fromOffset(24, 18)
-		row.Role.Visible = rowH >= 38
-		row.Role.Position, row.Role.Size = UDim2.fromOffset(0, rowH - 16), UDim2.fromOffset(32, 10)
-		row.Options.Position, row.Options.Size = UDim2.fromOffset(32, 0), UDim2.new(1, -36, 1, 0)
-		local count = #row.Cells
-		for option, cell in row.Cells do
-			if stacked then
-				cell.Frame.Position = UDim2.new(0, 0, (option - 1) / count, 0)
-				cell.Frame.Size = UDim2.fromScale(1, 1 / count)
-			else
-				cell.Frame.Position = UDim2.fromScale((option - 1) / count, 0)
-				cell.Frame.Size = UDim2.fromScale(1 / count, 1)
-			end
-			cell.Icon.Position = UDim2.fromOffset(0, math.floor((lineH - iconSize) / 2))
-			cell.Icon.Size = UDim2.fromOffset(iconSize, iconSize)
-			cell.Name.TextSize = nameSize
-			cell.Name.TextWrapped = not stacked
-			cell.Name.Position, cell.Name.Size = UDim2.fromOffset(iconSize + 5, 1), UDim2.new(1, -iconSize - 7, 1, -2)
+	card.Check.Ring.Position = UDim2.new(1, -10, 0, 10)
+	local bottom = h - pad - pillsH - 10 -- the strengths end here
+	local lines = #card.Lines
+	if wide then
+		-- Gem at the left, name and blurb beside it, strengths under both.
+		local gem = math.clamp(math.floor(h * 0.42), 44, 110)
+		card.Halo.Position, card.Halo.Size = UDim2.fromOffset(pad - 4, pad - 4), UDim2.fromOffset(gem + 8, gem + 8)
+		card.Holder.Position, card.Holder.Size = UDim2.fromOffset(pad, pad), UDim2.fromOffset(gem, gem)
+		local x = pad + gem + 14
+		card.Name.TextXAlignment, card.Blurb.TextXAlignment = Enum.TextXAlignment.Left, Enum.TextXAlignment.Left
+		card.Name.TextSize = math.clamp(math.floor(gem * 0.3), 16, 26)
+		card.Name.Position, card.Name.Size = UDim2.fromOffset(x, pad + 2), UDim2.new(1, -x - 40, 0, 30)
+		card.Blurb.Visible = true
+		card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(x, pad + 34), UDim2.new(1, -x - pad, 0, 18)
+		local top = pad + gem + 10
+		card.Title.Visible = false
+		card.Divider.Visible = false
+		local fit = math.max(0, math.floor((bottom - top) / lineH))
+		for index, pair in card.Lines do
+			local show = index <= fit
+			pair[1].Visible, pair[2].Visible = show, show
+			pair[1].Position, pair[1].Size =
+				UDim2.fromOffset(pad, top + (index - 1) * lineH), UDim2.fromOffset(14, lineH)
+			pair[2].Position, pair[2].Size =
+				UDim2.fromOffset(pad + 16, top + (index - 1) * lineH), UDim2.new(1, -pad * 2 - 16, 0, lineH)
+			pair[2].TextSize, pair[2].TextWrapped = lineSize, narrow
 		end
+		return
+	end
+	-- Tall: the gem leads, then the name, the blurb, the strengths.
+	card.Name.TextXAlignment, card.Blurb.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
+	local showBlurb, showTitle, nameH = true, true, 30
+	local function needs(): number
+		return pad + nameH + (if showBlurb then 20 else 0) + (if showTitle then 30 else 10) + lines * lineH
+	end
+	-- Room for the gem: drop the extras before it gets too small.
+	local gem = bottom - needs()
+	if gem < 70 then
+		showBlurb = false
+		gem = bottom - needs()
+	end
+	if gem < 60 then
+		showTitle = false
+		gem = bottom - needs()
+	end
+	gem = math.clamp(gem - 6, 30, 140)
+	card.Halo.Position = UDim2.new(0.5, -(gem + 30) / 2, 0, pad - 4)
+	card.Halo.Size = UDim2.fromOffset(gem + 30, gem + 30)
+	card.Holder.Position, card.Holder.Size = UDim2.new(0.5, -gem / 2, 0, pad + 8), UDim2.fromOffset(gem, gem)
+	local y = pad + gem + 14
+	card.Name.TextSize = math.clamp(math.floor(w / 11), 16, 26)
+	card.Name.Position, card.Name.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, nameH)
+	y += nameH
+	card.Blurb.Visible = showBlurb
+	card.Blurb.TextSize = if w < 220 then 11 else 13
+	card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, 18)
+	y += if showBlurb then 20 else 0
+	card.Divider.Visible = showTitle
+	card.Divider.Position, card.Divider.Size = UDim2.fromOffset(pad, y + 8), UDim2.new(1, -pad * 2, 0, 1)
+	card.Title.Visible = showTitle
+	card.Title.Position, card.Title.Size = UDim2.fromOffset(pad, y + 14), UDim2.new(1, -pad * 2, 0, 14)
+	y += if showTitle then 32 else 10
+	for index, pair in card.Lines do
+		local show = y + index * lineH <= bottom + 4
+		pair[1].Visible, pair[2].Visible = show, show
+		pair[1].Position, pair[1].Size = UDim2.fromOffset(pad, y + (index - 1) * lineH), UDim2.fromOffset(14, lineH)
+		pair[2].Position, pair[2].Size =
+			UDim2.fromOffset(pad + 16, y + (index - 1) * lineH), UDim2.new(1, -pad * 2 - 16, 0, lineH)
+		pair[2].TextSize, pair[2].TextWrapped = lineSize, narrow
 	end
 end
 
@@ -673,7 +723,7 @@ local function layoutElements()
 	if width <= 0 or height <= 0 then
 		return
 	end
-	local gap, inset = 10, 2
+	local gap, inset = if width < 700 then 8 else 12, 4
 	-- Every arrangement's card size; the first that fits wins.
 	local function size(columns)
 		local rows = math.ceil(#elementOrder / columns)
@@ -683,16 +733,15 @@ local function layoutElements()
 	local w4, h4 = size(4)
 	local w2, h2 = size(2)
 	local columns, cardW, cardH, scroll
-	if w2 >= 380 and h2 >= 250 then
-		columns, cardW, cardH = 2, w2, math.min(h2, CARD_TALL + 20) -- (tall screens: two by two)
+	if w2 >= 380 and h2 >= 200 and w4 < 230 then
+		columns, cardW, cardH = 2, w2, math.min(h2, 260) -- (tall screens: two by two)
 	elseif w4 >= CARD_MIN_W and h4 >= CARD_MIN_H then
-		columns, cardW, cardH = 4, w4, math.min(h4, CARD_TALL + 40) -- (wide: side by side)
-	elseif w2 >= CARD_MIN_W and h2 >= CARD_MIN_H then
+		columns, cardW, cardH = 4, w4, math.min(h4, CARD_TALL) -- (wide: side by side)
+	elseif w2 >= CARD_MIN_W and h2 >= 150 then
 		columns, cardW, cardH = 2, w2, h2
 	else
 		-- Very small (portrait phones): one column, scrolling.
-		local w1 = width - inset * 2 - 8
-		columns, cardW, cardH, scroll = 1, w1, CARD_TALL, true
+		columns, cardW, cardH, scroll = 1, width - inset * 2 - 8, 200, true
 	end
 	local rows = math.ceil(#elementOrder / columns)
 	local used = rows * cardH + (rows - 1) * gap
@@ -710,17 +759,35 @@ local function layoutElements()
 	elementArea.CanvasSize = if scroll then UDim2.fromOffset(0, inset * 2 + used) else UDim2.new()
 	elementArea.ScrollBarThickness = if scroll then 4 else 0
 end
-place(function(compact)
-	local top, bottom = if compact then 20 else 26, if compact then 42 else 56
+place(function()
 	elementArea.Visible = pickStep == "Element"
-	elementArea.Position = UDim2.fromOffset(0, top)
-	elementArea.Size = UDim2.new(1, 0, 1, -top - bottom)
+	elementArea.Position, elementArea.Size = UDim2.new(), UDim2.fromScale(1, 1)
 	layoutElements()
 end)
 listen(elementArea:GetPropertyChangedSignal("AbsoluteSize"), layoutElements)
+-- "▲ STRONG VS CRYO": the other element in its own colour.
+local function matchPill(parent, arrow: string, words: string, other: string, good: boolean)
+	local pill = frame(parent, {
+		BackgroundColor3 = if good then Color3.fromRGB(22, 44, 36) else Color3.fromRGB(48, 24, 28),
+		ZIndex = 22,
+	})
+	UiKit.round(pill, 7)
+	local mark = string.format('<font color="%s">%s</font>', if good then "#6fe0a0" else "#ff7a7a", arrow)
+	local name = string.format(
+		'<font color="%s">%s</font>',
+		hex(GemConfig.ElementColors[other]),
+		string.upper(GemConfig.elementName(other))
+	)
+	local full = string.format("%s  %s  %s", mark, words, name)
+	local value = text(pill, full, 10, C.Dim, Enum.Font.GothamBold, { RichText = true, ZIndex = 23 })
+	value.TextXAlignment = Enum.TextXAlignment.Center
+	-- (Narrow cards say just the element.)
+	return { Frame = pill, Label = value, Full = full, Short = string.format("%s  %s", mark, name) }
+end
 for _, element in elementOrder do
+	local info = ELEMENTS[element]
 	local color = GemConfig.ElementColors[element]
-	local row = new("TextButton", {
+	local card = new("TextButton", {
 		Name = element,
 		Text = "",
 		AutoButtonColor = false,
@@ -728,19 +795,20 @@ for _, element in elementOrder do
 		ZIndex = 21,
 		ClipsDescendants = true,
 	}, elementArea)
-	UiKit.round(row, 14)
-	local edge = stroke(row, C.Line, 0, 1)
-	new("UIGradient", { Rotation = 120, Color = ColorSequence.new(C.Text, color:Lerp(C.Text, 0.78)) }, row)
-	local bar = frame(row, {
-		BackgroundColor3 = color,
-		BackgroundTransparency = 0.45,
-		Size = UDim2.new(1, 0, 0, 3),
-		ZIndex = 22,
-	})
-	local disc = frame(row, { BackgroundColor3 = color, BackgroundTransparency = 0.86, ZIndex = 22 })
-	UiKit.round(disc, 16)
-	stroke(disc, color, 0.65, 1)
-	local holder = frame(row, { BackgroundTransparency = 1, ZIndex = 23 })
+	UiKit.round(card, 12)
+	local edge = stroke(card, C.Line, 0, 1)
+	-- A wash of its colour down from the top, and a soft glow behind the gem.
+	local wash = frame(card, { BackgroundColor3 = color, Size = UDim2.fromScale(1, 0.55), ZIndex = 21 })
+	new("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.8),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, wash)
+	local haloDisc = frame(card, { BackgroundColor3 = color, BackgroundTransparency = 0.9, ZIndex = 22 })
+	UiKit.round(haloDisc, 999)
+	local holder = frame(card, { BackgroundTransparency = 1, ZIndex = 23 })
 	Art.show(
 		holder,
 		{ Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 },
@@ -748,104 +816,45 @@ for _, element in elementOrder do
 		color,
 		false
 	)
-	local nameLabel = text(row, string.upper(GemConfig.elementName(element)), 19, color, Enum.Font.GothamBlack)
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	local description = text(row, ELEMENTS[element], 12, C.Text, Enum.Font.GothamMedium, { TextWrapped = true })
-	description.TextXAlignment, description.TextYAlignment = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
-	local marker = text(row, "○", 20, C.Dim, Enum.Font.GothamBold, {
-		Size = UDim2.fromOffset(24, 24),
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
-	local beats, weak = ElementMatchup.Beats[element], ElementMatchup.weakTo(element)
-	local matchup = text(
-		row,
-		string.format("Strong vs %s  /  Weak vs %s", GemConfig.elementName(beats), GemConfig.elementName(weak)),
-		11,
-		C.Dim,
-		Enum.Font.GothamMedium
-	)
-	matchup.TextXAlignment = Enum.TextXAlignment.Left
-	local pools = surgePools(element)
-	local surgeLabels, rows = {}, {}
-	local longest = 8 -- (letters in its longest move name)
-	for _, pool in pools do
-		for _, id in pool do
-			longest = math.max(longest, #moveName(id))
-		end
+	local check = checkMark(card)
+	local nameLabel = text(card, string.upper(GemConfig.elementName(element)), 24, color, Enum.Font.GothamBlack)
+	local blurb = text(card, info.Blurb, 13, C.Text, Enum.Font.GothamMedium)
+	local divider = frame(card, { BackgroundColor3 = C.Line, ZIndex = 22 })
+	local title = text(card, "STRENGTHS", 10, C.Dim, Enum.Font.GothamBold)
+	local lines = {}
+	for _, strength in info.Strengths do
+		local mark = text(card, "+", 13, color, Enum.Font.GothamBlack)
+		local line = text(card, strength, 12, C.Dim, Enum.Font.GothamMedium)
+		table.insert(lines, { mark, line })
 	end
-	for index, pool in pools do
-		local chip = frame(row, { BackgroundColor3 = C.Ink, BackgroundTransparency = 0.12, ZIndex = 22 })
-		UiKit.round(chip, 8)
-		local keyLabel = text(chip, ({ "Q", "E", "R" })[index], 15, color, Enum.Font.GothamBlack, {
-			TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		local role = text(chip, ({ "STRIKE", "ABILITY", "GUARD" })[index], 7, C.Dim, Enum.Font.GothamBold, {
-			TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		local options = frame(chip, { BackgroundTransparency = 1, ZIndex = 23 })
-		local cells = {}
-		for option, id in pool do
-			local move = Tech.Catalog[id]
-			local cell = frame(options, {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromScale((option - 1) / #pool, 0),
-				Size = UDim2.fromScale(1 / #pool, 1),
-				ZIndex = 23,
-			})
-			local icon = text(cell, "◆", 16, color, Enum.Font.GothamBold, { ZIndex = 24 })
-			UiKit.round(icon, 6)
-			if move then
-				Icons.apply(icon, move, color)
-			end
-			local name = text(cell, moveName(id), 11, C.Dim, Enum.Font.GothamMedium, { TextWrapped = true })
-			name.TextXAlignment = Enum.TextXAlignment.Left
-			table.insert(surgeLabels, name)
-			table.insert(cells, { Frame = cell, Icon = icon, Name = name })
-		end
-		table.insert(rows, { Chip = chip, Key = keyLabel, Role = role, Options = options, Cells = cells })
-	end
-	local tag = text(row, "", 10, C.Dim, Enum.Font.GothamBold, { TextWrapped = true })
+	local strong = matchPill(card, "▲", "STRONG VS", ElementMatchup.Beats[element], true)
+	local weak = matchPill(card, "▼", "WEAK VS", ElementMatchup.weakTo(element), false)
 	elementButtons[element] = {
-		Button = row,
+		Button = card,
 		Stroke = edge,
-		Surges = surgeLabels,
-		Bar = bar,
-		Disc = disc,
+		Wash = wash,
+		Halo = haloDisc,
 		Holder = holder,
+		Check = check,
 		Name = nameLabel,
-		Description = description,
-		Matchup = matchup,
-		MatchFull = matchup.Text,
-		Longest = longest,
-		MatchShort = string.format("▲ %s   ▼ %s", GemConfig.elementName(beats), GemConfig.elementName(weak)),
-		Rows = rows,
+		Blurb = blurb,
+		Divider = divider,
+		Title = title,
+		Lines = lines,
+		Strong = strong,
+		Weak = weak,
 		Color = color,
-		Tag = tag,
-		Marker = marker,
 	}
-	listen(row.Activated, function()
+	listen(card.Activated, function()
 		if not savedKit and not busy then
 			chosenElement = element
 			refreshChoices()
+			layoutElements()
 		end
 	end)
 end
 layoutElements()
 
--- What you're about to get.
-local summary = frame(choices, { BackgroundColor3 = C.Panel, ZIndex = 21, ClipsDescendants = true })
-UiKit.round(summary, 8)
-local summaryEdge = new("UIStroke", { Color = C.Line, Thickness = 1 }, summary)
-local summaryText = text(summary, "", 13, C.Text, Enum.Font.GothamBold, { RichText = true })
-summaryText.TextXAlignment = Enum.TextXAlignment.Left
-summaryText.TextWrapped = true
-place(function(compact)
-	local height = if compact then 36 else 48
-	summary.Position, summary.Size = UDim2.new(0, 0, 1, -height - CTA_ROOM), UDim2.new(1, 0, 0, height)
-	summaryText.TextSize = if compact then 11 else 13
-	summaryText.Position = UDim2.fromOffset(if compact then 10 else 16, 0)
-	summaryText.Size = UDim2.new(1, if compact then -20 else -32, 1, 0)
-end)
 local function layoutChoices(compact, rich)
 	rich = rich and not compact
 	if compact == compactMode and rich == richMode then
@@ -858,51 +867,55 @@ local function layoutChoices(compact, rich)
 	refreshChoices()
 end
 
-local function hex(color)
-	return string.format("#%02x%02x%02x", color.R * 255, color.G * 255, color.B * 255)
-end
 function refreshChoices()
-	local styleColor = C.Gold
 	for id, card in styleButtons do
 		local on = id == chosenStyle
+		local back = if on then C.Card:Lerp(card.Color, 0.1) else C.Card
 		card.Stroke.Color = if on then card.Color else C.Line
-		card.Button.BackgroundColor3 = if on then C.Card:Lerp(card.Color, 0.14) else C.Card
-		card.Name.TextColor3 = if on then C.Text else C.Dim
-		card.Pick.Visible = on and not compactMode -- (compact: the glowing border says it)
-		card.Art.ImageTransparency = if on then 0 else 0.4
-		card.Stroke.Thickness = if on then 3 else 1
-		if on then
-			styleColor = card.Color
+		card.Stroke.Thickness = if on then 2.5 else 1
+		card.Button.BackgroundColor3 = back
+		card.Scrim.BackgroundColor3 = back
+		card.Art.ImageTransparency = if on then 0 else 0.35
+		card.Name.TextColor3 = if on then C.Text else C.Text:Lerp(C.Dim, 0.5)
+		card.Tip.TextColor3 = if on then C.Text:Lerp(C.Dim, 0.35) else C.Dim
+		setCheck(card.Check, on, card.Color)
+		for _, row in card.Stats do
+			for pip, segment in row.Pips do
+				local lit = pip <= row.Value
+				segment.BackgroundColor3 = if lit then card.Color else C.Line
+				segment.BackgroundTransparency = if lit then (if on then 0 else 0.45) else 0.4
+			end
 		end
 	end
-	local elementColor = C.Cyan
-	for id, row in elementButtons do
+	for id, card in elementButtons do
 		local on = id == chosenElement
-		row.Stroke.Color = if on then row.Color else C.Line
-		row.Stroke.Thickness = if on then 2.5 else 1
-		row.Button.BackgroundColor3 = if on then C.Card:Lerp(row.Color, 0.14) else C.Card
-		for _, label in row.Surges do
-			label.TextColor3 = if on then C.Text else C.Dim
+		card.Stroke.Color = if on then card.Color else C.Line
+		card.Stroke.Thickness = if on then 2.5 else 1
+		card.Button.BackgroundColor3 = if on then C.Card:Lerp(card.Color, 0.1) else C.Card
+		card.Halo.BackgroundTransparency = if on then 0.78 else 0.9
+		for _, pair in card.Lines do
+			pair[2].TextColor3 = if on then C.Text else C.Dim
 		end
-		row.Bar.BackgroundTransparency = if on then 0 else 0.7
-		row.Disc.BackgroundTransparency = if on then 0.6 else 0.86
-		row.Tag.Text = if on then "SELECTED  ·  " .. (if savedKit then "YOUR SAVED KIT" else "ONE MOVE PER KEY, ROLLED WHEN EQUIPPED") else "CHOOSE ELEMENT  ·  ONE MOVE PER KEY"
-		row.Tag.TextColor3 = if on then row.Color else C.Dim
-		row.Marker.Text = if on then "✓" else "○"
-		row.Marker.TextColor3 = if on then row.Color else C.Dim
-		if on then
-			elementColor = row.Color
-		end
+		setCheck(card.Check, on, card.Color)
 	end
-	summaryEdge.Color = styleColor:Lerp(elementColor, 0.5)
 	-- This screen's words and button.
 	if not reward then
-		title.Text = if pickStep == "Style" then "HOW DO YOU FIGHT?" else "PICK YOUR ELEMENT"
+		-- (The reveal's panels wait underneath, out of sight.)
+		hero.Visible, rack.Visible = false, false
+		brand.Text = if pickStep == "Style" then "STEP 1 OF 2" else "STEP 2 OF 2"
+		brand.TextColor3 = C.Gold
+		title.Text = if pickStep == "Style" then "CHOOSE YOUR STYLE" else "CHOOSE YOUR ELEMENT"
 		subtitle.Text = if pickStep == "Style"
-			then "Your style is the armor you start in. You can wear any set later."
-			else "Any armor. Any element. Choose the powers for your Q / E / R moves."
+			then "The armor you start in, with a sword and shield. You can wear any set later."
+			else string.format(
+				"%s armor is set. Now pick the element your gems carry: each one beats another.",
+				chosenStyle
+			)
 		if not busy then
-			primary.Text = if pickStep == "Style" then "NEXT  ·  ELEMENT   ›" elseif chosenElement then "EQUIP & FIGHT" else "CHOOSE AN ELEMENT"
+			primary.Text = if pickStep == "Style"
+				then "CONTINUE   ›"
+				elseif chosenElement then "EQUIP & FIGHT"
+				else "CHOOSE AN ELEMENT"
 			local ready = pickStep == "Style" or chosenElement ~= nil
 			primary.Active, primary.Selectable = ready, ready
 			primary.BackgroundColor3 = if ready then C.Gold else C.Line
@@ -910,21 +923,6 @@ function refreshChoices()
 		end
 		backStep.Visible = pickStep == "Element" and not savedKit
 	end
-	if not chosenElement then
-		summaryText.Text = string.format('<font color="#8a9cb2">YOUR KIT</font>   %s armor + sword &amp; shield   ·   Choose any element next', string.upper(chosenStyle))
-		return
-	end
-	local names = surgeNames(chosenElement)
-	summaryText.Text = string.format(
-		'<font color="#8a9cb2">YOUR KIT</font>   <font color="%s">%s</font> armor  +  sword & shield   ·   <font color="%s">%s</font>  %s',
-		hex(styleColor),
-		string.upper(chosenStyle),
-		hex(elementColor),
-		string.upper(GemConfig.elementName(chosenElement)),
-		if #names ~= 3 then ""
-			elseif string.find(table.concat(names), " or ", 1, true) then "Q · E · R: one of two each, rolled as you equip"
-			else string.format("Q %s  ·  E %s  ·  R %s", names[1], names[2], names[3])
-	)
 end
 local function setPickStep(step: string)
 	pickStep = step
@@ -979,6 +977,8 @@ local function fit()
 	body.Position, body.Size = UDim2.fromOffset(0, header), UDim2.new(1, 0, 0, bodyHeight)
 	-- Short screens (phones): the compact picker.
 	layoutChoices(bodyHeight < 420, bodyHeight >= 560)
+	layoutStyles()
+	layoutElements()
 	local portrait = narrow and h > w
 	horizontal = false
 	if portrait then
@@ -1265,6 +1265,7 @@ local function showCard(card)
 end
 local function animate(entries, isGem)
 	phase = if isGem then "Gems" else "Armor"
+	hero.Visible, rack.Visible = true, true
 	createCards(entries)
 	counter.Text = string.format("0 / %d", #entries)
 	railFill.Size = UDim2.fromScale(0, 1)
@@ -1326,7 +1327,10 @@ local WELL = 156 -- (px: the circle, the reel's window)
 local CELL = 108 -- (px: one symbol on the reel)
 local function keycap(parent, key, color, size)
 	-- A physical key: a darker base under a raised cap.
-	local base = frame(parent, { BackgroundColor3 = color:Lerp(C.Ink, 0.55), Size = UDim2.fromOffset(size, size + 6), ZIndex = 45 })
+	local base = frame(
+		parent,
+		{ BackgroundColor3 = color:Lerp(C.Ink, 0.55), Size = UDim2.fromOffset(size, size + 6), ZIndex = 45 }
+	)
 	UiKit.round(base, 9)
 	local cap = frame(base, { BackgroundColor3 = color, Size = UDim2.fromOffset(size, size), ZIndex = 46 })
 	UiKit.round(cap, 9)
@@ -1418,10 +1422,15 @@ local function revealMoves(kit, after)
 	}, gui)
 	tween(shade, 0.3, { BackgroundTransparency = 0 })
 	-- The element floods up from below.
-	local flood = frame(shade, { BackgroundColor3 = deep, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 40 })
+	local flood =
+		frame(shade, { BackgroundColor3 = deep, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 40 })
 	new("UIGradient", {
 		Rotation = 270,
-		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(0.55, 0.9), NumberSequenceKeypoint.new(1, 1) }),
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.35),
+			NumberSequenceKeypoint.new(0.55, 0.9),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
 	}, flood)
 	tween(flood, 0.6, { BackgroundTransparency = 0 })
 
@@ -1461,7 +1470,14 @@ local function revealMoves(kit, after)
 		local id = moves[index]
 		local move = Tech.Catalog[id]
 		local gem = kit.Gems and kit.Gems[index] and kit.Gems[index].Gem
-			or { Id = "starter-" .. element .. index, Element = element, Tier = "Common", Size = 1, Clarity = 1, Cut = 1 }
+			or {
+				Id = "starter-" .. element .. index,
+				Element = element,
+				Tier = "Common",
+				Size = 1,
+				Clarity = 1,
+				Cut = 1,
+			}
 		local x = (index - 1) * 300
 		local card = frame(board, {
 			Position = UDim2.fromOffset(x + 4, 84 + 40),
@@ -1475,7 +1491,12 @@ local function revealMoves(kit, after)
 		local edge = stroke(card, spec.Color, 0.75, 1)
 		local punch = new("UIScale", { Scale = 1 }, card)
 		task.delay(0.1 + index * 0.09, function()
-			tween(card, 0.35, { Position = UDim2.fromOffset(x + 4, 84), BackgroundTransparency = 0 }, Enum.EasingStyle.Back)
+			tween(
+				card,
+				0.35,
+				{ Position = UDim2.fromOffset(x + 4, 84), BackgroundTransparency = 0 },
+				Enum.EasingStyle.Back
+			)
 		end)
 
 		-- Header: the key, which slot it fires from, what it pays.
@@ -1506,7 +1527,8 @@ local function revealMoves(kit, after)
 		-- The strip runs downward and stops with cell 2, your gem, in the
 		-- middle of the circle. (Cell 0 sits above it for the spring-back.)
 		local count = 20 + index * 7
-		local strip = frame(well, { BackgroundTransparency = 1, Size = UDim2.fromOffset(WELL, CELL * count), ZIndex = 45 })
+		local strip =
+			frame(well, { BackgroundTransparency = 1, Size = UDim2.fromOffset(WELL, CELL * count), ZIndex = 45 })
 		local symbols, cells, record, shadeNames, reelRecords = {}, {}, nil, {}, {}
 		for n = 0, count do
 			local cell = frame(strip, {
@@ -1576,7 +1598,12 @@ local function revealMoves(kit, after)
 				NumberSequenceKeypoint.new(1, 0.1),
 			}),
 		}, depth)
-		local flash = frame(well, { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 48 })
+		local flash = frame(well, {
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ZIndex = 48,
+		})
 
 		-- The surge badge: the move's icon, rising out of the gem.
 		local badge = frame(card, {
@@ -1590,10 +1617,21 @@ local function revealMoves(kit, after)
 		UiKit.round(badge, 12)
 		stroke(badge, spec.Color, 0, 3)
 		local badgeScale = new("UIScale", { Scale = 0.2 }, badge)
-		local art = frame(badge, { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(60, 60), BackgroundColor3 = C.Ink, ZIndex = 50 })
+		local art = frame(badge, {
+			Position = UDim2.fromOffset(4, 4),
+			Size = UDim2.fromOffset(60, 60),
+			BackgroundColor3 = C.Ink,
+			ZIndex = 50,
+		})
 		UiKit.round(art, 9)
 		if not Icons.apply(art, move) then
-			local word = label(art, string.upper(string.sub(move and move.Name or id, 1, 2)), 26, spec.Color, Enum.Font.GothamBlack)
+			local word = label(
+				art,
+				string.upper(string.sub(move and move.Name or id, 1, 2)),
+				26,
+				spec.Color,
+				Enum.Font.GothamBlack
+			)
 			word.TextXAlignment, word.ZIndex = Enum.TextXAlignment.Center, 51
 		end
 
@@ -1612,7 +1650,8 @@ local function revealMoves(kit, after)
 		stats.TextXAlignment, stats.ZIndex = Enum.TextXAlignment.Center, 45
 		stats.Position, stats.Size = UDim2.fromOffset(12, 322), UDim2.new(1, -24, 0, 16)
 		local about = label(card, "", 13, C.Dim, Enum.Font.GothamMedium)
-		about.TextXAlignment, about.TextYAlignment, about.ZIndex = Enum.TextXAlignment.Center, Enum.TextYAlignment.Top, 45
+		about.TextXAlignment, about.TextYAlignment, about.ZIndex =
+			Enum.TextXAlignment.Center, Enum.TextYAlignment.Top, 45
 		about.TextWrapped, about.TextTruncate = true, Enum.TextTruncate.AtEnd
 		about.Position, about.Size = UDim2.fromOffset(18, 344), UDim2.new(1, -36, 0, 48)
 
@@ -1650,7 +1689,8 @@ local function revealMoves(kit, after)
 			punch.Scale = 1.07
 			tween(punch, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
 			wellEdge.Transparency = 0
-			caption.Text, caption.TextColor3 = elementName .. " " .. spec.Gem .. "  ·  " .. string.upper(gem.Tier or "Common"), color
+			caption.Text, caption.TextColor3 =
+				elementName .. " " .. spec.Gem .. "  ·  " .. string.upper(gem.Tier or "Common"), color
 			for _, row in rows do
 				local on = row.Id == id
 				row.Frame.BackgroundColor3 = if on then spec.Color:Lerp(C.Ink, 0.55) else C.Panel
@@ -1682,7 +1722,9 @@ local function revealMoves(kit, after)
 				row.Frame.Visible = false
 			end
 			name.Text = string.upper(move and move.Name or id)
-			stats.Text = if move then string.format("%d %s   ·   %dS COOLDOWN", move.Cost or 0, spec.Pays, move.Cooldown or 0) else ""
+			stats.Text = if move
+				then string.format("%d %s   ·   %dS COOLDOWN", move.Cost or 0, spec.Pays, move.Cooldown or 0)
+				else ""
 			about.Text = move and move.Description or ""
 			edge.Color, edge.Transparency, edge.Thickness = spec.Color, 0.1, 2
 			effects[index].Live = true
@@ -1771,7 +1813,12 @@ local function revealMoves(kit, after)
 			if shade.Parent and entry.Phase == "Sealed" then
 				entry.Spinning = true
 				-- Runs just past the gem, then springs back onto it.
-				tween(entry.Strip, spin, { Position = UDim2.fromOffset(0, entry.Final + math.floor(CELL * 0.25)) }, Enum.EasingStyle.Quart)
+				tween(
+					entry.Strip,
+					spin,
+					{ Position = UDim2.fromOffset(0, entry.Final + math.floor(CELL * 0.25)) },
+					Enum.EasingStyle.Quart
+				)
 				task.delay(spin, function()
 					if entry.Phase == "Sealed" then
 						tween(entry.Strip, 0.18, { Position = UDim2.fromOffset(0, entry.Final) }, Enum.EasingStyle.Back)
@@ -1981,7 +2028,9 @@ listen(primary.MouseEnter, function()
 	end
 end)
 listen(primary.MouseLeave, function()
-	if not primary.Active then return end
+	if not primary.Active then
+		return
+	end
 	tween(buttonStroke, 0.15, { Thickness = 1, Transparency = if spin then 0.8 else 0.45 })
 	if not spin then
 		tween(primary, 0.15, { BackgroundColor3 = C.Gold })

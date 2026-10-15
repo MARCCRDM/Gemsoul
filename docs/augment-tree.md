@@ -1,6 +1,6 @@
 # Augment Tree
 
-Open **AUGMENT TREE** in the dashboard's Combat Arena panel, or press **K**. The Arena HUD has the same button. The arena instructor and combat guide also link to the tree.
+Open **AUGMENT TREE** in the dashboard's Combat Arena panel, or press **K**. In the Arena, **K** is the way in: the fight screen has no button for it. The arena instructor and combat guide also link to the tree.
 
 The screen shows connected nodes, prerequisites, unlocked/locked status, point prices, descriptions, available points and progress toward the next point. Desktop shows all three branches together; narrow screens show one branch with tabs. Select a node, then choose **UNLOCK**. **RESET & REFUND** returns spent points and keeps earned XP.
 

@@ -53,7 +53,7 @@ Title: bold 13 px, one line with truncation. Status: bold 10 px, two lines with 
 
 Channel state comes from the replicated server Channeling attribute. Cost text uses the current Augment Tree rank. Streaming resource warnings compare against the quarter-second payment used by the server, while the card shows the per-second rate.
 
-The server remains authoritative. These card states explain availability; they do not bypass costs, sockets, cooldowns, learned techniques, range, or line of sight. Techniques unlocked in the Augment Tree continue to cycle through the existing controls. AUGMENT TREE / K stays directly accessible.
+The server remains authoritative. These card states explain availability; they do not bypass costs, sockets, cooldowns, learned techniques, range, or line of sight. Techniques unlocked in the Augment Tree continue to cycle through the existing controls. K opens the Augment Tree from the fight; the fight screen has no button for it.
 
 ### Action controls
 
