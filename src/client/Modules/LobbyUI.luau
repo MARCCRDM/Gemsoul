@@ -1,8 +1,7 @@
 --[[
-	The lobby (the Saga Outpost): a command stack on the left (a big gold
-	PLAY, then one button each for the Inventory, Market, Store, Ranks,
-	Social and Invite, then your level and coins), what's happening on the
-	right (your daily streak and the next mode to unlock), and the PLAY menu
+	The lobby (the Saga Outpost): compact Play and Inventory controls on the
+	left, a two-column utility menu, level and coins, plus one small panel
+	on the right for the daily streak and next mode to unlock, and the PLAY menu
 	that picks what to play:
 
 	  PRACTICE  1v1 Practice    a rival miner, coins on a win (always open)
@@ -636,19 +635,19 @@ local function fitDock()
 		end
 		return
 	end
-	local width, gap, utilityHeight = STACK_W, 6, 36
+	local width, gap, utilityHeight = STACK_W, 4, 32
 	local utilityWidth = (width - gap) / 2
-	bar.AnchorPoint, bar.Position = Vector2.new(0, 1), UDim2.new(0, 16, 1, -20)
+	bar.AnchorPoint, bar.Position = Vector2.zero, UDim2.fromOffset(16, 54)
 	play.AnchorPoint, play.Position = Vector2.zero, UDim2.fromOffset(0, 0)
-	play.Size, playCaption.TextSize = UDim2.fromOffset(width, 46), 23
-	tiles.AnchorPoint, tiles.Position = Vector2.zero, UDim2.fromOffset(0, 54)
+	play.Size, playCaption.TextSize = UDim2.fromOffset(width, 44), 23
+	tiles.AnchorPoint, tiles.Position = Vector2.zero, UDim2.fromOffset(0, 50)
 	local utility = 0
 	for _, button in buttons do
 		local primary = button.Name == "INVENTORY"
 		if primary then
 			button.Position, button.Size = UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 40)
 		else
-			button.Position = UDim2.fromOffset((utility % 2) * (utilityWidth + gap), 46 + math.floor(utility / 2) * (utilityHeight + gap))
+			button.Position = UDim2.fromOffset((utility % 2) * (utilityWidth + gap), 44 + math.floor(utility / 2) * (utilityHeight + gap))
 			button.Size = UDim2.fromOffset(utilityWidth, utilityHeight)
 			utility += 1
 		end
@@ -672,12 +671,12 @@ local function fitDock()
 	end
 	local tilesHeight = 40 + math.ceil(utility / 2) * (utilityHeight + gap)
 	tiles.Size = UDim2.fromOffset(width, tilesHeight)
-	status.Position, status.Size = UDim2.fromOffset(0, 54 + tilesHeight + 8), UDim2.fromOffset(width, 28)
+	status.Position, status.Size = UDim2.fromOffset(0, 50 + tilesHeight + 8), UDim2.fromOffset(width, 28)
 	levelLabel.TextSize, coinsLabel.TextSize = 11, 11
 	levelLabel.Position, levelLabel.Size = UDim2.fromOffset(8, 0), UDim2.fromOffset(56, 28)
 	levelTrack.Position, levelTrack.Size = UDim2.new(0, 65, 0.5, 0), UDim2.new(1, -151, 0, 4)
 	coinsLabel.Position, coinsLabel.Size = UDim2.new(1, -8, 0, 0), UDim2.fromOffset(78, 28)
-	bar.Size = UDim2.fromOffset(width, 54 + tilesHeight + 8 + 28)
+	bar.Size = UDim2.fromOffset(width, 50 + tilesHeight + 8 + 28)
 	news.Position = UDim2.new(1, -16, 0, 64)
 end
 picker:GetPropertyChangedSignal("Visible"):Connect(function()

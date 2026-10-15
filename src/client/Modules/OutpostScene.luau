@@ -190,7 +190,7 @@ local buttons = new("Frame", {
 UiKit.list(buttons, 8, true)
 local hint = text(
 	hud,
-	"Click to mine  ·  G at a miner to duel  ·  F to invite  ·  E at PROBE-7 to trade",
+	"Click to mine  ·  G duel  ·  F invite  ·  E trade at PROBE-7",
 	14,
 	Color3.fromRGB(230, 238, 250),
 	IronUi.Bold,
@@ -201,9 +201,9 @@ local hint = text(
 	Enum.TextXAlignment.Center
 )
 hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 0, 1, -18)
+hint.Position = UDim2.new(0.5, 210, 1, -18)
 hint.TextSize = 12
-hint.Size = UDim2.new(1, -440, 0, 32)
+hint.Size = UDim2.new(1, -500, 0, 32)
 hint.TextWrapped = true
 hint.TextStrokeTransparency = 0.4
 
@@ -238,7 +238,7 @@ local function fitOutpostHud()
 	for _, promptGui in miningPrompts do
 		promptGui.Enabled = not blocked and hud.Enabled
 	end
-	hint.Visible = not blocked and not UserInputService.TouchEnabled
+	hint.Visible = not blocked and not mobile
 	charge.Frame.Visible = expanded
 	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")
 	expandLabel.Text = if expanded then "−" else "+"
