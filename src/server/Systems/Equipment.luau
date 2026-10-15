@@ -611,6 +611,37 @@ WEAPONS.Halberd = function(folder, _character, right, _left, accent, gem)
 	gemSocket(folder, right, m, Vector3.new(0, 4.6, 0), gem, 0.26)
 end
 
+-- A glowing outline round a plate (a cosmetic's seams or a blade's edge).
+-- A palette's SeamFx animates it on every client (SeamVisibility): "Pulse"
+-- breathes, "Shift" swings between the seam colour and the glow, "Flicker"
+-- crackles like a live wire, "Rainbow" runs through every hue. A part that
+-- already has one keeps one, restyled.
+local function outline(part: BasePart, color: Color3, thickness: number, palette: any?)
+	local box = part:FindFirstChild("SkinSeam") :: SelectionBox?
+	if not box then
+		box = Instance.new("SelectionBox")
+		box.Name = "SkinSeam"
+		box.Adornee = part
+		box.SurfaceTransparency = 1
+		CollectionService:AddTag(box, Tags.SkinSeam)
+	end
+	local seam = box :: SelectionBox
+	seam.Color3 = color
+	seam.LineThickness = thickness
+	seam.Visible = part.Transparency < 1
+	-- (SeamA is the seam's own colour, which a client that animated it goes
+	-- back to when it's restyled to a still one.)
+	seam:SetAttribute("SeamFx", palette and palette.SeamFx or nil)
+	seam:SetAttribute("SeamA", color)
+	seam:SetAttribute("SeamB", if palette and palette.SeamFx then palette.Glow else nil)
+	seam.Parent = part
+end
+
+-- A palette's seam colour and width (Cosmetics.Palette: SeamColor, SeamWidth).
+local function seamStyle(palette): (Color3, number)
+	return palette.SeamColor or palette.Glow, palette.SeamWidth or 0.025
+end
+
 -- Weapon skins (cosmetics): restyle whatever weapon is held, after its
 -- rarity, quality and gem have had their say.
 local SKINS = {}
@@ -640,6 +671,9 @@ SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
 	if not biggest then
 		return
 	end
+	-- A gold edge round the blade that burns to crusader red and back (the
+	-- Crusader Plate suit's seams).
+	outline(biggest, Color3.fromRGB(255, 184, 40), 0.045, { SeamFx = "Shift", Glow = Color3.fromRGB(230, 40, 56) })
 	-- Sparks drifting off the blade, a warm glow, and a gold trail along its
 	-- length that streaks through every swing.
 	local sparks = Instance.new("ParticleEmitter")
@@ -678,19 +712,6 @@ SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
 	trail.Parent = biggest
 end
 
--- A glowing outline round a plate (a cosmetic's seams or a blade's edge).
-local function outline(part: BasePart, color: Color3, thickness: number)
-	local box = Instance.new("SelectionBox")
-	box.Name = "SkinSeam"
-	box.Adornee = part
-	box.Color3 = color
-	box.LineThickness = thickness
-	box.SurfaceTransparency = 1
-	box.Visible = part.Transparency < 1
-	CollectionService:AddTag(box, Tags.SkinSeam)
-	box.Parent = part
-end
-
 -- Which plates take a palette's Accent colour (see Cosmetics.Palette):
 --   Camo     patches, the same on both sides (picked by the plate's size)
 --   Stripes  bands across the body, by height
@@ -708,14 +729,15 @@ local function accented(pattern: string?, part: BasePart, index: number, median:
 	return false
 end
 
-local SEAM_LIMIT = 12 -- outlined plates per piece, biggest first
+local SEAM_LIMIT = 12 -- outlined plates per armor piece, biggest first
+local WEAPON_SEAMS = 6 -- and per weapon (the blade's edge is its own)
 
 -- Repaints every part under `container` in a cosmetic Palette (skins and
 -- suits): neon takes the glow, dark parts and wood/leather the under-colour,
 -- the rest the plate colour and material (or the Accent, in its Pattern).
 -- Plain blocks get glowing Seams when the palette asks. Returns the biggest
 -- part (for particles, trails and a blade's look).
-local function repaint(container: Instance, palette): BasePart?
+local function repaint(container: Instance, palette, limit: number?): BasePart?
 	local biggest, biggestSize = nil, 0
 	local plates = {}
 	for _, part in container:GetDescendants() do
@@ -768,8 +790,9 @@ local function repaint(container: Instance, palette): BasePart?
 		table.sort(blocks, function(a, b)
 			return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
 		end)
-		for i = 1, math.min(#blocks, SEAM_LIMIT) do
-			outline(blocks[i], palette.Glow, 0.025)
+		local color, width = seamStyle(palette)
+		for i = 1, math.min(#blocks, limit or SEAM_LIMIT) do
+			outline(blocks[i], color, width, palette)
 		end
 	end
 	return biggest
@@ -793,7 +816,7 @@ end
 -- A weapon skin given as a Palette (Cosmetics): repainted, with its sparks,
 -- a glow, and a trail through every swing.
 SKINS.Palette = function(weaponFolder: Instance, color: Color3, palette)
-	local biggest = repaint(weaponFolder, palette)
+	local biggest = repaint(weaponFolder, palette, WEAPON_SEAMS)
 	if not biggest then
 		return
 	end
@@ -805,7 +828,8 @@ SKINS.Palette = function(weaponFolder: Instance, color: Color3, palette)
 		biggest.Reflectance = palette.Reflect or 0
 	end
 	if palette.Edge then
-		outline(biggest, palette.Glow, 0.04)
+		local seam, width = seamStyle(palette)
+		outline(biggest, seam, math.max(0.04, width * 1.4), palette)
 	end
 	if palette.Sparks then
 		drift(biggest, palette.Sparks, 12)
@@ -990,18 +1014,29 @@ SKINS.Bonk = function(weaponFolder: Instance, _color: Color3, palette)
 			)
 		end
 	end
-	-- A cartoon star band round the sweet spot.
-	meshed(
-		piece(
+	-- Neon bands: round the sweet spot, the knob and where the tape ends.
+	local band = palette.SeamColor or palette.Glow
+	for _, ring in
+		{
+			{ y - 0.35, 0.48, 0.08 },
+			{ y - 0.6, 0.46, 0.04 },
+			{ handle - 0.25, 0.25, 0.05 },
+			{ -0.33, 0.32, 0.04 },
+		}
+	do
+		local part = piece(
 			weaponFolder,
 			grip,
-			mount * CFrame.new(0, y - 0.35, 0),
-			Vector3.new(0.48, 0.07, 0.48),
-			palette.Glow,
-			Enum.Material.SmoothPlastic
-		),
-		Enum.MeshType.Cylinder
-	)
+			mount * CFrame.new(0, ring[1], 0),
+			Vector3.new(ring[2], ring[3], ring[2]),
+			band,
+			Enum.Material.Neon
+		)
+		meshed(part, Enum.MeshType.Cylinder)
+	end
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness, light.Shadows = band, 5, 0.7, false
+	light.Parent = grip
 end
 
 -- Banana Blade: a banana, curved like one, stem out of the fist. It still cuts.
@@ -1041,19 +1076,32 @@ SKINS.Banana = function(weaponFolder: Instance, _color: Color3, palette)
 		)
 		meshed(part, Enum.MeshType.Sphere)
 	end
-	-- The dark tip.
+	-- The tip glows, and neon stripes run round the peel.
+	local band = palette.SeamColor or palette.Glow
 	local x, yy = radius * (1 - math.cos(bend)), radius * math.sin(bend)
 	meshed(
-		piece(
-			weaponFolder,
-			grip,
-			mount * CFrame.new(x, yy, 0),
-			Vector3.new(0.12, 0.14, 0.12),
-			stem,
-			Enum.Material.SmoothPlastic
-		),
+		piece(weaponFolder, grip, mount * CFrame.new(x, yy, 0), Vector3.new(0.14, 0.16, 0.14), band, Enum.Material.Neon),
 		Enum.MeshType.Sphere
 	)
+	for _, t in { 0.22, 0.5, 0.78 } do
+		local angle = t * bend
+		local bx, by = radius * (1 - math.cos(angle)), radius * math.sin(angle)
+		local thick = (0.26 + 0.12 * math.sin(math.pi * t)) * 1.06
+		meshed(
+			piece(
+				weaponFolder,
+				grip,
+				mount * CFrame.new(bx, by, 0) * CFrame.Angles(0, 0, -angle),
+				Vector3.new(thick, 0.05, thick),
+				band,
+				Enum.Material.Neon
+			),
+			Enum.MeshType.Cylinder
+		)
+	end
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness, light.Shadows = band, 5, 0.7, false
+	light.Parent = grip
 end
 
 -- Back pieces (cosmetics) ---------------------------------------------------------------------

@@ -414,7 +414,8 @@ check(state.Ok and state.Group.Enabled == false and #state.Invites.Tiers == #Ref
 
 -- The full collection's designs -------------------------------------------------------------
 local PATTERNS = { Camo = true, Stripes = true, Trim = true }
-local defaults, earnedHow = 0, true
+local SEAM_FX = { Pulse = true, Shift = true, Flicker = true, Rainbow = true }
+local defaults, earnedHow, animated = 0, true, 0
 for id, cosmetic in Cosmetics.List do
 	local palette = cosmetic.Palette
 	if palette then
@@ -423,11 +424,31 @@ for id, cosmetic in Cosmetics.List do
 			(palette.Accent == nil) == (palette.Pattern == nil),
 			id .. " has an accent with no pattern, or the reverse"
 		)
-		check(not (palette.Seams and cosmetic.Kind ~= "Suit"), id .. " asks for seams but isn't a suit")
+		check(
+			not (palette.Seams and cosmetic.Kind ~= "Suit" and cosmetic.Kind ~= "Skin"),
+			id .. " asks for seams but isn't a suit or a skin"
+		)
 		check(
 			not ((palette.Blade or palette.Edge) and cosmetic.Kind ~= "Skin"),
 			id .. " styles a blade but isn't a skin"
 		)
+		-- The neon look: every suit is outlined, every skin has a glowing
+		-- edge (or, the Brainrot shapes, neon bands in their SeamColor).
+		if cosmetic.Kind == "Suit" then
+			check(palette.Seams == true, id .. " has no neon seams")
+		elseif cosmetic.Kind == "Skin" then
+			check(palette.Edge == true or (cosmetic.Look ~= nil and palette.SeamColor ~= nil), id .. " has no neon edge")
+		end
+		check(palette.SeamFx == nil or SEAM_FX[palette.SeamFx], id .. " has an unknown SeamFx")
+		check(
+			palette.SeamWidth == nil
+				or (type(palette.SeamWidth) == "number" and palette.SeamWidth > 0 and palette.SeamWidth <= 0.06),
+			id .. "'s SeamWidth is out of range"
+		)
+		check(palette.SeamColor == nil or typeof(palette.SeamColor) == "Color3", id .. "'s SeamColor isn't a colour")
+		if palette.SeamFx then
+			animated += 1
+		end
 	end
 	if cosmetic.Exclusive == "Default" then
 		defaults += 1
@@ -466,6 +487,73 @@ for id, cosmetic in Cosmetics.List do
 end
 check(defaults == 2, "Every miner should start with one skin and one suit")
 check(earnedHow, "An earned look doesn't say how it's earned")
+check(animated >= 15, "Too few looks have animated seams (" .. animated .. ")")
+
+-- Animated seams (SeamVisibility.fxColor) -------------------------------------------------
+do
+	local stub = setmetatable({}, { __index = function(t, k) return t end })
+	local SeamVisibility = luau.load(fs.readFile(ROOT .. "/src/client/Modules/SeamVisibility.luau"), {
+		debugName = "SeamVisibility",
+		environment = setmetatable({
+			Color3 = roblox.Color3,
+			Enum = roblox.Enum,
+			game = { GetService = function() return { Shared = { Tags = stub } } end },
+			require = function() return {} end,
+		}, { __index = _G }),
+	})()
+	local fxColor = SeamVisibility.fxColor
+	local a, b = roblox.Color3.fromRGB(255, 184, 40), roblox.Color3.fromRGB(230, 40, 56)
+	local function near(x, y)
+		return math.abs(x.R - y.R) + math.abs(x.G - y.G) + math.abs(x.B - y.B) < 0.03
+	end
+	local function valid(c)
+		return c.R >= 0 and c.R <= 1 and c.G >= 0 and c.G <= 1 and c.B >= 0 and c.B <= 1
+	end
+	check(fxColor("None", a, b, 3, 0) == a and fxColor("Odd", a, b, 1, 2) == a, "A still seam changed colour")
+	-- Shift swings all the way from the seam colour to the glow and back.
+	local sawA, sawB = false, false
+	for step = 0, 260 do
+		local c = fxColor("Shift", a, b, step / 100, 0)
+		check(valid(c), "Shift made an impossible colour")
+		sawA = sawA or near(c, a)
+		sawB = sawB or near(c, b)
+	end
+	check(sawA and sawB, "Shift didn't reach both of its colours")
+	-- Pulse breathes: dimmer and brighter than half-way, the same hue.
+	local low, high = math.huge, -math.huge
+	for step = 0, 180 do
+		local c = fxColor("Pulse", a, b, step / 100, 0)
+		check(valid(c), "Pulse made an impossible colour")
+		local _, _, v = c:ToHSV()
+		low, high = math.min(low, v), math.max(high, v)
+	end
+	check(high - low > 0.3, "Pulse doesn't breathe")
+	-- Flicker crackles: mostly the seam colour, with flashes of the glow.
+	local flashes, steady = 0, 0
+	for step = 0, 600 do
+		local c = fxColor("Flicker", a, b, step / 60, 3)
+		check(valid(c), "Flicker made an impossible colour")
+		if near(c, b:Lerp(roblox.Color3.new(1, 1, 1), 0.5)) then
+			flashes += 1
+		else
+			steady += 1
+		end
+	end
+	check(flashes > 0 and steady > flashes * 3, "Flicker should be mostly steady with sharp flashes")
+	-- Rainbow runs through every hue, staying bright.
+	local hues = {}
+	for step = 0, 100 do
+		local c = fxColor("Rainbow", a, b, step * 0.06, 0)
+		local h, sat, v = c:ToHSV()
+		check(sat >= 0.6 and v >= 0.85, "Rainbow went dull")
+		hues[math.floor(h * 6) % 6] = true
+	end
+	for sixth = 0, 5 do
+		check(hues[sixth], "Rainbow skipped a hue")
+	end
+	-- Two boxes of one suit don't flash in lockstep.
+	check(not near(fxColor("Shift", a, b, 1, 0), fxColor("Shift", a, b, 1, 5)), "Seeds don't stagger the seams")
+end
 for _, level in { 15, 25 } do
 	for _, id in Season.reward(level).Cosmetics or {} do
 		check(Cosmetics.get(id), "Free track level " .. level .. " gives an unknown cosmetic")
@@ -618,4 +706,4 @@ do
 	check(lit, "A bright pick doesn't glow")
 end
 
-print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d picks, %d titles; receipts once each, starter pack, season premium, codes)", checks, skins, suits, picks, titles))
+print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d picks, %d titles, %d with animated seams; receipts once each, starter pack, season premium, codes)", checks, skins, suits, picks, titles, animated))

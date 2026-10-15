@@ -7,14 +7,48 @@ local function part(transparency: number, modifier: number)
 		end,
 	}
 end
-local function box(adornee)
-	return {
+local function box(adornee, attributes)
+	local listeners = {}
+	local self
+	self = {
 		Adornee = adornee,
 		Visible = true,
+		Color3 = attributes and attributes.SeamA,
 		IsA = function(_, kind)
 			return kind == "SelectionBox"
 		end,
+		GetAttribute = function(_, name)
+			return (attributes or {})[name]
+		end,
+		-- (test only) what the server's Equipment.outline does on a restyle
+		Restyle = function(_, changes)
+			attributes = attributes or {}
+			for name, value in changes do
+				attributes[name] = if value == false then nil else value
+			end
+			for listener in listeners do
+				listener()
+			end
+		end,
+		AttributeChanged = {
+			Connect = function(_, fn)
+				listeners[fn] = true
+				return {
+					Disconnect = function()
+						listeners[fn] = nil
+					end,
+				}
+			end,
+		},
+		Listeners = function()
+			local n = 0
+			for _ in listeners do
+				n += 1
+			end
+			return n
+		end,
 	}
+	return self
 end
 
 assert(SeamVisibility.shows(box(part(0, 0))), "a plate in view keeps its seams")
@@ -43,4 +77,59 @@ local later = box(part(1, 0))
 added(later)
 bound()
 assert(not later.Visible, "a box tagged later is followed too")
+
+-- Animated seams: recoloured each frame between SeamA and SeamB.
+local gold, red = Color3.fromRGB(255, 184, 40), Color3.fromRGB(230, 40, 56)
+local plate = part(0, 0)
+local shifting = box(plate, { SeamFx = "Shift", SeamA = gold, SeamB = red })
+added(shifting)
+local seen = {}
+for frame = 0, 26 do
+	CLOCK = frame / 10
+	bound()
+	seen[string.format("%.2f", shifting.Color3.G)] = true
+end
+local distinct = 0
+for _ in seen do
+	distinct += 1
+end
+assert(distinct > 5, "a Shift seam changes colour from frame to frame")
+local still = box(part(0, 0), { SeamA = gold })
+added(still)
+CLOCK = 1.3
+bound()
+assert(still.Color3 == gold, "a seam with no SeamFx keeps its colour")
+-- A hidden plate's seam isn't animated (nothing to see).
+plate.Transparency = 1
+local before = shifting.Color3
+CLOCK = 2.1
+bound()
+assert(shifting.Color3 == before and not shifting.Visible, "a hidden seam isn't recoloured")
+plate.Transparency = 0
+-- Restyled to a still look: back to its own colour, and stays there.
+shifting:Restyle({ SeamFx = false, SeamB = false })
+assert(shifting.Color3 == gold, "a seam restyled to still goes back to SeamA")
+CLOCK = 0.7
+bound()
+assert(shifting.Color3 == gold, "a still seam isn't animated")
+-- Restyled to an animated look: animates again.
+shifting:Restyle({ SeamFx = "Rainbow" })
+CLOCK = 0.2
+bound()
+local first = shifting.Color3
+CLOCK = 2.2
+bound()
+local now = shifting.Color3
+assert(
+	math.abs(first.R - now.R) + math.abs(first.G - now.G) + math.abs(first.B - now.B) > 0.1,
+	"a seam restyled to Rainbow animates"
+)
+-- Untagged: forgotten, listener dropped.
+assert(shifting:Listeners() == 1, "one listener per box")
+removed(shifting)
+assert(shifting:Listeners() == 0, "an untagged box drops its listener")
+local frozen = shifting.Color3
+CLOCK = 3.3
+bound()
+assert(shifting.Color3 == frozen, "an untagged box isn't animated")
 print("seam visibility: all checks passed")

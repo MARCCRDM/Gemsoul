@@ -68,9 +68,47 @@ A palette can ask for more than one colour:
 | Palette field | What it draws |
 | --- | --- |
 | `Accent` + `Pattern` | A second plate colour. **Camo** is patches, the same on both sides. **Stripes** is bands across the body. **Trim** is the smaller plates: edges, straps, veins. |
-| `Seams` (suits) | The 12 biggest plates of each piece outlined in the glow colour. Used by Neon Runner, Raid Breaker, Circuit Rig and Chrome Knight. |
+| `Seams` | Plates outlined in neon: the 12 biggest of each armor piece, or the 6 biggest of a weapon. |
 | `Blade` + `BladeMaterial` (skins) | The blade's own colour and material: lava for Molten Core, glass for Glacier Shard, neon for Solar Flare. |
-| `Edge` (skins) | The blade outlined in the glow colour. |
+| `Edge` (skins) | The blade outlined in neon, a little thicker than the seams. |
+| `SeamColor` | The outline's colour. Without it, outlines take the glow colour. Bonk Bat and Banana Blade also use it for their neon bands. |
+| `SeamWidth` | The outline's thickness, from 0.018 (Frontier) to 0.036 (Solar Flare). Rarer looks get bolder lines. |
+| `SeamFx` | Makes the outlines move (see below). Without it they stay steady. |
+
+### The neon look
+
+Every suit and every weapon skin has glowing outlines, like Neon Runner and Raid
+Breaker always had:
+
+- Every suit has `Seams`.
+- Every palette skin has an `Edge`.
+- All but the three cheapest (Frontier Steel, Rust Bucket, Camo Ops) also outline the guard and grip with `Seams`.
+- Bonk Bat and Banana Blade have neon bands instead.
+
+The tests check this for every look.
+
+Each look has its own colour pairing: plate, under, and a contrasting outline. Pale looks get strong outlines so the lines still show:
+
+- gold on Champion Plate;
+- violet on Lunar Frontier;
+- gold to red on Crusader Plate.
+
+Steady outlines are the default. `SeamFx` animates them on every client (`SeamVisibility`). 21 looks use it:
+
+| SeamFx | What it does | Looks |
+| --- | --- | --- |
+| `Pulse` | Breathes, bright to dim and back (1.8 s). | Circuit Rig, Obsidian Lava, Neon Runner, Lunar Frontier, Champion Plate; Molten Core, Circuit Board, Champion's Edge, Ore Vein Gold |
+| `Shift` | Swings between the outline colour and the glow (2.6 s). | Royal Gold (gold to amethyst), Nebula Suit, Crusader Plate (gold to red); Daybreak, Void Crystal, Nebula, Crusader Gold |
+| `Flicker` | Crackles like a live wire, with sharp flashes of the glow. | Storm Conductor, Raid Breaker; Warlord's Edge, Solar Flare |
+| `Rainbow` | Runs through every hue. | Chrome Knight; Galaxy |
+
+How the effect gets to the client:
+
+- The server only tags each outline (`Equipment.outline`): `SeamFx`, `SeamA` (its own colour) and `SeamB` (the glow).
+- `SeamVisibility` reads those attributes once per box and again only when a restyle changes them.
+- It recolours just the animated boxes that are showing.
+- A box restyled to a steady look goes back to its own colour.
+- Shop and Wardrobe previews show the outlines as neon bars (a SelectionBox doesn't draw in a ViewportFrame), in their base colour.
 
 Three skins have their own look in `Equipment.luau`:
 
