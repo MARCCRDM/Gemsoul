@@ -6,7 +6,7 @@
 	To add one: a new line in Codes.List, in CAPITALS, letters and numbers
 	only (players can type it any way: "launch" or "Launch!" both work).
 
-	  Reward   any Store.Reward: Coins, Crates = { GeodeCrate = 2 },
+	  Reward   any Store.Reward: Coins,
 	           Cosmetics = { "TitleFounder" }, XPBoostMinutes, ...
 	  Expires  optional: os.time() after which it stops working
 	           (os.time({ year = 2026, month = 12, day = 1 }))
@@ -20,7 +20,7 @@ Codes.List = {
 		Note = "Launch day: Discord announcement",
 	},
 	CRUSADERS = {
-		Reward = { Crates = { GeodeCrate = 2 } },
+		Reward = { Coins = 500 },
 		Note = "Discord welcome message",
 	},
 	GEMRUSH = {

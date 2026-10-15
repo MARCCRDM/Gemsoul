@@ -83,7 +83,7 @@ end
 check(skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9, "The catalog is thinner than planned")
 -- Every product slot buys something real.
 for key in Store.RobuxProducts do
-	local real = Store.bundle(key) or Store.Crates[key] or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
+	local real = Store.bundle(key) or Store.kitsOf(key) or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
 		or key == "StarterPack" or key == "SeasonPremium"
 	check(real, key .. " is a product slot for nothing")
 	check(Store.robuxPrice(key), key .. " has no Robux price")
@@ -146,6 +146,7 @@ local handlers = {}
 local saves = 0
 local stubs = {
 	Cosmetics = Cosmetics,
+	MinerRoster = { Count = 3 },
 	ExpeditionEconomy = { legacyCredits = function() return 0 end },
 	Season = Season,
 	Store = Store,
@@ -252,7 +253,7 @@ check(buy("SuitRoyal") == Granted and profile.Cosmetics.Suit == "SuitRoyal", "A 
 -- The Starter Pack: its contents, its suit on, and it's marked bought.
 check(buy("StarterPack") == Granted, "The Starter Pack wasn't granted")
 check(profile.StarterBought and profile.Cosmetics.Owned.SuitIgnition and profile.Cosmetics.Suit == "SuitIgnition", "The Starter Pack's suit isn't owned and worn")
-check(profile.Coins >= Store.StarterPack.Contents.Coins and profile.Crates.GeodeCrate == Store.StarterPack.Contents.Crates.GeodeCrate, "The Starter Pack's coins and caches are missing")
+check(profile.Coins >= Store.StarterPack.Contents.Coins and profile.Cosmetics.Owned.PickBone and profile.Cosmetics.Owned.SkinMolten, "The Starter Pack's coins and looks are missing")
 -- A product that isn't ours, or a player who isn't here: not yet.
 check(receiptFn({ PlayerId = 7, ProductId = 999999, PurchaseId = "x" }) == NotYet, "An unknown product was granted")
 check(receiptFn({ PlayerId = 8, ProductId = ids.SkinVoid, PurchaseId = "y" }) == NotYet, "A purchase with nobody here was granted")
@@ -277,6 +278,103 @@ if Config.TestCosmeticPrice then
 	check(not handlers.BuyCosmetic(thePlayer, "SuitNeon").Ok, "A suit was bought twice")
 end
 check(Cosmetics.coinPrice(Cosmetics.get("TitleLunar")) == nil, "Titles must never have a coin price")
+check(Cosmetics.coinPrice(Cosmetics.get("SkinCrusader")) == nil, "Exclusives must never have a coin price")
+
+-- Bundles, squad kits and The Vault -----------------------------------------------------------
+-- Every bundle holds real looks, costs less than its looks one by one, and
+-- never sells power (gems, crates).
+for _, key in { "Welcome", "Rustbucket", "Brainrot", "Circuit", "DeepSpace", "SolarForge", "Royal", "Vault", "StarterPack" } do
+	local reward = Store.contents(key)
+	check(reward ~= nil, key .. " has no contents")
+	for _, id in reward.Cosmetics or {} do
+		check(Cosmetics.get(id), key .. " gives an unknown cosmetic: " .. id)
+	end
+	check(not (reward :: any).Crates and not reward.Stones and not reward.CutGems, key .. " sells random loot or power")
+	check(Store.savings(key) > 0, key .. " isn't cheaper than its looks one by one")
+end
+-- The Vault holds every look sold on its own.
+local vault = Store.contents("Vault")
+for id, cosmetic in Cosmetics.List do
+	if cosmetic.Robux then
+		check(table.find(vault.Cosmetics, id), "The Vault is missing " .. id)
+	end
+end
+check(table.find(vault.Cosmetics, "TitleCollector") and not table.find(vault.Cosmetics, "SuitIgnition"), "The Vault's exclusives are wrong")
+-- Kits: every choice of one, two or three has a product and the ladder's price.
+local kitIds = {}
+for _, kit in Store.Kits do
+	table.insert(kitIds, kit.Id)
+end
+check(Store.kitKey({ kitIds[3], kitIds[1] }) == Store.kitKey({ kitIds[1], kitIds[3] }), "A kit choice's key depends on the order picked")
+check(Store.kitKey({}) == nil and Store.kitKey({ "Nope" }) == nil, "A bad kit choice made a key")
+local choices = 0
+for mask = 1, 2 ^ #kitIds - 1 do
+	local pick = {}
+	for i, id in kitIds do
+		if bit32.band(mask, 2 ^ (i - 1)) ~= 0 then
+			table.insert(pick, id)
+		end
+	end
+	local key = Store.kitKey(pick)
+	choices += 1
+	check(key and Store.RobuxProducts[key] ~= nil, "No product for kits " .. table.concat(pick, "+"))
+	check(Store.robuxPrice(key) == Store.KitPrices[#pick], key .. " isn't priced on the ladder")
+	check(#(Store.kitsOf(key) or {}) == #pick, key .. " doesn't read back as its kits")
+	check(Store.savings(key) > 0, key .. " saves nothing")
+end
+check(choices == 7, "Three kits should make seven choices")
+check(table.find(Store.contents(Store.kitKey(kitIds)).Cosmetics, "TitleSquad"), "All three kits don't add the squad title")
+check(not table.find(Store.contents(Store.kitKey({ kitIds[1] })).Cosmetics, "TitleSquad"), "One kit gives the squad title")
+-- Who can buy what.
+local T0 = 1000000
+check(Store.canBuy("Welcome", { FirstJoin = T0 }, T0 + 60), "A new player can't buy the Welcome Kit")
+check(not Store.canBuy("Welcome", { FirstJoin = T0 }, T0 + Store.WelcomeHours * 3600 + 1), "The Welcome Kit outlived its day")
+check(not Store.canBuy("Welcome", { FirstJoin = T0, WelcomeBought = true }, T0 + 60), "The Welcome Kit sold twice")
+check(not Store.canBuy("StarterPack", {}, T0), "The Starter Pack sold before it was offered")
+check(Store.canBuy("StarterPack", { StarterOfferAt = T0 }, T0 + 60), "The Starter Pack can't be bought on offer")
+check(not Store.canBuy("Vault", { VaultBought = true }, T0), "The Vault sold twice")
+check(not Store.canBuy("SkinPlasma", { Cosmetics = { Owned = { SkinPlasma = true } } }, T0), "A look you own can be bought")
+check(Store.canBuy("Brainrot", { Cosmetics = { Owned = { SkinBonk = true } } }, T0), "A bundle you own part of can't be bought")
+check(not Store.canBuy("Brainrot", { Cosmetics = { Owned = { SkinBonk = true, SkinBanana = true } } }, T0), "A bundle you own all of can be bought")
+check(not Store.canBuy("SeasonPremium", { Season = { Premium = true } }, T0), "Season premium sold twice")
+-- Crates in old saves become coins.
+local old = { Coins = 5, Crates = { GeodeCrate = 2, MasterworkCrate = 1, Junk = 3 } }
+check(Store.refundCrates(old) == 2 * 250 + 800 and old.Coins == 5 + 1300 and next(old.Crates) == nil, "Old crates weren't refunded at cost")
+check(Store.refundCrates(old) == 0 and old.Coins == 1305, "Crates were refunded twice")
+
+-- Paid: squad kits dress one miner each, starting with the one you play.
+freshProfile()
+profile.Miners = { Active = 2, Slots = { { Character = {} }, { Character = {} }, { Character = {} } } }
+check(buy(Store.kitKey(kitIds)) == Granted, "The squad bundle wasn't granted")
+for _, id in Store.contents(Store.kitKey(kitIds)).Cosmetics do
+	check(profile.Cosmetics.Owned[id], "The squad bundle didn't give " .. id)
+end
+local firstSuit = Store.Kits[1].Contents.Cosmetics[1]
+check(profile.Cosmetics.Suit == firstSuit, "The first kit isn't on the miner you're playing")
+check(profile.Miners.Slots[3].Character.Wardrobe.Suit == Store.Kits[2].Contents.Cosmetics[1], "The second kit isn't on the next miner")
+check(profile.Miners.Slots[1].Character.Wardrobe.Suit == Store.Kits[3].Contents.Cosmetics[1], "The third kit didn't wrap round to miner 1")
+-- A bundle with a look you own: that look becomes coins.
+freshProfile()
+profile.Cosmetics.Owned.SkinBonk = true
+check(buy("Brainrot") == Granted and profile.Coins == Store.DuplicateRefund and profile.Cosmetics.Owned.SkinBanana, "An owned look in a bundle wasn't refunded")
+-- The Vault: everything, once.
+freshProfile()
+check(buy("Vault") == Granted and profile.VaultBought and profile.Cosmetics.Owned.TitleCollector and profile.Coins >= 10000, "The Vault wasn't granted")
+check(profile.Cosmetics.Suit == nil, "The Vault changed your look")
+-- Welcome Kit marks itself bought.
+freshProfile()
+check(buy("Welcome") == Granted and profile.WelcomeBought and profile.Cosmetics.Owned.SuitCamo, "The Welcome Kit wasn't granted")
+-- Testing: any product for coins, through the same grant; not twice.
+if Config.TestCosmeticPrice then
+	freshProfile()
+	profile.Coins = 1000
+	local r1 = handlers.BuyProduct(thePlayer, "DeepSpace")
+	check(r1.Ok and profile.Cosmetics.Owned.SuitNebula and profile.Coins == 1000 - Config.TestCosmeticPrice, "A bundle couldn't be test-bought for coins")
+	check(not handlers.BuyProduct(thePlayer, "DeepSpace").Ok, "A bundle you own all of was bought again")
+	check(not handlers.BuyProduct(thePlayer, "Nope").Ok and not handlers.BuyProduct(thePlayer, 42).Ok, "Junk was bought")
+	profile.Coins = 0
+	check(not handlers.BuyProduct(thePlayer, "Circuit").Ok, "A bundle was bought with no coins")
+end
 -- The Starter Pack goes on offer once.
 freshProfile()
 local offer = handlers.StarterOffer(thePlayer)
@@ -341,24 +439,30 @@ for id, cosmetic in Cosmetics.List do
 	if earned and not cosmetic.How then
 		earnedHow = false
 	end
-	-- Loot drops from a crate that rolls its rarity.
-	local loot = Cosmetics.isMinerKind(cosmetic.Kind)
-		and not cosmetic.Exclusive
-		and not cosmetic.Robux
-		and not cosmetic.Price
-	if loot then
-		check(table.find(StoreServer.Loot, id), id .. " is loot but in no crate's pool")
-		local drops = false
-		for crateId, crate in Store.Crates do
-			if cosmetic.Crate == nil or cosmetic.Crate == crateId then
-				for _, roll in crate.Rolls do
-					drops = drops or roll.Cosmetic == cosmetic.Rarity
-				end
-			end
+	-- Nothing is out of reach: a look is sold, earned (an exclusive), or
+	-- (trims and back pieces) a bundle extra or a Season Path reward.
+	if Cosmetics.isMinerKind(cosmetic.Kind) or cosmetic.Kind == "Title" then
+		check(cosmetic.Robux or cosmetic.Exclusive, id .. " can't be had any way (not sold, not earned)")
+	elseif not cosmetic.Exclusive then
+		local found = false
+		local function look(reward)
+			found = found or (reward and table.find(reward.Cosmetics or {}, id) ~= nil)
 		end
-		check(drops, id .. " is loot but no crate rolls a " .. cosmetic.Rarity)
+		for _, bundle in Store.Bundles do
+			look(bundle.Contents)
+		end
+		for _, kit in Store.Kits do
+			look(kit.Contents)
+		end
+		look(Store.StarterPack.Contents)
+		for level = 1, Season.MaxLevel do
+			look(Season.reward(level))
+			look(Season.premiumReward(level))
+		end
+		check(found, id .. " isn't in any bundle or on the Season Path")
 	end
-	check(cosmetic.Crate == nil or Store.Crates[cosmetic.Crate], id .. " names a crate that doesn't exist")
+	check(cosmetic.Price == nil, id .. " still has a coin price: nothing is sold for coins")
+	check((cosmetic :: any).Crate == nil, id .. " still names a crate")
 end
 check(defaults == 2, "Every miner should start with one skin and one suit")
 check(earnedHow, "An earned look doesn't say how it's earned")

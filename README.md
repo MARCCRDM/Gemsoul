@@ -166,18 +166,15 @@ Gem enchantments now work in fights: weapon gems burn, slow, arc lightning or we
 
 **Buttons** are low slabs, built by `IronUi.chunk`: a thin dark outline, a darker lip underneath for depth, a rim, and a gradient face with a faint sheen. Colours passed in are muted (`IronUi.mute`). Hovering lifts a button slightly and lights its edge gold; pressing sinks its face into the lip. The same slabs are used for the combat hotbar, the gem pouch cards and tabs, shopkeeper replies and the intro. Windows share the look: a dark iron panel with a thin gold edge, a dark header tinted with the window's colour over a gold rule, an icon badge, serif titles and a small close button.
 
-**Shop** (coins today, Robux-ready). Tabs:
+**Store** [B]. Laid out like a shop online, looks only, never stats (`docs/store.md`). Tabs:
 
-- **Featured:** the Geode Crate hero card: a floating crate, every prize with its odds, and buy 1, 5 (-10%) or 10 (-15%). Beside it the Masterwork Crate and the Welcome (or Legend) bundle.
-- **Bundles:** big cards with value ribbons.
-- **Back Pieces** and **Trims:** cosmetics with rarity-coloured tiles, a floating preview, and Buy / Equip / Take off.
-- **Passes:** VIP.
+- **Bundles:** the new-player offer while it's open (Welcome Kit or Starter Pack, with its clock), the squad kits (one, two or all three miners, one kit each), the collections and the premium sets (Royal Treasury, The Vault). Each bundle opens a page with every piece, what it costs alone, and the saving.
+- **Weapon Skins, Suits, Pickaxes:** a product grid (sort by featured or price, filter to what you don't own) and the picked look's page: 3D preview, price, buy or wear, and the bundle that saves on it.
+- **Free:** the group, friends, the login streak and promo codes.
 
-**Opening crates** is full screen: light rays spin, the crate shakes harder and harder (click to hurry it), a white flash, then the prize pops out with its name, rarity and odds ("1/16.7"). Open up to 10 at once and the rest line up as cards underneath.
+Buying opens Roblox's purchase prompt (coins while `Config.TestCosmeticPrice` is set), then an order confirmation. Trims, back pieces and titles come from bundles, the Season Path and rewards, and are worn from the Wardrobe. Products are switched on in `Store.RobuxProducts` (`src/shared/Store.luau`).
 
-New players get a **Welcome Bundle** popup after the intro: 5x value, once, with a 24-hour countdown. Cosmetics use the gem rarity tiers. *Trims* light your armor's brass bands in their colour. *Back pieces* (Prospector's Pack, War Banner, Geode Shell, Ember Cape, Crystal Wings, Gem Halo) are worn behind your armor. To sell for Robux too, create Developer Products on Roblox and put their ids in `Store.RobuxProducts` (`src/shared/Store.luau`); the Shop shows Robux buttons and the server grants the items.
-
-**Season Path.** Everything earns XP: mining, cutting, selling, crafting, enchanting, slaying and the daily reward. There are 30 levels, each with a reward to claim: coins, Marks, crates, materials, and exclusive trims and back pieces at levels 5, 10, 15, 20, 25 and 30. Bundles can include a 2x XP boost. Tuning is in `src/shared/Season.luau`.
+**Season Path.** Everything earns XP: mining, cutting, selling, crafting, enchanting, slaying and the daily reward. There are 30 levels, each with a reward to claim: coins, cut gems, and trims and back pieces at levels 5, 10, 15, 20, 25 and 30. Bundles can include a 2x XP boost. Tuning is in `src/shared/Season.luau`.
 
 **Party.** Invite up to three players in the server; they get an Accept / Decline popup. The party has a ready check, and the leader can kick members and set a **rally point** (Wilds, Arena, Quarry, Crafting Hall, Market) that draws a trail for everyone. Teammates' health shows at the top right with a marker over their heads. Monster kills reward every party member fighting nearby.
 
@@ -232,7 +229,7 @@ src/
       Nearby.luau             is a player standing near a shopkeeper?
       CombatServer.luau       attacks, abilities, resources, buffs, damage taken
       Enemies.luau            training dummies and Wilds monsters: spawning, AI, loot
-      StoreServer.luau        shop bundles, cosmetics, crates, Season Path claims, Robux receipts
+      StoreServer.luau        store purchases (Robux receipts, test coins), Season Path claims
       Progress.luau           season XP and levels
       Party.luau              parties: invites, ready check, rally points, shared rewards
       TopPlayers.luau         global leaderboards (ordered data stores)
@@ -242,7 +239,7 @@ src/
       Vip.luau                IsVIP attribute (game pass, or everyone in Studio)
   client/                     -> StarterPlayerScripts.Client
     Dialogue.client.luau      shopkeeper dialogue box and actions, quota terminal display
-    Hud.client.luau           the hub: menu buttons, currencies, shop/season/top players; Welcome Bundle popup
+    Hud.client.luau           the hub: menu buttons, currencies, shop/season/top players
     Guide.client.luau         NEXT STEP panel and trail for new players ([H] hides)
     Combat.client.luau        combat controls, hotbar HUD and hit effects
     Intro.client.luau         new-player intro screens
@@ -256,7 +253,7 @@ src/
     Crafting.luau             materials, gear quality, recipes, gem sell prices
     Combat.luau               combat formulas, resources, where fighting is allowed
     Cosmetics.luau            trims and back pieces
-    Store.luau                bundles, crates, welcome bundle, Robux product ids
+    Store.luau                the store: bundles, squad kits, prices, who can buy what, Robux product ids
     Season.luau               XP per activity, levels and rewards
     Vendors.luau              shopkeeper names, greetings and dialogue options
     Tags.luau                 CollectionService tag names

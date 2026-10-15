@@ -36,8 +36,7 @@ local REPLY_SOUNDS = {
 	MarketSell = "Coin",
 	BuyMaterial = "Coin",
 	BuyCosmetic = "Coin",
-	BuyCrate = "Coin",
-	BuyBundle = "Reward",
+	BuyProduct = "Reward",
 	ClaimSeason = "Reward",
 }
 

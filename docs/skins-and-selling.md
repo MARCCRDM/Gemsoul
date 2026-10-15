@@ -4,6 +4,10 @@ Cosmetics are looks only, never stats. Some are sold for Robux, directly
 (never at random). Others are free, earned one way only, so wearing one shows
 how you got it.
 
+The store itself, with its bundles, squad kits and prices, is in
+`docs/store.md` (2026-10-15). It replaced the crates and the coin-priced trims
+and back pieces described in older notes.
+
 ## What there is
 
 | Kind | What it does | Where it's drawn |
@@ -30,8 +34,11 @@ is only a few lines of data.
 | Obsidian Lava | suit | 399 |
 | Neon Runner | suit | 399 |
 | Royal Gold | suit | 799 |
-| Starter Pack | Ignition suit (only here), Molten Core, Ember Trim, 3 Geode Crates, 1,000 coins | 99, one time, for 48 h after your first win |
-| Season premium | a second reward track: Moonsteel skin, LUNAR VANGUARD title, Lunar Frontier suit, crates, coins | 399 |
+| Starter Pack | Ignition suit (only here), Molten Core, Bone Crusher, Ember Trim, 1,000 coins | 99, one time, for 48 h after your first win |
+| Season premium | a second reward track: Moonsteel skin, LUNAR VANGUARD title, Lunar Frontier suit, coins | 399 |
+
+Every skin, suit and pickaxe for sale, and the bundles, are listed in
+`docs/store.md`.
 
 ### Free (exclusive, never sold)
 
@@ -76,8 +83,7 @@ Where the new ones come from:
 | Source | Items | Works now? |
 | --- | --- | --- |
 | Everyone | Frontier Steel, Frontier Fatigues | Yes: given to every profile on load. |
-| Geode Crate | Rust Bucket, Rust Rig, Camo Ops (skin and suit), Copper Wire, Copper Coil | Yes. Each crate only drops its own items (`Crate`), and the Geode Crate now has a 4% Common roll. |
-| Masterwork Crate | Circuit Rig, Nebula, Nebula Suit (Circuit Board drops from either crate) | Yes |
+| Store (once crates) | Rust Bucket 49, Rust Rig 99, Camo Ops skin 49 and suit 149, Copper Wire 79, Copper Coil 149, Circuit Board 99, Circuit Rig 249, Nebula 199, Nebula Suit 399 | Once their Developer Products exist. Crates are gone; these are sold directly and in bundles. |
 | Robux | Glacier Shard 99, Bonk Bat 149, Banana Blade 149, Stealth Black 199, Storm Conductor 299, Biohazard 299, Solar Flare 399 | Once their Developer Products exist (the slots are in `Store.RobuxProducts`). |
 | Season 1 free track | Crater Grey (level 15), Moon Dust (level 25) | Yes |
 | Achievement, Ranked, Raid, Mining | Veteran Steel, Champion's Edge, Champion Plate, Warlord's Edge, Raid Breaker, Geode Crust, Fossil Bone, Fossil Shell, Ore Vein Gold | Not yet. They're in the Shop with how to earn them (`How`), but the systems that grant them are still to build. |
@@ -91,8 +97,9 @@ Nothing sells for Robux until you create its product.
 2. Paste each product's id into `Store.RobuxProducts` in
    `src/shared/Store.luau`. The key is the cosmetic's id (`SkinPlasma`,
    `SuitRoyal`, …), or `StarterPack` or `SeasonPremium`.
-3. Until an id is set, the Shop shows that price greyed out ("R$ 99 · SOON"),
-   and pressing it says it isn't on sale yet.
+3. Until an id is set, pressing Buy says it's coming soon (or, while
+   `Config.TestCosmeticPrice` is set, buys it for coins). Bundles and squad
+   kits need products too: see `docs/store.md`.
 
 Purchases are safe to retry:
 
@@ -121,7 +128,7 @@ players can't read the list out of the game.
   every 2 seconds, so codes can't be guessed by brute force.
 - **The starter codes are examples.** Change them before posting:
   - LAUNCH: the FOUNDER title + 500 coins
-  - CRUSADERS: 2 Geode Crates
+  - CRUSADERS: 500 coins
   - GEMRUSH: 750 coins + 30 min of 2x XP
 
 ## Roblox rules to keep to
@@ -131,9 +138,9 @@ players can't read the list out of the game.
   codes in Discord instead, since anyone can redeem them. Discord links belong
   on the game page's Social Links, which Roblox shows only to users old
   enough to see them.
-- **No Robux for random items.** Crates are bought with earned coins only, and
-  `Store.luau` says so. Keep it that way: paid random items need odds shown
-  and are restricted in some countries.
+- **No random items for sale.** The store sells only named looks and bundles;
+  crates are gone. Keep it that way: paid random items need odds shown and
+  are restricted in some countries.
 - **Joining the group and inviting friends** are both Roblox features. The
   game checks them with `IsInGroup` and the invite's join data. Both are fine
   to reward.

@@ -1,17 +1,22 @@
 --[[
-	The Shop, crates, cosmetics and the Season Path. Request actions:
-	  "BuyBundle", id              coins for a bundle (Welcome: new players, once)
-	  "BuyCosmetic", id            coins for a trim or back piece
-	  "BuyCrate", id, count?       coins for 1, 5 or 10 crates (bulk is cheaper)
-	  "OpenCrate", id, count?      open up to 10 of your crates; returns each result
-	  "EquipCosmetic", kind, id?   wear a trim / back piece / weapon skin / suit / title you own
-	                               (nil takes it off)
+	The store, cosmetics and the Season Path. Request actions:
+	  "BuyProduct", key            while testing (Config.TestCosmeticPrice):
+	                               buy any product for coins, through the same
+	                               grant as a Robux purchase
+	  "BuyCosmetic", id            the same, for one look (the Wardrobe's BUY)
+	  "EquipCosmetic", kind, id?   wear a trim / back piece / weapon skin / suit /
+	                               pickaxe / title you own (nil takes it off)
 	  "ClaimSeason", level|"all"   claim Season Path rewards you've reached (and
 	                               the premium track's, if unlocked)
 	  "StarterOffer"               puts the Starter Pack on offer (once, after a win)
 	Robux: when an id is set in Store.RobuxProducts, buying that Developer
-	Product grants its bundle, crate, cosmetic, Starter Pack or Season premium
-	(ProcessReceipt below), once per purchase.
+	Product grants it (ProcessReceipt below), once per purchase: a look, a
+	bundle, squad kits, the Starter Pack or the Season premium track.
+
+	What you buy goes on: a look you buy is worn at once; a bundle puts its
+	first suit, skin and pickaxe on the miner you're playing; squad kits go
+	one per miner, starting with this one (Store.Kits). The Vault leaves
+	your looks as they are.
 ]]
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -19,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Economy = require(ReplicatedStorage.Shared.ExpeditionEconomy)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Store = require(ReplicatedStorage.Shared.Store)
 local GemGenerator = require(script.Parent.GemGenerator)
@@ -45,21 +51,6 @@ function StoreServer.grant(player: Player, reward: Store.Reward): { string }
 	local function add(line: string)
 		table.insert(lines, line)
 	end
-	if reward.Coins then
-		profile.Coins += reward.Coins
-		add(string.format("%d coins", reward.Coins))
-	end
-	local legacy = Economy.legacyCredits(reward.Marks, reward.Materials)
-	if legacy > 0 then
-		profile.Coins += legacy
-		add(string.format("%d legacy salvage credits", legacy))
-	end
-	for id, count in reward.Crates or {} do
-		if Store.Crates[id] then
-			profile.Crates[id] = (profile.Crates[id] or 0) + count
-			add(string.format("%d %s", count, Store.Crates[id].Name))
-		end
-	end
 	for _, id in reward.Cosmetics or {} do
 		if Cosmetics.get(id) then
 			if profile.Cosmetics.Owned[id] then
@@ -70,6 +61,20 @@ function StoreServer.grant(player: Player, reward: Store.Reward): { string }
 				add(cosmeticName(id))
 			end
 		end
+	end
+	local coins = reward.Coins or 0
+	-- (Old rewards may still name crates: those are coins now.)
+	for id, count in (reward :: any).Crates or {} do
+		coins += (Store.CrateRefund[id] or 0) * count
+	end
+	if coins > 0 then
+		profile.Coins += coins
+		add(string.format("%d coins", coins))
+	end
+	local legacy = Economy.legacyCredits(reward.Marks, reward.Materials)
+	if legacy > 0 then
+		profile.Coins += legacy
+		add(string.format("%d legacy salvage credits", legacy))
 	end
 	if reward.XPBoostMinutes then
 		profile.Boosts.XPUntil = math.max(os.time(), profile.Boosts.XPUntil or 0) + reward.XPBoostMinutes * 60
@@ -96,162 +101,110 @@ function StoreServer.grant(player: Player, reward: Store.Reward): { string }
 	return lines
 end
 
-local function welcomeOpen(profile): boolean
-	return profile.FirstJoin > 0
-		and not profile.WelcomeBought
-		and os.time() < profile.FirstJoin + Store.WelcomeHours * 3600
+-- Puts a look on miner `index` (the one you're playing, or one resting in
+-- the roster: it wears it when you switch to it).
+local function dressMiner(player: Player, profile, index: number, ids: { string })
+	local roster = profile.Miners
+	local active = not roster or index == roster.Active
+	for _, id in ids do
+		local cosmetic = Cosmetics.get(id)
+		if cosmetic and Cosmetics.isMinerKind(cosmetic.Kind) and profile.Cosmetics.Owned[id] then
+			if active then
+				PlayerData.setCosmetic(player, cosmetic.Kind, id)
+			else
+				local slot = roster.Slots[index]
+				local character = slot and slot.Character
+				if character then
+					character.Wardrobe = character.Wardrobe or {}
+					character.Wardrobe[cosmetic.Kind] = id
+				end
+			end
+		end
+	end
 end
 
-local function buyBundle(player: Player, id: any)
-	local bundle = Store.bundle(id)
-	local profile = PlayerData.get(player)
-	if not bundle or not profile then
-		return reply(false, "That bundle isn't for sale.")
+-- The first suit, skin and pickaxe in a list.
+local function firstLook(ids: { string }): { string }
+	local look, taken = {}, {}
+	for _, id in ids do
+		local cosmetic = Cosmetics.get(id)
+		if cosmetic and Cosmetics.isMinerKind(cosmetic.Kind) and not taken[cosmetic.Kind] then
+			taken[cosmetic.Kind] = true
+			table.insert(look, id)
+		end
 	end
-	if bundle.NewPlayersOnly and not welcomeOpen(profile) then
-		return reply(false, "The Welcome Bundle is only for new players, once.")
+	return look
+end
+
+-- What a product grants (a Store.RobuxProducts key). Returns false for a
+-- key it doesn't know, else true and the lines to show.
+function StoreServer.grantProduct(player: Player, key: string): (boolean, { string }?)
+	local profile = PlayerData.get(player) :: any
+	if not profile then
+		return false
 	end
-	if not PlayerData.spendCoins(player, bundle.Price) then
-		return reply(false, string.format("You need %d coins.", bundle.Price))
+	if key == "SeasonPremium" then
+		profile.Season.Premium = true
+		PlayerData.sync(player)
+		return true, { "the Season Path's premium track" }
 	end
-	if bundle.NewPlayersOnly then
+	local reward = Store.contents(key)
+	if not reward then
+		return false
+	end
+	local lines = StoreServer.grant(player, reward)
+	local bundle = Store.bundle(key)
+	if bundle and bundle.NewPlayersOnly then
 		profile.WelcomeBought = true
 	end
-	local lines = StoreServer.grant(player, bundle.Contents)
-	return reply(true, bundle.Name .. ": " .. table.concat(lines, ", "), { Lines = lines })
+	if bundle and bundle.Once then
+		profile[bundle.Once] = true
+	end
+	if key == "StarterPack" then
+		profile.StarterBought = true
+	end
+	-- Put it on.
+	local active = profile.Miners and profile.Miners.Active or 1
+	local kits = Store.kitsOf(key)
+	if kits then
+		for i, kit in kits do
+			local index = (active - 1 + i - 1) % MinerRoster.Count + 1
+			dressMiner(player, profile, index, firstLook(kit.Contents.Cosmetics or {}))
+		end
+	elseif key ~= "Vault" then
+		dressMiner(player, profile, active, firstLook(reward.Cosmetics or {}))
+	end
+	PlayerData.sync(player)
+	return true, lines
+end
+
+-- Testing: buy a product for coins (Store.testPrice), through the same
+-- grant as Robux.
+local function buyProduct(player: Player, key: any)
+	local profile = PlayerData.get(player)
+	if typeof(key) ~= "string" or not profile then
+		return reply(false, "That isn't for sale.")
+	end
+	local price = Store.testPrice(key)
+	if not price then
+		return reply(false, if Store.robuxPrice(key) then "Buy it with Robux in the store." else "That isn't for sale.")
+	end
+	local ok, why = Store.canBuy(key, profile, os.time())
+	if not ok then
+		return reply(false, why or "That isn't for sale.")
+	end
+	if not PlayerData.spendCoins(player, price) then
+		return reply(false, string.format("You need %d coins.", price))
+	end
+	local _, lines = StoreServer.grantProduct(player, key)
+	return reply(true, Store.productName(key) .. " is yours!", { Key = key, Lines = lines or {} })
 end
 
 local function buyCosmetic(player: Player, id: any)
-	local cosmetic = Cosmetics.get(id)
-	local profile = PlayerData.get(player)
-	local price = cosmetic and Cosmetics.coinPrice(cosmetic)
-	if not cosmetic or not price or not profile then
+	if not Cosmetics.get(id) then
 		return reply(false, "That isn't for sale.")
 	end
-	if profile.Cosmetics.Owned[cosmetic.Id] then
-		return reply(false, "You already own " .. cosmetic.Name .. ".")
-	end
-	if not PlayerData.spendCoins(player, price) then
-		return reply(false, string.format("You need %d coins.", price))
-	end
-	profile.Cosmetics.Owned[cosmetic.Id] = true
-	-- A skin, suit or pick goes straight on, as a Robux purchase does.
-	if Cosmetics.isMinerKind(cosmetic.Kind) then
-		PlayerData.setCosmetic(player, cosmetic.Kind, cosmetic.Id)
-		PlayerData.sync(player)
-		return reply(true, "Unlocked " .. cosmetic.Name .. " and put it on!")
-	end
-	PlayerData.sync(player)
-	return reply(true, "Unlocked " .. cosmetic.Name .. "! Equip it from the Shop.")
-end
-
-local function buyCrate(player: Player, id: any, count: any)
-	local crate = typeof(id) == "string" and Store.Crates[id]
-	local profile = PlayerData.get(player)
-	local amount = if count == nil then 1 else count
-	local price = crate and Store.cratePrice(crate, amount)
-	if not crate or not profile or not price then
-		return reply(false, "That crate isn't for sale.")
-	end
-	if not PlayerData.spendCoins(player, price) then
-		return reply(false, string.format("You need %d coins.", price))
-	end
-	profile.Crates[crate.Id] = (profile.Crates[crate.Id] or 0) + amount
-	PlayerData.sync(player)
-	return reply(true, string.format("Bought %d %s%s.", amount, crate.Name, if amount == 1 then "" else "s"))
-end
-
--- A random cosmetic of `rarity` you don't own yet, from `crateId`'s pool:
--- the trims and back pieces in Cosmetics.Order, plus the loot skins, suits
--- and picks (never sold, never exclusive) for this crate or any crate. Nil
--- if you own them all.
-local LOOT = table.clone(Cosmetics.Order)
-for _, kind in Cosmetics.MinerKinds do
-	for _, id in Cosmetics.ofKind(kind) do
-		local cosmetic = Cosmetics.List[id]
-		if not cosmetic.Exclusive and not cosmetic.Robux and not cosmetic.Price then
-			table.insert(LOOT, id)
-		end
-	end
-end
-local function unownedOf(profile, rarity: string, crateId: string?): string?
-	local choices = {}
-	for _, id in LOOT do
-		local cosmetic = Cosmetics.List[id]
-		local here = cosmetic.Crate == nil or cosmetic.Crate == crateId
-		if cosmetic.Rarity == rarity and here and not profile.Cosmetics.Owned[id] then
-			table.insert(choices, id)
-		end
-	end
-	return if #choices > 0 then choices[Gems.random():NextInteger(1, #choices)] else nil
-end
-StoreServer.Loot = LOOT
-
--- Opens one crate: rolls, grants, and describes the result for the reveal.
-local function openOne(player: Player, profile, crate: Store.Crate)
-	profile.Crates[crate.Id] -= 1
-	local total = 0
-	for _, roll in crate.Rolls do
-		total += roll.Weight
-	end
-	local pick = Gems.random():NextNumber(0, total)
-	local chosen = crate.Rolls[#crate.Rolls]
-	for _, roll in crate.Rolls do
-		pick -= roll.Weight
-		if pick <= 0 then
-			chosen = roll
-			break
-		end
-	end
-	local reward: Store.Reward = chosen.Reward or {}
-	local rarity = "Common"
-	if chosen.Cosmetic then
-		rarity = chosen.Cosmetic
-		local cosmeticId = unownedOf(profile, chosen.Cosmetic, crate.Id)
-		reward = if cosmeticId then { Cosmetics = { cosmeticId } } else { Coins = Store.DuplicateRefund * 2 }
-	elseif reward.CutGems or reward.Marks then
-		rarity = "Uncommon"
-	end
-	return {
-		Lines = StoreServer.grant(player, reward),
-		Rarity = rarity,
-		Cosmetic = reward.Cosmetics and reward.Cosmetics[1],
-		Kind = if reward.Cosmetics
-			then "Cosmetic"
-			elseif reward.CutGems then "CutGems"
-			elseif reward.Stones then "Stones"
-			elseif reward.Marks then "Marks"
-			elseif reward.Materials then "Materials"
-			else "Coins",
-		Odds = math.max(1, math.floor(total / chosen.Weight * 10 + 0.5) / 10), -- "1 in N"
-	}
-end
-
--- Opens `count` crates (1-10). Returns every result for the reveal.
-local function openCrate(player: Player, id: any, count: any)
-	local crate = typeof(id) == "string" and Store.Crates[id]
-	local profile = PlayerData.get(player)
-	if not crate or not profile then
-		return reply(false, "Unknown crate.")
-	end
-	local amount = if typeof(count) == "number" then math.clamp(math.floor(count), 1, 10) else 1
-	local have = profile.Crates[crate.Id] or 0
-	if have < 1 then
-		return reply(false, "You don't have a " .. crate.Name .. ". Buy one in the Shop.")
-	end
-	amount = math.min(amount, have)
-	local results = {}
-	for _ = 1, amount do
-		table.insert(results, openOne(player, profile, crate))
-	end
-	local first = results[1]
-	return reply(true, crate.Name .. ": " .. table.concat(first.Lines, ", "), {
-		Results = results,
-		-- The first result, for callers that only show one.
-		Lines = first.Lines,
-		Rarity = first.Rarity,
-		Cosmetic = first.Cosmetic,
-	})
+	return buyProduct(player, id)
 end
 
 local function equipCosmetic(player: Player, kind: any, id: any)
@@ -325,42 +278,6 @@ local function starterOffer(player: Player)
 	return reply(true, "", { OfferedAt = profile.StarterOfferAt, Bought = profile.StarterBought == true })
 end
 
--- What a Robux product grants (Store.RobuxProducts key). Returns false for
--- a key it doesn't know.
-function StoreServer.grantProduct(player: Player, key: string): boolean
-	local profile = PlayerData.get(player) :: any
-	if not profile then
-		return false
-	end
-	local bundle = Store.bundle(key)
-	local cosmetic = Cosmetics.get(key)
-	if bundle then
-		if bundle.NewPlayersOnly then
-			profile.WelcomeBought = true
-		end
-		StoreServer.grant(player, bundle.Contents)
-	elseif Store.Crates[key] then
-		StoreServer.grant(player, { Crates = { [key] = 1 } })
-	elseif cosmetic and cosmetic.Robux then
-		-- Bought: yours, and on straight away.
-		profile.Cosmetics.Owned[cosmetic.Id] = true
-		PlayerData.setCosmetic(player, cosmetic.Kind, cosmetic.Id)
-	elseif key == "StarterPack" then
-		profile.StarterBought = true
-		StoreServer.grant(player, Store.StarterPack.Contents)
-		local suit = Store.StarterPack.Contents.Cosmetics and Store.StarterPack.Contents.Cosmetics[1]
-		if suit and Cosmetics.get(suit) then
-			PlayerData.setCosmetic(player, Cosmetics.get(suit).Kind, suit)
-		end
-	elseif key == "SeasonPremium" then
-		profile.Season.Premium = true
-	else
-		return false
-	end
-	PlayerData.sync(player)
-	return true
-end
-
 -- Robux purchases (only for products switched on in Store.RobuxProducts).
 -- Roblox can deliver a receipt more than once: each purchase is granted
 -- once, by its PurchaseId (the last 200 are kept on the profile).
@@ -394,10 +311,8 @@ local function processReceipt(receipt)
 end
 
 function StoreServer.start()
-	Shop.register("BuyBundle", buyBundle)
+	Shop.register("BuyProduct", buyProduct)
 	Shop.register("BuyCosmetic", buyCosmetic)
-	Shop.register("BuyCrate", buyCrate)
-	Shop.register("OpenCrate", openCrate)
 	Shop.register("EquipCosmetic", equipCosmetic)
 	Shop.register("ClaimSeason", claimSeason)
 	Shop.register("StarterOffer", starterOffer)

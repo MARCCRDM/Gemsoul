@@ -30,6 +30,7 @@ local TrainingRewards = require(ReplicatedStorage.Shared.TrainingRewards)
 local FastStart = require(ReplicatedStorage.Shared.FastStart)
 local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local Store = require(ReplicatedStorage.Shared.Store)
 local Remotes = require(script.Parent.Remotes)
 local SessionLock = require(script.Parent.SessionLock)
 
@@ -70,7 +71,7 @@ type Profile = {
 	Cosmetics: { Owned: { [string]: boolean }, Trim: string?, Back: string?, Skin: string?, Pick: string? },
 	Season: { XP: number, Claimed: { [string]: boolean } }, -- claimed levels, as strings
 	Stats: { Kills: number, BestGem: number, BestDepth: number? }, -- for Top Players
-	Crates: { [string]: number }, -- unopened crates
+	Crates: { [string]: number }, -- (retired: refunded as coins on load)
 	Boosts: { XPUntil: number }, -- os.time() when 2x XP ends
 	Duel: { Rating: number, Wins: number, Losses: number, Streak: number, Played: number?, RivalWins: number? }?, -- arena duels (see Duels); Played counts rival duels too
 	-- Saga Outpost mining: swings left on each pick, the one in hand, when
@@ -269,6 +270,9 @@ local function migrate(profile: Profile): Profile
 	profile.Version = math.max(profile.Version, FastStart.SaveVersion)
 	Tree.initialize(profile)
 	grantDefaults(profile)
+	-- Crates aren't sold or given any more: any left unopened become coins,
+	-- at what they cost (Store.refundCrates).
+	Store.refundCrates(profile)
 	-- Starter stones with an old intro move get its replacement.
 	Tech.Traits.upgradeStarterProfile(profile)
 	return profile
@@ -345,7 +349,9 @@ local function sync(player: Player)
 	player:SetAttribute("DailyQuota", Config.DailyQuota)
 	player:SetAttribute("MinedThisWeek", profile.Quota.UsedThisWeek)
 	player:SetAttribute("WeeklyQuota", Config.WeeklyQuota)
-	if profile.Miners then player:SetAttribute("ActiveMiner", profile.Miners.Active) end
+	if profile.Miners then
+		player:SetAttribute("ActiveMiner", profile.Miners.Active)
+	end
 	Remotes.Profile:FireClient(player, PlayerData.snapshot(player))
 end
 
@@ -423,7 +429,10 @@ local function claimDaily(player: Player, profile: Profile)
 	if skin and FreeRewards.streakEarned(daily.Streak) and not profile.Cosmetics.Owned[skin.Id] then
 		profile.Cosmetics.Owned[skin.Id] = true;
 		(profile.Cosmetics :: any)[skin.Kind] = skin.Id
-		Remotes.Notify:FireClient(player, string.format("%d days running: %s unlocked and equipped!", FreeRewards.Streak.Days, skin.Name))
+		Remotes.Notify:FireClient(
+			player,
+			string.format("%d days running: %s unlocked and equipped!", FreeRewards.Streak.Days, skin.Name)
+		)
 	end
 end
 
@@ -615,8 +624,8 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		StarterOfferAt = (profile :: any).StarterOfferAt, -- the Starter Pack (Store.StarterPack)
 		StarterBought = (profile :: any).StarterBought,
 		Stats = profile.Stats,
-		Crates = profile.Crates,
 		Boosts = profile.Boosts,
+		VaultBought = (profile :: any).VaultBought, -- the store's Vault, once (Store.Bundles)
 		Duel = profile.Duel, -- arena duel rating and record (see Duels)
 		Outpost = profile.Outpost, -- Saga Outpost picks and record (see OutpostServer)
 		Market = profile.Market, -- listings and offers in escrow (see MarketBoard)
@@ -824,7 +833,8 @@ function PlayerData.resetAsNewPlayer(player: Player): (boolean, string)
 	fresh.DevBackup = backup
 	profiles[player] = fresh
 	local saved = save(player)
-	return true, if saved or not store then "Reset to a new player." else "Reset (not saved yet; it saves when you leave)."
+	return true,
+		if saved or not store then "Reset to a new player." else "Reset (not saved yet; it saves when you leave)."
 end
 function PlayerData.restoreDevBackup(player: Player): (boolean, string)
 	local profile = profiles[player]
@@ -902,7 +912,9 @@ function PlayerData.equipGear(player: Player, kind: string, gearId: string): boo
 		return false
 	end
 	local owner = MinerRoster.owner(profile, key, gearId)
-	if owner and owner ~= profile.Miners.Active then return false end
+	if owner and owner ~= profile.Miners.Active then
+		return false
+	end
 	local character: { [string]: any } = profile.Character
 	character.ItemGems = character.ItemGems or {}
 	character.ItemGems[key] = character.ItemGems[key] or {}
@@ -936,14 +948,18 @@ end
 
 -- Records a first (see Profile.Milestones). Only syncs when it's new.
 function PlayerData.training(player, event, detail)
- local profile=profiles[player]
- if not profile then return end
- local earned,changed=TrainingRewards.record(profile,event,detail)
- if not changed then return end
- for _,objective in earned do
-  Remotes.Notify:FireClient(player,"TASK COMPLETE: "..objective.Name.."  +"..objective.Coins.." coins")
- end
- sync(player)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	local earned, changed = TrainingRewards.record(profile, event, detail)
+	if not changed then
+		return
+	end
+	for _, objective in earned do
+		Remotes.Notify:FireClient(player, "TASK COMPLETE: " .. objective.Name .. "  +" .. objective.Coins .. " coins")
+	end
+	sync(player)
 end
 
 function PlayerData.milestone(player: Player, name: string)
@@ -1111,10 +1127,14 @@ end
 -- validate their own session rules before switching the complete character.
 function PlayerData.selectMiner(player: Player, index: number): boolean
 	local profile = profiles[player]
-	if not profile then return false end
+	if not profile then
+		return false
+	end
 	-- Suits and skins go with the miner: keep this one's, put on the next one's.
 	Cosmetics.leaveMiner(profile.Cosmetics, profile.Character)
-	if not MinerRoster.switch(profile, index) then return false end
+	if not MinerRoster.switch(profile, index) then
+		return false
+	end
 	Cosmetics.joinMiner(profile.Cosmetics, profile.Character)
 	Tree.initialize(profile)
 	player:SetAttribute("ActiveMiner", index)

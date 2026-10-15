@@ -32,10 +32,10 @@ end
 local SPECIAL = {
 	[5] = { Cosmetics = { "TrimEmber" } },
 	[10] = { Cosmetics = { "BackGeode" } },
-	[15] = { Cosmetics = { "TrimRoseGold", "SkinCrater" }, Crates = { MasterworkCrate = 1 } },
+	[15] = { Cosmetics = { "TrimRoseGold", "SkinCrater" }, Coins = 800 },
 	[20] = { Cosmetics = { "BackWings" } },
 	[25] = { Cosmetics = { "TrimPrismatic", "SuitMoonDust" } },
-	[30] = { Cosmetics = { "BackHalo" }, Crates = { MasterworkCrate = 2 } },
+	[30] = { Cosmetics = { "BackHalo" }, Coins = 1600 },
 }
 
 function Season.reward(level: number): { [string]: any }
@@ -49,7 +49,7 @@ function Season.reward(level: number): { [string]: any }
 	elseif step == 2 then
 		return { Coins = 80 + level * 8 }
 	elseif step == 3 then
-		return { Crates = { GeodeCrate = 1 } }
+		return { Coins = 250 }
 	end
 	return { CutGems = 1 }
 end
@@ -58,12 +58,12 @@ end
 -- at these levels, on top of the free one, for everyone who unlocks it.
 -- Its cosmetics are only ever here.
 Season.Premium = {
-	[1] = { Coins = 500, Crates = { GeodeCrate = 1 } },
+	[1] = { Coins = 750 },
 	[5] = { Cosmetics = { "BackCape" }, XPBoostMinutes = 60 },
 	[10] = { Cosmetics = { "SkinLunar" } },
-	[15] = { Crates = { MasterworkCrate = 2 }, Coins = 1000 },
+	[15] = { Coins = 2600 },
 	[20] = { Cosmetics = { "TitleLunar" } },
-	[25] = { Cosmetics = { "TrimAmethyst" }, Crates = { MasterworkCrate = 1 } },
+	[25] = { Cosmetics = { "TrimAmethyst" }, Coins = 800 },
 	[30] = { Cosmetics = { "SuitLunar" } },
 }
 

@@ -1,9 +1,12 @@
 --[[
 	Wardrobe: your suits, weapon skins and pickaxes, opened from the Inventory's SKINS
 	button. What you pick here is this miner's own look (each miner keeps its
-	own; see Cosmetics.forMiner), and swaps in one tap.
+	own; see Cosmetics.forMiner), and swaps in one tap. Trims, back pieces
+	and titles (from bundles, the Season Path and rewards) are the
+	account's: every miner wears them.
 
-	  Tabs    SUITS, WEAPON SKINS and PICKAXES, with how many of each you own.
+	  Tabs    SUITS, WEAPON SKINS, PICKAXES, TRIMS, BACKS and TITLES, with how
+	          many of each you own.
 	  Left    the picked look, turning in 3D: its name, rarity, what it is,
 	          where it comes from, and WEAR (or TAKE OFF, or BUY while test
 	          coin prices are on).
@@ -40,14 +43,21 @@ local C = {
 	Accent = Color3.fromRGB(255, 120, 190),
 }
 local HEAVY, HEADING, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
-local KINDS = { "Suit", "Skin", "Pick" }
-local KIND_TITLE = { Suit = "SUITS", Skin = "WEAPON SKINS", Pick = "PICKAXES" }
-local KIND_WIDTH = { Suit = 120, Skin = 180, Pick = 150 }
+local KINDS = { "Suit", "Skin", "Pick", "Trim", "Back", "Title" }
+local KIND_TITLE =
+	{ Suit = "SUITS", Skin = "WEAPON SKINS", Pick = "PICKAXES", Trim = "TRIMS", Back = "BACKS", Title = "TITLES" }
+local KIND_WIDTH = { Suit = 98, Skin = 150, Pick = 124, Trim = 92, Back = 92, Title = 98 }
 local KIND_STANDARD = {
 	Suit = "Your armour in its own colours, as crafted.",
 	Skin = "Your weapon in its own colours, as forged.",
 	Pick = "Your pick as it came from the Probe, in its own colour.",
+	Trim = "Your class glow in its own colour.",
+	Back = "Nothing on your back.",
+	Title = "No title over your head.",
 }
+-- The "nothing" tile's name, per kind.
+local KIND_NONE =
+	{ Suit = "Standard", Skin = "Standard", Pick = "Standard", Trim = "No trim", Back = "None", Title = "None" }
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 
 local CANVAS_W, CANVAS_H = 1600, 840
@@ -233,7 +243,7 @@ local function tile(parent: Instance, id: string, order: number)
 	end
 	local name = text(
 		cell,
-		if cosmetic then cosmetic.Name else "Standard",
+		if cosmetic then cosmetic.Name else KIND_NONE[state.Kind],
 		12,
 		if mine then C.Text else C.Dim,
 		HEADING,
@@ -246,7 +256,7 @@ local function tile(parent: Instance, id: string, order: number)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	local status = if isWorn
 		then "WORN"
-		elseif mine then if cosmetic then string.upper(Cosmetics.rarityName(cosmetic) or "") else "NO SKIN"
+		elseif mine then if cosmetic then string.upper(Cosmetics.rarityName(cosmetic) or "") else "NONE"
 		else string.upper(Cosmetics.source(cosmetic :: any))
 	local tag = text(
 		cell,
@@ -340,7 +350,7 @@ local function drawTiles(mine: { string }, rest: { string })
 	if #mine == 0 then
 		local hint = new("TextLabel", {
 			BackgroundTransparency = 1,
-			Text = "None yet: get them in the Store, from crates and on the Season Path.",
+			Text = "None yet: get them in the Store and on the Season Path.",
 			TextSize = 12,
 			TextColor3 = C.Faint,
 			Font = MEDIUM,
@@ -383,9 +393,9 @@ local function drawStage()
 	end
 	local mine = id == "" or owned(id)
 	local isWorn = (worn(state.Kind) or "") == id
-	text(stage, if cosmetic then cosmetic.Name else "Standard", 26, C.Text, HEAVY, 24, 372, STAGE_W - 48, 32).Name =
+	text(stage, if cosmetic then cosmetic.Name else KIND_NONE[state.Kind], 26, C.Text, HEAVY, 24, 372, STAGE_W - 48, 32).Name =
 		"LookName"
-	local rarity = if cosmetic then string.upper(Cosmetics.rarityName(cosmetic) or "") else "NO SKIN"
+	local rarity = if cosmetic then string.upper(Cosmetics.rarityName(cosmetic) or "") else "NONE"
 	local chip = text(stage, rarity, 11, color, HEADING, 24, 408, 200, 16)
 	chip.Name = "Rarity"
 	local about = text(
@@ -434,7 +444,17 @@ local function drawStage()
 			end
 	end
 	if isWorn then
-		local on = text(stage, "✓  THIS MINER IS WEARING IT", 12, C.Gold, HEAVY, 24, 520, STAGE_W - 48, 18)
+		local on = text(
+			stage,
+			if Cosmetics.isMinerKind(state.Kind) then "✓  THIS MINER IS WEARING IT" else "✓  YOU'RE WEARING IT",
+			12,
+			C.Gold,
+			HEAVY,
+			24,
+			520,
+			STAGE_W - 48,
+			18
+		)
 		on.Name = "WornNote"
 	end
 	if label then
@@ -465,7 +485,9 @@ function draw()
 	end
 	local p = profile()
 	local miner = p and p.Miners and p.Miners.Active or 1
-	ui.Sub.Text = string.format("MINER %d  ·  EACH MINER WEARS ITS OWN LOOK", miner)
+	ui.Sub.Text = if Cosmetics.isMinerKind(state.Kind)
+		then string.format("MINER %d  ·  EACH MINER WEARS ITS OWN LOOK", miner)
+		else "EVERY MINER WEARS THESE"
 	for _, kind in KINDS do
 		local mine = looks(kind)
 		local tab = ui.Tabs[kind]

@@ -50,8 +50,6 @@ end
 local function icon(reward): string
 	if reward.Cosmetics then
 		return "✨"
-	elseif reward.Crates then
-		return "📦"
 	elseif reward.Coins then
 		return "💰"
 	elseif reward.Marks then
@@ -131,15 +129,20 @@ function SeasonUI.refresh()
 	if not premium then
 		local id = Store.RobuxProducts.SeasonPremium or 0
 		local price = Store.robuxPrice("SeasonPremium") or 0
-		local unlock = button(header, if id ~= 0
-			then string.format("★ UNLOCK PREMIUM  R$ %d", price)
-			else string.format("★ PREMIUM  R$ %d · SOON", price), true, function()
-			if id ~= 0 then
-				MarketplaceService:PromptProductPurchase(Players.LocalPlayer, id)
-			else
-				UiKit.toast("Not on sale yet: its Robux product isn't set up.", P.Dim)
+		local unlock = button(
+			header,
+			if id ~= 0
+				then string.format("★ UNLOCK PREMIUM  R$ %d", price)
+				else string.format("★ PREMIUM  R$ %d · SOON", price),
+			true,
+			function()
+				if id ~= 0 then
+					MarketplaceService:PromptProductPurchase(Players.LocalPlayer, id)
+				else
+					UiKit.toast("Not on sale yet: its Robux product isn't set up.", P.Dim)
+				end
 			end
-		end)
+		)
 		unlock.AnchorPoint = Vector2.new(1, 0)
 		unlock.Position = UDim2.new(1, if unclaimed > 0 then -190 else 0, 0, 12)
 	else
@@ -220,7 +223,13 @@ function SeasonUI.refresh()
 			head.Size = UDim2.new(1, 0, 0, 12)
 			head.AutomaticSize = Enum.AutomaticSize.None
 			head.TextXAlignment = Enum.TextXAlignment.Center
-			local items = text(band, table.concat(Store.describe(extra, cosmeticName), ", "), 10, if premium then P.Text else P.Dim, BOLD)
+			local items = text(
+				band,
+				table.concat(Store.describe(extra, cosmeticName), ", "),
+				10,
+				if premium then P.Text else P.Dim,
+				BOLD
+			)
 			items.Position = UDim2.fromOffset(4, 18)
 			items.Size = UDim2.new(1, -8, 0, 28)
 			items.AutomaticSize = Enum.AutomaticSize.None
@@ -255,7 +264,7 @@ function SeasonUI.refresh()
 	earn.Position = UDim2.fromOffset(0, 340)
 	local hint = text(
 		body,
-		"Special levels (5, 10, 15, 20, 25, 30) unlock trims and back pieces you can't buy. Premium adds a Moonsteel skin, a title and the Lunar Frontier suit.",
+		"Special levels (5, 10, 15, 20, 25, 30) unlock trims and back pieces. Premium adds a Moonsteel skin, a title and the Lunar Frontier suit.",
 		13,
 		P.Text
 	)

@@ -12,9 +12,11 @@
 	  Titles  a tag over your head that everyone sees.
 
 	How each is had:
-	  Price      coins in the Shop (trims and back pieces)
-	  Robux      sold for Robux, directly, never at random (Store.RobuxProducts
-	             holds each one's Developer Product id; 0 = not on sale yet)
+	  Robux      a weapon skin, suit or pickaxe sold in the store, directly,
+	             never at random (Store.RobuxProducts holds each one's
+	             Developer Product id; 0 = not on sale yet)
+	  (bundles)  trims and back pieces aren't sold on their own: they come
+	             with store bundles (Store.Bundles) and on the Season Path
 	  Exclusive  earned one way only, never sold, so it shows you did it:
 	             "Invite"   bring friends (Shared.Referrals.Tiers)
 	             "Group"    join the game's Roblox group (Shared.FreeRewards)
@@ -23,9 +25,10 @@
 	             "Starter"  the one-time Starter Pack (Shared.Store)
 	             "Season"   the Season Path (Shared.Season)
 	             "Default"  every miner has it from the start
+	             "Squad"    the Squad Bundle (all three kits, Store.Kits)
+	             "Vault"    The Vault, the store's complete collection
 	             "Achievement", "Ranked", "Raid", "Mining"
 	                        earned in play; How says exactly how
-	  (none)     Geode and Masterwork Crates (Crate names the one)
 
 	Equipment draws them on your avatar.
 ]]
@@ -57,13 +60,12 @@ export type Cosmetic = {
 	Name: string,
 	Description: string,
 	Rarity: string, -- a gem tier: Common, Uncommon, Rare, UltraRare
-	Price: number?, -- coins in the Shop
+	Price: number?, -- (retired: nothing is sold for coins)
 	Robux: number?, -- sold for Robux (see Store.RobuxProducts)
 	Color: Color3, -- the trim colour, the back piece's glow, a title's colour
 	Look: string?, -- how Equipment builds a back piece or applies a skin
 	Palette: Palette?, -- a skin's or suit's colours
 	Exclusive: string?, -- earned one way only (see above)
-	Crate: string?, -- loot from this crate only (Store.Crates); nil = any crate
 	How: string?, -- (earned ones) exactly what earns it, for the Shop
 }
 
@@ -92,7 +94,6 @@ Cosmetics.List = {
 		Name = "Ember Trim",
 		Description = "Glow like a banked forge.",
 		Rarity = "Uncommon",
-		Price = 300,
 		Color = Color3.fromRGB(255, 120, 40),
 	},
 	TrimGlacier = {
@@ -101,7 +102,6 @@ Cosmetics.List = {
 		Name = "Glacier Trim",
 		Description = "Cold, clear blue from the northern peaks.",
 		Rarity = "Uncommon",
-		Price = 300,
 		Color = Color3.fromRGB(130, 220, 255),
 	},
 	TrimVenom = {
@@ -110,7 +110,6 @@ Cosmetics.List = {
 		Name = "Venom Trim",
 		Description = "A sickly green that warns people off.",
 		Rarity = "Uncommon",
-		Price = 300,
 		Color = Color3.fromRGB(120, 255, 90),
 	},
 	TrimStorm = {
@@ -119,7 +118,6 @@ Cosmetics.List = {
 		Name = "Storm Trim",
 		Description = "Crackling lightning yellow.",
 		Rarity = "Rare",
-		Price = 700,
 		Color = Color3.fromRGB(255, 235, 60),
 	},
 	TrimAmethyst = {
@@ -128,7 +126,6 @@ Cosmetics.List = {
 		Name = "Amethyst Trim",
 		Description = "Deep violet, cut from a flawless stone.",
 		Rarity = "Rare",
-		Price = 700,
 		Color = Color3.fromRGB(190, 90, 255),
 	},
 	TrimRoseGold = {
@@ -153,7 +150,6 @@ Cosmetics.List = {
 		Name = "Prospector's Pack",
 		Description = "A sturdy pack with a pick strapped to the side.",
 		Rarity = "Common",
-		Price = 150,
 		Color = Color3.fromRGB(0, 240, 255),
 		Look = "Pack",
 	},
@@ -163,7 +159,6 @@ Cosmetics.List = {
 		Name = "War Banner",
 		Description = "Your class colours, carried high.",
 		Rarity = "Uncommon",
-		Price = 450,
 		Color = Color3.fromRGB(255, 200, 80),
 		Look = "Banner",
 	},
@@ -182,7 +177,6 @@ Cosmetics.List = {
 		Name = "Ember Cape",
 		Description = "A long cape with a smouldering hem.",
 		Rarity = "Rare",
-		Price = 900,
 		Color = Color3.fromRGB(255, 110, 40),
 		Look = "Cape",
 	},
@@ -353,6 +347,24 @@ Cosmetics.List = {
 		Rarity = "UltraRare",
 		Color = Color3.fromRGB(120, 230, 255),
 		Exclusive = "Code",
+	},
+	TitleSquad = {
+		Id = "TitleSquad",
+		Kind = "Title",
+		Name = "FULL SQUAD",
+		Description = "All three miners kitted out. Only in the Squad Bundle.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(255, 176, 72),
+		Exclusive = "Squad",
+	},
+	TitleCollector = {
+		Id = "TitleCollector",
+		Kind = "Title",
+		Name = "COLLECTOR",
+		Description = "Every look in the store. Only in The Vault.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(255, 214, 120),
+		Exclusive = "Vault",
 	},
 	-- Weapon skins for Robux --------------------------------------------------------
 	SkinPlasma = {
@@ -870,7 +882,7 @@ Cosmetics.List = {
 			Pattern = "Camo",
 			Blade = Color3.fromRGB(140, 76, 44),
 		},
-		Crate = "GeodeCrate",
+		Robux = 49,
 	},
 	SuitRust = {
 		Id = "SuitRust",
@@ -888,7 +900,7 @@ Cosmetics.List = {
 			AccentMaterial = Enum.Material.DiamondPlate,
 			Pattern = "Camo",
 		},
-		Crate = "GeodeCrate",
+		Robux = 99,
 	},
 	SkinCamo = {
 		Id = "SkinCamo",
@@ -906,7 +918,7 @@ Cosmetics.List = {
 			Pattern = "Camo",
 			Blade = Color3.fromRGB(110, 114, 90),
 		},
-		Crate = "GeodeCrate",
+		Robux = 49,
 	},
 	SuitCamo = {
 		Id = "SuitCamo",
@@ -925,7 +937,7 @@ Cosmetics.List = {
 			AccentMaterial = Enum.Material.Fabric,
 			Pattern = "Camo",
 		},
-		Crate = "GeodeCrate",
+		Robux = 149,
 	},
 	SkinCopper = {
 		Id = "SkinCopper",
@@ -946,7 +958,7 @@ Cosmetics.List = {
 			Pattern = "Trim",
 			Edge = true,
 		},
-		Crate = "GeodeCrate",
+		Robux = 79,
 	},
 	SuitCopper = {
 		Id = "SuitCopper",
@@ -965,13 +977,14 @@ Cosmetics.List = {
 			AccentMaterial = Enum.Material.Metal,
 			Pattern = "Stripes",
 		},
-		Crate = "GeodeCrate",
+		Robux = 149,
 	},
 	SkinCircuit = {
 		Id = "SkinCircuit",
 		Kind = "Skin",
 		Name = "Circuit Board",
 		Description = "Green board with gold traces that pulse with power.",
+		Robux = 99,
 		Rarity = "Rare",
 		Color = Color3.fromRGB(120, 255, 150),
 		Palette = {
@@ -1006,7 +1019,7 @@ Cosmetics.List = {
 			Pattern = "Trim",
 			Seams = true,
 		},
-		Crate = "MasterworkCrate",
+		Robux = 249,
 	},
 	SkinNebula = {
 		Id = "SkinNebula",
@@ -1030,7 +1043,7 @@ Cosmetics.List = {
 			Sparks = Color3.fromRGB(255, 210, 250),
 			Trail = true,
 		},
-		Crate = "MasterworkCrate",
+		Robux = 199,
 	},
 	SuitNebula = {
 		Id = "SuitNebula",
@@ -1050,7 +1063,7 @@ Cosmetics.List = {
 			Pattern = "Camo",
 			Sparks = Color3.fromRGB(240, 220, 255),
 		},
-		Crate = "MasterworkCrate",
+		Robux = 399,
 	},
 	SkinGlacier = {
 		Id = "SkinGlacier",
@@ -1288,7 +1301,7 @@ Cosmetics.List = {
 		Description = "Polished gold set with rubies and an emerald. Every hit glitters.",
 		Rarity = "UltraRare",
 		Color = Color3.fromRGB(255, 200, 80),
-		Crate = "MasterworkCrate",
+		Robux = 149,
 	},
 	PickGeode = {
 		Id = "PickGeode",
@@ -1297,7 +1310,7 @@ Cosmetics.List = {
 		Description = "A split geode whose crystals grow into the spike.",
 		Rarity = "Rare",
 		Color = Color3.fromRGB(190, 110, 255),
-		Crate = "GeodeCrate",
+		Robux = 99,
 	},
 	PickBone = {
 		Id = "PickBone",
@@ -1306,7 +1319,7 @@ Cosmetics.List = {
 		Description = "A monster's tusk lashed to a spine, with a skull for a hammer.",
 		Rarity = "Uncommon",
 		Color = Color3.fromRGB(240, 228, 200),
-		Crate = "GeodeCrate",
+		Robux = 79,
 	},
 	PickTwinStar = {
 		Id = "PickTwinStar",
@@ -1356,14 +1369,12 @@ function Cosmetics.ofKind(kind: string): { string }
 	return ids
 end
 
--- Its price in coins: a trim's or back piece's own Price, or (while testing,
--- Config.TestCosmeticPrice) the test price for any weapon skin, suit or pick.
+-- Its price in coins: only while testing (Config.TestCosmeticPrice), for a
+-- weapon skin, suit or pick the store sells, so a purchase can be tried
+-- without Robux. Nothing is sold for coins otherwise.
 function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
-	if cosmetic.Price then
-		return cosmetic.Price
-	end
 	local test = Config.TestCosmeticPrice
-	if type(test) == "number" and Cosmetics.isMinerKind(cosmetic.Kind) then
+	if type(test) == "number" and cosmetic.Robux and Cosmetics.isMinerKind(cosmetic.Kind) then
 		return test
 	end
 	return nil
@@ -1423,6 +1434,8 @@ Cosmetics.SourceText = {
 	Streak = "7-day login streak",
 	Code = "Promo code",
 	Starter = "Starter Pack",
+	Squad = "Squad Bundle",
+	Vault = "The Vault",
 	Season = "Season Path",
 	Default = "Everyone",
 	Achievement = "Achievement",
@@ -1435,12 +1448,8 @@ function Cosmetics.source(cosmetic: Cosmetic): string
 		return Cosmetics.SourceText[cosmetic.Exclusive] or "Exclusive"
 	elseif cosmetic.Robux then
 		return string.format("R$ %d", cosmetic.Robux)
-	elseif cosmetic.Price then
-		return string.format("%d coins", cosmetic.Price)
-	elseif cosmetic.Crate then
-		return (string.gsub(cosmetic.Crate, "Crate$", " Crate"))
 	end
-	return "Crates & Season"
+	return "Bundles & Season Path"
 end
 
 return Cosmetics
