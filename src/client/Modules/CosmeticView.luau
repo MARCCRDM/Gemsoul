@@ -1,6 +1,6 @@
 --[[
-	CosmeticView: a skin, suit or pickaxe as it really looks, in 3D, for the
-	Shop and the Wardrobe.
+	CosmeticView: a skin, suit, pickaxe or visor (on its helmet) as it really
+	looks, in 3D, for the Shop and the Wardrobe.
 
 	The server dresses a mannequin once per cosmetic and keeps the parts in
 	ReplicatedStorage.CosmeticPreviews[<id>] (Equipment.cosmeticPreview).
@@ -66,9 +66,14 @@ local function frame(view: ViewportFrame, source: Instance, kind: string, spin: 
 	-- From the front, turned a little: a suit faces you, and a blade shows
 	-- its flat (it's built across the miner's front). A pickaxe is seen
 	-- side on, head and spike in profile (Equipment builds it so).
-	local yaw = if kind == "Suit" then math.rad(200) elseif kind == "Pick" then math.rad(215) else math.rad(195)
-	local pitch = math.rad(if kind == "Suit" then 8 elseif kind == "Pick" then 10 else 4)
-	local reach = if kind == "Suit" then 1.8 elseif kind == "Pick" then 1.55 else 2.0
+	-- A visor is a helmet seen face on, turned a little so its wrap shows.
+	local yaw = if kind == "Suit"
+		then math.rad(200)
+		elseif kind == "Pick" then math.rad(215)
+		elseif kind == "Visor" then math.rad(205)
+		else math.rad(195)
+	local pitch = math.rad(if kind == "Suit" then 8 elseif kind == "Pick" then 10 elseif kind == "Visor" then 6 else 4)
+	local reach = if kind == "Suit" then 1.8 elseif kind == "Pick" then 1.55 elseif kind == "Visor" then 1.9 else 2.0
 	local distance = math.max(size.X, size.Y, size.Z) * reach + 0.3
 	local function place(angle: number)
 		local offset =

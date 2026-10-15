@@ -43,21 +43,36 @@ local C = {
 	Accent = Color3.fromRGB(255, 120, 190),
 }
 local HEAVY, HEADING, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
-local KINDS = { "Suit", "Skin", "Pick", "Trim", "Back", "Title" }
-local KIND_TITLE =
-	{ Suit = "SUITS", Skin = "WEAPON SKINS", Pick = "PICKAXES", Trim = "TRIMS", Back = "BACKS", Title = "TITLES" }
-local KIND_WIDTH = { Suit = 98, Skin = 150, Pick = 124, Trim = 92, Back = 92, Title = 98 }
+local KINDS = { "Suit", "Skin", "Visor", "Pick", "Trim", "Back", "Title" }
+local KIND_TITLE = {
+	Suit = "SUITS",
+	Skin = "WEAPON SKINS",
+	Visor = "VISORS",
+	Pick = "PICKAXES",
+	Trim = "TRIMS",
+	Back = "BACKS",
+	Title = "TITLES",
+}
+local KIND_WIDTH = { Suit = 98, Skin = 150, Visor = 108, Pick = 124, Trim = 92, Back = 92, Title = 98 }
 local KIND_STANDARD = {
 	Suit = "Your armour in its own colours, as crafted.",
 	Skin = "Your weapon in its own colours, as forged.",
+	Visor = "Your helmet's own visor, as it was rolled.",
 	Pick = "Your pick as it came from the Probe, in its own colour.",
 	Trim = "Your class glow in its own colour.",
 	Back = "Nothing on your back.",
 	Title = "No title over your head.",
 }
 -- The "nothing" tile's name, per kind.
-local KIND_NONE =
-	{ Suit = "Standard", Skin = "Standard", Pick = "Standard", Trim = "No trim", Back = "None", Title = "None" }
+local KIND_NONE = {
+	Suit = "Standard",
+	Skin = "Standard",
+	Visor = "Standard",
+	Pick = "Standard",
+	Trim = "No trim",
+	Back = "None",
+	Title = "None",
+}
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 
 local CANVAS_W, CANVAS_H = 1600, 840
@@ -527,10 +542,11 @@ local function build(canvas: Instance)
 		Color = ColorSequence.new(Color3.fromRGB(18, 24, 37), Color3.fromRGB(9, 12, 19)),
 	}, window)
 	ui.Window = window
-	text(window, "WARDROBE", 28, C.Text, HEAVY, 28, 20, 220, 34)
-	ui.Sub = text(window, "", 11, C.Dim, HEADING, 236, 32, 340, 16)
+	text(window, "WARDROBE", 28, C.Text, HEAVY, 28, 14, 220, 34)
+	-- (Under the title: the tabs take the rest of the row.)
+	ui.Sub = text(window, "", 11, C.Dim, HEADING, 30, 50, 400, 14)
 	ui.Tabs = {}
-	local tx = 590
+	local tx = 450
 	for _, kind in KINDS do
 		local w = KIND_WIDTH[kind]
 		local tab = button(window, KIND_TITLE[kind], tx, 22, w, 32)

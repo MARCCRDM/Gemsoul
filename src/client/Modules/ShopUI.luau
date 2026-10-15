@@ -1857,6 +1857,9 @@ local DRAW = {
 	Suits = function()
 		drawCatalog("Suits")
 	end,
+	Visors = function()
+		drawCatalog("Visors")
+	end,
 	Picks = function()
 		drawCatalog("Picks")
 	end,

@@ -14,6 +14,7 @@ and back pieces described in older notes.
 | --- | --- | --- |
 | Weapon skin | Restyles whatever weapon you hold: colours, material, sparks, a trail through every swing | `Equipment.luau`, `SKINS.Palette` |
 | Suit | Restyles every armor piece, whatever its style: plates, under-layer, glow, particles off the chest | `Equipment.luau`, the suit pass in `dress` |
+| Visor | Restyles the lens of whatever helmet you wear: tinted, lit, moving, elemental or many-coloured. Shows under any suit. | `Equipment.applyVisor` |
 | Title | A tag over your head, in its colour, that everyone sees | `Equipment.showTitle` |
 | Back piece / trim | As before. New: the Crusader's Standard back piece | `BACKS.Standard` |
 
@@ -38,7 +39,7 @@ is only a few lines of data.
 | Season premium | a second reward track: Moonsteel skin, LUNAR VANGUARD title, Lunar Frontier suit, coins | 399 |
 
 Every skin, suit and pickaxe for sale, and the bundles, are listed in
-`docs/store.md`.
+`docs/store.md`. The visors are below ("Visors").
 
 ### Free (exclusive, never sold)
 
@@ -174,6 +175,60 @@ Where the new ones come from:
 | Season 1 free track | Crater Grey (level 15), Moon Dust (level 25) | Yes |
 | Achievement, Ranked, Raid, Mining | Veteran Steel, Champion's Edge, Champion Plate, Warlord's Edge, Raid Breaker, Geode Crust, Fossil Bone, Fossil Shell, Ore Vein Gold | Not yet. They're in the Shop with how to earn them (`How`), but the systems that grant them are still to build. |
 
+## Visors
+
+A visor restyles the lens of whatever helmet you wear. Like a suit, skin or
+pickaxe, each miner wears its own (`Cosmetics.MinerKinds`). The Wardrobe has
+a VISORS tab, and the Store has a Visors tab. Your helmet's own rolled visor
+(its colour, and any perk a Matrix visor carries) is the Wardrobe's
+"Standard": a visor cosmetic only changes how the lens looks.
+
+![Visors](skin-designs/visors_gallery.png)
+
+| Visor | Rarity | Robux | Look |
+| --- | --- | --- | --- |
+| Smoke Glass | Common | free, everyone | dark smoked glass |
+| Rose Tint | Common | 29 | pink glass |
+| Tangerine | Common | 29 | orange glass |
+| Gold Mirror | Uncommon | 49 | astronaut's mirrored gold |
+| Hi-Vis Lime | Uncommon | 49 | lit lime |
+| Hot Pink | Uncommon | 49 | lit pink |
+| Heartbeat | Rare | 79 | red, beating (Pulse) |
+| Sentinel Scan | Rare | 79 | a red eye sweeping a dark lens (Scan, 9 bands) |
+| Twilight | Rare | 79 | violet to orange and back (Shift) |
+| Thermal Core | Ultra Rare | 129 | forge orange, flickering, shedding embers |
+| Cryo Frost | Ultra Rare | 129 | ice blue breathing to white, snow and mist drifting off |
+| Ion Storm | Ultra Rare | 129 | violet static with white sparks crackling over it |
+| Toxic Bloom | Ultra Rare | 129 | radioactive green, bubbling, a haze off it |
+| Aurora | Legendary | 199 | teal, green and violet flowing across 9 bands, framed in light |
+| Spectrum | Legendary | 199 | a rainbow across 9 bands, its frame the opposite hues |
+| Supernova | Legendary | 249 | gold, magenta and electric blue flowing across 9 bands, stardust drifting off |
+
+What each rarity promises (the tests hold every visor to it):
+
+- **Common:** tinted glass.
+- **Uncommon:** a lit lens, or mirror glass.
+- **Rare:** the lens moves.
+- **Ultra Rare:** it moves, and an element comes off it.
+- **Legendary:** a framed lens of 9 bands, with colour flowing across it.
+
+How it's built (`Equipment.applyVisor`, after everything else in `dress`):
+
+- **Lens parts:** every helmet builder marks its lens parts `VisorFace` (`ArmorKits`). The dark well round the lens and its lamps keep their own look. The visor restyles those parts on every helmet: the main lens, the wrap-around side lenses, a monocle or a headlamp lens.
+- **Banded looks:**
+  - The main lens is cut into bands standing just proud of it, with the lens itself gone dark behind them.
+  - Each band, and each other lens piece, is seeded by where it sits across the face, so a scan bar or a gradient runs left to right.
+  - A Legendary's lit frame (`inlay`) runs half a cycle out of step, so it stands out from the bands.
+- **Moving looks:** they carry the seams' attributes and tag (`SeamFx`, `SeamA`, `SeamB`, `SeamC`, `SeamSeed`, `SkinSeam`). Every client animates them (`SeamVisibility`), first person and the Store and Inventory previews included (`LiveLooks`).
+- **New effects:**
+  - `Scan`: a bar sweeps to and fro in 2.8 s.
+  - `Aurora`: three colours flow round the colour wheel in 4.5 s, never through grey.
+- **Elements:** the same effects a gem's stone gives off (`STONE_FX`), from the lens.
+- **Lights:**
+  - A lit lens has a soft light in its colour.
+  - The light beats with a Pulse and flickers with a Flicker, on each client (`GemLights`).
+- **Previews:** the Store's preview is the visor on a Juggernaut helmet (`Equipment.cosmeticPreview`). Previews show the lens moving, but not its particles or light, which a ViewportFrame can't draw.
+
 ## To switch selling on
 
 Nothing sells for Robux until you create its product.
@@ -244,5 +299,18 @@ players can't read the list out of the game.
 - **Promo codes:** each code once, codes typed loosely, made-up and expired
   codes, the 2-second limit between tries.
 - **The group reward:** stays off with no id set.
+
+- **Visors:** every visor's look is valid and keeps its rarity's promise, there's one of every element, and every visor for sale is in The Vault. `Scan` crosses the whole lens and `Aurora` reaches its three colours without going grey.
+
+`tests/gear_look_cases.luau` puts every visor on all 15 helmets and checks:
+
+- the lens takes the look;
+- moving lenses are tagged to move;
+- bands sit in front of the lens, seeded left to right;
+- the Legendaries are framed;
+- elements and lights are there;
+- nothing but the visor changes, under a suit too, and in the one-helmet preview.
+
+`tests/armor_articulation_cases.luau` checks every lens part is marked `VisorFace`.
 
 `tests/referrals_cases.luau` covers the invite tiers.

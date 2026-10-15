@@ -456,6 +456,61 @@ local function pickArt(root: Frame, size: number, cosmetic)
 	round(pommel, size)
 end
 
+-- A visor: a gunmetal helmet, its lens in the visor's colours (banded and
+-- framed for the many-coloured ones).
+local function visorArt(root: Frame, size: number, cosmetic)
+	local look = cosmetic.Visor or { Color = cosmetic.Color }
+	local glow = look.Glow or look.Color
+	local halo = piece(root, 0.5, 0.5, 0.9, 0.9, cosmetic.Color)
+	halo.BackgroundTransparency = 0.86
+	round(halo, size)
+	local metal = Color3.fromRGB(70, 76, 88)
+	local dome = piece(root, 0.5, 0.5, 0.66, 0.7, WHITE)
+	round(dome, math.floor(size * 0.24))
+	gradient(dome, metal:Lerp(WHITE, 0.25), metal:Lerp(BLACK, 0.45))
+	stroke(dome, BLACK, math.max(1, size / 60), 0.4)
+	local well = piece(dome, 0.5, 0.5, 0.86, 0.26, Color3.fromRGB(8, 12, 20))
+	round(well, math.floor(size * 0.05))
+	local lens = piece(well, 0.5, 0.5, 0.92, 0.72, WHITE)
+	round(lens, math.floor(size * 0.04))
+	if look.Fx == "Rainbow" then
+		local keys = {}
+		for i = 0, 6 do
+			table.insert(keys, ColorSequenceKeypoint.new(i / 6, Color3.fromHSV(i / 6 * 0.85, 0.8, 1)))
+		end
+		new("UIGradient", { Color = ColorSequence.new(keys) }, lens)
+	elseif look.Third then
+		new("UIGradient", {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, look.Color),
+				ColorSequenceKeypoint.new(0.5, glow),
+				ColorSequenceKeypoint.new(1, look.Third),
+			}),
+		}, lens)
+	elseif look.Fx == "Scan" then
+		lens.BackgroundColor3 = look.Color
+		local bar = piece(lens, 0.62, 0.5, 0.2, 1, glow)
+		round(bar, 2)
+	else
+		gradient(lens, look.Color:Lerp(WHITE, 0.25), if look.Glow then glow else look.Color:Lerp(BLACK, 0.3), 0)
+	end
+	if look.Material == "Glass" then
+		-- A glint across glass.
+		local glint = piece(lens, 0.3, 0.3, 0.3, 0.16, WHITE, -12)
+		glint.BackgroundTransparency = 0.55 - (look.Reflect or 0.2) * 0.4
+		round(glint, 2)
+	end
+	for i = 1, (look.Bands or 0) - 1 do
+		local gap = piece(lens, i / look.Bands, 0.5, 0.015, 0.8, Color3.fromRGB(8, 12, 20))
+		gap.BackgroundTransparency = 0.2
+	end
+	if look.Rim then
+		stroke(lens, look.Third or glow, math.max(1.5, size / 45))
+	end
+	local chin = piece(dome, 0.5, 0.84, 0.46, 0.13, metal:Lerp(BLACK, 0.3))
+	round(chin, 2)
+end
+
 -- An armor suit: a helmet in the suit's colours, visor lit.
 local function suitArt(root: Frame, size: number, cosmetic)
 	local palette = cosmetic.Palette
@@ -519,6 +574,9 @@ function ShopArt.icon(parent: Instance, kind: string, cosmeticId: string?, size:
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Pick" then
 		pickArt(root, size, cosmetic)
+		CosmeticView.attach(root, cosmetic.Id, size >= 120)
+	elseif cosmetic and cosmetic.Kind == "Visor" then
+		visorArt(root, size, cosmetic)
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Title" then
 		titleArt(root, size, cosmetic)

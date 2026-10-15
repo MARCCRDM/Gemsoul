@@ -548,11 +548,164 @@ do
 	)
 end
 
+-- 9. Visors (cosmetics, Kind "Visor") on every helmet: the lens takes the
+-- look, moving looks are tagged to move, banded lenses run left to right in
+-- front of the lens, the legends are framed, the elements come off it, and
+-- nothing but the visor changes.
+local Cosmetics = requireScript(Shared.Cosmetics)
+local visorIds = Cosmetics.ofKind("Visor")
+check(#visorIds >= 15, "too few visors")
+local function helmetKit(family, rarity)
+	local kit = table.clone(KIT)
+	kit.Helmet = "Armor" .. family .. "Helmet" .. rarity
+	return kit
+end
+local function signature(root)
+	-- Everything that isn't the visor, where it is and how it looks.
+	local list = {}
+	for _, part in parts(root) do
+		if not part:GetAttribute("Visor") then
+			local p = root.Parent:FindFirstChild("HumanoidRootPart").CFrame:PointToObjectSpace(part.CFrame.Position)
+			table.insert(
+				list,
+				string.format(
+					"%s|%s|%.2f,%.2f,%.2f|%s",
+					part.Name,
+					part.Material.Name,
+					p.X,
+					p.Y,
+					p.Z,
+					part.Color:ToHex()
+				)
+			)
+		end
+	end
+	table.sort(list)
+	return table.concat(list, "\n")
+end
+local visorLooks, bandsChecked = 0, 0
+for _, family in { "Prospector", "Skirmisher", "Juggernaut" } do
+	for rarity = 1, 5 do
+		local kit = helmetKit(family, rarity)
+		local _, bare = wear(nil, nil, kit)
+		local plain = signature(bare)
+		for _, id in visorIds do
+			local look = Cosmetics.get(id).Visor
+			local body, folder = wear(nil, { Visor = id }, kit)
+			local helmet = folder:FindFirstChild("Helmet")
+			local where = family .. rarity .. " " .. id
+			visorLooks += 1
+			check(signature(folder) == plain, where .. ": the visor changed more than the visor")
+			local faces, lenses, rims, lit = {}, {}, 0, 0
+			for _, part in parts(helmet) do
+				if part.Name == "VisorLens" then
+					table.insert(lenses, part)
+				elseif part:GetAttribute("VisorFace") and part.Transparency < 1 then
+					table.insert(faces, part)
+				elseif part.Name == "SkinSeam" and part:GetAttribute("Visor") then
+					rims += 1
+				end
+			end
+			check(#faces >= 1, where .. ": no lens to restyle")
+			local banded = (look.Bands or 0) > 1
+			for _, part in faces do
+				if part.Color == look.Color then
+					lit += 1
+				end
+			end
+			-- (A banded lens's main piece goes dark behind its bands.)
+			check(lit >= #faces - (if banded then 1 else 0), where .. ": a lens piece kept its old colour")
+			local material = if look.Material == "Glass" then roblox.Enum.Material.Glass else roblox.Enum.Material.Neon
+			for _, part in faces do
+				if part.Color == look.Color then
+					check(part.Material == material, where .. ": a lens piece has the wrong material")
+					check(part:GetAttribute("PrismaticBase") == nil, where .. ": a lens piece would shimmer")
+				end
+			end
+			local moving = {}
+			for _, part in faces do
+				if part.Color == look.Color then
+					table.insert(moving, part)
+				end
+			end
+			for _, part in lenses do
+				table.insert(moving, part)
+			end
+			for _, part in moving do
+				if look.Fx then
+					check(
+						part:GetAttribute("SeamFx") == look.Fx and part:HasTag(Tags.SkinSeam),
+						where .. ": a lens piece won't move"
+					)
+					check(part:GetAttribute("SeamA") == look.Color, where .. ": a lens piece has the wrong colours")
+				else
+					check(part:GetAttribute("SeamFx") == nil, where .. ": a still lens moves")
+				end
+			end
+			if banded then
+				bandsChecked += 1
+				check(#lenses == look.Bands, where .. ": " .. #lenses .. " bands, not " .. look.Bands)
+				-- Left to right across the face, each a step on from the last.
+				local head = body:FindFirstChild("Head")
+				table.sort(lenses, function(a, b)
+					return head.CFrame:PointToObjectSpace(a.CFrame.Position).X
+						< head.CFrame:PointToObjectSpace(b.CFrame.Position).X
+				end)
+				local seeds = {}
+				for _, band in lenses do
+					table.insert(seeds, band:GetAttribute("SeamSeed"))
+					-- In front of the face, not inside the helmet.
+					check(
+						head.CFrame:PointToObjectSpace(band.CFrame.Position).Z < -head.Size.Z * 0.3,
+						where .. ": a band is inside the helmet"
+					)
+				end
+				local ascending, descending = true, true
+				for i = 2, #seeds do
+					ascending = ascending and seeds[i] > seeds[i - 1]
+					descending = descending and seeds[i] < seeds[i - 1]
+				end
+				check(ascending or descending, where .. ": the bands aren't seeded across the lens")
+			else
+				check(#lenses == 0, where .. ": an unbanded lens grew bands")
+			end
+			check((rims >= 2) == (look.Rim == true), where .. ": the rim is missing or unasked for")
+			local effects, glow, pulsing = 0, nil, false
+			for _, d in helmet:GetDescendants() do
+				if d:IsA("ParticleEmitter") and d.Name == "VisorEffect" then
+					effects += 1
+				elseif d:IsA("PointLight") and d.Name == "VisorGlow" then
+					glow = d
+					pulsing = d:GetAttribute("PulseBase") ~= nil and d:HasTag(Tags.GemGlow)
+				end
+			end
+			check((effects > 0) == (look.Element ~= nil), where .. ": its element is missing or unasked for")
+			check((glow ~= nil) == (look.Material == "Neon"), where .. ": a lit lens has no light, or glass has one")
+			check(
+				pulsing == (look.Fx == "Pulse" or look.Fx == "Flicker"),
+				where .. ": its light doesn't breathe with it"
+			)
+		end
+	end
+end
+-- Under a suit the visor still shows (a suit dresses the armour, not the face).
+local _, suited = wear(nil, { Suit = "SuitObsidian", Visor = "VisorAurora" }, helmetKit("Juggernaut", 3))
+check(#named(suited.Helmet, "VisorLens") == Cosmetics.get("VisorAurora").Visor.Bands, "a suit took the visor off")
+-- The Armory's one-helmet preview wears it too.
+do
+	local rig = FighterRig.build()
+	rig:SetAttribute("FistGrip", true)
+	local only = Equipment._dress(rig, helmetKit("Prospector", 2), { Visor = "VisorScanner" }, 7, "Helmet")
+	check(only and #named(only.Helmet, "VisorLens") == 9, "the one-helmet preview has no visor")
+end
+
 print(
 	string.format(
-		"PASS: %d gear look checks (stones on every gemmed piece, %d suits trimmed in real parts, %d skins held in first person, nothing a preview can't draw)",
+		"PASS: %d gear look checks (stones on every gemmed piece, %d suits trimmed in real parts, %d skins held in first person, %d visor looks on 15 helmets, %d banded, nothing a preview can't draw)",
 		checks,
 		trimmed,
-		skins
+		skins,
+		visorLooks,
+		bandsChecked
 	)
 )
