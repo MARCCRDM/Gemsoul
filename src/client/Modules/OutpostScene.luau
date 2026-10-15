@@ -201,7 +201,10 @@ local hint = text(
 	Enum.TextXAlignment.Center
 )
 hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 0, 1, -148)
+hint.Position = UDim2.new(0.5, 0, 1, -18)
+hint.TextSize = 12
+hint.Size = UDim2.new(1, -440, 0, 32)
+hint.TextWrapped = true
 hint.TextStrokeTransparency = 0.4
 
 -- Keep the field clear; navigation lives in the lobby dock and world prompts.
@@ -230,7 +233,7 @@ local function fitOutpostHud()
 	togglePick.Size = UDim2.fromScale(1, 1)
 	track.Position = UDim2.fromOffset(14, if mobile and not expanded then 48 else 30)
 	-- Keep the contents at their designed width; scale the whole card on narrow screens.
-	cardScale.Scale = math.min(if mobile then MobileLayout.CardScale else 1, math.max(0.1, (size.X - 24) / 300))
+	cardScale.Scale = math.min(if mobile then MobileLayout.CardScale elseif expanded then 1 else 0.78, math.max(0.1, (size.X - 24) / 300))
 	card.Visible = not blocked
 	for _, promptGui in miningPrompts do
 		promptGui.Enabled = not blocked and hud.Enabled

@@ -33,7 +33,7 @@ local function bar(parent,pos,size,color)
  return fill
 end
 local gui=new("ScreenGui",{Name="TrainingRewards",ResetOnSpawn=false,DisplayOrder=25,Enabled=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},player:WaitForChild("PlayerGui"))
-local launch=button(gui,"",UDim2.new(1,-16,0,150),UDim2.fromOffset(240,94));launch.AnchorPoint=Vector2.new(1,0)
+local launch=button(gui,"",UDim2.new(1,-16,0,12),UDim2.fromOffset(132,40));launch.AnchorPoint=Vector2.new(1,0)
 stroke(launch,cyan,.65)
 gradient(launch,Color3.fromRGB(27,47,61),Color3.fromRGB(14,24,38))
 local shade=button(gui,"",UDim2.new(),UDim2.fromScale(1,1));shade.BackgroundColor3=Color3.new();shade.BackgroundTransparency=.25;shade.Visible=false;shade.AutoButtonColor=false
@@ -135,7 +135,8 @@ RunService.Heartbeat:Connect(function(dt)
  elapsed+=dt;if elapsed<.25 then return end;elapsed=0
  local p=GemClient.Profile
  local dashboard=player.PlayerGui:FindFirstChild("Dashboard")
- gui.Enabled=p~=nil and (not require(RS.Shared.Tutorial).Enabled or (p.Intro~=nil and p.Intro.Done)) and player:GetAttribute("Outpost")==true and not player:GetAttribute("CombatSession") and not player.PlayerGui:FindFirstChild("Tutorial") and not (dashboard and dashboard.Enabled)
+ local lobby=player.PlayerGui:FindFirstChild("LobbyHud")
+ gui.Enabled=p~=nil and (not require(RS.Shared.Tutorial).Enabled or (p.Intro~=nil and p.Intro.Done)) and player:GetAttribute("Outpost")==true and not player:GetAttribute("CombatSession") and not player.PlayerGui:FindFirstChild("Tutorial") and not (dashboard and dashboard.Enabled) and not (lobby and lobby:GetAttribute("ModePickerOpen"))
  if not gui.Enabled then shade.Visible=false end
  local size=gui.AbsoluteSize
  panel.Size=UDim2.fromOffset(math.min(780,math.max(260,size.X-24)),math.min(650,math.max(300,size.Y-24)))
@@ -149,9 +150,11 @@ RunService.Heartbeat:Connect(function(dt)
   row.Status.Position=UDim2.new(0,16,1,-41)
   row.Fill.Parent.Position=UDim2.new(0,16,1,-15)
  end
- launch.Size=UDim2.fromOffset(164,48)
+ launch.Size=UDim2.fromOffset(132,if game:GetService("UserInputService").TouchEnabled then 44 else 40)
+ launch.TextColor3=Color3.fromRGB(222,239,247)
+ launch.TextSize=12
  launch.Text="OBJECTIVES"
 
- launch.Position=UDim2.new(1,-12,0,if size.Y<500 then 64 else 150)
+ launch.Position=UDim2.new(1,-16,0,12)
 end)
 refresh()

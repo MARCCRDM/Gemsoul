@@ -373,7 +373,7 @@ close.Activated:Connect(LobbyUI.closePicker)
 -- streak, next unlock). On a phone the stack shrinks to thumb-sized rows.
 local GOLD_TOP, GOLD_BOTTOM = Color3.fromRGB(255, 214, 120), Color3.fromRGB(226, 156, 44)
 local STEEL = Color3.fromRGB(24, 31, 42)
-local STACK_W = 290
+local STACK_W = 196
 
 bar = new("Frame", {
 	AnchorPoint = Vector2.new(0, 0.5),
@@ -408,7 +408,7 @@ local tiles = new("Frame", {
 	Size = UDim2.fromOffset(STACK_W, 320),
 	BackgroundTransparency = 1,
 }, bar)
-local tileList = UiKit.list(tiles, 8, false)
+-- Positions are explicit so Inventory can span both utility columns.
 
 -- One row of the stack: a gunmetal plate, an emblem, the name, and a bright
 -- edge in its colour on the left.
@@ -434,14 +434,17 @@ local function tile(label: string, emblem: string, color: Color3, onClick: () ->
 	}, b)
 	edge.Name = "Edge"
 	local icon = IronUi.emblem(b, emblem, color, 28)
+	icon.Name = "NavIcon"
 	icon.AnchorPoint = Vector2.new(0, 0.5)
 	icon.Position = UDim2.new(0, 14, 0.5, 0)
 	local name = text(b, label, 17, P.Text, IronUi.Heading)
+	name.Name = "NavLabel"
 	name.AnchorPoint = Vector2.new(0, 0.5)
 	name.Position = UDim2.new(0, 54, 0.5, 0)
 	name.Size = UDim2.new(1, -64, 0, 22)
 	name.TextXAlignment = Enum.TextXAlignment.Left
 	local chevron = text(b, "›", 22, P.Dim, IronUi.Heading)
+	chevron.Name = "NavChevron"
 	chevron.AnchorPoint = Vector2.new(1, 0.5)
 	chevron.Position = UDim2.new(1, -12, 0.5, 0)
 	chevron.Size = UDim2.fromOffset(16, 24)
@@ -488,36 +491,37 @@ coinsLabel.TextXAlignment = Enum.TextXAlignment.Right
 
 -- What's happening (right): your daily streak and the next mode to unlock.
 local news = new("Frame", {
-	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -24, 0.5, 0),
-	Size = UDim2.fromOffset(270, 196),
-	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -16, 0, 64),
+	Size = UDim2.fromOffset(208, 120),
+	BackgroundColor3 = STEEL,
+	BackgroundTransparency = 0.12,
 }, gui)
-UiKit.list(news, 10, false)
+UiKit.round(news, 8)
+new("UIStroke", { Color = Color3.fromRGB(70, 82, 98), Thickness = 1, Transparency = 0.45 }, news)
+UiKit.list(news, 0, false)
 local function newsPanel(order: number, height: number)
 	local panel = new("Frame", {
-		Size = UDim2.fromOffset(270, height),
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		Size = UDim2.fromOffset(208, height),
+		BackgroundTransparency = 1,
 		LayoutOrder = order,
 	}, news)
-	UiKit.round(panel, 5)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(34, 43, 56), STEEL) }, panel)
-	new("UIStroke", { Color = Color3.fromRGB(70, 82, 98), Thickness = 1.2 }, panel)
+
 	return panel
 end
-local dailyPanel = newsPanel(1, 88)
+local dailyPanel = newsPanel(1, 64)
 local dailyTitle = text(dailyPanel, "DAILY REWARD", 11, P.Gold, IronUi.Heading)
-dailyTitle.Position, dailyTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(240, 14)
+dailyTitle.Position, dailyTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(184, 14)
 dailyTitle.TextXAlignment = Enum.TextXAlignment.Left
-local dailyText = text(dailyPanel, "", 15, P.Text, IronUi.Heading)
-dailyText.Position, dailyText.Size = UDim2.fromOffset(12, 24), UDim2.fromOffset(246, 20)
+local dailyText = text(dailyPanel, "", 11, P.Text, IronUi.Heading)
+dailyText.Position, dailyText.Size = UDim2.fromOffset(12, 24), UDim2.fromOffset(184, 14)
 dailyText.TextXAlignment = Enum.TextXAlignment.Left
 local streakDots = {}
 for i = 1, 7 do
 	local dot = new("Frame", {
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(12 + (i - 1) * 35, 54),
-		Size = UDim2.fromOffset(29, 22),
+		Position = UDim2.fromOffset(12 + (i - 1) * 27, 43),
+		Size = UDim2.fromOffset(22, 16),
 		BackgroundColor3 = Color3.fromRGB(30, 38, 50),
 	}, dailyPanel)
 	UiKit.round(dot, 4)
@@ -525,15 +529,17 @@ for i = 1, 7 do
 	day.Size = UDim2.fromScale(1, 1)
 	streakDots[i] = { Dot = dot, Label = day }
 end
-local unlockPanel = newsPanel(2, 92)
-local unlockTitle = text(unlockPanel, "NEXT UNLOCK", 11, P.Gold, IronUi.Heading)
-unlockTitle.Position, unlockTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(240, 14)
+local unlockPanel = newsPanel(2, 56)
+new("Frame", { Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 0, 1),
+	BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(65, 77, 94), BackgroundTransparency = 0.5 }, unlockPanel)
+local unlockTitle = text(unlockPanel, "NEXT UNLOCK", 10, P.Gold, IronUi.Heading)
+unlockTitle.Position, unlockTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(184, 14)
 unlockTitle.TextXAlignment = Enum.TextXAlignment.Left
-local unlockText = text(unlockPanel, "", 17, P.Text, IronUi.Heading)
-unlockText.Position, unlockText.Size = UDim2.fromOffset(12, 26), UDim2.fromOffset(246, 22)
+local unlockText = text(unlockPanel, "", 12, P.Text, IronUi.Heading)
+unlockText.Position, unlockText.Size = UDim2.fromOffset(12, 23), UDim2.fromOffset(184, 16)
 unlockText.TextXAlignment = Enum.TextXAlignment.Left
-local unlockHint = text(unlockPanel, "", 12, P.Dim, IronUi.Body)
-unlockHint.Position, unlockHint.Size = UDim2.fromOffset(12, 50), UDim2.fromOffset(246, 32)
+local unlockHint = text(unlockPanel, "", 10, P.Dim, IronUi.Body)
+unlockHint.Position, unlockHint.Size = UDim2.fromOffset(12, 40), UDim2.fromOffset(184, 14)
 unlockHint.TextXAlignment = Enum.TextXAlignment.Left
 unlockHint.TextYAlignment = Enum.TextYAlignment.Top
 unlockHint.TextWrapped = true
@@ -558,8 +564,8 @@ local function refreshNews()
 	local daily = profile.Daily or {}
 	local streak = math.clamp(daily.Streak or 0, 0, 7)
 	dailyText.Text = if streak > 0
-		then string.format("Day %d of 7 · come back tomorrow", streak)
-		else "Log in daily for growing rewards"
+		then string.format("Day %d / 7 · next reward tomorrow", streak)
+		else "Return daily to grow your rewards"
 	for i, entry in streakDots do
 		local done = i <= streak
 		entry.Dot.BackgroundColor3 = if done
@@ -573,21 +579,24 @@ local function refreshNews()
 	local duels = played()
 	local nextName, need = nil, nil
 	for _, entry in { { "Dungeon & Casual", LobbyUI.Unlocks.Dungeon }, { "Ranked 1v1", LobbyUI.Unlocks.Ranked } } do
-		if duels < entry[2] then
+		if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled
+			and not (profile.Tutorial and profile.Tutorial.Done) and duels < entry[2] then
 			nextName, need = entry[1], entry[2]
 			break
 		end
 	end
 	if nextName then
+		unlockTitle.Text = "NEXT UNLOCK"
 		unlockText.Text = string.upper(nextName)
 		unlockHint.Text = string.format(
-			"Win or lose, play %d more duel%s to unlock it.",
+			"%d more duel%s to unlock",
 			need - duels,
 			if need - duels == 1 then "" else "s"
 		)
 	else
-		unlockText.Text = "EVERY MODE OPEN"
-		unlockHint.Text = "Ranked 1v1 is live. Climb the ladder."
+		unlockTitle.Text = "ARENA"
+		unlockText.Text = "ALL MODES OPEN"
+		unlockHint.Text = "Choose your next match with Play"
 	end
 end
 GemClient.Changed:Connect(refreshNews)
@@ -596,90 +605,85 @@ task.defer(refreshNews)
 local function fitDock()
 	local size = gui.AbsoluteSize
 	local mobile = game:GetService("UserInputService").TouchEnabled or size.Y < 540
-	local count = 0
+	local buttons = {}
 	for _, button in tiles:GetChildren() do
-		if button:IsA("TextButton") then
-			count += 1
-		end
+		if button:IsA("TextButton") then table.insert(buttons, button) end
 	end
+	table.sort(buttons, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
+	modes.Visible = false
+	status.Visible = not mobile
+	news.Visible = not mobile and not picker.Visible
 	if mobile then
-		-- Phones: the old bottom dock. PLAY centred above one row of short
-		-- buttons with the name in the middle; no side panels.
-		local compact = MobileLayout.dock(size, count)
+		local compact = MobileLayout.dock(size, #buttons)
 		local width, gap, tileHeight = compact.W, compact.Gap, compact.TileHeight
-		bar.AnchorPoint = Vector2.new(0.5, 1)
-		bar.Position = UDim2.new(0.5, 0, 1, -12)
-		bar.Size = UDim2.fromOffset(width, 44 + 8 + tileHeight)
+		bar.AnchorPoint, bar.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -12)
+		bar.Size = UDim2.fromOffset(width, 52 + tileHeight)
 		play.AnchorPoint = Vector2.new(0.5, 0)
 		play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(math.min(220, width), 44)
 		playCaption.TextSize = 22
-		modes.Visible, status.Visible, news.Visible = false, false, false
-		tileList.FillDirection = Enum.FillDirection.Horizontal
-		tileList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		tileList.Padding = UDim.new(0, gap)
-		tiles.AnchorPoint = Vector2.new(0.5, 0)
-		tiles.Position, tiles.Size = UDim2.new(0.5, 0, 0, 52), UDim2.fromOffset(width, tileHeight)
-		local tileWidth = math.floor((width - gap * math.max(0, count - 1)) / math.max(1, count))
-		for _, button in tiles:GetChildren() do
-			if button:IsA("TextButton") then
-				button.Size = UDim2.fromOffset(tileWidth, tileHeight)
-				for _, child in button:GetChildren() do
-					if child:IsA("TextLabel") and child.Text ~= "›" then
-						child.TextSize = 11
-						child.AnchorPoint = Vector2.new(0.5, 0.5)
-						child.Position = UDim2.fromScale(0.5, 0.5)
-						child.Size = UDim2.new(1, -6, 1, 0)
-						child.TextXAlignment = Enum.TextXAlignment.Center
-					elseif child:IsA("GuiObject") then
-						child.Visible = false
-					end
-				end
+		tiles.AnchorPoint, tiles.Position = Vector2.new(0, 0), UDim2.fromOffset(0, 52)
+		tiles.Size = UDim2.fromOffset(width, tileHeight)
+		local tileWidth = math.floor((width - gap * math.max(0, #buttons - 1)) / math.max(1, #buttons))
+		for i, button in buttons do
+			button.Position, button.Size = UDim2.fromOffset((i - 1) * (tileWidth + gap), 0), UDim2.fromOffset(tileWidth, tileHeight)
+			for _, child in button:GetChildren() do
+				if child.Name == "NavLabel" then
+					child.TextSize, child.TextScaled = 11, true
+					child.AnchorPoint, child.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
+					child.Size, child.TextXAlignment = UDim2.new(1, -6, 0, 14), Enum.TextXAlignment.Center
+				elseif child:IsA("GuiObject") then child.Visible = false end
 			end
 		end
 		return
 	end
-	-- Phones: shorter rows, narrower stack, the news shrinks to the daily strip.
-	local width = if mobile then math.min(230, math.floor(size.X * 0.3)) else STACK_W
-	local playHeight = if mobile then 48 else 66
-	local rowHeight = if mobile then 34 else 46
-	local gap = if mobile then 5 else 8
-	local count = 0
-	for _, button in tiles:GetChildren() do
-		if button:IsA("TextButton") then
-			count += 1
+	local width, gap, utilityHeight = STACK_W, 6, 36
+	local utilityWidth = (width - gap) / 2
+	bar.AnchorPoint, bar.Position = Vector2.new(0, 1), UDim2.new(0, 16, 1, -20)
+	play.AnchorPoint, play.Position = Vector2.zero, UDim2.fromOffset(0, 0)
+	play.Size, playCaption.TextSize = UDim2.fromOffset(width, 46), 23
+	tiles.AnchorPoint, tiles.Position = Vector2.zero, UDim2.fromOffset(0, 54)
+	local utility = 0
+	for _, button in buttons do
+		local primary = button.Name == "INVENTORY"
+		if primary then
+			button.Position, button.Size = UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 40)
+		else
+			button.Position = UDim2.fromOffset((utility % 2) * (utilityWidth + gap), 46 + math.floor(utility / 2) * (utilityHeight + gap))
+			button.Size = UDim2.fromOffset(utilityWidth, utilityHeight)
+			utility += 1
 		end
-	end
-	play.Size = UDim2.fromOffset(width, playHeight)
-	playCaption.TextSize = if mobile then 22 else 30
-	modes.Visible = not mobile
-	modes.Size = UDim2.fromOffset(width, 20)
-	local tilesTop = playHeight + (if mobile then 8 else 30)
-	tileList.Padding = UDim.new(0, gap)
-	local tilesHeight = count * rowHeight + math.max(0, count - 1) * gap
-	tiles.Position, tiles.Size = UDim2.fromOffset(0, tilesTop), UDim2.fromOffset(width, tilesHeight)
-	for _, button in tiles:GetChildren() do
-		if button:IsA("TextButton") then
-			button.Size = UDim2.fromOffset(width, rowHeight)
-			for _, child in button:GetChildren() do
-				if child:IsA("TextLabel") and child.Text ~= "›" then
-					child.TextSize = if mobile then 14 else 17
-					child.Position = UDim2.new(0, if mobile then 40 else 54, 0.5, 0)
-				elseif child:IsA("Frame") and child.Name ~= "Edge" then
-					child.Size = UDim2.fromOffset(if mobile then 20 else 28, if mobile then 20 else 28)
-					child.Position = UDim2.new(0, if mobile then 12 else 14, 0.5, 0)
-				end
+		for _, child in button:GetChildren() do
+			if child.Name == "NavLabel" then
+				child.Visible, child.TextScaled, child.TextSize = true, false, if primary then 14 else 11
+				child.AnchorPoint = Vector2.new(if primary then 0 else 0.5, 0.5)
+				child.Position = if primary then UDim2.new(0, 40, 0.5, 0) else UDim2.fromScale(0.5, 0.5)
+				child.Size = if primary then UDim2.new(1, -64, 0, 20) else UDim2.new(1, -10, 0, 20)
+				child.TextXAlignment = if primary then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
+			elseif child.Name == "NavIcon" then
+				child.Visible = primary
+				child.Size, child.Position = UDim2.fromOffset(22, 22), UDim2.new(0, 10, 0.5, 0)
+			elseif child.Name == "NavChevron" then child.Visible = primary
+			elseif child.Name == "Edge" then
+				child.Visible = true
+				child.Size = UDim2.new(0, 2, 1, -14)
+				child.Position = UDim2.fromOffset(0, 7)
 			end
 		end
 	end
-	status.Position = UDim2.fromOffset(0, tilesTop + tilesHeight + gap + 2)
-	status.Size = UDim2.fromOffset(width, if mobile then 28 else 34)
-	local total = tilesTop + tilesHeight + gap + 2 + (if mobile then 28 else 34)
-	bar.Size = UDim2.fromOffset(width, total)
-	bar.Position = UDim2.new(0, if mobile then 12 else 24, 0.5, if mobile then 6 else 0)
-	news.Visible = not mobile or size.X > 760
-	news.Position = UDim2.new(1, if mobile then -12 else -24, 0.5, 0)
-	unlockPanel.Visible = not mobile
+	local tilesHeight = 40 + math.ceil(utility / 2) * (utilityHeight + gap)
+	tiles.Size = UDim2.fromOffset(width, tilesHeight)
+	status.Position, status.Size = UDim2.fromOffset(0, 54 + tilesHeight + 8), UDim2.fromOffset(width, 28)
+	levelLabel.TextSize, coinsLabel.TextSize = 11, 11
+	levelLabel.Position, levelLabel.Size = UDim2.fromOffset(8, 0), UDim2.fromOffset(56, 28)
+	levelTrack.Position, levelTrack.Size = UDim2.new(0, 65, 0.5, 0), UDim2.new(1, -151, 0, 4)
+	coinsLabel.Position, coinsLabel.Size = UDim2.new(1, -8, 0, 0), UDim2.fromOffset(78, 28)
+	bar.Size = UDim2.fromOffset(width, 54 + tilesHeight + 8 + 28)
+	news.Position = UDim2.new(1, -16, 0, 64)
 end
+picker:GetPropertyChangedSignal("Visible"):Connect(function()
+	gui:SetAttribute("ModePickerOpen", picker.Visible)
+	fitDock()
+end)
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitDock)
 task.defer(fitDock)
 
