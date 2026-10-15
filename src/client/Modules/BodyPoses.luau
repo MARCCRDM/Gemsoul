@@ -29,6 +29,9 @@
 	  BodyPoses.setFocus(fn)   fn() -> the model you're locked on, if any
 	  BodyPoses.settle(char)   a body back from a fight: joints at rest, out of
 	                           any stuck state, its animations started afresh
+	  BodyPoses.settleOther(p) another player's body back from their fight, on
+	                           this screen: joints at rest, leftover animations
+	                           stopped
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -43,6 +46,13 @@ local BodyPoses = {}
 BodyPoses.Range = 220
 -- Heads only turn toward a foe this close.
 BodyPoses.LookRange = 60
+-- Settling a body (BodyPoses.settle): seconds between stopping its
+-- animations and restarting its Animate script.
+BodyPoses.RestartDelay = 0.3
+-- Another player's body after their fight (BodyPoses.settleOther): which
+-- animations count as left over (playing OrphanSnapshot s after the fight
+-- ends) and when those still playing are stopped (OrphanCheck s after).
+BodyPoses.OrphanSnapshot, BodyPoses.OrphanCheck = 0.5, 1.6
 
 local focus: (() -> Model?)? = nil
 function BodyPoses.setFocus(fn: () -> Model?)
@@ -195,7 +205,12 @@ function BodyPoses.settle(character: Model?)
 		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 	end
 	-- (Its animations: whatever was left playing stops, and the stock Animate
-	-- script restarts, picking up idle or walk from where the body is now.)
+	-- script restarts, picking up idle or walk from where the body is now.
+	-- Not at once: as it starts, the stock Animate stops and destroys every
+	-- track still playing, and a track destroyed mid-stop didn't always stop
+	-- on other players' screens. There the body went on falling, arms up and
+	-- out, while it stood normally on its own. RestartDelay lets the stops
+	-- finish, and reach everyone, first.)
 	local animator = humanoid:FindFirstChildOfClass("Animator")
 	if animator then
 		for _, track in animator:GetPlayingAnimationTracks() do
@@ -205,12 +220,57 @@ function BodyPoses.settle(character: Model?)
 	local animate = character:FindFirstChild("Animate")
 	if animate and animate:IsA("LocalScript") and animate.Enabled then
 		animate.Enabled = false
-		task.defer(function()
+		task.delay(BodyPoses.RestartDelay, function()
 			if animate.Parent then
 				animate.Enabled = true
 			end
 		end)
 	end
+end
+
+-- Another player's body after their fight. Their own screen settles it
+-- (BodyPoses.settle, as the fight ends and again 0.6 s on), but that only
+-- reaches this screen as far as Roblox passes their animations on. Here,
+-- too, its joints go back to rest, and an animation still playing from
+-- before their second settle is stopped once that has had time to arrive
+-- (OrphanCheck seconds after the fight ends): their own screen stopped
+-- every one of those, so here it would only be left stuck.
+local function playingTracks(character: Model): { AnimationTrack }
+	local ok, tracks = pcall(function()
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+		return if animator then animator:GetPlayingAnimationTracks() else {}
+	end)
+	return if ok then tracks else {}
+end
+function BodyPoses.settleOther(player: Player)
+	local character = player.Character
+	if not character then
+		return
+	end
+	local function still(): boolean
+		return player.Character == character and player:GetAttribute("CombatSession") == nil
+	end
+	pcall(RivalPose.reset, character)
+	task.delay(BodyPoses.OrphanSnapshot, function()
+		if not still() then
+			return
+		end
+		pcall(RivalPose.reset, character)
+		local before = playingTracks(character)
+		task.delay(BodyPoses.OrphanCheck - BodyPoses.OrphanSnapshot, function()
+			if not still() then
+				return
+			end
+			for _, track in before do
+				pcall(function()
+					if track.IsPlaying then
+						track:Stop(0.2)
+					end
+				end)
+			end
+		end)
+	end)
 end
 
 local started=false
@@ -233,6 +293,24 @@ function BodyPoses.start()
 		end
 		wasFighting = fighting
 	end)
+	-- Everyone else's, as their fights end (BodyPoses.settleOther).
+	local function watch(player: Player)
+		if player == me then
+			return
+		end
+		local was = player:GetAttribute("CombatSession") ~= nil
+		player:GetAttributeChangedSignal("CombatSession"):Connect(function()
+			local fighting = player:GetAttribute("CombatSession") ~= nil
+			if was and not fighting then
+				BodyPoses.settleOther(player)
+			end
+			was = fighting
+		end)
+	end
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
+	Players.PlayerAdded:Connect(watch)
  -- After Animator evaluation, before joint transforms are committed to physics.
  -- One owner and one phase prevent render/physics fighting over arm poses.
  RunService.PreSimulation:Connect(function(dt)
