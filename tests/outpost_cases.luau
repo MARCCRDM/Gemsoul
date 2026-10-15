@@ -322,6 +322,7 @@ local Server = (function()
 				Gems = Gems,
 				ChatChannels = ChatChannels,
 				MineWall = MineWall,
+				MiningRolls = { publish = function() end },
 				PlayerData = PlayerData,
 				Progress = Progress,
 				Shop = Shop,

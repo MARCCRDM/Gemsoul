@@ -32,11 +32,10 @@ local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
-local GemArt = require(script.Parent.GemArt)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
 local MobileLayout = require(script.Parent.MobileLayout)
-local MiningReveal = require(script.Parent.MiningReveal)
+local MiningReveal = require(script.Parent.MiningWorldReveal)
 local PickImpacts = require(script.Parent.PickImpacts)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
@@ -57,14 +56,6 @@ local probeCharge = nil -- the free pick's meter at PROBE-7, while drawn
 local finds = { Gems = 0, Coins = 0, Gear = 0, Rocks = 0 }
 local nextSwing = 0
 local hiddenDashboard: ScreenGui? = nil
-
-local RARITY_COLORS = {
-	GemConfig.TierColors.Common,
-	GemConfig.TierColors.Uncommon,
-	GemConfig.TierColors.Rare,
-	GemConfig.TierColors.UltraRare,
-	GemConfig.TierColors.Legendary,
-}
 
 local function tween(
 	object: Instance,
@@ -233,7 +224,6 @@ local function fitOutpostHud()
 	local mobile = UserInputService.TouchEnabled or size.Y < 540
 	local blocked = next(openScreens) ~= nil or player:GetAttribute("CombatSession") ~= nil
 		or (mobile and player:GetAttribute("ChatOpen") == true)
-	if blocked then MiningReveal.close() end
 	if blocked or not hud.Enabled then expanded = false end
 	card.Size = UDim2.fromOffset(300, if expanded then 100 elseif mobile then 64 else 44)
 	togglePick.Size = UDim2.fromScale(1, 1)
@@ -610,63 +600,8 @@ reveal:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitReward)
 fitReward()
 local revealToken = 0
 
--- In the world: the gem rises out of the rubble in a beam of its colour.
-local function worldReveal(at: Vector3, color: Color3, rank: number, awardedGem)
-	local gem = GemArt.model(awardedGem, false)
-	gem.Name = "MiningGemDiscovery"
-	gem:PivotTo(CFrame.new(at) * GemArt.pose(awardedGem, 0))
-	for _, part in gem:GetDescendants() do
-		if part:IsA("BasePart") then part.CanQuery, part.CanTouch = false, false end
-	end
-	gem.Parent = workspace
-	local light = Instance.new("PointLight")
-	light.Color, light.Range, light.Brightness = color, 10 + rank * 4, 1 + rank * 0.6
-	light.Parent = gem:FindFirstChildWhichIsA("BasePart")
-	local beam = Instance.new("Part")
-	beam.Anchored, beam.CanCollide, beam.CanQuery, beam.CanTouch = true, false, false, false
-	beam.Shape = Enum.PartType.Cylinder
-	beam.Material = Enum.Material.Neon
-	beam.Color = color
-	beam.Transparency = 0.35
-	local beamHeight = 12 + rank * 8
-	beam.Size = Vector3.new(beamHeight, 0.15 + rank * 0.2, 0.15 + rank * 0.2)
-	beam.CFrame = CFrame.new(at + Vector3.new(0, beamHeight / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	beam.Parent = workspace
-	local t0 = os.clock()
-	local spin
-	spin = RunService.RenderStepped:Connect(function()
-		local t = os.clock() - t0
-		if not gem.Parent then
-			spin:Disconnect()
-			return
-		end
-		gem:PivotTo(CFrame.new(at + Vector3.new(0, math.min(t, 0.8) * 5 + math.sin(t * 3) * 0.2, 0))
-			* GemArt.pose(awardedGem, t * 2))
-	end)
-	tween(
-		beam,
-		2.6,
-		{ Transparency = 1, Size = Vector3.new(beamHeight, 0.05, 0.05) },
-		Enum.EasingStyle.Quad,
-		Enum.EasingDirection.In
-	)
-	task.delay(2.4, function()
-		for _, part in gem:GetDescendants() do
-			if part:IsA("BasePart") then tween(part, 0.4, { Transparency = 1 }) end
-		end
-	end)
-	Debris:AddItem(gem, 3)
-	Debris:AddItem(beam, 3)
-end
-
--- The gem roller owns its short queue; credit/log each find immediately so
--- mining another rock never cancels the previous find's session totals.
+-- Personal totals/logging only; the server broadcasts the shared world lottery.
 function OutpostScene.reveal(loot, at: Vector3?)
-	local rank = if loot.Gem then GemConfig.TierRank[loot.Gem.Tier] or 1 else 0
-	local color = if rank > 0 then RARITY_COLORS[rank] else P.Gold
-	if at and loot.Gem then
-		worldReveal(at + Vector3.new(0, 1, 0), color, rank, loot.Gem)
-	end
 	if loot.Tutorial then return end
 	local found = {}
 	if loot.Gem then table.insert(found, "[" .. (loot.Text or GemConfig.displayName(loot.Gem)) .. "]") end
@@ -683,12 +618,6 @@ function OutpostScene.reveal(loot, at: Vector3?)
 	if loot.Gem then
 		revealToken += 1
 		revealCard.Visible = false
-		if active and not player:GetAttribute("CombatSession") and next(openScreens) == nil then
-			MiningReveal.push(loot)
-		end
-	elseif #found > 0 then
-		UiKit.toast(table.concat(found, "  ·  "), P.Gold)
-		sound(PING, 1.5, 0.25)
 	end
 	if loot.Full then UiKit.toast("Gem pouch full: sell or socket gems!", P.Bad) end
 end

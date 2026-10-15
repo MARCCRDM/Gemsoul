@@ -134,6 +134,7 @@ local function showResult(entry, elapsed)
 		entry.Detail.Text = if packet.Full then "No stone collected" else "No stone this time"
 	end
 	local rewards = {}
+	if gem then table.insert(rewards, "VALUE ≈ " .. math.floor(GemConfig.value(gem)) .. " coins") end
 	if packet.Coins and packet.Coins > 0 then table.insert(rewards, "+" .. packet.Coins .. " coins") end
 	if packet.Gear then table.insert(rewards, tostring(packet.Gear)) end
 	entry.Extras.Text = table.concat(rewards, "  ·  ")
@@ -169,7 +170,8 @@ local function step()
 			local right = camera and camera.CFrame.RightVector or Vector3.new(1, 0, 0)
 			for i = -1, 1 do
 				local at = index + i
-				local cell, tier = entry.Cells[i + 2], entry.Sequence[at] or "Common"
+				-- Recycle three reel cells: only the incoming stone changes each tick.
+				local cell, tier = entry.Cells[at % 3 + 1], entry.Sequence[at] or "Common"
 				if cell.Index ~= at then
 					if cell.Model then cell.Model:Destroy(); cell.Model = nil end
 					cell.Index = at
