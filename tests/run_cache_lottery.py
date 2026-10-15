@@ -1,4 +1,4 @@
-"""Drive the actual Arena Cache lottery: gems then gear, exact outcomes, reveal/next/skip, waiting for previews, cleanup."""
+"""Drive the actual Arena Cache roll: every reel at once, landings in turn, exact outcomes, skip, previews wait, cleanup."""
 from pathlib import Path
 import re
 import subprocess

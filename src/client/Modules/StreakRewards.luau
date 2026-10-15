@@ -26,11 +26,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
-local Art = require(script.Parent.LotteryArt)
 local CacheLottery = require(script.Parent.CacheLottery)
-local GearArt = require(script.Parent.GearArt)
 local UiKit = require(script.Parent.UiKit)
 
 local StreakRewards = {}
@@ -108,48 +107,29 @@ function StreakRewards.refresh()
 	end)
 end
 
--- A gem's three grades, short enough for a card.
-local function grades(gem): string
-	if gem.Flawless then
-		return "FLAWLESS  ·  ALL 10s"
-	end
-	return string.format("Size %d · Clar %d · Prec %d", gem.Size or 0, gem.Clarity or 0, gem.Cut or 0)
-end
-
--- A piece of gear in 3D: the server's preview of it ("Slot|A:<tag>",
--- ArenaStreaks.previews), framed like the Market's. Nil until it's built.
-local function gearView(parent, slot: string, tag: string): ViewportFrame?
-	local view = new("ViewportFrame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		Ambient = Color3.fromRGB(185, 190, 210),
-		LightColor = Color3.fromRGB(255, 235, 201),
-		LightDirection = Vector3.new(-0.4, -1, -0.6),
-	}, parent)
-	local ok, drawn = pcall(GearArt.draw, view, slot, "A:" .. tag, false)
-	if ok and drawn then
-		return view
-	end
-	view:Destroy()
-	return nil
-end
-
--- One piece on a card: its rarity on a ribbon, its picture (3D: the gem
--- from its data, the gear from its server preview), name and what it is;
--- gear adds its stat rolls, passive and affixes. Ultra-Rare cards carry a
--- stronger edge and a tinted face. Gear whose preview isn't built yet shows
--- its silhouette until Upgrade draws it in 3D.
+-- One piece on a card: its rarity on a ribbon, its own round reel (the
+-- piece in 3D: the gem from its data, the gear from its server preview), its
+-- name and its stats: a gem's Size, Clarity and Cut as bars; a piece of
+-- gear's quality as a bar, then its stat rolls, passive and affixes.
+-- Ultra-Rare cards carry a stronger edge and a tinted face.
+-- Rolling (`lot`), the reel spins with the rest of the grid; the card shows
+-- what rolls past and fills in on landing. Gear whose 3D preview isn't
+-- built yet shows its silhouette until Upgrade draws it.
 local gearLines = CacheLottery.gearLines
 
-local GEAR_H, GEM_H = 250, 196 -- (card heights)
+local GEAR_H, GEM_H = 272, 226 -- (card heights)
+local WINDOW = 104 -- (px: the reel's round window)
+local OFF = Color3.fromRGB(38, 46, 62) -- (an unlit bar segment)
 
-local function card(parent, entry, onToggle, cacheId: string)
+local function card(parent, entry, onToggle, cacheId: string, lot)
 	local item = entry.Item
 	local free = entry.Free == true
+	local isGem = item.Kind == "Gem"
+	local tier = entry.Rarity or (item.Gem and item.Gem.Tier) or "Rare"
 	-- The row lays out a plain cell; the card sits centred in it.
 	local cell = new(
 		"Frame",
-		{ BackgroundTransparency = 1, Size = UDim2.fromOffset(150, if item.Kind == "Gear" then GEAR_H else GEM_H) },
+		{ BackgroundTransparency = 1, Size = UDim2.fromOffset(150, if isGem then GEM_H else GEAR_H) },
 		parent
 	)
 	local b = new("TextButton", {
@@ -170,82 +150,118 @@ local function card(parent, entry, onToggle, cacheId: string)
 	UiKit.round(ribbon, 6)
 	local art = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(12, 30),
-		Size = UDim2.fromOffset(126, 96),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 32),
+		Size = UDim2.fromOffset(WINDOW, WINDOW),
 	}, b)
-	local name = label(b, "", 13, TEXT, Enum.Font.GothamBlack)
-	name.Position, name.Size = UDim2.fromOffset(8, 126), UDim2.new(1, -16, 0, 34)
-	local sub = label(b, "", 10, DIM, Enum.Font.GothamBold)
-	sub.Position, sub.Size = UDim2.fromOffset(8, 164), UDim2.new(1, -16, 0, 14)
+	local window = CacheLottery.window(art)
 	local tick = label(b, if free then "YOURS" else "KEEP", 12, INK, Enum.Font.GothamBlack)
 	tick.BackgroundColor3, tick.BackgroundTransparency = if free then Color3.fromRGB(110, 220, 140) else GOLD, 0
 	tick.AnchorPoint = Vector2.new(0.5, 0)
-	tick.Position, tick.Size = UDim2.new(0.5, 0, 0, 104), UDim2.fromOffset(64, 20)
+	tick.Position, tick.Size = UDim2.new(0.5, 0, 0, 124), UDim2.fromOffset(64, 20)
+	tick.ZIndex = 4
 	tick.Visible = false
 	UiKit.round(tick, 6)
-	-- Gear: its stats, passive and affixes under the name.
-	local statLine, passiveLine, affixLine
-	if item.Kind == "Gear" then
+	local name = label(b, "", 13, TEXT, Enum.Font.GothamBlack)
+	name.Position, name.Size = UDim2.fromOffset(8, 148), UDim2.new(1, -16, 0, 30)
+
+	-- Bars: rows of segments under the name.
+	local bars = {}
+	local function bar(key, caption, y, count, width, gap)
+		local text = label(b, caption, 9, DIM, Enum.Font.GothamBold)
+		text.TextXAlignment = Enum.TextXAlignment.Left
+		text.Position, text.Size = UDim2.fromOffset(10, y - 2), UDim2.fromOffset(42, 12)
+		local segments = {}
+		local x = 150 - 10 - count * width - (count - 1) * gap
+		for i = 1, count do
+			local segment = new("Frame", {
+				BackgroundColor3 = OFF,
+				Position = UDim2.fromOffset(x + (i - 1) * (width + gap), y),
+				Size = UDim2.fromOffset(width, 8),
+			}, b)
+			UiKit.round(segment, 2)
+			segments[i] = segment
+		end
+		bars[key] = { Segments = segments, Shown = -1 }
+	end
+	local function showBar(key, amount: number, color)
+		local row = bars[key]
+		amount = math.clamp(math.floor(amount), 0, #row.Segments)
+		if row.Shown == amount and row.Color == color then
+			return
+		end
+		row.Shown, row.Color = amount, color
+		for i, segment in row.Segments do
+			segment.BackgroundColor3 = if i <= amount then color else OFF
+		end
+	end
+	local sub, statLine, passiveLine, affixLine
+	if isGem then
+		bar("Size", "SIZE", 184, 10, 7, 2)
+		bar("Clarity", "CLARITY", 198, 10, 7, 2)
+		bar("Cut", "CUT", 212, 10, 7, 2)
+	else
+		sub = label(b, "", 10, DIM, Enum.Font.GothamBold)
+		sub.Position, sub.Size = UDim2.fromOffset(8, 178), UDim2.new(1, -16, 0, 12)
+		bar("Quality", "QUALITY", 196, 4, 19, 3)
 		statLine = label(b, "", 11, Color3.fromRGB(120, 230, 150), Enum.Font.GothamBold)
-		statLine.Position, statLine.Size = UDim2.fromOffset(8, 182), UDim2.new(1, -16, 0, 28)
+		statLine.Position, statLine.Size = UDim2.fromOffset(8, 210), UDim2.new(1, -16, 0, 26)
 		passiveLine = label(b, "", 10, GOLD, Enum.Font.GothamBold)
-		passiveLine.Position, passiveLine.Size = UDim2.fromOffset(8, 212), UDim2.new(1, -16, 0, 14)
+		passiveLine.Position, passiveLine.Size = UDim2.fromOffset(8, 238), UDim2.new(1, -16, 0, 13)
 		affixLine = label(b, "", 10, Color3.fromRGB(140, 200, 255), Enum.Font.GothamBold)
-		affixLine.Position, affixLine.Size = UDim2.fromOffset(8, 228), UDim2.new(1, -16, 0, 14)
+		affixLine.Position, affixLine.Size = UDim2.fromOffset(8, 253), UDim2.new(1, -16, 0, 13)
 	end
 
 	-- The card's colours for a rarity.
 	local face, rest = CARD, { 1.5, 0.55 }
-	local function paint(tier: string)
-		local tint = GemConfig.TierColors[tier] or GOLD
-		local ultra = tier == "UltraRare"
-		face = if ultra then CARD:Lerp(tint, 0.1) else CARD
+	local function paint(shown: string, dim: boolean?)
+		local tint = GemConfig.TierColors[shown] or GOLD
+		local ultra = shown == "UltraRare"
+		face = if ultra and not dim then CARD:Lerp(tint, 0.1) else CARD
 		rest = if ultra then { 2, 0.15 } else { 1.5, 0.55 }
 		b.BackgroundColor3 = face
 		edge.Color, edge.Thickness, edge.Transparency = tint, rest[1], rest[2]
-		local word = string.upper(GemConfig.TierLabels[tier] or tier)
+		local word = string.upper(GemConfig.TierLabels[shown] or shown)
 		ribbon.Text = if ultra then "★ " .. word .. " ★" else word
-		ribbon.BackgroundColor3 = tint
+		ribbon.BackgroundColor3 = if dim then tint:Lerp(CARD, 0.35) else tint
+		window.paint(shown)
 		return tint
 	end
 
-	-- The real piece. Gear without its 3D preview yet shows its silhouette
-	-- (flat) until Upgrade can draw it.
-	local flat = false
-	local realArt = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, art)
-	local function drawGear(tint)
-		for _, child in realArt:GetChildren() do
-			child:Destroy()
-		end
-		if gearView(realArt, item.Slot, cacheId .. "/" .. entry.OfferId) then
-			flat = false
-			return
-		end
-		flat = true
-		local holder = new("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(38, 36),
-		}, realArt)
-		new("UIScale", { Scale = 2.3 }, holder)
-		pcall(GearArt.icon, holder, item.Slot, {}, tint)
-	end
-	local function showReal()
-		local tier = entry.Rarity or (item.Gem and item.Gem.Tier) or "Rare"
+	-- What it is, all filled in; `fill` animates the bars in.
+	local alive = true
+	local function showReal(fill: boolean?)
 		local tint = paint(tier)
-		realArt.Visible = true
-		if item.Kind == "Gem" then
-			pcall(Art.show, realArt, item.Gem, nil, GemConfig.ElementColors[item.Gem.Element] or tint, false)
-		else
-			drawGear(tint)
-		end
+		window.paint(tier, true)
 		name.Text, name.TextColor3 = entry.Name, TEXT
-		sub.Text = if item.Kind == "Gem"
-			then grades(item.Gem)
-			else string.upper(item.Slot or "Gear") .. "  ·  QUALITY " .. tostring(item.Quality or 1)
-		sub.TextColor3 = if item.Kind == "Gem" and item.Gem.Flawless then GOLD else DIM
-		if statLine then
+		local color = if isGem and item.Gem.Flawless then GOLD else tint
+		local goals = if isGem
+			then { Size = item.Gem.Size or 0, Clarity = item.Gem.Clarity or 0, Cut = item.Gem.Cut or 0 }
+			else { Quality = item.Quality or 1 }
+		for key in bars do
+			showBar(key, if fill then 0 else goals[key], color)
+		end
+		if fill then
+			-- (row after row, a segment at a time)
+			task.spawn(function()
+				for step = 1, 14 do
+					task.wait(0.035)
+					if not alive then
+						return
+					end
+					for row, key in { "Size", "Clarity", "Cut", "Quality" } do
+						if bars[key] then
+							showBar(key, math.min(goals[key], step - (row - 1) * 2), color)
+						end
+					end
+				end
+				for key in bars do
+					showBar(key, goals[key], color)
+				end
+			end)
+		end
+		if not isGem then
+			sub.Text = string.upper((Slots.Definitions[item.Slot] or {}).Label or item.Slot or "Gear")
 			local stats, passive, affixes = gearLines(item)
 			statLine.Text = if stats ~= "" then stats else "Base stats"
 			passiveLine.Text = if passive then "◆ " .. passive else ""
@@ -258,7 +274,46 @@ local function card(parent, entry, onToggle, cacheId: string)
 		end
 	end
 
-	showReal()
+	-- Gear drawn flat (its 3D preview wasn't built yet) is redrawn by Upgrade.
+	local flat = false
+	if lot then
+		-- Rolling: blank until its reel starts, then what rolls past.
+		paint(tier, true)
+		ribbon.Text, name.Text, name.TextColor3 = "· · ·", "", DIM
+		lot.add(window, entry, {
+			Center = function(option)
+				paint(option.Tier, true)
+				name.Text = option.Name or ""
+				local dim = (GemConfig.TierColors[option.Tier] or DIM):Lerp(CARD, 0.4)
+				if isGem then
+					local grades = option.Grades or {}
+					for key in bars do
+						showBar(key, grades[key] or 0, dim)
+					end
+				else
+					sub.Text = string.upper(option.Label or "")
+					showBar("Quality", option.Quality or 1, dim)
+					statLine.Text, passiveLine.Text, affixLine.Text = "· · ·", "", ""
+				end
+			end,
+			Land = function(own)
+				flat = own.Flat == true
+				showReal(true)
+			end,
+		})
+	else
+		if isGem then
+			window.still(CacheLottery.gemView(item.Gem))
+		else
+			local view
+			view, flat = CacheLottery.gearView(entry, cacheId .. "/" .. entry.OfferId)
+			window.still(view)
+		end
+		showReal(false)
+	end
+	cell.Destroying:Connect(function()
+		alive = false
+	end)
 
 	b.Activated:Connect(function()
 		if onToggle then
@@ -266,10 +321,16 @@ local function card(parent, entry, onToggle, cacheId: string)
 		end
 	end)
 	return {
-		-- The gear previews arrived: draw it in 3D.
+		-- The gear previews arrived: a piece drawn flat is redrawn in 3D.
 		Upgrade = function()
-			if flat and item.Kind == "Gear" then
-				drawGear(GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD)
+			if flat and not isGem then
+				local view, stillFlat = CacheLottery.gearView(entry, cacheId .. "/" .. entry.OfferId)
+				if stillFlat then
+					view:Destroy()
+				else
+					flat = false
+					window.still(view)
+				end
 			end
 		end,
 		Mark = function(on: boolean)
@@ -277,7 +338,7 @@ local function card(parent, entry, onToggle, cacheId: string)
 				return -- (yours already: nothing to pick)
 			end
 			edge.Thickness, edge.Transparency = if on then 3 else rest[1], if on then 0 else rest[2]
-			edge.Color = if on then GOLD else (GemConfig.TierColors[entry.Rarity or "Rare"] or GOLD)
+			edge.Color = if on then GOLD else (GemConfig.TierColors[tier] or GOLD)
 			b.BackgroundColor3 = if on then face:Lerp(GOLD, 0.14) else face
 			tick.Visible = on
 		end,
@@ -355,10 +416,11 @@ function StreakRewards.open()
 		end
 	end)
 
-	-- The pick screen. Two rows on one board, scaled to fit the screen
-	-- (phones included): the free gems (all yours), then the gear to choose
-	-- from.
-	local function pickScreen()
+	-- Two rows on one board, scaled to fit the screen (phones included): the
+	-- free gems (all yours), then the gear to choose from. The first time a
+	-- cache opens, every card's reel rolls at once and lands in turn, the
+	-- gems first (CacheLottery); a tap lands them all.
+	do
 		local gemEntries, gearEntries = {}, {}
 		for _, entry in cache.Items do
 			table.insert(if entry.Free then gemEntries else gearEntries, entry)
@@ -460,15 +522,23 @@ function StreakRewards.open()
 		gearRow = row(gearTop, GEAR_H)
 
 		local claim
+		local skip = false
 		local function redraw()
 			for id, c in cards do
 				c.Mark(chosen[id] == true)
 			end
 			local n = #order
-			claim.Text = if n == picks then "CLAIM THESE " .. picks else string.format("PICK %d MORE", picks - n)
-			claim.BackgroundColor3 = if n == picks then GOLD else Color3.fromRGB(70, 74, 90)
+			claim.Text = if rolling
+				then "ROLLING  ·  TAP TO REVEAL"
+				elseif n == picks then "CLAIM THESE " .. picks
+				else string.format("PICK %d MORE", picks - n)
+			claim.BackgroundColor3 = if n == picks and not rolling then GOLD else Color3.fromRGB(70, 74, 90)
 		end
 		local function toggle(id)
+			if rolling then
+				skip = true -- (a tap lands the whole roll)
+				return
+			end
 			if chosen[id] then
 				chosen[id] = nil
 				table.remove(order, table.find(order, id))
@@ -482,12 +552,24 @@ function StreakRewards.open()
 			end
 			redraw()
 		end
+		local lot = if rolling
+			then CacheLottery.new(cache, {
+				Ready = function()
+					return previewsIn
+				end,
+			})
+			else nil
 		for _, entry in gemEntries do
-			cards[entry.OfferId] = card(gemRow, entry, nil, cache.Id)
+			cards[entry.OfferId] = card(gemRow, entry, function()
+				-- (free: nothing to pick; a tap only lands the roll)
+				if rolling then
+					skip = true
+				end
+			end, cache.Id, lot)
 			table.insert(drawn, cards[entry.OfferId])
 		end
 		for _, entry in gearEntries do
-			cards[entry.OfferId] = card(gearRow, entry, toggle, cache.Id)
+			cards[entry.OfferId] = card(gearRow, entry, toggle, cache.Id, lot)
 			table.insert(drawn, cards[entry.OfferId])
 		end
 		if previewsIn then
@@ -508,6 +590,10 @@ function StreakRewards.open()
 		UiKit.round(claim, 10)
 		claim:SetAttribute("UiSound", "Confirm")
 		claim.Activated:Connect(function()
+			if rolling then
+				skip = true
+				return
+			end
 			if busy or #order ~= picks then
 				return
 			end
@@ -538,26 +624,29 @@ function StreakRewards.open()
 		end)
 		redraw()
 		drawLauncher()
-	end
 
-	-- The first time a cache opens, its lottery plays first (CacheLottery):
-	-- the free gems, then the gear, rolled and landed one by one.
-	if rolling then
-		task.spawn(function()
-			local ok, err = pcall(CacheLottery.play, shown, cache, {
-				Ready = function()
-					return previewsIn
-				end,
-			})
-			if not ok then
-				warn("[StreakRewards] the cache's lottery failed: " .. tostring(err))
-			end
-			if screen == shown then
-				pickScreen()
-			end
-		end)
-	else
-		pickScreen()
+		if lot then
+			task.spawn(function()
+				local ok, err = pcall(lot.run, function()
+					return screen == shown
+				end, function()
+					return skip
+				end)
+				if not ok then
+					warn("[StreakRewards] the cache's roll failed: " .. tostring(err))
+				end
+				lot.destroy()
+				if screen == shown then
+					rolling = false
+					redraw()
+					if previewsIn then
+						for _, c in drawn do
+							c.Upgrade()
+						end
+					end
+				end
+			end)
+		end
 	end
 end
 

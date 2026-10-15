@@ -1,136 +1,157 @@
 
 local checks = 0
 local function check(ok, message) checks += 1; assert(ok, message) end
--- The piece in the display's window (the reel cell at its stop).
-local function landedPiece()
+local function gemEntry(offer, tier, id)
+	local gem = { Id = id, Element = "Frost", Tier = tier, Size = 8, Clarity = 7, Cut = 6 }
+	return { OfferId = offer, Free = true, Rarity = tier, Name = "Gem " .. id, Item = { Kind = "Gem", Gem = gem } }
+end
+local function gearEntry(offer, slot, tier)
+	return { OfferId = offer, Rarity = tier, Name = tier .. " " .. slot,
+		Item = { Kind = "Gear", Slot = slot, Id = "Test" .. slot, Quality = 3, Roll = { Stats = { Health = 12, Power = 8 }, Affixes = { {}, {} } } } }
+end
+local reveals = 0
+LotterySound.reveal = function(rank) reveals += 1; table.insert(sounds, rank) end
+-- The piece in the middle of a window (its cell at the stop).
+local function middle(win)
 	for _, o in objects do
-		if not o.Destroyed and o.Name == "ReelCell" and math.abs(o.Position.Y.Offset - 23) < 0.01 then
-			for _, child in o:GetChildren() do
-				if child.Name == "Piece" then return child:GetChildren()[1] end
+		if not o.Destroyed and o.Name == "ReelCell" and o.Parent == win.Holder:FindFirstChildOfClass("CanvasGroup") then
+			local y = o.Position.Y.Offset
+			if math.abs(y + o.Size.Y.Offset / 2) < 0.01 then
+				return o:GetChildren()[1]:GetChildren()[1]
 			end
 		end
 	end
 end
-local function press(name) find(name).Activated:Fire() end
-local function count(name)
-	local n = 0
-	for _, o in objects do if not o.Destroyed and o.Name == name then n += 1 end end
-	return n
+-- No picture may sit in two cells at once.
+local function cellsDistinct(win)
+	local well = win.Holder:FindFirstChildOfClass("CanvasGroup")
+	local seen = {}
+	for _, cell in well:GetChildren() do
+		if cell.Name == "ReelCell" then
+			for _, view in cell:GetChildren()[1]:GetChildren() do
+				if seen[view] then return false end
+				seen[view] = true
+			end
+		end
+	end
+	return true
 end
-local function gemEntry(offer, tier, id, flawless)
-	local gem = { Id = id, Element = "Frost", Tier = tier, Size = 8, Clarity = 7, Cut = 6 }
-	if flawless then gem.Size, gem.Clarity, gem.Cut, gem.Flawless = 10, 10, 10, true end
-	return { OfferId = offer, Free = true, Rarity = tier, Name = "Gem " .. id, Item = { Kind = "Gem", Gem = gem } }
+local function build(items, ready)
+	local cache = { Id = "c1", Wins = 50, Items = items }
+	local lot = CacheLottery.new(cache, { Ready = ready })
+	local rows = {}
+	for i, entry in items do
+		local frame = new("Frame", { Name = "Art" .. i, Size = UDim2.fromOffset(104, 104) }, root)
+		local win = CacheLottery.window(frame)
+		local row = { Entry = entry, Win = win, Frame = frame, Centers = 0 }
+		lot.add(win, entry, {
+			Center = function(option) row.Centers += 1; row.Last = option end,
+			Land = function(own) row.Own = own; row.LandedAt = now end,
+		})
+		rows[i] = row
+	end
+	return lot, rows
 end
-local function gearEntry(offer, slot, tier, quality, stats)
-	return { OfferId = offer, Rarity = tier, Name = tier .. " " .. slot, Item = { Kind = "Gear", Slot = slot,
-		Id = "Test" .. slot, Quality = quality, Roll = { Stats = stats or { Health = 12, Power = 8 }, Affixes = { {}, {} } } } }
-end
-local function cacheOf(items, dev) return { Id = "c1", Wins = 50, Dev = dev, Items = items } end
-local function run(cache, ready)
-	local parent = new("Frame", { Name = "ArenaCacheScreen" }, root)
-	local state = { Done = false, Parent = parent }
+local function start(lot, flags)
+	local state = { Done = false }
 	task.spawn(function()
-		CacheLottery.play(parent, cache, { Ready = ready or function() return true end })
+		lot.run(function() return not flags.Dead end, function() return flags.Skip == true end)
 		state.Done = true
 	end)
 	return state
 end
-local UR, R = string.upper(GemConfig.TierLabels.UltraRare), string.upper(GemConfig.TierLabels.Rare)
 
--- 1. Gems first, then gear, each landing on exactly what the server rolled.
-local gearOrder = { "Helmet", "Weapon", "Shield", "Armor", "Gloves", "Boots" }
-local items = { gearEntry("3", "Helmet", "UltraRare", 3), gemEntry("1", "UltraRare", "g1"), gemEntry("2", "Rare", "g2", true) }
-for i = 2, 6 do table.insert(items, gearEntry(tostring(i + 2), gearOrder[i], "Rare", 2, { Defense = 9 })) end
-local run1 = run(cacheOf(items))
-check(count("PieceChip") == 8, "One chip per piece in the strip")
-check(labelWith("ARENA CACHE  ·  50 WINS"), "The cache is named on the lottery")
-step(3)
-check(landedPiece() and landedPiece().Gem and landedPiece().Gem.Id == "g1", "First roll did not land on the first free gem")
-check(labelWith(UR) and labelWith("FREE GEM  ·  1 OF 2  ·  YOURS"), "Gem landing lacks its rarity or heading")
-local function commas(n)
-	local text = tostring(math.floor(n + 0.5))
-	while true do
-		local swapped, k = string.gsub(text, "^(-?%d+)(%d%d%d)", "%1,%2")
-		text = swapped
-		if k == 0 then return text end
+-- 1. Every reel spins at once and they land in turn: gems first, then gear,
+--    each on exactly its own piece, never showing a picture twice.
+local items = { gemEntry("1", "UltraRare", "g1"), gemEntry("2", "Rare", "g2") }
+for i, slot in { "Helmet", "Weapon", "Shield", "Armor", "Gloves", "Boots" } do
+	table.insert(items, gearEntry(tostring(i + 2), slot, if i == 1 then "UltraRare" else "Rare"))
+end
+local lot, rows = build(items, function() return true end)
+local flags = {}
+local run = start(lot, flags)
+step(0.5)
+for i, row in rows do
+	check(row.Centers > 0, "Reel " .. i .. " is not spinning with the rest")
+	check(not row.Own, "Reel " .. i .. " landed too early")
+	check(cellsDistinct(row.Win), "A picture sits in two cells of reel " .. i)
+end
+local distinctAll = true
+for _ = 1, 300 do
+	step(1 / 60)
+	for _, row in rows do
+		if not cellsDistinct(row.Win) then distinctAll = false end
 	end
 end
-check(labelWith("≈ " .. commas(GemConfig.value(items[2].Item.Gem)) .. " coins"), "Gem worth missing")
+check(distinctAll, "A reel showed the same picture in two cells while spinning")
 step(1)
-check(labelWith("8/10") and labelWith("7/10") and labelWith("6/10"), "Size, Clarity and Cut bars did not fill")
-check(find("RevealOrNext").Text == "NEXT  ›", "Landed piece should offer NEXT")
-press("RevealOrNext")
-step(0.1)
-check(find("RevealOrNext").Text == "REVEAL  ›", "NEXT did not move on to the next roll")
-press("RevealOrNext") -- (REVEAL: land it now)
-step(0.05)
-check(landedPiece().Gem.Id == "g2", "REVEAL landed somewhere other than the awarded gem")
-check(labelWith("Flawless: every grade a 10. Free, it's yours."), "Flawless gem not called out")
-press("RevealOrNext")
-step(0.1)
-check(labelWith("GEAR  ·  1 OF 6"), "Gear roll did not follow the gems")
-step(2.2)
-local piece = landedPiece()
-check(piece and piece.Name == "Helmet|A:c1/3", "Gear roll landed on the wrong piece: " .. tostring(piece and piece.Name))
-step(1.2)
-check(labelWith("+12 Health  ·  +8 Power") and labelWith("◆ Bulwark") and labelWith("2 elemental affixes"), "Gear stats, passive or affixes missing")
-check(labelWith("3/4") and labelWith(UR), "Gear quality bar or rarity missing")
-check(labelWith("≈ 12,000 coins"), "Gear Market price missing")
-check(labelWith("Keep it, or it sells on the Market and you get 25% (≈ 3,000 coins)."), "Commission line missing")
-check(drawnGear == 6, "Every piece of the cache's gear should be drawn once for the reel")
-for n = 2, 6 do
-	press("RevealOrNext") -- (NEXT, then REVEAL)
-	step(0.05)
-	press("RevealOrNext")
-	step(0.05)
-	check(landedPiece().Name == gearOrder[n] .. "|A:c1/" .. (n + 2), "Gear " .. n .. " landed on the wrong piece")
-	check(labelWith("GEAR  ·  " .. n .. " OF 6"), "Gear counter wrong")
+check(run.Done, "The roll did not finish")
+local order = table.clone(rows)
+table.sort(order, function(a, b) return a.LandedAt < b.LandedAt end)
+for i, row in order do
+	check(row == rows[i], "Landing order should be gems first, then gear in order")
 end
-check(find("RevealOrNext").Text == "TO YOUR PICKS  ›", "Last piece should lead to the picks")
-check(not run1.Done, "Lottery ended before the last piece was seen")
-press("RevealOrNext")
-step(0.5)
-check(run1.Done, "Lottery did not finish after the last piece")
-check(liveCount("ViewportFrame") == 0 and count("CacheLottery") == 0 and #run1.Parent:GetChildren() == 0, "Lottery leaked UI or templates")
+check(rows[1].LandedAt >= 1.4 and rows[1].LandedAt <= 1.6, "First reel should land at about 1.5 s")
+check(rows[8].LandedAt - rows[7].LandedAt >= 0.35, "Landings should be staggered")
+check(middle(rows[1].Win).Gem == items[1].Item.Gem and middle(rows[2].Win).Gem == items[2].Item.Gem, "Gem reel landed on a preview instead of the awarded gem")
+for i = 3, 8 do
+	local view = middle(rows[i].Win)
+	check(view and view.Name == items[i].Item.Slot .. "|A:c1/" .. items[i].OfferId, "Gear reel " .. i .. " landed on the wrong piece")
+	check(rows[i].Own.Tier == items[i].Rarity, "Gear rarity lost")
+end
+check(reveals == 8, "One reveal sound per landing")
+lot.destroy()
+check(liveCount("ViewportFrame") == 8, "Only each reel's own piece should stay after the roll (got " .. liveCount("ViewportFrame") .. ")")
+for _, row in rows do row.Frame:Destroy() end
+check(liveCount("ViewportFrame") == 0, "Cards leaked pictures")
 
--- 2. SKIP ALL ends it at once, mid-roll.
-local run2 = run(cacheOf({ gemEntry("1", "Rare", "s1"), gearEntry("2", "Boots", "Rare", 2) }))
-step(0.5)
-press("SkipAll")
-step(0.5)
-check(run2.Done and liveCount("ViewportFrame") == 0 and #run2.Parent:GetChildren() == 0, "SKIP ALL did not end and clean up")
+-- 2. A tap lands everything at once, with one sound.
+reveals = 0
+local lot2, rows2 = build({ gemEntry("1", "Rare", "s1"), gearEntry("2", "Boots", "Rare"), gearEntry("3", "Helmet", "Rare") }, function() return true end)
+local flags2 = {}
+local run2 = start(lot2, flags2)
+step(0.3)
+flags2.Skip = true
+step(2 / 60)
+check(run2.Done and reveals == 1, "Skip should land every reel at once with one sound")
+check(middle(rows2[1].Win).Gem.Id == "s1" and middle(rows2[2].Win).Name == "Boots|A:c1/2", "Skip landed on the wrong pieces")
+lot2.destroy()
+for _, row in rows2 do row.Frame:Destroy() end
 
--- 3. Previews not built: it waits (3 s at most), then rolls silhouettes.
+-- 3. Gear waits for its 3D previews (3 s at most), then rolls silhouettes.
 previewsBuilt = false
-local run3 = run(cacheOf({ gearEntry("1", "Helmet", "Rare", 2), gearEntry("2", "Weapon", "UltraRare", 4) }, true), function() return false end)
-step(2)
-check(labelWith("Bringing out the gear...") and not landedPiece(), "Gear rolled before waiting for its previews")
-step(1.5)
-check(count("GearShape") >= 2, "Missing previews should roll as silhouettes")
-press("RevealOrNext")
-step(0.05)
-check(landedPiece().Name == "GearShape" and labelWith("Keep it, or it's dropped (a test roll)."), "Dev cache landing wrong")
-step(20)
-check(run3.Done and #run3.Parent:GetChildren() == 0, "Silhouette run did not finish by itself")
+local lot3, rows3 = build({ gemEntry("1", "Rare", "w1"), gearEntry("2", "Helmet", "Rare"), gearEntry("3", "Weapon", "UltraRare") }, function() return false end)
+local run3 = start(lot3, {})
+step(2.8)
+check(rows3[1].Own and rows3[2].Centers == 0 and rows3[3].Centers == 0, "Gear rolled before its previews (or the gem waited for them)")
+step(0.4)
+check(rows3[2].Centers > 0, "Gear never started after 3 s")
+step(4)
+check(run3.Done and rows3[2].Own.Flat == true and middle(rows3[2].Win).Name == "GearShape", "Gear without previews should land as a silhouette marked flat")
+lot3.destroy()
+for _, row in rows3 do row.Frame:Destroy() end
 previewsBuilt = true
 
--- 4. The screen closing mid-roll (a fight starting) stops it cleanly.
-local run4 = run(cacheOf({ gemEntry("1", "Rare", "x1"), gearEntry("2", "Gloves", "Rare", 2) }))
-step(1)
-run4.Parent:Destroy()
-step(1)
-check(run4.Done and liveCount("ViewportFrame") == 0, "Closing the screen left the lottery running")
+-- 4. The screen closing mid-roll stops it; nothing is left behind.
+local lot4, rows4 = build({ gemEntry("1", "Rare", "x1"), gearEntry("2", "Gloves", "Rare") }, function() return true end)
+local flags4 = {}
+local run4 = start(lot4, flags4)
+step(0.6)
+flags4.Dead = true
+for _, row in rows4 do row.Frame:Destroy() end
+step(0.1)
+check(run4.Done, "Closing the screen left the roll running")
+lot4.destroy()
+check(liveCount("ViewportFrame") == 0, "A closed roll leaked pictures")
 
--- 5. Phone sizes: the card fits.
-viewport = { X = 390, Y = 740 }
-local run5 = run(cacheOf({ gemEntry("1", "Rare", "p1") }))
-local fit = find("CacheLottery"):FindFirstChildOfClass("UIScale")
-check(660 * fit.Scale <= 366 and 396 * fit.Scale <= 708, "Phone portrait clips")
-run5.Parent.AbsoluteSize = { X = 844, Y = 390 }
-run5.Parent:GetPropertyChangedSignal("AbsoluteSize"):Fire()
-check(396 * fit.Scale <= 358 and 660 * fit.Scale <= 820, "Phone landscape clips")
-press("SkipAll")
-step(0.5)
-check(run5.Done, "Phone run did not end")
-print("PASS: " .. checks .. " cache lottery checks; gems then gear, exact outcomes, stats, reveal/next/skip, previews wait, close, phone fit")
+-- 5. A cache opened again: one still piece in the middle.
+local frame = new("Frame", { Size = UDim2.fromOffset(104, 104) }, root)
+local win = CacheLottery.window(frame)
+local view = CacheLottery.gemView({ Id = "still", Element = "Frost", Tier = "Rare", Size = 5, Clarity = 5, Cut = 5 })
+win.still(view)
+check(middle(win) == view, "Still piece not centred")
+local swap = CacheLottery.gemView({ Id = "swap", Element = "Frost", Tier = "Rare", Size = 5, Clarity = 5, Cut = 5 })
+win.still(swap)
+check(middle(win) == swap and view.Destroyed, "Swapping the still piece should replace the old one")
+frame:Destroy()
+print("PASS: " .. checks .. " cache lottery checks; all reels at once, staggered landings (gems first), exact outcomes, no doubled pictures, skip, previews wait, close, still pieces")

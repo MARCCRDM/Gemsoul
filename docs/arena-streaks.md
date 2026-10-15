@@ -53,32 +53,31 @@ All the numbers live in `src/shared/ArenaStreak.luau`.
 
 ## The roll
 
-The first time a cache opens, its lottery plays before the pick screen
-(`src/client/Modules/CacheLottery.luau`). It works like the mining gem find
-(`MiningReveal`): one round display rolls a reel, slows and lands on one piece
-at a time, with its rarity, name and stats beside it.
+The first time a cache opens, the whole grid rolls at once
+(`src/client/Modules/CacheLottery.luau`). Every card has its own round reel,
+the mining find's display (`MiningReveal`) made small, and they all spin
+together. Each slows as its turn comes and lands in order: the free gems
+first, then the gear, 0.4 s apart.
 
-- **Gem lottery** (the free gems, first). The reel rolls through gems of every
-  rarity, like a real find, and lands on yours. Size, Clarity and Cut fill in
-  as bars, with the gem's worth.
-- **Gear lottery** (the six armour and weapon pieces, next). The reel rolls
-  through the cache's own pieces in 3D and lands on each in turn. Its quality
-  fills in (out of 4), then its stat rolls, passive and affixes appear, with
-  its Market price and your 25% if it sells.
+- **Gem reels** roll through gems of every rarity, like a real find, and land
+  on yours. Size, Clarity and Cut fill in as bars.
+- **Gear reels** roll through the cache's own armour and weapons in 3D and
+  land on each piece. Its quality bar fills in (out of 4), then its stat
+  rolls, passive and affixes appear.
 
-A strip along the bottom lights each piece as it lands. **REVEAL** lands the
-current piece now, **NEXT** moves on (pieces also move on by themselves), and
-**SKIP ALL** goes straight to the picks. The pieces are rolled on the server
-when the milestone is reached, so the lottery only reveals them. Reopening a
-cache later in the session goes straight to the picks.
+While it rolls, each card shows the rarity and name rolling past. Tapping a
+card or the button lands everything at once. Once all have landed, the same
+grid is the pick screen. The pieces are rolled on the server when the
+milestone is reached, so the reels only reveal them. Opening a cache again in
+the same session shows it already landed.
 
 Every piece is shown in 3D: gems from their data, gear from a preview the
 server builds on its mannequin (the same as the Market's,
 `Equipment.groupPreviews`, group "A"). Gear has its look (finish, visor and
 roll) rolled when the cache is rolled, at its own tier as the Forge does, so
 the model you see is exactly the piece you get. Previews are built when the
-cache list loads. The gear lottery waits for them (3 s at most from opening;
-the gem lottery usually covers it), so the reel rolls the real models.
+cache list loads. The gear reels wait for them (3 s at most from opening;
+the gems spin meanwhile), so they roll the real models.
 
 ## Testing it (DEV panel)
 

@@ -20,3 +20,15 @@ local GearArt = {
 local Classes = { gear = function() return { Passive = { Name = "Bulwark" } } end }
 local GemClient = { Profile = { Character = { Class = "Warrior" } } }
 local LotterySound = { tick = function() end, reveal = function(rank) table.insert(sounds, rank) end }
+task.delay = function(seconds, fn) task.spawn(function() task.wait(seconds); fn() end) end
+-- (A child moved away and back is listed once, as in Roblox.)
+function methods:GetChildren()
+	local result, seen = {}, {}
+	for _, child in self.Children do
+		if child.Parent == self and not child.Destroyed and not seen[child] then
+			seen[child] = true
+			table.insert(result, child)
+		end
+	end
+	return result
+end
