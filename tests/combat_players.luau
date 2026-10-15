@@ -3,7 +3,16 @@ local PlayerData={character=function(player) return profiles[player] and profile
 local function makePlayer(id,position,family)
 	local player={UserId=id,Neutral=true,Attributes={},CharacterAdded=signal()}
 	function player:GetAttribute(key) return self.Attributes[key] end
-	function player:SetAttribute(key,value) self.Attributes[key]=value end
+	local attributeSignals = {}
+	function player:GetAttributeChangedSignal(key)
+		attributeSignals[key] = attributeSignals[key] or signal()
+		return attributeSignals[key]
+	end
+	function player:SetAttribute(key,value)
+		local before = self.Attributes[key]
+		self.Attributes[key]=value
+		if before ~= value and attributeSignals[key] then attributeSignals[key].Fire() end
+	end
 	function player:RequestStreamAroundAsync() end
 	local root={Position=position,Size=Vector3.new(2,2,1),Parent=true,AssemblyLinearVelocity=Vector3.zero,AssemblyMass=1,CFrame={LookVector=Vector3.new(0,0,-1),RightVector=Vector3.new(1,0,0)}}
 	-- root.CFrame += offset moves the body (as Roblox does).
