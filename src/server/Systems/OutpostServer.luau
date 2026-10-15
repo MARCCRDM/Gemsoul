@@ -34,6 +34,7 @@ local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
 local MineWall = require(script.Parent.MineWall)
+local MiningRolls = require(script.Parent.MiningRolls)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Shop = require(script.Parent.Shop)
@@ -450,6 +451,7 @@ local function hit(player: Player, nodeId: any)
 	}
 	if node.Hp <= 0 then
 		result.Loot = loot(player, node, profile)
+		MiningRolls.publish(player, body.Position + Vector3.new(0, body.Size.Y * 0.5, 0), result.Loot)
 		popNode(node, player)
 		PlayerData.training(player, "Mine")
         if result.Loot and result.Loot.Gem then

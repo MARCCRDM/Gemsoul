@@ -18,6 +18,7 @@ local Remotes = {
 	Request = Instance.new("RemoteFunction"),
 	CombatInput = Instance.new("RemoteEvent"),
 	CombatFx = Instance.new("RemoteEvent"),
+	MiningRoll = Instance.new("RemoteEvent"), -- server -> everyone: shared world discovery
 	Party = Instance.new("RemoteEvent"),
 	Social = Instance.new("RemoteEvent"),
 	Report = Instance.new("RemoteEvent"),
