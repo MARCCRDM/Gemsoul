@@ -27,6 +27,7 @@
 	      full-screen view is up), Destination (() -> Vector3?)
 	      hold.cancel()   drop it now (a request that failed)
 	  LoadingFlow.waitCovered(timeout?)   until the screen is fully up
+	  LoadingFlow.waitClear(timeout?)     until it's gone
 	  LoadingFlow.active()    the loading screen is wanted
 	  LoadingFlow.home()      where you'll end up when free: the Outpost
 	  LoadingFlow.ready(s)    pure: whether snapshot `s` is ready, and what
@@ -42,7 +43,39 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local LoadingScreen = require(ReplicatedFirst:WaitForChild("LoadingScreen"))
+
+-- The screen itself (ReplicatedFirst.LoadingScreen). The title, the lobby,
+-- the Outpost and the mine all come through here, so this must never stop
+-- them: if the screen is missing (a place synced without the new
+-- ReplicatedFirst modules) or broken, the game carries on uncovered. (It
+-- once waited for it forever, and the whole game sat there unstarted.)
+local NO_SCREEN = {
+	cover = function()
+		return { Min = 0, release = function() end, status = function() end }
+	end,
+	active = function()
+		return false
+	end,
+	covered = function()
+		return true
+	end,
+	waitCovered = function() end,
+	waitClear = function() end,
+	progress = function() end,
+}
+local LoadingScreen = (function()
+	local ok, loaded = pcall(function()
+		-- (ReplicatedFirst arrives before any of this runs: a short wait is plenty.)
+		local module = ReplicatedFirst:FindFirstChild("LoadingScreen")
+			or ReplicatedFirst:WaitForChild("LoadingScreen", 2)
+		return require(module :: ModuleScript)
+	end)
+	if ok and type(loaded) == "table" then
+		return loaded
+	end
+	warn("[LoadingFlow] no loading screen (ReplicatedFirst.LoadingScreen missing or broken), carrying on without it")
+	return NO_SCREEN
+end)()
 
 local LoadingFlow = {}
 
@@ -240,7 +273,7 @@ local holds: { Hold } = {}
 local function finish(hold: Hold)
 	hold.Done = true
 	hold.Cover.Min = 0 -- (the hold kept its own minimum)
-	hold.Cover.release()
+	pcall(hold.Cover.release)
 end
 
 -- One frame of every hold: each comes down once it's been up Min and what's
@@ -253,7 +286,13 @@ function LoadingFlow.step(now: number, look: ((Hold, number) -> Snapshot)?)
 			table.remove(holds, i)
 			continue
 		end
-		local s = (look or LoadingFlow.snapshot)(hold, now)
+		local read, s = pcall(look or LoadingFlow.snapshot, hold, now)
+		if not read then
+			-- (Can't tell: better the world than a screen stuck up.)
+			finish(hold)
+			table.remove(holds, i)
+			continue
+		end
 		local ok, say = LoadingFlow.ready(s)
 		if ok and not s.Owned then
 			hold.ReadyAt = hold.ReadyAt or now
@@ -264,7 +303,7 @@ function LoadingFlow.step(now: number, look: ((Hold, number) -> Snapshot)?)
 			hold.ReadyAt = nil
 		end
 		if say then
-			hold.Cover.status(say)
+			pcall(hold.Cover.status, say)
 		end
 		if s.Owned or (ok and now - hold.Started >= hold.Min) or now - hold.Started >= hold.Max then
 			finish(hold)
@@ -300,20 +339,26 @@ function LoadingFlow.hold(reason: string, options: { [string]: any }?): Hold
 		ReadyAt = nil,
 		Done = false,
 	} :: any
-	-- Something of its own already covers the screen: nothing to do.
-	if not o.Force and owned(now) then
+	-- Something of its own already covers the screen: nothing to do. (Nor
+	-- if the screen won't go up: never in the way of what asked for it.)
+	local covered, cover = false, nil
+	local seen, ownView = pcall(owned, now)
+	if LoadingScreen ~= NO_SCREEN and (o.Force or not (seen and ownView)) then
+		covered, cover = pcall(LoadingScreen.cover, reason, {
+			Status = o.Status or LoadingFlow.Statuses[reason] or "Loading",
+			Instant = o.Instant,
+			FadeIn = o.FadeIn,
+			Min = 0,
+			Max = hold.Max,
+		})
+	end
+	if not covered or type(cover) ~= "table" then
 		hold.Done = true
-		hold.Cover = { Min = 0, release = function() end, status = function() end }
+		hold.Cover = NO_SCREEN.cover()
 		hold.cancel = function() end
 		return hold
 	end
-	hold.Cover = LoadingScreen.cover(reason, {
-		Status = o.Status or LoadingFlow.Statuses[reason] or "Loading",
-		Instant = o.Instant,
-		FadeIn = o.FadeIn,
-		Min = 0,
-		Max = hold.Max,
-	})
+	hold.Cover = cover
 	function hold.cancel()
 		if not hold.Done then
 			finish(hold)
@@ -325,11 +370,16 @@ function LoadingFlow.hold(reason: string, options: { [string]: any }?): Hold
 end
 
 function LoadingFlow.waitCovered(timeout: number?)
-	LoadingScreen.waitCovered(timeout)
+	pcall(LoadingScreen.waitCovered, timeout)
+end
+
+function LoadingFlow.waitClear(timeout: number?)
+	pcall(LoadingScreen.waitClear, timeout)
 end
 
 function LoadingFlow.active(): boolean
-	return LoadingScreen.active()
+	local ok, up = pcall(LoadingScreen.active)
+	return ok and up == true
 end
 
 local started = false
@@ -363,7 +413,7 @@ function LoadingFlow.start()
 	-- backstop).
 	local playerGui = player:WaitForChild("PlayerGui")
 	playerGui.ChildRemoved:Connect(function(child)
-		if child.Name == "Intro" and not LoadingScreen.active() then
+		if child.Name == "Intro" and not LoadingFlow.active() then
 			LoadingFlow.hold("Intro", { Instant = true, Destination = LoadingFlow.home })
 		end
 	end)
@@ -387,7 +437,7 @@ function LoadingFlow.start()
 		if jump > LoadingFlow.SettleJump then
 			lastJumpAt = os.clock()
 		end
-		if jump > LoadingFlow.TeleportJump and not LoadingScreen.active() then
+		if jump > LoadingFlow.TeleportJump and not LoadingFlow.active() then
 			LoadingFlow.hold("Teleport", { Instant = true })
 		end
 	end)

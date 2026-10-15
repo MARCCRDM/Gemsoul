@@ -20,7 +20,6 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local IronUi = require(script.Parent.Modules.IronUi)
 local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
-local LoadingScreen = require(game:GetService("ReplicatedFirst"):WaitForChild("LoadingScreen"))
 local Music = require(script.Parent.Modules.Music)
 
 local IMAGE_ID = 123729911771910 -- saga_title.png
@@ -298,7 +297,7 @@ end
 
 -- Clicks, taps and keys: skip the intro, then enter.
 UserInputService.InputBegan:Connect(function(input)
-	if phase == "Done" or LoadingScreen.active() then
+	if phase == "Done" or LoadingFlow.active() then
 		return
 	end
 	local t = input.UserInputType
@@ -321,7 +320,7 @@ end)
 -- screen's art and music to download first).
 introSound = sound(Music.Ids.Intro, 0.8)
 gui:SetAttribute("Built", true)
-LoadingScreen.waitClear(60)
+LoadingFlow.waitClear(60)
 if introSound then
 	introSound:Play()
 end

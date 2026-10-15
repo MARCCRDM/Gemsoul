@@ -188,6 +188,9 @@ local services = {
 }
 local LoadingScreen
 services.ReplicatedFirst = {
+	FindFirstChild = function()
+		return "LoadingScreen"
+	end,
 	WaitForChild = function()
 		return "LoadingScreen"
 	end,
@@ -533,6 +536,60 @@ root.Position = roblox.Vector3.new(10, 20, 30)
 camera.CFrame = roblox.CFrame.new(10, 30, 45)
 run(LoadingFlow.Min + LoadingFlow.Settle)
 check(not LoadingScreen.active(), "the respawn cover stayed up once back in the Outpost")
+
+-- 9. Never in the game's way. With the screen missing from the place (not
+-- synced), or broken, the scenes that ask for it carry on uncovered: the
+-- title, the lobby and the Outpost once waited for it forever, and the game
+-- sat there unstarted.
+local warned = {}
+local function flowWith(replicatedFirst, requireScreen)
+	services.ReplicatedFirst = replicatedFirst
+	return load("/src/client/Modules/LoadingFlow.luau", {
+		require = function(name)
+			if name == "Config" then
+				return Config
+			elseif name == "LoadingScreen" then
+				return requireScreen()
+			end
+			return require(name)
+		end,
+		warn = function(message)
+			table.insert(warned, message)
+		end,
+		script = { Parent = {} },
+		setmetatable = setmetatable,
+	})
+end
+local missing = flowWith({
+	FindFirstChild = function()
+		return nil
+	end,
+	WaitForChild = function()
+		return nil -- (as Roblox does once the timeout's up)
+	end,
+}, function()
+	error("Attempted to call require with invalid argument(s).")
+end)
+check(#warned == 1, "a missing loading screen isn't reported")
+local started = now
+local hold = missing.hold("Outpost", { Instant = true })
+missing.waitCovered(1)
+missing.waitClear(60)
+check(now == started, "a scene waited on a loading screen that isn't there")
+check(hold.Done and not missing.active(), "a missing loading screen counts as up")
+hold.cancel()
+local broken = flowWith(services.ReplicatedFirst, function()
+	error("LoadingScreen:12: something broke")
+end)
+check(#warned == 2, "a broken loading screen isn't reported")
+check(broken.hold("Mine", {}).Done and not broken.active(), "a broken loading screen counts as up")
+-- A screen that errors mid-frame takes itself away.
+local tips = LoadingScreen.TipSeconds
+LoadingScreen.TipSeconds = nil :: any -- (the next tip can't be timed: the frame errors)
+LoadingScreen.cover("Breaks", { Instant = true, Max = 60 })
+run(LoadingScreen.TipSeconds or 6)
+check(gui.Enabled == false and not LoadingScreen.active(), "a broken loading screen stayed up")
+LoadingScreen.TipSeconds = tips
 
 print(
 	string.format("PASS: %d loading screen checks (covers held, timed and taken down once the scene's ready)", checks)

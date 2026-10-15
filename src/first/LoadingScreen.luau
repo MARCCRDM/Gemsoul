@@ -388,13 +388,33 @@ local function frame(dt: number)
 	end
 end
 
+-- A screen that breaks takes itself away: better the game half loaded than
+-- a screen stuck up in front of it.
+local function giveUp(problem: any)
+	warn("[LoadingScreen] " .. tostring(problem))
+	table.clear(covers)
+	alpha = 0
+	if gui then
+		gui.Enabled = false
+	end
+	if stepping then
+		stepping:Disconnect()
+		stepping = nil
+	end
+end
+
 local function show()
 	if not gui then
 		gui = build()
 	end
 	(gui :: ScreenGui).Enabled = true
 	if not stepping then
-		stepping = RunService.RenderStepped:Connect(frame)
+		stepping = RunService.RenderStepped:Connect(function(dt)
+			local ok, problem = pcall(frame, dt)
+			if not ok then
+				giveUp(problem)
+			end
+		end)
 	end
 end
 

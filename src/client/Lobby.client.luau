@@ -23,7 +23,11 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- The loading screen over every change of place (fights, respawns, jumps).
-LoadingFlow.start()
+-- (Never at the lobby's expense: if it can't start, the lobby still runs.)
+local loadingStarted, loadingProblem = pcall(LoadingFlow.start)
+if not loadingStarted then
+	warn("[Lobby] loading screens off: " .. tostring(loadingProblem))
+end
 
 -- The lobby HUD: in the Outpost, not fighting, not inside a menu. Checked
 -- a few times a second, and only applied when it changes.

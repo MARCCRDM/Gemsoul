@@ -13,14 +13,27 @@ local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
-local LoadingScreen = require(script.Parent:WaitForChild("LoadingScreen"))
-
 local MIN = 1.2 -- seconds up at least
+local MAX = 30 -- and never longer, whatever happens below
 local TITLE_WAIT = 8 -- seconds to wait for the title screen once loaded
 local ASSET_WAIT = 6 -- seconds to wait for its art and music
 
-local join = LoadingScreen.cover("Join", { Status = "Loading the game", Instant = true, Min = MIN, Max = 60 })
-LoadingScreen.progress(0.05)
+-- (If the screen can't go up, Roblox's own loading screen carries on and
+-- the game starts as it always did.)
+local found, LoadingScreen = pcall(function()
+	return require(script.Parent:WaitForChild("LoadingScreen", 5) :: ModuleScript)
+end)
+if not found or type(LoadingScreen) ~= "table" then
+	warn("[Loading] no loading screen: " .. tostring(LoadingScreen))
+	return
+end
+local up, join =
+	pcall(LoadingScreen.cover, "Join", { Status = "Loading the game", Instant = true, Min = MIN, Max = MAX })
+if not up then
+	warn("[Loading] the loading screen didn't go up: " .. tostring(join))
+	return
+end
+pcall(LoadingScreen.progress, 0.05)
 pcall(function()
 	ReplicatedFirst:RemoveDefaultLoadingScreen()
 end)
@@ -37,42 +50,48 @@ local function waitUntil(condition: () -> boolean, seconds: number): boolean
 	return true
 end
 
--- 1. The game.
-if not game:IsLoaded() then
-	game.Loaded:Wait()
-end
-LoadingScreen.progress(0.35)
+-- Whatever goes wrong in here, the screen still comes down at the end.
+local finished, problem = pcall(function()
+	-- 1. The game.
+	if not game:IsLoaded() then
+		game.Loaded:Wait()
+	end
+	LoadingScreen.progress(0.35)
 
--- 2. Your miner.
-join.status("Getting your miner ready")
-local player = Players.LocalPlayer
-waitUntil(function()
-	local character = player.Character
-	return character ~= nil and character:FindFirstChild("HumanoidRootPart") ~= nil
-end, 20)
-LoadingScreen.progress(0.6)
-
--- 3. The title screen, and what it needs downloaded.
-join.status("Almost there")
-local playerGui = player:WaitForChild("PlayerGui")
-local title: Instance? = nil
-waitUntil(function()
-	title = playerGui:FindFirstChild("Splash")
-	return title ~= nil and title:GetAttribute("Built") == true
-end, TITLE_WAIT)
-if title then
-	local done = false
-	task.spawn(function()
-		pcall(function()
-			ContentProvider:PreloadAsync({ title :: Instance }, function()
-				LoadingScreen.progress(0.6 + 0.35 * (1 - math.min(ContentProvider.RequestQueueSize, 20) / 20))
-			end)
-		end)
-		done = true
-	end)
+	-- 2. Your miner.
+	join.status("Getting your miner ready")
+	local player = Players.LocalPlayer
 	waitUntil(function()
-		return done
-	end, ASSET_WAIT)
+		local character = player.Character
+		return character ~= nil and character:FindFirstChild("HumanoidRootPart") ~= nil
+	end, 20)
+	LoadingScreen.progress(0.6)
+
+	-- 3. The title screen, and what it needs downloaded.
+	join.status("Almost there")
+	local playerGui = player:WaitForChild("PlayerGui")
+	local title: Instance? = nil
+	waitUntil(function()
+		title = playerGui:FindFirstChild("Splash")
+		return title ~= nil and title:GetAttribute("Built") == true
+	end, TITLE_WAIT)
+	if title then
+		local done = false
+		task.spawn(function()
+			pcall(function()
+				ContentProvider:PreloadAsync({ title :: Instance }, function()
+					LoadingScreen.progress(0.6 + 0.35 * (1 - math.min(ContentProvider.RequestQueueSize, 20) / 20))
+				end)
+			end)
+			done = true
+		end)
+		waitUntil(function()
+			return done
+		end, ASSET_WAIT)
+	end
+end)
+if not finished then
+	warn("[Loading] " .. tostring(problem))
 end
-LoadingScreen.progress(1)
+pcall(LoadingScreen.progress, 1)
 join.release()

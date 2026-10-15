@@ -54,6 +54,15 @@ hold you behind it.
 - Scenes ask for it directly: the title (`Splash.client`), the intro
   (`Intro.client`), `OutpostScene` and `MineScene`.
 
+It never stands in the game's way. If `ReplicatedFirst.LoadingScreen` is
+missing from the place (for example, Rojo was already running when the project
+file gained it, so it never synced) or it breaks, the game starts and runs
+exactly as before, just without the cover. The console then says
+`[LoadingFlow] no loading screen …`. In Studio, ReplicatedFirst should hold
+`Orientation`, `LoadingScreen` and `Loading`; if it doesn't, restart
+`rojo serve` and reconnect. A screen that errors while it's up takes itself
+away.
+
 To cover something new:
 
 ```lua
