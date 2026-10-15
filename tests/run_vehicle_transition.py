@@ -12,3 +12,15 @@ with tempfile.TemporaryDirectory(prefix='gemsoul-drive-') as directory:
     script = Path(directory)/'drive.luau'
     script.write_text(prefix + logic + cases)
     subprocess.run([str(ROOT/'.tools/luau/luau.exe'), str(script)], check=True)
+
+# Exercise the actual scene handoff that owns Roblox's movement/vehicle inputs.
+import re
+arena = (ROOT/'src/client/Modules/ArenaScene.luau').read_text()
+arena = re.sub(r'^local \w+ = (require\([^\n]+\)|game:GetService\([^\n]+\))\n', '', arena, flags=re.M)
+arena = arena.replace('return ArenaScene', '')
+fixture = (ROOT/'tests/arena_controls_cases.luau').read_text()
+prefix, cases = fixture.split('-- ARENA HERE')
+with tempfile.TemporaryDirectory(prefix='gemsoul-arena-controls-') as directory:
+    script = Path(directory)/'controls.luau'
+    script.write_text(prefix + arena + cases)
+    subprocess.run([str(ROOT/'.tools/luau/luau.exe'), str(script)], check=True)

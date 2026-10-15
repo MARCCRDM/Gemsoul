@@ -57,6 +57,27 @@ local function board()
 	hum.Seated:Fire(true,seat)
 end
 -- DRIVE HERE
+-- Boarding may finish before the controller attaches, without another Seated event.
+hum.SeatPart, seat.Occupant = seat, hum
+RunService.Heartbeat:Fire(.1)
+check(VehicleDrive.isDriving() and drive.PlaneVelocity.Y==-5, "Missed boarding event left mech inert")
+board()
+check(player.CameraMinZoomDistance==24, "Repeated boarding reset mech zoom")
+hum.SeatPart, seat.Occupant = nil, nil
+hum.Seated:Fire(false,nil)
+check(player.CameraMinZoomDistance==6, "Repeated boarding overwrote original zoom")
+-- Occupancy and the driving constraints can replicate after the seat event.
+hum.SeatPart = seat
+hum.Seated:Fire(true,seat)
+check(not VehicleDrive.isDriving(), "Started before occupant replicated")
+local findConstraint = chassis.FindFirstChild
+chassis.FindFirstChild = function() return nil end
+seat.Occupant = hum
+RunService.Heartbeat:Fire(.1)
+check(not VehicleDrive.isDriving(), "Started with missing constraints")
+chassis.FindFirstChild = findConstraint
+RunService.Heartbeat:Fire(.1)
+check(VehicleDrive.isDriving() and drive.PlaneVelocity.Y==-5, "Late constraints never resumed driving")
 board()
 check(VehicleDrive.isDriving() and gui.Enabled, "Lobby mech cannot be driven")
 VehicleDrive.step(0.1)
