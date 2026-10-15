@@ -27,6 +27,8 @@ local function reset()
 	loadout.Surge1Gem, loadout.Surge2Gem, loadout.Surge3Gem = nil, nil, nil
 	wallBlocks = false
 	local st = CombatServer._state(source)
+	-- Fixed starting balance isolates move costs from miner-level capacity.
+	st.Resources.Stamina = 100
 	-- A fight starts part-charged; the checks below measure each spend from full.
 	st.Resources.Charge = Tech.Resources.Charge.Max
 	return st
