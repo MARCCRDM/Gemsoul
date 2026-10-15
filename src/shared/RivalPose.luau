@@ -1196,6 +1196,44 @@ function RivalPose.update(
 	end
 end
 
+-- Every joint of a rig straight back to rest, and the holds on its own
+-- animations let go.
+local function toRest(rig)
+	for joint, entry in rig.Joints do
+		if entry.Object.Parent then
+			(entry.Object :: any)[entry.Property] = entry.Rest
+		end
+		entry.Last = entry.Rest
+		rig.Angles[joint] = { 0, 0, 0 }
+	end
+	rig.Hold, rig.UpperHold, rig.Stride, rig.Phase = 0, 0, 0, 0
+	rig.Striking, rig.Action = false, nil
+end
+
+-- A body no longer being posed (Client.BodyPoses stops when it's out of
+-- sight, or when posing it fails): straight back to rest if it's bent or
+-- holding its animations off. Left as it was, it stayed frozen part-way
+-- through whatever it was doing (a pick swing's wind-up, arm overhead)
+-- until it was posed again, and its walk and idle stayed held off.
+-- Returns whether anything had to move.
+function RivalPose.relax(model: Model): boolean
+	local rig = rigs[model]
+	if not rig then
+		return false
+	end
+	local bent = (rig.Hold or 0) > 0.001 or (rig.UpperHold or 0) > 0.001 or (rig.Stride or 0) > 0.001
+	for _, angles in rig.Angles do
+		if math.abs(angles[1]) + math.abs(angles[2]) + math.abs(angles[3]) > 1e-4 then
+			bent = true
+			break
+		end
+	end
+	if bent then
+		toRest(rig)
+	end
+	return bent
+end
+
 -- Every joint straight back to its rest pose, at once, and the pose's own
 -- state (angles, guard and upper-body holds, guarded stride) forgotten: for
 -- a body coming out of a fight, so nothing it was doing carries over. Its
@@ -1204,15 +1242,8 @@ end
 function RivalPose.reset(model: Model)
 	local rig = rigs[model]
 	if rig then
-		for joint, entry in rig.Joints do
-			if entry.Object.Parent then
-				(entry.Object :: any)[entry.Property] = entry.Rest
-			end
-			entry.Last = entry.Rest
-			rig.Angles[joint] = { 0, 0, 0 }
-		end
-		rig.Hold, rig.UpperHold, rig.Stride, rig.Phase = 0, 0, 0, 0
-		rig.SeenStart, rig.SeenAt, rig.Striking, rig.Action = nil, nil, false, nil
+		toRest(rig)
+		rig.SeenStart, rig.SeenAt = nil, nil
 	end
 	for _, motor in model:GetDescendants() do
 		if motor:IsA("Motor6D") then

@@ -42,7 +42,12 @@ local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 
 local BodyPoses = {}
 
--- Bodies further than this from the camera aren't posed (too small to see).
+-- Bodies further than this from the camera aren't posed (too small to see),
+-- except your own: the camera is often far off it (the menu's orbit round
+-- the moon base, an arena drop's flight) while it's doing something, and a
+-- body that stops being posed part-way through a move stays that way.
+-- Every other body goes straight back to rest as it leaves the range
+-- (RivalPose.relax), never frozen mid-swing.
 BodyPoses.Range = 220
 -- Heads only turn toward a foe this close.
 BodyPoses.LookRange = 60
@@ -96,15 +101,23 @@ local function near(model: Model, eye: Vector3?): boolean
 end
 
 -- A body whose posing fails is reported once (in the developer console),
--- not swallowed silently.
+-- not swallowed silently, and stands at rest rather than frozen in
+-- whatever it was last posed in.
 local reported = setmetatable({}, { __mode = "k" })
 local function pose(model: Model, ...)
 	local ok, problem = pcall(RivalPose.update, model, ...)
-	if not ok and not reported[model] then
-		reported[model] = true
-		warn("[BodyPoses] couldn't pose " .. model:GetFullName() .. ": " .. tostring(problem))
+	if not ok then
+		pcall(RivalPose.relax, model)
+		if not reported[model] then
+			reported[model] = true
+			warn("[BodyPoses] couldn't pose " .. model:GetFullName() .. ": " .. tostring(problem))
+		end
 	end
 end
+
+-- The bodies posed this frame and the last (swapped every frame).
+local posed: { [Model]: boolean } = {}
+local posing: { [Model]: boolean } = {}
 
 -- Who another player is fighting, as far as this screen can tell: you, if
 -- you're both in a fight and on opposite sides; else their own rival.
@@ -136,7 +149,8 @@ function BodyPoses.step(dt: number)
 	local me = Players.LocalPlayer
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
-		if character and near(character, eye) then
+		if character and (player == me or near(character, eye)) then
+			posing[character] = true
 			local fighting = player:GetAttribute("CombatSession") ~= nil
 			-- (Who it's looking at never stops the posing: any trouble there
 			-- just means no head turn this frame.)
@@ -168,12 +182,22 @@ function BodyPoses.step(dt: number)
 	-- the screen's frame rate instead of the network's.
 	for _, model in enemies do
 		if model:GetAttribute("Posed") and model:IsA("Model") and near(model, eye) then
+			posing[model] = true
 			local found, look = pcall(function()
 				return lookPoint(model, characterOf(model:GetAttribute("FocusUserId") or model:GetAttribute("RivalOwner")))
 			end)
 			pose(model, dt, now, clock, nil, nil, if found then look else nil)
 		end
 	end
+	-- Bodies posed last frame and not this one (out of range, or gone):
+	-- straight back to rest.
+	for model in posed do
+		if not posing[model] then
+			pcall(RivalPose.relax, model)
+		end
+	end
+	posed, posing = posing, posed
+	table.clear(posing)
 end
 
 -- Your body coming back from a fight (or the intro's) to the lobby: the
