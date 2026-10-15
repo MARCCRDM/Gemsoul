@@ -38,6 +38,8 @@ A suit, a weapon skin, rarity shine and Prismatic all leave a set stone as it is
   - Cryo pulses slowly;
   - Ion strobes;
   - Corrosive throbs.
+
+  Every client moves it (`GemLights`), from the light's `PulseBase`, `PulsePeriod` and `PulseDim` attributes and its `GemGlow` tag. It used to be a tween on the server, which sent every stone's light to every player every frame, and a copy of it never moved.
 - **Effect:** a small effect comes off the stone, busier the rarer the gem:
 
 | Element | Off the stone |
@@ -64,9 +66,42 @@ A suit's `Seams` and a skin's `Edge` are neon strips set into the plates. See
 
 First person copies your worn weapon and right gauntlet, so its skin, trim and
 stone are the same as everyone sees (now that trim and stones are real parts,
-they come along too). `ViewGrip.frame` holds the weapon by its blade; a weapon
+they come along too). The copy moves as the worn one does (see below). `ViewGrip.frame` holds the weapon by its blade; a weapon
 with no straight piece off its grip is held along the line from the grip to its
 farthest piece, rather than not at all.
+
+## Copies move as the gear does
+
+Your first-person weapon, the Inventory's miner (v1 and v2), its item art, the
+character screen's portrait, the Shop and Wardrobe previews (`CosmeticView`) and
+the lottery's reward art are all clones of the real parts. Three things animate
+gear on each client:
+
+- skin trim with a `SeamFx` (`SeamVisibility`);
+- Prismatic plates (`PrismaticShimmer`);
+- stone lights (`GemLights`).
+
+Each of them finds its parts by CollectionService tag, and a clone can't be
+counted on to keep its tags (its attributes it always keeps). That's why a
+Nebula sword shifted colour for everyone but you, and stood still in the
+Inventory.
+
+So whoever makes a copy calls `LiveLooks.watch(copy)`, and its animated parts
+are handed to the animators by attribute (`SeamFx`, `PrismaticBase`,
+`PulseBase`). Where a part is drawn decides when it moves
+(`LiveLooks.place`):
+
+| Place | Moves |
+| --- | --- |
+| World (worn gear) | near the camera (trim 120 studs, Prismatic 150, lights 120) |
+| Camera (first person) | always |
+| View (a preview) | while it's on screen: its ScreenGui on and every frame round it visible, however far off the camera is |
+| Away (the Shop's mannequins in ReplicatedStorage) | never: not even checked |
+
+- A copy is forgotten as it leaves the game.
+- The character screen's grey silhouette drops its `SeamFx` and `PrismaticBase`, so it stays grey.
+- A skin or suit painting over a Prismatic plate takes its `PrismaticBase` as well as its tag, so a copy doesn't shimmer where the worn gear doesn't.
+- Previews still can't show particles or lights: a ViewportFrame doesn't draw them.
 
 ## Tests
 
@@ -84,3 +119,17 @@ farthest piece, rather than not at all.
 - **Repeatable:** the same kit builds the same twice.
 - **The Armory:** its one-piece previews show their stones.
 - **First person:** it can hold all 27 weapon skins, and a weapon with no straight piece.
+- **Stone lights:** each carries its pulse (`PulseBase`, `PulsePeriod`, `PulseDim`) and the `GemGlow` tag.
+- **Prismatic under a skin or suit:** no plate keeps `PrismaticBase` without its tag.
+
+`tests/live_looks_cases.luau` (`run_live_looks.py`) and
+`tests/seam_visibility_cases.luau` (`run_seam_visibility.py`) check the copies,
+for animated trim, Prismatic plates and stone lights:
+
+- an untagged first-person copy moves;
+- a preview moves while it's on screen, however far off the camera is, and stops when its screen closes or a frame round it hides;
+- a far-off worn piece holds still;
+- a part drawn nowhere is never touched;
+- a copy that leaves the game is forgotten;
+- the first-person light breathes at its own (halved) brightness;
+- a preview's light is left alone.

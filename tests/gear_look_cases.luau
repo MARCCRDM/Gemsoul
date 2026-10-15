@@ -477,6 +477,77 @@ for slot, count in STONES do
 	previewable(only, slot .. "'s own preview")
 end
 
+-- 7. A stone's light breathes on every client (GemLights), not by a server
+-- tween: its pulse is in attributes, the light tagged.
+local _, lit = wear(GEMS)
+local lights = 0
+for _, d in lit:GetDescendants() do
+	if d:IsA("PointLight") and d.Name == "GemGlow" then
+		lights += 1
+		local base, period, dim = d:GetAttribute("PulseBase"), d:GetAttribute("PulsePeriod"), d:GetAttribute("PulseDim")
+		check(
+			type(base) == "number" and math.abs(base - d.Brightness) < 1e-6,
+			"a stone's light doesn't carry its PulseBase"
+		)
+		check(type(period) == "number" and period > 0, "a stone's light has no PulsePeriod")
+		check(type(dim) == "number" and dim > 0 and dim < 1, "a stone's light has no PulseDim")
+		check(d:HasTag(Tags.GemGlow), "a stone's light isn't tagged GemGlow")
+	end
+end
+check(lights >= 8, "fewer stone lights than stones")
+
+-- 8. A Prismatic roll under a skin or a suit: the repaint takes the plate's
+-- tag, and its PrismaticBase with it (or a copy of it, found by attribute,
+-- would shimmer in first person and the previews while the worn gear didn't).
+local GearRolls = requireScript(Shared.GearRolls)
+local rolled = table.clone(KIT)
+rolled.GearRolls = {}
+-- (A fixed die: every roll its lowest.)
+local die = {
+	NextInteger = function(_, low)
+		return low
+	end,
+	NextNumber = function(_, low)
+		return low or 0
+	end,
+}
+for slot, kind in { Weapon = "Weapons", Armor = "Armors", Helmet = "Helmets" } do
+	local roll = GearRolls.roll(die, 1)
+	roll.Prismatic = true
+	rolled.GearRolls[kind] = { [KIT[slot]] = roll }
+end
+local function prismatic(root)
+	local tagged, stray = 0, 0
+	for _, part in parts(root) do
+		if part:GetAttribute("PrismaticBase") ~= nil then
+			if part:HasTag(Tags.Prismatic) then
+				tagged += 1
+			else
+				stray += 1
+			end
+		end
+	end
+	return tagged, stray
+end
+local _, plain = wear(nil, nil, rolled)
+local shimmering = prismatic(plain)
+check(shimmering > 0, "a Prismatic roll shimmered nowhere (the check below would prove nothing)")
+for _, cosmetics in
+	{
+		{ Skin = "SkinNebula" },
+		{ Skin = "SkinCrusader" },
+		{ Suit = "SuitObsidian" },
+		{ Suit = "SuitNeon", Skin = "SkinSolar" },
+	}
+do
+	local _, dressed = wear(nil, cosmetics, rolled)
+	local _, stray = prismatic(dressed)
+	check(
+		stray == 0,
+		string.format("%d plates kept PrismaticBase under %s %s", stray, cosmetics.Suit or "", cosmetics.Skin or "")
+	)
+end
+
 print(
 	string.format(
 		"PASS: %d gear look checks (stones on every gemmed piece, %d suits trimmed in real parts, %d skins held in first person, nothing a preview can't draw)",

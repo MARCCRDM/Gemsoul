@@ -26,8 +26,12 @@ return {
 	GemOutline = "GemOutline",
 	-- Coloured plates of a Prismatic roll: their hue shimmers on every client.
 	Prismatic = "Prismatic",
-	-- A skin's seam and edge outlines (SelectionBoxes): Roblox draws those even
-	-- round a hidden part, so the client shows each only while its part shows
-	-- (SeamVisibility).
+	-- A skin's seams and edges (neon strips, or SelectionBoxes on older
+	-- gear): animated on every client, and a box shown only while its part
+	-- shows (SeamVisibility).
 	SkinSeam = "SkinSeam",
+	-- A socketed stone's light (PointLight): it breathes its element's way
+	-- on every client (GemLights), from its PulseBase, PulsePeriod and
+	-- PulseDim attributes.
+	GemGlow = "GemGlow",
 }

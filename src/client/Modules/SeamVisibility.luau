@@ -18,6 +18,11 @@
 	  Flicker  crackles like a live wire: the glow, with sharp flashes
 	  Rainbow  runs through every hue
 
+	Copies move too: your first-person sword, the Inventory's and the Shop's
+	previews and gear art are clones, found by their attributes (LiveLooks)
+	since a clone can't be counted on to keep its tag. A preview's seams move
+	while it's on screen, wherever the world's camera is.
+
 	  SeamVisibility.shows(box)  pure: whether the box's part is showing
 	  SeamVisibility.fxColor(fx, a, b, t, seed)  pure: an animated seam's colour
 	  SeamVisibility.start()
@@ -27,6 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local LiveLooks = require(script.Parent.LiveLooks)
 
 local SeamVisibility = {}
 
@@ -61,86 +67,108 @@ function SeamVisibility.fxColor(fx: string, a: Color3, b: Color3, t: number, see
 end
 
 -- Cost: a neon suit has up to ~80 outlines, so a full server has well over a
--- thousand. Those round your own body (and the first-person view) are
--- checked every frame, since first person hides and shows your plates from
--- one frame to the next. Everyone else's only change when their gear is
--- staged or stowed, so they're checked a slice at a time: every one of them
--- every few frames (Spread). Animated outlines move only near the camera
--- (FxRange); far off, too small to see, they hold still.
+-- thousand. Those round your own body, in the first-person view and in a
+-- preview are checked every frame (first person hides and shows your plates
+-- from one frame to the next; a preview only while it's on screen).
+-- Everyone else's only change when their gear is staged or stowed, so
+-- they're checked a slice at a time: every one of them every few frames
+-- (Spread). Animated outlines in the world move only near the camera
+-- (FxRange); far off, too small to see, they hold still. Seams drawn
+-- nowhere (the Shop's mannequins in ReplicatedStorage) aren't checked.
 SeamVisibility.Spread = 4
 SeamVisibility.SliceMin = 64 -- (fewer outlines than this: all, every frame)
 SeamVisibility.FxRange = 120
 SeamVisibility.PartFxRate = 20
 
-function SeamVisibility.start()
-	local Players = game:GetService("Players")
-	local boxes: { [Instance]: boolean } = {} -- every seam: SelectionBoxes and strips
-	-- Animated seams, read once (and again only when a restyle changes them).
-	local effects: { [Instance]: Fx } = {}
-	local links: { [Instance]: RBXScriptConnection } = {}
-	local own: { [Instance]: boolean } = {} -- on your body or in the camera
-	local showing: { [Instance]: boolean } = {}
-	local near: { [Instance]: boolean } = {}
-	local others: { Instance } = {} -- everyone else's, checked a slice a frame
-	local dirty, cursor, count = true, 0, 0
-	local nextPartFx = 0
-	local function paint(seam: Instance, color: Color3)
-		if seam:IsA("SelectionBox") then
-			seam.Color3 = color
-		else
-			(seam :: BasePart).Color = color
+local Players = game:GetService("Players")
+local boxes: { [Instance]: boolean } = {} -- every seam: SelectionBoxes and strips
+-- Animated seams, read once (and again only when a restyle changes them).
+local effects: { [Instance]: Fx } = {}
+local links: { [Instance]: { RBXScriptConnection } } = {}
+local own: { [Instance]: boolean } = {} -- on your body, in the camera or in a preview
+local views: { [Instance]: Instance } = {} -- a preview's seams: their ViewportFrame
+local showing: { [Instance]: boolean } = {}
+local near: { [Instance]: boolean } = {}
+local others: { Instance } = {} -- everyone else's, checked a slice a frame
+local dirty, cursor, count = true, 0, 0
+
+local function paint(seam: Instance, color: Color3)
+	if seam:IsA("SelectionBox") then
+		seam.Color3 = color
+	else
+		(seam :: BasePart).Color = color
+	end
+end
+local function read(seam: Instance)
+	local fx, a, b = seam:GetAttribute("SeamFx"), seam:GetAttribute("SeamA"), seam:GetAttribute("SeamB")
+	local seed = seam:GetAttribute("SeamSeed")
+	if typeof(fx) == "string" and typeof(a) == "Color3" then
+		count += 1
+		effects[seam] = {
+			Fx = fx,
+			A = a,
+			B = if typeof(b) == "Color3" then b else a,
+			Seed = if type(seed) == "number" then seed else count % 17,
+		}
+	elseif effects[seam] then
+		-- Restyled to a still seam: back to its own colour (SeamA).
+		effects[seam] = nil
+		if typeof(a) == "Color3" then
+			paint(seam, a)
 		end
 	end
-	local function read(seam: Instance)
-		local fx, a, b = seam:GetAttribute("SeamFx"), seam:GetAttribute("SeamA"), seam:GetAttribute("SeamB")
-		local seed = seam:GetAttribute("SeamSeed")
-		if typeof(fx) == "string" and typeof(a) == "Color3" then
-			count += 1
-			effects[seam] = {
-				Fx = fx,
-				A = a,
-				B = if typeof(b) == "Color3" then b else a,
-				Seed = if type(seed) == "number" then seed else count % 17,
-			}
-		elseif effects[seam] then
-			-- Restyled to a still seam: back to its own colour (SeamA).
-			effects[seam] = nil
-			if typeof(a) == "Color3" then
-				paint(seam, a)
-			end
-		end
+end
+local function classify(seam: Instance)
+	local me = Players.LocalPlayer
+	local character = me and me.Character
+	local place = LiveLooks.place(seam)
+	views[seam] = if place == "View" then LiveLooks.viewOf(seam) else nil
+	local mine = place == "View" or place == "Camera" or (character ~= nil and seam:IsDescendantOf(character))
+	own[seam] = if mine then true else nil
+	-- (Drawn nowhere: neither yours nor anyone's, so not checked at all.)
+	boxes[seam] = if mine or place == "World" then true else false
+	dirty = true
+end
+local function drop(seam: Instance)
+	if boxes[seam] == nil then
+		return
 	end
-	local function classify(seam: Instance)
-		local me = Players.LocalPlayer
-		local character = me and me.Character
-		local camera = workspace.CurrentCamera
-		local mine = (character ~= nil and seam:IsDescendantOf(character))
-			or (camera ~= nil and seam:IsDescendantOf(camera))
-		own[seam] = if mine then true else nil
-		dirty = true
+	boxes[seam], effects[seam], own[seam], views[seam], showing[seam], near[seam] = nil, nil, nil, nil, nil, nil
+	dirty = true
+	for _, link in links[seam] or {} do
+		link:Disconnect()
 	end
-	local function add(instance: Instance)
-		if (instance:IsA("SelectionBox") or instance:IsA("BasePart")) and not boxes[instance] then
-			boxes[instance] = true
-			classify(instance)
-			read(instance)
-			links[instance] = instance.AttributeChanged:Connect(function()
+	links[seam] = nil
+end
+local function add(instance: Instance)
+	if (instance:IsA("SelectionBox") or instance:IsA("BasePart")) and boxes[instance] == nil then
+		classify(instance)
+		read(instance)
+		links[instance] = {
+			instance.AttributeChanged:Connect(function()
 				read(instance)
-			end)
-		end
+			end),
+			-- Moved (into a preview, onto a body) or gone: an untagged copy
+			-- has no tag to lose, so it's forgotten as it leaves the game.
+			LiveLooks.follow(instance, function()
+				if boxes[instance] ~= nil then
+					classify(instance)
+				end
+			end, function()
+				drop(instance)
+			end),
+		}
 	end
+end
+
+function SeamVisibility.start()
 	for _, instance in CollectionService:GetTagged(Tags.SkinSeam) do
 		add(instance)
 	end
 	CollectionService:GetInstanceAddedSignal(Tags.SkinSeam):Connect(add)
-	CollectionService:GetInstanceRemovedSignal(Tags.SkinSeam):Connect(function(instance)
-		boxes[instance], effects[instance], own[instance], showing[instance], near[instance] = nil, nil, nil, nil, nil
-		dirty = true
-		if links[instance] then
-			links[instance]:Disconnect()
-			links[instance] = nil
-		end
-	end)
+	CollectionService:GetInstanceRemovedSignal(Tags.SkinSeam):Connect(drop)
+	-- Copies (first person, previews, gear art): by attribute (LiveLooks).
+	LiveLooks.track("SeamFx", add)
 	-- A new body: whose outlines are yours changes.
 	local me = Players.LocalPlayer
 	if me then
@@ -150,8 +178,18 @@ function SeamVisibility.start()
 			end
 		end)
 	end
+	local live: { [Instance]: boolean } = {} -- each preview: on screen this frame?
 	local function check(seam: Instance, eye: Vector3?)
 		local shows = SeamVisibility.shows(seam)
+		local view = views[seam]
+		if view and shows then
+			local on = live[view]
+			if on == nil then
+				on = LiveLooks.onScreen(view)
+				live[view] = on
+			end
+			shows = on
+		end
 		local box = if seam:IsA("SelectionBox") then seam else nil
 		if box and box.Visible ~= shows then
 			box.Visible = shows -- (a strip hides with its own part)
@@ -163,17 +201,19 @@ function SeamVisibility.start()
 			near[seam] = position == nil or (position - eye).Magnitude < SeamVisibility.FxRange
 		end
 	end
+	local nextPartFx = 0
 	-- Just after the camera (and the first-person view, which hides your own
 	-- parts at Camera + 3), so a box never shows for a frame round the camera.
 	RunService:BindToRenderStep("SkinSeams", Enum.RenderPriority.Camera.Value + 4, function()
 		local t = os.clock()
 		local camera = workspace.CurrentCamera
 		local eye = camera and camera.CFrame.Position
+		table.clear(live)
 		if dirty then
 			dirty = false
 			table.clear(others)
-			for seam in boxes do
-				if not own[seam] then
+			for seam, drawn in boxes do
+				if drawn and not own[seam] then
 					table.insert(others, seam)
 				end
 			end
@@ -196,7 +236,7 @@ function SeamVisibility.start()
 			nextPartFx = t + 1 / SeamVisibility.PartFxRate
 		end
 		for seam, effect in effects do
-			if showing[seam] and near[seam] ~= false then
+			if showing[seam] and near[seam] ~= false and boxes[seam] then
 				local box = seam:IsA("SelectionBox")
 				if box or parts then
 					paint(seam, SeamVisibility.fxColor(effect.Fx, effect.A, effect.B, t, effect.Seed))

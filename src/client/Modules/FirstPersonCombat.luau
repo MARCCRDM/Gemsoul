@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMotion)
 local ViewGrip = require(script.Parent.ViewGrip)
+local LiveLooks = require(script.Parent.LiveLooks)
 local player = Players.LocalPlayer
 local View = {}
 local saved, model, gear, connection, removalConnection
@@ -47,6 +48,10 @@ local function viewCopy(part, holder, scale: number?)
 			-- Right at the camera a gem's light would wash the whole view.
 			descendant.Range *= 0.6
 			descendant.Brightness *= 0.5
+			local base = descendant:GetAttribute("PulseBase") -- (and it breathes: GemLights)
+			if type(base) == "number" then
+				descendant:SetAttribute("PulseBase", base * 0.5)
+			end
 		elseif descendant:IsA("SelectionBox") and descendant.Parent and descendant.Parent:IsA("BasePart") then
 			-- A skin's seam or edge: round this copy, not the hidden original
 			-- (whose box would wrap the camera).
@@ -407,6 +412,10 @@ local function rebuild(character, equipment)
 			end
 		end
 	end
+	-- Animated skins (seams, Prismatic plates) and stones' lights move in
+	-- your hands as they do on you: the copies are found by attribute, not
+	-- tag (LiveLooks).
+	LiveLooks.watch(model)
 end
 function View.setPose(blocking, progress)
 	raised = if blocking then 1 else 0

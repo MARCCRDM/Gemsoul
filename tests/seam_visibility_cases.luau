@@ -12,10 +12,19 @@ local function box(adornee, attributes, owner)
 	local self
 	self = {
 		Adornee = adornee,
-		-- (test only) which body it's on: your character, or nil
+		-- (test only) which body it's on: your character, or nil; in the
+		-- world either way
 		IsDescendantOf = function(_, ancestor)
-			return owner ~= nil and owner == ancestor
+			return (owner ~= nil and owner == ancestor) or ancestor == workspace or ancestor == game
 		end,
+		FindFirstAncestorWhichIsA = function()
+			return nil
+		end,
+		AncestryChanged = {
+			Connect = function()
+				return { Disconnect = function() end }
+			end,
+		},
 		Visible = true,
 		Color3 = attributes and attributes.SeamA,
 		IsA = function(_, kind)
@@ -192,8 +201,11 @@ local function strip(attributes)
 	local self = part(0, 0)
 	self.Color = attributes.SeamA
 	self.CFrame = { Position = { X = 0, Y = 0, Z = 0 } }
-	self.IsDescendantOf = function()
-		return false
+	self.IsDescendantOf = function(_, ancestor)
+		return ancestor == workspace or ancestor == game
+	end
+	self.FindFirstAncestorWhichIsA = function()
+		return nil
 	end
 	self.GetAttribute = function(_, name)
 		return attributes[name]
@@ -203,6 +215,7 @@ local function strip(attributes)
 			return { Disconnect = function() end }
 		end,
 	}
+	self.AncestryChanged = self.AttributeChanged
 	return self
 end
 local left = strip({ SeamFx = "Shift", SeamA = gold, SeamB = red, SeamSeed = 3 })
@@ -237,4 +250,176 @@ local hiddenColor = left.Color
 CLOCK = 13
 bound()
 assert(left.Color == hiddenColor, "a hidden strip was recoloured")
+
+-- Copies (LiveLooks): the first-person sword and the previews are clones,
+-- and a clone can't be counted on to keep its tag. Watched, they're found
+-- by attribute; a preview moves while it's on screen however far off the
+-- camera is; the Shop's mannequins (drawn nowhere) are never touched.
+local Vector = {}
+Vector.__sub = function(a, b)
+	return setmetatable({ X = a.X - b.X, Y = a.Y - b.Y, Z = a.Z - b.Z }, Vector)
+end
+Vector.__index = function(v, key)
+	if key == "Magnitude" then
+		return math.sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z)
+	end
+	return nil
+end
+local function at(x)
+	return setmetatable({ X = x, Y = 0, Z = 0 }, Vector)
+end
+local camera = { Name = "Camera", CFrame = { Position = at(0) } }
+workspace.CurrentCamera = camera
+-- A GUI chain: a ScreenGui, a frame in it, a ViewportFrame in that.
+local function gui(kind, parent)
+	return {
+		Parent = parent,
+		Visible = true,
+		Enabled = true,
+		IsA = function(_, class)
+			return class == kind or (class == "GuiObject" and kind ~= "LayerCollector")
+		end,
+	}
+end
+local screen = gui("LayerCollector", nil)
+local panel = gui("GuiObject", screen)
+local preview = gui("ViewportFrame", panel)
+-- A copied strip: where it's drawn ("camera", "view", "world" or "away"),
+-- at x studs from the camera; Leave() takes it out of the game.
+local function copied(where, x, attributes)
+	local self = part(0, 0)
+	self.Color = attributes.SeamA
+	self.CFrame = { Position = at(x) }
+	local listeners, moved = {}, {}
+	local inGame = true
+	self.IsDescendantOf = function(_, ancestor)
+		if ancestor == game then
+			return inGame
+		elseif ancestor == workspace then
+			return inGame and (where == "world" or where == "camera")
+		elseif ancestor == camera then
+			return inGame and where == "camera"
+		end
+		return false
+	end
+	self.FindFirstAncestorWhichIsA = function(_, class)
+		return if class == "ViewportFrame" and where == "view" and inGame then preview else nil
+	end
+	self.GetAttribute = function(_, name)
+		return attributes[name]
+	end
+	local function signal(into)
+		return {
+			Connect = function(_, fn)
+				into[fn] = true
+				return {
+					Disconnect = function()
+						into[fn] = nil
+					end,
+				}
+			end,
+		}
+	end
+	self.AttributeChanged = signal(listeners)
+	self.AncestryChanged = signal(moved)
+	self.Listening = function()
+		return next(listeners) ~= nil
+	end
+	self.Leave = function()
+		inGame = false
+		for fn in moved do
+			fn()
+		end
+	end
+	return self
+end
+local function copyOf(strips)
+	return {
+		GetAttribute = function()
+			return nil
+		end,
+		GetDescendants = function()
+			return strips
+		end,
+		DescendantAdded = {
+			Connect = function()
+				return { Disconnect = function() end }
+			end,
+		},
+	}
+end
+-- (The clock only moves on from here.)
+CLOCK = 40
+local function tick()
+	CLOCK += 0.11
+	bound()
+end
+local function moves(seam, label)
+	local seen = {}
+	for _ = 1, 30 do
+		tick()
+		seen[string.format("%.3f", seam.Color.G)] = true
+	end
+	local distinct = 0
+	for _ in seen do
+		distinct += 1
+	end
+	return distinct > 4, label
+end
+local fx = { SeamFx = "Shift", SeamA = gold, SeamB = red, SeamSeed = 2 }
+-- First person: an untagged copy in the camera moves.
+local held = copied("camera", 1, fx)
+LiveLooks.watch(copyOf({ held }))
+assert(moves(held, ""), "your first-person copy of an animated skin stood still")
+-- A preview, 900 studs from the camera: moves while it's on screen.
+local shown = copied("view", 900, fx)
+LiveLooks.watch(copyOf({ shown }))
+assert(moves(shown, ""), "an Inventory/Shop preview of an animated skin stood still")
+screen.Enabled = false
+tick()
+local closed = shown.Color
+for _ = 1, 10 do
+	tick()
+end
+assert(shown.Color == closed, "a preview was animated while its screen was closed")
+screen.Enabled = true
+panel.Visible = false
+for _ = 1, 10 do
+	tick()
+end
+assert(shown.Color == closed, "a preview was animated inside a hidden frame")
+panel.Visible = true
+assert(moves(shown, ""), "a preview stood still once it was back on screen")
+-- A tagged clone in a preview (if Roblox keeps its tag) moves too, however
+-- far off the camera is: it's classed with the preview, not the world.
+local taggedCopy = copied("view", 900, fx)
+added(taggedCopy)
+assert(moves(taggedCopy, ""), "a tagged clone in a preview was held still as a far-off world seam")
+-- The same skin in the world that far off holds still (FxRange).
+local farWorld = copied("world", 900, fx)
+added(farWorld)
+local farColor = farWorld.Color
+for _ = 1, 10 do
+	tick()
+end
+assert(farWorld.Color == farColor, "a far-off world seam was animated")
+-- The Shop's mannequins (ReplicatedStorage): drawn nowhere, never touched.
+local mannequin = copied("away", 1, fx)
+added(mannequin)
+local stored = mannequin.Color
+assert(moves(mannequin, "") == false and mannequin.Color == stored, "a seam drawn nowhere was animated")
+-- A copy leaving the game (the view rebuilt, the preview closed) is
+-- forgotten: no longer painted, its listener dropped.
+held.Leave()
+assert(not held:Listening(), "a copy that left the game kept its listener")
+local gone = held.Color
+for _ = 1, 10 do
+	tick()
+end
+assert(held.Color == gone, "a copy that left the game was still painted")
+-- A copy that isn't animated (no SeamFx) isn't taken on at all.
+local plain = copied("camera", 1, { SeamA = gold })
+LiveLooks.watch(copyOf({ plain }))
+assert(not plain:Listening(), "a still seam in a copy was watched")
+workspace.CurrentCamera = nil
 print("seam visibility: all checks passed")

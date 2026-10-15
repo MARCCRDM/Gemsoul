@@ -1,6 +1,7 @@
 -- Local, code-native presentation. Winning gear keeps its authored geometry.
 local Players = game:GetService("Players")
 local GemArt = require(script.Parent.GemArt)
+local LiveLooks = require(script.Parent.LiveLooks)
 local Art = {}
 local INK = Color3.fromRGB(28, 39, 53)
 local METAL = Color3.fromRGB(125, 145, 161)
@@ -75,6 +76,7 @@ function Art.gear(slot)
 		model:Destroy()
 		return nil
 	end
+	LiveLooks.watch(model) -- (an animated skin moves here as it does when worn)
 	return model
 end
 function Art.show(parent, gem, slot, color, capsule)

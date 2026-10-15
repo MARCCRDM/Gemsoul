@@ -34,7 +34,8 @@ server.
 | Combat HUD | A crosshair raycast every frame, for a target card that is never shown. | Gone. |
 | First-person view (`FirstPersonCombat`) | One `CFrame` write per viewmodel part (the shield alone is about 40), and attribute reads repeated per part. | One `BulkMoveTo`; attributes read once a frame. |
 | Target lock (`TargetLock`) | A raycast per foe per frame, rebuilding the filter each time. | The locked foe every frame; the others at the 10 Hz scan; the filter rebuilt only when it changes. |
-| Skin trim (`SeamVisibility`) | Every outline in the server checked every frame (well over a thousand with neon suits). | Your own every frame; everyone else's in slices (all of them every 4 frames); animated trim only within 120 studs, and trim strips (real parts, over a hundred a suit) recoloured 20 times a second. |
+| Skin trim (`SeamVisibility`) | Every outline in the server checked every frame (well over a thousand with neon suits), including the Shop's mannequins in ReplicatedStorage. | Your own and first person's every frame, a preview's only while it's on screen; everyone else's in slices (all of them every 4 frames); animated trim only within 120 studs; trim strips (real parts, over a hundred a suit) recoloured 20 times a second; parts drawn nowhere never checked. |
+| Stone lights (`GemLights`) | A tween per stone on the server: every stone's light (up to 8 a fighter, Ion's strobing every frame) sent to every player. | Moved on each client, within 120 studs; nothing goes over the network. |
 | Prismatic gear (`PrismaticShimmer`) | Every plate in the world recoloured every frame, with an attribute read and an HSV conversion. | Base colour read once; only plates within 150 studs shimmer. |
 | Status effects (`StatusEffects.decode`) | Each fighter's status string parsed 3 or more times a frame (HUD, overhead bars, auras). | Each string parsed once and the result shared (frozen). |
 | World decorations (`Effects.client`) | One `CFrame` write per spinning or bobbing part; attribute and light lookups every frame. | One `BulkMoveTo`; lookups cached. |
@@ -50,3 +51,4 @@ server.
   - a new body's outlines count as yours;
   - the animation and restyle cases still work.
 - `tests/run_target_lock.py` checks that the cover grace on the locked foe still starts the moment it's hidden.
+- `tests/run_live_looks.py` checks that stone lights and Prismatic plates move only where they're drawn: near the camera, in first person, or in a preview on screen.

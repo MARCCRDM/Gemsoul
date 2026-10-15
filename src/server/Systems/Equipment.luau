@@ -11,7 +11,6 @@
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
@@ -806,6 +805,7 @@ SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
 			continue
 		end
 		CollectionService:RemoveTag(part, Tags.Prismatic)
+		part:SetAttribute("PrismaticBase", nil) -- (or a copy of it would shimmer: LiveLooks)
 		local _, _, value = part.Color:ToHSV()
 		if part.Material == Enum.Material.Neon then
 			part.Color = color -- white-hot edges
@@ -923,6 +923,7 @@ local function repaint(container: Instance, palette, limit: number?, suit: boole
 			continue
 		end
 		CollectionService:RemoveTag(part, Tags.Prismatic)
+		part:SetAttribute("PrismaticBase", nil) -- (or a copy of it would shimmer: LiveLooks)
 		local _, _, value = part.Color:ToHSV()
 		if part.Material == Enum.Material.Neon then
 			part.Color = palette.Glow
@@ -2081,11 +2082,12 @@ local function gemLook(component: Instance, gem, suited: boolean?)
 		lamp.Shadows = false
 		lamp.Range = (3 + tier * 0.6) * scale
 		lamp.Brightness = 0.55 + tier * 0.12
-		TweenService:Create(
-			lamp,
-			TweenInfo.new(pulse[1], Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-			{ Brightness = lamp.Brightness * pulse[2] }
-		):Play()
+		-- It breathes the element's way on every client (GemLights): a tween
+		-- here would send every stone's light to every player, every frame.
+		lamp:SetAttribute("PulseBase", lamp.Brightness)
+		lamp:SetAttribute("PulsePeriod", pulse[1])
+		lamp:SetAttribute("PulseDim", pulse[2])
+		CollectionService:AddTag(lamp, Tags.GemGlow)
 		stoneParticles(core, gem.Element, tier, scale, 1)
 		if gem.Element == "Frost" then
 			frostCrystals(core, 3 + math.floor(tier / 2))
