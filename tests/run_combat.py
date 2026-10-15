@@ -44,6 +44,10 @@ source+=read('tests/combat_tutorial_cases.luau')
 source+='\ndo\n'+read('tests/weapon_perk_cases.luau')+'\nend\n'
 source+='\nGemTraits.Enabled = true -- the Q / E / R triad\n'
 source+=read('tests/triad_live_cases.luau')
+# Exercise the actual avatar stat application without building cosmetic geometry.
+equipment=read('src/server/Systems/Equipment.luau')
+source+='\ndo\n'+equipment[equipment.index('local function applyStats('):equipment.index('-- Builds the gear folder')]
+source+=read('tests/level_vitals_cases.luau')+'\nend\n'
 with tempfile.TemporaryDirectory(prefix='gemsoul-combat-') as directory:
     script=Path(directory)/'combat.luau'; script.write_text(source,encoding='utf-8')
     subprocess.run([str(ROOT/'.tools/luau/luau.exe'),str(script)],check=True)
