@@ -415,6 +415,19 @@ check(state.Ok and state.Group.Enabled == false and #state.Invites.Tiers == #Ref
 -- The full collection's designs -------------------------------------------------------------
 local PATTERNS = { Camo = true, Stripes = true, Trim = true }
 local SEAM_FX = { Pulse = true, Shift = true, Flicker = true, Rainbow = true }
+-- Clean finishes only: no gritty textures (fabric weave, rust, concrete, stone).
+local SUIT_MATERIALS = { SmoothPlastic = true, Metal = true, Foil = true, Glass = true, Neon = true }
+local GRITTY = {
+	Fabric = true,
+	CorrodedMetal = true,
+	Concrete = true,
+	Slate = true,
+	Basalt = true,
+	Marble = true,
+	Rock = true,
+	DiamondPlate = true,
+	Granite = true,
+}
 local defaults, earnedHow, animated = 0, true, 0
 for id, cosmetic in Cosmetics.List do
 	local palette = cosmetic.Palette
@@ -440,6 +453,17 @@ for id, cosmetic in Cosmetics.List do
 			check(palette.Edge == true or (cosmetic.Look ~= nil and palette.SeamColor ~= nil), id .. " has no neon edge")
 		end
 		check(palette.SeamFx == nil or SEAM_FX[palette.SeamFx], id .. " has an unknown SeamFx")
+		for _, field in { "PlateMaterial", "UnderMaterial", "AccentMaterial", "BladeMaterial" } do
+			local material = palette[field]
+			if material then
+				local name = material.Name
+				if cosmetic.Kind == "Suit" then
+					check(SUIT_MATERIALS[name], id .. "'s " .. field .. " is a textured finish (" .. name .. ")")
+				else
+					check(not GRITTY[name], id .. "'s " .. field .. " is a gritty texture (" .. name .. ")")
+				end
+			end
+		end
 		check(
 			palette.SeamWidth == nil
 				or (type(palette.SeamWidth) == "number" and palette.SeamWidth > 0 and palette.SeamWidth <= 0.06),

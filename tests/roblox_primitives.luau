@@ -53,8 +53,17 @@ local builtParts = {}
 local Instance = {
 	new = function(className)
 		local values = { ClassName = className }
+		local attributes = {}
+		values.Attributes = attributes
 		function values.Destroy()
 			values.Parent = nil
+		end
+		-- (Some runners patch in their own SetAttribute above: keep theirs.)
+		values.SetAttribute = values.SetAttribute or function(_self, name, value)
+			attributes[name] = value
+		end
+		values.GetAttribute = values.GetAttribute or function(_self, name)
+			return attributes[name]
 		end
 		return setmetatable({}, {
 			__index = values,

@@ -165,6 +165,15 @@ local function glow(folder, seg, cframe, size, color)
 	return part
 end
 
+-- Visor parts keep their own colour under any suit (Equipment's repaint
+-- skips parts marked Visor): a suit dresses the armour, never the face.
+local function visorPart(part: BasePart?): BasePart?
+	if part then
+		part:SetAttribute("Visor", true)
+	end
+	return part
+end
+
 local function darken(color: Color3, amount: number): Color3
 	return color:Lerp(Color3.new(0, 0, 0), amount)
 end
@@ -578,8 +587,10 @@ end
 local function bucketHelm(folder, head: Segment, kit: Kit)
 	local h = head.Size
 	box(folder, head, CFrame.new(0, h.Y * 0.1, 0), h * Vector3.new(1.2, 1.3, 1.22), kit.Metal, kit.Material)
-	glow(folder, head, CFrame.new(0, h.Y * 0.12, -h.Z * 0.62), Vector3.new(h.X * 0.8, 0.1, 0.04), kit.Accent)
-	glow(folder, head, CFrame.new(0, -h.Y * 0.08, -h.Z * 0.62), Vector3.new(0.1, h.Y * 0.5, 0.04), kit.Accent)
+	visorPart(glow(folder, head, CFrame.new(0, h.Y * 0.12, -h.Z * 0.62), Vector3.new(h.X * 0.8, 0.1, 0.04), kit.Accent))
+	visorPart(
+		glow(folder, head, CFrame.new(0, -h.Y * 0.08, -h.Z * 0.62), Vector3.new(0.1, h.Y * 0.5, 0.04), kit.Accent)
+	)
 	cylinder(
 		folder,
 		head,
@@ -746,21 +757,27 @@ local function helmet(folder, head: Segment, kit: Kit, style: Suit)
 	box(folder, head, CFrame.new(0, 0, 0.05), h * Vector3.new(1.12, 1.06, 1.12), kit.Trim, SMOOTH)
 	box(folder, head, CFrame.new(0, h.Y * 0.36, 0), h * Vector3.new(1.22, 0.34, 1.16), shellColor, SMOOTH)
 	box(folder, head, CFrame.new(0, h.Y * 0.57, 0.04), h * Vector3.new(0.88, 0.14, 0.98), shellColor, SMOOTH)
-	box(folder, head, CFrame.new(0, h.Y * 0.08, -h.Z * 0.59), h * Vector3.new(0.92, 0.5, 0.08), VISOR, SMOOTH)
-	box(
-		folder,
-		head,
-		CFrame.new(0, h.Y * 0.1, -h.Z * 0.64),
-		h * Vector3.new(0.74, 0.38, 0.03),
-		if kit.Traits then kit.Traits.VisorColor else Color3.fromRGB(20, 139, 184),
-		SMOOTH
+	visorPart(
+		box(folder, head, CFrame.new(0, h.Y * 0.08, -h.Z * 0.59), h * Vector3.new(0.92, 0.5, 0.08), VISOR, SMOOTH)
 	)
-	light(
-		folder,
-		head,
-		CFrame.new(-h.X * 0.23, h.Y * 0.1, -h.Z * 0.665),
-		h * Vector3.new(0.08, 0.34, 0.02),
-		Color3.fromRGB(100, 232, 248)
+	visorPart(
+		box(
+			folder,
+			head,
+			CFrame.new(0, h.Y * 0.1, -h.Z * 0.64),
+			h * Vector3.new(0.74, 0.38, 0.03),
+			if kit.Traits then kit.Traits.VisorColor else Color3.fromRGB(20, 139, 184),
+			SMOOTH
+		)
+	)
+	visorPart(
+		light(
+			folder,
+			head,
+			CFrame.new(-h.X * 0.23, h.Y * 0.1, -h.Z * 0.665),
+			h * Vector3.new(0.08, 0.34, 0.02),
+			Color3.fromRGB(100, 232, 248)
+		)
 	)
 	box(folder, head, CFrame.new(0, -h.Y * 0.36, -h.Z * 0.5), h * Vector3.new(0.84, 0.24, 0.34), shellColor, SMOOTH)
 	for _, side in sides() do
@@ -1549,6 +1566,8 @@ local function frontierSuit(family: number)
 		local helmetVariant = math.clamp(kit.Traits and kit.Traits.Helmet or 1, 1, 5)
 		-- Catalog identity is stable across saved cosmetic rolls.
 		local design = kit.HelmetDesign or helmetVariant
+		local visor = kit.Traits and kit.Traits.VisorColor or Color3.fromRGB(238, 174, 57)
+		local RECESS = Color3.fromRGB(8, 20, 30) -- the dark well the visor sits in
 		local function block(seg, x, y, z, sx, sy, sz, color, tilt)
 			local detail = box(
 				folder,
@@ -1562,6 +1581,9 @@ local function frontierSuit(family: number)
 				-- Preserve thin etched trim; the legacy builder clamps it to 0.05 studs.
 				detail.Size = Vector3.new(math.max(sx, 0.015), math.max(sy, 0.015), math.max(sz, 0.015))
 				detail.Reflectance = if color == edge or color == BRASS then 0.08 else 0.025
+				if color == visor or color == RECESS then
+					visorPart(detail)
+				end
 			end
 		end
 		local function lit(seg, x, y, z, sx, sy, sz)
@@ -1582,8 +1604,7 @@ local function frontierSuit(family: number)
 			block(head, 0, 0, 0.04, x * 0.86, y * 0.92, z * 0.88, trim)
 			plate(head, 0, y * 0.34, 0.015, x * 1.02, y * 0.34, z * 0.98, metal)
 			block(head, 0, y * 0.53, 0.055, x * (0.6 + helmetVariant * 0.025), y * 0.12, z * 0.8, edge)
-			block(head, 0, y * 0.03, -z * 0.5, x * 0.79, y * 0.4, 0.045, Color3.fromRGB(8, 20, 30))
-			local visor = kit.Traits and kit.Traits.VisorColor or Color3.fromRGB(238, 174, 57)
+			block(head, 0, y * 0.03, -z * 0.5, x * 0.79, y * 0.4, 0.045, RECESS)
 			block(head, 0, y * 0.065, -z * 0.535, x * 0.68, y * 0.24, 0.025, visor)
 			for _, side in { -1, 1 } do
 				block(head, side * x * 0.385, y * 0.06, -z * 0.47, x * 0.17, y * 0.25, 0.1, visor, side * -8)

@@ -732,16 +732,35 @@ end
 local SEAM_LIMIT = 12 -- outlined plates per armor piece, biggest first
 local WEAPON_SEAMS = 6 -- and per weapon (the blade's edge is its own)
 
+-- A suit keeps the armour's own light and shade: each part takes the
+-- palette's colour at its own relative brightness (a lighter edge stays
+-- lighter, a deep trim deeper), so the armour's detail still reads. And a
+-- suit never blacks the armour out: a part keeps at least a share of its
+-- own brightness (KEEP: most of it under the plates, over half on them),
+-- and nothing goes below the floors.
+local SUIT_PLATE_REF, SUIT_UNDER_REF = 0.62, 0.25
+local SUIT_PLATE_FLOOR, SUIT_UNDER_FLOOR = 0.27, 0.15
+local SUIT_PLATE_KEEP, SUIT_UNDER_KEEP = 0.55, 0.85
+local function shaded(color: Color3, ratio: number, floor: number, own: number?): Color3
+	local h, sat, v = color:ToHSV()
+	return Color3.fromHSV(h, sat, math.clamp(math.max(v * ratio, own or 0), floor, 1))
+end
+
 -- Repaints every part under `container` in a cosmetic Palette (skins and
 -- suits): neon takes the glow, dark parts and wood/leather the under-colour,
 -- the rest the plate colour and material (or the Accent, in its Pattern).
 -- Plain blocks get glowing Seams when the palette asks. Returns the biggest
--- part (for particles, trails and a blade's look).
-local function repaint(container: Instance, palette, limit: number?): BasePart?
+-- part (for particles, trails and a blade's look). `suit`: armour, shaded
+-- (above), its visor left as it is (parts marked Visor, see ArmorKits).
+local function repaint(container: Instance, palette, limit: number?, suit: boolean?): BasePart?
 	local biggest, biggestSize = nil, 0
 	local plates = {}
+	local shades: { [BasePart]: number } = {}
 	for _, part in container:GetDescendants() do
 		if not part:IsA("BasePart") or part.Transparency >= 1 or part.Name == "SocketedGem" then
+			continue
+		end
+		if suit and part:GetAttribute("Visor") then
 			continue
 		end
 		CollectionService:RemoveTag(part, Tags.Prismatic)
@@ -749,12 +768,24 @@ local function repaint(container: Instance, palette, limit: number?): BasePart?
 		if part.Material == Enum.Material.Neon then
 			part.Color = palette.Glow
 		elseif value < 0.45 or part.Material == Enum.Material.Wood or part.Material == Enum.Material.Leather then
-			part.Color = palette.Under
+			part.Color = if suit
+				then shaded(
+					palette.Under,
+					math.clamp(value / SUIT_UNDER_REF, 0.7, 1.5),
+					SUIT_UNDER_FLOOR,
+					value * SUIT_UNDER_KEEP
+				)
+				else palette.Under
 			part.Material = palette.UnderMaterial or Enum.Material.SmoothPlastic
 			part.Reflectance = 0
 		else
-			part.Color, part.Material = palette.Plate, palette.PlateMaterial
+			local ratio = if suit then math.clamp(value / SUIT_PLATE_REF, 0.8, 1.2) else 1
+			part.Color = if suit
+				then shaded(palette.Plate, ratio, SUIT_PLATE_FLOOR, value * SUIT_PLATE_KEEP)
+				else palette.Plate
+			part.Material = palette.PlateMaterial
 			part.Reflectance = palette.Reflect or 0
+			shades[part] = value
 			table.insert(plates, part)
 		end
 		local size = part.Size.X * part.Size.Y * part.Size.Z
@@ -771,7 +802,15 @@ local function repaint(container: Instance, palette, limit: number?): BasePart?
 		local median = volumes[math.ceil(#volumes / 2)] or 0
 		for index, part in plates do
 			if accented(palette.Pattern, part, index, median) then
-				part.Color = palette.Accent
+				local own = shades[part] or SUIT_PLATE_REF
+				part.Color = if suit
+					then shaded(
+						palette.Accent,
+						math.clamp(own / SUIT_PLATE_REF, 0.8, 1.2),
+						SUIT_PLATE_FLOOR,
+						own * SUIT_PLATE_KEEP
+					)
+					else palette.Accent
 				part.Material = palette.AccentMaterial or palette.PlateMaterial
 			end
 		end
@@ -2169,7 +2208,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 			local component = folder:FindFirstChild(slot)
 			if component and (not only or only == slot) then
-				local biggest = repaint(component, suit.Palette)
+				local biggest = repaint(component, suit.Palette, nil, true)
 				if slot == "Armor" and biggest and suit.Palette.Sparks then
 					drift(biggest, suit.Palette.Sparks, 8)
 				end

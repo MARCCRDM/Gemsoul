@@ -96,6 +96,21 @@ A palette can ask for more than one colour:
 | `SeamWidth` | The outline's thickness, from 0.018 (Frontier) to 0.036 (Solar Flare). Rarer looks get bolder lines. |
 | `SeamFx` | Makes the outlines move (see below). Without it they stay steady. |
 
+### How a suit paints armour
+
+A suit recolours the armour you wear (`repaint` in `Equipment.luau`, with `suit` set), but keeps it looking like armour:
+
+- **The visor stays as it is.** The builders mark visor parts (the glass, the dark well behind it, a bucket helm's slits) with a `Visor` attribute (`ArmorKits.visorPart`). The repaint skips them, so every suit keeps your armour's own visor colour.
+- **Light and shade are kept.** Each part takes the palette's colour at its own relative brightness, so a lighter edge stays lighter and a deep trim deeper, and the armour's detail still reads.
+- **Nothing blacks out.**
+  - A part keeps at least 85% of its own brightness under the plates, and 55% on them.
+  - There's also a floor for each.
+  - Dark suits (Stealth Black, Neon Runner, Obsidian Lava) read as gunmetal and indigo with their plates showing, not as a black silhouette.
+- **Clean finishes only.**
+  - Suits use SmoothPlastic, Metal, Foil, Glass or Neon. Gritty textures (fabric weave, rust, concrete, slate, basalt, marble) are gone.
+  - Weapon skins drop the gritty ones too. They keep the materials that make them: Molten Core's lava blade, Glacier Shard's ice, Bonk Bat's wood.
+  - `tests/skins_store_cases.luau` checks this for every look.
+
 ### The neon look
 
 Every suit and every weapon skin has glowing outlines, like Neon Runner and Raid

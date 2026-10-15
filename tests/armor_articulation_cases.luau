@@ -136,3 +136,37 @@ print(
 		.. bootChecks
 		.. " boot configurations: R6/R15, 3 families, 5 rarities, 3 scales; joint clearance and weld ownership"
 )
+
+-- Visors are marked (the Visor attribute) so a suit leaves them their own
+-- colour (Equipment's repaint skips them): every part in the visor's colour
+-- is marked, and so is the dark well it sits in.
+local visorChecks = 0
+for _, look in { "UtilityMiner", "FrontierRanger", "HeavyVanguard" } do
+	for rarity = 1, 5 do
+		local character = rig(true)
+		local visorTint = Color3.fromRGB(30, 140, 220)
+		table.clear(builtParts)
+		ArmorKits.build(
+			{},
+			character,
+			look,
+			Color3.fromRGB(80, 200, 220),
+			rarity,
+			{ Rarity = rarity, VisorColor = visorTint, FinishColor = Color3.fromRGB(100, 120, 140) },
+			"Helmet"
+		)
+		local marked, tinted = 0, 0
+		for _, part in builtParts do
+			if part.Color == visorTint then
+				tinted += 1
+				assert(part.Attributes.Visor == true, look .. " left a visor part unmarked at rarity " .. rarity)
+			end
+			if part.Attributes.Visor then
+				marked += 1
+			end
+		end
+		assert(tinted >= 1 and marked > tinted, look .. "'s visor (and its well) aren't marked at rarity " .. rarity)
+		visorChecks += 1
+	end
+end
+print("PASS: " .. visorChecks .. " helmets: every visor part marked, so suits leave visors their own colour")
