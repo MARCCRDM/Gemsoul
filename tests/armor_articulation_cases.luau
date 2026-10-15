@@ -160,6 +160,10 @@ for _, look in { "UtilityMiner", "FrontierRanger", "HeavyVanguard" } do
 			if part.Color == visorTint then
 				tinted += 1
 				assert(part.Attributes.Visor == true, look .. " left a visor part unmarked at rarity " .. rarity)
+				-- (And as the lens itself, which a visor cosmetic restyles.)
+				assert(part.Attributes.VisorFace == true, look .. " left a lens part unmarked at rarity " .. rarity)
+			elseif part.Attributes.VisorFace then
+				error(look .. " marked a part that isn't the lens as the lens at rarity " .. rarity)
 			end
 			if part.Attributes.Visor then
 				marked += 1

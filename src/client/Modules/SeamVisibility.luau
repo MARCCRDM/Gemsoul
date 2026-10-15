@@ -17,6 +17,12 @@
 	  Shift    swings from one colour to the other
 	  Flicker  crackles like a live wire: the glow, with sharp flashes
 	  Rainbow  runs through every hue
+	  Scan     a bright bar (SeamB) sweeps to and fro over a dimmed lens
+	           (SeamA): each band's SeamSeed (0-10) is where it sits
+	  Aurora   flows through three colours (SeamA, SeamB, SeamC), a little
+	           behind from one band to the next
+	(Scan and Aurora are visors' (Cosmetics.VisorLook); a visor's lens is
+	tagged and animated here as a seam is.)
 
 	Copies move too: your first-person sword, the Inventory's and the Shop's
 	previews and gear art are clones, found by their attributes (LiveLooks)
@@ -24,7 +30,7 @@
 	while it's on screen, wherever the world's camera is.
 
 	  SeamVisibility.shows(box)  pure: whether the box's part is showing
-	  SeamVisibility.fxColor(fx, a, b, t, seed)  pure: an animated seam's colour
+	  SeamVisibility.fxColor(fx, a, b, t, seed, c?)  pure: an animated seam's colour
 	  SeamVisibility.start()
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -43,11 +49,21 @@ end
 
 local BLACK, WHITE = Color3.new(0, 0, 0), Color3.new(1, 1, 1)
 
-type Fx = { Fx: string, A: Color3, B: Color3, Seed: number }
+-- From one colour to another round the colour wheel (the short way), not
+-- straight across it: blue to gold goes by way of green, not grey.
+local function wheel(a: Color3, b: Color3, k: number): Color3
+	local ha, sa, va = a:ToHSV()
+	local hb, sb, vb = b:ToHSV()
+	local turn = (hb - ha + 0.5) % 1 - 0.5
+	return Color3.fromHSV((ha + turn * k) % 1, sa + (sb - sa) * k, va + (vb - va) * k)
+end
+
+type Fx = { Fx: string, A: Color3, B: Color3, C: Color3?, Seed: number }
 
 -- The colour of an animated seam at time `t` (seconds). `seed` staggers
--- boxes a little, so a suit's seams don't all flash in lockstep.
-function SeamVisibility.fxColor(fx: string, a: Color3, b: Color3, t: number, seed: number): Color3
+-- boxes a little, so a suit's seams don't all flash in lockstep (and places
+-- a visor's band across its lens: 0 at one side, 10 at the other).
+function SeamVisibility.fxColor(fx: string, a: Color3, b: Color3, t: number, seed: number, c: Color3?): Color3
 	if fx == "Pulse" then
 		local k = 0.5 + 0.5 * math.sin(t * math.pi * 2 / 1.8)
 		return a:Lerp(BLACK, 0.5 * (1 - k)):Lerp(WHITE, 0.15 * k)
@@ -62,6 +78,24 @@ function SeamVisibility.fxColor(fx: string, a: Color3, b: Color3, t: number, see
 	elseif fx == "Rainbow" then
 		local _, s, v = a:ToHSV()
 		return Color3.fromHSV((t * 0.18 + seed * 0.03) % 1, math.max(s, 0.65), math.max(v, 0.9))
+	elseif fx == "Scan" then
+		-- To and fro across the lens in 2.8 s, a soft glow either side of it.
+		local phase = (t / 1.4) % 2
+		local at = if phase < 1 then phase else 2 - phase
+		local hit = math.clamp(1 - math.abs(math.clamp(seed, 0, 10) / 10 - at) * 4.5, 0, 1)
+		return a:Lerp(BLACK, 0.45):Lerp(b, hit * hit * (3 - 2 * hit))
+	elseif fx == "Aurora" then
+		-- a, b, c and round again in 4.5 s, each band a step behind.
+		local third = c or a
+		local u = (t / 4.5 + seed * 0.03) % 1 * 3
+		local k = u % 1
+		k = k * k * (3 - 2 * k)
+		if u < 1 then
+			return wheel(a, b, k)
+		elseif u < 2 then
+			return wheel(b, third, k)
+		end
+		return wheel(third, a, k)
 	end
 	return a
 end
@@ -101,13 +135,14 @@ local function paint(seam: Instance, color: Color3)
 end
 local function read(seam: Instance)
 	local fx, a, b = seam:GetAttribute("SeamFx"), seam:GetAttribute("SeamA"), seam:GetAttribute("SeamB")
-	local seed = seam:GetAttribute("SeamSeed")
+	local c, seed = seam:GetAttribute("SeamC"), seam:GetAttribute("SeamSeed")
 	if typeof(fx) == "string" and typeof(a) == "Color3" then
 		count += 1
 		effects[seam] = {
 			Fx = fx,
 			A = a,
 			B = if typeof(b) == "Color3" then b else a,
+			C = if typeof(c) == "Color3" then c else nil,
 			Seed = if type(seed) == "number" then seed else count % 17,
 		}
 	elseif effects[seam] then
@@ -239,7 +274,7 @@ function SeamVisibility.start()
 			if showing[seam] and near[seam] ~= false and boxes[seam] then
 				local box = seam:IsA("SelectionBox")
 				if box or parts then
-					paint(seam, SeamVisibility.fxColor(effect.Fx, effect.A, effect.B, t, effect.Seed))
+					paint(seam, SeamVisibility.fxColor(effect.Fx, effect.A, effect.B, t, effect.Seed, effect.C))
 				end
 			end
 		end

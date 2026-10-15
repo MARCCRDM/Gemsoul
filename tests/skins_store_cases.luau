@@ -48,8 +48,11 @@ local FreeRewards = shared("FreeRewards")
 
 -- Catalog -----------------------------------------------------------------------------
 local equipment = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
-local KINDS = { Trim = true, Back = true, Skin = true, Suit = true, Pick = true, Title = true }
-local skins, suits, titles, picks = 0, 0, 0, 0
+local KINDS = { Trim = true, Back = true, Skin = true, Suit = true, Pick = true, Visor = true, Title = true }
+local skins, suits, titles, picks, visors = 0, 0, 0, 0, 0
+-- Visors: what each rarity promises.
+local VISOR_FX = { Pulse = true, Shift = true, Flicker = true, Rainbow = true, Scan = true, Aurora = true }
+local ELEMENTS = { Fire = true, Frost = true, Shock = true, Poison = true }
 local impacts = fs.readFile(ROOT .. "/src/client/Modules/PickImpacts.luau")
 local pickaxeSource = fs.readFile(ROOT .. "/src/shared/PickaxeLooks.luau")
 for id, cosmetic in Cosmetics.List do
@@ -74,13 +77,67 @@ for id, cosmetic in Cosmetics.List do
 		local impact = string.match(pickaxeSource, "LOOKS%." .. id .. " = {%s*Impact = \"(%w+)\"")
 		check(impact, id .. " has no pickaxe model (PickaxeLooks)")
 		check(string.find(impacts, "function LOOKS." .. impact .. "(", 1, true), id .. "'s hit (" .. tostring(impact) .. ") isn't drawn")
+	elseif cosmetic.Kind == "Visor" then
+		visors += 1
+		local v = cosmetic.Visor
+		check(v ~= nil and typeof(v.Color) == "Color3", id .. " has no lens colour")
+		v = v or {}
+		check(v.Material == "Glass" or v.Material == "Neon", id .. " has an unknown lens material")
+		check(v.Fx == nil or VISOR_FX[v.Fx], id .. " has an unknown visor effect")
+		check(v.Element == nil or ELEMENTS[v.Element], id .. " has an unknown element")
+		check(v.Glow == nil or typeof(v.Glow) == "Color3", id .. "'s Glow isn't a colour")
+		check(v.Third == nil or typeof(v.Third) == "Color3", id .. "'s Third isn't a colour")
+		check(v.Reflect == nil or (v.Reflect >= 0 and v.Reflect <= 1), id .. "'s Reflect is out of range")
+		check(
+			v.Bands == nil or (v.Bands == math.floor(v.Bands) and v.Bands >= 3 and v.Bands <= 15),
+			id .. " has a bad band count"
+		)
+		check(v.Fx ~= "Scan" or (v.Glow ~= nil and v.Bands ~= nil), id .. " scans with no sweep colour or no bands")
+		check(v.Fx ~= "Aurora" or (v.Glow ~= nil and v.Third ~= nil), id .. " is an Aurora without three colours")
+		check(v.Fx ~= "Shift" and v.Fx ~= "Flicker" or v.Glow ~= nil, id .. " swings to no second colour")
+		check(
+			v.Material ~= "Glass" or (v.Fx == nil and v.Element == nil),
+			id .. " is glass but moves (lit lenses move)"
+		)
+		local rank = ({ Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 })[cosmetic.Rarity]
+		check(rank ~= nil, id .. " has an unknown rarity")
+		if rank == 1 then
+			check(v.Material == "Glass", id .. " is Common but lit (Commons are tinted glass)")
+		elseif rank == 3 then
+			check(v.Fx ~= nil, id .. " is Rare but doesn't move")
+		elseif rank == 4 then
+			check(v.Fx ~= nil and v.Element ~= nil, id .. " is Ultra Rare but has no element")
+		elseif rank == 5 then
+			check(
+				(v.Fx == "Rainbow" or v.Fx == "Aurora") and (v.Bands or 0) >= 5 and v.Rim == true,
+				id .. " is Legendary but not a framed, banded, many-coloured lens"
+			)
+		end
 	elseif cosmetic.Kind == "Title" then
 		titles += 1
 	elseif cosmetic.Kind == "Back" then
 		check(cosmetic.Look and string.find(equipment, "BACKS." .. cosmetic.Look .. " =", 1, true), id .. " can't be built")
 	end
 end
-check(skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9, "The catalog is thinner than planned")
+check(skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9 and visors >= 15, "The catalog is thinner than planned")
+-- Visors: one of every element, a tab of their own, all in the Vault.
+local elements = {}
+for id, cosmetic in Cosmetics.List do
+	if cosmetic.Kind == "Visor" and cosmetic.Visor and cosmetic.Visor.Element then
+		elements[cosmetic.Visor.Element] = true
+	end
+end
+for element in ELEMENTS do
+	check(elements[element], "No visor carries " .. element)
+end
+check(Store.TabKinds.Visors == "Visor" and table.find(Store.Tabs, "Visors"), "Visors have no Store tab")
+check(Cosmetics.isMinerKind("Visor"), "A visor isn't each miner's own")
+local vault = Store.bundle("Vault")
+for _, id in Cosmetics.ofKind("Visor") do
+	if Cosmetics.List[id].Robux then
+		check(table.find(vault.Contents.Cosmetics, id), id .. " is sold but not in The Vault")
+	end
+end
 -- Every product slot buys something real.
 for key in Store.RobuxProducts do
 	local real = Store.bundle(key) or Store.kitsOf(key) or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
@@ -509,7 +566,7 @@ for id, cosmetic in Cosmetics.List do
 	check(cosmetic.Price == nil, id .. " still has a coin price: nothing is sold for coins")
 	check((cosmetic :: any).Crate == nil, id .. " still names a crate")
 end
-check(defaults == 2, "Every miner should start with one skin and one suit")
+check(defaults == 3, "Every miner should start with one skin, one suit and one visor")
 check(earnedHow, "An earned look doesn't say how it's earned")
 check(animated >= 15, "Too few looks have animated seams (" .. animated .. ")")
 
@@ -578,6 +635,59 @@ do
 	end
 	-- Two boxes of one suit don't flash in lockstep.
 	check(not near(fxColor("Shift", a, b, 1, 0), fxColor("Shift", a, b, 1, 5)), "Seeds don't stagger the seams")
+	-- Scan (visors): one bright bar crossing a dim lens, band by band (seed
+	-- 0-10 is where a band sits), to the far side and back.
+	local lens, bar = roblox.Color3.fromRGB(110, 10, 18), roblox.Color3.fromRGB(255, 70, 40)
+	local litAt = {}
+	for step = 0, 280 do
+		local t = step / 100
+		local brightest, at = -1, nil
+		for band = 0, 10 do
+			local c = fxColor("Scan", lens, bar, t, band)
+			check(valid(c), "Scan made an impossible colour")
+			local _, _, v = c:ToHSV()
+			if v > brightest then
+				brightest, at = v, band
+			end
+		end
+		litAt[at] = true
+		local lit, dark = 0, 0
+		for band = 0, 10 do
+			if near(fxColor("Scan", lens, bar, t, band), bar) then
+				lit += 1
+			elseif not near(fxColor("Scan", lens, bar, t, band), bar:Lerp(lens, 0.3)) then
+				dark += 1
+			end
+		end
+		check(lit <= 2 and dark >= 6, "Scan should light one bar across a dim lens")
+	end
+	check(litAt[0] and litAt[5] and litAt[10], "Scan's bar doesn't cross the whole lens")
+	-- Aurora (visors): through all three colours, round the colour wheel, never grey.
+	local teal, green, violet =
+		roblox.Color3.fromRGB(30, 236, 200), roblox.Color3.fromRGB(110, 255, 100), roblox.Color3.fromRGB(170, 84, 255)
+	local reached = {}
+	for step = 0, 450 do
+		local c = fxColor("Aurora", teal, green, step / 100, 0, violet)
+		check(valid(c), "Aurora made an impossible colour")
+		local _, sat = c:ToHSV()
+		check(sat >= 0.5, "Aurora went grey between its colours")
+		for name, stop in { Teal = teal, Green = green, Violet = violet } do
+			if near(c, stop) then
+				reached[name] = true
+			end
+		end
+	end
+	check(reached.Teal and reached.Green and reached.Violet, "Aurora didn't reach all three of its colours")
+	-- Blue to gold (Supernova's turn) goes round the wheel, not through grey.
+	local gold, blue = roblox.Color3.fromRGB(255, 186, 30), roblox.Color3.fromRGB(60, 150, 255)
+	for step = 0, 450 do
+		local _, sat = fxColor("Aurora", gold, roblox.Color3.fromRGB(255, 50, 170), step / 100, 0, blue):ToHSV()
+		check(sat >= 0.5, "Supernova's colours went grey between them")
+	end
+	check(
+		not near(fxColor("Aurora", teal, green, 2, 0, violet), fxColor("Aurora", teal, green, 2, 10, violet)),
+		"Aurora's bands all show one colour (no flow across the lens)"
+	)
 end
 for _, level in { 15, 25 } do
 	for _, id in Season.reward(level).Cosmetics or {} do
@@ -731,4 +841,4 @@ do
 	check(lit, "A bright pick doesn't glow")
 end
 
-print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d picks, %d titles, %d with animated seams; receipts once each, starter pack, season premium, codes)", checks, skins, suits, picks, titles, animated))
+print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d picks, %d visors, %d titles, %d with animated seams; receipts once each, starter pack, season premium, codes)", checks, skins, suits, picks, visors, titles, animated))

@@ -9,10 +9,13 @@
 	  Suits   restyle your whole armor, every piece, whatever its style.
 	  Picks   restyle the pickaxe you mine with (Shared.PickaxeLooks builds
 	          each one, and how its hits land); it keeps its tier's power.
+	  Visors  restyle the lens of whatever helmet you wear (a VisorLook):
+	          tinted glass, lit, moving, elemental or many-coloured. The
+	          helmet's own visor roll (and any perk it carries) stays.
 	  Titles  a tag over your head that everyone sees.
 
 	How each is had:
-	  Robux      a weapon skin, suit or pickaxe sold in the store, directly,
+	  Robux      a weapon skin, suit, pickaxe or visor sold in the store, directly,
 	             never at random (Store.RobuxProducts holds each one's
 	             Developer Product id; 0 = not on sale yet)
 	  (bundles)  trims and back pieces aren't sold on their own: they come
@@ -57,9 +60,24 @@ export type Palette = {
 	SeamWidth: number?, -- its thickness in studs (default 0.025)
 	SeamFx: ("Pulse" | "Shift" | "Flicker" | "Rainbow")?, -- how it moves (SeamVisibility)
 }
+-- A visor's look (Kind "Visor"): Equipment lays it on the lens of whatever
+-- helmet is worn (its parts marked VisorFace), and every client moves it
+-- (SeamVisibility, as it does a skin's seams).
+export type VisorLook = {
+	Color: Color3, -- the lens
+	Material: "Glass" | "Neon", -- tinted glass, or lit from inside
+	Reflect: number?, -- glass's mirror shine (0-1)
+	Glow: Color3?, -- its second colour: where a Shift swings, a Scan's sweep, a Flicker's flash
+	Third: Color3?, -- an Aurora's third colour
+	Fx: ("Pulse" | "Shift" | "Flicker" | "Rainbow" | "Scan" | "Aurora")?, -- how it moves
+	Bands: number?, -- the lens split into this many bands across, for a sweep or a flowing gradient
+	Element: ("Fire" | "Frost" | "Shock" | "Poison")?, -- an element coming off it (as off a gem's stone)
+	Rim: boolean?, -- a lit frame round the lens, moving with it
+	Sparks: Color3?, -- motes drifting off it
+}
 export type Cosmetic = {
 	Id: string,
-	Kind: "Trim" | "Back" | "Skin" | "Suit" | "Pick" | "Title",
+	Kind: "Trim" | "Back" | "Skin" | "Suit" | "Pick" | "Visor" | "Title",
 	Name: string,
 	Description: string,
 	Rarity: string, -- a gem tier: Common, Uncommon, Rare, UltraRare
@@ -68,6 +86,7 @@ export type Cosmetic = {
 	Color: Color3, -- the trim colour, the back piece's glow, a title's colour
 	Look: string?, -- how Equipment builds a back piece or applies a skin
 	Palette: Palette?, -- a skin's or suit's colours
+	Visor: VisorLook?, -- a visor's look
 	Exclusive: string?, -- earned one way only (see above)
 	How: string?, -- (earned ones) exactly what earns it, for the Shop
 }
@@ -1481,6 +1500,221 @@ Cosmetics.List = {
 		Exclusive = "Invite",
 		How = "Invite 2 friends who join the game.",
 	},
+	-- Visors (Equipment.applyVisor lays one on any helmet's lens). Glass
+	-- tints, then lit lenses, then moving ones, then the elements, then the
+	-- many-coloured legends.
+	VisorSmoke = {
+		Id = "VisorSmoke",
+		Kind = "Visor",
+		Name = "Smoke Glass",
+		Description = "Dark smoked glass, cool and clean. Every miner's spare.",
+		Rarity = "Common",
+		Color = Color3.fromRGB(96, 106, 124),
+		Visor = { Color = Color3.fromRGB(54, 62, 78), Material = "Glass", Reflect = 0.3 },
+		Exclusive = "Default",
+	},
+	VisorTangerine = {
+		Id = "VisorTangerine",
+		Kind = "Visor",
+		Name = "Tangerine",
+		Description = "Bright orange glass: the whole world through a sunset.",
+		Rarity = "Common",
+		Color = Color3.fromRGB(255, 150, 50),
+		Visor = { Color = Color3.fromRGB(255, 132, 34), Material = "Glass", Reflect = 0.2 },
+		Robux = 29,
+	},
+	VisorRose = {
+		Id = "VisorRose",
+		Kind = "Visor",
+		Name = "Rose Tint",
+		Description = "Pink-tinted glass, for seeing everything rosy.",
+		Rarity = "Common",
+		Color = Color3.fromRGB(255, 130, 180),
+		Visor = { Color = Color3.fromRGB(240, 104, 160), Material = "Glass", Reflect = 0.2 },
+		Robux = 29,
+	},
+	VisorGoldMirror = {
+		Id = "VisorGoldMirror",
+		Kind = "Visor",
+		Name = "Gold Mirror",
+		Description = "An astronaut's mirrored gold. Nobody sees your eyes; they see themselves.",
+		Rarity = "Uncommon",
+		Color = Color3.fromRGB(255, 200, 80),
+		Visor = { Color = Color3.fromRGB(232, 172, 56), Material = "Glass", Reflect = 0.65 },
+		Robux = 49,
+	},
+	VisorLime = {
+		Id = "VisorLime",
+		Kind = "Visor",
+		Name = "Hi-Vis Lime",
+		Description = "Glows safety lime from the inside. You will be seen.",
+		Rarity = "Uncommon",
+		Color = Color3.fromRGB(180, 255, 70),
+		Visor = { Color = Color3.fromRGB(166, 255, 54), Material = "Neon" },
+		Robux = 49,
+	},
+	VisorHotPink = {
+		Id = "VisorHotPink",
+		Kind = "Visor",
+		Name = "Hot Pink",
+		Description = "A lit pink lens, loud enough to hear.",
+		Rarity = "Uncommon",
+		Color = Color3.fromRGB(255, 80, 190),
+		Visor = { Color = Color3.fromRGB(255, 64, 184), Material = "Neon" },
+		Robux = 49,
+	},
+	VisorHeartbeat = {
+		Id = "VisorHeartbeat",
+		Kind = "Visor",
+		Name = "Heartbeat",
+		Description = "A deep red glow that beats like a heart.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(255, 60, 80),
+		Visor = { Color = Color3.fromRGB(255, 44, 64), Material = "Neon", Fx = "Pulse" },
+		Robux = 79,
+	},
+	VisorScanner = {
+		Id = "VisorScanner",
+		Kind = "Visor",
+		Name = "Sentinel Scan",
+		Description = "A red eye sweeps side to side across a dark lens. It's watching.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(255, 70, 50),
+		Visor = {
+			Color = Color3.fromRGB(110, 10, 18),
+			Glow = Color3.fromRGB(255, 70, 40),
+			Material = "Neon",
+			Fx = "Scan",
+			Bands = 9,
+		},
+		Robux = 79,
+	},
+	VisorTwilight = {
+		Id = "VisorTwilight",
+		Kind = "Visor",
+		Name = "Twilight",
+		Description = "Dusk on the lens: violet melting into orange and back again.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(190, 110, 255),
+		Visor = {
+			Color = Color3.fromRGB(140, 70, 255),
+			Glow = Color3.fromRGB(255, 140, 50),
+			Material = "Neon",
+			Fx = "Shift",
+		},
+		Robux = 79,
+	},
+	VisorThermal = {
+		Id = "VisorThermal",
+		Kind = "Visor",
+		Name = "Thermal Core",
+		Description = "Molten orange that flickers like a forge, shedding embers as you move.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(255, 120, 30),
+		Visor = {
+			Color = Color3.fromRGB(255, 96, 14),
+			Glow = Color3.fromRGB(255, 226, 96),
+			Material = "Neon",
+			Fx = "Flicker",
+			Element = "Fire",
+		},
+		Robux = 129,
+	},
+	VisorCryo = {
+		Id = "VisorCryo",
+		Kind = "Visor",
+		Name = "Cryo Frost",
+		Description = "Ice-blue light breathing behind frosted glass, snow drifting off it.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(140, 225, 255),
+		Visor = {
+			Color = Color3.fromRGB(70, 190, 255),
+			Glow = Color3.fromRGB(190, 240, 255),
+			Material = "Neon",
+			Fx = "Shift",
+			Element = "Frost",
+		},
+		Robux = 129,
+	},
+	VisorIon = {
+		Id = "VisorIon",
+		Kind = "Visor",
+		Name = "Ion Storm",
+		Description = "Violet static that crackles with white-hot sparks.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(150, 110, 255),
+		Visor = {
+			Color = Color3.fromRGB(120, 76, 255),
+			Glow = Color3.fromRGB(226, 250, 255),
+			Material = "Neon",
+			Fx = "Flicker",
+			Element = "Shock",
+		},
+		Robux = 129,
+	},
+	VisorToxic = {
+		Id = "VisorToxic",
+		Kind = "Visor",
+		Name = "Toxic Bloom",
+		Description = "Radioactive green, bubbling and seeping a sickly haze.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(110, 235, 80),
+		Visor = {
+			Color = Color3.fromRGB(70, 220, 56),
+			Glow = Color3.fromRGB(214, 255, 90),
+			Material = "Neon",
+			Fx = "Shift",
+			Element = "Poison",
+		},
+		Robux = 129,
+	},
+	VisorAurora = {
+		Id = "VisorAurora",
+		Kind = "Visor",
+		Name = "Aurora",
+		Description = "The northern lights rippling across your lens in teal, green and violet.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(70, 240, 200),
+		Visor = {
+			Color = Color3.fromRGB(30, 236, 200),
+			Glow = Color3.fromRGB(110, 255, 100),
+			Third = Color3.fromRGB(170, 84, 255),
+			Material = "Neon",
+			Fx = "Aurora",
+			Bands = 9,
+			Rim = true,
+		},
+		Robux = 199,
+	},
+	VisorSpectrum = {
+		Id = "VisorSpectrum",
+		Kind = "Visor",
+		Name = "Spectrum",
+		Description = "Every colour at once: a rainbow flowing across the glass, framed in light.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(255, 90, 90),
+		Visor = { Color = Color3.fromRGB(255, 60, 60), Material = "Neon", Fx = "Rainbow", Bands = 9, Rim = true },
+		Robux = 199,
+	},
+	VisorSupernova = {
+		Id = "VisorSupernova",
+		Kind = "Visor",
+		Name = "Supernova",
+		Description = "A star going off behind the glass: gold, magenta and electric blue, throwing off stardust.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(255, 200, 90),
+		Visor = {
+			Color = Color3.fromRGB(255, 186, 30),
+			Glow = Color3.fromRGB(255, 50, 170),
+			Third = Color3.fromRGB(60, 150, 255),
+			Material = "Neon",
+			Fx = "Aurora",
+			Bands = 9,
+			Rim = true,
+			Sparks = Color3.fromRGB(255, 236, 180),
+		},
+		Robux = 249,
+	},
 } :: { [string]: Cosmetic }
 
 function Cosmetics.get(id: any): Cosmetic?
@@ -1520,7 +1754,7 @@ function Cosmetics.ofKind(kind: string): { string }
 end
 
 -- Its price in coins: only while testing (Config.TestCosmeticPrice), for a
--- weapon skin, suit or pick the store sells, so a purchase can be tried
+-- weapon skin, suit, pick or visor the store sells, so a purchase can be tried
 -- without Robux. Nothing is sold for coins otherwise.
 function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
 	local test = Config.TestCosmeticPrice
@@ -1530,13 +1764,13 @@ function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
 	return nil
 end
 
--- What each miner wears for itself: a suit, a weapon skin and a pickaxe
--- (kept in its character as Wardrobe = { Suit, Skin, Pick }). Trims, backs
--- and titles are the account's. A miner with no Wardrobe yet wears the
--- account's current look.
-Cosmetics.MinerKinds = { "Suit", "Skin", "Pick" }
+-- What each miner wears for itself: a suit, a weapon skin, a pickaxe and a
+-- visor (kept in its character as Wardrobe = { Suit, Skin, Pick, Visor }).
+-- Trims, backs and titles are the account's. A miner with no Wardrobe yet
+-- wears the account's current look.
+Cosmetics.MinerKinds = { "Suit", "Skin", "Pick", "Visor" }
 function Cosmetics.isMinerKind(kind: any): boolean
-	return kind == "Suit" or kind == "Skin" or kind == "Pick"
+	return kind == "Suit" or kind == "Skin" or kind == "Pick" or kind == "Visor"
 end
 local function currentLook(cosmetics: any): { [string]: string? }
 	local look = {}

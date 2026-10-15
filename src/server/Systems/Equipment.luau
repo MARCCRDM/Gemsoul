@@ -720,11 +720,13 @@ end
 
 -- Neon trim round a plate's outward face (both broad faces, `twoSided`, for
 -- a blade): four strips just inside the face's edges, standing a little
--- proud of it. Skipped on a face too small to frame.
+-- proud of it. Skipped on a face too small to frame. Returns how many
+-- strips, and the strips.
 local function inlay(plate: BasePart, container: Instance, color: Color3, width: number, palette, twoSided: boolean?)
 	local anchor = anchorOf(plate, container)
+	local strips: { BasePart } = {}
 	if not anchor then
-		return 0
+		return 0, strips
 	end
 	local n, side = outwardFace(plate, anchor)
 	local dims = { plate.Size.X, plate.Size.Y, plate.Size.Z }
@@ -739,14 +741,24 @@ local function inlay(plate: BasePart, container: Instance, color: Color3, width:
 		local wide = dims[a] >= dims[b]
 		local runs, across = if wide then a else b, if wide then b else a
 		if dims[runs] < 0.3 or dims[across] < w * 1.5 then
-			return 0
+			return 0, strips
 		end
 		for _, s in if twoSided then { side, -side } else { side } do
 			local at = AXES[n] * s * (dims[n] / 2 + deep * 0.3)
-			seamStrip(plate, anchor, CFrame.new(at), sized(runs, dims[runs] * 0.8, across, w, n, deep), color, palette)
+			table.insert(
+				strips,
+				seamStrip(
+					plate,
+					anchor,
+					CFrame.new(at),
+					sized(runs, dims[runs] * 0.8, across, w, n, deep),
+					color,
+					palette
+				)
+			)
 			made += 1
 		end
-		return made
+		return made, strips
 	end
 	for _, s in if twoSided then { side, -side } else { side } do
 		local lift = AXES[n] * s * (dims[n] / 2 + deep * 0.3)
@@ -757,12 +769,15 @@ local function inlay(plate: BasePart, container: Instance, color: Color3, width:
 			local length = if long then dims[runs] else dims[runs] - 2 * w
 			for _, edge in { -1, 1 } do
 				local at = lift + AXES[across] * edge * (dims[across] / 2 - w / 2)
-				seamStrip(plate, anchor, CFrame.new(at), sized(runs, length, across, w, n, deep), color, palette)
+				table.insert(
+					strips,
+					seamStrip(plate, anchor, CFrame.new(at), sized(runs, length, across, w, n, deep), color, palette)
+				)
 				made += 1
 			end
 		end
 	end
-	return made
+	return made, strips
 end
 
 -- A blade's glowing edge: a strip down each of its long narrow sides (its
@@ -2222,6 +2237,166 @@ end
 
 -- Builds the gear folder for a loadout on a character (not parented yet).
 -- `only` limits it to one slot, for item previews.
+-- Visors (cosmetics, Kind "Visor") -----------------------------------------------------------
+
+-- How a lit visor's light breathes (GemLights), for the looks that move:
+-- seconds from bright to dim, and how dim.
+local VISOR_PULSE = { Pulse = { 0.9, 0.35 }, Flicker = { 0.07, 0.3 } }
+-- Looks that run across the lens: each band and lens piece is seeded by
+-- where it sits, left to right (0 to this), so a sweep or a gradient flows
+-- over the visor: a Scan's bar crosses it all (SeamVisibility reads 0-10),
+-- an Aurora shows a colour and a half at once, a Rainbow nearly every hue.
+-- The rest move as one.
+local VISOR_ACROSS = { Scan = 10, Aurora = 15, Rainbow = 30 }
+
+-- Lays a visor look (Cosmetics.VisorLook) on a helmet's lens: the parts its
+-- builder marked VisorFace (ArmorKits), whatever the helmet. The dark well
+-- round the lens and its lamps stay as they are. Moving looks carry the
+-- seams' attributes (SeamFx, SeamA, SeamB, SeamC, SeamSeed) and tag, so
+-- every client animates them, copies included (SeamVisibility, LiveLooks).
+local function applyVisor(helmet: Instance, look)
+	local faces: { BasePart } = {}
+	for _, part in helmet:GetDescendants() do
+		if part:IsA("BasePart") and part:GetAttribute("VisorFace") and part.Transparency < 1 then
+			table.insert(faces, part)
+		end
+	end
+	local head = faces[1] and anchorOf(faces[1], helmet)
+	if not head then
+		return
+	end
+	local right = (head :: BasePart).CFrame.RightVector
+	-- A part's own axis (1-3) lying most across the face.
+	local function crosswise(part: BasePart): number
+		local axis, best = 1, -1
+		for i, v in { part.CFrame.RightVector, part.CFrame.UpVector, part.CFrame.LookVector } do
+			local d = math.abs(v:Dot(right))
+			if d > best then
+				axis, best = i, d
+			end
+		end
+		return axis
+	end
+	local function across(part: BasePart): number
+		return (head :: BasePart).CFrame:PointToObjectSpace(part.CFrame.Position).X
+	end
+	-- The main lens (the biggest face) and the visor's span, side to side.
+	local main, mainArea = faces[1], 0
+	local low, high = math.huge, -math.huge
+	for _, part in faces do
+		local s = part.Size
+		local area = s.X * s.Y * s.Z / math.max(math.min(s.X, s.Y, s.Z), 0.001)
+		if area > mainArea then
+			main, mainArea = part, area
+		end
+		local half = ({ s.X, s.Y, s.Z })[crosswise(part)] / 2
+		low, high = math.min(low, across(part) - half), math.max(high, across(part) + half)
+	end
+	local function where(part: BasePart): number
+		return math.clamp((across(part) - low) / math.max(high - low, 0.01), 0, 1)
+	end
+	local fx = look.Fx
+	local glass = look.Material == "Glass"
+	local function style(part: BasePart)
+		part.Color = look.Color
+		part.Material = if glass then Enum.Material.Glass else Enum.Material.Neon
+		part.Reflectance = if glass then look.Reflect or 0.2 else 0
+		part.CastShadow = false
+		CollectionService:RemoveTag(part, Tags.Prismatic)
+		part:SetAttribute("PrismaticBase", nil)
+		if fx then
+			part:SetAttribute("SeamFx", fx)
+			part:SetAttribute("SeamA", look.Color)
+			part:SetAttribute("SeamB", look.Glow or look.Color)
+			part:SetAttribute("SeamC", look.Third)
+			part:SetAttribute("SeamSeed", where(part) * (VISOR_ACROSS[fx] or 0))
+			CollectionService:AddTag(part, Tags.SkinSeam)
+		end
+	end
+	local banded = (look.Bands or 0) > 1
+	for _, part in faces do
+		if not (banded and part == main) then
+			style(part)
+		end
+	end
+	local n, side = outwardFace(main, head)
+	local dims = { main.Size.X, main.Size.Y, main.Size.Z }
+	if banded then
+		-- The main lens cut into bands across, standing just proud of it,
+		-- with the lens itself gone dark behind them.
+		local runs = crosswise(main)
+		if runs == n then
+			runs = n % 3 + 1
+		end
+		local up = 6 - n - runs
+		local count = look.Bands
+		local width = dims[runs] / count
+		local deep = 0.012
+		local lift = AXES[n] * side * (dims[n] / 2 + deep / 2)
+		for i = 1, count do
+			local at = lift + AXES[runs] * (-dims[runs] / 2 + (i - 0.5) * width)
+			local band = piece(
+				main.Parent :: Instance,
+				head,
+				head.CFrame:ToObjectSpace(main.CFrame * CFrame.new(at)),
+				sized(runs, width * 0.84, up, dims[up] * 0.8, n, deep),
+				look.Color,
+				Enum.Material.Neon
+			)
+			band.Name = "VisorLens"
+			band:SetAttribute("Visor", true)
+			style(band)
+		end
+		main.Color = look.Color:Lerp(Color3.new(0, 0, 0), 0.82)
+		main.Material = Enum.Material.SmoothPlastic
+		main.Reflectance = 0.1
+		CollectionService:RemoveTag(main, Tags.Prismatic)
+		main:SetAttribute("PrismaticBase", nil)
+	end
+	if look.Rim then
+		-- A lit frame round the main lens, moving with it but half a turn
+		-- out of step, so it stands out from the bands it frames.
+		local _, strips = inlay(main, helmet, look.Color, 0.02, { SeamFx = fx, Glow = look.Glow or look.Color }, false)
+		for _, part in strips do
+			part:SetAttribute("Visor", true)
+			if fx then
+				local span = VISOR_ACROSS[fx] or 0
+				part:SetAttribute("SeamC", look.Third)
+				part:SetAttribute("SeamSeed", where(part) * span + (if fx == "Scan" then 0 else 16.7))
+			end
+		end
+	end
+	if look.Element then
+		-- The element comes off the lens as it does off a gem's stone.
+		stoneParticles(main, look.Element, 4, 1.6, 0.6, true)
+		for _, child in main:GetChildren() do
+			if child:IsA("ParticleEmitter") and child.Name == "GemEffect" then
+				child.Name = "VisorEffect"
+			end
+		end
+	end
+	if look.Sparks then
+		drift(main, look.Sparks, 6)
+	end
+	if not glass then
+		-- A lit lens lights the face round it, breathing with it if it moves.
+		local light = Instance.new("PointLight")
+		light.Name = "VisorGlow"
+		light.Color = look.Color
+		light.Range = 5
+		light.Brightness = 0.6
+		light.Shadows = false
+		local pulse = fx and VISOR_PULSE[fx]
+		if pulse then
+			light:SetAttribute("PulseBase", light.Brightness)
+			light:SetAttribute("PulsePeriod", pulse[1])
+			light:SetAttribute("PulseDim", pulse[2])
+			CollectionService:AddTag(light, Tags.GemGlow)
+		end
+		light.Parent = main
+	end
+end
+
 local function dress(character: Model, loadout, cosmetics, userId: number, only: string?): Folder?
 	if not only then
 		local weapon = Classes.weapon(loadout.Class, loadout.Weapon)
@@ -2544,6 +2719,12 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	if applySkin and (not only or only == "Weapon") then
 		applySkin(weaponFolder, skin.Color, skin.Palette)
 	end
+	-- So does a visor (cosmetic), on whatever helmet is worn, under any suit.
+	local visor = cosmetics and Cosmetics.get(cosmetics.Visor)
+	local helmetPiece = folder:FindFirstChild("Helmet")
+	if visor and visor.Kind == "Visor" and visor.Visor and helmetPiece and (not only or only == "Helmet") then
+		applyVisor(helmetPiece, visor.Visor)
+	end
 	return folder
 end
 
@@ -2830,7 +3011,14 @@ function Equipment.cosmeticPreview(id: string): boolean
 	local origin = rig:GetPivot()
 	local cosmetics = { Owned = {}, [cosmetic.Kind] = id }
 	local ok, folder = pcall(dress, rig, PREVIEW_KIT, cosmetics, 0)
-	local source = ok and folder and (if cosmetic.Kind == "Skin" then folder:FindFirstChild("Weapon") else folder)
+	local source = ok
+		and folder
+		and (
+			if cosmetic.Kind == "Skin"
+				then folder:FindFirstChild("Weapon")
+				elseif cosmetic.Kind == "Visor" then folder:FindFirstChild("Helmet")
+				else folder
+		)
 	if source then
 		local preview = Instance.new("Folder")
 		preview.Name = id

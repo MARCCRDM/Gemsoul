@@ -60,16 +60,17 @@ local Cosmetics = require(script.Parent.Cosmetics)
 
 local Store = {}
 
-Store.Tabs = { "Bundles", "Skins", "Suits", "Picks", "Free" }
+Store.Tabs = { "Bundles", "Skins", "Suits", "Visors", "Picks", "Free" }
 Store.TabNames = {
 	Bundles = "Bundles",
 	Skins = "Weapon Skins",
 	Suits = "Suits",
+	Visors = "Visors",
 	Picks = "Pickaxes",
 	Free = "Free",
 }
 -- The cosmetic kind each catalog tab sells.
-Store.TabKinds = { Skins = "Skin", Suits = "Suit", Picks = "Pick" }
+Store.TabKinds = { Skins = "Skin", Suits = "Suit", Visors = "Visor", Picks = "Pick" }
 
 -- New players can buy the Welcome Kit once, within this long of joining.
 Store.WelcomeHours = 24
@@ -278,6 +279,22 @@ Store.RobuxProducts = {
 	PickMagma = 0,
 	PickStorm = 0,
 	PickVoid = 0,
+	-- Visors
+	VisorTangerine = 0,
+	VisorRose = 0,
+	VisorGoldMirror = 0,
+	VisorLime = 0,
+	VisorHotPink = 0,
+	VisorHeartbeat = 0,
+	VisorScanner = 0,
+	VisorTwilight = 0,
+	VisorThermal = 0,
+	VisorCryo = 0,
+	VisorIon = 0,
+	VisorToxic = 0,
+	VisorAurora = 0,
+	VisorSpectrum = 0,
+	VisorSupernova = 0,
 	-- One-time offers and the Season Path
 	StarterPack = 0,
 	SeasonPremium = 0,
@@ -358,7 +375,7 @@ do
 			table.insert(list, id)
 		end
 	end
-	for _, kind in { "Suit", "Skin", "Pick" } do
+	for _, kind in { "Suit", "Skin", "Pick", "Visor" } do
 		for _, id in Cosmetics.ofKind(kind) do
 			if Cosmetics.List[id].Robux then
 				add(id)

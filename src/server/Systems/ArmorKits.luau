@@ -173,6 +173,14 @@ local function visorPart(part: BasePart?): BasePart?
 	end
 	return part
 end
+-- The lens itself (not the dark well round it or its lamps) is also marked
+-- VisorFace: a visor cosmetic (Equipment.applyVisor) restyles just that.
+local function visorFace(part: BasePart?): BasePart?
+	if part then
+		part:SetAttribute("VisorFace", true)
+	end
+	return visorPart(part)
+end
 
 local function darken(color: Color3, amount: number): Color3
 	return color:Lerp(Color3.new(0, 0, 0), amount)
@@ -587,8 +595,8 @@ end
 local function bucketHelm(folder, head: Segment, kit: Kit)
 	local h = head.Size
 	box(folder, head, CFrame.new(0, h.Y * 0.1, 0), h * Vector3.new(1.2, 1.3, 1.22), kit.Metal, kit.Material)
-	visorPart(glow(folder, head, CFrame.new(0, h.Y * 0.12, -h.Z * 0.62), Vector3.new(h.X * 0.8, 0.1, 0.04), kit.Accent))
-	visorPart(
+	visorFace(glow(folder, head, CFrame.new(0, h.Y * 0.12, -h.Z * 0.62), Vector3.new(h.X * 0.8, 0.1, 0.04), kit.Accent))
+	visorFace(
 		glow(folder, head, CFrame.new(0, -h.Y * 0.08, -h.Z * 0.62), Vector3.new(0.1, h.Y * 0.5, 0.04), kit.Accent)
 	)
 	cylinder(
@@ -760,7 +768,7 @@ local function helmet(folder, head: Segment, kit: Kit, style: Suit)
 	visorPart(
 		box(folder, head, CFrame.new(0, h.Y * 0.08, -h.Z * 0.59), h * Vector3.new(0.92, 0.5, 0.08), VISOR, SMOOTH)
 	)
-	visorPart(
+	visorFace(
 		box(
 			folder,
 			head,
@@ -1581,7 +1589,9 @@ local function frontierSuit(family: number)
 				-- Preserve thin etched trim; the legacy builder clamps it to 0.05 studs.
 				detail.Size = Vector3.new(math.max(sx, 0.015), math.max(sy, 0.015), math.max(sz, 0.015))
 				detail.Reflectance = if color == edge or color == BRASS then 0.08 else 0.025
-				if color == visor or color == RECESS then
+				if color == visor then
+					visorFace(detail)
+				elseif color == RECESS then
 					visorPart(detail)
 				end
 			end
