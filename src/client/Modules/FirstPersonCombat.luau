@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMotion)
+local ViewGrip = require(script.Parent.ViewGrip)
 local player = Players.LocalPlayer
 local View = {}
 local saved, model, gear, connection, removalConnection
@@ -144,8 +145,11 @@ local function buildViewShield(holder, source, plain: boolean?)
 			table.insert(emitters, part)
 		end
 	end
+	local gemColor = source:GetAttribute("GemColor")
 	local highlight = source:FindFirstChild("GemHighlight")
-	if highlight and highlight:IsA("Highlight") then
+	if typeof(gemColor) == "Color3" then
+		glow = gemColor
+	elseif highlight and highlight:IsA("Highlight") then
 		glow = highlight.OutlineColor
 	end
 	glow = glow or Color3.fromRGB(80, 220, 235)
@@ -290,30 +294,9 @@ end
 -- angled toward the enemy so you see its back and rim; raised to block, it
 -- swings up square in front of the left half of the view.
 local shieldRest, shieldRaised
--- The weapon's own frame: its grip point, with +Y running up its longest
--- piece (the blade), so it can be held at a set angle however it's mounted.
+-- The weapon's own frame, to hold it by (ViewGrip).
 local function weaponFrame(weapon)
-	local grip = weapon:FindFirstChild("RightGrip")
-	local blade, length = nil, 0
-	for _, part in weapon:GetDescendants() do
-        local weld = part:IsA("BasePart") and part:FindFirstChildWhichIsA("WeldConstraint")
-        -- Only the right-hand blade defines its frame, never a built-in shield
-        -- or the offhand blade of a dual-wield model.
-        if part:IsA("BasePart") and weld and weld.Part0 == grip and authoredTransparency(part) < 1 and part.Size.Y > length then
-			if part.Size.Y >= math.max(part.Size.X, part.Size.Z) then
-				blade, length = part, part.Size.Y
-			end
-		end
-	end
-	if not grip or not blade then
-		return nil
-	end
-	-- Which way along the blade is the tip (away from the grip).
-	local rotation = blade.CFrame.Rotation
-	if (blade.CFrame.Position - grip.CFrame.Position):Dot(blade.CFrame.UpVector) < 0 then
-		rotation *= CFrame.Angles(0, 0, math.pi)
-	end
-	return CFrame.new(grip.CFrame.Position) * rotation
+	return ViewGrip.frame(weapon, authoredTransparency)
 end
 local function rebuild(character, equipment)
 	clearModel()
@@ -348,6 +331,8 @@ local function rebuild(character, equipment)
 			-- camera a bold outline wraps half the view in glow.
 			local holder = Instance.new("Model")
 			holder.Name = slot
+			-- (Its gem's colour, for its trail and the view shield's glow.)
+			holder:SetAttribute("GemColor", source:GetAttribute("GemColor"))
 			holder.Parent = model
 			local highlight = source:FindFirstChild("GemHighlight")
 			if highlight and highlight:IsA("Highlight") then

@@ -184,4 +184,57 @@ bound()
 later2.Adornee.LocalTransparencyModifier = 1
 bound()
 assert(not later2.Visible, "outlines on your new body weren't treated as yours")
+
+-- Trim strips (the server's neon parts, Equipment.inlay): they hide with
+-- their own part, are recoloured PartFxRate times a second, and a plate's
+-- strips (one SeamSeed) move as one.
+local function strip(attributes)
+	local self = part(0, 0)
+	self.Color = attributes.SeamA
+	self.CFrame = { Position = { X = 0, Y = 0, Z = 0 } }
+	self.IsDescendantOf = function()
+		return false
+	end
+	self.GetAttribute = function(_, name)
+		return attributes[name]
+	end
+	self.AttributeChanged = {
+		Connect = function()
+			return { Disconnect = function() end }
+		end,
+	}
+	return self
+end
+local left = strip({ SeamFx = "Shift", SeamA = gold, SeamB = red, SeamSeed = 3 })
+local right = strip({ SeamFx = "Shift", SeamA = gold, SeamB = red, SeamSeed = 3 })
+local other = strip({ SeamFx = "Shift", SeamA = gold, SeamB = red, SeamSeed = 9 })
+added(left)
+added(right)
+added(other)
+assert(SeamVisibility.shows(left), "a strip in view shows")
+-- (In this crowd they're checked a slice a frame: give them a round.)
+CLOCK = 9
+for _ = 1, SeamVisibility.Spread + 1 do
+	bound()
+end
+CLOCK = 10
+bound()
+local painted = left.Color
+assert(left.Color.R == right.Color.R and left.Color.G == right.Color.G, "a plate's strips aren't in step")
+assert(left.Color.G ~= other.Color.G, "different plates' strips move in lockstep")
+CLOCK = 10 + 0.4 / SeamVisibility.PartFxRate
+bound()
+assert(left.Color == painted, "a strip was recoloured faster than PartFxRate")
+CLOCK = 10 + 1.2 / SeamVisibility.PartFxRate
+bound()
+assert(left.Color ~= painted, "a strip wasn't recoloured at PartFxRate")
+assert(left.Visible == nil, "a strip had its visibility toggled (it hides with its own part)")
+left.Transparency = 1
+for _ = 1, SeamVisibility.Spread + 1 do
+	bound() -- (the clock holds still: whatever's painted now is the same colour)
+end
+local hiddenColor = left.Color
+CLOCK = 13
+bound()
+assert(left.Color == hiddenColor, "a hidden strip was recoloured")
 print("seam visibility: all checks passed")

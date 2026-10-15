@@ -611,30 +611,181 @@ WEAPONS.Halberd = function(folder, _character, right, _left, accent, gem)
 	gemSocket(folder, right, m, Vector3.new(0, 4.6, 0), gem, 0.26)
 end
 
--- A glowing outline round a plate (a cosmetic's seams or a blade's edge).
--- A palette's SeamFx animates it on every client (SeamVisibility): "Pulse"
--- breathes, "Shift" swings between the seam colour and the glow, "Flicker"
--- crackles like a live wire, "Rainbow" runs through every hue. A part that
--- already has one keeps one, restyled.
-local function outline(part: BasePart, color: Color3, thickness: number, palette: any?)
-	local box = part:FindFirstChild("SkinSeam") :: SelectionBox?
-	if not box then
-		box = Instance.new("SelectionBox")
-		box.Name = "SkinSeam"
-		box.Adornee = part
-		box.SurfaceTransparency = 1
-		CollectionService:AddTag(box, Tags.SkinSeam)
+-- Glowing trim (a cosmetic's seams, a blade's edge) is made of real parts:
+-- thin neon strips set into the plate, welded where the plate is. They hide
+-- behind the armour in front of them, as the armour does, and show the same
+-- in the world, first person, the Inventory and the Store. (They were
+-- SelectionBoxes, which Roblox draws as all twelve edges of the box, through
+-- whatever is in front, so a suit read as a tangle of wireframe; and a
+-- ViewportFrame doesn't draw them at all, so previews lost them.)
+-- A palette's SeamFx animates them on every client (SeamVisibility):
+-- "Pulse" breathes, "Shift" swings between the seam colour and the glow,
+-- "Flicker" crackles like a live wire, "Rainbow" runs through every hue.
+
+-- The parts of a set gem (gemSocket and its element's crystals): suits,
+-- skins and rarity shine leave them as they are.
+local GEM_PARTS = { SocketedGem = true, GemSetting = true, GemFacet = true, GemIce = true }
+
+-- What a gear part hangs on: the body part (or a weapon's grip) at the end
+-- of its welds.
+local function anchorOf(part: BasePart, container: Instance): BasePart?
+	local current = part
+	for _ = 1, 6 do
+		local weld = current:FindFirstChildOfClass("WeldConstraint")
+		local next0 = weld and weld.Part0
+		if not next0 then
+			return nil
+		end
+		if not next0:IsDescendantOf(container) or next0.Name == "RightGrip" or next0.Name == "LeftGrip" then
+			return next0
+		end
+		current = next0
 	end
-	local seam = box :: SelectionBox
-	seam.Color3 = color
-	seam.LineThickness = thickness
-	seam.Visible = part.Transparency < 1
+	return nil
+end
+
+-- Each plate's strips share a seed, so an animated frame moves as one.
+local seamSeed = 0
+local function seamStrip(
+	plate: BasePart,
+	anchor: BasePart,
+	local_: CFrame,
+	size: Vector3,
+	color: Color3,
+	palette,
+	seed: number?
+)
+	local strip = piece(
+		plate.Parent :: Instance,
+		anchor,
+		anchor.CFrame:ToObjectSpace(plate.CFrame * local_),
+		size,
+		color,
+		Enum.Material.Neon
+	)
+	strip.Name = "SkinSeam"
+	strip.CastShadow = false
 	-- (SeamA is the seam's own colour, which a client that animated it goes
 	-- back to when it's restyled to a still one.)
-	seam:SetAttribute("SeamFx", palette and palette.SeamFx or nil)
-	seam:SetAttribute("SeamA", color)
-	seam:SetAttribute("SeamB", if palette and palette.SeamFx then palette.Glow else nil)
-	seam.Parent = part
+	strip:SetAttribute("SeamFx", palette and palette.SeamFx or nil)
+	strip:SetAttribute("SeamA", color)
+	strip:SetAttribute("SeamB", if palette and palette.SeamFx then palette.Glow else nil)
+	strip:SetAttribute("SeamSeed", seed or seamSeed)
+	CollectionService:AddTag(strip, Tags.SkinSeam)
+	return strip
+end
+
+local AXES = { Vector3.xAxis, Vector3.yAxis, Vector3.zAxis }
+-- A size with `runs`, `across` and `n` (the three axes, 1-3) set.
+local function sized(runs: number, length: number, across: number, width: number, n: number, depth: number): Vector3
+	local v = { 0, 0, 0 }
+	v[runs], v[across], v[n] = length, width, depth
+	return Vector3.new(v[1], v[2], v[3])
+end
+
+-- A plate's outward face: on a thin plate its broad side facing away from
+-- what it's worn on, on a block whichever face that direction leaves by.
+-- Returns the face's axis (1-3) and side (1 or -1), or nil for no face.
+local function outwardFace(plate: BasePart, anchor: BasePart?): (number, number)
+	local dims = { plate.Size.X, plate.Size.Y, plate.Size.Z }
+	local from = if anchor then plate.CFrame.Position - anchor.CFrame.Position else Vector3.zero
+	if from.Magnitude < 0.05 and anchor then
+		from = anchor.CFrame.LookVector -- (centred on it: its front)
+	end
+	local out = plate.CFrame:VectorToObjectSpace(from)
+	local comps = { out.X, out.Y, out.Z }
+	local thin = 1
+	for i = 2, 3 do
+		if dims[i] < dims[thin] then
+			thin = i
+		end
+	end
+	local others = math.huge
+	for i = 1, 3 do
+		if i ~= thin then
+			others = math.min(others, dims[i])
+		end
+	end
+	local axis = thin
+	if dims[thin] >= 0.6 * others then
+		local best = -1
+		for i = 1, 3 do
+			local score = math.abs(comps[i]) / math.max(dims[i] / 2, 0.01)
+			if score > best then
+				axis, best = i, score
+			end
+		end
+	end
+	return axis, if comps[axis] < 0 then -1 else 1
+end
+
+-- Neon trim round a plate's outward face (both broad faces, `twoSided`, for
+-- a blade): four strips just inside the face's edges, standing a little
+-- proud of it. Skipped on a face too small to frame.
+local function inlay(plate: BasePart, container: Instance, color: Color3, width: number, palette, twoSided: boolean?)
+	local anchor = anchorOf(plate, container)
+	if not anchor then
+		return 0
+	end
+	local n, side = outwardFace(plate, anchor)
+	local dims = { plate.Size.X, plate.Size.Y, plate.Size.Z }
+	local a, b = n % 3 + 1, (n + 1) % 3 + 1
+	local w = math.clamp(width * 1.6, 0.035, 0.06)
+	local deep = w * 0.6
+	local made = 0
+	seamSeed = (seamSeed + 1) % 17
+	if math.min(dims[a], dims[b]) < w * 3 + 0.08 then
+		-- Too narrow to frame: one glowing line down the middle of it, if
+		-- it's long enough to carry one.
+		local wide = dims[a] >= dims[b]
+		local runs, across = if wide then a else b, if wide then b else a
+		if dims[runs] < 0.3 or dims[across] < w * 1.5 then
+			return 0
+		end
+		for _, s in if twoSided then { side, -side } else { side } do
+			local at = AXES[n] * s * (dims[n] / 2 + deep * 0.3)
+			seamStrip(plate, anchor, CFrame.new(at), sized(runs, dims[runs] * 0.8, across, w, n, deep), color, palette)
+			made += 1
+		end
+		return made
+	end
+	for _, s in if twoSided then { side, -side } else { side } do
+		local lift = AXES[n] * s * (dims[n] / 2 + deep * 0.3)
+		for _, pair in { { a, b }, { b, a } } do
+			local runs, across = pair[1], pair[2]
+			-- The long pair runs the full length; the short pair fits between.
+			local long = dims[runs] >= dims[across]
+			local length = if long then dims[runs] else dims[runs] - 2 * w
+			for _, edge in { -1, 1 } do
+				local at = lift + AXES[across] * edge * (dims[across] / 2 - w / 2)
+				seamStrip(plate, anchor, CFrame.new(at), sized(runs, length, across, w, n, deep), color, palette)
+				made += 1
+			end
+		end
+	end
+	return made
+end
+
+-- A blade's glowing edge: a strip down each of its long narrow sides (its
+-- cutting edges), wrapping the edge a little proud of it, both faces.
+local function edgeLines(blade: BasePart, container: Instance, color: Color3, width: number, palette)
+	local anchor = anchorOf(blade, container)
+	if not anchor then
+		return
+	end
+	local dims = { blade.Size.X, blade.Size.Y, blade.Size.Z }
+	local order = { 1, 2, 3 }
+	table.sort(order, function(i, j)
+		return dims[i] > dims[j]
+	end)
+	local runs, across, through = order[1], order[2], order[3]
+	local w = math.clamp(width * 1.4, 0.04, 0.07)
+	seamSeed = (seamSeed + 1) % 17
+	for _, edge in { -1, 1 } do
+		local at = AXES[across] * edge * (dims[across] / 2 + w * 0.2)
+		local size = sized(runs, dims[runs] * 0.97, across, w, through, dims[through] + w * 0.5)
+		seamStrip(blade, anchor, CFrame.new(at), size, color, palette)
+	end
 end
 
 -- A palette's seam colour and width (Cosmetics.Palette: SeamColor, SeamWidth).
@@ -651,7 +802,7 @@ SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
 	local obsidian = Color3.fromRGB(20, 18, 26)
 	local biggest, biggestSize = nil, 0
 	for _, part in weaponFolder:GetDescendants() do
-		if not part:IsA("BasePart") or part.Transparency >= 1 or part.Name == "SocketedGem" then
+		if not part:IsA("BasePart") or part.Transparency >= 1 or GEM_PARTS[part.Name] then
 			continue
 		end
 		CollectionService:RemoveTag(part, Tags.Prismatic)
@@ -673,7 +824,13 @@ SKINS.Crusader = function(weaponFolder: Instance, color: Color3)
 	end
 	-- A gold edge round the blade that burns to crusader red and back (the
 	-- Crusader Plate suit's seams).
-	outline(biggest, Color3.fromRGB(255, 184, 40), 0.045, { SeamFx = "Shift", Glow = Color3.fromRGB(230, 40, 56) })
+	edgeLines(
+		biggest,
+		weaponFolder,
+		Color3.fromRGB(255, 184, 40),
+		0.045,
+		{ SeamFx = "Shift", Glow = Color3.fromRGB(230, 40, 56) }
+	)
 	-- Sparks drifting off the blade, a warm glow, and a gold trail along its
 	-- length that streaks through every swing.
 	local sparks = Instance.new("ParticleEmitter")
@@ -729,8 +886,8 @@ local function accented(pattern: string?, part: BasePart, index: number, median:
 	return false
 end
 
-local SEAM_LIMIT = 12 -- outlined plates per armor piece, biggest first
-local WEAPON_SEAMS = 6 -- and per weapon (the blade's edge is its own)
+local SEAM_LIMIT = 9 -- trimmed plates per armor piece, broadest face first
+local WEAPON_SEAMS = 2 -- and per weapon (the blade's edge is its own)
 
 -- A suit keeps the armour's own light and shade: each part takes the
 -- palette's colour at its own relative brightness (a lighter edge stays
@@ -749,15 +906,17 @@ end
 -- Repaints every part under `container` in a cosmetic Palette (skins and
 -- suits): neon takes the glow, dark parts and wood/leather the under-colour,
 -- the rest the plate colour and material (or the Accent, in its Pattern).
--- Plain blocks get glowing Seams when the palette asks. Returns the biggest
+-- Plain blocks get glowing Seams when the palette asks: neon trim round
+-- their outward faces (inlay), the broadest faces first. Returns the biggest
 -- part (for particles, trails and a blade's look). `suit`: armour, shaded
 -- (above), its visor left as it is (parts marked Visor, see ArmorKits).
+-- A set gem keeps its own colours, whatever's worn.
 local function repaint(container: Instance, palette, limit: number?, suit: boolean?): BasePart?
 	local biggest, biggestSize = nil, 0
 	local plates = {}
 	local shades: { [BasePart]: number } = {}
 	for _, part in container:GetDescendants() do
-		if not part:IsA("BasePart") or part.Transparency >= 1 or part.Name == "SocketedGem" then
+		if not part:IsA("BasePart") or part.Transparency >= 1 or GEM_PARTS[part.Name] or part.Name == "SkinSeam" then
 			continue
 		end
 		if suit and part:GetAttribute("Visor") then
@@ -826,12 +985,23 @@ local function repaint(container: Instance, palette, limit: number?, suit: boole
 				table.insert(blocks, part)
 			end
 		end
+		-- Broadest faces first (a plate's two biggest sides).
+		local function face(part: BasePart): number
+			local s = part.Size
+			return s.X * s.Y * s.Z / math.min(s.X, s.Y, s.Z)
+		end
 		table.sort(blocks, function(a, b)
-			return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
+			return face(a) > face(b)
 		end)
 		local color, width = seamStyle(palette)
-		for i = 1, math.min(#blocks, limit or SEAM_LIMIT) do
-			outline(blocks[i], color, width, palette)
+		local trimmed = 0
+		for _, block in blocks do
+			if trimmed >= (limit or SEAM_LIMIT) then
+				break
+			end
+			if inlay(block, container, color, width, palette, not suit) > 0 then
+				trimmed += 1
+			end
 		end
 	end
 	return biggest
@@ -868,7 +1038,7 @@ SKINS.Palette = function(weaponFolder: Instance, color: Color3, palette)
 	end
 	if palette.Edge then
 		local seam, width = seamStyle(palette)
-		outline(biggest, seam, math.max(0.04, width * 1.4), palette)
+		edgeLines(biggest, weaponFolder, seam, math.max(0.04, width * 1.4), palette)
 	end
 	if palette.Sparks then
 		drift(biggest, palette.Sparks, 12)
@@ -1045,22 +1215,30 @@ local function swapShape(weaponFolder: Instance): (BasePart?, CFrame, number)
 	end
 	side = side.Unit
 	local mount = CFrame.fromMatrix(Vector3.zero, side, axis)
+	-- (What to hide is listed first: its effects are destroyed as it goes.)
+	local hide, drop = {}, {}
 	for _, part in weaponFolder:GetDescendants() do
 		if part:IsA("BasePart") and part ~= grip then
-			part.Transparency = 1
-			for _, effect in part:GetChildren() do
-				if
-					effect:IsA("ParticleEmitter")
-					or effect:IsA("Trail")
-					or effect:IsA("SelectionBox")
-					or effect:IsA("Light")
-				then
-					effect:Destroy()
-				end
-			end
+			table.insert(hide, part)
 		elseif part:IsA("Highlight") then
-			part:Destroy()
+			table.insert(drop, part)
 		end
+	end
+	for _, part in hide do
+		part.Transparency = 1
+		for _, effect in part:GetChildren() do
+			if
+				effect:IsA("ParticleEmitter")
+				or effect:IsA("Trail")
+				or effect:IsA("SelectionBox")
+				or effect:IsA("Light")
+			then
+				effect:Destroy()
+			end
+		end
+	end
+	for _, highlight in drop do
+		highlight:Destroy()
 	end
 	return grip, mount, length
 end
@@ -1515,8 +1693,8 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 	end
 	local biggest, biggestSize = nil, 0
 	for _, part in component:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" then
-			if part.Material == Enum.Material.Neon then
+		if part:IsA("BasePart") and part.Transparency < 1 and not GEM_PARTS[part.Name] then
+			if part.Material == Enum.Material.Neon and part.Name ~= "SkinSeam" then
 				part.Color = color -- trims glow in the element's colour
 			elseif SHINY[part.Material] then
 				part.Reflectance = math.max(part.Reflectance, spec[1])
@@ -1559,29 +1737,25 @@ local function rarityShine(component: Instance, rarity: number, color: Color3)
 	end
 end
 
--- A gem in a piece of gear (armor, shield or weapon) enchants it with the
--- gem's element. Two layers:
---   * a Highlight outline around the piece in the element's colour, the
---     rarer the gem the bolder (faint at Common, solid at Legendary). Outline
---     only, no fill, so the armor keeps its own generated colours;
---   * the element's own effect pouring off its biggest plate:
---       Thermal    flames licking upward, embers, a flickering heat-glow
---       Cryo       a crust of ice crystals on the plate, falling snow and
---                  cold mist, a slow cold glow
---       Ion        crackling sparks and flashes, a strobing light
---       Corrosive  billowing clouds of green toxic gas, curling wisps and
---                  rising bubbles
---     busier and brighter up the tiers.
---   highlight fill transparency, highlight outline transparency, light
---   brightness, light range, particles per second, ice crystals (Cryo).
---   The light stays soft so it doesn't tint the armor's own colours.
-local GEM_GLOW = {
-	{ 1, 0.85, 0.35, 6, 4, 2 }, -- Common
-	{ 1, 0.75, 0.5, 7, 6, 3 }, -- Uncommon
-	{ 1, 0.6, 0.65, 8, 8, 4 }, -- Rare
-	{ 1, 0.45, 0.8, 9, 11, 5 }, -- Ultra Rare
-	{ 1, 0.3, 1, 10, 15, 6 }, -- Legendary
-}
+-- A gem in a piece of gear shows as the stone itself, set into the piece
+-- (gemSocket: bezel, prongs, a glowing core under a faceted crown), in the
+-- gem's own shade: on the brow of a helmet, the front of each forearm and
+-- shin, the centre of the chest, the shield's face and the weapon's hilt.
+-- Real parts, so the stone shows the same everywhere: in the world, in first
+-- person, in the Inventory and the Store. Then its element, from the stone:
+--   * the piece's glowing trims turn the element's colour (unless a suit
+--     colours them);
+--   * a soft light in the stone, moving the element's way;
+--   * a small effect coming off the stone, busier the rarer the gem:
+--       Thermal    a flicker of flame and a few embers
+--       Cryo       frost crystals round the setting, snow drifting off it,
+--                  a breath of cold mist
+--       Ion        sparks crackling over it, the odd bright flash
+--       Corrosive  bubbles rising off it, a thin wisp of gas
+--   * an enchanted weapon's blade carries a little of it too.
+-- (It was a coloured outline round the whole piece and clouds of flame,
+-- smoke or gas off its biggest plate: busy in the world, and nothing at all
+-- in a preview.)
 -- How each element's light moves: seconds per pulse, and how far it dims.
 local GEM_PULSE = {
 	Fire = { 0.16, 0.55 }, -- flicker
@@ -1589,130 +1763,123 @@ local GEM_PULSE = {
 	Shock = { 0.07, 0.25 }, -- strobe
 	Poison = { 1.0, 0.5 }, -- sickly throb
 }
--- Each element's signature: what pours off enchanted armor.
-local SIGNATURE: { [string]: { any } } = {
+-- What comes off a stone, per element: particle styles (sizes for a stone
+-- 0.2 across; Rate at Common, + PerTier for each tier above).
+local STONE_FX: { [string]: { any } } = {
 	Fire = {
 		{
 			Texture = FIRE_TEXTURE,
-			Colors = { Color3.fromRGB(255, 220, 110), Color3.fromRGB(255, 50, 15) },
-			Size = 0.9,
-			Lifetime = NumberRange.new(0.3, 0.55),
-			Speed = NumberRange.new(1, 2.5),
-			Acceleration = Vector3.new(0, 8, 0),
-			Spread = 20,
-			Transparency = 0.1,
+			Colors = { Color3.fromRGB(255, 226, 130), Color3.fromRGB(255, 70, 20) },
+			Size = 0.24,
+			Lifetime = NumberRange.new(0.25, 0.45),
+			Speed = NumberRange.new(0.3, 0.9),
+			Acceleration = Vector3.new(0, 4, 0),
+			Spread = 15,
+			Transparency = 0.15,
 			Light = 1,
-			Share = 1,
+			Rate = 6,
+			PerTier = 2,
 		},
 		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(255, 235, 150), Color3.fromRGB(255, 90, 30) },
-			Size = 0.2,
-			Lifetime = NumberRange.new(0.8, 1.5),
-			Speed = NumberRange.new(1.5, 3.5),
-			Acceleration = Vector3.new(0, 4, 0),
-			Spread = 60,
+			Colors = { Color3.fromRGB(255, 236, 160), Color3.fromRGB(255, 110, 40) },
+			Size = 0.07,
+			Lifetime = NumberRange.new(0.6, 1.1),
+			Speed = NumberRange.new(0.8, 1.6),
+			Acceleration = Vector3.new(0, 2, 0),
+			Spread = 40,
 			Transparency = 0,
 			Light = 1,
-			Share = 0.6,
+			Rate = 2,
+			PerTier = 1,
 		},
 	},
 	Frost = {
 		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(245, 253, 255), Color3.fromRGB(110, 190, 255) },
-			Size = 0.3,
-			Lifetime = NumberRange.new(1.2, 2),
-			Speed = NumberRange.new(0.1, 0.4),
-			Acceleration = Vector3.new(0, -2, 0),
+			Colors = { Color3.fromRGB(245, 253, 255), Color3.fromRGB(130, 200, 255) },
+			Size = 0.09,
+			Lifetime = NumberRange.new(0.9, 1.5),
+			Speed = NumberRange.new(0.1, 0.35),
+			Acceleration = Vector3.new(0, -1, 0),
 			Spread = 180,
 			Transparency = 0,
 			Light = 1,
-			Share = 1,
+			Rate = 3,
+			PerTier = 1.2,
 			Spin = true,
 		},
 		{
 			Texture = SMOKE_TEXTURE,
-			Colors = { Color3.fromRGB(220, 245, 255), Color3.fromRGB(140, 200, 255) },
-			Size = 1.2,
-			Lifetime = NumberRange.new(1.2, 1.8),
-			Speed = NumberRange.new(0.1, 0.4),
-			Acceleration = Vector3.new(0, -1.4, 0),
+			Colors = { Color3.fromRGB(225, 245, 255), Color3.fromRGB(150, 205, 255) },
+			Size = 0.4,
+			Lifetime = NumberRange.new(1, 1.6),
+			Speed = NumberRange.new(0.05, 0.2),
+			Acceleration = Vector3.new(0, -0.6, 0),
 			Spread = 50,
-			Transparency = 0.65,
+			Transparency = 0.75,
 			Light = 0.3,
-			Share = 0.35,
+			Rate = 1,
+			PerTier = 0.5,
 		},
 	},
 	Shock = {
 		{
 			Texture = SPARK_TEXTURE,
 			Colors = { Color3.fromRGB(255, 255, 235), Color3.fromRGB(255, 215, 30) },
-			Size = 0.35,
-			Lifetime = NumberRange.new(0.05, 0.15),
-			Speed = NumberRange.new(7, 12),
+			Size = 0.13,
+			Lifetime = NumberRange.new(0.05, 0.12),
+			Speed = NumberRange.new(2, 4),
 			Acceleration = Vector3.zero,
 			Spread = 180,
 			Transparency = 0,
 			Light = 1,
-			Share = 1.6,
+			Rate = 6,
+			PerTier = 3,
 			Locked = true,
 		},
 		{
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(255, 255, 220), Color3.fromRGB(255, 235, 90) },
-			Size = 0.8,
-			Lifetime = NumberRange.new(0.04, 0.09),
+			Colors = { Color3.fromRGB(255, 255, 230), Color3.fromRGB(255, 240, 120) },
+			Size = 0.36,
+			Lifetime = NumberRange.new(0.04, 0.08),
 			Speed = NumberRange.new(0),
 			Acceleration = Vector3.zero,
 			Spread = 0,
 			Transparency = 0,
 			Light = 1,
-			Share = 0.45,
+			Rate = 1.5,
+			PerTier = 0.8,
 			Locked = true,
 		},
 	},
 	Poison = {
 		{
-			-- Billowing clouds of toxic gas.
-			Texture = SMOKE_TEXTURE,
-			Colors = { Color3.fromRGB(170, 255, 90), Color3.fromRGB(40, 140, 40) },
-			Size = 1.7,
-			Lifetime = NumberRange.new(1.6, 2.6),
-			Speed = NumberRange.new(0.3, 0.9),
-			Acceleration = Vector3.new(0, 0.6, 0),
-			Spread = 180,
-			Transparency = 0.4,
-			Light = 0.4,
-			Share = 0.6,
-			Spin = true,
-		},
-		{
-			-- Wisps of gas curling off it.
-			Texture = SMOKE_TEXTURE,
-			Colors = { Color3.fromRGB(200, 255, 140), Color3.fromRGB(90, 200, 70) },
-			Size = 0.7,
-			Lifetime = NumberRange.new(0.8, 1.3),
-			Speed = NumberRange.new(0.8, 1.6),
-			Acceleration = Vector3.new(0, 1.5, 0),
-			Spread = 70,
-			Transparency = 0.3,
-			Light = 0.6,
-			Share = 0.6,
-			Spin = true,
-		},
-		{
-			-- Toxic bubbles rising through it.
 			Texture = SPARK_TEXTURE,
-			Colors = { Color3.fromRGB(210, 255, 150), Color3.fromRGB(70, 210, 80) },
-			Size = 0.26,
-			Lifetime = NumberRange.new(1, 1.8),
-			Speed = NumberRange.new(0.3, 0.9),
-			Acceleration = Vector3.new(0, 1.8, 0),
-			Spread = 40,
+			Colors = { Color3.fromRGB(215, 255, 160), Color3.fromRGB(70, 210, 80) },
+			Size = 0.08,
+			Lifetime = NumberRange.new(0.8, 1.4),
+			Speed = NumberRange.new(0.2, 0.5),
+			Acceleration = Vector3.new(0, 1.2, 0),
+			Spread = 30,
 			Transparency = 0.05,
 			Light = 0.8,
-			Share = 0.4,
+			Rate = 2,
+			PerTier = 1,
+		},
+		{
+			Texture = SMOKE_TEXTURE,
+			Colors = { Color3.fromRGB(200, 255, 140), Color3.fromRGB(70, 170, 60) },
+			Size = 0.3,
+			Lifetime = NumberRange.new(0.8, 1.3),
+			Speed = NumberRange.new(0.2, 0.5),
+			Acceleration = Vector3.new(0, 0.8, 0),
+			Spread = 40,
+			Transparency = 0.7,
+			Light = 0.3,
+			Rate = 1,
+			PerTier = 0.5,
+			Spin = true,
 		},
 	},
 }
@@ -1724,92 +1891,25 @@ local function gemTier(gem): number
 	end
 	return 1
 end
--- Cryo: a crust of ice crystals jutting from the plate's top edge.
-local function iceCrust(plate: BasePart, count: number, rng: Random)
-	local half = plate.Size / 2
-	for i = 1, count do
-		local crystal = Instance.new("Part")
-		crystal.Name = "GemIce"
-		local height = 0.25 + rng:NextNumber() * 0.35
-		crystal.Size = Vector3.new(0.12, height, 0.12)
-		crystal.Material = Enum.Material.Glass
-		crystal.Color = Color3.fromRGB(200, 235, 255)
-		crystal.Transparency = 0.25
-		crystal.Reflectance = 0.2
-		crystal.CanCollide, crystal.CanQuery, crystal.CanTouch = false, false, false
-		crystal.Massless, crystal.CastShadow = true, false
-		local x = (i - (count + 1) / 2) / count * half.X * 1.6
-		crystal.CFrame = plate.CFrame
-			* CFrame.new(x, half.Y + height * 0.3, -half.Z * rng:NextNumber())
-			* CFrame.Angles(rng:NextNumber(-0.4, 0.4), 0, rng:NextNumber(-0.5, 0.5))
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0, weld.Part1 = plate, crystal
-		weld.Parent = crystal
-		crystal.Parent = plate.Parent
-	end
-end
-local function gemGlow(component: Instance, gem)
-	local color = GemConfig.ElementColors[gem.Element]
-	if not color then
-		return
-	end
-	local tier = gemTier(gem)
-	local spec = GEM_GLOW[tier]
-	local plates = {}
-	for _, part in component:GetDescendants() do
-		if part:IsA("BasePart") and part.Transparency < 1 and part.Name ~= "SocketedGem" then
-			if part.Material == Enum.Material.Neon then
-				part.Color = color -- trims glow in the element's colour
-			end
-			table.insert(plates, part)
-		end
-	end
-	if #plates == 0 then
-		return
-	end
-	table.sort(plates, function(a, b)
-		return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
-	end)
-	local biggest = plates[1]
-	-- The highlight: brighter and bolder the rarer the gem.
-	if component:IsA("Model") then
-		local highlight = Instance.new("Highlight")
-		highlight.Name = "GemHighlight"
-		highlight.FillColor = color
-		highlight.FillTransparency = spec[1]
-		highlight.OutlineColor = color:Lerp(Color3.new(1, 1, 1), 0.25)
-		highlight.OutlineTransparency = spec[2]
-		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
-		highlight.Parent = component
-		CollectionService:AddTag(highlight, Tags.GemOutline)
-	end
-	-- The light, moving the element's way.
-	local pulse = GEM_PULSE[gem.Element] or { 1, 0.5 }
-	local light = Instance.new("PointLight")
-	light.Name = "GemGlow"
-	light.Color = color
-	light.Brightness = spec[3]
-	light.Range = spec[4]
-	light.Shadows = false
-	light.Parent = biggest
-	TweenService:Create(
-		light,
-		TweenInfo.new(pulse[1], Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Brightness = spec[3] * pulse[2] }
-	):Play()
-	if gem.Element == "Frost" and component.Name ~= "Weapon" then
-		iceCrust(biggest, spec[6], Random.new(#plates * 7 + tier))
-	end
-	-- The element's signature particles.
-	for _, style in SIGNATURE[gem.Element] or {} do
+-- One element effect on `part`: `scale` sizes it (1 for a stone 0.2
+-- across), `share` thins it (a blade's touch of it).
+local function stoneParticles(
+	part: BasePart,
+	element: string,
+	tier: number,
+	scale: number,
+	share: number,
+	volume: boolean?
+)
+	for index, style in STONE_FX[element] or {} do
 		local emitter = Instance.new("ParticleEmitter")
-		emitter.Name = "GemSignature"
+		emitter.Name = "GemEffect"
 		emitter.Texture = style.Texture
 		emitter.Color = ColorSequence.new(style.Colors[1], style.Colors[2])
 		emitter.LightEmission = style.Light
-		local size = style.Size * (0.8 + tier * 0.1)
+		local size = style.Size * scale * (0.9 + tier * 0.05)
 		emitter.Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, size * 0.4),
+			NumberSequenceKeypoint.new(0, size * 0.5),
 			NumberSequenceKeypoint.new(0.3, size),
 			NumberSequenceKeypoint.new(1, 0),
 		})
@@ -1821,15 +1921,179 @@ local function gemGlow(component: Instance, gem)
 		emitter.Speed = style.Speed
 		emitter.SpreadAngle = Vector2.new(style.Spread, style.Spread)
 		emitter.Acceleration = style.Acceleration
-		emitter.Rate = spec[5] * style.Share
+		emitter.Rate = (style.Rate + style.PerTier * (tier - 1)) * share
 		emitter.LockedToPart = style.Locked == true
 		if style.Spin then
-			emitter.RotSpeed = NumberRange.new(-120, 120)
+			emitter.RotSpeed = NumberRange.new(-90, 90)
 			emitter.Rotation = NumberRange.new(0, 360)
 		end
-		emitter.Shape = Enum.ParticleEmitterShape.Box
-		emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-		emitter.Parent = biggest
+		if volume then
+			emitter.Shape = Enum.ParticleEmitterShape.Box
+			emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		end
+		emitter:SetAttribute("Layer", index)
+		emitter.Parent = part
+	end
+end
+-- Cryo: a ring of small ice crystals jutting out of the setting.
+local function frostCrystals(core: BasePart, count: number)
+	local weld = core:FindFirstChildOfClass("WeldConstraint")
+	local anchor = weld and weld.Part0
+	if not anchor then
+		return
+	end
+	local radius = core.Size.X * 1.05
+	for i = 1, count do
+		local angle = (i - 0.5) / count * math.pi * 2 + 0.4
+		local crystal = piece(
+			core.Parent :: Instance,
+			anchor,
+			anchor.CFrame:ToObjectSpace(
+				core.CFrame
+					* CFrame.new(math.cos(angle) * radius, math.sin(angle) * radius, -core.Size.Z * 0.2)
+					* CFrame.Angles(0, 0, angle - math.pi / 2)
+					* CFrame.Angles(math.rad(-25), 0, 0)
+			),
+			Vector3.new(core.Size.X * 0.22, core.Size.X * (0.55 + (i % 2) * 0.25), core.Size.X * 0.22),
+			Color3.fromRGB(205, 238, 255),
+			Enum.Material.Glass
+		)
+		crystal.Name = "GemIce"
+		crystal.Transparency = 0.2
+		crystal.Reflectance = 0.25
+		crystal.CastShadow = false
+	end
+end
+-- Where a ray coming in from outside, back along `dir` toward `origin`,
+-- first meets `parts`: the outside of the armour there (nil: it misses).
+local function surfaceAt(parts: { BasePart }, origin: Vector3, dir: Vector3): Vector3?
+	local start = origin + dir * 6
+	local best = nil
+	for _, part in parts do
+		local o = part.CFrame:PointToObjectSpace(start)
+		local d = part.CFrame:VectorToObjectSpace(-dir)
+		local h = part.Size / 2
+		local tmin, tmax, hit = -math.huge, math.huge, true
+		for _, axis in { "X", "Y", "Z" } do
+			local oa, da, ha = (o :: any)[axis], (d :: any)[axis], (h :: any)[axis]
+			if math.abs(da) < 1e-6 then
+				if oa < -ha or oa > ha then
+					hit = false
+					break
+				end
+			else
+				local t1, t2 = (-ha - oa) / da, (ha - oa) / da
+				if t1 > t2 then
+					t1, t2 = t2, t1
+				end
+				tmin, tmax = math.max(tmin, t1), math.min(tmax, t2)
+				if tmin > tmax then
+					hit = false
+					break
+				end
+			end
+		end
+		if hit and tmax >= 0 then
+			local t = math.max(tmin, 0)
+			if not best or t < best then
+				best = t
+			end
+		end
+	end
+	return if best then start - dir * best else nil
+end
+-- Where each piece's stone is set: the body part (R15, R6), the spot on it
+-- (as a share of its size, the stone facing out of its front) and the
+-- stone's size. Gloves and boots have one on each side.
+local STONE_SPOTS = {
+	Helmet = { { "Head", "Head", Vector3.new(0, 0.2, 0), 0.2 } },
+	Armor = { { "UpperTorso", "Torso", Vector3.new(0, 0.12, 0), 0.3 } },
+	Gloves = {
+		{ "RightLowerArm", "Right Arm", Vector3.new(0, 0.05, 0), 0.15 },
+		{ "LeftLowerArm", "Left Arm", Vector3.new(0, 0.05, 0), 0.15 },
+	},
+	Boots = {
+		{ "RightLowerLeg", "Right Leg", Vector3.new(0, 0.18, 0), 0.16 },
+		{ "LeftLowerLeg", "Left Leg", Vector3.new(0, 0.18, 0), 0.16 },
+	},
+}
+-- Sets `gem` into a worn armour piece, on the outside of the armour.
+local function pieceStones(component: Instance, character: Model, slot: string, gem)
+	local spots = STONE_SPOTS[slot]
+	if not spots or not gem then
+		return
+	end
+	local parts = {}
+	for _, part in component:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and not part:GetAttribute("Visor") then
+			table.insert(parts, part)
+		end
+	end
+	for _, spot in spots do
+		local body = bodyPart(character, spot[1], spot[2])
+		if body then
+			local on = spot[3] * body.Size
+			local dir = body.CFrame.LookVector
+			local origin = body.CFrame * on
+			local surface = surfaceAt(parts, origin, dir)
+			local depth = if surface then (surface - origin):Dot(dir) else body.Size.Z / 2
+			gemSocket(component, body, CFrame.new(), on - Vector3.new(0, 0, depth + spot[4] * 0.12), gem, spot[4])
+		end
+	end
+end
+-- The element on a piece with a set stone (or a weapon): see above.
+-- `suited`: a suit colours the piece's trims, so they're left be.
+local function gemLook(component: Instance, gem, suited: boolean?)
+	local color = GemConfig.ElementColors[gem.Element]
+	if not color then
+		return
+	end
+	local tier = gemTier(gem)
+	component:SetAttribute("GemColor", color)
+	local cores, biggest, biggestSize = {}, nil, 0
+	for _, part in component:GetDescendants() do
+		if not part:IsA("BasePart") or part.Transparency >= 1 then
+			continue
+		end
+		if part.Name == "SocketedGem" then
+			table.insert(cores, part)
+		elseif not GEM_PARTS[part.Name] and part.Name ~= "SkinSeam" then
+			if part.Material == Enum.Material.Neon and not suited then
+				part.Color = color -- trims glow in the element's colour
+			end
+			local size = part.Size.X * part.Size.Y * part.Size.Z
+			if size > biggestSize then
+				biggest, biggestSize = part, size
+			end
+		end
+	end
+	local pulse = GEM_PULSE[gem.Element] or { 1, 0.5 }
+	for _, core in cores do
+		local scale = math.clamp(core.Size.X / 0.124, 0.6, 1.6) -- (a 0.2 stone's core is 0.124)
+		local light = core:FindFirstChildOfClass("PointLight")
+		if not light then
+			light = Instance.new("PointLight")
+			light.Parent = core
+		end
+		local lamp = light :: PointLight
+		lamp.Name = "GemGlow"
+		lamp.Color = color
+		lamp.Shadows = false
+		lamp.Range = (3 + tier * 0.6) * scale
+		lamp.Brightness = 0.55 + tier * 0.12
+		TweenService:Create(
+			lamp,
+			TweenInfo.new(pulse[1], Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+			{ Brightness = lamp.Brightness * pulse[2] }
+		):Play()
+		stoneParticles(core, gem.Element, tier, scale, 1)
+		if gem.Element == "Frost" then
+			frostCrystals(core, 3 + math.floor(tier / 2))
+		end
+	end
+	-- A weapon's blade (its biggest piece) carries a touch of it along its length.
+	if component.Name == "Weapon" and biggest then
+		stoneParticles(biggest, gem.Element, tier, 0.8, 0.45, true)
 	end
 end
 
@@ -1980,7 +2244,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		local gear = (not only or only == slot)
 			and Classes.gear(loadout.Class, Slots.Definitions[slot].Kind, loadout[slot])
 		if gear then
-			-- A Model (not a Folder) so it can carry its gem's Highlight.
+			-- A Model (not a Folder), as every piece is.
 			local component = Instance.new("Model")
 			component.Name = slot
 			component.Parent = folder
@@ -1998,8 +2262,10 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 				gear.Id
 			)
 			affinityGlow(component, GearRolls.get(loadout, slot))
+			-- Its gem, set in it (the chest's comes after its trim, below).
 			local gem = loadout[slot .. "Gem"]
 			if gem and slot ~= "Armor" then
+				pieceStones(component, character, slot, gem)
 				local parts = {}
 				for _, part in component:GetDescendants() do
 					if part:IsA("BasePart") then
@@ -2020,17 +2286,21 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 			end
 		end
 	end
-	-- An armor gem glows at the centre of the chest.
+	-- An armor gem glows at the centre of the chest, set into the chest piece.
 	local torso = bodyPart(character, "UpperTorso", "Torso")
 	if torso and loadout.ArmorGem and (not only or only == "Armor") then
-		gemSocket(
-			folder,
-			torso,
-			CFrame.new(),
-			Vector3.new(0, torso.Size.Y * 0.12, -torso.Size.Z * 0.5 - 0.2),
-			loadout.ArmorGem,
-			0.3
-		)
+		if armorSlots.Armor then
+			pieceStones(armorSlots.Armor, character, "Armor", loadout.ArmorGem)
+		else
+			gemSocket(
+				folder,
+				torso,
+				CFrame.new(),
+				Vector3.new(0, torso.Size.Y * 0.12, -torso.Size.Z * 0.5 - 0.2),
+				loadout.ArmorGem,
+				0.3
+			)
+		end
 	end
 	local armorParts = {}
 	for _, part in (armorSlots.Armor or folder):GetDescendants() do
@@ -2048,7 +2318,7 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	end
 
 	-- The weapon gets its own folder, so its parts are easy to tell apart.
-	local weaponFolder = Instance.new("Model") -- a Model, to carry its gem's Highlight
+	local weaponFolder = Instance.new("Model") -- (a Model, as the armour pieces are)
 	weaponFolder.Name = "Weapon"
 	weaponFolder.Parent = folder
 	local right = gripAnchor(weaponFolder, character, "Right")
@@ -2233,12 +2503,13 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		end
 	end
 	-- Every gem-enchanted piece (armor, shield and weapon) shows its gem's
-	-- element, more the rarer the gem.
+	-- element from its stone, more the rarer the gem (gemLook).
+	local suited = suit ~= nil and suit.Kind == "Suit" and suit.Palette ~= nil
 	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield", "Weapon" } do
 		local component = folder:FindFirstChild(slot)
 		local gem = loadout[slot .. "Gem"]
 		if component and gem and (not only or only == slot) then
-			gemGlow(component, gem)
+			gemLook(component, gem, suited and slot ~= "Weapon")
 		end
 	end
 	-- A Prismatic roll (about 1 in 100): its coloured plates shimmer through
@@ -2249,7 +2520,12 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		local suited = suit and suit.Palette and slot ~= "Weapon"
 		if component and roll and roll.Prismatic and not suited and (not only or only == slot) then
 			for _, part in component:GetDescendants() do
-				if part:IsA("BasePart") and part.Transparency < 1 and part.Material ~= Enum.Material.Neon then
+				if
+					part:IsA("BasePart")
+					and part.Transparency < 1
+					and part.Material ~= Enum.Material.Neon
+					and not GEM_PARTS[part.Name]
+				then
 					local h, s, v = part.Color:ToHSV()
 					if s > 0.2 and v > 0.25 then
 						part:SetAttribute("PrismaticBase", Color3.fromHSV(h, s, v))
@@ -2267,6 +2543,9 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	end
 	return folder
 end
+
+-- (For tests: the builder itself, `only` one slot as the Armory previews it.)
+Equipment._dress = dress
 
 -- Dresses any rig (the PvP Duelist) in a loadout, as a player would wear it.
 function Equipment.dressModel(model: Model, loadout, seed: number, cosmetics: any?): Folder?

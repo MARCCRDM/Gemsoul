@@ -89,12 +89,12 @@ A palette can ask for more than one colour:
 | Palette field | What it draws |
 | --- | --- |
 | `Accent` + `Pattern` | A second plate colour. **Camo** is patches, the same on both sides. **Stripes** is bands across the body. **Trim** is the smaller plates: edges, straps, veins. |
-| `Seams` | Plates outlined in neon: the 12 biggest of each armor piece, or the 6 biggest of a weapon. |
+| `Seams` | Neon trim set into plates: a frame round each plate's outward face (a single line down a plate too narrow to frame), on the 9 broadest plates of each armor piece and the 2 biggest of a weapon (both sides). |
 | `Blade` + `BladeMaterial` (skins) | The blade's own colour and material: lava for Molten Core, glass for Glacier Shard, neon for Solar Flare. |
-| `Edge` (skins) | The blade outlined in neon, a little thicker than the seams. |
-| `SeamColor` | The outline's colour. Without it, outlines take the glow colour. Bonk Bat and Banana Blade also use it for their neon bands. |
-| `SeamWidth` | The outline's thickness, from 0.018 (Frontier) to 0.036 (Solar Flare). Rarer looks get bolder lines. |
-| `SeamFx` | Makes the outlines move (see below). Without it they stay steady. |
+| `Edge` (skins) | A neon strip down each cutting edge of the blade, a little thicker than the seams. |
+| `SeamColor` | The trim's colour. Without it, the trim takes the glow colour. Bonk Bat and Banana Blade also use it for their neon bands. |
+| `SeamWidth` | The trim's weight, from 0.018 (Frontier) to 0.036 (Solar Flare): strips are 1.6 times it, 0.035 to 0.06 studs wide. Rarer looks get bolder lines. |
+| `SeamFx` | Makes the trim move (see below). Without it, it stays steady. |
 
 ### How a suit paints armour
 
@@ -113,38 +113,50 @@ A suit recolours the armour you wear (`repaint` in `Equipment.luau`, with `suit`
 
 ### The neon look
 
-Every suit and every weapon skin has glowing outlines, like Neon Runner and Raid
-Breaker always had:
+Every suit and every weapon skin has glowing trim, like Neon Runner and Raid
+Breaker always had. The trim is real parts: thin neon strips set into the
+plates, welded where the plate is (`inlay` and `edgeLines` in `Equipment.luau`):
+
+- It hides behind the armour in front of it, as the armour does. (It used to be
+  SelectionBoxes, which Roblox draws as all twelve edges of a box, through
+  whatever is in front: a suit read as a tangle of wireframe.)
+- It shows the same in the world, in first person, in the Inventory and in the
+  Store. (A ViewportFrame doesn't draw a SelectionBox at all.)
+- A frame goes round each plate's outward face: the broad side facing away from
+  the body part it's worn on, or for a block, the face that direction leaves by.
+  A plate too narrow to frame gets one line down its middle.
+
+Which looks have it:
 
 - Every suit has `Seams`.
 - Every palette skin has an `Edge`.
-- All but the three cheapest (Frontier Steel, Rust Bucket, Camo Ops) also outline the guard and grip with `Seams`.
+- All but the three cheapest (Frontier Steel, Rust Bucket, Camo Ops) also trim the guard and grip with `Seams`.
 - Bonk Bat and Banana Blade have neon bands instead.
 
 The tests check this for every look.
 
-Each look has its own colour pairing: plate, under, and a contrasting outline. Pale looks get strong outlines so the lines still show:
+Each look has its own colour pairing: plate, under, and contrasting trim. Pale looks get strong trim so the lines still show:
 
 - gold on Champion Plate;
 - violet on Lunar Frontier;
 - gold to red on Crusader Plate.
 
-Steady outlines are the default. `SeamFx` animates them on every client (`SeamVisibility`). 21 looks use it:
+Steady trim is the default. `SeamFx` animates it on every client (`SeamVisibility`). 21 looks use it:
 
 | SeamFx | What it does | Looks |
 | --- | --- | --- |
 | `Pulse` | Breathes, bright to dim and back (1.8 s). | Circuit Rig, Obsidian Lava, Neon Runner, Lunar Frontier, Champion Plate; Molten Core, Circuit Board, Champion's Edge, Ore Vein Gold |
-| `Shift` | Swings between the outline colour and the glow (2.6 s). | Royal Gold (gold to amethyst), Nebula Suit, Crusader Plate (gold to red); Daybreak, Void Crystal, Nebula, Crusader Gold |
+| `Shift` | Swings between the trim colour and the glow (2.6 s). | Royal Gold (gold to amethyst), Nebula Suit, Crusader Plate (gold to red); Daybreak, Void Crystal, Nebula, Crusader Gold |
 | `Flicker` | Crackles like a live wire, with sharp flashes of the glow. | Storm Conductor, Raid Breaker; Warlord's Edge, Solar Flare |
 | `Rainbow` | Runs through every hue. | Chrome Knight; Galaxy |
 
 How the effect gets to the client:
 
-- The server only tags each outline (`Equipment.outline`): `SeamFx`, `SeamA` (its own colour) and `SeamB` (the glow).
-- `SeamVisibility` reads those attributes once per box and again only when a restyle changes them.
-- It recolours just the animated boxes that are showing.
-- A box restyled to a steady look goes back to its own colour.
-- Shop and Wardrobe previews show the outlines as neon bars (a SelectionBox doesn't draw in a ViewportFrame), in their base colour.
+- The server only tags each strip (`SkinSeam`): `SeamFx`, `SeamA` (its own colour), `SeamB` (the glow) and `SeamSeed` (shared by a plate's strips, so its frame moves as one).
+- `SeamVisibility` reads those attributes once per strip and again only when a restyle changes them.
+- It recolours just the animated strips that are showing and within 120 studs, 20 times a second (a suit has over a hundred strips).
+- A strip restyled to a steady look goes back to its own colour.
+- Shop, Wardrobe and Inventory previews show the trim as it is, in its base colour (previews don't animate).
 
 Three skins have their own look in `Equipment.luau`:
 

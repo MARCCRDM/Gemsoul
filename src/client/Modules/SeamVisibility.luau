@@ -1,16 +1,18 @@
 --[[
-	Skin seams and glowing edges are SelectionBoxes (tagged SkinSeam by the
-	server, Equipment.outline). Roblox draws a SelectionBox even round a part
-	that is hidden, so without this the outlines of your own suit filled the
-	first-person view (your helmet and chest plates are hidden round the
-	camera, their outlines weren't), and a staged or stowed piece left its
-	outline floating in the air. Each box shows only while its part does.
-	Purely local.
+	Skin seams and glowing edges (tagged SkinSeam by the server) are thin
+	neon parts set into the armour (Equipment.inlay, edgeLines): they hide
+	and show with the armour by themselves. Older ones were SelectionBoxes,
+	which Roblox draws even round a part that is hidden, so a box shows only
+	while its part does (or your own suit's outlines filled the first-person
+	view, and a staged or stowed piece left its outline floating in the
+	air). Purely local.
 
-	Seams can be alive, too: a box with a SeamFx attribute (set from its
-	skin's palette, Cosmetics) is recoloured every frame while it shows,
-	between its SeamA (the seam colour, set on every box) and SeamB (the
-	glow):
+	Seams can be alive, too: one with a SeamFx attribute (set from its
+	skin's palette, Cosmetics) is recoloured while it shows, between its
+	SeamA (the seam colour, set on every seam) and SeamB (the glow); a
+	plate's strips share a SeamSeed, so its frame moves as one. (Strips are
+	recoloured PartFxRate times a second, boxes every frame: a suit has over
+	a hundred strips.)
 	  Pulse    breathes, bright to dim and back
 	  Shift    swings from one colour to the other
 	  Flicker  crackles like a live wire: the glow, with sharp flashes
@@ -28,8 +30,8 @@ local Tags = require(ReplicatedStorage.Shared.Tags)
 
 local SeamVisibility = {}
 
-function SeamVisibility.shows(box: SelectionBox): boolean
-	local part = box.Adornee
+function SeamVisibility.shows(seam: Instance): boolean
+	local part = if seam:IsA("SelectionBox") then seam.Adornee else seam
 	return part ~= nil and part:IsA("BasePart") and part.Transparency < 0.99 and part.LocalTransparencyModifier < 0.99
 end
 
@@ -68,42 +70,57 @@ end
 SeamVisibility.Spread = 4
 SeamVisibility.SliceMin = 64 -- (fewer outlines than this: all, every frame)
 SeamVisibility.FxRange = 120
+SeamVisibility.PartFxRate = 20
 
 function SeamVisibility.start()
 	local Players = game:GetService("Players")
-	local boxes: { [SelectionBox]: boolean } = {}
-	-- Animated boxes, read once (and again only when a restyle changes them).
-	local effects: { [SelectionBox]: Fx } = {}
-	local links: { [SelectionBox]: RBXScriptConnection } = {}
-	local own: { [SelectionBox]: boolean } = {} -- on your body or in the camera
-	local showing: { [SelectionBox]: boolean } = {}
-	local near: { [SelectionBox]: boolean } = {}
-	local others: { SelectionBox } = {} -- everyone else's, checked a slice a frame
+	local boxes: { [Instance]: boolean } = {} -- every seam: SelectionBoxes and strips
+	-- Animated seams, read once (and again only when a restyle changes them).
+	local effects: { [Instance]: Fx } = {}
+	local links: { [Instance]: RBXScriptConnection } = {}
+	local own: { [Instance]: boolean } = {} -- on your body or in the camera
+	local showing: { [Instance]: boolean } = {}
+	local near: { [Instance]: boolean } = {}
+	local others: { Instance } = {} -- everyone else's, checked a slice a frame
 	local dirty, cursor, count = true, 0, 0
-	local function read(box: SelectionBox)
-		local fx, a, b = box:GetAttribute("SeamFx"), box:GetAttribute("SeamA"), box:GetAttribute("SeamB")
+	local nextPartFx = 0
+	local function paint(seam: Instance, color: Color3)
+		if seam:IsA("SelectionBox") then
+			seam.Color3 = color
+		else
+			(seam :: BasePart).Color = color
+		end
+	end
+	local function read(seam: Instance)
+		local fx, a, b = seam:GetAttribute("SeamFx"), seam:GetAttribute("SeamA"), seam:GetAttribute("SeamB")
+		local seed = seam:GetAttribute("SeamSeed")
 		if typeof(fx) == "string" and typeof(a) == "Color3" then
 			count += 1
-			effects[box] = { Fx = fx, A = a, B = if typeof(b) == "Color3" then b else a, Seed = count % 17 }
-		elseif effects[box] then
+			effects[seam] = {
+				Fx = fx,
+				A = a,
+				B = if typeof(b) == "Color3" then b else a,
+				Seed = if type(seed) == "number" then seed else count % 17,
+			}
+		elseif effects[seam] then
 			-- Restyled to a still seam: back to its own colour (SeamA).
-			effects[box] = nil
+			effects[seam] = nil
 			if typeof(a) == "Color3" then
-				box.Color3 = a
+				paint(seam, a)
 			end
 		end
 	end
-	local function classify(box: SelectionBox)
+	local function classify(seam: Instance)
 		local me = Players.LocalPlayer
 		local character = me and me.Character
 		local camera = workspace.CurrentCamera
-		local mine = (character ~= nil and box:IsDescendantOf(character))
-			or (camera ~= nil and box:IsDescendantOf(camera))
-		own[box] = if mine then true else nil
+		local mine = (character ~= nil and seam:IsDescendantOf(character))
+			or (camera ~= nil and seam:IsDescendantOf(camera))
+		own[seam] = if mine then true else nil
 		dirty = true
 	end
 	local function add(instance: Instance)
-		if instance:IsA("SelectionBox") and not boxes[instance] then
+		if (instance:IsA("SelectionBox") or instance:IsA("BasePart")) and not boxes[instance] then
 			boxes[instance] = true
 			classify(instance)
 			read(instance)
@@ -117,33 +134,33 @@ function SeamVisibility.start()
 	end
 	CollectionService:GetInstanceAddedSignal(Tags.SkinSeam):Connect(add)
 	CollectionService:GetInstanceRemovedSignal(Tags.SkinSeam):Connect(function(instance)
-		local box = instance :: SelectionBox
-		boxes[box], effects[box], own[box], showing[box], near[box] = nil, nil, nil, nil, nil
+		boxes[instance], effects[instance], own[instance], showing[instance], near[instance] = nil, nil, nil, nil, nil
 		dirty = true
-		if links[box] then
-			links[box]:Disconnect()
-			links[box] = nil
+		if links[instance] then
+			links[instance]:Disconnect()
+			links[instance] = nil
 		end
 	end)
 	-- A new body: whose outlines are yours changes.
 	local me = Players.LocalPlayer
 	if me then
 		me.CharacterAdded:Connect(function()
-			for box in boxes do
-				classify(box)
+			for seam in boxes do
+				classify(seam)
 			end
 		end)
 	end
-	local function check(box: SelectionBox, eye: Vector3?)
-		local shows = SeamVisibility.shows(box)
-		if box.Visible ~= shows then
-			box.Visible = shows
+	local function check(seam: Instance, eye: Vector3?)
+		local shows = SeamVisibility.shows(seam)
+		local box = if seam:IsA("SelectionBox") then seam else nil
+		if box and box.Visible ~= shows then
+			box.Visible = shows -- (a strip hides with its own part)
 		end
-		showing[box] = shows
-		if eye and effects[box] then
-			local part = box.Adornee :: BasePart?
-			local position = part and (part :: any).Position
-			near[box] = position == nil or (position - eye).Magnitude < SeamVisibility.FxRange
+		showing[seam] = shows
+		if eye and effects[seam] then
+			local part = if box then box.Adornee :: BasePart? else seam :: BasePart
+			local position = part and part.CFrame.Position
+			near[seam] = position == nil or (position - eye).Magnitude < SeamVisibility.FxRange
 		end
 	end
 	-- Just after the camera (and the first-person view, which hides your own
@@ -155,16 +172,16 @@ function SeamVisibility.start()
 		if dirty then
 			dirty = false
 			table.clear(others)
-			for box in boxes do
-				if not own[box] then
-					table.insert(others, box)
+			for seam in boxes do
+				if not own[seam] then
+					table.insert(others, seam)
 				end
 			end
 			cursor = 0
 		end
-		for box in own do
-			check(box, nil)
-			near[box] = true
+		for seam in own do
+			check(seam, nil)
+			near[seam] = true
 		end
 		local n = #others
 		local slice = if n <= SeamVisibility.SliceMin
@@ -174,9 +191,16 @@ function SeamVisibility.start()
 			cursor = cursor % n + 1
 			check(others[cursor], eye)
 		end
-		for box, effect in effects do
-			if showing[box] and near[box] ~= false then
-				box.Color3 = SeamVisibility.fxColor(effect.Fx, effect.A, effect.B, t, effect.Seed)
+		local parts = t >= nextPartFx
+		if parts then
+			nextPartFx = t + 1 / SeamVisibility.PartFxRate
+		end
+		for seam, effect in effects do
+			if showing[seam] and near[seam] ~= false then
+				local box = seam:IsA("SelectionBox")
+				if box or parts then
+					paint(seam, SeamVisibility.fxColor(effect.Fx, effect.A, effect.B, t, effect.Seed))
+				end
 			end
 		end
 	end)

@@ -34,7 +34,7 @@ server.
 | Combat HUD | A crosshair raycast every frame, for a target card that is never shown. | Gone. |
 | First-person view (`FirstPersonCombat`) | One `CFrame` write per viewmodel part (the shield alone is about 40), and attribute reads repeated per part. | One `BulkMoveTo`; attributes read once a frame. |
 | Target lock (`TargetLock`) | A raycast per foe per frame, rebuilding the filter each time. | The locked foe every frame; the others at the 10 Hz scan; the filter rebuilt only when it changes. |
-| Skin outlines (`SeamVisibility`) | Every outline in the server checked every frame (well over a thousand with neon suits). | Your own every frame; everyone else's in slices (all of them every 4 frames); animated outlines only within 120 studs. |
+| Skin trim (`SeamVisibility`) | Every outline in the server checked every frame (well over a thousand with neon suits). | Your own every frame; everyone else's in slices (all of them every 4 frames); animated trim only within 120 studs, and trim strips (real parts, over a hundred a suit) recoloured 20 times a second. |
 | Prismatic gear (`PrismaticShimmer`) | Every plate in the world recoloured every frame, with an attribute read and an HSV conversion. | Base colour read once; only plates within 150 studs shimmer. |
 | Status effects (`StatusEffects.decode`) | Each fighter's status string parsed 3 or more times a frame (HUD, overhead bars, auras). | Each string parsed once and the result shared (frozen). |
 | World decorations (`Effects.client`) | One `CFrame` write per spinning or bobbing part; attribute and light lookups every frame. | One `BulkMoveTo`; lookups cached. |

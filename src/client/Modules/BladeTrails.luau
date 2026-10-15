@@ -60,6 +60,11 @@ end
 local tracked = {}
 
 local function colorOf(weapon: Instance): Color3
+	-- Its gem's element (Equipment.gemLook), as the stone in its hilt glows.
+	local gem = weapon:GetAttribute("GemColor")
+	if typeof(gem) == "Color3" then
+		return gem
+	end
 	local highlight = weapon:FindFirstChild("GemHighlight")
 	if highlight and highlight:IsA("Highlight") then
 		return highlight.OutlineColor
