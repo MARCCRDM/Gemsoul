@@ -144,6 +144,9 @@ end
 
 local function begin(seat: VehicleSeat, humanoid: Humanoid)
 	if blocked() then finish(); return end
+	if driving and driving.Seat == seat and driving.Humanoid == humanoid then return end
+	-- Seated and Occupant can arrive in separate replication updates.
+	if not seat.Parent or seat.Occupant ~= humanoid then return end
 	local kind = seat:GetAttribute("OutpostMachine")
 	local spec = Rules.Machines[kind]
 	local chassis = seat.Parent and seat.Parent:FindFirstChild("Chassis") :: BasePart?
@@ -174,8 +177,20 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 	refreshHud()
 end
 
+local function resumeSeat()
+	if driving or blocked() then return end
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	if seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
+		begin(seat, humanoid)
+	end
+end
+
 -- One frame of driving.
 function VehicleDrive.step(dt: number)
+	-- Recover missed boarding events and delayed chassis/constraint replication.
+	-- Only the local character is inspected, with no world or UI scans.
+	if not driving then resumeSeat() end
 	local d = driving
 	if not d then
 		return
@@ -211,13 +226,8 @@ end
 local function refreshSession()
 	if blocked() then
 		finish()
-	elseif not driving then
-		-- A rejected arena request may leave the player legitimately seated.
-		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-		local seat = humanoid and humanoid.SeatPart
-		if seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
-			begin(seat, humanoid)
-		end
+	else
+		resumeSeat()
 	end
 end
 for _, attribute in { "Outpost", "CombatSession", "ArenaDropPreparing", "ArenaDropUntil", "Expedition" } do
@@ -243,6 +253,7 @@ local function watch(character: Model)
 			finish()
 		end
 	end)
+	resumeSeat()
 end
 
 if player.Character then

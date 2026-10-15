@@ -7,10 +7,13 @@ local UiKit = require(script.Parent.UiKit)
 local ArenaScene = {}
 local player = Players.LocalPlayer
 local active, busy, controls = false, false, nil
+local function worldActive(): boolean
+	return player:GetAttribute("Outpost") == true or player:GetAttribute("Expedition") ~= nil
+end
 task.spawn(function()
 	local module = player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")
 	controls = require(module):GetControls()
-	if active then
+	if player:GetAttribute("CombatSession") ~= nil or worldActive() then
 		controls:Enable()
 	end
 end)
@@ -18,11 +21,11 @@ local function refresh()
 	active = player:GetAttribute("CombatSession") ~= nil
 	if Config.MenuOnly then
 		local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
-		if dashboard then
+		if dashboard and (active or not worldActive()) then
 			dashboard.Enabled = not active and player.PlayerGui:FindFirstChild("Intro") == nil
 		end
 		if controls then
-			if active then
+			if active or worldActive() then
 				controls:Enable()
 			else
 				controls:Disable()
@@ -73,4 +76,6 @@ function ArenaScene.isActive()
 	return player:GetAttribute("CombatSession") ~= nil
 end
 player:GetAttributeChangedSignal("CombatSession"):Connect(refresh)
+player:GetAttributeChangedSignal("Outpost"):Connect(refresh)
+player:GetAttributeChangedSignal("Expedition"):Connect(refresh)
 return ArenaScene
