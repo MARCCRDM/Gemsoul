@@ -29,6 +29,7 @@ local MiningSite = require(ReplicatedStorage.Shared.MiningSite)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local LoadingFlow = require(script.Parent.LoadingFlow)
 local Scenes = require(script.Parent.Scenes)
 local ThirdPerson = require(script.Parent.ThirdPerson)
 local UiKit = require(script.Parent.UiKit)
@@ -709,9 +710,14 @@ function MineScene.begin()
 	end
 	busy = true
 	task.spawn(function()
+		-- The loading screen over the trip down (LoadingFlow): up before
+		-- you're moved, down once you're standing in the mine.
+		local cover = LoadingFlow.hold("Mine", { FadeIn = 0.25 })
+		LoadingFlow.waitCovered(1)
 		local result = GemClient.request("ExpeditionStart")
 		busy = false
 		if not result.Ok then
+			cover.cancel()
 			UiKit.toast(result.Message, P.Bad)
 			return
 		end
@@ -751,7 +757,10 @@ function MineScene.leave()
 	end
 	busy = true
 	task.spawn(function()
+		-- (And over the way back, until you're in the Outpost again.)
+		LoadingFlow.hold("MineExit", { FadeIn = 0.25, Destination = LoadingFlow.home })
 		tween(fade, 0.25, { BackgroundTransparency = 0 })
+		LoadingFlow.waitCovered(1)
 		local result = GemClient.request("ExpeditionLeave")
 		busy = false
 		task.wait(0.3)

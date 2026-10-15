@@ -19,6 +19,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local IronUi = require(script.Parent.Modules.IronUi)
+local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
+local LoadingScreen = require(game:GetService("ReplicatedFirst"):WaitForChild("LoadingScreen"))
 local Music = require(script.Parent.Modules.Music)
 
 local IMAGE_ID = 123729911771910 -- saga_title.png
@@ -272,6 +274,10 @@ local function showTitle(fromSkip: boolean)
 	credit.Parent = back
 end
 
+-- In: the title hands over to the loading screen (LoadingFlow), which
+-- stays up until the game behind it is ready: the starter intro, or you
+-- standing in the Outpost. (Fading the title away showed the menu and the
+-- world half built behind it.)
 local function enter()
 	if phase ~= "Title" then
 		return
@@ -282,16 +288,17 @@ local function enter()
 	end
 	TweenService:Create(zoom, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 1.15 })
 		:Play()
-	local fade = TweenService:Create(back, TweenInfo.new(0.6), { GroupTransparency = 1 })
-	fade.Completed:Connect(function()
+	gui:SetAttribute("Closing", true)
+	LoadingFlow.hold("Title", { FadeIn = 0.5, Destination = LoadingFlow.home })
+	task.spawn(function()
+		LoadingFlow.waitCovered(1.5)
 		gui:Destroy()
 	end)
-	fade:Play()
 end
 
 -- Clicks, taps and keys: skip the intro, then enter.
 UserInputService.InputBegan:Connect(function(input)
-	if phase == "Done" then
+	if phase == "Done" or LoadingScreen.active() then
 		return
 	end
 	local t = input.UserInputType
@@ -309,8 +316,12 @@ UserInputService.InputBegan:Connect(function(input)
 	end
 end)
 
--- The intro: out of the dark over the build, then the drop.
+-- The intro: out of the dark over the build, then the drop. Not until the
+-- loading screen has gone (Loading, in ReplicatedFirst: it waits for this
+-- screen's art and music to download first).
 introSound = sound(Music.Ids.Intro, 0.8)
+gui:SetAttribute("Built", true)
+LoadingScreen.waitClear(60)
 if introSound then
 	introSound:Play()
 end

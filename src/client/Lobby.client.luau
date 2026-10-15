@@ -14,12 +14,16 @@ local RunService = game:GetService("RunService")
 
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local GemClient = require(script.Parent.Modules.GemClient)
+local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
 local LobbyUI = require(script.Parent.Modules.LobbyUI)
 local OutpostScene = require(script.Parent.Modules.OutpostScene)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- The loading screen over every change of place (fights, respawns, jumps).
+LoadingFlow.start()
 
 -- The lobby HUD: in the Outpost, not fighting, not inside a menu. Checked
 -- a few times a second, and only applied when it changes.
@@ -179,7 +183,8 @@ task.spawn(function()
 		task.wait(1)
 		if free() and not (OutpostScene.isActive() and player:GetAttribute("Outpost")) then
 			away += 1
-			if away >= 3 then
+			-- (Sooner behind the loading screen: it's waiting on this.)
+			if away >= (if LoadingFlow.active() then 1 else 3) then
 				OutpostScene.ensure()
 			end
 		else

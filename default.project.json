@@ -11,6 +11,12 @@
       "$className": "ReplicatedFirst",
       "Orientation": {
         "$path": "src/first/Orientation.client.luau"
+      },
+      "LoadingScreen": {
+        "$path": "src/first/LoadingScreen.luau"
+      },
+      "Loading": {
+        "$path": "src/first/Loading.client.luau"
       }
     },
     "StarterGui": {

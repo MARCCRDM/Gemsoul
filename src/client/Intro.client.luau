@@ -22,6 +22,7 @@ local UiKit = require(script.Parent.Modules.UiKit)
 local LotterySound = require(script.Parent.Modules.LotterySound)
 local Icons = require(script.Parent.Modules.SurgeIcons)
 local CardFX = require(script.Parent.Modules.ElementCardFX)
+local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -1304,6 +1305,11 @@ local function close()
 	for _, connection in connections do
 		connection:Disconnect()
 	end
+	-- The loading screen takes over at once (LoadingFlow): the inventory and
+	-- the world behind the intro aren't for seeing, only where it goes next
+	-- (your first fight's drop, or the Outpost).
+	gui:SetAttribute("Closing", true)
+	LoadingFlow.hold("Intro", { Instant = true, Destination = LoadingFlow.home })
 	gui:Destroy()
 end
 -- The roll: a full-screen reveal of the kit. Each key is a tall card, and

@@ -33,6 +33,7 @@ local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local LoadingFlow = require(script.Parent.LoadingFlow)
 local LotterySound = require(script.Parent.LotterySound)
 local MobileLayout = require(script.Parent.MobileLayout)
 local MiningReveal = require(script.Parent.MiningWorldReveal)
@@ -1074,15 +1075,32 @@ local function exitScene()
 	end
 end
 
+-- The loading screen up over the trip (LoadingFlow), before you're moved:
+-- down once you're standing in the basin with it loaded round you.
+local function goingIn()
+	local cover = LoadingFlow.hold("Outpost", {
+		FadeIn = 0.25,
+		Destination = function()
+			local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+			local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+			return if typeof(spawn) == "CFrame" then spawn.Position else nil
+		end,
+	})
+	LoadingFlow.waitCovered(1)
+	return cover
+end
+
 function OutpostScene.enter()
 	if busy or active then
 		return
 	end
 	busy = true
 	task.spawn(function()
+		local cover = goingIn()
 		local result = GemClient.request("OutpostEnter")
 		busy = false
 		if not result.Ok then
+			cover.cancel()
 			UiKit.toast(result.Message, P.Bad)
 			return
 		end
@@ -1120,9 +1138,11 @@ function OutpostScene.ensure(respawn: boolean?)
 	lastEnsure = os.clock()
 	busy = true
 	task.spawn(function()
+		local cover = goingIn()
 		local result = GemClient.request("OutpostEnter")
 		busy = false
 		if not result.Ok then
+			cover.cancel()
 			if respawn then
 				UiKit.toast(result.Message, P.Bad)
 			end
