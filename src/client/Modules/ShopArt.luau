@@ -397,12 +397,32 @@ local function skinArt(root: Frame, size: number, cosmetic)
 	round(halo, size)
 	local blade = piece(root, 0.5, 0.42, 0.16, 0.66, WHITE, 45)
 	round(blade, math.max(2, math.floor(size * 0.03)))
-	gradient(blade, plate:Lerp(WHITE, 0.35), plate:Lerp(BLACK, 0.2), 0)
+	-- (Kindred Edge's blade is its dark starlit crystal, as in 3D.)
+	local steel = if cosmetic.Look == "Kindred" and palette and palette.Blade then palette.Blade else plate
+	gradient(blade, steel:Lerp(WHITE, 0.35), steel:Lerp(BLACK, 0.2), 0)
 	-- (A neon edge, as the skin's blade has in 3D.)
 	local edgeColor = if palette and palette.Edge then palette.SeamColor or glow else under
 	stroke(blade, edgeColor, math.max(1, size / (if palette and palette.Edge then 40 else 55)))
 	local edge = piece(blade, 0.86, 0.5, 0.14, 0.92, glow)
 	edge.BackgroundTransparency = 0.05
+	if cosmetic.Look == "Kindred" and palette then
+		-- Forged for two: the other edge in the gold of its second strand,
+		-- and beads of both strands winding up the blade.
+		local twin = palette.Plate
+		local other = piece(blade, 0.14, 0.5, 0.14, 0.92, twin)
+		other.BackgroundTransparency = 0.05
+		for i = 0, 5 do
+			local bead = piece(
+				blade,
+				if i % 2 == 0 then 0.3 else 0.7,
+				0.12 + i * 0.15,
+				0.3,
+				0.07,
+				if i % 2 == 0 then glow else twin
+			)
+			round(bead, size)
+		end
+	end
 	local tip = piece(root, 0.75, 0.17, 0.11, 0.11, plate:Lerp(WHITE, 0.3), 45)
 	round(tip, 1)
 	local guard = piece(root, 0.32, 0.68, 0.34, 0.07, under, 45)

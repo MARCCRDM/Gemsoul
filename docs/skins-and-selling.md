@@ -44,8 +44,10 @@ Every skin, suit and pickaxe for sale, and the bundles, are listed in
 
 | Do this | Get this | Where it's handled |
 | --- | --- | --- |
-| Bring 1 friend | Crusader Gold (weapon skin) | `Systems/Referrals` |
+| Bring 1 friend | **Kindred Edge** (Legendary weapon skin, only from here) | `Systems/Referrals` |
+| Bring 2 friends | Twin Star (pickaxe) | `Systems/Referrals` |
 | Bring 3 friends | Crusader's Standard (back piece) | `Systems/Referrals` |
+| Bring 4 friends | Crusader Gold (weapon skin) | `Systems/Referrals` |
 | Bring 5 friends | Crusader Plate (suit) | `Systems/Referrals` |
 | Bring 10 friends | CRUSADER LEGEND (title) | `Systems/Referrals` |
 | Join the Roblox group | Starforged (weapon skin) | `Systems/FreeRewards` |
@@ -55,9 +57,28 @@ Every skin, suit and pickaxe for sale, and the bundles, are listed in
 Free rewards are put on as soon as they're earned, so other players see them.
 The Shop's **Free** tab shows every one, with your progress.
 
+### Bring a friend
+
+**Kindred Edge** is the first reward (`SKINS.Kindred` in `Equipment.luau`), a blade "forged for two":
+
+- A dark, starlit crystal blade.
+- Two strands of neon, teal and gold (the gold matches the hilt), wind round each other from the guard to the point. They're built from short linked neon parts, so they show in shop previews and in first person too.
+- The edge pulses with white starlight.
+- Teal and gold motes drift up off the blade, and its swing trail runs from teal to gold.
+
+How a friend counts (`Systems/Referrals`):
+
+1. You invite them with Roblox's game invite, from the lobby's **INVITE** tile or the Shop's Free tab. Both run `ReferralUI.invite`. In a Studio playtest it says invites only work in the live game.
+2. When they join, Roblox tells the server who invited them (`ReferredByPlayerId`), and that friend is counted once, in a DataStore. A failed save is tried 3 times.
+3. If you're in the same server, the reward goes on at once.
+4. If you're in another server, a MessagingService message (`GemsoulReferralJoined`) carries your new count there, and it goes on at once.
+5. If you're offline, it goes on at your next join, or when you press **CHECK CLAIM**.
+
+The Bring a Friend window shows the skin turning in 3D. Once it's yours, the progress row moves on to the next reward, and the second button puts the skin on or takes it off.
+
 ## The designs (the full collection)
 
-There are 26 weapon skins and 21 suits, all of them in `src/shared/Cosmetics.luau`. Renders of every
+There are 27 weapon skins and 21 suits, all of them in `src/shared/Cosmetics.luau`. Renders of every
 one:
 
 - `docs/skin-designs/skins_gallery.png`

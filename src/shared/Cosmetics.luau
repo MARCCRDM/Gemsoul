@@ -202,11 +202,39 @@ Cosmetics.List = {
 		Look = "Halo",
 	},
 	-- Not in Order: these are never sold for coins or found in crates.
+	-- Bring 1 friend: the first reward, and the rarest look you can't buy.
+	SkinKindred = {
+		Id = "SkinKindred",
+		Kind = "Skin",
+		Name = "Kindred Edge",
+		Description = "Forged for two: a starlit crystal blade with strands of teal and gold winding up it round each other, its edge pulsing with starlight. Bring a friend.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(60, 230, 255),
+		Look = "Kindred",
+		Exclusive = "Invite",
+		How = "Invite a friend who joins the game.",
+		Palette = {
+			Plate = Color3.fromRGB(244, 172, 40), -- the hilt, and the gold strand
+			PlateMaterial = Enum.Material.Foil,
+			Under = Color3.fromRGB(22, 18, 44),
+			Glow = Color3.fromRGB(60, 230, 255), -- the teal strand
+			Reflect = 0.3,
+			Blade = Color3.fromRGB(30, 26, 64),
+			BladeMaterial = Enum.Material.Glass,
+			Edge = true,
+			Seams = true,
+			SeamColor = Color3.fromRGB(225, 240, 255), -- starlight
+			SeamWidth = 0.036,
+			SeamFx = "Pulse",
+			Sparks = Color3.fromRGB(150, 240, 255),
+			Trail = true,
+		},
+	},
 	SkinCrusader = {
 		Id = "SkinCrusader",
 		Kind = "Skin",
 		Name = "Crusader Gold",
-		Description = "Burnished gold and obsidian, its edge burning gold to crusader red, with a trail of sparks. On any weapon.",
+		Description = "Burnished gold and obsidian, its edge burning gold to crusader red, with a trail of sparks. On any weapon. Bring 4 friends.",
 		Rarity = "UltraRare",
 		Color = Color3.fromRGB(255, 214, 110),
 		Look = "Crusader",

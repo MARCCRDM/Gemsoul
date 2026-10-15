@@ -1,19 +1,24 @@
 --[[
 	Bring a friend (Shared.Referrals): invite a friend with Roblox's own game
-	invite; once they join through it you earn Crusader Gold, an exclusive weapon skin. The server
-	(Systems/Referrals) counts the join and grants the reward, even while
-	you're away; CHECK CLAIM asks it now.
+	invite; once they join through it you earn Kindred Edge, a Legendary
+	weapon skin you can't get any other way (then the rest of the ladder:
+	2, 3, 4, 5 and 10 friends). The server (Systems/Referrals) counts the
+	join and grants the reward, even while you're away or in another
+	server; CHECK CLAIM asks it now.
 
 	  ReferralUI.open() / close() / toggle()
+	  ReferralUI.invite()   Roblox's invite prompt (the Shop's Free tab too)
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local SocialService = game:GetService("SocialService")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Rules = require(ReplicatedStorage.Shared.Referrals)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local ShopArt = require(script.Parent.ShopArt)
 local UiKit = require(script.Parent.UiKit)
 
 local P = IronUi.Colors
@@ -60,55 +65,35 @@ new("UIGradient", {
 	Rotation = 90,
 	Color = ColorSequence.new(Color3.fromRGB(26, 70, 86), Color3.fromRGB(10, 16, 26)),
 }, stage)
--- The skin, drawn on a blade: gold and obsidian, white-hot edges, sparks.
-local GOLD, OBSIDIAN = Color3.fromRGB(226, 172, 58), Color3.fromRGB(20, 18, 26)
-local HOT = reward and reward.Color or Color3.fromRGB(255, 214, 110)
-local art = new("Frame", {
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.45),
-	Size = UDim2.fromOffset(150, 160),
-	Rotation = 35,
-}, stage)
-local function bar(x, y, w, h, color, rotation)
-	return new("Frame", {
-		BackgroundColor3 = color,
+-- The skin itself, turning in 3D (drawn until the model arrives), with
+-- motes of its two colours twinkling round it.
+local palette = reward and reward.Palette
+local TWIN_A = palette and palette.Glow or TEAL
+local TWIN_B = palette and palette.Plate or Color3.fromRGB(244, 172, 40)
+local art = ShopArt.icon(stage, "Skin", Rules.Reward, 180)
+art.AnchorPoint, art.Position = Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0.5, -8)
+local motes = {}
+for i, spot in { { 0.16, 0.2 }, { 0.84, 0.28 }, { 0.12, 0.66 }, { 0.88, 0.7 }, { 0.5, 0.08 }, { 0.3, 0.86 } } do
+	local mote = new("Frame", {
+		BackgroundColor3 = if i % 2 == 0 then TWIN_A else TWIN_B,
 		BorderSizePixel = 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(x, y),
-		Size = UDim2.fromOffset(w, h),
-		Rotation = rotation or 0,
-	}, art)
+		Position = UDim2.fromScale(spot[1], spot[2]),
+		Size = UDim2.fromOffset(5 + (i % 3) * 2, 5 + (i % 3) * 2),
+		Rotation = 45,
+		ZIndex = 4,
+	}, stage)
+	motes[i] = mote
 end
--- Glow behind the blade.
-local glow = bar(75, 62, 46, 130, HOT)
-glow.BackgroundTransparency = 0.82
-UiKit.round(glow, 23)
-bar(75, 62, 20, 112, GOLD) -- blade
-bar(75, 4, 14, 14, GOLD, 45) -- point
-bar(68, 64, 3, 108, HOT) -- white-hot edges
-bar(82, 64, 3, 108, HOT)
-bar(75, 62, 4, 96, Color3.fromRGB(150, 104, 30)) -- fuller
-bar(75, 122, 62, 10, OBSIDIAN) -- crossguard
-bar(75, 122, 54, 3, GOLD)
-bar(75, 122, 12, 12, HOT, 45) -- gem
-bar(75, 142, 9, 26, OBSIDIAN) -- grip
-bar(75, 157, 14, 14, GOLD, 45) -- pommel
--- Sparks.
-local sparks = {}
-for i, spot in { { 40, 30 }, { 112, 52 }, { 44, 92 }, { 108, 108 }, { 56, 10 } } do
-	local spark = bar(spot[1], spot[2], 6 + (i % 2) * 3, 6 + (i % 2) * 3, HOT, 45)
-	sparks[i] = spark
-end
-IronUi.animate(art, function(t)
-	for i, spark in sparks do
-		spark.BackgroundTransparency = 0.5 + 0.5 * math.sin(t * 3 + i * 1.7)
+IronUi.animate(stage, function(t)
+	for i, mote in motes do
+		mote.BackgroundTransparency = 0.45 + 0.55 * math.abs(math.sin(t * 1.6 + i * 1.3))
 	end
-	glow.BackgroundTransparency = 0.78 + 0.08 * math.sin(t * 2)
 end)
-local tag = label(stage, "EXCLUSIVE", 11, Color3.fromRGB(10, 16, 26), IronUi.Heading)
+local tag = label(stage, "ONLY HERE", 11, Color3.fromRGB(10, 16, 26), IronUi.Heading)
 tag.AnchorPoint, tag.Position, tag.Size = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10), UDim2.fromOffset(110, 22)
-tag.BackgroundTransparency, tag.BackgroundColor3 = 0, TEAL
+tag.BackgroundTransparency, tag.BackgroundColor3 = 0, TWIN_B
+tag.ZIndex = 5
 tag.TextXAlignment = Enum.TextXAlignment.Center
 UiKit.round(tag, 11)
 
@@ -118,11 +103,17 @@ local info = new(
 	{ BackgroundTransparency = 1, Position = UDim2.fromOffset(222, 0), Size = UDim2.new(1, -222, 0, 200) },
 	body
 )
-local kicker = label(info, "FREE  ·  EXCLUSIVE WEAPON SKIN", 11, TEAL)
+local kicker = label(
+	info,
+	string.format("FREE  ·  %s WEAPON SKIN", string.upper(reward and reward.Rarity or "Legendary")),
+	11,
+	TEAL
+)
 kicker.Size = UDim2.new(1, 0, 0, 16)
-local title = label(info, string.upper(reward and reward.Name or "Crusader Gold"), 23, P.Text, IronUi.Heading)
+local title = label(info, string.upper(reward and reward.Name or "Kindred Edge"), 23, P.Text, IronUi.Heading)
 title.Position, title.Size = UDim2.fromOffset(0, 18), UDim2.new(1, 0, 0, 34)
-local pitch = label(info, "Bring a friend into the Saga. Your weapon turns to burnished gold.", 15, P.Text, IronUi.Body)
+local pitch =
+	label(info, "Bring a friend into the Saga: your blade, forged for two in teal and gold.", 15, P.Text, IronUi.Body)
 pitch.Position, pitch.Size = UDim2.fromOffset(0, 56), UDim2.new(1, 0, 0, 40)
 -- The one step, ticked off when it's done.
 local step = new("Frame", {
@@ -155,23 +146,36 @@ status.Position, status.Size = UDim2.fromOffset(0, 274), UDim2.new(1, 0, 0, 18)
 
 local busy = false
 local checkLabel: TextLabel? = nil -- the second button's caption
+local checkButton: TextButton
 local function draw()
 	local profile = GemClient.Profile
-	local claimed = profile ~= nil
-		and profile.Cosmetics ~= nil
-		and profile.Cosmetics.Owned ~= nil
-		and profile.Cosmetics.Owned[Rules.Reward] == true
+	local owned = profile and profile.Cosmetics and profile.Cosmetics.Owned or {}
+	local claimed = owned[Rules.Reward] == true
 	local wearing = claimed and profile.Cosmetics.Skin == Rules.Reward
 	local count = profile and profile.Referrals and profile.Referrals.Count or 0
-	local done = claimed or Rules.earned(count)
+	-- Before the first reward, that one step; after it, the next rung.
+	local target = if claimed then Rules.nextTier(count) else Rules.Tiers[1]
+	local done = if claimed then target == nil else Rules.earned(count)
+	if not claimed then
+		stepText.Text = "Invite a friend who joins through your invite."
+	elseif target then
+		local nextReward = Cosmetics.get(target.Reward)
+		stepText.Text =
+			string.format("Next: %s at %d friends.", nextReward and nextReward.Name or target.Reward, target.Friends)
+	else
+		stepText.Text = "Every friend reward is yours. Thank you!"
+	end
+	local goal = if target then target.Friends else count
 	tick.Text = if done then "✓" else "○"
 	tick.TextColor3 = if done then P.Good else P.Dim
 	stepEdge.Color = if done then P.Good else P.Edge
-	progress.Text = string.format("%d / %d", math.min(count, Rules.Needed), Rules.Needed)
+	progress.Text = string.format("%d / %d", math.min(count, goal), goal)
 	progress.TextColor3 = if done then P.Good else P.Dim
 	-- Once it's yours, the second button puts it on or takes it off.
-	if checkLabel then
-		checkLabel.Text = if not claimed then "CHECK CLAIM" elseif wearing then "TAKE OFF SKIN" else "EQUIP SKIN"
+	local caption = if not claimed then "CHECK CLAIM" elseif wearing then "TAKE OFF SKIN" else "EQUIP SKIN"
+	if checkLabel and checkLabel.Text ~= caption then
+		checkLabel.Text = caption
+		checkButton.Text = caption -- (the button's own, unseen text sizes it)
 	end
 	if claimed then
 		status.Text = if wearing
@@ -184,14 +188,49 @@ local function draw()
 	end
 end
 
-local function invite()
+-- Roblox's own invite prompt. (Roblox doesn't send invites from a Studio
+-- playtest: it says so instead of failing quietly.)
+function ReferralUI.invite()
+	if RunService:IsStudio() then
+		UiKit.toast("Invites open in the live game. Studio playtests can't send them.", P.Gold)
+		return
+	end
 	local ok, can = pcall(SocialService.CanSendGameInviteAsync, SocialService, player)
-	if ok and can then
-		pcall(SocialService.PromptGameInvite, SocialService, player)
-	else
-		UiKit.toast("Invites aren't available on this device or account.", P.Bad)
+	if not ok or not can then
+		UiKit.toast("Invites aren't available on this account or device.", P.Bad)
+		return
+	end
+	local options = nil
+	pcall(function()
+		local made = Instance.new("ExperienceInviteOptions")
+		made.PromptMessage = "Bring a friend: when they join, you get Kindred Edge!"
+		options = made
+	end)
+	local shown = pcall(function()
+		if options then
+			SocialService:PromptGameInvite(player, options)
+		else
+			SocialService:PromptGameInvite(player)
+		end
+	end)
+	if not shown then
+		UiKit.toast("The invite couldn't open. Try again in a moment.", P.Bad)
 	end
 end
+-- Who you sent it to: a word of thanks, and what happens next.
+pcall(function()
+	SocialService.GameInvitePromptClosed:Connect(function(who: Instance, recipients: { number })
+		if who ~= player or type(recipients) ~= "table" or #recipients == 0 then
+			return
+		end
+		status.Text = string.format(
+			"Invite sent to %d friend%s. When one joins, your reward unlocks by itself.",
+			#recipients,
+			if #recipients == 1 then "" else "s"
+		)
+		status.TextColor3 = P.Good
+	end)
+end)
 
 local function check()
 	if busy then
@@ -218,17 +257,18 @@ local function check()
 		local result = GemClient.request("ReferralState")
 		busy = false
 		status.Text = result.Message or ""
-		status.TextColor3 = if result.Ok then P.Good else P.Dim
+		status.TextColor3 = if not result.Ok then P.Bad elseif result.Claimed then P.Good else P.Dim
 		draw()
 	end)
 end
 
-local inviteButton = IronUi.gemButton(actions, "INVITE A FRIEND", TEAL, invite)
+local inviteButton = IronUi.gemButton(actions, "INVITE A FRIEND", TEAL, ReferralUI.invite)
 inviteButton.Position, inviteButton.Size = UDim2.fromOffset(0, 0), UDim2.new(0.5, -6, 1, 0)
-local checkButton = IronUi.button(actions, "CHECK CLAIM", false, check)
+checkButton = IronUi.button(actions, "CHECK CLAIM", false, check)
 checkButton.AnchorPoint = Vector2.new(1, 0)
 checkButton.Position, checkButton.Size = UDim2.new(1, 0, 0, 0), UDim2.new(0.5, -6, 1, 0)
-checkLabel = checkButton:FindFirstChildWhichIsA("TextLabel", true)
+-- (IronUi buttons show their words in a child named Label.)
+checkLabel = checkButton:FindFirstChild("Label", true) :: TextLabel?
 
 function ReferralUI.open()
 	gui.Enabled = true

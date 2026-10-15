@@ -893,6 +893,83 @@ SKINS.Solar = function(weaponFolder: Instance, color: Color3, palette)
 	end
 end
 
+-- Kindred Edge (bring a friend): a starlit blade forged for two. The palette
+-- does the blade, its edge pulsing with starlight, the teal motes and the
+-- trail; on top, two strands of light - teal (the glow) and gold (the
+-- hilt's), half a turn apart - wind up the blade round each other from the
+-- guard to the point (built from short neon links, so they show in
+-- previews and first person too), and gold motes rise with the teal ones.
+SKINS.Kindred = function(weaponFolder: Instance, color: Color3, palette)
+	SKINS.Palette(weaponFolder, color, palette)
+	local blade = nil
+	for _, part in weaponFolder:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and part:FindFirstChild("SkinTrailTip") then
+			blade = part
+		end
+	end
+	if not blade then
+		return
+	end
+	-- The blade's own axes: along it, across its flat, through it.
+	local size = blade.Size
+	local axes = {
+		{ Vector3.xAxis, size.X },
+		{ Vector3.yAxis, size.Y },
+		{ Vector3.zAxis, size.Z },
+	}
+	table.sort(axes, function(a, b)
+		return a[2] > b[2]
+	end)
+	local along, across, through = axes[1][1], axes[2][1], axes[3][1]
+	local length = axes[1][2]
+	local wide, deep = axes[2][2] / 2 + 0.07, axes[3][2] / 2 + 0.07
+	local LINKS, TURNS = 22, 1.25
+	for strand, strandColor in { palette.Glow, palette.Plate } do
+		local phase = (strand - 1) * math.pi
+		local function at(t: number): Vector3
+			local angle = phase + t * TURNS * 2 * math.pi
+			return along * (length * (t * 0.86 - 0.42))
+				+ across * (wide * math.cos(angle))
+				+ through * (deep * math.sin(angle))
+		end
+		for i = 0, LINKS - 1 do
+			-- (Round links, overlapping a little, so the strand reads as one
+			-- smooth thread. A cylinder runs along its X axis.)
+			local from, to = at(i / LINKS), at((i + 1) / LINKS)
+			local run = (to - from).Unit
+			local side = run:Cross(through)
+			side = if side.Magnitude > 1e-3 then side.Unit else run:Cross(across).Unit
+			local link = neon(
+				weaponFolder,
+				blade,
+				CFrame.fromMatrix((from + to) / 2, run, side:Cross(run).Unit),
+				Vector3.new((to - from).Magnitude + 0.05, 0.065, 0.065),
+				strandColor
+			)
+			link.Shape = Enum.PartType.Cylinder
+			link.Name = "KindredStrand"
+		end
+	end
+	-- Gold motes rising with the teal ones.
+	local motes = Instance.new("ParticleEmitter")
+	motes.Name = "SkinSparks"
+	motes.Color = ColorSequence.new(palette.Plate)
+	motes.LightEmission = 1
+	motes.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 0) })
+	motes.Transparency = NumberSequence.new(0.1, 1)
+	motes.Lifetime = NumberRange.new(0.6, 1.1)
+	motes.Rate = 10
+	motes.Speed = NumberRange.new(0.3, 1)
+	motes.SpreadAngle = Vector2.new(180, 180)
+	motes.Acceleration = Vector3.new(0, 1.8, 0)
+	motes.Parent = blade
+	-- Its swing streaks from one colour into the other.
+	local trail = blade:FindFirstChild("SkinTrail") :: Trail?
+	if trail then
+		trail.Color = ColorSequence.new(palette.Glow, palette.Plate)
+	end
+end
+
 -- Shape skins (the Brainrot collection) swap the weapon's model for their
 -- own, held the same way: the old parts are hidden and the new one is built
 -- along the old blade, from the grip outwards.

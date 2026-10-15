@@ -3,15 +3,19 @@
 	game invite, Roblox tells us who invited them (GetJoinData's
 	ReferredByPlayerId). That's recorded against the inviter in a DataStore,
 	so it counts even when they're offline or in another server; each friend
-	counts once. Once enough friends have joined, the inviter earns the
-	rewards of every tier reached (Shared.Referrals.Tiers) and wears them: on
-	their next join, or when they press CHECK CLAIM.
+	counts once (a failed save is tried again). Once enough friends have
+	joined, the inviter earns the rewards of every tier reached
+	(Shared.Referrals.Tiers) and wears them: at once if they're in this
+	server, at once in theirs if they're in another (a cross-server message,
+	MessagingService), else on their next join or CHECK CLAIM.
 
 	Request actions:
 	  "ReferralState"   refresh from the store, grant the reward if earned;
-	                    replies { Count, Needed, Claimed }
+	                    replies Ok (the check worked) and { Count, Needed,
+	                    Claimed (the first reward is yours) }
 ]]
 local DataStoreService = game:GetService("DataStoreService")
+local MessagingService = game:GetService("MessagingService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -24,6 +28,10 @@ local Shop = require(script.Parent.Shop)
 local reply = Shop.reply
 
 local Referrals = {}
+
+-- The cross-server message: a friend joined through this inviter's invite.
+Referrals.Topic = "GemsoulReferralJoined"
+Referrals.SaveTries = 3
 
 local store = nil
 local function referralStore()
@@ -56,7 +64,9 @@ local function ownsReward(profile): boolean
 end
 
 -- Grants the reward when it's earned; stores the count on the profile.
-local function settle(player: Player): (boolean, number?)
+-- `known`: a count just reported (a friend's join, here or in another
+-- server), trusted over a read that may still be cached.
+local function settle(player: Player, known: number?): (any, number?)
 	local profile = PlayerData.get(player) :: any
 	if not profile then
 		return false, nil
@@ -65,6 +75,9 @@ local function settle(player: Player): (boolean, number?)
 	profile.Referrals = profile.Referrals or { Count = 0 }
 	if count then
 		profile.Referrals.Count = math.max(profile.Referrals.Count or 0, count)
+	end
+	if type(known) == "number" and known == known then
+		profile.Referrals.Count = math.max(profile.Referrals.Count or 0, math.floor(known))
 	end
 	-- Every tier reached (Referrals.Tiers) that isn't yours yet; each goes
 	-- straight on, to show it off.
@@ -88,18 +101,32 @@ local function recordJoin(referrerId: number, friendId: number)
 	if not data then
 		return
 	end
-	local isNew = false
-	pcall(function()
-		data:UpdateAsync(tostring(referrerId), function(entry)
-			local updated, fresh = ReferralRules.record(entry, friendId)
-			isNew = fresh
-			return updated
+	local isNew, count, saved = false, nil, false
+	for try = 1, Referrals.SaveTries do
+		saved = pcall(function()
+			data:UpdateAsync(tostring(referrerId), function(entry)
+				local updated, fresh = ReferralRules.record(entry, friendId)
+				isNew, count = fresh, updated.Count
+				return updated
+			end)
 		end)
-	end)
-	-- The inviter is here: they get it now.
+		if saved then
+			break
+		end
+		task.wait(try * 2)
+	end
+	if not saved or not isNew then
+		return
+	end
 	local referrer = Players:GetPlayerByUserId(referrerId)
-	if isNew and referrer then
-		settle(referrer)
+	if referrer then
+		-- The inviter is here: they get it now.
+		settle(referrer, count)
+	else
+		-- Maybe in another server: tell it, so they get it there now.
+		pcall(function()
+			MessagingService:PublishAsync(Referrals.Topic, { Referrer = referrerId, Count = count })
+		end)
 	end
 end
 
@@ -140,11 +167,27 @@ local function state(player: Player)
 			nextTier.Friends
 		)
 		else "Every reward is yours. Thanks for bringing your friends!"
-	return reply(claimed, message, { Count = count, Needed = ReferralRules.Needed, Claimed = claimed })
+	-- (The check itself worked: Ok. Whether the reward is yours yet is Claimed.)
+	return reply(true, message, { Count = count, Needed = ReferralRules.Needed, Claimed = claimed })
+end
+
+-- Another server recorded a friend's join for someone who may be here.
+function Referrals.onMessage(message)
+	local data = type(message) == "table" and message.Data or nil
+	local referrerId = type(data) == "table" and data.Referrer or nil
+	local referrer = type(referrerId) == "number" and Players:GetPlayerByUserId(referrerId) or nil
+	if referrer then
+		settle(referrer, data.Count)
+	end
 end
 
 function Referrals.start()
 	Shop.register("ReferralState", state)
+	task.spawn(function()
+		pcall(function()
+			MessagingService:SubscribeAsync(Referrals.Topic, Referrals.onMessage)
+		end)
+	end)
 	for _, player in Players:GetPlayers() do
 		task.spawn(onJoin, player)
 	end

@@ -735,7 +735,7 @@ end)
 tile("SOCIAL", "Social", P.Teal, function()
 	require(script.Parent.SocialUI).toggle()
 end)
--- Bring a friend: a free exclusive back piece (Modules/ReferralUI).
+-- Bring a friend: Kindred Edge and the friend ladder (Modules/ReferralUI).
 tile("INVITE", "Invite", Color3.fromRGB(60, 210, 240), function()
 	require(script.Parent.ReferralUI).toggle()
 end)
