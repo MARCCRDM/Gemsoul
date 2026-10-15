@@ -191,11 +191,7 @@ local buttons = new("Frame", {
 UiKit.list(buttons, 8, true)
 local hint = text(
 	hud,
-<<<<<<< HEAD
-	"Click to mine  ·  G duel  ·  F invite  ·  E trade at PROBE-7",
-=======
-	"Click to mine  ·  1 to spar  ·  G at a miner to duel  ·  F to invite  ·  E at PROBE-7 to trade",
->>>>>>> ad4eaabe618890cba4f78fd37a1fddf78b02062c
+	"Click to mine  ·  1 spar  ·  G duel  ·  F invite  ·  E trade at PROBE-7",
 	14,
 	Color3.fromRGB(230, 238, 250),
 	IronUi.Bold,
