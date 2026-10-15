@@ -1,6 +1,6 @@
 --[[
 	Saga Outpost's world, built by the server so everyone shares it: a wide
-	crater basin on the moon, ringed by jagged rim rock, with a working
+	crater basin on the moon, ringed by weathered crater slopes, with a working
 	frontier outpost at its north edge (landing pad and shuttle, habitat
 	modules strung on tubes, a refinery tower, a drill rig over its pit,
 	conveyors, pipes and floodlight masts), the crashed Probe that serves as
@@ -588,41 +588,82 @@ local DIRT = Color3.fromRGB(92, 86, 84)
 local CONCRETE = Color3.fromRGB(86, 90, 98)
 local QUARRY = 440 -- where the stepped quarry walls start (Shared.Outpost.Radius)
 
--- A peak of the mountain range around the quarry.
-local function mountain(parent, at: CFrame, rng: Random)
-	local h = rng:NextNumber(50, 130)
-	local w = rng:NextNumber(34, 74)
-	local d = rng:NextNumber(30, 60)
-	local color = RIM:Lerp(REGOLITH_DARK, rng:NextNumber(0, 0.7))
-	local base = at
-		* CFrame.new(0, h / 2 - 6, 0)
-		* CFrame.Angles(rng:NextNumber(-0.12, 0.12), rng:NextNumber(0, 6.28), rng:NextNumber(-0.12, 0.12))
-	part(parent, base, Vector3.new(w, h, d), color, Enum.Material.Slate)
-	-- A jagged peak: two wedges back to back make a ridge along the top.
-	local peak = rng:NextNumber(0.35, 0.8) * w
-	for side = -1, 1, 2 do
-		part(
-			parent,
-			base * CFrame.new(0, h / 2 + peak / 2, side * d / 4) * CFrame.Angles(0, if side > 0 then 0 else math.pi, 0),
-			Vector3.new(w, peak, d / 2),
-			color,
-			Enum.Material.Slate,
-			"Wedge"
-		)
+-- Connected triangles make a continuous crater surface rather than separate
+-- vertical towers. Shared vertices keep the silhouette and slopes seam-free.
+local function craterFace(parent, at, a, b, c, color, material)
+	local ab, ac, bc = b - a, c - a, c - b
+	if ab:Dot(ab) > ac:Dot(ac) and ab:Dot(ab) > bc:Dot(bc) then
+		c, a = a, c
+	elseif ac:Dot(ac) > bc:Dot(bc) then
+		a, b = b, a
 	end
-	-- Pale regolith dusting the taller ridges.
-	if h + peak > 120 then
+	ab, ac, bc = b - a, c - a, c - b
+	local right, back = ac:Cross(ab).Unit, bc.Unit
+	local up = bc:Cross(right).Unit
+	local height = math.abs(ab:Dot(up))
+	for _, spec in {
+		{ (a + b) / 2, right, back, math.abs(ab:Dot(back)) },
+		{ (a + c) / 2, -right, -back, math.abs(ac:Dot(back)) },
+	} do
+		local face = part(parent, at * CFrame.fromMatrix(spec[1], spec[2], up, spec[3]),
+			Vector3.new(0.6, height, math.max(0.05, spec[4])), color, material, "Wedge")
+		face.Name = "CraterSurface"
+	end
+end
+
+local function craterRim(parent, at: CFrame)
+	local rim = folder(parent, "NaturalCraterRim")
+	local rng = Random.new(8217)
+	local segments = 72
+	-- Low debris apron, eroded inner wall, broad crest, and a falling outer slope.
+	-- All scenery stays beyond the playable benches and machine routes.
+	local profile = {
+		{ 471, 12 }, { 503, 24 }, { 555, 65 },
+		{ 619, 105 }, { 687, 68 }, { 772, -12 },
+	}
+	local rings = {}
+	for band, spec in profile do
+		local points = {}
+		for i = 0, segments - 1 do
+			local angle = i / segments * math.pi * 2
+			local relief = math.sin(angle * 3 + 0.4) * 25 + math.sin(angle * 5 - 0.7) * 14
+			local erosion = (0.5 + 0.5 * math.sin(angle * 11 + 0.8)) ^ 4
+			local weight = if band == 1 then 0 else if band == 2 then 0.24 else if band == 6 then 0.25 else 1
+			local radius = spec[1] + weight * (math.sin(angle * 3) * 22 + math.sin(angle * 7 + band * 0.7) * 14)
+			local channelDepth = if band == 3 then 26 else 12
+			local height = spec[2] + weight * (relief - erosion * channelDepth + math.sin(angle * 9 + band) * 5)
+			local bearing = angle + weight * math.sin(angle * 6 + band) * 0.018
+			points[i + 1] = Vector3.new(math.cos(bearing) * radius, height, math.sin(bearing) * radius)
+		end
+		rings[band] = points
+	end
+	for band = 1, #rings - 1 do
+		for i = 1, segments do
+			local j = i % segments + 1
+			local angle = (i - 1) / segments * math.pi * 2
+			local height = (rings[band][i].Y + rings[band + 1][j].Y) / 2
+			local shade = math.clamp(height / 160, 0, 0.85)
+			local color = Color3.fromRGB(99, 102, 113):Lerp(Color3.fromRGB(139, 141, 151), shade)
+			color = color:Lerp(REGOLITH_DARK, (0.5 + 0.5 * math.sin(angle * 11 + 0.8)) * 0.08)
+			local material = if band == 1 or band == 5 then Enum.Material.Sand else Enum.Material.Rock
+			craterFace(rim, at, rings[band][i], rings[band + 1][i], rings[band + 1][j], color, material)
+			craterFace(rim, at, rings[band][i], rings[band + 1][j], rings[band][j], color, material)
+		end
+	end
+	-- Low, half-buried fragments break up the join with the worked quarry benches.
+	for i = 0, 47 do
+		local angle = (i + rng:NextNumber(-0.25, 0.25)) / 48 * math.pi * 2
+		local radius = rng:NextNumber(481, 495)
+		local width = rng:NextNumber(8, 18)
+		local rockAt = at * CFrame.new(math.cos(angle) * radius, 16 + (radius - 481) * 0.35, math.sin(angle) * radius)
+			* CFrame.Angles(rng:NextNumber(-0.3, 0.3), angle, rng:NextNumber(-0.25, 0.25))
+		local height = rng:NextNumber(5, 9)
+		local color = REGOLITH:Lerp(RIM, rng:NextNumber(0.2, 0.65))
 		for side = -1, 1, 2 do
-			part(
-				parent,
-				base
-					* CFrame.new(0, h / 2 + peak * 0.82, side * d / 16)
-					* CFrame.Angles(0, if side > 0 then 0 else math.pi, 0),
-				Vector3.new(w * 0.99, peak * 0.36, d / 8),
-				REGOLITH:Lerp(Color3.new(1, 1, 1), 0.35),
-				Enum.Material.Sand,
-				"Wedge"
-			)
+			local rock = part(rim, rockAt * CFrame.new(0, 0, side * width * 0.175)
+				* CFrame.Angles(0, if side > 0 then math.pi else 0, 0),
+				Vector3.new(width, height, width * 0.35), color, Enum.Material.Rock, "Wedge")
+			rock.Name = "CraterScree"
 		end
 	end
 end
@@ -822,12 +863,12 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local root = Instance.new("Model")
 	root.Name = "SagaOutpost"
 	root:SetAttribute("Landscape", "Moon Quarry")
-	root:SetAttribute("LandscapeVersion", 3)
+	root:SetAttribute("LandscapeVersion", 4)
 	root:SetAttribute("SkySetting", "MoonBase")
 	local rng = Random.new(4242)
 	local ground = folder(root, "Ground")
-	-- The quarry floor and its regolith, the stepped benches and the mountain
-	-- range round it, with walls off its edge so no one wanders off.
+	-- The quarry floor and its regolith, worked benches, and a continuous
+	-- natural crater rim. Invisible boundary walls stay beyond the benches.
 	solid(disc(ground, at * CFrame.new(0, -1, 0), 520, 2, REGOLITH, Enum.Material.Slate))
 	for _ = 1, 90 do
 		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(10, 430)
@@ -863,14 +904,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		crater(ground, at * CFrame.new(c[1], 0, c[2]), c[3])
 	end
 	local benchRamps = benches(ground, at)
-	for i = 0, 119 do
-		local a = i / 120 * math.pi * 2
-		mountain(
-			ground,
-			at * CFrame.new(math.cos(a) * rng:NextNumber(482, 540), 0, math.sin(a) * rng:NextNumber(482, 540)),
-			rng
-		)
-	end
+	craterRim(ground, at)
 	for i = 0, 71 do
 		local a = i / 72 * math.pi * 2
 		local w = solid(
