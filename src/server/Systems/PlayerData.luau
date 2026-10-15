@@ -339,6 +339,7 @@ local function sync(player: Player)
 	end
 	resetQuotaIfNeeded(profile)
 	stampOrigins(player, profile)
+	player:SetAttribute("MinerLevel", Tree.vitals(profile).Level)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
 		leaderstats.Coins.Value = profile.Coins

@@ -2214,6 +2214,7 @@ local function applyStats(character: Model, loadout, profile)
 		* (1 + (augments.Mobility or 0))
 	local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 	humanoid.MaxHealth = Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)
+		+ Tree.vitals(profile, rules and rules.Stats).Health
 	humanoid.Health = humanoid.MaxHealth * fraction
 end
 
@@ -3002,7 +3003,7 @@ local function watch(player: Player)
 	end)
 	-- A duel's PvP rule (set at the match start, cleared at the end) changes
 	-- health and speed, so restat the body when it does.
-	for _, key in { "MatchStats", "MatchRarityCap" } do
+	for _, key in { "MatchStats", "MatchRarityCap", "MinerLevel" } do
 		player:GetAttributeChangedSignal(key):Connect(function()
 			local character = player.Character
 			local loadout = PlayerData.character(player)

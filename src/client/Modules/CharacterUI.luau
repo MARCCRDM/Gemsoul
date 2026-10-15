@@ -1994,7 +1994,8 @@ local function drawStats(loadout, class)
 	end
 	local ratings = Classes.ratings(loadout)
 	local hints = {
-		Health = whole(Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)) .. " HP",
+		Health = whole(Classes.maxHealth(ratings.Health.Base + ratings.Health.Bonus)
+			+ Tree.vitals(GemClient.Profile, player:GetAttribute("MatchStats")).Health) .. " HP",
 		Speed = string.format("%.1f", Classes.walkSpeed(ratings.Speed.Base + ratings.Speed.Bonus)),
 	}
 	local power = 0

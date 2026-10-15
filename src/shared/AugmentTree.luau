@@ -275,6 +275,19 @@ Tree.MaxLevel = Tree.MaxPoints - Tree.StartingPoints + 1
 function Tree.level(xp: number): number
 	return math.min(Tree.MaxLevel, 1 + math.floor(math.max(0, xp) / Tree.XPPerPoint))
 end
+-- Miner progression is separate from Season XP. Even-stats PvP uses level 1.
+Tree.VitalsPerLevel = { Health = 5, Stamina = 2, Charge = 2 }
+function Tree.vitals(profile, matchStats: string?)
+	local xp = profile and profile.Augments and profile.Augments.XP or 0
+	local level = if matchStats == "Even" then 1 else Tree.level(xp)
+	local gained = level - 1
+	return {
+		Level = level,
+		Health = gained * Tree.VitalsPerLevel.Health,
+		Stamina = Tech.Resources.Stamina.Max + gained * Tree.VitalsPerLevel.Stamina,
+		Charge = Tech.Resources.Charge.Max + gained * Tree.VitalsPerLevel.Charge,
+	}
+end
 function Tree.tierLevel(id: string): number
 	local n = Tree.Nodes[id]
 	return if n then Tree.TierLevels[n.Tier] or 1 else math.huge

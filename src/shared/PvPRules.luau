@@ -11,8 +11,8 @@
 	              Ultra Rare
 
 	"Even": the base stats are the same for everyone. Today that means the
-	Augment Tree's perks are off (as in every Arena session); when character
-	levels arrive, Health, Charge and Stamina snap to the baseline here too.
+	Augment Tree's perks are off; miner-level Health, Charge and Stamina
+	bonuses snap to the level-one baseline here too.
 	Your build (gear, gems and their grades) and your skill still count.
 	"Full": your whole progression counts, the Augment Tree included.
 	Ranked's rarity cap: a piece of gear rolled above Ultra Rare fights with

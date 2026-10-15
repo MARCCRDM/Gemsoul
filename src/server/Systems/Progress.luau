@@ -27,9 +27,12 @@ function Progress.addXP(player: Player, reason: string, times: number?)
 		Remotes.Notify:FireClient(
 			player,
 			string.format(
-				"+%d Augment Point%s! Open your Augment Tree with K.",
+				"MINER LEVEL UP! +%d Augment Point%s, +%d max Health, +%d max Stamina, +%d max Charge. Upgrades: K.",
 				points,
-				if points == 1 then "" else "s"
+				if points == 1 then "" else "s",
+				points * Tree.VitalsPerLevel.Health,
+				points * Tree.VitalsPerLevel.Stamina,
+				points * Tree.VitalsPerLevel.Charge
 			)
 		)
 	end

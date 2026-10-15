@@ -135,10 +135,13 @@ CombatServer.kitFor = kitFor
 local function rating(k, stat)
 	return k.Ratings[stat].Base + k.Ratings[stat].Bonus
 end
+local function resourceMax(player, id)
+	return Tree.vitals(PlayerData.get(player), player:GetAttribute("MatchStats"))[id]
+end
 local function state(player)
 	if not states[player] then
 		states[player] = {
-			Resources = { Stamina = 100, Charge = Tech.Resources.Charge.Start },
+			Resources = { Stamina = resourceMax(player, "Stamina"), Charge = Tech.Resources.Charge.Start },
 			ResourceAt = os.clock(),
 			TechCooldowns = {},
 			NextTech = 0,
@@ -184,7 +187,7 @@ end
 -- Shared signature outputs are capped after anti-heal and healing bonuses.
 local function armorOutput(player, st, k, charge, healing)
 	local now = os.clock()
-	charge = ArmorSignatures.budget(st, "Charge", math.min(charge, 100 - st.Resources.Charge), 30, now)
+	charge = ArmorSignatures.budget(st, "Charge", math.max(0, math.min(charge, resourceMax(player, "Charge") - st.Resources.Charge)), 30, now)
 	st.Resources.Charge += charge
 	player:SetAttribute("Charge", math.floor(st.Resources.Charge + 1e-6))
 	local hum = alive(player)
@@ -236,6 +239,7 @@ local function updateResources(player, st, k)
 	local elapsed = math.clamp(now - st.ResourceAt, 0, 1)
 	st.ResourceAt = now
 	for id, rule in Tech.Resources do
+		local maximum = resourceMax(player, id)
 		local regen = rule.Regen * (1 + (k.Effects[id .. "Regen"] or 0))
 		if id == "Stamina" then
             regen *= ArmorSignatures.staminaMultiplier(k.Signatures)
@@ -249,7 +253,7 @@ local function updateResources(player, st, k)
          local bonus=ArmorSignatures.recycler(st,k.Signatures,now,elapsed)
          armorOutput(player,st,k,bonus,0)
         end
-		st.Resources[id] = math.clamp(st.Resources[id] + elapsed * regen, 0, rule.Max)
+		st.Resources[id] = math.clamp(st.Resources[id] + elapsed * regen, 0, maximum)
 		if id == "Stamina" and regen < 0 and st.Resources.Stamina <= 0 then
 			-- Held the guard until there was nothing left: it drops.
 			st.BlockUntil, st.BlockBrokenUntil = 0, now + Actions.Stamina.GuardBreakSeconds
@@ -264,7 +268,7 @@ local function updateResources(player, st, k)
 		-- and every change to a player's attribute is sent to every player
 		-- in the server. Whole points change a few times a second instead.
 		player:SetAttribute(id, math.floor(st.Resources[id] + 1e-6))
-		player:SetAttribute("Max" .. id, rule.Max)
+		player:SetAttribute("Max" .. id, maximum)
 	end
 end
 local function flat(v)
@@ -448,7 +452,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	if Actions.invulnerable(st.DodgeStarted, now, k.Rules, pvp, st.DodgeKind) then
 		if origin and not reflected then
 			local refund = ArmorSignatures.dodged(st, k.Signatures, now, st.ArmorDodgeCost, st.DodgeStarted)
-			st.Resources.Stamina = math.min(100, st.Resources.Stamina + refund)
+			st.Resources.Stamina = math.min(resourceMax(player, "Stamina"), st.Resources.Stamina + refund)
 			player:SetAttribute("Stamina", math.floor(st.Resources.Stamina + 1e-6))
 		end
 		DamageLog.send(player, { Dir = "In", Kind = "Dodge", Who = attackerName })
@@ -647,7 +651,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	if now < st.SiphonUntil and st.SiphonCapacity > 0 then
 		local absorbed = math.min(damage, st.SiphonCapacity)
 		st.SiphonCapacity -= absorbed
-		st.Resources.Charge = math.min(100, st.Resources.Charge + absorbed * (st.SiphonRate or 0.5))
+		st.Resources.Charge = math.min(resourceMax(player, "Charge"), st.Resources.Charge + absorbed * (st.SiphonRate or 0.5))
 		damage -= absorbed
 		player:SetAttribute("Charge", math.floor(st.Resources.Charge + 1e-6))
 	end
@@ -999,7 +1003,8 @@ local function weaponPerksOnHit(source, k, st, target, damage: number, guarded: 
 		local amount = e[pair[1]]
 		if amount then
 			local id = pair[2]
-			st.Resources[id] = math.min(Tech.Resources[id].Max, st.Resources[id] + Tech.Resources[id].Max * amount)
+			local maximum = resourceMax(source, id)
+			st.Resources[id] = math.min(maximum, st.Resources[id] + maximum * amount)
 			source:SetAttribute(id, math.floor(st.Resources[id] + 1e-6))
 		end
 	end
@@ -1143,7 +1148,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		-- Landing the weapon builds Charge for your surges (with a gem to use it).
 		if not guarded and healthBefore > target.Humanoid.Health and Tech.hasGem(k.Loadout) then
 			local rule = Tech.Resources.Charge
-			st.Resources.Charge = math.min(rule.Max, st.Resources.Charge + (if heavy then rule.OnHeavy else rule.OnHit) * ArmorSignatures.chargeMultiplier(k.Signatures) * TriadServer.chargeGain(source, k, st, os.clock()))
+			st.Resources.Charge = math.min(resourceMax(source, "Charge"), st.Resources.Charge + (if heavy then rule.OnHeavy else rule.OnHit) * ArmorSignatures.chargeMultiplier(k.Signatures) * TriadServer.chargeGain(source, k, st, os.clock()))
 		end
 		if not guarded and target.Humanoid.Health < healthBefore then
 			TriadServer.afterSwing(source, k, st, target, os.clock())
@@ -2603,8 +2608,10 @@ function CombatServer.heal(player, amount)
 	return restored
 end
 function CombatServer.tutorialCharge(player)
- state(player).Resources.Charge = 100
- player:SetAttribute("Charge", 100)
+ local maximum = resourceMax(player, "Charge")
+ state(player).Resources.Charge = maximum
+ player:SetAttribute("Charge", maximum)
+ player:SetAttribute("MaxCharge", maximum)
 end
 function CombatServer.reset(player)
 	if states[player] then
@@ -2627,7 +2634,9 @@ function CombatServer.reset(player)
 		end
 		character:SetAttribute("GuardUntil", 0)
 	end
-	player:SetAttribute("Stamina", 100)
+	player:SetAttribute("Stamina", resourceMax(player, "Stamina"))
+	player:SetAttribute("MaxStamina", resourceMax(player, "Stamina"))
+	player:SetAttribute("MaxCharge", resourceMax(player, "Charge"))
 	player:SetAttribute("Charge", Tech.Resources.Charge.Start)
 end
 function CombatServer.start()
@@ -2648,11 +2657,25 @@ function CombatServer.start()
 		return Shop.reply(false, "Rig Maneuvers are retired. Equip gems in the Surge Array (Q, E, R) from the Loadout.")
 	end)
 	local function watch(player)
+		local function refreshCaps()
+			local st = state(player)
+			for id in Tech.Resources do
+				local maximum = resourceMax(player, id)
+				st.Resources[id] = math.min(maximum, st.Resources[id])
+				player:SetAttribute("Max" .. id, maximum)
+				player:SetAttribute(id, math.floor(st.Resources[id]))
+			end
+		end
+		for _, key in { "MinerLevel", "MatchStats" } do
+			player:GetAttributeChangedSignal(key):Connect(refreshCaps)
+		end
+		refreshCaps()
 		player.CharacterAdded:Connect(function()
 			if states[player] then
 				stopDodge(states[player])
 			end
 			states[player] = nil
+			refreshCaps()
 		end)
 	end
 	Players.PlayerAdded:Connect(watch)
@@ -2672,6 +2695,7 @@ function CombatServer.start()
 end
 -- What the triad's moves need from here (TriadServer).
 TriadServer.bind({
+	resourceMax = resourceMax,
 	Tech = Tech,
 	Enemies = Enemies,
 	state = state,

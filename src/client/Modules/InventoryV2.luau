@@ -654,6 +654,7 @@ local function buildLeft(canvas: Frame)
 	end
 	ui.Name = place(text(canvas, "", 40, C.Text, HEAVY), x, 140, w + 120, 44)
 	ui.Sub = place(text(canvas, "", 11, C.Dim, HEADING), x, 188, w + 120, 16)
+	ui.LevelBonus = place(text(canvas, "", 10, C.Teal, BODY), x, 207, w + 120, 13)
 	-- The rating, big, with its caption beside it on the same baseline.
 	local ratingRow = new("Frame", { BackgroundTransparency = 1 }, canvas)
 	place(ratingRow, x, 220, w, 64)
@@ -682,6 +683,7 @@ local function buildLeft(canvas: Frame)
 		value.TextXAlignment = Enum.TextXAlignment.Right
 		ui.Stats[stat] = { Fill = fill, Value = value, Last = nil }
 	end
+	ui.Vitals = place(text(canvas, "", 11, C.Teal, HEADING), x, 438, w + 100, 16)
 	-- The armor set.
 	local rule = frame(canvas, C.Line, 0.93)
 	place(rule, x, 456, w, 1)
@@ -1592,11 +1594,16 @@ local function drawLeft(profile, loadout)
 	ui.Name.Text = string.upper(player.DisplayName)
 	local level = Tree.level(profile.Augments and profile.Augments.XP or 0)
 	ui.Sub.Text = string.format("MINER %d  ·  LEVEL %d", active, level)
+	local vitals = Tree.vitals(profile, player:GetAttribute("MatchStats"))
+	ui.LevelBonus.Text = if player:GetAttribute("MatchStats") == "Even" then "EVEN STATS · LEVEL BONUSES NORMALIZED"
+		else string.format("LEVEL BONUS  +%d HP · +%d STAMINA · +%d CHARGE", vitals.Health, vitals.Stamina - 100, vitals.Charge - 100)
+	ui.Vitals.Text = string.format("MAX STAMINA %d     MAX CHARGE %d", vitals.Stamina, vitals.Charge)
 	local r = ratings(loadout)
 	local total = 0
 	for _, stat in Classes.StatNames do
 		local value = if r then r[stat].Base + r[stat].Bonus else 0
 		total += value
+		if stat == "Health" then value = Classes.maxHealth(value) + vitals.Health end
 		local entry = ui.Stats[stat]
 		entry.Value.Text = whole(value)
 		entry.Fill.Size = UDim2.fromScale(math.clamp(value / 140, 0, 1), 1)

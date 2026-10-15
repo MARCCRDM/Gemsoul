@@ -145,7 +145,7 @@ local function steal(player, st, target, resource: string, amount: number, now: 
 	if taken <= 0 then
 		return 0
 	end
-	local max = api.Tech.Resources[resource].Max
+	local max = api.resourceMax(player, resource)
 	st.Resources[resource] = math.min(max, st.Resources[resource] + taken)
 	player:SetAttribute(resource, st.Resources[resource])
 	api.fx("TriadSteal", target.Root.Position, player, resource, math.floor(taken + 0.5))
@@ -1044,7 +1044,7 @@ function TriadServer.afterHit(player, k, st, target, definition, dealt: number, 
 		end
 	end
 	if definition.KillRefund and target.Humanoid.Health <= 0 then
-		st.Resources.Charge = math.min(100, st.Resources.Charge + definition.KillRefund)
+		st.Resources.Charge = math.min(api.resourceMax(player, "Charge"), st.Resources.Charge + definition.KillRefund)
 		player:SetAttribute("Charge", math.floor(st.Resources.Charge + 1e-6))
 	end
 	if definition.ArcExtra and not st.TriadArcing then
