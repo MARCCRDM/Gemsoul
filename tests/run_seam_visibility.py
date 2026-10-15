@@ -6,7 +6,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 setup = r'''
 local Enum = { RenderPriority = { Camera = { Value = 200 } } }
-local tagged, added, removed, bound = {}, nil, nil, nil
+local tagged, added, removed, bound, respawned = {}, nil, nil, nil, nil
 local services = {
 	CollectionService = {
 		GetTagged = function(_, tag) return tagged[tag] or {} end,
@@ -20,7 +20,14 @@ local services = {
 		end,
 	},
 	ReplicatedStorage = { Shared = { Tags = "Tags" } },
+	Players = {
+		LocalPlayer = {
+			Character = nil,
+			CharacterAdded = { Connect = function(_, fn) respawned = fn end },
+		},
+	},
 }
+local workspace = { CurrentCamera = nil }
 local game = { GetService = function(_, name) return services[name] end }
 -- Just enough Color3 for the animated seams.
 local Color3

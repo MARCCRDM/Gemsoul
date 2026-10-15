@@ -7,6 +7,8 @@ local player = Players.LocalPlayer
 local View = {}
 local saved, model, gear, connection, removalConnection
 local pieces, hidden = {}, {}
+local movedParts: { BasePart } = {} -- (reused each frame: no garbage)
+local movedFrames: { CFrame } = {}
 local raised, charge, swingAt, swingSide, swingHeavy = 0, 0, -10, "Right", false
 local cursorFree = false
 local fireAt, smoothedRaised, smoothedCharge = -10, 0, 0
@@ -760,6 +762,12 @@ function View.start()
 				end
 			end
 		end
+		-- Read once a frame, not once a piece.
+		local weaponBlock = if character and character:GetAttribute("WeaponBlock") then true else false
+		local weaponKind = character and character:GetAttribute("CombatWeaponType")
+		local view = if #pieces > 0 then current.CFrame * insertionPose * flinch else nil
+		table.clear(movedParts)
+		table.clear(movedFrames)
 		for _, piece in pieces do
 			local pose = if piece.Shield
 				-- (A swing dips the shield down and out of the blade's way.)
@@ -787,13 +795,13 @@ function View.start()
 				)
 			-- Tuck the weapon and its gauntlet below the shield during a shield guard.
 			-- Weapon-only guards below retain their raised two-hand bracing pose.
-			if not piece.Shield and not piece.Left and character and not character:GetAttribute("WeaponBlock") then
+			if not piece.Shield and not piece.Left and character and not weaponBlock then
 				local lowered = CFrame.new(1.02, -1.3 + breathe, -1.12)
 					* CFrame.Angles(math.rad(-32), math.rad(12), math.rad(28))
 				pose = pose:Lerp(lowered, smoothedRaised)
 			end
-			if character and character:GetAttribute("WeaponBlock") and not piece.Shield then
-				local kind = character:GetAttribute("CombatWeaponType")
+			if weaponBlock and not piece.Shield then
+				local kind = weaponKind
 				local twin = kind == "TwinBlades"
 				local side = if piece.Left then -1 else 1
 				local weaponGuard = if twin
@@ -870,7 +878,13 @@ function View.start()
 				end
 				pose = motion * pose
 			end
-			piece.Part.CFrame = current.CFrame * insertionPose * flinch * pose * piece.Offset
+			table.insert(movedParts, piece.Part)
+			table.insert(movedFrames, view * pose * piece.Offset)
+		end
+		-- All of the view's pieces moved in one call: much cheaper than
+		-- setting each part's CFrame (the shield alone is ~40 parts).
+		if #movedParts > 0 then
+			workspace:BulkMoveTo(movedParts, movedFrames, Enum.BulkMoveMode.FireCFrameChanged)
 		end
 	end)
 end

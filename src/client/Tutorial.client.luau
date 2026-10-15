@@ -289,6 +289,36 @@ local function run()
 	end
 	local lastSocket = nil
 	local elapsed = 0
+	-- The GUI pieces a beat points at, by attribute: found once and kept
+	-- while they're still there and still match. (A search of the whole
+	-- PlayerGui - thousands of pieces with the inventory open - ten times a
+	-- second made the tutorial stutter.) A failed search waits half a second.
+	local found: { [string]: GuiObject } = {}
+	local missedAt: { [string]: number } = {}
+	local function findGui(attribute: string, value: any, extra: ((GuiObject) -> boolean)?): GuiObject?
+		local key = attribute .. "=" .. tostring(value)
+		local held = found[key]
+		if
+			held
+			and held:IsDescendantOf(player.PlayerGui)
+			and held:GetAttribute(attribute) == value
+			and (not extra or extra(held))
+		then
+			return held
+		end
+		found[key] = nil
+		if os.clock() < (missedAt[key] or 0) then
+			return nil
+		end
+		for _, o in player.PlayerGui:GetDescendants() do
+			if o:IsA("GuiObject") and o:GetAttribute(attribute) == value and (not extra or extra(o)) then
+				found[key] = o
+				return o
+			end
+		end
+		missedAt[key] = os.clock() + 0.5
+		return nil
+	end
 	local connection = RunService.RenderStepped:Connect(function(dt)
 		elapsed += dt
 		if elapsed < 0.1 then
@@ -384,23 +414,13 @@ local function run()
 				advance(beat.Id)
 			end
 		elseif beat.Id == "CloseInventory" then
-			for _, o in player.PlayerGui:GetDescendants() do
-				if o:IsA("GuiObject") and o:GetAttribute("TutorialSocket") == "CloseInventory" then
-					target = o
-					break
-				end
-			end
+			target = findGui("TutorialSocket", "CloseInventory")
 			if not LobbyUI.dashboardOpen() then
 				advance(beat.Id)
 			end
 		elseif beat.Id ~= "GemIntro" then
 			local slot = ({ SocketArmor = "Armor", SocketWeapon = "Weapon", SocketShield = "Shield" })[beat.Id]
-			for _, o in player.PlayerGui:GetDescendants() do
-				if o:IsA("GuiObject") and o:GetAttribute("TutorialSocket") == slot then
-					target = o
-					break
-				end
-			end
+			target = if slot then findGui("TutorialSocket", slot) else nil
 			if Tutorial.met(GemClient.Profile, beat.Id) then
 				if lastSocket ~= beat.Id then
 					lastSocket = beat.Id
@@ -430,41 +450,35 @@ local function run()
 				local x, y, w, h = p.X - 8, p.Y - 8, s.X + 16, s.Y + 16
 				local element = ({ SocketArmor = "Fire", SocketWeapon = "Frost", SocketShield = "Shock" })[beat.Id]
 				if element and LobbyUI.dashboardOpen() then
-					for _, o in player.PlayerGui:GetDescendants() do
-						if
-							o:IsA("GuiObject")
-							and o:GetAttribute("TutorialGem") == element
-							and (
-								not GemClient.Profile.Tutorial.GemIds
-								or o:GetAttribute("TutorialGemId") == GemClient.Profile.Tutorial.GemIds[element]
-							)
-						then
-							local gp, gs = screenPosition(o), o.AbsoluteSize
-							rectangle(sourceBox, gp.X - 4, gp.Y - 4, gs.X + 8, gs.Y + 8)
-							sourceBox.Visible = true
-							startPoint = gp + gs / 2
-							endPoint = p + s / 2
-							destination.Position = UDim2.fromOffset(endPoint.X, p.Y - 10)
-							destination.Visible = true
-							local id = o:GetAttribute("TutorialGemId")
-							if shownGem ~= id then
-								shownGem = id
-								ghost:ClearAllChildren()
-								demoAt = os.clock()
-								for _, gem in GemClient.Profile.Gems do
-									if gem.Id == id then
-										GemArt.viewport(ghost, gem, true)
-										break
-									end
+					local ids = GemClient.Profile.Tutorial.GemIds
+					local o = findGui("TutorialGem", element, function(tile)
+						return not ids or tile:GetAttribute("TutorialGemId") == ids[element]
+					end)
+					if o then
+						local gp, gs = screenPosition(o), o.AbsoluteSize
+						rectangle(sourceBox, gp.X - 4, gp.Y - 4, gs.X + 8, gs.Y + 8)
+						sourceBox.Visible = true
+						startPoint = gp + gs / 2
+						endPoint = p + s / 2
+						destination.Position = UDim2.fromOffset(endPoint.X, p.Y - 10)
+						destination.Visible = true
+						local id = o:GetAttribute("TutorialGemId")
+						if shownGem ~= id then
+							shownGem = id
+							ghost:ClearAllChildren()
+							demoAt = os.clock()
+							for _, gem in GemClient.Profile.Gems do
+								if gem.Id == id then
+									GemArt.viewport(ghost, gem, true)
+									break
 								end
 							end
-							body.Text =
-								"1. Hold the glowing gem.  2. Drag it to the outlined equipment.  3. Release to enchant. Follow the moving example."
-							local right, bottom = math.max(x + w, gp.X + gs.X + 8), math.max(y + h, gp.Y + gs.Y + 8)
-							x, y = math.min(x, gp.X - 8), math.min(y, gp.Y - 8)
-							w, h = right - x, bottom - y
-							break
 						end
+						body.Text =
+							"1. Hold the glowing gem.  2. Drag it to the outlined equipment.  3. Release to enchant. Follow the moving example."
+						local right, bottom = math.max(x + w, gp.X + gs.X + 8), math.max(y + h, gp.Y + gs.Y + 8)
+						x, y = math.min(x, gp.X - 8), math.min(y, gp.Y - 8)
+						w, h = right - x, bottom - y
 					end
 				end
 				spot(x, y, w, h)

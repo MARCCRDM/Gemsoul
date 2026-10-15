@@ -7,11 +7,15 @@ local function part(transparency: number, modifier: number)
 		end,
 	}
 end
-local function box(adornee, attributes)
+local function box(adornee, attributes, owner)
 	local listeners = {}
 	local self
 	self = {
 		Adornee = adornee,
+		-- (test only) which body it's on: your character, or nil
+		IsDescendantOf = function(_, ancestor)
+			return owner ~= nil and owner == ancestor
+		end,
 		Visible = true,
 		Color3 = attributes and attributes.SeamA,
 		IsA = function(_, kind)
@@ -132,4 +136,52 @@ local frozen = shifting.Color3
 CLOCK = 3.3
 bound()
 assert(shifting.Color3 == frozen, "an untagged box isn't animated")
+
+-- A full server: everyone else's outlines are checked a slice a frame, all
+-- of them within a few frames; your own every frame.
+local crowd = {}
+for i = 1, 400 do
+	local plate = part(0, 0)
+	local outline = box(plate, { SeamA = gold })
+	added(outline)
+	crowd[i] = { Plate = plate, Box = outline }
+end
+bound()
+for _, entry in crowd do
+	entry.Plate.Transparency = 1 -- everyone stows their gear
+end
+bound()
+local stillShowing = 0
+for _, entry in crowd do
+	if entry.Box.Visible then
+		stillShowing += 1
+	end
+end
+assert(stillShowing > 0, "every outline in a full server was checked in one frame (not sliced)")
+for _ = 2, SeamVisibility.Spread do
+	bound()
+end
+for _, entry in crowd do
+	assert(not entry.Box.Visible, "an outline wasn't checked within Spread frames")
+end
+-- Yours: on your body, checked every frame even in a crowd.
+local me = services.Players.LocalPlayer
+local myPlate = part(0, 0)
+me.Character = { Name = "Me" }
+local mine = box(myPlate, { SeamA = gold }, me.Character)
+added(mine)
+bound()
+myPlate.LocalTransparencyModifier = 1 -- first person
+bound()
+assert(not mine.Visible, "your own outline lagged behind first person in a crowd")
+myPlate.LocalTransparencyModifier = 0
+-- A new body: an outline already tagged becomes yours.
+local later2 = box(part(0, 0), { SeamA = gold }, "NextBody")
+added(later2)
+me.Character = "NextBody"
+respawned()
+bound()
+later2.Adornee.LocalTransparencyModifier = 1
+bound()
+assert(not later2.Visible, "outlines on your new body weren't treated as yours")
 print("seam visibility: all checks passed")

@@ -186,7 +186,7 @@ local function armorOutput(player, st, k, charge, healing)
 	local now = os.clock()
 	charge = ArmorSignatures.budget(st, "Charge", math.min(charge, 100 - st.Resources.Charge), 30, now)
 	st.Resources.Charge += charge
-	player:SetAttribute("Charge", st.Resources.Charge)
+	player:SetAttribute("Charge", math.floor(st.Resources.Charge + 1e-6))
 	local hum = alive(player)
 	if hum and healing > 0 then
 		healing *= (1 + (k.Effects.HealingReceived or 0)) * CrowdControl.healingMultiplier(st.CC, now)
@@ -208,7 +208,7 @@ end
 local function spendStamina(player, st, amount)
 	st.Resources.Stamina = math.max(0, st.Resources.Stamina - amount)
 	st.StaminaRestUntil = os.clock() + Actions.Stamina.RegenDelay
-	player:SetAttribute("Stamina", st.Resources.Stamina)
+	player:SetAttribute("Stamina", math.floor(st.Resources.Stamina + 1e-6))
 end
 -- Your body acts out what you do, as the Arena rival's does (RivalPose, the
 -- same poses, seen by everyone; every client poses it, see BodyPoses): a
@@ -260,7 +260,10 @@ local function updateResources(player, st, k)
 		if id == "Charge" and not Tech.hasGem(k.Loadout) then
 			st.Resources[id] = 0
 		end
-		player:SetAttribute(id, st.Resources[id])
+		-- Published in whole points: regen moves the exact value every frame,
+		-- and every change to a player's attribute is sent to every player
+		-- in the server. Whole points change a few times a second instead.
+		player:SetAttribute(id, math.floor(st.Resources[id] + 1e-6))
 		player:SetAttribute("Max" .. id, rule.Max)
 	end
 end
@@ -446,7 +449,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		if origin and not reflected then
 			local refund = ArmorSignatures.dodged(st, k.Signatures, now, st.ArmorDodgeCost, st.DodgeStarted)
 			st.Resources.Stamina = math.min(100, st.Resources.Stamina + refund)
-			player:SetAttribute("Stamina", st.Resources.Stamina)
+			player:SetAttribute("Stamina", math.floor(st.Resources.Stamina + 1e-6))
 		end
 		DamageLog.send(player, { Dir = "In", Kind = "Dodge", Who = attackerName })
 		DamageLog.send(source, { Dir = "Out", Kind = "Dodge", Who = DamageLog.nameOf(player) })
@@ -646,7 +649,7 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		st.SiphonCapacity -= absorbed
 		st.Resources.Charge = math.min(100, st.Resources.Charge + absorbed * (st.SiphonRate or 0.5))
 		damage -= absorbed
-		player:SetAttribute("Charge", st.Resources.Charge)
+		player:SetAttribute("Charge", math.floor(st.Resources.Charge + 1e-6))
 	end
 	if now < st.ShieldUntil and st.Shield > 0 then
 		local absorbed = math.min(st.Shield, damage)
@@ -997,7 +1000,7 @@ local function weaponPerksOnHit(source, k, st, target, damage: number, guarded: 
 		if amount then
 			local id = pair[2]
 			st.Resources[id] = math.min(Tech.Resources[id].Max, st.Resources[id] + Tech.Resources[id].Max * amount)
-			source:SetAttribute(id, st.Resources[id])
+			source:SetAttribute(id, math.floor(st.Resources[id] + 1e-6))
 		end
 	end
 	if e.KillHeal and target.Humanoid.Health <= 0 then
@@ -2455,7 +2458,7 @@ local function tick(dt)
 				player.Character:SetAttribute("ActionHold", serverNow + 0.3)
 			end
 		end
-		player:SetAttribute("Charge", st.Resources.Charge)
+		player:SetAttribute("Charge", math.floor(st.Resources.Charge + 1e-6))
 		if st.DodgeMove then
 			if now >= st.DodgeMove.Ends then
 				stopDodge(st)
@@ -2473,12 +2476,11 @@ local function tick(dt)
 			st.ChargeStarted = nil
 		end
 		player:SetAttribute("Blocking", blocking(st, now))
-		-- The shield comes up for everyone to see, as the rival's does.
+		-- The shield comes up for everyone to see, as the rival's does. (On the
+		-- fixed server clock offset: GetServerTimeNow() drifts against os.clock()
+		-- a little every frame, which re-sent the attribute every frame.)
 		if player.Character then
-			player.Character:SetAttribute(
-				"GuardUntil",
-				if blocking(st, now) then workspace:GetServerTimeNow() + (st.BlockUntil - now) else 0
-			)
+			player.Character:SetAttribute("GuardUntil", if blocking(st, now) then serverTime(st.BlockUntil) else 0)
 		end
 		if blocking(st, now) and k.Defense.CleanseInterval < math.huge and now >= st.NextCleanse then
 			cleanse(st)

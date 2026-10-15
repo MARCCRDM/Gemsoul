@@ -16,6 +16,7 @@ local Lock = {}
 local active, paused, manualUntil, nextScan = false, false, 0, 0
 local engagedUntil = setmetatable({}, { __mode = "k" }) -- [model] = until (os.clock)
 local state, candidates, records = Rules.new(), {}, {}
+local sight: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any -- last line-of-sight check
 local params = RaycastParams.new()
 params.FilterType = Enum.RaycastFilterType.Exclude
 local outline = Instance.new("Highlight")
@@ -76,18 +77,29 @@ local function pointOf(model)
 	local root = rootOf(model)
 	return root and root.Position + Vector3.new(0, math.min(1, root.Size.Y * 0.25), 0)
 end
+-- (The ray ignores you, the camera and combat effects. Setting the filter
+-- list rebuilds it, so that's done only when one of them changes.)
+local filtered: { any } = {}
+local function refreshFilter(camera: Camera)
+	local character, effects = player.Character, workspace:FindFirstChild("CombatFx")
+	if filtered[1] ~= character or filtered[2] ~= camera or filtered[3] ~= effects then
+		filtered = { character, camera, effects }
+		params.FilterDescendantsInstances = { character, camera, effects }
+	end
+end
 local function visible(model, point)
 	local camera = workspace.CurrentCamera
 	local screen, onScreen = camera:WorldToViewportPoint(point)
 	if not onScreen or screen.Z <= 0 then
 		return false
 	end
-	params.FilterDescendantsInstances = { player.Character, camera, workspace:FindFirstChild("CombatFx") }
+	refreshFilter(camera)
 	local result = workspace:Raycast(camera.CFrame.Position, point - camera.CFrame.Position, params)
 	return result == nil or result.Instance:IsDescendantOf(model)
 end
 function Lock.reset()
 	state, candidates, records, nextScan, manualUntil = Rules.new(), {}, {}, 0, 0
+	table.clear(sight)
 	outline.Adornee, outline.Enabled = nil, false
 end
 function Lock.setActive(value)
@@ -205,7 +217,8 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 	if UserInputService.MouseEnabled and UserInputService:GetMouseDelta().Magnitude > 0.5 then
 		manualUntil = now + 0.18
 	end
-	if now >= nextScan then
+	local scanning = now >= nextScan
+	if scanning then
 		table.clear(candidates)
 		local enemies = workspace:FindFirstChild("Enemies")
 		if enemies then
@@ -229,6 +242,12 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 			local rival = Matchmaking.ownsRival(model, player)
 			if delta.Magnitude > 0.01 and (distance <= Rules.RetainRange or rival) then
 				local look = camera.CFrame.LookVector
+				-- Line of sight is a raycast per foe: the locked one every frame
+				-- (its cover grace starts the moment it's hidden), the rest with
+				-- the scan, ten times a second.
+				if scanning or sight[model] == nil or model == state.Target then
+					sight[model] = visible(model, point)
+				end
 				table.insert(records, {
 					-- Left (negative) to right across the view, for switching.
 					Bearing = math.atan2(look.X * delta.Z - look.Z * delta.X, look.X * delta.X + look.Z * delta.Z),
@@ -236,7 +255,7 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 					Distance = distance,
 					Facing = camera.CFrame.LookVector:Dot(delta.Unit),
 					Allowed = true,
-					Visible = visible(model, point),
+					Visible = sight[model],
 					-- Your Arena rival: always the one to lock.
 					Priority = rival,
 					Engaged = (engagedUntil[model] or 0) > now,

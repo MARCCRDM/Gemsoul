@@ -77,6 +77,7 @@ type Bar = {
 	Shown: number,
 	Trailing: number,
 	Label: TextLabel,
+	ShownName: string?,
 }
 local bars: { [Model]: Bar } = {}
 
@@ -184,6 +185,7 @@ type Row = {
 	Fill: Frame,
 	Percent: TextLabel,
 	Model: Model?,
+	ShownPercent: number?,
 }
 local rows: { Row } = {}
 for i = 1, FoeBars.MaxRows do
@@ -295,7 +297,11 @@ RunService.RenderStepped:Connect(function(dt)
 		bar.Trail.Size = UDim2.fromScale(bar.Trailing, 1)
 		local locked = model == target
 		bar.Back.Size = if locked then UDim2.fromOffset(120, 11) else UDim2.fromOffset(100, 9)
-		bar.Label.Text = nameOf(model)
+		local label = nameOf(model)
+		if bar.ShownName ~= label then
+			bar.ShownName = label
+			bar.Label.Text = label
+		end
 		local head = bar.Board.Adornee
 		if head then
 			bar.Board.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + 1.8, 0)
@@ -320,7 +326,11 @@ RunService.RenderStepped:Connect(function(dt)
 			row.Icon.BackgroundColor3 = tintOf(model)
 			row.Fill.Size = UDim2.fromScale(share, 1)
 			row.Fill.BackgroundColor3 = if share <= 0.3 then Color3.fromRGB(255, 96, 96) else HEALTH
-			row.Percent.Text = string.format("%d%%", math.ceil(share * 100))
+			local percent = math.ceil(share * 100)
+			if row.ShownPercent ~= percent then
+				row.ShownPercent = percent
+				row.Percent.Text = string.format("%d%%", percent)
+			end
 			row.Stroke.Color = if locked then LOCK else EDGE
 			row.Stroke.Thickness = if locked then 1.5 else 1
 		end

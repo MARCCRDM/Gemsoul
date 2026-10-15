@@ -1337,7 +1337,27 @@ local function layoutThumb(viewport: Vector2): (number, number)
 	return top, centre
 end
 
-local lastActive = false
+-- The HUD's layout (sizes and positions) is worked out again only when the
+-- screen changes, and a few times a second for content that grows or
+-- shrinks; surge contents (the augment tree, each gem's stats, the icon art)
+-- a few times a second too. Cooldowns, bars and timers draw every frame.
+local shown = {
+	Active = false, -- (fighting last frame)
+	LayoutAt = 0,
+	LayoutW = 0,
+	LayoutH = 0,
+	LayoutTouch = nil :: boolean?,
+	SurgeAt = 0,
+	Surges = {} :: { [number]: any },
+	SurgeTitle = "SURGES",
+	VignetteEdges = vignette:GetChildren(),
+	Health = -1,
+	MaxHealth = -1,
+	Shield = -1,
+	Low = nil :: boolean?,
+	Keys = { Basic = "LMB", Heavy = "SHIFT+LMB", Block = "HOLD RMB", Dodge = "SPACE" },
+	TouchKeys = { Basic = "HOLD", Heavy = "HOLD", Block = "HOLD", Dodge = "TAP·2×" },
+}
 RunService.RenderStepped:Connect(function(dt)
 	-- The combat HUD never draws over the menu dashboard.
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
@@ -1349,7 +1369,7 @@ RunService.RenderStepped:Connect(function(dt)
 	TargetLock.setPaused(CombatGuide.isOpen() or AugmentTreeUI.isOpen())
 	leave.Visible = ArenaScene.isActive()
 	if not fight then
-		if lastActive then
+		if shown.Active then
 			hitUntil, incomingUntil, incomingOrigin = 0, 0, nil
 			cancel()
 			FirstPerson.stop()
@@ -1358,7 +1378,8 @@ RunService.RenderStepped:Connect(function(dt)
 			guideWasOpen = false
 			cursorFree = false
 		end
-		lastActive = false
+		shown.Active = false
+		shown.LayoutAt, shown.SurgeAt = 0, 0
 		return
 	end
 	FirstPerson.start()
@@ -1368,77 +1389,86 @@ RunService.RenderStepped:Connect(function(dt)
 		FirstPerson.setCursorFree(cursorFree)
 	end
 	guideWasOpen = guideOpen
-	if not lastActive then
+	if not shown.Active then
 		fightSince = os.clock()
 	end
-	lastActive = true
+	shown.Active = true
 	local camera = workspace.CurrentCamera
 	local viewport = camera.ViewportSize
 	local portrait = viewport.X < 600
 	local short = viewport.Y < 430 and not portrait
 	local touch = UserInputService.TouchEnabled
-	actionBar.Frame.Visible = not touch
-	treeButton.Visible = not touch
-	local stackTop, centreX = 0, nil
-	local logRoom = 0
-	-- Callouts sit under the crosshair; on touch screens above it, clear
-	-- of the maneuver row on short phones.
-	hint.Position = if touch then UDim2.new(0.5, 0, 0.5, -64) else UDim2.new(0.5, 0, 0.5, 30)
-	if touch then
-		stackTop, centreX = layoutThumb(viewport)
-	else
-		local iconSize = if portrait
-			then math.clamp(math.floor((viewport.X - 100) / 7), 34, 48)
-			elseif short then 44
-			else 52
-		layoutTray(surgeTray, surgeIcons, iconSize)
-		layoutTray(maneuverTray, maneuverIcons, iconSize)
-		-- One stack at the bottom: the action bar, the vitals above it, your
-		-- buffs above those; on narrow screens Health gets its own row.
-		local barWidth, barHeight = HudChrome.layoutActionBar(actionBar, surgeTray, maneuverTray)
-		local stacked = portrait or (viewport.X < 760 and not short)
-		local hudBottom = 22 + barHeight + 12
-		local vitalsWidth = if stacked
-			then math.max(barWidth, math.min(viewport.X - 40, 420))
-			elseif short then barWidth + 40
-			else math.max(barWidth + 120, 600)
-		local hudHeight = HudChrome.layoutVitals(
-			hud,
-			{ Name = nameLabel, Shield = hp, Health = healthTrack, Bars = resourceBars },
-			vitalsWidth,
-			stacked
-		)
-		hud.Position = UDim2.new(0.5, 0, 1, -hudBottom)
-		stackTop = hudBottom + hudHeight
-		-- Mouse and keyboard: no on-screen buttons.
-		for _, slot in slots do
-			slot.Button.Visible = false
+	if
+		viewport.X ~= shown.LayoutW
+		or viewport.Y ~= shown.LayoutH
+		or touch ~= shown.LayoutTouch
+		or os.clock() >= shown.LayoutAt
+	then
+		shown.LayoutW, shown.LayoutH, shown.LayoutTouch, shown.LayoutAt =
+			viewport.X, viewport.Y, touch, os.clock() + 0.25
+		actionBar.Frame.Visible = not touch
+		treeButton.Visible = not touch
+		local stackTop, centreX = 0, nil
+		local logRoom = 0
+		-- Callouts sit under the crosshair; on touch screens above it, clear
+		-- of the maneuver row on short phones.
+		hint.Position = if touch then UDim2.new(0.5, 0, 0.5, -64) else UDim2.new(0.5, 0, 0.5, 30)
+		if touch then
+			stackTop, centreX = layoutThumb(viewport)
+		else
+			local iconSize = if portrait
+				then math.clamp(math.floor((viewport.X - 100) / 7), 34, 48)
+				elseif short then 44
+				else 52
+			layoutTray(surgeTray, surgeIcons, iconSize)
+			layoutTray(maneuverTray, maneuverIcons, iconSize)
+			-- One stack at the bottom: the action bar, the vitals above it, your
+			-- buffs above those; on narrow screens Health gets its own row.
+			local barWidth, barHeight = HudChrome.layoutActionBar(actionBar, surgeTray, maneuverTray)
+			local stacked = portrait or (viewport.X < 760 and not short)
+			local hudBottom = 22 + barHeight + 12
+			local vitalsWidth = if stacked
+				then math.max(barWidth, math.min(viewport.X - 40, 420))
+				elseif short then barWidth + 40
+				else math.max(barWidth + 120, 600)
+			local hudHeight = HudChrome.layoutVitals(
+				hud,
+				{ Name = nameLabel, Shield = hp, Health = healthTrack, Bars = resourceBars },
+				vitalsWidth,
+				stacked
+			)
+			hud.Position = UDim2.new(0.5, 0, 1, -hudBottom)
+			stackTop = hudBottom + hudHeight
+			-- Mouse and keyboard: no on-screen buttons.
+			for _, slot in slots do
+				slot.Button.Visible = false
+			end
+			logRoom = (viewport.X - (if stacked then viewport.X else vitalsWidth)) / 2 - 24
 		end
-		logRoom = (viewport.X - (if stacked then viewport.X else vitalsWidth)) / 2 - 24
+		rivalPanel.Fit.Scale = math.clamp((viewport.Y - 150) / 420, 0.58, 1)
+		controlsHint.Position = UDim2.new(0.5, 0, 1, -3)
+		-- Your buffs and debuffs ride just above the vitals, wherever they sit.
+		selfStatusRow.Position = if centreX
+			then UDim2.new(0, centreX, 1, -(stackTop + 6))
+			else UDim2.new(0.5, 0, 1, -(stackTop + 8))
+		-- The log keeps to the bottom-left corner, clear of the stack (touch
+		-- screens leave that corner to the move stick).
+		combatLog.LogPanel.Visible = not touch and combatLog.LogPanel.Visible
+		combatLog.LogPanel.Position = UDim2.new(0, 12, 1, -12)
+		combatLog.LogPanel.Size = UDim2.fromOffset(math.clamp(logRoom, 240, 340), combatLog.LogPanel.Size.Y.Offset)
+		controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 16)
+		leave.Position, leave.Size =
+			UDim2.new(1, -12, 0, if portrait then 80 else 16),
+			if touch
+				then UDim2.fromOffset(96, 30)
+				elseif portrait then UDim2.fromOffset(130, 38)
+				else UDim2.fromOffset(160, 38)
+		leave.Text = if touch then "LEAVE" else "LEAVE ARENA"
+		targetCard.Size = UDim2.fromOffset(if portrait then math.min(260, viewport.X - 40) else 380, 74)
+		-- Phones: below the corner buttons.
+		targetCard.Position = UDim2.new(0.5, 0, 0, if portrait then 124 else 14)
+		targetName.TextSize = if portrait then 12 else 15
 	end
-	rivalPanel.Fit.Scale = math.clamp((viewport.Y - 150) / 420, 0.58, 1)
-	controlsHint.Position = UDim2.new(0.5, 0, 1, -3)
-	-- Your buffs and debuffs ride just above the vitals, wherever they sit.
-	selfStatusRow.Position = if centreX
-		then UDim2.new(0, centreX, 1, -(stackTop + 6))
-		else UDim2.new(0.5, 0, 1, -(stackTop + 8))
-	-- The log keeps to the bottom-left corner, clear of the stack (touch
-	-- screens leave that corner to the move stick).
-	combatLog.LogPanel.Visible = not touch and combatLog.LogPanel.Visible
-	combatLog.LogPanel.Position = UDim2.new(0, 12, 1, -12)
-	combatLog.LogPanel.Size = UDim2.fromOffset(math.clamp(logRoom, 240, 340), combatLog.LogPanel.Size.Y.Offset)
-	controlsHint.Size = UDim2.fromOffset(math.min(760, viewport.X - 32), 16)
-	leave.Position, leave.Size =
-		UDim2.new(1, -12, 0, if portrait then 80 else 16),
-		if touch
-			then UDim2.fromOffset(96, 30)
-			elseif portrait then UDim2.fromOffset(130, 38)
-			else UDim2.fromOffset(160, 38)
-	leave.Text = if touch then "LEAVE" else "LEAVE ARENA"
-	targetCard.Size = UDim2.fromOffset(if portrait then math.min(260, viewport.X - 40) else 380, 74)
-	-- Phones: below the corner buttons.
-	targetCard.Position = UDim2.new(0.5, 0, 0, if portrait then 124 else 14)
-	targetName.TextSize = if portrait then 12 else 15
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		local maxHealth = math.max(1, humanoid.MaxHealth)
@@ -1449,12 +1479,22 @@ RunService.RenderStepped:Connect(function(dt)
 			else healthTrailRatio + (ratio - healthTrailRatio) * (1 - math.exp(-dt * 3))
 		healthTrail.Size = UDim2.fromScale(healthTrailRatio, 1)
 		local low = ratio <= 0.3
-		local top = if low then Color3.fromRGB(255, 110, 110) else Color3.fromRGB(240, 90, 100)
-		healthGradient.Color = ColorSequence.new(top, top:Lerp(Color3.new(0, 0, 0), 0.3))
+		if low ~= shown.Low then
+			shown.Low = low
+			local top = if low then Color3.fromRGB(255, 110, 110) else Color3.fromRGB(240, 90, 100)
+			healthGradient.Color = ColorSequence.new(top, top:Lerp(Color3.new(0, 0, 0), 0.3))
+		end
 		local shield = player:GetAttribute("Shield") or 0
 		shieldFill.Size = UDim2.fromScale(math.min(ratio + shield / maxHealth, 1), 1)
-		healthText.Text = string.format("%d / %d", math.ceil(humanoid.Health), math.ceil(humanoid.MaxHealth))
-		hp.Text = if shield > 0 then string.format("◈ %d", shield) else ""
+		local health, most = math.ceil(humanoid.Health), math.ceil(humanoid.MaxHealth)
+		if health ~= shown.Health or most ~= shown.MaxHealth then
+			shown.Health, shown.MaxHealth = health, most
+			healthText.Text = string.format("%d / %d", health, most)
+		end
+		if shield ~= shown.Shield then
+			shown.Shield = shield
+			hp.Text = if shield > 0 then string.format("◈ %d", shield) else ""
+		end
 		-- Red edges: pulse below 30% health, flash briefly when hit.
 		local now = os.clock()
 		vignette.Visible = low or now < flashUntil
@@ -1463,63 +1503,89 @@ RunService.RenderStepped:Connect(function(dt)
 			if low then
 				strength = math.max(strength, 0.55 + 0.25 * math.sin(now * 5))
 			end
-			for _, edge in vignette:GetChildren() do
+			for _, edge in shown.VignetteEdges do
 				edge.BackgroundTransparency = 1 - math.clamp(strength, 0, 1)
 			end
 		end
 	end
 	for id, bar in resourceBars do
 		local amount, maximum = player:GetAttribute(id) or 0, player:GetAttribute("Max" .. id) or 100
-		bar.Value.Text = string.format("%d / %d", math.floor(amount), maximum)
+		local whole = math.floor(amount)
+		if whole ~= bar.ShownAmount or maximum ~= bar.ShownMax then
+			bar.ShownAmount, bar.ShownMax = whole, maximum
+			bar.Value.Text = string.format("%d / %d", whole, maximum)
+		end
 		local ratio = math.clamp(amount / math.max(1, maximum), 0, 1)
 		-- Spending is immediate; regeneration eases toward authoritative values.
 		bar.Display = if not bar.Display or ratio < bar.Display
 			then ratio
 			else bar.Display + (ratio - bar.Display) * (1 - math.exp(-dt * 12))
 		bar.Fill.Size = UDim2.fromScale(bar.Display, 1)
-		bar.Label.Text = id:upper() .. (if ratio <= 0.2 then "  ·  LOW" else "")
-		bar.Value.TextColor3 = if ratio <= 0.2 then P.Gold else P.Text
+		local scarce = ratio <= 0.2
+		if scarce ~= bar.ShownLow then
+			bar.ShownLow = scarce
+			bar.Label.Text = id:upper() .. (if scarce then "  ·  LOW" else "")
+			bar.Value.TextColor3 = if scarce then P.Gold else P.Text
+		end
 	end
 	local profile = GemClient.Profile
 	local loadout = Classes.activeLoadout(profile and profile.Character)
-	local amps = if profile then Tree.effects(profile) else {}
-	for i, key in SURGE_KEYS do
-		local icon = surgeIcons[i]
-		local gem = Tech.surgeGem(loadout, key)
-		local definition = gem and Tech.surgeStats(gem, amps, player:GetAttribute("MatchRarityCap") ~= nil)
-		if definition then
-			local color = GemConfig.ElementColors[gem.Element] or P.Gold
-			local cost = definition.Cost * (if definition.PerSecond and not definition.Prepaid then 0.25 else 1)
-			icon.Glyph.Text, icon.Glyph.TextColor3 = "◆", color
-			if SurgeIcons.apply(icon.Button, definition) then
-				icon.Glyph.Text = ""
+	-- What's in each key: a few times a second (see surgeAt).
+	if os.clock() >= shown.SurgeAt then
+		shown.SurgeAt = os.clock() + 0.2
+		local amps = if profile then Tree.effects(profile) else {}
+		for i, key in SURGE_KEYS do
+			local icon = surgeIcons[i]
+			local gem = Tech.surgeGem(loadout, key)
+			local definition = gem and Tech.surgeStats(gem, amps, player:GetAttribute("MatchRarityCap") ~= nil)
+			if definition then
+				local color = GemConfig.ElementColors[gem.Element] or P.Gold
+				shown.Surges[i] = {
+					Definition = definition,
+					Color = color,
+					Cost = definition.Cost * (if definition.PerSecond and not definition.Prepaid then 0.25 else 1),
+				}
+				icon.Glyph.Text, icon.Glyph.TextColor3 = "◆", color
+				if SurgeIcons.apply(icon.Button, definition) then
+					icon.Glyph.Text = ""
+				end
+				icon.Badge.Text = Tech.rarityLabel(gem)
+				icon.Name.Text = definition.Name
+				-- The triad: each key wears its lane's colour; R pays Stamina.
+				icon.Chip.BackgroundColor3 = if definition.Triad then TriadVfx.KeyColors[key] else P.Gold
+			else
+				shown.Surges[i] = nil
+				icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
+				SurgeIcons.apply(icon.Button, nil)
+				icon.Badge.Text = ""
+				icon.Name.Text = if Tech.Traits.active(loadout)
+					then string.upper(Tech.Traits.SocketNames[key]) .. " GEM"
+					else "EMPTY"
 			end
-			icon.Badge.Text = Tech.rarityLabel(gem)
-			icon.Name.Text = definition.Name
-			-- The triad: each key wears its lane's colour; R pays Stamina.
-			local keyColor = if definition.Triad then TriadVfx.KeyColors[key] else P.Gold
-			icon.Chip.BackgroundColor3 = keyColor
+		end
+		shown.SurgeTitle = if Tech.Traits.active(loadout) then "Q · E · R" else "SURGES"
+	end
+	-- Cooldowns, charge and the aura's pulse: every frame.
+	for i, key in SURGE_KEYS do
+		local icon, view = surgeIcons[i], shown.Surges[i]
+		if view then
+			local definition = view.Definition
 			local auraOn = definition.Type == "Aura" and techReady("Surge" .. key)
 			icon.Aura.Visible = auraOn
 			if auraOn then
-				icon.AuraStroke.Color = color
+				icon.AuraStroke.Color = view.Color
 				icon.AuraStroke.Transparency = 0.35 + 0.3 * math.sin(os.clock() * 3)
 			end
-			local usable = (player:GetAttribute(definition.Resource or "Charge") or 0) >= cost
-			setIcon(icon, color, techCooldowns["Surge" .. key], usable, beamKey == key, not usable)
+			local usable = (player:GetAttribute(definition.Resource or "Charge") or 0) >= view.Cost
+			setIcon(icon, view.Color, techCooldowns["Surge" .. key], usable, beamKey == key, not usable)
 		else
-			icon.Glyph.Text, icon.Glyph.TextColor3 = "+", P.Dim
-			SurgeIcons.apply(icon.Button, nil)
-			icon.Badge.Text = ""
-			icon.Name.Text = if Tech.Traits.active(loadout) then string.upper(Tech.Traits.SocketNames[key]) .. " GEM" else "EMPTY"
 			icon.Aura.Visible = false
 			setIcon(icon, P.Dim, nil, false, false)
 		end
 	end
-	local trayTitle = if Tech.Traits.active(loadout) then "Q · E · R" else "SURGES"
-	if actionBar.SurgeTitle.Text ~= trayTitle then
-		actionBar.SurgeTitle.Text = trayTitle
-		actionBar.SurgeTitle.Size = UDim2.fromOffset(8 + utf8.len(trayTitle) * 7, 14)
+	if actionBar.SurgeTitle.Text ~= shown.SurgeTitle then
+		actionBar.SurgeTitle.Text = shown.SurgeTitle
+		actionBar.SurgeTitle.Size = UDim2.fromOffset(8 + utf8.len(shown.SurgeTitle) * 7, 14)
 	end
 	if beamKey and os.clock() >= nextBeamUpdate then
 		input:FireServer("Surge", beamKey, aimPoint())
@@ -1623,13 +1689,14 @@ RunService.RenderStepped:Connect(function(dt)
 	controlsHint.Visible = not UserInputService.TouchEnabled and (cursorFree or hintAge < 13)
 	controlsHint.TextTransparency = if cursorFree then 0 else math.clamp(hintAge - 12, 0, 1)
 	cursorModal.Modal = cursorFree
-	local hit = aimedHit()
-	local lockedTarget = trackedTarget
-	local target = lockedTarget or (hit and hit.Instance:FindFirstAncestorOfClass("Model"))
-	local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
 	-- Touch screens: the foe's health rides over its head (FoeBars) instead.
+	-- (With the card off, nothing here aims a ray at the crosshair each frame.)
 	targetCard.Visible = false -- no duplicate desktop target health panel
 	if targetCard.Visible then
+		local lockedTarget = trackedTarget
+		local hit = aimedHit()
+		local target = lockedTarget or (hit and hit.Instance:FindFirstAncestorOfClass("Model"))
+		local enemyHumanoid = target and target:FindFirstChildOfClass("Humanoid")
 		local opponent = Players:GetPlayerFromCharacter(target)
 		local ratio = math.clamp(enemyHumanoid.Health / math.max(1, enemyHumanoid.MaxHealth), 0, 1)
 		if target ~= lastTarget then
@@ -1688,10 +1755,16 @@ RunService.RenderStepped:Connect(function(dt)
 		if id == "Basic" or id == "Heavy" then
 			remaining = math.max(0, nextAttack - now)
 		end
-		slot.Key.Text = if UserInputService.TouchEnabled
-			then (if id == "Dodge" then "TAP·2×" else "HOLD")
-			else ({ Basic = "LMB", Heavy = "SHIFT+LMB", Block = "HOLD RMB", Dodge = "SPACE" })[id]
-		slot.Timer.Text = if remaining > 0 then string.format("%.1f", remaining) else ""
+		local key = if UserInputService.TouchEnabled then shown.TouchKeys[id] else shown.Keys[id]
+		if slot.ShownKey ~= key then
+			slot.ShownKey = key
+			slot.Key.Text = key
+		end
+		local timer = if remaining > 0 then math.ceil(remaining * 10) else 0
+		if slot.ShownTimer ~= timer then
+			slot.ShownTimer = timer
+			slot.Timer.Text = if timer > 0 then string.format("%.1f", timer / 10) else ""
+		end
 		local pressed = (id == "Block" and blockHeld)
 			or (holding and ((id == "Basic" and attackSide == "Left") or (id == "Heavy" and attackSide == "Right")))
 		slot.Name.TextColor3 = if pressed then P.Gold elseif remaining > 0 then P.Dim else P.Text

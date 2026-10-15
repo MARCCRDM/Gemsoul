@@ -58,12 +58,28 @@ function SeamVisibility.fxColor(fx: string, a: Color3, b: Color3, t: number, see
 	return a
 end
 
+-- Cost: a neon suit has up to ~80 outlines, so a full server has well over a
+-- thousand. Those round your own body (and the first-person view) are
+-- checked every frame, since first person hides and shows your plates from
+-- one frame to the next. Everyone else's only change when their gear is
+-- staged or stowed, so they're checked a slice at a time: every one of them
+-- every few frames (Spread). Animated outlines move only near the camera
+-- (FxRange); far off, too small to see, they hold still.
+SeamVisibility.Spread = 4
+SeamVisibility.SliceMin = 64 -- (fewer outlines than this: all, every frame)
+SeamVisibility.FxRange = 120
+
 function SeamVisibility.start()
+	local Players = game:GetService("Players")
 	local boxes: { [SelectionBox]: boolean } = {}
 	-- Animated boxes, read once (and again only when a restyle changes them).
 	local effects: { [SelectionBox]: Fx } = {}
 	local links: { [SelectionBox]: RBXScriptConnection } = {}
-	local count = 0
+	local own: { [SelectionBox]: boolean } = {} -- on your body or in the camera
+	local showing: { [SelectionBox]: boolean } = {}
+	local near: { [SelectionBox]: boolean } = {}
+	local others: { SelectionBox } = {} -- everyone else's, checked a slice a frame
+	local dirty, cursor, count = true, 0, 0
 	local function read(box: SelectionBox)
 		local fx, a, b = box:GetAttribute("SeamFx"), box:GetAttribute("SeamA"), box:GetAttribute("SeamB")
 		if typeof(fx) == "string" and typeof(a) == "Color3" then
@@ -77,9 +93,19 @@ function SeamVisibility.start()
 			end
 		end
 	end
+	local function classify(box: SelectionBox)
+		local me = Players.LocalPlayer
+		local character = me and me.Character
+		local camera = workspace.CurrentCamera
+		local mine = (character ~= nil and box:IsDescendantOf(character))
+			or (camera ~= nil and box:IsDescendantOf(camera))
+		own[box] = if mine then true else nil
+		dirty = true
+	end
 	local function add(instance: Instance)
 		if instance:IsA("SelectionBox") and not boxes[instance] then
 			boxes[instance] = true
+			classify(instance)
 			read(instance)
 			links[instance] = instance.AttributeChanged:Connect(function()
 				read(instance)
@@ -92,23 +118,64 @@ function SeamVisibility.start()
 	CollectionService:GetInstanceAddedSignal(Tags.SkinSeam):Connect(add)
 	CollectionService:GetInstanceRemovedSignal(Tags.SkinSeam):Connect(function(instance)
 		local box = instance :: SelectionBox
-		boxes[box], effects[box] = nil, nil
+		boxes[box], effects[box], own[box], showing[box], near[box] = nil, nil, nil, nil, nil
+		dirty = true
 		if links[box] then
 			links[box]:Disconnect()
 			links[box] = nil
 		end
 	end)
+	-- A new body: whose outlines are yours changes.
+	local me = Players.LocalPlayer
+	if me then
+		me.CharacterAdded:Connect(function()
+			for box in boxes do
+				classify(box)
+			end
+		end)
+	end
+	local function check(box: SelectionBox, eye: Vector3?)
+		local shows = SeamVisibility.shows(box)
+		if box.Visible ~= shows then
+			box.Visible = shows
+		end
+		showing[box] = shows
+		if eye and effects[box] then
+			local part = box.Adornee :: BasePart?
+			local position = part and (part :: any).Position
+			near[box] = position == nil or (position - eye).Magnitude < SeamVisibility.FxRange
+		end
+	end
 	-- Just after the camera (and the first-person view, which hides your own
 	-- parts at Camera + 3), so a box never shows for a frame round the camera.
 	RunService:BindToRenderStep("SkinSeams", Enum.RenderPriority.Camera.Value + 4, function()
 		local t = os.clock()
-		for box in boxes do
-			local shows = SeamVisibility.shows(box)
-			if box.Visible ~= shows then
-				box.Visible = shows
+		local camera = workspace.CurrentCamera
+		local eye = camera and camera.CFrame.Position
+		if dirty then
+			dirty = false
+			table.clear(others)
+			for box in boxes do
+				if not own[box] then
+					table.insert(others, box)
+				end
 			end
-			local effect = shows and effects[box]
-			if effect then
+			cursor = 0
+		end
+		for box in own do
+			check(box, nil)
+			near[box] = true
+		end
+		local n = #others
+		local slice = if n <= SeamVisibility.SliceMin
+			then n
+			else math.max(SeamVisibility.SliceMin, math.ceil(n / SeamVisibility.Spread))
+		for _ = 1, slice do
+			cursor = cursor % n + 1
+			check(others[cursor], eye)
+		end
+		for box, effect in effects do
+			if showing[box] and near[box] ~= false then
 				box.Color3 = SeamVisibility.fxColor(effect.Fx, effect.A, effect.B, t, effect.Seed)
 			end
 		end

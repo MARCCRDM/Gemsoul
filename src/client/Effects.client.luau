@@ -103,23 +103,35 @@ local function near(base: CFrame, from: Vector3): boolean
 	return (base.Position - from).Magnitude < ANIMATE_DISTANCE
 end
 
+-- Moved parts go to the engine in one call (BulkMoveTo), much cheaper than
+-- setting each one's CFrame; the lists are reused, so no garbage per frame.
+local movedParts: { BasePart } = {}
+local movedFrames: { CFrame } = {}
+-- Read once per part, not every frame.
+local runePhases: { [BasePart]: number } = setmetatable({}, { __mode = "k" }) :: any
+local flameLights: { [BasePart]: PointLight | false } = setmetatable({}, { __mode = "k" }) :: any
+
 RunService.RenderStepped:Connect(function(dt)
 	local t = os.clock()
 	local eye = camera.CFrame.Position
 	turnVendors(dt)
+	table.clear(movedParts)
+	table.clear(movedFrames)
 
 	for part, base in spinning do
 		if not near(base, eye) then
 			continue
 		end
-		part.CFrame = CFrame.new(base.Position) * CFrame.Angles(0, t * 1.2, 0) * base.Rotation
+		table.insert(movedParts, part)
+		table.insert(movedFrames, CFrame.new(base.Position) * CFrame.Angles(0, t * 1.2, 0) * base.Rotation)
 	end
 
 	for part, base in bobbing do
 		if not near(base, eye) then
 			continue
 		end
-		part.CFrame = base + Vector3.new(0, math.sin(t * 2 + phaseOf(base)) * 0.6, 0)
+		table.insert(movedParts, part)
+		table.insert(movedFrames, base + Vector3.new(0, math.sin(t * 2 + phaseOf(base)) * 0.6, 0))
 	end
 
 	for part, base in fields do
@@ -127,14 +139,26 @@ RunService.RenderStepped:Connect(function(dt)
 			continue
 		end
 		local lift = math.sin(t * 1.5 + phaseOf(base)) * 0.8
-		part.CFrame = CFrame.new(base.Position + Vector3.new(0, lift, 0)) * CFrame.Angles(0, t * 0.8, 0) * base.Rotation
+		table.insert(movedParts, part)
+		table.insert(
+			movedFrames,
+			CFrame.new(base.Position + Vector3.new(0, lift, 0)) * CFrame.Angles(0, t * 0.8, 0) * base.Rotation
+		)
+	end
+
+	if #movedParts > 0 then
+		workspace:BulkMoveTo(movedParts, movedFrames, Enum.BulkMoveMode.FireCFrameChanged)
 	end
 
 	for part, base in runes do
 		if not near(base, eye) then
 			continue
 		end
-		local phase = part:GetAttribute("Phase") or 0
+		local phase = runePhases[part]
+		if phase == nil then
+			phase = part:GetAttribute("Phase") or 0
+			runePhases[part] = phase
+		end
 		part.Transparency = 0.1 + 0.6 * (0.5 + 0.5 * math.sin(t * 2 + phase * 0.8))
 	end
 
@@ -144,7 +168,11 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		local n = math.noise(t * 3, phaseOf(base))
 		part.Transparency = math.clamp(n * 0.4, 0, 0.35)
-		local light = part:FindFirstChildOfClass("PointLight")
+		local light = flameLights[part]
+		if light == nil then
+			light = part:FindFirstChildOfClass("PointLight") or false
+			flameLights[part] = light
+		end
 		if light then
 			light.Brightness = 2 + n * 1.5
 		end

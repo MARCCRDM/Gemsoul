@@ -21,13 +21,32 @@ function PrismaticShimmer.hue(t: number, offset: number): number
 	return (t * PrismaticShimmer.Speed + offset) % 1
 end
 
+-- Only plates near the camera shimmer (too small to see further off), and
+-- each plate's base colour is read once, not every frame.
+PrismaticShimmer.Range = 150
+
 function PrismaticShimmer.start()
-	local parts: { [BasePart]: number } = {}
+	type Plate = { Offset: number, Saturation: number, Value: number }
+	local parts: { [BasePart]: Plate } = {}
+	local function read(part: BasePart)
+		local entry = parts[part]
+		local base = part:GetAttribute("PrismaticBase")
+		if entry and typeof(base) == "Color3" then
+			local _, s, v = base:ToHSV()
+			entry.Saturation, entry.Value = math.max(s, 0.6), math.max(v, 0.7)
+		elseif entry then
+			entry.Saturation = -1 -- (no base colour: left alone)
+		end
+	end
 	local function add(instance: Instance)
 		if instance:IsA("BasePart") then
 			-- Neighbouring plates are offset by where they sit, so the colour flows.
 			local p = instance.Position
-			parts[instance] = (p.X * 0.07 + p.Y * 0.11 + p.Z * 0.05) % 1
+			parts[instance] = { Offset = (p.X * 0.07 + p.Y * 0.11 + p.Z * 0.05) % 1, Saturation = -1, Value = 1 }
+			read(instance)
+			instance:GetAttributeChangedSignal("PrismaticBase"):Connect(function()
+				read(instance)
+			end)
 		end
 	end
 	for _, instance in CollectionService:GetTagged(Tags.Prismatic) do
@@ -39,11 +58,11 @@ function PrismaticShimmer.start()
 	end)
 	RunService.RenderStepped:Connect(function()
 		local t = os.clock()
-		for part, offset in parts do
-			local base = part:GetAttribute("PrismaticBase")
-			if typeof(base) == "Color3" then
-				local _, s, v = base:ToHSV()
-				part.Color = Color3.fromHSV(PrismaticShimmer.hue(t, offset), math.max(s, 0.6), math.max(v, 0.7))
+		local camera = workspace.CurrentCamera
+		local eye = camera and camera.CFrame.Position
+		for part, plate in parts do
+			if plate.Saturation >= 0 and (not eye or (part.Position - eye).Magnitude < PrismaticShimmer.Range) then
+				part.Color = Color3.fromHSV(PrismaticShimmer.hue(t, plate.Offset), plate.Saturation, plate.Value)
 			end
 		end
 	end)

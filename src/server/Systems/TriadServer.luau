@@ -1045,7 +1045,7 @@ function TriadServer.afterHit(player, k, st, target, definition, dealt: number, 
 	end
 	if definition.KillRefund and target.Humanoid.Health <= 0 then
 		st.Resources.Charge = math.min(100, st.Resources.Charge + definition.KillRefund)
-		player:SetAttribute("Charge", st.Resources.Charge)
+		player:SetAttribute("Charge", math.floor(st.Resources.Charge + 1e-6))
 	end
 	if definition.ArcExtra and not st.TriadArcing then
 		-- Circuit Cleave: the hit jumps on to more enemies (once per cast).

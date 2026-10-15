@@ -326,16 +326,36 @@ function Status.encode(list: { Active }, now: number): string
 	return table.concat(parts, ",")
 end
 
+-- The attribute string -> its effects. Every fighter's string is decoded by
+-- several things each frame (the HUD, overhead bars, auras), and it only
+-- changes when an effect does, so each string is decoded once and the
+-- (frozen, read-only) list shared.
+local decoded: { [string]: { Active } } = {}
+local decodedCount = 0
+local NONE: { Active } = table.freeze({})
 function Status.decode(text: string?): { Active }
-	local list = {}
-	if type(text) ~= "string" then
-		return list
+	if type(text) ~= "string" or text == "" then
+		return NONE
 	end
+	local cached = decoded[text]
+	if cached then
+		return cached
+	end
+	local list = {}
 	for id, ends, value in string.gmatch(text, "(%w+):([%d%.]+):(%-?%d+)") do
 		if Status.Catalog[id] then
-			table.insert(list, { Id = id, Ends = tonumber(ends) :: number, Value = tonumber(value) :: number })
+			table.insert(
+				list,
+				table.freeze({ Id = id, Ends = tonumber(ends) :: number, Value = tonumber(value) :: number })
+			)
 		end
 	end
+	if decodedCount >= 256 then
+		table.clear(decoded)
+		decodedCount = 0
+	end
+	decoded[text] = table.freeze(list)
+	decodedCount += 1
 	return list
 end
 
