@@ -5,8 +5,8 @@ There are two ways to ask:
 
 - **Press Z** ("Ask to spar") over the player. On a gamepad it's Y; on a
   phone, tap the prompt.
-- **Press 1** to ask the nearest player within about 15 studs. On a gamepad
-  it's D-pad up; on a phone, tap the kit bar.
+- **Press 1** to ask the nearest free player within about 15 studs. On a
+  gamepad it's D-pad up.
 
 If nobody is close enough, 1 tells you how to ask.
 
@@ -15,15 +15,12 @@ seconds:
 
 ![Spar request](friendly-sparring/request.png)
 
-When they accept, both of you swap your pickaxes for your combat kits. You
-fight exactly as in a duel: first-person view, every move, your gear and gems.
-The difference is that **only the two of you** can hit each other. Nobody else
-can hit either of you, or be hit by you, whether they're mining or in a spar
-of their own.
-
-The kit bar sits at the top center and shows which kit is in your hands:
-
-![Pickaxe out](friendly-sparring/lobby.png)
+When they accept, both of you swap your pickaxes for your combat kits. There's
+no switch to press: the kit comes out when a spar starts and goes away when it
+ends. You fight exactly as in a duel: first-person view, every move, your gear
+and gems. The difference is that **only the two of you** can hit each other.
+Nobody else can hit either of you, or be hit by you, whether they're mining or
+in a spar of their own.
 
 When the spar starts, you see your partner's name, with the sound of a
 blade being drawn:
@@ -31,8 +28,9 @@ blade being drawn:
 ![Spar starts](friendly-sparring/flash.png)
 
 While you spar, the lobby HUD, mining hint and Outpost prompts step aside, and
-the fight HUD takes over. For the first few seconds a line under the bar says
-who you're sparring with:
+the fight HUD takes over. A bar at the top center says who you're fighting,
+with END (the 1 key, or click it). For the first few seconds a line under it
+gives the rule:
 
 ![Sparring](friendly-sparring/fight.png)
 
@@ -73,8 +71,8 @@ hit or be hit. The player who landed the blow gets a banner, and anyone nearby
 
 ## Ending it
 
-Press **1** to end the spar. It ends for both of you, and your partner is
-told. You can't end it in the middle of an exchange: for 3 s after you're
+Press **1** (or END on the bar) to end the spar. It ends for both of you, and
+your partner is told. You can't end it in the middle of an exchange: for 3 s after you're
 hit, and while you're down, 1 answers *Still in the fight: you can stop in N s.*
 
 The spar also ends for both of you whenever it stops making sense for either:
@@ -95,7 +93,7 @@ back in third person. While your kit is out, Shift belongs to the fight
 Shift Lock behind the first-person view. That used to leave the mouse locked
 in the middle of the screen once the kit was away.
 
-On a phone the key cap is hidden and the bar is the button:
+On a phone the key cap is hidden and END is the button:
 
 ![Phone](friendly-sparring/phone.png)
 
@@ -112,7 +110,7 @@ it only ever locks onto your partner.
 | `CombatServer` | `canPvP` follows `Spar.canHit` for sparring players: partners only. A lethal blow asks `onSparLethal` first; a downed player's input is ignored. Sparring counts as equal ground (no tree perks), as in the Arena |
 | `OutpostServer` | The "Ask to spar" prompt (Z) on each visitor, beside Duel (G) and Party (F); no mining with the kit out, and no prompts on a sparring player |
 | `SocialUI` | The Accept / Decline card (`SparAsk`), taken down when the request is withdrawn (`SparAskOver`) or once you're sparring |
-| `src/client/Modules/SparKit.luau` | 1 / D-pad up (ask the nearest player, or end the spar), the kit bar, the flash when a spar starts or ends, the knocked-down overlay and fall, the KO banner and toast, the ⚔ badge |
+| `src/client/Modules/SparKit.luau` | 1 / D-pad up (ask the nearest player, or end the spar), the spar bar (only while sparring: your partner and END), the flash when a spar starts or ends, the knocked-down overlay and fall, the KO banner and toast, the ⚔ badge |
 | `Combat.client`, `TargetLock`, `BodyPoses`, `FighterSpacing`, `FightSpacing` | Treat a spar as a fight: first-person view and HUD, lock only onto your partner, face them, no jumping (Space is dodge) |
 
 Player attributes:

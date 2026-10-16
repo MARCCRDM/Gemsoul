@@ -31,7 +31,7 @@ if not loadingStarted then
 	warn("[Lobby] loading screens off: " .. tostring(loadingProblem))
 end
 
--- Friendly sparring: 1 swaps your pick for your combat kit (SparKit).
+-- Friendly sparring: ask someone (Z, or 1 for the nearest); 1 ends it (SparKit).
 SparKit.start()
 
 -- The lobby HUD: in the Outpost, not fighting (or sparring), not inside a

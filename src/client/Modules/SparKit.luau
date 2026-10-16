@@ -5,10 +5,10 @@
 	nearest one. They get a card to accept (SocialUI). Once they do, both
 	kits come out; 1 ends the spar, for both.
 
-	  The kit bar   top centre in the lobby: PICKAXE | COMBAT, the one in
-	                hand lit, with the 1 key (tap or click it too). The kit
-	                coming out or going away gets a quick flash, a word and
-	                the sound of a blade.
+	  The spar bar  top centre, only while you spar: who you're fighting,
+	                and END (the 1 key; tap or click it too). The kit coming
+	                out or going away gets a quick flash, a word and the
+	                sound of a blade.
 	  A spar        with the kit out the fight view takes over (Combat.client,
 	                first person, every move); only your partner can hit you,
 	                or be hit.
@@ -167,69 +167,78 @@ local function flash(title: string, sub: string, color: Color3)
 	end)
 end
 
--- The kit bar -------------------------------------------------------------------------------------------
+-- The spar bar -------------------------------------------------------------------------------------------
+-- Only while you spar: there's nothing to swap otherwise (the kit comes out
+-- when a request is accepted). Who you're fighting, and END (1, or a tap).
 
 local barGui = UiKit.gui("SparKit", 7)
 barGui.IgnoreGuiInset = false
 local bar = new("TextButton", {
-	Name = "KitBar",
+	Name = "SparBar",
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 10),
-	Size = UDim2.fromOffset(292, 44),
-	BackgroundColor3 = GLASS,
-	BackgroundTransparency = 0.18,
+	Size = UDim2.fromOffset(300, 44),
+	BackgroundColor3 = FIGHT:Lerp(GLASS, 0.82),
+	BackgroundTransparency = 0.1,
 	AutoButtonColor = false,
 	Text = "",
 	Visible = false,
 }, barGui)
 UiKit.round(bar, 12)
-local barStroke = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.35 }, bar)
+new("UIStroke", { Color = FIGHT, Thickness = 1.5, Transparency = 0.15 }, bar)
 local barScale = new("UIScale", { Scale = 1 }, bar)
+new("TextLabel", {
+	Position = UDim2.fromOffset(10, 0),
+	Size = UDim2.fromOffset(26, 44),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	Text = "⚔",
+	TextSize = 18,
+	TextColor3 = FIGHT,
+}, bar)
+local versus = new("TextLabel", {
+	Name = "Versus",
+	Position = UDim2.fromOffset(40, 0),
+	Size = UDim2.new(1, -136, 1, 0),
+	BackgroundTransparency = 1,
+	Font = IronUi.Bold,
+	Text = "SPAR",
+	TextSize = 13,
+	TextColor3 = P.Text,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+}, bar)
+local endChip = new("Frame", {
+	Name = "End",
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -6, 0.5, 0),
+	Size = UDim2.fromOffset(86, 32),
+	BackgroundColor3 = FIGHT:Lerp(GLASS, 0.55),
+}, bar)
+UiKit.round(endChip, 9)
+new("UIStroke", { Color = FIGHT, Thickness = 1, Transparency = 0.3 }, endChip)
 local keyCap = new("TextLabel", {
 	Name = "Key",
-	Position = UDim2.fromOffset(8, 8),
-	Size = UDim2.fromOffset(28, 28),
+	Position = UDim2.fromOffset(6, 5),
+	Size = UDim2.fromOffset(22, 22),
 	BackgroundColor3 = Color3.fromRGB(34, 38, 58),
 	Font = Enum.Font.GothamBlack,
 	Text = "1",
-	TextSize = 15,
+	TextSize = 13,
 	TextColor3 = P.Text,
-}, bar)
-UiKit.round(keyCap, 7)
-new("UIStroke", { Color = P.Dim, Thickness = 1, Transparency = 0.5 }, keyCap)
-
-local function slot(x: number, icon: string, name: string)
-	local frame = new("Frame", {
-		Position = UDim2.fromOffset(x, 5),
-		Size = UDim2.fromOffset(120, 34),
-		BackgroundColor3 = GLASS,
-		BackgroundTransparency = 1,
-	}, bar)
-	UiKit.round(frame, 9)
-	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 1 }, frame)
-	local glyph = new("TextLabel", {
-		Position = UDim2.fromOffset(8, 0),
-		Size = UDim2.fromOffset(24, 34),
-		BackgroundTransparency = 1,
-		Font = Enum.Font.GothamBold,
-		Text = icon,
-		TextSize = 18,
-		TextColor3 = P.Dim,
-	}, frame)
-	local label = new("TextLabel", {
-		Position = UDim2.fromOffset(36, 0),
-		Size = UDim2.new(1, -40, 1, 0),
-		BackgroundTransparency = 1,
-		Font = IronUi.Bold,
-		Text = name,
-		TextSize = 13,
-		TextColor3 = P.Dim,
-		TextXAlignment = Enum.TextXAlignment.Left,
-	}, frame)
-	return { Frame = frame, Edge = edge, Glyph = glyph, Label = label }
-end
-local pickSlot = slot(42, "⛏", "PICKAXE")
-local fightSlot = slot(166, "⚔", "COMBAT")
+}, endChip)
+UiKit.round(keyCap, 6)
+local endLabel = new("TextLabel", {
+	Name = "Label",
+	Position = UDim2.fromOffset(32, 0),
+	Size = UDim2.new(1, -36, 1, 0),
+	BackgroundTransparency = 1,
+	Font = IronUi.Bold,
+	Text = "END",
+	TextSize = 13,
+	TextColor3 = P.Text,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, endChip)
 local caption = new("TextLabel", {
 	Name = "Caption",
 	AnchorPoint = Vector2.new(0.5, 0),
@@ -237,7 +246,7 @@ local caption = new("TextLabel", {
 	Size = UDim2.fromOffset(640, 18),
 	BackgroundTransparency = 1,
 	Font = IronUi.Bold,
-	Text = "FRIENDLY SPAR",
+	Text = "FRIENDLY SPAR  ·  only you two can hit each other",
 	TextSize = 12,
 	TextColor3 = P.Text,
 	TextStrokeColor3 = P.Ink,
@@ -252,49 +261,33 @@ local function partnerName(): string
 	return if other then other.DisplayName else "your partner"
 end
 
-local function paintSlot(entry, on: boolean, color: Color3)
-	entry.Frame.BackgroundColor3 = if on then color:Lerp(GLASS, 0.72) else GLASS
-	entry.Frame.BackgroundTransparency = if on then 0 else 1
-	entry.Edge.Color = color
-	entry.Edge.Transparency = if on then 0 else 1
-	entry.Glyph.TextColor3 = if on then color else P.Dim
-	entry.Label.TextColor3 = if on then P.Text else P.Dim
-end
-
-local shownMode: string? = nil
+local shown = false
 local captionUntil = 0
 local function refreshBar()
 	local sparring = Spar.sparring(player)
-	-- In the lobby (out of menus), or sparring.
-	local show = sparring or (SparKit.available() and player:GetAttribute("ChatOpen") ~= true)
-	bar.Visible = show
-	if not show then
+	bar.Visible = sparring
+	if not sparring then
+		shown = false
+		caption.TextTransparency = 1
 		return
 	end
+	versus.Text = "SPAR vs " .. string.upper(partnerName())
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	-- (Touch: no key to show; the chip itself is the button.)
 	keyCap.Visible = not touch
-	-- (Touch: no key to show, so the slots slide left over its place.)
-	pickSlot.Frame.Position = UDim2.fromOffset(if touch then 6 else 42, 5)
-	fightSlot.Frame.Position = UDim2.fromOffset(if touch then 130 else 166, 5)
-	bar.Size = UDim2.fromOffset(if touch then 256 else 292, 44)
+	endLabel.Position = UDim2.fromOffset(if touch then 0 else 32, 0)
+	endLabel.Size = if touch then UDim2.fromScale(1, 1) else UDim2.new(1, -36, 1, 0)
+	endLabel.TextXAlignment = if touch then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
 	barScale.Scale = if viewport.Y < 430 then 0.82 else 1
-	local mode = if sparring then "Fight" else "Pick"
-	if mode ~= shownMode then
-		shownMode = mode
-		paintSlot(pickSlot, not sparring, PICK)
-		paintSlot(fightSlot, sparring, FIGHT)
-		barStroke.Color = if sparring then FIGHT else P.Edge
-		if sparring then
-			caption.Text = "FRIENDLY SPAR vs " .. string.upper(partnerName()) .. "  ·  only you two can hit each other"
-			captionUntil = os.clock() + 5
-			caption.TextTransparency = 0
-		end
+	-- The rule, for the first few seconds of a spar.
+	if not shown then
+		shown = true
+		captionUntil = os.clock() + 5
+		caption.TextTransparency = 0
 	end
-	if not sparring or os.clock() > captionUntil then
-		if caption.TextTransparency < 1 then
-			tween(caption, 0.4, { TextTransparency = 1 })
-		end
+	if os.clock() > captionUntil and caption.TextTransparency < 1 then
+		tween(caption, 0.4, { TextTransparency = 1 })
 	end
 end
 
