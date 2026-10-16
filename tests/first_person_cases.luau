@@ -30,4 +30,14 @@ View.start()
 bound()
 View.stop()
 check(bindCount == 2 and part.LocalTransparencyModifier == 0.25 and bound == nil, "Second session cleanup failed")
+-- Entered on a frame that had the cursor locked and the camera in first
+-- person (a spar's kit swapped back and forth in the lobby): leaving never
+-- hands back the lock, nor first person.
+input.MouseBehavior, input.MouseIconEnabled = "Locked", false
+player.CameraMode = "First"
+View.start()
+bound()
+View.stop()
+check(input.MouseBehavior == "Free" and input.MouseIconEnabled, "Leaving the view left the mouse locked")
+check(player.CameraMode == "Classic", "Leaving the view left the camera in first person")
 print("PASS: " .. count .. " first-person camera, cursor and visibility lifecycle checks")

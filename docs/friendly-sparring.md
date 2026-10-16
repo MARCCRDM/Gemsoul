@@ -54,6 +54,12 @@ off at 1 health.
 The kit can't come out until you've finished the starter intro, while you're
 seated, or while another fight is on. The reply tells you why.
 
+Putting the kit away always hands the mouse back, free and showing, with
+the camera back in third person. While your kit is out, Shift belongs to the
+fight (Shift + click is the off-hand attack), so it can't also switch on
+Roblox's Shift Lock behind the first-person view. That used to leave the mouse
+locked in the middle of the screen once the kit was away.
+
 On a phone the key cap is hidden and the bar is the button:
 
 ![Phone](friendly-sparring/phone.png)

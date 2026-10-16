@@ -5,7 +5,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 setup = r'''
-local Enum = { CameraMode = {LockFirstPerson="First"}, MouseBehavior={Default="Free",LockCenter="Locked"}, RenderPriority={Camera={Value=200}} }
+local Enum = { CameraMode = {LockFirstPerson="First", Classic="Classic"}, MouseBehavior={Default="Free",LockCenter="Locked"}, RenderPriority={Camera={Value=200}} }
 local disconnected, bound, bindCount = false, nil, 0
 local removalCallback, removalDisconnected
 local part = { Parent=true, LocalTransparencyModifier=0.25, IsA=function(_, kind) return kind=="BasePart" end }

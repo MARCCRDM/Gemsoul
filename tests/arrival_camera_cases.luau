@@ -61,6 +61,9 @@ check(next(callbacks)==nil and player.CameraMinZoomDistance==1 and player.Camera
 -- Combat and insertion retain ownership; a stalled teleport cannot bind forever.
 ThirdPerson.enter(spawn);attributes.CombatSession="PvP";old=camera.CFrame;step(4)
 check(camera.CFrame==old and next(callbacks)==nil,"Lobby reset overrode an active fight")
+attributes.CombatSession=nil;ThirdPerson.enter(spawn);attributes.Spar=true;old=camera.CFrame;step(4)
+check(camera.CFrame==old and next(callbacks)==nil,"Lobby reset pulled the camera out of a spar")
+attributes.Spar=nil
 attributes.CombatSession=nil;ThirdPerson.enter(spawn);attributes.ArenaDropUntil=123;step(4)
 check(camera.CFrame==old,"Lobby reset overrode insertion")
 attributes.ArenaDropUntil=nil;step(3);step(1)

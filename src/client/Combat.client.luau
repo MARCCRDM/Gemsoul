@@ -1179,6 +1179,16 @@ ContextActionService:BindActionAtPriority("SwitchTarget", function(_, state)
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.X, Enum.KeyCode.DPadRight)
 UserInputService.WindowFocusReleased:Connect(cancel)
+-- Shift is the off-hand key (Shift + click, read with IsKeyDown). In a fight
+-- it's kept here, so it can't also flip Roblox's Shift Lock unseen behind the
+-- first-person view: flipped on there, the mouse stayed locked in the middle
+-- of the screen once the fight ended (putting your kit away in the lobby).
+ContextActionService:BindActionAtPriority("CombatShift", function()
+	if not canFight() then
+		return Enum.ContextActionResult.Pass
+	end
+	return Enum.ContextActionResult.Sink
+end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift)
 ContextActionService:BindActionAtPriority("UniversalDodge", function(_, state)
 	if not canFight() or UserInputService:GetFocusedTextBox() then
 		return Enum.ContextActionResult.Pass
@@ -1352,9 +1362,10 @@ RunService.RenderStepped:Connect(function(dt)
 	leave.Visible = ArenaScene.isActive()
 	if not fight then
 		if shown.Active then
+			-- (The view first: the camera and mouse are back whatever follows.)
+			FirstPerson.stop()
 			hitUntil, incomingUntil, incomingOrigin = 0, 0, nil
 			cancel()
-			FirstPerson.stop()
 			CombatGuide.close()
 			AugmentTreeUI.close()
 			guideWasOpen = false

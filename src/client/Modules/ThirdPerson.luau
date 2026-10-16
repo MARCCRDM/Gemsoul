@@ -41,7 +41,10 @@ function ThirdPerson.enter(destination: CFrame?)
 	local previous: Vector3? = nil
 	local previousCharacter: Model? = nil
 	RunService:BindToRenderStep(RESET_BIND, Enum.RenderPriority.Camera.Value + 4, function(dt)
-		if not saved or player:GetAttribute("CombatSession") ~= nil then
+		-- (A fight has the camera: an Arena session, or a spar in the lobby
+		-- with the kit out. Pulled back to third person under the spar's
+		-- first-person view, the mouse stayed locked to the middle.)
+		if not saved or player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("Spar") == true then
 			cancelReset()
 			return
 		end

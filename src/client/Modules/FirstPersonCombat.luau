@@ -540,7 +540,23 @@ function View.stop()
 	if not saved then
 		return
 	end
+	local was = saved
+	saved = nil
 	RunService:UnbindFromRenderStep("SagaFirstPerson")
+	-- The camera and the cursor first, so nothing after can leave you
+	-- looking out of the helmet with the mouse locked: the zoom and mode from
+	-- before (never first person, that's this view's own), and the cursor
+	-- free and showing. Not the cursor as it was found: putting back a locked
+	-- one left it stuck once the kit was away. Roblox's camera locks it again
+	-- by itself wherever it should.
+	player.CameraMaxZoomDistance = was.Max
+	player.CameraMinZoomDistance = was.Min
+	player.CameraMode = if was.Mode == Enum.CameraMode.LockFirstPerson then Enum.CameraMode.Classic else was.Mode
+	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	UserInputService.MouseIconEnabled = true
+	if was.Camera.Parent then
+		was.Camera.FieldOfView = was.Fov
+	end
 	if connection then
 		connection:Disconnect()
 		connection = nil
@@ -556,14 +572,6 @@ function View.stop()
 		end
 	end
 	table.clear(hidden)
-	player.CameraMaxZoomDistance = saved.Max
-	player.CameraMinZoomDistance = saved.Min
-	player.CameraMode = saved.Mode
-	UserInputService.MouseBehavior, UserInputService.MouseIconEnabled = saved.Mouse, saved.Icon
-	if saved.Camera.Parent then
-		saved.Camera.FieldOfView = saved.Fov
-	end
-	saved = nil
 	cursorFree, raised, charge = false, 0, 0
 	if castOrb then
 		castOrb:Destroy()
@@ -584,8 +592,6 @@ function View.start()
 		Max = player.CameraMaxZoomDistance,
 		Camera = camera,
 		Fov = camera.FieldOfView,
-		Mouse = UserInputService.MouseBehavior,
-		Icon = UserInputService.MouseIconEnabled,
 	}
 	player.CameraMinZoomDistance, player.CameraMaxZoomDistance = 0.5, 0.5
 	player.CameraMode = Enum.CameraMode.LockFirstPerson
