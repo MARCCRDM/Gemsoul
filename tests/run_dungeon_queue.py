@@ -15,6 +15,7 @@ local Classes={}
 local launches={}
 local Dungeon={queueParty=function(p) table.insert(launches,p);return {Ok=true} end}
 local Raids={busy=function(p) return p:GetAttribute("CombatSession") end}
+local Config={Features={}}
 '''
 s+=module('Party','src/server/Systems/Party.luau')
 s+=module('Queue','src/server/Systems/DungeonQueue.luau')

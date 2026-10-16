@@ -1,5 +1,17 @@
 -- Game-wide settings shared by server and client.
+
+-- Where the game is in its life. This one switch sets every launch-sensitive
+-- setting together (STAGES, at the bottom):
+--   "Playtest"  friends-only test servers: every join starts brand new and
+--               nothing is saved, everyone gets the DEV tools, cosmetics cost
+--               25 test coins.
+--   "Beta"      the public beta: saves load and save, only Owners and Testers
+--               get the DEV tools, cosmetics are had the normal way.
+--   "Live"      launch: the same as Beta.
+local STAGE = "Beta"
+
 local Config = {
+	Stage = STAGE,
 	-- Menu-first: everything (mining, trading, enchanting, selling and the shop)
 	-- is played from the menu. Combat and walking around the town are paused
 	-- while this is on: no monsters, no hotbar, and the camera shows the
@@ -11,10 +23,17 @@ local Config = {
 	-- random equipment set). nil opens all classes again.
 	OnlyClass = "Warrior",
 	-- Whole activities can be switched off (e.g. a combat-only playtest): the
-	-- server refuses them and the dashboard shows them as closed.
+	-- server refuses them and the menus hide them or show them as closed.
 	Features = {
 		Mining = true,
 		Market = true,
+		-- Squad dungeons and party raids (the Dungeon card, Social's dungeon
+		-- buttons, DungeonFind, PartyDungeon and PartyRaid). Off for the beta
+		-- until their whole entry-to-reward flow passes testing; Owners can
+		-- still run them from the DEV panel's dungeon tests.
+		Dungeons = false,
+		-- The Motor Pool's drivable mechs (the Pilot prompt).
+		Mechs = true,
 	},
 
 	-- Free mining: each mined node uses one free mine. When the daily or
@@ -24,9 +43,9 @@ local Config = {
 
 	-- Economy
 	-- TESTING: every weapon skin and suit can be bought for this many coins
-	-- (Cosmetics.coinPrice), on top of how it's normally had. Set to nil
-	-- before launch: then they're Robux, loot or earned only again.
-	TestCosmeticPrice = 25,
+	-- (Cosmetics.coinPrice), on top of how it's normally had. nil: they're
+	-- Robux, loot or earned only. Set by the stage (STAGES).
+	TestCosmeticPrice = nil,
 	StartingCoins = 300,
 	MaxGems = 200, -- inventory limit
 	MaxGear = 80, -- pieces of gear a player can hold (worn included)
@@ -42,33 +61,35 @@ local Config = {
 
 	-- Saving (needs "Enable Studio Access to API Services" to work in Studio).
 	-- Full-player reset, 2026-10-09. Keep this name stable after publishing:
-    -- every account starts fresh once, then saves normally in this generation.
-    -- The previous v1 store remains an inactive recovery backup.
-    DataStoreName = "GemSoul_PlayerData_v2",
+	-- every account starts fresh once, then saves normally in this generation.
+	-- The previous v1 store remains an inactive recovery backup. Beta progress
+	-- carries into launch while this name stays; a new name wipes everyone.
+	DataStoreName = "GemSoul_PlayerData_v2",
 	-- The Market board and mailboxes. Raise it (and publish) to start the
 	-- Market empty: every listed or offered item goes back to its owner the
 	-- next time they join, and old mailbox notes are left behind.
 	MarketVersion = 2,
 	AutosaveSeconds = 120,
 
-	-- Playtesting with friends on a published server.
+	-- Testing on a published server (the stage sets OpenAdmin and FreshStart).
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "Fresh Start 2 · 2026-10-09",
+		Build = "Beta 1 · 2026-10-16",
 		-- UserIds who can read feedback and error reports in game (Social >
 		-- Feedback > Reports). In Studio everyone can.
 		Owners = { 11738957136, 11758049015 }, -- Devvolver, VolverDev
 		-- UserIds who get the test-admin tools (e.g. regenerating gear).
 		Testers = { 11758049015 }, -- VolverDev
-		-- Everyone gets the test-admin tools while testing. Turn off for launch.
-		OpenAdmin = true,
+		-- On: everyone gets the test-admin tools, not just Owners and Testers.
+		OpenAdmin = false,
 		-- On: every join starts as a brand-new player (zero coins, the fast
 		-- start: style, element, first fight) and nothing is loaded or saved,
-		-- so the first-time flow can be played again and again. Off (normal
-		-- testing, and launch): saves load and save like the live game, and
-		-- the fast start runs once per account.
-		FreshStart = true,
+		-- so the first-time flow can be played again and again. Off (Beta and
+		-- Live): saves load and save like the live game, and the fast start
+		-- runs once per account. Owners and Testers can replay the fast start
+		-- from the DEV panel either way.
+		FreshStart = false,
 	},
 
 	-- VIP: set this to your game pass id once you create one.
@@ -79,5 +100,18 @@ local Config = {
 	-- Treat everyone as VIP while testing in Studio so you can walk through the gate.
 	VipInStudio = true,
 }
+
+-- What each stage sets. Anything a stage leaves out keeps its value above.
+local STAGES = {
+	Playtest = { FreshStart = true, OpenAdmin = true, TestCosmeticPrice = 25 },
+	Beta = { FreshStart = false, OpenAdmin = false, TestCosmeticPrice = false },
+	Live = { FreshStart = false, OpenAdmin = false, TestCosmeticPrice = false },
+}
+local preset = STAGES[STAGE]
+assert(preset, "Config: unknown stage " .. tostring(STAGE))
+Config.Playtest.FreshStart = preset.FreshStart
+Config.Playtest.OpenAdmin = preset.OpenAdmin
+-- false (no test price) is stored as nil, the way the price checks expect.
+Config.TestCosmeticPrice = preset.TestCosmeticPrice or nil
 
 return Config

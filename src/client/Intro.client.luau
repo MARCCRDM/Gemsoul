@@ -2009,6 +2009,12 @@ listen(primary.Activated, function()
 	end
 	if phase == "Welcome" and pickStep == "Style" then
 		setPickStep("Element")
+		-- The onboarding funnel's style step (Systems/Funnel).
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local funnel = remotes and remotes:FindFirstChild("Funnel")
+		if funnel then
+			funnel:FireServer("Style")
+		end
 		return
 	end
 	if phase == "Welcome" then

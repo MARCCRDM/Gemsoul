@@ -29,6 +29,7 @@ local Remotes = {
 	MechInput = Instance.new("RemoteEvent"),
 	MechReport = Instance.new("RemoteEvent"),
 	MechExit = Instance.new("RemoteEvent"), -- pilot requests release from the server-owned seat
+	Funnel = Instance.new("RemoteEvent"), -- client -> server: an onboarding step in its menus (Systems/Funnel)
 }
 for name, remote in Remotes do
 	remote.Name = name

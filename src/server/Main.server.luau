@@ -60,6 +60,8 @@ if Config.MenuOnly then
 else
 	WorldBuilder.build()
 end
+-- The onboarding funnel (analytics) listens for loads, so it starts first.
+require(script.Parent.Systems.Funnel).start()
 PlayerData.start()
 Vip.start()
 Mining.start()
@@ -107,6 +109,9 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 	if Config.CombatEnabled or not Config.MenuOnly then
 		require(script.Parent.Systems.SparServer).start()
 	end
-	-- The Motor Pool's machines, for driving round the quarry.
-	require(script.Parent.Systems.OutpostVehicles).start(OutpostServer.site())
+	-- The Motor Pool's machines, for driving round the quarry (Config.Features:
+	-- off leaves the bays empty).
+	if Config.Features == nil or Config.Features.Mechs ~= false then
+		require(script.Parent.Systems.OutpostVehicles).start(OutpostServer.site())
+	end
 end

@@ -9,12 +9,16 @@ def module(name,p):
 s=read('tests/duels_services.luau').replace('Changed = {}','Changed = {}, CharacterRemoving = signal(), CharacterAdded = signal()').replace('p.Humanoid, p.Root = humanoid, root', 'p.Character.WaitForChild = function(_, key) return if key == "Humanoid" then humanoid elseif key == "HumanoidRootPart" then root else nil end\n p.Humanoid, p.Root = humanoid, root')
 s+=module('Slots','src/shared/EquipmentSlots.luau')
 s+=module('MinerRoster','src/shared/MinerRoster.luau')
+s+=module('ExpeditionEconomy','src/shared/ExpeditionEconomy.luau')
+s+=module('GemConfig','src/shared/GemConfig.luau')
+s+=module('ArmorSignatures','src/shared/ArmorSignatures.luau')
 s+=module('ElementMatchup','src/shared/ElementMatchup.luau')
 s+=module('Rules','src/shared/DungeonRules.luau')
 s+=module('GemTraits','src/shared/GemTraits.luau')
 s+=module('GemRoller','src/shared/GemRoller.luau')
 s+='\nGemTraits.Enabled = false -- the classic surge array (the triad has its own suites)\n'
 s+='local dungeonLethal\n'
+s+='local Config={Features={}}\n'
 s+=read('tests/dungeon_services.luau')
 s+='CombatServer.onDungeonLethal=function(hook) dungeonLethal=hook end\nPlayerData.selectMiner=function(p,index) return MinerRoster.switch(profiles[p],index) end\n'
 s+=module('Dungeon','src/server/Systems/Dungeons.luau')

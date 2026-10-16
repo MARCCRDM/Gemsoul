@@ -1,6 +1,8 @@
 -- Same-server, opt-in matchmaking: three solos or a ready duo plus a solo.
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Config = require(ReplicatedStorage.Shared.Config)
 local Party = require(script.Parent.Party)
 local Raids = require(script.Parent.Raids)
 local Dungeon = require(script.Parent.Dungeons)
@@ -92,6 +94,9 @@ function Queue.step()
 	end
 end
 local function join(player)
+	if Config.Features and Config.Features.Dungeons == false then
+		return Shop.reply(false, "Squad dungeons are closed for the beta.")
+	end
 	if player:GetAttribute("DungeonQueue") then
 		return Shop.reply(false, "Already searching.")
 	end

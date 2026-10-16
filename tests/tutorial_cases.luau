@@ -182,6 +182,11 @@ local stubs = {
 			return false
 		end,
 	},
+	Funnel = {
+		reach = function()
+			return false
+		end,
+	},
 	StarterLottery = load("src/shared/StarterLottery.luau", {
 		script = { Parent = {} },
 		require = function()

@@ -64,6 +64,11 @@ check(not handlers.PartyDungeon(team[2]).Ok, "Nonleader queued")
 party.Ready[team[3]] = false
 check(not handlers.PartyDungeon(team[1]).Ok, "Unready party queued")
 party.Ready[team[3]] = true
+Config.Features.Dungeons = false
+local closed = handlers.PartyDungeon(team[1])
+check(not closed.Ok and string.find(closed.Message, "closed", 1, true), "A closed dungeon took a ready squad")
+check(team[1]:GetAttribute("DungeonId") == nil, "A closed dungeon started a run")
+Config.Features.Dungeons = nil
 check(handlers.PartyDungeon(team[1]).Ok, "Ready trio rejected")
 local id = team[1]:GetAttribute("DungeonId")
 check(not handlers.PartyDungeon(team[1]).Ok, "Double queue accepted")
@@ -196,7 +201,10 @@ print("PASS: Studio test entry, live rejection, solo boss and cleanup")
 
 studioMode = false
 permittedTester = tester
+-- Dungeons closed for the players: the owners' tests still run.
+Config.Features.Dungeons = false
 check(handlers.DungeonTest(tester, "Sahur").Ok, "Authorized live tester rejected")
+Config.Features.Dungeons = nil
 local liveId = tester:GetAttribute("DungeonId")
 tick(3)
 clearRoom(liveId, 1)

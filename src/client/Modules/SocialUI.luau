@@ -26,6 +26,8 @@ local TextChatService = game:GetService("TextChatService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+-- Squad dungeons and raids switched off (Config.Features): their buttons go.
+local dungeonsOpen = not (Config.Features and Config.Features.Dungeons == false)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
@@ -390,7 +392,7 @@ end
 -- Party card.
 local function drawParty()
 	clear(partyCard)
-	local title = heading(partyCard, "RAID SQUAD")
+	local title = heading(partyCard, if dungeonsOpen then "RAID SQUAD" else "PARTY")
 	title.Position = UDim2.fromOffset(14, 10)
 	local count = if party then #party.Members else 1
 	local tally = text(partyCard, string.format("%d/%d", count, math.max(3, count)), 12, P.Dim, BOLD)
@@ -554,6 +556,9 @@ local function drawArena()
 		SocialUI.close()
 		ArenaScene.enter(false)
 	end, 80)
+	if not dungeonsOpen then
+		return
+	end
 	local raiders = if party then #party.Members else 1
 	chip(
 		practice,

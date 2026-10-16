@@ -56,6 +56,27 @@ for _,page in Training.Pages do
  for _,o in Training.Objectives do if Training.pageOf(o)==page then paid[o.Id]=true end end
 end
 check(Training.currentPage(paid)==nil,"All-complete state")
+-- A closed activity's page (dungeons off: PvE) is skipped and left out.
+local partway={}
+for _,o in Training.Objectives do
+ local page=Training.pageOf(o)
+ if page~="PvE" and page~="Market" and page~="Discoveries" then partway[o.Id]=true end
+end
+check(Training.currentPage(partway)=="PvE","Open PvE page should come next")
+Training.Closed.PvE=true
+check(Training.currentPage(partway)=="Market","A closed page held up the next one")
+check(not Training.listed({Id="Boss",Category="PvE"}) and Training.listed({Id="FirstRock",Category="Mining"}),"Closed tasks listed (or open ones hidden)")
+Training.Closed.PvE=nil
+-- The lobby tracker's task: the first left on the current page.
+check(Training.nextTask({}).Id=="FirstRock","The tracker must start on the first rock")
+check(Training.nextTask({FirstRock=true,PvPWin=true}).Id=="ThreeRocks","The tracker skipped ahead")
+local miningDone={}
+for _,o in Training.Objectives do if Training.pageOf(o)=="Mining" then miningDone[o.Id]=true end end
+check(Training.nextTask(miningDone).Id=="Enchant","After mining the tracker must point at socketing")
+Training.Closed.PvE=true
+check(Training.nextTask(partway).Category=="Market","The tracker pointed at a closed task")
+Training.Closed.PvE=nil
+check(Training.nextTask(paid)==nil,"The tracker must go when every task is done")
 print("PASS: "..checks.." training reward checks: payouts, repeated actions, unique slots, persistence, replay and any-order progression")
 """
 with tempfile.TemporaryDirectory(prefix="gemsoul-rewards-") as d:

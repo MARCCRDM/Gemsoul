@@ -52,7 +52,12 @@ local input={InputBegan=signal()}
 local tween={Create=function(_,obj,_,props) return {Play=function() for k,v in props do obj[k]=v end end} end}
 -- No splash intro in the test: the launch intro starts straight away.
 local players={LocalPlayer={PlayerGui={FindFirstChild=function() return nil end}}}
-local services={RunService=run,TweenService=tween,UserInputService=input,ReplicatedStorage={},Players=players}
+-- The onboarding funnel's remote: the steps the picker reports.
+local funnelSteps={}
+local funnelRemote={FireServer=function(_,step) table.insert(funnelSteps,step) end}
+local remoteFolder={FindFirstChild=function(_,name) return if name=="Funnel" then funnelRemote else nil end}
+local replicated={FindFirstChild=function(_,name) return if name=="Remotes" then remoteFolder else nil end}
+local services={RunService=run,TweenService=tween,UserInputService=input,ReplicatedStorage=replicated,Players=players}
 local game={GetService=function(_,id) return services[id] end}
 local UiKit={gui=function(name) return new("ScreenGui",{Name=name}) end,round=function() end,toast=function() end}
 local IronUi={new=new}

@@ -124,9 +124,15 @@ local Shop = {
 		return r
 	end,
 }
+-- Tasks events (PlayerData.training) by player, e.g. trained[p].Mine.
+local trained = {}
 local PlayerData = {
 	get = function(p)
 		return profiles[p]
+	end,
+	training = function(p, event)
+		trained[p] = trained[p] or {}
+		trained[p][event] = (trained[p][event] or 0) + 1
 	end,
 	addCoins = function(p, n)
 		profiles[p].Coins += n
@@ -307,7 +313,7 @@ local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
 local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
-	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks", "Spar" } do
+	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial" } do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
 		stub.Parent = sharedFolder
@@ -321,6 +327,8 @@ local Server = (function()
 				Mine = Mine,
 				PickaxeLooks = PickaxeLooks,
 				Spar = Spar,
+				Tutorial = { beat = function() return nil end }, -- (no mining tutorial running)
+				Intro = { tutorialMined = function() return nil end },
 				OutpostWorld = World,
 				Gems = Gems,
 				ChatChannels = ChatChannels,
@@ -410,8 +418,12 @@ do
 			"A rock spot off the island"
 		)
 	end
+	-- Each ring the lobby grows rocks on has room (the Field ring only while
+	-- it has rocks of its own: FieldNodeCount 0 keeps everyone on the quarry).
 	for _, zone in Rules.ZoneOrder do
-		check((perZone[zone] or 0) >= 8, zone .. " ring has too little room: " .. tostring(perZone[zone]))
+		if zone ~= "Field" or Rules.FieldNodeCount > 0 then
+			check((perZone[zone] or 0) >= 8, zone .. " ring has too little room: " .. tostring(perZone[zone]))
+		end
 	end
 end
 local nodeCount = 0
@@ -633,47 +645,18 @@ check(handlers.OutpostState(ana).State.Picks.Survey == 5, "The free pick didn't 
 profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * Rules.Picks.Survey.Swings
 check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings, "The free pick didn't refill")
 
--- The secrets: six hidden props, each with a prompt; found once for coins.
-check(#site.Secrets == #Rules.SecretOrder, "Not every secret was hidden")
-check(#site.Parking == 0, "The Skyport has no Motor Pool")
-local secretIds = {}
-for _, part in site.Secrets do
-	local id = part:GetAttribute("SecretId")
-	secretIds[id] = part
-	check(Rules.Secrets[id] ~= nil, "A secret with no story: " .. tostring(id))
-	check(part:FindFirstChildOfClass("ProximityPrompt") ~= nil, id .. " has no prompt")
-	local p = part.CFrame.Position - Rules.Location.Position
-	check(R.Vector2.new(p.X, p.Z).Magnitude < 470, id .. " is outside the walls")
-end
-local duck = secretIds.Duck
+-- The secrets are retired: none hidden, none to find. The Motor Pool has
+-- its mech bays.
+check(#site.Secrets == 0, "A retired Easter egg was hidden again")
 anaRoot.CFrame = R.CFrame.new(Rules.Location.Position)
-check(not handlers.OutpostSecret(ana, "Duck").Ok, "Found a secret from across the quarry")
-check(not handlers.OutpostSecret(ana, "Nope").Ok, "Found a secret that doesn't exist")
-anaRoot.CFrame = duck.CFrame * R.CFrame.new(0, 0, 4)
 local coinsBefore = profiles[ana].Coins
-local announcedBefore = #announced
-local first = handlers.OutpostSecret(ana, "Duck")
-check(
-	first.Ok and first.Secret.New and first.Secret.Found == 1 and first.Secret.Coins == Rules.SecretReward,
-	"The first find didn't pay"
-)
-check(profiles[ana].Coins == coinsBefore + Rules.SecretReward, "Secret coins weren't added")
-check(#announced == announcedBefore + 1, "The find wasn't announced")
-check(first.State.Secrets == 1 and first.State.SecretsTotal == #Rules.SecretOrder, "The HUD count is wrong")
-local again = handlers.OutpostSecret(ana, "Duck")
-check(
-	again.Ok and not again.Secret.New and profiles[ana].Coins == coinsBefore + Rules.SecretReward,
-	"A secret paid twice"
-)
--- The full set pays the bonus.
-for _, id in Rules.SecretOrder do
-	anaRoot.CFrame = secretIds[id].CFrame * R.CFrame.new(0, 0, 4)
-	handlers.OutpostSecret(ana, id)
+check(not handlers.OutpostSecret(ana, "Duck").Ok, "Found a retired secret")
+check(not handlers.OutpostSecret(ana, "Nope").Ok, "Found a secret that doesn't exist")
+check(profiles[ana].Coins == coinsBefore, "A retired secret paid out")
+check(#site.Parking > 0, "The Motor Pool has no bays")
+for _, bay in site.Parking do
+	check(Rules.Machines[bay.Kind] ~= nil, "A bay for an unknown machine: " .. tostring(bay.Kind))
 end
-check(
-	profiles[ana].Coins == coinsBefore + Rules.SecretReward * #Rules.SecretOrder + Rules.SecretBonus,
-	"The full-set bonus wasn't paid once"
-)
 
 -- Only Ultra Rare and Legendary finds are called out to the server.
 local lootCalls = 0
@@ -683,6 +666,9 @@ for _, call in announced do
 	end
 end
 check(gemsAwarded > 0 and lootCalls == 0, "A Rare find was announced to the server")
+
+-- Mining counts toward Tasks (and the onboarding funnel's first rock).
+check(trained[ana] and (trained[ana].Mine or 0) > 0, "Popping rocks didn't count for Tasks")
 
 -- Leaving.
 check(handlers.OutpostLeave(ana).Ok and ana:GetAttribute("Outpost") == nil, "Couldn't leave")
@@ -694,5 +680,5 @@ check(
 print(
 	"PASS: "
 		.. checks
-		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, free pick charge, secrets, enter/leave)"
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, free pick charge, retired secrets, mech bays, enter/leave)"
 )

@@ -5,10 +5,10 @@ Training.Objectives = {
  {Id="ThreeRocks",Category="Mining",Event="Mine",Goal=3,Coins=35,Name="Keep digging",Hint="Break three Outpost rocks. Every discovery can improve your build."},
  {Id="Enchant",Category="Equipment",Event="Enchant",Goal=1,Coins=25,Name="Power up your gear",Hint="Drag a gem onto an equipment socket in Inventory."},
  {Id="ThreeSlots",Category="Equipment",Event="Slot",Goal=3,Coins=50,Name="Build your loadout",Hint="Enchant three different equipment slots. Repeating one slot does not count."},
- {Id="EquipSurge",Category="Equipment",Event="EquipSurge",Goal=1,Coins=20,Name="Ready a Surge",Hint="Move a gem into Q, E or R in Inventory. It can occupy only one slot."},
+ {Id="EquipSurge",Category="Equipment",Event="EquipSurge",Goal=1,Coins=20,Name="Ready a Surge",Hint="In Inventory, move a gem into Q, E or R: its Surge is then yours to cast in fights."},
  {Id="Attack",Category="Combat",Event="Hit",Goal=1,Coins=20,Name="Make contact",Hint="Land a light or heavy weapon attack on an enemy."},
  {Id="Guard",Category="Combat",Event="Block",Goal=1,Coins=35,Name="Stand your ground",Hint="Face an enemy and hold Guard to absorb an incoming hit."},
- {Id="Cast",Category="Combat",Event="Surge",Goal=1,Coins=30,Name="Unleash your gem",Hint="Build Charge in combat, then successfully cast an equipped Surge."},
+ {Id="Cast",Category="Combat",Event="Surge",Goal=1,Coins=30,Name="Unleash your gem",Hint="Build Charge in a fight, then press Q, E or R (the gem buttons on a phone) to cast a Surge."},
  {Id="Rival",Category="Combat",Event="RivalWin",Goal=1,Coins=50,Name="First Rival victory",Hint="Defeat a Rival in practice or the Arena. No player opponent required."},
  {Id="GemFind",Category="Mining",Event="MineGem",Goal=1,Coins=25,Name="Something inside",Hint="Mine a rock that drops a gem. Check its element and ability in Inventory."},
  {Id="RareFind",Category="Mining",Event="RareGem",Goal=1,Coins=60,Name="A rare discovery",Hint="Mine a Rare or better gem. Starter gifts and purchases do not count."},
@@ -23,12 +23,25 @@ Training.Objectives = {
 }
 -- Sequential presentation only; valid gameplay still earns credit in any order.
 Training.Pages={"Mining","Equipment","Combat","PvP","PvE","Market","Discoveries"}
+-- Pages for activities that are switched off (Config.Features), e.g.
+-- Closed.PvE while dungeons are closed: they're left out of the list and the
+-- count, and never the page the window opens on. Filled in from
+-- Config.Features by closeFor.
+Training.Closed={}
+function Training.closeFor(features)
+ Training.Closed.PvE=features.Dungeons==false
+ Training.Closed.Market=features.Market==false
+end
 function Training.pageOf(objective)
  if objective.Id=="RareFind" or objective.Id=="LegendFind" then return "Discoveries" end
  return objective.Category
 end
+function Training.listed(objective)
+ return not Training.Closed[Training.pageOf(objective)]
+end
 function Training.currentPage(paid)
  for index,name in Training.Pages do
+  if Training.Closed[name] then continue end
   local total,done=0,0
   for _,o in Training.Objectives do
    if Training.pageOf(o)==name then total+=1;if paid[o.Id] then done+=1 end end
@@ -36,6 +49,16 @@ function Training.currentPage(paid)
   if done<total then return name,index,done,total end
  end
  return nil,#Training.Pages,0,0
+end
+-- The one task to point a player at (the lobby's tracker): the first one
+-- left on the current page, or nil when every listed task is done.
+function Training.nextTask(paid)
+ local page=Training.currentPage(paid)
+ if not page then return nil end
+ for _,o in Training.Objectives do
+  if Training.pageOf(o)==page and not paid[o.Id] then return o end
+ end
+ return nil
 end
 function Training.state(profile)
  profile.TrainingRewards = profile.TrainingRewards or {Counts={},Paid={},Slots={}}

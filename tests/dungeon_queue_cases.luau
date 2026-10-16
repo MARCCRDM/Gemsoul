@@ -33,6 +33,12 @@ check(not h:GetAttribute("DungeonQueue"),"Busy player stayed queued")
 Players.PlayerRemoving.Fire(i)
 check(not i:GetAttribute("DungeonQueue"),"Disconnect leaked reservation")
 check(Party.matchDungeon({d,g,h})==nil,"Match split an existing party")
+Config.Features.Dungeons=false
+local shut=makePlayer(312,"Shut")
+local refused=handlers.DungeonFind(shut)
+check(not refused.Ok and string.find(refused.Message,"closed",1,true),"A closed dungeon search went ahead")
+check(not shut:GetAttribute("DungeonQueue"),"A closed dungeon search held a place")
+Config.Features.Dungeons=nil
 local j,k=makePlayer(310,"J"),makePlayer(311,"K")
 handlers.PartyInvite(j,k.UserId);handlers.PartyRespond(k,j.UserId,true)
 handlers.PartyReady(j,true);handlers.PartyReady(k,true)

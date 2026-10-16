@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Shared.Config)
 local Rules = require(ReplicatedStorage.Shared.DungeonRules)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
@@ -317,6 +318,10 @@ local function queue(player, testMode)
 	local testing = testMode ~= nil and canTest(player)
 	if testMode ~= nil and not testing then
 		return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
+	end
+	-- Switched off (Config.Features): only the owners' tests get in.
+	if not testing and Config.Features and Config.Features.Dungeons == false then
+		return Shop.reply(false, "Squad dungeons are closed for the beta.")
 	end
 	local party = Party.of(player)
 	local members = if testing then { player } else party and party.Members or {}

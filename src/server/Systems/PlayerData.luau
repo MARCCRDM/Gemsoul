@@ -82,6 +82,7 @@ type Profile = {
 	Session: { JobId: string, Time: number }?, -- which server owns this save (see SessionLock)
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle
 	WelcomeBought: boolean,
+	Funnel: { [string]: boolean }?, -- onboarding steps already logged (Systems/Funnel); new accounts only
 }
 
 local PlayerData = {}
@@ -93,6 +94,12 @@ local saving, tradeLocks, tradeReady = {}, {}, {}
 -- Fires (player) when a player's class, gear or socketed gem changes.
 local characterChanged = Instance.new("BindableEvent")
 PlayerData.CharacterChanged = characterChanged.Event
+-- (player): a profile finished loading. (player, event): a Tasks event
+-- counted for the first time (PlayerData.training). Systems/Funnel uses both.
+local loadedEvent = Instance.new("BindableEvent")
+PlayerData.Loaded = loadedEvent.Event
+local trainedEvent = Instance.new("BindableEvent")
+PlayerData.Trained = trainedEvent.Event
 
 local store = nil
 do
@@ -543,6 +550,7 @@ local function load(player: Player)
 	end
 	sync(player)
 	characterChanged:Fire(player)
+	loadedEvent:Fire(player)
 	if fresh then
 		Remotes.Notify:FireClient(player, "Playtest: you start fresh every time you join. Progress isn't saved.")
 	elseif not loaded then
@@ -957,6 +965,7 @@ function PlayerData.training(player, event, detail)
 	if not changed then
 		return
 	end
+	trainedEvent:Fire(player, event)
 	for _, objective in earned do
 		Remotes.Notify:FireClient(player, "TASK COMPLETE: " .. objective.Name .. "  +" .. objective.Coins .. " coins")
 	end

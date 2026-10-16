@@ -27,9 +27,11 @@ if resuming then
  named("Fire").Activated.Fire()
  check(selected("Frost") and not selected("Fire"),"Committed kit choice changed")
 else
+ check(#funnelSteps==0,"The style step was reported before a style was picked")
  for _,style in {"Prospector","Skirmisher","Juggernaut"} do
   named(style).Activated.Fire()
   primary.Activated.Fire()
+  check(funnelSteps[#funnelSteps]=="Style","Picking a style wasn't reported to the onboarding funnel")
   check(area.Visible and not primary.Active,"Element step must start without a choice")
   for _,element in {"Fire","Frost","Shock","Poison"} do check(not selected(element),style.." auto-selected "..element) end
   primary.Activated.Fire()

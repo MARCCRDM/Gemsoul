@@ -761,7 +761,7 @@ function OutpostServer.start()
 	for _, spec in
 		{
 			{ site.Probe, "Probe", "Open the Exchange", "PROBE-7" },
-			{ site.Gate, "Gate", "Arena Uplink", "Duels · Raids · Rival" },
+			{ site.Gate, "Gate", "Arena Uplink", "Duels · Rival · Party" },
 		}
 	do
 		local prompt = Instance.new("ProximityPrompt")

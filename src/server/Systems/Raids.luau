@@ -13,6 +13,7 @@ local Debris = game:GetService("Debris")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local CombatServer = require(script.Parent.CombatServer)
 local ArenaDrop = require(script.Parent.ArenaDrop)
@@ -49,6 +50,9 @@ function Raids.busy(player: Player): string?
 end
 
 local function start(player: Player)
+	if Config.Features and Config.Features.Dungeons == false then
+		return reply(false, "Party raids are closed for the beta.")
+	end
 	local party = Party.of(player)
 	if party and party.Leader ~= player then
 		return reply(false, "Only your party's leader can start a raid.")

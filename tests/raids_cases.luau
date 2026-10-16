@@ -53,6 +53,11 @@ check(
 	"Started without a member who's away (or didn't say who)"
 )
 rc:SetAttribute("Expedition", nil)
+Config.Features.Dungeons = false
+local shut = handlers.PartyRaid(ra)
+check(not shut.Ok and string.find(shut.Message, "closed", 1, true), "A raid started while raids are closed")
+check(ra:GetAttribute("CombatSession") == nil, "A closed raid still moved the party")
+Config.Features.Dungeons = nil
 local started = handlers.PartyRaid(ra)
 check(started.Ok, "A ready party of three couldn't start: " .. tostring(started.Message))
 for _, member in { ra, rb, rc } do

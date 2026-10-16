@@ -7,6 +7,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local GemGenerator = require(script.Parent.GemGenerator)
+local Funnel = require(script.Parent.Funnel)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
@@ -139,6 +140,7 @@ local function prepareLottery(player: Player, style, element)
 		end
 	end
 	PlayerData.sync(player)
+	Funnel.reach(player, "Element")
 	return reply(true, "Your chosen starter kit is ready!", { Lottery = reward })
 end
 local function quickStart(player: Player)
@@ -158,6 +160,7 @@ local function quickStart(player: Player)
 		return reply(false, message)
 	end
 	PlayerData.augmentsChanged(player)
+	Funnel.reach(player, "Kit")
 	return reply(true, "Starter kit equipped. Q / E / R: your Gem Surges.", { Lottery = profile.Intro.Lottery })
 end
 

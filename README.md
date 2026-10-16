@@ -23,21 +23,23 @@ A Roblox game (the repo and some code names still say Gemsoul: gems are Saga Sto
    - **Security:** turn on *Enable Studio Access to API Services* so saving works in Studio.
    - **Places:** set *Max Players* to the group size you want in one server, e.g. 8 to 12. Duels only match players in the same server.
 3. **Who can play:** open the [Creator Dashboard](https://create.roblox.com/dashboard/creations), choose the experience, then **Access/Permissions**. Keep it **Private** and add your testers as **Collaborators**. (Public works too, but then anyone can join.)
-4. **Config:** in `src/shared/Config.luau`, under `Playtest`:
-   - `Build`: give it a new name every time you publish, so reports say which version they came from.
-   - `Owners`: put your own UserId here. Owners can read everyone's reports in game.
-   - `OpenAdmin`: gives every tester the test-admin tools. Turn it off before launch.
+4. **Config:** in `src/shared/Config.luau`:
+   - `STAGE` (at the top) sets every launch setting at once. `"Playtest"`: every join starts fresh with nothing saved, everyone gets the DEV tools, cosmetics cost 25 test coins. `"Beta"` and `"Live"`: saves load and save, only Owners and Testers get the DEV tools, no test prices. See [docs/beta-launch.md](docs/beta-launch.md).
+   - `Playtest.Build`: give it a new name every time you publish, so reports say which version they came from.
+   - `Playtest.Owners`: put your own UserId here. Owners can read everyone's reports in game.
+   - `Playtest.Testers`: UserIds who keep the DEV tools in Beta and Live.
 5. **In game:**
    - **Invite friends** (Social, **P**) opens Roblox's invite prompt, and invited friends land in your server.
-   - **Feedback** sends a bug report or idea, stamped with the build and where the player was.
+   - **Feedback** sends a bug report or idea, stamped with the build and where the player was. In the lobby, **REPORT A BUG** (top right) opens it straight away.
    - Server and client script errors are collected automatically and grouped by message.
    - Owners open **Feedback → Reports** to read everything.
 
 Saves are session-locked (`SessionLock.luau`): only one server can own a player's save at a time. Hopping between servers can't roll progress back or duplicate traded items. A player who rejoins while their old server is still saving waits a few seconds. A lock left by a crashed server expires after 5 minutes.
 
-Before launch:
-- Set `Playtest.OpenAdmin = false`.
-- Set `VipGamePassId` to your real game pass.
+Before launch (the full checklist is in [docs/beta-launch.md](docs/beta-launch.md)):
+- `STAGE = "Beta"` (it is) or `"Live"`, and a new `Playtest.Build` name.
+- Keep `DataStoreName` as it is: beta progress then carries into launch. A new name starts everyone over.
+- Set `VipGamePassId` to your real game pass, once purchases are verified.
 - Consider making the experience public.
 
 ## Menu-first play (right now)

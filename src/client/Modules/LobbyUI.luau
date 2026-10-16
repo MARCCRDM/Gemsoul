@@ -1,11 +1,14 @@
 --[[
 	The lobby (the Saga Outpost): compact Play and Inventory controls on the
 	left, a two-column utility menu, level and coins, plus one small panel
-	on the right for the daily streak and next mode to unlock, and the PLAY menu
-	that picks what to play:
+	on the right for the daily streak, the next mode to unlock and the next
+	task (on a phone, just the task), a REPORT A BUG button by the TASKS
+	button, and the PLAY menu that picks what to play:
 
 	  PRACTICE  1v1 Practice    a rival miner, coins on a win (always open)
-	            Squad Dungeon   three miners, a dungeon and its boss
+	            Squad Dungeon   three miners, a dungeon and its boss (not
+	                            while Config.Features.Dungeons is off: then
+	                            1v1 Practice takes its space)
 	  RANKED    1v1 Ranked      real players, rating on the line
 
 	Modes unlock as you play duels (Unlocks). The Inventory opens the full
@@ -16,7 +19,10 @@
 	  LobbyUI.Unlocks         duels needed for each mode
 ]]
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
+local Training = require(ReplicatedStorage.Shared.TrainingRewards)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -28,6 +34,8 @@ local new = IronUi.new
 
 local LobbyUI = {}
 LobbyUI.Unlocks = { Dungeon = 3, Casual = 3, Ranked = 10 }
+-- Squad dungeons can be switched off for a test or the beta (Config.Features).
+LobbyUI.DungeonsOpen = not (Config.Features and Config.Features.Dungeons == false)
 -- Key art for each card (assets/images/lobby/*.png, painted by
 -- tools/make_lobby_cards.py). 0 = not uploaded yet: the card shows its emblem.
 -- Casual reuses the duel art (same fight, nothing on the line).
@@ -266,28 +274,30 @@ card({
 	Color = P.Gold,
 	X = 0,
 	Y = 60,
-	W = 340,
+	W = if LobbyUI.DungeonsOpen then 340 else 782,
 	H = 500,
 	Go = function()
 		require(script.Parent.ArenaScene).enter(true)
 	end,
 })
-card({
-	Title = "SQUAD DUNGEON",
-	Art = "Dungeon",
-	Kicker = "THREE MINERS",
-	Sub = "Clear the rooms and beat the boss together.",
-	Emblem = "Enchant",
-	Color = P.Amethyst,
-	X = 362,
-	Y = 60,
-	W = 420,
-	H = 500,
-	Unlock = "Dungeon",
-	Go = function()
-		run("DungeonFind")
-	end,
-})
+if LobbyUI.DungeonsOpen then
+	card({
+		Title = "SQUAD DUNGEON",
+		Art = "Dungeon",
+		Kicker = "THREE MINERS",
+		Sub = "Clear the rooms and beat the boss together.",
+		Emblem = "Enchant",
+		Color = P.Amethyst,
+		X = 362,
+		Y = 60,
+		W = 420,
+		H = 500,
+		Unlock = "Dungeon",
+		Go = function()
+			run("DungeonFind")
+		end,
+	})
+end
 -- Player modes: both fight on even stats (Shared.PvPRules), stacked.
 card({
 	Title = "1v1 CASUAL",
@@ -397,7 +407,13 @@ playCaption.Size = UDim2.fromScale(1, 1)
 playCaption.TextStrokeTransparency = 1
 IronUi.juice(play)
 play.Activated:Connect(LobbyUI.openPicker)
-local modes = text(bar, "1v1 PRACTICE  ·  DUNGEON  ·  RANKED", 11, P.Text, IronUi.Heading)
+local modes = text(
+	bar,
+	if LobbyUI.DungeonsOpen then "1v1 PRACTICE  ·  DUNGEON  ·  RANKED" else "1v1 PRACTICE  ·  CASUAL  ·  RANKED",
+	11,
+	P.Text,
+	IronUi.Heading
+)
 modes.Position, modes.Size = UDim2.fromOffset(0, 70), UDim2.fromOffset(STACK_W, 20)
 modes.BackgroundColor3, modes.BackgroundTransparency = Color3.fromRGB(10, 14, 20), 0.25
 UiKit.round(modes, 4)
@@ -543,6 +559,80 @@ unlockHint.TextXAlignment = Enum.TextXAlignment.Left
 unlockHint.TextYAlignment = Enum.TextYAlignment.Top
 unlockHint.TextWrapped = true
 
+-- The next task (Shared.TrainingRewards): what to do, how, and how far
+-- along. Tapping it opens the Tasks window.
+Training.closeFor(Config.Features or {})
+local TASK_H = 104
+local taskPanel = new("TextButton", {
+	Name = "NextTask",
+	Size = UDim2.fromOffset(208, TASK_H),
+	BackgroundTransparency = 1,
+	Text = "",
+	AutoButtonColor = false,
+	LayoutOrder = 3,
+}, news)
+local taskRule = new("Frame", {
+	Position = UDim2.fromOffset(12, 0),
+	Size = UDim2.new(1, -24, 0, 1),
+	BorderSizePixel = 0,
+	BackgroundColor3 = Color3.fromRGB(65, 77, 94),
+	BackgroundTransparency = 0.5,
+}, taskPanel)
+local taskTitle = text(taskPanel, "NEXT TASK", 10, Color3.fromRGB(103, 218, 232), IronUi.Heading)
+taskTitle.Position, taskTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(120, 14)
+taskTitle.TextXAlignment = Enum.TextXAlignment.Left
+local taskReward = text(taskPanel, "", 10, P.Gold, IronUi.Heading)
+taskReward.Position, taskReward.Size = UDim2.fromOffset(112, 8), UDim2.fromOffset(84, 14)
+taskReward.TextXAlignment = Enum.TextXAlignment.Right
+local taskName = text(taskPanel, "", 12, P.Text, IronUi.Heading)
+taskName.Position, taskName.Size = UDim2.fromOffset(12, 23), UDim2.fromOffset(184, 16)
+taskName.TextXAlignment = Enum.TextXAlignment.Left
+taskName.TextTruncate = Enum.TextTruncate.AtEnd
+local taskHint = text(taskPanel, "", 11, P.Dim, IronUi.Body)
+taskHint.Position, taskHint.Size = UDim2.fromOffset(12, 40), UDim2.fromOffset(184, 40)
+taskHint.TextXAlignment = Enum.TextXAlignment.Left
+taskHint.TextYAlignment = Enum.TextYAlignment.Top
+taskHint.TextWrapped = true
+local taskTrack = new("Frame", {
+	BorderSizePixel = 0,
+	BackgroundColor3 = Color3.fromRGB(48, 62, 80),
+	Position = UDim2.fromOffset(12, 89),
+	Size = UDim2.fromOffset(140, 5),
+}, taskPanel)
+UiKit.round(taskTrack, 3)
+local taskFill = new("Frame", {
+	BorderSizePixel = 0,
+	BackgroundColor3 = Color3.fromRGB(103, 218, 232),
+	Size = UDim2.fromScale(0, 1),
+}, taskTrack)
+UiKit.round(taskFill, 3)
+local taskCount = text(taskPanel, "", 10, P.Text, IronUi.Heading)
+taskCount.Position, taskCount.Size = UDim2.fromOffset(156, 83), UDim2.fromOffset(40, 16)
+taskCount.TextXAlignment = Enum.TextXAlignment.Right
+taskPanel.Activated:Connect(function()
+	local tasks = player.PlayerGui:FindFirstChild("TrainingRewards")
+	local open = tasks and tasks:FindFirstChild("OpenTasks")
+	if open and open:IsA("BindableEvent") then
+		open:Fire()
+	end
+end)
+
+-- What the panel shows: on a phone only the task; the rest on wider screens.
+local compactNews = false
+local function layoutNews()
+	dailyPanel.Visible = not compactNews
+	unlockPanel.Visible = not compactNews and unlockPanel:GetAttribute("Pending") == true
+	taskRule.Visible = dailyPanel.Visible or unlockPanel.Visible
+	local height = 0
+	for _, panel in { dailyPanel, unlockPanel, taskPanel } do
+		if panel.Visible then
+			height += panel.Size.Y.Offset
+		end
+	end
+	news.Size = UDim2.fromOffset(208, height + 4)
+	return height > 0
+end
+
 local function refreshNews()
 	local profile = GemClient.Profile
 	if not profile then
@@ -577,13 +667,16 @@ local function refreshNews()
 	-- The next mode you're working toward.
 	local duels = played()
 	local nextName, need = nil, nil
-	for _, entry in { { "Dungeon & Casual", LobbyUI.Unlocks.Dungeon }, { "Ranked 1v1", LobbyUI.Unlocks.Ranked } } do
+	local first = if LobbyUI.DungeonsOpen then "Dungeon & Casual" else "Casual 1v1"
+	for _, entry in { { first, LobbyUI.Unlocks.Casual }, { "Ranked 1v1", LobbyUI.Unlocks.Ranked } } do
 		if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled
 			and not (profile.Tutorial and profile.Tutorial.Done) and duels < entry[2] then
 			nextName, need = entry[1], entry[2]
 			break
 		end
 	end
+	-- Only while a mode is still locked: once all are open it has nothing to say.
+	unlockPanel:SetAttribute("Pending", nextName ~= nil)
 	if nextName then
 		unlockTitle.Text = "NEXT UNLOCK"
 		unlockText.Text = string.upper(nextName)
@@ -592,14 +685,49 @@ local function refreshNews()
 			need - duels,
 			if need - duels == 1 then "" else "s"
 		)
-	else
-		unlockTitle.Text = "ARENA"
-		unlockText.Text = "ALL MODES OPEN"
-		unlockHint.Text = "Choose your next match with Play"
 	end
+	-- The next task.
+	local state = profile.TrainingRewards or {}
+	local nextTask = Training.nextTask(state.Paid or {})
+	taskPanel.Visible = nextTask ~= nil
+	if nextTask then
+		local progress = math.min(nextTask.Goal, (state.Counts or {})[nextTask.Event] or 0)
+		taskName.Text = nextTask.Name
+		taskHint.Text = nextTask.Hint
+		taskReward.Text = "+" .. nextTask.Coins .. " ◆"
+		taskCount.Text = progress .. " / " .. nextTask.Goal
+		taskFill.Size = UDim2.fromScale(progress / nextTask.Goal, 1)
+	end
+	layoutNews()
 end
 GemClient.Changed:Connect(refreshNews)
 task.defer(refreshNews)
+
+-- REPORT A BUG, beside the TASKS button (top right): the feedback form
+-- (Social), which sends the build and where you were with it.
+local bug = new("TextButton", {
+	Name = "ReportBug",
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -156, 0, 12),
+	Size = UDim2.fromOffset(132, 40),
+	BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
+	AutoButtonColor = false,
+	Text = "🐞 REPORT A BUG",
+	TextSize = 12,
+	Font = IronUi.Heading,
+	TextColor3 = Color3.fromRGB(255, 226, 170),
+}, gui)
+UiKit.round(bug, 8)
+new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.55 }, bug)
+new(
+	"UIGradient",
+	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(58, 44, 26), Color3.fromRGB(30, 22, 14)) },
+	bug
+)
+IronUi.juice(bug)
+bug.Activated:Connect(function()
+	require(script.Parent.SocialUI).feedback()
+end)
 
 local function fitDock()
 	local size = gui.AbsoluteSize
@@ -611,7 +739,11 @@ local function fitDock()
 	table.sort(buttons, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
 	modes.Visible = false
 	status.Visible = not mobile
-	news.Visible = not mobile and not picker.Visible
+	compactNews = mobile
+	news.Position = UDim2.new(1, -16, 0, 64)
+	news.Visible = layoutNews() and not picker.Visible
+	bug.Visible = not picker.Visible
+	bug.Size = UDim2.fromOffset(132, if mobile then 44 else 40)
 	if mobile then
 		local compact = MobileLayout.dock(size, #buttons)
 		local width, gap, tileHeight = compact.W, compact.Gap, compact.TileHeight

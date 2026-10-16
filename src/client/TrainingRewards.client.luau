@@ -18,6 +18,7 @@ local RS = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
 local UserInputService = game:GetService("UserInputService")
+local Config = require(RS.Shared.Config)
 local Rules = require(RS.Shared.TrainingRewards)
 local Tutorial = require(RS.Shared.Tutorial)
 local GemClient = require(script.Parent.Modules.GemClient)
@@ -41,7 +42,20 @@ local CATEGORY_COLORS = {
 	PvE = Color3.fromRGB(113, 218, 168),
 	Market = CYAN,
 }
-local CATEGORIES = { "All", "Mining", "Equipment", "Combat", "PvP", "PvE", "Market" }
+-- Tasks for switched-off activities sit out (Config.Features).
+Rules.closeFor(Config.Features or {})
+local CATEGORIES = { "All" }
+for _, name in { "Mining", "Equipment", "Combat", "PvP", "PvE", "Market" } do
+	if not Rules.Closed[name] then
+		table.insert(CATEGORIES, name)
+	end
+end
+local objectives = {}
+for _, o in Rules.Objectives do
+	if Rules.listed(o) then
+		table.insert(objectives, o)
+	end
+end
 local FILTERS = { { Id = "Active", Text = "To do" }, { Id = "Completed", Text = "Done" }, { Id = "All", Text = "All" } }
 
 local function new(kind: string, props, parent: Instance?)
@@ -248,7 +262,7 @@ local footer = label(panel, "Rewards arrive by themselves as you play. No expiry
 footer.TextXAlignment = Enum.TextXAlignment.Center
 
 local cards = {}
-for i, o in Rules.Objectives do
+for i, o in objectives do
 	local accent = CATEGORY_COLORS[o.Category] or GOLD
 	local card = new("Frame", { BackgroundColor3 = CARD, LayoutOrder = i }, list)
 	UiKit.round(card, 10)
@@ -386,7 +400,7 @@ refresh = function()
 	local state = p and p.TrainingRewards or {}
 	local paid, counts = state.Paid or {}, state.Counts or {}
 	local done, shown = 0, 0
-	for _, o in Rules.Objectives do
+	for _, o in objectives do
 		local c = cards[o.Id]
 		local complete = paid[o.Id] == true
 		if complete then
@@ -413,7 +427,7 @@ refresh = function()
 		-- Done ones sink to the bottom of "All".
 		c.Frame.LayoutOrder = (if complete then 1000 else 0) + c.Index
 	end
-	local total = #Rules.Objectives
+	local total = #objectives
 	count.Text = string.format("%d / %d DONE", done, total)
 	overallFill.Size = UDim2.fromScale(if total > 0 then done / total else 0, 1)
 	empty.Visible = shown == 0
@@ -452,6 +466,13 @@ launch.Activated:Connect(function()
 	if shade.Visible then
 		shade.Visible = false
 	else
+		open()
+	end
+end)
+-- Other screens open it too (the lobby's task tracker): fire OpenTasks.
+local openEvent = new("BindableEvent", { Name = "OpenTasks" }, gui)
+openEvent.Event:Connect(function()
+	if gui.Enabled then
 		open()
 	end
 end)
