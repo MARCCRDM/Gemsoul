@@ -31,7 +31,7 @@ function player:GetAttribute(k) return attrs[k] end
 function player:GetAttributeChangedSignal(k) signals[k]=signals[k] or signal(); return signals[k] end
 function player:SetAttribute(k,v) attrs[k]=v; if signals[k] then signals[k]:Fire() end end
 local Enum = { CameraMode={LockFirstPerson="FirstPerson"} }
-local Vector2 = { zero={}, new=function(x,y) return { X=x, Y=y, Magnitude=math.sqrt(x*x+y*y) } end }
+local Vector2 = { zero={X=0,Y=0,Magnitude=0}, new=function(x,y) return { X=x, Y=y, Magnitude=math.sqrt(x*x+y*y) } end }
 local CFrame = { Angles=function() return { LookVector={X=0,Z=-1} } end }
 local UDim2 = { fromScale=function() return {} end }
 local RunService = { Heartbeat=signal() }
@@ -87,7 +87,7 @@ local playerScripts = { FindFirstChild=function(_, name) return if name=="Player
 function player:FindFirstChild(name) return if name=="PlayerScripts" then playerScripts else nil end
 local function require(module) return module.Module end
 local sent = {}
-local mechInput = { FireServer=function(_, throttle, steer) table.insert(sent, {throttle, steer}) end }
+local mechInput = { FireServer=function(_, throttle, steer) table.insert(sent, {throttle, steer}); lastDrive={throttle,steer} end }
 local reports = {}
 local mechReport = { FireServer=function(_, text) table.insert(reports, text) end }
 local remotesFolder = { FindFirstChild=function(_, name)
@@ -99,7 +99,7 @@ local ReplicatedStorage = { FindFirstChild=function(_, name) return if name=="Re
 -- Boarding may finish before the controller attaches, without another Seated event.
 hum.SeatPart, seat.Occupant = seat, hum
 RunService.Heartbeat:Fire(.1)
-check(VehicleDrive.isDriving() and drive.PlaneVelocity.Y==-5, "Missed boarding event left mech inert")
+check(VehicleDrive.isDriving() and sent[#sent][1]==1, "Missed boarding event left mech inert")
 board()
 check(player.CameraMinZoomDistance==24, "Repeated boarding reset mech zoom")
 hum.SeatPart, seat.Occupant = nil, nil
@@ -116,16 +116,16 @@ RunService.Heartbeat:Fire(.1)
 check(not VehicleDrive.isDriving(), "Started with missing constraints")
 chassis.FindFirstChild = findConstraint
 RunService.Heartbeat:Fire(.1)
-check(VehicleDrive.isDriving() and drive.PlaneVelocity.Y==-5, "Late constraints never resumed driving")
+check(VehicleDrive.isDriving() and sent[#sent][1]==1, "Late constraints never resumed driving")
 board()
 check(VehicleDrive.isDriving() and gui.Enabled, "Lobby mech cannot be driven")
 VehicleDrive.step(0.1)
-check(drive.PlaneVelocity.Y==-5, "Valid driving stopped")
+check(sent[#sent][1]==1, "Valid driving stopped")
 dashboard:setEnabled(true)
 check(VehicleDrive.isDriving() and not gui.Enabled, "Inventory must hide HUD without ejecting rider")
-check(drive.PlaneVelocity==Vector2.zero, "Opening menu did not immediately stop propulsion")
+check(sent[#sent][1]==0 and sent[#sent][2]==0, "Opening menu did not immediately stop propulsion")
 VehicleDrive.step(0.1)
-check(drive.PlaneVelocity==Vector2.zero and not gui.Enabled, "Menu input continued driving")
+check(sent[#sent][1]==0 and sent[#sent][2]==0 and not gui.Enabled, "Menu input continued driving")
 local shop = screen("Shop", true, playerGui)
 playerGui.ChildAdded:Fire(shop)
 dashboard:setEnabled(false)
@@ -133,7 +133,7 @@ check(not gui.Enabled, "Closing inventory revealed HUD under another open menu")
 shop:setEnabled(false)
 check(gui.Enabled and VehicleDrive.isDriving(), "Closing last menu did not restore HUD")
 VehicleDrive.step(0.1)
-check(drive.PlaneVelocity.Y==-5, "Driving did not resume after closing menu")
+check(sent[#sent][1]==1, "Driving did not resume after closing menu")
 local toast = screen("Toasts",true,playerGui)
 playerGui.ChildAdded:Fire(toast)
 check(gui.Enabled, "Nonmodal HUD hid driving card")
@@ -145,7 +145,7 @@ check(not gui.Enabled, "Modal rewards did not hide HUD")
 rewards:setModal(false)
 check(gui.Enabled, "Closing reward modal did not restore HUD")
 GuiService.MenuIsOpen=true; GuiService.Changed:Fire()
-check(not gui.Enabled and drive.PlaneVelocity==Vector2.zero, "Roblox escape menu retained HUD or propulsion")
+check(not gui.Enabled and sent[#sent][1]==0 and sent[#sent][2]==0, "Roblox escape menu retained HUD or propulsion")
 dashboard:setEnabled(true)
 GuiService.MenuIsOpen=false; GuiService.Changed:Fire()
 check(not gui.Enabled, "Closing escape menu ignored inventory")
@@ -173,7 +173,7 @@ VehicleDrive.step(0.1)
 check(not VehicleDrive.isDriving(), "Lost seat was not cleaned up")
 board()
 player:SetAttribute("ArenaDropPreparing",100)
-check(not VehicleDrive.isDriving() and not gui.Enabled and drive.PlaneVelocity==Vector2.zero, "Arena preparation retained drive/HUD")
+check(not VehicleDrive.isDriving() and not gui.Enabled and sent[#sent][1]==0 and sent[#sent][2]==0, "Arena preparation retained drive/HUD")
 check(player.CameraMinZoomDistance==6 and player.CameraMaxZoomDistance==40, "Mech zoom was not restored")
 board() -- late seat event while match is preparing
 check(not VehicleDrive.isDriving(), "Late seat event restarted mech in transition")
@@ -331,4 +331,22 @@ chassis.Position = point(0, 0, 0)
 keysDown = {}
 for _ = 1, 40 do frame() end
 check(#reports == 0, "Reported a mech nobody was driving")
+-- The client never overwrites server constraints, and reports real speed.
+check(drive.PlaneVelocity==Vector2.zero, "Client wrote server-owned physics constraints")
+chassis.AssemblyLinearVelocity = {X=0,Z=-8}
+frame()
+check(speedLabel.Text=="8", "HUD displayed requested speed instead of actual movement")
+seat.ThrottleFloat=1; focusedBox={}; frame()
+check(lastSent()[1]==0, "Stale seat input drove while typing")
+focusedBox=nil; seat.ThrottleFloat=0
+-- Even a PlayerModule require which never returns cannot hold keyboard input.
+controlModule=nil
+local savedSpawn=task.spawn
+local pendingControlLoad
+task.spawn=function(fn) pendingControlLoad=fn end
+keysDown={}; frame()
+check(pendingControlLoad~=nil, "Control discovery wasn't asynchronous")
+keysDown={W=true}; frame()
+check(lastSent()[1]==1, "Unfinished PlayerModule load blocked W")
+task.spawn=savedSpawn
 print("PASS: " .. checks .. " vehicle transition checks")

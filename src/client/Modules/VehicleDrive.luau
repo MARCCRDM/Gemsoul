@@ -1,10 +1,5 @@
--- Driving the Outpost's machines. While you sit in one, your client owns its
--- physics and steers it every frame through the chassis constraints (Drive:
--- horizontal velocity, Steer: heading), using the seat's throttle and steer
--- (WASD, arrow keys, a gamepad stick or the mobile thumbstick). The input is
--- also sent to the server, which drives the machine whenever it still holds
--- the physics. Jump to get out. A small card shows the machine, its speed and
--- the controls, and the camera pulls back to fit the big ones.
+-- Send pilot input to the server, which owns and moves every mech. The client
+-- handles controls, camera and HUD, without competing writes to constraints.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,7 +9,7 @@ local Rules = require(ReplicatedStorage.Shared.Outpost)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
-require(script.Parent.MechAnimation)
+task.spawn(function() require(script.Parent.MechAnimation) end)
 
 local VehicleDrive = {}
 local player = Players.LocalPlayer
@@ -48,17 +43,22 @@ end
 -- default controls; when they stay at 0 (the controls can be switched off or
 -- slow to notice the seat), the move vector or the keys themselves stand in.
 local controlModule = nil
+local loadingControls = false
 local function moveVector(): Vector3?
-	if controlModule == nil then
+	if controlModule == nil and not loadingControls then
 		local scripts = player:FindFirstChild("PlayerScripts")
 		local module = scripts and scripts:FindFirstChild("PlayerModule")
 		if not module then
 			return nil
 		end
-		local ok, found = pcall(function()
-			return require(module):GetControls()
+		loadingControls = true
+		-- Requiring PlayerModule can yield during startup. Never suspend the
+		-- driving heartbeat (or keyboard fallback) while it initializes.
+		task.spawn(function()
+			local ok, found = pcall(function() return require(module):GetControls() end)
+			controlModule = if ok and found then found else false
+			loadingControls = false
 		end)
-		controlModule = if ok and found then found else false
 	end
 	if not controlModule then
 		return nil
@@ -76,19 +76,22 @@ local function held(...): boolean
 end
 -- Also says where the input came from: "seat", "controls", "keys" or "none".
 local function pilotInput(seat: VehicleSeat): (number, number, string)
+	if UserInputService:GetFocusedTextBox() then return 0, 0, "none" end
 	local throttle, steer = seat.ThrottleFloat, seat.SteerFloat
 	local source = "seat"
 	if throttle == 0 and steer == 0 then
 		source = "none"
-		local move = moveVector()
-		if move and move.Magnitude > 0.05 then
-			throttle, steer, source = -move.Z, move.X, "controls"
-		elseif not UserInputService:GetFocusedTextBox() then
-			local K = Enum.KeyCode
+		local K = Enum.KeyCode
+		if held(K.W, K.Up, K.S, K.Down, K.A, K.Left, K.D, K.Right) then
 			throttle = (if held(K.W, K.Up) then 1 else 0) - (if held(K.S, K.Down) then 1 else 0)
 			steer = (if held(K.D, K.Right) then 1 else 0) - (if held(K.A, K.Left) then 1 else 0)
 			if throttle ~= 0 or steer ~= 0 then
 				source = "keys"
+			end
+		else
+			local move = moveVector()
+			if move and move.Magnitude > 0.05 then
+				throttle, steer, source = -move.Z, move.X, "controls"
 			end
 		end
 	end
@@ -111,7 +114,8 @@ local function tellServer(throttle: number, steer: number, force: boolean?)
 	end
 	-- A sweeping stick changes every frame: at most 10 a second, but letting go
 	-- goes out at once.
-	if not force and not stale and now - sentAt < 0.1 and (throttle ~= 0 or steer ~= 0) then
+	if not force and not stale and now - sentAt < 0.1
+		and (sentThrottle ~= 0 or sentSteer ~= 0) and (throttle ~= 0 or steer ~= 0) then
 		return
 	end
 	local input = remote("MechInput")
@@ -171,11 +175,7 @@ local function finish()
 	if not d then
 		return
 	end
-	-- Leave it standing still (the server takes it back from here).
-	pcall(function()
-		d.Drive.PlaneVelocity = Vector2.zero
-	end)
-	tellServer(0, 0)
+	tellServer(0, 0, true)
 	-- A delayed Seated(false) must not overwrite the combat camera's zoom.
 	if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
 		player.CameraMinZoomDistance = d.Zoom[1]
@@ -202,7 +202,6 @@ local function refreshHud()
 		and driving.Seat.Occupant == driving.Humanoid and not blocked() and not hidden
 	if driving and hidden then
 		driving.Speed = 0
-		driving.Drive.PlaneVelocity = Vector2.zero
 		tellServer(0, 0)
 	end
 end
@@ -318,7 +317,7 @@ local function reportStuck(d: Driving, throttle: number, steer: number, source: 
 	if report then
 		report:FireServer(text)
 	end
-	UiKit.toast("Your mech seems stuck. Switching it to backup driving and sending a report.")
+	UiKit.toast("Your mech seems stuck. Checking its movement and sending a report.")
 end
 local function watchStuck(d: Driving, throttle: number, steer: number, source: string, dt: number)
 	local c = d.Chassis
@@ -358,20 +357,11 @@ function VehicleDrive.step(dt: number)
 	local throttle, steer, source = pilotInput(d.Seat)
 	tellServer(throttle, steer)
 	watchStuck(d, throttle, steer, source, dt)
-	local speed, yaw = Rules.drive(d.Spec, d.Speed, d.Yaw, throttle, steer, dt)
-	-- Don't keep shoving at full speed into a wall or a rock.
 	local v = d.Chassis.AssemblyLinearVelocity
 	local actual = Vector2.new(v.X, v.Z).Magnitude
-	if math.abs(speed) > actual + 10 then
-		speed = math.sign(speed) * (actual + 10)
-	end
-	d.Speed, d.Yaw = speed, yaw
-	local heading = CFrame.Angles(0, yaw, 0)
-	local forward = heading.LookVector
-	d.Drive.PlaneVelocity = Vector2.new(forward.X * speed, forward.Z * speed)
-	d.Steer.CFrame = heading
-	speedLabel.Text = tostring(math.floor(math.abs(speed) + 0.5))
-	fill.Size = UDim2.fromScale(math.clamp(math.abs(speed) / d.Spec.MaxSpeed, 0, 1), 1)
+	d.Speed = actual
+	speedLabel.Text = tostring(math.floor(actual + 0.5))
+	fill.Size = UDim2.fromScale(math.clamp(actual / d.Spec.MaxSpeed, 0, 1), 1)
 end
 
 function VehicleDrive.isDriving(): boolean

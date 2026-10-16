@@ -1,12 +1,6 @@
--- The Outpost's machines: parks them in their Motor Pool bays, seats a
--- driver from the Drive prompt, hands the driver's client the physics (it
--- steers through the chassis constraints, see Client VehicleDrive), and sends
--- abandoned machines home. Driving only: they don't mine or carry anything.
--- Until the hand-over takes, the server drives the machine itself from the
--- pilot's input (MechInput), so a seated pilot is never stuck. When a pilot's
--- client says its mech won't move (MechReport), the server frees anything
--- anchored, takes the physics back, and logs both sides' view (Output, and
--- Feedback > Reports). A pilot whose client never starts driving is logged too.
+-- Server-owned mech physics. The pilot sends input, and one controller sets
+-- velocity/heading for every occupied machine. Seat weld creation can change
+-- assembly ownership, so it is checked again after boarding and while driving.
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -20,7 +14,7 @@ local OutpostVehicles = {}
 
 -- Seconds before a held input that stops arriving counts as let go.
 local INPUT_TIMEOUT = 1.5
--- Seconds between tries to hand a machine's physics to its driver.
+-- Seconds between ownership checks after the seat weld settles.
 local CLAIM_RETRY = 2
 -- Seconds in the seat with no word from the pilot's client before it's logged.
 local SILENT_AFTER = 5
@@ -48,7 +42,6 @@ type Machine = {
 	Heard: boolean,
 	SilentLogged: boolean,
 	Reports: number,
-	ServerOnly: boolean,
 }
 local machines: { Machine } = {}
 local bySeat: { [Instance]: Machine } = {}
@@ -71,33 +64,32 @@ local function stop(machine: Machine)
 	end
 end
 
--- Who simulates it: the driver (so it handles with no lag), else the server.
-local function owner(machine: Machine, player: Player?)
+-- Always retain manual server ownership, including the seated character.
+local function owner(machine: Machine)
 	local chassis = machine.Model.PrimaryPart
 	if not chassis then
 		return
 	end
-	local ok, problem = pcall(chassis.SetNetworkOwner, chassis, player)
-	if not ok and player and not machine.Warned then
+	local ok, problem = pcall(chassis.SetNetworkOwner, chassis, nil)
+	if not ok and not machine.Warned then
 		machine.Warned = true
 		warn(
 			string.format(
-				"[Mech] %s: couldn't hand its physics to %s, the server drives it instead: %s",
+				"[Mech] %s: couldn't claim server physics: %s",
 				machine.Kind,
-				player.Name,
 				tostring(problem)
 			)
 		)
 	end
 end
 
-local function driverOwns(machine: Machine, driver: Player): boolean
+local function serverOwns(machine: Machine): boolean
 	local chassis = machine.Model.PrimaryPart
 	if not chassis then
 		return false
 	end
 	local ok, current = pcall(chassis.GetNetworkOwner, chassis)
-	return ok and current == driver
+	return ok and current == nil
 end
 
 -- Back to its bay, parked straight.
@@ -115,6 +107,7 @@ local function reset(machine: Machine)
 	chassis.Anchored = false
 	chassis.AssemblyLinearVelocity = Vector3.zero
 	chassis.AssemblyAngularVelocity = Vector3.zero
+	owner(machine)
 	machine.LastUsed = os.clock()
 end
 
@@ -155,7 +148,6 @@ local function spawnMachine(kind: string, bay: CFrame)
 		Heard = false,
 		SilentLogged = false,
 		Reports = 0,
-		ServerOnly = false,
 	}
 	table.insert(machines, machine)
 
@@ -178,7 +170,7 @@ local function spawnMachine(kind: string, bay: CFrame)
 	return machine
 end
 
--- A pilot got in or out: fresh input, and the physics to whoever drives.
+-- A pilot got in or out: fresh input, with physics still on the server.
 function OutpostVehicles.seated(machine: Machine)
 	local driver = driverOf(machine)
 	local prompt = machine.Seat:FindFirstChild("DrivePrompt") :: ProximityPrompt?
@@ -188,13 +180,11 @@ function OutpostVehicles.seated(machine: Machine)
 	machine.Throttle, machine.Steer, machine.InputAt, machine.Speed = 0, 0, 0, 0
 	machine.ServerDriving, machine.Warned = false, false
 	machine.BoardedAt, machine.Heard, machine.SilentLogged = os.clock(), false, false
-	machine.Reports, machine.ServerOnly = 0, false
+	machine.Reports = 0
 	-- The seat weld can still be settling: try again shortly if it didn't take.
 	machine.NextClaim = os.clock() + 0.5
-	if not driver then
-		stop(machine)
-	end
-	owner(machine, driver)
+	stop(machine)
+	owner(machine)
 	machine.LastUsed = os.clock()
 end
 
@@ -299,11 +289,9 @@ local function recover(machine: Machine, driver: Player): string
 			table.insert(done, "unanchored " .. part.Name)
 		end
 	end
-	if not machine.ServerOnly then
-		machine.ServerOnly = true
-		owner(machine, nil)
-		table.insert(done, "physics moved to the server")
-	end
+	owner(machine)
+	machine.ServerDriving = false -- resume from the actual heading after repair
+	table.insert(done, "server physics reclaimed")
 	return if #done > 0 then table.concat(done, ", ") else "nothing left to try"
 end
 
@@ -361,14 +349,9 @@ function OutpostVehicles.step(dt: number, now: number?)
 				)
 			)
 		end
-		if not machine.ServerOnly and driverOwns(machine, driver) then
-			-- The pilot's client drives it (Client VehicleDrive).
-			machine.ServerDriving = false
-			continue
-		end
-		if not machine.ServerOnly and clock >= machine.NextClaim then
+		if clock >= machine.NextClaim then
 			machine.NextClaim = clock + CLAIM_RETRY
-			owner(machine, driver)
+			if not serverOwns(machine) then owner(machine) end
 		end
 		local drive = chassis:FindFirstChild("Drive") :: LinearVelocity?
 		local steer = chassis:FindFirstChild("Steer") :: AlignOrientation?

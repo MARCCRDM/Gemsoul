@@ -253,17 +253,15 @@ local pilot, pilotHum = makePlayer("Pilot")
 promptTriggered:Fire(prompt, pilot)
 local chassis = hauler.Model.PrimaryPart
 check(hauler.Seat.Occupant == pilotHum and not prompt.Enabled, "The Drive prompt didn't seat the pilot")
-check(chassis.Owner == pilot, "The pilot wasn't handed the physics")
+check(chassis.Owner == nil, "The server must own the occupied mech")
 check(#handovers() == 0, "A clean hand-over warned")
 
--- With the pilot's client in charge, the server stays out of it.
+-- Input must drive even when the client never writes any constraints.
 mechInput.OnServerEvent:Fire(pilot, 1, 0)
-for _ = 1, 30 do
-	clockNow += 1 / 60
-	heartbeat:Fire(1 / 60)
-end
-check(chassis.Drive.PlaneVelocity == R.Vector2.zero, "The server fought the pilot's client for the controls")
-check(not hauler.ServerDriving, "The server thought it was driving a client-owned machine")
+heartbeat:Fire(1/60)
+check(chassis.Drive.PlaneVelocity.Y<0 and hauler.ServerDriving, "Server waited for client-side physics")
+getOut(hauler.Seat,pilotHum)
+Vehicles.sit(pilot,hauler.Seat)
 
 -- Physics follow the drive constraint, unless something blocks the way.
 -- While a key is held the client re-sends it every 0.5 s (Client VehicleDrive).
@@ -293,29 +291,19 @@ local function frames(n, dt)
 	end
 end
 
--- The hand-over fails: the server drives instead, and says why, once.
-getOut(hauler.Seat, pilotHum)
-check(chassis.Owner == nil and prompt.Enabled, "Getting out didn't give the machine back to the server")
-chassis.OwnerError, chassis.Claims = NO_OWNER, 0
-promptTriggered:Fire(prompt, pilot)
-check(hauler.Seat.Occupant == pilotHum, "Couldn't reboard")
-check(
-	#handovers() == 1 and handovers()[1]:find("[Mech]", 1, true) and handovers()[1]:find("Pilot", 1, true),
-	"No warning when the hand-over failed"
-)
-check(handovers()[1]:find("Anchored", 1, true) ~= nil, "The warning didn't say why")
+-- Server ownership remains stable throughout the ride.
 frames(10)
 check(chassis.Drive.PlaneVelocity == R.Vector2.zero, "The server drove without any input")
 check(press(pilot, 1, 0), "The pilot's input was refused")
 frames(60 * 4)
 local pv = chassis.Drive.PlaneVelocity
-check(
-	math.abs(pv.X) < 1e-3 and math.abs(pv.Y + Rules.Machines.Hauler.MaxSpeed) < 1e-3,
-	"Server-side driving didn't reach top speed straight ahead"
-)
-check(chassis.CFrame.Position.Z < 7000 - 40, "The machine never moved")
-check(#handovers() == 1, "Retrying the hand-over warned again")
-check(chassis.Claims >= 3, "The hand-over was never retried")
+check(math.abs(pv.X)<1e-3 and math.abs(pv.Y+Rules.Machines.Hauler.MaxSpeed)<1e-3,"Server didn't reach top speed")
+check(chassis.CFrame.Position.Z < 7000-40,"The machine never moved")
+check(chassis.Owner==nil and hauler.ServerDriving,"Occupied mech yielded physics to a client")
+-- A late seat-weld ownership change is corrected without a client stuck report.
+chassis.Owner=pilot
+frames(60*3)
+check(chassis.Owner==nil and chassis.Drive.PlaneVelocity.Magnitude>5,"Seat ownership drift stopped movement")
 
 -- Steering, from where the machine actually points.
 press(pilot, 0, 1)
@@ -355,21 +343,14 @@ frames(60 * 3)
 check(chassis.Drive.PlaneVelocity.Magnitude < 1, "A pilot in a fight kept driving")
 pilot.Attributes.CombatSession = nil
 
--- Turning in place while client-driven, then losing the physics: the server
--- carries on from the current heading, not the one it was boarded at.
-chassis.OwnerError = nil
-frames(60 * 3)
-check(chassis.Owner == pilot and not hauler.ServerDriving, "A retried hand-over didn't take")
-local velocity = chassis.Drive.PlaneVelocity
-frames(30)
-check(chassis.Drive.PlaneVelocity == velocity, "The server kept driving after the hand-over took")
-chassis.CFrame = R.CFrame.new(chassis.CFrame.Position) * R.CFrame.Angles(0, 1.2, 0)
-chassis.Owner = nil
-chassis.OwnerError = NO_OWNER
-press(pilot, 0, 0)
+-- Reboarding picks up the actual heading, not an earlier ride's heading.
+getOut(hauler.Seat,pilotHum)
+chassis.CFrame=R.CFrame.new(chassis.CFrame.Position)*R.CFrame.Angles(0,1.2,0)
+Vehicles.sit(pilot,hauler.Seat)
+press(pilot,0,0)
 frames(1)
-local _, carried = chassis.Steer.CFrame:ToOrientation()
-check(math.abs(carried - 1.2) < 0.05, "The server snapped the machine back to an old heading")
+local _,carried=chassis.Steer.CFrame:ToOrientation()
+check(math.abs(carried-1.2)<.05,"Reboarding snapped back to an old heading")
 
 -- Getting out: it stops, the prompt comes back, the server holds the physics.
 press(pilot, 1, 0)
@@ -385,7 +366,7 @@ check(not Vehicles.input(pilot, 1, 0), "Input from someone who got out was accep
 
 -- A new pilot starts from rest, not from the last pilot's input.
 local second, secondHum = makePlayer("Second")
-chassis.OwnerError = NO_OWNER
+chassis.OwnerError = nil
 promptTriggered:Fire(prompt, second)
 check(
 	hauler.Seat.Occupant == secondHum and hauler.Throttle == 0 and hauler.Steer == 0,
@@ -393,7 +374,7 @@ check(
 )
 frames(30)
 check(chassis.Drive.PlaneVelocity == R.Vector2.zero, "A new pilot's machine moved on its own")
-check(#handovers() == 2 and handovers()[2]:find("Second", 1, true), "The new pilot's failed hand-over didn't warn")
+check(chassis.Owner==nil, "New pilot took physics ownership")
 
 -- Taken: the Drive prompt won't seat someone else, or anyone busy, and only
 -- the seat's occupant steers it (a stale SeatPart is not enough).
@@ -408,7 +389,7 @@ pilot.Attributes.Expedition = nil
 check(Vehicles.sit(pilot, mole.Seat), "Couldn't board the free machine")
 moleHum = pilotHum
 check(
-	mole.Seat.Occupant == moleHum and mole.Model.PrimaryPart.Owner == pilot,
+	mole.Seat.Occupant == moleHum and mole.Model.PrimaryPart.Owner == nil,
 	"Second machine wasn't handed to its pilot"
 )
 
@@ -461,7 +442,7 @@ function boulder:GetFullName()
 	return "Workspace.Boulder"
 end
 joinPart(mole, boulder)
-check(moleChassis.Owner == quiet, "The pilot didn't hold the physics before the report")
+check(moleChassis.Owner == nil, "Server lost physics before the report")
 check(not Vehicles.report(quiet, 5), "A report that isn't text was taken")
 check(not Vehicles.report(other, "stuck"), "Someone on foot filed a stuck report")
 before = #notes
@@ -469,7 +450,7 @@ mechReport.OnServerEvent:Fire(quiet, "input 1.00/0.00 from keys")
 last = notes[#notes]
 check(#notes == before + 1 and last.Message:find("won't move", 1, true), "The stuck report wasn't logged")
 check(
-	last.Detail:find("Client: input 1.00/0.00 from keys", 1, true) and last.Detail:find("physics pilot", 1, true),
+	last.Detail:find("Client: input 1.00/0.00 from keys", 1, true) and last.Detail:find("physics server", 1, true),
 	"The log lacks the client's or the server's view"
 )
 check(
@@ -482,7 +463,7 @@ check(
 )
 check(boulder.Anchored, "Unanchored something that isn't the mech's or the pilot's")
 check(
-	moleChassis.Owner == nil and mole.ServerOnly and last.Detail:find("physics moved to the server", 1, true),
+	moleChassis.Owner == nil and last.Detail:find("server physics reclaimed", 1, true),
 	"The server didn't take the physics back"
 )
 check(warnings[#warnings]:find("won't move", 1, true) ~= nil, "The stuck report wasn't in the Output")
@@ -492,7 +473,7 @@ check(moleChassis.Owner == nil, "The physics went back to the pilot mid-ride")
 check(moleChassis.Drive.PlaneVelocity.Magnitude > 10, "The server didn't drive after taking over")
 moleChassis.Owner = quiet -- (if the physics ever drifts back to the pilot's client)
 frames(5)
-check(mole.ServerDriving and moleChassis.Owner == quiet, "The server let go of a mech it took over")
+check(mole.ServerDriving and moleChassis.Owner == nil, "The server let go of a mech it took over")
 moleChassis.Owner = nil
 check(Vehicles.report(quiet, "again"), "A second report was refused")
 check(notes[#notes].Detail:find("nothing left to try", 1, true) ~= nil, "A second report claimed to fix something")
@@ -502,9 +483,9 @@ local long = string.rep("x", 5000)
 getOut(mole.Seat, quietHum)
 hold = nil
 
--- The next ride starts fresh: the pilot gets the physics, and may report again.
+-- The next ride starts fresh on the server, and may report again.
 check(
-	Vehicles.sit(quiet, mole.Seat) and moleChassis.Owner == quiet and not mole.ServerOnly,
+	Vehicles.sit(quiet, mole.Seat) and moleChassis.Owner == nil,
 	"A new ride didn't hand the physics to the pilot again"
 )
 check(Vehicles.report(quiet, long), "A new ride couldn't report")

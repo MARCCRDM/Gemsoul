@@ -300,6 +300,7 @@ function OutpostMachines.build(kind: string, at: CFrame): Model
 	local drive = Instance.new("LinearVelocity")
 	drive.Name, drive.Attachment0, drive.RelativeTo = "Drive", attachment, Enum.ActuatorRelativeTo.World
 	drive.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
+	drive.ForceLimitsEnabled, drive.ForceLimitMode = true, Enum.ForceLimitMode.Magnitude
 	drive.PrimaryTangentAxis, drive.SecondaryTangentAxis = Vector3.new(1, 0, 0), Vector3.new(0, 0, 1)
 	drive.PlaneVelocity, drive.MaxForce, drive.Parent = Vector2.zero, 6e5, chassis
 	local steer = Instance.new("AlignOrientation")
