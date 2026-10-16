@@ -2249,6 +2249,115 @@ local VISOR_PULSE = { Pulse = { 0.9, 0.35 }, Flicker = { 0.07, 0.3 } }
 -- The rest move as one.
 local VISOR_ACROSS = { Scan = 10, Aurora = 15, Rainbow = 30 }
 
+-- A visor's colour as a light: a glass visor's tint (often dark) lifted
+-- until it glows, so an eye it lights is never put out.
+local function visorGlow(look): Color3
+	if look.Material ~= "Glass" then
+		return look.Color
+	end
+	local h, s, v = look.Color:ToHSV()
+	return Color3.fromHSV(h, s, math.max(v, 0.9))
+end
+
+-- A visor on a helmet skin (HelmetLooks): its faces say how they take one
+-- (VisorFit). Each eye glows in the visor's colour and moves as it does (or,
+-- for a visor that holds still, as the skin's own eyes did); each lens takes
+-- the visor's tint and stays see-through to the eyes behind it. The skin's
+-- shapes stay as they are: nothing is cut into bands or framed, and the
+-- visor's particles, sparks and glow come off the eyes, both of them alike.
+local function fitVisor(helmet: Instance, head: BasePart, faces: { BasePart }, look, where: (BasePart) -> number)
+	local fx = look.Fx
+	local glass = look.Material == "Glass"
+	local glow = visorGlow(look)
+	-- An eye, or a part lit by the same light: the visor's glow, moving
+	-- as the visor does (or as the skin's own did).
+	local function lightUp(part: BasePart)
+		part.Color = glow
+		part.Material = Enum.Material.Neon
+		part.Reflectance = 0
+		local own = part:GetAttribute("SeamFx")
+		if fx or own then
+			part:SetAttribute("SeamFx", fx or own)
+			part:SetAttribute("SeamA", glow)
+			part:SetAttribute("SeamB", if fx then look.Glow or glow else glow:Lerp(Color3.new(1, 1, 1), 0.45))
+			part:SetAttribute("SeamC", if fx then look.Third else nil)
+			if fx then
+				part:SetAttribute("SeamSeed", where(part) * (VISOR_ACROSS[fx] or 0))
+			end
+			CollectionService:AddTag(part, Tags.SkinSeam)
+		end
+	end
+	local eyes: { BasePart } = {}
+	for _, part in faces do
+		CollectionService:RemoveTag(part, Tags.Prismatic)
+		part:SetAttribute("PrismaticBase", nil)
+		if part:GetAttribute("VisorFit") == "Lens" then
+			-- (Its see-through, the skin's own, is left as it is.)
+			part.Color = if glass then look.Color else look.Color:Lerp(Color3.new(0, 0, 0), 0.55)
+			part.Material = Enum.Material.Glass
+			part.Reflectance = if glass then look.Reflect or 0.2 else 0.25
+		else
+			table.insert(eyes, part)
+			lightUp(part)
+		end
+	end
+	-- What the skin lights with its eyes (a pumpkin's lid cut, the lamps
+	-- round them) takes the visor's colour too.
+	for _, d in helmet:GetDescendants() do
+		if d:IsA("BasePart") and d:GetAttribute("VisorTint") then
+			lightUp(d)
+		elseif d:IsA("Light") and d:GetAttribute("VisorLight") then
+			(d :: Light).Color = glow
+		end
+	end
+	if #eyes == 0 then
+		eyes = faces
+	end
+	-- One unseen box round the eyes, for the visor's particles and glow.
+	local low, high = Vector3.one * math.huge, -Vector3.one * math.huge
+	for _, part in eyes do
+		local at = head.CFrame:PointToObjectSpace(part.CFrame.Position)
+		local reach = Vector3.one * (math.min(part.Size.X, part.Size.Y, part.Size.Z) / 2 + 0.02)
+		low, high = low:Min(at - reach), high:Max(at + reach)
+	end
+	local spot = piece(
+		eyes[1].Parent :: Instance,
+		head,
+		CFrame.new((low + high) / 2),
+		high - low,
+		glow,
+		Enum.Material.SmoothPlastic
+	)
+	spot.Name = "VisorSpot"
+	spot.Transparency = 1
+	spot.CastShadow = false
+	if look.Element then
+		stoneParticles(spot, look.Element, 4, 1.6, 0.6, true)
+		for _, child in spot:GetChildren() do
+			if child:IsA("ParticleEmitter") and child.Name == "GemEffect" then
+				child.Name = "VisorEffect"
+			end
+		end
+	end
+	if look.Sparks then
+		drift(spot, look.Sparks, 6)
+	end
+	local light = Instance.new("PointLight")
+	light.Name = "VisorGlow"
+	light.Color = glow
+	light.Range = 5
+	light.Brightness = 0.6
+	light.Shadows = false
+	local pulse = fx and VISOR_PULSE[fx]
+	if pulse then
+		light:SetAttribute("PulseBase", light.Brightness)
+		light:SetAttribute("PulsePeriod", pulse[1])
+		light:SetAttribute("PulseDim", pulse[2])
+		CollectionService:AddTag(light, Tags.GemGlow)
+	end
+	light.Parent = spot
+end
+
 -- Lays a visor look (Cosmetics.VisorLook) on a helmet's lens: the parts its
 -- builder marked VisorFace (ArmorKits), whatever the helmet. The dark well
 -- round the lens and its lamps stay as they are. Moving looks carry the
@@ -2294,6 +2403,11 @@ local function applyVisor(helmet: Instance, look)
 	end
 	local function where(part: BasePart): number
 		return math.clamp((across(part) - low) / math.max(high - low, 0.01), 0, 1)
+	end
+	-- A helmet skin's eyes and lenses: fitted, not cut.
+	if main:GetAttribute("VisorFit") then
+		fitVisor(helmet, head :: BasePart, faces, look, where)
+		return
 	end
 	local fx = look.Fx
 	local glass = look.Material == "Glass"

@@ -2575,6 +2575,8 @@ function ArmorKits.hideAvatar(character: Model)
 end
 
 ArmorKits.Looks = KITS
+-- (For helmet skins, HelmetLooks: the head helmets are built round.)
+ArmorKits.humanHead = humanHead
 -- Trim colour: enchanting lights it up in the gem's element.
 ArmorKits.Brass = BRASS
 
