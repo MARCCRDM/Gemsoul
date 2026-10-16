@@ -24,6 +24,23 @@ local function setProfile(profile)
 	end
 end
 
+-- Daily challenge progress between full syncs (Shared.DailyChallenges): kept
+-- on the profile, with its own signal so a fight's hits don't redraw every
+-- screen that listens to Changed.
+local challengesChanged = Instance.new("BindableEvent")
+GemClient.ChallengesChanged = challengesChanged.Event
+task.spawn(function()
+	local event = remotes:WaitForChild("Challenges", 30)
+	if event and event:IsA("RemoteEvent") then
+		event.OnClientEvent:Connect(function(view)
+			if GemClient.Profile and type(view) == "table" then
+				GemClient.Profile.Challenges = view
+				challengesChanged:Fire(view)
+			end
+		end)
+	end
+end)
+
 -- The menu sound for a request's reply (a failed one plays the error sound).
 local REPLY_SOUNDS = {
 	Craft = "Craft",

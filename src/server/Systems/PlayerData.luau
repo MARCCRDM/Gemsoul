@@ -27,6 +27,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local Season = require(ReplicatedStorage.Shared.Season)
 local TrainingRewards = require(ReplicatedStorage.Shared.TrainingRewards)
+local DailyChallenges = require(ReplicatedStorage.Shared.DailyChallenges)
 local FastStart = require(ReplicatedStorage.Shared.FastStart)
 local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
@@ -83,6 +84,7 @@ type Profile = {
 	FirstJoin: number, -- os.time(); 0 for players from before the Welcome Bundle
 	WelcomeBought: boolean,
 	Funnel: { [string]: boolean }?, -- onboarding steps already logged (Systems/Funnel); new accounts only
+	Challenges: any?, -- today's daily challenges (Shared.DailyChallenges)
 }
 
 local PlayerData = {}
@@ -428,10 +430,9 @@ local function claimDaily(player: Player, profile: Profile)
 	profile.Coins += reward
 	profile.Season.XP += Season.XP.Daily
 	Tree.addXP(profile, Season.XP.Daily)
-	Remotes.Notify:FireClient(
-		player,
-		string.format("Daily reward: +%d coins (day %d streak). Come back tomorrow for more!", reward, daily.Streak)
-	)
+	-- The lobby's welcome banner shows it (Modules/LobbyFeed).
+	player:SetAttribute("DailyReward", reward)
+	player:SetAttribute("DailyStreak", daily.Streak)
 	-- A full week running: the streak's own weapon skin, once, and on.
 	local skin = Cosmetics.get(FreeRewards.Streak.Reward)
 	if skin and FreeRewards.streakEarned(daily.Streak) and not profile.Cosmetics.Owned[skin.Id] then
@@ -615,6 +616,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Augments = profile.Augments,
 		Coins = profile.Coins,
 		TrainingRewards = profile.TrainingRewards,
+		Challenges = DailyChallenges.view(profile, player.UserId, today()),
 		Marks = profile.Marks,
 		Gems = profile.Gems,
 		Quota = profile.Quota,
@@ -955,21 +957,57 @@ function PlayerData.setGearQuality(player: Player, kind: string, gearId: string,
 	sync(player)
 end
 
--- Records a first (see Profile.Milestones). Only syncs when it's new.
+-- Daily challenge progress goes to the lobby on its own (Remotes.Challenges),
+-- at most once a second: a fight counts every hit, and a whole profile sync
+-- per hit would be heavy.
+local challengePush: { [Player]: boolean } = {}
+local function pushChallenges(player: Player)
+	if challengePush[player] then
+		return
+	end
+	challengePush[player] = true
+	task.delay(1, function()
+		challengePush[player] = nil
+		local profile = profiles[player]
+		if profile and player.Parent then
+			Remotes.Challenges:FireClient(player, DailyChallenges.view(profile, player.UserId, today()))
+		end
+	end)
+end
+Players.PlayerRemoving:Connect(function(player)
+	challengePush[player] = nil
+end)
+
+-- A Tasks event: daily challenge progress (paid as each is done), then the
+-- once-ever Tasks. Syncs the profile when something pays or a task moves.
 function PlayerData.training(player, event, detail)
 	local profile = profiles[player]
 	if not profile then
 		return
 	end
+	local finished, bonus, moved = DailyChallenges.record(profile, player.UserId, event, today())
+	for _, challenge in finished do
+		Remotes.Notify:FireClient(player, "DAILY CHALLENGE: " .. challenge.Name .. "  +" .. challenge.Coins .. " coins")
+	end
+	if bonus then
+		Remotes.Notify:FireClient(player, "ALL 3 DAILY CHALLENGES DONE!  +" .. bonus .. " bonus coins")
+	end
 	local earned, changed = TrainingRewards.record(profile, event, detail)
-	if not changed then
-		return
+	if changed then
+		trainedEvent:Fire(player, event)
+		for _, objective in earned do
+			Remotes.Notify:FireClient(
+				player,
+				"TASK COMPLETE: " .. objective.Name .. "  +" .. objective.Coins .. " coins"
+			)
+		end
 	end
-	trainedEvent:Fire(player, event)
-	for _, objective in earned do
-		Remotes.Notify:FireClient(player, "TASK COMPLETE: " .. objective.Name .. "  +" .. objective.Coins .. " coins")
+	-- (A full sync carries the challenges too.)
+	if changed or #finished > 0 then
+		sync(player)
+	elseif moved then
+		pushChallenges(player)
 	end
-	sync(player)
 end
 
 function PlayerData.milestone(player: Player, name: string)

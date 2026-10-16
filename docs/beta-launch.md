@@ -86,6 +86,9 @@ is logged once per account:
 
 ## The lobby: next task and bug reports
 
+(The lobby has grown since: daily challenges, a live feed and a welcome-back
+banner. See [lobby.md](lobby.md).)
+
 **Next task.** The right-hand panel shows the next task, with:
 - its one-line hint;
 - how far along you are;

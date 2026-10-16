@@ -84,7 +84,7 @@ local NAMES = {
 	"Tova Cinder",
 	"Orin Slate",
 }
-local WIN_COINS = 25
+local WIN_COINS = Matchmaking.RivalWinCoins
 local REMATCH_DELAY = 6
 
 -- Counts a finished 1v1 against a rival (won or lost) in the player's duel

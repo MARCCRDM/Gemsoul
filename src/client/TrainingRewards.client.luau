@@ -506,7 +506,7 @@ local function wanted(): boolean
 	local lobby = playerGui:FindFirstChild("LobbyHud")
 	return playerGui:FindFirstChild("Tutorial") == nil
 		and not (dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled)
-		and not (lobby and lobby:GetAttribute("ModePickerOpen"))
+		and not (lobby and (lobby:GetAttribute("ModePickerOpen") or lobby:GetAttribute("WelcomeOpen")))
 end
 local elapsed = 0
 RunService.Heartbeat:Connect(function(dt)

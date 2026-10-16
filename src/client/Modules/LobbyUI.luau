@@ -22,7 +22,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Training = require(ReplicatedStorage.Shared.TrainingRewards)
+local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
+local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -224,6 +225,26 @@ local function card(spec)
 			end
 		end
 	end
+	-- What a win pays, in a corner; for the player queues, who's searching
+	-- right now (their DuelQueue attribute), bottom right.
+	if spec.Reward then
+		local chip = text(b, spec.Reward, 12, P.Gold, IronUi.Heading)
+		-- (Top right on a tall card; on a wide one the words have the top.)
+		chip.AnchorPoint = if big then Vector2.new(1, 0) else Vector2.new(0, 1)
+		chip.Position = if big then UDim2.new(1, -12, 0, 12) else UDim2.new(0, 14, 1, -10)
+		chip.Size = UDim2.fromOffset(104, 24)
+		chip.BackgroundColor3, chip.BackgroundTransparency = Color3.fromRGB(8, 10, 16), 0.2
+		chip.TextStrokeTransparency, chip.ZIndex = 1, 23
+		UiKit.round(chip, 12)
+	end
+	local live = nil
+	if spec.Queue then
+		live = text(b, "", 12, P.Dim, IronUi.Heading)
+		live.AnchorPoint = Vector2.new(1, 1)
+		live.Position, live.Size = UDim2.new(1, -14, 1, -12), UDim2.fromOffset(150, 20)
+		live.TextXAlignment, live.ZIndex = Enum.TextXAlignment.Right, 23
+		live.RichText = true
+	end
 	-- Locked: a dark veil with how many more duels open it.
 	local veil = new("Frame", {
 		Size = UDim2.fromScale(1, 1),
@@ -261,7 +282,7 @@ local function card(spec)
 		LobbyUI.closePicker()
 		spec.Go()
 	end)
-	table.insert(cards, { Spec = spec, Veil = veil, Lock = lock, Kicker = kicker })
+	table.insert(cards, { Spec = spec, Veil = veil, Lock = lock, Kicker = kicker, Live = live })
 	return b
 end
 
@@ -272,6 +293,7 @@ card({
 	Sub = "Warm up against a rival miner with their own random kit. Coins on a win.",
 	Emblem = "Equipment",
 	Color = P.Gold,
+	Reward = string.format("WIN +%d ◆", Matchmaking.RivalWinCoins),
 	X = 0,
 	Y = 60,
 	W = if LobbyUI.DungeonsOpen then 340 else 782,
@@ -306,6 +328,8 @@ card({
 	Sub = "Real players, same base stats. Just for the fight.",
 	Emblem = "Equipment",
 	Color = P.Teal,
+	Reward = string.format("WIN +%d ◆", PvPRules.Kinds.Casual.Rewards.Win),
+	Queue = "casual",
 	X = 830,
 	Y = 60,
 	W = 290,
@@ -322,6 +346,8 @@ card({
 	Sub = "First to 2 rounds. Swap presets between rounds. Rating on the line.",
 	Emblem = "Equipment",
 	Color = RED,
+	Reward = string.format("WIN +%d ◆", PvPRules.Kinds.Ranked.Rewards.Win),
+	Queue = "1v1",
 	X = 830,
 	Y = 320,
 	W = 290,
@@ -360,6 +386,17 @@ local function refreshCards()
 			string.format("LOCKED\nComplete %d more duel%s to unlock", left, if left == 1 then "" else "s")
 		if entry.Spec.Unlock == "Ranked" then
 			entry.Kicker.Text = string.format("RATING %d", player:GetAttribute("DuelRating") or 1000)
+		end
+		if entry.Live then
+			local searching = 0
+			for _, other in Players:GetPlayers() do
+				if other:GetAttribute("DuelQueue") == entry.Spec.Queue then
+					searching += 1
+				end
+			end
+			entry.Live.Text = if searching > 0
+				then string.format('<font color="#4ED692">●</font> %d SEARCHING NOW', searching)
+				else "QUEUE OPEN"
 		end
 	end
 end
@@ -405,6 +442,10 @@ new("UIGradient", { Rotation = 90, Color = ColorSequence.new(GOLD_TOP, GOLD_BOTT
 local playCaption = text(play, "PLAY", 30, Color3.fromRGB(28, 18, 4), IronUi.Heading)
 playCaption.Size = UDim2.fromScale(1, 1)
 playCaption.TextStrokeTransparency = 1
+-- Under PLAY: who's around (or the modes, alone in a server).
+local playSub = text(play, "PRACTICE  ·  CASUAL  ·  RANKED", 10, Color3.fromRGB(92, 56, 8), IronUi.Heading)
+playSub.TextStrokeTransparency = 1
+IronUi.shine(play, 3.5)
 IronUi.juice(play)
 play.Activated:Connect(LobbyUI.openPicker)
 local modes = text(
@@ -474,23 +515,36 @@ function LobbyUI.tile(label: string): GuiButton?
 	return tiles:FindFirstChild(label) :: GuiButton?
 end
 
--- Level and coins under the stack.
+-- Your card under the stack: level, name, coins and the XP to the next level.
 local status = new("Frame", {
-	Size = UDim2.fromOffset(STACK_W, 34),
-	BackgroundColor3 = Color3.fromRGB(10, 14, 20),
-	BackgroundTransparency = 0.15,
+	Size = UDim2.fromOffset(STACK_W, 54),
+	BackgroundColor3 = Color3.fromRGB(12, 16, 24),
+	BackgroundTransparency = 0.12,
 }, bar)
-UiKit.round(status, 5)
-new("UIStroke", { Color = Color3.fromRGB(52, 64, 80), Thickness = 1 }, status)
-local levelLabel = text(status, "LEVEL 1", 13, P.Text, IronUi.Heading)
-levelLabel.Position, levelLabel.Size = UDim2.fromOffset(10, 0), UDim2.fromOffset(70, 34)
-levelLabel.TextXAlignment = Enum.TextXAlignment.Left
+UiKit.round(status, 8)
+new("UIStroke", { Color = Color3.fromRGB(64, 78, 98), Thickness = 1, Transparency = 0.3 }, status)
+local levelBadge = new("Frame", {
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	Position = UDim2.fromOffset(8, 8),
+	Size = UDim2.fromOffset(38, 38),
+}, status)
+UiKit.round(levelBadge, 19)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(GOLD_TOP, GOLD_BOTTOM) }, levelBadge)
+new("UIStroke", { Color = Color3.fromRGB(255, 240, 200), Thickness = 1.5 }, levelBadge)
+local levelLabel = text(levelBadge, "1", 16, Color3.fromRGB(40, 24, 0), IronUi.Heading)
+levelLabel.Size = UDim2.fromScale(1, 1)
+levelLabel.TextStrokeTransparency = 1
+local nameLabel = text(status, "", 13, P.Text, IronUi.Heading, Enum.TextXAlignment.Left)
+nameLabel.Position, nameLabel.Size = UDim2.fromOffset(54, 7), UDim2.new(1, -140, 0, 18)
+nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+local coinsLabel = text(status, "0", 13, P.Gold, IronUi.Heading, Enum.TextXAlignment.Right)
+coinsLabel.AnchorPoint = Vector2.new(1, 0)
+coinsLabel.Position, coinsLabel.Size = UDim2.new(1, -9, 0, 7), UDim2.fromOffset(84, 18)
 local levelTrack = new("Frame", {
 	BorderSizePixel = 0,
-	BackgroundColor3 = Color3.fromRGB(30, 38, 50),
-	AnchorPoint = Vector2.new(0, 0.5),
-	Position = UDim2.new(0, 84, 0.5, 0),
-	Size = UDim2.new(1, -194, 0, 6),
+	BackgroundColor3 = Color3.fromRGB(34, 44, 58),
+	Position = UDim2.fromOffset(54, 30),
+	Size = UDim2.new(1, -63, 0, 6),
 }, status)
 UiKit.round(levelTrack, 3)
 local levelFill = new("Frame", {
@@ -499,209 +553,121 @@ local levelFill = new("Frame", {
 	Size = UDim2.fromScale(0, 1),
 }, levelTrack)
 UiKit.round(levelFill, 3)
-local coinsLabel = text(status, "0", 13, P.Gold, IronUi.Heading)
-coinsLabel.AnchorPoint = Vector2.new(1, 0)
-coinsLabel.Position, coinsLabel.Size = UDim2.new(1, -10, 0, 0), UDim2.fromOffset(100, 34)
-coinsLabel.TextXAlignment = Enum.TextXAlignment.Right
+local xpLabel = text(status, "", 10, P.Dim, IronUi.Body, Enum.TextXAlignment.Left)
+xpLabel.Position, xpLabel.Size = UDim2.fromOffset(54, 37), UDim2.new(1, -63, 0, 14)
+xpLabel.TextStrokeTransparency = 1
 
--- What's happening (right): your daily streak and the next mode to unlock.
-local news = new("Frame", {
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -16, 0, 64),
-	Size = UDim2.fromOffset(208, 120),
-	BackgroundColor3 = STEEL,
-	BackgroundTransparency = 0.12,
-}, gui)
-UiKit.round(news, 8)
-new("UIStroke", { Color = Color3.fromRGB(70, 82, 98), Thickness = 1, Transparency = 0.45 }, news)
-UiKit.list(news, 0, false)
-local function newsPanel(order: number, height: number)
-	local panel = new("Frame", {
-		Size = UDim2.fromOffset(208, height),
-		BackgroundTransparency = 1,
-		LayoutOrder = order,
-	}, news)
-
-	return panel
+-- On a phone: level and coins in a pill beside PLAY, and who's around on
+-- its other side.
+local function pill(parent: Instance)
+	local p = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(12, 16, 24),
+		BackgroundTransparency = 0.15,
+		Size = UDim2.fromOffset(150, 30),
+		Visible = false,
+	}, parent)
+	UiKit.round(p, 15)
+	new("UIStroke", { Color = Color3.fromRGB(64, 78, 98), Thickness = 1, Transparency = 0.3 }, p)
+	local l = text(p, "", 12, P.Text, IronUi.Heading)
+	l.RichText = true
+	l.Size = UDim2.fromScale(1, 1)
+	l.TextStrokeTransparency = 1
+	return p, l
 end
-local dailyPanel = newsPanel(1, 64)
-local dailyTitle = text(dailyPanel, "DAILY REWARD", 11, P.Gold, IronUi.Heading)
-dailyTitle.Position, dailyTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(184, 14)
-dailyTitle.TextXAlignment = Enum.TextXAlignment.Left
-local dailyText = text(dailyPanel, "", 11, P.Text, IronUi.Heading)
-dailyText.Position, dailyText.Size = UDim2.fromOffset(12, 24), UDim2.fromOffset(184, 14)
-dailyText.TextXAlignment = Enum.TextXAlignment.Left
-local streakDots = {}
-for i = 1, 7 do
-	local dot = new("Frame", {
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(12 + (i - 1) * 27, 43),
-		Size = UDim2.fromOffset(22, 16),
-		BackgroundColor3 = Color3.fromRGB(30, 38, 50),
-	}, dailyPanel)
-	UiKit.round(dot, 4)
-	local day = text(dot, tostring(i), 11, P.Dim, IronUi.Heading)
-	day.Size = UDim2.fromScale(1, 1)
-	streakDots[i] = { Dot = dot, Label = day }
-end
-local unlockPanel = newsPanel(2, 56)
-new("Frame", { Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 0, 1),
-	BorderSizePixel = 0, BackgroundColor3 = Color3.fromRGB(65, 77, 94), BackgroundTransparency = 0.5 }, unlockPanel)
-local unlockTitle = text(unlockPanel, "NEXT UNLOCK", 10, P.Gold, IronUi.Heading)
-unlockTitle.Position, unlockTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(184, 14)
-unlockTitle.TextXAlignment = Enum.TextXAlignment.Left
-local unlockText = text(unlockPanel, "", 12, P.Text, IronUi.Heading)
-unlockText.Position, unlockText.Size = UDim2.fromOffset(12, 23), UDim2.fromOffset(184, 16)
-unlockText.TextXAlignment = Enum.TextXAlignment.Left
-local unlockHint = text(unlockPanel, "", 10, P.Dim, IronUi.Body)
-unlockHint.Position, unlockHint.Size = UDim2.fromOffset(12, 40), UDim2.fromOffset(184, 14)
-unlockHint.TextXAlignment = Enum.TextXAlignment.Left
-unlockHint.TextYAlignment = Enum.TextYAlignment.Top
-unlockHint.TextWrapped = true
+local walletPill, walletText = pill(bar)
+local crowdPill, crowdText = pill(bar)
 
--- The next task (Shared.TrainingRewards): what to do, how, and how far
--- along. Tapping it opens the Tasks window.
-Training.closeFor(Config.Features or {})
-local TASK_H = 104
-local taskPanel = new("TextButton", {
-	Name = "NextTask",
-	Size = UDim2.fromOffset(208, TASK_H),
-	BackgroundTransparency = 1,
-	Text = "",
-	AutoButtonColor = false,
-	LayoutOrder = 3,
-}, news)
-local taskRule = new("Frame", {
-	Position = UDim2.fromOffset(12, 0),
-	Size = UDim2.new(1, -24, 0, 1),
-	BorderSizePixel = 0,
-	BackgroundColor3 = Color3.fromRGB(65, 77, 94),
-	BackgroundTransparency = 0.5,
-}, taskPanel)
-local taskTitle = text(taskPanel, "NEXT TASK", 10, Color3.fromRGB(103, 218, 232), IronUi.Heading)
-taskTitle.Position, taskTitle.Size = UDim2.fromOffset(12, 8), UDim2.fromOffset(120, 14)
-taskTitle.TextXAlignment = Enum.TextXAlignment.Left
-local taskReward = text(taskPanel, "", 10, P.Gold, IronUi.Heading)
-taskReward.Position, taskReward.Size = UDim2.fromOffset(112, 8), UDim2.fromOffset(84, 14)
-taskReward.TextXAlignment = Enum.TextXAlignment.Right
-local taskName = text(taskPanel, "", 12, P.Text, IronUi.Heading)
-taskName.Position, taskName.Size = UDim2.fromOffset(12, 23), UDim2.fromOffset(184, 16)
-taskName.TextXAlignment = Enum.TextXAlignment.Left
-taskName.TextTruncate = Enum.TextTruncate.AtEnd
-local taskHint = text(taskPanel, "", 11, P.Dim, IronUi.Body)
-taskHint.Position, taskHint.Size = UDim2.fromOffset(12, 40), UDim2.fromOffset(184, 40)
-taskHint.TextXAlignment = Enum.TextXAlignment.Left
-taskHint.TextYAlignment = Enum.TextYAlignment.Top
-taskHint.TextWrapped = true
-local taskTrack = new("Frame", {
-	BorderSizePixel = 0,
-	BackgroundColor3 = Color3.fromRGB(48, 62, 80),
-	Position = UDim2.fromOffset(12, 89),
-	Size = UDim2.fromOffset(140, 5),
-}, taskPanel)
-UiKit.round(taskTrack, 3)
-local taskFill = new("Frame", {
-	BorderSizePixel = 0,
-	BackgroundColor3 = Color3.fromRGB(103, 218, 232),
-	Size = UDim2.fromScale(0, 1),
-}, taskTrack)
-UiKit.round(taskFill, 3)
-local taskCount = text(taskPanel, "", 10, P.Text, IronUi.Heading)
-taskCount.Position, taskCount.Size = UDim2.fromOffset(156, 83), UDim2.fromOffset(40, 16)
-taskCount.TextXAlignment = Enum.TextXAlignment.Right
-taskPanel.Activated:Connect(function()
-	local tasks = player.PlayerGui:FindFirstChild("TrainingRewards")
-	local open = tasks and tasks:FindFirstChild("OpenTasks")
-	if open and open:IsA("BindableEvent") then
-		open:Fire()
-	end
-end)
-
--- What the panel shows: on a phone only the task; the rest on wider screens.
-local compactNews = false
-local function layoutNews()
-	dailyPanel.Visible = not compactNews
-	unlockPanel.Visible = not compactNews and unlockPanel:GetAttribute("Pending") == true
-	taskRule.Visible = dailyPanel.Visible or unlockPanel.Visible
-	local height = 0
-	for _, panel in { dailyPanel, unlockPanel, taskPanel } do
-		if panel.Visible then
-			height += panel.Size.Y.Offset
-		end
-	end
-	news.Size = UDim2.fromOffset(208, height + 4)
-	return height > 0
+local function formatCoins(coins: number): string
+	return (tostring(math.floor(coins)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
 end
+
+-- The right side: daily streak, daily challenges, next unlock, next task
+-- (Modules/LobbyBoard); the live feed and the welcome banner (Modules/LobbyFeed).
+local LobbyBoard = require(script.Parent.LobbyBoard)
+local LobbyFeed = require(script.Parent.LobbyFeed)
+local board = LobbyBoard.mount(gui)
+LobbyFeed.mount(gui)
 
 local function refreshNews()
 	local profile = GemClient.Profile
 	if not profile then
 		return
 	end
-	-- Level and coins.
+	-- Level, XP and coins.
 	local Tree = require(game:GetService("ReplicatedStorage").Shared.AugmentTree)
-	local xp = profile.Augments and profile.Augments.XP or 0
+	local xp = math.max(0, profile.Augments and profile.Augments.XP or 0)
 	local level = Tree.level(xp)
-	levelLabel.Text = "LEVEL " .. level
+	levelLabel.Text = tostring(level)
+	nameLabel.Text = player.DisplayName
 	local maxed = level >= Tree.MaxLevel
-	local progress = if maxed then 1 else (math.max(0, xp) % Tree.XPPerPoint) / Tree.XPPerPoint
-	levelFill.Size = UDim2.fromScale(math.clamp(progress, 0, 1), 1)
-	local coins = math.floor(profile.Coins or 0)
-	local formatted = tostring(coins):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
-	coinsLabel.Text = "◆ " .. formatted
-	-- Daily streak (Config: a week of growing rewards).
-	local daily = profile.Daily or {}
-	local streak = math.clamp(daily.Streak or 0, 0, 7)
-	dailyText.Text = if streak > 0
-		then string.format("Day %d / 7 · next reward tomorrow", streak)
-		else "Return daily to grow your rewards"
-	for i, entry in streakDots do
-		local done = i <= streak
-		entry.Dot.BackgroundColor3 = if done
-			then Color3.fromRGB(46, 120, 76)
-			elseif i == streak + 1 then GOLD_BOTTOM
-			else Color3.fromRGB(30, 38, 50)
-		entry.Label.TextColor3 = if done or i == streak + 1 then Color3.new(1, 1, 1) else P.Dim
-		entry.Label.Text = if done then "✓" else tostring(i)
-	end
-	-- The next mode you're working toward.
+	local into = xp % Tree.XPPerPoint
+	levelFill.Size = UDim2.fromScale(if maxed then 1 else math.clamp(into / Tree.XPPerPoint, 0, 1), 1)
+	xpLabel.Text = if maxed
+		then "MAX LEVEL"
+		else string.format("%d / %d XP to level %d", into, Tree.XPPerPoint, level + 1)
+	coinsLabel.Text = "◆ " .. formatCoins(profile.Coins or 0)
+	walletText.Text =
+		string.format('LV %d  <font color="#FFCA5B">◆ %s</font>', level, formatCoins(profile.Coins or 0))
+	-- The next mode you're working toward (while modes unlock with duels).
 	local duels = played()
-	local nextName, need = nil, nil
+	local unlock = nil
 	local first = if LobbyUI.DungeonsOpen then "Dungeon & Casual" else "Casual 1v1"
 	for _, entry in { { first, LobbyUI.Unlocks.Casual }, { "Ranked 1v1", LobbyUI.Unlocks.Ranked } } do
 		if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled
 			and not (profile.Tutorial and profile.Tutorial.Done) and duels < entry[2] then
-			nextName, need = entry[1], entry[2]
+			unlock = { Name = entry[1], Left = entry[2] - duels }
 			break
 		end
 	end
-	-- Only while a mode is still locked: once all are open it has nothing to say.
-	unlockPanel:SetAttribute("Pending", nextName ~= nil)
-	if nextName then
-		unlockTitle.Text = "NEXT UNLOCK"
-		unlockText.Text = string.upper(nextName)
-		unlockHint.Text = string.format(
-			"%d more duel%s to unlock",
-			need - duels,
-			if need - duels == 1 then "" else "s"
-		)
-	end
-	-- The next task.
-	local state = profile.TrainingRewards or {}
-	local nextTask = Training.nextTask(state.Paid or {})
-	taskPanel.Visible = nextTask ~= nil
-	if nextTask then
-		local progress = math.min(nextTask.Goal, (state.Counts or {})[nextTask.Event] or 0)
-		taskName.Text = nextTask.Name
-		taskHint.Text = nextTask.Hint
-		taskReward.Text = "+" .. nextTask.Coins .. " ◆"
-		taskCount.Text = progress .. " / " .. nextTask.Goal
-		taskFill.Size = UDim2.fromScale(progress / nextTask.Goal, 1)
-	end
-	layoutNews()
+	LobbyBoard.unlock = unlock
+	LobbyBoard.refresh()
 end
 GemClient.Changed:Connect(refreshNews)
 task.defer(refreshNews)
+
+-- Who's around: miners in the server, and how many are searching for a
+-- 1v1 or fighting one (their DuelQueue and MatchId attributes).
+local function crowd()
+	local online, searching, fighting = 0, 0, 0
+	for _, other in Players:GetPlayers() do
+		online += 1
+		if other:GetAttribute("DuelQueue") then
+			searching += 1
+		elseif other:GetAttribute("MatchId") then
+			fighting += 1
+		end
+	end
+	return online, searching, fighting
+end
+LobbyUI.crowd = crowd
+local function refreshCrowd()
+	local online, searching = crowd()
+	local dot = '<font color="#4ED692">●</font> '
+	if searching > 0 then
+		playSub.Text = string.format("● %d ONLINE  ·  %d SEARCHING", online, searching)
+		crowdText.Text = string.format("%s%d online · %d searching", dot, online, searching)
+	else
+		playSub.Text = if online > 1
+			then string.format("● %d MINERS ONLINE", online)
+			else "PRACTICE  ·  CASUAL  ·  RANKED"
+		crowdText.Text = string.format("%s%d online", dot, online)
+	end
+end
+Players.PlayerAdded:Connect(refreshCrowd)
+Players.PlayerRemoving:Connect(function()
+	task.defer(refreshCrowd)
+end)
+task.spawn(function()
+	while true do
+		if gui.Enabled then
+			refreshCrowd()
+			if picker.Visible then
+				refreshCards() -- (the queues' live counts)
+			end
+		end
+		task.wait(2)
+	end
+end)
 
 -- REPORT A BUG, beside the TASKS button (top right): the feedback form
 -- (Social), which sends the build and where you were with it.
@@ -739,19 +705,33 @@ local function fitDock()
 	table.sort(buttons, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
 	modes.Visible = false
 	status.Visible = not mobile
-	compactNews = mobile
-	news.Position = UDim2.new(1, -16, 0, 64)
-	news.Visible = layoutNews() and not picker.Visible
+	walletPill.Visible, crowdPill.Visible = mobile, mobile
+	-- The board under TASKS on the right; the live feed at the top centre.
+	LobbyBoard.setCompact(mobile)
+	LobbyFeed.setCompact(mobile)
+	board.Position = UDim2.new(1, -16, 0, 64)
+	LobbyBoard.setHidden(picker.Visible)
 	bug.Visible = not picker.Visible
-	bug.Size = UDim2.fromOffset(132, if mobile then 44 else 40)
+	bug.Size = UDim2.fromOffset(if mobile then 84 else 132, if mobile then 44 else 40)
+	bug.Text = if mobile then "🐞 BUG" else "🐞 REPORT A BUG"
 	if mobile then
 		local compact = MobileLayout.dock(size, #buttons)
 		local width, gap, tileHeight = compact.W, compact.Gap, compact.TileHeight
 		bar.AnchorPoint, bar.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -12)
 		bar.Size = UDim2.fromOffset(width, 52 + tileHeight)
+		local playWidth = math.min(220, width)
 		play.AnchorPoint = Vector2.new(0.5, 0)
-		play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(math.min(220, width), 44)
+		play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(playWidth, 44)
 		playCaption.TextSize = 22
+		playCaption.Position, playCaption.Size = UDim2.fromOffset(0, 0), UDim2.fromScale(1, 1)
+		playSub.Visible = false
+		-- The pills either side of PLAY, as wide as the screen has room for.
+		local side = math.floor((size.X - playWidth) / 2) - 24
+		local pillWidth = math.clamp(side, 0, 160)
+		walletPill.Visible, crowdPill.Visible = pillWidth >= 96, pillWidth >= 96
+		walletPill.AnchorPoint, walletPill.Position = Vector2.new(1, 0.5), UDim2.new(0.5, -playWidth / 2 - 8, 0, 22)
+		crowdPill.AnchorPoint, crowdPill.Position = Vector2.new(0, 0.5), UDim2.new(0.5, playWidth / 2 + 8, 0, 22)
+		walletPill.Size, crowdPill.Size = UDim2.fromOffset(pillWidth, 30), UDim2.fromOffset(pillWidth, 30)
 		tiles.AnchorPoint, tiles.Position = Vector2.new(0, 0), UDim2.fromOffset(0, 52)
 		tiles.Size = UDim2.fromOffset(width, tileHeight)
 		local tileWidth = math.floor((width - gap * math.max(0, #buttons - 1)) / math.max(1, #buttons))
@@ -771,8 +751,12 @@ local function fitDock()
 	local utilityWidth = (width - gap) / 2
 	bar.AnchorPoint, bar.Position = Vector2.zero, UDim2.fromOffset(16, 54)
 	play.AnchorPoint, play.Position = Vector2.zero, UDim2.fromOffset(0, 0)
-	play.Size, playCaption.TextSize = UDim2.fromOffset(width, 44), 23
-	tiles.AnchorPoint, tiles.Position = Vector2.zero, UDim2.fromOffset(0, 50)
+	play.Size, playCaption.TextSize = UDim2.fromOffset(width, 56), 26
+	playCaption.Position, playCaption.Size = UDim2.fromOffset(0, 5), UDim2.new(1, 0, 0, 30)
+	playSub.Visible = true
+	playSub.Position, playSub.Size = UDim2.fromOffset(0, 35), UDim2.new(1, 0, 0, 14)
+	local top = 62
+	tiles.AnchorPoint, tiles.Position = Vector2.zero, UDim2.fromOffset(0, top)
 	local utility = 0
 	for _, button in buttons do
 		local primary = button.Name == "INVENTORY"
@@ -803,13 +787,8 @@ local function fitDock()
 	end
 	local tilesHeight = 40 + math.ceil(utility / 2) * (utilityHeight + gap)
 	tiles.Size = UDim2.fromOffset(width, tilesHeight)
-	status.Position, status.Size = UDim2.fromOffset(0, 50 + tilesHeight + 8), UDim2.fromOffset(width, 28)
-	levelLabel.TextSize, coinsLabel.TextSize = 11, 11
-	levelLabel.Position, levelLabel.Size = UDim2.fromOffset(8, 0), UDim2.fromOffset(56, 28)
-	levelTrack.Position, levelTrack.Size = UDim2.new(0, 65, 0.5, 0), UDim2.new(1, -151, 0, 4)
-	coinsLabel.Position, coinsLabel.Size = UDim2.new(1, -8, 0, 0), UDim2.fromOffset(78, 28)
-	bar.Size = UDim2.fromOffset(width, 50 + tilesHeight + 8 + 28)
-	news.Position = UDim2.new(1, -16, 0, 64)
+	status.Position, status.Size = UDim2.fromOffset(0, top + tilesHeight + 8), UDim2.fromOffset(width, 54)
+	bar.Size = UDim2.fromOffset(width, top + tilesHeight + 8 + 54)
 end
 picker:GetPropertyChangedSignal("Visible"):Connect(function()
 	gui:SetAttribute("ModePickerOpen", picker.Visible)
@@ -879,6 +858,15 @@ end)
 
 function LobbyUI.setVisible(on: boolean)
 	wanted = on
+	if on then
+		refreshCrowd()
+		-- The welcome banner, once the lobby has settled (Modules/LobbyFeed).
+		task.delay(1.5, function()
+			if wanted and not dashboardShown then
+				LobbyFeed.welcome()
+			end
+		end)
+	end
 	if not on then
 		LobbyUI.closePicker()
 		if dashboardShown then

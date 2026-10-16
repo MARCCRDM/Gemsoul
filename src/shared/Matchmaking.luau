@@ -54,7 +54,9 @@ Matchmaking.Rounds = {
 	Pivot = 30, -- seconds to pick a preset between rounds
 	Reveal = 3, -- seconds the picks show before the countdown
 }
--- Coins for a duel: by its PvP rule (Shared.PvPRules.Kinds).
+-- Coins for a duel: by its PvP rule (Shared.PvPRules.Kinds). Beating a rival
+-- in 1v1 Practice pays this (Systems/Duelist; the PLAY menu shows it).
+Matchmaking.RivalWinCoins = 25
 
 Matchmaking.Raid = {
 	Min = 3, -- raiders needed to start
