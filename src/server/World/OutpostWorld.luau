@@ -488,29 +488,118 @@ local function welcomeField(parent, at: CFrame)
 	local orange = Color3.fromRGB(225, 106, 32)
 	local amber = Color3.fromRGB(255, 203, 126)
 	local green = Color3.fromRGB(45, 91, 68)
-	local function pumpkin(x, z, scale, yaw)
-		local pose = at * CFrame.new(x, 0, z) * CFrame.Angles(0, yaw, 0)
+	local violet = Color3.fromRGB(163, 105, 236)
+	local exclusions = {}
+	local function pumpkin(x, z, scale, yaw, style, height)
+		local pose = at * CFrame.new(x, height or 0, z) * CFrame.Angles(0, yaw, 0)
 		local m = folder(decor, "MoonPumpkin")
+		m:SetAttribute("PumpkinScale", scale)
+		local rind = if style == "Pearl" then Color3.fromRGB(224, 214, 186) else orange
+		local groove = if style == "Pearl" then Color3.fromRGB(188, 175, 151) else Color3.fromRGB(191, 77, 28)
+		local glow = if style == "Pearl" then violet else amber
 		for i = 0, 7 do
 			local a = i * math.pi / 4
 			part(m, pose * CFrame.new(math.cos(a) * .48 * scale, .9 * scale, math.sin(a) * .48 * scale),
-				Vector3.new(1.3, 1.65, 1.3) * scale, if i % 2 == 0 then orange else Color3.fromRGB(191, 77, 28),
+				Vector3.new(1.3, 1.65, 1.3) * scale, if i % 2 == 0 then rind else groove,
 				Enum.Material.SmoothPlastic, "Ball")
 		end
 		part(m, pose * CFrame.new(0, 1.85 * scale, 0) * CFrame.Angles(0, 0, -.25),
 			Vector3.new(.27, .6, .27) * scale, green, Enum.Material.Wood)
 		for _, xEye in { -.38, .38 } do
 			part(m, pose * CFrame.new(xEye * scale, 1.08 * scale, 1.04 * scale) * CFrame.Angles(0, 0, xEye * .5),
-				Vector3.new(.3, .35, .12) * scale, amber, Enum.Material.Neon)
+				Vector3.new(.3, .35, .12) * scale, glow, Enum.Material.Neon, if style == "Pearl" then "Ball" else nil)
 		end
 		local smile = part(m, pose * CFrame.new(0, .6 * scale, 1.08 * scale),
-			Vector3.new(.7, .18, .12) * scale, amber, Enum.Material.Neon)
-		if scale > 1.2 then light(smile, amber, 14, .65) end
+			Vector3.new(.7, .18, .12) * scale, glow, Enum.Material.Neon)
+		if scale > 2.5 then
+			-- A gap-toothed smile on the giant photo pumpkins.
+			part(m, pose * CFrame.new(.12 * scale, .66 * scale, 1.16 * scale),
+				Vector3.new(.14, .13, .06) * scale, rind)
+			light(smile, glow, 20, .75)
+		end
+		return pose
 	end
 	for _, p in { { -20, 46, 1.4, -.2 }, { -23, 44, .8, -.4 }, { 20, 46, 1.5, .2 },
 		{ 23, 43, .9, .4 }, { -31, 18, 1.2, -.3 }, { 31, 18, 1.3, .3 },
 		{ -33, -7, .9, 0 }, { 34, -7, 1.1, .2 } } do
 		pumpkin(p[1], p[2], p[3], p[4])
+	end
+	-- Small patches at destinations across the lobby, with footprints reserved
+	-- from random mining placement. Sizes range from pocket pumpkins to giants.
+	for i, patch in { { -47, 8, 3.8 }, { 60, 4, 3.2 }, { -127, 20, 4.2 },
+		{ 128, 118, 2.8 }, { -81, 153, 3.4 }, { 81, 153, 3.6 }, { -38, -80, 2.6 } } do
+		local x, z, size = patch[1], patch[2], patch[3]
+		table.insert(exclusions, { (at * CFrame.new(x, 0, z)).Position, 11 })
+		local pose = pumpkin(x, z, size, (if x < 0 then -.3 else .3), if i % 3 == 0 then "Pearl" else nil)
+		pumpkin(x - 5, z + 3, 1.05, -.5, "Pearl")
+		pumpkin(x + 4.5, z + 3.5, .55, .3)
+		if i == 1 or i == 6 then
+			-- Squat brim and a crooked, faceted witch hat above the giant pumpkin.
+			local hat = pose * CFrame.new(0, size * 1.75, 0) * CFrame.Angles(0, 0, -.15)
+			disc(decor, hat, size * .85, .24, Color3.fromRGB(43, 30, 65), Enum.Material.SmoothPlastic)
+			for tier = 0, 2 do
+				for _, yaw in { 0, math.pi } do
+					part(decor, hat * CFrame.new(tier * .3, 1 + tier * 1.1, 0) * CFrame.Angles(0, yaw, 0),
+						Vector3.new(3.6 - tier, 2.2, 1.8 - tier * .45), Color3.fromRGB(53, 34, 80), nil, "Wedge")
+				end
+			end
+			disc(decor, hat * CFrame.new(0, .35, 0), size * .52, .35, violet, Enum.Material.SmoothPlastic)
+		end
+	end
+	-- A pumpkin totem beside the leaderboard, with deliberately uneven tiers.
+	table.insert(exclusions, { (at * CFrame.new(-49, 0, 57)).Position, 6 })
+	pumpkin(-49, 57, 1.7, -.2)
+	pumpkin(-49.2, 57, 1.2, .2, "Pearl", 2.75)
+	pumpkin(-48.9, 57, .7, -.3, nil, 4.7)
+	local function ghost(x, y, z, scale, yaw)
+		local m = folder(decor, "MoonGhost")
+		local pose = at * CFrame.new(x, y, z) * CFrame.Angles(0, yaw, -.1)
+		local cream = Color3.fromRGB(219, 237, 236)
+		part(m, pose, Vector3.new(1.9, 2.5, 1.3) * scale, cream, Enum.Material.SmoothPlastic, "Ball")
+		for j = -1, 1 do
+			part(m, pose * CFrame.new(j * .55 * scale, -1.05 * scale, 0), Vector3.new(.7, .8, 1) * scale,
+				cream, Enum.Material.SmoothPlastic, "Ball")
+		end
+		for _, side in { -1, 1 } do
+			part(m, pose * CFrame.new(side * 1.1 * scale, .15 * scale, 0) * CFrame.Angles(0, 0, side * .6),
+				Vector3.new(.9, .4, .55) * scale, cream, Enum.Material.SmoothPlastic, "Ball")
+			part(m, pose * CFrame.new(side * .32 * scale, .25 * scale, .62 * scale),
+				Vector3.new(.22, .38, .13) * scale, HULL_DARK, nil, "Ball")
+		end
+		part(m, pose * CFrame.new(0, -.25 * scale, .67 * scale), Vector3.new(.25, .3, .1) * scale, violet, Enum.Material.Neon, "Ball")
+	end
+	ghost(-27, 9, 42, 1.1, -.3)
+	ghost(28, 11, 39, .85, .3)
+	ghost(-123, 13, 23, 1.4, -.2)
+	ghost(86, 12, 153, 1.2, -.5)
+	ghost(-38, 11, -80, 1, .3)
+	-- Bats hang over the patches, away from the walking/camera corridor.
+	for i, p in { { -47, 15, 8 }, { -43, 17, 9 }, { 59, 13, 4 }, { 64, 15, 6 },
+		{ -81, 15, 153 }, { 81, 17, 153 }, { -127, 18, 20 }, { 128, 13, 118 } } do
+		local pose = at * CFrame.new(p[1], p[2], p[3]) * CFrame.Angles(0, i * .4, .2)
+		local m = folder(decor, "HarvestBat")
+		part(m, pose, Vector3.new(.6, 1, .5), HULL_DARK, nil, "Ball")
+		for _, side in { -1, 1 } do
+			part(m, pose * CFrame.new(side * .9, .15, 0) * CFrame.Angles(0, if side < 0 then math.pi else 0, side * -.3),
+				Vector3.new(1.6, .85, .16), Color3.fromRGB(65, 41, 88), nil, "Wedge")
+			part(m, pose * CFrame.new(side * .18, .6, 0), Vector3.new(.18, .45, .24), HULL_DARK, nil, "Wedge")
+		end
+	end
+	-- Delicate webs on freestanding frames by the service landmarks.
+	for _, p in { { -89, 26 }, { 79, 70 } } do
+		local pose = at * CFrame.new(p[1], 8, p[2])
+		part(decor, pose * CFrame.new(-3.5, -2, 0), Vector3.new(.25, 12, .25), HULL_DARK, Enum.Material.Metal)
+		part(decor, pose * CFrame.new(0, 3.5, 0), Vector3.new(7.3, .25, .25), HULL_DARK, Enum.Material.Metal)
+		local web = folder(decor, "HarvestWeb")
+		for ray = 0, 5 do
+			local a, b = ray * math.pi / 3, (ray + 1) * math.pi / 3
+			tube(web, pose.Position, (pose * CFrame.new(math.cos(a) * 3.4, math.sin(a) * 3.4, 0)).Position, .035, HULL)
+			for ring = 1, 3 do
+				local r = ring * 1.1
+				tube(web, (pose * CFrame.new(math.cos(a) * r, math.sin(a) * r, 0)).Position,
+					(pose * CFrame.new(math.cos(b) * r, math.sin(b) * r, 0)).Position, .025, HULL)
+			end
+		end
 	end
 	-- Warm pools of light at the edge of the field; the centre stays open.
 	for _, x in { -22, 22 } do
@@ -551,6 +640,7 @@ local function welcomeField(parent, at: CFrame)
 		part(decor, gift * CFrame.new(0, .67, 0), Vector3.new(.2, .06, 1.25), amber)
 		part(decor, gift * CFrame.new(0, 0, .61), Vector3.new(.2, 1.3, .04), amber)
 	end
+	return exclusions
 end
 
 -- The Arena Uplink: a ring gate on a pad, for queuing duels.
@@ -1328,7 +1418,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local probeScreen = probe(root, at * CFrame.new(96, 0, 52) * CFrame.Angles(0, math.rad(-120), 0))
 	local face = billboard(root, at * CFrame.new(-67, 0, 59) * CFrame.Angles(0, math.rad(145), 0))
 	local gatePad = gate(root, at * CFrame.new(-110, 0, 40))
-	welcomeField(root, at)
+	local festiveExclusions = welcomeField(root, at)
 	sky(root, at)
 
 	-- Where rocks can grow: across the basin, clear of the buildings.
@@ -1349,6 +1439,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ motorAt.Position, 84 },
 		{ rigAt.Position, 16 },
 	}
+	for _, exclusion in festiveExclusions do
+		table.insert(keepOut, exclusion)
+	end
 	for _, secret in hidden do
 		table.insert(keepOut, { secret.CFrame.Position, 26 })
 	end
