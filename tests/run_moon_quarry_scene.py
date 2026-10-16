@@ -50,7 +50,12 @@ local origin=CFrame.new(0,0,7000)
 local site=World.build(origin,{})
 assert(site.Model.Landscape=="Moon Quarry" and site.Model.SkySetting=="MoonBase")
 assert(#site.Secrets==0 and #site.FieldSpots==0,"Retired extras returned")
-assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7070 and site.Spawn.Position.Y==3.5,"Landing pad spawn moved")
+assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7058 and site.Spawn.Position.Y==3.5,"Spawn must face the field from the front of the pad")
+assert(#site.ArrivalSpots==8,"Welcome mining field missing")
+for _,index in site.ArrivalSpots do
+ local p=site.Spots[index].Position-origin.Position
+ assert(p.Z<30 and math.abs(p.X)>=12 and math.abs(p.X)<=26,"Welcome nodes block the central path")
+end
 assert(site.Probe.Name=="ProbeScreen" and site.Board.Name=="BoardFace" and site.Gate.Name=="GatePad","Missing lobby services")
 assert(Rules.Radius==440 and Rules.NodeCount==110 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
 assert(#site.Spots>=Rules.NodeCount,"Too few mining sites")
@@ -185,6 +190,40 @@ for _,kind in Rules.MachineOrder do
    print("MECH|"..table.concat(row,"|"))
   end
  end
+end
+'''
+server = (ROOT / "src/server/Systems/OutpostServer.luau").read_text(encoding="utf-8")
+spawn_node = server[server.index("local function spawnNode("):server.index("-- A rock popped:")]
+source += r'''
+do
+local freeSpots,fieldSpots,nodes={},{},{}
+local nodesFolder={}
+local nextId=0
+local rng=Random.new(45)
+local OutpostWorld=World
+local OutpostServer={Tag="MineNode"}
+local CollectionService={AddTag=function() end}
+for i in site.Spots do freeSpots[i]=true end
+''' + spawn_node + r'''
+for i=1,Rules.NodeCount do spawnNode() end
+assert(nextId==110,"Welcome nodes changed total population")
+for _,i in site.ArrivalSpots do assert(not freeSpots[i],"Random population left welcome field empty") end
+local arrivalIndex=site.ArrivalSpots[1]
+for id,node in nodes do if node.Spot==arrivalIndex then nodes[id]=nil end end
+freeSpots[arrivalIndex]=true
+spawnNode()
+assert(nodes[nextId].Spot==arrivalIndex,"Welcome rock did not replenish")
+local occupied={}
+for _,node in nodes do
+ assert(not occupied[node.Spot],"Mining nodes share a site")
+ occupied[node.Spot]=true
+end
+-- A field-only request must not consume common welcome positions.
+freeSpots[arrivalIndex]=true
+local before=nextId
+spawnNode(true)
+assert(nextId==before and freeSpots[arrivalIndex],"Zone filter bypassed by arrival priority")
+print("PASS: actual server node population, 8 welcome rocks, 110-node cap, replenishment and zone isolation")
 end
 '''
 lighting = (ROOT / "src/client/Modules/Scenes.luau").read_text(encoding="utf-8")

@@ -15,6 +15,7 @@ local player = Players.LocalPlayer
 
 local ThirdPerson = {}
 ThirdPerson.StartZoom = 14 -- studs behind the player on arrival
+ThirdPerson.LobbyZoom = 18 -- wider view of the mining field on the landing pad
 ThirdPerson.MinZoom = 6 -- the closest the player can scroll in
 ThirdPerson.MaxZoom = 40
 
@@ -31,10 +32,11 @@ function ThirdPerson.enter(destination: CFrame?)
 		saved = { Mode = player.CameraMode, Min = player.CameraMinZoomDistance, Max = player.CameraMaxZoomDistance }
 	end
 	arrival = destination
+	local zoom = if destination then ThirdPerson.LobbyZoom else ThirdPerson.StartZoom
 	cancelReset()
 	player.CameraMode = Enum.CameraMode.Classic
 	player.CameraMaxZoomDistance = ThirdPerson.MaxZoom
-	player.CameraMinZoomDistance = ThirdPerson.StartZoom
+	player.CameraMinZoomDistance = zoom
 	-- CombatSession can clear before the teleport reaches the client. Wait
 	-- for the destination and two stable frames, after combat camera cleanup.
 	local elapsed, stable, applied = 0, 0, false
@@ -72,10 +74,10 @@ function ThirdPerson.enter(destination: CFrame?)
 		local forward = Vector3.new(direction.X, 0, direction.Z)
 		forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.new(0, 0, -1)
 		local focus = root.Position + Vector3.new(0, 2, 0)
-		local eye = focus - forward * ThirdPerson.StartZoom + Vector3.new(0, 6, 0)
+		local eye = focus - forward * zoom + Vector3.new(0, if destination then 8 else 6, 0)
 		player.CameraMode = Enum.CameraMode.Classic
 		player.CameraMaxZoomDistance = ThirdPerson.MaxZoom
-		player.CameraMinZoomDistance = ThirdPerson.StartZoom
+		player.CameraMinZoomDistance = zoom
 		humanoid.CameraOffset = Vector3.zero
 		camera.CameraSubject = humanoid
 		camera.CameraType = Enum.CameraType.Custom

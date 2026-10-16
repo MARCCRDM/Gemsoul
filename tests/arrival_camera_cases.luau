@@ -41,8 +41,8 @@ check(camera.CFrame==old,"Reset before the teleport settled")
 -- A late first-person cleanup must not put the camera back inside the body.
 player.CameraMode="FirstPerson";player.CameraMinZoomDistance=.5;player.CameraMaxZoomDistance=.5
 step(1)
-check(camera.CFrame.Position.Y==root.Position.Y+8,"Arrival camera is not safely above the player")
-check(camera.CFrame.Position.Z==root.Position.Z+14,"Arrival camera is not behind the spawn heading")
+check(camera.CFrame.Position.Y==root.Position.Y+10,"Arrival camera is not safely above the player")
+check(camera.CFrame.Position.Z==root.Position.Z+18,"Arrival camera is not behind the spawn heading")
 check(camera.CFrame.LookVector.Y<0,"Camera is still looking up from below the ground")
 check(camera.Focus.Position.Y==root.Position.Y+2,"Camera focus is not at the character")
 check(camera.CameraSubject==humanoid and camera.CameraType=="Custom","Did not restore the live humanoid camera")
@@ -75,4 +75,7 @@ humanoid={Health=100};player.Character=character;root.Position=Vector3.new(5000,
 check(camera.CameraSubject==humanoid,"Respawn retained the old humanoid")
 ThirdPerson.exit();added()
 check(next(callbacks)==nil,"Respawn outside a mining world claimed the camera")
+ThirdPerson.enter();step(3)
+check(camera.CFrame.Position.Z==root.Position.Z+14 and camera.CFrame.Position.Y==root.Position.Y+8,"Mine camera inherited lobby framing")
+ThirdPerson.exit()
 print("PASS: "..checks.." arrival camera checks: delayed teleport, safe pitch, combat cleanup, orbit, cancellation, insertion, timeout and respawn")

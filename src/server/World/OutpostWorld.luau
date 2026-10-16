@@ -481,6 +481,78 @@ local function billboard(parent, at: CFrame)
 	return face
 end
 
+-- A seasonal welcome at human scale. Static, non-interactive decorations
+-- frame the route without taking over the mining silhouettes or the sky.
+local function welcomeField(parent, at: CFrame)
+	local decor = folder(parent, "HarvestWelcome")
+	local orange = Color3.fromRGB(225, 106, 32)
+	local amber = Color3.fromRGB(255, 203, 126)
+	local green = Color3.fromRGB(45, 91, 68)
+	local function pumpkin(x, z, scale, yaw)
+		local pose = at * CFrame.new(x, 0, z) * CFrame.Angles(0, yaw, 0)
+		local m = folder(decor, "MoonPumpkin")
+		for i = 0, 7 do
+			local a = i * math.pi / 4
+			part(m, pose * CFrame.new(math.cos(a) * .48 * scale, .9 * scale, math.sin(a) * .48 * scale),
+				Vector3.new(1.3, 1.65, 1.3) * scale, if i % 2 == 0 then orange else Color3.fromRGB(191, 77, 28),
+				Enum.Material.SmoothPlastic, "Ball")
+		end
+		part(m, pose * CFrame.new(0, 1.85 * scale, 0) * CFrame.Angles(0, 0, -.25),
+			Vector3.new(.27, .6, .27) * scale, green, Enum.Material.Wood)
+		for _, xEye in { -.38, .38 } do
+			part(m, pose * CFrame.new(xEye * scale, 1.08 * scale, 1.04 * scale) * CFrame.Angles(0, 0, xEye * .5),
+				Vector3.new(.3, .35, .12) * scale, amber, Enum.Material.Neon)
+		end
+		local smile = part(m, pose * CFrame.new(0, .6 * scale, 1.08 * scale),
+			Vector3.new(.7, .18, .12) * scale, amber, Enum.Material.Neon)
+		if scale > 1.2 then light(smile, amber, 14, .65) end
+	end
+	for _, p in { { -20, 46, 1.4, -.2 }, { -23, 44, .8, -.4 }, { 20, 46, 1.5, .2 },
+		{ 23, 43, .9, .4 }, { -31, 18, 1.2, -.3 }, { 31, 18, 1.3, .3 },
+		{ -33, -7, .9, 0 }, { 34, -7, 1.1, .2 } } do
+		pumpkin(p[1], p[2], p[3], p[4])
+	end
+	-- Warm pools of light at the edge of the field; the centre stays open.
+	for _, x in { -22, 22 } do
+		part(decor, at * CFrame.new(x, 6.5, 43), Vector3.new(.4, 13, .4), HULL_DARK, Enum.Material.Metal)
+		local lamp = part(decor, at * CFrame.new(x, 12, 43), Vector3.new(1, 1.4, 1), amber, Enum.Material.Neon)
+		light(lamp, amber, 30, 1.4)
+		part(decor, at * CFrame.new(x, 12.9, 43), Vector3.new(1.5, .25, 1.5), HULL_DARK, Enum.Material.Metal)
+	end
+	-- Sagging string lights, mostly orange with occasional violet bulbs.
+	local previous
+	for i = 0, 20 do
+		local t = i / 20
+		local cf = at * CFrame.new(-22 + t * 44, 13 - math.sin(t * math.pi) * 2.5, 43)
+		if previous then tube(decor, previous, cf.Position, .055, HULL_DARK) end
+		previous = cf.Position
+		part(decor, cf * CFrame.new(0, -.25, 0), Vector3.new(.32, .5, .32),
+			if i % 4 == 0 then Color3.fromRGB(169, 118, 255) else amber, Enum.Material.Neon, "Ball")
+	end
+	-- A small holiday cargo corner, off to the right, rather than snowing on the moon.
+	local tree = at * CFrame.new(34, 0, 59)
+	part(decor, tree * CFrame.new(0, 1.4, 0), Vector3.new(.7, 2.8, .7), HULL_DARK, Enum.Material.Wood)
+	for tier = 0, 2 do
+		local width = 5.6 - tier * 1.35
+		for _, yaw in { 0, math.pi / 2, math.pi, math.pi * 1.5 } do
+			part(decor, tree * CFrame.new(0, 2.6 + tier * 1.6, 0) * CFrame.Angles(0, yaw, 0),
+				Vector3.new(width, 3.2, width / 2), green, Enum.Material.SmoothPlastic, "Wedge")
+		end
+		for bulb = 0, 5 do
+			local a = bulb * math.pi / 3 + tier * .4
+			part(decor, tree * CFrame.new(math.cos(a) * width * .38, 2 + tier * 1.6, math.sin(a) * width * .38),
+				Vector3.one * .28, if bulb % 2 == 0 then amber else GLOW, Enum.Material.Neon, "Ball")
+		end
+	end
+	part(decor, tree * CFrame.new(0, 7.4, 0) * CFrame.Angles(0, 0, math.pi / 4), Vector3.new(.7, .7, .3), amber, Enum.Material.Neon)
+	for i = 0, 2 do
+		local gift = tree * CFrame.new(3 + i * 1.3, .65, i % 2)
+		part(decor, gift, Vector3.new(1.2, 1.3, 1.2), if i == 1 then green else Color3.fromRGB(149, 57, 49))
+		part(decor, gift * CFrame.new(0, .67, 0), Vector3.new(.2, .06, 1.25), amber)
+		part(decor, gift * CFrame.new(0, 0, .61), Vector3.new(.2, 1.3, .04), amber)
+	end
+end
+
 -- The Arena Uplink: a ring gate on a pad, for queuing duels.
 local function gate(parent, at: CFrame)
 	local m = folder(parent, "ArenaGate")
@@ -1254,8 +1326,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 
 	-- The Probe (market) on the east side, the leaderboard by the pad, the Arena gate west.
 	local probeScreen = probe(root, at * CFrame.new(96, 0, 52) * CFrame.Angles(0, math.rad(-120), 0))
-	local face = billboard(root, at * CFrame.new(-36, 0, 40) * CFrame.Angles(0, math.rad(160), 0))
+	local face = billboard(root, at * CFrame.new(-67, 0, 59) * CFrame.Angles(0, math.rad(145), 0))
 	local gatePad = gate(root, at * CFrame.new(-110, 0, 40))
+	welcomeField(root, at)
 	sky(root, at)
 
 	-- Where rocks can grow: across the basin, clear of the buildings.
@@ -1265,7 +1338,11 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ (north * CFrame.new(72, 0, -14)).Position, 18 },
 		{ padAt.Position, 40 },
 		{ (at * CFrame.new(96, 0, 52)).Position, 24 },
-		{ (at * CFrame.new(-36, 0, 40)).Position, 20 },
+		{ (at * CFrame.new(-67, 0, 59)).Position, 20 },
+		{ (at * CFrame.new(-31, 0, 18)).Position, 6 },
+		{ (at * CFrame.new(31, 0, 18)).Position, 6 },
+		{ (at * CFrame.new(-33, 0, -7)).Position, 6 },
+		{ (at * CFrame.new(34, 0, -7)).Position, 6 },
 		{ (at * CFrame.new(-95, 0, -60)).Position, 30 },
 		{ (at * CFrame.new(118, 0, -40)).Position, 24 },
 		{ (at * CFrame.new(-110, 0, 40)).Position, 16 },
@@ -1294,6 +1371,13 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		return false
 	end
 	local spots = {}
+	local arrivalSpots = {}
+	-- Two loose clusters flank a clear walking lane immediately ahead of spawn.
+	for _, p in { { -12, 29 }, { 12, 29 }, { -20, 13 }, { 20, 13 },
+		{ -12, -3 }, { 12, -3 }, { -26, -22 }, { 26, -22 } } do
+		table.insert(spots, at * CFrame.new(p[1], 0, p[2]))
+		table.insert(arrivalSpots, #spots)
+	end
 	local tries = 0
 	while #spots < 170 and tries < 12000 do
 		tries += 1
@@ -1325,11 +1409,12 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	root.Parent = parent
 	return {
 		Model = root,
-		Spawn = CFrame.lookAt((padAt * CFrame.new(0, 3.5, 0)).Position, at.Position + Vector3.new(0, 3.5, 0)),
+		Spawn = CFrame.lookAt((padAt * CFrame.new(0, 3.5, -12)).Position, at.Position + Vector3.new(0, 3.5, 0)),
 		Probe = probeScreen,
 		Board = face,
 		Gate = gatePad,
 		Spots = spots,
+		ArrivalSpots = arrivalSpots,
 		Zones = zones,
 		FieldSpots = {},
 		Parking = parking,

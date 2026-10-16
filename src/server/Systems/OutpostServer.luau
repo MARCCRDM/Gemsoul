@@ -274,6 +274,14 @@ local function spawnNode(field: boolean?)
 		return
 	end
 	local index = spots[rng:NextInteger(1, #spots)]
+	-- Keep the welcome field stocked before filling distant quarry sites.
+	-- These still use the same node cap, loot and respawn timers as other rocks.
+	for _, arrivalIndex in site.ArrivalSpots or {} do
+		if freeSpots[arrivalIndex] and (fieldSpots[arrivalIndex] == true) == (field == true) then
+			index = arrivalIndex
+			break
+		end
+	end
 	freeSpots[index] = nil
 	nextId += 1
 	-- Each ring grows its own mix (Shared.Outpost.Zones).
