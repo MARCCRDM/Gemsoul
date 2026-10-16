@@ -142,7 +142,25 @@ check(not card("Unlock").Visible, "Unlock showed with nothing locked")
 LobbyBoard.unlock = { Name = "Ranked 1v1", Left = 2 }
 LobbyBoard.refresh()
 check(card("Unlock").Visible and string.find(texts(card("Unlock")), "2 DUELS", 1, true), "A locked mode isn't shown")
+-- (LobbyUI's: a function of the profile, asked as the board redraws.)
+LobbyBoard.unlock = function(profile)
+	return if profile.Coins > 0 then { Name = "Casual 1v1", Left = 1 } else nil
+end
+LobbyBoard.refresh()
+check(string.find(texts(card("Unlock")), "CASUAL 1V1", 1, true) and string.find(texts(card("Unlock")), "1 DUEL", 1, true), "The unlock function wasn't asked")
 LobbyBoard.unlock = nil
+-- A hidden lobby doesn't redraw as the profile changes (a fight syncs it
+-- with nothing to see); it catches up as it shows.
+gui.Enabled = false
+local before, tasks = texts(card("NextTask")), GemClient.Profile.TrainingRewards
+GemClient.Profile.TrainingRewards = { Paid = {}, Counts = {} }
+GemClient.Changed:Fire(GemClient.Profile)
+check(texts(card("NextTask")) == before, "The board redrew while the lobby was hidden")
+gui.Enabled = true
+check(texts(card("NextTask")) ~= before, "The board didn't catch up as the lobby showed")
+GemClient.Profile.TrainingRewards = tasks
+GemClient.Changed:Fire(GemClient.Profile)
+check(texts(card("NextTask")) == before, "The board didn't redraw with the lobby up")
 -- Every task done: the task card goes.
 local all = {}
 for _, o in Training.Objectives do

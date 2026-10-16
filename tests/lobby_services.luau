@@ -86,6 +86,11 @@ local function new(class, props, parent)
 	function methods:IsA(key)
 		return values.ClassName == key
 	end
+	local changed = {}
+	function methods:GetPropertyChangedSignal(key)
+		changed[key] = changed[key] or signal()
+		return changed[key]
+	end
 	function methods:FindFirstChild(name)
 		for _, child in values.children do
 			if child.Name == name then
@@ -113,7 +118,11 @@ local function new(class, props, parent)
 			if key == "Parent" and value then
 				table.insert(value.children, values.self)
 			end
+			local was = values[key]
 			values[key] = value
+			if changed[key] and was ~= value then
+				changed[key]:Fire()
+			end
 		end,
 	})
 	values.self = object

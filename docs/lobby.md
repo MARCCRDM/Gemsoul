@@ -57,7 +57,8 @@ every day at midnight UTC.
   "DAILY CHALLENGE: Break 10 rocks +40 coins".
 - **Network.** Progress reaches the lobby at most once a second
   (`Remotes.Challenges`). A fight counts every hit, and a full profile sync
-  per hit would be heavy.
+  per hit would be heavy. The board redraws only while the lobby is on
+  screen, and catches up as it shows.
 
 The rules are `src/shared/DailyChallenges.luau`. A challenge is one table
 row, so adding, retiring or re-pricing one is a one-line change. A retired id
@@ -119,4 +120,4 @@ and it refreshes every 2 seconds while the menu is open.
 | Suite | Checks | What it covers |
 | --- | --- | --- |
 | `tests/run_daily_challenges.py` | 22,446 rules + 8 server | One per group; stable rolls; progress; paying once; the bonus; new days; old saves. The server side: progress pushes, payouts, notes and the bonus |
-| `tests/run_lobby.py` | 19 board + 16 feed | The real board and feed against GUI doubles. Board: cards per screen; the phone's choice; challenge rows; the bonus; the streak; unlock; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once; Tasks stepping aside |
+| `tests/run_lobby.py` | 23 board + 16 feed | The real board and feed against GUI doubles. Board: cards per screen; the phone's choice; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once; Tasks stepping aside |

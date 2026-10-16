@@ -15,7 +15,11 @@
 	  LobbyBoard.mount(gui)        builds it in the lobby's ScreenGui
 	  LobbyBoard.setCompact(on)    phone layout
 	  LobbyBoard.setHidden(on)     out of the way (the PLAY menu is open)
-	  LobbyBoard.refresh()         redraw from GemClient.Profile
+	  LobbyBoard.refresh()         redraw from GemClient.Profile (it redraws
+	                               itself as the profile changes, while the
+	                               lobby is on screen, and on showing it)
+	  LobbyBoard.unlock            the mode being unlocked, or a function of
+	                               the profile that says it (LobbyUI's)
 	  LobbyBoard.Frame             the column (LobbyUI places it)
 	  -> LobbyBoard.layout() returns the column's height (0: nothing to show)
 ]]
@@ -299,7 +303,8 @@ end
 
 -- Next unlock (while a mode is locked) ------------------------------------------------------------
 
-LobbyBoard.unlock = nil :: { Name: string, Left: number }?
+type Unlock = { Name: string, Left: number }
+LobbyBoard.unlock = nil :: (Unlock | (profile: any) -> Unlock?)?
 
 local function buildUnlock()
 	local frame, note = card("Unlock", 3, GOLD, "NEXT UNLOCK")
@@ -311,8 +316,11 @@ local function buildUnlock()
 			return 60
 		end,
 	}
-	refreshers.Unlock = function()
+	refreshers.Unlock = function(profile)
 		local unlock = LobbyBoard.unlock
+		if type(unlock) == "function" then
+			unlock = unlock(profile)
+		end
 		if unlock then
 			name.Text = string.upper(unlock.Name)
 			note.Text = string.format("%d DUEL%s", unlock.Left, if unlock.Left == 1 then "" else "S")
@@ -390,8 +398,16 @@ function LobbyBoard.mount(gui: ScreenGui)
 	buildChallenges()
 	buildUnlock()
 	buildTask()
-	GemClient.Changed:Connect(LobbyBoard.refresh)
-	GemClient.ChallengesChanged:Connect(LobbyBoard.refresh)
+	-- Redrawn as the profile changes while the lobby is up, and as it shows
+	-- (a fight syncs the profile and counts challenges with nothing to see).
+	local function changed()
+		if gui.Enabled then
+			LobbyBoard.refresh()
+		end
+	end
+	GemClient.Changed:Connect(changed)
+	GemClient.ChallengesChanged:Connect(changed)
+	gui:GetPropertyChangedSignal("Enabled"):Connect(changed)
 	-- The reset countdown ticks over while the lobby is up.
 	task.spawn(function()
 		while column.Parent do

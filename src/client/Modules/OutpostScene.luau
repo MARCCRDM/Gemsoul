@@ -754,6 +754,13 @@ function OutpostScene.swing(nodeId: number?)
 		local result = GemClient.request("OutpostHit", id)
 		if result.State then
 			state = result.State
+			-- (The server only sends the whole profile when a rock pops: keep
+			-- the copy's picks current for the screens that read them.)
+			local profile = GemClient.Profile
+			if profile and profile.Outpost then
+				profile.Outpost.Picks, profile.Outpost.Active = state.Picks, state.Active
+				profile.Outpost.SurveyAt = state.SurveyAt
+			end
 			refreshHud()
 		end
 		if not result.Ok then

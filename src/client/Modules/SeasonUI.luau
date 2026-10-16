@@ -7,6 +7,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Store = require(ReplicatedStorage.Shared.Store)
@@ -19,14 +20,20 @@ local BOLD, HEADING = IronUi.Bold, IronUi.Heading
 local new, text, box, button, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
 
 local WIDTH, HEIGHT = 1000, 560
+-- What earns XP (Season.XP), the main loop first. Dungeon kills only while
+-- dungeons are open (Config.Features).
 local XP_LABELS = {
-	{ "Mine", "Mine a crystal" },
+	{ "Mine", "Break a rock" },
+	{ "DuelWin", "Win a duel" },
+	{ "DuelPlay", "Lose a duel" },
+	{ "Enchant", "Socket a new gem" },
 	{ "Sell", "Sell a gem" },
-	{ "Enchant", "Enchant" },
-	{ "SlayCrawler", "Slay a Crawler" },
-	{ "SlayBrute", "Slay a Brute" },
 	{ "Daily", "Daily reward" },
 }
+if not (Config.Features and Config.Features.Dungeons == false) then
+	table.insert(XP_LABELS, { "SlayCrawler", "Slay a Crawler" })
+	table.insert(XP_LABELS, { "SlayBrute", "Slay a Brute" })
+end
 
 local SeasonUI = {}
 

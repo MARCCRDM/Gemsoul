@@ -452,8 +452,9 @@ local nav = new("Frame", {
 	Position = UDim2.fromOffset(240, 0),
 	Size = UDim2.fromOffset(560, 64),
 }, panel)
--- (Seven tabs: closer together, to fit the bar.)
-UiKit.list(nav, 20, true).VerticalAlignment = Enum.VerticalAlignment.Center
+-- (Seven tabs: close together, so the offer's clock on the right never
+-- covers the last of them.)
+UiKit.list(nav, 16, true).VerticalAlignment = Enum.VerticalAlignment.Center
 local navButtons = {}
 for i, id in Store.Tabs do
 	local b = new("TextButton", {
@@ -464,7 +465,7 @@ for i, id in Store.Tabs do
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromOffset(0, 64),
 		Font = BOLD,
-		TextSize = 15,
+		TextSize = 14,
 		TextColor3 = C.Dim,
 		LayoutOrder = i,
 	}, nav)

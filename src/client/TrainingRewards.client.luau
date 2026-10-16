@@ -164,12 +164,12 @@ local kicker = label(panel, "Learn the game, earn coins. They never expire.", 12
 local close = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 0),
 	BackgroundColor3 = CHIP,
-	Text = "X",
+	Text = "✕",
 	TextColor3 = TEXT,
 	TextSize = 14,
 	Font = Enum.Font.GothamBold,
 }, panel)
-UiKit.round(close, 8)
+UiKit.round(close, 999)
 stroke(close, MUTED, 0.8)
 
 -- Filters: categories (scrolling sideways) and the To do / Done / All switch.
@@ -448,6 +448,20 @@ refresh = function()
 	launch.Text = if done < total then string.format("TASKS  %d/%d", done, total) else "TASKS"
 end
 
+-- While the window is shut only the TASKS count can change on screen: the
+-- cards are redrawn when it opens (every sync redrawing them was a waste).
+local function refreshLaunch()
+	local p = GemClient.Profile
+	local paid = p and p.TrainingRewards and p.TrainingRewards.Paid or {}
+	local done = 0
+	for _, o in objectives do
+		if paid[o.Id] == true then
+			done += 1
+		end
+	end
+	launch.Text = if done < #objectives then string.format("TASKS  %d/%d", done, #objectives) else "TASKS"
+end
+
 -- Opening: on the first page with something left to do (Shared.TrainingRewards).
 local function open()
 	local p = GemClient.Profile
@@ -482,7 +496,13 @@ end)
 shade.Activated:Connect(function()
 	shade.Visible = false
 end)
-GemClient.Changed:Connect(refresh)
+GemClient.Changed:Connect(function()
+	if shade.Visible then
+		refresh()
+	else
+		refreshLaunch()
+	end
+end)
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 	if gui.Enabled then
 		layout()

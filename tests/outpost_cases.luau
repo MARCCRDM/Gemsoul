@@ -126,6 +126,7 @@ local Shop = {
 }
 -- Tasks events (PlayerData.training) by player, e.g. trained[p].Mine.
 local trained = {}
+local synced = {}
 local PlayerData = {
 	get = function(p)
 		return profiles[p]
@@ -144,7 +145,9 @@ local PlayerData = {
 		profiles[p].Coins -= n
 		return true
 	end,
-	sync = function() end,
+	sync = function(p)
+		synced[p] = (synced[p] or 0) + 1
+	end,
 	milestone = function() end,
 	CharacterChanged = signal(),
 }
@@ -530,8 +533,11 @@ local function standBy(root, node)
 end
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined from across the basin")
 standBy(anaRoot, target)
+local syncsBefore = synced[ana] or 0
 local first = handlers.OutpostHit(ana, target.Id)
 check(first.Ok and first.Hp < target.MaxHp, "A swing didn't chip the rock")
+-- (The reply carries the swing: a whole profile sync per swing was heavy.)
+check((synced[ana] or 0) == syncsBefore, "A swing that didn't pop the rock synced the whole profile")
 check(first.State.Picks.Survey == Rules.Picks.Survey.Swings - 1, "The swing didn't wear the pick")
 check(
 	first.State.SurveyAt ~= nil and first.State.NextSwingIn == Rules.FreeSwingSeconds,
@@ -589,6 +595,7 @@ check(handlers.OutpostHit(ben, target.Id).Ok, "An abandoned rock couldn't be tak
 -- Ana takes it back and pops it.
 advance(Rules.ClaimSeconds)
 local coinsBefore = profiles[ana].Coins
+local syncsBeforePop = synced[ana] or 0
 local result
 for _ = 1, 40 do
 	advance(0.5)
@@ -599,6 +606,7 @@ for _ = 1, 40 do
 end
 -- A rock pays coins only by chance now (mining is for gems).
 check(result and result.Loot ~= nil, "Popping a rock returned no loot")
+check((synced[ana] or 0) == syncsBeforePop + 1, "A pop didn't sync the profile once (only the pop sends it)")
 check(profiles[ana].Coins == coinsBefore + (result.Loot.Coins or 0), "Coins not paid")
 check(Server._nodes[target.Id] == nil and target.Model:GetAttribute("Popped") == 1, "The rock didn't pop")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined a popped rock")
@@ -621,8 +629,10 @@ standBy(anaRoot, nextRock)
 profiles[ana].Outpost.Picks.Survey = 1
 profiles[ana].Outpost.SurveyAt = 86400 * 20000 + math.floor(now) -- (no swings regained meanwhile)
 advance(Rules.ClaimSeconds + 1)
+local syncsBeforeBreak = synced[ana] or 0
 local last = handlers.OutpostHit(ana, nextRock.Id)
 check(last.Ok and last.PickBroke == "Survey Pick", "The pick didn't break at zero")
+check((synced[ana] or 0) > syncsBeforeBreak, "A broken pick didn't sync the profile")
 advance(1)
 local broken = handlers.OutpostHit(ana, nextRock.Id)
 check(not broken.Ok and broken.NoPick, "Mined with a broken pick")

@@ -488,7 +488,12 @@ local function hit(player: Player, nodeId: any)
             if rank >= 5 then PlayerData.training(player, "LegendGem") end
         end
 	end
-	PlayerData.sync(player)
+	-- A whole profile goes to the client only when it changed beyond the
+	-- pick's swings (a pop pays out, a pick breaks): the reply's State carries
+	-- the swings, and a full sync on every swing (three a second) was heavy.
+	if node.Hp <= 0 or broke then
+		PlayerData.sync(player)
+	end
 	return reply(true, "", result)
 end
 

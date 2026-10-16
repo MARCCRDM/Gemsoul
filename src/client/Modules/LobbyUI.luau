@@ -358,19 +358,21 @@ card({
 	end,
 })
 
+-- (The round ✕ every window closes with: IronUi.window, the Store.)
 local close = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, 0, 0, 0),
 	Size = UDim2.fromOffset(44, 44),
 	Text = "✕",
-	TextSize = 22,
+	TextSize = 18,
 	Font = IronUi.Heading,
 	TextColor3 = P.Text,
-	BackgroundColor3 = Color3.fromRGB(70, 20, 26),
+	BackgroundColor3 = Color3.fromRGB(20, 25, 37),
+	AutoButtonColor = true,
 	ZIndex = 22,
 }, stage)
-UiKit.round(close, 8)
-new("UIStroke", { Color = RED, Thickness = 1.5 }, close)
+UiKit.round(close, 22)
+new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1, Transparency = 0.82 }, close)
 close.Position = UDim2.new(1, 0, 0, -52)
 
 local function refreshCards()
@@ -588,12 +590,26 @@ local LobbyFeed = require(script.Parent.LobbyFeed)
 local board = LobbyBoard.mount(gui)
 LobbyFeed.mount(gui)
 
+-- The next mode you're working toward (while modes unlock with duels): the
+-- board asks as it redraws.
+LobbyBoard.unlock = function(profile)
+	local duels = played()
+	local first = if LobbyUI.DungeonsOpen then "Dungeon & Casual" else "Casual 1v1"
+	for _, entry in { { first, LobbyUI.Unlocks.Casual }, { "Ranked 1v1", LobbyUI.Unlocks.Ranked } } do
+		if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled
+			and not (profile.Tutorial and profile.Tutorial.Done) and duels < entry[2] then
+			return { Name = entry[1], Left = entry[2] - duels }
+		end
+	end
+	return nil
+end
+
+-- Level, XP and coins (redrawn while the lobby is up, and as it shows).
 local function refreshNews()
 	local profile = GemClient.Profile
-	if not profile then
+	if not profile or not gui.Enabled then
 		return
 	end
-	-- Level, XP and coins.
 	local Tree = require(game:GetService("ReplicatedStorage").Shared.AugmentTree)
 	local xp = math.max(0, profile.Augments and profile.Augments.XP or 0)
 	local level = Tree.level(xp)
@@ -608,21 +624,9 @@ local function refreshNews()
 	coinsLabel.Text = "◆ " .. formatCoins(profile.Coins or 0)
 	walletText.Text =
 		string.format('LV %d  <font color="#FFCA5B">◆ %s</font>', level, formatCoins(profile.Coins or 0))
-	-- The next mode you're working toward (while modes unlock with duels).
-	local duels = played()
-	local unlock = nil
-	local first = if LobbyUI.DungeonsOpen then "Dungeon & Casual" else "Casual 1v1"
-	for _, entry in { { first, LobbyUI.Unlocks.Casual }, { "Ranked 1v1", LobbyUI.Unlocks.Ranked } } do
-		if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled
-			and not (profile.Tutorial and profile.Tutorial.Done) and duels < entry[2] then
-			unlock = { Name = entry[1], Left = entry[2] - duels }
-			break
-		end
-	end
-	LobbyBoard.unlock = unlock
-	LobbyBoard.refresh()
 end
 GemClient.Changed:Connect(refreshNews)
+gui:GetPropertyChangedSignal("Enabled"):Connect(refreshNews)
 task.defer(refreshNews)
 
 -- Who's around: miners in the server, and how many are searching for a

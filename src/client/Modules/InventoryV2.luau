@@ -734,7 +734,7 @@ local function buildLeft(canvas: Frame)
 		-- (the last row sits beside the Q card, so it stays narrower)
 		local value = place(text(canvas, "", if i == 3 then 12 else 15, C.Text, HEADING), vx, y + 15, if i == 3 then 162 else 220, 20)
 		value.RichText = true
-		local detail = place(text(canvas, "", 10, C.Faint, MEDIUM), vx, y + 36, 180, 14)
+		local detail = place(text(canvas, "", 10, C.Faint, MEDIUM), vx, y + 36, if i == 3 then 162 else 180, 14)
 		ui.Verdict[i] = { Value = value, Detail = detail }
 	end
 end
@@ -1740,7 +1740,7 @@ local function drawLeft(profile, loadout)
 	-- The two strongest fit on the line (the radar shows them all).
 	local shownParts = { parts[1], parts[2] }
 	resists.Value.Text = if #parts > 0 then table.concat(shownParts, "  ") else "NONE YET"
-	resists.Detail.Text = if #parts > 0 then "Half strength from perk pieces" else "Armor gems resist their element"
+	resists.Detail.Text = if #parts > 0 then "Half strength on perk pieces" else "Gems in armor add resists"
 	-- The mix: every socketed gem (armor, sword and surges), by element.
 	local counts = {}
 	for _, slot in Slots.Order do

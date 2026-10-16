@@ -21,7 +21,7 @@ HudChrome.GoldDim = Color3.fromRGB(126, 100, 58)
 HudChrome.Ink = Color3.fromRGB(11, 12, 17)
 HudChrome.Steel = Color3.fromRGB(36, 38, 48)
 HudChrome.Parchment = Color3.fromRGB(236, 224, 196)
-HudChrome.Title = Enum.Font.Merriweather -- names and titles, carved-serif
+HudChrome.Title = Enum.Font.GothamBold -- names and titles (the game's heading face)
 
 local function make(className: string, props, parent: Instance?)
 	local object = Instance.new(className)

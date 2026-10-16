@@ -132,6 +132,11 @@ local function chip(parent, value, on, color, x, y, w, callback)
 	return c
 end
 
+-- 15000 -> "15,000".
+local function commas(n: number): string
+	return (tostring(math.floor(n)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
+end
+
 -- Scroll positions by list, kept across redraws (a redraw rebuilds the list).
 local scrolled: { [string]: Vector2 } = {}
 local function scroller(parent, x, y, w, h, remember: string?)
@@ -144,6 +149,13 @@ local function scroller(parent, x, y, w, h, remember: string?)
 		ScrollBarThickness = 4,
 		ScrollBarImageColor3 = P.Edge,
 	}, parent)
+	-- (Room for the cards' outlines: the frame clips what pokes past its edge.)
+	new("UIPadding", {
+		PaddingTop = UDim.new(0, 2),
+		PaddingLeft = UDim.new(0, 2),
+		PaddingRight = UDim.new(0, 2),
+		PaddingBottom = UDim.new(0, 2),
+	}, frame)
 	if remember then
 		local saved = scrolled[remember]
 		if saved then
@@ -303,7 +315,7 @@ local function detailLines(payload)
 		end
 		local ok, worth = pcall(GemConfig.value, gem)
 		if ok and worth then
-			add("Worth about " .. worth .. " coins", 12, P.Dim)
+			add("Worth about " .. commas(worth) .. " coins", 12, P.Dim)
 		end
 		if gem.MinedBy then
 			add("Mined by " .. gem.MinedBy, 12, Color3.fromRGB(150, 160, 185))
@@ -556,7 +568,7 @@ local function listingCard(parent, row, order)
 	line.TextYAlignment = Enum.TextYAlignment.Top
 	label(card, "by " .. (row.SellerName or "?"), 11, P.Dim, BODY, 72, 56, 124, 14)
 	if row.Mode == "Sell" then
-		label(card, tostring(row.Price) .. " coins", 18, P.Gold, BOLD, 10, 74, 140, 24)
+		label(card, commas(row.Price) .. " coins", 18, P.Gold, BOLD, 10, 74, 140, 24)
 	else
 		label(card, "⇄ FOR TRADE", 14, TRADE, BOLD, 10, 74, 120, 22)
 		label(card, "Wants: " .. (Rules.WantLabels[row.Want] or "Any offer"), 11, P.Dim, BODY, 10, 96, 186, 14)
@@ -675,7 +687,7 @@ local function drawInspect()
 	end)
 	label(box, "Listed by " .. (row.SellerName or "?") .. "  ·  " .. timeLeft(row), 13, P.Dim, BODY, 16, 290, 260, 18)
 	if row.Mode == "Sell" then
-		label(box, tostring(row.Price) .. " coins", 26, P.Gold, BOLD, 16, 316, 260, 32)
+		label(box, commas(row.Price) .. " coins", 26, P.Gold, BOLD, 16, 316, 260, 32)
 	else
 		label(box, "⇄ FOR TRADE", 20, TRADE, BOLD, 16, 316, 260, 28)
 		label(box, "Wants: " .. (Rules.WantLabels[row.Want] or "Any offer"), 13, P.Dim, BODY, 16, 346, 260, 18)
@@ -1042,7 +1054,7 @@ local function drawMine()
 		label(card, itemLine(entry.Item), 12, P.Dim, BODY, 84, 34, 420, 16)
 		local status = if not row
 			then "Settling…"
-			elseif row.Mode == "Sell" then row.Price .. " coins  ·  " .. timeLeft(row)
+			elseif row.Mode == "Sell" then commas(row.Price) .. " coins  ·  " .. timeLeft(row)
 			else "⇄ For trade  ·  wants "
 				.. string.lower(Rules.WantLabels[row.Want] or "any offer")
 				.. "  ·  "
@@ -1135,7 +1147,7 @@ draw = function()
 	)
 	label(
 		bar,
-		tostring(GemClient.Profile.Coins or 0) .. " coins",
+		commas(GemClient.Profile.Coins or 0) .. " coins",
 		18,
 		P.Gold,
 		BOLD,

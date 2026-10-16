@@ -8,11 +8,13 @@ local UiSound = require(script.Parent.UiSound)
 
 local IronUi = {}
 
+-- (Frame, Inset, Slot and Edge are the navy-slate of the Store and the
+-- Inventory, with a hint of the old station violet.)
 IronUi.Colors = {
-	Frame = Color3.fromRGB(12, 10, 25),
-	Inset = Color3.fromRGB(26, 22, 43),
-	Slot = Color3.fromRGB(40, 33, 61),
-	Edge = Color3.fromRGB(99, 83, 137), -- subdued station border
+	Frame = Color3.fromRGB(11, 13, 24),
+	Inset = Color3.fromRGB(21, 25, 39),
+	Slot = Color3.fromRGB(31, 36, 55),
+	Edge = Color3.fromRGB(74, 86, 118), -- subdued station border
 	Gold = Color3.fromRGB(255, 202, 91), -- Saga amber
 	Text = Color3.fromRGB(235, 242, 249),
 	Dim = Color3.fromRGB(177, 193, 216),
@@ -56,9 +58,12 @@ IronUi.alive = alive
 -- wobbling, floating) instead of a loop per element. step(t) gets the clock;
 -- the entry drops out on its own once `object` is destroyed.
 local animations: { [Instance]: (number) -> () } = {}
+-- Each one's ScreenGui, found once (not walked up to every frame).
+local screens: { [Instance]: ScreenGui } = {}
 local animating = false
 function IronUi.animate(object: Instance, step: (number) -> ())
 	animations[object] = step
+	screens[object] = nil
 	if animating then
 		return
 	end
@@ -66,10 +71,14 @@ function IronUi.animate(object: Instance, step: (number) -> ())
 	RunService.RenderStepped:Connect(function()
 		local now = os.clock()
 		for target, fn in animations do
-			if not alive(target) then
-				animations[target] = nil
+			if target.Parent == nil then
+				animations[target], screens[target] = nil, nil
 			else
-				local screen = target:FindFirstAncestorWhichIsA("ScreenGui")
+				local screen = screens[target]
+				if not screen or screen.Parent == nil then
+					screen = target:FindFirstAncestorWhichIsA("ScreenGui")
+					screens[target] = screen
+				end
 				if not screen or screen.Enabled then
 					fn(now)
 				end
@@ -696,45 +705,34 @@ function IronUi.window(
 		Size = UDim2.fromOffset(width, height),
 		BackgroundColor3 = Color3.new(1, 1, 1),
 	}, gui)
-	UiKit.round(panel, 8)
-	-- A thin gold edge, and a dark iron body fading down.
-	new("UIStroke", { Color = color:Lerp(P.Edge, 0.55), Thickness = 1.5 }, panel)
+	UiKit.round(panel, 14)
+	-- The Store's look: a hairline edge and a dark navy body fading down.
+	new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1, Transparency = 0.86 }, panel)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(30, 40, 62), P.Frame),
+		Color = ColorSequence.new(Color3.fromRGB(14, 18, 28), Color3.fromRGB(7, 9, 15)),
 	}, panel)
-	local rim = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(5, 5),
-		Size = UDim2.new(1, -10, 1, -10),
-	}, panel)
-	UiKit.round(rim, 12)
-	new("UIStroke", { Color = color:Lerp(Color3.new(1, 1, 1), 0.3), Thickness = 1.5, Transparency = 0.85 }, rim)
 
-	-- Header bar.
+	-- Header: clear, over a hairline with the window's colour as a short bar.
 	local header = new("Frame", {
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(5, 5),
 		Size = UDim2.new(1, -10, 0, 62),
 	}, panel)
-	UiKit.round(header, 6)
-	-- A dark bar tinted with the window's colour, fading out to the right.
-	local tint = mute(color)
-	new("UIGradient", {
-		Rotation = 0,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, tint:Lerp(P.Inset, 0.32)),
-			ColorSequenceKeypoint.new(1, P.Frame),
-		}),
-	}, header)
-	-- A thin gold rule under the bar.
 	new("Frame", {
-		BackgroundColor3 = P.Edge,
-		BorderSizePixel = 0,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.92,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, 1),
 	}, header)
+	local bar = new("Frame", {
+		BackgroundColor3 = color,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 19, 1, 0),
+		Size = UDim2.fromOffset(48, 2),
+	}, header)
+	corner(bar, UDim.new(0, 1))
 
 	local scale = new("UIScale", {}, panel)
 	local target = 1
@@ -775,44 +773,64 @@ function IronUi.window(
 		tween:Play()
 	end)
 
-	-- The icon badge pops out of the top-left corner; the title moves over.
+	-- The icon in a round chip of the window's colour; the title beside it.
 	local left = 24
 	if icon then
-		local badge = IronUi.badge(panel, icon, 38)
-		badge.Position = UDim2.fromOffset(16, 14)
-		badge.Rotation = 0
-		badge.ZIndex = 5
-		for _, child in badge:GetDescendants() do
-			if child:IsA("GuiObject") then
-				child.ZIndex = 6
-			end
-		end
-		left = 72
+		local chip = new("Frame", {
+			BackgroundColor3 = mute(color):Lerp(Color3.fromRGB(20, 25, 37), 0.55),
+			Position = UDim2.fromOffset(18, 15),
+			Size = UDim2.fromOffset(38, 38),
+			ZIndex = 5,
+		}, panel)
+		corner(chip, UDim.new(0.5, 0))
+		new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.45 }, chip)
+		new("TextLabel", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Text = icon,
+			TextSize = 20,
+			Font = IronUi.Chunky,
+			TextColor3 = Color3.new(1, 1, 1),
+			ZIndex = 6,
+		}, chip)
+		left = 68
 	end
-	local title = IronUi.title(panel, "", 30)
-	title.Position = UDim2.fromOffset(left, 12)
-	title.Size = UDim2.new(0.6, 0, 0, 32)
+	local title = IronUi.title(panel, "", 22)
+	title.Font = Enum.Font.GothamBlack
+	title.Position = UDim2.fromOffset(left, 14)
+	title.Size = UDim2.new(0.6, 0, 0, 26)
+	title.AutomaticSize = Enum.AutomaticSize.None
 	title.ZIndex = 3
-	local subtitle = IronUi.text(panel, "", 13, P.Dim, IronUi.Body)
-	subtitle.Position = UDim2.fromOffset(left + 2, 44)
+	local subtitle = IronUi.text(panel, "", 12, P.Dim, IronUi.Body)
+	subtitle.Position = UDim2.fromOffset(left + 1, 40)
 	subtitle.Size = UDim2.new(0.62, 0, 0, 16)
 	subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 	subtitle.AutomaticSize = Enum.AutomaticSize.None
 	subtitle.ZIndex = 3
 
-	-- A chunky red close button on the top-right corner.
-	local close, closeFace = IronUi.chunk(panel, {
-		Color = Color3.fromRGB(150, 60, 54),
+	-- Close: a quiet round button in the top-right corner (as in the Store).
+	local close = new("TextButton", {
+		Text = "✕",
+		AutoButtonColor = false,
+		Font = IronUi.Bold,
+		TextSize = 16,
+		TextColor3 = P.Dim,
+		BackgroundColor3 = Color3.fromRGB(20, 25, 37),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -18, 0, 16),
 		Size = UDim2.fromOffset(36, 36),
-		Radius = 6,
-		Lip = 3,
-		Stripes = "None",
-	})
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -14, 0, 18)
-	close.ZIndex = 5
+		ZIndex = 5,
+	}, panel)
+	corner(close, UDim.new(0.5, 0))
 	close:SetAttribute("UiSound", "Back")
-	IronUi.label(close, closeFace, "X", 18, IronUi.Chunky)
+	close.MouseEnter:Connect(function()
+		close.TextColor3 = P.Text
+		close.BackgroundColor3 = Color3.fromRGB(27, 34, 50)
+	end)
+	close.MouseLeave:Connect(function()
+		close.TextColor3 = P.Dim
+		close.BackgroundColor3 = Color3.fromRGB(20, 25, 37)
+	end)
 
 	-- Dock to the right with a share of the screen (e.g. 0.62), or nil to centre.
 	local function dock(share: number?)

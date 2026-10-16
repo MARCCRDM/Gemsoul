@@ -1,4 +1,4 @@
-# Performance (2026-10-15)
+# Performance (2026-10-15, screens 2026-10-16)
 
 The game should run smoothly, with no hitches in a fight, even in a full
 server where every fighter wears a neon suit. The rules below keep it that
@@ -26,6 +26,22 @@ server.
 - **Publish times on a fixed clock.** Use `serverTime(t)` in CombatServer (os.clock plus an offset fixed at start). Mixing `GetServerTimeNow()` with `os.clock()` drifts a little every frame and re-sends the value every frame.
 - **`SetAttribute` with an unchanged value costs nothing on the network.** That's why the quantised values above are cheap even though the server still sets them every tick.
 
+## Rules for screens
+
+`GemClient.Changed` fires on every profile sync, and about two dozen screens
+listen to it.
+
+- **A screen that isn't showing doesn't redraw.** Check that its window or
+  `ScreenGui` is open first. Redraw when it opens, or as it shows (its
+  `Enabled` signal).
+- **Draw a change once.** If two handlers fire for the same change, one of
+  them asks the other for what it needs. The lobby board, for example, asks
+  LobbyUI for the next unlock (`LobbyBoard.unlock` can be a function); it
+  isn't told it on every sync.
+- **Don't send the whole profile for a small change.** A request's reply can
+  carry what changed. The client patches its copy of the profile, and the
+  full sync waits for a change that needs it.
+
 ## What was optimised
 
 | Where | Before | Now |
@@ -43,6 +59,15 @@ server.
 | Foe bars (`FoeBars`) | Names and percentages rewritten every frame. | Only when they change. |
 | Server (`CombatServer`, `TriadServer`) | Fractional Charge and Stamina, and a drifting `GuardUntil`, sent to every player every frame. | Whole points and a fixed-clock `GuardUntil`: sent only when they really change. |
 
+### Screens and syncs (2026-10-16)
+
+| Where | Before | Now |
+| --- | --- | --- |
+| Mining (`OutpostServer`) | A full profile sync on every pick swing, about 3 a second while mining. | The swing's reply carries the pick's swings, and the client patches its copy. A full sync goes only when a rock pops (loot) or a pick breaks. |
+| Tasks window (`TrainingRewards.client`) | Every task card (30+, about 14 properties each) rewritten on every sync, with the window shut. | While it's shut, only the TASKS count. The cards redraw when it opens. |
+| Lobby board (`LobbyBoard`, `LobbyUI`) | Redrawn twice per sync (once by itself, once by LobbyUI to pass the next unlock), even during a fight. | Once, and only while the lobby is on screen. It catches up as the lobby shows. |
+| Idle UI animations (`IronUi.animate`) | Every frame, for each animated element: a `pcall` closure, and a walk up the tree to find its `ScreenGui`. | The `ScreenGui` is found once and kept, and the element's parent is checked directly. |
+
 ## Tests
 
 - `tests/run_seam_visibility.py` checks the outline slicing:
@@ -52,3 +77,9 @@ server.
   - the animation and restyle cases still work.
 - `tests/run_target_lock.py` checks that the cover grace on the locked foe still starts the moment it's hidden.
 - `tests/run_live_looks.py` checks that stone lights and Prismatic plates move only where they're drawn: near the camera, in first person, or in a preview on screen.
+- `tests/run_outpost.py` checks that a swing that doesn't pop the rock sends
+  no full sync, a pop sends exactly one, and a breaking pick sends one.
+- `tests/run_lobby.py` checks that:
+  - the board doesn't redraw while the lobby is hidden;
+  - it catches up as the lobby shows, and redraws while the lobby is up;
+  - it asks LobbyUI's function for the next unlock.

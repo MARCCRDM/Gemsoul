@@ -207,9 +207,13 @@ local function makeIcon(parent, key, round)
 		new("UIStroke", { Color = P.Dim, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, button)
 	local glyph = centered(button, 24, P.Text)
 	glyph.Position, glyph.Size = UDim2.fromScale(0, 0.1), UDim2.fromScale(1, 0.56)
+	-- The gem's rarity, in its colour: shrunk to fit the circle's chord
+	-- ("Legendary" spilled over the rim at full size).
 	local badge = centered(button, 10, P.Gold)
-	badge.Position, badge.Size = UDim2.fromScale(0, 0.64), UDim2.fromScale(1, 0.24)
+	badge.Position, badge.Size = UDim2.fromScale(0.14, 0.66), UDim2.fromScale(0.72, 0.18)
 	badge.ZIndex, badge.TextStrokeTransparency = 2, 0.3
+	badge.TextScaled, badge.TextTruncate = true, Enum.TextTruncate.None
+	new("UITextSizeConstraint", { MaxTextSize = 10, MinTextSize = 6 }, badge)
 	new("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new(Color3.fromRGB(62, 62, 72), Color3.fromRGB(16, 17, 23)),
@@ -1545,6 +1549,7 @@ RunService.RenderStepped:Connect(function(dt)
 					icon.Glyph.Text = ""
 				end
 				icon.Badge.Text = Tech.rarityLabel(gem)
+				icon.Badge.TextColor3 = GemConfig.TierColors[gem.Tier] or P.Gold
 				icon.Name.Text = definition.Name
 				-- The triad: each key wears its lane's colour; R pays Stamina.
 				icon.Chip.BackgroundColor3 = if definition.Triad then TriadVfx.KeyColors[key] else P.Gold
