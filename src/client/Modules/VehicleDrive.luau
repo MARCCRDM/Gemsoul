@@ -30,6 +30,10 @@ type Driving = {
 	Speed: number,
 	Yaw: number,
 	Zoom: { number },
+	-- Watching for a mech that won't budge (see stuck below).
+	Start: Vector3,
+	StuckFor: number,
+	Reports: number,
 }
 local driving: Driving? = nil
 local function blocked(): boolean
@@ -70,40 +74,49 @@ local function held(...): boolean
 	end
 	return false
 end
-local function pilotInput(seat: VehicleSeat): (number, number)
+-- Also says where the input came from: "seat", "controls", "keys" or "none".
+local function pilotInput(seat: VehicleSeat): (number, number, string)
 	local throttle, steer = seat.ThrottleFloat, seat.SteerFloat
+	local source = "seat"
 	if throttle == 0 and steer == 0 then
+		source = "none"
 		local move = moveVector()
 		if move and move.Magnitude > 0.05 then
-			throttle, steer = -move.Z, move.X
+			throttle, steer, source = -move.Z, move.X, "controls"
 		elseif not UserInputService:GetFocusedTextBox() then
 			local K = Enum.KeyCode
 			throttle = (if held(K.W, K.Up) then 1 else 0) - (if held(K.S, K.Down) then 1 else 0)
 			steer = (if held(K.D, K.Right) then 1 else 0) - (if held(K.A, K.Left) then 1 else 0)
+			if throttle ~= 0 or steer ~= 0 then
+				source = "keys"
+			end
 		end
 	end
-	return math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1)
+	return math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1), source
 end
 
 -- The same input goes to the server, which drives the machine itself while
 -- it still holds the physics (see Server OutpostVehicles).
+local function remote(name: string): RemoteEvent?
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	return remotes and remotes:FindFirstChild(name) :: RemoteEvent?
+end
 local sentThrottle, sentSteer, sentAt = 0, 0, 0
-local function tellServer(throttle: number, steer: number)
+local function tellServer(throttle: number, steer: number, force: boolean?)
 	local now = os.clock()
 	local changed = math.abs(throttle - sentThrottle) >= 0.05 or math.abs(steer - sentSteer) >= 0.05
 	local stale = (throttle ~= 0 or steer ~= 0) and now - sentAt >= 0.5
-	if not changed and not stale then
+	if not changed and not stale and not force then
 		return
 	end
 	-- A sweeping stick changes every frame: at most 10 a second, but letting go
 	-- goes out at once.
-	if not stale and now - sentAt < 0.1 and (throttle ~= 0 or steer ~= 0) then
+	if not force and not stale and now - sentAt < 0.1 and (throttle ~= 0 or steer ~= 0) then
 		return
 	end
-	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-	local remote = remotes and remotes:FindFirstChild("MechInput")
-	if remote then
-		remote:FireServer(throttle, steer)
+	local input = remote("MechInput")
+	if input then
+		input:FireServer(throttle, steer)
 		sentThrottle, sentSteer, sentAt = throttle, steer, now
 	end
 end
@@ -237,7 +250,12 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 		Speed = 0,
 		Yaw = yaw,
 		Zoom = { player.CameraMinZoomDistance, player.CameraMaxZoomDistance },
+		Start = chassis.Position,
+		StuckFor = 0,
+		Reports = 0,
 	}
+	-- Tell the server this client is piloting (it watches for one that isn't).
+	tellServer(0, 0, true)
 	-- Pull the camera back to fit the machine.
 	local fit = seat.Parent:GetAttribute("CameraFit") or math.max(14, chassis.Size.Z * 1.15)
 	player.CameraMaxZoomDistance = math.max(player.CameraMaxZoomDistance, fit * 2)
@@ -254,6 +272,69 @@ local function resumeSeat()
 	local seat = humanoid and humanoid.SeatPart
 	if seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
 		begin(seat, humanoid)
+	end
+end
+
+-- A mech that won't budge: held input for 2 s and it never left the spot it
+-- was boarded at. Say what this client sees (Output and Feedback > Reports,
+-- via the server) and ask the server to take over (Server OutpostVehicles).
+local function anchoredIn(part: BasePart): string
+	local found = {}
+	local ok, parts = pcall(part.GetConnectedParts, part, true)
+	for _, connected in if ok then parts else {} do
+		if connected.Anchored then
+			table.insert(found, connected:GetFullName())
+			if #found >= 3 then
+				break
+			end
+		end
+	end
+	return if #found > 0 then table.concat(found, ", ") else "none"
+end
+local function reportStuck(d: Driving, throttle: number, steer: number, source: string)
+	local c = d.Chassis
+	local v, pv = c.AssemblyLinearVelocity, d.Drive.PlaneVelocity
+	local root = c.AssemblyRootPart
+	local text = string.format(
+		"input %.2f/%.2f from %s (seat %.2f/%.2f), speed %.1f, drive (%.1f, %.1f) on=%s, steer on=%s, "
+			.. "receiveAge %.2f, root %s, mass %.0f, anchored: %s",
+		throttle,
+		steer,
+		source,
+		d.Seat.ThrottleFloat,
+		d.Seat.SteerFloat,
+		Vector2.new(v.X, v.Z).Magnitude,
+		pv.X,
+		pv.Y,
+		tostring(d.Drive.Enabled),
+		tostring(d.Steer.Enabled),
+		c.ReceiveAge,
+		if root then root.Name else "?",
+		c.AssemblyMass,
+		anchoredIn(c)
+	)
+	warn("[Mech] Won't move (client): " .. text)
+	local report = remote("MechReport")
+	if report then
+		report:FireServer(text)
+	end
+	UiKit.toast("Your mech seems stuck. Switching it to backup driving and sending a report.")
+end
+local function watchStuck(d: Driving, throttle: number, steer: number, source: string, dt: number)
+	local c = d.Chassis
+	local v = c.AssemblyLinearVelocity
+	local moving = Vector2.new(v.X, v.Z).Magnitude >= 1.5 or math.abs(c.AssemblyAngularVelocity.Y) >= 0.2
+	local pushing = math.abs(throttle) >= 0.5 or math.abs(steer) >= 0.5
+	local home = (c.Position - d.Start).Magnitude < 4
+	if not (pushing and home and not moving) then
+		d.StuckFor = 0
+		return
+	end
+	d.StuckFor += dt
+	if d.StuckFor >= 2 and d.Reports < 2 then
+		-- (Give the server's takeover a few seconds before asking again.)
+		d.StuckFor, d.Reports = -3, d.Reports + 1
+		reportStuck(d, throttle, steer, source)
 	end
 end
 
@@ -274,8 +355,9 @@ function VehicleDrive.step(dt: number)
 		refreshHud()
 		return
 	end
-	local throttle, steer = pilotInput(d.Seat)
+	local throttle, steer, source = pilotInput(d.Seat)
 	tellServer(throttle, steer)
+	watchStuck(d, throttle, steer, source, dt)
 	local speed, yaw = Rules.drive(d.Spec, d.Speed, d.Yaw, throttle, steer, dt)
 	-- Don't keep shoving at full speed into a wall or a rock.
 	local v = d.Chassis.AssemblyLinearVelocity

@@ -9,6 +9,8 @@
 --   Report (event, client -> server): client script errors, for playtests
 --   MechInput (event, client -> server): a mech pilot's throttle and steer, for
 --             the server to drive with whenever it holds the mech's physics
+--   MechReport (event, client -> server): what a pilot's client sees when its
+--              mech won't move; the server takes over and logs it
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local folder = Instance.new("Folder")
@@ -25,6 +27,7 @@ local Remotes = {
 	Social = Instance.new("RemoteEvent"),
 	Report = Instance.new("RemoteEvent"),
 	MechInput = Instance.new("RemoteEvent"),
+	MechReport = Instance.new("RemoteEvent"),
 }
 for name, remote in Remotes do
 	remote.Name = name

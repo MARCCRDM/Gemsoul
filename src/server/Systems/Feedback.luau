@@ -112,6 +112,12 @@ local function noteError(side: string, message: string, trace: string)
 	end
 end
 
+-- Other systems' diagnostics (e.g. a mech that won't move), grouped and kept
+-- like errors, so they show in Feedback > Reports.
+function Feedback.note(side: string, message: string, detail: string?)
+	noteError(side, message, detail or "")
+end
+
 local function flush()
 	if not store or next(pendingErrors) == nil then
 		return

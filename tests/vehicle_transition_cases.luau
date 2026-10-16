@@ -44,8 +44,19 @@ local Rules = { Machines={Mole={Name="Mole",Blurb="Drill mech",MaxSpeed=20}}, dr
 	return 5,0
 end }
 local VehicleDrive, driving = {}, nil
-local drive, steer = { PlaneVelocity=Vector2.zero }, {}
-local chassis = { Size={Z=20}, AssemblyLinearVelocity={X=0,Z=0}, CFrame={ToOrientation=function() return 0,0,0 end} }
+local drive, steer = { PlaneVelocity=Vector2.zero, Enabled=true }, { Enabled=true }
+local pointMeta = {}
+pointMeta.__sub = function(a, b) return setmetatable({X=a.X-b.X, Y=a.Y-b.Y, Z=a.Z-b.Z}, pointMeta) end
+pointMeta.__index = function(v, k) if k == "Magnitude" then return math.sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z) end end
+local function point(x, y, z) return setmetatable({X=x, Y=y, Z=z}, pointMeta) end
+local chassis = { Size={Z=20}, AssemblyLinearVelocity={X=0,Z=0}, CFrame={ToOrientation=function() return 0,0,0 end},
+	Position=point(0, 0, 0), AssemblyAngularVelocity={Y=0}, AssemblyRootPart={Name="Chassis"}, AssemblyMass=900, ReceiveAge=0 }
+local joined = {}
+function chassis:GetConnectedParts(recursive) assert(recursive == true); return joined end
+local toasts = {}
+local UiKit = { toast=function(text) table.insert(toasts, text) end }
+local printed = {}
+local function warn(...) table.insert(printed, table.concat({...}, " ")) end
 function chassis:FindFirstChild(name) return if name=="Drive" then drive else steer end
 local machine = { GetAttribute=function() return 24 end, FindFirstChild=function() return chassis end }
 local seat = { Parent=machine, ThrottleFloat=1, SteerFloat=0 }
@@ -77,7 +88,11 @@ function player:FindFirstChild(name) return if name=="PlayerScripts" then player
 local function require(module) return module.Module end
 local sent = {}
 local mechInput = { FireServer=function(_, throttle, steer) table.insert(sent, {throttle, steer}) end }
-local remotesFolder = { FindFirstChild=function(_, name) return if name=="MechInput" then mechInput else nil end }
+local reports = {}
+local mechReport = { FireServer=function(_, text) table.insert(reports, text) end }
+local remotesFolder = { FindFirstChild=function(_, name)
+	return if name=="MechInput" then mechInput elseif name=="MechReport" then mechReport else nil
+end }
 local remotesHere = true
 local ReplicatedStorage = { FindFirstChild=function(_, name) return if name=="Remotes" and remotesHere then remotesFolder else nil end }
 -- DRIVE HERE
@@ -270,4 +285,50 @@ hum.SeatPart, seat.Occupant = nil, nil
 hum.Seated:Fire(false, nil)
 check(lastSent()[1]==0 and lastSent()[2]==0, "Getting out left the server driving")
 keysDown = {}
+-- Boarding says hello, so the server knows this client is driving.
+hum.SeatPart, seat.Occupant = nil, nil
+hum.Seated:Fire(false, nil)
+seat.ThrottleFloat, seat.SteerFloat = 0, 0
+keysDown = {}
+count = #sent
+board()
+check(#sent == count + 1 and lastSent()[1] == 0 and lastSent()[2] == 0, "Boarding didn't tell the server")
+
+-- Held input, and the mech never leaves its spot: one report, with what this
+-- client sees, then the server's takeover gets a few seconds.
+reports, toasts = {}, {}
+joined = { chassis, { Anchored=true, GetFullName=function() return "Workspace.Pilot.HumanoidRootPart" end } }
+keysDown = {W=true}
+for _ = 1, 15 do frame() end
+check(#reports == 0, "Reported a stuck mech too soon")
+frame(); frame()
+check(#reports == 1, "A mech that won't move wasn't reported")
+check(reports[1]:find("from keys", 1, true) and reports[1]:find("Workspace.Pilot.HumanoidRootPart", 1, true), "The report lacked the input or what's anchored")
+check(reports[1]:find("receiveAge", 1, true) and reports[1]:find("mass 900", 1, true), "The report lacked the physics facts")
+check(#toasts == 1, "The pilot wasn't told")
+check(printed[#printed]:find("[Mech] Won't move", 1, true) ~= nil, "The report wasn't in the Output")
+for _ = 1, 30 do frame() end
+check(#reports == 1, "Reported again before the takeover had a chance")
+for _ = 1, 20 do frame() end
+check(#reports == 2, "A mech still stuck after the takeover wasn't reported again")
+for _ = 1, 120 do frame() end
+check(#reports == 2, "Kept reporting the same ride")
+joined = { chassis }
+
+-- Not stuck: it's moving, or it has left its spot (e.g. now against a wall).
+hum.SeatPart, seat.Occupant = nil, nil
+hum.Seated:Fire(false, nil)
+board()
+reports = {}
+chassis.AssemblyLinearVelocity = {X=0, Z=-8}
+for _ = 1, 40 do frame() end
+check(#reports == 0, "Reported a mech that was moving")
+chassis.AssemblyLinearVelocity = {X=0, Z=0}
+chassis.Position = point(0, 0, -30)
+for _ = 1, 40 do frame() end
+check(#reports == 0, "Reported a mech that had already driven off")
+chassis.Position = point(0, 0, 0)
+keysDown = {}
+for _ = 1, 40 do frame() end
+check(#reports == 0, "Reported a mech nobody was driving")
 print("PASS: " .. checks .. " vehicle transition checks")
