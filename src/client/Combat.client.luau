@@ -999,6 +999,7 @@ for i, key in SURGE_KEYS do
 	local icon = makeIcon(surgeTray, key, true)
 	surgeIcons[i] = icon
 	icon.Button:SetAttribute("TutorialTarget", "Surge")
+	icon.Button:SetAttribute("HintKey", key) -- (the first fight points at one key: FirstFight)
 	icon.Button.InputBegan:Connect(function(obj)
 		if pressInput(obj) then
 			if obj.UserInputType == Enum.UserInputType.Touch then
@@ -1256,8 +1257,10 @@ local function layoutThumb(viewport: Vector2): (number, number)
 	local k = math.clamp(viewport.Y / 380, 0.8, 1.3)
 	local A, S, M, G = math.floor(86 * k), math.floor(58 * k), math.floor(50 * k), math.floor(56 * k)
 	local margin = math.floor(14 * k)
-	-- The ring's centre, measured from the bottom-right corner.
-	local cx, cy = margin + A / 2, margin + A / 2
+	-- The ring's centre, measured from the bottom-right corner: in from the
+	-- edge a little, where the right thumb rests rather than at full stretch.
+	local inset = math.floor(math.clamp(viewport.X * 0.035, 16, 44))
+	local cx, cy = margin + inset + A / 2, margin + A / 2
 	local function at(button: GuiObject, size: number, radius: number, degrees: number)
 		local a = math.rad(degrees)
 		button.AnchorPoint = Vector2.new(0.5, 0.5)

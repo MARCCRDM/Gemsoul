@@ -18,6 +18,7 @@ if not Tutorial.Enabled and not FastStart.Enabled then
 	return
 end
 local Art = require(script.Parent.Modules.LotteryArt)
+local GemArt = require(script.Parent.Modules.GemArt)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -132,12 +133,13 @@ local panel = frame(back, {
 	Size = UDim2.new(1, -24, 1, -16),
 })
 local panelLimit = new("UISizeConstraint", { MaxSize = Vector2.new(1200, 880) }, panel)
--- Wide, short phones: the panel stops at about twice its height, so cards
--- and buttons aren't stretched across the whole screen.
+-- Wide, short phones: the panel stops at about two and a half times its
+-- height, so cards and buttons aren't stretched across the whole screen, but
+-- four element cards still fit side by side on a 360-point-tall phone.
 local function capPanel()
 	local h = back.AbsoluteSize.Y
 	if h > 0 then
-		panelLimit.MaxSize = Vector2.new(math.clamp(h * 2.05, 560, 1200), 880)
+		panelLimit.MaxSize = Vector2.new(math.clamp(h * 2.45, 560, 1200), 880)
 	end
 end
 capPanel()
@@ -376,22 +378,27 @@ local STATS = { "Health", "Power", "Defense", "Speed" }
 -- yet: the card shows its colour instead.
 local STYLE_ART = { Prospector = 72266295660132, Skirmisher = 84192854197420, Juggernaut = 76447015122752 }
 -- Each element in a few words, and what its hits do (Shared.StatusEffects).
+-- Hit: the first strength, short enough for a phone's narrow card.
 -- The moves themselves are a surprise: they're rolled as you equip.
 local ELEMENTS = {
 	Fire = {
 		Blurb = "Burn and burst",
+		Hit = "Burns every second",
 		Strengths = { "Burns them every second", "Critical burns cut their healing" },
 	},
 	Frost = {
-		Blurb = "Slow, freeze and shield",
+		Blurb = "Slow, freeze, shield",
+		Hit = "Every hit slows",
 		Strengths = { "Every hit slows them down", "Can freeze them solid", "Shields you from harm" },
 	},
 	Shock = {
 		Blurb = "Stun and chain",
+		Hit = "Chains to the next foe",
 		Strengths = { "Arcs chain to the next enemy", "Can stun them in place" },
 	},
 	Poison = {
-		Blurb = "Shred armor, wear them down",
+		Blurb = "Shred and wear down",
+		Hit = "Shreds their armor",
 		Strengths = { "Shreds their armor", "Can leave them vulnerable", "Cuts their healing" },
 	},
 }
@@ -444,6 +451,7 @@ end
 -- Every piece lays itself out from its own size: compactMode and richMode
 -- (short and tall screens) only pick the words.
 local relayout, compactMode, richMode = {}, false, false
+local shortScreen = false -- (phones in landscape: the subtitle shares the title's row)
 -- The fast start's two screens: "Style" (three fighters), then "Element"
 -- (the four elements and what each is good at).
 local pickStep = if savedKit then "Element" else "Style"
@@ -619,21 +627,22 @@ local elementArea = new("ScrollingFrame", {
 }, choices)
 local elementOrder = { "Fire", "Frost", "Shock", "Poison" }
 local CARD_TALL = 410 -- a card at its fullest
-local CARD_MIN_H, CARD_MIN_W = 190, 150
+local CARD_MIN_H, CARD_MIN_W = 150, 150 -- (a card this short still fits gem, name and matchup)
 
 -- Lay one element card out inside w x h: the gem on top (tall cards) or at
--- the left (wide ones), and as much of the rest as fits.
+-- the left (wide ones), as big as the card allows, then as much of the rest
+-- as fits. The matchup always shows, in words: BEATS and WEAK TO.
 local function layoutCard(card, w: number, h: number)
 	local wide = w > h * 1.15
-	local pad = if w < 200 then 12 else 16
-	-- Narrow cards (phones): each strength may take two lines.
+	local pad = if w < 200 then 10 else 16
 	local narrow = w < 200
-	local lineH = if narrow then 26 elseif w < 220 then 17 else 20
+	-- What its hits do: one line each, as many as fit.
+	local lineH = if narrow then 15 elseif w < 220 then 17 else 20
 	local lineSize = if narrow then 10 elseif w < 220 then 11 else 12
-	-- The matchup: two pills, side by side when there's width.
+	-- The matchup: two rows (or side by side when there's width).
 	local pillRow = w >= 300
-	local pillH = 26
-	local pillsH = if pillRow then pillH else pillH * 2 + 6
+	local pillH = if h < 260 then 19 else 24
+	local pillsH = if pillRow then pillH else pillH * 2 + 4
 	card.Strong.Frame.Size = if pillRow then UDim2.new(0.5, -pad - 3, 0, pillH) else UDim2.new(1, -pad * 2, 0, pillH)
 	card.Weak.Frame.Size = card.Strong.Frame.Size
 	card.Strong.Frame.Position = if pillRow
@@ -643,79 +652,62 @@ local function layoutCard(card, w: number, h: number)
 		then UDim2.new(0.5, 3, 1, -pad - pillH)
 		else UDim2.new(0, pad, 1, -pad - pillH)
 	for _, pill in { card.Strong, card.Weak } do
-		pill.Label.TextSize = if narrow then 9 else 10
-		pill.Label.Text = if narrow then pill.Short else pill.Full
+		pill.Label.TextSize = if pillH < 22 then 9 else 11
+		pill.Label.Text = pill.Full
 	end
-	card.Check.Ring.Position = UDim2.new(1, -10, 0, 10)
-	local bottom = h - pad - pillsH - 10 -- the strengths end here
-	local lines = #card.Lines
-	if wide then
-		-- Gem at the left, name and blurb beside it, strengths under both.
-		local gem = math.clamp(math.floor(h * 0.42), 44, 110)
-		card.Halo.Position, card.Halo.Size = UDim2.fromOffset(pad - 4, pad - 4), UDim2.fromOffset(gem + 8, gem + 8)
-		card.Holder.Position, card.Holder.Size = UDim2.fromOffset(pad, pad), UDim2.fromOffset(gem, gem)
-		local x = pad + gem + 14
-		card.Name.TextXAlignment, card.Blurb.TextXAlignment = Enum.TextXAlignment.Left, Enum.TextXAlignment.Left
-		card.Name.TextSize = math.clamp(math.floor(gem * 0.3), 16, 26)
-		card.Name.Position, card.Name.Size = UDim2.fromOffset(x, pad + 2), UDim2.new(1, -x - 40, 0, 30)
-		card.Blurb.Visible = true
-		card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(x, pad + 34), UDim2.new(1, -x - pad, 0, 18)
-		local top = pad + gem + 10
-		card.Title.Visible = false
-		card.Divider.Visible = false
-		local fit = math.max(0, math.floor((bottom - top) / lineH))
+	card.Check.Ring.Position = UDim2.new(1, -8, 0, 8)
+	local bottom = h - pad - pillsH - 6 -- the strengths end here
+	local function placeLines(x: number, top: number, room: number)
+		local fit = math.max(0, math.floor(room / lineH))
 		for index, pair in card.Lines do
 			local show = index <= fit
 			pair[1].Visible, pair[2].Visible = show, show
-			pair[1].Position, pair[1].Size =
-				UDim2.fromOffset(pad, top + (index - 1) * lineH), UDim2.fromOffset(14, lineH)
+			pair[1].Position, pair[1].Size = UDim2.fromOffset(x, top + (index - 1) * lineH), UDim2.fromOffset(14, lineH)
 			pair[2].Position, pair[2].Size =
-				UDim2.fromOffset(pad + 16, top + (index - 1) * lineH), UDim2.new(1, -pad * 2 - 16, 0, lineH)
-			pair[2].TextSize, pair[2].TextWrapped = lineSize, narrow
+				UDim2.fromOffset(x + 16, top + (index - 1) * lineH), UDim2.new(1, -x - pad - 16, 0, lineH)
+			pair[2].TextSize, pair[2].TextWrapped = lineSize, false
+			pair[2].Text = if narrow and index == 1 then card.Hit else pair.Full
 		end
+	end
+	card.Title.Visible = false
+	card.Divider.Visible = false
+	if wide then
+		-- Gem at the left, name and what it's about beside it, its hits under them.
+		local gem = math.clamp(math.floor(bottom - pad), 56, 150)
+		card.Halo.Position = UDim2.fromOffset(pad - 6, pad - 6)
+		card.Halo.Size = UDim2.fromOffset(gem + 12, gem + 12)
+		card.Holder.Position, card.Holder.Size = UDim2.fromOffset(pad, pad), UDim2.fromOffset(gem, gem)
+		local x = pad + gem + 14
+		card.Name.TextXAlignment, card.Blurb.TextXAlignment = Enum.TextXAlignment.Left, Enum.TextXAlignment.Left
+		card.Name.TextSize = math.clamp(math.floor(gem * 0.24), 18, 28)
+		card.Name.Position, card.Name.Size = UDim2.fromOffset(x, pad), UDim2.new(1, -x - 36, 0, 30)
+		card.Blurb.Visible = true
+		card.Blurb.TextSize = 13
+		card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(x, pad + 30), UDim2.new(1, -x - pad, 0, 18)
+		placeLines(x, pad + 54, bottom - pad - 54)
 		return
 	end
-	-- Tall: the gem leads, then the name, the blurb, the strengths.
+	-- Tall: the gem leads, then the name, what it's about, and its hits.
 	card.Name.TextXAlignment, card.Blurb.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
-	local showBlurb, showTitle, nameH = true, true, 30
-	local function needs(): number
-		return pad + nameH + (if showBlurb then 20 else 0) + (if showTitle then 30 else 10) + lines * lineH
-	end
-	-- Room for the gem: drop the extras before it gets too small.
-	local gem = bottom - needs()
-	if gem < 70 then
-		showBlurb = false
-		gem = bottom - needs()
-	end
-	if gem < 60 then
-		showTitle = false
-		gem = bottom - needs()
-	end
-	gem = math.clamp(gem - 6, 30, 140)
-	card.Halo.Position = UDim2.new(0.5, -(gem + 30) / 2, 0, pad - 4)
-	card.Halo.Size = UDim2.fromOffset(gem + 30, gem + 30)
-	card.Holder.Position, card.Holder.Size = UDim2.new(0.5, -gem / 2, 0, pad + 8), UDim2.fromOffset(gem, gem)
-	local y = pad + gem + 14
-	card.Name.TextSize = math.clamp(math.floor(w / 11), 16, 26)
+	local nameH = if narrow then 24 else 30
+	local blurbH = if narrow then 15 else 18
+	-- The gem takes what's left once the words have one line of hits, up to
+	-- about half the card.
+	local words = 6 + nameH + blurbH + 6 + lineH
+	local cap = math.min(w - pad * 2 - 8, math.floor(h * 0.5), 200)
+	local gem = math.clamp(bottom - pad - words, math.min(48, cap), math.max(cap, 1))
+	card.Halo.Position = UDim2.new(0.5, -(gem + 24) / 2, 0, pad - 12)
+	card.Halo.Size = UDim2.fromOffset(gem + 24, gem + 24)
+	card.Holder.Position, card.Holder.Size = UDim2.new(0.5, -gem / 2, 0, pad), UDim2.fromOffset(gem, gem)
+	local y = pad + gem + 6
+	card.Name.TextSize = math.clamp(math.floor(w / 9), 18, 28)
 	card.Name.Position, card.Name.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, nameH)
 	y += nameH
-	card.Blurb.Visible = showBlurb
-	card.Blurb.TextSize = if w < 220 then 11 else 13
-	card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, 18)
-	y += if showBlurb then 20 else 0
-	card.Divider.Visible = showTitle
-	card.Divider.Position, card.Divider.Size = UDim2.fromOffset(pad, y + 8), UDim2.new(1, -pad * 2, 0, 1)
-	card.Title.Visible = showTitle
-	card.Title.Position, card.Title.Size = UDim2.fromOffset(pad, y + 14), UDim2.new(1, -pad * 2, 0, 14)
-	y += if showTitle then 32 else 10
-	for index, pair in card.Lines do
-		local show = y + index * lineH <= bottom + 4
-		pair[1].Visible, pair[2].Visible = show, show
-		pair[1].Position, pair[1].Size = UDim2.fromOffset(pad, y + (index - 1) * lineH), UDim2.fromOffset(14, lineH)
-		pair[2].Position, pair[2].Size =
-			UDim2.fromOffset(pad + 16, y + (index - 1) * lineH), UDim2.new(1, -pad * 2 - 16, 0, lineH)
-		pair[2].TextSize, pair[2].TextWrapped = lineSize, narrow
-	end
+	card.Blurb.Visible = true
+	card.Blurb.TextSize = if narrow then 11 else 13
+	card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, blurbH)
+	y += blurbH + 6
+	placeLines(pad, y, bottom - y)
 end
 
 local function layoutElements()
@@ -765,7 +757,7 @@ place(function()
 	layoutElements()
 end)
 listen(elementArea:GetPropertyChangedSignal("AbsoluteSize"), layoutElements)
--- "▲ STRONG VS CRYO": the other element in its own colour.
+-- "▲ BEATS CRYO" / "▼ WEAK TO THERMAL": the other element in its own colour.
 local function matchPill(parent, arrow: string, words: string, other: string, good: boolean)
 	local pill = frame(parent, {
 		BackgroundColor3 = if good then Color3.fromRGB(22, 44, 36) else Color3.fromRGB(48, 24, 28),
@@ -779,10 +771,9 @@ local function matchPill(parent, arrow: string, words: string, other: string, go
 		string.upper(GemConfig.elementName(other))
 	)
 	local full = string.format("%s  %s  %s", mark, words, name)
-	local value = text(pill, full, 10, C.Dim, Enum.Font.GothamBold, { RichText = true, ZIndex = 23 })
+	local value = text(pill, full, 10, C.Text, Enum.Font.GothamBold, { RichText = true, ZIndex = 23 })
 	value.TextXAlignment = Enum.TextXAlignment.Center
-	-- (Narrow cards say just the element.)
-	return { Frame = pill, Label = value, Full = full, Short = string.format("%s  %s", mark, name) }
+	return { Frame = pill, Label = value, Full = full }
 end
 for _, element in elementOrder do
 	local info = ELEMENTS[element]
@@ -809,13 +800,8 @@ for _, element in elementOrder do
 	local haloDisc = frame(card, { BackgroundColor3 = color, BackgroundTransparency = 0.9, ZIndex = 22 })
 	UiKit.round(haloDisc, 999)
 	local holder = frame(card, { BackgroundTransparency = 1, ZIndex = 23 })
-	Art.show(
-		holder,
-		{ Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 },
-		nil,
-		color,
-		false
-	)
+	local gem = { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }
+	local art = Art.show(holder, gem, nil, color, false)
 	local check = checkMark(card)
 	local nameLabel = text(card, string.upper(GemConfig.elementName(element)), 24, color, Enum.Font.GothamBlack)
 	local blurb = text(card, info.Blurb, 13, C.Text, Enum.Font.GothamMedium)
@@ -825,10 +811,10 @@ for _, element in elementOrder do
 	for _, strength in info.Strengths do
 		local mark = text(card, "+", 13, color, Enum.Font.GothamBlack)
 		local line = text(card, strength, 12, C.Dim, Enum.Font.GothamMedium)
-		table.insert(lines, { mark, line })
+		table.insert(lines, { mark, line, Full = strength })
 	end
-	local strong = matchPill(card, "▲", "STRONG VS", ElementMatchup.Beats[element], true)
-	local weak = matchPill(card, "▼", "WEAK VS", ElementMatchup.weakTo(element), false)
+	local strong = matchPill(card, "▲", "BEATS", ElementMatchup.Beats[element], true)
+	local weak = matchPill(card, "▼", "WEAK TO", ElementMatchup.weakTo(element), false)
 	elementButtons[element] = {
 		Button = card,
 		Stroke = edge,
@@ -844,6 +830,10 @@ for _, element in elementOrder do
 		Strong = strong,
 		Weak = weak,
 		Color = color,
+		Gem = gem,
+		Art = art,
+		Hit = info.Hit,
+		Phase = #elementOrder * 0.7 - (table.find(elementOrder, element) or 1) * 0.7,
 	}
 	listen(card.Activated, function()
 		if not savedKit and not busy then
@@ -854,6 +844,30 @@ for _, element in elementOrder do
 	end)
 end
 layoutElements()
+
+-- The gems turn while you choose: the picked one quicker. (A gem's a few
+-- dozen parts; 30 turns a second is smooth and keeps phones cool.)
+local spinAt, spun = 0, 0
+listen(RunService.RenderStepped, function(dt)
+	spun += dt
+	if spun < 1 / 30 then
+		return
+	end
+	local step = spun
+	spun = 0
+	if closed or not gui.Enabled or not elementArea.Visible or pickStep ~= "Element" then
+		return
+	end
+	spinAt += step
+	for id, card in elementButtons do
+		local model = card.Art and card.Art.Model
+		if model and model.Parent then
+			local speed = if id == chosenElement then 1.6 else 0.6
+			card.Turn = (card.Turn or card.Phase) + step * speed
+			model:PivotTo(GemArt.pose(card.Gem, card.Turn))
+		end
+	end
+end)
 
 local function layoutChoices(compact, rich)
 	rich = rich and not compact
@@ -906,9 +920,12 @@ function refreshChoices()
 		brand.TextColor3 = C.Gold
 		title.Text = if pickStep == "Style" then "CHOOSE YOUR STYLE" else "CHOOSE YOUR ELEMENT"
 		subtitle.Text = if pickStep == "Style"
-			then "The armor you start in, with a sword and shield. You can wear any set later."
+			then (if shortScreen
+				then "The armor you start in. You can wear any set later."
+				else "The armor you start in, with a sword and shield. You can wear any set later.")
+			elseif shortScreen then "Your gems and your Q, E and R moves use it. Each one beats another."
 			else string.format(
-				"%s armor is set. Now pick the element your gems carry: each one beats another.",
+				"%s armor is set. Your gems, and the Q, E and R moves they give you, take this element. Each one beats another.",
 				chosenStyle
 			)
 		if not busy then
@@ -966,11 +983,25 @@ local function fit()
 	skip.Text = if oneRow then "Skip · keep rewards" else "Skip reveal · keep all rewards"
 	local bodyHeight = math.max(80, h - header - (if oneRow then 54 else 108))
 	title.TextSize = if w < 420 then 20 elseif w < 500 then 24 elseif short then 20 else 34
+	-- Short screens (phones): the subtitle shares the title's row, at its
+	-- right, while you pick; the reveal that follows keeps the row for itself.
+	local besideTitle = short and w >= 560
 	title.Position, title.Size =
-		UDim2.fromOffset(0, if short then 18 else 24), UDim2.new(1, 0, 0, if short then 26 else 42)
-	subtitle.Visible = not short
+		UDim2.fromOffset(0, if short then 18 else 24),
+		UDim2.new(if besideTitle then 0.46 else 1, 0, 0, if short then 26 else 42)
+	subtitle.Visible = not short or (besideTitle and reward == nil)
 	brand.Visible = not short -- (short screens: the title takes its line)
-	subtitle.Position = UDim2.fromOffset(0, if narrow then 62 else 70)
+	if besideTitle then
+		subtitle.Position, subtitle.Size = UDim2.new(0.46, 8, 0, 12), UDim2.new(0.54, -8, 0, 36)
+		subtitle.TextXAlignment, subtitle.TextWrapped, subtitle.TextSize = Enum.TextXAlignment.Right, true, 12
+	else
+		subtitle.Position, subtitle.Size = UDim2.fromOffset(0, if narrow then 62 else 70), UDim2.new(1, 0, 0, 22)
+		subtitle.TextXAlignment, subtitle.TextWrapped, subtitle.TextSize = Enum.TextXAlignment.Left, false, 14
+	end
+	if short ~= shortScreen then
+		shortScreen = short
+		refreshChoices()
+	end
 	-- (No reveal steps any more: you pick your kit and go.)
 	stepper.Visible = false
 	motion.Visible = false

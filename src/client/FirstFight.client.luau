@@ -1,7 +1,9 @@
 --[[
 	The first fight's hints (Shared.FastStart): while the server has a new
-	player in their first spar (player attribute FirstFight), one hint at a
-	time pops up the first time a control is useful, and goes once it's done:
+	player in their first spar (player attribute FirstFight), one control at
+	a time pulses, the first time it's useful, until it's been used. No card
+	over the fight: just a ring round the button itself (Combat's buttons,
+	tagged TutorialTarget, and HintKey on Q / E / R).
 
 	  Swing   from the start, until a hit lands
 	  Block   while the partner winds up a quick swing, until you block
@@ -17,8 +19,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 
 local FastStart = require(ReplicatedStorage.Shared.FastStart)
 if not FastStart.Enabled then
@@ -32,41 +32,36 @@ local UiKit = require(script.Parent.Modules.UiKit)
 local player = Players.LocalPlayer
 local new = IronUi.new
 local GOLD, ORANGE, GREEN = Color3.fromRGB(255, 202, 91), Color3.fromRGB(255, 140, 70), Color3.fromRGB(96, 214, 128)
-local INK, TEXT, DIM = Color3.fromRGB(10, 13, 20), Color3.fromRGB(240, 244, 250), Color3.fromRGB(150, 162, 180)
 
+-- The ring, drawn over Combat's own button (same ScreenGui settings, so the
+-- button's on-screen position is the ring's too).
 local gui = UiKit.gui("FirstFightHints", 9)
 gui.Enabled = false
-local card = new("Frame", {
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 0.74, 0),
-	Size = UDim2.fromOffset(420, 66),
-	BackgroundColor3 = INK,
-	BackgroundTransparency = 0.12,
+local ring = new("Frame", {
+	Name = "HintRing",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundTransparency = 1,
+	ZIndex = 20,
 }, gui)
-UiKit.round(card, 14)
-local edge = new("UIStroke", { Color = GOLD, Thickness = 2, Transparency = 0.1 }, card)
-local scale = new("UIScale", { Scale = 1 }, card)
-local line = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 8),
-	Size = UDim2.new(1, -32, 0, 28),
-	Font = Enum.Font.GothamBlack,
-	TextSize = 20,
-	TextColor3 = TEXT,
-	Text = "",
-}, card)
-local reason = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 38),
-	Size = UDim2.new(1, -32, 0, 18),
-	Font = Enum.Font.GothamMedium,
-	TextSize = 13,
-	TextColor3 = DIM,
-	Text = "",
-}, card)
+new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, ring)
+local edge = new("UIStroke", { Color = GOLD, Thickness = 3 }, ring)
 
-local function touch(): boolean
-	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+-- The button each hint is about.
+local SLOT = { Swing = "Basic", Block = "Block", Dodge = "Dodge", Heavy = "Heavy" }
+local function findTarget(id: string): GuiObject?
+	local hud = player.PlayerGui:FindFirstChild("CombatHud")
+	if not hud or not hud:IsA("ScreenGui") or not hud.Enabled then
+		return nil
+	end
+	for _, d in hud:GetDescendants() do
+		if d:IsA("GuiObject") and d.Visible and d.AbsoluteSize.X > 4 then
+			local tag = d:GetAttribute("TutorialTarget")
+			if (SLOT[id] and tag == SLOT[id]) or (tag == "Surge" and d:GetAttribute("HintKey") == id) then
+				return d
+			end
+		end
+	end
+	return nil
 end
 
 -- Your Q / E / R moves: name, cost and what pays for it.
@@ -107,7 +102,6 @@ local function complete(event: string)
 	if was and done[was] then
 		-- Got it: a green flash, then the next one.
 		edge.Color = GREEN
-		line.TextColor3 = GREEN
 		shown = nil
 		flashUntil = os.clock() + 0.6
 		task.delay(0.6, function()
@@ -147,24 +141,39 @@ player:GetAttributeChangedSignal("Blocking"):Connect(function()
 	end
 end)
 
-local function show(id: string, list)
-	local names = {}
-	for key, move in list do
-		names[key] = move.Name
-	end
-	local text, why = FastStart.text(id, touch(), names)
+local target: GuiObject?, targetFor, lookedAt = nil, nil, 0
+local function show(id: string)
 	if shown ~= id then
 		shown, shownAt = id, os.clock()
-		scale.Scale = 0.85
-		TweenService:Create(scale, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-			:Play()
 	end
-	local urgent = FastStart.Urgent[id] == true
-	edge.Color = if urgent then ORANGE else GOLD
-	line.TextColor3 = if urgent then ORANGE else TEXT
-	line.Text, reason.Text = text, why
+	edge.Color = if FastStart.Urgent[id] == true then ORANGE else GOLD
 	gui.Enabled = true
 end
+
+-- Every frame while a hint is up: the ring round its button, breathing.
+RunService.RenderStepped:Connect(function()
+	if not gui.Enabled then
+		return
+	end
+	local now = os.clock()
+	local id = shown
+	-- (A fresh look for the button twice a second at most: the HUD is big.)
+	if id and (id ~= targetFor or now - lookedAt > 0.5) then
+		target, targetFor, lookedAt = findTarget(id), id, now
+	end
+	local button = target
+	if not button or not button.Parent or not button.Visible or (not id and now >= flashUntil) then
+		ring.Visible = false
+		return
+	end
+	local pulse = (math.sin(now * 6) + 1) / 2
+	local size = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) + 12 + pulse * 10
+	local centre = button.AbsolutePosition + button.AbsoluteSize / 2
+	ring.Visible = true
+	ring.Size = UDim2.fromOffset(size, size)
+	ring.Position = UDim2.fromOffset(centre.X, centre.Y)
+	edge.Transparency = 0.05 + pulse * 0.45
+end)
 
 local nextTick = 0
 RunService.Heartbeat:Connect(function()
@@ -211,7 +220,7 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 	if id then
-		show(id, list)
+		show(id)
 	else
 		gui.Enabled, shown = false, nil
 	end

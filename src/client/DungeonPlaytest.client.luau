@@ -34,7 +34,7 @@ toggle.BackgroundColor3 = Color3.fromRGB(39, 61, 79)
 toggle.TextColor3 = Color3.fromRGB(255, 210, 126)
 toggle.Font = Enum.Font.GothamBold
 toggle.TextSize = 12
-toggle.Text = "DEV  ▴"
+toggle.Text = "DEV"
 toggle.Parent = gui
 corner(toggle, 6)
 
@@ -63,15 +63,29 @@ status.Text = "DEV TOOLS · Onboarding is currently paused."
 status.Parent = panel
 
 -- Touch screens: the bottom-right corner is the thumb's (Combat's buttons),
--- so the DEV button moves up under LEAVE and its panel opens downward.
+-- and under the top bar sit LEAVE and every window's close button. So the
+-- DEV button goes up into the top bar's own strip, at its empty right end,
+-- small, and its panel opens downward from there.
 if game:GetService("UserInputService").TouchEnabled then
-	toggle.AnchorPoint, toggle.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 62)
-	panel.AnchorPoint, panel.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 96)
-	toggle.Text = "DEV  ▾"
+	gui.IgnoreGuiInset = true
+	toggle.AnchorPoint, toggle.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 10)
+	toggle.Size = UDim2.fromOffset(56, 26)
+	toggle.TextSize = 11
+	toggle.BackgroundTransparency = 0.25
+	panel.AnchorPoint, panel.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 42)
+	-- A phone in landscape is shorter than the panel: shrink it to fit.
+	local fit = Instance.new("UIScale")
+	fit.Parent = panel
+	local function shrink()
+		local height = gui.AbsoluteSize.Y
+		fit.Scale = if height > 0 then math.clamp((height - 52) / 394, 0.55, 1) else 1
+	end
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(shrink)
+	shrink()
 end
+-- (Plain words: the arrow glyphs this used to show aren't in every phone's font.)
 local function arrow(open: boolean): string
-	local touch = game:GetService("UserInputService").TouchEnabled
-	return if open == touch then "DEV  ▴" else "DEV  ▾"
+	return if open then "CLOSE" else "DEV"
 end
 
 toggle.Activated:Connect(function()

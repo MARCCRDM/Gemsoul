@@ -97,7 +97,7 @@ for _,element in {"Fire","Frost","Shock","Poison"} do
  gather(named(element))
  local all=table.concat(texts,"\n")
  check(string.find(all,"STRENGTHS",1,true)~=nil,element.." card has no strengths")
- check(string.find(all,"STRONG VS",1,true)~=nil and string.find(all,"WEAK VS",1,true)~=nil,element.." card has no matchup")
+ check(string.find(all,"BEATS",1,true)~=nil and string.find(all,"WEAK TO",1,true)~=nil,element.." card has no matchup in words")
 end
 failPrepare=true
 primary.Activated.Fire()
