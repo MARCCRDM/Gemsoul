@@ -1840,16 +1840,6 @@ Cosmetics.List = {
 		Look = "GrimReaper",
 		Robux = 199,
 	},
-	HelmetWitchHat = {
-		Id = "HelmetWitchHat",
-		Kind = "Helmet",
-		Name = "Witch's Brim",
-		Description = "Halloween: a drooping witch's hat with a crescent charm and a spider let down from the brim, over violet eyes and lank hair.",
-		Rarity = "Rare",
-		Color = Color3.fromRGB(196, 90, 255),
-		Look = "WitchHat",
-		Robux = 149,
-	},
 } :: { [string]: Cosmetic }
 
 function Cosmetics.get(id: any): Cosmetic?

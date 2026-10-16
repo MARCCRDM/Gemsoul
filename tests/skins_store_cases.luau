@@ -128,7 +128,7 @@ for id, cosmetic in Cosmetics.List do
 	end
 end
 check(
-	skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9 and visors >= 15 and helmets >= 13,
+	skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9 and visors >= 15 and helmets >= 12,
 	"The catalog is thinner than planned"
 )
 -- Helmets: every design is sold (once), with a tab of its own, each miner's own.

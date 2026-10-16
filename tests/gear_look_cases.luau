@@ -125,6 +125,16 @@ roblox.implementMethod("Model", "GetPivot", function(m)
 	local root = m:FindFirstChild("HumanoidRootPart")
 	return if root then root.CFrame else CFrame.new()
 end)
+-- (Moves every part with the root, as welds would.)
+roblox.implementMethod("Model", "PivotTo", function(m, target)
+	local root = m:FindFirstChild("HumanoidRootPart")
+	local move = target * (if root then root.CFrame else CFrame.new()):Inverse()
+	for _, part in m:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CFrame = move * part.CFrame
+		end
+	end
+end)
 local cache = {}
 local function requireScript(script)
 	local key = script:GetFullName()
@@ -705,7 +715,7 @@ end
 -- shine leave it in its own colours, every visor lights its eyes (a dark glass
 -- one too), and the one-helmet preview wears it.
 local helmetIds = Cosmetics.ofKind("Helmet")
-check(#helmetIds >= 13, "too few helmet skins")
+check(#helmetIds >= 12, "too few helmet skins")
 local function weldedTo(part)
 	local weld = part:FindFirstChildOfClass("WeldConstraint")
 	return weld and weld.Part0
@@ -817,6 +827,32 @@ do
 	local rig = FighterRig.build()
 	local only = Equipment._dress(rig, table.clone(KIT), { Owned = {}, Helmet = helmetIds[1] }, 7, "Helmet")
 	check(only and only.Helmet and only.Helmet:GetAttribute("HelmetSkin") ~= nil, "the one-helmet preview has no skin")
+end
+-- The Store's preview of each skin is the skin as worn, rounded parts and
+-- all: every egg and tube keeps its mesh (stripped, each showed as a box).
+services.Players.CreateHumanoidModelFromDescription = function()
+	return FighterRig.build()
+end
+local function rounded(root)
+	local n = 0
+	for _, d in root:GetDescendants() do
+		if d:IsA("BasePart") and d.Transparency < 1 and d:FindFirstChildOfClass("SpecialMesh") then
+			n += 1
+		end
+	end
+	return n
+end
+for _, id in helmetIds do
+	check(Equipment.cosmeticPreview(id), id .. ": no store preview")
+	local store = game:GetService("ReplicatedStorage"):FindFirstChild("CosmeticPreviews")
+	local preview = store and store:FindFirstChild(id)
+	local _, folder = wear(nil, { Helmet = id })
+	local worn = rounded(folder:FindFirstChild("Helmet"))
+	local shown = if preview then rounded(preview) else 0
+	check(
+		worn > 0 and shown == worn,
+		string.format("%s: the store preview has %d of its %d rounded parts", id, shown, worn)
+	)
 end
 
 print(

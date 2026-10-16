@@ -374,6 +374,11 @@ DESIGNS.HardHat = function(b)
 	end
 	shine(part(b, "Tube", at(0, 0.27, 0.03), v(1.26, 0.05, 1.32), yellow), 0.08)
 	part(b, "Egg", at(0, 0.27, -0.5, -6), v(0.86, 0.06, 0.62), yellow)
+	-- The chin strap.
+	for _, side in { -1, 1 } do
+		part(b, "Block", at(side * 0.47, -0.12, -0.08, 0, 0, side * 6), v(0.03, 0.66, 0.05), rubber)
+	end
+	part(b, "Egg", at(0, -0.5, -0.32), v(0.24, 0.08, 0.16), rubber)
 	-- The headlamp, the stone set just under it.
 	part(b, "Tube", at(0, 0.5, -0.53, 90), v(0.26, 0.14, 0.26), dark, METAL)
 	local bulb = part(b, "Tube", at(0, 0.5, -0.61, 90), v(0.2, 0.03, 0.2), rgb(255, 244, 210), NEON)
@@ -515,7 +520,7 @@ DESIGNS.ArenaPlume = function(b)
 	shine(part(b, "Egg", at(0, 0.1, 0.03), v(1.1, 1.2, 1.16), bronze, METAL), 0.15)
 	shine(part(b, "Egg", at(0, 0.1, 0.03), v(0.16, 1.27, 1.22), deep, METAL), 0.15)
 	-- The grated face: a shallow plate under the brim, pierced.
-	shine(part(b, "Egg", at(0, -0.02, -0.42), v(0.84, 0.76, 0.3), deep, METAL), 0.12)
+	part(b, "Egg", at(0, -0.02, -0.42), v(0.84, 0.76, 0.3), rgb(34, 26, 18), MAIL)
 	local function onFace(x: number, y: number): number
 		return -0.42 - 0.15 * math.sqrt(math.max(1 - (x / 0.42) ^ 2 - ((y + 0.02) / 0.38) ^ 2, 0))
 	end
@@ -532,10 +537,20 @@ DESIGNS.ArenaPlume = function(b)
 		part(b, "Block", at(side * 0.18, 0.08, -0.595), v(0.22, 0.025, 0.02), bronze, METAL)
 		part(b, "Block", at(side * 0.18, 0.08, -0.595), v(0.025, 0.22, 0.02), bronze, METAL)
 	end
-	for row = 0, 2 do
-		for col = 0, 3 do
-			local x, y = -0.18 + col * 0.12, -0.12 - row * 0.09
-			part(b, "Tube", at(x, y, onFace(x, y) - 0.005, 90), v(0.055, 0.03, 0.055), rgb(26, 20, 14))
+	-- The grille: bronze bars over the dark mesh.
+	for col = -2, 2 do
+		local x = col * 0.11
+		local y = -0.17
+		shine(part(b, "Block", at(x, y, onFace(x, y) - 0.012, 0, -x * 60, 0), v(0.03, 0.3, 0.03), bronze, METAL), 0.15)
+	end
+	for _, y in { -0.06, -0.17, -0.28 } do
+		shine(part(b, "Block", at(0, y, onFace(0, y) - 0.014), v(0.26, 0.026, 0.03), bronze, METAL), 0.15)
+		for _, side in { -1, 1 } do
+			local x = side * 0.2
+			shine(
+				part(b, "Block", at(x, y, onFace(x, y) - 0.008, 0, side * -32, 0), v(0.18, 0.026, 0.03), bronze, METAL),
+				0.15
+			)
 		end
 	end
 	-- An engraved band round the bowl.
@@ -564,6 +579,16 @@ DESIGNS.ArenaPlume = function(b)
 			if i % 2 == 0 then hair else hairDark,
 			FABRIC
 		)
+	end
+	-- A griffin's head leading the crest, rivets round the brim.
+	shine(part(b, "Egg", at(0, 0.66, -0.46, -20), v(0.15, 0.16, 0.2), deep, METAL), 0.2)
+	shine(part(b, "Wedge", at(0, 0.62, -0.58, 160), v(0.07, 0.1, 0.1), deep, METAL), 0.2)
+	for _, side in { -1, 1 } do
+		part(b, "Egg", at(side * 0.06, 0.69, -0.53), v(0.03, 0.03, 0.02), rgb(20, 14, 8))
+	end
+	for i = 0, 15 do
+		local a = math.rad(i * 22.5)
+		part(b, "Egg", at(0.69 * math.sin(a), 0.3, 0.04 - 0.71 * math.cos(a)), v(0.04, 0.03, 0.04), deep, METAL)
 	end
 	-- Feathers at either side, in bronze holders.
 	for _, side in { -1, 1 } do
@@ -802,19 +827,29 @@ DESIGNS.Shogun = function(b)
 		shine(part(b, "Egg", at(0, 0.27, 0.02, 0, i * 30, 0), v(0.035, 0.93, 1.17), rgb(70, 52, 34)), 0.25)
 	end
 	shine(part(b, "Tube", at(0, 0.72, 0.02), v(0.16, 0.04, 0.16), gold, METAL), 0.4)
+	-- Gold rivets round the bowl.
+	for i = 0, 9 do
+		local a = math.rad(-150 + i * 33.3)
+		part(b, "Egg", at(0.56 * math.sin(a), 0.36, 0.02 - 0.58 * math.cos(a)), v(0.05, 0.05, 0.05), gold, METAL)
+	end
 	part(b, "Egg", at(0, 0.74, 0.02), v(0.07, 0.07, 0.07), gold, METAL)
 	-- The peak, gold-edged.
 	shine(part(b, "Egg", at(0, 0.19, -0.43, 8), v(1, 0.05, 0.54), gold, METAL), 0.4)
 	shine(part(b, "Egg", at(0, 0.205, -0.42, 8), v(0.96, 0.06, 0.5), lacquer), 0.25)
-	-- The neck guard: three flaring tiers, gold at the hem.
+	-- The neck guard: three flaring tiers laced in blue cord, gold at the hem.
+	local cord = rgb(44, 74, 170)
 	for tier = 0, 2 do
-		skirt(b, 0.06 - tier * 0.16, 0.6 + tier * 0.08, -118, 118, 9, 0.17, 0.05, 18 + tier * 6, lacquer, PLASTIC, 0.06)
+		local y, r, flare = 0.06 - tier * 0.16, 0.6 + tier * 0.08, 18 + tier * 6
+		skirt(b, y, r, -118, 118, 9, 0.17, 0.05, flare, lacquer, PLASTIC, 0.06)
+		skirt(b, y + 0.02, r + 0.006, -118, 118, 9, 0.035, 0.06, flare, cord, FABRIC, 0.06)
 	end
 	skirt(b, -0.38, 0.79, -118, 118, 9, 0.035, 0.055, 30, gold, METAL, 0.06)
-	-- Fukigaeshi: the wings turned back at the front, a gold crest on each.
+	-- Fukigaeshi: the wings turned back at the front, gold-edged, a gold crest
+	-- on each.
 	for _, side in { -1, 1 } do
 		local wing = at(side * 0.66, 0.08, -0.3, 0, side * 50, side * -6)
-		shine(part(b, "Block", wing, v(0.06, 0.3, 0.34), lacquer), 0.25)
+		shine(part(b, "Block", wing, v(0.06, 0.4, 0.44), lacquer), 0.25)
+		shine(part(b, "Block", wing * CFrame.new(-side * 0.012, 0, 0), v(0.05, 0.44, 0.48), gold, METAL), 0.4)
 		shine(
 			part(
 				b,
@@ -857,12 +892,19 @@ DESIGNS.Shogun = function(b)
 		shine(part(b, "Block", at(side * 0.3, -0.24, -0.42, 0, side * -35, 0), v(0.05, 0.3, 0.24), red), 0.2)
 	end
 	shine(part(b, "Wedge", at(0, -0.08, -0.62, 0, 180, 0), v(0.12, 0.16, 0.1), red), 0.2)
+	-- Cheekbones, scowl lines, and a gold rim round the mask.
+	for _, side in { -1, 1 } do
+		shine(part(b, "Egg", at(side * 0.2, -0.13, -0.56), v(0.16, 0.1, 0.1), red), 0.2)
+		part(b, "Block", at(side * 0.2, -0.24, -0.585, 0, side * -18, side * 32), v(0.12, 0.014, 0.02), rgb(70, 10, 12))
+		part(b, "Block", at(side * 0.12, -0.02, -0.6, 0, 0, side * 40), v(0.08, 0.014, 0.02), rgb(70, 10, 12))
+		shine(part(b, "Block", at(side * 0.34, -0.22, -0.46, 0, side * -35, 0), v(0.02, 0.3, 0.26), gold, METAL), 0.4)
+	end
 	part(b, "Block", at(0, -0.3, -0.605), v(0.28, 0.05, 0.03), rgb(20, 14, 14))
 	for k = -1.5, 1.5 do
 		shine(part(b, "Block", at(k * 0.06, -0.3, -0.618), v(0.045, 0.035, 0.02), gold, METAL), 0.4)
 	end
 	for _, side in { -1, 1 } do
-		part(b, "Egg", at(side * 0.13, -0.21, -0.6, 0, 0, side * 22), v(0.24, 0.06, 0.06), rgb(240, 240, 236), FABRIC)
+		part(b, "Egg", at(side * 0.14, -0.215, -0.6, 0, 0, side * 26), v(0.3, 0.08, 0.07), rgb(240, 240, 236), FABRIC)
 	end
 	part(b, "Egg", at(0, -0.45, -0.53), v(0.12, 0.12, 0.08), rgb(240, 240, 236), FABRIC)
 	-- Throat guard.
@@ -899,7 +941,11 @@ DESIGNS.Pharaoh = function(b)
 		part(b, "Egg", at(side * 0.16, 0.15, -0.425, 0, 0, side * -8), v(0.24, 0.035, 0.04), lapis)
 	end
 	shine(part(b, "Egg", at(0, -0.06, -0.5), v(0.1, 0.18, 0.1), gold, METAL), 0.3)
-	part(b, "Block", at(0, -0.24, -0.465), v(0.16, 0.025, 0.03), rgb(120, 40, 30))
+	-- Lips and chin, sculpted.
+	shine(part(b, "Egg", at(0, -0.225, -0.475), v(0.18, 0.045, 0.05), rgb(196, 140, 52), METAL), 0.3)
+	shine(part(b, "Egg", at(0, -0.27, -0.465), v(0.15, 0.05, 0.05), rgb(196, 140, 52), METAL), 0.3)
+	part(b, "Block", at(0, -0.247, -0.49), v(0.14, 0.01, 0.02), rgb(120, 70, 30))
+	shine(part(b, "Egg", at(0, -0.39, -0.38), v(0.26, 0.13, 0.18), gold, METAL), 0.3)
 	-- The headcloth: a striped cap, flaring wings at the cheeks, lappets
 	-- down the front and a queue at the back.
 	part(b, "Egg", at(0, 0.18, 0.08), v(1.06, 0.82, 1.06), lapis, FABRIC)
@@ -930,8 +976,9 @@ DESIGNS.Pharaoh = function(b)
 	shine(part(b, "Tube", at(0, 0.3, 0.06), v(1.09, 0.08, 1.1), gold, METAL), 0.35)
 	seat(shine(part(b, "Egg", at(0, 0.3, -0.48), v(0.14, 0.1, 0.06), gold, METAL), 0.35))
 	chain(b, { v(0, 0.36, -0.5), v(0, 0.46, -0.56), v(0, 0.55, -0.56) }, 0.06, 0.05, gold, METAL)
-	shine(part(b, "Egg", at(0, 0.56, -0.57), v(0.18, 0.2, 0.05), gold, METAL), 0.4)
-	part(b, "Egg", at(0, 0.56, -0.595), v(0.09, 0.12, 0.02), rgb(196, 40, 40))
+	shine(part(b, "Egg", at(0, 0.56, -0.57), v(0.25, 0.27, 0.05), gold, METAL), 0.4)
+	part(b, "Egg", at(0, 0.56, -0.595), v(0.14, 0.17, 0.02), rgb(196, 40, 40))
+	part(b, "Egg", at(0, 0.56, -0.605), v(0.06, 0.09, 0.02), lapis)
 	part(b, "Egg", at(0, 0.67, -0.58), v(0.08, 0.07, 0.09), gold, METAL)
 	-- The beard.
 	for i = 0, 3 do
@@ -952,6 +999,21 @@ DESIGNS.Pharaoh = function(b)
 		}, 0.07, 0.04, gold, METAL)
 	end
 	shine(part(b, "Tube", at(0, 0.94, 0.14, 90), v(0.48, 0.04, 0.48), gold, METAL), 0.4)
+	-- Its rays.
+	for i = 0, 11 do
+		local a = math.rad(i * 30 + 15)
+		shine(
+			part(
+				b,
+				"Block",
+				at(0.32 * math.cos(a), 0.94 + 0.32 * math.sin(a), 0.15, 0, 0, i * 30 + 15),
+				v(0.12, 0.028, 0.02),
+				gold,
+				METAL
+			),
+			0.4
+		)
+	end
 	local sun = part(b, "Tube", at(0, 0.94, 0.11, 90), v(0.4, 0.04, 0.4), rgb(255, 150, 40), NEON)
 	animate(sun, "Shift", rgb(255, 120, 30), rgb(255, 220, 90))
 	lamp(sun, rgb(255, 180, 70), 7, 0.7, 2.4, 0.45)
@@ -965,91 +1027,119 @@ DESIGNS.Pharaoh = function(b)
 	})
 end
 
--- Mech Ace: a mobile-suit head: white, blue and red armour, a gold V-fin,
--- a red forehead sensor, slanted green eyes over a vented faceplate, and
--- ear pods.
+-- Mech Ace: a mobile-suit head: a white helmet of angled plates under a blue
+-- crest, a tall gold V-fin over a red forehead camera, slanted green eyes
+-- in a black visor under a scowling brow, a vented faceplate with a red
+-- chin, cheek guards swept back, head vulcans, lit ear sensors, a rear fin
+-- and an antenna.
 DESIGNS.MechAce = function(b)
-	local white, blue, red = rgb(238, 240, 246), rgb(42, 84, 206), rgb(216, 32, 44)
-	local gold, dark = rgb(244, 192, 60), rgb(46, 50, 60)
-	shine(part(b, "Block", at(0, 0.04, 0.02), v(0.94, 0.86, 1.02), white), 0.1)
-	shine(part(b, "Block", at(0, 0.5, 0.08), v(0.8, 0.14, 0.88), white), 0.1)
-	shine(part(b, "Wedge", at(0, 0.5, -0.43), v(0.8, 0.14, 0.14), white), 0.1)
-	shine(part(b, "Block", at(0, 0.6, 0.14), v(0.2, 0.1, 0.78), blue), 0.12)
-	shine(part(b, "Wedge", at(0, 0.6, -0.31), v(0.2, 0.1, 0.12), blue), 0.12)
-	-- The forehead sensor (the stone sits on it) and the V-fin.
-	seat(shine(part(b, "Block", at(0, 0.36, -0.53), v(0.2, 0.16, 0.08), red), 0.2))
-	shine(part(b, "Block", at(0, 0.3, -0.56), v(0.24, 0.08, 0.04), gold, METAL), 0.4)
+	local white, plate, blue, red = rgb(238, 240, 246), rgb(196, 202, 216), rgb(42, 84, 206), rgb(216, 32, 44)
+	local gold, dark, steel = rgb(244, 192, 60), rgb(24, 26, 34), rgb(92, 98, 112)
+	local green, amber = rgb(80, 255, 140), rgb(255, 206, 60)
+	local function armour(p: BasePart): BasePart
+		return shine(p, 0.1)
+	end
+	-- The helmet: a block, its top edges cut away by sloped plates.
+	armour(part(b, "Block", at(0, 0.02, 0.05), v(0.86, 0.7, 0.92), white))
+	armour(part(b, "Block", at(0, 0.415, 0.11), v(0.6, 0.09, 0.78), white))
 	for _, side in { -1, 1 } do
-		shine(part(b, "Block", at(side * 0.24, 0.56, -0.57, 0, 0, side * -48), v(0.07, 0.58, 0.03), gold, METAL), 0.4)
+		armour(part(b, "Wedge", at(side * 0.365, 0.415, 0.11, 0, -side * 90, 0), v(0.78, 0.09, 0.13), white))
+	end
+	armour(part(b, "Wedge", at(0, 0.415, -0.355), v(0.6, 0.09, 0.15), white))
+	-- The crest down the crown, and a blue band round the back.
+	armour(part(b, "Block", at(0, 0.49, 0.16), v(0.16, 0.07, 0.62), blue))
+	armour(part(b, "Wedge", at(0, 0.49, -0.21), v(0.16, 0.07, 0.12), blue))
+	armour(part(b, "Block", at(0, 0.2, 0.5), v(0.7, 0.24, 0.06), blue))
+	-- The forehead: a gold plate, the red camera on it (the stone's seat)
+	-- and the V-fin rising from it.
+	armour(part(b, "Block", at(0, 0.3, -0.455), v(0.3, 0.14, 0.04), gold, METAL))
+	seat(shine(part(b, "Block", at(0, 0.3, -0.485), v(0.15, 0.09, 0.04), red), 0.3))
+	for _, side in { -1, 1 } do
+		local fin = at(side * 0.25, 0.62, -0.49, 0, 0, side * -40)
+		shine(part(b, "Block", fin, v(0.075, 0.72, 0.035), gold, METAL), 0.4)
 		shine(
 			part(
 				b,
-				"Wedge",
-				at(side * 0.47, 0.77, -0.57, 0, 0, side * -48) * CFrame.Angles(0, math.pi / 2, 0),
-				v(0.03, 0.14, 0.07),
-				gold,
+				"Block",
+				fin * CFrame.new(side * 0.03, -0.04, -0.012),
+				v(0.02, 0.6, 0.02),
+				rgb(255, 226, 120),
 				METAL
 			),
 			0.4
 		)
+		-- (Tapering to its point.)
+		shine(part(b, "Block", fin * CFrame.new(-side * 0.012, 0.42, 0), v(0.045, 0.14, 0.03), gold, METAL), 0.4)
 	end
-	-- Eyes in a dark band.
-	part(b, "Block", at(0, 0.13, -0.5), v(0.72, 0.18, 0.06), rgb(14, 16, 22))
+	-- The brow, scowling down to the middle, over a black visor and the eyes.
+	for _, side in { -1, 1 } do
+		armour(part(b, "Block", at(side * 0.2, 0.23, -0.47, 0, 0, side * 9), v(0.42, 0.06, 0.1), white))
+		-- Head vulcans either side of the camera.
+		part(b, "Tube", at(side * 0.33, 0.31, -0.465, 90), v(0.075, 0.08, 0.075), steel, METAL)
+		part(b, "Tube", at(side * 0.33, 0.31, -0.5, 90), v(0.04, 0.02, 0.04), dark)
+	end
+	part(b, "Block", at(0, 0.12, -0.445), v(0.74, 0.17, 0.04), dark)
 	for _, side in { -1, 1 } do
 		animate(
-			eye(
-				part(
-					b,
-					"Block",
-					at(side * 0.16, 0.14, -0.535, 0, 0, side * 10),
-					v(0.22, 0.065, 0.02),
-					rgb(80, 255, 140),
-					NEON
-				)
-			),
+			eye(part(b, "Block", at(side * 0.165, 0.125, -0.47, 0, 0, side * 12), v(0.21, 0.055, 0.02), green, NEON)),
 			"Pulse",
-			rgb(80, 255, 140)
+			green
+		)
+		-- The point of each eye, toward the temple.
+		animate(
+			eye(part(b, "Block", at(side * 0.285, 0.155, -0.47, 0, 0, side * 32), v(0.07, 0.035, 0.02), green, NEON)),
+			"Pulse",
+			green
 		)
 	end
-	eyeLight(lamp(anchor(b, at(0, 0.14, -0.52), v(0.04, 0.04, 0.02)), rgb(90, 255, 150), 4, 0.6, 1.8, 0.4))
-	-- Faceplate, chin and vents.
-	shine(part(b, "Block", at(0, -0.22, -0.48), v(0.56, 0.36, 0.14), white), 0.1)
-	shine(part(b, "Block", at(0, -0.43, -0.5), v(0.3, 0.1, 0.12), red), 0.2)
+	eyeLight(lamp(anchor(b, at(0, 0.13, -0.46), v(0.04, 0.04, 0.02)), rgb(90, 255, 150), 4, 0.6, 1.8, 0.4))
+	-- The faceplate: vents either side of a centre ridge, a red chin.
+	armour(part(b, "Block", at(0, -0.13, -0.45), v(0.46, 0.26, 0.06), plate))
+	part(b, "Block", at(0, -0.12, -0.484), v(0.03, 0.22, 0.02), steel)
 	for _, side in { -1, 1 } do
 		for k = 0, 2 do
-			part(b, "Block", at(side * 0.11, -0.14 - k * 0.075, -0.555), v(0.13, 0.035, 0.02), dark)
+			part(b, "Block", at(side * 0.12, -0.06 - k * 0.07, -0.484, 0, 0, side * -14), v(0.13, 0.026, 0.02), dark)
 		end
-		-- Cheek guards, ear pods and vulcans.
-		shine(part(b, "Block", at(side * 0.38, -0.12, -0.4, 0, side * 22, 0), v(0.16, 0.42, 0.22), blue), 0.12)
-		shine(part(b, "Tube", at(side * 0.53, 0.06, 0.02, 0, 0, 90), v(0.38, 0.14, 0.38), white), 0.1)
-		part(b, "Tube", at(side * 0.605, 0.06, 0.02, 0, 0, 90), v(0.26, 0.02, 0.26), dark)
-		part(b, "Block", at(side * 0.62, 0.06, 0.02), v(0.02, 0.05, 0.2), rgb(255, 206, 60), NEON)
-		part(b, "Tube", at(side * 0.3, 0.44, -0.52, 90), v(0.08, 0.12, 0.08), dark, METAL)
 	end
-	-- Rear fin and neck.
-	shine(part(b, "Block", at(0, 0.28, 0.56), v(0.5, 0.3, 0.1), blue), 0.12)
-	for k = -1, 1 do
-		part(b, "Block", at(k * 0.13, 0.28, 0.615), v(0.08, 0.22, 0.02), dark)
-	end
-	part(b, "Tube", at(0, -0.56, 0.04), v(0.5, 0.3, 0.5), dark, METAL)
-	for k = 0, 1 do
-		part(b, "Tube", at(0, -0.5 - k * 0.12, 0.04), v(0.56, 0.04, 0.56), rgb(80, 86, 98), METAL)
-	end
-	-- Panel lines and a red marking down the sides.
+	armour(part(b, "Block", at(0, -0.3, -0.455), v(0.22, 0.08, 0.08), red))
+	armour(part(b, "Wedge", at(0, -0.36, -0.455, 180, 0, 0), v(0.22, 0.05, 0.08), red))
+	-- Cheek guards swept back, a blue stripe on each.
 	for _, side in { -1, 1 } do
-		part(b, "Block", at(side * 0.476, 0.32, 0.02), v(0.012, 0.02, 0.86), dark)
-		part(b, "Block", at(side * 0.476, -0.25, 0.02), v(0.012, 0.02, 0.86), dark)
-		part(b, "Block", at(side * 0.476, 0.03, 0.34), v(0.012, 0.56, 0.02), dark)
-		part(b, "Block", at(side * 0.476, 0.4, 0.33), v(0.012, 0.07, 0.24), red)
+		local cheek = at(side * 0.35, -0.1, -0.36, 0, side * 24, 0)
+		armour(part(b, "Block", cheek, v(0.14, 0.36, 0.2), white))
+		armour(part(b, "Block", cheek * CFrame.new(side * 0.072, 0.04, 0), v(0.01, 0.2, 0.12), blue))
 	end
-	-- A lit vent under the rear fin, and the antenna.
-	part(b, "Block", at(0, -0.04, 0.535), v(0.42, 0.18, 0.02), dark)
+	-- The helmet's sides flaring out over the jaw.
+	for _, side in { -1, 1 } do
+		armour(part(b, "Block", at(side * 0.455, -0.2, 0.08, 0, 0, side * 14), v(0.06, 0.32, 0.78), white))
+		part(b, "Block", at(side * 0.5, -0.33, 0.08, 0, 0, side * 14), v(0.02, 0.04, 0.78), blue)
+	end
+	-- Ear sensors, lit amber, and the panel lines down the sides.
+	for _, side in { -1, 1 } do
+		armour(part(b, "Tube", at(side * 0.46, 0.05, 0.06, 0, 0, 90), v(0.36, 0.07, 0.36), white))
+		part(b, "Tube", at(side * 0.495, 0.05, 0.06, 0, 0, 90), v(0.26, 0.02, 0.26), steel, METAL)
+		animate(
+			part(b, "Tube", at(side * 0.51, 0.05, 0.06, 0, 0, 90), v(0.14, 0.02, 0.14), amber, NEON),
+			"Pulse",
+			amber
+		)
+		part(b, "Block", at(side * 0.432, 0.3, 0.05), v(0.012, 0.02, 0.86), dark)
+		part(b, "Block", at(side * 0.432, -0.22, 0.05), v(0.012, 0.02, 0.86), dark)
+		part(b, "Block", at(side * 0.432, 0.05, 0.36), v(0.012, 0.5, 0.02), dark)
+		armour(part(b, "Block", at(side * 0.435, 0.24, 0.3), v(0.012, 0.06, 0.2), red))
+	end
+	-- The rear fin and its lit vents, the neck, and the antenna.
+	armour(part(b, "Block", at(0, 0.34, 0.54), v(0.3, 0.2, 0.08), blue))
+	part(b, "Block", at(0, -0.06, 0.53), v(0.44, 0.18, 0.04), dark)
 	for k = 0, 1 do
-		part(b, "Block", at(0, -0.0 - k * 0.08, 0.547), v(0.34, 0.025, 0.01), rgb(255, 206, 60), NEON)
+		part(b, "Block", at(0, -0.02 - k * 0.08, 0.555), v(0.36, 0.025, 0.01), amber, NEON)
 	end
-	rod(b, v(0.22, 0.47, 0.36), v(0.32, 0.94, 0.58), 0.03, dark, METAL)
-	local beacon = part(b, "Egg", at(0.325, 0.96, 0.59), v(0.06, 0.06, 0.06), red, NEON)
-	animate(beacon, "Pulse", red)
+	part(b, "Tube", at(0, -0.5, 0.05), v(0.46, 0.3, 0.46), steel, METAL)
+	for k = 0, 1 do
+		part(b, "Tube", at(0, -0.44 - k * 0.12, 0.05), v(0.52, 0.04, 0.52), dark, METAL)
+	end
+	rod(b, v(0.3, 0.44, 0.38), v(0.4, 0.98, 0.6), 0.03, steel, METAL)
+	animate(part(b, "Egg", at(0.405, 1.0, 0.61), v(0.06, 0.06, 0.06), red, NEON), "Pulse", red)
 end
 
 -- Wyrmking: a crimson dragon's head: a long snout with fangs, a jaw with
@@ -1188,13 +1278,17 @@ DESIGNS.JackOLantern = function(b)
 		)
 	end
 	part(b, "Tube", at(0, -0.48, 0.02), v(0.62, 0.22, 0.62), rgb(150, 66, 12))
-	-- The carved face, glowing.
+	-- The carved face, glowing, each cut edged dark where the knife went in.
 	local carved = {}
+	local cutEdge = rgb(96, 34, 6)
 	for _, side in { -1, 1 } do
-		for _, p in triangle(b, at(side * 0.21, 0.15, -0.575, 0, side * -18, 0), 0.26, 0.2, 0.06, glow, NEON, true) do
+		local spot = at(side * 0.21, 0.15, -0.575, 0, side * -18, 0)
+		triangle(b, spot * CFrame.new(0, 0, 0.014), 0.33, 0.26, 0.04, cutEdge, PLASTIC, true)
+		for _, p in triangle(b, spot, 0.26, 0.2, 0.06, glow, NEON, true) do
 			table.insert(carved, p)
 		end
 	end
+	triangle(b, at(0, -0.03, -0.585), 0.18, 0.15, 0.04, cutEdge, PLASTIC, true)
 	for _, p in triangle(b, at(0, -0.03, -0.6), 0.13, 0.11, 0.06, glow, NEON, true) do
 		table.insert(carved, p)
 	end
@@ -1213,13 +1307,25 @@ DESIGNS.JackOLantern = function(b)
 				NEON
 			)
 		)
+		part(b, "Block", at(x, y, -0.572 + math.abs(x) * 0.12, 0, -x * 50, slope * 0.25), v(0.16, 0.13, 0.04), cutEdge)
 	end
 	for _, p in carved do
 		animate(eye(p), "Flicker", glow, flash, 1)
 	end
-	-- Teeth left standing in the grin.
-	part(b, "Block", at(-0.07, -0.245, -0.615), v(0.07, 0.05, 0.04), orange)
-	part(b, "Block", at(0.12, -0.27, -0.61), v(0.07, 0.05, 0.04), orange)
+	-- Fangs left standing in the grin.
+	for _, x in { -0.13, 0.13 } do
+		triangle(
+			b,
+			at(x, -0.225 + 0.09 * (x / 0.3) ^ 2, -0.618, 0, -x * 50, 0),
+			0.07,
+			0.07,
+			0.03,
+			orange,
+			PLASTIC,
+			false
+		)
+	end
+	triangle(b, at(0, -0.305, -0.618), 0.06, 0.06, 0.03, orange, PLASTIC, true)
 	-- The light inside.
 	eyeLight(lamp(anchor(b, at(0, 0, -0.1), v(0.1, 0.1, 0.1)), rgb(255, 150, 50), 8, 1.1, 0.3, 0.55))
 	seat(anchor(b, at(0, 0.38, -0.55), v(0.1, 0.1, 0.02)))
@@ -1229,6 +1335,7 @@ DESIGNS.JackOLantern = function(b)
 	local top =
 		part(b, "Tube", at(0.03, 0.71, 0.03, 0, 0, -10), v(0.13, 0.05, 0.13), rgb(70, 76, 30), Enum.Material.Wood)
 	part(b, "Egg", at(0.22, 0.58, 0.12, 0, 20, -14), v(0.36, 0.03, 0.22), green, FABRIC)
+	part(b, "Egg", at(-0.16, 0.6, -0.12, 0, -30, 18), v(0.28, 0.03, 0.18), rgb(88, 156, 52), FABRIC)
 	-- The lid's cut round the stem, the candlelight showing through it.
 	for i = 0, 11 do
 		local a = math.rad(i * 30)
@@ -1273,7 +1380,7 @@ DESIGNS.GrimReaper = function(b)
 	-- folds of the cloth either side of it.
 	chain(
 		b,
-		{ v(0, 0.6, 0.3), v(0, 0.62, 0.52), v(0, 0.5, 0.74), v(0, 0.28, 0.86), v(0, 0.02, 0.88) },
+		{ v(0, 0.62, 0.2), v(0, 0.76, 0.42), v(0, 0.62, 0.66), v(0, 0.36, 0.84), v(0, 0.06, 0.9) },
 		0.5,
 		0.08,
 		cloth,
@@ -1299,6 +1406,23 @@ DESIGNS.GrimReaper = function(b)
 		part(b, "Egg", at(side * 0.18, -0.04, -0.52), v(0.14, 0.08, 0.12), bone)
 	end
 	triangle(b, at(0, -0.03, -0.615), 0.07, 0.08, 0.03, void, PLASTIC, true)
+	-- The brow over the sockets, and green fire licking up out of them.
+	part(b, "Egg", at(0, 0.19, -0.56), v(0.42, 0.08, 0.1), bone)
+	part(b, "Block", at(0.17, 0.27, -0.6, 0, 0, 60), v(0.1, 0.012, 0.02), rgb(120, 112, 96))
+	for _, side in { -1, 1 } do
+		emit(anchor(b, at(side * 0.12, 0.12, -0.62), v(0.05, 0.03, 0.02)), {
+			Texture = FIRE_TEXTURE,
+			Colors = { ghost, rgb(30, 160, 80) },
+			Size = 0.09,
+			Rate = 8,
+			Life = { 0.3, 0.6 },
+			Speed = { 0.2, 0.4 },
+			Spread = 12,
+			Accel = Vector3.new(0, 0.8, 0),
+			Light = 1,
+			Fade = 0.2,
+		})
+	end
 	part(b, "Egg", at(0, -0.17, -0.46), v(0.38, 0.2, 0.32), bone)
 	part(b, "Block", at(0, -0.13, -0.6), v(0.25, 0.06, 0.02), void)
 	for k = -2, 2 do
@@ -1306,16 +1430,32 @@ DESIGNS.GrimReaper = function(b)
 	end
 	seat(part(b, "Egg", at(0, 0.27, -0.56), v(0.12, 0.1, 0.06), bone))
 	eyeLight(lamp(anchor(b, at(0, 0.08, -0.5), v(0.04, 0.04, 0.04)), rgb(90, 255, 130), 5, 0.7, 1.8, 0.35))
-	-- The hood's rim, framing the face.
-	part(b, "Egg", at(0, 0.44, -0.44, 12), v(0.8, 0.22, 0.34), cloth, FABRIC)
+	-- The hood's rim, framing the face in a pointed arch, its edge worn grey.
+	local rim = rgb(64, 64, 80)
 	for _, side in { -1, 1 } do
+		part(b, "Egg", at(side * 0.19, 0.43, -0.45, 0, 0, side * -24), v(0.52, 0.17, 0.34), cloth, FABRIC)
+		part(b, "Egg", at(side * 0.19, 0.4, -0.5, 0, 0, side * -24), v(0.46, 0.06, 0.26), rim, FABRIC)
 		part(b, "Egg", at(side * 0.35, 0.0, -0.44, 0, side * -14, side * 4), v(0.15, 0.92, 0.32), cloth, FABRIC)
+		part(b, "Egg", at(side * 0.31, -0.02, -0.52, 0, side * -14, side * 4), v(0.05, 0.84, 0.18), rim, FABRIC)
 	end
+	part(b, "Egg", at(0, 0.53, -0.47), v(0.14, 0.16, 0.2), cloth, FABRIC)
 	-- The mantle, in tatters.
 	part(b, "Tube", at(0, -0.5, 0.08), v(1.16, 0.18, 1.16), cloth, FABRIC)
 	skirt(b, -0.74, 0.6, -150, 150, 11, 0.42, 0.04, 14, cloth, FABRIC, 0.08)
 	skirt(b, -0.86, 0.66, -135, 135, 6, 0.3, 0.04, 18, rgb(30, 30, 38), FABRIC, 0.08)
-	part(b, "Egg", at(0, -0.5, -0.5), v(0.12, 0.12, 0.08), bone)
+	-- Skull clasps at the throat, a chain slung between them.
+	for _, side in { -1, 1 } do
+		part(b, "Egg", at(side * 0.22, -0.5, -0.5), v(0.1, 0.11, 0.07), bone)
+		part(b, "Egg", at(side * 0.22, -0.49, -0.535), v(0.07, 0.03, 0.02), void)
+	end
+	chain(
+		b,
+		{ v(-0.17, -0.52, -0.52), v(-0.08, -0.6, -0.55), v(0.08, -0.6, -0.55), v(0.17, -0.52, -0.52) },
+		0.025,
+		0.025,
+		rgb(150, 150, 160),
+		METAL
+	)
 	emit(anchor(b, at(0, -0.6, 0.1), v(0.9, 0.1, 0.9)), {
 		Texture = SMOKE_TEXTURE,
 		Colors = { rgb(110, 255, 150), rgb(40, 120, 70) },
@@ -1328,99 +1468,6 @@ DESIGNS.GrimReaper = function(b)
 		Fade = 0.7,
 		Grow = true,
 		Rotate = true,
-	})
-end
-
--- Witch's Brim: a wide-brimmed witch's hat, its point bent and drooping, a
--- purple band with a gold buckle, over a green face with a hooked nose and
--- glowing violet eyes, lank hair, a crescent moon charm and drifting magic.
-DESIGNS.WitchHat = function(b)
-	local hat, band, gold = rgb(34, 26, 46), rgb(116, 42, 176), rgb(234, 184, 64)
-	local skin, wart, hair = rgb(122, 172, 82), rgb(92, 136, 60), rgb(42, 28, 62)
-	local violet = rgb(196, 90, 255)
-	-- The face.
-	part(b, "Egg", at(0, -0.06, -0.02), v(0.86, 1, 0.92), skin)
-	for _, side in { -1, 1 } do
-		animate(eye(part(b, "Egg", at(side * 0.16, 0.07, -0.43), v(0.15, 0.09, 0.05), violet, NEON)), "Pulse", violet)
-		part(b, "Block", at(side * 0.16, 0.16, -0.43, 0, 0, side * 16), v(0.2, 0.035, 0.03), hair)
-	end
-	chain(b, { v(0, 0.02, -0.44), v(0, -0.07, -0.6), v(0, -0.15, -0.66), v(0, -0.18, -0.62) }, 0.12, 0.05, skin)
-	part(b, "Egg", at(0.035, -0.09, -0.63), v(0.05, 0.05, 0.05), wart)
-	for k = -2, 2 do
-		part(
-			b,
-			"Block",
-			at(k * 0.06, -0.3 + math.abs(k) * 0.025, -0.42 + math.abs(k) * 0.02, 0, 0, k * 10),
-			v(0.07, 0.03, 0.03),
-			rgb(46, 20, 34)
-		)
-	end
-	part(b, "Block", at(0.05, -0.33, -0.43), v(0.03, 0.04, 0.02), rgb(240, 236, 210))
-	part(b, "Egg", at(0, -0.48, -0.26), v(0.24, 0.18, 0.2), skin)
-	-- Lank hair round the sides and back, in locks of uneven length over
-	-- a dark mass of it.
-	part(b, "Egg", at(0, -0.02, 0.12), v(0.94, 0.94, 0.86), rgb(36, 24, 52), FABRIC)
-	for i = 0, 14 do
-		local phi = math.rad(-126 + i * 18)
-		local long = 0.6 + 0.16 * math.sin(i * 2.3) ^ 2
-		local cf = CFrame.new(0.47 * math.sin(phi), 0.33 - long / 2, 0.04 + 0.47 * math.cos(phi))
-			* CFrame.Angles(0, phi, 0)
-			* CFrame.Angles(math.rad(-8), 0, math.rad(math.sin(i * 1.7) * 6))
-		part(b, "Egg", cf, v(0.17, long, 0.07), if i % 2 == 0 then hair else rgb(60, 38, 86), FABRIC)
-	end
-	-- The brim, drooping at the front, the band and its buckle.
-	part(b, "Tube", at(0, 0.36, 0.02), v(1.9, 0.04, 1.9), hat, FABRIC)
-	part(b, "Egg", at(0, 0.335, -0.64, -10), v(1.1, 0.04, 0.6), hat, FABRIC)
-	part(b, "Tube", at(0, 0.44, 0.04), v(0.96, 0.1, 0.96), band)
-	shine(part(b, "Block", at(0, 0.44, -0.49), v(0.2, 0.14, 0.03), gold, METAL), 0.4)
-	seat(part(b, "Block", at(0, 0.44, -0.505), v(0.11, 0.07, 0.01), band))
-	-- The cone: narrowing up, bent back, the tip drooping.
-	for k = 0, 13 do
-		local d = 0.84 - k * 0.043
-		part(b, "Tube", at(0, 0.52 + k * 0.037, 0.04 + k * 0.0035), v(d, 0.045, d), hat, FABRIC)
-	end
-	chain(
-		b,
-		{ v(0, 0.98, 0.09), v(0, 1.16, 0.16), v(0, 1.3, 0.32), v(0, 1.36, 0.5), v(0, 1.3, 0.66) },
-		0.27,
-		0.06,
-		hat,
-		FABRIC
-	)
-	-- A patch on the cone.
-	part(b, "Block", at(0.18, 0.66, -0.26, -12, 24, 8), v(0.18, 0.16, 0.02), rgb(86, 60, 112), FABRIC)
-	-- A little spider let down on its thread from the brim.
-	local web = rgb(214, 214, 224)
-	rod(b, v(0.6, 0.34, -0.38), v(0.6, 0.06, -0.38), 0.008, web)
-	part(b, "Egg", at(0.6, 0.02, -0.38), v(0.1, 0.1, 0.11), rgb(16, 14, 20))
-	part(b, "Egg", at(0.6, -0.05, -0.39), v(0.06, 0.055, 0.06), rgb(16, 14, 20))
-	for _, side in { -1, 1 } do
-		part(b, "Egg", at(0.6 + side * 0.012, -0.06, -0.42), v(0.016, 0.016, 0.01), rgb(255, 40, 40), NEON)
-		for k = 1, 4 do
-			local up = 0.03 - k * 0.018
-			rod(
-				b,
-				v(0.6 + side * 0.03, up, -0.38),
-				v(0.6 + side * 0.1, up - 0.04, -0.38 + (k - 2.5) * 0.04),
-				0.012,
-				rgb(16, 14, 20)
-			)
-		end
-	end
-	-- The crescent charm on a thread from the tip.
-	rod(b, v(0, 1.3, 0.68), v(0, 1.12, 0.72), 0.015, gold)
-	local moon = arc(b, at(0, 1.02, 0.72, 0, 0, -30), 0.1, 60, 300, 6, 0.015, 0.05, 0.03, gold, NEON)
-	for _, p in moon do
-		animate(p, "Shift", gold, violet)
-	end
-	lamp(moon[3], rgb(190, 110, 255), 6, 0.7, 2, 0.45)
-	emit(anchor(b, at(0, 0.7, 0.04), v(0.9, 0.5, 0.9)), {
-		Colors = { rgb(200, 120, 255), rgb(120, 255, 160) },
-		Size = 0.1,
-		Rate = 5,
-		Life = { 0.9, 1.6 },
-		Speed = { 0.1, 0.4 },
-		Accel = Vector3.new(0, 0.4, 0),
 	})
 end
 

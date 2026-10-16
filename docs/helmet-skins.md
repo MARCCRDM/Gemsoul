@@ -1,27 +1,26 @@
 # Helmet skins
 
-Thirteen helmet skins. Each one is a whole new head in place of the helmet
+Twelve helmet skins. Each one is a whole new head in place of the helmet
 you wear. The helmet keeps its stats, rolls and gem; only its look changes.
 Each skin has its own silhouette, built from parts welded to the head and
-sized to it, so it fits any avatar. Three of them are for Halloween.
+sized to it, so it fits any avatar. Two of them are for Halloween.
 
-![The thirteen helmet skins, front and back](helmet-skins/lineup.png)
+![The twelve helmet skins, front and back](helmet-skins/lineup.png)
 
 | Skin | The look |
 | --- | --- |
 | Hard Hat | A ribbed yellow site helmet with reflective tape, a gem sticker and a headlamp corded to a battery pack (red tail light). Amber goggles, ear defenders, a dust mask. |
 | Star Bubble | A 1950s fishbowl space helmet: a white comms cap with a racing stripe, a smoked shield with eyes behind it, a blinking antenna, and a life-support pack with air tanks on the collar. |
-| Arena Plume | A bronze gladiator's helmet with a wide brim, a grille face with two eye grilles, a red horsehair crest, white feathers and a flared neck guard. |
+| Arena Plume | A bronze gladiator's helmet with a riveted wide brim, a face of bronze bars over dark mesh with two eye grilles, a griffin's head leading a red horsehair crest, white feathers and a flared neck guard. |
 | Deep Diver | A copper diving bonnet: a riveted brass faceplate with glowing eyes behind the port, grilled side ports, wing nuts, a nameplate, an air valve and hose, and bubbles. |
 | Jarl's Horns | An iron spangenhelm with spectacle guard and nasal, mail flaring over the shoulders, a braided ginger beard, a fur collar and great ivory horns. |
 | Shark Bite | Your head in a shark's jaws, eyes glowing in the dark of its mouth, with a dorsal fin and a tail fin. |
-| Shogun Kabuto | A black-lacquered kabuto: a gold crescent crest, a three-tier neck guard, a red war mask with gold teeth, and a burning red stare. |
-| Sun Pharaoh | A gold death mask in a lapis-and-gold headcloth, the cobra on its brow, and a burning sun disc between golden horns. |
-| Mech Ace | A mobile-suit head with a gold V-fin, slanted green eyes, panel lines, a lit rear vent and an antenna. |
+| Shogun Kabuto | A black-lacquered kabuto with gold rivets: a gold crescent crest, gold-edged side wings, a three-tier neck guard laced in blue cord, a red war mask with cheekbones, scowl lines, gold teeth and a flowing white moustache, and a burning red stare. |
+| Sun Pharaoh | A gold death mask with sculpted lips and chin, in a lapis-and-gold headcloth, the cobra rearing on its brow, and a burning, rayed sun disc between golden horns. |
+| Mech Ace | A mobile-suit head of angled white plates under a blue crest: a tall gold V-fin over a red forehead camera, slanted green eyes under a scowling brow, a vented faceplate with a red chin, swept cheek guards, head vulcans, lit ear sensors and an antenna. |
 | Wyrmking | A crimson dragon's head: a long snout with fangs and fire in its jaw, ember eyes, gold-tipped horns, frills, a scaled back and smoke from the nostrils. |
-| Jack-o'-Helm *(Halloween)* | A pumpkin with a carved, flickering grin, lit from inside, its lid cut glowing round the stem, embers rising off the top. |
-| Grim Reaper *(Halloween)* | A hood with a long, drooping tail round a bone skull with green fire in its eyes, a tattered mantle and green mist. |
-| Witch's Brim *(Halloween)* | A drooping witch's hat with a crescent charm and a spider let down from the brim, over a green face with violet eyes and lank hair. |
+| Jack-o'-Helm *(Halloween)* | A pumpkin with a carved, flickering face (every cut edged dark, fangs left in the grin), lit from inside, its lid cut glowing round the stem, two leaves, embers rising off the top. |
+| Grim Reaper *(Halloween)* | A peaked hood with a pointed, grey-worn opening and a long, drooping tail, round a bone skull with green fire licking up out of its eyes; skull clasps and a chain on a tattered mantle, green mist. |
 
 ## Getting one
 
@@ -38,14 +37,13 @@ The Store has a **Helmets** tab, between Suits and Visors:
 | Jarl's Horns | `HelmetJarlHorns` | Rare | 129 |
 | Shark Bite | `HelmetSharkBite` | Rare | 129 |
 | Jack-o'-Helm | `HelmetJackOLantern` | Rare | 149 |
-| Witch's Brim | `HelmetWitchHat` | Rare | 149 |
 | Shogun Kabuto | `HelmetShogun` | Ultra Rare | 199 |
 | Sun Pharaoh | `HelmetPharaoh` | Ultra Rare | 199 |
 | Mech Ace | `HelmetMechAce` | Ultra Rare | 199 |
 | Grim Reaper | `HelmetGrimReaper` | Ultra Rare | 199 |
 | Wyrmking | `HelmetWyrmking` | Legendary | 299 |
 
-The Vault holds all thirteen.
+The Vault holds all twelve.
 
 Like a suit, a visor or a pickaxe, each miner wears its own helmet skin
 (`Cosmetics.MinerKinds`). You put one on from the Wardrobe's **HELMETS** tab.
@@ -65,7 +63,7 @@ nothing is cut into bands or framed. A visor's particles, sparks and light come
 off both eyes alike.
 
 - **Character helmets** (Shogun, Pharaoh, Mech Ace, Wyrmking, Jack-o'-Helm,
-  Grim Reaper, Witch's Brim): their own eyes light in the visor's colour.
+  Grim Reaper): their own eyes light in the visor's colour.
   Their glows change colour too: the light inside the pumpkin and its lid
   cut, and the lamps by the eyes. With a visor that holds still, a skin's
   own flicker or pulse carries on in the visor's colour.
@@ -139,7 +137,7 @@ The other pieces of code involved:
 
 Every helmet's Developer Product id in `Store.RobuxProducts` is still `0`.
 Until it's set, the Buy button says "Coming soon". While testing, it buys for
-coins instead (`Config.TestCosmeticPrice`). Create the thirteen products at
+coins instead (`Config.TestCosmeticPrice`). Create the twelve products at
 the prices above, then paste in their ids (see `docs/store.md`, "To switch
 Robux on").
 
@@ -157,6 +155,9 @@ Robux on").
     glow in the visor's colour, the glass takes its tint, and no bands are
     cut.
   - A one-helmet preview builds the skin.
+  - The Store's preview of each skin keeps every rounded part the worn
+    skin has. The preview once dropped their meshes, so in the Store
+    every dome, egg and tube showed as a box.
 - **`tests/skins_store_cases.luau`** checks the catalog:
   - Every skin is a real design and is sold once, with a price.
   - The Store has a Helmets tab.
@@ -167,5 +168,4 @@ Robux on").
 The skins are in the game: Store, Wardrobe, previews, the gem and visors.
 The images are rendered from the game's own building code with a stand-in
 renderer, and haven't been checked in Roblox Studio yet. Each skin uses
-roughly 12 to 72 parts. Wyrmking, Jarl's Horns and Witch's Brim are the
-heaviest.
+37 (Star Bubble) to 129 (Shogun Kabuto, mostly its laced neck guard) parts.

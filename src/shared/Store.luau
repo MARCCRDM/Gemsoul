@@ -309,7 +309,6 @@ Store.RobuxProducts = {
 	HelmetWyrmking = 0,
 	HelmetJackOLantern = 0,
 	HelmetGrimReaper = 0,
-	HelmetWitchHat = 0,
 	-- One-time offers and the Season Path
 	StarterPack = 0,
 	SeasonPremium = 0,

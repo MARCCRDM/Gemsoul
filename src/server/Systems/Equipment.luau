@@ -3242,8 +3242,13 @@ function Equipment.cosmeticPreview(id: string): boolean
 			if box then
 				bakeSeams(part, box, preview)
 			end
+			-- Its shape and surface stay (a mesh makes the domes, eggs and
+			-- tubes of a helmet skin or a weapon: without it each is a box);
+			-- welds, lights, particles and the rest go.
 			for _, child in part:GetChildren() do
-				child:Destroy()
+				if not (child:IsA("DataModelMesh") or child:IsA("Decal") or child:IsA("SurfaceAppearance")) then
+					child:Destroy()
+				end
 			end
 			part.Anchored = true
 			part.Parent = preview

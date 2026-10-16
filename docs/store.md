@@ -48,7 +48,7 @@ this honestly:
 | Deep Space Set | medium | 599 | Nebula suit + skin, Void Crystal, Void Reaper | 36% |
 | Solar Forge Set | medium | 699 | Obsidian Lava, Solar Flare, Magma Heart | 29% |
 | Royal Treasury | large | 1,499 | Royal Gold, Chrome Knight, Stealth Black, Galaxy, Stormbreaker, Prism Shard, Gilded Prospector, Ember Cape, 5,000 coins, 24 h 2x XP | 24% |
-| The Vault | largest, once per account | 4,999 | Every weapon skin, suit, helmet, visor and pickaxe in the store (64), every bundle extra, the COLLECTOR title, 10,000 coins, 24 h 2x XP | 54% |
+| The Vault | largest, once per account | 4,999 | Every weapon skin, suit, helmet, visor and pickaxe in the store (63), every bundle extra, the COLLECTOR title, 10,000 coins, 24 h 2x XP | 53% |
 
 ### Squad kits (one, two or all three miners)
 
