@@ -84,19 +84,29 @@ for _, kind in Rules.MachineOrder do
 	local _, gotYaw = steer.CFrame:ToOrientation()
 	check(math.abs(wantYaw - gotYaw) < 1e-4, kind .. " would swing round when it spawns")
 	-- Each cosmetic part is connected through a weld or an articulated joint.
-	local connected, joints = {}, {}
+	-- (Instances compare equal with ==, but lune can hand back a new wrapper
+	-- each time a property is read, so they can't be table keys.)
+	local links, joints = {}, {}
 	for _, d in model:GetDescendants() do
 		if d.ClassName == "WeldConstraint" or d.ClassName == "Motor6D" then
 			check(d.Part0 and d.Part1 and d.Part0:IsDescendantOf(model) and d.Part1:IsDescendantOf(model), kind .. " has a detached limb")
-			connected[d.Part1] = true
+			table.insert(links, d.Part1)
 			if d.ClassName == "Motor6D" then joints[d.Name] = d end
 		end
+	end
+	local function connected(part)
+		for _, linked in links do
+			if linked == part then
+				return true
+			end
+		end
+		return false
 	end
 	local parts = 0
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") and d ~= chassis then
 			parts += 1
-			check(connected[d], kind .. ": " .. d.Name .. " is not attached")
+			check(connected(d), kind .. ": " .. d.Name .. " is not attached")
 			check(d.Massless and not d.Anchored and not d.CanCollide, kind .. ": cosmetic collision/mass")
 		end
 	end
