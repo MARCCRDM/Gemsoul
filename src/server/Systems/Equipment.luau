@@ -19,6 +19,7 @@ local Tags = require(ReplicatedStorage.Shared.Tags)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local ArmorKits = require(script.Parent.ArmorKits)
+local HelmetLooks = require(script.Parent.HelmetLooks)
 local FrontierAssets = require(script.Parent.FrontierAssets)
 local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
@@ -2057,6 +2058,64 @@ local function pieceStones(component: Instance, character: Model, slot: string, 
 		end
 	end
 end
+-- A helmet skin (HelmetLooks) sets its gem where its design says, on the
+-- part marked StoneSeat: on the front of it, facing out as the head does.
+-- False if the skin has no seat.
+local function seatStone(component: Instance, character: Model, gem): boolean
+	local head = bodyPart(character, "Head", "Head")
+	if not head or not gem then
+		return false
+	end
+	for _, seat in component:GetDescendants() do
+		if seat:IsA("BasePart") and seat:GetAttribute("StoneSeat") then
+			local forward = head.CFrame.LookVector
+			local c, s = seat.CFrame, seat.Size
+			-- How far the seat reaches forward from its middle.
+			local reach = (
+				math.abs(c.RightVector:Dot(forward)) * s.X
+				+ math.abs(c.UpVector:Dot(forward)) * s.Y
+				+ math.abs(c.LookVector:Dot(forward)) * s.Z
+			) / 2
+			local size = STONE_SPOTS.Helmet[1][4] * 0.8
+			local at = c.Position + forward * (reach + size * 0.12)
+			gemSocket(component, seat, c:ToObjectSpace(CFrame.lookAt(at, at + forward)), Vector3.zero, gem, size)
+			return true
+		end
+	end
+	return false
+end
+-- A helmet skin is built round the head inside it: the avatar's own head and
+-- face are hidden under it, and shown again (as they were) once it comes off.
+local function hideHead(character: Model)
+	local head = character:FindFirstChild("Head")
+	if not head or not head:IsA("BasePart") or head:GetAttribute("SkinHid") ~= nil then
+		return
+	end
+	head:SetAttribute("SkinHid", head.Transparency)
+	head.Transparency = 1
+	for _, decal in head:GetChildren() do
+		if decal:IsA("Decal") then
+			decal:SetAttribute("SkinHid", decal.Transparency)
+			decal.Transparency = 1
+		end
+	end
+end
+local function showHead(character: Model)
+	local head = character:FindFirstChild("Head")
+	local was = head and head:GetAttribute("SkinHid")
+	if not head or not head:IsA("BasePart") or type(was) ~= "number" then
+		return
+	end
+	head.Transparency = was
+	head:SetAttribute("SkinHid", nil)
+	for _, decal in head:GetChildren() do
+		local before = decal:GetAttribute("SkinHid")
+		if decal:IsA("Decal") and type(before) == "number" then
+			decal.Transparency = before
+			decal:SetAttribute("SkinHid", nil)
+		end
+	end
+end
 -- The element on a piece with a set stone (or a weapon): see above.
 -- `suited`: a suit colours the piece's trims, so they're left be.
 local function gemLook(component: Instance, gem, suited: boolean?)
@@ -2530,6 +2589,18 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	local trim = cosmetics and Cosmetics.get(cosmetics.Trim)
 	local accent = if trim then trim.Color else class.Color
 
+	-- A helmet skin (cosmetic): a whole new head built in place of the
+	-- helmet's own (HelmetLooks); the helmet keeps its stats, rolls and gem.
+	local helmetSkin = cosmetics and Cosmetics.get(cosmetics.Helmet)
+	local skinLook = if helmetSkin
+			and helmetSkin.Kind == "Helmet"
+			and HelmetLooks.has(helmetSkin.Look)
+		then helmetSkin.Look
+		else nil
+	if not only or only == "Helmet" then
+		showHead(character)
+	end
+
 	removeHeadwear(character)
 	local armorSlots = {}
 	for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
@@ -2541,23 +2612,31 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 			component.Name = slot
 			component.Parent = folder
 			armorSlots[slot] = component
-			ArmorKits.build(
-				component,
-				character,
-				gear.Look,
-				accent,
-				loadout[slot .. "Quality"],
-				if GearRolls.get(loadout, slot)
-					then GearRolls.appearance(GearRolls.get(loadout, slot))
-					else SuitTraits.forSuit(userId, gear.Id),
-				slot,
-				gear.Id
-			)
+			local skinned = slot == "Helmet" and skinLook ~= nil and HelmetLooks.build(component, character, skinLook)
+			if skinned then
+				hideHead(character)
+			else
+				ArmorKits.build(
+					component,
+					character,
+					gear.Look,
+					accent,
+					loadout[slot .. "Quality"],
+					if GearRolls.get(loadout, slot)
+						then GearRolls.appearance(GearRolls.get(loadout, slot))
+						else SuitTraits.forSuit(userId, gear.Id),
+					slot,
+					gear.Id
+				)
+			end
 			affinityGlow(component, GearRolls.get(loadout, slot))
-			-- Its gem, set in it (the chest's comes after its trim, below).
+			-- Its gem, set in it (the chest's comes after its trim, below; a
+			-- helmet skin's where its design seats it).
 			local gem = loadout[slot .. "Gem"]
 			if gem and slot ~= "Armor" then
-				pieceStones(component, character, slot, gem)
+				if not (skinned and seatStone(component, character, gem)) then
+					pieceStones(component, character, slot, gem)
+				end
 				local parts = {}
 				for _, part in component:GetDescendants() do
 					if part:IsA("BasePart") then
@@ -2769,7 +2848,8 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	if suit and suit.Kind == "Suit" and suit.Palette then
 		for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
 			local component = folder:FindFirstChild(slot)
-			if component and (not only or only == slot) then
+			-- (Not a helmet skin: it's a look of its own.)
+			if component and (not only or only == slot) and not component:GetAttribute("HelmetSkin") then
 				local biggest = repaint(component, suit.Palette, nil, true)
 				if slot == "Armor" and biggest and suit.Palette.Sparks then
 					drift(biggest, suit.Palette.Sparks, 8)
@@ -2833,9 +2913,15 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	if applySkin and (not only or only == "Weapon") then
 		applySkin(weaponFolder, skin.Color, skin.Palette)
 	end
-	-- So does a visor (cosmetic), on whatever helmet is worn, under any suit.
-	local visor = cosmetics and Cosmetics.get(cosmetics.Visor)
+	-- A helmet skin keeps its own colours through the gem, rarity and
+	-- Prismatic passes (their stones, lights and particles stay).
 	local helmetPiece = folder:FindFirstChild("Helmet")
+	if helmetPiece and helmetPiece:GetAttribute("HelmetSkin") then
+		HelmetLooks.restore(helmetPiece)
+	end
+	-- A visor (cosmetic) goes on last, on whatever helmet is worn, under any
+	-- suit (a helmet skin's eyes light in its colour: fitVisor).
+	local visor = cosmetics and Cosmetics.get(cosmetics.Visor)
 	if visor and visor.Kind == "Visor" and visor.Visor and helmetPiece and (not only or only == "Helmet") then
 		applyVisor(helmetPiece, visor.Visor)
 	end
@@ -3130,7 +3216,7 @@ function Equipment.cosmeticPreview(id: string): boolean
 		and (
 			if cosmetic.Kind == "Skin"
 				then folder:FindFirstChild("Weapon")
-				elseif cosmetic.Kind == "Visor" then folder:FindFirstChild("Helmet")
+				elseif cosmetic.Kind == "Visor" or cosmetic.Kind == "Helmet" then folder:FindFirstChild("Helmet")
 				else folder
 		)
 	if source then
@@ -3381,7 +3467,18 @@ function Equipment.start()
 				local look = if profile.Miners.Active == index
 					then profile.Cosmetics or {}
 					else Cosmetics.forMiner(profile.Cosmetics, miner.Character)
-				table.insert(keys, string.format("look:%s/%s/%s/%s", tostring(look.Suit), tostring(look.Skin), tostring(look.Back), tostring(look.Trim)))
+				table.insert(
+					keys,
+					string.format(
+						"look:%s/%s/%s/%s/%s/%s",
+						tostring(look.Suit),
+						tostring(look.Skin),
+						tostring(look.Back),
+						tostring(look.Trim),
+						tostring(look.Helmet),
+						tostring(look.Visor)
+					)
+				)
 				-- ("fist" marks previews held the fighting way: rebuilt once from older ones)
 				local key = "fist|" .. table.concat(keys, "|")
 				local name = tostring(index)

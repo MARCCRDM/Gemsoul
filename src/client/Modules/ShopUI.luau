@@ -72,8 +72,16 @@ local BLACK, BOLD, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Fo
 local W, H = 1100, 660
 local PAGE_X, PAGE_Y = 24, 80
 local PAGE_W, PAGE_H = W - 48, H - 100
-local KIND_NAMES =
-	{ Skin = "Weapon skin", Suit = "Suit", Pick = "Pickaxe", Trim = "Trim", Back = "Back piece", Title = "Title" }
+local KIND_NAMES = {
+	Skin = "Weapon skin",
+	Suit = "Suit",
+	Helmet = "Helmet",
+	Visor = "Visor",
+	Pick = "Pickaxe",
+	Trim = "Trim",
+	Back = "Back piece",
+	Title = "Title",
+}
 local RARITY_NAMES =
 	{ Common = "Common", Uncommon = "Uncommon", Rare = "Rare", UltraRare = "Ultra Rare", Legendary = "Legendary" }
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
@@ -444,7 +452,8 @@ local nav = new("Frame", {
 	Position = UDim2.fromOffset(240, 0),
 	Size = UDim2.fromOffset(560, 64),
 }, panel)
-UiKit.list(nav, 26, true).VerticalAlignment = Enum.VerticalAlignment.Center
+-- (Seven tabs: closer together, to fit the bar.)
+UiKit.list(nav, 20, true).VerticalAlignment = Enum.VerticalAlignment.Center
 local navButtons = {}
 for i, id in Store.Tabs do
 	local b = new("TextButton", {
@@ -1856,6 +1865,9 @@ local DRAW = {
 	end,
 	Suits = function()
 		drawCatalog("Suits")
+	end,
+	Helmets = function()
+		drawCatalog("Helmets")
 	end,
 	Visors = function()
 		drawCatalog("Visors")

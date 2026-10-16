@@ -60,17 +60,18 @@ local Cosmetics = require(script.Parent.Cosmetics)
 
 local Store = {}
 
-Store.Tabs = { "Bundles", "Skins", "Suits", "Visors", "Picks", "Free" }
+Store.Tabs = { "Bundles", "Skins", "Suits", "Helmets", "Visors", "Picks", "Free" }
 Store.TabNames = {
 	Bundles = "Bundles",
 	Skins = "Weapon Skins",
 	Suits = "Suits",
+	Helmets = "Helmets",
 	Visors = "Visors",
 	Picks = "Pickaxes",
 	Free = "Free",
 }
 -- The cosmetic kind each catalog tab sells.
-Store.TabKinds = { Skins = "Skin", Suits = "Suit", Visors = "Visor", Picks = "Pick" }
+Store.TabKinds = { Skins = "Skin", Suits = "Suit", Helmets = "Helmet", Visors = "Visor", Picks = "Pick" }
 
 -- New players can buy the Welcome Kit once, within this long of joining.
 Store.WelcomeHours = 24
@@ -161,7 +162,7 @@ Store.Bundles = {
 	{
 		Id = "Vault",
 		Name = "The Vault",
-		Tagline = "Every weapon skin, suit and pickaxe in the store, every bundle extra, the COLLECTOR title and 10,000 coins.",
+		Tagline = "Every weapon skin, suit, helmet, visor and pickaxe in the store, every bundle extra, the COLLECTOR title and 10,000 coins.",
 		Section = "Premium",
 		Color = Color3.fromRGB(255, 214, 120),
 		Hero = "SkinSolar",
@@ -295,6 +296,20 @@ Store.RobuxProducts = {
 	VisorAurora = 0,
 	VisorSpectrum = 0,
 	VisorSupernova = 0,
+	-- Helmets
+	HelmetHardHat = 0,
+	HelmetStarBubble = 0,
+	HelmetArenaPlume = 0,
+	HelmetDeepDiver = 0,
+	HelmetJarlHorns = 0,
+	HelmetSharkBite = 0,
+	HelmetShogun = 0,
+	HelmetPharaoh = 0,
+	HelmetMechAce = 0,
+	HelmetWyrmking = 0,
+	HelmetJackOLantern = 0,
+	HelmetGrimReaper = 0,
+	HelmetWitchHat = 0,
 	-- One-time offers and the Season Path
 	StarterPack = 0,
 	SeasonPremium = 0,
@@ -375,7 +390,7 @@ do
 			table.insert(list, id)
 		end
 	end
-	for _, kind in { "Suit", "Skin", "Pick", "Visor" } do
+	for _, kind in { "Suit", "Skin", "Pick", "Visor", "Helmet" } do
 		for _, id in Cosmetics.ofKind(kind) do
 			if Cosmetics.List[id].Robux then
 				add(id)

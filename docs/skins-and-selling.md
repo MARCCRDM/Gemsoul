@@ -15,6 +15,7 @@ and back pieces described in older notes.
 | Weapon skin | Restyles whatever weapon you hold: colours, material, sparks, a trail through every swing | `Equipment.luau`, `SKINS.Palette` |
 | Suit | Restyles every armor piece, whatever its style: plates, under-layer, glow, particles off the chest | `Equipment.luau`, the suit pass in `dress` |
 | Visor | Restyles the lens of whatever helmet you wear: tinted, lit, moving, elemental or many-coloured. Shows under any suit. | `Equipment.applyVisor` |
+| Helmet skin | A whole new head in place of your helmet: 13 designs, the gem seated on it, eyes lit in your visor's colour | `HelmetLooks.luau`, see `docs/helmet-skins.md` |
 | Title | A tag over your head, in its colour, that everyone sees | `Equipment.showTitle` |
 | Back piece / trim | As before. New: the Crusader's Standard back piece | `BACKS.Standard` |
 
@@ -39,7 +40,8 @@ is only a few lines of data.
 | Season premium | a second reward track: Moonsteel skin, LUNAR VANGUARD title, Lunar Frontier suit, coins | 399 |
 
 Every skin, suit and pickaxe for sale, and the bundles, are listed in
-`docs/store.md`. The visors are below ("Visors").
+`docs/store.md`. The visors are below ("Visors"). The helmet skins are in
+`docs/helmet-skins.md`.
 
 ### Free (exclusive, never sold)
 

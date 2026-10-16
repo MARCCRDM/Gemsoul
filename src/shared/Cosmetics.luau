@@ -12,10 +12,13 @@
 	  Visors  restyle the lens of whatever helmet you wear (a VisorLook):
 	          tinted glass, lit, moving, elemental or many-coloured. The
 	          helmet's own visor roll (and any perk it carries) stays.
+	  Helmets a whole new head in place of the helmet you wear (its Look is
+	          a HelmetLooks design). The helmet keeps its stats, rolls and
+	          gem; its eyes light in your visor's colour.
 	  Titles  a tag over your head that everyone sees.
 
 	How each is had:
-	  Robux      a weapon skin, suit, pickaxe or visor sold in the store, directly,
+	  Robux      a weapon skin, suit, pickaxe, visor or helmet sold in the store, directly,
 	             never at random (Store.RobuxProducts holds each one's
 	             Developer Product id; 0 = not on sale yet)
 	  (bundles)  trims and back pieces aren't sold on their own: they come
@@ -77,14 +80,14 @@ export type VisorLook = {
 }
 export type Cosmetic = {
 	Id: string,
-	Kind: "Trim" | "Back" | "Skin" | "Suit" | "Pick" | "Visor" | "Title",
+	Kind: "Trim" | "Back" | "Skin" | "Suit" | "Pick" | "Visor" | "Helmet" | "Title",
 	Name: string,
 	Description: string,
 	Rarity: string, -- a gem tier: Common, Uncommon, Rare, UltraRare
 	Price: number?, -- (retired: nothing is sold for coins)
 	Robux: number?, -- sold for Robux (see Store.RobuxProducts)
 	Color: Color3, -- the trim colour, the back piece's glow, a title's colour
-	Look: string?, -- how Equipment builds a back piece or applies a skin
+	Look: string?, -- how Equipment builds a back piece or applies a skin (a helmet's: its HelmetLooks design)
 	Palette: Palette?, -- a skin's or suit's colours
 	Visor: VisorLook?, -- a visor's look
 	Exclusive: string?, -- earned one way only (see above)
@@ -1715,6 +1718,138 @@ Cosmetics.List = {
 		},
 		Robux = 249,
 	},
+	-- Helmets (a whole new head, HelmetLooks builds each one; Equipment wears it
+	-- in place of the helmet's own, which keeps its stats, rolls and gem).
+	HelmetHardHat = {
+		Id = "HelmetHardHat",
+		Kind = "Helmet",
+		Name = "Hard Hat",
+		Description = "A proper site helmet: reflective tape, a headlamp on a cord to its battery pack, amber goggles, ear defenders and a dust mask.",
+		Rarity = "Uncommon",
+		Color = Color3.fromRGB(255, 196, 28),
+		Look = "HardHat",
+		Robux = 79,
+	},
+	HelmetStarBubble = {
+		Id = "HelmetStarBubble",
+		Kind = "Helmet",
+		Name = "Star Bubble",
+		Description = "A 1950s fishbowl space helmet: a smoked shield with your eyes glowing behind it, a racing stripe, a blinking antenna and a life-support pack.",
+		Rarity = "Uncommon",
+		Color = Color3.fromRGB(150, 210, 255),
+		Look = "StarBubble",
+		Robux = 79,
+	},
+	HelmetArenaPlume = {
+		Id = "HelmetArenaPlume",
+		Kind = "Helmet",
+		Name = "Arena Plume",
+		Description = "A bronze gladiator's helm: a wide brim, a pierced grille with eyes burning behind it, a red horsehair crest and white feathers.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(198, 142, 64),
+		Look = "ArenaPlume",
+		Robux = 129,
+	},
+	HelmetDeepDiver = {
+		Id = "HelmetDeepDiver",
+		Kind = "Helmet",
+		Name = "Deep Diver",
+		Description = "A riveted copper diving bonnet, wing nuts and all, your eyes glowing in the dark behind the faceplate. Trails bubbles.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(186, 106, 60),
+		Look = "DeepDiver",
+		Robux = 129,
+	},
+	HelmetJarlHorns = {
+		Id = "HelmetJarlHorns",
+		Kind = "Helmet",
+		Name = "Jarl's Horns",
+		Description = "An iron spangenhelm with great ivory horns, flaring mail, a fur collar and a braided ginger beard. Icy eyes behind the spectacles.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(176, 134, 62),
+		Look = "JarlHorns",
+		Robux = 129,
+	},
+	HelmetSharkBite = {
+		Id = "HelmetSharkBite",
+		Kind = "Helmet",
+		Name = "Shark Bite",
+		Description = "Your head in a shark's jaws, eyes glowing in the dark of its mouth. Dorsal fin and tail included.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(98, 122, 148),
+		Look = "SharkBite",
+		Robux = 129,
+	},
+	HelmetShogun = {
+		Id = "HelmetShogun",
+		Kind = "Helmet",
+		Name = "Shogun Kabuto",
+		Description = "Black-lacquered kabuto: a gold crescent crest, a three-tier neck guard, a red war mask with gold teeth and a burning stare. Blossom drifts off it.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(176, 30, 34),
+		Look = "Shogun",
+		Robux = 199,
+	},
+	HelmetPharaoh = {
+		Id = "HelmetPharaoh",
+		Kind = "Helmet",
+		Name = "Sun Pharaoh",
+		Description = "A gold death mask in a banded lapis headcloth, the cobra on its brow and a burning sun between golden horns.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(228, 178, 64),
+		Look = "Pharaoh",
+		Robux = 199,
+	},
+	HelmetMechAce = {
+		Id = "HelmetMechAce",
+		Kind = "Helmet",
+		Name = "Mech Ace",
+		Description = "An ace pilot's mobile-suit head: a gold V-fin, slanted eyes, a lit vent and an antenna blinking at the back.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(42, 84, 206),
+		Look = "MechAce",
+		Robux = 199,
+	},
+	HelmetWyrmking = {
+		Id = "HelmetWyrmking",
+		Kind = "Helmet",
+		Name = "Wyrmking",
+		Description = "A crimson dragon's head with fire in its jaw, ember eyes, gold-tipped horns, frills and scales. Smoke and embers off its snout.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(152, 24, 30),
+		Look = "Wyrmking",
+		Robux = 299,
+	},
+	HelmetJackOLantern = {
+		Id = "HelmetJackOLantern",
+		Kind = "Helmet",
+		Name = "Jack-o'-Helm",
+		Description = "Halloween: a pumpkin with a carved, flickering grin, lit from inside, its lid cut glowing round the stem.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(234, 112, 22),
+		Look = "JackOLantern",
+		Robux = 149,
+	},
+	HelmetGrimReaper = {
+		Id = "HelmetGrimReaper",
+		Kind = "Helmet",
+		Name = "Grim Reaper",
+		Description = "Halloween: a long-tailed hood round a bone skull with green fire in its eyes, green mist pouring off its tattered mantle.",
+		Rarity = "UltraRare",
+		Color = Color3.fromRGB(90, 255, 130),
+		Look = "GrimReaper",
+		Robux = 199,
+	},
+	HelmetWitchHat = {
+		Id = "HelmetWitchHat",
+		Kind = "Helmet",
+		Name = "Witch's Brim",
+		Description = "Halloween: a drooping witch's hat with a crescent charm and a spider let down from the brim, over violet eyes and lank hair.",
+		Rarity = "Rare",
+		Color = Color3.fromRGB(196, 90, 255),
+		Look = "WitchHat",
+		Robux = 149,
+	},
 } :: { [string]: Cosmetic }
 
 function Cosmetics.get(id: any): Cosmetic?
@@ -1754,7 +1889,7 @@ function Cosmetics.ofKind(kind: string): { string }
 end
 
 -- Its price in coins: only while testing (Config.TestCosmeticPrice), for a
--- weapon skin, suit, pick or visor the store sells, so a purchase can be tried
+-- weapon skin, suit, pick, visor or helmet the store sells, so a purchase can be tried
 -- without Robux. Nothing is sold for coins otherwise.
 function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
 	local test = Config.TestCosmeticPrice
@@ -1764,13 +1899,14 @@ function Cosmetics.coinPrice(cosmetic: Cosmetic): number?
 	return nil
 end
 
--- What each miner wears for itself: a suit, a weapon skin, a pickaxe and a
--- visor (kept in its character as Wardrobe = { Suit, Skin, Pick, Visor }).
+-- What each miner wears for itself: a suit, a weapon skin, a pickaxe, a
+-- visor and a helmet (kept in its character as Wardrobe = { Suit, Skin,
+-- Pick, Visor, Helmet }).
 -- Trims, backs and titles are the account's. A miner with no Wardrobe yet
 -- wears the account's current look.
-Cosmetics.MinerKinds = { "Suit", "Skin", "Pick", "Visor" }
+Cosmetics.MinerKinds = { "Suit", "Skin", "Pick", "Visor", "Helmet" }
 function Cosmetics.isMinerKind(kind: any): boolean
-	return kind == "Suit" or kind == "Skin" or kind == "Pick" or kind == "Visor"
+	return kind == "Suit" or kind == "Skin" or kind == "Pick" or kind == "Visor" or kind == "Helmet"
 end
 local function currentLook(cosmetics: any): { [string]: string? }
 	local look = {}

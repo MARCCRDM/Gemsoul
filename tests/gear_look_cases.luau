@@ -699,13 +699,134 @@ do
 	check(only and #named(only.Helmet, "VisorLens") == 9, "the one-helmet preview has no visor")
 end
 
+-- 10. Helmet skins (cosmetics, Kind "Helmet"): the helmet's own model gives
+-- way to the skin, the avatar's head is hidden under it (and shows again once
+-- it's off), its gem is set on the skin's seat, a suit, a gem and the rarity
+-- shine leave it in its own colours, every visor lights its eyes (a dark glass
+-- one too), and the one-helmet preview wears it.
+local helmetIds = Cosmetics.ofKind("Helmet")
+check(#helmetIds >= 13, "too few helmet skins")
+local function weldedTo(part)
+	local weld = part:FindFirstChildOfClass("WeldConstraint")
+	return weld and weld.Part0
+end
+local helmetsWorn = 0
+local bareHead = wear(GEMS, nil):FindFirstChild("Head")
+for _, id in helmetIds do
+	local look = Cosmetics.get(id)
+	local body, folder = wear(GEMS, { Helmet = id, Suit = "SuitObsidian" })
+	local helmet = folder:FindFirstChild("Helmet")
+	check(helmet and helmet:GetAttribute("HelmetSkin") == look.Look, id .. ": the skin wasn't built")
+	helmet = helmet or folder
+	helmetsWorn += 1
+	local skinParts, eyes, seated = 0, 0, false
+	for _, part in parts(helmet) do
+		if part:GetAttribute("VisorFace") then
+			check(part:GetAttribute("VisorFit") ~= nil, id .. ": the standard helmet's lens is still there")
+		end
+		if part.Name == "HelmSkin" then
+			skinParts += 1
+			local color = part:GetAttribute("SkinColor")
+			if typeof(color) == "Color3" then
+				check(near(part.Color, color), id .. ": a part lost its own colour to the suit, gem or shine")
+			end
+			if part:GetAttribute("VisorFit") == "Eye" then
+				eyes += 1
+			end
+		end
+		local seat = weldedTo(part)
+		if part.Name == "SocketedGem" and seat and seat:GetAttribute("StoneSeat") then
+			-- Set on the front of its seat, facing out.
+			local head = body:FindFirstChild("Head")
+			local out = (part.CFrame.Position - seat.CFrame.Position):Dot(head.CFrame.LookVector)
+			check(out > 0, id .. ": its gem is set behind its seat")
+			seated = true
+		end
+	end
+	check(skinParts >= 10, id .. ": too little of the skin was built")
+	check(#named(helmet, "SkinSeam") == 0, id .. ": the suit drew its seams on the skin")
+	check(eyes >= 1, id .. " has no eyes to light")
+	check(seated, id .. ": its gem isn't set on the skin's seat")
+	local head = body:FindFirstChild("Head")
+	check(head.Transparency == 1, id .. ": the avatar's head shows through the skin")
+	-- Off again: the head and its face as the kit leaves them without one
+	-- (today's armour hides the whole avatar anyway).
+	Equipment.dressModel(body, table.clone(KIT), 7, { Owned = {} })
+	check(head:GetAttribute("SkinHid") == nil, id .. ": the head was never given back once the skin was off")
+	check(head.Transparency == bareHead.Transparency, id .. ": the head isn't as the kit leaves it, once the skin is off")
+	for _, decal in head:GetChildren() do
+		if decal:IsA("Decal") then
+			check(decal:GetAttribute("SkinHid") == nil, id .. ": the face was never given back once the skin was off")
+		end
+	end
+	-- Every visor lights its eyes, a dark glass one too.
+	for _, visorId in { "VisorLime", "VisorSmoke", "VisorSupernova" } do
+		local lens = Cosmetics.get(visorId).Visor
+		local _, lit = wear(nil, { Helmet = id, Visor = visorId })
+		for _, part in parts(lit:FindFirstChild("Helmet") or lit) do
+			local fit = part:GetAttribute("VisorFit")
+			if fit == "Eye" or part:GetAttribute("VisorTint") then
+				local _, _, v = part.Color:ToHSV()
+				check(part.Material == roblox.Enum.Material.Neon and v >= 0.85, id .. " + " .. visorId .. ": an eye isn't lit")
+				if lens.Material == "Neon" then
+					check(near(part.Color, lens.Color), id .. " + " .. visorId .. ": an eye isn't the visor's colour")
+				end
+				check((part:GetAttribute("SeamFx") ~= nil) == (lens.Fx ~= nil or part:GetAttribute("SeamFx") ~= nil), id .. ": an eye's movement is lost")
+			elseif fit == "Lens" then
+				check(part.Material == roblox.Enum.Material.Glass, id .. " + " .. visorId .. ": a lens isn't glass")
+			end
+		end
+		check(#named(lit, "VisorLens") == 0, id .. " + " .. visorId .. ": a skin's eyes were cut into bands")
+	end
+end
+-- With a look that doesn't hide the avatar (today's armour all does), a skin
+-- still hides the head under it, and gives it back, face and all.
+do
+	local Classes = requireScript(Shared.Classes)
+	local defs = {
+		Classes.gear(KIT.Class, "Helmets", KIT.Helmet),
+		Classes.armor(KIT.Class, KIT.Armor),
+		Classes.gear(KIT.Class, "Gloves", KIT.Gloves),
+		Classes.gear(KIT.Class, "Boots", KIT.Boots),
+	}
+	local looks = {}
+	for i, def in defs do
+		looks[i] = def.Look
+		def.Look = "Bulwark"
+	end
+	local body = wear(nil, nil)
+	local head = body:FindFirstChild("Head")
+	check(head.Transparency == 0, "(that plain look hides the avatar: pick another for this check)")
+	Equipment.dressModel(body, table.clone(KIT), 7, { Owned = {}, Helmet = helmetIds[1] })
+	check(head.Transparency == 1, "a helmet skin left the avatar's head showing through it")
+	Equipment.dressModel(body, table.clone(KIT), 7, { Owned = {} })
+	check(head.Transparency == 0, "the head stayed hidden once the skin was off")
+	local faces = 0
+	for _, decal in head:GetChildren() do
+		if decal:IsA("Decal") then
+			faces += 1
+			check(decal.Transparency == 0, "the face stayed hidden once the skin was off")
+		end
+	end
+	check(faces > 0, "(the rig has no face to check)")
+	for i, def in defs do
+		def.Look = looks[i]
+	end
+end
+do
+	local rig = FighterRig.build()
+	local only = Equipment._dress(rig, table.clone(KIT), { Owned = {}, Helmet = helmetIds[1] }, 7, "Helmet")
+	check(only and only.Helmet and only.Helmet:GetAttribute("HelmetSkin") ~= nil, "the one-helmet preview has no skin")
+end
+
 print(
 	string.format(
-		"PASS: %d gear look checks (stones on every gemmed piece, %d suits trimmed in real parts, %d skins held in first person, %d visor looks on 15 helmets, %d banded, nothing a preview can't draw)",
+		"PASS: %d gear look checks (stones on every gemmed piece, %d suits trimmed in real parts, %d skins held in first person, %d visor looks on 15 helmets, %d banded, %d helmet skins worn, nothing a preview can't draw)",
 		checks,
 		trimmed,
 		skins,
 		visorLooks,
-		bandsChecked
+		bandsChecked,
+		helmetsWorn
 	)
 )

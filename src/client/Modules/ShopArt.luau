@@ -511,6 +511,28 @@ local function visorArt(root: Frame, size: number, cosmetic)
 	round(chin, 2)
 end
 
+-- A helmet skin: a head in the skin's colour, two eyes glowing out of a dark
+-- face (the real thing loads over it in 3D).
+local function helmetArt(root: Frame, size: number, cosmetic)
+	local color = cosmetic.Color
+	local halo = piece(root, 0.5, 0.5, 0.9, 0.9, color)
+	halo.BackgroundTransparency = 0.86
+	round(halo, size)
+	local dome = piece(root, 0.5, 0.52, 0.64, 0.68, WHITE)
+	round(dome, math.floor(size * 0.3))
+	gradient(dome, color:Lerp(WHITE, 0.2), color:Lerp(BLACK, 0.5))
+	stroke(dome, BLACK, math.max(1, size / 60), 0.4)
+	local face = piece(dome, 0.5, 0.56, 0.7, 0.3, Color3.fromRGB(10, 12, 18))
+	round(face, math.floor(size * 0.06))
+	local glow = color:Lerp(WHITE, 0.55)
+	for _, x in { 0.3, 0.7 } do
+		local eye = piece(face, x, 0.48, 0.22, 0.28, glow)
+		round(eye, math.floor(size * 0.04))
+	end
+	local crest = piece(dome, 0.5, 0.08, 0.12, 0.2, color:Lerp(WHITE, 0.35))
+	round(crest, 2)
+end
+
 -- An armor suit: a helmet in the suit's colours, visor lit.
 local function suitArt(root: Frame, size: number, cosmetic)
 	local palette = cosmetic.Palette
@@ -577,6 +599,9 @@ function ShopArt.icon(parent: Instance, kind: string, cosmeticId: string?, size:
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Visor" then
 		visorArt(root, size, cosmetic)
+		CosmeticView.attach(root, cosmetic.Id, size >= 120)
+	elseif cosmetic and cosmetic.Kind == "Helmet" then
+		helmetArt(root, size, cosmetic)
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Title" then
 		titleArt(root, size, cosmetic)

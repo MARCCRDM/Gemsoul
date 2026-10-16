@@ -43,20 +43,22 @@ local C = {
 	Accent = Color3.fromRGB(255, 120, 190),
 }
 local HEAVY, HEADING, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
-local KINDS = { "Suit", "Skin", "Visor", "Pick", "Trim", "Back", "Title" }
+local KINDS = { "Suit", "Skin", "Helmet", "Visor", "Pick", "Trim", "Back", "Title" }
 local KIND_TITLE = {
 	Suit = "SUITS",
 	Skin = "WEAPON SKINS",
+	Helmet = "HELMETS",
 	Visor = "VISORS",
 	Pick = "PICKAXES",
 	Trim = "TRIMS",
 	Back = "BACKS",
 	Title = "TITLES",
 }
-local KIND_WIDTH = { Suit = 98, Skin = 150, Visor = 108, Pick = 124, Trim = 92, Back = 92, Title = 98 }
+local KIND_WIDTH = { Suit = 98, Skin = 150, Helmet = 116, Visor = 108, Pick = 124, Trim = 92, Back = 92, Title = 98 }
 local KIND_STANDARD = {
 	Suit = "Your armour in its own colours, as crafted.",
 	Skin = "Your weapon in its own colours, as forged.",
+	Helmet = "Your helmet as it was forged.",
 	Visor = "Your helmet's own visor, as it was rolled.",
 	Pick = "Your pick as it came from the Probe, in its own colour.",
 	Trim = "Your class glow in its own colour.",
@@ -67,6 +69,7 @@ local KIND_STANDARD = {
 local KIND_NONE = {
 	Suit = "Standard",
 	Skin = "Standard",
+	Helmet = "Standard",
 	Visor = "Standard",
 	Pick = "Standard",
 	Trim = "No trim",
@@ -546,7 +549,8 @@ local function build(canvas: Instance)
 	-- (Under the title: the tabs take the rest of the row.)
 	ui.Sub = text(window, "", 11, C.Dim, HEADING, 30, 50, 400, 14)
 	ui.Tabs = {}
-	local tx = 450
+	-- (Right of the title: eight tabs take the rest of the row.)
+	local tx = 316
 	for _, kind in KINDS do
 		local w = KIND_WIDTH[kind]
 		local tab = button(window, KIND_TITLE[kind], tx, 22, w, 32)

@@ -15,7 +15,7 @@ Code:
 | Tab | What's there |
 | --- | --- |
 | **Bundles** | The new-player offer (while it's open), the squad kits, the collections and the premium sets. |
-| **Weapon Skins**, **Suits**, **Pickaxes** | A grid of every look, sorted by featured or by price, showing all of them or only the ones you don't own. Beside it is the picked look's page: a 3D preview, the price, buy (or wear), and the bundle that saves on it. Looks earned in play show after the ones for sale, each saying how to earn it. |
+| **Weapon Skins**, **Suits**, **Helmets**, **Visors**, **Pickaxes** | A grid of every look, sorted by featured or by price, showing all of them or only the ones you don't own. Beside it is the picked look's page: a 3D preview, the price, buy (or wear), and the bundle that saves on it. Looks earned in play show after the ones for sale, each saying how to earn it. |
 | **Free** | The group, friends, the 7-day login streak and promo codes. |
 
 What was removed or moved:
@@ -48,7 +48,7 @@ this honestly:
 | Deep Space Set | medium | 599 | Nebula suit + skin, Void Crystal, Void Reaper | 36% |
 | Solar Forge Set | medium | 699 | Obsidian Lava, Solar Flare, Magma Heart | 29% |
 | Royal Treasury | large | 1,499 | Royal Gold, Chrome Knight, Stealth Black, Galaxy, Stormbreaker, Prism Shard, Gilded Prospector, Ember Cape, 5,000 coins, 24 h 2x XP | 24% |
-| The Vault | largest, once per account | 4,999 | Every weapon skin, suit and pickaxe in the store (36), every bundle extra, the COLLECTOR title, 10,000 coins, 24 h 2x XP | 31% |
+| The Vault | largest, once per account | 4,999 | Every weapon skin, suit, helmet, visor and pickaxe in the store (64), every bundle extra, the COLLECTOR title, 10,000 coins, 24 h 2x XP | 54% |
 
 ### Squad kits (one, two or all three miners)
 

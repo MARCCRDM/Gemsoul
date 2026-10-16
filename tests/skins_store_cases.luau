@@ -48,8 +48,9 @@ local FreeRewards = shared("FreeRewards")
 
 -- Catalog -----------------------------------------------------------------------------
 local equipment = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
-local KINDS = { Trim = true, Back = true, Skin = true, Suit = true, Pick = true, Visor = true, Title = true }
-local skins, suits, titles, picks, visors = 0, 0, 0, 0, 0
+local KINDS = { Trim = true, Back = true, Skin = true, Suit = true, Pick = true, Visor = true, Helmet = true, Title = true }
+local skins, suits, titles, picks, visors, helmets = 0, 0, 0, 0, 0, 0
+local helmetSource = fs.readFile(ROOT .. "/src/server/Systems/HelmetLooks.luau")
 -- Visors: what each rarity promises.
 local VISOR_FX = { Pulse = true, Shift = true, Flicker = true, Rainbow = true, Scan = true, Aurora = true }
 local ELEMENTS = { Fire = true, Frost = true, Shock = true, Poison = true }
@@ -113,13 +114,35 @@ for id, cosmetic in Cosmetics.List do
 				id .. " is Legendary but not a framed, banded, many-coloured lens"
 			)
 		end
+	elseif cosmetic.Kind == "Helmet" then
+		helmets += 1
+		check(
+			cosmetic.Look and string.find(helmetSource, "DESIGNS." .. cosmetic.Look .. " = function", 1, true),
+			id .. " has no helmet design (HelmetLooks)"
+		)
+		check(cosmetic.Robux ~= nil, id .. " isn't sold")
 	elseif cosmetic.Kind == "Title" then
 		titles += 1
 	elseif cosmetic.Kind == "Back" then
 		check(cosmetic.Look and string.find(equipment, "BACKS." .. cosmetic.Look .. " =", 1, true), id .. " can't be built")
 	end
 end
-check(skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9 and visors >= 15, "The catalog is thinner than planned")
+check(
+	skins >= 8 and suits >= 6 and titles >= 3 and picks >= 9 and visors >= 15 and helmets >= 13,
+	"The catalog is thinner than planned"
+)
+-- Helmets: every design is sold (once), with a tab of its own, each miner's own.
+for design in string.gmatch(helmetSource, "DESIGNS%.(%w+) = function") do
+	local sold = 0
+	for _, cosmetic in Cosmetics.List do
+		if cosmetic.Kind == "Helmet" and cosmetic.Look == design then
+			sold += 1
+		end
+	end
+	check(sold == 1, "Helmet design " .. design .. " is sold " .. sold .. " times")
+end
+check(Store.TabKinds.Helmets == "Helmet" and table.find(Store.Tabs, "Helmets"), "Helmets have no Store tab")
+check(Cosmetics.isMinerKind("Helmet"), "A helmet isn't each miner's own")
 -- Visors: one of every element, a tab of their own, all in the Vault.
 local elements = {}
 for id, cosmetic in Cosmetics.List do
@@ -841,4 +864,4 @@ do
 	check(lit, "A bright pick doesn't glow")
 end
 
-print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d picks, %d visors, %d titles, %d with animated seams; receipts once each, starter pack, season premium, codes)", checks, skins, suits, picks, visors, titles, animated))
+print(string.format("PASS: %d skins & selling checks (%d skins, %d suits, %d picks, %d visors, %d helmets, %d titles, %d with animated seams; receipts once each, starter pack, season premium, codes)", checks, skins, suits, picks, visors, helmets, titles, animated))
