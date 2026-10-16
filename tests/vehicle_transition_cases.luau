@@ -38,7 +38,11 @@ local RunService = { Heartbeat=signal() }
 local task = { spawn=function(fn,...) fn(...) end }
 local gui, title, blurb, controls, speedLabel, fill = {}, {}, {}, {}, {}, {}
 local controlText = function() return "Drive" end
-local Rules = { Machines={Mole={Name="Mole",Blurb="Drill mech",MaxSpeed=20}}, drive=function() return 5,0 end }
+local lastDrive = {}
+local Rules = { Machines={Mole={Name="Mole",Blurb="Drill mech",MaxSpeed=20}}, drive=function(_, _, _, throttle, steer)
+	lastDrive = {throttle, steer}
+	return 5,0
+end }
 local VehicleDrive, driving = {}, nil
 local drive, steer = { PlaneVelocity=Vector2.zero }, {}
 local chassis = { Size={Z=20}, AssemblyLinearVelocity={X=0,Z=0}, CFrame={ToOrientation=function() return 0,0,0 end} }
@@ -56,6 +60,26 @@ local function board()
 	hum.SeatPart, seat.Occupant = seat, hum
 	hum.Seated:Fire(true,seat)
 end
+-- Input stand-ins: held keys, a focused chat box, the controls' move vector
+-- and the MechInput remote (what reaches the server).
+local keysDown, focusedBox, moveVec, clockNow = {}, nil, nil, 0
+local os = { clock=function() return clockNow end }
+local UserInputService = {}
+function UserInputService:IsKeyDown(key) return keysDown[key] == true end
+function UserInputService:GetFocusedTextBox() return focusedBox end
+Enum.KeyCode = { W="W", A="A", S="S", D="D", Up="Up", Down="Down", Left="Left", Right="Right" }
+local function vec(x, y, z) return { X=x, Y=y, Z=z, Magnitude=math.sqrt(x*x+y*y+z*z), IsVector3=true } end
+local function typeof(value) return if type(value)=="table" and value.IsVector3 then "Vector3" else type(value) end
+local controlStub = { GetMoveVector=function() return moveVec end }
+local playerModule = { Module={ GetControls=function() return controlStub end } }
+local playerScripts = { FindFirstChild=function(_, name) return if name=="PlayerModule" then playerModule else nil end }
+function player:FindFirstChild(name) return if name=="PlayerScripts" then playerScripts else nil end
+local function require(module) return module.Module end
+local sent = {}
+local mechInput = { FireServer=function(_, throttle, steer) table.insert(sent, {throttle, steer}) end }
+local remotesFolder = { FindFirstChild=function(_, name) return if name=="MechInput" then mechInput else nil end }
+local remotesHere = true
+local ReplicatedStorage = { FindFirstChild=function(_, name) return if name=="Remotes" and remotesHere then remotesFolder else nil end }
 -- DRIVE HERE
 -- Boarding may finish before the controller attaches, without another Seated event.
 hum.SeatPart, seat.Occupant = seat, hum
@@ -162,4 +186,88 @@ player:SetAttribute("CombatSession",nil)
 board()
 player:SetAttribute("Outpost",false)
 check(not VehicleDrive.isDriving() and not gui.Enabled, "Leaving lobby retained driving")
+-- Input: the seat's floats first, then the controls' move vector, then the keys.
+player:SetAttribute("Outpost", true)
+hum.SeatPart, seat.Occupant = nil, nil
+hum.Seated:Fire(false, nil)
+board()
+check(VehicleDrive.isDriving(), "Could not board for the input checks")
+local function frame() clockNow += 0.125; VehicleDrive.step(0.125) end
+local function lastSent() return sent[#sent] or {} end
+seat.ThrottleFloat, seat.SteerFloat = 1, 0
+frame()
+check(lastDrive[1]==1 and lastDrive[2]==0, "Seat throttle was not used")
+check(lastSent()[1]==1 and lastSent()[2]==0, "Seat throttle never reached the server")
+local count = #sent
+frame()
+check(#sent==count, "Unchanged input was resent every frame")
+clockNow += 0.5
+frame()
+check(#sent==count+1, "Held input was not refreshed for the server")
+seat.ThrottleFloat, seat.SteerFloat = 0, 0
+moveVec = vec(0.5, 0, -1)
+frame()
+check(lastDrive[1]==1 and lastDrive[2]==0.5, "Move vector did not stand in for silent seat floats")
+check(lastSent()[1]==1 and lastSent()[2]==0.5, "Move vector input never reached the server")
+moveVec = vec(0, 0, 0)
+keysDown = {W=true, A=true}
+frame()
+check(lastDrive[1]==1 and lastDrive[2]==-1, "W and A did not drive with the seat and controls silent")
+keysDown = {Down=true, Right=true}
+frame()
+check(lastDrive[1]==-1 and lastDrive[2]==1, "Arrow keys did not drive")
+keysDown = {W=true, S=true}
+frame()
+check(lastDrive[1]==0 and lastDrive[2]==0, "W and S together did not cancel out")
+keysDown = {Down=true, Right=true}
+frame()
+focusedBox = {}
+frame()
+check(lastDrive[1]==0 and lastDrive[2]==0, "Typing in chat drove the mech")
+check(lastSent()[1]==0 and lastSent()[2]==0, "The server kept the old input while typing")
+focusedBox = nil
+keysDown = {W=true}
+frame()
+check(lastSent()[1]==1, "Input did not resume after typing")
+seat.ThrottleFloat = -0.5
+frame()
+check(lastDrive[1]==-0.5 and lastSent()[1]==-0.5, "The seat's own throttle did not take priority over the keys")
+seat.ThrottleFloat = 0
+frame()
+dashboard:setEnabled(true)
+check(lastSent()[1]==0 and lastSent()[2]==0, "Opening a menu left the server driving")
+count = #sent
+VehicleDrive.step(0.1)
+check(#sent==count, "A menu kept sending input")
+dashboard:setEnabled(false)
+frame()
+check(lastSent()[1]==1, "Closing the menu did not resume input")
+-- A sweeping stick: at most 10 sends a second, but letting go goes out at once.
+count = #sent
+for i = 1, 60 do
+	clockNow += 1/60
+	seat.ThrottleFloat = 0.2 + (i % 2) * 0.5
+	VehicleDrive.step(1/60)
+end
+check(#sent - count <= 11, "A sweeping stick flooded the server: " .. (#sent - count) .. " sends in a second")
+check(#sent - count >= 7, "A sweeping stick was not kept up to date")
+clockNow += 0.01
+seat.ThrottleFloat = 0
+keysDown = {}
+VehicleDrive.step(0.01)
+check(lastSent()[1]==0 and lastSent()[2]==0, "Letting go waited for the rate limit")
+keysDown = {W=true}
+clockNow += 0.2
+frame()
+remotesHere = false
+count = #sent
+clockNow += 1
+frame()
+check(#sent==count and lastDrive[1]==1, "A missing remote stopped the client driving")
+remotesHere = true
+frame()
+hum.SeatPart, seat.Occupant = nil, nil
+hum.Seated:Fire(false, nil)
+check(lastSent()[1]==0 and lastSent()[2]==0, "Getting out left the server driving")
+keysDown = {}
 print("PASS: " .. checks .. " vehicle transition checks")

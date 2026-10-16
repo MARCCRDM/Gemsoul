@@ -7,6 +7,8 @@
 --   Party (event, server -> client): party state and invites
 --   Social (event, server -> client): duel queue, challenges and matches
 --   Report (event, client -> server): client script errors, for playtests
+--   MechInput (event, client -> server): a mech pilot's throttle and steer, for
+--             the server to drive with whenever it holds the mech's physics
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local folder = Instance.new("Folder")
@@ -22,6 +24,7 @@ local Remotes = {
 	Party = Instance.new("RemoteEvent"),
 	Social = Instance.new("RemoteEvent"),
 	Report = Instance.new("RemoteEvent"),
+	MechInput = Instance.new("RemoteEvent"),
 }
 for name, remote in Remotes do
 	remote.Name = name

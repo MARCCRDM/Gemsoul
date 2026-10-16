@@ -1,9 +1,10 @@
 -- Driving the Outpost's machines. While you sit in one, your client owns its
 -- physics and steers it every frame through the chassis constraints (Drive:
 -- horizontal velocity, Steer: heading), using the seat's throttle and steer
--- (WASD, arrow keys, a gamepad stick or the mobile thumbstick). Jump to get
--- out. A small card shows the machine, its speed and the controls, and the
--- camera pulls back to fit the big ones.
+-- (WASD, arrow keys, a gamepad stick or the mobile thumbstick). The input is
+-- also sent to the server, which drives the machine whenever it still holds
+-- the physics. Jump to get out. A small card shows the machine, its speed and
+-- the controls, and the camera pulls back to fit the big ones.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -37,6 +38,74 @@ local function blocked(): boolean
 		or player:GetAttribute("ArenaDropPreparing") ~= nil
 		or player:GetAttribute("ArenaDropUntil") ~= nil
 		or player:GetAttribute("Expedition") ~= nil
+end
+
+-- What the pilot is asking for, -1..1 each. The seat's floats come from the
+-- default controls; when they stay at 0 (the controls can be switched off or
+-- slow to notice the seat), the move vector or the keys themselves stand in.
+local controlModule = nil
+local function moveVector(): Vector3?
+	if controlModule == nil then
+		local scripts = player:FindFirstChild("PlayerScripts")
+		local module = scripts and scripts:FindFirstChild("PlayerModule")
+		if not module then
+			return nil
+		end
+		local ok, found = pcall(function()
+			return require(module):GetControls()
+		end)
+		controlModule = if ok and found then found else false
+	end
+	if not controlModule then
+		return nil
+	end
+	local ok, move = pcall(controlModule.GetMoveVector, controlModule)
+	return if ok and typeof(move) == "Vector3" then move else nil
+end
+local function held(...): boolean
+	for _, key in { ... } do
+		if UserInputService:IsKeyDown(key) then
+			return true
+		end
+	end
+	return false
+end
+local function pilotInput(seat: VehicleSeat): (number, number)
+	local throttle, steer = seat.ThrottleFloat, seat.SteerFloat
+	if throttle == 0 and steer == 0 then
+		local move = moveVector()
+		if move and move.Magnitude > 0.05 then
+			throttle, steer = -move.Z, move.X
+		elseif not UserInputService:GetFocusedTextBox() then
+			local K = Enum.KeyCode
+			throttle = (if held(K.W, K.Up) then 1 else 0) - (if held(K.S, K.Down) then 1 else 0)
+			steer = (if held(K.D, K.Right) then 1 else 0) - (if held(K.A, K.Left) then 1 else 0)
+		end
+	end
+	return math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1)
+end
+
+-- The same input goes to the server, which drives the machine itself while
+-- it still holds the physics (see Server OutpostVehicles).
+local sentThrottle, sentSteer, sentAt = 0, 0, 0
+local function tellServer(throttle: number, steer: number)
+	local now = os.clock()
+	local changed = math.abs(throttle - sentThrottle) >= 0.05 or math.abs(steer - sentSteer) >= 0.05
+	local stale = (throttle ~= 0 or steer ~= 0) and now - sentAt >= 0.5
+	if not changed and not stale then
+		return
+	end
+	-- A sweeping stick changes every frame: at most 10 a second, but letting go
+	-- goes out at once.
+	if not stale and now - sentAt < 0.1 and (throttle ~= 0 or steer ~= 0) then
+		return
+	end
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	local remote = remotes and remotes:FindFirstChild("MechInput")
+	if remote then
+		remote:FireServer(throttle, steer)
+		sentThrottle, sentSteer, sentAt = throttle, steer, now
+	end
 end
 
 -- The driving card.
@@ -93,6 +162,7 @@ local function finish()
 	pcall(function()
 		d.Drive.PlaneVelocity = Vector2.zero
 	end)
+	tellServer(0, 0)
 	-- A delayed Seated(false) must not overwrite the combat camera's zoom.
 	if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
 		player.CameraMinZoomDistance = d.Zoom[1]
@@ -120,6 +190,7 @@ local function refreshHud()
 	if driving and hidden then
 		driving.Speed = 0
 		driving.Drive.PlaneVelocity = Vector2.zero
+		tellServer(0, 0)
 	end
 end
 local function watchScreen(screen)
@@ -203,7 +274,9 @@ function VehicleDrive.step(dt: number)
 		refreshHud()
 		return
 	end
-	local speed, yaw = Rules.drive(d.Spec, d.Speed, d.Yaw, d.Seat.ThrottleFloat, d.Seat.SteerFloat, dt)
+	local throttle, steer = pilotInput(d.Seat)
+	tellServer(throttle, steer)
+	local speed, yaw = Rules.drive(d.Spec, d.Speed, d.Yaw, throttle, steer, dt)
 	-- Don't keep shoving at full speed into a wall or a rock.
 	local v = d.Chassis.AssemblyLinearVelocity
 	local actual = Vector2.new(v.X, v.Z).Magnitude
