@@ -170,6 +170,11 @@ do
 	local seat, chassis, weld, unrelated = object("VehicleSeat"), object("Part"), object("Weld"), object("Weld")
 	local drive = { PlaneVelocity = { Moving = true } }
 	local networkReturned = false
+	local characterOwnershipReturned = false
+	function root:SetNetworkOwnershipAuto()
+		check(weld.Parent == nil, "Character ownership restored before breaking the mech weld")
+		characterOwnershipReturned = true
+	end
 	function chassis:FindFirstChild(name) return if name == "Drive" then drive else nil end
 	function chassis:SetNetworkOwner(owner) networkReturned = owner == nil end
 	seat.Parent = { PrimaryPart = chassis }
@@ -194,6 +199,7 @@ do
 	check(root.Anchored and root.AssemblyLinearVelocity == Vector3.zero, "Character not ready for insertion")
 	check(chassis.AssemblyLinearVelocity == Vector3.zero and networkReturned, "Mech retained motion or client ownership")
 	check(drive.PlaneVelocity == Vector2.zero, "Mech drive kept pushing")
+	check(characterOwnershipReturned, "Pilot retained server ownership after leaving the mech")
 	Drop.cancel(model)
 	check(not root.Anchored and rider:GetAttribute("ArenaDropPreparing") == nil, "Cancelled seated entry stayed locked")
 end
