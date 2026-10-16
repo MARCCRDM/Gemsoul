@@ -21,6 +21,9 @@ function SeatExit.detach(character: Model)
 	if root then
 		root.AssemblyLinearVelocity = Vector3.zero
 		root.AssemblyAngularVelocity = Vector3.zero
+		-- The seated assembly was server-owned. Let normal character ownership
+		-- resume once the weld is broken (including exits before an arena move).
+		pcall(root.SetNetworkOwnershipAuto, root)
 	end
 	-- Leave an Outpost mech stationary in the lobby and return physics to the server.
 	local machine = seat:GetAttribute("OutpostMachine") and seat.Parent

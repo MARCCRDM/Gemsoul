@@ -23,7 +23,6 @@ type Driving = {
 	Steer: AlignOrientation,
 	Spec: any,
 	Speed: number,
-	Yaw: number,
 	Zoom: { number },
 	-- Watching for a mech that won't budge (see stuck below).
 	Start: Vector3,
@@ -98,8 +97,7 @@ local function pilotInput(seat: VehicleSeat): (number, number, string)
 	return math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1), source
 end
 
--- The same input goes to the server, which drives the machine itself while
--- it still holds the physics (see Server OutpostVehicles).
+-- Only input crosses to the server; movement targets stay server-owned.
 local function remote(name: string): RemoteEvent?
 	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 	return remotes and remotes:FindFirstChild(name) :: RemoteEvent?
@@ -238,7 +236,6 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 	if not spec or not chassis or not drive or not steer then
 		return
 	end
-	local _, yaw = chassis.CFrame:ToOrientation()
 	driving = {
 		Seat = seat,
 		Humanoid = humanoid,
@@ -247,7 +244,6 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 		Steer = steer,
 		Spec = spec,
 		Speed = 0,
-		Yaw = yaw,
 		Zoom = { player.CameraMinZoomDistance, player.CameraMaxZoomDistance },
 		Start = chassis.Position,
 		StuckFor = 0,
@@ -276,7 +272,7 @@ end
 
 -- A mech that won't budge: held input for 2 s and it never left the spot it
 -- was boarded at. Say what this client sees (Output and Feedback > Reports,
--- via the server) and ask the server to take over (Server OutpostVehicles).
+-- via the server) and ask it to inspect the assembly (Server OutpostVehicles).
 local function anchoredIn(part: BasePart): string
 	local found = {}
 	local ok, parts = pcall(part.GetConnectedParts, part, true)
@@ -367,6 +363,12 @@ end
 function VehicleDrive.isDriving(): boolean
 	return driving ~= nil
 end
+
+UserInputService.JumpRequest:Connect(function()
+	if not driving or blocked() or menuOpen() or UserInputService:GetFocusedTextBox() then return end
+	local leave = remote("MechExit")
+	if leave then leave:FireServer() end
+end)
 
 local function refreshSession()
 	if blocked() then

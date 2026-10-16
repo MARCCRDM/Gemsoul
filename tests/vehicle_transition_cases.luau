@@ -75,7 +75,7 @@ end
 -- and the MechInput remote (what reaches the server).
 local keysDown, focusedBox, moveVec, clockNow = {}, nil, nil, 0
 local os = { clock=function() return clockNow end }
-local UserInputService = {}
+local UserInputService = {JumpRequest=signal()}
 function UserInputService:IsKeyDown(key) return keysDown[key] == true end
 function UserInputService:GetFocusedTextBox() return focusedBox end
 Enum.KeyCode = { W="W", A="A", S="S", D="D", Up="Up", Down="Down", Left="Left", Right="Right" }
@@ -89,9 +89,11 @@ local function require(module) return module.Module end
 local sent = {}
 local mechInput = { FireServer=function(_, throttle, steer) table.insert(sent, {throttle, steer}); lastDrive={throttle,steer} end }
 local reports = {}
+local exitRequests=0
+local mechExit={FireServer=function() exitRequests+=1 end}
 local mechReport = { FireServer=function(_, text) table.insert(reports, text) end }
 local remotesFolder = { FindFirstChild=function(_, name)
-	return if name=="MechInput" then mechInput elseif name=="MechReport" then mechReport else nil
+	return if name=="MechInput" then mechInput elseif name=="MechReport" then mechReport elseif name=="MechExit" then mechExit else nil
 end }
 local remotesHere = true
 local ReplicatedStorage = { FindFirstChild=function(_, name) return if name=="Remotes" and remotesHere then remotesFolder else nil end }
@@ -349,4 +351,10 @@ check(pendingControlLoad~=nil, "Control discovery wasn't asynchronous")
 keysDown={W=true}; frame()
 check(lastSent()[1]==1, "Unfinished PlayerModule load blocked W")
 task.spawn=savedSpawn
+UserInputService.JumpRequest:Fire()
+check(exitRequests==1,"Jump did not ask the server to release the pilot")
+dashboard:setEnabled(true)
+UserInputService.JumpRequest:Fire()
+check(exitRequests==1,"Jump in a menu exited the mech")
+dashboard:setEnabled(false)
 print("PASS: " .. checks .. " vehicle transition checks")

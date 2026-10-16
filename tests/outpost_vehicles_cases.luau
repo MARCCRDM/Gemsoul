@@ -1,9 +1,6 @@
--- The Outpost's machines on the server (Server OutpostVehicles): boarding from
--- the Drive prompt, handing the pilot the physics, and the fallback when that
--- hand-over doesn't take: the server drives the machine itself from the
--- pilot's MechInput, until the hand-over is retried and succeeds. Real
--- module and driving maths (Shared.Outpost), with stand-in seats, players and
--- physics. Run by tests/run_outpost_vehicles.py (needs lune).
+-- Server-owned mech movement, pilot input, seat ownership drift, exit and
+-- diagnostics. Actual modules/math with simulated seats and physics; run by
+-- tests/run_outpost_vehicles.py with Lune or the bundled Luau runtime.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local roblox = require("@lune/roblox")
@@ -170,6 +167,8 @@ end
 local promptTriggered = signal()
 local mechInput = { OnServerEvent = signal() }
 local mechReport = { OnServerEvent = signal() }
+local mechExit = { OnServerEvent = signal() }
+local detached = 0
 local notes = {}
 local function handovers()
 	local found = {}
@@ -184,7 +183,12 @@ local heartbeat = signal()
 local Rules = load("src/shared/Outpost.luau", { CFrame = R.CFrame, Color3 = R.Color3 })
 local modules = {
 	Rules = { Module = Rules },
-	Remotes = { Module = { MechInput = mechInput, MechReport = mechReport } },
+	Remotes = { Module = { MechInput = mechInput, MechReport = mechReport, MechExit=mechExit } },
+	SeatExit = { Module = { detach=function(character)
+		detached+=1
+		local hum=character:FindFirstChildOfClass("Humanoid")
+		getOut(hum.SeatPart,hum)
+	end } },
 	Feedback = {
 		Module = {
 			note = function(side, message, detail)
@@ -210,6 +214,7 @@ local Vehicles = load("src/server/Systems/OutpostVehicles.luau", {
 	script = {
 		Parent = {
 			Remotes = modules.Remotes,
+			SeatExit = modules.SeatExit,
 			Feedback = modules.Feedback,
 			Parent = { World = { OutpostMachines = modules.Machines } },
 		},
@@ -472,11 +477,11 @@ frames(60 * 5)
 check(moleChassis.Owner == nil, "The physics went back to the pilot mid-ride")
 check(moleChassis.Drive.PlaneVelocity.Magnitude > 10, "The server didn't drive after taking over")
 moleChassis.Owner = quiet -- (if the physics ever drifts back to the pilot's client)
-frames(5)
+frames(60 * 3)
 check(mole.ServerDriving and moleChassis.Owner == nil, "The server let go of a mech it took over")
 moleChassis.Owner = nil
 check(Vehicles.report(quiet, "again"), "A second report was refused")
-check(notes[#notes].Detail:find("nothing left to try", 1, true) ~= nil, "A second report claimed to fix something")
+check(notes[#notes].Detail:find("unanchored", 1, true) == nil, "A second report claimed to unanchor something")
 check(Vehicles.report(quiet, "third"), "A third report was refused")
 check(not Vehicles.report(quiet, "fourth"), "Took more than three reports in one ride")
 local long = string.rep("x", 5000)
@@ -486,9 +491,13 @@ hold = nil
 -- The next ride starts fresh on the server, and may report again.
 check(
 	Vehicles.sit(quiet, mole.Seat) and moleChassis.Owner == nil,
-	"A new ride didn't hand the physics to the pilot again"
+	"A new ride did not retain server physics"
 )
 check(Vehicles.report(quiet, long), "A new ride couldn't report")
 check(#notes[#notes].Detail < 1200, "A long report wasn't cut short")
 
+check(not Vehicles.exit(other),"Non-pilot could exit another player's mech")
+mechExit.OnServerEvent:Fire(quiet)
+check(detached==1 and mole.Seat.Occupant==nil,"Jump did not detach the pilot on the server")
+check(moleChassis.Drive.PlaneVelocity==R.Vector2.zero,"Exiting kept the mech moving")
 print("PASS: " .. checks .. " outpost vehicle checks")

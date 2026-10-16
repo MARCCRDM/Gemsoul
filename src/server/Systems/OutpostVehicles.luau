@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local Remotes = require(script.Parent.Remotes)
 local OutpostMachines = require(script.Parent.Parent.World.OutpostMachines)
+local SeatExit = require(script.Parent.SeatExit)
 
 local OutpostVehicles = {}
 
@@ -225,6 +226,18 @@ function OutpostVehicles.input(player: Player, throttle: any, steer: any, now: n
 	return true
 end
 
+function OutpostVehicles.exit(player: Player): boolean
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	local machine = seat and bySeat[seat]
+	if not machine or seat.Occupant ~= humanoid then return false end
+	machine.Throttle, machine.Steer, machine.Speed = 0, 0, 0
+	stop(machine)
+	SeatExit.detach(character)
+	return true
+end
+
 -- Diagnostics -----------------------------------------------------------------------------
 
 -- To the Output, and kept with the playtest reports (Feedback > Reports).
@@ -402,6 +415,7 @@ function OutpostVehicles.start(site)
 	Remotes.MechReport.OnServerEvent:Connect(function(player, text)
 		OutpostVehicles.report(player, text)
 	end)
+	Remotes.MechExit.OnServerEvent:Connect(OutpostVehicles.exit)
 	RunService.Heartbeat:Connect(function(dt)
 		OutpostVehicles.step(dt)
 	end)
