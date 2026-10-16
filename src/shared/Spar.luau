@@ -1,9 +1,11 @@
 --[[
-	Friendly sparring in the lobby (the Saga Outpost). Press 1 to swap your
-	pickaxe for your combat kit, and 1 again to put it away. With your kit
-	out you fight exactly as in a duel (the first-person view, every move,
-	gear and gems only), but only against other players who have theirs out
-	too: a miner with a pickaxe in hand can't hit you or be hit.
+	Friendly sparring in the lobby (the Saga Outpost). A spar is asked for
+	and agreed to: walk up to another player and press Z (or 1, for the
+	nearest), and they get a card to accept or decline. Once they accept,
+	both of you swap your pickaxes for your combat kits and fight exactly as
+	in a duel (the first-person view, every move, gear and gems only), but
+	only each other: nobody else can hit either of you, or be hit. Press 1
+	to end it, for both of you.
 
 	Nothing is lost. At 0 health you're knocked down for a few seconds,
 	then you get up where you fell, at full health, with a moment's guard
@@ -11,9 +13,10 @@
 
 	Attributes, on the Player:
 	  Spar      true while your combat kit is out (the server sets it)
+	  SparWith  your partner's UserId, while sparring
 	  SparDown  server time you get back up, while knocked down
-	  SparHurt  server time you were last hit in a spar: you can't put your
-	            weapon away in the middle of an exchange
+	  SparHurt  server time you were last hit in a spar: you can't end it
+	            in the middle of an exchange
 
 	Pure, for the server, the client and tests:
 	  Spar.sparring(player)        kit out (down or not)
@@ -21,15 +24,22 @@
 	  Spar.active(player, now?)    kit out and on your feet: fighting
 	  Spar.fighting(player)        in a fight of any kind: an Arena session,
 	                               a match, or a spar
-	  Spar.canHit(sourceSpar, targetSpar, sourceDown, targetDown, same)
-	  Spar.startProblem(state)     why the kit can't come out (nil if it can)
-	  Spar.stopWait(state, now)    seconds before it can go away (0 = now)
+	  Spar.paired(a, b)            sparring with each other
+	  Spar.canHit(sourceSpar, targetSpar, sourceDown, targetDown, same, paired)
+	  Spar.startProblem(state)     why you can't spar now (nil if you can)
+	  Spar.askProblem(ask)         why you can't ask someone (nil if you can)
+	  Spar.stopWait(state, now)    seconds before it can end (0 = now)
 ]]
 local Spar = {}
 
 Spar.DownSeconds = 3 -- knocked down this long
 Spar.GuardSeconds = 1.5 -- then shielded this long, back on your feet
-Spar.SheatheLock = 3 -- no putting the weapon away this soon after a hit
+Spar.SheatheLock = 3 -- no ending the spar this soon after a hit
+Spar.AskSeconds = 20 -- a request stays open this long
+Spar.AskRange = 30 -- studs: ask someone near you (the prompt is 10)
+Spar.AskAgain = 15 -- after a no (or no answer), wait this long to ask them again
+Spar.AskGap = 1.5 -- between any two requests of yours
+Spar.MaxApart = 150 -- studs: further apart than this, the spar is over
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -52,10 +62,34 @@ function Spar.fighting(player: Instance): boolean
 	return player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil or Spar.sparring(player)
 end
 
--- Can one sparring player hit another? Both kit out, both on their feet,
--- and not themselves. (Teams and parties don't matter: friends spar too.)
-function Spar.canHit(sourceSpar: any, targetSpar: any, sourceDown: boolean, targetDown: boolean, same: boolean): boolean
-	return sourceSpar == true and targetSpar == true and not sourceDown and not targetDown and not same
+-- Your partner's UserId while you spar.
+function Spar.partner(player: Instance): number?
+	local id = player:GetAttribute("SparWith")
+	return if Spar.sparring(player) and type(id) == "number" then id else nil
+end
+
+-- Sparring with each other (both agreed: each has the other as partner).
+function Spar.paired(a: any, b: any): boolean
+	return a ~= b and Spar.partner(a) == b.UserId and Spar.partner(b) == a.UserId
+end
+
+-- Can one sparring player hit another? Both kit out, partners, both on
+-- their feet, and not themselves. (Teams and parties don't matter: friends
+-- spar too.)
+function Spar.canHit(
+	sourceSpar: any,
+	targetSpar: any,
+	sourceDown: boolean,
+	targetDown: boolean,
+	same: boolean,
+	paired: boolean
+): boolean
+	return sourceSpar == true
+		and targetSpar == true
+		and paired == true
+		and not sourceDown
+		and not targetDown
+		and not same
 end
 
 export type State = {
@@ -66,7 +100,7 @@ export type State = {
 	Intro: boolean?, -- the starter picker or tutorial still running
 }
 
--- Why the kit can't come out now, in a few words for the player; nil if it can.
+-- Why you can't spar now, in a few words for the player; nil if you can.
 function Spar.startProblem(state: State): string?
 	if state.Busy then
 		return "Finish your fight first."
@@ -82,7 +116,43 @@ function Spar.startProblem(state: State): string?
 	return nil
 end
 
--- Seconds before the kit can be put away: never while knocked down (you
+export type Ask = {
+	Here: boolean, -- the other player is in the server (and isn't you)
+	Name: string, -- their display name
+	Mine: State, -- yours
+	Theirs: State, -- theirs
+	MyPartner: string?, -- who you're sparring with now
+	TheirPartner: string?, -- who they're sparring with now
+	Distance: number?, -- studs between you
+	Asked: boolean?, -- you've asked them already and it's still open
+	Wait: number?, -- seconds before you can ask them again
+}
+
+-- Why you can't ask someone to spar now, for the player; nil if you can.
+function Spar.askProblem(ask: Ask): string?
+	if not ask.Here then
+		return "That player isn't here."
+	end
+	local mine = Spar.startProblem(ask.Mine)
+	if mine then
+		return mine
+	elseif ask.MyPartner then
+		return "You're already sparring with " .. ask.MyPartner .. "."
+	elseif ask.TheirPartner then
+		return ask.Name .. " is already sparring."
+	elseif Spar.startProblem(ask.Theirs) then
+		return ask.Name .. " can't spar right now."
+	elseif type(ask.Distance) ~= "number" or ask.Distance > Spar.AskRange then
+		return "Get closer to " .. ask.Name .. " to ask."
+	elseif ask.Asked then
+		return "You've asked " .. ask.Name .. " already."
+	elseif ask.Wait and ask.Wait > 0 then
+		return "Give " .. ask.Name .. " a moment before asking again."
+	end
+	return nil
+end
+
+-- Seconds before the spar can end: never while knocked down (you
 -- get up first), and not within SheatheLock of being hit.
 function Spar.stopWait(state: { Down: number?, Hurt: number? }, now: number): number
 	local wait = 0

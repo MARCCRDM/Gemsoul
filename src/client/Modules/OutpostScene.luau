@@ -967,9 +967,19 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 				UiKit.toast(result.Message, P.Bad)
 			end
 		end)
-	elseif kind == "Duel" or kind == "Party" then
+	elseif kind == "Spar" or kind == "Duel" or kind == "Party" then
 		local target = prompt:GetAttribute("TargetUserId")
 		if target == player.UserId then
+			return
+		end
+		if kind == "Spar" then
+			-- A friendly spar: they get a card to accept (Shared.Spar).
+			task.spawn(function()
+				local result = GemClient.request("SparAsk", target)
+				if result.Message and result.Message ~= "" then
+					UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
+				end
+			end)
 			return
 		end
 		if kind == "Duel" then
@@ -985,7 +995,7 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		end)
 	end
 end)
--- Your own duel/party prompts aren't for you.
+-- Your own spar/duel/party prompts aren't for you.
 local function hideOwnPrompts(character: Model)
 	local root = character:WaitForChild("HumanoidRootPart", 10)
 	if not root then

@@ -1,5 +1,5 @@
 -- Server-authoritative universal actions. Only opted-in Arena players can damage each other,
--- and in the lobby, players sparring with their kits out (Shared.Spar).
+-- and in the lobby, two players sparring who agreed to it (Shared.Spar).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -287,14 +287,15 @@ local function canPvP(source, target)
 	if source.Character:FindFirstChildOfClass("ForceField") then
 		return false
 	end
-	-- A spar in the lobby: both kits out, both on their feet.
+	-- A spar in the lobby: partners only, both on their feet.
 	if Spar.sparring(source) or Spar.sparring(target) then
 		return Spar.canHit(
 			source:GetAttribute("Spar"),
 			target:GetAttribute("Spar"),
 			Spar.isDown(source),
 			Spar.isDown(target),
-			source == target
+			source == target,
+			Spar.paired(source, target)
 		)
 	end
 	local sameTeam = source.Team ~= nil and source.Team == target.Team and not source.Neutral and not target.Neutral

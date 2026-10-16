@@ -17,7 +17,7 @@
 	in the basin after its respawn time. Rocks carry their state as
 	attributes (Hp, MaxHp, ClaimedBy, LastHitBy, LastCrit, Popped) so every
 	client can show every swing; prompts carry PromptKind (Mine, Probe,
-	Gate, Duel, Party) for the client to act on.
+	Gate, Spar, Duel, Party) for the client to act on.
 
 	The leaderboard billboard shows the top gear scores and duel wins
 	(TopPlayers' Gear and Wins boards), refreshed every 30 seconds.
@@ -208,13 +208,14 @@ local function refreshKit(player: Player)
 	end
 end
 
--- "Challenge to a duel" (G) and "Invite to party" (F) on each visitor, for others.
+-- "Ask to spar" (Z), "Challenge to a duel" (G) and "Invite to party" (F) on
+-- each visitor, for others.
 local function socialPrompts(player: Player, on: boolean)
 	local root = rootOf(player)
 	if not root then
 		return
 	end
-	for _, name in { "OutpostDuel", "OutpostParty" } do
+	for _, name in { "OutpostSpar", "OutpostDuel", "OutpostParty" } do
 		local old = root:FindFirstChild(name)
 		if old then
 			old:Destroy()
@@ -233,6 +234,7 @@ local function socialPrompts(player: Player, on: boolean)
 	end
 	for _, spec in
 		{
+			{ "OutpostSpar", "Spar", "Ask to spar", Enum.KeyCode.Z, Vector2.new(0, -204), Enum.KeyCode.ButtonY },
 			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G, Vector2.new(0, -120) },
 			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F, Vector2.new(0, -36) },
 		}
@@ -242,11 +244,15 @@ local function socialPrompts(player: Player, on: boolean)
 		prompt.ActionText = spec[3]
 		prompt.ObjectText = player.DisplayName
 		prompt.KeyboardKeyCode = spec[4]
+		-- (Its own gamepad button where it has one: the others share X.)
+		if spec[6] then
+			prompt.GamepadKeyCode = spec[6]
+		end
 		prompt.HoldDuration = 0.25
 		prompt.MaxActivationDistance = 10
 		prompt.RequiresLineOfSight = false
 		-- One above the other (a full prompt's height apart, so they never
-		-- overlap), and both up over the miner rather than down by their feet,
+		-- overlap), and all up over the miner rather than down by their feet,
 		-- clear of the lobby's PLAY button and tiles.
 		prompt.UIOffset = spec[5]
 		prompt:SetAttribute("PromptKind", spec[2])
@@ -371,7 +377,7 @@ local function hit(player: Player, nodeId: any)
 		return reply(false, "Head to the Outpost to mine.")
 	end
 	if Spar.sparring(player) then
-		return reply(false, "Press 1 to put your weapon away and mine.")
+		return reply(false, "Press 1 to end the spar and mine.")
 	end
 	-- On foot with your pick, or from a mech's cockpit (Outpost.Machines,
 	-- Mine): bigger strikes, sooner, each spending its swings.

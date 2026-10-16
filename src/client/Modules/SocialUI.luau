@@ -31,6 +31,7 @@ local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
+local Spar = require(ReplicatedStorage.Shared.Spar)
 local ArenaScene = require(script.Parent.ArenaScene)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local GemClient = require(script.Parent.GemClient)
@@ -882,7 +883,8 @@ local stack = new("Frame", {
 }, popups)
 UiKit.list(stack, 8)
 
--- A card with Accept / Decline that times out.
+-- A card with Accept / Decline that times out. Returns a function that
+-- takes it down unanswered (the offer was withdrawn).
 local function prompt(
 	icon: string,
 	title: string,
@@ -890,7 +892,7 @@ local function prompt(
 	seconds: number,
 	accent: Color3,
 	onAnswer: (boolean) -> ()
-)
+): () -> ()
 	local card = new("Frame", {
 		BackgroundColor3 = P.Frame,
 		Size = UDim2.fromOffset(330, 108),
@@ -929,13 +931,27 @@ local function prompt(
 		answer(false)
 	end, 100)
 	no.Position = UDim2.fromOffset(170, 68)
-	task.delay(seconds, function()
+	local function dismiss()
 		if not answered then
 			answered = true
 			card:Destroy()
 		end
-	end)
+	end
+	task.delay(seconds, dismiss)
+	return dismiss
 end
+
+-- Open spar requests, by who asked: their card's dismiss. Once you're
+-- sparring, the rest come down (the server has dropped them).
+local sparCards: { [number]: () -> () } = {}
+Players.LocalPlayer:GetAttributeChangedSignal("Spar"):Connect(function()
+	if Spar.sparring(Players.LocalPlayer) then
+		for from, dismiss in sparCards do
+			dismiss()
+			sparCards[from] = nil
+		end
+	end
+end)
 
 local banner = new("TextButton", {
 	AutoButtonColor = false,
@@ -1324,6 +1340,34 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 				run("DuelRespond", a, accept)
 			end
 		)
+	elseif kind == "SparAsk" and type(a) == "number" then
+		-- Someone near you asks for a friendly spar in the lobby (Shared.Spar).
+		if sparCards[a] then
+			sparCards[a]()
+		end
+		local from = a
+		sparCards[from] = prompt(
+			"⚔",
+			"Spar request",
+			string.format("%s wants a friendly spar. Nothing is lost, win or lose.", tostring(b)),
+			if type(c) == "number" then c else Spar.AskSeconds,
+			Color3.fromRGB(255, 92, 76),
+			function(accept)
+				sparCards[from] = nil
+				task.spawn(function()
+					local result = GemClient.request("SparRespond", from, accept)
+					if result.Message and result.Message ~= "" then
+						UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
+					end
+				end)
+			end
+		)
+	elseif kind == "SparAskOver" and type(a) == "number" then
+		-- They're sparring with someone else now, busy, or gone.
+		if sparCards[a] then
+			sparCards[a]()
+			sparCards[a] = nil
+		end
 	elseif kind == "Match" then
 		queued = nil
 		SocialUI.close()

@@ -142,8 +142,8 @@ local function foeOf(player: Player, enemies: { Instance }): Model?
 	then
 		return me.Character
 	end
-	-- Sparring in the lobby: they look at you if you're sparring too.
-	if me and me.Character and Spar.active(player) and Spar.active(me) then
+	-- Sparring in the lobby: they look at you if you're their partner.
+	if me and me.Character and Spar.active(player) and Spar.active(me) and Spar.paired(player, me) then
 		return me.Character
 	end
 	for _, model in enemies do

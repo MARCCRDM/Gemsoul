@@ -27,15 +27,18 @@ check(Lock.target()==opponent.Character,"Nearest eligible PvP opponent not selec
 player.Team,opponent.Team,player.Neutral,opponent.Neutral="Blue","Blue",false,false
 now+=0.2; bound(1/60)
 check(Lock.target()==dummy,"Teammate lock retained")
--- A friendly spar in the lobby: both kits out, teammates or not; never a
--- knocked-down player, and never a miner with the pickaxe in hand.
-dummy.Removed=true; player.Spar,opponent.Spar=true,true; now+=0.2; bound(1/60)
-check(Lock.target()==opponent.Character,"Sparring teammate not locked")
+-- A friendly spar in the lobby: your partner only, teammates or not; never
+-- someone sparring with someone else, a knocked-down player, or a miner
+-- with the pickaxe in hand.
+dummy.Removed=true; player.Spar,opponent.Spar,player.SparWith,opponent.SparWith=true,true,opponent.UserId,99; now+=0.2; bound(1/60)
+check(Lock.target()==nil,"Locked onto someone sparring with someone else")
+opponent.SparWith=player.UserId; now+=0.2; bound(1/60)
+check(Lock.target()==opponent.Character,"Sparring partner (a teammate) not locked")
 opponent.SparDown=os.clock()+60; now+=0.2; bound(1/60)
 check(Lock.target()==nil,"Knocked-down sparring player kept locked")
-opponent.SparDown,opponent.Spar=nil,nil; now+=0.2; bound(1/60)
+opponent.SparDown,opponent.Spar,opponent.SparWith=nil,nil,nil; now+=0.2; bound(1/60)
 check(Lock.target()==nil,"A sparring player locked onto a miner")
-player.Spar=nil; dummy.Removed=false; now+=0.2; bound(1/60)
+player.Spar,player.SparWith=nil,nil; dummy.Removed=false; now+=0.2; bound(1/60)
 check(Lock.target()==dummy,"Lock didn't go back to the enemy after the spar")
 dummy.Removed=true; now+=0.2; bound(1/60)
 check(Lock.target()==nil,"Unparented enemy retained")

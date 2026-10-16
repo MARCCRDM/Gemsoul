@@ -213,6 +213,8 @@ local GemConfig = {
 	end,
 }
 local Mine = load("src/shared/Mine.luau", "Mine", {})
+-- The sparring rules (Shared.Spar): who's sparring, for the kit and prompts.
+local Spar = load("src/shared/Spar.luau", "Spar", {})
 -- (its one require, script.Parent.Tags, reads as nil here)
 local Tags = load("src/shared/Tags.luau", "Tags", {})
 local PickaxeLooks = load(
@@ -305,7 +307,7 @@ local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
 local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
-	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks" } do
+	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks", "Spar" } do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
 		stub.Parent = sharedFolder
@@ -318,6 +320,7 @@ local Server = (function()
 				GemConfig = GemConfig,
 				Mine = Mine,
 				PickaxeLooks = PickaxeLooks,
+				Spar = Spar,
 				OutpostWorld = World,
 				Gems = Gems,
 				ChatChannels = ChatChannels,

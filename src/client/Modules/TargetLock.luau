@@ -49,14 +49,15 @@ local function eligible(model)
 	end
 	local opponent = Players:GetPlayerFromCharacter(model)
 	if opponent and (Spar.sparring(player) or Spar.sparring(opponent)) then
-		-- A friendly spar in the lobby: both kits out, both on their feet.
+		-- A friendly spar in the lobby: your partner only, both on your feet.
 		return not player.Character:FindFirstChildOfClass("ForceField")
 			and Spar.canHit(
 				player:GetAttribute("Spar"),
 				opponent:GetAttribute("Spar"),
 				Spar.isDown(player),
 				Spar.isDown(opponent),
-				false
+				false,
+				Spar.paired(player, opponent)
 			)
 	end
 	if opponent then

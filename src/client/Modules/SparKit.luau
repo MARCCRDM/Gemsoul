@@ -1,23 +1,26 @@
 --[[
 	Friendly sparring in the lobby (Shared.Spar has the rules, the server's
-	SparServer runs them): press 1 to swap your pickaxe for your combat kit,
-	1 again to put it away.
+	SparServer runs them). A spar is asked for and agreed to: press Z over
+	another player ("Ask to spar", OutpostServer's prompt), or 1 to ask the
+	nearest one. They get a card to accept (SocialUI). Once they do, both
+	kits come out; 1 ends the spar, for both.
 
 	  The kit bar   top centre in the lobby: PICKAXE | COMBAT, the one in
-	                hand lit, with the 1 key (tap or click it too). Every
-	                swap gets a quick flash, a word and the sound of a blade.
+	                hand lit, with the 1 key (tap or click it too). The kit
+	                coming out or going away gets a quick flash, a word and
+	                the sound of a blade.
 	  A spar        with the kit out the fight view takes over (Combat.client,
-	                first person, every move); only players with their kits
-	                out can hit you, or be hit.
+	                first person, every move); only your partner can hit you,
+	                or be hit.
 	  Knocked down  at 0 health: you fall, the view pulls back to watch, and
 	                you're up again a few seconds later at full health. Whoever
 	                knocked you down gets a banner.
-	  Who's armed   while you mine, a crossed-swords mark over anyone with
-	                their kit out (they can't touch you).
+	  Who's sparring  while you mine, a crossed-swords mark over anyone in a
+	                spar (they can't touch you).
 
 	  SparKit.start()     once, from Lobby.client
 	  SparKit.available() whether 1 does anything right now
-	  SparKit.toggle()    take the kit out, or put it away
+	  SparKit.toggle()    ask the nearest player to spar, or end your spar
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -231,16 +234,23 @@ local caption = new("TextLabel", {
 	Name = "Caption",
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 1, 6),
-	Size = UDim2.fromOffset(420, 18),
+	Size = UDim2.fromOffset(640, 18),
 	BackgroundTransparency = 1,
 	Font = IronUi.Bold,
-	Text = "FRIENDLY SPAR  ·  only players with their weapons out can hit you",
+	Text = "FRIENDLY SPAR",
 	TextSize = 12,
 	TextColor3 = P.Text,
 	TextStrokeColor3 = P.Ink,
 	TextStrokeTransparency = 0.45,
 	TextTransparency = 1,
 }, bar)
+
+-- Your partner's name while you spar.
+local function partnerName(): string
+	local id = Spar.partner(player)
+	local other = id and Players:GetPlayerByUserId(id)
+	return if other then other.DisplayName else "your partner"
+end
 
 local function paintSlot(entry, on: boolean, color: Color3)
 	entry.Frame.BackgroundColor3 = if on then color:Lerp(GLASS, 0.72) else GLASS
@@ -276,6 +286,7 @@ local function refreshBar()
 		paintSlot(fightSlot, sparring, FIGHT)
 		barStroke.Color = if sparring then FIGHT else P.Edge
 		if sparring then
+			caption.Text = "FRIENDLY SPAR vs " .. string.upper(partnerName()) .. "  ·  only you two can hit each other"
 			captionUntil = os.clock() + 5
 			caption.TextTransparency = 0
 		end
@@ -287,35 +298,82 @@ local function refreshBar()
 	end
 end
 
--- Swapping -----------------------------------------------------------------------------------------------
+-- Asking and ending -------------------------------------------------------------------------------------
+
+-- The nearest other player close enough to ask (in the Outpost, and not
+-- sparring or in any other fight), or nil.
+local function nearest(): Player?
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return nil
+	end
+	local best, bestDistance = nil, Spar.AskRange / 2
+	for _, other in Players:GetPlayers() do
+		local theirs = other.Character and other.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if other ~= player and theirs and other:GetAttribute("Outpost") == true and not Spar.fighting(other) then
+			local distance = (theirs.Position - root.Position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = other, distance
+			end
+		end
+	end
+	return best
+end
+
+local function send(action: string, ...: any)
+	busy = true
+	local args = table.pack(...)
+	task.spawn(function()
+		local result = GemClient.request(action, table.unpack(args, 1, args.n))
+		busy = false
+		if result.Message and result.Message ~= "" then
+			UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
+		end
+		refreshBar()
+	end)
+end
 
 function SparKit.toggle()
 	if busy then
 		return
 	end
-	local want = not Spar.sparring(player)
-	if want and not SparKit.available() then
+	if Spar.sparring(player) then
+		send("Spar", false)
 		return
 	end
-	busy = true
-	if want then
-		flash("COMBAT KIT", "Fight anyone else with their weapon out  ·  1 to put it away", FIGHT)
+	if not SparKit.available() then
+		return
+	end
+	local other = nearest()
+	if other then
+		send("SparAsk", other.UserId)
+	else
+		local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+		UiKit.toast(
+			if touch
+				then "Walk up to a player and tap Ask to spar."
+				else "Walk up to a player and press Z (or 1) to ask them to spar.",
+			P.Text
+		)
+	end
+end
+
+-- The kit comes out when both agree, and goes away when either ends it
+-- (or the spar stops making sense): a flash either way.
+local wasSparring = false
+local function sparChanged()
+	local sparring = Spar.sparring(player)
+	if sparring == wasSparring then
+		return
+	end
+	wasSparring = sparring
+	if sparring then
+		flash("SPAR", "vs " .. partnerName() .. "  ·  only you two can hit each other  ·  1 to stop", FIGHT)
 		CombatSound.play("Draw")
 	else
-		flash("PICKAXE", "Back to mining  ·  1 to spar", PICK)
+		flash("PICKAXE", "Spar over  ·  back to mining", PICK)
 		CombatSound.play("Sheathe")
 	end
-	task.spawn(function()
-		local result = GemClient.request("Spar", want)
-		busy = false
-		if not result.Ok then
-			word.TextTransparency, subword.TextTransparency = 1, 1
-			if result.Message and result.Message ~= "" then
-				UiKit.toast(result.Message, P.Bad)
-			end
-		end
-		refreshBar()
-	end)
 end
 
 -- Knocked down -------------------------------------------------------------------------------------------
@@ -413,7 +471,7 @@ local function refreshDown()
 		downGui.Enabled = false
 		rise()
 		if Spar.sparring(player) then
-			flash("BACK UP", "Full health  ·  keep going, or 1 to put it away", Color3.fromRGB(110, 230, 150))
+			flash("BACK UP", "Full health  ·  keep going, or 1 to stop", Color3.fromRGB(110, 230, 150))
 		end
 		lastAttacker = nil
 	end
@@ -539,9 +597,10 @@ function SparKit.start()
 		end)
 	end
 	-- Mid-spar, E is a fight key: no world prompts (rocks, PROBE-7, the
-	-- duel and party invites) pop up or fire until the kit is away.
+	-- spar, duel and party invites) pop up or fire until the kit is away.
 	player:GetAttributeChangedSignal("Spar"):Connect(function()
 		ProximityPromptService.Enabled = not Spar.sparring(player)
+		sparChanged()
 	end)
 	local function watch(other: Player)
 		if other == player then
