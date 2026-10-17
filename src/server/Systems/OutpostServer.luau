@@ -14,11 +14,14 @@
 	  "OutpostState"           your picks and record
 
 	Rocks are shared: a rock's first hitter keeps it while they keep
-	swinging (Outpost.ClaimSeconds). A mined-out rock grows back somewhere
-	in the basin after its respawn time. Rocks carry their state as
-	attributes (Hp, MaxHp, ClaimedBy, LastHitBy, LastCrit, Popped) so every
-	client can show every swing; prompts carry PromptKind (Mine, Probe,
-	Gate, Spar, Duel, Party) for the client to act on.
+	swinging (Outpost.ClaimSeconds). A mined-out rock grows back where it
+	was after its respawn time, so the candy trails out to the walls stay
+	trails (Shared.Frontier). Out along them the rocks run richer: their
+	zone (Outpost.Zones) adds its Luck to every gem, and their crystals
+	glow in the band's colour. Rocks carry their state as attributes (Hp,
+	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
+	can show every swing; prompts carry PromptKind (Mine, Probe, Gate,
+	Spar, Duel, Party) for the client to act on.
 
 	The leaderboard billboard shows the top gear scores and duel wins
 	(TopPlayers' Gear and Wins boards), refreshed every 30 seconds.
@@ -28,6 +31,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
@@ -264,7 +268,9 @@ end
 
 -- Rocks ---------------------------------------------------------------------------
 
-local function spawnNode(field: boolean?)
+-- A rock on a free spot: the welcome field first, then the field round the
+-- middle, else anywhere; `want` (a spot) when a rock grows back where it was.
+local function spawnNode(field: boolean?, want: number?)
 	local spots = {}
 	for index in freeSpots do
 		if (fieldSpots[index] == true) == (field == true) then
@@ -293,15 +299,22 @@ local function spawnNode(field: boolean?)
 			break
 		end
 	end
+	if want and freeSpots[want] then
+		index = want
+	end
 	freeSpots[index] = nil
 	nextId += 1
-	-- Each ring grows its own mix (Shared.Outpost.Zones).
-	local size = Rules.rollSize(rng:NextNumber(), site.Zones and site.Zones[index])
+	-- Each zone grows its own mix (Shared.Outpost.Zones), its crystals in its
+	-- band's colour out along the trails (Shared.Frontier.Bands).
+	local zone = site.Zones and site.Zones[index]
+	local size = Rules.rollSize(rng:NextNumber(), zone)
 	local spec = Rules.Sizes[size]
-	local model = OutpostWorld.rock(size, site.Spots[index], rng)
+	local band = zone and Frontier.Bands[zone]
+	local model = OutpostWorld.rock(size, site.Spots[index], rng, if band then band.Color else nil)
 	model.Name = "Rock" .. nextId
 	model:SetAttribute("NodeId", nextId)
 	model:SetAttribute("Size", size)
+	model:SetAttribute("Zone", zone)
 	model:SetAttribute("Hp", spec.Hp)
 	model:SetAttribute("MaxHp", spec.Hp)
 	local prompt = Instance.new("ProximityPrompt")
@@ -321,6 +334,7 @@ local function spawnNode(field: boolean?)
 		Id = nextId,
 		Spot = index,
 		Size = size,
+		Zone = zone,
 		Hp = spec.Hp,
 		MaxHp = spec.Hp,
 		Model = model,
@@ -340,10 +354,12 @@ local function popNode(node, player: Player)
 	end
 	task.delay(0.9, function()
 		model:Destroy()
-		freeSpots[node.Spot] = true
 	end)
+	-- It grows back where it was (a trail stays a trail): its spot stays
+	-- its own until then.
 	task.delay(Rules.Sizes[node.Size].Respawn, function()
-		spawnNode(fieldSpots[node.Spot] == true)
+		freeSpots[node.Spot] = true
+		spawnNode(fieldSpots[node.Spot] == true, node.Spot)
 	end)
 end
 
@@ -359,8 +375,11 @@ local function loot(player: Player, node, profile)
   return tutorialLoot
  end
 	local spec = Rules.Sizes[node.Size]
-	local result = { Size = node.Size, Name = spec.Name }
-	local gem = Gems.award(player, "MiningNode", { Luck = Mine.luck(spec.Depth) + (spec.Luck or 0), Silent = true })
+	local result = { Size = node.Size, Name = spec.Name, Zone = node.Zone }
+	-- Further out along the trails, luckier (its zone's Luck).
+	local zone = node.Zone and Rules.Zones[node.Zone]
+	local luck = Mine.luck(spec.Depth) + (spec.Luck or 0) + (zone and zone.Luck or 0)
+	local gem = Gems.award(player, "MiningNode", { Luck = luck, Silent = true })
 	if gem then
 		result.Gem = gem
 		result.Rarity = gem.Tier

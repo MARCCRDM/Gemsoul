@@ -120,14 +120,15 @@ On a computer the card sits at the bottom left, TAME above it:
 Your kaiju fights whether or not you do. To fight yourself, press HUNT: your
 combat kit comes out, as in a spar but alone. Only creatures can hit you, and
 you can only hit creatures; a creature's finishing blow knocks you down for a
-few seconds, as in a spar. While you aren't hunting, wild kaiju and moon bugs
-leave you alone (your kaiju still fights them), so mining is never
-interrupted.
+few seconds, as in a spar. While you aren't hunting, wild kaiju leave you
+alone (your kaiju still fights them). Moon bugs don't: out past the core
+they come through rifts at miners too ([frontier.md](frontier.md)), and
+their finishing blow knocks you down the same way.
 
 ## In the Outpost
 
-Wild kaiju and moon bugs live in the far quarry, at least 140 studs from the
-landing pad.
+Wild kaiju live in the far quarry, at least 140 studs from the landing pad.
+Moon bugs come through rifts round players out past the core.
 
 ### Wild kaiju
 
@@ -164,11 +165,17 @@ element hits harder (125%). Recall your kaiju when it would finish the job.
 
 ### Moon bugs
 
-Swarms of three to five little creatures. For now they're the brainrot
-characters shrunk down: Tung Tung Tung Sahur, Tralalero Tralala, Brr Brr
-Patapim and Bombardiro Crocodilo.
-Kite them into your kaiju. Each is worth 10 EXP to your kaiju and 2 coins
-to you, up to 300 coins a day. They get tougher with the kaiju around them.
+Little creatures that tear through reality at you: each comes through a
+rift of its own, a ragged tear in the air that opens, lets it hop out at
+you, and seals. Rifts only open round players out past the Outpost's core,
+more often and more at once the further out you go; see
+[frontier.md](frontier.md). For now they're the brainrot characters shrunk
+down: Tung Tung Tung Sahur, Tralalero Tralala, Brr Brr Patapim and
+Bombardiro Crocodilo.
+Kite them into your kaiju, hunt them, or run back to the core, where they
+give up and slip back through rifts of their own. Each is worth 10 EXP to
+your kaiju (15 from the Edge) and 2 coins to you, up to 300 coins a day.
+They get tougher with the kaiju around them, and from the Edge.
 
 ## Feeding
 
@@ -218,7 +225,8 @@ Proposed guardrails:
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E; the attributes clients pose it by |
 | `KaijuServer` | Your kaiju: the starter, out and back, following and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
-| `KaijuWilds` | Wild kaiju and moon bugs: spawning, their brain, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`) |
+| `KaijuWilds` | Wild kaiju and moon bugs: spawning (`spawnBug`: one out of a rift, at its prey), their brain, slipping back through a rift, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`) |
+| `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
 | `SparServer` | `Hunt`: the kit out alone |
 | `KaijuHud` (client) | The card, RECALL, HUNT, TAME and the kaiju panel |
@@ -234,6 +242,8 @@ kaiju take the spread and pick their foes (never a miner), heavies break
 guards, parries leave the attacker reeling, a wild kaiju hops from a
 hunter's charged heavy, the E winds up on the cast bar, a whole duel
 between two kaiju, kills pay their Gemsoul and EXP, taming (range, half
-health, tries, burrowing, a full roster) and moon bugs' coins and daily cap.
+health, tries, burrowing, a full roster), moon bugs' coins and daily cap,
+and the rifts: who they open round, the caps, a bug hopping out at its prey
+(a miner too), giving up and slipping back.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
 card's place on every phone.

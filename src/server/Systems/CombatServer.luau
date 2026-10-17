@@ -419,13 +419,14 @@ end
 function CombatServer.onLethal(hook)
 	lethalHook = hook
 end
--- A sparring player isn't finished, just knocked down (SparServer).
+-- A sparring player isn't finished, just knocked down (SparServer); nor is
+-- anyone in the Outpost (a rift's critter can catch a miner out there).
 function CombatServer.onSparLethal(hook)
 	sparLethalHook = hook
 end
 local function spared(player, humanoid, amount, source): boolean
 	if amount < humanoid.Health then return false end
-	if sparLethalHook and Spar.sparring(player) then
+	if sparLethalHook and (Spar.sparring(player) or player:GetAttribute("Outpost") == true) then
 		return sparLethalHook(player, humanoid, source)
 	end
 	if dungeonLethalHook and dungeonLethalHook(player, humanoid) then return true end

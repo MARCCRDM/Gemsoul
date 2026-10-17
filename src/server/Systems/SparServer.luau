@@ -28,7 +28,9 @@
 	Hunting is the kit out alone, against the Outpost's wild kaiju and moon
 	bugs (KaijuWilds): Hunt and Spar, with no partner. No player can hit a
 	hunter or be hit by one; a creature's finishing blow knocks them down
-	as in a spar. "Hunt", true / false takes the kit out or puts it away
+	as in a spar. So it does anyone else in the Outpost (a miner a rift's
+	critter catches out past the core: FrontierServer): down, then up again
+	whole. "Hunt", true / false takes the kit out or puts it away
 	("Spar", false and the 1 key put it away too).
 ]]
 local Debris = game:GetService("Debris")
@@ -325,16 +327,18 @@ end
 
 -- Knock-downs ---------------------------------------------------------------------------------------------
 
--- Back on your feet: full health, a moment's guard.
-local function getUp(player: Player, humanoid: Humanoid)
+-- Back on your feet: full health, a moment's guard. (`miner`: downed out
+-- of a spar, by a rift's critter in the Outpost.)
+local function getUp(player: Player, humanoid: Humanoid, miner: boolean?)
 	-- (Gone, or a new body since: nothing to do.)
 	if humanoidOf(player) ~= humanoid then
 		return
 	end
 	player:SetAttribute("SparDown", nil)
 	-- (The spar may have ended while they were down: then they were healed
-	-- already, and need no guard.)
-	if humanoid.Health > 0 and Spar.sparring(player) then
+	-- already, and need no guard. A miner still in the Outpost gets up
+	-- whole, too.)
+	if humanoid.Health > 0 and (Spar.sparring(player) or (miner and player:GetAttribute("Outpost") == true)) then
 		humanoid.Health = humanoid.MaxHealth
 		local guard = Instance.new("ForceField")
 		guard.Name = "SparGuard"
@@ -354,7 +358,7 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?): bo
 	player:SetAttribute("Blocking", false)
 	player:SetAttribute("SparDown", workspace:GetServerTimeNow() + Spar.DownSeconds)
 	Remotes.CombatFx:FireAllClients("SparKO", player.UserId, if source then source.UserId else 0)
-	task.delay(Spar.DownSeconds, getUp, player, humanoid)
+	task.delay(Spar.DownSeconds, getUp, player, humanoid, not Spar.sparring(player))
 	return true
 end
 

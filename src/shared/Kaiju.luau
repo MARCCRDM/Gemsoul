@@ -164,7 +164,9 @@ Kaiju.TameCooldown = 2
 -- A hit on a wild kaiju lands anywhere in this range of its usual damage.
 Kaiju.Spread = { 0.6, 1.4 }
 
--- Moon bugs: swarms to kite. A little EXP for your kaiju, a few coins.
+-- Moon bugs: they come through rifts round players out past the core
+-- (Shared.Frontier), to kite and fight. A little EXP for your kaiju, a few
+-- coins. Leash: how far from its rift one chases.
 Kaiju.Bug = {
 	Health = 60,
 	Damage = 4,
@@ -176,9 +178,7 @@ Kaiju.Bug = {
 	Coins = 2,
 	DailyCoins = 300,
 	Scale = 0.55,
-	Swarms = 4, -- swarms out at once
-	SwarmSize = { 3, 5 },
-	Respawn = 40,
+	Leash = 120,
 }
 
 -- Feeding: a stone's EXP by its rarity, in full until the kaiju passes

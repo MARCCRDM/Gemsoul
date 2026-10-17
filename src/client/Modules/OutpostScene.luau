@@ -28,6 +28,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local Seating = require(ReplicatedStorage.Shared.Seating)
@@ -47,6 +48,8 @@ local ProbeLayout = require(script.Parent.ProbeLayout)
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
 local SkyRift = require(script.Parent.SkyRift)
+local RiftTear = require(script.Parent.RiftTear)
+local FrontierHud = require(script.Parent.FrontierHud)
 local ThirdPerson = require(script.Parent.ThirdPerson)
 local UiKit = require(script.Parent.UiKit)
 
@@ -361,17 +364,36 @@ local function labelRock(model: Model)
 	end
 	local size = model:GetAttribute("Size") or "Pebble"
 	local spec = Rules.Sizes[size] or Rules.Sizes.Pebble
+	-- Out along the candy trails: where it grows, and the luck that adds.
+	local zone = model:GetAttribute("Zone")
+	local band = zone and Frontier.Bands[zone]
+	local top = if band then 13 else 0
 	local gui = new("BillboardGui", {
-		Size = UDim2.fromOffset(150, 40),
+		Size = UDim2.fromOffset(150, 40 + top),
 		StudsOffsetWorldSpace = Vector3.new(0, spec.Scale * 1.15 + 1.5, 0),
 		MaxDistance = LABEL_NEAR,
 		LightInfluence = 0,
 		AlwaysOnTop = false,
 	}, body)
-	local name = text(gui, spec.Name, 13, sizeColor(size), IronUi.Bold, 0, 0, 150, 16, Enum.TextXAlignment.Center)
+	if band then
+		local tag = text(
+			gui,
+			string.format("%s  ·  +%d%% LUCK", string.upper(band.Name), math.floor(band.Luck * 100 + 0.5)),
+			10,
+			band.Color,
+			IronUi.Bold,
+			0,
+			0,
+			150,
+			12,
+			Enum.TextXAlignment.Center
+		)
+		tag.TextStrokeTransparency = 0.3
+	end
+	local name = text(gui, spec.Name, 13, sizeColor(size), IronUi.Bold, 0, top, 150, 16, Enum.TextXAlignment.Center)
 	name.TextStrokeTransparency = 0.3
 	local bar = new("Frame", {
-		Position = UDim2.fromOffset(25, 18),
+		Position = UDim2.fromOffset(25, 18 + top),
 		Size = UDim2.fromOffset(100, 6),
 		BackgroundColor3 = Color3.fromRGB(20, 22, 30),
 		BackgroundTransparency = 0.2,
@@ -380,7 +402,7 @@ local function labelRock(model: Model)
 	local barFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = sizeColor(size) }, bar)
 	UiKit.round(barFill, 3)
 	local claim =
-		text(gui, "", 11, Color3.fromRGB(255, 220, 140), IronUi.Bold, 0, 26, 150, 14, Enum.TextXAlignment.Center)
+		text(gui, "", 11, Color3.fromRGB(255, 220, 140), IronUi.Bold, 0, 26 + top, 150, 14, Enum.TextXAlignment.Center)
 	claim.TextStrokeTransparency = 0.3
 	local light = body:FindFirstChildOfClass("PointLight")
 	labels[model] =
@@ -1748,6 +1770,10 @@ task.spawn(function()
 		end
 	end
 end)
+-- The frontier: rifts tearing open out past the core, and a banner as you
+-- cross from band to band.
+RiftTear.start()
+FrontierHud.start()
 RunService.RenderStepped:Connect(function(dt)
 	-- The rift in the sky shows only while you're here.
 	if active then
@@ -1758,6 +1784,7 @@ RunService.RenderStepped:Connect(function(dt)
 		return
 	end
 	SkyRift.step(dt)
+	RiftTear.step(workspace:GetServerTimeNow())
 	local site = workspace:FindFirstChild("SagaOutpost")
 	local ring = site and site:FindFirstChild("Probe") and site.Probe:FindFirstChild("ProbeRing")
 	if ring and ring:IsA("BasePart") then

@@ -147,3 +147,16 @@ for english, spanish in LangEs do
 end
 check(count > 400, "The Spanish table is short: " .. count)
 print("PASS: " .. (checks - tableChecks) .. " checks on " .. count .. " Spanish entries (numbers, wildcards, tags)")
+
+-- The real table on the game's own text (the frontier's banners and rock tags).
+Lang.setLocale("es-mx", LangEs)
+same(Lang.translate("OUTPOST CORE"), "NÚCLEO DEL PUESTO", "The core's banner")
+same(
+	Lang.translate("Rifts tear open out here  ·  the rocks run richer"),
+	"Aquí se abren grietas  ·  las rocas son más ricas",
+	"The Fringe's banner"
+)
+same(Lang.translate("THE EDGE  ·  +16% LUCK"), "EL BORDE  ·  +16% DE SUERTE", "A rock's band tag")
+same(Lang.translate("RIFT VEIN  ·  +25% LUCK"), "VETA DE LA GRIETA  ·  +25% DE SUERTE", "A Rift Vein's tag")
+Lang.setLocale("en")
+print("PASS: the frontier's text in Spanish")

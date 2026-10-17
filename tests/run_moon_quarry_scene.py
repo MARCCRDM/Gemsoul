@@ -47,6 +47,7 @@ end
 '''
 for name, path in [
     ("Rules", "src/shared/Outpost.luau"),
+    ("Frontier", "src/shared/Frontier.luau"),
     ("World", "src/server/World/OutpostWorld.luau"),
     ("Machines", "src/server/World/OutpostMachines.luau"),
     ("Motion", "src/shared/MechMotion.luau"),
@@ -54,6 +55,8 @@ for name, path in [
     source += f"local {name}=(function()\n{(ROOT / path).read_text(encoding='utf-8')}\nend)()\n"
 source += r'''
 local origin=CFrame.new(0,0,7000)
+-- (Its candy trails come from Shared.Frontier, handed in as the server finds it.)
+World.Frontier=Frontier
 local site=World.build(origin,{})
 assert(site.Model.Landscape=="Moon Quarry" and site.Model.SkySetting=="MoonBase")
 assert(#site.Secrets==0 and #site.FieldSpots==0,"Retired extras returned")
@@ -64,15 +67,19 @@ for _,index in site.ArrivalSpots do
  assert(p.Z<30 and math.abs(p.X)>=12 and math.abs(p.X)<=26,"Welcome nodes block the central path")
 end
 assert(site.Probe.Name=="ProbeScreen" and site.Board.Name=="BoardFace" and site.Gate.Name=="GatePad","Missing lobby services")
-assert(Rules.Radius==440 and Rules.NodeCount==180 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
-assert(#site.Spots>=Rules.NodeCount,"Too few mining sites")
--- The field round the middle: plenty of rocks close by, none on the lane
--- from the pad (overlaps are checked with every spot below).
-assert(#site.NearSpots>=70,"The field round the middle is too thin: "..#site.NearSpots)
+assert(Rules.Radius==440 and Rules.NodeCount==210 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
+-- Every spot holds a rock: the field round the middle, the candy trails out
+-- to the walls (Shared.Frontier) and a Rift Vein at each trail's end.
+local population=math.min(Rules.NodeCount,#site.Spots)
+assert(#site.Spots>=180 and population==#site.Spots,"Too few mining sites, or more than the cap: "..#site.Spots)
+assert(#site.TrailSpots>=100 and #site.VeinSpots>=20 and #site.Scars==#Frontier.TrailAngles,"The candy trails are missing")
+-- The field round the middle: rocks close by, inside the core, none on the
+-- lane from the pad (overlaps are checked with every spot below).
+assert(#site.NearSpots>=48,"The field round the middle is too thin: "..#site.NearSpots)
 for _,index in site.NearSpots do
  local p=site.Spots[index].Position-origin.Position
  local r=Vector3.new(p.X,0,p.Z).Magnitude
- assert(r>=36 and r<=200,"A near rock out of the middle")
+ assert(r>=36 and r<=Frontier.Core,"A near rock out of the middle")
  assert(not (math.abs(p.X)<10 and p.Z>-60),"A near rock blocks the lane from the pad")
  assert(not table.find(site.ArrivalSpots,index),"A spot counted twice")
 end
@@ -110,9 +117,13 @@ for _,p in builtParts do
 end
 assert(rim>1000 and skyModel and skyModel.ModelStreamingMode=="Persistent","Crater rim or sky missing or streamed")
 assert(#builtParts<4000,"Quarry scenery budget exceeded")
+local veins={}
+for _,index in site.VeinSpots do veins[index]=true end
 for i,spot in site.Spots do
  local p=spot.Position-origin.Position
- assert(site.Zones[i]=="Common" and math.abs(p.Y)<.001 and p.Magnitude<Rules.Radius,"Unsafe mining position/zone")
+ -- Its zone is its band's (richer outward), or a Rift Vein's.
+ local zone=Frontier.zoneOf(Vector3.new(p.X,0,p.Z).Magnitude,veins[i])
+ assert(site.Zones[i]==zone and math.abs(p.Y)<.001 and p.Magnitude<Rules.Radius,"Unsafe mining position/zone")
  assert((p-Vector3.new(0,0,150)).Magnitude>=84,"Rock in Motor Pool")
  assert((p-Vector3.new(0,0,70)).Magnitude>=40,"Rock in arrival area")
  for j=i+1,#site.Spots do
@@ -265,8 +276,8 @@ local CollectionService={AddTag=function() end}
 for i in site.Spots do freeSpots[i]=true end
 ''' + spawn_node + r'''
 local lightsBefore=#builtLights
-for i=1,Rules.NodeCount do spawnNode() end
-assert(nextId==Rules.NodeCount,"Welcome nodes changed total population")
+for i=1,population do spawnNode() end
+assert(nextId==population,"Welcome nodes changed total population")
 -- The rocks' glow on the floor round the middle (36-200 studs out, every 4
 -- studs; falloff taken as (1 - d/Range)^2). Wide lights overlapped there and
 -- washed the floor and everyone on it cyan-white.
@@ -276,7 +287,7 @@ for i=lightsBefore+1,#builtLights do
  local at=l.Parent.Position
  table.insert(glows,{at.X,at.Y,at.Z,l.Range,l.Brightness})
 end
-assert(#glows==Rules.NodeCount,"One glow per rock: "..#glows)
+assert(#glows==population,"One glow per rock: "..#glows)
 local middle=origin.Position
 local samples,lit,peak=0,0,0
 for x=-200,200,4 do
@@ -326,7 +337,13 @@ freeSpots[arrivalIndex]=true
 local before=nextId
 spawnNode(true)
 assert(nextId==before and freeSpots[arrivalIndex],"Zone filter bypassed by arrival priority")
-print("PASS: actual server node population, 8 welcome rocks, the field round the middle first, "..Rules.NodeCount.."-node cap, replenishment and zone isolation")
+-- A rock grows back where it was (a trail stays a trail), wherever it is.
+local trailIndex=site.TrailSpots[#site.TrailSpots]
+for id,node in nodes do if node.Spot==trailIndex then nodes[id]=nil end end
+freeSpots[trailIndex]=true
+spawnNode(false,trailIndex)
+assert(nodes[nextId].Spot==trailIndex and nodes[nextId].Zone==site.Zones[trailIndex],"A trail rock grew back elsewhere")
+print("PASS: actual server node population, 8 welcome rocks, the field round the middle first, "..population.." rocks (every spot), trail rocks regrow in place, replenishment and zone isolation")
 end
 '''
 lighting = (ROOT / "src/client/Modules/Scenes.luau").read_text(encoding="utf-8")

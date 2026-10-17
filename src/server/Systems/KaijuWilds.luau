@@ -16,8 +16,14 @@
 	              Tamed ("KaijuTame"): it joins you, Gemsoul and all. Three
 	              failed tries and it burrows away; so does one left alone
 	              for Kaiju.Wild.Lifetime.
-	  Moon bugs   swarms of the little brainrot creatures (DungeonRules'
-	              roster, shrunk), for kaiju EXP and a few coins a day.
+	  Moon bugs   the little brainrot creatures (DungeonRules' roster,
+	              shrunk), each through a rift of its own round a player out
+	              past the core (FrontierServer: Shared.Frontier). One hops
+	              out at whoever drew it (a miner too: KaijuWilds.prey) and
+	              goes for them, then their kaiju; with nobody to fight for a
+	              moment (Frontier.Leave), or after Frontier.Life, it slips
+	              back through a rift. For kaiju EXP and a few coins a day;
+	              the edge's are tougher and worth more (Frontier.Boost).
 
 	Both are ordinary Enemies (so every attack, status and nameplate works on
 	them) with their own brains, marked OutpostCreature for the kaiju out.
@@ -25,6 +31,10 @@
 	KaijuTries for the client's tame button.
 
 	  "KaijuTame", model   try to tame a weakened wild kaiju (within 30 studs)
+
+	  KaijuWilds.spawnBug(at, opts) -> enemy?   a moon bug out of a rift
+	  KaijuWilds.rift(at, facing) -> timeline?  opens a rift (FrontierServer
+	                                            sets it; a bug slips back through one)
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +42,8 @@ local RunService = game:GetService("RunService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
+local Frontier = require(ReplicatedStorage.Shared.Frontier)
+local Outpost = require(ReplicatedStorage.Shared.Outpost)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
@@ -64,11 +76,15 @@ type Wild = {
 	Fighter: any?, -- how a wild kaiju fights (KaijuFighter; a moon bug has none)
 	LastFight: number?,
 	Bug: boolean,
-	Swarm: any?,
+	Prey: Player?, -- a rift's critter: whoever drew it
+	Band: string?, -- where its rift opened (Shared.Frontier)
+	ExpScale: number?,
+	IdleSince: number?,
+	Leaving: boolean?,
 }
 
 local wilds: { [any]: Wild } = {} -- by Enemies record
-local wildCount, swarmCount = 0, 0
+local wildCount = 0
 local spots: { Vector3 } = {}
 local rng = Random.new()
 
@@ -99,6 +115,35 @@ local function hunter(player: Player): boolean
 end
 KaijuWilds.hunter = hunter
 
+-- Prey for a rift's critter: a hunter anywhere, or anyone else in the
+-- Outpost on their feet out past the core, not driving a machine, not in a
+-- spar or a fight elsewhere. (A critter's blow that would finish a miner
+-- knocks them down instead: SparServer.)
+local function prey(player: Player): boolean
+	if hunter(player) then
+		return true
+	end
+	if
+		player:GetAttribute("Outpost") ~= true
+		or Spar.sparring(player)
+		or Spar.isDown(player)
+		or player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("MatchId") ~= nil
+		or player:GetAttribute("DungeonId") ~= nil
+		or player:GetAttribute("Expedition") ~= nil
+	then
+		return false
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = rootOf(player)
+	if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart ~= nil or not root then
+		return false
+	end
+	return Frontier.distance(root.Position, Outpost.Location.Position) >= Frontier.Core - Frontier.Safe
+end
+KaijuWilds.prey = prey
+
 -- The level of the kaiju out with players near a point.
 local function levelsNear(point: Vector3, radius: number): { number }
 	local levels = {}
@@ -128,8 +173,9 @@ end
 
 -- Foes -------------------------------------------------------------------------------------------------
 
--- Its foes inside a circle: kaiju out (not recalled) and hunters.
-local function foesNear(center: Vector3, radius: number): { any }
+-- Its foes inside a circle: kaiju out (not recalled) and hunters (`wide`,
+-- a rift's critter: any prey).
+local function foesNear(center: Vector3, radius: number, wide: boolean?): { any }
 	local list = {}
 	for _, pet in KaijuServer.pets() do
 		if KaijuServer.targetable(pet) and (pet.Root.Position - center).Magnitude <= radius then
@@ -138,7 +184,8 @@ local function foesNear(center: Vector3, radius: number): { any }
 	end
 	for _, player in Players:GetPlayers() do
 		local root = rootOf(player)
-		if root and hunter(player) and (root.Position - center).Magnitude <= radius then
+		local fair = if wide then prey(player) else hunter(player)
+		if root and fair and (root.Position - center).Magnitude <= radius then
 			table.insert(list, { Root = root, Player = player })
 		end
 	end
@@ -148,21 +195,25 @@ end
 -- A blow (`heavy` true or false; nil for an E) on a kaiju or a hunter, who
 -- may guard, parry or hop clear of it. Returns how it landed.
 local function hitFoe(enemy, victim, amount: number, element: string?, status: string?, heavy: boolean?): string
+	local wild = wilds[enemy]
+	local player = victim.Player
 	if victim.Pet then
 		return KaijuServer.hurt(victim.Pet, amount, element, status, heavy)
-	elseif victim.Player and hunter(victim.Player) then
+	elseif player and (hunter(player) or (wild ~= nil and wild.Prey ~= nil and prey(player))) then
 		local _, guarded = Enemies.hitPlayer(victim.Player, amount, element, enemy, heavy)
 		return if guarded then "Guarded" else "Hit"
 	end
 	return "Missed"
 end
 
--- Who it goes after: whoever hurt it last (a kaiju or a hunter), while
--- they're inside its leash; else its current foe; else the nearest it sees.
+-- Who it goes after: a rift's critter, whoever drew it while they're fair
+-- game; then whoever hurt it last (a kaiju or a hunter), while they're
+-- inside its leash; else its current foe; else the nearest it sees.
 local function chooseFoe(enemy, wild: Wild, aggro: number)
 	local now = os.clock()
 	local e = enemy :: any
-	local leash = Kaiju.Wild.Leash
+	local rifted = wild.Prey ~= nil
+	local leash = if rifted then Kaiju.Bug.Leash else Kaiju.Wild.Leash
 	local function valid(victim): boolean
 		if not victim or not victim.Root or not victim.Root.Parent then
 			return false
@@ -170,10 +221,16 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		if victim.Pet and not KaijuServer.targetable(victim.Pet) then
 			return false
 		end
-		if victim.Player and not hunter(victim.Player) then
+		if victim.Player and not (if rifted then prey(victim.Player) else hunter(victim.Player)) then
 			return false
 		end
 		return (victim.Root.Position - enemy.Home).Magnitude <= leash
+	end
+	if rifted and wild.Prey.Parent then
+		local victim = { Root = rootOf(wild.Prey), Player = wild.Prey }
+		if valid(victim) then
+			return victim
+		end
 	end
 	-- Hurt by a kaiju or a player in the last few seconds.
 	local pet = e.LastPet
@@ -195,7 +252,7 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		return current
 	end
 	local best, bestDistance = nil, aggro
-	for _, victim in foesNear(enemy.Root.Position, aggro) do
+	for _, victim in foesNear(enemy.Root.Position, aggro, rifted) do
 		local distance = (victim.Root.Position - enemy.Root.Position).Magnitude
 		if valid(victim) and distance <= bestDistance then
 			best, bestDistance = victim, distance
@@ -204,8 +261,35 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 	return best
 end
 
+-- Opens a rift (FrontierServer sets this): returns its timeline, or nil.
+KaijuWilds.rift = function(_at: Vector3, _facing: Vector3)
+	return nil
+end
+
+-- A rift's critter with nobody left to fight (or out too long) slips back
+-- through a rift of its own.
+local function slipBack(wild: Wild)
+	local enemy = wild.Enemy
+	if wild.Leaving or not enemy.Alive then
+		return
+	end
+	wild.Leaving = true
+	local root = enemy.Root
+	enemy.Humanoid:MoveTo(root.Position)
+	local life = KaijuWilds.rift(root.Position, root.Position + root.CFrame.LookVector * 10)
+	local wait = if life then life.HopAt - workspace:GetServerTimeNow() else 0
+	task.delay(math.max(0, wait), function()
+		if enemy.Alive then
+			wilds[enemy] = nil
+			Enemies.remove(enemy)
+		end
+	end)
+end
+KaijuWilds._slipBack = slipBack
+
 -- The brain both kinds share: find a foe and fight it (a wild kaiju as a
--- duellist, KaijuFighter; a moon bug chases and bites), else go home.
+-- duellist, KaijuFighter; a moon bug chases and bites), else go home (a
+-- rift's critter slips back through a rift).
 local function brain(enemy, now: number)
 	local wild = wilds[enemy]
 	if not wild then
@@ -220,10 +304,29 @@ local function brain(enemy, now: number)
 	end
 	local kind = enemy.Kind
 	humanoid.WalkSpeed = kind.Speed * (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
+	if wild.Leaving then
+		humanoid:MoveTo(root.Position)
+		return
+	end
 	local fromHome = flat(root.Position - enemy.Home).Magnitude
-	local victim = if fromHome <= Kaiju.Wild.Leash then chooseFoe(enemy, wild, kind.Aggro) else nil
+	local leash = if wild.Prey then Kaiju.Bug.Leash else Kaiju.Wild.Leash
+	local victim = if fromHome <= leash then chooseFoe(enemy, wild, kind.Aggro) else nil
 	e.FoeVictim = victim
 	e.Foe = if victim then (victim.Pet or victim.Player) else nil
+	if wild.Prey and now - wild.Born > Frontier.Life then
+		slipBack(wild) -- (no critter stays for good)
+		return
+	end
+	if not victim and wild.Prey then
+		-- Nobody to fight: a moment's sniffing about, then back where it came from.
+		wild.IdleSince = wild.IdleSince or now
+		humanoid:MoveTo(root.Position)
+		if now - wild.IdleSince >= Frontier.Leave then
+			slipBack(wild)
+		end
+		return
+	end
+	wild.IdleSince = nil
 	if not victim then
 		if fighter then
 			KaijuFighter.calm(fighter)
@@ -531,7 +634,7 @@ end
 
 -- Moon bugs -------------------------------------------------------------------------------------------------
 
-local Duelist -- (required when the first swarm spawns: it's a big module)
+local Duelist -- (required when the first moon bug comes through: it's a big module)
 
 local function bugDied(enemy)
 	local wild = wilds[enemy]
@@ -541,7 +644,7 @@ local function bugDied(enemy)
 	wilds[enemy] = nil
 	local best = credits(enemy)
 	if best then
-		KaijuServer.reward(best, Kaiju.Bug.Exp)
+		KaijuServer.reward(best, math.floor(Kaiju.Bug.Exp * (wild.ExpScale or 1) + 0.5))
 		local profile = PlayerData.get(best)
 		if profile then
 			local roster = Kaiju.roster(profile)
@@ -557,98 +660,91 @@ local function bugDied(enemy)
 			end
 		end
 	end
-	local swarm = wild.Swarm
-	if swarm then
-		swarm.Left -= 1
-		if swarm.Left <= 0 then
-			swarmCount -= 1
-			task.delay(Kaiju.Bug.Respawn, KaijuWilds.spawnSwarm)
-		end
-	end
 end
 
-function KaijuWilds.spawnSwarm()
-	if swarmCount >= Kaiju.Bug.Swarms then
-		return
-	end
-	local center = spot()
-	if not center then
-		return
-	end
+-- A moon bug out of a rift at `at` (its foot, on the ground). `opts` = {
+--   Prey     the player who drew the rift: it goes for them first
+--   Band     where the rift opened (Shared.Frontier.Boost: the edge's are tougher)
+--   Facing   a point it turns to (its prey)
+--   Hop      its leap out of the tear (a velocity)
+-- }
+function KaijuWilds.spawnBug(at: Vector3, opts)
 	Duelist = Duelist or require(script.Parent.Duelist)
 	local spec = DungeonRules.Roster[rng:NextInteger(1, #DungeonRules.Roster)]
-	local levels = levelsNear(center, 160)
 	local level = 1
-	for _, l in levels do
+	for _, l in levelsNear(at, 160) do
 		level = math.max(level, l)
 	end
 	local grow = 1 + Kaiju.Growth * (level - 1)
-	local size = rng:NextInteger(Kaiju.Bug.SwarmSize[1], Kaiju.Bug.SwarmSize[2])
-	local swarm = { Left = 0 }
-	swarmCount += 1
-	for _ = 1, size do
-		local ok, err = pcall(function()
-			local color = GemConfig.ElementColors[spec.Element] or Color3.new(1, 1, 1)
-			local rig = Duelist.creatureBody(spec, color)
-			rig:ScaleTo(Kaiju.Bug.Scale)
-			for _, joint in rig:GetDescendants() do
-				if joint:IsA("Motor6D") and joint:GetAttribute("CreatureMotion") then
-					joint:SetAttribute("CreatureRest", joint.C0)
-				end
+	local boost = Frontier.Boost[opts.Band or ""] or Frontier.Boost.Fringe
+	local ok, result = pcall(function()
+		local color = GemConfig.ElementColors[spec.Element] or Color3.new(1, 1, 1)
+		local rig = Duelist.creatureBody(spec, color)
+		rig:ScaleTo(Kaiju.Bug.Scale)
+		for _, joint in rig:GetDescendants() do
+			if joint:IsA("Motor6D") and joint:GetAttribute("CreatureMotion") then
+				joint:SetAttribute("CreatureRest", joint.C0)
 			end
-			local humanoid = rig:FindFirstChildOfClass("Humanoid") :: Humanoid
-			humanoid.HipHeight = 1.9 * Kaiju.Bug.Scale
-			local angle = rng:NextNumber(0, math.pi * 2)
-			local at = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(2, 7)
-			local floor = KaijuServer.ground(at)
-			rig:PivotTo(CFrame.new(floor + Vector3.new(0, humanoid.HipHeight + 1, 0)) * CFrame.Angles(0, angle, 0))
-			rig.Name = "Moon Bug"
-			rig:SetAttribute("Posed", true) -- clients pose its body (BodyPoses)
-			rig:SetAttribute("MoonBug", true)
-			local kind = {
-				Name = "Moon Bug",
-				Health = math.floor(Kaiju.Bug.Health * grow + 0.5),
-				Damage = Kaiju.Bug.Damage * grow,
-				Speed = Kaiju.Bug.Speed,
-				Reach = Kaiju.Bug.Reach,
-				Rate = Kaiju.Bug.Rate,
-				Aggro = Kaiju.Bug.Aggro,
-				Coins = 0,
-				DropChance = 0,
-				Luck = 0,
-				Respawn = 0,
-			}
-			local enemy = Enemies.adopt(
-				rig,
-				kind,
-				{ Element = spec.Element, Title = string.format("Moon Bug · %s", spec.Name), Home = floor }
-			)
-			local e = enemy :: any
-			e.OutpostCreature = true
-			e.Brain = brain
-			e.OnDeath = bugDied
-			wilds[enemy] = {
-				Enemy = enemy,
-				Species = spec.Id,
-				Element = spec.Element,
-				Level = level,
-				Soul = nil,
-				Ability = nil,
-				Born = os.clock(),
-				Tries = 0,
-				TameAt = {},
-				Bug = true,
-				Swarm = swarm,
-			}
-			swarm.Left += 1
-		end)
-		if not ok then
-			warn("[Kaiju] moon bug spawn failed:", err)
 		end
+		local humanoid = rig:FindFirstChildOfClass("Humanoid") :: Humanoid
+		humanoid.HipHeight = 1.9 * Kaiju.Bug.Scale
+		local foot = at + Vector3.new(0, humanoid.HipHeight + 1, 0)
+		local facing = opts.Facing or (at + Vector3.new(0, 0, -1))
+		local look = Vector3.new(facing.X, foot.Y, facing.Z)
+		rig:PivotTo(if (look - foot).Magnitude > 0.1 then CFrame.lookAt(foot, look) else CFrame.new(foot))
+		rig.Name = "Moon Bug"
+		rig:SetAttribute("Posed", true) -- clients pose its body (BodyPoses)
+		rig:SetAttribute("MoonBug", true)
+		rig:SetAttribute("RiftBorn", true)
+		local kind = {
+			Name = "Moon Bug",
+			Health = math.floor(Kaiju.Bug.Health * grow * boost.Health + 0.5),
+			Damage = Kaiju.Bug.Damage * grow * boost.Damage,
+			Speed = Kaiju.Bug.Speed,
+			Reach = Kaiju.Bug.Reach,
+			Rate = Kaiju.Bug.Rate,
+			Aggro = Kaiju.Bug.Aggro,
+			Coins = 0,
+			DropChance = 0,
+			Luck = 0,
+			Respawn = 0,
+		}
+		local enemy = Enemies.adopt(
+			rig,
+			kind,
+			{ Element = spec.Element, Title = string.format("Moon Bug · %s", spec.Name), Home = at }
+		)
+		local e = enemy :: any
+		e.OutpostCreature = true
+		e.Brain = brain
+		e.OnDeath = bugDied
+		enemy.LastAttack = os.clock() -- (its first bite a moment after it lands)
+		wilds[enemy] = {
+			Enemy = enemy,
+			Species = spec.Id,
+			Element = spec.Element,
+			Level = level,
+			Soul = nil,
+			Ability = nil,
+			Born = os.clock(),
+			Tries = 0,
+			TameAt = {},
+			Bug = true,
+			Prey = opts.Prey,
+			Band = opts.Band,
+			ExpScale = boost.Exp,
+		}
+		-- Out of the tear, at its prey.
+		if opts.Hop then
+			enemy.Root.AssemblyLinearVelocity = opts.Hop
+		end
+		return enemy
+	end)
+	if not ok then
+		warn("[Kaiju] moon bug spawn failed:", result)
+		return nil
 	end
-	if swarm.Left == 0 then
-		swarmCount -= 1
-	end
+	return result
 end
 
 -- Upkeep ------------------------------------------------------------------------------------------------------
@@ -684,12 +780,10 @@ function KaijuWilds.start(site)
 		end
 	end
 	Shop.register("KaijuTame", tame)
+	-- (Moon bugs come through rifts round players out past the core: FrontierServer.)
 	task.delay(5, function()
 		for _ = 1, Kaiju.Wild.Max do
 			spawnWild()
-		end
-		for _ = 1, Kaiju.Bug.Swarms do
-			KaijuWilds.spawnSwarm()
 		end
 	end)
 	local timer = 0

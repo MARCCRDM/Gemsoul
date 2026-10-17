@@ -1627,4 +1627,15 @@ return {
 	["Ground Stomp"] = "Pisotón",
 	["Tail Lash"] = "Latigazo de cola",
 	["Shell Slam"] = "Golpe de caparazón",
+	-- The frontier: bands, the banner as you cross into one (FrontierHud), a rock's tag (OutpostScene).
+	["Outpost Core"] = "Núcleo del Puesto",
+	["The Fringe"] = "La Franja",
+	["The Edge"] = "El Borde",
+	["Rift Vein"] = "Veta de la Grieta",
+	["Safe from the rifts"] = "A salvo de las grietas",
+	["Rifts tear open out here"] = "Aquí se abren grietas",
+	["the rocks run richer"] = "las rocas son más ricas",
+	["The richest veins"] = "Las vetas más ricas",
+	["the most rifts"] = "las grietas más frecuentes",
+	["+{1}% Luck"] = "+{1}% de suerte",
 }

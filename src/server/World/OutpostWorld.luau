@@ -12,13 +12,26 @@
 	      Board (BasePart with the leaderboard's face), Gate (BasePart),
 	      Spots ({ CFrame }, where rocks may grow), ArrivalSpots and
 	      NearSpots (indexes into Spots: the welcome field by the pad, and the
-	      denser field all round the middle, filled before the far quarry),
+	      field round the middle, filled first), TrailSpots and VeinSpots
+	      (the candy trails out to the walls, Shared.Frontier, and the Rift
+	      Vein at each end), Zones (each spot's Shared.Outpost zone), Scars
+	      ({ CFrame }: the dormant rift at each trail's end, facing in),
 	      Parking ({ Kind, CFrame }: the Motor Pool bays for the machines),
 	      Secrets (empty: retired Easter eggs stay disabled) }
-	  OutpostWorld.rock(size, cframe, rng) -> Model   one rock of that size
-	      (Shared.Outpost.Sizes), its main chunk named "Body"
+	  OutpostWorld.rock(size, cframe, rng, tint?) -> Model   one rock of that size
+	      (Shared.Outpost.Sizes), its main chunk named "Body"; `tint` colours
+	      its crystals (a frontier band's, Shared.Frontier.Bands)
 ]]
 local OutpostWorld = {}
+
+-- The frontier's rules (Shared.Frontier: the candy trails). Offline scene
+-- tests hand it in here.
+OutpostWorld.Frontier = (function()
+	local ok, module = pcall(function()
+		return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Frontier", 10))
+	end)
+	return if ok then module else nil
+end)()
 
 -- Imported art (ServerStorage.Assets) when it's there; plain parts when not.
 local AssetKit = (function()
@@ -120,7 +133,18 @@ end
 -- One crystal standing out of `base`: a shaft with a pointed tip, leaning
 -- `lean` radians toward `heading` (a yaw). A big one is glass that glows
 -- from a core inside; a small one is all glow.
-local function shard(parent, base: Vector3, heading: number, lean: number, length: number, width: number, rng, core)
+local function shard(
+	parent,
+	base: Vector3,
+	heading: number,
+	lean: number,
+	length: number,
+	width: number,
+	rng,
+	core,
+	color: Color3?
+)
+	local glow = color or GLOW
 	local tip = math.min(width * 1.5, length * 0.45)
 	local shaft = length - tip
 	local at = CFrame.new(base)
@@ -130,17 +154,18 @@ local function shard(parent, base: Vector3, heading: number, lean: number, lengt
 		* CFrame.new(0, shaft / 2 - width * 0.75, 0)
 	local material = if core then Enum.Material.Glass else Enum.Material.Neon
 	local look = if core then { Transparency = 0.35, Reflectance = 0.15 } else nil
-	part(parent, at, Vector3.new(width, shaft, width), GLOW, material, nil, look).Name = "Crystal"
+	part(parent, at, Vector3.new(width, shaft, width), glow, material, nil, look).Name = "Crystal"
 	local point = at * CFrame.new(0, (shaft + tip) / 2, 0)
-	part(parent, point, Vector3.new(width, tip, width), GLOW, material, "CornerWedge", look).Name = "Crystal"
+	part(parent, point, Vector3.new(width, tip, width), glow, material, "CornerWedge", look).Name = "Crystal"
 	if core then
-		part(parent, at, Vector3.new(width * 0.5, shaft * 0.9, width * 0.5), CRYSTAL_CORE, Enum.Material.Neon).Name =
+		local heart = if color then color:Lerp(Color3.new(1, 1, 1), 0.65) else CRYSTAL_CORE
+		part(parent, at, Vector3.new(width * 0.5, shaft * 0.9, width * 0.5), heart, Enum.Material.Neon).Name =
 			"CrystalCore"
 	end
 end
 
 -- A glowing ore vein across one side of a stone: two strokes with a bend.
-local function vein(parent, stone: BasePart, rng)
+local function vein(parent, stone: BasePart, rng, color: Color3?)
 	local side = rng:NextInteger(0, 3)
 	local across = if side % 2 == 0 then stone.Size.X else stone.Size.Z
 	local depth = (if side % 2 == 0 then stone.Size.Z else stone.Size.X) / 2
@@ -150,7 +175,7 @@ local function vein(parent, stone: BasePart, rng)
 	local bend = rng:NextNumber(0.5, 0.9) * (if rng:NextNumber() < 0.5 then -1 else 1)
 	local second = first * CFrame.new(0, stroke / 2, 0) * CFrame.Angles(0, 0, bend) * CFrame.new(0, stroke / 2, 0)
 	for _, at in { first, second } do
-		part(parent, at, Vector3.new(0.16, stroke + 0.12, 0.16), GLOW, Enum.Material.Neon).Name = "Vein"
+		part(parent, at, Vector3.new(0.16, stroke + 0.12, 0.16), color or GLOW, Enum.Material.Neon).Name = "Vein"
 	end
 end
 
@@ -174,8 +199,9 @@ end
 -- chunks heaped on a scorched bed, ore veins in their sides and a crystal
 -- cluster bursting out of the top (the boulder has a second one breaking
 -- out of a flank).
-local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Model
+local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng, tint: Color3?): Model
 	local s = if big then 6 else 3.6
+	local glow = tint or GLOW
 	local function lean(low: number, high: number): number
 		return rng:NextNumber(low, high) * (if rng:NextNumber() < 0.5 then -1 else 1)
 	end
@@ -225,7 +251,8 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Mod
 		s * (if big then 0.78 else 0.62),
 		s * (if big then 0.16 else 0.14),
 		rng,
-		true
+		true,
+		tint
 	)
 	local fan = if big then 3 else 2
 	for i = 1, fan do
@@ -236,7 +263,7 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Mod
 		local away = Vector3.new(math.cos(h), 0, -math.sin(h))
 		away = (away - up * away:Dot(up)).Unit
 		local length = s * (if first then 0.54 else rng:NextNumber(0.36, 0.46))
-		shard(model, base + away * width * 1.1, h, rng:NextNumber(0.5, 0.85), length, width, rng, first)
+		shard(model, base + away * width * 1.1, h, rng:NextNumber(0.5, 0.85), length, width, rng, first, tint)
 	end
 	if big then
 		-- A second, smaller cluster breaking out of the flank that faces most
@@ -262,14 +289,16 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Mod
 				math.clamp(math.acos(math.clamp(outward.Y, -1, 1)), 0.6, 1.15),
 				s * rng:NextNumber(0.28, 0.36),
 				s * 0.08,
-				rng
+				rng,
+				nil,
+				tint
 			)
 		end
 	end
-	vein(model, body, rng)
-	vein(model, stones[1], rng)
+	vein(model, body, rng, tint)
+	vein(model, stones[1], rng, tint)
 	if big then
-		vein(model, stones[2], rng)
+		vein(model, stones[2], rng, tint)
 	end
 	-- Rubble at its foot, and a chip of crystal knocked loose.
 	for _ = 1, 2 do
@@ -294,7 +323,7 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Mod
 			* CFrame.Angles(0, rng:NextNumber(0, 6.28), 0)
 			* CFrame.Angles(1.3, 0, 0),
 		Vector3.new(s * 0.06, s * 0.16, s * 0.06),
-		GLOW,
+		glow,
 		Enum.Material.Neon,
 		"Wedge"
 	)
@@ -302,7 +331,7 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Mod
 	-- A small glow on its own bed. The field round the middle holds a hundred
 	-- rocks, and wider lights overlapped into a floor (and miners) washed
 	-- cyan-white; the neon crystals glow without lighting anything.
-	light(body, GLOW, s * 1.4, 0.5)
+	light(body, glow, s * 1.4, 0.5)
 	return model
 end
 
@@ -317,11 +346,13 @@ local ROCK_TINT = {
 	Geode = Color3.fromRGB(100, 78, 128),
 }
 
-function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
+function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random, tint: Color3?): Model
 	local model = Instance.new("Model")
 	model.Name = "Rock"
 	if size == "Pebble" or size == "Boulder" then
-		return crystalRock(model, size == "Boulder", cframe, rng)
+		-- (Out along the trails their crystals warm from cyan to gold to
+		-- rose; a Rift Vein's are rift-touched violet.)
+		return crystalRock(model, size == "Boulder", cframe, rng, tint)
 	end
 	local spec = ({
 		Monolith = { 8.5, Color3.fromRGB(84, 82, 96), SAGA, 9 },
@@ -920,8 +951,48 @@ end
 local DIRT = Color3.fromRGB(92, 86, 84)
 local CONCRETE = Color3.fromRGB(86, 90, 98)
 local QUARRY = 440 -- where the stepped quarry walls start (Shared.Outpost.Radius)
-local NEAR_SPOTS = 80 -- rock spots in the field round the middle
-local ROCK_SPOTS = 280 -- rock spots in all (Shared.Outpost.NodeCount of them hold a rock)
+-- A glowing crumb of crystal on the trail, half sunk in the regolith.
+local function crumb(parent, at: CFrame, color: Color3, rng)
+	local big = rng:NextNumber() < 0.35
+	local p = part(
+		parent,
+		at
+			* CFrame.new(0, 0.12, 0)
+			* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+			* CFrame.Angles(rng:NextNumber(-0.35, 0.35), 0, rng:NextNumber(-0.35, 0.35)),
+		if big then Vector3.new(1, 0.5, 1.3) else Vector3.new(0.75, 0.38, 0.95),
+		color,
+		Enum.Material.Neon,
+		"Wedge"
+	)
+	p.Name = "Crumb"
+	p.CastShadow = false
+	return p
+end
+
+-- Where a dormant rift sits at a trail's end: scorched ground, and cracks of
+-- the other side's light running out from it (the tear itself is drawn by
+-- each player's client: RiftTear).
+local function scarMark(parent, at: CFrame, rng)
+	local bed = disc(parent, at * CFrame.new(0, 0.06, 0), 5.5, 0.1, Color3.fromRGB(44, 30, 58), Enum.Material.Slate)
+	bed.CastShadow = false
+	for i = 1, 5 do
+		local a = i / 5 * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		local length = rng:NextNumber(2.5, 6)
+		local crack = part(
+			parent,
+			at * CFrame.Angles(0, a, 0) * CFrame.new(0, 0.13, -(1.2 + length / 2)),
+			Vector3.new(rng:NextNumber(0.14, 0.26), 0.06, length),
+			Color3.fromRGB(215, 90, 255),
+			Enum.Material.Neon
+		)
+		crack.Name = "ScarCrack"
+		crack.CastShadow = false
+	end
+end
+
+local NEAR_SPOTS = 52 -- rock spots in the field round the middle (the trails lead out from it)
+local NEAR_REACH = 140 -- studs: the field stays inside the core (Shared.Frontier.Core)
 
 -- Connected triangles make a continuous crater surface rather than separate
 -- vertical towers. Shared vertices keep the silhouette and slopes seam-free.
@@ -1617,6 +1688,11 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ (at * CFrame.new(-110, 0, 40)).Position, 16 },
 		{ motorAt.Position, 84 },
 		{ rigAt.Position, 16 },
+		-- (the container stacks out in the quarry)
+		{ (at * CFrame.new(-280, 0, -56)).Position, 20 },
+		{ (at * CFrame.new(120, 0, -326)).Position, 20 },
+		{ (at * CFrame.new(-200, 0, 244)).Position, 20 },
+		{ (at * CFrame.new(340, 0, 64)).Position, 20 },
 	}
 	for _, exclusion in festiveExclusions do
 		table.insert(keepOut, exclusion)
@@ -1667,14 +1743,56 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 		return true
 	end
-	-- A denser field all round the middle, where people mine between fights
-	-- (spread evenly by distance, not area, so it isn't all at the edge). The
-	-- lane from the pad to the middle stays open.
+	-- The candy trails first (Shared.Frontier): runs of rocks leading out
+	-- from the core to the walls, crumbs glowing between them and their
+	-- crystals warming band by band, each ending in a Rift Vein round a
+	-- dormant rift scar.
+	local Frontier = assert(OutpostWorld.Frontier, "OutpostWorld needs Shared.Frontier")
+	local trails = folder(root, "Trails")
+	local trailSpots, veinSpots, scars = {}, {}, {}
+	local zoneOf = {}
+	local function grow(offset: Vector3, zone: string, gap: number): boolean
+		local p = (at * CFrame.new(offset.X, 0, offset.Z)).Position
+		if not clear(p, gap) then
+			return false
+		end
+		table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
+		zoneOf[#spots] = zone
+		return true
+	end
+	for t = 1, #Frontier.TrailAngles do
+		local placed = {}
+		for _, offset in Frontier.trail(t, rng) do
+			if grow(offset, Frontier.zoneOf(offset.Magnitude), 12) then
+				table.insert(trailSpots, #spots)
+				table.insert(placed, offset)
+			end
+		end
+		local vein, scar = Frontier.vein(placed[#placed], rng)
+		for _, offset in vein do
+			if grow(offset, "Vein", 12) then
+				table.insert(veinSpots, #spots)
+			end
+		end
+		-- Crumbs from rock to rock, and on from the last to the scar.
+		table.insert(placed, scar)
+		for i = 2, #placed do
+			local band = if i == #placed then "Vein" else Frontier.band(placed[i].Magnitude)
+			for _, c in Frontier.crumbs(placed[i - 1], placed[i], rng) do
+				crumb(trails, at * CFrame.new(c.X, 0, c.Z), Frontier.Bands[band].Color, rng)
+			end
+		end
+		local scarAt = at * CFrame.new(scar.X, 0, scar.Z)
+		scarMark(trails, scarAt, rng)
+		table.insert(scars, CFrame.lookAt(scarAt.Position, at.Position))
+	end
+	-- Then a field round the middle, where people mine between fights
+	-- (spread evenly by distance, not area). The lane from the pad stays open.
 	local nearSpots = {}
 	local tries = 0
 	while #nearSpots < NEAR_SPOTS and tries < 8000 do
 		tries += 1
-		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(36, 200)
+		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(36, NEAR_REACH)
 		local x, z = math.cos(a) * r, math.sin(a) * r
 		local p = (at * CFrame.new(x, 0, z)).Position
 		if not (math.abs(x) < 10 and z > -60) and clear(p, 12) then
@@ -1682,21 +1800,11 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			table.insert(nearSpots, #spots)
 		end
 	end
-	-- Then the far quarry, out to the walls.
-	tries = 0
-	while #spots < ROCK_SPOTS and tries < 12000 do
-		tries += 1
-		local a, r = rng:NextNumber(0, math.pi * 2), math.sqrt(rng:NextNumber(0.01, 1)) * (QUARRY - 25)
-		local p = (at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)).Position
-		if clear(p, 12) then
-			table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
-		end
-	end
 
-	-- Explicit zones also keep respawns on the basic mining-object mix.
+	-- Every spot's zone (its rock mix and luck, and respawns keep it).
 	local zones = {}
 	for index in spots do
-		zones[index] = "Common"
+		zones[index] = zoneOf[index] or "Common"
 	end
 	root.Parent = parent
 	return {
@@ -1708,6 +1816,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Spots = spots,
 		ArrivalSpots = arrivalSpots,
 		NearSpots = nearSpots,
+		TrailSpots = trailSpots,
+		VeinSpots = veinSpots,
+		Scars = scars,
 		Zones = zones,
 		FieldSpots = {},
 		Parking = parking,

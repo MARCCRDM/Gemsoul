@@ -433,6 +433,16 @@ now += Spar.DownSeconds + Spar.SheatheLock + 0.1
 SparServer._getUp(a, ha)
 check(ha.Health == ha.MaxHealth, "Not back up, whole")
 check(Hunt(a, false).Ok and a:GetAttribute("Hunt") == nil and a:GetAttribute("Spar") == nil, "Couldn't put it away")
+-- A rift's critter catching a miner (kit away) out in the Outpost: down,
+-- then up again whole, with a moment's guard.
+now += Spar.SheatheLock + 1
+ha.Health = 5
+pcall(Enemies.hitPlayer, a, 500, "Fire", bug)
+check(ha.Health >= 1 and Spar.isDown(a), "A critter's blow killed a miner (or didn't land)")
+local minerGuards = #listeners
+SparServer._getUp(a, ha, true)
+check(not Spar.isDown(a) and ha.Health == ha.MaxHealth, "A downed miner didn't get up whole")
+check(#listeners == minerGuards + 1, "A downed miner got up with no guard")
 -- The hunt ends by itself when hunting stops making sense (a seat, leaving).
 check(Hunt(a, true).Ok, "Couldn't hunt again")
 ha.SeatPart = {}

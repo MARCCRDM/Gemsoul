@@ -152,11 +152,13 @@ local PlayerData = {
 	CharacterChanged = signal(),
 }
 local gemsAwarded = 0
+local lastLuck = nil -- the luck the last gem was rolled with
 local Gems = {
 	random = function()
 		return Rand.new(11)
 	end,
-	award = function()
+	award = function(_, _, opts)
+		lastLuck = opts and opts.Luck
 		gemsAwarded += 1
 		return { Id = "G" .. gemsAwarded, Tier = "Rare", Element = "Shock" }
 	end,
@@ -325,11 +327,16 @@ end
 
 -- The server --------------------------------------------------------------------------
 local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
+-- (Its trails come from Shared.Frontier, handed in as the server would find it.)
+local Frontier = load("src/shared/Frontier.luau", "Frontier", {})
+World.Frontier = Frontier
 -- OutpostServer's requires resolve by name to the stand-ins above.
 local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
-	for _, name in { "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "Seating" } do
+	for _, name in
+		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "Seating", "Frontier" }
+	do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
 		stub.Parent = sharedFolder
@@ -339,6 +346,7 @@ local Server = (function()
 		if key then
 			return ({
 				Outpost = Rules,
+				Frontier = Frontier,
 				Config = { MaxGems = 200 },
 				GemConfig = GemConfig,
 				Mine = Mine,
@@ -421,7 +429,10 @@ end)()
 Server.start()
 local site = Server.site()
 check(site and site.Model.Parent == workspaceRoot, "The Outpost wasn't built")
-check(#site.Spots >= Rules.NodeCount, "Not enough room for the rocks")
+-- Every spot holds a rock: the field round the middle, the candy trails out
+-- to the walls and the Rift Vein at each end (Shared.Frontier).
+check(#site.Spots >= 180 and #site.Spots <= Rules.NodeCount, "Not enough room for the rocks: " .. #site.Spots)
+check(#site.TrailSpots >= 100 and #site.VeinSpots >= 20 and #site.Scars == 6, "The candy trails are missing")
 -- The Skyport: compact, every spot on a mining ring, each ring with room.
 do
 	local perZone = {}
@@ -448,7 +459,7 @@ local nodeCount = 0
 for _ in Server._nodes do
 	nodeCount += 1
 end
-check(nodeCount == Rules.NodeCount, "Rocks out: " .. nodeCount)
+check(nodeCount == math.min(Rules.NodeCount, #site.Spots), "Rocks out: " .. nodeCount)
 for _, node in Server._nodes do
 	-- A ring only grows its own mix.
 	local zone = site.Zones[node.Spot]
@@ -461,6 +472,33 @@ for _, node in Server._nodes do
 	local prompt = model.PrimaryPart:FindFirstChildOfClass("ProximityPrompt")
 	check(prompt and prompt:GetAttribute("PromptKind") == "Mine", "A rock without its Mine prompt")
 	break
+end
+-- Out along the candy trails the crystals glow in their band's colour (a
+-- Rift Vein's rift violet), and each rock says its zone for the client.
+do
+	local tints = {}
+	for _, node in Server._nodes do
+		local zone = site.Zones[node.Spot]
+		check(node.Zone == zone and node.Model:GetAttribute("Zone") == zone, "A rock doesn't know its zone")
+		local crystal
+		for _, d in node.Model:GetDescendants() do
+			if d:IsA("BasePart") and d.Name == "Crystal" then
+				crystal = d
+				break
+			end
+		end
+		if crystal and Frontier.Bands[zone] then
+			check(crystal.Color == Frontier.Bands[zone].Color, zone .. " crystals aren't its colour")
+			tints[zone] = true
+		end
+	end
+	check(tints.Fringe and tints.Edge and tints.Vein, "Some band's rocks never grew")
+	-- Each trail's dormant rift, by the walls, facing in.
+	for _, scar in site.Scars do
+		local offset = scar.Position - Rules.Location.Position
+		check(R.Vector3.new(offset.X, 0, offset.Z).Magnitude > Frontier.Rim - 1, "A rift scar off the walls")
+	end
+	check(site.Model:FindFirstChild("Trails") and #site.Model.Trails:GetChildren() > 150, "No crumbs on the trails")
 end
 check(site.Probe:FindFirstChildOfClass("ProximityPrompt") ~= nil, "The Probe has no prompt")
 check(
@@ -658,6 +696,44 @@ for _ in Server._nodes do
 	after += 1
 end
 check(after == before + 1, "A mined rock never grew back")
+local regrown
+for _, node in Server._nodes do
+	if node.Spot == target.Spot then
+		regrown = node
+	end
+end
+check(regrown and regrown.Zone == target.Zone, "A mined rock grew back somewhere else")
+-- Further out, luckier: a gem from a Rift Vein boulder rolls with its zone's
+-- luck on top of the boulder's own.
+local commonLuck = lastLuck
+local vein
+for _, node in Server._nodes do
+	if node.Zone == "Vein" and node.Size == target.Size then
+		vein = node
+		break
+	end
+end
+check(vein ~= nil, "No boulder in a Rift Vein")
+if vein then
+	standBy(anaRoot, vein)
+	for _ = 1, 40 do
+		advance(0.5)
+		local hit = handlers.OutpostHit(ana, vein.Id)
+		if hit.Loot then
+			check(hit.Loot.Zone == "Vein", "The loot doesn't say where it came from")
+			break
+		end
+	end
+	check(
+		math.abs(lastLuck - commonLuck - (Rules.Zones.Vein.Luck - (Rules.Zones[target.Zone].Luck or 0))) < 1e-9,
+		string.format(
+			"A vein's gem rolled with %s luck (a %s rock's %s)",
+			tostring(lastLuck),
+			target.Zone,
+			tostring(commonLuck)
+		)
+	)
+end
 
 -- A full gem pouch: no swinging (the rock would pay a gem with nowhere to
 -- go), and the pick isn't worn by trying.
