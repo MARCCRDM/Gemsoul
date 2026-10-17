@@ -96,6 +96,19 @@ for _,p in builtParts do
 end
 assert(floor and math.abs(floor.CFrame.t[2]+floor.Size.X/2)<.001,"Quarry floor missing or wrong height")
 assert(roads>100 and ramps==5 and sky>=260 and motor>20 and base>200,"Original quarry landmarks missing")
+-- The crater rim and the sky are sent whole: far off, streaming would never
+-- send them (the rim's far side is 900-1,200 studs from most of the quarry).
+local rim,skyModel=0,nil
+for _,p in builtParts do
+ local model=p.Parent
+ if model and model.Name=="NaturalCraterRim" then
+  rim+=1
+  assert(model.ModelStreamingMode=="Persistent","The crater rim streams: its far side never loads")
+ elseif model and model.Name=="Sky" then
+  skyModel=model
+ end
+end
+assert(rim>1000 and skyModel and skyModel.ModelStreamingMode=="Persistent","Crater rim or sky missing or streamed")
 assert(#builtParts<4000,"Quarry scenery budget exceeded")
 for i,spot in site.Spots do
  local p=spot.Position-origin.Position
@@ -119,7 +132,7 @@ for i=0,10000 do
  local size=Rules.rollSize(i/10001,"Common")
  assert(size=="Pebble" or size=="Boulder","Rare mining object returned")
 end
-print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 5 ramps; services and safe sky")
+print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 5 ramps; services and safe sky; the crater rim and sky always load")
 local counts={Hauler=0,Mole=0,Digger=0,Skipper=0}
 assert(#site.Parking==8,"Motor Pool has missing bays")
 for _,bay in site.Parking do

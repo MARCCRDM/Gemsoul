@@ -46,6 +46,7 @@ local ProbeLayout = require(script.Parent.ProbeLayout)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
+local SkyRift = require(script.Parent.SkyRift)
 local ThirdPerson = require(script.Parent.ThirdPerson)
 local UiKit = require(script.Parent.UiKit)
 
@@ -1747,10 +1748,16 @@ task.spawn(function()
 		end
 	end
 end)
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
+	-- The rift in the sky shows only while you're here.
+	if active then
+		SkyRift.mount(Rules.Location)
+	end
+	SkyRift.show(active)
 	if not active then
 		return
 	end
+	SkyRift.step(dt)
 	local site = workspace:FindFirstChild("SagaOutpost")
 	local ring = site and site:FindFirstChild("Probe") and site.Probe:FindFirstChild("ProbeRing")
 	if ring and ring:IsA("BasePart") then

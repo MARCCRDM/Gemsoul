@@ -948,6 +948,12 @@ end
 
 local function craterRim(parent, at: CFrame)
 	local rim = folder(parent, "NaturalCraterRim")
+	-- Sent to every player whole, like the sky. It stands 470-770 studs out,
+	-- so from most of the quarry its far side is past what streaming sends
+	-- (1,024 studs at best, much less on a phone), and it never loaded.
+	pcall(function()
+		(rim :: any).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	end)
 	local rng = Random.new(8217)
 	local segments = 72
 	-- Low debris apron, eroded inner wall, broad crest, and a falling outer slope.
