@@ -847,7 +847,7 @@ end
 modalDismiss.Activated:Connect(closeInventoryPicker)
 -- Opens the stash drawer on its own (gems and armor, no slot picked).
 local stashButton = new("TextButton", {
-	Text = "GEMS & ARMOR  ▸",
+	Text = "GEMS & ARMOR  ›",
 	TextSize = 11,
 	Font = HEADING,
 	TextColor3 = C.Text,
@@ -2306,16 +2306,14 @@ local function closeDetails()
 	end
 end
 local popClose = new("TextButton", {
-	Text = "✕",
-	TextSize = 16,
-	Font = HEADING,
-	TextColor3 = C.Text,
+	Text = "",
 	AutoButtonColor = true,
 	BackgroundColor3 = P.Frame,
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -12, 0, 10),
 	Size = UDim2.fromOffset(30, 28),
 }, popCard)
+IronUi.cross(popClose, 12, C.Text)
 round(popClose, 5)
 stroke(popClose, C.PanelEdge, 1)
 popClose:SetAttribute("UiSound", "Back")
@@ -3358,7 +3356,7 @@ local function drawRight()
 		selection = nil
 	end
 	if selection and not comparing() then
-		footer.Text = "✕ TO GO BACK"
+		footer.Text = "X TO GO BACK"
 	elseif tab == "Gems" then
 		drawGems()
 	elseif tab == "Armor" then

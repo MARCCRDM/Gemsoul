@@ -299,7 +299,10 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Mod
 		"Wedge"
 	)
 	chip.Name = "Crystal"
-	light(body, GLOW, s * 3, 1.2)
+	-- A small glow on its own bed. The field round the middle holds a hundred
+	-- rocks, and wider lights overlapped into a floor (and miners) washed
+	-- cyan-white; the neon crystals glow without lighting anything.
+	light(body, GLOW, s * 1.4, 0.5)
 	return model
 end
 
@@ -377,7 +380,7 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 			)
 			core.Name = "Crystal"
 		end
-		light(body, crystal, s * 3, if size == "Geode" then 2.4 else 1.1)
+		light(body, crystal, s * 1.8, if size == "Geode" then 1.4 else 0.7) -- (small, like the everyday rocks')
 		return model
 	end
 	local body = part(
@@ -440,7 +443,7 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 		)
 		core.Name = "Crystal"
 	end
-	light(body, crystal, s * 3, if size == "Geode" then 2.4 else 1.1)
+	light(body, crystal, s * 1.8, if size == "Geode" then 1.4 else 0.7)
 	return model
 end
 

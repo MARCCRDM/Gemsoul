@@ -23,6 +23,7 @@ local Lang = require(RS.Shared.Lang)
 local Rules = require(RS.Shared.TrainingRewards)
 local Tutorial = require(RS.Shared.Tutorial)
 local GemClient = require(script.Parent.Modules.GemClient)
+local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
 local player = Players.LocalPlayer
 
@@ -175,11 +176,9 @@ local kicker = label(panel, "Learn the game, earn coins. They never expire.", 12
 local close = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 0),
 	BackgroundColor3 = CHIP,
-	Text = "✕",
-	TextColor3 = TEXT,
-	TextSize = 14,
-	Font = Enum.Font.GothamBold,
+	Text = "",
 }, panel)
+IronUi.cross(close, 13, TEXT)
 UiKit.round(close, 999)
 stroke(close, MUTED, 0.8)
 

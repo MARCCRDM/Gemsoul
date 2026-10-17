@@ -498,16 +498,14 @@ box(panel, C.Line, 0, 64, W, 1, 0.92).Name = "HeaderRule"
 
 local close = new("TextButton", {
 	Name = "Close",
-	Text = "✕",
+	Text = "",
 	AutoButtonColor = false,
-	Font = BOLD,
-	TextSize = 16,
-	TextColor3 = C.Dim,
 	BackgroundColor3 = C.Surface,
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -20, 0, 14),
 	Size = UDim2.fromOffset(36, 36),
 }, panel)
+IronUi.cross(close, 14, C.Dim)
 round(close, 18)
 close:SetAttribute("UiSound", "Back")
 -- Right of the categories: the offer (while one's open), then coins.
@@ -598,17 +596,15 @@ local function overlayCard(w: number, h: number): Frame
 	stroke(card, C.Line, 1, 0.8)
 	local x = new("TextButton", {
 		Name = "CloseSheet",
-		Text = "✕",
+		Text = "",
 		AutoButtonColor = false,
-		Font = BOLD,
-		TextSize = 15,
-		TextColor3 = C.Dim,
 		BackgroundColor3 = C.Surface,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -14, 0, 14),
 		Size = UDim2.fromOffset(32, 32),
 		ZIndex = 30,
 	}, card)
+	IronUi.cross(x, 13, C.Dim)
 	round(x, 16)
 	x.Activated:Connect(closeOverlay)
 	return card
@@ -2068,16 +2064,14 @@ local function offerPopup(name: string, key: string)
 	text(card, "SPECIAL OFFER", 11, C.Gold, BOLD, 24, 20, 300, 14)
 	local x = new("TextButton", {
 		Name = "Close",
-		Text = "✕",
+		Text = "",
 		AutoButtonColor = false,
-		Font = BOLD,
-		TextSize = 15,
-		TextColor3 = C.Dim,
 		BackgroundColor3 = C.Surface,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -16, 0, 12),
 		Size = UDim2.fromOffset(32, 32),
 	}, card)
+	IronUi.cross(x, 13, C.Dim)
 	round(x, 16)
 	local body = new("Frame", {
 		BackgroundTransparency = 1,

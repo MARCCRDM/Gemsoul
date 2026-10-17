@@ -143,7 +143,9 @@ local function card(name: string, order: number, accent: Color3, title: string)
 	note.AnchorPoint = Vector2.new(1, 0)
 	note.Position, note.Size = UDim2.new(1, -12, 0, 10), UDim2.fromOffset(78, 22)
 	note.RichText = true
-	local chevron = label(frame, "▾", 12, P.Dim, IronUi.Heading, Enum.TextXAlignment.Center)
+	-- (A "›" turned to point down or up: the font has no ▾ or ▴, they showed as
+	-- empty boxes.)
+	local chevron = label(frame, "›", 12, P.Dim, IronUi.Heading, Enum.TextXAlignment.Center)
 	chevron.Name = "Chevron"
 	chevron.AnchorPoint = Vector2.new(1, 0)
 	chevron.Size = UDim2.fromOffset(14, 22)
@@ -151,7 +153,9 @@ local function card(name: string, order: number, accent: Color3, title: string)
 end
 
 -- The title row for a mode: the title, the note (left of the chevron on a
--- computer), the coloured edge and the chevron (`mark`: what it shows folded).
+-- computer), the coloured edge and the chevron (`mark`: which way it points
+-- folded, "Down" for a card that opens or "Right" for one that opens a window).
+local TURN = { Down = 90, Right = 0 }
 local function placeTop(m: string, heading, note, edge, chevron, mark: string?)
 	local y = if m == "open" then 10 else 5
 	heading.Visible = m ~= "phone"
@@ -160,7 +164,7 @@ local function placeTop(m: string, heading, note, edge, chevron, mark: string?)
 	edge.Position = UDim2.fromOffset(0, if m == "phone" then 10 elseif m == "open" then 12 else 15)
 	chevron.Visible = m ~= "phone" and mark ~= nil
 	chevron.Position = UDim2.new(1, -8, 0, y)
-	chevron.Text = if m == "open" then "▴" else mark or ""
+	chevron.Rotation = if m == "open" then -90 else TURN[mark] or 0
 end
 
 -- Tapping a folded card opens it (and folds the one that was open).
@@ -200,7 +204,7 @@ local function buildStreak()
 	week.Position, week.Size = UDim2.fromOffset(14, 41), UDim2.new(1, -28, 0, 3)
 	local function place()
 		local m = mode("Streak")
-		placeTop(m, heading, note, edge, chevron, "▾")
+		placeTop(m, heading, note, edge, chevron, "Down")
 		for _, entry in dots do
 			entry.Dot.Visible = m == "open"
 		end
@@ -301,7 +305,7 @@ local function buildChallenges()
 		local h = rowHeight()
 		local width = if compact then NARROW else WIDE
 		local m = mode("Challenges")
-		placeTop(m, heading, note, edge, chevron, "▾")
+		placeTop(m, heading, note, edge, chevron, "Down")
 		bonus.Visible = m == "open"
 		line.Visible, lineTrack.Visible, figure.Visible = m ~= "open", m ~= "open", m == "folded"
 		if m == "phone" then
@@ -339,7 +343,8 @@ local function buildChallenges()
 		place()
 		heading.Text = "DAILY CHALLENGES"
 		local allDone = view.BonusDone == true
-		note.Text = if allDone then '<font color="#4ED692">ALL DONE ✓</font>' else "↻ " .. untilReset()
+		-- (The time left on today's three; the ↻ it led with showed as a box.)
+		note.Text = if allDone then '<font color="#4ED692">ALL DONE ✓</font>' else untilReset()
 		local nextUp = nil
 		for _, item in view.List do
 			if item.Done ~= true then
@@ -471,7 +476,7 @@ local function buildTask()
 	-- slim strip: the task's name and its reward over a thin bar.
 	local function place()
 		local m = mode("NextTask")
-		placeTop(m, heading, note, edge, chevron, "›")
+		placeTop(m, heading, note, edge, chevron, "Right")
 		hint.Visible, count.Visible = false, m ~= "phone"
 		if m == "phone" then
 			name.Position, name.Size = UDim2.fromOffset(14, 6), UDim2.new(1, -78, 0, 20)

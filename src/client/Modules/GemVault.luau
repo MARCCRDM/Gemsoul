@@ -583,9 +583,8 @@ local function build(canvas: Instance)
 		state.Sort = if state.Sort == "Rarity" then "Value" else "Rarity"
 		draw()
 	end)
-	local close = button(window, "✕", WIN_W - 58, 18, 38, 38)
-	close.TextSize = 18
-	close.TextColor3 = C.Text
+	local close = button(window, "", WIN_W - 58, 18, 38, 38)
+	IronUi.cross(close, 14, C.Text)
 	close:SetAttribute("UiSound", "Back")
 	close.Activated:Connect(function()
 		GemVault.close()

@@ -45,6 +45,11 @@ next task's row opens the Tasks window.
 
 ![The board folded, then the challenges and the streak opened](lobby/board-folded.png)
 
+The arrow on a row is a "›" turned to point down (folded) or up (open).
+Gotham has no "▾" or "▴", and they showed in game as empty boxes. The
+challenges' row shows the time left on today's three on its own; the "↻"
+it led with was a box too.
+
 On a phone there is room for one slim strip, under TASKS:
 - the **next task** while a player is still learning (the first two Tasks
   pages: mining and gear): its name and reward over a thin bar;

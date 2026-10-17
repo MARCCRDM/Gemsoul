@@ -359,19 +359,17 @@ card({
 	end,
 })
 
--- (The round ✕ every window closes with: IronUi.window, the Store.)
+-- (The round X every window closes with: IronUi.window, the Store.)
 local close = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, 0, 0, 0),
 	Size = UDim2.fromOffset(44, 44),
-	Text = "✕",
-	TextSize = 18,
-	Font = IronUi.Heading,
-	TextColor3 = P.Text,
+	Text = "",
 	BackgroundColor3 = Color3.fromRGB(20, 25, 37),
 	AutoButtonColor = true,
 	ZIndex = 22,
 }, stage)
+IronUi.cross(close, 16, P.Text)
 UiKit.round(close, 22)
 new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1, Transparency = 0.82 }, close)
 close.Position = UDim2.new(1, 0, 0, -52)
@@ -810,7 +808,7 @@ local back = new("TextButton", {
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 10),
 	Size = UDim2.fromOffset(220, 40),
-	Text = "◂  BACK TO LOBBY",
+	Text = "‹  BACK TO LOBBY",
 	TextSize = 16,
 	Font = IronUi.Heading,
 	TextColor3 = Color3.new(1, 1, 1),

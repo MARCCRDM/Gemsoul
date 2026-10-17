@@ -565,10 +565,9 @@ local function build(canvas: Instance)
 		end)
 		tx += w + 8
 	end
-	local close = button(window, "✕", WIN_W - 58, 18, 38, 38)
+	local close = button(window, "", WIN_W - 58, 18, 38, 38)
 	close.Name = "Close"
-	close.TextSize = 18
-	close.TextColor3 = C.Text
+	IronUi.cross(close, 14, C.Text)
 	close:SetAttribute("UiSound", "Back")
 	close.Activated:Connect(function()
 		Wardrobe.close()

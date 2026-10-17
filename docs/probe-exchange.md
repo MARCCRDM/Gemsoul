@@ -78,8 +78,9 @@ when the Spanish runs longer.
 
 ## The close button
 
-Every window built with `IronUi.window` draws its X from two crossed bars.
-Gotham has no "✕" character, so in the game it showed as an empty box.
+Every window built with `IronUi.window` draws its X from two crossed bars
+(`IronUi.cross`, which every other close button now uses too). Gotham has
+no "✕" character, so in the game it showed as an empty box.
 
 ## Code and tests
 

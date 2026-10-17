@@ -596,6 +596,28 @@ function IronUi.gemButton(parent: Instance, label: string, color: Color3?, onCli
 	return b
 end
 
+-- An X drawn in the middle of `button` from two crossed bars, `length` long:
+-- Gotham has no "✕", which shows as an empty box in game. Returns the bars
+-- (to recolour on hover).
+function IronUi.cross(button: GuiObject, length: number, color: Color3): { Frame }
+	local bars = {}
+	for _, angle in { 45, -45 } do
+		local bar = new("Frame", {
+			Name = "Cross",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(length, 2),
+			Rotation = angle,
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			ZIndex = button.ZIndex + 1,
+		}, button)
+		corner(bar, UDim.new(0, 1))
+		table.insert(bars, bar)
+	end
+	return bars
+end
+
 -- Removes children except layout pieces (lists, corners, outlines, padding).
 function IronUi.clear(parent: Instance)
 	for _, child in parent:GetChildren() do
@@ -816,9 +838,8 @@ function IronUi.window(
 	subtitle.AutomaticSize = Enum.AutomaticSize.None
 	subtitle.ZIndex = 3
 
-	-- Close: a quiet round button in the top-right corner (as in the Store).
-	-- Its X is drawn (two crossed bars): Gotham has no "✕", which shows as a
-	-- box in game.
+	-- Close: a quiet round button in the top-right corner (as in the Store),
+	-- its X drawn (IronUi.cross).
 	local close = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
@@ -830,20 +851,7 @@ function IronUi.window(
 	}, panel)
 	corner(close, UDim.new(0.5, 0))
 	close:SetAttribute("UiSound", "Back")
-	local bars = {}
-	for _, angle in { 45, -45 } do
-		local bar = new("Frame", {
-			Name = "Cross",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(14, 2),
-			Rotation = angle,
-			BackgroundColor3 = P.Dim,
-			ZIndex = 6,
-		}, close)
-		corner(bar, UDim.new(0, 1))
-		table.insert(bars, bar)
-	end
+	local bars = IronUi.cross(close, 14, P.Dim)
 	close.MouseEnter:Connect(function()
 		for _, bar in bars do
 			bar.BackgroundColor3 = P.Text

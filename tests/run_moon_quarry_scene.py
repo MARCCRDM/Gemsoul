@@ -251,8 +251,45 @@ local OutpostServer={Tag="MineNode"}
 local CollectionService={AddTag=function() end}
 for i in site.Spots do freeSpots[i]=true end
 ''' + spawn_node + r'''
+local lightsBefore=#builtLights
 for i=1,Rules.NodeCount do spawnNode() end
 assert(nextId==Rules.NodeCount,"Welcome nodes changed total population")
+-- The rocks' glow on the floor round the middle (36-200 studs out, every 4
+-- studs; falloff taken as (1 - d/Range)^2). Wide lights overlapped there and
+-- washed the floor and everyone on it cyan-white.
+local glows={}
+for i=lightsBefore+1,#builtLights do
+ local l=builtLights[i]
+ local at=l.Parent.Position
+ table.insert(glows,{at.X,at.Y,at.Z,l.Range,l.Brightness})
+end
+assert(#glows==Rules.NodeCount,"One glow per rock: "..#glows)
+local middle=origin.Position
+local samples,lit,peak=0,0,0
+for x=-200,200,4 do
+ for z=-200,200,4 do
+  local r=math.sqrt(x*x+z*z)
+  if r>=36 and r<=200 then
+   samples+=1
+   local px,py,pz=middle.X+x,middle.Y,middle.Z+z
+   local sum,reached=0,false
+   for _,g in glows do
+    local dx,dy,dz=g[1]-px,g[2]-py,g[3]-pz
+    local d=math.sqrt(dx*dx+dy*dy+dz*dz)
+    if d<g[4] then
+     reached=true
+     sum+=g[5]*(1-d/g[4])^2
+    end
+   end
+   if reached then lit+=1 end
+   peak=math.max(peak,sum)
+  end
+ end
+end
+-- (The old lights reached 35% of it and stacked to 1.13.)
+assert(lit/samples<=0.15,string.format("Rock lights reach %.0f%% of the floor round the middle",lit/samples*100))
+assert(peak<=0.6,string.format("Rock lights stack to %.2f on the floor",peak))
+print(string.format("PASS: rock glows reach %.0f%% of the floor round the middle, %.2f at most",lit/samples*100,peak))
 for _,i in site.ArrivalSpots do assert(not freeSpots[i],"Random population left welcome field empty") end
 for _,i in site.NearSpots do assert(not freeSpots[i],"The field round the middle wasn't filled first") end
 -- A rock popped in the middle grows back in the middle, not out at the walls.

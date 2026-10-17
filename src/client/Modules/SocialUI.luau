@@ -447,10 +447,11 @@ local function drawParty()
 			ready.AutomaticSize, ready.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Right
 			ready.Position, ready.Size = UDim2.new(1, -118, 0, 9), UDim2.fromOffset(76, 16)
 			if isLeader() and member.UserId ~= player.UserId then
-				local kick = chip(slot, "✕", P.Bad, function()
+				local kick = chip(slot, "", P.Bad, function()
 					run("PartyKick", member.UserId)
 				end, 30)
 				kick.Position, kick.Size = UDim2.new(1, -36, 0, 4), UDim2.fromOffset(30, 26)
+				IronUi.cross(kick, 11, P.Text)
 			end
 		end
 	end

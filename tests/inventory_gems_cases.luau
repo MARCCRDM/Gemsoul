@@ -33,7 +33,7 @@ local function new(kind,props,parent)
 	table.insert(allUI,o)
 	return o
 end
-local IronUi={new=new}
+local IronUi={new=new,cross=function() return {} end}
 local RunService={RenderStepped=signal()}
 local game={GetService=function(_,name) return if name=="RunService" then RunService else {} end}
 local GemArt={viewport=function() end}

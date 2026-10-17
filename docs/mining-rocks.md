@@ -73,6 +73,12 @@ across the field. The label stays up until the rock pops.
 - The main chunk is the `Body`: the model's PrimaryPart, the only part
   that collides or can be queried, and the parent of the mining prompt and
   the PointLight. The light brightens as the rock nears popping.
+- The light is a small glow on the rock's own bed: its range is 1.4 times
+  the rock's size and its brightness 0.5 (the Saga Monolith and Star Geode:
+  1.8 times, at 0.7 and 1.4). The field round the middle holds about a
+  hundred rocks. With the old lights (3 times the size, brightness 1.2)
+  their pools overlapped, and the floor and the miners on it washed out
+  cyan-white. The crystals are neon, so they still glow.
 - The first child named `Crystal` sets the colour of the chips and flash
   on each hit.
 - Budget: a Regolith Chunk is 19 parts and a Crystal Boulder 29. Only
@@ -103,6 +109,11 @@ their old builder.
   `spawnNode`. It checks that the field round the middle has at least 70
   spots, that none is on the lane from the pad, that it fills first, and
   that a rock popped there grows back there.
+
+  With every rock grown, it samples the floor round the middle every 4
+  studs. The rocks' lights may reach at most 15% of it and add up to 0.6
+  at most. They now reach 9% and peak at 0.38; the old lights reached 35%
+  and stacked to 1.13.
 - `tests/outpost_cases.luau` checks that a popped rock pays exactly one
   gem and no coins or gear. It also checks that a full pouch refuses the
   swing without wearing the pick or chipping the rock.

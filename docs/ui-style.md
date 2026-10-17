@@ -22,7 +22,7 @@ It now has the Store's look:
 | Header | Clear, over a hairline, with the window's colour as a short bar under the title |
 | Icon | The window's icon in a round chip tinted with its colour |
 | Title | 22 px Gotham Black, with the subtitle 12 px under it |
-| Close | A quiet round ✕ (36 px), lighter on hover |
+| Close | A quiet round X (36 px) drawn from two bars (`IronUi.cross`), lighter on hover |
 
 The API is unchanged (`Gui`, `Panel`, `Header`, `Close`, `Title`, `Subtitle`,
 `Fit`, `Dock`), and so are the content positions.
@@ -57,6 +57,20 @@ The accents (Gold, Teal, Amethyst, Good, Bad) are unchanged.
 - In-world signs (Michroma), the splash prompt (Arcade) and the dialogue
   typewriter (Code) keep their faces on purpose.
 
+### Glyphs that show as boxes
+
+Gotham has no ✕ ▾ ▴ or ↻: in game each one showed as an empty box,
+though the offline renders (a browser font) drew them fine. ◂ and ▸ are
+the same small triangles, so they're treated as missing too.
+- An X is drawn from two crossed bars: `IronUi.cross(button, length,
+  colour)`. Every close button uses it, and the party's kick button.
+- An arrow is a "›" turned with `Rotation` (90 points down, -90 up), as on
+  the lobby board. "‹ ›" stand in for the small triangles in labels.
+- These render: › ‹ ◆ ✓ · and emoji.
+
+`tests/run_glyphs.py` fails if one of the six is in a string anywhere in
+`src` (comments may name them).
+
 ## Fixes found in the renders
 
 | Screen | Problem | Fix |
@@ -66,7 +80,7 @@ The accents (Gold, Teal, Amethyst, Good, Bad) are unchanged.
 | Market | The first row's card outlines were cut off by the scroll area; prices like "15000 coins" | 2 px padding inside every list; prices like "15,000 coins" |
 | Combat HUD | A surge's rarity ("Legendary") spilled past its round button | It shrinks to fit (6 to 10 px), in the rarity's colour |
 | Inventory | The last element line ran under the Q card | That line is as narrow as the value above it, with shorter words |
-| PLAY menu, Tasks | Square close buttons (a red one on PLAY) | The same round ✕ as every window |
+| PLAY menu, Tasks | Square close buttons (a red one on PLAY) | The same round X as every window |
 
 ## Screens
 
