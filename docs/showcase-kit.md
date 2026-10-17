@@ -24,6 +24,16 @@ parts). The window is a clipped frame, not a CanvasGroup, because 3D views
 don't draw inside one; that is also why its corners are rounded rather than
 a circle.
 
+Once the last gem gives up its surge, the kit is locked in and the fight
+starts by itself after 3 seconds: the button counts down ("TO THE FIGHT IN
+3") with a bar filling under it, and tapping it goes at once. Behind the
+cards is the arena you're heading to, in your element's colour: the stands
+in rings round a lit floor, two spotlights and a few stars. The strip under
+Roblox's top bar is dark too, all through the launch screens (it used to
+show the sky, and a planet in it).
+
+![The locked-in kit, before and now](showcase-kit/locked-in.png)
+
 ## The pools
 
 | Element | Q (sword) | E (core) | R (defense) |

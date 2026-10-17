@@ -64,8 +64,16 @@ local C = {
 	Gold = Color3.fromRGB(240, 186, 92),
 }
 local gui = UiKit.gui("Intro", 15)
--- Full bleed: the starfield runs under the Roblox top bar too.
 gui.IgnoreGuiInset = false
+-- The strip under Roblox's top bar is dark too (the screens below start
+-- under it), or the sky shows through it: a planet above the launch screen.
+new("Frame", {
+	Name = "TopBand",
+	Position = UDim2.fromOffset(0, -120),
+	Size = UDim2.new(1, 0, 0, 120),
+	BackgroundColor3 = C.Ink,
+	BorderSizePixel = 0,
+}, gui)
 local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BorderSizePixel = 0 }, gui)
 new("UIGradient", { Rotation = 115, Color = ColorSequence.new(C.Ink, Color3.fromRGB(16, 22, 42)) }, back)
 local function frame(parent, props)
@@ -1692,6 +1700,8 @@ local function rarityGlow(cell, tier)
 		UiKit.round(disc, 999)
 	end
 end
+-- Seconds the locked-in kit stays up before the fight starts on its own.
+local AUTO_FIGHT = 3
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
 	local element = kit.Element
@@ -1722,6 +1732,68 @@ local function revealMoves(kit, after)
 		}),
 	}, flood)
 	tween(flood, 0.6, { BackgroundTransparency = 0 })
+	-- The arena it leads to: the stands in rings of the element's colour round
+	-- a lit floor, two spotlights crossing overhead, a few stars above.
+	for i = 1, 18 do
+		frame(shade, {
+			Position = UDim2.fromScale(((i * 37) % 97) / 96, ((i * 23) % 41) / 100),
+			Size = UDim2.fromOffset(if i % 4 == 0 then 2 else 1, if i % 4 == 0 then 2 else 1),
+			BackgroundColor3 = C.Text,
+			BackgroundTransparency = if i % 4 == 0 then 0.5 else 0.72,
+			ZIndex = 40,
+		})
+	end
+	for _, side in { -1, 1 } do
+		local beam = frame(shade, {
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.fromScale(0.5 + side * 0.34, -0.12),
+			Size = UDim2.fromScale(0.07, 1.3),
+			Rotation = side * 24,
+			BackgroundColor3 = color:Lerp(C.Text, 0.6),
+			BackgroundTransparency = 1,
+			ZIndex = 40,
+		})
+		new("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.88),
+				NumberSequenceKeypoint.new(0.7, 0.97),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}, beam)
+		tween(beam, 0.8, { BackgroundTransparency = 0 })
+	end
+	local floor = frame(shade, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 1.04),
+		Size = UDim2.fromScale(0.9, 0.34),
+		BackgroundColor3 = color,
+		BackgroundTransparency = 1,
+		ZIndex = 40,
+	})
+	UiKit.round(floor, 999)
+	new("UIGradient", {
+		Rotation = 270,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.55),
+			NumberSequenceKeypoint.new(1, 0.95),
+		}),
+	}, floor)
+	tween(floor, 0.8, { BackgroundTransparency = 0 })
+	for i, spec in { { 1.5, 0.62, 0.8 }, { 1.18, 0.46, 0.72 }, { 0.9, 0.32, 0.6 } } do
+		local stand = frame(shade, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 1.04),
+			Size = UDim2.fromScale(spec[1], spec[2]),
+			BackgroundTransparency = 1,
+			ZIndex = 40,
+		})
+		UiKit.round(stand, 999)
+		local edge = stroke(stand, color, 1, 2)
+		task.delay(0.15 * i, function()
+			tween(edge, 0.6, { Transparency = spec[3] })
+		end)
+	end
 
 	-- Everything sits on one board, scaled to fit the screen.
 	local board = frame(shade, {
@@ -2126,6 +2198,40 @@ local function revealMoves(kit, after)
 		end
 	end)
 
+	-- Into the fight: on its own a few seconds after the last gem, or at once
+	-- on the button.
+	local done = false
+	local function proceed()
+		if done then
+			return
+		end
+		done = true
+		live:Disconnect()
+		shade:Destroy()
+		after()
+	end
+	local fill = frame(go, {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 10, 1, -5),
+		Size = UDim2.new(0, 0, 0, 4),
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.55,
+		ZIndex = 45,
+	})
+	local function countdown(left: number)
+		if done or not shade.Parent then
+			return
+		end
+		if left <= 0 then
+			proceed()
+			return
+		end
+		go.Text = string.format("TO THE FIGHT IN %d   ›", left)
+		task.delay(1, function()
+			countdown(left - 1)
+		end)
+	end
+
 	local finished = false
 	local function allOut()
 		if finished then
@@ -2136,6 +2242,8 @@ local function revealMoves(kit, after)
 		LotterySound.play("Attune")
 		go.Visible = true
 		tween(goScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+		tween(fill, AUTO_FIGHT, { Size = UDim2.new(1, -20, 0, 4) }, Enum.EasingStyle.Linear)
+		countdown(AUTO_FIGHT)
 	end
 	-- All three spin; Q stops first, then E, then R, each on its gem, which
 	-- cracks and lets its surge out.
@@ -2184,16 +2292,7 @@ local function revealMoves(kit, after)
 		LotterySound.play("Lock")
 		allOut()
 	end)
-	local done = false
-	listen(go.Activated, function()
-		if done then
-			return
-		end
-		done = true
-		live:Disconnect()
-		shade:Destroy()
-		after()
-	end)
+	listen(go.Activated, proceed)
 end
 local function finish()
 	if busy or closed then
