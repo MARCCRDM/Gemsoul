@@ -3,11 +3,12 @@
 	docs/kaiju.md). Wild kaiju and moon bugs are KaijuWilds'.
 
 	  Your kaiju   out beside you whenever you're in the Outpost (in
-	               workspace.Kaiju). It follows you, takes on any creature
-	               that comes near you (wild kaiju and moon bugs), and casts
-	               its Gemsoul's E every Kaiju.AbilityEvery seconds of a
-	               fight (KaijuAbilities). At 0 health it's knocked back into
-	               its Gemsoul, out again after Kaiju.KnockoutSeconds.
+	               workspace.Kaiju). It follows you and takes on any creature
+	               that comes near you (wild kaiju and moon bugs), fighting
+	               as the Arena's duellist does (KaijuFighter): combos,
+	               heavies, guard and parry, hops, and its Gemsoul's E. At 0
+	               health it's knocked back into its Gemsoul, out again after
+	               Kaiju.KnockoutSeconds.
 	  A starter    everyone's first visit to the Outpost brings one: a
 	               random kind in a random element.
 
@@ -19,14 +20,15 @@
 	Profile.Kaiju (Kaiju.roster) is in the profile snapshot. The one out
 	carries, for every client: KaijuOwner (UserId), KaijuId, KaijuName,
 	KaijuLevel, KaijuExp, KaijuExpNext, KaijuAbility, KaijuAbilityAt (server
-	time of its last E), KaijuRecallUntil, ActionAt (its last blow, for
-	CreatureAnimation); and the Player carries KaijuDownUntil (server time
-	it's back) while it's knocked out.
+	time of its last E), KaijuRecallUntil, and its fight (KaijuFighter's
+	Action* and GuardUntil, HurtAt and BlockedAt, for CreatureAnimation);
+	and the Player carries KaijuDownUntil (server time it's back) while it's
+	knocked out.
 
 	KaijuWilds asks here:
 	  KaijuServer.pets()                     every kaiju out, by owner
 	  KaijuServer.petOf(model)               the pet a model is
-	  KaijuServer.hurt(pet, amount, element, status?)   a creature's blow
+	  KaijuServer.hurt(pet, amount, element, status?, heavy?) -> outcome   a creature's blow
 	  KaijuServer.reward(player, exp)        EXP for the kaiju out
 	  KaijuServer.adopt(player, species, soul, level) -> record?   a tamed one
 ]]
@@ -35,11 +37,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
-local KaijuAbilities = require(script.Parent.KaijuAbilities)
+local KaijuFighter = require(script.Parent.KaijuFighter)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -58,8 +61,7 @@ export type Pet = {
 	Stats: any,
 	Ability: string?,
 	Target: any?, -- the Enemies record it's fighting
-	NextBlow: number,
-	NextAbility: number,
+	Fighter: any, -- how it fights (KaijuFighter), with this as its body
 	LastFight: number,
 	RecallUntil: number,
 	StunUntil: number,
@@ -67,6 +69,14 @@ export type Pet = {
 	Slow: number,
 	BlindUntil: number,
 	VulnerableUntil: number,
+	-- Its guard and hops (KaijuFight.resolve).
+	GuardUntil: number,
+	GuardMult: number?,
+	GuardRaisedAt: number?,
+	ParrySpent: boolean?,
+	GuardBrokenUntil: number,
+	DodgeUntil: number,
+	BlockedAt: number?,
 	Dots: { { PerTick: number, Ticks: number, Element: string?, Next: number } },
 	Fill: Frame,
 	Label: TextLabel,
@@ -120,8 +130,21 @@ function KaijuServer.body(speciesId: string, element: string, scale: number): (M
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 	humanoid.Parent = model
+	-- In a fight it faces its foe as it circles (KaijuFighter turns this on).
+	local root = model.PrimaryPart :: BasePart
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "FaceAttachment"
+	attachment.Parent = root
+	local align = Instance.new("AlignOrientation")
+	align.Name = "FaceAlign"
+	align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	align.Attachment0 = attachment
+	align.Responsiveness = 30
+	align.MaxTorque = 1e6
+	align.Enabled = false
+	align.Parent = root
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	return model, humanoid, model.PrimaryPart :: BasePart
+	return model, humanoid, root
 end
 
 -- The ground under a point (or the point itself when there's none).
@@ -205,6 +228,7 @@ local function refresh(pet: Pet)
 	local h = pet.Humanoid
 	local share = h.Health / math.max(1, h.MaxHealth)
 	pet.Stats = stats
+	KaijuFighter.restat(pet.Fighter, stats, Kaiju.Scale.Pet)
 	h.MaxHealth = stats.Health
 	h.Health = math.max(1, math.floor(stats.Health * share + 0.5))
 	local model = pet.Model
@@ -227,6 +251,7 @@ local function despawn(player: Player)
 		kept[player] = kept[player] or {}
 		kept[player][pet.Record.Id] = pet.Humanoid.Health
 	end
+	KaijuFighter.forget(pet.Fighter)
 	pet.Model:Destroy()
 end
 
@@ -252,8 +277,7 @@ local function spawnPet(player: Player, record): Pet?
 		Stats = Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier),
 		Ability = ability,
 		Target = nil,
-		NextBlow = 0,
-		NextAbility = 0,
+		Fighter = nil,
 		LastFight = 0,
 		RecallUntil = 0,
 		StunUntil = 0,
@@ -261,10 +285,30 @@ local function spawnPet(player: Player, record): Pet?
 		Slow = 0,
 		BlindUntil = 0,
 		VulnerableUntil = 0,
+		GuardUntil = 0,
+		GuardBrokenUntil = 0,
+		DodgeUntil = 0,
 		Dots = {},
 		Fill = nil :: any,
 		Label = nil :: any,
 	}
+	pet.Fighter = KaijuFighter.new({
+		Model = model,
+		Root = petRoot,
+		Humanoid = humanoid,
+		Species = record.Species,
+		Element = record.Element,
+		Scale = Kaiju.Scale.Pet,
+		Body = pet,
+		Stats = pet.Stats,
+		Ability = ability,
+		Strike = function(foe, amount: number, heavy: boolean, _name: string): string
+			return if foe.Enemy then KaijuServer.strike(pet, foe.Enemy, amount, nil, heavy) else "Missed"
+		end,
+		Caster = function()
+			return KaijuServer.caster(pet)
+		end,
+	})
 	humanoid.MaxHealth = pet.Stats.Health
 	local health = kept[player] and kept[player][record.Id]
 	humanoid.Health = math.clamp(health or pet.Stats.Health, 1, pet.Stats.Health)
@@ -378,26 +422,43 @@ local function afflict(enemy, status: string?, amount: number, element: string)
 end
 
 -- A blow (or an E) from `pet` landing on a creature. Credited to its owner
--- (for the kill's rewards), without the owner's own hit sounds.
-local function strike(pet: Pet, enemy, amount: number, status: string?)
+-- (for the kill's rewards), without the owner's own hit sounds. `heavy` is
+-- true or false for its blows (a wild kaiju's guard meets them as a
+-- player's), nil for its E. Returns how it landed (KaijuFight.resolve's
+-- words; "Parried" leaves it reeling).
+local function strike(pet: Pet, enemy, amount: number, status: string?, heavy: boolean?): string
 	if not enemy.Alive then
-		return
+		return "Missed"
 	end
+	local now = os.clock()
+	pet.LastFight = now
+	-- A light blow just as a wild kaiju braces is parried (Enemies.damage
+	-- parries only a player's swings).
+	if KaijuFight.parries(enemy, heavy, now) then
+		fx("BlockSpark", enemy.Root.Position, false)
+		enemy.Model:SetAttribute("BlockedAt", serverNow())
+		return "Parried"
+	end
+	local outcome = if enemy.DodgeUntil and now < enemy.DodgeUntil
+		then "Dodged"
+		elseif KaijuFight.guarding(enemy, now) then (if heavy == true then "Broken" else "Guarded")
+		else "Hit"
 	local before = enemy.Humanoid.Health
 	local color = GemConfig.ElementColors[pet.Element]
-	Enemies.damage(enemy, amount, nil, false, color, nil, pet.Element)
+	Enemies.damage(enemy, amount, nil, false, color, heavy, pet.Element)
 	local e = enemy :: any
 	e.KaijuCredit = e.KaijuCredit or {}
 	e.KaijuCredit[pet.Owner] = (e.KaijuCredit[pet.Owner] or 0) + math.max(0, before - enemy.Humanoid.Health)
-	e.LastPet, e.LastPetAt = pet, os.clock()
-	if enemy.Alive then
+	e.LastPet, e.LastPetAt = pet, now
+	if enemy.Alive and (outcome == "Hit" or outcome == "Broken") then
 		afflict(enemy, status, amount, pet.Element)
 	end
-	pet.LastFight = os.clock()
+	return outcome
 end
 KaijuServer.strike = strike
 
-local function caster(pet: Pet)
+-- Its E's caster (KaijuAbilities.cast): its foes are the creatures near.
+function KaijuServer.caster(pet: Pet)
 	return {
 		Model = pet.Model,
 		Root = pet.Root,
@@ -406,7 +467,7 @@ local function caster(pet: Pet)
 		Damage = Kaiju.abilityDamage(pet.Stats.Damage, pet.Record.Soul, pet.Ability),
 		Foes = creaturesNear,
 		Hit = function(victim, amount: number, status: string?)
-			strike(pet, victim.Enemy, amount, status)
+			strike(pet, victim.Enemy, amount, status, nil)
 		end,
 		Alive = function(): boolean
 			return pet.Model.Parent ~= nil and pet.Humanoid.Health > 0
@@ -421,6 +482,7 @@ local function knockOut(pet: Pet)
 		kept[player][pet.Record.Id] = nil
 	end
 	pets[player] = nil
+	KaijuFighter.forget(pet.Fighter)
 	pet.Model:Destroy()
 	downUntil[player] = os.clock() + Kaiju.KnockoutSeconds
 	player:SetAttribute("KaijuDownUntil", serverNow() + Kaiju.KnockoutSeconds)
@@ -434,21 +496,39 @@ local function knockOut(pet: Pet)
 	)
 end
 
--- A creature's blow (or E) on a pet: its element against the pet's, its
--- kind's Guard, then what the element leaves.
-function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: string?)
+-- A creature's blow (or E) on a pet: its guard or a hop first
+-- (KaijuFight.resolve: `heavy` true or false for blows, nil for an E),
+-- then its element against the pet's and its kind's Guard, then what the
+-- element leaves. Returns how it landed ("Parried" leaves the attacker
+-- reeling).
+function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: string?, heavy: boolean?): string
 	if not pet.Model.Parent or pet.Humanoid.Health <= 0 then
-		return
+		return "Missed"
 	end
 	local now = os.clock()
+	pet.LastFight = now
+	local model = pet.Model
+	local outcome, share = KaijuFight.resolve(pet, heavy, now)
+	if outcome == "Dodged" then
+		return outcome
+	elseif outcome == "Parried" then
+		fx("BlockSpark", pet.Root.Position, false)
+		model:SetAttribute("BlockedAt", serverNow())
+		return outcome
+	elseif outcome == "Broken" then
+		fx("BlockSpark", pet.Root.Position, true)
+		model:SetAttribute("GuardUntil", 0)
+	elseif outcome == "Guarded" then
+		fx("BlockSpark", pet.Root.Position, false)
+		model:SetAttribute("BlockedAt", serverNow())
+	end
 	local mult, tag = Kaiju.taken(pet.Record.Species, pet.Element, element)
 	if now < pet.VulnerableUntil then
 		mult *= 1.15
 	end
-	local dealt = math.max(1, math.floor(amount * mult + 0.5))
+	local dealt = math.max(1, math.floor(amount * share * mult + 0.5))
 	local h = pet.Humanoid
 	h.Health = math.max(0, h.Health - dealt)
-	pet.LastFight = now
 	fx(
 		"Damage",
 		pet.Root.Position + Vector3.new(0, 2, 0),
@@ -459,8 +539,15 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 	)
 	if h.Health <= 0 then
 		knockOut(pet)
-		return
+		return outcome
 	end
+	if outcome == "Guarded" then
+		refreshPlate(pet)
+		return outcome -- (a guard keeps out what the element leaves)
+	end
+	-- (It flinches: CreatureAnimation.)
+	model:SetAttribute("HurtAt", serverNow())
+	model:SetAttribute("HurtSide", if math.random() < 0.5 then -1 else 1)
 	if status == "Burn" or status == "Poison" then
 		table.insert(pet.Dots, { PerTick = amount * 0.06, Ticks = 5, Element = element, Next = now + 1 })
 	elseif status == "Slow" then
@@ -475,6 +562,7 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 		pet.VulnerableUntil = now + 6
 	end
 	refreshPlate(pet)
+	return outcome
 end
 
 -- Who it fights: what it's already fighting, if that's still near its
@@ -513,43 +601,6 @@ local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean)
 	end
 end
 
-local function fight(pet: Pet, enemy, now: number)
-	local h = pet.Humanoid
-	h.WalkSpeed = pet.Stats.Speed * (1 - (if now < pet.SlowUntil then pet.Slow else 0))
-	local reach = pet.Stats.Reach + enemy.Root.Size.X / 2
-	local distance = flat(enemy.Root.Position - pet.Root.Position).Magnitude
-	if distance > reach then
-		h:MoveTo(enemy.Root.Position)
-		return
-	end
-	h:MoveTo(pet.Root.Position)
-	-- Face it.
-	local at = pet.Root.Position
-	local look = Vector3.new(enemy.Root.Position.X, at.Y, enemy.Root.Position.Z)
-	if (look - at).Magnitude > 0.1 then
-		pet.Root.CFrame = CFrame.lookAt(at, look)
-	end
-	if pet.NextAbility == 0 then
-		pet.NextAbility = now + 3 -- its first E a moment into the fight
-	end
-	if pet.Ability and now >= pet.NextAbility then
-		pet.NextAbility = now + Kaiju.AbilityEvery
-		if KaijuAbilities.cast(caster(pet), { Root = enemy.Root, Enemy = enemy }) then
-			pet.Model:SetAttribute("ActionAt", serverNow())
-			pet.LastFight = now
-			return
-		end
-	end
-	if now >= pet.NextBlow then
-		pet.NextBlow = now + pet.Stats.Rate
-		pet.Model:SetAttribute("ActionAt", serverNow())
-		if now < pet.BlindUntil and math.random() < 0.5 then
-			return -- swung at nothing
-		end
-		strike(pet, enemy, pet.Stats.Damage, nil)
-	end
-end
-
 local function think(pet: Pet, now: number, dt: number)
 	local owner = pet.Owner
 	local ownerRoot = rootOf(owner)
@@ -580,29 +631,25 @@ local function think(pet: Pet, now: number, dt: number)
 	local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
 	if away > Kaiju.Follow.Teleport then
 		pet.Target = nil
+		KaijuFighter.calm(pet.Fighter)
 		local side = ownerRoot.CFrame.RightVector * 3 - ownerRoot.CFrame.LookVector * 3
 		KaijuServer.place(pet.Model, ownerRoot.Position + side, ownerRoot.Position)
 		return
 	end
-	if now < pet.StunUntil then
-		h:MoveTo(pet.Root.Position)
-		return
-	end
 	local recalled = now < pet.RecallUntil
-	if recalled or away > Kaiju.Follow.Leash then
-		pet.Target = nil
-		follow(pet, ownerRoot, recalled)
-		return
-	end
-	local target = chooseTarget(pet, ownerRoot)
+	local target = if recalled or away > Kaiju.Follow.Leash then nil else chooseTarget(pet, ownerRoot)
 	pet.Target = target
 	if target then
-		fight(pet, target, now)
+		-- It fights as a duellist does (KaijuFighter: it reels when stunned).
+		pet.LastFight = now
+		KaijuFighter.step(pet.Fighter, { Root = target.Root, Enemy = target }, now)
+		return
+	end
+	KaijuFighter.calm(pet.Fighter)
+	if now < pet.StunUntil then
+		h:MoveTo(pet.Root.Position)
 	else
-		if now - pet.LastFight > 6 then
-			pet.NextAbility = 0
-		end
-		follow(pet, ownerRoot, false)
+		follow(pet, ownerRoot, recalled)
 	end
 end
 

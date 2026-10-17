@@ -1,13 +1,16 @@
 -- lune run tests/kaiju_server_cases.luau <repo>
 -- Mini kaiju on the server, against stand-in Roblox pieces (the real
--- Shared.Kaiju, KaijuAbilities, KaijuServer and KaijuWilds; Enemies,
--- PlayerData and the models are stand-ins): every E ability lands where it
--- should; your kaiju comes out in the Outpost (a starter the first time),
--- fights creatures near you and is credited to you, is hurt by element,
--- knocked out and back; recall; switching; feeding; wild kaiju take blows
--- with the spread and their element, go after kaiju and hunters (never a
--- miner), pay EXP and their Gemsoul when killed; taming (range, half health,
--- tries, burrowing, a full roster).
+-- Shared.Kaiju, KaijuFight, KaijuAbilities, KaijuFighter, KaijuServer and
+-- KaijuWilds; Enemies, CombatServer, PlayerData and the models are
+-- stand-ins): every E ability lands where it should; your kaiju comes out
+-- in the Outpost (a starter the first time), fights creatures near you and
+-- is credited to you, is hurt by element, knocked out and back; recall;
+-- switching; feeding; wild kaiju take blows with the spread and their
+-- element, go after kaiju and hunters (never a miner); both fight as the
+-- Arena's duellist (wind-ups, heavies that break a guard, parries that
+-- leave the attacker reeling, hops, reading a hunter's charge, the E after
+-- a wind-up, a whole duel between two kaiju); kills pay EXP and the
+-- Gemsoul; taming (range, half health, tries, burrowing, a full roster).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -340,12 +343,28 @@ function Enemies.remove(enemy)
 	enemies[enemy.Model] = nil
 	enemy.Model:Destroy()
 end
-function Enemies.damage(enemy, amount, source, _crit, _color, _heavy, element)
+function Enemies.damage(enemy, amount, source, _crit, _color, heavy, element)
 	if not enemy.Alive then
 		return
 	end
 	if enemy.TakenScale then
 		amount *= (enemy.TakenScale(element))
+	end
+	-- A hop dodges; a heavy breaks a guard and staggers; a guard takes off the rest.
+	if enemy.DodgeUntil and now < enemy.DodgeUntil then
+		return
+	end
+	if enemy.GuardUntil and now < enemy.GuardUntil then
+		if heavy == true then
+			enemy.GuardUntil = 0
+			enemy.GuardBrokenUntil = now + 0.9
+			enemy.StunUntil = math.max(enemy.StunUntil, now + 0.35)
+		else
+			amount *= enemy.GuardMult or 0.3
+			if heavy ~= nil then
+				enemy.BlockedAt = now
+			end
+		end
 	end
 	amount = math.floor(amount + 0.5)
 	enemy.LastHit = os.clock()
@@ -371,12 +390,22 @@ end
 function Enemies.addDot(enemy, total)
 	enemy.LastDot = total
 end
-function Enemies.hitPlayer(player, amount, element, enemy)
-	table.insert(playerHits, { player, amount, element, enemy })
+function Enemies.hitPlayer(player, amount, element, enemy, heavy)
+	table.insert(playerHits, { player, amount, element, enemy, heavy })
+	return amount, false
 end
 function Enemies.weakness()
 	return 0
 end
+
+-- A hunter's fight state, as CombatServer keeps it (what a wild kaiju reads).
+local combatStates = {}
+local CombatServerStub = {
+	_state = function(player)
+		combatStates[player] = combatStates[player] or { NextAttack = 0, StunUntil = 0 }
+		return combatStates[player]
+	end,
+}
 
 local GemsStub = {
 	random = function()
@@ -408,6 +437,7 @@ local server = {
 	Remotes = Remotes,
 	Shop = Shop,
 	Duelist = DuelistStub,
+	CombatServer = CombatServerStub,
 }
 local sharedEnv
 local function load(path: string, name: string, environment)
@@ -501,9 +531,28 @@ sharedEnv.script = {
 }
 
 local Kaiju = shared("Kaiju")
+local KaijuFight = shared("KaijuFight")
 local KaijuAbilities = serverModule("KaijuAbilities")
+local KaijuFighter = serverModule("KaijuFighter")
 local KaijuServer = serverModule("KaijuServer")
 local KaijuWilds = serverModule("KaijuWilds")
+-- Its rolls from a seed (or one forced roll), its effects counted.
+local fightRng = Random.new(11)
+local fightRoll: number? = nil
+KaijuFighter.random = function()
+	return fightRoll or fightRng:NextNumber()
+end
+KaijuFighter.fx = function(kind, ...)
+	table.insert(fxs, { kind, ... })
+end
+local function drew(kind)
+	for _, entry in fxs do
+		if entry[1] == kind then
+			return entry
+		end
+	end
+	return nil
+end
 
 -- Every E ability ------------------------------------------------------------------------------------------
 
@@ -777,15 +826,29 @@ check(enemy.Foe == nil, "It went after a knocked-down hunter")
 a:SetAttribute("SparDown", nil)
 a:SetAttribute("Hunt", nil)
 a:SetAttribute("Spar", nil)
--- Your kaiju near it: it fights it, and the blows are yours.
-pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2, 0, 0))
+-- Your kaiju near it: it squares up and fights it as a duellist (wind-ups
+-- before its blows), and the blows are yours.
+pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
 rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(6, 0, 0))
-pet.RecallUntil, pet.NextBlow, pet.NextAbility = 0, 0, now + 100
+pet.RecallUntil = 0
 local before = enemy.Humanoid.Health
 KaijuServer._think(pet, now, 0.15)
 check(pet.Target == enemy, "Your kaiju ignored the wild one beside you")
-check(enemy.Humanoid.Health < before and (enemy.KaijuCredit[a] or 0) > 0, "Its blow didn't land, or wasn't yours")
-check(pet.Model:GetAttribute("ActionAt") == now, "No blow for the animation")
+check(pet.Fighter.Engaged and pet.Humanoid.AutoRotate == false, "It didn't square up to it")
+check(pet.Root:FindFirstChild("FaceAlign").Enabled, "It doesn't face its foe as it circles")
+local blows, windups = 0, 0
+for _ = 1, 40 do
+	now += 0.15
+	KaijuServer._think(pet, now, 0.15)
+	local start, at = pet.Model:GetAttribute("ActionStart"), pet.Model:GetAttribute("ActionAt")
+	local kind = pet.Model:GetAttribute("ActionKind")
+	if start == now and (kind == "Light" or kind == "Heavy" or kind == "Punish" or kind == "Lunge") then
+		blows += 1
+		windups += if at > start then 1 else 0
+	end
+end
+check(blows > 0 and windups == blows, "Its blows have no wind-up for the animation")
+check(enemy.Humanoid.Health < before and (enemy.KaijuCredit[a] or 0) > 0, "Its blows didn't land, or weren't yours")
 enemy.FoeVictim = nil
 KaijuWilds._brain(enemy, now)
 check(enemy.Foe == pet, "The wild one didn't fight back")
@@ -797,7 +860,172 @@ enemy.FoeVictim = nil
 enemy.LastPet = nil
 KaijuWilds._brain(enemy, now)
 check(enemy.Foe ~= pet, "A wild kaiju fought a recalled one")
+check(not pet.Fighter.Engaged and pet.Humanoid.AutoRotate, "A recalled kaiju stays squared up")
 now += Kaiju.RecallSeconds + 1
+
+-- Fighting as a duellist ------------------------------------------------------------------------------------------
+
+local fighter, wf = pet.Fighter, wild.Fighter
+check(KaijuFighter.of(pet.Model) == fighter and KaijuFighter.of(enemy.Model) == wf, "No fighters")
+check(fighter.Body == pet and wf.Body == enemy, "A fighter's guard lives somewhere else")
+check(math.abs(fighter.Reach - pet.Stats.Reach * Kaiju.Scale.Pet) < 1e-9, "A pet's reach isn't its size")
+check(math.abs(wf.Reach - Kaiju.stats(wild.Species, wild.Level).Reach * Kaiju.Scale.Wild) < 1e-9, "A wild one's reach")
+local petFoe = { Root = pet.Root, Pet = pet }
+local wildFoe = { Root = enemy.Root, Enemy = enemy }
+local function settle(f)
+	f.Action, f.SwingTimes, f.RecoverUntil, f.LastOffense = nil, {}, 0, now
+	f.NextAttack, f.NextDefense, f.NextSurge, f.NextHighBlock = 0, 0, math.huge, 0
+	f.Body.StunUntil, f.Body.GuardUntil, f.Body.GuardBrokenUntil, f.Body.DodgeUntil = 0, 0, 0, 0
+	f.Body.BlockedAt, f.Body.GuardRaisedAt, f.FoeIdleSince = nil, nil, nil
+end
+pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1e6, 1e6
+enemy.Humanoid.MaxHealth, enemy.Humanoid.Health = 1e6, 1e6
+pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
+
+-- A foe behind its guard: a heavy, named on the cast bar, a warning ring at
+-- its feet; landing, it breaks the guard and staggers it.
+now += 5
+settle(fighter)
+settle(wf)
+KaijuFight.raiseGuard(wf, now - 1, 5)
+table.clear(fxs)
+fightRoll = 0.1
+KaijuFighter.step(fighter, wildFoe, now)
+check(
+	fighter.Action and fighter.Action.Kind == "Heavy",
+	"No heavy against a raised guard: " .. tostring(fighter.Choice)
+)
+check(pet.Model:GetAttribute("ActionName") == KaijuFight.style(pet.Record.Species).Names.Heavy, "A heavy isn't named")
+check(pet.Model:GetAttribute("ActionAt") - now == KaijuFight.windup(fighter.Style, "Heavy"), "A heavy's wind-up")
+check(drew("Nova"), "No warning ring for a heavy")
+before = enemy.Humanoid.Health
+now += KaijuFight.windup(fighter.Style, "Heavy") + 0.01
+KaijuFighter.step(fighter, wildFoe, now)
+check(enemy.Humanoid.Health < before and not KaijuFight.guarding(enemy, now), "A heavy didn't break the guard")
+check(enemy.StunUntil > now and enemy.GuardBrokenUntil > now, "A broken guard didn't stagger it")
+
+-- A light blow just as the wild one braces: parried, and your kaiju reels.
+now += 5
+settle(fighter)
+settle(wf)
+KaijuFight.raiseGuard(wf, now, 1.6)
+fighter.Action = { Kind = "Light", At = now + 0.1, Hits = 1 }
+before = enemy.Humanoid.Health
+KaijuFighter.step(fighter, wildFoe, now + 0.1)
+check(enemy.Humanoid.Health == before and pet.StunUntil >= now + 0.1 + KaijuFight.ParryStagger, "Not parried")
+check(pet.Model:GetAttribute("ActionKind") == "Stagger" and fighter.Action == nil, "It didn't reel")
+-- Reeling, it can't act.
+KaijuFighter.step(fighter, wildFoe, now + 0.2)
+check(fighter.Choice == "Stagger" and fighter.Action == nil, "It acted while reeling")
+
+-- The same the other way: the wild one's light blow on your kaiju's fresh guard.
+now += 5
+settle(fighter)
+settle(wf)
+KaijuFight.raiseGuard(fighter, now, 1.6)
+wf.Action = { Kind = "Light", At = now + 0.05, Hits = 1 }
+before = pet.Humanoid.Health
+KaijuFighter.step(wf, petFoe, now + 0.05)
+check(
+	pet.Humanoid.Health == before and enemy.StunUntil >= now + 0.05 + KaijuFight.ParryStagger,
+	"Your kaiju didn't parry"
+)
+-- Later in its guard: blocked (GuardMult of it), and it can answer.
+now += 1
+wf.Action = { Kind = "Light", At = now, Hits = 1 }
+enemy.StunUntil = 0
+local taken = 1 - Kaiju.Species[pet.Record.Species].Guard
+KaijuServer.hurt(pet, 100, nil, nil, false)
+local dealt = before - pet.Humanoid.Health
+check(dealt == math.floor(100 * fighter.Style.GuardMult * taken + 0.5), "A blocked blow: " .. dealt)
+check(pet.BlockedAt == now, "A blocked blow it can't answer")
+fightRoll = 0.2
+KaijuFighter.step(fighter, wildFoe, now + 0.1)
+check(fighter.Action and fighter.Action.Kind == "Punish", "No riposte after a block: " .. tostring(fighter.Choice))
+-- A heavy breaks your kaiju's guard; a hop dodges everything.
+settle(fighter)
+KaijuFight.raiseGuard(fighter, now - 1, 5)
+before = pet.Humanoid.Health
+check(KaijuServer.hurt(pet, 100, nil, nil, true) == "Broken", "A heavy didn't break your kaiju's guard")
+check(before - pet.Humanoid.Health == math.floor(100 * taken + 0.5) and pet.StunUntil > now, "A broken guard")
+pet.DodgeUntil = now + 0.3
+before = pet.Humanoid.Health
+check(KaijuServer.hurt(pet, 100, nil, nil, true) == "Dodged" and pet.Humanoid.Health == before, "A hop didn't dodge")
+
+-- A hunter charging a heavy beside a wild kaiju: it hops aside (a swing
+-- mid-hop misses), and it waits a beat before it reacts again.
+now += 5
+settle(wf)
+rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(3, 0, 0))
+CombatServerStub._state(a).ChargeStarted = now - 0.5
+table.clear(fxs)
+fightRoll = 0.1
+KaijuFighter.step(wf, { Root = rootA, Player = a }, now)
+check(wf.Choice == "Dodge" and enemy.DodgeUntil > now, "It stood in the way of a hunter's heavy")
+check(drew("DodgeRoll") and enemy.Root.AssemblyLinearVelocity.Magnitude > 0, "No hop")
+check(wf.NextDefense > now, "No beat before it reacts again")
+before = enemy.Humanoid.Health
+Enemies.damage(enemy, 50, a, false, nil, true, nil)
+check(enemy.Humanoid.Health == before, "A swing mid-hop landed")
+CombatServerStub._state(a).ChargeStarted = nil
+
+-- Its E: after a wind-up on the cast bar, then cast (and not again for a while).
+now += 5
+settle(fighter)
+settle(wf)
+fighter.NextSurge = now - 1
+pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(7, 0, 0))
+fightRoll = 0.5
+KaijuFighter.step(fighter, wildFoe, now)
+local plan = Kaiju.AbilityPlans[pet.Ability]
+check(fighter.Action and fighter.Action.Kind == "Surge", "No E from range: " .. tostring(fighter.Choice))
+check(pet.Model:GetAttribute("ActionKind") == KaijuFight.surgeKind(plan), "Its E's wind-up")
+check(pet.Model:GetAttribute("ActionName") == shared("GemTraits").Moves[pet.Ability].Name, "Its E isn't named")
+check(pet.Model:GetAttribute("ActionElement") == pet.Element, "Its E's cast bar isn't its element")
+now += 1.2
+KaijuFighter.step(fighter, wildFoe, now)
+flush()
+check(pet.Model:GetAttribute("KaijuAbilityAt") == now and fighter.NextSurge == now + Kaiju.AbilityEvery, "No E")
+fightRoll = nil
+
+-- A whole duel: your kaiju and the wild one, twenty seconds of it.
+pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
+rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(6, 0, 0))
+settle(fighter)
+settle(wf)
+enemy.LastPet, enemy.LastPetAt, enemy.FoeVictim = pet, now, nil
+local petBefore, wildBefore = pet.Humanoid.Health, enemy.Humanoid.Health
+local choices = {}
+local combo = false
+for _ = 1, 133 do
+	now += 0.15
+	KaijuServer._think(pet, now, 0.15)
+	KaijuWilds._brain(enemy, now)
+	flush()
+	choices[fighter.Choice or ""] = true
+	choices[wf.Choice or ""] = true
+	combo = combo
+		or (fighter.Action ~= nil and (fighter.Action.Hits or 1) >= 2)
+		or (wf.Action ~= nil and (wf.Action.Hits or 1) >= 2)
+end
+check(pet.Humanoid.Health < petBefore and enemy.Humanoid.Health < wildBefore, "A duel where nobody was hurt")
+check(enemy.Foe == pet, "The wild one fought someone else")
+for _, move in { "Light", "Guard" } do
+	check(choices[move], "Nobody chose " .. move .. " in a whole duel")
+end
+check(choices.Heavy or choices.Dodge or choices.Punish or choices.Riposte, "A duel of nothing but swings and guards")
+check(combo, "No combos in a whole duel")
+-- Out of the fight: it calms (its guard down, its pose cleared).
+registered.KaijuRecall(a)
+KaijuServer._think(pet, now, 0.15)
+check(not fighter.Engaged and not KaijuFight.guarding(pet, now), "Still braced out of the fight")
+check(pet.Model:GetAttribute("ActionKind") == nil and pet.Model:GetAttribute("GuardUntil") == 0, "Its pose stuck")
+now += Kaiju.RecallSeconds + 1
+pet.Humanoid.MaxHealth = Kaiju.stats(pet.Record.Species, pet.Record.Level, pet.Record.Soul.Tier).Health
+pet.Humanoid.Health = pet.Humanoid.MaxHealth
+enemy.Humanoid.MaxHealth =
+	math.floor(Kaiju.stats(wild.Species, wild.Level, wild.Soul.Tier).Health * Kaiju.Wild.Health + 0.5)
+enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
 
 -- Taming ------------------------------------------------------------------------------------------------------------
 
@@ -875,6 +1103,17 @@ check(
 	bugs[1].OutpostCreature and bugs[1].Model:GetAttribute("MoonBug") and bugs[1].Model:GetAttribute("Posed"),
 	"A bug isn't marked"
 )
+-- A bug's bite on your kaiju's fresh guard is parried, and the bug reels.
+local biter = bugs[#bugs]
+pet = KaijuServer.pets()[a]
+biter.Root.CFrame = CFrame.new(pet.Root.Position + Vector3.new(1.5, 0, 0))
+biter.Home, biter.LastAttack, pet.RecallUntil = biter.Root.Position, 0, 0
+settle(pet.Fighter)
+KaijuFight.raiseGuard(pet.Fighter, now, 2)
+local health = pet.Humanoid.Health
+KaijuWilds._brain(biter, now)
+check(biter.Foe == pet and pet.Humanoid.Health == health, "A bug's bite on a fresh guard wasn't parried")
+check(biter.StunUntil >= now + KaijuFight.ParryStagger, "A parried bug didn't reel")
 local coins = profiles[a].Coins
 local exp = Kaiju.active(roster).Exp
 local level = Kaiju.active(roster).Level
@@ -890,4 +1129,4 @@ bugs[3].KaijuCredit = { [a] = 10 }
 Enemies.damage(bugs[3], 1e6)
 check(profiles[a].Coins == coins + Kaiju.Bug.Coins + 1, "Coins past the day's cap")
 
-print(string.format("PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, taming, kills)", checks))
+print(string.format("PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills)", checks))

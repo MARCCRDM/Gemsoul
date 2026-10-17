@@ -1623,4 +1623,8 @@ return {
 	["Put your kit away first ({1})."] = "Primero guarda tu equipo de combate ({1}).",
 	["{=} is out hunting."] = "{=} está de caza.",
 	["Finish your spar first."] = "Primero termina tu combate.",
+	-- A kaiju's heavy blows, on its cast bar (Shared.KaijuFight).
+	["Ground Stomp"] = "Pisotón",
+	["Tail Lash"] = "Latigazo de cola",
+	["Shell Slam"] = "Golpe de caparazón",
 }

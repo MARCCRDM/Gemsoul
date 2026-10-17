@@ -1,6 +1,9 @@
 -- Supplement the shared combat skeleton with creature-only detail joints.
 -- Far creatures are reset and skipped; streaming arrivals get a rescan.
--- Kaiju (workspace.Kaiju) walk, swing and bite the same way.
+-- Kaiju (wild ones in workspace.Enemies, yours in workspace.Kaiju) walk the
+-- same way, and fight with their whole body: each kind's wind-ups and
+-- blows, guard, hops and staggers (CreatureMotion.fight, from KaijuFighter's
+-- attributes), eased so a combo's next blow flows on from the last.
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Motion = require(ReplicatedStorage.Shared.CreatureMotion)
@@ -32,7 +35,15 @@ RunService.PreSimulation:Connect(function(dt)
 			if not root or not humanoid then continue end
 			local rig = rigs[model]
 			if not rig then
-				rig = { Root = root, Humanoid = humanoid, Joints = {}, Known = {}, Phase = 0, Amount = 0 }
+				rig = {
+					Root = root,
+					Humanoid = humanoid,
+					Joints = {},
+					Known = {},
+					Phase = 0,
+					Amount = 0,
+					Species = model:GetAttribute("KaijuSpecies"),
+				}
 				rigs[model] = rig
 			end
 			for _, joint in model:GetDescendants() do
@@ -63,11 +74,32 @@ RunService.PreSimulation:Connect(function(dt)
 		rig.Amount += (math.clamp(speed / 8, 0, 1) - rig.Amount) * (1 - math.exp(-10 * step))
 		rig.Phase = (rig.Phase + speed * step * math.pi * 2 / (3.5 * model:GetScale())) % (math.pi * 2)
 		local at = model:GetAttribute("ActionAt")
+		local pose
+		if rig.Species then
+			pose = Motion.fight(rig.Species, {
+				Kind = model:GetAttribute("ActionKind"),
+				Start = model:GetAttribute("ActionStart"),
+				At = at,
+				Side = model:GetAttribute("ActionSide"),
+				GuardUntil = model:GetAttribute("GuardUntil"),
+				BlockedAt = model:GetAttribute("BlockedAt"),
+				HurtAt = model:GetAttribute("HurtAt"),
+				HurtSide = model:GetAttribute("HurtSide"),
+			}, now)
+			rig.Pose = Motion.blend(rig.Pose, pose, 1 - math.exp(-24 * step))
+			pose = rig.Pose
+		end
+		local scale = model:GetScale()
 		for i = #rig.Joints, 1, -1 do
 			local entry = rig.Joints[i]
 			if not entry.Joint.Parent then
 				rig.Known[entry.Joint] = nil
 				table.remove(rig.Joints, i)
+			elseif pose then
+				local x, y, z = Motion.angles(entry.Kind, now, rig.Phase, rig.Amount, entry.Side, nil)
+				local lift, push
+				x, y, z, lift, push = Motion.apply(pose, entry.Kind, entry.Side, x, y, z)
+				entry.Joint.C0 = entry.Rest * CFrame.new(0, lift * scale, -push * scale) * CFrame.Angles(x, y, z)
 			else
 				entry.Joint.C0 = entry.Rest * CFrame.Angles(Motion.angles(entry.Kind, now, rig.Phase, rig.Amount, entry.Side, at))
 			end

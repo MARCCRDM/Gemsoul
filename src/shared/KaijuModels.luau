@@ -12,9 +12,12 @@
 	             tiled in plates, a horned head and a spiked club tail
 
 	Every model has an invisible HumanoidRootPart (its KaijuHipHeight
-	attribute is the Humanoid's HipHeight), legs, arms, jaw and tail on
-	Motor6Ds marked for the client's CreatureAnimation (CreatureMotion kinds
-	Stride, Arm, Jaw and Tail, from Shared.CreatureMotion), and faces -Z.
+	attribute is the Humanoid's HipHeight), and faces -Z. Its trunk (the
+	part everything else hangs from) sits on a Body joint at its hips, so it
+	can lean, rear up, lunge and crouch in a fight; its legs, arms, jaw and
+	tail hang from the trunk on joints of their own. Every joint is a
+	Motor6D marked for the client's CreatureAnimation (CreatureMotion kinds
+	Body, Stride, Arm, Jaw and Tail, from Shared.CreatureMotion).
 
 	  KaijuModels.build(species, element) -> Model
 	  KaijuModels.scale(model, scale)     resize, keeping the joints' rest poses
@@ -120,8 +123,9 @@ end
 -- Bulwark --------------------------------------------------------------------------------------
 local function bulwark(model: Model, pal)
 	local r = root(model, V(2.2, 2.2, 2), 2.3)
-	-- A heavy torso leaning into the walk.
-	local torso = make(model, r, "Torso", V(2.4, 2.1, 2), CF(0, 2.55, 0.15) * A(rad(-14), 0, 0), BODY)
+	-- A heavy torso leaning into the walk, on its hips (level with its legs' joints).
+	local torso =
+		limb(model, r, "Torso", V(2.4, 2.1, 2), CF(0, 2.55, 0.15) * A(rad(-14), 0, 0), V(0, 1.68, 0.3), "Body", 1, BODY)
 	plate(model, torso, "Chest", V(1.25, 0.95, 0.22), CF(0, 2.25, -0.86) * A(rad(-14), 0, 0), pal)
 	glow(model, torso, "Core", V(0.46, 0.46, 0.12), CF(0, 2.98, -1.02) * A(rad(-14), 0, 0), pal)
 	make(model, torso, "Hips", V(2.1, 0.7, 1.7), CF(0, 1.6, 0.35), BODY2)
@@ -216,7 +220,8 @@ end
 -- Razorback ------------------------------------------------------------------------------------
 local function razorback(model: Model, pal)
 	local r = root(model, V(1.4, 1.4, 1.6), 2)
-	local body = make(model, r, "Body", V(1.3, 1.15, 2.4), CF(0, 2.15, 0) * A(rad(8), 0, 0), BODY)
+	local body =
+		limb(model, r, "Body", V(1.3, 1.15, 2.4), CF(0, 2.15, 0) * A(rad(8), 0, 0), V(0, 2.05, 0.45), "Body", 1, BODY)
 	plate(model, body, "Chest", V(1.0, 0.3, 1.3), CF(0, 1.62, -0.45), pal)
 	for _, x in { -1, 1 } do
 		glow(model, body, "Vent", V(0.06, 0.12, 0.85), CF(x * 0.67, 2.3, 0.1), pal)
@@ -303,7 +308,7 @@ end
 -- Carapace -------------------------------------------------------------------------------------
 local function carapace(model: Model, pal)
 	local r = root(model, V(2.4, 1, 2.6), 1.35)
-	local belly = make(model, r, "Belly", V(2.6, 0.7, 3.2), CF(0, 1.25, 0), BODY)
+	local belly = limb(model, r, "Belly", V(2.6, 0.7, 3.2), CF(0, 1.25, 0), V(0, 1.1, 0), "Body", 1, BODY)
 	-- The shell, in three steps, tiled with plates.
 	local shell = make(model, belly, "Shell", V(3.3, 0.7, 3.6), CF(0, 1.8, 0.05), BODY2)
 	make(model, shell, "ShellTop", V(2.6, 0.55, 2.9), CF(0, 2.35, 0.05), BODY2)

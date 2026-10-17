@@ -5,10 +5,12 @@
 	  Wild kaiju  up to Kaiju.Wild.Max roam at once, each a random kind and
 	              element, levelled near the kaiju out around them. They go
 	              after kaiju that come near and anyone hunting (the combat
-	              kit out: SparServer), cast their Gemsoul's E, and walk home
-	              to heal if led past their leash. Every blow on one lands
-	              anywhere from 60% to 140%, by element as well (TakenScale,
-	              which Enemies.damage applies).
+	              kit out: SparServer), fight as the Arena's duellist does
+	              (KaijuFighter: combos, telegraphed heavies, guard and
+	              parry, hops, their Gemsoul's E), and walk home to heal if
+	              led past their leash. Every blow on one lands anywhere from
+	              60% to 140%, by element as well (TakenScale, which
+	              Enemies.damage applies), and meets its guard there.
 	              Killed: the one who (with their kaiju) did the most gets
 	              its Gemsoul, and every kaiju that fought it gets EXP.
 	              Tamed ("KaijuTame"): it joins you, Gemsoul and all. Three
@@ -29,13 +31,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
-local KaijuAbilities = require(script.Parent.KaijuAbilities)
+local KaijuFighter = require(script.Parent.KaijuFighter)
 local KaijuServer = require(script.Parent.KaijuServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
@@ -58,7 +61,7 @@ type Wild = {
 	Born: number,
 	Tries: number,
 	TameAt: { [Player]: number },
-	NextAbility: number,
+	Fighter: any?, -- how a wild kaiju fights (KaijuFighter; a moon bug has none)
 	LastFight: number?,
 	Bug: boolean,
 	Swarm: any?,
@@ -142,12 +145,16 @@ local function foesNear(center: Vector3, radius: number): { any }
 	return list
 end
 
-local function hitFoe(enemy, victim, amount: number, element: string?, status: string?)
+-- A blow (`heavy` true or false; nil for an E) on a kaiju or a hunter, who
+-- may guard, parry or hop clear of it. Returns how it landed.
+local function hitFoe(enemy, victim, amount: number, element: string?, status: string?, heavy: boolean?): string
 	if victim.Pet then
-		KaijuServer.hurt(victim.Pet, amount, element, status)
+		return KaijuServer.hurt(victim.Pet, amount, element, status, heavy)
 	elseif victim.Player and hunter(victim.Player) then
-		Enemies.hitPlayer(victim.Player, amount, element, enemy)
+		local _, guarded = Enemies.hitPlayer(victim.Player, amount, element, enemy, heavy)
+		return if guarded then "Guarded" else "Hit"
 	end
+	return "Missed"
 end
 
 -- Who it goes after: whoever hurt it last (a kaiju or a hunter), while
@@ -197,7 +204,8 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 	return best
 end
 
--- The brain both kinds share: chase, strike, cast (a wild kaiju), go home.
+-- The brain both kinds share: find a foe and fight it (a wild kaiju as a
+-- duellist, KaijuFighter; a moon bug chases and bites), else go home.
 local function brain(enemy, now: number)
 	local wild = wilds[enemy]
 	if not wild then
@@ -205,7 +213,8 @@ local function brain(enemy, now: number)
 	end
 	local e = enemy :: any
 	local humanoid, root = enemy.Humanoid, enemy.Root
-	if now < enemy.StunUntil then
+	local fighter = wild.Fighter
+	if now < enemy.StunUntil and not fighter then
 		humanoid:MoveTo(root.Position)
 		return
 	end
@@ -216,6 +225,13 @@ local function brain(enemy, now: number)
 	e.FoeVictim = victim
 	e.Foe = if victim then (victim.Pet or victim.Player) else nil
 	if not victim then
+		if fighter then
+			KaijuFighter.calm(fighter)
+			if now < enemy.StunUntil then
+				humanoid:MoveTo(root.Position)
+				return
+			end
+		end
 		-- Home, healing on the way; and the tries on it are forgotten there.
 		if fromHome > 4 then
 			humanoid:MoveTo(enemy.Home)
@@ -224,10 +240,13 @@ local function brain(enemy, now: number)
 			humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * HOME_HEAL * 0.15)
 			enemy.Bar.Size = UDim2.fromScale(humanoid.Health / humanoid.MaxHealth, 1)
 		end
-		wild.NextAbility = 0
 		return
 	end
 	wild.LastFight = now
+	if fighter then
+		KaijuFighter.step(fighter, victim, now)
+		return
+	end
 	local reach = kind.Reach + victim.Root.Size.X / 2
 	local distance = flat(victim.Root.Position - root.Position).Magnitude
 	if distance > reach then
@@ -240,44 +259,17 @@ local function brain(enemy, now: number)
 	if (look - at).Magnitude > 0.1 then
 		root.CFrame = CFrame.lookAt(at, look)
 	end
-	-- Its E, a moment into the fight and then every AbilityEvery seconds.
-	if wild.Ability then
-		if wild.NextAbility == 0 then
-			wild.NextAbility = now + 4
-		elseif now >= wild.NextAbility then
-			wild.NextAbility = now + Kaiju.AbilityEvery
-			local element = wild.Element
-			local cast = KaijuAbilities.cast({
-				Model = enemy.Model,
-				Root = root,
-				Element = element,
-				Ability = wild.Ability,
-				Damage = Kaiju.abilityDamage(kind.Damage, wild.Soul, wild.Ability),
-				Foes = foesNear,
-				Hit = function(target, amount: number, status: string?)
-					hitFoe(enemy, target, amount, element, status)
-				end,
-				Alive = function(): boolean
-					return enemy.Alive
-				end,
-			}, victim)
-			if cast then
-				enemy.Model:SetAttribute("ActionAt", serverNow())
-				enemy.LastAttack = now
-				return
-			end
-		end
-	end
 	if now - enemy.LastAttack >= kind.Rate then
 		enemy.LastAttack = now
 		enemy.Model:SetAttribute("ActionAt", serverNow())
-		if wild.Bug then
-			fx("EnemySwing", root.Position, victim.Root.Position, GemConfig.ElementColors[wild.Element])
-		end
+		fx("EnemySwing", root.Position, victim.Root.Position, GemConfig.ElementColors[wild.Element])
 		if now < (e.BlindUntil or 0) and math.random() < (e.Blind or 0) then
 			return -- swung at nothing
 		end
-		hitFoe(enemy, victim, kind.Damage * (1 - Enemies.weakness(enemy)), wild.Element, nil)
+		local outcome = hitFoe(enemy, victim, kind.Damage * (1 - Enemies.weakness(enemy)), wild.Element, nil, false)
+		if outcome == "Parried" then
+			Enemies.addStatus(enemy, "Stun", 1, KaijuFight.ParryStagger) -- (a kaiju's guard turned its bite)
+		end
 	end
 end
 
@@ -305,6 +297,7 @@ end
 local spawnWild
 
 local function gone(wild: Wild)
+	KaijuFighter.forget(wild.Fighter)
 	wilds[wild.Enemy] = nil
 	wildCount -= 1
 	task.delay(Kaiju.Wild.Respawn, spawnWild)
@@ -413,6 +406,39 @@ function spawnWild()
 		model:SetAttribute("KaijuLevel", level)
 		model:SetAttribute("KaijuAbility", ability)
 		model:SetAttribute("KaijuTries", 0)
+		-- It fights as a duellist, its guard and hops on its Enemies record
+		-- (so a hunter's swings meet them in Enemies.damage).
+		local fighter = KaijuFighter.new({
+			Model = model,
+			Root = enemy.Root,
+			Humanoid = enemy.Humanoid,
+			Species = species,
+			Element = element,
+			Scale = Kaiju.Scale.Wild,
+			Body = enemy,
+			Stats = stats,
+			Ability = ability,
+			FirstSurge = 4,
+			Strike = function(victim, amount: number, heavy: boolean, _name: string): string
+				return hitFoe(enemy, victim, amount * (1 - Enemies.weakness(enemy)), element, nil, heavy)
+			end,
+			Caster = function()
+				return {
+					Model = model,
+					Root = enemy.Root,
+					Element = element,
+					Ability = ability,
+					Damage = Kaiju.abilityDamage(stats.Damage, soul, ability),
+					Foes = foesNear,
+					Hit = function(target, amount: number, status: string?)
+						hitFoe(enemy, target, amount, element, status, nil)
+					end,
+					Alive = function(): boolean
+						return enemy.Alive
+					end,
+				}
+			end,
+		})
 		wilds[enemy] = {
 			Enemy = enemy,
 			Species = species,
@@ -423,7 +449,7 @@ function spawnWild()
 			Born = os.clock(),
 			Tries = 0,
 			TameAt = {},
-			NextAbility = 0,
+			Fighter = fighter,
 			Bug = false,
 		}
 	end)
@@ -611,7 +637,6 @@ function KaijuWilds.spawnSwarm()
 				Born = os.clock(),
 				Tries = 0,
 				TameAt = {},
-				NextAbility = 0,
 				Bug = true,
 				Swarm = swarm,
 			}

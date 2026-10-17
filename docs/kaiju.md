@@ -16,9 +16,9 @@ Each kind comes in Thermal, Cryo, Ion and Corrosive: twelve in all.
 
 | Kind | Looks | Plays | Health | Damage | Speed |
 | --- | --- | --- | --- | --- | --- |
-| **Bulwark** | Stands upright: plated chest, fins down its back, a long tail | Slow, heavy blows, shrugs off 10% | 240 | 20 a blow, every 1.6 s | 12 |
-| **Razorback** | Runs low: long toothed snout, spines, long legs | Quick light bites, fragile | 160 | 11 a bite, every 0.8 s | 20 |
-| **Carapace** | Four stubby legs under a wide shell, a spiked club tail | The hardest to wear down: shrugs off 25% | 300 | 13 a blow, every 1.3 s | 10 |
+| **Bulwark** | Stands upright: plated chest, fins down its back, a long tail | Slow, heavy blows, shrugs off 10% | 240 | 20 a blow; attacks about every 1.6 s | 12 |
+| **Razorback** | Runs low: long toothed snout, spines, long legs | Quick light bites, fragile | 160 | 11 a bite; attacks about every 0.8 s | 20 |
+| **Carapace** | Four stubby legs under a wide shell, a spiked club tail | The hardest to wear down: shrugs off 25% | 300 | 13 a blow; attacks about every 1.3 s | 10 |
 
 Those are level 1. Each level adds 8% of them, up to level 30. A finer
 Gemsoul (below) adds up to 20% more.
@@ -27,8 +27,9 @@ Gemsoul (below) adds up to 20% more.
 
 Every kaiju carries a Gemsoul: a gem of its element, rolled like any gem
 (rarity, Size, Clarity, Cut), with an E ability. The kaiju casts that E in
-a fight every 9 seconds. The E is always one you can see land, never a dash
-or a "while ready" bonus:
+a fight 3 seconds in and then at most every 9 seconds, after a wind-up its
+foe can see on its cast bar. The E is always one you can see land, never a
+dash or a "while ready" bonus:
 
 | Element | E abilities a Gemsoul rolls |
 | --- | --- |
@@ -40,6 +41,40 @@ or a "while ready" bonus:
 A Gemsoul you win is a gem like any other: socket it in your gear, enchant
 it, sell it. Only its E works. Its Q and R lanes stay sealed, wherever it's
 socketed.
+
+## How they fight
+
+Kaiju fight exactly as the Arena's rival does, run by the same brain
+(`Shared.DuelistBrain`), just shrunk to their size and in their own blows.
+They read their foe the way the rival reads you: a swing coming, a charged
+heavy, a cast, a raised guard, an opening after a blow, a foe standing idle.
+
+| | Quick blow (combos) | Heavy (breaks a guard) | Guard |
+| --- | --- | --- | --- |
+| **Bulwark** | Claw Swipe, up to 2 in a row | Ground Stomp: 2× | arms up, takes 30% |
+| **Razorback** | Bite, up to 3 in a row | Tail Lash: 1.6× | a low crouch, takes 40% |
+| **Carapace** | Shell Snap, up to 2 in a row | Shell Slam: 1.8× | into its shell, takes 15% |
+
+- **Wind-ups.** Every blow winds up first (the brute slowest, the runner
+  quickest). A heavy rings its feet in orange and names itself on the cast
+  bar: hop out of it. The third blow of a combo lands 30% harder.
+- **Guard and parry.** A guard takes most of a blow. A light blow landing
+  just as a guard goes up (within 0.22 s) is parried, and the attacker reels
+  for 0.45 s; a guard parries at most every 1.5 s. A heavy smashes through a
+  guard, staggers it, and the guard can't go up again for 0.9 s.
+- **Hops, pounces, counters.** A kaiju hops aside from a heavy or a cast
+  (untouchable for 0.3 s), pounces on a foe that keeps out of reach, counters
+  a blow it just blocked or a foe left open after swinging, circles between
+  blows and backs off when badly hurt.
+- **Hunting a wild kaiju yourself.** Your swings meet its guard as they
+  would the rival's: your heavy breaks it, a light swing just as it braces
+  is parried (and you reel), and it hops away from your charged heavy.
+
+![Each kind's fight poses](kaiju/fight-poses.png)
+
+Distances are scaled: the brain thinks in the rival's studs, a kaiju's
+reach is its kind's at its size (a kaiju of yours is 0.55 the size of the
+model, a wild one 0.75), and its steps, hops and pounces shrink to match.
 
 ## Your team
 
@@ -99,8 +134,8 @@ landing pad.
 Up to three roam the Outpost at once, within two levels of the strongest
 kaiju near them, with half again the health of a kaiju of yours at their
 level: it takes you and your kaiju together. They go after kaiju that come
-near and anyone hunting, cast their own E, and walk home to heal if you lead
-them more than 70 studs away. One nobody fights burrows back after 10
+near and anyone hunting, fight as above (their E too), and walk home to heal
+if you lead them more than 70 studs away. One nobody fights burrows back after 10
 minutes, and a new one crawls out 90 seconds after one goes.
 
 - **Kill it:** every kaiju that fought it gets 40 + 12 × its level EXP, and
@@ -176,23 +211,29 @@ Proposed guardrails:
 | Where | What |
 | --- | --- |
 | `Shared.Kaiju` | The rules: kinds, stats, EXP, feeding, taming, the hit spread, slots, Gemsouls, each E's plan, the roster |
-| `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)` |
-| `Shared.CreatureMotion` | Their walk (`Stride`), arms (`Arm`), jaw and tail |
+| `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
+| `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
+| `Shared.CreatureMotion` | Their walk (`Stride`), arms (`Arm`), jaw and tail, and every fight pose (`fight`, `apply`) |
 | `Shared.GemTraits` | A Gemsoul's Q and R stay sealed (`traitsOf`) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
-| `KaijuServer` | Your kaiju: the starter, out and back, following and fighting, hurt by element, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
+| `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E; the attributes clients pose it by |
+| `KaijuServer` | Your kaiju: the starter, out and back, following and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
 | `KaijuWilds` | Wild kaiju and moon bugs: spawning, their brain, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`) |
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
 | `SparServer` | `Hunt`: the kit out alone |
 | `KaijuHud` (client) | The card, RECALL, HUNT, TAME and the kaiju panel |
-| `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies` |
+| `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk and their fight poses |
 
-Tests: `tests/run_kaiju.py` checks the rules, builds every kind in every
-element (joints, feet on the ground, part budget, motions), and runs the
-server against stand-ins: every E lands where it should, your kaiju comes
-out, fights, is hurt by element, knocked out and back, recalled, switched
-and fed, wild kaiju take the spread and pick their foes (never a miner),
-kills pay their Gemsoul and EXP, taming (range, half health, tries,
-burrowing, a full roster) and moon bugs' coins and daily cap.
+Tests: `tests/run_kaiju.py` checks the rules and how they fight (each
+kind's style, guard, parry, breaks, hops, reads, the brain's choices),
+builds every kind in every element (joints, feet on the ground, part
+budget, motions, every fight pose), and runs the server against stand-ins:
+every E lands where it should, your kaiju comes out, fights with wind-ups,
+is hurt by element, knocked out and back, recalled, switched and fed, wild
+kaiju take the spread and pick their foes (never a miner), heavies break
+guards, parries leave the attacker reeling, a wild kaiju hops from a
+hunter's charged heavy, the E winds up on the cast bar, a whole duel
+between two kaiju, kills pay their Gemsoul and EXP, taming (range, half
+health, tries, burrowing, a full roster) and moon bugs' coins and daily cap.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
 card's place on every phone.

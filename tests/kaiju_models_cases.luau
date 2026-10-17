@@ -29,7 +29,7 @@ local Motion = load("CreatureMotion")
 
 local SPECIES = { "Bulwark", "Razorback", "Carapace" }
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
-local KINDS = { Stride = true, Arm = true, Jaw = true, Tail = true }
+local KINDS = { Body = true, Stride = true, Arm = true, Jaw = true, Tail = true }
 local BUDGET = 90 -- parts in one kaiju (up to 3 per player, plus the wild ones)
 
 local shapes = {}
@@ -76,6 +76,7 @@ for _, species in SPECIES do
 		local ground = root.CFrame.Position.Y - root.Size.Y / 2 - hip
 		check(math.abs(low - ground) < 0.35, string.format("%s: feet at %.2f, ground at %.2f", name, low, ground))
 		check(high - low > 2.4 and high - low < 6, name .. ": an odd height")
+		check(kinds.Body == 1, name .. ": not one Body joint")
 		for _, kind in { "Stride", "Jaw", "Tail" } do
 			check(kinds[kind], name .. ": no " .. kind .. " joint")
 		end
@@ -108,4 +109,88 @@ check(
 check(Motion.angles("Arm", 0.2, 0, 0, 1, 0) > Motion.angles("Arm", 0.2, 0, 0, 1), "A blow doesn't swing its arms")
 check(Motion.angles("Jaw", 0.2, 0, 0, 1, 0) < Motion.angles("Jaw", 0.2, 0, 0, 1), "A blow doesn't open its jaw")
 
-print(string.format("PASS: %d kaiju model checks (3 species x 4 elements, joints, ground, budget, motions)", checks))
+-- Fighting: each kind's whole body winds up, strikes and settles (CreatureMotion.fight).
+local function pose(species, kind, at, now, extra)
+	local a = { Kind = kind, Start = 10, At = at, Side = 1 }
+	for key, value in extra or {} do
+		a[key] = value
+	end
+	return Motion.fight(species, a, now)
+end
+local still = Motion.fight("Bulwark", {}, 5)
+for field, value in still do
+	check(value == 0, "A kaiju out of a fight holds a pose: " .. field)
+end
+-- A stomp: it rears up (arms high) by the blow, then slams down.
+local wind = pose("Bulwark", "Heavy", 10.8, 10.79)
+local slam = pose("Bulwark", "Heavy", 10.8, 10.9)
+check(wind.Pitch > 0.25 and wind.Arm > 1.5, "The brute doesn't rear up for its stomp")
+check(slam.Pitch < -0.15 and slam.Lift < 0, "The brute's stomp doesn't slam down")
+check(pose("Bulwark", "Heavy", 10.8, 10.4).Pitch < wind.Pitch, "A wind-up doesn't build")
+local rested = pose("Bulwark", "Heavy", 10.8, 10.8 + Motion.Strike + Motion.Settle + 0.01)
+for field, value in rested do
+	check(value == 0 or field == "ArmSide", "A blow doesn't settle back: " .. field)
+end
+-- A swipe uses one arm, on its side; the other side mirrors it.
+local swipe = pose("Bulwark", "Light", 10.3, 10.4)
+check(swipe.ArmSide == 1 and swipe.Arm > 1, "A claw swipe isn't one arm")
+local mirrored = Motion.fight("Bulwark", { Kind = "Light", Start = 10, At = 10.3, Side = -1 }, 10.4)
+check(math.abs(mirrored.Yaw + swipe.Yaw) < 1e-9 and mirrored.ArmSide == -1, "The other side doesn't mirror it")
+local _, _, _ = Motion.apply(swipe, "Arm", 1, 0, 0, 0)
+check(
+	select(1, Motion.apply(swipe, "Arm", 1, 0, 0, 0)) > select(1, Motion.apply(swipe, "Arm", -1, 0, 0, 0)),
+	"Both arms swipe"
+)
+-- A bite: jaws wide on the wind-up, snapped shut on the blow; a counter bites the same way.
+local open = pose("Razorback", "Light", 10.24, 10.23)
+local snap = pose("Razorback", "Light", 10.24, 10.34)
+check(open.Jaw > 0.5 and snap.Jaw < 0.1 and snap.Push > 0.4, "The runner doesn't bite")
+check(pose("Razorback", "Punish", 10.24, 10.23).Jaw == open.Jaw, "A counter isn't a bite")
+-- A tail lash spins it round; an E rears up to roar.
+check(math.abs(pose("Razorback", "Heavy", 10.6, 10.7).Yaw) > 1.2, "The tail lash doesn't spin")
+check(
+	pose("Carapace", "Bolt", 10.7, 10.69).Jaw > 0.5 and pose("Carapace", "Nova", 10.7, 10.69).Pitch > 0.2,
+	"No roar for an E"
+)
+-- Its guard: the shell sinks into itself; the brute raises its arms; a blow on it jolts it.
+local shell = Motion.fight("Carapace", { GuardUntil = 12 }, 11)
+check(shell.Lift < -0.3, "The shell doesn't tuck in")
+check(Motion.fight("Bulwark", { GuardUntil = 12 }, 11).Arm > 1, "The brute doesn't raise its guard")
+check(Motion.fight("Carapace", { GuardUntil = 12 }, 12.5).Lift == 0, "A guard that ran out stays up")
+check(
+	Motion.fight("Carapace", { GuardUntil = 12, BlockedAt = 10.95 }, 11).Push < shell.Push,
+	"No jolt on a blocked blow"
+)
+-- A hop lifts and leans into it; a stagger throws it back; a hit makes it flinch.
+local hop = pose("Razorback", "Dodge", 10, 10.17)
+check(hop.Lift > 0.4 and hop.Roll < -0.3, "A hop doesn't hop")
+check(pose("Razorback", "Dodge", 10, 10.5).Lift == 0, "A hop doesn't land")
+check(pose("Bulwark", "Stagger", 10, 10.1).Pitch > 0.25, "A stagger doesn't reel")
+check(Motion.fight("Bulwark", { HurtAt = 10 }, 10.05).Pitch > 0, "No flinch")
+-- On the joints: the trunk rears and moves; the legs stay upright under it.
+local x, _, _, lift = Motion.apply(wind, "Body", 1, 0, 0, 0)
+check(x == wind.Pitch and lift == wind.Lift, "The trunk doesn't take the pose")
+check(Motion.apply(wind, "Stride", 1, 0, 0, 0) == -wind.Pitch, "The legs rear up with the trunk")
+check(Motion.apply(open, "Jaw", 1, 0, 0, 0) == -open.Jaw, "The jaw doesn't open")
+-- Eased: a pose comes on fast but not at once.
+local eased = Motion.blend(Motion.rest(), wind, 0.5)
+check(math.abs(eased.Pitch - wind.Pitch / 2) < 1e-9, "Not eased")
+eased = Motion.blend(nil, wind, 0.5)
+check(eased.Pitch == wind.Pitch and eased ~= wind, "A first pose isn't its own")
+for species in Motion.Fight do
+	for i = 0, 60 do
+		for _, kind in { "Light", "Heavy", "Punish", "Lunge", "Bolt", "Nova", "Dodge", "Stagger" } do
+			local p = pose(species, kind, 10.5, 10 + i / 50, { GuardUntil = 11, HurtAt = 10.3 })
+			for field, value in p do
+				check(value == value and math.abs(value) < 3, species .. " " .. kind .. ": a wild " .. field)
+			end
+		end
+	end
+end
+
+print(
+	string.format(
+		"PASS: %d kaiju model checks (3 species x 4 elements, joints, ground, budget, motions, fight poses)",
+		checks
+	)
+)
