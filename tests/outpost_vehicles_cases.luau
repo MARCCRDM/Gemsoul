@@ -99,7 +99,9 @@ local function makeMachine(kind, bay)
 	function chassis:GetFullName()
 		return "Workspace.Outpost.Machines." .. kind .. ".Chassis"
 	end
-	local seat = { Occupant = nil, Children = {}, Changed = signal(), Kind = kind }
+	local seat = { Occupant = nil, Children = {}, Changed = signal(), Kind = kind, Attributes = {} }
+	function seat:SetAttribute(k, v) self.Attributes[k] = v end
+	function seat:GetAttribute(k) return self.Attributes[k] end
 	function seat:FindFirstChild(name)
 		return self.Children[name]
 	end
@@ -126,7 +128,8 @@ local function makeMachine(kind, bay)
 end
 
 local function makePlayer(name)
-	local player = { Name = name, Attributes = { Outpost = true } }
+	local player = { Name = name, Attributes = { Outpost = true }, Children = {} }
+	function player:FindFirstChild(k) return self.Children[k] end
 	function player:GetAttribute(k)
 		return self.Attributes[k]
 	end
@@ -169,7 +172,10 @@ function Players:GetPlayerFromCharacter(character)
 end
 local promptTriggered = signal()
 local mechInput = { OnServerEvent = signal() }
-local mechReport = { OnServerEvent = signal() }
+local echoed = {}
+local mechReport = { OnServerEvent = signal(), FireClient = function(_, player, detail)
+	table.insert(echoed, {Player=player, Detail=detail})
+end }
 local mechExit = { OnServerEvent = signal() }
 local detached = 0
 local notes = {}
@@ -266,13 +272,19 @@ promptTriggered:Fire(prompt, pilot)
 local chassis = hauler.Model.PrimaryPart
 check(hauler.Seat.Occupant == pilotHum and not prompt.Enabled, "The Drive prompt didn't seat the pilot")
 check(chassis.Owner == nil, "The server must own the occupied mech")
+check(pilot:FindFirstChild("PilotedMechSeat").Value == hauler.Seat, "Pilot has no replicated seat discovery reference")
 check(#handovers() == 0, "A clean hand-over warned")
 
 -- Input must drive even when the client never writes any constraints.
 mechInput.OnServerEvent:Fire(pilot, 1, 0)
+local inputAt = hauler.InputAt
+Vehicles.seated(hauler) -- SeatWeld notification following Occupant
+check(hauler.Heard and hauler.Throttle == 1 and hauler.InputAt == inputAt, "Duplicate boarding event erased accepted input")
+check(hauler.Seat:GetAttribute("MechInputThrottle") == 1, "Accepted input was not acknowledged")
 heartbeat:Fire(1/60)
 check(chassis.Drive.PlaneVelocity.Y<0 and hauler.ServerDriving, "Server waited for client-side physics")
 getOut(hauler.Seat,pilotHum)
+check(pilot:FindFirstChild("PilotedMechSeat").Value == nil, "Seat discovery reference survived exit")
 Vehicles.sit(pilot,hauler.Seat)
 
 -- Physics follow the drive constraint, unless something blocks the way.
@@ -461,6 +473,7 @@ before = #notes
 mechReport.OnServerEvent:Fire(quiet, "input 1.00/0.00 from keys")
 last = notes[#notes]
 check(#notes == before + 1 and last.Message:find("won't move", 1, true), "The stuck report wasn't logged")
+check(echoed[#echoed].Player == quiet and echoed[#echoed].Detail:find("physics server", 1, true), "Server diagnosis wasn't returned to the affected pilot")
 check(
 	last.Detail:find("Client: input 1.00/0.00 from keys", 1, true) and last.Detail:find("physics server", 1, true),
 	"The log lacks the client's or the server's view"
@@ -540,4 +553,24 @@ hold = nil
 check(not Vehicles.input(lone, 1, 0), "Input taken after getting out")
 frames(30)
 check(chassis.Drive.PlaneVelocity == R.Vector2.zero, "The mech kept going after its pilot got out")
+-- A SeatWeld child can arrive before Part1, with no second child/Occupant event.
+local delayed, delayedHum = makePlayer("Delayed")
+local delayedRoot = {Parent = delayed.Character}
+local delayedWeld = {Name = "SeatWeld", Part0 = hauler.Seat}
+hauler.Seat.Children.SeatWeld = delayedWeld
+Vehicles.seated(hauler)
+check(delayed:FindFirstChild("PilotedMechSeat") == nil, "Incomplete weld assigned a pilot")
+delayedWeld.Part1 = delayedRoot
+heartbeat:Fire(1/60)
+check(delayed:FindFirstChild("PilotedMechSeat").Value == hauler.Seat, "Late weld endpoint never registered the pilot")
+check(Vehicles.input(delayed, 1, 0), "Late weld pilot couldn't drive")
+heartbeat:Fire(1/60)
+check(chassis.Drive.PlaneVelocity.Magnitude > 0, "Late weld registration erased input")
+hauler.Seat.Children.SeatWeld = nil
+heartbeat:Fire(1/60)
+check(delayed:FindFirstChild("PilotedMechSeat").Value == nil, "Heartbeat left the late-weld pilot reference behind")
+hauler.Seat.Children.SeatWeld = delayedWeld
+check(Vehicles.input(delayed, 1, 0), "Input arriving before the boarding heartbeat was refused")
+heartbeat:Fire(1/60)
+check(hauler.Throttle == 1 and hauler.Heard, "Boarding reconciliation erased an early input")
 print("PASS: " .. checks .. " outpost vehicle checks")

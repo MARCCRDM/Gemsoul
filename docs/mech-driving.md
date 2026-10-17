@@ -40,7 +40,7 @@ real numbers clamped to -1..1. Input that stops arriving for 1.5 s counts
 as let go. A pilot who enters a fight, an expedition or an Arena drop stops
 driving, and the next pilot starts from rest.
 
-## Why the mechs didn't move
+## Seat discovery and boarding safeguards
 
 Who sits in a seat is in two properties, `Seat.Occupant` and
 `Humanoid.SeatPart`. Neither replicates: each side works them out for itself
@@ -71,6 +71,14 @@ they're set, and from the weld when they aren't. All of these use it now:
 
 The server still never takes input for a mech someone else sits in.
 
+The server also keeps a `PilotedMechSeat` ObjectValue on the player. This lets
+the client find the exact seat when its local root joint list is incomplete;
+it still verifies the seat occupant or weld before enabling driving. The
+reference is cleared on exit. Heartbeat reconciles late weld endpoints, and
+duplicate Occupant/SeatWeld notifications no longer reset accepted input.
+These cases are covered by regression tests; they are not confirmation of
+the cause of every live zero-speed report.
+
 ## When a mech still won't move
 
 Both sides watch for it and say what they see:
@@ -78,8 +86,9 @@ Both sides watch for it and say what they see:
 - **Your game never starts driving.** When piloting starts, your game tells
   the server. If you've sat in a mech for 5 seconds and the server has heard
   nothing, it logs `[Mech] no word from the pilot's client`.
-- **The mech won't budge.** You hold a direction for 2 seconds and the mech
-  never leaves the spot where you got in. Your game then:
+- **The mech won't budge.** You hold a direction for 2 seconds without the
+  requested motion, including stalls away from the boarding spot. Turning
+  alone does not hide a forward-motion stall. Your game then:
   - prints `[Mech] Won't move (client): ...` with what it sees: the input and
     where it came from (seat, controls or keys), the speed, the drive
     settings, `ReceiveAge`, the assembly's root part and mass, and anything
@@ -94,6 +103,12 @@ Both sides watch for it and say what they see:
 Each line goes to the Output, and the server's lines also go to Feedback →
 Reports (owners only). A ride sends at most 2 reports from your game, and the
 server takes at most 3. The next ride starts fresh.
+
+Controller 2 prints its place/version at client startup and logs successful
+pilot control startup. The seat exposes `MechInputThrottle` and `MechInputSteer`
+as acknowledgments of server-accepted input; stuck reports include them.
+The server returns its stuck diagnosis (or missing-input warning) to the
+affected pilot's client log as well, so a client log can show both sides.
 
 | Piece | What it does |
 | --- | --- |

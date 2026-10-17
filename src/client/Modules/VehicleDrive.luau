@@ -26,7 +26,6 @@ type Driving = {
 	Speed: number,
 	Zoom: { number },
 	-- Watching for a mech that won't budge (see stuck below).
-	Start: Vector3,
 	StuckFor: number,
 	Reports: number,
 }
@@ -247,12 +246,12 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 		Spec = spec,
 		Speed = 0,
 		Zoom = { player.CameraMinZoomDistance, player.CameraMaxZoomDistance },
-		Start = chassis.Position,
 		StuckFor = 0,
 		Reports = 0,
 	}
 	-- Tell the server this client is piloting (it watches for one that isn't).
 	tellServer(0, 0, true)
+	print("[Mech] Pilot controls started: " .. tostring(kind))
 	-- Pull the camera back to fit the machine.
 	local fit = seat.Parent:GetAttribute("CameraFit") or math.max(14, chassis.Size.Z * 1.15)
 	player.CameraMaxZoomDistance = math.max(player.CameraMaxZoomDistance, fit * 2)
@@ -267,13 +266,17 @@ local function resumeSeat()
 	if driving or blocked() then return end
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	local seat = Seating.seatOf(humanoid)
+	if not seat then
+		local reference = player:FindFirstChild("PilotedMechSeat")
+		seat = reference and reference.Value
+	end
 	if seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
 		begin(seat, humanoid)
 	end
 end
 
--- A mech that won't budge: held input for 2 s and it never left the spot it
--- was boarded at. Say what this client sees (Output and Feedback > Reports,
+-- A mech that won't budge: held input for 2 s without the requested motion.
+-- Say what this client sees (Output and Feedback > Reports,
 -- via the server) and ask it to inspect the assembly (Server OutpostVehicles).
 local function anchoredIn(part: BasePart): string
 	local found = {}
@@ -310,6 +313,8 @@ local function reportStuck(d: Driving, throttle: number, steer: number, source: 
 		c.AssemblyMass,
 		anchoredIn(c)
 	)
+	text ..= string.format("; server accepted %s/%s", tostring(d.Seat:GetAttribute("MechInputThrottle")),
+		tostring(d.Seat:GetAttribute("MechInputSteer")))
 	warn("[Mech] Won't move (client): " .. text)
 	local report = remote("MechReport")
 	if report then
@@ -320,10 +325,13 @@ end
 local function watchStuck(d: Driving, throttle: number, steer: number, source: string, dt: number)
 	local c = d.Chassis
 	local v = c.AssemblyLinearVelocity
-	local moving = Vector2.new(v.X, v.Z).Magnitude >= 1.5 or math.abs(c.AssemblyAngularVelocity.Y) >= 0.2
-	local pushing = math.abs(throttle) >= 0.5 or math.abs(steer) >= 0.5
-	local home = (c.Position - d.Start).Magnitude < 4
-	if not (pushing and home and not moving) then
+	-- Turning isn't evidence that forward motion works. Watch translation
+	-- when accelerating and rotation only when steering in place.
+	local accelerating = math.abs(throttle) >= 0.5
+	local moving = if accelerating then Vector2.new(v.X, v.Z).Magnitude >= 1.5
+		else math.abs(c.AssemblyAngularVelocity.Y) >= 0.2
+	local pushing = accelerating or math.abs(steer) >= 0.5
+	if not (pushing and not moving) then
 		d.StuckFor = 0
 		return
 	end

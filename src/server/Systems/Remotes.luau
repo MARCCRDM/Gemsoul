@@ -11,6 +11,7 @@
 --             the server-owned movement controller
 --   MechReport (event, client -> server): what a pilot's client sees when its
 --              mech won't move; the server checks the assembly and logs it
+--              server -> pilot: the resulting server diagnosis, for their log
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local folder = Instance.new("Folder")

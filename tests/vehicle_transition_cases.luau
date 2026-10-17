@@ -90,7 +90,10 @@ local function typeof(value) return if type(value)=="table" and value.IsVector3 
 local controlStub = { GetMoveVector=function() return moveVec end }
 local playerModule = { Module={ GetControls=function() return controlStub end } }
 local playerScripts = { FindFirstChild=function(_, name) return if name=="PlayerModule" then playerModule else nil end }
-function player:FindFirstChild(name) return if name=="PlayerScripts" then playerScripts else nil end
+local seatReference = {Value=nil}
+function player:FindFirstChild(name)
+	return if name=="PlayerScripts" then playerScripts elseif name=="PilotedMechSeat" then seatReference else nil
+end
 local function require(module) return module.Module end
 local sent = {}
 local mechInput = { FireServer=function(_, throttle, steer) table.insert(sent, {throttle, steer}); lastDrive={throttle,steer} end }
@@ -130,6 +133,16 @@ check(VehicleDrive.isDriving() and sent[#sent][1]==1, "The seat weld alone never
 seat.Children.SeatWeld, root.Joints = nil, {}
 VehicleDrive.step(0.1)
 check(not VehicleDrive.isDriving(), "The weld going didn't stop driving")
+-- Server reference discovers a seat whose weld exists but isn't in the
+-- local root's joint list yet. It cannot authorize riding an empty seat.
+seat.Children.SeatWeld = weld
+seatReference.Value = seat
+RunService.Heartbeat:Fire(.1)
+check(VehicleDrive.isDriving() and gui.Enabled, "Replicated pilot reference didn't recover missing local seat discovery")
+seat.Children.SeatWeld = nil
+RunService.Heartbeat:Fire(.1)
+check(not VehicleDrive.isDriving(), "Stale server reference authorized an empty seat")
+seatReference.Value = nil
 -- The driving constraints can replicate after the seat event.
 hum.SeatPart = seat
 local findConstraint = chassis.FindFirstChild
@@ -338,7 +351,7 @@ for _ = 1, 120 do frame() end
 check(#reports == 2, "Kept reporting the same ride")
 joined = { chassis }
 
--- Not stuck: it's moving, or it has left its spot (e.g. now against a wall).
+-- Moving doesn't report. A later stall does, even away from the spawn bay.
 hum.SeatPart, seat.Occupant = nil, nil
 hum.Seated:Fire(false, nil)
 board()
@@ -348,12 +361,14 @@ for _ = 1, 40 do frame() end
 check(#reports == 0, "Reported a mech that was moving")
 chassis.AssemblyLinearVelocity = {X=0, Z=0}
 chassis.Position = point(0, 0, -30)
+chassis.AssemblyAngularVelocity = {Y=.5}
 for _ = 1, 40 do frame() end
-check(#reports == 0, "Reported a mech that had already driven off")
+check(#reports == 1, "Turning or leaving the boarding spot hid a translation stall")
+chassis.AssemblyAngularVelocity = {Y=0}
 chassis.Position = point(0, 0, 0)
 keysDown = {}
 for _ = 1, 40 do frame() end
-check(#reports == 0, "Reported a mech nobody was driving")
+check(#reports == 1, "Reported a mech nobody was driving")
 -- The client never overwrites server constraints, and reports real speed.
 check(drive.PlaneVelocity==Vector2.zero, "Client wrote server-owned physics constraints")
 chassis.AssemblyLinearVelocity = {X=0,Z=-8}

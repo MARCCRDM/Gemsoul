@@ -44,6 +44,7 @@ type Machine = {
 	Heard: boolean,
 	SilentLogged: boolean,
 	Reports: number,
+	Pilot: Player?,
 }
 local machines: { Machine } = {}
 local bySeat: { [Instance]: Machine } = {}
@@ -207,6 +208,29 @@ function OutpostVehicles.seated(machine: Machine)
 	if prompt then
 		prompt.Enabled = driver == nil
 	end
+	-- Occupant and SeatWeld both notify us. The second notification must not
+	-- erase input that arrived between them, or restart the silent-client timer.
+	if machine.Pilot == driver then return end
+	local previous = machine.Pilot
+	machine.Pilot = driver
+	if previous then
+		local reference = previous:FindFirstChild("PilotedMechSeat")
+		if reference and reference.Value == machine.Seat then reference.Value = nil end
+	end
+	if driver then
+		-- Replicate an explicit discovery reference. On a remote client the
+		-- humanoid's SeatPart and root's joint list can lag behind the seat weld.
+		-- Clients still verify the occupant/weld before using this reference.
+		local reference = driver:FindFirstChild("PilotedMechSeat")
+		if not reference then
+			reference = Instance.new("ObjectValue")
+			reference.Name = "PilotedMechSeat"
+			reference.Parent = driver
+		end
+		reference.Value = machine.Seat
+	end
+	machine.Seat:SetAttribute("MechInputThrottle", nil)
+	machine.Seat:SetAttribute("MechInputSteer", nil)
 	machine.Throttle, machine.Steer, machine.InputAt, machine.Speed = 0, 0, 0, 0
 	machine.ServerDriving, machine.Warned = false, false
 	machine.BoardedAt, machine.Heard, machine.SilentLogged = os.clock(), false, false
@@ -253,9 +277,12 @@ function OutpostVehicles.input(player: Player, throttle: any, steer: any, now: n
 	if not machine then
 		return false
 	end
+	if machine.Pilot ~= driverOf(machine) then OutpostVehicles.seated(machine) end
 	machine.Throttle, machine.Steer = math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1)
 	machine.InputAt = now or os.clock()
 	machine.Heard = true
+	machine.Seat:SetAttribute("MechInputThrottle", machine.Throttle)
+	machine.Seat:SetAttribute("MechInputSteer", machine.Steer)
 	return true
 end
 
@@ -355,6 +382,9 @@ function OutpostVehicles.report(player: Player, text: any, now: number?): boolea
 	local clock = now or os.clock()
 	local before = serverView(machine, player, clock)
 	local done = recover(machine, player)
+	-- Echo the server view to this pilot's log. Client-only logs otherwise
+	-- cannot distinguish rejected input from a blocked physics assembly.
+	Remotes.MechReport:FireClient(player, "[Mech] Server: " .. before .. ". Done: " .. done)
 	note(
 		"[Mech] " .. machine.Kind .. " won't move",
 		string.format(
@@ -374,6 +404,9 @@ function OutpostVehicles.step(dt: number, now: number?)
 	local clock = now or os.clock()
 	for _, machine in machines do
 		local driver = driverOf(machine)
+		-- ChildAdded can fire before SeatWeld.Part1 arrives. Reconcile after
+		-- replication/physics settles instead of depending on another event.
+		if machine.Pilot ~= driver then OutpostVehicles.seated(machine) end
 		local chassis = machine.Model.PrimaryPart
 		if not driver or not chassis or chassis.Anchored then
 			machine.ServerDriving = false
@@ -381,6 +414,8 @@ function OutpostVehicles.step(dt: number, now: number?)
 		end
 		if not machine.Heard and not machine.SilentLogged and clock - machine.BoardedAt >= SILENT_AFTER then
 			machine.SilentLogged = true
+			Remotes.MechReport:FireClient(driver, "[Mech] No pilot input received after boarding. Server: "
+				.. serverView(machine, driver, clock))
 			note(
 				"[Mech] no word from the pilot's client",
 				string.format(
