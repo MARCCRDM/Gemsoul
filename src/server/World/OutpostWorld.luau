@@ -48,12 +48,18 @@ local HAZARD = Color3.fromRGB(240, 178, 48)
 local GLOW = Color3.fromRGB(110, 220, 255)
 local SAGA = Color3.fromRGB(255, 184, 72)
 local STEEL = Color3.fromRGB(150, 158, 170)
--- Keep the meadow's basic mining objects readable in the moon lighting:
--- pale, opaque stone with cyan crystal tips, independent of imported art.
-local MINING_STONE = Color3.fromRGB(184, 192, 198)
+-- The everyday mining rocks: dark basalt, so they stand out on the pale
+-- regolith, with glassy crystals that glow from inside.
+local BASALT = Color3.fromRGB(84, 86, 106)
+local BASALT_DARK = Color3.fromRGB(58, 60, 76)
+local BASALT_LIGHT = Color3.fromRGB(118, 118, 136)
+local CRYSTAL_CORE = Color3.fromRGB(215, 250, 255)
+local BED = Color3.fromRGB(92, 92, 104)
 
 local function part(parent, cframe, size, color, material, shape, props)
-	local p = Instance.new(if shape == "Wedge" then "WedgePart" else "Part")
+	local p = Instance.new(
+		if shape == "Wedge" then "WedgePart" elseif shape == "CornerWedge" then "CornerWedgePart" else "Part"
+	)
 	if shape == "Ball" then
 		p.Shape = Enum.PartType.Ball
 	elseif shape == "Cylinder" then
@@ -109,28 +115,199 @@ local function disc(parent, at: CFrame, radius: number, height: number, color, m
 	)
 end
 
--- One rock: a heap of tilted slabs with crystals breaking through, sized and
--- coloured by its kind.
--- Kit rocks for each size of mining rock, and the tint they get.
+-- One crystal standing out of `base`: a shaft with a pointed tip, leaning
+-- `lean` radians toward `heading` (a yaw). A big one is glass that glows
+-- from a core inside; a small one is all glow.
+local function shard(parent, base: Vector3, heading: number, lean: number, length: number, width: number, rng, core)
+	local tip = math.min(width * 1.5, length * 0.45)
+	local shaft = length - tip
+	local at = CFrame.new(base)
+		* CFrame.Angles(0, heading, 0)
+		* CFrame.Angles(0, 0, -lean)
+		* CFrame.Angles(0, rng:NextNumber(0, math.pi / 2), 0)
+		* CFrame.new(0, shaft / 2 - width * 0.75, 0)
+	local material = if core then Enum.Material.Glass else Enum.Material.Neon
+	local look = if core then { Transparency = 0.35, Reflectance = 0.15 } else nil
+	part(parent, at, Vector3.new(width, shaft, width), GLOW, material, nil, look).Name = "Crystal"
+	local point = at * CFrame.new(0, (shaft + tip) / 2, 0)
+	part(parent, point, Vector3.new(width, tip, width), GLOW, material, "CornerWedge", look).Name = "Crystal"
+	if core then
+		part(parent, at, Vector3.new(width * 0.5, shaft * 0.9, width * 0.5), CRYSTAL_CORE, Enum.Material.Neon).Name =
+			"CrystalCore"
+	end
+end
+
+-- A glowing ore vein across one side of a stone: two strokes with a bend.
+local function vein(parent, stone: BasePart, rng)
+	local side = rng:NextInteger(0, 3)
+	local across = if side % 2 == 0 then stone.Size.X else stone.Size.Z
+	local depth = (if side % 2 == 0 then stone.Size.Z else stone.Size.X) / 2
+	local stroke = math.min(across, stone.Size.Y) * 0.3
+	local face = stone.CFrame * CFrame.Angles(0, side * math.pi / 2, 0) * CFrame.new(0, stone.Size.Y * 0.08, depth)
+	local first = face * CFrame.Angles(0, 0, rng:NextNumber(-1.2, 1.2)) * CFrame.new(0, -stroke / 2, 0)
+	local bend = rng:NextNumber(0.5, 0.9) * (if rng:NextNumber() < 0.5 then -1 else 1)
+	local second = first * CFrame.new(0, stroke / 2, 0) * CFrame.Angles(0, 0, bend) * CFrame.new(0, stroke / 2, 0)
+	for _, at in { first, second } do
+		part(parent, at, Vector3.new(0.16, stroke + 0.12, 0.16), GLOW, Enum.Material.Neon).Name = "Vein"
+	end
+end
+
+-- The face of a block that looks most upward: its centre and its normal.
+local function upFace(p: BasePart): (Vector3, Vector3)
+	local best, normal, depth = -2, Vector3.yAxis, p.Size.Y / 2
+	for _, axis in
+		{ { p.CFrame.RightVector, p.Size.X }, { p.CFrame.UpVector, p.Size.Y }, { p.CFrame.LookVector, p.Size.Z } }
+	do
+		for _, sign in { 1, -1 } do
+			local n = axis[1] * sign
+			if n.Y > best then
+				best, normal, depth = n.Y, n, axis[2] / 2
+			end
+		end
+	end
+	return p.CFrame.Position + normal * depth, normal
+end
+
+-- The everyday rocks (Regolith Chunk, Crystal Boulder): tilted basalt
+-- chunks heaped on a scorched bed, ore veins in their sides and a crystal
+-- cluster bursting out of the top (the boulder has a second one breaking
+-- out of a flank).
+local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng): Model
+	local s = if big then 6 else 3.6
+	local function lean(low: number, high: number): number
+		return rng:NextNumber(low, high) * (if rng:NextNumber() < 0.5 then -1 else 1)
+	end
+	local ground = cframe * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+	local bed = disc(model, ground * CFrame.new(0, 0.04, 0), s * 0.64, 0.08, BED, Enum.Material.Slate)
+	bed.CastShadow = false
+	local body = solid(
+		part(
+			model,
+			ground * CFrame.new(0, s * 0.18, 0) * CFrame.Angles(lean(0.3, 0.5), 0, lean(0.2, 0.4)),
+			Vector3.new(s * 0.78, s * 0.62, s * 0.7),
+			BASALT,
+			Enum.Material.Basalt
+		)
+	)
+	body.Name = "Body"
+	model.PrimaryPart = body
+	-- Stones heaped around it, tipped every way and sunk into the bed.
+	local stones = {}
+	local around = if big then 4 else 3
+	for i = 1, around do
+		local a = i / around * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		local r = s * rng:NextNumber(0.3, 0.42)
+		local w, h = s * rng:NextNumber(0.36, 0.5), s * rng:NextNumber(0.28, 0.42)
+		table.insert(
+			stones,
+			part(
+				model,
+				ground
+					* CFrame.new(math.cos(a) * r, h * 0.15, math.sin(a) * r)
+					* CFrame.Angles(lean(0.2, 0.6), rng:NextNumber(0, 6.28), lean(0.2, 0.6)),
+				Vector3.new(w, h, w * rng:NextNumber(0.75, 1.1)),
+				BASALT:Lerp(if i % 2 == 0 then BASALT_LIGHT else BASALT_DARK, rng:NextNumber(0.2, 0.7)),
+				Enum.Material.Basalt
+			)
+		)
+	end
+	-- The cluster on the top face: one tall crystal, the rest fanned out.
+	local base, up = upFace(body)
+	local heading = math.atan2(-up.Z, up.X)
+	local tilt = math.acos(math.clamp(up.Y, -1, 1))
+	shard(
+		model,
+		base,
+		heading,
+		tilt * 0.5,
+		s * (if big then 0.78 else 0.62),
+		s * (if big then 0.16 else 0.14),
+		rng,
+		true
+	)
+	local fan = if big then 3 else 2
+	for i = 1, fan do
+		local h = heading + i / fan * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		local first = big and i == 1
+		local width = s * (if first then 0.12 else 0.09)
+		-- Rooted beside the tall one on the same face, never inside the rock.
+		local away = Vector3.new(math.cos(h), 0, -math.sin(h))
+		away = (away - up * away:Dot(up)).Unit
+		local length = s * (if first then 0.54 else rng:NextNumber(0.36, 0.46))
+		shard(model, base + away * width * 1.1, h, rng:NextNumber(0.5, 0.85), length, width, rng, first)
+	end
+	if big then
+		-- A second, smaller cluster breaking out of the flank that faces most
+		-- upward (one facing down would hide it).
+		local flank, outward = nil, Vector3.new(0, -2, 0)
+		for side = 0, 3 do
+			local across = if side % 2 == 0 then body.Size.X else body.Size.Z
+			local depth = (if side % 2 == 0 then body.Size.Z else body.Size.X) / 2
+			local at = body.CFrame
+				* CFrame.Angles(0, side * math.pi / 2, 0)
+				* CFrame.new(rng:NextNumber(-0.2, 0.2) * across, body.Size.Y * 0.18, depth - 0.1)
+			local facing = at:VectorToWorldSpace(Vector3.zAxis)
+			if facing.Y > outward.Y then
+				flank, outward = at, facing
+			end
+		end
+		local h = math.atan2(-outward.Z, outward.X)
+		for i = 1, 2 do
+			shard(
+				model,
+				flank.Position + Vector3.new(0, (i - 1.5) * s * 0.1, 0),
+				h + (i - 1.5) * 0.6,
+				math.clamp(math.acos(math.clamp(outward.Y, -1, 1)), 0.6, 1.15),
+				s * rng:NextNumber(0.28, 0.36),
+				s * 0.08,
+				rng
+			)
+		end
+	end
+	vein(model, body, rng)
+	vein(model, stones[1], rng)
+	if big then
+		vein(model, stones[2], rng)
+	end
+	-- Rubble at its foot, and a chip of crystal knocked loose.
+	for _ = 1, 2 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local r = s * rng:NextNumber(0.56, 0.72)
+		local w = s * rng:NextNumber(0.09, 0.14)
+		part(
+			model,
+			ground
+				* CFrame.new(math.cos(a) * r, w * 0.25, math.sin(a) * r)
+				* CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, 6.28), rng:NextNumber(-0.4, 0.4)),
+			Vector3.new(w, w * 0.7, w * 0.85),
+			BASALT:Lerp(BASALT_DARK, rng:NextNumber(0, 1)),
+			Enum.Material.Basalt
+		)
+	end
+	local a = rng:NextNumber(0, math.pi * 2)
+	local chip = part(
+		model,
+		ground
+			* CFrame.new(math.cos(a) * s * 0.55, 0.18, math.sin(a) * s * 0.55)
+			* CFrame.Angles(0, rng:NextNumber(0, 6.28), 0)
+			* CFrame.Angles(1.3, 0, 0),
+		Vector3.new(s * 0.06, s * 0.16, s * 0.06),
+		GLOW,
+		Enum.Material.Neon,
+		"Wedge"
+	)
+	chip.Name = "Crystal"
+	light(body, GLOW, s * 3, 1.2)
+	return model
+end
+
+-- The rarer rocks: kit art (when imported) or a heap of tilted slabs, with
+-- crystals breaking through, sized and coloured by its kind.
 local ROCK_KIT = {
-	Pebble = {
-		"rock_smallA",
-		"rock_smallB",
-		"rock_smallC",
-		"rock_smallD",
-		"rock_smallE",
-		"rock_smallG",
-		"rock_smallH",
-		"rock_smallTopA",
-		"rock_smallTopB",
-	},
-	Boulder = { "rock_largeA", "rock_largeB", "rock_largeC", "rock_largeD", "rock_largeE", "rock_largeF" },
 	Monolith = { "rock_tallA", "rock_tallB", "rock_tallC", "rock_tallD", "rock_tallG", "rock_tallH", "rock_tallI" },
 	Geode = { "rock_crystalsLargeA", "rock_crystalsLargeB", "rock_crystals", "meteor_detailed" },
 }
 local ROCK_TINT = {
-	Pebble = MINING_STONE,
-	Boulder = MINING_STONE,
 	Monolith = Color3.fromRGB(104, 98, 114),
 	Geode = Color3.fromRGB(100, 78, 128),
 }
@@ -138,16 +315,15 @@ local ROCK_TINT = {
 function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 	local model = Instance.new("Model")
 	model.Name = "Rock"
+	if size == "Pebble" or size == "Boulder" then
+		return crystalRock(model, size == "Boulder", cframe, rng)
+	end
 	local spec = ({
-		Pebble = { 3.6, MINING_STONE, GLOW, 3 },
-		Boulder = { 6, MINING_STONE, GLOW, 6 },
 		Monolith = { 8.5, Color3.fromRGB(84, 82, 96), SAGA, 9 },
 		Geode = { 7, Color3.fromRGB(70, 56, 92), Color3.fromRGB(205, 120, 255), 11 },
 	})[size] or { 3, REGOLITH, GLOW, 2 }
 	local s, stone, crystal, crystals = spec[1], spec[2], spec[3], spec[4]
 	local tall = if size == "Monolith" then 1.7 else 1
-	local basic = size == "Pebble" or size == "Boulder"
-	local stoneMaterial = if basic then Enum.Material.SmoothPlastic else Enum.Material.Glass
 	-- The kit's rock (when imported) is the shape; an invisible Body is what
 	-- you hit, and the glowing crystals still say how rich it is.
 	local kitName = AssetKit.pick(ROCK_KIT[size] or {}, rng)
@@ -165,23 +341,13 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 		)
 		body.Name = "Body"
 		model.PrimaryPart = body
-		local imported = AssetKit.place(model, kitName, cframe, {
+		AssetKit.place(model, kitName, cframe, {
 			Width = if size == "Monolith" then nil else s * 1.2,
 			Height = if size == "Monolith" then s * tall else nil,
 			Yaw = rng:NextNumber(0, 6.28),
 			Sink = 0.2,
 			Color = ROCK_TINT[size],
 		})
-		if imported and basic then
-			-- Normalize the cloned rock, leaving the source kit and crystals alone.
-			for _, piece in imported:GetDescendants() do
-				if piece:IsA("BasePart") then
-					piece.Color = stone
-					piece.Material = stoneMaterial
-					piece.Transparency = 0
-				end
-			end
-		end
 		for _ = 1, math.ceil(crystals / 2) do
 			local a = rng:NextNumber(0, math.pi * 2)
 			local len = s * rng:NextNumber(0.3, 0.55)
@@ -219,7 +385,7 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 			* CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 6.28), rng:NextNumber(-0.2, 0.2)),
 		Vector3.new(s, s * 0.85 * tall, s * 0.9),
 		stone,
-		stoneMaterial
+		Enum.Material.Glass
 	)
 	body.Name = "Body"
 	solid(body)
@@ -239,7 +405,7 @@ function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random): Model
 				s * rng:NextNumber(0.45, 0.7)
 			),
 			stone:Lerp(Color3.new(0, 0, 0), rng:NextNumber(0, 0.2)),
-			stoneMaterial
+			Enum.Material.Glass
 		)
 	end
 	-- Crystals: wedges jutting out of the top and sides, glowing.

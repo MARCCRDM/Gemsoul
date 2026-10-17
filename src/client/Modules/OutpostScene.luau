@@ -331,6 +331,9 @@ end
 
 local labels: { [Model]: { Gui: BillboardGui, Fill: Frame, Name: TextLabel, Claim: TextLabel, Light: PointLight?, Base: number } } =
 	{}
+-- A whole rock's name only shows up close; one being mined shows from
+-- further off, so you can see who's on it.
+local LABEL_NEAR, LABEL_MINED = 24, 60
 local function sizeColor(size: string): Color3
 	return ({
 		Pebble = Color3.fromRGB(200, 205, 215),
@@ -346,6 +349,7 @@ local function refreshLabel(model: Model)
 	end
 	local hp, max = model:GetAttribute("Hp") or 1, model:GetAttribute("MaxHp") or 1
 	entry.Fill.Size = UDim2.fromScale(math.clamp(hp / max, 0, 1), 1)
+	entry.Gui.MaxDistance = if hp < max then LABEL_MINED else LABEL_NEAR
 	local claimed = model:GetAttribute("ClaimedBy")
 	local who = claimed and Players:GetPlayerByUserId(claimed)
 	entry.Claim.Text = if who and hp < max then "⛏ " .. who.DisplayName else ""
@@ -364,7 +368,7 @@ local function labelRock(model: Model)
 	local gui = new("BillboardGui", {
 		Size = UDim2.fromOffset(150, 40),
 		StudsOffsetWorldSpace = Vector3.new(0, spec.Scale * 1.15 + 1.5, 0),
-		MaxDistance = 70,
+		MaxDistance = LABEL_NEAR,
 		LightInfluence = 0,
 		AlwaysOnTop = false,
 	}, body)

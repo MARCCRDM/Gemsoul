@@ -21,10 +21,17 @@ end
 local oldFrameIndex=cmt.__index
 cmt.__index=function(a,k)
  if k=="LookVector" then return Vector3.new(-a.r[3],-a.r[6],-a.r[9]) end
+ if k=="RightVector" then return Vector3.new(a.r[1],a.r[4],a.r[7]) end
+ if k=="UpVector" then return Vector3.new(a.r[2],a.r[5],a.r[8]) end
+ if k=="VectorToWorldSpace" then
+  return function(x,v) return Vector3.new(x.r[1]*v.X+x.r[2]*v.Y+x.r[3]*v.Z,x.r[4]*v.X+x.r[5]*v.Y+x.r[6]*v.Z,x.r[7]*v.X+x.r[8]*v.Y+x.r[9]*v.Z) end
+ end
  if k=="ToOrientation" then return function(x) return 0,math.atan2(x.r[3],x.r[9]),0 end end
  return oldFrameIndex(a,k)
 end
 local Vector2={new=function(x,y) return {X=x,Y=y} end,zero={X=0,Y=0}}
+Vector3.yAxis=Vector3.new(0,1,0)
+Vector3.zAxis=Vector3.new(0,0,1)
 UDim2.fromScale=UDim2.new
 local NumberRange={new=function(...) return {...} end}
 local NumberSequence=NumberRange
@@ -155,8 +162,25 @@ for _,bay in site.Parking do
 end
 assert(counts.Hauler==2 and counts.Mole==2 and counts.Digger==1 and counts.Skipper==3,"Original vehicle mix changed")
 for _,size in {"Pebble","Boulder"} do
- local rock=World.rock(size,site.Spots[1],Random.new(55))
- assert(rock.PrimaryPart.Name=="Body" and rock.PrimaryPart.CanCollide,"Mining collision body lost")
+ for seed=1,40 do
+  local partsBefore,lightsBefore=#builtParts,#builtLights
+  local rock=World.rock(size,site.Spots[1],Random.new(seed))
+  local body=rock.PrimaryPart
+  assert(body.Name=="Body" and body.CanCollide and body.CanQuery,"Mining collision body lost")
+  assert(#builtLights==lightsBefore+1 and builtLights[#builtLights].Parent==body,"Rock lost its glow light")
+  local parts,crystals,first=0,0,nil
+  for i=partsBefore+1,#builtParts do
+   local child=builtParts[i]
+   assert(child.Parent==rock,"Rock part built outside its model")
+   parts+=1
+   assert(child.Name=="Body" or not child.CanCollide,"Rock decoration blocks walking")
+   if child.Name=="Crystal" then crystals+=1; first=first or child end
+  end
+  -- The hit chips and flash take the first crystal's colour.
+  local glow=Color3.fromRGB(110,220,255)
+  assert(crystals>=4 and math.abs(first.Color.R-glow.R)+math.abs(first.Color.G-glow.G)+math.abs(first.Color.B-glow.B)<.01,"Rock lost its crystals: "..crystals)
+  assert(parts<=(if size=="Boulder" then 32 else 22),"Rock detail budget: "..parts)
+ end
 end
 print("PASS: all 8 mech rigs, cockpit seats, walking joints, tool motors, detail budget and floor clearance; basic rock builders")
 for _,kind in Rules.MachineOrder do
