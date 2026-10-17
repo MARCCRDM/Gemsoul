@@ -67,7 +67,8 @@ GemClient.Profile = {
 }
 LobbyBoard.refresh()
 check(shown() == "Challenges,NextTask,Streak", "Desktop cards wrong: " .. shown())
-check(LobbyBoard.layout() > 300, "The column has no height")
+-- Folded to rows: each its title, one line and a thin bar.
+check(LobbyBoard.layout() == 3 * 48 + 2 * 8, "The desktop cards aren't folded to rows: " .. LobbyBoard.layout())
 -- On a phone, one slim strip: the task while learning, just its name and
 -- reward over a bar.
 local function strip(name)
@@ -119,6 +120,34 @@ check(column.Visible == true, "The board didn't come back")
 LobbyBoard.setCompact(false)
 check(card("Challenges"):FindFirstChild("Title").Text == "DAILY CHALLENGES", "The desktop title is wrong")
 check(card("Challenges"):FindFirstChild("Title").Visible == true, "The desktop lost the heading")
+-- Folded, the challenges row names the next one to do; tapping a row opens
+-- that card, tapping another folds it, and tapping the open one folds it.
+local function openRows()
+	local n = 0
+	for i = 1, 3 do
+		if card("Challenges"):FindFirstChild("Row" .. i).Visible then
+			n += 1
+		end
+	end
+	return n
+end
+local folded = strip("Challenges")
+check(openRows() == 0, "The folded challenges card shows its rows")
+check(
+	string.find(folded, "Break 10 rocks", 1, true) and string.find(folded, "3/10", 1, true),
+	"The folded challenges row doesn't name the next one: " .. folded
+)
+card("Challenges").Activated:Fire()
+check(
+	openRows() == 3 and LobbyBoard.layout() == (40 + 3 * 48 + 26) + 2 * 48 + 2 * 8,
+	"Tapping the challenges didn't open them: " .. LobbyBoard.layout()
+)
+card("Streak").Activated:Fire()
+check(openRows() == 0 and LobbyBoard.layout() == 88 + 2 * 48 + 2 * 8, "Opening the streak didn't fold the challenges")
+card("Streak").Activated:Fire()
+check(LobbyBoard.layout() == 3 * 48 + 2 * 8, "Tapping the open streak didn't fold it")
+-- The next task doesn't open in place: it opens the Tasks window (below).
+card("Challenges").Activated:Fire()
 
 -- Challenge rows: progress, done marks, the bonus line.
 local rows = card("Challenges")

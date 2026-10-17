@@ -31,6 +31,20 @@ answer three questions at a glance:
 
 A challenge that finishes flashes gold on its row.
 
+On a computer every card starts folded to a slim row: its title, one line
+of what matters and a thin bar. Tap the streak or the challenges to open
+that card; only one is open at a time, and tapping it again folds it. The
+next task's row opens the Tasks window.
+
+| Card | Folded row |
+| --- | --- |
+| Daily streak | Tomorrow's reward, the week as a bar |
+| Daily challenges | The next one still to do, its count and coins; the time until new ones |
+| Next unlock | The mode and the duels still needed |
+| Next task | The task, its count and coins |
+
+![The board folded, then the challenges and the streak opened](lobby/board-folded.png)
+
 On a phone there is room for one slim strip, under TASKS:
 - the **next task** while a player is still learning (the first two Tasks
   pages: mining and gear): its name and reward over a thin bar;
@@ -163,4 +177,4 @@ and runs the same action as the key when a button is pressed.
 | Suite | Checks | What it covers |
 | --- | --- | --- |
 | `tests/run_daily_challenges.py` | 22,446 rules + 8 server | One per group; stable rolls; progress; paying once; the bonus; new days; old saves. The server side: progress pushes, payouts, notes and the bonus |
-| `tests/run_lobby.py` | 29 board + 32 feed | The real board and feed against GUI doubles. Board: cards per screen; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside |
+| `tests/run_lobby.py` | 34 board + 32 feed | The real board and feed against GUI doubles. Board: cards per screen; folded rows, tapping one open (one at a time) and closed; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside |
