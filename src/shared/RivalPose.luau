@@ -639,6 +639,37 @@ function RivalPose.guardStep(phase: number, forward: number, side: number, amoun
 	}
 end
 
+-- Creature locomotion follows distance travelled, so feet stop when the
+-- controller stops. These offsets never move the combat root or hitbox.
+function RivalPose.creatureStep(shape: string, phase: number, forward: number, amount: number)
+	local swing = math.sin(phase)
+	local lift = math.cos(phase)
+	local stride = (if shape == "Tree" then 0.42 elseif shape == "Shark" then 0.7 else 0.55) * amount
+	local roll = (if shape == "Tree" then 0.09 elseif shape == "Crocodile" then 0.055 else 0.035) * amount
+	local arm = (if shape == "Tree" then 0.16 elseif shape == "Wood" then 0.28 else 0) * amount * swing * forward
+	return {
+		RightHip = { stride * swing * forward, 0, 0 },
+		LeftHip = { -stride * swing * forward, 0, 0 },
+		RightKnee = { -0.72 * amount * math.max(0, lift), 0, 0 },
+		LeftKnee = { -0.72 * amount * math.max(0, -lift), 0, 0 },
+		Waist = { -0.045 * amount, 0.045 * swing * amount, roll * swing },
+		RightShoulder = { -arm, 0, 0 }, LeftShoulder = { arm, 0, 0 },
+	}
+end
+
+local function creatureStance(shape: string, t: number)
+	local breath = math.sin(t * (if shape == "Tree" then 1.5 else 2))
+	local lean = if shape == "Tree" then -0.16 elseif shape == "Shark" then -0.03 else 0
+	return {
+		Waist = { lean + 0.018 * breath, 0.025 * math.sin(t * 0.7), 0 },
+		Neck = { -lean * 0.5, 0, 0 },
+		RightShoulder = { 0.15, 0, 0.08 }, LeftShoulder = { 0.15, 0, -0.08 },
+		RightElbow = { 0.25, 0, 0 }, LeftElbow = { 0.25, 0, 0 },
+		RightHip = { 0.08, 0, 0 }, LeftHip = { 0.08, 0, 0 },
+		RightKnee = { -0.12, 0, 0 }, LeftKnee = { -0.12, 0, 0 },
+	}
+end
+
 -- Timing of a blow after its wind-up: the snap through (overshooting the
 -- strike pose a little), the follow-through settling back onto it, then an
 -- eased recovery to the stance.
@@ -808,7 +839,7 @@ end
 -- actions (no fighting stance, no breathing).
 local REST = {}
 function RivalPose.pose(a, t: number, rest: boolean?): ({ [string]: { number } }, number)
-	local base = if rest then REST else breathe(READY, t)
+	local base = if rest then REST elseif a.CreatureShape then creatureStance(a.CreatureShape, t) else breathe(READY, t)
 	local bat = a.CombatPoseProfile == "SahurBat"
 	local weaponGuard = if a.WeaponBlock then WEAPON_GUARDS[a.CombatWeaponType] else nil
 	local guard = weaponGuard or (if bat then BAT_GUARD else GUARD)
@@ -997,6 +1028,7 @@ local ATTRIBUTES = {
 	"CombatWeaponType",
 	"WeaponBlock",
 	"CombatPoseProfile",
+	"CreatureShape",
 	"ActionKind",
 	"ActionStart",
 	"ActionAt",
@@ -1129,7 +1161,8 @@ function RivalPose.update(
 	local root = model:FindFirstChild("HumanoidRootPart")
 	local pace = 0
 	local moving, velocity = false, nil
-	if guardUp and root and root:IsA("BasePart") then
+	local creature = model:GetAttribute("CreatureShape")
+	if (guardUp or creature) and root and root:IsA("BasePart") then
 		moving, velocity = pcall(velocityOf, root)
 	end
 	if moving and velocity then
@@ -1143,11 +1176,21 @@ function RivalPose.update(
 	end
 	local follow = 1 - math.exp(-10 * step)
 	rig.Stride = (rig.Stride or 0) + (math.min(1, pace / 6) - (rig.Stride or 0)) * follow
-	rig.Phase = ((rig.Phase or 0) + pace * step * 2 * math.pi / STRIDE_LENGTH) % (2 * math.pi)
+	local strideLength = if creature == "Tree" then 6.5 elseif creature == "Shark" then 3.5 else STRIDE_LENGTH
+	if creature then strideLength *= model:GetScale() end
+	rig.Phase = ((rig.Phase or 0) + pace * step * 2 * math.pi / strideLength) % (2 * math.pi)
 	if rig.Stride > 0.01 then
-		target = add(target, RivalPose.guardStep(rig.Phase, rig.Forward or 1, rig.Side or 0, rig.Stride), 1)
+		if creature and not guardUp then
+			local attacking = type(attrs.ActionAt) == "number" and type(attrs.ActionStart) == "number"
+				and now >= attrs.ActionStart and now < math.max(attrs.ActionHold or 0, attrs.ActionAt + 0.9)
+			if not attacking then
+				target = add(target, RivalPose.creatureStep(creature, rig.Phase, rig.Forward or 1, rig.Stride), 1)
+			end
+		else
+			target = add(target, RivalPose.guardStep(rig.Phase, rig.Forward or 1, rig.Side or 0, rig.Stride), 1)
+		end
 	end
-	rig.Hold = (rig.Hold or 0) + ((if guardUp then 1 else 0) - (rig.Hold or 0)) * (1 - math.exp(-14 * step))
+	rig.Hold = (rig.Hold or 0) + ((if guardUp or creature then 1 else 0) - (rig.Hold or 0)) * (1 - math.exp(-14 * step))
 	-- Upper-body combat poses own their joints; do not add the walk's arm
  -- swing on top. Legs keep locomotion unless the guard owns the full body.
  local upperActive = not rest or next(target) ~= nil

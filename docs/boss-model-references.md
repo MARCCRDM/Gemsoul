@@ -9,7 +9,16 @@ The dungeon skins are original Roblox-part reconstructions guided by the visible
 | Brr Brr Patapim | [KAG3D on Sketchfab](https://sketchfab.com/3d-models/brr-brr-patapim-8fbb2c0103474c5fb10686b762e98de5) | Moss hood and trunk, long pendulous nose, root limbs, oversized bare feet and toes. |
 | Bombardiro Crocodilo | [Aizen on Sketchfab](https://sketchfab.com/3d-models/bombardiro-crocodilo-db92444b3c064933a6f8ae31b0c27810) | Horizontal crocodile-fuselage, long open jaws, staggered teeth, cockpit, broad wings, propellers, yellow leading edges and aircraft tail. |
 
-Element colors are restrained accents on the bat, dorsal edge, spores and engines. Bosses use the same creatures at 1.8x scale. The crocodile visually hovers on the existing ground-navigation controller; this is not a new flight AI. Its propellers are currently static geometry. The shark's third foot follows the pelvis, while its other feet use the existing walking joints.
+Element colors are restrained accents on the bat, dorsal edge, spores and engines. Bosses use the same creatures at 1.8x scale. The crocodile visually hovers on the existing ground-navigation controller; this is not a new flight AI.
+
+## Creature detail and movement pass — October 17, 2026
+
+- Organic volumes use resizable sphere meshes so snouts, trunks, limbs and shoes retain their authored proportions. Cosmetic geometry remains massless and excluded from collision and hit queries.
+- Sahur gains bark grain and crown growth rings; the shark gains lateral markings, nostrils and fin rays; Patapim gains root buttresses, shelf mushrooms and hanging moss; Crocodilo gains wing rivets, exhausts and navigation lamps.
+- `RivalPose` supplies distance-driven creature steps, with a slower, heavier stride for Patapim and quicker steps for Tralalero. Existing attack, guard and damage timelines remain authoritative. Creature locomotion replaces the default human walking track on the controlled joints.
+- `CreatureAnimation.client.luau` animates shark tails and the third foot, crocodile propellers, hinged lower jaws with attack reactions, and hanging moss. Detail joints are cosmetic and reset outside 180 studs. Late streamed joints are discovered on a half-second scan.
+- Boss scaling refreshes the stored detail-joint rest frames after `ScaleTo`, keeping moving details attached at both sizes.
+- `tests/run_creature_motion.py` exercises idle/reverse movement, alternating legs, action poses and bounded detail motion. `tools/render_boss_previews.py --check` executes all four builders at regular and boss sizes, checking geometry budgets, collision flags and attachment transforms. The combat regression suite and Rojo build also pass. Live multiplayer playback still needs Studio/published-game verification.
 
 ## Preview and verification
 

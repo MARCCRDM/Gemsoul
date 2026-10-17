@@ -10,12 +10,37 @@ local function part(rig, bone, name, size, pos, color, shape, rotation)
 	p.CFrame = bone.CFrame * CFrame.new(pos) * (rotation or CFrame.identity)
 	p.Color, p.Material = color, Enum.Material.SmoothPlastic
 	p.CanCollide, p.CanTouch, p.CanQuery, p.Massless = false, false, false, true
-	if shape and shape ~= "Wedge" then
+	if shape == BALL then
+		-- Ball parts clamp to a sphere. These bodies, jaws, feet and roots
+		-- need their authored proportions on all three axes.
+		local mesh = Instance.new("SpecialMesh")
+		mesh.Name = "SpecialMesh"
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = p
+	elseif shape and shape ~= "Wedge" then
 		p.Shape = shape
 	end
 	p.Parent = rig
 	local w = Instance.new("WeldConstraint")
+	w.Name = "CreatureDetail"
 	w.Part0, w.Part1, w.Parent = bone, p, p
+	return p
+end
+-- A pivot shared by several decorative parts keeps teeth with a moving jaw
+-- and fins with a moving tail. The combat skeleton/collision never changes.
+local function animate(p, motion, pivot, side)
+	local weld = p:FindFirstChild("CreatureDetail")
+	local bone = weld.Part0
+	local joint = Instance.new("Motor6D")
+	joint.Name = "CreatureMotion"
+	joint.Part0, joint.Part1 = bone, p
+	joint.C1 = p.CFrame:Inverse() * bone.CFrame * pivot
+	joint.C0 = pivot
+	joint:SetAttribute("CreatureMotion", motion)
+	joint:SetAttribute("CreatureRest", pivot)
+	joint:SetAttribute("CreatureSide", side or 1)
+	weld:Destroy()
+	joint.Parent = p
 	return p
 end
 local function eyes(rig, bone, y, z, spacing, scale, iris)
@@ -470,6 +495,81 @@ local function croc(rig, accent)
 	end
 end
 -- Creature-fitted armor preserves faces and signature silhouettes while exposing sockets.
+local function creatureDetails(rig, shape, accent)
+	local t = rig.UpperTorso
+	if shape == "Wood" then
+		-- Split bark, staggered grain and end-grain rings on the exposed crown.
+		for i = 1, 12 do
+			local a = i * math.pi / 6
+			local x, z = math.cos(a) * 0.765, math.sin(a) * 0.765
+			if z > -0.5 then
+				local p = part(rig, t, "BarkGrain", V(0.055, 1.5 + (i % 3) * 0.4, 0.035),
+					V(x, 0.2, z), C(119, 65, 29), nil, A(0, -a, (i % 3 - 1) * 0.03))
+				p.Material = Enum.Material.Wood
+			end
+		end
+		for ring = 1, 3 do
+			local radius = ring * 0.19
+			for i = 1, 12 do
+				local a = i * math.pi / 6
+				part(rig, t, "GrowthRing", V(0.018, 0.018, radius * 0.54),
+					V(math.cos(a) * radius, 2.705, math.sin(a) * radius), C(133, 79, 39), nil, A(0, -a, 0))
+			end
+		end
+	elseif shape == "Shark" then
+		for _, side in { -1, 1 } do
+			part(rig, t, "LateralStripe", V(0.06, 0.12, 2.35), V(side * 0.94, -1.57, 0.12), C(95, 125, 139), BALL)
+			part(rig, t, "Nostril", V(0.08, 0.07, 0.14), V(side * 0.48, -1.35, -2.5), dark, BALL)
+			for i = 1, 3 do
+				part(rig, t, "FinRay", V(0.035, 0.65 + i * 0.18, 0.05), V(side * 0.09, -0.35, 0.08 + i * 0.24), C(91, 124, 141), nil, A(-0.18, 0, 0))
+			end
+		end
+	elseif shape == "Tree" then
+		for _, side in { -1, 1 } do
+			for i = 1, 3 do
+				local a = side * (0.2 + i * 0.14)
+				local root = part(rig, t, "TrunkButtress", V(0.22, 1.6, 0.3), V(side * (0.35 + i * 0.12), -0.6, -0.5), C(116, 81, 43), nil, A(0, 0, a))
+				root.Material = Enum.Material.Wood
+				part(rig, t, "ShelfMushroom", V(0.46, 0.12, 0.38), V(side * 0.98, -0.5 + i * 0.39, 0.18), C(159, 140, 87), BALL)
+			end
+		end
+		for i = 1, 5 do
+			local p = part(rig, rig.Head, "HangingMoss", V(0.09, 0.35 + i * 0.06, 0.12), V((i - 3) * 0.24, -0.6, 0.45), C(72, 107, 45), BALL)
+			animate(p, "Moss", CFrame.new((i - 3) * 0.24, -0.32, 0.45), if i % 2 == 0 then -1 else 1)
+		end
+	else
+		for _, side in { -1, 1 } do
+			for i = 1, 5 do
+				part(rig, t, "WingRivet", V(0.055, 0.055, 0.055), V(side * (0.9 + i * 0.52), -0.065, 0.52 + i * 0.07), C(172, 182, 157), BALL)
+			end
+			for i = 1, 3 do
+				part(rig, t, "ExhaustPipe", V(0.25, 0.16, 0.16), V(side * 2.18, -0.36, 0.12 + i * 0.15), C(34, 38, 32), CYL)
+			end
+			part(rig, t, "WingTipLamp", V(0.16, 0.12, 0.22), V(side * 4.1, -0.12, 0.62), accent, BALL).Material = Enum.Material.Neon
+		end
+	end
+	for _, p in rig:GetChildren() do
+		if not p:IsA("BasePart") then continue end
+		local n = p.Name
+		if shape == "Shark" then
+			if n == "TailPeduncle" or n == "UpperTailFin" or n == "LowerTailFin" then
+				animate(p, "Tail", CFrame.new(0, -1.38, 1.65))
+			elseif n == "LowerJaw" then
+				animate(p, "Jaw", CFrame.new(0, -1.95, -1.3))
+			elseif n == "ThirdWalkingFin" or (p:FindFirstChild("CreatureDetail") and p:FindFirstChild("CreatureDetail").Part0 == rig.LowerTorso) then
+				animate(p, "ThirdFoot", CFrame.new(0, -0.8, 2.4))
+			end
+		elseif shape == "Crocodile" then
+			if n == "PropellerBlade" then
+				local localPos = t.CFrame:PointToObjectSpace(p.CFrame.Position)
+				animate(p, "Propeller", CFrame.new(localPos), if localPos.X < 0 then -1 else 1)
+			elseif n == "LowerJaw" or n == "LowerFang" then
+				animate(p, "Jaw", CFrame.new(0, -0.65, -1.05))
+			end
+		end
+	end
+end
+
 local function armor(rig, spec, accent, tier, hasShield)
 	local metal = C(48 + 12 * tier, 55 + 10 * tier, 63 + 9 * tier)
 	local trim = if tier == 5 then C(230, 184, 72) elseif tier == 4 then C(163, 110, 216) else C(116, 141, 164)
@@ -503,7 +603,7 @@ local function armor(rig, spec, accent, tier, hasShield)
 	if horizontal then
 		local y = if spec.Shape == "Shark" then -0.72 else 0.43
 		plate(t, "ArmoredCarapace", V(1.65, 0.22, 1.2), V(0, y, 0.75))
-		plate(t, "CranialArmor", V(0.72, 0.14, 0.55), V(0, y + 0.12, -1))
+		plate(t, "CranialArmor", V(0.72, 0.14, 0.55), V(0, if spec.Shape == "Shark" then -0.94 else y + 0.12, -1))
 		for _, side in { -1, 1 } do
 			plate(t, "FlankGuard", V(0.18, 0.55, 0.8), V(side * 0.88, y - 0.3, 0.8))
 			plate(t, "TailGreave", V(0.2, 0.27, 0.5), V(side * 0.27, y - 0.2, 2.3))
@@ -528,7 +628,7 @@ local function armor(rig, spec, accent, tier, hasShield)
 				t,
 				"EliteArmorCrest",
 				V(0.13, 0.48, 0.28),
-				V(side * 0.72, if horizontal then 0.55 else 2.65, 0.25),
+				V(side * 0.72, if spec.Shape == "Shark" then -0.42 elseif horizontal then 0.55 else 2.65, 0.25),
 				trim,
 				"Wedge"
 			)
@@ -550,6 +650,7 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	else
 		croc(rig, accent)
 	end
+	creatureDetails(rig, spec.Shape, accent)
 	-- Tung Tung wears no armor: the log is the look.
 	if spec.Shape ~= "Wood" then
 		armor(rig, spec, accent, gearTier or (if boss then 4 else 1), hasShield)
@@ -557,7 +658,14 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	if boss then
 		rig:ScaleTo(1.8)
 	end
+	-- Model scaling updates joint offsets, but not arbitrary CFrame attributes.
+	for _, joint in rig:GetDescendants() do
+		if joint:IsA("Motor6D") and joint:GetAttribute("CreatureMotion") then
+			joint:SetAttribute("CreatureRest", joint.C0)
+		end
+	end
 	rig:SetAttribute("BrainrotCharacter", spec.Id)
+	rig:SetAttribute("CreatureShape", spec.Shape)
 	rig:SetAttribute("CombatPoseProfile", if spec.Id == "Sahur" then "SahurBat" else nil)
 	rig:SetAttribute("DungeonBoss", boss)
 end

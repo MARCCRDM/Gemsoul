@@ -1,42 +1,70 @@
 from pathlib import Path
-import subprocess,math,json
+import subprocess,math,json,sys,tempfile
 import numpy as np
 from PIL import Image,ImageDraw,ImageFont
 root=Path(__file__).resolve().parents[1]
 base=(root/'.tools/render_equipment_details.py').read_text(encoding='utf-8').split("for name, path in")[0]
 ctx={'__file__':str(root/'.tools/render_equipment_details.py')};exec(base,ctx);source=ctx['source']
+source=source.replace('if key == "Size" then', 'if key == "Size" and (className == "Part" or className == "WedgePart") then')
+source=source.replace('if key == "Color" then', 'if key == "Color" and className ~= "ParticleEmitter" then')
+source=source.replace('table.insert(builtParts, values)', 'table.insert(builtParts, _self)')
 source=source.replace('return setmetatable({t={x or 0,y or 0,z or 0}', 'if type(x)=="table" then x,y,z=x.X,x.Y,x.Z end\n return setmetatable({t={x or 0,y or 0,z or 0}')
 source+='\nvmt.__add=function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end\nVector3.zero=Vector3.new(0,0,0)\n'
+source+=(root/'tests/creature_geometry_harness.luau').read_text(encoding='utf-8')+'\n'
 source+='local Skins=(function()\n'+(root/'src/server/Systems/BrainrotSkins.luau').read_text(encoding='utf-8')+'\nend)()\n'
-source+='local ElementMatchup=(function()\n'+(root/'src/shared/ElementMatchup.luau').read_text(encoding='utf-8')+'\nend)()\n'
 source+='local Rules=(function()\n'+(root/'src/shared/DungeonRules.luau').read_text(encoding='utf-8').replace('local ElementMatchup = require(script.Parent.ElementMatchup)\n','')+'\nend)()\n'
 duel=(root/'src/server/Systems/Duelist.luau').read_text(encoding='utf-8');source+=duel[duel.index('local BODY ='):duel.index('local JOINTS =')]
 source+='''
 local colors={Fire=Color3.fromRGB(238,62,54),Frost=Color3.fromRGB(64,150,255),Poison=Color3.fromRGB(70,205,90),Shock=Color3.fromRGB(255,212,40)}
 for _,spec in Rules.Roster do
  table.clear(builtParts)
- local rig={}
+ local rig=Instance.new("Model")
  for _,b in BODY do
   local p=Instance.new("Part");p.Name=b[1];p.Size=b[2];p.CFrame=CFrame.new(b[3]);p.Material="SmoothPlastic";p.Color=Color3.new(1,1,1);p.Parent=rig
   p.IsA=function(_,kind) return kind=="BasePart" end
   rig[b[1]]=p
  end
- rig.GetChildren=function() local list={} for _,b in BODY do table.insert(list,rig[b[1]]) end return list end
- rig.SetAttribute=function() end
- rig.ScaleTo=function(_,scale) for _,p in builtParts do p.Size=p.Size*scale;for i=1,3 do p.CFrame.t[i]*=scale end end end
  Skins.apply(rig,spec,colors[spec.Element],true)
+ local count,joints=0,0
+ for _,p in rig:GetChildren() do
+  if p:IsA("BasePart") and p.Transparency~=1 then
+   count+=1
+   assert(p.Massless and not p.CanCollide and not p.CanQuery and not p.CanTouch,"Cosmetics affect combat physics")
+   local joint=p:FindFirstChild("CreatureMotion")
+   if joint then
+    joints+=1
+    assert(not p:FindFirstChild("CreatureDetail"),"Animated part is also rigidly welded")
+    local rest=joint.Part0.CFrame*joint.C0*joint.C1:Inverse()
+    for i=1,3 do assert(math.abs(rest.t[i]-p.CFrame.t[i])<0.001,"Pivot shifted authored geometry") end
+    assert(joint:GetAttribute("CreatureRest")==joint.C0,"Boss rest offset not scaled")
+   end
+  end
+ end
+ assert(count<240,"Creature geometry budget exceeded")
+ if spec.Shape~="Wood" then assert(joints>=5,"Missing animated features") end
+ print("CHECK|"..spec.Id.."|"..count.." parts|"..joints.." animated details")
  print("MODEL|"..spec.Name.."|"..spec.Element.."|"..spec.Weakness)
  for _,p in builtParts do
   if p.Transparency==1 then continue end
-  local row={if p.ClassName=="WedgePart" then "Wedge" else p.Shape or "Block",p.Material,tostring(p.Size.X),tostring(p.Size.Y),tostring(p.Size.Z),tostring(p.Color.R),tostring(p.Color.G),tostring(p.Color.B)}
+  local mesh=p.FindFirstChild(p,"SpecialMesh")
+  local row={if p.ClassName=="WedgePart" then "Wedge" elseif mesh then "Ball" else p.Shape or "Block",p.Material,tostring(p.Size.X),tostring(p.Size.Y),tostring(p.Size.Z),tostring(p.Color.R),tostring(p.Color.G),tostring(p.Color.B)}
   for _,n in p.CFrame.t do table.insert(row,tostring(n)) end
   for _,n in p.CFrame.r do table.insert(row,tostring(n)) end
   print(table.concat(row,"|"))
  end
 end
 '''
-bundle=root/'.tools/boss-preview.luau';bundle.write_text(source,encoding='utf-8')
-raw=subprocess.check_output([str(root/'.tools/luau/luau.exe'),str(bundle)],text=True)
+with tempfile.TemporaryDirectory(prefix='boss-preview-') as directory:
+ bundle=Path(directory)/'preview.luau';bundle.write_text(source,encoding='utf-8')
+ raw=subprocess.check_output([str(root/'.tools/luau/luau.exe'),str(bundle)],text=True)
+ if '--check' in sys.argv:
+  for line in raw.splitlines():
+   if line.startswith('CHECK|'): print('BOSS|'+line)
+  bundle.write_text(source.replace('Skins.apply(rig,spec,colors[spec.Element],true)', 'Skins.apply(rig,spec,colors[spec.Element],false)'),encoding='utf-8')
+  normal=subprocess.check_output([str(root/'.tools/luau/luau.exe'),str(bundle)],text=True)
+  for line in normal.splitlines():
+   if line.startswith('CHECK|'): print('NORMAL|'+line)
+  raise SystemExit(0)
 models=[]
 for line in raw.splitlines():
  v=line.split('|')
