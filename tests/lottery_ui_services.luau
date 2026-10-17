@@ -82,6 +82,16 @@ function Art.show(parent,gem,slot)
  return {View=view,Camera=new("Camera",{FieldOfView=34}),Gem=gem}
 end
 function Art.pose(record) assert(record.View.Parent,"Animating a destroyed preview") end
+-- The starter roll's card effects (ElementCardFX).
+local CardFX={Themes={},create=function() return {} end,update=function() end}
+-- The starter reel's 3D gems (GemArt): a model, its view's camera, its pose.
+local reelModels=0
+local GemArt={
+ model=function(gem) reelModels+=1; local m=new("Model",{Name="Gem",Gem=gem}); function m:PivotTo() end; return m,1 end,
+ pose=function() return CFrame.new() end,
+ setupViewport=function(view) return new("Camera",{},view) end,
+ cardDistance=function(radius) return radius*3 end,
+}
 local Slots={Definitions={},SurgeDefinitions={}}
 local class={}
 local character={Class="Warrior",GearRolls={}}
@@ -96,6 +106,18 @@ local color=Color3.new(0.3,0.7,0.9)
 local GearRolls={Rarities={{Name="Rare",Color=color}}}
 local GemConfig={Elements={"Fire","Frost","Shock","Poison"},ElementLabels={Fire="Thermal",Frost="Cryo",Shock="Ion",Poison="Corrosive"},ElementColors={Fire=color,Frost=color,Shock=color,Poison=color},TierLabels={Common="Common",Uncommon="Uncommon"},TierColors={Common=color,Uncommon=color},shade=function(gem) return {Name=gem.Element.." gem"} end}
 function GemConfig.elementName(element) return GemConfig.ElementLabels[element] or element end
+-- Every rarity, each its own colour, and a shade name per element and rarity
+-- (the starter roll's reel shows them all).
+GemConfig.TierOrder={"Common","Uncommon","Rare","UltraRare","Legendary"}
+GemConfig.Shades={}
+for i,tier in GemConfig.TierOrder do
+ GemConfig.TierLabels[tier]=GemConfig.TierLabels[tier] or tier
+ GemConfig.TierColors[tier]=Color3.new(i/5,1-i/5,0.5)
+end
+for _,element in GemConfig.Elements do
+ GemConfig.Shades[element]={}
+ for _,tier in GemConfig.TierOrder do table.insert(GemConfig.Shades[element],{Tier=tier,Name=element.." "..tier}) end
+end
 local profile={Intro={Done=false},Character=character,Gems={}}
 local count=0
 local reward=nil

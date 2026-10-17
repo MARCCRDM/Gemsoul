@@ -22,7 +22,8 @@ profile.Intro.Lottery = Lottery.prepareChoice(profile, "Juggernaut", "Frost", fu
  return {Id="saved-"..element, Element=element, Tier="Common"}
 end)
 '''
-    run=source+setup+"\ndo\n"+intro+"\nend\n"+read("tests/element_picker_cases.luau")
+    # (The intro runs in its own function: its locals get their own 200 slots.)
+    run=source+setup+"\n;(function()\n"+intro+"\nend)()\n"+read("tests/element_picker_cases.luau")
     with tempfile.TemporaryDirectory(prefix="gemsoul-lottery-ui-") as directory:
         script=Path(directory)/"intro.luau"
         script.write_text(run,encoding="utf-8")

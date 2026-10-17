@@ -1643,8 +1643,10 @@ local KEYS = {
 	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CORE", Gem = "CORE GEM", Pays = "CHARGE" },
 	{ Key = "R", Color = Color3.fromRGB(120, 230, 170), Slot = "DEFENSE", Gem = "SHIELD GEM", Pays = "STAMINA" },
 }
-local WELL = 156 -- (px: the circle, the reel's window)
-local CELL = 108 -- (px: one symbol on the reel)
+local WELL = 156 -- (px: the reel's window)
+local CELL = 108 -- (px: one gem on the reel)
+local WINDOW_ROUND = 26 -- (px: the window's corners)
+local reelWindow -- (in revealMoves: the 3D gems in a reel's window)
 local function keycap(parent, key, color, size)
 	-- A physical key: a darker base under a raised cap.
 	local base = frame(
@@ -1659,23 +1661,12 @@ local function keycap(parent, key, color, size)
 	glyph.TextXAlignment, glyph.ZIndex = Enum.TextXAlignment.Center, 47
 	return base
 end
--- The reel rolls like a normal gem roll of your element: every rarity at the
--- usual odds, each in its own shade (Thermal: Ember Red up to Starfire
--- Ruby). The gems nearest the stop, the ones you watch as it slows, are 3D;
--- the ones that blur past further up are drawn flat (in the same shades) to
--- keep it light.
-local REEL_TIERS = { Common = 40, Uncommon = 28, Rare = 18, UltraRare = 9, Legendary = 5 }
-local function reelTier(rng)
-	local roll = rng:NextNumber(0, 100)
-	for _, tier in { "Legendary", "UltraRare", "Rare", "Uncommon" } do
-		roll -= REEL_TIERS[tier]
-		if roll < 0 then
-			return tier
-		end
-	end
-	return "Common"
-end
-local REEL_3D = 10 -- (cells 0 to this, nearest the stop, are 3D)
+-- The reel rolls like a real gem roll of your element: every rarity at its
+-- real odds (GemRoller), each gem in its own shade (Thermal: Ember Red up to
+-- Starfire Ruby) on a glow of its rarity's colour. Only the gems in the window
+-- are 3D: each reel keeps a few gem models per rarity and hands them to the
+-- cells passing through (a gem is about a hundred parts; a fresh one for
+-- every cell would be thousands).
 local function shadeOf(element, tier)
 	for _, shade in GemConfig.Shades[element] or {} do
 		if shade.Tier == tier then
@@ -1684,44 +1675,22 @@ local function shadeOf(element, tier)
 	end
 	return nil
 end
-local function reelGem(parent, color, tier)
-	local white = Color3.new(1, 1, 1)
-	local gem = frame(parent, {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(math.floor(CELL * 0.52), math.floor(CELL * 0.52)),
-		BackgroundColor3 = white,
-		Rotation = 45,
-		ZIndex = 46,
-	})
-	UiKit.round(gem, 6)
-	new("UIGradient", {
-		Rotation = -45,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, color:Lerp(white, 0.55)),
-			ColorSequenceKeypoint.new(0.5, color),
-			ColorSequenceKeypoint.new(1, color:Lerp(C.Ink, 0.55)),
-		}),
-	}, gem)
-	stroke(gem, GemConfig.TierColors[tier] or C.Line, 0, 3)
-	local facet = frame(gem, {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.46, 0.46),
-		BackgroundColor3 = color:Lerp(white, 0.35),
-		BackgroundTransparency = 0.25,
-		ZIndex = 46,
-	})
-	UiKit.round(facet, 3)
-	local glint = frame(gem, {
-		Position = UDim2.fromScale(0.14, 0.14),
-		Size = UDim2.fromScale(0.2, 0.2),
-		BackgroundColor3 = white,
-		BackgroundTransparency = 0.2,
-		ZIndex = 46,
-	})
-	UiKit.round(glint, 2)
-	return gem
+-- A glow of the rarity's colour behind a gem on the reel: stronger the rarer.
+local GLOW = { Common = 0.9, Uncommon = 0.86, Rare = 0.8, UltraRare = 0.74, Legendary = 0.66 }
+local function rarityGlow(cell, tier)
+	local color = GemConfig.TierColors[tier] or C.Line
+	for i, scale in { 0.86, 0.56 } do
+		local disc = frame(cell, {
+			Name = "RarityGlow",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(math.floor(CELL * scale), math.floor(CELL * scale)),
+			BackgroundColor3 = color,
+			BackgroundTransparency = (GLOW[tier] or 0.9) + (i - 1) * 0.04,
+			ZIndex = 45,
+		})
+		UiKit.round(disc, 999)
+	end
 end
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
@@ -1827,19 +1796,22 @@ local function revealMoves(kit, after)
 		local pays = label(card, "PAYS " .. spec.Pays, 11, C.Dim, Enum.Font.GothamBold)
 		pays.Position, pays.Size, pays.ZIndex = UDim2.fromOffset(72, 40), UDim2.new(1, -84, 0, 14), 45
 
-		-- The circle: a round reel window (a CanvasGroup clips to its corner).
-		local well = new("CanvasGroup", {
+		-- The reel's window: a clipped frame with rounded corners (3D gem
+		-- views don't draw inside a CanvasGroup). The gems are narrower than
+		-- the window, so they never reach its corners.
+		local well = frame(card, {
+			Name = "ReelWindow",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(0.5, 0, 0, 74 + WELL / 2),
 			Size = UDim2.fromOffset(WELL, WELL),
 			BackgroundColor3 = C.Ink,
-			BorderSizePixel = 0,
 			ClipsDescendants = true,
 			ZIndex = 44,
-		}, card)
-		UiKit.round(well, WELL)
+		})
+		UiKit.round(well, WINDOW_ROUND)
 		local wellEdge = stroke(well, spec.Color, 0.6, 2)
 		local back = frame(well, { BackgroundColor3 = C.Ink, Size = UDim2.fromScale(1, 1), ZIndex = 44 })
+		UiKit.round(back, WINDOW_ROUND)
 		new("UIGradient", {
 			Rotation = 90,
 			Color = ColorSequence.new(color:Lerp(C.Ink, 0.6), C.Ink),
@@ -1849,9 +1821,10 @@ local function revealMoves(kit, after)
 		local count = 20 + index * 7
 		local strip =
 			frame(well, { BackgroundTransparency = 1, Size = UDim2.fromOffset(WELL, CELL * count), ZIndex = 45 })
-		local symbols, cells, record, shadeNames, reelRecords = {}, {}, nil, {}, {}
+		local symbols, cells, record, shadeNames = {}, {}, nil, {}
 		for n = 0, count do
 			local cell = frame(strip, {
+				Name = "ReelCell",
 				Position = UDim2.fromOffset(0, (n - 1) * CELL),
 				Size = UDim2.fromOffset(WELL, CELL),
 				BackgroundTransparency = 1,
@@ -1859,6 +1832,8 @@ local function revealMoves(kit, after)
 			})
 			cells[n] = cell
 			if n == 2 then
+				-- Yours (the server's roll): the reel stops on it.
+				rarityGlow(cell, gem.Tier or "Common")
 				local holder = frame(cell, {
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Position = UDim2.fromScale(0.5, 0.5),
@@ -1869,36 +1844,11 @@ local function revealMoves(kit, after)
 				record = Art.show(holder, gem, nil, color, false)
 				symbols[n] = "Gem"
 			else
-				-- Gems of every rarity roll past, each in its own shade of
-				-- the element; what's inside stays hidden.
-				local tier = reelTier(rng)
+				-- Gems of every rarity roll past at their real odds, each in its
+				-- own shade of the element.
+				local tier = GemRoller.rollRarity(rng)
 				local look = shadeOf(element, tier)
-				if n <= REEL_3D then
-					local holder = frame(cell, {
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromScale(0.5, 0.5),
-						Size = UDim2.fromOffset(CELL, CELL),
-						BackgroundTransparency = 1,
-						ZIndex = 46,
-					})
-					local size = rng:NextInteger(3, 9)
-					local ok, passing = pcall(Art.show, holder, {
-						Id = "reel-" .. index .. "-" .. n,
-						Element = element,
-						Tier = tier,
-						Size = size,
-						Clarity = rng:NextInteger(3, 9),
-						Cut = rng:NextInteger(3, 9),
-					}, nil, color, false)
-					if ok and passing then
-						table.insert(reelRecords, passing)
-					else
-						holder:Destroy()
-						reelGem(cell, if look then look.Color else color, tier)
-					end
-				else
-					reelGem(cell, if look then look.Color else color, tier)
-				end
+				rarityGlow(cell, tier)
 				symbols[n] = tier
 				shadeNames[n] = look and look.Name
 			end
@@ -1907,8 +1857,9 @@ local function revealMoves(kit, after)
 			return WELL / 2 - CELL / 2 - (n - 1) * CELL
 		end
 		strip.Position = UDim2.fromOffset(0, stripY(count))
-		-- Depth: the circle darkens toward its top and bottom.
+		-- Depth: the window darkens toward its top and bottom.
 		local depth = frame(well, { BackgroundColor3 = C.Ink, Size = UDim2.fromScale(1, 1), ZIndex = 47 })
+		UiKit.round(depth, WINDOW_ROUND)
 		new("UIGradient", {
 			Rotation = 90,
 			Transparency = NumberSequence.new({
@@ -1924,6 +1875,7 @@ local function revealMoves(kit, after)
 			BackgroundTransparency = 1,
 			ZIndex = 48,
 		})
+		UiKit.round(flash, WINDOW_ROUND)
 
 		-- The surge badge: the move's icon, rising out of the gem.
 		local badge = frame(card, {
@@ -1987,7 +1939,11 @@ local function revealMoves(kit, after)
 			Strip = strip,
 			Symbols = symbols,
 			ShadeNames = shadeNames,
-			ReelRecords = reelRecords,
+			Cells = cells,
+			Shown = {}, -- cell -> { View, Model, Tier }: the 3D gems in the window
+			Free = {}, -- rarity -> gem models not in use
+			Views = {}, -- 3D views not in use
+			WellEdge = wellEdge,
 			Final = stripY(2),
 			LastCell = nil,
 			Caption = caption,
@@ -2000,10 +1956,11 @@ local function revealMoves(kit, after)
 			end
 			entry.Phase = "Gem"
 			strip.Position = UDim2.fromOffset(0, entry.Final)
-			-- Only the gem stays in the circle.
+			-- Only the gem stays in the window, and its rarity lights the edge.
 			for n, cell in cells do
 				cell.Visible = n == 2
 			end
+			wellEdge.Color = GemConfig.TierColors[gem.Tier or "Common"] or spec.Color
 			flash.BackgroundTransparency = 0
 			tween(flash, 0.4, { BackgroundTransparency = 1 })
 			punch.Scale = 1.07
@@ -2069,6 +2026,62 @@ local function revealMoves(kit, after)
 	UiKit.round(go, 10)
 	local goScale = new("UIScale", { Scale = 0.6 }, go)
 
+	-- The 3D gems in a reel's window (cells middle-1 to middle+1): each takes a
+	-- free model of its rarity (built the first time one's short) and a free
+	-- view; the ones that have left give theirs back.
+	local reelGrades = { Size = 6, Clarity = 6, Cut = 6 }
+	local function reelModel(entry, tier)
+		local free = entry.Free[tier]
+		if free and #free > 0 then
+			return table.remove(free)
+		end
+		local model, radius = GemArt.model({
+			Id = "starter-reel-" .. element .. "-" .. tier,
+			Element = element,
+			Tier = tier,
+			Size = reelGrades.Size,
+			Clarity = reelGrades.Clarity,
+			Cut = reelGrades.Cut,
+		}, false)
+		entry.Radius = entry.Radius or radius
+		return model
+	end
+	function reelWindow(entry, middle, t)
+		for n, shown in entry.Shown do
+			if n < middle - 1 or n > middle + 1 then
+				shown.Model.Parent = nil
+				entry.Free[shown.Tier] = entry.Free[shown.Tier] or {}
+				table.insert(entry.Free[shown.Tier], shown.Model)
+				shown.View.Parent = nil
+				table.insert(entry.Views, shown.View)
+				entry.Shown[n] = nil
+			end
+		end
+		for n = middle - 1, middle + 1 do
+			local tier, cell = entry.Symbols[n], entry.Cells[n]
+			if n ~= 2 and cell and GemConfig.TierColors[tier] and not entry.Shown[n] then
+				local model = reelModel(entry, tier)
+				local view = table.remove(entry.Views)
+				if not view then
+					view = new("ViewportFrame", {
+						Name = "ReelGem",
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromScale(0.5, 0.5),
+						Size = UDim2.fromOffset(CELL, CELL),
+						BackgroundTransparency = 1,
+						ZIndex = 46,
+					})
+					GemArt.setupViewport(view, GemArt.cardDistance(entry.Radius or 1))
+				end
+				model.Parent, view.Parent = view, cell
+				entry.Shown[n] = { View = view, Model = model, Tier = tier }
+			end
+		end
+		for n, shown in entry.Shown do
+			shown.Model:PivotTo(GemArt.pose(reelGrades, t * 1.6 + n * 0.9))
+		end
+	end
+
 	local born = os.clock()
 	local lastTick = 0
 	local live = RunService.RenderStepped:Connect(function()
@@ -2092,18 +2105,17 @@ local function revealMoves(kit, after)
 				local tierColor = GemConfig.TierColors[showing]
 				-- (by the gem's own name: "SOLAR GARNET  ·  ULTRA-RARE")
 				local shadeName = entry.ShadeNames[middle]
-				if tierColor and middle ~= entry.Shown then
-					entry.Shown = middle
+				if tierColor and middle ~= entry.Middle then
+					entry.Middle = middle
 					local tierName = string.upper(GemConfig.TierLabels[showing] or showing)
 					entry.Caption.Text = if shadeName
 						then string.upper(shadeName) .. "  ·  " .. tierName
 						else tierName .. "  ·  " .. entry.GemWord
 					entry.Caption.TextColor3 = tierColor
+					entry.WellEdge.Color = tierColor
 				end
-				-- The 3D gems turn as they pass, like yours.
-				for i, passing in entry.ReelRecords do
-					Art.pose(passing, t + i * 0.7, false)
-				end
+				-- The gems in the window are 3D, and turn as they pass.
+				reelWindow(entry, middle, t)
 			end
 			Art.pose(entry.Record, t, false)
 		end

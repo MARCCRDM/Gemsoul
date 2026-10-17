@@ -14,6 +14,16 @@ until the roll.
 | --- | --- | --- |
 | ![Style](showcase-kit/style.png) | ![Element](showcase-kit/picker.png) | ![Reveal](showcase-kit/reveal.png) |
 
+The roll's reels are real 3D gems of your element, each on a glow of its
+rarity's colour, rolling past at the real gem odds (`GemRoller`: Common 40,
+Uncommon 25, Rare 20, Ultra Rare 10, Legendary 5). The window's edge and the
+name under it take the colour of the gem going past. Where it stops, your
+gem, is the server's roll. Only the gems in a window are 3D: each reel keeps
+a few models per rarity and passes them along (a gem is about a hundred
+parts). The window is a clipped frame, not a CanvasGroup, because 3D views
+don't draw inside one; that is also why its corners are rounded rather than
+a circle.
+
 ## The pools
 
 | Element | Q (sword) | E (core) | R (defense) |

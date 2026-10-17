@@ -144,4 +144,47 @@ primary.Activated.Fire()
 check(primary.Text=="RETRY THE LAUNCH" and not profile.Intro.Done,"Network failure must leave the picker retryable")
 check(prepareArgs[1]==(if resuming then "Juggernaut" else "Skirmisher"),"Wrong armor sent to server")
 check(prepareArgs[2]==(if resuming then "Frost" else "Poison"),"Wrong explicit element sent to server")
+-- The starter roll: three reels of real 3D gems (no flat stand-ins), every
+-- rarity at its real odds on a glow of its colour, in clipped windows (3D
+-- views don't draw inside a CanvasGroup). Only the gems in a window are 3D,
+-- and a reel reuses its models as cells pass.
+failPrepare=false
+primary.Activated.Fire()
+local windows,glows,cellCount,tiersSeen={},0,0,{}
+for _,obj in objects do
+ if not obj.Destroyed and obj.Name=="ReelWindow" then table.insert(windows,obj) end
+ if not obj.Destroyed and obj.Name=="ReelCell" then
+  cellCount+=1
+  local mine=0
+  for _,c in obj.children do if c.Name=="RarityGlow" then mine+=1; tiersSeen[c.BackgroundColor3]=true end end
+  check(mine==2,"A reel cell has no rarity glow")
+  glows+=mine
+ end
+ check(not (obj.ClassName=="CanvasGroup" and not obj.Destroyed),"A reel window is a CanvasGroup: its 3D gems wouldn't draw")
+end
+check(#windows==3,"Expected three reel windows")
+for _,w in windows do check(w.ClassName=="Frame" and w.ClipsDescendants==true,"A reel window doesn't clip its gems") end
+check(cellCount>=60,"The reels are too short")
+local seen=0
+for _ in tiersSeen do seen+=1 end
+check(seen>=3,"The reels don't roll through the rarities")
+-- Spin each reel through every cell: never more than three 3D gems in a
+-- window, and the models are reused.
+local strips={}
+for _,obj in objects do
+ if not obj.Destroyed and obj.Name=="ReelCell" and obj.Parent and not table.find(strips,obj.Parent) then table.insert(strips,obj.Parent) end
+end
+check(#strips==3,"Expected three reel strips")
+for n=60,2,-1 do
+ for _,strip in strips do strip.Position=UDim2.fromOffset(0,24-(n-1)*108) end
+ step(0.1)
+ for _,strip in strips do
+  local shown=0
+  for _,cell in strip.children do
+   for _,c in cell.children do if c.ClassName=="ViewportFrame" and c.Name=="ReelGem" and c.Parent==cell then shown+=1 end end
+  end
+  check(shown<=3,"More than three 3D gems in a reel window")
+ end
+end
+check(reelModels>=3 and reelModels<=45,"Reel gem models not reused: "..reelModels)
 print("PASS: "..checks.." starter picker checks ("..(if resuming then "saved kit" else "fresh choice")..", no automatic element, independent armor, disabled confirmation, responsive cards, strengths without moves and retry)")
