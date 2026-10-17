@@ -39,6 +39,7 @@ local IronUi = require(script.Parent.IronUi)
 local LoadingFlow = require(script.Parent.LoadingFlow)
 local LotterySound = require(script.Parent.LotterySound)
 local MobileLayout = require(script.Parent.MobileLayout)
+local MinerLoot = require(script.Parent.MinerLoot)
 local MiningReveal = require(script.Parent.MiningWorldReveal)
 local PickImpacts = require(script.Parent.PickImpacts)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
@@ -243,6 +244,7 @@ local function fitOutpostHud()
 		promptGui.Enabled = not blocked and hud.Enabled
 	end
 	PlayerCard.setBlocked(blocked or not hud.Enabled)
+	MinerLoot.setBlocked(blocked or not hud.Enabled)
 	hint.Visible = not blocked and not mobile
 	charge.Frame.Visible = expanded
 	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")
@@ -610,9 +612,11 @@ reveal:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitReward)
 fitReward()
 local revealToken = 0
 
--- Personal totals/logging only; the server broadcasts the shared world lottery.
+-- Your loot card (MinerLoot), chat and totals. Other players see the find
+-- over your head: the server broadcasts it (MiningWorldReveal).
 function OutpostScene.reveal(loot, at: Vector3?)
 	if loot.Tutorial then return end
+	MinerLoot.push(loot)
 	local found = {}
 	if loot.Gem then table.insert(found, "[" .. (loot.Text or GemConfig.displayName(loot.Gem)) .. "]") end
 	if loot.Gear then table.insert(found, "[" .. tostring(loot.Gear) .. "]") end
@@ -1117,6 +1121,7 @@ local function exitScene()
 	revealCard.Visible = false
 	revealToken += 1
 	MiningReveal.close()
+	MinerLoot.close()
 	fitOutpostHud()
 	setWalking(false)
 	ThirdPerson.exit()
@@ -1250,6 +1255,7 @@ player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 			else
 				hud.Enabled = false
 				MiningReveal.close()
+				MinerLoot.close()
 				fitOutpostHud()
 			end
 		end)

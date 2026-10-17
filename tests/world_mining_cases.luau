@@ -57,6 +57,20 @@ for _,full in {false,true} do
 	check(textContains("+2 coins") and #liveClass("ParticleEmitter")==0,"Coins missing or empty find celebrated as a gem")
 	Reveal.close()
 end
+-- Your own find is your loot card (MinerLoot), never a box over your own head;
+-- everyone else still sees it.
+remotePlayers[player.UserId]=player
+for _,tier in {"Common","Legendary"} do
+	MiningRolls.publish(player,at,reward(tier))
+	check(packets[#packets].MinerId==player.UserId,"Own find not broadcast for other players")
+	check(#live("RollAnchor")==0 and #liveClass("BillboardGui")==0,"Miner sees their own roll over their head")
+	step(Roll.Duration+.1)
+	check(#live("AwardedGem")==0,"Miner's own result shown in the world")
+end
+MiningRolls.publish(miner,at,reward("Rare"))
+check(#live("RollAnchor")==1,"Skipping own finds hid another player's roll")
+Reveal.close()
+remotePlayers[player.UserId]=nil
 local before=#packets
 MiningRolls.publish(miner,at,{Tutorial=true,Gem=reward("Rare").Gem})
 check(#packets==before,"Tutorial broadcast twice")

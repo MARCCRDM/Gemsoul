@@ -243,6 +243,8 @@ local function step()
 end
 function Reveal.receive(packet)
 	if type(packet) ~= "table" or not canWatch() then return end
+	-- Your own finds are your loot card (MinerLoot), not a box over your head.
+	if packet.MinerId == player.UserId then return end
 	local center = aboveMiner(packet)
 	if not near(center) then return end
 	local now = workspace:GetServerTimeNow()

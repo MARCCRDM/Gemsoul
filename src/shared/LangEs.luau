@@ -844,6 +844,15 @@ return {
 	["Click to mine"] = "Clic para minar",
 	["Welcome to Saga Outpost. Rocks grow back after they're mined out."] = "Bienvenido al Puesto Saga. Las rocas vuelven a crecer después de agotarse.",
 	["Walk to PROBE-{1} (the crashed probe, east side) and press E."] = "Camina hasta la SONDA-{1} (la sonda estrellada, lado este) y presiona E.",
+	-- your loot card (and the rocks it names)
+	["Rolling"] = "Girando",
+	["Rock mined"] = "Roca minada",
+	["Gear found"] = "Equipo encontrado",
+	["Gem pouch full"] = "Bolsa de gemas llena",
+	["Regolith Chunk"] = "Trozo de regolito",
+	["Crystal Boulder"] = "Roca de cristal",
+	["Saga Monolith"] = "Monolito Saga",
+	["Star Geode"] = "Geoda estelar",
 
 	-- Loading ---------------------------------------------------------------------------------------------
 	["Loading the Outpost"] = "Cargando el Puesto",
