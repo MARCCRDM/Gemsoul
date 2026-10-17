@@ -15,6 +15,7 @@ if player:GetAttribute("CanTestDungeon") ~= true then
 end
 local gui = Instance.new("ScreenGui")
 gui.Name = "DungeonPlaytest"
+gui:SetAttribute("NoTranslate", true) -- (test tools stay in English)
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 120
 gui.Parent = player:WaitForChild("PlayerGui")
@@ -41,7 +42,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 394)
+panel.Size = UDim2.fromOffset(300, 426)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -303,6 +304,42 @@ for i, wins in { 10, 20, 30, 40, 50 } do
 		run("DevStreakCache", wins)
 	end)
 end
+
+-- LANGUAGE: the game in English or Spanish (client/Translate), whatever
+-- Roblox is set to. This session only.
+local languageCaption = versionCaption:Clone()
+languageCaption.Position = UDim2.fromOffset(6, 392)
+languageCaption.Text = "LANGUAGE"
+languageCaption.Parent = panel
+local languageButtons = {}
+local function paintLanguage()
+	local current = require(game:GetService("ReplicatedStorage").Shared.Lang).language()
+	for id, b in languageButtons do
+		local on = id == current
+		b.BackgroundColor3 = if on then Color3.fromRGB(255, 210, 126) else Color3.fromRGB(39, 61, 79)
+		b.TextColor3 = if on then Color3.fromRGB(17, 25, 36) else Color3.fromRGB(240, 245, 250)
+	end
+end
+for i, id in { "en", "es" } do
+	local b = Instance.new("TextButton")
+	b.Name = "Language" .. id
+	b.Size = UDim2.fromOffset(92, 26)
+	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 392)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 12
+	b.Text = if id == "en" then "ENGLISH" else "ESPAÑOL"
+	b.Parent = panel
+	corner(b, 5)
+	b.Activated:Connect(function()
+		player:SetAttribute("Language", id)
+		task.defer(paintLanguage)
+	end)
+	languageButtons[id] = b
+end
+paintLanguage()
+player:GetAttributeChangedSignal("Language"):Connect(function()
+	task.defer(paintLanguage)
+end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or UserInputService:GetFocusedTextBox() then

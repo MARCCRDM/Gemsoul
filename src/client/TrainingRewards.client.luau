@@ -19,6 +19,7 @@ local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
 local UserInputService = game:GetService("UserInputService")
 local Config = require(RS.Shared.Config)
+local Lang = require(RS.Shared.Lang)
 local Rules = require(RS.Shared.TrainingRewards)
 local Tutorial = require(RS.Shared.Tutorial)
 local GemClient = require(script.Parent.Modules.GemClient)
@@ -90,8 +91,10 @@ local function bar(parent: Instance, color: Color3)
 	UiKit.round(fill, 3)
 	return back, fill
 end
--- How wide some words are (Roblox's own measure; a fair guess without it).
+-- How wide some words are as the player reads them, maybe in Spanish
+-- (Roblox's own measure; a fair guess without it).
 local function textWidth(text: string, size: number, font: Enum.Font): number
+	text = Lang.translate(text)
 	local ok, bounds = pcall(function()
 		return TextService:GetTextSize(text, size, font, Vector2.new(1000, 100))
 	end)

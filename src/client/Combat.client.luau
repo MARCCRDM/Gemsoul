@@ -37,6 +37,7 @@ local BladeTrails = require(script.Parent.Modules.BladeTrails)
 local CombatSound = require(script.Parent.Modules.CombatSound)
 local MatchupUI = require(script.Parent.Modules.MatchupUI)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
+local Lang = require(ReplicatedStorage.Shared.Lang)
 local UiKit = require(script.Parent.Modules.UiKit)
 local HudChrome = require(script.Parent.Modules.HudChrome)
 if Config.MenuOnly and not Config.CombatEnabled then
@@ -105,6 +106,7 @@ local hud = new("Frame", {
 	Size = UDim2.fromOffset(600, 34),
 }, gui)
 local nameLabel = shadowed(text(hud, string.upper(player.DisplayName), 12, HudChrome.Parchment, HudChrome.Title))
+nameLabel:SetAttribute("NoTranslate", true) -- (a player's name)
 nameLabel.AutomaticSize, nameLabel.TextWrapped, nameLabel.TextTruncate =
 	Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
 nameLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -581,6 +583,7 @@ local function rivalLabel(size, color, x, y, w, h)
 	return label
 end
 local rivalName = rivalLabel(14, P.Text, 12, 7, 160, 19)
+rivalName:SetAttribute("NoTranslate", true) -- (a player's name)
 rivalName.Font = HudChrome.Title
 local rivalTag = rivalLabel(10, Color3.fromRGB(255, 120, 120), 172, 10, 66, 14)
 rivalTag.TextXAlignment = Enum.TextXAlignment.Right
@@ -1349,6 +1352,7 @@ local shown = {
 	SurgeAt = 0,
 	Surges = {} :: { [number]: any },
 	SurgeTitle = "SURGES",
+	SurgeTitleSet = "", -- (what the title was last given: its Text may be in Spanish)
 	VignetteEdges = vignette:GetChildren(),
 	Health = -1,
 	MaxHealth = -1,
@@ -1583,9 +1587,11 @@ RunService.RenderStepped:Connect(function(dt)
 			setIcon(icon, P.Dim, nil, false, false)
 		end
 	end
-	if actionBar.SurgeTitle.Text ~= shown.SurgeTitle then
+	if shown.SurgeTitleSet ~= shown.SurgeTitle then
+		shown.SurgeTitleSet = shown.SurgeTitle
 		actionBar.SurgeTitle.Text = shown.SurgeTitle
-		actionBar.SurgeTitle.Size = UDim2.fromOffset(8 + utf8.len(shown.SurgeTitle) * 7, 14)
+		-- (As wide as the words the player reads.)
+		actionBar.SurgeTitle.Size = UDim2.fromOffset(8 + utf8.len(Lang.translate(shown.SurgeTitle)) * 7, 14)
 	end
 	if beamKey and os.clock() >= nextBeamUpdate then
 		input:FireServer("Surge", beamKey, aimPoint())
@@ -1851,9 +1857,12 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 		Size = UDim2.fromScale(1, 1),
 		Font = Enum.Font.GothamBlack,
 		-- RESIST / WEAK!: the element against the target's armor (ElementMatchup).
-		Text = (if crit then "CRIT " else "")
-			.. tostring(amount)
-			.. (if matchTag == "Weak" then " WEAK!" elseif matchTag == "Resist" then " RESIST" else ""),
+		-- (In the world, so client/Translate doesn't see it: translated here.)
+		Text = Lang.translate(
+			(if crit then "CRIT " else "")
+				.. tostring(amount)
+				.. (if matchTag == "Weak" then " WEAK!" elseif matchTag == "Resist" then " RESIST" else "")
+		),
 		TextSize = if crit then 32 else 24,
 		TextColor3 = if matchTag == "Resist"
 			then Color3.fromRGB(165, 168, 180)

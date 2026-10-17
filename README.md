@@ -203,6 +203,10 @@ Every button and window has sound: a soft tick on hover, a press sound on click,
 
 How it fits together: `UiSounds.client.luau` hooks hover and click on every button automatically. A button picks its own sound with the `UiSound` attribute (`"Confirm"`, `"Tab"`, `"Back"`, or `"None"` for silence; the Mine's rocks use `"None"`). `IronUi.window` plays open and close, `UiKit.toast` plays notices and errors, and `GemClient.request` plays the sound for a craft, enchant, sale, purchase or reward. `UiSound.Volume` (0 to 1) is the master volume. To change a sound, edit its recipe in `tools/make_sounds.py` (`pip install numpy soundfile`, then `python tools/make_sounds.py`) and upload the new file.
 
+## Spanish
+
+Players whose Roblox language is Spanish see the game in Spanish (neutral Latin American). Screens still write English: `Translate.client.luau` translates each label as its text is set, using the table in `src/shared/LangEs.luau`. To test it, open the DEV panel's LANGUAGE row and pick ESPAÑOL. To translate a new text, add it to the table and run `python tests/run_lang.py`. See [docs/spanish.md](docs/spanish.md).
+
 ## Code layout
 
 ```

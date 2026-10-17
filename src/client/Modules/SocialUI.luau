@@ -199,6 +199,7 @@ local chatLog = new("ScrollingFrame", {
 	ScrollBarImageColor3 = P.Edge,
 }, chatCard)
 UiKit.round(chatLog, 8)
+chatLog:SetAttribute("NoTranslate", true) -- (players' words stay as they wrote them)
 UiKit.pad(chatLog, 8)
 UiKit.list(chatLog, 4)
 local chatInput = new("TextBox", {

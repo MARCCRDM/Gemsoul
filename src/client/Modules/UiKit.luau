@@ -33,6 +33,16 @@ function UiKit.round(parent: GuiObject, radius: number?)
 	corner.Parent = parent
 end
 
+-- One line at its own size, or smaller when the text doesn't fit (a
+-- translation can run longer than the English).
+function UiKit.fit(label: TextLabel): TextLabel
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MaxTextSize = label.TextSize
+	limit.Parent = label
+	label.TextScaled = true
+	return label
+end
+
 function UiKit.pad(parent: GuiObject, pixels: number)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingTop = UDim.new(0, pixels)

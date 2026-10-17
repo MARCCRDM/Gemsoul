@@ -71,6 +71,7 @@ end
 -- The frame -------------------------------------------------------------------------------
 
 local gui = UiKit.gui("ChatFrame", 5)
+gui:SetAttribute("NoTranslate", true) -- (players' words stay as they wrote them)
 gui.Enabled = false
 local frame = new("Frame", {
 	AnchorPoint = Vector2.new(0, 1),

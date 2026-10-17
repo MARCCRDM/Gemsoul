@@ -146,6 +146,7 @@ status.Position, status.Size = UDim2.fromOffset(0, 274), UDim2.new(1, 0, 0, 18)
 
 local busy = false
 local checkLabel: TextLabel? = nil -- the second button's caption
+local checkCaption: string? = nil -- (what it was last given: its Text may be in Spanish)
 local checkButton: TextButton
 local function draw()
 	local profile = GemClient.Profile
@@ -173,7 +174,8 @@ local function draw()
 	progress.TextColor3 = if done then P.Good else P.Dim
 	-- Once it's yours, the second button puts it on or takes it off.
 	local caption = if not claimed then "CHECK CLAIM" elseif wearing then "TAKE OFF SKIN" else "EQUIP SKIN"
-	if checkLabel and checkLabel.Text ~= caption then
+	if checkLabel and checkCaption ~= caption then
+		checkCaption = caption
 		checkLabel.Text = caption
 		checkButton.Text = caption -- (the button's own, unseen text sizes it)
 	end

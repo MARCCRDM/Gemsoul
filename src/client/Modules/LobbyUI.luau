@@ -184,14 +184,16 @@ local function card(spec)
 		label.TextXAlignment = align
 		return label
 	end
-	local emblem
+	local emblem, kicker, title
 	if big then
 		-- Tall card: the emblem up top, the words at the bottom, centred.
 		local center = Enum.TextXAlignment.Center
 		emblem = IronUi.emblem(b, spec.Emblem, spec.Color, 120)
 		emblem.Position = UDim2.fromOffset((spec.W - 120) / 2, 80)
-		place(text(b, spec.Kicker, 22, spec.Color, IronUi.Heading), 12, spec.H - 150, spec.W - 24, 26, center)
-		place(text(b, spec.Title, 40, P.Text, IronUi.Heading), 12, spec.H - 122, spec.W - 24, 50, center)
+		kicker = UiKit.fit(
+			place(text(b, spec.Kicker, 22, spec.Color, IronUi.Heading), 12, spec.H - 150, spec.W - 24, 26, center)
+		)
+		UiKit.fit(place(text(b, spec.Title, 40, P.Text, IronUi.Heading), 12, spec.H - 122, spec.W - 24, 50, center))
 		local sub = place(text(b, spec.Sub, 14, P.Dim, IronUi.Body), 20, spec.H - 66, spec.W - 40, 40, center)
 		sub.TextWrapped = true
 	else
@@ -199,16 +201,10 @@ local function card(spec)
 		local left = Enum.TextXAlignment.Left
 		emblem = IronUi.emblem(b, spec.Emblem, spec.Color, 72)
 		emblem.Position = UDim2.fromOffset(26, (spec.H - 72) / 2)
-		place(text(b, spec.Kicker, 15, spec.Color, IronUi.Heading), 122, 30, spec.W - 140, 20, left)
-		place(text(b, spec.Title, 29, P.Text, IronUi.Heading), 122, 52, spec.W - 140, 40, left)
+		kicker = UiKit.fit(place(text(b, spec.Kicker, 15, spec.Color, IronUi.Heading), 122, 30, spec.W - 140, 20, left))
+		title = UiKit.fit(place(text(b, spec.Title, 29, P.Text, IronUi.Heading), 122, 52, spec.W - 140, 40, left))
 		local sub = place(text(b, spec.Sub, 13, P.Dim, IronUi.Body), 122, 98, spec.W - 140, 32, left)
 		sub.TextWrapped = true
-	end
-	local kicker
-	for _, child in b:GetChildren() do
-		if child:IsA("TextLabel") and child.Text == spec.Kicker then
-			kicker = child
-		end
 	end
 	for _, d in emblem:GetDescendants() do
 		if d:IsA("GuiObject") then
@@ -224,6 +220,9 @@ local function card(spec)
 				child.Position -= UDim2.fromOffset(96, 0)
 			end
 		end
+		-- (The one-line words take the room too, so they keep their size.)
+		kicker.Size += UDim2.fromOffset(96, 0)
+		title.Size += UDim2.fromOffset(96, 0)
 	end
 	-- What a win pays, in a corner; for the player queues, who's searching
 	-- right now (their DuelQueue attribute), bottom right.
@@ -537,6 +536,7 @@ local levelLabel = text(levelBadge, "1", 16, Color3.fromRGB(40, 24, 0), IronUi.H
 levelLabel.Size = UDim2.fromScale(1, 1)
 levelLabel.TextStrokeTransparency = 1
 local nameLabel = text(status, "", 13, P.Text, IronUi.Heading, Enum.TextXAlignment.Left)
+nameLabel:SetAttribute("NoTranslate", true) -- (a player's name)
 nameLabel.Position, nameLabel.Size = UDim2.fromOffset(54, 7), UDim2.new(1, -140, 0, 18)
 nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 local coinsLabel = text(status, "0", 13, P.Gold, IronUi.Heading, Enum.TextXAlignment.Right)

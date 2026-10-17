@@ -216,13 +216,16 @@ local fade = new("Frame", {
 	ZIndex = 50,
 }, hud)
 
+local bannerShows = 0 -- (not banner.Text: that's what the player reads, maybe in Spanish)
 local function showBanner(message: string, color: Color3?)
+	bannerShows += 1
+	local show = bannerShows
 	banner.Text = message
 	banner.TextColor3 = color or P.Gold
 	banner.TextTransparency = 0
 	banner:FindFirstChildOfClass("UIStroke").Transparency = 0.1
 	task.delay(1.6, function()
-		if banner.Text == message then
+		if bannerShows == show then
 			tween(banner, 0.5, { TextTransparency = 1 })
 			tween(banner:FindFirstChildOfClass("UIStroke"), 0.5, { Transparency = 1 })
 		end

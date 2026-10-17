@@ -568,7 +568,8 @@ local function listingCard(parent, row, order)
 	line.TextYAlignment = Enum.TextYAlignment.Top
 	label(card, "by " .. (row.SellerName or "?"), 11, P.Dim, BODY, 72, 56, 124, 14)
 	if row.Mode == "Sell" then
-		label(card, commas(row.Price) .. " coins", 18, P.Gold, BOLD, 10, 74, 140, 24)
+		-- (Clear of the time left on the right.)
+		UiKit.fit(label(card, commas(row.Price) .. " coins", 18, P.Gold, BOLD, 10, 74, 116, 24))
 	else
 		label(card, "⇄ FOR TRADE", 14, TRADE, BOLD, 10, 74, 120, 22)
 		label(card, "Wants: " .. (Rules.WantLabels[row.Want] or "Any offer"), 11, P.Dim, BODY, 10, 96, 186, 14)
@@ -1145,7 +1146,7 @@ draw = function()
 			draw()
 		end
 	)
-	label(
+	local wallet = label(
 		bar,
 		commas(GemClient.Profile.Coins or 0) .. " coins",
 		18,
@@ -1157,6 +1158,7 @@ draw = function()
 		44,
 		Enum.TextXAlignment.Right
 	)
+	UiKit.fit(wallet)
 	button(bar, "FACE TO FACE", Color3.fromRGB(70, 76, 100), 696, 4, 164, 36, function()
 		window.Gui.Enabled = false
 		require(script.Parent.TradeUI).open()
