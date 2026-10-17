@@ -69,7 +69,10 @@ local C = {
 	Ink = Color3.fromRGB(8, 10, 16),
 }
 local BLACK, BOLD, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
-local W, H = 1100, 660
+-- (on a phone on its side, shorter, so it's drawn larger: the product page
+-- stacks tighter and the Free page scrolls)
+local SHORT = UiKit.short()
+local W, H = 1100, if SHORT then 520 else 660
 local PAGE_X, PAGE_Y = 24, 80
 local PAGE_W, PAGE_H = W - 48, H - 100
 local KIND_NAMES = {
@@ -437,7 +440,10 @@ local scale = new("UIScale", {}, panel)
 local function fit()
 	local screen = gui.AbsoluteSize
 	if screen.X > 0 then
-		scale.Scale = math.min(1, (screen.X - 24) / W, (screen.Y - 24) / H)
+		local s = math.min(1, (screen.X - 24) / W, (screen.Y - (if screen.Y < 500 then 12 else 24)) / H)
+		local room, at = UiKit.clearTopbar(screen, Vector2.new(W, H) * s)
+		scale.Scale = s * room
+		panel.Position = at
 	end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
@@ -762,7 +768,11 @@ function showBundle(key: string)
 	if not reward then
 		return
 	end
-	local card = overlayCard(860, 540)
+	-- (a short screen: the sheet is shorter, its summary stacked tighter)
+	local Y = if SHORT
+		then { Card = 474, List = 374, Pic = 110, Art = 96, Name = 118, About = 166, Lines = 212, Buy = 362 }
+		else { Card = 540, List = 440, Pic = 150, Art = 130, Name = 162, About = 214, Lines = 268, Buy = 412 }
+	local card = overlayCard(860, Y.Card)
 	local items = Store.items(reward, function(id)
 		local cosmetic = Cosmetics.get(id)
 		return if cosmetic then cosmetic.Name else id
@@ -774,7 +784,7 @@ function showBundle(key: string)
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(26, 78),
-		Size = UDim2.fromOffset(500, 440),
+		Size = UDim2.fromOffset(500, Y.List),
 		CanvasSize = UDim2.fromOffset(0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 4,
@@ -801,25 +811,25 @@ function showBundle(key: string)
 	local side = new("Frame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(548, 64),
-		Size = UDim2.fromOffset(286, 460),
+		Size = UDim2.fromOffset(286, Y.Card - 80),
 		ZIndex = 22,
 	}, card)
-	local pic = well(side, tint, 0, 0, 286, 150)
+	local pic = well(side, tint, 0, 0, 286, Y.Pic)
 	pic.ZIndex = 22
 	if hero then
-		art(pic, "Cosmetic", hero, 130)
+		art(pic, "Cosmetic", hero, Y.Art)
 	end
-	local name = wrap(text(side, Store.productName(key), 21, C.Text, BLACK, 0, 162, 286, 54))
+	local name = wrap(text(side, Store.productName(key), 21, C.Text, BLACK, 0, Y.Name, 286, 54))
 	local tagline = if bundle
 		then bundle.Tagline
 		elseif key == "StarterPack" then Store.StarterPack.Tagline
 		elseif kits and #kits == #Store.Kits then "All three squad kits, one per miner, and the FULL SQUAD title."
 		elseif kits then "Each kit dresses one of your miners."
 		else ""
-	local about = wrap(text(side, tagline, 12, C.Dim, MEDIUM, 0, 214, 286, 46))
+	local about = wrap(text(side, tagline, 12, C.Dim, MEDIUM, 0, Y.About, 286, 46))
 	local price = Store.robuxPrice(key) or 0
 	local separate = Store.separatePrice(reward)
-	local y = 268
+	local y = Y.Lines
 	local function line(left: string, right: string, color: Color3, bold: boolean?)
 		text(side, left, 13, C.Dim, MEDIUM, 0, y, 180, 20).ZIndex = 22
 		local r = text(side, right, 13, color, if bold then BLACK else BOLD, 106, y, 180, 20)
@@ -853,7 +863,7 @@ function showBundle(key: string)
 		)
 		note.ZIndex = 22
 	end
-	local b = buyButton(side, key, 0, 412, 286, 46)
+	local b = buyButton(side, key, 0, Y.Buy, 286, 46)
 	b.ZIndex = 23
 	for _, d in { name, about } do
 		d.ZIndex = 22
@@ -1061,8 +1071,38 @@ local function productPage(id: string, x: number)
 	side.Name = "ProductPage"
 	round(side, 14)
 	local inner = w - 36
-	local pic = well(side, color, 14, 14, w - 28, 216)
-	local hero = art(pic, "Cosmetic", id, 184)
+	-- Where each part sits, top to bottom (tighter on a short screen).
+	local Y = if SHORT
+		then {
+			Pic = 150,
+			Art = 126,
+			Name = 172,
+			Desc = 202,
+			DescH = 34,
+			Price = 238,
+			Buy = 276,
+			Note = 322,
+			How = 268,
+			Free = 312,
+			Offer = 342,
+			OfferH = 54,
+		}
+		else {
+			Pic = 216,
+			Art = 184,
+			Name = 242,
+			Desc = 274,
+			DescH = 44,
+			Price = 322,
+			Buy = 364,
+			Note = 416,
+			How = 356,
+			Free = 400,
+			Offer = PAGE_H - 108,
+			OfferH = 64,
+		}
+	local pic = well(side, color, 14, 14, w - 28, Y.Pic)
+	local hero = art(pic, "Cosmetic", id, Y.Art)
 	IronUi.animate(hero, function(t)
 		hero.Position = UDim2.new(0.5, 0, 0.5, math.sin(t * 1.6) * 4)
 	end)
@@ -1070,15 +1110,15 @@ local function productPage(id: string, x: number)
 	local kindTag = pill(pic, string.upper(KIND_NAMES[cosmetic.Kind] or ""), C.Text, false, 10)
 	kindTag.AnchorPoint = Vector2.new(1, 0)
 	kindTag.Position = UDim2.new(1, -12, 0, 12)
-	text(side, cosmetic.Name, 24, C.Text, BLACK, 18, 242, inner, 30).Name = "ProductName"
-	wrap(text(side, cosmetic.Description or "", 12, C.Dim, MEDIUM, 18, 274, inner, 44)).TextTruncate =
+	text(side, cosmetic.Name, 24, C.Text, BLACK, 18, Y.Name, inner, 30).Name = "ProductName"
+	wrap(text(side, cosmetic.Description or "", 12, C.Dim, MEDIUM, 18, Y.Desc, inner, Y.DescH)).TextTruncate =
 		Enum.TextTruncate.AtEnd
 	local mine, isWorn = owned(id), worn(cosmetic.Kind) == id
 	if cosmetic.Robux and not mine then
-		text(side, robux(cosmetic.Robux), 28, C.Text, BLACK, 18, 322, inner, 34).Name = "Price"
-		local yours = text(side, "One-time purchase  ·  yours to keep", 11, C.Faint, MEDIUM, 18, 322, inner, 34)
+		text(side, robux(cosmetic.Robux), 28, C.Text, BLACK, 18, Y.Price, inner, 34).Name = "Price"
+		local yours = text(side, "One-time purchase  ·  yours to keep", 11, C.Faint, MEDIUM, 18, Y.Price, inner, 34)
 		yours.TextXAlignment = Enum.TextXAlignment.Right
-		buyButton(side, id, 18, 364, inner, 46)
+		buyButton(side, id, 18, Y.Buy, inner, 46)
 		if not live(id) and Store.testPrice(id) then
 			text(
 				side,
@@ -1087,7 +1127,7 @@ local function productPage(id: string, x: number)
 				C.Faint,
 				BOLD,
 				18,
-				416,
+				Y.Note,
 				inner,
 				16
 			).Name =
@@ -1101,22 +1141,22 @@ local function productPage(id: string, x: number)
 			C.Good,
 			BOLD,
 			18,
-			324,
+			Y.Price + 2,
 			inner,
 			30
 		)
 		if isWorn then
-			button(side, "Take it off", "Secondary", 18, 364, inner, 46, function()
+			button(side, "Take it off", "Secondary", 18, Y.Buy, inner, 46, function()
 				equip(cosmetic.Kind, nil)
 			end)
 		else
-			button(side, "Wear it", "Primary", 18, 364, inner, 46, function()
+			button(side, "Wear it", "Primary", 18, Y.Buy, inner, 46, function()
 				equip(cosmetic.Kind, id)
 			end).Name =
 				"Wear"
 		end
 	else
-		text(side, "Not sold", 15, C.Gold, BOLD, 18, 324, inner, 30)
+		text(side, "Not sold", 15, C.Gold, BOLD, 18, Y.Price + 2, inner, 30)
 		wrap(
 			text(
 				side,
@@ -1125,13 +1165,13 @@ local function productPage(id: string, x: number)
 				C.Dim,
 				MEDIUM,
 				18,
-				356,
+				Y.How,
 				inner,
 				40
 			)
 		)
 		if cosmetic.Exclusive == "Invite" or cosmetic.Exclusive == "Group" or cosmetic.Exclusive == "Streak" then
-			button(side, "See Free rewards", "Secondary", 18, 400, inner, 40, function()
+			button(side, "See Free rewards", "Secondary", 18, Y.Free, inner, 40, function()
 				state.Tab = "Free"
 				refresh()
 			end)
@@ -1141,7 +1181,7 @@ local function productPage(id: string, x: number)
 	local deals = if cosmetic.Robux and not mine then Store.bundlesWith(id) else {}
 	if #deals > 0 then
 		local key = deals[1]
-		local offer = box(side, C.Sale, 18, PAGE_H - 108, inner, 64, 0.88)
+		local offer = box(side, C.Sale, 18, Y.Offer, inner, Y.OfferH, 0.88)
 		offer.Name = "BundleDeal"
 		round(offer, 10)
 		stroke(offer, C.Sale, 1, 0.55)
@@ -1163,7 +1203,7 @@ local function productPage(id: string, x: number)
 			30
 		)
 		wrap(about)
-		button(offer, "View", "Secondary", inner - 76, 16, 64, 32, function()
+		button(offer, "View", "Secondary", inner - 76, (Y.OfferH - 32) / 2, 64, 32, function()
 			if Store.kitsOf(key) then
 				state.Tab = "Bundles"
 				refresh()
@@ -1179,7 +1219,7 @@ local function productPage(id: string, x: number)
 		C.Faint,
 		BOLD,
 		18,
-		PAGE_H - 30,
+		PAGE_H - (if SHORT then 22 else 30),
 		inner,
 		16
 	)
@@ -1322,8 +1362,15 @@ local function offerBanner(parent: Instance, key: string, w: number, order: numb
 	local priceBox = box(banner, C.Window, w - 254, 14, 240, 168, 0.15)
 	round(priceBox, 12)
 	text(priceBox, "BUNDLE PRICE", 10, C.Dim, BOLD, 16, 14, 200, 14)
-	priceRow(priceBox, key, 16, 34, 30)
+	-- (the saving up beside the caption: price, old price and badge in one
+	-- row are wider than the box)
+	priceRow(priceBox, key, 16, 34, 30, false)
 	local separate = Store.separatePrice(reward)
+	if separate > (Store.robuxPrice(key) or 0) then
+		local save = pill(priceBox, "-" .. Store.savings(key) .. "%", C.Sale, true, 12)
+		save.AnchorPoint = Vector2.new(1, 0)
+		save.Position = UDim2.new(1, -14, 0, 10)
+	end
 	text(
 		priceBox,
 		if separate > 0 then "Worth " .. robux(separate) .. " bought one by one" else "",
@@ -1660,8 +1707,9 @@ local function freeAction(action: string, ...)
 	end)
 end
 
+local freeHost: GuiObject? = nil -- (the page, or on a short screen a scroller in it)
 local function freeCard(x: number, y: number, w: number, h: number, tint: Color3, title: string, blurb: string): Frame
-	local card = box(page, C.Surface, x, y, w, h)
+	local card = box(freeHost or page, C.Surface, x, y, w, h)
 	round(card, 14)
 	local rail = box(card, tint, 18, 0, w - 36, 3)
 	round(rail, 2)
@@ -1693,7 +1741,22 @@ local function drawFree()
 	local info = freeState
 	local top = 56
 	local half = math.floor((PAGE_W - 14) / 2)
-	local cardH = math.floor((PAGE_H - top - 14) / 2)
+	-- The four cards keep their full size; a short screen scrolls them.
+	local cardH = math.floor((560 - top - 14) / 2)
+	freeHost = page
+	if SHORT then
+		freeHost = new("ScrollingFrame", {
+			Name = "FreeScroll",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(0, top),
+			Size = UDim2.fromOffset(PAGE_W + 8, PAGE_H - top),
+			CanvasSize = UDim2.fromOffset(0, 2 * cardH + 14),
+			ScrollBarThickness = 4,
+			ScrollBarImageColor3 = C.Faint,
+		}, page)
+		top = 0
+	end
 
 	-- 1. The group.
 	local group = info.Group or {}
@@ -1994,7 +2057,10 @@ local function offerPopup(name: string, key: string)
 	local function fitPopup()
 		local s = popup.AbsoluteSize
 		if s.X > 0 then
-			fitScale.Scale = math.min(1, (s.X - 24) / 900, (s.Y - 24) / 420)
+			local fitted = math.min(1, (s.X - 24) / 900, (s.Y - 24) / 420)
+			local room, at = UiKit.clearTopbar(s, Vector2.new(900, 420) * fitted)
+			fitScale.Scale = fitted * room
+			card.Position = at
 		end
 	end
 	popup:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPopup)

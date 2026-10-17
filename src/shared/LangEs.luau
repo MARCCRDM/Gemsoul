@@ -1483,4 +1483,11 @@ return {
 	["Your Ion sword hits +{1}%"] = "Tu espada iónica pega +{1}%",
 	["Takes +{=}% (your armor is Corrosive)"] = "Recibe +{=}% (tu armadura es corrosiva)",
 	["Your Corrosive sword hits +{1}%"] = "Tu espada corrosiva pega +{1}%",
+
+	-- The compact (phone) Inventory.
+	["{1} SPARE"] = "{1} LIBRES",
+	["{1} OWNED"] = "{1} TUYOS",
+	["TAP TO ADD A GEM"] = "TOCA PARA AGREGAR GEMA",
+	["TAP + TO ADD A GEM"] = "TOCA + PARA AGREGAR GEMA",
+	["Add a gem to enchant it"] = "Agrega una gema para encantarla",
 }

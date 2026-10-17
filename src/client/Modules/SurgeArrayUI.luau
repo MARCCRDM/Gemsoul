@@ -23,7 +23,11 @@ local P = IronUi.Colors
 local BOLD, HEADING = IronUi.Bold, IronUi.Heading
 local new, text, box, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.clear
 
-local WIDTH, HEIGHT = 1060, 600
+-- (on a phone on its side, shorter, so it reads larger: the pouch scrolls and
+-- the loadout card moves up beside it)
+local SHORT = UiKit.short()
+local WIDTH, HEIGHT = 1060, if SHORT then 520 else 600
+local CARD_Y = if SHORT and not Tech.ManeuversEnabled then 272 else 336
 local KEYS = { "Q", "E", "R" }
 local ROMAN = { "I", "II", "III" }
 local AMPLIFIERS = {
@@ -215,7 +219,7 @@ local function pouchList(parent, profile, amps)
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(0, 294),
-		Size = UDim2.fromOffset(620, 206),
+		Size = UDim2.fromOffset(620, HEIGHT - 394),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 5,
@@ -423,7 +427,8 @@ end
 
 local function amplifierBox(parent, amps)
 	if Tech.RaritySurges then
-		local card = box(parent, UDim2.fromOffset(646, 336), UDim2.fromOffset(340, 164), P.Inset, 12)
+		local card =
+			box(parent, UDim2.fromOffset(646, CARD_Y), UDim2.fromOffset(340, HEIGHT - 100 - CARD_Y), P.Inset, 12)
 		place(label(card, "SURGE LOADOUT", 13, P.Gold), 14, 10, 312, 18)
 		for i, text in
 			{
@@ -440,7 +445,7 @@ local function amplifierBox(parent, amps)
 		return
 	end
 	local x = 646
-	local card = box(parent, UDim2.fromOffset(x, 336), UDim2.fromOffset(340, 164), P.Inset, 12)
+	local card = box(parent, UDim2.fromOffset(x, CARD_Y), UDim2.fromOffset(340, HEIGHT - 100 - CARD_Y), P.Inset, 12)
 	stroke(card, Color3.fromRGB(84, 160, 255), 1, 0.4)
 	place(label(card, "◆  SURGE AMPLIFIERS", 13, Color3.fromRGB(120, 180, 255)), 14, 10, 312, 18)
 	for i, entry in AMPLIFIERS do

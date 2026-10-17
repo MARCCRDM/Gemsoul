@@ -36,7 +36,11 @@ local GOLD = Color3.fromRGB(232, 168, 52)
 local TRADE = Color3.fromRGB(110, 170, 255)
 local READY = Color3.fromRGB(64, 196, 110)
 local PANEL = Color3.fromRGB(16, 18, 32)
-local W, H = 900, 640
+-- (on a phone on its side, shorter, so it's drawn larger: the pages under
+-- the tabs get CONTENT_H, and the item and sell pages stack tighter)
+local SHORT = UiKit.short()
+local W, H = 900, if SHORT then 520 else 640
+local CONTENT_H = H - 150
 
 local window = IronUi.window("MarketBoard", 10, W, H, "⚖", GOLD)
 window.Title.Text = "MARKET"
@@ -50,7 +54,7 @@ local bar = new("Frame", {
 local content = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(20, 134),
-	Size = UDim2.fromOffset(860, 490),
+	Size = UDim2.fromOffset(860, CONTENT_H),
 }, window.Panel)
 
 local tab = "Browse"
@@ -664,7 +668,7 @@ local function drawBrowse()
 		)
 		return
 	end
-	local grid = scroller(content, 0, 50, 860, 440, "browse")
+	local grid = scroller(content, 0, 50, 860, CONTENT_H - 50, "browse")
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(204, 168),
 		CellPadding = UDim2.fromOffset(9, 9),
@@ -679,22 +683,27 @@ end
 -- you can do with it.
 local function drawInspect()
 	local row = inspect
-	local box = panel(content, 0, 0, 860, 490)
-	itemIcon(box, row.Item, 16, 16, 260, if row.Item.Kind == "Gear" then "M:" .. row.Id else nil)
-	details(box, row.Item, 296, 16, 430, 456)
+	local box = panel(content, 0, 0, 860, CONTENT_H)
+	-- (the picture, then who's selling, the price and the button, down the left)
+	local picture = if SHORT then 180 else 260
+	local below = 16 + picture
+	itemIcon(box, row.Item, 16, 16, picture, if row.Item.Kind == "Gear" then "M:" .. row.Id else nil)
+	details(box, row.Item, 296, 16, 430, CONTENT_H - 34)
 	button(box, "BACK", Color3.fromRGB(80, 84, 110), 744, 16, 100, 34, function()
 		inspect = nil
 		draw()
 	end)
-	label(box, "Listed by " .. (row.SellerName or "?") .. "  ·  " .. timeLeft(row), 13, P.Dim, BODY, 16, 290, 260, 18)
+	local listed = "Listed by " .. (row.SellerName or "?") .. "  ·  " .. timeLeft(row)
+	label(box, listed, 13, P.Dim, BODY, 16, below + 14, 260, 18)
 	if row.Mode == "Sell" then
-		label(box, commas(row.Price) .. " coins", 26, P.Gold, BOLD, 16, 316, 260, 32)
+		label(box, commas(row.Price) .. " coins", 26, P.Gold, BOLD, 16, below + 40, 260, 32)
 	else
-		label(box, "⇄ FOR TRADE", 20, TRADE, BOLD, 16, 316, 260, 28)
-		label(box, "Wants: " .. (Rules.WantLabels[row.Want] or "Any offer"), 13, P.Dim, BODY, 16, 346, 260, 18)
+		label(box, "⇄ FOR TRADE", 20, TRADE, BOLD, 16, below + 40, 260, 28)
+		label(box, "Wants: " .. (Rules.WantLabels[row.Want] or "Any offer"), 13, P.Dim, BODY, 16, below + 70, 260, 18)
 	end
+	local buttonY = if SHORT then CONTENT_H - 68 else 420
 	if row.Seller == Players.LocalPlayer.UserId then
-		button(box, "YOURS · MANAGE", Color3.fromRGB(80, 84, 110), 16, 420, 260, 52, function()
+		button(box, "YOURS · MANAGE", Color3.fromRGB(80, 84, 110), 16, buttonY, 260, 52, function()
 			inspect = nil
 			tab = "Mine"
 			draw()
@@ -706,7 +715,7 @@ local function drawInspect()
 			if afford then "BUY FOR " .. row.Price .. " COINS" else "NOT ENOUGH COINS",
 			if afford then READY else Color3.fromRGB(90, 70, 70),
 			16,
-			420,
+			buttonY,
 			260,
 			52,
 			function()
@@ -717,7 +726,7 @@ local function drawInspect()
 			end
 		)
 	else
-		button(box, "MAKE AN OFFER", TRADE, 16, 420, 260, 52, function()
+		button(box, "MAKE AN OFFER", TRADE, 16, buttonY, 260, 52, function()
 			inspect = nil
 			offerFor = row
 			draw()
@@ -728,7 +737,7 @@ end
 -- The offer picker: one of your items for someone's trade listing.
 local function drawOfferPicker()
 	local row = offerFor
-	local box = panel(content, 0, 0, 860, 490)
+	local box = panel(content, 0, 0, 860, CONTENT_H)
 	label(box, "MAKE AN OFFER", 13, TRADE, BOLD, 16, 12, 400, 18)
 	itemIcon(box, row.Item, 16, 40, 60, "M:" .. row.Id)
 	label(box, itemName(row.Item), 17, itemColor(row.Item), BOLD, 88, 42, 500, 22)
@@ -751,7 +760,7 @@ local function drawOfferPicker()
 		draw()
 	end)
 	filters(box, 112, false)
-	local grid = scroller(box, 16, 146, 828, 332, "picker")
+	local grid = scroller(box, 16, 146, 828, CONTENT_H - 158, "picker")
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(198, 70),
 		CellPadding = UDim2.fromOffset(8, 8),
@@ -815,7 +824,7 @@ local function drawSell()
 		180,
 		18
 	)
-	local grid = scroller(content, 0, 36, 500, 454, "sell")
+	local grid = scroller(content, 0, 36, 500, CONTENT_H - 36, "sell")
 	new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(242, 70),
 		CellPadding = UDim2.fromOffset(8, 8),
@@ -867,7 +876,7 @@ local function drawSell()
 	end
 
 	-- The listing form.
-	local form = panel(content, 516, 36, 344, 454)
+	local form = panel(content, 516, 36, 344, CONTENT_H - 36)
 	if not sellPick then
 		label(form, "⚖", 48, P.Edge, BOLD, 0, 120, 344, 56, Enum.TextXAlignment.Center)
 		label(form, "Pick an item to put up", 15, P.Text, BOLD, 0, 184, 344, 20, Enum.TextXAlignment.Center)
@@ -892,22 +901,26 @@ local function drawSell()
 	local l = label(form, itemLine(item), 11, P.Dim, BODY, 88, 38, 244, 36)
 	l.TextWrapped = true
 	l.TextYAlignment = Enum.TextYAlignment.Top
-	-- Everything about it (buyers see the same).
-	local info = details(form, item, 14, 84, 322, 104, true)
-	info.BackgroundTransparency = 0.5
-	info.BackgroundColor3 = P.Inset
-	UiKit.round(info, 6)
-	UiKit.pad(info, 6)
-	chip(form, "SELL FOR COINS", sellMode == "Sell", GOLD, 14, 196, 154, function()
+	-- Everything about it (buyers see the same). A short screen leaves it to
+	-- the name and line above, and everything below moves up (dy).
+	local dy = if SHORT then -110 else 0
+	if not SHORT then
+		local info = details(form, item, 14, 84, 322, 104, true)
+		info.BackgroundTransparency = 0.5
+		info.BackgroundColor3 = P.Inset
+		UiKit.round(info, 6)
+		UiKit.pad(info, 6)
+	end
+	chip(form, "SELL FOR COINS", sellMode == "Sell", GOLD, 14, 196 + dy, 154, function()
 		sellMode = "Sell"
 		draw()
 	end)
-	chip(form, "OPEN TO TRADE", sellMode == "Trade", TRADE, 176, 196, 154, function()
+	chip(form, "OPEN TO TRADE", sellMode == "Trade", TRADE, 176, 196 + dy, 154, function()
 		sellMode = "Trade"
 		draw()
 	end)
 	if sellMode == "Sell" then
-		label(form, "PRICE (COINS)", 11, P.Dim, BOLD, 14, 232, 200, 14)
+		label(form, "PRICE (COINS)", 11, P.Dim, BOLD, 14, 232 + dy, 200, 14)
 		local box = new("TextBox", {
 			Text = tostring(sellPrice),
 			PlaceholderText = "Price",
@@ -916,7 +929,7 @@ local function drawSell()
 			Font = BOLD,
 			TextColor3 = P.Gold,
 			BackgroundColor3 = P.Inset,
-			Position = UDim2.fromOffset(14, 250),
+			Position = UDim2.fromOffset(14, 250 + dy),
 			Size = UDim2.fromOffset(316, 40),
 		}, form)
 		UiKit.round(box, 6)
@@ -928,7 +941,7 @@ local function drawSell()
 		end)
 		local x = 14
 		for _, step in { -100, -10, 10, 100, 1000 } do
-			chip(form, (if step > 0 then "+" else "") .. step, false, GOLD, x, 298, 58, function()
+			chip(form, (if step > 0 then "+" else "") .. step, false, GOLD, x, 298 + dy, 58, function()
 				sellPrice = math.clamp(sellPrice + step, Rules.MinPrice, Rules.MaxPrice)
 				draw()
 			end)
@@ -943,7 +956,7 @@ local function drawSell()
 				P.Dim,
 				BODY,
 				14,
-				330,
+				330 + dy,
 				316,
 				14
 			)
@@ -955,15 +968,15 @@ local function drawSell()
 			P.Good,
 			BOLD,
 			14,
-			348,
+			348 + dy,
 			316,
 			16
 		)
 	else
-		label(form, "WHAT DO YOU WANT FOR IT?", 11, P.Dim, BOLD, 14, 232, 300, 14)
+		label(form, "WHAT DO YOU WANT FOR IT?", 11, P.Dim, BOLD, 14, 232 + dy, 300, 14)
 		for i, want in Rules.Wants do
 			local col, rowY = (i - 1) % 2, (i - 1) // 2
-			chip(form, want.Label, sellWant == want.Id, TRADE, 14 + col * 162, 250 + rowY * 34, 154, function()
+			chip(form, want.Label, sellWant == want.Id, TRADE, 14 + col * 162, 250 + dy + rowY * 34, 154, function()
 				sellWant = want.Id
 				draw()
 			end)
@@ -975,20 +988,20 @@ local function drawSell()
 			P.Dim,
 			BODY,
 			14,
-			322,
+			322 + dy,
 			316,
 			46
 		)
 		t.TextWrapped = true
 	end
-	local note = label(form, "Out of your bag while listed · lasts 48 hours", 11, P.Dim, BODY, 14, 372, 316, 16)
+	local note = label(form, "Out of your bag while listed · lasts 48 hours", 11, P.Dim, BODY, 14, 372 + dy, 316, 16)
 	note.TextWrapped = true
 	button(
 		form,
 		if sellMode == "Sell" then "LIST FOR " .. sellPrice .. " COINS" else "LIST FOR TRADE",
 		if sellMode == "Sell" then GOLD else TRADE,
 		14,
-		394,
+		394 + dy,
 		316,
 		46,
 		function()
@@ -1015,7 +1028,7 @@ end
 local function drawMine()
 	local profile = GemClient.Profile
 	local escrow = profile and profile.Market and profile.Market.Escrow or {}
-	local list = scroller(content, 0, 0, 860, 490, "mine")
+	local list = scroller(content, 0, 0, 860, CONTENT_H, "mine")
 	UiKit.list(list, 8)
 	local order = 0
 	local function heading(value)

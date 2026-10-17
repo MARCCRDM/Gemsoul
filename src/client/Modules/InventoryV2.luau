@@ -122,11 +122,14 @@ end
 local GEM_RARITY = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 
--- The layout is drawn at 1600 x 840 and scaled to the screen.
+-- The layout is drawn at 1600 x 840 and scaled to the screen. Where that
+-- would read too small (a phone), it's built compact instead (see
+-- chooseLayout): 990 x 380, no stats column, everything else larger.
 local W, H = 1600, 840
 local TOPBAR, BOTTOM = 54, 36 -- Roblox's own buttons above; chat and DEV below
 local RIGHT_X, RIGHT_W = 1170, 390
 local LEFT_X, LEFT_W = 40, 330
+local COMPACT = false
 
 -- Small builders ---------------------------------------------------------------------------------------
 
@@ -150,7 +153,8 @@ local function text(parent: Instance, value: string, size: number, color: Color3
 	return new("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = value,
-		TextSize = size,
+		-- (compact, the small print grows: it's drawn smaller on a phone)
+		TextSize = if COMPACT then math.max(size, 13) else size,
 		TextColor3 = color,
 		Font = font or HEADING,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -511,14 +515,18 @@ local function buildTop(canvas: Frame)
 	-- Back to the lobby: a solid gold button, the one way out, never missed.
 	local back = new("TextButton", {
 		Name = "BackToLobby",
-		Text = "‹   BACK TO LOBBY",
-		TextSize = 13,
+		Text = if COMPACT then "‹  LOBBY" else "‹   BACK TO LOBBY",
+		TextSize = if COMPACT then 15 else 13,
 		Font = HEAVY,
 		TextColor3 = Color3.fromRGB(26, 18, 6),
 		AutoButtonColor = false,
 		BackgroundColor3 = C.Gold,
 	}, canvas)
-	place(back, 0, 8, 186, 40)
+	if COMPACT then
+		place(back, 0, 6, 128, 40)
+	else
+		place(back, 0, 8, 186, 40)
+	end
 	round(back, 10)
 	local backEdge = stroke(back, Color3.fromRGB(255, 226, 160), 1, 0.6)
 	back:SetAttribute("UiSound", "Back")
@@ -545,9 +553,21 @@ local function buildTop(canvas: Frame)
 		end
 	end
 	local tabs = new("Frame", { BackgroundTransparency = 1 }, canvas)
-	place(tabs, 216, 8, 820, 40)
-	local list = UiKit.list(tabs, 28, true)
+	if COMPACT then
+		place(tabs, 144, 6, 520, 40)
+	else
+		place(tabs, 216, 8, 820, 40)
+	end
+	-- (the row shrinks to fit if a language's words run longer)
+	local row = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.fromScale(1, 1),
+	}, tabs)
+	local list = UiKit.list(row, if COMPACT then 16 else 28, true)
 	list.VerticalAlignment = Enum.VerticalAlignment.Center
+	UiKit.shrinkRow(row, list)
 	-- The keyboard keys the Dashboard binds (K, L, J), shown where there's a keyboard.
 	local keyboard = UserInputService.KeyboardEnabled
 	for order, spec in {
@@ -565,12 +585,12 @@ local function buildTop(canvas: Frame)
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.fromOffset(0, 34),
 			LayoutOrder = order,
-		}, tabs)
+		}, row)
 		local inner = UiKit.list(slot, 6, true)
 		inner.VerticalAlignment = Enum.VerticalAlignment.Center
 		local b = new("TextButton", {
 			Text = spec[1],
-			TextSize = 13,
+			TextSize = if COMPACT then 14 else 13,
 			Font = HEADING,
 			TextColor3 = if on then C.Text else C.Dim,
 			BackgroundTransparency = 1,
@@ -583,7 +603,7 @@ local function buildTop(canvas: Frame)
 		bar.AnchorPoint = Vector2.new(0, 1)
 		bar.Position = UDim2.fromScale(0, 1)
 		bar.Size = UDim2.new(1, 0, 0, 2)
-		if spec[3] and keyboard then
+		if spec[3] and keyboard and not COMPACT then
 			local cap = text(slot, spec[3], 9, C.Dim, HEAVY)
 			cap.Size = UDim2.fromOffset(16, 16)
 			cap.LayoutOrder = 2
@@ -605,20 +625,25 @@ local function buildTop(canvas: Frame)
 		end
 	end
 	-- Wallet: three quiet readouts, right-aligned.
+	local readW = if COMPACT then 116 else 150
 	local function readout(x: number, caption: string)
 		local value = text(canvas, "", 18, C.Text, HEAVY)
-		place(value, x, 8, 150, 22)
+		place(value, x, 8, readW, 22)
 		value.TextXAlignment = Enum.TextXAlignment.Right
 		local cap = text(canvas, caption, 10, C.Dim, HEADING)
-		place(cap, x, 30, 150, 14)
+		place(cap, x, 30, readW, 14)
 		cap.TextXAlignment = Enum.TextXAlignment.Right
+		if COMPACT then
+			UiKit.fit(cap)
+		end
 		return value, cap
 	end
-	ui.Coins = readout(W - 520, "COINS")
-	ui.Season, ui.SeasonCap = readout(W - 340, "SEASON")
-	ui.Pick, ui.PickCap = readout(W - 160, "FREE PICK")
+	local step, margin = if COMPACT then 124 else 180, if COMPACT then 0 else 10
+	ui.Coins = readout(W - margin - readW - 2 * step, "COINS")
+	ui.Season, ui.SeasonCap = readout(W - margin - readW - step, "SEASON")
+	ui.Pick, ui.PickCap = readout(W - margin - readW, "FREE PICK")
 	local track = frame(canvas, C.Line, 0.92)
-	place(track, W - 96 - 340 + 150, 47, 96, 3)
+	place(track, W - margin - step - 96, 47, 96, 3)
 	round(track, 2)
 	ui.SeasonFill = frame(track, C.Teal)
 	ui.SeasonFill.Size = UDim2.fromScale(0, 1)
@@ -630,6 +655,16 @@ end
 
 local function buildLeft(canvas: Frame)
 	local x, w = LEFT_X, LEFT_W
+	-- Compact keeps only miner 1 / 2 / 3 and the name (over the miner): the
+	-- rest is built (the draw code fills it in) but hidden.
+	local box = canvas
+	if COMPACT then
+		box = new(
+			"Frame",
+			{ Name = "Stats", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false },
+			canvas
+		)
+	end
 	-- Miner 1 / 2 / 3.
 	ui.Miners = {}
 	for index = 1, MinerRoster.Count do
@@ -642,7 +677,11 @@ local function buildLeft(canvas: Frame)
 			BackgroundColor3 = C.Gold,
 			BackgroundTransparency = 1,
 		}, canvas)
-		place(b, x + (index - 1) * 40, 96, 32, 32)
+		if COMPACT then
+			place(b, (index - 1) * 38, 54, 32, 32)
+		else
+			place(b, x + (index - 1) * 40, 96, 32, 32)
+		end
 		round(b, 8)
 		local edge = stroke(b, C.Line, 1, 0.9)
 		b:SetAttribute("UiSound", "Tab")
@@ -653,11 +692,15 @@ local function buildLeft(canvas: Frame)
 		end)
 		ui.Miners[index] = { Button = b, Edge = edge }
 	end
-	ui.Name = place(text(canvas, "", 40, C.Text, HEAVY), x, 140, w + 120, 44)
-	ui.Sub = place(text(canvas, "", 11, C.Dim, HEADING), x, 188, w + 120, 16)
-	ui.LevelBonus = place(text(canvas, "", 10, C.Teal, BODY), x, 207, w + 120, 13)
+	if COMPACT then
+		ui.Name = place(text(canvas, "", 22, C.Text, HEAVY), 116, 54, RIGHT_X - 128, 32)
+	else
+		ui.Name = place(text(canvas, "", 40, C.Text, HEAVY), x, 140, w + 120, 44)
+	end
+	ui.Sub = place(text(box, "", 11, C.Dim, HEADING), x, 188, w + 120, 16)
+	ui.LevelBonus = place(text(box, "", 10, C.Teal, BODY), x, 207, w + 120, 13)
 	-- The rating, big, with its caption beside it on the same baseline.
-	local ratingRow = new("Frame", { BackgroundTransparency = 1 }, canvas)
+	local ratingRow = new("Frame", { BackgroundTransparency = 1 }, box)
 	place(ratingRow, x, 220, w, 64)
 	local rowList = UiKit.list(ratingRow, 12, true)
 	rowList.VerticalAlignment = Enum.VerticalAlignment.Bottom
@@ -673,86 +716,90 @@ local function buildLeft(canvas: Frame)
 	ui.Stats = {}
 	for i, stat in Classes.StatNames do
 		local y = 312 + (i - 1) * 34
-		place(text(canvas, string.upper(stat), 10, C.Dim, HEADING), x, y, 80, 16)
-		local track = frame(canvas, C.Line, 0.93)
+		place(text(box, string.upper(stat), 10, C.Dim, HEADING), x, y, 80, 16)
+		local track = frame(box, C.Line, 0.93)
 		place(track, x + 84, y + 6, 196, 4)
 		round(track, 2)
 		local fill = frame(track, STAT_COLOR[stat])
 		fill.Size = UDim2.fromScale(0, 1)
 		round(fill, 2)
-		local value = place(text(canvas, "0", 16, C.Text, HEAVY), x + w - 44, y - 2, 44, 20)
+		local value = place(text(box, "0", 16, C.Text, HEAVY), x + w - 44, y - 2, 44, 20)
 		value.TextXAlignment = Enum.TextXAlignment.Right
 		ui.Stats[stat] = { Fill = fill, Value = value, Last = nil }
 	end
-	ui.Vitals = place(text(canvas, "", 11, C.Teal, HEADING), x, 438, w + 100, 16)
+	ui.Vitals = place(text(box, "", 11, C.Teal, HEADING), x, 438, w + 100, 16)
 	-- The armor set.
-	local rule = frame(canvas, C.Line, 0.93)
+	local rule = frame(box, C.Line, 0.93)
 	place(rule, x, 456, w, 1)
-	ui.SetName = place(text(canvas, "", 11, C.Teal, HEADING), x, 470, 220, 16)
+	ui.SetName = place(text(box, "", 11, C.Teal, HEADING), x, 470, 220, 16)
 	ui.Pips = {}
 	for i = 1, 6 do
-		local pip = frame(canvas, C.Line, 0.9)
+		local pip = frame(box, C.Line, 0.9)
 		place(pip, x + w - 6 * 19 + (i - 1) * 19, 476, 14, 4)
 		round(pip, 2)
 		ui.Pips[i] = pip
 	end
-	ui.SetBonus = place(text(canvas, "", 12, C.Text, HEADING), x, 494, w, 18)
+	ui.SetBonus = place(text(box, "", 12, C.Text, HEADING), x, 494, w, 18)
 	ui.SetBonus.RichText = true
-	ui.SetNext = place(text(canvas, "", 12, C.Dim, BODY), x, 514, w, 34)
+	ui.SetNext = place(text(box, "", 12, C.Dim, BODY), x, 514, w, 34)
 	ui.SetNext.TextWrapped = true
 	ui.SetNext.TextYAlignment = Enum.TextYAlignment.Top
 	-- Elements: the radar (attack in gold, resistance in teal) and the verdict.
-	local elementRule = frame(canvas, C.Line, 0.93)
+	local elementRule = frame(box, C.Line, 0.93)
 	place(elementRule, x, 562, w + 90, 1)
-	place(text(canvas, "ELEMENTS", 11, C.Dim, HEADING), x, 574, 80, 16)
+	place(text(box, "ELEMENTS", 11, C.Dim, HEADING), x, 574, 80, 16)
 	for i, spec in { { "ATTACK", C.Gold }, { "RESIST", C.Teal } } do
-		local swatch = frame(canvas, spec[2], 0.2)
+		local swatch = frame(box, spec[2], 0.2)
 		place(swatch, x + 236 + (i - 1) * 84, 579, 14, 6)
 		round(swatch, 3)
-		place(text(canvas, spec[1], 10, C.Dim, HEADING), x + 256 + (i - 1) * 84, 574, 64, 16)
+		place(text(box, spec[1], 10, C.Dim, HEADING), x + 256 + (i - 1) * 84, 574, 64, 16)
 	end
 	local axes = {}
 	for i, element in ELEMENTS do
 		axes[i] = { Name = string.upper(GemConfig.elementName(element)), Color = GemConfig.ElementColors[element] or C.Text }
 	end
 	local RADIUS = 68
-	ui.AttackRadar = StatRadar.create(canvas, axes, RADIUS, C.Gold)
-	ui.ResistRadar = StatRadar.create(canvas, axes, RADIUS, C.Teal, { Web = false, Labels = false })
+	ui.AttackRadar = StatRadar.create(box, axes, RADIUS, C.Gold)
+	ui.ResistRadar = StatRadar.create(box, axes, RADIUS, C.Teal, { Web = false, Labels = false })
 	for _, radar in { ui.AttackRadar, ui.ResistRadar } do
 		radar.Frame.Position = UDim2.fromOffset(x + 56, 626)
 	end
 	-- Every gem you wear, by element: the mix behind the shapes.
-	ui.Mix = place(text(canvas, "", 11, C.Dim, HEADING), x, 794, w + 100, 16)
+	ui.Mix = place(text(box, "", 11, C.Dim, HEADING), x, 794, w + 100, 16)
 	ui.Mix.RichText = true
-	place(text(canvas, "Each element beats the next one, clockwise.", 10, C.Faint, MEDIUM), x, 814, w + 100, 14)
+	place(text(box, "Each element beats the next one, clockwise.", 10, C.Faint, MEDIUM), x, 814, w + 100, 14)
 	-- The verdict, beside the radar.
 	ui.Verdict = {}
 	for i, caption in { "STRONG VS", "WEAK TO", "RESISTS" } do
 		local y = 612 + (i - 1) * 62
 		local vx = x + 236
-		place(text(canvas, caption, 10, C.Dim, HEADING), vx, y, 170, 14)
+		place(text(box, caption, 10, C.Dim, HEADING), vx, y, 170, 14)
 		-- (the last row sits beside the Q card, so it stays narrower)
-		local value = place(text(canvas, "", if i == 3 then 12 else 15, C.Text, HEADING), vx, y + 15, if i == 3 then 162 else 220, 20)
+		local value = place(text(box, "", if i == 3 then 12 else 15, C.Text, HEADING), vx, y + 15, if i == 3 then 162 else 220, 20)
 		value.RichText = true
-		local detail = place(text(canvas, "", 10, C.Faint, MEDIUM), vx, y + 36, if i == 3 then 162 else 180, 14)
+		local detail = place(text(box, "", 10, C.Faint, MEDIUM), vx, y + 36, if i == 3 then 162 else 180, 14)
 		ui.Verdict[i] = { Value = value, Detail = detail }
 	end
 end
 
 local function buildStage(canvas: Frame)
-	glow(canvas, 800, 430, 360, C.Teal, 1)
+	-- (compact, the miner stands in the left column, under the name: the
+	-- same stage at about a third of the size)
+	local k = if COMPACT then 0.36 else 1
+	local cx, floorY = if COMPACT then (RIGHT_X - 12) / 2 else 800, if COMPACT then 306 else 714
+	glow(canvas, cx, if COMPACT then 210 else 430, 360 * k, C.Teal, 1)
 	-- The floor: a soft pool of light under the feet and a thin bright line.
 	for i = 1, 8 do
 		local pool = frame(canvas, C.Teal, 0.975)
 		pool.AnchorPoint = Vector2.new(0.5, 0.5)
-		place(pool, 800, 714, 140 + i * 60, 10 + i * 7)
-		pool.Position = UDim2.fromOffset(800, 714)
+		place(pool, cx, floorY, (140 + i * 60) * k, (10 + i * 7) * k)
+		pool.Position = UDim2.fromOffset(cx, floorY)
 		round(pool, 9999)
 	end
 	local line = frame(canvas, C.Teal, 0.2)
 	line.AnchorPoint = Vector2.new(0.5, 0.5)
-	place(line, 800, 714, 520, 2)
-	line.Position = UDim2.fromOffset(800, 714)
+	place(line, cx, floorY, 520 * k, 2)
+	line.Position = UDim2.fromOffset(cx, floorY)
 	new("UIGradient", {
 		Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 1),
@@ -761,7 +808,7 @@ local function buildStage(canvas: Frame)
 		}),
 	}, line)
 	local horizon = frame(canvas, C.Line, 0.95)
-	place(horizon, 420, 650, 760, 1)
+	place(horizon, cx - 380 * k, floorY - 64 * k, 760 * k, 1)
 	new("UIGradient", {
 		Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 1),
@@ -776,12 +823,20 @@ local function buildStage(canvas: Frame)
 		LightColor = Color3.fromRGB(235, 245, 255),
 		LightDirection = Vector3.new(-0.5, -0.8, 0.6),
 	}, canvas)
-	place(ui.MinerView, 470, 80, 660, 650)
+	if COMPACT then
+		place(ui.MinerView, 0, 90, RIGHT_X - 12, 230)
+	else
+		place(ui.MinerView, 470, 80, 660, 650)
+	end
 	ui.MinerSource = nil
 	ui.MinerYaw = 0
 	-- Drag across the miner to turn them.
 	local turn = new("TextButton", { Name = "TurnMiner", Text = "", AutoButtonColor = false, BackgroundTransparency = 1 }, canvas)
-	place(turn, 560, 110, 480, 600)
+	if COMPACT then
+		place(turn, 0, 90, RIGHT_X - 12, 230)
+	else
+		place(turn, 560, 110, 480, 600)
+	end
 	turn.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			ui.Turning = { X = input.Position.X, Touch = input.UserInputType == Enum.UserInputType.Touch }
@@ -790,6 +845,7 @@ local function buildStage(canvas: Frame)
 	local hint = place(text(canvas, "DRAG TO TURN", 10, C.Faint, HEADING), 700, 728, 200, 14)
 	hint.TextXAlignment = Enum.TextXAlignment.Center
 	hint.TextTransparency = 0.3
+	hint.Visible = not COMPACT
 end
 
 -- One equipment row: art, name, rarity / slot / perk, and the gem socket.
@@ -875,48 +931,71 @@ end
 
 local function buildRight(canvas: Frame)
 	local column = new("Frame", { Name = "Equipment", BackgroundTransparency = 1 }, canvas)
-	place(column, RIGHT_X, 96, RIGHT_W, 640)
-	-- The list.
-	local list = new("Frame", { Name = "List", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, column)
-	place(text(list, "EQUIPMENT", 11, C.Dim, HEADING), 0, 0, 200, 16)
-	local hint = place(text(list, "CLICK TO CHANGE", 10, C.Faint, HEADING), RIGHT_W - 200, 0, 200, 16)
-	hint.TextXAlignment = Enum.TextXAlignment.Right
 	ui.Rows = {}
 	local y = 26
-	for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
-		ui.Rows[slot] = buildRow(list, slot, y)
-		y += 80
+	-- (compact: the middle of the screen, two columns of three rows over Q/E/R)
+	if COMPACT then
+		place(column, RIGHT_X, 56, W - RIGHT_X, 324)
+	else
+		place(column, RIGHT_X, 96, RIGHT_W, 640)
 	end
-	local divider = frame(list, C.Line, 0.93)
-	place(divider, 0, y + 4, RIGHT_W, 1)
-	y += 14
-	for _, slot in { "Weapon", "Shield" } do
-		ui.Rows[slot] = buildRow(list, slot, y)
-		y += 80
+	-- The list.
+	local list = new("Frame", { Name = "List", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, column)
+	if COMPACT then
+		for i, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
+			local entry = buildRow(list, slot, ((i - 1) % 3) * 78)
+			entry.Row.Position = UDim2.fromOffset(if i > 3 then RIGHT_W + 10 else 0, ((i - 1) % 3) * 78)
+			entry.Enchant.Text = "TAP + TO ADD A GEM"
+			ui.Rows[slot] = entry
+		end
+	else
+		place(text(list, "EQUIPMENT", 11, C.Dim, HEADING), 0, 0, 200, 16)
+		local hint = place(text(list, "CLICK TO CHANGE", 10, C.Faint, HEADING), RIGHT_W - 200, 0, 200, 16)
+		hint.TextXAlignment = Enum.TextXAlignment.Right
+		for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
+			ui.Rows[slot] = buildRow(list, slot, y)
+			y += 80
+		end
+		local divider = frame(list, C.Line, 0.93)
+		place(divider, 0, y + 4, RIGHT_W, 1)
+		y += 14
+		for _, slot in { "Weapon", "Shield" } do
+			ui.Rows[slot] = buildRow(list, slot, y)
+			y += 80
+		end
 	end
 	-- Under the list: available stones, in the gem window (GemVault).
+	-- (compact: under the miner, in the left column)
+	local holder = if COMPACT then canvas else list
 	local gems = new("TextButton", {
 		Name = "GemsButton",
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(1, 1, 1),
-	}, list)
+	}, holder)
 	-- GEMS and SKINS share the row (the Q/E/R cards reach in under this column).
-	local half = (RIGHT_W - 10) / 2
-	place(gems, 0, y + 12, half, 56)
+	local half = if COMPACT then (RIGHT_X - 20) / 2 else (RIGHT_W - 10) / 2
+	local buttonY, buttonH = if COMPACT then 326 else y + 12, if COMPACT then 54 else 56
+	local iconAt, iconSize, labelX = if COMPACT then 6 else 10, if COMPACT then 32 else 40, if COMPACT then 44 else 62
+	place(gems, 0, buttonY, half, buttonH)
 	round(gems, 10)
 	new("UIGradient", {
 		Color = ColorSequence.new(Color3.fromRGB(38, 31, 60), Color3.fromRGB(16, 20, 31)),
 	}, gems)
 	local gemsEdge = stroke(gems, Color3.fromRGB(190, 120, 255), 1, 0.55)
 	local gemsIcon = frame(gems, Color3.fromRGB(255, 255, 255), 0.95)
-	place(gemsIcon, 10, 8, 40, 40)
+	place(gemsIcon, iconAt, (buttonH - iconSize) / 2, iconSize, iconSize)
 	round(gemsIcon, 20)
 	ui.GemsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, gemsIcon)
-	place(text(gems, "GEMS", 15, C.Text, HEAVY), 62, 10, 160, 20)
-	ui.GemsCount = place(text(gems, "", 10, C.Dim, HEADING), 62, 31, half - 70, 14)
+	local gemsTitle = place(text(gems, "GEMS", 15, C.Text, HEAVY), labelX, 10, math.min(160, half - labelX - 6), 20)
+	ui.GemsCount = place(text(gems, "", 10, C.Dim, HEADING), labelX, 31, half - labelX - 8, 14)
+	if COMPACT then
+		UiKit.fit(gemsTitle)
+		UiKit.fit(ui.GemsCount)
+	end
 	local review = place(text(gems, "›", 18, Color3.fromRGB(200, 150, 255), HEAVY), half - 26, 16, 16, 22)
 	review.TextXAlignment = Enum.TextXAlignment.Right
+	review.Visible = not COMPACT
 	gems:SetAttribute("UiSound", "Click")
 	gems.MouseEnter:Connect(function()
 		gemsEdge.Transparency = 0.1
@@ -925,8 +1004,8 @@ local function buildRight(canvas: Frame)
 		gemsEdge.Transparency = 0.55
 	end)
 	gems.Activated:Connect(function()
-		if ui.Canvas then
-			GemVault.open(ui.Canvas, nil, InventoryV2.beginGemDrag)
+		if ui.Popups then
+			GemVault.open(ui.Popups, nil, InventoryV2.beginGemDrag)
 		end
 	end)
 	-- Beside it: the miner's suit and weapon skin, in the Wardrobe.
@@ -935,23 +1014,27 @@ local function buildRight(canvas: Frame)
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(1, 1, 1),
-	}, list)
-	place(skins, half + 10, y + 12, half, 56)
+	}, holder)
+	place(skins, half + (if COMPACT then 8 else 10), buttonY, half, buttonH)
 	round(skins, 10)
 	new("UIGradient", {
 		Color = ColorSequence.new(Color3.fromRGB(56, 30, 48), Color3.fromRGB(16, 20, 31)),
 	}, skins)
 	local skinsEdge = stroke(skins, Color3.fromRGB(255, 120, 190), 1, 0.55)
 	local skinsIcon = frame(skins, Color3.fromRGB(255, 255, 255), 0.95)
-	place(skinsIcon, 10, 8, 40, 40)
+	place(skinsIcon, iconAt, (buttonH - iconSize) / 2, iconSize, iconSize)
 	round(skinsIcon, 20)
 	ui.SkinsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, skinsIcon)
-	place(text(skins, "SKINS", 15, C.Text, HEAVY), 62, 10, 120, 20)
-	ui.SkinsCount = place(text(skins, "", 10, C.Dim, HEADING), 62, 31, half - 70, 14)
+	local skinsTitle = place(text(skins, "SKINS", 15, C.Text, HEAVY), labelX, 10, math.min(120, half - labelX - 6), 20)
+	if COMPACT then
+		UiKit.fit(skinsTitle)
+	end
+	ui.SkinsCount = place(text(skins, "", 10, C.Dim, HEADING), labelX, 31, half - labelX - 8, 14)
 	ui.SkinsCount.TextScaled = true
-	new("UITextSizeConstraint", { MaxTextSize = 10 }, ui.SkinsCount)
+	new("UITextSizeConstraint", { MaxTextSize = ui.SkinsCount.TextSize }, ui.SkinsCount)
 	local wardrobe = place(text(skins, "›", 18, Color3.fromRGB(255, 150, 205), HEAVY), half - 26, 16, 16, 22)
 	wardrobe.TextXAlignment = Enum.TextXAlignment.Right
+	wardrobe.Visible = not COMPACT
 	skins:SetAttribute("UiSound", "Click")
 	skins.MouseEnter:Connect(function()
 		skinsEdge.Transparency = 0.1
@@ -960,8 +1043,8 @@ local function buildRight(canvas: Frame)
 		skinsEdge.Transparency = 0.55
 	end)
 	skins.Activated:Connect(function()
-		if ui.Canvas then
-			Wardrobe.open(ui.Canvas)
+		if ui.Popups then
+			Wardrobe.open(ui.Popups)
 		end
 	end)
 	y += 68
@@ -1130,7 +1213,7 @@ local function buildRight(canvas: Frame)
 		name.TextXAlignment = Enum.TextXAlignment.Center
 		local sub = text(card, "", 10, C.Dim, HEADING)
 		sub.AnchorPoint = Vector2.new(0.5, 0)
-		place(sub, cx, 146, 180, 14)
+		place(sub, cx, 146, if COMPACT then 170 else 180, 14)
 		sub.Position = UDim2.fromOffset(cx, 146)
 		sub.TextXAlignment = Enum.TextXAlignment.Center
 		local tap = hit(holder)
@@ -1202,11 +1285,20 @@ local function buildRight(canvas: Frame)
 	ui.PerkText.TextYAlignment = Enum.TextYAlignment.Top
 	ui.PerkValue = place(text(card, "", 18, C.Good, HEAVY), 18, 228, RIGHT_W - 36, 26)
 	ui.PerkValue.RichText = true
-	-- Tabs and the element filter.
-	ui.Tabs = new("Frame", { BackgroundTransparency = 1 }, detail)
-	place(ui.Tabs, 0, 320, 230, 24)
-	ui.Filters = new("Frame", { BackgroundTransparency = 1 }, detail)
-	place(ui.Filters, RIGHT_W - 150, 320, 150, 24)
+	-- Under the card (compact: beside it): the tabs and the element filter,
+	-- the grid, what a pick would change, and the buttons.
+	local lower = new("Frame", { Name = "Lower", BackgroundTransparency = 1 }, detail)
+	if COMPACT then
+		place(lower, RIGHT_W + 10, 0, RIGHT_W, 324)
+	else
+		place(lower, 0, 320, RIGHT_W, 296)
+	end
+	local gridH = if COMPACT then 160 else 144
+	ui.ButtonY = 32 + gridH + 76
+	ui.Tabs = new("Frame", { BackgroundTransparency = 1 }, lower)
+	place(ui.Tabs, 0, 0, 230, 24)
+	ui.Filters = new("Frame", { BackgroundTransparency = 1 }, lower)
+	place(ui.Filters, RIGHT_W - 150, 0, 150, 24)
 	-- The grid.
 	ui.Grid = new("ScrollingFrame", {
 		Name = "Grid",
@@ -1216,11 +1308,11 @@ local function buildRight(canvas: Frame)
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
-	}, detail)
-	place(ui.Grid, 0, 352, RIGHT_W, 144)
+	}, lower)
+	place(ui.Grid, 0, 32, RIGHT_W, gridH)
 	-- What a pick (or the hovered one) would change, and the buttons.
-	ui.Compare = frame(detail, C.Gold, 0.93)
-	place(ui.Compare, 0, 504, RIGHT_W, 60)
+	ui.Compare = frame(lower, C.Gold, 0.93)
+	place(ui.Compare, 0, 32 + gridH + 8, RIGHT_W, 60)
 	round(ui.Compare, 10)
 	ui.CompareEdge = stroke(ui.Compare, C.Gold, 1, 0.75)
 	ui.CompareText = text(ui.Compare, "", 12, C.Dim, MEDIUM)
@@ -1238,8 +1330,8 @@ local function buildRight(canvas: Frame)
 			TextColor3 = if primary then Color3.fromRGB(26, 18, 6) else C.Dim,
 			BackgroundColor3 = if primary then C.Gold else C.Ink,
 			BackgroundTransparency = if primary then 0 else 0.5,
-		}, detail)
-		place(b, x, 572, w, 44)
+		}, lower)
+		place(b, x, ui.ButtonY, w, 44)
 		round(b, 10)
 		if not primary then
 			stroke(b, C.Faint, 1, 0.2)
@@ -1285,7 +1377,13 @@ local function buildSurges(canvas: Frame)
 	-- Left edge clear of the elements panel; they reach right under the
 	-- equipment column (which ends above them), room for the whole info line.
 	local cardW, gap = 248, 12
-	local x0 = 441
+	local x0, y0 = 441, 750
+	if COMPACT then
+		-- (a row under the equipment, as wide as it)
+		gap = 10
+		cardW = math.floor((W - RIGHT_X - 2 * gap) / 3)
+		x0, y0 = RIGHT_X, 292
+	end
 	for i, key in KEYS do
 		local card = new("TextButton", {
 			Name = "Key" .. key,
@@ -1294,7 +1392,7 @@ local function buildSurges(canvas: Frame)
 			BackgroundColor3 = Color3.fromRGB(10, 14, 22),
 			BackgroundTransparency = 0.2,
 		}, canvas)
-		place(card, x0 + (i - 1) * (cardW + gap), 750, cardW, 66)
+		place(card, x0 + (i - 1) * (cardW + gap), y0, cardW, 66)
 		round(card, 12)
 		local edge = stroke(card, C.Line, 1, 0.9)
 		local icon = frame(card, C.Ink, 0.3)
@@ -1305,6 +1403,9 @@ local function buildSurges(canvas: Frame)
 		glyph.TextXAlignment = Enum.TextXAlignment.Center
 		local name = place(text(card, "", 14, C.Text, HEADING), 68, 14, cardW - 80, 18)
 		local info = place(text(card, "", 10, C.Dim, MEDIUM), 68, 36, cardW - 80, 14)
+		if COMPACT then
+			UiKit.fit(info)
+		end
 		local badge = text(card, key, 11, C.Text, HEAVY)
 		badge.Position = UDim2.fromOffset(3, 3)
 		badge.Size = UDim2.fromOffset(20, 18)
@@ -1342,6 +1443,9 @@ local function buildSurges(canvas: Frame)
 		-- The key's job, above its name (OFFENSE / ABILITY / DEFENSE).
 		local lane = place(text(card, "", 9, C.Dim, HEAVY), 68, 4, cardW - 80, 12)
 		lane.TextTransparency = 0.1
+		if COMPACT then
+			UiKit.fit(lane)
+		end
 		ui.Keys[key] = { Card = card, Edge = edge, Icon = icon, Glyph = glyph, Name = name, Info = info, Line = line, Badge = badge, Lane = lane }
 	end
 end
@@ -1896,7 +2000,8 @@ local function drawNudge(profile, loadout)
 		first = first or "E"
 	end
 	local spare = #GemInventory.available(profile)
-	ui.Nudge.Visible = #empty > 0
+	-- (compact has no room for it: the rows' empty sockets glow instead)
+	ui.Nudge.Visible = #empty > 0 and not COMPACT
 	ui.NudgeTarget = first
 	if #empty == 0 then
 		return
@@ -1933,6 +2038,7 @@ local function drawKeys(loadout)
 				whole(surge.Cooldown or 0),
 				if surge.Triad then "  ·  " .. whole((surge.Output or 1) * 100) .. "% power" else ""
 			)
+			elseif COMPACT then "TAP TO ADD A GEM"
 			else "ADD STONE  ·  CLICK OR DRAG & DROP"
 		entry.Line.BackgroundColor3 = tint
 		entry.Line.BackgroundTransparency = if gem then 0.15 else 0.7
@@ -2284,7 +2390,7 @@ function InventoryV2.drawCompare()
 		ui.Secondary.Visible = hasGem
 		ui.Secondary.Text = if table.find(KEYS, target) then "CLEAR " .. target else "REMOVE GEM"
 	end
-	ui.Secondary.Position = if ui.Primary.Visible then UDim2.fromOffset(262, 572) else UDim2.fromOffset(0, 572)
+	ui.Secondary.Position = UDim2.fromOffset(if ui.Primary.Visible then 262 else 0, ui.ButtonY)
 	ui.Secondary.Size = if ui.Primary.Visible then UDim2.fromOffset(RIGHT_W - 262, 44) else UDim2.fromOffset(RIGHT_W, 44)
 end
 
@@ -2322,6 +2428,11 @@ local function drawDetail(loadout)
 	local target = state.Detail
 	ui.List.Visible = target == nil
 	ui.Detail.Visible = target ~= nil
+	-- (compact, the open piece takes the Q / E / R row's place too: its strip
+	-- still hops to them)
+	for _, entry in ui.Keys do
+		entry.Card.Visible = not (COMPACT and target ~= nil)
+	end
 	if not target then
 		return
 	end
@@ -2560,6 +2671,9 @@ do
 		end
 	end
 	function InventoryV2.showTip(slot: string, row: GuiObject)
+		if COMPACT then
+			return -- (a touch screen: a tap opens the piece instead)
+		end
 		local loadout = loadoutNow()
 		local gear = gearOf(loadout, slot)
 		if not gear or not ui.Canvas then
@@ -2658,7 +2772,7 @@ local function drawGemsButton(profile, loadout)
 			best, bestRank = gem, rank
 		end
 	end
-	ui.GemsCount.Text = string.format("%d AVAILABLE", #available)
+	ui.GemsCount.Text = string.format(if COMPACT then "%d SPARE" else "%d AVAILABLE", #available)
 	local key = best and best.Id or ""
 	if gemsShown ~= key then
 		gemsShown = key
@@ -2691,7 +2805,9 @@ local function drawSkinsButton(profile)
 	local function count(n: number, what: string): string
 		return string.format("%d %s%s", n, what, if n == 1 then "" else "S")
 	end
-	ui.SkinsCount.Text = count(suits, "SUIT") .. "  ·  " .. count(skins, "SKIN") .. "  ·  " .. count(picks, "PICK")
+	ui.SkinsCount.Text = if COMPACT
+		then string.format("%d OWNED", suits + skins + picks)
+		else count(suits, "SUIT") .. "  ·  " .. count(skins, "SKIN") .. "  ·  " .. count(picks, "PICK")
 	local key = tostring(cosmetics.Suit) .. "/" .. tostring(cosmetics.Skin)
 	if skinsShown ~= key then
 		skinsShown = key
@@ -2743,7 +2859,8 @@ local function buildIntro(canvas: Frame)
 		Visible = false,
 		ZIndex = 40,
 	}, canvas)
-	place(shade, -400, -200, W + 800, H + 400)
+	-- (drawn for the full 1600 x 840 layout, on the popup layer when compact)
+	place(shade, -400, -200, 1600 + 800, 840 + 400)
 	local panel = frame(shade, Color3.fromRGB(12, 16, 24), 0.02)
 	panel.ZIndex = 41
 	place(panel, 400 + 300, 200 + 150, 1000, 520)
@@ -2844,9 +2961,26 @@ end
 
 -- Mount ------------------------------------------------------------------------------------------------
 
+-- Compact when the full layout would show at under 70% of its size (a
+-- phone, a small window): chosen once, as the Inventory is built.
+local function chooseLayout(host: ScreenGui)
+	local screen = host.AbsoluteSize
+	if screen.X <= 0 and workspace.CurrentCamera then
+		screen = workspace.CurrentCamera.ViewportSize
+	end
+	if screen.X > 0 and math.min(screen.X / W, (screen.Y - TOPBAR - BOTTOM) / H) < 0.7 then
+		-- The miner's column on the left (224 wide), two columns of rows.
+		COMPACT = true
+		W, H = 990, 380
+		RIGHT_X, RIGHT_W = 236, 372
+		BOTTOM = 12 -- (no chat box under it on a phone)
+	end
+end
+
 local root: Frame? = nil
 function InventoryV2.mount(host: ScreenGui)
 	gui = host
+	chooseLayout(host)
 	local holder = new("Frame", { Name = "InventoryV2", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 2 }, host)
 	root = holder
 	buildBackground(holder)
@@ -2864,13 +2998,41 @@ function InventoryV2.mount(host: ScreenGui)
 	}, safe)
 	local scale = new("UIScale", {}, canvas)
 	ui.Canvas = canvas
+	-- What opens over the Inventory (the gem vault, the wardrobe, the triad
+	-- intro) is drawn for the full layout. Compact, it gets a full-screen
+	-- layer of its own, scaled as large as the screen allows.
+	ui.Popups = canvas
+	local popups: Frame? = nil
+	local popupScale: UIScale? = nil
+	if COMPACT then
+		popups = new("Frame", {
+			Name = "Popups",
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(1600, 840),
+			ZIndex = 3,
+		}, holder)
+		popupScale = new("UIScale", {}, popups)
+		ui.Popups = popups
+	end
 	local function fit()
 		if not gui then
 			return
 		end
 		local screen = gui.AbsoluteSize
 		if screen.X > 0 and screen.Y > TOPBAR + BOTTOM then
-			scale.Scale = math.min(screen.X / W, (screen.Y - TOPBAR - BOTTOM) / H)
+			-- (compact, the canvas can fill the width: keep a gutter at each side)
+			local wide = if COMPACT then screen.X - 32 else screen.X
+			scale.Scale = math.min(wide / W, (screen.Y - TOPBAR - BOTTOM) / H)
+			if popups and popupScale then
+				-- (the vault and the wardrobe are 1360 x 720, centred, clear of
+				-- Roblox's buttons at the top)
+				local s = math.min(screen.X / 1360, screen.Y / 720)
+				local room, at = UiKit.clearTopbar(screen, Vector2.new(1360, 720) * s)
+				popupScale.Scale = s * room
+				popups.Position = at
+			end
 		end
 	end
 	host:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
@@ -2880,7 +3042,7 @@ function InventoryV2.mount(host: ScreenGui)
 	buildLeft(canvas)
 	buildRight(canvas)
 	buildSurges(canvas)
-	buildIntro(canvas)
+	buildIntro(ui.Popups)
 	host:GetPropertyChangedSignal("Enabled"):Connect(function()
 		if host.Enabled then
 			draw()

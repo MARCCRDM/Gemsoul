@@ -19,7 +19,10 @@ local P = IronUi.Colors
 local BOLD, HEADING = IronUi.Bold, IronUi.Heading
 local new, text, box, button, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
 
-local WIDTH, HEIGHT = 1000, 560
+-- (on a phone on its side, shorter: the note under the track goes, so the
+-- rest reads larger)
+local SHORT = UiKit.short()
+local WIDTH, HEIGHT = 1000, if SHORT then 470 else 560
 -- What earns XP (Season.XP), the main loop first. Dungeon kills only while
 -- dungeons are open (Config.Features).
 local XP_LABELS = {
@@ -268,7 +271,10 @@ function SeasonUI.refresh()
 		table.insert(ways, string.format("%s +%d", entry[2], Season.XP[entry[1]]))
 	end
 	local earn = text(body, "EARN XP:  " .. table.concat(ways, "   •   "), 13, P.Dim, BOLD)
-	earn.Position = UDim2.fromOffset(0, 340)
+	earn.Position = UDim2.fromOffset(0, if SHORT then 336 else 340)
+	if SHORT then
+		return
+	end
 	local hint = text(
 		body,
 		"Special levels (5, 10, 15, 20, 25, 30) unlock trims and back pieces. Premium adds a Moonsteel skin, a title and the Lunar Frontier suit.",

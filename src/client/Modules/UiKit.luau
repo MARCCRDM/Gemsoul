@@ -17,6 +17,56 @@ UiKit.Colors = {
 }
 local K = UiKit.Colors
 
+-- A short screen: a phone on its side. Windows lay out shorter for it.
+-- (Before the camera knows the screen, a touch screen without a keyboard
+-- counts as one.)
+function UiKit.short(): boolean
+	local camera = workspace.CurrentCamera
+	-- (pcall: a stand-in camera in tests may have no screen size)
+	local ok, size = pcall(function()
+		return if camera then camera.ViewportSize else Vector2.zero
+	end)
+	if not ok or size.Y <= 2 then
+		local found, touch = pcall(function()
+			local input = game:GetService("UserInputService")
+			return input.TouchEnabled and not input.KeyboardEnabled
+		end)
+		return found and touch
+	end
+	return size.Y < 500
+end
+
+-- A box centred on a screen that ignores the top bar's inset. On a short
+-- screen a big box reaches the top, under Roblox's buttons there, so it moves
+-- beside them or shrinks to fit below them, whichever leaves it bigger.
+-- `size` is the box as already scaled to fit. Returns a further scale (1 or
+-- less) and the box's Position for an AnchorPoint of 0.5, 0.5.
+function UiKit.clearTopbar(screen: Vector2, size: Vector2): (number, UDim2)
+	local centre = UDim2.fromScale(0.5, 0.5)
+	if screen.Y >= 500 then
+		return 1, centre
+	end
+	local ok, bar = pcall(function()
+		return game:GetService("GuiService").TopbarInset
+	end)
+	local top = if ok and bar then bar.Max.Y else 0
+	if top <= 0 or (screen.Y - size.Y) / 2 >= top then
+		return 1, centre
+	end
+	-- Beside: between the buttons on the left and any on the right.
+	local left = bar.Min.X + 8
+	local right = (if bar.Max.X > bar.Min.X then bar.Max.X else screen.X) - 8
+	local beside = math.min(1, (right - left) / size.X)
+	-- Below: from the bar down to the screen's edge.
+	local below = math.min(1, (screen.Y - top - 8) / size.Y)
+	if beside >= below then
+		local half = size.X * beside / 2
+		local x = math.clamp(screen.X / 2, left + half, math.max(left + half, right - half))
+		return beside, UDim2.new(0.5, x - screen.X / 2, 0.5, 0)
+	end
+	return below, UDim2.new(0.5, 0, 0.5, (top - 8) / 2)
+end
+
 function UiKit.gui(name: string, order: number?): ScreenGui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name
@@ -41,6 +91,26 @@ function UiKit.fit(label: TextLabel): TextLabel
 	limit.Parent = label
 	label.TextScaled = true
 	return label
+end
+
+-- A row laid out by `list` (side by side) shrinks to the width of the row's
+-- parent when its contents grow past it (a longer translation, say), and
+-- returns to full size when they fit.
+function UiKit.shrinkRow(row: GuiObject, list: UIListLayout)
+	local parent = row.Parent :: GuiObject
+	local scale = Instance.new("UIScale")
+	scale.Parent = row
+	local function fit()
+		-- (the content's size includes this scale: undo it for its own width)
+		local natural = list.AbsoluteContentSize.X / scale.Scale
+		local room = parent.AbsoluteSize.X
+		if natural > 0 and room > 0 then
+			scale.Scale = math.min(1, room / natural)
+		end
+	end
+	list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(fit)
+	parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+	fit()
 end
 
 function UiKit.pad(parent: GuiObject, pixels: number)

@@ -743,7 +743,14 @@ function IronUi.window(
 	local function fit()
 		local screen = gui.AbsoluteSize
 		local wide = if dockShare then screen.X * dockShare else screen.X
-		target = math.min(1, (wide - 40) / width, (screen.Y - 40) / height)
+		-- (a phone on its side: nearly all of its height)
+		local spare = if screen.Y < 500 then 16 else 40
+		target = math.min(1, (wide - 40) / width, (screen.Y - spare) / height)
+		if not dockShare then
+			local room, at = UiKit.clearTopbar(screen, Vector2.new(width, height) * target)
+			target *= room
+			panel.Position = at
+		end
 		if not popping then
 			scale.Scale = target
 		end

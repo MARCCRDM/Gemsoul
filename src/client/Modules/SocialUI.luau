@@ -45,7 +45,11 @@ local P = IronUi.Colors
 local BOLD, HEADING = IronUi.Bold, IronUi.Heading
 local new, text, box, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.clear
 
-local WIDTH, HEIGHT = 1060, 600
+-- (on a phone on its side, shorter, so it's drawn larger: the party card
+-- tightens and the Arena card's list scrolls)
+local SHORT = UiKit.short()
+local WIDTH, HEIGHT = 1060, if SHORT then 470 else 600
+local PARTY_H = if SHORT then 208 else 250
 local MAX_PARTY = 4
 local CHAT_LINES = 80
 
@@ -175,9 +179,14 @@ local playerList = new("ScrollingFrame", {
 UiKit.list(playerList, 6)
 
 -- Column 2: party (top) and Arena (bottom).
-local partyCard = box(body, UDim2.fromOffset(COLUMN + 12, 0), UDim2.fromOffset(COLUMN, 250), P.Inset, 12)
-local arenaCard =
-	box(body, UDim2.fromOffset(COLUMN + 12, 262), UDim2.fromOffset(COLUMN, HEIGHT - 102 - 262), P.Inset, 12)
+local partyCard = box(body, UDim2.fromOffset(COLUMN + 12, 0), UDim2.fromOffset(COLUMN, PARTY_H), P.Inset, 12)
+local arenaCard = box(
+	body,
+	UDim2.fromOffset(COLUMN + 12, PARTY_H + 12),
+	UDim2.fromOffset(COLUMN, HEIGHT - 102 - PARTY_H - 12),
+	P.Inset,
+	12
+)
 
 -- Column 3: chat.
 local chatCard = box(body, UDim2.fromOffset(2 * (COLUMN + 12), 0), UDim2.fromOffset(COLUMN, HEIGHT - 102), P.Inset, 12)

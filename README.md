@@ -207,6 +207,10 @@ How it fits together: `UiSounds.client.luau` hooks hover and click on every butt
 
 Players whose Roblox language is Spanish see the game in Spanish (neutral Latin American). Screens still write English: `Translate.client.luau` translates each label as its text is set, using the table in `src/shared/LangEs.luau`. To test it, open the DEV panel's LANGUAGE row and pick ESPAÑOL. To translate a new text, add it to the table and run `python tests/run_lang.py`. See [docs/spanish.md](docs/spanish.md).
 
+## Phones
+
+On a phone on its side (`UiKit.short()`: under 500 points tall), the Inventory is built compact: no stats column, everything else larger. The Market, Store, Season Path, Social and Surge Array windows lay out shorter so they show larger, and every window keeps clear of Roblox's buttons at the top (`UiKit.clearTopbar`). Desktop layouts are unchanged. See [docs/mobile.md](docs/mobile.md).
+
 ## Code layout
 
 ```
