@@ -249,8 +249,29 @@ check(
 )
 local nextReward = Config.DailyRewardBase + Config.DailyRewardPerStreak * 3
 check(string.find(all, "+" .. nextReward .. " ◆", 1, true) ~= nil, "Tomorrow's reward is missing from the banner")
+-- The track: every day of the week with its coins, today marked, and the
+-- rule for a missed day.
+for day = 1, Config.DailyStreakMax do
+	local coins = tostring(Config.DailyRewardBase + Config.DailyRewardPerStreak * (day - 1))
+	local tile = nil
+	for _, d in banner:GetDescendants() do
+		if d.Name == "Day" .. day then
+			tile = d
+		end
+	end
+	local shown = {}
+	for _, d in if tile then tile:GetDescendants() else {} do
+		if d.ClassName == "TextLabel" then
+			shown[d.Text] = true
+		end
+	end
+	check(tile ~= nil and shown[coins] == true, "Day " .. day .. " doesn't show its " .. coins .. " coins")
+	check((shown.TODAY == true) == (day == 3), "TODAY is on the wrong day (" .. day .. ")")
+end
+check(string.find(all, "DAY 7+", 1, true) ~= nil, "Day 7 doesn't say it keeps paying")
+check(string.find(all, "Miss a day", 1, true) ~= nil, "The banner doesn't say what a missed day does")
 for _, d in banner:GetDescendants() do
-	if d.ClassName == "TextButton" and d.Text == "LET'S GO" then
+	if d.ClassName == "TextButton" and d.Text == "CONTINUE" then
 		d.Activated:Fire()
 	end
 end

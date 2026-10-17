@@ -2463,7 +2463,8 @@ local function drawDetail(loadout)
 		gw.Empty.Visible = gem == nil
 		gw.Edge.Color = if trying then C.Gold elseif gem then tint else C.Line
 		gw.Edge.Transparency = if gem then 0 else 0.85
-		gw.Name.Text = if gem then gemName(gem)
+		gw.Name.Text = if gem
+			then gemName(gem)
 			elseif triad then "No gem in your " .. string.lower(Traits.SocketNames[target])
 			else "Empty socket"
 		if trying then
@@ -2489,9 +2490,15 @@ local function drawDetail(loadout)
 		-- (a Legendary gem's flourish: a gold line under it)
 		local flourish = if surge and surge.Flourished and surge.Flourish then surge.Flourish.Text else nil
 		ui.PerkText.Text = if surge
-			then (surge.Description or "")
-				.. (if flourish then string.format('\n<font color="#%s">✦ %s</font>', gold, flourish) else "")
-			elseif triad then string.format("%s fires the %s of the gem in your %s. Any cut gem fits.", target, string.lower(Traits.Lanes[target]), string.lower(Traits.SocketNames[target]))
+			then (surge.Description or "") .. (if flourish
+				then string.format('\n<font color="#%s">✦ %s</font>', gold, flourish)
+				else "")
+			elseif triad then string.format(
+				"%s fires the %s of the gem in your %s. Any cut gem fits.",
+				target,
+				string.lower(Traits.Lanes[target]),
+				string.lower(Traits.SocketNames[target])
+			)
 			else "Surges are cast with Q, E and R in a fight. Any cut gem with a surge fits."
 		ui.PerkText.Size = UDim2.fromOffset(RIGHT_W - 36, 60)
 		-- (compact, a little smaller for the longest, so four lines hold it)

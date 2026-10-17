@@ -831,7 +831,15 @@ local function matchTile(parent, good: boolean, other: string)
 	local nameLimit = new("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 7 }, name)
 	-- (Short: without the dot, for the narrowest cards. The limits are the
 	-- sizes the layout picks: a longer translation shrinks a little instead.)
-	return { Frame = tile, Head = head, Name = name, Long = long, Short = word, HeadLimit = headLimit, NameLimit = nameLimit }
+	return {
+		Frame = tile,
+		Head = head,
+		Name = name,
+		Long = long,
+		Short = word,
+		HeadLimit = headLimit,
+		NameLimit = nameLimit,
+	}
 end
 for _, element in elementOrder do
 	local info = ELEMENTS[element]
@@ -1045,7 +1053,10 @@ function refreshChoices()
 			NumberSequenceKeypoint.new(1, 1),
 		})
 		for _, glow in card.Glow do
-			glow.Disc.BackgroundTransparency = if on then glow.Base - 0.02 elseif back then glow.Base + 0.015 else glow.Base
+			glow.Disc.BackgroundTransparency = if on
+				then glow.Base - 0.02
+				elseif back then glow.Base + 0.015
+				else glow.Base
 		end
 		card.Ring.Transparency = if on then 0.2 elseif back then 0.9 else 0.72
 		card.Spark.Visible = on

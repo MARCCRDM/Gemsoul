@@ -42,6 +42,16 @@ local ColorSequence = {
 		return { ... }
 	end,
 }
+local NumberSequenceKeypoint = {
+	new = function(time, value)
+		return { Time = time, Value = value }
+	end,
+}
+local NumberSequence = {
+	new = function(...)
+		return { ... }
+	end,
+}
 local TweenInfo = {
 	new = function()
 		return {}

@@ -264,6 +264,14 @@ return {
 	["{1} new daily challenges are waiting"] = "Te esperan {1} desafíos diarios nuevos",
 	["Come back tomorrow for {*}"] = "Vuelve mañana por {*}",
 	["LET'S GO"] = "¡VAMOS!",
+	["Welcome, {=}"] = "Bienvenido, {=}",
+	["Welcome back, {=}"] = "Hola de nuevo, {=}",
+	["NEW STREAK"] = "RACHA NUEVA",
+	["DAY {1}+"] = "DÍA {1}+",
+	["TODAY"] = "HOY",
+	["Every day from now on: {*}"] = "Cada día desde ahora: {*}",
+	["Miss a day and the streak starts again at day {1}."] = "Si faltas un día, la racha vuelve al día {1}.",
+	["+{1} Season XP"] = "+{1} XP de temporada",
 
 	-- The PLAY menu
 	["PRACTICE"] = "PRÁCTICA",

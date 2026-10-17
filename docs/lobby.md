@@ -76,19 +76,38 @@ screen. It shows:
 It shows three lines at most, each gone after 7 seconds. It only fills while
 the lobby is on screen.
 
-## Welcome back
+## Welcome back: the daily reward
 
-The first time the lobby shows in a session, a banner celebrates the daily
-reward the server just paid. It shows:
-- the streak and the coins;
-- the week with today lit up;
-- what tomorrow pays;
-- a nudge towards today's challenges.
+The first time the lobby shows in a session, a banner shows the daily reward
+the server just paid (`PlayerData.claimDaily`, marked on the player as
+`DailyReward` and `DailyStreak`):
 
-It closes on a tap or after 8 seconds. The server marks the reward on the
-player (`DailyReward`, `DailyStreak`); it used to send a plain toast.
+- **The week's track**: seven tiles, each with its day and its coins.
+  - Days already collected are ticked.
+  - Today is lit and marked TODAY.
+  - Tomorrow has a teal edge.
+- **What it pays**: day 1 pays 75 coins, and each day in a row adds 25.
+  - Day 7 pays 225, and so does every day after it while the streak lasts.
+    That's why its tile says "DAY 7+": it doesn't reset weekly.
+  - Missing a day (UTC) starts the streak again at day 1.
 
-![Welcome back](lobby/welcome-back.png)
+| Day | 1 | 2 | 3 | 4 | 5 | 6 | 7 and after |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Coins | 75 | 100 | 125 | 150 | 175 | 200 | 225 |
+
+- **Below the track**: what tomorrow pays (from day 7 on, "every day from now
+  on"), and the rule for a missed day.
+- **At the bottom**:
+  - today's coins and the +50 Season XP the claim also gives;
+  - a nudge towards today's challenges;
+  - CONTINUE.
+- **The header**: the player's name, and the streak (NEW STREAK on day 1).
+
+It closes on CONTINUE, a tap outside or after 8 seconds. The amounts come
+from `Config.DailyRewardBase`, `DailyRewardPerStreak` and `DailyStreakMax`, so
+the track follows any change to them.
+
+![Welcome back: before, day 3, day 7 and in Spanish](lobby/welcome-back.png)
 
 ## The PLAY menu
 
@@ -141,4 +160,4 @@ and runs the same action as the key when a button is pressed.
 | Suite | Checks | What it covers |
 | --- | --- | --- |
 | `tests/run_daily_challenges.py` | 22,446 rules + 8 server | One per group; stable rolls; progress; paying once; the bonus; new days; old saves. The server side: progress pushes, payouts, notes and the bonus |
-| `tests/run_lobby.py` | 23 board + 16 feed | The real board and feed against GUI doubles. Board: cards per screen; the phone's choice; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once; Tasks stepping aside |
+| `tests/run_lobby.py` | 23 board + 32 feed | The real board and feed against GUI doubles. Board: cards per screen; the phone's choice; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside |
