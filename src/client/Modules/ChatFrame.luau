@@ -67,13 +67,16 @@ local function escape(value: string): string
 end
 -- Rich-text tags stripped, entities decoded: the words of a marked-up line.
 function ChatFrame.plain(value: string): string
-	local stripped = string.gsub(value, "<[^<>]->", "")
+	-- An icon drawn in Roblox's icon font is a word in that font ("nebula"):
+	-- it goes with its tags.
+	local stripped = string.gsub(value, "<font[^<>]-[Ii]cons[^<>]->[^<>]-</font>", "")
+	stripped = string.gsub(stripped, "<[^<>]->", "")
 	stripped = string.gsub(stripped, "&lt;", "<")
 	stripped = string.gsub(stripped, "&gt;", ">")
 	stripped = string.gsub(stripped, "&quot;", '"')
 	stripped = string.gsub(stripped, "&apos;", "'")
 	stripped = string.gsub(stripped, "&amp;", "&")
-	return stripped
+	return (string.match(stripped, "^%s*(.-)%s*$"))
 end
 -- [Item names] in a message stand out like item links.
 local function linkify(value: string): string
@@ -822,9 +825,11 @@ TextChatService.MessageReceived:Connect(function(message)
 	local speaker = fromId and Players:GetPlayerByUserId(fromId)
 	local who = if speaker then speaker.DisplayName elseif source then source.Name else "?"
 	local body = linkify(escape(message.Text))
-	if name == "RBXSystem" then
-		-- Roblox's own lines ("Your friend ... has joined") come already
-		-- marked up: keep the words, not the tags (escaped, they showed raw).
+	if name == "RBXSystem" or not source then
+		-- Roblox's own lines ("Your friend ... has joined", the notices about
+		-- chat translation and summaries) come already marked up, some on the
+		-- General channel with no speaker: keep the words, not the tags
+		-- (escaped, they showed raw, under "[?]").
 		push("System", linkify(escape(ChatFrame.plain(message.Text))))
 		return
 	end

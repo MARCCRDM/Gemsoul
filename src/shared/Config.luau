@@ -75,7 +75,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "Beta 1 · 2026-10-16",
+		Build = "Beta 2 · 2026-10-17",
 		-- UserIds who can read feedback and error reports in game (Social >
 		-- Feedback > Reports). In Studio everyone can.
 		Owners = { 11738957136, 11758049015 }, -- Devvolver, VolverDev
