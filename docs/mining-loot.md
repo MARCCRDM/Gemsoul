@@ -38,8 +38,10 @@ Finds that come quickly stack:
 - **A new gem** folds the card that's up into a one-line row: its rarity,
   name and worth. That skips the rest of that card's roll, because you've
   moved on. The new gem gets the card and rolls.
-- **A find with no gem** (coins, a piece of gear, or a full pouch) becomes
-  a row straight away. The card stays.
+- **Every rock pays a gem**, so the only find without one is a rock that
+  couldn't pay it (a full pouch: the server normally refuses that swing
+  first). It becomes a red "Gem pouch full" row straight away, and the
+  card stays.
 - **Rows** stack above the card, newest nearest it. Each one goes after
   6 seconds. A desktop keeps 3 rows, a phone 1; with more than that, the
   oldest go first.
@@ -53,8 +55,8 @@ On a touch screen the card sits above the PLAY dock. On a phone (a screen
 under 500 points tall) it's also drawn at 86% and keeps one row. It hides,
 silently, while a menu or a fight has the screen, and it clears when you
 leave the Outpost. The words are in the Spanish table
-(rarities, elements, the stat names, the rocks, "Rock mined", "Gear
-found", "Gem pouch full").
+(rarities, elements, the stat names, the rocks, "Rock mined", "Gem pouch
+full").
 
 ## Code
 

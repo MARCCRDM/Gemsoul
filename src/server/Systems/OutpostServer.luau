@@ -7,7 +7,8 @@
 	  "OutpostEnter"           go to the Outpost (the free Survey Pick recharges)
 	  "OutpostLeave"           back to base
 	  "OutpostHit", nodeId     swing at a rock (wears your pick; the last hit
-	                           pops it and pays out)
+	                           pops it and pays out one gem, never coins or
+	                           gear; refused while the gem pouch is full)
 	  "OutpostBuyPick", id     buy a pick at the Probe (coins)
 	  "OutpostEquipPick", id   take a pick you own in hand
 	  "OutpostState"           your picks and record
@@ -27,6 +28,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
@@ -35,7 +37,6 @@ local Seating = require(ReplicatedStorage.Shared.Seating)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
-local MineWall = require(script.Parent.MineWall)
 local MiningRolls = require(script.Parent.MiningRolls)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
@@ -272,8 +273,18 @@ local function spawnNode(field: boolean?)
 		return
 	end
 	local index = spots[rng:NextInteger(1, #spots)]
-	-- Keep the welcome field stocked before filling distant quarry sites.
-	-- These still use the same node cap, loot and respawn timers as other rocks.
+	-- Keep the welcome field stocked, then the field round the middle, before
+	-- filling distant quarry sites. These still use the same node cap, loot
+	-- and respawn timers as other rocks.
+	local near = {}
+	for _, nearIndex in site.NearSpots or {} do
+		if freeSpots[nearIndex] and (fieldSpots[nearIndex] == true) == (field == true) then
+			table.insert(near, nearIndex)
+		end
+	end
+	if #near > 0 then
+		index = near[rng:NextInteger(1, #near)]
+	end
 	for _, arrivalIndex in site.ArrivalSpots or {} do
 		if freeSpots[arrivalIndex] and (fieldSpots[arrivalIndex] == true) == (field == true) then
 			index = arrivalIndex
@@ -334,8 +345,9 @@ local function popNode(node, player: Player)
 	end)
 end
 
--- What a popped rock pays: a gem by chance, a few coins by chance (mining
--- is for gems, not a coin mint), gear rarely.
+-- What a popped rock pays: one gem, every time (a Common at worst; bigger
+-- rocks roll luckier). Never coins, never gear: mining is for gems. (`hit`
+-- won't swing with a full pouch, so there's always room for it.)
 local function loot(player: Player, node, profile)
  local tutorialLoot = require(script.Parent.Intro).tutorialMined(player)
  if tutorialLoot then
@@ -345,33 +357,22 @@ local function loot(player: Player, node, profile)
   return tutorialLoot
  end
 	local spec = Rules.Sizes[node.Size]
-	local roll = Gems.random()
 	local result = { Size = node.Size, Name = spec.Name }
-	if roll:NextNumber() < (spec.CoinChance or 1) then
-		local coins = roll:NextInteger(spec.Coins[1], spec.Coins[2])
-		PlayerData.addCoins(player, coins)
-		result.Coins = coins
-	end
-	if roll:NextNumber() < spec.Gem then
-		local gem = Gems.award(player, "MiningNode", { Luck = Mine.luck(spec.Depth) + (spec.Luck or 0), Silent = true })
-		if gem then
-			result.Gem = gem
-			result.Rarity = gem.Tier
-			result.Text = GemConfig.displayName(gem)
-			PlayerData.milestone(player, "Mined")
-			-- Ultra Rare and Legendary finds are called out to the whole server.
-			if (GemConfig.TierRank[gem.Tier] or 0) >= 4 then
-				ChatChannels.announce(
-					"Loot",
-					string.format("%s unearthed [%s] at the Outpost!", player.DisplayName, result.Text)
-				)
-			end
-		else
-			result.Full = true
+	local gem = Gems.award(player, "MiningNode", { Luck = Mine.luck(spec.Depth) + (spec.Luck or 0), Silent = true })
+	if gem then
+		result.Gem = gem
+		result.Rarity = gem.Tier
+		result.Text = GemConfig.displayName(gem)
+		PlayerData.milestone(player, "Mined")
+		-- Ultra Rare and Legendary finds are called out to the whole server.
+		if (GemConfig.TierRank[gem.Tier] or 0) >= 4 then
+			ChatChannels.announce(
+				"Loot",
+				string.format("%s unearthed [%s] at the Outpost!", player.DisplayName, result.Text)
+			)
 		end
-	end
-	if roll:NextNumber() < spec.Gear then
-		result.Gear = MineWall.recoverGear(player, spec.Depth)
+	else
+		result.Full = true
 	end
 	Progress.addXP(player, "Mine")
 	record(profile).Rocks += 1
@@ -420,6 +421,15 @@ local function hit(player: Player, nodeId: any)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return reply(false, "Your data is still loading.")
+	end
+	-- Every rock pays a gem, so a full pouch would waste it: no swinging
+	-- (or spending the pick) until there's room.
+	if #(profile.Gems or {}) >= Config.MaxGems then
+		return reply(
+			false,
+			string.format("Gem pouch full (%d)! Sell or socket gems to keep mining.", Config.MaxGems),
+			{ PouchFull = true }
+		)
 	end
 	local o = record(profile)
 	local pickId = o.Active

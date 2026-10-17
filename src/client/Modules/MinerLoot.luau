@@ -6,7 +6,8 @@
 -- fill once it lands. Finds that come quickly stack (LootStack):
 -- - the newest gem is the card;
 -- - the ones before it fold into one-line rows above it;
--- - a find with no gem (coins, gear) is a row straight away.
+-- - every rock pays a gem, so the only find without one (a full pouch) is a
+--   row straight away.
 --
 --   MinerLoot.push(loot)        the server's loot for a rock you mined
 --   MinerLoot.setBlocked(on)    a menu or a fight has the screen: hide
@@ -179,12 +180,8 @@ local function buildRow(item)
 			GemConfig.shade(gem).Name
 		)
 		right = string.format("≈ %s ◆", commas(GemConfig.value(gem)))
-	elseif loot.Gear then
-		left = string.format('Gear found  <font color="#%s">%s</font>', P.Teal:ToHex(), tostring(loot.Gear))
-		right = if (loot.Coins or 0) > 0 then string.format("+%d ◆", loot.Coins) else ""
 	else
-		left = if loot.Full then "Gem pouch full" else "Rock mined"
-		right = string.format("+%d ◆", loot.Coins or 0)
+		left, right = if loot.Full then "Gem pouch full" else "Rock mined", ""
 	end
 	text(frame, left, 12, if loot.Full and not gem then P.Bad else P.Text, 28, 0, CARD_W - 120, ROW_H)
 	text(frame, right, 12, GOLD, CARD_W - 96, 0, 84, ROW_H, Enum.TextXAlignment.Right)

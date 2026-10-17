@@ -10,7 +10,7 @@ Training.Objectives = {
  {Id="Guard",Category="Combat",Event="Block",Goal=1,Coins=35,Name="Stand your ground",Hint="Face an enemy and hold Guard to absorb an incoming hit."},
  {Id="Cast",Category="Combat",Event="Surge",Goal=1,Coins=30,Name="Unleash your gem",Hint="Build Charge in a fight, then press Q, E or R (the gem buttons on a phone) to cast a Surge."},
  {Id="Rival",Category="Combat",Event="RivalWin",Goal=1,Coins=50,Name="First Rival victory",Hint="Defeat a Rival in practice or the Arena. No player opponent required."},
- {Id="GemFind",Category="Mining",Event="MineGem",Goal=1,Coins=25,Name="Something inside",Hint="Mine a rock that drops a gem. Check its element and ability in Inventory."},
+ {Id="GemFind",Category="Mining",Event="MineGem",Goal=1,Coins=25,Name="Something inside",Hint="Break a rock: every one holds a gem. Check its element and ability in Inventory."},
  {Id="RareFind",Category="Mining",Event="RareGem",Goal=1,Coins=60,Name="A rare discovery",Hint="Mine a Rare or better gem. Starter gifts and purchases do not count."},
  {Id="LegendFind",Category="Mining",Event="LegendGem",Goal=1,Coins=150,Name="Struck legendary",Hint="Discover a Legendary gem while mining. This is an optional long-term milestone."},
  {Id="TimedGuard",Category="Combat",Event="TimedBlock",Goal=1,Coins=40,Name="Perfect timing",Hint="Raise your shield just before a hit to perform a timed block."},

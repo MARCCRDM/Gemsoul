@@ -152,7 +152,8 @@ local function showResult(entry, elapsed)
 		entry.Detail.TextColor3 = GemConfig.ElementColors[gem.Element] or WHITE
 		entry.Stats.Text = string.format("SIZE %d/10   ·   CLARITY %d/10   ·   %s", gem.Size, gem.Clarity, if gem.Cut then "CUT " .. gem.Cut .. "/10" else "UNCUT")
 	else
-		-- Coins-only finds become a short receipt, never a blank slot machine.
+		-- Every rock pays a gem; only a full pouch (the server normally
+		-- refuses that swing) lands here, as a short notice, never a blank reel.
 		entry.Board.Size = UDim2.new(5.8, 0, 1.65, 0)
 		entry.Board.StudsOffsetWorldSpace = Vector3.new(0, -0.975, 0)
 		entry.SizeLimit.MaxSize = Vector2.new(260, 74)
@@ -161,15 +162,13 @@ local function showResult(entry, elapsed)
 		entry.Heading.Position, entry.Heading.Size = UDim2.fromScale(0.05, 0.29), UDim2.fromScale(0.90, 0.30)
 		entry.Detail.Position, entry.Detail.Size = UDim2.fromScale(0.05, 0.63), UDim2.fromScale(0.90, 0.17)
 		entry.Extras.Position, entry.Extras.Size = UDim2.fromScale(0.05, 0.82), UDim2.fromScale(0.90, 0.14)
-		entry.Heading.Text = if (packet.Coins or 0) > 0 then "+" .. packet.Coins .. " coins" else "ROCK MINED"
-		entry.Heading.TextColor3 = if (packet.Coins or 0) > 0 then GOLD else WHITE
-		entry.Detail.Text = if packet.Full then "STONE POUCH FULL" else "No stone this time"
+		entry.Heading.Text = "ROCK MINED"
+		entry.Heading.TextColor3 = WHITE
+		entry.Detail.Text = if packet.Full then "GEM POUCH FULL" else ""
 		entry.Detail.TextColor3 = MUTED
 	end
 	local rewards = {}
 	if gem then table.insert(rewards, "VALUE ≈ " .. math.floor(GemConfig.value(gem)) .. " coins") end
-	if gem and packet.Coins and packet.Coins > 0 then table.insert(rewards, "+" .. packet.Coins .. " coins") end
-	if packet.Gear then table.insert(rewards, tostring(packet.Gear)) end
 	entry.Extras.Text = table.concat(rewards, "  ·  ")
 	-- A delayed observer sees the result without replaying an old explosion.
 	if gem and elapsed - Roll.Duration < 0.7 then burst(entry) end

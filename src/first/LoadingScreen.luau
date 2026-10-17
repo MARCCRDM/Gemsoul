@@ -55,7 +55,7 @@ LoadingScreen.Tips = {
 	{
 		Stage = 1,
 		Last = 2,
-		Text = "Mine gems to upgrade your gear and unlock new elemental moves. Any rock you break could hold one.",
+		Text = "Mine gems to upgrade your gear and unlock new elemental moves. Every rock you break holds one.",
 	},
 	{
 		Stage = 1,
@@ -69,7 +69,7 @@ LoadingScreen.Tips = {
 	},
 	{
 		Stage = 1,
-		Text = "Crystal Boulders take more swings than Regolith Chunks, but they hold gems more often, and rarer ones.",
+		Text = "Crystal Boulders take more swings than Regolith Chunks, but their gems roll rarer.",
 	},
 	{
 		Stage = 2,

@@ -10,7 +10,9 @@
 	  OutpostWorld.build(at, parent) -> {
 	      Model, Spawn (CFrame), Probe (BasePart, the terminal),
 	      Board (BasePart with the leaderboard's face), Gate (BasePart),
-	      Spots ({ CFrame }, where rocks may grow),
+	      Spots ({ CFrame }, where rocks may grow), ArrivalSpots and
+	      NearSpots (indexes into Spots: the welcome field by the pad, and the
+	      denser field all round the middle, filled before the far quarry),
 	      Parking ({ Kind, CFrame }: the Motor Pool bays for the machines),
 	      Secrets (empty: retired Easter eggs stay disabled) }
 	  OutpostWorld.rock(size, cframe, rng) -> Model   one rock of that size
@@ -915,6 +917,8 @@ end
 local DIRT = Color3.fromRGB(92, 86, 84)
 local CONCRETE = Color3.fromRGB(86, 90, 98)
 local QUARRY = 440 -- where the stepped quarry walls start (Shared.Outpost.Radius)
+local NEAR_SPOTS = 80 -- rock spots in the field round the middle
+local ROCK_SPOTS = 280 -- rock spots in all (Shared.Outpost.NodeCount of them hold a rock)
 
 -- Connected triangles make a continuous crater surface rather than separate
 -- vertical towers. Shared vertices keep the silhouette and slopes seam-free.
@@ -1637,25 +1641,45 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		table.insert(spots, at * CFrame.new(p[1], 0, p[2]))
 		table.insert(arrivalSpots, #spots)
 	end
-	local tries = 0
-	while #spots < 170 and tries < 12000 do
-		tries += 1
-		local a, r = rng:NextNumber(0, math.pi * 2), math.sqrt(rng:NextNumber(0.01, 1)) * (QUARRY - 25)
-		local p = (at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)).Position
-		local ok = not onRoad(p)
+	-- Room for a rock at `p`: off the roads and buildings, `gap` from the rest.
+	local function clear(p: Vector3, gap: number): boolean
+		if onRoad(p) then
+			return false
+		end
 		for _, k in keepOut do
 			if (p - k[1]).Magnitude < k[2] then
-				ok = false
-				break
+				return false
 			end
 		end
 		for _, s in spots do
-			if (s.Position - p).Magnitude < 12 then
-				ok = false
-				break
+			if (s.Position - p).Magnitude < gap then
+				return false
 			end
 		end
-		if ok then
+		return true
+	end
+	-- A denser field all round the middle, where people mine between fights
+	-- (spread evenly by distance, not area, so it isn't all at the edge). The
+	-- lane from the pad to the middle stays open.
+	local nearSpots = {}
+	local tries = 0
+	while #nearSpots < NEAR_SPOTS and tries < 8000 do
+		tries += 1
+		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(36, 200)
+		local x, z = math.cos(a) * r, math.sin(a) * r
+		local p = (at * CFrame.new(x, 0, z)).Position
+		if not (math.abs(x) < 10 and z > -60) and clear(p, 12) then
+			table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
+			table.insert(nearSpots, #spots)
+		end
+	end
+	-- Then the far quarry, out to the walls.
+	tries = 0
+	while #spots < ROCK_SPOTS and tries < 12000 do
+		tries += 1
+		local a, r = rng:NextNumber(0, math.pi * 2), math.sqrt(rng:NextNumber(0.01, 1)) * (QUARRY - 25)
+		local p = (at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)).Position
+		if clear(p, 12) then
 			table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
 		end
 	end
@@ -1674,6 +1698,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Gate = gatePad,
 		Spots = spots,
 		ArrivalSpots = arrivalSpots,
+		NearSpots = nearSpots,
 		Zones = zones,
 		FieldSpots = {},
 		Parking = parking,

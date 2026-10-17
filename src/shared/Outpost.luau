@@ -32,15 +32,16 @@ local Outpost = {}
 -- The original moon quarry, with haul roads and a drivable Motor Pool.
 Outpost.Location = CFrame.new(0, 0, 7000)
 Outpost.Radius = 440 -- quarry rim; recovery allows the surrounding benches
-Outpost.NodeCount = 110 -- basic rocks spread across the quarry
+Outpost.NodeCount = 180 -- basic rocks: the field round the middle first, then the far quarry
 Outpost.FieldNodeCount = 0 -- this lobby uses the common quarry sites
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from
 Outpost.SwingCooldown = 0.32
 Outpost.CritChance = 0.15
 
--- Rocks, smallest to rarest. `Depth` is how deep a wall of the old mine
--- this matches, for gem luck and gear finds.
+-- Rocks, smallest to rarest. Every rock pays exactly one gem when it pops
+-- (a Common at worst): no coins, no gear. `Depth` is how deep a wall of the
+-- old mine this matches, for that gem's luck; a Geode adds `Luck` on top.
 Outpost.Sizes = {
 	Pebble = {
 		Name = "Regolith Chunk",
@@ -49,10 +50,6 @@ Outpost.Sizes = {
 		Weight = 44,
 		Scale = 3.6,
 		Depth = 2,
-		Gem = 0.35,
-		CoinChance = 0.3,
-		Coins = { 2, 6 },
-		Gear = 0.04,
 	},
 	Boulder = {
 		Name = "Crystal Boulder",
@@ -61,10 +58,6 @@ Outpost.Sizes = {
 		Weight = 34,
 		Scale = 6,
 		Depth = 5,
-		Gem = 0.55,
-		CoinChance = 0.4,
-		Coins = { 4, 10 },
-		Gear = 0.1,
 	},
 	Monolith = {
 		Name = "Saga Monolith",
@@ -73,10 +66,6 @@ Outpost.Sizes = {
 		Weight = 17,
 		Scale = 8.5,
 		Depth = 9,
-		Gem = 0.75,
-		CoinChance = 0.5,
-		Coins = { 8, 18 },
-		Gear = 0.2,
 	},
 	Geode = {
 		Name = "Star Geode",
@@ -85,10 +74,6 @@ Outpost.Sizes = {
 		Weight = 5,
 		Scale = 7,
 		Depth = 14,
-		Gem = 1,
-		CoinChance = 1,
-		Coins = { 20, 45 },
-		Gear = 0.4,
 		Luck = 0.35, -- on top of its depth
 	},
 }

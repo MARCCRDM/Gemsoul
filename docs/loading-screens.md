@@ -24,7 +24,7 @@ your profile updates):
 
 | Stage | Who | Tips, newest to you first |
 | --- | --- | --- |
-| 1 Just started | no gem mined yet, under 10 rocks | mine gems to upgrade your gear and unlock moves · sword gem = Q, core = E, shield = R · land hits for Charge · parry (raise your guard just before a melee hit) · Crystal Boulders hold gems more often, and rarer ones |
+| 1 Just started | no gem mined yet, under 10 rocks | mine gems to upgrade your gear and unlock moves · sword gem = Q, core = E, shield = R · land hits for Charge · parry (raise your guard just before a melee hit) · Crystal Boulders take more swings, but their gems roll rarer |
 | 2 Found a gem | first gem mined, or 10+ rocks | rarity sets how strong a gem's moves are (Common 60% to Legendary 100%, plus a Flourish) · grades 1–10: Size power, Clarity duration, Cut cooldowns and odds · Thermal > Cryo > Ion > Corrosive > Thermal · then the stage 1 tips, minus Charge |
 | 3 Old hand | level 5, 5 fights or 150 rocks | 2, 4 or 6 pieces of one set (the sword counts) · Ranked evens stats and caps gems at Ultra Rare · then the stage 2 tips and parry and rocks (the basics stop) |
 

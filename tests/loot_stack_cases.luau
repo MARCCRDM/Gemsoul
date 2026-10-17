@@ -7,7 +7,7 @@ local function check(value, message)
 	assert(value, message)
 end
 local function gem(tier)
-	return { Name = "Crystal Boulder", Coins = 4, Gem = { Id = "g-" .. tier, Tier = tier, Element = "Frost" } }
+	return { Name = "Crystal Boulder", Gem = { Id = "g-" .. tier, Tier = tier, Element = "Frost" } }
 end
 local function ids(rows)
 	local out = {}
@@ -19,7 +19,10 @@ end
 
 -- Nothing found: nothing shown.
 local stack = LootStack.new()
-check(LootStack.push(stack, { Name = "Regolith Chunk", Coins = 0 }, 0, 3) == nil, "An empty rock made a card")
+check(LootStack.push(stack, { Name = "Regolith Chunk" }, 0, 3) == nil, "An empty rock made a card")
+-- Rocks pay gems only: an old coin or gear find shows nothing.
+check(LootStack.push(stack, { Name = "Regolith Chunk", Coins = 6 }, 0, 3) == nil, "A coin find showed")
+check(LootStack.push(stack, { Name = "Star Geode", Gear = "Titan Visor" }, 0, 3) == nil, "A gear find showed")
 check(LootStack.push(stack, nil, 0, 3) == nil, "No loot made a card")
 check(stack.Card == nil and #stack.Rows == 0, "Nothing found left something on screen")
 
@@ -57,19 +60,17 @@ check(first.GoneAt == 0.5 + LootStack.RowLife, "A folded card's row is not timed
 check(LootStack.phase(second, 0.5) == "Rolling", "New card skipped its roll")
 local third = LootStack.push(stack, gem("Rare"), 0.9, 3)
 check(stack.Card == third and ids(stack.Rows) == second.Id .. "," .. first.Id, "Rows not newest first")
--- Coins and gear go straight to a row; the card stays.
-local coins = LootStack.push(stack, { Name = "Regolith Chunk", Coins = 6 }, 1.1, 3)
-check(stack.Card == third and stack.Rows[1] == coins, "A coin find replaced the card")
-check(coins.LandAt == nil and coins.Rank == 0, "A coin find rolled like a gem")
+-- A rock that couldn't pay its gem (a full pouch) goes straight to a row;
+-- the card stays.
+local blocked = LootStack.push(stack, { Name = "Regolith Chunk", Full = true }, 1.1, 3)
+check(stack.Card == third and stack.Rows[1] == blocked, "A full pouch replaced the card")
+check(blocked.LandAt == nil and blocked.Rank == 0, "A full pouch rolled like a gem")
 check(#stack.Rows == 3, "Rows not kept to the limit")
-local gear = LootStack.push(stack, { Name = "Star Geode", Gear = "Titan Visor" }, 1.2, 3)
+local full = LootStack.push(stack, { Name = "Crystal Boulder", Full = true }, 1.3, 3)
 check(
-	stack.Rows[1] == gear and #stack.Rows == 3 and ids(stack.Rows) == gear.Id .. "," .. coins.Id .. "," .. second.Id,
+	stack.Rows[1] == full and #stack.Rows == 3 and ids(stack.Rows) == full.Id .. "," .. blocked.Id .. "," .. second.Id,
 	"The oldest row did not go first"
 )
--- A pouch-full rock (coins, no gem) is a row too.
-local full = LootStack.push(stack, { Name = "Crystal Boulder", Coins = 3, Full = true }, 1.3, 3)
-check(stack.Rows[1] == full and stack.Card == third, "A full pouch replaced the card")
 
 -- A shorter screen keeps fewer rows.
 check(

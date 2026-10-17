@@ -9,7 +9,6 @@ math.randomseed(5)
 local function gem(tier, size, clarity, cut)
 	return {
 		Name = "Crystal Boulder",
-		Coins = 4,
 		Gem = { Id = "g-" .. tier, Tier = tier, Element = "Frost", Size = size, Clarity = clarity, Cut = cut },
 	}
 end
@@ -39,17 +38,16 @@ local function lit(frame, color)
 	return n
 end
 
--- Nothing found, nothing shown.
-Loot.push({ Name = "Regolith Chunk", Coins = 0 })
-check(#live("LootCard") == 0 and #live("LootRow") == 0, "An empty rock showed something")
+-- Nothing found, nothing shown (rocks pay gems only: coins or gear never show).
+Loot.push({ Name = "Regolith Chunk" })
+Loot.push({ Name = "Regolith Chunk", Coins = 6, Gear = "Titan Visor" })
+check(#live("LootCard") == 0 and #live("LootRow") == 0, "A rock with no gem showed something")
 
--- A coin find is a row straight away.
-Loot.push({ Name = "Regolith Chunk", Coins = 6 })
-check(#live("LootRow") == 1 and #live("LootCard") == 0, "A coin find did not make one row")
-check(
-	texts(live("LootRow")[1]):find("Rock mined", 1, true) and texts(live("LootRow")[1]):find("+6 ◆", 1, true),
-	"Coin row lost its words"
-)
+-- A rock that couldn't pay its gem (a full pouch) is a row straight away, in red.
+Loot.push({ Name = "Regolith Chunk", Full = true })
+check(#live("LootRow") == 1 and #live("LootCard") == 0, "A full pouch did not make one row")
+check(texts(live("LootRow")[1]):find("Gem pouch full", 1, true), "Full pouch row lost its words")
+check(not texts(live("LootRow")[1]):find("◆", 1, true), "A full pouch row shows coins")
 check(render:Count() == 1, "No frame loop while something is on show")
 
 -- A gem: it rolls through rarities, then lands on the real one.
@@ -104,18 +102,14 @@ check(newest.Loot == find, "The folded gem is not the newest row")
 check(texts(card()):find("ROLLING", 1, true), "The new card skipped its roll")
 -- More finds than fit: never past three rows on a desktop.
 for i = 1, 6 do
-	Loot.push(
-		if i % 2 == 0
-			then gem("Rare", 5, 5, 5)
-			else { Name = "Star Geode", Coins = i, Gear = if i == 3 then "Titan Visor" else nil }
-	)
+	Loot.push(if i % 2 == 0 then gem("Rare", 5, 5, 5) else { Name = "Star Geode", Full = true })
 	step(0.1)
 end
 check(#live("LootRow") <= 3 and #Loot.shown().Rows <= 3, "Rows stacked past three")
 check(#live("LootCard") == 1, "More than one card")
 
 -- A pouch-full rock says so in red.
-Loot.push({ Name = "Crystal Boulder", Coins = 3, Full = true })
+Loot.push({ Name = "Crystal Boulder", Full = true })
 step(0.05)
 local fullRow = nil
 for _, row in live("LootRow") do

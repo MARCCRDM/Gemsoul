@@ -58,7 +58,7 @@ local NODE_TAG = "OutpostNode"
 local active, busy = false, false
 local state = nil -- picks and record, from the server
 local probeCharge = nil -- the free pick's meter at PROBE-7, while drawn
-local finds = { Gems = 0, Coins = 0, Gear = 0, Rocks = 0 }
+local finds = { Gems = 0, Rocks = 0 }
 local nextSwing = 0
 local hiddenDashboard: ScreenGui? = nil
 
@@ -317,13 +317,7 @@ local function refreshHud()
 	fill.Size = UDim2.fromScale(math.clamp(left / spec.Swings, 0, 1), 1)
 	fill.BackgroundColor3 = if left / spec.Swings > 0.3 then spec.Color else Color3.fromRGB(255, 110, 90)
 	refreshCharge()
-	findsLabel.Text = string.format(
-		"This trip: %d gem%s · %d coins · %d gear",
-		finds.Gems,
-		if finds.Gems == 1 then "" else "s",
-		finds.Coins,
-		finds.Gear
-	)
+	findsLabel.Text = string.format("This trip: %d gem%s", finds.Gems, if finds.Gems == 1 then "" else "s")
 	recordLabel.Text = string.format("%d rocks mined", state.Rocks or 0)
 end
 
@@ -621,16 +615,12 @@ local revealToken = 0
 function OutpostScene.reveal(loot, at: Vector3?)
 	if loot.Tutorial then return end
 	MinerLoot.push(loot)
-	local found = {}
-	if loot.Gem then table.insert(found, "[" .. (loot.Text or GemConfig.displayName(loot.Gem)) .. "]") end
-	if loot.Gear then table.insert(found, "[" .. tostring(loot.Gear) .. "]") end
-	if loot.Coins then table.insert(found, loot.Coins .. " coins") end
-	if #found > 0 then
-		require(script.Parent.ChatFrame).loot("You receive loot: " .. table.concat(found, ", "))
+	-- (every rock pays one gem: no coins, no gear)
+	if loot.Gem then
+		local name = loot.Text or GemConfig.displayName(loot.Gem)
+		require(script.Parent.ChatFrame).loot("You receive loot: [" .. name .. "]")
 	end
 	finds.Gems += if loot.Gem then 1 else 0
-	finds.Coins += loot.Coins or 0
-	finds.Gear += if loot.Gear then 1 else 0
 	finds.Rocks += 1
 	refreshHud()
 	if loot.Gem then
@@ -776,7 +766,7 @@ function OutpostScene.swing(nodeId: number?)
 		end
 		if not result.Ok then
 			if result.Message and result.Message ~= "" then
-				UiKit.toast(result.Message, if result.NoPick then P.Bad else nil)
+				UiKit.toast(result.Message, if result.NoPick or result.PouchFull then P.Bad else nil)
 			end
 			if result.NoPick then
 				OutpostScene.openProbe()
@@ -1108,7 +1098,7 @@ end
 
 local function enterScene(result)
 	state = result.State
-	finds = { Gems = 0, Coins = 0, Gear = 0, Rocks = 0 }
+	finds = { Gems = 0, Rocks = 0 }
 	active = true
 	showWorld()
 	refreshHud()

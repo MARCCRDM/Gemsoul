@@ -35,7 +35,9 @@ for rank,tier in GemConfig.TierOrder do
 	check(#live("AwardedGem")==1 and live("AwardedGem")[1].Gem==packet.Gem,"Showcase not actual awarded gem")
 	check(live("AwardedGem")[1].Parent==live("GemReel")[1],"Winning gem escaped box")
 	check(textContains("SIZE 8/10") and textContains("CLARITY 7/10") and textContains("CUT 6/10"),"Rolled metrics missing")
-	check(textContains(string.upper(GemConfig.TierLabels[tier])) and textContains("+4 coins"),"Result lost rarity/rewards")
+	check(textContains(string.upper(GemConfig.TierLabels[tier])) and textContains("VALUE"),"Result lost rarity/worth")
+	-- Rocks pay gems only: stray coins or gear never reach the broadcast or the box.
+	check(packet.Coins==nil and packet.Gear==nil and not textContains("+4 coins"),"A gem find advertised coins")
 	check(#live("DiscoveryRing")==0 and #live("RarityBeacon")==0,"World geometry cuts through reward card")
 	check(live("WinningSlot")[1].Visible==false,"Reel selection remains on final gem")
 	check(liveClass("UISizeConstraint")[1].MaxSize.X==260 and liveClass("UISizeConstraint")[1].MaxSize.Y==162,"Close camera can inflate reward card")
@@ -46,15 +48,15 @@ for rank,tier in GemConfig.TierOrder do
 	step(Roll.lifetime(packet))
 	check(#liveClass("BillboardGui")==0 and #liveClass("Model")==0,"Roll/templates leaked after expiry")
 end
--- No gem (including full pouch) must never invent a reward.
+-- No gem (a full pouch) must never invent a reward.
 for _,full in {false,true} do
 	MiningRolls.publish(miner,at,{Name="Boulder",Coins=2,Full=full})
 	step(Roll.Duration+.1)
 	check(#live("AwardedGem")==0,"Empty reward manufactured a gem")
-	check(textContains(if full then "STONE POUCH FULL" else "No stone this time"),"No-gem outcome not explained")
+	check(textContains("ROCK MINED") and (textContains("GEM POUCH FULL")==full),"No-gem outcome not explained")
 	check(live("ReelWindow")[1].Visible==false and live("WinningSlot")[1].Visible==false,"Empty reward leaves blank reel on screen")
 	check(liveClass("UISizeConstraint")[1].MaxSize.Y==74 and live("Discovery")[1].Size[3]==1.65,"No-gem result did not collapse")
-	check(textContains("+2 coins") and #liveClass("ParticleEmitter")==0,"Coins missing or empty find celebrated as a gem")
+	check(not textContains("+2 coins") and #liveClass("ParticleEmitter")==0,"Coins shown or empty find celebrated as a gem")
 	Reveal.close()
 end
 -- Your own find is your loot card (MinerLoot), never a box over your own head;

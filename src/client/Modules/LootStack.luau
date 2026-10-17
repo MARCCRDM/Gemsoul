@@ -3,9 +3,10 @@
 --
 -- A gem opens the card: it rolls, lands, holds, then folds into a one-line
 -- row. A gem found while a card is up folds that card at once (its result
--- shows in the row: mining fast skips the suspense) and opens its own. A find
--- with no gem (coins, a piece of gear) is a row straight away. Rows go after
--- a while, and the oldest go first when there are more than fit.
+-- shows in the row: mining fast skips the suspense) and opens its own. Every
+-- rock pays a gem; one that couldn't (the pouch was full) is a row straight
+-- away. Rows go after a while, and the oldest go first when there are more
+-- than fit.
 --
 --   LootStack.new() -> stack
 --   LootStack.push(stack, loot, now, maxRows) -> the new item, or nil (nothing found)
@@ -35,7 +36,7 @@ function LootStack.new(): Stack
 end
 
 local function found(loot): boolean
-	return type(loot) == "table" and (loot.Gem ~= nil or (loot.Coins or 0) > 0 or loot.Gear ~= nil)
+	return type(loot) == "table" and (loot.Gem ~= nil or loot.Full == true)
 end
 
 -- Rows newest first; past maxRows the oldest go.

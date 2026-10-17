@@ -64,8 +64,18 @@ for _,index in site.ArrivalSpots do
  assert(p.Z<30 and math.abs(p.X)>=12 and math.abs(p.X)<=26,"Welcome nodes block the central path")
 end
 assert(site.Probe.Name=="ProbeScreen" and site.Board.Name=="BoardFace" and site.Gate.Name=="GatePad","Missing lobby services")
-assert(Rules.Radius==440 and Rules.NodeCount==110 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
+assert(Rules.Radius==440 and Rules.NodeCount==180 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
 assert(#site.Spots>=Rules.NodeCount,"Too few mining sites")
+-- The field round the middle: plenty of rocks close by, none on the lane
+-- from the pad (overlaps are checked with every spot below).
+assert(#site.NearSpots>=70,"The field round the middle is too thin: "..#site.NearSpots)
+for _,index in site.NearSpots do
+ local p=site.Spots[index].Position-origin.Position
+ local r=Vector3.new(p.X,0,p.Z).Magnitude
+ assert(r>=36 and r<=200,"A near rock out of the middle")
+ assert(not (math.abs(p.X)<10 and p.Z>-60),"A near rock blocks the lane from the pad")
+ assert(not table.find(site.ArrivalSpots,index),"A spot counted twice")
+end
 local roads,sky,ramps,floor,motor,base=0,0,0,nil,0,0
 for _,p in builtParts do
  assert(p.Size.X>0 and p.Size.Y>0 and p.Size.Z>0,"Invalid geometry")
@@ -242,8 +252,15 @@ local CollectionService={AddTag=function() end}
 for i in site.Spots do freeSpots[i]=true end
 ''' + spawn_node + r'''
 for i=1,Rules.NodeCount do spawnNode() end
-assert(nextId==110,"Welcome nodes changed total population")
+assert(nextId==Rules.NodeCount,"Welcome nodes changed total population")
 for _,i in site.ArrivalSpots do assert(not freeSpots[i],"Random population left welcome field empty") end
+for _,i in site.NearSpots do assert(not freeSpots[i],"The field round the middle wasn't filled first") end
+-- A rock popped in the middle grows back in the middle, not out at the walls.
+local nearIndex=site.NearSpots[1]
+for id,node in nodes do if node.Spot==nearIndex then nodes[id]=nil end end
+freeSpots[nearIndex]=true
+spawnNode()
+assert(nodes[nextId].Spot==nearIndex,"A rock in the middle grew back out in the quarry")
 local arrivalIndex=site.ArrivalSpots[1]
 for id,node in nodes do if node.Spot==arrivalIndex then nodes[id]=nil end end
 freeSpots[arrivalIndex]=true
@@ -259,7 +276,7 @@ freeSpots[arrivalIndex]=true
 local before=nextId
 spawnNode(true)
 assert(nextId==before and freeSpots[arrivalIndex],"Zone filter bypassed by arrival priority")
-print("PASS: actual server node population, 8 welcome rocks, 110-node cap, replenishment and zone isolation")
+print("PASS: actual server node population, 8 welcome rocks, the field round the middle first, "..Rules.NodeCount.."-node cap, replenishment and zone isolation")
 end
 '''
 lighting = (ROOT / "src/client/Modules/Scenes.luau").read_text(encoding="utf-8")

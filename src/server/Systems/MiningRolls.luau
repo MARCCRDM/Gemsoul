@@ -26,8 +26,6 @@ function MiningRolls.publish(player, position, loot)
 		MinerName = player.DisplayName,
 		NodeName = loot.Name or "Mining rock",
 		Gem = gem,
-		Coins = loot.Coins,
-		Gear = loot.Gear,
 		Full = loot.Full == true,
 	})
 end

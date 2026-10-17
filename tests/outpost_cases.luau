@@ -307,7 +307,12 @@ check(Rules.mechStrikes("NotAMech", 10) == 0 and Rules.mechStrikes(nil, 10) == 0
 check(Rules.MechReach > Rules.Reach, "A mech reaches less far than a miner")
 for _, id in Rules.SizeOrder do
 	local s = Rules.Sizes[id]
-	check(s.Hp > 0 and s.Respawn > 0 and s.Coins[2] >= s.Coins[1], id .. " rock incomplete")
+	check(s.Hp > 0 and s.Respawn > 0 and s.Depth > 0, id .. " rock incomplete")
+	-- Mining pays gems only: no rock rolls coins or gear.
+	check(
+		s.Coins == nil and s.CoinChance == nil and s.Gear == nil and s.Gem == nil,
+		id .. " still pays more than a gem"
+	)
 end
 
 -- The server --------------------------------------------------------------------------
@@ -316,7 +321,7 @@ local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
 local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
-	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "Seating" } do
+	for _, name in { "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "Seating" } do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
 		stub.Parent = sharedFolder
@@ -326,6 +331,7 @@ local Server = (function()
 		if key then
 			return ({
 				Outpost = Rules,
+				Config = { MaxGems = 200 },
 				GemConfig = GemConfig,
 				Mine = Mine,
 				PickaxeLooks = PickaxeLooks,
@@ -615,6 +621,7 @@ check(handlers.OutpostHit(ben, target.Id).Ok, "An abandoned rock couldn't be tak
 advance(Rules.ClaimSeconds)
 local coinsBefore = profiles[ana].Coins
 local syncsBeforePop = synced[ana] or 0
+local gemsBeforePop = gemsAwarded
 local result
 for _ = 1, 40 do
 	advance(0.5)
@@ -623,10 +630,12 @@ for _ = 1, 40 do
 		break
 	end
 end
--- A rock pays coins only by chance now (mining is for gems).
+-- A rock pays one gem, every time, and nothing else (mining is for gems).
 check(result and result.Loot ~= nil, "Popping a rock returned no loot")
 check((synced[ana] or 0) == syncsBeforePop + 1, "A pop didn't sync the profile once (only the pop sends it)")
-check(profiles[ana].Coins == coinsBefore + (result.Loot.Coins or 0), "Coins not paid")
+check(result.Loot.Gem ~= nil and gemsAwarded == gemsBeforePop + 1, "A popped rock didn't pay exactly one gem")
+check(result.Loot.Coins == nil and result.Loot.Gear == nil, "A popped rock paid coins or gear")
+check(profiles[ana].Coins == coinsBefore, "Mining paid coins")
 check(Server._nodes[target.Id] == nil and target.Model:GetAttribute("Popped") == 1, "The rock didn't pop")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined a popped rock")
 check(profiles[ana].Outpost.Rocks == 1, "Rock not counted")
@@ -642,9 +651,20 @@ for _ in Server._nodes do
 end
 check(after == before + 1, "A mined rock never grew back")
 
--- A pick wears out and breaks; then the Probe sells another.
+-- A full gem pouch: no swinging (the rock would pay a gem with nowhere to
+-- go), and the pick isn't worn by trying.
 local nextRock = select(2, next(Server._nodes))
 standBy(anaRoot, nextRock)
+advance(Rules.ClaimSeconds + 1)
+profiles[ana].Gems = table.create(200, {})
+local swingsBefore = profiles[ana].Outpost.Picks[profiles[ana].Outpost.Active]
+local full = handlers.OutpostHit(ana, nextRock.Id)
+check(not full.Ok and full.PouchFull and string.find(full.Message, "full", 1, true), "Mined with a full gem pouch")
+check(profiles[ana].Outpost.Picks[profiles[ana].Outpost.Active] == swingsBefore, "A refused swing wore the pick")
+check(nextRock.Hp == nextRock.MaxHp, "A refused swing chipped the rock")
+profiles[ana].Gems = nil
+
+-- A pick wears out and breaks; then the Probe sells another.
 profiles[ana].Outpost.Picks.Survey = 1
 profiles[ana].Outpost.SurveyAt = 86400 * 20000 + math.floor(now) -- (no swings regained meanwhile)
 advance(Rules.ClaimSeconds + 1)
