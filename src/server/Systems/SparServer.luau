@@ -24,6 +24,12 @@
 	A spar ends for both when either ends it, or whenever it stops making
 	sense for either: leaving the Outpost, a match or Arena session, a
 	machine, a respawn, leaving the game, or drifting too far apart.
+
+	Hunting is the kit out alone, against the Outpost's wild kaiju and moon
+	bugs (KaijuWilds): Hunt and Spar, with no partner. No player can hit a
+	hunter or be hit by one; a creature's finishing blow knocks them down
+	as in a spar. "Hunt", true / false takes the kit out or puts it away
+	("Spar", false and the 1 key put it away too).
 ]]
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -123,6 +129,7 @@ local function stop(player: Player, note: string?)
 		humanoid.Health = humanoid.MaxHealth
 	end
 	player:SetAttribute("Spar", nil)
+	player:SetAttribute("Hunt", nil)
 	player:SetAttribute("SparWith", nil)
 	player:SetAttribute("SparDown", nil)
 	player:SetAttribute("SparHurt", nil)
@@ -169,6 +176,11 @@ local function askProblem(player: Player, target: Player?, answering: boolean?):
 	local here = target ~= nil and target ~= player and target.Parent ~= nil
 	if not here or not target then
 		return Spar.askProblem({ Here = false, Name = "", Mine = stateOf(player), Theirs = stateOf(player) })
+	end
+	if Spar.hunting(player) then
+		return "Put your kit away first (1)."
+	elseif Spar.hunting(target) then
+		return target.DisplayName .. " is out hunting."
 	end
 	local partner, theirs = partnerOf(player), partnerOf(target)
 	local waits = again[player]
@@ -269,6 +281,48 @@ local function request(player: Player, on: any)
 	return reply(true, "")
 end
 
+-- "Hunt", on: the kit out alone to hunt creatures, or away again.
+local function hunt(player: Player, on: any)
+	if type(on) ~= "boolean" then
+		return reply(false, "")
+	end
+	if not on then
+		if not Spar.hunting(player) then
+			return reply(true, "")
+		end
+		local wait = Spar.stopWait({
+			Down = player:GetAttribute("SparDown"),
+			Hurt = player:GetAttribute("SparHurt"),
+		}, workspace:GetServerTimeNow())
+		if wait > 0 then
+			return reply(
+				false,
+				string.format("Still in the fight: you can stop in %ds.", math.ceil(wait)),
+				{ Wait = wait }
+			)
+		end
+		stop(player)
+		return reply(true, "")
+	end
+	if Spar.hunting(player) then
+		return reply(true, "")
+	elseif Spar.sparring(player) then
+		return reply(false, "Finish your spar first.")
+	end
+	local problem = Spar.startProblem(stateOf(player))
+	if problem then
+		return reply(false, problem)
+	end
+	-- (Their spar requests are off while they hunt.)
+	withdraw(player)
+	player:SetAttribute("SparDown", nil)
+	player:SetAttribute("SparHurt", nil)
+	CombatServer.reset(player)
+	player:SetAttribute("Hunt", true)
+	player:SetAttribute("Spar", true)
+	return reply(true, "")
+end
+
 -- Knock-downs ---------------------------------------------------------------------------------------------
 
 -- Back on your feet: full health, a moment's guard.
@@ -326,6 +380,13 @@ local function check(player: Player)
 	if not Spar.sparring(player) then
 		return
 	end
+	if Spar.hunting(player) then
+		-- (A hunt has no partner: it lasts while hunting still makes sense.)
+		if Spar.startProblem(stateOf(player)) then
+			stop(player)
+		end
+		return
+	end
 	local partner = partnerOf(player)
 	if not partner or not Spar.paired(player, partner) then
 		stop(player)
@@ -373,6 +434,7 @@ function SparServer.start()
 	Shop.register("Spar", request)
 	Shop.register("SparAsk", ask)
 	Shop.register("SparRespond", respond)
+	Shop.register("Hunt", hunt)
 	CombatServer.onSparLethal(knockOut)
 	local function watch(player: Player)
 		player.CharacterAdded:Connect(function(character)
@@ -417,6 +479,6 @@ end
 -- For tests.
 SparServer._request, SparServer._knockOut, SparServer._stop = request, knockOut, stop
 SparServer._getUp, SparServer._ask, SparServer._respond = getUp, ask, respond
-SparServer._asks = asks
+SparServer._asks, SparServer._hunt = asks, hunt
 
 return SparServer

@@ -172,6 +172,6 @@ local plain = { Id = "plain", Element = "Fire", Tier = "Rare" }
 check(not Kaiju.isSoul(plain) and GemTraits.traitFor(plain, "Q") ~= nil, "A plain gem lost its Q")
 local kaiju =
 	Kaiju.new("k1", "Bulwark", Kaiju.rollSoul(Random.new(9), "Frost", { Id = "s", Time = 1, Species = "Bulwark" }))
-check(kaiju.Element == "Frost" and kaiju.Level == 1 and Kaiju.title(kaiju) == "Frost Bulwark", "A new kaiju is wrong")
+check(kaiju.Element == "Frost" and kaiju.Level == 1 and Kaiju.title(kaiju) == "Cryo Bulwark", "A new kaiju is wrong")
 
 print(string.format("PASS: %d kaiju rule checks (stats, EXP, feeding, taming, spread, slots, Gemsouls)", checks))

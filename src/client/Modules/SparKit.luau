@@ -271,7 +271,12 @@ local function refreshBar()
 		caption.TextTransparency = 1
 		return
 	end
-	versus.Text = "SPAR vs " .. string.upper(partnerName())
+	-- (Hunting: the kit out alone, against the Outpost's creatures.)
+	local hunting = Spar.hunting(player)
+	versus.Text = if hunting then "HUNTING" else "SPAR vs " .. string.upper(partnerName())
+	caption.Text = if hunting
+		then "HUNTING  ·  only creatures can hit you  ·  wear a wild kaiju down to tame it"
+		else "FRIENDLY SPAR  ·  only you two can hit each other"
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	-- (Touch: no key to show; the chip itself is the button.)
 	keyCap.Visible = not touch
@@ -353,7 +358,7 @@ end
 
 -- The kit comes out when both agree, and goes away when either ends it
 -- (or the spar stops making sense): a flash either way.
-local wasSparring = false
+local wasSparring, wasHunting = false, false
 local function sparChanged()
 	local sparring = Spar.sparring(player)
 	if sparring == wasSparring then
@@ -361,10 +366,15 @@ local function sparChanged()
 	end
 	wasSparring = sparring
 	if sparring then
-		flash("SPAR", "vs " .. partnerName() .. "  ·  only you two can hit each other  ·  1 to stop", FIGHT)
+		wasHunting = Spar.hunting(player)
+		if wasHunting then
+			flash("HUNT", "your kit is out  ·  fight beside your kaiju  ·  1 to stop", FIGHT)
+		else
+			flash("SPAR", "vs " .. partnerName() .. "  ·  only you two can hit each other  ·  1 to stop", FIGHT)
+		end
 		CombatSound.play("Draw")
 	else
-		flash("PICKAXE", "Spar over  ·  back to mining", PICK)
+		flash("PICKAXE", if wasHunting then "Hunt over  ·  back to mining" else "Spar over  ·  back to mining", PICK)
 		CombatSound.play("Sheathe")
 	end
 end

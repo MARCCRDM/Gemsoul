@@ -40,6 +40,9 @@ local Config = {
 		-- plays one miner, so there's one character to learn and to manage.
 		-- Saves that already hold three keep them for when it's back on.
 		MinerRoster = false,
+		-- Mini kaiju in the Outpost (docs/kaiju.md): a kaiju of your own
+		-- beside you, wild ones to fight or tame, moon bugs, hunting.
+		Kaiju = true,
 	},
 
 	-- Free mining: each mined node uses one free mine. When the daily or

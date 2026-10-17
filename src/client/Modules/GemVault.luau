@@ -388,6 +388,18 @@ local function drawTree(parent: Frame, gem)
 				draw()
 			end)
 		end
+		-- A kaiju's Gemsoul (Shared.Kaiju): only its E wakes; Q and R are sealed.
+		if mine == nil and type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju" then
+			local width = #ids * (tile + gap)
+			local seal = box(parent, C.Ink, startX - 4, mid - tile / 2 - 16, width, tile + 34, 0.18)
+			round(seal, 12)
+			seal.ZIndex = 4
+			stroke(seal, color, 1, 0.5)
+			local words =
+				text(seal, "SEALED  ·  a kaiju's Gemsoul wakes only its E", 12, C.Dim, HEAVY, 0, 0, width, tile + 34)
+			words.TextXAlignment = Enum.TextXAlignment.Center
+			words.ZIndex = 5
+		end
 	end
 end
 

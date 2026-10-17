@@ -403,6 +403,58 @@ check(FightSpacing.inFight(b), "A spar isn't a fight for jumping")
 b:SetAttribute("Spar", nil)
 check(not FightSpacing.inFight(b), "Out of the spar, still in a fight")
 
+-- Hunting: the kit out alone, against the Outpost's creatures (KaijuWilds).
+local Hunt = registered.Hunt
+check(Hunt ~= nil, "Hunt isn't a request")
+for _, player in { a, b, c, d } do
+	SparServer._stop(player)
+end
+check(not Hunt(a, "yes").Ok, "A malformed hunt request")
+check(Hunt(a, true).Ok and a:GetAttribute("Hunt") == true and a:GetAttribute("Spar") == true, "No kit out to hunt")
+check(Spar.hunting(a) and Spar.partner(a) == nil and Spar.active(a), "A hunter isn't hunting, alone")
+check(Hunt(a, true).Ok, "Hunting twice failed")
+tick()
+check(Spar.hunting(a), "The hunt ended on its own (no partner)")
+check(not CombatServer._canPvP(a, b) and not CombatServer._canPvP(b, a), "A hunter and a miner can fight")
+check(Hunt(b, true).Ok and not CombatServer._canPvP(a, b), "Two hunters can fight each other")
+SparServer._stop(b)
+gap()
+check(Ask(c, a.UserId).Message == "P1 is out hunting.", "Asked a hunter to spar")
+gap()
+check(Ask(a, c.UserId).Message == "Put your kit away first (1).", "A hunter asked to spar")
+-- A creature's finishing blow knocks a hunter down, as in a spar.
+local bug = { Root = { Position = ra.Position }, Kind = { Name = "Moon Bug" }, Element = "Fire", Model = nil }
+ha.Health = 5
+pcall(Enemies.hitPlayer, a, 500, "Fire", bug)
+check(ha.Health >= 1 and Spar.isDown(a), "A creature's blow killed a hunter (or didn't land)")
+-- Can't put the kit away mid-fight; can a moment later.
+check(not Hunt(a, false).Ok, "Put the kit away while down")
+now += Spar.DownSeconds + Spar.SheatheLock + 0.1
+SparServer._getUp(a, ha)
+check(ha.Health == ha.MaxHealth, "Not back up, whole")
+check(Hunt(a, false).Ok and a:GetAttribute("Hunt") == nil and a:GetAttribute("Spar") == nil, "Couldn't put it away")
+-- The hunt ends by itself when hunting stops making sense (a seat, leaving).
+check(Hunt(a, true).Ok, "Couldn't hunt again")
+ha.SeatPart = {}
+tick()
+check(a:GetAttribute("Hunt") == nil and a:GetAttribute("Spar") == nil, "Hunted from a seat")
+ha.SeatPart = nil
+check(Hunt(a, true).Ok, "Couldn't hunt again")
+a:SetAttribute("Outpost", nil)
+check(a:GetAttribute("Hunt") == nil, "Hunted outside the Outpost")
+check(not Hunt(a, true).Ok, "Hunted from outside the Outpost")
+a:SetAttribute("Outpost", true)
+-- Sparring, then asked to hunt: no.
+pair()
+check(Hunt(a, true).Message == "Finish your spar first.", "Hunted mid-spar")
+-- "Spar", false puts a hunter's kit away too.
+SparServer._stop(a)
+check(Hunt(a, true).Ok, "Couldn't hunt")
+now += Spar.SheatheLock + 1
+check(Spar_(a, false).Ok and a:GetAttribute("Hunt") == nil, "1 didn't end the hunt")
+
 print(
-	"PASS: " .. checks .. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both)"
+	"PASS: "
+		.. checks
+		.. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both, hunting)"
 )

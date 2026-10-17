@@ -252,6 +252,14 @@ local function buildBody(skin: Color3): Model
 	return rig
 end
 
+-- A brainrot creature's bare body (Shared.DungeonRules.Roster `spec`), for
+-- the Outpost's moon bugs (KaijuWilds): the rig, dressed as the creature.
+function Duelist.creatureBody(spec, accent: Color3): Model
+	local rig = buildBody(Color3.fromRGB(150, 130, 110))
+	BrainrotSkins.apply(rig, spec, accent, false, 1, false)
+	return rig
+end
+
 -- An R15 rig in the rival's gear, standing at `at`.
 local function buildRig(loadout, name: string, at: CFrame): Model?
 	local skin = Color3.fromHSV(0.06 + math.random() * 0.05, 0.25 + math.random() * 0.35, 0.45 + math.random() * 0.5)

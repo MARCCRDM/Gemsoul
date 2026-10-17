@@ -637,6 +637,13 @@ function Enemies.damage(
 	elseif (enemy :: any).ArmorProfile then
 		matchMult, matchTag = ElementMatchup.against(hitElement, (enemy :: any).ArmorProfile)
 	end
+	-- A creature with its own rules for taking a blow (a wild kaiju: its
+	-- element and kind, and a spread so no blow is sure; see KaijuWilds).
+	if (enemy :: any).TakenScale then
+		local scale, tag = (enemy :: any).TakenScale(hitElement)
+		matchMult *= scale
+		matchTag = matchTag or tag
+	end
 	amount *= matchMult
 	if not enemy.Alive or amount <= 0 then
 		return

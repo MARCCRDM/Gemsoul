@@ -1,8 +1,9 @@
 --[[
-	Mini kaiju: knee-high creatures that roam the Outpost, fight beside you,
+	Mini kaiju: small creatures that roam the Outpost, fight beside you,
 	and can be tamed. See docs/kaiju.md.
 
-	Three species, each in four elements:
+	Three species, each in four elements (Fire, Frost, Shock and Poison in
+	the data; Thermal, Cryo, Ion and Corrosive on screen):
 	  Bulwark    an armoured brute on two legs: slow, heavy blows
 	  Razorback  a spined runner: quick, light, fragile
 	  Carapace   a low shell on four legs: the hardest to wear down
@@ -24,6 +25,7 @@
 
 	Pure data and logic, for the server, the client and tests.
 ]]
+local GemConfig = require(script.Parent.GemConfig)
 local GemRoller = require(script.Parent.GemRoller)
 local GemTraits = require(script.Parent.GemTraits)
 local ElementMatchup = require(script.Parent.ElementMatchup)
@@ -91,6 +93,41 @@ Kaiju.Abilities = {
 	Poison = { "E_AcidSpray", "E_ToxicCloud", "E_ArmorMelt", "E_ToxicTide", "E_Maneater" },
 }
 
+-- How each E lands when a kaiju casts it (KaijuServer). Shape:
+--   Bolt   a shot at its foe          Blast  an area on its foe (after Delay)
+--   Nova   an area round itself       Line   a sweep from it through its foe
+--   Field  a lasting area on its foe  Chain  a bolt that leaps to Hits foes
+--   Storm  Hits bolts on its foe      Pylon  a turret by it, zapping its foe
+-- Mult: a share of the E's damage (the whole cast, however many hits).
+-- Status: what it leaves (Burn, Slow, Freeze, Stun, Blind, Poison,
+-- Vulnerable). Show: the move's own look (MoveVfx), for the big ones.
+Kaiju.AbilityPlans = {
+	E_EmberLance = { Shape = "Bolt", Mult = 1, Status = "Burn" },
+	E_Supernova = { Shape = "Blast", Radius = 10, Delay = 1, Mult = 1.4, Status = "Burn", Show = "Supernova" },
+	E_SolarFlare = { Shape = "Nova", Radius = 8, Mult = 0.6, Status = "Blind" },
+	E_FlameTornado = { Shape = "Line", Length = 22, Width = 6, Mult = 1.2, Status = "Burn", Show = "FlameTornado" },
+	E_CryoLance = { Shape = "Bolt", Mult = 0.9, Status = "Slow" },
+	E_AbsoluteZero = { Shape = "Blast", Radius = 10, Delay = 1, Mult = 1, Status = "Freeze", Show = "AbsoluteZero" },
+	E_Hailstorm = { Shape = "Field", Radius = 8, Duration = 3, Mult = 1.2, Status = "Slow", Show = "Hailstorm" },
+	E_IonSpark = { Shape = "Bolt", Mult = 0.9, Status = "Stun" },
+	E_ChainLightning = { Shape = "Chain", Radius = 14, Hits = 4, Mult = 1.2 },
+	E_ThunderPylon = { Shape = "Pylon", Radius = 14, Duration = 4, Mult = 1.2 },
+	E_StormCall = { Shape = "Storm", Radius = 9, Hits = 5, Mult = 1.4, Status = "Stun", Show = "StormCall" },
+	E_IonCannon = { Shape = "Line", Length = 30, Width = 4, Mult = 1.4, Status = "Stun", Show = "IonCannon" },
+	E_AcidSpray = { Shape = "Nova", Radius = 7, Mult = 0.8, Status = "Poison" },
+	E_ToxicCloud = { Shape = "Field", Radius = 8, Duration = 5, Mult = 1.2, Status = "Poison" },
+	E_ArmorMelt = { Shape = "Bolt", Mult = 0.8, Status = "Vulnerable" },
+	E_ToxicTide = { Shape = "Line", Length = 24, Width = 8, Mult = 1.2, Status = "Poison", Show = "ToxicTide" },
+	E_Maneater = { Shape = "Blast", Radius = 5, Delay = 0.4, Mult = 1.4, Status = "Stun", Show = "Maneater" },
+}
+
+-- How big they stand in the world (KaijuModels are about four studs tall at 1).
+Kaiju.Scale = { Pet = 0.55, Wild = 0.75 }
+
+-- Your kaiju beside you: it takes on creatures within Engage studs of you,
+-- runs back past Leash, and is put back beside you past Teleport.
+Kaiju.Follow = { Engage = 28, Leash = 45, Teleport = 90, Gap = 5 }
+
 -- Your team: one kaiju to start; a second slot opens when one of yours
 -- reaches level 10, a third at level 20.
 Kaiju.SlotLevels = { 1, 10, 20 }
@@ -108,6 +145,8 @@ Kaiju.Wild = {
 	Aggro = 26, -- notices fighters this close
 	Leash = 70,
 	LevelSpread = 2, -- within this many levels of the strongest kaiju near it
+	Health = 1.5, -- tougher than a kaiju of yours at its level: it takes two to bring down
+	FarFromSpawn = 140, -- studs: they roam the quarry, not the landing pad
 }
 -- Taming. Below TameFrom of its health you can try; the chance climbs as it
 -- weakens (points between are a straight line). TameTries failed tries and it
@@ -148,6 +187,10 @@ Kaiju.FeedExp = { Common = 20, Uncommon = 45, Rare = 100, UltraRare = 220, Legen
 Kaiju.FeedFull = { Common = 10, Uncommon = 15, Rare = 20, UltraRare = 25, Legendary = math.huge }
 Kaiju.FeedWeak = 0.5 -- a stone of the element that beats it
 Kaiju.FeedSame = 1.25 -- a stone of its own element
+
+-- A starter kaiju for everyone, the first time they reach the Outpost: a
+-- random kind, in a random element, with a Gemsoul rolled like a mined gem.
+Kaiju.StarterLevel = 1
 
 -- The 1v1 kaiju arena (phase 2): every match is for keeps.
 Kaiju.Arena = {
@@ -301,6 +344,46 @@ function Kaiju.rollSoul(rng, element: string, opts)
 	}
 end
 
+-- The damage of a kaiju's E: its blow times AbilityPower, times its
+-- Gemsoul's output (rarity, GemTraits.Output) and a little more for a
+-- bigger stone (Size), times the move's share (Kaiju.AbilityPlans).
+function Kaiju.abilityDamage(damage: number, gem, abilityId: string?): number
+	local plan = abilityId and Kaiju.AbilityPlans[abilityId]
+	local size = (math.clamp((gem and gem.Size) or 1, 1, 10) - 1) / 9
+	return damage * Kaiju.AbilityPower * GemTraits.output(gem) * (1 + 0.2 * size) * (plan and plan.Mult or 1)
+end
+
+-- A wild kaiju's level: near the strongest kaiju out with the players
+-- around (`levels`), within Wild.LevelSpread; level 1 to 3 with none.
+function Kaiju.wildLevel(levels: { number }, rng): number
+	local best = 0
+	for _, level in levels do
+		best = math.max(best, level)
+	end
+	local spread = Kaiju.Wild.LevelSpread
+	local roll = if rng then rng:NextInteger(-spread, spread) else math.random(-spread, spread)
+	if best <= 0 then
+		return math.clamp(2 + roll, 1, 3)
+	end
+	return math.clamp(best + roll, 1, Kaiju.MaxLevel)
+end
+
+-- The damage a kaiju takes from a blow of `element`: its own element 75%,
+-- its weakness 125% (ElementMatchup), less its kind's Guard.
+function Kaiju.taken(speciesId: string, kaijuElement: string?, element: string?): (number, string?)
+	local mult, tag = ElementMatchup.versus(element, kaijuElement)
+	local s = Kaiju.Species[speciesId]
+	return mult * (1 - (s and s.Guard or 0)), tag
+end
+
+-- Daily coin cap for moon bugs: coins still to earn today.
+function Kaiju.bugCoins(record, day: number): number
+	if not record or record.Day ~= day then
+		return Kaiju.Bug.DailyCoins
+	end
+	return math.max(0, Kaiju.Bug.DailyCoins - (record.Coins or 0))
+end
+
 -- The E ability its Gemsoul carries.
 function Kaiju.ability(gem): string?
 	return Kaiju.isSoul(gem) and GemTraits.traitFor(gem, "E") or nil
@@ -318,10 +401,57 @@ function Kaiju.new(id: string, speciesId: string, soul, level: number?)
 	}
 end
 
--- A stable display name: "Frost Razorback".
+-- The kaiju you own --------------------------------------------------------------------------
+
+Kaiju.MaxOwned = 12 -- kaiju one player can keep
+
+-- A profile's roster, made if it has none: { List = { [id] = record },
+-- Active = id (the one out), Next = the next id's number, Bugs = { Day, Coins } }.
+function Kaiju.roster(profile)
+	local roster = profile.Kaiju
+	if type(roster) ~= "table" then
+		roster = { List = {}, Next = 1 }
+		profile.Kaiju = roster
+	end
+	roster.List = roster.List or {}
+	roster.Next = roster.Next or 1
+	return roster
+end
+
+function Kaiju.count(roster): number
+	local n = 0
+	for _ in (roster and roster.List) or {} do
+		n += 1
+	end
+	return n
+end
+
+-- Adds a kaiju (given its kind, Gemsoul and level) and returns its record,
+-- or nil if the roster is full. The first one becomes the one out.
+function Kaiju.add(roster, speciesId: string, soul, level: number?)
+	if Kaiju.count(roster) >= Kaiju.MaxOwned or not Kaiju.Species[speciesId] then
+		return nil
+	end
+	local id = "k" .. roster.Next
+	roster.Next += 1
+	local record = Kaiju.new(id, speciesId, soul, level)
+	roster.List[id] = record
+	if not roster.Active or not roster.List[roster.Active] then
+		roster.Active = id
+	end
+	return record
+end
+
+-- The kaiju out with you (nil if none).
+function Kaiju.active(roster)
+	return roster and roster.Active and roster.List[roster.Active] or nil
+end
+
+-- A stable display name, with the game's name for its element: "Cryo Razorback".
 function Kaiju.title(record): string
 	local s = Kaiju.Species[record.Species]
-	return string.format("%s %s", record.Element or "", s and s.Name or "Kaiju")
+	local element = GemConfig.ElementLabels[record.Element or ""] or record.Element or ""
+	return string.format("%s %s", element, s and s.Name or "Kaiju")
 end
 
 return Kaiju

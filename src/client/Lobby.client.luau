@@ -20,6 +20,7 @@ local OutpostScene = require(script.Parent.Modules.OutpostScene)
 local UiKit = require(script.Parent.Modules.UiKit)
 local SparKit = require(script.Parent.Modules.SparKit)
 local Spar = require(game:GetService("ReplicatedStorage").Shared.Spar)
+local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -38,6 +39,11 @@ GemClient.Changed:Connect(LoadingFlow.progress)
 
 -- Friendly sparring: ask someone (Z, or 1 for the nearest); 1 ends it (SparKit).
 SparKit.start()
+
+-- Your mini kaiju: its card, RECALL, HUNT and TAME, and the kaiju panel.
+if Config.Features == nil or Config.Features.Kaiju ~= false then
+	require(script.Parent.Modules.KaijuHud).start()
+end
 
 -- The lobby HUD: in the Outpost, not fighting (or sparring), not inside a
 -- menu. Checked a few times a second, and only applied when it changes.

@@ -641,6 +641,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Outpost = profile.Outpost, -- Saga Outpost picks and record (see OutpostServer)
 		Market = profile.Market, -- listings and offers in escrow (see MarketBoard)
 		Presets = (profile :: any).Presets, -- saved gear setups (see Presets)
+		Kaiju = (profile :: any).Kaiju, -- your mini kaiju (Shared.Kaiju.roster, KaijuServer)
 		Referrals = (profile :: any).Referrals, -- friends who joined through your invite (see Referrals)
 		FirstJoin = profile.FirstJoin,
 		WelcomeBought = profile.WelcomeBought,

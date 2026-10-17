@@ -59,5 +59,19 @@ for _, s in SCREENS do
 	check(dock.TileWidth * TILES + dock.Gap * (TILES - 1) <= dock.W, label .. ": the tiles spill off the dock")
 	check(dock.TileWidth >= 44 and dock.TileHeight >= 44, label .. ": tiles too small to tap")
 	check(open.H >= 120 and open.W >= 240, label .. ": the open chat is too small to read")
+	-- Your kaiju's card and TAME, with and without the CHAT button above.
+	for _, chat in { false, true } do
+		local k = MobileLayout.kaiju(chat)
+		local tame = { X = k.TameX, Y = k.Y, W = k.TameW, H = k.H }
+		local what = label .. (if chat then " (with CHAT)" else "")
+		check(inside(k) and inside(tame), what .. ": the kaiju card runs off the screen")
+		for name, r in { ["pick card"] = card, coins = wallet, dock = dock, ["teammates' cards"] = party, jump = jump } do
+			check(not MobileLayout.overlaps(k, r), what .. ": the kaiju card overlaps the " .. name)
+			check(not MobileLayout.overlaps(tame, r), what .. ": TAME overlaps the " .. name)
+		end
+		if chat then
+			check(not MobileLayout.overlaps(k, closed), what .. ": the kaiju card overlaps the CHAT button")
+		end
+	end
 end
-print("PASS: " .. checks .. " mobile layout checks (pick card, coins, chat, dock, teammates, at 7 screen sizes)")
+print("PASS: " .. checks .. " mobile layout checks (pick card, coins, chat, dock, teammates, kaiju, at 7 screen sizes)")

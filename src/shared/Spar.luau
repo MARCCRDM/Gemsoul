@@ -13,6 +13,7 @@
 
 	Attributes, on the Player:
 	  Spar      true while your combat kit is out (the server sets it)
+	  Hunt      true while it's out to hunt (with Spar)
 	  SparWith  your partner's UserId, while sparring
 	  SparDown  server time you get back up, while knocked down
 	  SparHurt  server time you were last hit in a spar: you can't end it
@@ -24,6 +25,9 @@
 	  Spar.active(player, now?)    kit out and on your feet: fighting
 	  Spar.fighting(player)        in a fight of any kind: an Arena session,
 	                               a match, or a spar
+	  Spar.hunting(player)         the kit out alone, to hunt the Outpost's
+	                               creatures (KaijuWilds): a spar with no
+	                               partner, so no player can hit you or be hit
 	  Spar.paired(a, b)            sparring with each other
 	  Spar.canHit(sourceSpar, targetSpar, sourceDown, targetDown, same, paired)
 	  Spar.startProblem(state)     why you can't spar now (nil if you can)
@@ -60,6 +64,10 @@ end
 
 function Spar.fighting(player: Instance): boolean
 	return player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil or Spar.sparring(player)
+end
+
+function Spar.hunting(player: Instance): boolean
+	return player:GetAttribute("Hunt") == true and Spar.sparring(player)
 end
 
 -- Your partner's UserId while you spar.

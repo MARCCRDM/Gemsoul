@@ -19,6 +19,9 @@
 	  MobileLayout.chat(screen, open)      the chat box: CHAT button, or opened
 	  MobileLayout.dock(screen, tiles)     the dock, its PLAY and tile size
 	  MobileLayout.party(screen)           the teammates' cards
+	  MobileLayout.kaiju(chat)             your kaiju's card (KaijuHud), under
+	                                       the coins (beside the CHAT button,
+	                                       if there is one), TAME beside it
 ]]
 local MobileLayout = {}
 
@@ -68,6 +71,17 @@ end
 
 function MobileLayout.party(screen: Vector2)
 	return { X = screen.X - 16 - 220, Y = 132, W = 220, H = 40 }
+end
+
+function MobileLayout.kaiju(chat: boolean?)
+	local wallet = MobileLayout.wallet()
+	local x, y = 12, wallet.Y + wallet.H + 8
+	if chat then
+		-- (Beside the CHAT button: under it, a short screen runs into the dock.)
+		local button = MobileLayout.chat(Vector2.zero, false)
+		x, y = button.X + button.W + 8, button.Y
+	end
+	return { X = x, Y = y, W = 236, H = 50, TameX = x + 236 + 8, TameW = 86 }
 end
 
 function MobileLayout.overlaps(a, b): boolean
