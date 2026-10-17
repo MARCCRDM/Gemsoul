@@ -4,6 +4,10 @@
 -- click a line to whisper, invite, duel or trade its sender, item links in
 -- [brackets], one-tap LFG posts, and loot/system lines. Messages go through
 -- TextChatService, so Roblox filters them.
+--
+-- On phones and tablets the frame stays off: Roblox's own chat takes over
+-- (the speech-bubble button in the top bar, with its unread count, opens the
+-- recent lobby chat), and everyone's words pop up as bubbles over their heads.
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -46,6 +50,14 @@ local whisperChannels: { [number]: string } = {} -- partner UserId -> channel na
 local lastActivity = 0
 local collapsed = UserInputService.TouchEnabled
 local autoCollapsed = false -- folded by itself over the dashboard
+-- A phone or tablet (a touch screen with no keyboard): Roblox's chat, not ours.
+local handheld = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+ChatFrame.Handheld = handheld
+
+-- Speech bubbles over heads, for everyone.
+pcall(function()
+	TextChatService.BubbleChatConfiguration.Enabled = true
+end)
 
 local function hex(color: Color3): string
 	return string.format("#%02X%02X%02X", color.R * 255, color.G * 255, color.B * 255)
@@ -385,10 +397,11 @@ drawTabs = function()
 	end
 end
 
--- On a phone the chat lives in the top-left corner (MobileLayout): a CHAT
--- button under the pick card and, opened, a column down the left side that
--- stops above the lobby dock and leaves the middle of the screen clear. While
--- it's open the pick card steps aside (the "ChatOpen" attribute).
+-- On a small screen (with a keyboard: phones use Roblox's chat) the chat
+-- lives in the top-left corner (MobileLayout): a CHAT button under the pick
+-- card and your coins and, opened, a column down the left side that stops
+-- above the lobby dock and leaves the middle of the screen clear. While it's
+-- open the pick card steps aside (the "ChatOpen" attribute).
 local function fitChat()
 	local mobile = UserInputService.TouchEnabled or gui.AbsoluteSize.X < 700 or gui.AbsoluteSize.Y < 540
 	local width = math.min(WIDTH, math.max(240, gui.AbsoluteSize.X - 24))
@@ -880,7 +893,7 @@ end)
 -- rather than the 3D world.
 local function wanted(): (boolean, boolean)
 	local playerGui = player:FindFirstChildOfClass("PlayerGui")
-	if not playerGui or playerGui:FindFirstChild("Intro") then
+	if handheld or not playerGui or playerGui:FindFirstChild("Intro") then
 		return false, false
 	end
 	local dashboard = playerGui:FindFirstChild("Dashboard")

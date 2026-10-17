@@ -1,7 +1,8 @@
 -- lune run tests/mobile_layout_cases.luau <repo>
 -- The lobby's pieces on a phone never overlap (MobileLayout): the pick card,
--- the CHAT button, the opened chat, the dock (PLAY and its tiles) and the
--- teammates' cards, at every common phone size; the dock's tiles all fit.
+-- your level and coins, the CHAT button (small screens with a keyboard), the
+-- opened chat, the dock (PLAY and its tiles) and the teammates' cards, at
+-- every common phone size; the dock's tiles all fit.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -28,18 +29,23 @@ local SCREENS = {
 	{ 932, 430 - 58 },
 	{ 1024, 768 - 36 },
 }
-local TILES = 5
+local TILES = 6 -- INVENTORY, MARKET, STORE, RANKS, SOCIAL, INVITE
 for _, s in SCREENS do
 	local screen = Vector2.new(s[1], s[2])
 	local label = s[1] .. "x" .. s[2]
 	local card, dock, party = MobileLayout.card(), MobileLayout.dock(screen, TILES), MobileLayout.party(screen)
 	local closed, open = MobileLayout.chat(screen, false), MobileLayout.chat(screen, true)
+	local wallet = MobileLayout.wallet()
 	local function inside(r)
 		return r.X >= 0 and r.Y >= 0 and r.X + r.W <= screen.X and r.Y + r.H <= screen.Y
 	end
-	for name, r in { card = card, dock = dock, party = party, chat = closed, open = open } do
+	for name, r in { card = card, wallet = wallet, dock = dock, party = party, chat = closed, open = open } do
 		check(inside(r), label .. ": the " .. name .. " runs off the screen")
 	end
+	check(not MobileLayout.overlaps(card, wallet), label .. ": the coins overlap the pick card")
+	check(not MobileLayout.overlaps(wallet, closed), label .. ": the CHAT button overlaps the coins")
+	check(not MobileLayout.overlaps(wallet, dock), label .. ": the coins overlap the dock")
+	check(not MobileLayout.overlaps(wallet, party), label .. ": the coins overlap the teammates' cards")
 	check(not MobileLayout.overlaps(card, closed), label .. ": the CHAT button overlaps the pick card")
 	check(not MobileLayout.overlaps(closed, dock), label .. ": the CHAT button overlaps the dock")
 	check(not MobileLayout.overlaps(open, dock), label .. ": the open chat covers PLAY or the tiles")
@@ -51,7 +57,7 @@ for _, s in SCREENS do
 	check(not MobileLayout.overlaps(dock, jump), label .. ": the dock runs under the jump button")
 	-- Every tile fits the dock, with room for its name.
 	check(dock.TileWidth * TILES + dock.Gap * (TILES - 1) <= dock.W, label .. ": the tiles spill off the dock")
-	check(dock.TileWidth >= 44, label .. ": tiles too narrow to tap")
+	check(dock.TileWidth >= 44 and dock.TileHeight >= 44, label .. ": tiles too small to tap")
 	check(open.H >= 120 and open.W >= 240, label .. ": the open chat is too small to read")
 end
-print("PASS: " .. checks .. " mobile layout checks (pick card, chat, dock, teammates, at 7 screen sizes)")
+print("PASS: " .. checks .. " mobile layout checks (pick card, coins, chat, dock, teammates, at 7 screen sizes)")

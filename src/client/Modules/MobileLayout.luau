@@ -3,15 +3,19 @@
 	onto each other (tests/mobile_layout_cases checks every phone size):
 
 	  top left      the pick card (OutpostScene), drawn at CardScale, and
-	                the CHAT button under it; opened, the chat is a column
-	                down the left that stops above the dock (and the card
-	                steps aside while it's open)
+	                your level and coins (LobbyUI) in a pill under it. On a
+	                small screen with a keyboard, the CHAT button goes under
+	                that; opened, the chat is a column down the left that
+	                stops above the dock (and the card steps aside while it's
+	                open). Phones and tablets use Roblox's own chat instead
+	                (ChatFrame).
 	  bottom middle the dock (LobbyUI): PLAY, and a row of tiles under it
 	  top right     teammates' health (PartyUI), hidden in a fight
 
 	Rects are { X, Y, W, H } in the ScreenGui's space (below the top bar).
 
 	  MobileLayout.card()                  the pick card
+	  MobileLayout.wallet()                level and coins
 	  MobileLayout.chat(screen, open)      the chat box: CHAT button, or opened
 	  MobileLayout.dock(screen, tiles)     the dock, its PLAY and tile size
 	  MobileLayout.party(screen)           the teammates' cards
@@ -25,10 +29,15 @@ function MobileLayout.card()
 	return { X = 12, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
 end
 
+function MobileLayout.wallet()
+	local card = MobileLayout.card()
+	return { X = 12, Y = card.Y + card.H + 8, W = 150, H = 30 }
+end
+
 function MobileLayout.dock(screen: Vector2, tiles: number)
 	-- Clear of Roblox's jump button at the bottom right (and as wide on the left).
 	local width = math.min(420, math.max(240, screen.X - 280))
-	local gap, tileHeight, playHeight = 6, 34, 44
+	local gap, tileHeight, playHeight = 6, 44, 44
 	local height = playHeight + 8 + tileHeight
 	return {
 		X = (screen.X - width) / 2,
@@ -42,9 +51,9 @@ function MobileLayout.dock(screen: Vector2, tiles: number)
 end
 
 function MobileLayout.chat(screen: Vector2, open: boolean)
-	local card = MobileLayout.card()
+	local wallet = MobileLayout.wallet()
 	if not open then
-		return { X = 12, Y = card.Y + card.H + 10, W = 76, H = 44 }
+		return { X = 12, Y = wallet.Y + wallet.H + 8, W = 76, H = 44 }
 	end
 	local dock = MobileLayout.dock(screen, 5)
 	local width = math.floor(math.clamp(screen.X * 0.38, 240, 340))

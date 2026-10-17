@@ -2,8 +2,10 @@
 	The lobby (the Saga Outpost): compact Play and Inventory controls on the
 	left, a two-column utility menu, level and coins, plus one small panel
 	on the right for the daily streak, the next mode to unlock and the next
-	task (on a phone, just the task), a REPORT A BUG button by the TASKS
-	button, and the PLAY menu that picks what to play:
+	task, a REPORT A BUG button by the TASKS button, and the PLAY menu that
+	picks what to play. On a phone: PLAY alone at the bottom centre with icon
+	buttons under it, level and coins at the top left, the next task as one
+	slim strip, and no bug button (SOCIAL has the form).
 
 	  PRACTICE  1v1 Practice    a rival miner, coins on a win (always open)
 	            Squad Dungeon   three miners, a dungeon and its boss (not
@@ -559,25 +561,21 @@ local xpLabel = text(status, "", 10, P.Dim, IronUi.Body, Enum.TextXAlignment.Lef
 xpLabel.Position, xpLabel.Size = UDim2.fromOffset(54, 37), UDim2.new(1, -63, 0, 14)
 xpLabel.TextStrokeTransparency = 1
 
--- On a phone: level and coins in a pill beside PLAY, and who's around on
--- its other side.
-local function pill(parent: Instance)
-	local p = new("Frame", {
-		BackgroundColor3 = Color3.fromRGB(12, 16, 24),
-		BackgroundTransparency = 0.15,
-		Size = UDim2.fromOffset(150, 30),
-		Visible = false,
-	}, parent)
-	UiKit.round(p, 15)
-	new("UIStroke", { Color = Color3.fromRGB(64, 78, 98), Thickness = 1, Transparency = 0.3 }, p)
-	local l = text(p, "", 12, P.Text, IronUi.Heading)
-	l.RichText = true
-	l.Size = UDim2.fromScale(1, 1)
-	l.TextStrokeTransparency = 1
-	return p, l
-end
-local walletPill, walletText = pill(bar)
-local crowdPill, crowdText = pill(bar)
+-- On a phone: level and coins in a pill at the top left, under the pick
+-- card (MobileLayout.wallet).
+local walletPill = new("Frame", {
+	Name = "Wallet",
+	BackgroundColor3 = Color3.fromRGB(12, 16, 24),
+	BackgroundTransparency = 0.15,
+	Size = UDim2.fromOffset(150, 30),
+	Visible = false,
+}, gui)
+UiKit.round(walletPill, 15)
+new("UIStroke", { Color = Color3.fromRGB(64, 78, 98), Thickness = 1, Transparency = 0.3 }, walletPill)
+local walletText = text(walletPill, "", 12, P.Text, IronUi.Heading)
+walletText.RichText = true
+walletText.Size = UDim2.fromScale(1, 1)
+walletText.TextStrokeTransparency = 1
 
 local function formatCoins(coins: number): string
 	return (tostring(math.floor(coins)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
@@ -646,15 +644,12 @@ end
 LobbyUI.crowd = crowd
 local function refreshCrowd()
 	local online, searching = crowd()
-	local dot = '<font color="#4ED692">●</font> '
 	if searching > 0 then
 		playSub.Text = string.format("● %d ONLINE  ·  %d SEARCHING", online, searching)
-		crowdText.Text = string.format("%s%d online · %d searching", dot, online, searching)
 	else
 		playSub.Text = if online > 1
 			then string.format("● %d MINERS ONLINE", online)
 			else "PRACTICE  ·  CASUAL  ·  RANKED"
-		crowdText.Text = string.format("%s%d online", dot, online)
 	end
 end
 Players.PlayerAdded:Connect(refreshCrowd)
@@ -674,7 +669,10 @@ task.spawn(function()
 end)
 
 -- REPORT A BUG, beside the TASKS button (top right): the feedback form
--- (Social), which sends the build and where you were with it.
+-- (Social), which sends the build and where you were with it. Not on a
+-- phone, where the corner is kept clear: SOCIAL has the same form there
+-- (its Feedback button). Its words are a label of their own, so the
+-- gradient doesn't tint them dark.
 local bug = new("TextButton", {
 	Name = "ReportBug",
 	AnchorPoint = Vector2.new(1, 0),
@@ -682,10 +680,7 @@ local bug = new("TextButton", {
 	Size = UDim2.fromOffset(132, 40),
 	BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
 	AutoButtonColor = false,
-	Text = "🐞 REPORT A BUG",
-	TextSize = 12,
-	Font = IronUi.Heading,
-	TextColor3 = Color3.fromRGB(255, 226, 170),
+	Text = "",
 }, gui)
 UiKit.round(bug, 8)
 new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.55 }, bug)
@@ -694,6 +689,9 @@ new(
 	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(58, 44, 26), Color3.fromRGB(30, 22, 14)) },
 	bug
 )
+local bugLabel = text(bug, "🐞 REPORT A BUG", 12, Color3.fromRGB(255, 226, 170), IronUi.Heading)
+bugLabel.Size = UDim2.fromScale(1, 1)
+bugLabel.TextStrokeTransparency = 1
 IronUi.juice(bug)
 bug.Activated:Connect(function()
 	require(script.Parent.SocialUI).feedback()
@@ -709,15 +707,17 @@ local function fitDock()
 	table.sort(buttons, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
 	modes.Visible = false
 	status.Visible = not mobile
-	walletPill.Visible, crowdPill.Visible = mobile, mobile
-	-- The board under TASKS on the right; the live feed at the top centre.
+	walletPill.Visible = mobile and not picker.Visible
+	-- The board under TASKS on the right; the live feed at the top centre (on
+	-- a phone, in the gap between the pick card and the board).
 	LobbyBoard.setCompact(mobile)
-	LobbyFeed.setCompact(mobile)
+	local card = MobileLayout.card()
+	local gapLeft = card.X + card.W + 8
+	local gapRight = size.X - 16 - board.Size.X.Offset - 8
+	LobbyFeed.setCompact(mobile, if mobile then { X = gapLeft, W = gapRight - gapLeft } else nil)
 	board.Position = UDim2.new(1, -16, 0, 64)
 	LobbyBoard.setHidden(picker.Visible)
-	bug.Visible = not picker.Visible
-	bug.Size = UDim2.fromOffset(if mobile then 84 else 132, if mobile then 44 else 40)
-	bug.Text = if mobile then "🐞 BUG" else "🐞 REPORT A BUG"
+	bug.Visible = not picker.Visible and not mobile
 	if mobile then
 		local compact = MobileLayout.dock(size, #buttons)
 		local width, gap, tileHeight = compact.W, compact.Gap, compact.TileHeight
@@ -729,23 +729,25 @@ local function fitDock()
 		playCaption.TextSize = 22
 		playCaption.Position, playCaption.Size = UDim2.fromOffset(0, 0), UDim2.fromScale(1, 1)
 		playSub.Visible = false
-		-- The pills either side of PLAY, as wide as the screen has room for.
-		local side = math.floor((size.X - playWidth) / 2) - 24
-		local pillWidth = math.clamp(side, 0, 160)
-		walletPill.Visible, crowdPill.Visible = pillWidth >= 96, pillWidth >= 96
-		walletPill.AnchorPoint, walletPill.Position = Vector2.new(1, 0.5), UDim2.new(0.5, -playWidth / 2 - 8, 0, 22)
-		crowdPill.AnchorPoint, crowdPill.Position = Vector2.new(0, 0.5), UDim2.new(0.5, playWidth / 2 + 8, 0, 22)
-		walletPill.Size, crowdPill.Size = UDim2.fromOffset(pillWidth, 30), UDim2.fromOffset(pillWidth, 30)
+		-- Level and coins up at the top left; nothing either side of PLAY.
+		local wallet = MobileLayout.wallet()
+		walletPill.AnchorPoint, walletPill.Position = Vector2.zero, UDim2.fromOffset(wallet.X, wallet.Y)
+		walletPill.Size = UDim2.fromOffset(wallet.W, wallet.H)
 		tiles.AnchorPoint, tiles.Position = Vector2.new(0, 0), UDim2.fromOffset(0, 52)
 		tiles.Size = UDim2.fromOffset(width, tileHeight)
 		local tileWidth = math.floor((width - gap * math.max(0, #buttons - 1)) / math.max(1, #buttons))
+		-- Each tile: its icon, and its name small under it.
 		for i, button in buttons do
 			button.Position, button.Size = UDim2.fromOffset((i - 1) * (tileWidth + gap), 0), UDim2.fromOffset(tileWidth, tileHeight)
 			for _, child in button:GetChildren() do
 				if child.Name == "NavLabel" then
-					child.TextSize, child.TextScaled = 11, true
-					child.AnchorPoint, child.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
-					child.Size, child.TextXAlignment = UDim2.new(1, -6, 0, 14), Enum.TextXAlignment.Center
+					child.Visible, child.TextSize, child.TextScaled = true, 9, true
+					child.AnchorPoint, child.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -4)
+					child.Size, child.TextXAlignment = UDim2.new(1, -6, 0, 11), Enum.TextXAlignment.Center
+				elseif child.Name == "NavIcon" then
+					child.Visible = true
+					child.AnchorPoint, child.Position = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 5)
+					child.Size = UDim2.fromOffset(tileHeight - 22, tileHeight - 22)
 				elseif child:IsA("GuiObject") then child.Visible = false end
 			end
 		end
@@ -780,6 +782,7 @@ local function fitDock()
 				child.TextXAlignment = if primary then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
 			elseif child.Name == "NavIcon" then
 				child.Visible = primary
+				child.AnchorPoint = Vector2.new(0, 0.5)
 				child.Size, child.Position = UDim2.fromOffset(22, 22), UDim2.new(0, 10, 0.5, 0)
 			elseif child.Name == "NavChevron" then child.Visible = primary
 			elseif child.Name == "Edge" then

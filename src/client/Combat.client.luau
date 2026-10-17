@@ -1047,10 +1047,11 @@ local attackButton = makeSlot("Basic", "LEFT", "HOLD", UDim2.new(0, 56, 1, -32))
 local heavyButton = makeSlot("Heavy", "RIGHT", "HOLD", UDim2.new(1, -56, 1, -32))
 local dodgeButton = makeSlot("Dodge", "DODGE", "TAP·2×", UDim2.new(1, -56, 1, -210))
 local blockButton = makeSlot("Block", "GUARD", "HOLD", UDim2.new(0.5, 0, 1, -32))
+-- ATTACK swings each hand in turn, as a click does; held, it charges a heavy.
 attackButton.InputBegan:Connect(function(obj)
 	if pressInput(obj) and not holding then
 		attackTouch = if obj.UserInputType == Enum.UserInputType.Touch then obj else nil
-		beginAttack("Left")
+		beginAttack(nil)
 	end
 end)
 attackButton.InputEnded:Connect(function(obj)
@@ -1223,11 +1224,12 @@ player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 	nextAttack = 0
 end)
 -- Touch screens: the fighting actions under the right thumb, the left side
--- left to the move stick. ATTACK sits in the bottom-right corner; the three
--- surges ring it closest (Q left, E diagonal, R above); GUARD, HEAVY and
--- DODGE make one even outer arc, all round. Your vitals sit bottom-centre,
--- left of the ring, with your maneuvers (round too) in a row just above
--- them. Returns the top of that stack (from the bottom) and its centre.
+-- left to the move stick. ATTACK sits in the bottom-right corner, close to
+-- the edge; the three surges ring it closest (Q left, E diagonal, R above);
+-- GUARD and DODGE sit on an outer arc. There's no HEAVY button: holding
+-- ATTACK charges a heavy. Your vitals sit bottom-centre, left of the ring,
+-- with your maneuvers (round too) in a row just above them. Returns the top
+-- of that stack (from the bottom) and its centre.
 local thumbReady = false
 local THUMB_NAMES = { Basic = "ATTACK", Heavy = "HEAVY", Block = "GUARD", Dodge = "DODGE" }
 local function roundAll(button: GuiObject)
@@ -1263,11 +1265,10 @@ local function layoutThumb(viewport: Vector2): (number, number)
 	end
 	local k = math.clamp(viewport.Y / 380, 0.8, 1.3)
 	local A, S, M, G = math.floor(86 * k), math.floor(58 * k), math.floor(50 * k), math.floor(56 * k)
-	local margin = math.floor(14 * k)
-	-- The ring's centre, measured from the bottom-right corner: in from the
-	-- edge a little, where the right thumb rests rather than at full stretch.
-	local inset = math.floor(math.clamp(viewport.X * 0.035, 16, 44))
-	local cx, cy = margin + inset + A / 2, margin + A / 2
+	local margin = math.floor(12 * k)
+	-- The ring's centre, measured from the bottom-right corner: ATTACK close
+	-- to the edge, where the right thumb lands.
+	local cx, cy = margin + A / 2, margin + A / 2
 	local function at(button: GuiObject, size: number, radius: number, degrees: number)
 		local a = math.rad(degrees)
 		button.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1284,15 +1285,14 @@ local function layoutThumb(viewport: Vector2): (number, number)
 		icon.Glyph.TextSize = math.floor(S * 0.38)
 		icon.Badge.TextSize = math.floor(9 * k)
 	end
-	-- The outer arc: guard low by the thumb, heavy, dodge on top.
+	-- The outer arc: guard low by the thumb, dodge on top.
 	local outer = inner + S / 2 + G / 2 + 8 * k
 	at(slots.Block.Button, G, outer, 184)
-	at(slots.Heavy.Button, M, outer, 140)
-	at(slots.Dodge.Button, M, outer, 97)
+	at(slots.Dodge.Button, M, outer, 100)
 	-- The round buttons: name centred, cooldown above it, no key hint.
 	for id, slot in slots do
 		local size = if id == "Basic" then A elseif id == "Block" then G else M
-		slot.Button.Visible = true
+		slot.Button.Visible = id ~= "Heavy"
 		slot.Key.Visible = false
 		slot.Name.Text = if id == "Block" and player:GetAttribute("Blocking") then "GUARD UP" else THUMB_NAMES[id]
 		slot.Name.TextSize = if id == "Basic" then math.floor(15 * k) else math.floor(10 * k)
@@ -1302,9 +1302,12 @@ local function layoutThumb(viewport: Vector2): (number, number)
 		slot.Timer.Size = UDim2.new(1, -4, 0, math.floor(size * 0.3))
 		slot.Timer.TextSize = math.floor(size * 0.24)
 	end
-	-- Vitals: between the move stick's side (the left fifth) and the ring.
+	-- Vitals: between the move stick's side (the left fifth) and the ring
+	-- (with the room they had before the ring moved to the edge, so they keep
+	-- their layout).
 	local left = viewport.X * 0.2
-	local right = viewport.X - (cx + outer + G / 2 + 14 * k)
+	local reserve = math.floor(math.clamp(viewport.X * 0.035, 16, 44))
+	local right = viewport.X - (cx + reserve + outer + G / 2 + 14 * k)
 	local width = math.clamp(right - left, 240, 420)
 	local centre = math.max(left + width / 2, math.min(right - width / 2, viewport.X / 2))
 	local stacked = width < 400
@@ -1772,7 +1775,7 @@ RunService.RenderStepped:Connect(function(dt)
 			slot.Timer.Text = if timer > 0 then string.format("%.1f", timer / 10) else ""
 		end
 		local pressed = (id == "Block" and blockHeld)
-			or (holding and ((id == "Basic" and attackSide == "Left") or (id == "Heavy" and attackSide == "Right")))
+			or (holding and (id == "Basic" or (id == "Heavy" and attackSide == "Right")))
 		slot.Name.TextColor3 = if pressed then P.Gold elseif remaining > 0 then P.Dim else P.Text
 	end
 	slots.Block.Name.Text = if player:GetAttribute("Blocking") then "GUARD UP" else "GUARD"

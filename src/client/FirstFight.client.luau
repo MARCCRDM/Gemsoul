@@ -46,8 +46,9 @@ local ring = new("Frame", {
 new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, ring)
 local edge = new("UIStroke", { Color = GOLD, Thickness = 3 }, ring)
 
--- The button each hint is about.
-local SLOT = { Swing = "Basic", Block = "Block", Dodge = "Dodge", Heavy = "Heavy" }
+-- The button each hint is about (a heavy is ATTACK held: there's no HEAVY
+-- button on a touch screen).
+local SLOT = { Swing = "Basic", Block = "Block", Dodge = "Dodge", Heavy = "Basic" }
 local function findTarget(id: string): GuiObject?
 	local hud = player.PlayerGui:FindFirstChild("CombatHud")
 	if not hud or not hud:IsA("ScreenGui") or not hud.Enabled then

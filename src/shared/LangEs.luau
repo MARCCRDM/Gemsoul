@@ -234,6 +234,7 @@ return {
 	["DAILY CHALLENGES"] = "DESAFÍOS DIARIOS",
 	["CHALLENGES"] = "DESAFÍOS",
 	["ALL DONE ✓"] = "TODO LISTO ✓",
+	["Today's challenges done"] = "Desafíos de hoy completados",
 	["ALL THREE  {*}"] = "LOS TRES  {*}",
 	["+{1} ◆ BONUS"] = "+{1} ◆ EXTRA",
 	["NEXT UNLOCK"] = "PRÓXIMO DESBLOQUEO",

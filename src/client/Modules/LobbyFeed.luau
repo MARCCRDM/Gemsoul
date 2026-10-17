@@ -11,7 +11,8 @@
 	                 coins, tomorrow's reward, and today's challenges.
 
 	  LobbyFeed.mount(gui)        builds both in the lobby's ScreenGui
-	  LobbyFeed.setCompact(on)    phone layout
+	  LobbyFeed.setCompact(on, span?)  phone layout, fitted to the gap it's
+	                                   given ({ X, W }) between the corners
 	  LobbyFeed.push(icon, text, color?)   adds a line (rich text)
 	  LobbyFeed.welcome()         shows the banner if there's a reward to show
 ]]
@@ -499,10 +500,19 @@ function LobbyFeed.mount(gui: ScreenGui)
 	return stack
 end
 
-function LobbyFeed.setCompact(on: boolean)
+-- `span` (a phone's) is the gap the feed fits in, between the pick card and
+-- the board: { X = its left edge, W = its width }.
+function LobbyFeed.setCompact(on: boolean, span: { X: number, W: number }?)
 	compact = on
 	if stack then
-		stack.Size = UDim2.fromOffset(if compact then 300 else 380, 3 * 30)
+		local width = if compact then 300 else 380
+		if span then
+			width = math.min(width, math.max(160, span.W))
+			stack.Position = UDim2.new(0, span.X + span.W / 2, 0, 12)
+		else
+			stack.Position = UDim2.new(0.5, 0, 0, 12)
+		end
+		stack.Size = UDim2.fromOffset(width, 3 * 30)
 	end
 end
 

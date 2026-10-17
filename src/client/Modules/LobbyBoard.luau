@@ -9,8 +9,10 @@
 	  NEXT TASK         the next Tasks step with its hint; tapping it opens
 	                    the Tasks window
 
-	On a phone (compact) there's room for one card: the next task while the
-	player is still learning (the first two Tasks pages), the challenges after.
+	On a phone (compact) there's room for one slim strip: the next task while
+	the player is still learning (the first two Tasks pages), the challenges
+	after (the next one still to do). Each is one line, its reward on the
+	right, over a thin progress bar.
 
 	  LobbyBoard.mount(gui)        builds it in the lobby's ScreenGui
 	  LobbyBoard.setCompact(on)    phone layout
@@ -40,7 +42,7 @@ local new = IronUi.new
 
 local LobbyBoard = {}
 
-local WIDE, NARROW = 224, 212
+local WIDE, NARROW = 224, 236
 local PANEL = Color3.fromRGB(14, 19, 29)
 local EDGE = Color3.fromRGB(72, 88, 112)
 local TRACK = Color3.fromRGB(40, 52, 70)
@@ -95,6 +97,9 @@ local function setFill(fill: Frame, share: number, animate: boolean)
 	end
 end
 
+-- How tall a card is as a phone's slim strip.
+local STRIP = 38
+
 -- A card: a dark glass panel, a coloured edge, a title and a note on the right.
 local function card(name: string, order: number, accent: Color3, title: string)
 	local frame = new("TextButton", {
@@ -128,7 +133,7 @@ local function card(name: string, order: number, accent: Color3, title: string)
 	note.AnchorPoint = Vector2.new(1, 0)
 	note.Position, note.Size = UDim2.new(1, -12, 0, 10), UDim2.fromOffset(78, 22)
 	note.RichText = true
-	return frame, note, heading
+	return frame, note, heading, edge
 end
 
 -- Daily streak ----------------------------------------------------------------------------------
@@ -186,7 +191,7 @@ local function untilReset(): string
 end
 
 local function buildChallenges()
-	local frame, note, heading = card("Challenges", 2, VIOLET, "DAILY CHALLENGES")
+	local frame, note, heading, edge = card("Challenges", 2, VIOLET, "DAILY CHALLENGES")
 	local rows = {}
 	for i = 1, 3 do
 		local row = new("Frame", { Name = "Row" .. i, BackgroundTransparency = 1 }, frame)
@@ -223,14 +228,25 @@ local function buildChallenges()
 	end
 	local bonus = label(frame, "", 11, P.Dim, IronUi.Heading)
 	bonus.RichText = true
+	-- The phone's strip: the next challenge still to do, over its bar (its
+	-- count goes by the reward, so the name stays a string the Spanish
+	-- table knows).
+	local line = label(frame, "", 12, P.Text)
+	line.Position, line.Size = UDim2.fromOffset(14, 6), UDim2.new(1, -104, 0, 20)
+	local lineTrack, lineFill = bar(frame, VIOLET)
+	lineTrack.Position, lineTrack.Size = UDim2.fromOffset(14, 29), UDim2.new(1, -28, 0, 3)
 	local done = {}
 	local drawn = false
 	local function rowHeight()
-		return if compact then 30 else 48
+		return 48
 	end
 	local function place()
 		local h = rowHeight()
 		local width = if compact then NARROW else WIDE
+		heading.Visible, bonus.Visible = not compact, not compact
+		line.Visible, lineTrack.Visible = compact, compact
+		edge.Position = UDim2.fromOffset(0, if compact then 10 else 12)
+		note.Position = UDim2.new(1, -12, 0, if compact then 5 else 10)
 		for i, entry in rows do
 			entry.Row.Position, entry.Row.Size = UDim2.fromOffset(0, 38 + (i - 1) * h), UDim2.new(1, 0, 0, h)
 			entry.Name.Size = UDim2.new(1, -110, 0, 20)
@@ -245,7 +261,7 @@ local function buildChallenges()
 	cards.Challenges = {
 		Frame = frame,
 		Height = function()
-			return 40 + 3 * rowHeight() + 26
+			return if compact then STRIP else 40 + 3 * rowHeight() + 26
 		end,
 		Place = place,
 	}
@@ -255,12 +271,34 @@ local function buildChallenges()
 			return false
 		end
 		place()
-		heading.Text = if compact then "CHALLENGES" else "DAILY CHALLENGES"
+		heading.Text = "DAILY CHALLENGES"
 		local allDone = view.BonusDone == true
 		note.Text = if allDone then '<font color="#4ED692">ALL DONE ✓</font>' else "↻ " .. untilReset()
+		local nextUp = nil
+		for _, item in view.List do
+			if item.Done ~= true then
+				nextUp = item
+				break
+			end
+		end
+		if nextUp then
+			line.Text = nextUp.Name
+			if compact then
+				note.Text = string.format(
+					'%d/%d  <font color="#FFCA5B">+%d ◆</font>',
+					math.min(nextUp.Count, nextUp.Goal),
+					nextUp.Goal,
+					nextUp.Coins
+				)
+			end
+			setFill(lineFill, nextUp.Count / nextUp.Goal, drawn)
+		else
+			line.Text = "Today's challenges done"
+			setFill(lineFill, 1, drawn)
+		end
 		for i, entry in rows do
 			local item = view.List[i]
-			entry.Row.Visible = item ~= nil
+			entry.Row.Visible = item ~= nil and not compact
 			if item then
 				local finished = item.Done == true
 				entry.Name.Text = item.Name
@@ -342,7 +380,7 @@ end
 local learning = false -- still on the first Tasks pages (the phone shows the task then)
 
 local function buildTask()
-	local frame, note = card("NextTask", 4, CYAN, "NEXT TASK")
+	local frame, note, heading, edge = card("NextTask", 4, CYAN, "NEXT TASK")
 	local name = label(frame, "", 13, P.Text)
 	name.Position, name.Size = UDim2.fromOffset(14, 32), UDim2.new(1, -28, 0, 18)
 	local hint = label(frame, "", 11, P.Dim, IronUi.Body)
@@ -356,11 +394,25 @@ local function buildTask()
 	count.Position, count.Size = UDim2.new(1, -12, 0, 90), UDim2.fromOffset(44, 16)
 	frame.Activated:Connect(openTasks)
 	IronUi.juice(frame, 1.02, 0.98)
+	-- On a phone: one slim strip, the task's name and its reward over a thin bar.
+	local function place()
+		heading.Visible, hint.Visible, count.Visible = not compact, not compact, not compact
+		edge.Position = UDim2.fromOffset(0, if compact then 10 else 12)
+		note.Position = UDim2.new(1, -12, 0, if compact then 5 else 10)
+		if compact then
+			name.Position, name.Size = UDim2.fromOffset(14, 6), UDim2.new(1, -78, 0, 20)
+			track.Position, track.Size = UDim2.fromOffset(14, 29), UDim2.new(1, -28, 0, 3)
+		else
+			name.Position, name.Size = UDim2.fromOffset(14, 32), UDim2.new(1, -28, 0, 18)
+			track.Position, track.Size = UDim2.fromOffset(14, 96), UDim2.new(1, -72, 0, 5)
+		end
+	end
 	cards.NextTask = {
 		Frame = frame,
 		Height = function()
-			return 112
+			return if compact then STRIP else 112
 		end,
+		Place = place,
 	}
 	local drawn = false
 	refreshers.NextTask = function(profile)

@@ -68,9 +68,34 @@ GemClient.Profile = {
 LobbyBoard.refresh()
 check(shown() == "Challenges,NextTask,Streak", "Desktop cards wrong: " .. shown())
 check(LobbyBoard.layout() > 300, "The column has no height")
--- On a phone, one card: the task while learning.
+-- On a phone, one slim strip: the task while learning, just its name and
+-- reward over a bar.
+local function strip(name)
+	local root = card(name)
+	local function seen(node)
+		while node and node ~= root do
+			if node.Visible == false then
+				return false
+			end
+			node = node.Parent
+		end
+		return true
+	end
+	local words = {}
+	for _, d in root:GetDescendants() do
+		if d.ClassName == "TextLabel" and d.Text ~= "" and seen(d) then
+			table.insert(words, d.Text)
+		end
+	end
+	table.sort(words)
+	return table.concat(words, "|")
+end
 LobbyBoard.setCompact(true)
 check(shown() == "NextTask", "Phone while learning should show the task: " .. shown())
+check(LobbyBoard.layout() == 38, "The phone's task isn't one slim strip: " .. LobbyBoard.layout())
+check(card("NextTask"):FindFirstChild("Title").Visible == false, "The phone strip kept its NEXT TASK heading")
+local _, words = string.gsub(strip("NextTask"), "|", "")
+check(words == 1, "The phone strip shows more than the task and its reward: " .. strip("NextTask"))
 -- Past the first pages: the phone shows the challenges.
 local paid = {}
 for _, id in { "FirstRock", "ThreeRocks", "GemFind", "Enchant", "ThreeSlots", "EquipSurge" } do
@@ -79,7 +104,13 @@ end
 GemClient.Profile.TrainingRewards = { Paid = paid, Counts = {} }
 LobbyBoard.refresh()
 check(shown() == "Challenges", "Phone after learning should show the challenges: " .. shown())
-check(card("Challenges"):FindFirstChild("Title").Text == "CHALLENGES", "The phone keeps the long title")
+-- As a strip too: the next challenge to do, its count and its reward.
+check(LobbyBoard.layout() == 38, "The phone's challenges aren't one slim strip")
+check(card("Challenges"):FindFirstChild("Title").Visible == false, "The phone strip kept its heading")
+check(
+	strip("Challenges") == '3/10  <font color="#FFCA5B">+40 ◆</font>|Break 10 rocks',
+	"The phone strip doesn't show the next challenge: " .. strip("Challenges")
+)
 -- The PLAY menu open: the whole board steps aside.
 LobbyBoard.setHidden(true)
 check(column.Visible == false, "The board stayed over the PLAY menu")
@@ -87,6 +118,7 @@ LobbyBoard.setHidden(false)
 check(column.Visible == true, "The board didn't come back")
 LobbyBoard.setCompact(false)
 check(card("Challenges"):FindFirstChild("Title").Text == "DAILY CHALLENGES", "The desktop title is wrong")
+check(card("Challenges"):FindFirstChild("Title").Visible == true, "The desktop lost the heading")
 
 -- Challenge rows: progress, done marks, the bonus line.
 local rows = card("Challenges")

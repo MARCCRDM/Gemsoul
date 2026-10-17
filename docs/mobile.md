@@ -17,6 +17,50 @@ of the previous version).
 its side. Before the camera knows the screen size, a touch screen without a
 keyboard counts as one. Windows read it once, when they're built.
 
+## The lobby and fights
+
+The lobby and the fight screen are cleared down to what you use, like a
+phone game should be.
+
+![The lobby on a phone, before and after](mobile/lobby-phone.png)
+
+- **Chat is Roblox's.** On a phone or tablet (a touch screen without a
+  keyboard) our chat box and its CHAT button are gone. Roblox's own chat
+  takes over: the speech-bubble button in the top bar, with its unread
+  count, opens the recent lobby chat, and what people say pops up as a
+  bubble over their head (bubble chat is on for everyone). A computer keeps
+  the full chat box (`ChatFrame.Handheld`).
+- **Level and coins** sit in a pill at the top left, under the pick card,
+  where the CHAT button was (`MobileLayout.wallet`).
+- **The "online" pill is gone.** PLAY stands alone at the bottom centre.
+- **The six buttons under PLAY** are icons with their name small under
+  them, 44 points tall.
+- **Tasks:** the TASKS button, and under it the next task as one slim
+  strip: its name and reward over a thin bar. Tap it to open Tasks. After
+  the first Tasks pages, the strip shows the next daily challenge instead.
+- **No BUG button** on a phone. The same form is SOCIAL's Feedback button.
+- **The live feed** fits in the gap between the pick card and the task
+  strip, so on a small phone they don't overlap.
+
+![The lobby on a small phone, before and after](mobile/lobby-small-phone.png)
+
+TASKS and REPORT A BUG looked greyed out (on every screen). Their buttons
+are coloured by a gradient, and a gradient tints a button's own text too, so
+their words came out nearly black. The words are now labels of their own.
+(The offline renders don't draw that tint, so they show the old buttons
+bright.)
+
+### In a fight
+
+![The fight buttons on a phone, before and after](mobile/fight-phone.png)
+
+- **No HEAVY button.** Holding ATTACK already charges a heavy blow; ATTACK
+  now swings each hand in turn, as a click does. The first fight's "HOLD
+  ATTACK, release for a heavy" hint rings ATTACK.
+- **The ring sits at the right edge**, under the right thumb: ATTACK in the
+  corner, Q / E / R round it, GUARD and DODGE outside them.
+- **No chat box** in a fight (Roblox's chat button is still in the top bar).
+
 ## The Inventory
 
 When the full 1600 x 840 layout would show at under 70% of its size, the

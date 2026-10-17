@@ -101,10 +101,11 @@ through the beta loop:
 2. socketing: drag a gem onto gear, then into Q, E or R;
 3. fighting: hit, guard, cast a Surge, beat a rival.
 
-On a phone the panel shows only the task. Once all modes are open, the old
+On a phone the panel is one slim strip: the task's name and reward. Once all modes are open, the old
 "ARENA · ALL MODES OPEN" line no longer appears.
 
-**REPORT A BUG**, beside TASKS, opens the feedback form straight away. Each
+**REPORT A BUG**, beside TASKS, opens the feedback form straight away (on a
+phone, where the corner is kept clear, it's SOCIAL's Feedback button). Each
 report carries the build and where the player was. Owners read them under
 Social, Feedback, Reports.
 

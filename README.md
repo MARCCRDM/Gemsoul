@@ -30,7 +30,7 @@ A Roblox game (the repo and some code names still say Gemsoul: gems are Saga Sto
    - `Playtest.Testers`: UserIds who keep the DEV tools in Beta and Live.
 5. **In game:**
    - **Invite friends** (Social, **P**) opens Roblox's invite prompt, and invited friends land in your server.
-   - **Feedback** sends a bug report or idea, stamped with the build and where the player was. In the lobby, **REPORT A BUG** (top right) opens it straight away.
+   - **Feedback** sends a bug report or idea, stamped with the build and where the player was. In the lobby, **REPORT A BUG** (top right; on a phone, SOCIAL's Feedback) opens it straight away.
    - Server and client script errors are collected automatically and grouped by message.
    - Owners open **Feedback → Reports** to read everything.
 
@@ -219,7 +219,7 @@ Players whose Roblox language is Spanish see the game in Spanish (neutral Latin 
 
 ## Phones
 
-On a phone on its side (`UiKit.short()`: under 500 points tall), the Inventory is built compact: no stats column, everything else larger. The Market, Store, Season Path, Social and Surge Array windows lay out shorter so they show larger, and every window keeps clear of Roblox's buttons at the top (`UiKit.clearTopbar`). Desktop layouts are unchanged. See [docs/mobile.md](docs/mobile.md).
+On a phone on its side (`UiKit.short()`: under 500 points tall), the Inventory is built compact: no stats column, everything else larger. The Market, Store, Season Path, Social and Surge Array windows lay out shorter so they show larger, and every window keeps clear of Roblox's buttons at the top (`UiKit.clearTopbar`). Desktop layouts are unchanged. The lobby and fights are cleared down on a phone: Roblox's chat (top-bar bubble, bubbles over heads) instead of our chat box, level and coins at the top left, no online pill, icon buttons under PLAY, the next task as one slim strip, and no HEAVY button in a fight (hold ATTACK). See [docs/mobile.md](docs/mobile.md).
 
 ## Code layout
 

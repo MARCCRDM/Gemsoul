@@ -109,16 +109,15 @@ local gui = new("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 }, player:WaitForChild("PlayerGui"))
 
--- The button that opens it (top right of the lobby).
+-- The button that opens it (top right of the lobby). Its words are a label
+-- of their own: the gradient would tint the button's own text near black.
 local launch = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, 12),
 	Size = UDim2.fromOffset(132, 40),
-	BackgroundColor3 = Color3.fromRGB(29, 43, 60),
-	TextColor3 = Color3.fromRGB(222, 239, 247),
-	TextSize = 12,
-	Font = Enum.Font.GothamBold,
-	Text = "TASKS",
+	BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
+	Text = "",
+	AutoButtonColor = false,
 }, gui)
 UiKit.round(launch, 8)
 stroke(launch, CYAN, 0.65)
@@ -127,6 +126,15 @@ new(
 	{ Color = ColorSequence.new(Color3.fromRGB(27, 47, 61), Color3.fromRGB(14, 24, 38)), Rotation = 90 },
 	launch
 )
+local launchLabel = new("TextLabel", {
+	Name = "Label",
+	BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1),
+	TextColor3 = Color3.fromRGB(222, 239, 247),
+	TextSize = 12,
+	Font = Enum.Font.GothamBold,
+	Text = "TASKS",
+}, launch)
 
 -- The window, over a dark shade that closes it when tapped.
 local shade = new("TextButton", {
@@ -448,7 +456,7 @@ refresh = function()
 		segment.BackgroundColor3 = if on then Color3.fromRGB(35, 65, 78) else CHIP
 		segment.TextColor3 = if on then CYAN else MUTED
 	end
-	launch.Text = if done < total then string.format("TASKS  %d/%d", done, total) else "TASKS"
+	launchLabel.Text = if done < total then string.format("TASKS  %d/%d", done, total) else "TASKS"
 end
 
 -- While the window is shut only the TASKS count can change on screen: the
@@ -462,7 +470,7 @@ local function refreshLaunch()
 			done += 1
 		end
 	end
-	launch.Text = if done < #objectives then string.format("TASKS  %d/%d", done, #objectives) else "TASKS"
+	launchLabel.Text = if done < #objectives then string.format("TASKS  %d/%d", done, #objectives) else "TASKS"
 end
 
 -- Opening: on the first page with something left to do (Shared.TrainingRewards).
