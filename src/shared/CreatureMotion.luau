@@ -13,6 +13,16 @@ function Motion.angles(kind: string, time: number, phase: number, amount: number
 		return -0.035 * (1 + math.sin(time * 2.2)) - attack * 0.24, 0, 0
 	elseif kind == "ThirdFoot" then
 		return math.sin(phase + math.pi * 0.66) * 0.32 * amount, 0, 0
+	elseif kind == "Stride" then
+		-- a kaiju's legs (side 1 and -1 step in turn; a four-legged one pairs them diagonally)
+		return math.sin(phase + (if side > 0 then 0 else math.pi)) * 0.55 * amount, 0, 0
+	elseif kind == "Arm" then
+		-- a kaiju's arms: swing against the legs, and reach forward on a blow
+		return math.sin(phase + (if side > 0 then math.pi else 0)) * 0.3 * amount
+			+ math.sin(time * 1.4 + side) * 0.04
+			+ attack * 0.9,
+			0,
+			0
 	elseif kind == "Moss" then
 		return math.sin(time * 1.6 + side) * 0.06 + amount * 0.08, 0, math.sin(phase + side) * amount * 0.08
 	end

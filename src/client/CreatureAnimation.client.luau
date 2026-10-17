@@ -1,5 +1,6 @@
 -- Supplement the shared combat skeleton with creature-only detail joints.
 -- Far creatures are reset and skipped; streaming arrivals get a rescan.
+-- Kaiju (workspace.Kaiju) walk, swing and bite the same way.
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Motion = require(ReplicatedStorage.Shared.CreatureMotion)
@@ -17,8 +18,14 @@ RunService.PreSimulation:Connect(function(dt)
 	local now = workspace:GetServerTimeNow()
 	if now >= scanAt then
 		scanAt = now + 0.5
-		local folder = workspace:FindFirstChild("Enemies")
-		for _, model in if folder then folder:GetChildren() else {} do
+		local found = {}
+		for _, name in { "Enemies", "Kaiju" } do -- creatures, wild kaiju; kaiju out with their players
+			local folder = workspace:FindFirstChild(name)
+			for _, model in if folder then folder:GetChildren() else {} do
+				table.insert(found, model)
+			end
+		end
+		for _, model in found do
 			if not model:GetAttribute("CreatureShape") then continue end
 			local root = model:FindFirstChild("HumanoidRootPart")
 			local humanoid = model:FindFirstChildOfClass("Humanoid")

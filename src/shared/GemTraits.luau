@@ -901,6 +901,11 @@ function GemTraits.traitsOf(gem)
 		end
 		out[lane] = id
 	end
+	-- A kaiju's Gemsoul (Shared.Kaiju): only its E ability wakes, wherever
+	-- it's socketed.
+	if type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju" then
+		return { Ability = out.Ability }
+	end
 	return out
 end
 

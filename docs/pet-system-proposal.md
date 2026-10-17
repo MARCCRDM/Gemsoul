@@ -5,7 +5,9 @@ summary: Marc's Oct 13 request formalized - alien animals roam the lobby, captur
 
 # Pet System Proposal — Alien Critters of the Outpost (v1.5 draft)
 
-**Status:** Proposal for discussion — nothing Adopted until Marc signs off. Extends [authoritative-spec.md](authoritative-spec.md) v1.4. Concept art: `docs/pet-concepts/` in the Gemsoul repo (6 renders).
+**Status:** Superseded by [kaiju.md](kaiju.md): mini kaiju replace the critter pets.
+
+**Earlier status:** Proposal for discussion — nothing Adopted until Marc signs off. Extends [authoritative-spec.md](authoritative-spec.md) v1.4. Concept art: `docs/pet-concepts/` in the Gemsoul repo (6 renders).
 
 ## 1. Why pets, structurally
 
