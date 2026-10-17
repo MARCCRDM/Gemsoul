@@ -379,6 +379,35 @@ do
 	check(m.Rounds == nil and m.State == "Done", "A challenge played rounds")
 	advance(Matchmaking.EndPause)
 	respawn(gus, hal)
+	-- One miner (Config.Features.MinerRoster off): the window between rounds
+	-- is a short break with nobody to pick, and nobody swaps, loser included.
+	MinerRoster.configure(false)
+	handlers.DuelQueue(gus, "1v1")
+	handlers.DuelQueue(hal, "1v1")
+	advance(0.25)
+	m = Duels.matchOf(gus)
+	advance(Matchmaking.Countdown)
+	lethalBlow(gus)
+	pivot = last(gus, "Round")[2]
+	check(m.State == "Pivot" and pivot.Ends - now <= Matchmaking.Rounds.Break, "One miner still got the long pick")
+	check(not pivot.CanSwap and not last(hal, "Round")[2].CanSwap, "A counter-pick was offered with one miner")
+	local active = profiles[gus].Miners.Active
+	check(not handlers.DuelPivot(gus, active % 3 + 1).Ok, "The loser swapped in another miner")
+	check(handlers.DuelPivot(gus, nil).Ok and handlers.DuelPivot(hal, nil).Ok, "READY failed with one miner")
+	revealed = last(gus, "Round")[2]
+	check(revealed.Phase == "Reveal" and revealed.Picks.Mine[1].Preset == nil, "A miner number was revealed")
+	check(profiles[gus].Miners.Active == active, "The active miner changed")
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(hal)
+	check(m.State == "Pivot", "Round 2 didn't end on a knockout")
+	advance(Matchmaking.Rounds.Break)
+	check(m.State == "Countdown", "The one-miner break never closed")
+	MinerRoster.configure(true)
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(gus)
+	check(m.State == "Done", "Round 3 didn't end the match")
+	advance(Matchmaking.EndPause)
+	respawn(gus, hal)
 end
 
 -- Lanes: more duels than lanes wait for a free one -----------------------------

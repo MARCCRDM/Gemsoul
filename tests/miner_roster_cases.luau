@@ -48,3 +48,43 @@ do
 	assert(not MinerRoster.canCounter(1, 1) and MinerRoster.canCounter(1, 2) and MinerRoster.canCounter(nil, 1))
 	print("PASS: miner migration, starter grants, independent progression, shared stash, exclusive equipment, 150 swaps and life/counter rules")
 end
+-- One miner (Config.Features.MinerRoster off, the beta): a new account gets
+-- one, and an old save that holds three keeps them but plays only the active one.
+do
+	MinerRoster.configure(false)
+	local made = 0
+	local function starter()
+		made += 1
+		return { Class = "Warrior" }, { XP = 0 }
+	end
+	local fresh = { Character = { Class = "Warrior" }, Augments = { XP = 40 } }
+	local roster = MinerRoster.initialize(fresh, starter)
+	assert(made == 0 and #roster.Slots == 1 and roster.Active == 1, "One-miner account got extra miners")
+	assert(MinerRoster.switch(fresh, 1) and not MinerRoster.switch(fresh, 2), "Switched to a miner that isn't there")
+	assert(MinerRoster.remaining(roster, {})[1] == 1 and #MinerRoster.remaining(roster, { [1] = true }) == 0)
+	assert(not MinerRoster.canCounter(1, 2) and not MinerRoster.canCounter(nil, 1), "Counter-pick with one miner")
+	local old = {
+		Character = { Class = "Warrior", Weapon = "b" },
+		Augments = { XP = 300 },
+		Miners = {
+			Version = 1,
+			Active = 2,
+			Slots = {
+				{ Name = "Miner 1", Character = { Class = "Warrior", Weapon = "a" }, Augments = { XP = 10 } },
+				{ Name = "Miner 2" },
+				{ Name = "Miner 3", Character = { Class = "Warrior", Weapon = "c" }, Augments = { XP = 20 } },
+			},
+		},
+	}
+	MinerRoster.initialize(old, starter)
+	assert(made == 0 and #old.Miners.Slots == 3, "An old three-miner save lost or gained miners")
+	assert(not MinerRoster.switch(old, 1) and not MinerRoster.switch(old, 3), "Switched away from the active miner")
+	assert(MinerRoster.switch(old, 2) and old.Miners.Active == 2 and old.Augments.XP == 300, "Active miner changed")
+	assert(MinerRoster.playable(old.Miners, 2) and not MinerRoster.playable(old.Miners, 1))
+	local left = MinerRoster.remaining(old.Miners, {})
+	assert(#left == 1 and left[1] == 2 and #MinerRoster.remaining(old.Miners, { [2] = true }) == 0, "Reserve deployed")
+	assert(MinerRoster.owner(old, "Weapon", "a") == 1, "A resting miner's equipped gear became free")
+	MinerRoster.configure(true)
+	assert(MinerRoster.switch(old, 1) and old.Augments.XP == 10, "The other miners didn't come back with the roster")
+	print("PASS: one-miner mode: no extra miners, no switch, no reserve, no counter-pick, old saves kept")
+end

@@ -38,6 +38,7 @@ local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
 local Referrals = require(ReplicatedStorage.Shared.Referrals)
 local Store = require(ReplicatedStorage.Shared.Store)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local ShopArt = require(script.Parent.ShopArt)
@@ -819,6 +820,7 @@ function showBundle(key: string)
 	local tagline = if bundle
 		then bundle.Tagline
 		elseif key == "StarterPack" then Store.StarterPack.Tagline
+		elseif kits and not MinerRoster.Enabled then "Your miner wears the first; the rest wait in your Wardrobe."
 		elseif kits and #kits == #Store.Kits then "All three squad kits, one per miner, and the FULL SQUAD title."
 		elseif kits then "Each kit dresses one of your miners."
 		else ""
@@ -912,7 +914,7 @@ function showReceipt(key: string)
 	end
 	local note = text(
 		card,
-		if Store.kitsOf(key)
+		if Store.kitsOf(key) and MinerRoster.Enabled
 			then "Your miners are wearing their kits. Change looks anytime in the Wardrobe."
 			elseif key == "Vault" then "Everything is in your Wardrobe."
 			else "It's on. Change looks anytime in the Wardrobe.",
@@ -1210,7 +1212,9 @@ local function productPage(id: string, x: number)
 	end
 	text(
 		side,
-		"✓ Looks only, never stats     ✓ Any of your miners can wear it",
+		if MinerRoster.Enabled
+			then "✓ Looks only, never stats     ✓ Any of your miners can wear it"
+			else "✓ Looks only, never stats",
 		10,
 		C.Faint,
 		BOLD,
@@ -1440,7 +1444,9 @@ local function squadSection(parent: Instance, order: number)
 		parent,
 		order,
 		"Squad kits",
-		"One look per fighting style: a suit, a weapon skin, a pickaxe and a trim. Each kit dresses one of your three miners."
+		if MinerRoster.Enabled
+			then "One look per fighting style: a suit, a weapon skin, a pickaxe and a trim. Each kit dresses one of your three miners."
+			else "One look per fighting style: a suit, a weapon skin, a pickaxe and a trim."
 	)
 	local row = new("Frame", {
 		Name = "Squad",
@@ -1485,7 +1491,9 @@ local function squadSection(parent: Instance, order: number)
 	wrap(
 		text(
 			summary,
-			"Each goes on one miner: the one you're playing first, then the next.",
+			if MinerRoster.Enabled
+				then "Each goes on one miner: the one you're playing first, then the next."
+				else "Your miner wears the first; the rest wait in your Wardrobe.",
 			11,
 			C.Dim,
 			MEDIUM,

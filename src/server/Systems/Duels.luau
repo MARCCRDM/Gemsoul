@@ -553,8 +553,10 @@ local function endRound(match, winner: number?, reason: string)
 	match.State = "Pivot"
 	r.Picks, r.Locked = {}, {}
 	r.LastWinner = winner
-	r.PivotEnds = os.clock() + Matchmaking.Rounds.Pivot
-	local ends = serverNow() + Matchmaking.Rounds.Pivot
+	-- (With one miner there's nothing to pick: a shorter break.)
+	local pause = if MinerRoster.Enabled then Matchmaking.Rounds.Pivot else Matchmaking.Rounds.Break
+	r.PivotEnds = os.clock() + pause
+	local ends = serverNow() + pause
 	for _, team in match.Teams do
 		for _, member in team do
 			shield(match, member)
@@ -595,7 +597,7 @@ local function reveal(match)
 
 			table.insert(picks[t], {
 				Name = member.DisplayName,
-				Preset = "Miner " .. current,
+				Preset = if MinerRoster.Enabled then "Miner " .. current else nil,
 				Locked = r.Locked[member] == true,
 			})
 		end
@@ -637,6 +639,9 @@ local function pivot(player: Player, index: any)
 	local profile = PlayerData.get(player)
 	local roster = profile and profile.Miners
 	local chosen = index or (roster and roster.Active)
+	if roster and chosen ~= roster.Active and not MinerRoster.Enabled then
+		return reply(false, "You play one miner for now.")
+	end
 	if not MinerRoster.valid(chosen) or not roster or not roster.Slots[chosen] then
 		return reply(false, "Choose one of your three miners.")
 	end

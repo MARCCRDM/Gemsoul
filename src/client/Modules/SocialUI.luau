@@ -1076,7 +1076,7 @@ local scoutRow = new("Frame", {
 }, pivotPanel)
 local scoutList = UiKit.list(scoutRow, 8, true)
 scoutList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-pivotLabel("COUNTER-PICK  ·  the round loser may switch miners", 12, P.Dim, BOLD, 160, 18)
+local counterLabel = pivotLabel("COUNTER-PICK  ·  the round loser may switch miners", 12, P.Dim, BOLD, 160, 18)
 local pickRow = new("Frame", {
 	BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 194),
 	Size = UDim2.new(1, -32, 0, 64),
@@ -1095,6 +1095,14 @@ local lockButton = new("TextButton", {
 UiKit.round(lockButton, 8)
 local pivotStatus = pivotLabel("", 13, P.Text, BOLD, 318, 18)
 local pivotTheirs = pivotLabel("", 12, P.Dim, BOLD, 340, 16)
+-- One miner (the roster off): nothing to pick. The break shows the round,
+-- what they fought with and READY, in a shorter panel.
+if not MinerRoster.Enabled then
+	counterLabel.Visible, pickRow.Visible = false, false
+	lockButton.Position = UDim2.new(0.5, 0, 0, 170)
+	pivotStatus.Position, pivotTheirs.Position = UDim2.fromOffset(16, 212), UDim2.fromOffset(16, 234)
+	pivotPanel.Size = UDim2.fromOffset(620, 266)
+end
 local pivotEnds = 0
 local pivotLocked = false
 local picked = nil
@@ -1103,7 +1111,7 @@ local canSwap = false
 local function fitPivot()
 	local screen = overlay.AbsoluteSize
 	if screen.X > 0 then
-		pivotScale.Scale = math.min(1, (screen.X - 24) / 620, (screen.Y - 24) / 370)
+		pivotScale.Scale = math.min(1, (screen.X - 24) / 620, (screen.Y - 24) / pivotPanel.Size.Y.Offset)
 	end
 end
 overlay:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPivot)
@@ -1113,7 +1121,7 @@ function drawPicks()
 	clear(pickRow)
 	local profile = GemClient.Profile
 	local roster = profile and profile.Miners
-	for index = 1, MinerRoster.Count do
+	for index = 1, if MinerRoster.Enabled then MinerRoster.Count else 0 do
 		local miner = roster and roster.Slots[index]
 		local selected = picked == index
 		local enabled = miner ~= nil and (canSwap or index == roster.Active) and not pivotLocked
@@ -1184,9 +1192,12 @@ local function showPivot(info)
 	pivotLocked = false
 	picked = GemClient.Profile and GemClient.Profile.Miners and GemClient.Profile.Miners.Active or 1
 	canSwap = info.CanSwap == true
-	pivotStatus.Text = if canSwap then "Choose a miner to counter their build, or keep your current miner." else "Round won. Keep your miner; your opponent may counter-pick."
+	pivotStatus.Text = if not MinerRoster.Enabled
+		then "Next round soon. Press READY when you are."
+		elseif canSwap then "Choose a miner to counter their build, or keep your current miner."
+		else "Round won. Keep your miner; your opponent may counter-pick."
 	pivotStatus.TextColor3 = P.Text
-	pivotTheirs.Text = "Opponent: choosing…"
+	pivotTheirs.Text = if MinerRoster.Enabled then "Opponent: choosing…" else "Opponent: getting ready…"
 	drawPicks()
 	fitPivot()
 	pivotPanel.Visible = true

@@ -505,7 +505,8 @@ end
 local minerCards = {}
 local rosterHeader = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, portrait)
 local MINER_W = (W - 24) / 3
-for index = 1, MinerRoster.Count do
+-- (No cards while the roster is off: one miner.)
+for index = 1, if MinerRoster.Enabled then MinerRoster.Count else 0 do
 	local button = new("TextButton", { Text = "", BackgroundColor3 = C.Card }, rosterHeader)
 	at(button, (index - 1) * (MINER_W + 12), 0, MINER_W, 76)
 	round(button, 8)
@@ -1438,7 +1439,9 @@ local function drawArmor()
 		emptyNote(
 			page,
 			if armorFilter == "All"
-				then "Your shared stash is empty.\nGear worn by your other miners stays with them."
+				then (if MinerRoster.Enabled
+					then "Your shared stash is empty.\nGear worn by your other miners stays with them."
+					else "Your stash is empty.")
 				else "No other "
 					.. string.lower(SLOT_LABEL[armorFilter] or "gear")
 					.. " to swap in yet.\nRecover more in the mine or trade for it."
@@ -2457,9 +2460,13 @@ local function drawLeft()
 	scoutReveal.Text = if #names > 0 then "Revealed after a round: " .. table.concat(names, " · ") else "No equipped elements to reveal."
 	scoutMix.Text = if #mix > 0 then "Your mix (gear + Surges): " .. table.concat(mix, " · ") else "Equip gems to shape this miner's elemental mix."
 	scoutTip.Text = (if dominant and leaders == 1 then "Your mix leans " .. dominant .. ". " else "Your mix has no single leading element. ")
-		.. "After a loss, swap miners between rounds to adapt. Counts are private."
-	nameLabel.Text = "MINER " .. tostring(profile and profile.Miners and profile.Miners.Active or 1)
-	nameLabel.Text ..= "  /  " .. string.upper(player.DisplayName)
+		.. (if MinerRoster.Enabled then "After a loss, swap miners between rounds to adapt. " else "")
+		.. "Counts are private."
+	nameLabel.Text = if MinerRoster.Enabled
+		then "MINER " .. tostring(profile and profile.Miners and profile.Miners.Active or 1) .. "  /  " .. string.upper(
+			player.DisplayName
+		)
+		else string.upper(player.DisplayName)
 	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	nameLabel.Size = UDim2.fromOffset(LEFT_W - 40, 32)
 	local class = loadout.Class and Classes.get(loadout.Class)

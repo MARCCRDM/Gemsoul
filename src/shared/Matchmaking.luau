@@ -52,6 +52,7 @@ Matchmaking.Rounds = {
 	Max = 3,
 	Time = 90, -- seconds a round lasts: then the healthier side takes it
 	Pivot = 30, -- seconds to pick a preset between rounds
+	Break = 10, -- the same, when there's no miner to pick (one miner: Shared.MinerRoster)
 	Reveal = 3, -- seconds the picks show before the countdown
 }
 -- Coins for a duel: by its PvP rule (Shared.PvPRules.Kinds). Beating a rival

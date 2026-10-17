@@ -31,3 +31,23 @@ do
 	check(not p.Root.Anchored and not p:GetAttribute("DungeonSelecting"), "Leaving selection stranded the player")
 	print("PASS: dungeon reserve choice, same-run survival, invalid requests, deployment, timeout, exhaustion, new-run reset and leave cleanup")
 end
+-- One miner (Config.Features.MinerRoster off): a defeat is the end of your run,
+-- no next miner is offered or deployed.
+do
+	MinerRoster.configure(false)
+	local p = squad(1)[1]
+	permittedTester = p
+	check(handlers.DungeonTest(p, "Full").Ok, "One-miner test dungeon failed")
+	local id = p:GetAttribute("DungeonId")
+	tick(1)
+	check(not dungeonLethal(p, p.Humanoid), "A reserve was offered with one miner")
+	check(not p:GetAttribute("DungeonSelecting") and not p.Root.Anchored, "The defeated miner was held for a pick")
+	check(not handlers.DungeonMinerSelect(p, 2).Ok and not handlers.DungeonMinerSelect(p, 3).Ok, "A reserve deployed")
+	p.Humanoid.Health = 0
+	tick(1)
+	check(p:GetAttribute("DungeonId") == nil and worlds[id].Folder.Destroyed, "One-miner defeat didn't end the run")
+	check(profiles[p].Miners.Active == 1, "The active miner changed")
+	p.Humanoid.Health = p.Humanoid.MaxHealth
+	MinerRoster.configure(true)
+	print("PASS: one-miner dungeon: no reserve offered or deployed, a defeat ends the run")
+end

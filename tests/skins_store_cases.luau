@@ -226,7 +226,7 @@ local handlers = {}
 local saves = 0
 local stubs = {
 	Cosmetics = Cosmetics,
-	MinerRoster = { Count = 3 },
+	MinerRoster = { Count = 3, Enabled = true },
 	ExpeditionEconomy = { legacyCredits = function() return 0 end },
 	Season = Season,
 	Store = Store,
@@ -433,6 +433,21 @@ local firstSuit = Store.Kits[1].Contents.Cosmetics[1]
 check(profile.Cosmetics.Suit == firstSuit, "The first kit isn't on the miner you're playing")
 check(profile.Miners.Slots[3].Character.Wardrobe.Suit == Store.Kits[2].Contents.Cosmetics[1], "The second kit isn't on the next miner")
 check(profile.Miners.Slots[1].Character.Wardrobe.Suit == Store.Kits[3].Contents.Cosmetics[1], "The third kit didn't wrap round to miner 1")
+-- One miner (Config.Features.MinerRoster off): it wears the first kit, the
+-- others wait in the Wardrobe, and the resting miners in an old save keep their looks.
+stubs.MinerRoster.Count, stubs.MinerRoster.Enabled = 1, false
+freshProfile()
+profile.Miners = { Active = 2, Slots = { { Character = {} }, { Character = {} }, { Character = {} } } }
+check(buy(Store.kitKey(kitIds)) == Granted, "The squad bundle wasn't granted with one miner")
+for _, id in Store.contents(Store.kitKey(kitIds)).Cosmetics do
+	check(profile.Cosmetics.Owned[id], "The one-miner squad bundle didn't give " .. id)
+end
+check(profile.Cosmetics.Suit == firstSuit, "One miner isn't wearing the first kit")
+check(
+	profile.Miners.Slots[1].Character.Wardrobe == nil and profile.Miners.Slots[3].Character.Wardrobe == nil,
+	"A resting miner was dressed"
+)
+stubs.MinerRoster.Count, stubs.MinerRoster.Enabled = 3, true
 -- A bundle with a look you own: that look becomes coins.
 freshProfile()
 profile.Cosmetics.Owned.SkinBonk = true
@@ -725,6 +740,9 @@ check(
 -- Each miner wears its own suit and skin -----------------------------------------------
 do
 	local Roster = shared("MinerRoster")
+	-- (Switching needs the roster on; the beta's Config turns it off.)
+	local was = Roster.Enabled
+	Roster.configure(true)
 	local cosmetics = {
 		Owned = { SuitNeon = true, SuitIgnition = true, SkinMolten = true },
 		Suit = "SuitNeon",
@@ -760,6 +778,7 @@ do
 		other.Suit == "SuitIgnition" and other.Skin == nil and other.Title == "TitleLunar",
 		"forMiner shows the wrong look for another miner"
 	)
+	Roster.configure(was)
 end
 
 -- Each miner holds its own pickaxe too --------------------------------------------------

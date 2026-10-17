@@ -38,6 +38,7 @@ the menus leave them out.
 | `Market` | on | The Market board and trading |
 | `Dungeons` | **off** | See below |
 | `Mechs` | on | The Motor Pool mechs (off: no mechs are parked) |
+| `MinerRoster` | **off** | Three miners per account; off, everyone plays one (see below) |
 
 **What `Dungeons` covers:**
 - the PLAY menu's Squad Dungeon card;
@@ -51,6 +52,32 @@ the menus leave them out.
 - Owners can still run dungeon tests from the DEV panel.
 
 When dungeons pass a full entry-to-reward test, set `Dungeons = true`.
+
+### One miner
+
+An account holds three miners that share one stash (`Shared.MinerRoster`).
+Three characters to manage is a lot to take in at first, so the beta plays
+one. With `MinerRoster = false`:
+
+- **New accounts** get one miner. No starter kits are made for miners 2 and 3.
+- **Switching** is refused: `MinerSelect` answers "You play one miner for
+  now." and so does a 1v1 pick of another miner.
+- **1v1 rounds.** The 30-second counter-pick becomes a 10-second break
+  (`Matchmaking.Rounds.Break`). The panel keeps the round result, what the
+  opponent fought with and READY; the counter-pick row is gone. The reveal
+  shows no miner numbers.
+- **Dungeons.** A defeat no longer offers the next miner. Your run ends when
+  you fall, and the squad's when everyone has.
+- **Menus.** The Inventory's miner buttons and roster cards, the Wardrobe's
+  "MINER 2" line and the Store's "each kit dresses one of your three miners"
+  lines are gone. A squad kit dresses your miner; the other kits wait in the
+  Wardrobe.
+- **Old saves** that already hold three keep all three as they are. The
+  active one is the one you play; the others come back, gear and progress
+  intact, when the flag is turned on again.
+
+`MinerRoster.configure(enabled)` sets it at runtime; the tests use it to run
+both ways.
 
 So the beta leads with mining, gems and gear, then 1v1:
 - Practice against a rival;
@@ -122,6 +149,9 @@ Social, Feedback, Reports.
 | `run_training_rewards.py` | | Closed pages are skipped; the tracker's next task |
 | `run_lottery_ui.py` | | The picker reports the style step |
 | `run_outpost.py` | | Mining counts for Tasks |
+| `run_equipment.py` (`miner_roster_cases`) | | One miner: no extra miners, no switch, no reserve or counter-pick; old three-miner saves kept and back with the flag |
+| `run_duels.py` | | One miner: the short break, nobody swaps, no miner numbers at the reveal |
+| `run_dungeons.py` (`miner_dungeon_cases`) | | One miner: no reserve offered or deployed; a defeat ends the run |
 
 **Suites that were failing and now pass:**
 - `run_dungeons` and `run_expedition`: their harnesses didn't load

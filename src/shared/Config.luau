@@ -34,6 +34,12 @@ local Config = {
 		Dungeons = false,
 		-- The Motor Pool's drivable mechs (the Pilot prompt).
 		Mechs = true,
+		-- Three miners per account (Shared.MinerRoster): switch between them in
+		-- the Inventory, counter-pick another between 1v1 rounds, and send the
+		-- next one in when one falls in a dungeon. Off for the beta: everyone
+		-- plays one miner, so there's one character to learn and to manage.
+		-- Saves that already hold three keep them for when it's back on.
+		MinerRoster = false,
 	},
 
 	-- Free mining: each mined node uses one free mine. When the daily or

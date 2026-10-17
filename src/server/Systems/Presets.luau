@@ -26,6 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Combat = require(ReplicatedStorage.Shared.Combat)
 local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
@@ -223,6 +224,9 @@ end
 
 function Presets.start()
 	Shop.register("MinerSelect", function(player, index)
+		if not MinerRoster.Enabled then
+			return reply(false, "You play one miner for now.")
+		end
 		if not canChange(player) or player:GetAttribute("DuelQueue") then
 			return reply(false, "Switch miners in the Outpost, before you queue.")
 		end

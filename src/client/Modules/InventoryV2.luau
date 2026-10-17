@@ -665,9 +665,9 @@ local function buildLeft(canvas: Frame)
 			canvas
 		)
 	end
-	-- Miner 1 / 2 / 3.
+	-- Miner 1 / 2 / 3 (none while the roster is off: one miner).
 	ui.Miners = {}
-	for index = 1, MinerRoster.Count do
+	for index = 1, if MinerRoster.Enabled then MinerRoster.Count else 0 do
 		local b = new("TextButton", {
 			Text = tostring(index),
 			TextSize = 13,
@@ -693,7 +693,8 @@ local function buildLeft(canvas: Frame)
 		ui.Miners[index] = { Button = b, Edge = edge }
 	end
 	if COMPACT then
-		ui.Name = place(text(canvas, "", 22, C.Text, HEAVY), 116, 54, RIGHT_X - 128, 32)
+		local nameX = if MinerRoster.Enabled then 116 else 0
+		ui.Name = place(text(canvas, "", 22, C.Text, HEAVY), nameX, 54, RIGHT_X - 12 - nameX, 32)
 	else
 		ui.Name = place(text(canvas, "", 40, C.Text, HEAVY), x, 140, w + 120, 44)
 	end
@@ -1693,7 +1694,9 @@ local function drawLeft(profile, loadout)
 	end
 	ui.Name.Text = string.upper(player.DisplayName)
 	local level = Tree.level(profile.Augments and profile.Augments.XP or 0)
-	ui.Sub.Text = string.format("MINER %d  ·  LEVEL %d", active, level)
+	ui.Sub.Text = if MinerRoster.Enabled
+		then string.format("MINER %d  ·  LEVEL %d", active, level)
+		else string.format("LEVEL %d", level)
 	local vitals = Tree.vitals(profile, player:GetAttribute("MatchStats"))
 	ui.LevelBonus.Text = if player:GetAttribute("MatchStats") == "Even" then "EVEN STATS · LEVEL BONUSES NORMALIZED"
 		else string.format("LEVEL BONUS  +%d HP · +%d STAMINA · +%d CHARGE", vitals.Health, vitals.Stamina - 100, vitals.Charge - 100)

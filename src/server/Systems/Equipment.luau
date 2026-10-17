@@ -24,6 +24,7 @@ local FrontierAssets = require(script.Parent.FrontierAssets)
 local SuitTraits = require(ReplicatedStorage.Shared.SuitTraits)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
@@ -3460,6 +3461,10 @@ function Equipment.start()
 			end
 			rosterKeys[player] = rosterKeys[player] or {}
 			for index, miner in profile.Miners.Slots do
+				-- (Only miners you can play: with the roster off, the active one.)
+				if not MinerRoster.playable(profile.Miners, index) then
+					continue
+				end
 				local loadout = table.clone(if profile.Miners.Active == index then profile.Character else miner.Character)
 				loadout.GearRolls = profile.Character.GearRolls
 				loadout.ItemGems = profile.Character.ItemGems

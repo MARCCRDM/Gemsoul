@@ -20,6 +20,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local ShopArt = require(script.Parent.ShopArt)
@@ -503,8 +504,12 @@ function draw()
 	end
 	local p = profile()
 	local miner = p and p.Miners and p.Miners.Active or 1
-	ui.Sub.Text = if Cosmetics.isMinerKind(state.Kind)
-		then string.format("MINER %d  ·  EACH MINER WEARS ITS OWN LOOK", miner)
+	ui.Sub.Text = if not MinerRoster.Enabled
+		then "YOUR LOOK"
+		elseif Cosmetics.isMinerKind(state.Kind) then string.format(
+			"MINER %d  ·  EACH MINER WEARS ITS OWN LOOK",
+			miner
+		)
 		else "EVERY MINER WEARS THESE"
 	for _, kind in KINDS do
 		local mine = looks(kind)

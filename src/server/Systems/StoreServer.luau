@@ -167,9 +167,13 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 	local active = profile.Miners and profile.Miners.Active or 1
 	local kits = Store.kitsOf(key)
 	if kits then
+		-- One per miner from this one; with one miner it wears the first kit
+		-- and the rest wait in the Wardrobe.
 		for i, kit in kits do
-			local index = (active - 1 + i - 1) % MinerRoster.Count + 1
-			dressMiner(player, profile, index, firstLook(kit.Contents.Cosmetics or {}))
+			if i <= MinerRoster.Count then
+				local index = if MinerRoster.Enabled then (active - 1 + i - 1) % MinerRoster.Count + 1 else active
+				dressMiner(player, profile, index, firstLook(kit.Contents.Cosmetics or {}))
+			end
 		end
 	elseif key ~= "Vault" then
 		dressMiner(player, profile, active, firstLook(reward.Cosmetics or {}))
