@@ -16,6 +16,23 @@ Outpost*, *Loading the area*, *Landing*, and so on. The bar shows real progress
 while joining and sweeps otherwise. Tips rotate every five seconds. The screen
 takes clicks and taps, so nothing behind it is pressed by accident.
 
+## Tips, by how far you've got
+
+The tips change as you play (`LoadingScreen.Tips`). Your save puts you in one
+of three stages (`LoadingScreen.stage`, fed by `LoadingFlow.progress` each time
+your profile updates):
+
+| Stage | Who | Tips, newest to you first |
+| --- | --- | --- |
+| 1 Just started | no gem mined yet, under 10 rocks | mine gems to upgrade your gear and unlock moves · sword gem = Q, core = E, shield = R · land hits for Charge · parry (raise your guard just before a melee hit) · Crystal Boulders hold gems more often, and rarer ones |
+| 2 Found a gem | first gem mined, or 10+ rocks | rarity sets how strong a gem's moves are (Common 60% to Legendary 100%, plus a Flourish) · grades 1–10: Size power, Clarity duration, Cut cooldowns and odds · Thermal > Cryo > Ion > Corrosive > Thermal · then the stage 1 tips, minus Charge |
+| 3 Old hand | level 5, 5 fights or 150 rocks | 2, 4 or 6 pieces of one set (the sword counts) · Ranked evens stats and caps gems at Ultra Rare · then the stage 2 tips and parry and rocks (the basics stop) |
+
+A tip shows from its `Stage` up to its `Last`, if it has one. A new stage
+starts its tips from the top. Until your save has loaded (the very start of
+joining), you get stage 1. Every tip is in the Spanish table, and the test
+keeps each one short enough for its two lines.
+
 ## When it shows
 
 | Moment | Up until |

@@ -257,6 +257,61 @@ check(tipLabel ~= nil, "no tip is shown")
 local firstTip = tipLabel.Text
 run(LoadingScreen.TipSeconds + 0.1)
 check(tipLabel.Text ~= firstTip, "the tip never changes")
+
+-- The tips follow how far you've got: a new player gets the basics, a miner
+-- learns about gems, an old hand about sets and Ranked.
+check(LoadingScreen.stage(nil) == 1 and LoadingScreen.stage({}) == 1, "nothing known isn't a new player")
+check(LoadingScreen.stage({ Rocks = 4 }) == 1, "a few rocks with no gem moved past the start")
+check(
+	LoadingScreen.stage({ Mined = true }) == 2 and LoadingScreen.stage({ Rocks = 10 }) == 2,
+	"a first gem (or 10 rocks) didn't move on"
+)
+check(LoadingScreen.stage({ Mined = true, Level = 5 }) == 3, "level 5 isn't an old hand")
+check(
+	LoadingScreen.stage({ Fights = 5 }) == 3 and LoadingScreen.stage({ Rocks = 150 }) == 3,
+	"fights or rocks don't make an old hand"
+)
+local function has(list, words)
+	for _, text in list do
+		if string.find(text, words, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+local seen, all = {}, 0
+for stage = 1, 3 do
+	local list = LoadingScreen.tipsFor(stage)
+	check(#list >= 3, "stage " .. stage .. " has too few tips")
+	for _, text in list do
+		check(#text <= 140, "a tip too long for its two lines: " .. text)
+		if not seen[text] then
+			seen[text], all = true, all + 1
+		end
+	end
+end
+check(all == #LoadingScreen.Tips and all == 10, "every tip shows at some stage")
+local new, miner, old = LoadingScreen.tipsFor(1), LoadingScreen.tipsFor(2), LoadingScreen.tipsFor(3)
+check(has(new, "Mine gems") and not has(new, "graded") and not has(new, "Ranked"), "a new player gets the wrong tips")
+check(string.find(miner[1], "rarer the gem", 1, true) ~= nil, "a miner's tips don't lead with what's new to them")
+check(
+	has(miner, "graded") and has(miner, "Mine gems") and not has(miner, "build Charge"),
+	"a miner gets the wrong tips"
+)
+check(
+	has(old, "Ranked") and has(old, "armor set") and not has(old, "Mine gems") and has(old, "parry"),
+	"an old hand gets the wrong tips"
+)
+-- A new stage takes over from the next tip.
+LoadingScreen.setStage(3)
+run(LoadingScreen.TipSeconds + 0.1)
+check(tipLabel.Text == "TIP  ·  " .. old[1], "a new stage didn't start from its first tip")
+run(LoadingScreen.TipSeconds + 0.1)
+check(tipLabel.Text == "TIP  ·  " .. old[2], "the tips stopped rotating")
+LoadingScreen.setStage(3)
+run(LoadingScreen.TipSeconds + 0.1)
+check(tipLabel.Text == "TIP  ·  " .. old[3], "the same stage again started over")
+LoadingScreen.setStage(1)
 join.release()
 check(LoadingScreen.active() == false, "a cover released past its Min still wants the screen")
 frame(1 / 60)

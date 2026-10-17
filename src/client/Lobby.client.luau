@@ -30,6 +30,11 @@ local loadingStarted, loadingProblem = pcall(LoadingFlow.start)
 if not loadingStarted then
 	warn("[Lobby] loading screens off: " .. tostring(loadingProblem))
 end
+-- Its tips follow how far you've got (your first gem, your level, your fights).
+if GemClient.Profile then
+	LoadingFlow.progress(GemClient.Profile)
+end
+GemClient.Changed:Connect(LoadingFlow.progress)
 
 -- Friendly sparring: ask someone (Z, or 1 for the nearest); 1 ends it (SparKit).
 SparKit.start()

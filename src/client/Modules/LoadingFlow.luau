@@ -35,6 +35,7 @@
 	  LoadingFlow.step(now, look)   one frame of every hold (look(hold) ->
 	                          snapshot; the game's own by default)
 	  LoadingFlow.start()
+	  LoadingFlow.progress(profile)  the screen's tips fit how far they've got
 ]]
 local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
@@ -62,6 +63,10 @@ local NO_SCREEN = {
 	waitCovered = function() end,
 	waitClear = function() end,
 	progress = function() end,
+	stage = function()
+		return 1
+	end,
+	setStage = function() end,
 }
 local LoadingScreen = (function()
 	local ok, loaded = pcall(function()
@@ -375,6 +380,28 @@ end
 
 function LoadingFlow.waitClear(timeout: number?)
 	pcall(LoadingScreen.waitClear, timeout)
+end
+
+-- How far the player has got, from their save, so the loading screen's tips
+-- fit them (LoadingScreen.stage).
+function LoadingFlow.progress(profile)
+	if type(profile) ~= "table" then
+		return
+	end
+	local outpost, duel = profile.Outpost, profile.Duel
+	local level = 0
+	pcall(function()
+		local Tree = require(ReplicatedStorage.Shared.AugmentTree)
+		level = Tree.level(profile.Augments and profile.Augments.XP or 0)
+	end)
+	pcall(function()
+		LoadingScreen.setStage(LoadingScreen.stage({
+			Mined = profile.Milestones and profile.Milestones.Mined == true,
+			Rocks = outpost and outpost.Rocks or 0,
+			Level = level,
+			Fights = duel and duel.Played or 0,
+		}))
+	end)
 end
 
 function LoadingFlow.active(): boolean

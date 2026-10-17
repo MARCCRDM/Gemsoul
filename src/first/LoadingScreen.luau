@@ -24,6 +24,11 @@
 	  LoadingScreen.waitCovered(timeout?)
 	  LoadingScreen.waitClear(timeout?)  -- until it's gone
 	  LoadingScreen.wanted(covers, now)  -- pure: (wanted, status)
+
+	Tips change with how far you've got (LoadingFlow.progress tells it):
+	  LoadingScreen.stage(facts) -> 1 | 2 | 3   -- pure, from your save
+	  LoadingScreen.tipsFor(stage) -> { string } -- pure, newest first
+	  LoadingScreen.setStage(stage)
 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -43,14 +48,54 @@ local CYAN = Color3.fromRGB(120, 220, 235)
 local DIM = Color3.fromRGB(138, 150, 178)
 local FAINT = Color3.fromRGB(88, 94, 128)
 
+-- Tips by how far you've got (LoadingScreen.stage): 1 just started, 2 found a
+-- gem, 3 an old hand. Each shows from its Stage on, up to its Last if it has
+-- one (the basics stop once you know them).
 LoadingScreen.Tips = {
-	"Click, tap or press E for each swing. Break rocks to discover gems.",
-	"One gem, two ways to build: enchant your gear, or equip it as a Surge.",
-	"Land attacks to build Charge, then spend it on your Q, E and R Surges.",
-	"Rocks grow back after they're mined out. Rarer gems hide in bigger rocks.",
-	"Hold your guard to block. A well-timed block staggers your rival.",
-	"Trade gems with other miners at the Market: it pays better than selling.",
+	{
+		Stage = 1,
+		Last = 2,
+		Text = "Mine gems to upgrade your gear and unlock new elemental moves. Any rock you break could hold one.",
+	},
+	{
+		Stage = 1,
+		Last = 2,
+		Text = "Your sword's gem gives you your Q move, your core gem your E, and your shield's gem your R. Swap a gem to swap the move.",
+	},
+	{ Stage = 1, Last = 1, Text = "Land hits to build Charge, then spend it on your Q, E and R moves." },
+	{
+		Stage = 1,
+		Text = "Raise your guard just before a melee hit lands to parry: you take far less damage, spend no stamina and stun your rival.",
+	},
+	{
+		Stage = 1,
+		Text = "Crystal Boulders take more swings than Regolith Chunks, but they hold gems more often, and rarer ones.",
+	},
+	{
+		Stage = 2,
+		Text = "The rarer the gem, the stronger its moves: a Common gem's moves work at 60% strength, a Legendary's at 100%, plus a Flourish.",
+	},
+	{
+		Stage = 2,
+		Text = "Every gem is graded 1 to 10. Size: more power. Clarity: effects last longer. Cut: shorter cooldowns, better crit, freeze and stun odds.",
+	},
+	{
+		Stage = 2,
+		Text = "Thermal beats Cryo, Cryo beats Ion, Ion beats Corrosive and Corrosive beats Thermal. Bring the element that beats theirs.",
+	},
+	{
+		Stage = 3,
+		Text = "Wear 2, 4 or 6 pieces of one armor set (your sword counts too) for bigger set bonuses.",
+	},
+	{
+		Stage = 3,
+		Text = "Ranked evens everyone's stats and caps gems at Ultra Rare: there, your skill and your moves decide it.",
+	},
 }
+-- Old hands: level 5, five fights or 150 rocks. A first gem found (or 10
+-- rocks) moves you on from the start.
+LoadingScreen.Veteran = { Level = 5, Fights = 5, Rocks = 150 }
+LoadingScreen.Miner = { Rocks = 10 }
 
 export type Cover = {
 	Reason: string,
@@ -98,6 +143,8 @@ local shimmer: Frame? = nil
 local blocker: Frame? = nil
 local tipIndex = 0
 local tipAt = 0
+local tipList: { string } = {}
+local tipStage = 0
 
 local function new(class: string, props: { [string]: any }, parent: Instance?): any
 	local object = Instance.new(class)
@@ -322,10 +369,48 @@ local function apply()
 	end
 end
 
+-- How far you've got, from your save: { Mined = found a gem, Rocks, Level,
+-- Fights }. Nothing known yet counts as just started.
+function LoadingScreen.stage(facts: { [string]: any }?): number
+	local f = facts or {}
+	local rocks, veteran = f.Rocks or 0, LoadingScreen.Veteran
+	if (f.Level or 0) >= veteran.Level or (f.Fights or 0) >= veteran.Fights or rocks >= veteran.Rocks then
+		return 3
+	end
+	return if f.Mined or rocks >= LoadingScreen.Miner.Rocks then 2 else 1
+end
+
+-- The tips for `stage`: its own first (what's new to you), then the earlier
+-- ones still worth a reminder.
+function LoadingScreen.tipsFor(stage: number): { string }
+	local list = {}
+	for from = stage, 1, -1 do
+		for _, entry in LoadingScreen.Tips do
+			if entry.Stage == from and stage <= (entry.Last or math.huge) then
+				table.insert(list, entry.Text)
+			end
+		end
+	end
+	return list
+end
+
+-- A new stage starts its tips from the top (at the next tip shown).
+function LoadingScreen.setStage(stage: number)
+	if stage ~= tipStage then
+		tipStage, tipList, tipIndex = stage, LoadingScreen.tipsFor(stage), 0
+	end
+end
+
 local function nextTip()
-	tipIndex = tipIndex % #LoadingScreen.Tips + 1
+	if tipStage == 0 then
+		LoadingScreen.setStage(1)
+	end
+	if #tipList == 0 then
+		return
+	end
+	tipIndex = tipIndex % #tipList + 1
 	if tip then
-		tip.Text = "TIP  ·  " .. LoadingScreen.Tips[tipIndex]
+		tip.Text = "TIP  ·  " .. tipList[tipIndex]
 	end
 end
 
