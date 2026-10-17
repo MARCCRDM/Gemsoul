@@ -428,18 +428,21 @@ end
 local function hex(color)
 	return string.format("#%02x%02x%02x", color.R * 255, color.G * 255, color.B * 255)
 end
--- A small rounded tag sized to its words.
+-- A small rounded tag sized to its words (in any language).
 local function tag(parent, value, color)
 	local pill = frame(parent, {
 		BackgroundColor3 = C.Ink,
 		BackgroundTransparency = 0.2,
-		Size = UDim2.fromOffset(#value * 7 + 22, 22),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 22),
 		ZIndex = 25,
 	})
 	UiKit.round(pill, 999)
 	stroke(pill, color, 0.35, 1)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 11), PaddingRight = UDim.new(0, 11) }, pill)
 	local words = text(pill, value, 10, color, Enum.Font.GothamBold, { ZIndex = 26 })
-	words.TextXAlignment = Enum.TextXAlignment.Center
+	words.AutomaticSize, words.Size = Enum.AutomaticSize.X, UDim2.fromScale(0, 1)
+	words.TextTruncate = Enum.TextTruncate.None
 	return pill
 end
 -- The selected mark, top right: an empty ring, filled with a tick once chosen.
@@ -479,45 +482,72 @@ end
 local styleButtons, elementButtons = {}, {}
 local refreshChoices -- (below)
 
--- Style: three tall fighter cards, the key art leading each.
+-- Style: three tall fighter cards. Each leads with its key art, framed on
+-- the fighter (a short card never cuts the head off), then its name, what it's
+-- for, a quick read of its stats, and the bonus a two-piece set gives.
 local styleArea = frame(choices, { BackgroundTransparency = 1, ZIndex = 21 })
+local ART_ASPECT = 480 / 392 -- (the key art's shape)
+-- Where each fighter's head is, down its art (0..1): kept a third of the way
+-- down the window.
+local ART_HEAD = { Prospector = 0.36, Skirmisher = 0.23, Juggernaut = 0.3 }
 local function layoutStyleCard(card, w: number, h: number)
 	local small = h < 360
-	local artH = math.floor(h * (if small then 0.55 else 0.56))
-	card.Art.Size = UDim2.new(1, 0, 0, artH)
-	card.Role.Position = UDim2.fromOffset(12, 12)
-	card.Check.Ring.Position = UDim2.new(1, -12, 0, 12)
-	local nameH = if small then 22 else 32
-	local y = artH - nameH - (if small then 2 else 6)
-	card.Name.TextSize = if small then 19 else math.clamp(math.floor(w / 12), 22, 30)
-	card.Name.Position, card.Name.Size = UDim2.fromOffset(16, y), UDim2.new(1, -32, 0, nameH)
-	y = artH + (if small then 6 else 10)
+	local pad = if small then 12 else 16
+	-- The art: as wide as the card, the fighter's head in view.
+	local artH = math.floor(h * (if small then 0.52 else 0.54))
+	card.Window.Size = UDim2.new(1, 0, 0, artH)
+	local imageH = math.max(artH, math.floor(w / ART_ASPECT))
+	local imageW = math.max(w, math.floor(imageH * ART_ASPECT))
+	local top = math.clamp(math.floor(card.Head * imageH - artH / 3), 0, imageH - artH)
+	card.Art.Position = UDim2.fromOffset(math.floor((w - imageW) / 2), -top)
+	card.Art.Size = UDim2.fromOffset(imageW, imageH)
+	card.Role.Position = UDim2.fromOffset(pad - 4, pad - 4)
+	card.Check.Ring.Position = UDim2.new(1, -(pad - 4), 0, pad - 4)
+	-- The name sits on the art's fade, an accent bar under it.
+	local nameH = if small then 24 else 34
+	card.Name.TextSize = if small then 20 else math.clamp(math.floor(w / 12), 22, 30)
+	card.Name.Position, card.Name.Size = UDim2.fromOffset(pad, artH - nameH + 2), UDim2.new(1, -pad * 2, 0, nameH)
+	card.Bar.Position, card.Bar.Size = UDim2.fromOffset(pad, artH + 6), UDim2.fromOffset(if small then 22 else 30, 3)
+	local y = artH + (if small then 16 else 20)
 	local tipH = if small or w < 240 then 0 else 36
 	card.Tip.Visible = tipH > 0
-	card.Tip.Position, card.Tip.Size = UDim2.fromOffset(16, y), UDim2.new(1, -32, 0, tipH)
+	card.Tip.Position, card.Tip.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, tipH)
 	card.Tip.TextSize = if w >= 330 then 13 else 12
-	y += tipH + (if tipH > 0 then 8 else 0)
-	-- The stat bars share what's left above the set bonus.
-	local bonusH = if small then 0 else 30
-	card.Bonus.Visible = bonusH > 0
-	card.Bonus.Position, card.Bonus.Size = UDim2.new(0, 16, 1, -bonusH - 6), UDim2.new(1, -32, 0, bonusH)
-	local rowH = math.clamp(math.floor((h - y - bonusH - 14) / #STATS), 0, 22)
-	local labelW = if w >= 300 then 74 else 62
+	y += tipH + (if tipH > 0 then 6 else 0)
+	-- The set bonus along the bottom: what it is over what it gives.
+	local bonusH = if small then 34 elseif h >= 400 then 46 else 40
+	card.Strip.Position, card.Strip.Size = UDim2.new(0, 0, 1, -bonusH), UDim2.new(1, 0, 0, bonusH)
+	card.BonusHead.Position = UDim2.fromOffset(pad, if small then 5 else 8)
+	card.BonusHead.Size = UDim2.new(1, -pad * 2, 0, if small then 10 else 12)
+	card.BonusValue.Position = UDim2.fromOffset(pad, if small then 16 else 21)
+	card.BonusValue.Size = UDim2.new(1, -pad * 2, 0, if small then 14 else 17)
+	card.BonusHeadLimit.MaxTextSize = if small then 8 else 10
+	card.BonusValueLimit.MaxTextSize = if small then 12 elseif bonusH >= 46 then 14 else 13
+	-- The stat bars share what's left between the words and the bonus.
+	local rowH = math.clamp(math.floor((h - bonusH - y - (if small then 8 else 12)) / #STATS), 0, 22)
+	local labelW = if w >= 300 then 80 else 72
+	local barW = w - pad * 2 - labelW
+	local segment = math.floor((barW + 4) / 5)
 	for index, row in card.Stats do
 		local show = rowH >= 11
+		local rowY = y + (index - 1) * rowH
 		row.Label.Visible = show
 		row.Label.TextSize = if rowH >= 18 then 10 else 9
-		row.Label.Position = UDim2.fromOffset(16, y + (index - 1) * rowH)
-		row.Label.Size = UDim2.fromOffset(labelW, rowH)
-		local barW = w - 32 - labelW
-		for pip, segment in row.Pips do
-			segment.Visible = show
-			segment.Position = UDim2.fromOffset(
-				16 + labelW + math.floor((pip - 1) * barW / 5),
-				y + (index - 1) * rowH + math.floor(rowH / 2) - 3
-			)
-			segment.Size = UDim2.fromOffset(math.floor(barW / 5) - 4, 6)
+		row.Label.Position, row.Label.Size = UDim2.fromOffset(pad, rowY), UDim2.fromOffset(labelW, rowH)
+		for pip, piece in row.Pips do
+			piece.Visible = show
+			piece.Position = UDim2.fromOffset(pad + labelW + (pip - 1) * segment, rowY + math.floor(rowH / 2) - 2)
+			piece.Size = UDim2.fromOffset(segment - 4, 5)
 		end
+	end
+end
+-- The picked card's halo: two soft rings of its colour round it.
+local function placeHalo(card)
+	local position, size = card.Button.Position, card.Button.Size
+	for i, ring in card.Halo do
+		local grow = if i == 1 then 10 else 4
+		ring.Position = UDim2.fromOffset(position.X.Offset - grow, position.Y.Offset - grow)
+		ring.Size = UDim2.fromOffset(size.X.Offset + grow * 2, size.Y.Offset + grow * 2)
 	end
 end
 local function layoutStyles()
@@ -525,16 +555,19 @@ local function layoutStyles()
 	if width <= 0 or height <= 0 then
 		return
 	end
-	local gap = if width < 700 then 8 else 14
-	local cardW = math.floor((width - gap * 2) / 3)
-	local cardH = math.min(height, 560)
+	-- (a little room round the edge for the picked card's halo)
+	local inset = 6
+	local gap = if width < 700 then 10 else 16
+	local cardW = math.floor((width - inset * 2 - gap * 2) / 3)
+	local cardH = math.min(height - inset * 2, 560)
 	local y0 = math.floor((height - cardH) / 2)
 	for i, style in STYLES do
 		local card = styleButtons[style.Id]
 		if card then
-			card.Button.Position = UDim2.fromOffset((i - 1) * (cardW + gap), y0)
+			card.Button.Position = UDim2.fromOffset(inset + (i - 1) * (cardW + gap), y0)
 			card.Button.Size = UDim2.fromOffset(cardW, cardH)
 			layoutStyleCard(card, cardW, cardH)
+			placeHalo(card)
 		end
 	end
 end
@@ -545,6 +578,16 @@ place(function()
 end)
 listen(styleArea:GetPropertyChangedSignal("AbsoluteSize"), layoutStyles)
 for _, style in STYLES do
+	local halo = {}
+	for i = 1, 2 do
+		local ring = frame(styleArea, {
+			BackgroundColor3 = style.Color,
+			BackgroundTransparency = 1,
+			ZIndex = 20,
+		})
+		UiKit.round(ring, if i == 1 then 20 else 15)
+		halo[i] = ring
+	end
 	local card = new("TextButton", {
 		Name = style.Id,
 		Text = "",
@@ -555,20 +598,41 @@ for _, style in STYLES do
 	}, styleArea)
 	UiKit.round(card, 12)
 	local edge = stroke(card, C.Line, 0, 1)
+	local pop = new("UIScale", { Scale = 1 }, card)
+	-- The art's window: the edges and top darkened so the eye goes to the
+	-- fighter, and fading into the card at the bottom, under the name.
+	local window = frame(card, {
+		Name = "ArtWindow",
+		BackgroundColor3 = style.Color:Lerp(C.Ink, 0.82),
+		ClipsDescendants = true,
+		ZIndex = 22,
+	})
 	local artId = STYLE_ART[style.Id] or 0
 	local art = new("ImageLabel", {
 		Name = "StyleArt",
-		BackgroundColor3 = style.Color:Lerp(C.Ink, 0.82),
-		BorderSizePixel = 0,
+		BackgroundTransparency = 1,
 		Image = if artId ~= 0 then "rbxassetid://" .. artId else "",
-		ScaleType = Enum.ScaleType.Crop,
+		ScaleType = Enum.ScaleType.Stretch,
 		ZIndex = 22,
-	}, card)
-	-- The art fades into the card, under the name.
-	local scrim = frame(art, {
+	}, window)
+	local sides = frame(window, { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, ZIndex = 23 })
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.3),
+			NumberSequenceKeypoint.new(0.24, 1),
+			NumberSequenceKeypoint.new(0.76, 1),
+			NumberSequenceKeypoint.new(1, 0.3),
+		}),
+	}, sides)
+	local shade = frame(window, { Size = UDim2.fromScale(1, 0.32), BackgroundColor3 = C.Ink, ZIndex = 23 })
+	new("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) }),
+	}, shade)
+	local scrim = frame(window, {
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.fromScale(1, 0.6),
+		Size = UDim2.fromScale(1, 0.56),
 		BackgroundColor3 = C.Card,
 		ZIndex = 23,
 	})
@@ -576,13 +640,23 @@ for _, style in STYLES do
 		Rotation = 90,
 		Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.55, 0.45),
+			NumberSequenceKeypoint.new(0.55, 0.4),
 			NumberSequenceKeypoint.new(1, 0),
 		}),
 	}, scrim)
+	-- A glassy light along the top edge.
+	frame(card, {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.88,
+		Position = UDim2.fromOffset(14, 0),
+		Size = UDim2.new(1, -28, 0, 1),
+		ZIndex = 24,
+	})
 	local role = tag(card, style.Role, style.Color)
 	local check = checkMark(card)
 	local name = text(card, string.upper(style.Id), 28, C.Text, Enum.Font.GothamBlack, { ZIndex = 25 })
+	local bar = frame(card, { BackgroundColor3 = style.Color, ZIndex = 25 })
+	UiKit.round(bar, 999)
 	local tip = text(card, style.Tip, 13, C.Dim, Enum.Font.Gotham, { TextWrapped = true })
 	tip.TextYAlignment = Enum.TextYAlignment.Top
 	local stats = {}
@@ -590,39 +664,66 @@ for _, style in STYLES do
 		local statLabel = text(card, string.upper(stat), 10, C.Dim, Enum.Font.GothamBold)
 		local pips = {}
 		for pip = 1, 5 do
-			local segment = frame(card, { BackgroundColor3 = C.Line, ZIndex = 23 })
-			UiKit.round(segment, 3)
-			pips[pip] = segment
+			local piece = frame(card, { BackgroundColor3 = C.Line, ZIndex = 23 })
+			UiKit.round(piece, 999)
+			pips[pip] = piece
 		end
 		table.insert(stats, { Label = statLabel, Pips = pips, Value = style.Profile[stat] or 0 })
 	end
-	local bonus = text(
-		card,
-		string.format('<font color="#8a9cb2">2-PIECE BONUS</font>   %s', style.Bonus),
-		12,
-		style.Color,
-		Enum.Font.GothamBold,
-		{ RichText = true }
-	)
-	styleButtons[style.Id] = {
+	-- The set bonus: a strip of its colour along the bottom, a hairline over it.
+	local strip = frame(card, { Name = "BonusStrip", BackgroundColor3 = style.Color:Lerp(C.Card, 0.88), ZIndex = 22 })
+	local hairline = frame(strip, { BackgroundColor3 = style.Color, Size = UDim2.new(1, 0, 0, 1), ZIndex = 23 })
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.35),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, hairline)
+	local bonusHead = text(strip, "2-PIECE BONUS", 10, C.Dim, Enum.Font.GothamBold, { ZIndex = 24 })
+	bonusHead.TextScaled = true
+	local bonusHeadLimit = new("UITextSizeConstraint", { MaxTextSize = 10, MinTextSize = 7 }, bonusHead)
+	local bonusValue = text(strip, style.Bonus, 13, style.Color, Enum.Font.GothamBold, { ZIndex = 24 })
+	bonusValue.TextScaled = true
+	local bonusValueLimit = new("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 8 }, bonusValue)
+	local entry = {
 		Button = card,
 		Stroke = edge,
+		Pop = pop,
+		Halo = halo,
+		Window = window,
 		Art = art,
+		Head = ART_HEAD[style.Id] or 0.3,
 		Scrim = scrim,
 		Role = role,
 		Check = check,
 		Name = name,
+		Bar = bar,
 		Tip = tip,
 		Stats = stats,
-		Bonus = bonus,
+		Strip = strip,
+		BonusHead = bonusHead,
+		BonusHeadLimit = bonusHeadLimit,
+		BonusValue = bonusValue,
+		BonusValueLimit = bonusValueLimit,
 		Color = style.Color,
 	}
+	styleButtons[style.Id] = entry
 	listen(card.Activated, function()
 		if not savedKit and not busy then
 			chosenStyle = style.Id
 			refreshChoices()
 			layoutStyles()
 		end
+	end)
+	-- A pointer over it lifts its edge and its art.
+	listen(card.MouseEnter, function()
+		entry.Hover = true
+		refreshChoices()
+	end)
+	listen(card.MouseLeave, function()
+		entry.Hover = false
+		refreshChoices()
 	end)
 end
 
@@ -1020,24 +1121,45 @@ local function layoutChoices(compact, rich)
 	refreshChoices()
 end
 
+local poppedStyle = chosenStyle
 function refreshChoices()
+	-- The picked style glows and its art is at full light; the others step back
+	-- (a pointer over one lifts it).
 	for id, card in styleButtons do
 		local on = id == chosenStyle
-		local back = if on then C.Card:Lerp(card.Color, 0.1) else C.Card
-		card.Stroke.Color = if on then card.Color else C.Line
-		card.Stroke.Thickness = if on then 2.5 else 1
+		local back = if on then C.Card:Lerp(card.Color, 0.08) else C.Card
+		card.Stroke.Color = if on then card.Color elseif card.Hover then card.Color:Lerp(C.Edge, 0.5) else C.Line
+		card.Stroke.Thickness = if on then 2 else 1
+		card.Halo[1].BackgroundTransparency = if on then 0.93 else 1
+		card.Halo[2].BackgroundTransparency = if on then 0.86 else 1
 		card.Button.BackgroundColor3 = back
 		card.Scrim.BackgroundColor3 = back
-		card.Art.ImageTransparency = if on then 0 else 0.35
-		card.Name.TextColor3 = if on then C.Text else C.Text:Lerp(C.Dim, 0.5)
-		card.Tip.TextColor3 = if on then C.Text:Lerp(C.Dim, 0.35) else C.Dim
+		card.Art.ImageColor3 = if on
+			then Color3.new(1, 1, 1)
+			elseif card.Hover then Color3.fromRGB(228, 230, 235)
+			else Color3.fromRGB(178, 182, 192)
+		card.Name.TextColor3 = if on then C.Text else C.Text:Lerp(C.Dim, 0.4)
+		card.Bar.BackgroundTransparency = if on then 0 else 0.6
+		card.Tip.TextColor3 = if on then C.Text:Lerp(C.Dim, 0.3) else C.Dim
+		card.Strip.BackgroundColor3 = card.Color:Lerp(C.Card, if on then 0.84 else 0.93)
+		card.BonusValue.TextColor3 = if on then card.Color else card.Color:Lerp(C.Dim, 0.45)
 		setCheck(card.Check, on, card.Color)
 		for _, row in card.Stats do
-			for pip, segment in row.Pips do
+			row.Label.TextColor3 = if on then C.Text:Lerp(C.Dim, 0.4) else C.Dim
+			for pip, piece in row.Pips do
 				local lit = pip <= row.Value
-				segment.BackgroundColor3 = if lit then card.Color else C.Line
-				segment.BackgroundTransparency = if lit then (if on then 0 else 0.45) else 0.4
+				piece.BackgroundColor3 = if lit then card.Color else C.Line
+				piece.BackgroundTransparency = if lit then (if on then 0 else 0.5) else 0.35
 			end
+		end
+	end
+	-- A new pick pops.
+	if chosenStyle ~= poppedStyle then
+		poppedStyle = chosenStyle
+		local card = styleButtons[chosenStyle]
+		if card then
+			card.Pop.Scale = 1.035
+			tween(card.Pop, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
 		end
 	end
 	-- The picked element lights up; once one is picked, the others step back.

@@ -105,7 +105,15 @@ Streets and building plots are painted terrain (cobblestone, pavement, dirt), so
 The fast start (`src/shared/FastStart.luau`), about a minute from joining to fighting:
 
 1. **The title screen** (`src/client/Splash.client.luau`), as for everyone.
-2. **How do you fight?** (`src/client/Intro.client.luau`): three style cards, Prospector (balanced), Skirmisher (fast, crits) or Juggernaut (heavy, defensive). The style is the armor set you start in, with a sword and shield; any set can be worn later.
+2. **How do you fight?** (`src/client/Intro.client.luau`): three style cards, Prospector (balanced), Skirmisher (fast, crits) or Juggernaut (heavy, defensive). The style is the armor set you start in, with a sword and shield; any set can be worn later. Each card has:
+   - the fighter's art, framed on its head (`ART_HEAD`) so a short card never cuts it off, with the edges darkened;
+   - its name over the art's fade, with an accent bar;
+   - what it's for, and its Health, Power, Defense and Speed out of 5;
+   - its 2-piece set bonus in a strip of its colour along the bottom.
+
+   The card you pick gets a bright edge, a soft halo and a small pop, and the screen takes its colour. The others dim a little; a pointer over one lifts it.
+
+   ![The style step: before and now, on a small phone and in Spanish](docs/intro/style-picker.png)
 3. **Pick your element**: Thermal, Cryo, Ion or Corrosive. Nothing is picked for you. Each card shows its gem on a lit stage, what the element is about, its strengths, and which element it beats and which beats it. The moves themselves are a surprise, rolled as you equip. The card you pick lights up (its ring gets a spark) and the screen takes its colour. **EQUIP & FIGHT** grants the kit (`Shared/StarterLottery`, `Systems/Intro`).
 
    ![The element step: before and now, on a phone and in Spanish](docs/intro/element-picker.png)

@@ -468,6 +468,7 @@ return {
 	["Trade blows and outlast them. Steady damage, quick to recover."] = "Intercambia golpes y resiste más que ellos. Daño constante, te recuperas rápido.",
 	["Strike, dodge, strike again. Speed and crits win the race."] = "Golpea, esquiva, golpea otra vez. La velocidad y los críticos ganan.",
 	["Hold the line. Block their best, then punish with heavy hits."] = "Mantén la línea. Bloquea lo mejor que tengan y castiga con golpes pesados.",
+	["{1}-piece bonus"] = "Bono de {1} piezas",
 	["+{1}% attack damage"] = "+{1}% de daño de ataque",
 	["+{1}% attack speed"] = "+{1}% de velocidad de ataque",
 	["+{1}% heavy damage"] = "+{1}% de daño pesado",

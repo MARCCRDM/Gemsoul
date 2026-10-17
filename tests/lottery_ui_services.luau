@@ -19,6 +19,7 @@ v2mt.__add=function(a,b) return setmetatable({X=a.X+b.X,Y=a.Y+b.Y},v2mt) end
 v2mt.__sub=function(a,b) return setmetatable({X=a.X-b.X,Y=a.Y-b.Y},v2mt) end
 local Vector2={new=function(x,y) return setmetatable({X=x,Y=y},v2mt) end}
 Vector2.zero=Vector2.new(0,0)
+local UDim={new=function(scale,offset) return {Scale=scale or 0,Offset=offset or 0} end}
 local UDim2={new=function(xs,xo,ys,yo) return {X={Scale=xs or 0,Offset=xo or 0},Y={Scale=ys or 0,Offset=yo or 0}} end}
 UDim2.fromScale=function(x,y) return UDim2.new(x,0,y,0) end
 UDim2.fromOffset=function(x,y) return UDim2.new(0,x,0,y) end

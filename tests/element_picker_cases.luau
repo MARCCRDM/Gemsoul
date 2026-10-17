@@ -48,6 +48,38 @@ else
  named("Poison").Activated.Fire()
  check(selected("Poison") and not selected("Frost"),"Selection markers are not exclusive")
 end
+-- The style cards: only the picked one has the bright edge, and at every size
+-- the art fills its window (no gaps) with the bonus strip along the bottom.
+if not resuming then
+ local function child(obj,name,class)
+  for _,c in obj.children do if (not name or c.Name==name) and (not class or c.ClassName==class) and not c.Destroyed then return c end end
+ end
+ back.Activated.Fire(); named("Juggernaut").Activated.Fire()
+ for _,style in {"Prospector","Skirmisher","Juggernaut"} do
+  local edge=child(named(style),nil,"UIStroke")
+  check((edge.Thickness>1)==(style=="Juggernaut"),"Only the picked style should have the bright edge: "..style)
+ end
+ local styleArea=named("Prospector").Parent
+ local before=styleArea.AbsoluteSize
+ for _,size in {{1200,450},{900,560},{800,300},{620,250}} do
+  styleArea.AbsoluteSize=Vector2.new(size[1],size[2])
+  styleArea:GetPropertyChangedSignal("AbsoluteSize").Fire()
+  for _,style in {"Prospector","Skirmisher","Juggernaut"} do
+   local card=named(style)
+   local w,h=card.Size.X.Offset,card.Size.Y.Offset
+   local window=child(card,"ArtWindow"); local art=child(window,"StyleArt")
+   local artH=window.Size.Y.Offset
+   check(art.Size.X.Offset>=w and art.Position.X.Offset<=0 and art.Position.X.Offset+art.Size.X.Offset>=w,style.." art leaves a gap at the sides")
+   check(art.Position.Y.Offset<=0 and art.Position.Y.Offset+art.Size.Y.Offset>=artH,style.." art leaves a gap at the top or bottom")
+   local strip=child(card,"BonusStrip")
+   check(strip.Position.Y.Scale==1 and strip.Position.Y.Offset==-strip.Size.Y.Offset and strip.Size.Y.Offset>=28,style.." bonus strip not along the bottom")
+   check(artH<h-strip.Size.Y.Offset-60,style.." art leaves no room for the stats")
+  end
+ end
+ styleArea.AbsoluteSize=before
+ styleArea:GetPropertyChangedSignal("AbsoluteSize").Fire()
+ back.Activated.Fire(); named("Skirmisher").Activated.Fire(); primary.Activated.Fire(); named("Poison").Activated.Fire()
+end
 -- Resize the actual layout callback: all four fit without scrolling wherever
 -- they can (side by side when wide and short, two by two when tall), never
 -- overlap or overflow, never shrink below a readable card, and only very
