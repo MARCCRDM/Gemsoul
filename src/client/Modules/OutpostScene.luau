@@ -42,6 +42,7 @@ local MobileLayout = require(script.Parent.MobileLayout)
 local MinerLoot = require(script.Parent.MinerLoot)
 local MiningReveal = require(script.Parent.MiningWorldReveal)
 local PickImpacts = require(script.Parent.PickImpacts)
+local ProbeLayout = require(script.Parent.ProbeLayout)
 -- Driving the Motor Pool's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
@@ -793,134 +794,585 @@ end
 
 -- The Probe: picks and the Market ---------------------------------------------------------------------
 
-local probe = IronUi.window("ProbeExchange", 12, 760, 430, "🛰", Color3.fromRGB(80, 200, 255))
+--[[
+	PROBE-7's window: a card per pick (the pick itself in 3D, its tier, what
+	it does, Swings, Power and Crit as bars against the best pick, and what
+	you can do with it: buy, refill or take it in hand; the free pick shows
+	its charge), your coins in the corner, and the player market below.
+
+	On a short screen (a phone on its side) the window is as wide as the
+	screen and the cards are shorter, so the words stay full size. Where
+	everything sits, and what each card offers, is ProbeLayout.
+]]
+local PROBE_SUBTITLE = "A survey probe that crashed here years ago, rewired into the outpost's trading post."
+local CARD_TOP = Color3.fromRGB(14, 18, 28)
+local TRACK = Color3.fromRGB(30, 36, 52)
+
+local probe =
+	IronUi.window("ProbeExchange", 12, ProbeLayout.Desk.W, ProbeLayout.Desk.H, "🛰", Color3.fromRGB(80, 200, 255))
 probe.Title.Text = "PROBE-7 EXCHANGE"
-probe.Subtitle.Text = "A survey probe that crashed here years ago, rewired into the outpost's trading post."
+probe.Subtitle.Text = PROBE_SUBTITLE
+UiKit.fit(probe.Subtitle)
 probe.Close.Activated:Connect(function()
 	probe.Gui.Enabled = false
 end)
-local probeBody = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(20, 84),
-	Size = UDim2.new(1, -40, 1, -104),
+-- Your coins, beside the close button.
+local wallet = new("Frame", {
+	Name = "Wallet",
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -64, 0, 18),
+	Size = UDim2.fromOffset(132, 32),
+	BackgroundColor3 = Color3.fromRGB(20, 25, 37),
+	ZIndex = 5,
 }, probe.Panel)
-local function drawProbe()
+UiKit.round(wallet, 16)
+new("UIStroke", { Color = P.Gold, Transparency = 0.6, Thickness = 1 }, wallet)
+local walletLabel = text(wallet, "◆ 0", 15, P.Gold, IronUi.Heading, 0, 0, 132, 32, Enum.TextXAlignment.Center)
+walletLabel.ZIndex = 6
+local probeBody = new("Frame", { Name = "Body", BackgroundTransparency = 1 }, probe.Panel)
+local probeCoins: number? = nil -- what the cards were drawn with
+
+local function coins(): number
+	return GemClient.Profile and GemClient.Profile.Coins or 0
+end
+
+local function commas(n: number): string
+	local s = tostring(math.floor(n))
+	repeat
+		local k
+		s, k = s:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+	until k == 0
+	return s
+end
+
+-- A pick in 3D, as PROBE-7 shows it: in its tier's own colour (a skin is
+-- looks only), leaning across the card, head and spike side on.
+local function pickView(parent: GuiObject, id: string, spec, size: number)
+	local view = new("ViewportFrame", {
+		Name = "PickView",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(size * 1.5, size),
+		BackgroundTransparency = 1,
+		Ambient = Color3.fromRGB(150, 152, 168),
+		LightColor = Color3.new(1, 1, 1),
+		LightDirection = Vector3.new(-0.6, -1, -0.8),
+		ZIndex = 3,
+	}, parent)
+	view:SetAttribute("Pick", id)
+	local model = Instance.new("Model")
+	PickaxeLooks.build(model, CFrame.Angles(math.rad(-48), 0, 0), nil, spec.Color, nil, spec.Power > 1)
+	model.Parent = view
+	local box, extent = model:GetBoundingBox()
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 30
+	local yaw, pitch = math.rad(100), math.rad(12)
+	local reach = math.max(extent.X, extent.Y, extent.Z) * 1.75 + 0.3
+	local offset = Vector3.new(math.sin(yaw) * math.cos(pitch), math.sin(pitch), math.cos(yaw) * math.cos(pitch))
+	camera.CFrame = CFrame.lookAt(box.Position + offset * reach, box.Position)
+	camera.Parent = view
+	view.CurrentCamera = camera
+	return view
+end
+
+-- A slab button without the side stripe; greyed out when it can't be used.
+local function probeButton(
+	parent: GuiObject,
+	label: string,
+	color: Color3,
+	on: boolean,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	size: number,
+	onClick: () -> ()
+)
+	local b, face = IronUi.chunk(parent, {
+		Color = if on then color else P.Slot,
+		Rim = if on then color else P.Edge,
+		Size = UDim2.fromOffset(w, h),
+		Radius = 10,
+		Lip = 4,
+		Stripes = "None",
+	})
+	b.Position = UDim2.fromOffset(x, y)
+	b.ZIndex = 4
+	local words = UiKit.fit(IronUi.label(b, face, label, size, IronUi.Heading))
+	words.TextColor3 = if on then Color3.new(1, 1, 1) else P.Dim
+	b:SetAttribute("UiSound", if on then "Confirm" else "Back")
+	b.Activated:Connect(onClick)
+	return b
+end
+
+-- A small pill on the art: the pick's tier, or IN HAND / OWNED.
+local function pill(parent: GuiObject, value: string, color: Color3, filled: boolean, right: boolean, size: number)
+	local w = math.ceil(utf8.len(value) * size * 0.72) + 16
+	local tag = new("Frame", {
+		AnchorPoint = Vector2.new(if right then 1 else 0, 0),
+		Position = UDim2.new(if right then 1 else 0, if right then -8 else 8, 0, 8),
+		Size = UDim2.fromOffset(w, size + 10),
+		BackgroundColor3 = if filled then color else Color3.fromRGB(10, 13, 22),
+		BackgroundTransparency = if filled then 0 else 0.25,
+		ZIndex = 5,
+	}, parent)
+	UiKit.round(tag, 8)
+	new("UIStroke", { Color = color, Transparency = if filled then 1 else 0.35, Thickness = 1 }, tag)
+	local words = UiKit.fit(
+		text(
+			tag,
+			value,
+			size,
+			if filled then Color3.fromRGB(10, 13, 22) else color,
+			IronUi.Heading,
+			6,
+			0,
+			w - 12,
+			size + 10,
+			Enum.TextXAlignment.Center
+		)
+	)
+	words.ZIndex = 6
+	return tag
+end
+
+-- One stat: its name, a bar against the best pick, its value.
+local function statRow(card: GuiObject, L, y: number, label: string, value: string, share: number, color: Color3)
+	local phone = L.Phone
+	local labelW, valueW = if phone then 50 else 58, if phone then 40 else 46
+	local name = text(card, label, if phone then 10 else 11, P.Dim, IronUi.Bold, 12, y, labelW, L.Row)
+	name.ZIndex = 3
+	local trackW = L.CardW - 24 - labelW - valueW - 8
+	local bar = new("Frame", {
+		Position = UDim2.fromOffset(12 + labelW, y + math.floor(L.Row / 2) - 2),
+		Size = UDim2.fromOffset(trackW, 5),
+		BackgroundColor3 = TRACK,
+		ZIndex = 3,
+	}, card)
+	UiKit.round(bar, 3)
+	if share > 0 then
+		local fillBar = new("Frame", {
+			Size = UDim2.fromScale(math.clamp(share, 0.04, 1), 1),
+			BackgroundColor3 = color,
+			ZIndex = 4,
+		}, bar)
+		UiKit.round(fillBar, 3)
+	end
+	local amount = text(
+		card,
+		value,
+		if phone then 12 else 13,
+		P.Text,
+		IronUi.Heading,
+		L.CardW - 12 - valueW,
+		y,
+		valueW,
+		L.Row,
+		Enum.TextXAlignment.Right
+	)
+	amount.ZIndex = 3
+end
+
+local drawProbe
+local function probeRequest(action: string, id: string, bought: boolean)
+	task.spawn(function()
+		local result = GemClient.request(action, id)
+		if bought or not result.Ok then
+			UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
+		end
+		if result.State then
+			state = result.State
+			refreshHud()
+			drawProbe()
+		end
+		if bought and result.Ok then
+			sound(PING, 1.5, 0.4)
+			sound(PING, 2, 0.35, nil, 0.08)
+		end
+	end)
+end
+
+-- What you can do with a pick: its swings (or the free pick's charge) and a button.
+local function cardFooter(card: GuiObject, L, id: string, spec)
+	local owned = state.Picks[id] or 0
+	local offer = ProbeLayout.offer(spec, owned, state.Active == id, coins())
+	local phone = L.Phone
+	local y = L.FootY
+	local width = L.CardW - 24
+	local info = UiKit.fit(text(card, "", if phone then 11 else 12, P.Dim, IronUi.Bold, 12, y, width - 70, 14))
+	local count = text(
+		card,
+		"",
+		if phone then 12 else 13,
+		P.Text,
+		IronUi.Heading,
+		L.CardW - 12 - 80,
+		y - 1,
+		80,
+		16,
+		Enum.TextXAlignment.Right
+	)
+	info.ZIndex, count.ZIndex = 3, 3
+	local track = new("Frame", {
+		Position = UDim2.fromOffset(12, y + 18),
+		Size = UDim2.fromOffset(width, 6),
+		BackgroundColor3 = TRACK,
+		ClipsDescendants = true,
+		ZIndex = 3,
+	}, card)
+	UiKit.round(track, 3)
+	local fillBar = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = spec.Color, ZIndex = 4 }, track)
+	UiKit.round(fillBar, 3)
+	local buttonY, buttonH = y + 30, L.ButtonH
+	local textSize = if phone then 13 else 15
+
+	if offer.Kind == "Charge" then
+		-- The free pick: its charge, live (refreshCharge).
+		local next =
+			new("Frame", { BackgroundColor3 = ChargeMeter.Charging, BackgroundTransparency = 0.55, ZIndex = 4 }, track)
+		local status = nil
+		if state.Active == id then
+			status = text(
+				card,
+				"",
+				if phone then 11 else 12,
+				P.Dim,
+				IronUi.Body,
+				12,
+				buttonY,
+				width,
+				buttonH,
+				Enum.TextXAlignment.Center
+			)
+			status.TextWrapped = true
+			status.ZIndex = 3
+		else
+			probeButton(card, "TAKE IN HAND", spec.Color, true, 12, buttonY, width, buttonH, textSize, function()
+				probeRequest("OutpostEquipPick", id, false)
+			end)
+		end
+		probeCharge = {
+			set = function(swings: number, nextIn: number?, progress: number)
+				local full = nextIn == nil
+				local color = if full then ChargeMeter.Charged else ChargeMeter.Charging
+				info.Text = if full then "⚡ CHARGED" else "⚡ CHARGING"
+				info.TextColor3 = color
+				count.Text = string.format("%d / %d", swings, ChargeMeter.Full)
+				count.TextColor3 = if swings > 0 then P.Text else P.Bad
+				local share = math.clamp(swings / ChargeMeter.Full, 0, 1)
+				fillBar.Size = UDim2.fromScale(share, 1)
+				fillBar.BackgroundColor3 = color
+				next.Visible = not full
+				next.Position = UDim2.fromScale(share, 0)
+				next.Size = UDim2.fromScale(math.clamp(progress, 0, 1) / ChargeMeter.Full, 1)
+				if status then
+					status.Text = ChargeMeter.status(swings, nextIn)
+					status.TextColor3 = if full then ChargeMeter.Charged else P.Dim
+				end
+			end,
+		}
+		return
+	end
+
+	local short = offer.Short
+	local afford = short <= 0
+	local function buy()
+		if afford then
+			probeRequest("OutpostBuyPick", id, true)
+		else
+			UiKit.toast(string.format("You need %s more coins.", commas(short)), P.Bad)
+		end
+	end
+	local need = string.format("NEED ◆ %s MORE", commas(short))
+	if offer.Kind == "Buy" then
+		info.Text = "NOT OWNED"
+		count.Text = "◆ " .. commas(spec.Price)
+		count.TextColor3 = P.Gold
+		probeButton(
+			card,
+			if afford then "BUY" else need,
+			spec.Color,
+			afford,
+			12,
+			buttonY,
+			width,
+			buttonH,
+			textSize,
+			buy
+		)
+		return
+	end
+	info.Text = "SWINGS LEFT"
+	count.Text = commas(owned)
+	fillBar.Size = UDim2.fromScale(math.clamp(owned / math.max(spec.Swings, owned), 0.03, 1), 1)
+	if offer.Kind == "Refill" then
+		probeButton(
+			card,
+			if afford then "REFILL  ◆ " .. commas(spec.Price) else need,
+			spec.Color,
+			afford,
+			12,
+			buttonY,
+			width,
+			buttonH,
+			textSize,
+			buy
+		)
+	else
+		-- Take it in hand, or top it up.
+		local refillW = math.floor(width * 0.36)
+		probeButton(
+			card,
+			"TAKE IN HAND",
+			spec.Color,
+			true,
+			12,
+			buttonY,
+			width - refillW - 6,
+			buttonH,
+			textSize,
+			function()
+				probeRequest("OutpostEquipPick", id, false)
+			end
+		)
+		probeButton(
+			card,
+			"+ ◆ " .. commas(spec.Price),
+			spec.Color,
+			afford,
+			L.CardW - 12 - refillW,
+			buttonY,
+			refillW,
+			buttonH,
+			if phone then 11 else 12,
+			buy
+		)
+	end
+end
+
+local function pickCard(L, index: number, id: string)
+	local spec = Rules.Picks[id]
+	local active = state.Active == id
+	local owned = (state.Picks[id] or 0) > 0
+	local phone = L.Phone
+	local card = new("Frame", {
+		Name = "Pick" .. id,
+		Position = UDim2.fromOffset((index - 1) * (L.CardW + L.Gap), 0),
+		Size = UDim2.fromOffset(L.CardW, L.CardH),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		ClipsDescendants = true,
+	}, probeBody)
+	UiKit.round(card, 12)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(spec.Color:Lerp(CARD_TOP, 0.84), CARD_TOP:Lerp(Color3.new(), 0.3)),
+	}, card)
+	new("UIStroke", {
+		Color = if active then spec.Color else spec.Color:Lerp(P.Edge, 0.5),
+		Transparency = if active then 0 else 0.45,
+		Thickness = if active then 2 else 1,
+	}, card)
+
+	-- The art: the pick turning in a pool of its own light.
+	local art = new("Frame", {
+		Name = "Art",
+		Size = UDim2.new(1, 0, 0, L.ArtH),
+		BackgroundColor3 = spec.Color,
+		BackgroundTransparency = 0.82,
+		ZIndex = 2,
+	}, card)
+	UiKit.round(art, 12)
+	new("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.2),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, art)
+	-- A soft glow (rings fading out) and a shadow for it to stand over.
+	for ring, share in { 1.25, 0.9, 0.55 } do
+		local glow = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(L.ArtH * share, L.ArtH * share),
+			BackgroundColor3 = spec.Color,
+			BackgroundTransparency = (if active then 0.9 else 0.93) - ring * 0.012,
+			ZIndex = 2,
+		}, art)
+		UiKit.round(glow, L.ArtH)
+	end
+	local shadow = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -4),
+		Size = UDim2.fromOffset(L.ArtH * 0.9, math.max(4, L.ArtH * 0.07)),
+		BackgroundColor3 = Color3.new(),
+		BackgroundTransparency = 0.6,
+		ZIndex = 2,
+	}, art)
+	UiKit.round(shadow, L.ArtH)
+	pickView(art, id, spec, L.ArtH)
+	pill(art, spec.Tag or "", spec.Color, false, false, if phone then 9 else 10)
+	if active then
+		pill(art, "IN HAND", spec.Color, true, true, if phone then 9 else 10)
+	elseif owned then
+		pill(art, "OWNED", P.Good, false, true, if phone then 9 else 10)
+	end
+
+	local name = UiKit.fit(
+		text(
+			card,
+			spec.Name,
+			if phone then 17 else 21,
+			spec.Color:Lerp(Color3.new(1, 1, 1), 0.25),
+			Enum.Font.GothamBlack,
+			12,
+			L.NameY,
+			L.CardW - 24,
+			if phone then 20 else 24
+		)
+	)
+	name.ZIndex = 3
+	if not phone then
+		local blurb =
+			UiKit.fit(text(card, spec.Blurb or "", 12, P.Dim, IronUi.Body, 12, L.NameY + 25, L.CardW - 24, 16))
+		blurb.ZIndex = 3
+	end
+
+	-- Against the best pick the Probe sells.
+	local best = { Swings = 0, Power = 0, Crit = 0 }
+	for _, other in Rules.Picks do
+		best.Swings, best.Power, best.Crit =
+			math.max(best.Swings, other.Swings), math.max(best.Power, other.Power), math.max(best.Crit, other.Crit)
+	end
+	local y = L.StatsY
+	statRow(card, L, y, "SWINGS", tostring(spec.Swings), spec.Swings / best.Swings, spec.Color)
+	statRow(card, L, y + L.Row, "POWER", "×" .. spec.Power, spec.Power / best.Power, spec.Color)
+	statRow(
+		card,
+		L,
+		y + L.Row * 2,
+		"CRIT",
+		string.format("+%d%%", math.floor(spec.Crit * 100 + 0.5)),
+		if best.Crit > 0 then spec.Crit / best.Crit else 0,
+		spec.Color
+	)
+	cardFooter(card, L, id, spec)
+end
+
+-- The player market, under the picks.
+local function marketBanner(L)
+	local phone = L.Phone
+	local w, h = L.W - L.Side * 2, L.MarketH
+	local banner = new("TextButton", {
+		Name = "Market",
+		Text = "",
+		AutoButtonColor = false,
+		Position = UDim2.fromOffset(0, L.CardH + L.Gap),
+		Size = UDim2.fromOffset(w, h),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+	}, probeBody)
+	UiKit.round(banner, 12)
+	new("UIGradient", {
+		Color = ColorSequence.new(P.Gold:Lerp(CARD_TOP, 0.8), CARD_TOP),
+	}, banner)
+	new("UIStroke", { Color = P.Gold, Transparency = 0.55, Thickness = 1 }, banner)
+	IronUi.highlight(banner)
+	local open = function()
+		probe.Gui.Enabled = false
+		require(script.Parent.MarketBoardUI).open()
+	end
+	banner.Activated:Connect(open)
+	local chip = if phone then 28 else 38
+	local icon = new("Frame", {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 10, 0.5, 0),
+		Size = UDim2.fromOffset(chip, chip),
+		BackgroundColor3 = P.Gold:Lerp(CARD_TOP, 0.65),
+		ZIndex = 2,
+	}, banner)
+	UiKit.round(icon, chip)
+	new("UIStroke", { Color = P.Gold, Transparency = 0.4, Thickness = 1 }, icon)
+	local glyph =
+		text(icon, "🤝", if phone then 14 else 19, P.Text, IronUi.Body, 0, 0, chip, chip, Enum.TextXAlignment.Center)
+	glyph.ZIndex = 3
+	local buttonW, buttonH = if phone then 112 else 156, if phone then 30 else 38
+	local left = 10 + chip + 10
+	local room = w - left - buttonW - 20
+	local title = text(
+		banner,
+		"PLAYER MARKET",
+		if phone then 13 else 15,
+		P.Gold,
+		Enum.Font.GothamBlack,
+		left,
+		if phone then 4 else 9,
+		room,
+		if phone then 16 else 20
+	)
+	title.ZIndex = 2
+	local sub = text(
+		banner,
+		"Buy, sell and trade gems and gear with other miners.",
+		if phone then 11 else 12,
+		P.Dim,
+		IronUi.Body,
+		left,
+		if phone then 21 else 30,
+		room,
+		15
+	)
+	sub.ZIndex = 2
+	probeButton(
+		banner,
+		"OPEN MARKET",
+		P.Gold,
+		true,
+		w - buttonW - 10,
+		math.floor((h - buttonH) / 2),
+		buttonW,
+		buttonH,
+		if phone then 12 else 15,
+		open
+	)
+end
+
+function drawProbe()
 	probeBody:ClearAllChildren()
 	probeCharge = nil
 	if not state then
 		return
 	end
+	local screen = probe.Gui.AbsoluteSize
+	local L = ProbeLayout.design(screen.X, screen.Y)
+	local phone = L.Phone
+	probe.Resize(L.W, L.H)
+	probe.Subtitle.Text = if phone then "Picks, and the player market." else PROBE_SUBTITLE
+	probe.Subtitle.Size = UDim2.new(0, L.W - 69 - 64 - 132 - 16, 0, 16)
+	probeBody.Position = UDim2.fromOffset(L.Side, L.Top)
+	probeBody.Size = UDim2.new(1, -L.Side * 2, 1, -L.Top)
+	probeCoins = coins()
+	walletLabel.Text = "◆ " .. commas(probeCoins)
 	for i, id in Rules.PickOrder do
-		local spec = Rules.Picks[id]
-		local owned = state.Picks[id] or 0
-		local box = new("Frame", {
-			Position = UDim2.fromOffset((i - 1) * 244, 0),
-			Size = UDim2.fromOffset(230, 250),
-			BackgroundColor3 = Color3.fromRGB(20, 26, 42),
-		}, probeBody)
-		UiKit.round(box, 8)
-		new(
-			"UIStroke",
-			{ Color = spec.Color, Transparency = if state.Active == id then 0 else 0.6, Thickness = 2 },
-			box
-		)
-		text(box, spec.Name, 20, spec.Color, IronUi.Heading, 14, 12, 210, 24)
-		text(
-			box,
-			if spec.Price > 0
-				then string.format("%d swings", spec.Swings)
-				else string.format("%d swings · recharges", spec.Swings),
-			14,
-			Color3.new(1, 1, 1),
-			IronUi.Bold,
-			14,
-			44,
-			210,
-			18
-		)
-		text(
-			box,
-			if spec.Power > 1 then "Chips 2 layers a swing" else "Chips 1 layer a swing",
-			13,
-			Color3.fromRGB(200, 214, 235),
-			IronUi.Body,
-			14,
-			66,
-			210,
-			16
-		)
-		text(
-			box,
-			string.format("Crit chance +%d%%", math.floor(spec.Crit * 100 + 0.5)),
-			13,
-			Color3.fromRGB(200, 214, 235),
-			IronUi.Body,
-			14,
-			86,
-			210,
-			16
-		)
-		text(
-			box,
-			if spec.Price == 0
-				then string.format("Free · +1 swing every %d min", Rules.FreeSwingSeconds // 60)
-				elseif owned > 0 then string.format("You have: %d swings", owned)
-				else "You have none",
-			13,
-			if owned > 0 then P.Good else Color3.fromRGB(150, 160, 180),
-			IronUi.Bold,
-			14,
-			112,
-			210,
-			16
-		)
-		if spec.Price > 0 then
-			local buy = IronUi.gemButton(box, string.format("BUY  %d COINS", spec.Price), spec.Color, function()
-				task.spawn(function()
-					local result = GemClient.request("OutpostBuyPick", id)
-					UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
-					if result.State then
-						state = result.State
-						refreshHud()
-						drawProbe()
-					end
-					if result.Ok then
-						sound(PING, 1.5, 0.4)
-						sound(PING, 2, 0.35, nil, 0.08)
-					end
-				end)
-			end)
-			buy.Position, buy.Size = UDim2.fromOffset(14, 150), UDim2.fromOffset(202, 38)
-		else
-			probeCharge = ChargeMeter.new(box, 14, 144, 202)
-		end
-		if owned > 0 and state.Active ~= id then
-			local equip = IronUi.gemButton(box, "TAKE IN HAND", Color3.fromRGB(110, 120, 140), function()
-				task.spawn(function()
-					local result = GemClient.request("OutpostEquipPick", id)
-					if result.State then
-						state = result.State
-						refreshHud()
-						drawProbe()
-					end
-				end)
-			end)
-			equip.Position, equip.Size = UDim2.fromOffset(14, 198), UDim2.fromOffset(202, 36)
-		elseif state.Active == id then
-			text(box, "IN HAND", 14, spec.Color, IronUi.Bold, 14, 206, 210, 20)
-		end
+		pickCard(L, i, id)
 	end
-	local market = IronUi.gemButton(probeBody, "OPEN THE MARKET  ·  BUY, SELL & TRADE", P.Gold, function()
-		probe.Gui.Enabled = false
-		require(script.Parent.MarketBoardUI).open()
-	end)
-	market.Position, market.Size = UDim2.fromOffset(0, 266), UDim2.fromOffset(720, 44)
+	marketBanner(L)
+	refreshCharge()
 end
+-- Coins changed while it's open (a sale, a payout): redraw what you can afford.
+GemClient.Changed:Connect(function()
+	if probe.Gui.Enabled and probeCoins ~= coins() then
+		drawProbe()
+	end
+end)
+-- A phone turned, a window resized: the design for the new screen.
+probe.Gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	if probe.Gui.Enabled then
+		drawProbe()
+	end
+end)
 function OutpostScene.openProbe()
 	probe.Gui.Enabled = true
-	probe.Fit()
 	drawProbe()
-	refreshCharge()
 end
 
 -- Prompts: rocks, the Probe, the gate, other miners -----------------------------------------------------

@@ -672,6 +672,7 @@ export type Window = {
 	Subtitle: TextLabel,
 	Fit: () -> (),
 	Dock: (number?) -> (),
+	Resize: (number, number) -> (),
 }
 
 --[[
@@ -816,12 +817,11 @@ function IronUi.window(
 	subtitle.ZIndex = 3
 
 	-- Close: a quiet round button in the top-right corner (as in the Store).
+	-- Its X is drawn (two crossed bars): Gotham has no "✕", which shows as a
+	-- box in game.
 	local close = new("TextButton", {
-		Text = "✕",
+		Text = "",
 		AutoButtonColor = false,
-		Font = IronUi.Bold,
-		TextSize = 16,
-		TextColor3 = P.Dim,
 		BackgroundColor3 = Color3.fromRGB(20, 25, 37),
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -18, 0, 16),
@@ -830,12 +830,30 @@ function IronUi.window(
 	}, panel)
 	corner(close, UDim.new(0.5, 0))
 	close:SetAttribute("UiSound", "Back")
+	local bars = {}
+	for _, angle in { 45, -45 } do
+		local bar = new("Frame", {
+			Name = "Cross",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(14, 2),
+			Rotation = angle,
+			BackgroundColor3 = P.Dim,
+			ZIndex = 6,
+		}, close)
+		corner(bar, UDim.new(0, 1))
+		table.insert(bars, bar)
+	end
 	close.MouseEnter:Connect(function()
-		close.TextColor3 = P.Text
+		for _, bar in bars do
+			bar.BackgroundColor3 = P.Text
+		end
 		close.BackgroundColor3 = Color3.fromRGB(27, 34, 50)
 	end)
 	close.MouseLeave:Connect(function()
-		close.TextColor3 = P.Dim
+		for _, bar in bars do
+			bar.BackgroundColor3 = P.Dim
+		end
 		close.BackgroundColor3 = Color3.fromRGB(20, 25, 37)
 	end)
 
@@ -853,6 +871,13 @@ function IronUi.window(
 		fit()
 	end
 
+	-- A new design size (e.g. a phone layout), scaled to fit like the first.
+	local function resize(w: number, h: number)
+		width, height = w, h
+		panel.Size = UDim2.fromOffset(w, h)
+		fit()
+	end
+
 	return {
 		Gui = gui,
 		Panel = panel,
@@ -864,6 +889,7 @@ function IronUi.window(
 		Subtitle = subtitle,
 		Fit = fit,
 		Dock = dock,
+		Resize = resize,
 	}
 end
 

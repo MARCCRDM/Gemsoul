@@ -80,9 +80,12 @@ Outpost.Sizes = {
 Outpost.SizeOrder = { "Pebble", "Boulder", "Monolith", "Geode" }
 
 -- Picks: swings before they break, layers per swing, extra crit chance.
+-- Tag and Blurb are what PROBE-7 says about them.
 Outpost.Picks = {
 	Survey = {
 		Name = "Survey Pick",
+		Tag = "STARTER",
+		Blurb = "Free. Refills while you're away.",
 		Swings = 60,
 		Power = 1,
 		Crit = 0,
@@ -91,6 +94,8 @@ Outpost.Picks = {
 	},
 	Titan = {
 		Name = "Titan Pick",
+		Tag = "TIER II",
+		Blurb = "Lasts longer, lands more crits.",
 		Swings = 160,
 		Power = 1,
 		Crit = 0.08,
@@ -99,6 +104,8 @@ Outpost.Picks = {
 	},
 	Plasma = {
 		Name = "Plasma Drill",
+		Tag = "TIER III",
+		Blurb = "Digs 50% deeper every swing.",
 		Swings = 250,
 		Power = 1.5,
 		Crit = 0.12,
