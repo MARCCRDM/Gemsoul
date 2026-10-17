@@ -6,13 +6,16 @@
 
 	Rocks come in four sizes. Bigger ones take more hits, hide better finds
 	and take longer to grow back once mined out (like ore nodes in an MMO).
-	Swinging wears your pick: every swing costs one point of durability, and
-	a pick at zero breaks. The free Survey Pick regains a swing every
-	FreeSwingSeconds (up to its full 60), so there's a little mining every
-	time you come back; better picks are bought at the Probe.
+	Every swing spends one of your pick's swings. The free Survey Pick
+	regains a swing every FreeSwingSeconds (up to its full 60), so there's a
+	little mining every time you come back; refills (more swings, on top of
+	those) are bought at the Probe.
 
 	  Outpost.Sizes / Outpost.SizeOrder      the rocks
-	  Outpost.Picks / Outpost.PickOrder      the picks
+	  Outpost.Picks / Outpost.PickOrder      the pick (the free Survey Pick)
+	  Outpost.Refills / Outpost.RefillOrder  the swings PROBE-7 sells
+	  Outpost.legacySwings(picks)            swings for picks a save still
+	                                         holds from when the Probe sold them
 	  Outpost.rollSize(roll, zone?)          a new rock's size (a ring's mix), 0 <= roll < 1
 	  Outpost.damage(pick, crit)             how many layers a swing chips
 	  Outpost.tension(hp, maxHp)             0 (fresh) .. 1 (about to pop): how
@@ -79,41 +82,54 @@ Outpost.Sizes = {
 }
 Outpost.SizeOrder = { "Pebble", "Boulder", "Monolith", "Geode" }
 
--- Picks: swings before they break, layers per swing, extra crit chance.
--- Tag and Blurb are what PROBE-7 says about them.
+-- The pick: its full charge, layers per swing, extra crit chance. Tag and
+-- Blurb are what PROBE-7 says about it.
 Outpost.Picks = {
 	Survey = {
 		Name = "Survey Pick",
-		Tag = "STARTER",
-		Blurb = "Free. Refills while you're away.",
+		Tag = "FREE",
+		Blurb = "Recharges itself while you're away.",
 		Swings = 60,
 		Power = 1,
 		Crit = 0,
 		Price = 0,
 		Color = Color3.fromRGB(176, 150, 120),
 	},
-	Titan = {
-		Name = "Titan Pick",
-		Tag = "TIER II",
-		Blurb = "Lasts longer, lands more crits.",
-		Swings = 160,
-		Power = 1,
-		Crit = 0.08,
-		Price = 900,
-		Color = Color3.fromRGB(150, 196, 225),
+}
+Outpost.PickOrder = { "Survey" }
+
+-- What PROBE-7 sells: swings for your pick, on top of its free charge (they
+-- go first; it recharges again once it's back under its full 60).
+Outpost.Refills = {
+	Refill = {
+		Name = "Swing Refill",
+		Tag = "REFILL",
+		Blurb = "A full charge, on top of yours.",
+		Swings = 60,
+		Price = 300,
+		Color = Color3.fromRGB(58, 203, 233),
 	},
-	Plasma = {
-		Name = "Plasma Drill",
-		Tag = "TIER III",
-		Blurb = "Digs 50% deeper every swing.",
-		Swings = 250,
-		Power = 1.5,
-		Crit = 0.12,
-		Price = 2400,
-		Color = Color3.fromRGB(255, 120, 230),
+	Mega = {
+		Name = "Mega Refill",
+		Tag = "MEGA",
+		Blurb = "200 swings, 20% cheaper each.",
+		Swings = 200,
+		Price = 800,
+		Color = Color3.fromRGB(255, 202, 91),
 	},
 }
-Outpost.PickOrder = { "Survey", "Titan", "Plasma" }
+Outpost.RefillOrder = { "Refill", "Mega" }
+
+-- The Probe used to sell better picks. A save that still holds one gets its
+-- swings as extra swings instead (a Plasma Drill's at its 1.5 power).
+Outpost.LegacyPicks = { Titan = 1, Plasma = 1.5 }
+function Outpost.legacySwings(picks: { [string]: number }): number
+	local swings = 0
+	for id, power in Outpost.LegacyPicks do
+		swings += math.floor((picks[id] or 0) * power)
+	end
+	return swings
+end
 
 -- Only basic chunks/boulders spawn in the lobby, including every respawn.
 -- Retain the deeper definitions for other content and saved references.

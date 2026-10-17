@@ -6,11 +6,10 @@
 	      window's own design size. A phone on its side (under 500 tall) gets
 	      a design as wide as its screen and shorter cards, so the window is
 	      drawn near full size and its words stay readable.
-	  ProbeLayout.offer(spec, owned, active, coins) -> { Kind, Short }
-	      what a pick's card offers: "Charge" (the free pick: its charge),
-	      "Buy" (one you don't own), "Refill" (the one in your hand) or
-	      "Hand" (one you own but aren't holding: take it, or top it up), and
-	      how many coins short you are of its price (0 when you can pay).
+	  ProbeLayout.short(price, coins) -> how many coins short you are of a
+	      price (0 when you can pay)
+	  ProbeLayout.saving(refill, base) -> how much less each swing costs in
+	      `refill` than in `base`, as a whole percent (0 when it's no cheaper)
 ]]
 local ProbeLayout = {}
 
@@ -56,15 +55,13 @@ function ProbeLayout.design(screenX: number, screenY: number)
 	return L
 end
 
-function ProbeLayout.offer(spec, owned: number, active: boolean, coins: number)
-	if spec.Price <= 0 then
-		return { Kind = "Charge", Short = 0 }
-	end
-	local short = math.max(0, spec.Price - coins)
-	if owned <= 0 then
-		return { Kind = "Buy", Short = short }
-	end
-	return { Kind = if active then "Refill" else "Hand", Short = short }
+function ProbeLayout.short(price: number, coins: number): number
+	return math.max(0, price - coins)
+end
+
+function ProbeLayout.saving(refill, base): number
+	local each, baseEach = refill.Price / refill.Swings, base.Price / base.Swings
+	return math.max(0, math.floor((1 - each / baseEach) * 100 + 0.5))
 end
 
 return ProbeLayout

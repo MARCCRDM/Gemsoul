@@ -219,7 +219,7 @@ Players whose Roblox language is Spanish see the game in Spanish (neutral Latin 
 
 ## Phones
 
-On a phone on its side (`UiKit.short()`: under 500 points tall), the Inventory is built compact: no stats column, everything else larger. The Market, Store, Season Path, Social and Surge Array windows lay out shorter so they show larger, and every window keeps clear of Roblox's buttons at the top (`UiKit.clearTopbar`). Desktop layouts are unchanged. PROBE-7's window (picks and the market) is as wide as a phone's screen, so it's drawn near full size; see [docs/probe-exchange.md](docs/probe-exchange.md). The lobby and fights are cleared down on a phone: Roblox's chat (top-bar bubble, bubbles over heads) instead of our chat box, level and coins at the top left, no online pill, icon buttons under PLAY, the next task as one slim strip, and no HEAVY button in a fight (hold ATTACK). See [docs/mobile.md](docs/mobile.md).
+On a phone on its side (`UiKit.short()`: under 500 points tall), the Inventory is built compact: no stats column, everything else larger. The Market, Store, Season Path, Social and Surge Array windows lay out shorter so they show larger, and every window keeps clear of Roblox's buttons at the top (`UiKit.clearTopbar`). Desktop layouts are unchanged. PROBE-7's window (swing refills and the market) is as wide as a phone's screen, so it's drawn near full size; see [docs/probe-exchange.md](docs/probe-exchange.md). The lobby and fights are cleared down on a phone: Roblox's chat (top-bar bubble, bubbles over heads) instead of our chat box, level and coins at the top left, no online pill, icon buttons under PLAY, the next task as one slim strip, and no HEAVY button in a fight (hold ATTACK). See [docs/mobile.md](docs/mobile.md).
 
 ## Code layout
 

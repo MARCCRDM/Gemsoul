@@ -33,10 +33,21 @@ function ChargeMeter.read(picks: { [string]: number }?, surveyAt: number?): (num
 	return Rules.surveyCharge(picks and picks.Survey or 0, surveyAt, workspace:GetServerTimeNow())
 end
 
--- "+1 swing in 1:42 · full in 46:00", or "Fully charged".
+-- The swings as a count: "23 / 60", or with refills on top "60 + 140".
+function ChargeMeter.count(swings: number): string
+	if swings > ChargeMeter.Full then
+		return string.format("%d + %d", ChargeMeter.Full, swings - ChargeMeter.Full)
+	end
+	return string.format("%d / %d", swings, ChargeMeter.Full)
+end
+
+-- "+1 swing in 1:42 · full in 46:00", "Fully charged", or with refills on
+-- top "Fully charged · 140 extra" (they're spent first; it recharges after).
 function ChargeMeter.status(swings: number, nextIn: number?): string
 	if not nextIn then
-		return "Fully charged"
+		return if swings > ChargeMeter.Full
+			then string.format("Fully charged · %d extra", swings - ChargeMeter.Full)
+			else "Fully charged"
 	end
 	local fullIn = nextIn + (ChargeMeter.Full - swings - 1) * Rules.FreeSwingSeconds
 	return string.format("+1 swing in %s · full in %s", Rules.clock(nextIn), Rules.clock(fullIn))
@@ -109,7 +120,7 @@ function ChargeMeter.new(parent: GuiObject, x: number, y: number, w: number)
 		title.Text = if full
 			then (if short then "⚡ CHARGED" else "⚡ FREE PICK CHARGED")
 			else (if short then "⚡ CHARGING" else "⚡ FREE PICK CHARGING")
-		count.Text = string.format("%d / %d", swings, ChargeMeter.Full)
+		count.Text = ChargeMeter.count(swings)
 		count.TextColor3 = if swings > 0 then P.Text else P.Bad
 		status.Text = ChargeMeter.status(swings, nextIn)
 		status.TextColor3 = if full then ChargeMeter.Charged else P.Dim

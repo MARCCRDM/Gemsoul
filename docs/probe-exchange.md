@@ -1,48 +1,69 @@
 # PROBE-7 Exchange
 
 PROBE-7 is the crashed survey probe on the Outpost's east side. Walk up and
-press E to open its window, where you can buy, refill and swap picks, or open
-the player market.
+press E, or run out of swings, to open its window. There you can buy refills
+(more swings for your pick) or open the player market.
 
-![The Exchange: a Titan Pick in hand](probe/desktop.png)
+![The Exchange: the free pick nearly empty, both refills affordable](probe/desktop.png)
 
-## The window
+## Your pick and its swings
 
-- **One card per pick.** Each shows:
-  - the pick itself in 3D, in its tier's colour (a pick skin is looks
-    only);
-  - its tier (STARTER, TIER II, TIER III) and a line about it;
-  - Swings, Power and Crit as bars against the best pick, so they're easy
-    to compare.
-- **The pick in your hand** has a lit border and an IN HAND tag. Other picks
-  you own are tagged OWNED.
-- **Your coins** sit at the top right, beside the close button. They update
-  while the window is open.
-- **The player market** is the strip under the cards. Tap it or OPEN MARKET.
+Everyone mines with the free Survey Pick. Each swing spends one of its
+swings. It recharges by itself, one swing every 2 minutes, up to its full
+charge of 60. The Probe doesn't sell other picks. It sells refills.
 
-## What a card offers
+## Refills
 
-| Card | Shows | Button |
-| --- | --- | --- |
-| The free Survey Pick | Its charge, live, and when the next swing comes | TAKE IN HAND (when it isn't in your hand) |
-| A pick you don't own | NOT OWNED and its price | BUY |
-| The pick in your hand | Swings left | REFILL ◆ price (adds a full load of swings) |
-| A pick you own but aren't holding | Swings left | TAKE IN HAND, and + ◆ price to top it up |
+| Refill | Swings | Price | Each swing |
+| --- | --- | --- | --- |
+| Swing Refill | +60 (a full charge) | ◆ 300 | ◆ 5 |
+| Mega Refill | +200 | ◆ 800 | ◆ 4 (20% less) |
 
-When you can't afford a pick, its button is greyed out and says how much
-you're short, for example "NEED ◆ 600 MORE". Tapping it explains that too.
+- A refill adds its swings on top of what you have, past the full 60. The
+  window shows that as "60 + 120".
+- Bought swings are spent first. The free pick starts recharging again once
+  it's back under 60.
+- Refills stack, so you can buy as many as you like.
+- Each refill card shows:
+  - the swings it adds;
+  - the price of each swing;
+  - what you'll have after buying, as a number and on the bar (grey for
+    what you have, the refill's colour for what it adds);
+  - BUY.
+- When you can't afford a refill, its button is greyed out and says how
+  much you're short, for example "NEED ◆ 40 MORE".
 
-![A new player: the free pick charging, nothing affordable yet](probe/desktop-new-player.png)
+![Short of coins: both buttons say how much more you need](probe/desktop-short-of-coins.png)
 
-![Every pick owned: refill the Plasma Drill, or take another in hand](probe/desktop-every-pick.png)
+![Refills on top of a full charge: 60 + 120](probe/desktop-extra-swings.png)
+
+The free pick's card shows:
+- its charge, live;
+- when the next swing comes and when it'll be full;
+- any extra swings you've bought.
+
+Your coins sit at the top right and update while the window is open. The
+player market is the banner under the cards.
+
+### Picks from before
+
+The Probe used to sell the Titan Pick and the Plasma Drill. A save that still
+holds one gets its swings as extra swings on the free pick, the next time it
+loads. A Plasma Drill's swings count 1.5 times, for its old power.
+
+## Running out
+
+With no swings left, a swing at a rock says when the next free swing comes
+and opens the Probe: "Free pick recharging: +1 swing in 1:42. Buy a refill at
+PROBE-7 to keep mining."
 
 ## Phones
 
 On a short screen (a phone on its side, under 500 points tall) the window
-is as wide as the screen. Its cards are shorter: a smaller pick, no line
-about it. It's drawn at about full size, so the text stays readable and the
-buttons are 40 points tall. It sits below Roblox's buttons at the top. The
-window redraws if the screen turns or resizes while it's open.
+is as wide as the screen. Its cards are shorter: no line under the name, and
+a refill's saving moves into its "each" row. It's drawn at about full size,
+so the text stays readable and the buttons are 40 points tall. It sits below
+Roblox's buttons at the top, and redraws if the screen turns while it's open.
 
 ![An 844 x 390 phone](probe/phone.png)
 
@@ -57,25 +78,34 @@ when the Spanish runs longer.
 
 ## The close button
 
-Every window built with `IronUi.window` (this one, and the others that share
-it) now draws its X from two crossed bars. Gotham has no "✕" character, so
-in the game it showed as an empty box.
+Every window built with `IronUi.window` draws its X from two crossed bars.
+Gotham has no "✕" character, so in the game it showed as an empty box.
 
 ## Code and tests
 
+- `src/shared/Outpost.luau`:
+  - `Refills` and `RefillOrder` (what the Probe sells);
+  - `Picks` (the free pick only);
+  - `LegacyPicks` and `legacySwings` (picks a save still holds).
+- `src/server/Systems/OutpostServer.luau`:
+  - `buyRefill` (the `OutpostBuyRefill` request: near the Probe, paid in
+    coins, swings added on top);
+  - `record`, which turns old picks into swings.
 - `src/client/Modules/OutpostScene.luau`: the window (`drawProbe`,
-  `pickCard`, `cardFooter`, `marketBanner`, `pickView`).
+  `pickCard`, `refillCard`, `marketBanner`).
 - `src/client/Modules/ProbeLayout.luau`: where everything sits on each
-  screen (`design`) and what each card offers (`offer`). It has no Roblox
-  dependencies, so it's tested on its own.
-- `src/shared/Outpost.luau`: each pick's `Tag` and `Blurb`.
-- `src/client/Modules/IronUi.luau`: the drawn close X, and `Resize`, which
-  gives a window a new design size (the phone layout).
-- `tests/probe_layout_cases.luau` (run with `tests/run_probe_layout.py`)
-  checks:
-  - on ten screen sizes, from 1920 x 1080 down to 568 x 320, the cards,
-    stats, buttons and market fit;
-  - phones draw the window at 90% or more, with buttons at least 36 points
-    tall;
-  - each card's offer;
-  - every pick has a tag and a one-line blurb.
+  screen, how short you are of a price, and what a bigger refill saves. It
+  has no Roblox dependencies, so it's tested on its own.
+- `src/client/Modules/ChargeMeter.luau`: `count` and `status` show extra
+  swings ("60 + 120", "Fully charged · 120 extra"). They're used by the
+  dashboard and the Inventory too.
+- `tests/outpost_cases.luau` checks that:
+  - a refill only sells at the Probe, charges its price and adds its swings;
+  - refills stack past the full charge;
+  - picks can't be bought;
+  - a refill you can't afford takes nothing;
+  - an old save's Titan and Plasma swings become extra swings.
+- `tests/probe_layout_cases.luau` (`tests/run_probe_layout.py`) checks that:
+  - the window fits on ten screen sizes;
+  - phones draw it near full size with tappable buttons;
+  - prices, savings and every card's line are right.

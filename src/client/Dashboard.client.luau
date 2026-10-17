@@ -325,7 +325,7 @@ local function refreshMining(profile)
 	local outpost = profile.Outpost
 	local charged, nextIn = ChargeMeter.read(outpost and outpost.Picks, outpost and outpost.SurveyAt)
 	local color = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
-	pickValue.Text = string.format("%d/%d", charged, ChargeMeter.Full)
+	pickValue.Text = ChargeMeter.count(charged)
 	pickValue.TextColor3 = if charged > 0 then Color3.new(1, 1, 1) else P.Bad
 	if pickCaption then
 		pickCaption.Text = if nextIn then "FREE PICK  +" .. OutpostRules.clock(nextIn) else "FREE PICK  FULL"

@@ -9,8 +9,8 @@
 	  "OutpostHit", nodeId     swing at a rock (wears your pick; the last hit
 	                           pops it and pays out one gem, never coins or
 	                           gear; refused while the gem pouch is full)
-	  "OutpostBuyPick", id     buy a pick at the Probe (coins)
-	  "OutpostEquipPick", id   take a pick you own in hand
+	  "OutpostBuyRefill", id   buy swings at the Probe (Outpost.Refills, coins),
+	                           on top of the free pick's charge
 	  "OutpostState"           your picks and record
 
 	Rocks are shared: a rock's first hitter keeps it while they keep
@@ -59,13 +59,21 @@ local lastSwing: { [Player]: number } = {}
 local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
--- A player's Outpost record, the free pick's regained swings added, a
--- working pick in hand.
+-- A player's Outpost record, the free pick's regained swings added.
 local function record(profile)
 	profile.Outpost = profile.Outpost or { Picks = {}, Active = "Survey", Rocks = 0 }
 	local o = profile.Outpost
 	o.Picks = o.Picks or {}
 	o.Rocks = o.Rocks or 0
+	-- Picks the Probe no longer sells (it sells refills): their swings
+	-- become extra swings on the free pick.
+	local legacy = Rules.legacySwings(o.Picks)
+	for id in Rules.LegacyPicks do
+		o.Picks[id] = nil
+	end
+	if legacy > 0 then
+		o.Picks.Survey = (o.Picks.Survey or 0) + legacy
+	end
 	if o.SurveyAt == nil then
 		-- A new miner (or one from before the refill) starts with it full.
 		o.Picks.Survey = math.max(o.Picks.Survey or 0, Rules.Picks.Survey.Swings)
@@ -74,14 +82,8 @@ local function record(profile)
 	swings, o.SurveyAt = Rules.refillSurvey(o.Picks.Survey or 0, o.SurveyAt or os.time(), os.time())
 	-- (A worn-out pick stays gone until a swing comes back.)
 	o.Picks.Survey = if swings > 0 then swings else o.Picks.Survey
-	if (o.Picks[o.Active] or 0) <= 0 then
-		for i = #Rules.PickOrder, 1, -1 do
-			local id = Rules.PickOrder[i]
-			if (o.Picks[id] or 0) > 0 then
-				o.Active = id
-				break
-			end
-		end
+	if not Rules.Picks[o.Active] then
+		o.Active = Rules.PickOrder[1]
 	end
 	return o
 end
@@ -437,11 +439,11 @@ local function hit(player: Player, nodeId: any)
 		local _, nextIn = Rules.surveyCharge(o.Picks.Survey or 0, o.SurveyAt or os.time(), os.time())
 		return reply(
 			false,
-			if pickId == "Survey" and nextIn
+			if nextIn
 				then "Free pick recharging: +1 swing in "
 					.. Rules.clock(nextIn)
-					.. ". Buy a pick at the Probe to keep mining."
-				else "Your pick is broken! Get a new one at the Probe.",
+					.. ". Buy a refill at PROBE-7 to keep mining."
+				else "Out of swings! Buy a refill at PROBE-7.",
 			{ NoPick = true, State = stateOf(player) }
 		)
 	end
@@ -510,42 +512,33 @@ local function nearProbe(player: Player): boolean
 	return root ~= nil and site ~= nil and (root.Position - site.Probe.Position).Magnitude <= 40
 end
 
-local function buy(player: Player, pickId: any)
-	local pick = type(pickId) == "string" and Rules.Picks[pickId] or nil
-	if not pick or pick.Price <= 0 then
+-- A refill at PROBE-7: swings on top of the free pick's charge (its charge
+-- brought up to now first). They're spent first, and it recharges again
+-- once it's back under its full charge.
+local function buyRefill(player: Player, refillId: any)
+	local refill = type(refillId) == "string" and Rules.Refills[refillId] or nil
+	if not refill then
 		return reply(false, "The Probe doesn't sell that.")
 	end
 	if not nearProbe(player) then
-		return reply(false, "Visit the Probe to buy picks.")
+		return reply(false, "Visit the Probe to buy refills.")
 	end
 	local profile = PlayerData.get(player)
-	if not profile or not PlayerData.spendCoins(player, pick.Price) then
+	if not profile or not PlayerData.spendCoins(player, refill.Price) then
 		return reply(false, "Not enough coins.")
 	end
 	local o = record(profile)
-	o.Picks[pickId] = (o.Picks[pickId] or 0) + pick.Swings
-	o.Active = pickId
+	o.Picks.Survey = (o.Picks.Survey or 0) + refill.Swings
+	o.Active = "Survey"
 	if player:GetAttribute("Outpost") then
 		pickModel(player)
 	end
 	PlayerData.sync(player)
-	return reply(true, pick.Name .. " ready: " .. pick.Swings .. " swings.", { State = stateOf(player) })
-end
-
-local function equip(player: Player, pickId: any)
-	local profile = PlayerData.get(player)
-	if not profile or type(pickId) ~= "string" or not Rules.Picks[pickId] then
-		return reply(false, "Pick not found.")
-	end
-	local o = record(profile)
-	if (o.Picks[pickId] or 0) <= 0 then
-		return reply(false, "You don't have that pick.")
-	end
-	o.Active = pickId
-	if player:GetAttribute("Outpost") then
-		pickModel(player)
-	end
-	return reply(true, Rules.Picks[pickId].Name .. " in hand.", { State = stateOf(player) })
+	return reply(
+		true,
+		string.format("+%d swings! You have %d.", refill.Swings, o.Picks.Survey),
+		{ State = stateOf(player) }
+	)
 end
 
 local function enter(player: Player)
@@ -813,8 +806,7 @@ function OutpostServer.start()
 	Shop.register("OutpostEnter", enter)
 	Shop.register("OutpostLeave", leave)
 	Shop.register("OutpostHit", hit)
-	Shop.register("OutpostBuyPick", buy)
-	Shop.register("OutpostEquipPick", equip)
+	Shop.register("OutpostBuyRefill", buyRefill)
 	Shop.register("OutpostSecret", secret)
 	Shop.register("OutpostState", function(player)
 		return reply(true, "", { State = stateOf(player) })

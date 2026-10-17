@@ -1,7 +1,7 @@
 -- PROBE-7's window (ProbeLayout): on every screen its cards, stats and
 -- buttons fit, a phone's is drawn near full size with buttons big enough to
--- tap, and each card offers the right thing (buy, refill, take in hand, the
--- free pick's charge). The picks it sells say what they are.
+-- tap, it knows how short you are of a price and what a bigger refill
+-- saves, and the pick and the refills it sells say what they are.
 local checks = 0
 local function check(value, message)
 	checks += 1
@@ -57,28 +57,28 @@ do
 	check(L.W * s <= x and L.H * s <= y, name .. ": the window runs off the screen")
 end
 
--- What each card offers.
-local Survey, Titan = Rules.Picks.Survey, Rules.Picks.Titan
-local o = Layout.offer(Survey, 23, true, 0)
-check(o.Kind == "Charge" and o.Short == 0, "The free pick isn't its charge")
-check(Layout.offer(Survey, 60, false, 0).Kind == "Charge", "The free pick out of hand isn't its charge")
-o = Layout.offer(Titan, 0, false, 300)
-check(o.Kind == "Buy" and o.Short == Titan.Price - 300, "A pick you can't afford doesn't say how short you are")
-o = Layout.offer(Titan, 0, false, Titan.Price)
-check(o.Kind == "Buy" and o.Short == 0, "Exactly the price wasn't enough")
-o = Layout.offer(Titan, 112, true, 5000)
-check(o.Kind == "Refill" and o.Short == 0, "The pick in hand isn't a refill")
-o = Layout.offer(Titan, 112, false, 100)
-check(o.Kind == "Hand" and o.Short == Titan.Price - 100, "A pick you own but aren't holding isn't take-in-hand")
+-- What you're short of a price, and how much a bigger refill saves.
+check(Layout.short(300, 890) == 0 and Layout.short(300, 300) == 0, "Enough coins came up short")
+check(Layout.short(800, 260) == 540, "Coins short of a price are wrong")
+local Refill, Mega = Rules.Refills.Refill, Rules.Refills.Mega
+check(Layout.saving(Refill, Refill) == 0, "A refill saves against itself")
+check(Layout.saving(Mega, Refill) == 20, "The Mega Refill doesn't save 20% a swing: " .. Layout.saving(Mega, Refill))
+check(Layout.saving({ Swings = 10, Price = 100 }, Refill) == 0, "A dearer refill shows a saving")
 
--- Every pick the Probe sells says what it is, in a line that fits a card.
-for _, id in Rules.PickOrder do
-	local spec = Rules.Picks[id]
-	check(type(spec.Tag) == "string" and #spec.Tag > 0, id .. " has no tier tag")
+-- The pick and every refill say what they are, in a line that fits a card.
+local cards = { Rules.Picks.Survey }
+for _, id in Rules.RefillOrder do
+	table.insert(cards, Rules.Refills[id])
+end
+check(#cards == 3, "The Probe doesn't show the pick and two refills")
+for _, spec in cards do
+	check(type(spec.Tag) == "string" and #spec.Tag > 0, spec.Name .. " has no tag")
 	check(
-		type(spec.Blurb) == "string" and #spec.Blurb > 0 and #spec.Blurb <= 34,
-		id .. "'s line is missing or too long"
+		type(spec.Blurb) == "string" and #spec.Blurb > 0 and #spec.Blurb <= 36,
+		spec.Name .. "'s line is missing or too long"
 	)
 end
 
-print("PASS: " .. checks .. " Probe window checks (every screen fits, phones near full size, offers, pick lines)")
+print(
+	"PASS: " .. checks .. " Probe window checks (every screen fits, phones near full size, prices, savings, card lines)"
+)

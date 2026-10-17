@@ -255,12 +255,20 @@ check(
 		and counts.Geode > 0,
 	"Rock sizes aren't weighted rarest-last"
 )
-check(
-	Rules.damage("Survey", false) == 1
-		and Rules.damage("Survey", true) == 2
-		and Rules.damage("Plasma", false) == Rules.Picks.Plasma.Power,
-	"Swing damage wrong"
-)
+check(Rules.damage("Survey", false) == 1 and Rules.damage("Survey", true) == 2, "Swing damage wrong")
+-- PROBE-7 sells refills (swings), not picks; each is cheaper by the swing
+-- the bigger it is, and every pick a save held from before turns into swings.
+check(#Rules.PickOrder == 1 and Rules.Picks.Survey.Price == 0, "The Probe sells picks again")
+for i, id in Rules.RefillOrder do
+	local refill = Rules.Refills[id]
+	check(refill.Swings > 0 and refill.Price > 0, id .. " refill incomplete")
+	local before = Rules.Refills[Rules.RefillOrder[i - 1]]
+	check(
+		not before or refill.Price / refill.Swings < before.Price / before.Swings,
+		id .. " isn't cheaper by the swing than the smaller refill"
+	)
+end
+check(Rules.legacySwings({ Titan = 100, Plasma = 40, Survey = 7 }) == 160, "Old picks didn't turn into swings")
 check(
 	Rules.tension(10, 10) == 0 and Rules.tension(0, 10) == 1 and math.abs(Rules.tension(3, 4) - 0.25) < 1e-9,
 	"Tension wrong"
@@ -664,7 +672,7 @@ check(profiles[ana].Outpost.Picks[profiles[ana].Outpost.Active] == swingsBefore,
 check(nextRock.Hp == nextRock.MaxHp, "A refused swing chipped the rock")
 profiles[ana].Gems = nil
 
--- A pick wears out and breaks; then the Probe sells another.
+-- A pick wears out and breaks; then the Probe sells refills.
 profiles[ana].Outpost.Picks.Survey = 1
 profiles[ana].Outpost.SurveyAt = 86400 * 20000 + math.floor(now) -- (no swings regained meanwhile)
 advance(Rules.ClaimSeconds + 1)
@@ -675,24 +683,45 @@ check((synced[ana] or 0) > syncsBeforeBreak, "A broken pick didn't sync the prof
 advance(1)
 local broken = handlers.OutpostHit(ana, nextRock.Id)
 check(not broken.Ok and broken.NoPick, "Mined with a broken pick")
-check(not handlers.OutpostBuyPick(ana, "Titan").Ok, "Bought a pick away from the Probe")
+check(not handlers.OutpostBuyRefill(ana, "Refill").Ok, "Bought a refill away from the Probe")
 anaRoot.CFrame = R.CFrame.new(site.Probe.CFrame.Position + R.Vector3.new(0, 0, 6))
 local coins = profiles[ana].Coins
-local bought = handlers.OutpostBuyPick(ana, "Titan")
-check(bought.Ok and profiles[ana].Coins == coins - Rules.Picks.Titan.Price, "Buying a pick didn't charge for it")
+local Refill, Mega = Rules.Refills.Refill, Rules.Refills.Mega
+local bought = handlers.OutpostBuyRefill(ana, "Refill")
+check(bought.Ok and profiles[ana].Coins == coins - Refill.Price, "A refill didn't charge for it")
 check(
-	bought.State.Active == "Titan" and bought.State.Picks.Titan == Rules.Picks.Titan.Swings,
-	"The bought pick isn't in hand"
+	bought.State.Active == "Survey" and bought.State.Picks.Survey == Refill.Swings,
+	"A refill didn't put its swings in the pick"
 )
-check(not handlers.OutpostBuyPick(ana, "Survey").Ok, "The free pick was for sale")
+-- Refills stack past the full charge (the extra goes first).
+local mega = handlers.OutpostBuyRefill(ana, "Mega")
+check(mega.Ok and mega.State.Picks.Survey == Refill.Swings + Mega.Swings, "Refills don't stack")
+check(not handlers.OutpostBuyRefill(ana, "Survey").Ok, "The free pick was for sale")
+check(not handlers.OutpostBuyRefill(ana, "Titan").Ok, "The Probe still sells picks")
 profiles[ana].Coins = 10
-check(not handlers.OutpostBuyPick(ana, "Plasma").Ok, "Bought a pick without the coins")
+check(not handlers.OutpostBuyRefill(ana, "Mega").Ok, "Bought a refill without the coins")
+check(profiles[ana].Coins == 10, "A refused refill took coins")
 -- Time passes: the free pick regains its swings.
 profiles[ana].Outpost.Picks.Survey = 0
 profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * 5
 check(handlers.OutpostState(ana).State.Picks.Survey == 5, "The free pick didn't regain swings over time")
 profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * Rules.Picks.Survey.Swings
 check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings, "The free pick didn't refill")
+
+-- A save from when the Probe sold picks: their swings become extra swings
+-- on the free pick, which is back in hand.
+profiles[ben].Outpost = {
+	Picks = { Survey = 10, Titan = 100, Plasma = 40 },
+	Active = "Plasma",
+	Rocks = 3,
+	SurveyAt = 86400 * 20000 + math.floor(now),
+}
+local migrated = handlers.OutpostState(ben).State
+check(
+	migrated.Picks.Survey == 10 + 100 + 60 and migrated.Picks.Titan == nil and migrated.Picks.Plasma == nil,
+	"An old save's picks didn't turn into swings"
+)
+check(migrated.Active == "Survey", "An old save kept a pick the Probe doesn't sell in hand")
 
 -- The secrets are retired: none hidden, none to find. The Motor Pool has
 -- its mech bays.
@@ -729,5 +758,5 @@ check(
 print(
 	"PASS: "
 		.. checks
-		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe, free pick charge, retired secrets, mech bays, enter/leave)"
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave)"
 )
