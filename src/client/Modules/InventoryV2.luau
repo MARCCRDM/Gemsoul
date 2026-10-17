@@ -1103,7 +1103,8 @@ local function buildRight(canvas: Frame)
 		openDetail(nil)
 	end)
 	ui.Strip = {}
-	local sx = 40
+	-- (compact, a little tighter: R ran past the card into the grid's column)
+	local sx, group = if COMPACT then 34 else 40, if COMPACT then 4 else 8
 	for _, slot in Slots.Order do
 		local tile = new("TextButton", {
 			Name = "Hop" .. slot,
@@ -1135,10 +1136,10 @@ local function buildRight(canvas: Frame)
 		})
 		sx += 38
 		if slot == "Boots" then
-			sx += 8
+			sx += group
 		end
 	end
-	sx += 8
+	sx += group
 	for _, key in KEYS do
 		local tile = new("TextButton", {
 			Name = "Hop" .. key,
@@ -1222,64 +1223,57 @@ local function buildRight(canvas: Frame)
 	end
 	ui.PieceWell = well(RIGHT_W * 0.27, false)
 	ui.GemWell = well(RIGHT_W * 0.73, true)
+	-- (a key: either well opens the gem window on that gem, with all three of
+	-- its moves)
+	local function openKeyGem()
+		local gem = ui.KeyGem
+		if gem and ui.Popups then
+			GemVault.open(ui.Popups, gem.SourceId or gem.Id, InventoryV2.beginGemDrag)
+		end
+	end
 	ui.PieceWell.Tap.Activated:Connect(function()
-		if state.Detail and not table.find(KEYS, state.Detail) then
+		if not state.Detail then
+			return
+		elseif table.find(KEYS, state.Detail) then
+			openKeyGem()
+		else
 			state.Tab, state.Pick, state.Hover = "Pieces", nil, nil
 			draw()
 		end
 	end)
 	ui.GemWell.Tap.Activated:Connect(function()
-		state.Tab, state.Pick, state.Hover = "Gems", nil, nil
-		draw()
+		if state.Detail and table.find(KEYS, state.Detail) then
+			openKeyGem()
+		else
+			state.Tab, state.Pick, state.Hover = "Gems", nil, nil
+			draw()
+		end
 	end)
 	ui.Plus = text(card, "+", 18, C.Faint, HEADING)
 	ui.Plus.AnchorPoint = Vector2.new(0.5, 0.5)
 	place(ui.Plus, RIGHT_W / 2, 68, 30, 30)
 	ui.Plus.Position = UDim2.fromOffset(RIGHT_W / 2, 68)
 	ui.Plus.TextXAlignment = Enum.TextXAlignment.Center
-	-- The surge view (a key): one big icon on the left, words on the right.
-	ui.SurgeIcon = frame(card, C.Ink, 0.4)
-	place(ui.SurgeIcon, 18, 18, 100, 100)
-	round(ui.SurgeIcon, 14)
-	ui.SurgeIconEdge = stroke(ui.SurgeIcon, C.Line, 1.5, 0.6)
-	ui.SurgeGlyph = text(ui.SurgeIcon, "", 34, C.Faint, HEADING)
-	ui.SurgeGlyph.Size = UDim2.fromScale(1, 1)
-	ui.SurgeGlyph.TextXAlignment = Enum.TextXAlignment.Center
-	ui.SurgeName = place(text(card, "", 18, C.Text, HEAVY), 134, 30, RIGHT_W - 150, 24)
-	ui.SurgeMeta = place(text(card, "", 10, C.Dim, HEADING), 134, 58, RIGHT_W - 150, 14)
-	ui.SurgeMeta.RichText = true
-	ui.SurgeGem = place(text(card, "", 11, C.Dim, HEADING), 134, 80, RIGHT_W - 150, 30)
-	ui.SurgeGem.TextWrapped = true
-	ui.SurgeGem.TextYAlignment = Enum.TextYAlignment.Top
-	-- The triad: a read-only display of the gem's three traits, with this key lit.
-	ui.TraitStrip = new("Frame", { Name = "Traits", BackgroundTransparency = 1, Visible = false }, card)
-	place(ui.TraitStrip, 18, 124, RIGHT_W - 36, 40)
-	ui.TraitChips = {}
-	local chipW = math.floor((RIGHT_W - 36 - 12) / 3)
-	for i, key in KEYS do
-		local chip = new("Frame", {
-			Name = "Trait" .. key,
-			BackgroundColor3 = C.Ink,
-			BackgroundTransparency = 0.5,
-		}, ui.TraitStrip)
-		place(chip, (i - 1) * (chipW + 6), 0, chipW, 40)
-		round(chip, 8)
-		local edge = stroke(chip, C.Line, 1, 0.5)
-		local badge = text(chip, key, 11, C.Ink, HEAVY)
-		place(badge, 7, 11, 18, 18)
-		badge.TextXAlignment = Enum.TextXAlignment.Center
-		badge.BackgroundTransparency = 0
-		round(badge, 4)
-		local lane = place(text(chip, "", 8, C.Dim, HEAVY), 31, 5, chipW - 36, 11)
-		local name = place(text(chip, "", 11, C.Text, HEADING), 31, 18, chipW - 36, 16)
-
-		local entry = { Chip = chip, Edge = edge, Badge = badge, Lane = lane, Name = name, Key = key }
-		ui.TraitChips[key] = entry
-	end
+	-- A key: the square holds the move's icon, with the key on its corner, and
+	-- the round one the gem it comes from (as a piece and its gem).
+	ui.MoveGlyph = text(ui.PieceWell.Holder, "", 34, C.Faint, HEADING)
+	place(ui.MoveGlyph, 6, 6, 88, 88)
+	ui.MoveGlyph.TextXAlignment = Enum.TextXAlignment.Center
+	round(ui.MoveGlyph, 8)
+	ui.KeyBadge = text(ui.PieceWell.Holder, "", 13, C.Ink, HEAVY)
+	place(ui.KeyBadge, -7, -7, 26, 26)
+	ui.KeyBadge.TextXAlignment = Enum.TextXAlignment.Center
+	ui.KeyBadge.BackgroundTransparency = 0
+	ui.KeyBadge.ZIndex = 4
+	round(ui.KeyBadge, 7)
 	-- The perk band (or the surge's description).
 	local rule = frame(card, C.Line, 0.92)
 	place(rule, 18, 170, RIGHT_W - 36, 1)
 	ui.PerkName = place(text(card, "", 10, C.Gold, HEADING), 18, 182, RIGHT_W - 36, 14)
+	-- (a key: its cost, cooldown and output, on the right of that line)
+	ui.PerkStats = place(text(card, "", 10, C.Dim, HEADING), 128, 182, RIGHT_W - 146, 14)
+	ui.PerkStats.TextXAlignment = Enum.TextXAlignment.Right
+	UiKit.fit(ui.PerkStats)
 	ui.PerkText = place(text(card, "", 12, C.Dim, BODY), 18, 198, RIGHT_W - 36, 30)
 	ui.PerkText.TextWrapped = true
 	ui.PerkText.TextYAlignment = Enum.TextYAlignment.Top
@@ -2238,36 +2232,6 @@ local function drawFilters(show: boolean)
 end
 
 -- The words in the compare box, and the two buttons.
--- The trait strip shows the gem's existing moves and highlights the current key.
-function InventoryV2.drawTraits(gem, key: string?)
-	local strip = ui.TraitStrip
-	if not strip then
-		return
-	end
-	local traits = gem and triadOn(loadoutNow()) and Traits.traitsOf(gem)
-	strip.Visible = traits ~= nil
-	if not traits then
-		return
-	end
-	for k, entry in ui.TraitChips do
-		local lit = k == key
-		local color = KEY_COLORS[k]
-		local move = Tech.Catalog[traits[Traits.Lanes[k]] or ""]
-		entry.Badge.BackgroundColor3 = if lit then color else C.Faint
-		entry.Name.Text = if move then move.Name else "?"
-		-- Smaller for the long names, so the whole name fits the chip.
-		local length = #entry.Name.Text
-		entry.Name.TextSize = if length <= 11 then 11 elseif length <= 13 then 10 else 9
-		entry.Name.TextColor3 = if lit then C.Text else C.Dim
-		entry.Lane.Text = LANE_WORDS[k] .. (if move and move.Rare then "  ★" else "") -- (★ a signature move: rolls at half the odds)
-		entry.Lane.TextColor3 = if lit then color else C.Faint
-		entry.Chip.BackgroundColor3 = if lit then color:Lerp(C.Ink, 0.8) else C.Ink
-		entry.Chip.BackgroundTransparency = if lit then 0.1 else 0.5
-		entry.Edge.Color = if lit then color else C.Line
-		entry.Edge.Transparency = if lit then 0.15 else 0.6
-	end
-end
-
 function InventoryV2.drawCompare()
 	if not ui.Compare then
 		return
@@ -2438,66 +2402,102 @@ local function drawDetail(loadout)
 	end
 	paintStrip(loadout)
 	local isKey = table.find(KEYS, target) ~= nil
-	if not isKey then
-		InventoryV2.drawTraits(nil)
-	end
-	for _, name in { "PieceWell", "GemWell" } do
-		ui[name].Holder.Visible = not isKey
-		ui[name].Name.Visible = not isKey
-		ui[name].Sub.Visible = not isKey
-	end
-	ui.Plus.Visible = not isKey
-	ui.SurgeIcon.Visible = isKey
-	ui.SurgeName.Visible = isKey
-	ui.SurgeMeta.Visible = isKey
-	ui.SurgeGem.Visible = isKey
+	-- (both show the same two wells: a key's move and its gem, or a piece and
+	-- its gem)
+	ui.PieceWell.Art.Visible = not isKey
+	ui.MoveGlyph.Visible = isKey
+	ui.KeyBadge.Visible = isKey
+	ui.PerkStats.Visible = isKey
+	ui.PerkText.RichText = isKey
+	ui.PerkText.TextSize = if COMPACT then 13 else 12
 	local pick = state.Pick
 	local gold = C.Gold:ToHex()
 	if isKey then
+		local triad = triadOn(loadout)
 		local current = Tech.surgeGem(loadout, target)
 		local trying = if pick and pick.Kind == "Gem" then keyGem(pick.Gem, target, loadout) else nil
 		local gem = trying or current
 		local surge = gem and Tech.surgeStats(gem)
 		local tint = if gem then gemColor(gem) else C.Faint
-		ui.SurgeName.Text = if surge then surge.Name else "No surge on " .. target
-		ui.SurgeMeta.Text = (if trying then string.format('<font color="#%s">TRYING ON</font>  ·  ', gold) else "")
-			.. (if surge
-				then string.format(
-					'<font color="#%s">%s</font>  ·  %s %s  ·  %s S%s',
-					tint:ToHex(),
-					string.upper(GemConfig.elementName(gem.Element)),
-					whole(surge.Cost or 0),
-					string.upper(surge.Resource or "Charge"),
-					whole(surge.Cooldown or 0),
-					if surge.Triad then string.format("  ·  %s%% OUTPUT", whole((surge.Output or 1) * 100)) else ""
-				)
-				else "PICK A GEM BELOW")
-		ui.SurgeGem.Text = if trying and current then "Replaces " .. gemName(current) .. " on " .. target
-			elseif gem then "From " .. GemConfig.displayName(gem)
-			else ""
-		ui.SurgeIconEdge.Color = if trying then C.Gold else tint
-		local shown = if gem then gem.Id .. tostring(gem.Surge) else ""
-		if ui.SurgeShown ~= shown then
-			ui.SurgeShown = shown
-			ui.SurgeGlyph.Text = if surge then "◆" else "+"
-			ui.SurgeGlyph.TextColor3 = tint
-			local art = ui.SurgeGlyph:FindFirstChild("AbilityArt")
-			if art then
-				art:Destroy()
-			end
+		local keyColor = if triad then KEY_COLORS[target] else C.Gold
+		ui.KeyGem = gem
+		-- The move: only this key's, its icon with the key on the corner.
+		local well = ui.PieceWell
+		local shown = if surge then gem.Id .. tostring(gem.Surge) else ""
+		if ui.MoveShown ~= shown then
+			ui.MoveShown = shown
+			ui.MoveGlyph.Text = if surge then "◆" else ""
+			ui.MoveGlyph.TextColor3 = tint
 			if surge then
-				SurgeIcons.apply(ui.SurgeGlyph, surge, tint)
+				SurgeIcons.apply(ui.MoveGlyph, surge, tint)
+			else
+				local art = ui.MoveGlyph:FindFirstChild("AbilityArt")
+				if art then
+					art:Destroy()
+				end
 			end
 		end
-		ui.PerkName.Text = if surge
-			then (if surge.Flourished and surge.Flourish then "WHAT IT DOES  ·  LEGENDARY FLOURISH" else "WHAT IT DOES")
+		well.Empty.Visible = surge == nil
+		well.Edge.Color = if trying then C.Gold elseif surge then keyColor else C.Line
+		well.Edge.Transparency = if trying then 0 elseif surge then 0.2 else 0.85
+		ui.KeyBadge.Text = target
+		ui.KeyBadge.BackgroundColor3 = keyColor
+		well.Name.Text = if surge then surge.Name else "No surge on " .. target
+		-- (★ a signature move: it rolls at half the odds)
+		local move = gem and Tech.Catalog[gem.Surge or ""]
+		well.Sub.Text = target
+			.. "  ·  "
+			.. (if triad then LANE_WORDS[target] else "SURGE")
+			.. (if move and move.Rare then "  ·  ★" else "")
+		well.Sub.TextColor3 = keyColor
+		-- The gem it comes from.
+		local gw = ui.GemWell
+		local gemKey = if gem then gem.Id .. ":" .. tostring(gem.Cut) else ""
+		if gw.Key ~= gemKey then
+			gw.Key = gemKey
+			clear(gw.Art)
+			if gem then
+				gemArt(gw.Art, gem)
+			end
+		end
+		gw.Empty.Visible = gem == nil
+		gw.Edge.Color = if trying then C.Gold elseif gem then tint else C.Line
+		gw.Edge.Transparency = if gem then 0 else 0.85
+		gw.Name.Text = if gem then gemName(gem)
+			elseif triad then "No gem in your " .. string.lower(Traits.SocketNames[target])
+			else "Empty socket"
+		if trying then
+			gw.Sub.Text = "TRYING ON"
+			gw.Sub.TextColor3 = C.Gold
+		else
+			gw.Sub.Text = if gem
+				then string.upper(GemConfig.elementName(gem.Element)) .. "  ·  " .. rarityName(gemRarity(gem))
+				else "PICK ONE BELOW"
+			gw.Sub.TextColor3 = if gem then tint else C.Dim
+		end
+		-- What it does, with its cost, cooldown and output on the right.
+		ui.PerkName.Text = if surge then "WHAT IT DOES" else ""
+		ui.PerkStats.Text = if surge
+			then string.format(
+				"%s %s  ·  %ss%s",
+				whole(surge.Cost or 0),
+				string.upper(surge.Resource or "Charge"),
+				whole(surge.Cooldown or 0),
+				if surge.Triad then string.format("  ·  %s%% OUTPUT", whole((surge.Output or 1) * 100)) else ""
+			)
 			else ""
+		-- (a Legendary gem's flourish: a gold line under it)
+		local flourish = if surge and surge.Flourished and surge.Flourish then surge.Flourish.Text else nil
 		ui.PerkText.Text = if surge
-			then (surge.Description or "") .. (if surge.Flourished and surge.Flourish then "  " .. surge.Flourish.Text else "")
-			elseif triadOn(loadout) then string.format("%s fires the %s of the gem in your %s. Any cut gem fits.", target, string.lower(Traits.Lanes[target]), string.lower(Traits.SocketNames[target]))
+			then (surge.Description or "")
+				.. (if flourish then string.format('\n<font color="#%s">✦ %s</font>', gold, flourish) else "")
+			elseif triad then string.format("%s fires the %s of the gem in your %s. Any cut gem fits.", target, string.lower(Traits.Lanes[target]), string.lower(Traits.SocketNames[target]))
 			else "Surges are cast with Q, E and R in a fight. Any cut gem with a surge fits."
-		InventoryV2.drawTraits(gem, target)
 		ui.PerkText.Size = UDim2.fromOffset(RIGHT_W - 36, 60)
+		-- (compact, a little smaller for the longest, so four lines hold it)
+		if COMPACT and surge and #(surge.Description or "") + #(flourish or "") > 130 then
+			ui.PerkText.TextSize = 11
+		end
 		ui.PerkValue.Text = ""
 		drawTabs({ { "Gems", if triadOn(loadout) then string.upper(Traits.SocketNames[target]) .. " GEMS" else "SURGE GEMS" } })
 		drawFilters(true)
