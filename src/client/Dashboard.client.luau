@@ -83,8 +83,9 @@ for index = 0, 14 do
 end
 -- The layout is designed at 1432x720 (wide and short, to suit landscape
 -- screens) and scaled to fit the screen, below
--- Roblox's own top bar (its menu buttons sit in the top-left corner).
-local TOPBAR = 54
+-- Roblox's own top bar (its menu buttons sit in the top-left corner; its
+-- height is UiKit.topbar's).
+local TOPBAR = 58
 -- A strip along the bottom stays clear for the chat bar (left) and the
 -- owner's DEV button (right), so neither covers the panels.
 local BOTTOM = 36
@@ -109,6 +110,8 @@ local function fit()
 	-- the DEV button sits up top), so the panels can be bigger.
 	local phone = screen.Y > 0 and screen.Y < 500
 	local bottom = if phone then 6 else BOTTOM
+	TOPBAR = (UiKit.topbar(screen.X))
+	safe.Position = UDim2.fromOffset(0, TOPBAR)
 	safe.Size = UDim2.new(1, 0, 1, -TOPBAR - bottom)
 	if buildTag then
 		buildTag.Visible = not phone and InventoryV2.version(player) ~= 2
@@ -118,6 +121,7 @@ local function fit()
 	end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+UiKit.onTopbar(fit)
 fit()
 
 -- Shared pieces ---------------------------------------------------------------------------------------------

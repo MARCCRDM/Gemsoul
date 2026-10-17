@@ -779,6 +779,7 @@ function IronUi.window(
 		end
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+	UiKit.onTopbar(fit)
 	-- Pop open (and fade the backdrop in) every time the window is shown.
 	gui:GetPropertyChangedSignal("Enabled"):Connect(function()
 		if not gui.Enabled then

@@ -126,6 +126,19 @@ local function run()
 		gui
 	)
 	UiKit.round(skip, 8)
+	-- The card and SKIP sit just below Roblox's buttons at the top of the
+	-- screen (and the DEV button at its right end, for testers).
+	local function cardTop(): number
+		return UiKit.topbar(gui.AbsoluteSize.X) + 6
+	end
+	local function clearTop()
+		skip.Position = UDim2.new(1, -14, 0, cardTop())
+		if card.Position.Y.Scale == 0 then
+			card.Position = UDim2.new(0.5, 0, 0, cardTop())
+		end
+	end
+	local stopTopbar = UiKit.onTopbar(clearTop)
+	clearTop()
 	local marker = new(
 		"Highlight",
 		{ FillColor = GOLD, FillTransparency = 0.7, OutlineColor = GOLD, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop },
@@ -357,7 +370,7 @@ local function run()
 				CloseInventory = "COMPLETE",
 			})[beat.Id]
 		card.Size = UDim2.fromOffset(math.min(480, size.X - 32), 116)
-		card.Position = UDim2.new(0.5, 0, 0, 52)
+		card.Position = UDim2.new(0.5, 0, 0, cardTop())
 		title.Text = if Input.TouchEnabled then beat.Mobile or beat.Prompt else beat.Prompt
 		body.Text = beat.Detail or ""
 		nextButton.Visible = beat.Id == "GemIntro"
@@ -499,6 +512,7 @@ local function run()
 	animation:Disconnect()
 	pulse:Cancel()
 	marker:Destroy()
+	stopTopbar()
 	gui:Destroy()
 	if not current() then
 		UiKit.toast("Ready! Mine gems and enchant your gear.", GOLD)

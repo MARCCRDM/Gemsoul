@@ -6,6 +6,7 @@ local CollectionService = game:GetService("CollectionService")
 local GemArt = require(script.Parent.GemArt)
 local GearArt = require(script.Parent.GearArt)
 local SurgeIcons = require(script.Parent.SurgeIcons)
+local UiKit = require(script.Parent.UiKit)
 local Guide = {}
 local gold = Color3.fromRGB(255, 206, 91)
 local white = Color3.fromRGB(232, 240, 247)
@@ -78,8 +79,15 @@ function Guide.mount(parent, firstTopic, preview)
 	make("UIGradient",{Rotation=25,Color=ColorSequence.new(Color3.fromRGB(19,42,53),Color3.fromRGB(6,10,18))},background)
 	local canvas=make("Frame",{BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(1120,630)},background)
 	local scale=make("UIScale",{},canvas)
-	local function resize() scale.Scale=math.min(background.AbsoluteSize.X/1120,background.AbsoluteSize.Y/630) end
+	-- (clear of Roblox's buttons at the top of a phone's screen)
+	local function resize()
+		local screen=background.AbsoluteSize
+		local s=math.min(screen.X/1120,screen.Y/630)
+		local room,at=UiKit.clearTopbar(screen,Vector2.new(1120,630)*s)
+		scale.Scale=s*room;canvas.Position=at
+	end
 	local connection=background:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize);resize()
+	local stopTopbar=UiKit.onTopbar(resize)
 	local stage=make("Frame",{BackgroundTransparency=1,Size=UDim2.fromScale(1,1)},canvas)
 	local track=make("Frame",{BackgroundColor3=Color3.fromRGB(42,56,67),BorderSizePixel=0,Position=UDim2.fromOffset(50,605),Size=UDim2.fromOffset(1020,3)},canvas)
 	local fill=make("Frame",{BackgroundColor3=gold,BorderSizePixel=0,Size=UDim2.fromScale(0,1)},track)
@@ -122,7 +130,7 @@ function Guide.mount(parent, firstTopic, preview)
 		local close=make("TextButton",{BackgroundTransparency=1,Text="CLOSE",TextColor3=gold,TextSize=14,Position=UDim2.fromOffset(965,45),Size=UDim2.fromOffset(105,30)},canvas)
 		close.Activated:Connect(function() gui:Destroy() end)
 	end
-	gui.Destroying:Connect(function() connection:Disconnect() end)
+	gui.Destroying:Connect(function() connection:Disconnect();stopTopbar() end)
 	show(current)
 	return {Show=show,SetProgress=function(value) fill.Size=UDim2.fromScale(math.clamp(value,0,1),1) end,Destroy=function() gui:Destroy() end}
 end

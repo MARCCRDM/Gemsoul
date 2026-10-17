@@ -63,26 +63,37 @@ status.Font = Enum.Font.GothamBold
 status.Text = "DEV TOOLS · Onboarding is currently paused."
 status.Parent = panel
 
--- Touch screens: the bottom-right corner is the thumb's (Combat's buttons),
--- and under the top bar sit LEAVE and every window's close button. So the
--- DEV button goes up into the top bar's own strip, at its empty right end,
--- small, and its panel opens downward from there.
+-- Touch screens: the bottom-right corner is the thumb's (Combat's buttons).
+-- So the DEV button goes up into Roblox's top bar strip, at its empty right
+-- end, small, and its panel opens downward from there. That end is kept for
+-- it (UiKit.reserveTopbar): windows that reach into the strip stop short of
+-- it, so it never covers their close buttons.
 if game:GetService("UserInputService").TouchEnabled then
+	local UiKit = require(script.Parent.Modules.UiKit)
 	gui.IgnoreGuiInset = true
-	toggle.AnchorPoint, toggle.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 10)
+	toggle.AnchorPoint, toggle.Position = Vector2.new(1, 0.5), UDim2.new(1, -14, 0, 29)
 	toggle.Size = UDim2.fromOffset(56, 26)
+	UiKit.reserveTopbar(14 + 56)
+	-- (centred on the strip, in line with Roblox's own buttons)
+	local function level()
+		local top = UiKit.topbar(gui.AbsoluteSize.X)
+		toggle.Position = UDim2.new(1, -14, 0, top / 2)
+		panel.Position = UDim2.new(1, -14, 0, top + 4)
+	end
+	UiKit.onTopbar(level)
 	toggle.TextSize = 11
 	toggle.BackgroundTransparency = 0.25
-	panel.AnchorPoint, panel.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 42)
+	panel.AnchorPoint, panel.Position = Vector2.new(1, 0), UDim2.new(1, -14, 0, 62)
 	-- A phone in landscape is shorter than the panel: shrink it to fit.
 	local fit = Instance.new("UIScale")
 	fit.Parent = panel
 	local function shrink()
 		local height = gui.AbsoluteSize.Y
-		fit.Scale = if height > 0 then math.clamp((height - 52) / 394, 0.55, 1) else 1
+		fit.Scale = if height > 0 then math.clamp((height - 70) / 394, 0.55, 1) else 1
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(shrink)
 	shrink()
+	level()
 end
 -- (Plain words: the arrow glyphs this used to show aren't in every phone's font.)
 local function arrow(open: boolean): string

@@ -126,7 +126,7 @@ local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 -- would read too small (a phone), it's built compact instead (see
 -- chooseLayout): 990 x 380, no stats column, everything else larger.
 local W, H = 1600, 840
-local TOPBAR, BOTTOM = 54, 36 -- Roblox's own buttons above; chat and DEV below
+local TOPBAR, BOTTOM = 58, 36 -- Roblox's own buttons above (UiKit.topbar); chat and DEV below
 local RIGHT_X, RIGHT_W = 1170, 390
 local LEFT_X, LEFT_W = 40, 330
 local COMPACT = false
@@ -3031,6 +3031,9 @@ function InventoryV2.mount(host: ScreenGui)
 			return
 		end
 		local screen = gui.AbsoluteSize
+		TOPBAR = (UiKit.topbar(screen.X))
+		safe.Position = UDim2.fromOffset(0, TOPBAR)
+		safe.Size = UDim2.new(1, 0, 1, -TOPBAR - BOTTOM)
 		if screen.X > 0 and screen.Y > TOPBAR + BOTTOM then
 			-- (compact, the canvas can fill the width: keep a gutter at each side)
 			local wide = if COMPACT then screen.X - 32 else screen.X
@@ -3046,6 +3049,7 @@ function InventoryV2.mount(host: ScreenGui)
 		end
 	end
 	host:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+	UiKit.onTopbar(fit)
 	fit()
 	buildStage(canvas)
 	buildTop(canvas)

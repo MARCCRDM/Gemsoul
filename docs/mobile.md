@@ -102,18 +102,78 @@ Every `IronUi.window` also uses nearly all the screen's height on a phone
 
 ### Roblox's buttons
 
-The windows and the Inventory ignore the top bar's inset, so a window that
-fills a phone's height reaches the top of the screen, under Roblox's menu
-and chat buttons. `UiKit.clearTopbar(screen, size)` reads
-`GuiService.TopbarInset` and either moves the window beside the buttons or
-shrinks it to fit below them, whichever leaves it bigger. The Store, every
-`IronUi.window`, the Store's offer pop-up and the Inventory's pop-up layer
-use it. On a desktop screen it does nothing.
+Roblox draws its own buttons in a strip along the top of the screen: the
+Roblox button, then a pill with its menu, chat and voice, on the left. On a
+phone the strip is 58 points tall, and its buttons reach about 265 points in
+from the screen's left edge on a notched phone (about 205 on one without a
+notch). A tap there goes to Roblox, never to us, so nothing of ours may sit
+under them.
+
+A screen that leaves the strip alone (a `ScreenGui`'s default) starts below
+it. The windows, the Inventory and a few overlays draw over it
+(`IgnoreGuiInset`), and those keep themselves clear of the buttons:
+
+| Helper | What it does |
+| --- | --- |
+| `UiKit.topbar(width)` | The strip's height, where Roblox's buttons end, and where its free part ends on the right (less the DEV button's room) |
+| `UiKit.clearTopbar(screen, size)` | A centred box that would reach under the buttons moves beside them or shrinks to fit below them, whichever leaves it bigger. A box already clear stays as it is |
+| `UiKit.onTopbar(fn)` | Calls `fn` when the strip changes: Roblox draws its buttons, opens or closes its menu, or the DEV button comes. Returns a function that stops it |
+| `UiKit.reserveTopbar(width)` | Keeps the strip's right end for our own button (DEV) |
+
+**Why the Wardrobe sat under them.** Roblox fills in
+`GuiService.TopbarInset` a moment after our screens are built. Until then it
+reads empty, so a screen laid out at once (the Inventory's pop-ups, the
+Wardrobe and the Gem Vault among them, and the Store) placed itself as if
+there were no buttons, and never looked again. The Wardrobe's title and
+first tab sat under Roblox's buttons, and its ✕ under the DEV button. Now:
+- an empty reading assumes the usual strip (58 tall, buttons to 290);
+- every screen laid out around the strip lays itself out again when Roblox
+  fills it in (`UiKit.onTopbar`);
+- it applies on every screen size, not only phones. On a desktop or tablet a
+  window that reaches the top is moved down a little.
+
+**What uses it:**
+- every `IronUi.window`, the Store and its offer pop-ups;
+- the Inventory and its pop-ups (Gem Vault, Wardrobe);
+- the dashboard (its top margin is the strip's real height, not a fixed 54);
+- the 1v1 panel between rounds;
+- the mine's top bar (just below the strip where it would reach the buttons);
+- the tutorial's card and SKIP (just below the strip);
+- the loading guide preview.
+
+**The DEV button** (testers, touch screens) sits at the strip's right end,
+centred on it, and keeps that end (`UiKit.reserveTopbar`). A window that
+reaches into the strip stops short of it, so it can't cover a close button.
+
+**Tests.** `tests/run_topbar.py`:
+- checks the rules on six screens (phones, a tablet, a desktop) with seven
+  window sizes: before and after Roblox draws its buttons, with DEV, and
+  with Roblox's menu opened wide;
+- checks that every screen drawn over the strip uses these helpers or is a
+  listed full-screen cover with nothing in the strip: the loading screen, the
+  title screen, the drop pod's flash, damage numbers and the spar flash.
+
+**Renders.** 24 phone renders were drawn with Roblox's buttons and the DEV
+button in place: at 844 x 390, at a notched phone's 726 x 390 safe area and
+at 667 x 375, each both as the buttons appear and after.
+
+- **Before:** with the strip still empty, 10 screens (13 renders) had
+  something of ours under Roblox's buttons or DEV: the Wardrobe, the Gem
+  Vault, every Store tab, the Starter offer, the Season Path, Social, the
+  Market, the Surge Array, the Augment tree and the mine's top bar. On most
+  of them the ✕ sat under DEV.
+- **After:** no button or text is under either, on any of them. What is
+  left in the strip is backdrop: the intro's dark band and the title
+  screen's art.
+
+![Before and after: the Wardrobe, the Store, Social and the mine's HUD on a phone](mobile/topbar-before-after.png)
 
 ### Scale on a phone
 
-How large each screen shows (1 = as drawn), before and after. The renders
-assume Roblox's buttons end 188 points from the left.
+How large each screen shows (1 = as drawn), before and after. These renders
+assumed Roblox's buttons end 188 points from the left; they reach about 265,
+so the windows that reach the top now shrink a little more to sit below
+them (see Roblox's buttons, above).
 
 | Screen | 844 x 390 | 667 x 375 |
 | --- | --- | --- |
@@ -135,6 +195,7 @@ get out from under Roblox's buttons, which it used to sit under.
 | --- | --- |
 | `UiKit.short()` | True on a phone on its side |
 | `UiKit.clearTopbar(screen, size)` | Keeps a centred window clear of Roblox's buttons: returns a further scale and a Position |
+| `UiKit.topbar(width)`, `UiKit.onTopbar(fn)`, `UiKit.reserveTopbar(width)` | The strip Roblox's buttons sit in, a call when it changes, and room in it for DEV (see [Roblox's buttons](#roblox-s-buttons)) |
 | `UiKit.fit(label)` | Keeps a one-line label at its size, shrinking it only when its words don't fit |
 | `UiKit.shrinkRow(row, list)` | Shrinks a row laid out side by side to its parent's width when its contents outgrow it |
 
@@ -149,5 +210,12 @@ get out from under Roblox's buttons, which it used to sit under.
 As in [ui-style.md](ui-style.md): Lune runs the client modules against
 stand-in Roblox services, writes the GUI tree as JSON, and a headless browser
 draws it. 3D models and the world are placeholders. For a phone the
-stand-ins give the screen at 844 x 390 (and 667 x 375), with Roblox's
-buttons drawn as grey shapes at the top left.
+stand-ins give the screen at 844 x 390 (and 667 x 375).
+
+Roblox's buttons are drawn at their real size and place: the Roblox button
+and the menu pill, 44 points tall, to about 262 points across on 844 x 390.
+The DEV button is drawn at its place too. Each screen the windows draw over
+the strip is given its full height; the others start below the strip.
+The renderer lists any button, text or box of ours under either one. Each
+screen is drawn twice: as Roblox's buttons appear (`TopbarInset` empty) and
+after.

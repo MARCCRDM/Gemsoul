@@ -119,13 +119,7 @@ local hud = UiKit.gui("Expedition", 5)
 hud.IgnoreGuiInset = true
 hud.Enabled = false
 local hudScale = new("UIScale", {}, hud)
-local function fitHud()
-	local screen = hud.AbsoluteSize
-	if screen.X > 0 then
-		hudScale.Scale = math.clamp(math.min(screen.X / 1280, screen.Y / 720), 0.6, 1.3)
-	end
-end
-hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitHud)
+local fitHud
 
 local function label(parent: Instance, value: string, size: number, color: Color3, font: Enum.Font?): TextLabel
 	local t = IronUi.text(parent, value, size, color, font or IronUi.Bold)
@@ -170,6 +164,22 @@ local foundText = label(bar, "Nothing yet", 15, Color3.new(1, 1, 1))
 foundText.Position = UDim2.fromOffset(456, 26)
 foundText.Size = UDim2.fromOffset(170, 26)
 foundText.TextYAlignment = Enum.TextYAlignment.Center
+
+-- The whole HUD scales with the screen. The top bar sits at the top, or,
+-- where it would reach Roblox's buttons there (a phone), just below them.
+function fitHud()
+	local screen = hud.AbsoluteSize
+	if screen.X > 0 then
+		local scale = math.clamp(math.min(screen.X / 1280, screen.Y / 720), 0.6, 1.3)
+		hudScale.Scale = scale
+		local top, left, right = UiKit.topbar(screen.X)
+		local half = bar.Size.X.Offset * scale / 2
+		local clear = screen.X / 2 - half >= left + 8 and screen.X / 2 + half <= right - 8
+		bar.Position = UDim2.new(0.5, 0, 0, if clear then 12 else (top + 6) / scale)
+	end
+end
+hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitHud)
+UiKit.onTopbar(fitHud)
 
 -- Bottom right: the way down, and the way home.
 local actions = new("Frame", {

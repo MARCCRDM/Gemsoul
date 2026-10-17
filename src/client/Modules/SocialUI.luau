@@ -1108,13 +1108,19 @@ local pivotLocked = false
 local picked = nil
 local canSwap = false
 
+-- (clear of Roblox's buttons at the top of a phone's screen)
 local function fitPivot()
 	local screen = overlay.AbsoluteSize
 	if screen.X > 0 then
-		pivotScale.Scale = math.min(1, (screen.X - 24) / 620, (screen.Y - 24) / pivotPanel.Size.Y.Offset)
+		local size = pivotPanel.Size
+		local s = math.min(1, (screen.X - 24) / size.X.Offset, (screen.Y - 24) / size.Y.Offset)
+		local room, at = UiKit.clearTopbar(screen, Vector2.new(size.X.Offset, size.Y.Offset) * s)
+		pivotScale.Scale = s * room
+		pivotPanel.Position = at
 	end
 end
 overlay:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPivot)
+UiKit.onTopbar(fitPivot)
 
 local drawPicks
 function drawPicks()

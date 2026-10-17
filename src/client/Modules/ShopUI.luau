@@ -448,6 +448,7 @@ local function fit()
 	end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+UiKit.onTopbar(fit)
 
 -- Header: the name, the categories, an offer while one's open, coins, close.
 local brand = text(panel, "SUPPLY DEPOT", 20, C.Text, BLACK, 28, 14, 210, 26)
@@ -2068,6 +2069,7 @@ local function offerPopup(name: string, key: string)
 		end
 	end
 	popup:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPopup)
+	UiKit.onTopbar(fitPopup)
 	fitPopup()
 	text(card, "SPECIAL OFFER", 11, C.Gold, BOLD, 24, 20, 300, 14)
 	local x = new("TextButton", {

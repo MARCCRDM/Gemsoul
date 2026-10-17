@@ -36,26 +36,86 @@ function UiKit.short(): boolean
 	return size.Y < 500
 end
 
--- A box centred on a screen that ignores the top bar's inset. On a short
--- screen a big box reaches the top, under Roblox's buttons there, so it moves
--- beside them or shrinks to fit below them, whichever leaves it bigger.
+-- Roblox's own buttons along the top of the screen: the Roblox button, then
+-- its menu, chat and voice, on the left. GuiService.TopbarInset is the rest
+-- of that strip: Min.X is where those buttons end, Max.Y how tall it is. It
+-- reads empty for a moment after our screens are built, until Roblox has
+-- drawn them, so until then we assume the usual size; anything laid out
+-- around them listens for the real one (UiKit.onTopbar).
+local ASSUMED_TOP, ASSUMED_LEFT = 58, 290
+local reservedRight = 0 -- (our own button at the strip's right end: DEV)
+local listeners = {}
+local watching = false
+
+-- The strip on a screen `width` wide: its height, where Roblox's buttons on
+-- the left end, and where its free part ends on the right.
+function UiKit.topbar(width: number): (number, number, number)
+	-- (read whole, in a pcall: a screen must never fail to build over this)
+	local ok, height, ends, free = pcall(function()
+		local bar = game:GetService("GuiService").TopbarInset
+		return bar.Max.Y, bar.Min.X, bar.Max.X
+	end)
+	local top, left, right = ASSUMED_TOP, ASSUMED_LEFT, width
+	if ok and type(height) == "number" and height > 0 then
+		top, left = height, ends
+		if free > ends then
+			right = math.min(width, free)
+		end
+	end
+	return top, left, right - reservedRight
+end
+
+local function topbarChanged()
+	for _, fn in listeners do
+		task.spawn(fn)
+	end
+end
+
+-- Calls `fn` whenever the strip changes: Roblox draws its buttons, opens or
+-- closes its menu, or our own button at its end comes or goes. Returns a
+-- function that stops it.
+function UiKit.onTopbar(fn: () -> ()): () -> ()
+	table.insert(listeners, fn)
+	if not watching then
+		watching = true
+		pcall(function()
+			game:GetService("GuiService"):GetPropertyChangedSignal("TopbarInset"):Connect(topbarChanged)
+		end)
+	end
+	return function()
+		local at = table.find(listeners, fn)
+		if at then
+			table.remove(listeners, at)
+		end
+	end
+end
+
+-- Keeps `width` at the strip's right end for our own button (DEV).
+function UiKit.reserveTopbar(width: number)
+	reservedRight = width
+	topbarChanged()
+end
+
+-- A box centred on a screen that ignores the top bar's inset. A big box
+-- reaches the top, under Roblox's buttons there (or our DEV button), so it
+-- moves beside them or shrinks to fit below them, whichever leaves it bigger.
 -- `size` is the box as already scaled to fit. Returns a further scale (1 or
--- less) and the box's Position for an AnchorPoint of 0.5, 0.5.
+-- less) and the box's Position for an AnchorPoint of 0.5, 0.5. Whatever uses
+-- it calls it again on UiKit.onTopbar.
 function UiKit.clearTopbar(screen: Vector2, size: Vector2): (number, UDim2)
 	local centre = UDim2.fromScale(0.5, 0.5)
-	if screen.Y >= 500 then
+	if screen.Y <= 0 then
 		return 1, centre
 	end
-	local ok, bar = pcall(function()
-		return game:GetService("GuiService").TopbarInset
-	end)
-	local top = if ok and bar then bar.Max.Y else 0
-	if top <= 0 or (screen.Y - size.Y) / 2 >= top then
+	local top, left, right = UiKit.topbar(screen.X)
+	left += 8
+	right -= 8
+	-- Clear already: below the strip, or between the buttons at its ends.
+	local edge = (screen.X - size.X) / 2
+	if (screen.Y - size.Y) / 2 >= top or (edge >= left and screen.X - edge <= right) then
 		return 1, centre
 	end
 	-- Beside: between the buttons on the left and any on the right.
-	local left = bar.Min.X + 8
-	local right = (if bar.Max.X > bar.Min.X then bar.Max.X else screen.X) - 8
 	local beside = math.min(1, (right - left) / size.X)
 	-- Below: from the bar down to the screen's edge.
 	local below = math.min(1, (screen.Y - top - 8) / size.Y)
