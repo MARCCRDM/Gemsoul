@@ -31,6 +31,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
+local Seating = require(ReplicatedStorage.Shared.Seating)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
@@ -234,9 +235,9 @@ local function socialPrompts(player: Player, on: boolean)
 	end
 	for _, spec in
 		{
-			{ "OutpostSpar", "Spar", "Ask to spar", Enum.KeyCode.Z, Vector2.new(0, -204), Enum.KeyCode.ButtonY },
-			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G, Vector2.new(0, -120) },
-			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F, Vector2.new(0, -36) },
+			{ "OutpostSpar", "Spar", "Ask to spar", Enum.KeyCode.Z, Enum.KeyCode.ButtonY },
+			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G, Enum.KeyCode.ButtonX },
+			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F, Enum.KeyCode.ButtonB },
 		}
 	do
 		local prompt = Instance.new("ProximityPrompt")
@@ -244,17 +245,14 @@ local function socialPrompts(player: Player, on: boolean)
 		prompt.ActionText = spec[3]
 		prompt.ObjectText = player.DisplayName
 		prompt.KeyboardKeyCode = spec[4]
-		-- (Its own gamepad button where it has one: the others share X.)
-		if spec[6] then
-			prompt.GamepadKeyCode = spec[6]
-		end
+		-- (Each its own gamepad button, so all three stay live together.)
+		prompt.GamepadKeyCode = spec[5]
 		prompt.HoldDuration = 0.25
 		prompt.MaxActivationDistance = 10
 		prompt.RequiresLineOfSight = false
-		-- One above the other (a full prompt's height apart, so they never
-		-- overlap), and all up over the miner rather than down by their feet,
-		-- clear of the lobby's PLAY button and tiles.
-		prompt.UIOffset = spec[5]
+		-- Drawn by the client as one card beside the miner (PlayerCard), not
+		-- as three of Roblox's panels stacked over them.
+		prompt.Style = Enum.ProximityPromptStyle.Custom
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt:SetAttribute("TargetUserId", player.UserId)
 		prompt.Parent = root
@@ -390,7 +388,7 @@ local function hit(player: Player, nodeId: any)
 	-- On foot with your pick, or from a mech's cockpit (Outpost.Machines,
 	-- Mine): bigger strikes, sooner, each spending its swings.
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
+	local seat = Seating.seatOf(humanoid)
 	local machineId = seat and seat:GetAttribute("OutpostMachine")
 	local machine = machineId and Rules.Machines[machineId]
 	local mech = if machine and machine.Mine then seat.Parent else nil

@@ -146,6 +146,9 @@ local function makePlayer(name)
 		return "Workspace." .. name .. ".HumanoidRootPart"
 	end
 	player.Root = root
+	function character:FindFirstChild(name)
+		return if name == "HumanoidRootPart" then root else nil
+	end
 	return player, humanoid
 end
 -- A part welded into a machine's assembly (anchored or not).
@@ -184,10 +187,12 @@ local Rules = load("src/shared/Outpost.luau", { CFrame = R.CFrame, Color3 = R.Co
 local modules = {
 	Rules = { Module = Rules },
 	Remotes = { Module = { MechInput = mechInput, MechReport = mechReport, MechExit=mechExit } },
-	SeatExit = { Module = { detach=function(character)
+	SeatExit = { Module = { detach=function(character, seat)
 		detached+=1
 		local hum=character:FindFirstChildOfClass("Humanoid")
-		getOut(hum.SeatPart,hum)
+		seat = seat or hum.SeatPart
+		seat.Children.SeatWeld = nil
+		getOut(seat,hum)
 	end } },
 	Feedback = {
 		Module = {
@@ -202,7 +207,9 @@ local services = {
 	Players = Players,
 	CollectionService = { AddTag = function() end },
 	ProximityPromptService = { PromptTriggered = promptTriggered },
-	ReplicatedStorage = { Shared = { Outpost = modules.Rules } },
+	ReplicatedStorage = {
+		Shared = { Outpost = modules.Rules, Seating = { Module = load("src/shared/Seating.luau", {}) } },
+	},
 	RunService = { Heartbeat = heartbeat },
 }
 local Vehicles = load("src/server/Systems/OutpostVehicles.luau", {
@@ -500,4 +507,37 @@ check(not Vehicles.exit(other),"Non-pilot could exit another player's mech")
 mechExit.OnServerEvent:Fire(quiet)
 check(detached==1 and mole.Seat.Occupant==nil,"Jump did not detach the pilot on the server")
 check(moleChassis.Drive.PlaneVelocity==R.Vector2.zero,"Exiting kept the mech moving")
+
+-- Seat.Occupant and Humanoid.SeatPart don't replicate, so the side that
+-- didn't seat someone can see either one empty. The pilot is still found,
+-- from whichever is there or from the seat weld itself (Shared.Seating).
+getOut(hauler.Seat, secondHum)
+hold = nil
+local lone, loneHum = makePlayer("Lone")
+check(Vehicles.sit(lone, hauler.Seat), "Couldn't board for the replication checks")
+loneHum.SeatPart = nil -- (the seat's Occupant only)
+check(press(lone, 1, 0), "Input refused with only the seat's Occupant to go on")
+frames(60)
+check(chassis.Drive.PlaneVelocity.Magnitude > 5, "Didn't drive with only the seat's Occupant")
+-- The weld only: neither Occupant nor SeatPart.
+local loneRoot = { Name = "HumanoidRootPart", Parent = lone.Character }
+function lone.Character:FindFirstChild(name)
+	return if name == "HumanoidRootPart" then loneRoot else nil
+end
+local weld = { Name = "SeatWeld", Part0 = hauler.Seat, Part1 = loneRoot }
+function loneRoot:GetJoints()
+	return if hauler.Seat.Children.SeatWeld then { weld } else {}
+end
+hauler.Seat.Children.SeatWeld = weld
+hauler.Seat.Occupant = nil
+check(press(lone, 1, 0), "Input refused with only the seat weld to go on")
+frames(60)
+check(chassis.Drive.PlaneVelocity.Magnitude > 5 and hauler.ServerDriving, "Didn't drive with only the seat weld")
+check(not Vehicles.sit(other, hauler.Seat), "Seated someone over a pilot only the weld shows")
+check(Vehicles.report(lone, "weld only"), "A pilot only the weld shows couldn't report")
+check(Vehicles.exit(lone) and detached == 2, "A pilot only the weld shows couldn't get out")
+hold = nil
+check(not Vehicles.input(lone, 1, 0), "Input taken after getting out")
+frames(30)
+check(chassis.Drive.PlaneVelocity == R.Vector2.zero, "The mech kept going after its pilot got out")
 print("PASS: " .. checks .. " outpost vehicle checks")

@@ -1,10 +1,18 @@
 -- Break the physical seat connection before moving a character to another world.
 local SeatExit = {}
 
-function SeatExit.detach(character: Model)
+-- `seat` when the caller knows it. Otherwise it's found from the body: the
+-- server can see no SeatPart for someone it seated (Shared.Seating).
+function SeatExit.detach(character: Model, seat: Instance?)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
-	if not seat then return end
+	seat = seat or (humanoid and humanoid.SeatPart)
+	if not seat and humanoid then
+		local ok, found = pcall(function()
+			return require(game:GetService("ReplicatedStorage").Shared.Seating).seatOf(humanoid)
+		end)
+		seat = if ok then found else nil
+	end
+	if not seat or not humanoid then return end
 	-- Setting Sit alone waits for the humanoid/physics update. The SeatWeld
 	-- must be gone synchronously, before PivotTo can drag the whole assembly.
 	for _, joint in seat:GetChildren() do

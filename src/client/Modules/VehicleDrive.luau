@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local Seating = require(ReplicatedStorage.Shared.Seating)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
@@ -197,7 +198,7 @@ end
 local function refreshHud()
 	local hidden = menuOpen()
 	gui.Enabled = driving ~= nil and driving.Seat.Parent ~= nil
-		and driving.Seat.Occupant == driving.Humanoid and not blocked() and not hidden
+		and Seating.sits(driving.Humanoid, driving.Seat) and not blocked() and not hidden
 	if driving and hidden then
 		driving.Speed = 0
 		tellServer(0, 0)
@@ -226,8 +227,9 @@ end
 local function begin(seat: VehicleSeat, humanoid: Humanoid)
 	if blocked() then finish(); return end
 	if driving and driving.Seat == seat and driving.Humanoid == humanoid then return end
-	-- Seated and Occupant can arrive in separate replication updates.
-	if not seat.Parent or seat.Occupant ~= humanoid then return end
+	-- (The server seats you, so this screen can see no Occupant: Seating
+	-- reads the seat weld too. It can also arrive a little after Seated.)
+	if not seat.Parent or not Seating.sits(humanoid, seat) then return end
 	local kind = seat:GetAttribute("OutpostMachine")
 	local spec = Rules.Machines[kind]
 	local chassis = seat.Parent and seat.Parent:FindFirstChild("Chassis") :: BasePart?
@@ -264,7 +266,7 @@ end
 local function resumeSeat()
 	if driving or blocked() then return end
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
+	local seat = Seating.seatOf(humanoid)
 	if seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
 		begin(seat, humanoid)
 	end
@@ -342,7 +344,7 @@ function VehicleDrive.step(dt: number)
 	if not d then
 		return
 	end
-	if blocked() or not d.Seat.Parent or d.Seat.Occupant ~= d.Humanoid then
+	if blocked() or not d.Seat.Parent or not Seating.sits(d.Humanoid, d.Seat) then
 		finish()
 		return
 	end

@@ -42,7 +42,7 @@ local function mech(x,partial)
  function m:Load()
   self.Chassis={Position=Vector3.new(x,0,0),CFrame=CFrame.new(x,0,0),AssemblyLinearVelocity=Vector3.new(0,0,-24),AssemblyAngularVelocity=Vector3.zero}
   function self.Chassis:IsDescendantOf() return m.InWorld end
-  self.Seat={Occupant={},GetAttribute=function() return "Hauler" end}
+  self.Seat={Occupant={},GetAttribute=function() return "Hauler" end,FindFirstChild=function() return nil end}
   for _,name in {"Waist","LeftHip","LeftKnee","LeftAnkle","RightHip","RightKnee","RightAnkle","LeftShoulder","LeftElbow","RightShoulder","RightElbow"} do
    local j={Name=name,Transform=nil}
    function j:IsA(kind) return kind=="Motor6D" end
@@ -64,8 +64,9 @@ local services={CollectionService=CollectionService,ReplicatedStorage={},RunServ
 local game={GetService=function(_,name) return services[name] end}
 '''
 source += "local Motion=(function()\n" + (ROOT / "src/shared/MechMotion.luau").read_text() + "\nend)()\n"
+source += "local Seating=(function()\n" + (ROOT / "src/shared/Seating.luau").read_text() + "\nend)()\n"
 code = (ROOT / "src/client/Modules/MechAnimation.luau").read_text()
-code = re.sub(r'^local Motion = require\([^\n]+\)\n', '', code, flags=re.M)
+code = re.sub(r'^local (Motion|Seating) = require\([^\n]+\)\n', '', code, flags=re.M)
 source += "local Animator=(function()\n" + code + "\nend)()\n"
 source += r'''
 for i=1,60 do tick:Fire(1/60) end

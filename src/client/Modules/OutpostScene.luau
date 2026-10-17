@@ -30,7 +30,9 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
+local Seating = require(ReplicatedStorage.Shared.Seating)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
+local PlayerCard = require(script.Parent.PlayerCard)
 local ChargeMeter = require(script.Parent.ChargeMeter)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -240,6 +242,7 @@ local function fitOutpostHud()
 	for _, promptGui in miningPrompts do
 		promptGui.Enabled = not blocked and hud.Enabled
 	end
+	PlayerCard.setBlocked(blocked or not hud.Enabled)
 	hint.Visible = not blocked and not mobile
 	charge.Frame.Visible = expanded
 	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")
@@ -681,7 +684,7 @@ end
 -- spec. Nil on foot; false in a seat that can't.
 local function pilotedMech(): any
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
+	local seat = Seating.seatOf(humanoid)
 	if not seat then
 		return nil
 	end
@@ -924,6 +927,25 @@ end
 
 -- Prompts: rocks, the Probe, the gate, other miners -----------------------------------------------------
 
+local SOCIAL_KINDS = { Spar = true, Duel = true, Party = true }
+
+-- Another miner's Duel, Spar and Party: one card beside them (PlayerCard).
+ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
+	if SOCIAL_KINDS[prompt:GetAttribute("PromptKind")] then
+		PlayerCard.shown(prompt, inputType)
+	end
+end)
+ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt)
+	if SOCIAL_KINDS[prompt:GetAttribute("PromptKind")] then
+		PlayerCard.holding(prompt, true)
+	end
+end)
+ProximityPromptService.PromptButtonHoldEnded:Connect(function(prompt)
+	if SOCIAL_KINDS[prompt:GetAttribute("PromptKind")] then
+		PlayerCard.holding(prompt, false)
+	end
+end)
+
 -- A small, clickable instruction instead of Roblox's large E + rock-name panel.
 ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	if prompt:GetAttribute("PromptKind") ~= "Mine" then return end
@@ -948,7 +970,36 @@ end)
 ProximityPromptService.PromptHidden:Connect(function(prompt)
 	local promptGui = miningPrompts[prompt]
 	if promptGui then promptGui:Destroy(); miningPrompts[prompt] = nil end
+	PlayerCard.hidden(prompt)
 end)
+
+-- Duel, Spar or Party on another miner: from their prompt's key, or a
+-- click or tap on their card.
+local function socialAction(kind: string, target: number)
+	if not active or target == player.UserId then
+		return
+	end
+	if kind == "Spar" then
+		-- A friendly spar: they get a card to accept (Shared.Spar).
+		task.spawn(function()
+			local result = GemClient.request("SparAsk", target)
+			if result.Message and result.Message ~= "" then
+				UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
+			end
+		end)
+	elseif kind == "Duel" then
+		local other = Players:GetPlayerByUserId(target)
+		ChallengeChooser.open(target, other and other.DisplayName)
+	elseif kind == "Party" then
+		task.spawn(function()
+			local result = GemClient.request("PartyInvite", target)
+			if result.Message and result.Message ~= "" then
+				UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
+			end
+		end)
+	end
+end
+PlayerCard.onAction(socialAction)
 
 ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
 	if who ~= player or not active then
@@ -974,32 +1025,8 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 				UiKit.toast(result.Message, P.Bad)
 			end
 		end)
-	elseif kind == "Spar" or kind == "Duel" or kind == "Party" then
-		local target = prompt:GetAttribute("TargetUserId")
-		if target == player.UserId then
-			return
-		end
-		if kind == "Spar" then
-			-- A friendly spar: they get a card to accept (Shared.Spar).
-			task.spawn(function()
-				local result = GemClient.request("SparAsk", target)
-				if result.Message and result.Message ~= "" then
-					UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
-				end
-			end)
-			return
-		end
-		if kind == "Duel" then
-			local other = Players:GetPlayerByUserId(target)
-			ChallengeChooser.open(target, other and other.DisplayName)
-			return
-		end
-		task.spawn(function()
-			local result = GemClient.request("PartyInvite", target)
-			if result.Message and result.Message ~= "" then
-				UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
-			end
-		end)
+	elseif SOCIAL_KINDS[kind] then
+		socialAction(kind, prompt:GetAttribute("TargetUserId"))
 	end
 end)
 -- Your own spar/duel/party prompts aren't for you.

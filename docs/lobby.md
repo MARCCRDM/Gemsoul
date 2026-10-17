@@ -106,6 +106,27 @@ and it refreshes every 2 seconds while the menu is open.
 
 ![The PLAY menu](lobby/play-menu.png)
 
+## Other miners: DUEL, SPAR, PARTY
+
+Walk within 10 studs of another miner and one card appears beside them, at
+chest height, with three buttons. Before, these were three of Roblox's own
+prompt panels stacked over their head: hard to read, and on a phone they
+covered the middle of the screen.
+
+![The card on a desktop, on a phone, and in Spanish](lobby/player-card.png)
+
+- **Click or tap** a button, or press its key: **G** to duel, **Z** to spar,
+  **F** to invite to a party. A held key fills its button. A gamepad has a
+  button for each (X, Y, B), so all three stay live together.
+- **On a phone** the buttons are 44 points tall, and the keys aren't shown.
+- It hides while a menu is open, during a fight, and when the lobby HUD is
+  hidden.
+
+The server still puts a prompt for each on the miner (`socialPrompts` in
+`OutpostServer`). Their `Style` is Custom, so Roblox draws nothing. They decide
+who's in range and take the keys. `PlayerCard` draws the card when they show,
+and runs the same action as the key when a button is pressed.
+
 ## On a phone
 
 ![The lobby on a phone](lobby/lobby-phone.png)

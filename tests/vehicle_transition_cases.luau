@@ -59,11 +59,17 @@ local printed = {}
 local function warn(...) table.insert(printed, table.concat({...}, " ")) end
 function chassis:FindFirstChild(name) return if name=="Drive" then drive else steer end
 local machine = { GetAttribute=function() return 24 end, FindFirstChild=function() return chassis end }
-local seat = { Parent=machine, ThrottleFloat=1, SteerFloat=0 }
+local seat = { Parent=machine, ThrottleFloat=1, SteerFloat=0, Children={} }
 function seat:IsA(name) return name=="VehicleSeat" end
+function seat:FindFirstChild(name) return self.Children[name] end
 function seat:GetAttribute(name) return if name=="OutpostMachine" then "Mole" else nil end
 local hum = { Seated=signal() }
 local character = { WaitForChild=function() return hum end, FindFirstChildOfClass=function() return hum end }
+hum.Parent = character
+-- The body's root, and the seat weld the seat makes (Part0 the seat, Part1 the root).
+local root = { Name="HumanoidRootPart", Parent=character, Joints={} }
+function root:GetJoints() return self.Joints end
+function character:FindFirstChild(name) return if name=="HumanoidRootPart" then root else nil end
 player.Character = character
 local checks = 0
 local function check(ok,message) checks+=1; assert(ok,message) end
@@ -107,10 +113,25 @@ check(player.CameraMinZoomDistance==24, "Repeated boarding reset mech zoom")
 hum.SeatPart, seat.Occupant = nil, nil
 hum.Seated:Fire(false,nil)
 check(player.CameraMinZoomDistance==6, "Repeated boarding overwrote original zoom")
--- Occupancy and the driving constraints can replicate after the seat event.
+-- The server seats the pilot, and Seat.Occupant doesn't replicate: this
+-- screen sees its own SeatPart but no Occupant. That's enough to drive.
 hum.SeatPart = seat
 hum.Seated:Fire(true,seat)
-check(not VehicleDrive.isDriving(), "Started before occupant replicated")
+VehicleDrive.step(0.1)
+check(VehicleDrive.isDriving() and sent[#sent][1]==1, "A server-seated pilot (no Occupant here) never drove")
+hum.SeatPart = nil
+hum.Seated:Fire(false,nil)
+check(not VehicleDrive.isDriving(), "Leaving the seat didn't stop driving")
+-- Neither property set here, only the seat weld: still found, and driven.
+local weld = { Name="SeatWeld", Part0=seat, Part1=root }
+seat.Children.SeatWeld, root.Joints = weld, { weld }
+RunService.Heartbeat:Fire(.1)
+check(VehicleDrive.isDriving() and sent[#sent][1]==1, "The seat weld alone never started driving")
+seat.Children.SeatWeld, root.Joints = nil, {}
+VehicleDrive.step(0.1)
+check(not VehicleDrive.isDriving(), "The weld going didn't stop driving")
+-- The driving constraints can replicate after the seat event.
+hum.SeatPart = seat
 local findConstraint = chassis.FindFirstChild
 chassis.FindFirstChild = function() return nil end
 seat.Occupant = hum

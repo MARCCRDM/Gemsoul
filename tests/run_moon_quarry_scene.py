@@ -108,7 +108,18 @@ assert(#site.Parking==8,"Motor Pool has missing bays")
 for _,bay in site.Parking do
  counts[bay.Kind]+=1
  local vehicle=Machines.build(bay.Kind,bay.CFrame)
- assert(vehicle.PrimaryPart.Name=="Chassis" and vehicle.PrimaryPart.CanCollide,"Vehicle has no physics chassis")
+ assert(vehicle.PrimaryPart.Name=="Chassis" and not vehicle.PrimaryPart.Massless,"Vehicle has no physics chassis")
+ -- It collides through a ball underneath (rides up steps) and a box above the
+ -- step height (walls), not the flat-bottomed chassis box (catches on kerbs).
+ local hull,foot=nil,nil
+ for _,part in builtParts do
+  if part.Parent==vehicle and part.Name=="Hull" then hull=part end
+  if part.Parent==vehicle and part.Name=="Foot" then foot=part end
+ end
+ assert(not vehicle.PrimaryPart.CanCollide and hull and hull.CanCollide and foot and foot.CanCollide,"Mech colliders missing")
+ local base=vehicle.PrimaryPart.Position.Y-vehicle.PrimaryPart.Size.Y/2
+ assert(math.abs(foot.CFrame.Position.Y-foot.Size.Y/2-base)<.01,"The ball doesn't reach the ground")
+ assert(hull.CFrame.Position.Y-hull.Size.Y/2>=base+1,"The box still drags along the ground")
  local seat,drive,steer,drill=nil,nil,nil,nil
  local joints={}
  for _,object in instances do
@@ -133,7 +144,8 @@ for _,bay in site.Parking do
  for _,part in builtParts do
   if part.Parent==vehicle then
    total+=1
-   if part.Name~="Chassis" then assert(not part.CanCollide and part.Massless,"Cosmetic body obstructs walking") end
+   if part.Name=="Hull" or part.Name=="Foot" then assert(part.Massless,"A collider adds weight")
+   elseif part.Name~="Chassis" then assert(not part.CanCollide and part.Massless,"Cosmetic body obstructs walking") end
   end
  end
  assert(total>120 and total<240,"Mech detail budget changed: "..total)

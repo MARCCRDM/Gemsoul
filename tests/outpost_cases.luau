@@ -316,7 +316,7 @@ local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
 local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
-	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial" } do
+	for _, name in { "Outpost", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "Seating" } do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
 		stub.Parent = sharedFolder
@@ -331,6 +331,7 @@ local Server = (function()
 				PickaxeLooks = PickaxeLooks,
 				Spar = Spar,
 				Tutorial = { beat = function() return nil end }, -- (no mining tutorial running)
+				Seating = load("src/shared/Seating.luau", "Seating", {}),
 				Intro = { tutorialMined = function() return nil end },
 				OutpostWorld = World,
 				Gems = Gems,
@@ -517,6 +518,24 @@ check(
 	anaRoot:FindFirstChild("OutpostDuel") and anaRoot:FindFirstChild("OutpostParty"),
 	"No duel/party prompts on the miner"
 )
+-- Drawn by the client as one card beside the miner (PlayerCard): no panels of
+-- Roblox's own stacked over them, and each its own key and gamepad button.
+local keys, pads = {}, {}
+for _, name in { "OutpostSpar", "OutpostDuel", "OutpostParty" } do
+	local prompt = anaRoot:FindFirstChild(name)
+	check(prompt and prompt.Style == R.Enum.ProximityPromptStyle.Custom, name .. " is drawn by Roblox, not the card")
+	check(prompt.UIOffset == R.Vector2.zero, name .. " is still stacked over the miner")
+	check(prompt:GetAttribute("TargetUserId") == ana.UserId, name .. " doesn't say whose it is")
+	keys[prompt.KeyboardKeyCode], pads[prompt.GamepadKeyCode] = true, true
+end
+local function size(set)
+	local n = 0
+	for _ in set do
+		n += 1
+	end
+	return n
+end
+check(size(keys) == 3 and size(pads) == 3, "Two social prompts share a key or gamepad button")
 handlers.OutpostEnter(ben)
 
 -- Pick a rock and stand by it.

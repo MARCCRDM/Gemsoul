@@ -8,9 +8,11 @@ logic = source[source.index('local function blocked()'):source.index('-- The dri
 logic += source[source.index('local function finish()'):source.index('return VehicleDrive')]
 fixture = (ROOT/'tests/vehicle_transition_cases.luau').read_text()
 prefix, cases = fixture.split('-- DRIVE HERE')
+# Who sits where (Shared.Seating), as VehicleDrive requires it.
+seating = 'local Seating = (function()\n' + (ROOT/'src/shared/Seating.luau').read_text() + '\nend)()\n'
 with tempfile.TemporaryDirectory(prefix='gemsoul-drive-') as directory:
     script = Path(directory)/'drive.luau'
-    script.write_text(prefix + logic + cases)
+    script.write_text(prefix + seating + logic + cases)
     subprocess.run([str(ROOT/'.tools/luau/luau.exe'), str(script)], check=True)
 
 # Exercise the actual scene handoff that owns Roblox's movement/vehicle inputs.

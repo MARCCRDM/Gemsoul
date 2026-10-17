@@ -16,54 +16,80 @@ to its bay after 90 seconds.
 
 ## How it works
 
-Each mech slides on one invisible chassis. A `LinearVelocity` called `Drive`
-sets its speed over the ground, and an `AlignOrientation` called `Steer` sets
-its heading. Everything else is massless bodywork on joints, animated by
-`MechAnimation`. The driving maths is `Outpost.drive` in `src/shared/Outpost.luau`.
+Each mech is one physics assembly:
 
-Normally the pilot's own client runs the physics, so the mech handles with no
-lag. When you sit down, the server hands you the chassis's physics, and
-`VehicleDrive` sets `Drive` and `Steer` every frame from your input.
+- **Chassis**: an invisible box carrying the mech's weight. It's the
+  assembly's root and the model's PrimaryPart, but it doesn't collide.
+- **Foot**: an invisible ball under it that touches the ground. A box sliding
+  on its flat bottom catches on the smallest step (a kerb, the edge of the
+  bay's apron) and stops dead. A ball rides up steps of up to 1.6 studs.
+- **Hull**: an invisible box from 1.6 studs up, which hits walls.
+- Everything else is massless bodywork on joints, animated by
+  `MechAnimation`.
 
-## Three ways it could get stuck
+A `LinearVelocity` called `Drive` sets the mech's speed over the ground, and
+an `AlignOrientation` called `Steer` sets its heading. The driving maths is
+`Outpost.drive` in `src/shared/Outpost.luau`.
 
-Before, a mech could take the pilot but not move. There were three ways this
-could happen, and each one is now covered:
+The server keeps the mech's physics. The pilot's game (`VehicleDrive`) reads
+the input and sends it with `MechInput`. That happens when the input changes
+(at most 10 times a second), every 0.5 s while it's held, and straight away
+as 0 when you let go, open a menu or get out. Each frame the server sets
+`Drive` and `Steer` from it. It only takes input from the mech's pilot,
+real numbers clamped to -1..1. Input that stops arriving for 1.5 s counts
+as let go. A pilot who enters a fight, an expedition or an Arena drop stops
+driving, and the next pilot starts from rest.
 
-| What went wrong | What happens now |
-| --- | --- |
-| The seat's throttle and steer stayed at 0. Roblox's controls fill them from WASD, but they can be switched off by another scene, or be slow to notice the seat. | `VehicleDrive` falls back to the controls' move vector, then to the keys themselves: W/S/A/D and the arrows, ignored while you type in chat. |
-| The hand-over of the physics never took, or was lost. | The server retries 0.5 s after you sit, then every 2 s. The first failure prints one warning in the output: `[Mech] <kind>: couldn't hand its physics to <player>, the server drives it instead: <reason>`. |
-| The server still runs the physics, so the client's settings for `Drive` and `Steer` do nothing. | The client also sends its input to the server (`MechInput`): when it changes (at most 10 times a second), every 0.5 s while held, and 0 straight away when you let go, open a menu or get out. Whenever the server holds the physics it drives the mech itself, with the same maths and the same wall rule. It picks up from the mech's current heading and speed. |
+## Why the mechs didn't move
 
-The server only accepts input from the player sitting in that seat. It takes
-real numbers only, clamped to -1..1. Input that stops arriving for 1.5 s counts
-as let go, so a dropped connection doesn't leave a mech driving off. A pilot
-who enters a fight, an expedition or an Arena drop stops driving, and the next
-pilot starts from rest.
+Who sits in a seat is in two properties, `Seat.Occupant` and
+`Humanoid.SeatPart`. Neither replicates: each side works them out for itself
+(Roblox marks both NotReplicated). The Pilot prompt seats you from the server.
+So your game could see no `Occupant` on the seat, and the server could see no
+`SeatPart` on your body.
+
+Every step of driving checked one of them:
+
+- **Your game** only started driving when the seat's `Occupant` was you. If
+  it never was, nothing was sent, and the mech never moved. Your game's own
+  "won't move" report never ran either, because it only runs while driving.
+  The only sign was one server warning: no word from the pilot's client.
+- **The server** found the pilot's mech from their `SeatPart`. If that was
+  empty, it refused every input, the stuck reports and the request to get
+  out.
+- **Mining from the cockpit** and the seated pose had the same problem.
+
+The seat makes a weld, `SeatWeld`, from the seat (`Part0`) to your body's root
+(`Part1`), and that weld does replicate. `Shared.Seating` answers "who sits
+here" and "which seat is this body in" from `Occupant` / `SeatPart` when
+they're set, and from the weld when they aren't. All of these use it now:
+- `VehicleDrive` (starting, keeping on and stopping driving);
+- `OutpostVehicles` (whose input counts, getting in and out, reports);
+- `SeatExit` (hopping out);
+- mining from the cockpit, on both sides;
+- `MechAnimation` (the seated pose).
+
+The server still never takes input for a mech someone else sits in.
 
 ## When a mech still won't move
 
-Both sides now watch for it, and say what they see:
+Both sides watch for it and say what they see:
 
 - **Your game never starts driving.** When piloting starts, your game tells
   the server. If you've sat in a mech for 5 seconds and the server has heard
-  nothing, it logs `[Mech] no word from the pilot's client`. That means
-  `VehicleDrive` never got going on your side, for example because a script
-  error stopped it loading.
+  nothing, it logs `[Mech] no word from the pilot's client`.
 - **The mech won't budge.** You hold a direction for 2 seconds and the mech
   never leaves the spot where you got in. Your game then:
   - prints `[Mech] Won't move (client): ...` with what it sees: the input and
     where it came from (seat, controls or keys), the speed, the drive
-    settings, `ReceiveAge` (0 means your game runs the mech's physics), the
-    assembly's root part and mass, and anything anchored in it;
+    settings, `ReceiveAge`, the assembly's root part and mass, and anything
+    anchored in it;
   - sends that to the server;
   - shows you a short message.
 
-  The server then frees anything anchored in the mech or your body. It takes
-  the physics back and drives the mech itself for the rest of the ride. It logs
-  `[Mech] <kind> won't move for <player>`, with both sides' view and what it
-  did.
+  The server then frees anything anchored in the mech or your body and takes
+  the physics back. It logs `[Mech] <kind> won't move for <player>`, with both
+  sides' view and what it did.
 
 Each line goes to the Output, and the server's lines also go to Feedback →
 Reports (owners only). A ride sends at most 2 reports from your game, and the
@@ -71,36 +97,30 @@ server takes at most 3. The next ride starts fresh.
 
 | Piece | What it does |
 | --- | --- |
-| `src/server/World/OutpostMachines.luau` | Builds each mech: chassis, bodywork, seat, `Drive` and `Steer` |
-| `src/server/Systems/OutpostVehicles.luau` | Parks the mechs, runs the Pilot prompt and the physics hand-over (with retries), accepts `MechInput`, and drives from the server when it has to. Sends empty mechs home |
-| `src/client/Modules/VehicleDrive.luau` | Your input (seat, then controls, then keys), driving each frame, sending input to the server, the driving card and camera |
+| `src/server/World/OutpostMachines.luau` | Builds each mech: chassis, foot, hull, bodywork, seat, `Drive` and `Steer` |
+| `src/server/Systems/OutpostVehicles.luau` | Parks the mechs, runs the Pilot prompt, keeps the physics, takes `MechInput` and drives. Sends empty mechs home |
+| `src/shared/Seating.luau` | Who sits where, from the seat weld when the properties are empty |
+| `src/client/Modules/VehicleDrive.luau` | Your input (seat, then controls, then keys), sending it to the server, the driving card and camera |
 | `Remotes.MechInput` | Client to server: `(throttle, steer)`. A `(0, 0)` when piloting starts says hello |
 | `Remotes.MechReport` | Client to server: what your game sees when the mech won't move |
-| `Feedback.note` | Keeps the server's `[Mech]` lines with the playtest reports |
+| `Remotes.MechExit` | Client to server: hop out (Space or jump) |
 
 ## Verification
 
-- `tests/run_outpost_vehicles.py` (77 checks) runs the real server module and
-  driving maths with stand-in seats, players and physics. It covers boarding;
-  the hand-over; staying out of the way while the client drives; a failed
-  hand-over, with the server driving to top speed, steering, the wall rule,
-  lost input, a busy pilot, retries, the hand-over taking and the warning
-  appearing once; picking up the current heading; getting out; a new pilot
-  starting from rest; whose input counts and bad numbers; an anchored mech;
-  the silent-client log (once, and not after a hello); and stuck reports
-  (both views logged, the pilot's and the mech's anchored parts freed and
-  nothing else, the physics kept on the server for that ride only, at most 3,
-  long text cut short).
-- `tests/run_vehicle_transition.py` (75 checks) covers the client: the
-  fallback input from the seat, then the move vector, then the keys; arrows;
-  no driving while typing; what is sent to the server and when, at most 10
-  times a second from a sweeping stick; stopping for menus and getting out;
-  the hello; and the stuck report (after 2 s, with the input and what's
-  anchored, then a pause, at most 2, and none while moving, once driven off,
-  or with nothing held).
+- `tests/run_outpost_vehicles.py` (83 checks) runs the real server module and
+  driving maths with stand-in seats, players and physics. Among them: a pilot
+  the server sees only through the seat's `Occupant`, and one it sees only
+  through the seat weld. Both drive, report and get out, and once out their
+  input is refused.
+- `tests/run_vehicle_transition.py` (85 checks) covers the client. Among
+  them: a pilot whose game sees its own `SeatPart` but no `Occupant` drives,
+  and so does one whose game sees only the seat weld.
+- `tests/run_machines.py` (1760 checks) and `tests/run_moon_quarry_scene.py`
+  build every mech. They check that only the foot and hull collide, that the
+  foot (a ball) reaches the ground, and that the hull starts 1 to 2 studs up.
+- `tests/run_outpost.py` checks mining from the cockpit.
 
-Each of 40 deliberate breaks in these pieces is caught by these checks.
-
-Not yet checked in Studio. If a mech still won't move, hold W for a few
-seconds. Then copy every `[Mech]` line from the Output, or from Feedback →
-Reports.
+These run the real modules against stand-ins. Roblox's own physics and
+replication can only be checked in a live server: if a mech still won't move,
+hold W for a few seconds, then copy every `[Mech]` line from the Output, or
+from Feedback → Reports.

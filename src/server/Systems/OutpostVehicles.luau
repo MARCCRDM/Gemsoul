@@ -7,6 +7,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
+local Seating = require(ReplicatedStorage.Shared.Seating)
 local Remotes = require(script.Parent.Remotes)
 local OutpostMachines = require(script.Parent.Parent.World.OutpostMachines)
 local SeatExit = require(script.Parent.SeatExit)
@@ -112,9 +113,29 @@ local function reset(machine: Machine)
 	machine.LastUsed = os.clock()
 end
 
+-- (Seating, not Seat.Occupant or Humanoid.SeatPart alone: neither replicates.)
 local function driverOf(machine: Machine): Player?
-	local humanoid = machine.Seat.Occupant
+	local humanoid = Seating.occupant(machine.Seat)
 	return humanoid and Players:GetPlayerFromCharacter(humanoid.Parent)
+end
+
+-- The machine `humanoid` sits in, if any (never one someone else sits in).
+local function machineOf(humanoid: Humanoid?): Machine?
+	if not humanoid then
+		return nil
+	end
+	local seat = Seating.seatOf(humanoid)
+	local machine = seat and bySeat[seat]
+	if machine then
+		local occupant = Seating.occupant(machine.Seat)
+		return if occupant == nil or occupant == humanoid then machine else nil
+	end
+	for _, other in machines do
+		if Seating.occupant(other.Seat) == humanoid then
+			return other
+		end
+	end
+	return nil
 end
 
 -- Outside the Outpost, or busy elsewhere: no driving.
@@ -168,6 +189,14 @@ local function spawnMachine(kind: string, bay: CFrame)
 	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
 		OutpostVehicles.seated(machine)
 	end)
+	-- (The weld coming and going says the same, wherever Occupant stays empty.)
+	for _, changed in { seat.ChildAdded, seat.ChildRemoved } do
+		changed:Connect(function(child)
+			if child.Name == "SeatWeld" then
+				OutpostVehicles.seated(machine)
+			end
+		end)
+	end
 	return machine
 end
 
@@ -194,7 +223,13 @@ function OutpostVehicles.sit(player: Player, seat: Instance): boolean
 	local machine = bySeat[seat]
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not machine or not humanoid or humanoid.Health <= 0 or humanoid.SeatPart or machine.Seat.Occupant then
+	if
+		not machine
+		or not humanoid
+		or humanoid.Health <= 0
+		or Seating.seatOf(humanoid)
+		or Seating.occupant(machine.Seat)
+	then
 		return false
 	end
 	if busy(player) then
@@ -214,10 +249,8 @@ function OutpostVehicles.input(player: Player, throttle: any, steer: any, now: n
 		return false
 	end
 	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
-	local machine = seat and bySeat[seat]
-	if not machine or machine.Seat.Occupant ~= humanoid then
+	local machine = machineOf(character and character:FindFirstChildOfClass("Humanoid"))
+	if not machine then
 		return false
 	end
 	machine.Throttle, machine.Steer = math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1)
@@ -228,13 +261,13 @@ end
 
 function OutpostVehicles.exit(player: Player): boolean
 	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
-	local machine = seat and bySeat[seat]
-	if not machine or seat.Occupant ~= humanoid then return false end
+	local machine = machineOf(character and character:FindFirstChildOfClass("Humanoid"))
+	if not machine then
+		return false
+	end
 	machine.Throttle, machine.Steer, machine.Speed = 0, 0, 0
 	stop(machine)
-	SeatExit.detach(character)
+	SeatExit.detach(character, machine.Seat)
 	return true
 end
 
@@ -314,10 +347,8 @@ function OutpostVehicles.report(player: Player, text: any, now: number?): boolea
 		return false
 	end
 	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
-	local machine = seat and bySeat[seat]
-	if not machine or machine.Seat.Occupant ~= humanoid or machine.Reports >= MAX_REPORTS then
+	local machine = machineOf(character and character:FindFirstChildOfClass("Humanoid"))
+	if not machine or machine.Reports >= MAX_REPORTS then
 		return false
 	end
 	machine.Reports += 1

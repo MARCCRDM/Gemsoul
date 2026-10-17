@@ -30,7 +30,7 @@ Vector2.zero=Vector2.new(0,0)
 local R={Vector2=Vector2,Vector3=Vector3,CFrame=CFrame,Color3=Color3,Enum=Enum}
 local modules={}
 '''
-    for path in ['src/shared/Outpost.luau', 'src/server/Systems/OutpostVehicles.luau']:
+    for path in ['src/shared/Outpost.luau', 'src/shared/Seating.luau', 'src/server/Systems/OutpostVehicles.luau']:
         source += f'modules["{path}"]=function(env)\n'
         for name in ['game', 'script', 'require', 'Instance', 'Enum', 'CFrame', 'Vector2', 'Vector3', 'Color3', 'os', 'task', 'warn']:
             source += f'local {name}=env.{name} or {name}\n'

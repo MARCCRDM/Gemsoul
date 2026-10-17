@@ -5,6 +5,7 @@ local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Motion = require(ReplicatedStorage.Shared.MechMotion)
+local Seating = require(ReplicatedStorage.Shared.Seating)
 local TAG = "OutpostMech"
 local active = {}
 local pending = {}
@@ -185,7 +186,7 @@ RunService.PreSimulation:Connect(function(dt)
 		if (rig.Root.Position - camera.CFrame.Position).Magnitude > 300 then
 			continue
 		end
-		local occupied = rig.Seat.Occupant ~= nil
+		local occupied = Seating.occupant(rig.Seat) ~= nil
 		local speed = rig.Root.AssemblyLinearVelocity:Dot(rig.Root.CFrame.LookVector) / rig.Scale
 		Motion.step(rig.State, dt, speed, rig.Root.AssemblyAngularVelocity.Y, occupied)
 		local poses = Motion.pose(rig.State, rig.Scale, now, occupied)

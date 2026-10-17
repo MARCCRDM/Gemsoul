@@ -84,10 +84,23 @@ function OutpostMachines.build(kind: string, at: CFrame): Model
 		)
 	end
 	local chassis = raw("Chassis", at * CFrame.new(0, 6 * scale + 0.2, 0), Vector3.new(7.6, 12, 6.2), DARK)
-	chassis.Transparency, chassis.Massless, chassis.CanCollide, chassis.CanQuery = 1, false, true, true
+	chassis.Transparency, chassis.Massless, chassis.CanQuery = 1, false, true
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(1.2, 0.05, 0, 100, 1)
 	chassis.RootPriority = 127
 	model.PrimaryPart = chassis
+	-- What it bumps into. A box sliding on its flat bottom catches on the
+	-- smallest step (a kerb, the edge of the bay's apron) and stops dead, so
+	-- the chassis carries the weight but doesn't collide: a ball under it
+	-- takes the ground and rides up steps of up to LIFT studs, and a box
+	-- above that height takes the walls.
+	local LIFT, FOOT = 1.6, 6.2
+	local hull = raw("Hull", chassis.CFrame * frame(0, LIFT / 2, 0), Vector3.new(7.6, 12 - LIFT, 6.2), DARK)
+	local foot = raw("Foot", chassis.CFrame * frame(0, -6 + FOOT / 2, 0), Vector3.one * FOOT, DARK, nil, "Ball")
+	for _, collider in { hull, foot } do
+		collider.Transparency, collider.CanCollide = 1, true
+		collider.CustomPhysicalProperties = PhysicalProperties.new(1.2, 0.05, 0, 100, 1)
+		weld(chassis, collider)
+	end
 	-- Local offsets below are measured from the chassis centre.
 	local torso = joint(chassis, "Waist", frame(0, 2, 0))
 	piece(torso, "Pelvis", frame(0, 0, 0), Vector3.new(5.4, 1.3, 3.2), DARK)

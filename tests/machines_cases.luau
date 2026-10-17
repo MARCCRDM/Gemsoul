@@ -70,9 +70,19 @@ for _, kind in Rules.MachineOrder do
 	local model = Machines.build(kind, at)
 	local chassis = model:FindFirstChild("Chassis")
 	check(chassis and model.PrimaryPart == chassis, kind .. " has no chassis")
-	check(chassis.CanCollide and chassis.Transparency == 1 and not chassis.Anchored, kind .. "'s chassis can't slide")
+	check(chassis.Transparency == 1 and not chassis.Anchored and not chassis.Massless, kind .. "'s chassis can't slide")
 	local bottom = chassis.CFrame.Position.Y - chassis.Size.Y / 2
 	check(bottom > 0 and bottom < 0.5, kind .. " isn't standing on the ground")
+	-- It collides through a ball underneath, which rides up steps, and a box
+	-- above the step height for walls: not the chassis box, whose flat bottom
+	-- catches on any kerb.
+	local hull, foot = model:FindFirstChild("Hull"), model:FindFirstChild("Foot")
+	check(not chassis.CanCollide and hull and hull.CanCollide and foot and foot.CanCollide, kind .. " has no colliders")
+	check(foot.Shape == R.Enum.PartType.Ball, kind .. "'s foot isn't a ball")
+	check(math.abs(foot.CFrame.Position.Y - foot.Size.Y / 2 - bottom) < 0.01, kind .. "'s foot doesn't reach the ground")
+	local lift = hull.CFrame.Position.Y - hull.Size.Y / 2 - bottom
+	check(lift >= 1 and lift <= 2, kind .. "'s hull drags along the ground, or leaves too big a gap")
+	check(math.abs(hull.CFrame.Position.Y + hull.Size.Y / 2 - (bottom + chassis.Size.Y)) < 0.01, kind .. "'s hull isn't as tall as the mech")
 	local seat = model:FindFirstChild("Seat")
 	check(seat and seat.ClassName == "VehicleSeat" and seat:GetAttribute("OutpostMachine") == kind, kind .. " has no seat")
 	check(not seat.CanTouch and seat.MaxSpeed == 0 and seat.Torque == 0, kind .. "'s seat would take over the driving")
@@ -107,7 +117,8 @@ for _, kind in Rules.MachineOrder do
 		if d:IsA("BasePart") and d ~= chassis then
 			parts += 1
 			check(connected(d), kind .. ": " .. d.Name .. " is not attached")
-			check(d.Massless and not d.Anchored and not d.CanCollide, kind .. ": cosmetic collision/mass")
+			local collider = d.Name == "Hull" or d.Name == "Foot"
+			check(d.Massless and not d.Anchored and (collider or not d.CanCollide), kind .. ": cosmetic collision/mass")
 		end
 	end
 	check(parts > 120 and parts < 240, kind .. " detail budget changed")
