@@ -59,6 +59,9 @@ local BodyPoses = {}
 -- Every other body goes straight back to rest as it leaves the range
 -- (RivalPose.relax), never frozen mid-swing.
 BodyPoses.Range = 220
+-- The Outpost's moon bugs (small, and a dozen can be about) are posed
+-- closer in than that.
+BodyPoses.BugRange = 100
 -- Heads only turn toward a foe this close.
 BodyPoses.LookRange = 60
 -- Settling a body (BodyPoses.settle): seconds between stopping its
@@ -102,12 +105,12 @@ local function characterOf(userId: any): Model?
 	return owner and owner.Character
 end
 
-local function near(model: Model, eye: Vector3?): boolean
+local function near(model: Model, eye: Vector3?, range: number?): boolean
 	if not eye then
 		return true
 	end
 	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
-	return root == nil or not root:IsA("BasePart") or (root.Position - eye).Magnitude <= BodyPoses.Range
+	return root == nil or not root:IsA("BasePart") or (root.Position - eye).Magnitude <= (range or BodyPoses.Range)
 end
 
 -- A body whose posing fails is reported once (in the developer console),
@@ -195,7 +198,8 @@ function BodyPoses.step(dt: number)
 	-- them "Posed" and leaves their poses to every client, so they move at
 	-- the screen's frame rate instead of the network's.
 	for _, model in enemies do
-		if model:GetAttribute("Posed") and model:IsA("Model") and near(model, eye) then
+		local range = if model:GetAttribute("MoonBug") then BodyPoses.BugRange else nil
+		if model:GetAttribute("Posed") and model:IsA("Model") and near(model, eye, range) then
 			posing[model] = true
 			local found, look = pcall(function()
 				return lookPoint(model, characterOf(model:GetAttribute("FocusUserId") or model:GetAttribute("RivalOwner")))

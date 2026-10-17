@@ -367,10 +367,10 @@ function Enemies.damage(enemy, amount, source, _crit, _color, heavy, element)
 		end
 	end
 	amount = math.floor(amount + 0.5)
-	enemy.LastHit = os.clock()
+	enemy.LastHit = now
 	if source then
 		enemy.Damage[source] = (enemy.Damage[source] or 0) + amount
-		enemy.LastSource, enemy.LastSourceAt = source, os.clock()
+		enemy.LastSource, enemy.LastSourceAt = source, now
 	end
 	enemy.Humanoid.Health = math.max(0, enemy.Humanoid.Health - amount)
 	if enemy.Humanoid.Health <= 0 then
@@ -384,7 +384,7 @@ end
 function Enemies.addStatus(enemy, status, amount, seconds)
 	enemy.LastStatus = { status, amount, seconds }
 	if status == "Stun" then
-		enemy.StunUntil = math.max(enemy.StunUntil, os.clock() + seconds)
+		enemy.StunUntil = math.max(enemy.StunUntil, now + seconds) -- (the modules' clock: `now`)
 	end
 end
 function Enemies.addDot(enemy, total)

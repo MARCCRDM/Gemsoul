@@ -195,7 +195,7 @@ check(Frontier.incursion("Core", 0.5) == 0, "Critters in the core")
 for roll = 0, 0.99, 0.01 do
 	local fringe, edge = Frontier.incursion("Fringe", roll), Frontier.incursion("Edge", roll)
 	check(fringe >= 1 and fringe <= Frontier.Caps.Fringe, "A fringe incursion's size")
-	check(edge >= 2 and edge <= 4 and edge <= Frontier.Caps.Edge, "An edge incursion's size")
+	check(edge >= 2 and edge <= 3 and edge <= Frontier.Caps.Edge, "An edge incursion's size")
 end
 check(Frontier.Caps.Edge > Frontier.Caps.Fringe and Frontier.Caps.Server >= Frontier.Caps.Edge * 3, "The caps")
 check(Frontier.Boost.Edge.Health > 1 and Frontier.Boost.Edge.Exp > 1, "Edge critters aren't worth more")

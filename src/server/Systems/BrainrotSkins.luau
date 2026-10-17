@@ -651,8 +651,9 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 		croc(rig, accent)
 	end
 	creatureDetails(rig, spec.Shape, accent)
-	-- Tung Tung wears no armor: the log is the look.
-	if spec.Shape ~= "Wood" then
+	-- Tung Tung wears no armor: the log is the look. (Nor does anything at
+	-- gear tier 0: the Outpost's moon bugs.)
+	if spec.Shape ~= "Wood" and gearTier ~= 0 then
 		armor(rig, spec, accent, gearTier or (if boss then 4 else 1), hasShield)
 	end
 	if boss then
@@ -668,5 +669,39 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	rig:SetAttribute("CreatureShape", spec.Shape)
 	rig:SetAttribute("CombatPoseProfile", if spec.Id == "Sahur" then "SahurBat" else nil)
 	rig:SetAttribute("DungeonBoss", boss)
+end
+-- A small copy (the Outpost's moon bugs): details too small to see at its
+-- size go (grain, rivets, laces, spores), but never its face, nor a part
+-- others hang off (a jaw's teeth) or one carrying an effect. Its lights go
+-- too, and only its bigger parts cast shadows. Sizes are before scaling.
+local SPECK, SHADOW = 0.36, 1.1
+local FACE = { "Eye", "Pupil", "Iris", "Brow", "Smile", "Mouth", "Nose", "Fang", "Tooth" }
+function Skins.thin(rig)
+	local holding = {}
+	for _, d in rig:GetDescendants() do
+		if d:IsA("Light") then
+			d:Destroy()
+		elseif (d:IsA("JointInstance") or d:IsA("WeldConstraint")) and d.Part0 then
+			holding[d.Part0] = true
+		end
+	end
+	for _, p in rig:GetChildren() do
+		if not p:IsA("BasePart") or not (p:FindFirstChild("CreatureDetail") or p:FindFirstChild("CreatureMotion")) then
+			continue
+		end
+		local biggest = math.max(p.Size.X, p.Size.Y, p.Size.Z)
+		local keep = biggest >= SPECK or holding[p]
+		for _, word in FACE do
+			keep = keep or string.find(p.Name, word, 1, true) ~= nil
+		end
+		for _, child in p:GetChildren() do
+			keep = keep or not (child:IsA("JointInstance") or child:IsA("WeldConstraint") or child:IsA("DataModelMesh"))
+		end
+		if keep then
+			p.CastShadow = biggest >= SHADOW
+		else
+			p:Destroy()
+		end
+	end
 end
 return Skins

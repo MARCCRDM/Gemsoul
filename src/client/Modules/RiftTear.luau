@@ -27,6 +27,7 @@ local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local RiftTear = {}
 
 RiftTear.Near = 220 -- studs: further off, a tear isn't animated
+RiftTear.DormantRate = 15 -- times a second a dormant one breathes (an open one moves every frame)
 local DEEP = Color3.fromRGB(34, 6, 62)
 local VIOLET = Color3.fromRGB(150, 70, 255)
 local MAGENTA = Color3.fromRGB(255, 70, 210)
@@ -166,6 +167,9 @@ local function build(anchor: BasePart)
 	-- Its glow on the ground, and its light.
 	tear.Floor = piece(model, VIOLET, 0.7)
 	tear.Floor.Shape = Enum.PartType.Cylinder
+	local foot = anchor.Position - Vector3.new(0, height / 2 + 0.35, 0)
+	tear.Floor.Size = Vector3.new(0.06, height * 0.9, height * 0.9)
+	tear.Floor.CFrame = CFrame.new(foot) * CFrame.Angles(0, 0, math.pi / 2)
 	local light = Instance.new("PointLight")
 	light.Color = VIOLET
 	light.Range = height * 1.7
@@ -266,12 +270,16 @@ local function animate(tear, now: number)
 		local part = tear.Parts[k]
 		part.Size, part.CFrame, part.Transparency = spec.Size, spec.CFrame, spec.Transparency
 	end
-	local foot = anchor.Position - Vector3.new(0, shape.Height / 2 + 0.35, 0)
-	tear.Floor.Size = Vector3.new(0.06, shape.Height * 0.9, shape.Height * 0.9)
-	tear.Floor.CFrame = CFrame.new(foot) * CFrame.Angles(0, 0, math.pi / 2)
 	tear.Floor.Transparency = 1 - 0.35 * open
-	tear.Light.Brightness = 1.6 * open
-	tear.Stars.Rate = if tear.Dormant then 6 else 40 * open
+	-- (A light changing every frame is costly to draw: a dormant one's holds still.)
+	local glow = if tear.Dormant then 0.65 else 1.6 * open
+	if tear.Light.Brightness ~= glow then
+		tear.Light.Brightness = glow
+	end
+	local rate = if tear.Dormant then 6 else 40 * open
+	if tear.Stars.Rate ~= rate then
+		tear.Stars.Rate = rate
+	end
 end
 
 function RiftTear.step(serverNow: number)
@@ -287,7 +295,8 @@ function RiftTear.step(serverNow: number)
 				tear.Model.Parent = if near then holder else nil
 				tear.Stars.Enabled = near
 			end
-			if near then
+			if near and (not tear.Dormant or serverNow >= (tear.NextAt or 0)) then
+				tear.NextAt = serverNow + 1 / RiftTear.DormantRate
 				animate(tear, serverNow)
 			end
 		end

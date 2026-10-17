@@ -88,8 +88,10 @@ Frontier.Rift = {
 -- Outward. At Threshold, an incursion (and it starts again from a little).
 -- Back in the core it drains at Drain a second.
 Frontier.Pressure = { Fringe = 0.8, Edge = 1.6, Outward = 1.6, Threshold = 10, Drain = 2 }
--- Critters at once round one player (more stay away), and in the whole Outpost.
-Frontier.Caps = { Fringe = 3, Edge = 6, Server = 30 }
+-- Critters at once round one player (more stay away), and in the whole
+-- Outpost. (Each is a whole brainrot body: dozens at once made the Outpost
+-- lag.)
+Frontier.Caps = { Fringe = 2, Edge = 4, Server = 12 }
 -- A critter with no one to fight this long slips back through a rift; none
 -- stays longer than Life seconds.
 Frontier.Leave, Frontier.Life = 4, 90
@@ -181,9 +183,9 @@ end
 -- How many critters come through at once (`roll` in [0, 1)).
 function Frontier.incursion(band: string, roll: number): number
 	if band == "Edge" then
-		return if roll < 0.5 then 2 elseif roll < 0.85 then 3 else 4
+		return if roll < 0.6 then 2 else 3
 	elseif band == "Fringe" then
-		return if roll < 0.7 then 1 else 2
+		return if roll < 0.75 then 1 else 2
 	end
 	return 0
 end

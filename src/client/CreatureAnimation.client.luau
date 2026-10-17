@@ -1,5 +1,8 @@
 -- Supplement the shared combat skeleton with creature-only detail joints.
--- Far creatures are reset and skipped; streaming arrivals get a rescan.
+-- Far creatures are reset and skipped. A creature's joints are gathered once,
+-- when it arrives, and as streaming brings in the rest of its body (not by
+-- rescanning every body twice a second: dozens of moon bugs made that a
+-- stutter).
 -- Kaiju (wild ones in workspace.Enemies, yours in workspace.Kaiju) walk the
 -- same way, and fight with their whole body: each kind's wind-ups and
 -- blows, guard, hops and staggers (CreatureMotion.fight, from KaijuFighter's
@@ -15,6 +18,14 @@ local function reset(rig)
 		if entry.Joint.Parent then entry.Joint.C0 = entry.Rest end
 	end
 	rig.Active = false
+end
+
+local function learn(rig, joint)
+	if joint:IsA("Motor6D") and joint:GetAttribute("CreatureMotion") and not rig.Known[joint] then
+		rig.Known[joint] = true
+		table.insert(rig.Joints, { Joint = joint, Rest = joint:GetAttribute("CreatureRest"),
+			Kind = joint:GetAttribute("CreatureMotion"), Side = joint:GetAttribute("CreatureSide") or 1 })
+	end
 end
 
 RunService.PreSimulation:Connect(function(dt)
@@ -45,18 +56,18 @@ RunService.PreSimulation:Connect(function(dt)
 					Species = model:GetAttribute("KaijuSpecies"),
 				}
 				rigs[model] = rig
-			end
-			for _, joint in model:GetDescendants() do
-				if joint:IsA("Motor6D") and joint:GetAttribute("CreatureMotion") and not rig.Known[joint] then
-					rig.Known[joint] = true
-					table.insert(rig.Joints, { Joint = joint, Rest = joint:GetAttribute("CreatureRest"),
-						Kind = joint:GetAttribute("CreatureMotion"), Side = joint:GetAttribute("CreatureSide") or 1 })
+				for _, joint in model:GetDescendants() do
+					learn(rig, joint)
 				end
+				rig.Arrivals = model.DescendantAdded:Connect(function(joint)
+					learn(rig, joint)
+				end)
 			end
 		end
 		for model, rig in rigs do
 			if not model:IsDescendantOf(workspace) or rig.Root.Parent == nil then
 				reset(rig)
+				rig.Arrivals:Disconnect()
 				rigs[model] = nil
 			end
 		end
@@ -71,8 +82,9 @@ RunService.PreSimulation:Connect(function(dt)
 		local v = rig.Root.AssemblyLinearVelocity
 		local speed = Vector2.new(v.X, v.Z).Magnitude
 		local step = math.min(dt, 0.1)
+		local scale = model:GetScale()
 		rig.Amount += (math.clamp(speed / 8, 0, 1) - rig.Amount) * (1 - math.exp(-10 * step))
-		rig.Phase = (rig.Phase + speed * step * math.pi * 2 / (3.5 * model:GetScale())) % (math.pi * 2)
+		rig.Phase = (rig.Phase + speed * step * math.pi * 2 / (3.5 * scale)) % (math.pi * 2)
 		local at = model:GetAttribute("ActionAt")
 		local pose
 		if rig.Species then
@@ -89,7 +101,6 @@ RunService.PreSimulation:Connect(function(dt)
 			rig.Pose = Motion.blend(rig.Pose, pose, 1 - math.exp(-24 * step))
 			pose = rig.Pose
 		end
-		local scale = model:GetScale()
 		for i = #rig.Joints, 1, -1 do
 			local entry = rig.Joints[i]
 			if not entry.Joint.Parent then

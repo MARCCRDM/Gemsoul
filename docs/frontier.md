@@ -17,7 +17,7 @@ Each band is measured across the ground from the middle of the Outpost.
 | --- | --- | --- | --- | --- |
 | **Outpost Core** | 0–150 studs | None: safe | The lobby mix (chunks and boulders), no extra luck | Cyan |
 | **The Fringe** | 150–300 | One or two critters at a time | Half chunks, half boulders, +8% luck | Gold |
-| **The Edge** | 300 to the walls | Two to four at a time | More boulders (65%), +16% luck | Rose |
+| **The Edge** | 300 to the walls | Two or three at a time | More boulders (65%), +16% luck | Rose |
 | **Rift Vein** | A trail's last four rocks | (in the Edge) | Mostly boulders (85%), +25% luck | Violet |
 
 The luck goes on top of the rock's own luck on every gem it pays, so the
@@ -78,15 +78,16 @@ pressure that builds every second they spend out there:
 | The Edge | 1.6 | 2.56 |
 | The core | drains 2 a second | |
 
-At 10, rifts open: in the Fringe, one (70%) or two; in the Edge, two (50%),
-three (35%) or four. They open a third of a second apart. Then the pressure
+At 10, rifts open: in the Fringe, one (75%) or two; in the Edge, two (60%)
+or three. They open a third of a second apart. Then the pressure
 starts again from somewhere between 0 and 3, so the rifts don't come at
 regular intervals. In the Edge, heading outward, that's every few seconds.
 Standing still in the Fringe, it's about every ten.
 
-Caps: three critters at once on one player in the Fringe, six in the Edge,
-thirty in the whole Outpost. If more would come through than the cap
-allows, only enough open to reach it.
+Caps: two critters at once on one player in the Fringe, four in the Edge,
+twelve in the whole Outpost. If more would come through than the cap
+allows, only enough open to reach it. (Each critter is a whole brainrot
+body, so the caps are kept low; see [Performance](#performance).)
 
 No rifts open round you while you're driving a machine, sparring, knocked
 down, or in a fight, a dungeon or an expedition.
@@ -117,6 +118,36 @@ and half again the EXP for your kaiju.
 - **Run back in**: past the core's edge they give up and go back through
   their rifts.
 
+## Performance
+
+The Outpost was already a big scene: about 8,600 parts, nearly 4,700 of
+them in its ~190 rocks, each rock with its own light. Rifts added a stream
+of creatures on top of that, and the Outpost lagged. What keeps it light:
+
+- **Moon bugs are built light.** Each critter is a whole brainrot body, and
+  rifts create and remove them every few seconds, so every one is sent to
+  every player. Built for a dungeon, they were 121 to 214 parts each, every
+  part casting a shadow. As moon bugs they wear no armour, lose the details
+  too small to see at their size (grain, rivets, laces, spores; never the
+  face), carry no lights, and only their bigger parts cast shadows: 66 to 179
+  parts, about 20 to 50 of them casting shadows (`BrainrotSkins.thin`).
+- **Fewer at once**: two round a player in the Fringe, four at the Edge,
+  twelve in the whole Outpost (it was three, six and thirty).
+- **Only the rocks near you are lit.** Each rock's light is on within 70
+  studs of the camera and off further out, where the crystals' neon still
+  glows (`OutpostScene`). Instead of ~190 lights, about 13 on average (29 at
+  most, in the busy core).
+- **Creatures' joints are found once**, when a body arrives (and as streaming
+  brings in the rest of it), instead of every creature's every part being
+  re-read twice a second (`CreatureAnimation`).
+- **Moon bugs are fully posed only within 100 studs** (220 for everyone
+  else: `BodyPoses.BugRange`).
+- **A dormant rift breathes 15 times a second**, not every frame, its light
+  holds still, and its glow on the ground is placed once (`RiftTear`). An
+  open one, which lasts three seconds, moves every frame.
+
+![The moon bugs as a dungeon dresses them (top) and as they come through rifts (bottom)](frontier/moon-bugs.png)
+
 ## In the code
 
 | Where | What |
@@ -127,6 +158,7 @@ and half again the EXP for your kaiju.
 | `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot |
 | `FrontierServer` | Each player's band (`FrontierBand`) and pressure, the incursions, the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`; the scars carry `Dormant`) |
 | `KaijuWilds` | `spawnBug`: a critter out of a rift, at its prey (`prey`); slipping back (`rift`) |
+| `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
 | `FrontierHud` (client) | The banner as you cross into a band |
@@ -138,6 +170,8 @@ how many come at once, where rifts open, the timeline, that tears are
 ragged and lopsided, the pieces each tear is drawn from, the banners).
 `tests/run_kaiju.py` runs the server side: who rifts open round, the
 caps, incursions, a critter hopping out at its prey (a miner too), giving
-up and slipping back. `tests/run_outpost.py` and
+up and slipping back; and builds every moon bug (`tests/moon_bug_cases.luau`:
+its part and shadow budget, no armour or lights, nothing left hanging loose,
+its whole face). `tests/run_outpost.py` and
 `tests/run_moon_quarry_scene.py` cover the zones, luck, regrowth and the
 built trails.

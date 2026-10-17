@@ -172,8 +172,10 @@ more often and more at once the further out you go; see
 [frontier.md](frontier.md). For now they're the brainrot characters shrunk
 down: Tung Tung Tung Sahur, Tralalero Tralala, Brr Brr Patapim and
 Bombardiro Crocodilo.
-Kite them into your kaiju, hunt them, or run back to the core, where they
-give up and slip back through rifts of their own. Each is worth 10 EXP to
+They're built light (no armour, nothing too small to see at their size),
+since a dozen can be about at once. Kite them into your kaiju, hunt them,
+or run back to the core, where they give up and slip back through rifts of
+their own. Each is worth 10 EXP to
 your kaiju (15 from the Edge) and 2 coins to you, up to 300 coins a day.
 They get tougher with the kaiju around them, and from the Edge.
 

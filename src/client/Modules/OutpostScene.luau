@@ -333,6 +333,27 @@ local labels: { [Model]: { Gui: BillboardGui, Fill: Frame, Name: TextLabel, Clai
 -- A whole rock's name only shows up close; one being mined shows from
 -- further off, so you can see who's on it.
 local LABEL_NEAR, LABEL_MINED = 24, 60
+-- Only the rocks round you keep their glow lit: every rock carries a light,
+-- and nearly two hundred lit at once across the quarry slowed every frame
+-- (on phones most of all). Further off, the crystals' neon still glows.
+local LIGHT_NEAR = 70
+local function lightNearRocks()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local eye = camera.CFrame.Position
+	for _, entry in labels do
+		local light = entry.Light
+		local body = light and light.Parent
+		if light and body and body:IsA("BasePart") then
+			local on = (body.Position - eye).Magnitude <= LIGHT_NEAR
+			if light.Enabled ~= on then
+				light.Enabled = on
+			end
+		end
+	end
+end
 local function sizeColor(size: string): Color3
 	return ({
 		Pebble = Color3.fromRGB(200, 205, 215),
@@ -1762,6 +1783,7 @@ task.spawn(function()
 	while true do
 		task.wait(1)
 		if active then
+			lightNearRocks()
 			refreshCharge()
 			if expanded and os.clock() >= collapseAt then
 				expanded = false
