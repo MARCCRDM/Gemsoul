@@ -126,11 +126,26 @@ for i = 1, 28 do
 		BackgroundTransparency = if i % 5 == 0 then 0.55 else 0.75,
 	})
 end
+-- While you choose, the screen takes the colour of your pick, rising faintly
+-- from the bottom (see refreshChoices).
+local ambient = frame(back, {
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.fromScale(0.5, 1),
+	Size = UDim2.fromScale(1, 0.7),
+	BackgroundColor3 = C.Cyan,
+	Visible = false,
+	ZIndex = 1,
+})
+new("UIGradient", {
+	Rotation = 90,
+	Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.84) }),
+}, ambient)
 local panel = frame(back, {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.new(0.5, 0, 0.5, 0),
 	Size = UDim2.new(1, -24, 1, -16),
+	ZIndex = 2,
 })
 local panelLimit = new("UISizeConstraint", { MaxSize = Vector2.new(1200, 880) }, panel)
 -- Wide, short phones: the panel stops at about two and a half times its
@@ -444,8 +459,9 @@ local function checkMark(parent)
 end
 local function setCheck(check, on, color)
 	check.Ring.BackgroundColor3 = if on then color else C.Ink
-	check.Ring.BackgroundTransparency = if on then 0 else 0.3
+	check.Ring.BackgroundTransparency = if on then 0 else 0.55
 	check.Edge.Color = if on then color else C.Edge
+	check.Edge.Transparency = if on then 0 else 0.35
 	check.Tick.Visible = on
 end
 -- Every piece lays itself out from its own size: compactMode and richMode
@@ -629,9 +645,10 @@ local elementOrder = { "Fire", "Frost", "Shock", "Poison" }
 local CARD_TALL = 410 -- a card at its fullest
 local CARD_MIN_H, CARD_MIN_W = 150, 150 -- (a card this short still fits gem, name and matchup)
 
--- Lay one element card out inside w x h: the gem on top (tall cards) or at
--- the left (wide ones), as big as the card allows, then as much of the rest
--- as fits. The matchup always shows, in words: BEATS and WEAK TO.
+-- Lay one element card out inside w x h: the gem on its stage on top (tall
+-- cards) or at the left (wide ones), as big as the card allows, then as much
+-- of the rest as fits. The matchup always shows, as two tiles along the
+-- bottom: what it beats and what it's weak to.
 local function layoutCard(card, w: number, h: number)
 	local wide = w > h * 1.15
 	local pad = if w < 200 then 10 else 16
@@ -639,75 +656,98 @@ local function layoutCard(card, w: number, h: number)
 	-- What its hits do: one line each, as many as fit.
 	local lineH = if narrow then 15 elseif w < 220 then 17 else 20
 	local lineSize = if narrow then 10 elseif w < 220 then 11 else 12
-	-- The matchup: two rows (or side by side when there's width).
-	local pillRow = w >= 300
-	local pillH = if h < 260 then 19 else 24
-	local pillsH = if pillRow then pillH else pillH * 2 + 4
-	card.Strong.Frame.Size = if pillRow then UDim2.new(0.5, -pad - 3, 0, pillH) else UDim2.new(1, -pad * 2, 0, pillH)
-	card.Weak.Frame.Size = card.Strong.Frame.Size
-	card.Strong.Frame.Position = if pillRow
-		then UDim2.new(0, pad, 1, -pad - pillH)
-		else UDim2.new(0, pad, 1, -pad - pillsH)
-	card.Weak.Frame.Position = if pillRow
-		then UDim2.new(0.5, 3, 1, -pad - pillH)
-		else UDim2.new(0, pad, 1, -pad - pillH)
-	for _, pill in { card.Strong, card.Weak } do
-		pill.Label.TextSize = if pillH < 22 then 9 else 11
-		pill.Label.Text = pill.Full
+	-- The matchup: two tiles side by side, or (too narrow for a long element
+	-- name in half the card) two one-line rows, one over the other.
+	local gap = if narrow then 4 else 6
+	local tileW = math.floor((w - pad * 2 - gap) / 2)
+	local stacked = tileW < 110
+	local rowH = if h < 260 then 19 else 22
+	local matchH = if stacked then rowH * 2 + gap elseif h < 260 then 32 else 40
+	for i, tile in { card.Strong, card.Weak } do
+		if stacked then
+			tile.Frame.Position = UDim2.new(0, pad, 1, -pad - matchH + (i - 1) * (rowH + gap))
+			tile.Frame.Size = UDim2.new(1, -pad * 2, 0, rowH)
+			local tight = w < 170
+			tile.HeadLimit.MaxTextSize = if tight then 8 else 9
+			tile.NameLimit.MaxTextSize = if tight then 9 elseif narrow then 10 else 11
+			tile.Name.Text = if tight then tile.Short else tile.Long
+			tile.Head.TextXAlignment, tile.Name.TextXAlignment = Enum.TextXAlignment.Right, Enum.TextXAlignment.Left
+			tile.Head.Position, tile.Head.Size = UDim2.new(), UDim2.new(0.44, 0, 1, 0)
+			tile.Name.Position, tile.Name.Size = UDim2.new(0.44, 6, 0, 0), UDim2.new(0.56, -8, 1, 0)
+		else
+			local small = matchH < 36
+			tile.Name.Text = tile.Long
+			tile.Frame.Position = UDim2.new(0, pad + (i - 1) * (tileW + gap), 1, -pad - matchH)
+			tile.Frame.Size = UDim2.fromOffset(tileW, matchH)
+			tile.HeadLimit.MaxTextSize, tile.NameLimit.MaxTextSize = if small then 8 else 9, if small then 10 else 12
+			tile.Head.TextXAlignment, tile.Name.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
+			tile.Head.Position = UDim2.fromOffset(0, if small then 3 else 6)
+			tile.Head.Size = UDim2.new(1, 0, 0, if small then 11 else 12)
+			tile.Name.Position = UDim2.fromOffset(4, if small then 14 else 19)
+			tile.Name.Size = UDim2.new(1, -8, 0, if small then 14 else 16)
+		end
 	end
-	card.Check.Ring.Position = UDim2.new(1, -8, 0, 8)
-	local bottom = h - pad - pillsH - 6 -- the strengths end here
-	local function placeLines(x: number, top: number, room: number)
+	card.Check.Ring.Position = UDim2.new(1, -10, 0, 10)
+	local bottom = h - pad - matchH - 8 -- the strengths end here
+	local function placeLines(x: number, top: number, room: number): number
 		local fit = math.max(0, math.floor(room / lineH))
 		for index, pair in card.Lines do
 			local show = index <= fit
+			local y = top + (index - 1) * lineH
 			pair[1].Visible, pair[2].Visible = show, show
-			pair[1].Position, pair[1].Size = UDim2.fromOffset(x, top + (index - 1) * lineH), UDim2.fromOffset(14, lineH)
-			pair[2].Position, pair[2].Size =
-				UDim2.fromOffset(x + 16, top + (index - 1) * lineH), UDim2.new(1, -x - pad - 16, 0, lineH)
-			pair[2].TextSize, pair[2].TextWrapped = lineSize, false
+			pair[1].Position, pair[1].Size = UDim2.fromOffset(x, y), UDim2.fromOffset(10, lineH)
+			pair[2].Position, pair[2].Size = UDim2.fromOffset(x + 16, y), UDim2.new(1, -x - pad - 16, 0, lineH)
+			pair.Limit.MaxTextSize, pair[2].TextWrapped = lineSize, false
 			pair[2].Text = if narrow and index == 1 then card.Hit else pair.Full
 		end
+		return fit
 	end
-	card.Title.Visible = false
-	card.Divider.Visible = false
+	-- The gem, its glow and ring round it, and its shadow under it.
+	local function placeGem(x: number, y: number, gem: number)
+		card.Holder.Position, card.Holder.Size = UDim2.fromOffset(x, y), UDim2.fromOffset(gem, gem)
+		local glow = gem + math.floor(gem * 0.18)
+		card.Stage.Position = UDim2.fromOffset(x + math.floor((gem - glow) / 2), y + math.floor((gem - glow) / 2))
+		card.Stage.Size = UDim2.fromOffset(glow, glow)
+		local sw, sh = math.floor(gem * 0.5), math.max(4, math.floor(gem * 0.06))
+		card.Shadow.Position = UDim2.fromOffset(x + math.floor((gem - sw) / 2), y + math.floor(gem * 0.84))
+		card.Shadow.Size = UDim2.fromOffset(sw, sh)
+	end
 	if wide then
 		-- Gem at the left, name and what it's about beside it, its hits under them.
 		local gem = math.clamp(math.floor(bottom - pad), 56, 150)
-		card.Halo.Position = UDim2.fromOffset(pad - 6, pad - 6)
-		card.Halo.Size = UDim2.fromOffset(gem + 12, gem + 12)
-		card.Holder.Position, card.Holder.Size = UDim2.fromOffset(pad, pad), UDim2.fromOffset(gem, gem)
+		placeGem(pad, pad, gem)
 		local x = pad + gem + 14
 		card.Name.TextXAlignment, card.Blurb.TextXAlignment = Enum.TextXAlignment.Left, Enum.TextXAlignment.Left
 		card.Name.TextSize = math.clamp(math.floor(gem * 0.24), 18, 28)
 		card.Name.Position, card.Name.Size = UDim2.fromOffset(x, pad), UDim2.new(1, -x - 36, 0, 30)
-		card.Blurb.Visible = true
 		card.Blurb.TextSize = 13
 		card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(x, pad + 30), UDim2.new(1, -x - pad, 0, 18)
-		placeLines(x, pad + 54, bottom - pad - 54)
+		card.Divider.Position, card.Divider.Size = UDim2.fromOffset(x, pad + 52), UDim2.new(1, -x - pad, 0, 1)
+		card.Divider.Visible = placeLines(x, pad + 58, bottom - pad - 58) > 0
 		return
 	end
 	-- Tall: the gem leads, then the name, what it's about, and its hits.
 	card.Name.TextXAlignment, card.Blurb.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
 	local nameH = if narrow then 24 else 30
 	local blurbH = if narrow then 15 else 18
-	-- The gem takes what's left once the words have one line of hits, up to
-	-- about half the card.
-	local words = 6 + nameH + blurbH + 6 + lineH
+	-- The gem takes what's left once the words have their lines of hits (more
+	-- of them on taller cards), up to about half the card.
+	local wanted = if h >= 380 then 3 elseif h >= 300 then 2 else 1
+	local words = 6 + nameH + blurbH + 12 + lineH * wanted
 	local cap = math.min(w - pad * 2 - 8, math.floor(h * 0.5), 200)
 	local gem = math.clamp(bottom - pad - words, math.min(48, cap), math.max(cap, 1))
-	card.Halo.Position = UDim2.new(0.5, -(gem + 24) / 2, 0, pad - 12)
-	card.Halo.Size = UDim2.fromOffset(gem + 24, gem + 24)
-	card.Holder.Position, card.Holder.Size = UDim2.new(0.5, -gem / 2, 0, pad), UDim2.fromOffset(gem, gem)
+	placeGem(math.floor((w - gem) / 2), pad, gem)
 	local y = pad + gem + 6
 	card.Name.TextSize = math.clamp(math.floor(w / 9), 18, 28)
 	card.Name.Position, card.Name.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, nameH)
 	y += nameH
-	card.Blurb.Visible = true
 	card.Blurb.TextSize = if narrow then 11 else 13
 	card.Blurb.Position, card.Blurb.Size = UDim2.fromOffset(pad, y), UDim2.new(1, -pad * 2, 0, blurbH)
 	y += blurbH + 6
-	placeLines(pad, y, bottom - y)
+	-- A hairline under the blurb, fading out at its ends.
+	card.Divider.Position, card.Divider.Size = UDim2.fromOffset(pad + 6, y), UDim2.new(1, -pad * 2 - 12, 0, 1)
+	y += 6
+	card.Divider.Visible = placeLines(pad + 2, y, bottom - y) > 0
 end
 
 local function layoutElements()
@@ -757,23 +797,41 @@ place(function()
 	layoutElements()
 end)
 listen(elementArea:GetPropertyChangedSignal("AbsoluteSize"), layoutElements)
--- "▲ BEATS CRYO" / "▼ WEAK TO THERMAL": the other element in its own colour.
-local function matchPill(parent, arrow: string, words: string, other: string, good: boolean)
-	local pill = frame(parent, {
-		BackgroundColor3 = if good then Color3.fromRGB(22, 44, 36) else Color3.fromRGB(48, 24, 28),
+-- A matchup tile: "▲ BEATS" over the element it beats, or "▼ WEAK TO" over
+-- the one that beats it, in that element's colour.
+local function matchTile(parent, good: boolean, other: string)
+	local tile = frame(parent, {
+		BackgroundColor3 = if good then Color3.fromRGB(19, 38, 32) else Color3.fromRGB(42, 21, 27),
 		ZIndex = 22,
 	})
-	UiKit.round(pill, 7)
-	local mark = string.format('<font color="%s">%s</font>', if good then "#6fe0a0" else "#ff7a7a", arrow)
-	local name = string.format(
-		'<font color="%s">%s</font>',
-		hex(GemConfig.ElementColors[other]),
-		string.upper(GemConfig.elementName(other))
+	UiKit.round(tile, 8)
+	stroke(tile, if good then Color3.fromRGB(70, 150, 110) else Color3.fromRGB(165, 72, 84), 0.72, 1)
+	local head = text(
+		tile,
+		string.format(
+			'<font color="%s">%s</font>  %s',
+			if good then "#6fe0a0" else "#ff7a7a",
+			if good then "▲" else "▼",
+			if good then "BEATS" else "WEAK TO"
+		),
+		9,
+		C.Dim,
+		Enum.Font.GothamBold,
+		{ RichText = true, ZIndex = 23 }
 	)
-	local full = string.format("%s  %s  %s", mark, words, name)
-	local value = text(pill, full, 10, C.Text, Enum.Font.GothamBold, { RichText = true, ZIndex = 23 })
-	value.TextXAlignment = Enum.TextXAlignment.Center
-	return { Frame = pill, Label = value, Full = full }
+	head.TextXAlignment = Enum.TextXAlignment.Center
+	head.TextScaled = true
+	local headLimit = new("UITextSizeConstraint", { MaxTextSize = 9, MinTextSize = 6 }, head)
+	local shade = hex(GemConfig.ElementColors[other])
+	local word = string.format('<font color="%s">%s</font>', shade, string.upper(GemConfig.elementName(other)))
+	local long = string.format('<font color="%s">◆</font>  %s', shade, word)
+	local name = text(tile, long, 12, C.Text, Enum.Font.GothamBlack, { RichText = true, ZIndex = 23 })
+	name.TextXAlignment = Enum.TextXAlignment.Center
+	name.TextScaled = true
+	local nameLimit = new("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 7 }, name)
+	-- (Short: without the dot, for the narrowest cards. The limits are the
+	-- sizes the layout picks: a longer translation shrinks a little instead.)
+	return { Frame = tile, Head = head, Name = name, Long = long, Short = word, HeadLimit = headLimit, NameLimit = nameLimit }
 end
 for _, element in elementOrder do
 	local info = ELEMENTS[element]
@@ -788,44 +846,101 @@ for _, element in elementOrder do
 	}, elementArea)
 	UiKit.round(card, 12)
 	local edge = stroke(card, C.Line, 0, 1)
-	-- A wash of its colour down from the top, and a soft glow behind the gem.
-	local wash = frame(card, { BackgroundColor3 = color, Size = UDim2.fromScale(1, 0.55), ZIndex = 21 })
+	-- A wash of its colour down from the top (stronger once picked), and a
+	-- glassy light along the top edge.
+	local wash = frame(card, { BackgroundColor3 = color, Size = UDim2.fromScale(1, 1), ZIndex = 21 })
+	local washFade = new("UIGradient", { Rotation = 90 }, wash)
+	frame(card, {
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.88,
+		Position = UDim2.fromOffset(14, 0),
+		Size = UDim2.new(1, -28, 0, 1),
+		ZIndex = 22,
+	})
+	-- The gem's stage: a soft glow, a ring (a spark runs round it once
+	-- picked), and a shadow under the gem.
+	local stage = frame(card, { BackgroundTransparency = 1, ZIndex = 22 })
+	local glow = {}
+	-- (five faint discs, one inside the other: brightest at the middle, with
+	-- no hard rings)
+	for _, scale in { 1, 0.86, 0.72, 0.58, 0.44 } do
+		local disc = frame(stage, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(scale, scale),
+			BackgroundColor3 = color,
+			BackgroundTransparency = 0.965,
+			ZIndex = 22,
+		})
+		UiKit.round(disc, 999)
+		table.insert(glow, { Disc = disc, Base = 0.965 })
+	end
+	local ring = frame(stage, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.86, 0.86),
+		BackgroundTransparency = 1,
+		ZIndex = 22,
+	})
+	UiKit.round(ring, 999)
+	local ringEdge = stroke(ring, color, 0.72, 1.5)
+	local spark = frame(ring, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0),
+		Size = UDim2.fromOffset(7, 7),
+		BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.55),
+		Visible = false,
+		ZIndex = 23,
+	})
+	UiKit.round(spark, 999)
+	local shadow = frame(card, { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, ZIndex = 22 })
+	UiKit.round(shadow, 999)
 	new("UIGradient", {
-		Rotation = 90,
 		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.8),
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0),
 			NumberSequenceKeypoint.new(1, 1),
 		}),
-	}, wash)
-	local haloDisc = frame(card, { BackgroundColor3 = color, BackgroundTransparency = 0.9, ZIndex = 22 })
-	UiKit.round(haloDisc, 999)
+	}, shadow)
 	local holder = frame(card, { BackgroundTransparency = 1, ZIndex = 23 })
 	local gem = { Id = "starter-" .. element, Element = element, Tier = "Common", Size = 3, Clarity = 5, Cut = 5 }
 	local art = Art.show(holder, gem, nil, color, false)
 	local check = checkMark(card)
 	local nameLabel = text(card, string.upper(GemConfig.elementName(element)), 24, color, Enum.Font.GothamBlack)
 	local blurb = text(card, info.Blurb, 13, C.Text, Enum.Font.GothamMedium)
-	local divider = frame(card, { BackgroundColor3 = C.Line, ZIndex = 22 })
-	local title = text(card, "STRENGTHS", 10, C.Dim, Enum.Font.GothamBold)
+	local divider = frame(card, { BackgroundColor3 = color:Lerp(C.Line, 0.6), ZIndex = 22, Visible = false })
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.2),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, divider)
 	local lines = {}
 	for _, strength in info.Strengths do
-		local mark = text(card, "+", 13, color, Enum.Font.GothamBlack)
+		local mark = text(card, "◆", 8, color, Enum.Font.GothamBlack)
+		mark.TextXAlignment = Enum.TextXAlignment.Center
 		local line = text(card, strength, 12, C.Dim, Enum.Font.GothamMedium)
-		table.insert(lines, { mark, line, Full = strength })
+		line.TextScaled = true
+		local limit = new("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 8 }, line)
+		table.insert(lines, { mark, line, Full = strength, Limit = limit })
 	end
-	local strong = matchPill(card, "▲", "BEATS", ElementMatchup.Beats[element], true)
-	local weak = matchPill(card, "▼", "WEAK TO", ElementMatchup.weakTo(element), false)
-	elementButtons[element] = {
+	local strong = matchTile(card, true, ElementMatchup.Beats[element])
+	local weak = matchTile(card, false, ElementMatchup.weakTo(element))
+	local entry = {
 		Button = card,
 		Stroke = edge,
-		Wash = wash,
-		Halo = haloDisc,
+		WashFade = washFade,
+		Stage = stage,
+		Glow = glow,
+		Ring = ringEdge,
+		Spark = spark,
+		Shadow = shadow,
 		Holder = holder,
 		Check = check,
 		Name = nameLabel,
 		Blurb = blurb,
 		Divider = divider,
-		Title = title,
 		Lines = lines,
 		Strong = strong,
 		Weak = weak,
@@ -835,12 +950,22 @@ for _, element in elementOrder do
 		Hit = info.Hit,
 		Phase = #elementOrder * 0.7 - (table.find(elementOrder, element) or 1) * 0.7,
 	}
+	elementButtons[element] = entry
 	listen(card.Activated, function()
 		if not savedKit and not busy then
 			chosenElement = element
 			refreshChoices()
 			layoutElements()
 		end
+	end)
+	-- A pointer over it lifts its edge.
+	listen(card.MouseEnter, function()
+		entry.Hover = true
+		refreshChoices()
+	end)
+	listen(card.MouseLeave, function()
+		entry.Hover = false
+		refreshChoices()
 	end)
 end
 layoutElements()
@@ -866,6 +991,12 @@ listen(RunService.RenderStepped, function(dt)
 			card.Turn = (card.Turn or card.Phase) + step * speed
 			model:PivotTo(GemArt.pose(card.Gem, card.Turn))
 		end
+	end
+	-- The picked gem's spark, round its ring.
+	local picked = chosenElement and elementButtons[chosenElement]
+	if picked then
+		local angle = spinAt * 1.4 - math.pi / 2
+		picked.Spark.Position = UDim2.fromScale(0.5 + 0.5 * math.cos(angle), 0.5 + 0.5 * math.sin(angle))
 	end
 end)
 
@@ -901,16 +1032,41 @@ function refreshChoices()
 			end
 		end
 	end
+	-- The picked element lights up; once one is picked, the others step back.
 	for id, card in elementButtons do
 		local on = id == chosenElement
-		card.Stroke.Color = if on then card.Color else C.Line
-		card.Stroke.Thickness = if on then 2.5 else 1
-		card.Button.BackgroundColor3 = if on then C.Card:Lerp(card.Color, 0.1) else C.Card
-		card.Halo.BackgroundTransparency = if on then 0.78 else 0.9
+		local back = chosenElement ~= nil and not on
+		card.Stroke.Color = if on then card.Color elseif card.Hover then card.Color:Lerp(C.Edge, 0.5) else C.Line
+		card.Stroke.Thickness = if on then 2 else 1
+		card.Button.BackgroundColor3 = if on then C.Card:Lerp(card.Color, 0.12) else C.Card
+		card.WashFade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, if on then 0.62 elseif back then 0.9 else 0.8),
+			NumberSequenceKeypoint.new(0.6, if on then 0.94 else 0.98),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		for _, glow in card.Glow do
+			glow.Disc.BackgroundTransparency = if on then glow.Base - 0.02 elseif back then glow.Base + 0.015 else glow.Base
+		end
+		card.Ring.Transparency = if on then 0.2 elseif back then 0.9 else 0.72
+		card.Spark.Visible = on
+		card.Name.TextColor3 = if back then card.Color:Lerp(C.Dim, 0.45) else card.Color
+		card.Blurb.TextColor3 = if back then C.Dim else C.Text
+		if card.Art and card.Art.View then
+			card.Art.View.ImageTransparency = if back then 0.35 else 0
+		end
 		for _, pair in card.Lines do
-			pair[2].TextColor3 = if on then C.Text else C.Dim
+			pair[2].TextColor3 = if on then C.Text elseif back then C.Faint else C.Dim
 		end
 		setCheck(card.Check, on, card.Color)
+	end
+	-- The screen takes the colour of your pick (the style's, then the element's).
+	local tint = if reward
+		then nil
+		elseif pickStep == "Element" then chosenElement and GemConfig.ElementColors[chosenElement]
+		else styleButtons[chosenStyle] and styleButtons[chosenStyle].Color
+	ambient.Visible = tint ~= nil
+	if tint then
+		tween(ambient, 0.35, { BackgroundColor3 = tint })
 	end
 	-- This screen's words and button.
 	if not reward then

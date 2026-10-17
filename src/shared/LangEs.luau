@@ -499,6 +499,7 @@ return {
 	["The armor you start in. You can wear any set later."] = "La armadura con la que empiezas. Luego puedes usar cualquier conjunto.",
 	["The armor you start in, with a sword and shield. You can wear any set later."] = "La armadura con la que empiezas, con espada y escudo. Luego puedes usar cualquier conjunto.",
 	["Your gems and your Q, E and R moves use it. Each one beats another."] = "Tus gemas y tus movimientos Q, E y R lo usan. Cada uno vence a otro.",
+	["{=} armor is set. Your gems, and the Q, E and R moves they give you, take this element. Each one beats another."] = "Armadura {=} lista. Tus gemas, y los movimientos Q, E y R que te dan, toman este elemento. Cada uno vence a otro.",
 	["It powers your Q / E / R moves. Your style's own element is picked; change it if you like."] = "Potencia tus movimientos Q / E / R. Ya elegimos el elemento de tu estilo; cámbialo si quieres.",
 	["{1} / {2}  FIGHTING STYLE  ·  the armor you start in, with a sword and shield"] = "{1} / {2}  ESTILO DE PELEA  ·  la armadura con la que empiezas, con espada y escudo",
 	["{1} / {2}  ELEMENT  ·  your three gems: the moves on Q / E / R"] = "{1} / {2}  ELEMENTO  ·  tus tres gemas: los movimientos de Q / E / R",

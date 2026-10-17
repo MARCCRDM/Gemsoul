@@ -94,11 +94,17 @@ for _,element in {"Fire","Frost","Shock","Poison"} do
    end
   end
  end
- local texts={}
- local function gather(o) for _,c in o.children do if c.Text then table.insert(texts,c.Text) end gather(c) end end
+ local texts,bullets={},0
+ local function gather(o)
+  for _,c in o.children do
+   if c.Text then table.insert(texts,c.Text) end
+   if c.Text=="◆" then bullets+=1 end -- (one per strength line)
+   gather(c)
+  end
+ end
  gather(named(element))
  local all=table.concat(texts,"\n")
- check(string.find(all,"STRENGTHS",1,true)~=nil,element.." card has no strengths")
+ check(bullets>=2,element.." card has no strengths")
  check(string.find(all,"BEATS",1,true)~=nil and string.find(all,"WEAK TO",1,true)~=nil,element.." card has no matchup in words")
 end
 failPrepare=true
