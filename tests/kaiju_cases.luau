@@ -158,19 +158,60 @@ for _, element in Kaiju.Elements do
 		check(Kaiju.isSoul(soul) and soul.Soul.Species == "Razorback", "Not marked as a kaiju's Gemsoul")
 		local ability = Kaiju.ability(soul)
 		check(ability and table.find(Kaiju.Abilities[element], ability), "Its E isn't one a kaiju casts")
-		check(GemTraits.traitFor(soul, "Q") == nil and GemTraits.traitFor(soul, "R") == nil, "A Gemsoul woke Q or R")
+		-- One stone, three moves: a Q and an R a kaiju can cast too.
+		local q, r = GemTraits.traitFor(soul, "Q"), GemTraits.traitFor(soul, "R")
+		check(q and table.find(Kaiju.Moves[element].Offense, q), "A Gemsoul's Q isn't one a kaiju casts")
+		check(r and table.find(Kaiju.Moves[element].Defense, r), "A Gemsoul's R isn't one a kaiju casts")
 		check(GemTraits.traitFor(soul, "E") == ability, "A Gemsoul's E doesn't work")
 		check(soul.Tier and soul.Size and soul.Clarity and soul.Cut, "A Gemsoul isn't a whole gem")
+		-- Its moves wake as it levels: E at once, Q at 5, R at 10.
+		local young, five, ten = Kaiju.moves(soul, 1), Kaiju.moves(soul, 5), Kaiju.moves(soul, 10)
+		check(young.E == ability and young.Q == nil and young.R == nil, "A level 1 kaiju has more than its E")
+		check(Kaiju.moves(soul, 4).Q == nil and five.Q == q and five.R == nil, "Q doesn't wake at level 5")
+		check(Kaiju.moves(soul, 9).R == nil and ten.R == r and ten.Q == q and ten.E == ability, "R doesn't wake at level 10")
+		local id, awake = Kaiju.move(soul, "R", 3)
+		check(id == r and not awake, "A sleeping R isn't named, or is awake")
 	end
 end
-for element, list in Kaiju.Abilities do
-	check(#list >= 3, element .. ": too few kaiju abilities")
-	for _, id in list do
-		check(table.find(GemTraits.Matrix[element].Ability, id), id .. " isn't one of " .. element .. "'s E moves")
-		local move = GemTraits.Moves[id]
-		check(move and not string.find(move.Description, "while ready"), id .. " is a passive")
+check(Kaiju.MoveLevels.E == 1 and Kaiju.MoveLevels.Q == 5 and Kaiju.MoveLevels.R == 10, "The move levels aren't E 1, Q 5, R 10")
+local lanesOf = { Offense = 0, Ability = 0, Defense = 0 }
+for element, lanes in Kaiju.Moves do
+	check(lanes.Ability == Kaiju.Abilities[element], element .. ": Abilities isn't the E lane")
+	for lane, list in lanes do
+		check(#list >= 3, element .. ": too few kaiju " .. lane .. " moves")
+		lanesOf[lane] += #list
+		for _, id in list do
+			check(table.find(GemTraits.Matrix[element][lane], id), id .. " isn't one of " .. element .. "'s " .. lane .. " moves")
+			local move = GemTraits.Moves[id]
+			check(move and not string.find(move.Description, "while ready"), id .. " is a passive")
+			check(Kaiju.AbilityPlans[id] ~= nil, id .. " has no plan for a kaiju to cast it")
+		end
 	end
 end
+check(lanesOf.Offense == 12 and lanesOf.Defense == 12, "Not three Q and three R moves per element")
+-- Q and R plans: the shapes KaijuAbilities knows, and an R's numbers.
+local shapes = { Bolt = 1, Blast = 1, Nova = 1, Line = 1, Field = 1, Chain = 1, Storm = 1, Pylon = 1, Shell = 1, Ward = 1, Mend = 1 }
+for id, plan in Kaiju.AbilityPlans do
+	check(shapes[plan.Shape], id .. ": an unknown shape " .. tostring(plan.Shape))
+	if plan.Shape == "Shell" then
+		check(plan.Absorb > 0 and plan.Absorb <= 1 and plan.Duration > 0, id .. ": a shell without an absorb or a time")
+	elseif plan.Shape == "Ward" then
+		check(plan.Reduce > 0 and plan.Reduce < 1 and plan.Duration > 0, id .. ": a ward without a cut or a time")
+	elseif plan.Shape == "Mend" then
+		check(plan.Heal > 0 and plan.Duration > 0, id .. ": a mend without a heal or a time")
+	end
+end
+-- A Gemsoul saved before Q and R woke (its Q and R rolled from the whole
+-- lane): seeded into the kaiju's own, the same everywhere.
+local oldSoul = { Id = "old-soul", Element = "Fire", Tier = "Rare", Soul = { Kind = "Kaiju" },
+	Traits = { Offense = "Q_CinderCleave", Ability = "E_Supernova", Defense = "R_PhoenixMantle" } }
+local oq = GemTraits.traitFor(oldSoul, "Q")
+check(table.find(Kaiju.Moves.Fire.Offense, oq) and oq == GemTraits.traitFor(table.clone(oldSoul), "Q"), "An old Gemsoul's Q isn't seeded into a kaiju's")
+check(table.find(Kaiju.Moves.Fire.Defense, GemTraits.traitFor(oldSoul, "R")), "An old Gemsoul's R isn't seeded into a kaiju's")
+check(GemTraits.traitFor(oldSoul, "E") == "E_Supernova", "An old Gemsoul lost its E")
+-- Each key's power: a Q hits for QPower, an R's own hits for RPower.
+check(math.abs(Kaiju.abilityDamage(10, oldSoul, "Q_MagmaFault") / Kaiju.abilityDamage(10, oldSoul, "E_Supernova")
+	- (Kaiju.QPower * Kaiju.AbilityPlans.Q_MagmaFault.Mult) / (Kaiju.AbilityPower * Kaiju.AbilityPlans.E_Supernova.Mult)) < 1e-6, "A Q doesn't hit for QPower")
 local plain = { Id = "plain", Element = "Fire", Tier = "Rare" }
 check(not Kaiju.isSoul(plain) and GemTraits.traitFor(plain, "Q") ~= nil, "A plain gem lost its Q")
 local kaiju =

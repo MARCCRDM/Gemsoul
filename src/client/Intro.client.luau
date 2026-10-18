@@ -1648,7 +1648,7 @@ end
 -- rises out of it, with its name. Q, then E, then R. Click to skip ahead.
 local KEYS = {
 	{ Key = "Q", Color = Color3.fromRGB(255, 138, 92), Slot = "SWORD", Gem = "SWORD GEM", Pays = "CHARGE" },
-	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CORE", Gem = "CORE GEM", Pays = "CHARGE" },
+	{ Key = "E", Color = Color3.fromRGB(122, 196, 255), Slot = "CHEST", Gem = "CHEST GEM", Pays = "CHARGE" },
 	{ Key = "R", Color = Color3.fromRGB(120, 230, 170), Slot = "DEFENSE", Gem = "SHIELD GEM", Pays = "STAMINA" },
 }
 local WELL = 156 -- (px: the reel's window)

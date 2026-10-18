@@ -36,7 +36,7 @@ show the sky, and a planet in it).
 
 ## The pools
 
-| Element | Q (sword) | E (core) | R (defense) |
+| Element | Q (sword) | E (chest) | R (shield) |
 | --- | --- | --- | --- |
 | Thermal | ***Meteor Leap*** / Magma Fault | Supernova / ***Flame Tornado*** | Fire Wall / **Ring of Fire** |
 | Cryo | ***Frost Chakram*** / Permafrost Spire | Absolute Zero / ***Hailstorm*** | Frozen Wall / **Ice Pillar** |

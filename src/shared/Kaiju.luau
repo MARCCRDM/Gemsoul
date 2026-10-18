@@ -9,10 +9,11 @@
 	  Carapace   a low shell on four legs: the hardest to wear down
 
 	Every kaiju carries its Gemsoul: a gem of its element, rolled like any
-	gem (rarity, Size, Clarity, Cut), whose only working move is its E
-	ability. The kaiju casts it in a fight. A kaiju killed (or lost in the
-	arena) leaves its Gemsoul behind as a gem anyone can socket; only its E
-	works there too.
+	gem (rarity, Size, Clarity, Cut), and all three of its moves come from
+	that one stone: its E from the start, its Q from level 5, its R from
+	level 10 (MoveLevels). The kaiju casts them in a fight. A kaiju killed
+	(or lost in the arena) leaves its Gemsoul behind as a gem anyone can
+	socket, its Q, E and R working in a sword, a chest and a shield.
 
 	Taming: bring a wild kaiju to half health or less WITHOUT killing it (it
 	glows gold when it's ready), then cast your tame (Tame.Cast seconds of
@@ -88,14 +89,26 @@ Kaiju.SoulBonus = { Common = 1, Uncommon = 1.05, Rare = 1.1, UltraRare = 1.15, L
 -- its blows (times its Gemsoul's output, GemTraits.Output).
 Kaiju.AbilityEvery = 9
 Kaiju.AbilityPower = 2.6
--- The E abilities a Gemsoul rolls, by element: the ones you see land (bolts,
--- blasts, storms, waves), never a dash or a "while ready" bonus.
-Kaiju.Abilities = {
-	Fire = { "E_EmberLance", "E_Supernova", "E_SolarFlare", "E_FlameTornado" },
-	Frost = { "E_CryoLance", "E_AbsoluteZero", "E_Hailstorm" },
-	Shock = { "E_IonSpark", "E_ChainLightning", "E_ThunderPylon", "E_StormCall", "E_IonCannon" },
-	Poison = { "E_AcidSpray", "E_ToxicCloud", "E_ArmorMelt", "E_ToxicTide", "E_Maneater" },
-}
+-- Its Gemsoul's three moves wake as it levels: E from the start, Q from
+-- level 5, R from level 10.
+Kaiju.MoveLevels = { Q = 5, E = 1, R = 10 }
+-- Q, its strike: in place of a blow, every this many seconds, for this many
+-- of its blows. R, its defense: when it's down to RWhen of its health or a
+-- heavy blow (or a cast) is coming its way, at most every REvery seconds.
+-- Power: its R's own hits (a ring's burn, an aura's ticks), in its blows.
+Kaiju.QEvery = 7
+Kaiju.QPower = 1.6
+Kaiju.REvery = 14
+Kaiju.RWhen = 0.6
+Kaiju.RPower = 1
+-- The moves a Gemsoul rolls, by element and lane (GemTraits.SoulMoves).
+-- Abilities: its E's, the ones you see land (bolts, blasts, storms,
+-- waves), never a dash or a "while ready" bonus.
+Kaiju.Moves = GemTraits.SoulMoves
+Kaiju.Abilities = {}
+for element, lanes in GemTraits.SoulMoves do
+	Kaiju.Abilities[element] = lanes.Ability
+end
 
 -- How each E lands when a kaiju casts it (KaijuServer). Shape:
 --   Bolt   a shot at its foe          Blast  an area on its foe (after Delay)
@@ -123,6 +136,44 @@ Kaiju.AbilityPlans = {
 	E_ArmorMelt = { Shape = "Bolt", Mult = 0.8, Status = "Vulnerable" },
 	E_ToxicTide = { Shape = "Line", Length = 24, Width = 8, Mult = 1.2, Status = "Poison", Show = "ToxicTide" },
 	E_Maneater = { Shape = "Blast", Radius = 5, Delay = 0.4, Mult = 1.4, Status = "Stun", Show = "Maneater" },
+
+	-- Q, its strike (the same shapes as an E, quicker and closer in).
+	Q_FurnaceCrescent = { Shape = "Line", Length = 9, Width = 6, Mult = 1, Status = "Burn" },
+	Q_MagmaFault = { Shape = "Line", Length = 16, Width = 4, Mult = 1, Status = "Burn" },
+	Q_MeteorLeap = { Shape = "Blast", Radius = 6, Delay = 0.5, Mult = 1.2, Status = "Burn" },
+	Q_GlacierFan = { Shape = "Line", Length = 10, Width = 6, Mult = 0.9, Status = "Slow" },
+	Q_PermafrostSpire = { Shape = "Blast", Radius = 4, Delay = 0.4, Mult = 1, Status = "Freeze" },
+	Q_FrostChakram = { Shape = "Line", Length = 18, Width = 3, Mult = 1, Status = "Slow" },
+	Q_CircuitCleave = { Shape = "Chain", Radius = 10, Hits = 3, Mult = 1 },
+	Q_ThunderDash = { Shape = "Line", Length = 14, Width = 4, Mult = 1.1, Status = "Stun" },
+	Q_Skybreaker = { Shape = "Blast", Radius = 4, Delay = 0.6, Mult = 1.3, Status = "Stun" },
+	Q_CausticDart = { Shape = "Bolt", Mult = 0.9, Status = "Poison" },
+	Q_VitriolSweep = { Shape = "Line", Length = 9, Width = 6, Mult = 1, Status = "Vulnerable" },
+	Q_ToxicFlask = { Shape = "Blast", Radius = 6, Delay = 0.5, Mult = 1, Status = "Poison" },
+
+	-- R, its defense. Shell: soaks Absorb of its health for Duration. Ward:
+	-- takes Reduce less for Duration. Mend: heals Heal of its health over
+	-- Duration (Cleanse: shakes off burns, poisons, slows and blinds).
+	-- Aura: every second, hits foes within Radius with Mult of its R power
+	-- (and its Status). Burst: when the shell breaks or runs out, a ring of
+	-- Radius round it (Mult, Status). A Nova is a ring at once.
+	R_HeatShield = { Shape = "Shell", Absorb = 0.18, Duration = 4, Aura = { Radius = 5, Mult = 0.15, Status = "Burn" } },
+	R_Cauterize = { Shape = "Mend", Heal = 0.15, Duration = 3, Cleanse = true },
+	R_RingOfFire = { Shape = "Nova", Radius = 7, Mult = 0.8, Status = "Burn" },
+	R_IceArmor = { Shape = "Ward", Reduce = 0.25, Duration = 5 },
+	R_GlacialBulwark = {
+		Shape = "Shell",
+		Absorb = 0.22,
+		Duration = 5,
+		Burst = { Radius = 8, Mult = 0.4, Status = "Slow" },
+	},
+	R_IcePillar = { Shape = "Shell", Absorb = 1, Duration = 1.5, Burst = { Radius = 8, Mult = 0.3, Status = "Slow" } },
+	R_IonShield = { Shape = "Shell", Absorb = 0.15, Duration = 6 },
+	R_Capacitor = { Shape = "Shell", Absorb = 0.18, Duration = 4, Recharge = 3 },
+	R_TeslaFence = { Shape = "Nova", Radius = 7, Mult = 0.6, Status = "Stun" },
+	R_RadShield = { Shape = "Shell", Absorb = 0.18, Duration = 5, Cleanse = true },
+	R_BioRegrowth = { Shape = "Mend", Heal = 0.3, Duration = 6 },
+	R_ToxicMantle = { Shape = "Ward", Reduce = 0.1, Duration = 5, Aura = { Radius = 5, Mult = 0.2, Status = "Poison" } },
 }
 
 -- How big they stand in the world (KaijuModels are about four studs tall at
@@ -392,14 +443,19 @@ function Kaiju.isSoul(gem): boolean
 	return type(gem) == "table" and type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju"
 end
 
--- A Gemsoul for a kaiju of an element: rolled like any gem, its E ability
--- one of its element's (Kaiju.Abilities). `opts` = { Luck, Id, Time, Species }.
+-- A Gemsoul for a kaiju of an element: rolled like any gem, its three
+-- moves its element's that a kaiju can cast (Kaiju.Moves). `opts` = { Luck,
+-- Id, Time, Species }.
 function Kaiju.rollSoul(rng, element: string, opts)
 	local rolled = GemRoller.roll(rng, opts.Luck or 0)
 	GemRoller.setElement(rolled, element)
-	local lane = Kaiju.Abilities[element]
-	if lane then
-		rolled.Traits.Ability = lane[rng:NextInteger(1, #lane)]
+	local lanes = Kaiju.Moves[element]
+	if lanes then
+		rolled.Traits = rolled.Traits or {}
+		-- (E first, as before, so a seed rolls the same E.)
+		for _, lane in { "Ability", "Offense", "Defense" } do
+			rolled.Traits[lane] = lanes[lane][rng:NextInteger(1, #lanes[lane])]
+		end
 	end
 	return {
 		Id = opts.Id,
@@ -419,13 +475,16 @@ function Kaiju.rollSoul(rng, element: string, opts)
 	}
 end
 
--- The damage of a kaiju's E: its blow times AbilityPower, times its
--- Gemsoul's output (rarity, GemTraits.Output) and a little more for a
--- bigger stone (Size), times the move's share (Kaiju.AbilityPlans).
+-- The damage of a kaiju's move: its blow times its key's power (an E's
+-- AbilityPower, a Q's QPower, an R's RPower), times its Gemsoul's output
+-- (rarity, GemTraits.Output) and a little more for a bigger stone (Size),
+-- times the move's share (Kaiju.AbilityPlans).
 function Kaiju.abilityDamage(damage: number, gem, abilityId: string?): number
 	local plan = abilityId and Kaiju.AbilityPlans[abilityId]
 	local size = (math.clamp((gem and gem.Size) or 1, 1, 10) - 1) / 9
-	return damage * Kaiju.AbilityPower * GemTraits.output(gem) * (1 + 0.2 * size) * (plan and plan.Mult or 1)
+	local key = abilityId and string.sub(abilityId, 1, 2)
+	local power = if key == "Q_" then Kaiju.QPower elseif key == "R_" then Kaiju.RPower else Kaiju.AbilityPower
+	return damage * power * GemTraits.output(gem) * (1 + 0.2 * size) * (plan and plan.Mult or 1)
 end
 
 -- A wild kaiju's level: near the strongest kaiju out with the players
@@ -462,6 +521,25 @@ end
 -- The E ability its Gemsoul carries.
 function Kaiju.ability(gem): string?
 	return Kaiju.isSoul(gem) and GemTraits.traitFor(gem, "E") or nil
+end
+
+-- The move its Gemsoul gives `key` (Q, E or R), and whether a kaiju of
+-- `level` has it awake yet (MoveLevels).
+function Kaiju.move(gem, key: string, level: number?): (string?, boolean)
+	local id = if Kaiju.isSoul(gem) then GemTraits.traitFor(gem, key) else nil
+	return id, id ~= nil and (level or 1) >= (Kaiju.MoveLevels[key] or math.huge)
+end
+
+-- Its moves awake at `level`: { Q, E, R } (nil while asleep).
+function Kaiju.moves(gem, level: number?): { [string]: string }
+	local out = {}
+	for _, key in { "Q", "E", "R" } do
+		local id, awake = Kaiju.move(gem, key, level)
+		if awake then
+			out[key] = id
+		end
+	end
+	return out
 end
 
 -- A new kaiju record.

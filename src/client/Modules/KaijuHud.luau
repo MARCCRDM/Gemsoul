@@ -168,6 +168,39 @@ local chipText = label(chip, "E", 11, P.Text)
 chipText.Size = UDim2.fromScale(1, 1)
 chipText.TextXAlignment = Enum.TextXAlignment.Center
 chipText.ZIndex = 4
+-- Its Q and R, from the same Gemsoul: chips on the other corners, filling
+-- as they ready; asleep (dim, the level they wake at) while it's young.
+local function keyChip(anchor: Vector2, position: UDim2, key: string)
+	local frame = new("Frame", {
+		AnchorPoint = anchor,
+		Position = position,
+		Size = UDim2.fromOffset(20, 20),
+		BackgroundColor3 = INK,
+		ZIndex = 3,
+	}, view)
+	frame.Name = "Chip" .. key
+	UiKit.round(frame, 10)
+	local edge = new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, frame)
+	local fill = new("Frame", {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromScale(1, 0),
+		BackgroundColor3 = P.Gold,
+		BackgroundTransparency = 0.5,
+		ZIndex = 3,
+	}, frame)
+	UiKit.round(fill, 10)
+	local letter = label(frame, key, 11, P.Text)
+	letter.Size = UDim2.fromScale(1, 1)
+	letter.TextXAlignment = Enum.TextXAlignment.Center
+	letter.ZIndex = 4
+	return { Frame = frame, Stroke = edge, Fill = fill, Text = letter, Key = key }
+end
+local keyChips = {
+	keyChip(Vector2.new(0, 1), UDim2.new(0, -3, 1, 3), "Q"),
+	keyChip(Vector2.new(1, 0), UDim2.new(1, 3, 0, -3), "R"),
+}
+local KEY_EVERY = { Q = Kaiju.QEvery, R = Kaiju.REvery }
 
 local nameText = label(card, "", 13)
 nameText.Position, nameText.Size = UDim2.fromOffset(62, 5), UDim2.new(1, -140, 0, 16)
@@ -306,6 +339,10 @@ local function showPortrait(record)
 	cardStroke.Color = color:Lerp(P.Edge, 0.4)
 	chipStroke.Color = color
 	chipFill.BackgroundColor3 = color
+	for _, c in keyChips do
+		c.Stroke.Color = color
+		c.Fill.BackgroundColor3 = color
+	end
 end
 
 -- The wild kaiju you could try to tame now: the weakest near you.
@@ -368,6 +405,17 @@ local function refresh()
 	local since = if castAt then workspace:GetServerTimeNow() - castAt else math.huge
 	chipFill.Size = UDim2.fromScale(1, math.clamp(since / Kaiju.AbilityEvery, 0, 1))
 	chipText.TextColor3 = if since >= Kaiju.AbilityEvery then INK else P.Text
+	-- Its Q and R: awake from their levels (Kaiju.MoveLevels).
+	for _, c in keyChips do
+		local _, awake = Kaiju.move(record.Soul, c.Key, level)
+		local at = model and model:GetAttribute("Kaiju" .. c.Key .. "At")
+		local ready = if at then workspace:GetServerTimeNow() - at else math.huge
+		local every = KEY_EVERY[c.Key]
+		c.Text.Text = if awake then c.Key else tostring(Kaiju.MoveLevels[c.Key])
+		c.Stroke.Transparency = if awake then 0 else 0.7
+		c.Fill.Size = UDim2.fromScale(1, if awake then math.clamp(ready / every, 0, 1) else 0)
+		c.Text.TextColor3 = if awake and ready >= every then INK elseif awake then P.Text else P.Dim
+	end
 	-- Knocked out.
 	local back = player:GetAttribute("KaijuDownUntil")
 	local wait = if type(back) == "number" then back - workspace:GetServerTimeNow() else 0
@@ -621,14 +669,19 @@ function drawPanel()
 			if Kaiju.expToNext(record.Level) == math.huge then "MAX" else tostring(Kaiju.expToNext(record.Level))
 		)
 		local soul = record.Soul
-		local ability = Kaiju.ability(soul)
-		local move = ability and GemTraits.Moves[ability]
-		soulText.Text = string.format(
-			"%s\nE: %s\n%s\nQ and R are sealed: only its E wakes, wherever it's socketed.",
-			if soul then GemConfig.displayName(soul) else "?",
-			moveName(ability),
-			if move and move.Description then move.Description else ""
-		)
+		-- Its Gemsoul's three moves: E from the start, Q and R as it levels.
+		local lines = { if soul then GemConfig.displayName(soul) else "?" }
+		for _, key in { "E", "Q", "R" } do
+			local id, awake = Kaiju.move(soul, key, record.Level)
+			table.insert(
+				lines,
+				if awake
+					then string.format("%s: %s", key, moveName(id))
+					else string.format("%s: %s  ·  wakes at Lv %d", key, moveName(id), Kaiju.MoveLevels[key])
+			)
+		end
+		table.insert(lines, "In your gear, its Gemsoul gives all three.")
+		soulText.Text = table.concat(lines, "\n")
 	else
 		portrait(heroView, nil)
 		heroName.Text = "No kaiju yet"
@@ -661,8 +714,17 @@ function drawPanel()
 			UiKit.round(stripe, 2)
 			local title = label(frame, string.format("%s · Lv %d", Kaiju.title(other), other.Level), 14)
 			title.Position, title.Size = UDim2.fromOffset(14, 5), UDim2.new(1, -140, 0, 18)
-			local sub = label(frame, "E: " .. moveName(Kaiju.ability(other.Soul)), 11, P.Dim, IronUi.Body)
+			-- Its moves awake (E, then Q from level 5 and R from 10).
+			local awake = {}
+			for _, key in { "E", "Q", "R" } do
+				local move, up = Kaiju.move(other.Soul, key, other.Level)
+				if up then
+					table.insert(awake, key .. ": " .. moveName(move))
+				end
+			end
+			local sub = label(frame, table.concat(awake, "  ·  "), 11, P.Dim, IronUi.Body)
 			sub.Position, sub.Size = UDim2.fromOffset(14, 25), UDim2.new(1, -140, 0, 14)
+			sub.TextTruncate = Enum.TextTruncate.AtEnd
 			if id == data.Active then
 				local out = label(frame, "OUT", 12, P.Good)
 				out.AnchorPoint = Vector2.new(1, 0.5)

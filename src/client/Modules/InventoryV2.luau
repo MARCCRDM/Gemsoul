@@ -101,7 +101,7 @@ local SLOT_NAME =
 	{ Helmet = "HELMET", Armor = "CHEST", Gloves = "GLOVES", Boots = "BOOTS", Weapon = "SWORD", Shield = "SHIELD" }
 local KEYS = { "Q", "E", "R" }
 -- The Q / E / R triad (Shared.GemTraits): each key has a job and a colour,
--- and reads one socket: Q the sword's gem, E the core gem, R the shield's.
+-- and reads one socket: Q the sword's gem, E the chest's, R the shield's.
 local Traits = Tech.Traits
 local KEY_COLORS = {
 	Q = Color3.fromRGB(255, 138, 92),
@@ -1431,7 +1431,7 @@ local function buildSurges(canvas: Frame)
 				return acceptsKey(key, item)
 			end,
 			Drop = function(item: Item)
-				-- (with the triad on, the server sockets it in the sword, the core or the shield)
+				-- (with the triad on, the server sockets it in the sword, the chest or the shield)
 				socketInto(key, item)
 			end,
 		})
@@ -1926,8 +1926,8 @@ local function drawRows(loadout)
 		local tail: string = if signature then "  ·  " .. string.upper(signature.Definition.Name)
 			elseif gear and gear.BuffReady and gear.Passive and gear.Passive.Name and gear.Passive.Name ~= "Signature" then "  ·  " .. string.upper(gear.Passive.Name)
 			else ""
-		-- The triad: the sword gives Q its move, the shield R.
-		local rowKey = if triadOn(loadout) then (if slot == "Weapon" then "Q" elseif slot == "Shield" then "R" else nil) else nil
+		-- The triad: the sword gives Q its move, the chest E, the shield R.
+		local rowKey = if triadOn(loadout) then Traits.KeyOfSocket[slot] else nil
 		if rowKey and gem then
 			local move = Tech.Catalog[Traits.traitFor(gem, rowKey) or ""]
 			if move then
@@ -1991,10 +1991,6 @@ local function drawNudge(profile, loadout)
 			table.insert(empty, SLOT_NAME[slot])
 			first = first or slot
 		end
-	end
-	if triadOn(loadout) and loadout.Surge2Gem == nil then
-		table.insert(empty, "CORE (E)")
-		first = first or "E"
 	end
 	local spare = #GemInventory.available(profile)
 	-- (compact has no room for it: the rows' empty sockets glow instead)
@@ -2578,8 +2574,8 @@ local function drawDetail(loadout)
 				else "ENCHANTING IS PURE GAIN"
 			gw.Sub.TextColor3 = if gem then gemColor(gem) else C.Dim
 		end
-		-- The triad: the sword's gem is your Q, the shield's your R.
-		local slotKey = if triadOn(loadout) then (if slot == "Weapon" then "Q" elseif slot == "Shield" then "R" else nil) else nil
+		-- The triad: the sword's gem is your Q, the chest's your E, the shield's your R.
+		local slotKey = if triadOn(loadout) then Traits.KeyOfSocket[slot] else nil
 		local move = slotKey and gem and Tech.Catalog[Traits.traitFor(gem, slotKey) or ""]
 		if move then
 			gw.Sub.Text = slotKey .. "  ·  " .. string.upper(move.Name)
@@ -2888,7 +2884,7 @@ local function buildIntro(canvas: Frame)
 	label("Every gem carries three moves: an Offense, an Ability and a Defense. The socket a gem sits in decides which one you use.", 14, C.Dim, MEDIUM, 48, 108, 900, 40)
 	local columns = {
 		{ "Q", "OFFENSE", "Your sword's gem", "A sword technique: hit harder, wider or smarter. Pays Charge." },
-		{ "E", "ABILITY", "Your core gem", "Your elemental surge: a strike, a dash or an aura that helps while it's ready. Pays Charge." },
+		{ "E", "ABILITY", "Your chest's gem", "Your elemental surge: a strike, a dash or an aura that helps while it's ready. Pays Charge." },
 		{ "R", "DEFENSE", "Your shield's gem", "Survive pressure: walls, shields, cleanses. Pays Stamina, so it works from the first second." },
 	}
 	for i, column in columns do
@@ -2956,16 +2952,17 @@ drawIntro = function(profile, loadout)
 	-- Only for a returning miner whose old surge gems were moved (a new one
 	-- learns Q, E and R in the intro), only on the open Inventory (never
 	-- behind a loading screen), and once.
-	local show = state.Active == true
-		and triadOn(loadout)
-		and profile.TriadSeen ~= true
-		and (profile.TriadNotice or 0) > 0
-		and not introDone
+	local moved = profile.TriadSeen ~= true and (profile.TriadNotice or 0) > 0
+	local show = state.Active == true and triadOn(loadout) and (moved or profile.CoreNotice ~= nil) and not introDone
 	ui.Intro.Visible = show
 	if show then
-		ui.IntroNote.Text = if (profile.TriadNotice or 0) > 0
-			then string.format("Your old Q and R surge gems (%d) are back in your stash, safe: socket them in a sword, a shield or the core.", profile.TriadNotice)
-			else "Socket gems in your sword, your shield and the core slot to fill Q, E and R."
+		local core = if profile.CoreNotice == "Chest"
+			then "Your E now comes from your chest: your old core gem is on your chest."
+			elseif profile.CoreNotice == "Stash" then "Your E now comes from your chest: your old core gem is in your stash, so socket it in your chest."
+			else nil
+		ui.IntroNote.Text = if moved
+			then string.format("Your old Q and R surge gems (%d) are back in your stash, safe: socket them in a sword, a chest or a shield.", profile.TriadNotice)
+			else core or "Socket gems in your sword, your chest and your shield to fill Q, E and R."
 	end
 end
 

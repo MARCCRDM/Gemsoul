@@ -9,10 +9,12 @@
 	  SELL COMMONS  every spare Common to the shop in one go (tap twice:
 	          the server's SellSpare), for coins to spend on the market.
 	  Tree    the gem's three moves (Shared.GemTraits): the gem branches into
-	          Q (sword), E (core) and R (shield), and each branch shows every
+	          Q (sword), E (chest) and R (shield), and each branch shows every
 	          move that element can roll for that key, with this gem's lit,
-	          the odds under each, and a signature ★. Tap a move for what it
-	          does at this gem's numbers. This view only inspects existing moves.
+	          the odds under each, and a signature ★ (a kaiju's Gemsoul: the
+	          moves a kaiju casts, and the levels its kaiju wakes Q and R at).
+	          Tap a move for what it does at this gem's numbers. This view only
+	          inspects existing moves.
 
 	Drawn on the Inventory's 1600 x 840 canvas, so it scales with it.
 	  GemVault.open(canvas)   GemVault.close()   GemVault.isOpen()
@@ -23,6 +25,7 @@ local RunService = game:GetService("RunService")
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
+local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
@@ -56,7 +59,7 @@ local KEY_COLORS = {
 	R = Color3.fromRGB(120, 230, 170),
 }
 local KEY_LANE = { Q = "OFFENSE", E = "ABILITY", R = "DEFENSE" }
-local KEY_SOCKET = { Q = "SWORD", E = "CORE", R = "SHIELD" }
+local KEY_SOCKET = { Q = "SWORD", E = "CHEST", R = "SHIELD" }
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 
@@ -317,9 +320,17 @@ local function drawTree(parent: Frame, gem)
 		letter.TextXAlignment = Enum.TextXAlignment.Center
 		text(parent, KEY_LANE[key], 10, color, HEAVY, spineX + 62, mid - 14, 74, 13)
 		text(parent, KEY_SOCKET[key], 9, C.Dim, HEADING, spineX + 62, mid + 1, 74, 12)
-		-- Every move this element can roll for the key, along the branch.
-		local ids = (Traits.Matrix[gem.Element] or {})[lane] or {}
+		-- Every move this element can roll for the key, along the branch (a
+		-- kaiju's Gemsoul: the ones a kaiju casts, each as likely).
+		local soul = type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju"
+		local ids = ((if soul then Traits.SoulMoves else Traits.Matrix)[gem.Element] or {})[lane] or {}
 		local odds = Traits.odds(gem.Element, lane)
+		if soul then
+			odds = {}
+			for _, id in ids do
+				odds[id] = 1 / #ids
+			end
+		end
 		local mine = traits[lane]
 		local startX, tile, gap = spineX + 136, 56, 9
 		line(parent, color, spineX + 128, mid - 1, 8 + #ids * (tile + gap), 2, 0.8)
@@ -394,17 +405,12 @@ local function drawTree(parent: Frame, gem)
 				draw()
 			end)
 		end
-		-- A kaiju's Gemsoul (Shared.Kaiju): only its E wakes; Q and R are sealed.
-		if mine == nil and type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju" then
-			local width = #ids * (tile + gap)
-			local seal = box(parent, C.Ink, startX - 4, mid - tile / 2 - 16, width, tile + 34, 0.18)
-			round(seal, 12)
-			seal.ZIndex = 4
-			stroke(seal, color, 1, 0.5)
-			local words =
-				text(seal, "SEALED  ·  a kaiju's Gemsoul wakes only its E", 12, C.Dim, HEAVY, 0, 0, width, tile + 34)
-			words.TextXAlignment = Enum.TextXAlignment.Center
-			words.ZIndex = 5
+		-- A kaiju's Gemsoul (Shared.Kaiju): in your gear all three work; in its
+		-- kaiju, Q and R wake as it levels.
+		local wakes = if soul then Kaiju.MoveLevels[key] else nil
+		if wakes and wakes > 1 then
+			local x = startX + #ids * (tile + gap) + 4
+			text(parent, string.format("KAIJU LV %d", wakes), 9, color, HEAVY, x, mid - 6, 80, 12)
 		end
 	end
 end

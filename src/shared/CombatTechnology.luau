@@ -66,7 +66,7 @@ Tech.SurgeSlots = 3 -- Q, E, R
 -- (Character.Surge1Gem, Surge2Gem, Surge3Gem).
 Tech.SurgeSockets = { Q = "Surge1", E = "Surge2", R = "Surge3" }
 -- With the triad on (GemTraits), each key reads its own socket instead:
--- Q the sword's gem (its Offense), E the core socket's (its Ability) and R
+-- Q the sword's gem (its Offense), E the chest's (its Ability) and R
 -- the shield's (its Defense), as a projected copy carrying that trait.
 function Tech.surgeGem(loadout, key: string)
 	if GemTraits.active(loadout) then

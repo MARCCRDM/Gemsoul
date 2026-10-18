@@ -745,6 +745,12 @@ function Enemies.damage(
 	if e.ArmorAbsorb then
 		amount, absorbed = e.ArmorAbsorb(amount)
 	end
+	-- A creature's own shell (a wild kaiju's R: KaijuAbilities.soak).
+	if e.Soak then
+		local through = math.floor(e.Soak(amount) + 0.5)
+		absorbed += amount - through
+		amount = through
+	end
 	if (e.Shield or 0) > 0 and now < (e.ShieldUntil or 0) then
 		local shieldAbsorb = math.min(e.Shield, amount)
 		e.Shield -= shieldAbsorb

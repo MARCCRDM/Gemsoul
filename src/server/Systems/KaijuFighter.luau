@@ -4,14 +4,16 @@
 	kaiju or a hunter. It fights exactly as the Arena's duellist does, run by
 	the same brain (Shared.DuelistBrain), shrunk to its size: wind-ups and
 	combos, telegraphed heavies, guard and parry, hops aside, pounces,
-	counters, and its Gemsoul's E (KaijuAbilities) after a wind-up you can
-	see on its cast bar.
+	counters, and its Gemsoul's moves (KaijuAbilities) after a wind-up you
+	can see on its cast bar: its E, its Q in place of a blow once it's
+	level 5, its R when it's hard pressed once it's level 10.
 
 	  KaijuFighter.new(spec) -> Fighter
 	  KaijuFighter.step(fighter, foe, now)   one think (every 0.15s) against `foe`
 	  KaijuFighter.calm(fighter)             out of the fight: guard down, poses cleared
 	  KaijuFighter.of(model) -> Fighter?     the fighter a model is
 	  KaijuFighter.forget(fighter)           it's gone
+	  KaijuFighter.setMoves(fighter, moves)  its Q and R awake (a level)
 
 	spec = {
 	  Model, Root, Humanoid, Species, Element, Scale (its size)
@@ -20,10 +22,11 @@
 	              its pet record
 	  Stats       Damage, Rate, Speed, Reach (Kaiju.stats)
 	  Ability     its Gemsoul's E (nil: none)
+	  Moves       its Q and R awake (Kaiju.moves: { Q?, R? })
 	  FirstSurge  its E this long into a fight (Kaiju.FirstSurge)
 	  Strike(foe, amount, heavy, name) -> outcome   a blow landing on its foe
 	              ("Parried" leaves it reeling)
-	  Caster()    its E's caster (KaijuAbilities.cast)
+	  Caster()    its caster, for any of its moves (KaijuAbilities.cast)
 	}
 	foe = { Root, Pet? | Enemy? | Player? } (a victim, as KaijuAbilities' are)
 
@@ -59,6 +62,8 @@ local fighters: { [Instance]: any } = {} -- by model
 
 local HEAVY_COLOR = Color3.fromRGB(255, 120, 60)
 local HEAVY_CHARGE = 0.45 -- a player's charge this long is a heavy (CombatActions Heavy.Charge)
+local FIRST_Q = 6 -- its Q this long into a fight (after its E, so they don't land together)
+local R_WINDUP = 0.25 -- a shell goes up quickly: it's a reaction
 
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
@@ -214,6 +219,16 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 		f.NextSurge = now + Kaiju.AbilityEvery
 		f.NextAttack = math.max(f.NextAttack, now + 0.4)
 		return
+	elseif action.Kind == "Move" then
+		local caster = f.Caster(action.Id)
+		-- (A Capacitor's soaked charge brings its next Q and E nearer.)
+		caster.Recharge = function(seconds: number)
+			f.NextSurge -= seconds
+			f.NextQ -= seconds
+		end
+		KaijuAbilities.cast(caster, foe, action.Id)
+		f.NextAttack = math.max(f.NextAttack, now + 0.4)
+		return
 	end
 	local heavy = action.Kind == "Heavy"
 	local color = GemConfig.ElementColors[f.Element] or Color3.new(1, 1, 1)
@@ -277,6 +292,28 @@ local function engage(f, now: number)
 	elseif f.NextSurge == 0 or now - (f.LastFight or 0) > 6 then
 		f.NextSurge = now + (f.FirstSurge or KaijuFight.FirstSurge)
 	end
+	if f.NextQ == 0 or now - (f.LastFight or 0) > 6 then
+		f.NextQ, f.NextR = now + FIRST_Q, now
+	end
+end
+
+-- Winds up its Q or R (named on its cast bar), and starts that key's wait.
+local function move(f, key: string, id: string, foe, now: number)
+	local plan = Kaiju.AbilityPlans[id]
+	local kind = KaijuFight.surgeKind(plan)
+	local seconds = if key == "R" then R_WINDUP else Brain.Windup[kind] * 0.7
+	local named = GemTraits.Moves[id]
+	lower(f, now)
+	if key == "Q" then
+		f.LastOffense = now
+		f.NextQ = now + Kaiju.QEvery
+	else
+		f.NextR = now + Kaiju.REvery
+	end
+	f.Action = { Kind = "Move", Key = key, Id = id, At = now + seconds }
+	animate(f, kind, seconds, nil, if named then named.Name else key)
+	f.Humanoid:MoveTo(f.Root.Position)
+	face(f, foe.Root.Position)
 end
 
 function KaijuFighter.step(f, foe, now: number)
@@ -320,6 +357,21 @@ function KaijuFighter.step(f, foe, now: number)
 	local h = humanoid
 	local ratio = h.Health / math.max(1, h.MaxHealth)
 	local view = KaijuFight.view(f, readFoe(f, foe, now), now, distance, ratio)
+	-- Its R, hard pressed: low on health, or a heavy blow or a cast coming
+	-- (a ring only with its foe inside it).
+	local moves = f.Moves
+	local ringR = moves.R and Kaiju.AbilityPlans[moves.R]
+	if
+		moves.R
+		and now >= f.NextR
+		and not view.Stunned
+		and (ratio <= Kaiju.RWhen or view.FoeHeavy or view.FoeCasting)
+		and not (ringR and ringR.Shape == "Nova" and distance > (ringR.Radius or 6))
+	then
+		f.Choice = "R"
+		move(f, "R", moves.R, foe, now)
+		return
+	end
 	local choice = KaijuFight.decide(f, view, KaijuFighter.random())
 	f.Choice = choice
 	if choice == "Stagger" then
@@ -393,6 +445,10 @@ function KaijuFighter.step(f, foe, now: number)
 		end
 		humanoid:MoveTo(foe.Root.Position - dir * 2 * k + side * f.Weave * 1.5 * k)
 		face(f, foe.Root.Position)
+	elseif (choice == "Light" or choice == "Heavy") and moves.Q and now >= f.NextQ then
+		-- Its Q, in place of a blow.
+		f.Choice = "Q"
+		move(f, "Q", moves.Q, foe, now)
 	elseif choice == "Light" or choice == "Heavy" then
 		lower(f, now)
 		windup(f, choice, now)
@@ -446,9 +502,16 @@ function KaijuFighter.new(spec)
 	f.Element, f.Stats, f.Ability, f.Scale = spec.Element, spec.Stats, spec.Ability, spec.Scale or 1
 	f.FirstSurge = spec.FirstSurge
 	f.Strike, f.Caster = spec.Strike, spec.Caster
+	f.Moves = spec.Moves or {}
+	f.NextQ, f.NextR = 0, 0
 	f.Swings, f.Engaged = 0, false
 	fighters[spec.Model] = f
 	return f
+end
+
+-- Its Q and R awake now (Kaiju.moves, at a new level).
+function KaijuFighter.setMoves(f, moves)
+	f.Moves = moves or {}
 end
 
 -- New stats (a level, a Gemsoul): its blows and reach follow.

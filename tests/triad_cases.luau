@@ -204,13 +204,36 @@ check(Traits.traitsOf(siphon).Defense == "R_Capacitor", "Energy Siphon becomes C
 old.Traits = { Offense = "Q_CryoEdge", Ability = "E_WintersHold", Defense = "R_FrozenWall" }
 check(Traits.traitsOf(old).Defense == "R_FrozenWall", "A saved trait roll is kept")
 
--- The socket picks the trait: sword -> Q, core -> E, shield -> R.
+-- The socket picks the trait: sword -> Q, chest -> E, shield -> R. The
+-- gear's own gem sockets are the surge sockets; the old surge array (the
+-- core socket, Surge2, too) is retired.
 local sword = { Id = "S", Element = "Fire", Tier = "Legendary", Traits = { Offense = "Q_CinderDrill", Ability = "E_Supernova", Defense = "R_FireWall" } }
 local core = { Id = "C", Element = "Frost", Tier = "Common", Traits = { Offense = "Q_GlacierFan", Ability = "E_CryoLance", Defense = "R_IceArmor" } }
 local shield = { Id = "H", Element = "Shock", Tier = "Rare", Traits = { Offense = "Q_Railstorm", Ability = "E_IonSpark", Defense = "R_StaticCatch" } }
-local loadout = { WeaponGem = sword, Surge2Gem = core, ShieldGem = shield, Surge1Gem = { Id = "old1", Element = "Fire" }, Surge3Gem = { Id = "old3", Element = "Fire" } }
+local loadout = { WeaponGem = sword, ArmorGem = core, ShieldGem = shield, Surge1Gem = { Id = "old1", Element = "Fire" }, Surge3Gem = { Id = "old3", Element = "Fire" } }
 check(Tech.surgeGem(loadout, "Q").Surge == "Q_CinderDrill", "Q fires the sword gem's Offense")
-check(Tech.surgeGem(loadout, "E").Surge == "E_CryoLance", "E fires the core gem's Ability")
+check(Tech.surgeGem(loadout, "E").Surge == "E_CryoLance", "E fires the chest gem's Ability")
+check(Traits.Sockets.E == "Armor" and Traits.SocketNames.E == "Chest", "E isn't the chest's")
+check(Traits.KeyOfSocket.Weapon == "Q" and Traits.KeyOfSocket.Armor == "E" and Traits.KeyOfSocket.Shield == "R", "The gear slots don't name their keys")
+check(table.find(Traits.ArchivedSockets, "Surge2") and Traits.Moved.Surge2 == "Armor", "The core socket isn't retired onto the chest")
+check(Tech.surgeGem({ Surge2Gem = core }, "E") == nil, "A gem left on the old core socket still fires E")
+-- An old save's core gem: onto the chest worn, else the pouch, else it waits.
+local function save(character, gems)
+	return { Character = character, Gems = gems or {} }
+end
+local onChest = save({ Armor = "PaddedVest", Surge2Gem = core, ItemGems = {} })
+local went, clear = Traits.moveCoreGem(onChest, 300)
+check(went == "Chest" and clear and onChest.Character.ArmorGem == core and onChest.Character.Surge2Gem == nil, "The core gem didn't go onto the chest")
+check(onChest.Character.ItemGems.Armor.PaddedVest == core, "The chest piece doesn't keep its gem")
+check(Tech.surgeGem(onChest.Character, "E").Surge == "E_CryoLance", "The moved gem doesn't fire E")
+local taken = save({ Armor = "PaddedVest", ArmorGem = sword, Surge2Gem = core }, {})
+went, clear = Traits.moveCoreGem(taken, 300)
+check(went == "Stash" and clear and taken.Gems[1] == core and taken.Character.ArmorGem == sword, "A chest with a gem lost it, or the core gem was lost")
+local full = save({ Surge2Gem = core }, { sword, shield })
+went, clear = Traits.moveCoreGem(full, 2)
+check(went == nil and not clear and full.Character.Surge2Gem == core and #full.Gems == 2, "With no room the core gem must wait where it is")
+went, clear = Traits.moveCoreGem(save({ Armor = "PaddedVest" }), 300)
+check(went == nil and clear, "An empty core socket moved something")
 check(Tech.surgeGem(loadout, "R").Surge == "R_StaticCatch", "R fires the shield gem's Defense")
 check(loadout.WeaponGem.Surge == nil, "Projecting never touches the saved gem")
 check(Tech.surgeGem(loadout, "Q").SourceId == "S", "The projection remembers its gem")

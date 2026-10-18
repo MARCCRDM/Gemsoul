@@ -1,14 +1,24 @@
 --[[
-	A kaiju casting its Gemsoul's E (Shared.Kaiju.AbilityPlans): where it
-	lands, when, on whom, and how it looks. Pets and wild kaiju cast the same
-	way; the caster says who its foes are and how a hit lands on them.
+	A kaiju casting one of its Gemsoul's moves (Shared.Kaiju.AbilityPlans):
+	its E, its Q (a strike) or its R (a shell, a ward, a mend or a ring):
+	where it lands, when, on whom, and how it looks. Pets and wild kaiju cast
+	the same way; the caster says who its foes are and how a hit lands on
+	them.
 
-	  KaijuAbilities.cast(caster, aim) -> boolean   false if it has no E
+	  KaijuAbilities.cast(caster, aim, id?) -> boolean   false if it can't
+	                        (id: the move, else its E)
+	  KaijuAbilities.soak(body, amount) -> amount   a blow on it, less what
+	                        its R's shell or ward takes (KaijuServer.hurt,
+	                        Enemies.damage)
 
 	  caster = {
 	    Model, Root           the kaiju
 	    Element, Ability      its Gemsoul's element and E (an AbilityPlans id)
-	    Damage                the whole cast's damage (Kaiju.abilityDamage)
+	    Damage                its E's whole cast (Kaiju.abilityDamage)
+	    DamageOf(id)?         another move's (else Damage)
+	    Body?, Humanoid?      where its R's shell sits, and its health (a
+	                          shell or a mend needs them)
+	    Recharge(seconds)?    brings its next Q and E nearer (Capacitor)
 	    Foes(center, radius)  its foes inside a circle -> { victim }
 	    Hit(victim, amount, status?)   a hit landing on one of them
 	    Alive()               still able to finish a delayed cast
@@ -17,7 +27,8 @@
 	  aim = its foe's victim (where Bolts, Blasts and Lines go)
 
 	The big showcase moves draw with their own look (MoveVfx, "TriadShow");
-	the rest with the shared shots, blasts, arcs and pools.
+	the rest with the shared shots, blasts, arcs and pools; an R with the
+	triad's auras (TriadAura) on the kaiju.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -38,6 +49,12 @@ end
 KaijuAbilities.after = function(seconds: number, fn: () -> ())
 	task.delay(seconds, fn)
 end
+-- Its clock, for how long an R holds (os.clock, as KaijuServer and
+-- Enemies keep time). Tests replace it.
+KaijuAbilities.clock = os.clock
+
+-- The HUD's attribute for when each key last went off.
+local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" }
 
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
@@ -72,9 +89,138 @@ local function sweep(caster, a: Vector3, b: Vector3, width: number, amount: numb
 	end
 end
 
--- Cast its E at `aim`. Returns false if it has none.
-function KaijuAbilities.cast(caster, aim): boolean
-	local plan = Kaiju.AbilityPlans[caster.Ability]
+-- Every foe within `radius` of it, hit.
+local function ring(caster, radius: number, amount: number, status: string?)
+	each(caster, caster.Root.Position, radius, function(victim)
+		caster.Hit(victim, amount, status)
+	end)
+end
+
+-- Shakes off what the elements left on it: burns and poisons, slows, blinds.
+local function cleanse(body)
+	if not body then
+		return
+	end
+	if type(body.Dots) == "table" then
+		table.clear(body.Dots)
+	end
+	body.SlowUntil, body.BlindUntil = 0, 0
+end
+
+-- An R's aura: every second it holds, foes near it take its share.
+local function aura(caster, plan, damage: number, seconds: number)
+	local a = plan.Aura
+	if not a then
+		return
+	end
+	for i = 1, math.max(1, math.floor(seconds)) do
+		KaijuAbilities.after(i, function()
+			if caster.Alive() then
+				ring(caster, a.Radius or 5, damage * (a.Mult or 0.2), a.Status)
+			end
+		end)
+	end
+end
+
+function KaijuAbilities.soak(body, amount: number): number
+	local d = body and body.Defense
+	if not d then
+		return amount
+	end
+	if KaijuAbilities.clock() >= d.Until then
+		body.Defense = nil
+		return amount
+	end
+	if d.Reduce then
+		amount *= 1 - d.Reduce
+	end
+	if d.Left then
+		local taken = math.min(d.Left, amount)
+		d.Left -= taken
+		amount -= taken
+		if d.Left <= 0 then
+			-- Broken: a ward under it holds on; its burst goes off.
+			d.Left = nil
+			if not d.Reduce then
+				body.Defense = nil
+			end
+			d.Break()
+		end
+	end
+	return amount
+end
+
+-- Its R's shell or ward, its mend, or (a ring) nothing here: false.
+local function defend(caster, id: string, plan, damage: number): boolean
+	local fx = KaijuAbilities.fx
+	local shape = plan.Shape
+	local h = caster.Humanoid
+	local seconds = plan.Duration or 4
+	if shape == "Mend" then
+		if not h then
+			return false
+		end
+		cleanse(if plan.Cleanse then caster.Body else nil)
+		fx("TriadAura", caster.Root, id, caster.Element, "Heal", seconds)
+		local ticks = math.max(1, math.floor(seconds / 0.5))
+		for i = 1, ticks do
+			KaijuAbilities.after(i * 0.5, function()
+				if caster.Alive() then
+					h.Health = math.min(h.MaxHealth, h.Health + h.MaxHealth * plan.Heal / ticks)
+				end
+			end)
+		end
+		return true
+	end
+	local body = caster.Body
+	if not body then
+		return false
+	end
+	local d = { Until = KaijuAbilities.clock() + seconds }
+	if shape == "Shell" then
+		d.Left = (if h then h.MaxHealth else 100) * plan.Absorb
+	else
+		d.Reduce = plan.Reduce
+	end
+	-- Its burst: once, when the shell breaks or runs out.
+	local popped = false
+	d.Break = function()
+		if popped then
+			return
+		end
+		popped = true
+		local burst = plan.Burst
+		if burst and caster.Alive() then
+			local color = GemConfig.ElementColors[caster.Element] or Color3.new(1, 1, 1)
+			fx("Nova", caster.Root.Position, burst.Radius, color, 0)
+			ring(caster, burst.Radius, damage * (burst.Mult or 0.3), burst.Status)
+		end
+	end
+	body.Defense = d
+	cleanse(if plan.Cleanse then body else nil)
+	local look = if plan.Aura and plan.Aura.Status == "Poison"
+		then "Mantle"
+		elseif shape == "Shell" then "Shield"
+		else "Armor"
+	fx("TriadAura", caster.Root, id, caster.Element, look, seconds)
+	KaijuAbilities.after(seconds, function()
+		if body.Defense == d then
+			body.Defense = nil
+		end
+		d.Break()
+	end)
+	if plan.Recharge and caster.Recharge then
+		caster.Recharge(plan.Recharge)
+	end
+	aura(caster, plan, damage, seconds)
+	return true
+end
+
+-- Cast a move (its E, unless `id` names another) at `aim`. Returns false
+-- if it can't.
+function KaijuAbilities.cast(caster, aim, id: string?): boolean
+	id = id or caster.Ability
+	local plan = id and Kaiju.AbilityPlans[id]
 	if not plan or not aim or not aim.Root or not caster.Root then
 		return false
 	end
@@ -82,13 +228,18 @@ function KaijuAbilities.cast(caster, aim): boolean
 	local color = GemConfig.ElementColors[caster.Element] or Color3.new(1, 1, 1)
 	local from = caster.Root.Position
 	local at = aim.Root.Position
-	local damage = caster.Damage
+	local damage = if caster.DamageOf then caster.DamageOf(id) else caster.Damage
 	local status = plan.Status
 	local model = caster.Model
-	caster.Model:SetAttribute("KaijuAbilityAt", workspace:GetServerTimeNow())
+	local key = string.sub(id :: string, 1, 1)
+	caster.Model:SetAttribute(CAST_AT[key] or CAST_AT.E, workspace:GetServerTimeNow())
+
+	if plan.Shape == "Shell" or plan.Shape == "Ward" or plan.Shape == "Mend" then
+		return defend(caster, id :: string, plan, damage)
+	end
 
 	if plan.Shape == "Bolt" then
-		fx("Shot", nil, from, at, color, if caster.Ability == "E_EmberLance" then "Fireball" else nil)
+		fx("Shot", nil, from, at, color, if id == "E_EmberLance" then "Fireball" else nil)
 		KaijuAbilities.after(0.25, function()
 			if aim.Root.Parent then
 				caster.Hit(aim, damage, status)
@@ -113,7 +264,9 @@ function KaijuAbilities.cast(caster, aim): boolean
 		end)
 	elseif plan.Shape == "Nova" then
 		local radius = plan.Radius or 8
-		if caster.Element == "Poison" then
+		if id == "R_RingOfFire" then
+			fx("TriadRing", caster.Root, radius, 1, caster.Element)
+		elseif caster.Element == "Poison" then
 			fx("TriadBreak", from, radius, caster.Element)
 		else
 			fx("Nova", from, radius, color, 0)

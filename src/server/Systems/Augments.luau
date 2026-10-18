@@ -101,7 +101,7 @@ function Augments.start()
 			true,
 			if mode == "Classic"
 				then "Classic surges: Q, E and R read the three surge sockets."
-				else "The triad: Q is your sword's gem, E your core gem, R your shield's."
+				else "The triad: Q is your sword's gem, E your chest's, R your shield's."
 		)
 	end)
 	-- The "what's new" card about the triad has been read.
@@ -109,7 +109,8 @@ function Augments.start()
 		local profile = PlayerData.get(player)
 		if profile then
 			(profile :: any).TriadSeen = true;
-			(profile :: any).TriadNotice = nil
+			(profile :: any).TriadNotice = nil;
+			(profile :: any).CoreNotice = nil
 			PlayerData.sync(player)
 		end
 		return Shop.reply(true, "")

@@ -4,20 +4,28 @@
 
 	  key  lane     socket          pays with   job
 	  Q    Offense  the sword       Charge      the sword's special move
-	  E    Ability  the core socket Charge      your elemental surge (Strike,
+	  E    Ability  the chest       Charge      your elemental surge (Strike,
 	                                            Shift or Aura)
 	  R    Defense  the shield      Stamina     survive pressure
+
+	The gear's own gem sockets are the surge sockets: enchant the sword, the
+	chest and the shield and you have Q, E and R. (With a two-handed weapon,
+	no shield: the weapon's gem gives R too.)
 
 	Each element has five moves per lane (60 in all). A gem rolls one of each
 	from its element; signature moves roll at half the odds. Rarity sets how
 	strong all three are (Common 60% ... Legendary 100%, plus a Flourish);
 	Size adds potency, Clarity duration and Cut shortens the cooldown.
 
-	Nothing is deleted: the three old surge sockets are kept in the save (the
-	core socket is the old E socket, Surge2), every retired surge id still
-	resolves, and the Arena rival keeps its own surge list (it reads its
-	Surge1-3 gems directly). Set Enabled = false to go back to the classic
-	surge array.
+	A kaiju's Gemsoul is one stone for all three of its moves: E from the
+	start, Q and R as it levels (Shared.Kaiju). In your gear it's a gem like
+	any other.
+
+	Nothing is deleted: the three old surge sockets are kept in the save (a
+	gem left on the old core socket, Surge2, moves onto the chest), every
+	retired surge id still resolves, and the Arena rival keeps its own surge
+	list (it reads its Surge1-3 gems directly). Set Enabled = false to go
+	back to the classic surge array.
 
 	Pure data and logic, shared by the server and every client.
 ]]
@@ -27,12 +35,18 @@ GemTraits.Enabled = true
 GemTraits.Keys = { "Q", "E", "R" }
 GemTraits.Lanes = { Q = "Offense", E = "Ability", R = "Defense" }
 GemTraits.KeyOfLane = { Offense = "Q", Ability = "E", Defense = "R" }
--- The saved socket each key reads its gem from.
-GemTraits.Sockets = { Q = "Weapon", E = "Surge2", R = "Shield" }
--- The surge sockets the triad retires (kept in the save, never cleared).
-GemTraits.ArchivedSockets = { "Surge1", "Surge3" }
+-- The saved socket each key reads its gem from: the sword's, the chest's
+-- (the Armor slot) and the shield's.
+GemTraits.Sockets = { Q = "Weapon", E = "Armor", R = "Shield" }
+-- The key a piece of gear's gem gives.
+GemTraits.KeyOfSocket = { Weapon = "Q", Armor = "E", Shield = "R" }
+-- The surge sockets the triad retires (kept in the save).
+GemTraits.ArchivedSockets = { "Surge1", "Surge2", "Surge3" }
+-- Where a retired socket's gem goes now: the old core socket's onto the
+-- chest (the old Q and R sockets' to the pouch).
+GemTraits.Moved = { Surge2 = "Armor" }
 GemTraits.LaneNames = { Offense = "Offense", Ability = "Ability", Defense = "Defense" }
-GemTraits.SocketNames = { Q = "Sword", E = "Core", R = "Shield" }
+GemTraits.SocketNames = { Q = "Sword", E = "Chest", R = "Shield" }
 
 -- Rarity sets output: damage, absorb, healing, burns, steals and drains.
 -- Cost, cooldown, reach and control timing are the same at every rarity.
@@ -71,6 +85,33 @@ GemTraits.Matrix = {
 		Offense = { "Q_BreachCut", "Q_CausticDart", "Q_VitriolSweep", "Q_Dissolution", "Q_SappingEdge", "Q_ViperLash", "Q_ToxicFlask" },
 		Ability = { "E_AcidSpray", "E_ToxicCloud", "E_ArmorMelt", "E_LeechBloom", "E_SeepStep", "E_ToxicTide", "E_Maneater" },
 		Defense = { "R_RadShield", "R_PurgeShell", "R_CorrosionAura", "R_BioRegrowth", "R_ToxicMantle", "R_SporeWall", "R_AcidSlick" },
+	},
+}
+
+-- A kaiju's Gemsoul rolls its three moves from these: the ones a kaiju can
+-- cast (Shared.Kaiju.AbilityPlans plans how each lands), a strike for Q,
+-- a surge you can see land for E and a shell, a mend or a ring for R. In
+-- your gear a Gemsoul works like any gem, these moves on its keys.
+GemTraits.SoulMoves = {
+	Fire = {
+		Offense = { "Q_FurnaceCrescent", "Q_MagmaFault", "Q_MeteorLeap" },
+		Ability = { "E_EmberLance", "E_Supernova", "E_SolarFlare", "E_FlameTornado" },
+		Defense = { "R_HeatShield", "R_Cauterize", "R_RingOfFire" },
+	},
+	Frost = {
+		Offense = { "Q_GlacierFan", "Q_PermafrostSpire", "Q_FrostChakram" },
+		Ability = { "E_CryoLance", "E_AbsoluteZero", "E_Hailstorm" },
+		Defense = { "R_IceArmor", "R_GlacialBulwark", "R_IcePillar" },
+	},
+	Shock = {
+		Offense = { "Q_CircuitCleave", "Q_ThunderDash", "Q_Skybreaker" },
+		Ability = { "E_IonSpark", "E_ChainLightning", "E_ThunderPylon", "E_StormCall", "E_IonCannon" },
+		Defense = { "R_IonShield", "R_Capacitor", "R_TeslaFence" },
+	},
+	Poison = {
+		Offense = { "Q_CausticDart", "Q_VitriolSweep", "Q_ToxicFlask" },
+		Ability = { "E_AcidSpray", "E_ToxicCloud", "E_ArmorMelt", "E_ToxicTide", "E_Maneater" },
+		Defense = { "R_RadShield", "R_BioRegrowth", "R_ToxicMantle" },
 	},
 }
 
@@ -880,14 +921,17 @@ end
 
 -- A gem's three traits: its saved roll, else seeded from its id (so the
 -- server and every client agree without a migration). A gem whose surge is
--- in the matrix keeps it in that lane.
+-- in the matrix keeps it in that lane. A kaiju's Gemsoul keeps to the
+-- moves a kaiju can cast (SoulMoves): one saved from before (when only its
+-- E woke) that isn't one is seeded from them.
 function GemTraits.traitsOf(gem)
 	if not gem or not gem.Element or not GemTraits.Matrix[gem.Element] then
 		return nil
 	end
-	local lanes = GemTraits.Matrix[gem.Element]
+	local soul = type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju"
+	local lanes = if soul then GemTraits.SoulMoves[gem.Element] else GemTraits.Matrix[gem.Element]
 	local saved = type(gem.Traits) == "table" and gem.Traits or {}
-	local kept = GemTraits.FromSurge[gem.Surge or ""]
+	local kept = if soul then nil else GemTraits.FromSurge[gem.Surge or ""]
 	local keptInfo = kept and GemTraits.Index[kept]
 	local out = {}
 	for lane, ids in lanes do
@@ -900,11 +944,6 @@ function GemTraits.traitsOf(gem)
 			end
 		end
 		out[lane] = id
-	end
-	-- A kaiju's Gemsoul (Shared.Kaiju): only its E ability wakes, wherever
-	-- it's socketed.
-	if type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju" then
-		return { Ability = out.Ability }
 	end
 	return out
 end
@@ -921,7 +960,7 @@ function GemTraits.active(loadout): boolean
 	return GemTraits.Enabled and not (loadout and loadout.LegacySurges == true)
 end
 
--- The gem a key reads (from the sword, the core socket or the shield). With
+-- The gem a key reads (from the sword, the chest or the shield). With
 -- no shield carried (a two-handed weapon), the weapon is its own guard: R
 -- reads the weapon's gem.
 function GemTraits.socketGem(loadout, key: string)
@@ -934,6 +973,32 @@ function GemTraits.socketGem(loadout, key: string)
 		gem = loadout.WeaponGem
 	end
 	return gem
+end
+
+-- A save from before E came from the chest: the old core socket's gem goes
+-- onto the chest worn when it has none, else back to the pouch (`maxGems`
+-- is the pouch's size); with no room it stays saved where it is. Returns
+-- where it went ("Chest", "Stash", or nil) and whether the old socket is
+-- clear.
+function GemTraits.moveCoreGem(profile, maxGems: number): (string?, boolean)
+	local c = profile.Character
+	local gem = c.Surge2Gem
+	if not gem then
+		return nil, true
+	end
+	if c.Armor and not c.ArmorGem then
+		c.ArmorGem, c.Surge2Gem = gem, nil
+		c.ItemGems = c.ItemGems or {}
+		c.ItemGems.Armor = c.ItemGems.Armor or {}
+		c.ItemGems.Armor[c.Armor] = gem
+		return "Chest", true
+	end
+	if #profile.Gems < maxGems then
+		table.insert(profile.Gems, gem)
+		c.Surge2Gem = nil
+		return "Stash", true
+	end
+	return nil, false
 end
 
 -- What a key fires: a copy of the socket's gem carrying the trait id as its

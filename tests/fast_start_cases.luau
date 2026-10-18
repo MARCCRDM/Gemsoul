@@ -97,6 +97,30 @@ for _, element in FastStart.Elements do
 	end
 end
 
+-- Claimed, the three stones go where their keys are: the sword, the chest
+-- and the shield. A kit rolled before the core socket retired puts its E
+-- stone on the chest (its old Q and R sockets' stones in the pouch).
+if Traits.Enabled then
+	local made = 0
+	local profile = { Intro = {}, Gems = {}, Character = { Weapon = "Sword", Armor = "Vest", Shield = "Buckler", ItemGems = {} } }
+	local kit = Lottery.prepareChoice(profile, "Juggernaut", "Fire", function()
+		made += 1
+		return { Id = "kit" .. made }
+	end)
+	check(kit.Gems[1].Slot == "Weapon" and kit.Gems[2].Slot == "Armor" and kit.Gems[3].Slot == "Shield", "The starter stones aren't for the sword, chest and shield")
+	check(Lottery.finish(profile, 300), "The starter kit wasn't claimed")
+	local c = profile.Character
+	check(c.WeaponGem == kit.Gems[1].Gem and c.ArmorGem == kit.Gems[2].Gem and c.ShieldGem == kit.Gems[3].Gem and #profile.Gems == 0, "The starter stones aren't in the sword, chest and shield")
+	check(c.ItemGems.Armor.Vest == kit.Gems[2].Gem and c.Surge2Gem == nil, "The E stone isn't on the chest piece")
+	local old = { Intro = {}, Gems = {}, Character = { Armor = "Vest", ItemGems = {} } }
+	old.Intro.Lottery = { Version = 4, Gear = {}, Granted = false, Gems = {
+		{ Slot = "Surge1", Gem = { Id = "q" } }, { Slot = "Surge2", Gem = { Id = "e" } }, { Slot = "Surge3", Gem = { Id = "r" } },
+	} }
+	check(Lottery.finish(old, 300), "An old kit wasn't claimed")
+	check(old.Character.ArmorGem.Id == "e" and old.Character.Surge2Gem == nil, "An old kit's E stone didn't go on the chest")
+	check(#old.Gems == 2 and old.Character.Surge1Gem == nil and old.Character.Surge3Gem == nil, "An old kit's Q and R stones didn't go to the pouch")
+end
+
 -- The first fight's hints: one at a time, the threat first.
 local idle = { FoeSlash = false, FoeHeavy = false, FoeGuard = false, Ready = {} }
 local done = {}

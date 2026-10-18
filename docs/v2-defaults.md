@@ -90,7 +90,7 @@ profile as `Character.LegacySurges = true`.
 | Key | Reads the gem in | Fires its | Pays |
 | --- | --- | --- | --- |
 | Q | the sword (`WeaponGem`) | Offense | Charge |
-| E | the core socket (`Surge2Gem`, the old E socket) | Ability | Charge |
+| E | the chest (`ArmorGem`) | Ability | Charge |
 | R | the shield (`ShieldGem`); with no shield, the sword's gem | Defense | Stamina |
 
 - **The moves:** 60 of them, 4 elements × 3 lanes × 5 moves. They are all in
@@ -101,11 +101,21 @@ profile as `Character.LegacySurges = true`.
 
 ### What happened to the old data
 
-- **The retired sockets:** `Surge1` and `Surge3` (`GemTraits.ArchivedSockets`).
-  - When a profile loads, a gem left on either one goes back to the pouch.
+- **The retired sockets:** all three surge sockets, `Surge1`, `Surge2` and
+  `Surge3` (`GemTraits.ArchivedSockets`). The gear's own gem sockets are the
+  surge sockets now: the sword, the chest and the shield.
+  - When a profile loads, a gem left on `Surge1` or `Surge3` (the old Q and
+    R) goes back to the pouch.
+  - A gem left on `Surge2` (the old core socket, E before the chest gave it)
+    goes onto the chest you wear if the chest has no gem, else back to the
+    pouch (`GemTraits.moveCoreGem`). The Inventory says where it went, once
+    (`profile.CoreNotice`: "Chest" or "Stash").
   - If the pouch is full, the gem stays saved on the socket and is moved on a
-    later load (`profile.TriadMoved` stays false until it has been moved).
+    later load (`profile.TriadMoved` / `profile.CoreMoved` stay false until it
+    has been moved).
   - Gems are never cleared.
+  - A starter kit rolled before this, still waiting to be claimed, puts its
+    E stone on the chest too (`StarterLottery`).
 - **Old gems:** gems from before the triad get their three moves seeded from
   the gem id, so the result is stable on every server and client. A gem's old
   surge keeps its lane where the matrix has it: a Cryo Lance gem keeps Cryo

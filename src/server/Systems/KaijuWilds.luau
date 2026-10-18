@@ -95,6 +95,7 @@ local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
+local KaijuAbilities = require(script.Parent.KaijuAbilities)
 local KaijuFighter = require(script.Parent.KaijuFighter)
 local KaijuServer = require(script.Parent.KaijuServer)
 local PlayerData = require(script.Parent.PlayerData)
@@ -1022,10 +1023,17 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		local mult, tag = Kaiju.taken(species, element, hitElement)
 		return mult * Kaiju.spread(), tag
 	end
+	-- Its R's shell or ward takes its share of a blow (Enemies.damage).
+	e.Soak = function(amount: number): number
+		return KaijuAbilities.soak(enemy, amount)
+	end
 	local ability = Kaiju.ability(soul)
+	local moves = Kaiju.moves(soul, level)
 	model:SetAttribute("KaijuWild", true)
 	model:SetAttribute("KaijuLevel", level)
 	model:SetAttribute("KaijuAbility", ability)
+	model:SetAttribute("KaijuQ", moves.Q)
+	model:SetAttribute("KaijuR", moves.R)
 	model:SetAttribute("KaijuTries", 0)
 	if guard then
 		model:SetAttribute("KaijuGuardian", true)
@@ -1053,6 +1061,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Body = enemy,
 		Stats = stats,
 		Ability = ability,
+		Moves = moves,
 		FirstSurge = 4,
 		Strike = function(victim, amount: number, heavy: boolean, _name: string): string
 			return hitFoe(enemy, victim, amount * (1 - Enemies.weakness(enemy)), element, nil, heavy)
@@ -1064,6 +1073,11 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 				Element = element,
 				Ability = ability,
 				Damage = Kaiju.abilityDamage(stats.Damage, soul, ability),
+				DamageOf = function(id: string): number
+					return Kaiju.abilityDamage(stats.Damage, soul, id)
+				end,
+				Body = enemy,
+				Humanoid = enemy.Humanoid,
 				Foes = function(center: Vector3, radius: number)
 					local wild = wilds[enemy]
 					return if wild then foesOf(wild)(center, radius) else {}

@@ -1,5 +1,5 @@
 -- The Q / E / R triad in a live fight (CombatServer + TriadServer): Q comes
--- from the sword's gem, E from the core socket, R from the shield and pays
+-- from the sword's gem, E from the chest's, R from the shield and pays
 -- Stamina. Run inside run_combat.py, after the classic suites.
 do
 local checks = 0
@@ -26,7 +26,8 @@ local function fresh()
 	CombatServer.reset(a)
 	CombatServer.reset(b)
 	ha.Health, hb.Health = 1000, 1000
-	loadout.WeaponGem, loadout.ShieldGem, loadout.Surge1Gem, loadout.Surge2Gem, loadout.Surge3Gem = nil, nil, nil, nil, nil
+	loadout.WeaponGem, loadout.ArmorGem, loadout.ShieldGem = nil, nil, nil
+	loadout.Surge1Gem, loadout.Surge2Gem, loadout.Surge3Gem = nil, nil, nil
 	local st = CombatServer._state(a)
 	st.Resources.Charge, st.Resources.Stamina = 100, 100
 	return st, CombatServer._state(b)
@@ -130,9 +131,9 @@ check(st.Resources.Charge == 0, "Overcharge Strike spends all your Charge")
 settle(0.8)
 check(hb.Health < 1000, "Overcharge Strike missed")
 
--- E fires the core gem's Ability; an Aura is on while E is ready.
+-- E fires the chest gem's Ability; an Aura is on while E is ready.
 st = fresh()
-loadout.Surge2Gem = gem("Shock", "Legendary", { Ability = "E_Overload" })
+loadout.ArmorGem = gem("Shock", "Legendary", { Ability = "E_Overload" })
 check(TriadServer.chargeGain(a, CombatServer.kitFor(loadout, {}), st, now) > 1.2, "Overload adds Charge gain while ready")
 check(cast("E"), "Overload was rejected")
 check(TriadServer.chargeGain(a, CombatServer.kitFor(loadout, {}), st, now) == 1, "An Aura pauses while E recharges")

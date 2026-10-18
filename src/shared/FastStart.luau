@@ -112,7 +112,7 @@ local TEXT = {
 		"Its guard is up: a heavy breaks it",
 	},
 	Q = { "PRESS Q: %s", "TAP Q: %s", "Your sword gem's move" },
-	E = { "PRESS E: %s", "TAP E: %s", "Your core gem's move" },
+	E = { "PRESS E: %s", "TAP E: %s", "Your chest gem's move" },
 	R = { "PRESS R: %s", "TAP R: %s", "Your defense move (uses Stamina)" },
 }
 

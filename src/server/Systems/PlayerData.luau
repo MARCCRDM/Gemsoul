@@ -254,7 +254,7 @@ local function migrate(profile: Profile): Profile
 	-- pouch; with no room they stay saved where they are. Nothing is lost.
 	if Tech.Traits.active(profile.Character) and not (profile :: any).TriadMoved then
 		local moved, waiting = 0, 0
-		for _, slot in Tech.Traits.ArchivedSockets do
+		for _, slot in { "Surge1", "Surge3" } do
 			local key = slot .. "Gem"
 			local gem = (profile.Character :: any)[key]
 			if gem then
@@ -271,6 +271,13 @@ local function migrate(profile: Profile): Profile
 		if moved > 0 then
 			(profile :: any).TriadNotice = moved
 		end
+	end
+	-- Then E came from the chest (the core socket retired too): the core
+	-- socket's gem moves onto the chest, or back to the pouch.
+	if Tech.Traits.active(profile.Character) and not (profile :: any).CoreMoved then
+		local went, clear = Tech.Traits.moveCoreGem(profile, Config.MaxGems);
+		(profile :: any).CoreNotice = went or (profile :: any).CoreNotice;
+		(profile :: any).CoreMoved = clear
 	end
 	profile.Version = math.max(profile.Version, 10)
 	-- The fast start (Shared.FastStart) is for new accounts: a save that's
@@ -649,6 +656,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		CanRegenerateEquipment = TestAdmin.allowed(player.UserId),
 		TriadSeen = (profile :: any).TriadSeen, -- the triad's "what's new" card was read
 		TriadNotice = (profile :: any).TriadNotice, -- old Q / R surge gems moved to the stash
+		CoreNotice = (profile :: any).CoreNotice, -- the core socket's gem moved: "Chest" or "Stash"
 	}
 end
 
@@ -742,7 +750,7 @@ function PlayerData.socketGem(player: Player, gemId: string, slot: string?): Gem
 	end
 	local surgeKey = ({ Surge1 = "Q", Surge2 = "E", Surge3 = "R" })[slot or "Weapon"]
 	if surgeKey and Tech.Traits.active(profile.Character) and table.find(Tech.Traits.ArchivedSockets, slot) then
-		return nil -- (retired by the triad: Q is the sword's gem, R the shield's)
+		return nil -- (retired by the triad: Q, E and R are the sword's, the chest's and the shield's gems)
 	end
 	if surgeKey and not Tech.canSocket(gem, surgeKey, profile.Character) then
 		return nil
@@ -791,7 +799,7 @@ end
 ]]
 PlayerData.SurgeKeys = { Q = "Surge1", E = "Surge2", R = "Surge3" }
 -- The socket a key reads: with the triad on, Q is the sword's gem, E the
--- core socket's and R the shield's (Shared.GemTraits).
+-- chest's and R the shield's (Shared.GemTraits).
 local function surgeSlot(player: Player, key: string): string?
 	local profile = profiles[player]
 	if profile and Tech.Traits.active(profile.Character) then
@@ -810,10 +818,11 @@ function PlayerData.unsocketSurge(player: Player, key: string): Gem?
 	return if slot then PlayerData.unsocketGem(player, slot) else nil
 end
 
--- Is this key's old surge socket retired (a saved preset's Q or R gem)?
+-- Is this key's old surge socket retired (a saved preset's surge gem)? With
+-- the triad on, all three are: Q, E and R ride the sword, chest and shield.
 function PlayerData.surgeArchived(player: Player, key: string): boolean
 	local profile = profiles[player]
-	return profile ~= nil and Tech.Traits.active(profile.Character) and key ~= "E"
+	return profile ~= nil and Tech.Traits.active(profile.Character) and Tech.SurgeSockets[key] ~= nil
 end
 
 -- DEV (test admins, see Systems/Intro): start over as a brand-new player.

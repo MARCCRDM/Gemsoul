@@ -58,8 +58,8 @@ function Lottery.prepareChoice(profile, style, element, generate, pick: ((number
 		table.insert(reward.Gear, { Slot = slot, Id = if slot == "Weapon" then "MatrixSwords1" else "Armor" .. style .. slot .. "1" })
 	end
 	-- With the triad on, the chosen element's three stones go where its keys
-	-- are: the sword (Q), the core socket (E) and the shield (R).
-	local slots = if GemTraits.Enabled then { "Weapon", "Surge2", "Shield" } else { "Surge1", "Surge2", "Surge3" }
+	-- are: the sword (Q), the chest (E) and the shield (R).
+	local slots = if GemTraits.Enabled then { "Weapon", "Armor", "Shield" } else { "Surge1", "Surge2", "Surge3" }
 	for index, slot in slots do
 		local gem = generate(element)
 		gem.Element, gem.Tier = element, "Common"
@@ -140,28 +140,37 @@ function Lottery.finish(profile, maxGems)
 		profile.Intro.Done = true
 		return true
 	end
+	local c = profile.Character
+	-- Where a stone goes: its socket, or (a kit rolled before the triad
+	-- retired the surge sockets) the old core stone onto the chest, the old Q
+	-- and R stones to the pouch (nil).
+	local function target(slot: string): string?
+		if GemTraits.active(c) and table.find(GemTraits.ArchivedSockets, slot) then
+			return GemTraits.Moved[slot]
+		end
+		return slot
+	end
 	local overflow = 0
 	for _, entry in reward.Gems do
-		if profile.Character[entry.Slot .. "Gem"] then
+		local slot = target(entry.Slot)
+		if not slot or c[slot .. "Gem"] then
 			overflow += 1
 		end
 	end
 	if #profile.Gems + overflow > maxGems then
 		return false, "Make room in your gem backpack before claiming."
 	end
-	local c = profile.Character
 	c.ItemGems = c.ItemGems or {}
 	for _, entry in reward.Gems do
-		local key = entry.Slot .. "Gem"
-		-- (the triad retired the Q and R surge sockets: those stones go to the pouch)
-		local retired = GemTraits.active(c) and table.find(GemTraits.ArchivedSockets, entry.Slot) ~= nil
-		if c[key] or retired then
+		local slot = target(entry.Slot)
+		local key = slot and slot .. "Gem"
+		if not key or c[key] then
 			table.insert(profile.Gems, entry.Gem)
 		else
 			c[key] = entry.Gem
-			if c[entry.Slot] then
-				c.ItemGems[entry.Slot] = c.ItemGems[entry.Slot] or {}
-				c.ItemGems[entry.Slot][c[entry.Slot]] = entry.Gem
+			if c[slot] then
+				c.ItemGems[slot] = c.ItemGems[slot] or {}
+				c.ItemGems[slot][c[slot]] = entry.Gem
 			end
 		end
 	end

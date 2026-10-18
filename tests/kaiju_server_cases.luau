@@ -367,6 +367,10 @@ function Enemies.damage(enemy, amount, source, _crit, _color, heavy, element)
 		end
 	end
 	amount = math.floor(amount + 0.5)
+	-- (Its own shell soaks what's left, as the real one: a wild kaiju's R.)
+	if enemy.Soak then
+		amount = math.floor(enemy.Soak(amount) + 0.5)
+	end
 	enemy.LastHit = now
 	if source then
 		enemy.Damage[source] = (enemy.Damage[source] or 0) + amount
@@ -576,12 +580,16 @@ local function root(at: Vector3)
 	return { Position = at, CFrame = CFrame.new(at), Parent = true }
 end
 for id, plan in Kaiju.AbilityPlans do
+	local body = { Dots = { {} }, SlowUntil = 99, BlindUntil = 99 }
+	local humanoid = { Health = 50, MaxHealth = 200 }
 	local caster = {
 		Model = make("Model"),
 		Root = root(Vector3.new(0, 0, 0)),
 		Element = "Fire",
 		Ability = id,
 		Damage = 100,
+		Body = body,
+		Humanoid = humanoid,
 	}
 	-- Its foe 5 studs ahead (in reach), one more beside it, one far away.
 	local foe = { Root = root(Vector3.new(0, 0, -5)), Name = "foe" }
@@ -612,9 +620,21 @@ for id, plan in Kaiju.AbilityPlans do
 	check(KaijuAbilities.cast(caster, foe), id .. " didn't cast")
 	flush()
 	check(#fxs > 0, id .. " drew nothing")
-	check((dealt.foe or 0) > 0, id .. " missed its foe")
+	-- An R that guards it: a shell or a ward on it, or its health back.
+	local guards = plan.Shape == "Shell" or plan.Shape == "Ward" or plan.Shape == "Mend"
+	if plan.Shape == "Mend" then
+		check(math.abs(humanoid.Health - (50 + 200 * plan.Heal)) < 1e-6, id .. " didn't heal its share")
+	elseif guards then
+		check(body.Defense == nil, id .. "'s shell outlasted it")
+	end
+	if plan.Cleanse then
+		check(#body.Dots == 0 and body.SlowUntil == 0 and body.BlindUntil == 0, id .. " didn't cleanse")
+	end
+	if not guards or plan.Aura or plan.Burst then
+		check((dealt.foe or 0) > 0, id .. " missed its foe")
+		check(dealt.foe <= 100 + 1e-6 or plan.Aura ~= nil, id .. " dealt its foe more than the whole cast")
+	end
 	check(dealt.far == nil, id .. " hit a foe 200 studs away")
-	check(dealt.foe <= 100 + 1e-6, id .. " dealt its foe more than the whole cast")
 	if plan.Shape == "Bolt" then
 		check(dealt.beside == nil, id .. " (a bolt) hit a second foe")
 	end
@@ -624,6 +644,10 @@ for id, plan in Kaiju.AbilityPlans do
 	if plan.Status and plan.Shape ~= "Storm" then
 		check(statuses[plan.Status], id .. " didn't leave " .. plan.Status)
 	end
+	local extra = plan.Aura or plan.Burst
+	if extra and extra.Status then
+		check(statuses[extra.Status], id .. " didn't leave " .. extra.Status)
+	end
 	if plan.Show then
 		local shown = false
 		for _, entry in fxs do
@@ -631,7 +655,8 @@ for id, plan in Kaiju.AbilityPlans do
 		end
 		check(shown, id .. " didn't draw its own look")
 	end
-	check(caster.Model:GetAttribute("KaijuAbilityAt") == now, id .. ": no cast time for the HUD")
+	local at = ({ Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" })[string.sub(id, 1, 1)]
+	check(caster.Model:GetAttribute(at) == now, id .. ": no cast time for the HUD")
 end
 check(
 	not KaijuAbilities.cast({ Ability = "E_Nope", Root = root(Vector3.zero) }, { Root = root(Vector3.zero) }),
@@ -1055,12 +1080,102 @@ flush()
 check(pet.Model:GetAttribute("KaijuAbilityAt") == now and fighter.NextSurge == now + Kaiju.AbilityEvery, "No E")
 fightRoll = nil
 
+-- Its Q and R, from the same Gemsoul: asleep while it's young (Q wakes at
+-- level 5, R at 10), on the model for every client when awake.
+local Traits = shared("GemTraits")
+local soulQ, soulR = Kaiju.move(pet.Record.Soul, "Q"), Kaiju.move(pet.Record.Soul, "R")
+local young = Kaiju.moves(pet.Record.Soul, pet.Record.Level)
+check(fighter.Moves.Q == young.Q and fighter.Moves.R == young.R, "Its moves don't follow its level")
+check(pet.Model:GetAttribute("KaijuQ") == young.Q and pet.Model:GetAttribute("KaijuR") == young.R, "Its moves aren't on the model")
+check(wf.Moves.Q == Kaiju.moves(wild.Soul, wild.Level).Q, "A wild one's moves don't follow its level")
+KaijuFighter.setMoves(fighter, Kaiju.moves(pet.Record.Soul, 10))
+check(fighter.Moves.Q == soulQ and fighter.Moves.R == soulR, "Level 10 didn't wake Q and R")
+-- Q: in place of a blow when it's ready, named on its cast bar.
+now += 5
+settle(fighter)
+settle(wf)
+fighter.NextQ, fighter.NextR = now - 1, math.huge
+pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
+KaijuFight.raiseGuard(wf, now - 1, 5) -- (it would swing a heavy)
+fightRoll = 0.1
+KaijuFighter.step(fighter, wildFoe, now)
+check(
+	fighter.Choice == "Q" and fighter.Action and fighter.Action.Kind == "Move" and fighter.Action.Id == soulQ,
+	"No Q in place of a blow: " .. tostring(fighter.Choice)
+)
+check(pet.Model:GetAttribute("ActionName") == Traits.Moves[soulQ].Name, "Its Q isn't named on the cast bar")
+check(fighter.NextQ == now + Kaiju.QEvery, "Its Q's wait didn't start")
+now += 1
+KaijuFighter.step(fighter, wildFoe, now)
+flush()
+check(pet.Model:GetAttribute("KaijuQAt") == now, "Its Q didn't go off")
+-- Not again until its wait is over: a blow instead.
+settle(fighter)
+KaijuFight.raiseGuard(wf, now - 1, 5)
+KaijuFighter.step(fighter, wildFoe, now + 0.1)
+check(fighter.Choice == "Heavy", "Its Q went off again straight away: " .. tostring(fighter.Choice))
+-- R: hard pressed (down to RWhen of its health), it raises it at once.
+now += 5
+settle(fighter)
+settle(wf)
+fighter.NextQ, fighter.NextR = math.huge, now - 1
+pet.Humanoid.Health = pet.Humanoid.MaxHealth * 0.9
+KaijuFighter.step(fighter, wildFoe, now)
+check(fighter.Choice ~= "R", "It raised its R untroubled")
+settle(fighter)
+pet.Humanoid.Health = pet.Humanoid.MaxHealth * (Kaiju.RWhen - 0.05)
+KaijuFighter.step(fighter, wildFoe, now)
+check(fighter.Choice == "R" and fighter.Action and fighter.Action.Id == soulR, "No R when hard pressed: " .. tostring(fighter.Choice))
+check(fighter.NextR == now + Kaiju.REvery and fighter.Action.At - now < 0.5, "Its R is slow, or its wait didn't start")
+now += 0.3
+KaijuFighter.step(fighter, wildFoe, now)
+check(pet.Model:GetAttribute("KaijuRAt") == now, "Its R didn't go up")
+flush()
+pet.Defense = nil
+pet.Humanoid.Health = pet.Humanoid.MaxHealth
+-- A shell soaks blows on your kaiju until it breaks; a ward takes its share.
+local petCaster = KaijuServer.caster(pet)
+pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1000, 1000
+settle(fighter)
+check(KaijuAbilities.cast(petCaster, wildFoe, "R_IonShield"), "No Ion Shield")
+before = pet.Humanoid.Health
+KaijuServer.hurt(pet, 100, nil, nil, nil)
+check(pet.Humanoid.Health == before and pet.Defense and pet.Defense.Left < 150, "The shell didn't soak a blow")
+KaijuServer.hurt(pet, 300, nil, nil, nil)
+check(pet.Defense == nil and pet.Humanoid.Health < before, "The shell held past what it soaks")
+flush()
+check(KaijuAbilities.cast(petCaster, wildFoe, "R_IceArmor"), "No Ice Armor")
+before = pet.Humanoid.Health
+KaijuServer.hurt(pet, 100, nil, nil, nil)
+check(before - pet.Humanoid.Health == math.floor(100 * 0.75 * taken + 0.5), "The ward didn't take its share")
+now += 6
+KaijuServer.hurt(pet, 100, nil, nil, nil)
+check(pet.Defense == nil, "The ward outlasted its time")
+flush()
+-- A burst when a shell breaks: Glacial Bulwark slows those near.
+check(KaijuAbilities.cast(petCaster, wildFoe, "R_GlacialBulwark"), "No Glacial Bulwark")
+pet.Defense.Left = 1
+KaijuServer.hurt(pet, 100, nil, nil, nil)
+check(pet.Defense == nil, "A broken shell stayed up")
+flush()
+pet.Defense = nil
+-- And on a wild kaiju, through Enemies.damage.
+check(KaijuAbilities.cast(wf.Caster(), petFoe, "R_IonShield"), "A wild one has no Ion Shield")
+before = enemy.Humanoid.Health
+Enemies.damage(enemy, 50, a, false, nil, nil, nil)
+check(enemy.Humanoid.Health == before and enemy.Defense ~= nil, "A wild one's shell didn't soak a blow")
+flush()
+enemy.Defense = nil
+pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1e6, 1e6
+fightRoll = nil
+
 -- A whole duel: your kaiju and the wild one, twenty seconds of it.
 pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
 rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(6, 0, 0))
 settle(fighter)
 settle(wf)
 enemy.LastPet, enemy.LastPetAt, enemy.FoeVictim = pet, now, nil
+fighter.NextQ, fighter.NextR = now + 1, now -- (its Q and R awake, as at level 10)
 local petBefore, wildBefore = pet.Humanoid.Health, enemy.Humanoid.Health
 local choices = {}
 local combo = false
@@ -1081,6 +1196,7 @@ for _, move in { "Light", "Guard" } do
 	check(choices[move], "Nobody chose " .. move .. " in a whole duel")
 end
 check(choices.Heavy or choices.Dodge or choices.Punish or choices.Riposte, "A duel of nothing but swings and guards")
+check(choices.Q, "Its Q never went off in a whole duel")
 check(combo, "No combos in a whole duel")
 -- Out of the fight: it calms (its guard down, its pose cleared).
 registered.KaijuRecall(a)
@@ -1797,9 +1913,11 @@ local function aWildDay()
 	end
 	-- Someone comes close: it stops and looks them over (a roar at times), and
 	-- leaves them be.
+	-- (A pack's leader, or one alone: a packmate far behind its leader gets
+	-- up to follow instead.)
 	local watcher
 	for _, entry in roamers do
-		if not entry.Guard then
+		if not entry.Guard and (not entry.Pack or entry.Pack.Members[1] == entry) then
 			watcher = entry
 			break
 		end

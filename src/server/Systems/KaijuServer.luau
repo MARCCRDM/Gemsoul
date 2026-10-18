@@ -42,6 +42,7 @@ local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
+local KaijuAbilities = require(script.Parent.KaijuAbilities)
 local KaijuFighter = require(script.Parent.KaijuFighter)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
@@ -238,6 +239,11 @@ local function refresh(pet: Pet)
 	h.MaxHealth = stats.Health
 	h.Health = math.max(1, math.floor(stats.Health * share + 0.5))
 	local model = pet.Model
+	-- Its Q and R wake as it levels (Kaiju.MoveLevels).
+	local moves = Kaiju.moves(record.Soul, record.Level)
+	KaijuFighter.setMoves(pet.Fighter, moves)
+	model:SetAttribute("KaijuQ", moves.Q)
+	model:SetAttribute("KaijuR", moves.R)
 	model:SetAttribute("KaijuLevel", record.Level)
 	model:SetAttribute("KaijuExp", record.Exp or 0)
 	local next = Kaiju.expToNext(record.Level)
@@ -308,6 +314,7 @@ local function spawnPet(player: Player, record): Pet?
 		Body = pet,
 		Stats = pet.Stats,
 		Ability = ability,
+		Moves = Kaiju.moves(record.Soul, record.Level),
 		Strike = function(foe, amount: number, heavy: boolean, _name: string): string
 			return if foe.Enemy then KaijuServer.strike(pet, foe.Enemy, amount, nil, heavy) else "Missed"
 		end,
@@ -480,14 +487,21 @@ local function strike(pet: Pet, enemy, amount: number, status: string?, heavy: b
 end
 KaijuServer.strike = strike
 
--- Its E's caster (KaijuAbilities.cast): its foes are the creatures near.
+-- Its caster for its moves (KaijuAbilities.cast): its foes are the
+-- creatures near; its R's shell sits on the pet.
 function KaijuServer.caster(pet: Pet)
+	local soul = pet.Record.Soul
 	return {
 		Model = pet.Model,
 		Root = pet.Root,
 		Element = pet.Element,
 		Ability = pet.Ability,
-		Damage = Kaiju.abilityDamage(pet.Stats.Damage, pet.Record.Soul, pet.Ability),
+		Damage = Kaiju.abilityDamage(pet.Stats.Damage, soul, pet.Ability),
+		DamageOf = function(id: string): number
+			return Kaiju.abilityDamage(pet.Stats.Damage, soul, id)
+		end,
+		Body = pet,
+		Humanoid = pet.Humanoid,
 		Foes = function(center: Vector3, radius: number)
 			return creaturesNear(center, radius, pet.Owner)
 		end,
@@ -551,7 +565,13 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 	if now < pet.VulnerableUntil then
 		mult *= 1.15
 	end
-	local dealt = math.max(1, math.floor(amount * share * mult + 0.5))
+	-- Its R's shell or ward takes its share first.
+	local through = KaijuAbilities.soak(pet, amount * share * mult)
+	if through <= 0 then
+		fx("BlockSpark", pet.Root.Position, false)
+		return outcome
+	end
+	local dealt = math.max(1, math.floor(through + 0.5))
 	local h = pet.Humanoid
 	h.Health = math.max(0, h.Health - dealt)
 	fx(

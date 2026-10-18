@@ -18,7 +18,7 @@ chips, so it read as three moves on one key.
   the key and its job ("Q · OFFENSE"). A ★ marks a signature move (it rolls
   at half the odds).
 - **The circle: the gem it comes from.** Its art, name, element and rarity.
-  In the triad Q reads the sword's gem, E the core gem and R the shield's.
+  In the triad Q reads the sword's gem, E the chest's and R the shield's.
 - **WHAT IT DOES:** the move's description. Its cost, cooldown and output
   are on the right of that line. A Legendary gem's flourish is a gold ✦
   line under the description. On a phone the longest of these step down a
