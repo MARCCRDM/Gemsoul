@@ -113,6 +113,8 @@ local function screen(name, enabled)
 end
 local dashboard = screen("Dashboard", false)
 table.insert(playerGui.Children, dashboard)
+-- (The daily caches' screen is always on, only its button hidden.)
+table.insert(playerGui.Children, screen("StreakRewards", true))
 
 -- The mech, as it streams in: its chassis at the root, its hull.
 local CENTRE = R.Vector3.new(0, 0, 7000)
@@ -158,7 +160,7 @@ local streamed = {}
 -- Services and remotes ------------------------------------------------------------------------
 local clockNow = 0
 local keysDown, focusedBox = {}, nil
-local UserInputService = { JumpRequest = signal(), TouchEnabled = false, KeyboardEnabled = true }
+local UserInputService = { JumpRequest = signal(), InputBegan = signal(), TouchEnabled = false, KeyboardEnabled = true }
 function UserInputService:IsKeyDown(key)
 	return keysDown[key.Name] == true
 end
@@ -250,8 +252,14 @@ local modules = {
 	MechAnimation = {},
 }
 local texts = {}
-function modules.IronUi.new(_class, props)
-	return props or {}
+local buttons = {}
+function modules.IronUi.new(class, props)
+	props = props or {}
+	if class == "TextButton" then
+		props.Activated = signal()
+		buttons[props.Text] = props
+	end
+	return props
 end
 function modules.IronUi.text(_parent, text)
 	local label = { Text = text }
@@ -391,6 +399,10 @@ check(not VehicleDrive.isDriving() and #sent == 0 and not hudGui.Enabled, "Drove
 player:SetAttribute("MechPilot", "Hauler1")
 frames(5)
 check(not VehicleDrive.isDriving() and #sent == 0, "Started driving a mech that isn't here")
+-- (You can still get out.)
+UserInputService.JumpRequest:Fire()
+check(exits == 1, "Couldn't get out before the mech streamed in")
+clockNow += 1
 table.insert(streamed, mech)
 frames(1)
 check(VehicleDrive.isDriving() and hudGui.Enabled, "Didn't start once the mech arrived")
@@ -502,22 +514,37 @@ check(#reports == 1, "Turning on the spot was reported")
 motionOnly, keysDown = false, {}
 frames(120)
 
--- Menus own the screen: no HUD, no driving; closed, back again.
+-- A menu hides the card, and that's all: it still drives, and you can
+-- still get out.
+check(hudGui.Enabled, "An always-on screen (the daily caches) hid the card")
 dashboard:setEnabled(true)
 keysDown = { W = true }
 stoodAt = mech.Chassis.Position
 frames(30)
-check(not hudGui.Enabled and (mech.Chassis.Position - stoodAt).Magnitude < 1e-3, "Drove with a menu open")
-dashboard:setEnabled(false)
-frames(30)
-check(hudGui.Enabled and (mech.Chassis.Position - stoodAt).Magnitude > 0.5, "Didn't drive again after the menu")
--- Jump: out (not from a menu).
-dashboard:setEnabled(true)
+check(not hudGui.Enabled, "The card stayed over a menu")
+check((mech.Chassis.Position - stoodAt).Magnitude > 0.5, "A menu took the controls")
+local exitsBefore = exits
+clockNow += 1
 UserInputService.JumpRequest:Fire()
-check(exits == 0, "Jumped out from a menu")
+check(exits == exitsBefore + 1, "Couldn't jump out with a menu open")
 dashboard:setEnabled(false)
+frames(1)
+check(hudGui.Enabled, "The card didn't come back after the menu")
+-- Space, jump and HOP OUT all ask once (Space and jump come together).
+clockNow += 1
+UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Space })
 UserInputService.JumpRequest:Fire()
-check(exits == 1, "Jump didn't ask to get out")
+check(exits == exitsBefore + 2, "Space didn't ask to get out, or asked twice")
+clockNow += 1
+check(buttons["HOP OUT"] ~= nil, "No HOP OUT button")
+buttons["HOP OUT"].Activated:Fire()
+check(exits == exitsBefore + 3, "HOP OUT didn't ask to get out")
+-- Not while typing in the chat.
+clockNow += 1
+focusedBox = {}
+UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Space })
+check(exits == exitsBefore + 3, "Typing a space in the chat got you out")
+focusedBox = nil
 keysDown = {}
 
 -- The server lets go (you're out): it stops driving, the camera comes back.

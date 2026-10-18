@@ -165,7 +165,9 @@ local function send(d: Driving, force: boolean?)
 	local now = os.clock()
 	local moving = m.Speed ~= 0 or d.Turn ~= 0
 	if not force then
-		if moving and now - d.SentAt < SEND_EVERY then
+		-- (A few ms of slack: four frames at 60 a second can add up to a hair
+		-- under SEND_EVERY.)
+		if moving and now - d.SentAt < SEND_EVERY - 0.005 then
 			return
 		end
 		if not moving and not d.SentMoving then
@@ -208,7 +210,7 @@ local function report(d: Driving, source: string)
 end
 
 -- The driving card.
-local gui = UiKit.gui("DriveHud", 6)
+local gui = UiKit.gui("DriveHud", 7) -- (over the lobby HUD)
 gui.Enabled = false
 local card = IronUi.new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 1),
@@ -242,6 +244,19 @@ local fill =
 UiKit.round(fill, 3)
 local controls = IronUi.text(card, "", 11, P.Dim, IronUi.Bold)
 controls.Position, controls.Size = UDim2.fromOffset(14, 57), UDim2.new(1, -28, 0, 14)
+-- (Over the card's right corner: a tap gets you out on any screen.)
+local hopOutButton = IronUi.new("TextButton", {
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, 0, 0, -6),
+	Size = UDim2.fromOffset(110, 30),
+	BackgroundColor3 = Color3.fromRGB(242, 182, 36),
+	Text = "HOP OUT",
+	TextSize = 14,
+	TextColor3 = Color3.fromRGB(10, 12, 20),
+	Font = IronUi.Bold,
+	AutoButtonColor = true,
+}, card)
+UiKit.round(hopOutButton, 8)
 
 local function controlText(): string
 	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
@@ -267,14 +282,31 @@ local function finish()
 	end
 end
 
--- Menus own the screen even while you're in a mech. Track instances, so
--- closing one of several overlays does not reveal the HUD.
+-- A menu over the screen hides the driving card, nothing more: it never
+-- takes your controls or the way out. (It used to do both. StreakRewards was
+-- on this list, and its screen is always on, only its button hidden, so in
+-- the lobby every mech sat still and nobody could get out.) Track instances,
+-- so closing one of several overlays does not reveal the card.
 local blockingScreens = {
-	Dashboard = true, Shop = true, Season = true, AugmentTree = true,
-	SurgeArray = true, Social = true, ProbeExchange = true, WelcomeBundle = true,
-	Intro = true, Tutorial = true, MarketBoard = true, ChallengeChooser = true,
-	StreakRewards = true, Character = true, Combat = true, Mine = true,
-	Party = true, Referral = true, TopPlayers = true, EquipmentTrade = true,
+	Dashboard = true,
+	Shop = true,
+	Season = true,
+	AugmentTree = true,
+	SurgeArray = true,
+	Social = true,
+	ProbeExchange = true,
+	WelcomeBundle = true,
+	Intro = true,
+	Tutorial = true,
+	MarketBoard = true,
+	ChallengeChooser = true,
+	Character = true,
+	Combat = true,
+	Mine = true,
+	Party = true,
+	Referral = true,
+	TopPlayers = true,
+	EquipmentTrade = true,
 }
 local openScreens, screenConnections = {}, {}
 local function menuOpen(): boolean
@@ -396,10 +428,7 @@ function VehicleDrive.step(dt: number)
 	if now - d.ParamsAt > 1 then
 		d.Params, d.ParamsAt = params(d.Model), now
 	end
-	local throttle, steer, source = 0, 0, "none"
-	if not menuOpen() then
-		throttle, steer, source = pilotInput()
-	end
+	local throttle, steer, source = pilotInput()
 	local m = d.Mech
 	local before = m.Yaw
 	local speed, yaw = Rules.drive(d.Spec, m.Speed, m.Yaw, throttle, steer, dt)
@@ -436,10 +465,28 @@ function VehicleDrive.isDriving(): boolean
 	return driving ~= nil
 end
 
-UserInputService.JumpRequest:Connect(function()
-	if not driving or blocked() or menuOpen() or UserInputService:GetFocusedTextBox() then return end
+-- Out: Space, jump (the phone's button too) or HOP OUT. Whenever you're a
+-- pilot, whatever else is on the screen, even before driving starts.
+local leftAt = -math.huge
+function VehicleDrive.hopOut(): boolean
+	if not MechPilot.of(player) or UserInputService:GetFocusedTextBox() then
+		return false
+	end
+	local now = os.clock()
 	local leave = remote("MechExit")
-	if leave then leave:FireServer() end
+	if not leave or now - leftAt < 0.3 then
+		return false
+	end
+	leftAt = now
+	leave:FireServer()
+	return true
+end
+UserInputService.JumpRequest:Connect(VehicleDrive.hopOut)
+hopOutButton.Activated:Connect(VehicleDrive.hopOut)
+UserInputService.InputBegan:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonA then
+		VehicleDrive.hopOut()
+	end
 end)
 
 local function refreshSession()

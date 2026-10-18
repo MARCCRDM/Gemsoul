@@ -443,6 +443,13 @@ new("UIGradient", { Rotation = 90, Color = ColorSequence.new(GOLD_TOP, GOLD_BOTT
 local playCaption = text(play, "PLAY", 30, Color3.fromRGB(28, 18, 4), IronUi.Heading)
 playCaption.Size = UDim2.fromScale(1, 1)
 playCaption.TextStrokeTransparency = 1
+-- In a mech, the driving card has the bottom of a phone's screen, where PLAY
+-- sits (Client VehicleDrive).
+local function pilotingChanged()
+	play.Visible = player:GetAttribute("MechPilot") == nil
+end
+player:GetAttributeChangedSignal("MechPilot"):Connect(pilotingChanged)
+pilotingChanged()
 -- Under PLAY: who's around (or the modes, alone in a server).
 local playSub = text(play, "PRACTICE  ·  CASUAL  ·  RANKED", 10, Color3.fromRGB(92, 56, 8), IronUi.Heading)
 playSub.TextStrokeTransparency = 1

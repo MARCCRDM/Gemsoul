@@ -469,9 +469,26 @@ check(
 	"A silent screen wasn't logged"
 )
 check(echoed[#echoed].Player == other and echoed[#echoed].Detail:find("Mole2", 1, true), "The silent pilot wasn't told")
-clockNow += 10
+clockNow += 5
 Vehicles.step(clockNow)
 check(#notes == before + 1, "The silent screen was logged again")
+check(mole.Pilot == other, "Let a silent pilot out too soon")
+-- Still nothing: their screen isn't driving, so there's no way to drive or
+-- get out. They're let out, beside it.
+clockNow += 1.5
+Vehicles.step(clockNow)
+check(
+	mole.Pilot == nil and other:GetAttribute("MechPilot") == nil and mole.Prompt.Enabled,
+	"A pilot whose screen never drove was kept in"
+)
+check(echoed[#echoed].Player == other and echoed[#echoed].Detail:find("let out", 1, true), "Not told they're out")
+-- (Back in for the reports: the hello is word from their screen.)
+near(other, mole.Model.Cockpit)
+check(Vehicles.board(other, mole), "Couldn't get back in")
+check(move(other, moleChassis.Position, mole.Yaw, 0, 0, 0.1), "The hello was refused")
+clockNow += 20
+Vehicles.step(clockNow)
+check(mole.Pilot == other, "A pilot whose screen said hello was let out")
 -- A stuck report: logged with both sides' view, three a ride.
 check(not Vehicles.report(other, 5), "A report that isn't text was taken")
 check(not Vehicles.report(makePlayer("Walker"), "stuck"), "Someone on foot filed a report")

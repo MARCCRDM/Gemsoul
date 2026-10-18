@@ -32,8 +32,10 @@ local OutpostVehicles = {}
 
 -- How close you must be to get in.
 local BOARD_RANGE = 24
--- Seconds in the cockpit with no word from the pilot's screen before it's logged.
-local SILENT_AFTER = 5
+-- Seconds in the cockpit with no word from the pilot's screen before it's
+-- logged, and before they're let out (their screen isn't driving: without
+-- it there's no way to drive or get out).
+local SILENT_AFTER, SILENT_RELEASE = 5, 12
 -- Seconds without a move before it counts as stopped (for everyone's glide).
 local STOPPED_AFTER = 1
 -- Stuck reports taken from one pilot, per ride.
@@ -348,6 +350,15 @@ function OutpostVehicles.step(now: number?)
 					serverView(machine, clock)
 				)
 			)
+		end
+		if not machine.MovedAt and clock - machine.BoardedAt >= SILENT_RELEASE then
+			Remotes.MechReport:FireClient(
+				player,
+				"[Mech] Server: your screen never started driving, so you've been let out."
+			)
+			warn(string.format("[Mech] %s: let %s out (their screen never drove it)", machine.Kind, player.Name))
+			release(machine, true)
+			continue
 		end
 		if
 			machine.MovedAt

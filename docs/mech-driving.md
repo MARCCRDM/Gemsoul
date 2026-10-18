@@ -6,7 +6,7 @@ Drill, Forge Utility and Scout Pathfinder). Walk up to one and hold **E**
 
 - **W / S** (or the arrow keys) to go forward and back;
 - **A / D** to turn. The mechs turn on the spot;
-- **Space** to hop out.
+- **Space**, or the **HOP OUT** button on the driving card, to hop out.
 
 A gamepad's left stick and the phone thumbstick work too. A card at the bottom
 shows the mech, its speed and the controls. An empty mech walks itself back
@@ -30,6 +30,14 @@ from the logs. Every version depended on one of these:
 - the seat's own controls, camera and jump-to-leave.
 
 So all of them are gone.
+
+None of that was what stopped the mechs after Oct 15, though. The pilot's
+game treats some screens as menus: while one is open, the driving card hides.
+The daily caches' screen (`StreakRewards`) was added to that list. That
+screen is always switched on, with only its button hidden. Back then, a menu
+also took away your controls and Space, so in the lobby every mech sat still
+and nobody could jump out. Now a menu only hides the card. Your controls and
+the way out work whatever is on the screen.
 
 ### Getting in
 
@@ -104,7 +112,9 @@ legs walk at its speed. Your own mech isn't glided: your screen drives it.
 
 ### Getting out
 
-Space (or jump) sends `MechExit`. The server takes the weld away, clears both
+Space, jump (the phone's button too) or the HOP OUT button sends
+`MechExit`. That works as soon as you're the pilot, even before driving starts,
+and with a menu open. Only typing in the chat doesn't count. The server takes the weld away, clears both
 attributes, stands you up and puts you down beside the mech's left leg. You
 also get out if you die, respawn, leave the game, or start a fight, a match,
 an expedition or an Arena drop. If anything else takes the weld away, or
@@ -134,6 +144,7 @@ Look in the Output (F9 in a live game) for `[Mech]` lines:
 | `[Mech] <you> is piloting <id>` | server | The server made you the pilot |
 | `[Mech] Piloting <id>: driving from this screen` | client | Your game started driving |
 | `[Mech] <kind>: <you> has sat in it for 5 s and their screen hasn't moved it` | server | You're in, but your game never started driving. Your game gets a line about it too |
+| `[Mech] <kind>: let <you> out (their screen never drove it)` | server | Still nothing after 12 s, so the server let you out rather than leave you stuck |
 | `[Mech] Server isn't hearing this pilot: ...` | client | You're moving on your screen, but the server hasn't passed on a move for 4 seconds. Others can't see you move |
 | `[Mech] couldn't park a <kind>: ...` | server | A mech failed to build |
 
@@ -165,17 +176,20 @@ The server's lines also go to Feedback → Reports (owners only).
   - passing over a pebble, stepping up and off a kerb;
   - stopping at a ledge, falling into a pit, and no ground loaded;
   - the crater rim.
-- `tests/run_outpost_vehicles.py` (90 checks) runs the real server module:
+- `tests/run_outpost_vehicles.py` (96 checks) runs the real server module:
   getting in and out, moves from the pilot only, the limits on a move, the
-  silent-pilot log, reports, letting go of pilots who die, respawn, leave or
+  silent-pilot log and letting them out, reports, letting go of pilots who die, respawn, leave or
   get busy, and going home.
-- `tests/run_vehicle_transition.py` (46 checks, then the arena controls)
+- `tests/run_vehicle_transition.py` (52 checks, then the arena controls)
   runs the real client module under lune:
   - waiting for the mech to stream in, then driving;
   - sending moves, and stopping;
   - a wall and pushing through, and a failing cast;
   - a server that isn't answering, and turning on the spot;
-  - menus, getting out, being let go, a respawn and the camera.
+  - an always-on screen, menus (they hide the card, nothing more);
+  - getting out by Space, jump or HOP OUT, before driving starts and with a
+    menu open, but not while typing;
+  - being let go, a respawn and the camera.
 - `tests/run_mech_animation.py` checks the gliding, the legs, and that your
   own mech isn't glided.
 - `tests/run_machines.py` and `tests/run_moon_quarry_scene.py` build every
