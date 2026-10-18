@@ -117,7 +117,8 @@ end
 
 -- A wild kaiju's day (KaijuWilds: KaijuMood, from KaijuMoodAt): head down
 -- sniffing the ground, looking about, lying down, asleep (lower, curled),
--- or a roar (rearing, jaws wide). Each settles in over a moment.
+-- or a roar (rearing, jaws wide); and Bound, held by a tame, struggling
+-- against it. Each settles in over a moment.
 Motion.Moods = {
 	Sniff = function(pose, t, k)
 		pose.Pitch -= 0.28 * k
@@ -141,6 +142,19 @@ Motion.Moods = {
 		pose.Tail += 0.35 * k
 		pose.Arm -= 0.2 * k
 		pose.Lift += math.sin(t * 0.8) * 0.02 * k
+	end,
+	Bound = function(pose, t, k)
+		-- Crouched low and straining: it twists and tugs, jaws snapping,
+		-- harder as the hold goes on.
+		local strain = k * (0.7 + math.min(t, 2.5) * 0.12)
+		pose.Lift -= 0.22 * k
+		pose.Pitch -= 0.1 * k
+		pose.Yaw += (math.sin(t * 11) * 0.12 + math.sin(t * 4.3) * 0.08) * strain
+		pose.Roll += math.sin(t * 13 + 1) * 0.06 * strain
+		pose.Pitch += math.max(0, math.sin(t * 5.5)) * 0.14 * strain
+		pose.Jaw += (0.15 + math.max(0, math.sin(t * 9)) * 0.45) * strain
+		pose.Arm += math.sin(t * 7) * 0.25 * strain
+		pose.Tail += math.sin(t * 10) * 0.4 * strain
 	end,
 	Roar = function(pose, t, _k)
 		-- Rears back over a third of a second, holds it, and settles.

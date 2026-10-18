@@ -1104,15 +1104,69 @@ rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(5, 0, 0))
 enemy.Humanoid.Health = enemy.Humanoid.MaxHealth * 0.8
 check(Tame(a, enemy.Model).Message:find("half") ~= nil, "Tamed one at 80%")
 enemy.Humanoid.Health = enemy.Humanoid.MaxHealth * 0.2
+-- The tame is a cast (Kaiju.Tame): it's held, struggling, untouchable; the
+-- roll comes at its end.
+local function finishCast(target)
+	now += Kaiju.Tame.Cast + 0.01
+	KaijuWilds._brain(target, now)
+end
 forcedRoll = 0.99 -- (every try fails)
 local first = Tame(a, enemy.Model)
-check(not first.Ok and first.Chance > 0 and enemy.Model:GetAttribute("KaijuTries") == 1, "A failed try didn't count")
+check(
+	first.Ok and first.Casting and first.Chance > 0 and first.Seconds == Kaiju.Tame.Cast,
+	"The tame didn't start a cast"
+)
+check(
+	enemy.Model:GetAttribute("KaijuTameBy") == a.UserId and enemy.Model:GetAttribute("KaijuMood") == "Bound",
+	"It isn't held by the tame"
+)
+check(enemy.Model:GetAttribute("KaijuTameEnds") ~= nil, "No end time for the cast bar")
+local heldHealth = enemy.Humanoid.Health
+Enemies.damage(enemy, 500, b, false, nil, nil, nil)
+check(enemy.Alive and enemy.Humanoid.Health == heldHealth, "A held kaiju was hurt")
+check(Tame(a, enemy.Model).Message:find("taming") ~= nil, "Cast twice on one")
+now += Kaiju.Tame.Cast / 2
+KaijuWilds._brain(enemy, now)
+check(enemy.Model:GetAttribute("KaijuTameBy") == a.UserId and wild.Tries == 0, "The cast ended early")
+check(enemy.FoeVictim == nil, "A held kaiju went for someone")
+finishCast(enemy)
+check(
+	enemy.Model:GetAttribute("KaijuTameBy") == nil and enemy.Model:GetAttribute("KaijuMood") == nil,
+	"Still held after the cast"
+)
+check(
+	enemy.Model:GetAttribute("KaijuTries") == 1 and a:GetAttribute("TameResult") == "Broke",
+	"A failed try didn't count"
+)
+check(noted(a, "broke free"), "The tamer didn't hear it broke free")
 check(Tame(a, enemy.Model).Message:find("moment") ~= nil, "Tried again at once")
+-- Stray too far, or get hit, and the cast breaks (no try spent).
+now += Kaiju.TameCooldown
+check(Tame(a, enemy.Model).Casting, "Couldn't cast again")
+rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(Kaiju.Tame.Break + 4, 0, 0))
+KaijuWilds._brain(enemy, now)
+check(
+	enemy.Model:GetAttribute("KaijuTameBy") == nil and a:GetAttribute("TameResult") == "Interrupted" and wild.Tries == 1,
+	"Walking off didn't break the tame (or spent a try)"
+)
+rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(5, 0, 0))
+now += Kaiju.TameCooldown
+check(Tame(a, enemy.Model).Casting, "Couldn't cast after a break")
+local aHumanoid = a.Character:FindFirstChildOfClass("Humanoid")
+aHumanoid.Health -= 10
+KaijuWilds._brain(enemy, now)
+check(a:GetAttribute("TameResult") == "Interrupted" and noted(a, "hit"), "A hit didn't break the tame")
+aHumanoid.Health = aHumanoid.MaxHealth
 now += Kaiju.TameCooldown
 Tame(a, enemy.Model)
+finishCast(enemy)
 now += Kaiju.TameCooldown
-local last = Tame(a, enemy.Model)
-check(last.Gone and not enemy.Alive and KaijuWilds._wilds[enemy] == nil, "Three failed tries and it stayed")
+Tame(a, enemy.Model)
+finishCast(enemy)
+check(
+	a:GetAttribute("TameResult") == "Fled" and not enemy.Alive and KaijuWilds._wilds[enemy] == nil,
+	"Three failed tries and it stayed"
+)
 -- The next one: a lucky try.
 local target = wilds[2]
 local wild2 = KaijuWilds._wilds[target]
@@ -1120,16 +1174,18 @@ target.Root.CFrame = CFrame.new(rootA.Position + Vector3.new(4, 0, 0))
 target.Humanoid.Health = target.Humanoid.MaxHealth * 0.1
 forcedRoll = 0.01
 local owned = Kaiju.count(roster)
-local tamed = Tame(a, target.Model)
-check(tamed.Ok and tamed.Tamed, "A lucky try at 10% health failed")
-check(
-	Kaiju.count(roster) == owned + 1 and roster.List[tamed.Id].Species == wild2.Species,
-	"The tamed kaiju isn't yours"
-)
-check(
-	roster.List[tamed.Id].Level == wild2.Level and roster.List[tamed.Id].Soul.Element == wild2.Element,
-	"It changed taming"
-)
+check(Tame(a, target.Model).Casting, "No cast on a weak one")
+-- (Your kaiju leaves one being caught alone.)
+check(not KaijuServer._fair(a, target), "Your kaiju still fights one being tamed")
+finishCast(target)
+check(a:GetAttribute("TameResult") == "Tamed", "A lucky try at 10% health failed")
+local tamedId
+for id, entry in roster.List do
+	if entry.Species == wild2.Species and entry.Level == wild2.Level and entry.Soul.Element == wild2.Element then
+		tamedId = id
+	end
+end
+check(Kaiju.count(roster) == owned + 1 and tamedId ~= nil, "The tamed kaiju isn't yours (or it changed taming)")
 check(not target.Alive, "The tamed one still roams")
 -- A full roster: no taming. (Another roams out once they've gone.)
 KaijuWilds._spawnWild()

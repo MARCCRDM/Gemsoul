@@ -398,6 +398,10 @@ end
 -- wild kaiju only once `owner` has started on it (KaijuWilds keeps who has,
 -- in Engaged).
 local function fair(owner: Player, enemy): boolean
+	-- (Not one held by a tame: it's being caught, not fought.)
+	if enemy.Model and enemy.Model:GetAttribute("KaijuTameBy") ~= nil then
+		return false
+	end
 	local engaged = (enemy :: any).Engaged
 	return engaged == nil or engaged[owner] ~= nil
 end
@@ -936,6 +940,6 @@ end
 -- For tests.
 KaijuServer._upkeep, KaijuServer._think, KaijuServer._feed = upkeep, think, feed
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._grantStarter = recall, setActive, grantStarter
-KaijuServer._despawn = despawn
+KaijuServer._despawn, KaijuServer._fair = despawn, fair
 
 return KaijuServer

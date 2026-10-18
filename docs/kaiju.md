@@ -111,7 +111,8 @@ On a computer the card sits at the bottom left, TAME above it:
     it away).
   - Knocked out, the card says when it's back.
 - **TAME**, beside the card, when a wild kaiju near you is down to half its
-  health: the chance right now and the tries left.
+  health: the chance right now and the tries left. It starts the taming
+  cast (see Taming), and hides while the cast is under way.
 - **The kaiju panel:** the one out (stats, its Gemsoul and E), your others
   (SEND OUT to swap), and FEED: tick stones from your pouch, each showing the
   EXP it gives.
@@ -225,7 +226,25 @@ and beats a kaiju of its own level.
 
 ### Taming
 
-Bring it to half its health or less **without killing it**, then try:
+Bring it to half its health or less **without killing it**. When it's
+ready to be caught, it **glows gold** (a pulsing outline you can see
+through rocks) with **READY TO TAME** and the chance over it. Anyone within
+140 studs sees that.
+
+Then tap **TAME**. Taming is a **cast** of 2.5 seconds (`Kaiju.Tame`):
+
+- A beam of gold light runs from your hand to it, and motes of light
+  spiral in round it, closing in as the cast goes on. Everyone near sees
+  this.
+- It's **held**: it stops where it is and struggles against the hold
+  (crouched, twisting, jaws snapping: the `Bound` pose). It can't move,
+  fight back or be hurt, and your kaiju (anyone's) leaves it alone.
+- Your **cast bar** says TAMING and what it is, with the chance, and fills
+  as it goes: "Stay close and don't get hit."
+- The cast **breaks** if you're hit (by a critter, say), if you stray more
+  than 38 studs from it, or if you leave the Outpost. A broken cast costs
+  no try.
+- At the end comes the roll, at its health then:
 
 | Its health | Chance |
 | --- | --- |
@@ -235,8 +254,11 @@ Bring it to half its health or less **without killing it**, then try:
 | 5% | 60% |
 | 1 HP | nearly 80% |
 
-Three failed tries and it burrows away. The tries are 2 seconds apart, from
-within 30 studs.
+The bar ends on the result: **TAMED!** (it's yours, in the kaiju panel),
+**IT BROKE FREE** (a try spent), **IT FLED** (it burrowed away after the
+third) or **TAME BROKEN** (cut short). You start a cast from within 30
+studs; tries are at least 2 seconds apart, and you tame one at a time
+(and nobody else can tame one you're holding).
 
 The hard part is not killing it. Every hit on a wild kaiju lands anywhere
 from 60% to 140% of its usual damage, so one big hit can end the tame. To
@@ -336,6 +358,7 @@ Proposed guardrails:
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
 | `SparServer` | `Hunt`: the kit out alone |
 | `KaijuHud` (client) | The card, RECALL, HUNT, TAME, a wild kaiju's Challenge and the kaiju panel |
+| `KaijuTaming` (client) | The gold glow and READY TO TAME on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
 | `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk, their fight poses and their moods (`KaijuMood`: `CreatureMotion.Moods`) |
 
 Tests: `tests/run_kaiju.py` checks the rules and how they fight (each
@@ -350,7 +373,9 @@ them once home; your kaiju (and its E) leaves it be till then. Heavies break
 guards, parries leave the attacker reeling, a wild kaiju hops from a
 hunter's charged heavy, the E winds up on the cast bar, a whole duel
 between two kaiju, kills pay their Gemsoul and EXP, taming (range, half
-health, tries, burrowing, a full roster), moon bugs' coins and daily cap,
+health, the cast holding it untouchable and still, breaking when you stray
+or are hit without spending a try, your kaiju leaving it be, the roll at
+the end, tries, burrowing, a full roster), moon bugs' coins and daily cap,
 and the rifts: who they open round, the caps, a bug hopping out at its prey
 (a miner too), giving up and slipping back. The vein guardian: its level,
 health and where it sleeps, waking on the third swing at its own vein
@@ -373,6 +398,12 @@ the Edge drawing critters while the wild kaiju roam and their lifetimes run
 out; no brain errors, the critters within their caps, never a moment
 without wild kaiju (the old fixed lifetimes left the quarry empty for 90
 seconds every ten minutes), and nothing piling up.
-`tests/kaiju_models_cases.luau` checks each mood's pose.
+`tests/kaiju_models_cases.luau` checks each mood's pose (a held kaiju
+crouches and struggles). `tests/run_kaiju_taming.py` drives the taming
+screen: a weakened kaiju near you glows with READY TO TAME and its chance (a
+healthy one, a far one, one being tamed or one out of the Outpost doesn't),
+the glow pulses, a cast draws two beams from your hand and twelve motes
+that close in, the bar fills, and it ends on TAMED! or TAME BROKEN and
+goes.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
 card's place on every phone.

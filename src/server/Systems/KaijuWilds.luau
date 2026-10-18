@@ -23,9 +23,11 @@
 	              Enemies.damage applies), and meets its guard there.
 	              Killed: the one who (with their kaiju) did the most gets
 	              its Gemsoul, and every kaiju that fought it gets EXP.
-	              Tamed ("KaijuTame"): it joins you, Gemsoul and all. Three
-	              failed tries and it burrows away; so does one left alone
-	              for Kaiju.Wild.Lifetime.
+	              Tamed ("KaijuTame"): a cast (Kaiju.Tame) that holds it,
+	              struggling ("Bound") and untouchable, then the roll; it
+	              joins you, Gemsoul and all. The cast breaks if you're hit
+	              or stray. Three failed tries and it burrows away; so does
+	              one left alone for Kaiju.Wild.Lifetime.
 	  Guardian    one more wild kaiju, bigger, pacing and napping in front of
 	              the guarded Rift Vein (Shared.Frontier.Guardian: levels 16
 	              to 20). The first swing at its vein stirs it, the second
@@ -58,9 +60,12 @@
 	Both are ordinary Enemies (so every attack, status and nameplate works on
 	them) with their own brains, marked OutpostCreature for the kaiju out.
 	A wild kaiju's model carries KaijuWild, KaijuLevel, KaijuAbility and
-	KaijuTries for the client's tame button.
+	KaijuTries for the client's tame button (and its glow when it's ready),
+	and KaijuTameBy / KaijuTameEnds while a tame is cast on it; the tamer
+	gets TameResult / TameResultAt when it ends.
 
-	  "KaijuTame", model        try to tame a weakened wild kaiju (within 30 studs)
+	  "KaijuTame", model        cast a tame on a weakened wild kaiju (within
+	                            Kaiju.Tame.Range); the roll at its end
 	  "KaijuChallenge", model   start a fight with a wild kaiju (within 20 studs,
 	                            with your kaiju out or hunting)
 
@@ -100,7 +105,7 @@ local reply = Shop.reply
 
 local KaijuWilds = {}
 
-local TAME_RANGE = 30
+local TAME_RANGE = Kaiju.Tame.Range
 local CHALLENGE_RANGE = 20
 local CALM_AFTER = 8 -- seconds home, out of the fight, before it forgets who started on it
 local HOME_HEAL = 0.05 -- share of its health back each second, walking home
@@ -137,6 +142,7 @@ type Wild = {
 	GrowlAt: number?, -- its last roar at someone
 	Lifetime: number?, -- a wild one's: seconds unfought before it burrows (each its own)
 	Noticed: { [Player]: number }?, -- when it last stopped to look at each player
+	Taming: any?, -- a tame being cast on it: { Player, Ends, Health (the tamer's, to see a hit) }
 }
 
 -- A pack of roaming wild kaiju: its den out in the frontier (they wander
@@ -694,6 +700,8 @@ KaijuWilds._wander = wander
 -- The brain both kinds share: find a foe and fight it (a wild kaiju as a
 -- duellist, KaijuFighter; a moon bug chases and bites), else go home (a
 -- rift's critter slips back through a rift).
+local tameStep -- (a tame's tick: Taming, below)
+
 local function brain(enemy, now: number)
 	local wild = wilds[enemy]
 	if not wild then
@@ -702,6 +710,12 @@ local function brain(enemy, now: number)
 	local e = enemy :: any
 	local humanoid, root = enemy.Humanoid, enemy.Root
 	local fighter = wild.Fighter
+	-- Held by a tame: nothing else till it's over.
+	if wild.Taming then
+		e.FoeVictim, e.Foe = nil, nil
+		tameStep(enemy, wild, now)
+		return
+	end
 	if now < enemy.StunUntil and not fighter then
 		humanoid:MoveTo(root.Position)
 		return
@@ -868,6 +882,13 @@ local spawnWild
 -- a burrow: Kaiju.Wild.Return; the guardian has none: a fresh one sleeps at
 -- its vein once it moves).
 local function gone(wild: Wild, soon: boolean?)
+	if wild.Taming then
+		-- (Gone mid-tame, its vein moving or its time up: the tamer hears.)
+		local player = wild.Taming.Player
+		wild.Taming = nil
+		player:SetAttribute("TameResult", "Interrupted")
+		player:SetAttribute("TameResultAt", workspace:GetServerTimeNow())
+	end
 	KaijuFighter.forget(wild.Fighter)
 	wilds[wild.Enemy] = nil
 	local pack = wild.Pack
@@ -994,6 +1015,10 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 	-- Every blow lands 60%-140%, times its element against this one's
 	-- and its kind's Guard.
 	e.TakenScale = function(hitElement: string?)
+		local held = wilds[enemy]
+		if held and held.Taming then
+			return 0, nil -- (held by a tame: nothing hurts it)
+		end
 		local mult, tag = Kaiju.taken(species, element, hitElement)
 		return mult * Kaiju.spread(), tag
 	end
@@ -1225,6 +1250,131 @@ end
 
 -- Taming --------------------------------------------------------------------------------------------------
 
+-- Who's casting a tame on which: one at a time each.
+local function tamingOf(player: Player): Wild?
+	for _, wild in wilds do
+		if wild.Taming and wild.Taming.Player == player then
+			return wild
+		end
+	end
+	return nil
+end
+
+-- How a tame ended, for the tamer's screen: their TameResult ("Tamed",
+-- "Broke", "Fled" or "Interrupted") at TameResultAt (server time).
+local function tell(player: Player, text: string)
+	if player.Parent then
+		Remotes.Notify:FireClient(player, text)
+	end
+end
+
+local function tameResult(player: Player, result: string)
+	if player.Parent then
+		player:SetAttribute("TameResult", result)
+		player:SetAttribute("TameResultAt", serverNow())
+	end
+end
+
+-- The cast over, either way: it's let go.
+local function release(wild: Wild)
+	wild.Taming = nil
+	local model = wild.Enemy.Model
+	model:SetAttribute("KaijuTameBy", nil)
+	model:SetAttribute("KaijuTameEnds", nil)
+	setMood(wild, nil)
+end
+
+-- The cast's end: the roll (tameChance at its health now).
+local function resolveTame(enemy, wild: Wild, player: Player, now: number)
+	local humanoid = enemy.Humanoid
+	local chance = Kaiju.tameChance(humanoid.Health, humanoid.MaxHealth)
+	release(wild)
+	wild.TameAt[player] = now -- (a moment before the next try)
+	local title = Kaiju.title({ Species = wild.Species, Element = wild.Element })
+	local profile = PlayerData.get(player)
+	if not profile or Kaiju.count(Kaiju.roster(profile)) >= Kaiju.MaxOwned then
+		tell(player, string.format("You can keep %d kaiju: let one go first.", Kaiju.MaxOwned))
+		tameResult(player, "Interrupted")
+		return
+	end
+	if rng:NextNumber() < chance then
+		local soul = table.clone(wild.Soul)
+		soul.Id = PlayerData.newGemId()
+		local record = KaijuServer.adopt(player, wild.Species, soul, wild.Level)
+		if not record then
+			tell(player, "Couldn't tame it right now.")
+			tameResult(player, "Interrupted")
+			return
+		end
+		fx("TriadBreak", enemy.Root.Position, 6, wild.Element)
+		Enemies.remove(enemy)
+		gone(wild)
+		PlayerData.milestone(player, "KaijuTamed")
+		tell(player, string.format("Tamed! The %s (level %d) is yours.", title, wild.Level))
+		tameResult(player, "Tamed")
+		return
+	end
+	wild.Tries += 1
+	enemy.Model:SetAttribute("KaijuTries", wild.Tries)
+	if wild.Tries >= Kaiju.TameTries then
+		burrow(wild)
+		tell(player, string.format("The %s broke free and burrowed away!", title))
+		tameResult(player, "Fled")
+		return
+	end
+	local left = Kaiju.TameTries - wild.Tries
+	tell(
+		player,
+		string.format(
+			"It broke free! (%d%% chance) %d tr%s left.",
+			math.floor(chance * 100 + 0.5),
+			left,
+			if left == 1 then "y" else "ies"
+		)
+	)
+	tameResult(player, "Broke")
+end
+
+-- A tick of a cast (its brain's): held still, struggling, turned to its
+-- tamer; broken if they stray past Tame.Break, are hit or go; the roll at
+-- its end.
+function tameStep(enemy, wild: Wild, now: number)
+	local taming = wild.Taming
+	local player = taming.Player
+	local root = rootOf(player)
+	local body = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	enemy.Humanoid:MoveTo(enemy.Root.Position)
+	local broke = nil
+	if not player.Parent or not root or not body or body.Health <= 0 or player:GetAttribute("Outpost") ~= true then
+		broke = "The tame broke."
+	elseif flat(root.Position - enemy.Root.Position).Magnitude > Kaiju.Tame.Break then
+		broke = "Too far away: the tame broke."
+	elseif body.Health < taming.Health - 0.5 then
+		broke = "You were hit: the tame broke."
+	end
+	if broke then
+		release(wild)
+		wild.TameAt[player] = now
+		tell(player, broke)
+		tameResult(player, "Interrupted")
+		return
+	end
+	taming.Health = body.Health -- (healing up meanwhile is fine)
+	wild.LastFight = now -- (a tame counts as a fight: it won't burrow of old age mid-cast)
+	local at = enemy.Root.Position
+	local look = Vector3.new(root.Position.X, at.Y, root.Position.Z)
+	if flat(look - at).Magnitude > 0.5 then
+		enemy.Root.CFrame = CFrame.lookAt(at, look)
+	end
+	if now >= taming.Ends then
+		resolveTame(enemy, wild, player, now)
+	end
+end
+
+-- "KaijuTame": start a tame on a weakened wild kaiju (within Tame.Range).
+-- It's a cast (Kaiju.Tame): the kaiju is held, struggling, untouchable,
+-- for Tame.Cast seconds, then the roll; the tamer hears how it went
+-- (Notify, and TameResult on them).
 local function tame(player: Player, model: any)
 	local enemy = typeof(model) == "Instance" and Enemies.get(model) or nil
 	local wild = enemy and wilds[enemy]
@@ -1237,6 +1387,15 @@ local function tame(player: Player, model: any)
 	end
 	if (root.Position - enemy.Root.Position).Magnitude > TAME_RANGE then
 		return reply(false, "Get closer to tame it.")
+	end
+	if wild.Taming then
+		return reply(
+			false,
+			if wild.Taming.Player == player then "Hold steady: you're taming it." else "Someone's taming that one."
+		)
+	end
+	if tamingOf(player) then
+		return reply(false, "You're already taming one.")
 	end
 	local now = os.clock()
 	local last = wild.TameAt[player]
@@ -1252,45 +1411,18 @@ local function tame(player: Player, model: any)
 	if not profile or Kaiju.count(Kaiju.roster(profile)) >= Kaiju.MaxOwned then
 		return reply(false, string.format("You can keep %d kaiju: let one go first.", Kaiju.MaxOwned))
 	end
+	local body = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	wild.TameAt[player] = now
-	local title = Kaiju.title({ Species = wild.Species, Element = wild.Element })
-	if rng:NextNumber() < chance then
-		local soul = table.clone(wild.Soul)
-		soul.Id = PlayerData.newGemId()
-		local record = KaijuServer.adopt(player, wild.Species, soul, wild.Level)
-		if not record then
-			return reply(false, "Couldn't tame it right now.")
-		end
-		fx("TriadBreak", enemy.Root.Position, 6, wild.Element)
-		Enemies.remove(enemy)
-		gone(wild)
-		PlayerData.milestone(player, "KaijuTamed")
-		return reply(
-			true,
-			string.format("Tamed! The %s (level %d) is yours.", title, wild.Level),
-			{ Tamed = true, Chance = chance, Id = record.Id }
-		)
+	wild.Taming = { Player = player, Ends = now + Kaiju.Tame.Cast, Health = if body then body.Health else 0 }
+	wild.Plan = nil
+	if wild.Fighter then
+		KaijuFighter.calm(wild.Fighter)
 	end
-	wild.Tries += 1
-	enemy.Model:SetAttribute("KaijuTries", wild.Tries)
-	if wild.Tries >= Kaiju.TameTries then
-		burrow(wild)
-		return reply(
-			false,
-			string.format("The %s broke free and burrowed away!", title),
-			{ Chance = chance, Gone = true }
-		)
-	end
-	return reply(
-		false,
-		string.format(
-			"It broke free! (%d%% chance) %d tr%s left.",
-			math.floor(chance * 100 + 0.5),
-			Kaiju.TameTries - wild.Tries,
-			if Kaiju.TameTries - wild.Tries == 1 then "y" else "ies"
-		),
-		{ Chance = chance }
-	)
+	setMood(wild, "Bound")
+	enemy.Model:SetAttribute("KaijuTameBy", player.UserId)
+	enemy.Model:SetAttribute("KaijuTameEnds", serverNow() + Kaiju.Tame.Cast)
+	humanoid:MoveTo(enemy.Root.Position)
+	return reply(true, "", { Casting = true, Seconds = Kaiju.Tame.Cast, Chance = chance })
 end
 
 -- "KaijuChallenge": start a fight with a wild kaiju, with your kaiju out (it

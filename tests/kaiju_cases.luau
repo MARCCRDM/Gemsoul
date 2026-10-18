@@ -122,6 +122,9 @@ check(Kaiju.feedExp(nil, { Level = 1 }) == 0, "Feeding nothing gave EXP")
 -- Taming -----------------------------------------------------------------------------------
 check(Kaiju.tameChance(60, 100) == 0 and Kaiju.tameChance(51, 100) == 0, "Tameable above half health")
 check(Kaiju.tameChance(0, 100) == 0, "A dead kaiju can be tamed")
+-- The tame is a cast: a couple of seconds, broken a little past where it starts.
+check(Kaiju.Tame.Cast >= 1.5 and Kaiju.Tame.Cast <= 4, "The tame's cast is too quick or too slow")
+check(Kaiju.Tame.Break > Kaiju.Tame.Range, "A tame breaks before you're out of its range")
 check(math.abs(Kaiju.tameChance(50, 100) - 0.05) < 1e-9, "5% at half health")
 check(math.abs(Kaiju.tameChance(30, 100) - 0.15) < 1e-9, "15% at 30%")
 check(math.abs(Kaiju.tameChance(15, 100) - 0.35) < 1e-9, "35% at 15%")

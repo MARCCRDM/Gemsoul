@@ -14,8 +14,11 @@
 	arena) leaves its Gemsoul behind as a gem anyone can socket; only its E
 	works there too.
 
-	Taming: bring a wild kaiju to half health or less WITHOUT killing it, then
-	try your luck (tameChance): the lower its health, the better. Hits on a
+	Taming: bring a wild kaiju to half health or less WITHOUT killing it (it
+	glows gold when it's ready), then cast your tame (Tame.Cast seconds of
+	holding it, struggling, in your gem's light; broken if you're hit or
+	stray past Tame.Break) and try your luck (tameChance): the lower its
+	health, the better. Hits on a
 	wild kaiju land anywhere from 60% to 140% (Spread), so a big hit can end
 	the tame; hit it with its own element (75%, ElementMatchup) to go gently.
 
@@ -218,6 +221,11 @@ Kaiju.TameCurve = {
 }
 Kaiju.TameTries = 3
 Kaiju.TameCooldown = 2
+-- The tame is a cast: Cast seconds holding it in your gem's light (it's held
+-- still, struggling, and nothing can hurt it meanwhile); it breaks if you're
+-- hit or stray past Break studs. Range: how close you start it from. The
+-- roll comes at its end.
+Kaiju.Tame = { Cast = 2.5, Range = 30, Break = 38 }
 -- A hit on a wild kaiju lands anywhere in this range of its usual damage.
 Kaiju.Spread = { 0.6, 1.4 }
 

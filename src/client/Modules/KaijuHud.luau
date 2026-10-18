@@ -11,7 +11,9 @@
 	                  coins, and at the top right while you hunt (the fight's
 	                  foe list has the top left then).
 	  TAME            beside the card when a wild kaiju near you is down to
-	                  half its health: the chance now, and the tries left.
+	                  half its health (it glows gold then: KaijuTaming): the
+	                  chance now, and the tries left. It casts the tame
+	                  (KaijuTaming's bar), hidden while that's under way.
 	  Challenge       a wild kaiju's prompt (hold E beside it): it leaves you
 	                  and your kaiju alone till you start on it, here or by
 	                  hitting it while you hunt.
@@ -38,6 +40,7 @@ local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local KaijuTaming = require(script.Parent.KaijuTaming)
 local MobileLayout = require(script.Parent.MobileLayout)
 local OutpostScene = require(script.Parent.OutpostScene)
 local UiKit = require(script.Parent.UiKit)
@@ -51,7 +54,7 @@ local KaijuHud = {}
 local INK = Color3.fromRGB(10, 12, 22)
 local HEALTH = Color3.fromRGB(96, 214, 120)
 local EXP = Color3.fromRGB(176, 132, 255)
-local TAME_RANGE = 30
+local TAME_RANGE = Kaiju.Tame.Range
 
 local function elementColor(element: string?): Color3
 	return GemConfig.ElementColors[element or ""] or P.Gold
@@ -312,15 +315,10 @@ local function tameTarget(): (Model?, number)
 	end
 	local best, bestChance = nil, 0
 	for _, model in enemies:GetChildren() do
-		if model:GetAttribute("KaijuWild") then
+		if model:IsA("Model") and KaijuTaming.ready(model) then
 			local humanoid = model:FindFirstChildOfClass("Humanoid")
 			local body = model.PrimaryPart
-			if
-				humanoid
-				and body
-				and humanoid.Health > 0
-				and (body.CFrame.Position - root.CFrame.Position).Magnitude <= TAME_RANGE
-			then
+			if humanoid and body and (body.CFrame.Position - root.CFrame.Position).Magnitude <= TAME_RANGE then
 				local chance = Kaiju.tameChance(humanoid.Health, humanoid.MaxHealth)
 				if chance > bestChance then
 					best, bestChance = model, chance
@@ -380,7 +378,7 @@ local function refresh()
 	-- TAME.
 	local target, chance = tameTarget()
 	tameModel = target
-	tame.Visible = target ~= nil
+	tame.Visible = target ~= nil and not KaijuTaming.casting()
 	if target then
 		tameOdds.Text = string.format("%d%% chance", math.floor(chance * 100 + 0.5))
 		local left = Kaiju.TameTries - (target:GetAttribute("KaijuTries") or 0)
@@ -453,7 +451,13 @@ tame.Activated:Connect(function()
 	end
 	act(function()
 		local result = GemClient.request("KaijuTame", target)
-		say(result)
+		if result and result.Casting then
+			-- The cast is on: its bar shows how it goes (KaijuTaming).
+			KaijuTaming.cast(target, result.Chance or 0, result.Seconds or Kaiju.Tame.Cast)
+			tame.Visible = false
+		else
+			say(result)
+		end
 	end)
 end)
 
@@ -780,6 +784,7 @@ function KaijuHud.start()
 		return
 	end
 	started = true
+	KaijuTaming.start()
 	layout()
 	local ok, err = pcall(refresh)
 	if not ok then

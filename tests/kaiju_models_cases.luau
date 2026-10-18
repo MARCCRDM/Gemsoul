@@ -200,6 +200,16 @@ local resting, sleeping = moodPose("Rest", 2).Lift, moodPose("Sleep", 2).Lift
 check(resting < -0.3 and sleeping < resting, "Resting and sleeping aren't lower")
 check(math.abs(moodPose("Rest", 0.05).Lift) < math.abs(moodPose("Rest", 2).Lift) / 3, "It drops to rest at once")
 check(moodPose("Roar", 0.6).Jaw > 0.6 and moodPose("Roar", 0.6).Pitch > 0.2, "A roar doesn't rear up, jaws wide")
+-- Held by a tame (Bound): crouched low, twisting and snapping against it.
+check(moodPose("Bound", 1.5).Lift < -0.15, "A held kaiju doesn't crouch")
+do
+	local twist = {}
+	for i = 0, 8 do
+		twist[i] = moodPose("Bound", 1 + i * 0.07).Yaw
+	end
+	local most, least = math.max(table.unpack(twist)), math.min(table.unpack(twist))
+	check(most - least > 0.1, "A held kaiju doesn't struggle")
+end
 check(math.abs(moodPose("Roar", 2).Jaw) < 1e-6, "A roar doesn't settle")
 local looks = {}
 for t = 0, 6, 0.5 do
