@@ -57,63 +57,97 @@ rest of the rocks fill the field round the outpost as before.
 Every critter comes through a rift of its own: a ragged tear in the air,
 never symmetrical and never the same shape twice. A tear:
 
-1. **opens** (half a second): it splits along a crooked crack, with a
-   crackle and a flash;
-2. **lets the critter out** (0.7 s in): it hops out at whoever drew it;
+1. **opens and crackles** for a second and a half: it splits along a
+   crooked crack, with the crackle and its critter's own sound (Sahur's
+   bonk, Tralalero's whoosh, Patapim's frost, the croc's bomb), so you
+   know what's coming and where;
+2. **lets the critter out**: it hops out at whoever drew it;
 3. **lingers** (1.8 s): a dark void with glowing lips and hairline cracks
    off them;
 4. **seals** (half a second) with a last flash.
 
-Rifts open 14–24 studs ahead of you, up to 70° either side of the way you're
-heading. They never open in the core or past the walls.
+Rifts open 14–24 studs away, within 100° of where you're facing. If one
+opens off your screen, an arrow at the screen's edge points at it until its
+critter is out. They never open in the core or past the walls.
 
-### Pressure
+### Mining noise
 
-Rifts only open round a player out past the core. Each player has a hidden
-pressure that builds every second they spend out there:
+Mining is what draws critters, not standing about. Every swing out past
+the core makes noise, and a little more trickles in each second you're out
+there. The ring of twenty dots on the right of your screen shows it filling;
+nearly full, it turns red.
 
-| Where | A second adds | Heading outward |
-| --- | --- | --- |
-| The Fringe | 0.8 | 1.28 |
-| The Edge | 1.6 | 2.56 |
-| The core | drains 2 a second | |
+| Where | An encounter about every | Standing about | Critters at once |
+| --- | --- | --- | --- |
+| The core | never | never | 0 |
+| The Fringe | 30 to 40 swings | 7 minutes | 1 or 2 |
+| The Edge | 15 to 20 swings | 3 minutes | 2 or 3 |
 
-At 10, rifts open: in the Fringe, one (75%) or two; in the Edge, two (60%)
-or three. They open a third of a second apart. Then the pressure
-starts again from somewhere between 0 and 3, so the rifts don't come at
-regular intervals. In the Edge, heading outward, that's every few seconds.
-Standing still in the Fringe, it's about every ten.
+Each swing's share of the noise varies (60% to 140%), so encounters don't
+come like clockwork, and the next can't come within 8 seconds of the last.
+A mech's strike makes as much noise as the swings it spends, and its pilot
+is fair game: a critter that knocks them down throws them out of the
+cockpit. Back in the core, the noise dies down over a minute or so.
 
-Caps: two critters at once on one player in the Fringe, four in the Edge,
-twelve in the whole Outpost. If more would come through than the cap
-allows, only enough open to reach it. (Each critter is a whole brainrot
-body, so the caps are kept low; see [Performance](#performance).)
+Caps: two critters at once on one player in the Fringe, three at the Edge,
+twelve in the whole Outpost, shared fairly between everyone out there.
+Critters still on their way through a rift count. If more would come than
+the cap allows, only enough open to reach it. (Each critter is a whole
+brainrot body, so the caps are kept low; see [Performance](#performance).)
 
-No rifts open round you while you're driving a machine, sparring, knocked
-down, or in a fight, a dungeon or an expedition.
+No rifts open round you while you're sparring, knocked down, or in a fight,
+a dungeon or an expedition.
+
+### Wandering rifts
+
+Every 40 to 80 seconds the frontier tears open by itself, 35 to 70 studs from
+someone out there. Its tear lingers longer, and two or three critters roam
+round it for a minute, going for anyone who comes within about 22 studs, and
+for the player it opened near once they're within 30. Go round it, or bring
+your kaiju. At most three critters are out of wandering rifts at once (of
+the twelve). If nobody is near when they'd hop out, it seals empty.
+
+Kill every critter from one and everyone who helped is **Rift Charged**:
+gems 10% luckier for 60 seconds. A tag under the noise ring counts it down.
 
 ### The critters
 
 They're the moon bugs from [kaiju.md](kaiju.md): the brainrot characters
 shrunk down. One that came through a rift:
 
+- is **level 1–4 in the Fringe and 9–13 at the Edge**, whoever is near, so
+  the Edge is a real step up (a kaiju of about level 8 and up). Its level
+  is on its nameplate;
 - goes for whoever drew it, even a miner who isn't hunting, then for
   anything else close by (kaiju, hunters, other players out there);
 - follows its prey up to 120 studs from its rift;
 - gives up once its prey is back in the core (12 studs inside it), or is in
-  a machine, a spar or a fight;
+  a spar or a fight;
 - with nobody to fight for 4 seconds, or after 90 seconds anyway, opens a
-  rift of its own and slips back through it.
+  rift of its own and slips back through it. Every critter does, even one
+  nobody drew.
 
 A critter's finishing blow doesn't kill you in the Outpost: it knocks you
 down for a few seconds, as in a spar, and you get up healed.
 
-Ones from the Edge are tougher: a quarter more health, a fifth more damage,
-and half again the EXP for your kaiju.
+Ones from the Edge are tougher: a quarter more health and a fifth more
+damage.
+
+What one pays:
+
+- **EXP** for every kaiju that fought it: 6 + 2 per level, half again from
+  the Edge, a quarter after your first 60 critters of the day. A kaiju
+  left at home earns nothing.
+- **Coins** for whoever did the most to it: 2 from the Fringe, 4 from the
+  Edge, up to 300 a day.
 
 ### What you do about them
 
-- **Kite them** into your kaiju: it fights them on its own.
+- **Let your kaiju handle them**: it fights them on its own.
+- **Bonk them** with your pick: the mine button (or a click) hits a critter
+  within 6 studs before any rock. Each bonk takes 12% of its health and
+  knocks it back 10 studs, every 0.6 seconds, and costs no swings. A miner
+  alone kills a Fringe bug in about 8 to 10 seconds.
 - **Hunt**: press HUNT and fight them yourself.
 - **Run back in**: past the core's edge they give up and go back through
   their rifts.
@@ -131,8 +165,11 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
   too small to see at their size (grain, rivets, laces, spores; never the
   face), carry no lights, and only their bigger parts cast shadows: 66 to 179
   parts, about 20 to 50 of them casting shadows (`BrainrotSkins.thin`).
-- **Fewer at once**: two round a player in the Fringe, four at the Edge,
-  twelve in the whole Outpost (it was three, six and thirty).
+- **Fewer at once**: two round a player in the Fringe, three at the Edge,
+  twelve in the whole Outpost (it was three, six and thirty), shared
+  fairly, with critters still on their way counted.
+- **Fewer encounters**: they come from mining, about 1 in 35 swings in the
+  Fringe and 1 in 17 at the Edge, instead of every 5 to 10 seconds out there.
 - **Only the rocks near you are lit.** Each rock's light is on within 70
   studs of the camera and off further out, where the crystals' neon still
   glows (`OutpostScene`). Instead of ~190 lights, about 13 on average (29 at
@@ -145,6 +182,14 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 - **A dormant rift breathes 15 times a second**, not every frame, its light
   holds still, and its glow on the ground is placed once (`RiftTear`). An
   open one, which lasts three seconds, moves every frame.
+- **A tear is only built near you** (within 220 studs): a rift across the
+  Outpost costs your screen nothing (`RiftTear`).
+- **A critter's death only blows up near you**: past 140 studs there's no
+  blast at all, and a critter's is its 40 biggest pieces (`ElementalDeath`).
+- **Bug joints are animated within 100 studs** (kaiju's within 180:
+  `CreatureAnimation`).
+- **One enemy's error doesn't stop the rest**: each thinks on its own, an
+  error logged now and then (`Enemies`).
 
 ![The moon bugs as a dungeon dresses them (top) and as they come through rifts (bottom)](frontier/moon-bugs.png)
 
@@ -155,22 +200,25 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 | `Shared.Frontier` | The rules: bands, colours and luck, the trails, Rift Veins and crumbs, pressure, how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
 | `Shared.Outpost` | The Fringe, Edge and Vein zones (rock mix and luck) |
 | `OutpostWorld` | Lays out the trails, crumbs, Rift Veins and scars before the rest of the field; crystals tinted by band (`rock(size, cframe, rng, tint)`) |
-| `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot |
-| `FrontierServer` | Each player's band (`FrontierBand`) and pressure, the incursions, the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`; the scars carry `Dormant`) |
-| `KaijuWilds` | `spawnBug`: a critter out of a rift, at its prey (`prey`); slipping back (`rift`) |
+| `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot; every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
+| `FrontierServer` | Each player's band (`FrontierBand`) and noise (`FrontierNoise`), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`) |
+| `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk` |
 | `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
-| `FrontierHud` (client) | The banner as you cross into a band |
-| `OutpostScene` (client) | The band and luck on a rock's label |
+| `FrontierHud` (client) | The banner as you cross into a band, the noise ring, arrows to rifts off screen, the Rift Charged tag |
+| `OutpostScene` (client) | The band and luck on a rock's label; the mine button bonks a critter close by |
 
 Tests: `tests/run_frontier.py` checks the rules (bands and zones, the six
-trails clear of the roads and buildings, the Rift Veins, crumbs, pressure,
-how many come at once, where rifts open, the timeline, that tears are
-ragged and lopsided, the pieces each tear is drawn from, the banners).
-`tests/run_kaiju.py` runs the server side: who rifts open round, the
-caps, incursions, a critter hopping out at its prey (a miner too), giving
-up and slipping back; and builds every moon bug (`tests/moon_bug_cases.luau`:
+trails clear of the roads and buildings, the Rift Veins, crumbs, mining
+noise, fair shares, critter levels and EXP, how many come at once, where
+rifts open (wandering ones too), the timeline, that tears are ragged and
+lopsided, the pieces each tear is drawn from, the banners, the noise ring
+and the arrows). `tests/run_kaiju.py` runs the server side: who rifts open
+round, swings drawing them, the warning, the caps, edge levels, a pilot's
+strikes, a critter hopping out at its prey (a miner too), giving up and
+slipping back, a stray leaving, wandering rifts roaming and Rift Charged,
+the pay, and the bonk; and builds every moon bug (`tests/moon_bug_cases.luau`:
 its part and shadow budget, no armour or lights, nothing left hanging loose,
 its whole face). `tests/run_outpost.py` and
 `tests/run_moon_quarry_scene.py` cover the zones, luck, regrowth and the

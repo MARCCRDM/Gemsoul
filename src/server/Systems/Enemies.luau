@@ -1106,6 +1106,27 @@ function Enemies.start(trainingOnly: boolean?)
 		landmarks:SetAttribute("Wilds", Enemies.WildsCenter)
 	end
 
+	-- One enemy's thinking: an error in it is logged (once in a while) and
+	-- skips only that enemy, not every one after it this tick.
+	local lastWarned = -math.huge
+	local function tick(enemy: Enemy, now: number)
+		if enemy.Kind.Dummy then
+			-- Dummies heal back to full once left alone.
+			if now - enemy.LastHit > 4 and enemy.Humanoid.Health < enemy.Humanoid.MaxHealth then
+				enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
+				updateBar(enemy)
+			end
+		elseif enemy.Brain then
+			enemy.Brain(enemy, now)
+		else
+			think(enemy, now)
+		end
+		if enemy.Alive then
+			publishStatuses(enemy, now)
+		end
+	end
+	Enemies._tick = tick
+
 	local thinkTimer, dotTimer = 0, 0
 	RunService.Heartbeat:Connect(function(dt)
 		thinkTimer += dt
@@ -1115,19 +1136,10 @@ function Enemies.start(trainingOnly: boolean?)
 			thinkTimer = 0
 			for _, enemy in enemies do
 				if enemy.Alive then
-					if enemy.Kind.Dummy then
-						-- Dummies heal back to full once left alone.
-						if now - enemy.LastHit > 4 and enemy.Humanoid.Health < enemy.Humanoid.MaxHealth then
-							enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
-							updateBar(enemy)
-						end
-					elseif enemy.Brain then
-						enemy.Brain(enemy, now)
-					else
-						think(enemy, now)
-					end
-					if enemy.Alive then
-						publishStatuses(enemy, now)
+					local ok, err = pcall(tick, enemy, now)
+					if not ok and now - lastWarned > 10 then
+						lastWarned = now
+						warn("[Enemies] " .. tostring(enemy.Kind.Name) .. " couldn't think: " .. tostring(err))
 					end
 				end
 			end

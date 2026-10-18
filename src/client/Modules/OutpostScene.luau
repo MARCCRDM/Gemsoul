@@ -755,6 +755,46 @@ local function nearestRock(): Model?
 	return best
 end
 
+-- A rift's critter close enough for the pick to bonk (Shared.Frontier.Bonk).
+local function nearestCritter(): Model?
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local enemies = workspace:FindFirstChild("Enemies")
+	if not root or not enemies then
+		return nil
+	end
+	local best, bestDistance = nil, Frontier.Bonk.Offer
+	for _, model in enemies:GetChildren() do
+		if model:IsA("Model") and model:GetAttribute("RiftBorn") then
+			local body = model:FindFirstChild("HumanoidRootPart") :: BasePart?
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			local d = if body then (body.Position - root.Position).Magnitude else math.huge
+			if humanoid and humanoid.Health > 0 and d <= bestDistance then
+				best, bestDistance = model, d
+			end
+		end
+	end
+	return best
+end
+
+-- The pick on a critter: it costs no swings, and it knocks it back.
+local function bonk(critter: Model)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local body = critter:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root and body then
+		local look = Vector3.new(body.Position.X, root.Position.Y, body.Position.Z)
+		if (look - root.Position).Magnitude > 0.5 then
+			root.CFrame = CFrame.lookAt(root.Position, look)
+		end
+	end
+	task.spawn(function()
+		local result = GemClient.request("OutpostBonk", critter)
+		if not result.Ok and result.Message and result.Message ~= "" then
+			UiKit.toast(result.Message)
+		end
+	end)
+end
+OutpostScene._nearestCritter = nearestCritter
+
 function OutpostScene.swing(nodeId: number?)
 	-- (Not with your combat kit out: 1 puts it away.)
 	if not active or Spar.fighting(player) or next(openScreens) ~= nil then
@@ -767,6 +807,13 @@ function OutpostScene.swing(nodeId: number?)
 	end
 	local now = os.clock()
 	if now < nextSwing then
+		return
+	end
+	-- On foot, a critter on you comes before a rock: the pick bonks it.
+	local critter = if mech then nil else nearestCritter()
+	if critter then
+		nextSwing = now + math.max(Rules.SwingCooldown, Frontier.Bonk.Cooldown) + 0.05
+		bonk(critter)
 		return
 	end
 	local model = nil

@@ -2,8 +2,10 @@
 -- The Outpost's frontier (Shared.Frontier): the bands, the candy trails
 -- (out to the walls, clear of the roads and buildings, rocks evenly
 -- spaced, crumbs between, a Rift Vein at each end), richer rocks outward
--- (Shared.Outpost.Zones), pressure and incursions, where rifts open, their
--- timeline, and their ragged, lopsided tears.
+-- (Shared.Outpost.Zones), mining noise and incursions, fair shares,
+-- critter levels and EXP, where rifts open (wandering ones too), their
+-- timeline, their ragged, lopsided tears, and the HUD's noise ring and
+-- arrows.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -177,20 +179,31 @@ for i, a in ends do
 end
 check(#Frontier.crumbs(Vector3.zero, Vector3.new(60, 0, 0), rng) == 0, "Crumbs across a big gap")
 
--- Pressure and incursions --------------------------------------------------------------------------------
-check(Frontier.pressure(5, "Core", false, 1) == 5 - Frontier.Pressure.Drain, "The core doesn't drain it")
-check(Frontier.pressure(0.5, "Core", true, 1) == 0, "Drained below nothing")
-local function secondsTo(band, outward)
-	local heat, t = 0, 0
-	while heat < Frontier.Pressure.Threshold and t < 100 do
-		heat = Frontier.pressure(heat, band, outward, 0.5)
-		t += 0.5
+-- Mining noise and incursions -----------------------------------------------------------------------------
+-- (An encounter at 1: swings make it, the edge's more; a second out there a
+-- little; the core nothing.)
+check(Frontier.noise(0.3, "Core", 10, 60) == 0.3, "The core makes noise")
+local function swingsTo(band, roll)
+	local noise, swings = 0, 0
+	while noise < 1 and swings < 500 do
+		noise = Frontier.noise(noise, band, 1, 0, roll)
+		swings += 1
+	end
+	return swings
+end
+check(swingsTo("Fringe", 0.5) >= 30 and swingsTo("Fringe", 0.5) <= 40, "Not about 1 in 35 swings in the fringe")
+check(swingsTo("Edge", 0.5) >= 15 and swingsTo("Edge", 0.5) <= 20, "Not about 1 in 17 swings at the edge")
+check(swingsTo("Fringe", 0) > swingsTo("Fringe", 1), "Each swing's share doesn't vary")
+local function secondsIdle(band)
+	local noise, t = 0, 0
+	while noise < 1 and t < 3600 do
+		noise = Frontier.noise(noise, band, 0, 1)
+		t += 1
 	end
 	return t
 end
-check(secondsTo("Edge", false) < secondsTo("Fringe", false), "The edge isn't busier than the fringe")
-check(secondsTo("Fringe", true) < secondsTo("Fringe", false), "Heading out doesn't draw them sooner")
-check(secondsTo("Fringe", false) <= 15 and secondsTo("Edge", true) >= 3, "Rifts too rare or too often")
+check(math.abs(secondsIdle("Fringe") - 420) <= 2 and math.abs(secondsIdle("Edge") - 180) <= 2, "The idle trickle")
+check(Frontier.noise(0, "Edge", 3, 0, 0.5) > Frontier.noise(0, "Edge", 1, 0, 0.5) * 2.9, "A mech's strike of 3 swings")
 check(Frontier.incursion("Core", 0.5) == 0, "Critters in the core")
 for roll = 0, 0.99, 0.01 do
 	local fringe, edge = Frontier.incursion("Fringe", roll), Frontier.incursion("Edge", roll)
@@ -199,6 +212,26 @@ for roll = 0, 0.99, 0.01 do
 end
 check(Frontier.Caps.Edge > Frontier.Caps.Fringe and Frontier.Caps.Server >= Frontier.Caps.Edge * 3, "The caps")
 check(Frontier.Boost.Edge.Health > 1 and Frontier.Boost.Edge.Exp > 1, "Edge critters aren't worth more")
+-- A fair share of the Outpost's: the band's cap with few out there, a
+-- slice of 12 with many, never none.
+check(Frontier.share(Frontier.Caps.Edge, 1) == Frontier.Caps.Edge, "One player's share isn't the band's cap")
+check(Frontier.share(Frontier.Caps.Edge, 6) == 2, "Six out there don't get two each")
+check(Frontier.share(Frontier.Caps.Edge, 30) == 1, "A crowd left someone with none")
+
+-- Critters by band: levels, EXP, coins -----------------------------------------------------------------------
+for _ = 1, 100 do
+	local fringe, edge = Frontier.critterLevel("Fringe", rng), Frontier.critterLevel("Edge", rng)
+	check(fringe >= 1 and fringe <= 4, "A fringe critter's level")
+	check(edge >= 9 and edge <= 13, "An edge critter's level")
+end
+check(Frontier.critterExp(1, "Fringe", 0) == 8, "A level-1 critter's EXP")
+check(Frontier.critterExp(10, "Fringe", 0) == 26, "A level-10 critter's EXP")
+check(Frontier.critterExp(10, "Edge", 0) == 39, "An edge critter isn't worth half again")
+check(Frontier.critterExp(10, "Edge", Frontier.Exp.Daily) == 10, "No quarter after the day's critters")
+check(Frontier.critterExp(1, "Fringe", 999) >= 1, "A critter worth nothing")
+check(Frontier.Coins.Edge > Frontier.Coins.Fringe and Frontier.Coins.Guardian > Frontier.Coins.Edge, "Coins by band")
+check(Frontier.Bonk.Share > 0 and Frontier.Bonk.Share < 0.2 and Frontier.Bonk.Offer < Frontier.Bonk.Reach, "The bonk")
+check(Frontier.Rift.Hop >= 1.5, "Under a second and a half's warning before a critter hops out")
 
 -- Where rifts open ----------------------------------------------------------------------------------------
 local center = Vector3.new(0, 0, 7000)
@@ -212,6 +245,21 @@ for _ = 1, 200 do
 	local angle = math.acos(math.clamp(Vector3.new(away.X, 0, away.Z).Unit:Dot(east), -1, 1))
 	check(angle <= Frontier.Rift.Spread + 0.01, "A rift behind a player heading out")
 end
+-- Wandering rifts: Near to Far from whoever they're tied to, any way round,
+-- never in the core or the walls.
+local ways = {}
+for _ = 1, 200 do
+	local spot = Frontier.wanderSpot(player, center, rng)
+	local away = flat(spot - player)
+	local r = Frontier.distance(spot, center)
+	check(r >= Frontier.Core - 0.01 and r <= Frontier.Rim + 0.01, "A wandering rift in the core or the walls")
+	check(away <= Frontier.Wander.Far + 0.01, "A wandering rift too far off")
+	if r > Frontier.Core + 1 and r < Frontier.Rim - 1 then
+		check(away >= Frontier.Wander.Near - 0.01, "A wandering rift too close")
+	end
+	ways[if spot.X > player.X then "east" else "west"] = true
+end
+check(ways.east and ways.west, "Wandering rifts only open one way")
 -- Standing still: outward. Never inside the core or past the walls.
 for _ = 1, 100 do
 	local spot = Frontier.riftSpot(center + Vector3.new(0, 0, -155), Vector3.zero, center, rng)
@@ -240,6 +288,8 @@ for t = life.CloseAt, life.EndAt - 0.01, 0.05 do
 	last = open
 end
 check(last < 0.2, "It never seals")
+local lingering = Frontier.timeline(100, 4)
+check(lingering.CloseAt - lingering.HopAt == 4 and lingering.HopAt == life.HopAt, "A wandering rift doesn't linger")
 
 -- The tear: ragged, lopsided, never the same twice -----------------------------------------------------------
 local function widths(shape)
@@ -326,7 +376,23 @@ for _, band in Frontier.BandOrder do
 	local lines = FrontierHud.Lines[band]
 	check(lines and #lines[1] > 0 and #lines[2] > 0 and lines[1] == string.upper(lines[1]), band .. " has no banner")
 end
+-- The noise ring: twenty dots, in twentieths.
+check(FrontierHud.lit(nil) == 0 and FrontierHud.lit(0.5) == 10 and FrontierHud.lit(1.4) == 20, "The noise ring's dots")
+-- Arrows for rifts off screen: on the screen's edge, pointing at it.
+local screen = Vector2.new(1000, 600)
+local at, angle = FrontierHud.edge(screen, Vector2.new(3000, 300), 40)
+check(
+	math.abs(at.X - 960) < 0.01 and math.abs(at.Y - 300) < 0.01 and math.abs(angle) < 1e-6,
+	"An arrow off to the right"
+)
+at, angle = FrontierHud.edge(screen, Vector2.new(500, -900), 40)
+check(math.abs(at.Y - 40) < 0.01 and math.abs(angle + math.pi / 2) < 1e-6, "An arrow above")
+at = FrontierHud.edge(screen, Vector2.new(-5000, 5000), 40)
+check(at.X >= 39.9 and at.X <= 960.1 and at.Y >= 39.9 and at.Y <= 560.1, "An arrow off the screen")
 
 print(
-	string.format("PASS: %d frontier checks (bands, candy trails, veins, pressure, rifts, tears, drawing them)", checks)
+	string.format(
+		"PASS: %d frontier checks (bands, candy trails, veins, noise, shares, critters, rifts, tears, the HUD)",
+		checks
+	)
 )

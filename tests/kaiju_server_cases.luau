@@ -1133,7 +1133,7 @@ local active = Kaiju.active(roster)
 check(active.Level > levelBefore or active.Exp > expBefore, "No EXP for the kill")
 check(#profiles[b].Gems == 0, "The one who did less got the Gemsoul too")
 
--- The frontier: moon bugs come through rifts -----------------------------------------------------------------
+-- The frontier: critters come through rifts ------------------------------------------------------------------
 
 -- (Delayed work, in the order it falls due, until nothing more is.)
 local function runDelayed()
@@ -1156,10 +1156,11 @@ local FrontierServer = serverModule("FrontierServer")
 local riftsFolder
 local center = outpost * Vector3.new(1, 0, 1)
 FrontierServer.start({ Scars = { CFrame.new(center + Vector3.new(Frontier.Rim + 2, 0, 0)) } })
+FrontierServer._setWanderAt(math.huge) -- (wandering rifts have their own checks, below)
 riftsFolder = workspaceObject:FindFirstChild("Rifts")
 check(riftsFolder ~= nil, "No Rifts folder")
 local scar = riftsFolder:FindFirstChild("RiftScar")
-check(scar and scar:GetAttribute("Dormant") == true and scar:GetAttribute("Seed"), "No dormant rift at a trail's end")
+check(scar and scar:GetAttribute("Dormant") == true and scar:GetAttribute("Seed"), "No dormant rift at a vein")
 local function rifts()
 	local list = {}
 	for _, child in riftsFolder:GetChildren() do
@@ -1178,48 +1179,69 @@ local function critterFor(player)
 	end
 	return list
 end
--- A miner (no kaiju, kit away) in the core: no rifts, however long.
-for _, entry in pairs(KaijuWilds._wilds) do
-	if entry.Bug then
-		entry.Enemy.Alive = false
+local function clearCritters()
+	for enemy, entry in pairs(KaijuWilds._wilds) do
+		if entry.Bug then
+			enemy.Alive = false
+			KaijuWilds._wilds[enemy] = nil
+		end
 	end
+	table.clear(FrontierServer._pending)
 end
+local east = Vector3.new(1, 0, 0)
+local function stand(at: Vector3)
+	rootB.CFrame = CFrame.lookAt(at, at + east)
+end
+-- `count` swings by b, `gap` seconds apart (the rifts' delays run as they fall due).
+local function swingFor(count: number, gap: number, until_: (() -> boolean)?)
+	for i = 1, count do
+		now += gap
+		FrontierServer.swing(b)
+		FrontierServer._step(gap)
+		runDelayed()
+		if until_ and until_() then
+			return i
+		end
+	end
+	return count
+end
+
+-- A miner swinging in the core: no rifts, however long, and no noise.
+clearCritters()
 table.clear(playerHits)
-rootB.CFrame = CFrame.new(center + Vector3.new(60, 5, 0))
-for _ = 1, 40 do
-	now += 0.5
-	FrontierServer._step(0.5)
-	runDelayed()
-end
+stand(center + Vector3.new(60, 5, 0))
+swingFor(60, 0.5)
 check(#rifts() == 0 and #critterFor(b) == 0, "A rift opened in the core")
 check(b:GetAttribute("FrontierBand") == "Core", "No band for the HUD")
--- Out into the fringe, heading outward: soon a rift tears open ahead, and
--- a critter hops out of it at them.
-local x = 160
-local firstRift, firstAt
-for _ = 1, 40 do
-	x += 1.2
-	rootB.CFrame = CFrame.new(center + Vector3.new(x, 5, 0))
-	now += 0.5
-	FrontierServer._step(0.5)
-	if not firstRift and #rifts() > 0 then
-		firstRift, firstAt = rifts()[1], now
-	end
-	runDelayed()
-	if #critterFor(b) > 0 then
-		break
-	end
-end
+check((b:GetAttribute("FrontierNoise") or 0) <= Frontier.Noise.Restart + 0.05, "Swinging in the core made noise")
+
+-- Out in the fringe: each swing makes noise (the HUD's ring fills), and
+-- about one in 35 brings a rift, near where they face.
+stand(center + Vector3.new(200, 5, 0))
+local loudest = 0
+local swings = swingFor(140, 0.4, function()
+	loudest = math.max(loudest, b:GetAttribute("FrontierNoise") or 0)
+	return #rifts() > 0
+end)
 check(b:GetAttribute("FrontierBand") == "Fringe", "Not in the fringe")
-check(firstRift ~= nil, "No rift tore open round a miner heading out")
+check(#rifts() > 0, "No rift tore open round a miner swinging in the fringe")
+check(swings >= 15 and swings <= 90, "Not about 1 in 35 swings: " .. swings)
+check(loudest >= 0.5, "The noise ring never filled")
+local firstRift = rifts()[1]
 local open, hop = firstRift:GetAttribute("OpenAt"), firstRift:GetAttribute("HopAt")
 local close, finish = firstRift:GetAttribute("CloseAt"), firstRift:GetAttribute("EndAt")
-check(open <= hop and hop < close and close < finish, "A rift's timeline")
+check(open < hop and hop < close and close < finish, "A rift's timeline")
+check(hop - open >= 1.5, "Under a second and a half's warning")
+check(firstRift:GetAttribute("Prey") == b.UserId, "A rift says nothing of who it's for")
+check(firstRift:GetAttribute("Critter") ~= nil, "A rift says nothing of what's coming")
 local height = firstRift:GetAttribute("Height")
 check(height >= Frontier.Rift.Height[1] and height <= Frontier.Rift.Height[2], "A rift's height")
 local away = firstRift.Position - rootB.Position
 check(Vector3.new(away.X, 0, away.Z).Magnitude <= Frontier.Rift.Far + 12, "A rift far from whoever drew it")
-check(Vector3.new(away.X, 0, away.Z).Unit.X > -0.2, "A rift behind a miner heading out")
+check(Vector3.new(away.X, 0, away.Z).Unit:Dot(east) >= math.cos(Frontier.Rift.Spread) - 0.05, "A rift behind the miner")
+check(#critterFor(b) == 0, "A critter hopped out before the warning was over")
+now = hop + 0.05
+runDelayed()
 local bug = critterFor(b)[1]
 check(bug ~= nil, "Nothing hopped out of the rift")
 local entry = KaijuWilds._wilds[bug]
@@ -1227,6 +1249,13 @@ check(
 	entry.Prey == b and entry.Band == "Fringe" and bug.Model:GetAttribute("RiftBorn"),
 	"A critter not drawn by its miner"
 )
+check(
+	entry.Species == firstRift:GetAttribute("Critter") or #critterFor(b) > 1,
+	"Not the critter its rift crackled with"
+)
+check(entry.Level >= 1 and entry.Level <= 4, "A fringe critter's level")
+check(bug.Model:GetAttribute("CritterLevel") == entry.Level, "A critter's level isn't on it")
+check(string.find(bug.Model:GetAttribute("CombatTitle"), "Lv " .. entry.Level, 1, true), "Its nameplate has no level")
 check(bug.Root.AssemblyLinearVelocity.Y > 0, "It didn't hop out")
 -- It goes straight for them, kit or no kit (they kite it, or their kaiju fights it).
 bug.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(2, 0, 0))
@@ -1234,66 +1263,78 @@ bug.LastAttack = 0
 KaijuWilds._brain(bug, now)
 check(bug.Foe == b, "A critter ignored the miner who drew it")
 check(#playerHits > 0 and playerHits[#playerHits][1] == b and playerHits[#playerHits][5] == false, "It never bit them")
--- More come, but never more than the fringe's cap round one player.
-for _ = 1, 120 do
-	x = math.min(x + 1, 280)
-	rootB.CFrame = CFrame.new(center + Vector3.new(x, 5, 0))
-	now += 0.5
-	FrontierServer._step(0.5)
-	runDelayed()
-	check(#critterFor(b) <= Frontier.Caps.Fringe, "More critters than the fringe allows")
+-- More come, but never more than the fringe's cap round one player,
+-- counting those still on their way through.
+for _ = 1, 160 do
+	swingFor(1, 0.4)
+	local coming = #critterFor(b) + (FrontierServer._pending[b] or 0)
+	check(coming <= Frontier.Caps.Fringe, "More critters than the fringe allows")
 end
 check(#critterFor(b) >= 2, "Rifts stopped opening round a miner out in the fringe")
--- Out at the edge: tougher critters (and worth more).
-for _, enemy in critterFor(b) do
-	enemy.Alive = false
-end
-x = 360
-local edgeBug
-for _ = 1, 60 do
-	rootB.CFrame = CFrame.new(center + Vector3.new(x, 5, 0))
+-- Standing about out there, not mining: hardly any (a trickle every few minutes).
+clearCritters()
+local before = #rifts()
+for _ = 1, 40 do
 	now += 0.5
 	FrontierServer._step(0.5)
 	runDelayed()
+end
+check(#critterFor(b) <= 1, "Standing still drew critters like mining")
+
+-- Out at the edge: tougher critters, from level 9.
+clearCritters()
+stand(center + Vector3.new(360, 5, 0))
+local edgeBug
+swingFor(200, 0.4, function()
 	for _, enemy in critterFor(b) do
 		if KaijuWilds._wilds[enemy].Band == "Edge" then
 			edgeBug = enemy
 		end
 	end
-	if edgeBug then
-		break
+	if not edgeBug then
+		-- (and on past the warning)
+		now += Frontier.Rift.Hop
+		runDelayed()
 	end
-end
+	return edgeBug ~= nil
+end)
 check(edgeBug ~= nil and b:GetAttribute("FrontierBand") == "Edge", "No critters at the edge")
+local edgeLevel = KaijuWilds._wilds[edgeBug].Level
+check(edgeLevel >= 9 and edgeLevel <= 13, "An edge critter's level: " .. tostring(edgeLevel))
 check(edgeBug.Humanoid.MaxHealth > bug.Humanoid.MaxHealth, "An edge critter isn't tougher")
--- Driving a machine: no rifts round them.
-for _, enemy in critterFor(b) do
-	enemy.Alive = false
-end
-local seat = make("Part")
-b.Character:FindFirstChildOfClass("Humanoid").SeatPart = seat
-local before = #rifts()
-for _ = 1, 30 do
+check(#critterFor(b) <= Frontier.Caps.Edge, "More critters than the edge allows")
+
+-- A mech's pilot: their strikes make noise too, and the critters come for them.
+clearCritters()
+b:SetAttribute("MechPilot", "Hauler1")
+check(KaijuWilds.prey(b) and FrontierServer._eligible(b), "A pilot is safe from the critters")
+for _ = 1, 120 do
 	now += 0.5
-	FrontierServer._step(0.5)
-	runDelayed()
-end
-check(#critterFor(b) == 0, "Critters came for someone driving")
-b.Character:FindFirstChildOfClass("Humanoid").SeatPart = nil
--- Back to the core: their critters give up and slip back through a rift.
-for _ = 1, 30 do
-	x = math.min(x + 1, 400)
-	rootB.CFrame = CFrame.new(center + Vector3.new(x, 5, 0))
-	now += 0.5
+	FrontierServer.swing(b, 3)
 	FrontierServer._step(0.5)
 	runDelayed()
 	if #critterFor(b) > 0 then
 		break
 	end
 end
+check(#critterFor(b) > 0, "A mech's mining drew no critters")
+b:SetAttribute("MechPilot", nil)
+-- Seated in anything else: no rifts round them.
+clearCritters()
+local seat = make("Part")
+b.Character:FindFirstChildOfClass("Humanoid").SeatPart = seat
+swingFor(60, 0.5)
+check(#critterFor(b) == 0, "Critters came for someone seated")
+b.Character:FindFirstChildOfClass("Humanoid").SeatPart = nil
+-- Back to the core: their critters give up and slip back through a rift.
+swingFor(200, 0.4, function()
+	now += Frontier.Rift.Hop
+	runDelayed()
+	return #critterFor(b) > 0
+end)
 local leaver = critterFor(b)[1]
 check(leaver ~= nil, "No critter to send home")
-rootB.CFrame = CFrame.new(center + Vector3.new(40, 5, 0))
+stand(center + Vector3.new(40, 5, 0))
 leaver.Root.CFrame = CFrame.new(center + Vector3.new(200, 5, 0))
 leaver.Home = leaver.Root.Position
 before = #rifts()
@@ -1307,13 +1348,86 @@ for _ = 1, 20 do
 end
 check(not leaver.Alive and KaijuWilds._wilds[leaver] == nil, "A critter stayed with its miner safe in the core")
 check(#rifts() > 0, "It left without a rift")
+-- A critter drawn by nobody still leaves when there's nobody to fight (it
+-- used to wander home forever).
+clearCritters()
+local stray = KaijuWilds.spawnBug(center + Vector3.new(250, 0, 200), { Band = "Fringe" })
+stray.Home = stray.Root.Position
+for _ = 1, 20 do
+	now += 0.5
+	KaijuWilds._brain(stray, now)
+	runDelayed()
+	if not stray.Alive then
+		break
+	end
+end
+check(not stray.Alive, "A critter with nobody to chase never left")
 
--- Moon bugs pay: a little EXP for the kaiju (half again from the edge) and
--- a couple of coins, up to the day's cap.
+-- Wandering rifts ------------------------------------------------------------------------------------------
+-- One opens by itself Near to Far studs from someone out there, lingering;
+-- its critters roam round it, and only go for their player once they're near.
+clearCritters()
+table.clear(notes)
+stand(center + Vector3.new(250, 5, 0))
+FrontierServer._setWanderAt(0)
+now += 0.5
+FrontierServer._step(0.5)
+FrontierServer._setWanderAt(math.huge)
+local wanderRift
+for _, rift in rifts() do
+	if rift:GetAttribute("CloseAt") - rift:GetAttribute("HopAt") >= 4 then
+		wanderRift = rift
+	end
+end
+check(wanderRift ~= nil and #FrontierServer._wanders == 1, "No wandering rift opened near someone out there")
+local off = Vector3.new(wanderRift.Position.X - rootB.Position.X, 0, wanderRift.Position.Z - rootB.Position.Z).Magnitude
+check(off >= Frontier.Wander.Near - 1 and off <= Frontier.Wander.Far + 1, "A wandering rift's distance: " .. off)
+check(wanderRift:GetAttribute("Prey") == b.UserId, "A wandering rift isn't tied to anyone")
+now = wanderRift:GetAttribute("HopAt") + 0.05
+runDelayed()
+local roamers = critterFor(b)
+check(#roamers >= 2 and KaijuWilds._wilds[roamers[1]].Wander ~= nil, "No critters roamed out of the wandering rift")
+local roamer = roamers[1]
+KaijuWilds._brain(roamer, now)
+check(roamer.Foe == nil and roamer.Humanoid.MovingTo ~= nil, "A wandering critter went straight for its player")
+local fromRift = roamer.Humanoid.MovingTo - roamer.Home
+check(Vector3.new(fromRift.X, 0, fromRift.Z).Magnitude <= Frontier.Wander.Roam + 0.1, "It roamed off its patch")
+stand(roamer.Root.Position + Vector3.new(6, 0, 0))
+KaijuWilds._brain(roamer, now)
+check(roamer.Foe == b, "A wandering critter let its player walk right up")
+-- Cleared, every one killed: everyone who helped is Rift Charged.
+for i, enemy in roamers do
+	if i == 1 then
+		enemy.KaijuCredit = { [a] = 5 }
+	end
+	Enemies.damage(enemy, 1e6, b)
+end
+check((b:GetAttribute("RiftCharged") or 0) > now and (a:GetAttribute("RiftCharged") or 0) > now, "Nobody Rift Charged")
+check(noted(b, "Rift Charged"), "Nobody told them they're Rift Charged")
+check(#FrontierServer._wanders == 0, "A cleared wandering rift stayed")
+-- One whose player has wandered off by the time they'd hop out: it seals empty.
+clearCritters()
+a:SetAttribute("RiftCharged", nil)
+b:SetAttribute("RiftCharged", nil)
+FrontierServer._setWanderAt(0)
+now += 0.5
+FrontierServer._step(0.5)
+FrontierServer._setWanderAt(math.huge)
+check(#FrontierServer._wanders == 1, "No second wandering rift")
+stand(center + Vector3.new(40, 5, 0))
+now += Frontier.Rift.Hop + 0.1
+runDelayed()
+check(#critterFor(b) == 0 and #FrontierServer._wanders == 0, "A wandering rift let critters out with nobody near")
+check(not FrontierServer._pending[b], "Its critters are still on their way")
+
+-- Moon bugs pay: EXP to every kaiju that fought one (by its level and
+-- band, a quarter after the day's first 60), coins by band to whoever did
+-- the most, within the day's cap; a kill no kaiju was in pays no EXP.
+clearCritters()
 local bugs = {}
-for i = 1, 3 do
+for i = 1, 5 do
 	local at = center + Vector3.new(320 + i * 4, 0, 0)
-	table.insert(bugs, KaijuWilds.spawnBug(at, { Prey = a, Band = "Edge", Facing = rootA.Position }))
+	table.insert(bugs, KaijuWilds.spawnBug(at, { Prey = a, Band = "Edge", Level = 10, Facing = rootA.Position }))
 end
 check(
 	bugs[1].OutpostCreature and bugs[1].Model:GetAttribute("MoonBug") and bugs[1].Model:GetAttribute("Posed"),
@@ -1331,24 +1445,66 @@ local health = pet.Humanoid.Health
 KaijuWilds._brain(biter, now)
 check(biter.Foe == pet and pet.Humanoid.Health == health, "A bug's bite on a fresh guard wasn't parried")
 check(biter.StunUntil >= now + KaijuFight.ParryStagger, "A parried bug didn't reel")
+local function expOf(record)
+	local total = record.Exp
+	for level = 1, record.Level - 1 do
+		total += Kaiju.expToNext(level)
+	end
+	return total
+end
+roster.Bugs = nil -- (a fresh day)
 local coins = profiles[a].Coins
-local exp = Kaiju.active(roster).Exp
-local level = Kaiju.active(roster).Level
+local exp = expOf(Kaiju.active(roster))
 bugs[1].KaijuCredit = { [a] = 10 }
 Enemies.damage(bugs[1], 1e6)
-check(profiles[a].Coins == coins + Kaiju.Bug.Coins, "A bug paid no coins")
-check(Kaiju.active(roster).Exp > exp or Kaiju.active(roster).Level > level, "A bug gave no EXP")
-roster.Bugs.Coins = Kaiju.Bug.DailyCoins - 1
+check(profiles[a].Coins == coins + Frontier.Coins.Edge, "An edge bug paid the wrong coins")
+check(expOf(Kaiju.active(roster)) - exp == Frontier.critterExp(10, "Edge", 0), "A kaiju that fought got the wrong EXP")
+check(roster.Bugs.Count == 1, "The day's critters weren't counted")
+-- After the day's first 60: a quarter.
+roster.Bugs.Count = Frontier.Exp.Daily
+exp = expOf(Kaiju.active(roster))
 bugs[2].KaijuCredit = { [a] = 10 }
 Enemies.damage(bugs[2], 1e6)
-check(profiles[a].Coins == coins + Kaiju.Bug.Coins + 1, "The day's cap let more through")
-bugs[3].KaijuCredit = { [a] = 10 }
-Enemies.damage(bugs[3], 1e6)
-check(profiles[a].Coins == coins + Kaiju.Bug.Coins + 1, "Coins past the day's cap")
+check(expOf(Kaiju.active(roster)) - exp == Frontier.critterExp(10, "Edge", Frontier.Exp.Daily), "No quarter after 60")
+-- A kill with no kaiju in it (a pick, a hunter): coins, no EXP for anyone.
+exp = expOf(Kaiju.active(roster))
+coins = profiles[a].Coins
+Enemies.damage(bugs[3], 1e6, a)
+check(expOf(Kaiju.active(roster)) == exp, "A kaiju that never fought got EXP")
+check(profiles[a].Coins == coins + Frontier.Coins.Edge, "A pick's kill paid no coins")
+-- The day's cap.
+roster.Bugs.Coins = Kaiju.Bug.DailyCoins - 1
+coins = profiles[a].Coins
+bugs[4].KaijuCredit = { [a] = 10 }
+Enemies.damage(bugs[4], 1e6)
+check(profiles[a].Coins == coins + 1, "The day's cap let more through")
+bugs[5].KaijuCredit = { [a] = 10 }
+Enemies.damage(bugs[5], 1e6)
+check(profiles[a].Coins == coins + 1, "Coins past the day's cap")
+
+-- The pick's bonk: a share of a critter's health, yours, back it goes,
+-- reeling; never on a wild kaiju.
+local target = KaijuWilds.spawnBug(center + Vector3.new(300, 0, 40), { Prey = b, Band = "Fringe", Level = 2 })
+stand(target.Root.Position + Vector3.new(-4, 0, 0))
+local full = target.Humanoid.Health
+check(KaijuWilds.critterOf(target.Model) == target, "A critter isn't found from its model")
+check(KaijuWilds.bonk(target, b, rootB.Position), "The bonk didn't land")
+local taken = full - target.Humanoid.Health
+local share = target.Humanoid.MaxHealth * Frontier.Bonk.Share
+check(math.abs(taken - share) <= 1, "The bonk took the wrong share: " .. taken)
+check(target.Damage[b] and target.Damage[b] > 0, "The bonk isn't credited to the miner")
+check(target.Root.AssemblyLinearVelocity.X > 0 and target.StunUntil > now, "It wasn't knocked back, reeling")
+for _, wildEntry in KaijuWilds._wilds do
+	if not wildEntry.Bug then
+		check(KaijuWilds.critterOf(wildEntry.Enemy.Model) == nil, "A wild kaiju counts as a critter")
+		check(not KaijuWilds.bonk(wildEntry.Enemy, b, rootB.Position), "A wild kaiju was bonked")
+		break
+	end
+end
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills, rifts)",
+		"PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills, rifts, critters)",
 		checks
 	)
 )

@@ -2,14 +2,15 @@
 	The frontier's rifts, drawn by each player's client. FrontierServer puts
 	an invisible anchor in workspace.Rifts for each: where the tear hangs,
 	facing whoever drew it, with OpenAt, HopAt, CloseAt, EndAt (server
-	time), Seed and Height; a dormant one at a trail's end has Dormant
-	instead of a timeline.
+	time), Seed, Height and Critter (what's coming through); a dormant one
+	at a vein has Dormant instead of a timeline.
 
 	A tear is a ragged rip in the air, never the same shape twice and never
 	symmetrical (Shared.Frontier.tear): its two glowing lips, the other
 	side's violet dark between them and a brighter heart inside that, hair
 	cracks running off its lips, the other side's stars seeping out, and its
-	glow on the ground. It splits open from a hair crack, crackling, flashes
+	glow on the ground. It splits open from a hair crack, crackling (with
+	its critter's own cue, so you know what's coming: CritterCues), flashes
 	as the critter hops out, lingers, and seals with a snap. A dormant one
 	only breathes, half open.
 
@@ -34,6 +35,14 @@ local MAGENTA = Color3.fromRGB(255, 70, 210)
 local CYAN = Color3.fromRGB(80, 235, 255)
 local WHITE = Color3.fromRGB(240, 235, 255)
 local LIPS = { MAGENTA, VIOLET, CYAN, MAGENTA, WHITE, VIOLET, MAGENTA }
+-- Each critter's cue as its rift crackles (a CombatSound, its pitch): the
+-- bonk of Sahur's bat, Tralalero's whoosh, Patapim's frost, the croc's bomb.
+RiftTear.CritterCues = {
+	Sahur = { "Block", 0.6 },
+	Tralalero = { "Swing", 1.5 },
+	Patapim = { "Freeze", 1.25 },
+	Crocodilo = { "Blast", 0.7 },
+}
 
 -- Where its lips are, `open` (0 a hair crack, 1 wide open) of the way from
 -- the crack they part along: { Left = { Vector2 }, Right = { Vector2 } }.
@@ -47,13 +56,17 @@ function RiftTear.layout(shape, open: number)
 end
 
 local tears = {} -- [anchor] = { Parts, Shape, ... }
+-- Rifts not drawn yet: a tear is only built once you're near it (a few
+-- dozen parts, a light and sparks each, for every rift in the Outpost on
+-- every screen, was waste).
+local waiting: { [BasePart]: boolean } = {}
 local holder: Instance?
 local started = false
 
-local function sound(name: string, at: Vector3, volume: number?)
+local function sound(name: string, at: Vector3, volume: number?, pitch: number?)
 	local ok, CombatSound = pcall(require, script.Parent.CombatSound)
 	if ok and CombatSound then
-		CombatSound.play(name, at, { Volume = volume or 0.8 })
+		CombatSound.play(name, at, { Volume = volume or 0.8, Pitch = pitch })
 	end
 end
 
@@ -202,6 +215,7 @@ local function build(anchor: BasePart)
 end
 
 local function drop(anchor: Instance)
+	waiting[anchor :: BasePart] = nil
 	local tear = tears[anchor]
 	if tear then
 		tears[anchor] = nil
@@ -252,6 +266,10 @@ local function animate(tear, now: number)
 		if not tear.Sounded and now >= life.OpenAt then
 			tear.Sounded = true
 			sound("NovaWarn", at, 0.6)
+			local cue = RiftTear.CritterCues[anchor:GetAttribute("Critter") or ""]
+			if cue then
+				sound(cue[1], at, 0.9, cue[2])
+			end
 		end
 		if not tear.Flashed and now >= life.HopAt then
 			tear.Flashed = true
@@ -285,6 +303,16 @@ end
 function RiftTear.step(serverNow: number)
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
+	for anchor in waiting do
+		if not anchor.Parent then
+			waiting[anchor] = nil
+		elseif (anchor.Position - eye).Magnitude <= RiftTear.Near then
+			build(anchor)
+			if tears[anchor] then
+				waiting[anchor] = nil
+			end
+		end
+	end
 	for anchor, tear in tears do
 		if not anchor.Parent then
 			drop(anchor)
@@ -317,21 +345,16 @@ function RiftTear.start()
 		folder.Name = "RiftTears"
 		folder.Parent = workspace
 		holder = folder
+		-- (Built in `step` once near: its attributes may land a moment after it does.)
 		local function added(child: Instance)
 			if child:IsA("BasePart") then
-				-- (Its attributes may land a moment after it does.)
-				if child:GetAttribute("Seed") == nil then
-					child:GetAttributeChangedSignal("Seed"):Wait()
-				end
-				build(child)
+				waiting[child] = true
 			end
 		end
-		rifts.ChildAdded:Connect(function(child)
-			task.spawn(added, child)
-		end)
+		rifts.ChildAdded:Connect(added)
 		rifts.ChildRemoved:Connect(drop)
 		for _, child in rifts:GetChildren() do
-			task.spawn(added, child)
+			added(child)
 		end
 	end)
 end

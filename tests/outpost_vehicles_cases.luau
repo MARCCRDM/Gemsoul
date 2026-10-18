@@ -533,6 +533,14 @@ check(hauler.Pilot == nil and pilot:GetAttribute("MechPilot") == nil, "A pilot i
 check(#pilot.Character.Pivots == pivots + 1, "A pilot pulled into a fight wasn't put down beside it")
 pilot.Attributes.CombatSession = nil
 
+-- Knocked down in the cockpit (a rift's critter caught them): out, beside it.
+pivots = boarded(pilot, hauler)
+pilot.Attributes.SparDown = 99999
+Vehicles.step(clockNow)
+check(hauler.Pilot == nil and pilot:GetAttribute("MechPilot") == nil, "A knocked-down pilot kept the mech")
+check(#pilot.Character.Pivots == pivots + 1, "A knocked-down pilot wasn't put down beside it")
+pilot.Attributes.SparDown = nil
+
 pivots = boarded(pilot, hauler)
 hauler.Weld:Destroy() -- (SeatExit, before an arena move)
 Vehicles.step(clockNow)

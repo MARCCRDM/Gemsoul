@@ -11,6 +11,8 @@
 	                           gear; refused while the gem pouch is full)
 	  "OutpostBuyRefill", id   buy swings at the Probe (Outpost.Refills, coins),
 	                           on top of the free pick's charge
+	  "OutpostBonk", model     bonk a rift's critter with your pick
+	                           (Shared.Frontier.Bonk: it costs no swings)
 	  "OutpostState"           your picks and record
 
 	Rocks are shared: a rock's first hitter keeps it while they keep
@@ -22,6 +24,10 @@
 	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
 	can show every swing; prompts carry PromptKind (Mine, Probe, Gate,
 	Spar, Duel, Party) for the client to act on.
+
+	Every swing out past the core makes noise (OutpostServer.onSwing:
+	FrontierServer.swing, which brings the critters). A player Rift Charged
+	(RiftCharged, server time) mines luckier gems (Shared.Frontier.Charged).
 
 	The leaderboard billboard shows the top gear scores and duel wins
 	(TopPlayers' Gear and Wins boards), refreshed every 30 seconds.
@@ -60,6 +66,12 @@ local freeSpots: { [number]: boolean } = {}
 local fieldSpots: { [number]: boolean } = {}
 local nextId = 0
 local lastSwing: { [Player]: number } = {}
+local lastBonk: { [Player]: number } = {}
+
+-- Main wires these to the frontier (FrontierServer, KaijuWilds) when it runs:
+-- a swing's noise, and a pick's bonk on a critter.
+OutpostServer.onSwing = function(_player: Player, _swings: number) end
+OutpostServer.bonker = nil :: any -- KaijuWilds: critterOf(model) -> enemy?, bonk(enemy, player, from)
 local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
@@ -379,6 +391,10 @@ local function loot(player: Player, node, profile)
 	-- Further out along the trails, luckier (its zone's Luck).
 	local zone = node.Zone and Rules.Zones[node.Zone]
 	local luck = Mine.luck(spec.Depth) + (spec.Luck or 0) + (zone and zone.Luck or 0)
+	-- Rift Charged (a wandering rift cleared): luckier for a while.
+	if (player:GetAttribute("RiftCharged") or 0) > workspace:GetServerTimeNow() then
+		luck += Frontier.Charged.Luck
+	end
 	local gem = Gems.award(player, "MiningNode", { Luck = luck, Silent = true })
 	if gem then
 		result.Gem = gem
@@ -467,6 +483,8 @@ local function hit(player: Player, nodeId: any)
 	end
 	lastSwing[player] = now
 	local strikes = if mech then Rules.mechStrikes(machineId, o.Picks[pickId]) else 1
+	-- Noise out past the core: the frontier's critters come for it.
+	task.spawn(OutpostServer.onSwing, player, strikes)
 	o.Picks[pickId] -= strikes
 	local pick = Rules.Picks[pickId]
 	local crit = rng:NextNumber() < Rules.CritChance + pick.Crit
@@ -523,6 +541,55 @@ local function hit(player: Player, nodeId: any)
 		PlayerData.sync(player)
 	end
 	return reply(true, "", result)
+end
+
+-- "OutpostBonk": your pick on a rift's critter (never a wild kaiju), on
+-- foot, close, with nothing between you; it shares the rock swing's
+-- cooldown and costs no swings (Shared.Frontier.Bonk).
+local function bonk(player: Player, model: any)
+	local bonker = OutpostServer.bonker
+	if not bonker or player:GetAttribute("Outpost") ~= true or player:GetAttribute("CombatSession") then
+		return reply(false, "")
+	end
+	if MechPilot.of(player) or player:GetAttribute("SparWith") ~= nil or Spar.isDown(player) then
+		return reply(false, "")
+	end
+	local now = os.clock()
+	local swung, bonked = now - (lastSwing[player] or 0), now - (lastBonk[player] or 0)
+	if swung < Rules.SwingCooldown or bonked < Frontier.Bonk.Cooldown then
+		return reply(false, "")
+	end
+	local enemy = typeof(model) == "Instance" and bonker.critterOf(model) or nil
+	if not enemy or not enemy.Alive then
+		return reply(false, "")
+	end
+	local root = rootOf(player)
+	if not root or (enemy.Root.Position - root.Position).Magnitude > Frontier.Bonk.Reach + 2 then
+		return reply(false, "Get closer to it.")
+	end
+	-- (Nothing solid between you: no bonking through a rock.)
+	local blocked = false
+	pcall(function()
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { player.Character :: Instance, model }
+		local between = enemy.Root.Position - root.Position
+		local hit = workspace:Raycast(root.Position, between, params)
+		blocked = hit ~= nil and hit.Instance.CanCollide and hit.Distance < between.Magnitude - 1.5
+	end)
+	if blocked then
+		return reply(false, "")
+	end
+	lastSwing[player], lastBonk[player] = now, now
+	bonker.bonk(enemy, player, root.Position)
+	local character = player.Character
+	if character then
+		local t = workspace:GetServerTimeNow()
+		character:SetAttribute("ActionKind", "Mine")
+		character:SetAttribute("ActionStart", t - 0.12)
+		character:SetAttribute("ActionAt", t + 0.05)
+	end
+	return reply(true, "", { Bonk = true })
 end
 
 local function nearProbe(player: Player): boolean
@@ -825,6 +892,7 @@ function OutpostServer.start()
 	Shop.register("OutpostLeave", leave)
 	Shop.register("OutpostHit", hit)
 	Shop.register("OutpostBuyRefill", buyRefill)
+	Shop.register("OutpostBonk", bonk)
 	Shop.register("OutpostSecret", secret)
 	Shop.register("OutpostState", function(player)
 		return reply(true, "", { State = stateOf(player) })

@@ -112,8 +112,13 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 		-- through rifts round anyone out past the core (the frontier).
 		if Config.Features == nil or Config.Features.Kaiju ~= false then
 			require(script.Parent.Systems.KaijuServer).start()
-			require(script.Parent.Systems.KaijuWilds).start(OutpostServer.site())
-			require(script.Parent.Systems.FrontierServer).start(OutpostServer.site())
+			local KaijuWilds = require(script.Parent.Systems.KaijuWilds)
+			KaijuWilds.start(OutpostServer.site())
+			local FrontierServer = require(script.Parent.Systems.FrontierServer)
+			FrontierServer.start(OutpostServer.site())
+			-- Swings out past the core draw critters; a pick bonks them.
+			OutpostServer.onSwing = FrontierServer.swing
+			OutpostServer.bonker = KaijuWilds
 		end
 	end
 	-- The Motor Pool's machines, for driving round the quarry (Config.Features:

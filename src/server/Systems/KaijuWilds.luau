@@ -22,11 +22,18 @@
 	  Moon bugs   the little brainrot creatures (DungeonRules' roster,
 	              shrunk), each through a rift of its own round a player out
 	              past the core (FrontierServer: Shared.Frontier). One hops
-	              out at whoever drew it (a miner too: KaijuWilds.prey) and
-	              goes for them, then their kaiju; with nobody to fight for a
-	              moment (Frontier.Leave), or after Frontier.Life, it slips
-	              back through a rift. For kaiju EXP and a few coins a day;
-	              the edge's are tougher and worth more (Frontier.Boost).
+	              out at whoever drew it (a miner too, or a mech's pilot:
+	              KaijuWilds.prey) and goes for them, then their kaiju; with
+	              nobody to fight for a moment (Frontier.Leave), or after its
+	              life (Frontier.Life), it slips back through a rift. One out
+	              of a wandering rift (opts.Wander) roams round it instead,
+	              going for whoever comes close, its own player only once
+	              they're near. Its level comes from where it came through
+	              (Frontier.Levels; the edge's are tougher too,
+	              Frontier.Boost). Killed: EXP to every kaiju that fought it
+	              (Frontier.critterExp), coins to whoever did the most
+	              (Frontier.Coins, a day's cap). A pickaxe bonks one
+	              (KaijuWilds.bonk, from OutpostServer).
 
 	Both are ordinary Enemies (so every attack, status and nameplate works on
 	them) with their own brains, marked OutpostCreature for the kaiju out.
@@ -38,8 +45,14 @@
 	                            with your kaiju out or hunting)
 
 	  KaijuWilds.spawnBug(at, opts) -> enemy?   a moon bug out of a rift
+	  KaijuWilds.pickCritter(rng) -> roster id  what comes through next
+	  KaijuWilds.isCritter(enemy) -> boolean    a rift's critter (not a wild kaiju)
+	  KaijuWilds.critterOf(model) -> enemy?     the rift's critter a model is
+	  KaijuWilds.bonk(enemy, player, from) -> boolean   a pickaxe's bonk on a critter
 	  KaijuWilds.rift(at, facing) -> timeline?  opens a rift (FrontierServer
 	                                            sets it; a bug slips back through one)
+	  KaijuWilds.done(enemy, killed, totals)    a critter is gone (FrontierServer
+	                                            sets it: wandering rifts cleared)
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -84,12 +97,14 @@ type Wild = {
 	LastFight: number?,
 	Bug: boolean,
 	Prey: Player?, -- a rift's critter: whoever drew it
+	Wander: any?, -- out of a wandering rift: { Home, Roam, Notice }
+	Life: number?, -- seconds before a critter slips back (Frontier.Life)
+	RoamAt: number?,
 	-- A wild kaiju's: who started a fight with it (and when they last did
 	-- anything in it). Its Enemies record carries the same table (Engaged),
 	-- for the kaiju out.
 	Engaged: { [Player]: number },
 	Band: string?, -- where its rift opened (Shared.Frontier)
-	ExpScale: number?,
 	IdleSince: number?,
 	Leaving: boolean?,
 }
@@ -127,8 +142,8 @@ end
 KaijuWilds.hunter = hunter
 
 -- Prey for a rift's critter: a hunter anywhere, or anyone else in the
--- Outpost on their feet out past the core, not driving a machine, not in a
--- spar or a fight elsewhere. (A critter's blow that would finish a miner
+-- Outpost on their feet (or in a mech's cockpit) out past the core, not in
+-- a spar or a fight elsewhere. (A critter's blow that would finish a miner
 -- knocks them down instead: SparServer.)
 local function prey(player: Player): boolean
 	if hunter(player) then
@@ -148,13 +163,8 @@ local function prey(player: Player): boolean
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = rootOf(player)
-	if
-		not humanoid
-		or humanoid.Health <= 0
-		or humanoid.SeatPart ~= nil
-		or player:GetAttribute("MechPilot") ~= nil -- (in a mech)
-		or not root
-	then
+	-- (A mech's pilot too: its swings draw critters like a pick's.)
+	if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart ~= nil or not root then
 		return false
 	end
 	return Frontier.distance(root.Position, Outpost.Location.Position) >= Frontier.Core - Frontier.Safe
@@ -239,7 +249,7 @@ local function hitFoe(enemy, victim, amount: number, element: string?, status: s
 	local player = victim.Player
 	if victim.Pet then
 		return KaijuServer.hurt(victim.Pet, amount, element, status, heavy)
-	elseif player and (hunter(player) or (wild ~= nil and wild.Prey ~= nil and prey(player))) then
+	elseif player and (hunter(player) or (wild ~= nil and wild.Bug and prey(player))) then
 		local _, guarded = Enemies.hitPlayer(victim.Player, amount, element, enemy, heavy)
 		return if guarded then "Guarded" else "Hit"
 	end
@@ -254,7 +264,7 @@ end
 local function chooseFoe(enemy, wild: Wild, aggro: number)
 	local now = os.clock()
 	local e = enemy :: any
-	local rifted = wild.Prey ~= nil
+	local rifted = wild.Bug
 	local leash = if rifted then Kaiju.Bug.Leash else Kaiju.Wild.Leash
 	if not wild.Bug then
 		if e.LastPet and e.LastPetAt and now - e.LastPetAt < 6 then
@@ -279,9 +289,12 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		end
 		return (victim.Root.Position - enemy.Home).Magnitude <= leash
 	end
-	if rifted and wild.Prey.Parent then
+	-- (Out of a wandering rift: its own player only once they come near.)
+	if rifted and wild.Prey and wild.Prey.Parent then
 		local victim = { Root = rootOf(wild.Prey), Player = wild.Prey }
-		if valid(victim) then
+		local near = not wild.Wander
+			or (victim.Root ~= nil and (victim.Root.Position - enemy.Root.Position).Magnitude <= wild.Wander.Notice)
+		if near and valid(victim) then
 			return victim
 		end
 	end
@@ -318,6 +331,8 @@ end
 KaijuWilds.rift = function(_at: Vector3, _facing: Vector3)
 	return nil
 end
+-- A critter is gone, `killed` or slipped back (FrontierServer sets this).
+KaijuWilds.done = function(_enemy, _killed: boolean, _totals) end
 
 -- A rift's critter with nobody left to fight (or out too long) slips back
 -- through a rift of its own.
@@ -327,6 +342,7 @@ local function slipBack(wild: Wild)
 		return
 	end
 	wild.Leaving = true
+	KaijuWilds.done(enemy, false, nil)
 	local root = enemy.Root
 	enemy.Humanoid:MoveTo(root.Position)
 	local life = KaijuWilds.rift(root.Position, root.Position + root.CFrame.LookVector * 10)
@@ -339,6 +355,26 @@ local function slipBack(wild: Wild)
 	end)
 end
 KaijuWilds._slipBack = slipBack
+
+-- A wandering rift's critter stays while its player is still about.
+local function lingers(wild: Wild): boolean
+	local player = wild.Prey
+	local root = player and player.Parent and rootOf(player)
+	return root ~= nil
+		and prey(player :: Player)
+		and flat(root.Position - wild.Enemy.Home).Magnitude <= Frontier.Wander.Seal * 1.4
+end
+
+-- Roaming round its rift: a new spot within Roam every few seconds.
+local function roam(enemy, wild: Wild, now: number)
+	if now < (wild.RoamAt or 0) then
+		return
+	end
+	wild.RoamAt = now + rng:NextNumber(2.5, 4.5)
+	local angle = rng:NextNumber(0, math.pi * 2)
+	local reach = rng:NextNumber(4, wild.Wander.Roam)
+	enemy.Humanoid:MoveTo(enemy.Home + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach)
+end
 
 -- The brain both kinds share: find a foe and fight it (a wild kaiju as a
 -- duellist, KaijuFighter; a moon bug chases and bites), else go home (a
@@ -362,15 +398,21 @@ local function brain(enemy, now: number)
 		return
 	end
 	local fromHome = flat(root.Position - enemy.Home).Magnitude
-	local leash = if wild.Prey then Kaiju.Bug.Leash else Kaiju.Wild.Leash
+	local leash = if wild.Bug then Kaiju.Bug.Leash else Kaiju.Wild.Leash
 	local victim = if fromHome <= leash then chooseFoe(enemy, wild, kind.Aggro) else nil
 	e.FoeVictim = victim
 	e.Foe = if victim then (victim.Pet or victim.Player) else nil
-	if wild.Prey and now - wild.Born > Frontier.Life then
+	if wild.Bug and now - wild.Born > (wild.Life or Frontier.Life) then
 		slipBack(wild) -- (no critter stays for good)
 		return
 	end
-	if not victim and wild.Prey then
+	if not victim and wild.Bug and wild.Wander and lingers(wild) then
+		-- Out of a wandering rift, its player still about: it roams its patch.
+		wild.IdleSince = nil
+		roam(enemy, wild, now)
+		return
+	end
+	if not victim and wild.Bug then
 		-- Nobody to fight: a moment's sniffing about, then back where it came from.
 		wild.IdleSince = wild.IdleSince or now
 		humanoid:MoveTo(root.Position)
@@ -745,47 +787,122 @@ end
 
 local Duelist -- (required when the first moon bug comes through: it's a big module)
 
+-- Today's critter tally on a roster (Bugs = { Day, Coins, Count }), fresh each day.
+local function tally(roster)
+	local day = math.floor(os.time() / 86400)
+	if not roster.Bugs or roster.Bugs.Day ~= day then
+		roster.Bugs = { Day = day, Coins = 0, Count = 0 }
+	end
+	roster.Bugs.Count = roster.Bugs.Count or 0
+	return roster.Bugs
+end
+KaijuWilds._tally = tally
+
+-- Coins for a critter (or a guardian), within the day's cap.
+local function payCoins(player: Player, amount: number)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return
+	end
+	local bugs = tally(Kaiju.roster(profile))
+	local coins = math.min(amount, Kaiju.bugCoins(bugs, bugs.Day))
+	if coins > 0 then
+		bugs.Coins += coins
+		PlayerData.addCoins(player, coins)
+	end
+end
+
 local function bugDied(enemy)
 	local wild = wilds[enemy]
 	if not wild then
 		return
 	end
 	wilds[enemy] = nil
-	local best = credits(enemy)
-	if best then
-		KaijuServer.reward(best, math.floor(Kaiju.Bug.Exp * (wild.ExpScale or 1) + 0.5))
-		local profile = PlayerData.get(best)
+	local best, totals = credits(enemy)
+	local band = wild.Band or "Fringe"
+	-- EXP to every kaiju that fought it (a kaiju left at home earns none: a
+	-- pick's or a hunter's kill pays coins, not EXP), less after the day's
+	-- first Frontier.Exp.Daily.
+	for player, amount in (enemy :: any).KaijuCredit or {} do
+		local profile = player.Parent and amount > 0 and PlayerData.get(player)
 		if profile then
-			local roster = Kaiju.roster(profile)
-			local day = math.floor(os.time() / 86400)
-			local left = Kaiju.bugCoins(roster.Bugs, day)
-			local coins = math.min(Kaiju.Bug.Coins, left)
-			if coins > 0 then
-				if not roster.Bugs or roster.Bugs.Day ~= day then
-					roster.Bugs = { Day = day, Coins = 0 }
-				end
-				roster.Bugs.Coins += coins
-				PlayerData.addCoins(best, coins)
-			end
+			local bugs = tally(Kaiju.roster(profile))
+			KaijuServer.reward(player, Frontier.critterExp(wild.Level, band, bugs.Count))
+			bugs.Count += 1
 		end
 	end
+	if best then
+		payCoins(best, Frontier.Coins[band] or Frontier.Coins.Fringe)
+	end
+	KaijuWilds.done(enemy, true, totals)
+end
+
+-- What comes through the next rift: a roster id (its rift crackles with it).
+function KaijuWilds.pickCritter(r): string
+	local roll = r or rng
+	return DungeonRules.Roster[roll:NextInteger(1, #DungeonRules.Roster)].Id
+end
+
+local function rosterSpec(id: string?)
+	for _, spec in DungeonRules.Roster do
+		if spec.Id == id then
+			return spec
+		end
+	end
+	return nil
+end
+
+-- A rift's critter (not a wild kaiju).
+function KaijuWilds.isCritter(enemy): boolean
+	local wild = enemy and wilds[enemy]
+	return wild ~= nil and wild.Bug
+end
+
+-- The rift's critter a model is, if it is one.
+function KaijuWilds.critterOf(model: Instance)
+	local enemy = if model:IsA("Model") then Enemies.get(model) else nil
+	return if enemy and KaijuWilds.isCritter(enemy) then enemy else nil
+end
+
+-- A pickaxe's bonk on a rift's critter (OutpostServer checks who swung and
+-- from where): Frontier.Bonk.Share of its health, credited to `player`, and
+-- knocked back from `from`, reeling a moment. Returns whether it landed.
+function KaijuWilds.bonk(enemy, player: Player, from: Vector3): boolean
+	local wild = enemy and wilds[enemy]
+	if not wild or not wild.Bug or not enemy.Alive then
+		return false
+	end
+	local root = enemy.Root
+	local away = flat(root.Position - from)
+	away = if away.Magnitude > 0.1 then away.Unit else -root.CFrame.LookVector
+	Enemies.damage(enemy, enemy.Humanoid.MaxHealth * Frontier.Bonk.Share, player, false, Color3.fromRGB(255, 220, 140))
+	fx("BlockSpark", root.Position, false)
+	if enemy.Alive then
+		-- (Back about Knock studs, and it gathers itself before it bites again.)
+		root.AssemblyLinearVelocity = away * Frontier.Bonk.Knock * 3 + Vector3.new(0, 14, 0)
+		Enemies.addStatus(enemy, "Stun", 1, 0.35)
+		enemy.LastAttack = os.clock()
+	end
+	return true
 end
 
 -- A moon bug out of a rift at `at` (its foot, on the ground). `opts` = {
 --   Prey     the player who drew the rift: it goes for them first
 --   Band     where the rift opened (Shared.Frontier.Boost: the edge's are tougher)
+--   Critter  which one (a roster id; any, if not given)
+--   Level    its level (Frontier.critterLevel of its band, if not given)
 --   Facing   a point it turns to (its prey)
 --   Hop      its leap out of the tear (a velocity)
+--   Wander   out of a wandering rift: { Home, Roam, Notice }: it roams there
+--   Life     seconds before it slips back (Frontier.Life)
 -- }
 function KaijuWilds.spawnBug(at: Vector3, opts)
 	Duelist = Duelist or require(script.Parent.Duelist)
-	local spec = DungeonRules.Roster[rng:NextInteger(1, #DungeonRules.Roster)]
-	local level = 1
-	for _, l in levelsNear(at, 160) do
-		level = math.max(level, l)
-	end
+	local spec = rosterSpec(opts.Critter) or DungeonRules.Roster[rng:NextInteger(1, #DungeonRules.Roster)]
+	local band = opts.Band or "Fringe"
+	local level = opts.Level or Frontier.critterLevel(band, rng)
 	local grow = 1 + Kaiju.Growth * (level - 1)
-	local boost = Frontier.Boost[opts.Band or ""] or Frontier.Boost.Fringe
+	local boost = Frontier.Boost[band] or Frontier.Boost.Fringe
 	local ok, result = pcall(function()
 		local color = GemConfig.ElementColors[spec.Element] or Color3.new(1, 1, 1)
 		local rig = Duelist.creatureBody(spec, color)
@@ -805,6 +922,7 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 		rig:SetAttribute("Posed", true) -- clients pose its body (BodyPoses)
 		rig:SetAttribute("MoonBug", true)
 		rig:SetAttribute("RiftBorn", true)
+		rig:SetAttribute("CritterLevel", level)
 		local kind = {
 			Name = "Moon Bug",
 			Health = math.floor(Kaiju.Bug.Health * grow * boost.Health + 0.5),
@@ -821,7 +939,7 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 		local enemy = Enemies.adopt(
 			rig,
 			kind,
-			{ Element = spec.Element, Title = string.format("Moon Bug · %s", spec.Name), Home = at }
+			{ Element = spec.Element, Title = string.format("Moon Bug · %s · Lv %d", spec.Name, level), Home = at }
 		)
 		local e = enemy :: any
 		e.OutpostCreature = true
@@ -841,8 +959,9 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Bug = true,
 			Engaged = {}, -- (a critter needs nobody to start on it)
 			Prey = opts.Prey,
-			Band = opts.Band,
-			ExpScale = boost.Exp,
+			Band = band,
+			Wander = opts.Wander,
+			Life = opts.Life,
 		}
 		-- Out of the tear, at its prey.
 		if opts.Hop then

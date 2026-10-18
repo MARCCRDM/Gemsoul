@@ -10,6 +10,10 @@
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Motion = require(ReplicatedStorage.Shared.CreatureMotion)
+-- Studs from the camera a creature's joints are animated out to: kaiju
+-- further, moon bugs only near (there can be a dozen of them, and a far
+-- one's legs aren't worth the frame).
+local FAR, BUG_FAR = 180, 100
 local rigs = {}
 local scanAt = 0
 
@@ -54,6 +58,7 @@ RunService.PreSimulation:Connect(function(dt)
 					Phase = 0,
 					Amount = 0,
 					Species = model:GetAttribute("KaijuSpecies"),
+					Far = if model:GetAttribute("MoonBug") then BUG_FAR else FAR,
 				}
 				rigs[model] = rig
 				for _, joint in model:GetDescendants() do
@@ -74,7 +79,8 @@ RunService.PreSimulation:Connect(function(dt)
 	end
 	local camera = workspace.CurrentCamera
 	for model, rig in rigs do
-		if not camera or rig.Humanoid.Health <= 0 or (rig.Root.Position - camera.CFrame.Position).Magnitude > 180 then
+		local far = camera and (rig.Root.Position - camera.CFrame.Position).Magnitude > rig.Far
+		if not camera or rig.Humanoid.Health <= 0 or far then
 			if rig.Active then reset(rig) end
 			continue
 		end

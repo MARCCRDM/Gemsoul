@@ -608,7 +608,13 @@ end
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined from across the basin")
 standBy(anaRoot, target)
 local syncsBefore = synced[ana] or 0
+-- (Every swing makes noise for the frontier: OutpostServer.onSwing.)
+local swingsHeard = {}
+Server.onSwing = function(player, swings)
+	table.insert(swingsHeard, { player, swings })
+end
 local first = handlers.OutpostHit(ana, target.Id)
+check(#swingsHeard == 1 and swingsHeard[1][1] == ana and swingsHeard[1][2] == 1, "A swing made no noise")
 check(first.Ok and first.Hp < target.MaxHp, "A swing didn't chip the rock")
 -- (The reply carries the swing: a whole profile sync per swing was heavy.)
 check((synced[ana] or 0) == syncsBefore, "A swing that didn't pop the rock synced the whole profile")
@@ -641,6 +647,7 @@ do
 	local strike = handlers.OutpostHit(ana, target.Id)
 	local strikes = Rules.Machines.Mole.Mine.Strikes
 	check(strike.Ok and strike.Strikes == strikes, "A mech couldn't mine: " .. tostring(strike.Message))
+	check(swingsHeard[#swingsHeard][2] == strikes, "A mech's strike made one swing's noise")
 	check(strike.State.Picks.Survey == swingsBefore - strikes, "A mech strike didn't spend its swings")
 	check(hpBefore - strike.Hp >= strikes, "A mech strike didn't land its swings")
 	check(
@@ -735,6 +742,69 @@ if vein then
 			tostring(commonLuck)
 		)
 	)
+end
+
+-- Rift Charged (a wandering rift cleared): gems roll luckier while it lasts.
+do
+	local plain
+	for _, node in Server._nodes do
+		if node.Zone == target.Zone and node.Size == target.Size and node ~= vein then
+			plain = node
+			break
+		end
+	end
+	check(plain ~= nil, "No rock like the first to mine Rift Charged")
+	ana:SetAttribute("RiftCharged", now + 30)
+	standBy(anaRoot, plain)
+	advance(Rules.ClaimSeconds + 1)
+	for _ = 1, 40 do
+		advance(0.5)
+		if handlers.OutpostHit(ana, plain.Id).Loot then
+			break
+		end
+	end
+	check(math.abs(lastLuck - commonLuck - Frontier.Charged.Luck) < 1e-9, "Rift Charged didn't add its luck")
+	ana:SetAttribute("RiftCharged", nil)
+end
+
+-- The pick's bonk on a rift's critter (KaijuWilds does the blow): close, on
+-- foot, the swing's cooldown, never a swing spent.
+do
+	local critterModel = R.Instance.new("Model")
+	local enemy = { Alive = true, Root = { Position = anaRoot.CFrame.Position + R.Vector3.new(4, 0, 0) } }
+	local bonks = {}
+	check(not handlers.OutpostBonk(ana, critterModel).Ok, "Bonked with no frontier running")
+	Server.bonker = {
+		critterOf = function(model)
+			return if model == critterModel then enemy else nil
+		end,
+		bonk = function(target, player, from)
+			table.insert(bonks, { target, player, from })
+			return true
+		end,
+	}
+	advance(1)
+	local picksBefore = profiles[ana].Outpost.Picks.Survey
+	local hit = handlers.OutpostBonk(ana, critterModel)
+	check(hit.Ok and hit.Bonk and #bonks == 1 and bonks[1][1] == enemy and bonks[1][2] == ana, "The bonk didn't land")
+	check(profiles[ana].Outpost.Picks.Survey == picksBefore, "A bonk spent a swing")
+	check(not handlers.OutpostBonk(ana, critterModel).Ok and #bonks == 1, "Bonked again without the cooldown")
+	advance(Frontier.Bonk.Cooldown + 0.05)
+	check(handlers.OutpostBonk(ana, critterModel).Ok and #bonks == 2, "No second bonk after the cooldown")
+	advance(1)
+	check(not handlers.OutpostBonk(ana, R.Instance.new("Model")).Ok, "Bonked something that isn't a critter")
+	enemy.Root.Position = anaRoot.CFrame.Position + R.Vector3.new(Frontier.Bonk.Reach + 6, 0, 0)
+	local far = handlers.OutpostBonk(ana, critterModel)
+	check(not far.Ok and far.Message:find("closer", 1, true), "Bonked from afar")
+	enemy.Root.Position = anaRoot.CFrame.Position + R.Vector3.new(3, 0, 0)
+	ana:SetAttribute("MechPilot", "Mole3")
+	advance(1)
+	check(not handlers.OutpostBonk(ana, critterModel).Ok, "Bonked from a mech's cockpit")
+	ana:SetAttribute("MechPilot", nil)
+	enemy.Alive = false
+	advance(1)
+	check(not handlers.OutpostBonk(ana, critterModel).Ok, "Bonked a dead critter")
+	Server.bonker = nil
 end
 
 -- A full gem pouch: no swinging (the rock would pay a gem with nowhere to

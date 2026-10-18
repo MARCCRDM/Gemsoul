@@ -19,12 +19,23 @@
 	trail.
 
 	Rifts: every critter comes through a rift of its own, a ragged tear in
-	the air (never the same shape twice). It opens (Rift.Open), the critter
-	hops out at whoever drew it (Rift.Hop), the tear lingers (Rift.Linger)
-	and seals (Rift.Close). Rifts only open round a player out past the
-	core: their pressure builds each second they're out there (faster at
-	the edge, faster still heading outward), and when it's full, critters
-	come through ahead of them.
+	the air (never the same shape twice). It opens and crackles for a
+	moment first (Rift.Hop: the warning), the critter hops out at whoever
+	drew it, the tear lingers (Rift.Linger) and seals (Rift.Close). Rifts
+	come two ways, only round players out past the core:
+	  Mining noise   every swing out there makes noise (Noise.Swing: more at
+	                 the edge), and a little more trickles in each second
+	                 you're out there (Noise.Idle). Full, an encounter:
+	                 critters tear through near you (Frontier.incursion).
+	  Wandering      every so often the frontier tears open by itself
+	                 (Wander), 35 to 70 studs from someone out there: a few
+	                 critters roam that patch for about a minute, going for
+	                 whoever comes close. Go round it, or bring your kaiju.
+	A critter's level comes from where it came through (Levels: the edge's
+	are a real step up), and so do its EXP and coins (Frontier.critterExp,
+	Coins). Clearing a wandering rift leaves everyone who helped Rift
+	Charged (Charged: luckier gems for a while). A pickaxe can bonk a
+	critter (Bonk) so a miner without a kaiju isn't helpless.
 
 	  Frontier.distance(position, center) -> studs across the ground
 	  Frontier.band(distance) -> "Core" | "Fringe" | "Edge"
@@ -32,10 +43,14 @@
 	  Frontier.trail(index, rng) -> { Vector3 }   a trail's rock spots (offsets from the middle)
 	  Frontier.vein(last, rng) -> { Vector3 }, Vector3   its Rift Vein's rocks, and its scar
 	  Frontier.crumbs(a, b, rng) -> { Vector3 }   glowing crumbs between two rocks
-	  Frontier.pressure(heat, band, outward, dt) -> heat
+	  Frontier.noise(noise, band, swings, seconds, roll?) -> noise   (an encounter at 1)
 	  Frontier.incursion(band, roll) -> critters at once
-	  Frontier.riftSpot(position, heading, center, rng) -> Vector3   where a rift opens
-	  Frontier.timeline(at) -> { OpenAt, HopAt, CloseAt, EndAt }
+	  Frontier.share(cap, playersOut) -> critters at once round one player
+	  Frontier.critterLevel(band, rng) -> level
+	  Frontier.critterExp(level, band, today) -> EXP for a kaiju that fought it
+	  Frontier.riftSpot(position, facing, center, rng) -> Vector3   where a rift opens
+	  Frontier.wanderSpot(position, center, rng) -> Vector3   where a wandering rift opens
+	  Frontier.timeline(at, linger?) -> { OpenAt, HopAt, CloseAt, EndAt }
 	  Frontier.openness(timeline, now) -> 0..1   how wide a tear is
 	  Frontier.tear(seed, height) -> shape   a tear's ragged outline
 ]]
@@ -71,32 +86,63 @@ Frontier.TrailSway = 14 -- studs a trail wanders either side
 Frontier.CrumbStep = 7 -- studs between crumbs (a crumb or two between rocks)
 Frontier.VeinRocks = 4
 
--- Rifts: seconds it takes to open, until the critter hops out, then lingers
--- and seals; how tall (studs); and where round a player it opens (studs
--- ahead, and how far either side of their heading).
+-- Rifts: seconds it takes to open, until the critter hops out (it
+-- crackles all that while: the warning), then lingers and seals; how tall
+-- (studs); and where round a player it opens (studs away, and how far
+-- either side of where they face).
 Frontier.Rift = {
 	Open = 0.55,
-	Hop = 0.7,
+	Hop = 1.5,
 	Linger = 1.8,
 	Close = 0.45,
 	Height = { 4.5, 7.5 },
 	Near = 14,
 	Far = 24,
-	Spread = math.rad(70),
+	Spread = math.rad(100),
 }
--- Pressure: a second out in a band adds this; heading outward, times
--- Outward. At Threshold, an incursion (and it starts again from a little).
--- Back in the core it drains at Drain a second.
-Frontier.Pressure = { Fringe = 0.8, Edge = 1.6, Outward = 1.6, Threshold = 10, Drain = 2 }
+-- Mining noise: what a swing out in a band adds (an encounter at 1: about
+-- 1 in 35 swings in the fringe, 1 in 17 at the edge, each swing's share
+-- anywhere from 60% to 140% so they don't come like clockwork), and what a
+-- second out there adds, mining or not (about one every 7 minutes in the
+-- fringe, 3 at the edge). After an encounter it starts again from a little
+-- (Restart), and the next can't come for Gap seconds.
+Frontier.Noise = {
+	Swing = { Fringe = 1 / 35, Edge = 1 / 17 },
+	Idle = { Fringe = 1 / 420, Edge = 1 / 180 },
+	Spread = { 0.6, 1.4 },
+	Restart = 0.12,
+	Gap = 8,
+}
 -- Critters at once round one player (more stay away), and in the whole
--- Outpost. (Each is a whole brainrot body: dozens at once made the Outpost
--- lag.)
-Frontier.Caps = { Fringe = 2, Edge = 4, Server = 12 }
+-- Outpost, shared fairly between those out there. (Each is a whole
+-- brainrot body: dozens at once made the Outpost lag.)
+Frontier.Caps = { Fringe = 2, Edge = 3, Server = 12 }
 -- A critter with no one to fight this long slips back through a rift; none
 -- stays longer than Life seconds.
 Frontier.Leave, Frontier.Life = 4, 90
+-- Its level by where it came through: the edge's are for a kaiju of about
+-- level 8 and up.
+Frontier.Levels = { Fringe = { 1, 4 }, Edge = { 9, 13 } }
 -- Critters from the edge are tougher, and worth more.
 Frontier.Boost = { Fringe = { Health = 1, Damage = 1, Exp = 1 }, Edge = { Health = 1.25, Damage = 1.2, Exp = 1.5 } }
+-- EXP for each kaiju that fought one: Base + PerLevel x its level (times
+-- its band's Boost.Exp); a quarter after Daily critters a day.
+Frontier.Exp = { Base = 6, PerLevel = 2, Daily = 60, After = 0.25 }
+-- Coins to whoever did the most to one, by band (a day's cap: Shared.Kaiju.Bug.DailyCoins).
+Frontier.Coins = { Fringe = 2, Edge = 4, Guardian = 40 }
+-- Wandering rifts: one every Every seconds or so somewhere out there, at
+-- most Max critters out of them at once (of the Server cap), Near to Far
+-- studs from whoever it's tied to. Its critters roam Roam studs round it
+-- for Life seconds, going for anyone who comes within Notice; it seals
+-- empty if its player is further than Seal studs off when they'd hop out.
+Frontier.Wander = { Every = { 40, 80 }, Max = 3, Near = 35, Far = 70, Roam = 26, Notice = 30, Life = 60, Seal = 110 }
+-- Clearing a wandering rift: everyone who helped is Rift Charged, gems
+-- this much luckier for Seconds.
+Frontier.Charged = { Luck = 0.1, Seconds = 60 }
+-- The pickaxe on a critter: Share of its health, every Cooldown seconds,
+-- knocked Knock studs back; from Reach studs (the client offers it at
+-- Offer). It costs no swings.
+Frontier.Bonk = { Share = 0.12, Cooldown = 0.6, Knock = 10, Reach = 8, Offer = 6 }
 
 function Frontier.distance(position: Vector3, center: Vector3): number
 	return Vector3.new(position.X - center.X, 0, position.Z - center.Z).Magnitude
@@ -171,13 +217,41 @@ function Frontier.crumbs(a: Vector3, b: Vector3, rng): { Vector3 }
 	return list
 end
 
--- A player's pressure after `dt` seconds in `band` (heading outward or not).
-function Frontier.pressure(heat: number, band: string, outward: boolean, dt: number): number
-	local rate = Frontier.Pressure[band]
-	if not rate then
-		return math.max(0, heat - Frontier.Pressure.Drain * dt)
+-- A player's mining noise after `swings` swings and `seconds` seconds out
+-- in `band` (the core adds nothing). `roll` (0..1) sets each swing's share
+-- within Noise.Spread.
+function Frontier.noise(noise: number, band: string, swings: number, seconds: number, roll: number?): number
+	local swing, idle = Frontier.Noise.Swing[band], Frontier.Noise.Idle[band]
+	if not swing then
+		return noise
 	end
-	return heat + rate * dt * (if outward then Frontier.Pressure.Outward else 1)
+	local spread = Frontier.Noise.Spread
+	local share = spread[1] + (spread[2] - spread[1]) * (roll or 0.5)
+	return noise + swing * swings * share + idle * seconds
+end
+
+-- Critters at once round one player: their band's cap, or a fair share of
+-- the Outpost's when many are out there (never less than one).
+function Frontier.share(cap: number, playersOut: number): number
+	return math.min(cap, math.max(1, math.floor(Frontier.Caps.Server / math.max(1, playersOut))))
+end
+
+-- A critter's level, by where it came through.
+function Frontier.critterLevel(band: string, rng): number
+	local range = Frontier.Levels[band] or Frontier.Levels.Fringe
+	return if rng then rng:NextInteger(range[1], range[2]) else range[1]
+end
+
+-- EXP for a kaiju that fought a critter of `level` from `band`, its owner
+-- having had `today` critters' EXP already today.
+function Frontier.critterExp(level: number, band: string?, today: number?): number
+	local e = Frontier.Exp
+	local boost = Frontier.Boost[band or ""] or Frontier.Boost.Fringe
+	local exp = (e.Base + e.PerLevel * math.max(1, level)) * boost.Exp
+	if (today or 0) >= e.Daily then
+		exp *= e.After
+	end
+	return math.max(1, math.floor(exp + 0.5))
 end
 
 -- How many critters come through at once (`roll` in [0, 1)).
@@ -190,33 +264,47 @@ function Frontier.incursion(band: string, roll: number): number
 	return 0
 end
 
--- Where a rift opens round a player at `position` heading `heading` (a flat
--- direction, or zero standing still: then outward): ahead of them, inside
--- the walls and outside the core. Returns a point at their height.
-function Frontier.riftSpot(position: Vector3, heading: Vector3, center: Vector3, rng): Vector3
-	local flat = Vector3.new(heading.X, 0, heading.Z)
+-- Where a rift opens round a player at `position` facing `facing` (a flat
+-- direction, or zero: then outward): near where they look, inside the walls
+-- and outside the core. Returns a point at their height.
+function Frontier.riftSpot(position: Vector3, facing: Vector3, center: Vector3, rng): Vector3
+	local flat = Vector3.new(facing.X, 0, facing.Z)
 	if flat.Magnitude < 0.1 then
 		flat = Vector3.new(position.X - center.X, 0, position.Z - center.Z)
 	end
 	local angle = if flat.Magnitude > 0.01 then math.atan2(flat.Z, flat.X) else rng:NextNumber(0, math.pi * 2)
 	angle += rng:NextNumber(-Frontier.Rift.Spread, Frontier.Rift.Spread)
 	local reach = rng:NextNumber(Frontier.Rift.Near, Frontier.Rift.Far)
-	local spot = position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach
+	return Frontier.inFrontier(position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach, center, position.Y)
+end
+
+-- A point brought inside the frontier (out of the core, inside the walls), at height `y`.
+function Frontier.inFrontier(spot: Vector3, center: Vector3, y: number): Vector3
 	local offset = Vector3.new(spot.X - center.X, 0, spot.Z - center.Z)
 	local r = math.clamp(offset.Magnitude, Frontier.Core, Frontier.Rim)
 	offset = if offset.Magnitude > 0.01 then offset.Unit * r else Vector3.new(r, 0, 0)
-	return Vector3.new(center.X + offset.X, position.Y, center.Z + offset.Z)
+	return Vector3.new(center.X + offset.X, y, center.Z + offset.Z)
+end
+
+-- Where a wandering rift opens: Wander.Near to Far studs from someone out
+-- there at `position`, any way round, inside the frontier.
+function Frontier.wanderSpot(position: Vector3, center: Vector3, rng): Vector3
+	local angle = rng:NextNumber(0, math.pi * 2)
+	local reach = rng:NextNumber(Frontier.Wander.Near, Frontier.Wander.Far)
+	return Frontier.inFrontier(position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach, center, position.Y)
 end
 
 -- A rift opening at `at` (server time): when it's open, the critter hops,
--- it starts to seal, and it's gone.
-function Frontier.timeline(at: number)
+-- it starts to seal, and it's gone. `linger`: seconds it stays open after
+-- the hop (Rift.Linger unless given).
+function Frontier.timeline(at: number, linger: number?)
 	local rift = Frontier.Rift
+	local stay = linger or rift.Linger
 	return {
 		OpenAt = at,
 		HopAt = at + rift.Hop,
-		CloseAt = at + rift.Hop + rift.Linger,
-		EndAt = at + rift.Hop + rift.Linger + rift.Close,
+		CloseAt = at + rift.Hop + stay,
+		EndAt = at + rift.Hop + stay + rift.Close,
 	}
 end
 

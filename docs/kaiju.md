@@ -181,18 +181,24 @@ element hits harder (125%). Recall your kaiju when it would finish the job.
 ### Moon bugs
 
 Little creatures that tear through reality at you: each comes through a
-rift of its own, a ragged tear in the air that opens, lets it hop out at
-you, and seals. Rifts only open round players out past the Outpost's core,
-more often and more at once the further out you go; see
+rift of its own, a ragged tear in the air that crackles for a second and a
+half, lets it hop out at you, and seals. Mining out past the Outpost's core
+draws them (about 1 in 35 swings in the Fringe, 1 in 17 at the Edge), and
+now and then the frontier tears open by itself and a few roam round it; see
 [frontier.md](frontier.md). For now they're the brainrot characters shrunk
 down: Tung Tung Tung Sahur, Tralalero Tralala, Brr Brr Patapim and
 Bombardiro Crocodilo.
 They're built light (no armour, nothing too small to see at their size),
-since a dozen can be about at once. Kite them into your kaiju, hunt them,
-or run back to the core, where they give up and slip back through rifts of
-their own. Each is worth 10 EXP to
-your kaiju (15 from the Edge) and 2 coins to you, up to 300 coins a day.
-They get tougher with the kaiju around them, and from the Edge.
+since a dozen can be about at once. Let your kaiju fight them, bonk them
+with your pick, hunt them, or run back to the core, where they give up and
+slip back through rifts of their own.
+
+Their level comes from where they came through: 1 to 4 in the Fringe, 9 to
+13 at the Edge (tougher again: a quarter more health, a fifth more damage).
+Each one gives every kaiju that fought it 6 + 2 per level EXP (half again
+from the Edge; a quarter after your first 60 of the day), and whoever did
+the most to it 2 coins from the Fringe or 4 from the Edge, up to 300 a day.
+A kaiju left at home earns nothing from them.
 
 ## Feeding
 
@@ -242,7 +248,7 @@ Proposed guardrails:
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E; the attributes clients pose it by |
 | `KaijuServer` | Your kaiju: the starter, out and back, following and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
-| `KaijuWilds` | Wild kaiju and moon bugs: spawning (`spawnBug`: one out of a rift, at its prey), their brain, slipping back through a rift, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
+| `KaijuWilds` | Wild kaiju and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
 | `SparServer` | `Hunt`: the kit out alone |

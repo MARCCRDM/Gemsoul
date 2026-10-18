@@ -36,6 +36,8 @@ local CombatVfx = require(script.Parent.CombatVfx)
 
 local ElementalDeath = {}
 ElementalDeath.MaxPieces = 140
+ElementalDeath.CritterPieces = 40 -- a moon bug's blast: only its biggest pieces
+ElementalDeath.Far = 140 -- studs from the camera: past this, no blast at all
 ElementalDeath.Chunks = 18 -- torn-off bits added to every blast
 ElementalDeath.Lifetime = 6 -- seconds before the remains are gone
 
@@ -77,7 +79,7 @@ end
 
 -- The stand-in: a local copy of every visible piece, largest first, with the
 -- real body hidden. Each piece remembers where it started.
-local function copyBody(model: Model)
+local function copyBody(model: Model, limit: number)
 	local sources = {}
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") and d.Transparency < 0.95 and d.Name ~= "HumanoidRootPart" then
@@ -93,7 +95,7 @@ local function copyBody(model: Model)
 	local pieces = {}
 	for i, source in sources do
 		source.LocalTransparencyModifier = 1
-		if i <= ElementalDeath.MaxPieces then
+		if i <= limit then
 			local ok, copy = pcall(function()
 				return source:Clone()
 			end)
@@ -181,7 +183,8 @@ end
 -- the torso, thrown with everything else. Added to `pieces`.
 local function chunks(pieces, centre: Vector3, tint: Color3?, material: Enum.Material?)
 	local count = #pieces
-	for _ = 1, ElementalDeath.Chunks do
+	-- (A critter's small blast gets a few.)
+	for _ = 1, if count <= ElementalDeath.CritterPieces then 6 else ElementalDeath.Chunks do
 		local from = if count > 0 then pieces[math.random(1, math.min(count, 12))] else nil
 		local color = if from then from.Color else Color3.fromRGB(90, 90, 100)
 		if tint then
@@ -480,7 +483,15 @@ function ElementalDeath.play(model: Model?, element: string?, color: Color3?): b
 		return false
 	end
 	played[model] = true
-	local pieces, _ = copyBody(model)
+	-- (Far off, nobody would see it: every client blowing up every critter's
+	-- body at any distance was a stutter.)
+	local camera = workspace.CurrentCamera
+	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
+	if camera and root and (root.Position - camera.CFrame.Position).Magnitude > ElementalDeath.Far then
+		return true
+	end
+	local limit = if model:GetAttribute("MoonBug") then ElementalDeath.CritterPieces else ElementalDeath.MaxPieces
+	local pieces, _ = copyBody(model, limit)
 	if #pieces == 0 then
 		return false
 	end

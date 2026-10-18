@@ -96,9 +96,11 @@ local function publish(machine: Machine)
 	end
 end
 
--- Outside the Outpost, or busy elsewhere: no piloting.
+-- Outside the Outpost, busy elsewhere, or knocked down (a critter caught
+-- them in the cockpit): no piloting.
 local function busy(player: Player): boolean
 	return not player:GetAttribute("Outpost")
+		or player:GetAttribute("SparDown") ~= nil
 		or player:GetAttribute("CombatSession") ~= nil
 		or player:GetAttribute("MatchId") ~= nil
 		or player:GetAttribute("ArenaDropPreparing") ~= nil
