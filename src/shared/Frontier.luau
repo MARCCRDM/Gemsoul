@@ -11,12 +11,19 @@
 	  Edge    out to the walls: rifts open often and more critters come
 	          through at once; the richest rocks
 
-	Candy trails: TrailAngles runs of rocks lead out from the core to the
-	walls, a rock every TrailStep studs and glowing crumbs between them, the
-	crystals warming from cyan to gold to rose the further out they grow.
-	Each ends in a Rift Vein (VeinRocks rocks, the richest of all) round a
-	dormant rift scar. Rocks grow back where they were, so a trail stays a
-	trail.
+	Outcrops: past the field round the outpost, rocks grow in natural
+	seams of two to five along a grain (Outcrop), thicker on rich ground (a
+	smooth noise field), bigger further out, with a few lone rocks between
+	and some leading out of the core like stepping stones. Their crystals
+	warm from cyan to gold to rose the further out they grow, and glowing
+	cracks in the ground round each make them sparkle from afar. What pulls
+	you outward is what you see, not a road.
+
+	Rift Veins: three of six rich violet rocks each, by the walls, far apart
+	(Veins), each round a dormant rift with a beam of light over it you can
+	see from the outpost. A vein moves somewhere new once it's mined out, and
+	every ten minutes or so anyway (the Outpost checks a ring of sites for
+	room when it's built: Frontier.veinSites, veinAt).
 
 	Rifts: every critter comes through a rift of its own, a ragged tear in
 	the air (never the same shape twice). It opens and crackles for a
@@ -40,9 +47,13 @@
 	  Frontier.distance(position, center) -> studs across the ground
 	  Frontier.band(distance) -> "Core" | "Fringe" | "Edge"
 	  Frontier.zoneOf(distance, vein?) -> a Shared.Outpost.Zones id
-	  Frontier.trail(index, rng) -> { Vector3 }   a trail's rock spots (offsets from the middle)
-	  Frontier.vein(last, rng) -> { Vector3 }, Vector3   its Rift Vein's rocks, and its scar
-	  Frontier.crumbs(a, b, rng) -> { Vector3 }   glowing crumbs between two rocks
+	  Frontier.field(rng) -> (offset) -> 0..1   how rich the ground is
+	  Frontier.outcrops(rng) -> { outcrop }, { Vector3 }   the outcrops and the lone rocks
+	  Frontier.veinSites(rng) -> { angle }   where veins may surface, round the walls
+	  Frontier.veinAt(angle, rng) -> { Vector3 }, Vector3   a vein's rocks there, and its scar
+	  Frontier.apart(a, b) -> radians between two angles round the middle
+	  Frontier.pickSite(sites, taken, others, rng) -> index?   where a vein goes next
+	  Frontier.compass(angle) -> "north-east" ...   a direction from the middle
 	  Frontier.noise(noise, band, swings, seconds, roll?) -> noise   (an encounter at 1)
 	  Frontier.incursion(band, roll) -> critters at once
 	  Frontier.share(cap, playersOut) -> critters at once round one player
@@ -66,25 +77,35 @@ local GOLD = Color3.fromRGB(255, 200, 90)
 local ROSE = Color3.fromRGB(255, 120, 190)
 local RIFT = Color3.fromRGB(215, 90, 255)
 
--- Each band's name, its crystals' colour, and the luck its rocks add.
+-- Each band's name, its crystals' colour, and the luck its rocks add (on
+-- every gem: the rocks are the same mix everywhere, so this is what pays
+-- for going out).
 Frontier.Bands = {
 	Core = { Name = "Outpost Core", Color = CYAN, Luck = 0 },
-	Fringe = { Name = "The Fringe", Color = GOLD, Luck = 0.08 },
-	Edge = { Name = "The Edge", Color = ROSE, Luck = 0.16 },
-	Vein = { Name = "Rift Vein", Color = RIFT, Luck = 0.25 },
+	Fringe = { Name = "The Fringe", Color = GOLD, Luck = 0.2 },
+	Edge = { Name = "The Edge", Color = ROSE, Luck = 0.4 },
+	Vein = { Name = "Rift Vein", Color = RIFT, Luck = 0.75 },
 }
 Frontier.BandOrder = { "Core", "Fringe", "Edge" }
 Frontier.RiftColor = RIFT
 
--- Candy trails: their headings round the middle (degrees: 0 east, 90
--- south), between the haul roads and clear of the motor pool (south) and
--- the outpost (north).
-Frontier.TrailAngles = { 0, 50, 130, 180, 230, 310 }
-Frontier.TrailFrom, Frontier.TrailTo = 80, 400
-Frontier.TrailStep = 17 -- studs between rocks on a trail
-Frontier.TrailSway = 14 -- studs a trail wanders either side
-Frontier.CrumbStep = 7 -- studs between crumbs (a crumb or two between rocks)
-Frontier.VeinRocks = 4
+-- Outcrops (angles round the middle are radians: 0 east, a quarter turn
+-- south): Count of them From to To studs out, Apart studs between their
+-- middles, Step studs between their rocks; Lone of the frontier's rocks
+-- set alone, Stones of those leading out of the core.
+Frontier.Outcrop = {
+	From = 100,
+	To = 412,
+	Count = 46,
+	Apart = 36,
+	Step = 13.5,
+	Lone = 0.15,
+	Stones = 6,
+}
+-- Rift Veins: Count at once, Rocks each, moving every Every seconds (give
+-- or take Wobble) if not mined out first; at least Apart radians from each
+-- other round the middle; Sites places round the walls to choose from.
+Frontier.Veins = { Count = 3, Rocks = 6, Every = 600, Wobble = 60, Apart = math.rad(70), Sites = 12 }
 
 -- Rifts: seconds it takes to open, until the critter hops out (it
 -- crackles all that while: the warning), then lingers and seals; how tall
@@ -166,55 +187,172 @@ function Frontier.zoneOf(distance: number, vein: boolean?): string
 	return if band == "Core" then "Common" else band
 end
 
--- Trail `index`'s rock spots, from the core out to the walls: offsets from
--- the middle (Y 0), a rock every TrailStep studs or so, wandering.
-function Frontier.trail(index: number, rng): { Vector3 }
-	local base = math.rad(Frontier.TrailAngles[index] or 0)
-	local wave = rng:NextNumber(55, 90)
-	local phase = rng:NextNumber(0, math.pi * 2)
-	local points = {}
-	local r = Frontier.TrailFrom
-	while r <= Frontier.TrailTo do
-		-- (Its sway grows from nothing near the core, so it starts clear of the roads.)
-		local sway = math.min(Frontier.TrailSway, (r - Frontier.TrailFrom) * 0.25 + 4)
-		local a = base + sway * math.sin(r / wave + phase) / r
-		local across = Vector3.new(-math.sin(a), 0, math.cos(a)) * rng:NextNumber(-2.5, 2.5)
-		table.insert(points, Vector3.new(math.cos(a) * r, 0, math.sin(a) * r) + across)
-		r += Frontier.TrailStep * rng:NextNumber(0.88, 1.08)
+-- How rich the ground is (0..1) at an offset from the middle: three soft
+-- waves across the quarry, their directions and phases from `rng`.
+function Frontier.field(rng): (Vector3) -> number
+	local waves = {}
+	for _ = 1, 3 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		table.insert(waves, {
+			Dir = Vector3.new(math.cos(a), 0, math.sin(a)),
+			Freq = rng:NextNumber(1 / 150, 1 / 80) * math.pi * 2,
+			Phase = rng:NextNumber(0, math.pi * 2),
+		})
 	end
-	return points
+	return function(offset: Vector3): number
+		local sum = 0
+		for _, w in waves do
+			sum += math.sin(offset:Dot(w.Dir) * w.Freq + w.Phase)
+		end
+		return (sum / #waves + 1) / 2
+	end
 end
 
--- A trail's end: its Rift Vein's rocks, fanned round the last stretch, and
--- the dormant rift scar they guard (between them and the wall).
-function Frontier.vein(last: Vector3, rng): ({ Vector3 }, Vector3)
-	local out = Vector3.new(last.X, 0, last.Z).Unit
+-- The outcrops past the core: { { Middle, Grain (radians), Length (studs),
+-- Rocks = { Vector3 } } }, and the lone rocks between them ({ Vector3 }),
+-- all offsets from the middle (Y 0). Thicker on rich ground; an outcrop of
+-- two or three near the core, up to five out at the edge.
+function Frontier.outcrops(rng): ({ any }, { Vector3 })
+	local o = Frontier.Outcrop
+	local rich = Frontier.field(rng)
+	local crops, rocks = {}, {}
+	local tries = 0
+	while #crops < o.Count and tries < 8000 do
+		tries += 1
+		-- (Spread by area, so the wide outer ring isn't sparse.)
+		local r = math.sqrt(rng:NextNumber(o.From ^ 2, (o.To - 10) ^ 2))
+		local a = rng:NextNumber(0, math.pi * 2)
+		local middle = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+		local roomy = true
+		for _, other in crops do
+			if (other.Middle - middle).Magnitude < o.Apart then
+				roomy = false
+				break
+			end
+		end
+		if roomy and rng:NextNumber() < 0.2 + 0.8 * rich(middle) then
+			local out = (r - o.From) / (o.To - o.From)
+			local count = math.clamp(2 + math.floor(rng:NextNumber() * (0.6 + 3.4 * out) + 0.1), 2, 5)
+			local grain = rng:NextNumber(0, math.pi * 2)
+			local along = Vector3.new(math.cos(grain), 0, math.sin(grain))
+			local across = Vector3.new(-along.Z, 0, along.X)
+			-- (Each a step or a little more on from the last, centred on its middle.)
+			local steps = { 0 }
+			for k = 2, count do
+				steps[k] = steps[k - 1] + o.Step * rng:NextNumber(0.95, 1.12)
+			end
+			local list = {}
+			for k = 1, count do
+				local t = steps[k] - steps[count] / 2
+				local p = middle + along * t + across * rng:NextNumber(-2.5, 2.5)
+				-- (None past the frontier's edge: that end is cut short.)
+				if p.Magnitude <= o.To then
+					table.insert(list, p)
+				end
+			end
+			if #list >= 2 then
+				for _, p in list do
+					table.insert(rocks, p)
+				end
+				table.insert(crops, { Middle = middle, Grain = grain, Length = count * o.Step, Rocks = list })
+			end
+		end
+	end
+	-- Lone rocks between them, a few leading out of the core first.
+	local wanted = math.floor(#rocks * o.Lone / (1 - o.Lone) + 0.5)
+	local lone = {}
+	local function free(p: Vector3): boolean
+		for _, q in rocks do
+			if (q - p).Magnitude < 16 then
+				return false
+			end
+		end
+		for _, q in lone do
+			if (q - p).Magnitude < 16 then
+				return false
+			end
+		end
+		return true
+	end
+	tries = 0
+	while #lone < wanted and tries < 4000 do
+		tries += 1
+		local stone = #lone < o.Stones
+		local r = if stone then rng:NextNumber(o.From, Frontier.Core + 25) else rng:NextNumber(Frontier.Core, o.To)
+		local a = rng:NextNumber(0, math.pi * 2)
+		local p = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+		if free(p) then
+			table.insert(lone, p)
+		end
+	end
+	return crops, lone
+end
+
+-- The angles round the walls a vein may surface at: Veins.Sites of them,
+-- evenly round with a little give (the Outpost keeps those with room).
+function Frontier.veinSites(rng): { number }
+	local sites = {}
+	local n = Frontier.Veins.Sites
+	for i = 1, n do
+		table.insert(sites, (i - 1) / n * math.pi * 2 + rng:NextNumber(-0.12, 0.12))
+	end
+	return sites
+end
+
+-- A vein at `angle` round the middle: its six rocks in two staggered rows
+-- fanned in front of its dormant rift by the walls, and the rift's spot
+-- (offsets from the middle, Y 0).
+function Frontier.veinAt(angle: number, rng): ({ Vector3 }, Vector3)
+	local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
 	local side = Vector3.new(-out.Z, 0, out.X)
-	local scar = out * (Frontier.Rim + 2)
+	local n = Frontier.Veins.Rocks
 	local rocks = {}
-	for i = 1, Frontier.VeinRocks do
-		local t = (i - (Frontier.VeinRocks + 1) / 2) / Frontier.VeinRocks
-		local p = out * (Frontier.Rim - 9 - math.abs(t) * 12 + rng:NextNumber(-1.5, 1.5)) + side * (t * 58)
+	for i = 1, n do
+		local t = (i - (n + 1) / 2) / n
+		local row = if i % 2 == 0 then 9 else 0
+		local p = out * (Frontier.Rim - 8 - row - math.abs(t) * 10 + rng:NextNumber(-1, 1)) + side * (t * 66)
 		table.insert(rocks, p)
 	end
-	return rocks, scar
+	return rocks, out * (Frontier.Rim + 2)
 end
 
--- The glowing crumbs between two rocks of a trail (none across a big gap).
-function Frontier.crumbs(a: Vector3, b: Vector3, rng): { Vector3 }
-	local gap = b - a
-	local length = Vector3.new(gap.X, 0, gap.Z).Magnitude
-	local list = {}
-	if length > Frontier.TrailStep * 2.4 or length < 0.1 then
-		return list
+-- Radians between two angles round the middle (0..pi).
+function Frontier.apart(a: number, b: number): number
+	local d = (a - b) % (math.pi * 2)
+	return math.min(d, math.pi * 2 - d)
+end
+
+-- Where a vein goes next: a site (by index into `sites`, angles) nobody has
+-- (`taken[index]`), at least Veins.Apart from the `others` (angles), at
+-- random; nil if there's none.
+function Frontier.pickSite(sites: { number }, taken: { [number]: boolean }, others: { number }, rng): number?
+	local choices = {}
+	for index, angle in sites do
+		if not taken[index] then
+			local ok = true
+			for _, other in others do
+				if Frontier.apart(angle, other) < Frontier.Veins.Apart then
+					ok = false
+					break
+				end
+			end
+			if ok then
+				table.insert(choices, index)
+			end
+		end
 	end
-	local count = math.max(1, math.floor(length / Frontier.CrumbStep) - 1)
-	local across = Vector3.new(-gap.Z, 0, gap.X).Unit
-	for i = 1, count do
-		local t = i / (count + 1)
-		table.insert(list, a + gap * t + across * rng:NextNumber(-0.9, 0.9))
+	if #choices == 0 then
+		return nil
 	end
-	return list
+	return choices[rng:NextInteger(1, #choices)]
+end
+
+-- Which way an angle round the middle is, as a compass point (north is
+-- toward the outpost: Shared.Outpost faces it that way).
+local COMPASS = { "east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east" }
+function Frontier.compass(angle: number): string
+	local i = math.floor(((angle % (math.pi * 2)) / (math.pi * 2)) * 8 + 0.5) % 8
+	return COMPASS[i + 1]
 end
 
 -- A player's mining noise after `swings` swings and `seconds` seconds out

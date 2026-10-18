@@ -12,19 +12,24 @@
 	      Board (BasePart with the leaderboard's face), Gate (BasePart),
 	      Spots ({ CFrame }, where rocks may grow), ArrivalSpots and
 	      NearSpots (indexes into Spots: the welcome field by the pad, and the
-	      field round the middle, filled first), TrailSpots and VeinSpots
-	      (the candy trails out to the walls, Shared.Frontier, and the Rift
-	      Vein at each end), Zones (each spot's Shared.Outpost zone), Scars
-	      ({ CFrame }: the dormant rift at each trail's end, facing in),
+	      field round the middle, filled first), OutcropSpots (the frontier's
+	      outcrops and lone rocks, Shared.Frontier), Veins ({ { Site, Spots } }:
+	      the three Rift Veins, each a site and its six spots, which move when
+	      a vein does), VeinSites ({ { Angle, Rocks = { CFrame }, Scar } }:
+	      every place by the walls with room for one), Zones (each spot's
+	      Shared.Outpost zone), Scars ({ CFrame }: each vein's dormant rift,
+	      facing in),
 	      Parking ({ Kind, CFrame }: the Motor Pool bays for the machines),
 	      Secrets (empty: retired Easter eggs stay disabled) }
 	  OutpostWorld.rock(size, cframe, rng, tint?) -> Model   one rock of that size
 	      (Shared.Outpost.Sizes), its main chunk named "Body"; `tint` colours
 	      its crystals (a frontier band's, Shared.Frontier.Bands)
+	  OutpostWorld.veinMarks(parent, scar, rng) -> Model   a vein's scorched bed,
+	      cracks and beam of light over its dormant rift (moved with it)
 ]]
 local OutpostWorld = {}
 
--- The frontier's rules (Shared.Frontier: the candy trails). Offline scene
+-- The frontier's rules (Shared.Frontier: outcrops and veins). Offline scene
 -- tests hand it in here.
 OutpostWorld.Frontier = (function()
 	local ok, module = pcall(function()
@@ -951,29 +956,44 @@ end
 local DIRT = Color3.fromRGB(92, 86, 84)
 local CONCRETE = Color3.fromRGB(86, 90, 98)
 local QUARRY = 440 -- where the stepped quarry walls start (Shared.Outpost.Radius)
--- A glowing crumb of crystal on the trail, half sunk in the regolith.
-local function crumb(parent, at: CFrame, color: Color3, rng)
-	local big = rng:NextNumber() < 0.35
-	local p = part(
-		parent,
-		at
-			* CFrame.new(0, 0.12, 0)
-			* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
-			* CFrame.Angles(rng:NextNumber(-0.35, 0.35), 0, rng:NextNumber(-0.35, 0.35)),
-		if big then Vector3.new(1, 0.5, 1.3) else Vector3.new(0.75, 0.38, 0.95),
-		color,
-		Enum.Material.Neon,
-		"Wedge"
-	)
-	p.Name = "Crumb"
-	p.CastShadow = false
-	return p
+-- Glowing cracks in the ground along an outcrop's grain, so it sparkles
+-- from afar without drawing a road: two or three thin strips.
+local function seam(parent, at: CFrame, grain: number, length: number, color: Color3, rng)
+	local along = CFrame.Angles(0, -grain, 0)
+	for i = 1, rng:NextInteger(2, 3) do
+		local off = (i - 2) * rng:NextNumber(3, 5)
+		local crack = part(
+			parent,
+			at * along * CFrame.new(rng:NextNumber(-3, 3), 0.11, off) * CFrame.Angles(0, rng:NextNumber(-0.25, 0.25), 0),
+			Vector3.new(length * rng:NextNumber(0.55, 0.9), 0.06, rng:NextNumber(0.16, 0.3)),
+			color,
+			Enum.Material.Neon
+		)
+		crack.Name = "SeamCrack"
+		crack.CastShadow = false
+	end
 end
 
--- Where a dormant rift sits at a trail's end: scorched ground, and cracks of
--- the other side's light running out from it (the tear itself is drawn by
--- each player's client: RiftTear).
-local function scarMark(parent, at: CFrame, rng)
+-- Where a vein's dormant rift sits: scorched ground, cracks of the other
+-- side's light running out from it, and a thin beam of violet light over it
+-- you can see from the outpost (the tear itself is drawn by each player's
+-- client: RiftTear). Its own model, so it moves with its vein.
+function OutpostWorld.veinMarks(parent, at: CFrame, rng): Model
+	local model = Instance.new("Model")
+	model.Name = "VeinMarks"
+	model.Parent = parent
+	local beam = part(
+		model,
+		at * CFrame.new(0, 90, 0) * CFrame.Angles(0, 0, math.pi / 2),
+		Vector3.new(180, 1.1, 1.1),
+		Color3.fromRGB(215, 90, 255),
+		Enum.Material.Neon,
+		"Cylinder"
+	)
+	beam.Name = "VeinBeam"
+	beam.Transparency = 0.55
+	beam.CastShadow = false
+	parent = model
 	local bed = disc(parent, at * CFrame.new(0, 0.06, 0), 5.5, 0.1, Color3.fromRGB(44, 30, 58), Enum.Material.Slate)
 	bed.CastShadow = false
 	for i = 1, 5 do
@@ -989,6 +1009,7 @@ local function scarMark(parent, at: CFrame, rng)
 		crack.Name = "ScarCrack"
 		crack.CastShadow = false
 	end
+	return model
 end
 
 local NEAR_SPOTS = 52 -- rock spots in the field round the middle (the trails lead out from it)
@@ -1743,48 +1764,92 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 		return true
 	end
-	-- The candy trails first (Shared.Frontier): runs of rocks leading out
-	-- from the core to the walls, crumbs glowing between them and their
-	-- crystals warming band by band, each ending in a Rift Vein round a
-	-- dormant rift scar.
+	-- The frontier first (Shared.Frontier). Where the Rift Veins may surface
+	-- by the walls: every site with room for all six rocks (kept clear of
+	-- the outcrops, so a vein can always move there).
 	local Frontier = assert(OutpostWorld.Frontier, "OutpostWorld needs Shared.Frontier")
-	local trails = folder(root, "Trails")
-	local trailSpots, veinSpots, scars = {}, {}, {}
+	local frontier = folder(root, "Frontier")
 	local zoneOf = {}
+	local function spotAt(offset: Vector3): Vector3
+		return (at * CFrame.new(offset.X, 0, offset.Z)).Position
+	end
+	local veinSites = {}
+	for _, base in Frontier.veinSites(rng) do
+		-- (A road or a ramp in the way: it shifts a little round the wall.)
+		for _, shift in { 0, 0.07, -0.07, 0.14, -0.14, 0.21, -0.21 } do
+			local angle = base + shift
+			local rocks, scar = Frontier.veinAt(angle, rng)
+			local places, room = {}, true
+			for _, offset in rocks do
+				local p = spotAt(offset)
+				if not clear(p, 12) then
+					room = false
+					break
+				end
+				table.insert(places, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
+			end
+			if room then
+				local scarAt = spotAt(scar)
+				table.insert(veinSites, { Angle = angle, Rocks = places, Scar = CFrame.lookAt(scarAt, at.Position) })
+				for _, cf in places do
+					table.insert(keepOut, { cf.Position, 12 })
+				end
+				break
+			end
+		end
+	end
+	-- Outcrops: seams of rocks along a grain, glowing cracks round each, and
+	-- lone rocks between (a few leading out of the core).
+	local outcropSpots = {}
 	local function grow(offset: Vector3, zone: string, gap: number): boolean
-		local p = (at * CFrame.new(offset.X, 0, offset.Z)).Position
+		local p = spotAt(offset)
 		if not clear(p, gap) then
 			return false
 		end
 		table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
 		zoneOf[#spots] = zone
+		table.insert(outcropSpots, #spots)
 		return true
 	end
-	for t = 1, #Frontier.TrailAngles do
-		local placed = {}
-		for _, offset in Frontier.trail(t, rng) do
+	local crops, lone = Frontier.outcrops(rng)
+	for _, crop in crops do
+		local grew = 0
+		for _, offset in crop.Rocks do
 			if grow(offset, Frontier.zoneOf(offset.Magnitude), 12) then
-				table.insert(trailSpots, #spots)
-				table.insert(placed, offset)
+				grew += 1
 			end
 		end
-		local vein, scar = Frontier.vein(placed[#placed], rng)
-		for _, offset in vein do
-			if grow(offset, "Vein", 12) then
-				table.insert(veinSpots, #spots)
-			end
+		if grew > 0 then
+			local band = Frontier.band(crop.Middle.Magnitude)
+			local middle = at * CFrame.new(crop.Middle.X, 0, crop.Middle.Z)
+			seam(frontier, middle, crop.Grain, crop.Length, Frontier.Bands[band].Color, rng)
 		end
-		-- Crumbs from rock to rock, and on from the last to the scar.
-		table.insert(placed, scar)
-		for i = 2, #placed do
-			local band = if i == #placed then "Vein" else Frontier.band(placed[i].Magnitude)
-			for _, c in Frontier.crumbs(placed[i - 1], placed[i], rng) do
-				crumb(trails, at * CFrame.new(c.X, 0, c.Z), Frontier.Bands[band].Color, rng)
-			end
+	end
+	for _, offset in lone do
+		grow(offset, Frontier.zoneOf(offset.Magnitude), 12)
+	end
+	-- The three Rift Veins, far apart: their rocks take spots of their own,
+	-- which move to another site when the vein does (OutpostServer).
+	local veins, scars, taken, angles = {}, {}, {}, {}
+	local siteAngles = {}
+	for i, siteInfo in veinSites do
+		siteAngles[i] = siteInfo.Angle
+	end
+	for _ = 1, Frontier.Veins.Count do
+		local index = Frontier.pickSite(siteAngles, taken, angles, rng)
+		if not index then
+			break
 		end
-		local scarAt = at * CFrame.new(scar.X, 0, scar.Z)
-		scarMark(trails, scarAt, rng)
-		table.insert(scars, CFrame.lookAt(scarAt.Position, at.Position))
+		taken[index] = true
+		table.insert(angles, siteAngles[index])
+		local vein = { Site = index, Spots = {} }
+		for _, cf in veinSites[index].Rocks do
+			table.insert(spots, cf)
+			zoneOf[#spots] = "Vein"
+			table.insert(vein.Spots, #spots)
+		end
+		table.insert(veins, vein)
+		table.insert(scars, veinSites[index].Scar)
 	end
 	-- Then a field round the middle, where people mine between fights
 	-- (spread evenly by distance, not area). The lane from the pad stays open.
@@ -1816,8 +1881,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Spots = spots,
 		ArrivalSpots = arrivalSpots,
 		NearSpots = nearSpots,
-		TrailSpots = trailSpots,
-		VeinSpots = veinSpots,
+		OutcropSpots = outcropSpots,
+		Veins = veins,
+		VeinSites = veinSites,
 		Scars = scars,
 		Zones = zones,
 		FieldSpots = {},

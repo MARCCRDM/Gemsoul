@@ -35,7 +35,7 @@ local Outpost = {}
 -- The original moon quarry, with haul roads and a drivable Motor Pool.
 Outpost.Location = CFrame.new(0, 0, 7000)
 Outpost.Radius = 440 -- quarry rim; recovery allows the surrounding benches
-Outpost.NodeCount = 210 -- rocks out at once (every spot: the field round the middle, the candy trails and their veins)
+Outpost.NodeCount = 210 -- rocks out at once (every spot: the field round the middle, the outcrops and the Rift Veins)
 Outpost.FieldNodeCount = 0 -- this lobby uses the common quarry sites
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from
@@ -133,15 +133,16 @@ end
 
 -- Only basic chunks/boulders spawn in the lobby, including every respawn.
 -- Retain the deeper definitions for other content and saved references.
--- Out along the candy trails (Shared.Frontier) the boulders grow commoner
--- and every gem rolls luckier (`Luck`, on top of the rock's own): the
--- further out, the richer, and a trail's end (its Rift Vein) the richest.
+-- Out in the frontier (Shared.Frontier) every gem rolls luckier (`Luck`,
+-- on top of the rock's own; Frontier.Bands has the same): the further out,
+-- the richer, a Rift Vein the richest. The rock mix stays the same out
+-- there (bigger rocks out there only cost more swings for the same gem).
 Outpost.Zones = {
 	Field = { Name = "Corundum Meadow", Weights = { Pebble = 68, Boulder = 32 } },
 	Common = { Name = "Common Field", Weights = { Pebble = 62, Boulder = 38 } },
-	Fringe = { Name = "The Fringe", Weights = { Pebble = 50, Boulder = 50 }, Luck = 0.08 },
-	Edge = { Name = "The Edge", Weights = { Pebble = 35, Boulder = 65 }, Luck = 0.16 },
-	Vein = { Name = "Rift Vein", Weights = { Pebble = 15, Boulder = 85 }, Luck = 0.25 },
+	Fringe = { Name = "The Fringe", Weights = { Pebble = 62, Boulder = 38 }, Luck = 0.2 },
+	Edge = { Name = "The Edge", Weights = { Pebble = 62, Boulder = 38 }, Luck = 0.4 },
+	Vein = { Name = "Rift Vein", Weights = { Pebble = 62, Boulder = 38 }, Luck = 0.75 },
 	Deep = { Name = "Deep Vein", Weights = { Boulder = 58, Monolith = 42 } },
 	Crystal = { Name = "Crystal Crown", Weights = { Monolith = 68, Geode = 32 } },
 }

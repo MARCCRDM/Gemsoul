@@ -119,6 +119,8 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- Swings out past the core draw critters; a pick bonks them.
 			OutpostServer.onSwing = FrontierServer.swing
 			OutpostServer.bonker = KaijuWilds
+			-- A Rift Vein surfacing somewhere new takes its dormant rift along.
+			OutpostServer.onVeinMoved = FrontierServer.moveScar
 		end
 	end
 	-- The Motor Pool's machines, for driving round the quarry (Config.Features:

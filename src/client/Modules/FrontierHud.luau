@@ -15,6 +15,8 @@
 	               it, till its critter is out.
 	  Rift Charged a tag with the seconds left, after you helped clear a
 	               wandering rift (RiftCharged: gems come luckier).
+	  vein news    a banner when a Rift Vein surfaces somewhere new
+	               (workspace's VeinNews, VeinNewsAt), saying which way.
 
 	  FrontierHud.start()
 	  FrontierHud.Lines[band] -> title, subtitle   (pure, for tests)
@@ -103,16 +105,9 @@ local function banner(player: Player, gui: ScreenGui)
 		end
 		TweenService:Create(rule, info, { BackgroundTransparency = to }):Play()
 	end
-	local function show(band: string)
-		local lines = FrontierHud.Lines[band]
-		local now = os.clock()
-		if not lines or (shown[band] and now - shown[band] < FrontierHud.Again) then
-			return
-		end
-		shown[band] = now
+	local function showLines(lines, color: Color3)
 		token += 1
 		local mine = token
-		local color = Frontier.Bands[band].Color
 		title.Text, subtitle.Text = lines[1], lines[2]
 		title.TextColor3 = color
 		rule.BackgroundColor3 = color
@@ -131,6 +126,22 @@ local function banner(player: Player, gui: ScreenGui)
 			end
 		end)
 	end
+	local function show(band: string)
+		local lines = FrontierHud.Lines[band]
+		local now = os.clock()
+		if not lines or (shown[band] and now - shown[band] < FrontierHud.Again) then
+			return
+		end
+		shown[band] = now
+		showLines(lines, Frontier.Bands[band].Color)
+	end
+	-- A Rift Vein surfacing somewhere new (while you're in the Outpost).
+	workspace:GetAttributeChangedSignal("VeinNewsAt"):Connect(function()
+		local news = workspace:GetAttribute("VeinNews")
+		if type(news) == "string" and player:GetAttribute("Outpost") == true then
+			showLines({ "RIFT VEIN", news }, Frontier.RiftColor)
+		end
+	end)
 	local last = player:GetAttribute("FrontierBand")
 	player:GetAttributeChangedSignal("FrontierBand"):Connect(function()
 		local band = player:GetAttribute("FrontierBand")

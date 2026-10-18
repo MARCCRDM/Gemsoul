@@ -17,10 +17,18 @@
 
 	Rocks are shared: a rock's first hitter keeps it while they keep
 	swinging (Outpost.ClaimSeconds). A mined-out rock grows back where it
-	was after its respawn time, so the candy trails out to the walls stay
-	trails (Shared.Frontier). Out along them the rocks run richer: their
-	zone (Outpost.Zones) adds its Luck to every gem, and their crystals
-	glow in the band's colour. Rocks carry their state as attributes (Hp,
+	was after its respawn time, so the outcrops stay where they are
+	(Shared.Frontier). Further out the rocks run richer: their zone
+	(Outpost.Zones) adds its Luck to every gem, and their crystals glow in
+	the band's colour.
+
+	The three Rift Veins move: a vein's rocks don't grow back, so once one
+	is mined out (a moment after its last rock pops), and every ten minutes
+	or so anyway (put off while someone is mining it), whatever is left of
+	it goes and it surfaces at another site by the walls with room
+	(site.VeinSites), away from the other two: fresh rocks, its marks and beam of light (OutpostWorld.veinMarks), its dormant
+	rift (OutpostServer.onVeinMoved: FrontierServer), and word round the
+	Outpost (workspace's VeinNews and VeinNewsAt: FrontierHud's banner). Rocks carry their state as attributes (Hp,
 	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
 	can show every swing; prompts carry PromptKind (Mine, Probe, Gate,
 	Spar, Duel, Party) for the client to act on.
@@ -67,11 +75,21 @@ local fieldSpots: { [number]: boolean } = {}
 local nextId = 0
 local lastSwing: { [Player]: number } = {}
 local lastBonk: { [Player]: number } = {}
+-- The Rift Veins: { Site (index into site.VeinSites), Spots, Due (os.clock
+-- it next moves), Marks (its model) }; which vein a spot is in; and each
+-- spot's epoch, bumped when its vein moves (a rock popped before then
+-- doesn't grow back on top of the new one).
+local veins = {}
+local veinOf: { [number]: number } = {}
+local spotEpoch: { [number]: number } = {}
+local veinFolder: Folder? = nil
 
 -- Main wires these to the frontier (FrontierServer, KaijuWilds) when it runs:
 -- a swing's noise, and a pick's bonk on a critter.
 OutpostServer.onSwing = function(_player: Player, _swings: number) end
 OutpostServer.bonker = nil :: any -- KaijuWilds: critterOf(model) -> enemy?, bonk(enemy, player, from)
+-- A vein surfaced somewhere new: its index and its dormant rift's CFrame.
+OutpostServer.onVeinMoved = function(_index: number, _scar: CFrame) end
 local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
@@ -367,12 +385,129 @@ local function popNode(node, player: Player)
 	task.delay(0.9, function()
 		model:Destroy()
 	end)
-	-- It grows back where it was (a trail stays a trail): its spot stays
-	-- its own until then.
+	-- A vein's rock doesn't grow back: once its last one goes, the vein
+	-- moves on, a moment later, and grows afresh somewhere else.
+	local v = veinOf[node.Spot]
+	if v then
+		task.delay(4, function()
+			if OutpostServer._minedOut(v) then
+				OutpostServer.moveVein(v)
+			end
+		end)
+		return
+	end
+	-- Any other grows back where it was (an outcrop stays where it is): its
+	-- spot stays its own until then.
+	local epoch = spotEpoch[node.Spot]
 	task.delay(Rules.Sizes[node.Size].Respawn, function()
+		if spotEpoch[node.Spot] ~= epoch then
+			return
+		end
 		freeSpots[node.Spot] = true
 		spawnNode(fieldSpots[node.Spot] == true, node.Spot)
 	end)
+end
+
+-- Rift Veins --------------------------------------------------------------------------------------
+
+local function nodeOn(spot: number)
+	for _, node in nodes do
+		if node.Spot == spot then
+			return node
+		end
+	end
+	return nil
+end
+
+function OutpostServer._minedOut(v: number): boolean
+	for _, spot in veins[v].Spots do
+		if nodeOn(spot) then
+			return false
+		end
+	end
+	return true
+end
+
+-- Someone is mining it right now (its rocks claimed).
+local function worked(v: number, now: number): boolean
+	for _, spot in veins[v].Spots do
+		local node = nodeOn(spot)
+		if node and node.ClaimUntil and node.ClaimUntil > now then
+			return true
+		end
+	end
+	return false
+end
+
+local function nextDue(): number
+	local v = Frontier.Veins
+	return os.clock() + v.Every + rng:NextNumber(-v.Wobble, v.Wobble)
+end
+
+local function markVein(vein)
+	if vein.Marks then
+		vein.Marks:Destroy()
+	end
+	vein.Marks = OutpostWorld.veinMarks(veinFolder, site.VeinSites[vein.Site].Scar, rng)
+end
+
+-- Vein `v` surfaces at another site: whatever's left of it goes, fresh
+-- rocks grow there, and its marks and dormant rift move with it. Returns
+-- whether it moved (there's always a site, unless the Outpost had too few).
+function OutpostServer.moveVein(v: number): boolean
+	local vein = veins[v]
+	if not vein or not site then
+		return false
+	end
+	local angles, taken, others = {}, {}, {}
+	for i, siteInfo in site.VeinSites do
+		angles[i] = siteInfo.Angle
+	end
+	for i, other in veins do
+		taken[other.Site] = true
+		if i ~= v then
+			table.insert(others, angles[other.Site])
+		end
+	end
+	local index = Frontier.pickSite(angles, taken, others, rng)
+	if not index then
+		vein.Due = os.clock() + 60
+		return false
+	end
+	vein.Site = index
+	local siteInfo = site.VeinSites[index]
+	for k, spot in vein.Spots do
+		spotEpoch[spot] = (spotEpoch[spot] or 0) + 1
+		local node = nodeOn(spot)
+		if node then
+			nodes[node.Id] = nil
+			node.Ready = false
+			node.Model:Destroy()
+		end
+		site.Spots[spot] = siteInfo.Rocks[k]
+		freeSpots[spot] = true
+		spawnNode(fieldSpots[spot] == true, spot)
+	end
+	vein.Due = nextDue()
+	markVein(vein)
+	OutpostServer.onVeinMoved(v, siteInfo.Scar)
+	workspace:SetAttribute("VeinNews", "A Rift Vein surfaced to the " .. Frontier.compass(siteInfo.Angle))
+	workspace:SetAttribute("VeinNewsAt", workspace:GetServerTimeNow())
+	return true
+end
+
+-- Every few seconds: a vein whose time has come moves (put off while it's
+-- being mined).
+function OutpostServer._veinTick(now: number)
+	for v, vein in veins do
+		if now >= vein.Due then
+			if worked(v, now) then
+				vein.Due = now + 20
+			else
+				OutpostServer.moveVein(v)
+			end
+		end
+	end
 end
 
 -- What a popped rock pays: one gem, every time (a Common at worst; bigger
@@ -842,6 +977,27 @@ function OutpostServer.start()
 	for _, index in site.FieldSpots or {} do
 		fieldSpots[index] = true
 	end
+	-- The Rift Veins: their marks, and when each moves on.
+	local marks = Instance.new("Folder")
+	marks.Name = "Veins"
+	marks.Parent = site.Model
+	veinFolder = marks
+	for v, vein in site.Veins or {} do
+		veins[v] = { Site = vein.Site, Spots = vein.Spots, Due = nextDue() }
+		for _, spot in vein.Spots do
+			veinOf[spot] = v
+		end
+		markVein(veins[v])
+	end
+	task.spawn(function()
+		while true do
+			task.wait(5)
+			local ok, err = pcall(OutpostServer._veinTick, os.clock())
+			if not ok then
+				warn("[Outpost] veins:", err)
+			end
+		end
+	end)
 	for _ = 1, math.min(Rules.NodeCount, #site.Spots - #(site.FieldSpots or {})) do
 		spawnNode()
 	end
@@ -994,6 +1150,9 @@ end
 OutpostServer._hit, OutpostServer._enter, OutpostServer._buy = hit, enter, buy
 OutpostServer._secret = secret
 OutpostServer._nodes = nodes
+-- For tests.
+OutpostServer._veins = veins
+
 function OutpostServer.site()
 	return site
 end

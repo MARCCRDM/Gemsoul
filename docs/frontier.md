@@ -2,53 +2,76 @@
 
 The Outpost gets more dangerous and richer the further out you go. Near
 the outpost you're safe. Further out, the rocks pay better, but rifts tear
-open in the air and the brainrot critters hop out of them at you. Candy
-trails of rocks lead out to the walls, so mining pulls you outward. You
-mine your way out, kite what comes through, and run back in when it gets
-too hot.
+open in the air and the brainrot critters hop out of them at you. Out
+there the rocks grow in outcrops, and three Rift Veins, the richest rocks
+of all, glow by the walls and move on when they're mined out. You mine your
+way out, kite what comes through, and run back in when it gets too hot.
 
-![The Outpost from above: the three bands, the six trails and their Rift Veins](frontier/map.png)
+![The Outpost from above: the three bands, the outcrops and the Rift Veins](frontier/map.png)
 
 ## The three bands
 
 Each band is measured across the ground from the middle of the Outpost.
 
-| Band | From the middle | Rifts | Rocks | Crystals |
+| Band | From the middle | Rifts | Luck on every gem | Crystals |
 | --- | --- | --- | --- | --- |
-| **Outpost Core** | 0–150 studs | None: safe | The lobby mix (chunks and boulders), no extra luck | Cyan |
-| **The Fringe** | 150–300 | One or two critters at a time | Half chunks, half boulders, +8% luck | Gold |
-| **The Edge** | 300 to the walls | Two or three at a time | More boulders (65%), +16% luck | Rose |
-| **Rift Vein** | A trail's last four rocks | (in the Edge) | Mostly boulders (85%), +25% luck | Violet |
+| **Outpost Core** | 0–150 studs | None: safe | None | Cyan |
+| **The Fringe** | 150–300 | One or two critters at a time | +20% | Gold |
+| **The Edge** | 300 to the walls | Two or three at a time | +40% | Rose |
+| **Rift Vein** | Three spots by the walls | (in the Edge) | +75% | Violet |
 
-The luck goes on top of the rock's own luck on every gem it pays, so the
-outer rocks roll better gems. There are still only chunks and boulders
-everywhere: the lobby has no Monoliths or Geodes. A rock's label shows its
-band and luck, e.g. `THE EDGE · +16% LUCK`.
+The rocks are the same everywhere: the lobby mix of chunks and boulders (62
+to 38), with no Monoliths or Geodes. A boulder takes more swings for the
+same one gem, so more boulders out there would only have made the frontier
+slower. Going out pays in luck instead: it goes on top of the rock's own
+luck on every gem it pays, so the outer rocks roll better gems. A rock's
+label shows its band and luck, e.g. `THE EDGE · +40% LUCK`.
 
 When you cross into a band, its name and a line about it show at the top of
 the screen in its colour. The same band's banner won't show again for 20
 seconds, so walking back and forth across a boundary doesn't keep showing
 it. Arriving in the Outpost doesn't show one.
 
-## Candy trails
+## Outcrops
 
-![The east trail's last stretch: rose crystals, crumbs, the Rift Vein round its dormant rift, and a rift open beside a miner](frontier/trail.png)
+Past the core's rocks, from 100 studs out to 412, the rocks grow in
+**outcrops**: 46 of them, at least 36 studs apart. An outcrop is a short
+row of rocks (one every 13.5 to 15 studs) along a grain of its own, with
+dark seams in the ground joining them, so you can see it's one outcrop:
 
-Six trails of rocks run out from the core to the walls, between the haul
-roads and clear of the outpost and the motor pool. Each trail:
+- two or three rocks near the core, up to five out at the Edge;
+- thicker on rich ground. Three soft waves of richness cross the quarry, a
+  different way each server, so some stretches are crowded and others
+  bare;
+- about one rock in seven out there grows alone, between the outcrops. The
+  first six of those lead out of the core, so the way out starts close.
 
-- has a rock about every 17 studs, from 80 studs out to 400, wandering a
-  little either side;
-- has glowing crumbs between its rocks, so you can see where it goes next;
-- has crystals that change from cyan to gold to rose as you go out;
-- ends in a **Rift Vein**: four rich violet rocks fanned round a
-  **dormant rift**, a scar in the ground with a tear above it that never
-  opens fully and stays.
+Outcrops stay clear of the roads, the buildings, the motor pool and the
+Rift Veins. A mined rock grows back in the same spot, so an outcrop stays
+an outcrop.
 
-A mined rock grows back in the same spot, so a trail stays a trail. The
-rest of the rocks fill the field round the outpost as before.
+## Rift Veins
 
-![Close up: a rift opening beside a trail](frontier/trail-close.png)
+Three **Rift Veins** glow by the walls. Each is six rich violet rocks in two
+staggered rows round a **dormant rift**: a scar in the ground, a tear above
+it that never opens fully, and a violet beam 180 studs tall that you can
+see from anywhere in the Outpost.
+
+A Rift Vein doesn't stay put:
+
+- **its rocks don't grow back.** When the last of its six goes, it moves on
+  a few seconds later;
+- **if nobody mines it out, it moves anyway**, every 10 minutes or so (give
+  or take a minute). While someone is mining it, it waits for them (another
+  20 seconds at a time);
+- it surfaces at one of 12 places round the walls, never one another vein
+  has, and at least 70° round from the other two, so they stay spread out.
+  Fresh rocks grow there, and its scar, tear and beam go with it;
+- everyone in the Outpost gets a banner as it surfaces: **RIFT VEIN** "A
+  Rift Vein surfaced to the north-east" (which way, from the middle).
+
+So the richest rocks are always somewhere new to head for, and nobody can
+camp them.
 
 ## Rifts
 
@@ -197,20 +220,23 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 
 | Where | What |
 | --- | --- |
-| `Shared.Frontier` | The rules: bands, colours and luck, the trails, Rift Veins and crumbs, pressure, how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
-| `Shared.Outpost` | The Fringe, Edge and Vein zones (rock mix and luck) |
-| `OutpostWorld` | Lays out the trails, crumbs, Rift Veins and scars before the rest of the field; crystals tinted by band (`rock(size, cframe, rng, tint)`) |
-| `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot; every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
-| `FrontierServer` | Each player's band (`FrontierBand`) and noise (`FrontierNoise`), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`) |
+| `Shared.Frontier` | The rules: bands, colours and luck, the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), pressure, how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
+| `Shared.Outpost` | The Fringe, Edge and Vein zones (the same rock mix, more luck) |
+| `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and beam (`veinMarks`); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
+| `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot, except a vein's; moves a vein when it's mined out or its time comes (`moveVein`, `onVeinMoved`, and `VeinNews` on `workspace`); every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
+| `FrontierServer` | Each player's band (`FrontierBand`) and noise (`FrontierNoise`), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`, and move with their veins: `moveScar`) |
 | `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk` |
 | `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
-| `FrontierHud` (client) | The banner as you cross into a band, the noise ring, arrows to rifts off screen, the Rift Charged tag |
+| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, the noise ring, arrows to rifts off screen, the Rift Charged tag |
 | `OutpostScene` (client) | The band and luck on a rock's label; the mine button bonks a critter close by |
 
-Tests: `tests/run_frontier.py` checks the rules (bands and zones, the six
-trails clear of the roads and buildings, the Rift Veins, crumbs, mining
+Tests: `tests/run_frontier.py` checks the rules (bands and zones, the luck
+going up band by band on the same rock mix, the outcrops (none on top of
+each other, on their grain, bigger further out, inside the frontier, the
+lone rocks and the stepping stones out of the core; the rich ground), the vein sites
+and their rocks, picking a vein's next site, the compass, mining
 noise, fair shares, critter levels and EXP, how many come at once, where
 rifts open (wandering ones too), the timeline, that tears are ragged and
 lopsided, the pieces each tear is drawn from, the banners, the noise ring
@@ -222,4 +248,7 @@ the pay, and the bonk; and builds every moon bug (`tests/moon_bug_cases.luau`:
 its part and shadow budget, no armour or lights, nothing left hanging loose,
 its whole face). `tests/run_outpost.py` and
 `tests/run_moon_quarry_scene.py` cover the zones, luck, regrowth and the
-built trails.
+built layout: the outcrops clear of the roads and buildings with room
+round every rock, their seams, the three veins and their beams, and a vein
+moving (mined out or on time, not while it's being mined; fresh rocks, its
+scar, the banner, nothing growing back where it was).

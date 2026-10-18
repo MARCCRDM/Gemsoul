@@ -1,8 +1,9 @@
 -- lune run tests/frontier_cases.luau <repo>
--- The Outpost's frontier (Shared.Frontier): the bands, the candy trails
--- (out to the walls, clear of the roads and buildings, rocks evenly
--- spaced, crumbs between, a Rift Vein at each end), richer rocks outward
--- (Shared.Outpost.Zones), mining noise and incursions, fair shares,
+-- The Outpost's frontier (Shared.Frontier): the bands, the outcrops (natural
+-- seams, bigger further out, lone rocks and stepping stones between, a rich
+-- ground field), the Rift Veins (sites round the walls, six rocks each,
+-- far apart, where one moves next, compass points), richer rocks outward
+-- (Shared.Outpost.Zones: the same mix everywhere, more luck), mining noise and incursions, fair shares,
 -- critter levels and EXP, where rifts open (wandering ones too), their
 -- timeline, their ragged, lopsided tears, and the HUD's noise ring and
 -- arrows.
@@ -75,18 +76,22 @@ check(Frontier.band(Frontier.Core) == "Fringe" and Frontier.band(Frontier.EdgeFr
 check(Frontier.band(Frontier.EdgeFrom) == "Edge" and Frontier.band(1000) == "Edge", "The edge")
 check(Frontier.distance(Vector3.new(3, 50, 4), Vector3.new(0, 0, 0)) == 5, "Distance counts height")
 -- Richer outward: every zone a lobby rock grows in is chunks and boulders
--- only, with more boulders and more luck the further out.
-local lastBoulders, lastLuck = -1, -1
+-- only, the same mix everywhere (bigger rocks out there would only cost
+-- more swings per gem), with much more luck the further out.
+local lastLuck = -1
 for _, zone in { "Common", "Fringe", "Edge", "Vein" } do
 	local spec = Outpost.Zones[zone]
 	check(spec, zone .. " isn't a zone")
 	for size in spec.Weights do
 		check(size == "Pebble" or size == "Boulder", zone .. " grows a " .. size .. " in the lobby")
 	end
-	local boulders = spec.Weights.Boulder / (spec.Weights.Boulder + spec.Weights.Pebble)
-	check(boulders > lastBoulders and (spec.Luck or 0) > lastLuck, zone .. " isn't richer than the zone inside it")
-	lastBoulders, lastLuck = boulders, spec.Luck or 0
+	check(spec.Weights.Pebble == Outpost.Zones.Common.Weights.Pebble, zone .. "'s mix isn't the core's")
+	check(spec.Weights.Boulder == Outpost.Zones.Common.Weights.Boulder, zone .. "'s mix isn't the core's")
+	check((spec.Luck or 0) > lastLuck, zone .. " isn't richer than the zone inside it")
+	lastLuck = spec.Luck or 0
 end
+local zones = Outpost.Zones
+check(zones.Fringe.Luck == 0.2 and zones.Edge.Luck == 0.4 and zones.Vein.Luck == 0.75, "The luck steps")
 check(Frontier.zoneOf(10) == "Common" and Frontier.zoneOf(200) == "Fringe", "Zones by distance")
 check(Frontier.zoneOf(350) == "Edge" and Frontier.zoneOf(350, true) == "Vein", "The edge and its veins")
 for band, spec in Frontier.Bands do
@@ -95,7 +100,7 @@ for band, spec in Frontier.Bands do
 	check(spec.Luck == (zone.Luck or 0), band .. "'s luck isn't its zone's")
 end
 
--- Candy trails ---------------------------------------------------------------------------------------
+-- Outcrops ----------------------------------------------------------------------------------------------
 -- (The Outpost's roads, outpost, pad and motor pool, as OutpostWorld builds them.)
 local roads = {}
 for i = 0, 5 do
@@ -119,65 +124,140 @@ local buildings = {
 	{ Vector3.new(0, 0, 70), 40, "the landing pad" },
 	{ Vector3.new(0, 0, 150), 84, "the motor pool" },
 }
+local function clearOfTheOutpost(p)
+	if toRoad(p) < 14 then
+		return false
+	end
+	for _, b in buildings do
+		if (p - b[1]).Magnitude < b[2] then
+			return false
+		end
+	end
+	return true
+end
 local rng = Random.new(7)
-local total = 0
-local ends = {}
-for index = 1, #Frontier.TrailAngles do
-	local points = Frontier.trail(index, rng)
-	check(#points >= 16, "Trail " .. index .. " is too short: " .. #points)
-	total += #points
-	check(math.abs(flat(points[1]) - Frontier.TrailFrom) < 4, "Trail " .. index .. " doesn't start at the core")
-	check(flat(points[#points]) > Frontier.TrailTo - 20, "Trail " .. index .. " doesn't reach the walls")
-	local inBand = {}
-	for i, p in points do
-		check(p.Y == 0 and flat(p) < Frontier.Rim, "A trail rock past the walls")
-		inBand[Frontier.band(flat(p))] = true
-		if i > 1 then
-			local step = (p - points[i - 1]).Magnitude
-			check(step > 11 and step < 23, string.format("Trail %d: rocks %.1f apart", index, step))
-			check(flat(p) > flat(points[i - 1]), "Trail " .. index .. " doubles back")
+-- The rich ground: soft, between 0 and 1, varying across the quarry.
+local rich = Frontier.field(Random.new(3))
+local low, high = 1, 0
+for x = -400, 400, 40 do
+	for z = -400, 400, 40 do
+		local v = rich(Vector3.new(x, 0, z))
+		check(v >= 0 and v <= 1, "The rich ground out of range")
+		low, high = math.min(low, v), math.max(high, v)
+	end
+end
+check(high - low > 0.5, "The ground is as rich everywhere")
+local kept, outer, inner, grew = 0, {}, {}, {}
+for seed = 1, 6 do
+	local crops, lone = Frontier.outcrops(Random.new(seed * 11))
+	local count = Frontier.Outcrop.Count
+	check(#crops >= count - 2 and #crops <= count, "Not about 46 outcrops: " .. #crops)
+	local rocks = 0
+	for i, crop in crops do
+		check(#crop.Rocks >= 2 and #crop.Rocks <= 5, "An outcrop of " .. #crop.Rocks)
+		local r = flat(crop.Middle)
+		check(r >= Frontier.Outcrop.From - 0.01 and r <= Frontier.Outcrop.To + 0.01, "An outcrop out of the frontier")
+		for j = i + 1, #crops do
+			local gap = (crop.Middle - crops[j].Middle).Magnitude
+			check(gap >= Frontier.Outcrop.Apart - 0.01, "Two outcrops on top of each other")
 		end
-		check(toRoad(p) > 15, string.format("Trail %d rock on a road (%.1f)", index, toRoad(p)))
-		for _, b in buildings do
-			check((p - b[1]).Magnitude > b[2], string.format("Trail %d runs through %s", index, b[3]))
-		end
-		-- It leads somewhere: never far off its heading.
-		local heading = math.rad(Frontier.TrailAngles[index])
-		local dir = Vector3.new(math.cos(heading), 0, math.sin(heading))
-		local off = (p - dir * p:Dot(dir)).Magnitude
-		check(off < Frontier.TrailSway + 4, "Trail " .. index .. " wanders off")
-		-- Crumbs between this rock and the next.
-		local nextPoint = points[i + 1]
-		if nextPoint then
-			local crumbs = Frontier.crumbs(p, nextPoint, rng)
-			check(#crumbs >= 1, "No crumbs between two rocks")
-			for _, c in crumbs do
-				check((c - p).Magnitude > 2 and (c - nextPoint).Magnitude > 2, "A crumb under a rock")
+		-- A seam: its rocks in a line along its grain, a step or so apart.
+		local along = Vector3.new(math.cos(crop.Grain), 0, math.sin(crop.Grain))
+		for k, p in crop.Rocks do
+			local inside = flat(p) <= Frontier.Outcrop.To + 0.01 and flat(p) < Frontier.Rim
+			check(p.Y == 0 and inside, "A rock past the walls")
+			local off = (p - crop.Middle) - along * (p - crop.Middle):Dot(along)
+			check(off.Magnitude < 4, "An outcrop's rock off its grain")
+			if k > 1 then
+				local step = (p - crop.Rocks[k - 1]).Magnitude
+				check(step > 12 and step < 17 or step > 22, "An outcrop's rocks " .. step .. " apart")
+			end
+			rocks += 1
+			if clearOfTheOutpost(p) then
+				kept += 1
 			end
 		end
+		table.insert(if r > 330 then outer else inner, #crop.Rocks)
 	end
-	check(inBand.Core and inBand.Fringe and inBand.Edge, "Trail " .. index .. " doesn't cross every band")
-	-- Its end: a Rift Vein of rocks round a dormant scar, by the walls.
-	local vein, scar = Frontier.vein(points[#points], rng)
-	check(#vein == Frontier.VeinRocks, "A vein without its rocks")
-	for i, v in vein do
-		check(flat(v) > flat(points[#points]) and flat(v) < Frontier.Rim, "A vein rock out of place")
-		check((v - points[#points]).Magnitude > 12, "A vein rock on the last trail rock")
-		for j = i + 1, #vein do
-			check((v - vein[j]).Magnitude > 12, "Vein rocks on top of each other")
+	-- Lone rocks between: about 15% of the frontier's, a few leading out of the core.
+	local stones = 0
+	for _, p in lone do
+		local r = flat(p)
+		check(r >= Frontier.Outcrop.From - 0.01 and r <= Frontier.Outcrop.To + 0.01, "A lone rock out of place")
+		if flat(p) < Frontier.Core + 25 then
+			stones += 1
 		end
-		check((v - scar).Magnitude < 30, "A vein rock far from its scar")
+		if clearOfTheOutpost(p) then
+			kept += 1
+		end
 	end
-	check(flat(scar) >= Frontier.Rim and flat(scar) < 440, "The scar isn't by the walls")
-	table.insert(ends, scar)
+	local share = #lone / (#lone + rocks)
+	check(share > 0.1 and share < 0.2, "Lone rocks aren't about 15%: " .. share)
+	check(stones >= Frontier.Outcrop.Stones, "No stepping stones out of the core")
+	table.insert(grew, #lone + rocks)
 end
-check(total >= 100, "Too few trail rocks: " .. total)
-for i, a in ends do
-	for j = i + 1, #ends do
-		check((a - ends[j]).Magnitude > 150, "Two trails end together")
+local function mean(list)
+	local sum = 0
+	for _, v in list do
+		sum += v
+	end
+	return sum / math.max(1, #list)
+end
+check(mean(outer) > mean(inner) + 0.4, "Outcrops aren't bigger further out")
+-- About as many rocks as the six trails had (the same budget), after the
+-- roads and buildings take theirs.
+check(kept / 6 >= 95 and kept / 6 <= 140, "Not about the frontier's number of rocks: " .. kept / 6)
+check(#Frontier.outcrops(Random.new(5)) == #Frontier.outcrops(Random.new(5)), "Outcrops differ from one seed")
+
+-- Rift Veins -----------------------------------------------------------------------------------------------
+local sites = Frontier.veinSites(rng)
+check(#sites == Frontier.Veins.Sites, "Not every vein site")
+for i, angle in sites do
+	local rocks, scar = Frontier.veinAt(angle, rng)
+	check(#rocks == Frontier.Veins.Rocks, "A vein without its six rocks")
+	check(flat(scar) >= Frontier.Rim and flat(scar) < 440, "A vein's rift isn't by the walls")
+	for k, p in rocks do
+		check(flat(p) < Frontier.Rim and flat(p) > Frontier.EdgeFrom, "A vein rock out of the edge")
+		check((p - scar).Magnitude < 45, "A vein rock far from its rift")
+		for j = k + 1, #rocks do
+			check((p - rocks[j]).Magnitude >= 11.5, "Vein rocks on top of each other")
+		end
+	end
+	if i > 1 then
+		check(Frontier.apart(angle, sites[i - 1]) > 0.2, "Two vein sites together")
 	end
 end
-check(#Frontier.crumbs(Vector3.zero, Vector3.new(60, 0, 0), rng) == 0, "Crumbs across a big gap")
+check(math.abs(Frontier.apart(0.1, math.pi * 2 - 0.1) - 0.2) < 1e-9, "Angles apart across east")
+check(math.abs(Frontier.apart(0, math.pi) - math.pi) < 1e-9, "Opposite angles")
+-- Three far apart, and where one goes next: away from the other two, never
+-- a site that's taken.
+local taken, angles = {}, {}
+for _ = 1, Frontier.Veins.Count do
+	local index = Frontier.pickSite(sites, taken, angles, rng)
+	check(index ~= nil, "No room for three veins")
+	for _, other in angles do
+		check(Frontier.apart(sites[index], other) >= Frontier.Veins.Apart, "Two veins together")
+	end
+	taken[index] = true
+	table.insert(angles, sites[index])
+end
+for _ = 1, 50 do
+	local index = Frontier.pickSite(sites, taken, { angles[2], angles[3] }, rng)
+	check(index and not taken[index], "A vein moved onto a taken site")
+	check(
+		Frontier.apart(sites[index], angles[2]) >= Frontier.Veins.Apart
+			and Frontier.apart(sites[index], angles[3]) >= Frontier.Veins.Apart,
+		"A vein moved next to another"
+	)
+end
+local all = {}
+for i in sites do
+	all[i] = true
+end
+check(Frontier.pickSite(sites, all, {}, rng) == nil, "A site found with every one taken")
+check(Frontier.compass(0) == "east" and Frontier.compass(math.pi / 2) == "south", "The compass")
+check(Frontier.compass(math.pi * 1.5) == "north", "The compass's north")
+check(Frontier.compass(-math.pi / 4) == "north-east", "The compass's north-east")
 
 -- Mining noise and incursions -----------------------------------------------------------------------------
 -- (An encounter at 1: swings make it, the edge's more; a second out there a
@@ -392,7 +472,7 @@ check(at.X >= 39.9 and at.X <= 960.1 and at.Y >= 39.9 and at.Y <= 560.1, "An arr
 
 print(
 	string.format(
-		"PASS: %d frontier checks (bands, candy trails, veins, noise, shares, critters, rifts, tears, the HUD)",
+		"PASS: %d frontier checks (bands, outcrops, veins, noise, shares, critters, rifts, tears, the HUD)",
 		checks
 	)
 )

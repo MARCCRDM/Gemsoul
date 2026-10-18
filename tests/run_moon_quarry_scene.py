@@ -55,7 +55,7 @@ for name, path in [
     source += f"local {name}=(function()\n{(ROOT / path).read_text(encoding='utf-8')}\nend)()\n"
 source += r'''
 local origin=CFrame.new(0,0,7000)
--- (Its candy trails come from Shared.Frontier, handed in as the server finds it.)
+-- (Its outcrops and Rift Veins come from Shared.Frontier, handed in as the server finds it.)
 World.Frontier=Frontier
 local site=World.build(origin,{})
 assert(site.Model.Landscape=="Moon Quarry" and site.Model.SkySetting=="MoonBase")
@@ -68,11 +68,35 @@ for _,index in site.ArrivalSpots do
 end
 assert(site.Probe.Name=="ProbeScreen" and site.Board.Name=="BoardFace" and site.Gate.Name=="GatePad","Missing lobby services")
 assert(Rules.Radius==440 and Rules.NodeCount==210 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
--- Every spot holds a rock: the field round the middle, the candy trails out
--- to the walls (Shared.Frontier) and a Rift Vein at each trail's end.
+-- Every spot holds a rock: the field round the middle, the outcrops out
+-- to the walls (Shared.Frontier) and the three Rift Veins.
 local population=math.min(Rules.NodeCount,#site.Spots)
-assert(#site.Spots>=180 and population==#site.Spots,"Too few mining sites, or more than the cap: "..#site.Spots)
-assert(#site.TrailSpots>=100 and #site.VeinSpots>=20 and #site.Scars==#Frontier.TrailAngles,"The candy trails are missing")
+assert(#site.Spots>=170 and #site.Spots<=210 and population==#site.Spots,"Not about the old number of mining sites, or more than the cap: "..#site.Spots)
+assert(#site.OutcropSpots>=90 and #site.Veins==Frontier.Veins.Count and #site.Scars==Frontier.Veins.Count,"The outcrops or veins are missing")
+assert(#site.VeinSites>=8,"Too few places for a vein to move to: "..#site.VeinSites)
+for v,vein in site.Veins do
+ assert(#vein.Spots==Frontier.Veins.Rocks and site.VeinSites[vein.Site],"A vein without its six rocks")
+ for k,index in vein.Spots do
+  assert((site.Spots[index].Position-site.VeinSites[vein.Site].Rocks[k].Position).Magnitude<1e-6,"A vein's rock off its site")
+ end
+ for w=v+1,#site.Veins do
+  assert(Frontier.apart(site.VeinSites[vein.Site].Angle,site.VeinSites[site.Veins[w].Site].Angle)>=Frontier.Veins.Apart,"Two veins together")
+ end
+end
+-- Every vein site has room: none of its rocks on another spot, a road or a building.
+for _,siteInfo in site.VeinSites do
+ for _,cf in siteInfo.Rocks do
+  local p=cf.Position-origin.Position
+  assert(Vector3.new(p.X,0,p.Z).Magnitude<Frontier.Rim and (p-Vector3.new(0,0,150)).Magnitude>=84,"A vein site in the walls or the motor pool")
+  for i,spot in site.Spots do
+   local mine=false
+   for _,vein in site.Veins do
+    if site.VeinSites[vein.Site]==siteInfo and table.find(vein.Spots,i) then mine=true end
+   end
+   assert(mine or (spot.Position-cf.Position).Magnitude>=12,"A vein site with no room")
+  end
+ end
+end
 -- The field round the middle: rocks close by, inside the core, none on the
 -- lane from the pad (overlaps are checked with every spot below).
 assert(#site.NearSpots>=48,"The field round the middle is too thin: "..#site.NearSpots)
@@ -118,7 +142,7 @@ end
 assert(rim>1000 and skyModel and skyModel.ModelStreamingMode=="Persistent","Crater rim or sky missing or streamed")
 assert(#builtParts<4000,"Quarry scenery budget exceeded")
 local veins={}
-for _,index in site.VeinSpots do veins[index]=true end
+for _,vein in site.Veins do for _,index in vein.Spots do veins[index]=true end end
 for i,spot in site.Spots do
  local p=spot.Position-origin.Position
  -- Its zone is its band's (richer outward), or a Rift Vein's.
@@ -337,13 +361,13 @@ freeSpots[arrivalIndex]=true
 local before=nextId
 spawnNode(true)
 assert(nextId==before and freeSpots[arrivalIndex],"Zone filter bypassed by arrival priority")
--- A rock grows back where it was (a trail stays a trail), wherever it is.
-local trailIndex=site.TrailSpots[#site.TrailSpots]
-for id,node in nodes do if node.Spot==trailIndex then nodes[id]=nil end end
-freeSpots[trailIndex]=true
-spawnNode(false,trailIndex)
-assert(nodes[nextId].Spot==trailIndex and nodes[nextId].Zone==site.Zones[trailIndex],"A trail rock grew back elsewhere")
-print("PASS: actual server node population, 8 welcome rocks, the field round the middle first, "..population.." rocks (every spot), trail rocks regrow in place, replenishment and zone isolation")
+-- A rock grows back where it was (an outcrop stays where it is), wherever it is.
+local outcropIndex=site.OutcropSpots[#site.OutcropSpots]
+for id,node in nodes do if node.Spot==outcropIndex then nodes[id]=nil end end
+freeSpots[outcropIndex]=true
+spawnNode(false,outcropIndex)
+assert(nodes[nextId].Spot==outcropIndex and nodes[nextId].Zone==site.Zones[outcropIndex],"An outcrop rock grew back elsewhere")
+print("PASS: actual server node population, 8 welcome rocks, the field round the middle first, "..population.." rocks (every spot), outcrop rocks regrow in place, veins with room to move, replenishment and zone isolation")
 end
 '''
 lighting = (ROOT / "src/client/Modules/Scenes.luau").read_text(encoding="utf-8")

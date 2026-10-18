@@ -1,4 +1,4 @@
-"""The Outpost's frontier: bands, candy trails, Rift Veins, pressure, rifts and their tears (Shared.Frontier, RiftTear, FrontierHud)."""
+"""The Outpost's frontier: bands, outcrops, Rift Veins, pressure, rifts and their tears (Shared.Frontier, RiftTear, FrontierHud)."""
 from pathlib import Path
 import shutil, subprocess
 

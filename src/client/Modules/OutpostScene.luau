@@ -385,7 +385,7 @@ local function labelRock(model: Model)
 	end
 	local size = model:GetAttribute("Size") or "Pebble"
 	local spec = Rules.Sizes[size] or Rules.Sizes.Pebble
-	-- Out along the candy trails: where it grows, and the luck that adds.
+	-- Out in the frontier: where it grows, and the luck that adds.
 	local zone = model:GetAttribute("Zone")
 	local band = zone and Frontier.Bands[zone]
 	local top = if band then 13 else 0

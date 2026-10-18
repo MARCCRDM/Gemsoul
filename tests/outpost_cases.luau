@@ -432,10 +432,10 @@ end)()
 Server.start()
 local site = Server.site()
 check(site and site.Model.Parent == workspaceRoot, "The Outpost wasn't built")
--- Every spot holds a rock: the field round the middle, the candy trails out
--- to the walls and the Rift Vein at each end (Shared.Frontier).
-check(#site.Spots >= 180 and #site.Spots <= Rules.NodeCount, "Not enough room for the rocks: " .. #site.Spots)
-check(#site.TrailSpots >= 100 and #site.VeinSpots >= 20 and #site.Scars == 6, "The candy trails are missing")
+-- Every spot holds a rock: the field round the middle, the outcrops out to
+-- the walls and the three Rift Veins (Shared.Frontier).
+check(#site.Spots >= 170 and #site.Spots <= Rules.NodeCount, "Not enough room for the rocks: " .. #site.Spots)
+check(#site.OutcropSpots >= 90 and #site.Veins == 3 and #site.Scars == 3, "The outcrops or veins are missing")
 -- The Skyport: compact, every spot on a mining ring, each ring with room.
 do
 	local perZone = {}
@@ -476,8 +476,8 @@ for _, node in Server._nodes do
 	check(prompt and prompt:GetAttribute("PromptKind") == "Mine", "A rock without its Mine prompt")
 	break
 end
--- Out along the candy trails the crystals glow in their band's colour (a
--- Rift Vein's rift violet), and each rock says its zone for the client.
+-- Further out the crystals glow in their band's colour (a Rift Vein's
+-- violet), and each rock says its zone for the client.
 do
 	local tints = {}
 	for _, node in Server._nodes do
@@ -496,12 +496,21 @@ do
 		end
 	end
 	check(tints.Fringe and tints.Edge and tints.Vein, "Some band's rocks never grew")
-	-- Each trail's dormant rift, by the walls, facing in.
+	-- Each vein's dormant rift, by the walls, facing in.
 	for _, scar in site.Scars do
 		local offset = scar.Position - Rules.Location.Position
 		check(R.Vector3.new(offset.X, 0, offset.Z).Magnitude > Frontier.Rim - 1, "A rift scar off the walls")
 	end
-	check(site.Model:FindFirstChild("Trails") and #site.Model.Trails:GetChildren() > 150, "No crumbs on the trails")
+	-- Glowing cracks round the outcrops (no crumb roads), and each vein's
+	-- marks with its beam of light.
+	local seams = site.Model:FindFirstChild("Frontier")
+	check(seams and #seams:GetChildren() >= 60 and #seams:GetChildren() <= 160, "No glowing cracks round the outcrops")
+	check(site.Model:FindFirstChild("Trails") == nil, "The old trails are still there")
+	local marks = site.Model:FindFirstChild("Veins")
+	check(marks and #marks:GetChildren() == 3, "The veins have no marks")
+	for _, model in marks:GetChildren() do
+		check(model:FindFirstChild("VeinBeam") ~= nil, "A vein without its beam of light")
+	end
 end
 check(site.Probe:FindFirstChildOfClass("ProximityPrompt") ~= nil, "The Probe has no prompt")
 check(
@@ -805,6 +814,84 @@ do
 	advance(1)
 	check(not handlers.OutpostBonk(ana, critterModel).Ok, "Bonked a dead critter")
 	Server.bonker = nil
+end
+
+-- Rift Veins move: once mined out (a moment after its last rock pops), and
+-- in time anyway (put off while someone's mining it). Fresh rocks at the
+-- new site, away from the other two; its marks and dormant rift move; word
+-- goes round.
+do
+	local veins = Server._veins
+	check(#veins == 3, "The server isn't keeping the veins")
+	local moved = {}
+	Server.onVeinMoved = function(index, scar)
+		table.insert(moved, { index, scar })
+	end
+	local function siteOf(v)
+		return site.VeinSites[veins[v].Site]
+	end
+	local function nodesOn(v)
+		local list = {}
+		for _, spot in veins[v].Spots do
+			for _, node in Server._nodes do
+				if node.Spot == spot then
+					table.insert(list, node)
+				end
+			end
+		end
+		return list
+	end
+	check(#nodesOn(1) == Frontier.Veins.Rocks, "A vein isn't fully grown")
+	-- Mine it out.
+	local before = siteOf(1)
+	profiles[ana].Outpost.Picks.Survey = 500
+	profiles[ana].Gems = {}
+	for _, node in nodesOn(1) do
+		standBy(anaRoot, node)
+		advance(Rules.ClaimSeconds + 1)
+		local last
+		for _ = 1, 60 do
+			advance(0.4)
+			last = handlers.OutpostHit(ana, node.Id)
+			if last.Loot then
+				break
+			end
+		end
+	end
+	check(#nodesOn(1) == 0, "Couldn't mine the vein out (or its rocks grew back in place)")
+	advance(5)
+	check(#moved == 1 and moved[1][1] == 1, "A mined-out vein didn't move")
+	local after = siteOf(1)
+	check(after ~= before, "It surfaced where it was")
+	check(#nodesOn(1) == Frontier.Veins.Rocks, "The moved vein has no fresh rocks")
+	for k, spot in veins[1].Spots do
+		check((site.Spots[spot].Position - after.Rocks[k].Position).Magnitude < 1e-3, "A vein rock off its new site")
+	end
+	for v = 2, 3 do
+		check(Frontier.apart(after.Angle, siteOf(v).Angle) >= Frontier.Veins.Apart, "It surfaced beside another vein")
+	end
+	check((moved[1][2].Position - after.Scar.Position).Magnitude < 1e-3, "Its dormant rift didn't move with it")
+	local news = workspaceRoot:GetAttribute("VeinNews") or ""
+	check(string.find(news, Frontier.compass(after.Angle), 1, true), "No word of where it went")
+	-- Nothing grows back on top of the new rocks.
+	local count = #nodesOn(1)
+	advance(400)
+	check(#nodesOn(1) == count, "A rock grew back on top of the moved vein")
+	-- In time, anyway, but not while someone's mining it.
+	local node2 = nodesOn(2)[1]
+	standBy(anaRoot, node2)
+	advance(Rules.ClaimSeconds + 1)
+	handlers.OutpostHit(ana, node2.Id)
+	local site2 = veins[2].Site
+	veins[2].Due = now
+	Server._veinTick(now)
+	check(veins[2].Site == site2 and veins[2].Due > now, "A vein moved from under its miner")
+	advance(Rules.ClaimSeconds + 1)
+	veins[2].Due = now
+	Server._veinTick(now)
+	check(veins[2].Site ~= site2 and #moved == 2 and moved[2][1] == 2, "A vein never moved in time")
+	check(veins[2].Due - now >= Frontier.Veins.Every - Frontier.Veins.Wobble - 1, "Its next move isn't ten minutes off")
+	profiles[ana].Gems = {}
 end
 
 -- A full gem pouch: no swinging (the rock would pay a gem with nowhere to

@@ -35,6 +35,7 @@
 	  FrontierServer.swing(player, swings)   a swing out there (OutpostServer)
 	  FrontierServer.open(at, facing, opts?) -> anchor, timeline   a rift on the ground at `at`
 	  FrontierServer.scar(at) -> anchor   a dormant rift (a vein's)
+	  FrontierServer.moveScar(index, at)  vein `index`'s dormant rift moves with it
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -63,6 +64,7 @@ local pending: { [Player]: number } = {}
 local wanders = {}
 local groupOf = setmetatable({}, { __mode = "k" }) -- [enemy] = its wandering rift
 local playersOut = 0 -- those out past the core, last step (for a fair share)
+local scars: { [number]: BasePart } = {} -- each vein's dormant rift
 local nextWander = 0
 
 local function serverNow(): number
@@ -454,6 +456,14 @@ local function step(dt: number)
 	end
 end
 
+-- Vein `index`'s dormant rift, now at `at` (it surfaced somewhere new).
+function FrontierServer.moveScar(index: number, at: CFrame)
+	if scars[index] then
+		scars[index]:Destroy()
+	end
+	scars[index] = FrontierServer.scar(at)
+end
+
 -- A dormant rift at `at` (a vein's scar, facing in): returns its anchor.
 function FrontierServer.scar(at: CFrame): BasePart
 	nextSeed += 1
@@ -476,8 +486,8 @@ function FrontierServer.start(site)
 	folder.Name = "Rifts"
 	folder.Parent = workspace
 	-- The dormant rift at each vein: it stays, quietly churning.
-	for _, scar in (site and site.Scars) or {} do
-		FrontierServer.scar(scar)
+	for index, scar in (site and site.Scars) or {} do
+		scars[index] = FrontierServer.scar(scar)
 	end
 	-- A critter slipping back goes through a rift of its own.
 	KaijuWilds.rift = function(at: Vector3, facing: Vector3)
