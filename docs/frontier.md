@@ -191,7 +191,8 @@ What one pays:
 
 ### What you do about them
 
-- **Let your kaiju handle them**: it fights them on its own.
+- **Let your kaiju handle them**: it fights them on its own, and they go
+  for it rather than you while it's within 30 studs of them.
 - **Bonk them** with your pick: the mine button (or a click) hits a critter
   within 6 studs before any rock. Each bonk takes 12% of its health and
   knocks it back 10 studs, every 0.6 seconds, and costs no swings. A miner
@@ -254,7 +255,7 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 | `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
-| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, the noise ring, arrows to rifts off screen, the Rift Charged tag |
+| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, the noise ring, arrows to rifts off screen and to the nearest wild kaiju (`nearest`), the Rift Charged tag |
 | `OutpostScene` (client) | The band and luck on a rock's label; the mine button bonks a critter close by |
 
 Tests: `tests/run_frontier.py` checks the rules (bands and zones, the luck
@@ -264,7 +265,8 @@ lone rocks and the stepping stones out of the core; the rich ground), the
 vein sites and their rocks, picking a vein's next site, the compass, the
 guarded vein's luck and its guardian's numbers, mining noise, fair
 shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
-lopsided, the pieces each tear is drawn from, the banners, the noise ring
+lopsided, the pieces each tear is drawn from, the banners, the noise ring,
+the nearest wild kaiju for its arrow
 and the arrows). `tests/run_kaiju.py` runs the server side: who rifts open
 round, swings drawing them, the warning, the caps, edge levels, a pilot's
 strikes, a critter hopping out at its prey (a miner too), giving up and

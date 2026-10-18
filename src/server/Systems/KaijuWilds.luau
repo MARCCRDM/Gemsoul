@@ -13,7 +13,9 @@
 	              challenge it ("KaijuChallenge", its Challenge prompt) and
 	              your kaiju goes in, or hit it while hunting (the combat
 	              kit out: SparServer). It fights those who started on it
-	              and their kaiju, and forgets them once home. It fights as the Arena's duellist does
+	              and their kaiju (its packmate close by joins in:
+	              Kaiju.Wild.Defend), and forgets them once home. It walks
+	              only where the way is clear (clearPath). It fights as the Arena's duellist does
 	              (KaijuFighter: combos, telegraphed heavies, guard and
 	              parry, hops, their Gemsoul's E), and walk home to heal if
 	              led past their leash. Every blow on one lands anywhere from
@@ -40,7 +42,8 @@
 	              shrunk), each through a rift of its own round a player out
 	              past the core (FrontierServer: Shared.Frontier). One hops
 	              out at whoever drew it (a miner too, or a mech's pilot:
-	              KaijuWilds.prey) and goes for them, then their kaiju; with
+	              KaijuWilds.prey), but a kaiju out close by draws it first
+	              (Kaiju.Bug.Draw: the prey's own before any other); with
 	              nobody to fight for a moment (Frontier.Leave), or after its
 	              life (Frontier.Life), it slips back through a rift. One out
 	              of a wandering rift (opts.Wander) roams round it instead,
@@ -297,6 +300,15 @@ end
 local function engage(wild: Wild, player: Player?, now: number)
 	if player and not wild.Bug then
 		wild.Engaged[player] = now
+		-- Its packmate close by comes to its defence (Kaiju.Wild.Defend).
+		for _, mate in if wild.Pack then wild.Pack.Members else {} do
+			local close = mate ~= wild
+				and mate.Enemy.Alive
+				and flat(mate.Enemy.Root.Position - wild.Enemy.Root.Position).Magnitude <= Kaiju.Wild.Defend
+			if close then
+				mate.Engaged[player] = now
+			end
+		end
 	end
 end
 local function engaged(wild: Wild, player: Player?): boolean
@@ -364,6 +376,25 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 			return false
 		end
 		return (victim.Root.Position - enemy.Home).Magnitude <= leash
+	end
+	-- A rift's critter goes for a kaiju out close by before any player (your
+	-- kaiju draws them off you: Kaiju.Bug.Draw), its prey's own first; and
+	-- the kaiju goes for it (KaijuServer: one after it or its owner).
+	if rifted then
+		local best, bestScore = nil, math.huge
+		for _, pet in KaijuServer.pets() do
+			local distance = (pet.Root.Position - enemy.Root.Position).Magnitude
+			if distance <= Kaiju.Bug.Draw then
+				local victim = { Root = pet.Root, Pet = pet }
+				local score = distance - (if pet.Owner == wild.Prey then 100 else 0)
+				if score < bestScore and valid(victim) then
+					best, bestScore = victim, score
+				end
+			end
+		end
+		if best then
+			return best
+		end
 	end
 	-- (Out of a wandering rift: its own player only once they come near.)
 	if rifted and wild.Prey and wild.Prey.Parent then
@@ -476,7 +507,34 @@ local function startPlan(wild: Wild, mood: string, seconds: number, now: number,
 	return wild.Plan
 end
 
--- Somewhere to amble to: round its den (a packmate keeps near its leader).
+-- Nothing solid in the way from `from` to `to`, about its knee height (a
+-- mast, a container, a rock: Roblox's Spherecast; with none to ask, clear).
+local function clearPath(wild: Wild, from: Vector3, to: Vector3): boolean
+	local ok, hit = pcall(function()
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local skip = { wild.Enemy.Model }
+		for _, name in { "Enemies", "Kaiju", "Rifts" } do
+			local folder = workspace:FindFirstChild(name)
+			if folder then
+				table.insert(skip, folder)
+			end
+		end
+		for _, player in Players:GetPlayers() do
+			if player.Character then
+				table.insert(skip, player.Character)
+			end
+		end
+		params.FilterDescendantsInstances = skip
+		local lift = Vector3.new(0, 1.5, 0)
+		local way = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+		return workspace:Spherecast(from + lift, 1.5, way, params)
+	end)
+	return not ok or hit == nil or not hit.Instance.CanCollide
+end
+
+-- Somewhere to amble to: round its den (a packmate keeps near its leader),
+-- with a clear way there.
 local function walkTarget(wild: Wild, range: number): Vector3?
 	local enemy = wild.Enemy
 	local pack = wild.Pack
@@ -489,7 +547,8 @@ local function walkTarget(wild: Wild, range: number): Vector3?
 		local a = rng:NextNumber(0, math.pi * 2)
 		local r = math.sqrt(rng:NextNumber()) * reach
 		local p = Vector3.new(around.X + math.cos(a) * r, enemy.Home.Y, around.Z + math.sin(a) * r)
-		if flat(p - enemy.Home).Magnitude <= range + 4 and roomy(p, wild.Guard) then
+		local fits = flat(p - enemy.Home).Magnitude <= range + 4 and roomy(p, wild.Guard)
+		if fits and clearPath(wild, enemy.Root.Position, p) then
 			return p
 		end
 	end

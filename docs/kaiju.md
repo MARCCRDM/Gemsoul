@@ -157,9 +157,15 @@ They go about their day:
   it was going, so a pack wanders about 150 studs across the quarry in ten
   minutes and you'll meet it somewhere new.
 - Come within 22 studs and it stops to look you over, turning to face you.
-  Now and then (at most every 25 seconds) it roars at you. Either way it
-  leaves you be.
-- It doesn't wander into the core.
+  Now and then (at most every 25 seconds) it roars at you, each kind in its
+  own voice: a deep bellow, a raspy snarl, a rumble under a hiss. Either way
+  it leaves you be.
+- It doesn't wander into the core, and it only sets off where the way is
+  clear (nothing solid in a line to where it's going), so it doesn't push
+  against masts or containers.
+- One within 220 studs but off your screen gets an arrow at the screen's
+  edge, with how far it is (the guardian's in red), so you can go and find
+  them.
 
 Your own kaiju does the same, in a small way. Stand still for 3 seconds and
 it potters round you (within 6 studs): sniffs, looks about, lies down. It's
@@ -172,8 +178,9 @@ it. There are two ways:
   out or while you hunt. Your kaiju goes in.
 - **Hit it** while you hunt.
 
-Then it fights everyone who started on it, and their kaiju. It doesn't go
-for anyone else near. It fights as above (its E too), and only hits you
+Then it fights everyone who started on it, and their kaiju. **Its packmate
+joins in** if it's within 40 studs: start on one of a pair and you'll often
+face both. It doesn't go for anyone else near. It fights as above (its E too), and only hits you
 while you hunt. Lead it more than 70 studs from its den and it walks back to
 heal. Once it has been back 8 seconds with nobody fighting it, it forgets who
 started on it, and goes about its day again.
@@ -250,6 +257,11 @@ They're built light (no armour, nothing too small to see at their size),
 since a dozen can be about at once. Let your kaiju fight them, bonk them
 with your pick, hunt them, or run back to the core, where they give up and
 slip back through rifts of their own.
+
+**A critter goes for a kaiju before a player.** If a kaiju is out within 30
+studs of it, it goes for that kaiju, your own before anyone else's, and your
+kaiju goes for it. So your kaiju draws the critters off you while you mine.
+Recall it and they come back for you.
 
 Their level comes from where they came through: 1 to 4 in the Fringe, 9 to
 13 at the Edge (tougher again: a quarter more health, a fifth more damage).
@@ -336,7 +348,12 @@ simulated minutes in which each one walks and stops to sniff, look, rest or
 roar, keeps to its range and out of the core and keep-out zones, keeps near
 its packmate, while the dens move on; the guardian paces and naps; stopping
 to look at someone close and leaving them be; your kaiju pottering round you
-and following when you move. The Outpost for fifteen minutes: a miner at
+and following when you move. A packmate close by joining in when you
+start on its mate (not one far off), and a wild kaiju never walking into a
+wall. A critter going for your kaiju rather than you, your kaiju going for
+it, the bites landing on the kaiju; recall it and the critter comes back to
+you, and another miner's critter is drawn by your kaiju too. The Outpost for
+fifteen minutes: a miner at
 the Edge drawing critters while the wild kaiju roam and their lifetimes run
 out; no brain errors, the critters within their caps, never a moment
 without wild kaiju (the old fixed lifetimes left the quarry empty for 90

@@ -17,12 +17,17 @@
 	               wandering rift (RiftCharged: gems come luckier).
 	  vein news    a banner when a Rift Vein surfaces somewhere new
 	               (workspace's VeinNews, VeinNewsAt), saying which way.
+	  sightings    the nearest wild kaiju within Sighting studs, off
+	               screen, gets an arrow at the screen's edge with how far
+	               it is (the vein guardian's in red), so you can find them.
 
 	  FrontierHud.start()
 	  FrontierHud.Lines[band] -> title, subtitle   (pure, for tests)
 	  FrontierHud.lit(noise) -> dots lit (0..20)   (pure)
 	  FrontierHud.edge(size, point, margin) -> Vector2, angle   where an
 	      arrow sits for a point off screen (pure)
+	  FrontierHud.nearest(spots, from, reach) -> index?, studs   the nearest
+	      of `spots` (Vector3s) within `reach` across the ground (pure)
 ]]
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -46,6 +51,8 @@ local RED = Color3.fromRGB(255, 80, 90)
 local DIM = Color3.fromRGB(60, 52, 76)
 
 local shown: { [string]: number } = {}
+FrontierHud.Sighting = 220 -- studs: how far off a wild kaiju gets an arrow
+local WILD = Color3.fromRGB(255, 176, 70)
 
 -- Dots lit for `noise` (0..1).
 function FrontierHud.lit(noise: number?): number
@@ -64,6 +71,18 @@ function FrontierHud.edge(size: Vector2, point: Vector2, margin: number): (Vecto
 	local halfW, halfH = math.max(1, middle.X - margin), math.max(1, middle.Y - margin)
 	local scale = math.min(halfW / math.max(math.abs(d.X), 1e-3), halfH / math.max(math.abs(d.Y), 1e-3))
 	return middle + d * scale, math.atan2(d.Y, d.X)
+end
+
+-- The nearest of `spots` within `reach` of `from`, across the ground.
+function FrontierHud.nearest(spots: { Vector3 }, from: Vector3, reach: number): (number?, number)
+	local best, bestDistance = nil, reach
+	for i, spot in spots do
+		local distance = Vector2.new(spot.X - from.X, spot.Z - from.Z).Magnitude
+		if distance <= bestDistance then
+			best, bestDistance = i, distance
+		end
+	end
+	return best, bestDistance
 end
 
 local function banner(player: Player, gui: ScreenGui)
@@ -312,6 +331,88 @@ local function arrows(player: Player, gui: ScreenGui)
 	end)
 end
 
+-- An arrow at the screen's edge toward the nearest wild kaiju off screen
+-- (within Sighting studs, in the Outpost, not in a fight), with how far.
+local function sightings(player: Player, gui: ScreenGui)
+	local holder = Instance.new("Frame")
+	holder.AnchorPoint = Vector2.new(0.5, 0.5)
+	holder.Size = UDim2.fromOffset(70, 46)
+	holder.BackgroundTransparency = 1
+	holder.Visible = false
+	holder.Parent = gui
+	local arrow = Instance.new("TextLabel")
+	arrow.AnchorPoint = Vector2.new(0.5, 0.5)
+	arrow.Position = UDim2.fromScale(0.5, 0.32)
+	arrow.Size = UDim2.fromOffset(26, 26)
+	arrow.BackgroundTransparency = 1
+	arrow.Font = Enum.Font.GothamBlack
+	arrow.TextSize = 22
+	arrow.Text = "➤"
+	arrow.TextStrokeTransparency = 0.3
+	arrow.Parent = holder
+	local label = Instance.new("TextLabel")
+	label.AnchorPoint = Vector2.new(0.5, 0)
+	label.Position = UDim2.fromScale(0.5, 0.62)
+	label.Size = UDim2.fromOffset(90, 14)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 11
+	label.TextStrokeTransparency = 0.35
+	label.Parent = holder
+	local target: BasePart? = nil
+	local guard = false
+	local scanIn = 0
+	RunService.RenderStepped:Connect(function(dt)
+		scanIn -= dt
+		local character = player.Character
+		local me = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local busy = player:GetAttribute("Outpost") ~= true or player:GetAttribute("CombatSession") ~= nil
+		if scanIn <= 0 then
+			scanIn = 0.25
+			target = nil
+			local enemies = workspace:FindFirstChild("Enemies")
+			if me and not busy and enemies then
+				local spots, parts = {}, {}
+				for _, model in enemies:GetChildren() do
+					local root = model:GetAttribute("KaijuWild") and (model :: Model).PrimaryPart
+					if root then
+						table.insert(spots, root.Position)
+						table.insert(parts, root)
+					end
+				end
+				local index = FrontierHud.nearest(spots, me.Position, FrontierHud.Sighting)
+				target = if index then parts[index] else nil
+				guard = target ~= nil and (target.Parent :: Instance):GetAttribute("KaijuGuardian") == true
+			end
+		end
+		local camera = workspace.CurrentCamera
+		if not target or not target.Parent or not me or busy or not camera then
+			holder.Visible = false
+			return
+		end
+		local point, onScreen = camera:WorldToViewportPoint(target.Position)
+		local inset = GuiService:GetGuiInset()
+		local size = camera.ViewportSize - Vector2.new(0, inset.Y)
+		local y = point.Y - inset.Y
+		local inside = onScreen and point.X >= 0 and y >= 0 and point.X <= size.X and y <= size.Y
+		holder.Visible = not inside
+		if inside then
+			return
+		end
+		local flat = Vector2.new(point.X, y)
+		if point.Z < 0 then
+			flat = size - flat -- (behind the camera: mirrored)
+		end
+		local at, angle = FrontierHud.edge(size, flat, 64)
+		holder.Position = UDim2.fromOffset(at.X, at.Y)
+		arrow.Rotation = math.deg(angle)
+		local color = if guard then Frontier.Bands.Guarded.Color else WILD
+		arrow.TextColor3, label.TextColor3 = color, color
+		local studs = Vector2.new(target.Position.X - me.Position.X, target.Position.Z - me.Position.Z).Magnitude
+		label.Text = string.format("%s %d", if guard then "GUARDIAN" else "KAIJU", math.floor(studs + 0.5))
+	end)
+end
+
 function FrontierHud.start()
 	local player = Players.LocalPlayer
 	local gui = Instance.new("ScreenGui")
@@ -322,6 +423,7 @@ function FrontierHud.start()
 	banner(player, gui)
 	noiseRing(player, gui)
 	arrows(player, gui)
+	sightings(player, gui)
 end
 
 return FrontierHud

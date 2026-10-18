@@ -476,6 +476,12 @@ at, angle = FrontierHud.edge(screen, Vector2.new(500, -900), 40)
 check(math.abs(at.Y - 40) < 0.01 and math.abs(angle + math.pi / 2) < 1e-6, "An arrow above")
 at = FrontierHud.edge(screen, Vector2.new(-5000, 5000), 40)
 check(at.X >= 39.9 and at.X <= 960.1 and at.Y >= 39.9 and at.Y <= 560.1, "An arrow off the screen")
+-- The wild kaiju sighting: the nearest within reach, across the ground.
+local spots = { Vector3.new(100, 0, 0), Vector3.new(0, 50, 40), Vector3.new(-300, 0, 0) }
+local index, studs = FrontierHud.nearest(spots, Vector3.zero, FrontierHud.Sighting)
+check(index == 2 and math.abs(studs - 40) < 1e-6, "The sighting isn't the nearest wild kaiju")
+check(FrontierHud.nearest(spots, Vector3.new(-1000, 0, 0), FrontierHud.Sighting) == nil, "A sighting past its reach")
+check(FrontierHud.nearest({}, Vector3.zero, 100) == nil, "A sighting with none about")
 
 print(
 	string.format(

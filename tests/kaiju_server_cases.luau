@@ -1915,6 +1915,112 @@ local function riftsOnOpenGround()
 end
 riftsOnOpenGround()
 
+-- Start on one of a pack and its packmate close by joins in (one far off
+-- doesn't); and a wild one only sets off where the way is clear.
+local function packsAndPaths()
+	local pack
+	for _, candidate in KaijuWilds._packs do
+		if #candidate.Members == 2 then
+			pack = candidate
+			break
+		end
+	end
+	check(pack ~= nil, "No pair to test")
+	local first, second = pack.Members[1], pack.Members[2]
+	table.clear(first.Engaged)
+	table.clear(second.Engaged)
+	first.Enemy.Root.CFrame = CFrame.new(pack.Den)
+	second.Enemy.Root.CFrame = CFrame.new(pack.Den + Vector3.new(Kaiju.Wild.Defend - 10, 0, 0))
+	rootA.CFrame = CFrame.new(first.Enemy.Root.Position + Vector3.new(3, 0, 0))
+	pet.Root.CFrame = CFrame.new(first.Enemy.Root.Position + Vector3.new(2.5, 0, 0))
+	pet.RecallUntil = 0
+	check(registered.KaijuChallenge(a, first.Enemy.Model).Ok, "Couldn't challenge one of a pair")
+	check(first.Engaged[a] and second.Engaged[a], "Its packmate close by didn't join in")
+	table.clear(first.Engaged)
+	table.clear(second.Engaged)
+	second.Enemy.Root.CFrame = CFrame.new(pack.Den + Vector3.new(Kaiju.Wild.Defend + 10, 0, 0))
+	registered.KaijuChallenge(a, first.Enemy.Model)
+	check(first.Engaged[a] and not second.Engaged[a], "A packmate far off joined in")
+	table.clear(first.Engaged)
+	pet.Root.CFrame = CFrame.new(center + Vector3.new(0, 0, 4))
+	rootA.CFrame = CFrame.new(center)
+	-- (Something solid everywhere east of it: it only ever sets off west.)
+	local we = first.Enemy
+	we.Root.CFrame = CFrame.new(pack.Den)
+	local spherecast = workspaceObject.Spherecast
+	workspaceObject.Spherecast = function(_, _from, _radius, direction)
+		if direction.X > 0 then
+			return { Instance = { CanCollide = true }, Position = we.Root.Position }
+		end
+		return nil
+	end
+	local walks, east = 0, 0
+	for _ = 1, 400 do
+		now += 0.15
+		first.Plan = nil
+		KaijuWilds._wander(we, first, now)
+		if first.Plan and first.Plan.Mood == "Walk" then
+			walks += 1
+			if first.Plan.To.X > we.Root.Position.X + 0.01 then
+				east += 1
+			end
+		end
+	end
+	workspaceObject.Spherecast = spherecast
+	check(walks >= 20, "Hardly ever set off: " .. walks)
+	check(east == 0, "It set off into something solid " .. east .. " times")
+end
+packsAndPaths()
+
+-- A critter goes for your kaiju before you, and your kaiju for it: they
+-- take each other on. Recalled, it comes back for you.
+local function crittersAndKaiju()
+	clearCritters()
+	pet = KaijuServer.pets()[a]
+	pet.RecallUntil, pet.StunUntil, pet.Plan, pet.IdleSpot = 0, 0, nil, nil
+	local spot = center + Vector3.new(-320, 5, 0)
+	rootA.CFrame = CFrame.new(spot)
+	pet.Root.CFrame = CFrame.new(spot + Vector3.new(3, 0, 4))
+	stand(center + Vector3.new(320, 5, 0)) -- (b far away)
+	local critter = KaijuWilds.spawnBug(spot + Vector3.new(14, 0, 0), { Prey = a, Band = "Edge", Level = 9 })
+	check(critter ~= nil, "No critter came")
+	critter.LastAttack = 0
+	KaijuWilds._brain(critter, now)
+	check(critter.Foe == pet, "The critter went for its player, not the kaiju beside them")
+	pet.Target = nil
+	KaijuServer._think(pet, now, 0.15)
+	check(pet.Target == critter, "Your kaiju didn't go for the critter after it")
+	-- (They trade blows: the critter's land on the kaiju, not on you.)
+	table.clear(playerHits)
+	local healthBefore = pet.Humanoid.Health
+	critter.Root.CFrame = CFrame.new(pet.Root.Position + Vector3.new(2, 0, 0))
+	for _ = 1, 20 do
+		now += 0.15
+		critter.FoeVictim = nil
+		KaijuWilds._brain(critter, now)
+	end
+	check(pet.Humanoid.Health < healthBefore, "The critter never bit the kaiju")
+	check(#playerHits == 0, "The critter bit you with your kaiju beside you")
+	-- Recalled, it's out of reach: the critter comes back for you.
+	registered.KaijuRecall(a)
+	critter.FoeVictim = nil
+	KaijuWilds._brain(critter, now)
+	check(critter.Foe == a, "With your kaiju recalled, the critter didn't come for you")
+	-- Someone else's kaiju close by draws it too, but its prey's own comes first.
+	now += Kaiju.RecallSeconds + 1
+	pet.RecallUntil = 0
+	local other = KaijuWilds.spawnBug(spot + Vector3.new(-14, 0, 0), { Prey = b, Band = "Edge", Level = 9 })
+	stand(spot + Vector3.new(-20, 0, 0))
+	other.FoeVictim = nil
+	KaijuWilds._brain(other, now)
+	check(other.Foe == pet, "A kaiju close by didn't draw another's critter")
+	clearCritters()
+	pet.Root.CFrame = CFrame.new(center + Vector3.new(0, 0, 4))
+	rootA.CFrame = CFrame.new(center)
+	pet.Target, pet.Humanoid.Health = nil, pet.Humanoid.MaxHealth
+end
+crittersAndKaiju()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do

@@ -143,6 +143,7 @@ Kaiju.Regen = 0.03 -- share of its health back each second while it isn't fighti
 Kaiju.Wild = {
 	Max = 4, -- roaming at once (and the guarded Rift Vein's guardian: Shared.Frontier.Guardian)
 	Pack = 2, -- of them to a pack, sharing a den out in the frontier
+	Defend = 40, -- studs: start on one and its packmate this close joins in
 	Respawn = 90, -- seconds after one is killed or tamed
 	Return = 20, -- seconds after one burrows away (another comes up elsewhere)
 	Lifetime = 600, -- one nobody fights burrows back after about this long (each its own: 70% to 150%)
@@ -234,6 +235,7 @@ Kaiju.Bug = {
 	DailyCoins = 300,
 	Scale = 0.55,
 	Leash = 120,
+	Draw = 30, -- studs: a kaiju out this close draws a critter onto itself (its prey's first)
 }
 
 -- Feeding: a stone's EXP by its rarity, in full until the kaiju passes

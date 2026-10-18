@@ -8,10 +8,11 @@
 -- blows, guard, hops and staggers (CreatureMotion.fight, from KaijuFighter's
 -- attributes), eased so a combo's next blow flows on from the last; out of a
 -- fight, a wild one's mood (sniffing, looking about, resting, asleep, a roar:
--- KaijuWilds' KaijuMood).
+-- KaijuWilds' KaijuMood), its roar heard in its kind's voice (CombatSound).
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Motion = require(ReplicatedStorage.Shared.CreatureMotion)
+local CombatSound = require(script.Parent.Modules.CombatSound)
 -- Studs from the camera a creature's joints are animated out to: kaiju
 -- further, moon bugs only near (there can be a dozen of them, and a far
 -- one's legs aren't worth the frame).
@@ -95,6 +96,14 @@ RunService.PreSimulation:Connect(function(dt)
 		rig.Phase = (rig.Phase + speed * step * math.pi * 2 / (3.5 * scale)) % (math.pi * 2)
 		local at = model:GetAttribute("ActionAt")
 		local pose
+		-- A roar is heard, once, in its kind's voice.
+		local moodAt = model:GetAttribute("KaijuMoodAt")
+		if rig.Species and moodAt ~= rig.MoodAt then
+			rig.MoodAt = moodAt
+			if model:GetAttribute("KaijuMood") == "Roar" then
+				CombatSound.play("Roar" .. rig.Species, rig.Root.Position)
+			end
+		end
 		if rig.Species then
 			pose = Motion.fight(rig.Species, {
 				Kind = model:GetAttribute("ActionKind"),

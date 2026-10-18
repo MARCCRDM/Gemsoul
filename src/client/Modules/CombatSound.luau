@@ -77,6 +77,10 @@ CombatSound.Ids = {
 	Death = 0, -- death.mp3
 	Warn = 0, -- warn.mp3
 	Kill = 0, -- kill.mp3
+	-- A wild kaiju's roar, by its kind (tools/make_kaiju_sounds.py).
+	RoarBulwark = 0, -- roar_bulwark.mp3
+	RoarRazorback = 0, -- roar_razorback.mp3
+	RoarCarapace = 0, -- roar_carapace.mp3
 }
 
 -- 0 mutes combat, 1 is full.
@@ -101,6 +105,9 @@ local LEVEL = {
 	Winded = 0.7,
 	Combo = 0.55,
 	Warn = 0.6,
+	RoarBulwark = 0.95,
+	RoarRazorback = 0.9,
+	RoarCarapace = 0.9,
 }
 
 -- Built-in stand-ins until a sound is uploaded: layers of { sound, speed,
@@ -157,6 +164,18 @@ local FALLBACK = {
 	Draw = { { S .. "unsheath.wav", 1, 0.55 }, { S .. "swordslash.wav", 1.4, 0.2, 0.06 } },
 	Sheathe = { { S .. "unsheath.wav", 0.7, 0.4 }, { S .. "action_jump_land.mp3", 1.6, 0.25, 0.08 } },
 	KnockDown = { { S .. "swordlunge.wav", 0.4, 0.55 }, { S .. "action_jump_land.mp3", 0.45, 0.8, 0.12 } },
+	-- A wild kaiju's roar: slowed-down whooshes and thuds, deep for the big one.
+	RoarBulwark = {
+		{ S .. "swordlunge.wav", 0.28, 0.8 },
+		{ S .. "action_jump_land.mp3", 0.35, 0.7 },
+		{ S .. "action_falling.mp3", 0.45, 0.35, 0.05 },
+	},
+	RoarRazorback = { { S .. "swordlunge.wav", 0.55, 0.7 }, { S .. "switch.wav", 0.4, 0.3, 0.04 } },
+	RoarCarapace = {
+		{ S .. "action_falling.mp3", 0.35, 0.5 },
+		{ S .. "swordlunge.wav", 0.3, 0.6 },
+		{ S .. "clickfast.wav", 0.5, 0.25, 0.2 },
+	},
 }
 
 -- Shortest gap between two plays of the same sound, so a flurry doesn't pile up.
