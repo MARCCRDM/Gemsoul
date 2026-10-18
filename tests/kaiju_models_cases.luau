@@ -188,9 +188,30 @@ for species in Motion.Fight do
 	end
 end
 
+-- A wild one's day (KaijuMood): it settles into each over a moment; head
+-- down sniffing, lower resting and lower still asleep, rearing to roar and
+-- settling back; and no mood in a fight.
+local function moodPose(mood: string, since: number, kind: string?)
+	local a = { Mood = mood, MoodAt = 100, Kind = kind, Start = kind and 100, At = kind and 100.3 }
+	return Motion.fight("Razorback", a, 100 + since)
+end
+check(moodPose("Sniff", 2).Pitch < -0.15, "Sniffing doesn't put its head down")
+local resting, sleeping = moodPose("Rest", 2).Lift, moodPose("Sleep", 2).Lift
+check(resting < -0.3 and sleeping < resting, "Resting and sleeping aren't lower")
+check(math.abs(moodPose("Rest", 0.05).Lift) < math.abs(moodPose("Rest", 2).Lift) / 3, "It drops to rest at once")
+check(moodPose("Roar", 0.6).Jaw > 0.6 and moodPose("Roar", 0.6).Pitch > 0.2, "A roar doesn't rear up, jaws wide")
+check(math.abs(moodPose("Roar", 2).Jaw) < 1e-6, "A roar doesn't settle")
+local looks = {}
+for t = 0, 6, 0.5 do
+	table.insert(looks, moodPose("Look", t).Yaw)
+end
+check(math.max(table.unpack(looks)) > 0.2 and math.min(table.unpack(looks)) < -0.2, "Looking about doesn't turn")
+check(moodPose("Sleep", 2, "Light").Lift > -0.2, "Its mood shows in a fight")
+check(math.abs(Motion.fight("Razorback", { Mood = "Nope", MoodAt = 100 }, 102).Lift) < 1e-9, "An unknown mood poses")
+
 print(
 	string.format(
-		"PASS: %d kaiju model checks (3 species x 4 elements, joints, ground, budget, motions, fight poses)",
+		"PASS: %d kaiju model checks (3 species x 4 elements, joints, ground, budget, motions, fight poses, moods)",
 		checks
 	)
 )

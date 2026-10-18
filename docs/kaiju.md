@@ -129,15 +129,41 @@ their finishing blow knocks you down the same way.
 
 ## In the Outpost
 
-Wild kaiju live in the far quarry, at least 140 studs from the landing pad.
-Moon bugs come through rifts round players out past the core.
+Wild kaiju roam the frontier, out past the Outpost's core and at least 140
+studs from the landing pad. Moon bugs come through rifts round players out
+past the core.
 
 ### Wild kaiju
 
-Up to two roam the Outpost at once, within two levels of the strongest
-kaiju near them, with half again the health of a kaiju of yours at their
-level: it takes you and your kaiju together. A third guards a Rift Vein
-(see [The vein guardian](#the-vein-guardian)).
+Up to four roam the Outpost at once, in **packs of two** of a kind (each
+its own element; the two packs are different kinds). They're within two
+levels of the strongest kaiju near them, with half again the health of a
+kaiju of yours at their level: it takes you and your kaiju together. They
+stand about your height (yours come up to your knee). A fifth guards a Rift
+Vein (see [The vein guardian](#the-vein-guardian)). Their names show from
+160 studs off.
+
+They go about their day:
+
+- Each pack has a **den** out in the frontier, clear of the rocks, the
+  buildings, the old workings, the ramps and the vein sites, at least 110
+  studs from the other pack's.
+- Each kaiju wanders round its den (up to 34 studs), ambling at under half
+  its speed, and stops to do things: **sniff** the ground (head down),
+  **look about**, **lie down** for 8 to 16 seconds, or **roar**. Walking
+  takes up about half its time, lying down about a quarter. The second of a
+  pair keeps near the first, and gets up to follow when it wanders off.
+- Every one to two minutes the den moves on 20 to 30 studs, roughly the way
+  it was going, so a pack wanders about 150 studs across the quarry in ten
+  minutes and you'll meet it somewhere new.
+- Come within 22 studs and it stops to look you over, turning to face you.
+  Now and then (at most every 25 seconds) it roars at you. Either way it
+  leaves you be.
+- It doesn't wander into the core.
+
+Your own kaiju does the same, in a small way. Stand still for 3 seconds and
+it potters round you (within 6 studs): sniffs, looks about, lies down. It's
+up and after you as soon as you move on.
 
 A wild kaiju leaves you and your kaiju alone until you start a fight with
 it. There are two ways:
@@ -148,12 +174,15 @@ it. There are two ways:
 
 Then it fights everyone who started on it, and their kaiju. It doesn't go
 for anyone else near. It fights as above (its E too), and only hits you
-while you hunt. Lead it more than 70 studs from home and it walks back to
-heal. Once it has been home 8 seconds with nobody fighting it, it forgets who
-started on it, and it's calm again.
+while you hunt. Lead it more than 70 studs from its den and it walks back to
+heal. Once it has been back 8 seconds with nobody fighting it, it forgets who
+started on it, and goes about its day again.
 
-One nobody fights burrows back after 10 minutes. A new one crawls out 90
-seconds after one goes.
+One nobody fights burrows back after 7 to 15 minutes (each its own time, so
+they don't all go at once and leave the quarry empty, as they used to every
+ten minutes). Another comes up elsewhere 20 seconds after one burrows, 90
+seconds after one is killed or tamed. One that falls through the floor is
+put back at its den.
 
 - **Kill it:** every kaiju that fought it gets 40 + 12 × its level EXP, and
   the player who (with their kaiju) did the most gets its Gemsoul.
@@ -163,11 +192,16 @@ seconds after one goes.
 
 One of the three Rift Veins is guarded (its rocks are red-tinted and
 luckier still, +110%, and its beam is red: see [frontier.md](frontier.md)).
-A wild kaiju of level 16 to 20 sleeps in front of it. It loses narrowly to
-a level-25 kaiju or to two level-10s, and beats a kaiju of its own level.
+A wild kaiju of level 16 to 20 keeps a short beat in front of it, a head
+taller than you. It loses narrowly to a level-25 kaiju or to two level-10s,
+and beats a kaiju of its own level.
 
-- It sleeps through people walking by. The **third swing** at its vein's
-  rocks wakes it (two swings, then nothing for 30 seconds, and the count
+- It paces up and down in front of its vein, sniffs about and naps (about
+  half the time). It looks over anyone who comes close, and roars at them
+  now and then. It doesn't attack them.
+- The first swing at its vein's rocks stirs it (it looks round at you), the
+  second makes it roar, and the **third swing** wakes it (two swings, then
+  nothing for 30 seconds, and the count
   starts again).
 - Awake, it goes for whoever woke it, and anyone else who mines its vein,
   **a plain miner too**, not only hunters. Its finishing blow knocks a
@@ -264,20 +298,20 @@ Proposed guardrails:
 
 | Where | What |
 | --- | --- |
-| `Shared.Kaiju` | The rules: kinds, stats, EXP, feeding, taming, the hit spread, slots, Gemsouls, each E's plan, the roster |
+| `Shared.Kaiju` | The rules: kinds, stats, EXP, feeding, taming, the hit spread, slots, Gemsouls, each E's plan, the roster, sizes (`Scale`), packs and a wild one's day (`Wild`, `Roam`, `mood`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
 | `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
 | `Shared.CreatureMotion` | Their walk (`Stride`), arms (`Arm`), jaw and tail, and every fight pose (`fight`, `apply`) |
 | `Shared.GemTraits` | A Gemsoul's Q and R stay sealed (`traitsOf`) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E; the attributes clients pose it by |
-| `KaijuServer` | Your kaiju: the starter, out and back, following and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
-| `KaijuWilds` | Wild kaiju, the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
+| `KaijuServer` | Your kaiju: the starter, out and back, following (pottering round you when you stand about) and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
+| `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
 | `SparServer` | `Hunt`: the kit out alone |
 | `KaijuHud` (client) | The card, RECALL, HUNT, TAME, a wild kaiju's Challenge and the kaiju panel |
-| `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk and their fight poses |
+| `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk, their fight poses and their moods (`KaijuMood`: `CreatureMotion.Moods`) |
 
 Tests: `tests/run_kaiju.py` checks the rules and how they fight (each
 kind's style, guard, parry, breaks, hops, reads, the brain's choices),
@@ -297,6 +331,16 @@ and the rifts: who they open round, the caps, a bug hopping out at its prey
 health and where it sleeps, waking on the third swing at its own vein
 (not another's), going for a plain miner, everyone mining its vein once
 awake, not burrowing of old age, back to sleep, moving with its vein, and
-its coins, with no new one until the vein moves.
+its coins, with no new one until the vein moves. A wild kaiju's day: ten
+simulated minutes in which each one walks and stops to sniff, look, rest or
+roar, keeps to its range and out of the core and keep-out zones, keeps near
+its packmate, while the dens move on; the guardian paces and naps; stopping
+to look at someone close and leaving them be; your kaiju pottering round you
+and following when you move. The Outpost for fifteen minutes: a miner at
+the Edge drawing critters while the wild kaiju roam and their lifetimes run
+out; no brain errors, the critters within their caps, never a moment
+without wild kaiju (the old fixed lifetimes left the quarry empty for 90
+seconds every ten minutes), and nothing piling up.
+`tests/kaiju_models_cases.luau` checks each mood's pose.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
 card's place on every phone.

@@ -121,8 +121,10 @@ Kaiju.AbilityPlans = {
 	E_Maneater = { Shape = "Blast", Radius = 5, Delay = 0.4, Mult = 1.4, Status = "Stun", Show = "Maneater" },
 }
 
--- How big they stand in the world (KaijuModels are about four studs tall at 1).
-Kaiju.Scale = { Pet = 0.55, Wild = 0.75 }
+-- How big they stand in the world (KaijuModels are about four studs tall at
+-- 1): yours at your knee, a wild one near your height, the vein guardian
+-- over you.
+Kaiju.Scale = { Pet = 0.55, Wild = 0.9, Guardian = 1.2 }
 
 -- Your kaiju beside you: it takes on creatures within Engage studs of you,
 -- runs back past Leash, and is put back beside you past Teleport.
@@ -139,15 +141,68 @@ Kaiju.Regen = 0.03 -- share of its health back each second while it isn't fighti
 
 -- Wild kaiju in the Outpost.
 Kaiju.Wild = {
-	Max = 2, -- roaming at once (and the guarded Rift Vein's guardian: Shared.Frontier.Guardian)
-	Respawn = 90, -- seconds after one is killed, tamed or burrows away
-	Lifetime = 600, -- one nobody fights burrows back after this long
+	Max = 4, -- roaming at once (and the guarded Rift Vein's guardian: Shared.Frontier.Guardian)
+	Pack = 2, -- of them to a pack, sharing a den out in the frontier
+	Respawn = 90, -- seconds after one is killed or tamed
+	Return = 20, -- seconds after one burrows away (another comes up elsewhere)
+	Lifetime = 600, -- one nobody fights burrows back after about this long (each its own: 70% to 150%)
 	Aggro = 26, -- notices fighters this close
 	Leash = 70,
 	LevelSpread = 2, -- within this many levels of the strongest kaiju near it
 	Health = 1.5, -- tougher than a kaiju of yours at its level: it takes two to bring down
 	FarFromSpawn = 140, -- studs: they roam the quarry, not the landing pad
 }
+
+-- A wild kaiju's day, when nobody's fighting it: it wanders round its
+-- pack's den (Range studs), stopping to sniff the ground, look about, lie
+-- down or roar now and then (Moods: how likely each is next, Times: how
+-- long, in seconds), ambling at Amble of its speed. Every Every seconds the
+-- den moves on Drift studs, so a pack wanders the quarry over time. Someone
+-- coming within Notice studs makes it stop and look at them (a roar at most
+-- every Growl seconds). The guardian keeps to a short beat in front of its
+-- vein, napping now and then (Guard).
+Kaiju.Roam = {
+	Range = 34,
+	Amble = 0.45,
+	Drift = { 20, 30 },
+	Every = { 60, 120 },
+	Notice = 22,
+	Growl = 25,
+	Moods = { Walk = 45, Sniff = 20, Look = 15, Rest = 12, Roar = 8 },
+	Times = { Walk = { 6, 12 }, Sniff = { 2.5, 5 }, Look = { 2, 4 }, Rest = { 8, 16 }, Roar = { 1.6, 1.6 } },
+	-- Your kaiju, with you standing about After seconds: it potters round
+	-- you (Range studs), and is up and after you as soon as you move on.
+	Pet = {
+		After = 3,
+		Range = 6,
+		Moods = { Walk = 30, Sniff = 25, Look = 25, Rest = 20 },
+		Times = { Walk = { 3, 6 }, Sniff = { 2.5, 5 }, Look = { 2, 4 }, Rest = { 6, 14 } },
+	},
+	Guard = {
+		Range = 16,
+		Moods = { Walk = 45, Look = 20, Sniff = 10, Sleep = 25 },
+		Times = { Walk = { 5, 9 }, Look = { 2, 4 }, Sniff = { 2.5, 5 }, Sleep = { 8, 16 } },
+	},
+}
+
+-- The next mood from `moods` (weights by name) for `roll` (0..1): names in
+-- order, so the same roll always gives the same mood.
+function Kaiju.mood(moods: { [string]: number }, roll: number): string
+	local names, total = {}, 0
+	for name, weight in moods do
+		table.insert(names, name)
+		total += weight
+	end
+	table.sort(names)
+	local at = math.clamp(roll, 0, 0.999999) * total
+	for _, name in names do
+		at -= moods[name]
+		if at < 0 then
+			return name
+		end
+	end
+	return names[#names]
+end
 -- Taming. Below TameFrom of its health you can try; the chance climbs as it
 -- weakens (points between are a straight line). TameTries failed tries and it
 -- burrows away. Each try is a TameCooldown apart.

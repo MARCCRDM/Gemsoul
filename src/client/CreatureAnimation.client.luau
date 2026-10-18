@@ -6,7 +6,9 @@
 -- Kaiju (wild ones in workspace.Enemies, yours in workspace.Kaiju) walk the
 -- same way, and fight with their whole body: each kind's wind-ups and
 -- blows, guard, hops and staggers (CreatureMotion.fight, from KaijuFighter's
--- attributes), eased so a combo's next blow flows on from the last.
+-- attributes), eased so a combo's next blow flows on from the last; out of a
+-- fight, a wild one's mood (sniffing, looking about, resting, asleep, a roar:
+-- KaijuWilds' KaijuMood).
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Motion = require(ReplicatedStorage.Shared.CreatureMotion)
@@ -103,8 +105,12 @@ RunService.PreSimulation:Connect(function(dt)
 				BlockedAt = model:GetAttribute("BlockedAt"),
 				HurtAt = model:GetAttribute("HurtAt"),
 				HurtSide = model:GetAttribute("HurtSide"),
+				Mood = model:GetAttribute("KaijuMood"),
+				MoodAt = model:GetAttribute("KaijuMoodAt"),
 			}, now)
-			rig.Pose = Motion.blend(rig.Pose, pose, 1 - math.exp(-24 * step))
+			-- (A fight's blows snap in; getting up from a nap takes a moment.)
+			local rate = if model:GetAttribute("ActionKind") then 24 else 6
+			rig.Pose = Motion.blend(rig.Pose, pose, 1 - math.exp(-rate * step))
 			pose = rig.Pose
 		end
 		for i = #rig.Joints, 1, -1 do

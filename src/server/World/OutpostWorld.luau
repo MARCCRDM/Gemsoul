@@ -20,6 +20,8 @@
 	      Shared.Outpost zone), Scars ({ CFrame }: each vein's dormant rift,
 	      facing in),
 	      Parking ({ Kind, CFrame }: the Motor Pool bays for the machines),
+	      KeepOut ({ { Vector3, studs } }: the buildings, workings, ramps and
+	      vein sites, for wild kaiju to keep clear of),
 	      Secrets (empty: retired Easter eggs stay disabled) }
 	  OutpostWorld.rock(size, cframe, rng, tint?) -> Model   one rock of that size
 	      (Shared.Outpost.Sizes), its main chunk named "Body"; `tint` colours
@@ -1892,6 +1894,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		FieldSpots = {},
 		Parking = parking,
 		Secrets = hidden,
+		KeepOut = keepOut,
 	}
 end
 

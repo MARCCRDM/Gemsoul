@@ -649,9 +649,11 @@ local b, rootB = makePlayer(2, outpost + Vector3.new(500, 0, 0))
 profiles[a] = { Gems = {}, Coins = 0, Milestones = {} }
 profiles[b] = { Gems = {}, Coins = 0, Milestones = {} }
 KaijuServer.start()
+local keepOut = { { outpost + Vector3.new(-260, 0, 0), 60 } } -- (a building out there)
 KaijuWilds.start({
 	Spawn = CFrame.new(outpost),
 	Spots = { CFrame.new(outpost + Vector3.new(0, 0, -300)), CFrame.new(outpost + Vector3.new(300, 0, 0)) },
+	KeepOut = keepOut,
 })
 local kaijuFolder = workspaceObject:FindFirstChild("Kaiju")
 check(kaijuFolder ~= nil, "No Kaiju folder")
@@ -765,7 +767,6 @@ check(not registered.KaijuActive(a, starter.Id).Ok, "Switched again at once")
 
 -- Wild kaiju --------------------------------------------------------------------------------------------------
 
-check(#KaijuWilds._spots == 2, "Wild spots near the landing pad were used")
 flush()
 -- (Spawning waits a moment after start.)
 for _, entry in delayed do
@@ -781,6 +782,29 @@ for enemy, wild in KaijuWilds._wilds do
 	end
 end
 check(#wilds == Kaiju.Wild.Max, "Not " .. Kaiju.Wild.Max .. " wild kaiju: " .. #wilds)
+-- In packs of up to two of a kind, each round a den out in the frontier:
+-- clear of the rocks, away from the landing pad and the other dens.
+local packs = KaijuWilds._packs
+check(#packs == math.ceil(Kaiju.Wild.Max / Kaiju.Wild.Pack), "Not packs of two: " .. #packs)
+local FrontierRules = shared("Frontier")
+for i, pack in packs do
+	check(#pack.Members >= 1 and #pack.Members <= Kaiju.Wild.Pack, "A pack of " .. #pack.Members)
+	local out = FrontierRules.distance(pack.Den, outpost)
+	check(out >= FrontierRules.Core + 10 and out <= FrontierRules.Rim - 10, "A den out of the frontier: " .. out)
+	for _, spotAt in { outpost + Vector3.new(0, 0, -300), outpost + Vector3.new(300, 0, 0) } do
+		check((pack.Den - spotAt).Magnitude >= 7, "A den on a rock")
+	end
+	for j, other in packs do
+		if j ~= i then
+			check((other.Den - pack.Den).Magnitude >= 110, "Two dens side by side")
+			check(other.Species ~= pack.Species, "Two packs of one kind")
+		end
+	end
+	for _, member in pack.Members do
+		check(member.Species == pack.Species and member.Pack == pack, "A pack of mixed kinds")
+		check((member.Enemy.Root.Position - pack.Den).Magnitude < 12, "A packmate far from its den")
+	end
+end
 local enemy = wilds[1]
 local wild = KaijuWilds._wilds[enemy]
 check(enemy.OutpostCreature and enemy.Model:GetAttribute("KaijuWild") == true, "A wild kaiju isn't marked")
@@ -1518,7 +1542,7 @@ end
 local function across(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
-check(Kaiju.Wild.Max == 2, "Not 2 wild kaiju roaming")
+check(Kaiju.Wild.Max == 4 and Kaiju.Wild.Pack == 2, "Not 4 wild kaiju roaming, in pairs")
 local Guarded = Frontier.Veins.Guarded
 local veinScar = CFrame.new(center + Vector3.new(0, 0, -(Frontier.Rim + 2)))
 KaijuWilds._setGuardAt(veinScar)
@@ -1543,8 +1567,13 @@ keeper.LastAttack = 0
 KaijuWilds._brain(keeper, now)
 check(keeper.Foe == nil, "The guardian woke for a miner walking by")
 KaijuWilds.veinSwing(Guarded + 1, b)
+check(guard.Swings == 0, "A swing at another vein counted")
+-- The first stirs it (it looks round at the miner), the second makes it roar.
 KaijuWilds.veinSwing(Guarded, b)
+check(guard.Plan and guard.Plan.Mood == "Look", "The first swing didn't stir it")
+check(keeper.Model:GetAttribute("KaijuMood") == "Look", "Its stirring isn't shown")
 KaijuWilds.veinSwing(Guarded, b)
+check(guard.Plan and guard.Plan.Mood == "Roar", "The second swing didn't make it roar")
 KaijuWilds._brain(keeper, now)
 check(keeper.Foe == nil and next(guard.Engaged) == nil, "The guardian woke before the third swing")
 table.clear(notes)
@@ -1552,6 +1581,7 @@ KaijuWilds.veinSwing(Guarded, b)
 check(guard.Engaged[b] ~= nil and noted(b, "guardian woke"), "The third swing didn't wake it")
 KaijuWilds._brain(keeper, now)
 check(keeper.Foe == b, "It didn't go for the miner who woke it")
+check(keeper.Model:GetAttribute("KaijuMood") == nil and guard.Plan == nil, "It fights in a mood")
 for _ = 1, 80 do
 	now += 0.15
 	stand(keeper.Root.Position + Vector3.new(3, 0, 0))
@@ -1601,9 +1631,263 @@ check(KaijuWilds._guardian() == nil, "Another guardian came before its vein move
 KaijuWilds.veinMoved(Guarded, veinScar)
 check(KaijuWilds._guardian() ~= nil, "No fresh guardian once its vein moved")
 
+-- A wild kaiju's day ---------------------------------------------------------------------------------------
+
+-- Ten minutes of the Outpost with nobody fighting: every wild one wanders
+-- round its pack's den (and the den moves on), stops to sniff, look about,
+-- lie down or roar, keeps to the frontier and near its packmate; the
+-- guardian paces its beat and naps. (Each step every one thinks, then walks
+-- toward where it was sent, at its walking speed.)
+local center2 = outpost * Vector3.new(1, 0, 1) + Vector3.new(0, outpost.Y, 0)
+local function aWildDay()
+	clearCritters()
+	now += Kaiju.Wild.Respawn + 1
+	runDelayed()
+	while true do
+		local count = 0
+		for _, entry in KaijuWilds._wilds do
+			if not entry.Bug and not entry.Guard and entry.Enemy.Alive then
+				count += 1
+			end
+		end
+		if count >= Kaiju.Wild.Max then
+			break
+		end
+		KaijuWilds._spawnWild()
+	end
+	rootA.CFrame = CFrame.new(center2)
+	stand(center2 + Vector3.new(4, 0, 0))
+	pet.Root.CFrame = CFrame.new(center2 + Vector3.new(0, 0, 4))
+	local roamers, walked, moods, worst, dens = {}, {}, {}, {}, {}
+	for _, entry in KaijuWilds._wilds do
+		if not entry.Bug and entry.Enemy.Alive then
+			table.insert(roamers, entry)
+			walked[entry], moods[entry], worst[entry] = 0, {}, 0
+			entry.Engaged = entry.Engaged or {}
+			table.clear(entry.Engaged)
+		end
+	end
+	for _, pack in KaijuWilds._packs do
+		dens[pack] = pack.Den
+	end
+	local apartMost, inCore, inBuilding = 0, 0, 0
+	for _ = 1, 4000 do
+		now += 0.15
+		for _, entry in roamers do
+			local e = entry.Enemy
+			if e.Alive then
+				KaijuWilds._brain(e, now)
+				local to = e.Humanoid.MovingTo
+				if to then
+					local from = e.Root.Position
+					local d = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+					local step = math.min(d.Magnitude, (e.Humanoid.WalkSpeed or 0) * 0.15)
+					if d.Magnitude > 1e-3 and step > 0 then
+						e.Root.CFrame = CFrame.new(from + d.Unit * step)
+						walked[entry] += step
+					end
+				end
+				moods[entry][entry.Plan and entry.Plan.Mood or "?"] = true
+				local range = if entry.Guard then Kaiju.Roam.Guard.Range else Kaiju.Roam.Range
+				worst[entry] = math.max(worst[entry], across(e.Root.Position - e.Home).Magnitude - range)
+				if not entry.Guard and Frontier.distance(e.Root.Position, outpost) < Frontier.Core then
+					inCore += 1
+				end
+				if not entry.Guard and across(e.Root.Position - keepOut[1][1]).Magnitude < keepOut[1][2] - 4 then
+					inBuilding += 1
+				end
+			end
+		end
+		for _, pack in KaijuWilds._packs do
+			local first, second = pack.Members[1], pack.Members[2]
+			if first and second then
+				local gap = across(first.Enemy.Root.Position - second.Enemy.Root.Position).Magnitude
+				apartMost = math.max(apartMost, gap)
+			end
+		end
+	end
+	check(#roamers == Kaiju.Wild.Max + 1, "Not every wild kaiju (and the guardian) out: " .. #roamers)
+	for _, entry in roamers do
+		local name = (if entry.Guard then "The guardian" else "A wild kaiju") .. " (" .. entry.Species .. ")"
+		local count = 0
+		for _ in moods[entry] do
+			count += 1
+		end
+		if entry.Guard then
+			check(walked[entry] > 15, name .. " never paced: " .. walked[entry])
+			check(moods[entry].Sleep, name .. " never napped")
+		else
+			check(walked[entry] > 120, name .. " hardly moved in ten minutes: " .. math.floor(walked[entry]))
+			check(count >= 4, name .. " did only " .. count .. " things all day")
+		end
+		-- (Past its range only as its den moves on, by a step at most: then it walks over.)
+		local slack = if entry.Guard then 8 else Kaiju.Roam.Drift[2] + 8
+		check(worst[entry] <= slack, name .. " strayed " .. math.floor(worst[entry]) .. " studs past its range")
+	end
+	check(inCore == 0, "A wild kaiju wandered into the core")
+	check(inBuilding == 0, "A wild kaiju wandered into a keep-out zone")
+	check(apartMost < 50, "Packmates drifted " .. math.floor(apartMost) .. " studs apart")
+	local drifted = false
+	for pack, den in dens do
+		if table.find(KaijuWilds._packs, pack) and across(pack.Den - den).Magnitude >= Kaiju.Roam.Drift[1] then
+			drifted = true
+		end
+	end
+	check(drifted, "No pack's den moved on in ten minutes")
+	for _, entry in roamers do
+		local shown = entry.Enemy.Model:GetAttribute("KaijuMood")
+		local mood = entry.Plan and entry.Plan.Mood
+		check(shown == (if mood == "Walk" then nil else mood), "Its mood isn't shown as it is")
+	end
+	-- Someone comes close: it stops and looks them over (a roar at times), and
+	-- leaves them be.
+	local watcher
+	for _, entry in roamers do
+		if not entry.Guard then
+			watcher = entry
+			break
+		end
+	end
+	local we = watcher.Enemy
+	watcher.Plan = { Mood = "Walk", Until = now + 10, To = we.Home, From = we.Root.Position, Check = now }
+	watcher.Noticed = {}
+	stand(we.Root.Position + Vector3.new(10, 0, 0))
+	table.clear(playerHits)
+	KaijuWilds._brain(we, now)
+	local mood = watcher.Plan and watcher.Plan.Mood
+	check(mood == "Look" or mood == "Roar", "It didn't stop to look at someone close: " .. tostring(mood))
+	check(we.Root.CFrame.LookVector.X > 0.9, "It didn't turn to them")
+	check(we.Foe == nil and #playerHits == 0, "It went for someone who only came close")
+	check(we.Humanoid.MovingTo and (we.Humanoid.MovingTo - we.Root.Position).Magnitude < 0.01, "It kept walking")
+end
+aWildDay()
+
+-- Your kaiju, with you standing about: after a few seconds it potters round
+-- you; you move on and it's up and after you.
+pet = KaijuServer.pets()[a]
+local function petPotters()
+	pet.RecallUntil, pet.StunUntil, pet.Target = 0, 0, nil
+	pet.Plan, pet.IdleSpot = nil, nil
+	rootA.CFrame = CFrame.new(center2)
+	pet.Root.CFrame = CFrame.new(center2 + Vector3.new(3, 0, 5))
+	local pottered = {}
+	for _ = 1, 120 do
+		now += 0.15
+		KaijuServer._think(pet, now, 0.15)
+		if pet.Plan then
+			pottered[pet.Plan.Mood] = true
+		end
+	end
+	local kinds = 0
+	for _ in pottered do
+		kinds += 1
+	end
+	check(kinds >= 2, "Your kaiju stood stock-still beside you")
+	local petMood = pet.Plan and pet.Plan.Mood
+	check(pet.Model:GetAttribute("KaijuMood") == (if petMood == "Walk" then nil else petMood), "Its mood isn't shown")
+	rootA.CFrame = CFrame.new(center2 + Vector3.new(0, 0, -12))
+	KaijuServer._think(pet, now + 0.15, 0.15)
+	check(pet.Plan == nil and pet.Model:GetAttribute("KaijuMood") == nil, "It kept pottering as you left")
+	local after = pet.Humanoid.MovingTo
+	check(after and (after - pet.Root.Position).Magnitude > 5, "It didn't come after you")
+end
+petPotters()
+
+-- The Outpost for fifteen minutes ---------------------------------------------------------------------------
+
+-- A miner at work out at the Edge (critters come for the noise), the wild
+-- kaiju fresh (as at a server's start) going about their day, the guardian
+-- at its vein, their lifetimes running out and others coming up: nothing
+-- errors, the critters keep to their caps and come and go, and the quarry
+-- is never left without its wild kaiju.
+local function outpostSoak()
+	clearCritters()
+	FrontierServer._setWanderAt(now + 30)
+	for _, entry in KaijuWilds._wilds do
+		if not entry.Bug then
+			entry.Born, entry.LastFight, entry.Enemy.LastHit = now, now, 0
+		end
+	end
+	local edgeSpot = center2 + Vector3.new(330, 0, 0)
+	stand(edgeSpot)
+	local errors, firstError = 0, nil
+	local mostCritters, leastWild, emptyFor, wildRecords = 0, math.huge, 0, 0
+	local dt, swingIn, upkeepIn = 0.25, 0, 0
+	for step = 1, 3600 do
+		now += dt
+		swingIn -= dt
+		if swingIn <= 0 then
+			swingIn = 1.25
+			FrontierServer.swing(b)
+		end
+		FrontierServer._step(dt)
+		runDelayed()
+		upkeepIn -= dt
+		if upkeepIn <= 0 then
+			upkeepIn = 5
+			KaijuWilds._lifetimes(now)
+		end
+		local critters, roaming, records = 0, 0, 0
+		for e, entry in KaijuWilds._wilds do
+			records += 1
+			if e.Alive then
+				local ok, err = pcall(KaijuWilds._brain, e, now)
+				if not ok then
+					errors += 1
+					firstError = firstError or err
+				end
+				local to = e.Humanoid.MovingTo
+				if to and e.Alive then
+					local from = e.Root.Position
+					local d = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+					local stride = math.min(d.Magnitude, (e.Humanoid.WalkSpeed or 0) * dt)
+					if d.Magnitude > 1e-3 and stride > 0 then
+						e.Root.CFrame = CFrame.new(from + d.Unit * stride)
+					end
+				end
+				if entry.Bug then
+					critters += 1
+				elseif not entry.Guard then
+					roaming += 1
+				end
+			end
+		end
+		stand(edgeSpot) -- (the miner keeps at it)
+		mostCritters = math.max(mostCritters, critters)
+		wildRecords = math.max(wildRecords, records)
+		if step * dt > 30 then
+			leastWild = math.min(leastWild, roaming)
+			if roaming == 0 then
+				emptyFor += dt
+			end
+		end
+	end
+	check(errors == 0, "Brains errored " .. errors .. " times: " .. tostring(firstError))
+	check(mostCritters >= 1, "No critters came for a miner at the Edge in fifteen minutes")
+	check(mostCritters <= Frontier.Caps.Server, "Critters past the server's cap: " .. mostCritters)
+	check(emptyFor == 0, "The quarry had no wild kaiju for " .. emptyFor .. " seconds")
+	check(leastWild >= Kaiju.Wild.Max - 2, "Down to " .. leastWild .. " wild kaiju at one time")
+	check(wildRecords <= Kaiju.Wild.Max + 1 + Frontier.Caps.Server + 4, "Wild records pile up: " .. wildRecords)
+	FrontierServer._setWanderAt(math.huge)
+	clearCritters()
+end
+outpostSoak()
+
+-- The rules' moods: the same roll, the same mood, and every one reachable.
+local seen = {}
+for i = 0, 99 do
+	seen[Kaiju.mood(Kaiju.Roam.Moods, i / 100)] = true
+end
+for name in Kaiju.Roam.Moods do
+	check(seen[name], "The mood " .. name .. " never comes")
+	check(Kaiju.Roam.Times[name], "No time for the mood " .. name)
+end
+check(Kaiju.mood(Kaiju.Roam.Moods, 0.37) == Kaiju.mood(Kaiju.Roam.Moods, 0.37), "The same roll, another mood")
+check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale.Pet, "The sizes")
+
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian)",
+		"PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian, a wild kaiju's day)",
 		checks
 	)
 )

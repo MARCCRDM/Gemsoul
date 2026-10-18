@@ -1142,7 +1142,7 @@ function OutpostServer.start()
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)
-		lastSwing[player] = nil
+		lastSwing[player], lastBonk[player] = nil, nil
 		for _, node in nodes do
 			if node.ClaimedBy == player.UserId then
 				node.ClaimedBy = nil

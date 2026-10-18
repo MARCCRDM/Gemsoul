@@ -80,9 +80,15 @@ export type Pet = {
 	Dots: { { PerTick: number, Ticks: number, Element: string?, Next: number } },
 	Fill: Frame,
 	Label: TextLabel,
+	-- Its owner standing about: where (its spot by them) and since when, and
+	-- what it's doing meanwhile ({ Mood, Until, To? }: Kaiju.Roam.Pet).
+	IdleSpot: Vector3?,
+	IdleSince: number?,
+	Plan: any?,
 }
 
 local pets: { [Player]: Pet } = {}
+local rng = Random.new()
 -- Knocked out: back at this os.clock(), by player.
 local downUntil: { [Player]: number } = {}
 -- A pet's health between its trips out (a recall or a walk to the Arena
@@ -609,11 +615,71 @@ local function chooseTarget(pet: Pet, ownerRoot: BasePart)
 	return best
 end
 
-local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean)
+-- What it's doing, for every client to pose (KaijuMood, KaijuMoodAt).
+local function setMood(pet: Pet, mood: string?)
+	local shown = if mood == "Walk" then nil else mood
+	if pet.Model:GetAttribute("KaijuMood") ~= shown then
+		pet.Model:SetAttribute("KaijuMood", shown)
+		pet.Model:SetAttribute("KaijuMoodAt", workspace:GetServerTimeNow())
+	end
+end
+
+-- Its day stops (a fight, its owner moving on).
+local function settle(pet: Pet)
+	if pet.Plan then
+		pet.Plan = nil
+		setMood(pet, nil)
+	end
+end
+
+-- With its owner standing about a while it potters round them: sniffing,
+-- looking about, lying down (Kaiju.Roam.Pet). Returns whether it is.
+local function potter(pet: Pet, spot: Vector3, now: number): boolean
+	local rules = Kaiju.Roam.Pet
+	if not pet.IdleSpot or flat(spot - pet.IdleSpot).Magnitude > 4 then
+		pet.IdleSpot, pet.IdleSince = spot, now -- (they moved: up and after them)
+		settle(pet)
+		return false
+	end
+	if now - (pet.IdleSince or now) < rules.After then
+		return false
+	end
+	local plan = pet.Plan
+	if not plan and flat(spot - pet.Root.Position).Magnitude > rules.Range + 2 then
+		return false -- (beside them first)
+	end
+	local h = pet.Humanoid
+	if not plan or now >= plan.Until then
+		local mood = Kaiju.mood(rules.Moods, rng:NextNumber())
+		local times = rules.Times[mood]
+		plan = { Mood = mood, Until = now + rng:NextNumber(times[1], times[2]) }
+		if mood == "Walk" then
+			local a = rng:NextNumber(0, math.pi * 2)
+			plan.To = pet.IdleSpot + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(1.5, rules.Range)
+		end
+		pet.Plan = plan
+		setMood(pet, mood)
+	end
+	if plan.To and flat(plan.To - pet.Root.Position).Magnitude > 1.5 then
+		h.WalkSpeed = pet.Stats.Speed * 0.5
+		h:MoveTo(plan.To)
+	else
+		h:MoveTo(pet.Root.Position)
+	end
+	return true
+end
+
+local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean, now: number)
 	local h = pet.Humanoid
 	local gap = Kaiju.Follow.Gap
 	local offset = ownerRoot.CFrame.RightVector * 3 - ownerRoot.CFrame.LookVector * gap
 	local spot = ownerRoot.Position + offset
+	if not recalled and potter(pet, spot, now) then
+		return
+	end
+	if recalled then
+		settle(pet)
+	end
 	h.WalkSpeed = math.max(pet.Stats.Speed, 22) * (if recalled then 1.4 else 1)
 	if flat(spot - pet.Root.Position).Magnitude > 2 then
 		h:MoveTo(spot)
@@ -663,6 +729,8 @@ local function think(pet: Pet, now: number, dt: number)
 	if target then
 		-- It fights as a duellist does (KaijuFighter: it reels when stunned).
 		pet.LastFight = now
+		settle(pet)
+		pet.IdleSpot = nil
 		KaijuFighter.step(pet.Fighter, { Root = target.Root, Enemy = target }, now)
 		return
 	end
@@ -670,7 +738,7 @@ local function think(pet: Pet, now: number, dt: number)
 	if now < pet.StunUntil then
 		h:MoveTo(pet.Root.Position)
 	else
-		follow(pet, ownerRoot, recalled)
+		follow(pet, ownerRoot, recalled, now)
 	end
 end
 

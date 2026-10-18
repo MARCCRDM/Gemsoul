@@ -115,11 +115,55 @@ local function ease(t: number): number
 	return t * t * (3 - 2 * t)
 end
 
+-- A wild kaiju's day (KaijuWilds: KaijuMood, from KaijuMoodAt): head down
+-- sniffing the ground, looking about, lying down, asleep (lower, curled),
+-- or a roar (rearing, jaws wide). Each settles in over a moment.
+Motion.Moods = {
+	Sniff = function(pose, t, k)
+		pose.Pitch -= 0.28 * k
+		pose.Lift -= 0.06 * k
+		pose.Jaw += (0.05 + math.max(0, math.sin(t * 7)) * 0.08) * k
+		pose.Pitch += math.sin(t * 6) * 0.03 * k
+	end,
+	Look = function(pose, t, k)
+		pose.Yaw += math.sin(t * 0.9) * 0.4 * k
+		pose.Pitch += 0.06 * k
+	end,
+	Rest = function(pose, t, k)
+		pose.Lift -= 0.38 * k
+		pose.Pitch -= 0.05 * k
+		pose.Tail += 0.15 * k
+		pose.Pitch += math.sin(t * 1.1) * 0.01 * k
+	end,
+	Sleep = function(pose, t, k)
+		pose.Lift -= 0.45 * k
+		pose.Pitch -= 0.12 * k
+		pose.Tail += 0.35 * k
+		pose.Arm -= 0.2 * k
+		pose.Lift += math.sin(t * 0.8) * 0.02 * k
+	end,
+	Roar = function(pose, t, _k)
+		-- Rears back over a third of a second, holds it, and settles.
+		local k = if t < 0.3 then t / 0.3 elseif t < 1.2 then 1 else math.max(0, 1 - (t - 1.2) / 0.4)
+		pose.Pitch += 0.32 * k
+		pose.Jaw += 0.9 * k
+		pose.Arm += 0.5 * k
+		pose.Lift += 0.08 * k
+		pose.Yaw += math.sin(t * 9) * 0.04 * k
+	end,
+}
+
 -- Its fight pose at `now` (server time). `a` = { Kind, Start, At, Side,
--- GuardUntil, BlockedAt, HurtAt, HurtSide }, its model's ActionKind,
--- ActionStart, ActionAt, ActionSide, GuardUntil, BlockedAt, HurtAt, HurtSide.
+-- GuardUntil, BlockedAt, HurtAt, HurtSide, Mood, MoodAt }, its model's
+-- ActionKind, ActionStart, ActionAt, ActionSide, GuardUntil, BlockedAt,
+-- HurtAt, HurtSide, KaijuMood and KaijuMoodAt (its mood only out of a fight).
 function Motion.fight(species: string?, a, now: number)
 	local pose = Motion.rest()
+	local mood = Motion.Moods[a.Mood or ""]
+	if mood and a.Kind == nil and type(a.MoodAt) == "number" then
+		local t = math.max(0, now - a.MoodAt)
+		mood(pose, t, ease(t / 0.8))
+	end
 	local keys = Motion.Fight[species or ""] or Motion.Fight.Bulwark
 	local side = if (a.Side or 1) < 0 then -1 else 1
 	local kind, start, at = a.Kind, a.Start, a.At

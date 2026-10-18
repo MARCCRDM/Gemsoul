@@ -2,8 +2,13 @@
 	Wild kaiju and moon bugs in the Outpost's far quarry (Shared.Kaiju has
 	the numbers; see docs/kaiju.md).
 
-	  Wild kaiju  up to Kaiju.Wild.Max roam at once, each a random kind and
-	              element, levelled near the kaiju out around them. One
+	  Wild kaiju  up to Kaiju.Wild.Max roam at once, in packs of up to
+	              Kaiju.Wild.Pack of a kind (each its own element), levelled
+	              near the kaiju out around them. A pack has a den out in the
+	              frontier that moves on now and then; each kaiju wanders
+	              round it, stopping to sniff, look about, lie down or roar,
+	              and stops to look at anyone who comes close (Kaiju.Roam,
+	              KaijuMood on its model for the clients' poses). One
 	              leaves you and your kaiju alone until you start a fight:
 	              challenge it ("KaijuChallenge", its Challenge prompt) and
 	              your kaiju goes in, or hit it while hunting (the combat
@@ -19,10 +24,11 @@
 	              Tamed ("KaijuTame"): it joins you, Gemsoul and all. Three
 	              failed tries and it burrows away; so does one left alone
 	              for Kaiju.Wild.Lifetime.
-	  Guardian    one more wild kaiju, sleeping in front of the guarded Rift
-	              Vein (Shared.Frontier.Guardian: levels 16 to 20). The third
-	              swing at its vein wakes it (KaijuWilds.veinSwing, from
-	              OutpostServer), and it goes for that miner, then anyone
+	  Guardian    one more wild kaiju, bigger, pacing and napping in front of
+	              the guarded Rift Vein (Shared.Frontier.Guardian: levels 16
+	              to 20). The first swing at its vein stirs it, the second
+	              makes it roar, the third wakes it (KaijuWilds.veinSwing,
+	              from OutpostServer), and it goes for that miner, then anyone
 	              else mining its vein, a plain miner too (knocked down, not
 	              killed), and their kaiju. Challenge it, beat it or tame it
 	              like any wild kaiju; killed, it pays Frontier.Coins.Guardian
@@ -123,13 +129,30 @@ type Wild = {
 	Guard: boolean?, -- the guarded vein's (Frontier.Guardian)
 	Swings: number?, -- swings at its vein while it slept, the last at SwingAt
 	SwingAt: number?,
+	Pack: any?, -- a roaming one's pack (its den, its packmates)
+	Plan: any?, -- what it's doing while nobody fights it: { Mood, Until, To? }
+	GrowlAt: number?, -- its last roar at someone
+	Lifetime: number?, -- a wild one's: seconds unfought before it burrows (each its own)
+	Noticed: { [Player]: number }?, -- when it last stopped to look at each player
+}
+
+-- A pack of roaming wild kaiju: its den out in the frontier (they wander
+-- round it, and it moves on now and then), its kind, and its members (the
+-- first leads: the others keep near it).
+type Pack = {
+	Den: Vector3,
+	Heading: number,
+	MoveAt: number,
+	Species: string,
+	Members: { Wild },
 }
 
 local wilds: { [any]: Wild } = {} -- by Enemies record
 local wildCount = 0 -- (roaming: the guardian isn't one of them)
 local guardian: Wild? = nil
 local guardAt: CFrame? = nil -- its vein's dormant rift
-local spots: { Vector3 } = {}
+local packs: { Pack } = {}
+local site: any = nil -- the Outpost's (its rock spots, live: veins move theirs)
 local rng = Random.new()
 
 local function serverNow(): number
@@ -207,13 +230,46 @@ local function levelsNear(point: Vector3, radius: number): { number }
 	return levels
 end
 
-local function spot(): Vector3?
-	if #spots == 0 then
-		return nil
+-- Where the guardian sleeps: in front of its vein, Frontier.Guardian.Home
+-- studs in from the dormant rift, facing the outpost.
+local function guardHome(scar: CFrame): (Vector3, Vector3)
+	local middle = Outpost.Location.Position
+	local out = flat(scar.Position - middle)
+	out = if out.Magnitude > 0.1 then out.Unit else Vector3.new(1, 0, 0)
+	return scar.Position - out * Frontier.Guardian.Home, middle
+end
+
+-- Room for a wild kaiju to stand at `p`: clear of the rocks (and, for a
+-- roaming one, out in the frontier, away from the landing pad, the guarded
+-- vein and the site's keep-out zones: OutpostWorld's KeepOut).
+local function roomy(p: Vector3, guard: boolean?): boolean
+	local out = Frontier.distance(p, Outpost.Location.Position)
+	if out > Frontier.Rim - 10 then
+		return false
 	end
-	local base = spots[rng:NextInteger(1, #spots)]
-	local angle = rng:NextNumber(0, math.pi * 2)
-	return base + Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(6, 12)
+	if not guard then
+		if out < Frontier.Core + 10 then
+			return false
+		end
+		if site and site.Spawn and flat(p - site.Spawn.Position).Magnitude < Kaiju.Wild.FarFromSpawn then
+			return false
+		end
+		if guardAt and flat(p - (guardHome(guardAt :: CFrame))).Magnitude < 55 then
+			return false
+		end
+		-- (Nor into the buildings, the old workings, the ramps or a vein's site.)
+		for _, zone in if site and site.KeepOut then site.KeepOut else {} do
+			if flat(zone[1] - p).Magnitude < zone[2] then
+				return false
+			end
+		end
+	end
+	for _, cframe in if site and site.Spots then site.Spots else {} do
+		if flat(cframe.Position - p).Magnitude < 7 then
+			return false
+		end
+	end
+	return true
 end
 
 -- Foes -------------------------------------------------------------------------------------------------
@@ -396,6 +452,186 @@ local function roam(enemy, wild: Wild, now: number)
 	enemy.Humanoid:MoveTo(enemy.Home + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach)
 end
 
+-- A wild kaiju's day ---------------------------------------------------------------------------------------
+
+-- What it's doing, for every client to pose (CreatureMotion: KaijuMood and
+-- KaijuMoodAt on its model; walking is no mood).
+local function setMood(wild: Wild, mood: string?)
+	local model = wild.Enemy.Model
+	local shown = if mood == "Walk" then nil else mood
+	if model:GetAttribute("KaijuMood") ~= shown then
+		model:SetAttribute("KaijuMood", shown)
+		model:SetAttribute("KaijuMoodAt", serverNow())
+	end
+end
+
+-- It does `mood` for `seconds`, turned to `facing` if given.
+local function startPlan(wild: Wild, mood: string, seconds: number, now: number, facing: Vector3?)
+	local root = wild.Enemy.Root
+	if facing and flat(facing - root.Position).Magnitude > 0.5 then
+		root.CFrame = CFrame.lookAt(root.Position, Vector3.new(facing.X, root.Position.Y, facing.Z))
+	end
+	wild.Plan = { Mood = mood, Until = now + seconds }
+	setMood(wild, mood)
+	return wild.Plan
+end
+
+-- Somewhere to amble to: round its den (a packmate keeps near its leader).
+local function walkTarget(wild: Wild, range: number): Vector3?
+	local enemy = wild.Enemy
+	local pack = wild.Pack
+	local leader = pack and pack.Members[1]
+	local around, reach = enemy.Home, range
+	if leader and leader ~= wild and leader.Enemy.Alive then
+		around, reach = leader.Enemy.Root.Position, 10
+	end
+	for _ = 1, 12 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local r = math.sqrt(rng:NextNumber()) * reach
+		local p = Vector3.new(around.X + math.cos(a) * r, enemy.Home.Y, around.Z + math.sin(a) * r)
+		if flat(p - enemy.Home).Magnitude <= range + 4 and roomy(p, wild.Guard) then
+			return p
+		end
+	end
+	return nil
+end
+
+-- Its pack's leader, if it's a packmate following one (and how far off).
+local function leaderOf(wild: Wild): (Wild?, number)
+	local pack = wild.Pack
+	local leader = pack and pack.Members[1]
+	if not leader or leader == wild or not leader.Enemy.Alive then
+		return nil, 0
+	end
+	return leader, flat(leader.Enemy.Root.Position - wild.Enemy.Root.Position).Magnitude
+end
+
+-- The next thing it does (Kaiju.Roam's moods, by chance; a packmate left
+-- behind catches up first).
+local function nextPlan(wild: Wild, rules, now: number)
+	local mood = Kaiju.mood(rules.Moods, rng:NextNumber())
+	local leader, behind = leaderOf(wild)
+	if leader and behind > 14 then
+		mood = "Walk"
+	end
+	local times = rules.Times[mood]
+	local seconds = rng:NextNumber(times[1], times[2])
+	if mood == "Walk" then
+		local to = walkTarget(wild, rules.Range)
+		if not to then
+			return startPlan(wild, "Look", 2, now)
+		end
+		local plan = startPlan(wild, "Walk", seconds, now)
+		plan.To, plan.From, plan.Check = to, wild.Enemy.Root.Position, now
+		return plan
+	end
+	return startPlan(wild, mood, seconds, now)
+end
+
+-- The nearest player within `radius` of `at` who's about in the Outpost.
+local function playerNear(at: Vector3, radius: number): (Player?, BasePart?)
+	local best, bestRoot, bestDistance = nil, nil, radius
+	for _, player in Players:GetPlayers() do
+		local root = rootOf(player)
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if root and humanoid and humanoid.Health > 0 and player:GetAttribute("Outpost") == true then
+			local distance = flat(root.Position - at).Magnitude
+			if distance <= bestDistance then
+				best, bestRoot, bestDistance = player, root, distance
+			end
+		end
+	end
+	return best, bestRoot
+end
+
+-- A pack's den moves on now and then (its leader decides): Kaiju.Roam.Drift
+-- studs on, roughly the way it was heading, staying out in the frontier and
+-- away from the other dens.
+local function driftDen(pack: Pack, now: number)
+	local roam = Kaiju.Roam
+	pack.MoveAt = now + rng:NextNumber(roam.Every[1], roam.Every[2])
+	for try = 0, 11 do
+		local heading = pack.Heading + rng:NextNumber(-0.7, 0.7) + try * math.pi / 6
+		local step = rng:NextNumber(roam.Drift[1], roam.Drift[2])
+		local den = pack.Den + Vector3.new(math.cos(heading), 0, math.sin(heading)) * step
+		local apart = roomy(den)
+		for _, other in packs do
+			if other ~= pack and flat(other.Den - den).Magnitude < 80 then
+				apart = false
+			end
+		end
+		if apart then
+			pack.Den, pack.Heading = den, heading
+			for _, member in pack.Members do
+				local home = member.Enemy.Home
+				member.Enemy.Home = Vector3.new(den.X, home.Y, den.Z)
+			end
+			return
+		end
+	end
+end
+
+-- Nobody's fighting it: it wanders round its den, stops to sniff, look
+-- about, lie down or roar (the guardian paces in front of its vein and
+-- mostly sleeps), and stops to look at anyone who comes close.
+local function wander(enemy, wild: Wild, now: number)
+	local rules = if wild.Guard then Kaiju.Roam.Guard else Kaiju.Roam
+	local humanoid, root = enemy.Humanoid, enemy.Root
+	local pack = wild.Pack
+	if pack and pack.Members[1] == wild and now >= pack.MoveAt then
+		driftDen(pack, now)
+	end
+	local plan = wild.Plan
+	-- Someone close (and it awake): it stops and looks them over; now and
+	-- then it roars at them.
+	if not (plan and (plan.Mood == "Sleep" or plan.Mood == "Roar")) then
+		local player, theirRoot = playerNear(root.Position, Kaiju.Roam.Notice)
+		local noticed = wild.Noticed or {}
+		wild.Noticed = noticed
+		if player and theirRoot and now - (noticed[player] or -math.huge) > 12 then
+			for gone in noticed do
+				if gone.Parent == nil then
+					noticed[gone] = nil -- (they left the game)
+				end
+			end
+			noticed[player] = now
+			local roar = now - (wild.GrowlAt or -math.huge) >= Kaiju.Roam.Growl and rng:NextNumber() < 0.5
+			if roar then
+				wild.GrowlAt = now
+			end
+			plan = startPlan(wild, if roar then "Roar" else "Look", if roar then 1.6 else 3, now, theirRoot.Position)
+		end
+	end
+	-- A packmate whose leader has wandered off gets up and follows.
+	local _, behind = leaderOf(wild)
+	if plan and behind > 26 and plan.Mood ~= "Walk" and plan.Mood ~= "Roar" then
+		plan.Until = now
+	end
+	if not plan or now >= plan.Until then
+		plan = nextPlan(wild, rules, now)
+	end
+	if plan.Mood ~= "Walk" then
+		humanoid:MoveTo(root.Position)
+		return
+	end
+	local to = plan.To
+	if flat(to - root.Position).Magnitude < 3 then
+		plan.Until = now -- (there: something else next)
+		humanoid:MoveTo(root.Position)
+		return
+	end
+	humanoid.WalkSpeed *= Kaiju.Roam.Amble
+	humanoid:MoveTo(to)
+	-- Hardly moved in two seconds (a rock in the way): somewhere else.
+	if now - plan.Check >= 2 then
+		if flat(root.Position - plan.From).Magnitude < 1 then
+			plan.Until = now
+		end
+		plan.From, plan.Check = root.Position, now
+	end
+end
+KaijuWilds._wander = wander
+
 -- The brain both kinds share: find a foe and fight it (a wild kaiju as a
 -- duellist, KaijuFighter; a moon bug chases and bites), else go home (a
 -- rift's critter slips back through a rift).
@@ -415,6 +651,12 @@ local function brain(enemy, now: number)
 	humanoid.WalkSpeed = kind.Speed * (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
 	if wild.Leaving then
 		humanoid:MoveTo(root.Position)
+		return
+	end
+	if not wild.Bug and root.Position.Y < enemy.Home.Y - 40 then
+		-- (Fallen through the floor: back up at its den.)
+		enemy.Model:PivotTo(CFrame.new(enemy.Home + Vector3.new(0, 4, 0)))
+		root.AssemblyLinearVelocity = Vector3.zero
 		return
 	end
 	local fromHome = flat(root.Position - enemy.Home).Magnitude
@@ -450,9 +692,14 @@ local function brain(enemy, now: number)
 				return
 			end
 		end
-		-- Home, healing on the way; and home a while, it forgets who started
-		-- on it.
-		if fromHome > 4 then
+		-- Led off: back home, healing on the way. Home a while, it forgets
+		-- who started on it, and goes about its day (wander).
+		local range = if wild.Guard then Kaiju.Roam.Guard.Range else Kaiju.Roam.Range
+		if fromHome > range + 6 then
+			if wild.Plan then
+				wild.Plan = nil
+				setMood(wild, nil)
+			end
 			humanoid:MoveTo(enemy.Home)
 		else
 			local awake = next(wild.Engaged) ~= nil
@@ -464,6 +711,7 @@ local function brain(enemy, now: number)
 			if wild.Guard and awake and next(wild.Engaged) == nil then
 				wild.Swings = 0 -- (back to sleep)
 			end
+			wander(enemy, wild, now)
 		end
 		if now - enemy.LastHit > 6 and humanoid.Health < humanoid.MaxHealth then
 			humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * HOME_HEAL * 0.15)
@@ -473,6 +721,10 @@ local function brain(enemy, now: number)
 	end
 	wild.LastFight = now
 	engage(wild, if victim.Pet then victim.Pet.Owner else victim.Player, now)
+	if wild.Plan then
+		wild.Plan = nil -- (its day can wait)
+		setMood(wild, nil)
+	end
 	if fighter then
 		KaijuFighter.step(fighter, victim, now)
 		return
@@ -553,11 +805,25 @@ end
 
 local spawnWild
 
--- Killed, tamed or burrowed: another roams out a while later (the guardian
--- has none: a fresh one sleeps at its vein once it moves).
-local function gone(wild: Wild)
+-- Killed, tamed or burrowed: another roams out a while later (`soon`, after
+-- a burrow: Kaiju.Wild.Return; the guardian has none: a fresh one sleeps at
+-- its vein once it moves).
+local function gone(wild: Wild, soon: boolean?)
 	KaijuFighter.forget(wild.Fighter)
 	wilds[wild.Enemy] = nil
+	local pack = wild.Pack
+	if pack then
+		local at = table.find(pack.Members, wild)
+		if at then
+			table.remove(pack.Members, at)
+		end
+		if #pack.Members == 0 then
+			local index = table.find(packs, pack)
+			if index then
+				table.remove(packs, index)
+			end
+		end
+	end
 	if wild.Guard then
 		if guardian == wild then
 			guardian = nil
@@ -565,7 +831,7 @@ local function gone(wild: Wild)
 		return
 	end
 	wildCount -= 1
-	task.delay(Kaiju.Wild.Respawn, spawnWild)
+	task.delay(if soon then Kaiju.Wild.Return else Kaiju.Wild.Respawn, spawnWild)
 end
 
 -- Burrows away (left alone too long, or too many failed tames).
@@ -576,7 +842,7 @@ local function burrow(wild: Wild)
 	end
 	fx("TriadBreak", enemy.Root.Position, 5, wild.Element)
 	Enemies.remove(enemy)
-	gone(wild)
+	gone(wild, true)
 end
 
 local function wildDied(enemy)
@@ -619,10 +885,12 @@ local function wildDied(enemy)
 end
 
 -- A wild kaiju at `at` (on the ground there), its `level`, turned to
--- `facing` (any way, if not given); `guard`, the guarded vein's.
-local function newWild(at: Vector3, level: number, guard: boolean, facing: Vector3?): Wild
-	local species = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
+-- `facing` (any way, if not given), of `species` (any, if not given);
+-- `guard`, the guarded vein's (bigger).
+local function newWild(at: Vector3, level: number, guard: boolean, facing: Vector3?, species: string?): Wild
+	species = species or Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
 	local element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
+	local scale = if guard then Kaiju.Scale.Guardian else Kaiju.Scale.Wild
 	local soul = Kaiju.rollSoul(Gems.random(), element, {
 		Id = "wild",
 		Time = os.time(),
@@ -630,7 +898,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Luck = math.clamp(level / 60, 0, 0.5),
 	})
 	local stats = Kaiju.stats(species, level, soul.Tier)
-	local model, _, _ = KaijuServer.body(species, element, Kaiju.Scale.Wild)
+	local model, _, _ = KaijuServer.body(species, element, scale)
 	local named = Kaiju.title({ Species = species, Element = element })
 	local title = (if guard then "Vein Guardian " else "Wild ") .. named
 	model.Name = title
@@ -655,6 +923,11 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 	)
 	local e = enemy :: any
 	local engagedBy = {}
+	-- (Its name over it from further off than a creature's: they roam far.)
+	local board = enemy.Root:FindFirstChild("HealthBar")
+	if board and board:IsA("BillboardGui") then
+		board.MaxDistance = 160
+	end
 	e.OutpostCreature = true
 	e.Engaged = engagedBy -- (the kaiju out only fight it for those who started on it)
 	e.Brain = brain
@@ -692,7 +965,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Humanoid = enemy.Humanoid,
 		Species = species,
 		Element = element,
-		Scale = Kaiju.Scale.Wild,
+		Scale = scale,
 		Body = enemy,
 		Stats = stats,
 		Ability = ability,
@@ -735,22 +1008,77 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Engaged = engagedBy,
 		Guard = guard,
 		Swings = 0,
+		-- (Each its own, so they don't all burrow at once and leave the quarry empty.)
+		Lifetime = Kaiju.Wild.Lifetime * rng:NextNumber(0.7, 1.5),
 	}
 	wilds[enemy] = wild
 	return wild
+end
+
+-- A pack with room for one more, or a new one with a den of its own out in
+-- the frontier (away from the other dens and the guarded vein).
+local function packFor(): Pack?
+	for _, pack in packs do
+		if #pack.Members < Kaiju.Wild.Pack then
+			return pack
+		end
+	end
+	local middle = Outpost.Location.Position
+	for _ = 1, 80 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local r = rng:NextNumber(Frontier.Core + 30, Frontier.Rim - 45)
+		local den = middle + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+		local apart = roomy(den)
+		for _, other in packs do
+			if flat(other.Den - den).Magnitude < 110 then
+				apart = false
+			end
+		end
+		if apart then
+			-- (A kind no other pack is, if there's one.)
+			local kinds = {}
+			for _, species in Kaiju.Order do
+				local taken = false
+				for _, other in packs do
+					taken = taken or other.Species == species
+				end
+				if not taken then
+					table.insert(kinds, species)
+				end
+			end
+			kinds = if #kinds > 0 then kinds else Kaiju.Order
+			local roam = Kaiju.Roam
+			local pack: Pack = {
+				Den = den,
+				Heading = rng:NextNumber(0, math.pi * 2),
+				MoveAt = os.clock() + rng:NextNumber(roam.Every[1], roam.Every[2]),
+				Species = kinds[rng:NextInteger(1, #kinds)],
+				Members = {},
+			}
+			table.insert(packs, pack)
+			return pack
+		end
+	end
+	return nil
 end
 
 function spawnWild()
 	if wildCount >= Kaiju.Wild.Max then
 		return
 	end
-	local at = spot()
-	if not at then
+	local pack = packFor()
+	if not pack then
 		return
 	end
+	local a = rng:NextNumber(0, math.pi * 2)
+	local at = pack.Den + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(3, 9)
 	wildCount += 1
 	local ok, err = pcall(function()
-		newWild(at, Kaiju.wildLevel(levelsNear(at, 160), rng), false)
+		local wild = newWild(at, Kaiju.wildLevel(levelsNear(at, 160), rng), false, nil, pack.Species)
+		wild.Pack = pack
+		local home = wild.Enemy.Home
+		wild.Enemy.Home = Vector3.new(pack.Den.X, home.Y, pack.Den.Z)
+		table.insert(pack.Members, wild)
 	end)
 	if not ok then
 		wildCount -= 1
@@ -759,15 +1087,6 @@ function spawnWild()
 end
 
 -- The vein guardian -----------------------------------------------------------------------------------------
-
--- Where it sleeps: in front of its vein, Frontier.Guardian.Home studs in
--- from the dormant rift, facing the outpost.
-local function guardHome(scar: CFrame): (Vector3, Vector3)
-	local middle = Outpost.Location.Position
-	local out = flat(scar.Position - middle)
-	out = if out.Magnitude > 0.1 then out.Unit else Vector3.new(1, 0, 0)
-	return scar.Position - out * Frontier.Guardian.Home, middle
-end
 
 local function spawnGuardian()
 	if guardian or not guardAt then
@@ -802,6 +1121,16 @@ function KaijuWilds.veinSwing(index: number, player: Player)
 	end
 	wild.Swings = (wild.Swings or 0) + 1
 	wild.SwingAt = now
+	-- It stirs and looks round at the first, growls at the next, and the
+	-- third wakes it.
+	local root = rootOf(player)
+	local at = if root then root.Position else nil
+	if wild.Swings == Frontier.Guardian.Wake - 2 then
+		startPlan(wild, "Look", 4, now, at)
+	elseif wild.Swings == Frontier.Guardian.Wake - 1 then
+		wild.GrowlAt = now
+		startPlan(wild, "Roar", 1.6, now, at)
+	end
 	if wild.Swings >= Frontier.Guardian.Wake then
 		engage(wild, player, now)
 		wild.LastFight = now
@@ -817,6 +1146,13 @@ function KaijuWilds.veinMoved(index: number, scar: CFrame)
 		return
 	end
 	guardAt = scar
+	-- (A pack denned near the vein's new site moves on.)
+	local home = guardHome(scar)
+	for _, pack in packs do
+		if flat(pack.Den - home).Magnitude < 90 then
+			pack.MoveAt = 0
+		end
+	end
 	local old = guardian
 	if old and old.Enemy.Alive then
 		fx("TriadBreak", old.Enemy.Root.Position, 5, old.Element)
@@ -1105,31 +1441,22 @@ local function lifetimes(now: number)
 	for _, wild in wilds do
 		if not wild.Bug and not wild.Guard and wild.Enemy.Alive then
 			local fought = math.max(wild.Enemy.LastHit or 0, wild.LastFight or 0)
-			if now - wild.Born > Kaiju.Wild.Lifetime and now - fought > 20 then
+			if now - wild.Born > (wild.Lifetime or Kaiju.Wild.Lifetime) and now - fought > 20 then
 				burrow(wild)
 			end
 		end
 	end
 end
 
--- `site` is the Outpost's (OutpostServer.site()): wild things roam its
--- rock spots far from the landing pad.
-function KaijuWilds.start(site)
-	if not site or not site.Spots then
+-- `outpost` is the Outpost's site (OutpostServer.site()): wild kaiju roam
+-- its frontier in packs, clear of its rocks, and the guardian sleeps at the
+-- guarded vein.
+function KaijuWilds.start(outpost)
+	if not outpost or not outpost.Spots then
 		warn("[Kaiju] no Outpost site: no wild kaiju")
 		return
 	end
-	local pad = site.Spawn.Position
-	for _, cframe in site.Spots do
-		if flat(cframe.Position - pad).Magnitude >= Kaiju.Wild.FarFromSpawn then
-			table.insert(spots, cframe.Position)
-		end
-	end
-	if #spots == 0 then
-		for _, cframe in site.Spots do
-			table.insert(spots, cframe.Position)
-		end
-	end
+	site = outpost
 	-- The guarded vein's dormant rift (OutpostWorld; KaijuWilds.veinMoved once it moves).
 	local guarded = site.Veins and site.Veins[Frontier.Veins.Guarded]
 	local siteInfo = guarded and site.VeinSites and site.VeinSites[guarded.Site]
@@ -1138,10 +1465,10 @@ function KaijuWilds.start(site)
 	Shop.register("KaijuChallenge", challenge)
 	-- (Moon bugs come through rifts round players out past the core: FrontierServer.)
 	task.delay(5, function()
+		spawnGuardian() -- (first: the packs keep their dens away from it)
 		for _ = 1, Kaiju.Wild.Max do
 			spawnWild()
 		end
-		spawnGuardian()
 	end)
 	local timer = 0
 	RunService.Heartbeat:Connect(function(dt)
@@ -1156,7 +1483,7 @@ end
 -- For tests.
 KaijuWilds._tame, KaijuWilds._brain, KaijuWilds._wilds = tame, brain, wilds
 KaijuWilds._challenge = challenge
-KaijuWilds._spawnWild, KaijuWilds._spots = spawnWild, spots
+KaijuWilds._spawnWild, KaijuWilds._packs = spawnWild, packs
 KaijuWilds._spawnGuardian, KaijuWilds._lifetimes = spawnGuardian, lifetimes
 function KaijuWilds._guardian()
 	return guardian
