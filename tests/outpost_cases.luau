@@ -86,6 +86,9 @@ local CollectionService = {
 		tags[tag] = tags[tag] or {}
 		table.insert(tags[tag], instance)
 	end,
+	GetTagged = function(_, tag)
+		return tags[tag] or {}
+	end,
 }
 local playerList = {}
 local Players = {
@@ -335,7 +338,7 @@ local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
 	for _, name in
-		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "Seating", "Frontier" }
+		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "MechPilot", "Frontier" }
 	do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
@@ -353,7 +356,7 @@ local Server = (function()
 				PickaxeLooks = PickaxeLooks,
 				Spar = Spar,
 				Tutorial = { beat = function() return nil end }, -- (no mining tutorial running)
-				Seating = load("src/shared/Seating.luau", "Seating", {}),
+				MechPilot = load("src/shared/MechPilot.luau", "MechPilot", {}),
 				Intro = { tutorialMined = function() return nil end },
 				OutpostWorld = World,
 				Gems = Gems,
@@ -620,19 +623,17 @@ check(
 )
 check(ana.Character:GetAttribute("ActionKind") == "Mine", "No chop for others to see")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Swung faster than the pick allows")
--- From a mech's cockpit: from further off, a strike lands several swings at
--- once and spends them, and the mech swings for everyone to see.
+-- From a mech's cockpit (its pilot: Shared.MechPilot, no seat): from
+-- further off, a strike lands several swings at once and spends them, and
+-- the mech swings for everyone to see.
 do
-	local humanoid = R.Instance.new("Humanoid")
-	humanoid.Parent = ana.Character
 	local mech = R.Instance.new("Model")
 	mech.Name = "Mole"
-	local seat = R.Instance.new("VehicleSeat")
-	seat.Name = "Seat"
-	seat:SetAttribute("OutpostMachine", "Mole")
-	seat.Parent = mech
+	mech:SetAttribute("MechId", "Mole3")
+	mech:SetAttribute("MechKind", "Mole")
 	mech.Parent = workspaceRoot
-	humanoid.SeatPart = seat
+	CollectionService:AddTag(mech, "OutpostMech")
+	ana:SetAttribute("MechPilot", "Mole3")
 	advance(1)
 	local swingsBefore, hpBefore = first.State.Picks.Survey, target.Hp
 	local rock = target.Model.PrimaryPart.CFrame.Position
@@ -649,11 +650,12 @@ do
 	anaRoot.CFrame = R.CFrame.new(rock + R.Vector3.new(Rules.MechReach + 30, 9, 0))
 	advance(1)
 	check(not handlers.OutpostHit(ana, target.Id).Ok, "A mech mined from too far off")
-	seat:SetAttribute("OutpostMachine", "NotAMech")
+	mech:SetAttribute("MechKind", "NotAMech")
 	standBy(anaRoot, target)
 	advance(1)
-	check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined from a seat that isn't a mech")
-	humanoid.Parent = nil
+	local refused = handlers.OutpostHit(ana, target.Id)
+	check(not refused.Ok and refused.Message:find("Hop out", 1, true), "Mined from a machine that can't mine")
+	ana:SetAttribute("MechPilot", nil)
 	mech.Parent = nil
 end
 -- Ben can't steal it while Ana is on it, but can once she walks away.

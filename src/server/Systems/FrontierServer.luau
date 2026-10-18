@@ -76,7 +76,11 @@ local function eligible(player: Player): boolean
 	end
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	return humanoid ~= nil and humanoid.Health > 0 and humanoid.SeatPart == nil and rootOf(player) ~= nil
+	return humanoid ~= nil
+		and humanoid.Health > 0
+		and humanoid.SeatPart == nil
+		and player:GetAttribute("MechPilot") == nil -- (in a mech)
+		and rootOf(player) ~= nil
 end
 FrontierServer._eligible = eligible
 

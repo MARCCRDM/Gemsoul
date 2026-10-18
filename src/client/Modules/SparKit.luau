@@ -100,6 +100,7 @@ function SparKit.available(): boolean
 		and h ~= nil
 		and h.Health > 0
 		and h.SeatPart == nil
+		and player:GetAttribute("MechPilot") == nil
 		and not modalOpen()
 end
 

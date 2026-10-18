@@ -31,7 +31,7 @@ local Rules = require(ReplicatedStorage.Shared.Outpost)
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
-local Seating = require(ReplicatedStorage.Shared.Seating)
+local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local PlayerCard = require(script.Parent.PlayerCard)
 local ChargeMeter = require(script.Parent.ChargeMeter)
@@ -724,14 +724,12 @@ end
 -- Mining -----------------------------------------------------------------------------------------------
 
 -- The mech you're piloting, if it can mine (Outpost.Machines, Mine): its
--- spec. Nil on foot; false in a seat that can't.
+-- spec. Nil on foot; false in one that can't.
 local function pilotedMech(): any
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	local seat = Seating.seatOf(humanoid)
-	if not seat then
+	if not MechPilot.of(player) then
 		return nil
 	end
-	local machine = Rules.Machines[seat:GetAttribute("OutpostMachine") or ""]
+	local machine = Rules.Machines[MechPilot.kind(MechPilot.mech(player)) or ""]
 	return if machine and machine.Mine then machine else false
 end
 

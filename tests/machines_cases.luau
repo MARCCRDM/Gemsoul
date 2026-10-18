@@ -1,5 +1,5 @@
 -- The Outpost's machines: how each is put together (one chassis at the root,
--- welded massless bodywork, a seat, no drive constraints (the server moves
+-- welded massless bodywork, a cockpit (no Roblox seat), no drive constraints (the server moves
 -- it, Server OutpostVehicles), the Mole's spinning drill) and the driving maths (Shared.Outpost.drive). Uses lune's
 -- roblox library. Run by tests/run_machines.py (needs lune).
 local fs = require("@lune/fs")
@@ -84,9 +84,12 @@ for _, kind in Rules.MachineOrder do
 	local lift = hull.CFrame.Position.Y - hull.Size.Y / 2 - bottom
 	check(lift >= 1 and lift <= 2, kind .. "'s hull drags along the ground, or leaves too big a gap")
 	check(math.abs(hull.CFrame.Position.Y + hull.Size.Y / 2 - (bottom + chassis.Size.Y)) < 0.01, kind .. "'s hull isn't as tall as the mech")
-	local seat = model:FindFirstChild("Seat")
-	check(seat and seat.ClassName == "VehicleSeat" and seat:GetAttribute("OutpostMachine") == kind, kind .. " has no seat")
-	check(not seat.CanTouch and seat.MaxSpeed == 0 and seat.Torque == 0, kind .. "'s seat would take over the driving")
+	-- A cockpit to weld the pilot into, not a Roblox seat (Server OutpostVehicles).
+	local cockpit = model:FindFirstChild("Cockpit")
+	check(cockpit and cockpit.ClassName == "Part" and model:GetAttribute("MechKind") == kind, kind .. " has no cockpit")
+	check(not cockpit.CanTouch and not cockpit.CanCollide and cockpit.Massless, kind .. "'s cockpit gets in the way")
+	local seat = model:FindFirstChildWhichIsA("Seat", true) or model:FindFirstChildWhichIsA("VehicleSeat", true)
+	check(seat == nil, kind .. " still has a Roblox seat")
 	-- Nothing pushes it about: the server anchors the chassis and moves it.
 	check(
 		chassis:FindFirstChild("Drive") == nil and chassis:FindFirstChild("Steer") == nil,
@@ -135,5 +138,5 @@ end
 print(
 	"PASS: "
 		.. checks
-		.. " machine checks (driving maths, chassis, seats, no drive constraints, welds, articulated mech joints)"
+		.. " machine checks (driving maths, chassis, cockpits, no seats or drive constraints, welds, articulated mech joints)"
 )

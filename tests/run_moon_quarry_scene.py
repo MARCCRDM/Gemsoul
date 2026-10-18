@@ -164,7 +164,7 @@ for _,bay in site.Parking do
  local seat,drive,steer,drill=nil,nil,nil,nil
  local joints={}
  for _,object in instances do
-  if object.Parent==vehicle and object.Name=="Seat" then seat=object end
+  if object.Parent==vehicle and object.Name=="Cockpit" then seat=object end
   if object.Parent==vehicle.PrimaryPart and object.Name=="Drive" then drive=object end
   if object.Parent==vehicle.PrimaryPart and object.Name=="Steer" then steer=object end
   if object.ClassName=="Motor6D" and object.Parent and object.Parent.Parent==vehicle then
@@ -173,14 +173,14 @@ for _,bay in site.Parking do
    if object.Name=="ToolRotor" then drill=object end
   end
  end
- assert(seat and seat.OutpostMachine==bay.Kind,"Driver seat identity missing")
+ assert(seat and vehicle.MechKind==bay.Kind,"Cockpit or mech kind missing")
  assert(not drive and not steer,"Mech still has drive constraints (the server moves it)")
  if bay.Kind=="Mole" then assert(drill,"Mole drill motor missing") end
  assert(vehicle.Mech and vehicle.CameraFit>=20,"Mech identity/camera fit missing")
  for _,name in {"Waist","LeftHip","LeftKnee","LeftAnkle","RightHip","RightKnee","RightAnkle","LeftShoulder","LeftElbow","RightShoulder","RightElbow"} do
   assert(joints[name],"Missing animated joint: "..name)
  end
- assert(seat.Position.Y>8 and seat.Position.Y<14,"Cockpit seat outside frame")
+ assert(seat.Position.Y>8 and seat.Position.Y<14,"Cockpit outside frame")
  local total=0
  for _,part in builtParts do
   if part.Parent==vehicle then
@@ -216,7 +216,7 @@ for _,size in {"Pebble","Boulder"} do
   assert(parts<=(if size=="Boulder" then 32 else 22),"Rock detail budget: "..parts)
  end
 end
-print("PASS: all 8 mech rigs, cockpit seats, walking joints, tool motors, detail budget and floor clearance; basic rock builders")
+print("PASS: all 8 mech rigs, cockpits, walking joints, tool motors, detail budget and floor clearance; basic rock builders")
 for _,kind in Rules.MachineOrder do
  local spec=Rules.Machines[kind]
  local speed,yaw=0,0

@@ -1,8 +1,9 @@
--- Server-moved mechs (Server OutpostVehicles): the pilot's input moving the
--- anchored mech along the ground (up a kerb, down a drop, stopped by a rock,
--- a ledge, a gap and the crater rim), getting in and out, an abandoned mech
--- going home, and the diagnostics. The real module and drive maths, with
--- stand-ins for the seats and the world it moves through; run by
+-- The mechs on the server (Server OutpostVehicles), with no Roblox seats:
+-- parking, getting in (the Pilot prompt: MechPilot on the player, a weld in
+-- the cockpit), the pilot's screen's moves checked and passed on (only its
+-- pilot, no faster than it goes, inside the rim), getting out and being let
+-- go (leaving, dying, respawning, getting busy, SeatExit), going home, and
+-- the diagnostics. Stand-ins for the world; run by
 -- tests/run_outpost_vehicles.py with Lune or the bundled Luau runtime.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -41,198 +42,150 @@ local function signal()
 end
 
 -- Stand-ins ------------------------------------------------------------------------------
-local function newInstance(class)
-	local data = { ClassName = class, Attributes = {}, Enabled = true, Children = {} }
-	local proxy = {}
-	function data.SetAttribute(_, k, v)
-		data.Attributes[k] = v
+local function attributes(object)
+	object.Attributes = object.Attributes or {}
+	function object:SetAttribute(k, v)
+		self.Attributes[k] = v
 	end
-	function data.GetAttribute(_, k)
-		return data.Attributes[k]
+	function object:GetAttribute(k)
+		return self.Attributes[k]
+	end
+	return object
+end
+
+-- An instance: its children by Parent, and Destroy.
+local function newInstance(class)
+	local data = attributes({ ClassName = class, Enabled = true, Children = {}, Destroyed = false })
+	local proxy = {}
+	function data.GetChildren()
+		local list = {}
+		for child in data.Children do
+			table.insert(list, child)
+		end
+		return list
+	end
+	function data.Destroy()
+		data.Destroyed = true
+		proxy.Parent = nil
 	end
 	return setmetatable(proxy, {
 		__index = data,
 		__newindex = function(_, k, v)
-			data[k] = v
-			if k == "Parent" and type(v) == "table" and v.Children and data.Name then
-				v.Children[data.Name] = proxy
+			if k == "Parent" then
+				local old = data.Parent
+				if type(old) == "table" and old.Children then
+					old.Children[proxy] = nil
+				end
+				if type(v) == "table" and v.Children then
+					v.Children[proxy] = true
+				end
 			end
+			data[k] = v
 		end,
 	})
 end
 
--- A part whose Position follows its CFrame, as a real one's does.
-local function newPart(data)
+-- A part whose Position follows its CFrame.
+local function newPart(fields)
+	local part = newInstance("Part")
+	for k, v in fields do
+		part[k] = v
+	end
 	return setmetatable({}, {
 		__index = function(_, k)
 			if k == "Position" then
-				return data.CFrame.Position
+				return part.CFrame.Position
 			end
-			return data[k]
+			return part[k]
 		end,
-		__newindex = data,
+		__newindex = part,
 	})
 end
 
--- A mech as OutpostMachines builds one (at scale 1): the chassis at the
--- root with its bottom on the ground, and the hull from 1.6 studs up (what
--- it bumps into; the foot ball under it takes the kerbs).
+-- A mech as OutpostMachines builds one (at scale 1): the chassis at the root
+-- with its bottom on the ground, and the cockpit up in its torso.
+local built = {}
 local function makeMachine(kind, bay)
+	local model = attributes({ Name = kind, Pivots = 0 })
 	local chassis = newPart({
 		Name = "Chassis",
 		Anchored = false,
 		Size = R.Vector3.new(7.6, 12, 6.2),
 		CFrame = bay * R.CFrame.new(0, 6.2, 0),
 	})
-	local hull = setmetatable({ Name = "Hull", Size = R.Vector3.new(7.6, 12 - 1.6, 6.2) }, {
+	local cockpit = setmetatable({}, {
 		__index = function(_, k)
-			if k == "CFrame" then
-				return chassis.CFrame * R.CFrame.new(0, 0.8, 0)
+			if k == "Position" then
+				return (chassis.CFrame * R.CFrame.new(0, 5, 0)).Position
 			end
-			return nil
+			return chassis.__cockpit[k]
 		end,
 	})
-	local seat = {
-		Occupant = nil,
-		Children = {},
-		Changed = signal(),
-		ChildAdded = signal(),
-		ChildRemoved = signal(),
-		Kind = kind,
-		Attributes = {},
-	}
-	function seat:SetAttribute(k, v)
-		self.Attributes[k] = v
-	end
-	function seat:GetAttribute(k)
-		return self.Attributes[k]
-	end
-	function seat:FindFirstChild(name)
-		return self.Children[name]
-	end
-	function seat:GetPropertyChangedSignal(name)
-		assert(name == "Occupant", "Unexpected seat property " .. tostring(name))
-		return self.Changed
-	end
-	function seat:Sit(humanoid)
-		self.Occupant = humanoid
-		humanoid.SeatPart = self
-		self.Changed:Fire()
-	end
-	local model = { Name = kind, PrimaryPart = chassis, Seat = seat, Hull = hull, Attributes = {}, Sets = 0 }
+	chassis.__cockpit = newInstance("Part")
+	chassis.__cockpit.Name, chassis.__cockpit.Size = "Cockpit", R.Vector3.new(2, 1, 2)
+	model.PrimaryPart, model.Cockpit = chassis, cockpit
 	function model:FindFirstChild(name)
-		return if name == "Seat" then self.Seat elseif name == "Hull" then self.Hull else nil
-	end
-	function model:GetAttribute(k)
-		return self.Attributes[k]
-	end
-	function model:SetAttribute(k, v)
-		self.Sets += 1
-		self.Attributes[k] = v
-	end
-	function chassis:IsDescendantOf(ancestor)
-		return ancestor == model
+		return if name == "Cockpit" then cockpit else nil
 	end
 	function model:PivotTo(cf)
+		self.Pivots += 1
 		chassis.CFrame = cf
 	end
+	table.insert(built, model)
 	return model
 end
 
+local userIds = 0
+local players = {}
 local function makePlayer(name)
-	local player = { Name = name, Attributes = { Outpost = true }, Children = {} }
+	userIds += 1
+	local player = attributes({ Name = name, UserId = userIds, Parent = "Players", Children = {} })
+	player.Attributes.Outpost = true
 	function player:FindFirstChild(k)
 		return self.Children[k]
 	end
-	function player:GetAttribute(k)
-		return self.Attributes[k]
-	end
-	local humanoid = { Health = 100, SeatPart = nil }
-	local character = { Player = player, Humanoid = humanoid }
-	function character:FindFirstChildOfClass(class)
-		return if class == "Humanoid" then self.Humanoid else nil
-	end
-	function character:FindFirstChild()
-		return nil
-	end
-	humanoid.Parent = character
-	player.Character = character
-	return player, humanoid
-end
-local function getOut(seat, humanoid)
-	seat.Occupant = nil
-	humanoid.SeatPart = nil
-	seat.Changed:Fire()
-end
-
--- The world the mechs move through: the quarry floor at y = 0, with areas
--- raised, sunk or cut away, and rocks in the way. The module's own sweep and
--- floor (Blockcast and Raycast) are replaced with these.
-local areas = {} -- { X = { min, max }, Z = { min, max }, Y = its height, or Cut = true: no floor }
-local rocks = {} -- { Name, X, Z, Radius, Top }
-local function inside(area, x, z)
-	return x >= area.X[1] and x <= area.X[2] and z >= area.Z[1] and z <= area.Z[2]
-end
--- Like a ray down from `top`: the highest surface at or below it (one it
--- starts inside doesn't count, as with a real ray).
-local function surfaceAt(x, z, top)
-	local best = if top >= 0 then 0 else nil
-	for _, area in areas do
-		if inside(area, x, z) and area.Cut then
-			best = nil
+	local function body()
+		local humanoid = { Health = 100, Sit = false, States = {} }
+		function humanoid:ChangeState(state)
+			table.insert(self.States, state)
 		end
-	end
-	for _, area in areas do
-		if inside(area, x, z) and area.Y and area.Y <= top and (best == nil or area.Y > best) then
-			best = area.Y
+		local root = newPart({ Name = "HumanoidRootPart", CFrame = R.CFrame.new(0, 3, 7000) })
+		root.AssemblyLinearVelocity = R.Vector3.zero
+		local character = { Player = player, Humanoid = humanoid, Root = root, Pivots = {} }
+		function character:FindFirstChildOfClass(class)
+			return if class == "Humanoid" then self.Humanoid else nil
 		end
-	end
-	return best
-end
-local sweeps, lastSweep = 0, nil
-local function sweep(_, from, size, direction)
-	sweeps += 1
-	lastSweep = { From = from, Size = size, Direction = direction }
-	local start = from.Position
-	local bottom = start.Y - size.Y / 2
-	local reach = size.Z / 2 -- (the hull's front, near enough)
-	local length = direction.Magnitude
-	local ux, uz = direction.X / length, direction.Z / length
-	local best, name = nil, nil
-	for _, rock in rocks do
-		-- (Lower than the hull's bottom, it passes under: the foot takes it.)
-		if rock.Top > bottom then
-			local dx, dz = rock.X - start.X, rock.Z - start.Z
-			local r = rock.Radius + reach
-			local b = dx * ux + dz * uz
-			local c = dx * dx + dz * dz - r * r
-			-- (A cast doesn't see what it starts inside.)
-			if c > 0 and b * b - c >= 0 then
-				local t = b - math.sqrt(b * b - c)
-				if t >= 0 and t <= length and (best == nil or t < best) then
-					best, name = t, rock.Name
-				end
-			end
+		function character:FindFirstChild(k)
+			return if k == "HumanoidRootPart" then self.Root else nil
 		end
+		function character:PivotTo(cf)
+			-- (What holds the body when it's moved: a weld still on would drag the mech.)
+			table.insert(self.Pivots, { CFrame = cf, Welded = player.Welded and player.Welded.Parent ~= nil })
+			root.CFrame = cf
+		end
+		humanoid.Parent = character
+		player.Character = character
 	end
-	return best, name
+	body()
+	player.Respawn = body
+	table.insert(players, player)
+	return player
 end
-local function floor(_, origin, length)
-	local y = surfaceAt(origin.X, origin.Z, origin.Y)
-	return if y and y >= origin.Y - length then y else nil
+local function near(player, part, offset)
+	player.Character.Root.CFrame = R.CFrame.new(part.Position + (offset or R.Vector3.new(4, -4, 0)))
 end
 
 local clockNow = 1000
-local warnings = {}
-local Players = {}
+local warnings, prints = {}, {}
+local Players = { PlayerRemoving = signal() }
 function Players:GetPlayerFromCharacter(character)
 	return character and character.Player
 end
 function Players:GetPlayers()
-	return {}
+	return players
 end
 local promptTriggered = signal()
-local mechInput = { OnServerEvent = signal() }
+local mechMove = { OnServerEvent = signal() }
 local echoed = {}
 local mechReport = {
 	OnServerEvent = signal(),
@@ -241,24 +194,37 @@ local mechReport = {
 	end,
 }
 local mechExit = { OnServerEvent = signal() }
-local detached = 0
 local notes = {}
 local heartbeat = signal()
+local tags = {}
 local Rules = load("src/shared/Outpost.luau", { CFrame = R.CFrame, Color3 = R.Color3 })
+local collection = {
+	AddTag = function(_, object, tag)
+		tags[object] = tag
+	end,
+	GetTagged = function(_, tag)
+		local list = {}
+		for object, t in tags do
+			if t == tag then
+				table.insert(list, object)
+			end
+		end
+		return list
+	end,
+}
+local MechPilot = load("src/shared/MechPilot.luau", {
+	game = {
+		GetService = function()
+			return collection
+		end,
+	},
+	CFrame = R.CFrame,
+	Vector3 = R.Vector3,
+})
 local modules = {
 	Rules = { Module = Rules },
-	Remotes = { Module = { MechInput = mechInput, MechReport = mechReport, MechExit = mechExit } },
-	SeatExit = {
-		Module = {
-			detach = function(character, seat)
-				detached += 1
-				local hum = character:FindFirstChildOfClass("Humanoid")
-				seat = seat or hum.SeatPart
-				seat.Children.SeatWeld = nil
-				getOut(seat, hum)
-			end,
-		},
-	},
+	MechPilot = { Module = MechPilot },
+	Remotes = { Module = { MechMove = mechMove, MechReport = mechReport, MechExit = mechExit } },
 	Feedback = {
 		Module = {
 			note = function(side, message, detail)
@@ -270,13 +236,12 @@ local modules = {
 }
 local services = {
 	Players = Players,
-	CollectionService = { AddTag = function() end },
+	CollectionService = collection,
 	ProximityPromptService = { PromptTriggered = promptTriggered },
-	ReplicatedStorage = {
-		Shared = { Outpost = modules.Rules, Seating = { Module = load("src/shared/Seating.luau", {}) } },
-	},
+	ReplicatedStorage = { Shared = { Outpost = modules.Rules, MechPilot = modules.MechPilot } },
 	RunService = { Heartbeat = heartbeat },
 }
+local welds = {}
 local Vehicles = load("src/server/Systems/OutpostVehicles.luau", {
 	game = {
 		GetService = function(_, name)
@@ -286,7 +251,6 @@ local Vehicles = load("src/server/Systems/OutpostVehicles.luau", {
 	script = {
 		Parent = {
 			Remotes = modules.Remotes,
-			SeatExit = modules.SeatExit,
 			Feedback = modules.Feedback,
 			Parent = { World = { OutpostMachines = modules.Machines } },
 		},
@@ -294,11 +258,18 @@ local Vehicles = load("src/server/Systems/OutpostVehicles.luau", {
 	require = function(target)
 		return assert(target.Module, "Unexpected require")
 	end,
-	Instance = { new = newInstance },
+	Instance = {
+		new = function(class)
+			local object = newInstance(class)
+			if class == "Weld" then
+				table.insert(welds, object)
+			end
+			return object
+		end,
+	},
 	Enum = R.Enum,
 	CFrame = R.CFrame,
 	Vector3 = R.Vector3,
-	Vector2 = R.Vector2,
 	os = setmetatable({
 		clock = function()
 			return clockNow
@@ -308,442 +279,328 @@ local Vehicles = load("src/server/Systems/OutpostVehicles.luau", {
 	warn = function(...)
 		table.insert(warnings, table.concat({ ... }, " "))
 	end,
+	print = function(...)
+		table.insert(prints, table.concat({ ... }, " "))
+	end,
 })
-Vehicles.sweep, Vehicles.floor = sweep, floor
 
-local function near(a, b, within)
-	return math.abs(a - b) <= (within or 1e-3)
-end
 local function same(a, b)
-	return a ~= nil and b ~= nil and (a - b).Magnitude < 1e-6
+	return a ~= nil and b ~= nil and (a - b).Magnitude < 1e-3
 end
 local function yawOf(part)
 	local _, yaw = part.CFrame:ToOrientation()
 	return yaw
 end
 
--- Boarding -------------------------------------------------------------------------------
+-- Parking ------------------------------------------------------------------------------------------
 local origin = Rules.Location.Position
 local site = {
 	Model = {},
 	Parking = {
-		{ Kind = "Hauler", CFrame = R.CFrame.new(origin.X, origin.Y, origin.Z) },
+		{ Kind = "Hauler", CFrame = R.CFrame.new(origin) },
 		{
 			Kind = "Mole",
-			CFrame = R.CFrame.new(origin.X + 40, origin.Y, origin.Z) * R.CFrame.Angles(0, math.rad(90), 0),
+			CFrame = R.CFrame.new(origin + R.Vector3.new(40, 0, 0)) * R.CFrame.Angles(0, math.rad(90), 0),
 		},
 	},
 }
 Vehicles.start(site)
 local hauler, mole = Vehicles._machines[1], Vehicles._machines[2]
-check(hauler and mole and #Vehicles._machines == 2, "Machines were not parked")
-check(mechInput.OnServerEvent:Count() == 1 and heartbeat:Count() == 1, "Pilot input or the drive step isn't wired up")
-check(mechReport.OnServerEvent:Count() == 1, "Stuck reports aren't wired up")
-local chassis = hauler.Model.PrimaryPart
-local moleChassis = mole.Model.PrimaryPart
-check(chassis.Anchored and moleChassis.Anchored, "A parked mech isn't anchored (the server moves it)")
+check(hauler and mole and #Vehicles._machines == 2, "The mechs weren't parked")
+check(
+	mechMove.OnServerEvent:Count() == 1 and mechExit.OnServerEvent:Count() == 1,
+	"Moves or getting out aren't wired up"
+)
+check(mechReport.OnServerEvent:Count() == 1 and heartbeat:Count() == 1, "Reports or the step aren't wired up")
+check(prints[#prints]:find("2 mechs parked", 1, true) ~= nil, "Parking wasn't logged")
+local chassis, moleChassis = hauler.Model.PrimaryPart, mole.Model.PrimaryPart
+check(chassis.Anchored and moleChassis.Anchored, "A parked mech isn't anchored")
+check(hauler.Id == "Hauler1" and mole.Id == "Mole2", "Mech ids")
+check(
+	hauler.Model:GetAttribute("MechId") == "Hauler1" and hauler.Model:GetAttribute("MechKind") == "Hauler",
+	"A mech doesn't say what it is"
+)
+check(MechPilot.find("Mole2") == mole.Model, "A mech can't be found by its id")
 check(same(hauler.Model:GetAttribute("MechPosition"), chassis.Position), "A parked mech didn't say where it is")
 check(
-	near(mole.Yaw, math.rad(90)) and near(mole.Model:GetAttribute("MechMotion").X, math.rad(90)),
-	"A parked mech lost its heading"
+	math.abs(mole.Model:GetAttribute("MechMotion").X - math.rad(90)) < 1e-4,
+	"A parked mech didn't say which way it faces"
 )
-local prompt = hauler.Seat:FindFirstChild("DrivePrompt")
-check(prompt and prompt:GetAttribute("PromptKind") == "Drive" and prompt.Enabled, "No Drive prompt on the seat")
+local prompt = hauler.Prompt
+check(prompt.Parent == hauler.Model.Cockpit, "The Pilot prompt isn't on the cockpit")
+check(
+	prompt:GetAttribute("PromptKind") == "Drive" and prompt.ActionText == "Pilot" and prompt.Enabled,
+	"No Pilot prompt"
+)
 
--- A parked mech sends nothing: no attribute churn, frame after frame.
-local sets = hauler.Model.Sets
-for _ = 1, 30 do
-	heartbeat:Fire(1 / 60)
-end
-check(hauler.Model.Sets == sets, "A parked mech kept re-sending where it is")
-
-local pilot, pilotHum = makePlayer("Pilot")
+-- Getting in -----------------------------------------------------------------------------------------
+local pilot = makePlayer("Pilot")
+near(pilot, hauler.Model.Cockpit)
 promptTriggered:Fire(prompt, pilot)
-check(hauler.Seat.Occupant == pilotHum and not prompt.Enabled, "The Drive prompt didn't seat the pilot")
-check(pilot:FindFirstChild("PilotedMechSeat").Value == hauler.Seat, "Pilot has no replicated seat discovery reference")
-
--- Input moves it, with nothing from the client but the input.
-local home = chassis.Position
-mechInput.OnServerEvent:Fire(pilot, 1, 0)
-local inputAt = hauler.InputAt
-Vehicles.seated(hauler) -- SeatWeld notification following Occupant
+local weld = hauler.Weld
+check(pilot:GetAttribute("MechPilot") == "Hauler1", "The prompt didn't make them its pilot")
+check(MechPilot.of(pilot) == "Hauler1" and MechPilot.mech(pilot) == hauler.Model, "MechPilot doesn't see the pilot")
+check(hauler.Model:GetAttribute("MechPilotId") == pilot.UserId, "The mech doesn't say who pilots it")
+check(weld and weld.ClassName == "Weld" and weld.Name == "PilotWeld", "No weld holds the pilot")
 check(
-	hauler.Heard and hauler.Throttle == 1 and hauler.InputAt == inputAt,
-	"Duplicate boarding event erased accepted input"
+	weld.Part1 == pilot.Character.Root and weld.Parent == hauler.Model.Cockpit,
+	"The weld doesn't hold the pilot in the cockpit"
 )
-check(hauler.Seat:GetAttribute("MechInputThrottle") == 1, "Accepted input was not acknowledged")
-heartbeat:Fire(1 / 60)
-check(hauler.ServerDriving and chassis.Position.Z < home.Z, "The first frame of input didn't move the mech")
-getOut(hauler.Seat, pilotHum)
-check(pilot:FindFirstChild("PilotedMechSeat").Value == nil, "Seat discovery reference survived exit")
-check(Vehicles.sit(pilot, hauler.Seat), "Couldn't get back in")
+check(pilot.Character.Humanoid.Sit and not prompt.Enabled, "Not sat, or the prompt still shows")
+check(Vehicles.machineOf(pilot) == hauler, "The server doesn't know who pilots what")
+check(prints[#prints]:find("Pilot is piloting Hauler1", 1, true) ~= nil, "Getting in wasn't logged")
+pilot.Welded = weld
 
--- While a key is held the client re-sends it every 0.5 s (Client VehicleDrive).
-local hold = nil
-local function press(player, throttle, steer)
-	hold = { player, throttle, steer }
-	return Vehicles.input(player, throttle, steer)
-end
-local sinceSend = 0
-local function frames(n, dt)
-	dt = dt or 1 / 60
-	for _ = 1, n do
-		clockNow += dt
-		sinceSend += dt
-		if hold and sinceSend >= 0.5 then
-			sinceSend = 0
-			Vehicles.input(hold[1], hold[2], hold[3])
-		end
-		heartbeat:Fire(dt)
-	end
-end
--- Put a mech somewhere, standing still and facing `yaw` (as if it had driven there).
-local function place(machine, x, z, yaw, y)
-	machine.Model.PrimaryPart.CFrame = R.CFrame.new(x, (y or 0) + 6.2, z) * R.CFrame.Angles(0, yaw, 0)
-	machine.Yaw, machine.Speed, machine.Fall = yaw, 0, 0
-end
-
--- Driving --------------------------------------------------------------------------------
-local start = chassis.Position
-frames(10)
-check(same(chassis.Position, start), "The mech moved without any input")
-check(press(pilot, 1, 0), "The pilot's input was refused")
-frames(60 * 4)
-local spec = Rules.Machines.Hauler
-check(near(hauler.Speed, spec.MaxSpeed), "The mech didn't reach top speed")
-check(chassis.Position.Z < start.Z - 50, "The mech never got anywhere")
-check(near(chassis.Position.X, start.X) and near(chassis.Position.Y, 6.2), "Driving straight on the flat wandered off")
-check(chassis.Anchored, "Driving unanchored the mech")
-check(same(hauler.Model:GetAttribute("MechPosition"), chassis.Position), "Clients weren't told where it is")
-local motion = hauler.Model:GetAttribute("MechMotion")
-check(
-	near(motion.Y, spec.MaxSpeed) and hauler.Model:GetAttribute("MechBlocked") == nil,
-	"Clients weren't told its speed"
-)
--- It's the hull that's swept, from above the step height: not the chassis,
--- whose flat bottom would catch on every kerb.
-check(sweeps > 0 and lastSweep ~= nil, "Nothing checked the way ahead")
-check(near(lastSweep.From.Position.Y, chassis.Position.Y + 0.8), "The sweep didn't start from the hull")
-check(near(lastSweep.Size.Y, 10.2, 0.01), "The sweep isn't the hull's size")
-check(lastSweep.Direction.Unit:Dot(R.Vector3.new(0, 0, -1)) > 0.999, "The sweep looked the wrong way")
-
--- Steering, from where the mech actually points.
-press(pilot, 0, 1)
-frames(30)
-check(hauler.Yaw < -0.2 and near(yawOf(chassis), hauler.Yaw), "Steering didn't turn the mech")
-check(hauler.Model:GetAttribute("MechMotion").Z < 0, "Clients weren't told it's turning")
-
--- A rock: it stops short of it, says so, and turns away and goes on.
-place(hauler, 0, 6900, 0)
-rocks = { { Name = "Boulder", X = 0, Z = 6870, Radius = 4, Top = 8 } }
-press(pilot, 1, 0)
-frames(60 * 3)
-check(
-	near(chassis.Position.Z, 6870 + 4 + 3 + 0.4, 0.05),
-	"Drove into the rock, or stopped short: " .. chassis.Position.Z
-)
-check(
-	hauler.Blocked == "Boulder" and hauler.Model:GetAttribute("MechBlocked") == "Boulder",
-	"Didn't say what's in the way"
-)
-check(hauler.Speed == 0 and hauler.Model:GetAttribute("MechMotion").Y == 0, "Kept pushing into the rock")
-press(pilot, 0, 1)
-frames(60 * 2)
-press(pilot, 1, 0)
-local stopped = chassis.Position
-frames(60)
-check((chassis.Position - stopped).Magnitude > 5 and hauler.Blocked == nil, "Couldn't drive away from the rock")
--- A rock low enough to step over isn't in the way.
-place(hauler, 0, 6900, 0)
-rocks = { { Name = "Pebble", X = 0, Z = 6880, Radius = 2, Top = 1 } }
-frames(60 * 2)
-check(chassis.Position.Z < 6878 and hauler.Blocked == nil, "A pebble stopped the mech")
-rocks = {}
-
--- A kerb: it steps up. Off the far side: it drops, falling.
-place(hauler, 0, 6900, 0)
-areas = { { X = { -50, 50 }, Z = { 6850, 6885 }, Y = 1.2 } }
-frames(60 * 2)
-local z = chassis.Position.Z
-check(z < 6885 and z > 6850 and near(chassis.Position.Y, 7.4), "Didn't step up the kerb")
-frames(60 * 2)
-check(chassis.Position.Z < 6850 and near(chassis.Position.Y, 6.2) and hauler.Fall == 0, "Didn't step back down off it")
--- A ledge too high to step up: it stops at the foot of it.
-place(hauler, 0, 6900, 0)
-areas = { { X = { -50, 50 }, Z = { 6850, 6885 }, Y = 1.8 } }
-frames(60 * 2)
-check(chassis.Position.Z > 6885 and chassis.Position.Z < 6890, "Climbed a ledge too high, or stopped short of it")
-check(hauler.Blocked == "a ledge" and near(chassis.Position.Y, 6.2), "Didn't say a ledge was in the way")
--- A pit: it drives off the edge and falls in, under gravity.
-place(hauler, 0, 6900, 0)
-areas = { { X = { -50, 50 }, Z = { 6800, 6890 }, Cut = true }, { X = { -50, 50 }, Z = { 6800, 6890 }, Y = -8 } }
-local fell, lowest = false, math.huge
-for _ = 1, 60 * 2 do
-	frames(1)
-	local y = chassis.Position.Y
-	if y < 6.2 - 0.01 and y > -1.8 + 0.01 then
-		fell = true
-	end
-	lowest = math.min(lowest, y)
-end
-check(fell and near(lowest, -1.8) and near(chassis.Position.Y, -1.8), "Didn't fall into the pit, or fell through it")
-check(hauler.Fall == 0 and chassis.Position.Z < 6890, "Didn't land in the pit")
--- No ground at all: it won't go.
-place(hauler, 0, 6900, 0)
-areas = { { X = { -50, 50 }, Z = { 6800, 6890 }, Cut = true } }
-frames(60 * 2)
-check(chassis.Position.Z > 6890 and hauler.Blocked == "no ground", "Drove off into nothing")
-areas = {}
--- The crater rim.
-place(hauler, origin.X, origin.Z - Rules.Radius - 30, 0)
-frames(60 * 3)
-local out = chassis.Position - origin
-check(R.Vector3.new(out.X, 0, out.Z).Magnitude <= Rules.Radius + 40 + 0.01, "Drove out over the crater rim")
-check(hauler.Blocked == "the crater rim", "Didn't say the rim is in the way")
-place(hauler, 0, 6950, 0)
-frames(5)
-check(hauler.Blocked == nil, "Still blocked after driving away")
-
--- Input that stops arriving counts as let go.
-hold = nil
-frames(60 * 3)
-check(hauler.Speed < 1, "A lost connection left the mech driving")
-local resting = chassis.Position
-frames(30)
-check((chassis.Position - resting).Magnitude < 0.5, "A mech kept rolling with no input")
-press(pilot, 1, 0)
-frames(60)
-check(hauler.Speed > 5, "Fresh input didn't drive again")
-
--- Only the pilot steers, and only with sane numbers.
+-- Not in: someone else into a taken mech, the pilot into a second, someone
+-- busy, too far, or dead.
 local other = makePlayer("Other")
-check(not Vehicles.input(other, -1, 0), "Someone on foot steered another player's mech")
-for _, bad in { { 0 / 0, 0 }, { math.huge, 0 }, { 0, -math.huge }, { "1", 0 }, { nil, 0 }, { {}, 1 } } do
-	check(not Vehicles.input(pilot, bad[1], bad[2]), "Bad input was accepted: " .. tostring(bad[1]))
+near(other, hauler.Model.Cockpit)
+check(not Vehicles.board(other, hauler), "Two pilots in one mech")
+near(pilot, mole.Model.Cockpit)
+check(not Vehicles.board(pilot, mole), "One pilot in two mechs")
+near(other, mole.Model.Cockpit)
+other.Attributes.Expedition = true
+check(not Vehicles.board(other, mole), "Got in while on an expedition")
+other.Attributes.Expedition = nil
+other.Attributes.Outpost = nil
+check(not Vehicles.board(other, mole), "Got in outside the Outpost")
+other.Attributes.Outpost = true
+near(other, mole.Model.Cockpit, R.Vector3.new(60, 0, 0))
+check(not Vehicles.board(other, mole), "Got in from 60 studs away")
+near(other, mole.Model.Cockpit)
+other.Character.Humanoid.Health = 0
+check(not Vehicles.board(other, mole), "A dead player got in")
+other.Character.Humanoid.Health = 100
+check(other:GetAttribute("MechPilot") == nil and mole.Pilot == nil, "A refused boarding left something behind")
+
+-- Moves from the pilot's screen -------------------------------------------------------------------------
+local spec = Rules.Machines.Hauler
+local start = chassis.Position
+local function move(player, at, yaw, speed, turn, dt)
+	clockNow += dt or 1 / 15
+	return Vehicles.move(player, at, yaw, speed or 0, turn or 0, clockNow)
 end
-check(hauler.Throttle == 1 and hauler.Steer == 0, "Bad input changed the controls")
-check(Vehicles.input(pilot, 9, -9) and hauler.Throttle == 1 and hauler.Steer == -1, "Out-of-range input wasn't clamped")
-Vehicles.input(pilot, 1, 0)
-
--- Busy elsewhere: the mech stops.
-pilot.Attributes.CombatSession = "Duel"
-press(pilot, 1, 0)
-frames(60 * 3)
-check(hauler.Speed < 1, "A pilot in a fight kept driving")
-pilot.Attributes.CombatSession = nil
-
--- Reboarding picks up the actual heading, not an earlier ride's heading.
-getOut(hauler.Seat, pilotHum)
-chassis.CFrame = R.CFrame.new(chassis.Position) * R.CFrame.Angles(0, 1.2, 0)
-Vehicles.sit(pilot, hauler.Seat)
-press(pilot, 0, 0)
-frames(1)
-check(near(hauler.Yaw, 1.2, 0.05) and near(yawOf(chassis), 1.2, 0.05), "Reboarding snapped back to an old heading")
-
--- Getting out: it stops where it is, and the prompt comes back.
-press(pilot, 1, 0)
-frames(30)
-getOut(hauler.Seat, pilotHum)
-hold = nil
-check(hauler.Speed == 0 and hauler.Model:GetAttribute("MechMotion").Y == 0, "An empty mech kept driving")
-check(prompt.Enabled and chassis.Anchored, "An empty mech wasn't parked")
-local parked = chassis.Position
-frames(30)
-check(same(chassis.Position, parked), "An empty mech moved")
-check(not Vehicles.input(pilot, 1, 0), "Input from someone who got out was accepted")
-
--- A new pilot starts from rest, not from the last pilot's input.
-local second, secondHum = makePlayer("Second")
-promptTriggered:Fire(prompt, second)
+-- Hello (where it stands): accepted, nothing moves.
+check(move(pilot, start, 0, 0, 0), "The pilot's hello was refused")
+check(same(chassis.Position, start), "The hello moved it")
+-- Forward: it goes where it's put, and everyone is told.
+local ahead = start + R.Vector3.new(0, 0, -1.5)
+check(move(pilot, ahead, 0, 22, 0), "A move forward was refused")
+check(same(chassis.Position, ahead) and chassis.Anchored, "The mech didn't go where its pilot put it")
+check(same(hauler.Model:GetAttribute("MechPosition"), ahead), "Others weren't told where it is")
+local motion = hauler.Model:GetAttribute("MechMotion")
+check(math.abs(motion.Y - 22) < 1e-6 and motion.X == 0 and motion.Z == 0, "Others weren't told how it moves")
+-- Turning: its heading is what the pilot says.
+check(move(pilot, ahead, -0.6, 0, -1.1), "A turn was refused")
+check(math.abs(yawOf(chassis) + 0.6) < 1e-4 and hauler.Model:GetAttribute("MechMotion").Z < 0, "It didn't turn")
+local acceptedAt = clockNow
+-- Only from its pilot, with real numbers.
+local held = chassis.Position
+check(not move(other, held + R.Vector3.new(0, 0, -1), 0, 10, 0), "Someone else moved the mech")
+for _, bad in
+	{
+		{ "far", 0, 0, 0 },
+		{ R.Vector3.new(0 / 0, 0, 0), 0, 0, 0 },
+		{ R.Vector3.new(math.huge, 0, 0), 0, 0, 0 },
+		{ held, 0 / 0, 0, 0 },
+		{ held, 0, math.huge, 0 },
+		{ held, 0, 0, "1" },
+	}
+do
+	check(
+		not Vehicles.move(pilot, bad[1], bad[2], bad[3], bad[4], clockNow),
+		"A bad move was taken: " .. tostring(bad[1])
+	)
+end
+check(same(chassis.Position, held), "A refused move moved it")
+-- No further than it could have gone: a jump of 200 studs is cut short.
+check(move(pilot, held + R.Vector3.new(0, 0, -200), 0, 22, 0), "A long move was refused outright")
+local since = clockNow - acceptedAt -- (since the last move it took)
+local went = (chassis.Position - held).Magnitude
 check(
-	hauler.Seat.Occupant == secondHum and hauler.Throttle == 0 and hauler.Steer == 0,
-	"A new pilot inherited old input"
+	went <= spec.MaxSpeed * since * 1.5 + 2 + 1e-3 and went > 1,
+	"A long move wasn't cut to what it could do: " .. went
 )
-frames(30)
-check(same(chassis.Position, parked), "A new pilot's mech moved on its own")
-local idle = hauler.Model.Sets
-frames(30)
-check(hauler.Model.Sets == idle, "A mech standing still kept re-sending where it is")
+-- A burst of moves arriving together still goes (a little slack).
+held = chassis.Position
+for _ = 1, 5 do
+	move(pilot, chassis.Position + R.Vector3.new(0, 0, -1.6), 0, 22, 0, 0)
+end
+check((chassis.Position - held).Magnitude > 7, "Moves arriving together were cut short")
+-- Up no more than a step or two at once; down a drop freely.
+held = chassis.Position
+move(pilot, held + R.Vector3.new(0, 30, 0), 0, 0, 0)
+check(chassis.Position.Y - held.Y <= 1.6 * 2 + 1 + 1e-3, "It rose 30 studs at once")
+held = chassis.Position
+move(pilot, held + R.Vector3.new(0, -20, 0), 0, 0, 0)
+check(math.abs(chassis.Position.Y - (held.Y - 20)) < 1e-3, "It couldn't drop")
+move(pilot, held, 0, 0, 0)
+-- Never out of the world: below it, or past the crater rim.
+held = chassis.Position
+move(pilot, R.Vector3.new(held.X, origin.Y - 100, held.Z), 0, 0, 0)
+check(math.abs(chassis.Position.Y - held.Y) < 1e-3, "It went below the world")
+local limit = Rules.Radius + 40
+chassis.CFrame = R.CFrame.new(origin + R.Vector3.new(0, 6.2, -(limit - 1)))
+move(pilot, origin + R.Vector3.new(0, 6.2, -(limit + 5)), 0, 22, 0, 0.5)
+local out = chassis.Position - origin
+check(R.Vector3.new(out.X, 0, out.Z).Magnitude <= limit + 1e-3, "It went out over the crater rim")
+chassis.CFrame = R.CFrame.new(start)
+-- Not faster than it goes, nor turning wildly.
+move(pilot, start, 0, 500, 99)
+motion = hauler.Model:GetAttribute("MechMotion")
+check(motion.Y == spec.MaxSpeed and motion.Z == 10, "A wild speed or turn was passed on")
+-- Moves stop coming: it has stopped, for everyone's glide.
+clockNow += 1.5
+Vehicles.step(clockNow)
+check(hauler.Model:GetAttribute("MechMotion").Y == 0, "A mech whose moves stopped kept going on others' screens")
 
--- Taken: the Drive prompt won't seat someone else, or anyone busy, and only
--- the seat's occupant steers it (a stale SeatPart is not enough).
-check(not Vehicles.sit(pilot, hauler.Seat), "Two pilots in one seat")
-local stale, staleHum = makePlayer("Stale")
-staleHum.SeatPart = hauler.Seat
-check(not Vehicles.input(stale, 1, 0) and hauler.Throttle == 0, "Someone who isn't the occupant steered the mech")
-pilot.Attributes.Expedition = true
-check(not Vehicles.sit(pilot, mole.Seat), "Boarded while on an expedition")
-pilot.Attributes.Expedition = nil
-check(Vehicles.sit(pilot, mole.Seat) and mole.Seat.Occupant == pilotHum, "Couldn't board the free mech")
-
--- The Mole drives the way it faces (90 degrees: -X), and if anything ever
--- unanchors it, it's anchored again.
-local moleStart = moleChassis.Position
-moleChassis.Anchored = false
-press(pilot, 1, 0)
-frames(60 * 2)
-check(moleChassis.Anchored, "An unanchored mech wasn't anchored again")
-check(
-	moleChassis.Position.X < moleStart.X - 15 and near(moleChassis.Position.Z, moleStart.Z, 0.01),
-	"The Mole didn't drive the way it faces"
-)
-
--- Getting out mid-fall: it still lands.
-place(mole, moleChassis.Position.X, moleChassis.Position.Z, mole.Yaw, 5)
-mole.Fall = 0.1
-getOut(mole.Seat, pilotHum)
-hold = nil
-frames(60)
-check(near(moleChassis.Position.Y, 6.2) and mole.Fall == 0, "An empty mech hung in the air")
-
--- Abandoned away from its bay, it goes home; out of the world, at once.
-local moleBay = mole.Bay.Position
-Vehicles.tidy(clockNow + Rules.MachineResetSeconds - 5)
-check((moleChassis.Position - moleBay).Magnitude > 12, "Went home too soon")
-Vehicles.tidy(clockNow + Rules.MachineResetSeconds + 5)
-check(
-	near((moleChassis.Position - moleBay).Magnitude, 6.2, 0.01) and near(yawOf(moleChassis), math.rad(90)),
-	"An abandoned mech didn't go home"
-)
-check(
-	moleChassis.Anchored and same(mole.Model:GetAttribute("MechPosition"), moleChassis.Position),
-	"Going home didn't tell the clients"
-)
-place(mole, moleBay.X, moleBay.Z, mole.Yaw, -100)
-Vehicles.tidy(clockNow)
-check(near(moleChassis.Position.Y, 6.2), "A mech out of the world stayed there")
-
--- Diagnostics --------------------------------------------------------------------------
-
--- A pilot whose client never starts driving is logged, once.
-Vehicles.input(second, 0, 0) -- (the hauler's pilot says hello)
-local quiet, quietHum = makePlayer("Quiet")
-check(Vehicles.sit(quiet, mole.Seat), "Couldn't board for the silent check")
+-- Diagnostics: a pilot whose screen never moves it is logged, once.
+near(other, mole.Model.Cockpit)
+check(Vehicles.board(other, mole), "Couldn't get into the Mole")
 local before = #notes
-frames(60 * 4)
-check(#notes == before, "Logged a silent client too soon")
-frames(60 * 2)
+clockNow += 4
+Vehicles.step(clockNow)
+check(#notes == before, "Logged a silent screen too soon")
+clockNow += 2
+Vehicles.step(clockNow)
 local last = notes[#notes]
 check(
-	#notes == before + 1 and last.Message:find("no word", 1, true) and last.Detail:find("Quiet", 1, true),
-	"A client that never started driving wasn't logged"
+	#notes == before + 1 and last.Message:find("no moves", 1, true) and last.Detail:find("Other", 1, true),
+	"A silent screen wasn't logged"
 )
-check(warnings[#warnings]:find("Quiet", 1, true) ~= nil, "The silent client wasn't in the Output")
-check(
-	echoed[#echoed].Player == quiet and echoed[#echoed].Detail:find("anchored true", 1, true),
-	"The silent pilot wasn't told the server's view"
-)
-frames(60 * 10)
-check(#notes == before + 1, "The silent client was logged again")
-getOut(mole.Seat, quietHum)
-
--- A client that says hello isn't.
-check(Vehicles.sit(quiet, mole.Seat), "Couldn't reboard")
-check(Vehicles.input(quiet, 0, 0), "The hello was refused")
-frames(60 * 6)
-check(#notes == before + 1, "A client that said hello was logged as silent")
-
--- A stuck report: logged with both sides' view, and for a moment the mech
--- drives through whatever it's wedged in.
-place(mole, moleBay.X, moleBay.Z, math.rad(90))
-rocks = { { Name = "Wedge", X = moleBay.X - 7.4, Z = moleBay.Z, Radius = 4, Top = 8 } }
-press(quiet, 1, 0)
-frames(60)
-check(mole.Blocked == "Wedge" and near(moleChassis.Position.X, moleBay.X, 0.05), "The rock didn't stop the Mole")
-check(not Vehicles.report(quiet, 5), "A report that isn't text was taken")
-check(not Vehicles.report(other, "stuck"), "Someone on foot filed a stuck report")
-before = #notes
-mechReport.OnServerEvent:Fire(quiet, "input 1.00/0.00 from keys")
+check(echoed[#echoed].Player == other and echoed[#echoed].Detail:find("Mole2", 1, true), "The silent pilot wasn't told")
+clockNow += 10
+Vehicles.step(clockNow)
+check(#notes == before + 1, "The silent screen was logged again")
+-- A stuck report: logged with both sides' view, three a ride.
+check(not Vehicles.report(other, 5), "A report that isn't text was taken")
+check(not Vehicles.report(makePlayer("Walker"), "stuck"), "Someone on foot filed a report")
+check(Vehicles.report(other, "server not answering"), "A report was refused")
 last = notes[#notes]
-check(#notes == before + 1 and last.Message:find("won't move", 1, true), "The stuck report wasn't logged")
 check(
-	last.Detail:find("Client: input 1.00/0.00 from keys", 1, true) and last.Detail:find("blocked by Wedge", 1, true),
-	"The log lacks the client's or the server's view"
+	last.Detail:find("Client: server not answering", 1, true) and last.Detail:find("Mole2 at", 1, true),
+	"The report lacks a side"
 )
 check(
-	echoed[#echoed].Player == quiet and echoed[#echoed].Detail:find("blocked by Wedge", 1, true),
-	"Server view wasn't returned to the pilot"
+	Vehicles.report(other, "again") and Vehicles.report(other, string.rep("x", 5000)),
+	"Second or third report refused"
 )
-check(warnings[#warnings]:find("won't move", 1, true) ~= nil, "The stuck report wasn't in the Output")
-local sweepsBefore = sweeps
-frames(60)
-check(moleChassis.Position.X < moleBay.X - 5 and sweeps == sweepsBefore, "A stuck report didn't free the mech")
-frames(60)
-check(sweeps > sweepsBefore, "It never went back to checking the way ahead")
-rocks = {}
-check(Vehicles.report(quiet, "again") and Vehicles.report(quiet, "third"), "A second or third report was refused")
-check(not Vehicles.report(quiet, "fourth"), "Took more than three reports in one ride")
-getOut(mole.Seat, quietHum)
-hold = nil
-
--- The next ride starts fresh, and may report again.
-check(Vehicles.sit(quiet, mole.Seat), "Couldn't board again")
-check(Vehicles.report(quiet, string.rep("x", 5000)), "A new ride couldn't report")
 check(#notes[#notes].Detail < 1200, "A long report wasn't cut short")
+check(not Vehicles.report(other, "fourth"), "Took a fourth report in one ride")
 
-check(not Vehicles.exit(other), "Non-pilot could exit another player's mech")
-press(quiet, 1, 0)
-frames(30)
-mechExit.OnServerEvent:Fire(quiet)
-check(detached == 1 and mole.Seat.Occupant == nil, "Jump did not detach the pilot on the server")
-check(mole.Speed == 0 and mole.Model:GetAttribute("MechMotion").Y == 0, "Exiting kept the mech moving")
-hold = nil
+-- Getting out ------------------------------------------------------------------------------------------
+mechExit.OnServerEvent:Fire(pilot)
+check(pilot:GetAttribute("MechPilot") == nil and hauler.Pilot == nil, "Getting out didn't let go")
+check(weld.Destroyed and hauler.Weld == nil, "The weld stayed")
+check(hauler.Model:GetAttribute("MechPilotId") == nil and prompt.Enabled, "The mech still says it's taken")
+check(not pilot.Character.Humanoid.Sit, "Still sat down")
+local pivot = pilot.Character.Pivots[#pilot.Character.Pivots]
+check(pivot and not pivot.Welded, "Moved out while still welded (it would drag the mech)")
+local beside = pivot.CFrame.Position - chassis.Position
+check(R.Vector3.new(beside.X, 0, beside.Z).Magnitude > 5, "Not stood beside the mech")
+check(not move(pilot, start, 0, 0, 0), "A move taken after getting out")
+check(not Vehicles.exit(pilot), "Got out twice")
 
--- Seat.Occupant and Humanoid.SeatPart don't replicate, so the side that
--- didn't seat someone can see either one empty. The pilot is still found,
--- from whichever is there or from the seat weld itself (Shared.Seating).
-getOut(hauler.Seat, secondHum)
-local lone, loneHum = makePlayer("Lone")
-check(Vehicles.sit(lone, hauler.Seat), "Couldn't board for the replication checks")
-loneHum.SeatPart = nil -- (the seat's Occupant only)
-check(press(lone, 1, 0), "Input refused with only the seat's Occupant to go on")
-local from = chassis.Position
-frames(60)
-check((chassis.Position - from).Magnitude > 5, "Didn't drive with only the seat's Occupant")
--- The weld only: neither Occupant nor SeatPart.
-local loneRoot = { Name = "HumanoidRootPart", Parent = lone.Character }
-function lone.Character:FindFirstChild(name)
-	return if name == "HumanoidRootPart" then loneRoot else nil
+-- Let go when they leave, die, respawn, get busy, or something else lets go
+-- of them (SeatExit), without being moved unless they got busy.
+local function boarded(player, machine)
+	near(player, machine.Model.Cockpit)
+	assert(Vehicles.board(player, machine), "couldn't get in for a release check")
+	player.Welded = machine.Weld
+	return #player.Character.Pivots
 end
-local weld = { Name = "SeatWeld", Part0 = hauler.Seat, Part1 = loneRoot }
-function loneRoot:GetJoints()
-	return if hauler.Seat.Children.SeatWeld then { weld } else {}
+local pivots = boarded(pilot, hauler)
+pilot.Attributes.CombatSession = "Duel"
+Vehicles.step(clockNow)
+check(hauler.Pilot == nil and pilot:GetAttribute("MechPilot") == nil, "A pilot in a fight kept the mech")
+check(#pilot.Character.Pivots == pivots + 1, "A pilot pulled into a fight wasn't put down beside it")
+pilot.Attributes.CombatSession = nil
+
+pivots = boarded(pilot, hauler)
+hauler.Weld:Destroy() -- (SeatExit, before an arena move)
+Vehicles.step(clockNow)
+check(
+	hauler.Pilot == nil and pilot:GetAttribute("MechPilot") == nil and prompt.Enabled,
+	"A weld let go elsewhere kept the pilot"
+)
+check(#pilot.Character.Pivots == pivots, "Someone else's move was overridden")
+
+boarded(pilot, hauler)
+pilot:SetAttribute("MechPilot", nil)
+Vehicles.step(clockNow)
+check(hauler.Pilot == nil and hauler.Weld == nil, "A pilot cleared elsewhere kept the mech")
+
+boarded(pilot, hauler)
+pilot.Character.Humanoid.Health = 0
+Vehicles.step(clockNow)
+check(hauler.Pilot == nil, "A dead pilot kept the mech")
+
+pilot.Respawn()
+boarded(pilot, hauler)
+pilot.Respawn() -- (a new body: the weld holds the old one)
+Vehicles.step(clockNow)
+check(hauler.Pilot == nil and hauler.Weld == nil, "A respawned pilot kept the mech")
+
+boarded(pilot, hauler)
+Players.PlayerRemoving:Fire(pilot)
+check(hauler.Pilot == nil and prompt.Enabled, "A pilot who left kept the mech")
+boarded(pilot, hauler)
+pilot.Parent = nil
+Vehicles.step(clockNow)
+check(hauler.Pilot == nil, "A pilot no longer in the game kept the mech")
+pilot.Parent = "Players"
+
+-- SeatExit lets go of a pilot too (before an arena move).
+local SeatExit = load("src/server/Systems/SeatExit.luau", {
+	game = {
+		GetService = function(_, name)
+			return if name == "Players" then Players else {}
+		end,
+	},
+	Enum = R.Enum,
+	Vector3 = R.Vector3,
+})
+boarded(pilot, hauler)
+local root = pilot.Character.Root
+function root:GetJoints()
+	return { hauler.Weld }
 end
-hauler.Seat.Children.SeatWeld = weld
-hauler.Seat.Occupant = nil
-check(press(lone, 1, 0), "Input refused with only the seat weld to go on")
-from = chassis.Position
-frames(60)
-check((chassis.Position - from).Magnitude > 5 and hauler.ServerDriving, "Didn't drive with only the seat weld")
-check(not Vehicles.sit(other, hauler.Seat), "Seated someone over a pilot only the weld shows")
-check(Vehicles.report(lone, "weld only"), "A pilot only the weld shows couldn't report")
-check(Vehicles.exit(lone) and detached == 2, "A pilot only the weld shows couldn't get out")
-hold = nil
-check(not Vehicles.input(lone, 1, 0), "Input taken after getting out")
-from = chassis.Position
-frames(30)
-check(same(chassis.Position, from), "The mech kept going after its pilot got out")
--- A SeatWeld child can arrive before Part1, with no second child/Occupant event.
-local delayed = makePlayer("Delayed")
-local delayedRoot = { Parent = delayed.Character }
-local delayedWeld = { Name = "SeatWeld", Part0 = hauler.Seat }
-hauler.Seat.Children.SeatWeld = delayedWeld
-hauler.Seat.ChildAdded:Fire(delayedWeld)
-check(delayed:FindFirstChild("PilotedMechSeat") == nil, "Incomplete weld assigned a pilot")
-delayedWeld.Part1 = delayedRoot
-heartbeat:Fire(1 / 60)
-check(delayed:FindFirstChild("PilotedMechSeat").Value == hauler.Seat, "Late weld endpoint never registered the pilot")
-check(Vehicles.input(delayed, 1, 0), "Late weld pilot couldn't drive")
-from = chassis.Position
-heartbeat:Fire(1 / 60)
-check(not same(chassis.Position, from), "Late weld registration erased input")
-hauler.Seat.Children.SeatWeld = nil
-heartbeat:Fire(1 / 60)
-check(delayed:FindFirstChild("PilotedMechSeat").Value == nil, "Heartbeat left the late-weld pilot reference behind")
-hauler.Seat.Children.SeatWeld = delayedWeld
-check(Vehicles.input(delayed, 1, 0), "Input arriving before the boarding heartbeat was refused")
-heartbeat:Fire(1 / 60)
-check(hauler.Throttle == 1 and hauler.Heard, "Boarding reconciliation erased an early input")
+SeatExit.detach(pilot.Character)
+check(hauler.Weld.Destroyed and pilot:GetAttribute("MechPilot") == nil, "SeatExit didn't let go of the pilot")
+check(not pilot.Character.Humanoid.Sit, "SeatExit left the pilot sat down")
+Vehicles.step(clockNow)
+check(hauler.Pilot == nil and prompt.Enabled, "The mech didn't notice its pilot was taken")
+root.GetJoints = nil
+
+-- Going home -----------------------------------------------------------------------------------------
+-- (The Mole's pilot gets out; the Hauler was left out past its bay.)
+Vehicles.exit(other)
+chassis.CFrame = R.CFrame.new(start + R.Vector3.new(0, 0, -80))
+hauler.LastUsed = clockNow
+Vehicles.tidy(clockNow + Rules.MachineResetSeconds - 5)
+check((chassis.Position - hauler.Bay.Position).Magnitude > 12, "Went home too soon")
+Vehicles.tidy(clockNow + Rules.MachineResetSeconds + 5)
+check(
+	math.abs((chassis.Position - hauler.Bay.Position).Magnitude - 6.2) < 0.01 and math.abs(yawOf(chassis)) < 1e-4,
+	"An abandoned mech didn't go home"
+)
+check(same(hauler.Model:GetAttribute("MechPosition"), chassis.Position), "Going home didn't tell anyone")
+-- A piloted one stays out; one out of the world comes back at once.
+boarded(pilot, hauler)
+chassis.CFrame = R.CFrame.new(start + R.Vector3.new(0, 0, -80))
+Vehicles.tidy(clockNow + Rules.MachineResetSeconds * 3)
+check(hauler.Pilot == pilot and (chassis.Position - hauler.Bay.Position).Magnitude > 12, "A piloted mech was sent home")
+Vehicles.exit(pilot)
+moleChassis.CFrame = R.CFrame.new(mole.Bay.Position + R.Vector3.new(0, -100, 0))
+Vehicles.tidy(clockNow)
+check(moleChassis.Position.Y > origin.Y, "A mech out of the world stayed there")
+-- Sending one home with a pilot in it puts them down first.
+boarded(pilot, hauler)
+Vehicles._reset(hauler)
+check(hauler.Pilot == nil and pilot:GetAttribute("MechPilot") == nil, "Sent home with its pilot welded in")
+
 print(
-	"PASS: " .. checks .. " outpost vehicle checks (driving, kerbs, ledges, drops, rocks, the rim, seats, diagnostics)"
+	"PASS: "
+		.. checks
+		.. " outpost vehicle checks (parking, getting in, moves checked, getting out, letting go, going home, diagnostics)"
 )

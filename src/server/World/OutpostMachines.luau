@@ -1,7 +1,8 @@
 -- Piloted quarry exosuits. Historical machine IDs keep parking and controls
 -- compatible; every body is now a cockpit, articulated arms and walking legs.
--- One invisible chassis is the root (OutpostVehicles anchors it and moves the
--- mech); an invisible hull and foot are what it bumps into. Cosmetic limbs use Motor6Ds, with
+-- One invisible chassis is the root (anchored; the pilot's screen moves the
+-- mech, Client VehicleDrive); an invisible hull and foot are what it bumps
+-- into; the pilot is welded into its cockpit. Cosmetic limbs use Motor6Ds, with
 -- distance-driven animation on each client (MechAnimation / Shared.MechMotion).
 local OutpostMachines = {}
 local DARK = Color3.fromRGB(32, 39, 42)
@@ -300,16 +301,14 @@ function OutpostMachines.build(kind: string, at: CFrame): Model
 	piece(torso, "SensorPod", frame(-1.7, 8.8, 0.4), Vector3.new(1.3, 0.9, 1.8), DARK)
 	piece(torso, "SensorEye", frame(-1.7, 8.8, -0.55), Vector3.new(0.8, 0.3, 0.15), accent, Enum.Material.Neon)
 	piece(torso, "Antenna", frame(2.25, 9.5, 1.5, 0, 0, -8), Vector3.new(0.12, 3, 0.12), STEEL)
-	local seat = Instance.new("VehicleSeat")
-	seat.Name, seat.Size, seat.Transparency = "Seat", Vector3.new(2, 1, 2), 1
-	seat.CanCollide, seat.CanTouch, seat.CanQuery, seat.Massless = false, false, false, true
-	seat.MaxSpeed, seat.Torque, seat.TurnSpeed, seat.HeadsUpDisplay = 0, 0, 0, false
-	seat.CFrame = torso.CFrame * frame(0, 3.1, 0)
-	seat:SetAttribute("OutpostMachine", kind)
-	seat.Parent = model
-	weld(torso, seat)
-	-- (No drive constraints: the server anchors the chassis and moves the
-	-- whole mech itself, Server OutpostVehicles.)
+	-- The cockpit: the pilot is welded here (no Roblox seat: Server
+	-- OutpostVehicles), and its Pilot prompt hangs off it.
+	local cockpit = raw("Cockpit", torso.CFrame * frame(0, 3.1, 0), Vector3.new(2, 1, 2), DARK)
+	cockpit.Transparency = 1
+	weld(torso, cockpit)
+	model:SetAttribute("MechKind", kind)
+	-- (No drive constraints: the chassis is anchored and the pilot's screen
+	-- moves it, Client VehicleDrive and Server OutpostVehicles.)
 	return model
 end
 

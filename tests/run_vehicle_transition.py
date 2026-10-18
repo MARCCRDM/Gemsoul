@@ -1,19 +1,14 @@
-"""Run production driving lifecycle with UI/physics service doubles."""
+"""Run the pilot's screen (Client VehicleDrive) and the arena/lobby control handoff.
+
+The driving needs lune (https://github.com/lune-org/lune) on PATH.
+"""
 from pathlib import Path
-import subprocess, tempfile
+import shutil, subprocess, tempfile
 ROOT = Path(__file__).resolve().parents[1]
-source = (ROOT/'src/client/Modules/VehicleDrive.luau').read_text()
-# Omit only presentation construction and service imports.
-logic = source[source.index('local function blocked()'):source.index('-- The driving card.')]
-logic += source[source.index('local function finish()'):source.index('return VehicleDrive')]
-fixture = (ROOT/'tests/vehicle_transition_cases.luau').read_text()
-prefix, cases = fixture.split('-- DRIVE HERE')
-# Who sits where (Shared.Seating), as VehicleDrive requires it.
-seating = 'local Seating = (function()\n' + (ROOT/'src/shared/Seating.luau').read_text() + '\nend)()\n'
-with tempfile.TemporaryDirectory(prefix='gemsoul-drive-') as directory:
-    script = Path(directory)/'drive.luau'
-    script.write_text(prefix + seating + logic + cases)
-    subprocess.run([str(ROOT/'.tools/luau/luau.exe'), str(script)], check=True)
+lune = shutil.which('lune')
+if not lune:
+    raise SystemExit('run_vehicle_transition needs lune (https://github.com/lune-org/lune) on PATH')
+subprocess.run([lune, 'run', str(ROOT / 'tests/vehicle_drive_cases.luau'), str(ROOT)], check=True)
 
 # Exercise the actual scene handoff that owns Roblox's movement/vehicle inputs.
 import re

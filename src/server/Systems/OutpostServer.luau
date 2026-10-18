@@ -37,7 +37,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Mine = require(ReplicatedStorage.Shared.Mine)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
-local Seating = require(ReplicatedStorage.Shared.Seating)
+local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
@@ -409,12 +409,11 @@ local function hit(player: Player, nodeId: any)
 	end
 	-- On foot with your pick, or from a mech's cockpit (Outpost.Machines,
 	-- Mine): bigger strikes, sooner, each spending its swings.
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	local seat = Seating.seatOf(humanoid)
-	local machineId = seat and seat:GetAttribute("OutpostMachine")
+	local piloted = MechPilot.mech(player)
+	local machineId = MechPilot.kind(piloted)
 	local machine = machineId and Rules.Machines[machineId]
-	local mech = if machine and machine.Mine then seat.Parent else nil
-	if seat and not mech then
+	local mech = if machine and machine.Mine then piloted else nil
+	if MechPilot.of(player) and not mech then
 		return reply(false, "Hop out of the machine to mine.")
 	end
 	local now = os.clock()

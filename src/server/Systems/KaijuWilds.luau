@@ -148,7 +148,13 @@ local function prey(player: Player): boolean
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = rootOf(player)
-	if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart ~= nil or not root then
+	if
+		not humanoid
+		or humanoid.Health <= 0
+		or humanoid.SeatPart ~= nil
+		or player:GetAttribute("MechPilot") ~= nil -- (in a mech)
+		or not root
+	then
 		return false
 	end
 	return Frontier.distance(root.Position, Outpost.Location.Position) >= Frontier.Core - Frontier.Safe

@@ -168,17 +168,12 @@ do
 	rider.Character = model
 	owners[model] = rider
 	local seat, chassis, weld, unrelated = object("VehicleSeat"), object("Part"), object("Weld"), object("Weld")
-	local drive = { PlaneVelocity = { Moving = true } }
-	local networkReturned = false
 	local characterOwnershipReturned = false
 	function root:SetNetworkOwnershipAuto()
-		check(weld.Parent == nil, "Character ownership restored before breaking the mech weld")
+		check(weld.Parent == nil, "Character ownership restored before breaking the seat weld")
 		characterOwnershipReturned = true
 	end
-	function chassis:FindFirstChild(name) return if name == "Drive" then drive else nil end
-	function chassis:SetNetworkOwner(owner) networkReturned = owner == nil end
 	seat.Parent = { PrimaryPart = chassis }
-	seat:SetAttribute("OutpostMachine", "Mole")
 	weld.Name, weld.Part0, weld.Part1 = "SeatWeld", seat, root
 	unrelated.Name, unrelated.Part0, unrelated.Part1 = "SeatWeld", seat, chassis
 	function root:IsDescendantOf(other) return other == model end
@@ -186,7 +181,7 @@ do
 	function chassis:IsDescendantOf() return false end
 	function seat:GetChildren() return { weld, unrelated } end
 	function weld:Destroy()
-		check(not root.Anchored, "Mech assembly anchored before unseating")
+		check(not root.Anchored, "Seated assembly anchored before unseating")
 		check(rider:GetAttribute("ArenaDropPreparing") ~= nil, "Reseat guard not active before detach")
 		self.Parent = nil
 	end
@@ -197,11 +192,45 @@ do
 	check(weld.Parent == nil and unrelated.Parent ~= nil, "Wrong seat weld removed")
 	check(not hum.Sit and hum.State == "GettingUp", "Humanoid left seated")
 	check(root.Anchored and root.AssemblyLinearVelocity == Vector3.zero, "Character not ready for insertion")
-	check(chassis.AssemblyLinearVelocity == Vector3.zero and networkReturned, "Mech retained motion or client ownership")
-	check(drive.PlaneVelocity == Vector2.zero, "Mech drive kept pushing")
-	check(characterOwnershipReturned, "Pilot retained server ownership after leaving the mech")
+	check(characterOwnershipReturned, "The rider kept someone else's ownership after leaving the seat")
 	Drop.cancel(model)
 	check(not root.Anchored and rider:GetAttribute("ArenaDropPreparing") == nil, "Cancelled seated entry stayed locked")
+end
+do
+	-- Entering a match while piloting a mech (no seat: a weld holds the pilot
+	-- in its cockpit, Server OutpostVehicles) lets go of them first.
+	local model, root, _, _, hum = actor()
+	local rider = object("Player")
+	rider.Character = model
+	owners[model] = rider
+	rider:SetAttribute("MechPilot", "Mole3")
+	local cockpit, weld, unrelated = object("Part"), object("Weld"), object("Weld")
+	weld.Name, weld.Part0, weld.Part1, weld.Parent = "PilotWeld", cockpit, root, cockpit
+	unrelated.Name, unrelated.Part0, unrelated.Part1, unrelated.Parent = "RootJoint", root, cockpit, model
+	function root:GetJoints()
+		return { weld, unrelated }
+	end
+	function weld:Destroy()
+		check(not root.Anchored, "The pilot was anchored before the cockpit let go")
+		check(rider:GetAttribute("ArenaDropPreparing") ~= nil, "Reseat guard not active before letting go of the pilot")
+		self.Parent = nil
+	end
+	local returned = false
+	function root:SetNetworkOwnershipAuto()
+		check(weld.Parent == nil, "Ownership restored before the cockpit let go")
+		returned = true
+	end
+	hum.Sit = true
+	Enum.HumanoidStateType = { GettingUp = "GettingUp" }
+	function hum:ChangeState(state)
+		self.State = state
+	end
+	Drop.prepare(rider)
+	check(weld.Parent == nil and unrelated.Parent ~= nil, "The wrong weld was let go")
+	check(rider:GetAttribute("MechPilot") == nil, "Still a mech's pilot on the way into a match")
+	check(not hum.Sit and hum.State == "GettingUp", "The pilot was left sat down")
+	check(root.Anchored and returned, "The pilot wasn't ready for insertion")
+	Drop.cancel(model)
 end
 local a, ar, armor, particles, ah, ab = actor()
 local b, br = actor()

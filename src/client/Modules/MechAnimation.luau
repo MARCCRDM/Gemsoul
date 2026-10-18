@@ -1,13 +1,15 @@
 -- Animate all nearby quarry mechs, including those piloted by other players,
--- and draw each one gliding between the server's steps (it's anchored, and
--- moved by the server: Server OutpostVehicles).
+-- and draw each one gliding between the moves the server passes on (it's
+-- anchored: Server OutpostVehicles). The one you pilot, your own screen moves
+-- (VehicleDrive).
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Motion = require(ReplicatedStorage.Shared.MechMotion)
-local Seating = require(ReplicatedStorage.Shared.Seating)
+local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
 local TAG = "OutpostMech"
 local RANGE = 300 -- studs from the camera a mech is animated and glided within
 local active = {}
@@ -29,8 +31,8 @@ local function register(model)
 		if not model:IsDescendantOf(workspace) or not CollectionService:HasTag(model, TAG) then
 			return false
 		end
-		local root, seat = model:FindFirstChild("Chassis"), model:FindFirstChild("Seat")
-		if not root or not seat then
+		local root = model:FindFirstChild("Chassis")
+		if not root then
 			return false
 		end
 		local joints = {}
@@ -58,12 +60,13 @@ local function register(model)
 				return false
 			end
 		end
-		if seat:GetAttribute("OutpostMachine") == "Mole" and not joints.ToolRotor then
+		local kind = MechPilot.kind(model)
+		if kind == "Mole" and not joints.ToolRotor then
 			return false
 		end
 		active[model] = {
 			Root = root,
-			Seat = seat,
+			Kind = kind,
 			Joints = joints,
 			State = Motion.new(),
 			Scale = model:GetAttribute("MechScale") or 1,
@@ -175,17 +178,23 @@ local function impact(at: Vector3, scale: number, drill: boolean, distance: numb
 	end
 end
 
--- The server moves a mech in steps, which reach this screen unevenly. Between
--- them it's drawn carrying on from the latest (MechPosition, and MechMotion:
--- heading, speed, turn rate) for a moment, easing out any difference; once
--- it stops it's put exactly where the server has it, and left there.
+-- A mech's moves reach this screen unevenly. Between them it's drawn carrying
+-- on from the latest (MechPosition, and MechMotion: heading, speed, turn
+-- rate) for a moment, easing out any difference; once it stops it's put
+-- exactly where the server has it, and left there. (Not the one you pilot:
+-- your screen moves that itself.)
 local GLIDE = 18 -- how quickly the drawn mech catches up (per second)
 local AHEAD = 0.25 -- seconds it carries on from a step before waiting for the next
 local SNAP = 12 -- studs off, it jumps there
 local function glide(dt: number)
 	local camera = workspace.CurrentCamera
 	local clock = os.clock()
+	local mine = MechPilot.of(Players.LocalPlayer)
 	for model, rig in active do
+		if mine and model:GetAttribute("MechId") == mine then
+			rig.Shown, rig.Settled, rig.Position = nil, false, nil
+			continue
+		end
 		local position, motion = model:GetAttribute("MechPosition"), model:GetAttribute("MechMotion")
 		if typeof(position) ~= "Vector3" or typeof(motion) ~= "Vector3" then
 			continue
@@ -238,7 +247,7 @@ RunService.PreSimulation:Connect(function(dt)
 		if (rig.Root.Position - camera.CFrame.Position).Magnitude > RANGE then
 			continue
 		end
-		local occupied = Seating.occupant(rig.Seat) ~= nil
+		local occupied = model:GetAttribute("MechPilotId") ~= nil
 		-- How fast the server moves it (forward, and turning): it's anchored,
 		-- so it has no velocity of its own.
 		local motion = model:GetAttribute("MechMotion")
@@ -249,7 +258,7 @@ RunService.PreSimulation:Connect(function(dt)
 		local struck = model:GetAttribute("MechStrikeStart")
 		local t = if type(struck) == "number" then now - struck else math.huge
 		if t >= 0 and t < STRIKE_END then
-			local drill = rig.Seat:GetAttribute("OutpostMachine") == "Mole"
+			local drill = rig.Kind == "Mole"
 			strike(poses, t, drill, now)
 			local landed = if drill then THRUST[3][1] else SLAM[3][1]
 			local target = model:GetAttribute("MechStrikeTarget")

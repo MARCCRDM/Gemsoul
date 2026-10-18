@@ -91,7 +91,7 @@ local function stateOf(player: Player): Spar.State
 	return {
 		Outpost = player:GetAttribute("Outpost") == true,
 		Alive = humanoid ~= nil and humanoid.Health > 0 and rootOf(player) ~= nil,
-		Seated = humanoid ~= nil and humanoid.SeatPart ~= nil,
+		Seated = (humanoid ~= nil and humanoid.SeatPart ~= nil) or player:GetAttribute("MechPilot") ~= nil,
 		Busy = busy,
 		Intro = profile ~= nil and profile.Intro ~= nil and profile.Intro.Done ~= true,
 	}

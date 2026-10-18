@@ -1,10 +1,54 @@
--- Break the physical seat connection before moving a character to another world.
+-- Let go of a seated character, or a mech's pilot, before moving them to
+-- another world.
 local SeatExit = {}
+
+local function stand(humanoid: Humanoid, character: Model)
+	humanoid.Sit = false
+	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+		-- The seated body was in someone else's assembly. Let normal character
+		-- ownership resume once it's free (including exits before an arena move).
+		pcall(root.SetNetworkOwnershipAuto, root)
+	end
+end
+
+-- A mech's pilot (no seat: Server OutpostVehicles, Shared.MechPilot): the
+-- weld that holds them in its cockpit goes, and they're no longer its pilot.
+-- Returns whether they were one.
+local function unpilot(character: Model): boolean
+	local was = false
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root then
+		local ok, joints = pcall(function()
+			return (root :: any):GetJoints()
+		end)
+		for _, joint in if ok and joints then joints else {} do
+			if joint.Name == "PilotWeld" then
+				joint:Destroy()
+				was = true
+			end
+		end
+	end
+	local ok, player = pcall(function()
+		return game:GetService("Players"):GetPlayerFromCharacter(character)
+	end)
+	if ok and player and player:GetAttribute("MechPilot") ~= nil then
+		player:SetAttribute("MechPilot", nil)
+		was = true
+	end
+	return was
+end
 
 -- `seat` when the caller knows it. Otherwise it's found from the body: the
 -- server can see no SeatPart for someone it seated (Shared.Seating).
 function SeatExit.detach(character: Model, seat: Instance?)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if unpilot(character) and humanoid then
+		stand(humanoid, character)
+	end
 	seat = seat or (humanoid and humanoid.SeatPart)
 	if not seat and humanoid then
 		local ok, found = pcall(function()
@@ -23,26 +67,7 @@ function SeatExit.detach(character: Model, seat: Instance?)
 			end
 		end
 	end
-	humanoid.Sit = false
-	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if root then
-		root.AssemblyLinearVelocity = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
-		-- The seated assembly was server-owned. Let normal character ownership
-		-- resume once the weld is broken (including exits before an arena move).
-		pcall(root.SetNetworkOwnershipAuto, root)
-	end
-	-- Leave an Outpost mech stationary in the lobby and return physics to the server.
-	local machine = seat:GetAttribute("OutpostMachine") and seat.Parent
-	local chassis = machine and machine.PrimaryPart
-	if chassis then
-		local drive = chassis:FindFirstChild("Drive")
-		if drive then drive.PlaneVelocity = Vector2.zero end
-		chassis.AssemblyLinearVelocity = Vector3.zero
-		chassis.AssemblyAngularVelocity = Vector3.zero
-		pcall(chassis.SetNetworkOwner, chassis, nil)
-	end
+	stand(humanoid, character)
 end
 
 return SeatExit

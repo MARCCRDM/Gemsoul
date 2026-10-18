@@ -1,13 +1,18 @@
--- Send pilot input to the server, which moves every mech itself (anchored:
--- Server OutpostVehicles). The client handles controls, camera and HUD;
--- MechAnimation draws the mech gliding between the server's steps.
+-- Pilot your mech. The server makes you a mech's pilot (your MechPilot
+-- attribute: Shared.MechPilot) and welds you into its cockpit; this screen
+-- drives it, so it answers your keys at once. Each frame: the speed and
+-- heading from your input (Shared.Outpost.drive), then the move over the
+-- ground (MechPilot.move: walls, kerbs, drops, the rim), then the mech is put
+-- there, you with it. About 15 times a second it tells the server where it
+-- is (MechMove); the server checks it and passes it on to everyone else.
+-- Space (or jump) gets you out.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
-local Seating = require(ReplicatedStorage.Shared.Seating)
+local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
@@ -17,20 +22,35 @@ local VehicleDrive = {}
 local player = Players.LocalPlayer
 local P = IronUi.Colors
 
+local SEND_EVERY = 1 / 15 -- seconds between moves sent while it's moving
+-- Pushing into something this long, it goes through it for this long.
+local UNSTICK_AFTER, UNSTICK_FOR = 1.5, 1
+-- Moving, with no word back from the server this long: it isn't hearing you.
+local DEAF_AFTER = 2
+
 type Driving = {
-	Seat: VehicleSeat,
-	Humanoid: Humanoid,
+	Id: string,
+	Model: Model,
 	Chassis: BasePart,
 	Spec: any,
-	Speed: number,
+	Mech: any, -- MechPilot.state
+	Turn: number,
 	Zoom: { number },
-	-- Watching for a mech that won't budge (see stuck below): where it was
-	-- when the pilot started pushing, for how long, and what's been done.
-	From: Vector3?,
-	FromYaw: number,
-	StuckFor: number,
+	World: any,
+	Params: RaycastParams?,
+	ParamsAt: number,
+	-- What it last told the server, and when the server last answered.
+	SentAt: number,
+	SentPosition: Vector3?,
+	SentMoving: boolean,
+	HeardAt: number,
+	MovedAt: number?,
+	Reported: boolean,
+	-- Pushing into something.
+	PushedFor: number,
+	ThroughUntil: number,
 	Hinted: boolean,
-	Reports: number,
+	Connections: { RBXScriptConnection },
 }
 local driving: Driving? = nil
 local function blocked(): boolean
@@ -41,9 +61,8 @@ local function blocked(): boolean
 		or player:GetAttribute("Expedition") ~= nil
 end
 
--- What the pilot is asking for, -1..1 each. The seat's floats come from the
--- default controls; when they stay at 0 (the controls can be switched off or
--- slow to notice the seat), the move vector or the keys themselves stand in.
+-- What the pilot is asking for, -1..1 each: the keys, else the controls'
+-- move vector (a thumbstick, a gamepad).
 local controlModule = nil
 local loadingControls = false
 local function moveVector(): Vector3?
@@ -55,7 +74,7 @@ local function moveVector(): Vector3?
 		end
 		loadingControls = true
 		-- Requiring PlayerModule can yield during startup. Never suspend the
-		-- driving heartbeat (or keyboard fallback) while it initializes.
+		-- driving (or the keys) while it loads.
 		task.spawn(function()
 			local ok, found = pcall(function() return require(module):GetControls() end)
 			controlModule = if ok and found then found else false
@@ -76,53 +95,115 @@ local function held(...): boolean
 	end
 	return false
 end
--- Also says where the input came from: "seat", "controls", "keys" or "none".
-local function pilotInput(seat: VehicleSeat): (number, number, string)
+-- Also says where the input came from: "keys", "controls" or "none".
+local function pilotInput(): (number, number, string)
 	if UserInputService:GetFocusedTextBox() then return 0, 0, "none" end
-	local throttle, steer = seat.ThrottleFloat, seat.SteerFloat
-	local source = "seat"
-	if throttle == 0 and steer == 0 then
-		source = "none"
-		local K = Enum.KeyCode
-		if held(K.W, K.Up, K.S, K.Down, K.A, K.Left, K.D, K.Right) then
-			throttle = (if held(K.W, K.Up) then 1 else 0) - (if held(K.S, K.Down) then 1 else 0)
-			steer = (if held(K.D, K.Right) then 1 else 0) - (if held(K.A, K.Left) then 1 else 0)
-			if throttle ~= 0 or steer ~= 0 then
-				source = "keys"
-			end
-		else
-			local move = moveVector()
-			if move and move.Magnitude > 0.05 then
-				throttle, steer, source = -move.Z, move.X, "controls"
-			end
+	local K = Enum.KeyCode
+	if held(K.W, K.Up, K.S, K.Down, K.A, K.Left, K.D, K.Right) then
+		local throttle = (if held(K.W, K.Up) then 1 else 0) - (if held(K.S, K.Down) then 1 else 0)
+		local steer = (if held(K.D, K.Right) then 1 else 0) - (if held(K.A, K.Left) then 1 else 0)
+		if throttle ~= 0 or steer ~= 0 then
+			return throttle, steer, "keys"
 		end
 	end
-	return math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1), source
+	local move = moveVector()
+	if move and move.Magnitude > 0.05 then
+		return math.clamp(-move.Z, -1, 1), math.clamp(move.X, -1, 1), "controls"
+	end
+	return 0, 0, "none"
 end
 
--- Only input crosses to the server; movement targets stay server-owned.
 local function remote(name: string): RemoteEvent?
 	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 	return remotes and remotes:FindFirstChild(name) :: RemoteEvent?
 end
-local sentThrottle, sentSteer, sentAt = 0, 0, 0
-local function tellServer(throttle: number, steer: number, force: boolean?)
+
+-- What the mech bumps into, seen from here: everything solid but itself,
+-- the players, and the Outpost's creatures and rifts.
+local function params(model: Model): RaycastParams
+	local p = RaycastParams.new()
+	p.FilterType = Enum.RaycastFilterType.Exclude
+	p.RespectCanCollide = true
+	local skip = { model }
+	for _, other in Players:GetPlayers() do
+		if other.Character then
+			table.insert(skip, other.Character)
+		end
+	end
+	for _, name in { "Enemies", "Kaiju", "Rifts", "RiftTears" } do
+		local found = workspace:FindFirstChild(name)
+		if found then
+			table.insert(skip, found)
+		end
+	end
+	p.FilterDescendantsInstances = skip
+	return p
+end
+-- The world it moves through (MechPilot.move), from this screen. A cast that
+-- fails counts as nothing there, so nothing ever holds the mech still.
+function VehicleDrive.world(d: Driving)
+	return {
+		Sweep = function(from: CFrame, size: Vector3, direction: Vector3): (number?, string?)
+			local ok, hit = pcall(workspace.Blockcast, workspace, from, size, direction, d.Params)
+			if ok and hit then
+				return hit.Distance, hit.Instance.Name
+			end
+			return nil, nil
+		end,
+		Floor = function(origin: Vector3, length: number): number?
+			local ok, hit = pcall(workspace.Raycast, workspace, origin, Vector3.new(0, -length, 0), d.Params)
+			return if ok and hit then hit.Position.Y else nil
+		end,
+		Rim = { Center = Rules.Location.Position, Radius = Rules.Radius + 40 },
+		Gravity = workspace.Gravity,
+	}
+end
+
+-- Tell the server where it is: while it moves, SEND_EVERY; stopping, at once.
+local function send(d: Driving, force: boolean?)
+	local m = d.Mech
 	local now = os.clock()
-	local changed = math.abs(throttle - sentThrottle) >= 0.05 or math.abs(steer - sentSteer) >= 0.05
-	local stale = (throttle ~= 0 or steer ~= 0) and now - sentAt >= 0.5
-	if not changed and not stale and not force then
+	local moving = m.Speed ~= 0 or d.Turn ~= 0
+	if not force then
+		if moving and now - d.SentAt < SEND_EVERY then
+			return
+		end
+		if not moving and not d.SentMoving then
+			return
+		end
+	end
+	local move = remote("MechMove")
+	if move then
+		move:FireServer(m.Position, m.Yaw, m.Speed, d.Turn)
+		d.SentAt, d.SentPosition, d.SentMoving = now, m.Position, moving
+	end
+end
+
+-- Moving, and the server hasn't answered for a while.
+local function deaf(d: Driving, now: number): boolean
+	return d.MovedAt ~= nil and now - d.MovedAt < DEAF_AFTER and now - d.HeardAt > DEAF_AFTER
+end
+
+local function report(d: Driving, source: string)
+	if d.Reported then
 		return
 	end
-	-- A sweeping stick changes every frame: at most 10 a second, but letting go
-	-- goes out at once.
-	if not force and not stale and now - sentAt < 0.1
-		and (sentThrottle ~= 0 or sentSteer ~= 0) and (throttle ~= 0 or steer ~= 0) then
-		return
-	end
-	local input = remote("MechInput")
-	if input then
-		input:FireServer(throttle, steer)
-		sentThrottle, sentSteer, sentAt = throttle, steer, now
+	d.Reported = true
+	local m = d.Mech
+	local text = string.format(
+		"driving %s from %s at (%.0f, %.1f, %.0f), speed %.1f, no word back from the server for %.1f s",
+		d.Id,
+		source,
+		m.Position.X,
+		m.Position.Y,
+		m.Position.Z,
+		m.Speed,
+		os.clock() - d.HeardAt
+	)
+	warn("[Mech] Server isn't hearing this pilot: " .. text)
+	local channel = remote("MechReport")
+	if channel then
+		channel:FireServer(text)
 	end
 end
 
@@ -176,16 +257,18 @@ local function finish()
 	if not d then
 		return
 	end
-	tellServer(0, 0, true)
-	-- A delayed Seated(false) must not overwrite the combat camera's zoom.
+	for _, connection in d.Connections do
+		connection:Disconnect()
+	end
+	-- (Not over the combat camera's zoom.)
 	if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
 		player.CameraMinZoomDistance = d.Zoom[1]
 		player.CameraMaxZoomDistance = d.Zoom[2]
 	end
 end
 
--- Menus own the screen even while the character remains seated in a mech.
--- Track instances, so closing one of several overlays does not reveal the HUD.
+-- Menus own the screen even while you're in a mech. Track instances, so
+-- closing one of several overlays does not reveal the HUD.
 local blockingScreens = {
 	Dashboard = true, Shop = true, Season = true, AugmentTree = true,
 	SurgeArray = true, Social = true, ProbeExchange = true, WelcomeBundle = true,
@@ -198,13 +281,7 @@ local function menuOpen(): boolean
 	return next(openScreens) ~= nil or GuiService.MenuIsOpen
 end
 local function refreshHud()
-	local hidden = menuOpen()
-	gui.Enabled = driving ~= nil and driving.Seat.Parent ~= nil
-		and Seating.sits(driving.Humanoid, driving.Seat) and not blocked() and not hidden
-	if driving and hidden then
-		driving.Speed = 0
-		tellServer(0, 0)
-	end
+	gui.Enabled = driving ~= nil and not blocked() and not menuOpen()
 end
 local function watchScreen(screen)
 	if not screen:IsA("ScreenGui") or (not blockingScreens[screen.Name] and screen.Name ~= "TrainingRewards") then return end
@@ -226,171 +303,133 @@ local function unwatchScreen(screen)
 	refreshHud()
 end
 
-local function begin(seat: VehicleSeat, humanoid: Humanoid)
-	if blocked() then finish(); return end
-	if driving and driving.Seat == seat and driving.Humanoid == humanoid then return end
-	-- (The server seats you, so this screen can see no Occupant: Seating
-	-- reads the seat weld too. It can also arrive a little after Seated.)
-	if not seat.Parent or not Seating.sits(humanoid, seat) then return end
-	local kind = seat:GetAttribute("OutpostMachine")
-	local spec = Rules.Machines[kind]
-	local chassis = seat.Parent and seat.Parent:FindFirstChild("Chassis") :: BasePart?
-	if not spec or not chassis then
+-- Start driving the mech `id`, once it's here.
+local function begin(id: string)
+	local model = MechPilot.find(id)
+	local chassis = model and model.PrimaryPart
+	local spec = Rules.Machines[MechPilot.kind(model) or ""]
+	if not model or model.Parent == nil or not chassis or not spec then
 		return
 	end
-	driving = {
-		Seat = seat,
-		Humanoid = humanoid,
+	local now = os.clock()
+	local d: Driving = {
+		Id = id,
+		Model = model,
 		Chassis = chassis,
 		Spec = spec,
-		Speed = 0,
+		Mech = MechPilot.state(model),
+		Turn = 0,
 		Zoom = { player.CameraMinZoomDistance, player.CameraMaxZoomDistance },
-		From = nil,
-		FromYaw = 0,
-		StuckFor = 0,
+		World = nil,
+		Params = params(model),
+		ParamsAt = now,
+		SentAt = 0,
+		SentPosition = nil,
+		SentMoving = false,
+		HeardAt = now,
+		MovedAt = nil,
+		Reported = false,
+		PushedFor = 0,
+		ThroughUntil = 0,
 		Hinted = false,
-		Reports = 0,
+		Connections = {},
 	}
-	-- Tell the server this client is piloting (it watches for one that isn't).
-	tellServer(0, 0, true)
-	print("[Mech] Pilot controls started: " .. tostring(kind))
-	-- Pull the camera back to fit the machine.
-	local fit = seat.Parent:GetAttribute("CameraFit") or math.max(14, chassis.Size.Z * 1.15)
+	d.World = VehicleDrive.world(d)
+	-- (Turning on the spot only changes MechMotion.)
+	for _, name in { "MechPosition", "MechMotion" } do
+		local connection = model:GetAttributeChangedSignal(name):Connect(function()
+			d.HeardAt = os.clock()
+		end)
+		table.insert(d.Connections, connection)
+	end
+	driving = d
+	-- Hello: the server knows this screen is driving (and logs one that isn't).
+	send(d, true)
+	print("[Mech] Piloting " .. id .. ": driving from this screen")
+	local fit = model:GetAttribute("CameraFit") or math.max(14, chassis.Size.Z * 1.15)
 	player.CameraMaxZoomDistance = math.max(player.CameraMaxZoomDistance, fit * 2)
 	player.CameraMinZoomDistance = fit
 	title.Text = string.upper(spec.Name)
 	blurb.Text = spec.Blurb
 	controls.Text = controlText()
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		pcall(function()
+			humanoid.Sit = true -- (the pose)
+		end)
+	end
 	refreshHud()
 end
 
-local function resumeSeat()
-	if driving or blocked() then return end
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	local seat = Seating.seatOf(humanoid)
-	if not seat then
-		local reference = player:FindFirstChild("PilotedMechSeat")
-		seat = reference and reference.Value
-	end
-	if seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
-		begin(seat, humanoid)
-	end
-end
-
--- Where the server has the mech: its MechPosition, and from MechMotion its
--- heading and speed (or where this screen has it, before they arrive), and
--- what's in its way (MechBlocked).
-local function serverMotion(d: Driving): (Vector3, number, number, string?)
-	local model = d.Seat.Parent
-	local position = model and model:GetAttribute("MechPosition")
-	local motion = model and model:GetAttribute("MechMotion")
-	local blockedBy = model and model:GetAttribute("MechBlocked")
-	if typeof(position) ~= "Vector3" then
-		position = d.Chassis.Position
-	end
-	local yaw, speed = 0, 0
-	if typeof(motion) == "Vector3" then
-		yaw, speed = motion.X, motion.Y
-	end
-	return position, yaw, speed, if type(blockedBy) == "string" then blockedBy else nil
-end
-
--- A mech that won't budge: input held for 2 s and the server's mech hasn't
--- moved (or turned, when only steering). Say what this client sees (Output
--- and Feedback > Reports, via the server); the server then lets it drive
--- through whatever it's wedged in for a moment (Server OutpostVehicles).
-local function reportStuck(d: Driving, throttle: number, steer: number, source: string)
-	local position, yaw, speed, blockedBy = serverMotion(d)
-	local here = d.Chassis.Position
-	local text = string.format(
-		"input %.2f/%.2f from %s (seat %.2f/%.2f), server has it at (%.0f, %.1f, %.0f) heading %.2f, "
-			.. "speed %.1f, blocked by %s; here it's at (%.0f, %.1f, %.0f), anchored %s",
-		throttle,
-		steer,
-		source,
-		d.Seat.ThrottleFloat,
-		d.Seat.SteerFloat,
-		position.X,
-		position.Y,
-		position.Z,
-		yaw,
-		speed,
-		blockedBy or "nothing",
-		here.X,
-		here.Y,
-		here.Z,
-		tostring(d.Chassis.Anchored)
-	)
-	text ..= string.format("; server accepted %s/%s", tostring(d.Seat:GetAttribute("MechInputThrottle")),
-		tostring(d.Seat:GetAttribute("MechInputSteer")))
-	warn("[Mech] Won't move (client): " .. text)
-	local report = remote("MechReport")
-	if report then
-		report:FireServer(text)
-	end
-	UiKit.toast("Your mech seems stuck. Checking its movement and sending a report.")
-end
-local function watchStuck(d: Driving, throttle: number, steer: number, source: string, dt: number)
-	local position, yaw, _, blockedBy = serverMotion(d)
-	-- Turning isn't evidence that forward motion works. Watch translation
-	-- when accelerating and rotation only when steering in place.
-	local accelerating = math.abs(throttle) >= 0.5
-	local pushing = accelerating or math.abs(steer) >= 0.5
-	local from = d.From
-	local moved = from ~= nil
-		and (if accelerating then (position - from).Magnitude >= 1.5 else math.abs(yaw - d.FromYaw) >= 0.2)
-	if not pushing or moved or not from then
-		d.From, d.FromYaw = position, yaw
-		if not pushing or moved then
-			d.StuckFor = 0
-		end
-		return
-	end
-	d.StuckFor += dt
-	if d.StuckFor < 2 then
-		return
-	end
-	-- Something in the way, and the server says so: first, just tell the pilot.
-	if blockedBy and not d.Hinted then
-		d.StuckFor, d.Hinted = 0, true
-		UiKit.toast("Something's in the way. Turn or back up.")
-	elseif d.Reports < 2 then
-		-- (Give the server's push-through a few seconds before asking again.)
-		d.StuckFor, d.Reports = -3, d.Reports + 1
-		reportStuck(d, throttle, steer, source)
-	end
-end
-
--- One frame of driving.
-function VehicleDrive.step(dt: number)
-	-- Recover missed boarding events and a chassis that replicates late.
-	-- Only the local character is inspected, with no world or UI scans.
-	if not driving then resumeSeat() end
-	local d = driving
-	if not d then
-		return
-	end
-	if blocked() or not d.Seat.Parent or not Seating.sits(d.Humanoid, d.Seat) then
-		finish()
-		return
-	end
-	if menuOpen() then
-		refreshHud()
-		return
-	end
-	local throttle, steer, source = pilotInput(d.Seat)
-	tellServer(throttle, steer)
-	watchStuck(d, throttle, steer, source, dt)
-	-- The speed the server is moving it at, and whether something's in the way.
-	local _, _, speed, blockedBy = serverMotion(d)
-	local actual = math.abs(speed)
-	d.Speed = actual
-	speedLabel.Text = tostring(math.floor(actual + 0.5))
-	fill.Size = UDim2.fromScale(math.clamp(actual / d.Spec.MaxSpeed, 0, 1), 1)
-	local line = if blockedBy then "Something's in the way" else d.Spec.Blurb
+local function hud(d: Driving, blockedBy: string?, now: number)
+	local speed = math.abs(d.Mech.Speed)
+	speedLabel.Text = tostring(math.floor(speed + 0.5))
+	fill.Size = UDim2.fromScale(math.clamp(speed / d.Spec.MaxSpeed, 0, 1), 1)
+	local line = if deaf(d, now)
+		then "The server isn't answering: others can't see you move"
+		elseif blockedBy then "Something's in the way"
+		else d.Spec.Blurb
 	if blurb.Text ~= line then
 		blurb.Text = line
 	end
+end
+
+-- One frame of driving (before the camera follows you).
+function VehicleDrive.step(dt: number)
+	local id = MechPilot.of(player)
+	if not id or blocked() then
+		finish()
+		return
+	end
+	if driving and (driving.Id ~= id or driving.Model.Parent == nil) then
+		finish()
+	end
+	if not driving then
+		begin(id)
+	end
+	local d = driving
+	if not d then
+		return -- (its mech hasn't streamed in yet)
+	end
+	dt = math.clamp(dt, 0, 0.1)
+	local now = os.clock()
+	if now - d.ParamsAt > 1 then
+		d.Params, d.ParamsAt = params(d.Model), now
+	end
+	local throttle, steer, source = 0, 0, "none"
+	if not menuOpen() then
+		throttle, steer, source = pilotInput()
+	end
+	local m = d.Mech
+	local before = m.Yaw
+	local speed, yaw = Rules.drive(d.Spec, m.Speed, m.Yaw, throttle, steer, dt)
+	m.Through = now < d.ThroughUntil
+	local blockedBy = MechPilot.move(m, d.World, speed * dt, yaw, dt)
+	m.Speed = if blockedBy then 0 else speed
+	d.Turn = if dt > 0 then (m.Yaw - before) / dt else 0
+	-- Pushing into something a moment: then through it, for a moment.
+	if blockedBy and math.abs(throttle) >= 0.5 then
+		d.PushedFor += dt
+		if d.PushedFor >= UNSTICK_AFTER then
+			d.PushedFor, d.ThroughUntil = 0, now + UNSTICK_FOR
+			if not d.Hinted then
+				d.Hinted = true
+				UiKit.toast("Something's in the way: pushing through.")
+			end
+		end
+	else
+		d.PushedFor = 0
+	end
+	d.Chassis.CFrame = MechPilot.frame(m)
+	if m.Speed ~= 0 or d.Turn ~= 0 then
+		d.MovedAt = now
+	end
+	send(d)
+	if deaf(d, now) and now - d.HeardAt > DEAF_AFTER * 2 then
+		report(d, source)
+	end
+	hud(d, blockedBy, now)
+	refreshHud()
 end
 
 function VehicleDrive.isDriving(): boolean
@@ -404,13 +443,11 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 local function refreshSession()
-	if blocked() then
+	if blocked() or not MechPilot.of(player) then
 		finish()
-	else
-		resumeSeat()
 	end
 end
-for _, attribute in { "Outpost", "CombatSession", "ArenaDropPreparing", "ArenaDropUntil", "Expedition" } do
+for _, attribute in { "Outpost", "CombatSession", "ArenaDropPreparing", "ArenaDropUntil", "Expedition", "MechPilot" } do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshSession)
 end
 
@@ -420,29 +457,7 @@ playerGui.ChildRemoved:Connect(unwatchScreen)
 for _, screen in playerGui:GetChildren() do watchScreen(screen) end
 GuiService:GetPropertyChangedSignal("MenuIsOpen"):Connect(refreshHud)
 
-local function watch(character: Model)
-	local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
-	if not humanoid then
-		return
-	end
-	humanoid.Seated:Connect(function(seated: boolean, seat: Instance?)
-		if character ~= player.Character then return end
-		if seated and seat and seat:IsA("VehicleSeat") and seat:GetAttribute("OutpostMachine") then
-			begin(seat, humanoid)
-		else
-			finish()
-		end
-	end)
-	resumeSeat()
-end
-
-if player.Character then
-	task.spawn(watch, player.Character)
-end
-player.CharacterAdded:Connect(function(character)
-	finish()
-	watch(character)
-end)
-RunService.Heartbeat:Connect(VehicleDrive.step)
+player.CharacterAdded:Connect(finish)
+RunService:BindToRenderStep("MechPilotDrive", Enum.RenderPriority.Camera.Value - 1, VehicleDrive.step)
 
 return VehicleDrive

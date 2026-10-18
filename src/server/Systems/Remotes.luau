@@ -7,11 +7,12 @@
 --   Party (event, server -> client): party state and invites
 --   Social (event, server -> client): duel queue, challenges and matches
 --   Report (event, client -> server): client script errors, for playtests
---   MechInput (event, client -> server): a mech pilot's throttle and steer, for
---             the server-owned movement controller
+--   MechMove (event, client -> server): where a mech's pilot has driven it
+--            (position, yaw, speed, turn rate); the server checks and applies it
+--   MechExit (event, client -> server): the pilot gets out
 --   MechReport (event, client -> server): what a pilot's client sees when its
---              mech won't move; the server checks the assembly and logs it
---              server -> pilot: the resulting server diagnosis, for their log
+--              mech won't move, for the server's log
+--              server -> pilot: the server's view, for their log
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local folder = Instance.new("Folder")
@@ -27,9 +28,9 @@ local Remotes = {
 	Party = Instance.new("RemoteEvent"),
 	Social = Instance.new("RemoteEvent"),
 	Report = Instance.new("RemoteEvent"),
-	MechInput = Instance.new("RemoteEvent"),
+	MechMove = Instance.new("RemoteEvent"),
 	MechReport = Instance.new("RemoteEvent"),
-	MechExit = Instance.new("RemoteEvent"), -- pilot requests release from the server-owned seat
+	MechExit = Instance.new("RemoteEvent"),
 	Funnel = Instance.new("RemoteEvent"), -- client -> server: an onboarding step in its menus (Systems/Funnel)
 	Challenges = Instance.new("RemoteEvent"), -- server -> client: daily challenge progress (Shared.DailyChallenges)
 }

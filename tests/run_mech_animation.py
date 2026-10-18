@@ -45,7 +45,7 @@ local tick=signal()
 local function mech(x,partial)
  local m={Tagged=true,InWorld=true,DescendantAdded=signal(),Joints={}}
  -- Where the server has it, and how it's moving: heading, speed, turn rate.
- m.Attributes={MechScale=1,MechPosition=Vector3.new(x,0,0),MechMotion=Vector3.new(0,24,0)}
+ m.Attributes={MechScale=1,MechKind="Hauler",MechId="Hauler"..x,MechPilotId=1,MechPosition=Vector3.new(x,0,0),MechMotion=Vector3.new(0,24,0)}
  function m:IsA(kind) return kind=="Model" end
  function m:IsDescendantOf() return self.InWorld end
  function m:GetAttribute(name) return self.Attributes[name] end
@@ -54,7 +54,6 @@ local function mech(x,partial)
  function m:Load()
   self.Chassis={Position=Vector3.new(x,0,0),CFrame=CFrame.new(x,0,0)}
   function self.Chassis:IsDescendantOf() return m.InWorld end
-  self.Seat={Occupant={},GetAttribute=function() return "Hauler" end,FindFirstChild=function() return nil end}
   for _,name in {"Waist","LeftHip","LeftKnee","LeftAnkle","RightHip","RightKnee","RightAnkle","LeftShoulder","LeftElbow","RightShoulder","RightElbow"} do
    local j={Name=name,Transform=nil}
    function j:IsA(kind) return kind=="Motor6D" end
@@ -73,14 +72,16 @@ local CollectionService={
  HasTag=function(_,m) return m.Tagged end,
 }
 local renders={}
+local me={Attributes={}}
+function me:GetAttribute(k) return self.Attributes[k] end
 local services={CollectionService=CollectionService,ReplicatedStorage={},RunService={PreSimulation=tick,
- BindToRenderStep=function(_,name,_,fn) renders[name]=fn end}}
+ BindToRenderStep=function(_,name,_,fn) renders[name]=fn end},Players={LocalPlayer=me}}
 local game={GetService=function(_,name) return services[name] end}
 '''
 source += "local Motion=(function()\n" + (ROOT / "src/shared/MechMotion.luau").read_text() + "\nend)()\n"
-source += "local Seating=(function()\n" + (ROOT / "src/shared/Seating.luau").read_text() + "\nend)()\n"
+source += "local MechPilot=(function()\n" + (ROOT / "src/shared/MechPilot.luau").read_text() + "\nend)()\n"
 code = (ROOT / "src/client/Modules/MechAnimation.luau").read_text()
-code = re.sub(r'^local (Motion|Seating) = require\([^\n]+\)\n', '', code, flags=re.M)
+code = re.sub(r'^local (Motion|MechPilot) = require\([^\n]+\)\n', '', code, flags=re.M)
 source += "local Animator=(function()\n" + code + "\nend)()\n"
 source += r'''
 for i=1,60 do tick:Fire(1/60) end
@@ -89,7 +90,7 @@ assert(math.abs(remote.Joints[3].Transform.r[5]-1)>.01,"Walking knee remains rig
 assert(far.Joints[1].Transform==nil,"Distant rig still animated")
 partial:Load();partial.DescendantAdded:Fire();flush();tick:Fire(1/60)
 assert(partial.Joints[1].Transform,"Streamed-in rig was never discovered")
-remote.Seat.Occupant=nil
+remote.Attributes.MechPilotId=nil
 for i=1,240 do tick:Fire(1/60) end
 assert(math.abs(remote.Joints[1].Transform.Position.Y)<.001,"Empty mech keeps bobbing")
 remote.Tagged=false;removed:Fire(remote)
@@ -135,7 +136,16 @@ assert(g.Chassis.CFrame.Position.X==5,"A stopped mech kept being drawn over")
 far.Attributes.MechPosition=Vector3.new(400,0,-5)
 glide(1/60)
 assert(far.Chassis.CFrame.Position.Z==0,"A mech out of range was glided")
-print("PASS: spectator walking, distance culling, streamed limbs, idle return, removal, re-entry, deferred cleanup and gliding between the server's steps")
+-- The mech you pilot, your own screen moves (VehicleDrive): never glided over.
+me.Attributes.MechPilot="Hauler30"
+g.Chassis.CFrame=CFrame.new(1,2,3)
+g.Attributes.MechPosition,g.Attributes.MechMotion=Vector3.new(30,0,-50),Vector3.new(0,10,0)
+for i=1,10 do clockNow+=1/60;glide(1/60) end
+assert(g.Chassis.CFrame.Position.X==1,"Your own mech was glided over")
+me.Attributes.MechPilot=nil
+glide(1/60)
+assert(g.Chassis.CFrame.Position.X~=1,"Getting out didn't hand it back to the glide")
+print("PASS: spectator walking, distance culling, streamed limbs, idle return, removal, re-entry, deferred cleanup, gliding between moves and leaving your own mech alone")
 '''
 script = ROOT / '.tools/mech-animation-test.luau'
 try:

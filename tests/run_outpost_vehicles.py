@@ -1,4 +1,4 @@
-"""Run the server-moved mechs with the real drive maths and a stand-in world.
+"""Run the server side of the mechs (no seats) with stand-in players and parts.
 
 Uses Lune when installed, otherwise the bundled Luau and scene math doubles.
 Neither runner substitutes for an in-engine multiplayer driving check.
@@ -27,13 +27,14 @@ local Vector2={new=function(x,y) return setmetatable({X=x,Y=y},v2mt) end}
 v2mt.__index=function(v,k) if k=="Magnitude" then return math.sqrt(v.X*v.X+v.Y*v.Y) end end
 v2mt.__eq=function(a,b) return a.X==b.X and a.Y==b.Y end
 vmt.__eq=function(a,b) return a.X==b.X and a.Y==b.Y and a.Z==b.Z end
+local function typeof(v) if type(v)=="table" and getmetatable(v)==vmt then return "Vector3" end return type(v) end
 Vector2.zero=Vector2.new(0,0)
 local R={Vector2=Vector2,Vector3=Vector3,CFrame=CFrame,Color3=Color3,Enum=Enum}
 local modules={}
 '''
-    for path in ['src/shared/Outpost.luau', 'src/shared/Seating.luau', 'src/server/Systems/OutpostVehicles.luau']:
+    for path in ['src/shared/Outpost.luau', 'src/shared/MechPilot.luau', 'src/server/Systems/OutpostVehicles.luau', 'src/server/Systems/SeatExit.luau']:
         source += f'modules["{path}"]=function(env)\n'
-        for name in ['game', 'script', 'require', 'Instance', 'Enum', 'CFrame', 'Vector2', 'Vector3', 'Color3', 'os', 'task', 'warn']:
+        for name in ['game', 'script', 'require', 'Instance', 'Enum', 'CFrame', 'Vector2', 'Vector3', 'Color3', 'os', 'task', 'warn', 'print', 'typeof']:
             source += f'local {name}=env.{name} or {name}\n'
         source += (ROOT / path).read_text(encoding='utf-8') + '\nend\n'
     source += '''
