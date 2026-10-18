@@ -124,12 +124,12 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   so a knocked-out kaiju's place stays its own and the team is always full.
   Each walks in its own place round you: one to your right, one to your
   left, one behind.
-- **They fight on their own.** They take on any moon bug within 28 studs of
-  you, going first for one that's after you or them. They only fight a
-  wild kaiju once you've started a fight with that one (see
-  [Wild kaiju](#wild-kaiju)). They follow you everywhere in the Outpost (put
-  back beside you if one falls far behind) and go away in a fight, a match
-  or an expedition.
+- **They fight on their own, as a team.** They take on any moon bug within
+  28 studs of you, and share them out (see
+  [Fighting as a team](#fighting-as-a-team)). They only fight a wild kaiju
+  once you've started a fight with that one (see [Wild kaiju](#wild-kaiju)).
+  They follow you everywhere in the Outpost (put back beside you if one falls
+  far behind) and go away in a fight, a match or an expedition.
 - **EXP** goes to each of them out: for kills and for the rocks you mine.
 - **Recall.** Calls all of them back to you; they stay out of the fight for
   4 seconds. Use it when one's about to die, or about to kill a kaiju you
@@ -140,6 +140,43 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **Changing the team** (the panel): LEAD puts one at the front; SEND OUT
   puts one from home in place of one of the team. Not one that's fought in
   the last 3 seconds, and not twice in a moment.
+
+## Fighting as a team
+
+![Three kaiju on six critters, walked through for twelve seconds: before and after](kaiju/team-fight.png)
+
+Your team, a pack of wild kaiju and the critters all fight as a side
+(`Shared.Squad`), not each on its own:
+
+- **Each its own foe while there are enough to go round.** Three kaiju on
+  three critters take one each; two on three fight one each while the third
+  waits its turn; two on ten never double up, so each works through its half,
+  five each, one at a time. As foes fall, the kaiju collapse onto the ones
+  left: with more kaiju than foes they share them out (three on two: two and
+  one), and three on one all go in.
+- **Who takes whom.** The nearest, but a critter already after a kaiju counts
+  6 studs nearer to it, one after you 10 nearer, and a kaiju keeps the foe
+  it's on unless another is 8 studs nearer, so they don't swap back and
+  forth (`Kaiju.Squad`, `Squad.Stick`, `Squad.Threat`).
+- **Flanking.** Two or more on one foe spread round it: two on opposite
+  sides, three a third of a turn apart. Each works round to its side a step
+  at a time (round the foe, not through it), keeping the side it came in on
+  where it can.
+- **Spacing.** No two of your kaiju stand closer than 5 studs: one crowding
+  another is pushed clear.
+- **The critters' side too.** Critters near your kaiju share the kaiju out
+  evenly: ten on two kaiju, five on each; three on two, two and one. They
+  take their own places in a ring round the kaiju they're on, at least 3.5
+  studs from each other. A wild pack shares out its foes and flanks one it
+  shares the same way.
+
+In the walked-through fight above (three kaiju on six critters, twelve
+seconds, the server's own brains), before this two kaiju always shared a
+critter, the critters never spread evenly, and the nearest two kaiju stood
+about 4 studs apart, on top of each other now and then; now each has its own
+critter every moment, the critters are spread two on each, and the nearest
+two kaiju fight 6 to 19 studs apart on average (it varies run to run), all
+but never on top of each other.
 
 ## On screen
 
@@ -335,9 +372,33 @@ with your pick, hunt them, or run back to the core, where they give up and
 slip back through rifts of their own.
 
 **A critter goes for a kaiju before a player.** If a kaiju is out within 30
-studs of it, it goes for that kaiju, your own before anyone else's, and your
-kaiju goes for it. So your kaiju draws the critters off you while you mine.
-Recall it and they come back for you.
+studs of it, it goes for a kaiju, your own before anyone else's, the
+critters about shared out evenly over the kaiju near (see
+[Fighting as a team](#fighting-as-a-team)), and your kaiju go for them. So
+your kaiju draw the critters off you while you mine. Recall them and they
+come back for you.
+
+**They fight for real** (`Kaiju.Bug`, `Kaiju.BugMoves`):
+
+- **A bite winds up** (0.3 s, the body shows it coming), then it hops back
+  out and circles a moment before it comes in again; your kaiju can parry it
+  or punish it as it recovers.
+- **It dodges.** A kaiju's blow it sees coming it hops clear of, by chance
+  (3 in 10; Tralalero more than half the time), at most once every 2.5 s.
+- **Each kind has its own move**, named on its cast bar, every 6 to 9 s:
+
+  | | Move | What it does |
+  | --- | --- | --- |
+  | **Sahur** | Bat Slam | a ring round its feet in warning, then a slam: 2.2× a bite to all inside 6 studs, breaking guards, burning |
+  | **Tralalero** | Shark Dash | from 4 to 16 studs off, a dash straight through its foe: 1.8× to everyone in the line, slowing |
+  | **Patapim** | Spore Burst | a ring in warning, then spores round it: 1.3× to all inside 7 studs, poisoning, a cloud left behind |
+  | **Crocodilo** | Carpet Bomb | three bombs round its foe, stunning |
+
+- **Crocodilo fights from a distance.** It keeps 11 studs off and lobs a bomb
+  every 2.2 s. A ring shows where each will land, and it lands where its foe
+  was: keep moving and it misses. It bites only one that closes in.
+- **Your kaiju read their moves.** A slam or a dash reads as a heavy (they
+  hop aside or brace), a burst or a lob as a cast.
 
 Their level comes from where they came through: 1 to 4 in the Fringe, 9 to
 13 at the Edge (tougher again: a quarter more health, a fifth more damage).
@@ -400,15 +461,16 @@ Proposed guardrails:
 
 | Where | What |
 | --- | --- |
-| `Shared.Kaiju` | The rules: kinds, stats, EXP, feeding, taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`), packs and a wild one's day (`Wild`, `Roam`, `mood`) |
+| `Shared.Kaiju` | The rules: kinds, stats, EXP, feeding, taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
+| `Shared.Squad` | Fighting as a side: sharing out foes (`assign`, `cost`), places round a shared foe (`slots`, `toward`), keeping clear (`apart`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
 | `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
 | `Shared.CreatureMotion` | Their walk (`Stride`), arms (`Arm`), jaw and tail, and every fight pose (`fight`, `apply`) |
 | `Shared.GemTraits` | The moves a Gemsoul rolls (`SoulMoves`); an old one's seeded into them (`traitsOf`) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
-| `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow and its R when hard pressed (`setMoves` after a level); the attributes clients pose it by |
+| `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow and its R when hard pressed (`setMoves` after a level), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
 | `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, knockout (`KaijuDown_<id>` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), feeding any of yours (`KaijuFeed`), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
-| `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
+| `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model; a pack shares its foes), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, sharing out your kaiju, how they fight (bites, hops, dodges, their moves, bombs), slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look; its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
 | `SparServer` | `Hunt`: the kit out alone |
@@ -427,7 +489,14 @@ the starter roll (three, the same when asked again, nothing out before the
 claim, three out in their places after, never twice, and given anyway after
 a while in the Outpost), your team (three out, one knocked out leaving the
 others, recall and EXP for all of them, LEAD, SEND OUT, the checks on a new
-team, feeding one at home), every move lands where it should (an R's shell, ward, mend, aura and
+team, feeding one at home), fighting as a team (3 on 3 one each, 3 on 1 all
+in from three sides, 2 on 3 one each and the collapse when one falls, 2 on 10
+never doubled up with the critters five and five, two on one spot pushed
+apart; a critter's bite winding up and hopping back out, its hop clear of a
+blow coming, each kind's move landing where it should and nowhere else, a
+bomb missing a kaiju that moved off; a pack on two kaiju taking one each and
+on one flanking it; and twelve seconds of three kaiju on six critters walked
+through), every move lands where it should (an R's shell, ward, mend, aura and
 burst too), your kaiju's moves follow its level, its Q goes off in place of
 a blow and waits its turn, its R goes up when it's hard pressed (not
 before), a shell soaks blows till it breaks and a ward takes its share, on

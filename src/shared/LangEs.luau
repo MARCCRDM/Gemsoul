@@ -1722,6 +1722,11 @@ return {
 	["Ground Stomp"] = "Pisotón",
 	["Tail Lash"] = "Latigazo de cola",
 	["Shell Slam"] = "Golpe de caparazón",
+	-- A critter's own move, on its cast bar (Shared.Kaiju.BugMoves).
+	["Bat Slam"] = "Batazo",
+	["Shark Dash"] = "Embestida de tiburón",
+	["Spore Burst"] = "Estallido de esporas",
+	["Carpet Bomb"] = "Bombardeo",
 	-- The frontier: bands, the banner as you cross into one (FrontierHud), a rock's tag (OutpostScene).
 	["Outpost Core"] = "Núcleo del Puesto",
 	["The Fringe"] = "La Franja",

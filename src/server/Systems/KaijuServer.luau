@@ -8,8 +8,12 @@
 	               creature that comes near you (wild kaiju and moon bugs),
 	               fighting as the Arena's duellist does (KaijuFighter):
 	               combos, heavies, guard and parry, hops, and their
-	               Gemsouls' moves. At 0 health one is knocked back into its
-	               Gemsoul, out again after Kaiju.KnockoutSeconds.
+	               Gemsouls' moves. They fight as a team (Shared.Squad): the
+	               creatures shared out (each its own while there are
+	               enough, the rest waiting their turn), one they share
+	               flanked from either side, and never on top of each other.
+	               At 0 health one is knocked back into its Gemsoul, out
+	               again after Kaiju.KnockoutSeconds.
 	  The roll     everyone starts with Kaiju.StarterTeam kaiju, rolled (the
 	               intro's roll, or the Outpost's for a player from before):
 	               prepared here and saved, so a retry never rerolls, then
@@ -51,6 +55,7 @@ local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Squad = require(ReplicatedStorage.Shared.Squad)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
 local KaijuAbilities = require(script.Parent.KaijuAbilities)
@@ -731,33 +736,89 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 	return outcome
 end
 
--- Who it fights: what it's already fighting, if that's still near its
--- owner; else a creature that's after it or its owner; else the nearest
--- creature near its owner. (A wild kaiju only once its owner has started on
--- it.)
-local function chooseTarget(pet: Pet, ownerRoot: BasePart)
+-- Fighting as a team (Shared.Squad): the creatures near its owner shared
+-- out among the team fit to fight (out, not recalled, not run off past the
+-- leash): each its own while there are enough to go round, else as evenly
+-- as can be, a creature after it (or after its owner, more so) counting
+-- nearer, and the one it's on kept unless another is well nearer (one it's
+-- on stays in the running a little past the engage range). Where two or more
+-- share one, the side of it each fights from. Returns { [pet]: enemy } and
+-- { [pet]: flank }.
+local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 	local engage = Kaiju.Follow.Engage
-	local current = pet.Target
-	if
-		current
-		and current.Alive
-		and fair(pet.Owner, current)
-		and (current.Root.Position - ownerRoot.Position).Magnitude <= engage + 12
-	then
-		return current
-	end
-	local best, bestScore = nil, math.huge
-	for _, entry in creaturesNear(ownerRoot.Position, engage, pet.Owner) do
-		local enemy = entry.Enemy
-		local distance = (enemy.Root.Position - pet.Root.Position).Magnitude
-		local after = (enemy :: any).Foe
-		-- (One already after it or its owner comes first.)
-		local score = distance - (if after == pet or after == pet.Owner then 100 else 0)
-		if score < bestScore then
-			best, bestScore = enemy, score
+	local fighters = {}
+	for _, pet in petsOf(player) do
+		local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
+		if pet.Model.Parent and pet.Humanoid.Health > 0 and now >= pet.RecallUntil and away <= Kaiju.Follow.Leash then
+			table.insert(fighters, pet)
 		end
 	end
-	return best
+	local foes, listed = {}, {}
+	for _, entry in creaturesNear(ownerRoot.Position, engage, player) do
+		table.insert(foes, entry.Enemy)
+		listed[entry.Enemy] = true
+	end
+	for _, pet in fighters do
+		local current = pet.Target
+		if
+			current
+			and not listed[current]
+			and current.Alive
+			and fair(player, current)
+			and (current.Root.Position - ownerRoot.Position).Magnitude <= engage + 12
+		then
+			table.insert(foes, current)
+			listed[current] = true
+		end
+	end
+	local targets = Squad.assign(fighters, foes, function(pet, enemy)
+		local after = (enemy :: any).Foe
+		local distance = (enemy.Root.Position - pet.Root.Position).Magnitude
+		return Squad.cost(distance, pet.Target == enemy, after == pet)
+			- (if after == player then Kaiju.Squad.OwnerThreat else 0)
+	end)
+	local groups, order = {}, {}
+	for _, pet in fighters do
+		local enemy = targets[pet]
+		if enemy then
+			if not groups[enemy] then
+				groups[enemy] = {}
+				table.insert(order, enemy)
+			end
+			table.insert(groups[enemy], pet)
+		end
+	end
+	local flanks = {}
+	for _, enemy in order do
+		local group = groups[enemy]
+		if #group > 1 then
+			local spots = {}
+			for i, pet in group do
+				spots[i] = pet.Root.Position
+			end
+			for i, dir in Squad.slots(enemy.Root.Position, spots) do
+				flanks[group[i]] = dir
+			end
+		end
+	end
+	return targets, flanks
+end
+
+-- A push clear of any other kaiju out crowding it (Kaiju.Squad.Space).
+local function spacing(pet: Pet): Vector3
+	local space = Kaiju.Squad.Space
+	local others = {}
+	for _, out in teams do
+		for _, other in out do
+			if other ~= pet and other.Model.Parent then
+				local at = other.Root.Position
+				if flat(at - pet.Root.Position).Magnitude < space then
+					table.insert(others, at)
+				end
+			end
+		end
+	end
+	return Squad.apart(pet.Root.Position, others, space, pet.Slot)
 end
 
 -- What it's doing, for every client to pose (KaijuMood, KaijuMoodAt).
@@ -866,14 +927,21 @@ local function think(pet: Pet, now: number, dt: number)
 		return
 	end
 	local recalled = now < pet.RecallUntil
-	local target = if recalled or away > Kaiju.Follow.Leash then nil else chooseTarget(pet, ownerRoot)
+	local target, flank = nil, nil
+	if not recalled and away <= Kaiju.Follow.Leash then
+		local targets, flanks = teamPlan(owner, ownerRoot, now)
+		target, flank = targets[pet], flanks[pet]
+	end
 	pet.Target = target
 	if target then
-		-- It fights as a duellist does (KaijuFighter: it reels when stunned).
+		-- It fights as a duellist does (KaijuFighter: it reels when stunned),
+		-- on its own side of a foe it shares, clear of the others.
 		pet.LastFight = now
 		settle(pet)
 		pet.IdleSpot = nil
-		KaijuFighter.step(pet.Fighter, { Root = target.Root, Enemy = target }, now)
+		local fighter = pet.Fighter
+		fighter.Flank, fighter.Apart = flank, spacing(pet)
+		KaijuFighter.step(fighter, { Root = target.Root, Enemy = target }, now)
 		return
 	end
 	KaijuFighter.calm(pet.Fighter)

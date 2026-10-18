@@ -1501,6 +1501,10 @@ bug.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(2, 0, 0))
 bug.LastAttack = 0
 KaijuWilds._brain(bug, now)
 check(bug.Foe == b, "A critter ignored the miner who drew it")
+-- (A bite winds up first: the body shows it coming.)
+check(#playerHits == 0 and bug.Model:GetAttribute("ActionKind") == "Slash", "It bit without a wind-up")
+now += Kaiju.Bug.BiteWindup
+KaijuWilds._brain(bug, now)
 check(#playerHits > 0 and playerHits[#playerHits][1] == b and playerHits[#playerHits][5] == false, "It never bit them")
 -- More come, but never more than the fringe's cap round one player,
 -- counting those still on their way through.
@@ -1679,8 +1683,10 @@ pet = KaijuServer.pets()[a]
 biter.Root.CFrame = CFrame.new(pet.Root.Position + Vector3.new(1.5, 0, 0))
 biter.Home, biter.LastAttack, pet.RecallUntil = biter.Root.Position, 0, 0
 settle(pet.Fighter)
-KaijuFight.raiseGuard(pet.Fighter, now, 2)
 local health = pet.Humanoid.Health
+KaijuWilds._brain(biter, now) -- (it winds up its bite...)
+now += Kaiju.Bug.BiteWindup
+KaijuFight.raiseGuard(pet.Fighter, now, 2) -- (...and the guard goes up just as it lands)
 KaijuWilds._brain(biter, now)
 check(biter.Foe == pet and pet.Humanoid.Health == health, "A bug's bite on a fresh guard wasn't parried")
 check(biter.StunUntil >= now + KaijuFight.ParryStagger, "A parried bug didn't reel")
@@ -2359,6 +2365,457 @@ local function yourTeam()
 end
 yourTeam()
 
+-- Fighting as a team ----------------------------------------------------------------------------------------
+-- The creatures shared out (each its own while there are enough: 3 on 3,
+-- 2 on 3 with the third waiting, 3 on 1 all in from three sides, 2 on 10
+-- with the critters split five and five); clear of each other; critters in a
+-- ring, biting and hopping out, dodging a blow coming, each kind's own move;
+-- a pack sharing its foes; and a short fight walked through to see it hold.
+local function teamFights()
+	Kaiju.SlotLevels = { 1, 1, 1 }
+	clearCritters()
+	for _, key in { "CombatSession", "MatchId", "DungeonId", "Expedition", "Hunt", "Spar" } do
+		a:SetAttribute(key, nil)
+	end
+	a:SetAttribute("Outpost", true)
+	local spot = center + Vector3.new(-320, 5, 60)
+	rootA.CFrame = CFrame.new(spot)
+	stand(center + Vector3.new(320, 5, 0)) -- (b far off)
+	now += 10
+	KaijuServer._upkeep(a, now)
+	local team = KaijuServer.team(a)
+	check(#team == 3, "Not three out for the team fights")
+	local bugs = {}
+	local function reset()
+		clearCritters()
+		table.clear(bugs)
+		for i, pet in team do
+			pet.RecallUntil, pet.StunUntil, pet.Plan, pet.IdleSpot, pet.Target = 0, 0, nil, nil, nil
+			pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1e6, 1e6
+			settle(pet.Fighter)
+			pet.Fighter.Flank, pet.Fighter.Apart = nil, nil
+			pet.Root.CFrame = CFrame.new(spot + Vector3.new((i - 2) * 6, 0, 3))
+		end
+	end
+	local function bugAt(p: Vector3, species: string?)
+		local bug = KaijuWilds.spawnBug(p, { Prey = a, Band = "Fringe", Level = 1, Critter = species })
+		bug.Root.CFrame = CFrame.new(p)
+		bug.Root.AssemblyLinearVelocity = Vector3.zero
+		bug.Home = p
+		bug.Humanoid.MaxHealth, bug.Humanoid.Health = 1e6, 1e6
+		bug.LastAttack = now
+		table.insert(bugs, bug)
+		return bug
+	end
+	local function tick(fighters)
+		for _, pet in fighters do
+			KaijuServer._think(pet, now, 0.15)
+		end
+		for _, bug in bugs do
+			if bug.Alive then
+				KaijuWilds._brain(bug, now)
+			end
+		end
+	end
+	local function distinct(fighters): boolean
+		local seen = {}
+		for _, pet in fighters do
+			if not pet.Target or seen[pet.Target] then
+				return false
+			end
+			seen[pet.Target] = true
+		end
+		return true
+	end
+	local function onEach(fighters)
+		local n = {}
+		for _, pet in fighters do
+			n[pet] = 0
+		end
+		for _, bug in bugs do
+			if bug.Alive and bug.Foe and n[bug.Foe] then
+				n[bug.Foe] += 1
+			end
+		end
+		return n
+	end
+	-- 3 on 3: one each.
+	reset()
+	for i = 1, 3 do
+		bugAt(spot + Vector3.new((i - 2) * 6, 0, 14))
+	end
+	tick(team)
+	check(distinct(team), "3 on 3: not one each")
+	local n = onEach(team)
+	check(n[team[1]] == 1 and n[team[2]] == 1 and n[team[3]] == 1, "3 critters on 3 kaiju: not one each")
+	-- 3 on 1: all of them, from three sides a third of a turn apart.
+	reset()
+	local lone = bugAt(spot + Vector3.new(0, 0, 12))
+	tick(team)
+	tick(team)
+	local flanks = {}
+	for _, pet in team do
+		check(pet.Target == lone, "3 on 1: one stayed out")
+		check(pet.Fighter.Flank ~= nil, "3 on 1: one without a side to fight from")
+		table.insert(flanks, pet.Fighter.Flank)
+	end
+	for i = 1, 3 do
+		for j = i + 1, 3 do
+			check(math.abs(flanks[i]:Dot(flanks[j]) + 0.5) < 1e-3, "3 on 1: not round it a third of a turn apart")
+		end
+	end
+	-- 2 on 3: one each, the third waiting; the critters two and one.
+	Kaiju.SlotLevels = { 1, 1 }
+	KaijuServer._upkeep(a, now)
+	local two = KaijuServer.team(a)
+	check(#two == 2, "Two slots, not two out")
+	reset()
+	for i = 1, 3 do
+		bugAt(spot + Vector3.new((i - 2) * 7, 0, 13))
+	end
+	tick(two)
+	check(distinct(two), "2 on 3: not one each")
+	n = onEach(two)
+	check(n[two[1]] + n[two[2]] == 3 and math.abs(n[two[1]] - n[two[2]]) == 1, "3 critters on 2 kaiju: not two and one")
+	-- One falls: the kaiju whose foe it was takes the one left waiting.
+	local freed = two[1]
+	local fallen = freed.Target
+	fallen.Alive = false
+	KaijuWilds._wilds[fallen] = nil
+	tick(two)
+	check(freed.Target ~= nil and freed.Target ~= fallen and distinct(two), "No collapse onto the one left")
+	-- 2 on 10: never doubled up, and the critters split five and five.
+	reset()
+	for i = 1, 10 do
+		local turn = i * math.pi * 2 / 10
+		bugAt(spot + Vector3.new(math.cos(turn) * 12, 0, 3 + math.sin(turn) * 12))
+	end
+	tick(two)
+	tick(two)
+	check(distinct(two), "2 on 10: doubled up")
+	n = onEach(two)
+	check(n[two[1]] == 5 and n[two[2]] == 5, "10 critters on 2 kaiju: not five each")
+	Kaiju.SlotLevels = { 1, 1, 1 }
+	KaijuServer._upkeep(a, now)
+	team = KaijuServer.team(a)
+	-- Clear of each other: two on the same spot get pushed apart.
+	reset()
+	bugAt(spot + Vector3.new(0, 0, 14))
+	team[2].Root.CFrame = team[1].Root.CFrame
+	tick(team)
+	local push, other = team[1].Fighter.Apart, team[2].Fighter.Apart
+	check(push and other and push.Magnitude > 1 and other.Magnitude > 1, "Two kaiju on top of each other stayed put")
+	check(push:Dot(other) < 0, "Pushed the same way, not apart")
+
+	-- A critter's bite: a wind-up, then it hops back out and circles.
+	reset()
+	local pet = team[1]
+	local biter = bugAt(pet.Root.Position + Vector3.new(2.5, 0, 0), "Sahur")
+	local e = biter :: any
+	e.NextMove, biter.LastAttack = math.huge, 0
+	KaijuWilds._brain(biter, now)
+	check(
+		e.Action and e.Action.Kind == "Bite" and biter.Model:GetAttribute("ActionKind") == "Slash",
+		"No wind-up to a bite"
+	)
+	local before = pet.Humanoid.Health
+	now += Kaiju.Bug.BiteWindup
+	KaijuWilds._brain(biter, now)
+	check(biter.Foe == pet and pet.Humanoid.Health < before, "The bite never landed")
+	check(biter.Root.AssemblyLinearVelocity:Dot(pet.Root.Position - biter.Root.Position) < 0, "It didn't hop back out")
+	check((e.RecoverUntil or 0) > now, "It didn't circle a moment before coming back")
+	-- A blow it sees coming: it hops clear, and the blow misses.
+	local dodge = Kaiju.Bug.Dodge
+	Kaiju.Bug.Dodge = 1
+	e.NextDodge, e.RecoverUntil = 0, 0
+	pet.Target = biter
+	pet.Fighter.Action = { Kind = "Light", At = now + 0.2, Hits = 1 }
+	KaijuWilds._brain(biter, now)
+	check((biter.DodgeUntil or 0) > now and biter.Model:GetAttribute("ActionKind") == "Dodge", "It never hopped clear")
+	check(KaijuServer.strike(pet, biter, 10, nil, false) == "Dodged", "The blow landed through its hop")
+	pet.Fighter.Action = nil
+	Kaiju.Bug.Dodge = dodge
+	-- Each kind's own move, named on its cast bar.
+	local function readyMove(species: string, at: Vector3)
+		reset()
+		local bug = bugAt(at, species)
+		local b2 = bug :: any
+		b2.NextMove, b2.NextDodge, bug.LastAttack = 0, math.huge, now
+		return bug, b2
+	end
+	local function healthOf()
+		local list = {}
+		for _, p in team do
+			list[p] = p.Humanoid.Health
+		end
+		return list
+	end
+	-- Sahur: a slam round its feet; your kaiju read it coming.
+	local move = Kaiju.BugMoves.Sahur
+	local slammer, sl = readyMove("Sahur", spot + Vector3.new(0, 0, 20))
+	team[2].Root.CFrame = CFrame.new(slammer.Root.Position + Vector3.new(0, 0, -3))
+	team[1].Root.CFrame = CFrame.new(slammer.Root.Position + Vector3.new(4, 0, 0))
+	team[3].Root.CFrame = CFrame.new(slammer.Root.Position + Vector3.new(20, 0, 0))
+	KaijuWilds._brain(slammer, now)
+	check(sl.Action and slammer.Model:GetAttribute("ActionName") == move.Name, "No Bat Slam on its cast bar")
+	check(slammer.Model:GetAttribute("ActionKind") == move.Pose, "The slam isn't posed")
+	check(
+		KaijuFighter._readFoe(team[2].Fighter, { Root = slammer.Root, Enemy = slammer }, now).Heavy,
+		"A kaiju can't see the slam coming"
+	)
+	local hp = healthOf()
+	now += move.Windup
+	KaijuWilds._brain(slammer, now)
+	check(
+		team[1].Humanoid.Health < hp[team[1]] and team[2].Humanoid.Health < hp[team[2]],
+		"The slam missed the kaiju inside it"
+	)
+	check(team[3].Humanoid.Health == hp[team[3]], "The slam reached one far off")
+	-- Tralalero: a dash straight through its foe (not one off to the side).
+	move = Kaiju.BugMoves.Tralalero
+	local dasher = readyMove("Tralalero", spot + Vector3.new(0, 0, 20))
+	team[1].Root.CFrame = CFrame.new(dasher.Root.Position + Vector3.new(0, 0, -10))
+	team[2].Root.CFrame = CFrame.new(dasher.Root.Position + Vector3.new(9, 0, -10))
+	team[3].Root.CFrame = CFrame.new(dasher.Root.Position + Vector3.new(-30, 0, 0))
+	KaijuWilds._brain(dasher, now)
+	check(
+		dasher.Model:GetAttribute("ActionName") == move.Name and dasher.Foe == team[1],
+		"No Shark Dash at the one in front"
+	)
+	hp = healthOf()
+	now += move.Windup
+	KaijuWilds._brain(dasher, now)
+	check(team[1].Humanoid.Health < hp[team[1]], "The dash missed the one it went through")
+	check(team[2].Humanoid.Health == hp[team[2]], "The dash hit one off to the side")
+	-- Patapim: spores round it, poison left behind.
+	move = Kaiju.BugMoves.Patapim
+	local burster, bu = readyMove("Patapim", spot + Vector3.new(0, 0, 20))
+	team[1].Root.CFrame = CFrame.new(burster.Root.Position + Vector3.new(0, 0, -4))
+	team[2].Root.CFrame = CFrame.new(burster.Root.Position + Vector3.new(5, 0, 0))
+	team[3].Root.CFrame = CFrame.new(burster.Root.Position + Vector3.new(12, 0, 0))
+	KaijuWilds._brain(burster, now)
+	check(bu.Action and burster.Model:GetAttribute("ActionName") == move.Name, "No Spore Burst")
+	check(
+		KaijuFighter._readFoe(team[1].Fighter, { Root = burster.Root, Enemy = burster }, now).Casting,
+		"The burst doesn't read as a cast"
+	)
+	hp = healthOf()
+	local dots = #team[2].Dots
+	now += move.Windup
+	KaijuWilds._brain(burster, now)
+	check(
+		team[1].Humanoid.Health < hp[team[1]] and team[2].Humanoid.Health < hp[team[2]],
+		"The burst missed the kaiju inside it"
+	)
+	check(
+		team[3].Humanoid.Health == hp[team[3]] and #team[2].Dots > dots,
+		"The burst reached too far, or left no poison"
+	)
+	-- Crocodilo: it keeps its distance and lobs bombs where its foe stands;
+	-- a kaiju that moves off is missed.
+	move = Kaiju.BugMoves.Crocodilo
+	local bomber, bo = readyMove("Crocodilo", spot + Vector3.new(0, 0, 25))
+	team[1].Root.CFrame = CFrame.new(bomber.Root.Position + Vector3.new(0, 0, -4))
+	team[2].Root.CFrame = CFrame.new(spot + Vector3.new(-40, 0, 0))
+	team[3].Root.CFrame = CFrame.new(spot + Vector3.new(40, 0, 0))
+	bo.NextMove = math.huge
+	bomber.LastAttack = now
+	KaijuWilds._brain(bomber, now)
+	local to = bomber.Humanoid.MovingTo
+	check(to and (to - team[1].Root.Position).Magnitude > move.Keep - 1.5, "The bomber didn't keep its distance")
+	bomber.LastAttack = now - 10
+	KaijuWilds._brain(bomber, now)
+	check(bo.Action and bo.Action.Kind == "Lob" and bomber.Model:GetAttribute("ActionKind") == "Bolt", "No lob")
+	now += move.Lob.Windup
+	KaijuWilds._brain(bomber, now)
+	check(bo.Bombs and #bo.Bombs == 1, "No bomb in the air")
+	hp = healthOf()
+	now += move.Lob.Flight
+	KaijuWilds._brain(bomber, now)
+	check(team[1].Humanoid.Health < hp[team[1]] and #bo.Bombs == 0, "The bomb didn't land on the one standing there")
+	bomber.LastAttack = now - 10
+	KaijuWilds._brain(bomber, now)
+	now += move.Lob.Windup
+	KaijuWilds._brain(bomber, now)
+	team[1].Root.CFrame = team[1].Root.CFrame + Vector3.new(8, 0, 0) -- (it moves off)
+	hp = healthOf()
+	now += move.Lob.Flight
+	KaijuWilds._brain(bomber, now)
+	check(team[1].Humanoid.Health == hp[team[1]], "A bomb hit a kaiju that moved off")
+
+	-- A short fight walked through: three kaiju on six critters for twelve
+	-- seconds. Each its own foe all along, the critters two on each, never
+	-- piled up, and the critters' moves used.
+	reset()
+	local kinds = { "Sahur", "Tralalero", "Patapim", "Crocodilo", "Sahur", "Patapim" }
+	for i, species in kinds do
+		local turn = i * math.pi * 2 / #kinds
+		local bug = bugAt(spot + Vector3.new(math.cos(turn) * 14, 0, 3 + math.sin(turn) * 14), species)
+		bug.LastAttack = 0
+	end
+	local function walkAll(dt: number)
+		local movers = {}
+		for _, p in team do
+			table.insert(movers, p)
+		end
+		for _, bug in bugs do
+			table.insert(movers, bug)
+		end
+		for _, m in movers do
+			local target = m.Humanoid.MovingTo
+			if target then
+				local from = m.Root.Position
+				local d = Vector3.new(target.X - from.X, 0, target.Z - from.Z)
+				local stride = math.min(d.Magnitude, (m.Humanoid.WalkSpeed or 0) * dt)
+				if d.Magnitude > 1e-3 and stride > 0 then
+					m.Root.CFrame = CFrame.new(from + d.Unit * stride)
+				end
+			end
+		end
+	end
+	local function flatGap(p: Vector3, q: Vector3): number
+		local d = p - q
+		return Vector3.new(d.X, 0, d.Z).Magnitude
+	end
+	local ticks, apartTicks, evenTicks, piled, petGap, bugGap, gaps = 0, 0, 0, 0, 0, 0, 0
+	local named = {}
+	for step = 1, 80 do
+		now += 0.15
+		tick(team)
+		walkAll(0.15)
+		for _, bug in bugs do
+			local name = bug.Model:GetAttribute("ActionName")
+			if name then
+				named[name] = true
+			end
+		end
+		if step > 20 then
+			ticks += 1
+			if distinct(team) then
+				apartTicks += 1
+			end
+			n = onEach(team)
+			local most, least = 0, math.huge
+			for _, p in team do
+				most, least = math.max(most, n[p]), math.min(least, n[p])
+			end
+			if most - least <= 1 then
+				evenTicks += 1
+			end
+			local closest = math.huge
+			for i = 1, #team do
+				for j = i + 1, #team do
+					closest = math.min(closest, flatGap(team[i].Root.Position, team[j].Root.Position))
+				end
+			end
+			petGap += closest
+			if closest < 1.5 then
+				piled += 1
+			end
+			-- Critters on the same kaiju: how close the nearest two are.
+			for _, p in team do
+				local on = {}
+				for _, bug in bugs do
+					if bug.Foe == p then
+						table.insert(on, bug.Root.Position)
+					end
+				end
+				if #on >= 2 then
+					local near = math.huge
+					for i = 1, #on do
+						for j = i + 1, #on do
+							near = math.min(near, flatGap(on[i], on[j]))
+						end
+					end
+					bugGap += near
+					gaps += 1
+				end
+			end
+		end
+	end
+	print(
+		string.format(
+			"  team fight: each its own foe %d/%d ticks, critters even %d/%d, kaiju %.1f studs apart (%d piled), critters on one %.1f apart",
+			apartTicks,
+			ticks,
+			evenTicks,
+			ticks,
+			petGap / ticks,
+			piled,
+			bugGap / math.max(1, gaps)
+		)
+	)
+	check(apartTicks == ticks, "Kaiju doubled up with critters to spare")
+	check(evenTicks >= ticks * 0.9, "Critters weren't spread over the kaiju")
+	check(petGap / ticks >= 3, "Kaiju bunched up")
+	check(piled <= ticks * 0.05, "Kaiju on top of each other")
+	check(gaps > 0 and bugGap / gaps >= 2.5, "Critters piled on a kaiju")
+	local used = 0
+	for _, m in Kaiju.BugMoves do
+		if named[m.Name] then
+			used += 1
+		end
+	end
+	check(used >= 2, "The critters hardly used their moves: " .. used)
+
+	-- A pack shares its foes too: two wild kaiju on two of yours take one
+	-- each; on one, both, from opposite sides.
+	reset()
+	local pack
+	for _, candidate in KaijuWilds._packs do
+		if #candidate.Members >= 2 then
+			pack = candidate
+			break
+		end
+	end
+	check(pack ~= nil, "No pack of two")
+	local w1, w2 = pack.Members[1], pack.Members[2]
+	local here = spot + Vector3.new(0, 0, 30)
+	for i, w in { w1, w2 } do
+		local we = w.Enemy :: any
+		we.Home = here
+		we.Root.CFrame = CFrame.new(here + Vector3.new((i - 1.5) * 8, 0, 0))
+		w.Engaged[a] = now
+		w.Taming, w.Plan = nil, nil
+		we.StunUntil, we.FoeVictim, we.LastPet = 0, nil, nil
+	end
+	team[1].Root.CFrame = CFrame.new(here + Vector3.new(-6, 0, -6))
+	team[2].Root.CFrame = CFrame.new(here + Vector3.new(6, 0, -6))
+	team[3].Root.CFrame = CFrame.new(spot + Vector3.new(0, 0, -90))
+	for _ = 1, 2 do
+		KaijuWilds._brain(w1.Enemy, now)
+		KaijuWilds._brain(w2.Enemy, now)
+	end
+	check(
+		w1.Enemy.Foe ~= nil and w2.Enemy.Foe ~= nil and w1.Enemy.Foe ~= w2.Enemy.Foe,
+		"A pack on two kaiju piled onto one"
+	)
+	team[2].Root.CFrame = CFrame.new(spot + Vector3.new(0, 0, -95))
+	for _ = 1, 2 do
+		KaijuWilds._brain(w1.Enemy, now)
+		KaijuWilds._brain(w2.Enemy, now)
+	end
+	check(w1.Enemy.Foe == team[1] and w2.Enemy.Foe == team[1], "A pack on one kaiju didn't both go in")
+	check(
+		w1.Fighter.Flank and w2.Fighter.Flank and w1.Fighter.Flank:Dot(w2.Fighter.Flank) < -0.99,
+		"A pack on one didn't flank it"
+	)
+	for _, w in { w1, w2 } do
+		local we = w.Enemy :: any
+		table.clear(w.Engaged)
+		we.FoeVictim, we.Foe = nil, nil
+		w.Fighter.Flank, w.Fighter.Apart = nil, nil
+		KaijuFighter.calm(w.Fighter)
+	end
+	clearCritters()
+	for i, p in team do
+		p.Target, p.Fighter.Flank, p.Fighter.Apart = nil, nil, nil
+		p.Root.CFrame = CFrame.new(center + Vector3.new((i - 2) * 4, 0, 4))
+	end
+	rootA.CFrame = CFrame.new(center)
+end
+teamFights()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do
@@ -2373,7 +2830,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian, a wild kaiju's day)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian, a wild kaiju's day)",
 		checks
 	)
 )

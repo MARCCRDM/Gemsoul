@@ -14,7 +14,8 @@
 	              your kaiju goes in, or hit it while hunting (the combat
 	              kit out: SparServer). It fights those who started on it
 	              and their kaiju (its packmate close by joins in:
-	              Kaiju.Wild.Defend), and forgets them once home. It walks
+	              Kaiju.Wild.Defend; a pack shares out its foes and flanks
+	              one it shares, Shared.Squad), and forgets them once home. It walks
 	              only where the way is clear (clearPath). It fights as the Arena's duellist does
 	              (KaijuFighter: combos, telegraphed heavies, guard and
 	              parry, hops, their Gemsoul's E), and walk home to heal if
@@ -45,7 +46,15 @@
 	              past the core (FrontierServer: Shared.Frontier). One hops
 	              out at whoever drew it (a miner too, or a mech's pilot:
 	              KaijuWilds.prey), but a kaiju out close by draws it first
-	              (Kaiju.Bug.Draw: the prey's own before any other); with
+	              (Kaiju.Bug.Draw: the prey's own before any other), the
+	              critters about shared out evenly over the kaiju near
+	              (Shared.Squad: ten on two, five each). It fights for real:
+	              it takes its own place in a ring round its foe (clear of
+	              the other critters), bites after a wind-up and hops back
+	              out, hops clear of a kaiju's blow it sees coming, and uses
+	              its kind's own move (Kaiju.BugMoves: Sahur's Bat Slam,
+	              Tralalero's Shark Dash, Patapim's Spore Burst, Crocodilo's
+	              bombs from a distance), named on its cast bar. With
 	              nobody to fight for a moment (Frontier.Leave), or after its
 	              life (Frontier.Life), it slips back through a rift. One out
 	              of a wandering rift (opts.Wander) roams round it instead,
@@ -93,6 +102,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
+local Squad = require(ReplicatedStorage.Shared.Squad)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
 local KaijuAbilities = require(script.Parent.KaijuAbilities)
@@ -144,6 +154,7 @@ type Wild = {
 	Lifetime: number?, -- a wild one's: seconds unfought before it burrows (each its own)
 	Noticed: { [Player]: number }?, -- when it last stopped to look at each player
 	Taming: any?, -- a tame being cast on it: { Player, Ends, Health (the tamer's, to see a hit) }
+	Serial: number, -- its number (a steady order when they share out their foes)
 }
 
 -- A pack of roaming wild kaiju: its den out in the frontier (they wander
@@ -164,6 +175,8 @@ local guardAt: CFrame? = nil -- its vein's dormant rift
 local packs: { Pack } = {}
 local site: any = nil -- the Outpost's (its rock spots, live: veins move theirs)
 local rng = Random.new()
+local serial = 0 -- the last wild kaiju's or critter's number (Wild.Serial)
+local PREY_OWN = 20 -- studs nearer its prey's own kaiju counts, for a critter
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -350,17 +363,83 @@ local function hitFoe(enemy, victim, amount: number, element: string?, status: s
 	return "Missed"
 end
 
--- Who it goes after: a rift's critter, whoever drew it while they're fair
--- game; then whoever hurt it last (a kaiju or a hunter), while they're
--- inside its leash; else its current foe; else the nearest it sees. A wild
--- kaiju only goes after those who started on it (a hit is starting on it)
--- and their kaiju; a guardian, those who mined its vein too, on foot.
+-- Whether `victim` is fair game for it now: still there, a kaiju it may
+-- hit or a player it may (a hunter; for a rift's critter or a guardian,
+-- any prey), one who started on it (a wild kaiju only), inside its leash.
+local function fairFor(enemy, wild: Wild, victim): boolean
+	if not victim or not victim.Root or not victim.Root.Parent then
+		return false
+	end
+	if victim.Pet and not KaijuServer.targetable(victim.Pet) then
+		return false
+	end
+	local wide = wild.Bug or wild.Guard == true
+	if victim.Player and not (if wide then prey(victim.Player) else hunter(victim.Player)) then
+		return false
+	end
+	if not wild.Bug and not engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
+		return false
+	end
+	local leash = if wild.Bug then Kaiju.Bug.Leash else Kaiju.Wild.Leash
+	return (victim.Root.Position - enemy.Home).Magnitude <= leash
+end
+
+-- Every kaiju out that can be fought, in a steady order (by owner, then place).
+local function kaijuOut(): { any }
+	local list = {}
+	for _, pet in KaijuServer.all() do
+		if KaijuServer.targetable(pet) then
+			table.insert(list, pet)
+		end
+	end
+	table.sort(list, function(x, y)
+		if x.Owner.UserId ~= y.Owner.UserId then
+			return x.Owner.UserId < y.Owner.UserId
+		end
+		return (x.Slot or 0) < (y.Slot or 0)
+	end)
+	return list
+end
+
+-- Rift critters near kaiju share them out (Shared.Squad): every critter
+-- within Kaiju.Bug.Draw of a kaiju out it may bite goes for one, spread
+-- evenly over the kaiju about (ten on two: five each; three on two: two and
+-- one), its prey's own counting nearer, one already fighting it nearer
+-- still, and the one it's on kept unless another's well nearer. Critters
+-- with no kaiju near aren't in it. Returns { [critter]: pet }.
+local function critterPlan(): { [any]: any }
+	local critters = {}
+	for enemy, wild in wilds do
+		if wild.Bug and enemy.Alive and not wild.Leaving then
+			table.insert(critters, enemy)
+		end
+	end
+	table.sort(critters, function(x, y)
+		return wilds[x].Serial < wilds[y].Serial
+	end)
+	return Squad.assign(critters, kaijuOut(), function(enemy, pet)
+		local wild = wilds[enemy]
+		local distance = (pet.Root.Position - enemy.Root.Position).Magnitude
+		if distance > Kaiju.Bug.Draw or not fairFor(enemy, wild, { Root = pet.Root, Pet = pet }) then
+			return math.huge
+		end
+		local current = (enemy :: any).FoeVictim
+		return Squad.cost(distance, current ~= nil and current.Pet == pet, pet.Target == enemy)
+			- (if pet.Owner == wild.Prey then PREY_OWN else 0)
+	end)
+end
+
+-- Who it goes after: a rift's critter, its share of the kaiju out close by
+-- (critterPlan), else whoever drew it while they're fair game; then whoever
+-- hurt it last (a kaiju or a hunter), while they're inside its leash; else
+-- its current foe; else the nearest it sees. A wild kaiju only goes after
+-- those who started on it (a hit is starting on it) and their kaiju; a
+-- guardian, those who mined its vein too, on foot.
 local function chooseFoe(enemy, wild: Wild, aggro: number)
 	local now = os.clock()
 	local e = enemy :: any
 	local rifted = wild.Bug
 	local wide = rifted or wild.Guard == true
-	local leash = if rifted then Kaiju.Bug.Leash else Kaiju.Wild.Leash
 	if not wild.Bug then
 		if e.LastPet and e.LastPetAt and now - e.LastPetAt < 6 then
 			engage(wild, e.LastPet.Owner, e.LastPetAt)
@@ -370,37 +449,15 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		end
 	end
 	local function valid(victim): boolean
-		if not victim or not victim.Root or not victim.Root.Parent then
-			return false
-		end
-		if victim.Pet and not KaijuServer.targetable(victim.Pet) then
-			return false
-		end
-		if victim.Player and not (if wide then prey(victim.Player) else hunter(victim.Player)) then
-			return false
-		end
-		if not wild.Bug and not engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
-			return false
-		end
-		return (victim.Root.Position - enemy.Home).Magnitude <= leash
+		return fairFor(enemy, wild, victim)
 	end
 	-- A rift's critter goes for a kaiju out close by before any player (your
-	-- kaiju draws them off you: Kaiju.Bug.Draw), its prey's own first; and
-	-- the kaiju goes for it (KaijuServer: one after it or its owner).
+	-- kaiju draws them off you: Kaiju.Bug.Draw), sharing them out with the
+	-- other critters; and the kaiju go for them (KaijuServer).
 	if rifted then
-		local best, bestScore = nil, math.huge
-		for _, pet in KaijuServer.all() do
-			local distance = (pet.Root.Position - enemy.Root.Position).Magnitude
-			if distance <= Kaiju.Bug.Draw then
-				local victim = { Root = pet.Root, Pet = pet }
-				local score = distance - (if pet.Owner == wild.Prey then 100 else 0)
-				if score < bestScore and valid(victim) then
-					best, bestScore = victim, score
-				end
-			end
-		end
-		if best then
-			return best
+		local pet = critterPlan()[enemy]
+		if pet then
+			return { Root = pet.Root, Pet = pet }
 		end
 	end
 	-- (Out of a wandering rift: its own player only once they come near.)
@@ -439,6 +496,85 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		end
 	end
 	return best
+end
+
+-- Who a victim is (a kaiju or a player), to tell two victim tables apart.
+local function whoOf(victim): any
+	return if victim then (victim.Pet or victim.Player) else nil
+end
+
+-- A pack in a fight shares out its foes (Shared.Squad), as your team does:
+-- packmates fighting (two or more) split who they take on among the foes
+-- each may fight near it (each its own while there are enough), one hurting
+-- or fighting it counting nearer, the one it chose kept unless another's
+-- well nearer; and two on one flank it. Returns its victim and its flank.
+local function packShare(enemy, wild: Wild, victim)
+	local pack = wild.Pack
+	if not pack or wild.Bug or not victim then
+		return victim, nil
+	end
+	local members = {}
+	for _, mate in pack.Members do
+		local chosen = (mate.Enemy :: any).FoeVictim
+		if mate.Enemy.Alive and not mate.Taming and mate.Fighter and fairFor(mate.Enemy, mate, chosen) then
+			table.insert(members, mate)
+		end
+	end
+	if #members < 2 or not table.find(members, wild) then
+		return victim, nil
+	end
+	local foes, seen = {}, {}
+	local function add(v)
+		local who = whoOf(v)
+		if who and not seen[who] then
+			seen[who] = v
+			table.insert(foes, v)
+		end
+	end
+	for _, mate in members do
+		add((mate.Enemy :: any).FoeVictim)
+		for _, near in foesNear(mate.Enemy.Root.Position, mate.Enemy.Kind.Aggro, mate.Guard == true) do
+			if fairFor(mate.Enemy, mate, near) then
+				add(near)
+			end
+		end
+	end
+	local plan = Squad.assign(members, foes, function(mate, v)
+		if not fairFor(mate.Enemy, mate, v) then
+			return math.huge
+		end
+		local me = mate.Enemy :: any
+		local distance = (v.Root.Position - mate.Enemy.Root.Position).Magnitude
+		local hurting = (v.Pet ~= nil and (me.LastPet == v.Pet or v.Pet.Target == mate.Enemy))
+			or (v.Player ~= nil and me.LastSource == v.Player)
+		return Squad.cost(distance, whoOf(me.FoeVictim) == whoOf(v), hurting)
+	end)
+	local mine = plan[wild] or victim
+	local sharing, spots = {}, {}
+	for _, mate in members do
+		if whoOf(plan[mate]) == whoOf(mine) then
+			table.insert(sharing, mate)
+			table.insert(spots, mate.Enemy.Root.Position)
+		end
+	end
+	local flank = nil
+	if #sharing > 1 then
+		flank = Squad.slots(mine.Root.Position, spots)[table.find(sharing, wild)]
+	end
+	return mine, flank
+end
+
+-- A push clear of its own side close by (packmates, or other critters).
+local function crowd(enemy, wild: Wild, space: number): Vector3
+	local others = {}
+	local here = enemy.Root.Position
+	for other, w in wilds do
+		local mates = if wild.Bug then w.Bug else (wild.Pack ~= nil and w.Pack == wild.Pack)
+		if other ~= enemy and mates and other.Alive and flat(other.Root.Position - here).Magnitude < space then
+			table.insert(others, other.Root.Position)
+		end
+	end
+	return Squad.apart(here, others, space, wild.Serial)
 end
 
 -- Opens a rift (FrontierServer sets this): returns its timeline, or nil.
@@ -698,6 +834,308 @@ local function wander(enemy, wild: Wild, now: number)
 end
 KaijuWilds._wander = wander
 
+-- A critter in a fight ----------------------------------------------------------------------------------
+
+-- What its body is doing, for every client to pose (BodyPoses: a bite is a
+-- Slash) and, for a named move, the cast bar (FoeCastBar).
+local function act(enemy, kind: string, windup: number, side: number?, name: string?)
+	local model = enemy.Model
+	local t = serverNow()
+	model:SetAttribute("ActionName", name)
+	model:SetAttribute("ActionElement", if name then wilds[enemy] and wilds[enemy].Element else nil)
+	model:SetAttribute("ActionKind", kind)
+	model:SetAttribute("ActionStart", t)
+	model:SetAttribute("ActionAt", t + windup)
+	model:SetAttribute("ActionSide", side or 1)
+end
+
+-- Faces `at` on the spot.
+local function lookAt(root: BasePart, at: Vector3)
+	local p = root.Position
+	local target = Vector3.new(at.X, p.Y, at.Z)
+	if (target - p).Magnitude > 0.1 then
+		root.CFrame = CFrame.lookAt(p, target)
+	end
+end
+
+-- Those it may hit inside a circle (a move lands on all of them).
+local function victimsNear(enemy, wild: Wild, center: Vector3, radius: number): { any }
+	local list = {}
+	for _, victim in foesNear(center, radius, true) do
+		if fairFor(enemy, wild, victim) then
+			table.insert(list, victim)
+		end
+	end
+	return list
+end
+
+-- A blow coming its way: a kaiju on it winding one up, landing soon.
+local function incoming(enemy, now: number): boolean
+	for _, pet in KaijuServer.all() do
+		local action = pet.Target == enemy and pet.Fighter and pet.Fighter.Action
+		if action and action.At > now and action.At - now <= 0.45 then
+			return true
+		end
+	end
+	return false
+end
+
+-- Its place in a ring round its foe, shared with the other critters on it
+-- (Shared.Squad.slots), as a direction from its foe; nil alone on it.
+local function ringSlot(enemy, victim): Vector3?
+	local who = (enemy :: any).Foe
+	local group = {}
+	for other, w in wilds do
+		if w.Bug and other.Alive and (other :: any).Foe == who then
+			table.insert(group, other)
+		end
+	end
+	if #group < 2 then
+		return nil
+	end
+	table.sort(group, function(x, y)
+		return wilds[x].Serial < wilds[y].Serial
+	end)
+	local spots = {}
+	for i, other in group do
+		spots[i] = other.Root.Position
+	end
+	return Squad.slots(victim.Root.Position, spots)[table.find(group, enemy)]
+end
+
+-- A bomb on its way (a Crocodilo's): a ring where it'll land, then it lands
+-- there after its flight, on anyone it may hit inside Radius (anyone who
+-- moved off is missed).
+local function lob(
+	enemy,
+	wild: Wild,
+	now: number,
+	to: Vector3,
+	radius: number,
+	flight: number,
+	amount: number,
+	status: string?
+)
+	local e = enemy :: any
+	local from = enemy.Root.Position + Vector3.new(0, 1.5, 0)
+	local color = GemConfig.ElementColors[wild.Element]
+	fx("Shot", nil, from, to, color, "Bomb")
+	fx("Nova", to, radius, color, flight) -- (the ring, then the blast as it lands)
+	e.Bombs = e.Bombs or {}
+	table.insert(e.Bombs, {
+		At = now + flight,
+		To = to,
+		Radius = radius,
+		Amount = amount,
+		Status = status,
+	})
+end
+
+local function bombsLand(enemy, wild: Wild, now: number)
+	local bombs = (enemy :: any).Bombs
+	if not bombs then
+		return
+	end
+	for i = #bombs, 1, -1 do
+		local bomb = bombs[i]
+		if now >= bomb.At then
+			table.remove(bombs, i)
+			for _, victim in victimsNear(enemy, wild, bomb.To, bomb.Radius) do
+				hitFoe(enemy, victim, bomb.Amount, wild.Element, bomb.Status, nil)
+			end
+		end
+	end
+end
+
+-- Its kind's own move lands (Kaiju.BugMoves).
+local function release(enemy, wild: Wild, move, victim, now: number)
+	local root = enemy.Root
+	local color = GemConfig.ElementColors[wild.Element]
+	local amount = enemy.Kind.Damage * move.Mult * (1 - Enemies.weakness(enemy))
+	local feet = root.Position - Vector3.new(0, root.Size.Y / 2 + enemy.Humanoid.HipHeight, 0)
+	if move.Shape == "Slam" then
+		-- (Its warning ring bursts now: critterFight fired it with the wind-up.)
+		for _, v in victimsNear(enemy, wild, root.Position, move.Radius) do
+			hitFoe(enemy, v, amount, wild.Element, move.Status, move.Heavy == true)
+		end
+	elseif move.Shape == "Burst" then
+		fx("Zone", feet, move.Radius, move.Linger or 2, color)
+		for _, v in victimsNear(enemy, wild, root.Position, move.Radius) do
+			hitFoe(enemy, v, amount, wild.Element, move.Status, nil)
+		end
+	elseif move.Shape == "Dash" then
+		-- Straight through its foe: everyone it may hit along the way, once.
+		local start = root.Position
+		local away = flat(victim.Root.Position - start)
+		local dir = if away.Magnitude > 0.05 then away.Unit else root.CFrame.LookVector
+		local length = math.min(move.Length, away.Magnitude + 5)
+		root.AssemblyLinearVelocity = dir * (length / 0.3) + Vector3.new(0, 4, 0)
+		fx("DodgeRoll", nil, start, dir, length, true)
+		fx("Swing", nil, start, dir, move.Width + 1, 120, color, true)
+		for _, v in victimsNear(enemy, wild, start + dir * (length / 2), length / 2 + move.Width) do
+			local rel = flat(v.Root.Position - start)
+			local along = math.clamp(rel:Dot(dir), 0, length)
+			if (rel - dir * along).Magnitude <= move.Width then
+				hitFoe(enemy, v, amount, wild.Element, move.Status, nil)
+			end
+		end
+	elseif move.Shape == "Bombs" then
+		-- Round where its foe stands now: keep moving.
+		local at = victim.Root.Position
+		for i = 1, move.Count do
+			local spot = at
+			if i > 1 then
+				local a = (i - 2) * math.pi * 2 / math.max(1, move.Count - 1) + rng:NextNumber(-0.4, 0.4)
+				spot = at + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(move.Spread * 0.5, move.Spread)
+			end
+			lob(enemy, wild, now, spot, move.Radius, move.Flight, amount, move.Status)
+		end
+	end
+end
+
+-- One think of a critter fighting `victim`: in its place round its foe, it
+-- bites and hops back out, hops clear of a blow coming, and uses its move.
+local function critterFight(enemy, wild: Wild, victim, now: number)
+	local e = enemy :: any
+	local humanoid, root, kind = enemy.Humanoid, enemy.Root, enemy.Kind
+	local rules = Kaiju.Bug
+	local move = Kaiju.BugMoves[wild.Species]
+	local offset = flat(victim.Root.Position - root.Position)
+	local distance = offset.Magnitude
+	local dir = if distance > 0.01 then offset / distance else root.CFrame.LookVector
+	local reach = kind.Reach + victim.Root.Size.X / 2
+	if move and e.NextMove == nil then
+		e.NextMove = now + rng:NextNumber(1.5, math.max(2, move.Every * 0.6))
+	end
+	-- Stunned (bonked, parried): whatever it was winding up is lost.
+	if now < enemy.StunUntil then
+		if e.Action then
+			e.Action, e.Windup = nil, nil
+			act(enemy, "Stagger", 0)
+		end
+		humanoid:MoveTo(root.Position)
+		return
+	end
+	-- A wind-up under way: it holds, facing its foe, then lets go.
+	local action = e.Action
+	if action then
+		humanoid:MoveTo(root.Position)
+		lookAt(root, victim.Root.Position)
+		if now < action.At then
+			return
+		end
+		e.Action, e.Windup = nil, nil
+		if action.Kind == "Bite" then
+			enemy.LastAttack = now
+			if distance > reach + 1 then
+				return -- (it slipped away)
+			end
+			fx("EnemySwing", root.Position, victim.Root.Position, GemConfig.ElementColors[wild.Element])
+			if now < (e.BlindUntil or 0) and math.random() < (e.Blind or 0) then
+				return -- swung at nothing
+			end
+			local outcome = hitFoe(enemy, victim, kind.Damage * (1 - Enemies.weakness(enemy)), wild.Element, nil, false)
+			if outcome == "Parried" then
+				Enemies.addStatus(enemy, "Stun", 1, KaijuFight.ParryStagger) -- (a kaiju's guard turned its bite)
+				return
+			end
+			-- Out again, to circle a moment before it comes back in.
+			root.AssemblyLinearVelocity = -dir * rules.HopBack * 4 + Vector3.new(0, 8, 0)
+			e.RecoverUntil = now + rules.Recover
+			e.Circle = if rng:NextNumber() < 0.5 then 1 else -1
+		elseif action.Kind == "Lob" then
+			enemy.LastAttack = now
+			local lobRules = move.Lob
+			lob(
+				enemy,
+				wild,
+				now,
+				victim.Root.Position,
+				lobRules.Radius,
+				lobRules.Flight,
+				kind.Damage * lobRules.Mult * (1 - Enemies.weakness(enemy)),
+				nil
+			)
+		else
+			release(enemy, wild, move, victim, now)
+			e.RecoverUntil = now + rules.Recover
+		end
+		return
+	end
+	-- A blow coming its way: a hop aside, by chance.
+	if now >= (e.NextDodge or 0) and incoming(enemy, now) then
+		e.NextDodge = now + rules.DodgeEvery
+		if rng:NextNumber() < ((move and move.Dodge) or rules.Dodge) then
+			local sign = if rng:NextNumber() < 0.5 then 1 else -1
+			local side = Vector3.new(-dir.Z, 0, dir.X) * sign
+			enemy.DodgeUntil = now + rules.DodgeFor
+			root.AssemblyLinearVelocity = (side * 0.85 - dir * 0.5).Unit * 40 + Vector3.new(0, 10, 0)
+			act(enemy, "Dodge", 0, sign)
+			fx("DodgeRoll", nil, root.Position, side, 6, true)
+			return
+		end
+	end
+	-- Its own move, ready, with its foe in range for it.
+	if move and now >= e.NextMove and distance <= move.Range and distance >= (move.Min or 0) then
+		e.NextMove = now + move.Every
+		e.Action = { Kind = "Move", At = now + move.Windup }
+		e.Windup = {
+			At = now + move.Windup,
+			Heavy = move.Heavy == true or move.Shape == "Dash",
+			Cast = move.Shape == "Burst" or move.Shape == "Bombs",
+		}
+		act(enemy, move.Pose, move.Windup, nil, move.Name)
+		if move.Radius and (move.Shape == "Slam" or move.Shape == "Burst") then
+			-- A ring at its feet in warning: get out of it.
+			local feet = root.Position - Vector3.new(0, root.Size.Y / 2 + humanoid.HipHeight, 0)
+			fx("Nova", feet, move.Radius, GemConfig.ElementColors[wild.Element], move.Windup)
+		end
+		humanoid:MoveTo(root.Position)
+		lookAt(root, victim.Root.Position)
+		return
+	end
+	local keep = move and move.Keep
+	-- From a distance (a Crocodilo): a bomb every so often.
+	if keep and move.Lob and distance <= move.Range and now - enemy.LastAttack >= move.Lob.Every then
+		e.Action = { Kind = "Lob", At = now + move.Lob.Windup }
+		e.Windup = { At = now + move.Lob.Windup, Cast = true }
+		act(enemy, "Bolt", move.Lob.Windup)
+		humanoid:MoveTo(root.Position)
+		lookAt(root, victim.Root.Position)
+		return
+	end
+	-- A bite, once it's in reach and ready.
+	if distance <= reach and now - enemy.LastAttack >= kind.Rate and now >= (e.RecoverUntil or 0) then
+		e.Action = { Kind = "Bite", At = now + rules.BiteWindup }
+		e.Windup = { At = now + rules.BiteWindup }
+		act(enemy, "Slash", rules.BiteWindup)
+		humanoid:MoveTo(root.Position)
+		lookAt(root, victim.Root.Position)
+		return
+	end
+	-- Else into its place round its foe (circling it a moment after a
+	-- bite), clear of the other critters: round its foe, not through it.
+	local standoff = keep or math.max(reach * 0.8, 1.5)
+	local here = flat(root.Position - victim.Root.Position)
+	local want = ringSlot(enemy, victim) or (if here.Magnitude > 0.05 then here.Unit else -dir)
+	if now < (e.RecoverUntil or 0) then
+		standoff += rules.HopBack * 0.6
+		local swing = math.rad(35) * (e.Circle or 1)
+		local c, sn = math.cos(swing), math.sin(swing)
+		want = Vector3.new(want.X * c - want.Z * sn, 0, want.X * sn + want.Z * c)
+	end
+	local spot = victim.Root.Position + Squad.toward(here, want, math.rad(60)) * standoff
+	spot += crowd(enemy, wild, Kaiju.Squad.BugSpace)
+	if flat(spot - root.Position).Magnitude > 0.8 then
+		humanoid:MoveTo(spot)
+	else
+		humanoid:MoveTo(root.Position)
+	end
+	if distance <= reach + 4 then
+		lookAt(root, victim.Root.Position)
+	end
+end
+
 -- The brain both kinds share: find a foe and fight it (a wild kaiju as a
 -- duellist, KaijuFighter; a moon bug chases and bites), else go home (a
 -- rift's critter slips back through a rift).
@@ -711,6 +1149,10 @@ local function brain(enemy, now: number)
 	local e = enemy :: any
 	local humanoid, root = enemy.Humanoid, enemy.Root
 	local fighter = wild.Fighter
+	-- (A critter's bombs in the air land whatever it's doing now.)
+	if wild.Bug then
+		bombsLand(enemy, wild, now)
+	end
 	-- Held by a tame: nothing else till it's over.
 	if wild.Taming then
 		e.FoeVictim, e.Foe = nil, nil
@@ -800,33 +1242,18 @@ local function brain(enemy, now: number)
 		setMood(wild, nil)
 	end
 	if fighter then
+		-- A pack shares out its foes and flanks one it shares; packmates
+		-- keep clear of each other (Shared.Squad).
+		local flank
+		victim, flank = packShare(enemy, wild, victim)
+		e.FoeVictim = victim
+		e.Foe = victim.Pet or victim.Player
+		fighter.Flank = flank
+		fighter.Apart = if wild.Pack then crowd(enemy, wild, Kaiju.Squad.Space) else nil
 		KaijuFighter.step(fighter, victim, now)
 		return
 	end
-	local reach = kind.Reach + victim.Root.Size.X / 2
-	local distance = flat(victim.Root.Position - root.Position).Magnitude
-	if distance > reach then
-		humanoid:MoveTo(victim.Root.Position)
-		return
-	end
-	humanoid:MoveTo(root.Position)
-	local at = root.Position
-	local look = Vector3.new(victim.Root.Position.X, at.Y, victim.Root.Position.Z)
-	if (look - at).Magnitude > 0.1 then
-		root.CFrame = CFrame.lookAt(at, look)
-	end
-	if now - enemy.LastAttack >= kind.Rate then
-		enemy.LastAttack = now
-		enemy.Model:SetAttribute("ActionAt", serverNow())
-		fx("EnemySwing", root.Position, victim.Root.Position, GemConfig.ElementColors[wild.Element])
-		if now < (e.BlindUntil or 0) and math.random() < (e.Blind or 0) then
-			return -- swung at nothing
-		end
-		local outcome = hitFoe(enemy, victim, kind.Damage * (1 - Enemies.weakness(enemy)), wild.Element, nil, false)
-		if outcome == "Parried" then
-			Enemies.addStatus(enemy, "Stun", 1, KaijuFight.ParryStagger) -- (a kaiju's guard turned its bite)
-		end
-	end
+	critterFight(enemy, wild, victim, now)
 end
 
 -- Who did the most to it: players' own blows (Enemies' Damage) and their
@@ -1108,7 +1535,9 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Swings = 0,
 		-- (Each its own, so they don't all burrow at once and leave the quarry empty.)
 		Lifetime = Kaiju.Wild.Lifetime * rng:NextNumber(0.7, 1.5),
+		Serial = serial + 1,
 	}
+	serial += 1
 	wilds[enemy] = wild
 	return wild
 end
@@ -1627,7 +2056,9 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Band = band,
 			Wander = opts.Wander,
 			Life = opts.Life,
+			Serial = serial + 1,
 		}
+		serial += 1
 		-- Out of the tear, at its prey.
 		if opts.Hop then
 			enemy.Root.AssemblyLinearVelocity = opts.Hop

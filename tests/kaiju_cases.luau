@@ -269,9 +269,125 @@ for seed = 1, 40 do
 	end
 end
 
+-- Fighting as a team (Shared.Squad) -----------------------------------------------------------
+local Squad = shared("Squad")
+local V3 = roblox.Vector3.new
+local function unit(id, x, z)
+	return { Id = id, At = V3(x, 0, z) }
+end
+local function byDistance(current, threat)
+	return function(f, e)
+		local d = (f.At - e.At).Magnitude
+		return Squad.cost(d, current and current[f] == e, threat and threat[e] == f)
+	end
+end
+local function loads(plan, foes)
+	local n = {}
+	for _, foe in foes do
+		n[foe] = 0
+	end
+	for _, foe in plan do
+		n[foe] += 1
+	end
+	return n
+end
+-- 2 on 3: each its own (1v1s); the third waits its turn.
+local a, b = unit("a", 0, 0), unit("b", 10, 0)
+local three = { unit("e1", 1, 3), unit("e2", 11, 3), unit("e3", 12, 5) }
+local plan = Squad.assign({ a, b }, three, byDistance())
+check(plan[a] == three[1] and plan[b] == three[2], "2 on 3: not 1v1 each, nearest first")
+-- 2 on 10: they never double up while there are enough, so each works
+-- through its own half (five each), one at a time.
+local ten = {}
+for i = 1, 5 do
+	table.insert(ten, unit("l" .. i, -2 - i, i))
+	table.insert(ten, unit("r" .. i, 12 + i, i))
+end
+local kills = { [a] = 0, [b] = 0 }
+local left = table.clone(ten)
+local current = {}
+while #left > 0 do
+	local p = Squad.assign({ a, b }, left, byDistance(current))
+	check(#left < 2 or p[a] ~= p[b], "Two kaiju doubled up with foes to spare")
+	current = p
+	-- Whoever's foe falls first (a, then b, in turn).
+	local fighter = if #left % 2 == 0 then a else b
+	local foe = p[fighter] or p[a] or p[b]
+	kills[fighter] += 1
+	table.remove(left, table.find(left, foe))
+	current[fighter] = nil
+end
+check(kills[a] == 5 and kills[b] == 5, "2 on 10 didn't come out five each")
+-- 3 on 1: all on it.  3 on 2: two and one.
+local c = unit("c", 5, -6)
+local lone = { unit("x", 5, 5) }
+plan = Squad.assign({ a, b, c }, lone, byDistance())
+check(plan[a] == lone[1] and plan[b] == lone[1] and plan[c] == lone[1], "3 on 1: not all on it")
+local two = { unit("y1", 0, 4), unit("y2", 10, 4) }
+local n = loads(Squad.assign({ a, b, c }, two, byDistance()), two)
+check((n[two[1]] == 2 and n[two[2]] == 1) or (n[two[1]] == 1 and n[two[2]] == 2), "3 on 2: not two and one")
+-- The critters' side: 10 on 2 kaiju come out five each; 3 on 2, two and one.
+local swarm = {}
+for i = 1, 10 do
+	table.insert(swarm, unit("bug" .. i, 5 + math.cos(i) * 8, math.sin(i) * 8))
+end
+n = loads(Squad.assign(swarm, { a, b }, byDistance()), { a, b })
+check(n[a] == 5 and n[b] == 5, "10 critters on 2 kaiju: not five each")
+n = loads(Squad.assign({ swarm[1], swarm[2], swarm[3] }, { a, b }, byDistance()), { a, b })
+check(n[a] + n[b] == 3 and math.abs(n[a] - n[b]) == 1, "3 critters on 2 kaiju: not two and one")
+-- It keeps the foe it's on unless another is well nearer; one after it counts nearer.
+local near, far = unit("near", 0, 6), unit("far", 0, 9)
+check(Squad.assign({ a }, { near, far }, byDistance({ [a] = far }))[a] == far, "Swapped for a foe barely nearer")
+check(Squad.assign({ a }, { near, far }, byDistance(nil, { [far] = a }))[a] == far, "Ignored the foe after it")
+check(
+	Squad.assign({ a }, { unit("z", 0, 2), unit("z2", 0, 40) }, byDistance({ [a] = nil }))[a].Id == "z",
+	"Not the nearest"
+)
+-- A foe it mustn't take (math.huge) it never gets; with a cap, the rest go without.
+plan = Squad.assign({ a, b }, { near }, function(f, e)
+	return if f == b then math.huge else 1
+end)
+check(plan[a] == near and plan[b] == nil, "Given a foe it mustn't take")
+plan = Squad.assign({ a, b, c }, { near }, byDistance(), 2)
+check(loads(plan, { near })[near] == 2 and next(plan) ~= nil, "A cap of two let three on")
+check(
+	next(Squad.assign({}, three, byDistance())) == nil and next(Squad.assign({ a }, {}, byDistance())) == nil,
+	"Nothing to share"
+)
+-- Round a shared foe: two on opposite sides, three a third of a turn apart,
+-- each keeping its side.
+local center = V3(0, 0, 0)
+local slots = Squad.slots(center, { V3(3, 0, 0.2), V3(3, 0, -0.2) })
+check(slots[1]:Dot(slots[2]) < -0.99, "Two on one foe aren't on opposite sides")
+slots = Squad.slots(center, { V3(4, 0, 1), V3(4, 0, 0), V3(4, 0, -1) })
+for i = 1, 3 do
+	for j = i + 1, 3 do
+		check(math.abs(slots[i]:Dot(slots[j]) + 0.5) < 1e-6, "Three on one foe aren't a third of a turn apart")
+	end
+end
+slots = Squad.slots(center, { V3(5, 0, 0), V3(0, 0, 5), V3(-5, 0, 0), V3(0, 0, -5) })
+for i, at in { V3(5, 0, 0), V3(0, 0, 5), V3(-5, 0, 0), V3(0, 0, -5) } do
+	check(slots[i]:Dot(at.Unit) > 0.999, "Spread already: a slot moved anyway")
+end
+check(
+	#Squad.slots(center, {}) == 0 and Squad.slots(center, { V3(0, 0, 3) })[1]:Dot(V3(0, 0, 1)) > 0.999,
+	"One alone moved"
+)
+-- Round its foe, not through it: a turn of at most maxAngle at a time.
+local turned = Squad.toward(V3(1, 0, 0), V3(-1, 0, 0.01), math.rad(50))
+check(math.abs(math.deg(math.acos(turned:Dot(V3(1, 0, 0)))) - 50) < 0.01, "Turned more than its step")
+check(
+	Squad.toward(V3(1, 0, 0), V3(1, 0, 0.2), math.rad(50)):Dot(V3(1, 0, 0.2).Unit) > 0.9999,
+	"Didn't reach a near slot"
+)
+-- Apart: pushed off one too close, nothing from one far off.
+local push = Squad.apart(V3(0, 0, 0), { V3(2, 0, 0) }, 5)
+check(push.X < -2.9 and push.X > -3.1 and math.abs(push.Z) < 1e-6, "Not pushed off one too close")
+check(Squad.apart(V3(0, 0, 0), { V3(8, 0, 0) }, 5).Magnitude == 0, "Pushed off one far away")
+check(Squad.apart(V3(0, 0, 0), { V3(0, 0, 0) }, 5).Magnitude > 4, "Two on the same spot stay put")
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, feeding, taming, spread, slots, Gemsouls, your team, the starter roll)",
+		"PASS: %d kaiju rule checks (stats, EXP, feeding, taming, spread, slots, Gemsouls, your team, the starter roll, fighting as a team)",
 		checks
 	)
 )

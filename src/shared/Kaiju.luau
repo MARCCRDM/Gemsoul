@@ -185,6 +185,12 @@ Kaiju.Scale = { Pet = 0.55, Wild = 0.9, Guardian = 1.2 }
 -- runs back past Leash, and is put back beside you past Teleport.
 Kaiju.Follow = { Engage = 28, Leash = 45, Teleport = 90, Gap = 5 }
 
+-- Fighting as a team (Shared.Squad): your kaiju share out the creatures (each
+-- its own while there are enough), flank one they share, and keep Space
+-- studs apart (a critter BugSpace from another); a creature after you counts
+-- OwnerThreat studs nearer.
+Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10 }
+
 -- Your team: the kaiju out with you at once. The beta opens all three
 -- slots from the start (the plan: a second when one of yours reaches level
 -- 10, a third at 20).
@@ -300,6 +306,84 @@ Kaiju.Bug = {
 	Scale = 0.55,
 	Leash = 120,
 	Draw = 30, -- studs: a kaiju out this close draws a critter onto itself (its prey's first)
+	-- In a fight (KaijuWilds): a bite comes after BiteWindup, then it hops
+	-- HopBack studs out and circles Recover seconds before it comes in again;
+	-- a blow it sees coming (a kaiju on it winding one up) it hops clear of,
+	-- by chance (Dodge, or its kind's own), at most once every DodgeEvery
+	-- seconds, untouchable for DodgeFor.
+	BiteWindup = 0.3,
+	HopBack = 5,
+	Recover = 0.7,
+	Dodge = 0.3,
+	DodgeEvery = 2.5,
+	DodgeFor = 0.45,
+}
+
+-- Each critter's own move (KaijuWilds), after a wind-up named on its cast
+-- bar, every Every seconds once its foe is within Range (and past Min):
+--   Slam    a blow brought down: Radius round its feet, Heavy breaks a guard
+--   Dash    straight through its foe, up to Length, hitting within Width
+--   Burst   a cloud round it (Radius) that lingers (Linger seconds)
+--   Bombs   Count bombs lobbed round its foe (within Spread), each landing
+--           after Flight where its foe was: keep moving
+-- Mult: a share of its bite. Status: what it leaves. Dodge: its own chance
+-- to hop clear. Keep: it fights from this far off, lobbing (Lob: a bomb every
+-- Every seconds, the same way), biting only one that closes in.
+Kaiju.BugMoves = {
+	Sahur = {
+		Name = "Bat Slam",
+		Shape = "Slam",
+		Pose = "Heavy",
+		Windup = 0.9,
+		Radius = 6,
+		Mult = 2.2,
+		Heavy = true,
+		Status = "Burn",
+		Every = 7,
+		Range = 5,
+	},
+	Tralalero = {
+		Name = "Shark Dash",
+		Shape = "Dash",
+		Pose = "Lunge",
+		Windup = 0.5,
+		Length = 16,
+		Width = 3.5,
+		Mult = 1.8,
+		Status = "Slow",
+		Every = 6,
+		Min = 4,
+		Range = 16,
+		Dodge = 0.55,
+	},
+	Patapim = {
+		Name = "Spore Burst",
+		Shape = "Burst",
+		Pose = "Nova",
+		Windup = 0.8,
+		Radius = 7,
+		Mult = 1.3,
+		Status = "Poison",
+		Linger = 3,
+		Every = 8,
+		Range = 6,
+	},
+	Crocodilo = {
+		Name = "Carpet Bomb",
+		Shape = "Bombs",
+		Pose = "Bolt",
+		Windup = 0.7,
+		Count = 3,
+		Spread = 5,
+		Radius = 3.5,
+		Flight = 0.6,
+		Mult = 1.2,
+		Status = "Stun",
+		Every = 9,
+		Range = 18,
+		Keep = 11,
+		Lob = { Every = 2.2, Windup = 0.45, Flight = 0.55, Radius = 3, Mult = 1 },
+	},
 }
 
 -- Feeding: a stone's EXP by its rarity, in full until the kaiju passes

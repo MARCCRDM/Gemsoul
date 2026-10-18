@@ -30,6 +30,11 @@
 	}
 	foe = { Root, Pet? | Enemy? | Player? } (a victim, as KaijuAbilities' are)
 
+	Fighting beside others (Shared.Squad): whoever runs it may set, before
+	each step, f.Flank (a unit direction: the side of its foe it fights
+	from, when it shares that foe) and f.Apart (a push clear of its own side
+	crowding it). With neither it fights as it does alone.
+
 	Its model carries, for every client (CreatureAnimation, FoeCastBar):
 	ActionKind (Light, Heavy, Punish, Lunge, Bolt, Nova, Dodge, Stagger),
 	ActionStart and ActionAt (server time: its wind-up and the blow),
@@ -43,6 +48,7 @@ local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
+local Squad = require(ReplicatedStorage.Shared.Squad)
 local KaijuAbilities = require(script.Parent.KaijuAbilities)
 
 local KaijuFighter = {}
@@ -64,6 +70,7 @@ local HEAVY_COLOR = Color3.fromRGB(255, 120, 60)
 local HEAVY_CHARGE = 0.45 -- a player's charge this long is a heavy (CombatActions Heavy.Charge)
 local FIRST_Q = 6 -- its Q this long into a fight (after its E, so they don't land together)
 local R_WINDUP = 0.25 -- a shell goes up quickly: it's a reaction
+local FLANK_TURN = math.rad(50) -- how far round its foe it works toward its flank each think
 
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
@@ -86,6 +93,27 @@ local function face(f, target: Vector3)
 			root.CFrame = CFrame.lookAt(root.Position, root.Position + look)
 		end
 	end
+end
+
+-- Walks to `point`, nudged clear of its own side (f.Apart).
+local function walk(f, point: Vector3)
+	local apart = f.Apart
+	if apart then
+		point += apart
+	end
+	f.Humanoid:MoveTo(point)
+end
+
+-- A spot `standoff` from its foe on its flank (f.Flank), worked round toward
+-- it a step at a time so it goes round its foe, not through; `swing`
+-- (radians) sways it either side as it circles.
+local function flankSpot(f, foePos: Vector3, standoff: number, swing: number): Vector3
+	local dir = Squad.toward(flat(f.Root.Position - foePos), f.Flank, FLANK_TURN)
+	if swing ~= 0 then
+		local c, s = math.cos(swing), math.sin(swing)
+		dir = Vector3.new(dir.X * c - dir.Z * s, 0, dir.X * s + dir.Z * c)
+	end
+	return foePos + dir * standoff
 end
 
 -- What its body is doing, for every client to pose: the action, when its
@@ -172,14 +200,18 @@ local function readFoe(f, foe, now: number)
 	local enemy = foe.Enemy
 	local last = if enemy and (enemy.LastAttack or 0) > 0 then enemy.LastAttack else nil
 	local h = enemy and enemy.Humanoid
+	-- (A critter's wind-up, KaijuWilds: a heavy to hop clear of, a lob or
+	-- a burst to read as a cast.)
+	local windup = enemy and (enemy :: any).Windup
+	local winding = windup ~= nil and now < windup.At
 	return {
-		Charging = false,
-		Heavy = false,
+		Charging = winding and windup.Heavy == true,
+		Heavy = winding and windup.Heavy == true,
 		LastSwing = last,
 		Swings = if last and now - last <= 2.5 then 1 else 0,
-		Casting = false,
+		Casting = winding and windup.Cast == true,
 		Blocking = false,
-		Recovering = false,
+		Recovering = enemy ~= nil and now < ((enemy :: any).RecoverUntil or 0),
 		Vulnerable = enemy ~= nil and (now < (enemy.StunUntil or 0) or now < (enemy.SlowUntil or 0)),
 		Low = h ~= nil and h.Health < h.MaxHealth * 0.3,
 		Busy = last ~= nil and now - last < 1,
@@ -388,12 +420,17 @@ function KaijuFighter.step(f, foe, now: number)
 			f.NextAttack = math.max(f.NextAttack, now + 0.3)
 		end
 		raise(f, now, hold)
-		humanoid:MoveTo(root.Position + side * f.Weave * 2 * k)
+		walk(f, root.Position + side * f.Weave * 2 * k)
 		face(f, foe.Root.Position)
 	elseif choice == "GuardAdvance" then
 		-- Walks its foe down braced (it drops the guard to strike once in reach).
 		raise(f, now, 0.8)
-		humanoid:MoveTo(foe.Root.Position - dir * 3 * k + side * f.Weave * k)
+		walk(
+			f,
+			if f.Flank
+				then flankSpot(f, foe.Root.Position, 3 * k, 0)
+				else foe.Root.Position - dir * 3 * k + side * f.Weave * k
+		)
 		face(f, foe.Root.Position)
 	elseif choice == "Riposte" or choice == "Punish" then
 		-- A blocked blow or an opening: a quick counter.
@@ -443,7 +480,12 @@ function KaijuFighter.step(f, foe, now: number)
 		if now >= f.NextWeave then
 			f.Weave, f.NextWeave = -f.Weave, now + 0.8 + KaijuFighter.random()
 		end
-		humanoid:MoveTo(foe.Root.Position - dir * 2 * k + side * f.Weave * 1.5 * k)
+		walk(
+			f,
+			if f.Flank
+				then flankSpot(f, foe.Root.Position, 2 * k, f.Weave * 0.2)
+				else foe.Root.Position - dir * 2 * k + side * f.Weave * 1.5 * k
+		)
 		face(f, foe.Root.Position)
 	elseif (choice == "Light" or choice == "Heavy") and moves.Q and now >= f.NextQ then
 		-- Its Q, in place of a blow.
@@ -458,17 +500,21 @@ function KaijuFighter.step(f, foe, now: number)
 		if now >= f.NextWeave then
 			f.Weave, f.NextWeave = -f.Weave, now + 1 + KaijuFighter.random() * 1.2
 		end
-		if view.FoeIdle then
+		if f.Flank then
+			-- Sharing its foe: it circles on its own side of it.
+			local standoff = if view.FoeIdle then 4 * k else math.max(center, 3 * k)
+			walk(f, flankSpot(f, foe.Root.Position, standoff, f.Weave * 0.35))
+		elseif view.FoeIdle then
 			-- Its foe's standing there: it circles in close, ready to strike.
-			humanoid:MoveTo(foe.Root.Position - dir * 4 * k + side * f.Weave * 2 * k)
+			walk(f, foe.Root.Position - dir * 4 * k + side * f.Weave * 2 * k)
 		else
 			local keep = if distance < 1 then -dir * 3 * k else Vector3.zero
-			humanoid:MoveTo(root.Position + side * f.Weave * 4 * k + keep)
+			walk(f, root.Position + side * f.Weave * 4 * k + keep)
 		end
 		face(f, foe.Root.Position)
 	end
 	if f.RetreatUntil and now < f.RetreatUntil and not f.Action then
-		humanoid:MoveTo(root.Position - dir * 10 * k)
+		walk(f, root.Position - dir * 10 * k)
 	end
 end
 
@@ -519,6 +565,9 @@ function KaijuFighter.restat(f, stats, scale: number?)
 	f.Stats, f.Rate = stats, stats.Rate
 	f.Reach = KaijuFight.reach(stats.Reach, scale or f.Scale or 1)
 end
+
+-- (For tests: what it reads off a foe.)
+KaijuFighter._readFoe = readFoe
 
 function KaijuFighter.of(model: Instance?)
 	return if model then fighters[model] else nil
