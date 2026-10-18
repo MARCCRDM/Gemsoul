@@ -1,7 +1,7 @@
 -- PROBE-7's window (ProbeLayout): on every screen its cards, stats and
 -- buttons fit, a phone's is drawn near full size with buttons big enough to
--- tap, it knows how short you are of a price and what a bigger refill
--- saves, and the pick and the refills it sells say what they are.
+-- tap, it knows what a bigger refill saves (by the swing, in Robux), and the
+-- pick and the refills it sells say what they are.
 local checks = 0
 local function check(value, message)
 	checks += 1
@@ -57,13 +57,12 @@ do
 	check(L.W * s <= x and L.H * s <= y, name .. ": the window runs off the screen")
 end
 
--- What you're short of a price, and how much a bigger refill saves.
-check(Layout.short(300, 890) == 0 and Layout.short(300, 300) == 0, "Enough coins came up short")
-check(Layout.short(800, 260) == 540, "Coins short of a price are wrong")
+-- How much a bigger refill saves, as its line says.
 local Refill, Mega = Rules.Refills.Refill, Rules.Refills.Mega
 check(Layout.saving(Refill, Refill) == 0, "A refill saves against itself")
-check(Layout.saving(Mega, Refill) == 20, "The Mega Refill doesn't save 20% a swing: " .. Layout.saving(Mega, Refill))
-check(Layout.saving({ Swings = 10, Price = 100 }, Refill) == 0, "A dearer refill shows a saving")
+check(Layout.saving(Mega, Refill) == 21, "The Mega Refill doesn't save 21% a swing: " .. Layout.saving(Mega, Refill))
+check(string.find(Mega.Blurb, Layout.saving(Mega, Refill) .. "%", 1, true), "The Mega Refill's line has the wrong saving")
+check(Layout.saving({ Swings = 10, Robux = 100 }, Refill) == 0, "A dearer refill shows a saving")
 
 -- The pick and every refill say what they are, in a line that fits a card.
 local cards = { Rules.Picks.Survey }
@@ -80,5 +79,5 @@ for _, spec in cards do
 end
 
 print(
-	"PASS: " .. checks .. " Probe window checks (every screen fits, phones near full size, prices, savings, card lines)"
+	"PASS: " .. checks .. " Probe window checks (every screen fits, phones near full size, savings, card lines)"
 )

@@ -46,7 +46,11 @@ local loose, worn, core, spare, other, rough = gem("loose"),gem("worn"),gem("cor
 rough.Cut=nil
 local profile={Gems={loose,worn,core,spare,other,rough,loose},Character={Helmet="Helm",HelmetGem=worn,Surge2Gem=core,ItemGems={Boots={Spare=spare}}},
  Miners={Active=1,Slots={{Character={HelmetGem=loose}},{Character={ShieldGem=other}}}}}
-local GemClient={Profile=profile,Changed=signal()}
+local sold={}
+local GemClient={Profile=profile,Changed=signal(),request=function(...) table.insert(sold,{...}); return {Ok=true,Message="Sold"} end}
+local Crafting={marketPrice=function(g) return g.Value or 3 end}
+local UiKit={toast=function() end}
+local task={delay=function() end,spawn=function(fn,...) fn(...) end}
 local checks=0
 local function check(ok,message) checks+=1; assert(ok,message) end
 check(#GemInventory.available(profile)==2,"Socketed or duplicate stones appeared in pouch")
@@ -67,6 +71,19 @@ local function hasText(value)
 	return false
 end
 check(hasText("2 AVAILABLE STONES"),"Available count is wrong")
+-- SELL COMMONS: every spare Common (loose, no loadout naming it), its worth,
+-- sold on a second tap.
+check(#GemInventory.spare(profile,"Common")==2 and #GemInventory.spare(profile,"Rare")==0,"Spare Commons wrong")
+profile.Presets={Weapon={{Surges={Q="loose"}}},Armor={}}
+check(#GemInventory.spare(profile,"Common")==1,"A loadout's gem counted as spare")
+profile.Presets=nil
+local sellButton
+for _,o in allUI do if o.Parent and o.Text=="SELL 2 COMMONS · ◆ 6" then sellButton=o end end
+check(sellButton~=nil and sellButton.Visible,"No SELL COMMONS button with the count and worth")
+sellButton.Activated:Fire()
+check(#sold==0 and sellButton.Text=="TAP AGAIN: SELL 2","One tap sold, or didn't ask again")
+sellButton.Activated:Fire()
+check(#sold==1 and sold[1][1]=="SellSpare" and sold[1][2]=="Common","The second tap didn't sell the Commons")
 local ui={Grid=new("ScrollingFrame",{ScrollingEnabled=true},canvas),List=new("Frame",{},canvas),Detail=new("Frame",{Visible=false},canvas)}
 local C={Ink=Color3.new(0,0,0),Gold=Color3.new(1,1,0)}
 local state={Active=true,Detail=nil}

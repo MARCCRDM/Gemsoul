@@ -270,9 +270,22 @@ from the Edge; a quarter after your first 60 of the day), and whoever did
 the most to it 2 coins from the Fringe or 4 from the Edge, up to 300 a day.
 A kaiju left at home earns nothing from them.
 
+## Levelling while you mine
+
+Your kaiju out beside you levels while you mine. Every rock you break gives
+it a little EXP, by the rock's size (`Kaiju.MineExp`: a Regolith Chunk 5, a
+Crystal Boulder 8, a Monolith 12, a Geode 20). It also fights the critters
+your swings bring out past the core, which gives more. A full free charge
+(600 swings, about 130 rocks) is worth about 800 EXP from the rocks alone,
+a few levels for a young kaiju, before the critters and before feeding it
+the Commons you mined. A kaiju that's down, or left at home, earns nothing
+(`KaijuServer.mined`, from `OutpostServer.onRockMined`).
+
 ## Feeding
 
-A kaiju eats stones for EXP:
+A kaiju eats stones for EXP, up to 25 at a time (`Kaiju.FeedBatch`). Mining
+pays mostly Commons, so `PICK COMMONS` in its feed tab picks 25 spare ones
+(loose, and not named by a saved loadout) in one tap:
 
 | Stone | EXP | In full until level |
 | --- | --- | --- |
@@ -317,7 +330,7 @@ Proposed guardrails:
 | `Shared.GemTraits` | A Gemsoul's Q and R stay sealed (`traitsOf`) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E; the attributes clients pose it by |
-| `KaijuServer` | Your kaiju: the starter, out and back, following (pottering round you when you stand about) and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
+| `KaijuServer` | Your kaiju: the starter, out and back, following (pottering round you when you stand about) and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`), EXP for the rocks you mine (`mined`) |
 | `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
@@ -352,7 +365,9 @@ and following when you move. A packmate close by joining in when you
 start on its mate (not one far off), and a wild kaiju never walking into a
 wall. A critter going for your kaiju rather than you, your kaiju going for
 it, the bites landing on the kaiju; recall it and the critter comes back to
-you, and another miner's critter is drawn by your kaiju too. The Outpost for
+you, and another miner's critter is drawn by your kaiju too. A rock mined
+with it out gives it EXP by the rock's size (none while it's down), and a
+long session's rocks make a young kaiju a few levels. The Outpost for
 fifteen minutes: a miner at
 the Edge drawing critters while the wild kaiju roam and their lifetimes run
 out; no brain errors, the critters within their caps, never a moment

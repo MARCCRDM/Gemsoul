@@ -6,6 +6,8 @@
 	          Drag a cut stone out of this window to enchant equipment.
 	  Right   the picked gem: a turning 3D stone, rarity, element, where it
 	          sits, Size / Clarity / Cut as bars, and its value.
+	  SELL COMMONS  every spare Common to the shop in one go (tap twice:
+	          the server's SellSpare), for coins to spend on the market.
 	  Tree    the gem's three moves (Shared.GemTraits): the gem branches into
 	          Q (sword), E (core) and R (shield), and each branch shows every
 	          move that element can roll for that key, with this gem's lit,
@@ -18,6 +20,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
@@ -25,6 +28,7 @@ local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local SurgeIcons = require(script.Parent.SurgeIcons)
+local UiKit = require(script.Parent.UiKit)
 
 local Traits = Tech.Traits
 local new = IronUi.new
@@ -67,6 +71,8 @@ local state = {
 	Sort = "Rarity",
 	Selected = nil :: string?,
 	Move = nil :: string?, -- the move whose details are showing
+	SellUntil = 0, -- SELL COMMONS was tapped once: a second tap before this sells
+	Selling = false,
 }
 local ui: { [string]: any } = {}
 local spin: RBXScriptConnection? = nil
@@ -454,6 +460,17 @@ draw = function()
 			else C.Card
 	end
 	ui.SortButton.Text = "SORT: " .. string.upper(state.Sort)
+	-- Every spare Common, and what the shop pays for them.
+	local spare, worth = GemInventory.spare(GemClient.Profile, "Common"), 0
+	for _, gem in spare do
+		worth += Crafting.marketPrice(gem)
+	end
+	ui.SellButton.Visible = #spare > 0
+	ui.SellButton.Text = if os.clock() < state.SellUntil
+		then string.format("TAP AGAIN: SELL %d", #spare)
+		else string.format("SELL %d COMMONS · ◆ %s", #spare, commas(worth))
+	ui.SellButton.TextColor3 = if os.clock() < state.SellUntil then C.Ink else C.Gold
+	ui.SellButton.BackgroundColor3 = if os.clock() < state.SellUntil then C.Gold else C.Card
 	local total = #allGems()
 	ui.Count.Text = string.format("%d AVAILABLE STONES", total)
 	ui.Empty.Text = if total == 0 then "No loose stones. Equipped stones stay on your gear." else "No available stones of this element."
@@ -594,6 +611,31 @@ local function build(canvas: Instance)
 	ui.SortButton.Activated:Connect(function()
 		state.Sort = if state.Sort == "Rarity" then "Value" else "Rarity"
 		draw()
+	end)
+	-- Sell every spare Common: one tap arms it, a second within 3 s sells.
+	ui.SellButton = button(window, "", fx + 160, 22, 214, 30)
+	ui.SellButton.TextSize = 11
+	ui.SellButton.Activated:Connect(function()
+		if state.Selling then
+			return
+		end
+		if os.clock() >= state.SellUntil then
+			state.SellUntil = os.clock() + 3
+			draw()
+			task.delay(3.05, function()
+				if ui.SellButton and ui.SellButton.Parent then
+					draw()
+				end
+			end)
+			return
+		end
+		state.SellUntil, state.Selling = 0, true
+		task.spawn(function()
+			local result = GemClient.request("SellSpare", "Common")
+			state.Selling = false
+			UiKit.toast(result.Message or "", if result.Ok then C.Gold else C.Dim)
+			draw()
+		end)
 	end)
 	local close = button(window, "", WIN_W - 58, 18, 38, 38)
 	IronUi.cross(close, 14, C.Text)

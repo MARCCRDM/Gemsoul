@@ -8,6 +8,9 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
+local Config = require(ReplicatedStorage.Shared.Config)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local Nearby = require(script.Parent.Nearby)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
@@ -21,7 +24,7 @@ local Combat = require(game:GetService("ReplicatedStorage").Shared.Combat)
 
 -- Checks a list of gem ids from the client: all distinct and all yours.
 local function pickGems(player: Player, ids: any): { any }?
-	if typeof(ids) ~= "table" or #ids == 0 or #ids > 200 then
+	if typeof(ids) ~= "table" or #ids == 0 or #ids > Config.MaxGems then
 		return nil
 	end
 	local seen, gems = {}, {}
@@ -64,6 +67,39 @@ local function marketSell(player: Player, ids: any)
 	PlayerData.milestone(player, "Sold")
 	Progress.addXP(player, "Sell")
 	return reply(true, string.format("Sold %d gem%s for %d coins.", #gems, if #gems == 1 then "" else "s", total))
+end
+
+-- Every spare Common (or Uncommon) sold in one tap, at the shop's rate:
+-- the loose ones no loadout names (GemInventory.spare). Mining is mostly
+-- Commons; this turns a session's into coins for the player market.
+local SPARE = { Common = true, Uncommon = true }
+local function sellSpare(player: Player, tier: any)
+	if not Nearby.vendor(player, { "Market" }, RANGE) then
+		return reply(false, "Tamsin trades at the Market in the town square.")
+	end
+	local profile = PlayerData.get(player)
+	if typeof(tier) ~= "string" or not SPARE[tier] or not profile then
+		return reply(false, "Pick Commons or Uncommons to sell.")
+	end
+	local gems = GemInventory.spare(profile, tier)
+	local label = GemConfig.TierLabels[tier] or tier
+	if #gems == 0 then
+		return reply(false, string.format("No spare %ss to sell.", label))
+	end
+	local ids, total = {}, 0
+	for _, gem in gems do
+		ids[gem.Id] = true
+		total += Crafting.marketPrice(gem)
+	end
+	local sold = PlayerData.removeGems(player, ids)
+	PlayerData.addCoins(player, total)
+	PlayerData.milestone(player, "Sold")
+	Progress.addXP(player, "Sell")
+	return reply(
+		true,
+		string.format("Sold %d %s%s for %d coins.", sold, label, if sold == 1 then "" else "s", total),
+		{ Sold = sold, Coins = total }
+	)
 end
 
 local function equipGear(player: Player, kind: any, gearId: any)
@@ -122,6 +158,7 @@ function Forge.start()
 	Shop.register("SellGems", marketSell) -- legacy sale requests also pay coins
 	Shop.register("EquipGear", equipGear)
 	Shop.register("MarketSell", marketSell)
+	Shop.register("SellSpare", sellSpare)
 end
 
 return Forge

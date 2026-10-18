@@ -2,48 +2,60 @@
 
 PROBE-7 is the crashed survey probe on the Outpost's east side. Walk up and
 press E, or run out of swings, to open its window. There you can buy refills
-(more swings for your pick) or open the player market.
+(more swings for your pick, for Robux) or open the player market.
 
-![The Exchange: the free pick nearly empty, both refills affordable](probe/desktop.png)
+![The Exchange](probe/desktop.png)
+
+The screenshots are from before refills moved to Robux. The cards now show
+"R$ 49" and "BUY · R$ 49" where they show coins, and "ABOUT ≈ 130 rocks"
+where they show the price of each swing.
 
 ## Your pick and its swings
 
 Everyone mines with the free Survey Pick. Each swing spends one of its
-swings. It recharges by itself, one swing every 2 minutes, up to its full
-charge of 60. The Probe doesn't sell other picks. It sells refills.
+swings. Its full charge is **600 swings**, about 130 rocks: a long session,
+long enough for your kaiju to fight the critters your swings bring and level
+up beside you (`docs/kaiju.md`). It recharges by itself, one swing every
+12 seconds, so it's full again two hours after you empty it. The Probe
+doesn't sell other picks. It sells refills.
 
-## Refills
+## Refills (Robux)
 
-| Refill | Swings | Price | Each swing |
+| Refill | Swings | Robux | About |
 | --- | --- | --- | --- |
-| Swing Refill | +60 (a full charge) | ◆ 300 | ◆ 5 |
-| Mega Refill | +200 | ◆ 800 | ◆ 4 (20% less) |
+| Swing Refill | +600 (a full charge) | R$ 49 | 130 rocks |
+| Mega Refill | +2,000 | R$ 129 | 430 rocks (21% less a swing) |
 
-- A refill adds its swings on top of what you have, past the full 60. The
-  window shows that as "60 + 120".
+- Each refill is a Developer Product (`Store.RobuxProducts.SwingRefill` and
+  `SwingMega`). BUY opens Roblox's purchase prompt. When the receipt goes
+  through, `StoreServer` puts the swings on your pick
+  (`OutpostServer.addSwings`), once per purchase. If the Outpost isn't
+  running, the receipt waits instead of being spent.
+- Until a product's id is set, its button says "COMING SOON". While testing
+  (`Config.TestCosmeticPrice`), refills can be bought for coins through the
+  store's `BuyProduct`.
+- A refill adds its swings on top of what you have, past the full 600. The
+  window shows that as "600 + 2,000".
 - Bought swings are spent first. The free pick starts recharging again once
-  it's back under 60.
+  it's back under 600.
 - Refills stack, so you can buy as many as you like.
 - Each refill card shows:
   - the swings it adds;
-  - the price of each swing;
+  - about how many rocks that is;
   - what you'll have after buying, as a number and on the bar (grey for
     what you have, the refill's colour for what it adds);
-  - BUY.
-- When you can't afford a refill, its button is greyed out and says how
-  much you're short, for example "NEED ◆ 40 MORE".
-
-![Short of coins: both buttons say how much more you need](probe/desktop-short-of-coins.png)
-
-![Refills on top of a full charge: 60 + 120](probe/desktop-extra-swings.png)
+  - BUY and its Robux.
 
 The free pick's card shows:
 - its charge, live;
 - when the next swing comes and when it'll be full;
 - any extra swings you've bought.
 
-Your coins sit at the top right and update while the window is open. The
-player market is the banner under the cards.
+Your coins sit at the top right and update while the window is open. Coins
+are for the player market, the banner under the cards. You earn them by
+selling gems: mining pays mostly Commons, and `SELL COMMONS` in the GEMS
+window sells every spare one at once, at the shop's rate (a quarter of
+their worth).
 
 ### Picks from before
 
@@ -54,14 +66,14 @@ loads. A Plasma Drill's swings count 1.5 times, for its old power.
 ## Running out
 
 With no swings left, a swing at a rock says when the next free swing comes
-and opens the Probe: "Free pick recharging: +1 swing in 1:42. Buy a refill at
+and opens the Probe: "Free pick recharging: +1 swing in 0:09. Buy a refill at
 PROBE-7 to keep mining."
 
 ## Phones
 
 On a short screen (a phone on its side, under 500 points tall) the window
 is as wide as the screen. Its cards are shorter: no line under the name, and
-a refill's saving moves into its "each" row. It's drawn at about full size,
+a refill's saving moves into its "about" row. It's drawn at about full size,
 so the text stays readable and the buttons are 40 points tall. It sits below
 Roblox's buttons at the top, and redraws if the screen turns while it's open.
 
@@ -89,24 +101,33 @@ no "✕" character, so in the game it showed as an empty box.
   - `Picks` (the free pick only);
   - `LegacyPicks` and `legacySwings` (picks a save still holds).
 - `src/server/Systems/OutpostServer.luau`:
-  - `buyRefill` (the `OutpostBuyRefill` request: near the Probe, paid in
-    coins, swings added on top);
+  - `addSwings` (a refill's swings on the pick, on top of its charge;
+    `StoreServer` calls it for a receipt);
   - `record`, which turns old picks into swings.
+- `src/shared/Store.luau`: the refills' products (`RobuxProducts`,
+  `refill`, `contents`), and `src/server/Systems/StoreServer.luau`, which
+  grants them.
 - `src/client/Modules/OutpostScene.luau`: the window (`drawProbe`,
-  `pickCard`, `refillCard`, `marketBanner`).
+  `pickCard`, `refillCard`, `marketBanner`), and `buyRefill` (Roblox's
+  prompt, then your swings again once the receipt lands).
 - `src/client/Modules/ProbeLayout.luau`: where everything sits on each
-  screen, how short you are of a price, and what a bigger refill saves. It
-  has no Roblox dependencies, so it's tested on its own.
+  screen, and what a bigger refill saves. It has no Roblox dependencies, so
+  it's tested on its own.
 - `src/client/Modules/ChargeMeter.luau`: `count` and `status` show extra
-  swings ("60 + 120", "Fully charged · 120 extra"). They're used by the
-  dashboard and the Inventory too.
+  swings ("600 + 2,000", "Fully charged · 2,000 extra"). They're used by
+  the dashboard and the Inventory too.
 - `tests/outpost_cases.luau` checks that:
-  - a refill only sells at the Probe, charges its price and adds its swings;
-  - refills stack past the full charge;
+  - refills are Robux products, not sold for coins, each cheaper by the
+    swing than the one before;
+  - the free charge is 100 rocks or more and full within two hours;
+  - a refill's swings go on the pick, take no coins, and stack past the
+    full charge;
   - picks can't be bought;
-  - a refill you can't afford takes nothing;
   - an old save's Titan and Plasma swings become extra swings.
+- `tests/skins_store_cases.luau` checks a refill's receipt: its swings
+  land once (a retried receipt adds none), refills stack, and with no
+  Outpost the receipt isn't granted.
 - `tests/probe_layout_cases.luau` (`tests/run_probe_layout.py`) checks that:
   - the window fits on ten screen sizes;
   - phones draw it near full size with tappable buttons;
-  - prices, savings and every card's line are right.
+  - the savings and every card's line are right.

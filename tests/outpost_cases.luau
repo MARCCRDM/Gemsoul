@@ -261,18 +261,26 @@ check(
 	"Rock sizes aren't weighted rarest-last"
 )
 check(Rules.damage("Survey", false) == 1 and Rules.damage("Survey", true) == 2, "Swing damage wrong")
--- PROBE-7 sells refills (swings), not picks; each is cheaper by the swing
--- the bigger it is, and every pick a save held from before turns into swings.
+-- PROBE-7 sells refills (swings, for Robux: each a Store product), not
+-- picks; each is cheaper by the swing the bigger it is, and every pick a
+-- save held from before turns into swings.
 check(#Rules.PickOrder == 1 and Rules.Picks.Survey.Price == 0, "The Probe sells picks again")
 for i, id in Rules.RefillOrder do
 	local refill = Rules.Refills[id]
-	check(refill.Swings > 0 and refill.Price > 0, id .. " refill incomplete")
+	check(refill.Swings > 0 and refill.Robux > 0 and type(refill.Product) == "string", id .. " refill incomplete")
+	check(refill.Price == nil, id .. " is still sold for coins")
 	local before = Rules.Refills[Rules.RefillOrder[i - 1]]
 	check(
-		not before or refill.Price / refill.Swings < before.Price / before.Swings,
+		not before or refill.Robux / refill.Swings < before.Robux / before.Swings,
 		id .. " isn't cheaper by the swing than the smaller refill"
 	)
 end
+check(Rules.Refills.Refill.Swings == Rules.Picks.Survey.Swings, "A Swing Refill isn't a full charge")
+-- The free charge is a long session (100+ rocks: your kaiju fights and
+-- levels beside you), full again within two hours.
+check(Rules.Picks.Survey.Swings / Rules.SwingsPerRock >= 100, "The free charge is under 100 rocks")
+check(Rules.Picks.Survey.Swings * Rules.FreeSwingSeconds <= 2 * 3600, "The free pick takes over two hours to fill")
+check(Rules.rechargeEvery() == "12 s", "The recharge reads " .. Rules.rechargeEvery())
 check(Rules.legacySwings({ Titan = 100, Plasma = 40, Survey = 7 }) == 160, "Old picks didn't turn into swings")
 check(
 	Rules.tension(10, 10) == 0 and Rules.tension(0, 10) == 1 and math.abs(Rules.tension(3, 4) - 0.25) < 1e-9,
@@ -295,9 +303,10 @@ do
 	check(s == full, "Free pick overfilled")
 	local _, waiting = Rules.refillSurvey(full, 0, 500)
 	check(waiting == 500, "A full free pick kept its clock running")
-	-- As a charge: 10 swings, 30s into the next one.
-	local swings, nextIn, progress = Rules.surveyCharge(10, 1000, 1000 + 30)
-	check(swings == 10 and nextIn == step - 30 and math.abs(progress - 30 / step) < 1e-9, "Charge reading wrong")
+	-- As a charge: 10 swings, partway into the next one.
+	local into = math.floor(step / 2)
+	local swings, nextIn, progress = Rules.surveyCharge(10, 1000, 1000 + into)
+	check(swings == 10 and nextIn == step - into and math.abs(progress - into / step) < 1e-9, "Charge reading wrong")
 	swings, nextIn, progress = Rules.surveyCharge(10, 1000, 1000 + step * 2 + 1)
 	check(swings == 12 and nextIn == step - 1, "Charge didn't count regained swings")
 	swings, nextIn, progress = Rules.surveyCharge(full, 0, 999)
@@ -686,6 +695,10 @@ advance(Rules.ClaimSeconds)
 local coinsBefore = profiles[ana].Coins
 local syncsBeforePop = synced[ana] or 0
 local gemsBeforePop = gemsAwarded
+local minedRocks = {}
+Server.onRockMined = function(player, size)
+	table.insert(minedRocks, { player, size })
+end
 local result
 for _ = 1, 40 do
 	advance(0.5)
@@ -703,6 +716,8 @@ check(profiles[ana].Coins == coinsBefore, "Mining paid coins")
 check(Server._nodes[target.Id] == nil and target.Model:GetAttribute("Popped") == 1, "The rock didn't pop")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined a popped rock")
 check(profiles[ana].Outpost.Rocks == 1, "Rock not counted")
+-- (Her kaiju out gets its EXP for the rock: OutpostServer.onRockMined.)
+check(#minedRocks == 1 and minedRocks[1][1] == ana and minedRocks[1][2] == target.Size, "The rock wasn't passed on")
 -- It grows back (somewhere) after its respawn time.
 local before = 0
 for _ in Server._nodes do
@@ -943,24 +958,21 @@ check((synced[ana] or 0) > syncsBeforeBreak, "A broken pick didn't sync the prof
 advance(1)
 local broken = handlers.OutpostHit(ana, nextRock.Id)
 check(not broken.Ok and broken.NoPick, "Mined with a broken pick")
-check(not handlers.OutpostBuyRefill(ana, "Refill").Ok, "Bought a refill away from the Probe")
-anaRoot.CFrame = R.CFrame.new(site.Probe.CFrame.Position + R.Vector3.new(0, 0, 6))
+-- Refills are Robux (StoreServer grants a receipt's swings through
+-- addSwings): none for coins, and none take any.
+check(handlers.OutpostBuyRefill == nil, "Refills are still sold for coins")
 local coins = profiles[ana].Coins
 local Refill, Mega = Rules.Refills.Refill, Rules.Refills.Mega
-local bought = handlers.OutpostBuyRefill(ana, "Refill")
-check(bought.Ok and profiles[ana].Coins == coins - Refill.Price, "A refill didn't charge for it")
+check(Server.addSwings(ana, Refill.Swings), "A refill's swings weren't added")
+local bought = handlers.OutpostState(ana).State
 check(
-	bought.State.Active == "Survey" and bought.State.Picks.Survey == Refill.Swings,
-	"A refill didn't put its swings in the pick"
+	bought.Active == "Survey" and bought.Picks.Survey == Refill.Swings and profiles[ana].Coins == coins,
+	"A refill didn't put its swings in the pick (or took coins)"
 )
 -- Refills stack past the full charge (the extra goes first).
-local mega = handlers.OutpostBuyRefill(ana, "Mega")
-check(mega.Ok and mega.State.Picks.Survey == Refill.Swings + Mega.Swings, "Refills don't stack")
-check(not handlers.OutpostBuyRefill(ana, "Survey").Ok, "The free pick was for sale")
-check(not handlers.OutpostBuyRefill(ana, "Titan").Ok, "The Probe still sells picks")
-profiles[ana].Coins = 10
-check(not handlers.OutpostBuyRefill(ana, "Mega").Ok, "Bought a refill without the coins")
-check(profiles[ana].Coins == 10, "A refused refill took coins")
+check(Server.addSwings(ana, Mega.Swings), "A second refill wasn't added")
+check(handlers.OutpostState(ana).State.Picks.Survey == Refill.Swings + Mega.Swings, "Refills don't stack")
+check(not Server.addSwings(ana, 0), "Added no swings")
 -- Time passes: the free pick regains its swings.
 profiles[ana].Outpost.Picks.Survey = 0
 profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * 5

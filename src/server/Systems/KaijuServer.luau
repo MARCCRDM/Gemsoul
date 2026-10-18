@@ -784,6 +784,16 @@ function KaijuServer.reward(player: Player, exp: number)
 	end
 end
 
+-- A rock `player` broke with their kaiju out beside them (OutpostServer's
+-- onRockMined): a little EXP for it (Kaiju.mineExp). Nothing while it's
+-- down or put away.
+function KaijuServer.mined(player: Player, size: string)
+	local pet = pets[player]
+	if pet and pet.Humanoid.Health > 0 then
+		KaijuServer.reward(player, Kaiju.mineExp(size))
+	end
+end
+
 -- A tamed kaiju joins `player`. Returns its record, or nil if they have
 -- room for no more.
 function KaijuServer.adopt(player: Player, speciesId: string, soul, level: number)
@@ -837,7 +847,7 @@ local function setActive(player: Player, id: any)
 	return reply(true, string.format("%s is out.", Kaiju.title(roster.List[id])))
 end
 
-local MAX_FEED = 25
+local MAX_FEED = Kaiju.FeedBatch
 
 local function feed(player: Player, ids: any)
 	local profile = PlayerData.get(player)

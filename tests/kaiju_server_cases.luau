@@ -2021,6 +2021,33 @@ local function crittersAndKaiju()
 end
 crittersAndKaiju()
 
+-- Mining with it out: EXP for every rock you break (by its size), so it
+-- levels while you mine; none while it's down, none with none out.
+local function minedWithIt()
+	pet = KaijuServer.pets()[a]
+	local record = pet.Record
+	local level, exp = record.Level, record.Exp or 0
+	KaijuServer.mined(a, "Boulder")
+	check(
+		record.Level > level or record.Exp == exp + Kaiju.MineExp.Boulder,
+		"A rock mined with it out gave no EXP"
+	)
+	check(Kaiju.mineExp("Pebble") < Kaiju.mineExp("Boulder") and Kaiju.mineExp(nil) == Kaiju.MineExp.Pebble, "Rock EXP by size")
+	level, exp = record.Level, record.Exp
+	pet.Humanoid.Health = 0
+	KaijuServer.mined(a, "Boulder")
+	check(record.Level == level and record.Exp == exp, "A downed kaiju got mining EXP")
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth
+	KaijuServer.mined(b, "Boulder") -- (b has none out)
+	-- A long session's rocks are worth a few early levels.
+	local session = { Level = 1, Exp = 0 }
+	for i = 1, 130 do
+		Kaiju.addExp(session, Kaiju.mineExp(if i % 8 < 3 then "Boulder" else "Pebble"))
+	end
+	check(session.Level >= 3 and session.Level <= 5, "A long session's mining made level " .. session.Level)
+end
+minedWithIt()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do

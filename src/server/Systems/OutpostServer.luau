@@ -9,8 +9,9 @@
 	  "OutpostHit", nodeId     swing at a rock (wears your pick; the last hit
 	                           pops it and pays out one gem, never coins or
 	                           gear; refused while the gem pouch is full)
-	  "OutpostBuyRefill", id   buy swings at the Probe (Outpost.Refills, coins),
-	                           on top of the free pick's charge
+	  (PROBE-7's refills are Robux products, Outpost.Refills: StoreServer
+	  grants their swings through OutpostServer.addSwings, on top of the
+	  free pick's charge)
 	  "OutpostBonk", model     bonk a rift's critter with your pick
 	                           (Shared.Frontier.Bonk: it costs no swings)
 	  "OutpostState"           your picks and record
@@ -95,6 +96,9 @@ OutpostServer.bonker = nil :: any -- KaijuWilds: critterOf(model) -> enemy?, bon
 OutpostServer.onVeinMoved = function(_index: number, _scar: CFrame) end
 -- Someone swung at one of vein `index`'s rocks (its guardian wakes).
 OutpostServer.onVeinSwing = function(_index: number, _player: Player) end
+-- A rock `player` broke (its Size): their kaiju out gets a little EXP
+-- (KaijuServer.mined).
+OutpostServer.onRockMined = function(_player: Player, _size: string) end
 local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
@@ -556,6 +560,7 @@ local function loot(player: Player, node, profile)
 	end
 	Progress.addXP(player, "Mine")
 	record(profile).Rocks += 1
+	OutpostServer.onRockMined(player, node.Size)
 	return result
 end
 
@@ -739,38 +744,22 @@ local function bonk(player: Player, model: any)
 	return reply(true, "", { Bonk = true })
 end
 
-local function nearProbe(player: Player): boolean
-	local root = rootOf(player)
-	return root ~= nil and site ~= nil and (root.Position - site.Probe.Position).Magnitude <= 40
-end
-
--- A refill at PROBE-7: swings on top of the free pick's charge (its charge
--- brought up to now first). They're spent first, and it recharges again
--- once it's back under its full charge.
-local function buyRefill(player: Player, refillId: any)
-	local refill = type(refillId) == "string" and Rules.Refills[refillId] or nil
-	if not refill then
-		return reply(false, "The Probe doesn't sell that.")
-	end
-	if not nearProbe(player) then
-		return reply(false, "Visit the Probe to buy refills.")
-	end
+-- Swings bought for the free pick (a PROBE-7 refill, for Robux: StoreServer
+-- grants it), on top of its charge brought up to now. They're spent first,
+-- and it recharges again once it's back under its full charge.
+function OutpostServer.addSwings(player: Player, swings: number): boolean
 	local profile = PlayerData.get(player)
-	if not profile or not PlayerData.spendCoins(player, refill.Price) then
-		return reply(false, "Not enough coins.")
+	if not profile or swings <= 0 then
+		return false
 	end
 	local o = record(profile)
-	o.Picks.Survey = (o.Picks.Survey or 0) + refill.Swings
+	o.Picks.Survey = (o.Picks.Survey or 0) + swings
 	o.Active = "Survey"
 	if player:GetAttribute("Outpost") then
 		pickModel(player)
 	end
 	PlayerData.sync(player)
-	return reply(
-		true,
-		string.format("+%d swings! You have %d.", refill.Swings, o.Picks.Survey),
-		{ State = stateOf(player) }
-	)
+	return true
 end
 
 local function enter(player: Player)
@@ -1059,7 +1048,6 @@ function OutpostServer.start()
 	Shop.register("OutpostEnter", enter)
 	Shop.register("OutpostLeave", leave)
 	Shop.register("OutpostHit", hit)
-	Shop.register("OutpostBuyRefill", buyRefill)
 	Shop.register("OutpostBonk", bonk)
 	Shop.register("OutpostSecret", secret)
 	Shop.register("OutpostState", function(player)

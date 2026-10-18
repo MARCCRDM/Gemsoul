@@ -2,6 +2,7 @@
 	Rolls a mined gem, in order (Ability System v3.0):
 	  1. Element   25% each: Thermal (Fire), Cryo (Frost), Corrosive (Poison), Ion (Shock)
 	  2. Rarity    40% Common, 25% Uncommon, 20% Rare, 10% Ultra Rare, 5% Legendary
+	               (a mined gem: 60 / 25 / 11 / 3.5 / 0.5, GemRoller.MiningWeights)
 	  3. Tier      the Gem Surge it carries: Novice (1) to Master (4), by rarity
 	  4. Surge     the element's surge at that tier; an Apprentice or Adept gem
 	               may carry a Resonance surge instead (no element needed)
@@ -45,6 +46,11 @@ GemRoller.Rarities = {
 	{ Name = "UltraRare", Weight = 10 },
 	{ Name = "Legendary", Weight = 5 },
 }
+-- A mined gem's rarity weights, in the order above: mostly Commons (every
+-- rock pays one), so the rarer ones are what keeps you mining; luck (the
+-- frontier, a vein) still tilts them rarer.
+GemRoller.MiningWeights = { 60, 25, 11, 3.5, 0.5 }
+GemRoller.MinedSources = { MiningNode = true, VipMiningNode = true }
 
 -- What each rarity can carry: surge tiers (which surge), the chance of each
 -- surge rank (its power, I / II / III) and the 1-10 band its metrics roll in
@@ -146,17 +152,18 @@ local function grade(rng, band): number
 	return high
 end
 
--- Rarity weights, nudged toward the rarer end by luck (0 = baseline, 1 = very lucky).
-function GemRoller.rarityWeights(luck: number?): { number }
+-- Rarity weights, nudged toward the rarer end by luck (0 = baseline, 1 = very
+-- lucky); `base` in place of the Rarities' own (GemRoller.MiningWeights).
+function GemRoller.rarityWeights(luck: number?, base: { number }?): { number }
 	local weights = {}
 	for i, rarity in GemRoller.Rarities do
-		weights[i] = rarity.Weight * (1 + (luck or 0) * (i - 1) * 0.75)
+		weights[i] = (if base then base[i] else rarity.Weight) * (1 + (luck or 0) * (i - 1) * 0.75)
 	end
 	return weights
 end
 
-function GemRoller.rollRarity(rng, luck: number?): string
-	local weights = GemRoller.rarityWeights(luck)
+function GemRoller.rollRarity(rng, luck: number?, base: { number }?): string
+	local weights = GemRoller.rarityWeights(luck, base)
 	local total = 0
 	for _, weight in weights do
 		total += weight
@@ -172,10 +179,11 @@ function GemRoller.rollRarity(rng, luck: number?): string
 end
 
 -- The rolls, as saved gem fields. `rarity` (optional) sets the rarity
--- instead of rolling it (an Arena Cache's Legendaries).
-function GemRoller.roll(rng, luck: number?, rarity: string?)
+-- instead of rolling it (an Arena Cache's Legendaries); `base` rolls it on
+-- other weights (GemRoller.MiningWeights).
+function GemRoller.roll(rng, luck: number?, rarity: string?, base: { number }?)
 	local element = pick(rng, GemRoller.Elements)
-	rarity = if rarity and GemRoller.ByRarity[rarity] then rarity else GemRoller.rollRarity(rng, luck)
+	rarity = if rarity and GemRoller.ByRarity[rarity] then rarity else GemRoller.rollRarity(rng, luck, base)
 	local rules = GemRoller.ByRarity[rarity]
 	local tier = pick(rng, rules.Tiers)
 	local alternate = rng:NextNumber() < 0.5

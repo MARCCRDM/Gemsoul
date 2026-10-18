@@ -18,6 +18,7 @@
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +33,7 @@ local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
+local Store = require(ReplicatedStorage.Shared.Store)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local PlayerCard = require(script.Parent.PlayerCard)
 local ChargeMeter = require(script.Parent.ChargeMeter)
@@ -865,9 +867,7 @@ function OutpostScene.swing(nodeId: number?)
 		end
 		if result.PickBroke then
 			UiKit.toast(
-				"Free pick out of charge! +1 swing every "
-					.. Rules.FreeSwingSeconds // 60
-					.. " min, or buy a refill at PROBE-7.",
+				"Free pick out of charge! +1 swing every " .. Rules.rechargeEvery() .. ", or buy a refill at PROBE-7.",
 				P.Bad
 			)
 			sound(CLANG, 0.6, 0.6)
@@ -883,10 +883,10 @@ end
 
 --[[
 	PROBE-7's window: your pick (the free Survey Pick in 3D, its charge
-	live), then the refills PROBE-7 sells (Shared.Outpost.Refills: swings on
-	top of that charge, what each costs, what you'll have after, and BUY or
-	how many coins you're short), your coins in the corner, and the player
-	market below.
+	live), then the refills PROBE-7 sells for Robux (Shared.Outpost.Refills:
+	swings on top of that charge, about how many rocks that is, what you'll
+	have after, and BUY for its Robux), your coins in the corner, and the
+	player market below.
 
 	On a short screen (a phone on its side) the window is as wide as the
 	screen and the cards are shorter, so the words stay full size. Where
@@ -1068,21 +1068,59 @@ local function statRow(card: GuiObject, L, y: number, label: string, value: stri
 end
 
 local drawProbe
-local function buyRefill(id: string)
-	task.spawn(function()
-		local result = GemClient.request("OutpostBuyRefill", id)
-		UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
-		if result.State then
-			state = result.State
-			refreshHud()
+-- Your swings again from the server (a refill's receipt has landed).
+local function refreshState()
+	local result = GemClient.request("OutpostState")
+	if result.Ok and result.State then
+		state = result.State
+		refreshHud()
+		if probe.Gui.Enabled then
 			drawProbe()
 		end
+	end
+end
+
+-- Is this refill on sale: its Developer Product set up (Store.RobuxProducts),
+-- or, while testing, for coins (Store.testPrice)?
+local function refillOnSale(refill): boolean
+	return (Store.RobuxProducts[refill.Product] or 0) ~= 0 or Store.testPrice(refill.Product) ~= nil
+end
+
+-- A refill: Roblox's purchase prompt for its Robux (the swings come with the
+-- receipt: StoreServer), or coins while testing (the store's BuyProduct).
+local function buyRefill(id: string)
+	local refill = Rules.Refills[id]
+	local productId = Store.RobuxProducts[refill.Product] or 0
+	if productId ~= 0 then
+		MarketplaceService:PromptProductPurchase(player, productId)
+		return
+	end
+	if not Store.testPrice(refill.Product) then
+		UiKit.toast("Coming soon: refills aren't on sale yet.", P.Dim)
+		return
+	end
+	task.spawn(function()
+		local result = GemClient.request("BuyProduct", refill.Product)
+		UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
 		if result.Ok then
+			refreshState()
 			sound(PING, 1.5, 0.4)
 			sound(PING, 2, 0.35, nil, 0.08)
 		end
 	end)
 end
+MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, purchased)
+	local refill = purchased and userId == player.UserId and Store.refill(Store.productKey(productId))
+	if refill then
+		-- The receipt lands a moment after the prompt closes.
+		task.delay(1, function()
+			refreshState()
+			UiKit.toast(string.format("+%s swings!", commas(refill.Swings)), P.Good)
+			sound(PING, 1.5, 0.4)
+			sound(PING, 2, 0.35, nil, 0.08)
+		end)
+	end
+end)
 
 -- A card's frame, tinted in `color`, and its art well (a soft glow, rings
 -- fading out; on the pick's, a shadow for it to stand over).
@@ -1211,15 +1249,7 @@ local function pickCard(L)
 	cardTitle(card, L, spec.Name, spec.Blurb or "", spec.Color)
 	local y = L.StatsY
 	statRow(card, L, y, "FULL CHARGE", spec.Swings .. " swings", nil, spec.Color)
-	statRow(
-		card,
-		L,
-		y + L.Row,
-		"RECHARGE",
-		string.format("+1 every %d min", Rules.FreeSwingSeconds // 60),
-		nil,
-		spec.Color
-	)
+	statRow(card, L, y + L.Row, "RECHARGE", "+1 every " .. Rules.rechargeEvery(), nil, spec.Color)
 	local extra = math.max(0, swings - ChargeMeter.Full)
 	statRow(card, L, y + L.Row * 2, "EXTRA", if extra > 0 then "+" .. commas(extra) else "none", nil, spec.Color)
 
@@ -1262,8 +1292,8 @@ local function pickCard(L)
 	}
 end
 
--- A refill PROBE-7 sells: its swings in big figures, what each costs, what
--- you'll have after, and BUY (or how many coins you're short).
+-- A refill PROBE-7 sells: its swings in big figures, about how many rocks
+-- that is, what you'll have after, and BUY for its Robux.
 local function refillCard(L, index: number, id: string)
 	local refill = Rules.Refills[id]
 	local phone = L.Phone
@@ -1309,15 +1339,15 @@ local function refillCard(L, index: number, id: string)
 	local swings = ChargeMeter.read(state.Picks, state.SurveyAt)
 	local after = swings + refill.Swings
 	local y = L.StatsY
-	statRow(card, L, y, "SWINGS", "+" .. refill.Swings, nil, refill.Color)
-	local each = refill.Price / refill.Swings
+	statRow(card, L, y, "SWINGS", "+" .. commas(refill.Swings), nil, refill.Color)
 	statRow(
 		card,
 		L,
 		y + L.Row,
-		"EACH",
-		"◆ "
-			.. (if each % 1 == 0 then tostring(math.floor(each)) else string.format("%.1f", each))
+		"ABOUT",
+		"≈ "
+			.. commas(math.floor(refill.Swings / Rules.SwingsPerRock / 10 + 0.5) * 10)
+			.. " rocks"
 			.. (if save > 0 and phone then string.format(" · -%d%%", save) else ""),
 		nil,
 		refill.Color
@@ -1327,7 +1357,7 @@ local function refillCard(L, index: number, id: string)
 	-- The bar: what you have, and what this adds on top.
 	local info, count, track, buttonY = cardFooter(card, L)
 	info.Text = "PRICE"
-	count.Text = "◆ " .. commas(refill.Price)
+	count.Text = "R$ " .. commas(refill.Robux)
 	count.TextColor3 = P.Gold
 	local have = new("Frame", {
 		Size = UDim2.fromScale(math.clamp(swings / after, 0, 1), 1),
@@ -1343,23 +1373,19 @@ local function refillCard(L, index: number, id: string)
 		ZIndex = 4,
 	}, track)
 	UiKit.round(adds, 3)
-	local short = ProbeLayout.short(refill.Price, coins())
+	local onSale = refillOnSale(refill)
 	probeButton(
 		card,
-		if short <= 0 then "BUY" else string.format("NEED ◆ %s MORE", commas(short)),
+		if onSale then "BUY  ·  R$ " .. commas(refill.Robux) else "COMING SOON",
 		refill.Color,
-		short <= 0,
+		onSale,
 		12,
 		buttonY,
 		L.CardW - 24,
 		L.ButtonH,
 		if phone then 13 else 15,
 		function()
-			if short <= 0 then
-				buyRefill(id)
-			else
-				UiKit.toast(string.format("You need %s more coins.", commas(short)), P.Bad)
-			end
+			buyRefill(id)
 		end
 	)
 end

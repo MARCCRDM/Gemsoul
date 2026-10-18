@@ -29,7 +29,9 @@ for name, path in [
     ("MinerRoster", "src/shared/MinerRoster.luau"),
     ("Logic", "src/shared/EquipmentTrade.luau"),
     ("Cosmetics", "src/shared/Cosmetics.luau"),
+    ("Outpost", "src/shared/Outpost.luau"),
     ("Store", "src/shared/Store.luau"),
+    ("GemInventory", "src/shared/GemInventory.luau"),
     ("Season", "src/shared/Season.luau"),
     ("Mine", "src/shared/Mine.luau"),
 ]: source += module(name, path)

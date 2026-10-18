@@ -26,7 +26,9 @@ function Roll.sample(packet, now)
 end
 function Roll.sequence(packet)
 	local rng, sequence = Random.new(packet.Seed), {}
-	for index = -1, Roll.Target + 2 do sequence[index] = GemRoller.rollRarity(rng) end
+	for index = -1, Roll.Target + 2 do
+		sequence[index] = GemRoller.rollRarity(rng, 0, GemRoller.MiningWeights)
+	end
 	sequence[Roll.Target] = packet.Gem and packet.Gem.Tier or "Empty"
 	return sequence
 end

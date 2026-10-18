@@ -30,6 +30,12 @@ end
 function PlayerData.removeGem(player, id)
  for i, gem in profiles[player].Gems do if gem.Id == id then return table.remove(profiles[player].Gems, i) end end
 end
+function PlayerData.removeGems(player, ids)
+ local kept, removed = {}, 0
+ for _, gem in profiles[player].Gems do if ids[gem.Id] then removed += 1 else table.insert(kept, gem) end end
+ profiles[player].Gems = kept
+ return removed
+end
 local rng = Random.new(934)
 local Gems = {random = function() return rng end}
 function Gems.award(player, source, opts)

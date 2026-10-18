@@ -343,7 +343,7 @@ local function buildCard(item)
 	local rng = Random.new()
 	local sequence, teases = {}, {}
 	for i = 0, TARGET + 3 do
-		sequence[i] = GemRoller.rollRarity(rng)
+		sequence[i] = GemRoller.rollRarity(rng, 0, GemRoller.MiningWeights)
 		teases[i] = { Size = rng:NextInteger(2, 9), Clarity = rng:NextInteger(2, 9), Cut = rng:NextInteger(2, 9) }
 	end
 	sequence[TARGET] = gem.Tier

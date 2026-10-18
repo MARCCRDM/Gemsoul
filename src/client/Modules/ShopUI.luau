@@ -405,7 +405,8 @@ MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, produc
 		return
 	end
 	local key = Store.productKey(productId)
-	if key then
+	-- (A swing refill is PROBE-7's: OutpostScene confirms those.)
+	if key and not Store.refill(key) then
 		task.delay(0.8, function()
 			showReceipt(key)
 			refresh()

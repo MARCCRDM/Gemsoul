@@ -39,6 +39,30 @@ for _, source in { "MiningNode", "VipMiningNode", "FirstStone", "PvEDrop", "Mini
 	end
 end
 print("SIMULATION: baseline mined gem average exchange price " .. math.floor(total / 2000) .. " coins")
+-- A mined gem is mostly a Common (GemRoller.MiningWeights: 60 / 25 / 11 /
+-- 3.5 / 0.5); anything else (a cache, a drop) keeps the usual odds.
+do
+	local function shares(source, n)
+		local counts = {}
+		for i = 1, n do
+			local gem = GemGenerator.generate(rng, source, { Id = "odds" .. i, Time = 1 })
+			counts[gem.Tier] = (counts[gem.Tier] or 0) + 1
+		end
+		return function(tier)
+			return (counts[tier] or 0) / n
+		end
+	end
+	local mined = shares("MiningNode", 40000)
+	check(math.abs(mined("Common") - 0.60) < 0.015, "Mined Commons aren't about 60%: " .. mined("Common"))
+	check(math.abs(mined("Rare") - 0.11) < 0.01, "Mined Rares aren't about 11%: " .. mined("Rare"))
+	check(mined("Legendary") > 0.002 and mined("Legendary") < 0.009, "Mined Legendaries aren't about 0.5%: " .. mined("Legendary"))
+	local dropped = shares("PvEDrop", 20000)
+	check(dropped("Common") < 0.45 and dropped("Legendary") > 0.03, "A monster's drop rolls the mining odds")
+	print(string.format(
+		"SIMULATION: mined gems %.1f%% Common, %.1f%% Uncommon, %.1f%% Rare, %.1f%% Ultra Rare, %.2f%% Legendary",
+		mined("Common") * 100, mined("Uncommon") * 100, mined("Rare") * 100, mined("UltraRare") * 100, mined("Legendary") * 100
+	))
+end
 -- Saved rough gems, off-slot enchants and copies upgrade once; valid cuts stay intact.
 local legacy = profile(1)
 legacy.Marks = 100
@@ -116,6 +140,25 @@ registry[11], registry[12] = pa, pb
 profiles[pa], profiles[pb] = profile(2), profile(3)
 Trading.start()
 Forge.start()
+-- Sell every spare Common in one go (SellSpare): loose ones a loadout
+-- doesn't name, at the shop's rate; nothing else goes.
+do
+	local seller = profiles[pa]
+	local keep = seller.Gems
+	local function stone(id, tier)
+		return { Id = id, Tier = tier, Element = "Fire", Size = 3, Clarity = 3, Cut = 3 }
+	end
+	seller.Gems = { stone("c1", "Common"), stone("c2", "Common"), stone("c3", "Common"), stone("named", "Common"), stone("r1", "Rare") }
+	seller.Presets = { Weapon = { { Surges = { Q = "named" } } }, Armor = {} }
+	local coins, worth = seller.Coins, Crafting.marketPrice(seller.Gems[1]) * 3
+	local sale = handlers.SellSpare(pa, "Common")
+	check(sale.Ok and sale.Sold == 3 and seller.Coins == coins + worth, "Spare Commons didn't sell for the shop's price")
+	check(#seller.Gems == 2 and seller.Gems[1].Id == "named" and seller.Gems[2].Id == "r1", "Selling Commons took the wrong gems")
+	check(not handlers.SellSpare(pa, "Common").Ok, "Sold Commons twice")
+	check(not handlers.SellSpare(pa, "Rare").Ok and #seller.Gems == 2, "Bulk-sold a Rare")
+	check(not handlers.SellSpare(pa, nil).Ok, "Sold without a rarity")
+	seller.Gems, seller.Presets = keep, nil
+end
 check(not handlers.TradeOffer(pa, 0 / 0, "Weapon", profiles[pa].Character.Weapon).Ok, "Invalid target accepted")
 check(not handlers.TradeOffer(pa, pa.UserId, "Weapon", profiles[pa].Character.Weapon).Ok, "Self trade accepted")
 local offer = handlers.TradeOffer(pa, pb.UserId, "Weapon", profiles[pa].Character.Weapon)

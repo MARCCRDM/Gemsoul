@@ -19,9 +19,10 @@
 	wild kaiju land anywhere from 60% to 140% (Spread), so a big hit can end
 	the tame; hit it with its own element (75%, ElementMatchup) to go gently.
 
-	Levels 1-30 from kills and from feeding it stones (feedExp): rarer stones
+	Levels 1-30 from kills, from feeding it stones (feedExp): rarer stones
 	keep their worth as it grows, a stone of the element that beats it gives
-	half, one of its own element a quarter more.
+	half, one of its own element a quarter more; and from your mining, a
+	little for every rock you break with it out beside you (mineExp).
 
 	Pure data and logic, for the server, the client and tests.
 ]]
@@ -244,6 +245,15 @@ Kaiju.FeedExp = { Common = 20, Uncommon = 45, Rare = 100, UltraRare = 220, Legen
 Kaiju.FeedFull = { Common = 10, Uncommon = 15, Rare = 20, UltraRare = 25, Legendary = math.huge }
 Kaiju.FeedWeak = 0.5 -- a stone of the element that beats it
 Kaiju.FeedSame = 1.25 -- a stone of its own element
+Kaiju.FeedBatch = 25 -- stones it eats in one go
+
+-- Mining with it out: EXP for every rock you break, by the rock's size
+-- (Shared.Outpost.Sizes), so it levels while you mine (and fights the
+-- critters your swings bring).
+Kaiju.MineExp = { Pebble = 5, Boulder = 8, Monolith = 12, Geode = 20 }
+function Kaiju.mineExp(size: string?): number
+	return Kaiju.MineExp[size or "Pebble"] or Kaiju.MineExp.Pebble
+end
 
 -- A starter kaiju for everyone, the first time they reach the Outpost: a
 -- random kind, in a random element, with a Gemsoul rolled like a mined gem.

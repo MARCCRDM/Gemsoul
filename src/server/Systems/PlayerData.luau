@@ -1079,6 +1079,33 @@ function PlayerData.removeGem(player: Player, gemId: string): Gem?
 	return nil
 end
 
+-- Removes every gem whose id is in `ids` (a set) at once, with one sync;
+-- returns how many went.
+function PlayerData.removeGems(player: Player, ids: { [string]: boolean }): number
+	local profile = profiles[player]
+	if not profile then
+		return 0
+	end
+	-- (In place: the pouch stays the same table.)
+	local gems, kept, removed = profile.Gems, 0, 0
+	for i = 1, #gems do
+		local gem = gems[i]
+		if ids[gem.Id] then
+			removed += 1
+		else
+			kept += 1
+			gems[kept] = gem
+		end
+	end
+	for i = #gems, kept + 1, -1 do
+		gems[i] = nil
+	end
+	if removed > 0 then
+		sync(player)
+	end
+	return removed
+end
+
 -- Moves a fully generated gem between players (PvP wager settlement).
 -- The gem keeps all its properties; its Source becomes "PvPWager".
 function PlayerData.transferGem(from: Player, to: Player, gemId: string): boolean

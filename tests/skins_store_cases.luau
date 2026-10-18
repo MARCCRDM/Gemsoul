@@ -164,7 +164,7 @@ end
 -- Every product slot buys something real.
 for key in Store.RobuxProducts do
 	local real = Store.bundle(key) or Store.kitsOf(key) or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
-		or key == "StarterPack" or key == "SeasonPremium"
+		or key == "StarterPack" or key == "SeasonPremium" or Store.refill(key)
 	check(real, key .. " is a product slot for nothing")
 	check(Store.robuxPrice(key), key .. " has no Robux price")
 end
@@ -334,6 +334,26 @@ check(buy("SuitRoyal") == Granted and profile.Cosmetics.Suit == "SuitRoyal", "A 
 check(buy("StarterPack") == Granted, "The Starter Pack wasn't granted")
 check(profile.StarterBought and profile.Cosmetics.Owned.SuitIgnition and profile.Cosmetics.Suit == "SuitIgnition", "The Starter Pack's suit isn't owned and worn")
 check(profile.Coins >= Store.StarterPack.Contents.Coins and profile.Cosmetics.Owned.PickBone and profile.Cosmetics.Owned.SkinMolten, "The Starter Pack's coins and looks are missing")
+-- A swing refill (PROBE-7's, for Robux): its swings on the pick, once per
+-- receipt; with no Outpost to put them on, not granted (so not charged).
+do
+	local refill = Store.refill("SwingRefill")
+	check(refill and Store.robuxPrice("SwingRefill") == refill.Robux, "The Swing Refill has no Robux price")
+	check(Store.contents("SwingMega").Swings == Store.refill("SwingMega").Swings, "The Mega Refill grants no swings")
+	check(Store.productName("SwingRefill") == refill.Name, "The Swing Refill has no name")
+	local added = 0
+	StoreServer.addSwings = nil
+	check(buy("SwingRefill", "r0") == NotYet and added == 0, "A refill was granted with nowhere to put its swings")
+	StoreServer.addSwings = function(who, swings)
+		check(who == thePlayer, "A refill's swings went to someone else")
+		added += swings
+		return true
+	end
+	check(buy("SwingRefill", "r1") == Granted and added == refill.Swings, "A refill's swings didn't land")
+	check(buy("SwingRefill", "r1") == Granted and added == refill.Swings, "A retried refill receipt added swings twice")
+	check(buy("SwingMega", "r2") == Granted and added == refill.Swings + Store.refill("SwingMega").Swings, "Refills don't stack")
+	check(Store.canBuy("SwingRefill", profile, os.time()), "A refill can only be bought once")
+end
 -- A product that isn't ours, or a player who isn't here: not yet.
 check(receiptFn({ PlayerId = 7, ProductId = 999999, PurchaseId = "x" }) == NotYet, "An unknown product was granted")
 check(receiptFn({ PlayerId = 8, ProductId = ids.SkinVoid, PurchaseId = "y" }) == NotYet, "A purchase with nobody here was granted")

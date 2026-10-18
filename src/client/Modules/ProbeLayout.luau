@@ -6,10 +6,9 @@
 	      window's own design size. A phone on its side (under 500 tall) gets
 	      a design as wide as its screen and shorter cards, so the window is
 	      drawn near full size and its words stay readable.
-	  ProbeLayout.short(price, coins) -> how many coins short you are of a
-	      price (0 when you can pay)
 	  ProbeLayout.saving(refill, base) -> how much less each swing costs in
-	      `refill` than in `base`, as a whole percent (0 when it's no cheaper)
+	      `refill` than in `base` (their Robux), as a whole percent (0 when
+	      it's no cheaper)
 ]]
 local ProbeLayout = {}
 
@@ -55,12 +54,8 @@ function ProbeLayout.design(screenX: number, screenY: number)
 	return L
 end
 
-function ProbeLayout.short(price: number, coins: number): number
-	return math.max(0, price - coins)
-end
-
 function ProbeLayout.saving(refill, base): number
-	local each, baseEach = refill.Price / refill.Swings, base.Price / base.Swings
+	local each, baseEach = refill.Robux / refill.Swings, base.Robux / base.Swings
 	return math.max(0, math.floor((1 - each / baseEach) * 100 + 0.5))
 end
 

@@ -33,13 +33,34 @@ gem reel, a Common at worst. Rocks never pay coins or gear (armour). A
 Crystal Boulder takes more swings than a Regolith Chunk, but its gem rolls
 luckier (`Depth` in `Shared.Outpost.Sizes`).
 
-A gem needs room in the pouch (200 gems). With a full pouch the server
-refuses the swing before it lands: "Gem pouch full (200)! Sell or socket
-gems to keep mining." The pick isn't worn and the rock isn't chipped, so
-no rock is ever mined for nothing.
+Mined gems are mostly Commons, so the good ones are what keeps you mining
+(`GemRoller.MiningWeights`; caches, drops and the starter spin keep the
+usual 40 / 25 / 20 / 10 / 5):
 
-Coins still come from Tasks, daily challenges and fights, just not from
-the rocks.
+| | Common | Uncommon | Rare | Ultra Rare | Legendary |
+| --- | --- | --- | --- | --- | --- |
+| A mined gem, before luck | 60% | 25% | 11% | 3.5% | 0.5% |
+| In the core (the rocks' own luck) | 58% | 26% | 12% | 4% | 0.6% (1 in 170 rocks) |
+| A guarded Rift Vein (the most luck) | 41% | 30% | 19% | 8% | 1.4% (1 in 72 rocks) |
+
+Further out, the frontier's luck tilts every roll rarer (`docs/frontier.md`).
+
+What Commons are for:
+- **Coins.** `SELL COMMONS` in the GEMS window sells every spare one in two
+  taps, at the shop's rate (a quarter of a gem's worth, `Config.MarketSellRate`).
+  The shop always pays below worth; other players pay better on the market.
+  "Spare" means loose and not named by a saved loadout
+  (`GemInventory.spare`; the server's `SellSpare`).
+- **Your kaiju.** A Common feeds it 20 EXP (full until level 10). `PICK
+  COMMONS` in its feed tab picks a mouthful (25) at once.
+
+A gem needs room in the pouch (300 gems, room for a long session's
+Commons). With a full pouch the server refuses the swing before it lands:
+"Gem pouch full (300)! Sell or socket gems to keep mining." The pick isn't
+worn and the rock isn't chipped, so no rock is ever mined for nothing.
+
+Coins still come from Tasks, daily challenges, fights and selling gems,
+just not from the rocks.
 
 ## How many, and where
 

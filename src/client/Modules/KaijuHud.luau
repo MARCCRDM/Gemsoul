@@ -33,6 +33,7 @@ local UserInputService = game:GetService("UserInputService")
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local GemClient = require(script.Parent.GemClient)
@@ -540,6 +541,11 @@ local feedButton = smallButton(footer, "FEED", P.Good)
 feedButton.AnchorPoint = Vector2.new(1, 0.5)
 feedButton.Position, feedButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(140, 38)
 feedButton.TextSize = 15
+-- One tap picks a mouthful of spare Commons (what mining mostly pays).
+local commonsButton = smallButton(footer, "PICK COMMONS", P.Teal)
+commonsButton.AnchorPoint = Vector2.new(1, 0.5)
+commonsButton.Position, commonsButton.Size = UDim2.new(1, -150, 0.5, 0), UDim2.fromOffset(122, 38)
+commonsButton.TextSize = 12
 
 local tab = "Team"
 local picked: { [string]: boolean } = {}
@@ -624,7 +630,7 @@ function drawPanel()
 		heroStats.Text, soulText.Text = "", ""
 	end
 	if tab == "Team" then
-		feedButton.Visible = false
+		feedButton.Visible, commonsButton.Visible = false, false
 		footerText.Size = UDim2.fromScale(1, 1)
 		footerText.Text = string.format(
 			"%d of %d kaiju kept. Tame more in the far quarry: wear one down to half health without killing it.",
@@ -672,7 +678,8 @@ function drawPanel()
 	end
 	-- Feed.
 	feedButton.Visible = true
-	footerText.Size = UDim2.new(1, -150, 1, 0)
+	commonsButton.Visible = record ~= nil and #GemInventory.spare(GemClient.Profile, "Common") > 0
+	footerText.Size = UDim2.new(1, if commonsButton.Visible then -282 else -150, 1, 0)
 	if not record then
 		footerText.Text = "No kaiju out to feed."
 		return
@@ -710,8 +717,20 @@ function drawPanel()
 	end
 	footerText.Text = if count > 0
 		then string.format("%d stone%s: +%d EXP", count, if count == 1 then "" else "s", total)
+		elseif commonsButton.Visible then "Pick stones to feed it, or a mouthful of Commons."
 		else "Pick stones to feed it. Rarer ones keep their worth as it grows; its weakness element gives half."
 end
+
+commonsButton.Activated:Connect(function()
+	table.clear(picked)
+	for i, gem in GemInventory.spare(GemClient.Profile, "Common") do
+		if i > Kaiju.FeedBatch then
+			break
+		end
+		picked[gem.Id] = true
+	end
+	drawPanel()
+end)
 
 feedButton.Activated:Connect(function()
 	local ids = {}

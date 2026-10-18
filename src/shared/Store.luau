@@ -1,6 +1,7 @@
 --[[
 	The store: weapon skins, suits, pickaxes and bundles, sold for Robux,
-	plus the Free rewards. Looks only, never stats.
+	plus the Free rewards. Looks only, never stats. (PROBE-7's swing refills
+	are Robux products too: Shared.Outpost.Refills, sold at the Probe.)
 
 	  Bundles      new-player offers (the Welcome Kit, the Starter Pack), the
 	               squad kits (one, two or all three miners), themed
@@ -22,7 +23,7 @@
 	bought for that many coins, through the same grant.
 
 	A Reward is any mix of:
-	  Coins, Cosmetics = { id, ... }, XPBoostMinutes
+	  Coins, Cosmetics = { id, ... }, XPBoostMinutes, Swings (a refill's)
 	  (and, from old saves and season tracks: Marks, Stones, CutGems,
 	  Materials)
 ]]
@@ -34,6 +35,7 @@ export type Reward = {
 	Materials: { [string]: number }?,
 	Cosmetics: { string }?,
 	XPBoostMinutes: number?,
+	Swings: number?,
 }
 export type Bundle = {
 	Id: string,
@@ -57,6 +59,7 @@ export type Kit = {
 
 local Config = require(script.Parent.Config)
 local Cosmetics = require(script.Parent.Cosmetics)
+local Outpost = require(script.Parent.Outpost)
 
 local Store = {}
 
@@ -312,6 +315,9 @@ Store.RobuxProducts = {
 	-- One-time offers and the Season Path
 	StarterPack = 0,
 	SeasonPremium = 0,
+	-- PROBE-7's swing refills (Shared.Outpost.Refills: their Product keys)
+	SwingRefill = 0,
+	SwingMega = 0,
 }
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
@@ -326,6 +332,20 @@ Store.RobuxPrices = {
 	StarterPack = 99,
 	SeasonPremium = 399,
 }
+-- (A refill's price is its own: Outpost.Refills.)
+for _, refill in Outpost.Refills do
+	Store.RobuxPrices[refill.Product] = refill.Robux
+end
+
+-- The PROBE-7 refill a product key is (nil if it isn't one).
+function Store.refill(key: any)
+	for _, refill in Outpost.Refills do
+		if refill.Product == key then
+			return refill
+		end
+	end
+	return nil
+end
 
 -- Kit products ------------------------------------------------------------------------------------------
 
@@ -426,12 +446,17 @@ function Store.bundle(id: any): Bundle?
 	return nil
 end
 
--- What a product grants (a cosmetic, a bundle, kits, the Starter Pack).
--- Nil for a key that isn't one (SeasonPremium unlocks a track instead).
+-- What a product grants (a cosmetic, a bundle, kits, the Starter Pack, a
+-- refill's swings). Nil for a key that isn't one (SeasonPremium unlocks a
+-- track instead).
 function Store.contents(key: any): Reward?
 	local cosmetic = Cosmetics.get(key)
 	if cosmetic and cosmetic.Robux then
 		return { Cosmetics = { cosmetic.Id } }
+	end
+	local refill = Store.refill(key)
+	if refill then
+		return { Swings = refill.Swings }
 	end
 	local bundle = Store.bundle(key)
 	if bundle then
@@ -574,6 +599,10 @@ function Store.productName(key: string): string
 	end
 	if key == "SeasonPremium" then
 		return "Season Path Premium"
+	end
+	local refill = Store.refill(key)
+	if refill then
+		return refill.Name
 	end
 	local kits = Store.kitsOf(key)
 	if kits then

@@ -105,13 +105,18 @@ end
 if Config.Features == nil or Config.Features.Mining ~= false then
 	local OutpostServer = require(script.Parent.Systems.OutpostServer)
 	OutpostServer.start()
+	-- PROBE-7's refills are Robux products: their swings go on the pick.
+	StoreServer.addSwings = OutpostServer.addSwings
 	-- Friendly sparring there: 1 swaps the pick for your combat kit.
 	if Config.CombatEnabled or not Config.MenuOnly then
 		require(script.Parent.Systems.SparServer).start()
 		-- Mini kaiju: yours beside you, wild ones to hunt, and moon bugs
 		-- through rifts round anyone out past the core (the frontier).
 		if Config.Features == nil or Config.Features.Kaiju ~= false then
-			require(script.Parent.Systems.KaijuServer).start()
+			local KaijuServer = require(script.Parent.Systems.KaijuServer)
+			KaijuServer.start()
+			-- Your kaiju out levels as you mine: EXP for every rock you break.
+			OutpostServer.onRockMined = KaijuServer.mined
 			local KaijuWilds = require(script.Parent.Systems.KaijuWilds)
 			KaijuWilds.start(OutpostServer.site())
 			local FrontierServer = require(script.Parent.Systems.FrontierServer)

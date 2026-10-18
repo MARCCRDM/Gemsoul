@@ -7,13 +7,15 @@
 	Rocks come in four sizes. Bigger ones take more hits, hide better finds
 	and take longer to grow back once mined out (like ore nodes in an MMO).
 	Every swing spends one of your pick's swings. The free Survey Pick
-	regains a swing every FreeSwingSeconds (up to its full 60), so there's a
-	little mining every time you come back; refills (more swings, on top of
-	those) are bought at the Probe.
+	holds a long session's mining (its full 600: your kaiju fights and
+	levels beside you while you mine) and regains a swing every
+	FreeSwingSeconds, full again in two hours; refills (more swings, on top
+	of those) are bought at the Probe, for Robux.
 
 	  Outpost.Sizes / Outpost.SizeOrder      the rocks
 	  Outpost.Picks / Outpost.PickOrder      the pick (the free Survey Pick)
-	  Outpost.Refills / Outpost.RefillOrder  the swings PROBE-7 sells
+	  Outpost.Refills / Outpost.RefillOrder  the swings PROBE-7 sells (Robux:
+	                                         each a Shared.Store product)
 	  Outpost.legacySwings(picks)            swings for picks a save still
 	                                         holds from when the Probe sold them
 	  Outpost.rollSize(roll, zone?)          a new rock's size (a ring's mix), 0 <= roll < 1
@@ -89,7 +91,7 @@ Outpost.Picks = {
 		Name = "Survey Pick",
 		Tag = "FREE",
 		Blurb = "Recharges itself while you're away.",
-		Swings = 60,
+		Swings = 600,
 		Power = 1,
 		Crit = 0,
 		Price = 0,
@@ -98,23 +100,27 @@ Outpost.Picks = {
 }
 Outpost.PickOrder = { "Survey" }
 
--- What PROBE-7 sells: swings for your pick, on top of its free charge (they
--- go first; it recharges again once it's back under its full 60).
+-- What PROBE-7 sells, for Robux: swings for your pick, on top of its free
+-- charge (they go first; it recharges again once it's back under its full
+-- charge). Each is a Developer Product, its Product key in Shared.Store
+-- (Store.RobuxProducts has the ids).
 Outpost.Refills = {
 	Refill = {
 		Name = "Swing Refill",
 		Tag = "REFILL",
 		Blurb = "A full charge, on top of yours.",
-		Swings = 60,
-		Price = 300,
+		Swings = 600,
+		Robux = 49,
+		Product = "SwingRefill",
 		Color = Color3.fromRGB(58, 203, 233),
 	},
 	Mega = {
 		Name = "Mega Refill",
 		Tag = "MEGA",
-		Blurb = "200 swings, 20% cheaper each.",
-		Swings = 200,
-		Price = 800,
+		Blurb = "2,000 swings, 21% cheaper each.",
+		Swings = 2000,
+		Robux = 129,
+		Product = "SwingMega",
 		Color = Color3.fromRGB(255, 202, 91),
 	},
 }
@@ -292,8 +298,17 @@ function Outpost.claimHolder(node, userId: number, now: number): boolean
 	return node.ClaimedBy == nil or node.ClaimedBy == userId or now >= (node.ClaimUntil or 0)
 end
 
--- The free Survey Pick regains one swing this often, up to its full Swings.
-Outpost.FreeSwingSeconds = 120
+-- The free Survey Pick regains one swing this often, up to its full Swings
+-- (600 of them: full again in two hours).
+Outpost.FreeSwingSeconds = 12
+-- How often it regains one, in words: "12 s" (or "2 min").
+function Outpost.rechargeEvery(): string
+	local every = Outpost.FreeSwingSeconds
+	return if every % 60 == 0 then string.format("%d min", every // 60) else string.format("%d s", every)
+end
+-- About how many swings a rock takes (the field's mix of chunks and
+-- boulders, crits included): what a charge or a refill comes to in rocks.
+Outpost.SwingsPerRock = 4.6
 function Outpost.refillSurvey(swings: number, since: number, now: number): (number, number)
 	local full = Outpost.Picks.Survey.Swings
 	if swings >= full then

@@ -316,7 +316,7 @@ local function show(loot, token)
 		return 2 + math.floor(rng:NextNumber() * 8)
 	end
 	for i = 0, target + 3 do
-		sequence[i] = GemRoller.rollRarity(rng)
+		sequence[i] = GemRoller.rollRarity(rng, 0, GemRoller.MiningWeights)
 		teases[i] = { Size = grade(), Clarity = grade(), Cut = grade() }
 	end
 	sequence[target] = gem.Tier

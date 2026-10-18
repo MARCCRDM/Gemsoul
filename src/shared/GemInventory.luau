@@ -33,6 +33,33 @@ function GemInventory.available(profile)
 	return available
 end
 
+-- Loose gems of one rarity that no saved loadout names (Presets' Surge
+-- gems): what selling every Common, or feeding them, may take in one go
+-- without breaking a loadout.
+function GemInventory.spare(profile, tier: string)
+	local named = {}
+	local presets = profile and profile.Presets
+	if type(presets) == "table" then
+		-- (An old save's single list, or the Armor and Weapon loadouts.)
+		for _, list in { presets, presets.Armor, presets.Weapon } do
+			for _, preset in if type(list) == "table" then list else {} do
+				if type(preset) == "table" and type(preset.Surges) == "table" then
+					for _, id in preset.Surges do
+						named[id] = true
+					end
+				end
+			end
+		end
+	end
+	local spare = {}
+	for _, gem in GemInventory.available(profile) do
+		if gem.Tier == tier and not named[gem.Id] then
+			table.insert(spare, gem)
+		end
+	end
+	return spare
+end
+
 function GemInventory.find(profile, id)
 	for _, gem in GemInventory.available(profile) do
 		if gem.Id == id then return gem end

@@ -22,8 +22,10 @@ function GemGenerator.generate(
 ): Gem
 	local luck = math.clamp((GemConfig.SourceLuck[source] or 0) + (opts.Luck or 0), 0, 1)
 	-- Element, rarity, surge tier, surge rank and metrics (GemRoller).
-	-- (opts.Rarity sets the rarity: an Arena Cache's Legendaries.)
-	local rolled = GemRoller.roll(rng, luck, opts.Rarity)
+	-- (opts.Rarity sets the rarity: an Arena Cache's Legendaries; a mined
+	-- gem rolls mostly Commons, GemRoller.MiningWeights.)
+	local base = if GemRoller.MinedSources[source] then GemRoller.MiningWeights else nil
+	local rolled = GemRoller.roll(rng, luck, opts.Rarity, base)
 	return {
 		Id = opts.Id,
 		Element = rolled.Element,

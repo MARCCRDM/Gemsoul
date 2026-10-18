@@ -11,7 +11,8 @@
 	  "StarterOffer"               puts the Starter Pack on offer (once, after a win)
 	Robux: when an id is set in Store.RobuxProducts, buying that Developer
 	Product grants it (ProcessReceipt below), once per purchase: a look, a
-	bundle, squad kits, the Starter Pack or the Season premium track.
+	bundle, squad kits, the Starter Pack, the Season premium track or a
+	PROBE-7 refill's swings (StoreServer.addSwings: OutpostServer's).
 
 	What you buy goes on: a look you buy is worn at once; a bundle puts its
 	first suit, skin and pickaxe on the miner you're playing; squad kits go
@@ -35,6 +36,9 @@ local Shop = require(script.Parent.Shop)
 local reply = Shop.reply
 
 local StoreServer = {}
+-- Puts swings on a player's free pick (a refill: OutpostServer.addSwings,
+-- wired in by Main); false when it can't (no Outpost).
+StoreServer.addSwings = nil :: ((Player, number) -> boolean)?
 
 local function cosmeticName(id: string): string
 	local cosmetic = Cosmetics.get(id)
@@ -148,6 +152,12 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 		PlayerData.sync(player)
 		return true, { "the Season Path's premium track" }
 	end
+	-- A refill: swings on the pick (not granted, so not paid for, without).
+	local refill = Store.refill(key)
+	if refill then
+		local added = StoreServer.addSwings ~= nil and StoreServer.addSwings(player, refill.Swings)
+		return added, if added then { string.format("%d swings", refill.Swings) } else nil
+	end
 	local reward = Store.contents(key)
 	if not reward then
 		return false
@@ -200,7 +210,12 @@ local function buyProduct(player: Player, key: any)
 	if not PlayerData.spendCoins(player, price) then
 		return reply(false, string.format("You need %d coins.", price))
 	end
-	local _, lines = StoreServer.grantProduct(player, key)
+	local granted, lines = StoreServer.grantProduct(player, key)
+	if not granted then
+		-- (A refill with no Outpost to put its swings on: the coins come back.)
+		PlayerData.addCoins(player, price)
+		return reply(false, "That didn't go through. Try again in a moment.")
+	end
 	return reply(true, Store.productName(key) .. " is yours!", { Key = key, Lines = lines or {} })
 end
 
