@@ -2,29 +2,37 @@
 	Your mini kaiju on screen (KaijuServer and KaijuWilds run them; see
 	docs/kaiju.md). Only in the Outpost.
 
-	  The kaiju card  its portrait (the model itself), name and level, health
-	                  and EXP, its E lighting up when it's ready, and RECALL
-	                  (back to you for a moment) and HUNT (your kit out to
-	                  fight beside it; 1 or HUNT again puts it away). Tap the
-	                  card for the kaiju panel. Knocked out: when it's back.
-	                  Computer: bottom left. Phone: under your level and
-	                  coins, and at the top right while you hunt (the fight's
-	                  foe list has the top left then).
-	  TAME            beside the card when a wild kaiju near you is down to
+	  The team strip  your team out, a tile each, the lead first (edged in
+	                  gold): its portrait (the model itself), level, health,
+	                  and dots for its Q, E and R, lit when ready (hollow
+	                  while asleep); knocked out, when it's back. RECALL (all
+	                  of them back to you for a moment) and HUNT (your kit out
+	                  to fight beside them; 1 or HUNT again puts it away).
+	                  Tap a tile for the panel on that kaiju. Computer:
+	                  bottom left. Phone: under your level and coins, and at
+	                  the top right while you hunt (the fight's foe list has
+	                  the top left then).
+	  TAME            beside the strip when a wild kaiju near you is down to
 	                  half its health (it glows gold then: KaijuTaming): the
 	                  chance now, and the tries left. It casts the tame
 	                  (KaijuTaming's bar), hidden while that's under way.
 	  Challenge       a wild kaiju's prompt (hold E beside it): it leaves you
 	                  and your kaiju alone till you start on it, here or by
 	                  hitting it while you hunt.
-	  The panel       the one out (stats, Gemsoul and its E), your others to
-	                  send out instead, and FEED: stones from your pouch with
-	                  the EXP each gives it (Shared.Kaiju.feedExp).
+	  The panel       every kaiju you have: your team first (all of them
+	                  fight; the first leads), then the ones at home. The one
+	                  picked in full (stats, its Gemsoul's rarity, its moves
+	                  and when Q and R wake) and what you can do with it:
+	                  LEAD (to the front), SEND OUT (one from home, in place
+	                  of one of the team you pick), FEED: stones from your
+	                  pouch with the EXP each gives it (Shared.Kaiju.feedExp).
+	  The roll        a player still owed starter kaiju (from before the
+	                  roll, say) gets the roll here, once (KaijuRoll).
 	  Wild nameplates the server's health bar over wild kaiju and moon bugs
 	                  while you aren't hunting (FoeBars draws them while you are).
 
-	  KaijuHud.start()   once, from Lobby.client
-	  KaijuHud.open()    the panel
+	  KaijuHud.start()     once, from Lobby.client
+	  KaijuHud.open(id?)   the panel, on kaiju `id` (else your lead)
 ]]
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -40,8 +48,10 @@ local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local KaijuRoll = require(script.Parent.KaijuRoll)
 local KaijuTaming = require(script.Parent.KaijuTaming)
 local ChatFeed = require(script.Parent.ChatFeed)
+local LoadingFlow = require(script.Parent.LoadingFlow)
 local MobileLayout = require(script.Parent.MobileLayout)
 local OutpostScene = require(script.Parent.OutpostScene)
 local UiKit = require(script.Parent.UiKit)
@@ -55,14 +65,14 @@ local KaijuHud = {}
 local INK = Color3.fromRGB(10, 12, 22)
 local HEALTH = Color3.fromRGB(96, 214, 120)
 local EXP = Color3.fromRGB(176, 132, 255)
+local TILE_BACK = Color3.fromRGB(20, 24, 38)
 local TAME_RANGE = Kaiju.Tame.Range
+local KEYS = { "Q", "E", "R" }
+local KEY_EVERY = { Q = Kaiju.QEvery, E = Kaiju.AbilityEvery, R = Kaiju.REvery }
+local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" }
 
 local function elementColor(element: string?): Color3
 	return GemConfig.ElementColors[element or ""] or P.Gold
-end
-
-local function touch(): boolean
-	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end
 
 local function label(parent: Instance, text: string, size: number, color: Color3?, font: Enum.Font?): TextLabel
@@ -99,11 +109,38 @@ local function smallButton(parent: Instance, text: string, color: Color3): TextB
 	return b
 end
 
--- A model in a ViewportFrame, framed from the front quarter.
+local function viewport(parent: Instance, props: { [string]: any }): ViewportFrame
+	props.BackgroundColor3 = props.BackgroundColor3 or TILE_BACK
+	props.Ambient = Color3.fromRGB(170, 170, 185)
+	props.LightColor = Color3.new(1, 1, 1)
+	props.LightDirection = Vector3.new(-0.4, -1, 0.6)
+	return new("ViewportFrame", props, parent)
+end
+
+-- Portraits: each kaiju's model is built once per place it's shown (`key`)
+-- and kept, so redrawing the panel doesn't rebuild a dozen models.
+local built: { [string]: { Look: string, Model: Model } } = {}
+local function modelFor(key: string, record): Model
+	local look = record.Species .. "/" .. record.Element
+	local entry = built[key]
+	if entry and entry.Look == look then
+		return entry.Model
+	end
+	if entry then
+		entry.Model:Destroy()
+	end
+	local model = KaijuModels.build(record.Species, record.Element)
+	built[key] = { Look = look, Model = model }
+	return model
+end
+
+-- A model in a ViewportFrame, framed from the front quarter (the one there
+-- before is put aside, not destroyed: it's kept for next time).
 local function portrait(frame: ViewportFrame, model: Model?)
-	-- (Only the last model and its camera: the frame's corner and chip stay.)
 	for _, child in frame:GetChildren() do
-		if child:IsA("Model") or child:IsA("Camera") then
+		if child:IsA("Model") and child ~= model then
+			child.Parent = nil
+		elseif child:IsA("Camera") then
 			child:Destroy()
 		end
 	end
@@ -120,96 +157,124 @@ local function portrait(frame: ViewportFrame, model: Model?)
 	frame.CurrentCamera = camera
 end
 
--- The card -------------------------------------------------------------------------------------------------
+local function roster()
+	local profile = GemClient.Profile
+	return profile and profile.Kaiju
+end
+
+-- Your kaiju out in the world, by id.
+local function petModels(): { [string]: Model }
+	local out = {}
+	local folder = workspace:FindFirstChild("Kaiju")
+	for _, model in if folder then folder:GetChildren() else {} do
+		local id = model:GetAttribute("KaijuId")
+		if model:GetAttribute("KaijuOwner") == player.UserId and type(id) == "string" then
+			out[id] = model
+		end
+	end
+	return out
+end
+
+-- Seconds till a knocked-out kaiju is back (0 if it isn't down).
+local function downFor(id: string): number
+	local back = player:GetAttribute("KaijuDown_" .. id)
+	return if type(back) == "number" then math.max(0, back - workspace:GetServerTimeNow()) else 0
+end
+
+local function healthShare(model: Model?): number
+	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+	return if humanoid then math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1) else 1
+end
+
+local function expShare(level: number, exp: number): number
+	local need = Kaiju.expToNext(level)
+	return if need == math.huge then 1 else math.clamp(exp / need, 0, 1)
+end
+
+-- The team strip -------------------------------------------------------------------------------------------
 
 local gui = UiKit.gui("KaijuHud", 6)
 gui.Enabled = false
 
-local card = new("TextButton", {
+local card = new("Frame", {
 	Name = "KaijuCard",
-	Text = "",
-	AutoButtonColor = false,
 	BackgroundColor3 = INK,
 	BackgroundTransparency = 0.12,
-	Size = UDim2.fromOffset(250, 60),
+	Size = UDim2.fromOffset(300, 62),
 }, gui)
 UiKit.round(card, 10)
-local cardStroke = new("UIStroke", { Color = P.Edge, Thickness = 1.2, Transparency = 0.2 }, card)
+new("UIStroke", { Color = P.Edge, Thickness = 1.2, Transparency = 0.2 }, card)
 
-local view = new("ViewportFrame", {
-	BackgroundColor3 = Color3.fromRGB(20, 24, 38),
-	Position = UDim2.fromOffset(5, 5),
-	Size = UDim2.fromOffset(50, 50),
-	Ambient = Color3.fromRGB(170, 170, 185),
-	LightColor = Color3.new(1, 1, 1),
-	LightDirection = Vector3.new(-0.4, -1, 0.6),
-}, card)
-UiKit.round(view, 8)
--- Its E: a chip on the portrait's corner that fills as it readies.
-local chip = new("Frame", {
-	AnchorPoint = Vector2.new(1, 1),
-	Position = UDim2.new(1, 3, 1, 3),
-	Size = UDim2.fromOffset(20, 20),
-	BackgroundColor3 = INK,
-	ZIndex = 3,
-}, view)
-UiKit.round(chip, 10)
-local chipStroke = new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, chip)
-local chipFill = new("Frame", {
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.fromScale(1, 0),
-	BackgroundColor3 = P.Gold,
-	BackgroundTransparency = 0.5,
-	ZIndex = 3,
-}, chip)
-UiKit.round(chipFill, 10)
-local chipText = label(chip, "E", 11, P.Text)
-chipText.Size = UDim2.fromScale(1, 1)
-chipText.TextXAlignment = Enum.TextXAlignment.Center
-chipText.ZIndex = 4
--- Its Q and R, from the same Gemsoul: chips on the other corners, filling
--- as they ready; asleep (dim, the level they wake at) while it's young.
-local function keyChip(anchor: Vector2, position: UDim2, key: string)
-	local frame = new("Frame", {
-		AnchorPoint = anchor,
-		Position = position,
-		Size = UDim2.fromOffset(20, 20),
+local tiles = {}
+for slot = 1, #Kaiju.SlotLevels do
+	local button = new("TextButton", {
+		Name = "KaijuTile" .. slot,
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = TILE_BACK,
+		Visible = false,
+	}, card)
+	UiKit.round(button, 8)
+	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, button)
+	local view = viewport(button, { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) })
+	-- Its level, top left.
+	local levelBack = new("Frame", {
 		BackgroundColor3 = INK,
+		BackgroundTransparency = 0.25,
+		Position = UDim2.fromOffset(3, 3),
+		Size = UDim2.fromOffset(30, 13),
 		ZIndex = 3,
-	}, view)
-	frame.Name = "Chip" .. key
-	UiKit.round(frame, 10)
-	local edge = new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, frame)
-	local fill = new("Frame", {
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.fromScale(1, 0),
-		BackgroundColor3 = P.Gold,
-		BackgroundTransparency = 0.5,
-		ZIndex = 3,
-	}, frame)
-	UiKit.round(fill, 10)
-	local letter = label(frame, key, 11, P.Text)
-	letter.Size = UDim2.fromScale(1, 1)
-	letter.TextXAlignment = Enum.TextXAlignment.Center
-	letter.ZIndex = 4
-	return { Frame = frame, Stroke = edge, Fill = fill, Text = letter, Key = key }
+	}, button)
+	UiKit.round(levelBack, 4)
+	local level = label(levelBack, "", 9, P.Text, IronUi.Bold)
+	level.Size, level.TextXAlignment, level.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
+	-- Q, E and R, down the right edge.
+	local dots = {}
+	for i, key in KEYS do
+		local dot = new("Frame", {
+			Name = "Key" .. key,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -4, 0, 4 + (i - 1) * 9),
+			Size = UDim2.fromOffset(7, 7),
+			BackgroundColor3 = P.Gold,
+			ZIndex = 3,
+		}, button)
+		UiKit.round(dot, 4)
+		dots[key] = { Frame = dot, Stroke = new("UIStroke", { Color = P.Gold, Thickness = 1 }, dot) }
+	end
+	local healthBack, healthFill = bar(button, HEALTH)
+	healthBack.AnchorPoint = Vector2.new(0, 1)
+	healthBack.Position, healthBack.Size = UDim2.new(0, 4, 1, -4), UDim2.new(1, -8, 0, 4)
+	healthBack.ZIndex, healthFill.ZIndex = 3, 3
+	-- Knocked out: a veil with when it's back.
+	local veil = new("Frame", {
+		BackgroundColor3 = INK,
+		BackgroundTransparency = 0.15,
+		Size = UDim2.fromScale(1, 1),
+		Visible = false,
+		ZIndex = 5,
+	}, button)
+	UiKit.round(veil, 8)
+	local veilText = label(veil, "", 10, P.Bad:Lerp(P.Text, 0.3), IronUi.Bold)
+	veilText.Size, veilText.TextXAlignment, veilText.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 6
+	local tile = {
+		Slot = slot,
+		Button = button,
+		Edge = edge,
+		View = view,
+		Level = level,
+		Dots = dots,
+		HealthFill = healthFill,
+		Veil = veil,
+		VeilText = veilText,
+		Id = nil :: string?,
+		Look = nil :: string?,
+	}
+	tiles[slot] = tile
+	button.Activated:Connect(function()
+		KaijuHud.open(tile.Id)
+	end)
 end
-local keyChips = {
-	keyChip(Vector2.new(0, 1), UDim2.new(0, -3, 1, 3), "Q"),
-	keyChip(Vector2.new(1, 0), UDim2.new(1, 3, 0, -3), "R"),
-}
-local KEY_EVERY = { Q = Kaiju.QEvery, R = Kaiju.REvery }
-
-local nameText = label(card, "", 13)
-nameText.Position, nameText.Size = UDim2.fromOffset(62, 5), UDim2.new(1, -140, 0, 16)
-local levelText = label(card, "", 11, P.Dim, IronUi.Bold)
-levelText.Position, levelText.Size = UDim2.fromOffset(62, 21), UDim2.new(1, -140, 0, 13)
-local healthBack, healthFill = bar(card, HEALTH)
-healthBack.Position, healthBack.Size = UDim2.fromOffset(62, 37), UDim2.new(1, -140, 0, 7)
-local expBack, expFill = bar(card, EXP)
-expBack.Position, expBack.Size = UDim2.fromOffset(62, 48), UDim2.new(1, -140, 0, 4)
 
 local recall = smallButton(card, "RECALL", Color3.fromRGB(120, 200, 255))
 recall.AnchorPoint = Vector2.new(1, 0)
@@ -218,21 +283,7 @@ local hunt = smallButton(card, "HUNT", Color3.fromRGB(255, 92, 76))
 hunt.AnchorPoint = Vector2.new(1, 1)
 hunt.Position, hunt.Size = UDim2.new(1, -6, 1, -6), UDim2.fromOffset(68, 22)
 
--- Knocked out: a veil over the card (not HUNT) with when it's back.
-local downVeil = new("Frame", {
-	BackgroundColor3 = INK,
-	BackgroundTransparency = 0.04,
-	Size = UDim2.new(1, -80, 1, 0),
-	Visible = false,
-	ZIndex = 5,
-}, card)
-UiKit.round(downVeil, 10)
-local downText = label(downVeil, "", 12, P.Dim)
-downText.Position, downText.Size = UDim2.fromOffset(8, 0), UDim2.new(1, -12, 1, 0)
-downText.TextWrapped = true
-downText.ZIndex = 6
-
--- TAME: beside the card, when there's a wild kaiju to tame.
+-- TAME: beside the strip, when there's a wild kaiju to tame.
 local tame = new("TextButton", {
 	Name = "Tame",
 	Text = "",
@@ -253,7 +304,7 @@ local tameTries = label(tame, "", 10, P.Dim, IronUi.Body)
 tameTries.Position, tameTries.Size = UDim2.fromOffset(0, 43), UDim2.new(1, 0, 0, 12)
 tameTries.TextXAlignment = Enum.TextXAlignment.Center
 
--- Where the card and TAME go: see the header.
+-- Where the strip and TAME go: see the header.
 local function layout()
 	local screen = gui.AbsoluteSize
 	if screen.X <= 0 then
@@ -263,7 +314,7 @@ local function layout()
 	local hunting = Spar.hunting(player)
 	-- (Beside the chat box's CHAT button on a small keyboard screen, while it's on.)
 	local spot = MobileLayout.kaiju(UserInputService.KeyboardEnabled and not ChatFeed.Enabled)
-	local w, h = if phone then spot.W else 260, if phone then spot.H else 62
+	local w, h = if phone then spot.W else 300, if phone then spot.H else 62
 	card.Size = UDim2.fromOffset(w, h)
 	tame.Size = UDim2.fromOffset(if phone then spot.TameW else 104, h)
 	local x, y
@@ -278,180 +329,291 @@ local function layout()
 		tame.Position = UDim2.fromOffset(spot.TameX, y)
 	end
 	card.Position = UDim2.fromOffset(x, y)
-	view.Size = UDim2.fromOffset(h - 10, h - 10)
-	local left = h + 2
-	nameText.Position = UDim2.fromOffset(left, if phone then 4 else 5)
-	levelText.Position = UDim2.fromOffset(left, if phone then 19 else 21)
-	healthBack.Position = UDim2.fromOffset(left, h - (if phone then 18 else 22))
-	expBack.Position = UDim2.fromOffset(left, h - (if phone then 9 else 11))
-	for _, item in { nameText, levelText, healthBack, expBack } do
-		item.Size = UDim2.new(1, -(left + 80), 0, item.Size.Y.Offset)
+	-- The tiles share what RECALL and HUNT leave.
+	local buttonW, gap = 68, if phone then 4 else 6
+	local th = h - 10
+	local tw = math.min(math.floor(th * 1.25), math.floor((w - 10 - buttonW - 8 - gap * (#tiles - 1)) / #tiles))
+	for slot, tile in tiles do
+		tile.Button.Position = UDim2.fromOffset(5 + (slot - 1) * (tw + gap), 5)
+		tile.Button.Size = UDim2.fromOffset(tw, th)
 	end
-	recall.Size = UDim2.fromOffset(68, if phone then 20 else 22)
+	recall.Size = UDim2.fromOffset(buttonW, if phone then 20 else 22)
 	hunt.Size = recall.Size
-	downText.Position, downText.Size = UDim2.fromOffset(8, 0), UDim2.new(1, -12, 1, 0)
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 player:GetAttributeChangedSignal("Hunt"):Connect(layout)
 
--- State ------------------------------------------------------------------------------------------------------
-
-local shownRecord = nil -- the record the portrait shows (Id .. Level)
-local pet: Model? = nil -- your kaiju in the world
-
-local function roster()
-	local profile = GemClient.Profile
-	return profile and profile.Kaiju
-end
-
-local function active()
-	return Kaiju.active(roster())
-end
-
-local function findPet(): Model?
-	if pet and pet.Parent then
-		return pet
-	end
-	local folder = workspace:FindFirstChild("Kaiju")
-	for _, model in if folder then folder:GetChildren() else {} do
-		if model:GetAttribute("KaijuOwner") == player.UserId then
-			pet = model
-			return model
-		end
-	end
-	pet = nil
-	return nil
-end
-
-local function showPortrait(record)
-	local key = if record then record.Id .. record.Element .. record.Species else ""
-	if key == shownRecord then
-		return
-	end
-	shownRecord = key
-	if not record then
-		portrait(view, nil)
-		return
-	end
-	local model = KaijuModels.build(record.Species, record.Element)
-	portrait(view, model)
+local function drawTile(tile, record, model: Model?, lead: boolean)
+	tile.Id = record.Id
 	local color = elementColor(record.Element)
-	cardStroke.Color = color:Lerp(P.Edge, 0.4)
-	chipStroke.Color = color
-	chipFill.BackgroundColor3 = color
-	for _, c in keyChips do
-		c.Stroke.Color = color
-		c.Fill.BackgroundColor3 = color
+	local look = record.Id .. "/" .. record.Species .. "/" .. record.Element
+	if tile.Look ~= look then
+		tile.Look = look
+		portrait(tile.View, modelFor("hud:" .. tile.Slot, record))
 	end
-end
-
--- The wild kaiju you could try to tame now: the weakest near you.
-local function tameTarget(): (Model?, number)
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local enemies = workspace:FindFirstChild("Enemies")
-	if not root or not enemies then
-		return nil, 0
-	end
-	local best, bestChance = nil, 0
-	for _, model in enemies:GetChildren() do
-		if model:IsA("Model") and KaijuTaming.ready(model) then
-			local humanoid = model:FindFirstChildOfClass("Humanoid")
-			local body = model.PrimaryPart
-			if humanoid and body and (body.CFrame.Position - root.CFrame.Position).Magnitude <= TAME_RANGE then
-				local chance = Kaiju.tameChance(humanoid.Health, humanoid.MaxHealth)
-				if chance > bestChance then
-					best, bestChance = model, chance
-				end
-			end
-		end
-	end
-	return best, bestChance
-end
-
-local tameModel: Model? = nil
-local wantShown = false
-
-local function refresh()
-	local record = active()
-	local inOutpost = OutpostScene.isActive() and player:GetAttribute("Outpost") == true
-	local blocked = player.PlayerGui:FindFirstChild("Intro") ~= nil
-		or player:GetAttribute("CombatSession") ~= nil
-		or player:GetAttribute("MatchId") ~= nil
-	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
-	local menu = dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled
-	wantShown = record ~= nil and inOutpost and not blocked and not menu
-	gui.Enabled = wantShown
-	if not wantShown then
-		return
-	end
-	showPortrait(record)
-	local model = findPet()
-	-- (Its kind in its element's colour: the full name is the panel's.)
-	local species = Kaiju.species(record.Species)
-	nameText.Text = if species then species.Name else Kaiju.title(record)
-	nameText.TextColor3 = elementColor(record.Element):Lerp(P.Text, 0.35)
+	tile.Edge.Color = if lead then P.Gold else color:Lerp(P.Edge, 0.35)
+	tile.Edge.Thickness = if lead then 2 else 1.5
 	local level = (model and model:GetAttribute("KaijuLevel")) or record.Level
-	local exp = (model and model:GetAttribute("KaijuExp")) or record.Exp or 0
-	local need = Kaiju.expToNext(level)
-	levelText.Text = if need == math.huge
-		then string.format("Lv %d · MAX", level)
-		else string.format("Lv %d · %d/%d", level, exp, need)
-	expFill.Size = UDim2.fromScale(if need == math.huge then 1 else math.clamp(exp / need, 0, 1), 1)
-	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
-	healthFill.Size =
-		UDim2.fromScale(if humanoid then math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1) else 1, 1)
-	-- Its E: full once AbilityEvery has passed since it last cast.
-	local castAt = model and model:GetAttribute("KaijuAbilityAt")
-	local since = if castAt then workspace:GetServerTimeNow() - castAt else math.huge
-	chipFill.Size = UDim2.fromScale(1, math.clamp(since / Kaiju.AbilityEvery, 0, 1))
-	chipText.TextColor3 = if since >= Kaiju.AbilityEvery then INK else P.Text
-	-- Its Q and R: awake from their levels (Kaiju.MoveLevels).
-	for _, c in keyChips do
-		local _, awake = Kaiju.move(record.Soul, c.Key, level)
-		local at = model and model:GetAttribute("Kaiju" .. c.Key .. "At")
-		local ready = if at then workspace:GetServerTimeNow() - at else math.huge
-		local every = KEY_EVERY[c.Key]
-		c.Text.Text = if awake then c.Key else tostring(Kaiju.MoveLevels[c.Key])
-		c.Stroke.Transparency = if awake then 0 else 0.7
-		c.Fill.Size = UDim2.fromScale(1, if awake then math.clamp(ready / every, 0, 1) else 0)
-		c.Text.TextColor3 = if awake and ready >= every then INK elseif awake then P.Text else P.Dim
+	tile.Level.Text = string.format("Lv %d", level)
+	local share = healthShare(model)
+	tile.HealthFill.Size = UDim2.fromScale(share, 1)
+	tile.HealthFill.BackgroundColor3 = if share < 0.3 then P.Bad else HEALTH
+	-- Q, E and R: lit when ready, faint while recharging, hollow asleep.
+	local now = workspace:GetServerTimeNow()
+	for key, dot in tile.Dots do
+		local _, awake = Kaiju.move(record.Soul, key, level)
+		local at = model and model:GetAttribute(CAST_AT[key])
+		local ready = awake and model ~= nil and (type(at) ~= "number" or now - at >= KEY_EVERY[key])
+		dot.Frame.BackgroundColor3, dot.Stroke.Color = color, color
+		dot.Frame.BackgroundTransparency = if ready then 0 elseif awake then 0.65 else 1
+		dot.Stroke.Transparency = if awake then 0 else 0.45
 	end
-	-- Knocked out.
-	local back = player:GetAttribute("KaijuDownUntil")
-	local wait = if type(back) == "number" then back - workspace:GetServerTimeNow() else 0
-	downVeil.Visible = wait > 0
+	local wait = downFor(record.Id)
+	tile.Veil.Visible = wait > 0
 	if wait > 0 then
-		downText.Text = string.format("Knocked out: back in its Gemsoul for %ds", math.ceil(wait))
-	end
-	hunt.Text = if Spar.hunting(player) then "STOP" else "HUNT"
-	recall.Visible = model ~= nil
-	-- TAME.
-	local target, chance = tameTarget()
-	tameModel = target
-	tame.Visible = target ~= nil and not KaijuTaming.casting()
-	if target then
-		tameOdds.Text = string.format("%d%% chance", math.floor(chance * 100 + 0.5))
-		local left = Kaiju.TameTries - (target:GetAttribute("KaijuTries") or 0)
-		tameTries.Text = string.format("%d tr%s left", left, if left == 1 then "y" else "ies")
+		tile.VeilText.Text = string.format("KO %ds", math.ceil(wait))
 	end
 end
 
--- Wild nameplates: the server's own bar while you're not hunting.
-local function wildPlates()
-	local enemies = workspace:FindFirstChild("Enemies")
-	local show = not Spar.hunting(player) and wantShown
-	for _, model in if enemies then enemies:GetChildren() else {} do
-		if model:GetAttribute("KaijuWild") or model:GetAttribute("MoonBug") then
-			local root = model.PrimaryPart
-			local board = root and root:FindFirstChild("HealthBar")
-			if board and board:IsA("BillboardGui") and board.Enabled ~= show then
-				board.Enabled = show
-			end
-		end
-	end
+-- The panel -------------------------------------------------------------------------------------------------------
+
+local W, H = 800, 480
+local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
+window.Title.Text = "YOUR KAIJU"
+window.Subtitle.Text = "Your team fights beside you in the Outpost. Pick one to see it."
+window.Close.Activated:Connect(function()
+	window.Gui.Enabled = false
+end)
+window.Shade.Activated:Connect(function()
+	window.Gui.Enabled = false
+end)
+
+local body = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(20, 78),
+	Size = UDim2.new(1, -40, 1, -96),
+}, window.Panel)
+
+-- Left: every kaiju you have, your team first.
+local LIST_W = 256
+local listFrame = new("ScrollingFrame", {
+	Name = "KaijuList",
+	BackgroundTransparency = 1,
+	Size = UDim2.new(0, LIST_W, 1, 0),
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 4,
+}, body)
+UiKit.list(listFrame, 6)
+
+-- Right: the one picked, or feeding it.
+local right = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(LIST_W + 14, 0),
+	Size = UDim2.new(1, -(LIST_W + 14), 1, 0),
+}, body)
+local tabRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30) }, right)
+UiKit.list(tabRow, 8, true)
+
+local detail = new("Frame", {
+	Name = "Detail",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 38),
+	Size = UDim2.new(1, 0, 1, -38),
+}, right)
+local heroView = viewport(detail, { Size = UDim2.fromOffset(168, 168) })
+UiKit.round(heroView, 10)
+local heroEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.2 }, heroView)
+local heroGlow = new("UIGradient", { Rotation = 90 }, heroView)
+local info = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(180, 0),
+	Size = UDim2.new(1, -180, 0, 168),
+}, detail)
+local heroName = label(info, "", 20, P.Text, Enum.Font.GothamBlack)
+heroName.Size = UDim2.new(1, 0, 0, 24)
+UiKit.fit(heroName)
+local heroTag = label(info, "", 11, P.Dim, IronUi.Bold)
+heroTag.Position, heroTag.Size = UDim2.fromOffset(0, 26), UDim2.new(1, 0, 0, 14)
+local pill = new("Frame", {
+	Position = UDim2.fromOffset(0, 46),
+	Size = UDim2.fromOffset(150, 20),
+	BackgroundColor3 = INK,
+}, info)
+UiKit.round(pill, 10)
+local pillEdge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.2 }, pill)
+local pillText = label(pill, "", 10, P.Text, Enum.Font.GothamBlack)
+pillText.Size, pillText.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+local heroBlurb = label(info, "", 11, P.Dim, IronUi.Body)
+heroBlurb.Position, heroBlurb.Size = UDim2.fromOffset(0, 70), UDim2.new(1, 0, 0, 28)
+heroBlurb.TextWrapped = true
+heroBlurb.TextYAlignment = Enum.TextYAlignment.Top
+-- Health, damage, speed.
+local statRow = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 102),
+	Size = UDim2.new(1, 0, 0, 40),
+}, info)
+UiKit.list(statRow, 8, true)
+local statValues = {}
+for order, name in { "HEALTH", "DAMAGE", "SPEED" } do
+	local chip = new("Frame", {
+		LayoutOrder = order,
+		BackgroundColor3 = P.Inset,
+		Size = UDim2.new(1 / 3, -6, 1, 0),
+	}, statRow)
+	UiKit.round(chip, 8)
+	local value = label(chip, "", 16, P.Text, Enum.Font.GothamBlack)
+	value.Position, value.Size = UDim2.fromOffset(10, 3), UDim2.new(1, -16, 0, 20)
+	local word = label(chip, name, 9, P.Dim, IronUi.Bold)
+	word.Position, word.Size = UDim2.fromOffset(10, 23), UDim2.new(1, -16, 0, 12)
+	statValues[order] = value
+end
+local expText = label(info, "", 11, P.Dim, IronUi.Bold)
+expText.Position, expText.Size = UDim2.fromOffset(0, 148), UDim2.new(1, 0, 0, 12)
+local expBack, expFill = bar(info, EXP)
+expBack.Position, expBack.Size = UDim2.fromOffset(0, 162), UDim2.new(1, 0, 0, 6)
+
+-- Its moves, from its Gemsoul: E from the start, Q and R as it levels.
+local moveBox = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 178),
+	Size = UDim2.new(1, 0, 0, 116),
+}, detail)
+UiKit.list(moveBox, 4)
+local moveRows = {}
+for order, key in { "E", "Q", "R" } do
+	local row = new("Frame", {
+		Name = "Move" .. key,
+		LayoutOrder = order,
+		BackgroundColor3 = P.Inset,
+		Size = UDim2.new(1, 0, 0, 36),
+	}, moveBox)
+	UiKit.round(row, 8)
+	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.6 }, row)
+	local chip = new("Frame", {
+		Position = UDim2.fromOffset(6, 6),
+		Size = UDim2.fromOffset(24, 24),
+		BackgroundColor3 = P.Gold,
+	}, row)
+	UiKit.round(chip, 6)
+	local chipEdge = new("UIStroke", { Color = P.Dim, Thickness = 1, Transparency = 1 }, chip)
+	local letter = label(chip, key, 13, INK, Enum.Font.GothamBlack)
+	letter.Size, letter.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	local name = label(row, "", 13, P.Text, IronUi.Bold)
+	name.Position, name.Size = UDim2.fromOffset(38, 3), UDim2.new(1, -144, 0, 16)
+	local about = label(row, "", 10, P.Dim, IronUi.Body)
+	about.Position, about.Size = UDim2.fromOffset(38, 19), UDim2.new(1, -144, 0, 13)
+	local state = label(row, "", 10, P.Good, Enum.Font.GothamBlack)
+	state.AnchorPoint, state.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+	state.Position, state.Size = UDim2.new(1, -10, 0, 0), UDim2.new(0, 100, 1, 0)
+	moveRows[key] = {
+		Frame = row,
+		Edge = edge,
+		Chip = chip,
+		ChipEdge = chipEdge,
+		Letter = letter,
+		Name = name,
+		About = about,
+		State = state,
+	}
 end
 
--- Actions ------------------------------------------------------------------------------------------------------
+-- What you can do with it.
+local actionBar = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.fromScale(0, 1),
+	Size = UDim2.new(1, 0, 0, 40),
+}, detail)
+local actionText = label(actionBar, "", 11, P.Dim, IronUi.Body)
+actionText.Size = UDim2.new(1, 0, 1, 0)
+actionText.TextWrapped = true
+local actionButtons = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.fromScale(1, 0),
+	Size = UDim2.fromScale(1, 1),
+}, actionBar)
+local actionList = UiKit.list(actionButtons, 6, true)
+actionList.HorizontalAlignment = Enum.HorizontalAlignment.Right
+
+-- Feeding the one picked.
+local feedPane = new("Frame", {
+	Name = "Feed",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 38),
+	Size = UDim2.new(1, 0, 1, -38),
+	Visible = false,
+}, right)
+local feedHead = label(feedPane, "", 12, P.Text, IronUi.Bold)
+feedHead.Size = UDim2.new(1, 0, 0, 18)
+local feedList = new("ScrollingFrame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 24),
+	Size = UDim2.new(1, 0, 1, -82),
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 4,
+}, feedPane)
+UiKit.list(feedList, 6)
+local footer = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.fromScale(0, 1),
+	Size = UDim2.new(1, 0, 0, 50),
+}, feedPane)
+local footerText = label(footer, "", 11, P.Dim, IronUi.Body)
+footerText.Size = UDim2.new(1, -150, 1, 0)
+footerText.TextWrapped = true
+local feedButton = smallButton(footer, "FEED", P.Good)
+feedButton.AnchorPoint = Vector2.new(1, 0.5)
+feedButton.Position, feedButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(130, 38)
+feedButton.TextSize = 15
+-- One tap picks a mouthful of spare Commons (what mining mostly pays).
+local commonsButton = smallButton(footer, "PICK COMMONS", P.Teal)
+commonsButton.AnchorPoint = Vector2.new(1, 0.5)
+commonsButton.Position, commonsButton.Size = UDim2.new(1, -140, 0.5, 0), UDim2.fromOffset(122, 38)
+
+local tab = "Details"
+local selected: string? = nil
+local swapping = false -- choosing who a kaiju from home goes out in place of
+local picked: { [string]: boolean } = {}
+local tabButtons = {}
+local rowLive = {} -- [id] = the bits of its row that change while you look
+local drawPanel
+
+for order, entry in { { "Details", "DETAILS" }, { "Feed", "FEED" } } do
+	local b = smallButton(tabRow, entry[2], P.Gold)
+	b.LayoutOrder = order
+	b.Size = UDim2.fromOffset(120, 28)
+	b.Activated:Connect(function()
+		tab = entry[1]
+		swapping = false
+		table.clear(picked)
+		drawPanel()
+	end)
+	tabButtons[entry[1]] = b
+end
+
+local function moveName(id: string?): string
+	local move = id and GemTraits.Moves[id]
+	return if move then move.Name else "?"
+end
+
+-- The stones it would eat, best EXP first, with what each gives.
+local function stonesFor(record)
+	local list = {}
+	for _, gem in (GemClient.Profile and GemClient.Profile.Gems) or {} do
+		table.insert(list, { Gem = gem, Exp = Kaiju.feedExp(gem, record) })
+	end
+	table.sort(list, function(a, b)
+		return if a.Exp ~= b.Exp then a.Exp > b.Exp else (a.Gem.Id < b.Gem.Id)
+	end)
+	return list
+end
+
+-- Actions ----------------------------------------------------------------------------------------------------------
 
 local busy = false
 local function act(fn: () -> ())
@@ -474,293 +636,305 @@ local function say(result)
 	end
 end
 
-recall.Activated:Connect(function()
-	act(function()
-		say(GemClient.request("KaijuRecall"))
-	end)
-end)
-hunt.Activated:Connect(function()
-	act(function()
-		say(GemClient.request("Hunt", not Spar.hunting(player)))
-	end)
-end)
--- A wild kaiju's Challenge prompt: your kaiju goes in (KaijuWilds).
-ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
-	if who ~= player or prompt:GetAttribute("PromptKind") ~= "KaijuChallenge" then
-		return
-	end
-	local model = prompt.Parent and prompt.Parent.Parent
-	act(function()
-		say(GemClient.request("KaijuChallenge", model))
-	end)
-end)
-tame.Activated:Connect(function()
-	local target = tameModel
-	if not target then
-		return
-	end
-	act(function()
-		local result = GemClient.request("KaijuTame", target)
-		if result and result.Casting then
-			-- The cast is on: its bar shows how it goes (KaijuTaming).
-			KaijuTaming.cast(target, result.Chance or 0, result.Seconds or Kaiju.Tame.Cast)
-			tame.Visible = false
-		else
-			say(result)
+-- The panel's list ------------------------------------------------------------------------------------------------
+
+local function clearList()
+	-- (The rows' models are kept for next time.)
+	for key, entry in built do
+		if string.sub(key, 1, 4) == "row:" then
+			entry.Model.Parent = nil
 		end
-	end)
-end)
-
--- The panel -------------------------------------------------------------------------------------------------------
-
-local W, H = 760, 470
-local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
-window.Title.Text = "YOUR KAIJU"
-window.Subtitle.Text = "They fight beside you in the Outpost. Feed them stones to grow."
-window.Close.Activated:Connect(function()
-	window.Gui.Enabled = false
-end)
-window.Shade.Activated:Connect(function()
-	window.Gui.Enabled = false
-end)
-
-local body = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(20, 78),
-	Size = UDim2.new(1, -40, 1, -96),
-}, window.Panel)
-
--- Left: the one out.
-local hero = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(0, 300, 1, 0) }, body)
-UiKit.round(hero, 10)
-local heroView = new("ViewportFrame", {
-	BackgroundColor3 = Color3.fromRGB(16, 20, 32),
-	Position = UDim2.fromOffset(10, 10),
-	Size = UDim2.new(1, -20, 0, 150),
-	Ambient = Color3.fromRGB(170, 170, 185),
-	LightColor = Color3.new(1, 1, 1),
-	LightDirection = Vector3.new(-0.4, -1, 0.6),
-}, hero)
-UiKit.round(heroView, 8)
-local heroName = label(hero, "", 18, P.Text, Enum.Font.GothamBlack)
-heroName.Position, heroName.Size = UDim2.fromOffset(12, 166), UDim2.new(1, -24, 0, 22)
-local heroBlurb = label(hero, "", 11, P.Dim, IronUi.Body)
-heroBlurb.Position, heroBlurb.Size = UDim2.fromOffset(12, 188), UDim2.new(1, -24, 0, 28)
-heroBlurb.TextWrapped = true
-heroBlurb.TextYAlignment = Enum.TextYAlignment.Top
-local heroStats = label(hero, "", 12, P.Text, IronUi.Bold)
-heroStats.Position, heroStats.Size = UDim2.fromOffset(12, 220), UDim2.new(1, -24, 0, 34)
-heroStats.TextWrapped = true
-heroStats.TextYAlignment = Enum.TextYAlignment.Top
-local soulBox = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(14, 17, 28),
-	Position = UDim2.fromOffset(10, 258),
-	Size = UDim2.new(1, -20, 1, -268),
-}, hero)
-UiKit.round(soulBox, 8)
-local soulTitle = label(soulBox, "GEMSOUL", 11, P.Gold)
-soulTitle.Position, soulTitle.Size = UDim2.fromOffset(10, 6), UDim2.new(1, -20, 0, 14)
-local soulText = label(soulBox, "", 11, P.Text, IronUi.Body)
-soulText.Position, soulText.Size = UDim2.fromOffset(10, 22), UDim2.new(1, -20, 1, -26)
-soulText.TextWrapped = true
-soulText.TextYAlignment = Enum.TextYAlignment.Top
-
--- Right: tabs for your kaiju and feeding.
-local right = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(312, 0),
-	Size = UDim2.new(1, -312, 1, 0),
-}, body)
-local tabRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 32) }, right)
-UiKit.list(tabRow, 8, true)
-local listFrame = new("ScrollingFrame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 40),
-	Size = UDim2.new(1, 0, 1, -100),
-	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollBarThickness = 4,
-}, right)
-UiKit.list(listFrame, 6)
-local footer = new("Frame", {
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.new(1, 0, 0, 52),
-}, right)
-local footerText = label(footer, "", 11, P.Dim, IronUi.Body)
-footerText.Size = UDim2.new(1, -150, 1, 0)
-footerText.TextWrapped = true
-local feedButton = smallButton(footer, "FEED", P.Good)
-feedButton.AnchorPoint = Vector2.new(1, 0.5)
-feedButton.Position, feedButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(140, 38)
-feedButton.TextSize = 15
--- One tap picks a mouthful of spare Commons (what mining mostly pays).
-local commonsButton = smallButton(footer, "PICK COMMONS", P.Teal)
-commonsButton.AnchorPoint = Vector2.new(1, 0.5)
-commonsButton.Position, commonsButton.Size = UDim2.new(1, -150, 0.5, 0), UDim2.fromOffset(122, 38)
-commonsButton.TextSize = 12
-
-local tab = "Team"
-local picked: { [string]: boolean } = {}
-local tabButtons = {}
-local drawPanel
-
-for _, entry in { { "Team", "YOUR KAIJU" }, { "Feed", "FEED" } } do
-	local b = smallButton(tabRow, entry[2], P.Gold)
-	b.Size = UDim2.fromOffset(130, 30)
-	b.Activated:Connect(function()
-		tab = entry[1]
-		table.clear(picked)
-		drawPanel()
-	end)
-	tabButtons[entry[1]] = b
-end
-
-local function row(height: number): Frame
-	local frame = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -8, 0, height) }, listFrame)
-	UiKit.round(frame, 8)
-	return frame
-end
-
-local function moveName(id: string?): string
-	local move = id and GemTraits.Moves[id]
-	return if move then move.Name else "?"
-end
-
--- The stones it would eat, best EXP first, with what each gives.
-local function feedList(record)
-	local list = {}
-	for _, gem in (GemClient.Profile and GemClient.Profile.Gems) or {} do
-		table.insert(list, { Gem = gem, Exp = Kaiju.feedExp(gem, record) })
-	end
-	table.sort(list, function(a, b)
-		return if a.Exp ~= b.Exp then a.Exp > b.Exp else (a.Gem.Id < b.Gem.Id)
-	end)
-	return list
-end
-
-function drawPanel()
-	local data = roster()
-	local record = Kaiju.active(data)
-	for name, b in tabButtons do
-		b.BackgroundColor3 = if name == tab then P.Gold:Lerp(INK, 0.3) else P.Gold:Lerp(INK, 0.75)
 	end
 	for _, child in listFrame:GetChildren() do
 		if child:IsA("GuiObject") then
 			child:Destroy()
 		end
 	end
-	-- The one out.
-	if record then
-		local model = KaijuModels.build(record.Species, record.Element)
-		portrait(heroView, model)
-		local species = Kaiju.species(record.Species)
-		heroName.Text = string.format("%s · Lv %d", Kaiju.title(record), record.Level)
-		heroName.TextColor3 = elementColor(record.Element)
-		heroBlurb.Text = if species then species.Blurb else ""
-		local stats = Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier)
-		heroStats.Text = string.format(
-			"Health %d  ·  Damage %d  ·  Speed %d\nEXP %d / %s",
-			stats.Health,
-			math.floor(stats.Damage + 0.5),
-			stats.Speed,
-			record.Exp or 0,
-			if Kaiju.expToNext(record.Level) == math.huge then "MAX" else tostring(Kaiju.expToNext(record.Level))
-		)
-		local soul = record.Soul
-		-- Its Gemsoul's three moves: E from the start, Q and R as it levels.
-		local lines = { if soul then GemConfig.displayName(soul) else "?" }
-		for _, key in { "E", "Q", "R" } do
-			local id, awake = Kaiju.move(soul, key, record.Level)
-			table.insert(
-				lines,
-				if awake
-					then string.format("%s: %s", key, moveName(id))
-					else string.format("%s: %s  ·  wakes at Lv %d", key, moveName(id), Kaiju.MoveLevels[key])
-			)
-		end
-		table.insert(lines, "In your gear, its Gemsoul gives all three.")
-		soulText.Text = table.concat(lines, "\n")
-	else
-		portrait(heroView, nil)
-		heroName.Text = "No kaiju yet"
-		heroBlurb.Text = "Visit the Outpost: your first kaiju is waiting there."
-		heroStats.Text, soulText.Text = "", ""
+	table.clear(rowLive)
+end
+
+local function heading(order: number, text: string, note: string)
+	local frame = new("Frame", {
+		LayoutOrder = order,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -8, 0, 18),
+	}, listFrame)
+	local title = label(frame, text, 11, P.Gold, Enum.Font.GothamBlack)
+	title.Size = UDim2.fromScale(0.6, 1)
+	local side = label(frame, note, 10, P.Dim, IronUi.Bold)
+	side.AnchorPoint, side.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+	side.Position, side.Size = UDim2.fromScale(1, 0), UDim2.fromScale(0.5, 1)
+end
+
+-- What a row says under its name: its level and where it is.
+local function rowStatus(record, slot: number?): (string, Color3)
+	local wait = downFor(record.Id)
+	if slot and wait > 0 then
+		return string.format("Lv %d  ·  KO, back in %ds", record.Level, math.ceil(wait)), P.Bad:Lerp(P.Text, 0.3)
+	elseif slot == 1 then
+		return string.format("Lv %d  ·  LEADS", record.Level), P.Gold
+	elseif slot then
+		return string.format("Lv %d  ·  OUT", record.Level), P.Good
 	end
-	if tab == "Team" then
-		feedButton.Visible, commonsButton.Visible = false, false
-		footerText.Size = UDim2.fromScale(1, 1)
-		footerText.Text = string.format(
+	return string.format("Lv %d  ·  AT HOME", record.Level), P.Dim
+end
+
+local function kaijuRow(order: number, record, slot: number?, models)
+	local color = elementColor(record.Element)
+	local chosen = record.Id == selected
+	local row = new("TextButton", {
+		Name = "Kaiju_" .. record.Id,
+		LayoutOrder = order,
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = if chosen then color:Lerp(INK, 0.72) else P.Inset,
+		Size = UDim2.new(1, -8, 0, 58),
+	}, listFrame)
+	UiKit.round(row, 8)
+	new("UIStroke", { Color = color, Thickness = 1.5, Transparency = if chosen then 0 else 1 }, row)
+	local view = viewport(row, { Position = UDim2.fromOffset(6, 6), Size = UDim2.fromOffset(46, 46) })
+	UiKit.round(view, 8)
+	portrait(view, modelFor("row:" .. record.Id, record))
+	if slot then
+		-- Its place in the team: 1 leads.
+		local badge = new("Frame", {
+			Position = UDim2.fromOffset(2, 2),
+			Size = UDim2.fromOffset(16, 16),
+			BackgroundColor3 = if slot == 1 then P.Gold else P.Slot,
+			ZIndex = 3,
+		}, row)
+		UiKit.round(badge, 8)
+		local n = label(badge, tostring(slot), 10, if slot == 1 then INK else P.Text, Enum.Font.GothamBlack)
+		n.Size, n.TextXAlignment, n.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
+	end
+	local name = label(row, Kaiju.title(record), 13, color:Lerp(P.Text, 0.35), IronUi.Bold)
+	name.Position, name.Size = UDim2.fromOffset(60, 6), UDim2.new(1, -66, 0, 16)
+	local statusText, statusColor = rowStatus(record, slot)
+	local status = label(row, statusText, 10, statusColor, IronUi.Bold)
+	status.Position, status.Size = UDim2.fromOffset(60, 23), UDim2.new(1, -66, 0, 13)
+	local live = { Record = record, Slot = slot, Status = status }
+	if slot then
+		local back, fill = bar(row, HEALTH)
+		back.Position, back.Size = UDim2.fromOffset(60, 40), UDim2.new(1, -72, 0, 5)
+		fill.Size = UDim2.fromScale(healthShare(models[record.Id]), 1)
+		live.Health = fill
+	end
+	local expBar, expBarFill = bar(row, EXP)
+	expBar.Position, expBar.Size = UDim2.fromOffset(60, if slot then 48 else 42), UDim2.new(1, -72, 0, 3)
+	expBarFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
+	rowLive[record.Id] = live
+	row.Activated:Connect(function()
+		selected = record.Id
+		swapping = false
+		drawPanel()
+	end)
+end
+
+local function drawList(data, team: { string })
+	clearList()
+	local models = petModels()
+	local inTeam = {}
+	heading(1, "YOUR TEAM", string.format("%d OUT", #team))
+	for slot, id in team do
+		inTeam[id] = slot
+		kaijuRow(1 + slot, data.List[id], slot, models)
+	end
+	local home = {}
+	for id, record in (data and data.List) or {} do
+		if not inTeam[id] then
+			table.insert(home, record)
+		end
+	end
+	table.sort(home, function(a, b)
+		return if a.Level ~= b.Level then a.Level > b.Level else a.Id < b.Id
+	end)
+	if #home > 0 then
+		heading(20, "AT HOME", tostring(#home))
+	end
+	for i, record in home do
+		kaijuRow(20 + i, record, nil, models)
+	end
+	local note = label(
+		listFrame,
+		string.format(
 			"%d of %d kaiju kept. Tame more in the far quarry: wear one down to half health without killing it.",
 			Kaiju.count(data),
 			Kaiju.MaxOwned
-		)
-		local ids = {}
-		for id in (data and data.List) or {} do
-			table.insert(ids, id)
+		),
+		10,
+		P.Dim,
+		IronUi.Body
+	)
+	note.LayoutOrder = 99
+	note.Size = UDim2.new(1, -8, 0, 40)
+	note.TextWrapped = true
+	note.TextYAlignment = Enum.TextYAlignment.Top
+	-- (Prune the models of kaiju you no longer have.)
+	for key, entry in built do
+		local id = string.match(key, "^row:(.+)$")
+		if id and not (data and data.List[id]) then
+			entry.Model:Destroy()
+			built[key] = nil
 		end
-		table.sort(ids, function(a, b)
-			local ra, rb = data.List[a], data.List[b]
-			return if ra.Level ~= rb.Level then ra.Level > rb.Level else a < b
-		end)
-		for _, id in ids do
+	end
+end
+
+-- The rows' health and knockouts, as they change.
+local function liveRows()
+	local models = petModels()
+	for id, live in rowLive do
+		if live.Health then
+			live.Health.Size = UDim2.fromScale(healthShare(models[id]), 1)
+		end
+		local text, color = rowStatus(live.Record, live.Slot)
+		live.Status.Text, live.Status.TextColor3 = text, color
+	end
+end
+
+-- The one picked ---------------------------------------------------------------------------------------------------
+
+local function actionButton(order: number, text: string, color: Color3, width: number, onClick: () -> ())
+	local b = smallButton(actionButtons, text, color)
+	b.LayoutOrder = order
+	b.Size = UDim2.fromOffset(width, 34)
+	b.Activated:Connect(onClick)
+	return b
+end
+
+local function drawActions(data, record, team: { string })
+	for _, child in actionButtons:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	local slot = table.find(team, record.Id)
+	if swapping and not slot then
+		-- SEND OUT: in place of which of the team?
+		actionText.Text = "In place of:"
+		actionText.Size = UDim2.new(0, 80, 1, 0)
+		for i, id in team do
 			local other = data.List[id]
-			local frame = row(48)
-			local stripe = new("Frame", {
-				BackgroundColor3 = elementColor(other.Element),
-				Size = UDim2.new(0, 4, 1, 0),
-			}, frame)
-			UiKit.round(stripe, 2)
-			local title = label(frame, string.format("%s · Lv %d", Kaiju.title(other), other.Level), 14)
-			title.Position, title.Size = UDim2.fromOffset(14, 5), UDim2.new(1, -140, 0, 18)
-			-- Its moves awake (E, then Q from level 5 and R from 10).
-			local awake = {}
-			for _, key in { "E", "Q", "R" } do
-				local move, up = Kaiju.move(other.Soul, key, other.Level)
-				if up then
-					table.insert(awake, key .. ": " .. moveName(move))
-				end
-			end
-			local sub = label(frame, table.concat(awake, "  ·  "), 11, P.Dim, IronUi.Body)
-			sub.Position, sub.Size = UDim2.fromOffset(14, 25), UDim2.new(1, -140, 0, 14)
-			sub.TextTruncate = Enum.TextTruncate.AtEnd
-			if id == data.Active then
-				local out = label(frame, "OUT", 12, P.Good)
-				out.AnchorPoint = Vector2.new(1, 0.5)
-				out.Position, out.Size = UDim2.new(1, -16, 0.5, 0), UDim2.fromOffset(60, 20)
-				out.TextXAlignment = Enum.TextXAlignment.Right
-			else
-				local send = smallButton(frame, "SEND OUT", P.Teal)
-				send.AnchorPoint = Vector2.new(1, 0.5)
-				send.Position, send.Size = UDim2.new(1, -10, 0.5, 0), UDim2.fromOffset(100, 30)
-				send.Activated:Connect(function()
+			local species = other and Kaiju.species(other.Species)
+			actionButton(
+				i,
+				string.upper(species and species.Name or id),
+				elementColor(other and other.Element),
+				100,
+				function()
+					local ids = table.clone(team)
+					ids[i] = record.Id
 					act(function()
-						say(GemClient.request("KaijuActive", id))
-						drawPanel()
+						local result = GemClient.request("KaijuTeam", ids)
+						say(result)
+						if result and result.Ok then
+							swapping = false
+						end
 					end)
-				end)
-			end
+				end
+			)
 		end
+		actionButton(9, "CANCEL", P.Edge, 80, function()
+			swapping = false
+			drawPanel()
+		end)
 		return
 	end
-	-- Feed.
-	feedButton.Visible = true
-	commonsButton.Visible = record ~= nil and #GemInventory.spare(GemClient.Profile, "Common") > 0
-	footerText.Size = UDim2.new(1, if commonsButton.Visible then -282 else -150, 1, 0)
-	if not record then
-		footerText.Text = "No kaiju out to feed."
-		return
+	actionText.Size = UDim2.new(1, -240, 1, 0)
+	if slot == 1 then
+		actionText.Text = "Leads your team: the first to fight."
+	elseif slot then
+		actionText.Text = string.format("Out with you, in place %d of your team.", slot)
+		actionButton(1, "LEAD", P.Gold, 100, function()
+			act(function()
+				say(GemClient.request("KaijuActive", record.Id))
+			end)
+		end)
+	else
+		actionText.Text = "At home: send it out in place of one of your team."
+		actionButton(1, "SEND OUT", P.Teal, 100, function()
+			swapping = true
+			drawPanel()
+		end)
 	end
+	actionButton(2, "FEED", P.Good, 100, function()
+		tab = "Feed"
+		table.clear(picked)
+		drawPanel()
+	end)
+end
+
+local function drawDetail(data, record, team: { string })
+	local color = elementColor(record.Element)
+	local species = Kaiju.species(record.Species)
+	local soul = record.Soul
+	local tier = (soul and soul.Tier) or "Common"
+	local tierColor = GemConfig.TierColors[tier] or P.Text
+	local slot = table.find(team, record.Id)
+	portrait(heroView, modelFor("hero", record))
+	heroEdge.Color = color
+	heroGlow.Color = ColorSequence.new(color:Lerp(INK, 0.55), INK)
+	heroName.Text = string.upper(Kaiju.title(record))
+	heroName.TextColor3 = color:Lerp(P.Text, 0.25)
+	heroTag.Text = string.format(
+		"%s  ·  LEVEL %d  ·  %s",
+		string.upper(species and species.Role or ""),
+		record.Level,
+		if slot == 1 then "LEADS" elseif slot then "OUT" else "AT HOME"
+	)
+	pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier) .. " GEMSOUL"
+	pillText.TextColor3, pillEdge.Color = tierColor, tierColor
+	pill.BackgroundColor3 = tierColor:Lerp(INK, 0.75)
+	heroBlurb.Text = if species then species.Blurb else ""
+	local stats = Kaiju.stats(record.Species, record.Level, tier)
+	if stats then
+		statValues[1].Text = tostring(math.floor(stats.Health + 0.5))
+		statValues[2].Text = tostring(math.floor(stats.Damage + 0.5))
+		statValues[3].Text = tostring(math.floor(stats.Speed + 0.5))
+	end
+	local need = Kaiju.expToNext(record.Level)
+	expText.Text = if need == math.huge
+		then string.format("EXP %d / MAX", record.Exp or 0)
+		else string.format("EXP %d / %d", record.Exp or 0, need)
+	expFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
+	for key, row in moveRows do
+		local id, awake = Kaiju.move(soul, key, record.Level)
+		local move = id and GemTraits.Moves[id]
+		row.Name.Text = moveName(id)
+		row.Name.TextColor3 = if awake then P.Text else P.Dim
+		row.About.Text = move and move.Description or ""
+		row.Chip.BackgroundColor3 = if awake then color else INK
+		row.ChipEdge.Transparency = if awake then 1 else 0
+		row.Letter.TextColor3 = if awake then INK else P.Dim
+		row.Edge.Color = if awake then color else P.Edge
+		row.Edge.Transparency = if awake then 0.45 else 0.7
+		row.Frame.BackgroundColor3 = if awake then color:Lerp(INK, 0.82) else P.Inset
+		row.State.Text = if awake then "READY" else string.format("WAKES AT LV %d", Kaiju.MoveLevels[key] or 1)
+		row.State.TextSize = if awake then 10 else 9
+		row.State.TextColor3 = if awake then P.Good else P.Dim
+	end
+	drawActions(data, record, team)
+end
+
+local function drawFeed(record)
+	for _, child in feedList:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	feedHead.Text = string.format("Feeding %s  ·  Lv %d", Kaiju.title(record), record.Level)
+	feedHead.TextColor3 = elementColor(record.Element):Lerp(P.Text, 0.35)
+	commonsButton.Visible = #GemInventory.spare(GemClient.Profile, "Common") > 0
+	footerText.Size = UDim2.new(1, if commonsButton.Visible then -272 else -140, 1, 0)
 	local total, count = 0, 0
-	for _, entry in feedList(record) do
+	for _, entry in stonesFor(record) do
 		local gem, exp = entry.Gem, entry.Exp
 		local chosen = picked[gem.Id] == true
 		if chosen then
 			total += exp
 			count += 1
 		end
-		local frame = row(38)
+		local frame = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -8, 0, 38) }, feedList)
+		UiKit.round(frame, 8)
 		local b = new("TextButton", {
 			Text = "",
 			BackgroundTransparency = 1,
@@ -789,6 +963,30 @@ function drawPanel()
 		else "Pick stones to feed it. Rarer ones keep their worth as it grows; its weakness element gives half."
 end
 
+function drawPanel()
+	local data = roster()
+	local team = Kaiju.teamIds(data)
+	if not (selected and data and data.List[selected]) then
+		selected = team[1]
+	end
+	local record = selected and data.List[selected]
+	for name, b in tabButtons do
+		b.BackgroundColor3 = if name == tab then P.Gold:Lerp(INK, 0.3) else P.Gold:Lerp(INK, 0.75)
+	end
+	drawList(data, team)
+	detail.Visible = tab == "Details" and record ~= nil
+	feedPane.Visible = tab == "Feed" and record ~= nil
+	if not record then
+		portrait(heroView, nil)
+		return
+	end
+	if tab == "Feed" then
+		drawFeed(record)
+	else
+		drawDetail(data, record, team)
+	end
+end
+
 commonsButton.Activated:Connect(function()
 	table.clear(picked)
 	for i, gem in GemInventory.spare(GemClient.Profile, "Common") do
@@ -805,11 +1003,12 @@ feedButton.Activated:Connect(function()
 	for id in picked do
 		table.insert(ids, id)
 	end
-	if #ids == 0 then
+	local target = selected
+	if #ids == 0 or not target then
 		return
 	end
 	act(function()
-		local result = GemClient.request("KaijuFeed", ids)
+		local result = GemClient.request("KaijuFeed", ids, target)
 		say(result)
 		if result and result.Ok then
 			table.clear(picked)
@@ -817,14 +1016,14 @@ feedButton.Activated:Connect(function()
 	end)
 end)
 
-function KaijuHud.open()
-	tab = "Team"
+function KaijuHud.open(id: string?)
+	tab = "Details"
+	swapping = false
 	table.clear(picked)
+	selected = id
 	drawPanel()
 	window.Gui.Enabled = true
 end
-
-card.Activated:Connect(KaijuHud.open)
 
 GemClient.Changed:Connect(function()
 	if window.Gui.Enabled then
@@ -840,6 +1039,135 @@ GemClient.Changed:Connect(function()
 		end
 		drawPanel()
 	end
+end)
+
+-- The strip, the roll and TAME --------------------------------------------------------------------------------------
+
+-- The wild kaiju you could try to tame now: the weakest near you.
+local function tameTarget(): (Model?, number)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local enemies = workspace:FindFirstChild("Enemies")
+	if not root or not enemies then
+		return nil, 0
+	end
+	local best, bestChance = nil, 0
+	for _, model in enemies:GetChildren() do
+		if model:IsA("Model") and KaijuTaming.ready(model) then
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			local body = model.PrimaryPart
+			if humanoid and body and (body.CFrame.Position - root.CFrame.Position).Magnitude <= TAME_RANGE then
+				local chance = Kaiju.tameChance(humanoid.Health, humanoid.MaxHealth)
+				if chance > bestChance then
+					best, bestChance = model, chance
+				end
+			end
+		end
+	end
+	return best, bestChance
+end
+
+local tameModel: Model? = nil
+local wantShown = false
+local rollTried = false
+
+local function refresh()
+	local profile = GemClient.Profile
+	local data = profile and profile.Kaiju
+	local team = Kaiju.teamIds(data)
+	local inOutpost = OutpostScene.isActive() and player:GetAttribute("Outpost") == true
+	local blocked = player.PlayerGui:FindFirstChild("Intro") ~= nil
+		or KaijuRoll.showing()
+		or player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("MatchId") ~= nil
+	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
+	local menu = dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled
+	-- The starter roll, once, for a player still owed it.
+	if not rollTried and inOutpost and not blocked and not menu and Kaiju.rollsOwed(profile) > 0 then
+		if not LoadingFlow.active() then
+			rollTried = true
+			task.spawn(KaijuRoll.play)
+		end
+	end
+	if window.Gui.Enabled then
+		liveRows()
+	end
+	wantShown = #team > 0 and inOutpost and not blocked and not menu
+	gui.Enabled = wantShown
+	if not wantShown then
+		return
+	end
+	local models = petModels()
+	for slot, tile in tiles do
+		local id = team[slot]
+		local record = id and data.List[id]
+		tile.Button.Visible = record ~= nil
+		if record then
+			drawTile(tile, record, models[id], slot == 1)
+		end
+	end
+	hunt.Text = if Spar.hunting(player) then "STOP" else "HUNT"
+	recall.Visible = next(models) ~= nil
+	-- TAME.
+	local target, chance = tameTarget()
+	tameModel = target
+	tame.Visible = target ~= nil and not KaijuTaming.casting()
+	if target then
+		tameOdds.Text = string.format("%d%% chance", math.floor(chance * 100 + 0.5))
+		local left = Kaiju.TameTries - (target:GetAttribute("KaijuTries") or 0)
+		tameTries.Text = string.format("%d tr%s left", left, if left == 1 then "y" else "ies")
+	end
+end
+
+-- Wild nameplates: the server's own bar while you're not hunting.
+local function wildPlates()
+	local enemies = workspace:FindFirstChild("Enemies")
+	local show = not Spar.hunting(player) and wantShown
+	for _, model in if enemies then enemies:GetChildren() else {} do
+		if model:GetAttribute("KaijuWild") or model:GetAttribute("MoonBug") then
+			local root = model.PrimaryPart
+			local board = root and root:FindFirstChild("HealthBar")
+			if board and board:IsA("BillboardGui") and board.Enabled ~= show then
+				board.Enabled = show
+			end
+		end
+	end
+end
+
+recall.Activated:Connect(function()
+	act(function()
+		say(GemClient.request("KaijuRecall"))
+	end)
+end)
+hunt.Activated:Connect(function()
+	act(function()
+		say(GemClient.request("Hunt", not Spar.hunting(player)))
+	end)
+end)
+-- A wild kaiju's Challenge prompt: your kaiju go in (KaijuWilds).
+ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
+	if who ~= player or prompt:GetAttribute("PromptKind") ~= "KaijuChallenge" then
+		return
+	end
+	local model = prompt.Parent and prompt.Parent.Parent
+	act(function()
+		say(GemClient.request("KaijuChallenge", model))
+	end)
+end)
+tame.Activated:Connect(function()
+	local target = tameModel
+	if not target then
+		return
+	end
+	act(function()
+		local result = GemClient.request("KaijuTame", target)
+		if result and result.Casting then
+			-- The cast is on: its bar shows how it goes (KaijuTaming).
+			KaijuTaming.cast(target, result.Chance or 0, result.Seconds or Kaiju.Tame.Cast)
+			tame.Visible = false
+		else
+			say(result)
+		end
+	end)
 end)
 
 local started = false

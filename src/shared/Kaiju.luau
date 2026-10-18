@@ -185,9 +185,13 @@ Kaiju.Scale = { Pet = 0.55, Wild = 0.9, Guardian = 1.2 }
 -- runs back past Leash, and is put back beside you past Teleport.
 Kaiju.Follow = { Engage = 28, Leash = 45, Teleport = 90, Gap = 5 }
 
--- Your team: one kaiju to start; a second slot opens when one of yours
--- reaches level 10, a third at level 20.
-Kaiju.SlotLevels = { 1, 10, 20 }
+-- Your team: the kaiju out with you at once. The beta opens all three
+-- slots from the start (the plan: a second when one of yours reaches level
+-- 10, a third at 20).
+Kaiju.SlotLevels = { 1, 1, 1 }
+-- Where each of the team walks beside you: studs to your right (left when
+-- negative) and behind you.
+Kaiju.TeamSpots = { { 3, 5 }, { -3, 5 }, { 0, 8.5 } }
 
 -- Knocked out in a fight: back in its Gemsoul, ready again after this long.
 Kaiju.KnockoutSeconds = 45
@@ -314,9 +318,15 @@ function Kaiju.mineExp(size: string?): number
 	return Kaiju.MineExp[size or "Pebble"] or Kaiju.MineExp.Pebble
 end
 
--- A starter kaiju for everyone, the first time they reach the Outpost: a
--- random kind, in a random element, with a Gemsoul rolled like a mined gem.
+-- The starter roll: everyone starts with a team of StarterTeam kaiju,
+-- rolled in the intro (or, for a player from before with fewer, the rest
+-- rolled once in the Outpost): each a random kind in a random element, with
+-- a Gemsoul rolled like a mined gem, never the same kind and element twice.
+-- A roll left unclaimed is given anyway after RollGrace seconds in the
+-- Outpost.
 Kaiju.StarterLevel = 1
+Kaiju.StarterTeam = 3
+Kaiju.RollGrace = 90
 
 -- The 1v1 kaiju arena (phase 2): every match is for keeps.
 Kaiju.Arena = {
@@ -559,7 +569,8 @@ end
 Kaiju.MaxOwned = 12 -- kaiju one player can keep
 
 -- A profile's roster, made if it has none: { List = { [id] = record },
--- Active = id (the one out), Next = the next id's number, Bugs = { Day, Coins } }.
+-- Team = { id } (the ones out, Kaiju.teamIds), Active = id (its lead), Next =
+-- the next id's number, Bugs = { Day, Coins } }.
 function Kaiju.roster(profile)
 	local roster = profile.Kaiju
 	if type(roster) ~= "table" then
@@ -595,9 +606,105 @@ function Kaiju.add(roster, speciesId: string, soul, level: number?)
 	return record
 end
 
--- The kaiju out with you (nil if none).
+-- The number in a kaiju's id ("k12" -> 12), for "oldest first".
+local function idNumber(id: string): number
+	return tonumber(string.match(id, "%d+")) or 0
+end
+
+-- Your team out, as ids in order (the first is its lead): kaiju you own,
+-- each once, as many as your slots, the ones you put out (roster.Team, else
+-- the one out from before) first; empty slots fill with your best others
+-- (highest level, then oldest).
+function Kaiju.teamIds(roster): { string }
+	local out, seen = {}, {}
+	if not roster or type(roster.List) ~= "table" then
+		return out
+	end
+	local slots = Kaiju.slots(roster)
+	local function take(id)
+		if #out < slots and type(id) == "string" and roster.List[id] and not seen[id] then
+			seen[id] = true
+			table.insert(out, id)
+		end
+	end
+	for _, id in (if type(roster.Team) == "table" then roster.Team else {}) do
+		take(id)
+	end
+	take(roster.Active)
+	local rest = {}
+	for id in roster.List do
+		if not seen[id] then
+			table.insert(rest, id)
+		end
+	end
+	table.sort(rest, function(a, b)
+		local ra, rb = roster.List[a], roster.List[b]
+		if (ra.Level or 1) ~= (rb.Level or 1) then
+			return (ra.Level or 1) > (rb.Level or 1)
+		end
+		return idNumber(a) < idNumber(b)
+	end)
+	for _, id in rest do
+		take(id)
+	end
+	return out
+end
+
+-- Your team out, as records in order.
+function Kaiju.team(roster): { any }
+	local out = {}
+	for _, id in Kaiju.teamIds(roster) do
+		table.insert(out, roster.List[id])
+	end
+	return out
+end
+
+-- Puts `ids` out (as Kaiju.teamIds tidies them); the first leads.
+function Kaiju.setTeam(roster, ids: { string })
+	roster.Team = ids
+	roster.Team = Kaiju.teamIds(roster)
+	roster.Active = roster.Team[1]
+end
+
+function Kaiju.inTeam(roster, id: string): boolean
+	return table.find(Kaiju.teamIds(roster), id) ~= nil
+end
+
+-- The kaiju leading your team (nil if none).
 function Kaiju.active(roster)
-	return roster and roster.Active and roster.List[roster.Active] or nil
+	local id = Kaiju.teamIds(roster)[1]
+	return if id then roster.List[id] else nil
+end
+
+-- How many starter kaiju a profile still has to roll (Kaiju.StarterTeam).
+function Kaiju.rollsOwed(profile): number
+	if not profile or profile.KaijuRolled then
+		return 0
+	end
+	return math.max(0, Kaiju.StarterTeam - Kaiju.count(profile.Kaiju))
+end
+
+-- Kinds and elements for `count` starter rolls: none the same as another or
+-- as one of `taken` (records already owned).
+function Kaiju.starterPicks(rng, count: number, taken: { any }?): { { Species: string, Element: string } }
+	local used = {}
+	for _, record in taken or {} do
+		used[tostring(record.Species) .. tostring(record.Element)] = true
+	end
+	local out = {}
+	for _ = 1, count do
+		local species, element
+		for _ = 1, 30 do
+			species = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
+			element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
+			if not used[species .. element] then
+				break
+			end
+		end
+		used[species .. element] = true
+		table.insert(out, { Species = species, Element = element })
+	end
+	return out
 end
 
 -- A stable display name, with the game's name for its element: "Cryo Razorback".

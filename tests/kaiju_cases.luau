@@ -146,9 +146,15 @@ check(lo >= 0.6 and hi <= 1.4 and lo < 0.65 and hi > 1.35, "Hits don't spread 60
 
 -- Team slots -------------------------------------------------------------------------------
 check(Kaiju.slots(nil) == 1 and Kaiju.slots({ List = {} }) == 1, "No starting slot")
+-- The beta opens all three from the start.
+check(Kaiju.slots({ List = { a = { Level = 1 } } }) == 3, "The beta doesn't open three slots at once")
+local betaSlots = Kaiju.SlotLevels
+Kaiju.SlotLevels = { 1, 10, 20 } -- (the plan for later)
 check(Kaiju.slots({ List = { a = { Level = 9 } } }) == 1, "A second slot before level 10")
 check(Kaiju.slots({ List = { a = { Level = 3 }, b = { Level = 10 } } }) == 2, "No second slot at level 10")
 check(Kaiju.slots({ List = { a = { Level = 30 } } }) == 3, "More than three slots, or none at 20")
+Kaiju.SlotLevels = betaSlots
+check(#Kaiju.TeamSpots >= #Kaiju.SlotLevels, "A team slot with nowhere to walk")
 
 -- Gemsouls ---------------------------------------------------------------------------------
 for _, element in Kaiju.Elements do
@@ -218,4 +224,54 @@ local kaiju =
 	Kaiju.new("k1", "Bulwark", Kaiju.rollSoul(Random.new(9), "Frost", { Id = "s", Time = 1, Species = "Bulwark" }))
 check(kaiju.Element == "Frost" and kaiju.Level == 1 and Kaiju.title(kaiju) == "Cryo Bulwark", "A new kaiju is wrong")
 
-print(string.format("PASS: %d kaiju rule checks (stats, EXP, feeding, taming, spread, slots, Gemsouls)", checks))
+-- Your team --------------------------------------------------------------------------------
+local function soulFor(element, id)
+	return Kaiju.rollSoul(Random.new(#id), element, { Id = id, Time = 1, Species = "Razorback" })
+end
+local profile = {}
+local roster = Kaiju.roster(profile)
+check(#Kaiju.teamIds(roster) == 0 and Kaiju.active(roster) == nil, "A team out with no kaiju")
+local k1 = Kaiju.add(roster, "Razorback", soulFor("Fire", "s1"))
+local k2 = Kaiju.add(roster, "Bulwark", soulFor("Frost", "s2"))
+local k3 = Kaiju.add(roster, "Carapace", soulFor("Shock", "s3"))
+local k4 = Kaiju.add(roster, "Razorback", soulFor("Toxic", "s4"))
+k4.Level = 7
+local ids = Kaiju.teamIds(roster)
+check(#ids == 3 and ids[1] == k1.Id, "The first kaiju doesn't lead a team of three")
+check(ids[2] == k4.Id and ids[3] == k2.Id, "Empty slots don't fill highest level, then oldest")
+check(Kaiju.inTeam(roster, k4.Id) and not Kaiju.inTeam(roster, k3.Id), "inTeam is wrong")
+Kaiju.setTeam(roster, { k3.Id, k3.Id, "nope", k2.Id })
+ids = Kaiju.teamIds(roster)
+check(ids[1] == k3.Id and ids[2] == k2.Id and #ids == 3, "setTeam didn't keep its order (once each, owned)")
+check(roster.Active == k3.Id and Kaiju.active(roster) == k3, "The lead isn't the first of the team")
+check(#roster.Team == 3, "setTeam didn't tidy the team it saved")
+roster.List[k3.Id] = nil
+check(Kaiju.teamIds(roster)[1] == k2.Id and #Kaiju.teamIds(roster) == 3, "A kaiju gone kept its place")
+check(#Kaiju.team(roster) == 3 and Kaiju.team(roster)[1] == k2, "Kaiju.team isn't the records in order")
+-- One out from before (Active, no Team) still leads.
+local before = { List = { k1 = { Id = "k1", Level = 9 }, k2 = { Id = "k2", Level = 2 } }, Active = "k2" }
+check(Kaiju.teamIds(before)[1] == "k2" and Kaiju.teamIds(before)[2] == "k1", "The one out from before lost the lead")
+
+-- The starter roll ---------------------------------------------------------------------------
+check(Kaiju.StarterTeam == 3, "Beta players don't start with three kaiju")
+check(Kaiju.rollsOwed({}) == 3 and Kaiju.rollsOwed(nil) == 0, "A new player isn't owed three")
+check(Kaiju.rollsOwed({ Kaiju = { List = { k1 = {} } } }) == 2, "A player from before with one isn't owed two")
+check(Kaiju.rollsOwed({ Kaiju = { List = { a = {}, b = {}, c = {}, d = {} } } }) == 0, "Owed with a full team")
+check(Kaiju.rollsOwed({ KaijuRolled = true }) == 0, "Owed again once rolled")
+for seed = 1, 40 do
+	local picks = Kaiju.starterPicks(Random.new(seed), 3, { { Species = "Bulwark", Element = "Fire" } })
+	check(#picks == 3, "Not three starter picks")
+	local used = { BulwarkFire = true }
+	for _, pick in picks do
+		check(Kaiju.Species[pick.Species] and table.find(Kaiju.Elements, pick.Element), "A starter pick isn't real")
+		check(not used[pick.Species .. pick.Element], "A starter pick repeats a kind and element")
+		used[pick.Species .. pick.Element] = true
+	end
+end
+
+print(
+	string.format(
+		"PASS: %d kaiju rule checks (stats, EXP, feeding, taming, spread, slots, Gemsouls, your team, the starter roll)",
+		checks
+	)
+)

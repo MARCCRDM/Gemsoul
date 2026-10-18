@@ -2,34 +2,45 @@
 	Your mini kaiju in the Outpost (Shared.Kaiju has the rules; see
 	docs/kaiju.md). Wild kaiju and moon bugs are KaijuWilds'.
 
-	  Your kaiju   out beside you whenever you're in the Outpost (in
-	               workspace.Kaiju). It follows you and takes on any creature
-	               that comes near you (wild kaiju and moon bugs), fighting
-	               as the Arena's duellist does (KaijuFighter): combos,
-	               heavies, guard and parry, hops, and its Gemsoul's E. At 0
-	               health it's knocked back into its Gemsoul, out again after
-	               Kaiju.KnockoutSeconds.
-	  A starter    everyone's first visit to the Outpost brings one: a
-	               random kind in a random element.
+	  Your team    up to three kaiju out beside you whenever you're in the
+	               Outpost (in workspace.Kaiju), each at its own spot by you
+	               (Kaiju.TeamSpots). They follow you and take on any
+	               creature that comes near you (wild kaiju and moon bugs),
+	               fighting as the Arena's duellist does (KaijuFighter):
+	               combos, heavies, guard and parry, hops, and their
+	               Gemsouls' moves. At 0 health one is knocked back into its
+	               Gemsoul, out again after Kaiju.KnockoutSeconds.
+	  The roll     everyone starts with Kaiju.StarterTeam kaiju, rolled (the
+	               intro's roll, or the Outpost's for a player from before):
+	               prepared here and saved, so a retry never rerolls, then
+	               claimed; a roll left unclaimed is given after
+	               Kaiju.RollGrace seconds in the Outpost.
 
 	Requests (Shop.register):
-	  "KaijuRecall"         back to you, out of the fight for Kaiju.RecallSeconds
-	  "KaijuActive", id     which of yours is out
-	  "KaijuFeed", { gemId }   feed it stones from your pouch (Kaiju.feedExp)
+	  "KaijuRecall"         the team back to you, out of the fight for Kaiju.RecallSeconds
+	  "KaijuTeam", { id }   which of yours are out (the first leads)
+	  "KaijuActive", id     this one out, leading (in the lead's place if it wasn't out)
+	  "KaijuFeed", { gemId }, id?   feed one of yours (the lead if no id)
+	                        stones from your pouch (Kaiju.feedExp)
+	  "KaijuRoll"           the starter roll owed: { Rolls = { { Species, Element, Soul } } }
+	  "KaijuRollClaim"      take it: the kaiju join you
 
-	Profile.Kaiju (Kaiju.roster) is in the profile snapshot. The one out
-	carries, for every client: KaijuOwner (UserId), KaijuId, KaijuName,
-	KaijuLevel, KaijuExp, KaijuExpNext, KaijuAbility, KaijuAbilityAt (server
-	time of its last E), KaijuRecallUntil, and its fight (KaijuFighter's
-	Action* and GuardUntil, HurtAt and BlockedAt, for CreatureAnimation);
-	and the Player carries KaijuDownUntil (server time it's back) while it's
-	knocked out.
+	Profile.Kaiju (Kaiju.roster), KaijuRoll and KaijuRolled are in the
+	profile snapshot (Kaiju.rollsOwed reads them). Each one out carries, for every client: KaijuOwner
+	(UserId), KaijuId, KaijuSlot, KaijuName, KaijuLevel, KaijuExp,
+	KaijuExpNext, KaijuAbility, KaijuAbilityAt (server time of its last E),
+	KaijuQ, KaijuR and their *At, KaijuRecallUntil, and its fight
+	(KaijuFighter's Action* and GuardUntil, HurtAt and BlockedAt, for
+	CreatureAnimation); and the Player carries KaijuDown_<id> (server time
+	it's back) for each one knocked out, and KaijuDownUntil (the last).
 
 	KaijuWilds asks here:
-	  KaijuServer.pets()                     every kaiju out, by owner
+	  KaijuServer.all()                      every kaiju out
+	  KaijuServer.team(player)               a player's kaiju out, in team order
+	  KaijuServer.pets()                     each player's lead out, by owner
 	  KaijuServer.petOf(model)               the pet a model is
 	  KaijuServer.hurt(pet, amount, element, status?, heavy?) -> outcome   a creature's blow
-	  KaijuServer.reward(player, exp)        EXP for the kaiju out
+	  KaijuServer.reward(player, exp)        EXP for each kaiju out
 	  KaijuServer.adopt(player, species, soul, level) -> record?   a tamed one
 ]]
 local Players = game:GetService("Players")
@@ -86,12 +97,16 @@ export type Pet = {
 	IdleSpot: Vector3?,
 	IdleSince: number?,
 	Plan: any?,
+	Slot: number, -- its place in the team (Kaiju.TeamSpots)
 }
 
-local pets: { [Player]: Pet } = {}
+-- The kaiju out, by player and kaiju id.
+local teams: { [Player]: { [string]: Pet } } = {}
 local rng = Random.new()
--- Knocked out: back at this os.clock(), by player.
-local downUntil: { [Player]: number } = {}
+-- Knocked out: back at this os.clock(), by player and kaiju id.
+local downUntil: { [Player]: { [string]: number } } = {}
+-- When a player owing a starter roll was first seen in the Outpost.
+local owedSince: { [Player]: number } = {}
 -- A pet's health between its trips out (a recall or a walk to the Arena
 -- doesn't heal it), by player and kaiju id.
 local kept: { [Player]: { [string]: number } } = {}
@@ -253,21 +268,44 @@ end
 
 -- Out and back ------------------------------------------------------------------------------------
 
-local function despawn(player: Player)
-	local pet = pets[player]
-	if not pet then
-		return
+-- A player's kaiju out, in team order.
+local function petsOf(player: Player): { Pet }
+	local list = {}
+	for _, pet in teams[player] or {} do
+		table.insert(list, pet)
 	end
-	pets[player] = nil
-	if pet.Humanoid.Health > 0 then
-		kept[player] = kept[player] or {}
-		kept[player][pet.Record.Id] = pet.Humanoid.Health
-	end
-	KaijuFighter.forget(pet.Fighter)
-	pet.Model:Destroy()
+	table.sort(list, function(a, b)
+		return a.Slot < b.Slot
+	end)
+	return list
 end
 
-local function spawnPet(player: Player, record): Pet?
+-- Puts one of `player`'s kaiju away (`id`), or all of them.
+local function despawn(player: Player, id: string?)
+	local out = teams[player]
+	if not out then
+		return
+	end
+	for petId, pet in out do
+		if id == nil or petId == id then
+			out[petId] = nil
+			if pet.Humanoid.Health > 0 then
+				kept[player] = kept[player] or {}
+				kept[player][pet.Record.Id] = pet.Humanoid.Health
+			end
+			KaijuFighter.forget(pet.Fighter)
+			pet.Model:Destroy()
+		end
+	end
+end
+
+-- Where a kaiju in `slot` walks beside `root` (Kaiju.TeamSpots).
+local function spotBy(root: BasePart, slot: number): Vector3
+	local spot = Kaiju.TeamSpots[slot] or Kaiju.TeamSpots[1]
+	return root.Position + root.CFrame.RightVector * spot[1] - root.CFrame.LookVector * spot[2]
+end
+
+local function spawnPet(player: Player, record, slot: number): Pet?
 	local root = rootOf(player)
 	if not root then
 		return nil
@@ -276,6 +314,7 @@ local function spawnPet(player: Player, record): Pet?
 	model.Name = player.Name .. "Kaiju"
 	model:SetAttribute("KaijuOwner", player.UserId)
 	model:SetAttribute("KaijuId", record.Id)
+	model:SetAttribute("KaijuSlot", slot)
 	model:SetAttribute("KaijuName", Kaiju.title(record))
 	local ability = Kaiju.ability(record.Soul)
 	model:SetAttribute("KaijuAbility", ability)
@@ -303,6 +342,7 @@ local function spawnPet(player: Player, record): Pet?
 		Dots = {},
 		Fill = nil :: any,
 		Label = nil :: any,
+		Slot = slot,
 	}
 	pet.Fighter = KaijuFighter.new({
 		Model = model,
@@ -327,11 +367,11 @@ local function spawnPet(player: Player, record): Pet?
 	humanoid.Health = math.clamp(health or pet.Stats.Health, 1, pet.Stats.Health)
 	nameplate(pet)
 	refresh(pet)
-	local side = root.CFrame.RightVector * 3 - root.CFrame.LookVector * 3
-	KaijuServer.place(model, root.Position + side, root.Position + root.CFrame.LookVector * 10)
+	KaijuServer.place(model, spotBy(root, slot), root.Position + root.CFrame.LookVector * 10)
 	model.Parent = folder
 	pcall(petRoot.SetNetworkOwner, petRoot, nil)
-	pets[player] = pet
+	teams[player] = teams[player] or {}
+	teams[player][record.Id] = pet
 	return pet
 end
 
@@ -346,30 +386,85 @@ local function canBeOut(player: Player): boolean
 		and aliveOf(player)
 end
 
--- Everyone's first kaiju.
-local function grantStarter(player: Player)
-	local profile = PlayerData.get(player)
-	if not profile or (profile :: any).KaijuStarter then
-		return
+-- The starter roll -------------------------------------------------------------------------------
+
+-- The roll a profile is owed (Kaiju.rollsOwed), made once and saved, so a
+-- retry or a rejoin shows the same kaiju: { Rolls = { { Species, Element,
+-- Soul } } }. Nil if none is owed.
+local function prepareRoll(profile)
+	local p = profile :: any
+	local roll = p.KaijuRoll
+	if type(roll) == "table" and type(roll.Rolls) == "table" and #roll.Rolls > 0 and not p.KaijuRolled then
+		return roll
+	end
+	local owed = Kaiju.rollsOwed(profile)
+	if owed <= 0 then
+		return nil
 	end
 	local roster = Kaiju.roster(profile)
-	if Kaiju.count(roster) > 0 then
-		(profile :: any).KaijuStarter = true
-		return
+	local owned = {}
+	for _, record in roster.List do
+		table.insert(owned, record)
 	end
-	local rng = Gems.random()
-	local species = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
-	local element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
-	local soul = Kaiju.rollSoul(rng, element, { Id = PlayerData.newGemId(), Time = os.time(), Species = species })
-	local record = Kaiju.add(roster, species, soul, Kaiju.StarterLevel);
-	(profile :: any).KaijuStarter = true
+	local random = Gems.random()
+	roll = { Rolls = {} }
+	for _, pick in Kaiju.starterPicks(random, owed, owned) do
+		local soul = Kaiju.rollSoul(
+			random,
+			pick.Element,
+			{ Id = PlayerData.newGemId(), Time = os.time(), Species = pick.Species }
+		)
+		table.insert(roll.Rolls, { Species = pick.Species, Element = pick.Element, Soul = soul })
+	end
+	p.KaijuRoll = roll
+	return roll
+end
+
+-- Takes the roll: its kaiju join `player`. Returns the records added.
+local function claimRoll(player: Player): { any }
+	local profile = PlayerData.get(player)
+	local roll = profile and prepareRoll(profile)
+	if not profile or not roll then
+		return {}
+	end
+	local roster = Kaiju.roster(profile)
+	local added = {}
+	for _, entry in roll.Rolls do
+		local record = Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel)
+		if record then
+			table.insert(added, record)
+		end
+	end
+	local p = profile :: any
+	p.KaijuRoll, p.KaijuRolled, p.KaijuStarter = nil, true, true
+	Kaiju.setTeam(roster, Kaiju.teamIds(roster))
+	owedSince[player] = nil
 	PlayerData.sync(player)
-	if record then
+	if #added > 0 then
+		local names = {}
+		for _, record in added do
+			table.insert(names, Kaiju.title(record))
+		end
 		Remotes.Notify:FireClient(
 			player,
-			string.format("Meet your kaiju: %s! It fights beside you in the Outpost.", Kaiju.title(record))
+			string.format("Meet your kaiju: %s! They fight beside you in the Outpost.", table.concat(names, ", "))
 		)
 	end
+	return added
+end
+
+-- Knockouts --------------------------------------------------------------------------------------------
+
+-- The HUD's knockout times: KaijuDown_<id> for each one down, and
+-- KaijuDownUntil the last of them.
+local function showDown(player: Player)
+	local last = nil
+	for id, at in downUntil[player] or {} do
+		local back = serverNow() + (at - os.clock())
+		player:SetAttribute("KaijuDown_" .. id, back)
+		last = math.max(last or back, back)
+	end
+	player:SetAttribute("KaijuDownUntil", last)
 end
 
 -- Puts the right kaiju out (or away) for `player`.
@@ -378,24 +473,46 @@ local function upkeep(player: Player, now: number)
 	if not profile then
 		return
 	end
-	if player:GetAttribute("Outpost") == true then
-		grantStarter(player)
+	-- A roll left unclaimed: given after a while in the Outpost.
+	if player:GetAttribute("Outpost") == true and Kaiju.rollsOwed(profile) > 0 then
+		owedSince[player] = owedSince[player] or now
+		if now - owedSince[player] >= Kaiju.RollGrace then
+			claimRoll(player)
+		end
 	end
-	local record = Kaiju.active(profile.Kaiju)
 	local down = downUntil[player]
-	if down and now >= down then
-		downUntil[player] = nil
-		player:SetAttribute("KaijuDownUntil", nil)
-		down = nil
+	for id, at in down or {} do
+		if now >= at then
+			down[id] = nil
+			player:SetAttribute("KaijuDown_" .. id, nil)
+			showDown(player)
+		end
 	end
-	local pet = pets[player]
-	local want = record ~= nil and down == nil and canBeOut(player)
-	if pet and (not want or pet.Record ~= record or not pet.Model.Parent) then
-		despawn(player)
-		pet = nil
+	local roster = profile.Kaiju
+	local want = {}
+	if roster and canBeOut(player) then
+		for slot, id in Kaiju.teamIds(roster) do
+			if not (down and down[id]) then
+				want[id] = slot
+			end
+		end
 	end
-	if want and not pet then
-		spawnPet(player, record)
+	for id, pet in teams[player] or {} do
+		if not want[id] or pet.Record ~= roster.List[id] or not pet.Model.Parent then
+			despawn(player, id)
+		end
+	end
+	for id, slot in want do
+		local pet = teams[player] and teams[player][id]
+		if pet then
+			if pet.Slot ~= slot then
+				pet.Slot = slot
+				pet.IdleSpot = nil
+				pet.Model:SetAttribute("KaijuSlot", slot)
+			end
+		else
+			spawnPet(player, roster.List[id], slot)
+		end
 	end
 end
 
@@ -517,14 +634,18 @@ end
 local function knockOut(pet: Pet)
 	local player = pet.Owner
 	fx("TriadBreak", pet.Root.Position, 4, pet.Element)
+	local id = pet.Record.Id
 	if kept[player] then
-		kept[player][pet.Record.Id] = nil
+		kept[player][id] = nil
 	end
-	pets[player] = nil
+	if teams[player] and teams[player][id] == pet then
+		teams[player][id] = nil
+	end
 	KaijuFighter.forget(pet.Fighter)
 	pet.Model:Destroy()
-	downUntil[player] = os.clock() + Kaiju.KnockoutSeconds
-	player:SetAttribute("KaijuDownUntil", serverNow() + Kaiju.KnockoutSeconds)
+	downUntil[player] = downUntil[player] or {}
+	downUntil[player][id] = os.clock() + Kaiju.KnockoutSeconds
+	showDown(player)
 	Remotes.Notify:FireClient(
 		player,
 		string.format(
@@ -695,9 +816,7 @@ end
 
 local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean, now: number)
 	local h = pet.Humanoid
-	local gap = Kaiju.Follow.Gap
-	local offset = ownerRoot.CFrame.RightVector * 3 - ownerRoot.CFrame.LookVector * gap
-	local spot = ownerRoot.Position + offset
+	local spot = spotBy(ownerRoot, pet.Slot)
 	if not recalled and potter(pet, spot, now) then
 		return
 	end
@@ -743,8 +862,7 @@ local function think(pet: Pet, now: number, dt: number)
 	if away > Kaiju.Follow.Teleport then
 		pet.Target = nil
 		KaijuFighter.calm(pet.Fighter)
-		local side = ownerRoot.CFrame.RightVector * 3 - ownerRoot.CFrame.LookVector * 3
-		KaijuServer.place(pet.Model, ownerRoot.Position + side, ownerRoot.Position)
+		KaijuServer.place(pet.Model, spotBy(ownerRoot, pet.Slot), ownerRoot.Position)
 		return
 	end
 	local recalled = now < pet.RecallUntil
@@ -768,12 +886,31 @@ end
 
 -- For KaijuWilds ---------------------------------------------------------------------------------------
 
+-- Every kaiju out.
+function KaijuServer.all(): { Pet }
+	local list = {}
+	for _, out in teams do
+		for _, pet in out do
+			table.insert(list, pet)
+		end
+	end
+	return list
+end
+
+-- A player's kaiju out, in team order.
+KaijuServer.team = petsOf
+
+-- Each player's lead out (the first of their team out), by owner.
 function KaijuServer.pets(): { [Player]: Pet }
-	return pets
+	local leads = {}
+	for player in teams do
+		leads[player] = petsOf(player)[1]
+	end
+	return leads
 end
 
 function KaijuServer.petOf(model: Instance?): Pet?
-	for _, pet in pets do
+	for _, pet in KaijuServer.all() do
 		if pet.Model == model then
 			return pet
 		end
@@ -786,35 +923,57 @@ function KaijuServer.targetable(pet: Pet): boolean
 	return pet.Model.Parent ~= nil and pet.Humanoid.Health > 0 and os.clock() >= pet.RecallUntil
 end
 
--- EXP for `player`'s kaiju out (a kill, a moon bug). Its level and EXP show
--- on its model at once; the profile's copy reaches the client on a level-up.
+-- EXP for each of `player`'s kaiju out (a kill, a moon bug), or for its
+-- lead if none is out (knocked out just as the kill landed). Their level
+-- and EXP show on their models at once; the profile's copy reaches the
+-- client on a level-up.
 function KaijuServer.reward(player: Player, exp: number)
 	local profile = PlayerData.get(player)
-	local record = profile and Kaiju.active(profile.Kaiju)
-	if not record or exp <= 0 then
+	if not profile or exp <= 0 then
 		return
 	end
-	local gained = Kaiju.addExp(record, exp)
-	local pet = pets[player]
-	if pet and pet.Record == record then
-		refresh(pet)
-	end
-	if gained > 0 then
-		PlayerData.sync(player)
-		Remotes.Notify:FireClient(player, string.format("%s reached level %d!", Kaiju.title(record), record.Level))
-		if pet then
-			fx("TriadBreak", pet.Root.Position, 5, pet.Element)
+	local out = petsOf(player)
+	local records = {}
+	for _, pet in out do
+		if pet.Humanoid.Health > 0 then
+			table.insert(records, pet.Record)
 		end
+	end
+	if #records == 0 then
+		local lead = Kaiju.active(profile.Kaiju)
+		if lead then
+			table.insert(records, lead)
+		end
+	end
+	local levelled = false
+	for _, record in records do
+		local gained = Kaiju.addExp(record, exp)
+		local pet = teams[player] and teams[player][record.Id]
+		if pet and pet.Record == record then
+			refresh(pet)
+		end
+		if gained > 0 then
+			levelled = true
+			Remotes.Notify:FireClient(player, string.format("%s reached level %d!", Kaiju.title(record), record.Level))
+			if pet then
+				fx("TriadBreak", pet.Root.Position, 5, pet.Element)
+			end
+		end
+	end
+	if levelled then
+		PlayerData.sync(player)
 	end
 end
 
 -- A rock `player` broke with their kaiju out beside them (OutpostServer's
--- onRockMined): a little EXP for it (Kaiju.mineExp). Nothing while it's
+-- onRockMined): a little EXP for each (Kaiju.mineExp). Nothing while they're
 -- down or put away.
 function KaijuServer.mined(player: Player, size: string)
-	local pet = pets[player]
-	if pet and pet.Humanoid.Health > 0 then
-		KaijuServer.reward(player, Kaiju.mineExp(size))
+	for _, pet in petsOf(player) do
+		if pet.Humanoid.Health > 0 then
+			KaijuServer.reward(player, Kaiju.mineExp(size))
+			return
+		end
 	end
 end
 
@@ -835,49 +994,104 @@ end
 -- Requests -----------------------------------------------------------------------------------------
 
 local function recall(player: Player)
-	local pet = pets[player]
-	if not pet then
-		return reply(false, "Your kaiju isn't out.")
+	local out = petsOf(player)
+	if #out == 0 then
+		return reply(false, "Your kaiju aren't out.")
 	end
 	local now = os.clock()
-	pet.RecallUntil = now + Kaiju.RecallSeconds
-	pet.Target = nil
-	pet.Model:SetAttribute("KaijuRecallUntil", serverNow() + Kaiju.RecallSeconds)
+	for _, pet in out do
+		pet.RecallUntil = now + Kaiju.RecallSeconds
+		pet.Target = nil
+		pet.Model:SetAttribute("KaijuRecallUntil", serverNow() + Kaiju.RecallSeconds)
+	end
 	return reply(true, "")
 end
 
+-- Puts `ids` out as the team (the first leads): only your own, not while
+-- one of them is mid-fight, and not twice in a moment.
+local function changeTeam(player: Player, ids: { string }): (boolean, string)
+	local profile = PlayerData.get(player)
+	local roster = profile and Kaiju.roster(profile)
+	if not roster then
+		return false, "That kaiju isn't yours."
+	end
+	local before = Kaiju.teamIds(roster)
+	local check = { List = roster.List, Team = ids, Next = roster.Next }
+	local after = Kaiju.teamIds(check)
+	if table.concat(before, ",") == table.concat(after, ",") then
+		return true, ""
+	end
+	local now = os.clock()
+	if lastSwitch[player] and now - lastSwitch[player] < 3 then
+		return false, "One moment."
+	end
+	for _, pet in petsOf(player) do
+		if now - pet.LastFight < 3 and not table.find(after, pet.Record.Id) then
+			return false, "Not in the middle of a fight."
+		end
+	end
+	lastSwitch[player] = now
+	Kaiju.setTeam(roster, after)
+	PlayerData.sync(player)
+	upkeep(player, now)
+	return true, ""
+end
+
+local function setTeam(player: Player, ids: any)
+	if type(ids) ~= "table" or #ids == 0 or #ids > #Kaiju.SlotLevels then
+		return reply(false, "Pick your team.")
+	end
+	local profile = PlayerData.get(player)
+	local roster = profile and Kaiju.roster(profile)
+	local seen = {}
+	for _, id in ids do
+		if type(id) ~= "string" or not (roster and roster.List[id]) or seen[id] then
+			return reply(false, "That kaiju isn't yours.")
+		end
+		seen[id] = true
+	end
+	local ok, message = changeTeam(player, ids)
+	return reply(ok, if ok then "Your team is out." else message)
+end
+
+-- `id` out, leading: moved to the front, or into the lead's place if it
+-- wasn't out.
 local function setActive(player: Player, id: any)
 	local profile = PlayerData.get(player)
 	local roster = profile and Kaiju.roster(profile)
 	if not roster or type(id) ~= "string" or not roster.List[id] then
 		return reply(false, "That kaiju isn't yours.")
 	end
-	if roster.Active == id then
+	local ids = Kaiju.teamIds(roster)
+	if ids[1] == id then
 		return reply(true, "")
 	end
-	local now = os.clock()
-	if lastSwitch[player] and now - lastSwitch[player] < 3 then
-		return reply(false, "One moment.")
+	local at = table.find(ids, id)
+	if at then
+		table.remove(ids, at)
+	else
+		table.remove(ids, 1)
 	end
-	local pet = pets[player]
-	if pet and now - pet.LastFight < 3 then
-		return reply(false, "Not in the middle of a fight.")
+	table.insert(ids, 1, id)
+	local ok, message = changeTeam(player, ids)
+	if not ok then
+		return reply(false, message)
 	end
-	lastSwitch[player] = now
-	roster.Active = id
-	despawn(player)
-	PlayerData.sync(player)
-	upkeep(player, now)
 	return reply(true, string.format("%s is out.", Kaiju.title(roster.List[id])))
 end
 
 local MAX_FEED = Kaiju.FeedBatch
 
-local function feed(player: Player, ids: any)
+local function feed(player: Player, ids: any, kaijuId: any)
 	local profile = PlayerData.get(player)
-	local record = profile and Kaiju.active(profile.Kaiju)
+	local roster = profile and profile.Kaiju
+	local record = if type(kaijuId) == "string" and roster and roster.List then roster.List[kaijuId] else nil
+	if kaijuId ~= nil and not record then
+		return reply(false, "That kaiju isn't yours.")
+	end
+	record = record or (profile and Kaiju.active(roster))
 	if not record then
-		return reply(false, "You have no kaiju out to feed.")
+		return reply(false, "You have no kaiju to feed.")
 	end
 	if type(ids) ~= "table" or #ids == 0 or #ids > MAX_FEED then
 		return reply(false, string.format("Pick 1 to %d stones.", MAX_FEED))
@@ -903,7 +1117,7 @@ local function feed(player: Player, ids: any)
 	if eaten == 0 then
 		return reply(false, "Those stones aren't in your pouch.")
 	end
-	local pet = pets[player]
+	local pet = teams[player] and teams[player][record.Id]
 	if pet and pet.Record == record then
 		refresh(pet)
 		fx("TriadBreak", pet.Root.Position, 3, pet.Element)
@@ -917,9 +1131,31 @@ local function feed(player: Player, ids: any)
 	return reply(true, message, { Exp = total, Levels = levels, Level = record.Level })
 end
 
+-- The starter roll owed, made now if it wasn't: what the reveal shows.
+local function rollRequest(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	local roll = prepareRoll(profile)
+	if not roll then
+		return reply(true, "", { Rolls = {} })
+	end
+	return reply(true, "", { Rolls = roll.Rolls })
+end
+
+local function rollClaim(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	local added = claimRoll(player)
+	return reply(true, "", { Added = #added })
+end
+
 local function left(player: Player)
 	despawn(player)
-	pets[player], downUntil[player], kept[player], lastSwitch[player] = nil, nil, nil, nil
+	teams[player], downUntil[player], kept[player], lastSwitch[player], owedSince[player] = nil, nil, nil, nil, nil
 end
 
 function KaijuServer.start()
@@ -927,8 +1163,11 @@ function KaijuServer.start()
 	folder.Name = "Kaiju"
 	folder.Parent = workspace
 	Shop.register("KaijuRecall", recall)
+	Shop.register("KaijuTeam", setTeam)
 	Shop.register("KaijuActive", setActive)
 	Shop.register("KaijuFeed", feed)
+	Shop.register("KaijuRoll", rollRequest)
+	Shop.register("KaijuRollClaim", rollClaim)
 	Players.PlayerRemoving:Connect(left)
 	local thinkTimer, upkeepTimer = 0, 0
 	RunService.Heartbeat:Connect(function(dt)
@@ -947,7 +1186,7 @@ function KaijuServer.start()
 		if thinkTimer >= 0.15 then
 			local step = thinkTimer
 			thinkTimer = 0
-			for _, pet in pets do
+			for _, pet in KaijuServer.all() do
 				local ok, err = pcall(think, pet, now, step)
 				if not ok then
 					warn("[Kaiju] think:", err)
@@ -959,7 +1198,8 @@ end
 
 -- For tests.
 KaijuServer._upkeep, KaijuServer._think, KaijuServer._feed = upkeep, think, feed
-KaijuServer._recall, KaijuServer._setActive, KaijuServer._grantStarter = recall, setActive, grantStarter
+KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
 KaijuServer._despawn, KaijuServer._fair = despawn, fair
+KaijuServer._prepareRoll, KaijuServer._claimRoll = prepareRoll, claimRoll
 
 return KaijuServer

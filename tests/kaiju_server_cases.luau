@@ -682,22 +682,56 @@ KaijuWilds.start({
 })
 local kaijuFolder = workspaceObject:FindFirstChild("Kaiju")
 check(kaijuFolder ~= nil, "No Kaiju folder")
-for _, name in { "KaijuRecall", "KaijuActive", "KaijuFeed", "KaijuTame" } do
+for _, name in { "KaijuRecall", "KaijuTeam", "KaijuActive", "KaijuFeed", "KaijuTame", "KaijuRoll", "KaijuRollClaim" } do
 	check(registered[name] ~= nil, name .. " isn't a request")
 end
 
--- The starter: the first visit brings one, once.
+-- The starter roll: three kaiju, made once (asking again shows the same),
+-- never the same kind and element twice; claimed, they all come out.
 KaijuServer._upkeep(a, now)
-local roster = profiles[a].Kaiju
-check(roster and Kaiju.count(roster) == 1 and profiles[a].KaijuStarter, "No starter kaiju")
+local roster = Kaiju.roster(profiles[a])
+check(Kaiju.count(roster) == 0 and Kaiju.rollsOwed(profiles[a]) == Kaiju.StarterTeam, "A kaiju before the roll")
+do
+	local rolled = registered.KaijuRoll(a)
+	check(rolled.Ok and #rolled.Rolls == Kaiju.StarterTeam, "No starter roll")
+	local rolledKinds = {}
+	for _, entry in rolled.Rolls do
+		check(
+			Kaiju.Species[entry.Species] and Kaiju.isSoul(entry.Soul) and entry.Soul.Element == entry.Element,
+			"A bad roll"
+		)
+		check(not rolledKinds[entry.Species .. entry.Element], "The same kaiju rolled twice")
+		rolledKinds[entry.Species .. entry.Element] = true
+	end
+	check(registered.KaijuRoll(a).Rolls[1].Soul.Id == rolled.Rolls[1].Soul.Id, "Asking again rerolled")
+	check(Kaiju.count(roster) == 0, "Rolling gave kaiju before the claim")
+	check(registered.KaijuRollClaim(a).Ok, "Couldn't claim the roll")
+	check(
+		Kaiju.count(roster) == 3 and profiles[a].KaijuRolled and Kaiju.rollsOwed(profiles[a]) == 0,
+		"The roll didn't join you"
+	)
+	check(noted(a, "Meet your kaiju"), "Nobody told them about their kaiju")
+	check(#registered.KaijuRoll(a).Rolls == 0 and registered.KaijuRollClaim(a).Added == 0, "A second roll")
+	KaijuServer._upkeep(a, now)
+	local team = KaijuServer.team(a)
+	check(#team == 3, "Not three out: " .. #team)
+	for slot, member in team do
+		check(member.Slot == slot and member.Model:GetAttribute("KaijuSlot") == slot, "The team's places are wrong")
+		check((member.Root.Position - rootA.Position).Magnitude < 12, "One came out far from its owner")
+	end
+	check(#KaijuServer.all() == 3 and KaijuServer.pets()[a] == team[1], "all() or the lead is wrong")
+end
 local starter = Kaiju.active(roster)
 check(starter.Level == 1 and Kaiju.isSoul(starter.Soul) and starter.Soul.Element == starter.Element, "A bad starter")
-check(noted(a, "Meet your kaiju"), "Nobody told them about their kaiju")
+check(roster.Active == starter.Id and Kaiju.teamIds(roster)[1] == starter.Id, "The lead isn't the team's first")
+-- (The checks below follow one kaiju out: one slot, till "Your team" at the end.)
+Kaiju.SlotLevels = { 1 }
 KaijuServer._upkeep(a, now)
-check(Kaiju.count(roster) == 1, "A second starter")
+check(#KaijuServer.team(a) == 1, "One slot, more than one out")
 local pet = KaijuServer.pets()[a]
 check(pet and pet.Model.Parent == kaijuFolder, "The kaiju isn't out")
 check(pet.Model:GetAttribute("KaijuOwner") == 1 and pet.Model:GetAttribute("KaijuLevel") == 1, "Its attributes")
+check(pet.Record == starter, "The lead isn't the one out")
 check(pet.Humanoid.MaxHealth == Kaiju.stats(starter.Species, 1, starter.Soul.Tier).Health, "Its health")
 check((pet.Root.Position - rootA.Position).Magnitude < 10, "It came out far from its owner")
 check(KaijuServer.petOf(pet.Model) == pet, "petOf doesn't find it")
@@ -734,6 +768,7 @@ table.clear(notes)
 KaijuServer.hurt(pet, 1e6, nil, nil)
 check(KaijuServer.pets()[a] == nil and pet.Model.Parent == nil, "Not knocked out at 0")
 check(a:GetAttribute("KaijuDownUntil") == now + Kaiju.KnockoutSeconds, "No knockout time for the HUD")
+check(a:GetAttribute("KaijuDown_" .. starter.Id) == now + Kaiju.KnockoutSeconds, "No knockout time for its tile")
 check(noted(a, "knocked out"), "Not told it was knocked out")
 KaijuServer._upkeep(a, now + 5)
 check(KaijuServer.pets()[a] == nil, "Back before its time")
@@ -744,6 +779,7 @@ check(
 	pet and pet.Humanoid.Health == pet.Humanoid.MaxHealth and a:GetAttribute("KaijuDownUntil") == nil,
 	"Not back, whole"
 )
+check(a:GetAttribute("KaijuDown_" .. starter.Id) == nil, "Its tile still says it's down")
 
 -- Recall.
 check(registered.KaijuRecall(a).Ok and pet.RecallUntil == now + Kaiju.RecallSeconds, "Recall didn't take")
@@ -2222,6 +2258,107 @@ local function minedWithIt()
 end
 minedWithIt()
 
+-- Your team --------------------------------------------------------------------------------------------------
+-- Three slots again: three out at once, each in its place; one knocked out
+-- leaves the others out; recall brings them all; EXP for each; a team set
+-- and led as you like (only your own, not in a rush, not mid-fight); any of
+-- yours fed; and a roll left unclaimed given after a while in the Outpost.
+local function yourTeam()
+	Kaiju.SlotLevels = { 1, 1, 1 }
+	for _, key in { "CombatSession", "MatchId", "DungeonId", "Expedition", "Hunt", "Spar" } do
+		a:SetAttribute(key, nil)
+	end
+	a:SetAttribute("Outpost", true)
+	now += 10
+	KaijuServer._upkeep(a, now)
+	local squad = KaijuServer.team(a)
+	check(#squad == 3, "Three slots, not three out: " .. #squad)
+	local squadIds = Kaiju.teamIds(roster)
+	for slot, member in squad do
+		check(member.Slot == slot and member.Record.Id == squadIds[slot], "The team out isn't the team")
+	end
+	-- One knocked out: the others stay out; it's back after its time.
+	local downed = squad[2]
+	KaijuServer.hurt(downed, 1e9, nil, nil)
+	KaijuServer._upkeep(a, now)
+	local left = KaijuServer.team(a)
+	check(#left == 2 and not table.find(left, downed), "A knockout took the others away")
+	check(a:GetAttribute("KaijuDown_" .. downed.Record.Id) ~= nil, "No knockout time for its tile")
+	now += Kaiju.KnockoutSeconds + 1
+	KaijuServer._upkeep(a, now)
+	squad = KaijuServer.team(a)
+	check(#squad == 3 and a:GetAttribute("KaijuDownUntil") == nil, "It didn't come back to the team")
+	-- Recall: all of them.
+	check(registered.KaijuRecall(a).Ok, "No recall")
+	for _, member in squad do
+		check(member.RecallUntil == now + Kaiju.RecallSeconds, "Recall missed one of the team")
+	end
+	now += Kaiju.RecallSeconds + 0.1
+	-- EXP: each one out gets it.
+	local before = {}
+	for _, member in squad do
+		before[member] = member.Record.Level * 100000 + (member.Record.Exp or 0)
+	end
+	KaijuServer.reward(a, 15)
+	for _, member in squad do
+		check(member.Record.Level * 100000 + (member.Record.Exp or 0) > before[member], "A kaiju out got no EXP")
+	end
+	-- The team as you set it: the first leads.
+	local order = { squadIds[3], squadIds[1], squadIds[2] }
+	now += 5
+	check(registered.KaijuTeam(a, order).Ok, "Couldn't set the team")
+	check(KaijuServer.team(a)[1].Record.Id == squadIds[3] and roster.Active == squadIds[3], "The new lead isn't first")
+	check(not registered.KaijuTeam(a, squadIds).Ok, "Changed the team twice in a moment")
+	now += 5
+	check(not registered.KaijuTeam(a, { "nope" }).Ok, "Put out a kaiju they don't own")
+	check(not registered.KaijuTeam(a, { order[1], order[1] }).Ok, "Put the same kaiju out twice")
+	check(not registered.KaijuTeam(a, { order[1], order[2], order[3], order[1] }).Ok, "Four out")
+	local bench
+	for id in roster.List do
+		if not table.find(Kaiju.teamIds(roster), id) then
+			bench = id
+		end
+	end
+	check(bench ~= nil, "No kaiju left at home to test with")
+	-- Swapping one mid-fight out: refused; once it's calm, done.
+	KaijuServer.team(a)[3].LastFight = now
+	check(not registered.KaijuTeam(a, { order[1], order[2], bench }).Ok, "Swapped one out mid-fight")
+	KaijuServer.team(a)[3].LastFight = now - 10
+	check(registered.KaijuTeam(a, { order[1], order[2], bench }).Ok, "Couldn't swap one in from home")
+	check(Kaiju.teamIds(roster)[3] == bench and #KaijuServer.team(a) == 3, "The one from home didn't come out")
+	-- KaijuActive: one from home into the lead's place.
+	now += 5
+	local home = order[3]
+	check(registered.KaijuActive(a, home).Ok, "Couldn't lead with one from home")
+	check(Kaiju.teamIds(roster)[1] == home and not Kaiju.inTeam(roster, order[1]), "It didn't take the lead's place")
+	-- Feeding any of yours: one at home too.
+	local resting
+	for id in roster.List do
+		if not Kaiju.inTeam(roster, id) then
+			resting = roster.List[id]
+		end
+	end
+	table.insert(
+		profiles[a].Gems,
+		{ Id = "t1", Tier = "Rare", Element = resting.Element, Size = 5, Clarity = 5, Cut = 5 }
+	)
+	local restingBefore = resting.Level * 100000 + (resting.Exp or 0)
+	check(registered.KaijuFeed(a, { "t1" }, resting.Id).Ok, "Couldn't feed one at home")
+	check(resting.Level * 100000 + (resting.Exp or 0) > restingBefore, "The one at home didn't eat")
+	check(not registered.KaijuFeed(a, { "t1" }, "nope").Ok, "Fed a kaiju they don't own")
+	-- A roll left unclaimed: given after a while in the Outpost.
+	table.clear(notes)
+	b:SetAttribute("Outpost", true)
+	KaijuServer._upkeep(b, now)
+	check(Kaiju.count(profiles[b].Kaiju) == 0 and Kaiju.rollsOwed(profiles[b]) == 3, "Given the roll at once")
+	KaijuServer._upkeep(b, now + Kaiju.RollGrace + 1)
+	check(Kaiju.count(profiles[b].Kaiju) == 3 and profiles[b].KaijuRolled, "An unclaimed roll was never given")
+	check(noted(b, "Meet your kaiju"), "Not told about the kaiju given")
+	b:SetAttribute("Outpost", nil)
+	KaijuServer._despawn(b)
+end
+yourTeam()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do
@@ -2236,7 +2373,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian, a wild kaiju's day)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian, a wild kaiju's day)",
 		checks
 	)
 )

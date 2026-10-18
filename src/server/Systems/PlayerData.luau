@@ -649,6 +649,8 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Market = profile.Market, -- listings and offers in escrow (see MarketBoard)
 		Presets = (profile :: any).Presets, -- saved gear setups (see Presets)
 		Kaiju = (profile :: any).Kaiju, -- your mini kaiju (Shared.Kaiju.roster, KaijuServer)
+		KaijuRoll = (profile :: any).KaijuRoll, -- the starter roll prepared and not yet claimed (KaijuServer)
+		KaijuRolled = (profile :: any).KaijuRolled, -- the starter roll was taken (Shared.Kaiju.rollsOwed)
 		Referrals = (profile :: any).Referrals, -- friends who joined through your invite (see Referrals)
 		FirstJoin = profile.FirstJoin,
 		WelcomeBought = profile.WelcomeBought,

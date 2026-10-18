@@ -225,15 +225,15 @@ KaijuWilds.prey = prey
 -- The level of the kaiju out with players near a point.
 local function levelsNear(point: Vector3, radius: number): { number }
 	local levels = {}
-	for player, pet in KaijuServer.pets() do
-		local root = rootOf(player)
+	for _, pet in KaijuServer.all() do
+		local root = rootOf(pet.Owner)
 		if root and (root.Position - point).Magnitude <= radius then
 			table.insert(levels, pet.Record.Level)
 		end
 	end
 	if #levels == 0 then
 		-- (Nobody near yet: the kaiju out anywhere in the Outpost.)
-		for _, pet in KaijuServer.pets() do
+		for _, pet in KaijuServer.all() do
 			table.insert(levels, pet.Record.Level)
 		end
 	end
@@ -288,7 +288,7 @@ end
 -- a rift's critter: any prey).
 local function foesNear(center: Vector3, radius: number, wide: boolean?): { any }
 	local list = {}
-	for _, pet in KaijuServer.pets() do
+	for _, pet in KaijuServer.all() do
 		if KaijuServer.targetable(pet) and (pet.Root.Position - center).Magnitude <= radius then
 			table.insert(list, { Root = pet.Root, Pet = pet })
 		end
@@ -389,7 +389,7 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 	-- the kaiju goes for it (KaijuServer: one after it or its owner).
 	if rifted then
 		local best, bestScore = nil, math.huge
-		for _, pet in KaijuServer.pets() do
+		for _, pet in KaijuServer.all() do
 			local distance = (pet.Root.Position - enemy.Root.Position).Magnitude
 			if distance <= Kaiju.Bug.Draw then
 				local victim = { Root = pet.Root, Pet = pet }
@@ -1459,8 +1459,11 @@ local function challenge(player: Player, model: any)
 	if (root.Position - enemy.Root.Position).Magnitude > CHALLENGE_RANGE then
 		return reply(false, "Get closer to challenge it.")
 	end
-	local pet = KaijuServer.pets()[player]
-	if not (pet and KaijuServer.targetable(pet)) and not hunter(player) then
+	local ready = false
+	for _, pet in KaijuServer.team(player) do
+		ready = ready or KaijuServer.targetable(pet)
+	end
+	if not ready and not hunter(player) then
 		return reply(false, "Your kaiju needs to be out to fight it (or press HUNT).")
 	end
 	local now = os.clock()

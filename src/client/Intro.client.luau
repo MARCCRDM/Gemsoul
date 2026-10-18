@@ -26,6 +26,7 @@ local LotterySound = require(script.Parent.Modules.LotterySound)
 local Icons = require(script.Parent.Modules.SurgeIcons)
 local CardFX = require(script.Parent.Modules.ElementCardFX)
 local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
+local KaijuRoll = require(script.Parent.Modules.KaijuRoll)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -2441,8 +2442,11 @@ listen(primary.Activated, function()
 		if reward and reward.Element then
 			busy = true
 			revealMoves(reward, function()
-				busy = false
-				finish()
+				-- Then your kaiju: the starter roll (KaijuRoll), and on.
+				KaijuRoll.play(function()
+					busy = false
+					finish()
+				end)
 			end)
 		else
 			finish()

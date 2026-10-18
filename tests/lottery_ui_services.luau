@@ -84,6 +84,8 @@ end
 function Art.pose(record) assert(record.View.Parent,"Animating a destroyed preview") end
 -- The starter roll's card effects (ElementCardFX).
 local CardFX={Themes={},create=function() return {} end,update=function() end}
+-- The kaiju starter roll after the gem roll (KaijuRoll): straight on here.
+local KaijuRoll={play=function(after) if after then after() end end}
 -- The starter reel's 3D gems (GemArt): a model, its view's camera, its pose.
 local reelModels=0
 local GemArt={
