@@ -82,8 +82,10 @@ Your first visit to the Outpost brings you a kaiju: a random kind in a
 random element. A second slot opens when one of yours reaches level 10, and
 a third at level 20. Phase 1 has one kaiju out at a time; you can keep 12.
 
-- **It fights on its own.** It takes on any wild kaiju or moon bug within
-  28 studs of you, going first for one that's after you or it. It follows
+- **It fights on its own.** It takes on any moon bug within 28 studs of
+  you, going first for one that's after you or it. It only fights a wild
+  kaiju once you've started a fight with that one (see
+  [Wild kaiju](#wild-kaiju)). It follows
   you everywhere in the Outpost (put back beside you if it falls far behind)
   and goes away in a fight, a match or an expedition.
 - **Recall.** Calls it back to you; it stays out of the fight for 4 seconds.
@@ -120,8 +122,8 @@ On a computer the card sits at the bottom left, TAME above it:
 Your kaiju fights whether or not you do. To fight yourself, press HUNT: your
 combat kit comes out, as in a spar but alone. Only creatures can hit you, and
 you can only hit creatures; a creature's finishing blow knocks you down for a
-few seconds, as in a spar. While you aren't hunting, wild kaiju leave you
-alone (your kaiju still fights them). Moon bugs don't: out past the core
+few seconds, as in a spar. Wild kaiju leave you and your kaiju alone until
+you start a fight with one. Moon bugs don't: out past the core
 they come through rifts at miners too ([frontier.md](frontier.md)), and
 their finishing blow knocks you down the same way.
 
@@ -134,10 +136,23 @@ Moon bugs come through rifts round players out past the core.
 
 Up to three roam the Outpost at once, within two levels of the strongest
 kaiju near them, with half again the health of a kaiju of yours at their
-level: it takes you and your kaiju together. They go after kaiju that come
-near and anyone hunting, fight as above (their E too), and walk home to heal
-if you lead them more than 70 studs away. One nobody fights burrows back after 10
-minutes, and a new one crawls out 90 seconds after one goes.
+level: it takes you and your kaiju together.
+
+A wild kaiju leaves you and your kaiju alone until you start a fight with
+it. There are two ways:
+
+- **Challenge it:** hold **E** beside it (within 20 studs), with your kaiju
+  out or while you hunt. Your kaiju goes in.
+- **Hit it** while you hunt.
+
+Then it fights everyone who started on it, and their kaiju. It doesn't go
+for anyone else near. It fights as above (its E too), and only hits you
+while you hunt. Lead it more than 70 studs from home and it walks back to
+heal. Once it has been home 8 seconds with nobody fighting it, it forgets who
+started on it, and it's calm again.
+
+One nobody fights burrows back after 10 minutes. A new one crawls out 90
+seconds after one goes.
 
 - **Kill it:** every kaiju that fought it gets 40 + 12 × its level EXP, and
   the player who (with their kaiju) did the most gets its Gemsoul.
@@ -227,11 +242,11 @@ Proposed guardrails:
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E; the attributes clients pose it by |
 | `KaijuServer` | Your kaiju: the starter, out and back, following and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
-| `KaijuWilds` | Wild kaiju and moon bugs: spawning (`spawnBug`: one out of a rift, at its prey), their brain, slipping back through a rift, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`) |
+| `KaijuWilds` | Wild kaiju and moon bugs: spawning (`spawnBug`: one out of a rift, at its prey), their brain, slipping back through a rift, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
 | `SparServer` | `Hunt`: the kit out alone |
-| `KaijuHud` (client) | The card, RECALL, HUNT, TAME and the kaiju panel |
+| `KaijuHud` (client) | The card, RECALL, HUNT, TAME, a wild kaiju's Challenge and the kaiju panel |
 | `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk and their fight poses |
 
 Tests: `tests/run_kaiju.py` checks the rules and how they fight (each
@@ -240,7 +255,9 @@ builds every kind in every element (joints, feet on the ground, part
 budget, motions, every fight pose), and runs the server against stand-ins:
 every E lands where it should, your kaiju comes out, fights with wind-ups,
 is hurt by element, knocked out and back, recalled, switched and fed, wild
-kaiju take the spread and pick their foes (never a miner), heavies break
+kaiju take the spread and pick their foes. A wild kaiju leaves a miner, a
+hunter and your kaiju alone till someone challenges or hits it, and forgets
+them once home; your kaiju (and its E) leaves it be till then. Heavies break
 guards, parries leave the attacker reeling, a wild kaiju hops from a
 hunter's charged heavy, the E winds up on the cast bar, a whole duel
 between two kaiju, kills pay their Gemsoul and EXP, taming (range, half

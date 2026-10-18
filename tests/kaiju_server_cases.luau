@@ -804,7 +804,8 @@ check(
 local own = enemy.TakenScale(wild.Element)
 check(own <= 1.4 * 0.75 * wildGuard + 1e-9, "Its own element hits it full")
 
--- Its brain: a miner walks by unbothered; a hunter or a kaiju is a foe.
+-- Its brain: it leaves a miner, a hunter and your kaiju alone until someone
+-- starts on it (challenges it, or hits it).
 enemy.Root.CFrame = CFrame.new(outpost + Vector3.new(30, 0, 0))
 enemy.Home = enemy.Root.Position
 pet.Root.CFrame = CFrame.new(outpost + Vector3.new(0, 0, 400)) -- (far off)
@@ -815,7 +816,26 @@ check(enemy.Foe == nil and #playerHits == 0, "A wild kaiju went after a miner")
 a:SetAttribute("Hunt", true)
 a:SetAttribute("Spar", true)
 KaijuWilds._brain(enemy, now)
-check(enemy.Foe == a, "A wild kaiju ignored a hunter beside it")
+check(enemy.Foe == nil and #playerHits == 0, "A wild kaiju went after a hunter who left it alone")
+-- Your kaiju beside it, its owner close by: neither picks a fight.
+pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
+pet.RecallUntil = 0
+KaijuServer._think(pet, now, 0.15)
+check(pet.Target == nil, "Your kaiju picked a fight with a wild one nobody started")
+KaijuWilds._brain(enemy, now)
+check(enemy.Foe == nil, "A wild kaiju went after a kaiju that left it alone")
+pet.Root.CFrame = CFrame.new(outpost + Vector3.new(0, 0, 400)) -- (far off again)
+-- Challenged: not from afar, nor something that isn't a wild kaiju; then it's on.
+local Challenge = registered.KaijuChallenge
+check(Challenge ~= nil, "No way to challenge a wild kaiju")
+check(enemy.Root:FindFirstChild("ChallengePrompt") ~= nil, "A wild kaiju has no Challenge prompt")
+rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(40, 0, 0))
+check(not Challenge(a, enemy.Model).Ok, "Challenged it from 40 studs")
+rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(3, 0, 0))
+check(not Challenge(a, make("Model")).Ok, "Challenged something that isn't a wild kaiju")
+check(Challenge(a, enemy.Model).Ok and wild.Engaged[a] ~= nil, "A hunter couldn't challenge it")
+KaijuWilds._brain(enemy, now)
+check(enemy.Foe == a, "A challenged wild kaiju ignored its challenger")
 now += 10
 KaijuWilds._brain(enemy, now)
 check(#playerHits > 0 and playerHits[#playerHits][1] == a, "It never struck the hunter")
@@ -861,7 +881,30 @@ enemy.LastPet = nil
 KaijuWilds._brain(enemy, now)
 check(enemy.Foe ~= pet, "A wild kaiju fought a recalled one")
 check(not pet.Fighter.Engaged and pet.Humanoid.AutoRotate, "A recalled kaiju stays squared up")
+-- With your kaiju recalled and no hunt, there's nothing to challenge it with.
+check(not Challenge(a, enemy.Model).Ok, "Challenged with no kaiju out and no hunt")
+-- Left alone at home a while, it forgets who started on it, and your kaiju
+-- leaves it be again.
+pet.Root.CFrame = CFrame.new(outpost + Vector3.new(0, 0, 400)) -- (far off)
+now += 9
+KaijuWilds._brain(enemy, now)
+check(next(wild.Engaged) == nil, "It never forgot who started on it")
 now += Kaiju.RecallSeconds + 1
+pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
+KaijuServer._think(pet, now, 0.15)
+check(pet.Target == nil, "Your kaiju went back for a wild one that had calmed down")
+-- Hitting it starts the fight too: your kaiju's blow (as below) or yours.
+local caster = KaijuServer.caster(pet)
+check(#caster.Foes(enemy.Root.Position, 10) == 0, "Your kaiju's E would hit a calm wild kaiju")
+enemy.LastSource, enemy.LastSourceAt = a, now
+a:SetAttribute("Hunt", true)
+a:SetAttribute("Spar", true)
+KaijuWilds._brain(enemy, now)
+check(enemy.Foe == a and wild.Engaged[a] ~= nil, "Hitting it didn't start the fight")
+check(#caster.Foes(enemy.Root.Position, 10) == 1, "Your kaiju's E misses the wild one you're fighting")
+a:SetAttribute("Hunt", nil)
+a:SetAttribute("Spar", nil)
+enemy.LastSource, enemy.FoeVictim = nil, nil
 
 -- Fighting as a duellist ------------------------------------------------------------------------------------------
 

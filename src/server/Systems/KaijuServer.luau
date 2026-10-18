@@ -388,11 +388,24 @@ end
 
 -- Fighting --------------------------------------------------------------------------------------
 
--- Creatures its foes are (KaijuWilds marks them OutpostCreature), inside a circle.
-local function creaturesNear(center: Vector3, radius: number): { any }
+-- Whether `owner`'s kaiju may fight this creature: a moon bug always; a
+-- wild kaiju only once `owner` has started on it (KaijuWilds keeps who has,
+-- in Engaged).
+local function fair(owner: Player, enemy): boolean
+	local engaged = (enemy :: any).Engaged
+	return engaged == nil or engaged[owner] ~= nil
+end
+
+-- Creatures its foes are (KaijuWilds marks them OutpostCreature), inside a
+-- circle: those `owner`'s kaiju may fight.
+local function creaturesNear(center: Vector3, radius: number, owner: Player): { any }
 	local list = {}
 	for _, enemy in Enemies.all() do
-		if (enemy :: any).OutpostCreature and (enemy.Root.Position - center).Magnitude <= radius then
+		if
+			(enemy :: any).OutpostCreature
+			and fair(owner, enemy)
+			and (enemy.Root.Position - center).Magnitude <= radius
+		then
 			table.insert(list, { Root = enemy.Root, Enemy = enemy })
 		end
 	end
@@ -465,7 +478,9 @@ function KaijuServer.caster(pet: Pet)
 		Element = pet.Element,
 		Ability = pet.Ability,
 		Damage = Kaiju.abilityDamage(pet.Stats.Damage, pet.Record.Soul, pet.Ability),
-		Foes = creaturesNear,
+		Foes = function(center: Vector3, radius: number)
+			return creaturesNear(center, radius, pet.Owner)
+		end,
 		Hit = function(victim, amount: number, status: string?)
 			strike(pet, victim.Enemy, amount, status, nil)
 		end,
@@ -567,15 +582,21 @@ end
 
 -- Who it fights: what it's already fighting, if that's still near its
 -- owner; else a creature that's after it or its owner; else the nearest
--- creature near its owner.
+-- creature near its owner. (A wild kaiju only once its owner has started on
+-- it.)
 local function chooseTarget(pet: Pet, ownerRoot: BasePart)
 	local engage = Kaiju.Follow.Engage
 	local current = pet.Target
-	if current and current.Alive and (current.Root.Position - ownerRoot.Position).Magnitude <= engage + 12 then
+	if
+		current
+		and current.Alive
+		and fair(pet.Owner, current)
+		and (current.Root.Position - ownerRoot.Position).Magnitude <= engage + 12
+	then
 		return current
 	end
 	local best, bestScore = nil, math.huge
-	for _, entry in creaturesNear(ownerRoot.Position, engage) do
+	for _, entry in creaturesNear(ownerRoot.Position, engage, pet.Owner) do
 		local enemy = entry.Enemy
 		local distance = (enemy.Root.Position - pet.Root.Position).Magnitude
 		local after = (enemy :: any).Foe

@@ -12,6 +12,9 @@
 	                  foe list has the top left then).
 	  TAME            beside the card when a wild kaiju near you is down to
 	                  half its health: the chance now, and the tries left.
+	  Challenge       a wild kaiju's prompt (hold E beside it): it leaves you
+	                  and your kaiju alone till you start on it, here or by
+	                  hitting it while you hunt.
 	  The panel       the one out (stats, Gemsoul and its E), your others to
 	                  send out instead, and FEED: stones from your pouch with
 	                  the EXP each gives it (Shared.Kaiju.feedExp).
@@ -22,6 +25,7 @@
 	  KaijuHud.open()    the panel
 ]]
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -429,6 +433,16 @@ end)
 hunt.Activated:Connect(function()
 	act(function()
 		say(GemClient.request("Hunt", not Spar.hunting(player)))
+	end)
+end)
+-- A wild kaiju's Challenge prompt: your kaiju goes in (KaijuWilds).
+ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
+	if who ~= player or prompt:GetAttribute("PromptKind") ~= "KaijuChallenge" then
+		return
+	end
+	local model = prompt.Parent and prompt.Parent.Parent
+	act(function()
+		say(GemClient.request("KaijuChallenge", model))
 	end)
 end)
 tame.Activated:Connect(function()

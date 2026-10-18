@@ -3,9 +3,12 @@
 	the numbers; see docs/kaiju.md).
 
 	  Wild kaiju  up to Kaiju.Wild.Max roam at once, each a random kind and
-	              element, levelled near the kaiju out around them. They go
-	              after kaiju that come near and anyone hunting (the combat
-	              kit out: SparServer), fight as the Arena's duellist does
+	              element, levelled near the kaiju out around them. One
+	              leaves you and your kaiju alone until you start a fight:
+	              challenge it ("KaijuChallenge", its Challenge prompt) and
+	              your kaiju goes in, or hit it while hunting (the combat
+	              kit out: SparServer). It fights those who started on it
+	              and their kaiju, and forgets them once home. It fights as the Arena's duellist does
 	              (KaijuFighter: combos, telegraphed heavies, guard and
 	              parry, hops, their Gemsoul's E), and walk home to heal if
 	              led past their leash. Every blow on one lands anywhere from
@@ -30,7 +33,9 @@
 	A wild kaiju's model carries KaijuWild, KaijuLevel, KaijuAbility and
 	KaijuTries for the client's tame button.
 
-	  "KaijuTame", model   try to tame a weakened wild kaiju (within 30 studs)
+	  "KaijuTame", model        try to tame a weakened wild kaiju (within 30 studs)
+	  "KaijuChallenge", model   start a fight with a wild kaiju (within 20 studs,
+	                            with your kaiju out or hunting)
 
 	  KaijuWilds.spawnBug(at, opts) -> enemy?   a moon bug out of a rift
 	  KaijuWilds.rift(at, facing) -> timeline?  opens a rift (FrontierServer
@@ -61,6 +66,8 @@ local reply = Shop.reply
 local KaijuWilds = {}
 
 local TAME_RANGE = 30
+local CHALLENGE_RANGE = 20
+local CALM_AFTER = 8 -- seconds home, out of the fight, before it forgets who started on it
 local HOME_HEAL = 0.05 -- share of its health back each second, walking home
 
 type Wild = {
@@ -77,6 +84,10 @@ type Wild = {
 	LastFight: number?,
 	Bug: boolean,
 	Prey: Player?, -- a rift's critter: whoever drew it
+	-- A wild kaiju's: who started a fight with it (and when they last did
+	-- anything in it). Its Enemies record carries the same table (Engaged),
+	-- for the kaiju out.
+	Engaged: { [Player]: number },
 	Band: string?, -- where its rift opened (Shared.Frontier)
 	ExpScale: number?,
 	IdleSince: number?,
@@ -192,6 +203,29 @@ local function foesNear(center: Vector3, radius: number, wide: boolean?): { any 
 	return list
 end
 
+-- A wild kaiju leaves you be until you start on it: who has, and since when.
+local function engage(wild: Wild, player: Player?, now: number)
+	if player and not wild.Bug then
+		wild.Engaged[player] = now
+	end
+end
+local function engaged(wild: Wild, player: Player?): boolean
+	return player ~= nil and player.Parent ~= nil and wild.Engaged[player] ~= nil
+end
+
+-- Its foes near a point (for its E): only those who started on it.
+local function foesOf(wild: Wild)
+	return function(center: Vector3, radius: number): { any }
+		local list = {}
+		for _, victim in foesNear(center, radius) do
+			if engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
+				table.insert(list, victim)
+			end
+		end
+		return list
+	end
+end
+
 -- A blow (`heavy` true or false; nil for an E) on a kaiju or a hunter, who
 -- may guard, parry or hop clear of it. Returns how it landed.
 local function hitFoe(enemy, victim, amount: number, element: string?, status: string?, heavy: boolean?): string
@@ -208,12 +242,22 @@ end
 
 -- Who it goes after: a rift's critter, whoever drew it while they're fair
 -- game; then whoever hurt it last (a kaiju or a hunter), while they're
--- inside its leash; else its current foe; else the nearest it sees.
+-- inside its leash; else its current foe; else the nearest it sees. A wild
+-- kaiju only goes after those who started on it (a hit is starting on it)
+-- and their kaiju.
 local function chooseFoe(enemy, wild: Wild, aggro: number)
 	local now = os.clock()
 	local e = enemy :: any
 	local rifted = wild.Prey ~= nil
 	local leash = if rifted then Kaiju.Bug.Leash else Kaiju.Wild.Leash
+	if not wild.Bug then
+		if e.LastPet and e.LastPetAt and now - e.LastPetAt < 6 then
+			engage(wild, e.LastPet.Owner, e.LastPetAt)
+		end
+		if enemy.LastSource and now - enemy.LastSourceAt < 6 then
+			engage(wild, enemy.LastSource, enemy.LastSourceAt)
+		end
+	end
 	local function valid(victim): boolean
 		if not victim or not victim.Root or not victim.Root.Parent then
 			return false
@@ -222,6 +266,9 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 			return false
 		end
 		if victim.Player and not (if rifted then prey(victim.Player) else hunter(victim.Player)) then
+			return false
+		end
+		if not wild.Bug and not engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
 			return false
 		end
 		return (victim.Root.Position - enemy.Home).Magnitude <= leash
@@ -335,9 +382,16 @@ local function brain(enemy, now: number)
 				return
 			end
 		end
-		-- Home, healing on the way; and the tries on it are forgotten there.
+		-- Home, healing on the way; and home a while, it forgets who started
+		-- on it.
 		if fromHome > 4 then
 			humanoid:MoveTo(enemy.Home)
+		else
+			for player, at in wild.Engaged do
+				if now - at > CALM_AFTER then
+					wild.Engaged[player] = nil
+				end
+			end
 		end
 		if now - enemy.LastHit > 6 and humanoid.Health < humanoid.MaxHealth then
 			humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * HOME_HEAL * 0.15)
@@ -346,6 +400,7 @@ local function brain(enemy, now: number)
 		return
 	end
 	wild.LastFight = now
+	engage(wild, if victim.Pet then victim.Pet.Owner else victim.Player, now)
 	if fighter then
 		KaijuFighter.step(fighter, victim, now)
 		return
@@ -495,7 +550,9 @@ function spawnWild()
 			{ Element = element, Title = string.format("%s · Lv %d", title, level), Home = model.PrimaryPart.Position }
 		)
 		local e = enemy :: any
+		local engagedBy = {}
 		e.OutpostCreature = true
+		e.Engaged = engagedBy -- (the kaiju out only fight it for those who started on it)
 		e.Brain = brain
 		e.OnDeath = wildDied
 		-- Every blow lands 60%-140%, times its element against this one's
@@ -509,6 +566,17 @@ function spawnWild()
 		model:SetAttribute("KaijuLevel", level)
 		model:SetAttribute("KaijuAbility", ability)
 		model:SetAttribute("KaijuTries", 0)
+		-- It leaves you be until you start on it: here, or by hitting it.
+		local challenge = Instance.new("ProximityPrompt")
+		challenge.Name = "ChallengePrompt"
+		challenge.ActionText = "Challenge"
+		challenge.ObjectText = string.format("%s · Lv %d", title, level)
+		challenge.KeyboardKeyCode = Enum.KeyCode.E
+		challenge.HoldDuration = 0.5
+		challenge.MaxActivationDistance = 16
+		challenge.RequiresLineOfSight = false
+		challenge:SetAttribute("PromptKind", "KaijuChallenge")
+		challenge.Parent = enemy.Root
 		-- It fights as a duellist, its guard and hops on its Enemies record
 		-- (so a hunter's swings meet them in Enemies.damage).
 		local fighter = KaijuFighter.new({
@@ -532,7 +600,10 @@ function spawnWild()
 					Element = element,
 					Ability = ability,
 					Damage = Kaiju.abilityDamage(stats.Damage, soul, ability),
-					Foes = foesNear,
+					Foes = function(center: Vector3, radius: number)
+						local wild = wilds[enemy]
+						return if wild then foesOf(wild)(center, radius) else {}
+					end,
 					Hit = function(target, amount: number, status: string?)
 						hitFoe(enemy, target, amount, element, status, nil)
 					end,
@@ -554,6 +625,7 @@ function spawnWild()
 			TameAt = {},
 			Fighter = fighter,
 			Bug = false,
+			Engaged = engagedBy,
 		}
 	end)
 	if not ok then
@@ -630,6 +702,37 @@ local function tame(player: Player, model: any)
 		),
 		{ Chance = chance }
 	)
+end
+
+-- "KaijuChallenge": start a fight with a wild kaiju, with your kaiju out (it
+-- goes in) or hunting.
+local function challenge(player: Player, model: any)
+	local enemy = typeof(model) == "Instance" and Enemies.get(model) or nil
+	local wild = enemy and wilds[enemy]
+	if not wild or wild.Bug or not enemy.Alive then
+		return reply(false, "There's no wild kaiju there.")
+	end
+	local root = rootOf(player)
+	if
+		not root
+		or player:GetAttribute("Outpost") ~= true
+		or player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("MatchId") ~= nil
+	then
+		return reply(false, "Not right now.")
+	end
+	if (root.Position - enemy.Root.Position).Magnitude > CHALLENGE_RANGE then
+		return reply(false, "Get closer to challenge it.")
+	end
+	local pet = KaijuServer.pets()[player]
+	if not (pet and KaijuServer.targetable(pet)) and not hunter(player) then
+		return reply(false, "Your kaiju needs to be out to fight it (or press HUNT).")
+	end
+	local now = os.clock()
+	engage(wild, player, now)
+	wild.LastFight = now
+	local title = Kaiju.title({ Species = wild.Species, Element = wild.Element })
+	return reply(true, string.format("You challenged the wild %s!", title))
 end
 
 -- Moon bugs -------------------------------------------------------------------------------------------------
@@ -730,6 +833,7 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Tries = 0,
 			TameAt = {},
 			Bug = true,
+			Engaged = {}, -- (a critter needs nobody to start on it)
 			Prey = opts.Prey,
 			Band = opts.Band,
 			ExpScale = boost.Exp,
@@ -780,6 +884,7 @@ function KaijuWilds.start(site)
 		end
 	end
 	Shop.register("KaijuTame", tame)
+	Shop.register("KaijuChallenge", challenge)
 	-- (Moon bugs come through rifts round players out past the core: FrontierServer.)
 	task.delay(5, function()
 		for _ = 1, Kaiju.Wild.Max do
@@ -798,6 +903,7 @@ end
 
 -- For tests.
 KaijuWilds._tame, KaijuWilds._brain, KaijuWilds._wilds = tame, brain, wilds
+KaijuWilds._challenge = challenge
 KaijuWilds._spawnWild, KaijuWilds._spots = spawnWild, spots
 
 return KaijuWilds
