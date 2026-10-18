@@ -252,7 +252,8 @@ local function fitOutpostHud()
 	end
 	PlayerCard.setBlocked(blocked or not hud.Enabled)
 	MinerLoot.setBlocked(blocked or not hud.Enabled)
-	hint.Visible = not blocked and not mobile
+	-- (In a mech, its driving card has the controls.)
+	hint.Visible = not blocked and not mobile and player:GetAttribute("MechPilot") == nil
 	charge.Frame.Visible = expanded
 	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")
 	expandLabel.Text = if expanded then "−" else "+"
@@ -288,6 +289,7 @@ hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitOutpostHud)
 player:GetAttributeChangedSignal("ChatOpen"):Connect(fitOutpostHud)
 player:GetAttributeChangedSignal("CombatSession"):Connect(fitOutpostHud)
 player:GetAttributeChangedSignal("Spar"):Connect(fitOutpostHud)
+player:GetAttributeChangedSignal("MechPilot"):Connect(fitOutpostHud)
 fitOutpostHud()
 
 -- The free pick's charge ticks up between server updates.

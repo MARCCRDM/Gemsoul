@@ -97,8 +97,20 @@ function methods:PivotTo() end
 local root = new("PlayerGui")
 local Instance = { new = new }
 local render = signal()
+-- The miner: MechPilot set while they drive a mech.
+local pilotChanged = signal()
+local localPlayer = { Attributes = {} }
+function localPlayer:GetAttribute(name) return self.Attributes[name] end
+function localPlayer:SetAttribute(name, value)
+	self.Attributes[name] = value
+	if name == "MechPilot" then pilotChanged:Fire() end
+end
+function localPlayer:GetAttributeChangedSignal(name)
+	assert(name == "MechPilot", "Unexpected attribute watched: " .. name)
+	return pilotChanged
+end
 local services = {
-	ReplicatedStorage = {}, RunService = { RenderStepped = render },
+	ReplicatedStorage = {}, RunService = { RenderStepped = render }, Players = { LocalPlayer = localPlayer },
 	UserInputService = { TouchEnabled = false },
 	TweenService = { Create = function(_, object, _, goal)
 		local done = signal()

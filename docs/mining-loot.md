@@ -54,7 +54,10 @@ Finds that come quickly stack:
 On a touch screen the card sits above the PLAY dock. On a phone (a screen
 under 500 points tall) it's also drawn at 86% and keeps one row. It hides,
 silently, while a menu or a fight has the screen, and it clears when you
-leave the Outpost. The words are in the Spanish table
+leave the Outpost. While you drive a mech, the card moves up above the
+mech's driving card (`MobileLayout.Drive`, shared with `VehicleDrive`), and
+the Outpost's key hint at the bottom is hidden, since the driving card
+lists the controls. The words are in the Spanish table
 (rarities, elements, the stat names, the rocks, "Rock mined", "Gem pouch
 full").
 
@@ -70,6 +73,7 @@ full").
 - `MiningWorldReveal.receive` skips packets whose `MinerId` is you.
 - Tests:
   - `tests/run_loot_stack.py`: the stack's timing and order;
-  - `tests/run_miner_loot.py`: the card, driven frame by frame;
+  - `tests/run_miner_loot.py`: the card, driven frame by frame, and above
+    a mech's driving card;
   - `tests/run_world_mining.py`: now also checks that your own find is
     never drawn over your head, while others still get it.

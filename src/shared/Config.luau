@@ -43,6 +43,10 @@ local Config = {
 		-- Mini kaiju in the Outpost (docs/kaiju.md): a kaiju of your own
 		-- beside you, wild ones to fight or tame, moon bugs, hunting.
 		Kaiju = true,
+		-- The MMO chat box (ChatFrame: tabs, channels, slash commands). Off
+		-- for now: chat is the windowless feed at the bottom left (ChatFeed),
+		-- and Roblox's own chat on phones and in fights.
+		ChatBox = false,
 	},
 
 	-- Free mining: each mined node uses one free mine. When the daily or

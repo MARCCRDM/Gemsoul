@@ -165,6 +165,32 @@ The server still puts a prompt for each on the miner (`socialPrompts` in
 who's in range and take the keys. `PlayerCard` draws the card when they show,
 and runs the same action as the key when a button is pressed.
 
+## Chat: the bottom left, windowless
+
+On a computer, the chat is a plain feed in the bottom left corner, like a
+standard game's: lines stack up from the bottom with no box, no tabs and no
+background (`ChatFeed`).
+
+- **Where.** It sits above your kaiju's card and its TAME button, and under
+  the PLAY stack. It gets shorter on a low screen, so it never runs into
+  either. On a short screen with a keyboard it takes the bottom left corner,
+  left of the dock.
+- **Lines.** The server's General chat, with each name in its own colour and
+  yours in green. Joins and other system lines are grey, and loot lines are
+  gold. Ten lines show at most. Each one stays 22 seconds, then fades.
+- **Typing.** Press **/** or click "Press / to chat". The recent lines come
+  back and a line opens to type in. **Enter** sends to everyone in the
+  server. This goes through Roblox's General channel, so it's filtered.
+  Escape, or an empty line, puts it away.
+- **Elsewhere** (fights, dungeons, the intro, a phone), Roblox's own chat is
+  on: its window and the top bar's chat button. Over a menu, neither shows.
+  Speech bubbles over heads are on for everyone.
+
+The old MMO chat box (`ChatFrame`) had tabs, channels and slash commands.
+It is off for now with `Config.Features.ChatBox = false`. Setting it to
+`true` brings the box back and turns the feed off. The server's channels
+(`ChatChannels`) still run, so Trade, LFG and whispers return with the box.
+
 ## On a phone
 
 ![The lobby on a phone](lobby/lobby-phone.png)
@@ -182,4 +208,5 @@ and runs the same action as the key when a button is pressed.
 | Suite | Checks | What it covers |
 | --- | --- | --- |
 | `tests/run_daily_challenges.py` | 22,446 rules + 8 server | One per group; stable rolls; progress; paying once; the bonus; new days; old saves. The server side: progress pushes, payouts, notes and the bonus |
+| `tests/run_chat_feed.py` | 57 | The real chat feed against chat and GUI doubles. Its place over the kaiju card, under the PLAY stack and on a short screen; names, your green and escaped markup; other channels kept out; system and loot lines; fading; ten shown and sixty kept; / and the hint; sending the trimmed line; Escape and empty lines; out of the Outpost, under a menu, in the intro and on a phone; the ChatBox switch |
 | `tests/run_lobby.py` | 34 board + 32 feed | The real board and feed against GUI doubles. Board: cards per screen; folded rows, tapping one open (one at a time) and closed; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside |

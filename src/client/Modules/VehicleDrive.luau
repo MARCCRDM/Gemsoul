@@ -14,6 +14,7 @@ local GuiService = game:GetService("GuiService")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
 local IronUi = require(script.Parent.IronUi)
+local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
 
 task.spawn(function() require(script.Parent.MechAnimation) end)
@@ -214,8 +215,8 @@ local gui = UiKit.gui("DriveHud", 7) -- (over the lobby HUD)
 gui.Enabled = false
 local card = IronUi.new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -44),
-	Size = UDim2.fromOffset(340, 78),
+	Position = UDim2.new(0.5, 0, 1, -MobileLayout.Drive.Bottom),
+	Size = UDim2.fromOffset(MobileLayout.Drive.W, MobileLayout.Drive.H),
 	BackgroundColor3 = Color3.fromRGB(10, 12, 20),
 	BackgroundTransparency = 0.15,
 }, gui)

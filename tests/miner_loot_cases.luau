@@ -133,6 +133,12 @@ check(
 	holder.Position.Y.Offset == -64 and holder:FindFirstChildOfClass("UIScale").Scale == 1,
 	"Desktop fit not restored"
 )
+-- In a mech: above its driving card (MobileLayout.Drive), then back down.
+local drive = MobileLayout.Drive
+localPlayer:SetAttribute("MechPilot", 1)
+check(holder.Position.Y.Offset == -(drive.Bottom + drive.H + 10), "The card sits on the mech's driving card")
+localPlayer:SetAttribute("MechPilot", nil)
+check(holder.Position.Y.Offset == -64, "The card stayed up after hopping out")
 
 -- A menu or a fight has the screen: hidden and silent, then back.
 Loot.setBlocked(true)

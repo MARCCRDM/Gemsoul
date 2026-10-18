@@ -8,12 +8,16 @@
 -- On phones and tablets the frame stays off: Roblox's own chat takes over
 -- (the speech-bubble button in the top bar, with its unread count, opens the
 -- recent lobby chat), and everyone's words pop up as bubbles over their heads.
+--
+-- Off for now everywhere (Config.Features.ChatBox): the windowless ChatFeed
+-- has the chat, and loot and system lines go there.
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
 local ChatRules = require(ReplicatedStorage.Shared.ChatRules)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
@@ -23,8 +27,10 @@ local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
 local TradeUI = require(script.Parent.TradeUI)
 local UiKit = require(script.Parent.UiKit)
+local ChatFeed = require(script.Parent.ChatFeed)
 
 local ChatFrame = {}
+ChatFrame.Off = not (Config.Features and Config.Features.ChatBox == true)
 local player = Players.LocalPlayer
 local P = IronUi.Colors
 local new = IronUi.new
@@ -323,9 +329,17 @@ local function systemLine(text: string)
 end
 
 function ChatFrame.system(text: string)
+	if ChatFrame.Off then
+		ChatFeed.system(text)
+		return
+	end
 	systemLine(text)
 end
 function ChatFrame.loot(text: string)
+	if ChatFrame.Off then
+		ChatFeed.loot(text)
+		return
+	end
 	push("Loot", linkify(escape(text)))
 end
 
@@ -915,10 +929,15 @@ end
 
 function ChatFrame.refresh()
 	local show, onDashboard = wanted()
+	if ChatFrame.Off then
+		show = false -- (ChatFeed has the chat, and Roblox's window)
+	end
 	if show ~= gui.Enabled then
 		gui.Enabled = show
 		fitChat()
-		setDefaultChat(not show)
+		if not ChatFrame.Off then
+			setDefaultChat(not show)
+		end
 		if not show then
 			closePopup()
 			input:ReleaseFocus()

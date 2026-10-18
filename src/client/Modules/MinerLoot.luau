@@ -9,9 +9,12 @@
 -- - every rock pays a gem, so the only find without one (a full pouch) is a
 --   row straight away.
 --
+-- In a mech it sits above the driving card (MobileLayout.Drive).
+--
 --   MinerLoot.push(loot)        the server's loot for a rock you mined
 --   MinerLoot.setBlocked(on)    a menu or a fight has the screen: hide
 --   MinerLoot.close()           leaving the Outpost: clear everything
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -22,6 +25,7 @@ local GemArt = require(script.Parent.GemArt)
 local IronUi = require(script.Parent.IronUi)
 local LootStack = require(script.Parent.LootStack)
 local LotterySound = require(script.Parent.LotterySound)
+local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
 
 local MinerLoot = {}
@@ -112,8 +116,15 @@ local function fit()
 	local short = size.Y > 0 and size.Y < 500
 	maxRows = if short then 1 else 3
 	fitScale.Scale = if short then 0.86 else 1
-	holder.Position = UDim2.new(0.5, 0, 1, if mobile then -104 else -64)
+	-- (In a mech: above its driving card, bottom middle.)
+	local drive = MobileLayout.Drive
+	local piloting = Players.LocalPlayer:GetAttribute("MechPilot") ~= nil
+	local up = if piloting then drive.Bottom + drive.H + 10 elseif mobile then 104 else 64
+	holder.Position = UDim2.new(0.5, 0, 1, -up)
 end
+Players.LocalPlayer:GetAttributeChangedSignal("MechPilot"):Connect(function()
+	fit()
+end)
 
 local function rowTop(index: number): number
 	local bottom = if cardUi then -GAP else CARD_H

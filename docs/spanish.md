@@ -85,7 +85,9 @@ Item, cosmetic, move, enemy and place names stay in English: they're names.
   `Classes`).
 - **Anything marked `NoTranslate`.** A GUI with the `NoTranslate` attribute
   keeps its text, and so does everything inside it. Set on:
-  - chat (ChatFrame, the Social chat log);
+  - chat: what players write (ChatFeed's lines, ChatFrame, the Social chat
+    log). The game's own lines in the feed ("Chat isn't ready yet.") are
+    translated before they're added;
   - player names in the lobby and in fights;
   - the DEV panel.
 - **World billboards**: name plates and the Outpost's signs. These sit in

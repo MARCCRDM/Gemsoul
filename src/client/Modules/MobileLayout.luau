@@ -22,11 +22,16 @@
 	  MobileLayout.kaiju(chat)             your kaiju's card (KaijuHud), under
 	                                       the coins (beside the CHAT button,
 	                                       if there is one), TAME beside it
+	  MobileLayout.Drive                   a mech's driving card (VehicleDrive),
+	                                       bottom middle on every screen: its
+	                                       size and how far up it sits, so the
+	                                       loot card (MinerLoot) goes above it
 ]]
 local MobileLayout = {}
 
 MobileLayout.CardScale = 0.7
 MobileLayout.Margin = 12
+MobileLayout.Drive = { W = 340, H = 78, Bottom = 44 }
 
 function MobileLayout.card()
 	return { X = 12, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }

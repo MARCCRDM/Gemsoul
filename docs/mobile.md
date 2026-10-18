@@ -28,8 +28,10 @@ phone game should be.
   keyboard) our chat box and its CHAT button are gone. Roblox's own chat
   takes over: the speech-bubble button in the top bar, with its unread
   count, opens the recent lobby chat, and what people say pops up as a
-  bubble over their head (bubble chat is on for everyone). A computer keeps
-  the full chat box (`ChatFrame.Handheld`).
+  bubble over their head (bubble chat is on for everyone). A computer gets
+  the windowless chat feed in the bottom left (`ChatFeed`; see
+  [lobby.md](lobby.md#chat-the-bottom-left-windowless)). The old chat box is
+  off for now.
 - **Level and coins** sit in a pill at the top left, under the pick card,
   where the CHAT button was (`MobileLayout.wallet`).
 - **The "online" pill is gone.** PLAY stands alone at the bottom centre.

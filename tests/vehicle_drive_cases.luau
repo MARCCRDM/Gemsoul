@@ -250,6 +250,11 @@ local modules = {
 		round = function() end,
 	},
 	MechAnimation = {},
+	-- (The real one: the driving card's size and place, MobileLayout.Drive.)
+	MobileLayout = luau.load(fs.readFile(ROOT .. "/src/client/Modules/MobileLayout.luau"), {
+		debugName = "MobileLayout",
+		environment = setmetatable({ Vector2 = R.Vector2 }, { __index = _G }),
+	})(),
 }
 local texts = {}
 local buttons = {}
@@ -311,7 +316,7 @@ local VehicleDrive = luau.load(fs.readFile(ROOT .. "/src/client/Modules/VehicleD
 				return assert(services[name], "No stand-in for " .. name)
 			end,
 		},
-		script = { Parent = { IronUi = "IronUi", UiKit = "UiKit", MechAnimation = "MechAnimation" } },
+		script = { Parent = { IronUi = "IronUi", UiKit = "UiKit", MechAnimation = "MechAnimation", MobileLayout = "MobileLayout" } },
 		require = function(target)
 			if type(target) == "string" then
 				return assert(modules[target], target)

@@ -1077,6 +1077,7 @@ return {
 	-- Social: chat, queues, feedback, results -------------------------------------------------------------
 	["In this server"] = "En este servidor",
 	["Say something…"] = "Escribe algo…",
+	["Press / to chat"] = "Pulsa / para chatear",
 	["Join a party to use party chat."] = "Únete a un grupo para usar el chat de grupo.",
 	["Chat isn't ready yet."] = "El chat aún no está listo.",
 	["Couldn't send that message."] = "No se pudo enviar ese mensaje.",
