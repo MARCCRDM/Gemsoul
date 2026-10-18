@@ -1873,6 +1873,48 @@ local function outpostSoak()
 end
 outpostSoak()
 
+-- Rifts open on open ground, level with the miner: not on top of the
+-- container stack just ahead of them.
+local function riftsOnOpenGround()
+	clearCritters()
+	FrontierServer._setWanderAt(math.huge)
+	local miner = center + Vector3.new(330, 5, 0)
+	stand(miner) -- (facing east, at the stack)
+	local function onStack(p: Vector3): boolean
+		return p.X > miner.X + 12 and p.X < miner.X + 26 and math.abs(p.Z - miner.Z) < 5
+	end
+	local raycast = workspaceObject.Raycast
+	workspaceObject.Raycast = function(_, origin)
+		if onStack(origin) then
+			return { Position = Vector3.new(origin.X, miner.Y + 8, origin.Z), Instance = workspaceObject }
+		end
+		return nil
+	end
+	local opened, count = {}, 0
+	for _ = 1, 1500 do
+		swingFor(1, 0.4)
+		for _, rift in rifts() do
+			if not opened[rift] then
+				opened[rift] = true
+				count += 1
+			end
+		end
+		if count >= 6 then
+			break
+		end
+		if count > 0 and #critterFor(b) >= 2 then
+			clearCritters()
+		end
+	end
+	workspaceObject.Raycast = raycast
+	check(count >= 3, "Too few rifts opened to tell: " .. count)
+	for rift in opened do
+		check(not onStack(rift.Position), "A rift opened on top of the container stack")
+	end
+	clearCritters()
+end
+riftsOnOpenGround()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do

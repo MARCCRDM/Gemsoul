@@ -83,14 +83,17 @@ camp them.
 
 One of the three is **guarded**. Its rocks are red, +110% luck (+35% on
 a vein's), and its beam is red, so you can tell it from afar. A wild kaiju
-of level 16 to 20 sleeps 30 studs in front of it, facing the outpost. It
-sleeps through people walking past. The third swing at its vein wakes it,
-and it goes for the miners as well as their kaiju (a plain miner is
+of level 16 to 20, a head taller than you, keeps a beat 30 studs in front of
+it: pacing, sniffing about, napping. It looks over anyone who comes close
+and roars at them now and then, but leaves them be. The first swing at its
+vein stirs it, the second makes it roar, the third wakes it, and it goes
+for the miners as well as their kaiju (a plain miner is
 knocked down, not killed). Beat it or tame it and the vein is yours until
 it moves on. A beaten guardian pays 40 coins on top of its Gemsoul. When
 the vein moves, a fresh guardian sleeps at the new site, and the banner
-says "A guarded Rift Vein surfaced to the …". The other two veins, and two
-wild kaiju roaming the quarry for taming, stay open to everyone. The rest
+says "A guarded Rift Vein surfaced to the …". The other two veins, and the
+two packs of wild kaiju roaming the quarry for taming, stay open to
+everyone. The rest
 is in [kaiju.md](kaiju.md#the-vein-guardian).
 
 ## Rifts
@@ -109,9 +112,11 @@ never symmetrical and never the same shape twice. A tear:
    off them;
 4. **seals** (half a second) with a last flash.
 
-Rifts open 14–24 studs away, within 100° of where you're facing. If one
-opens off your screen, an arrow at the screen's edge points at it until its
-critter is out. They never open in the core or past the walls.
+Rifts open 14–24 studs away, within 100° of where you're facing, on open
+ground level with you: never on top of a boulder or a container stack (the
+server tries a few spots). If one opens off your screen, an arrow at the
+screen's edge points at it until its critter is out. They never open in the
+core or past the walls.
 
 ### Mining noise
 
@@ -264,7 +269,8 @@ and the arrows). `tests/run_kaiju.py` runs the server side: who rifts open
 round, swings drawing them, the warning, the caps, edge levels, a pilot's
 strikes, a critter hopping out at its prey (a miner too), giving up and
 slipping back, a stray leaving, wandering rifts roaming and Rift Charged,
-the pay, the bonk, and the vein guardian; and builds every moon bug (`tests/moon_bug_cases.luau`:
+the pay, the bonk, rifts opening round a container stack rather than on
+it, and the vein guardian; and builds every moon bug (`tests/moon_bug_cases.luau`:
 its part and shadow budget, no armour or lights, nothing left hanging loose,
 its whole face). `tests/run_outpost.py` and
 `tests/run_moon_quarry_scene.py` cover the zones, luck, regrowth and the

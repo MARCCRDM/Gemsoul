@@ -212,6 +212,21 @@ local function arrived(player: Player)
 	pending[player] = if left > 0 then left else nil
 end
 
+-- The ground a rift opens on: a spot from `pick` (tried a few times) whose
+-- floor is level with the player's, so a critter doesn't come out on top of
+-- a boulder or a container stack.
+local function openGround(root: BasePart, pick: () -> Vector3): Vector3
+	local level = KaijuServer.ground(root.Position).Y
+	local floor
+	for _ = 1, 6 do
+		floor = KaijuServer.ground(pick())
+		if math.abs(floor.Y - level) <= 3 then
+			break
+		end
+	end
+	return floor
+end
+
 -- `count` rifts open near `player`, a moment apart, a critter out of each
 -- at them (once it has crackled its warning).
 local function incursion(player: Player, band: string, count: number)
@@ -223,8 +238,9 @@ local function incursion(player: Player, band: string, count: number)
 				arrived(player)
 				return
 			end
-			local spot = Frontier.riftSpot(root.Position, root.CFrame.LookVector, center(), rng)
-			local floor = KaijuServer.ground(spot)
+			local floor = openGround(root, function()
+				return Frontier.riftSpot(root.Position, root.CFrame.LookVector, center(), rng)
+			end)
 			local critter = KaijuWilds.pickCritter(rng)
 			local _, life = FrontierServer.open(floor, root.Position, { Critter = critter, Prey = player })
 			task.delay(life.HopAt - serverNow(), function()
@@ -368,6 +384,12 @@ local function wander(candidates: { any })
 		return
 	end
 	local floor = KaijuServer.ground(spot)
+	if math.abs(floor.Y - KaijuServer.ground(root.Position).Y) > 3 then
+		-- (On top of something: somewhere else round about.)
+		floor = openGround(root, function()
+			return Frontier.wanderSpot(root.Position, center(), rng)
+		end)
+	end
 	local critter = KaijuWilds.pickCritter(rng)
 	local _, life = FrontierServer.open(floor, root.Position, { Critter = critter, Prey = player, Linger = 4 })
 	local group = { Player = player, Critters = {}, Pending = count, Helpers = {}, Killed = 0, Lost = false }
