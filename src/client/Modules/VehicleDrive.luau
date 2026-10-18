@@ -1,5 +1,6 @@
--- Send pilot input to the server, which owns and moves every mech. The client
--- handles controls, camera and HUD, without competing writes to constraints.
+-- Send pilot input to the server, which moves every mech itself (anchored:
+-- Server OutpostVehicles). The client handles controls, camera and HUD;
+-- MechAnimation draws the mech gliding between the server's steps.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -20,13 +21,15 @@ type Driving = {
 	Seat: VehicleSeat,
 	Humanoid: Humanoid,
 	Chassis: BasePart,
-	Drive: LinearVelocity,
-	Steer: AlignOrientation,
 	Spec: any,
 	Speed: number,
 	Zoom: { number },
-	-- Watching for a mech that won't budge (see stuck below).
+	-- Watching for a mech that won't budge (see stuck below): where it was
+	-- when the pilot started pushing, for how long, and what's been done.
+	From: Vector3?,
+	FromYaw: number,
 	StuckFor: number,
+	Hinted: boolean,
 	Reports: number,
 }
 local driving: Driving? = nil
@@ -232,21 +235,20 @@ local function begin(seat: VehicleSeat, humanoid: Humanoid)
 	local kind = seat:GetAttribute("OutpostMachine")
 	local spec = Rules.Machines[kind]
 	local chassis = seat.Parent and seat.Parent:FindFirstChild("Chassis") :: BasePart?
-	local drive = chassis and chassis:FindFirstChild("Drive") :: LinearVelocity?
-	local steer = chassis and chassis:FindFirstChild("Steer") :: AlignOrientation?
-	if not spec or not chassis or not drive or not steer then
+	if not spec or not chassis then
 		return
 	end
 	driving = {
 		Seat = seat,
 		Humanoid = humanoid,
 		Chassis = chassis,
-		Drive = drive,
-		Steer = steer,
 		Spec = spec,
 		Speed = 0,
 		Zoom = { player.CameraMinZoomDistance, player.CameraMaxZoomDistance },
+		From = nil,
+		FromYaw = 0,
 		StuckFor = 0,
+		Hinted = false,
 		Reports = 0,
 	}
 	-- Tell the server this client is piloting (it watches for one that isn't).
@@ -275,43 +277,49 @@ local function resumeSeat()
 	end
 end
 
--- A mech that won't budge: held input for 2 s without the requested motion.
--- Say what this client sees (Output and Feedback > Reports,
--- via the server) and ask it to inspect the assembly (Server OutpostVehicles).
-local function anchoredIn(part: BasePart): string
-	local found = {}
-	local ok, parts = pcall(part.GetConnectedParts, part, true)
-	for _, connected in if ok then parts else {} do
-		if connected.Anchored then
-			table.insert(found, connected:GetFullName())
-			if #found >= 3 then
-				break
-			end
-		end
+-- Where the server has the mech: its MechPosition, and from MechMotion its
+-- heading and speed (or where this screen has it, before they arrive), and
+-- what's in its way (MechBlocked).
+local function serverMotion(d: Driving): (Vector3, number, number, string?)
+	local model = d.Seat.Parent
+	local position = model and model:GetAttribute("MechPosition")
+	local motion = model and model:GetAttribute("MechMotion")
+	local blockedBy = model and model:GetAttribute("MechBlocked")
+	if typeof(position) ~= "Vector3" then
+		position = d.Chassis.Position
 	end
-	return if #found > 0 then table.concat(found, ", ") else "none"
+	local yaw, speed = 0, 0
+	if typeof(motion) == "Vector3" then
+		yaw, speed = motion.X, motion.Y
+	end
+	return position, yaw, speed, if type(blockedBy) == "string" then blockedBy else nil
 end
+
+-- A mech that won't budge: input held for 2 s and the server's mech hasn't
+-- moved (or turned, when only steering). Say what this client sees (Output
+-- and Feedback > Reports, via the server); the server then lets it drive
+-- through whatever it's wedged in for a moment (Server OutpostVehicles).
 local function reportStuck(d: Driving, throttle: number, steer: number, source: string)
-	local c = d.Chassis
-	local v, pv = c.AssemblyLinearVelocity, d.Drive.PlaneVelocity
-	local root = c.AssemblyRootPart
+	local position, yaw, speed, blockedBy = serverMotion(d)
+	local here = d.Chassis.Position
 	local text = string.format(
-		"input %.2f/%.2f from %s (seat %.2f/%.2f), speed %.1f, drive (%.1f, %.1f) on=%s, steer on=%s, "
-			.. "receiveAge %.2f, root %s, mass %.0f, anchored: %s",
+		"input %.2f/%.2f from %s (seat %.2f/%.2f), server has it at (%.0f, %.1f, %.0f) heading %.2f, "
+			.. "speed %.1f, blocked by %s; here it's at (%.0f, %.1f, %.0f), anchored %s",
 		throttle,
 		steer,
 		source,
 		d.Seat.ThrottleFloat,
 		d.Seat.SteerFloat,
-		Vector2.new(v.X, v.Z).Magnitude,
-		pv.X,
-		pv.Y,
-		tostring(d.Drive.Enabled),
-		tostring(d.Steer.Enabled),
-		c.ReceiveAge,
-		if root then root.Name else "?",
-		c.AssemblyMass,
-		anchoredIn(c)
+		position.X,
+		position.Y,
+		position.Z,
+		yaw,
+		speed,
+		blockedBy or "nothing",
+		here.X,
+		here.Y,
+		here.Z,
+		tostring(d.Chassis.Anchored)
 	)
 	text ..= string.format("; server accepted %s/%s", tostring(d.Seat:GetAttribute("MechInputThrottle")),
 		tostring(d.Seat:GetAttribute("MechInputSteer")))
@@ -323,21 +331,31 @@ local function reportStuck(d: Driving, throttle: number, steer: number, source: 
 	UiKit.toast("Your mech seems stuck. Checking its movement and sending a report.")
 end
 local function watchStuck(d: Driving, throttle: number, steer: number, source: string, dt: number)
-	local c = d.Chassis
-	local v = c.AssemblyLinearVelocity
+	local position, yaw, _, blockedBy = serverMotion(d)
 	-- Turning isn't evidence that forward motion works. Watch translation
 	-- when accelerating and rotation only when steering in place.
 	local accelerating = math.abs(throttle) >= 0.5
-	local moving = if accelerating then Vector2.new(v.X, v.Z).Magnitude >= 1.5
-		else math.abs(c.AssemblyAngularVelocity.Y) >= 0.2
 	local pushing = accelerating or math.abs(steer) >= 0.5
-	if not (pushing and not moving) then
-		d.StuckFor = 0
+	local from = d.From
+	local moved = from ~= nil
+		and (if accelerating then (position - from).Magnitude >= 1.5 else math.abs(yaw - d.FromYaw) >= 0.2)
+	if not pushing or moved or not from then
+		d.From, d.FromYaw = position, yaw
+		if not pushing or moved then
+			d.StuckFor = 0
+		end
 		return
 	end
 	d.StuckFor += dt
-	if d.StuckFor >= 2 and d.Reports < 2 then
-		-- (Give the server's takeover a few seconds before asking again.)
+	if d.StuckFor < 2 then
+		return
+	end
+	-- Something in the way, and the server says so: first, just tell the pilot.
+	if blockedBy and not d.Hinted then
+		d.StuckFor, d.Hinted = 0, true
+		UiKit.toast("Something's in the way. Turn or back up.")
+	elseif d.Reports < 2 then
+		-- (Give the server's push-through a few seconds before asking again.)
 		d.StuckFor, d.Reports = -3, d.Reports + 1
 		reportStuck(d, throttle, steer, source)
 	end
@@ -345,7 +363,7 @@ end
 
 -- One frame of driving.
 function VehicleDrive.step(dt: number)
-	-- Recover missed boarding events and delayed chassis/constraint replication.
+	-- Recover missed boarding events and a chassis that replicates late.
 	-- Only the local character is inspected, with no world or UI scans.
 	if not driving then resumeSeat() end
 	local d = driving
@@ -363,11 +381,16 @@ function VehicleDrive.step(dt: number)
 	local throttle, steer, source = pilotInput(d.Seat)
 	tellServer(throttle, steer)
 	watchStuck(d, throttle, steer, source, dt)
-	local v = d.Chassis.AssemblyLinearVelocity
-	local actual = Vector2.new(v.X, v.Z).Magnitude
+	-- The speed the server is moving it at, and whether something's in the way.
+	local _, _, speed, blockedBy = serverMotion(d)
+	local actual = math.abs(speed)
 	d.Speed = actual
 	speedLabel.Text = tostring(math.floor(actual + 0.5))
 	fill.Size = UDim2.fromScale(math.clamp(actual / d.Spec.MaxSpeed, 0, 1), 1)
+	local line = if blockedBy then "Something's in the way" else d.Spec.Blurb
+	if blurb.Text ~= line then
+		blurb.Text = line
+	end
 end
 
 function VehicleDrive.isDriving(): boolean

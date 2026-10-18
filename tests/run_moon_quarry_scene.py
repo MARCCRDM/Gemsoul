@@ -149,7 +149,7 @@ assert(#site.Parking==8,"Motor Pool has missing bays")
 for _,bay in site.Parking do
  counts[bay.Kind]+=1
  local vehicle=Machines.build(bay.Kind,bay.CFrame)
- assert(vehicle.PrimaryPart.Name=="Chassis" and not vehicle.PrimaryPart.Massless,"Vehicle has no physics chassis")
+ assert(vehicle.PrimaryPart.Name=="Chassis" and not vehicle.PrimaryPart.Massless,"Vehicle has no chassis at its root")
  -- It collides through a ball underneath (rides up steps) and a box above the
  -- step height (walls), not the flat-bottomed chassis box (catches on kerbs).
  local hull,foot=nil,nil
@@ -174,7 +174,7 @@ for _,bay in site.Parking do
   end
  end
  assert(seat and seat.OutpostMachine==bay.Kind,"Driver seat identity missing")
- assert(drive and steer and drive.VelocityConstraintMode=="Plane","Driving constraints missing")
+ assert(not drive and not steer,"Mech still has drive constraints (the server moves it)")
  if bay.Kind=="Mole" then assert(drill,"Mole drill motor missing") end
  assert(vehicle.Mech and vehicle.CameraFit>=20,"Mech identity/camera fit missing")
  for _,name in {"Waist","LeftHip","LeftKnee","LeftAnkle","RightHip","RightKnee","RightAnkle","LeftShoulder","LeftElbow","RightShoulder","RightElbow"} do

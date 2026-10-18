@@ -1237,7 +1237,7 @@ local function motorPool(parent, at: CFrame)
 	sub.BackgroundTransparency = 1
 	sub.Position = UDim2.fromScale(0, 0.6)
 	sub.Size = UDim2.fromScale(1, 0.36)
-	sub.Text = "HOP IN AND DRIVE  Â·  JUMP TO GET OUT"
+	sub.Text = "HOP IN AND DRIVE  ·  JUMP TO GET OUT"
 	sub.TextScaled = true
 	sub.Font = Enum.Font.GothamMedium
 	sub.TextColor3 = Color3.fromRGB(220, 235, 255)

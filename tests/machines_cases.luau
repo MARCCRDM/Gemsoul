@@ -1,6 +1,6 @@
--- The Outpost's machines: how each is put together (one sliding chassis,
--- welded massless bodywork, a seat, the Drive/Steer constraints, the Mole's
--- spinning drill) and the driving maths (Shared.Outpost.drive). Uses lune's
+-- The Outpost's machines: how each is put together (one chassis at the root,
+-- welded massless bodywork, a seat, no drive constraints (the server moves
+-- it, Server OutpostVehicles), the Mole's spinning drill) and the driving maths (Shared.Outpost.drive). Uses lune's
 -- roblox library. Run by tests/run_machines.py (needs lune).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -70,7 +70,7 @@ for _, kind in Rules.MachineOrder do
 	local model = Machines.build(kind, at)
 	local chassis = model:FindFirstChild("Chassis")
 	check(chassis and model.PrimaryPart == chassis, kind .. " has no chassis")
-	check(chassis.Transparency == 1 and not chassis.Anchored and not chassis.Massless, kind .. "'s chassis can't slide")
+	check(chassis.Transparency == 1 and not chassis.Massless, kind .. "'s chassis isn't an invisible root")
 	local bottom = chassis.CFrame.Position.Y - chassis.Size.Y / 2
 	check(bottom > 0 and bottom < 0.5, kind .. " isn't standing on the ground")
 	-- It collides through a ball underneath, which rides up steps, and a box
@@ -79,6 +79,7 @@ for _, kind in Rules.MachineOrder do
 	local hull, foot = model:FindFirstChild("Hull"), model:FindFirstChild("Foot")
 	check(not chassis.CanCollide and hull and hull.CanCollide and foot and foot.CanCollide, kind .. " has no colliders")
 	check(foot.Shape == R.Enum.PartType.Ball, kind .. "'s foot isn't a ball")
+	check(hull.CanQuery and foot.CanQuery, kind .. " can't be bumped into: other mechs' sweeps can't see it")
 	check(math.abs(foot.CFrame.Position.Y - foot.Size.Y / 2 - bottom) < 0.01, kind .. "'s foot doesn't reach the ground")
 	local lift = hull.CFrame.Position.Y - hull.Size.Y / 2 - bottom
 	check(lift >= 1 and lift <= 2, kind .. "'s hull drags along the ground, or leaves too big a gap")
@@ -86,13 +87,15 @@ for _, kind in Rules.MachineOrder do
 	local seat = model:FindFirstChild("Seat")
 	check(seat and seat.ClassName == "VehicleSeat" and seat:GetAttribute("OutpostMachine") == kind, kind .. " has no seat")
 	check(not seat.CanTouch and seat.MaxSpeed == 0 and seat.Torque == 0, kind .. "'s seat would take over the driving")
-	local drive, steer = chassis:FindFirstChild("Drive"), chassis:FindFirstChild("Steer")
-	check(drive and drive.ClassName == "LinearVelocity" and drive.VelocityConstraintMode == R.Enum.VelocityConstraintMode.Plane, kind .. " has no planar Drive")
-	check(drive.PrimaryTangentAxis == R.Vector3.new(1, 0, 0) and drive.SecondaryTangentAxis == R.Vector3.new(0, 0, 1), kind .. "'s Drive isn't horizontal")
-	check(steer and steer.ClassName == "AlignOrientation" and steer.Mode == R.Enum.OrientationAlignmentMode.OneAttachment, kind .. " has no Steer")
+	-- Nothing pushes it about: the server anchors the chassis and moves it.
+	check(
+		chassis:FindFirstChild("Drive") == nil and chassis:FindFirstChild("Steer") == nil,
+		kind .. " still has drive constraints"
+	)
+	check(chassis:FindFirstChildWhichIsA("Constraint") == nil, kind .. " has a constraint on its chassis")
 	local _, wantYaw = at:ToOrientation()
-	local _, gotYaw = steer.CFrame:ToOrientation()
-	check(math.abs(wantYaw - gotYaw) < 1e-4, kind .. " would swing round when it spawns")
+	local _, gotYaw = chassis.CFrame:ToOrientation()
+	check(math.abs(wantYaw - gotYaw) < 1e-4, kind .. " doesn't face the way its bay does")
 	-- Each cosmetic part is connected through a weld or an articulated joint.
 	-- (Instances compare equal with ==, but lune can hand back a new wrapper
 	-- each time a property is read, so they can't be table keys.)
@@ -129,4 +132,8 @@ for _, kind in Rules.MachineOrder do
 	check(model:GetAttribute("Mech") and model:GetAttribute("CameraFit") >= 20, "Mech identity or camera fit missing")
 end
 
-print("PASS: " .. checks .. " machine checks (driving maths, chassis, seats, constraints, welds, articulated mech joints)")
+print(
+	"PASS: "
+		.. checks
+		.. " machine checks (driving maths, chassis, seats, no drive constraints, welds, articulated mech joints)"
+)

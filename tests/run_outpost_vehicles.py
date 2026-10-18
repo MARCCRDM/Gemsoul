@@ -1,4 +1,4 @@
-"""Run server vehicle lifecycle with real drive math and simulated physics.
+"""Run the server-moved mechs with the real drive maths and a stand-in world.
 
 Uses Lune when installed, otherwise the bundled Luau and scene math doubles.
 Neither runner substitutes for an in-engine multiplayer driving check.
@@ -26,6 +26,7 @@ local v2mt={}
 local Vector2={new=function(x,y) return setmetatable({X=x,Y=y},v2mt) end}
 v2mt.__index=function(v,k) if k=="Magnitude" then return math.sqrt(v.X*v.X+v.Y*v.Y) end end
 v2mt.__eq=function(a,b) return a.X==b.X and a.Y==b.Y end
+vmt.__eq=function(a,b) return a.X==b.X and a.Y==b.Y and a.Z==b.Z end
 Vector2.zero=Vector2.new(0,0)
 local R={Vector2=Vector2,Vector3=Vector3,CFrame=CFrame,Color3=Color3,Enum=Enum}
 local modules={}

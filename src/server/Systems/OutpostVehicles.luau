@@ -1,6 +1,15 @@
--- Server-owned mech physics. The pilot sends input, and one controller sets
--- velocity/heading for every occupied machine. Seat weld creation can change
--- assembly ownership, so it is checked again after boarding and while driving.
+-- The mechs, driven by the server. The pilot sends input; each frame the
+-- server moves every piloted mech itself. A mech is anchored, never a physics
+-- body: it's put where it should be, along the ground (stepping up kerbs,
+-- dropping off ledges, stopped by walls and rocks), with the pilot riding in
+-- its seat. So nothing depends on Roblox handing the physics to anyone, on
+-- the constraints' solver, or on the pilot's humanoid: an anchored part always
+-- goes where it's put. (Driving through physics, mechs that stood still were
+-- reported again and again, and no cause was ever found from the logs.)
+--
+-- Clients draw a moving mech gliding between the server's steps from the
+-- model's MechPosition and MechMotion (yaw, speed, turn rate) attributes
+-- (MechAnimation); MechBlocked says something is in the way.
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -16,12 +25,16 @@ local OutpostVehicles = {}
 
 -- Seconds before a held input that stops arriving counts as let go.
 local INPUT_TIMEOUT = 1.5
--- Seconds between ownership checks after the seat weld settles.
-local CLAIM_RETRY = 2
 -- Seconds in the seat with no word from the pilot's client before it's logged.
 local SILENT_AFTER = 5
 -- Stuck reports taken from one pilot, per time in the seat.
 local MAX_REPORTS = 3
+-- Studs kept clear of a wall; the highest step a mech climbs (times its
+-- scale: its foot rides up kerbs this tall, Server OutpostMachines); how far
+-- below it looks for the ground.
+local SKIN, LIFT, DROP = 0.4, 1.6, 60
+-- Seconds a stuck report lets it drive through whatever it's wedged in.
+local UNSTICK = 1.5
 
 type Machine = {
 	Kind: string,
@@ -36,8 +49,13 @@ type Machine = {
 	Speed: number,
 	Yaw: number,
 	ServerDriving: boolean,
-	NextClaim: number,
-	Warned: boolean,
+	-- Its size, for moving it along the ground: the highest step it climbs,
+	-- how high its middle rides, and how fast it's falling off a ledge.
+	Lift: number,
+	Hover: number,
+	Fall: number,
+	Blocked: string?,
+	UnstickUntil: number,
 	-- Diagnostics: when the pilot sat down, whether their client has said
 	-- anything since, stuck reports taken, and the server keeping the physics.
 	BoardedAt: number,
@@ -49,68 +67,45 @@ type Machine = {
 local machines: { Machine } = {}
 local bySeat: { [Instance]: Machine } = {}
 local folder: Instance? = nil
+OutpostVehicles.Gravity = 196.2 -- (workspace.Gravity, once started)
 
 local function yawOf(part: BasePart): number
 	local _, yaw = part.CFrame:ToOrientation()
 	return yaw
 end
 
+-- Where it is and how it's moving, for every client to draw it gliding
+-- between the server's steps (MechAnimation). Only sent when it changes.
+local function publish(machine: Machine, turn: number)
+	local chassis = machine.Model.PrimaryPart :: BasePart
+	local position = chassis.Position
+	local motion = Vector3.new(machine.Yaw, machine.Speed, turn)
+	local model = machine.Model
+	if model:GetAttribute("MechPosition") ~= position then
+		model:SetAttribute("MechPosition", position)
+	end
+	if model:GetAttribute("MechMotion") ~= motion then
+		model:SetAttribute("MechMotion", motion)
+	end
+	if model:GetAttribute("MechBlocked") ~= machine.Blocked then
+		model:SetAttribute("MechBlocked", machine.Blocked)
+	end
+end
+
 local function stop(machine: Machine)
 	local chassis = machine.Model.PrimaryPart :: BasePart
-	local drive = chassis:FindFirstChild("Drive") :: LinearVelocity?
-	local steer = chassis:FindFirstChild("Steer") :: AlignOrientation?
-	if drive then
-		drive.PlaneVelocity = Vector2.zero
-	end
-	if steer then
-		steer.CFrame = CFrame.Angles(0, yawOf(chassis), 0)
-	end
-end
-
--- Always retain manual server ownership, including the seated character.
-local function owner(machine: Machine)
-	local chassis = machine.Model.PrimaryPart
-	if not chassis then
-		return
-	end
-	local ok, problem = pcall(chassis.SetNetworkOwner, chassis, nil)
-	if not ok and not machine.Warned then
-		machine.Warned = true
-		warn(
-			string.format(
-				"[Mech] %s: couldn't claim server physics: %s",
-				machine.Kind,
-				tostring(problem)
-			)
-		)
-	end
-end
-
-local function serverOwns(machine: Machine): boolean
-	local chassis = machine.Model.PrimaryPart
-	if not chassis then
-		return false
-	end
-	local ok, current = pcall(chassis.GetNetworkOwner, chassis)
-	return ok and current == nil
+	machine.Speed, machine.Blocked = 0, nil
+	machine.Yaw = yawOf(chassis)
+	publish(machine, 0)
 end
 
 -- Back to its bay, parked straight.
 local function reset(machine: Machine)
 	local chassis = machine.Model.PrimaryPart :: BasePart
 	chassis.Anchored = true
-	local size = chassis.Size
-	machine.Model:PivotTo(machine.Bay * CFrame.new(0, size.Y / 2 + 0.2, 0))
+	machine.Model:PivotTo(machine.Bay * CFrame.new(0, chassis.Size.Y / 2 + 0.2, 0))
+	machine.Fall, machine.ServerDriving = 0, false
 	stop(machine)
-	local steer = chassis:FindFirstChild("Steer") :: AlignOrientation?
-	if steer then
-		local _, yaw = machine.Bay:ToOrientation()
-		steer.CFrame = CFrame.Angles(0, yaw, 0)
-	end
-	chassis.Anchored = false
-	chassis.AssemblyLinearVelocity = Vector3.zero
-	chassis.AssemblyAngularVelocity = Vector3.zero
-	owner(machine)
 	machine.LastUsed = os.clock()
 end
 
@@ -150,9 +145,13 @@ end
 
 local function spawnMachine(kind: string, bay: CFrame)
 	local model = OutpostMachines.build(kind, bay)
+	-- Anchored for good: the server moves it (see the top of this file).
+	local chassis = model.PrimaryPart :: BasePart
+	chassis.Anchored = true
 	model.Parent = folder
 	CollectionService:AddTag(model, "OutpostMech")
 	local seat = model:FindFirstChild("Seat") :: VehicleSeat
+	local scale = model:GetAttribute("MechScale") or 1
 	local machine: Machine = {
 		Kind = kind,
 		Bay = bay,
@@ -163,16 +162,20 @@ local function spawnMachine(kind: string, bay: CFrame)
 		Steer = 0,
 		InputAt = 0,
 		Speed = 0,
-		Yaw = 0,
+		Yaw = yawOf(chassis),
 		ServerDriving = false,
-		NextClaim = 0,
-		Warned = false,
+		Lift = LIFT * scale,
+		Hover = chassis.Size.Y / 2 + 0.2,
+		Fall = 0,
+		Blocked = nil,
+		UnstickUntil = 0,
 		BoardedAt = 0,
 		Heard = false,
 		SilentLogged = false,
 		Reports = 0,
 	}
 	table.insert(machines, machine)
+	publish(machine, 0)
 
 	local spec = Rules.Machines[kind]
 	local prompt = Instance.new("ProximityPrompt")
@@ -201,7 +204,7 @@ local function spawnMachine(kind: string, bay: CFrame)
 	return machine
 end
 
--- A pilot got in or out: fresh input, with physics still on the server.
+-- A pilot got in or out: fresh input, from rest.
 function OutpostVehicles.seated(machine: Machine)
 	local driver = driverOf(machine)
 	local prompt = machine.Seat:FindFirstChild("DrivePrompt") :: ProximityPrompt?
@@ -232,13 +235,10 @@ function OutpostVehicles.seated(machine: Machine)
 	machine.Seat:SetAttribute("MechInputThrottle", nil)
 	machine.Seat:SetAttribute("MechInputSteer", nil)
 	machine.Throttle, machine.Steer, machine.InputAt, machine.Speed = 0, 0, 0, 0
-	machine.ServerDriving, machine.Warned = false, false
+	machine.ServerDriving = false
 	machine.BoardedAt, machine.Heard, machine.SilentLogged = os.clock(), false, false
-	machine.Reports = 0
-	-- The seat weld can still be settling: try again shortly if it didn't take.
-	machine.NextClaim = os.clock() + 0.5
+	machine.Reports, machine.UnstickUntil = 0, 0
 	stop(machine)
-	owner(machine)
 	machine.LastUsed = os.clock()
 end
 
@@ -309,66 +309,27 @@ local function note(message: string, detail: string)
 	end
 end
 
-local function anchoredParts(chassis: BasePart): { BasePart }
-	local found = {}
-	local ok, parts = pcall(chassis.GetConnectedParts, chassis, true)
-	for _, part in if ok then parts else { chassis } do
-		if part.Anchored then
-			table.insert(found, part)
-		end
-	end
-	return found
-end
-
--- How it looks from here: who runs the physics, what's anchored, the input.
-local function serverView(machine: Machine, driver: Player, clock: number): string
+-- How it looks from here: where it is, the input, what's in the way.
+local function serverView(machine: Machine, clock: number): string
 	local chassis = machine.Model.PrimaryPart :: BasePart
-	local okOwner, current = pcall(chassis.GetNetworkOwner, chassis)
-	local drive = chassis:FindFirstChild("Drive") :: LinearVelocity?
-	local v = chassis.AssemblyLinearVelocity
-	local pv = if drive then drive.PlaneVelocity else Vector2.zero
-	local names = {}
-	for _, part in anchoredParts(chassis) do
-		table.insert(names, part:GetFullName())
-	end
+	local at = chassis.Position
 	return string.format(
-		"physics %s, server driving %s, input %.2f/%.2f (%.1f s old), speed %.1f, drive (%.1f, %.1f), anchored: %s",
-		if not okOwner
-			then "unknown"
-			elseif current == driver then "pilot"
-			elseif current then "other player"
-			else "server",
+		"at (%.0f, %.1f, %.0f), anchored %s, server driving %s, input %.2f/%.2f (%.1f s old), speed %.1f, blocked by %s",
+		at.X,
+		at.Y,
+		at.Z,
+		tostring(chassis.Anchored),
 		tostring(machine.ServerDriving),
 		machine.Throttle,
 		machine.Steer,
 		clock - machine.InputAt,
-		Vector2.new(v.X, v.Z).Magnitude,
-		pv.X,
-		pv.Y,
-		if #names > 0 then table.concat(names, ", ") else "none"
+		machine.Speed,
+		machine.Blocked or "nothing"
 	)
 end
 
--- Free anything anchored in the mech or the pilot, and keep the physics on
--- the server for the rest of this ride.
-local function recover(machine: Machine, driver: Player): string
-	local chassis = machine.Model.PrimaryPart :: BasePart
-	local done = {}
-	for _, part in anchoredParts(chassis) do
-		local ours = part:IsDescendantOf(machine.Model)
-			or (driver.Character ~= nil and part:IsDescendantOf(driver.Character))
-		if ours then
-			part.Anchored = false
-			table.insert(done, "unanchored " .. part.Name)
-		end
-	end
-	owner(machine)
-	machine.ServerDriving = false -- resume from the actual heading after repair
-	table.insert(done, "server physics reclaimed")
-	return if #done > 0 then table.concat(done, ", ") else "nothing left to try"
-end
-
--- MechReport: the pilot's client says its mech won't move.
+-- MechReport: the pilot's client says its mech won't move. Logged with both
+-- sides' view; for a moment it drives through whatever it's wedged in.
 function OutpostVehicles.report(player: Player, text: any, now: number?): boolean
 	if type(text) ~= "string" then
 		return false
@@ -380,10 +341,12 @@ function OutpostVehicles.report(player: Player, text: any, now: number?): boolea
 	end
 	machine.Reports += 1
 	local clock = now or os.clock()
-	local before = serverView(machine, player, clock)
-	local done = recover(machine, player)
-	-- Echo the server view to this pilot's log. Client-only logs otherwise
-	-- cannot distinguish rejected input from a blocked physics assembly.
+	local before = serverView(machine, clock)
+	local chassis = machine.Model.PrimaryPart :: BasePart
+	chassis.Anchored = true
+	machine.UnstickUntil = clock + UNSTICK
+	local done = "re-anchored, driving through obstacles for " .. UNSTICK .. " s"
+	-- Echo the server view to this pilot's log, so a client log shows both.
 	Remotes.MechReport:FireClient(player, "[Mech] Server: " .. before .. ". Done: " .. done)
 	note(
 		"[Mech] " .. machine.Kind .. " won't move",
@@ -399,23 +362,147 @@ function OutpostVehicles.report(player: Player, text: any, now: number?): boolea
 	return true
 end
 
--- One frame: drive every piloted machine whose physics the server still holds.
+-- What the mech bumps into: everything solid but itself, the players, and
+-- the Outpost's creatures and rifts.
+local function query(machine: Machine): RaycastParams
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	local skip = { machine.Model }
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(skip, player.Character)
+		end
+	end
+	for _, name in { "Enemies", "Kaiju", "Rifts", "RiftTears" } do
+		local found = workspace:FindFirstChild(name)
+		if found then
+			table.insert(skip, found)
+		end
+	end
+	params.FilterDescendantsInstances = skip
+	return params
+end
+
+-- How far the mech's hull, swept from `from` along `direction`, gets before
+-- it hits something (nil: nothing), and what it hit. (Replaced in tests.)
+function OutpostVehicles.sweep(machine: Machine, from: CFrame, size: Vector3, direction: Vector3): (number?, string?)
+	local hit = workspace:Blockcast(from, size, direction, query(machine))
+	if hit then
+		return hit.Distance, hit.Instance.Name
+	end
+	return nil, nil
+end
+
+-- The height of the ground under `origin`, looking down `length` studs.
+function OutpostVehicles.floor(machine: Machine, origin: Vector3, length: number): number?
+	local hit = workspace:Raycast(origin, Vector3.new(0, -length, 0), query(machine))
+	return hit and hit.Position.Y
+end
+
+-- The hull to sweep: its box where it stands now.
+local function hullOf(machine: Machine, chassis: BasePart): (CFrame, Vector3)
+	local hull = machine.Model:FindFirstChild("Hull") :: BasePart?
+	if hull then
+		return hull.CFrame, hull.Size - Vector3.new(0.2, 0.2, 0.2)
+	end
+	local size = chassis.Size
+	return chassis.CFrame * CFrame.new(0, machine.Lift / 2, 0), Vector3.new(size.X, size.Y - machine.Lift, size.Z)
+end
+
+-- One frame's move: `distance` studs along heading `yaw` (backwards if
+-- negative), over the ground. Returns what stopped it, if anything.
+local function travel(
+	machine: Machine,
+	chassis: BasePart,
+	distance: number,
+	yaw: number,
+	dt: number,
+	clock: number
+): string?
+	local here = chassis.Position
+	local heading = CFrame.Angles(0, yaw, 0)
+	local to = here
+	local blocked: string? = nil
+	if math.abs(distance) > 1e-4 then
+		local along = heading.LookVector * math.sign(distance)
+		local free = math.abs(distance)
+		if clock >= machine.UnstickUntil then
+			local from, size = hullOf(machine, chassis)
+			local hit, what = OutpostVehicles.sweep(machine, from, size, along * (free + SKIN))
+			if hit then
+				free = math.clamp(hit - SKIN, 0, free)
+				blocked = what or "something"
+			end
+		end
+		to = here + along * free
+		-- (Never out over the crater rim.)
+		local offset = to - Rules.Location.Position
+		if Vector3.new(offset.X, 0, offset.Z).Magnitude > Rules.Radius + 40 then
+			to, blocked = here, "the crater rim"
+		end
+	end
+	-- The ground there: a step it can climb, a drop it falls down, or neither.
+	local foot = here.Y - machine.Hover
+	local function groundAt(at: Vector3): number?
+		local y = OutpostVehicles.floor(
+			machine,
+			Vector3.new(at.X, foot + machine.Lift + 0.5, at.Z),
+			machine.Lift + 0.5 + DROP
+		)
+		return if y then y + machine.Hover else nil
+	end
+	local rest = groundAt(to)
+	if to ~= here and (rest == nil or rest > here.Y + machine.Lift + 0.05) then
+		to, blocked = here, if rest == nil then "no ground" else "a ledge"
+		rest = groundAt(here)
+	end
+	local y = here.Y
+	if rest and rest >= y then
+		y, machine.Fall = rest, 0
+	elseif rest then
+		machine.Fall += OutpostVehicles.Gravity * dt
+		y = math.max(rest, y - machine.Fall * dt)
+		if y <= rest then
+			machine.Fall = 0
+		end
+	end
+	-- (Nothing changed, nothing set: nothing to send to the clients.)
+	if to ~= here or y ~= here.Y or yaw ~= machine.Yaw then
+		chassis.CFrame = CFrame.new(to.X, y, to.Z) * heading
+	end
+	return blocked
+end
+
+-- One frame: move every piloted mech (and let a dropped one land).
 function OutpostVehicles.step(dt: number, now: number?)
 	local clock = now or os.clock()
 	for _, machine in machines do
 		local driver = driverOf(machine)
 		-- ChildAdded can fire before SeatWeld.Part1 arrives. Reconcile after
-		-- replication/physics settles instead of depending on another event.
-		if machine.Pilot ~= driver then OutpostVehicles.seated(machine) end
+		-- replication settles instead of depending on another event.
+		if machine.Pilot ~= driver then
+			OutpostVehicles.seated(machine)
+		end
 		local chassis = machine.Model.PrimaryPart
-		if not driver or not chassis or chassis.Anchored then
+		local spec = Rules.Machines[machine.Kind]
+		if not chassis or not spec then
+			continue
+		end
+		if not driver then
 			machine.ServerDriving = false
+			if machine.Fall > 0 then
+				travel(machine, chassis, 0, machine.Yaw, dt, clock)
+				publish(machine, 0)
+			end
 			continue
 		end
 		if not machine.Heard and not machine.SilentLogged and clock - machine.BoardedAt >= SILENT_AFTER then
 			machine.SilentLogged = true
-			Remotes.MechReport:FireClient(driver, "[Mech] No pilot input received after boarding. Server: "
-				.. serverView(machine, driver, clock))
+			Remotes.MechReport:FireClient(
+				driver,
+				"[Mech] No pilot input received after boarding. Server: " .. serverView(machine, clock)
+			)
 			note(
 				"[Mech] no word from the pilot's client",
 				string.format(
@@ -424,45 +511,39 @@ function OutpostVehicles.step(dt: number, now: number?)
 					machine.Kind,
 					driver.Name,
 					SILENT_AFTER,
-					serverView(machine, driver, clock)
+					serverView(machine, clock)
 				)
 			)
 		end
-		if clock >= machine.NextClaim then
-			machine.NextClaim = clock + CLAIM_RETRY
-			if not serverOwns(machine) then owner(machine) end
-		end
-		local drive = chassis:FindFirstChild("Drive") :: LinearVelocity?
-		local steer = chassis:FindFirstChild("Steer") :: AlignOrientation?
-		local spec = Rules.Machines[machine.Kind]
-		if not drive or not steer or not spec then
-			continue
-		end
-		local v = chassis.AssemblyLinearVelocity
 		if not machine.ServerDriving then
-			-- Pick up where the client left it, not where it was boarded.
+			-- Pick up from where it stands, at rest.
 			machine.ServerDriving = true
-			machine.Yaw = yawOf(chassis)
-			machine.Speed = v:Dot(CFrame.Angles(0, machine.Yaw, 0).LookVector)
+			machine.Yaw, machine.Speed = yawOf(chassis), 0
 		end
-		local fresh = clock - machine.InputAt <= INPUT_TIMEOUT
-		local throttle = if fresh and not busy(driver) then machine.Throttle else 0
-		local turn = if fresh and not busy(driver) then machine.Steer else 0
+		-- (Anchored for good; put back if anything ever lets go of it.)
+		if not chassis.Anchored then
+			chassis.Anchored = true
+		end
+		local fresh = clock - machine.InputAt <= INPUT_TIMEOUT and not busy(driver)
+		local throttle = if fresh then machine.Throttle else 0
+		local turn = if fresh then machine.Steer else 0
+		local before = machine.Yaw
 		local speed, yaw = Rules.drive(spec, machine.Speed, machine.Yaw, throttle, turn, dt)
-		-- Don't keep shoving at full speed into a wall or a rock.
-		local actual = Vector2.new(v.X, v.Z).Magnitude
-		if math.abs(speed) > actual + 10 then
-			speed = math.sign(speed) * (actual + 10)
-		end
-		machine.Speed, machine.Yaw = speed, yaw
-		local heading = CFrame.Angles(0, yaw, 0)
-		local forward = heading.LookVector
-		drive.PlaneVelocity = Vector2.new(forward.X * speed, forward.Z * speed)
-		steer.CFrame = heading
+		local blocked = travel(machine, chassis, speed * dt, yaw, dt, clock)
+		-- Against a wall it stops (and starts again from rest when turned away).
+		machine.Speed = if blocked then 0 else speed
+		machine.Yaw, machine.Blocked = yaw, blocked
+		publish(machine, if dt > 0 then (yaw - before) / dt else 0)
 	end
 end
 
 function OutpostVehicles.start(site)
+	local ok, gravity = pcall(function()
+		return workspace.Gravity
+	end)
+	if ok and type(gravity) == "number" and gravity > 0 then
+		OutpostVehicles.Gravity = gravity
+	end
 	local holder = Instance.new("Folder")
 	holder.Name = "Machines"
 	holder.Parent = site.Model

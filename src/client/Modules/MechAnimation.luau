@@ -1,4 +1,6 @@
--- Animate all nearby quarry mechs, including those piloted by other players.
+-- Animate all nearby quarry mechs, including those piloted by other players,
+-- and draw each one gliding between the server's steps (it's anchored, and
+-- moved by the server: Server OutpostVehicles).
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
@@ -7,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 local Motion = require(ReplicatedStorage.Shared.MechMotion)
 local Seating = require(ReplicatedStorage.Shared.Seating)
 local TAG = "OutpostMech"
+local RANGE = 300 -- studs from the camera a mech is animated and glided within
 local active = {}
 local pending = {}
 
@@ -172,6 +175,55 @@ local function impact(at: Vector3, scale: number, drill: boolean, distance: numb
 	end
 end
 
+-- The server moves a mech in steps, which reach this screen unevenly. Between
+-- them it's drawn carrying on from the latest (MechPosition, and MechMotion:
+-- heading, speed, turn rate) for a moment, easing out any difference; once
+-- it stops it's put exactly where the server has it, and left there.
+local GLIDE = 18 -- how quickly the drawn mech catches up (per second)
+local AHEAD = 0.25 -- seconds it carries on from a step before waiting for the next
+local SNAP = 12 -- studs off, it jumps there
+local function glide(dt: number)
+	local camera = workspace.CurrentCamera
+	local clock = os.clock()
+	for model, rig in active do
+		local position, motion = model:GetAttribute("MechPosition"), model:GetAttribute("MechMotion")
+		if typeof(position) ~= "Vector3" or typeof(motion) ~= "Vector3" then
+			continue
+		end
+		if position ~= rig.Position or motion ~= rig.Motion then
+			rig.Position, rig.Motion, rig.Heard, rig.Settled = position, motion, clock, false
+		end
+		if rig.Settled then
+			continue
+		end
+		if camera and (position - camera.CFrame.Position).Magnitude > RANGE then
+			rig.Shown = nil -- (far off, the server's own steps will do)
+			continue
+		end
+		local ahead = math.min(clock - rig.Heard, AHEAD)
+		local heading = CFrame.Angles(0, motion.X + motion.Z * ahead, 0)
+		local goal = CFrame.new(position + heading.LookVector * (motion.Y * ahead)) * heading
+		local shown = rig.Shown or rig.Root.CFrame
+		if (shown.Position - goal.Position).Magnitude > SNAP then
+			shown = goal
+		else
+			shown = shown:Lerp(goal, 1 - math.exp(-GLIDE * dt))
+		end
+		if
+			motion.Y == 0
+			and motion.Z == 0
+			and (shown.Position - goal.Position).Magnitude < 0.02
+			and shown.LookVector:Dot(goal.LookVector) > 0.99999
+		then
+			shown, rig.Settled = goal, true
+		end
+		rig.Shown = shown
+		rig.Root.CFrame = shown
+	end
+end
+-- (Before the camera follows it.)
+RunService:BindToRenderStep("MechGlide", Enum.RenderPriority.Camera.Value - 1, glide)
+
 RunService.PreSimulation:Connect(function(dt)
 	local camera = workspace.CurrentCamera
 	if not camera then
@@ -183,12 +235,16 @@ RunService.PreSimulation:Connect(function(dt)
 			remove(model)
 			continue
 		end
-		if (rig.Root.Position - camera.CFrame.Position).Magnitude > 300 then
+		if (rig.Root.Position - camera.CFrame.Position).Magnitude > RANGE then
 			continue
 		end
 		local occupied = Seating.occupant(rig.Seat) ~= nil
-		local speed = rig.Root.AssemblyLinearVelocity:Dot(rig.Root.CFrame.LookVector) / rig.Scale
-		Motion.step(rig.State, dt, speed, rig.Root.AssemblyAngularVelocity.Y, occupied)
+		-- How fast the server moves it (forward, and turning): it's anchored,
+		-- so it has no velocity of its own.
+		local motion = model:GetAttribute("MechMotion")
+		local speed = if typeof(motion) == "Vector3" then motion.Y / rig.Scale else 0
+		local turn = if typeof(motion) == "Vector3" then motion.Z else 0
+		Motion.step(rig.State, dt, speed, turn, occupied)
 		local poses = Motion.pose(rig.State, rig.Scale, now, occupied)
 		local struck = model:GetAttribute("MechStrikeStart")
 		local t = if type(struck) == "number" then now - struck else math.huge

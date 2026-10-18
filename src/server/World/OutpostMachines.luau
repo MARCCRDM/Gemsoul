@@ -1,6 +1,7 @@
 -- Piloted quarry exosuits. Historical machine IDs keep parking and controls
 -- compatible; every body is now a cockpit, articulated arms and walking legs.
--- One invisible chassis handles collision. Cosmetic limbs use Motor6Ds, with
+-- One invisible chassis is the root (OutpostVehicles anchors it and moves the
+-- mech); an invisible hull and foot are what it bumps into. Cosmetic limbs use Motor6Ds, with
 -- distance-driven animation on each client (MechAnimation / Shared.MechMotion).
 local OutpostMachines = {}
 local DARK = Color3.fromRGB(32, 39, 42)
@@ -88,16 +89,16 @@ function OutpostMachines.build(kind: string, at: CFrame): Model
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(1.2, 0.05, 0, 100, 1)
 	chassis.RootPriority = 127
 	model.PrimaryPart = chassis
-	-- What it bumps into. A box sliding on its flat bottom catches on the
-	-- smallest step (a kerb, the edge of the bay's apron) and stops dead, so
-	-- the chassis carries the weight but doesn't collide: a ball under it
-	-- takes the ground and rides up steps of up to LIFT studs, and a box
-	-- above that height takes the walls.
+	-- What it bumps into. The chassis doesn't collide: a box from LIFT studs
+	-- up does, the hull, which the server sweeps ahead as it moves the mech
+	-- (so a kerb under it doesn't stop it, and it steps up instead), and a
+	-- ball under it, so nobody walks through its legs.
 	local LIFT, FOOT = 1.6, 6.2
 	local hull = raw("Hull", chassis.CFrame * frame(0, LIFT / 2, 0), Vector3.new(7.6, 12 - LIFT, 6.2), DARK)
 	local foot = raw("Foot", chassis.CFrame * frame(0, -6 + FOOT / 2, 0), Vector3.one * FOOT, DARK, nil, "Ball")
 	for _, collider in { hull, foot } do
-		collider.Transparency, collider.CanCollide = 1, true
+		-- (Queryable too: the server's sweep finds other mechs by them.)
+		collider.Transparency, collider.CanCollide, collider.CanQuery = 1, true, true
 		collider.CustomPhysicalProperties = PhysicalProperties.new(1.2, 0.05, 0, 100, 1)
 		weld(chassis, collider)
 	end
@@ -307,20 +308,8 @@ function OutpostMachines.build(kind: string, at: CFrame): Model
 	seat:SetAttribute("OutpostMachine", kind)
 	seat.Parent = model
 	weld(torso, seat)
-
-	local attachment = Instance.new("Attachment")
-	attachment.Name, attachment.Parent = "DriveAttachment", chassis
-	local drive = Instance.new("LinearVelocity")
-	drive.Name, drive.Attachment0, drive.RelativeTo = "Drive", attachment, Enum.ActuatorRelativeTo.World
-	drive.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
-	drive.ForceLimitsEnabled, drive.ForceLimitMode = true, Enum.ForceLimitMode.Magnitude
-	drive.PrimaryTangentAxis, drive.SecondaryTangentAxis = Vector3.new(1, 0, 0), Vector3.new(0, 0, 1)
-	drive.PlaneVelocity, drive.MaxForce, drive.Parent = Vector2.zero, 6e5, chassis
-	local steer = Instance.new("AlignOrientation")
-	steer.Name, steer.Mode, steer.Attachment0 = "Steer", Enum.OrientationAlignmentMode.OneAttachment, attachment
-	local _, yaw = at:ToOrientation()
-	steer.CFrame, steer.MaxTorque, steer.Responsiveness = CFrame.Angles(0, yaw, 0), 1e8, 30
-	steer.Parent = chassis
+	-- (No drive constraints: the server anchors the chassis and moves the
+	-- whole mech itself, Server OutpostVehicles.)
 	return model
 end
 

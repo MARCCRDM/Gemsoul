@@ -44,21 +44,20 @@ local Rules = { Machines={Mole={Name="Mole",Blurb="Drill mech",MaxSpeed=20}}, dr
 	return 5,0
 end }
 local VehicleDrive, driving = {}, nil
-local drive, steer = { PlaneVelocity=Vector2.zero, Enabled=true }, { Enabled=true }
 local pointMeta = {}
 pointMeta.__sub = function(a, b) return setmetatable({X=a.X-b.X, Y=a.Y-b.Y, Z=a.Z-b.Z}, pointMeta) end
 pointMeta.__index = function(v, k) if k == "Magnitude" then return math.sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z) end end
-local function point(x, y, z) return setmetatable({X=x, Y=y, Z=z}, pointMeta) end
-local chassis = { Size={Z=20}, AssemblyLinearVelocity={X=0,Z=0}, CFrame={ToOrientation=function() return 0,0,0 end},
-	Position=point(0, 0, 0), AssemblyAngularVelocity={Y=0}, AssemblyRootPart={Name="Chassis"}, AssemblyMass=900, ReceiveAge=0 }
-local joined = {}
-function chassis:GetConnectedParts(recursive) assert(recursive == true); return joined end
+local function point(x, y, z) return setmetatable({X=x, Y=y, Z=z, IsVector3=true}, pointMeta) end
+local chassis = { Size={Z=20}, Position=point(0, 0, 0), Anchored=true }
 local toasts = {}
 local UiKit = { toast=function(text) table.insert(toasts, text) end }
 local printed = {}
 local function warn(...) table.insert(printed, table.concat({...}, " ")) end
-function chassis:FindFirstChild(name) return if name=="Drive" then drive else steer end
-local machine = { GetAttribute=function() return 24 end, FindFirstChild=function() return chassis end }
+-- The mech: its camera fit, and where the server has it (MechPosition;
+-- MechMotion: heading, speed, turn rate; MechBlocked: what's in the way).
+local mechAttributes = { CameraFit=24, MechPosition=point(0, 0, 0), MechMotion=point(0, 0, 0) }
+local machine = { GetAttribute=function(_, name) return mechAttributes[name] end,
+	FindFirstChild=function(_, name) return if name=="Chassis" then chassis else nil end }
 local seat = { Parent=machine, ThrottleFloat=1, SteerFloat=0, Children={} }
 function seat:IsA(name) return name=="VehicleSeat" end
 function seat:FindFirstChild(name) return self.Children[name] end
@@ -143,16 +142,16 @@ seat.Children.SeatWeld = nil
 RunService.Heartbeat:Fire(.1)
 check(not VehicleDrive.isDriving(), "Stale server reference authorized an empty seat")
 seatReference.Value = nil
--- The driving constraints can replicate after the seat event.
+-- The chassis can replicate after the seat event.
 hum.SeatPart = seat
-local findConstraint = chassis.FindFirstChild
-chassis.FindFirstChild = function() return nil end
+local findChassis = machine.FindFirstChild
+machine.FindFirstChild = function() return nil end
 seat.Occupant = hum
 RunService.Heartbeat:Fire(.1)
-check(not VehicleDrive.isDriving(), "Started with missing constraints")
-chassis.FindFirstChild = findConstraint
+check(not VehicleDrive.isDriving(), "Started without the chassis")
+machine.FindFirstChild = findChassis
 RunService.Heartbeat:Fire(.1)
-check(VehicleDrive.isDriving() and sent[#sent][1]==1, "Late constraints never resumed driving")
+check(VehicleDrive.isDriving() and sent[#sent][1]==1, "A late chassis never resumed driving")
 board()
 check(VehicleDrive.isDriving() and gui.Enabled, "Lobby mech cannot be driven")
 VehicleDrive.step(0.1)
@@ -330,50 +329,75 @@ count = #sent
 board()
 check(#sent == count + 1 and lastSent()[1] == 0 and lastSent()[2] == 0, "Boarding didn't tell the server")
 
--- Held input, and the mech never leaves its spot: one report, with what this
--- client sees, then the server's takeover gets a few seconds.
+-- Held input, and the server's mech never leaves its spot: one report, with
+-- what this client sees, then the server's push-through gets a few seconds.
 reports, toasts = {}, {}
-joined = { chassis, { Anchored=true, GetFullName=function() return "Workspace.Pilot.HumanoidRootPart" end } }
 keysDown = {W=true}
 for _ = 1, 15 do frame() end
 check(#reports == 0, "Reported a stuck mech too soon")
 frame(); frame()
 check(#reports == 1, "A mech that won't move wasn't reported")
-check(reports[1]:find("from keys", 1, true) and reports[1]:find("Workspace.Pilot.HumanoidRootPart", 1, true), "The report lacked the input or what's anchored")
-check(reports[1]:find("receiveAge", 1, true) and reports[1]:find("mass 900", 1, true), "The report lacked the physics facts")
+check(reports[1]:find("from keys", 1, true) and reports[1]:find("blocked by nothing", 1, true), "The report lacked the input or what's in the way")
+check(reports[1]:find("server has it at (0, 0.0, 0)", 1, true) and reports[1]:find("anchored true", 1, true), "The report lacked where the mech is")
 check(#toasts == 1, "The pilot wasn't told")
 check(printed[#printed]:find("[Mech] Won't move", 1, true) ~= nil, "The report wasn't in the Output")
 for _ = 1, 30 do frame() end
-check(#reports == 1, "Reported again before the takeover had a chance")
+check(#reports == 1, "Reported again before the push-through had a chance")
 for _ = 1, 20 do frame() end
-check(#reports == 2, "A mech still stuck after the takeover wasn't reported again")
+check(#reports == 2, "A mech still stuck after the push-through wasn't reported again")
 for _ = 1, 120 do frame() end
 check(#reports == 2, "Kept reporting the same ride")
-joined = { chassis }
 
--- Moving doesn't report. A later stall does, even away from the spawn bay.
+-- Moving doesn't report: the server's MechPosition keeps changing. A later
+-- stall does, even away from the boarding spot and while it turns.
 hum.SeatPart, seat.Occupant = nil, nil
 hum.Seated:Fire(false, nil)
 board()
 reports = {}
-chassis.AssemblyLinearVelocity = {X=0, Z=-8}
-for _ = 1, 40 do frame() end
+for i = 1, 40 do
+	mechAttributes.MechPosition = point(0, 0, -i) -- (8 studs a second)
+	frame()
+end
 check(#reports == 0, "Reported a mech that was moving")
-chassis.AssemblyLinearVelocity = {X=0, Z=0}
-chassis.Position = point(0, 0, -30)
-chassis.AssemblyAngularVelocity = {Y=.5}
-for _ = 1, 40 do frame() end
-check(#reports == 1, "Turning or leaving the boarding spot hid a translation stall")
-chassis.AssemblyAngularVelocity = {Y=0}
-chassis.Position = point(0, 0, 0)
+for i = 1, 40 do
+	mechAttributes.MechMotion = point(0.05 * i, 0, 0.4)
+	frame()
+end
+check(#reports == 1, "Turning or leaving the boarding spot hid a stall")
+mechAttributes.MechPosition, mechAttributes.MechMotion = point(0, 0, 0), point(0, 0, 0)
 keysDown = {}
 for _ = 1, 40 do frame() end
 check(#reports == 1, "Reported a mech nobody was driving")
--- The client never overwrites server constraints, and reports real speed.
-check(drive.PlaneVelocity==Vector2.zero, "Client wrote server-owned physics constraints")
-chassis.AssemblyLinearVelocity = {X=0,Z=-8}
+-- Steering in place: watched by its heading.
+keysDown = {D=true}
+for i = 1, 40 do
+	mechAttributes.MechMotion = point(-0.1 * i, 0, -0.8)
+	frame()
+end
+check(#reports == 1, "Reported a mech that was turning in place")
+
+-- Something in the way, and the server says so: a hint first, and a report
+-- only if it goes on.
+hum.SeatPart, seat.Occupant = nil, nil
+hum.Seated:Fire(false, nil)
+board()
+reports, toasts = {}, {}
+mechAttributes.MechBlocked = "Boulder"
+keysDown = {W=true}
+for _ = 1, 17 do frame() end
+check(#reports == 0 and #toasts == 1 and toasts[1]:find("in the way", 1, true), "Pushing against a rock wasn't hinted")
+check(blurb.Text == "Something's in the way", "The HUD didn't say something's in the way")
+for _ = 1, 16 do frame() end
+check(#reports == 1 and reports[1]:find("blocked by Boulder", 1, true), "Still stuck after the hint wasn't reported")
+mechAttributes.MechBlocked = nil
+keysDown = {}
 frame()
-check(speedLabel.Text=="8", "HUD displayed requested speed instead of actual movement")
+check(blurb.Text == "Drill mech", "The HUD kept saying something's in the way")
+-- The HUD shows the speed the server moves it at (backing up too).
+mechAttributes.MechMotion = point(0, -8, 0)
+frame()
+check(speedLabel.Text=="8", "HUD didn't show the server's speed")
+mechAttributes.MechMotion = point(0, 0, 0)
 seat.ThrottleFloat=1; focusedBox={}; frame()
 check(lastSent()[1]==0, "Stale seat input drove while typing")
 focusedBox=nil; seat.ThrottleFloat=0
