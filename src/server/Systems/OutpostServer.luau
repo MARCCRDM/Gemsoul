@@ -531,7 +531,7 @@ local function loot(player: Player, node, profile)
  end
 	local spec = Rules.Sizes[node.Size]
 	local result = { Size = node.Size, Name = spec.Name, Zone = node.Zone }
-	-- Further out along the trails, luckier (its zone's Luck).
+	-- Further out in the frontier, luckier (its zone's Luck).
 	local zone = node.Zone and Rules.Zones[node.Zone]
 	local luck = Mine.luck(spec.Depth) + (spec.Luck or 0) + (zone and zone.Luck or 0)
 	-- Rift Charged (a wandering rift cleared): luckier for a while.

@@ -28,6 +28,11 @@ slower. Going out pays in luck instead: it goes on top of the rock's own
 luck on every gem it pays, so the outer rocks roll better gems. A rock's
 label shows its band and luck, e.g. `THE EDGE · +40% LUCK`.
 
+A gem's luck, all told, tops out at 100% (`GemGenerator`). So a Legendary
+comes from about 5.6% of rocks in the core, 7.3% in the Fringe, 8.5% at the
+Edge and 10.1% on a vein. On the guarded vein the cap takes most of the
+extra 35%: 10.7%. Its guardian's Gemsoul and coins are the real prize.
+
 When you cross into a band, its name and a line about it show at the top of
 the screen in its colour. The same band's banner won't show again for 20
 seconds, so walking back and forth across a boundary doesn't keep showing
