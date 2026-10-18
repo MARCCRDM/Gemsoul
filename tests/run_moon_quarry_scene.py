@@ -142,11 +142,12 @@ end
 assert(rim>1000 and skyModel and skyModel.ModelStreamingMode=="Persistent","Crater rim or sky missing or streamed")
 assert(#builtParts<4000,"Quarry scenery budget exceeded")
 local veins={}
-for _,vein in site.Veins do for _,index in vein.Spots do veins[index]=true end end
+for v,vein in site.Veins do for _,index in vein.Spots do veins[index]=v end end
 for i,spot in site.Spots do
  local p=spot.Position-origin.Position
- -- Its zone is its band's (richer outward), or a Rift Vein's.
- local zone=Frontier.zoneOf(Vector3.new(p.X,0,p.Z).Magnitude,veins[i])
+ -- Its zone is its band's (richer outward), or a Rift Vein's (the guarded one's own).
+ local zone=Frontier.zoneOf(Vector3.new(p.X,0,p.Z).Magnitude,veins[i]~=nil)
+ if veins[i]==Frontier.Veins.Guarded then zone="Guarded" end
  assert(site.Zones[i]==zone and math.abs(p.Y)<.001 and p.Magnitude<Rules.Radius,"Unsafe mining position/zone")
  assert((p-Vector3.new(0,0,150)).Magnitude>=84,"Rock in Motor Pool")
  assert((p-Vector3.new(0,0,70)).Magnitude>=40,"Rock in arrival area")

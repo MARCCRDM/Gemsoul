@@ -823,9 +823,12 @@ end
 do
 	local veins = Server._veins
 	check(#veins == 3, "The server isn't keeping the veins")
-	local moved = {}
+	local moved, swungAt = {}, {}
 	Server.onVeinMoved = function(index, scar)
 		table.insert(moved, { index, scar })
+	end
+	Server.onVeinSwing = function(index, player)
+		table.insert(swungAt, { index, player })
 	end
 	local function siteOf(v)
 		return site.VeinSites[veins[v].Site]
@@ -842,6 +845,22 @@ do
 		return list
 	end
 	check(#nodesOn(1) == Frontier.Veins.Rocks, "A vein isn't fully grown")
+	-- One is guarded: luckier rocks of its own zone, and its beam red.
+	local guarded = Frontier.Veins.Guarded
+	local function beamOf(v)
+		return veins[v].Marks and veins[v].Marks:FindFirstChild("VeinBeam")
+	end
+	local function sameColor(x, y)
+		return math.abs(x.R - y.R) + math.abs(x.G - y.G) + math.abs(x.B - y.B) < 0.01
+	end
+	for v = 1, 3 do
+		local zone = if v == guarded then "Guarded" else "Vein"
+		for _, node in nodesOn(v) do
+			check(node.Zone == zone, "A vein " .. v .. " rock in the " .. tostring(node.Zone) .. " zone")
+		end
+		local color = if v == guarded then Frontier.Bands.Guarded.Color else Frontier.Bands.Vein.Color
+		check(beamOf(v) and sameColor(beamOf(v).Color, color), "Vein " .. v .. "'s beam is the wrong colour")
+	end
 	-- Mine it out.
 	local before = siteOf(1)
 	profiles[ana].Outpost.Picks.Survey = 500
@@ -859,6 +878,7 @@ do
 		end
 	end
 	check(#nodesOn(1) == 0, "Couldn't mine the vein out (or its rocks grew back in place)")
+	check(#swungAt > 0 and swungAt[1][1] == 1 and swungAt[1][2] == ana, "Its guardian never heard the swings")
 	advance(5)
 	check(#moved == 1 and moved[1][1] == 1, "A mined-out vein didn't move")
 	local after = siteOf(1)
@@ -873,6 +893,9 @@ do
 	check((moved[1][2].Position - after.Scar.Position).Magnitude < 1e-3, "Its dormant rift didn't move with it")
 	local news = workspaceRoot:GetAttribute("VeinNews") or ""
 	check(string.find(news, Frontier.compass(after.Angle), 1, true), "No word of where it went")
+	check(string.find(news, "A guarded Rift Vein", 1, true) == (if guarded == 1 then 1 else nil), "The news")
+	local red = beamOf(guarded)
+	check(red and sameColor(red.Color, Frontier.Bands.Guarded.Color), "Moved, its beam isn't red")
 	-- Nothing grows back on top of the new rocks.
 	local count = #nodesOn(1)
 	advance(400)
@@ -890,6 +913,8 @@ do
 	veins[2].Due = now
 	Server._veinTick(now)
 	check(veins[2].Site ~= site2 and #moved == 2 and moved[2][1] == 2, "A vein never moved in time")
+	local plain = workspaceRoot:GetAttribute("VeinNews") or ""
+	check(string.find(plain, "A Rift Vein surfaced", 1, true) == 1, "A plain vein's news: " .. plain)
 	check(veins[2].Due - now >= Frontier.Veins.Every - Frontier.Veins.Wobble - 1, "Its next move isn't ten minutes off")
 	profiles[ana].Gems = {}
 end

@@ -26,9 +26,12 @@
 	is mined out (a moment after its last rock pops), and every ten minutes
 	or so anyway (put off while someone is mining it), whatever is left of
 	it goes and it surfaces at another site by the walls with room
-	(site.VeinSites), away from the other two: fresh rocks, its marks and beam of light (OutpostWorld.veinMarks), its dormant
-	rift (OutpostServer.onVeinMoved: FrontierServer), and word round the
-	Outpost (workspace's VeinNews and VeinNewsAt: FrontierHud's banner). Rocks carry their state as attributes (Hp,
+	(site.VeinSites), away from the other two: fresh rocks, its marks and
+	beam of light (OutpostWorld.veinMarks), its dormant rift and its
+	guardian (OutpostServer.onVeinMoved: FrontierServer, KaijuWilds), and
+	word round the Outpost (workspace's VeinNews and VeinNewsAt:
+	FrontierHud's banner). A swing at a vein's rock tells its guardian
+	(OutpostServer.onVeinSwing: KaijuWilds). Rocks carry their state as attributes (Hp,
 	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
 	can show every swing; prompts carry PromptKind (Mine, Probe, Gate,
 	Spar, Duel, Party) for the client to act on.
@@ -90,6 +93,8 @@ OutpostServer.onSwing = function(_player: Player, _swings: number) end
 OutpostServer.bonker = nil :: any -- KaijuWilds: critterOf(model) -> enemy?, bonk(enemy, player, from)
 -- A vein surfaced somewhere new: its index and its dormant rift's CFrame.
 OutpostServer.onVeinMoved = function(_index: number, _scar: CFrame) end
+-- Someone swung at one of vein `index`'s rocks (its guardian wakes).
+OutpostServer.onVeinSwing = function(_index: number, _player: Player) end
 local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
@@ -448,7 +453,9 @@ local function markVein(vein)
 	if vein.Marks then
 		vein.Marks:Destroy()
 	end
-	vein.Marks = OutpostWorld.veinMarks(veinFolder, site.VeinSites[vein.Site].Scar, rng)
+	local guarded = vein == veins[Frontier.Veins.Guarded]
+	local color = if guarded then Frontier.Bands.Guarded.Color else nil
+	vein.Marks = OutpostWorld.veinMarks(veinFolder, site.VeinSites[vein.Site].Scar, rng, color)
 end
 
 -- Vein `v` surfaces at another site: whatever's left of it goes, fresh
@@ -491,7 +498,8 @@ function OutpostServer.moveVein(v: number): boolean
 	vein.Due = nextDue()
 	markVein(vein)
 	OutpostServer.onVeinMoved(v, siteInfo.Scar)
-	workspace:SetAttribute("VeinNews", "A Rift Vein surfaced to the " .. Frontier.compass(siteInfo.Angle))
+	local what = if v == Frontier.Veins.Guarded then "A guarded Rift Vein" else "A Rift Vein"
+	workspace:SetAttribute("VeinNews", what .. " surfaced to the " .. Frontier.compass(siteInfo.Angle))
 	workspace:SetAttribute("VeinNewsAt", workspace:GetServerTimeNow())
 	return true
 end
@@ -618,8 +626,12 @@ local function hit(player: Player, nodeId: any)
 	end
 	lastSwing[player] = now
 	local strikes = if mech then Rules.mechStrikes(machineId, o.Picks[pickId]) else 1
-	-- Noise out past the core: the frontier's critters come for it.
+	-- Noise out past the core: the frontier's critters come for it (and a
+	-- vein's guardian for a swing at its rocks).
 	task.spawn(OutpostServer.onSwing, player, strikes)
+	if veinOf[node.Spot] then
+		task.spawn(OutpostServer.onVeinSwing, veinOf[node.Spot], player)
+	end
 	o.Picks[pickId] -= strikes
 	local pick = Rules.Picks[pickId]
 	local crit = rng:NextNumber() < Rules.CritChance + pick.Crit

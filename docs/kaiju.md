@@ -134,9 +134,10 @@ Moon bugs come through rifts round players out past the core.
 
 ### Wild kaiju
 
-Up to three roam the Outpost at once, within two levels of the strongest
+Up to two roam the Outpost at once, within two levels of the strongest
 kaiju near them, with half again the health of a kaiju of yours at their
-level: it takes you and your kaiju together.
+level: it takes you and your kaiju together. A third guards a Rift Vein
+(see [The vein guardian](#the-vein-guardian)).
 
 A wild kaiju leaves you and your kaiju alone until you start a fight with
 it. There are two ways:
@@ -157,6 +158,29 @@ seconds after one goes.
 - **Kill it:** every kaiju that fought it gets 40 + 12 × its level EXP, and
   the player who (with their kaiju) did the most gets its Gemsoul.
 - **Tame it:** it joins you, Gemsoul and all, at its level.
+
+### The vein guardian
+
+One of the three Rift Veins is guarded (its rocks are red-tinted and
+luckier still, +110%, and its beam is red: see [frontier.md](frontier.md)).
+A wild kaiju of level 16 to 20 sleeps in front of it. It loses narrowly to
+a level-25 kaiju or to two level-10s, and beats a kaiju of its own level.
+
+- It sleeps through people walking by. The **third swing** at its vein's
+  rocks wakes it (two swings, then nothing for 30 seconds, and the count
+  starts again).
+- Awake, it goes for whoever woke it, and anyone else who mines its vein,
+  **a plain miner too**, not only hunters. Its finishing blow knocks a
+  miner down rather than killing them. And it fights their kaiju.
+- Challenge it, fight it or tame it like any other wild kaiju. Killed, it
+  also pays **40 coins** (within the 300 a day from critters).
+- Lead it 70 studs from home and it walks back. Home 8 seconds with
+  nobody fighting it, it forgets everyone and goes back to sleep: three
+  swings again.
+- It never burrows of old age. Beat it or tame it and the vein is yours
+  until the vein moves on; then a fresh guardian sleeps at the new site. If
+  the vein moves while its guardian is still about, the guardian goes with
+  it.
 
 ### Taming
 
@@ -248,7 +272,7 @@ Proposed guardrails:
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe, asks the brain, winds up, strikes, guards, hops, casts its E; the attributes clients pose it by |
 | `KaijuServer` | Your kaiju: the starter, out and back, following and fighting, hurt by element and its guard, knockout, recall, switching, feeding (`KaijuRecall`, `KaijuActive`, `KaijuFeed`) |
-| `KaijuWilds` | Wild kaiju and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
+| `KaijuWilds` | Wild kaiju, the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every E a kaiju casts: where it lands, on whom, and its look |
 | `SparServer` | `Hunt`: the kit out alone |
@@ -269,6 +293,10 @@ hunter's charged heavy, the E winds up on the cast bar, a whole duel
 between two kaiju, kills pay their Gemsoul and EXP, taming (range, half
 health, tries, burrowing, a full roster), moon bugs' coins and daily cap,
 and the rifts: who they open round, the caps, a bug hopping out at its prey
-(a miner too), giving up and slipping back.
+(a miner too), giving up and slipping back. The vein guardian: its level,
+health and where it sleeps, waking on the third swing at its own vein
+(not another's), going for a plain miner, everyone mining its vein once
+awake, not burrowing of old age, back to sleep, moving with its vein, and
+its coins, with no new one until the vein moves.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
 card's place on every phone.

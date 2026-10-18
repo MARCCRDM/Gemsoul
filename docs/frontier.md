@@ -7,7 +7,7 @@ there the rocks grow in outcrops, and three Rift Veins, the richest rocks
 of all, glow by the walls and move on when they're mined out. You mine your
 way out, kite what comes through, and run back in when it gets too hot.
 
-![The Outpost from above: the three bands, the outcrops and the Rift Veins](frontier/map.png)
+![The Outpost from above: the three bands, the outcrops, the Rift Veins and the guarded one](frontier/map.png)
 
 ## The three bands
 
@@ -19,6 +19,7 @@ Each band is measured across the ground from the middle of the Outpost.
 | **The Fringe** | 150–300 | One or two critters at a time | +20% | Gold |
 | **The Edge** | 300 to the walls | Two or three at a time | +40% | Rose |
 | **Rift Vein** | Three spots by the walls | (in the Edge) | +75% | Violet |
+| **Guarded vein** | One of the three | (in the Edge) | +110% | Red |
 
 The rocks are the same everywhere: the lobby mix of chunks and boulders (62
 to 38), with no Monoliths or Geodes. A boulder takes more swings for the
@@ -72,6 +73,20 @@ A Rift Vein doesn't stay put:
 
 So the richest rocks are always somewhere new to head for, and nobody can
 camp them.
+
+### The guarded vein
+
+One of the three is **guarded**. Its rocks are red, +110% luck (+35% on
+a vein's), and its beam is red, so you can tell it from afar. A wild kaiju
+of level 16 to 20 sleeps 30 studs in front of it, facing the outpost. It
+sleeps through people walking past. The third swing at its vein wakes it,
+and it goes for the miners as well as their kaiju (a plain miner is
+knocked down, not killed). Beat it or tame it and the vein is yours until
+it moves on. A beaten guardian pays 40 coins on top of its Gemsoul. When
+the vein moves, a fresh guardian sleeps at the new site, and the banner
+says "A guarded Rift Vein surfaced to the …". The other two veins, and two
+wild kaiju roaming the quarry for taming, stay open to everyone. The rest
+is in [kaiju.md](kaiju.md#the-vein-guardian).
 
 ## Rifts
 
@@ -220,12 +235,12 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 
 | Where | What |
 | --- | --- |
-| `Shared.Frontier` | The rules: bands, colours and luck, the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), pressure, how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
-| `Shared.Outpost` | The Fringe, Edge and Vein zones (the same rock mix, more luck) |
-| `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and beam (`veinMarks`); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
-| `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot, except a vein's; moves a vein when it's mined out or its time comes (`moveVein`, `onVeinMoved`, and `VeinNews` on `workspace`); every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
+| `Shared.Frontier` | The rules: bands, colours and luck, the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), the guarded one and its guardian (`Veins.Guarded`, `Guardian`), pressure, how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
+| `Shared.Outpost` | The Fringe, Edge, Vein and Guarded zones (the same rock mix, more luck) |
+| `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and beam (`veinMarks`, the guarded one's red); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
+| `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot, except a vein's; moves a vein when it's mined out or its time comes (`moveVein`, `onVeinMoved`, and `VeinNews` on `workspace`); a swing at a vein's rock (`onVeinSwing`); every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
 | `FrontierServer` | Each player's band (`FrontierBand`) and noise (`FrontierNoise`), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`, and move with their veins: `moveScar`) |
-| `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk` |
+| `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk`; the vein guardian (`veinSwing`, `veinMoved`) |
 | `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
@@ -235,20 +250,21 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 Tests: `tests/run_frontier.py` checks the rules (bands and zones, the luck
 going up band by band on the same rock mix, the outcrops (none on top of
 each other, on their grain, bigger further out, inside the frontier, the
-lone rocks and the stepping stones out of the core; the rich ground), the vein sites
-and their rocks, picking a vein's next site, the compass, mining
-noise, fair shares, critter levels and EXP, how many come at once, where
-rifts open (wandering ones too), the timeline, that tears are ragged and
+lone rocks and the stepping stones out of the core; the rich ground), the
+vein sites and their rocks, picking a vein's next site, the compass, the
+guarded vein's luck and its guardian's numbers, mining noise, fair
+shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
 lopsided, the pieces each tear is drawn from, the banners, the noise ring
 and the arrows). `tests/run_kaiju.py` runs the server side: who rifts open
 round, swings drawing them, the warning, the caps, edge levels, a pilot's
 strikes, a critter hopping out at its prey (a miner too), giving up and
 slipping back, a stray leaving, wandering rifts roaming and Rift Charged,
-the pay, and the bonk; and builds every moon bug (`tests/moon_bug_cases.luau`:
+the pay, the bonk, and the vein guardian; and builds every moon bug (`tests/moon_bug_cases.luau`:
 its part and shadow budget, no armour or lights, nothing left hanging loose,
 its whole face). `tests/run_outpost.py` and
 `tests/run_moon_quarry_scene.py` cover the zones, luck, regrowth and the
 built layout: the outcrops clear of the roads and buildings with room
-round every rock, their seams, the three veins and their beams, and a vein
-moving (mined out or on time, not while it's being mined; fresh rocks, its
+round every rock, their seams, the three veins and their beams (the
+guarded one's rocks and beam its own), a swing at a vein reaching its
+guardian, and a vein moving (mined out or on time, not while it's being mined; fresh rocks, its
 scar, the banner, nothing growing back where it was).

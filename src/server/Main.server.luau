@@ -119,8 +119,13 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- Swings out past the core draw critters; a pick bonks them.
 			OutpostServer.onSwing = FrontierServer.swing
 			OutpostServer.bonker = KaijuWilds
-			-- A Rift Vein surfacing somewhere new takes its dormant rift along.
-			OutpostServer.onVeinMoved = FrontierServer.moveScar
+			-- A Rift Vein surfacing somewhere new takes its dormant rift (and its
+			-- guardian) along; a swing at a vein's rocks wakes its guardian.
+			OutpostServer.onVeinMoved = function(index, scar)
+				FrontierServer.moveScar(index, scar)
+				task.spawn(KaijuWilds.veinMoved, index, scar)
+			end
+			OutpostServer.onVeinSwing = KaijuWilds.veinSwing
 		end
 	end
 	-- The Motor Pool's machines, for driving round the quarry (Config.Features:

@@ -1107,8 +1107,15 @@ check(
 	"It changed taming"
 )
 check(not target.Alive, "The tamed one still roams")
--- A full roster: no taming.
-local third = wilds[3]
+-- A full roster: no taming. (Another roams out once they've gone.)
+KaijuWilds._spawnWild()
+local third
+for other, entry in KaijuWilds._wilds do
+	if not entry.Bug and other.Alive then
+		third = other
+	end
+end
+check(third ~= nil, "No wild kaiju roamed out again")
 third.Root.CFrame = CFrame.new(rootA.Position + Vector3.new(4, 0, 0))
 third.Humanoid.Health = third.Humanoid.MaxHealth * 0.1
 for i = 1, Kaiju.MaxOwned do
@@ -1502,9 +1509,101 @@ for _, wildEntry in KaijuWilds._wilds do
 	end
 end
 
+-- The vein guardian ------------------------------------------------------------------------------------------
+
+-- One more wild kaiju, asleep in front of the guarded Rift Vein: levels 16
+-- to 20, the third swing at its vein wakes it, it goes for a plain miner
+-- too, it never burrows of old age, it moves with its vein, and killed it
+-- pays coins and nothing takes its place until the vein moves.
+local function across(v: Vector3): Vector3
+	return Vector3.new(v.X, 0, v.Z)
+end
+check(Kaiju.Wild.Max == 2, "Not 2 wild kaiju roaming")
+local Guarded = Frontier.Veins.Guarded
+local veinScar = CFrame.new(center + Vector3.new(0, 0, -(Frontier.Rim + 2)))
+KaijuWilds._setGuardAt(veinScar)
+KaijuWilds._spawnGuardian()
+local guard = KaijuWilds._guardian()
+check(guard ~= nil and guard.Guard == true and not guard.Bug, "No vein guardian")
+local keeper = guard.Enemy
+check(guard.Level >= 16 and guard.Level <= 20, "A guardian at level " .. guard.Level)
+check(keeper.Model:GetAttribute("KaijuGuardian") == true, "The guardian isn't marked")
+check(keeper.Model:GetAttribute("KaijuWild") == true, "The guardian can't be tamed")
+local guardHealth = Kaiju.stats(guard.Species, guard.Level, guard.Soul.Tier).Health * Kaiju.Wild.Health
+check(keeper.Humanoid.MaxHealth == math.floor(guardHealth + 0.5), "The guardian's health")
+local sleepAt = veinScar.Position + Vector3.new(0, 0, Frontier.Guardian.Home)
+check(across(keeper.Home - sleepAt).Magnitude < 1, "It doesn't sleep in front of its vein")
+KaijuWilds._spawnGuardian()
+check(KaijuWilds._guardian() == guard, "A second guardian")
+-- Asleep: a miner walking by, or swinging at another vein, doesn't wake it,
+-- nor do two swings at its own.
+stand(keeper.Root.Position + Vector3.new(3, 0, 0))
+table.clear(playerHits)
+keeper.LastAttack = 0
+KaijuWilds._brain(keeper, now)
+check(keeper.Foe == nil, "The guardian woke for a miner walking by")
+KaijuWilds.veinSwing(Guarded + 1, b)
+KaijuWilds.veinSwing(Guarded, b)
+KaijuWilds.veinSwing(Guarded, b)
+KaijuWilds._brain(keeper, now)
+check(keeper.Foe == nil and next(guard.Engaged) == nil, "The guardian woke before the third swing")
+table.clear(notes)
+KaijuWilds.veinSwing(Guarded, b)
+check(guard.Engaged[b] ~= nil and noted(b, "guardian woke"), "The third swing didn't wake it")
+KaijuWilds._brain(keeper, now)
+check(keeper.Foe == b, "It didn't go for the miner who woke it")
+for _ = 1, 80 do
+	now += 0.15
+	stand(keeper.Root.Position + Vector3.new(3, 0, 0))
+	KaijuWilds._brain(keeper, now)
+end
+check(#playerHits > 0 and playerHits[#playerHits][1] == b, "It never struck the miner")
+-- Awake, whoever mines its vein is on its list too.
+check(guard.Engaged[a] == nil, "It started on someone who never touched its vein")
+KaijuWilds.veinSwing(Guarded, a)
+check(guard.Engaged[a] ~= nil, "Mining its vein while it's awake didn't count")
+-- Old age doesn't move it on.
+guard.Born, guard.LastFight, keeper.LastHit = now - Kaiju.Wild.Lifetime - 100, now - 100, 0
+KaijuWilds._lifetimes(now)
+check(keeper.Alive and KaijuWilds._guardian() == guard, "The guardian burrowed of old age")
+-- Left alone at home a while, it goes back to sleep: three swings again.
+table.clear(guard.Engaged)
+guard.Engaged[a] = now - 100
+guard.Swings = 2
+stand(center + Vector3.new(300, 0, 0))
+rootA.CFrame = CFrame.new(center + Vector3.new(-300, 0, 0))
+keeper.Root.CFrame = CFrame.new(keeper.Home)
+keeper.FoeVictim, keeper.LastSource, keeper.LastPet = nil, nil, nil
+KaijuWilds._brain(keeper, now)
+check(guard.Swings == 0, "Asleep again, it still counts the swings from before")
+-- Another vein moving leaves it be; its own moving takes it along.
+local newScar = CFrame.new(center + Vector3.new(Frontier.Rim + 2, 0, 0))
+KaijuWilds.veinMoved(Guarded + 1, newScar)
+check(KaijuWilds._guardian() == guard and keeper.Alive, "Another vein moving moved the guardian")
+KaijuWilds.veinMoved(Guarded, newScar)
+local moved = KaijuWilds._guardian()
+check(not keeper.Alive and KaijuWilds._wilds[keeper] == nil, "The old guardian stayed behind")
+check(moved ~= nil and moved ~= guard and moved.Enemy.Alive, "No guardian at the vein's new site")
+local newSleep = newScar.Position - Vector3.new(Frontier.Guardian.Home, 0, 0)
+check(across(moved.Enemy.Home - newSleep).Magnitude < 1, "The guardian didn't sleep by its vein's new site")
+-- Killed: its Gemsoul, and coins, to whoever did the most; and nothing
+-- takes its place until its vein moves.
+Kaiju.roster(profiles[b]).Bugs = nil
+local coinsBefore = profiles[b].Coins
+moved.Enemy.Damage[b] = 100
+Enemies.damage(moved.Enemy, 1e6, nil, false, nil, nil, nil)
+check(not moved.Enemy.Alive and KaijuWilds._guardian() == nil, "The guardian didn't die")
+check(profiles[b].Coins == coinsBefore + Frontier.Coins.Guardian, "The guardian paid the wrong coins")
+check(noted(b, "vein's guardian"), "Not told they beat the guardian")
+now += Kaiju.Wild.Respawn + 1
+runDelayed()
+check(KaijuWilds._guardian() == nil, "Another guardian came before its vein moved")
+KaijuWilds.veinMoved(Guarded, veinScar)
+check(KaijuWilds._guardian() ~= nil, "No fresh guardian once its vein moved")
+
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills, rifts, critters)",
+		"PASS: %d kaiju server checks (E abilities, your kaiju, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian)",
 		checks
 	)
 )

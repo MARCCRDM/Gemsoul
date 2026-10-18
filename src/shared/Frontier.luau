@@ -23,7 +23,11 @@
 	(Veins), each round a dormant rift with a beam of light over it you can
 	see from the outpost. A vein moves somewhere new once it's mined out, and
 	every ten minutes or so anyway (the Outpost checks a ring of sites for
-	room when it's built: Frontier.veinSites, veinAt).
+	room when it's built: Frontier.veinSites, veinAt). One of the three is
+	guarded (Veins.Guarded: its rocks luckier still, Bands.Guarded, its
+	beam red): a wild kaiju sleeps in front of it and wakes on the third
+	swing there (Guardian), going for the miners too. Beat it or tame it
+	and the vein is yours until it moves on; its guardian goes with it.
 
 	Rifts: every critter comes through a rift of its own, a ragged tear in
 	the air (never the same shape twice). It opens and crackles for a
@@ -76,6 +80,7 @@ local CYAN = Color3.fromRGB(110, 220, 255)
 local GOLD = Color3.fromRGB(255, 200, 90)
 local ROSE = Color3.fromRGB(255, 120, 190)
 local RIFT = Color3.fromRGB(215, 90, 255)
+local GUARD = Color3.fromRGB(255, 86, 96)
 
 -- Each band's name, its crystals' colour, and the luck its rocks add (on
 -- every gem: the rocks are the same mix everywhere, so this is what pays
@@ -85,6 +90,7 @@ Frontier.Bands = {
 	Fringe = { Name = "The Fringe", Color = GOLD, Luck = 0.2 },
 	Edge = { Name = "The Edge", Color = ROSE, Luck = 0.4 },
 	Vein = { Name = "Rift Vein", Color = RIFT, Luck = 0.75 },
+	Guarded = { Name = "Guarded", Color = GUARD, Luck = 1.1 }, -- (a short name: it fits a rock's label)
 }
 Frontier.BandOrder = { "Core", "Fringe", "Edge" }
 Frontier.RiftColor = RIFT
@@ -104,8 +110,13 @@ Frontier.Outcrop = {
 }
 -- Rift Veins: Count at once, Rocks each, moving every Every seconds (give
 -- or take Wobble) if not mined out first; at least Apart radians from each
--- other round the middle; Sites places round the walls to choose from.
-Frontier.Veins = { Count = 3, Rocks = 6, Every = 600, Wobble = 60, Apart = math.rad(70), Sites = 12 }
+-- other round the middle; Sites places round the walls to choose from;
+-- the one (by index) a guardian sleeps at.
+Frontier.Veins = { Count = 3, Rocks = 6, Every = 600, Wobble = 60, Apart = math.rad(70), Sites = 12, Guarded = 1 }
+-- The guarded vein's wild kaiju (KaijuWilds): its level (one loses narrowly
+-- to a level-25 kaiju or two level-10s), the swing at its vein it wakes on,
+-- and where it sleeps: Home studs in from its dormant rift.
+Frontier.Guardian = { Levels = { 16, 20 }, Wake = 3, Home = 30 }
 
 -- Rifts: seconds it takes to open, until the critter hops out (it
 -- crackles all that while: the warning), then lingers and seals; how tall

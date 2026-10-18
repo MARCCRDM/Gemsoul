@@ -24,8 +24,9 @@
 	  OutpostWorld.rock(size, cframe, rng, tint?) -> Model   one rock of that size
 	      (Shared.Outpost.Sizes), its main chunk named "Body"; `tint` colours
 	      its crystals (a frontier band's, Shared.Frontier.Bands)
-	  OutpostWorld.veinMarks(parent, scar, rng) -> Model   a vein's scorched bed,
-	      cracks and beam of light over its dormant rift (moved with it)
+	  OutpostWorld.veinMarks(parent, scar, rng, color?) -> Model   a vein's scorched
+	      bed, cracks and beam of light over its dormant rift (moved with it;
+	      `color` the guarded vein's, Shared.Frontier.Bands.Guarded)
 ]]
 local OutpostWorld = {}
 
@@ -977,8 +978,9 @@ end
 -- Where a vein's dormant rift sits: scorched ground, cracks of the other
 -- side's light running out from it, and a thin beam of violet light over it
 -- you can see from the outpost (the tear itself is drawn by each player's
--- client: RiftTear). Its own model, so it moves with its vein.
-function OutpostWorld.veinMarks(parent, at: CFrame, rng): Model
+-- client: RiftTear). Its own model, so it moves with its vein. The guarded
+-- vein's beam is its own `color`.
+function OutpostWorld.veinMarks(parent, at: CFrame, rng, color: Color3?): Model
 	local model = Instance.new("Model")
 	model.Name = "VeinMarks"
 	model.Parent = parent
@@ -986,7 +988,7 @@ function OutpostWorld.veinMarks(parent, at: CFrame, rng): Model
 		model,
 		at * CFrame.new(0, 90, 0) * CFrame.Angles(0, 0, math.pi / 2),
 		Vector3.new(180, 1.1, 1.1),
-		Color3.fromRGB(215, 90, 255),
+		color or Color3.fromRGB(215, 90, 255),
 		Enum.Material.Neon,
 		"Cylinder"
 	)
@@ -1012,7 +1014,7 @@ function OutpostWorld.veinMarks(parent, at: CFrame, rng): Model
 	return model
 end
 
-local NEAR_SPOTS = 52 -- rock spots in the field round the middle (the trails lead out from it)
+local NEAR_SPOTS = 52 -- rock spots in the field round the middle (the outcrops lead out from it)
 local NEAR_REACH = 140 -- studs: the field stays inside the core (Shared.Frontier.Core)
 
 -- Connected triangles make a continuous crater surface rather than separate
@@ -1843,9 +1845,10 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		taken[index] = true
 		table.insert(angles, siteAngles[index])
 		local vein = { Site = index, Spots = {} }
+		local zone = if #veins + 1 == Frontier.Veins.Guarded then "Guarded" else "Vein"
 		for _, cf in veinSites[index].Rocks do
 			table.insert(spots, cf)
-			zoneOf[#spots] = "Vein"
+			zoneOf[#spots] = zone
 			table.insert(vein.Spots, #spots)
 		end
 		table.insert(veins, vein)

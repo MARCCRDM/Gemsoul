@@ -135,14 +135,16 @@ end
 -- Retain the deeper definitions for other content and saved references.
 -- Out in the frontier (Shared.Frontier) every gem rolls luckier (`Luck`,
 -- on top of the rock's own; Frontier.Bands has the same): the further out,
--- the richer, a Rift Vein the richest. The rock mix stays the same out
--- there (bigger rocks out there only cost more swings for the same gem).
+-- the richer, a Rift Vein the richest (the guarded one more so). The rock
+-- mix stays the same out there (bigger rocks out there only cost more
+-- swings for the same gem).
 Outpost.Zones = {
 	Field = { Name = "Corundum Meadow", Weights = { Pebble = 68, Boulder = 32 } },
 	Common = { Name = "Common Field", Weights = { Pebble = 62, Boulder = 38 } },
 	Fringe = { Name = "The Fringe", Weights = { Pebble = 62, Boulder = 38 }, Luck = 0.2 },
 	Edge = { Name = "The Edge", Weights = { Pebble = 62, Boulder = 38 }, Luck = 0.4 },
 	Vein = { Name = "Rift Vein", Weights = { Pebble = 62, Boulder = 38 }, Luck = 0.75 },
+	Guarded = { Name = "Guarded Rift Vein", Weights = { Pebble = 62, Boulder = 38 }, Luck = 1.1 },
 	Deep = { Name = "Deep Vein", Weights = { Boulder = 58, Monolith = 42 } },
 	Crystal = { Name = "Crystal Crown", Weights = { Monolith = 68, Geode = 32 } },
 }

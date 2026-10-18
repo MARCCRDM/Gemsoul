@@ -19,6 +19,17 @@
 	              Tamed ("KaijuTame"): it joins you, Gemsoul and all. Three
 	              failed tries and it burrows away; so does one left alone
 	              for Kaiju.Wild.Lifetime.
+	  Guardian    one more wild kaiju, sleeping in front of the guarded Rift
+	              Vein (Shared.Frontier.Guardian: levels 16 to 20). The third
+	              swing at its vein wakes it (KaijuWilds.veinSwing, from
+	              OutpostServer), and it goes for that miner, then anyone
+	              else mining its vein, a plain miner too (knocked down, not
+	              killed), and their kaiju. Challenge it, beat it or tame it
+	              like any wild kaiju; killed, it pays Frontier.Coins.Guardian
+	              too. It never burrows of old age, and nothing takes its
+	              place until its vein moves (KaijuWilds.veinMoved): then
+	              whatever's left of it goes, and a fresh one sleeps at the
+	              new site.
 	  Moon bugs   the little brainrot creatures (DungeonRules' roster,
 	              shrunk), each through a rift of its own round a player out
 	              past the core (FrontierServer: Shared.Frontier). One hops
@@ -53,6 +64,8 @@
 	                                            sets it; a bug slips back through one)
 	  KaijuWilds.done(enemy, killed, totals)    a critter is gone (FrontierServer
 	                                            sets it: wandering rifts cleared)
+	  KaijuWilds.veinSwing(index, player)       a swing at vein `index`'s rocks
+	  KaijuWilds.veinMoved(index, scar)         vein `index` surfaced at `scar`
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -107,10 +120,15 @@ type Wild = {
 	Band: string?, -- where its rift opened (Shared.Frontier)
 	IdleSince: number?,
 	Leaving: boolean?,
+	Guard: boolean?, -- the guarded vein's (Frontier.Guardian)
+	Swings: number?, -- swings at its vein while it slept, the last at SwingAt
+	SwingAt: number?,
 }
 
 local wilds: { [any]: Wild } = {} -- by Enemies record
-local wildCount = 0
+local wildCount = 0 -- (roaming: the guardian isn't one of them)
+local guardian: Wild? = nil
+local guardAt: CFrame? = nil -- its vein's dormant rift
 local spots: { Vector3 } = {}
 local rng = Random.new()
 
@@ -229,11 +247,12 @@ local function engaged(wild: Wild, player: Player?): boolean
 	return player ~= nil and player.Parent ~= nil and wild.Engaged[player] ~= nil
 end
 
--- Its foes near a point (for its E): only those who started on it.
+-- Its foes near a point (for its E): only those who started on it (a
+-- guardian's, miners too).
 local function foesOf(wild: Wild)
 	return function(center: Vector3, radius: number): { any }
 		local list = {}
-		for _, victim in foesNear(center, radius) do
+		for _, victim in foesNear(center, radius, wild.Guard) do
 			if engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
 				table.insert(list, victim)
 			end
@@ -249,7 +268,7 @@ local function hitFoe(enemy, victim, amount: number, element: string?, status: s
 	local player = victim.Player
 	if victim.Pet then
 		return KaijuServer.hurt(victim.Pet, amount, element, status, heavy)
-	elseif player and (hunter(player) or (wild ~= nil and wild.Bug and prey(player))) then
+	elseif player and (hunter(player) or (wild ~= nil and (wild.Bug or wild.Guard) and prey(player))) then
 		local _, guarded = Enemies.hitPlayer(victim.Player, amount, element, enemy, heavy)
 		return if guarded then "Guarded" else "Hit"
 	end
@@ -260,11 +279,12 @@ end
 -- game; then whoever hurt it last (a kaiju or a hunter), while they're
 -- inside its leash; else its current foe; else the nearest it sees. A wild
 -- kaiju only goes after those who started on it (a hit is starting on it)
--- and their kaiju.
+-- and their kaiju; a guardian, those who mined its vein too, on foot.
 local function chooseFoe(enemy, wild: Wild, aggro: number)
 	local now = os.clock()
 	local e = enemy :: any
 	local rifted = wild.Bug
+	local wide = rifted or wild.Guard == true
 	local leash = if rifted then Kaiju.Bug.Leash else Kaiju.Wild.Leash
 	if not wild.Bug then
 		if e.LastPet and e.LastPetAt and now - e.LastPetAt < 6 then
@@ -281,7 +301,7 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		if victim.Pet and not KaijuServer.targetable(victim.Pet) then
 			return false
 		end
-		if victim.Player and not (if rifted then prey(victim.Player) else hunter(victim.Player)) then
+		if victim.Player and not (if wide then prey(victim.Player) else hunter(victim.Player)) then
 			return false
 		end
 		if not wild.Bug and not engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
@@ -318,7 +338,7 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		return current
 	end
 	local best, bestDistance = nil, aggro
-	for _, victim in foesNear(enemy.Root.Position, aggro, rifted) do
+	for _, victim in foesNear(enemy.Root.Position, aggro, wide) do
 		local distance = (victim.Root.Position - enemy.Root.Position).Magnitude
 		if valid(victim) and distance <= bestDistance then
 			best, bestDistance = victim, distance
@@ -435,10 +455,14 @@ local function brain(enemy, now: number)
 		if fromHome > 4 then
 			humanoid:MoveTo(enemy.Home)
 		else
+			local awake = next(wild.Engaged) ~= nil
 			for player, at in wild.Engaged do
 				if now - at > CALM_AFTER then
 					wild.Engaged[player] = nil
 				end
+			end
+			if wild.Guard and awake and next(wild.Engaged) == nil then
+				wild.Swings = 0 -- (back to sleep)
 			end
 		end
 		if now - enemy.LastHit > 6 and humanoid.Health < humanoid.MaxHealth then
@@ -498,13 +522,48 @@ local function credits(enemy): (Player?, { [Player]: number })
 	return best, totals
 end
 
+-- Pay ----------------------------------------------------------------------------------------------------
+
+-- Today's critter tally on a roster (Bugs = { Day, Coins, Count }), fresh each day.
+local function tally(roster)
+	local day = math.floor(os.time() / 86400)
+	if not roster.Bugs or roster.Bugs.Day ~= day then
+		roster.Bugs = { Day = day, Coins = 0, Count = 0 }
+	end
+	roster.Bugs.Count = roster.Bugs.Count or 0
+	return roster.Bugs
+end
+KaijuWilds._tally = tally
+
+-- Coins for a critter (or a guardian), within the day's cap.
+local function payCoins(player: Player, amount: number)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return
+	end
+	local bugs = tally(Kaiju.roster(profile))
+	local coins = math.min(amount, Kaiju.bugCoins(bugs, bugs.Day))
+	if coins > 0 then
+		bugs.Coins += coins
+		PlayerData.addCoins(player, coins)
+	end
+end
+
 -- Wild kaiju ------------------------------------------------------------------------------------------
 
 local spawnWild
 
+-- Killed, tamed or burrowed: another roams out a while later (the guardian
+-- has none: a fresh one sleeps at its vein once it moves).
 local function gone(wild: Wild)
 	KaijuFighter.forget(wild.Fighter)
 	wilds[wild.Enemy] = nil
+	if wild.Guard then
+		if guardian == wild then
+			guardian = nil
+		end
+		return
+	end
 	wildCount -= 1
 	task.delay(Kaiju.Wild.Respawn, spawnWild)
 end
@@ -541,7 +600,8 @@ local function wildDied(enemy)
 			Remotes.Notify:FireClient(
 				best,
 				string.format(
-					"Defeated a wild %s: its Gemsoul is yours (%s, E: %s).",
+					"Defeated %s %s: its Gemsoul is yours (%s, E: %s).",
+					if wild.Guard then "the vein's guardian, a" else "a wild",
 					title,
 					GemConfig.displayName(soul),
 					if move then move.Name else "?"
@@ -551,8 +611,133 @@ local function wildDied(enemy)
 			Remotes.Notify:FireClient(best, "Your gem pouch is full: the Gemsoul crumbled to dust.")
 		end
 		PlayerData.milestone(best, "KaijuSlain")
+		if wild.Guard then
+			payCoins(best, Frontier.Coins.Guardian)
+		end
 	end
 	gone(wild)
+end
+
+-- A wild kaiju at `at` (on the ground there), its `level`, turned to
+-- `facing` (any way, if not given); `guard`, the guarded vein's.
+local function newWild(at: Vector3, level: number, guard: boolean, facing: Vector3?): Wild
+	local species = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
+	local element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
+	local soul = Kaiju.rollSoul(Gems.random(), element, {
+		Id = "wild",
+		Time = os.time(),
+		Species = species,
+		Luck = math.clamp(level / 60, 0, 0.5),
+	})
+	local stats = Kaiju.stats(species, level, soul.Tier)
+	local model, _, _ = KaijuServer.body(species, element, Kaiju.Scale.Wild)
+	local named = Kaiju.title({ Species = species, Element = element })
+	local title = (if guard then "Vein Guardian " else "Wild ") .. named
+	model.Name = title
+	KaijuServer.place(model, at, facing or at + Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)))
+	local kind = {
+		Name = title,
+		Health = math.floor(stats.Health * Kaiju.Wild.Health + 0.5),
+		Damage = stats.Damage,
+		Speed = stats.Speed,
+		Reach = stats.Reach,
+		Rate = stats.Rate,
+		Aggro = Kaiju.Wild.Aggro,
+		Coins = 0,
+		DropChance = 0,
+		Luck = 0,
+		Respawn = 0,
+	}
+	local enemy = Enemies.adopt(
+		model,
+		kind,
+		{ Element = element, Title = string.format("%s · Lv %d", title, level), Home = model.PrimaryPart.Position }
+	)
+	local e = enemy :: any
+	local engagedBy = {}
+	e.OutpostCreature = true
+	e.Engaged = engagedBy -- (the kaiju out only fight it for those who started on it)
+	e.Brain = brain
+	e.OnDeath = wildDied
+	-- Every blow lands 60%-140%, times its element against this one's
+	-- and its kind's Guard.
+	e.TakenScale = function(hitElement: string?)
+		local mult, tag = Kaiju.taken(species, element, hitElement)
+		return mult * Kaiju.spread(), tag
+	end
+	local ability = Kaiju.ability(soul)
+	model:SetAttribute("KaijuWild", true)
+	model:SetAttribute("KaijuLevel", level)
+	model:SetAttribute("KaijuAbility", ability)
+	model:SetAttribute("KaijuTries", 0)
+	if guard then
+		model:SetAttribute("KaijuGuardian", true)
+	end
+	-- It leaves you be until you start on it: here, or by hitting it.
+	local challenge = Instance.new("ProximityPrompt")
+	challenge.Name = "ChallengePrompt"
+	challenge.ActionText = "Challenge"
+	challenge.ObjectText = string.format("%s · Lv %d", title, level)
+	challenge.KeyboardKeyCode = Enum.KeyCode.E
+	challenge.HoldDuration = 0.5
+	challenge.MaxActivationDistance = 16
+	challenge.RequiresLineOfSight = false
+	challenge:SetAttribute("PromptKind", "KaijuChallenge")
+	challenge.Parent = enemy.Root
+	-- It fights as a duellist, its guard and hops on its Enemies record
+	-- (so a hunter's swings meet them in Enemies.damage).
+	local fighter = KaijuFighter.new({
+		Model = model,
+		Root = enemy.Root,
+		Humanoid = enemy.Humanoid,
+		Species = species,
+		Element = element,
+		Scale = Kaiju.Scale.Wild,
+		Body = enemy,
+		Stats = stats,
+		Ability = ability,
+		FirstSurge = 4,
+		Strike = function(victim, amount: number, heavy: boolean, _name: string): string
+			return hitFoe(enemy, victim, amount * (1 - Enemies.weakness(enemy)), element, nil, heavy)
+		end,
+		Caster = function()
+			return {
+				Model = model,
+				Root = enemy.Root,
+				Element = element,
+				Ability = ability,
+				Damage = Kaiju.abilityDamage(stats.Damage, soul, ability),
+				Foes = function(center: Vector3, radius: number)
+					local wild = wilds[enemy]
+					return if wild then foesOf(wild)(center, radius) else {}
+				end,
+				Hit = function(target, amount: number, status: string?)
+					hitFoe(enemy, target, amount, element, status, nil)
+				end,
+				Alive = function(): boolean
+					return enemy.Alive
+				end,
+			}
+		end,
+	})
+	local wild: Wild = {
+		Enemy = enemy,
+		Species = species,
+		Element = element,
+		Level = level,
+		Soul = soul,
+		Ability = ability,
+		Born = os.clock(),
+		Tries = 0,
+		TameAt = {},
+		Fighter = fighter,
+		Bug = false,
+		Engaged = engagedBy,
+		Guard = guard,
+		Swings = 0,
+	}
+	wilds[enemy] = wild
+	return wild
 end
 
 function spawnWild()
@@ -565,121 +750,82 @@ function spawnWild()
 	end
 	wildCount += 1
 	local ok, err = pcall(function()
-		local species = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
-		local element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
-		local level = Kaiju.wildLevel(levelsNear(at, 160), rng)
-		local soul = Kaiju.rollSoul(Gems.random(), element, {
-			Id = "wild",
-			Time = os.time(),
-			Species = species,
-			Luck = math.clamp(level / 60, 0, 0.5),
-		})
-		local stats = Kaiju.stats(species, level, soul.Tier)
-		local model, _, _ = KaijuServer.body(species, element, Kaiju.Scale.Wild)
-		local title = "Wild " .. Kaiju.title({ Species = species, Element = element })
-		model.Name = title
-		KaijuServer.place(model, at, at + Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)))
-		local kind = {
-			Name = title,
-			Health = math.floor(stats.Health * Kaiju.Wild.Health + 0.5),
-			Damage = stats.Damage,
-			Speed = stats.Speed,
-			Reach = stats.Reach,
-			Rate = stats.Rate,
-			Aggro = Kaiju.Wild.Aggro,
-			Coins = 0,
-			DropChance = 0,
-			Luck = 0,
-			Respawn = 0,
-		}
-		local enemy = Enemies.adopt(
-			model,
-			kind,
-			{ Element = element, Title = string.format("%s · Lv %d", title, level), Home = model.PrimaryPart.Position }
-		)
-		local e = enemy :: any
-		local engagedBy = {}
-		e.OutpostCreature = true
-		e.Engaged = engagedBy -- (the kaiju out only fight it for those who started on it)
-		e.Brain = brain
-		e.OnDeath = wildDied
-		-- Every blow lands 60%-140%, times its element against this one's
-		-- and its kind's Guard.
-		e.TakenScale = function(hitElement: string?)
-			local mult, tag = Kaiju.taken(species, element, hitElement)
-			return mult * Kaiju.spread(), tag
-		end
-		local ability = Kaiju.ability(soul)
-		model:SetAttribute("KaijuWild", true)
-		model:SetAttribute("KaijuLevel", level)
-		model:SetAttribute("KaijuAbility", ability)
-		model:SetAttribute("KaijuTries", 0)
-		-- It leaves you be until you start on it: here, or by hitting it.
-		local challenge = Instance.new("ProximityPrompt")
-		challenge.Name = "ChallengePrompt"
-		challenge.ActionText = "Challenge"
-		challenge.ObjectText = string.format("%s · Lv %d", title, level)
-		challenge.KeyboardKeyCode = Enum.KeyCode.E
-		challenge.HoldDuration = 0.5
-		challenge.MaxActivationDistance = 16
-		challenge.RequiresLineOfSight = false
-		challenge:SetAttribute("PromptKind", "KaijuChallenge")
-		challenge.Parent = enemy.Root
-		-- It fights as a duellist, its guard and hops on its Enemies record
-		-- (so a hunter's swings meet them in Enemies.damage).
-		local fighter = KaijuFighter.new({
-			Model = model,
-			Root = enemy.Root,
-			Humanoid = enemy.Humanoid,
-			Species = species,
-			Element = element,
-			Scale = Kaiju.Scale.Wild,
-			Body = enemy,
-			Stats = stats,
-			Ability = ability,
-			FirstSurge = 4,
-			Strike = function(victim, amount: number, heavy: boolean, _name: string): string
-				return hitFoe(enemy, victim, amount * (1 - Enemies.weakness(enemy)), element, nil, heavy)
-			end,
-			Caster = function()
-				return {
-					Model = model,
-					Root = enemy.Root,
-					Element = element,
-					Ability = ability,
-					Damage = Kaiju.abilityDamage(stats.Damage, soul, ability),
-					Foes = function(center: Vector3, radius: number)
-						local wild = wilds[enemy]
-						return if wild then foesOf(wild)(center, radius) else {}
-					end,
-					Hit = function(target, amount: number, status: string?)
-						hitFoe(enemy, target, amount, element, status, nil)
-					end,
-					Alive = function(): boolean
-						return enemy.Alive
-					end,
-				}
-			end,
-		})
-		wilds[enemy] = {
-			Enemy = enemy,
-			Species = species,
-			Element = element,
-			Level = level,
-			Soul = soul,
-			Ability = ability,
-			Born = os.clock(),
-			Tries = 0,
-			TameAt = {},
-			Fighter = fighter,
-			Bug = false,
-			Engaged = engagedBy,
-		}
+		newWild(at, Kaiju.wildLevel(levelsNear(at, 160), rng), false)
 	end)
 	if not ok then
 		wildCount -= 1
 		warn("[Kaiju] wild spawn failed:", err)
 	end
+end
+
+-- The vein guardian -----------------------------------------------------------------------------------------
+
+-- Where it sleeps: in front of its vein, Frontier.Guardian.Home studs in
+-- from the dormant rift, facing the outpost.
+local function guardHome(scar: CFrame): (Vector3, Vector3)
+	local middle = Outpost.Location.Position
+	local out = flat(scar.Position - middle)
+	out = if out.Magnitude > 0.1 then out.Unit else Vector3.new(1, 0, 0)
+	return scar.Position - out * Frontier.Guardian.Home, middle
+end
+
+local function spawnGuardian()
+	if guardian or not guardAt then
+		return
+	end
+	local levels = Frontier.Guardian.Levels
+	local ok, err = pcall(function()
+		local at, facing = guardHome(guardAt :: CFrame)
+		guardian = newWild(at, rng:NextInteger(levels[1], levels[2]), true, facing)
+	end)
+	if not ok then
+		warn("[Kaiju] vein guardian spawn failed:", err)
+	end
+end
+
+-- A swing at vein `index`'s rocks: the guardian (if this is its vein)
+-- wakes on the Frontier.Guardian.Wake'th since it last slept (a stray swing
+-- long ago doesn't count), and once awake whoever mines its vein is on its
+-- list.
+function KaijuWilds.veinSwing(index: number, player: Player)
+	local wild = guardian
+	if index ~= Frontier.Veins.Guarded or not wild or not wild.Enemy.Alive then
+		return
+	end
+	local now = os.clock()
+	if next(wild.Engaged) ~= nil then
+		engage(wild, player, now)
+		return
+	end
+	if now - (wild.SwingAt or now) > 30 then
+		wild.Swings = 0
+	end
+	wild.Swings = (wild.Swings or 0) + 1
+	wild.SwingAt = now
+	if wild.Swings >= Frontier.Guardian.Wake then
+		engage(wild, player, now)
+		wild.LastFight = now
+		wild.Enemy.Model:SetAttribute("ActionAt", serverNow())
+		Remotes.Notify:FireClient(player, "The vein's guardian woke up!")
+	end
+end
+
+-- Vein `index` surfaced at `scar`: if it's the guarded one, whatever's left
+-- of its guardian goes, and a fresh one sleeps at the new site.
+function KaijuWilds.veinMoved(index: number, scar: CFrame)
+	if index ~= Frontier.Veins.Guarded then
+		return
+	end
+	guardAt = scar
+	local old = guardian
+	if old and old.Enemy.Alive then
+		fx("TriadBreak", old.Enemy.Root.Position, 5, old.Element)
+		Enemies.remove(old.Enemy)
+	end
+	if old then
+		gone(old)
+	end
+	spawnGuardian()
 end
 
 -- Taming --------------------------------------------------------------------------------------------------
@@ -786,31 +932,6 @@ end
 -- Moon bugs -------------------------------------------------------------------------------------------------
 
 local Duelist -- (required when the first moon bug comes through: it's a big module)
-
--- Today's critter tally on a roster (Bugs = { Day, Coins, Count }), fresh each day.
-local function tally(roster)
-	local day = math.floor(os.time() / 86400)
-	if not roster.Bugs or roster.Bugs.Day ~= day then
-		roster.Bugs = { Day = day, Coins = 0, Count = 0 }
-	end
-	roster.Bugs.Count = roster.Bugs.Count or 0
-	return roster.Bugs
-end
-KaijuWilds._tally = tally
-
--- Coins for a critter (or a guardian), within the day's cap.
-local function payCoins(player: Player, amount: number)
-	local profile = PlayerData.get(player)
-	if not profile then
-		return
-	end
-	local bugs = tally(Kaiju.roster(profile))
-	local coins = math.min(amount, Kaiju.bugCoins(bugs, bugs.Day))
-	if coins > 0 then
-		bugs.Coins += coins
-		PlayerData.addCoins(player, coins)
-	end
-end
 
 local function bugDied(enemy)
 	local wild = wilds[enemy]
@@ -978,10 +1099,11 @@ end
 
 -- Upkeep ------------------------------------------------------------------------------------------------------
 
--- A wild kaiju nobody's fought for a while, past its lifetime, burrows.
+-- A wild kaiju nobody's fought for a while, past its lifetime, burrows
+-- (not the guardian: it waits for its vein to move).
 local function lifetimes(now: number)
 	for _, wild in wilds do
-		if not wild.Bug and wild.Enemy.Alive then
+		if not wild.Bug and not wild.Guard and wild.Enemy.Alive then
 			local fought = math.max(wild.Enemy.LastHit or 0, wild.LastFight or 0)
 			if now - wild.Born > Kaiju.Wild.Lifetime and now - fought > 20 then
 				burrow(wild)
@@ -1008,6 +1130,10 @@ function KaijuWilds.start(site)
 			table.insert(spots, cframe.Position)
 		end
 	end
+	-- The guarded vein's dormant rift (OutpostWorld; KaijuWilds.veinMoved once it moves).
+	local guarded = site.Veins and site.Veins[Frontier.Veins.Guarded]
+	local siteInfo = guarded and site.VeinSites and site.VeinSites[guarded.Site]
+	guardAt = guardAt or (siteInfo and siteInfo.Scar)
 	Shop.register("KaijuTame", tame)
 	Shop.register("KaijuChallenge", challenge)
 	-- (Moon bugs come through rifts round players out past the core: FrontierServer.)
@@ -1015,6 +1141,7 @@ function KaijuWilds.start(site)
 		for _ = 1, Kaiju.Wild.Max do
 			spawnWild()
 		end
+		spawnGuardian()
 	end)
 	local timer = 0
 	RunService.Heartbeat:Connect(function(dt)
@@ -1030,5 +1157,12 @@ end
 KaijuWilds._tame, KaijuWilds._brain, KaijuWilds._wilds = tame, brain, wilds
 KaijuWilds._challenge = challenge
 KaijuWilds._spawnWild, KaijuWilds._spots = spawnWild, spots
+KaijuWilds._spawnGuardian, KaijuWilds._lifetimes = spawnGuardian, lifetimes
+function KaijuWilds._guardian()
+	return guardian
+end
+function KaijuWilds._setGuardAt(scar: CFrame?)
+	guardAt = scar
+end
 
 return KaijuWilds

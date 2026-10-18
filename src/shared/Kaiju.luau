@@ -139,7 +139,7 @@ Kaiju.Regen = 0.03 -- share of its health back each second while it isn't fighti
 
 -- Wild kaiju in the Outpost.
 Kaiju.Wild = {
-	Max = 3, -- out at once
+	Max = 2, -- roaming at once (and the guarded Rift Vein's guardian: Shared.Frontier.Guardian)
 	Respawn = 90, -- seconds after one is killed, tamed or burrows away
 	Lifetime = 600, -- one nobody fights burrows back after this long
 	Aggro = 26, -- notices fighters this close

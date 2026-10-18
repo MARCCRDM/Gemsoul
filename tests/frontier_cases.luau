@@ -96,9 +96,16 @@ check(Frontier.zoneOf(10) == "Common" and Frontier.zoneOf(200) == "Fringe", "Zon
 check(Frontier.zoneOf(350) == "Edge" and Frontier.zoneOf(350, true) == "Vein", "The edge and its veins")
 for band, spec in Frontier.Bands do
 	local distance = if band == "Core" then 0 elseif band == "Fringe" then 200 else 350
-	local zone = Outpost.Zones[Frontier.zoneOf(distance, band == "Vein")]
+	local zone = Outpost.Zones[if band == "Guarded" then "Guarded" else Frontier.zoneOf(distance, band == "Vein")]
 	check(spec.Luck == (zone.Luck or 0), band .. "'s luck isn't its zone's")
 end
+-- The guarded vein: luckier still (+35% on a vein's), the same mix.
+check(math.abs(zones.Guarded.Luck - zones.Vein.Luck - 0.35) < 1e-9, "The guarded vein isn't +35% on a vein")
+check(zones.Guarded.Weights.Pebble == zones.Common.Weights.Pebble, "The guarded vein's mix isn't the core's")
+check(Frontier.Veins.Guarded >= 1 and Frontier.Veins.Guarded <= Frontier.Veins.Count, "No vein is guarded")
+local guardian = Frontier.Guardian
+check(guardian.Levels[1] == 16 and guardian.Levels[2] == 20 and guardian.Wake == 3, "The guardian's levels and waking")
+check(Frontier.Coins.Guardian == 40, "The guardian's coins")
 
 -- Outcrops ----------------------------------------------------------------------------------------------
 -- (The Outpost's roads, outpost, pad and motor pool, as OutpostWorld builds them.)
