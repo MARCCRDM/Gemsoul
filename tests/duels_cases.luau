@@ -126,6 +126,22 @@ check(
 	"Rewards wrong"
 )
 check(xp[ana] == "DuelWin" and xp[ben] == "DuelPlay" and Season.XP[xp[ana]] > Season.XP[xp[ben]], "XP wrong")
+-- The arena tournament (Shared.SwingRestore): the first win of a run
+-- restores 10% of the pick's swings; the loss ends the loser's run.
+check(
+	won.Tournament
+		and won.Tournament.Win == 1
+		and won.Tournament.Counted
+		and won.Tournament.Share == SwingRestore.Streak[1]
+		and won.Tournament.Swings == 60
+		and won.Tournament.NextAt == 5,
+	"A queued ranked win didn't restore the first tournament share"
+)
+check(
+	lost.Tournament and lost.Tournament.Win == 0 and lost.Tournament.Swings == 0 and lost.Tournament.NextShare == SwingRestore.Streak[1],
+	"A loss's tournament line"
+)
+check(#restoresGiven == 1 and restoresGiven[1].Player == ana and restoresGiven[1].Share == SwingRestore.Streak[1], "Restores given")
 check(ana:GetAttribute("DuelRating") == 1016, "Public rating not updated")
 check(
 	last(ana, "Feed") ~= nil and string.find(last(ana, "Feed")[2], "Ana defeated Ben", 1, true),
@@ -170,6 +186,7 @@ check(
 	"Leaving didn't forfeit"
 )
 check(last(ana, "MatchEnd")[2].Delta == 0 and profiles[ana].Duel.Rating == 1016, "A friendly duel changed the rating")
+check(last(ana, "MatchEnd")[2].Tournament == nil and #restoresGiven == 1, "A challenge counted toward the tournament")
 advance(Matchmaking.EndPause)
 -- An expired challenge can't be accepted.
 check(handlers.DuelChallenge(ana, ben.UserId).Ok, "Second challenge refused")
@@ -246,6 +263,23 @@ check(
 	profiles[eve].Coins - eveCoins == PvPRules.Kinds.Casual.Rewards.Win
 		and profiles[fay].Coins - fayCoins == PvPRules.Kinds.Casual.Rewards.Loss,
 	"Casual rewards wrong"
+)
+-- Casual's own run: the first win restores swings too.
+check(
+	last(eve, "MatchEnd")[2].Tournament.Win == 1
+		and profiles[eve].Duel.CasualStreak == 1
+		and last(fay, "MatchEnd")[2].Tournament.Win == 0,
+	"Casual's tournament run"
+)
+advance(Matchmaking.EndPause)
+respawn(fay)
+-- Beating the same player again doesn't add to the run.
+check(handlers.DuelQueue(eve, "casual").Ok and handlers.DuelQueue(fay, "casual").Ok, "Casual rematch refused")
+advance(Matchmaking.Countdown)
+kill(fay)
+check(
+	not last(eve, "MatchEnd")[2].Tournament.Counted and profiles[eve].Duel.CasualStreak == 1,
+	"The same opponent twice running counted"
 )
 advance(Matchmaking.EndPause)
 respawn(fay)

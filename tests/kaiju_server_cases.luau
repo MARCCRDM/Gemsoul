@@ -487,8 +487,9 @@ local clock = table.clone(os)
 clock.clock = function()
 	return now
 end
+-- (The wall clock moves with `now`: a knocked-out kaiju's revive time.)
 clock.time = function()
-	return 1700000000
+	return 1700000000 + math.floor(now)
 end
 env = setmetatable({
 	Color3 = Color3,
@@ -844,27 +845,23 @@ local function healthAndInfusing()
 	KaijuServer._upkeep(a, now + 600)
 	pet = KaijuServer.pets()[a]
 	check(pet and pet.Humanoid.Health == hurtTo, "Out again, it came back healed")
-	-- Knocked out at 0: back in its Gemsoul, down, and it stays down (no timer).
+	-- Knocked out at 0: back in its Gemsoul, down, till its revive time is
+	-- up (by level, on the wall clock: it counts while you're away). Gems
+	-- don't bring it back.
 	table.clear(notes)
 	KaijuServer.hurt(pet, 1e6, nil, nil)
 	check(KaijuServer.pets()[a] == nil and pet.Model.Parent == nil, "Not knocked out at 0")
 	check(starter.Down == true and starter.Health == 0, "Its record doesn't say it's down")
-	check(noted(a, "knocked out"), "Not told it was knocked out")
-	now += 3600
-	KaijuServer._upkeep(a, now)
-	check(KaijuServer.pets()[a] == nil, "Back without a revive")
+	local wait = Kaiju.reviveSeconds(starter)
+	check(starter.DownUntil == 1700000000 + math.floor(now) + wait, "Its revive time isn't kept on its record")
+	check(noted(a, "knocked out") and noted(a, "back by itself"), "Not told it was knocked out, and when it's back")
 	check(Kaiju.inTeam(roster, starter.Id), "Down, it lost its place in the team")
-
-	-- Infusing: stones bring it back (its revive cost, all at once: a stone
-	-- of its own element worth double, its weakness half), at half health;
-	-- they never give EXP, and only the stones it needs are used.
 	local function stone(id, tier, element)
 		local gem = { Id = id, Tier = tier, Element = element, Size = 5, Clarity = 5, Cut = 5 }
 		table.insert(profiles[a].Gems, gem)
 		return gem
 	end
 	local record = starter
-	local cost = Kaiju.reviveCost(record)
 	local weakness = shared("ElementMatchup").weakTo(record.Element)
 	local other = "Fire"
 	for _, element in Kaiju.Elements do
@@ -872,37 +869,32 @@ local function healthAndInfusing()
 			other = element
 		end
 	end
-	stone("w1", "Common", weakness)
-	local short = registered.KaijuInfuse(a, { "w1" }, record.Id)
-	check(
-		not short.Ok and short.Short == cost - Kaiju.Infuse.Power.Common * Kaiju.Infuse.Weak,
-		"A revive short of power: wrong shortfall"
-	)
-	check(#profiles[a].Gems == 1 and record.Down, "A failed revive ate stones or brought it back")
-	local ids = { "w1" }
-	for i = 1, cost do
-		stone("c" .. i, "Common", other)
-		table.insert(ids, "c" .. i)
-	end
 	stone("own", "Common", record.Element)
-	table.insert(ids, "own")
+	check(not registered.KaijuInfuse(a, { "own" }, record.Id).Ok and record.Down, "Gems brought it back")
+	check(#profiles[a].Gems == 1, "A refused heal ate a gem")
+	now += wait - 5
+	KaijuServer._upkeep(a, now)
+	check(KaijuServer.pets()[a] == nil and record.Down, "Back before its revive time")
+	now += 6
+	table.clear(notes)
 	local levelBefore, expBefore = record.Level, record.Exp
-	local revived = registered.KaijuInfuse(a, ids, record.Id)
-	check(revived.Ok and revived.Revived, "Couldn't revive with enough stones")
-	-- (Half a power from its weakness, then one a common: cost - 0.5 more,
-	-- rounded up, brings it back; the spares mend it.)
-	check(
-		not record.Down and record.Health >= math.floor(revived.Most * Kaiju.Infuse.Revive.Health),
-		"Not back at half health"
-	)
-	check(record.Level == levelBefore and record.Exp == expBefore, "Infusing gave EXP")
-	check(#profiles[a].Gems < cost + 2, "A revive took no stones")
 	KaijuServer._upkeep(a, now)
 	pet = KaijuServer.pets()[a]
-	check(
-		pet and pet.Record == record and pet.Humanoid.Health == record.Health,
-		"Revived, it didn't come out as it was"
-	)
+	local _, starterMost = Kaiju.health(record)
+	check(not record.Down and record.DownUntil == nil, "Not back once its revive time was up")
+	check(record.Health == math.floor(starterMost * Kaiju.Revive.Health + 0.5), "Not back at half health")
+	check(pet and pet.Record == record and pet.Humanoid.Health == record.Health, "Back, it didn't come out as it was")
+	check(noted(a, "back on its feet") and record.Level == levelBefore and record.Exp == expBefore, "Not told it's back, or given EXP")
+	-- Robux or a Revive coupon (reviveAll): every one that's down, back now.
+	KaijuServer.hurt(pet, 1e6, nil, nil)
+	check(record.Down, "Not knocked out again")
+	check(KaijuServer.reviveAll(a) == 1 and not record.Down, "reviveAll didn't bring it back")
+	pet = KaijuServer.pets()[a]
+	check(pet and pet.Record == record, "Revived, it didn't come out")
+	check(KaijuServer.reviveAll(a) == 0, "reviveAll counted one that wasn't down")
+	for _, gem in table.clone(profiles[a].Gems) do
+		PlayerData.removeGem(a, gem.Id)
+	end
 	-- Up and hurt: stones mend it, only as many as it needs.
 	for _, gem in table.clone(profiles[a].Gems) do
 		PlayerData.removeGem(a, gem.Id)
@@ -921,6 +913,16 @@ local function healthAndInfusing()
 	check(pet.Humanoid.Health == pet.Humanoid.MaxHealth and record.Health == pet.Humanoid.MaxHealth, "Not mended whole")
 	check(#profiles[a].Gems == 3, "Stones it didn't need were eaten")
 	check(not registered.KaijuInfuse(a, { "m3" }, record.Id).Ok, "Infused one already whole")
+	-- Only out of danger: not while one of the team out has just fought.
+	pet.Humanoid.Health = math.floor(pet.Humanoid.MaxHealth * 0.5)
+	pet.LastFight = now - 1
+	check(KaijuServer.inDanger(a, now), "A fight just now isn't danger")
+	local blocked = registered.KaijuInfuse(a, { "m3" }, record.Id)
+	check(not blocked.Ok and blocked.Danger and #profiles[a].Gems == 3, "Healed in the middle of a fight")
+	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
+	check(not KaijuServer.inDanger(a, now), "Still in danger once it's calm")
+	check(registered.KaijuInfuse(a, { "m3" }, record.Id).Ok, "Couldn't heal out of danger")
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth
 	pet.Humanoid.Health = 1
 	check(not registered.KaijuInfuse(a, { "nope" }).Ok, "Infused stones they don't have")
 	check(not registered.KaijuInfuse(a, {}).Ok and not registered.KaijuInfuse(a, "m3").Ok, "Infused nothing")
@@ -948,9 +950,9 @@ end
 healthAndInfusing()
 
 -- Auto heal: off till it's switched on; then spare Commons heal the team by
--- themselves: a hurt one once it's calm (never a gem wasted, never a rarer
--- one, never one a saved loadout names), one knocked out a moment after it
--- went down; quiet, but for a revive and, once, running out.
+-- themselves, out of danger (never a gem wasted, never a rarer one, never
+-- one a saved loadout names), never a revive; quiet, but once for running
+-- out.
 local function autoHealing()
 	local roster = profiles[a].Kaiju
 	local record = pet.Record
@@ -1000,7 +1002,7 @@ local function autoHealing()
 	KaijuServer._autoHeal(a, now)
 	check(#profiles[a].Gems == 7, "Auto healed mid-fight")
 	-- Calm: 35% short, a Common mends 10%: three, none wasted, never the Rare.
-	pet.LastFight = now - Kaiju.AutoHeal.Calm - 0.1
+	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
 	local before = pet.Humanoid.Health
 	KaijuServer._autoHeal(a, now)
 	check(#profiles[a].Gems == 4 and has("rare"), "Auto heal didn't take three Commons alone: " .. #profiles[a].Gems .. " left")
@@ -1014,13 +1016,13 @@ local function autoHealing()
 	check(#profiles[a].Gems == 4, "Auto healed again straight away")
 	-- A gem a saved loadout names stays put.
 	now += Kaiju.AutoHeal.Every + 0.1
-	pet.LastFight = now - Kaiju.AutoHeal.Calm - 0.1
+	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
 	profiles[a].Presets = { Armor = { { Surges = { "ah4" } } } }
 	KaijuServer._autoHeal(a, now)
 	check(has("ah4") and not has("ah5") and not has("ah6") and has("rare"), "Auto heal took a gem a loadout names")
 	-- Out of spare Commons: said once.
 	now += Kaiju.AutoHeal.Every + 0.1
-	pet.LastFight = now - Kaiju.AutoHeal.Calm - 0.1
+	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
 	table.clear(notes)
 	KaijuServer._autoHeal(a, now)
 	KaijuServer._autoHeal(a, now + 5)
@@ -1030,22 +1032,17 @@ local function autoHealing()
 	for _, g in table.clone(profiles[a].Gems) do
 		PlayerData.removeGem(a, g.Id)
 	end
-	-- Knocked out: back a moment later, from Commons alone, and said.
-	local cost = Kaiju.reviveCost(record)
-	for i = 1, cost + 2 do
+	-- Knocked out: auto heal leaves it be (it comes back by itself, or for
+	-- Robux or a coupon).
+	for i = 1, 30 do
 		gem("rv" .. i, "Common")
 	end
 	now += 10
-	table.clear(notes)
 	KaijuServer.hurt(pet, 1e9, nil, nil)
-	check(record.Down and said("Auto heal brings it back") == 1, "Knocked out with auto heal on: not told it'll come back")
-	KaijuServer._autoHeal(a, now + 1)
-	check(record.Down, "Auto heal brought it back at once")
-	KaijuServer._autoHeal(a, now + Kaiju.AutoHeal.ReviveAfter + 0.1)
-	check(not record.Down and record.Health >= math.floor(most * Kaiju.Infuse.Revive.Health), "Auto heal didn't bring it back")
-	check(said("Auto heal: ") == 1 and #profiles[a].Gems < 2, "A revive by auto heal wasn't said, or used too little")
+	KaijuServer._autoHeal(a, now + 30)
+	check(record.Down and #profiles[a].Gems == 30, "Auto heal revived one, or spent Commons on it")
+	KaijuServer.reviveAll(a)
 	pet = KaijuServer.pets()[a]
-	check(pet and pet.Record == record, "Brought back by auto heal, it didn't come out")
 	-- Off again.
 	check(registered.KaijuAutoHeal(a, false).Ok and not Kaiju.autoHealOn(roster), "Couldn't switch auto heal off")
 	for _, g in table.clone(profiles[a].Gems) do
@@ -2657,30 +2654,10 @@ local function yourTeam()
 	local left = KaijuServer.team(a)
 	check(#left == 2 and not table.find(left, downed), "A knockout took the others away")
 	check(downed.Record.Down and Kaiju.teamIds(roster)[2] == downed.Record.Id, "Down, it lost its place")
-	now += 3600
+	now += 5
 	KaijuServer._upkeep(a, now)
-	check(#KaijuServer.team(a) == 2, "It came back without a revive")
-	for i = 1, Kaiju.reviveCost(downed.Record) do
-		table.insert(
-			profiles[a].Gems,
-			{ Id = "r" .. i, Tier = "Common", Element = "Fire", Size = 5, Clarity = 5, Cut = 5 }
-		)
-	end
-	local reviveIds = {}
-	for i = 1, Kaiju.reviveCost(downed.Record) * 2 do
-		reviveIds[i] = "r" .. i
-	end
-	-- (Fire might be its weakness: two of everything offered, only what it needs used.)
-	for i = Kaiju.reviveCost(downed.Record) + 1, #reviveIds do
-		table.insert(
-			profiles[a].Gems,
-			{ Id = "r" .. i, Tier = "Common", Element = "Fire", Size = 5, Clarity = 5, Cut = 5 }
-		)
-	end
-	check(
-		registered.KaijuInfuse(a, { table.unpack(reviveIds, 1, Kaiju.Infuse.Batch) }, downed.Record.Id).Ok,
-		"Couldn't revive one of the team"
-	)
+	check(#KaijuServer.team(a) == 2, "It came back before its revive time")
+	check(KaijuServer.reviveAll(a) == 1, "Couldn't revive one of the team")
 	squad = KaijuServer.team(a)
 	check(#squad == 3 and squad[2].Record == downed.Record, "Revived, it didn't come back to its place")
 	for _, gem in table.clone(profiles[a].Gems) do

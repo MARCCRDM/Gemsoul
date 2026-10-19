@@ -164,7 +164,7 @@ end
 -- Every product slot buys something real.
 for key in Store.RobuxProducts do
 	local real = Store.bundle(key) or Store.kitsOf(key) or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
-		or key == "StarterPack" or key == "SeasonPremium" or Store.refill(key)
+		or key == "StarterPack" or key == "SeasonPremium" or Store.refill(key) or key == "KaijuRevive"
 	check(real, key .. " is a product slot for nothing")
 	check(Store.robuxPrice(key), key .. " has no Robux price")
 end

@@ -6,6 +6,7 @@
 -- and it is never sold or dropped.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
+local roblox = require("@lune/roblox")
 local process = require("@lune/process")
 
 local ROOT = process.args[1] or "."
@@ -100,8 +101,21 @@ local function makePlayer(userId, referredBy)
 	return player
 end
 local handlers = {}
+local notes = {}
+local Coupons = luau.load(fs.readFile(ROOT .. "/src/shared/Coupons.luau"), {
+	debugName = "Coupons",
+	environment = setmetatable({ Color3 = roblox.Color3 }, { __index = _G }),
+})()
 local stubs = {
 	Config = { DataStoreName = "Test" },
+	Coupons = Coupons,
+	Remotes = {
+		Notify = {
+			FireClient = function(_, player, text)
+				table.insert(notes, { Player = player, Text = text })
+			end,
+		},
+	},
 	Cosmetics = {
 		get = function(id)
 			local kinds = {
@@ -256,6 +270,20 @@ check(owned.Skin == "SkinKindred" and owned.Pick == "PickTwinStar" and owned.Bac
 join(makePlayer(34, 30))
 check(owned.Owned.SkinCrusader and owned.Skin == "SkinCrusader", "The fourth friend didn't unlock (and put on) Crusader Gold")
 check(owned.Owned.SkinKindred, "Kindred Edge was lost on reaching the next tier")
+-- Reward coupons (Shared.Coupons): one of each per friend, once.
+local held = profiles[recruiter]
+check(
+	Coupons.count(held, "Swings") == 4 and Coupons.count(held, "Revive") == 4 and Coupons.count(held, "XPBoost") == 4,
+	"Four friends didn't give four of each coupon"
+)
+check(held.Referrals.CouponsPaid == 4, "The friends paid for weren't kept")
+handlers.ReferralState(recruiter)
+check(Coupons.count(held, "Swings") == 4, "A check paid the same friends' coupons again")
+local told = false
+for _, note in notes do
+	told = told or (note.Player == recruiter and string.find(note.Text, "coupons", 1, true) ~= nil)
+end
+check(told, "The inviter wasn't told about the coupons")
 
 -- A failed save is tried again: the friend still counts.
 local patient = makePlayer(40, 0)

@@ -18,6 +18,8 @@ local CombatServer = require(script.Parent.CombatServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
+local Restores = require(script.Parent.Restores)
+local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local Shop = require(script.Parent.Shop)
 local Feedback = require(script.Parent.Feedback)
 local Dungeon = {}
@@ -97,13 +99,21 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonBoss", nil)
 				p:SetAttribute("DungeonLoot", nil)
 				p:SetAttribute("DungeonLootDeadline", nil)
+				-- A clear also restores a share of the pick's swings (Shared.SwingRestore).
+				local swings = 0
 				if eligible then
                     PlayerData.training(p, "DungeonComplete")
 					PlayerData.addCoins(p, 300)
 					Progress.addXP(p, "SlayBrute")
+					swings = Restores.give(p, SwingRestore.Dungeon)
 				end
 				ArenaSessions.leave(p)
-				Remotes.Notify:FireClient(p, reason .. (if eligible then " +300 coins." else ""))
+				Remotes.Notify:FireClient(
+					p,
+					reason
+						.. (if eligible then " +300 coins." else "")
+						.. (if swings > 0 then string.format(" +%d swings!", swings) else "")
+				)
 			end
 		end
 	end

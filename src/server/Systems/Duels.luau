@@ -26,7 +26,10 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	  "Round", { Phase = "Locked", Team }       a side locked its pick
 	  "Round", { Phase = "Reveal", Round, Wins, Team, StartsAt, Ends, Picks }
 	                                            both picks, then the countdown
-	  "MatchEnd", { Won, Draw, Reason, Rating, Delta, Coins, Ranked, Rules }
+	  "MatchEnd", { Won, Draw, Reason, Rating, Delta, Coins, Ranked, Rules,
+	                Streak, Tournament = { Streak, Win, Of, Counted, Champion,
+	                Share, Swings, NextAt, NextShare } (a queued 1v1: the
+	                arena tournament's run, Shared.SwingRestore) }
 	  "Feed", text                              a duel result, for everyone's chat
 
 	A match: both sides are moved into one of the Arena's lanes, shielded and
@@ -43,6 +46,10 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	(CombatServer.onLethal). Between rounds, the pivot window: preset swaps
 	only (Presets.wear), both lock at once, then the picks are revealed.
 	Each player's rating, wins and losses save in their profile (Duel).
+	Queued 1v1s (Ranked or Casual, not challenges) are the arena tournament
+	(Shared.SwingRestore): the 1st, 5th and 10th win of a run restore the
+	pick's swings (Restores), and ten in a row wins the tournament (Ranked:
+	with its Arena Cache, ArenaStreaks).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,6 +59,7 @@ local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local Season = require(ReplicatedStorage.Shared.Season)
+local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local CombatServer = require(script.Parent.CombatServer)
 local ArenaSessions = require(script.Parent.ArenaSessions)
 local Party = require(script.Parent.Party)
@@ -59,6 +67,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Progress = require(script.Parent.Progress)
 local ArenaStreaks = require(script.Parent.ArenaStreaks)
+local Restores = require(script.Parent.Restores)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
 
@@ -312,9 +321,36 @@ function finish(match, winner: number?, reason: string)
 			-- Ranked 1v1 win streaks: Arena Caches at 10, 20 ... (ArenaStreaks).
 			local rankedStreak = nil
 			local solo = #match.Teams[1] == 1 and #match.Teams[2] == 1
+			local foe = if solo then match.Teams[if t == 1 then 2 else 1][1] else nil
+			local rankedBefore = record and (record :: any).RankedStreak or 0
 			if record and winner and match.Ranked and solo then
-				local foe = match.Teams[if t == 1 then 2 else 1][1]
 				rankedStreak = ArenaStreaks.onRankedResult(member, won, foe and foe.UserId)
+			end
+			-- The arena tournament (Shared.SwingRestore): a queued 1v1's run of
+			-- wins restores the pick's swings (the 1st, 5th and 10th); ten in a
+			-- row wins it. Ranked runs on its streak, Casual on one of its own.
+			local tournament = nil
+			if record and winner and solo and match.Rules.Kind ~= "Challenge" then
+				local streak, counted
+				if match.Ranked then
+					streak = rankedStreak or 0
+					counted = won and streak > rankedBefore
+				else
+					streak, counted = SwingRestore.casual(record, won, foe and foe.UserId)
+				end
+				local share = if counted then SwingRestore.streakShare(streak) else 0
+				local nextAt, nextShare = SwingRestore.next(streak)
+				tournament = {
+					Streak = streak,
+					Win = if won then SwingRestore.round(streak) else 0,
+					Of = SwingRestore.Tournament,
+					Counted = counted,
+					Champion = counted and SwingRestore.won(streak),
+					Share = share,
+					Swings = if share > 0 then Restores.give(member, share) else 0,
+					NextAt = SwingRestore.round(nextAt),
+					NextShare = nextShare,
+				}
 			end
 			if record then
 				-- Every finished duel counts toward the lobby's unlocks.
@@ -343,6 +379,7 @@ function finish(match, winner: number?, reason: string)
 					Opponents = names[if t == 1 then 2 else 1],
 					Rules = { Name = match.Rules.Name, Stats = match.Rules.Stats },
 					Streak = rankedStreak,
+					Tournament = tournament,
 					Rounds = if match.Rounds
 						then { Mine = match.Rounds.Wins[t], Theirs = match.Rounds.Wins[if t == 1 then 2 else 1] }
 						else nil,

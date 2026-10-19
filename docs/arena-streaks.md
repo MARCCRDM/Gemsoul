@@ -10,6 +10,10 @@ Win Ranked 1v1 matches in a row. Every milestone opens an **Arena Cache**:
 
 Coins and (at the big milestones) a title come straight away.
 
+Every ten wins is also an **arena tournament** won: the 1st, 5th and 10th
+win of each run restore your pick's swings (10%, 25%, 50%). See
+[swing-restores.md](swing-restores.md).
+
 | Streak | Name | Free gems | Gear: Ultra-Rare / Rare | You keep | Gear quality | Coins | Title |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 10 | Contender | 1 Rare | 1 / 5 | 3 of 6 | 2 | 2,500 | |

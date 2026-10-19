@@ -5,8 +5,8 @@
 	  The team strip  your team out, a tile each, the lead first (edged in
 	                  gold): its portrait (the model itself), level, health,
 	                  and dots for its Q, E and R, lit when ready (hollow
-	                  while asleep); knocked out, DOWN (tap it to revive it
-	                  with gems: it stays down till you do). AUTO HEAL at
+	                  while asleep); knocked out, DOWN and when it's back by
+	                  itself (tap it to revive it now). AUTO HEAL at
 	                  its end: a Common, how many you have spare, and ON or
 	                  OFF; on, your spare Commons heal the team by themselves
 	                  (Shared.Kaiju.AutoHeal, KaijuServer). Tap a tile for
@@ -28,6 +28,12 @@
 	                  LEAD (to the front), SEND OUT (one from home, in place
 	                  of one of the team you pick), HEAL (REVIVE when it's
 	                  down). Its Gemsoul's gem sits on its portrait.
+	  REVIVE          one knocked out: gems don't bring it back. When it's
+	                  back by itself (Shared.Kaiju.reviveIn, at half
+	                  health), and REVIVE for Robux (the KaijuRevive
+	                  product; coins while testing) or COUPON (a Revive
+	                  coupon from inviting friends, Shared.Coupons): every
+	                  one of yours that's down, back now.
 	  HEAL            its health now and after, then your gems in stacks (a
 	                  card for each rarity and element, the stone itself, how
 	                  many, what each heals: its own element double, its
@@ -35,6 +41,8 @@
 	                  spare Commons are picked already, as many as bring it
 	                  to full (Kaiju.healPick): one tap of HEAL. Tap a card
 	                  for one more of it, - for one less; CLEAR, AUTO PICK.
+	                  Not while your team out is in a fight (the server's
+	                  KaijuDanger: Shared.Kaiju.Danger): IN A FIGHT then.
 	  The roll        a player still owed starter kaiju (from before the
 	                  roll, say) gets the roll here, once (KaijuRoll).
 	  Wild nameplates the server's health bar over wild kaiju and moon bugs
@@ -44,18 +52,21 @@
 	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
 	                       on "Details" or "Heal"
 ]]
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local Coupons = require(ReplicatedStorage.Shared.Coupons)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Spar = require(ReplicatedStorage.Shared.Spar)
+local Store = require(ReplicatedStorage.Shared.Store)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -219,6 +230,12 @@ local function liveRecord(record)
 	return live
 end
 
+-- "1:05": how long till one knocked out is back by itself (Kaiju.reviveIn).
+local function reviveClock(record): string
+	local left = math.ceil(Kaiju.reviveIn(record, workspace:GetServerTimeNow()))
+	return string.format("%d:%02d", left // 60, left % 60)
+end
+
 local function expShare(level: number, exp: number): number
 	local need = Kaiju.expToNext(level)
 	return if need == math.huge then 1 else math.clamp(exp / need, 0, 1)
@@ -279,7 +296,7 @@ for slot = 1, #Kaiju.SlotLevels do
 	healthBack.AnchorPoint = Vector2.new(0, 1)
 	healthBack.Position, healthBack.Size = UDim2.new(0, 4, 1, -4), UDim2.new(1, -8, 0, 4)
 	healthBack.ZIndex, healthFill.ZIndex = 3, 3
-	-- Knocked out: a veil, DOWN, till stones revive it.
+	-- Knocked out: a veil, DOWN and when it's back by itself.
 	local veil = new("Frame", {
 		BackgroundColor3 = INK,
 		BackgroundTransparency = 0.15,
@@ -479,7 +496,7 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 	end
 	tile.Veil.Visible = record.Down == true
 	if record.Down then
-		tile.VeilText.Text = "DOWN"
+		tile.VeilText.Text = "DOWN " .. reviveClock(record)
 	end
 end
 
@@ -754,6 +771,27 @@ healButton.TextSize = 16
 local resetButton = smallButton(healFoot, "CLEAR", P.Edge)
 resetButton.AnchorPoint = Vector2.new(1, 0.5)
 resetButton.Position, resetButton.Size = UDim2.new(1, -158, 0.5, 0), UDim2.fromOffset(106, 40)
+-- Knocked out: no gems bring it back, so in their place when it's back by
+-- itself, and how to bring it back now (REVIVE and COUPON, below).
+local reviveCard = new("Frame", {
+	Name = "Revive",
+	BackgroundColor3 = P.Inset,
+	Position = UDim2.fromOffset(0, stacksY),
+	Size = UDim2.new(1, 0, 1, -stacksY - footH - 4),
+	Visible = false,
+}, healPane)
+UiKit.round(reviveCard, 10)
+new("UIStroke", { Color = P.Bad:Lerp(P.Edge, 0.45), Thickness = 1.5 }, reviveCard)
+local function centred(text: string, size: number, color: Color3, font: Enum.Font, y: number, h: number): TextLabel
+	local l = label(reviveCard, text, size, color, font)
+	l.TextXAlignment = Enum.TextXAlignment.Center
+	l.Position, l.Size = UDim2.fromOffset(8, y), UDim2.new(1, -16, 0, h)
+	return l
+end
+local reviveCaption = centred("BACK BY ITSELF IN", 11, P.Dim, IronUi.Bold, if SHORT then 7 else 36, 14)
+local reviveTime = centred("", if SHORT then 32 else 46, P.Text, Enum.Font.GothamBlack, if SHORT then 20 else 54, if SHORT then 36 else 54)
+local reviveLine = centred("", 12, P.Text, IronUi.Bold, if SHORT then 58 else 118, 16)
+local reviveCoupon = centred("", 11, P.Gold, IronUi.Bold, if SHORT then 78 else 144, 16)
 
 local tab = "Details"
 local selected: string? = nil
@@ -1103,7 +1141,7 @@ local function drawActions(data, record, team: { string })
 		end)
 	end
 	if record.Down then
-		actionText.Text = "Knocked out: heal it with gems to bring it back."
+		actionText.Text = string.format("Knocked out: back by itself in %s, or revive it now.", reviveClock(record))
 	end
 	actionButton(2, if record.Down then "REVIVE" else "HEAL", if record.Down then P.Bad else P.Good, 100, function()
 		tab = "Heal"
@@ -1350,21 +1388,21 @@ local function drawHeal(record)
 	end)
 	local plan = Kaiju.infusePlan(record, chosen)
 	local share = math.floor(plan.Health / math.max(1, most) * 100 + 0.5)
-	local cost = Kaiju.reviveCost(record)
+	-- (Out beside you in a fight: no healing till it's over, KaijuDanger.)
+	local fighting = not down and player:GetAttribute("KaijuDanger") == true and petModels()[record.Id] ~= nil
+	stackList.Visible, reviveCard.Visible = not down, down
 	-- The head: its name, its health now and (lighter) after.
 	healName.Text = string.format("%s  ·  LV %d", string.upper(Kaiju.title(record)), record.Level)
 	healName.TextColor3 = elementColor(record.Element):Lerp(P.Text, 0.3)
 	if down then
-		local power = 0
-		for _, gem in chosen do
-			power += Kaiju.infusePower(gem, record)
-		end
-		healNumbers.Text = string.format("%g / %d POWER", math.min(power, cost), cost)
+		local wait = Kaiju.reviveSeconds(record)
+		local left = Kaiju.reviveIn(record, workspace:GetServerTimeNow())
+		healNumbers.Text = "KNOCKED OUT"
 		healNumbers.TextColor3 = P.Bad:Lerp(P.Text, 0.3)
 		healNow.Size = UDim2.fromScale(0, 1)
-		healAfter.Size = UDim2.fromScale(math.clamp(power / cost, 0, 1), 1)
+		healAfter.Size = UDim2.fromScale(math.clamp(1 - left / math.max(1, wait), 0, 1), 1)
 		healAfter.BackgroundColor3 = P.Gold
-		healBarText.Text = if plan.Revived then "READY TO REVIVE" else "KNOCKED OUT"
+		healBarText.Text = "BACK IN " .. reviveClock(record)
 	else
 		healNumbers.Text = string.format("%d / %d HEALTH", math.floor(now + 0.5), most)
 		healNumbers.TextColor3 = P.Text
@@ -1375,10 +1413,32 @@ local function drawHeal(record)
 		healBarText.Text = ""
 	end
 	local on = Kaiju.autoHealOn(roster())
-	healHint.Text = if on
-		then "AUTO HEAL is on: your spare Commons heal your team between fights."
+	healHint.Text = if down
+		then "Gems and AUTO HEAL don't bring back one that's knocked out."
+		elseif on then "AUTO HEAL is on: your spare Commons heal your team between fights."
 		else "Switch on AUTO HEAL by your team and your spare Commons heal them by themselves."
-	healHint.TextColor3 = if on then P.Good else P.Dim
+	healHint.TextColor3 = if on and not down then P.Good else P.Dim
+	if down then
+		-- Knocked out: back by itself, or REVIVE (Robux) or COUPON now.
+		local coupons = Coupons.count(GemClient.Profile, "Revive")
+		local onSale = (Store.RobuxProducts.KaijuRevive or 0) ~= 0 or Store.testPrice("KaijuRevive") ~= nil
+		reviveTime.Text = reviveClock(record)
+		reviveLine.Text = string.format("%s comes back at half health.", Kaiju.title(record))
+		reviveCoupon.Text = if coupons > 0
+			then string.format("You have %d Revive coupon%s: COUPON brings it back free.", coupons, if coupons == 1 then "" else "s")
+			else "Invite a friend: a free Revive coupon for each one who joins."
+		healSummary.Text = "Knocked out"
+		healNote.Text = "Revive now: every one of yours that's down, back at once."
+		healReady = onSale
+		healChosen = {}
+		healButton.Text = if onSale then "REVIVE  ·  R$ " .. tostring(Store.robuxPrice("KaijuRevive") or 0) else "COMING SOON"
+		healButton.AutoButtonColor = onSale
+		healButton.BackgroundColor3 = P.Gold:Lerp(INK, if onSale then 0.3 else 0.78)
+		healButton.TextColor3 = if onSale then P.Text else P.Dim
+		resetButton.Text = string.format("COUPON ×%d", coupons)
+		resetButton.Visible = coupons > 0
+		return
+	end
 	-- Under the gems: what the heal does, and HEAL.
 	if #stacks == 0 then
 		healSummary.Text = "No gems in your pouch"
@@ -1387,31 +1447,29 @@ local function drawHeal(record)
 		healSummary.Text = "Full health"
 		healNote.Text = "Nothing to heal."
 	elseif #chosen == 0 then
-		healSummary.Text = if down then string.format("Needs %d power to come back", cost) else "Tap your gems to pick them"
-		healNote.Text = if down and #suggested == 0
-			then "Your spare Commons aren't enough to bring it back: tap your gems to add more."
-			else "A gem of its own element heals double, its weakness half."
-	elseif down and not plan.Revived then
-		healSummary.Text = string.format("%g more power to bring it back", plan.Short)
-		healNote.Text = "Tap your gems to add them."
+		healSummary.Text = "Tap your gems to pick them"
+		healNote.Text = "A gem of its own element heals double, its weakness half."
 	else
 		healSummary.Text = string.format(
 			"%s  ·  %s %d%%",
 			if #plan.Used < #chosen
 				then string.format("%d of %d gems", #plan.Used, #chosen)
 				else string.format("%d gem%s", #plan.Used, if #plan.Used == 1 then "" else "s"),
-			if plan.Revived then "back at" else "heals to",
+			"heals to",
 			share
 		)
 		healNote.Text = if manual
 			then "A gem of its own element heals double, its weakness half."
 			else "Picked for you from your spare Commons. Tap a gem for one more, - for one less."
 	end
-	healReady = not full and #chosen > 0 and (not down or plan.Revived)
+	if fighting and not full then
+		healNote.Text = "In a fight: get clear of the critters to heal."
+	end
+	healReady = not full and #chosen > 0 and not fighting
 	healChosen = chosen
-	healButton.Text = if full then "FULL" elseif down then "REVIVE" else "HEAL"
+	healButton.Text = if full then "FULL" elseif fighting then "IN A FIGHT" else "HEAL"
 	healButton.AutoButtonColor = healReady
-	healButton.BackgroundColor3 = (if down then P.Gold else P.Good):Lerp(INK, if healReady then 0.3 else 0.78)
+	healButton.BackgroundColor3 = P.Good:Lerp(INK, if healReady then 0.3 else 0.78)
 	healButton.TextColor3 = if healReady then P.Text else P.Dim
 	resetButton.Text = if next(pickCounts) then "CLEAR" else "AUTO PICK"
 	resetButton.Visible = #stacks > 0 and not full and (next(pickCounts) ~= nil or #suggested > 0)
@@ -1441,7 +1499,45 @@ function drawPanel()
 	end
 end
 
+-- Your knocked-out kaiju back now: Roblox's purchase prompt for the
+-- KaijuRevive product (the revive comes with the receipt: StoreServer), or
+-- coins while testing (the store's BuyProduct).
+local function buyRevive()
+	local productId = Store.RobuxProducts.KaijuRevive or 0
+	if productId ~= 0 then
+		MarketplaceService:PromptProductPurchase(player, productId)
+		return
+	end
+	if not Store.testPrice("KaijuRevive") then
+		UiKit.toast("Coming soon: revives aren't on sale yet.", P.Dim)
+		return
+	end
+	act(function()
+		say(GemClient.request("BuyProduct", "KaijuRevive"))
+	end)
+end
+MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, purchased)
+	if purchased and userId == player.UserId and Store.productKey(productId) == "KaijuRevive" then
+		-- (The receipt lands a moment after the prompt closes.)
+		task.delay(1, function()
+			UiKit.toast("Your kaiju are back on their feet!", P.Good)
+		end)
+	end
+end)
+
+local function selectedDown(): boolean
+	local data = roster()
+	local record = selected and data and data.List[selected]
+	return record ~= nil and record.Down == true
+end
+
 resetButton.Activated:Connect(function()
+	if selectedDown() then
+		act(function()
+			say(GemClient.request("UseCoupon", "Revive"))
+		end)
+		return
+	end
 	if next(pickCounts) then
 		table.clear(pickCounts)
 		manual = true
@@ -1453,6 +1549,12 @@ end)
 
 healButton.Activated:Connect(function()
 	local target = selected
+	if selectedDown() then
+		if healReady then
+			buyRevive()
+		end
+		return
+	end
 	if not healReady or #healChosen == 0 or not target then
 		return
 	end
@@ -1479,6 +1581,28 @@ function KaijuHud.open(id: string?, onTab: string?)
 	selected = id
 	drawPanel()
 	window.Gui.Enabled = true
+end
+
+-- In a fight or out of it (KaijuDanger): HEAL follows.
+player:GetAttributeChangedSignal("KaijuDanger"):Connect(function()
+	if window.Gui.Enabled and tab == "Heal" then
+		drawPanel()
+	end
+end)
+
+-- The revive countdown, while it's on screen.
+local function tickRevive()
+	if not (window.Gui.Enabled and reviveCard.Visible and healPane.Visible) then
+		return
+	end
+	local data = roster()
+	local record = selected and data and data.List[selected]
+	if record and record.Down then
+		reviveTime.Text = reviveClock(record)
+		healBarText.Text = "BACK IN " .. reviveClock(record)
+		local left = Kaiju.reviveIn(record, workspace:GetServerTimeNow())
+		healAfter.Size = UDim2.fromScale(math.clamp(1 - left / math.max(1, Kaiju.reviveSeconds(record)), 0, 1), 1)
+	end
 end
 
 countCommons()
@@ -1664,6 +1788,7 @@ function KaijuHud.start()
 			warn("[KaijuHud]", err)
 		end
 		pcall(plates)
+		pcall(tickRevive)
 	end)
 end
 

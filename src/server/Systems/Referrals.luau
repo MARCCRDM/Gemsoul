@@ -7,7 +7,10 @@
 	joined, the inviter earns the rewards of every tier reached
 	(Shared.Referrals.Tiers) and wears them: at once if they're in this
 	server, at once in theirs if they're in another (a cross-server message,
-	MessagingService), else on their next join or CHECK CLAIM.
+	MessagingService), else on their next join or CHECK CLAIM. Every friend
+	also gives a reward coupon of each kind (Shared.Coupons.PerFriend: a
+	swing restore, a kaiju revive, double XP), once each, kept on the
+	profile till used (CouponServer).
 
 	Request actions:
 	  "ReferralState"   refresh from the store, grant the reward if earned;
@@ -21,8 +24,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local Coupons = require(ReplicatedStorage.Shared.Coupons)
 local ReferralRules = require(ReplicatedStorage.Shared.Referrals)
 local PlayerData = require(script.Parent.PlayerData)
+local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
 
 local reply = Shop.reply
@@ -91,7 +96,21 @@ local function settle(player: Player, known: number?): (any, number?)
 			granted = reward
 		end
 	end
+	-- A coupon of each kind for every friend not paid for yet.
+	local owed, paid = Coupons.owed(profile.Referrals.Count, profile.Referrals.CouponsPaid)
+	local given = 0
+	for kind, n in owed do
+		Coupons.add(profile, kind, n)
+		given += n
+	end
+	profile.Referrals.CouponsPaid = paid
 	PlayerData.sync(player)
+	if given > 0 then
+		Remotes.Notify:FireClient(
+			player,
+			string.format("A friend joined on your invite: +%d reward coupons! Open INVITE to use them.", given)
+		)
+	end
 	return granted, count
 end
 

@@ -136,13 +136,20 @@ check(handlers.DungeonLootChoice(team[2], "Roll").Ok, "Roll refused")
 check(handlers.DungeonLootChoice(team[3], "Pass").Ok, "Pass refused")
 check(#awarded == 1 and awarded[1].Player ~= team[3], "Loot duplicated or awarded to passer")
 check(awarded[1].Gem.SurgeTier == 4 and awarded[1].Gem.SurgeRank == 3, "Boss gem quality")
+local restoresBefore = #restoresGiven
 tick(5)
 for _, p in team do
 	check(profiles[p].Coins == 300, "Completion reward missing")
 	check(p:GetAttribute("DungeonId") == nil, "Session leaked")
 end
+-- A clear restores a share of each one's swings (Shared.SwingRestore).
+check(#restoresGiven - restoresBefore == #team, "A clear didn't restore swings for each of the squad")
+for i = restoresBefore + 1, #restoresGiven do
+	check(restoresGiven[i].Share == SwingRestore.Dungeon, "A clear's swing share")
+end
 boss.Encounter.OnDeath()
 check(profiles[team[1]].Coins == 300, "Duplicate reward")
+check(#restoresGiven - restoresBefore == #team, "Swings restored twice for one clear")
 check(worlds[id].Folder.Destroyed and removed[id], "Dungeon not cleaned")
 check(second[1]:GetAttribute("DungeonId") == id2, "Another squad interrupted")
 for _, p in second do
@@ -197,6 +204,7 @@ clearRoom(testId, 1)
 check(tester:GetAttribute("DungeonId") == nil, "Solo test failed cleanup")
 check(tester:GetAttribute("DungeonTest") == nil, "Test flag leaked")
 check(profiles[tester].Coins == 0, "Studio test awarded coins")
+check(restoresGiven[#restoresGiven].Player ~= tester, "A Studio test restored swings")
 print("PASS: Studio test entry, live rejection, solo boss and cleanup")
 
 studioMode = false

@@ -163,9 +163,14 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **They don't heal on their own.** A kaiju keeps the health it ends a fight
   with, out or at home, across sessions; gems heal it, by hand or by AUTO
   HEAL (see [Healing](#healing)).
-- **Knocked out**, it goes back into its Gemsoul and stays down (`Down`):
-  it doesn't come back by itself. Gems revive it, and it costs far more
-  than healing (see [Healing](#healing)). The others fight on.
+- **Knocked out**, it goes back into its Gemsoul and stays down (`Down`)
+  until it comes back by itself: 60 seconds and 8 more a level
+  (`Kaiju.Revive`, `reviveSeconds`; `DownUntil` on the record, the
+  server's clock, so it counts while you're away), at half health. Gems
+  don't revive it. Or revive it now: **REVIVE** for Robux (the
+  `KaijuRevive` product, R$ 25: every one of yours that's down) or a
+  **Revive coupon** from inviting friends (`Shared.Coupons`). The others
+  fight on. See [Knocked out](#knocked-out).
 - **Changing the team** (the panel): LEAD puts one at the front; SEND OUT
   puts one from home in place of one of the team. Not one that's fought in
   the last 3 seconds, and not twice in a moment.
@@ -493,37 +498,58 @@ A gem's **power** is its rarity's, and its element matters:
 
 - **Healing** a hurt kaiju: each point of power heals 10% of its health.
   A Common of its own element is 20%.
-- **Reviving** one that's down takes 10 power plus 1 a level, all at once
-  (a level-11 kaiju needs 21: eleven Commons of its own element, where
-  healing it from a sliver back to full is 10), and it comes back at half
-  health; gems past that go on healing it. Too little power and nothing is
-  spent.
+- **Only out of danger** (`Kaiju.Danger`): not while any of your team out
+  has fought in the last 4 seconds, and not with a critter or wild kaiju
+  within 45 studs of you (`KaijuServer.inDanger`). HEAL says IN A FIGHT then
+  (the server sets `KaijuDanger` on you), and the server refuses a heal sent
+  anyway. One at home can be healed any time.
+- **Not one that's down**: gems don't revive (see [Knocked out](#knocked-out)).
+
+![In a fight: HEAL waits till you're clear](kaiju/in-a-fight.png)
+
+### Knocked out
+
+![Knocked out: the countdown, REVIVE and COUPON](kaiju/revive.png)
+
+- **Back by itself** once its revive time is up: 60 seconds plus 8 a
+  level (a level-11 kaiju waits 2:28), at half health
+  (`Kaiju.Revive`, `reviveSeconds`, `reviveIn`). The server's upkeep wakes it
+  ("Cryo Razorback is back on its feet!"), at home or out, and the time runs
+  while you're offline too.
+- **REVIVE** (R$ 25, the `KaijuRevive` developer product; coins while
+  testing): every one of yours that's down, back now. Paid for when none is
+  down any more (it came back while the purchase went through), it becomes
+  a Revive coupon instead, so nothing is lost.
+- **COUPON**: a Revive coupon (one for every friend who joins on your
+  invite) does the same for free. Kept when none is down.
+- The HEAL tab shows a countdown in place of the gems (BACK BY ITSELF IN
+  2:28), the strip's tile says DOWN 2:28, and the panel's line says when it's
+  back.
 
 ### The HEAL tab
 
 1. **At the top**, its name and level, and its health bar: what it has now,
    and, lighter, what it'll have after the heal (`63 / 324 HEALTH`). One
-   that's down shows its revive instead: the power picked against what it
-   needs (`12 / 21 POWER`), KNOCKED OUT or READY TO REVIVE.
+   that's down shows KNOCKED OUT and how long till it's back.
 2. **Under that**, whether AUTO HEAL is on.
 3. **Your gems**, a card for each rarity and element: the gem itself (a 3D
    view of one of them), how many you have, and what each heals (`+20%
-   EACH`, gold for its own element, dim for its weakness; down, `+2 POWER
-   EACH`). Commons come first, then rarer, its own element first in each.
+   EACH`, gold for its own element, dim for its weakness). Commons come
+   first, then rarer, its own element first in each.
    Tap a card for one more of it; **-** takes one off. The card says how
    many are picked.
 4. **At the bottom**, what the heal does (`3 gems · heals to 100%`, or
    `4 of 8 gems` when it needs fewer than you picked), and **HEAL**
-   (**REVIVE**; **FULL** when there's nothing to heal). **CLEAR** takes the
+   (**FULL** when there's nothing to heal, **IN A FIGHT** while you're in
+   one). **CLEAR** takes the
    picks off; with none picked, **AUTO PICK** puts them back.
 
 Opened, it has your **spare Commons picked already**, as many as bring it to
 full (`Kaiju.healPick`): one tap of HEAL does it. Spare means loose and not
 named by a saved loadout. In each card the spare gems go first, then the
 least valuable, so a heal spends what you'd miss least. The picks follow
-its health (a fight, a heal) until you change them yourself. When your spare
-Commons can't bring one back that's down, nothing is picked and it says so:
-add rarer gems by hand. The server takes only the gems it uses, and checks
+its health (a fight, a heal) until you change them yourself. The server
+takes only the gems it uses, and checks
 every one is yours and loose (`KaijuServer.infuse`, `Kaiju.infusePlan`).
 
 This replaced the INFUSE tab: a list of every stone, each with a tick box,
@@ -535,18 +561,18 @@ Switched on (the strip's AUTO HEAL; `KaijuAutoHeal`, kept as the roster's
 `AutoHeal`), your **spare Commons** heal your team by themselves
 (`Kaiju.AutoHeal`, `KaijuServer`):
 
-- **A hurt one**, once it's gone 4 seconds without a fight (`Calm`). Only
-  Commons that fit are used: it never spends one that would heal past full
-  (`Kaiju.healPick`), so it can stop a little short.
-- **One knocked out**, 3 seconds after it went down (`ReviveAfter`), if your
-  spare Commons have the power. It comes back out at once.
+- **A hurt one**, only out of danger (`Kaiju.Danger`: no fight for 4
+  seconds, no critter near). Only Commons that fit are used: it never spends
+  one that would heal past full (`Kaiju.healPick`), so it can stop a little
+  short.
+- **Not one knocked out**: that one comes back by itself, or by REVIVE or a
+  coupon.
 - At most one round every 1.5 seconds (`Every`), all of the team that needs
   it in that round.
 - **Never** a rarer gem, a gem a saved loadout names, or a Gemsoul. Only in
   the Outpost, out of fights, matches and expeditions.
-- **Quiet**: the kaiju glows and the strip's count drops. A revive is said
-  ("Auto heal: Cryo Razorback is back! (12 Commons)"), and so, once, is
-  running out ("Auto heal is out of spare Commons...").
+- **Quiet**: the kaiju glows and the strip's count drops. Running out is
+  said once ("Auto heal is out of spare Commons...").
 
 It's **off until you switch it on** (`Kaiju.AutoHeal.Default`), so no one's
 gems are spent without them choosing it.
@@ -576,7 +602,7 @@ Proposed guardrails:
 
 | Where | What |
 | --- | --- |
-| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `reviveCost`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
+| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`, `Danger`), knocked out (`Revive`, `reviveSeconds`, `reviveIn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
 | `Shared.Squad` | Fighting as a side: sharing out foes (`assign`, `cost`), places round a shared foe (`slots`, `toward`), keeping clear (`apart`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
 | `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
@@ -584,7 +610,7 @@ Proposed guardrails:
 | `Shared.GemTraits` | The moves a Gemsoul rolls (`SoulMoves`); an old one's seeded into them (`traitsOf`) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow and its R when hard pressed (`setMoves` after a level), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
-| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till revived: `Down` on the record, `KaijuDown_<id>` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), healing any of yours (`KaijuInfuse`), AUTO HEAL (`KaijuAutoHeal`, healing with spare Commons between fights), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
+| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till its revive time is up: `Down` and `DownUntil` on the record, `KaijuDown_<id>` on you; `reviveAll` for REVIVE and coupons), danger (`inDanger`, `KaijuDanger` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), healing any of yours (`KaijuInfuse`), AUTO HEAL (`KaijuAutoHeal`, healing with spare Commons between fights), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
 | `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model; a pack shares its foes), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, sharing out your kaiju, how they fight (bites, hops, dodges, their moves, bombs), slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look, all at its caster's size (`Size`; effects sent `"Sized"`); its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
@@ -608,11 +634,12 @@ owed a full three once), every creature effect sent at its size (a pet's,
 a wild one's, a critter's), your team (three out, one knocked out leaving the
 others, recall and EXP for all of them, LEAD, SEND OUT, the checks on a new
 team, a knocked-out one staying down and in its place, health kept with no
-healing on its own, healing with gems (a revive's cost by level, its own
-element's gems counting double, nothing spent short of a revive, only
-loose gems, never a socketed one), AUTO HEAL (off till switched on, not
-mid-fight, only spare Commons that fit, never a rarer gem or one a loadout
-names, a revive a moment after the knockout, out of Commons said once), fighting as a team (3 on 3 one each, 3 on 1 all
+healing on its own, healing with gems (its own element's gems counting
+double, only loose gems, never a socketed one, never mid-fight, never one
+that's down), knocked out (back by itself at half health once its time by
+level is up, not a moment before, gems refused, `reviveAll`), AUTO HEAL (off
+till switched on, not mid-fight, only spare Commons that fit, never a rarer
+gem or one a loadout names, never a revive, out of Commons said once), fighting as a team (3 on 3 one each, 3 on 1 all
 in from three sides, 2 on 3 one each and the collapse when one falls, 2 on 10
 never doubled up with the critters five and five, two on one spot pushed
 apart; a critter's bite winding up and hopping back out, its hop clear of a

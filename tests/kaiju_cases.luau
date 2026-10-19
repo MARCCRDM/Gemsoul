@@ -144,37 +144,34 @@ end
 fireKaiju.Health = most - most * Infuse.Mend * 2.5
 local plan = Kaiju.infusePlan(fireKaiju, stones)
 check(
-	#plan.Used == 3 and plan.Health == most and not plan.Revived,
+	#plan.Used == 3 and plan.Health == most,
 	"Mending 25% didn't take three commons: " .. #plan.Used
 )
 check(plan.Used[1] == stones[1] and plan.Used[3] == stones[3], "It didn't use the stones in the order given")
 fireKaiju.Health = most
 check(#Kaiju.infusePlan(fireKaiju, stones).Used == 0, "A whole kaiju took stones")
--- Down: its revive cost all at once, or nothing.
+-- Down: gems don't bring it back. It's back by itself once its revive
+-- time is up (longer the higher its level), or at once for Robux or a
+-- coupon (the server).
 fireKaiju.Down, fireKaiju.Health = true, 0
-local cost = Kaiju.reviveCost(fireKaiju)
-check(cost == Infuse.Revive.Base + Infuse.Revive.PerLevel * 5, "The revive cost isn't by level")
-check(Kaiju.reviveCost({ Level = 20 }) > cost, "A higher level isn't dearer to revive")
+local wait = Kaiju.reviveSeconds(fireKaiju)
+check(wait == Kaiju.Revive.Base + Kaiju.Revive.PerLevel * 5, "The revive wait isn't by level")
+check(Kaiju.reviveSeconds({ Level = 20 }) > wait, "A higher level doesn't wait longer")
+check(Kaiju.Revive.Health > 0 and Kaiju.Revive.Health <= 1, "The revive's rules")
 check(select(1, Kaiju.health(fireKaiju)) == 0, "Down isn't no health")
-local few = {}
-for i = 1, cost - 1 do
-	few[i] = gem("Common", neutral, "f" .. i)
+local manyStones = {}
+for i = 1, 200 do
+	manyStones[i] = gem("Common", neutral, "f" .. i)
 end
-plan = Kaiju.infusePlan(fireKaiju, few)
-check(
-	not plan.Revived and #plan.Used == 0 and plan.Short == 1,
-	"A revive one short used stones, or got the shortfall wrong"
-)
-local enough = table.clone(few)
-table.insert(enough, gem("Common", neutral, "last"))
-table.insert(enough, gem("Common", neutral, "spare"))
-plan = Kaiju.infusePlan(fireKaiju, enough)
-check(plan.Revived and #plan.Used == cost + 1, "Revived, the spare didn't mend it")
-check(
-	math.abs(plan.Health - (most * Infuse.Revive.Health + most * Infuse.Mend)) < 1e-6,
-	"Not back at half (and the spare's mend)"
-)
--- Its own element brings it back for half the stones; its weakness takes double.
+plan = Kaiju.infusePlan(fireKaiju, manyStones)
+check(#plan.Used == 0 and plan.Power == 0 and plan.Health == 0, "Gems went into one that's down")
+fireKaiju.DownUntil = 1000 + wait
+check(Kaiju.reviveIn(fireKaiju, 1000) == wait, "The time left to its revive")
+check(Kaiju.reviveIn(fireKaiju, 1000 + wait + 5) == 0, "Past its revive time, still waiting")
+check(Kaiju.reviveIn({ Level = 3 }, 1000) == 0, "One that's up has a revive wait")
+fireKaiju.DownUntil = nil
+-- Danger: no healing in a fight (hit or hitting lately, or critters near).
+check(Kaiju.Danger.Calm > 0 and Kaiju.Danger.Radius > 0, "The danger rules")
 local function batch(element, count)
 	local list = {}
 	for i = 1, count do
@@ -182,16 +179,9 @@ local function batch(element, count)
 	end
 	return list
 end
-local ownNeed, weakNeed = math.ceil(cost / Infuse.Same), math.ceil(cost / Infuse.Weak)
-check(Kaiju.infusePlan(fireKaiju, batch("Fire", ownNeed)).Revived, "Its own element didn't halve the revive")
-check(not Kaiju.infusePlan(fireKaiju, batch("Fire", ownNeed - 1)).Revived, "Revived with too few of its own")
-check(Kaiju.infusePlan(fireKaiju, batch(weak, weakNeed)).Revived, "Its weakness: enough didn't revive")
-check(not Kaiju.infusePlan(fireKaiju, batch(weak, weakNeed - 1)).Revived, "Its weakness didn't double the revive")
--- A revive costs far more than mending the same health.
-check(cost > (Infuse.Revive.Health / Infuse.Mend) * 2, "A revive isn't much dearer than mending")
 -- Picking the gems for a heal (healPick): the strongest first (its own
--- element), never a Gemsoul; down, just enough to bring it back (none if
--- they can't, and the shortfall); then to full, or only the ones that fit.
+-- element), never a Gemsoul, none for one that's down; to full, or only
+-- the ones that fit.
 local mixed = { gem("Common", neutral, "n1"), gem("Common", weak, "w1"), gem("Common", "Fire", "o1"), gem("Common", neutral, "n2") }
 local soulGem = gem("Common", "Fire", "soul")
 soulGem.Soul = { Kind = "Kaiju" }
@@ -209,16 +199,11 @@ end
 fireKaiju.Health = most
 check(#Kaiju.healPick(fireKaiju, mixed, true) == 0, "A whole kaiju was picked gems")
 fireKaiju.Down, fireKaiju.Health = true, 0
-local pickedRevive, short = Kaiju.healPick(fireKaiju, batch(neutral, cost - 1), false)
-check(#pickedRevive == 0 and short == 1, "A revive one short was picked, or got the shortfall wrong")
-pickedRevive = Kaiju.healPick(fireKaiju, batch(neutral, cost + 2), false)
-check(Kaiju.infusePlan(fireKaiju, pickedRevive).Revived and #pickedRevive == cost + 2, "A revive didn't take what it needs and mend with the rest")
-pickedRevive = Kaiju.healPick(fireKaiju, batch("Fire", cost), false)
-check(#pickedRevive == math.ceil(cost / Infuse.Same) + math.floor(Infuse.Revive.Health / (Infuse.Mend * Infuse.Same)), "Its own element: the revive and the mend took the wrong count: " .. #pickedRevive)
+check(#Kaiju.healPick(fireKaiju, batch(neutral, 200), true) == 0, "One that's down was picked gems")
 fireKaiju.Down, fireKaiju.Health = nil, nil
 -- Auto heal: off till switched on, kept in the roster; Commons only.
 check(not Kaiju.autoHealOn({ List = {} }) and Kaiju.autoHealOn({ List = {}, AutoHeal = true }), "Auto heal isn't off till it's switched on")
-check(Kaiju.AutoHeal.Tier == "Common" and Kaiju.AutoHeal.Calm > 0 and Kaiju.AutoHeal.ReviveAfter > 0, "Auto heal's rules")
+check(Kaiju.AutoHeal.Tier == "Common" and Kaiju.AutoHeal.Every > 0, "Auto heal's rules")
 -- Down ones fill an empty place last.
 local downRoster = {
 	List = {
@@ -518,7 +503,7 @@ check(Kaiju.Bug.Size > pet and Kaiju.Bug.Size < wild, "A critter isn't between a
 check(Kaiju.size(1) == Kaiju.Height, "A model at scale 1 isn't its height")
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, infusing and revives, healPick and auto heal, taming, spread, slots, Gemsouls, your team, the starter roll, fighting as a team, sizes)",
+		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, Gemsouls, your team, the starter roll, fighting as a team, sizes)",
 		checks
 	)
 )

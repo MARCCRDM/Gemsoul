@@ -11,8 +11,10 @@
 	  "StarterOffer"               puts the Starter Pack on offer (once, after a win)
 	Robux: when an id is set in Store.RobuxProducts, buying that Developer
 	Product grants it (ProcessReceipt below), once per purchase: a look, a
-	bundle, squad kits, the Starter Pack, the Season premium track or a
-	PROBE-7 refill's swings (StoreServer.addSwings: OutpostServer's).
+	bundle, squad kits, the Starter Pack, the Season premium track, a
+	PROBE-7 refill's swings (StoreServer.addSwings: OutpostServer's) or a
+	kaiju revive (StoreServer.reviveKaiju: KaijuServer.reviveAll; with none
+	down by then, a Revive coupon, Shared.Coupons).
 
 	What you buy goes on: a look you buy is worn at once; a bundle puts its
 	first suit, skin and pickaxe on the miner you're playing; squad kits go
@@ -24,6 +26,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local Coupons = require(ReplicatedStorage.Shared.Coupons)
 local Economy = require(ReplicatedStorage.Shared.ExpeditionEconomy)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Season = require(ReplicatedStorage.Shared.Season)
@@ -39,6 +42,9 @@ local StoreServer = {}
 -- Puts swings on a player's free pick (a refill: OutpostServer.addSwings,
 -- wired in by Main); false when it can't (no Outpost).
 StoreServer.addSwings = nil :: ((Player, number) -> boolean)?
+-- Brings back every kaiju of a player's that's knocked out (a revive:
+-- KaijuServer.reviveAll, wired in by Main); how many came back.
+StoreServer.reviveKaiju = nil :: ((Player) -> number)?
 
 local function cosmeticName(id: string): string
 	local cosmetic = Cosmetics.get(id)
@@ -157,6 +163,18 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 	if refill then
 		local added = StoreServer.addSwings ~= nil and StoreServer.addSwings(player, refill.Swings)
 		return added, if added then { string.format("%d swings", refill.Swings) } else nil
+	end
+	-- A kaiju revive: every one of yours that's down, back now. Paid for
+	-- with none down (it came back by itself while the purchase went
+	-- through): a Revive coupon for next time instead.
+	if key == "KaijuRevive" then
+		local revived = if StoreServer.reviveKaiju then StoreServer.reviveKaiju(player) else 0
+		if revived > 0 then
+			return true, { if revived == 1 then "your kaiju back on its feet" else string.format("%d kaiju back on their feet", revived) }
+		end
+		Coupons.add(profile, "Revive", 1)
+		PlayerData.sync(player)
+		return true, { "a Kaiju Revive coupon (none of yours was down)" }
 	end
 	local reward = Store.contents(key)
 	if not reward then

@@ -210,6 +210,15 @@ local ArenaStreaks = {
 		return if won then 1 else 0
 	end,
 }
+-- Swing restores (Systems/Restores): each share given, recorded; the pick
+-- takes 600 at most.
+local restoresGiven = {}
+local Restores = {
+	give = function(p, share)
+		table.insert(restoresGiven, { Player = p, Share = share })
+		return math.floor(600 * share + 0.5)
+	end,
+}
 -- Party Raids: the boss is the Duelist's (recorded here); ids are fixed.
 local HttpService = {
 	GenerateGUID = function()

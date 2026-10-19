@@ -652,6 +652,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		KaijuRoll = (profile :: any).KaijuRoll, -- the starter roll prepared and not yet claimed (KaijuServer)
 		KaijuRolled = (profile :: any).KaijuRolled, -- the starter roll was taken (Shared.Kaiju.rollsOwed)
 		Referrals = (profile :: any).Referrals, -- friends who joined through your invite (see Referrals)
+		Coupons = (profile :: any).Coupons, -- reward coupons from invites, not yet used (Shared.Coupons, CouponServer)
 		FirstJoin = profile.FirstJoin,
 		WelcomeBought = profile.WelcomeBought,
 		ServerTime = os.time(),

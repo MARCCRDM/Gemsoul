@@ -26,11 +26,12 @@
 	Levels 1-30 from kills and from your mining, a little for every rock
 	you break with it out beside you (mineExp). It never heals on its own:
 	its health is kept, out and home, until you heal it with gems
-	(infusePlan), and one knocked out stays down until gems revive it, at
-	a far higher price (a gem of its own element worth double, one of the
-	element that beats it half). Gems never give EXP. healPick picks the
-	gems for a heal; AutoHeal, switched on, heals your team with your spare
-	Commons by itself.
+	(infusePlan: a gem of its own element worth double, one of the element
+	that beats it half), and only out of danger (Danger). Gems never give
+	EXP. healPick picks the gems for a heal; AutoHeal, switched on, heals
+	your team with your spare Commons by itself. One knocked out comes back
+	by itself once its revive time is up (Revive, reviveSeconds), or at once
+	for Robux or a Revive coupon; gems don't revive it.
 
 	Pure data and logic, for the server, the client and tests.
 ]]
@@ -399,21 +400,48 @@ Kaiju.BugMoves = {
 	},
 }
 
--- Infusing (KaijuServer's "KaijuInfuse"): stones from your pouch mend a
--- kaiju, never EXP. A stone's power by its rarity (Power), Same times for
+-- Healing (KaijuServer's "KaijuInfuse"): gems from your pouch heal a
+-- kaiju, never EXP. A gem's power by its rarity (Power), Same times for
 -- one of the kaiju's own element, Weak times for one of the element that
--- beats it; each point of power mends Mend of its health. Knocked out, it
--- takes Revive power at once (Base, and PerLevel more a level) to bring it
--- back, at Revive.Health of its health; stones past that go on mending.
--- Batch: stones it takes in one go.
+-- beats it; each point of power heals Mend of its health. Batch: gems it
+-- takes in one go. One knocked out takes none (Revive).
 Kaiju.Infuse = {
 	Power = { Common = 1, Uncommon = 2, Rare = 4, UltraRare = 8, Legendary = 16 },
 	Same = 2,
 	Weak = 0.5,
 	Mend = 0.1,
-	Revive = { Base = 10, PerLevel = 1, Health = 0.5 },
 	Batch = 25,
 }
+
+-- Knocked out: back by itself once Base seconds, and PerLevel more a level,
+-- have gone by (record.DownUntil, the server's clock: it counts while
+-- you're away), at Health of its health. Or at once: Robux (the
+-- "KaijuRevive" product, Shared.Store: every one of yours that's down) or
+-- a Revive coupon (Shared.Coupons).
+Kaiju.Revive = { Base = 60, PerLevel = 8, Health = 0.5 }
+
+-- How long one knocked out at its level stays down.
+function Kaiju.reviveSeconds(record): number
+	local revive = Kaiju.Revive
+	return revive.Base + revive.PerLevel * math.max(1, record and record.Level or 1)
+end
+
+-- Seconds until one knocked out is back by itself (0: up, or due now).
+function Kaiju.reviveIn(record, now: number): number
+	if not record or not record.Down then
+		return 0
+	end
+	local untilTime = tonumber(record.DownUntil)
+	if not untilTime then
+		return 0 -- (down before revive times: due now)
+	end
+	return math.max(0, untilTime - now)
+end
+
+-- Healing waits until you're out of danger (KaijuServer): none of your
+-- team out has fought for Calm seconds, and no creature they'd fight is
+-- within Radius of you.
+Kaiju.Danger = { Calm = 4, Radius = 45 }
 
 -- Mining with it out: EXP for every rock you break, by the rock's size
 -- (Shared.Outpost.Sizes), so it levels while you mine (and fights the
@@ -521,43 +549,17 @@ function Kaiju.infusePower(gem, record): number
 	return power
 end
 
--- The power that brings one knocked out back.
-function Kaiju.reviveCost(record): number
-	local revive = Kaiju.Infuse.Revive
-	return revive.Base + revive.PerLevel * math.max(1, record and record.Level or 1)
-end
-
--- What infusing `gems` (in the order given) into a kaiju does: only the
--- stones it needs are used. Down, it needs its revive cost all at once (or
--- nothing is used, and Short says how much more power it lacks); then
--- back at Revive.Health, the rest of the power mending. Up, stones mend it
--- until it's full. { Used = { gem }, Power, Revived, Health, Most, Short }.
+-- What healing a kaiju with `gems` (in the order given) does: only the
+-- gems it needs are used, until it's full. One knocked out takes none.
+-- { Used = { gem }, Power, Health, Most }.
 function Kaiju.infusePlan(record, gems: { any })
 	local health, most = Kaiju.health(record)
 	local mend = most * Kaiju.Infuse.Mend
-	local plan = { Used = {}, Power = 0, Revived = false, Health = health, Most = most, Short = 0 }
-	local start = 1
-	if record and record.Down then
-		local need, have, upTo = Kaiju.reviveCost(record), 0, nil
-		for i, gem in gems do
-			have += Kaiju.infusePower(gem, record)
-			if have >= need then
-				upTo = i
-				break
-			end
-		end
-		if not upTo then
-			plan.Short = need - have
-			return plan
-		end
-		for i = 1, upTo do
-			table.insert(plan.Used, gems[i])
-		end
-		plan.Power, plan.Revived = have, true
-		health = most * Kaiju.Infuse.Revive.Health + (have - need) * mend
-		start = upTo + 1
+	local plan = { Used = {}, Power = 0, Health = health, Most = most }
+	if not record or record.Down then
+		return plan
 	end
-	for i = start, #gems do
+	for i = 1, #gems do
 		if health >= most then
 			break
 		end
@@ -572,12 +574,11 @@ end
 
 -- Auto heal (KaijuServer's "KaijuAutoHeal", the HUD's AUTO HEAL): on, your
 -- spare Commons (Tier: never a rarer gem, never one a saved loadout names,
--- never a Gemsoul) heal your team by themselves: one that's hurt once it's
--- gone Calm seconds without a hit, one knocked out ReviveAfter seconds
--- after it went down. At most one heal every Every seconds, and never a
--- gem that would go to waste (healPick). Off till you switch it on
--- (Default), and kept in the roster (AutoHeal).
-Kaiju.AutoHeal = { Tier = "Common", Calm = 4, ReviveAfter = 3, Every = 1.5, Default = false }
+-- never a Gemsoul) heal your team by themselves, once you're out of danger
+-- (Danger). At most one round every Every seconds, and never a gem that
+-- would go to waste (healPick). It doesn't revive (Revive). Off till you
+-- switch it on (Default), and kept in the roster (AutoHeal).
+Kaiju.AutoHeal = { Tier = "Common", Every = 1.5, Default = false }
 
 function Kaiju.autoHealOn(roster): boolean
 	if roster and roster.AutoHeal ~= nil then
@@ -587,12 +588,10 @@ function Kaiju.autoHealOn(roster): boolean
 end
 
 -- The gems to heal a kaiju with, out of `gems`: the strongest first (its
--- own element), never a Gemsoul, at most Infuse.Batch. Knocked out, just
--- enough to bring it back (none at all if they can't: then the power it's
--- short); then, with `toFull`, on until it's full (the last may give more
--- than it needs), else only gems that fit (none wasted). Returns { gem },
--- and the power short of a revive.
-function Kaiju.healPick(record, gems: { any }, toFull: boolean?): ({ any }, number)
+-- own element), never a Gemsoul, at most Infuse.Batch; with `toFull`, on
+-- until it's full (the last may give more than it needs), else only gems
+-- that fit (none wasted). None for one knocked out.
+function Kaiju.healPick(record, gems: { any }, toFull: boolean?): { any }
 	local list = {}
 	for _, gem in gems do
 		if type(gem) == "table" and not Kaiju.isSoul(gem) then
@@ -607,25 +606,12 @@ function Kaiju.healPick(record, gems: { any }, toFull: boolean?): ({ any }, numb
 		return tostring(a.Id) < tostring(b.Id)
 	end)
 	local chosen = {}
-	if not record then
-		return chosen, 0
+	if not record or record.Down then
+		return chosen
 	end
 	local health, most = Kaiju.health(record)
 	local mend = most * Kaiju.Infuse.Mend
-	local start = 1
-	if record.Down then
-		local need, have = Kaiju.reviveCost(record), 0
-		while have < need and start <= #list and #chosen < Kaiju.Infuse.Batch do
-			have += Kaiju.infusePower(list[start], record)
-			table.insert(chosen, list[start])
-			start += 1
-		end
-		if have < need then
-			return {}, need - have
-		end
-		health = most * Kaiju.Infuse.Revive.Health + (have - need) * mend
-	end
-	for i = start, #list do
+	for i = 1, #list do
 		if health >= most - 1e-6 or #chosen >= Kaiju.Infuse.Batch then
 			break
 		end
@@ -635,7 +621,7 @@ function Kaiju.healPick(record, gems: { any }, toFull: boolean?): ({ any }, numb
 			health += gain
 		end
 	end
-	return chosen, 0
+	return chosen
 end
 
 -- The chance a tame works with the wild kaiju at this health.

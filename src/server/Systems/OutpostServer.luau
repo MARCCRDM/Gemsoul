@@ -11,7 +11,8 @@
 	                           gear; refused while the gem pouch is full)
 	  (PROBE-7's refills are Robux products, Outpost.Refills: StoreServer
 	  grants their swings through OutpostServer.addSwings, on top of the
-	  free pick's charge)
+	  free pick's charge; swing restores, Shared.SwingRestore, through
+	  OutpostServer.restoreSwings: never past its full charge)
 	  "OutpostBonk", model     bonk a rift's critter with your pick
 	                           (Shared.Frontier.Bonk: it costs no swings)
 	  "OutpostState"           your picks and record
@@ -56,6 +57,7 @@ local Mine = require(ReplicatedStorage.Shared.Mine)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
+local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
@@ -760,6 +762,41 @@ function OutpostServer.addSwings(player: Player, swings: number): boolean
 	end
 	PlayerData.sync(player)
 	return true
+end
+
+-- A swing restore (Shared.SwingRestore: an arena streak, a dungeon, a
+-- coupon): `share` of the free pick's full charge back, never past full.
+-- Returns the swings added (0 when it's full already, or no profile).
+function OutpostServer.restoreSwings(player: Player, share: number): number
+	local profile = PlayerData.get(player)
+	if not profile or type(share) ~= "number" or share <= 0 then
+		return 0
+	end
+	local o = record(profile)
+	local swings, added = SwingRestore.apply(o.Picks.Survey or 0, share, Rules.Picks.Survey.Swings)
+	if added <= 0 then
+		return 0
+	end
+	o.Picks.Survey = swings
+	if swings >= Rules.Picks.Survey.Swings then
+		-- (Full: its recharge clock waits till a swing is spent.)
+		o.SurveyAt = os.time()
+	end
+	if player:GetAttribute("Outpost") then
+		pickModel(player)
+	end
+	PlayerData.sync(player)
+	return added
+end
+
+-- How full the free pick is: swings, its full charge.
+function OutpostServer.charge(player: Player): (number, number)
+	local profile = PlayerData.get(player)
+	local full = Rules.Picks.Survey.Swings
+	if not profile then
+		return 0, full
+	end
+	return record(profile).Picks.Survey or 0, full
 end
 
 local function enter(player: Player)

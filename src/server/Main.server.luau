@@ -82,6 +82,9 @@ require(script.Parent.Systems.ChatChannels).start()
 require(script.Parent.Systems.Feedback).start()
 StoreServer.start()
 require(script.Parent.Systems.Referrals).start()
+-- Reward coupons from invites (Shared.Coupons): the INVITE menu spends them.
+local CouponServer = require(script.Parent.Systems.CouponServer)
+CouponServer.start()
 require(script.Parent.Systems.FreeRewards).start()
 TopPlayers.start()
 Equipment.start()
@@ -107,6 +110,9 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 	OutpostServer.start()
 	-- PROBE-7's refills are Robux products: their swings go on the pick.
 	StoreServer.addSwings = OutpostServer.addSwings
+	-- Swing restores (Shared.SwingRestore): arena streaks, dungeons, coupons.
+	require(script.Parent.Systems.Restores).swings = OutpostServer.restoreSwings
+	CouponServer.restoreSwings = OutpostServer.restoreSwings
 	-- Friendly sparring there: 1 swaps the pick for your combat kit.
 	if Config.CombatEnabled or not Config.MenuOnly then
 		require(script.Parent.Systems.SparServer).start()
@@ -115,6 +121,9 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 		if Config.Features == nil or Config.Features.Kaiju ~= false then
 			local KaijuServer = require(script.Parent.Systems.KaijuServer)
 			KaijuServer.start()
+			-- Revives for Robux (the KaijuRevive product) and Revive coupons.
+			StoreServer.reviveKaiju = KaijuServer.reviveAll
+			CouponServer.reviveKaiju = KaijuServer.reviveAll
 			-- Your kaiju out levels as you mine: EXP for every rock you break.
 			OutpostServer.onRockMined = KaijuServer.mined
 			local KaijuWilds = require(script.Parent.Systems.KaijuWilds)

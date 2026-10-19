@@ -347,7 +347,7 @@ local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
 	for _, name in
-		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "MechPilot", "Frontier" }
+		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "MechPilot", "Frontier", "SwingRestore" }
 	do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
@@ -366,6 +366,7 @@ local Server = (function()
 				Spar = Spar,
 				Tutorial = { beat = function() return nil end }, -- (no mining tutorial running)
 				MechPilot = load("src/shared/MechPilot.luau", "MechPilot", {}),
+				SwingRestore = load("src/shared/SwingRestore.luau", "SwingRestore", {}),
 				Intro = { tutorialMined = function() return nil end },
 				OutpostWorld = World,
 				Gems = Gems,
@@ -973,6 +974,16 @@ check(
 check(Server.addSwings(ana, Mega.Swings), "A second refill wasn't added")
 check(handlers.OutpostState(ana).State.Picks.Survey == Refill.Swings + Mega.Swings, "Refills don't stack")
 check(not Server.addSwings(ana, 0), "Added no swings")
+-- Swing restores (Shared.SwingRestore: arena wins, dungeons, coupons) fill
+-- toward the full charge, never past it; none while it's over full.
+check(Server.restoreSwings(ana, 0.5) == 0, "A restore took a refilled pick")
+profiles[ana].Outpost.Picks.Survey = 100
+check(Server.restoreSwings(ana, 0.10) == 60, "10% isn't 60 swings")
+check(handlers.OutpostState(ana).State.Picks.Survey == 160, "A restore didn't reach the pick")
+profiles[ana].Outpost.Picks.Survey = Rules.Picks.Survey.Swings - 20
+check(Server.restoreSwings(ana, 0.5) == 20, "A restore went past full")
+check(Server.restoreSwings(ana, 0.25) == 0 and select(1, Server.charge(ana)) == Rules.Picks.Survey.Swings, "A full pick was restored")
+check(Server.restoreSwings(ana, 0) == 0 and Server.restoreSwings({}, 0.5) == 0, "Nothing to restore, or no profile")
 -- Time passes: the free pick regains its swings.
 profiles[ana].Outpost.Picks.Survey = 0
 profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * 5

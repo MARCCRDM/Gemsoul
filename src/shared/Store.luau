@@ -36,6 +36,7 @@ export type Reward = {
 	Cosmetics: { string }?,
 	XPBoostMinutes: number?,
 	Swings: number?,
+	KaijuRevive: boolean?, -- every kaiju of yours that's knocked out, back now
 }
 export type Bundle = {
 	Id: string,
@@ -318,6 +319,8 @@ Store.RobuxProducts = {
 	-- PROBE-7's swing refills (Shared.Outpost.Refills: their Product keys)
 	SwingRefill = 0,
 	SwingMega = 0,
+	-- Your knocked-out kaiju back on their feet now (Shared.Kaiju.Revive)
+	KaijuRevive = 0,
 }
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
@@ -331,6 +334,7 @@ Store.RobuxPrices = {
 	Vault = 4999,
 	StarterPack = 99,
 	SeasonPremium = 399,
+	KaijuRevive = 25,
 }
 -- (A refill's price is its own: Outpost.Refills.)
 for _, refill in Outpost.Refills do
@@ -457,6 +461,9 @@ function Store.contents(key: any): Reward?
 	local refill = Store.refill(key)
 	if refill then
 		return { Swings = refill.Swings }
+	end
+	if key == "KaijuRevive" then
+		return { KaijuRevive = true }
 	end
 	local bundle = Store.bundle(key)
 	if bundle then
@@ -600,6 +607,9 @@ function Store.productName(key: string): string
 	if key == "SeasonPremium" then
 		return "Season Path Premium"
 	end
+	if key == "KaijuRevive" then
+		return "Kaiju Revive"
+	end
 	local refill = Store.refill(key)
 	if refill then
 		return refill.Name
@@ -646,6 +656,15 @@ function Store.canBuy(key: string, profile: any, now: number): (boolean, string?
 	local reward = Store.contents(key)
 	if not reward or not Store.robuxPrice(key) then
 		return false, "That isn't for sale."
+	end
+	if key == "KaijuRevive" then
+		-- (Only with one of yours knocked out.)
+		for _, record in profile.Kaiju and profile.Kaiju.List or {} do
+			if record.Down then
+				return true
+			end
+		end
+		return false, "None of your kaiju is knocked out."
 	end
 	local bundle = Store.bundle(key)
 	if key == "StarterPack" and not Store.starterOpen(profile.StarterOfferAt, profile.StarterBought, now) then

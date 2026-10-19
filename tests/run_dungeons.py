@@ -16,6 +16,7 @@ s+=module('ElementMatchup','src/shared/ElementMatchup.luau')
 s+=module('Rules','src/shared/DungeonRules.luau')
 s+=module('GemTraits','src/shared/GemTraits.luau')
 s+=module('GemRoller','src/shared/GemRoller.luau')
+s+=module('SwingRestore','src/shared/SwingRestore.luau')
 s+='\nGemTraits.Enabled = false -- the classic surge array (the triad has its own suites)\n'
 s+='local dungeonLethal\n'
 s+='local Config={Features={}}\n'
