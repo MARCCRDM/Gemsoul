@@ -1,11 +1,12 @@
--- Your own finds, as a card above the bottom of the screen. (Other players
--- see them over your head instead: MiningWorldReveal.)
+-- Your own finds, as a card in the bottom right of the screen (the top
+-- middle on a phone). (Other players see them over your head instead:
+-- MiningWorldReveal.)
 --
 -- A gem rolls through a reel and lands with a flash. Beside it go its
 -- rarity, element, name and worth, and Size, Clarity and Cut as bars that
 -- fill once it lands. Finds that come quickly stack (LootStack):
 -- - the newest gem is the card;
--- - the ones before it fold into one-line rows above it;
+-- - the ones before it fold into one-line rows above it (two at most);
 -- - every rock pays a gem, so the only find without one (a full pouch) is a
 --   row straight away.
 --
@@ -13,14 +14,14 @@
 -- (MobileLayout.loot): the reel, the rarity, the gem's name and its worth,
 -- no bars, and one row under it, so the middle of the screen (you, your
 -- kaiju, what's coming) and the dock stay clear; the live feed steps aside
--- while it's up (MobileLayout.claimTop). On a computer it's in full above
--- the bottom of the screen, or above a mech's HOP OUT button
--- (MobileLayout.Drive).
+-- while it's up (MobileLayout.claimTop). On a computer it's compact, in the
+-- bottom right corner above the key hints, clear of the middle of the
+-- screen, the noise ring (FrontierHud) and a mech's HOP OUT; where a short
+-- window leaves no room above it, its row waits until it's gone.
 --
 --   MinerLoot.push(loot)        the server's loot for a rock you mined
 --   MinerLoot.setBlocked(on)    a menu or a fight has the screen: hide
 --   MinerLoot.close()           leaving the Outpost: clear everything
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -43,32 +44,41 @@ local GOLD = Color3.fromRGB(255, 202, 91)
 local GAP = 6
 -- The card's sizes: W x H, a row's height, the reel's window (Well) and one
 -- gem on it (Cell, its art Art), the words' places, and whether the Size,
--- Clarity and Cut bars show. Slim (a phone) is as wide as fits up there;
+-- Clarity and Cut bars show (where: BarY, a bar every BarStep, its label
+-- BarLabelW wide, segments SegW x SegH every SegStep). Desk (a computer) is
+-- compact, for the corner; Slim (a phone) is as wide as fits up there;
 -- Short, a small phone's, has no room for a row under it.
-local FULL = {
+local DESK = {
 	Slim = false,
-	W = 360,
-	H = 124,
-	Row = 30,
-	Pad = 12,
-	Well = 100,
-	Cell = 84,
-	Art = 76,
-	Spot = 70,
+	W = 272,
+	H = 92,
+	Row = 26,
+	Pad = 8,
+	Well = 76,
+	Cell = 64,
+	Art = 56,
+	Spot = 54,
 	Bars = true,
-	Gap = 14,
-	HeaderY = 12,
-	HeaderH = 14,
-	Small = 10,
-	WorthY = 11,
-	WorthH = 16,
-	WorthW = 66,
-	Worth = 12,
-	NameY = 28,
-	NameH = 22,
-	Name = 16,
-	RowText = 12,
-	RowWorthW = 84,
+	Gap = 10,
+	HeaderY = 7,
+	HeaderH = 12,
+	Small = 9,
+	WorthY = 6,
+	WorthH = 14,
+	WorthW = 58,
+	Worth = 11,
+	NameY = 19,
+	NameH = 18,
+	Name = 14,
+	BarY = 41,
+	BarStep = 15,
+	BarLabelW = 42,
+	BarText = 8,
+	SegW = 8,
+	SegH = 6,
+	SegStep = 10,
+	RowText = 11,
+	RowWorthW = 72,
 	WorthOnName = false,
 	Short = false,
 }
@@ -116,7 +126,12 @@ local SHORT = {
 	WorthH = 15,
 	Short = true,
 }
-local D = FULL -- (the sizes now: a card keeps the ones it was built with)
+local D = DESK -- (the sizes now: a card keeps the ones it was built with)
+-- On a computer, the corner it sits in: Right and Bottom from the screen's
+-- edges (above the key hints: OutpostScene), and rows above it no higher
+-- than Below past the middle of the screen (the noise ring and its tag end
+-- there: FrontierHud).
+MinerLoot.Corner = { Right = 16, Bottom = 56, Below = 104 }
 local TARGET = 14 -- the reel position the found gem sits at
 local SEGMENTS = 10
 local STATS = { "Size", "Clarity", "Cut" }
@@ -129,9 +144,11 @@ local cardUi = nil
 local rows = {}
 local connection: RBXScriptConnection? = nil
 local views = nil -- a viewport per rarity, cloned onto the reel
-local maxRows = 3
+local maxRows = 2
+local rowsWait = false -- (no room for a row beside the card: it waits until the card's gone)
 local blocked = false
 local sync: () -> ()
+local layout: () -> ()
 
 local function clock(): number
 	return os.clock()
@@ -206,10 +223,11 @@ local function rebuild()
 	end
 end
 
--- Where everything sits. On a computer: the card at the bottom, rows above
--- it (newest first), or above a mech's HOP OUT button. On a phone or a tablet
--- (touch, or a short window): slim, at the top middle, one row under it
--- (a small phone's row shows once the card's gone).
+-- Where everything sits. On a computer: compact, in the bottom right corner
+-- (MinerLoot.Corner), rows above it (newest first, as many as fit below the
+-- noise ring, two at most). On a phone or a tablet (touch, or a short
+-- window): slim, at the top middle, one row under it. Where no row fits
+-- beside the card, it shows once the card's gone.
 local function fit()
 	if not gui then
 		return
@@ -217,7 +235,7 @@ local function fit()
 	local size = gui.AbsoluteSize
 	local mobile = UserInputService.TouchEnabled or (size.Y > 0 and size.Y < 540)
 	local spot = if mobile then MobileLayout.loot(size) else nil
-	local dims = FULL
+	local dims = DESK
 	if spot then
 		dims = table.clone(SLIM)
 		if spot.H < SLIM.H then
@@ -231,24 +249,24 @@ local function fit()
 		D = dims
 		rebuild()
 	end
-	maxRows = if mobile then 1 else 3
 	fitScale.Scale = 1
 	holder.Size = UDim2.fromOffset(D.W, D.H)
 	if spot then
 		holder.AnchorPoint = Vector2.new(0, 0)
 		holder.Position = UDim2.fromOffset(spot.X, spot.Y)
+		maxRows, rowsWait = 1, D.Short
 	else
-		-- (In a mech: above its HOP OUT button, bottom middle.)
-		local drive = MobileLayout.Drive
-		local piloting = Players.LocalPlayer:GetAttribute("MechPilot") ~= nil
-		holder.AnchorPoint = Vector2.new(0.5, 1)
-		holder.Position = UDim2.new(0.5, 0, 1, -(if piloting then drive.Bottom + drive.H + 10 else 64))
+		-- (Clear of a mech's HOP OUT, which is bottom middle.)
+		local corner = MinerLoot.Corner
+		holder.AnchorPoint = Vector2.new(1, 1)
+		holder.Position = UDim2.new(1, -corner.Right, 1, -corner.Bottom)
+		local room = (size.Y - corner.Bottom - D.H) - (size.Y / 2 + corner.Below)
+		local fits = math.floor(room / (D.Row + GAP))
+		maxRows, rowsWait = math.clamp(fits, 1, 2), fits < 1
 	end
+	layout()
 	claim()
 end
-Players.LocalPlayer:GetAttributeChangedSignal("MechPilot"):Connect(function()
-	fit()
-end)
 
 local function rowTop(index: number): number
 	if D.Slim then
@@ -260,9 +278,10 @@ local function rowTop(index: number): number
 	return bottom - D.Row - (index - 1) * (D.Row + GAP)
 end
 
-local function layout()
-	-- (Short: the row waits while a card's up; the board's strip is under it.)
-	local hide = D.Short and cardUi ~= nil
+function layout()
+	-- (No room for a row beside the card, a small phone's under its short
+	-- card or a short window's above it: the row waits while a card's up.)
+	local hide = rowsWait and cardUi ~= nil
 	for index, item in stack.Rows do
 		local row = rows[item.Id]
 		if row then
@@ -470,20 +489,23 @@ local function buildCard(item)
 	local name = text(frame, "", d.Name, P.Text, x, d.NameY, w, d.NameH)
 	local bars = {}
 	for row, key in if d.Bars then STATS else {} do
-		local y = 58 + (row - 1) * 20
-		text(frame, string.upper(key), 9, P.Dim, x, y, 52, 14)
+		local y = d.BarY + (row - 1) * d.BarStep
+		local line = d.BarStep - 1
+		text(frame, string.upper(key), d.BarText, P.Dim, x, y, d.BarLabelW, line)
 		local segments = {}
 		for i = 1, SEGMENTS do
 			local segment = new("Frame", {
-				Position = UDim2.fromOffset(x + 54 + (i - 1) * 13, y + 3),
-				Size = UDim2.fromOffset(11, 8),
+				Name = "Segment",
+				Position = UDim2.fromOffset(x + d.BarLabelW + (i - 1) * d.SegStep, y + (line - d.SegH) / 2),
+				Size = UDim2.fromOffset(d.SegW, d.SegH),
 				BackgroundColor3 = TRACK,
 				ZIndex = 4,
 			}, frame)
 			UiKit.round(segment, 2)
 			segments[i] = segment
 		end
-		local value = text(frame, "", 11, P.Text, x + 54 + SEGMENTS * 13 + 2, y, w - 54 - SEGMENTS * 13 - 2, 14)
+		local after = d.BarLabelW + SEGMENTS * d.SegStep + 2
+		local value = text(frame, "", d.BarText + 2, P.Text, x + after, y, w - after, line)
 		bars[key] = { Segments = segments, Value = value, Shown = -1 }
 	end
 	-- The reel: rarities rolled like real finds (with made-up stats for the
@@ -597,7 +619,7 @@ local function burst(ui, rank: number, color: Color3)
 			Rotation = 45,
 			ZIndex = 7,
 		}, ui.Frame)
-		local reach = (58 + rank * 8) * d.Well / FULL.Well
+		local reach = (58 + rank * 8) * d.Well / 100
 		tween(spark, 0.6 + rank * 0.05, {
 			Position = UDim2.fromOffset(cx + math.cos(angle) * reach, cy + math.sin(angle) * reach),
 			BackgroundTransparency = 1,

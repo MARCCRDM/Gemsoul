@@ -1,5 +1,6 @@
 -- Your own finds (MinerLoot): a gem rolls on a card, lands on the real gem
 -- with its stats as bars; finds that come quickly stack as rows above it.
+-- On a computer: compact, in the bottom right corner, two rows at most.
 -- On a phone: slim, at the top middle, one row under it (a small phone's
 -- once the card's gone).
 local checks = 0
@@ -28,12 +29,7 @@ end
 local function lit(frame, color)
 	local n = 0
 	for _, o in frame:GetDescendants() do
-		if
-			o.ClassName == "Frame"
-			and o.Size.X.Offset == 11
-			and o.Size.Y.Offset == 8
-			and o.BackgroundColor3 == color
-		then
+		if o.ClassName == "Frame" and o.Name == "Segment" and o.BackgroundColor3 == color then
 			n += 1
 		end
 	end
@@ -102,12 +98,12 @@ check(#live("LootRow") == before + 1, "The folded card did not become a row")
 local newest = Loot.shown().Rows[1]
 check(newest.Loot == find, "The folded gem is not the newest row")
 check(texts(card()):find("ROLLING", 1, true), "The new card skipped its roll")
--- More finds than fit: never past three rows on a desktop.
+-- More finds than fit: never past two rows on a desktop.
 for i = 1, 6 do
 	Loot.push(if i % 2 == 0 then gem("Rare", 5, 5, 5) else { Name = "Star Geode", Full = true })
 	step(0.1)
 end
-check(#live("LootRow") <= 3 and #Loot.shown().Rows <= 3, "Rows stacked past three")
+check(#live("LootRow") <= 2 and #Loot.shown().Rows <= 2, "Rows stacked past two")
 check(#live("LootCard") == 1, "More than one card")
 
 -- A pouch-full rock says so in red.
@@ -185,18 +181,63 @@ Loot.push(gem("Common", 3, 4, 2))
 local holder = live("Stack")[1]
 gui.AbsoluteSize = { X = 1366, Y = 710 }
 gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+-- Back on a computer: the compact card in the bottom right corner, above the
+-- key hints, clear of the middle of the screen.
+local corner = Loot.Corner
+local function inCorner()
+	return holder.AnchorPoint.X == 1
+		and holder.AnchorPoint.Y == 1
+		and holder.Position.X.Scale == 1
+		and holder.Position.X.Offset == -corner.Right
+		and holder.Position.Y.Scale == 1
+		and holder.Position.Y.Offset == -corner.Bottom
+end
+check(inCorner() and holder:FindFirstChildOfClass("UIScale").Scale == 1, "Desktop fit not restored")
+local desk = card()
 check(
-	holder.Position.Y.Offset == -64 and holder:FindFirstChildOfClass("UIScale").Scale == 1,
-	"Desktop fit not restored"
+	desk.Size.X.Offset <= 280 and desk.Size.Y.Offset <= 96 and lit(desk, GemConfig.TierColors.Common) >= 0,
+	"The compact card wasn't rebuilt"
 )
-check(card().Size.X.Offset == 360 and lit(card(), GemConfig.TierColors.Common) >= 0, "The full card wasn't rebuilt")
+check(1366 - corner.Right - desk.Size.X.Offset > 1366 / 2 + 200, "The card reaches into the middle of the screen")
 check(not MobileLayout.topClaimed(), "A computer's card kept the top middle")
--- In a mech: above its HOP OUT button (MobileLayout.Drive), then back down.
-local drive = MobileLayout.Drive
+-- Two rows above it, both clear of the noise ring (halfway down plus Below).
+Loot.push(gem("Rare", 5, 5, 5))
+step(0.05)
+Loot.push(gem("Uncommon", 4, 4, 4))
+step(0.05)
+Loot.push(gem("Common", 3, 3, 3))
+step(0.5)
+local deskRows = live("LootRow")
+check(#deskRows == 2, "Not two rows above a computer's card: " .. #deskRows)
+local cardTop = 710 - corner.Bottom - desk.Size.Y.Offset
+for _, row in deskRows do
+	check(row.Visible ~= false, "A row hid on a computer with room for it")
+	check(row.Position.Y.Offset < 0, "A row isn't above the card")
+	check(cardTop + row.Position.Y.Offset >= 710 / 2 + corner.Below, "A row reaches the noise ring")
+end
+-- A short window: no room above the card, so the row waits until it's gone.
+gui.AbsoluteSize = { X = 1100, Y = 560 }
+gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+step(0.05)
+local shortRows = live("LootRow")
+check(card() and #shortRows >= 1, "Nothing to show on a short window")
+for _, row in shortRows do
+	check(not row.Visible, "A row showed above the card on a short window")
+end
+step(6)
+shortRows = live("LootRow")
+check(card() == nil and #shortRows == 1 and shortRows[1].Visible, "The row didn't come back once the card folded")
+check(shortRows[1].Position.Y.Offset >= 0, "The row isn't where the card was")
+gui.AbsoluteSize = { X = 1366, Y = 710 }
+gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+Loot.push(gem("Common", 3, 4, 2))
+-- In a mech it stays put: its HOP OUT is bottom middle (MobileLayout.Drive).
 localPlayer:SetAttribute("MechPilot", 1)
-check(holder.Position.Y.Offset == -(drive.Bottom + drive.H + 10), "The card sits on the mech's HOP OUT button")
+check(inCorner(), "The card moved in a mech")
+local drive = MobileLayout.Drive
+check(1366 - corner.Right - desk.Size.X.Offset > 1366 / 2 + drive.W / 2, "The card overlaps HOP OUT")
 localPlayer:SetAttribute("MechPilot", nil)
-check(holder.Position.Y.Offset == -64, "The card stayed up after hopping out")
+check(inCorner(), "The card moved after hopping out")
 
 -- A menu or a fight has the screen: hidden and silent, then back.
 Loot.setBlocked(true)

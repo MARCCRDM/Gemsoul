@@ -43,9 +43,24 @@ Finds that come quickly stack:
   first). It becomes a red "Gem pouch full" row straight away, and the
   card stays.
 - **Rows** stack above the card, newest nearest it (under it on a phone).
-  Each one goes after 6 seconds. A desktop keeps 3 rows, a phone 1; with
+  Each one goes after 6 seconds. A computer keeps 2 rows, a phone 1; with
   more than that, the oldest go first.
 - **When you stop**, the last card folds into a row, then the rows go.
+
+## On a computer
+
+![The card on a computer, before and after](mining/desktop-corner.png)
+
+The card used to sit in full in the middle of the bottom of the screen (360
+x 124, three rows above it), right where you look while mining. It's now
+compact (272 x 92) and in the bottom right corner (`MinerLoot.Corner`),
+above the key hints. The middle of the screen stays clear, and so does a
+mech's HOP OUT at the bottom middle, so the card no longer moves when you
+pilot. It keeps the Size, Clarity and Cut bars, smaller. Up to 2 rows
+stack above it, as many as fit below the noise ring and its RIFT CHARGED
+tag (`FrontierHud`, which end about halfway down plus 100). On a short
+window with no room above the card, its row waits until the card has gone
+and then shows in its place.
 
 ## Phones and Spanish
 
@@ -62,11 +77,9 @@ gone. See [mobile.md](mobile.md#mining-in-the-outpost).
 
 ![In Spanish](mining/spanish.png)
 
-On a computer the card is in full above the PLAY dock. It hides,
-silently, while a menu or a fight has the screen, and it clears when you
-leave the Outpost. While you drive a mech, the card moves up above its
-HOP OUT button (`MobileLayout.Drive`, shared with `VehicleDrive`), and the
-Outpost's key hint at the bottom is hidden. The words are in the Spanish table
+The card hides, silently, while a menu or a fight has the screen, and it
+clears when you leave the Outpost. While you drive a mech, the Outpost's
+key hint at the bottom is hidden. The words are in the Spanish table
 (rarities, elements, the stat names, the rocks, "Rock mined", "Gem pouch
 full").
 
@@ -82,9 +95,11 @@ full").
 - `MiningWorldReveal.receive` skips packets whose `MinerId` is you.
 - Tests:
   - `tests/run_loot_stack.py`: the stack's timing and order;
-  - `tests/run_miner_loot.py`: the card, driven frame by frame, above a
-    mech's HOP OUT button, and slim at the top middle of a phone (no bars,
-    one row under it, none under a small phone's short card while it's up,
-    claiming the top middle);
+  - `tests/run_miner_loot.py`: the card, driven frame by frame; on a
+    computer compact in the bottom right corner, two rows at most, clear of
+    the noise ring, the row waiting on a short window, staying put in a
+    mech; and slim at the top middle of a phone (no bars, one row under it,
+    none under a small phone's short card while it's up, claiming the top
+    middle);
   - `tests/run_world_mining.py`: now also checks that your own find is
     never drawn over your head, while others still get it.

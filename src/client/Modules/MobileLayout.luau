@@ -40,8 +40,7 @@
 	                                       bottom middle on every screen, in
 	                                       PLAY's place on a phone (PLAY hides
 	                                       while you pilot): its size and how
-	                                       far up it sits, so the loot card
-	                                       (MinerLoot) goes above it
+	                                       far up it sits
 ]]
 local MobileLayout = {}
 
