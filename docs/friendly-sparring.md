@@ -88,7 +88,15 @@ The partner is told why. If either of you was knocked down at that moment,
 you're healed first, so nobody walks off at 1 health.
 
 Ending a spar always hands the mouse back, free and showing, with the camera
-back in third person. While your kit is out, Shift belongs to the fight
+back in third person **where it was before the fight**: as far back, at the
+same pitch, behind the way you're facing, and free to zoom again. Leaving
+first person, Roblox's camera stays at its closest (6 studs in the Outpost,
+not the 18 you arrive at), and a phone has no wheel to pull it back out, so
+`FirstPersonCombat` holds the zoom at the old distance until the camera is
+there, then lets go. The zoom you get back is the Outpost's own (6 to 40),
+never the arrival camera's short hold at 18: a fight started while the
+arrival camera was still settling used to keep that as the closest you could
+zoom (`ThirdPerson.range`). While your kit is out, Shift belongs to the fight
 (Shift + click is the off-hand attack), so it can't also switch on Roblox's
 Shift Lock behind the first-person view. That used to leave the mouse locked
 in the middle of the screen once the kit was away.
@@ -157,6 +165,14 @@ these checks.
 
 `tests/run_target_lock.py` checks that the lock never takes someone sparring
 with another player.
+
+`tests/run_first_person.py` checks the way back out of first person: the
+zoom held at the distance it had and let go once the camera is there, the
+camera behind you at the pitch it had, the Outpost's own zoom range back
+(not the arrival's hold), going back in before it got there (a knock-down),
+and never stamping over a zoom something else set meanwhile.
+`tests/run_arrival_camera.py` checks that a fight started while the arrival
+camera is settling lets go of its hold.
 
 The screenshots are rendered from the game's own UI code. That includes the
 request card, from the real `SocialUI`, where Accept sends `SparRespond` and

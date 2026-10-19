@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMotion)
 local ViewGrip = require(script.Parent.ViewGrip)
 local LiveLooks = require(script.Parent.LiveLooks)
+local ThirdPerson = require(script.Parent.ThirdPerson)
 local player = Players.LocalPlayer
 local View = {}
 local saved, model, gear, connection, removalConnection
@@ -536,6 +537,84 @@ end
 function View.setCursorFree(value)
 	cursorFree = value
 end
+
+-- How far the camera is from what it looks at, and how far it looks up or
+-- down (radians): nil if it can't be read.
+local function distanceOf(camera): number?
+	local ok, distance = pcall(function()
+		return (camera.CFrame.Position - camera.Focus.Position).Magnitude
+	end)
+	return if ok and type(distance) == "number" and distance == distance and distance >= 1 and distance < 500
+		then distance
+		else nil
+end
+local function pitchOf(camera): number?
+	local ok, pitch = pcall(function()
+		return math.asin(math.clamp(camera.CFrame.LookVector.Y, -1, 1))
+	end)
+	return if ok and type(pitch) == "number" and pitch == pitch then pitch else nil
+end
+
+-- Back out to third person where the camera was before the fight. Leaving
+-- first person, Roblox's camera stays at its closest (and a phone has no
+-- wheel to pull it back out), so the zoom is held at the distance it had,
+-- the camera put behind you at the pitch it had (the fight's view looks
+-- level), and let go once it's there.
+local BACK_OUT = "SagaThirdPersonReturn"
+local backOut: { Min: number, Distance: number, Until: number }? = nil
+local function endBackOut()
+	local hold = backOut
+	if not hold then
+		return
+	end
+	backOut = nil
+	RunService:UnbindFromRenderStep(BACK_OUT)
+	-- (Only its own hold: something else may have set the zoom since.)
+	if player.CameraMinZoomDistance == hold.Distance then
+		player.CameraMinZoomDistance = hold.Min
+	end
+end
+local function backOutTo(was)
+	if was.Mode == Enum.CameraMode.LockFirstPerson then
+		return
+	end
+	local distance = was.Distance or ThirdPerson.home()
+	if not distance or was.Max - was.Min < 0.5 then
+		return
+	end
+	distance = math.clamp(distance, was.Min, was.Max)
+	if distance <= was.Min + 0.25 then
+		return -- (Roblox's camera goes there anyway)
+	end
+	backOut = { Min = was.Min, Distance = distance, Until = os.clock() + 1.5 }
+	player.CameraMinZoomDistance = distance
+	pcall(function()
+		local camera = workspace.CurrentCamera
+		if camera.CameraType == Enum.CameraType.Scriptable then
+			return -- (a scene's own shot: not ours to move)
+		end
+		local look = camera.CFrame.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if flat.Magnitude < 0.01 then
+			return
+		end
+		local pitch = math.clamp(was.Pitch or -0.35, -1.2, 0.6)
+		local direction = flat.Unit * math.cos(pitch) + Vector3.new(0, math.sin(pitch), 0)
+		local focus = camera.Focus.Position
+		camera.CFrame = CFrame.lookAt(focus - direction * distance, focus)
+	end)
+	RunService:BindToRenderStep(BACK_OUT, Enum.RenderPriority.Camera.Value + 2, function()
+		local hold = backOut
+		if not hold then
+			return
+		end
+		local now = distanceOf(workspace.CurrentCamera)
+		if os.clock() >= hold.Until or (now and math.abs(now - hold.Distance) < 0.5) then
+			endBackOut()
+		end
+	end)
+end
+
 function View.stop()
 	if not saved then
 		return
@@ -557,6 +636,7 @@ function View.stop()
 	if was.Camera.Parent then
 		was.Camera.FieldOfView = was.Fov
 	end
+	backOutTo(was)
 	if connection then
 		connection:Disconnect()
 		connection = nil
@@ -586,12 +666,21 @@ function View.start()
 		return
 	end
 	local camera = workspace.CurrentCamera
+	-- (Back in before the last back-out got there: where it was going.)
+	local returning = backOut and backOut.Distance
+	endBackOut()
+	-- The zoom you have: the mining worlds' own range, never a hold on it
+	-- for a moment (the arrival's), which came back after the fight as the
+	-- closest you could zoom.
+	local low, high = ThirdPerson.range()
 	saved = {
 		Mode = player.CameraMode,
-		Min = player.CameraMinZoomDistance,
-		Max = player.CameraMaxZoomDistance,
+		Min = low or player.CameraMinZoomDistance,
+		Max = high or player.CameraMaxZoomDistance,
 		Camera = camera,
 		Fov = camera.FieldOfView,
+		Distance = returning or distanceOf(camera),
+		Pitch = pitchOf(camera),
 	}
 	player.CameraMinZoomDistance, player.CameraMaxZoomDistance = 0.5, 0.5
 	player.CameraMode = Enum.CameraMode.LockFirstPerson

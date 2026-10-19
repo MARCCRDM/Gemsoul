@@ -4,9 +4,14 @@
 	  ThirdPerson.enter()  starts the camera pulled back behind the player and
 	                       keeps it from zooming into first person
 	  ThirdPerson.exit()   puts back the camera settings from before
+	  ThirdPerson.range()  while it's on: the zoom you have (MinZoom, MaxZoom),
+	                       whatever it's holding the camera at for a moment
+	  ThirdPerson.home()   while it's on: how far back it starts (StartZoom, or
+	                       LobbyZoom on the landing pad)
 
 	Combat's first-person view saves and restores these same settings, so a
-	duel at the Outpost hands back to third person when it ends.
+	duel at the Outpost hands back to third person when it ends, back out
+	where the camera was (FirstPersonCombat).
 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,6 +27,7 @@ ThirdPerson.MaxZoom = 40
 local saved: { Mode: Enum.CameraMode, Min: number, Max: number }? = nil
 local RESET_BIND = "SagaArrivalCamera"
 local arrival: CFrame? = nil
+local homeZoom = ThirdPerson.StartZoom
 
 local function cancelReset()
 	RunService:UnbindFromRenderStep(RESET_BIND)
@@ -33,6 +39,7 @@ function ThirdPerson.enter(destination: CFrame?)
 	end
 	arrival = destination
 	local zoom = if destination then ThirdPerson.LobbyZoom else ThirdPerson.StartZoom
+	homeZoom = zoom
 	cancelReset()
 	player.CameraMode = Enum.CameraMode.Classic
 	player.CameraMaxZoomDistance = ThirdPerson.MaxZoom
@@ -47,6 +54,12 @@ function ThirdPerson.enter(destination: CFrame?)
 		-- with the kit out. Pulled back to third person under the spar's
 		-- first-person view, the mouse stayed locked to the middle.)
 		if not saved or player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("Spar") == true then
+			-- (Its hold on the zoom goes too, unless the fight's view has the
+			-- camera now: kept, it came back after the fight as the closest
+			-- you could zoom.)
+			if saved and player.CameraMinZoomDistance == zoom then
+				player.CameraMinZoomDistance = ThirdPerson.MinZoom
+			end
 			cancelReset()
 			return
 		end
@@ -85,6 +98,17 @@ function ThirdPerson.enter(destination: CFrame?)
 		camera.Focus = CFrame.new(focus)
 		applied = true
 	end)
+end
+
+function ThirdPerson.range(): (number?, number?)
+	if not saved then
+		return nil, nil
+	end
+	return ThirdPerson.MinZoom, ThirdPerson.MaxZoom
+end
+
+function ThirdPerson.home(): number?
+	return if saved then homeZoom else nil
 end
 
 function ThirdPerson.exit()

@@ -61,6 +61,11 @@ check(next(callbacks)==nil and player.CameraMinZoomDistance==1 and player.Camera
 -- Combat and insertion retain ownership; a stalled teleport cannot bind forever.
 ThirdPerson.enter(spawn);attributes.CombatSession="PvP";old=camera.CFrame;step(4)
 check(camera.CFrame==old and next(callbacks)==nil,"Lobby reset overrode an active fight")
+-- (Its hold on the zoom went too: kept, the fight's view gave it back after as the closest you could zoom.)
+check(player.CameraMinZoomDistance==6,"A fight mid-arrival kept the arrival's hold on the zoom")
+-- What the fight's view asks it: the zoom you have, and how far back it starts.
+local low,high=ThirdPerson.range()
+check(low==6 and high==40 and ThirdPerson.home()==18,"Range or home wrong on the landing pad")
 attributes.CombatSession=nil;ThirdPerson.enter(spawn);attributes.Spar=true;old=camera.CFrame;step(4)
 check(camera.CFrame==old and next(callbacks)==nil,"Lobby reset pulled the camera out of a spar")
 attributes.Spar=nil
@@ -77,5 +82,7 @@ ThirdPerson.exit();added()
 check(next(callbacks)==nil,"Respawn outside a mining world claimed the camera")
 ThirdPerson.enter();step(3)
 check(camera.CFrame.Position.Z==root.Position.Z+14 and camera.CFrame.Position.Y==root.Position.Y+8,"Mine camera inherited lobby framing")
+check(ThirdPerson.home()==14,"The mine's home distance isn't its start")
 ThirdPerson.exit()
-print("PASS: "..checks.." arrival camera checks: delayed teleport, safe pitch, combat cleanup, orbit, cancellation, insertion, timeout and respawn")
+check(ThirdPerson.range()==nil and ThirdPerson.home()==nil,"Range or home outside a mining world")
+print("PASS: "..checks.." arrival camera checks: delayed teleport, safe pitch, combat cleanup and its zoom hold, range and home, orbit, cancellation, insertion, timeout and respawn")
