@@ -1,0 +1,407 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="fontface.css">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+let W, H, renderer, scene, camera, composer, bloom, grade, out2d, ctx2d, moon, hemi, skyRift, fill;
+const clips = {}, actors = {}, images = {};
+let worldLights = [], lightPool = [], fxGroup, dynGroup;
+
+// Roblox geometry -------------------------------------------------------------------------------
+function wedgeGeo(sx, sy, sz) {
+  const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+  const v = [[-hx,-hy,-hz],[hx,-hy,-hz],[hx,-hy,hz],[-hx,-hy,hz],[-hx,hy,hz],[hx,hy,hz]];
+  const f = [[0,2,1],[0,3,2],[3,5,2],[3,4,5],[0,4,3],[1,2,5],[0,1,5],[0,5,4]];
+  const pos = []; for (const t of f) for (const k of t) pos.push(...v[k]);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+}
+function cornerGeo(sx, sy, sz) {
+  // A CornerWedgePart: its point over the (+X, -Z) corner.
+  const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+  const v = [[-hx,-hy,-hz],[hx,-hy,-hz],[hx,-hy,hz],[-hx,-hy,hz],[hx,hy,-hz]];
+  const f = [[0,2,1],[0,3,2],[0,1,4],[1,2,4],[2,3,4],[3,0,4]];
+  const pos = []; for (const t of f) for (const k of t) pos.push(...v[k]);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+}
+function partGeo(p, detail) {
+  const [sx, sy, sz] = p.s; let g;
+  const seg = detail ? 24 : 12;
+  switch (p.shape) {
+    case 'Ball': g = new THREE.SphereGeometry(Math.min(sx, sy, sz) / 2, seg, Math.max(8, seg * 0.6 | 0)); break;
+    case 'MeshSphere': g = new THREE.SphereGeometry(0.5, seg, Math.max(8, seg * 0.6 | 0)); g.scale(sx, sy, sz); break;
+    case 'Cylinder': { const r = Math.min(sy, sz) / 2; g = new THREE.CylinderGeometry(r, r, sx, seg); g.rotateZ(Math.PI / 2); break; }
+    case 'MeshCylinder': g = new THREE.CylinderGeometry(0.5, 0.5, 1, seg); g.scale(sx, sy, sz); break;
+    case 'Wedge': case 'MeshWedge': g = wedgeGeo(sx, sy, sz); break;
+    case 'CornerWedge': g = cornerGeo(sx, sy, sz); break;
+    default: g = new THREE.BoxGeometry(sx, sy, sz);
+  }
+  if (g.index) g = g.toNonIndexed();
+  g.deleteAttribute('uv');
+  return g;
+}
+function matKey(p) {
+  const m = p.mat;
+  let k = 'rough';
+  if (m === 'Neon') k = 'neon';
+  else if (/Glass|Ice|Glacier|ForceField/.test(m)) k = 'glass';
+  else if (/Metal|DiamondPlate|Foil|CorrodedMetal/.test(m)) k = 'metal';
+  else if (/SmoothPlastic|Marble|Plastic/.test(m)) k = 'smooth';
+  if (p.tr > 0.02 && k !== 'glass') k += '_t' + Math.round(p.tr * 10);
+  if (k === 'glass') k += '_t' + Math.round((p.tr || 0) * 10);
+  return k;
+}
+function makeMat(key, neonBoost) {
+  const [base, t] = key.split('_t');
+  const tr = t ? +t / 10 : 0;
+  const common = { vertexColors: true };
+  let m;
+  if (base === 'neon') m = new THREE.MeshBasicMaterial({ ...common, toneMapped: true });
+  else if (base === 'glass') m = new THREE.MeshPhysicalMaterial({ ...common, metalness: 0.05, roughness: 0.12, clearcoat: 1, transparent: true,
+      opacity: Math.max(0.35, 0.85 - tr * 0.9), depthWrite: false, emissive: 0xffffff, emissiveIntensity: 0.0, envMapIntensity: 1.2 });
+  else if (base === 'metal') m = new THREE.MeshStandardMaterial({ ...common, metalness: 0.3, roughness: 0.45 });
+  else if (base === 'smooth') m = new THREE.MeshStandardMaterial({ ...common, metalness: 0.0, roughness: 0.5, envMapIntensity: 0.5 });
+  else m = new THREE.MeshStandardMaterial({ ...common, metalness: 0.0, roughness: 0.93, envMapIntensity: 0.25 });
+  if (tr > 0 && base !== 'glass') { m.transparent = true; m.opacity = 1 - tr; m.depthWrite = tr < 0.5; }
+  m.userData.neon = base === 'neon';
+  m.userData.glass = base === 'glass';
+  return m;
+}
+const NEON = 2.2;
+function colorOf(p, key) {
+  const c = new THREE.Color().setRGB(p.c[0], p.c[1], p.c[2], THREE.SRGBColorSpace);
+  if (key.startsWith('neon')) c.multiplyScalar(NEON);
+  if (key.startsWith('glass')) c.multiplyScalar(1.15);
+  return c;
+}
+function matrixOf(p) {
+  const r = p.r;
+  return new THREE.Matrix4().set(r[0], r[3], r[6], p.p[0], r[1], r[4], r[7], p.p[1], r[2], r[5], r[8], p.p[2], 0, 0, 0, 1);
+}
+function colorize(g, c) {
+  const n = g.attributes.position.count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+}
+
+// Static world: one mesh per material, parts merged.
+function buildWorld(world) {
+  const buckets = {};
+  for (const p of world.Parts) {
+    const key = matKey(p);
+    const g = partGeo(p, false);
+    g.applyMatrix4(matrixOf(p));
+    colorize(g, colorOf(p, key));
+    (buckets[key] = buckets[key] || []).push(g);
+  }
+  const group = new THREE.Group();
+  for (const key in buckets) {
+    const merged = mergeGeometries(buckets[key], false);
+    const m = new THREE.Mesh(merged, makeMat(key));
+    m.castShadow = !key.startsWith('neon') && !key.startsWith('glass');
+    m.receiveShadow = true;
+    if (key.startsWith('glass')) m.renderOrder = 2;
+    group.add(m);
+  }
+  worldLights = world.Lights || [];
+  return group;
+}
+
+// A posed clip: a mesh per part, matrices set per frame.
+function buildActor(clip) {
+  const g = new THREE.Group();
+  const meshes = [];
+  const matCache = {};
+  for (const p of clip.parts) {
+    const key = matKey(p);
+    const geo = partGeo(p, true);
+    colorize(geo, colorOf(p, key));
+    const mat = matCache[key] || (matCache[key] = makeMat(key));
+    const m = new THREE.Mesh(geo, mat);
+    m.matrixAutoUpdate = false;
+    m.castShadow = !key.startsWith('neon'); m.receiveShadow = true;
+    g.add(m); meshes.push(m);
+  }
+  g.userData.meshes = meshes;
+  return g;
+}
+function poseActor(a, clip, frame) {
+  const f = clip.frames[Math.max(0, Math.min(clip.frames.length - 1, frame | 0))];
+  const ms = a.userData.meshes;
+  for (let i = 0; i < ms.length; i++) {
+    const o = i * 12;
+    ms[i].matrix.set(f[o + 3], f[o + 6], f[o + 9], f[o], f[o + 4], f[o + 7], f[o + 10], f[o + 1], f[o + 5], f[o + 8], f[o + 11], f[o + 2], 0, 0, 0, 1);
+    ms[i].matrixWorldNeedsUpdate = true;
+  }
+}
+
+// Effects (rebuilt each frame) -----------------------------------------------------------------
+const fxMats = {};
+function glowMat(color, opacity, additive = true) {
+  return new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.6), transparent: true, opacity, depthWrite: false,
+    blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, toneMapped: true, side: THREE.DoubleSide });
+}
+let _glowTex;
+function glowTex() {
+  if (_glowTex) return _glowTex;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,0.55)'); g.addColorStop(0.6, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  _glowTex = new THREE.CanvasTexture(c); _glowTex.userData = { keep: true }; return _glowTex;
+}
+function clearGroup(g) {
+  for (const c of [...g.children]) { g.remove(c); c.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && !o.material.userData.keep) o.material.dispose(); }); }
+}
+function addFx(fx) {
+  for (const e of fx || []) {
+    let m;
+    if (e.type === 'sphere') {
+      m = new THREE.Mesh(new THREE.SphereGeometry(e.r, 28, 18), glowMat(e.color, e.opacity ?? 0.6, e.additive !== false));
+      m.position.set(...e.pos);
+    } else if (e.type === 'ring') {
+      m = new THREE.Mesh(new THREE.RingGeometry(Math.max(0.01, e.r - (e.w || 1)), e.r, 64), glowMat(e.color, e.opacity ?? 0.7));
+      m.position.set(...e.pos); m.rotation.x = -Math.PI / 2; if (e.tilt) m.rotation.y = e.tilt;
+    } else if (e.type === 'beam') {
+      const a = new THREE.Vector3(...e.from), b = new THREE.Vector3(...e.to);
+      const len = a.distanceTo(b);
+      m = new THREE.Mesh(new THREE.CylinderGeometry(e.w, e.w, len, 16, 1, true), glowMat(e.color, e.opacity ?? 0.8));
+      m.position.copy(a).add(b).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    } else if (e.type === 'points') {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(e.pts, 3));
+      m = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(e.color).multiplyScalar(1.8), size: e.size || 0.6, transparent: true,
+        opacity: e.opacity ?? 1, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+    } else if (e.type === 'light') {
+      m = new THREE.PointLight(new THREE.Color(e.color), e.intensity, e.range || 40, 1.6); m.position.set(...e.pos);
+    } else if (e.type === 'glow') {
+      m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: new THREE.Color(e.color).multiplyScalar(e.boost ?? 1.5), transparent: true,
+        opacity: e.opacity ?? 1, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: e.depthTest ?? true, toneMapped: true }));
+      m.position.set(...e.pos); m.scale.set(e.size, e.size, 1);
+    } else if (e.type === 'gem') {
+      const col = new THREE.Color(e.color);
+      m = new THREE.Mesh(new THREE.OctahedronGeometry(e.r, 0), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: e.glow ?? 0.9,
+        metalness: 0.3, roughness: 0.12, flatShading: true }));
+      m.scale.set(1, e.stretch ?? 1.35, 1); m.position.set(...e.pos); m.rotation.y = e.spin || 0;
+    } else if (e.type === 'box') {
+      m = new THREE.Mesh(new THREE.BoxGeometry(...e.size), e.glow ? glowMat(e.color, e.opacity ?? 1, false) : new THREE.MeshStandardMaterial({ color: e.color, roughness: 0.9 }));
+      m.position.set(...e.pos); if (e.rot) m.rotation.set(...e.rot);
+      m.castShadow = true;
+    }
+    if (m) fxGroup.add(m);
+  }
+}
+function addDynamic(list) {
+  for (const d of list || []) {
+    const grp = new THREE.Group();
+    for (const p of d.parts) {
+      const key = matKey(p);
+      const geo = partGeo(p, true); colorize(geo, colorOf(p, key));
+      const m = new THREE.Mesh(geo, makeMat(key)); m.applyMatrix4(matrixOf(p)); grp.add(m);
+    }
+    grp.position.set(...(d.pos || [0, 0, 0])); grp.rotation.y = d.yaw || 0; grp.scale.setScalar(d.scale || 1);
+    dynGroup.add(grp);
+  }
+}
+
+// Post: grade, vignette, grain, flash.
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, vignette: { value: 0.35 }, grain: { value: 0.035 }, seed: { value: 0 }, lift: { value: new THREE.Vector3(0, 0, 0) },
+    tint: { value: new THREE.Vector3(1, 1, 1) }, saturation: { value: 1.08 }, flash: { value: 0 }, flashColor: { value: new THREE.Vector3(1, 1, 1) }, fade: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float vignette, grain, seed, saturation, flash, fade; uniform vec3 lift, tint, flashColor; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + seed) * 43758.5453); }
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); vec3 col = c.rgb;
+      float l = dot(col, vec3(0.299,0.587,0.114)); col = mix(vec3(l), col, saturation);
+      col = col * tint + lift;
+      vec2 d = vUv - 0.5; col *= 1.0 - vignette * smoothstep(0.25, 0.85, length(d * vec2(1.15, 1.0)));
+      col += (h(vUv * 1000.0) - 0.5) * grain;
+      col = mix(col, flashColor, flash); col *= 1.0 - fade;
+      gl_FragColor = vec4(col, 1.0); }`,
+};
+
+function starfield() {
+  const g = new THREE.BufferGeometry(); const pts = []; const cols = [];
+  let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 9000; i++) {
+    const u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+    const v = new THREE.Vector3(r * Math.cos(th), Math.abs(u) * 0.98 + 0.02 * (u < 0 ? -1 : 1), r * Math.sin(th)).multiplyScalar(4200);
+    pts.push(v.x, v.y, v.z);
+    const b = 0.35 + rnd() * 0.65, warm = rnd();
+    cols.push(b * (warm > 0.8 ? 1 : 0.85), b * 0.9, b * (warm < 0.2 ? 0.75 : 1));
+  }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, fog: false, transparent: true, depthWrite: false }));
+  m.renderOrder = -1;
+  return m;
+}
+
+window.init = async (cfg) => {
+  W = cfg.w; H = cfg.h;
+  renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(1); renderer.setSize(W, H);
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = cfg.exposure ?? 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.body.appendChild(renderer.domElement);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x010207);
+  // (No environment map: sampling it per pixel doubles the frame time in
+  // software WebGL; metals are toned down to suit.)
+  scene.environment = null;
+  scene.environmentIntensity = 0.5;
+  hemi = new THREE.HemisphereLight(0xa9b4d6, 0x34343e, 1.25); scene.add(hemi);
+  moon = new THREE.DirectionalLight(0xcdd9ff, 2.0);
+  moon.position.set(-300, 600, 200); moon.castShadow = true;
+  moon.shadow.mapSize.set(2048, 2048); moon.shadow.bias = -0.0004; moon.shadow.normalBias = 0.05;
+  scene.add(moon); scene.add(moon.target);
+  fill = new THREE.DirectionalLight(0xdfe6ff, 0.8); scene.add(fill); scene.add(fill.target);
+  scene.add(starfield());
+  camera = new THREE.PerspectiveCamera(50, W / H, 0.3, 9000);
+  const world = await (await fetch(cfg.world)).json();
+  scene.add(buildWorld(world));
+  for (let i = 0; i < 4; i++) { const L = new THREE.PointLight(0xffffff, 0, 30, 1.6); lightPool.push(L); scene.add(L); }
+  fxGroup = new THREE.Group(); scene.add(fxGroup);
+  dynGroup = new THREE.Group(); scene.add(dynGroup);
+  // Sky rift sprite.
+  skyRift = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false }));
+  skyRift.visible = false; scene.add(skyRift);
+  for (const id of cfg.clips || []) clips[id] = await (await fetch('actors/' + id + '.json')).json();
+  const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: cfg.samples ?? 4 });
+  composer = new EffectComposer(renderer, rt);
+  composer.addPass(new RenderPass(scene, camera));
+  bloom = new UnrealBloomPass(new THREE.Vector2(W / 2, H / 2), 0.8, 0.55, 0.82); composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+  grade = new ShaderPass(GradeShader); composer.addPass(grade);
+  out2d = document.createElement('canvas'); out2d.width = W; out2d.height = H; ctx2d = out2d.getContext('2d');
+  await document.fonts.ready;
+  for (const f of ['900 40px Montserrat', '700 40px Oswald', '400 40px Michroma', '400 40px "Press Start 2P"', '700 40px "Titillium Web"', '400 40px "Luckiest Guy"']) { try { await document.fonts.load(f); } catch (e) {} }
+  return { parts: world.Parts.length, clips: Object.keys(clips).length };
+};
+
+window.loadClip = async (id) => { clips[id] = await (await fetch('actors/' + id + '.json')).json(); return clips[id].frames.length; };
+async function img(src) {
+  if (images[src]) return images[src];
+  const im = new Image(); im.src = src; await im.decode(); images[src] = im; return im;
+}
+const texCache = {};
+async function tex(src) {
+  if (texCache[src]) return texCache[src];
+  const t = await new THREE.TextureLoader().loadAsync(src); t.colorSpace = THREE.SRGBColorSpace; texCache[src] = t; return t;
+}
+
+window.frame = async (s) => {
+  // Camera.
+  camera.fov = s.fov ?? 50; camera.aspect = W / H;
+  camera.position.set(...s.cam);
+  const up = s.roll ? new THREE.Vector3(Math.sin(s.roll), Math.cos(s.roll), 0) : new THREE.Vector3(0, 1, 0);
+  camera.up.copy(up); camera.lookAt(...s.look);
+  camera.updateProjectionMatrix();
+  // Light.
+  renderer.toneMappingExposure = s.exposure ?? 1.0;
+  hemi.intensity = s.hemi ?? 1.25; moon.intensity = s.moon ?? 2.0;
+  fill.intensity = s.fill ?? 0.8;
+  fill.position.copy(camera.position).add(new THREE.Vector3(0, 3, 0)); fill.target.position.set(...s.look);
+  const focus = new THREE.Vector3(...(s.shadowAt || s.look));
+  const sr = s.shadowRadius ?? 60;
+  moon.target.position.copy(focus); moon.position.copy(focus).add(new THREE.Vector3(-0.45, 1, 0.3).normalize().multiplyScalar(400));
+  Object.assign(moon.shadow.camera, { left: -sr, right: sr, top: sr, bottom: -sr, near: 1, far: 900 }); moon.shadow.camera.updateProjectionMatrix();
+  // The world's lamps nearest the focus.
+  const near = worldLights.map(l => [l, (l.p[0] - focus.x) ** 2 + (l.p[1] - focus.y) ** 2 + (l.p[2] - focus.z) ** 2]).sort((a, b) => a[1] - b[1]);
+  lightPool.forEach((L, i) => {
+    const e = near[i];
+    if (e && e[1] < (s.lampRange ?? 220) ** 2) { const l = e[0]; L.color.setRGB(...l.c, THREE.SRGBColorSpace); L.intensity = l.b * (s.lampGain ?? 60); L.distance = l.range * 1.6; L.position.set(...l.p); }
+    else L.intensity = 0;
+  });
+  // Actors.
+  for (const k in actors) actors[k].visible = false;
+  for (const a of s.actors || []) {
+    const clip = clips[a.clip]; if (!clip) continue;
+    let g = actors[a.key];
+    if (!g || g.userData.clip !== a.clip) { if (g) scene.remove(g); g = buildActor(clip); g.userData.clip = a.clip; actors[a.key] = g; scene.add(g); }
+    g.visible = true; poseActor(g, clip, a.frame);
+    g.position.set(...a.pos); g.rotation.set(a.pitch || 0, a.yaw || 0, a.roll || 0, 'YXZ'); g.scale.setScalar(a.scale || 1);
+  }
+  clearGroup(fxGroup); addFx(s.fx);
+  clearGroup(dynGroup); addDynamic(s.dynamic);
+  // Sky rift.
+  if (s.skyRift) {
+    skyRift.visible = true; skyRift.material.map = await tex(s.skyRift.src); skyRift.material.needsUpdate = true;
+    skyRift.position.set(...s.skyRift.pos); skyRift.scale.set(s.skyRift.size, s.skyRift.size, 1); skyRift.material.opacity = s.skyRift.opacity ?? 1;
+  } else skyRift.visible = false;
+  bloom.strength = s.bloom ?? 0.8; bloom.radius = s.bloomRadius ?? 0.55; bloom.threshold = s.bloomThreshold ?? 0.82;
+  const u = grade.uniforms;
+  u.vignette.value = s.vignette ?? 0.38; u.grain.value = s.grain ?? 0.03; u.seed.value = Math.random() * 100;
+  u.flash.value = s.flash ?? 0; u.flashColor.value.set(...(s.flashColor || [1, 1, 1])); u.fade.value = s.fade ?? 0;
+  u.saturation.value = s.saturation ?? 1.1; u.tint.value.set(...(s.tint || [1, 1, 1])); u.lift.value.set(...(s.lift || [0, 0, 0]));
+  ctx2d.globalAlpha = 1; ctx2d.globalCompositeOperation = 'source-over'; ctx2d.filter = 'none';
+  if (s.hideWorld) { ctx2d.fillStyle = '#000'; ctx2d.fillRect(0, 0, W, H); }
+  else { composer.render(); ctx2d.drawImage(renderer.domElement, 0, 0); }
+  for (const o of s.overlay || []) await drawOverlay(o);
+  return out2d.toDataURL('image/jpeg', s.quality ?? 0.94);
+};
+
+// Overlays: text, images, fills, bars.
+async function drawOverlay(o) {
+  const c = ctx2d; c.save();
+  c.globalAlpha = o.alpha ?? 1;
+  if (o.blend) c.globalCompositeOperation = o.blend;
+  if (o.type === 'fill') { c.fillStyle = o.color; c.fillRect(0, 0, W, H); }
+  else if (o.type === 'bars') { c.fillStyle = '#000'; c.fillRect(0, 0, W, o.h); c.fillRect(0, H - o.h, W, o.h); }
+  else if (o.type === 'rect') { c.fillStyle = o.color; c.fillRect(o.x, o.y, o.w, o.h); }
+  else if (o.type === 'image') {
+    const im = await img(o.src);
+    c.translate(o.x, o.y); if (o.rot) c.rotate(o.rot); const sc = o.scale ?? 1;
+    const w = (o.w ?? im.width) * sc, h = (o.h ?? im.height) * sc;
+    if (o.glow) { c.shadowColor = o.glow; c.shadowBlur = o.glowBlur ?? 40; }
+    if (o.crop) c.drawImage(im, o.crop[0], o.crop[1], o.crop[2], o.crop[3], -w * (o.ax ?? 0.5), -h * (o.ay ?? 0.5), w, h);
+    else c.drawImage(im, -w * (o.ax ?? 0.5), -h * (o.ay ?? 0.5), w, h);
+  } else if (o.type === 'text') {
+    c.font = o.font; c.textAlign = o.align || 'center'; c.textBaseline = o.baseline || 'middle';
+    if (o.spacing) c.letterSpacing = o.spacing + 'px';
+    c.translate(o.x, o.y); if (o.scale) c.scale(o.scale, o.scale); if (o.skew) c.transform(1, 0, o.skew, 1, 0, 0);
+    if (o.glow) { c.shadowColor = o.glow; c.shadowBlur = o.glowBlur ?? 30; }
+    if (o.stroke) { c.lineWidth = o.strokeWidth ?? 6; c.strokeStyle = o.stroke; c.lineJoin = 'round'; c.strokeText(o.text, 0, 0); }
+    if (o.gradient) { const g = c.createLinearGradient(0, -o.size / 2, 0, o.size / 2); o.gradient.forEach((col, i) => g.addColorStop(i / (o.gradient.length - 1), col)); c.fillStyle = g; }
+    else c.fillStyle = o.color || '#fff';
+    c.fillText(o.text, 0, 0);
+    if (o.glow && o.glowTwice) c.fillText(o.text, 0, 0);
+  } else if (o.type === 'line') {
+    c.strokeStyle = o.color; c.lineWidth = o.width || 2; c.beginPath(); c.moveTo(o.x1, o.y1); c.lineTo(o.x2, o.y2); c.stroke();
+  }
+  c.restore();
+}
+
+// A kaiju alone, framed as KaijuRoll's card window frames it (transparent background).
+window.portrait = async (o) => {
+  const r2 = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  r2.setPixelRatio(1); r2.setSize(o.w, o.h); r2.setClearColor(0x000000, 0);
+  r2.toneMapping = THREE.ACESFilmicToneMapping; r2.outputColorSpace = THREE.SRGBColorSpace;
+  const sc = new THREE.Scene();
+  sc.add(new THREE.AmbientLight(new THREE.Color().setRGB(150 / 255, 156 / 255, 176 / 255, THREE.SRGBColorSpace), 1.6));
+  const key = new THREE.DirectionalLight(new THREE.Color().setRGB(1, 246 / 255, 232 / 255, THREE.SRGBColorSpace), 2.4);
+  key.position.set(0.5, 0.8, -0.7); sc.add(key);
+  const rim = new THREE.DirectionalLight(0x9fb4ff, 0.8); rim.position.set(-1, 0.4, 1); sc.add(rim);
+  const clip = clips[o.clip];
+  const g = buildActor(clip); poseActor(g, clip, 0); sc.add(g);
+  g.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(g); const c = box.getCenter(new THREE.Vector3()); const size = box.getSize(new THREE.Vector3());
+  g.position.sub(c); g.updateMatrixWorld(true);
+  const pivot = new THREE.Group(); sc.remove(g); pivot.add(g); sc.add(pivot); pivot.rotation.y = o.turn || 0;
+  const reach = Math.max(size.x, size.y * 1.25, size.z);
+  const cam = new THREE.PerspectiveCamera(38, o.w / o.h, 0.05, 500);
+  cam.position.set(reach * 0.95, reach * 0.42, -reach * 1.3); cam.lookAt(0, 0, 0);
+  r2.render(sc, cam);
+  const url = r2.domElement.toDataURL('image/png'); r2.dispose(); return url;
+};
+window.ready = true;
+</script></body></html>

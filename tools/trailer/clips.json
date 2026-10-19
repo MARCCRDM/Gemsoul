@@ -1,0 +1,367 @@
+[
+{
+"id": "tear_breach",
+"kind": "tear",
+"seed": 88,
+"height": 6.5,
+"frames": 104,
+"open": [
+[
+0,
+0
+],
+[
+0.25,
+0.1
+],
+[
+1.0,
+1.0
+],
+[
+4,
+1.0
+]
+],
+"crackle": [
+[
+0,
+1
+],
+[
+1.3,
+0.5
+]
+]
+},
+{
+"id": "bug_sahur_breach",
+"kind": "bug",
+"critter": "Sahur",
+"scale": 0.55,
+"frames": 104,
+"speed": [
+[
+0,
+0
+],
+[
+1.65,
+0
+],
+[
+1.75,
+6
+],
+[
+4,
+6
+]
+]
+},
+{
+"id": "bug_tral_breach",
+"kind": "bug",
+"critter": "Tralalero",
+"scale": 0.55,
+"frames": 104,
+"speed": [
+[
+0,
+0
+],
+[
+2.35,
+0
+],
+[
+2.45,
+6
+],
+[
+4,
+6
+]
+]
+},
+{
+"id": "bug_sahur_charge",
+"kind": "bug",
+"critter": "Sahur",
+"scale": 0.55,
+"frames": 56,
+"speed": [
+[
+0,
+9
+],
+[
+0.75,
+9
+],
+[
+1.0,
+0
+]
+],
+"actions": [
+{
+"ActionKind": "Heavy",
+"ActionStart": 0.8,
+"ActionAt": 1.6558575962467228
+}
+]
+},
+{
+"id": "miner_mine",
+"kind": "miner",
+"frames": 104,
+"speed": 0,
+"swings": [
+0.2139643990616807,
+1.0418931971850423,
+1.8698219953084034
+]
+},
+{
+"id": "k_razor_tame",
+"kind": "kaiju",
+"species": "Razorback",
+"element": "Frost",
+"scale": 0.9,
+"frames": 104,
+"speed": 0,
+"moods": [
+{
+"Mood": "Bound",
+"MoodAt": -1.0
+},
+{
+"Mood": "Roar",
+"MoodAt": 1.6558575962467228
+}
+]
+},
+{
+"id": "miner_tame",
+"kind": "miner",
+"frames": 104,
+"speed": 0
+},
+{
+"id": "miner_run",
+"kind": "miner",
+"frames": 104,
+"speed": 16
+},
+{
+"id": "pet_razor_run",
+"kind": "kaiju",
+"species": "Razorback",
+"element": "Fire",
+"scale": 0.55,
+"frames": 104,
+"speed": 16
+},
+{
+"id": "pet_cara_run",
+"kind": "kaiju",
+"species": "Carapace",
+"element": "Frost",
+"scale": 0.55,
+"frames": 104,
+"speed": 16
+},
+{
+"id": "pet_bulw_run",
+"kind": "kaiju",
+"species": "Bulwark",
+"element": "Shock",
+"scale": 0.55,
+"frames": 104,
+"speed": 16
+},
+{
+"id": "pet_razor_fight",
+"kind": "kaiju",
+"species": "Razorback",
+"element": "Fire",
+"scale": 0.55,
+"frames": 104,
+"speed": 0,
+"actions": [
+{
+"Kind": "Light",
+"Start": 0.11396439906168071,
+"At": 0.4139643990616807,
+"Side": 1
+},
+{
+"Kind": "Light",
+"Start": 1.7698219953084033,
+"At": 2.0698219953084034,
+"Side": -1
+}
+]
+},
+{
+"id": "pet_bulw_fight",
+"kind": "kaiju",
+"species": "Bulwark",
+"element": "Shock",
+"scale": 0.55,
+"frames": 104,
+"speed": 0,
+"actions": [
+{
+"Kind": "Heavy",
+"Start": 0.8558575962467228,
+"At": 1.6558575962467228,
+"Side": 1
+}
+]
+},
+{
+"id": "pet_cara_fight",
+"kind": "kaiju",
+"species": "Carapace",
+"element": "Frost",
+"scale": 0.55,
+"frames": 104,
+"speed": 0,
+"actions": [
+{
+"Kind": "Bolt",
+"Start": 1.7837863943700845,
+"At": 2.4837863943700844,
+"Side": 1
+}
+]
+},
+{
+"id": "bug_sahur_fight",
+"kind": "bug",
+"critter": "Sahur",
+"scale": 0.55,
+"frames": 104,
+"speed": 0,
+"actions": [
+{
+"ActionKind": "Slash",
+"ActionStart": 0.05,
+"ActionAt": 0.3
+},
+{
+"ActionKind": "Stagger",
+"ActionStart": 1.6558575962467228,
+"ActionAt": 1.6558575962467228,
+"HurtAt": 1.6558575962467228,
+"HurtSide": 1
+}
+]
+},
+{
+"id": "bug_tral_fight",
+"kind": "bug",
+"critter": "Tralalero",
+"scale": 0.55,
+"frames": 104,
+"speed": 0,
+"actions": [
+{
+"ActionKind": "Stagger",
+"ActionStart": 0.4139643990616807,
+"ActionAt": 0.4139643990616807,
+"HurtAt": 0.4139643990616807,
+"HurtSide": -1
+},
+{
+"ActionKind": "Stagger",
+"ActionStart": 2.0698219953084034,
+"ActionAt": 2.0698219953084034,
+"HurtAt": 2.0698219953084034,
+"HurtSide": 1
+}
+]
+},
+{
+"id": "bug_pata_fight",
+"kind": "bug",
+"critter": "Patapim",
+"scale": 0.55,
+"frames": 104,
+"speed": 0,
+"actions": [
+{
+"ActionKind": "Stagger",
+"ActionStart": 2.6037863943700845,
+"ActionAt": 2.6037863943700845,
+"HurtAt": 2.6037863943700845,
+"HurtSide": 1
+}
+]
+},
+{
+"id": "mech_hauler_walk",
+"kind": "mech",
+"mech": "Hauler",
+"frames": 104,
+"speed": [
+[
+0,
+9
+],
+[
+1.45,
+9
+],
+[
+1.7,
+0
+]
+],
+"strikes": [
+1.7998219953084034
+]
+},
+{
+"id": "miner_idle",
+"kind": "miner",
+"frames": 240,
+"speed": 0
+},
+{
+"id": "pet_razor_idle",
+"kind": "kaiju",
+"species": "Razorback",
+"element": "Fire",
+"scale": 0.55,
+"frames": 240,
+"speed": 0
+},
+{
+"id": "pet_cara_idle",
+"kind": "kaiju",
+"species": "Carapace",
+"element": "Frost",
+"scale": 0.55,
+"frames": 240,
+"speed": 0
+},
+{
+"id": "pet_bulw_idle",
+"kind": "kaiju",
+"species": "Bulwark",
+"element": "Shock",
+"scale": 0.55,
+"frames": 240,
+"speed": 0
+},
+{
+"id": "mech_hauler_idle",
+"kind": "mech",
+"mech": "Hauler",
+"frames": 240,
+"speed": 0
+}
+]

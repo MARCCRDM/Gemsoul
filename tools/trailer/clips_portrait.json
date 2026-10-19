@@ -1,0 +1,5 @@
+[
+ {"id":"p_razorback_fire","kind":"kaiju","species":"Razorback","element":"Fire","frames":1,"speed":0},
+ {"id":"p_carapace_frost","kind":"kaiju","species":"Carapace","element":"Frost","frames":1,"speed":0},
+ {"id":"p_bulwark_shock","kind":"kaiju","species":"Bulwark","element":"Shock","frames":1,"speed":0}
+]
