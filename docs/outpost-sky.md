@@ -24,46 +24,50 @@ so the rim is built correctly; it just wasn't being sent.
 
 ## A rift in the sky
 
-Another dimension seeping in: a rift high in the north sky, past the red
-moon. It's drawn by each player's own client (`src/client/Modules/SkyRift.luau`);
-the server sends nothing.
+Another dimension showing through a rip in space: a rift high in the north
+sky, past the red moon. It's drawn by each player's own client
+(`src/client/Modules/SkyRift.luau`); the server sends nothing.
 
-![The rift, with the red moon passing in front](outpost-sky/rift.png)
+![The rift, with the red moon in front](outpost-sky/rift.png)
+
+It used to be a round portal of rings. It's now a tear:
+
+![Before and after](outpost-sky/rift-before-after.png)
 
 What it's made of:
-- **The opening.** A window onto the other side: a slowly turning nebula,
-  a swirl of light, and stars in pink, green and gold. A rim of light
-  churns round it, with a softer halo outside.
-- **Ripples.** Rings leave the rim one after another and spread out, about
-  one a second. They shimmer cyan, violet, magenta and gold, break into
-  arcs that swirl as they go, and sag a little as they spread, as if what
-  comes through were heavy. Each fades in leaving the rim and out at the
-  edge, so you never see one restart.
-- **The vortex.** Three arms of motes turning slowly round it.
-- **Seepage.** Sparks leak out of the rim and drift out and down, and
-  glowing motes (3D particles) fall slowly from it toward the quarry.
-- **Cracks.** Hairline fractures that flicker round the rim now and then.
-- **Surges.** Every 9 seconds the rim flares, a bright ring bursts out and
-  every crack lights at once.
+- **The tear.** A long, jagged rip leaning like "/", pointed at both ends.
+  Each side is torn to its own ragged width (`SkyRift.tear`). Inside is the
+  other side: light flowing slowly along it, a bright filament down its
+  middle, and stars in pink, green and gold.
+- **Torn edges.** White-hot lines, frayed with loose threads, glowing
+  magenta down one side and cyan down the other, flickering.
+- **Haze.** A violet glow spilling out round it into the black.
+- **Cracks.** Fractures running on into space from both ends and from its
+  sides. They're faint, and flash now and then.
+- **Shards.** Pieces of the sky breaking off its edges, spinning slowly
+  away and fading.
+- **Seepage.** Sparks leak from its edges and drift out and down, and
+  glowing motes (3D particles) spill out all along it toward the quarry.
+- **Surges.** Every 9 seconds it flares: the edges blaze and thicken, the
+  glow swells and every crack lights at once.
 
-![Four moments: a surge, then the ripples moving out](outpost-sky/rift-moments.png)
+![Four moments: a surge, then calm](outpost-sky/rift-moments.png)
 
 (Offline renders of the rift's picture over a stand-in sky. In game it
-hangs 2,600 studs out and about 35 degrees across, half the screen's
-height.)
+hangs 2,600 studs out, and the tear is about 21 degrees long.)
 
 ### Where it is
 
 `SkyRift.Offset` puts it 34 degrees up in the north, above the red moon
-and beyond every body in the sky. Its opening clears every
-planet, and anything its ripples reach (the red moon, the gas giant's
-rings) passes in front of it.
+and beyond every body in the sky. It leans away from the red moon, so its
+lower tip passes well to the moon's left. The tear clears every planet.
+The red moon is closer, and passes in front of its glow.
 
 ### Cost
 
-It's one BillboardGui of about 110 frames, updated 30 times a second
-while you're in the Outpost, and one particle emitter at 5 a second.
-Anywhere else it's hidden and nothing runs.
+It's one BillboardGui of about 260 frames (the round one had about 110),
+updated 30 times a second while you're in the Outpost, and one particle
+emitter at 5 a second. Anywhere else it's hidden and nothing runs.
 
 ### Code and tests
 
@@ -71,17 +75,20 @@ Anywhere else it's hidden and nothing runs.
   - `mount`, `show` and `step` put it in the sky and run it;
   - `draw` builds the picture in any square frame (the billboard, or a
     preview);
-  - `ripple`, `surge`, `mote` and `crack` are the timing, as plain
-    functions.
+  - `tear`, `surge`, `mote`, `shard` and `crack` are the shape and the
+    timing, as plain functions.
 - `src/client/Modules/OutpostScene.luau` mounts it on the first frame in
   the Outpost, shows it only while you're there, and steps it.
 - `tests/sky_rift_cases.luau` (`tests/run_sky_rift.py`) checks that:
-  - it's high in the north, behind the stars;
-  - its opening clears the gas giant, the home world and the red moon,
-    and those positions still match `OutpostWorld`;
-  - every ripple grows outward, sags, stays inside the picture, and fades
-    in and out without a pop, with at least three out at once;
-  - sparks start at the rim, never show inside the opening, and stay in
-    the picture;
+  - it's high in the north, behind the stars, and its tear is 15 to 30
+    degrees long;
+  - the tear is pointed at both ends, leans like "/", stays in the picture,
+    is never wider than `Width`, and is torn (its width keeps changing,
+    and its two sides differ);
+  - drawn where the rift's picture sees them, the gas giant, the home
+    world and the red moon are all clear of the tear, and those positions
+    still match `OutpostWorld`;
+  - sparks and shards stay in the picture, never pop in or out, and only
+    show outside the tear; shards spin;
   - a surge lasts about a second, every 9;
-  - each crack is lit between 5% and 30% of the time.
+  - each crack flashes between 5% and 30% of the time.

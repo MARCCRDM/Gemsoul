@@ -1,4 +1,4 @@
-"""Run the rift in the Outpost's sky (SkyRift) through its cases: placement, ripples, sparks, surge, cracks."""
+"""Run the rift in the Outpost's sky (SkyRift) through its cases: placement, the tear, sparks, shards, surge, cracks."""
 from pathlib import Path
 import os, shutil, subprocess, tempfile
 
