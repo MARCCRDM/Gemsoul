@@ -2117,6 +2117,9 @@ local function showHead(character: Model)
 		end
 	end
 end
+-- The gem outline's transparency by tier (Common .. Legendary).
+local GEM_OUTLINE = { 0.85, 0.75, 0.6, 0.45, 0.3 }
+
 -- The element on a piece with a set stone (or a weapon): see above.
 -- `suited`: a suit colours the piece's trims, so they're left be.
 local function gemLook(component: Instance, gem, suited: boolean?)
@@ -2167,6 +2170,21 @@ local function gemLook(component: Instance, gem, suited: boolean?)
 		if gem.Element == "Frost" then
 			frostCrystals(core, 3 + math.floor(tier / 2))
 		end
+	end
+	-- An outline around the whole piece in the element's colour, bolder the
+	-- rarer the gem (faint at Common, solid at Legendary), so a fighter's
+	-- elements read at a glance in a fight. Outline only: the armor keeps its
+	-- own colours. The client keeps the nearest ones on (OutlineBudget).
+	if component:IsA("Model") and not component:FindFirstChild("GemHighlight") then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "GemHighlight"
+		highlight.FillColor = color
+		highlight.FillTransparency = 1
+		highlight.OutlineColor = color:Lerp(Color3.new(1, 1, 1), 0.25)
+		highlight.OutlineTransparency = GEM_OUTLINE[tier] or 0.6
+		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+		highlight.Parent = component
+		CollectionService:AddTag(highlight, Tags.GemOutline)
 	end
 	-- A weapon's blade (its biggest piece) carries a touch of it along its length.
 	if component.Name == "Weapon" and biggest then

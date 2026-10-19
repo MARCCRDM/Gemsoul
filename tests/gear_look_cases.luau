@@ -5,7 +5,8 @@
 --     element (helmet brow, both forearms, both shins, chest, shield, hilt),
 --     set on the outside of the armour, with a small element effect;
 --   * nothing that makes the look is a SelectionBox or a Highlight (a
---     ViewportFrame draws neither, so previews lost them), so suits and
+--     ViewportFrame draws neither, so previews lost them; the one exception is
+--     the gem outline, an extra in the world), so suits and
 --     skins show the same everywhere;
 --   * a suit's trim is real neon strips, welded to the body (or the grip),
 --     standing on its plates' outward faces, not inside them;
@@ -345,7 +346,8 @@ check(#named(plain:FindFirstChild("Helmet"), "SocketedGem") == 1, "a lone helmet
 local function previewable(root, what)
 	for _, d in root:GetDescendants() do
 		check(not d:IsA("SelectionBox"), what .. " has a SelectionBox (a preview can't draw it)")
-		check(not d:IsA("Highlight"), what .. " has a Highlight (a preview can't draw it)")
+		-- (Only the gem outline: it adds to the world view; a preview just goes without it.)
+		check(not d:IsA("Highlight") or d.Name == "GemHighlight", what .. " has a Highlight (a preview can't draw it)")
 	end
 end
 previewable(folder, "a gemmed kit")

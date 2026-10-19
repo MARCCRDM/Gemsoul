@@ -697,8 +697,12 @@ function View.start()
 			then Motion.sample(serverNow - insertionStart, character:GetAttribute("ArenaDropReleaseDelay") or 0)
 			else nil
 		local draw = if insertion then 1 - insertion.Draw else 0
-		local insertionPose = if #pieces > 0
-			then CFrame.new(0, -0.85 * draw, 0.35 * draw) * CFrame.Angles(-0.3 * draw, 0, 0)
+		-- Still inside the pod: no sword or shield in view (they'd hang in the
+		-- cabin). They're drawn up once you step out.
+		local inPod = insertion ~= nil and insertion.Draw <= 0
+		local insertionPose = if #pieces > 0 and inPod
+			then CFrame.new(0, -60, 0)
+			elseif #pieces > 0 then CFrame.new(0, -0.85 * draw, 0.35 * draw) * CFrame.Angles(-0.3 * draw, 0, 0)
 			else nil
 		local blockedAt = character and character:GetAttribute("BlockedAt")
 		local hurtAt = character and character:GetAttribute("HurtAt")
