@@ -130,9 +130,9 @@ Each of these is shorter on a phone, so it scales up larger:
 | Window | Desktop | Phone | What gives |
 | --- | --- | --- | --- |
 | Market | 900 x 640 | 900 x 520 | Smaller picture when inspecting; the Sell form drops its details box |
-| Store | 1100 x 660 | 1100 x 520 | The product page is stacked tighter; the Free page scrolls; the bundle sheet is shorter |
-| Season Path | 1000 x 560 | 1000 x 470 | The note under the track |
-| Social | 1060 x 600 | 1060 x 470 | The party card is tighter; the Arena card's list scrolls |
+| Store | 1100 x 660 | 860 x 340 | Its own layout: tabs in a slim header, a three-column grid beside a compact product page, narrower squad kits, a shorter bundle sheet |
+| Season Path | 1000 x 560 | 760 x 440 | A shorter XP bar; the note under the track |
+| Social | 1060 x 600 | 860 x 340 | Its own layout: one section at a time (Miners, Party, Arena, Friends, Chat) under tabs in the header |
 | Surge Array | 1060 x 600 | 1060 x 520 | The gem pouch scrolls; the loadout card moves up beside it |
 
 Every `IronUi.window` also uses nearly all the screen's height on a phone
