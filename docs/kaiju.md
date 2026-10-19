@@ -157,15 +157,15 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   They follow you everywhere in the Outpost (put back beside you if one falls
   far behind) and go away in a fight, a match or an expedition.
 - **EXP** goes to each of them out: for kills and for the rocks you mine.
-- **Recall.** Calls all of them back to you; they stay out of the fight for
-  4 seconds. Use it when one's about to die, or about to kill a kaiju you
-  want to tame.
+- **Recall.** The server can still call all of them back to you for 4
+  seconds (`KaijuRecall`), but the strip no longer has a button for it:
+  AUTO HEAL took the place of RECALL and HUNT.
 - **They don't heal on their own.** A kaiju keeps the health it ends a fight
-  with, out or at home, across sessions; stones mend it (see
-  [Infusing](#infusing)).
+  with, out or at home, across sessions; gems heal it, by hand or by AUTO
+  HEAL (see [Healing](#healing)).
 - **Knocked out**, it goes back into its Gemsoul and stays down (`Down`):
-  it doesn't come back by itself. Stones revive it, and it costs far more
-  than mending (see [Infusing](#infusing)). The others fight on.
+  it doesn't come back by itself. Gems revive it, and it costs far more
+  than healing (see [Healing](#healing)). The others fight on.
 - **Changing the team** (the panel): LEAD puts one at the front; SEND OUT
   puts one from home in place of one of the team. Not one that's fought in
   the last 3 seconds, and not twice in a moment.
@@ -209,7 +209,7 @@ but never on top of each other.
 
 ## On screen
 
-![The team strip on a phone, and the kaiju panel](kaiju/hud.png)
+![The team strip on a phone with AUTO HEAL on, and the HEAL tab](kaiju/hud.png)
 
 On a computer the strip sits at the bottom left, TAME above it:
 [the lobby on a computer](kaiju/hud-desktop.png).
@@ -220,24 +220,27 @@ On a computer the strip sits at the bottom left, TAME above it:
   hollow while it's still asleep. Knocked out, its tile is veiled and says
   DOWN until you revive it. On a computer it sits at the bottom left; on a phone under your
   level and coins, and at the top right while you hunt. Tap a tile for the
-  kaiju panel on that kaiju.
-  - **RECALL** brings them all back to you.
-  - **HUNT** takes your combat kit out to fight beside them (STOP, or 1, puts
-    it away).
+  kaiju panel on that kaiju (a tile that's DOWN opens HEAL).
+  - **AUTO HEAL**, at the strip's end, in place of RECALL and HUNT: a Common
+    gem (of your lead's element), how many spare Commons you have, and ON
+    or OFF. Tap it to switch. On, your spare Commons heal your team by
+    themselves (see [Healing](#healing)).
 - **TAME**, beside the strip, when a wild kaiju near you is down to half its
   health: the chance right now and the tries left. It starts the taming
   cast (see Taming), and hides while the cast is under way.
 - **The kaiju panel:** on the left every kaiju you have: YOUR TEAM (numbered,
   1 leads; health, EXP, and DOWN: REVIVE IT on one knocked out) and AT HOME
   (their health too: it doesn't come back at home either). Pick one for it
-  in full on the right: its portrait, kind, level, its Gemsoul's rarity,
-  health, damage and speed, its EXP, and its E, Q and R with what each does
-  (READY, or WAKES AT LV 5 / 10, each with its icon and key). Under that,
-  what you can do: **LEAD** (one of the team to the front), **SEND OUT** (one
-  from home: then pick which of the team it goes out in place of) and
-  **INFUSE** (**REVIVE** on one that's down), which opens its INFUSE tab:
-  tick stones from your pouch, each showing what it gives (+20% HEALTH, or
-  2 POWER toward a revive), and the footer says where that leaves it.
+  in full on the right: its portrait, with its Gemsoul's gem on the corner
+  (edged in its rarity), kind, level, its Gemsoul's rarity, health, damage
+  and speed, its EXP, and its E, Q and R with what each does (READY, or
+  WAKES AT LV 5 / 10, each with its icon and key). Under that, what you can
+  do: **LEAD** (one of the team to the front), **SEND OUT** (one from home:
+  then pick which of the team it goes out in place of) and **HEAL**
+  (**REVIVE** on one that's down), which opens its HEAL tab (see
+  [Healing](#healing)). On a phone the panel is a window of its own, 860 by
+  340, drawn near full size (it used to be the computer's window shrunk to
+  about 70%); the one picked scrolls.
 - **The Gem Vault** shows a Gemsoul's branches as the moves a kaiju casts,
   with KAIJU LV 5 by Q and KAIJU LV 10 by R.
 
@@ -259,8 +262,10 @@ plates could pile up over the middle of a phone's screen. See
 
 ## Hunting
 
-Your kaiju fights whether or not you do. To fight yourself, press HUNT: your
-combat kit comes out, as in a spar but alone. Only creatures can hit you, and
+Your kaiju fights whether or not you do. Hunting puts your own combat kit
+out, as in a spar but alone. The strip's HUNT button is gone (AUTO HEAL
+took its place), so for now the HUD has no way to start a hunt; the server's
+`Hunt` request and the hunt itself are unchanged. Only creatures can hit you, and
 you can only hit creatures; a creature's finishing blow knocks you down for a
 few seconds, as in a spar. Wild kaiju leave you and your kaiju alone until
 you start a fight with one. Moon bugs don't: out past the core
@@ -467,18 +472,18 @@ your swings bring out past the core, which gives more. A full free charge
 a few levels for a young kaiju, before the critters. A kaiju that's down, or left at home, earns nothing
 (`KaijuServer.mined`, from `OutpostServer.onRockMined`).
 
-## Infusing
+## Healing
 
-![Reviving a kaiju that's down, and mending a hurt one](kaiju/infuse.png)
+![Reviving a kaiju that's down, and healing a hurt one](kaiju/heal.png)
 
-Stones from your pouch are what keep a kaiju going: they mend it, or bring
-it back once it's down. They never give EXP (a kaiju grows by fighting
-beside you and as you mine). Up to 25 at a time (`Kaiju.Infuse`), only loose
-stones in your pouch (none socketed in your gear), never a Gemsoul.
+Gems from your pouch are what keep a kaiju going: they heal it, or bring it
+back once it's down. They never give EXP (a kaiju grows by fighting beside
+you and as you mine). Up to 25 at a time (`Kaiju.Infuse`), only loose gems
+in your pouch (none socketed in your gear), never a Gemsoul.
 
-A stone's **power** is its rarity's, and its element matters:
+A gem's **power** is its rarity's, and its element matters:
 
-| Stone | Power | Its own element (×2) | The element that beats it (×½) |
+| Gem | Power | Its own element (×2) | The element that beats it (×½) |
 | --- | --- | --- | --- |
 | Common | 1 | 2 | 0.5 |
 | Uncommon | 2 | 4 | 1 |
@@ -486,19 +491,65 @@ A stone's **power** is its rarity's, and its element matters:
 | Ultra Rare | 8 | 16 | 4 |
 | Legendary | 16 | 32 | 8 |
 
-- **Mending** a hurt kaiju: each point of power mends 10% of its health.
+- **Healing** a hurt kaiju: each point of power heals 10% of its health.
   A Common of its own element is 20%.
 - **Reviving** one that's down takes 10 power plus 1 a level, all at once
   (a level-11 kaiju needs 21: eleven Commons of its own element, where
-  mending it from a sliver back to full is 10), and it comes back at half
-  health; stones past that go on mending
-  it. Too little power and nothing is spent: the footer says how much more
-  it needs.
-- **PICK FOR ME** ticks the cheapest stones that do the job (Commons first;
-  within a rarity its own element's first, the element that beats it last),
-  only as many as it needs, and never a Legendary or one a saved loadout
-  names. The server takes only the stones it uses, and checks every one
-  is yours and loose (`KaijuServer.infuse`, `Kaiju.infusePlan`).
+  healing it from a sliver back to full is 10), and it comes back at half
+  health; gems past that go on healing it. Too little power and nothing is
+  spent.
+
+### The HEAL tab
+
+1. **At the top**, its name and level, and its health bar: what it has now,
+   and, lighter, what it'll have after the heal (`63 / 324 HEALTH`). One
+   that's down shows its revive instead: the power picked against what it
+   needs (`12 / 21 POWER`), KNOCKED OUT or READY TO REVIVE.
+2. **Under that**, whether AUTO HEAL is on.
+3. **Your gems**, a card for each rarity and element: the gem itself (a 3D
+   view of one of them), how many you have, and what each heals (`+20%
+   EACH`, gold for its own element, dim for its weakness; down, `+2 POWER
+   EACH`). Commons come first, then rarer, its own element first in each.
+   Tap a card for one more of it; **-** takes one off. The card says how
+   many are picked.
+4. **At the bottom**, what the heal does (`3 gems · heals to 100%`, or
+   `4 of 8 gems` when it needs fewer than you picked), and **HEAL**
+   (**REVIVE**; **FULL** when there's nothing to heal). **CLEAR** takes the
+   picks off; with none picked, **AUTO PICK** puts them back.
+
+Opened, it has your **spare Commons picked already**, as many as bring it to
+full (`Kaiju.healPick`): one tap of HEAL does it. Spare means loose and not
+named by a saved loadout. In each card the spare gems go first, then the
+least valuable, so a heal spends what you'd miss least. The picks follow
+its health (a fight, a heal) until you change them yourself. When your spare
+Commons can't bring one back that's down, nothing is picked and it says so:
+add rarer gems by hand. The server takes only the gems it uses, and checks
+every one is yours and loose (`KaijuServer.infuse`, `Kaiju.infusePlan`).
+
+This replaced the INFUSE tab: a list of every stone, each with a tick box,
+and PICK FOR ME.
+
+### AUTO HEAL
+
+Switched on (the strip's AUTO HEAL; `KaijuAutoHeal`, kept as the roster's
+`AutoHeal`), your **spare Commons** heal your team by themselves
+(`Kaiju.AutoHeal`, `KaijuServer`):
+
+- **A hurt one**, once it's gone 4 seconds without a fight (`Calm`). Only
+  Commons that fit are used: it never spends one that would heal past full
+  (`Kaiju.healPick`), so it can stop a little short.
+- **One knocked out**, 3 seconds after it went down (`ReviveAfter`), if your
+  spare Commons have the power. It comes back out at once.
+- At most one round every 1.5 seconds (`Every`), all of the team that needs
+  it in that round.
+- **Never** a rarer gem, a gem a saved loadout names, or a Gemsoul. Only in
+  the Outpost, out of fights, matches and expeditions.
+- **Quiet**: the kaiju glows and the strip's count drops. A revive is said
+  ("Auto heal: Cryo Razorback is back! (12 Commons)"), and so, once, is
+  running out ("Auto heal is out of spare Commons...").
+
+It's **off until you switch it on** (`Kaiju.AutoHeal.Default`), so no one's
+gems are spent without them choosing it.
 
 ## The arena (phase 2)
 
@@ -516,7 +567,7 @@ Proposed guardrails:
 
 1. **Phase 1 (in the game now):** three kaiju out at once (the beta opens
    all three slots) from the starter roll, wild kaiju, taming, moon bugs,
-   infusing, recall, hunting.
+   healing (and AUTO HEAL), recall, hunting.
 2. **Phase 2:** slots opening with level (10, then 20), and the arena.
 
 `Config.Features.Kaiju` turns all of it off.
@@ -525,7 +576,7 @@ Proposed guardrails:
 
 | Where | What |
 | --- | --- |
-| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), infusing (`Infuse`, `infusePower`, `reviveCost`, `infusePlan`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
+| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `reviveCost`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
 | `Shared.Squad` | Fighting as a side: sharing out foes (`assign`, `cost`), places round a shared foe (`slots`, `toward`), keeping clear (`apart`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
 | `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
@@ -533,12 +584,12 @@ Proposed guardrails:
 | `Shared.GemTraits` | The moves a Gemsoul rolls (`SoulMoves`); an old one's seeded into them (`traitsOf`) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow and its R when hard pressed (`setMoves` after a level), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
-| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till revived: `Down` on the record, `KaijuDown_<id>` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), infusing any of yours (`KaijuInfuse`), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
+| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till revived: `Down` on the record, `KaijuDown_<id>` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), healing any of yours (`KaijuInfuse`), AUTO HEAL (`KaijuAutoHeal`, healing with spare Commons between fights), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
 | `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model; a pack shares its foes), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, sharing out your kaiju, how they fight (bites, hops, dodges, their moves, bombs), slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look, all at its caster's size (`Size`; effects sent `"Sized"`); its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
 | `SparServer` | `Hunt`: the kit out alone |
-| `KaijuHud` (client) | The team strip, RECALL, HUNT, TAME, a wild kaiju's Challenge, the kaiju panel, and the roll in the Outpost for a player still owed one |
+| `KaijuHud` (client) | The team strip, AUTO HEAL, TAME, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen: in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
 | `KaijuTaming` (client) | The gold glow and READY TO TAME on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
 | `FxSize` (client) | How big the effect being drawn is: a creature's size, held while its effect draws (`run`), kept through its delays and frame loops (`keep`); `CombatFx`, `CombatSound`, `CombatVfx`, `MoveVfx`, `TriadVfx` and `ElementalDeath` draw at it |
@@ -557,9 +608,11 @@ owed a full three once), every creature effect sent at its size (a pet's,
 a wild one's, a critter's), your team (three out, one knocked out leaving the
 others, recall and EXP for all of them, LEAD, SEND OUT, the checks on a new
 team, a knocked-out one staying down and in its place, health kept with no
-healing on its own, infusing (mending, a revive's cost by level, its own
-element's stones counting double, nothing spent short of a revive, only
-loose stones, never a socketed one), fighting as a team (3 on 3 one each, 3 on 1 all
+healing on its own, healing with gems (a revive's cost by level, its own
+element's gems counting double, nothing spent short of a revive, only
+loose gems, never a socketed one), AUTO HEAL (off till switched on, not
+mid-fight, only spare Commons that fit, never a rarer gem or one a loadout
+names, a revive a moment after the knockout, out of Commons said once), fighting as a team (3 on 3 one each, 3 on 1 all
 in from three sides, 2 on 3 one each and the collapse when one falls, 2 on 10
 never doubled up with the critters five and five, two on one spot pushed
 apart; a critter's bite winding up and hopping back out, its hop clear of a

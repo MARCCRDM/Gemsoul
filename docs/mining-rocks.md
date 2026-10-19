@@ -51,10 +51,11 @@ What Commons are for:
   The shop always pays below worth; other players pay better on the market.
   "Spare" means loose and not named by a saved loadout
   (`GemInventory.spare`; the server's `SellSpare`).
-- **Your kaiju.** Stones mend a hurt kaiju (a Common of its own element
+- **Your kaiju.** Gems heal a hurt kaiju (a Common of its own element
   20% of its health) and revive one that's down (10 power plus 1 a level);
-  they don't give EXP. PICK FOR ME in its INFUSE tab picks the Commons it
-  needs ([kaiju.md](kaiju.md#infusing)).
+  they don't give EXP. Its HEAL tab has the spare Commons it needs picked
+  already, and AUTO HEAL, switched on, spends spare Commons on the team by
+  itself ([kaiju.md](kaiju.md#healing)).
 
 A gem needs room in the pouch (300 gems, room for a long session's
 Commons). With a full pouch the server refuses the swing before it lands:

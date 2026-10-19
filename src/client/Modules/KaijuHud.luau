@@ -6,10 +6,11 @@
 	                  gold): its portrait (the model itself), level, health,
 	                  and dots for its Q, E and R, lit when ready (hollow
 	                  while asleep); knocked out, DOWN (tap it to revive it
-	                  with stones: it stays down till you do). RECALL (all
-	                  of them back to you for a moment) and HUNT (your kit out
-	                  to fight beside them; 1 or HUNT again puts it away).
-	                  Tap a tile for the panel on that kaiju. Computer:
+	                  with gems: it stays down till you do). AUTO HEAL at
+	                  its end: a Common, how many you have spare, and ON or
+	                  OFF; on, your spare Commons heal the team by themselves
+	                  (Shared.Kaiju.AutoHeal, KaijuServer). Tap a tile for
+	                  the panel on that kaiju. Computer:
 	                  bottom left. Phone: under your level and coins, and at
 	                  the top right while you hunt (the fight's foe list has
 	                  the top left then).
@@ -25,12 +26,15 @@
 	                  picked in full (stats, its Gemsoul's rarity, its moves
 	                  and when Q and R wake) and what you can do with it:
 	                  LEAD (to the front), SEND OUT (one from home, in place
-	                  of one of the team you pick), INFUSE: loose stones
-	                  from your pouch mend it (it never heals on its own),
-	                  or REVIVE it when it's down, at its revive cost, each
-	                  stone's power shown (Shared.Kaiju.infusePlan: its own
-	                  element double, its weakness half; never EXP). PICK
-	                  FOR ME picks the cheapest stones that do it.
+	                  of one of the team you pick), HEAL (REVIVE when it's
+	                  down). Its Gemsoul's gem sits on its portrait.
+	  HEAL            its health now and after, then your gems in stacks (a
+	                  card for each rarity and element, the stone itself, how
+	                  many, what each heals: its own element double, its
+	                  weakness half; Shared.Kaiju.infusePlan). Opened, your
+	                  spare Commons are picked already, as many as bring it
+	                  to full (Kaiju.healPick): one tap of HEAL. Tap a card
+	                  for one more of it, - for one less; CLEAR, AUTO PICK.
 	  The roll        a player still owed starter kaiju (from before the
 	                  roll, say) gets the roll here, once (KaijuRoll).
 	  Wild nameplates the server's health bar over wild kaiju and moon bugs
@@ -38,7 +42,7 @@
 
 	  KaijuHud.start()     once, from Lobby.client
 	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
-	                       on "Details" or "Infuse"
+	                       on "Details" or "Heal"
 ]]
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -52,6 +56,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Spar = require(ReplicatedStorage.Shared.Spar)
+local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local KaijuRoll = require(script.Parent.KaijuRoll)
@@ -302,16 +307,32 @@ for slot = 1, #Kaiju.SlotLevels do
 	button.Activated:Connect(function()
 		local data = roster()
 		local record = data and tile.Id and data.List[tile.Id]
-		KaijuHud.open(tile.Id, if record and record.Down then "Infuse" else nil)
+		KaijuHud.open(tile.Id, if record and record.Down then "Heal" else nil)
 	end)
 end
 
-local recall = smallButton(card, "RECALL", Color3.fromRGB(120, 200, 255))
-recall.AnchorPoint = Vector2.new(1, 0)
-recall.Position, recall.Size = UDim2.new(1, -6, 0, 6), UDim2.fromOffset(68, 22)
-local hunt = smallButton(card, "HUNT", Color3.fromRGB(255, 92, 76))
-hunt.AnchorPoint = Vector2.new(1, 1)
-hunt.Position, hunt.Size = UDim2.new(1, -6, 1, -6), UDim2.fromOffset(68, 22)
+-- AUTO HEAL, at the strip's end: on, your spare Common gems heal the team
+-- by themselves (Shared.Kaiju.AutoHeal, KaijuServer). It shows a Common and
+-- how many you have spare; a tap switches it.
+local autoButton = new("TextButton", {
+	Name = "AutoHeal",
+	Text = "",
+	AutoButtonColor = true,
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -5, 0.5, 0),
+	Size = UDim2.fromOffset(72, 52),
+	BackgroundColor3 = TILE_BACK,
+}, card)
+UiKit.round(autoButton, 8)
+local autoEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, autoButton)
+local autoGem = new("Frame", { Name = "Gem", BackgroundTransparency = 1 }, autoButton)
+local autoCount = label(autoButton, "", 12, P.Text, IronUi.Bold)
+local autoTitle = label(autoButton, "AUTO HEAL", 9, P.Dim, IronUi.Bold)
+autoTitle.TextXAlignment = Enum.TextXAlignment.Center
+local autoState = label(autoButton, "OFF", 13, P.Dim, Enum.Font.GothamBlack)
+autoState.TextXAlignment = Enum.TextXAlignment.Center
+local autoWant: boolean? = nil -- (switched here, till the roster says so)
+local autoArt: string? = nil
 
 -- TAME: beside the strip, when there's a wild kaiju to tame.
 local tame = new("TextButton", {
@@ -359,19 +380,77 @@ local function layout()
 		tame.Position = UDim2.fromOffset(spot.TameX, y)
 	end
 	card.Position = UDim2.fromOffset(x, y)
-	-- The tiles share what RECALL and HUNT leave.
-	local buttonW, gap = 68, if phone then 4 else 6
+	-- The tiles share what AUTO HEAL leaves.
+	local buttonW, gap = if phone then 62 else 72, if phone then 4 else 6
 	local th = h - 10
 	local tw = math.min(math.floor(th * 1.25), math.floor((w - 10 - buttonW - 8 - gap * (#tiles - 1)) / #tiles))
 	for slot, tile in tiles do
 		tile.Button.Position = UDim2.fromOffset(5 + (slot - 1) * (tw + gap), 5)
 		tile.Button.Size = UDim2.fromOffset(tw, th)
 	end
-	recall.Size = UDim2.fromOffset(buttonW, if phone then 20 else 22)
-	hunt.Size = recall.Size
+	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or OFF.
+	local gemSize, gemY = if phone then 13 else 18, if phone then 3 else 4
+	autoButton.Size = UDim2.fromOffset(buttonW, th)
+	autoGem.Position, autoGem.Size = UDim2.fromOffset(6, gemY), UDim2.fromOffset(gemSize, gemSize)
+	autoCount.Position, autoCount.Size = UDim2.fromOffset(9 + gemSize, gemY), UDim2.new(1, -13 - gemSize, 0, gemSize)
+	autoCount.TextSize = if phone then 11 else 12
+	autoTitle.Position = UDim2.fromOffset(0, gemY + gemSize + 1)
+	autoTitle.Size, autoTitle.TextSize = UDim2.new(1, 0, 0, if phone then 9 else 11), if phone then 8 else 9
+	local stateH = if phone then 11 else 14
+	autoState.Position = UDim2.new(0, 0, 1, -(if phone then 2 else 3) - stateH)
+	autoState.Size, autoState.TextSize = UDim2.new(1, 0, 0, stateH), if phone then 11 else 13
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 player:GetAttributeChangedSignal("Hunt"):Connect(layout)
+
+-- Your spare Commons (what AUTO HEAL uses, and what HEAL picks first):
+-- loose, never one a saved loadout names, never a Gemsoul.
+local spareCommons = {}
+local function countCommons()
+	local list = {}
+	for _, gem in GemInventory.spare(GemClient.Profile, Kaiju.AutoHeal.Tier) do
+		if not Kaiju.isSoul(gem) then
+			table.insert(list, gem)
+		end
+	end
+	spareCommons = list
+end
+
+-- AUTO HEAL as it stands: ON (green) or OFF, and a Common of the lead's
+-- element (those heal it double) with how many you have spare.
+local function drawAuto(lead)
+	local on = Kaiju.autoHealOn(roster())
+	if autoWant ~= nil and autoWant ~= on then
+		on = autoWant
+	else
+		autoWant = nil
+	end
+	autoButton.BackgroundColor3 = if on then P.Good:Lerp(INK, 0.72) else TILE_BACK
+	autoEdge.Color = if on then P.Good else P.Edge
+	autoState.Text = if on then "ON" else "OFF"
+	autoState.TextColor3 = if on then P.Good else P.Dim
+	autoTitle.TextColor3 = if on then P.Text else P.Dim
+	autoCount.Text = "×" .. #spareCommons
+	autoCount.TextColor3 = if #spareCommons > 0 then P.Text else P.Bad:Lerp(P.Text, 0.3)
+	local element = (lead and lead.Element) or "Fire"
+	local sample = nil
+	for _, gem in spareCommons do
+		if gem.Element == element then
+			sample = gem
+			break
+		end
+	end
+	sample = sample
+		or spareCommons[1]
+		or { Id = "AutoHeal" .. element, Element = element, Tier = Kaiju.AutoHeal.Tier, Size = 6, Clarity = 6, Cut = 5 }
+	if autoArt ~= sample.Id then
+		autoArt = sample.Id
+		for _, child in autoGem:GetChildren() do
+			child:Destroy()
+		end
+		pcall(GemArt.viewport, autoGem, sample, false)
+	end
+end
 
 local function drawTile(tile, record, model: Model?, lead: boolean)
 	tile.Id = record.Id
@@ -406,7 +485,10 @@ end
 
 -- The panel -------------------------------------------------------------------------------------------------------
 
-local W, H = 800, 480
+-- (On a phone on its side, a window of its own, drawn near full size: the
+-- one picked scrolls, and HEAL's gems take the width.)
+local SHORT = UiKit.short()
+local W, H = if SHORT then 860 else 800, if SHORT then 340 else 480
 local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
 window.Title.Text = "YOUR KAIJU"
 window.Subtitle.Text = "Your team fights beside you in the Outpost. Pick one to see it."
@@ -419,12 +501,12 @@ end)
 
 local body = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(20, 78),
-	Size = UDim2.new(1, -40, 1, -96),
+	Position = UDim2.fromOffset(if SHORT then 12 else 20, if SHORT then 70 else 78),
+	Size = UDim2.new(1, if SHORT then -24 else -40, 1, if SHORT then -78 else -96),
 }, window.Panel)
 
 -- Left: every kaiju you have, your team first.
-local LIST_W = 256
+local LIST_W = if SHORT then 214 else 256
 local listFrame = new("ScrollingFrame", {
 	Name = "KaijuList",
 	BackgroundTransparency = 1,
@@ -435,7 +517,7 @@ local listFrame = new("ScrollingFrame", {
 }, body)
 UiKit.list(listFrame, 6)
 
--- Right: the one picked, or infusing it.
+-- Right: the one picked, or healing it.
 local right = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(LIST_W + 14, 0),
@@ -444,16 +526,33 @@ local right = new("Frame", {
 local tabRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30) }, right)
 UiKit.list(tabRow, 8, true)
 
-local detail = new("Frame", {
+local detail = new(if SHORT then "ScrollingFrame" else "Frame", {
 	Name = "Detail",
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, 38),
 	Size = UDim2.new(1, 0, 1, -38),
 }, right)
+if SHORT then
+	detail.CanvasSize = UDim2.fromOffset(0, 362)
+	detail.ScrollBarThickness = 4
+	detail.ScrollingDirection = Enum.ScrollingDirection.Y
+end
 local heroView = viewport(detail, { Size = UDim2.fromOffset(168, 168) })
 UiKit.round(heroView, 10)
 local heroEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.2 }, heroView)
 local heroGlow = new("UIGradient", { Rotation = 90 }, heroView)
+-- Its Gemsoul (the gem it lives in), on the portrait's corner, edged in its rarity.
+local soulBadge = new("Frame", {
+	Name = "Gemsoul",
+	Position = UDim2.fromOffset(168 - 58, 168 - 58),
+	Size = UDim2.fromOffset(52, 52),
+	BackgroundColor3 = INK,
+	BackgroundTransparency = 0.15,
+	ZIndex = 3,
+}, detail)
+UiKit.round(soulBadge, 26)
+local soulEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, soulBadge)
+local soulArt: string? = nil
 local info = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(180, 0),
@@ -570,6 +669,10 @@ local actionBar = new("Frame", {
 	Position = UDim2.fromScale(0, 1),
 	Size = UDim2.new(1, 0, 0, 40),
 }, detail)
+if SHORT then
+	-- (At the foot of what scrolls.)
+	actionBar.AnchorPoint, actionBar.Position = Vector2.zero, UDim2.fromOffset(0, 362 - 40)
+end
 local actionText = label(actionBar, "", 11, P.Dim, IronUi.Body)
 actionText.Size = UDim2.new(1, 0, 1, 0)
 actionText.TextWrapped = true
@@ -582,60 +685,96 @@ local actionButtons = new("Frame", {
 local actionList = UiKit.list(actionButtons, 6, true)
 actionList.HorizontalAlignment = Enum.HorizontalAlignment.Right
 
--- Infusing the one picked: stones mend it, or bring it back when it's down.
-local feedPane = new("Frame", {
-	Name = "Infuse",
+-- Healing the one picked: gems from your pouch heal it, or bring it back
+-- when it's down. Its health now and after at the top, your gems in stacks
+-- below, HEAL at the bottom.
+local healPane = new("Frame", {
+	Name = "Heal",
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, 38),
 	Size = UDim2.new(1, 0, 1, -38),
 	Visible = false,
 }, right)
-local feedHead = label(feedPane, "", 12, P.Text, IronUi.Bold)
-feedHead.Size = UDim2.new(1, 0, 0, 18)
-local feedList = new("ScrollingFrame", {
+local HEAD_H = if SHORT then 46 else 58
+local healHead = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, 0, 0, HEAD_H) }, healPane)
+UiKit.round(healHead, 10)
+local healName = label(healHead, "", 14, P.Text, IronUi.Bold)
+healName.Position, healName.Size = UDim2.fromOffset(12, if SHORT then 4 else 7), UDim2.new(1, -184, 0, 18)
+local healNumbers = label(healHead, "", 12, P.Text, IronUi.Bold)
+healNumbers.AnchorPoint, healNumbers.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+healNumbers.Position, healNumbers.Size = UDim2.new(1, -12, 0, if SHORT then 4 else 7), UDim2.fromOffset(170, 18)
+local healBack = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(28, 32, 46),
+	Position = UDim2.fromOffset(12, if SHORT then 25 else 32),
+	Size = UDim2.new(1, -24, 0, if SHORT then 14 else 16),
+}, healHead)
+UiKit.round(healBack, 8)
+-- (After the heal, lighter, under its health now.)
+local healAfter = new("Frame", { BackgroundColor3 = HEALTH, BackgroundTransparency = 0.55 }, healBack)
+UiKit.round(healAfter, 8)
+local healNow = new("Frame", { BackgroundColor3 = HEALTH }, healBack)
+UiKit.round(healNow, 8)
+local healBarText = label(healBack, "", 10, P.Text, Enum.Font.GothamBlack)
+healBarText.Size, healBarText.TextXAlignment, healBarText.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 3
+-- Whether AUTO HEAL is on.
+local healHint = label(healPane, "", if SHORT then 11 else 10, P.Dim, IronUi.Bold)
+healHint.Position, healHint.Size = UDim2.fromOffset(2, HEAD_H + 4), UDim2.new(1, -4, 0, 14)
+-- Your gems, a card for each rarity and element.
+local CARD_W, CARD_H = if SHORT then 141 else 150, 84
+local stacksY, footH = HEAD_H + 22, if SHORT then 44 else 48
+local stackList = new("ScrollingFrame", {
+	Name = "GemStacks",
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 24),
-	Size = UDim2.new(1, 0, 1, -82),
+	Position = UDim2.fromOffset(0, stacksY),
+	Size = UDim2.new(1, 0, 1, -stacksY - footH - 4),
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollBarThickness = 4,
-}, feedPane)
-UiKit.list(feedList, 6)
-local footer = new("Frame", {
+}, healPane)
+new("UIGridLayout", {
+	CellSize = UDim2.fromOffset(CARD_W, CARD_H),
+	CellPadding = UDim2.fromOffset(8, 8),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, stackList)
+local healFoot = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0, 1),
 	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.new(1, 0, 0, 50),
-}, feedPane)
-local footerText = label(footer, "", 11, P.Dim, IronUi.Body)
-footerText.Size = UDim2.new(1, -150, 1, 0)
-footerText.TextWrapped = true
-local feedButton = smallButton(footer, "INFUSE", P.Good)
-feedButton.AnchorPoint = Vector2.new(1, 0.5)
-feedButton.Position, feedButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(130, 38)
-feedButton.TextSize = 15
--- One tap picks the cheapest stones that do it (Commons first, its own
--- element first: what mining mostly pays).
-local commonsButton = smallButton(footer, "PICK FOR ME", P.Teal)
-commonsButton.AnchorPoint = Vector2.new(1, 0.5)
-commonsButton.Position, commonsButton.Size = UDim2.new(1, -140, 0.5, 0), UDim2.fromOffset(122, 38)
+	Size = UDim2.new(1, 0, 0, footH),
+}, healPane)
+local healSummary = label(healFoot, "", 13, P.Text, IronUi.Bold)
+healSummary.Position, healSummary.Size = UDim2.fromOffset(2, 5), UDim2.new(1, -276, 0, 18)
+local healNote = label(healFoot, "", 10, P.Dim, IronUi.Body)
+healNote.Position, healNote.Size = UDim2.fromOffset(2, 23), UDim2.new(1, -276, 0, 24)
+healNote.TextWrapped, healNote.TextYAlignment = true, Enum.TextYAlignment.Top
+local healButton = smallButton(healFoot, "HEAL", P.Good)
+healButton.AnchorPoint = Vector2.new(1, 0.5)
+healButton.Position, healButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(150, 40)
+healButton.TextSize = 16
+local resetButton = smallButton(healFoot, "CLEAR", P.Edge)
+resetButton.AnchorPoint = Vector2.new(1, 0.5)
+resetButton.Position, resetButton.Size = UDim2.new(1, -158, 0.5, 0), UDim2.fromOffset(106, 40)
 
 local tab = "Details"
 local selected: string? = nil
 local swapping = false -- choosing who a kaiju from home goes out in place of
-local picked: { [string]: boolean } = {}
+-- HEAL's picks: how many of each stack. Made for you (pickFresh, a new
+-- kaiju, or its health changed while you hadn't touched them), else yours.
+local pickCounts: { [string]: number } = {}
+local pickFresh, pickFor, pickSig, manual = true, nil :: string?, nil :: string?, false
+local healChosen, healReady = {}, false
 local tabButtons = {}
 local rowLive = {} -- [id] = the bits of its row that change while you look
 local drawPanel
 
-for order, entry in { { "Details", "DETAILS" }, { "Infuse", "INFUSE" } } do
+for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" } } do
 	local b = smallButton(tabRow, entry[2], P.Gold)
 	b.LayoutOrder = order
 	b.Size = UDim2.fromOffset(120, 28)
 	b.Activated:Connect(function()
 		tab = entry[1]
 		swapping = false
-		table.clear(picked)
+		pickFresh = true
 		drawPanel()
 	end)
 	tabButtons[entry[1]] = b
@@ -646,64 +785,80 @@ local function moveName(id: string?): string
 	return if move then move.Name else "?"
 end
 
--- Loose stones it could take (never one on your gear, never a Gemsoul),
--- the cheapest first (Commons, then rarer), its own element first in each,
--- with the power each brings it (Shared.Kaiju.infusePower).
+-- Your gems for a heal, in stacks: one for each rarity and element (they
+-- heal alike), the cheapest first (Commons, then rarer), its own element
+-- first in each rarity. Never one on your gear, never a Gemsoul. In each
+-- stack the spare ones first (none a saved loadout names), then the least
+-- valuable, so a heal spends what you'd miss least.
 local TIER_RANK = {}
 for rank, tier in GemConfig.TierOrder do
 	TIER_RANK[tier] = rank
 end
-local function stonesFor(record)
-	local list = {}
-	for _, gem in GemInventory.available(GemClient.Profile) do
-		if not Kaiju.isSoul(gem) then
-			table.insert(list, { Gem = gem, Power = Kaiju.infusePower(gem, record) })
+local function stackKey(gem): string
+	return (gem.Tier or "Common") .. "/" .. tostring(gem.Element)
+end
+local function healStacks(record)
+	local profile = GemClient.Profile
+	local spare = {}
+	for _, tier in GemConfig.TierOrder do
+		for _, gem in GemInventory.spare(profile, tier) do
+			spare[gem.Id] = true
 		end
 	end
-	table.sort(list, function(a, b)
-		local ra, rb = TIER_RANK[a.Gem.Tier] or 0, TIER_RANK[b.Gem.Tier] or 0
+	local stacks, byKey = {}, {}
+	for _, gem in GemInventory.available(profile) do
+		if not Kaiju.isSoul(gem) then
+			local key = stackKey(gem)
+			local stack = byKey[key]
+			if not stack then
+				stack = {
+					Key = key,
+					Tier = gem.Tier or "Common",
+					Element = gem.Element,
+					Power = Kaiju.infusePower(gem, record),
+					Gems = {},
+				}
+				byKey[key] = stack
+				table.insert(stacks, stack)
+			end
+			table.insert(stack.Gems, gem)
+		end
+	end
+	local worth = {}
+	for _, stack in stacks do
+		for _, gem in stack.Gems do
+			local ok, value = pcall(GemConfig.value, gem)
+			worth[gem] = if ok and type(value) == "number" then value else 0
+		end
+		table.sort(stack.Gems, function(a, b)
+			if (spare[a.Id] == true) ~= (spare[b.Id] == true) then
+				return spare[a.Id] == true
+			end
+			if worth[a] ~= worth[b] then
+				return worth[a] < worth[b]
+			end
+			return a.Id < b.Id
+		end)
+	end
+	table.sort(stacks, function(a, b)
+		local ra, rb = TIER_RANK[a.Tier] or 0, TIER_RANK[b.Tier] or 0
 		if ra ~= rb then
 			return ra < rb
 		end
-		return if a.Power ~= b.Power then a.Power > b.Power else (a.Gem.Id < b.Gem.Id)
+		if a.Power ~= b.Power then
+			return a.Power > b.Power
+		end
+		return tostring(a.Element) < tostring(b.Element)
 	end)
-	return list
+	return stacks
 end
 
--- The cheapest stones that do it: down, its revive cost; hurt, back to full.
--- (Spare ones only: none a saved loadout names, as selling Commons spares.)
-local function pickFor(record): { string }
-	local spare = {}
-	for _, tier in GemConfig.TierOrder do
-		if tier ~= "Legendary" then
-			for _, gem in GemInventory.spare(GemClient.Profile, tier) do
-				spare[gem.Id] = true
-			end
-		end
+local function totalPicked(): number
+	local n = 0
+	for _, count in pickCounts do
+		n += count
 	end
-	local chosen, gems = {}, {}
-	local need = if record.Down then Kaiju.reviveCost(record) else 0
-	local power = 0
-	for _, entry in stonesFor(record) do
-		if #chosen >= Kaiju.Infuse.Batch then
-			break
-		end
-		if spare[entry.Gem.Id] then
-			if record.Down then
-				if power >= need then
-					break
-				end
-				power += entry.Power
-			else
-				table.insert(gems, entry.Gem)
-				if #Kaiju.infusePlan(record, gems).Used < #gems then
-					break -- (it's full without this one)
-				end
-			end
-			table.insert(chosen, entry.Gem.Id)
-		end
-	end
-	return chosen
+	return n
 end
 
 -- Actions ----------------------------------------------------------------------------------------------------------
@@ -948,14 +1103,11 @@ local function drawActions(data, record, team: { string })
 		end)
 	end
 	if record.Down then
-		actionText.Text = string.format(
-			"Knocked out: it stays down till you infuse %d power of stones into it.",
-			Kaiju.reviveCost(record)
-		)
+		actionText.Text = "Knocked out: heal it with gems to bring it back."
 	end
-	actionButton(2, if record.Down then "REVIVE" else "INFUSE", if record.Down then P.Bad else P.Good, 100, function()
-		tab = "Infuse"
-		table.clear(picked)
+	actionButton(2, if record.Down then "REVIVE" else "HEAL", if record.Down then P.Bad else P.Good, 100, function()
+		tab = "Heal"
+		pickFresh = true
 		drawPanel()
 	end)
 end
@@ -981,6 +1133,20 @@ local function drawDetail(data, record, team: { string })
 	pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier) .. " GEMSOUL"
 	pillText.TextColor3, pillEdge.Color = tierColor, tierColor
 	pill.BackgroundColor3 = tierColor:Lerp(INK, 0.75)
+	soulBadge.Visible = soul ~= nil
+	soulEdge.Color = tierColor
+	local soulKey = soul and (soul.Id or record.Id) or nil
+	if soulArt ~= soulKey then
+		soulArt = soulKey
+		for _, child in soulBadge:GetChildren() do
+			if child:IsA("ViewportFrame") then
+				child:Destroy()
+			end
+		end
+		if soul then
+			pcall(GemArt.viewport, soulBadge, soul, true)
+		end
+	end
 	heroBlurb.Text = if species then species.Blurb else ""
 	local stats = Kaiju.stats(record.Species, record.Level, tier)
 	if stats then
@@ -1025,100 +1191,230 @@ local function drawDetail(data, record, team: { string })
 	drawActions(data, record, team)
 end
 
-local function drawInfuse(record)
-	record = liveRecord(record)
-	for _, child in feedList:GetChildren() do
-		if child:IsA("GuiObject") then
-			child:Destroy()
-		end
+-- A stack's card in HEAL (kept between draws: its gem is a 3D view).
+local stackCards: { [string]: any } = {}
+local function stackCard(key: string)
+	local entry = stackCards[key]
+	if entry then
+		return entry
 	end
+	local b = new("TextButton", {
+		Name = "Gems_" .. key,
+		Text = "",
+		AutoButtonColor = true,
+		BackgroundColor3 = P.Inset,
+	}, stackList)
+	UiKit.round(b, 10)
+	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.25 }, b)
+	local art = new("Frame", {
+		Name = "Gem",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(6, 5),
+		Size = UDim2.fromOffset(46, 46),
+	}, b)
+	local have = label(b, "", 12, P.Text, IronUi.Bold)
+	have.AnchorPoint, have.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+	have.Position, have.Size = UDim2.new(1, -8, 0, 5), UDim2.fromOffset(60, 15)
+	local gain = label(b, "", 17, HEALTH, Enum.Font.GothamBlack)
+	gain.AnchorPoint, gain.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+	gain.Position, gain.Size = UDim2.new(1, -8, 0, 20), UDim2.fromOffset(70, 20)
+	local each = label(b, "EACH", 9, P.Dim, IronUi.Bold)
+	each.AnchorPoint, each.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+	each.Position, each.Size = UDim2.new(1, -8, 0, 40), UDim2.fromOffset(80, 11)
+	local kind = label(b, "", 10, P.Dim, IronUi.Bold)
+	kind.Position, kind.Size = UDim2.fromOffset(8, 53), UDim2.new(1, -16, 0, 12)
+	local pill = new("Frame", {
+		BackgroundColor3 = P.Good,
+		Position = UDim2.fromOffset(8, 66),
+		Size = UDim2.fromOffset(70, 15),
+		Visible = false,
+	}, b)
+	UiKit.round(pill, 7)
+	local pillLabel = label(pill, "", 9, INK, Enum.Font.GothamBlack)
+	pillLabel.Size, pillLabel.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	local minus = smallButton(b, "-", P.Bad)
+	minus.Name = "Less"
+	minus.AnchorPoint = Vector2.new(1, 0)
+	minus.Position, minus.Size = UDim2.new(1, -8, 0, 64), UDim2.fromOffset(30, 18)
+	minus.TextSize = 15
+	minus.Visible = false
+	entry = {
+		Button = b,
+		Edge = edge,
+		Art = art,
+		ArtId = nil :: string?,
+		Have = have,
+		Gain = gain,
+		Each = each,
+		Kind = kind,
+		Pill = pill,
+		PillLabel = pillLabel,
+		Minus = minus,
+		Stack = nil :: any,
+	}
+	b.Activated:Connect(function()
+		local stack = entry.Stack
+		local n = pickCounts[key] or 0
+		if stack and n < #stack.Gems and totalPicked() < Kaiju.Infuse.Batch then
+			pickCounts[key] = n + 1
+			manual = true
+			drawPanel()
+		end
+	end)
+	minus.Activated:Connect(function()
+		local n = pickCounts[key] or 0
+		if n > 0 then
+			pickCounts[key] = if n > 1 then n - 1 else nil
+			manual = true
+			drawPanel()
+		end
+	end)
+	stackCards[key] = entry
+	return entry
+end
+
+local function drawHeal(record)
+	record = liveRecord(record)
 	local down = record.Down == true
 	local now, most = Kaiju.health(record)
-	feedHead.Text = if down
-		then string.format(
-			"REVIVE %s  ·  Lv %d  ·  needs %d power",
-			string.upper(Kaiju.title(record)),
-			record.Level,
-			Kaiju.reviveCost(record)
-		)
-		else string.format(
-			"INFUSE %s  ·  Lv %d  ·  %d / %d health",
-			string.upper(Kaiju.title(record)),
-			record.Level,
-			math.floor(now + 0.5),
-			most
-		)
-	feedHead.TextColor3 = if down then P.Bad:Lerp(P.Text, 0.3) else elementColor(record.Element):Lerp(P.Text, 0.35)
-	feedButton.Text = if down then "REVIVE" else "INFUSE"
-	local stones = stonesFor(record)
-	commonsButton.Visible = #stones > 0
-	footerText.Size = UDim2.new(1, if commonsButton.Visible then -272 else -140, 1, 0)
-	local chosen = {}
-	for _, entry in stones do
-		local gem, power = entry.Gem, entry.Power
-		local isPicked = picked[gem.Id] == true
-		if isPicked then
-			table.insert(chosen, gem)
+	local full = not down and now >= most - 0.5
+	local stacks = healStacks(record)
+	-- Picked for you: your spare Commons, as many as bring it to full (or
+	-- back, if it's down: Kaiju.healPick). Again whenever its health changes,
+	-- unless you've picked your own.
+	local sig = record.Id .. (if down then "/down" else "/" .. math.floor(now))
+	local suggested = Kaiju.healPick(record, spareCommons, true)
+	if pickFresh or pickFor ~= record.Id or (pickSig ~= sig and not manual) then
+		pickFresh, pickFor, pickSig, manual = false, record.Id, sig, false
+		table.clear(pickCounts)
+		for _, gem in suggested do
+			local key = stackKey(gem)
+			pickCounts[key] = (pickCounts[key] or 0) + 1
 		end
-		local frame = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -8, 0, 38) }, feedList)
-		UiKit.round(frame, 8)
-		local b = new("TextButton", {
-			Text = "",
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 1),
-		}, frame)
-		local tick = new("Frame", {
-			BackgroundColor3 = if isPicked then P.Good else Color3.fromRGB(28, 32, 46),
-			Position = UDim2.fromOffset(10, 11),
-			Size = UDim2.fromOffset(16, 16),
-		}, frame)
-		UiKit.round(tick, 4)
-		local name = label(frame, GemConfig.displayName(gem), 13, elementColor(gem.Element))
-		name.Position, name.Size = UDim2.fromOffset(36, 0), UDim2.new(1, -170, 1, 0)
-		-- What it brings: power toward a revive, or the health it mends.
-		local mend = math.floor(power * Kaiju.Infuse.Mend * 100 + 0.5)
-		local worth = label(
-			frame,
-			if down then string.format("%g POWER", power) else string.format("+%d%% HEALTH", mend),
-			12,
-			if power > Kaiju.Infuse.Power[gem.Tier or "Common"]
-				then P.Gold
-				elseif power < Kaiju.Infuse.Power[gem.Tier or "Common"] then P.Dim
-				else P.Text,
-			IronUi.Bold
-		)
-		worth.AnchorPoint = Vector2.new(1, 0)
-		worth.Position, worth.Size = UDim2.new(1, -12, 0, 0), UDim2.new(0, 130, 1, 0)
-		worth.TextXAlignment = Enum.TextXAlignment.Right
-		b.Activated:Connect(function()
-			picked[gem.Id] = not picked[gem.Id] or nil
-			drawPanel()
-		end)
 	end
+	if full then
+		table.clear(pickCounts)
+	end
+	-- The cards, in order, and what's picked of each.
+	local seen, chosen = {}, {}
+	for order, stack in stacks do
+		seen[stack.Key] = true
+		local n = math.min(pickCounts[stack.Key] or 0, #stack.Gems)
+		pickCounts[stack.Key] = if n > 0 then n else nil
+		for i = 1, n do
+			table.insert(chosen, stack.Gems[i])
+		end
+		local c = stackCard(stack.Key)
+		c.Stack = stack
+		c.Button.LayoutOrder = order
+		local shown = stack.Gems[1]
+		if c.ArtId ~= shown.Id then
+			c.ArtId = shown.Id
+			for _, child in c.Art:GetChildren() do
+				child:Destroy()
+			end
+			pcall(GemArt.viewport, c.Art, shown, false)
+		end
+		c.Have.Text = "×" .. #stack.Gems
+		local base = Kaiju.Infuse.Power[stack.Tier] or Kaiju.Infuse.Power.Common
+		c.Gain.Text = if down
+			then string.format("+%g", stack.Power)
+			else string.format("+%d%%", math.floor(stack.Power * Kaiju.Infuse.Mend * 100 + 0.5))
+		c.Gain.TextColor3 = if stack.Power > base then P.Gold elseif stack.Power < base then P.Dim else HEALTH
+		c.Each.Text = if down then "POWER EACH" else "EACH"
+		c.Kind.Text = string.upper(
+			GemConfig.elementName(stack.Element) .. " · " .. (GemConfig.TierLabels[stack.Tier] or stack.Tier)
+		)
+		c.Kind.TextColor3 = (GemConfig.TierColors[stack.Tier] or P.Dim):Lerp(P.Text, 0.15)
+		c.Pill.Visible, c.Minus.Visible = n > 0, n > 0
+		c.PillLabel.Text = string.format("%d PICKED", n)
+		c.Edge.Color = if n > 0 then P.Good else elementColor(stack.Element):Lerp(P.Edge, 0.5)
+		c.Edge.Thickness = if n > 0 then 2 else 1.5
+		c.Button.BackgroundColor3 = if n > 0 then P.Good:Lerp(INK, 0.8) else P.Inset
+	end
+	for key, c in stackCards do
+		if not seen[key] then
+			c.Button:Destroy()
+			stackCards[key] = nil
+		end
+	end
+	for key in pickCounts do
+		if not seen[key] then
+			pickCounts[key] = nil
+		end
+	end
+	-- The strongest first, so the heal spends the fewest.
+	table.sort(chosen, function(a, b)
+		local pa, pb = Kaiju.infusePower(a, record), Kaiju.infusePower(b, record)
+		return if pa ~= pb then pa > pb else a.Id < b.Id
+	end)
 	local plan = Kaiju.infusePlan(record, chosen)
-	local share = math.floor(plan.Health / math.max(1, plan.Most) * 100 + 0.5)
-	footerText.Text = if #stones == 0
-		then "No loose stones in your pouch. Mine some: every rock pays one."
-		elseif #chosen == 0 and down then string.format(
-			"Pick %d power of stones to bring it back (its own element counts double, its weakness half), or let PICK FOR ME choose.",
-			Kaiju.reviveCost(record)
+	local share = math.floor(plan.Health / math.max(1, most) * 100 + 0.5)
+	local cost = Kaiju.reviveCost(record)
+	-- The head: its name, its health now and (lighter) after.
+	healName.Text = string.format("%s  ·  LV %d", string.upper(Kaiju.title(record)), record.Level)
+	healName.TextColor3 = elementColor(record.Element):Lerp(P.Text, 0.3)
+	if down then
+		local power = 0
+		for _, gem in chosen do
+			power += Kaiju.infusePower(gem, record)
+		end
+		healNumbers.Text = string.format("%g / %d POWER", math.min(power, cost), cost)
+		healNumbers.TextColor3 = P.Bad:Lerp(P.Text, 0.3)
+		healNow.Size = UDim2.fromScale(0, 1)
+		healAfter.Size = UDim2.fromScale(math.clamp(power / cost, 0, 1), 1)
+		healAfter.BackgroundColor3 = P.Gold
+		healBarText.Text = if plan.Revived then "READY TO REVIVE" else "KNOCKED OUT"
+	else
+		healNumbers.Text = string.format("%d / %d HEALTH", math.floor(now + 0.5), most)
+		healNumbers.TextColor3 = P.Text
+		healNow.Size = UDim2.fromScale(math.clamp(now / math.max(1, most), 0, 1), 1)
+		healNow.BackgroundColor3 = if now / math.max(1, most) < 0.3 then P.Bad else HEALTH
+		healAfter.Size = UDim2.fromScale(math.clamp(plan.Health / math.max(1, most), 0, 1), 1)
+		healAfter.BackgroundColor3 = HEALTH
+		healBarText.Text = ""
+	end
+	local on = Kaiju.autoHealOn(roster())
+	healHint.Text = if on
+		then "AUTO HEAL is on: your spare Commons heal your team between fights."
+		else "Switch on AUTO HEAL by your team and your spare Commons heal them by themselves."
+	healHint.TextColor3 = if on then P.Good else P.Dim
+	-- Under the gems: what the heal does, and HEAL.
+	if #stacks == 0 then
+		healSummary.Text = "No gems in your pouch"
+		healNote.Text = "Mine some: every rock pays a gem."
+	elseif full then
+		healSummary.Text = "Full health"
+		healNote.Text = "Nothing to heal."
+	elseif #chosen == 0 then
+		healSummary.Text = if down then string.format("Needs %d power to come back", cost) else "Tap your gems to pick them"
+		healNote.Text = if down and #suggested == 0
+			then "Your spare Commons aren't enough to bring it back: tap your gems to add more."
+			else "A gem of its own element heals double, its weakness half."
+	elseif down and not plan.Revived then
+		healSummary.Text = string.format("%g more power to bring it back", plan.Short)
+		healNote.Text = "Tap your gems to add them."
+	else
+		healSummary.Text = string.format(
+			"%s  ·  %s %d%%",
+			if #plan.Used < #chosen
+				then string.format("%d of %d gems", #plan.Used, #chosen)
+				else string.format("%d gem%s", #plan.Used, if #plan.Used == 1 then "" else "s"),
+			if plan.Revived then "back at" else "heals to",
+			share
 		)
-		elseif #chosen == 0 then "Pick stones to mend it (it never heals on its own), or let PICK FOR ME choose."
-		elseif down and not plan.Revived then string.format("%g more power to bring it back.", plan.Short)
-		elseif plan.Revived then string.format(
-			"Back at %d%% health, using %d of %d stone%s.",
-			share,
-			#plan.Used,
-			#chosen,
-			if #chosen == 1 then "" else "s"
-		)
-		else string.format(
-			"Mends it to %d%%, using %d of %d stone%s.",
-			share,
-			#plan.Used,
-			#chosen,
-			if #chosen == 1 then "" else "s"
-		)
+		healNote.Text = if manual
+			then "A gem of its own element heals double, its weakness half."
+			else "Picked for you from your spare Commons. Tap a gem for one more, - for one less."
+	end
+	healReady = not full and #chosen > 0 and (not down or plan.Revived)
+	healChosen = chosen
+	healButton.Text = if full then "FULL" elseif down then "REVIVE" else "HEAL"
+	healButton.AutoButtonColor = healReady
+	healButton.BackgroundColor3 = (if down then P.Gold else P.Good):Lerp(INK, if healReady then 0.3 else 0.78)
+	healButton.TextColor3 = if healReady then P.Text else P.Dim
+	resetButton.Text = if next(pickCounts) then "CLEAR" else "AUTO PICK"
+	resetButton.Visible = #stacks > 0 and not full and (next(pickCounts) ~= nil or #suggested > 0)
 end
 
 function drawPanel()
@@ -1133,70 +1429,63 @@ function drawPanel()
 	end
 	drawList(data, team)
 	detail.Visible = tab == "Details" and record ~= nil
-	feedPane.Visible = tab == "Infuse" and record ~= nil
+	healPane.Visible = tab == "Heal" and record ~= nil
 	if not record then
 		portrait(heroView, nil)
 		return
 	end
-	if tab == "Infuse" then
-		drawInfuse(record)
+	if tab == "Heal" then
+		drawHeal(record)
 	else
 		drawDetail(data, record, team)
 	end
 end
 
-commonsButton.Activated:Connect(function()
-	local data = roster()
-	local record = data and selected and data.List[selected]
-	if not record then
-		return
-	end
-	table.clear(picked)
-	for _, id in pickFor(liveRecord(record)) do
-		picked[id] = true
+resetButton.Activated:Connect(function()
+	if next(pickCounts) then
+		table.clear(pickCounts)
+		manual = true
+	else
+		pickFresh = true
 	end
 	drawPanel()
 end)
 
-feedButton.Activated:Connect(function()
-	local ids = {}
-	for id in picked do
-		table.insert(ids, id)
-	end
+healButton.Activated:Connect(function()
 	local target = selected
-	if #ids == 0 or not target then
+	if not healReady or #healChosen == 0 or not target then
 		return
+	end
+	local ids = {}
+	for _, gem in healChosen do
+		table.insert(ids, gem.Id)
 	end
 	act(function()
 		local result = GemClient.request("KaijuInfuse", ids, target)
 		say(result)
 		if result and result.Ok then
-			table.clear(picked)
+			pickFresh = true
+			if window.Gui.Enabled then
+				drawPanel()
+			end
 		end
 	end)
 end)
 
 function KaijuHud.open(id: string?, onTab: string?)
-	tab = if onTab == "Infuse" then "Infuse" else "Details"
+	tab = if onTab == "Heal" or onTab == "Infuse" then "Heal" else "Details"
 	swapping = false
-	table.clear(picked)
+	pickFresh = true
 	selected = id
 	drawPanel()
 	window.Gui.Enabled = true
 end
 
+countCommons()
 GemClient.Changed:Connect(function()
+	countCommons()
 	if window.Gui.Enabled then
-		-- (The pouch or the roster changed: what's picked may be gone.)
-		local gems = {}
-		for _, gem in (GemClient.Profile and GemClient.Profile.Gems) or {} do
-			gems[gem.Id] = true
-		end
-		for id in picked do
-			if not gems[id] then
-				picked[id] = nil
-			end
-		end
+		-- (The pouch or the roster changed: HEAL's picks are trimmed to what's left.)
 		drawPanel()
 	end
 end)
@@ -1265,8 +1554,7 @@ local function refresh()
 			drawTile(tile, record, models[id], slot == 1)
 		end
 	end
-	hunt.Text = if Spar.hunting(player) then "STOP" else "HUNT"
-	recall.Visible = next(models) ~= nil
+	drawAuto(team[1] and data.List[team[1]])
 	-- TAME.
 	local target, chance = tameTarget()
 	tameModel = target
@@ -1309,14 +1597,20 @@ local function plates()
 	end
 end
 
-recall.Activated:Connect(function()
+autoButton.Activated:Connect(function()
+	local data = roster()
+	if not data or busy then
+		return
+	end
+	local want = not (if autoWant ~= nil then autoWant else Kaiju.autoHealOn(data))
+	autoWant = want
+	pcall(refresh)
 	act(function()
-		say(GemClient.request("KaijuRecall"))
-	end)
-end)
-hunt.Activated:Connect(function()
-	act(function()
-		say(GemClient.request("Hunt", not Spar.hunting(player)))
+		local result = GemClient.request("KaijuAutoHeal", want)
+		say(result)
+		if not (result and result.Ok) then
+			autoWant = nil -- (as it was)
+		end
 	end)
 end)
 -- A wild kaiju's Challenge prompt: your kaiju go in (KaijuWilds).

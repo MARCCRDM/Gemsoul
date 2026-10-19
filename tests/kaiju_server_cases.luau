@@ -744,7 +744,7 @@ KaijuWilds.start({
 })
 local kaijuFolder = workspaceObject:FindFirstChild("Kaiju")
 check(kaijuFolder ~= nil, "No Kaiju folder")
-for _, name in { "KaijuRecall", "KaijuTeam", "KaijuActive", "KaijuInfuse", "KaijuTame", "KaijuRoll", "KaijuRollClaim" } do
+for _, name in { "KaijuRecall", "KaijuTeam", "KaijuActive", "KaijuInfuse", "KaijuAutoHeal", "KaijuTame", "KaijuRoll", "KaijuRollClaim" } do
 	check(registered[name] ~= nil, name .. " isn't a request")
 end
 
@@ -946,6 +946,115 @@ local function healthAndInfusing()
 	pet.Humanoid.Health = pet.Humanoid.MaxHealth
 end
 healthAndInfusing()
+
+-- Auto heal: off till it's switched on; then spare Commons heal the team by
+-- themselves: a hurt one once it's calm (never a gem wasted, never a rarer
+-- one, never one a saved loadout names), one knocked out a moment after it
+-- went down; quiet, but for a revive and, once, running out.
+local function autoHealing()
+	local roster = profiles[a].Kaiju
+	local record = pet.Record
+	local weakness = shared("ElementMatchup").weakTo(record.Element)
+	local plain = "Fire"
+	for _, element in Kaiju.Elements do
+		if element ~= record.Element and element ~= weakness then
+			plain = element
+		end
+	end
+	local function gem(id, tier)
+		table.insert(profiles[a].Gems, { Id = id, Tier = tier, Element = plain, Size = 5, Clarity = 5, Cut = 5 })
+	end
+	local function has(id)
+		for _, g in profiles[a].Gems do
+			if g.Id == id then
+				return true
+			end
+		end
+		return false
+	end
+	local function said(text)
+		local count = 0
+		for _, note in notes do
+			if note[1] == a and string.find(note[2], text, 1, true) then
+				count += 1
+			end
+		end
+		return count
+	end
+	check(registered.KaijuAutoHeal ~= nil, "KaijuAutoHeal isn't a request")
+	check(not Kaiju.autoHealOn(roster), "Auto heal on before it was switched on")
+	for i = 1, 6 do
+		gem("ah" .. i, "Common")
+	end
+	gem("rare", "Rare")
+	local most = pet.Humanoid.MaxHealth
+	pet.Humanoid.Health = math.floor(most * 0.65)
+	pet.LastFight = now - 60
+	KaijuServer._autoHeal(a, now)
+	check(#profiles[a].Gems == 7 and pet.Humanoid.Health < most, "Healed with auto heal off")
+	local on = registered.KaijuAutoHeal(a, true)
+	check(on.Ok and roster.AutoHeal == true and Kaiju.autoHealOn(roster), "Couldn't switch auto heal on")
+	check(not registered.KaijuAutoHeal(a, "yes").Ok and roster.AutoHeal == true, "Auto heal took something not on or off")
+	-- Mid-fight: not yet.
+	pet.LastFight = now - 1
+	KaijuServer._autoHeal(a, now)
+	check(#profiles[a].Gems == 7, "Auto healed mid-fight")
+	-- Calm: 35% short, a Common mends 10%: three, none wasted, never the Rare.
+	pet.LastFight = now - Kaiju.AutoHeal.Calm - 0.1
+	local before = pet.Humanoid.Health
+	KaijuServer._autoHeal(a, now)
+	check(#profiles[a].Gems == 4 and has("rare"), "Auto heal didn't take three Commons alone: " .. #profiles[a].Gems .. " left")
+	check(
+		math.abs(pet.Humanoid.Health - (before + most * 0.3)) <= 1 and record.Health == pet.Humanoid.Health,
+		"Three Commons didn't heal 30%"
+	)
+	-- Not again straight away.
+	pet.Humanoid.Health = math.floor(most * 0.5)
+	KaijuServer._autoHeal(a, now + 0.5)
+	check(#profiles[a].Gems == 4, "Auto healed again straight away")
+	-- A gem a saved loadout names stays put.
+	now += Kaiju.AutoHeal.Every + 0.1
+	pet.LastFight = now - Kaiju.AutoHeal.Calm - 0.1
+	profiles[a].Presets = { Armor = { { Surges = { "ah4" } } } }
+	KaijuServer._autoHeal(a, now)
+	check(has("ah4") and not has("ah5") and not has("ah6") and has("rare"), "Auto heal took a gem a loadout names")
+	-- Out of spare Commons: said once.
+	now += Kaiju.AutoHeal.Every + 0.1
+	pet.LastFight = now - Kaiju.AutoHeal.Calm - 0.1
+	table.clear(notes)
+	KaijuServer._autoHeal(a, now)
+	KaijuServer._autoHeal(a, now + 5)
+	check(said("out of spare Commons") == 1, "Running out of Commons wasn't said once")
+	check(has("ah4") and has("rare"), "Out of Commons, it took another gem")
+	profiles[a].Presets = nil
+	for _, g in table.clone(profiles[a].Gems) do
+		PlayerData.removeGem(a, g.Id)
+	end
+	-- Knocked out: back a moment later, from Commons alone, and said.
+	local cost = Kaiju.reviveCost(record)
+	for i = 1, cost + 2 do
+		gem("rv" .. i, "Common")
+	end
+	now += 10
+	table.clear(notes)
+	KaijuServer.hurt(pet, 1e9, nil, nil)
+	check(record.Down and said("Auto heal brings it back") == 1, "Knocked out with auto heal on: not told it'll come back")
+	KaijuServer._autoHeal(a, now + 1)
+	check(record.Down, "Auto heal brought it back at once")
+	KaijuServer._autoHeal(a, now + Kaiju.AutoHeal.ReviveAfter + 0.1)
+	check(not record.Down and record.Health >= math.floor(most * Kaiju.Infuse.Revive.Health), "Auto heal didn't bring it back")
+	check(said("Auto heal: ") == 1 and #profiles[a].Gems < 2, "A revive by auto heal wasn't said, or used too little")
+	pet = KaijuServer.pets()[a]
+	check(pet and pet.Record == record, "Brought back by auto heal, it didn't come out")
+	-- Off again.
+	check(registered.KaijuAutoHeal(a, false).Ok and not Kaiju.autoHealOn(roster), "Couldn't switch auto heal off")
+	for _, g in table.clone(profiles[a].Gems) do
+		PlayerData.removeGem(a, g.Id)
+	end
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth
+	now += 10
+end
+autoHealing()
 
 -- Recall.
 check(registered.KaijuRecall(a).Ok and pet.RecallUntil == now + Kaiju.RecallSeconds, "Recall didn't take")
@@ -3169,7 +3278,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day)",
 		checks
 	)
 )

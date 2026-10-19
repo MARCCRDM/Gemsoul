@@ -15,7 +15,12 @@
 	               Its health is kept (record.Health) and never comes
 	               back on its own; at 0 one is knocked back into its
 	               Gemsoul (record.Down) and stays there, its place in the
-	               team empty, until stones revive it (KaijuInfuse).
+	               team empty, until gems revive it (KaijuInfuse).
+	  Auto heal    switched on (Kaiju.AutoHeal, kept as roster.AutoHeal),
+	               your spare Commons heal your team by themselves: one
+	               hurt once it's calm, one knocked out a moment after it
+	               went down, never a gem wasted. Quiet, but for a revive
+	               and running out of Commons.
 	  The roll     everyone starts with Kaiju.StarterTeam kaiju, rolled (the
 	               intro's roll, or one full roll in the Outpost for a
 	               player who took an older one: Kaiju.RollVersion):
@@ -28,10 +33,11 @@
 	  "KaijuRecall"         the team back to you, out of the fight for Kaiju.RecallSeconds
 	  "KaijuTeam", { id }   which of yours are out (the first leads)
 	  "KaijuActive", id     this one out, leading (in the lead's place if it wasn't out)
-	  "KaijuInfuse", { gemId }, id?   stones from your pouch into one of
-	                        yours (the lead if no id): mended, or brought back
-	                        if it's down (Kaiju.infusePlan; only the stones
-	                        it needs are used, and never a Gemsoul)
+	  "KaijuInfuse", { gemId }, id?   heals one of yours with gems from your
+	                        pouch (the lead if no id): mended, or brought back
+	                        if it's down (Kaiju.infusePlan; only the gems it
+	                        needs are used, and never a Gemsoul)
+	  "KaijuAutoHeal", on   auto heal on or off
 	  "KaijuRoll"           the starter roll owed: { Rolls = { { Species, Element, Soul } } }
 	  "KaijuRollClaim"      take it: the kaiju join you
 
@@ -645,7 +651,10 @@ function KaijuServer.caster(pet: Pet)
 	}
 end
 
--- Down: back in its Gemsoul until stones revive it (KaijuInfuse).
+-- When each one knocked out went down (auto heal waits a moment).
+local downAt = setmetatable({}, { __mode = "k" })
+
+-- Down: back in its Gemsoul until gems revive it (KaijuInfuse).
 local function knockOut(pet: Pet)
 	local player = pet.Owner
 	petFx("TriadBreak", pet.Root.Position, 4 * PET_SIZE, pet.Element)
@@ -662,13 +671,15 @@ local function knockOut(pet: Pet)
 		Kaiju.setTeam(profile.Kaiju, Kaiju.teamIds(profile.Kaiju))
 	end
 	record.Down, record.Health = true, 0
+	downAt[record] = os.clock()
 	PlayerData.sync(player)
 	Remotes.Notify:FireClient(
 		player,
 		string.format(
-			"%s was knocked out! Infuse %d power of stones to bring it back.",
-			Kaiju.title(record),
-			Kaiju.reviveCost(record)
+			if Kaiju.autoHealOn(profile and profile.Kaiju)
+				then "%s was knocked out! Auto heal brings it back with your Commons."
+				else "%s was knocked out! Heal it with gems to bring it back.",
+			Kaiju.title(record)
 		)
 	)
 end
@@ -1157,9 +1168,32 @@ local function setActive(player: Player, id: any)
 end
 
 -- Stones from your pouch into one of yours (the lead if no id): mended,
--- or, knocked out, brought back (Kaiju.infusePlan: only the stones it
+-- or, knocked out, brought back (Kaiju.infusePlan: only the gems it
 -- needs are used; only loose ones, never one on your gear, and never a
 -- Gemsoul, which is a kaiju's own).
+
+-- A heal worked out (Kaiju.infusePlan), done: its gems out of the pouch,
+-- its health, the glow, and back out if it was down.
+local function applyHeal(player: Player, record, pet: Pet?, plan)
+	local used = {}
+	for _, gem in plan.Used do
+		used[gem.Id] = true
+	end
+	PlayerData.removeGems(player, used)
+	record.Down = nil
+	downAt[record] = nil
+	record.Health = math.max(1, math.floor(plan.Health + 0.5))
+	if pet then
+		pet.Humanoid.Health = math.min(pet.Humanoid.MaxHealth, record.Health)
+		refreshPlate(pet)
+		petFx("TriadAura", pet.Root, nil, pet.Element, "Heal", 1.5)
+	end
+	PlayerData.sync(player)
+	if plan.Revived then
+		upkeep(player, os.clock())
+	end
+end
+
 local function infuse(player: Player, ids: any, kaijuId: any)
 	local profile = PlayerData.get(player)
 	local roster = profile and profile.Kaiju
@@ -1169,10 +1203,10 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 	end
 	record = record or (profile and Kaiju.active(roster))
 	if not record then
-		return reply(false, "You have no kaiju to infuse.")
+		return reply(false, "You have no kaiju to heal.")
 	end
 	if type(ids) ~= "table" or #ids == 0 or #ids > Kaiju.Infuse.Batch then
-		return reply(false, string.format("Pick 1 to %d stones.", Kaiju.Infuse.Batch))
+		return reply(false, string.format("Pick 1 to %d gems.", Kaiju.Infuse.Batch))
 	end
 	local pet = teams[player] and teams[player][record.Id]
 	if pet and pet.Record ~= record then
@@ -1200,7 +1234,7 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 		end
 	end
 	if #gems == 0 then
-		return reply(false, "Those stones aren't in your pouch.")
+		return reply(false, "Those gems aren't in your pouch.")
 	end
 	local plan = Kaiju.infusePlan(record, gems)
 	if record.Down and not plan.Revived then
@@ -1210,30 +1244,104 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 			{ Short = plan.Short }
 		)
 	end
-	local used = {}
-	for _, gem in plan.Used do
-		used[gem.Id] = true
-	end
-	PlayerData.removeGems(player, used)
-	record.Down = nil
-	record.Health = math.max(1, math.floor(plan.Health + 0.5))
-	if pet then
-		pet.Humanoid.Health = math.min(pet.Humanoid.MaxHealth, record.Health)
-		refreshPlate(pet)
-		petFx("TriadAura", pet.Root, nil, pet.Element, "Heal", 1.5)
-	end
-	PlayerData.sync(player)
-	if plan.Revived then
-		upkeep(player, os.clock())
-	end
+	applyHeal(player, record, pet, plan)
 	local share = math.floor(record.Health / plan.Most * 100 + 0.5)
-	local stones = string.format("%d stone%s", #plan.Used, if #plan.Used == 1 then "" else "s")
+	local stones = string.format("%d gem%s", #plan.Used, if #plan.Used == 1 then "" else "s")
 	return reply(
 		true,
 		if plan.Revived
 			then string.format("%s is back! %d%% health (%s).", Kaiju.title(record), share, stones)
-			else string.format("%s mended to %d%% (%s).", Kaiju.title(record), share, stones),
+			else string.format("%s healed to %d%% (%s).", Kaiju.title(record), share, stones),
 		{ Used = #plan.Used, Health = record.Health, Most = plan.Most, Revived = plan.Revived }
+	)
+end
+
+-- Auto heal (Kaiju.AutoHeal): your spare Commons heal the team by
+-- themselves, each one due (hurt and calm, or down a moment) in one go.
+-- Quiet (it glows, and the strip's count of Commons drops), but for a
+-- revive, and once for running out.
+local healAt, toldEmpty = {}, {}
+local function autoHeal(player: Player, now: number)
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster or not Kaiju.autoHealOn(roster) or not canBeOut(player) or now < (healAt[player] or 0) then
+		return
+	end
+	local rule = Kaiju.AutoHeal
+	local commons = GemInventory.spare(profile, rule.Tier)
+	local healed, stuck = false, false
+	for _, id in Kaiju.teamIds(roster) do
+		local record = roster.List[id]
+		local pet = teams[player] and teams[player][id]
+		if pet and pet.Record ~= record then
+			pet = nil
+		end
+		local due
+		if record.Down then
+			due = now - (downAt[record] or -math.huge) >= rule.ReviveAfter
+		else
+			if pet then
+				keepHealth(pet)
+			end
+			local health, most = Kaiju.health(record)
+			due = health < most and (not pet or now - (pet.LastFight or 0) >= rule.Calm)
+		end
+		if due then
+			local gems, short = Kaiju.healPick(record, commons, false)
+			if #gems > 0 then
+				local plan = Kaiju.infusePlan(record, gems)
+				if not record.Down or plan.Revived then
+					applyHeal(player, record, pet, plan)
+					healed = true
+					local used = {}
+					for _, gem in plan.Used do
+						used[gem.Id] = true
+					end
+					for i = #commons, 1, -1 do
+						if used[commons[i].Id] then
+							table.remove(commons, i)
+						end
+					end
+					if plan.Revived then
+						Remotes.Notify:FireClient(
+							player,
+							string.format(
+								"Auto heal: %s is back! (%d Common%s)",
+								Kaiju.title(record),
+								#plan.Used,
+								if #plan.Used == 1 then "" else "s"
+							)
+						)
+					end
+				end
+			elseif #commons == 0 or short > 0 then
+				stuck = true
+			end
+		end
+	end
+	if healed then
+		healAt[player], toldEmpty[player] = now + rule.Every, nil
+	elseif stuck and not toldEmpty[player] then
+		toldEmpty[player] = true
+		Remotes.Notify:FireClient(player, "Auto heal is out of spare Commons: mine more to keep your team going.")
+	end
+end
+
+local function setAutoHeal(player: Player, on: any)
+	if type(on) ~= "boolean" then
+		return reply(false, "")
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	Kaiju.roster(profile).AutoHeal = on
+	healAt[player], toldEmpty[player] = nil, nil
+	PlayerData.sync(player)
+	return reply(
+		true,
+		if on then "Auto heal on: your spare Commons heal your team between fights." else "Auto heal off.",
+		{ AutoHeal = on }
 	)
 end
 
@@ -1262,6 +1370,7 @@ end
 local function left(player: Player)
 	despawn(player)
 	teams[player], lastSwitch[player], owedSince[player] = nil, nil, nil
+	healAt[player], toldEmpty[player] = nil, nil
 end
 
 function KaijuServer.start()
@@ -1272,6 +1381,7 @@ function KaijuServer.start()
 	Shop.register("KaijuTeam", setTeam)
 	Shop.register("KaijuActive", setActive)
 	Shop.register("KaijuInfuse", infuse)
+	Shop.register("KaijuAutoHeal", setAutoHeal)
 	Shop.register("KaijuRoll", rollRequest)
 	Shop.register("KaijuRollClaim", rollClaim)
 	Players.PlayerRemoving:Connect(left)
@@ -1286,6 +1396,10 @@ function KaijuServer.start()
 				local ok, err = pcall(upkeep, player, now)
 				if not ok then
 					warn("[Kaiju] upkeep:", err)
+				end
+				ok, err = pcall(autoHeal, player, now)
+				if not ok then
+					warn("[Kaiju] auto heal:", err)
 				end
 			end
 		end
@@ -1304,6 +1418,7 @@ end
 
 -- For tests.
 KaijuServer._upkeep, KaijuServer._think, KaijuServer._infuse = upkeep, think, infuse
+KaijuServer._autoHeal = autoHeal
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
 KaijuServer._despawn, KaijuServer._fair = despawn, fair
 KaijuServer._prepareRoll, KaijuServer._claimRoll = prepareRoll, claimRoll
