@@ -23,10 +23,12 @@
 	wild kaiju land anywhere from 60% to 140% (Spread), so a big hit can end
 	the tame; hit it with its own element (75%, ElementMatchup) to go gently.
 
-	Levels 1-30 from kills, from feeding it stones (feedExp): rarer stones
-	keep their worth as it grows, a stone of the element that beats it gives
-	half, one of its own element a quarter more; and from your mining, a
-	little for every rock you break with it out beside you (mineExp).
+	Levels 1-30 from kills and from your mining, a little for every rock
+	you break with it out beside you (mineExp). It never heals on its own:
+	its health is kept, out and home, until you infuse stones into it
+	(infusePlan), and one knocked out stays down until stones revive it, at
+	a far higher price (a stone of its own element worth double, one of the
+	element that beats it half). Stones never give EXP.
 
 	Pure data and logic, for the server, the client and tests.
 ]]
@@ -180,6 +182,14 @@ Kaiju.AbilityPlans = {
 -- 1): yours at your knee, a wild one near your height, the vein guardian
 -- over you.
 Kaiju.Scale = { Pet = 0.55, Wild = 0.9, Guardian = 1.2 }
+-- How big one stands next to you (1: a player), at a scale: a model is
+-- about four studs tall at 1 to your five. Its moves land that big (a pet's
+-- blast under half the size of yours: KaijuAbilities), and all it draws is
+-- drawn, sounds and shakes your screen that big (the client's FxSize).
+Kaiju.Height = 0.8
+function Kaiju.size(scale: number): number
+	return scale * Kaiju.Height
+end
 
 -- Your kaiju beside you: it takes on creatures within Engage studs of you,
 -- runs back past Leash, and is put back beside you past Teleport.
@@ -199,10 +209,10 @@ Kaiju.SlotLevels = { 1, 1, 1 }
 -- negative) and behind you.
 Kaiju.TeamSpots = { { 3, 5 }, { -3, 5 }, { 0, 8.5 } }
 
--- Knocked out in a fight: back in its Gemsoul, ready again after this long.
-Kaiju.KnockoutSeconds = 45
+-- Its health is kept (record.Health) and never comes back on its own.
+-- Knocked out in a fight (record.Down), it's back in its Gemsoul, down,
+-- until stones revive it (Kaiju.Infuse).
 Kaiju.RecallSeconds = 4 -- recalled: it stays out of the fight this long
-Kaiju.Regen = 0.03 -- share of its health back each second while it isn't fighting
 
 -- Wild kaiju in the Outpost.
 Kaiju.Wild = {
@@ -304,6 +314,7 @@ Kaiju.Bug = {
 	Coins = 2,
 	DailyCoins = 300,
 	Scale = 0.55,
+	Size = 0.55, -- next to you (its rig is your size at scale 1: Kaiju.size)
 	Leash = 120,
 	Draw = 30, -- studs: a kaiju out this close draws a critter onto itself (its prey's first)
 	-- In a fight (KaijuWilds): a bite comes after BiteWindup, then it hops
@@ -386,13 +397,21 @@ Kaiju.BugMoves = {
 	},
 }
 
--- Feeding: a stone's EXP by its rarity, in full until the kaiju passes
--- FeedFull, then half for ten levels, then a quarter.
-Kaiju.FeedExp = { Common = 20, Uncommon = 45, Rare = 100, UltraRare = 220, Legendary = 500 }
-Kaiju.FeedFull = { Common = 10, Uncommon = 15, Rare = 20, UltraRare = 25, Legendary = math.huge }
-Kaiju.FeedWeak = 0.5 -- a stone of the element that beats it
-Kaiju.FeedSame = 1.25 -- a stone of its own element
-Kaiju.FeedBatch = 25 -- stones it eats in one go
+-- Infusing (KaijuServer's "KaijuInfuse"): stones from your pouch mend a
+-- kaiju, never EXP. A stone's power by its rarity (Power), Same times for
+-- one of the kaiju's own element, Weak times for one of the element that
+-- beats it; each point of power mends Mend of its health. Knocked out, it
+-- takes Revive power at once (Base, and PerLevel more a level) to bring it
+-- back, at Revive.Health of its health; stones past that go on mending.
+-- Batch: stones it takes in one go.
+Kaiju.Infuse = {
+	Power = { Common = 1, Uncommon = 2, Rare = 4, UltraRare = 8, Legendary = 16 },
+	Same = 2,
+	Weak = 0.5,
+	Mend = 0.1,
+	Revive = { Base = 10, PerLevel = 1, Health = 0.5 },
+	Batch = 25,
+}
 
 -- Mining with it out: EXP for every rock you break, by the rock's size
 -- (Shared.Outpost.Sizes), so it levels while you mine (and fights the
@@ -403,13 +422,15 @@ function Kaiju.mineExp(size: string?): number
 end
 
 -- The starter roll: everyone starts with a team of StarterTeam kaiju,
--- rolled in the intro (or, for a player from before with fewer, the rest
--- rolled once in the Outpost): each a random kind in a random element, with
--- a Gemsoul rolled like a mined gem, never the same kind and element twice.
--- A roll left unclaimed is given anyway after RollGrace seconds in the
--- Outpost.
+-- rolled in the intro: each a random kind in a random element, with a
+-- Gemsoul rolled like a mined gem, never the same kind and element twice (or
+-- as one already yours); the ones rolled become your team. A player who
+-- took an older roll (RollVersion: one that only topped up kaiju from
+-- before) is owed one full roll of StarterTeam, once, in the Outpost. A
+-- roll left unclaimed is given anyway after RollGrace seconds there.
 Kaiju.StarterLevel = 1
 Kaiju.StarterTeam = 3
+Kaiju.RollVersion = 2
 Kaiju.RollGrace = 90
 
 -- The 1v1 kaiju arena (phase 2): every match is for keeps.
@@ -472,22 +493,79 @@ function Kaiju.killExp(level: number): number
 	return 40 + 12 * math.max(1, level)
 end
 
--- EXP a kaiju gets from eating a stone.
-function Kaiju.feedExp(gem, record): number
+-- Its health: { now, most } (record.Health is kept; never hurt, it's
+-- full; knocked out, none).
+function Kaiju.health(record): (number, number)
+	local stats = record and Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier)
+	local most = if stats then stats.Health else 1
+	if not record or record.Down then
+		return 0, most
+	end
+	return math.clamp(tonumber(record.Health) or most, 0, most), most
+end
+
+-- A stone's power infused into a kaiju (Kaiju.Infuse).
+function Kaiju.infusePower(gem, record): number
 	if type(gem) ~= "table" or not record then
 		return 0
 	end
-	local base = Kaiju.FeedExp[gem.Tier] or Kaiju.FeedExp.Common
-	local full = Kaiju.FeedFull[gem.Tier] or Kaiju.FeedFull.Common
-	local level = record.Level or 1
-	local falloff = if level <= full then 1 elseif level <= full + 10 then 0.5 else 0.25
-	local element = 1
-	if gem.Element == ElementMatchup.weakTo(record.Element) then
-		element = Kaiju.FeedWeak
-	elseif gem.Element == record.Element then
-		element = Kaiju.FeedSame
+	local infuse = Kaiju.Infuse
+	local power = infuse.Power[gem.Tier] or infuse.Power.Common
+	if gem.Element == record.Element then
+		power *= infuse.Same
+	elseif gem.Element == ElementMatchup.weakTo(record.Element) then
+		power *= infuse.Weak
 	end
-	return math.floor(base * falloff * element)
+	return power
+end
+
+-- The power that brings one knocked out back.
+function Kaiju.reviveCost(record): number
+	local revive = Kaiju.Infuse.Revive
+	return revive.Base + revive.PerLevel * math.max(1, record and record.Level or 1)
+end
+
+-- What infusing `gems` (in the order given) into a kaiju does: only the
+-- stones it needs are used. Down, it needs its revive cost all at once (or
+-- nothing is used, and Short says how much more power it lacks); then
+-- back at Revive.Health, the rest of the power mending. Up, stones mend it
+-- until it's full. { Used = { gem }, Power, Revived, Health, Most, Short }.
+function Kaiju.infusePlan(record, gems: { any })
+	local health, most = Kaiju.health(record)
+	local mend = most * Kaiju.Infuse.Mend
+	local plan = { Used = {}, Power = 0, Revived = false, Health = health, Most = most, Short = 0 }
+	local start = 1
+	if record and record.Down then
+		local need, have, upTo = Kaiju.reviveCost(record), 0, nil
+		for i, gem in gems do
+			have += Kaiju.infusePower(gem, record)
+			if have >= need then
+				upTo = i
+				break
+			end
+		end
+		if not upTo then
+			plan.Short = need - have
+			return plan
+		end
+		for i = 1, upTo do
+			table.insert(plan.Used, gems[i])
+		end
+		plan.Power, plan.Revived = have, true
+		health = most * Kaiju.Infuse.Revive.Health + (have - need) * mend
+		start = upTo + 1
+	end
+	for i = start, #gems do
+		if health >= most then
+			break
+		end
+		local power = Kaiju.infusePower(gems[i], record)
+		table.insert(plan.Used, gems[i])
+		plan.Power += power
+		health += power * mend
+	end
+	plan.Health = math.min(most, health)
+	return plan
 end
 
 -- The chance a tame works with the wild kaiju at this health.
@@ -698,7 +776,8 @@ end
 -- Your team out, as ids in order (the first is its lead): kaiju you own,
 -- each once, as many as your slots, the ones you put out (roster.Team, else
 -- the one out from before) first; empty slots fill with your best others
--- (highest level, then oldest).
+-- (on their feet, highest level, then oldest). One of the team knocked out
+-- keeps its place (it's down, not out) until you revive or replace it.
 function Kaiju.teamIds(roster): { string }
 	local out, seen = {}, {}
 	if not roster or type(roster.List) ~= "table" then
@@ -723,6 +802,9 @@ function Kaiju.teamIds(roster): { string }
 	end
 	table.sort(rest, function(a, b)
 		local ra, rb = roster.List[a], roster.List[b]
+		if (ra.Down == true) ~= (rb.Down == true) then
+			return not ra.Down -- (one knocked out fills a place last)
+		end
 		if (ra.Level or 1) ~= (rb.Level or 1) then
 			return (ra.Level or 1) > (rb.Level or 1)
 		end
@@ -760,12 +842,14 @@ function Kaiju.active(roster)
 	return if id then roster.List[id] else nil
 end
 
--- How many starter kaiju a profile still has to roll (Kaiju.StarterTeam).
+-- How many starter kaiju a profile still has to roll: a full StarterTeam
+-- until it's taken this version's roll (RollVersion), as many as it has
+-- room for.
 function Kaiju.rollsOwed(profile): number
-	if not profile or profile.KaijuRolled then
+	if not profile or profile.KaijuRolled == Kaiju.RollVersion then
 		return 0
 	end
-	return math.max(0, Kaiju.StarterTeam - Kaiju.count(profile.Kaiju))
+	return math.max(0, math.min(Kaiju.StarterTeam, Kaiju.MaxOwned - Kaiju.count(profile.Kaiju)))
 end
 
 -- Kinds and elements for `count` starter rolls: none the same as another or

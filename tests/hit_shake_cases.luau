@@ -11,6 +11,11 @@ local CFrame = { Angles = rotation }
 local original = rotation(0,0,0)
 local workspace = { CurrentCamera = { CFrame = original } }
 local CombatFx = {}
+-- The size of whatever's drawing (Modules/FxSize): 1, a player's.
+local FxSize = { Size = 1 }
+function FxSize.get()
+	return FxSize.Size
+end
 local checks = 0
 local function check(ok, message) checks+=1; assert(ok,message) end
 local function frame(dt)
@@ -58,4 +63,16 @@ frame(0)
 check(workspace.CurrentCamera.CFrame.X == heavy, "Repeated hit stacked camera offsets")
 frame(0.3)
 check(workspace.CurrentCamera.CFrame == original and next(callbacks)==nil, "Repeated hits never settled")
+-- A creature's (FxSize: a kaiju's, a critter's) shakes by its size squared:
+-- a half-size one's heavy blow a quarter as hard as yours.
+FxSize.Size = 0.5
+CombatFx.hitShake(true, true)
+FxSize.Size = 1
+frame(0)
+check(
+	math.abs(workspace.CurrentCamera.CFrame.X - heavy / 4) < 1e-9,
+	"A half-size creature's shake wasn't a quarter of a player's"
+)
+frame(0.3)
+check(workspace.CurrentCamera.CFrame == original and next(callbacks) == nil, "A creature's shake never settled")
 print("PASS: " .. checks .. " sword-hit camera checks")

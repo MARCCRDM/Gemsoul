@@ -358,9 +358,25 @@ local services = {
 		Heartbeat = signal(heartbeat), RenderStepped = signal(heartbeat), Stepped = signal(heartbeat),
 		BindToRenderStep = function() end, UnbindFromRenderStep = function() end, IsClient = function() return true end,
 	},
-	Players = setmetatable({ LocalPlayer = localPlayer, GetPlayers = function() return { localPlayer } end,
-		PlayerAdded = signal({}) }, { __index = function(_, k) return game:GetService("Players")[k] end }),
-	PhysicsService = { IsCollisionGroupRegistered = function() return true end },
+	Players = setmetatable({
+		LocalPlayer = localPlayer,
+		GetPlayers = function()
+			return { localPlayer }
+		end,
+		GetPlayerFromCharacter = function(_, model)
+			return if model and model == localPlayer.Character then localPlayer else nil
+		end,
+		PlayerAdded = signal({}),
+	}, {
+		__index = function(_, k)
+			return game:GetService("Players")[k]
+		end,
+	}),
+	PhysicsService = {
+		IsCollisionGroupRegistered = function()
+			return true
+		end,
+	},
 	CollectionService = {
 		-- (Prismatic parts take their own colour, as the shimmer gives them.)
 		AddTag = function(_, instance, tag)
@@ -724,6 +740,84 @@ for name, rows in MOVES do
 		end,
 	}
 end
+
+-- A kaiju's move at its size (FxSize, as the server's "Sized" sends it):
+-- each move as you cast it, then as a pet kaiju (knee high, Kaiju.size of
+-- its scale) does, its area shrunk by the server as KaijuAbilities does.
+-- The largest camera shake each one asks for is printed.
+local FxSize = requireScript(client.Modules.FxSize)
+local Kaiju = requireScript(shared.Kaiju)
+local PET = Kaiju.size(Kaiju.Scale.Pet)
+local shook = 0
+local shake = CombatFx.shake
+CombatFx.shake = function(strength, seconds)
+	local k = FxSize.get()
+	shook = math.max(shook, strength * k * k)
+	shake(strength, seconds)
+end
+local function stand(size)
+	-- A stand-in for the kaiju casting it, as tall as it stands.
+	local body = Instance.new("Part")
+	body.Name = "Kaiju"
+	body.Anchored = true
+	body.Size = V3.new(1.4, 4, 2.2) * size
+	body.Color = C3.fromRGB(60, 64, 80)
+	body.Material = roblox.Enum.Material.Metal
+	body.CFrame = CF.new(0, 2 * size, 0)
+	body.Position = body.CFrame.Position
+	body.Parent = workspace
+end
+local SIZED = {
+	{
+		"Supernova (you)",
+		1,
+		function(k)
+			show("Supernova", V3.new(0, 4.5, -1), foeAt, 10 * k)
+		end,
+	},
+	{
+		"Supernova (pet kaiju)",
+		PET,
+		function(k)
+			show("Supernova", V3.new(0, 2, -1), V3.new(0, 1, -8), 10 * k)
+		end,
+	},
+	{
+		"Toxic Tide (you)",
+		1,
+		function(k)
+			show("ToxicTide", meAt, V3.new(0, 3, -24 * k), 1.2, 8 * k)
+		end,
+	},
+	{
+		"Toxic Tide (pet kaiju)",
+		PET,
+		function(k)
+			show("ToxicTide", V3.new(0, 1, 0), V3.new(0, 1, -24 * k), 1.2, 8 * k)
+		end,
+	},
+}
+local sizedRows, sizedBy = {}, {}
+for _, row in SIZED do
+	table.insert(sizedRows, row[1])
+	sizedBy[row[1]] = row
+end
+scenarios.Sized = {
+	Frames = { 0.1, 0.25, 0.45, 0.7, 1.1 },
+	Rows = sizedRows,
+	Run = function(label, me)
+		local row = sizedBy[label]
+		shook = 0
+		if row[2] ~= 1 then
+			me.Parent = nil
+			stand(row[2])
+		end
+		FxSize.run(row[2], row[3], row[2])
+		fakeTask.delay(1.1, function()
+			print(string.format("Sized  %-24s shake %.3f", label, shook))
+		end)
+	end,
+}
 
 -- Pickaxe skins (Shared.PickaxeLooks): each one swung down through an arc,
 -- side on, its particles drifting and its trail streaking through the swing.

@@ -146,6 +146,36 @@ brainrot body, so the caps are kept low; see [Performance](#performance).)
 No rifts open round you while you're sparring, knocked down, or in a fight,
 a dungeon or an expedition.
 
+### Stirred up: the longer you mine, the harder it gets
+
+![The row under the noise ring: calm (none), restless, stirred up, swarming (with Rift Charged under it)](frontier/stirred.png)
+
+Mining out there stirs the frontier up, and it pushes back harder the
+longer you keep at it (`Frontier.Disturbance`). Every swing past the core
+stirs it a little (full after about 400 swings in the Fringe, 250 at the
+Edge: six or four minutes of steady mining). It holds while you keep
+mining, even through a short walk between rocks; after 20 seconds without
+a swing it settles, over two minutes from full, and back in the core in
+half a minute.
+
+| Stirred | Shown | Encounters | Critters per encounter | At once round you | Their level |
+| --- | --- | --- | --- | --- | --- |
+| 0–25% | nothing | as above | as above | 2 / 3 | as below |
+| 25–50% | RESTLESS (gold) | up to half again as often | as above | 2 / 3 | +1 |
+| 50–80% | STIRRED UP (orange) | up to 80% more often | one more | 3 / 4 | +2 to +3 |
+| 80–100% | SWARMING (red) | up to twice as often | two more | 4 / 5 | +3 to +4 |
+
+(At once: the Fringe / the Edge. Each swing's noise is 1 + the stir times
+as loud; a critter comes up to 4 levels higher at full, a share of that on
+the way.) So a long session at the Edge ends with four or five level 13–17
+critters at a time instead of two or three level 9–13s, and they pay more
+EXP for it. The Outpost's cap of twelve still holds, shared fairly. A row
+under the noise ring names the stage with a bar that warms from gold to red,
+and you're told as it gets to each stage (once, until it's well settled
+again): "The frontier is restless: critters come sooner.", "...stirred up:
+more critters, and tougher.", "...swarming! Head back to the core to let it
+settle." A wandering rift opened near you comes stirred up the same way.
+
 ### Wandering rifts
 
 Every 40 to 80 seconds the frontier tears open by itself, 35 to 70 studs from
@@ -246,16 +276,16 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 
 | Where | What |
 | --- | --- |
-| `Shared.Frontier` | The rules: bands, colours and luck, the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), the guarded one and its guardian (`Veins.Guarded`, `Guardian`), pressure, how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
+| `Shared.Frontier` | The rules: bands, colours and luck, the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), the guarded one and its guardian (`Veins.Guarded`, `Guardian`), pressure, stirring it up (`Disturbance`, `stir`, `settle`, `stage`, `capFor`), how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
 | `Shared.Outpost` | The Fringe, Edge, Vein and Guarded zones (the same rock mix, more luck) |
 | `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and beam (`veinMarks`, the guarded one's red); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
 | `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot, except a vein's; moves a vein when it's mined out or its time comes (`moveVein`, `onVeinMoved`, and `VeinNews` on `workspace`); a swing at a vein's rock (`onVeinSwing`); every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
-| `FrontierServer` | Each player's band (`FrontierBand`) and noise (`FrontierNoise`), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`, and move with their veins: `moveScar`) |
+| `FrontierServer` | Each player's band (`FrontierBand`), noise (`FrontierNoise`) and how stirred up (`FrontierStir`; told as it gets to each stage), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`, and move with their veins: `moveScar`) |
 | `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk`; the vein guardian (`veinSwing`, `veinMoved`) |
 | `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
-| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, the noise ring, arrows to rifts off screen and to the nearest wild kaiju (`nearest`), the Rift Charged tag |
+| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, the noise ring, arrows to rifts off screen and to the nearest wild kaiju (`nearest`), the stirred-up row under the noise ring (`stirRow`), the Rift Charged tag |
 | `OutpostScene` (client) | The band and luck on a rock's label; the mine button bonks a critter close by |
 
 Tests: `tests/run_frontier.py` checks the rules (bands and zones, the luck
@@ -263,13 +293,18 @@ going up band by band on the same rock mix, the outcrops (none on top of
 each other, on their grain, bigger further out, inside the frontier, the
 lone rocks and the stepping stones out of the core; the rich ground), the
 vein sites and their rocks, picking a vein's next site, the compass, the
-guarded vein's luck and its guardian's numbers, mining noise, fair
-shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
-lopsided, the pieces each tear is drawn from, the banners, the noise ring,
+guarded vein's luck and its guardian's numbers, mining noise, stirring
+it up (how fast it builds and settles, the core settling it faster, the
+stages, louder swings, more critters per encounter and allowed at once,
+higher levels, never in the core), fair shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
+lopsided, the pieces each tear is drawn from, the banners, the noise ring and its stirred-up row,
 the nearest wild kaiju for its arrow
 and the arrows). `tests/run_kaiju.py` runs the server side: who rifts open
-round, swings drawing them, the warning, the caps, edge levels, a pilot's
-strikes, a critter hopping out at its prey (a miner too), giving up and
+round, swings drawing them, the warning, the caps, edge levels, stirring
+it up (swings building it and the HUD told, being told once as it gets
+restless, a short pause not settling it, a swarming encounter bringing more
+critters past the calm cap at higher levels, settling once you stop and
+faster in the core), a pilot's strikes, a critter hopping out at its prey (a miner too), giving up and
 slipping back, a stray leaving, wandering rifts roaming and Rift Charged,
 the pay, the bonk, rifts opening round a container stack rather than on
 it, and the vein guardian; and builds every moon bug (`tests/moon_bug_cases.luau`:

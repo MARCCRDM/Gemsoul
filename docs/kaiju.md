@@ -97,7 +97,25 @@ heavy, a cast, a raised guard, an opening after a blow, a foe standing idle.
 
 Distances are scaled: the brain thinks in the rival's studs, a kaiju's
 reach is its kind's at its size (a kaiju of yours is 0.55 the size of the
-model, a wild one 0.75), and its steps, hops and pounces shrink to match.
+model, a wild one 0.9), and its steps, hops and pounces shrink to match.
+
+### Sized to them
+
+![The same move at your size and at your kaiju's](kaiju/sized-effects.png)
+
+A creature's moves and everything they draw are its size, not yours
+(`Kaiju.size`: next to you, at 1, your kaiju stands 0.44, a wild one 0.72,
+the vein guardian 0.96, a critter 0.55). A move a kaiju casts lands that
+big: its Supernova bursts round it in under half the circle yours does, its
+Toxic Tide runs under half as far, and the warning rings round its heavies
+match. On your screen the server tags each creature's effect with its size
+(`"Sized"`), and the client draws it at that size (`FxSize`): bursts,
+flashes, particles, slashes, auras, shields, its death, the sound (quieter,
+a touch higher) and the camera shake, which goes with the size squared, so
+a knee-high kaiju's slam barely nudges your screen. A creature's shakes
+also fade with distance (`CombatFx.shakeNear`): a death or a shield breaking
+across the quarry doesn't shake you at all (it used to, anywhere within 140
+studs). Your own moves and other players' are unchanged.
 
 ## Your team
 
@@ -110,20 +128,28 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **The starter roll.** Everyone starts with three kaiju, rolled like the
   gems in the intro: right after the move reveal, three cards spin through
   kaiju of every kind and element and land, one after another, on yours
-  (a random kind in a random element, never the same pair twice, each with
-  a Gemsoul rolled like a mined gem). Each card then shows its Gemsoul's
-  rarity, what kind it is, and its moves: E ready now, Q at level 5, R at
-  10. MEET YOUR TEAM brings them out (on its own after 20 seconds). The
-  server makes the roll once and keeps it till it's claimed, so leaving
-  doesn't reroll it. A player from before with fewer than three gets the
-  rest rolled the same way, once, the next time they're in the Outpost; a
-  roll left unclaimed is given anyway after 90 seconds there.
+  (a random kind in a random element, never the same pair twice, nor one
+  you have already, each with a Gemsoul rolled like a mined gem). Each card
+  stands its kaiju in a spotlight in its element's colour, with its
+  Gemsoul's rarity, its kind and level, health, damage and speed as bars,
+  and its moves with their icons: E ready now, Q at level 5, R at 10. MEET
+  YOUR TEAM brings them out (on its own after 20 seconds), and **the three
+  rolled are your team**. The server makes the roll once and keeps it till
+  it's claimed, so leaving doesn't reroll it; a roll left unclaimed is given
+  anyway after 90 seconds in the Outpost.
+- **Everyone gets the full three, once** (`Kaiju.RollVersion`). The first
+  roll only topped a player up to three, so someone with a kaiju already
+  (the old first-visit starter) saw two cards; anyone who took that roll is
+  owed one full roll of three the next time they're in the Outpost (room
+  permitting: 12 kept at most). A beta player can end up with six: the three
+  new ones go out, the old ones wait at home.
 - **Your team** is the three out, in order: the first leads (the one a
   wild kaiju sees first, and the one some old screens show). Empty places
   fill on their own with your best at home (highest level, then oldest),
   so a knocked-out kaiju's place stays its own and the team is always full.
   Each walks in its own place round you: one to your right, one to your
-  left, one behind.
+  left, one behind. One that's down keeps its place (down) until it's
+  revived; a place fills from home only when a kaiju leaves the team.
 - **They fight on their own, as a team.** They take on any moon bug within
   28 studs of you, and share them out (see
   [Fighting as a team](#fighting-as-a-team)). They only fight a wild kaiju
@@ -134,9 +160,12 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **Recall.** Calls all of them back to you; they stay out of the fight for
   4 seconds. Use it when one's about to die, or about to kill a kaiju you
   want to tame.
-- **Knocked out.** That one goes back into its Gemsoul and is ready again
-  after 45 seconds; the others fight on.
-- **Out of a fight** they heal 3% of their health a second.
+- **They don't heal on their own.** A kaiju keeps the health it ends a fight
+  with, out or at home, across sessions; stones mend it (see
+  [Infusing](#infusing)).
+- **Knocked out**, it goes back into its Gemsoul and stays down (`Down`):
+  it doesn't come back by itself. Stones revive it, and it costs far more
+  than mending (see [Infusing](#infusing)). The others fight on.
 - **Changing the team** (the panel): LEAD puts one at the front; SEND OUT
   puts one from home in place of one of the team. Not one that's fought in
   the last 3 seconds, and not twice in a moment.
@@ -188,8 +217,8 @@ On a computer the strip sits at the bottom left, TAME above it:
 - **The team strip:** a tile for each of your team, the lead first (edged in
   gold): its portrait, level and health, and three dots down its right edge
   for Q, E and R, lit when the move is ready, faint while it recharges and
-  hollow while it's still asleep. Knocked out, its tile says when it's back
-  (KO 32s). On a computer it sits at the bottom left; on a phone under your
+  hollow while it's still asleep. Knocked out, its tile is veiled and says
+  DOWN until you revive it. On a computer it sits at the bottom left; on a phone under your
   level and coins, and at the top right while you hunt. Tap a tile for the
   kaiju panel on that kaiju.
   - **RECALL** brings them all back to you.
@@ -199,13 +228,16 @@ On a computer the strip sits at the bottom left, TAME above it:
   health: the chance right now and the tries left. It starts the taming
   cast (see Taming), and hides while the cast is under way.
 - **The kaiju panel:** on the left every kaiju you have: YOUR TEAM (numbered,
-  1 leads; health, EXP, KO and when it's back) and AT HOME. Pick one for it
+  1 leads; health, EXP, and DOWN: REVIVE IT on one knocked out) and AT HOME
+  (their health too: it doesn't come back at home either). Pick one for it
   in full on the right: its portrait, kind, level, its Gemsoul's rarity,
   health, damage and speed, its EXP, and its E, Q and R with what each does
-  (READY, or WAKES AT LV 5 / 10). Under that, what you can do: **LEAD** (one
-  of the team to the front), **SEND OUT** (one from home: then pick which of
-  the team it goes out in place of) and **FEED**: tick stones from your
-  pouch for that kaiju, each showing the EXP it gives it.
+  (READY, or WAKES AT LV 5 / 10, each with its icon and key). Under that,
+  what you can do: **LEAD** (one of the team to the front), **SEND OUT** (one
+  from home: then pick which of the team it goes out in place of) and
+  **INFUSE** (**REVIVE** on one that's down), which opens its INFUSE tab:
+  tick stones from your pouch, each showing what it gives (+20% HEALTH, or
+  2 POWER toward a revive), and the footer says where that leaves it.
 - **The Gem Vault** shows a Gemsoul's branches as the moves a kaiju casts,
   with KAIJU LV 5 by Q and KAIJU LV 10 by R.
 
@@ -414,27 +446,41 @@ it a little EXP, by the rock's size (`Kaiju.MineExp`: a Regolith Chunk 5, a
 Crystal Boulder 8, a Monolith 12, a Geode 20). It also fights the critters
 your swings bring out past the core, which gives more. A full free charge
 (600 swings, about 130 rocks) is worth about 800 EXP from the rocks alone,
-a few levels for a young kaiju, before the critters and before feeding it
-the Commons you mined. A kaiju that's down, or left at home, earns nothing
+a few levels for a young kaiju, before the critters. A kaiju that's down, or left at home, earns nothing
 (`KaijuServer.mined`, from `OutpostServer.onRockMined`).
 
-## Feeding
+## Infusing
 
-A kaiju eats stones for EXP, up to 25 at a time (`Kaiju.FeedBatch`). Mining
-pays mostly Commons, so `PICK COMMONS` in its feed tab picks 25 spare ones
-(loose, and not named by a saved loadout) in one tap:
+![Reviving a kaiju that's down, and mending a hurt one](kaiju/infuse.png)
 
-| Stone | EXP | In full until level |
-| --- | --- | --- |
-| Common | 20 | 10 |
-| Uncommon | 45 | 15 |
-| Rare | 100 | 20 |
-| Ultra Rare | 220 | 25 |
-| Legendary | 500 | always |
+Stones from your pouch are what keep a kaiju going: they mend it, or bring
+it back once it's down. They never give EXP (a kaiju grows by fighting
+beside you and as you mine). Up to 25 at a time (`Kaiju.Infuse`), only loose
+stones in your pouch (none socketed in your gear), never a Gemsoul.
 
-Past that level a stone gives half for ten levels, then a quarter, so a
-common stone means little to a high-level kaiju. A stone of the element that
-beats it gives half again; one of its own element gives a quarter more.
+A stone's **power** is its rarity's, and its element matters:
+
+| Stone | Power | Its own element (×2) | The element that beats it (×½) |
+| --- | --- | --- | --- |
+| Common | 1 | 2 | 0.5 |
+| Uncommon | 2 | 4 | 1 |
+| Rare | 4 | 8 | 2 |
+| Ultra Rare | 8 | 16 | 4 |
+| Legendary | 16 | 32 | 8 |
+
+- **Mending** a hurt kaiju: each point of power mends 10% of its health.
+  A Common of its own element is 20%.
+- **Reviving** one that's down takes 10 power plus 1 a level, all at once
+  (a level-11 kaiju needs 21: eleven Commons of its own element, where
+  mending it from a sliver back to full is 10), and it comes back at half
+  health; stones past that go on mending
+  it. Too little power and nothing is spent: the footer says how much more
+  it needs.
+- **PICK FOR ME** ticks the cheapest stones that do the job (Commons first;
+  within a rarity its own element's first, the element that beats it last),
+  only as many as it needs, and never a Legendary or one a saved loadout
+  names. The server takes only the stones it uses, and checks every one
+  is yours and loose (`KaijuServer.infuse`, `Kaiju.infusePlan`).
 
 ## The arena (phase 2)
 
@@ -452,7 +498,7 @@ Proposed guardrails:
 
 1. **Phase 1 (in the game now):** three kaiju out at once (the beta opens
    all three slots) from the starter roll, wild kaiju, taming, moon bugs,
-   feeding, recall, hunting.
+   infusing, recall, hunting.
 2. **Phase 2:** slots opening with level (10, then 20), and the arena.
 
 `Config.Features.Kaiju` turns all of it off.
@@ -461,7 +507,7 @@ Proposed guardrails:
 
 | Where | What |
 | --- | --- |
-| `Shared.Kaiju` | The rules: kinds, stats, EXP, feeding, taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
+| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), infusing (`Infuse`, `infusePower`, `reviveCost`, `infusePlan`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
 | `Shared.Squad` | Fighting as a side: sharing out foes (`assign`, `cost`), places round a shared foe (`slots`, `toward`), keeping clear (`apart`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
 | `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
@@ -469,14 +515,15 @@ Proposed guardrails:
 | `Shared.GemTraits` | The moves a Gemsoul rolls (`SoulMoves`); an old one's seeded into them (`traitsOf`) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow and its R when hard pressed (`setMoves` after a level), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
-| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, knockout (`KaijuDown_<id>` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), feeding any of yours (`KaijuFeed`), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
+| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till revived: `Down` on the record, `KaijuDown_<id>` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), infusing any of yours (`KaijuInfuse`), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
 | `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model; a pack shares its foes), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, sharing out your kaiju, how they fight (bites, hops, dodges, their moves, bombs), slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
-| `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look; its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
+| `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look, all at its caster's size (`Size`; effects sent `"Sized"`); its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
 | `SparServer` | `Hunt`: the kit out alone |
 | `KaijuHud` (client) | The team strip, RECALL, HUNT, TAME, a wild kaiju's Challenge, the kaiju panel, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen: in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
 | `KaijuTaming` (client) | The gold glow and READY TO TAME on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
+| `FxSize` (client) | How big the effect being drawn is: a creature's size, held while its effect draws (`run`), kept through its delays and frame loops (`keep`); `CombatFx`, `CombatSound`, `CombatVfx`, `MoveVfx`, `TriadVfx` and `ElementalDeath` draw at it |
 | `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk, their fight poses and their moods (`KaijuMood`: `CreatureMotion.Moods`) |
 
 Tests: `tests/run_kaiju.py` checks the rules (your team's order, filling
@@ -486,10 +533,15 @@ kind's style, guard, parry, breaks, hops, reads, the brain's choices),
 builds every kind in every element (joints, feet on the ground, part
 budget, motions, every fight pose), and runs the server against stand-ins:
 the starter roll (three, the same when asked again, nothing out before the
-claim, three out in their places after, never twice, and given anyway after
-a while in the Outpost), your team (three out, one knocked out leaving the
+claim, the three rolled out as the team after, never twice, given anyway
+after a while in the Outpost, and a player who took the old top-up roll
+owed a full three once), every creature effect sent at its size (a pet's,
+a wild one's, a critter's), your team (three out, one knocked out leaving the
 others, recall and EXP for all of them, LEAD, SEND OUT, the checks on a new
-team, feeding one at home), fighting as a team (3 on 3 one each, 3 on 1 all
+team, a knocked-out one staying down and in its place, health kept with no
+healing on its own, infusing (mending, a revive's cost by level, its own
+element's stones counting double, nothing spent short of a revive, only
+loose stones, never a socketed one), fighting as a team (3 on 3 one each, 3 on 1 all
 in from three sides, 2 on 3 one each and the collapse when one falls, 2 on 10
 never doubled up with the critters five and five, two on one spot pushed
 apart; a critter's bite winding up and hopping back out, its hop clear of a
@@ -501,7 +553,7 @@ burst too), your kaiju's moves follow its level, its Q goes off in place of
 a blow and waits its turn, its R goes up when it's hard pressed (not
 before), a shell soaks blows till it breaks and a ward takes its share, on
 your kaiju and a wild one, your kaiju comes out, fights with wind-ups,
-is hurt by element, knocked out and back, recalled, switched and fed, wild
+is hurt by element, knocked out and revived, recalled, switched, wild
 kaiju take the spread and pick their foes. A wild kaiju leaves a miner, a
 hunter and your kaiju alone till someone challenges or hits it, and forgets
 them once home; your kaiju (and its E) leaves it be till then. Heavies break
@@ -533,6 +585,10 @@ the Edge drawing critters while the wild kaiju roam and their lifetimes run
 out; no brain errors, the critters within their caps, never a moment
 without wild kaiju (the old fixed lifetimes left the quarry empty for 90
 seconds every ten minutes), and nothing piling up.
+`tests/run_fx_size.py` checks the client's effect size (held while an
+effect draws, kept through its delays and frame loops, never lent to
+another effect, clamped, a body's size by its height), and
+`tests/run_hit_shake.py` a quarter-size kaiju's shake.
 The rules also check every Gemsoul's three moves (a kaiju's own, waking at
 5 and 10), every move's plan, an old Gemsoul's seeded Q and R, and each
 key's power. `tests/kaiju_models_cases.luau` checks each mood's pose (a held kaiju

@@ -18,12 +18,13 @@ end}
 local SoundService={}
 local Debris={AddItem=function() end}
 local GemConfig={ElementColors={}}
+local FxSize={get=function() return 1 end}
 local workspace={Terrain={}}
 local Enum={RollOffMode={InverseTapered=1}}
 local game={GetService=function(_,name) return ({SoundService=SoundService,Debris=Debris,ReplicatedStorage={}})[name] end}
 '''
 def module(path,name):
- s=(root/path).read_text(encoding='utf-8');s=re.sub(r'^local GemConfig = require[^\n]+\n','',s,flags=re.M)
+ s=(root/path).read_text(encoding='utf-8');s=re.sub(r'^local (GemConfig|FxSize) = require[^\n]+\n','',s,flags=re.M)
  return '\nlocal '+name+'=(function()\n'+s+'\nend)()\n'
 code=setup+module('src/client/Modules/CombatSound.luau','CombatSound')+module('src/client/Modules/LotterySound.luau','LotterySound')+'''
 local function sounds() local t={} for _,v in made do if v.Kind=="Sound" then table.insert(t,v) end end return t end

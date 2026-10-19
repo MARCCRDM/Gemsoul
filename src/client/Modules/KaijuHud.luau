@@ -5,7 +5,8 @@
 	  The team strip  your team out, a tile each, the lead first (edged in
 	                  gold): its portrait (the model itself), level, health,
 	                  and dots for its Q, E and R, lit when ready (hollow
-	                  while asleep); knocked out, when it's back. RECALL (all
+	                  while asleep); knocked out, DOWN (tap it to revive it
+	                  with stones: it stays down till you do). RECALL (all
 	                  of them back to you for a moment) and HUNT (your kit out
 	                  to fight beside them; 1 or HUNT again puts it away).
 	                  Tap a tile for the panel on that kaiju. Computer:
@@ -24,15 +25,20 @@
 	                  picked in full (stats, its Gemsoul's rarity, its moves
 	                  and when Q and R wake) and what you can do with it:
 	                  LEAD (to the front), SEND OUT (one from home, in place
-	                  of one of the team you pick), FEED: stones from your
-	                  pouch with the EXP each gives it (Shared.Kaiju.feedExp).
+	                  of one of the team you pick), INFUSE: loose stones
+	                  from your pouch mend it (it never heals on its own),
+	                  or REVIVE it when it's down, at its revive cost, each
+	                  stone's power shown (Shared.Kaiju.infusePlan: its own
+	                  element double, its weakness half; never EXP). PICK
+	                  FOR ME picks the cheapest stones that do it.
 	  The roll        a player still owed starter kaiju (from before the
 	                  roll, say) gets the roll here, once (KaijuRoll).
 	  Wild nameplates the server's health bar over wild kaiju and moon bugs
 	                  while you aren't hunting (FoeBars draws them while you are).
 
 	  KaijuHud.start()     once, from Lobby.client
-	  KaijuHud.open(id?)   the panel, on kaiju `id` (else your lead)
+	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
+	                       on "Details" or "Infuse"
 ]]
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -54,6 +60,7 @@ local ChatFeed = require(script.Parent.ChatFeed)
 local LoadingFlow = require(script.Parent.LoadingFlow)
 local MobileLayout = require(script.Parent.MobileLayout)
 local OutpostScene = require(script.Parent.OutpostScene)
+local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
@@ -175,15 +182,35 @@ local function petModels(): { [string]: Model }
 	return out
 end
 
--- Seconds till a knocked-out kaiju is back (0 if it isn't down).
-local function downFor(id: string): number
-	local back = player:GetAttribute("KaijuDown_" .. id)
-	return if type(back) == "number" then math.max(0, back - workspace:GetServerTimeNow()) else 0
+-- Its health, 0 to 1: the body's while it's out, its kept health at home
+-- (it never heals on its own), none while it's down.
+local function healthShare(record, model: Model?): number
+	if record and record.Down then
+		return 0
+	end
+	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		return math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
+	end
+	if not record then
+		return 1
+	end
+	local now, most = Kaiju.health(record)
+	return math.clamp(now / math.max(1, most), 0, 1)
 end
 
-local function healthShare(model: Model?): number
+-- Its record with its health as it is right now: the body's while it's
+-- out (the record you're sent catches up only now and then), else kept.
+local function liveRecord(record)
+	local model = record and not record.Down and petModels()[record.Id]
 	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
-	return if humanoid then math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1) else 1
+	if not humanoid then
+		return record
+	end
+	local live = table.clone(record)
+	local _, most = Kaiju.health(record)
+	live.Health = most * math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
+	return live
 end
 
 local function expShare(level: number, exp: number): number
@@ -246,7 +273,7 @@ for slot = 1, #Kaiju.SlotLevels do
 	healthBack.AnchorPoint = Vector2.new(0, 1)
 	healthBack.Position, healthBack.Size = UDim2.new(0, 4, 1, -4), UDim2.new(1, -8, 0, 4)
 	healthBack.ZIndex, healthFill.ZIndex = 3, 3
-	-- Knocked out: a veil with when it's back.
+	-- Knocked out: a veil, DOWN, till stones revive it.
 	local veil = new("Frame", {
 		BackgroundColor3 = INK,
 		BackgroundTransparency = 0.15,
@@ -272,7 +299,9 @@ for slot = 1, #Kaiju.SlotLevels do
 	}
 	tiles[slot] = tile
 	button.Activated:Connect(function()
-		KaijuHud.open(tile.Id)
+		local data = roster()
+		local record = data and tile.Id and data.List[tile.Id]
+		KaijuHud.open(tile.Id, if record and record.Down then "Infuse" else nil)
 	end)
 end
 
@@ -355,7 +384,7 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 	tile.Edge.Thickness = if lead then 2 else 1.5
 	local level = (model and model:GetAttribute("KaijuLevel")) or record.Level
 	tile.Level.Text = string.format("Lv %d", level)
-	local share = healthShare(model)
+	local share = healthShare(record, model)
 	tile.HealthFill.Size = UDim2.fromScale(share, 1)
 	tile.HealthFill.BackgroundColor3 = if share < 0.3 then P.Bad else HEALTH
 	-- Q, E and R: lit when ready, faint while recharging, hollow asleep.
@@ -368,10 +397,9 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 		dot.Frame.BackgroundTransparency = if ready then 0 elseif awake then 0.65 else 1
 		dot.Stroke.Transparency = if awake then 0 else 0.45
 	end
-	local wait = downFor(record.Id)
-	tile.Veil.Visible = wait > 0
-	if wait > 0 then
-		tile.VeilText.Text = string.format("KO %ds", math.ceil(wait))
+	tile.Veil.Visible = record.Down == true
+	if record.Down then
+		tile.VeilText.Text = "DOWN"
 	end
 end
 
@@ -406,7 +434,7 @@ local listFrame = new("ScrollingFrame", {
 }, body)
 UiKit.list(listFrame, 6)
 
--- Right: the one picked, or feeding it.
+-- Right: the one picked, or infusing it.
 local right = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(LIST_W + 14, 0),
@@ -500,6 +528,19 @@ for order, key in { "E", "Q", "R" } do
 	local chipEdge = new("UIStroke", { Color = P.Dim, Thickness = 1, Transparency = 1 }, chip)
 	local letter = label(chip, key, 13, INK, Enum.Font.GothamBlack)
 	letter.Size, letter.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	-- (Over the move's icon, when it has one: its key on the corner.)
+	local badge = new("Frame", {
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, 3, 1, 3),
+		Size = UDim2.fromOffset(13, 13),
+		BackgroundColor3 = P.Gold,
+		Visible = false,
+		ZIndex = 3,
+	}, chip)
+	UiKit.round(badge, 4)
+	local badgeLetter = label(badge, key, 9, INK, Enum.Font.GothamBlack)
+	badgeLetter.Size, badgeLetter.TextXAlignment, badgeLetter.ZIndex =
+		UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
 	local name = label(row, "", 13, P.Text, IronUi.Bold)
 	name.Position, name.Size = UDim2.fromOffset(38, 3), UDim2.new(1, -144, 0, 16)
 	local about = label(row, "", 10, P.Dim, IronUi.Body)
@@ -513,6 +554,8 @@ for order, key in { "E", "Q", "R" } do
 		Chip = chip,
 		ChipEdge = chipEdge,
 		Letter = letter,
+		Badge = badge,
+		BadgeLetter = badgeLetter,
 		Name = name,
 		About = about,
 		State = state,
@@ -538,9 +581,9 @@ local actionButtons = new("Frame", {
 local actionList = UiKit.list(actionButtons, 6, true)
 actionList.HorizontalAlignment = Enum.HorizontalAlignment.Right
 
--- Feeding the one picked.
+-- Infusing the one picked: stones mend it, or bring it back when it's down.
 local feedPane = new("Frame", {
-	Name = "Feed",
+	Name = "Infuse",
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, 38),
 	Size = UDim2.new(1, 0, 1, -38),
@@ -566,12 +609,13 @@ local footer = new("Frame", {
 local footerText = label(footer, "", 11, P.Dim, IronUi.Body)
 footerText.Size = UDim2.new(1, -150, 1, 0)
 footerText.TextWrapped = true
-local feedButton = smallButton(footer, "FEED", P.Good)
+local feedButton = smallButton(footer, "INFUSE", P.Good)
 feedButton.AnchorPoint = Vector2.new(1, 0.5)
 feedButton.Position, feedButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(130, 38)
 feedButton.TextSize = 15
--- One tap picks a mouthful of spare Commons (what mining mostly pays).
-local commonsButton = smallButton(footer, "PICK COMMONS", P.Teal)
+-- One tap picks the cheapest stones that do it (Commons first, its own
+-- element first: what mining mostly pays).
+local commonsButton = smallButton(footer, "PICK FOR ME", P.Teal)
 commonsButton.AnchorPoint = Vector2.new(1, 0.5)
 commonsButton.Position, commonsButton.Size = UDim2.new(1, -140, 0.5, 0), UDim2.fromOffset(122, 38)
 
@@ -583,7 +627,7 @@ local tabButtons = {}
 local rowLive = {} -- [id] = the bits of its row that change while you look
 local drawPanel
 
-for order, entry in { { "Details", "DETAILS" }, { "Feed", "FEED" } } do
+for order, entry in { { "Details", "DETAILS" }, { "Infuse", "INFUSE" } } do
 	local b = smallButton(tabRow, entry[2], P.Gold)
 	b.LayoutOrder = order
 	b.Size = UDim2.fromOffset(120, 28)
@@ -601,16 +645,64 @@ local function moveName(id: string?): string
 	return if move then move.Name else "?"
 end
 
--- The stones it would eat, best EXP first, with what each gives.
+-- Loose stones it could take (never one on your gear, never a Gemsoul),
+-- the cheapest first (Commons, then rarer), its own element first in each,
+-- with the power each brings it (Shared.Kaiju.infusePower).
+local TIER_RANK = {}
+for rank, tier in GemConfig.TierOrder do
+	TIER_RANK[tier] = rank
+end
 local function stonesFor(record)
 	local list = {}
-	for _, gem in (GemClient.Profile and GemClient.Profile.Gems) or {} do
-		table.insert(list, { Gem = gem, Exp = Kaiju.feedExp(gem, record) })
+	for _, gem in GemInventory.available(GemClient.Profile) do
+		if not Kaiju.isSoul(gem) then
+			table.insert(list, { Gem = gem, Power = Kaiju.infusePower(gem, record) })
+		end
 	end
 	table.sort(list, function(a, b)
-		return if a.Exp ~= b.Exp then a.Exp > b.Exp else (a.Gem.Id < b.Gem.Id)
+		local ra, rb = TIER_RANK[a.Gem.Tier] or 0, TIER_RANK[b.Gem.Tier] or 0
+		if ra ~= rb then
+			return ra < rb
+		end
+		return if a.Power ~= b.Power then a.Power > b.Power else (a.Gem.Id < b.Gem.Id)
 	end)
 	return list
+end
+
+-- The cheapest stones that do it: down, its revive cost; hurt, back to full.
+-- (Spare ones only: none a saved loadout names, as selling Commons spares.)
+local function pickFor(record): { string }
+	local spare = {}
+	for _, tier in GemConfig.TierOrder do
+		if tier ~= "Legendary" then
+			for _, gem in GemInventory.spare(GemClient.Profile, tier) do
+				spare[gem.Id] = true
+			end
+		end
+	end
+	local chosen, gems = {}, {}
+	local need = if record.Down then Kaiju.reviveCost(record) else 0
+	local power = 0
+	for _, entry in stonesFor(record) do
+		if #chosen >= Kaiju.Infuse.Batch then
+			break
+		end
+		if spare[entry.Gem.Id] then
+			if record.Down then
+				if power >= need then
+					break
+				end
+				power += entry.Power
+			else
+				table.insert(gems, entry.Gem)
+				if #Kaiju.infusePlan(record, gems).Used < #gems then
+					break -- (it's full without this one)
+				end
+			end
+			table.insert(chosen, entry.Gem.Id)
+		end
+	end
+	return chosen
 end
 
 -- Actions ----------------------------------------------------------------------------------------------------------
@@ -668,9 +760,8 @@ end
 
 -- What a row says under its name: its level and where it is.
 local function rowStatus(record, slot: number?): (string, Color3)
-	local wait = downFor(record.Id)
-	if slot and wait > 0 then
-		return string.format("Lv %d  ·  KO, back in %ds", record.Level, math.ceil(wait)), P.Bad:Lerp(P.Text, 0.3)
+	if record.Down then
+		return string.format("Lv %d  ·  DOWN: REVIVE IT", record.Level), P.Bad:Lerp(P.Text, 0.3)
 	elseif slot == 1 then
 		return string.format("Lv %d  ·  LEADS", record.Level), P.Gold
 	elseif slot then
@@ -713,14 +804,13 @@ local function kaijuRow(order: number, record, slot: number?, models)
 	local status = label(row, statusText, 10, statusColor, IronUi.Bold)
 	status.Position, status.Size = UDim2.fromOffset(60, 23), UDim2.new(1, -66, 0, 13)
 	local live = { Record = record, Slot = slot, Status = status }
-	if slot then
-		local back, fill = bar(row, HEALTH)
-		back.Position, back.Size = UDim2.fromOffset(60, 40), UDim2.new(1, -72, 0, 5)
-		fill.Size = UDim2.fromScale(healthShare(models[record.Id]), 1)
-		live.Health = fill
-	end
+	-- Its health, out or at home (kept: it never heals on its own).
+	local back, fill = bar(row, HEALTH)
+	back.Position, back.Size = UDim2.fromOffset(60, 40), UDim2.new(1, -72, 0, 5)
+	fill.Size = UDim2.fromScale(healthShare(record, models[record.Id]), 1)
+	live.Health = fill
 	local expBar, expBarFill = bar(row, EXP)
-	expBar.Position, expBar.Size = UDim2.fromOffset(60, if slot then 48 else 42), UDim2.new(1, -72, 0, 3)
+	expBar.Position, expBar.Size = UDim2.fromOffset(60, 48), UDim2.new(1, -72, 0, 3)
 	expBarFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
 	rowLive[record.Id] = live
 	row.Activated:Connect(function()
@@ -784,7 +874,7 @@ local function liveRows()
 	local models = petModels()
 	for id, live in rowLive do
 		if live.Health then
-			live.Health.Size = UDim2.fromScale(healthShare(models[id]), 1)
+			live.Health.Size = UDim2.fromScale(healthShare(live.Record, models[id]), 1)
 		end
 		local text, color = rowStatus(live.Record, live.Slot)
 		live.Status.Text, live.Status.TextColor3 = text, color
@@ -856,8 +946,14 @@ local function drawActions(data, record, team: { string })
 			drawPanel()
 		end)
 	end
-	actionButton(2, "FEED", P.Good, 100, function()
-		tab = "Feed"
+	if record.Down then
+		actionText.Text = string.format(
+			"Knocked out: it stays down till you infuse %d power of stones into it.",
+			Kaiju.reviveCost(record)
+		)
+	end
+	actionButton(2, if record.Down then "REVIVE" else "INFUSE", if record.Down then P.Bad else P.Good, 100, function()
+		tab = "Infuse"
 		table.clear(picked)
 		drawPanel()
 	end)
@@ -879,7 +975,7 @@ local function drawDetail(data, record, team: { string })
 		"%s  ·  LEVEL %d  ·  %s",
 		string.upper(species and species.Role or ""),
 		record.Level,
-		if slot == 1 then "LEADS" elseif slot then "OUT" else "AT HOME"
+		if record.Down then "DOWN" elseif slot == 1 then "LEADS" elseif slot then "OUT" else "AT HOME"
 	)
 	pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier) .. " GEMSOUL"
 	pillText.TextColor3, pillEdge.Color = tierColor, tierColor
@@ -887,7 +983,10 @@ local function drawDetail(data, record, team: { string })
 	heroBlurb.Text = if species then species.Blurb else ""
 	local stats = Kaiju.stats(record.Species, record.Level, tier)
 	if stats then
-		statValues[1].Text = tostring(math.floor(stats.Health + 0.5))
+		-- (Its health as it is: kept, out or home, none while it's down.)
+		local most = math.floor(stats.Health + 0.5)
+		local now = math.floor(healthShare(record, petModels()[record.Id]) * most + 0.5)
+		statValues[1].Text = if now < most then string.format("%d/%d", now, most) else tostring(most)
 		statValues[2].Text = tostring(math.floor(stats.Damage + 0.5))
 		statValues[3].Text = tostring(math.floor(stats.Speed + 0.5))
 	end
@@ -905,6 +1004,16 @@ local function drawDetail(data, record, team: { string })
 		row.Chip.BackgroundColor3 = if awake then color else INK
 		row.ChipEdge.Transparency = if awake then 1 else 0
 		row.Letter.TextColor3 = if awake then INK else P.Dim
+		-- Its icon (hollow and greyed while it sleeps), the key on its corner.
+		local ok, drawn = pcall(SurgeIcons.apply, row.Chip, move, color)
+		drawn = ok and drawn
+		if drawn then
+			pcall(SurgeIcons.dim, row.Chip, not awake)
+		end
+		row.Letter.Visible = not drawn
+		row.Badge.Visible = drawn
+		row.Badge.BackgroundColor3 = if awake then color else INK
+		row.BadgeLetter.TextColor3 = if awake then INK else P.Dim
 		row.Edge.Color = if awake then color else P.Edge
 		row.Edge.Transparency = if awake then 0.45 else 0.7
 		row.Frame.BackgroundColor3 = if awake then color:Lerp(INK, 0.82) else P.Inset
@@ -915,23 +1024,40 @@ local function drawDetail(data, record, team: { string })
 	drawActions(data, record, team)
 end
 
-local function drawFeed(record)
+local function drawInfuse(record)
+	record = liveRecord(record)
 	for _, child in feedList:GetChildren() do
 		if child:IsA("GuiObject") then
 			child:Destroy()
 		end
 	end
-	feedHead.Text = string.format("Feeding %s  ·  Lv %d", Kaiju.title(record), record.Level)
-	feedHead.TextColor3 = elementColor(record.Element):Lerp(P.Text, 0.35)
-	commonsButton.Visible = #GemInventory.spare(GemClient.Profile, "Common") > 0
+	local down = record.Down == true
+	local now, most = Kaiju.health(record)
+	feedHead.Text = if down
+		then string.format(
+			"REVIVE %s  ·  Lv %d  ·  needs %d power",
+			string.upper(Kaiju.title(record)),
+			record.Level,
+			Kaiju.reviveCost(record)
+		)
+		else string.format(
+			"INFUSE %s  ·  Lv %d  ·  %d / %d health",
+			string.upper(Kaiju.title(record)),
+			record.Level,
+			math.floor(now + 0.5),
+			most
+		)
+	feedHead.TextColor3 = if down then P.Bad:Lerp(P.Text, 0.3) else elementColor(record.Element):Lerp(P.Text, 0.35)
+	feedButton.Text = if down then "REVIVE" else "INFUSE"
+	local stones = stonesFor(record)
+	commonsButton.Visible = #stones > 0
 	footerText.Size = UDim2.new(1, if commonsButton.Visible then -272 else -140, 1, 0)
-	local total, count = 0, 0
-	for _, entry in stonesFor(record) do
-		local gem, exp = entry.Gem, entry.Exp
-		local chosen = picked[gem.Id] == true
-		if chosen then
-			total += exp
-			count += 1
+	local chosen = {}
+	for _, entry in stones do
+		local gem, power = entry.Gem, entry.Power
+		local isPicked = picked[gem.Id] == true
+		if isPicked then
+			table.insert(chosen, gem)
 		end
 		local frame = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, -8, 0, 38) }, feedList)
 		UiKit.round(frame, 8)
@@ -941,26 +1067,57 @@ local function drawFeed(record)
 			Size = UDim2.fromScale(1, 1),
 		}, frame)
 		local tick = new("Frame", {
-			BackgroundColor3 = if chosen then P.Good else Color3.fromRGB(28, 32, 46),
+			BackgroundColor3 = if isPicked then P.Good else Color3.fromRGB(28, 32, 46),
 			Position = UDim2.fromOffset(10, 11),
 			Size = UDim2.fromOffset(16, 16),
 		}, frame)
 		UiKit.round(tick, 4)
 		local name = label(frame, GemConfig.displayName(gem), 13, elementColor(gem.Element))
-		name.Position, name.Size = UDim2.fromOffset(36, 0), UDim2.new(1, -130, 1, 0)
-		local worth = label(frame, string.format("+%d EXP", exp), 13, if exp > 0 then P.Gold else P.Dim)
+		name.Position, name.Size = UDim2.fromOffset(36, 0), UDim2.new(1, -170, 1, 0)
+		-- What it brings: power toward a revive, or the health it mends.
+		local mend = math.floor(power * Kaiju.Infuse.Mend * 100 + 0.5)
+		local worth = label(
+			frame,
+			if down then string.format("%g POWER", power) else string.format("+%d%% HEALTH", mend),
+			12,
+			if power > Kaiju.Infuse.Power[gem.Tier or "Common"]
+				then P.Gold
+				elseif power < Kaiju.Infuse.Power[gem.Tier or "Common"] then P.Dim
+				else P.Text,
+			IronUi.Bold
+		)
 		worth.AnchorPoint = Vector2.new(1, 0)
-		worth.Position, worth.Size = UDim2.new(1, -12, 0, 0), UDim2.new(0, 90, 1, 0)
+		worth.Position, worth.Size = UDim2.new(1, -12, 0, 0), UDim2.new(0, 130, 1, 0)
 		worth.TextXAlignment = Enum.TextXAlignment.Right
 		b.Activated:Connect(function()
 			picked[gem.Id] = not picked[gem.Id] or nil
 			drawPanel()
 		end)
 	end
-	footerText.Text = if count > 0
-		then string.format("%d stone%s: +%d EXP", count, if count == 1 then "" else "s", total)
-		elseif commonsButton.Visible then "Pick stones to feed it, or a mouthful of Commons."
-		else "Pick stones to feed it. Rarer ones keep their worth as it grows; its weakness element gives half."
+	local plan = Kaiju.infusePlan(record, chosen)
+	local share = math.floor(plan.Health / math.max(1, plan.Most) * 100 + 0.5)
+	footerText.Text = if #stones == 0
+		then "No loose stones in your pouch. Mine some: every rock pays one."
+		elseif #chosen == 0 and down then string.format(
+			"Pick %d power of stones to bring it back (its own element counts double, its weakness half), or let PICK FOR ME choose.",
+			Kaiju.reviveCost(record)
+		)
+		elseif #chosen == 0 then "Pick stones to mend it (it never heals on its own), or let PICK FOR ME choose."
+		elseif down and not plan.Revived then string.format("%g more power to bring it back.", plan.Short)
+		elseif plan.Revived then string.format(
+			"Back at %d%% health, using %d of %d stone%s.",
+			share,
+			#plan.Used,
+			#chosen,
+			if #chosen == 1 then "" else "s"
+		)
+		else string.format(
+			"Mends it to %d%%, using %d of %d stone%s.",
+			share,
+			#plan.Used,
+			#chosen,
+			if #chosen == 1 then "" else "s"
+		)
 end
 
 function drawPanel()
@@ -975,25 +1132,27 @@ function drawPanel()
 	end
 	drawList(data, team)
 	detail.Visible = tab == "Details" and record ~= nil
-	feedPane.Visible = tab == "Feed" and record ~= nil
+	feedPane.Visible = tab == "Infuse" and record ~= nil
 	if not record then
 		portrait(heroView, nil)
 		return
 	end
-	if tab == "Feed" then
-		drawFeed(record)
+	if tab == "Infuse" then
+		drawInfuse(record)
 	else
 		drawDetail(data, record, team)
 	end
 end
 
 commonsButton.Activated:Connect(function()
+	local data = roster()
+	local record = data and selected and data.List[selected]
+	if not record then
+		return
+	end
 	table.clear(picked)
-	for i, gem in GemInventory.spare(GemClient.Profile, "Common") do
-		if i > Kaiju.FeedBatch then
-			break
-		end
-		picked[gem.Id] = true
+	for _, id in pickFor(liveRecord(record)) do
+		picked[id] = true
 	end
 	drawPanel()
 end)
@@ -1008,7 +1167,7 @@ feedButton.Activated:Connect(function()
 		return
 	end
 	act(function()
-		local result = GemClient.request("KaijuFeed", ids, target)
+		local result = GemClient.request("KaijuInfuse", ids, target)
 		say(result)
 		if result and result.Ok then
 			table.clear(picked)
@@ -1016,8 +1175,8 @@ feedButton.Activated:Connect(function()
 	end)
 end)
 
-function KaijuHud.open(id: string?)
-	tab = "Details"
+function KaijuHud.open(id: string?, onTab: string?)
+	tab = if onTab == "Infuse" then "Infuse" else "Details"
 	swapping = false
 	table.clear(picked)
 	selected = id

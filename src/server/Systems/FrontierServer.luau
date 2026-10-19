@@ -17,6 +17,13 @@
 	                 (RiftCharged: the server time it runs out; mined gems
 	                 come luckier till then, OutpostServer).
 
+	Stirred up      every swing out there stirs the frontier up too
+	                 (Frontier.stir); it settles once they stop or head
+	                 back in (Frontier.settle). Stirred up, their swings
+	                 make more noise, more critters come through at once and
+	                 more may be about them (Frontier.capFor), higher-
+	                 levelled (Frontier.Disturbance).
+
 	Nobody gets more critters than their band's cap or a fair share of the
 	Outpost's (Frontier.share); critters still on their way through count.
 	Nobody gets one in the core, in a fight elsewhere, in a spar, or down.
@@ -28,8 +35,8 @@
 	Critter (the roster id of what's coming through) and Prey (the UserId it
 	comes for); the dormant ones at the Rift Veins (site.Scars) carry
 	Dormant instead of a timeline, and stay. Each player carries
-	FrontierBand (Core, Fringe or Edge) and FrontierNoise (0..1, in
-	twentieths) for their HUD.
+	FrontierBand (Core, Fringe or Edge), FrontierNoise and FrontierStir
+	(how stirred up: both 0..1, in twentieths) for their HUD.
 
 	  FrontierServer.start(site)
 	  FrontierServer.swing(player, swings)   a swing out there (OutpostServer)
@@ -53,7 +60,9 @@ local FrontierServer = {}
 local folder: Folder
 local rng = Random.new()
 local nextSeed = 0
--- [player] = { Noise, LastEncounter (os.clock), Shown (the FrontierNoise last set) }
+-- [player] = { Noise, LastEncounter (os.clock), Shown (the FrontierNoise last
+-- set), Stir, LastSwing (os.clock), ShownStir (the FrontierStir last set),
+-- Told (the stage they were last told of) }
 local states: { [Player]: any } = {}
 -- [player] = { enemy }: the critters out for them (encounters and wandering rifts)
 local critters: { [Player]: { any } } = {}
@@ -108,20 +117,33 @@ FrontierServer._eligible = eligible
 local function stateOf(player: Player)
 	local state = states[player]
 	if not state then
-		state = { Noise = rng:NextNumber(0, Frontier.Noise.Restart), LastEncounter = -math.huge, Shown = nil }
+		state = {
+			Noise = rng:NextNumber(0, Frontier.Noise.Restart),
+			LastEncounter = -math.huge,
+			Shown = nil,
+			Stir = 0,
+			LastSwing = -math.huge,
+			ShownStir = nil,
+			Told = 1,
+		}
 		states[player] = state
 	end
 	return state
 end
 
--- Their noise for the HUD's ring, in twentieths (not every swing's share).
+-- Their noise for the HUD's ring and how stirred up it is, in twentieths
+-- (not every swing's share).
 local function show(player: Player, state)
-	local shown = if player:GetAttribute("Outpost") == true
-		then math.floor(math.clamp(state.Noise, 0, 1) * 20 + 0.5) / 20
-		else nil
+	local here = player:GetAttribute("Outpost") == true
+	local shown = if here then math.floor(math.clamp(state.Noise, 0, 1) * 20 + 0.5) / 20 else nil
 	if shown ~= state.Shown then
 		state.Shown = shown
 		player:SetAttribute("FrontierNoise", shown)
+	end
+	local stir = if here then math.floor(math.clamp(state.Stir, 0, 1) * 20 + 0.5) / 20 else nil
+	if stir ~= state.ShownStir then
+		state.ShownStir = stir
+		player:SetAttribute("FrontierStir", stir)
 	end
 end
 
@@ -195,9 +217,10 @@ local function total(): number
 	return count
 end
 
--- How many more critters may come for `player` out in `band`.
+-- How many more critters may come for `player` out in `band` (more the
+-- more stirred up they have it).
 local function roomFor(player: Player, band: string): number
-	local cap = Frontier.share(Frontier.Caps[band] or 0, math.max(1, playersOut))
+	local cap = Frontier.share(Frontier.capFor(band, stateOf(player).Stir), math.max(1, playersOut))
 	local mine = living(player) + (pending[player] or 0)
 	return math.max(0, math.min(cap - mine, Frontier.Caps.Server - total()))
 end
@@ -255,7 +278,7 @@ local function incursion(player: Player, band: string, count: number)
 					Prey = player,
 					Band = band,
 					Critter = critter,
-					Level = Frontier.critterLevel(band, rng),
+					Level = Frontier.critterLevel(band, rng, stateOf(player).Stir),
 					Facing = target.Position,
 					Hop = toward * 24 + Vector3.new(0, 26, 0),
 				})
@@ -280,11 +303,11 @@ local function consider(player: Player, state, band: string)
 	end
 	state.Noise = rng:NextNumber(0, Frontier.Noise.Restart)
 	state.LastEncounter = now
-	incursion(player, band, math.min(room, Frontier.incursion(band, rng:NextNumber())))
+	incursion(player, band, math.min(room, Frontier.incursion(band, rng:NextNumber(), state.Stir)))
 end
 
 -- A swing (or a mech's strike of `swings` swings) by `player`: noise, out
--- past the core.
+-- past the core, louder the more stirred up it is, and it stirs it up more.
 function FrontierServer.swing(player: Player, swings: number?)
 	local root = rootOf(player)
 	if not root or not eligible(player) then
@@ -295,7 +318,18 @@ function FrontierServer.swing(player: Player, swings: number?)
 		return
 	end
 	local state = stateOf(player)
-	state.Noise = Frontier.noise(state.Noise, band, swings or 1, 0, rng:NextNumber())
+	state.Noise = Frontier.noise(state.Noise, band, swings or 1, 0, rng:NextNumber(), state.Stir)
+	state.Stir = Frontier.stir(state.Stir, band, swings or 1)
+	state.LastSwing = os.clock()
+	-- (Told as it gets to each stage, once till it's well settled again.)
+	local stage = Frontier.stage(state.Stir)
+	if stage > state.Told then
+		state.Told = stage
+		local note = Frontier.Disturbance.Notes[stage]
+		if note then
+			Remotes.Notify:FireClient(player, note)
+		end
+	end
 	consider(player, state, band)
 	show(player, state)
 end
@@ -379,7 +413,8 @@ local function wander(candidates: { any })
 	local player, root = pick.Player, pick.Root
 	local spot = Frontier.wanderSpot(root.Position, center(), rng)
 	local band = Frontier.band(Frontier.distance(spot, center()))
-	local count = math.min(free, roomFor(player, band), math.max(2, Frontier.incursion(band, rng:NextNumber())))
+	local stir = stateOf(player).Stir
+	local count = math.min(free, roomFor(player, band), math.max(2, Frontier.incursion(band, rng:NextNumber(), stir)))
 	if count <= 0 then
 		return
 	end
@@ -413,7 +448,7 @@ local function wander(candidates: { any })
 				Prey = player,
 				Band = band,
 				Critter = critter,
-				Level = Frontier.critterLevel(band, rng),
+				Level = Frontier.critterLevel(band, rng, stir),
 				Facing = floor + out * 10,
 				Hop = out * 14 + Vector3.new(0, 22, 0),
 				Wander = { Home = floor, Roam = Frontier.Wander.Roam, Notice = Frontier.Wander.Notice },
@@ -436,19 +471,27 @@ end
 
 local function step(dt: number)
 	local out = {}
+	local now = os.clock()
 	for _, player in Players:GetPlayers() do
 		local state = stateOf(player)
 		local root = rootOf(player)
 		if not root or not eligible(player) then
-			if player:GetAttribute("Outpost") ~= true and player:GetAttribute("FrontierBand") ~= nil then
+			local away = player:GetAttribute("Outpost") ~= true
+			if away and player:GetAttribute("FrontierBand") ~= nil then
 				player:SetAttribute("FrontierBand", nil)
 			end
+			-- (Down, in a spar or a fight, it settles as if they'd stopped;
+			-- gone from the Outpost, as fast as in the core.)
+			state.Stir = Frontier.settle(state.Stir, if away then "Core" else "Fringe", dt, now - state.LastSwing)
+			state.Told = math.min(state.Told, (Frontier.stage(state.Stir + 0.1)))
 			continue
 		end
 		local band = Frontier.band(Frontier.distance(root.Position, center()))
 		if player:GetAttribute("FrontierBand") ~= band then
 			player:SetAttribute("FrontierBand", band)
 		end
+		state.Stir = Frontier.settle(state.Stir, band, dt, now - state.LastSwing)
+		state.Told = math.min(state.Told, (Frontier.stage(state.Stir + 0.1)))
 		if band == "Core" then
 			-- (Back in the core it quiets down again, over a minute or so.)
 			state.Noise = math.max(0, state.Noise - dt / 60)
@@ -464,7 +507,6 @@ local function step(dt: number)
 	for _, player in Players:GetPlayers() do
 		show(player, stateOf(player))
 	end
-	local now = os.clock()
 	if now >= nextWander then
 		local every = Frontier.Wander.Every
 		nextWander = now + rng:NextNumber(every[1], every[2])

@@ -6,10 +6,16 @@
 	      "Drips" for acid, "Shards" for deaths, plus a quick light flash
 	  flash(position, color, brightness, range, seconds)  a light pulse
 	  shake(strength, seconds)  shakes the camera (strength in radians)
+	  shakeNear(position, strength, seconds, within)  a shake from something
+	      landing there: none past `within` studs of you, harder closer in
 	  auras(now)  every frame: elemental auras on anyone with status effects
 	      (flames when Burning, frost mist and an ice tint when Frozen,
 	      sparks when Shocked, acid drips, a glowing outline when Shielded),
 	      with the sound of each effect as it lands
+
+	Drawn at the size of whoever plays it (FxSize: a kaiju's or a critter's
+	own): a flash's reach and a burst by its size, a shake by its size
+	squared (a knee-high kaiju's slam barely moves your screen).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +25,7 @@ local Debris = game:GetService("Debris")
 
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local CombatSound = require(script.Parent.CombatSound)
+local FxSize = require(script.Parent.FxSize)
 
 local CombatFx = {}
 
@@ -121,11 +128,12 @@ local KINDS = {
 CombatFx.LightBoost = 1
 
 function CombatFx.flash(position: Vector3, color: Color3, brightness: number?, range: number?, seconds: number?)
+	local k = FxSize.get()
 	local part = anchor(position)
 	local light = Instance.new("PointLight")
 	light.Color = color
-	light.Brightness = (brightness or 3) * CombatFx.LightBoost
-	light.Range = math.min((range or 12) * CombatFx.LightBoost, 60)
+	light.Brightness = (brightness or 3) * CombatFx.LightBoost * math.sqrt(k)
+	light.Range = math.min((range or 12) * CombatFx.LightBoost * k, 60)
 	light.Shadows = false
 	light.Parent = part
 	TweenService:Create(light, TweenInfo.new(seconds or 0.25, Enum.EasingStyle.Quad), { Brightness = 0 }):Play()
@@ -134,7 +142,8 @@ end
 
 function CombatFx.burst(position: Vector3, color: Color3, kind: string?, scale: number?)
 	local spec = KINDS[kind or "Sparks"] or KINDS.Sparks
-	scale = scale or 1
+	local base = scale or 1 -- (its flash takes the size itself)
+	scale = base * FxSize.get()
 	local part = anchor(position)
 	local attachment = Instance.new("Attachment")
 	attachment.Parent = part
@@ -155,7 +164,7 @@ function CombatFx.burst(position: Vector3, color: Color3, kind: string?, scale: 
 	emitter.Parent = attachment
 	emitter:Emit(math.floor(spec.Count * math.clamp(scale, 0.5, 2.5)))
 	if spec.Light then
-		CombatFx.flash(position, color, 2 + 2 * scale, 8 + 6 * scale, 0.22)
+		CombatFx.flash(position, color, 2 + 2 * base, 8 + 6 * base, 0.22)
 	end
 	Debris:AddItem(part, spec.Life.Max + 0.2)
 end
@@ -166,6 +175,8 @@ local shakeUntil, shakeTotal, shakeStrength = 0, 1, 0
 local shaking = false
 local shakenCamera, baseFrame, shakenFrame = nil, nil, nil
 function CombatFx.shake(strength: number, seconds: number)
+	local k = FxSize.get()
+	strength *= k * k
 	if strength <= 0 or seconds <= 0 then return end
 	local now = os.clock()
 	-- The stronger of what's running and what's asked for.
@@ -220,11 +231,27 @@ function CombatFx.hitShake(swordHit: boolean?, heavy: boolean?)
 	end
 end
 
--- How close is this spot to the local player (for shakes)?
+-- How close is this spot to the local player (for shakes)? (`within` by
+-- the size of what's drawing.)
 function CombatFx.nearMe(position: Vector3, within: number): boolean
 	local character = Players.LocalPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	return root ~= nil and (root.Position - position).Magnitude <= within
+	return root ~= nil and (root.Position - position).Magnitude <= within * FxSize.get()
+end
+
+-- A shake from something landing at `position`: none past `within` studs of
+-- you (by its size), its full strength only right on top of it.
+function CombatFx.shakeNear(position: Vector3, strength: number, seconds: number, within: number)
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local reach = within * FxSize.get()
+	if not root or reach <= 0 then
+		return
+	end
+	local closeness = 1 - (root.Position - position).Magnitude / reach
+	if closeness > 0 then
+		CombatFx.shake(strength * closeness * closeness, seconds)
+	end
 end
 
 -- Status auras ---------------------------------------------------------------------------

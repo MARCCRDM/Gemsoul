@@ -13,6 +13,7 @@
 
 	  caster = {
 	    Model, Root           the kaiju
+	    Size?                 how big it stands next to you (Kaiju.size; 1)
 	    Element, Ability      its Gemsoul's element and E (an AbilityPlans id)
 	    Damage                its E's whole cast (Kaiju.abilityDamage)
 	    DamageOf(id)?         another move's (else Damage)
@@ -29,6 +30,11 @@
 	The big showcase moves draw with their own look (MoveVfx, "TriadShow");
 	the rest with the shared shots, blasts, arcs and pools; an R with the
 	triad's auras (TriadAura) on the kaiju.
+
+	Its moves are its size (AbilityPlans are a player's): every radius,
+	length and width by its Size, what it hits and what's drawn alike, and
+	each effect goes out "Sized" so the client draws it, sounds it and
+	shakes your screen that big.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -52,6 +58,17 @@ end
 -- Its clock, for how long an R holds (os.clock, as KaijuServer and
 -- Enemies keep time). Tests replace it.
 KaijuAbilities.clock = os.clock
+
+-- Its effects: at its size, "Sized" (the client's FxSize) unless it's yours.
+local function sender(caster): (string, ...any) -> ()
+	local size = caster.Size or 1
+	if size == 1 then
+		return KaijuAbilities.fx
+	end
+	return function(kind: string, ...)
+		KaijuAbilities.fx("Sized", size, kind, ...)
+	end
+end
 
 -- The HUD's attribute for when each key last went off.
 local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" }
@@ -113,10 +130,11 @@ local function aura(caster, plan, damage: number, seconds: number)
 	if not a then
 		return
 	end
+	local radius = (a.Radius or 5) * (caster.Size or 1)
 	for i = 1, math.max(1, math.floor(seconds)) do
 		KaijuAbilities.after(i, function()
 			if caster.Alive() then
-				ring(caster, a.Radius or 5, damage * (a.Mult or 0.2), a.Status)
+				ring(caster, radius, damage * (a.Mult or 0.2), a.Status)
 			end
 		end)
 	end
@@ -152,7 +170,7 @@ end
 
 -- Its R's shell or ward, its mend, or (a ring) nothing here: false.
 local function defend(caster, id: string, plan, damage: number): boolean
-	local fx = KaijuAbilities.fx
+	local fx = sender(caster)
 	local shape = plan.Shape
 	local h = caster.Humanoid
 	local seconds = plan.Duration or 4
@@ -192,8 +210,9 @@ local function defend(caster, id: string, plan, damage: number): boolean
 		local burst = plan.Burst
 		if burst and caster.Alive() then
 			local color = GemConfig.ElementColors[caster.Element] or Color3.new(1, 1, 1)
-			fx("Nova", caster.Root.Position, burst.Radius, color, 0)
-			ring(caster, burst.Radius, damage * (burst.Mult or 0.3), burst.Status)
+			local radius = burst.Radius * (caster.Size or 1)
+			fx("Nova", caster.Root.Position, radius, color, 0)
+			ring(caster, radius, damage * (burst.Mult or 0.3), burst.Status)
 		end
 	end
 	body.Defense = d
@@ -224,7 +243,8 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 	if not plan or not aim or not aim.Root or not caster.Root then
 		return false
 	end
-	local fx = KaijuAbilities.fx
+	local fx = sender(caster)
+	local size = caster.Size or 1
 	local color = GemConfig.ElementColors[caster.Element] or Color3.new(1, 1, 1)
 	local from = caster.Root.Position
 	local at = aim.Root.Position
@@ -246,7 +266,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 			end
 		end)
 	elseif plan.Shape == "Blast" then
-		local radius, delay = plan.Radius or 8, plan.Delay or 0
+		local radius, delay = (plan.Radius or 8) * size, plan.Delay or 0
 		if plan.Show then
 			-- (The showcase blasts draw their own warning and burst.)
 			KaijuAbilities.after(delay, function()
@@ -263,7 +283,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 			end
 		end)
 	elseif plan.Shape == "Nova" then
-		local radius = plan.Radius or 8
+		local radius = (plan.Radius or 8) * size
 		if id == "R_RingOfFire" then
 			fx("TriadRing", caster.Root, radius, 1, caster.Element)
 		elseif caster.Element == "Poison" then
@@ -275,7 +295,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 			caster.Hit(victim, damage, status)
 		end)
 	elseif plan.Shape == "Line" then
-		local length, width = plan.Length or 20, plan.Width or 4
+		local length, width = (plan.Length or 20) * size, (plan.Width or 4) * size
 		local direction = flat(at - from)
 		direction = if direction.Magnitude > 0.1 then direction.Unit else flat(caster.Root.CFrame.LookVector).Unit
 		local finish = from + direction * length
@@ -288,7 +308,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 		end
 		sweep(caster, from, finish, width, damage, status)
 	elseif plan.Shape == "Field" then
-		local radius, duration = plan.Radius or 8, plan.Duration or 3
+		local radius, duration = (plan.Radius or 8) * size, plan.Duration or 3
 		if plan.Show then
 			fx("TriadShow", model, plan.Show, at, radius, duration, caster.Element)
 		else
@@ -309,9 +329,10 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 		-- Leaps from foe to foe (never the same one twice), Hits in all.
 		local hit, last, point = { [aim] = true }, aim, from
 		local hops = { aim }
+		local leap = (plan.Radius or 14) * size
 		while #hops < (plan.Hits or 3) do
-			local nearest, best = nil, plan.Radius or 14
-			for _, victim in caster.Foes(last.Root.Position, plan.Radius or 14) do
+			local nearest, best = nil, leap
+			for _, victim in caster.Foes(last.Root.Position, leap) do
 				local distance = (victim.Root.Position - last.Root.Position).Magnitude
 				if not hit[victim] and distance <= best then
 					nearest, best = victim, distance
@@ -334,7 +355,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 			end)
 		end
 	elseif plan.Shape == "Storm" then
-		local radius, hits = plan.Radius or 9, plan.Hits or 5
+		local radius, hits = (plan.Radius or 9) * size, plan.Hits or 5
 		fx("TriadShow", model, plan.Show or "StormCall", at, radius, hits * 0.5 + 0.5, caster.Element)
 		for i = 1, hits do
 			KaijuAbilities.after(i * 0.5, function()
@@ -350,15 +371,15 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 					end
 				end
 				local point = if nearest then nearest.Root.Position else at
-				fx("TriadShow", model, "StormBolt", point, 3, if i == hits then 1 else 0, caster.Element)
+				fx("TriadShow", model, "StormBolt", point, 3 * size, if i == hits then 1 else 0, caster.Element)
 				if nearest then
 					caster.Hit(nearest, damage / hits, if i == hits then status else nil)
 				end
 			end)
 		end
 	elseif plan.Shape == "Pylon" then
-		local reach, duration = plan.Radius or 14, plan.Duration or 4
-		local center = from + flat(at - from).Unit * 2
+		local reach, duration = (plan.Radius or 14) * size, plan.Duration or 4
+		local center = from + flat(at - from).Unit * 2 * size
 		fx("TriadPylon", center, reach, duration, caster.Element)
 		local ticks = math.max(1, math.floor(duration / 0.5))
 		for i = 1, ticks do
@@ -371,7 +392,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 					end
 				end
 				if nearest then
-					fx("Arc", center + Vector3.new(0, 4, 0), nearest.Root.Position, color)
+					fx("Arc", center + Vector3.new(0, 4 * size, 0), nearest.Root.Position, color)
 					caster.Hit(nearest, damage / ticks, nil)
 				end
 			end)

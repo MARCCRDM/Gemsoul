@@ -3,7 +3,8 @@
 -- seams, bigger further out, lone rocks and stepping stones between, a rich
 -- ground field), the Rift Veins (sites round the walls, six rocks each,
 -- far apart, where one moves next, compass points), richer rocks outward
--- (Shared.Outpost.Zones: the same mix everywhere, more luck), mining noise and incursions, fair shares,
+-- (Shared.Outpost.Zones: the same mix everywhere, more luck), mining noise and incursions, stirring the
+-- frontier up (it builds with swings, settles when you stop, and brings more, higher-levelled critters), fair shares,
 -- critter levels and EXP, where rifts open (wandering ones too), their
 -- timeline, their ragged, lopsided tears, and the HUD's noise ring and
 -- arrows.
@@ -305,6 +306,111 @@ check(Frontier.share(Frontier.Caps.Edge, 1) == Frontier.Caps.Edge, "One player's
 check(Frontier.share(Frontier.Caps.Edge, 6) == 2, "Six out there don't get two each")
 check(Frontier.share(Frontier.Caps.Edge, 30) == 1, "A crowd left someone with none")
 
+-- Stirring it up: the longer you mine, the harder it pushes back ------------------------------------------
+local D = Frontier.Disturbance
+local function swingsToStir(band, to)
+	local stir, swings = 0, 0
+	while stir < to and swings < 5000 do
+		stir = Frontier.stir(stir, band, 1)
+		swings += 1
+	end
+	return swings
+end
+check(Frontier.stir(0.4, "Core", 50) == 0.4, "Swinging in the core stirred it up")
+check(math.abs(swingsToStir("Fringe", 1) - 400) <= 1, "Not about 400 swings to stir the fringe up")
+check(math.abs(swingsToStir("Edge", 1) - 250) <= 1, "Not about 250 swings to stir the edge up")
+check(Frontier.stir(0.9, "Edge", 500) == 1, "Stirred past full")
+check(math.abs(Frontier.stir(0, "Edge", 3) - 3 * D.PerSwing.Edge) < 1e-9, "A mech's strike of 3 swings")
+-- It holds while you keep at it, settles once you stop (only the seconds
+-- past the rest), and faster back in the core.
+check(Frontier.settle(0.6, "Edge", 0.5, 3) == 0.6, "It settled mid-mining")
+check(Frontier.settle(0.6, "Fringe", 0.5, D.Rest - 0.1) == 0.6, "It settled before the rest was up")
+check(
+	math.abs(Frontier.settle(0.6, "Fringe", 1, D.Rest + 0.25) - (0.6 - D.Fade * 0.25)) < 1e-9,
+	"Only the seconds past the rest"
+)
+check(
+	math.abs(Frontier.settle(0.6, "Edge", 1, D.Rest + 10) - (0.6 - D.Fade)) < 1e-9,
+	"It didn't settle once you stopped"
+)
+check(math.abs(Frontier.settle(0.6, "Core", 1, 0) - (0.6 - D.CoreFade)) < 1e-9, "The core didn't settle it at once")
+check(Frontier.settle(0.01, "Core", 10, 0) == 0 and Frontier.settle(0.01, "Edge", 10, 999) == 0, "Settled past calm")
+local function secondsToSettle(band)
+	local stir, t = 1, 0
+	while stir > 0 and t < 3600 do
+		stir = Frontier.settle(stir, band, 0.5, D.Rest + t)
+		t += 0.5
+	end
+	return t
+end
+check(math.abs(secondsToSettle("Fringe") - 1 / D.Fade) <= 1, "Not about two minutes to settle out there")
+check(math.abs(secondsToSettle("Core") - 1 / D.CoreFade) <= 1, "Not about half a minute to settle in the core")
+check(1 / D.CoreFade < 1 / D.Fade, "The core doesn't settle it sooner")
+-- Its stages, in order.
+check(Frontier.stage(0) == 1 and Frontier.stage(nil) == 1 and Frontier.stage(1) == #D.Stages, "The stages' ends")
+local lastAt, lastExtra, lastCap = -1, -1, -1
+for i, stage in D.Stages do
+	check(stage.At > lastAt and stage.Extra >= lastExtra and stage.Cap >= lastCap, "Stage " .. i .. " out of order")
+	check(Frontier.stage(stage.At) == i, "Stage " .. i .. " doesn't start at its At")
+	check(i == 1 or Frontier.stage(stage.At - 0.001) == i - 1, "Stage " .. i .. " starts early")
+	check(type(stage.Name) == "string" and #stage.Name > 0, "Stage " .. i .. " has no name")
+	lastAt, lastExtra, lastCap = stage.At, stage.Extra, stage.Cap
+end
+local _, top = Frontier.stage(1)
+check(top.Extra >= 2 and top.Cap >= 2, "Swarming isn't much harder")
+-- Stirred up: encounters sooner (twice as often, full), more critters at
+-- once and more allowed round you (never in the core), higher-levelled.
+local function swingsToStirred(band, stir)
+	local noise, swings = 0, 0
+	while noise < 1 and swings < 500 do
+		noise = Frontier.noise(noise, band, 1, 0, 0.5, stir)
+		swings += 1
+	end
+	return swings
+end
+check(swingsToStirred("Fringe", 0) == swingsTo("Fringe", 0.5), "A calm frontier's noise changed")
+check(
+	math.abs(swingsToStirred("Fringe", 1) - swingsTo("Fringe", 0.5) / 2) <= 1,
+	"Full, encounters aren't twice as often"
+)
+check(swingsToStirred("Edge", 0.5) < swingsTo("Edge", 0.5), "Stirred up, swings aren't louder")
+check(Frontier.noise(0.2, "Core", 10, 60, 0.5, 1) == 0.2, "A stirred-up core made noise")
+check(
+	Frontier.noise(0, "Edge", 0, 10, nil, 1) == Frontier.noise(0, "Edge", 0, 10),
+	"Standing about stirred up got louder"
+)
+for roll = 0, 0.99, 0.05 do
+	for i, stage in D.Stages do
+		check(
+			Frontier.incursion("Fringe", roll, stage.At) == Frontier.incursion("Fringe", roll) + stage.Extra,
+			"Fringe at stage " .. i
+		)
+		check(
+			Frontier.incursion("Edge", roll, stage.At) == Frontier.incursion("Edge", roll) + stage.Extra,
+			"Edge at stage " .. i
+		)
+		check(Frontier.incursion("Core", roll, stage.At) == 0, "Critters in a stirred-up core")
+	end
+	check(Frontier.incursion("Edge", roll, 1) <= Frontier.capFor("Edge", 1), "A swarming encounter past its cap")
+	check(
+		Frontier.incursion("Fringe", roll, 1) <= Frontier.capFor("Fringe", 1),
+		"A swarming fringe encounter past its cap"
+	)
+end
+check(
+	Frontier.capFor("Fringe") == Frontier.Caps.Fringe and Frontier.capFor("Edge", 0.1) == Frontier.Caps.Edge,
+	"A calm cap"
+)
+check(Frontier.capFor("Edge", 1) == Frontier.Caps.Edge + top.Cap, "A swarming cap")
+check(Frontier.capFor("Core", 1) == 0, "Critters allowed in the core")
+check(Frontier.capFor("Edge", 1) * 2 <= Frontier.Caps.Server, "Two swarming miners fill the Outpost")
+check(
+	Frontier.critterLevel("Fringe", nil, 0) == 1 and Frontier.critterLevel("Fringe", nil, 1) == 1 + D.Levels,
+	"Levels when stirred"
+)
+check(Frontier.critterLevel("Edge", nil, 0.5) == 9 + math.floor(D.Levels / 2), "Halfway, half the levels")
+check(Frontier.critterLevel("Edge", nil, 7) == 9 + D.Levels, "More than full stirred")
+
 -- Critters by band: levels, EXP, coins -----------------------------------------------------------------------
 for _ = 1, 100 do
 	local fringe, edge = Frontier.critterLevel("Fringe", rng), Frontier.critterLevel("Edge", rng)
@@ -465,6 +571,19 @@ for _, band in Frontier.BandOrder do
 end
 -- The noise ring: twenty dots, in twentieths.
 check(FrontierHud.lit(nil) == 0 and FrontierHud.lit(0.5) == 10 and FrontierHud.lit(1.4) == 20, "The noise ring's dots")
+-- The stirred-up row: nothing while calm, then the stage's name over a bar,
+-- warmer as it swarms.
+check(FrontierHud.stirRow(nil) == nil and FrontierHud.stirRow(0.2) == nil, "A calm frontier showed a stirred-up row")
+local restless, restlessColor, restlessFill = FrontierHud.stirRow(0.3)
+check(restless == "RESTLESS" and math.abs(restlessFill - 0.3) < 1e-9, "The restless row")
+local swarming, swarmingColor, swarmingFill = FrontierHud.stirRow(1.7)
+check(swarming == "SWARMING" and swarmingFill == 1, "The swarming row")
+check(swarmingColor ~= restlessColor and swarmingColor.G < restlessColor.G, "Swarming isn't redder than restless")
+for i, stage in Frontier.Disturbance.Stages do
+	local text = FrontierHud.stirRow(stage.At)
+	check(i == 1 or text == string.upper(stage.Name), "Stage " .. i .. "'s row")
+	check(i == 1 or Frontier.Disturbance.Notes[i] ~= nil, "Nobody's told of stage " .. i)
+end
 -- Arrows for rifts off screen: on the screen's edge, pointing at it.
 local screen = Vector2.new(1000, 600)
 local at, angle = FrontierHud.edge(screen, Vector2.new(3000, 300), 40)
@@ -485,7 +604,7 @@ check(FrontierHud.nearest({}, Vector3.zero, 100) == nil, "A sighting with none a
 
 print(
 	string.format(
-		"PASS: %d frontier checks (bands, outcrops, veins, noise, shares, critters, rifts, tears, the HUD)",
+		"PASS: %d frontier checks (bands, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD)",
 		checks
 	)
 )

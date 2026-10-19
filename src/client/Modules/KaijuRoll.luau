@@ -1,11 +1,14 @@
 --[[
 	The kaiju starter roll (KaijuServer; see docs/kaiju.md): a full-screen
-	reveal of the kaiju you start with, like the intro's gem roll. A card for
-	each, its window a reel of kaiju (every kind, every element) turning past
-	and slowing till it lands on yours: a flash in its Gemsoul's rarity, then
-	its name, what it is, and its moves (E from the start, Q at level 5, R at
-	level 10). Click to land them all at once. MEET YOUR TEAM claims them;
-	the server keeps the roll till then, so leaving doesn't reroll it.
+	reveal of the three kaiju you start with, like the intro's gem roll. A
+	card for each, its stage a reel of kaiju (every kind, every element)
+	turning past under a spotlight and slowing till it lands on yours: a
+	flash in its Gemsoul's rarity, then its name and kind, its health,
+	damage and speed (bars against the toughest, hardest-hitting and
+	quickest of the kinds), and its three moves with their icons (E from the
+	start, Q at level 5, R at level 10). Click to land them all at once. MEET
+	YOUR TEAM claims them, and they're your team; the server keeps the roll
+	till then, so leaving doesn't reroll it.
 
 	  KaijuRoll.play(after)   the roll you're owed, then after() (at once if
 	                          there's none): in the intro after the gem roll,
@@ -23,6 +26,7 @@ local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
+local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
 
 local new = IronUi.new
@@ -42,9 +46,10 @@ local C = {
 	Good = Color3.fromRGB(90, 220, 150),
 }
 local RANKS = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
-local BOARD_W, BOARD_H = 900, 612
-local CARD_W, CARD_H, GAP = 284, 440, 16
-local VIEW_H = 190
+local BOARD_W, BOARD_H = 900, 650
+local CARD_W, CARD_H, GAP = 284, 470, 16
+local VIEW_H = 200
+local SHORT_VIEW_H = 150 -- the stage on a short (phone) screen, so the cards scale up
 local LANDS = { 2.1, 3.0, 3.9 } -- seconds till each card lands
 local AUTO = 20 -- seconds till MEET YOUR TEAM goes on its own
 local DECOYS = 3 -- other kaiju on each reel
@@ -52,6 +57,16 @@ local DECOYS = 3 -- other kaiju on each reel
 local function elementColor(element: string?): Color3
 	return GemConfig.ElementColors[element or ""] or C.Gold
 end
+
+-- The most any kind starts with (at the best Gemsoul), for the stat bars.
+local TOP_STATS = { Health = 1, Damage = 1, Speed = 1 }
+for id in Kaiju.Species do
+	local stats = Kaiju.stats(id, Kaiju.StarterLevel, "Legendary")
+	for key in TOP_STATS do
+		TOP_STATS[key] = math.max(TOP_STATS[key], stats[key])
+	end
+end
+local STAT_ROWS = { { "Health", "HEALTH" }, { "Damage", "DAMAGE" }, { "Speed", "SPEED" } }
 
 local function frame(parent: Instance, props: { [string]: any }): Frame
 	return new("Frame", props, parent)
@@ -201,11 +216,16 @@ function KaijuRoll.play(after: (() -> ())?)
 	}, floorGlow)
 	tween(floorGlow, 0.8, { BackgroundTransparency = 0 })
 
-	-- Everything sits on one board, scaled to fit the screen.
+	-- Everything sits on one board, scaled to fit the screen (a short one's
+	-- stages lower, so the cards come out bigger).
+	local camera = workspace.CurrentCamera
+	local viewport = camera and camera.ViewportSize
+	local stageH = if viewport and viewport.Y > 0 and viewport.Y < 480 then SHORT_VIEW_H else VIEW_H
+	local cardH, boardH = CARD_H - (VIEW_H - stageH), BOARD_H - (VIEW_H - stageH)
 	local board = frame(shade, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(BOARD_W, BOARD_H),
+		Size = UDim2.fromOffset(BOARD_W, boardH),
 		BackgroundTransparency = 1,
 		ZIndex = 2,
 	})
@@ -237,7 +257,7 @@ function KaijuRoll.play(after: (() -> ())?)
 		local short = size.Y < 480
 		kicker.Visible, title.Visible, subtitle.Visible = not short, not short, not short
 		local scale =
-			math.min(1.1, size.X / (BOARD_W + 40), size.Y / (if short then BOARD_H - TOP + 16 else BOARD_H + 30))
+			math.min(1.1, size.X / (BOARD_W + 40), size.Y / (if short then boardH - TOP + 16 else boardH + 30))
 		fitScale.Scale = scale
 		board.Position = UDim2.new(0.5, 0, 0.5, if short then -(TOP - 8) / 2 * scale else 0)
 	end
@@ -259,7 +279,7 @@ function KaijuRoll.play(after: (() -> ())?)
 		local card = frame(board, {
 			Name = "KaijuRollCard",
 			Position = UDim2.fromOffset(x, TOP + 40),
-			Size = UDim2.fromOffset(CARD_W, CARD_H),
+			Size = UDim2.fromOffset(CARD_W, cardH),
 			BackgroundColor3 = C.Card,
 			BackgroundTransparency = 1,
 			ZIndex = 2,
@@ -303,33 +323,89 @@ function KaijuRoll.play(after: (() -> ())?)
 		pillText.Size, pillText.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
 		pillText.ZIndex = 4
 
-		-- The window: a glow of the element passing by, behind the kaiju.
+		-- The stage: a spotlit backdrop in the element passing by, a glowing
+		-- floor under the kaiju, and its element named in the corner.
 		local window = frame(card, {
 			Name = "Window",
 			Position = UDim2.fromOffset(12, 40),
-			Size = UDim2.new(1, -24, 0, VIEW_H),
-			BackgroundColor3 = C.Ink,
+			Size = UDim2.new(1, -24, 0, stageH),
+			BackgroundColor3 = Color3.new(1, 1, 1),
 			ClipsDescendants = true,
 			ZIndex = 3,
 		})
 		UiKit.round(window, 12)
+		local backdrop = new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(C.Line:Lerp(C.Ink, 0.4), C.Ink),
+		}, window)
 		local windowEdge = stroke(window, C.Line, 0.3, 2)
 		local glow = frame(window, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.62),
-			Size = UDim2.fromScale(0.9, 0.9),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.8, 0.95),
 			BackgroundColor3 = C.Line,
-			BackgroundTransparency = 0.75,
+			BackgroundTransparency = 0.85,
 			ZIndex = 3,
 		})
 		UiKit.round(glow, 999)
+		new("UIGradient", {
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.5, 0),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}, glow)
+		-- (The floor it stands on: a pool of light and its bright core.)
+		local fadeEnds = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		local floorPool = frame(window, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.86),
+			Size = UDim2.fromScale(0.9, 0.16),
+			BackgroundColor3 = C.Line,
+			BackgroundTransparency = 0.7,
+			ZIndex = 3,
+		})
+		UiKit.round(floorPool, 999)
+		new("UIGradient", { Transparency = fadeEnds }, floorPool)
+		local floorCore = frame(window, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.86),
+			Size = UDim2.fromScale(0.5, 0.06),
+			BackgroundColor3 = C.Text,
+			BackgroundTransparency = 0.85,
+			ZIndex = 3,
+		})
+		UiKit.round(floorCore, 999)
+		new("UIGradient", { Transparency = fadeEnds }, floorCore)
+		local elementPill = frame(window, {
+			Position = UDim2.fromOffset(8, 8),
+			Size = UDim2.fromOffset(86, 18),
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 0.3,
+			Visible = false,
+			ZIndex = 6,
+		})
+		UiKit.round(elementPill, 9)
+		local elementText = label(
+			elementPill,
+			string.upper(GemConfig.ElementLabels[entry.Element] or entry.Element or ""),
+			10,
+			color,
+			Enum.Font.GothamBlack
+		)
+		elementText.Size, elementText.TextXAlignment, elementText.ZIndex =
+			UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 7
 		local view = new("ViewportFrame", {
 			Name = "KaijuView",
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
-			Ambient = Color3.fromRGB(170, 170, 185),
-			LightColor = Color3.new(1, 1, 1),
-			LightDirection = Vector3.new(-0.4, -1, 0.6),
+			Ambient = Color3.fromRGB(150, 156, 176),
+			LightColor = Color3.fromRGB(255, 246, 232),
+			LightDirection = Vector3.new(-0.5, -0.8, 0.7),
 			ZIndex = 4,
 		}, window)
 		local camera = Instance.new("Camera")
@@ -344,23 +420,53 @@ function KaijuRoll.play(after: (() -> ())?)
 		})
 		UiKit.round(flash, 12)
 
-		-- Under the window: the one going past, then yours.
+		-- Under the stage: the one going past, then yours.
 		local name = label(card, "", 22, C.Dim, Enum.Font.GothamBlack)
 		name.TextXAlignment = Enum.TextXAlignment.Center
-		name.Position, name.Size = UDim2.fromOffset(12, 238), UDim2.new(1, -24, 0, 26)
+		name.Position, name.Size = UDim2.fromOffset(12, 48 + stageH), UDim2.new(1, -24, 0, 26)
 		UiKit.fit(name)
 		local tag = label(card, "", 12, C.Faint, Enum.Font.GothamBold)
 		tag.TextXAlignment = Enum.TextXAlignment.Center
-		tag.Position, tag.Size = UDim2.fromOffset(12, 264), UDim2.new(1, -24, 0, 16)
-		local blurb = label(card, "", 12, C.Dim, Enum.Font.GothamMedium)
-		blurb.TextXAlignment, blurb.TextYAlignment = Enum.TextXAlignment.Center, Enum.TextYAlignment.Top
-		blurb.TextWrapped = true
-		blurb.Position, blurb.Size = UDim2.fromOffset(18, 284), UDim2.new(1, -36, 0, 32)
+		tag.Position, tag.Size = UDim2.fromOffset(12, 74 + stageH), UDim2.new(1, -24, 0, 16)
 
-		-- Its moves, from its Gemsoul: E now, Q and R as it levels.
+		-- Its health, damage and speed: bars against the best of the kinds.
+		local statsBox = frame(card, {
+			Position = UDim2.fromOffset(16, 98 + stageH),
+			Size = UDim2.new(1, -32, 0, 56),
+			BackgroundTransparency = 1,
+			Visible = false,
+			ZIndex = 3,
+		})
+		local startStats = Kaiju.stats(entry.Species, Kaiju.StarterLevel, tier)
+		local statFills = {}
+		for row, stat in STAT_ROWS do
+			local y = (row - 1) * 19
+			local word = label(statsBox, stat[2], 10, C.Dim, Enum.Font.GothamBlack)
+			word.Position, word.Size = UDim2.fromOffset(0, y), UDim2.fromOffset(64, 16)
+			local back = frame(statsBox, {
+				Position = UDim2.fromOffset(66, y + 5),
+				Size = UDim2.new(1, -112, 0, 6),
+				BackgroundColor3 = C.Panel,
+				ZIndex = 3,
+			})
+			UiKit.round(back, 3)
+			local fill = frame(back, {
+				Size = UDim2.fromScale(0, 1),
+				BackgroundColor3 = color,
+				ZIndex = 4,
+			})
+			UiKit.round(fill, 3)
+			local value = startStats and startStats[stat[1]] or 0
+			local number = label(statsBox, tostring(math.floor(value + 0.5)), 12, C.Text, Enum.Font.GothamBlack)
+			number.AnchorPoint, number.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+			number.Position, number.Size = UDim2.new(1, 0, 0, y), UDim2.fromOffset(42, 16)
+			statFills[row] = { Fill = fill, Share = math.clamp(value / TOP_STATS[stat[1]], 0.08, 1) }
+		end
+
+		-- Its moves, from its Gemsoul, with their icons: E now, Q and R as it levels.
 		local moves = frame(card, {
-			Position = UDim2.fromOffset(12, 324),
-			Size = UDim2.new(1, -24, 0, 104),
+			Position = UDim2.fromOffset(12, 160 + stageH),
+			Size = UDim2.new(1, -24, 0, 98),
 			BackgroundTransparency = 1,
 			Visible = false,
 			ZIndex = 3,
@@ -371,15 +477,16 @@ function KaijuRoll.play(after: (() -> ())?)
 			local row = frame(moves, {
 				Name = "Move" .. key,
 				LayoutOrder = order,
-				Size = UDim2.new(1, 0, 0, 32),
+				Size = UDim2.new(1, 0, 0, 30),
 				BackgroundColor3 = if awake then color:Lerp(C.Ink, 0.78) else C.Panel,
 				ZIndex = 3,
 			})
 			UiKit.round(row, 8)
 			stroke(row, if awake then color else C.Line, if awake then 0.45 else 0.2, 1)
+			-- (The move's icon, its key on the corner; the key alone till the icons load.)
 			local chip = frame(row, {
-				Position = UDim2.fromOffset(5, 5),
-				Size = UDim2.fromOffset(22, 22),
+				Position = UDim2.fromOffset(4, 3),
+				Size = UDim2.fromOffset(24, 24),
 				BackgroundColor3 = if awake then color else C.Ink,
 				ZIndex = 4,
 			})
@@ -389,8 +496,24 @@ function KaijuRoll.play(after: (() -> ())?)
 			end
 			local letter = label(chip, key, 13, if awake then C.Ink else C.Faint, Enum.Font.GothamBlack)
 			letter.Size, letter.TextXAlignment, letter.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 5
+			local move = id and GemTraits.Moves[id]
+			local ok, drawn = pcall(SurgeIcons.apply, chip, move, color)
+			if ok and drawn then
+				pcall(SurgeIcons.dim, chip, not awake)
+				local badge = frame(chip, {
+					AnchorPoint = Vector2.new(1, 1),
+					Position = UDim2.new(1, 3, 1, 3),
+					Size = UDim2.fromOffset(13, 13),
+					BackgroundColor3 = if awake then color else C.Ink,
+					ZIndex = 6,
+				})
+				UiKit.round(badge, 4)
+				local small = label(badge, key, 9, if awake then C.Ink else C.Faint, Enum.Font.GothamBlack)
+				small.Size, small.TextXAlignment, small.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 7
+				letter.Visible = false
+			end
 			local word = label(row, moveName(id), 13, if awake then C.Text else C.Dim, Enum.Font.GothamBold)
-			word.Position, word.Size, word.ZIndex = UDim2.fromOffset(34, 0), UDim2.new(1, -100, 1, 0), 4
+			word.Position, word.Size, word.ZIndex = UDim2.fromOffset(36, 0), UDim2.new(1, -100, 1, 0), 4
 			local note = label(
 				row,
 				if awake then "READY" else string.format("LV %d", Kaiju.MoveLevels[key] or 1),
@@ -445,7 +568,11 @@ function KaijuRoll.play(after: (() -> ())?)
 			item.Shown = s
 			s.Model.Parent = view
 			camera.CFrame = s.Camera
-			glow.BackgroundColor3 = elementColor(element)
+			-- (The stage takes on the element passing by.)
+			local tint = elementColor(element)
+			glow.BackgroundColor3 = tint
+			floorPool.BackgroundColor3 = tint
+			backdrop.Color = ColorSequence.new(tint:Lerp(C.Ink, 0.84), C.Ink)
 		end
 		function item.land(quick: boolean)
 			if item.Landed then
@@ -460,7 +587,10 @@ function KaijuRoll.play(after: (() -> ())?)
 				end
 			end
 			item.LandedAt = os.clock()
-			glow.BackgroundTransparency = 0.55
+			glow.BackgroundTransparency = 0.7
+			floorPool.BackgroundTransparency = 0.45
+			floorCore.BackgroundTransparency = 0.55
+			elementPill.Visible = true
 			windowEdge.Color, windowEdge.Transparency = tierColor, 0
 			edge.Color, edge.Transparency, edge.Thickness = color, 0.1, 2
 			cardGradient.Color = ColorSequence.new(color:Lerp(C.Card, 0.8), C.Ink)
@@ -473,7 +603,11 @@ function KaijuRoll.play(after: (() -> ())?)
 			name.TextColor3 = color:Lerp(C.Text, 0.2)
 			tag.Text = string.format("%s  ·  LV %d", string.upper(species and species.Role or ""), Kaiju.StarterLevel)
 			tag.TextColor3 = C.Dim
-			blurb.Text = if species then species.Blurb else ""
+			statsBox.Visible = true
+			for row, stat in statFills do
+				stat.Fill.Size = UDim2.fromScale(0, 1)
+				tween(stat.Fill, if quick then 0.2 else 0.5 + row * 0.12, { Size = UDim2.fromScale(stat.Share, 1) })
+			end
 			moves.Visible = true
 			if not quick then
 				LotterySound.play("Lock")
@@ -487,7 +621,7 @@ function KaijuRoll.play(after: (() -> ())?)
 	local go = new("TextButton", {
 		Name = "MeetTeam",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, TOP + CARD_H + 18),
+		Position = UDim2.new(0.5, 0, 0, TOP + cardH + 18),
 		Size = UDim2.fromOffset(320, 50),
 		BackgroundColor3 = C.Gold,
 		Text = "MEET YOUR TEAM   ›",
@@ -510,7 +644,7 @@ function KaijuRoll.play(after: (() -> ())?)
 	})
 	local hint = label(board, "Click to skip", 12, C.Faint, Enum.Font.GothamMedium)
 	hint.TextXAlignment = Enum.TextXAlignment.Center
-	hint.Position, hint.Size = UDim2.fromOffset(0, TOP + CARD_H + 30), UDim2.new(1, 0, 0, 16)
+	hint.Position, hint.Size = UDim2.fromOffset(0, TOP + cardH + 30), UDim2.new(1, 0, 0, 16)
 
 	-- Claiming: they join you, and on to whatever's next.
 	local claiming, claimed = false, false
@@ -555,7 +689,11 @@ function KaijuRoll.play(after: (() -> ())?)
 		end
 		finished = true
 		title.Text = "MEET YOUR TEAM"
-		subtitle.Text = "E is ready now; Q wakes at level 5, R at level 10. Feed them stones to grow."
+		subtitle.Text = string.format(
+			"E is ready now; Q wakes at level %d, R at level %d. They grow by fighting beside you and as you mine.",
+			Kaiju.MoveLevels.Q,
+			Kaiju.MoveLevels.R
+		)
 		hint.Visible = false
 		LotterySound.hum(false)
 		go.Visible = true

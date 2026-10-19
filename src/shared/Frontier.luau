@@ -42,6 +42,11 @@
 	                 (Wander), 35 to 70 studs from someone out there: a few
 	                 critters roam that patch for about a minute, going for
 	                 whoever comes close. Go round it, or bring your kaiju.
+	Stirred up: the longer you mine out there, the harder the frontier
+	pushes back (Disturbance): every swing stirs it, and it settles again
+	once you stop or head back to the core. Stirred up, your swings draw
+	encounters sooner, more critters come through at once and more may be
+	about you, and they come higher-levelled.
 	A critter's level comes from where it came through (Levels: the edge's
 	are a real step up), and so do its EXP and coins (Frontier.critterExp,
 	Coins). Clearing a wandering rift leaves everyone who helped Rift
@@ -58,10 +63,14 @@
 	  Frontier.apart(a, b) -> radians between two angles round the middle
 	  Frontier.pickSite(sites, taken, others, rng) -> index?   where a vein goes next
 	  Frontier.compass(angle) -> "north-east" ...   a direction from the middle
-	  Frontier.noise(noise, band, swings, seconds, roll?) -> noise   (an encounter at 1)
-	  Frontier.incursion(band, roll) -> critters at once
+	  Frontier.noise(noise, band, swings, seconds, roll?, stir?) -> noise   (an encounter at 1)
+	  Frontier.stir(stir, band, swings) -> stir   (0..1: how stirred up)
+	  Frontier.settle(stir, band, seconds, quiet) -> stir   `quiet` seconds since a swing
+	  Frontier.stage(stir) -> index, { At, Name, Extra, Cap }
+	  Frontier.incursion(band, roll, stir?) -> critters at once
+	  Frontier.capFor(band, stir?) -> critters allowed round one player
 	  Frontier.share(cap, playersOut) -> critters at once round one player
-	  Frontier.critterLevel(band, rng) -> level
+	  Frontier.critterLevel(band, rng, stir?) -> level
 	  Frontier.critterExp(level, band, today) -> EXP for a kaiju that fought it
 	  Frontier.riftSpot(position, facing, center, rng) -> Vector3   where a rift opens
 	  Frontier.wanderSpot(position, center, rng) -> Vector3   where a wandering rift opens
@@ -149,6 +158,36 @@ Frontier.Noise = {
 -- Outpost, shared fairly between those out there. (Each is a whole
 -- brainrot body: dozens at once made the Outpost lag.)
 Frontier.Caps = { Fringe = 2, Edge = 3, Server = 12 }
+-- Stirring the frontier up: the longer you mine out there, the harder it
+-- pushes back. Every swing past the core stirs it (PerSwing: full after
+-- about 400 swings in the fringe, 250 at the edge, six or four minutes of
+-- steady mining); it holds while you keep at it and settles once you stop
+-- (after Rest seconds without a swing, Fade a second: two minutes from
+-- full; in the core, CoreFade: half a minute). Stirred up, your swings make
+-- more noise (each swing's noise times 1 + Noise x the stir: twice as many
+-- encounters, full), and critters come Levels levels higher (full; a share
+-- of it on the way). Each Stage adds Extra critters to every encounter and
+-- lets Cap more about you at once (still within the Outpost's cap); Notes
+-- are what you're told as it gets to each.
+Frontier.Disturbance = {
+	PerSwing = { Fringe = 1 / 400, Edge = 1 / 250 },
+	Rest = 20,
+	Fade = 1 / 120,
+	CoreFade = 1 / 30,
+	Noise = 1,
+	Levels = 4,
+	Stages = {
+		{ At = 0, Name = "Calm", Extra = 0, Cap = 0 },
+		{ At = 0.25, Name = "Restless", Extra = 0, Cap = 0 },
+		{ At = 0.5, Name = "Stirred up", Extra = 1, Cap = 1 },
+		{ At = 0.8, Name = "Swarming", Extra = 2, Cap = 2 },
+	},
+	Notes = {
+		[2] = "The frontier is restless: critters come sooner.",
+		[3] = "The frontier is stirred up: more critters, and tougher.",
+		[4] = "The frontier is swarming! Head back to the core to let it settle.",
+	},
+}
 -- A critter with no one to fight this long slips back through a rift; none
 -- stays longer than Life seconds.
 Frontier.Leave, Frontier.Life = 4, 90
@@ -368,15 +407,72 @@ end
 
 -- A player's mining noise after `swings` swings and `seconds` seconds out
 -- in `band` (the core adds nothing). `roll` (0..1) sets each swing's share
--- within Noise.Spread.
-function Frontier.noise(noise: number, band: string, swings: number, seconds: number, roll: number?): number
+-- within Noise.Spread; `stir` (0..1) makes each swing louder.
+function Frontier.noise(
+	noise: number,
+	band: string,
+	swings: number,
+	seconds: number,
+	roll: number?,
+	stir: number?
+): number
 	local swing, idle = Frontier.Noise.Swing[band], Frontier.Noise.Idle[band]
 	if not swing then
 		return noise
 	end
 	local spread = Frontier.Noise.Spread
 	local share = spread[1] + (spread[2] - spread[1]) * (roll or 0.5)
-	return noise + swing * swings * share + idle * seconds
+	local louder = 1 + Frontier.Disturbance.Noise * math.clamp(stir or 0, 0, 1)
+	return noise + swing * swings * share * louder + idle * seconds
+end
+
+-- How stirred up the frontier is after `swings` more swings in `band` (the
+-- core stirs nothing).
+function Frontier.stir(stir: number, band: string, swings: number): number
+	local per = Frontier.Disturbance.PerSwing[band]
+	if not per then
+		return stir
+	end
+	return math.clamp(stir + per * swings, 0, 1)
+end
+
+-- How stirred up it is `seconds` later in `band`, `quiet` seconds since
+-- the last swing: it holds while you keep mining, settles after Rest
+-- seconds without a swing, and faster in the core.
+function Frontier.settle(stir: number, band: string, seconds: number, quiet: number): number
+	local d = Frontier.Disturbance
+	if band == "Core" then
+		return math.max(0, stir - d.CoreFade * seconds)
+	end
+	-- (Only the part of these seconds past the rest settles it.)
+	local resting = math.min(seconds, quiet - d.Rest)
+	if resting <= 0 then
+		return stir
+	end
+	return math.max(0, stir - d.Fade * resting)
+end
+
+-- Its stage at `stir`: index, { At, Name, Extra, Cap }.
+function Frontier.stage(stir: number?)
+	local stages = Frontier.Disturbance.Stages
+	local at = 1
+	for i, stage in stages do
+		if (stir or 0) >= stage.At then
+			at = i
+		end
+	end
+	return at, stages[at]
+end
+
+-- Critters allowed round one player out in `band` (before the fair
+-- share): the band's cap and its stage's more.
+function Frontier.capFor(band: string, stir: number?): number
+	local cap = Frontier.Caps[band] or 0
+	if cap <= 0 then
+		return 0
+	end
+	local _, stage = Frontier.stage(stir)
+	return cap + stage.Cap
 end
 
 -- Critters at once round one player: their band's cap, or a fair share of
@@ -385,10 +481,12 @@ function Frontier.share(cap: number, playersOut: number): number
 	return math.min(cap, math.max(1, math.floor(Frontier.Caps.Server / math.max(1, playersOut))))
 end
 
--- A critter's level, by where it came through.
-function Frontier.critterLevel(band: string, rng): number
+-- A critter's level, by where it came through, higher the more stirred up
+-- (`stir`) it is.
+function Frontier.critterLevel(band: string, rng, stir: number?): number
 	local range = Frontier.Levels[band] or Frontier.Levels.Fringe
-	return if rng then rng:NextInteger(range[1], range[2]) else range[1]
+	local level = if rng then rng:NextInteger(range[1], range[2]) else range[1]
+	return level + math.floor(Frontier.Disturbance.Levels * math.clamp(stir or 0, 0, 1) + 1e-9)
 end
 
 -- EXP for a kaiju that fought a critter of `level` from `band`, its owner
@@ -403,12 +501,14 @@ function Frontier.critterExp(level: number, band: string?, today: number?): numb
 	return math.max(1, math.floor(exp + 0.5))
 end
 
--- How many critters come through at once (`roll` in [0, 1)).
-function Frontier.incursion(band: string, roll: number): number
+-- How many critters come through at once (`roll` in [0, 1)), more the
+-- more stirred up (`stir`) it is.
+function Frontier.incursion(band: string, roll: number, stir: number?): number
+	local _, stage = Frontier.stage(stir)
 	if band == "Edge" then
-		return if roll < 0.6 then 2 else 3
+		return (if roll < 0.6 then 2 else 3) + stage.Extra
 	elseif band == "Fringe" then
-		return if roll < 0.75 then 1 else 2
+		return (if roll < 0.75 then 1 else 2) + stage.Extra
 	end
 	return 0
 end

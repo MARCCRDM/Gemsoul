@@ -189,6 +189,21 @@ end
 local function fx(kind: string, ...)
 	Remotes.CombatFx:FireAllClients(kind, ...)
 end
+-- An effect at a creature's size ("Sized": the client draws it, sounds it
+-- and shakes your screen as big as it stands, FxSize).
+local function sizedFx(size: number, kind: string, ...)
+	if size == 1 then
+		fx(kind, ...)
+	else
+		fx("Sized", size, kind, ...)
+	end
+end
+-- How big one stands next to you (Kaiju.size).
+local function sizeOf(wild: Wild): number
+	return if wild.Bug
+		then Kaiju.Bug.Size
+		else Kaiju.size(if wild.Guard then Kaiju.Scale.Guardian else Kaiju.Scale.Wild)
+end
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
@@ -676,6 +691,24 @@ local function clearPath(wild: Wild, from: Vector3, to: Vector3): boolean
 	return not ok or hit == nil or not hit.Instance.CanCollide
 end
 
+-- The straight way from `from` to `to` stays out of the keep-out zones
+-- (both ends can be clear of one and the way between cut across its edge).
+-- One it's somehow inside already, it may walk out of.
+local function wayAround(from: Vector3, to: Vector3): boolean
+	local way = flat(to - from)
+	for _, zone in if site and site.KeepOut then site.KeepOut else {} do
+		local center = flat(zone[1])
+		local start = flat(from)
+		if (start - center).Magnitude >= zone[2] then
+			local t = if way.Magnitude > 1e-3 then math.clamp((center - start):Dot(way) / way:Dot(way), 0, 1) else 0
+			if (start + way * t - center).Magnitude < zone[2] then
+				return false
+			end
+		end
+	end
+	return true
+end
+
 -- Somewhere to amble to: round its den (a packmate keeps near its leader),
 -- with a clear way there.
 local function walkTarget(wild: Wild, range: number): Vector3?
@@ -691,6 +724,7 @@ local function walkTarget(wild: Wild, range: number): Vector3?
 		local r = math.sqrt(rng:NextNumber()) * reach
 		local p = Vector3.new(around.X + math.cos(a) * r, enemy.Home.Y, around.Z + math.sin(a) * r)
 		local fits = flat(p - enemy.Home).Magnitude <= range + 4 and roomy(p, wild.Guard)
+		fits = fits and (wild.Guard or wayAround(enemy.Root.Position, p))
 		if fits and clearPath(wild, enemy.Root.Position, p) then
 			return p
 		end
@@ -759,6 +793,12 @@ local function driftDen(pack: Pack, now: number)
 		local apart = roomy(den)
 		for _, other in packs do
 			if other ~= pack and flat(other.Den - den).Magnitude < 80 then
+				apart = false
+			end
+		end
+		-- (Each member walks straight over: not through a keep-out zone.)
+		for _, member in pack.Members do
+			if member.Enemy.Alive and not wayAround(member.Enemy.Root.Position, den) then
 				apart = false
 			end
 		end
@@ -919,8 +959,8 @@ local function lob(
 	local e = enemy :: any
 	local from = enemy.Root.Position + Vector3.new(0, 1.5, 0)
 	local color = GemConfig.ElementColors[wild.Element]
-	fx("Shot", nil, from, to, color, "Bomb")
-	fx("Nova", to, radius, color, flight) -- (the ring, then the blast as it lands)
+	sizedFx(Kaiju.Bug.Size, "Shot", nil, from, to, color, "Bomb")
+	sizedFx(Kaiju.Bug.Size, "Nova", to, radius, color, flight) -- (the ring, then the blast as it lands)
 	e.Bombs = e.Bombs or {}
 	table.insert(e.Bombs, {
 		At = now + flight,
@@ -959,7 +999,7 @@ local function release(enemy, wild: Wild, move, victim, now: number)
 			hitFoe(enemy, v, amount, wild.Element, move.Status, move.Heavy == true)
 		end
 	elseif move.Shape == "Burst" then
-		fx("Zone", feet, move.Radius, move.Linger or 2, color)
+		sizedFx(Kaiju.Bug.Size, "Zone", feet, move.Radius, move.Linger or 2, color)
 		for _, v in victimsNear(enemy, wild, root.Position, move.Radius) do
 			hitFoe(enemy, v, amount, wild.Element, move.Status, nil)
 		end
@@ -970,8 +1010,8 @@ local function release(enemy, wild: Wild, move, victim, now: number)
 		local dir = if away.Magnitude > 0.05 then away.Unit else root.CFrame.LookVector
 		local length = math.min(move.Length, away.Magnitude + 5)
 		root.AssemblyLinearVelocity = dir * (length / 0.3) + Vector3.new(0, 4, 0)
-		fx("DodgeRoll", nil, start, dir, length, true)
-		fx("Swing", nil, start, dir, move.Width + 1, 120, color, true)
+		sizedFx(Kaiju.Bug.Size, "DodgeRoll", nil, start, dir, length, true)
+		sizedFx(Kaiju.Bug.Size, "Swing", nil, start, dir, move.Width + 1, 120, color, true)
 		for _, v in victimsNear(enemy, wild, start + dir * (length / 2), length / 2 + move.Width) do
 			local rel = flat(v.Root.Position - start)
 			local along = math.clamp(rel:Dot(dir), 0, length)
@@ -1030,7 +1070,13 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			if distance > reach + 1 then
 				return -- (it slipped away)
 			end
-			fx("EnemySwing", root.Position, victim.Root.Position, GemConfig.ElementColors[wild.Element])
+			sizedFx(
+				Kaiju.Bug.Size,
+				"EnemySwing",
+				root.Position,
+				victim.Root.Position,
+				GemConfig.ElementColors[wild.Element]
+			)
 			if now < (e.BlindUntil or 0) and math.random() < (e.Blind or 0) then
 				return -- swung at nothing
 			end
@@ -1071,7 +1117,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			enemy.DodgeUntil = now + rules.DodgeFor
 			root.AssemblyLinearVelocity = (side * 0.85 - dir * 0.5).Unit * 40 + Vector3.new(0, 10, 0)
 			act(enemy, "Dodge", 0, sign)
-			fx("DodgeRoll", nil, root.Position, side, 6, true)
+			sizedFx(Kaiju.Bug.Size, "DodgeRoll", nil, root.Position, side, 6, true)
 			return
 		end
 	end
@@ -1088,7 +1134,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		if move.Radius and (move.Shape == "Slam" or move.Shape == "Burst") then
 			-- A ring at its feet in warning: get out of it.
 			local feet = root.Position - Vector3.new(0, root.Size.Y / 2 + humanoid.HipHeight, 0)
-			fx("Nova", feet, move.Radius, GemConfig.ElementColors[wild.Element], move.Windup)
+			sizedFx(Kaiju.Bug.Size, "Nova", feet, move.Radius, GemConfig.ElementColors[wild.Element], move.Windup)
 		end
 		humanoid:MoveTo(root.Position)
 		lookAt(root, victim.Root.Position)
@@ -1348,7 +1394,7 @@ local function burrow(wild: Wild)
 	if not enemy.Alive then
 		return
 	end
-	fx("TriadBreak", enemy.Root.Position, 5, wild.Element)
+	sizedFx(sizeOf(wild), "TriadBreak", enemy.Root.Position, 5 * sizeOf(wild), wild.Element)
 	Enemies.remove(enemy)
 	gone(wild, true)
 end
@@ -1424,11 +1470,12 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Luck = 0,
 		Respawn = 0,
 	}
-	local enemy = Enemies.adopt(
-		model,
-		kind,
-		{ Element = element, Title = string.format("%s · Lv %d", title, level), Home = model.PrimaryPart.Position }
-	)
+	local enemy = Enemies.adopt(model, kind, {
+		Element = element,
+		Title = string.format("%s · Lv %d", title, level),
+		Home = model.PrimaryPart.Position,
+		Size = Kaiju.size(scale),
+	})
 	local e = enemy :: any
 	local engagedBy = {}
 	-- (Its name over it from further off than a creature's: they roam far.)
@@ -1497,6 +1544,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 			return {
 				Model = model,
 				Root = enemy.Root,
+				Size = Kaiju.size(scale),
 				Element = element,
 				Ability = ability,
 				Damage = Kaiju.abilityDamage(stats.Damage, soul, ability),
@@ -1682,7 +1730,7 @@ function KaijuWilds.veinMoved(index: number, scar: CFrame)
 	end
 	local old = guardian
 	if old and old.Enemy.Alive then
-		fx("TriadBreak", old.Enemy.Root.Position, 5, old.Element)
+		sizedFx(sizeOf(old), "TriadBreak", old.Enemy.Root.Position, 5 * sizeOf(old), old.Element)
 		Enemies.remove(old.Enemy)
 	end
 	if old then
@@ -1749,7 +1797,7 @@ local function resolveTame(enemy, wild: Wild, player: Player, now: number)
 			tameResult(player, "Interrupted")
 			return
 		end
-		fx("TriadBreak", enemy.Root.Position, 6, wild.Element)
+		sizedFx(sizeOf(wild), "TriadBreak", enemy.Root.Position, 6 * sizeOf(wild), wild.Element)
 		Enemies.remove(enemy)
 		gone(wild)
 		PlayerData.milestone(player, "KaijuTamed")
@@ -2030,11 +2078,12 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Luck = 0,
 			Respawn = 0,
 		}
-		local enemy = Enemies.adopt(
-			rig,
-			kind,
-			{ Element = spec.Element, Title = string.format("Moon Bug · %s · Lv %d", spec.Name, level), Home = at }
-		)
+		local enemy = Enemies.adopt(rig, kind, {
+			Element = spec.Element,
+			Title = string.format("Moon Bug · %s · Lv %d", spec.Name, level),
+			Home = at,
+			Size = Kaiju.Bug.Size,
+		})
 		local e = enemy :: any
 		e.OutpostCreature = true
 		e.Brain = brain

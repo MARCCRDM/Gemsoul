@@ -1,6 +1,7 @@
 -- lune run tests/kaiju_cases.luau <repo>
 -- Mini kaiju rules (Shared.Kaiju): stats by level and Gemsoul, the EXP curve
--- and its cap, feeding (rarity falloff by level, weakness and own element),
+-- and its cap, infusing (stones mend it and revive it: rarity, weakness and
+-- own element; only what it needs; never EXP),
 -- the tame chance curve, the hit spread, team slots, and Gemsouls (rolled in
 -- the kaiju's element, an E ability of that element, and only the E wakes).
 local fs = require("@lune/fs")
@@ -95,29 +96,110 @@ check(
 	"A kaiju kill isn't worth more than a bug"
 )
 
--- Feeding ----------------------------------------------------------------------------------
-local function feed(tier, element, level, kaijuElement)
-	return Kaiju.feedExp({ Tier = tier, Element = element }, { Level = level, Element = kaijuElement or "Fire" })
+-- Infusing --------------------------------------------------------------------------------
+-- A stone's power by rarity, double of its own element, half of the one
+-- that beats it; it mends, never EXP; down, it takes its revive cost at
+-- once and comes back at half; only the stones it needs are used.
+local Infuse = Kaiju.Infuse
+local function gem(tier, element, id)
+	return { Id = id or tier, Tier = tier, Element = element }
 end
-check(feed("Common", "Shock", 5) == Kaiju.FeedExp.Common, "A common stone isn't worth its full EXP early on")
-check(feed("Common", "Shock", 15) == Kaiju.FeedExp.Common // 2, "A common stone isn't halved past level 10")
-check(feed("Common", "Shock", 25) == Kaiju.FeedExp.Common // 4, "A common stone isn't a quarter past level 20")
-check(feed("Legendary", "Shock", 30) == Kaiju.FeedExp.Legendary, "A legendary stone lost its worth")
-check(feed("Rare", "Shock", 25) == Kaiju.FeedExp.Rare // 2, "A rare stone isn't halved past level 20")
+local fireKaiju = { Species = "Bulwark", Element = "Fire", Level = 5, Exp = 0, Soul = { Tier = "Common" } }
 local weak = ElementMatchup.weakTo("Fire")
 check(weak and weak ~= "Fire", "Fire has no weakness")
-check(feed("Rare", weak, 5) == math.floor(Kaiju.FeedExp.Rare * Kaiju.FeedWeak), "Its weakness element isn't halved")
-check(feed("Rare", "Fire", 5) == math.floor(Kaiju.FeedExp.Rare * Kaiju.FeedSame), "Its own element isn't a bonus")
-check(
-	feed("Common", weak, 25) < feed("Common", "Shock", 25) and feed("Common", weak, 25) > 0,
-	"A weak common stone on a high kaiju isn't the least (but some)"
-)
-for _, tier in { "Common", "Uncommon", "Rare", "UltraRare", "Legendary" } do
-	for level = 1, Kaiju.MaxLevel - 1 do
-		check(feed(tier, "Shock", level + 1) <= feed(tier, "Shock", level), tier .. " grows worth with level")
+local neutral = "Fire"
+for _, element in Kaiju.Elements do
+	if element ~= "Fire" and element ~= weak then
+		neutral = element
 	end
 end
-check(Kaiju.feedExp(nil, { Level = 1 }) == 0, "Feeding nothing gave EXP")
+check(Kaiju.infusePower(gem("Common", neutral), fireKaiju) == Infuse.Power.Common, "A common isn't worth its power")
+check(
+	Kaiju.infusePower(gem("Rare", "Fire"), fireKaiju) == Infuse.Power.Rare * Infuse.Same,
+	"Its own element isn't worth more"
+)
+check(
+	Kaiju.infusePower(gem("Rare", weak), fireKaiju) == Infuse.Power.Rare * Infuse.Weak,
+	"Its weakness isn't worth less"
+)
+check(Kaiju.infusePower(nil, fireKaiju) == 0, "Nothing has power")
+local lastPower = 0
+for _, tier in { "Common", "Uncommon", "Rare", "UltraRare", "Legendary" } do
+	check(Infuse.Power[tier] > lastPower, tier .. " isn't worth more than the rarity below")
+	lastPower = Infuse.Power[tier]
+end
+-- Its health: kept, full if never hurt, none if down.
+local _, most = Kaiju.health(fireKaiju)
+check(
+	select(1, Kaiju.health(fireKaiju)) == most and most == Kaiju.stats("Bulwark", 5, "Common").Health,
+	"Never hurt isn't full"
+)
+fireKaiju.Health = 30
+check(select(1, Kaiju.health(fireKaiju)) == 30, "Its kept health wasn't read")
+-- Mending: as many stones as it needs, no more.
+local stones = {}
+for i = 1, 10 do
+	stones[i] = gem("Common", neutral, "c" .. i)
+end
+fireKaiju.Health = most - most * Infuse.Mend * 2.5
+local plan = Kaiju.infusePlan(fireKaiju, stones)
+check(
+	#plan.Used == 3 and plan.Health == most and not plan.Revived,
+	"Mending 25% didn't take three commons: " .. #plan.Used
+)
+check(plan.Used[1] == stones[1] and plan.Used[3] == stones[3], "It didn't use the stones in the order given")
+fireKaiju.Health = most
+check(#Kaiju.infusePlan(fireKaiju, stones).Used == 0, "A whole kaiju took stones")
+-- Down: its revive cost all at once, or nothing.
+fireKaiju.Down, fireKaiju.Health = true, 0
+local cost = Kaiju.reviveCost(fireKaiju)
+check(cost == Infuse.Revive.Base + Infuse.Revive.PerLevel * 5, "The revive cost isn't by level")
+check(Kaiju.reviveCost({ Level = 20 }) > cost, "A higher level isn't dearer to revive")
+check(select(1, Kaiju.health(fireKaiju)) == 0, "Down isn't no health")
+local few = {}
+for i = 1, cost - 1 do
+	few[i] = gem("Common", neutral, "f" .. i)
+end
+plan = Kaiju.infusePlan(fireKaiju, few)
+check(
+	not plan.Revived and #plan.Used == 0 and plan.Short == 1,
+	"A revive one short used stones, or got the shortfall wrong"
+)
+local enough = table.clone(few)
+table.insert(enough, gem("Common", neutral, "last"))
+table.insert(enough, gem("Common", neutral, "spare"))
+plan = Kaiju.infusePlan(fireKaiju, enough)
+check(plan.Revived and #plan.Used == cost + 1, "Revived, the spare didn't mend it")
+check(
+	math.abs(plan.Health - (most * Infuse.Revive.Health + most * Infuse.Mend)) < 1e-6,
+	"Not back at half (and the spare's mend)"
+)
+-- Its own element brings it back for half the stones; its weakness takes double.
+local function batch(element, count)
+	local list = {}
+	for i = 1, count do
+		list[i] = gem("Common", element, element .. i)
+	end
+	return list
+end
+local ownNeed, weakNeed = math.ceil(cost / Infuse.Same), math.ceil(cost / Infuse.Weak)
+check(Kaiju.infusePlan(fireKaiju, batch("Fire", ownNeed)).Revived, "Its own element didn't halve the revive")
+check(not Kaiju.infusePlan(fireKaiju, batch("Fire", ownNeed - 1)).Revived, "Revived with too few of its own")
+check(Kaiju.infusePlan(fireKaiju, batch(weak, weakNeed)).Revived, "Its weakness: enough didn't revive")
+check(not Kaiju.infusePlan(fireKaiju, batch(weak, weakNeed - 1)).Revived, "Its weakness didn't double the revive")
+-- A revive costs far more than mending the same health.
+check(cost > (Infuse.Revive.Health / Infuse.Mend) * 2, "A revive isn't much dearer than mending")
+-- Down ones fill an empty place last.
+local downRoster = {
+	List = {
+		k1 = { Id = "k1", Species = "Bulwark", Element = "Fire", Level = 9, Down = true },
+		k2 = { Id = "k2", Species = "Bulwark", Element = "Frost", Level = 2 },
+	},
+	Next = 3,
+}
+Kaiju.SlotLevels = { 1 }
+check(Kaiju.teamIds(downRoster)[1] == "k2", "One down filled the team before one on its feet")
+Kaiju.SlotLevels = { 1, 1, 1 }
 
 -- Taming -----------------------------------------------------------------------------------
 check(Kaiju.tameChance(60, 100) == 0 and Kaiju.tameChance(51, 100) == 0, "Tameable above half health")
@@ -255,9 +337,20 @@ check(Kaiju.teamIds(before)[1] == "k2" and Kaiju.teamIds(before)[2] == "k1", "Th
 -- The starter roll ---------------------------------------------------------------------------
 check(Kaiju.StarterTeam == 3, "Beta players don't start with three kaiju")
 check(Kaiju.rollsOwed({}) == 3 and Kaiju.rollsOwed(nil) == 0, "A new player isn't owed three")
-check(Kaiju.rollsOwed({ Kaiju = { List = { k1 = {} } } }) == 2, "A player from before with one isn't owed two")
-check(Kaiju.rollsOwed({ Kaiju = { List = { a = {}, b = {}, c = {}, d = {} } } }) == 0, "Owed with a full team")
-check(Kaiju.rollsOwed({ KaijuRolled = true }) == 0, "Owed again once rolled")
+-- Always a full roll of three: a player from before with one is owed
+-- three, not two; one who took an older roll (a short top-up) is owed a
+-- full one, once; never more than there's room for.
+check(Kaiju.rollsOwed({ Kaiju = { List = { k1 = {} } } }) == 3, "A player from before with one isn't owed three")
+check(
+	Kaiju.rollsOwed({ KaijuRolled = true, Kaiju = { List = { a = {}, b = {}, c = {} } } }) == 3,
+	"An older roll isn't owed a full one"
+)
+check(Kaiju.rollsOwed({ KaijuRolled = Kaiju.RollVersion }) == 0, "Owed again once rolled")
+local crowded = { List = {} }
+for i = 1, Kaiju.MaxOwned - 1 do
+	crowded.List["k" .. i] = {}
+end
+check(Kaiju.rollsOwed({ Kaiju = crowded }) == 1, "Owed more than there's room for")
 for seed = 1, 40 do
 	local picks = Kaiju.starterPicks(Random.new(seed), 3, { { Species = "Bulwark", Element = "Fire" } })
 	check(#picks == 3, "Not three starter picks")
@@ -385,9 +478,17 @@ local push = Squad.apart(V3(0, 0, 0), { V3(2, 0, 0) }, 5)
 check(push.X < -2.9 and push.X > -3.1 and math.abs(push.Z) < 1e-6, "Not pushed off one too close")
 check(Squad.apart(V3(0, 0, 0), { V3(8, 0, 0) }, 5).Magnitude == 0, "Pushed off one far away")
 check(Squad.apart(V3(0, 0, 0), { V3(0, 0, 0) }, 5).Magnitude > 4, "Two on the same spot stay put")
+
+-- How big each stands next to you (its moves and effects that big): yours
+-- under half your size, a wild one smaller than you, the guardian about
+-- your size, a critter about half.
+local pet, wild, guard = Kaiju.size(Kaiju.Scale.Pet), Kaiju.size(Kaiju.Scale.Wild), Kaiju.size(Kaiju.Scale.Guardian)
+check(pet < 0.5 and pet < wild and wild < guard and guard <= 1, "Kaiju sizes out of order")
+check(Kaiju.Bug.Size > pet and Kaiju.Bug.Size < wild, "A critter isn't between a pet and a wild kaiju")
+check(Kaiju.size(1) == Kaiju.Height, "A model at scale 1 isn't its height")
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, feeding, taming, spread, slots, Gemsouls, your team, the starter roll, fighting as a team)",
+		"PASS: %d kaiju rule checks (stats, EXP, infusing and revives, taming, spread, slots, Gemsouls, your team, the starter roll, fighting as a team, sizes)",
 		checks
 	)
 )

@@ -35,6 +35,7 @@ local TriadVfx = require(script.Parent.Modules.TriadVfx)
 local MoveVfx = require(script.Parent.Modules.MoveVfx)
 local BladeTrails = require(script.Parent.Modules.BladeTrails)
 local CombatSound = require(script.Parent.Modules.CombatSound)
+local FxSize = require(script.Parent.Modules.FxSize)
 local MatchupUI = require(script.Parent.Modules.MatchupUI)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 local Lang = require(ReplicatedStorage.Shared.Lang)
@@ -2158,6 +2159,7 @@ end
 -- and a shake that's harder the closer to the centre you are.
 function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: number)
 	local floor = floorUnder(center)
+	local k = FxSize.get() -- (a creature's: its pillar, and how far its shake reaches)
 	if delay and delay > 0 then
 		local red = Color3.fromRGB(255, 60, 40)
 		local warn = ring(floor, radius, red, 0.7)
@@ -2171,7 +2173,7 @@ function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: nu
 			ring(floor + Vector3.new(0, 0.08, 0), radius * Actions.Blast.StunZone, Color3.fromRGB(255, 220, 90), 0.55)
 		CombatSound.play("NovaWarn", floor)
 		-- The rings pulse faster as the blast comes; the core flickers hardest.
-		task.spawn(function()
+		task.spawn(FxSize.keep(function()
 			local stop = os.clock() + delay
 			while warn.Parent and os.clock() < stop do
 				local left = stop - os.clock()
@@ -2181,42 +2183,51 @@ function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: nu
 				core.Transparency = 0.25 + 0.45 * wave
 				task.wait()
 			end
-		end)
-		task.delay(delay, function()
-			warn:Destroy()
-			middle:Destroy()
-			core:Destroy()
-			-- A flash dome bursting out of the centre.
-			local dome = effectPart(Vector3.one * radius * 0.4, CFrame.new(floor), color, Enum.PartType.Ball)
-			dome.Transparency = 0.15
-			fade(dome, 0.35, Vector3.one * radius * 2)
-			-- Two shockwaves racing out along the ground.
-			local wave = ring(floor + Vector3.new(0, 0.1, 0), 1, color:Lerp(Color3.new(1, 1, 1), 0.35), 0.05)
-			fade(wave, 0.3, Vector3.new(0.3, radius * 2.1, radius * 2.1))
-			local after = ring(floor + Vector3.new(0, 0.12, 0), 1, color, 0.35)
-			fade(after, 0.65, Vector3.new(0.2, radius * 2.5, radius * 2.5))
-			-- A scorch mark with a glowing rim that cools, then fades.
-			CombatVfx.scorch(floor, radius, color)
-			local pillar = effectPart(Vector3.new(2, 40, 2), CFrame.new(floor + Vector3.new(0, 20, 0)), color)
-			fade(pillar, 0.45, Vector3.new(radius * 0.8, 46, radius * 0.8))
-			CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Embers", 1.8 + radius / 6)
-			CombatFx.burst(floor + Vector3.new(0, 0.6, 0), color, "Sparks", 1.5 + radius / 8)
-			CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(120, 110, 100), "Smoke", 1.8 + radius / 10)
-			CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(110, 100, 92), "Shards", 1.4)
-			CombatFx.flash(floor + Vector3.new(0, 3, 0), color, 8, radius * 3, 0.45)
-			CombatSound.play("Blast", floor, { Volume = 1.2 })
-			CombatSound.element("Impact", CombatSound.elementOf(color), floor, { Volume = 0.9 })
-			local character = player.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			if root then
-				local offset = root.Position - floor
-				local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
-				if distance <= radius + 14 then
-					local closeness = 1 - math.clamp(distance / (radius + 14), 0, 1)
-					CombatFx.shake(0.02 + 0.05 * closeness, 0.3 + 0.3 * closeness)
+		end))
+		task.delay(
+			delay,
+			FxSize.keep(function()
+				warn:Destroy()
+				middle:Destroy()
+				core:Destroy()
+				-- A flash dome bursting out of the centre.
+				local dome = effectPart(Vector3.one * radius * 0.4, CFrame.new(floor), color, Enum.PartType.Ball)
+				dome.Transparency = 0.15
+				fade(dome, 0.35, Vector3.one * radius * 2)
+				-- Two shockwaves racing out along the ground.
+				local wave = ring(floor + Vector3.new(0, 0.1, 0), 1, color:Lerp(Color3.new(1, 1, 1), 0.35), 0.05)
+				fade(wave, 0.3, Vector3.new(0.3, radius * 2.1, radius * 2.1))
+				local after = ring(floor + Vector3.new(0, 0.12, 0), 1, color, 0.35)
+				fade(after, 0.65, Vector3.new(0.2, radius * 2.5, radius * 2.5))
+				-- A scorch mark with a glowing rim that cools, then fades.
+				CombatVfx.scorch(floor, radius, color)
+				local pillar =
+					effectPart(Vector3.new(2, 40, 2) * k, CFrame.new(floor + Vector3.new(0, 20 * k, 0)), color)
+				fade(pillar, 0.45, Vector3.new(radius * 0.8, 46 * k, radius * 0.8))
+				CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Embers", 1.8 + radius / 6)
+				CombatFx.burst(floor + Vector3.new(0, 0.6, 0), color, "Sparks", 1.5 + radius / 8)
+				CombatFx.burst(
+					floor + Vector3.new(0, 0.5, 0),
+					Color3.fromRGB(120, 110, 100),
+					"Smoke",
+					1.8 + radius / 10
+				)
+				CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(110, 100, 92), "Shards", 1.4)
+				CombatFx.flash(floor + Vector3.new(0, 3, 0), color, 8, radius * 3, 0.45)
+				CombatSound.play("Blast", floor, { Volume = 1.2 })
+				CombatSound.element("Impact", CombatSound.elementOf(color), floor, { Volume = 0.9 })
+				local character = player.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if root then
+					local offset = root.Position - floor
+					local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+					if distance <= radius + 14 * k then
+						local closeness = 1 - math.clamp(distance / (radius + 14 * k), 0, 1)
+						CombatFx.shake(0.02 + 0.05 * closeness, 0.3 + 0.3 * closeness)
+					end
 				end
-			end
-		end)
+			end)
+		)
 		return
 	end
 	local blast = ring(floor, 1, color, 0.2)
@@ -2250,7 +2261,8 @@ function handlers.Zone(center: Vector3, radius: number, duration: number, color:
 	local disc = ring(floor, radius, color, 0.75)
 	local edge = ring(floor + Vector3.new(0, 0.05, 0), radius, color, 0.4)
 	edge.Size = Vector3.new(0.1, radius * 2, radius * 2)
-	task.spawn(function()
+	local k = FxSize.get()
+	task.spawn(FxSize.keep(function()
 		local stop = os.clock() + duration
 		while os.clock() < stop and disc.Parent do
 			-- A churning pool: gas puffing up and bubbles rising and popping,
@@ -2259,21 +2271,21 @@ function handlers.Zone(center: Vector3, radius: number, duration: number, color:
 			local offset = Vector3.new((math.random() - 0.5) * radius * 1.6, 0, (math.random() - 0.5) * radius * 1.6)
 			CombatFx.burst(floor + offset + Vector3.new(0, 0.4, 0), color, "Smoke", 0.6)
 			local bubble = effectPart(
-				Vector3.one * 0.5,
+				Vector3.one * 0.5 * k,
 				CFrame.new(floor + offset),
 				color:Lerp(Color3.new(1, 1, 1), 0.3),
 				Enum.PartType.Ball
 			)
 			bubble.Transparency = 0.3
-			fade(bubble, 0.5, Vector3.one * 0.9)
+			fade(bubble, 0.5, Vector3.one * 0.9 * k)
 			TweenService:Create(bubble, TweenInfo.new(0.5, Enum.EasingStyle.Sine), {
-				CFrame = CFrame.new(floor + offset + Vector3.new(0, 2.5, 0)),
+				CFrame = CFrame.new(floor + offset + Vector3.new(0, 2.5 * k, 0)),
 			}):Play()
 			task.wait(0.12)
 		end
 		fade(disc, 0.3)
 		fade(edge, 0.3)
-	end)
+	end))
 end
 
 function handlers.Buff(who: Player, color: Color3)
@@ -2312,7 +2324,7 @@ function handlers.EnemySwing(from: Vector3, to: Vector3, color: Color3)
 	CombatVfx.slash(
 		from,
 		offset,
-		math.max(3, offset.Magnitude),
+		math.max(3 * FxSize.get(), offset.Magnitude),
 		100,
 		color,
 		false,
@@ -2339,9 +2351,10 @@ function handlers.BlockBroken(seconds, reason)
 	end
 end
 function handlers.BlockSpark(position, broken)
+	local up = Vector3.new(0, FxSize.get(), 0)
 	CombatSound.play(if broken then "GuardBreak" else "Block", position)
 	CombatFx.burst(
-		position + Vector3.new(0, 1, 0),
+		position + up,
 		if broken then Color3.fromRGB(255, 160, 50) else Color3.fromRGB(200, 240, 255),
 		"Sparks",
 		if broken then 1.8 else 1.1
@@ -2351,7 +2364,7 @@ function handlers.BlockSpark(position, broken)
 	end
 	-- A shield of light where the blow met the guard; a broken one shatters.
 	local camera = workspace.CurrentCamera
-	CombatVfx.guard(position + Vector3.new(0, 1, 0), if camera then camera.CFrame.Position - position else nil, broken)
+	CombatVfx.guard(position + up, if camera then camera.CFrame.Position - position else nil, broken)
 end
 function handlers.BlockRaise(who)
 	local root = who.Character and who.Character:FindFirstChild("HumanoidRootPart")
@@ -2372,16 +2385,25 @@ function handlers.BlockGem(who, element)
 end
 function handlers.DodgeRoll(who, origin, direction, distance, afterimage)
 	-- A hop is short; a roll goes the distance and kicks up more dust.
-	local hop = distance < 10
+	local k = FxSize.get()
+	local hop = distance < 10 * k
 	CombatSound.play(if hop then "Hop" else "Roll", origin)
-	CombatFx.burst(origin - Vector3.new(0, 2.5, 0), Color3.fromRGB(170, 160, 145), "Smoke", if hop then 0.6 else 1.1)
+	CombatFx.burst(
+		origin - Vector3.new(0, 2.5 * k, 0),
+		Color3.fromRGB(170, 160, 145),
+		"Smoke",
+		if hop then 0.6 else 1.1
+	)
 	local color = if afterimage then Color3.fromRGB(80, 225, 255) else P.Gold
 	CombatVfx.dash(origin, direction, distance, color)
 	for i = 0, 4 do
 		task.delay(i * 0.05, function()
 			local cf = CFrame.lookAt(origin + direction * distance * i / 4, origin + direction * (distance * i / 4 + 1))
-			local ghost =
-				effectPart(if afterimage then Vector3.new(1.4, 2.6, 0.4) else Vector3.new(1.8, 0.15, 1), cf, color)
+			local ghost = effectPart(
+				(if afterimage then Vector3.new(1.4, 2.6, 0.4) else Vector3.new(1.8, 0.15, 1)) * k,
+				cf,
+				color
+			)
 			ghost.Transparency = 0.55
 			fade(ghost, 0.25)
 		end)
@@ -2468,6 +2490,14 @@ function handlers.TriadDeflect(from, to)
 end
 function handlers.TriadEmpowerHit(position, kind, final)
 	TriadVfx.empowerHit(position, kind, final)
+end
+-- A creature's effect (a kaiju's, a critter's), drawn, sounded and shaken
+-- at its size: how big it stands next to a player (FxSize).
+function handlers.Sized(size, kind, ...)
+	local handler = kind ~= "Sized" and handlers[kind]
+	if handler then
+		FxSize.run(size, handler, ...)
+	end
 end
 fxEvent.OnClientEvent:Connect(function(kind, ...)
 	local handler = handlers[kind]

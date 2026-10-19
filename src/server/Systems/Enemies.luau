@@ -180,6 +180,16 @@ end
 local function fx(kind: string, ...)
 	Remotes.CombatFx:FireAllClients(kind, ...)
 end
+-- An effect on a creature, at its size (a kaiju's or a critter's, from
+-- adopt's Size: "Sized", the client's FxSize).
+local function fxOn(enemy, kind: string, ...)
+	local size = enemy.FxSize
+	if size and size ~= 1 then
+		fx("Sized", size, kind, ...)
+	else
+		fx(kind, ...)
+	end
+end
 
 -- Models -------------------------------------------------------------------------------------
 
@@ -450,7 +460,11 @@ end
 
 -- Registers a ready-built fighter (a rig with a Humanoid) as an enemy, so
 -- every player attack, surge and status already works against it.
-function Enemies.adopt(model: Model, kind, opts: { Element: string?, Title: string?, Home: Vector3? }): Enemy
+function Enemies.adopt(
+	model: Model,
+	kind,
+	opts: { Element: string?, Title: string?, Home: Vector3?, Size: number? }
+): Enemy
 	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
 	local root = (model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")) :: BasePart
 	humanoid.MaxHealth, humanoid.Health = kind.Health, kind.Health
@@ -505,6 +519,7 @@ function Enemies.adopt(model: Model, kind, opts: { Element: string?, Title: stri
 		TauntUntil = 0,
 		Taunter = nil,
 		Dots = {},
+		FxSize = opts.Size, -- how big it stands next to a player (its effects' size)
 	}
 	enemies[model] = enemy
 	return enemy
@@ -687,7 +702,7 @@ function Enemies.damage(
 			end
 			e.StunKind = "Stunned"
 			enemy.Model:SetAttribute("GuardUntil", 0)
-			fx("BlockSpark", enemy.Root.Position, true)
+			fxOn(enemy, "BlockSpark", enemy.Root.Position, true)
 			DamageLog.send(source, { Dir = "Out", Kind = "GuardBreak", Who = name })
 		elseif
 			heavy == false
@@ -699,7 +714,7 @@ function Enemies.damage(
 			-- Timed perfectly: parried, and the attacker is left open. A rival
 			-- duelist parries as a player does: once per raise, the blow cut
 			-- to 35% (PvP), the attacker staggered for a quarter second.
-			fx("BlockSpark", enemy.Root.Position, false)
+			fxOn(enemy, "BlockSpark", enemy.Root.Position, false)
 			e.BlockedAt = now
 			DamageLog.send(source, { Dir = "Out", Kind = "Parried", Who = name })
 			if not duelist then
@@ -718,7 +733,7 @@ function Enemies.damage(
 			enemy.GuardUntil = 0
 			e.GuardBrokenUntil = now + Enemies.GuardBreakSeconds
 			enemy.Model:SetAttribute("GuardUntil", 0)
-			fx("BlockSpark", enemy.Root.Position, true)
+			fxOn(enemy, "BlockSpark", enemy.Root.Position, true)
 			DamageLog.send(source, { Dir = "Out", Kind = "GuardBreak", Who = name })
 		else
 			local guarded = amount * (e.GuardMult or 0.3)
@@ -735,7 +750,7 @@ function Enemies.damage(
 			if heavy ~= nil then
 				e.BlockedAt = now -- a swing it can answer
 			end
-			fx("BlockSpark", enemy.Root.Position, false)
+			fxOn(enemy, "BlockSpark", enemy.Root.Position, false)
 		end
 	end
 	amount = math.floor(amount * exposure + 0.5)
@@ -790,7 +805,8 @@ function Enemies.damage(
 		Aggro.add(enemy.Threat, enemy.ThreatAt, source, amount * (1 + bonus), os.clock())
 		enemy.LastSource, enemy.LastSourceAt = source, os.clock()
 	end
-	fx(
+	fxOn(
+		enemy,
 		"Damage",
 		enemy.Root.Position + Vector3.new(0, enemy.Root.Size.Y / 2 + 1, 0),
 		amount,
@@ -1066,7 +1082,13 @@ local function think(enemy: Enemy, now: number)
 		humanoid:MoveTo(root.Position)
 		if now - enemy.LastAttack >= enemy.Kind.Rate then
 			enemy.LastAttack = now
-			fx("EnemySwing", root.Position, targetRoot.Position, GemConfig.ElementColors[enemy.Element or "Fire"])
+			fxOn(
+				enemy,
+				"EnemySwing",
+				root.Position,
+				targetRoot.Position,
+				GemConfig.ElementColors[enemy.Element or "Fire"]
+			)
 			local damage = enemy.Kind.Damage * (1 - Enemies.weakness(enemy))
 			Enemies.hitPlayer(target, damage, enemy.Element, enemy)
 		end

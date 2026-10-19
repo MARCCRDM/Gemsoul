@@ -20,6 +20,7 @@ CAMERAS = {
     "MovesFrost": ((24, 17, 4), (0, 3, -13), 62),
     "MovesShock": ((24, 19, 4), (0, 5, -15), 66),
     "MovesPoison": ((24, 17, 4), (0, 3, -13), 62),
+    "Sized": ((24, 17, 4), (0, 3, -13), 62),
     # Pickaxes side on (their head in profile), and their hits on a rock.
     "Picks": ((10.5, 6.2, -1.2), (0, 5.2, -1.2), 46),
     "PickLineup": ((0.6, 5.0, -6.2), (0, 4.4, 0), 40),

@@ -20,7 +20,9 @@
 	                                   decoyPop), an Acid Slick
 
 	Built like the rest of the kit (CombatVfx): neon and glass parts, trails,
-	particles and lights, tweened and cleaned up after themselves.
+	particles and lights, tweened and cleaned up after themselves. A
+	creature's (FxSize: a kaiju's shell, its ring, its knockout) is drawn
+	at its size: what rides on its body sits as far out as it's big.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +31,7 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 local CombatFx = require(script.Parent.CombatFx)
+local FxSize = require(script.Parent.FxSize)
 local MoveVfx = require(script.Parent.MoveVfx)
 local CombatSound = require(script.Parent.CombatSound)
 local GemConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GemConfig"))
@@ -145,22 +148,24 @@ local function floorUnder(at: Vector3): Vector3
 end
 local function light(parent: Instance, color: Color3, brightness: number, range: number): PointLight
 	local l = Instance.new("PointLight")
-	l.Color, l.Brightness, l.Range, l.Shadows = color, brightness, range, false
+	l.Color, l.Brightness, l.Range, l.Shadows = color, brightness, range * FxSize.get(), false
 	l.Parent = parent
 	return l
 end
 local function emitter(parent: Instance, color: Color3, rate: number, opts: { [string]: any }?): ParticleEmitter
 	local o = opts or {}
+	local k = FxSize.get()
 	local e = Instance.new("ParticleEmitter")
 	e.Texture = o.Texture or "rbxasset://textures/particles/sparkles_main.dds"
 	e.Color = ColorSequence.new(color:Lerp(WHITE, 0.45), color)
 	e.LightEmission = o.Light or 1
-	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, o.Size or 0.35), NumberSequenceKeypoint.new(1, 0) })
+	e.Size =
+		NumberSequence.new({ NumberSequenceKeypoint.new(0, (o.Size or 0.35) * k), NumberSequenceKeypoint.new(1, 0) })
 	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
 	e.Lifetime = NumberRange.new(o.Life or 0.5, (o.Life or 0.5) * 1.6)
-	e.Speed = NumberRange.new(o.Speed or 1.5, (o.Speed or 1.5) * 2)
+	e.Speed = NumberRange.new((o.Speed or 1.5) * k, (o.Speed or 1.5) * 2 * k)
 	e.SpreadAngle = Vector2.new(o.Spread or 180, o.Spread or 180)
-	e.Acceleration = o.Acceleration or Vector3.new(0, 2, 0)
+	e.Acceleration = (o.Acceleration or Vector3.new(0, 2, 0)) * k
 	e.Rate = rate
 	e.LockedToPart = o.Locked == true
 	e.Parent = parent
@@ -168,8 +173,24 @@ local function emitter(parent: Instance, color: Color3, rate: number, opts: { [s
 end
 
 -- Things that ride along with a body (auras, wings, marks): every frame
--- they're placed from the root, until they run out.
-type Follower = { Root: BasePart, Parts: { { Part: BasePart, Offset: CFrame } }, Until: number, Born: number, Animate: ((Follower, number) -> ())?, Key: string? }
+-- they're placed from the root, until they run out. Scale: the body's size
+-- (FxSize when it was made), how far out each sits.
+type Follower = {
+	Root: BasePart,
+	Parts: { { Part: BasePart, Offset: CFrame } },
+	Until: number,
+	Born: number,
+	Animate: ((Follower, number) -> ())?,
+	Key: string?,
+	Scale: number,
+}
+-- Where a rider sits: its offset from the root, at the body's size.
+local function seat(f: Follower, offset: CFrame): CFrame
+	if f.Scale == 1 then
+		return f.Root.CFrame * offset
+	end
+	return f.Root.CFrame * (offset - offset.Position + offset.Position * f.Scale)
+end
 local followers: { Follower } = {}
 local followConnection: RBXScriptConnection? = nil
 local function step()
@@ -184,10 +205,9 @@ local function step()
 				end
 			end
 		else
-			local base = f.Root.CFrame
 			for _, entry in f.Parts do
 				if entry.Part.Parent then
-					entry.Part.CFrame = base * entry.Offset
+					entry.Part.CFrame = seat(f, entry.Offset)
 				end
 			end
 			if f.Animate then
@@ -209,7 +229,15 @@ local function follow(root: BasePart, seconds: number, key: string?, animate: ((
 			end
 		end
 	end
-	local f: Follower = { Root = root, Parts = {}, Until = os.clock() + seconds, Born = os.clock(), Animate = animate, Key = key }
+	local f: Follower = {
+		Root = root,
+		Parts = {},
+		Until = os.clock() + seconds,
+		Born = os.clock(),
+		Animate = animate,
+		Key = key,
+		Scale = FxSize.get(),
+	}
 	table.insert(followers, f)
 	if not followConnection then
 		followConnection = RunService.RenderStepped:Connect(step)
@@ -218,7 +246,7 @@ local function follow(root: BasePart, seconds: number, key: string?, animate: ((
 end
 local function hold(f: Follower, p: BasePart, offset: CFrame)
 	table.insert(f.Parts, { Part = p, Offset = offset })
-	p.CFrame = f.Root.CFrame * offset
+	p.CFrame = seat(f, offset)
 end
 local function stopFollow(root: BasePart, key: string)
 	for _, f in followers do
@@ -424,6 +452,8 @@ end
 
 -- A hex bubble that shimmers while it holds.
 local function bubble(root, color, seconds, key, size, transparency)
+	local k = FxSize.get()
+	size *= k
 	local f = follow(root, seconds, key, function(f, t)
 		local shell = f.Parts[1]
 		if shell then
@@ -432,9 +462,9 @@ local function bubble(root, color, seconds, key, size, transparency)
 	end)
 	local shell = part(Vector3.one * size, root.CFrame, color, transparency, Enum.PartType.Ball, Enum.Material.ForceField)
 	hold(f, shell, CFrame.new(0, 0.2, 0))
-	local rim = part(Vector3.one * (size + 0.3), root.CFrame, color:Lerp(WHITE, 0.3), 0.85, Enum.PartType.Ball)
+	local rim = part(Vector3.one * (size + 0.3 * k), root.CFrame, color:Lerp(WHITE, 0.3), 0.85, Enum.PartType.Ball)
 	hold(f, rim, CFrame.new(0, 0.2, 0))
-	shell.Size = Vector3.one * 1
+	shell.Size = Vector3.one * k
 	tween(shell, 0.25, { Size = Vector3.one * size }, Enum.EasingStyle.Back)
 	return f
 end
@@ -502,13 +532,14 @@ function AURA.Boost(root, color, seconds)
 	CombatFx.burst(root.Position, color, "Embers", 1.2)
 end
 function AURA.Heal(root, _color, seconds)
+	local k = FxSize.get()
 	local attachment = Instance.new("Attachment")
-	attachment.Position = Vector3.new(0, -2, 0)
+	attachment.Position = Vector3.new(0, -2 * k, 0)
 	attachment.Parent = root
 	emitter(attachment, STAMINA, 14, { Size = 0.3, Speed = 2, Spread = 40, Acceleration = Vector3.new(0, 3, 0), Life = 0.9 })
 	light(attachment, STAMINA, 1.5, 8)
 	Debris:AddItem(attachment, seconds)
-	ringAt(floorUnder(root.Position), 3, STAMINA, 0.2, 0.6, 2.2)
+	ringAt(floorUnder(root.Position), 3 * k, STAMINA, 0.2, 0.6, 2.2)
 end
 function AURA.Phoenix(root, color, seconds)
 	-- Wings of flame on the back, beating slowly.
@@ -539,7 +570,7 @@ function AURA.Armor(root, _color, seconds)
 	local f = follow(root, seconds, "Armor")
 	for i = 1, 6 do
 		local a = i / 6 * math.pi * 2
-		local plate = glass(Vector3.new(1.1, 1.8, 0.14), root.CFrame, ICE, 0.25)
+		local plate = glass(Vector3.new(1.1, 1.8, 0.14) * f.Scale, root.CFrame, ICE, 0.25)
 		hold(f, plate, CFrame.new(math.cos(a) * 1.25, -0.2 + (i % 2) * 0.9, math.sin(a) * 1.25) * CFrame.Angles(0, -a + math.pi / 2, (i % 3 - 1) * 0.2))
 	end
 	CombatFx.burst(root.Position, ICE, "Frost", 1)
@@ -623,7 +654,7 @@ function AURA.Mantle(root, color, seconds)
 		end
 	end)
 	for _ = 1, 9 do
-		hold(f, part(Vector3.new(0.14, 1.1, 0.14), root.CFrame, color, 0.1), CFrame.new())
+		hold(f, part(Vector3.new(0.14, 1.1, 0.14) * f.Scale, root.CFrame, color, 0.1), CFrame.new())
 	end
 end
 function AURA.EmpowerEnd(root)
@@ -1031,11 +1062,13 @@ end
 function TriadVfx.breakBurst(position: Vector3, radius: number, element: string?)
 	local color = colorOf(element)
 	local floor = floorUnder(position)
-	ringAt(floor, 2, color, 0.05, 0.45, radius)
-	ringAt(floor + Vector3.new(0, 0.03, 0), 1, WHITE, 0.2, 0.3, radius * 1.2)
+	local k = FxSize.get()
+	ringAt(floor, 2 * k, color, 0.05, 0.45, radius)
+	ringAt(floor + Vector3.new(0, 0.03, 0), k, WHITE, 0.2, 0.3, radius * 1.2)
 	CombatFx.burst(position, color, if element == "Frost" then "Shards" elseif element == "Fire" then "Embers" else "Sparks", 1.6)
 	CombatFx.flash(position, color, 6, radius * 2.5, 0.35)
-	CombatFx.shake(0.35, 0.25)
+	-- (Felt near it, not across the map: a kaiju's knockout, a wild one's end.)
+	CombatFx.shakeNear(position, 0.35, 0.25, 40)
 	CombatSound.play("Blast", position, { Volume = 0.9 })
 end
 
@@ -1120,20 +1153,32 @@ end
 function TriadVfx.pylon(center: Vector3, reach: number, seconds: number, element: string?)
 	local floor = floorUnder(center)
 	local color = colorOf(element)
-	local mast = part(Vector3.new(0.6, 0.2, 0.6), CFrame.new(floor), Color3.fromRGB(70, 74, 92), 0, nil, Enum.Material.Metal)
-	tween(mast, 0.25, { Size = Vector3.new(0.6, 5, 0.6), CFrame = CFrame.new(floor + Vector3.new(0, 2.5, 0)) }, Enum.EasingStyle.Back)
-	local coil = part(Vector3.one * 1.4, CFrame.new(floor + Vector3.new(0, 5.2, 0)), color, 0.05, Enum.PartType.Ball)
+	local k = FxSize.get()
+	local mast =
+		part(Vector3.new(0.6, 0.2, 0.6) * k, CFrame.new(floor), Color3.fromRGB(70, 74, 92), 0, nil, Enum.Material.Metal)
+	tween(
+		mast,
+		0.25,
+		{ Size = Vector3.new(0.6, 5, 0.6) * k, CFrame = CFrame.new(floor + Vector3.new(0, 2.5 * k, 0)) },
+		Enum.EasingStyle.Back
+	)
+	local coil =
+		part(Vector3.one * 1.4 * k, CFrame.new(floor + Vector3.new(0, 5.2 * k, 0)), color, 0.05, Enum.PartType.Ball)
 	light(coil, color, 4, 16)
 	local attachment = Instance.new("Attachment")
 	attachment.Parent = coil
 	emitter(attachment, color, 25, { Size = 0.3, Speed = 4, Acceleration = Vector3.zero, Life = 0.25 })
-	local spin = TweenService:Create(coil, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Size = Vector3.one * 1.8 })
+	local spin = TweenService:Create(
+		coil,
+		TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+		{ Size = Vector3.one * 1.8 * k }
+	)
 	spin:Play()
 	local area = disc(floor + Vector3.new(0, 0.03, 0), reach * 2, color, 0.92)
 	task.delay(seconds, function()
 		spin:Cancel()
 		fade(mast, 0.3)
-		fade(coil, 0.3, { Size = Vector3.one * 3 })
+		fade(coil, 0.3, { Size = Vector3.one * 3 * k })
 		fade(area, 0.3)
 	end)
 	CombatSound.play("Zap", floor, { Volume = 0.8 })
@@ -1223,7 +1268,9 @@ function TriadVfx.ring(who: Player, radius: number, seconds: number, element: st
 		return
 	end
 	local color = colorOf(element)
-	local count = math.clamp(math.floor(radius * 2.4), 12, 22)
+	local k = FxSize.get() -- (its radius is already its size: only the flames and the drop to its feet)
+	local feet = -2.9 * k
+	local count = math.clamp(math.floor(radius / k * 2.4), 12, 22)
 	local flames = {}
 	local f = follow(root, seconds, "RingOfFire", function(self, age)
 		local spin = age * 1.4
@@ -1232,21 +1279,29 @@ function TriadVfx.ring(who: Player, radius: number, seconds: number, element: st
 			if flame then
 				local a = flame.Angle + spin
 				local lick = flame.Height * (0.85 + 0.25 * math.sin(age * 9 + i * 1.7))
-				entry.Offset = CFrame.new(math.cos(a) * radius, -2.9 + lick / 2, math.sin(a) * radius) * CFrame.Angles(0, 0, math.rad(90))
+				entry.Offset = CFrame.new(math.cos(a) * radius, feet + lick / 2, math.sin(a) * radius)
+					* CFrame.Angles(0, 0, math.rad(90))
 				if age > 0.2 then
 					entry.Part.Size = Vector3.new(lick, flame.Width, flame.Width)
 				end
 			end
 		end
 	end)
+	f.Scale = 1
 	for i = 1, count do
 		local a = i / count * math.pi * 2
-		local height = 3 + (i % 3) * 0.6
-		local width = 1.1 + (i % 2) * 0.3
-		local flame = part(Vector3.new(0.2, width, width), root.CFrame, if i % 2 == 0 then EMBER else HOT, if i % 2 == 0 then 0.15 else 0.3, Enum.PartType.Cylinder)
+		local height = (3 + (i % 3) * 0.6) * k
+		local width = (1.1 + (i % 2) * 0.3) * k
+		local flame = part(
+			Vector3.new(0.2 * k, width, width),
+			root.CFrame,
+			if i % 2 == 0 then EMBER else HOT,
+			if i % 2 == 0 then 0.15 else 0.3,
+			Enum.PartType.Cylinder
+		)
 		tween(flame, 0.2, { Size = Vector3.new(height, width, width) }, Enum.EasingStyle.Back)
 		table.insert(flames, { Angle = a, Height = height, Width = width })
-		hold(f, flame, CFrame.new(math.cos(a) * radius, -2.9, math.sin(a) * radius) * CFrame.Angles(0, 0, math.rad(90)))
+		hold(f, flame, CFrame.new(math.cos(a) * radius, feet, math.sin(a) * radius) * CFrame.Angles(0, 0, math.rad(90)))
 		if i % 3 == 0 and not busy() then
 			local attachment = Instance.new("Attachment")
 			attachment.Parent = flame
@@ -1257,11 +1312,17 @@ function TriadVfx.ring(who: Player, radius: number, seconds: number, element: st
 		end
 	end
 	-- A scorched band on the ground under the flames.
-	local band = part(Vector3.new(0.06, radius * 2 + 1.6, radius * 2 + 1.6), root.CFrame, Color3.fromRGB(90, 30, 10), 0.55, Enum.PartType.Cylinder)
+	local band = part(
+		Vector3.new(0.06, radius * 2 + 1.6 * k, radius * 2 + 1.6 * k),
+		root.CFrame,
+		Color3.fromRGB(90, 30, 10),
+		0.55,
+		Enum.PartType.Cylinder
+	)
 	table.insert(flames, false)
-	hold(f, band, CFrame.new(0, -2.95, 0) * CFrame.Angles(0, 0, math.rad(90)))
-	CombatFx.burst(root.Position - Vector3.new(0, 2, 0), EMBER, "Embers", 2)
-	ringAt(floorUnder(root.Position), 2, HOT, 0, 0.35, radius)
+	hold(f, band, CFrame.new(0, feet - 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)))
+	CombatFx.burst(root.Position - Vector3.new(0, 2 * k, 0), EMBER, "Embers", 2)
+	ringAt(floorUnder(root.Position), 2 * k, HOT, 0, 0.35, radius / k)
 	CombatSound.play("Burn", root.Position, { Volume = 1 })
 	CombatSound.element("Cast", "Fire", root.Position, { Volume = 0.8 })
 end

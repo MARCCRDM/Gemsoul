@@ -13,6 +13,9 @@
 	Everything runs through one mix: a compressor for punch, a touch of EQ
 	and a little arena reverb, with a cap on how many play at once.
 
+	A creature's sounds (FxSize) are as big as it is: a knee-high kaiju's
+	blast quieter and a little higher, a guardian's a little deeper.
+
 	Roblox only plays uploaded audio, so the files in assets/sounds/combat
 	(made by tools/make_combat_sounds.py; _preview_all.mp3 plays them all)
 	aren't used until they're uploaded. Run
@@ -25,6 +28,7 @@ local SoundService = game:GetService("SoundService")
 local Debris = game:GetService("Debris")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local FxSize = require(script.Parent.FxSize)
 
 local CombatSound = {}
 
@@ -314,8 +318,9 @@ function CombatSound.play(name: string, position: Vector3?, options: { Volume: n
 		return
 	end
 	lastPlayed[name] = now
-	local volume = (LEVEL[name] or 0.85) * (options and options.Volume or 1)
-	local pitch = (options and options.Pitch or 1) * (0.94 + math.random() * 0.12)
+	local size = FxSize.get()
+	local volume = (LEVEL[name] or 0.85) * (options and options.Volume or 1) * math.min(1.2, 0.4 + 0.6 * size)
+	local pitch = (options and options.Pitch or 1) * (0.94 + math.random() * 0.12) * math.clamp(size ^ -0.15, 0.9, 1.2)
 	local found = takes(name)
 	if #found > 0 then
 		-- A take at random, never the same one twice running.

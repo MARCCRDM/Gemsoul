@@ -5,7 +5,7 @@
 -- stand-ins): every E ability lands where it should; your kaiju comes out
 -- in the Outpost (a starter the first time), fights creatures near you and
 -- is credited to you, is hurt by element, knocked out and back; recall;
--- switching; feeding; wild kaiju take blows with the spread and their
+-- switching; infusing (health kept, knockouts revived with stones); wild kaiju take blows with the spread and their
 -- element, go after kaiju and hunters (never a miner); both fight as the
 -- Arena's duellist (wind-ups, heavies that break a guard, parries that
 -- leave the attacker reeling, hops, reading a hunter's charge, the E after
@@ -284,6 +284,16 @@ local PlayerData = {
 		end
 		return nil
 	end,
+	removeGems = function(player, ids)
+		local gems, removed = profiles[player].Gems, 0
+		for i = #gems, 1, -1 do
+			if ids[gems[i].Id] then
+				table.remove(gems, i)
+				removed += 1
+			end
+		end
+		return removed
+	end,
 	addGem = function(player, gem)
 		if #profiles[player].Gems >= 3 then
 			return false -- (a small pouch, to test a full one)
@@ -549,9 +559,10 @@ end
 KaijuFighter.fx = function(kind, ...)
 	table.insert(fxs, { kind, ... })
 end
+-- (A creature's comes "Sized": its size, then the effect.)
 local function drew(kind)
 	for _, entry in fxs do
-		if entry[1] == kind then
+		if entry[1] == kind or (entry[1] == "Sized" and entry[3] == kind) then
 			return entry
 		end
 	end
@@ -666,6 +677,57 @@ check(KaijuAbilities._onLine(Vector3.new(0, 0, -5), Vector3.zero, Vector3.new(0,
 check(not KaijuAbilities._onLine(Vector3.new(3, 0, -5), Vector3.zero, Vector3.new(0, 0, -10), 1), "Off the line, hit")
 check(not KaijuAbilities._onLine(Vector3.new(0, 0, 5), Vector3.zero, Vector3.new(0, 0, -10), 1), "Behind it, hit")
 
+-- A kaiju's moves are its size (AbilityPlans are a player's): a half-size
+-- caster's Supernova lands, and is drawn, half as wide, every effect of it
+-- "Sized" for the client; a full-size one's reaches the foe further out.
+local function halfCast(size)
+	local plan = Kaiju.AbilityPlans.E_Supernova
+	local hits = {}
+	local foe = { Root = root(Vector3.new(0, 0, -5)), Name = "foe" }
+	local near = { Root = root(Vector3.new(plan.Radius * 0.4, 0, -5)), Name = "near" }
+	local wide = { Root = root(Vector3.new(plan.Radius * 0.8, 0, -5)), Name = "wide" }
+	local caster = {
+		Model = make("Model"),
+		Root = root(Vector3.zero),
+		Size = size,
+		Element = "Fire",
+		Ability = "E_Supernova",
+		Damage = 100,
+		Foes = function(center, radius)
+			local list = {}
+			for _, victim in { foe, near, wide } do
+				if (victim.Root.Position - center).Magnitude <= radius then
+					table.insert(list, victim)
+				end
+			end
+			return list
+		end,
+		Hit = function(victim)
+			hits[victim.Name] = true
+		end,
+		Alive = function()
+			return true
+		end,
+	}
+	table.clear(fxs)
+	KaijuAbilities.cast(caster, foe)
+	flush()
+	return hits, plan
+end
+do
+	local hits, plan = halfCast(0.5)
+	check(hits.foe and hits.near and not hits.wide, "A half-size kaiju's blast didn't land half as wide")
+	local shown = drew("TriadShow")
+	check(shown ~= nil and shown[1] == "Sized" and shown[2] == 0.5, "A half-size kaiju's look wasn't sized")
+	check(shown ~= nil and math.abs(shown[8] - plan.Radius * 0.5) < 1e-6, "Its look wasn't drawn as wide as it lands")
+	for _, entry in fxs do
+		check(entry[1] == "Sized" and entry[2] == 0.5, "A half-size kaiju's " .. tostring(entry[1]) .. " wasn't sized")
+	end
+	hits = halfCast(nil)
+	check(hits.foe and hits.near and hits.wide, "A full-size blast didn't reach its whole radius")
+	check(fxs[1] ~= nil and fxs[1][1] ~= "Sized", "A full-size caster's look was sized")
+end
+
 -- Your kaiju ---------------------------------------------------------------------------------------------------
 
 local outpost = Vector3.new(0, 5, 7000)
@@ -682,7 +744,7 @@ KaijuWilds.start({
 })
 local kaijuFolder = workspaceObject:FindFirstChild("Kaiju")
 check(kaijuFolder ~= nil, "No Kaiju folder")
-for _, name in { "KaijuRecall", "KaijuTeam", "KaijuActive", "KaijuFeed", "KaijuTame", "KaijuRoll", "KaijuRollClaim" } do
+for _, name in { "KaijuRecall", "KaijuTeam", "KaijuActive", "KaijuInfuse", "KaijuTame", "KaijuRoll", "KaijuRollClaim" } do
 	check(registered[name] ~= nil, name .. " isn't a request")
 end
 
@@ -763,23 +825,127 @@ local guard = 1 - Kaiju.Species[pet.Record.Species].Guard
 local weak = shared("ElementMatchup").weakTo(pet.Element)
 check(hurtBy(pet.Element) == math.floor(40 * 0.75 * guard + 0.5), "Its own element isn't 75%")
 check(hurtBy(weak) == math.floor(40 * 1.25 * guard + 0.5), "Its weakness isn't 125%")
--- Knocked out at 0: back in its Gemsoul for a while, then out again.
-table.clear(notes)
-KaijuServer.hurt(pet, 1e6, nil, nil)
-check(KaijuServer.pets()[a] == nil and pet.Model.Parent == nil, "Not knocked out at 0")
-check(a:GetAttribute("KaijuDownUntil") == now + Kaiju.KnockoutSeconds, "No knockout time for the HUD")
-check(a:GetAttribute("KaijuDown_" .. starter.Id) == now + Kaiju.KnockoutSeconds, "No knockout time for its tile")
-check(noted(a, "knocked out"), "Not told it was knocked out")
-KaijuServer._upkeep(a, now + 5)
-check(KaijuServer.pets()[a] == nil, "Back before its time")
-now += Kaiju.KnockoutSeconds + 1
-KaijuServer._upkeep(a, now)
-pet = KaijuServer.pets()[a]
-check(
-	pet and pet.Humanoid.Health == pet.Humanoid.MaxHealth and a:GetAttribute("KaijuDownUntil") == nil,
-	"Not back, whole"
-)
-check(a:GetAttribute("KaijuDown_" .. starter.Id) == nil, "Its tile still says it's down")
+local function healthAndInfusing()
+	-- Its health is kept: hurt, it stays hurt, in the fight and out of it,
+	-- away and back out (no healing on its own).
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth
+	KaijuServer.hurt(pet, 60, nil, nil)
+	local hurtTo = pet.Humanoid.Health
+	check(hurtTo < pet.Humanoid.MaxHealth and pet.Record.Health == hurtTo, "Its health wasn't kept on its record")
+	pet.LastFight = now - 60
+	for _ = 1, 40 do
+		KaijuServer._think(pet, now, 0.5)
+	end
+	check(pet.Humanoid.Health == hurtTo, "It healed on its own")
+	a:SetAttribute("Outpost", nil)
+	KaijuServer._upkeep(a, now)
+	check(KaijuServer.pets()[a] == nil and starter.Health == hurtTo, "Put away, its health wasn't kept")
+	a:SetAttribute("Outpost", true)
+	KaijuServer._upkeep(a, now + 600)
+	pet = KaijuServer.pets()[a]
+	check(pet and pet.Humanoid.Health == hurtTo, "Out again, it came back healed")
+	-- Knocked out at 0: back in its Gemsoul, down, and it stays down (no timer).
+	table.clear(notes)
+	KaijuServer.hurt(pet, 1e6, nil, nil)
+	check(KaijuServer.pets()[a] == nil and pet.Model.Parent == nil, "Not knocked out at 0")
+	check(starter.Down == true and starter.Health == 0, "Its record doesn't say it's down")
+	check(noted(a, "knocked out"), "Not told it was knocked out")
+	now += 3600
+	KaijuServer._upkeep(a, now)
+	check(KaijuServer.pets()[a] == nil, "Back without a revive")
+	check(Kaiju.inTeam(roster, starter.Id), "Down, it lost its place in the team")
+
+	-- Infusing: stones bring it back (its revive cost, all at once: a stone
+	-- of its own element worth double, its weakness half), at half health;
+	-- they never give EXP, and only the stones it needs are used.
+	local function stone(id, tier, element)
+		local gem = { Id = id, Tier = tier, Element = element, Size = 5, Clarity = 5, Cut = 5 }
+		table.insert(profiles[a].Gems, gem)
+		return gem
+	end
+	local record = starter
+	local cost = Kaiju.reviveCost(record)
+	local weakness = shared("ElementMatchup").weakTo(record.Element)
+	local other = "Fire"
+	for _, element in Kaiju.Elements do
+		if element ~= record.Element and element ~= weakness then
+			other = element
+		end
+	end
+	stone("w1", "Common", weakness)
+	local short = registered.KaijuInfuse(a, { "w1" }, record.Id)
+	check(
+		not short.Ok and short.Short == cost - Kaiju.Infuse.Power.Common * Kaiju.Infuse.Weak,
+		"A revive short of power: wrong shortfall"
+	)
+	check(#profiles[a].Gems == 1 and record.Down, "A failed revive ate stones or brought it back")
+	local ids = { "w1" }
+	for i = 1, cost do
+		stone("c" .. i, "Common", other)
+		table.insert(ids, "c" .. i)
+	end
+	stone("own", "Common", record.Element)
+	table.insert(ids, "own")
+	local levelBefore, expBefore = record.Level, record.Exp
+	local revived = registered.KaijuInfuse(a, ids, record.Id)
+	check(revived.Ok and revived.Revived, "Couldn't revive with enough stones")
+	-- (Half a power from its weakness, then one a common: cost - 0.5 more,
+	-- rounded up, brings it back; the spares mend it.)
+	check(
+		not record.Down and record.Health >= math.floor(revived.Most * Kaiju.Infuse.Revive.Health),
+		"Not back at half health"
+	)
+	check(record.Level == levelBefore and record.Exp == expBefore, "Infusing gave EXP")
+	check(#profiles[a].Gems < cost + 2, "A revive took no stones")
+	KaijuServer._upkeep(a, now)
+	pet = KaijuServer.pets()[a]
+	check(
+		pet and pet.Record == record and pet.Humanoid.Health == record.Health,
+		"Revived, it didn't come out as it was"
+	)
+	-- Up and hurt: stones mend it, only as many as it needs.
+	for _, gem in table.clone(profiles[a].Gems) do
+		PlayerData.removeGem(a, gem.Id)
+	end
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth * 0.8
+	local mendIds = {}
+	for i = 1, 5 do
+		stone("m" .. i, "Common", other)
+		table.insert(mendIds, "m" .. i)
+	end
+	local mended = registered.KaijuInfuse(a, mendIds, record.Id)
+	check(
+		mended.Ok and not mended.Revived and mended.Used == 2,
+		"Mending 20% didn't take two commons: " .. tostring(mended.Used)
+	)
+	check(pet.Humanoid.Health == pet.Humanoid.MaxHealth and record.Health == pet.Humanoid.MaxHealth, "Not mended whole")
+	check(#profiles[a].Gems == 3, "Stones it didn't need were eaten")
+	check(not registered.KaijuInfuse(a, { "m3" }, record.Id).Ok, "Infused one already whole")
+	pet.Humanoid.Health = 1
+	check(not registered.KaijuInfuse(a, { "nope" }).Ok, "Infused stones they don't have")
+	check(not registered.KaijuInfuse(a, {}).Ok and not registered.KaijuInfuse(a, "m3").Ok, "Infused nothing")
+	local many = {}
+	for i = 1, Kaiju.Infuse.Batch + 1 do
+		many[i] = "x" .. i
+	end
+	check(not registered.KaijuInfuse(a, many).Ok, "Infused more than the limit at once")
+	check(not registered.KaijuInfuse(b, { "m3" }).Ok, "Infused with no kaiju")
+	table.insert(
+		profiles[a].Gems,
+		Kaiju.rollSoul(Random.new(9), record.Element, { Id = "soulgem", Time = 1, Species = "Bulwark" })
+	)
+	check(not registered.KaijuInfuse(a, { "soulgem" }, record.Id).Ok, "A Gemsoul was infused")
+	-- (A stone on your gear stays there.)
+	local worn = stone("worn", "Rare", record.Element)
+	profiles[a].Character = { WeaponGem = worn }
+	check(not registered.KaijuInfuse(a, { "worn" }, record.Id).Ok, "A stone on your gear was infused")
+	profiles[a].Character = nil
+	for _, gem in table.clone(profiles[a].Gems) do
+		PlayerData.removeGem(a, gem.Id)
+	end
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth
+end
+healthAndInfusing()
 
 -- Recall.
 check(registered.KaijuRecall(a).Ok and pet.RecallUntil == now + Kaiju.RecallSeconds, "Recall didn't take")
@@ -787,31 +953,6 @@ check(not registered.KaijuRecall(b).Ok, "Recalled a kaiju they don't have")
 check(not KaijuServer.targetable(pet), "A recalled kaiju can be fought")
 now += Kaiju.RecallSeconds + 0.1
 check(KaijuServer.targetable(pet), "Still recalled")
-
--- Feeding.
-local function stone(id, tier, element)
-	local gem = { Id = id, Tier = tier, Element = element, Size = 5, Clarity = 5, Cut = 5 }
-	table.insert(profiles[a].Gems, gem)
-	return gem
-end
-stone("s1", "Common", "Shock")
-stone("s2", "Rare", pet.Element)
-local record = pet.Record
-local expected = Kaiju.feedExp({ Tier = "Common", Element = "Shock" }, record)
-	+ Kaiju.feedExp({ Tier = "Rare", Element = pet.Element }, record)
-local result = registered.KaijuFeed(a, { "s1", "s2", "s1", "nope" })
-check(result.Ok and result.Exp == expected, "Feeding gave the wrong EXP: " .. tostring(result.Exp))
-check(#profiles[a].Gems == 0, "The stones weren't eaten")
-check(record.Level > 1, "A rare of its own element didn't level a new kaiju")
-check(pet.Model:GetAttribute("KaijuLevel") == record.Level, "The model didn't hear of the level")
-check(not registered.KaijuFeed(a, { "nope" }).Ok, "Fed stones they don't have")
-check(not registered.KaijuFeed(a, {}).Ok and not registered.KaijuFeed(a, "s1").Ok, "Fed nothing")
-local many = {}
-for i = 1, 26 do
-	many[i] = "x" .. i
-end
-check(not registered.KaijuFeed(a, many).Ok, "Fed more than the limit at once")
-check(not registered.KaijuFeed(b, { "s1" }).Ok, "Fed with no kaiju")
 
 -- Switching: only your own, not mid-fight, and the new one comes out.
 local soul = Kaiju.rollSoul(Random.new(3), "Frost", { Id = "soul2", Time = 1, Species = "Carapace" })
@@ -1501,17 +1642,27 @@ bug.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(2, 0, 0))
 bug.LastAttack = 0
 KaijuWilds._brain(bug, now)
 check(bug.Foe == b, "A critter ignored the miner who drew it")
--- (A bite winds up first: the body shows it coming.)
-check(#playerHits == 0 and bug.Model:GetAttribute("ActionKind") == "Slash", "It bit without a wind-up")
-now += Kaiju.Bug.BiteWindup
+-- (A bite winds up first: the body shows it coming. Crocodilo lobs a bomb
+-- instead, which lands a moment later.)
+local lob = Kaiju.BugMoves[entry.Species] and Kaiju.BugMoves[entry.Species].Lob
+check(
+	#playerHits == 0 and bug.Model:GetAttribute("ActionKind") == (if lob then "Bolt" else "Slash"),
+	"It bit without a wind-up"
+)
+now += if lob then lob.Windup else Kaiju.Bug.BiteWindup
 KaijuWilds._brain(bug, now)
-check(#playerHits > 0 and playerHits[#playerHits][1] == b and playerHits[#playerHits][5] == false, "It never bit them")
+if lob then
+	now += lob.Flight
+	KaijuWilds._brain(bug, now)
+end
+check(#playerHits > 0 and playerHits[#playerHits][1] == b and not playerHits[#playerHits][5], "It never bit them")
 -- More come, but never more than the fringe's cap round one player,
 -- counting those still on their way through.
 for _ = 1, 160 do
 	swingFor(1, 0.4)
 	local coming = #critterFor(b) + (FrontierServer._pending[b] or 0)
-	check(coming <= Frontier.Caps.Fringe, "More critters than the fringe allows")
+	local allowed = Frontier.capFor("Fringe", FrontierServer._states[b].Stir)
+	check(coming <= allowed, "More critters than the fringe allows")
 end
 check(#critterFor(b) >= 2, "Rifts stopped opening round a miner out in the fringe")
 -- Standing about out there, not mining: hardly any (a trickle every few minutes).
@@ -1524,14 +1675,17 @@ for _ = 1, 40 do
 end
 check(#critterFor(b) <= 1, "Standing still drew critters like mining")
 
--- Out at the edge: tougher critters, from level 9.
+-- Out at the edge: tougher critters, from level 9 (on a calm frontier:
+-- stirred up, they come higher still, below).
 clearCritters()
+FrontierServer._states[b].Stir = 0
 stand(center + Vector3.new(360, 5, 0))
-local edgeBug
+local edgeBug, edgeStir
 swingFor(200, 0.4, function()
 	for _, enemy in critterFor(b) do
 		if KaijuWilds._wilds[enemy].Band == "Edge" then
 			edgeBug = enemy
+			edgeStir = FrontierServer._states[b].Stir
 		end
 	end
 	if not edgeBug then
@@ -1543,9 +1697,10 @@ swingFor(200, 0.4, function()
 end)
 check(edgeBug ~= nil and b:GetAttribute("FrontierBand") == "Edge", "No critters at the edge")
 local edgeLevel = KaijuWilds._wilds[edgeBug].Level
-check(edgeLevel >= 9 and edgeLevel <= 13, "An edge critter's level: " .. tostring(edgeLevel))
+local stirred = math.floor(Frontier.Disturbance.Levels * (edgeStir or 0))
+check(edgeLevel >= 9 and edgeLevel <= 13 + stirred, "An edge critter's level: " .. tostring(edgeLevel))
 check(edgeBug.Humanoid.MaxHealth > bug.Humanoid.MaxHealth, "An edge critter isn't tougher")
-check(#critterFor(b) <= Frontier.Caps.Edge, "More critters than the edge allows")
+check(#critterFor(b) <= Frontier.capFor("Edge", FrontierServer._states[b].Stir), "More critters than the edge allows")
 
 -- A mech's pilot: their strikes make noise too, and the critters come for them.
 clearCritters()
@@ -1605,6 +1760,93 @@ for _ = 1, 20 do
 	end
 end
 check(not stray.Alive, "A critter with nobody to chase never left")
+
+-- Stirring it up -------------------------------------------------------------------------------------------
+-- The longer a miner keeps at it out there, the harder the frontier pushes
+-- back: their swings stir it up (FrontierStir, for the HUD), and stirred up
+-- an encounter brings more critters, higher-levelled, with more allowed
+-- about them. It holds while they keep mining, settles once they stop, and
+-- faster back in the core.
+local function stirringUp()
+	local D = Frontier.Disturbance
+	local state = FrontierServer._states[b]
+	local function shownStir()
+		return math.floor(state.Stir * 20 + 0.5) / 20
+	end
+	local function idle(seconds: number)
+		for _ = 1, seconds * 2 do
+			now += 0.5
+			FrontierServer._step(0.5)
+		end
+	end
+	clearCritters()
+	state.Stir, state.Noise = 0, 0
+	stand(center + Vector3.new(360, 5, 0))
+	swingFor(25, 0.4)
+	check(math.abs(state.Stir - 25 * D.PerSwing.Edge) < 1e-6, "Swings at the edge didn't stir it up: " .. state.Stir)
+	check(b:GetAttribute("FrontierStir") == shownStir(), "The HUD isn't told how stirred up it is")
+	-- Told as it gets restless, once (not again every swing).
+	table.clear(notes)
+	state.Stir = D.Stages[2].At - D.PerSwing.Edge / 2
+	swingFor(3, 0.4)
+	local told = 0
+	for _, note in notes do
+		if note[1] == b and note[2] == D.Notes[2] then
+			told += 1
+		end
+	end
+	check(told == 1, "Not told once that the frontier is restless: " .. told)
+	-- A pause between rocks doesn't settle it.
+	clearCritters()
+	local held = state.Stir
+	state.Noise = 0
+	idle(D.Rest / 2)
+	check(state.Stir == held, "A pause between rocks settled it")
+
+	-- Swarming: an encounter brings its stage's more, higher-levelled, past
+	-- the calm edge's cap.
+	clearCritters()
+	runDelayed()
+	state.Stir, state.Noise, state.LastEncounter = 1, 1, -math.huge
+	now += 0.4
+	FrontierServer.swing(b)
+	local coming = FrontierServer._pending[b] or 0
+	check(coming > Frontier.Caps.Edge, "Swarming, an encounter brought no more critters: " .. coming)
+	check(coming <= Frontier.capFor("Edge", 1), "Swarming, past its cap: " .. coming)
+	runDelayed() -- (the rifts open, a moment apart)
+	now += 0.35 * coming + 0.05
+	runDelayed()
+	now += Frontier.Rift.Hop + 0.1
+	runDelayed()
+	local list = critterFor(b)
+	check(#list == coming, "Not every swarming critter came through: " .. #list .. " of " .. coming)
+	for _, enemy in list do
+		local level = KaijuWilds._wilds[enemy].Level
+		check(level >= 9 + D.Levels and level <= 13 + D.Levels, "A swarming edge critter's level: " .. level)
+	end
+	-- Calm again, the edge's own cap and levels (above).
+
+	-- They stop: past the rest it settles, a little each second, and the HUD
+	-- follows.
+	clearCritters()
+	state.Stir, state.Noise, state.LastSwing = 0.6, 0, now
+	idle(D.Rest)
+	check(state.Stir == 0.6, "It settled before the rest was up")
+	idle(10)
+	check(math.abs(state.Stir - (0.6 - 10 * D.Fade)) < 1e-6, "It didn't settle once they stopped: " .. state.Stir)
+	check(b:GetAttribute("FrontierStir") == shownStir(), "The HUD wasn't told it settled")
+	-- Back in the core it settles faster, swinging or not (and swinging
+	-- there stirs nothing).
+	stand(center + Vector3.new(40, 5, 0))
+	local was = state.Stir
+	swingFor(10, 0.5)
+	check(math.abs(state.Stir - (was - 5 * D.CoreFade)) < 1e-6, "The core didn't settle it: " .. state.Stir)
+	idle(1 / D.CoreFade)
+	check(state.Stir == 0 and b:GetAttribute("FrontierStir") == 0, "The core never calmed it")
+	clearCritters()
+	runDelayed()
+end
+stirringUp()
 
 -- Wandering rifts ------------------------------------------------------------------------------------------
 -- One opens by itself Near to Far studs from someone out there, lingering;
@@ -1677,8 +1919,11 @@ check(
 	"A bug isn't marked"
 )
 -- A bug's bite on your kaiju's fresh guard is parried, and the bug reels.
-local biter = KaijuWilds.spawnBug(center + Vector3.new(330, 0, 0), { Band = "Fringe" })
+-- (One that bites: Crocodilo lobs bombs from range instead; its own move and
+-- its dodges held back.)
+local biter = KaijuWilds.spawnBug(center + Vector3.new(330, 0, 0), { Band = "Fringe", Critter = "Sahur" })
 KaijuWilds._wilds[biter].Prey = nil
+biter.NextMove, biter.NextDodge = math.huge, math.huge
 pet = KaijuServer.pets()[a]
 biter.Root.CFrame = CFrame.new(pet.Root.Position + Vector3.new(1.5, 0, 0))
 biter.Home, biter.LastAttack, pet.RecallUntil = biter.Root.Position, 0, 0
@@ -1965,6 +2210,8 @@ local function aWildDay()
 		end
 	end
 	local we = watcher.Enemy
+	-- (At home: one whose den just moved on heads straight there instead.)
+	we.Root.CFrame = CFrame.new(we.Home)
 	watcher.Plan = { Mood = "Walk", Until = now + 10, To = we.Home, From = we.Root.Position, Check = now }
 	watcher.Noticed = {}
 	stand(we.Root.Position + Vector3.new(10, 0, 0))
@@ -2201,6 +2448,9 @@ local function crittersAndKaiju()
 	local critter = KaijuWilds.spawnBug(spot + Vector3.new(14, 0, 0), { Prey = a, Band = "Edge", Level = 9 })
 	check(critter ~= nil, "No critter came")
 	critter.LastAttack = 0
+	-- (Its own move held back: a spore burst or a slam reaches you beside
+	-- your kaiju, by rights; this is about its bites.)
+	critter.NextMove = math.huge
 	KaijuWilds._brain(critter, now)
 	check(critter.Foe == pet, "The critter went for its player, not the kaiju beside them")
 	pet.Target = nil
@@ -2283,17 +2533,43 @@ local function yourTeam()
 	for slot, member in squad do
 		check(member.Slot == slot and member.Record.Id == squadIds[slot], "The team out isn't the team")
 	end
-	-- One knocked out: the others stay out; it's back after its time.
+	-- One knocked out: the others stay out; it keeps its place, down,
+	-- till it's revived; then it's back in its place.
 	local downed = squad[2]
 	KaijuServer.hurt(downed, 1e9, nil, nil)
 	KaijuServer._upkeep(a, now)
 	local left = KaijuServer.team(a)
 	check(#left == 2 and not table.find(left, downed), "A knockout took the others away")
-	check(a:GetAttribute("KaijuDown_" .. downed.Record.Id) ~= nil, "No knockout time for its tile")
-	now += Kaiju.KnockoutSeconds + 1
+	check(downed.Record.Down and Kaiju.teamIds(roster)[2] == downed.Record.Id, "Down, it lost its place")
+	now += 3600
 	KaijuServer._upkeep(a, now)
+	check(#KaijuServer.team(a) == 2, "It came back without a revive")
+	for i = 1, Kaiju.reviveCost(downed.Record) do
+		table.insert(
+			profiles[a].Gems,
+			{ Id = "r" .. i, Tier = "Common", Element = "Fire", Size = 5, Clarity = 5, Cut = 5 }
+		)
+	end
+	local reviveIds = {}
+	for i = 1, Kaiju.reviveCost(downed.Record) * 2 do
+		reviveIds[i] = "r" .. i
+	end
+	-- (Fire might be its weakness: two of everything offered, only what it needs used.)
+	for i = Kaiju.reviveCost(downed.Record) + 1, #reviveIds do
+		table.insert(
+			profiles[a].Gems,
+			{ Id = "r" .. i, Tier = "Common", Element = "Fire", Size = 5, Clarity = 5, Cut = 5 }
+		)
+	end
+	check(
+		registered.KaijuInfuse(a, { table.unpack(reviveIds, 1, Kaiju.Infuse.Batch) }, downed.Record.Id).Ok,
+		"Couldn't revive one of the team"
+	)
 	squad = KaijuServer.team(a)
-	check(#squad == 3 and a:GetAttribute("KaijuDownUntil") == nil, "It didn't come back to the team")
+	check(#squad == 3 and squad[2].Record == downed.Record, "Revived, it didn't come back to its place")
+	for _, gem in table.clone(profiles[a].Gems) do
+		PlayerData.removeGem(a, gem.Id)
+	end
 	-- Recall: all of them.
 	check(registered.KaijuRecall(a).Ok, "No recall")
 	for _, member in squad do
@@ -2337,21 +2613,22 @@ local function yourTeam()
 	local home = order[3]
 	check(registered.KaijuActive(a, home).Ok, "Couldn't lead with one from home")
 	check(Kaiju.teamIds(roster)[1] == home and not Kaiju.inTeam(roster, order[1]), "It didn't take the lead's place")
-	-- Feeding any of yours: one at home too.
+	-- Infusing any of yours: one at home too (its kept health mended).
 	local resting
 	for id in roster.List do
 		if not Kaiju.inTeam(roster, id) then
 			resting = roster.List[id]
 		end
 	end
+	local _, restingMost = Kaiju.health(resting)
+	resting.Health = math.floor(restingMost / 2)
 	table.insert(
 		profiles[a].Gems,
 		{ Id = "t1", Tier = "Rare", Element = resting.Element, Size = 5, Clarity = 5, Cut = 5 }
 	)
-	local restingBefore = resting.Level * 100000 + (resting.Exp or 0)
-	check(registered.KaijuFeed(a, { "t1" }, resting.Id).Ok, "Couldn't feed one at home")
-	check(resting.Level * 100000 + (resting.Exp or 0) > restingBefore, "The one at home didn't eat")
-	check(not registered.KaijuFeed(a, { "t1" }, "nope").Ok, "Fed a kaiju they don't own")
+	check(registered.KaijuInfuse(a, { "t1" }, resting.Id).Ok, "Couldn't infuse one at home")
+	check(resting.Health > math.floor(restingMost / 2), "The one at home wasn't mended")
+	check(not registered.KaijuInfuse(a, { "t1" }, "nope").Ok, "Infused a kaiju they don't own")
 	-- A roll left unclaimed: given after a while in the Outpost.
 	table.clear(notes)
 	b:SetAttribute("Outpost", true)
@@ -2360,6 +2637,25 @@ local function yourTeam()
 	KaijuServer._upkeep(b, now + Kaiju.RollGrace + 1)
 	check(Kaiju.count(profiles[b].Kaiju) == 3 and profiles[b].KaijuRolled, "An unclaimed roll was never given")
 	check(noted(b, "Meet your kaiju"), "Not told about the kaiju given")
+	-- Always three: one who took an older roll (a short top-up, left saved
+	-- unclaimed here) gets a full new roll of three, once, and the three
+	-- rolled become the team.
+	local old = profiles[b]
+	old.KaijuRolled = true
+	old.KaijuRoll =
+		{ Rolls = { { Species = "Bulwark", Element = "Fire" }, { Species = "Carapace", Element = "Frost" } } }
+	local fresh = KaijuServer._prepareRoll(old)
+	check(
+		fresh and #fresh.Rolls == Kaiju.StarterTeam and fresh.Version == Kaiju.RollVersion,
+		"An older roll wasn't made again as three"
+	)
+	local claimed = KaijuServer._claimRoll(b)
+	check(#claimed == 3 and Kaiju.count(old.Kaiju) == 6, "The full roll didn't join them")
+	local ids = Kaiju.teamIds(old.Kaiju)
+	for i, record in claimed do
+		check(ids[i] == record.Id, "The kaiju rolled aren't the team")
+	end
+	check(old.KaijuRolled == Kaiju.RollVersion and Kaiju.rollsOwed(old) == 0, "Owed again after the full roll")
 	b:SetAttribute("Outpost", nil)
 	KaijuServer._despawn(b)
 end
@@ -2677,11 +2973,33 @@ local function teamFights()
 		local d = p - q
 		return Vector3.new(d.X, 0, d.Z).Magnitude
 	end
+	-- The critters the team plan can share out: those near you, and any a
+	-- kaiju's already on a little further off. (Fewer than the kaiju, as
+	-- critters hop back, dash past or keep their distance, and the kaiju
+	-- share them by rights.)
+	local function inReach(): number
+		local listed, count = {}, 0
+		for _, bug in bugs do
+			if bug.Alive and (bug.Root.Position - rootA.Position).Magnitude <= Kaiju.Follow.Engage then
+				listed[bug], count = true, count + 1
+			end
+		end
+		for _, pet in team do
+			local foe = pet.Target
+			local near = foe and (foe.Root.Position - rootA.Position).Magnitude <= Kaiju.Follow.Engage + 12
+			if foe and not listed[foe] and foe.Alive and near then
+				listed[foe], count = true, count + 1
+			end
+		end
+		return count
+	end
 	local ticks, apartTicks, evenTicks, piled, petGap, bugGap, gaps = 0, 0, 0, 0, 0, 0, 0
 	local named = {}
+	table.clear(fxs)
 	for step = 1, 80 do
 		now += 0.15
 		tick(team)
+		local spare = inReach() >= #team
 		walkAll(0.15)
 		for _, bug in bugs do
 			local name = bug.Model:GetAttribute("ActionName")
@@ -2691,7 +3009,7 @@ local function teamFights()
 		end
 		if step > 20 then
 			ticks += 1
-			if distinct(team) then
+			if distinct(team) or not spare then
 				apartTicks += 1
 			end
 			n = onEach(team)
@@ -2757,6 +3075,20 @@ local function teamFights()
 		end
 	end
 	check(used >= 2, "The critters hardly used their moves: " .. used)
+	-- Every blow, hop and move in it drawn at its fighter's size (FxSize):
+	-- a pet's at a pet's, a critter's at a critter's, none at a player's.
+	local petSize, sized, raw = Kaiju.size(Kaiju.Scale.Pet), {}, 0
+	local drawn = { Swing = true, DodgeRoll = true, EnemySwing = true, Nova = true, Shot = true, Zone = true }
+	for _, entry in fxs do
+		if entry[1] == "Sized" then
+			sized[entry[2]] = (sized[entry[2]] or 0) + 1
+		elseif drawn[entry[1]] then
+			raw += 1
+		end
+	end
+	check(raw == 0, raw .. " creature effects drawn at a player's size")
+	check((sized[petSize] or 0) > 0, "No kaiju effects at a pet's size")
+	check((sized[Kaiju.Bug.Size] or 0) > 0, "No critter effects at a critter's size")
 
 	-- A pack shares its foes too: two wild kaiju on two of yours take one
 	-- each; on one, both, from opposite sides.
@@ -2830,7 +3162,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, the vein guardian, a wild kaiju's day)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day)",
 		checks
 	)
 )

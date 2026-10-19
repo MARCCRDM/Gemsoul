@@ -20,6 +20,10 @@
 	last one that hit it (the server keeps it on the model as
 	"LastHitElement"). Purely local and short-lived.
 
+	A body's death is as big as it is (FxSize.ofModel, its height next to a
+	player's): a knee-high kaiju's or a critter's blast throws its bits a
+	short way, and shakes your screen only close by and only a little.
+
 	  ElementalDeath.play(model, element, color) -> true when it ran
 	  ElementalDeath.start()               players' bodies too (on death)
 ]]
@@ -31,6 +35,7 @@ local Debris = game:GetService("Debris")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CombatFx = require(script.Parent.CombatFx)
+local FxSize = require(script.Parent.FxSize)
 local CombatSound = require(script.Parent.CombatSound)
 local CombatVfx = require(script.Parent.CombatVfx)
 
@@ -40,6 +45,7 @@ ElementalDeath.CritterPieces = 40 -- a moon bug's blast: only its biggest pieces
 ElementalDeath.Far = 140 -- studs from the camera: past this, no blast at all
 ElementalDeath.Chunks = 18 -- torn-off bits added to every blast
 ElementalDeath.Lifetime = 6 -- seconds before the remains are gone
+ElementalDeath.ShakeWithin = 40 -- studs (by its size): past this a death doesn't shake you
 
 local played = setmetatable({}, { __mode = "k" }) -- [model] = true, once each
 
@@ -151,6 +157,11 @@ local SLICK = PhysicalProperties.new(0.35, 0.05, 0.2, 1, 1)
 -- and roll.
 local function blowApart(pieces, centre: Vector3, speed: NumberRange, lift: number, slick: boolean?)
 	local group = groupOf()
+	-- (A smaller body's bits fly as far out for its size: speed by the root
+	-- of it, as a throw's reach goes with its speed squared.)
+	local k = FxSize.get()
+	local push = math.sqrt(k)
+	lift *= push
 	for _, piece in pieces do
 		local part = piece.Part
 		if part.Parent then
@@ -163,8 +174,8 @@ local function blowApart(pieces, centre: Vector3, speed: NumberRange, lift: numb
 			-- A little scatter so the blast isn't a perfect sphere.
 			local scatter = Vector3.new(math.random() - 0.5, math.random() * 0.5, math.random() - 0.5) * 0.7
 			local direction = (out.Unit + scatter).Unit
-			local falloff = math.clamp(1.25 - distance / 8, 0.55, 1.25)
-			local power = (speed.Min + math.random() * (speed.Max - speed.Min)) * falloff
+			local falloff = math.clamp(1.25 - distance / (8 * k), 0.55, 1.25)
+			local power = (speed.Min + math.random() * (speed.Max - speed.Min)) * falloff * push
 			part.Anchored = false
 			part.Massless = false
 			part.CanCollide = true
@@ -183,6 +194,7 @@ end
 -- the torso, thrown with everything else. Added to `pieces`.
 local function chunks(pieces, centre: Vector3, tint: Color3?, material: Enum.Material?)
 	local count = #pieces
+	local k = FxSize.get()
 	-- (A critter's small blast gets a few.)
 	for _ = 1, if count <= ElementalDeath.CritterPieces then 6 else ElementalDeath.Chunks do
 		local from = if count > 0 then pieces[math.random(1, math.min(count, 12))] else nil
@@ -190,9 +202,9 @@ local function chunks(pieces, centre: Vector3, tint: Color3?, material: Enum.Mat
 		if tint then
 			color = color:Lerp(tint, 0.6)
 		end
-		local size = Vector3.new(0.25 + math.random() * 0.6, 0.25 + math.random() * 0.6, 0.25 + math.random() * 0.6)
+		local size = Vector3.new(0.25 + math.random() * 0.6, 0.25 + math.random() * 0.6, 0.25 + math.random() * 0.6) * k
 		local at = centre
-			+ Vector3.new((math.random() - 0.5) * 1.6, (math.random() - 0.3) * 2.4, (math.random() - 0.5) * 1.6)
+			+ Vector3.new((math.random() - 0.5) * 1.6, (math.random() - 0.3) * 2.4, (math.random() - 0.5) * 1.6) * k
 		local chunk = neon(
 			size,
 			CFrame.new(at) * CFrame.Angles(math.random() * 6, math.random() * 6, math.random() * 6),
@@ -217,6 +229,7 @@ local function fadeOut(pieces, after: number, seconds: number)
 end
 
 local function ring(at: Vector3, color: Color3, radius: number, seconds: number)
+	radius *= FxSize.get()
 	local disc = neon(
 		Vector3.new(0.12, 1, 1),
 		CFrame.new(at) * CFrame.Angles(0, 0, math.rad(90)),
@@ -229,9 +242,16 @@ local function ring(at: Vector3, color: Color3, radius: number, seconds: number)
 end
 
 local function ball(at: Vector3, color: Color3, radius: number, seconds: number)
-	local sphere = neon(Vector3.one * 1.5, CFrame.new(at), color, 0.25, Enum.PartType.Ball)
+	local k = FxSize.get()
+	radius *= k
+	local sphere = neon(Vector3.one * 1.5 * k, CFrame.new(at), color, 0.25, Enum.PartType.Ball)
 	tween(sphere, seconds, { Size = Vector3.one * radius * 2, Transparency = 1 })
 	Debris:AddItem(sphere, seconds + 0.1)
+end
+
+-- Its blast felt near it (harder close in), not across the map.
+local function shake(centre: Vector3, strength: number, seconds: number)
+	CombatFx.shakeNear(centre, strength, seconds, ElementalDeath.ShakeWithin)
 end
 
 -- The elements ------------------------------------------------------------------------------------
@@ -244,9 +264,10 @@ function STYLES.Fire(pieces, centre: Vector3, floor: number)
 	for _, piece in pieces do
 		tween(piece.Part, 0.4, { Color = piece.Color:Lerp(orange, 0.65) })
 	end
-	local flames = neon(Vector3.new(2, 4, 1), CFrame.new(centre), orange, 1)
+	local k = FxSize.get()
+	local flames = neon(Vector3.new(2, 4, 1) * k, CFrame.new(centre), orange, 1)
 	local fire = Instance.new("Fire")
-	fire.Size, fire.Heat, fire.Color, fire.SecondaryColor = 9, 18, orange, Color3.fromRGB(255, 60, 20)
+	fire.Size, fire.Heat, fire.Color, fire.SecondaryColor = 9 * k, 18 * k, orange, Color3.fromRGB(255, 60, 20)
 	fire.Parent = flames
 	Debris:AddItem(flames, 2.5)
 	CombatFx.flash(centre, orange, 4, 18, 0.45)
@@ -258,7 +279,7 @@ function STYLES.Fire(pieces, centre: Vector3, floor: number)
 	CombatFx.flash(centre, orange, 10, 40, 0.7)
 	CombatFx.burst(centre, orange, "Embers", 2.4)
 	CombatFx.burst(centre, Color3.fromRGB(255, 220, 140), "Sparks", 2)
-	CombatFx.shake(0.5, 0.35)
+	shake(centre, 0.5, 0.35)
 	ball(centre, orange, 5, 0.45)
 	ball(centre, Color3.fromRGB(255, 240, 200), 3, 0.25)
 	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), orange, 10, 0.45)
@@ -269,10 +290,10 @@ function STYLES.Fire(pieces, centre: Vector3, floor: number)
 		tween(piece.Part, 1.4, { Color = Color3.fromRGB(38, 28, 24) })
 		if i % 7 == 1 then
 			local burn = Instance.new("Fire")
-			burn.Size, burn.Heat, burn.Color = 2.5, 4, orange
+			burn.Size, burn.Heat, burn.Color = 2.5 * k, 4 * k, orange
 			burn.Parent = piece.Part
 			local smoke = Instance.new("Smoke")
-			smoke.Size, smoke.Opacity, smoke.RiseVelocity = 1.5, 0.15, 3
+			smoke.Size, smoke.Opacity, smoke.RiseVelocity = 1.5 * k, 0.15, 3 * k
 			smoke.Color = Color3.fromRGB(60, 50, 45)
 			smoke.Parent = piece.Part
 		end
@@ -283,6 +304,7 @@ end
 function STYLES.Shock(pieces, centre: Vector3, floor: number)
 	local ion = GemConfig.ElementColors.Shock
 	local white = Color3.fromRGB(235, 245, 255)
+	local k = FxSize.get()
 	-- Locked up, crackling: pieces twitch and flash, arcs leap across the body.
 	local started = os.clock()
 	local step = 0
@@ -297,7 +319,7 @@ function STYLES.Shock(pieces, centre: Vector3, floor: number)
 				part.Material = Enum.Material.SmoothPlastic
 				part.Color = piece.Color:Lerp(ion, 0.35)
 			end
-			local jitter = 0.18
+			local jitter = 0.18 * k
 			part.CFrame = piece.Home
 				* CFrame.new(
 					(math.random() - 0.5) * jitter,
@@ -312,7 +334,7 @@ function STYLES.Shock(pieces, centre: Vector3, floor: number)
 			local a = pieces[first].Part.Position
 			local b = pieces[second].Part.Position
 			if (b - a).Magnitude > 0.1 then
-				CombatVfx.lightning(a, b + (b - a).Unit * 2, if math.random() < 0.5 then ion else white)
+				CombatVfx.lightning(a, b + (b - a).Unit * 2 * k, if math.random() < 0.5 then ion else white)
 			end
 		end
 		if step % 3 == 1 then
@@ -325,13 +347,13 @@ function STYLES.Shock(pieces, centre: Vector3, floor: number)
 	CombatSound.element("Impact", "Shock", centre, { Volume = 1.2 })
 	CombatFx.flash(centre, white, 12, 40, 0.5)
 	CombatFx.burst(centre, ion, "Sparks", 2.8)
-	CombatFx.shake(0.45, 0.3)
+	shake(centre, 0.45, 0.3)
 	ball(centre, white, 4, 0.3)
 	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), ion, 10, 0.4)
 	for _ = 1, 6 do
 		local out = Vector3.new(math.random() - 0.5, math.random() * 0.6, math.random() - 0.5)
 		if out.Magnitude > 0.05 then
-			CombatVfx.lightning(centre, centre + out.Unit * (8 + math.random() * 8), ion)
+			CombatVfx.lightning(centre, centre + out.Unit * (8 + math.random() * 8) * k, ion)
 		end
 	end
 	chunks(pieces, centre, Color3.fromRGB(40, 42, 52))
@@ -345,6 +367,7 @@ end
 
 function STYLES.Poison(pieces, centre: Vector3, floor: number)
 	local acid = GemConfig.ElementColors.Poison
+	local k = FxSize.get()
 	-- Melting: plates go acid green and slump into a spreading puddle.
 	local puddle = neon(
 		Vector3.new(0.1, 1, 1),
@@ -353,7 +376,7 @@ function STYLES.Poison(pieces, centre: Vector3, floor: number)
 		0.5,
 		Enum.PartType.Cylinder
 	)
-	tween(puddle, 1.1, { Size = Vector3.new(0.1, 11, 11) })
+	tween(puddle, 1.1, { Size = Vector3.new(0.1, 11 * k, 11 * k) })
 	Debris:AddItem(puddle, 3.2)
 	task.delay(2.2, function()
 		if puddle.Parent then
@@ -373,17 +396,17 @@ function STYLES.Poison(pieces, centre: Vector3, floor: number)
 		}, Enum.EasingStyle.Sine)
 	end
 	for _ = 1, 5 do
-		CombatFx.burst(centre - Vector3.new(0, 2, 0), acid, "Embers", 0.8)
+		CombatFx.burst(centre - Vector3.new(0, 2 * k, 0), acid, "Embers", 0.8)
 		task.wait(0.2)
 	end
 	task.wait(0.1) -- the melt tweens are done before physics takes over
 	-- The remains burst.
-	local low = Vector3.new(centre.X, floor + 0.8, centre.Z)
+	local low = Vector3.new(centre.X, floor + 0.8 * k, centre.Z)
 	CombatSound.play("Death", low)
 	CombatSound.element("Impact", "Poison", low, { Volume = 1.2 })
 	CombatFx.flash(low, acid, 8, 30, 0.5)
 	CombatFx.burst(low, acid, "Embers", 2.4)
-	CombatFx.shake(0.35, 0.3)
+	shake(low, 0.35, 0.3)
 	ball(low, acid, 4, 0.4)
 	chunks(pieces, low, acid, Enum.Material.Slate)
 	blowApart(pieces, low, NumberRange.new(32, 58), 48)
@@ -393,6 +416,7 @@ end
 function STYLES.Frost(pieces, centre: Vector3, floor: number)
 	local ice = Color3.fromRGB(196, 236, 255)
 	local deep = GemConfig.ElementColors.Frost
+	local k = FxSize.get()
 	-- Frozen solid: an ice shell, spikes growing out, a beat of stillness.
 	for _, piece in pieces do
 		local part = piece.Part
@@ -406,13 +430,13 @@ function STYLES.Frost(pieces, centre: Vector3, floor: number)
 	for i = 1, 10 do
 		local angle = i / 10 * math.pi * 2
 		local tilt = CFrame.Angles(math.rad(25 + math.random() * 30), angle, 0)
-		local base = CFrame.new(centre + Vector3.new(0, (math.random() - 0.4) * 3, 0)) * tilt
-		local spike = neon(Vector3.new(0.5, 0.2, 0.5), base, ice, 0.2)
+		local base = CFrame.new(centre + Vector3.new(0, (math.random() - 0.4) * 3 * k, 0)) * tilt
+		local spike = neon(Vector3.new(0.5, 0.2, 0.5) * k, base, ice, 0.2)
 		spike.Material = Enum.Material.Glass
 		tween(
 			spike,
 			0.3,
-			{ Size = Vector3.new(0.6, 2.4 + math.random() * 1.6, 0.6), CFrame = base * CFrame.new(0, 1.4, 0) }
+			{ Size = Vector3.new(0.6, 2.4 + math.random() * 1.6, 0.6) * k, CFrame = base * CFrame.new(0, 1.4 * k, 0) }
 		)
 		table.insert(spikes, spike)
 		Debris:AddItem(spike, 3)
@@ -423,14 +447,14 @@ function STYLES.Frost(pieces, centre: Vector3, floor: number)
 	CombatSound.element("Impact", "Frost", centre, { Volume = 1.3 })
 	CombatFx.flash(centre, ice, 10, 36, 0.45)
 	CombatFx.burst(centre, ice, "Shards", 2.6)
-	CombatFx.shake(0.45, 0.3)
+	shake(centre, 0.45, 0.3)
 	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), deep, 9, 0.4)
 	-- Extra splinters from the biggest pieces.
 	for i = 1, math.min(#pieces, 24) do
 		local source = pieces[i].Part
 		for _ = 1, 2 do
 			local shard = neon(
-				Vector3.new(0.25, 0.25 + math.random() * 0.6, 0.25),
+				Vector3.new(0.25, 0.25 + math.random() * 0.6, 0.25) * k,
 				source.CFrame
 					* CFrame.new((math.random() - 0.5) * source.Size.X, (math.random() - 0.5) * source.Size.Y, 0),
 				ice,
@@ -464,7 +488,7 @@ function STYLES.Blast(pieces, centre: Vector3, floor: number, color: Color3?)
 	CombatFx.flash(centre, glow, 9, 34, 0.5)
 	CombatFx.burst(centre, glow, "Sparks", 2.2)
 	CombatFx.burst(centre, Color3.fromRGB(80, 74, 70), "Smoke", 1.6)
-	CombatFx.shake(0.4, 0.3)
+	shake(centre, 0.4, 0.3)
 	ball(centre, glow, 4, 0.35)
 	ring(Vector3.new(centre.X, floor + 0.1, centre.Z), glow, 9, 0.4)
 	chunks(pieces, centre)
@@ -496,7 +520,9 @@ function ElementalDeath.play(model: Model?, element: string?, color: Color3?): b
 		return false
 	end
 	local centre, floor = centreOf(pieces, model)
-	task.spawn(style, pieces, centre, floor, color)
+	-- (A player's body is a player's size, whatever it's wearing.)
+	local size = if Players:GetPlayerFromCharacter(model) then 1 else FxSize.ofModel(model)
+	task.spawn(FxSize.run, size, style, pieces, centre, floor, color)
 	return true
 end
 

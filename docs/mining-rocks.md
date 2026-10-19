@@ -51,8 +51,10 @@ What Commons are for:
   The shop always pays below worth; other players pay better on the market.
   "Spare" means loose and not named by a saved loadout
   (`GemInventory.spare`; the server's `SellSpare`).
-- **Your kaiju.** A Common feeds it 20 EXP (full until level 10). `PICK
-  COMMONS` in its feed tab picks a mouthful (25) at once.
+- **Your kaiju.** Stones mend a hurt kaiju (a Common of its own element
+  20% of its health) and revive one that's down (10 power plus 1 a level);
+  they don't give EXP. PICK FOR ME in its INFUSE tab picks the Commons it
+  needs ([kaiju.md](kaiju.md#infusing)).
 
 A gem needs room in the pouch (300 gems, room for a long session's
 Commons). With a full pouch the server refuses the swing before it lands:

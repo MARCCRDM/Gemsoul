@@ -35,6 +35,10 @@
 	from, when it shares that foe) and f.Apart (a push clear of its own side
 	crowding it). With neither it fights as it does alone.
 
+	Its effects go out "Sized" (Kaiju.size of its Scale: the client draws
+	them, sounds them and shakes your screen as big as it stands), and an R
+	ring is cast only on a foe inside the ring at its size.
+
 	Its model carries, for every client (CreatureAnimation, FoeCastBar):
 	ActionKind (Light, Heavy, Punish, Lunge, Bolt, Nova, Dodge, Stagger),
 	ActionStart and ActionAt (server time: its wind-up and the blow),
@@ -61,6 +65,15 @@ KaijuFighter.fx = function(kind: string, ...)
 	local event = remotes and remotes:FindFirstChild("CombatFx")
 	if event then
 		(event :: RemoteEvent):FireAllClients(kind, ...)
+	end
+end
+-- Its effect, at its size ("Sized") when it isn't a player's.
+local function fx(f, kind: string, ...)
+	local size = f.Size or 1
+	if size ~= 1 then
+		KaijuFighter.fx("Sized", size, kind, ...)
+	else
+		KaijuFighter.fx(kind, ...)
 	end
 end
 
@@ -230,7 +243,7 @@ local function windup(f, kind: string, now: number)
 	animate(f, kind, seconds, nil, if heavy then f.Style.Names.Heavy else nil)
 	if heavy then
 		local feet = f.Root.Position - Vector3.new(0, f.Root.Size.Y / 2 + f.Humanoid.HipHeight, 0)
-		KaijuFighter.fx("Nova", feet, f.Reach + 0.5, HEAVY_COLOR, seconds)
+		fx(f, "Nova", feet, f.Reach + 0.5, HEAVY_COLOR, seconds)
 	end
 end
 
@@ -265,11 +278,11 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 	local heavy = action.Kind == "Heavy"
 	local color = GemConfig.ElementColors[f.Element] or Color3.new(1, 1, 1)
 	local arc = if heavy then (if f.Species == "Razorback" then 220 else 150) else 100
-	KaijuFighter.fx("Swing", nil, f.Root.Position, dir, f.Reach + 1, arc, color, heavy)
+	fx(f, "Swing", nil, f.Root.Position, dir, f.Reach + 1, arc, color, heavy)
 	if heavy and f.Species ~= "Razorback" then
 		-- A stomp or a slam: a shockwave at its feet.
 		local feet = f.Root.Position - Vector3.new(0, f.Root.Size.Y / 2 + f.Humanoid.HipHeight, 0)
-		KaijuFighter.fx("Nova", feet, f.Reach + 0.5, color, 0)
+		fx(f, "Nova", feet, f.Reach + 0.5, color, 0)
 	end
 	if distance * Brain.Reach / f.Reach <= Brain.Reach + KaijuFight.HitRange then
 		local blinded = now < (body.BlindUntil or 0) and KaijuFighter.random() < (body.Blind or 0.5)
@@ -398,7 +411,7 @@ function KaijuFighter.step(f, foe, now: number)
 		and now >= f.NextR
 		and not view.Stunned
 		and (ratio <= Kaiju.RWhen or view.FoeHeavy or view.FoeCasting)
-		and not (ringR and ringR.Shape == "Nova" and distance > (ringR.Radius or 6))
+		and not (ringR and ringR.Shape == "Nova" and distance > (ringR.Radius or 6) * (f.Size or 1))
 	then
 		f.Choice = "R"
 		move(f, "R", moves.R, foe, now)
@@ -448,13 +461,13 @@ function KaijuFighter.step(f, foe, now: number)
 		body.DodgeUntil = now + KaijuFight.DodgeFor
 		animate(f, "Dodge", 0, sign)
 		root.AssemblyLinearVelocity = away * 55 * k * f.Style.Hop + Vector3.new(0, 6 * k, 0)
-		KaijuFighter.fx("DodgeRoll", nil, root.Position, away, 8 * k * f.Style.Hop, true)
+		fx(f, "DodgeRoll", nil, root.Position, away, 8 * k * f.Style.Hop, true)
 	elseif choice == "Lunge" then
 		-- A pounce from mid range, the blow landing as it arrives.
 		lower(f, now)
 		f.NextLunge = now + 4 + KaijuFighter.random() * 2
 		root.AssemblyLinearVelocity = dir * math.min(80 * k, distance * 5) + Vector3.new(0, 4 * k, 0)
-		KaijuFighter.fx("DodgeRoll", nil, root.Position, dir, math.max(1, distance - f.Reach * 0.5), false)
+		fx(f, "DodgeRoll", nil, root.Position, dir, math.max(1, distance - f.Reach * 0.5), false)
 		windup(f, "Lunge", now)
 		face(f, foe.Root.Position)
 	elseif choice == "Surge" then
@@ -546,6 +559,7 @@ function KaijuFighter.new(spec)
 		KaijuFight.new(spec.Species, spec.Body, KaijuFight.reach(spec.Stats.Reach, spec.Scale or 1), spec.Stats.Rate)
 	f.Model, f.Root, f.Humanoid = spec.Model, spec.Root, spec.Humanoid
 	f.Element, f.Stats, f.Ability, f.Scale = spec.Element, spec.Stats, spec.Ability, spec.Scale or 1
+	f.Size = Kaiju.size(f.Scale)
 	f.FirstSurge = spec.FirstSurge
 	f.Strike, f.Caster = spec.Strike, spec.Caster
 	f.Moves = spec.Moves or {}

@@ -16,6 +16,10 @@
 
 	Built from neon, glass and ice parts, particles and lights, tweened and
 	cleaned up after themselves, capped so a crowded fight stays smooth.
+
+	A kaiju casting one (FxSize: "Sized" from the server) gets it at its own
+	size: the server shrinks where it lands, and here its columns, flames,
+	debris, particles, lights and shake shrink with it.
 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -24,6 +28,7 @@ local Debris = game:GetService("Debris")
 
 local CombatFx = require(script.Parent.CombatFx)
 local CombatSound = require(script.Parent.CombatSound)
+local FxSize = require(script.Parent.FxSize)
 local CombatVfx = require(script.Parent.CombatVfx)
 
 local MoveVfx = {}
@@ -142,7 +147,7 @@ local function fade(p: BasePart, seconds: number, goal: { [string]: any }?, styl
 	Debris:AddItem(p, seconds + 0.05)
 end
 local function later(seconds: number, fn: () -> ())
-	task.delay(seconds, fn)
+	task.delay(seconds, FxSize.keep(fn))
 end
 -- A flat disc lying on the ground (a cylinder stood on its side).
 local FLAT = CFrame.Angles(0, 0, math.rad(90))
@@ -194,26 +199,27 @@ local function floorUnder(at: Vector3): Vector3
 end
 local function light(parent: Instance, color: Color3, brightness: number, range: number): PointLight
 	local l = Instance.new("PointLight")
-	l.Color, l.Brightness, l.Range, l.Shadows = color, brightness, math.min(range, 60), false
+	l.Color, l.Brightness, l.Range, l.Shadows = color, brightness, math.min(range * FxSize.get(), 60), false
 	l.Parent = parent
 	return l
 end
 local function emitter(parent: Instance, color: Color3, rate: number, o: { [string]: any }?): ParticleEmitter
 	local opts = o or {}
+	local k = FxSize.get()
 	local e = Instance.new("ParticleEmitter")
 	e.Texture = opts.Texture or SPARK_TEXTURE
 	e.Color = ColorSequence.new(opts.From or color:Lerp(WHITE, 0.4), color)
 	e.LightEmission = opts.Light or 1
 	e.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, opts.Size or 0.4),
-		NumberSequenceKeypoint.new(1, opts.EndSize or 0),
+		NumberSequenceKeypoint.new(0, (opts.Size or 0.4) * k),
+		NumberSequenceKeypoint.new(1, (opts.EndSize or 0) * k),
 	})
 	e.Transparency =
 		NumberSequence.new({ NumberSequenceKeypoint.new(0, opts.Alpha or 0.1), NumberSequenceKeypoint.new(1, 1) })
 	e.Lifetime = NumberRange.new(opts.Life or 0.5, (opts.Life or 0.5) * 1.5)
-	e.Speed = NumberRange.new(opts.Speed or 2, (opts.Speed or 2) * 1.8)
+	e.Speed = NumberRange.new((opts.Speed or 2) * k, (opts.Speed or 2) * 1.8 * k)
 	e.SpreadAngle = Vector2.new(opts.Spread or 180, opts.Spread or 180)
-	e.Acceleration = opts.Acceleration or Vector3.new(0, 2, 0)
+	e.Acceleration = (opts.Acceleration or Vector3.new(0, 2, 0)) * k
 	e.Rotation = NumberRange.new(0, 360)
 	e.RotSpeed = NumberRange.new(-120, 120)
 	e.Drag = opts.Drag or 0
@@ -233,14 +239,20 @@ local function attach(p: BasePart): Attachment
 	a.Parent = p
 	return a
 end
--- Shakes your camera when it happens close to you.
+-- Shakes your camera when it happens close to you (a creature's only close
+-- to it, fading with the distance).
 local function rumble(at: Vector3, strength: number, seconds: number, within: number?)
-	if CombatFx.nearMe(at, within or 34) then
+	if FxSize.get() ~= 1 then
+		CombatFx.shakeNear(at, strength, seconds, within or 34)
+	elseif CombatFx.nearMe(at, within or 34) then
 		CombatFx.shake(strength, seconds)
 	end
 end
--- Runs `step(alpha, elapsed)` every frame for `seconds`, then `done()`.
+-- Runs `step(alpha, elapsed)` every frame for `seconds`, then `done()`
+-- (at the size it was started at).
 local function animate(seconds: number, step: (number, number) -> (), done: (() -> ())?)
+	step = FxSize.keep(step)
+	done = if done then FxSize.keep(done) else nil
 	local born = os.clock()
 	local connection: RBXScriptConnection
 	connection = RunService.RenderStepped:Connect(function()
@@ -267,6 +279,10 @@ local function chunk(
 	if busy() then
 		return
 	end
+	-- (A creature's: smaller bits, thrown as far out for its size.)
+	local k = FxSize.get()
+	size *= k
+	velocity *= math.sqrt(k)
 	local c = part(
 		size,
 		CFrame.new(at) * CFrame.Angles(math.random() * 6, math.random() * 6, math.random() * 6),
@@ -293,8 +309,8 @@ local function strike(from: Vector3, to: Vector3, color: Color3, core: number?)
 	CombatVfx.lightning(from, to, color)
 	local length = (to - from).Magnitude
 	if length > 0.5 and (core or 0) > 0 then
-		local beam =
-			part(Vector3.new(core :: number, core :: number, length), CFrame.lookAt((from + to) / 2, to), WHITE, 0.05)
+		local width = (core :: number) * FxSize.get()
+		local beam = part(Vector3.new(width, width, length), CFrame.lookAt((from + to) / 2, to), WHITE, 0.05)
 		light(beam, color, 6, 30)
 		fade(beam, 0.22, { Size = Vector3.new(0.05, 0.05, length) })
 	end
@@ -466,22 +482,23 @@ end
 -- Flame Tornado: a spinning column of fire that tears across the ground.
 SHOW.FlameTornado = function(_who, from: Vector3, to: Vector3, seconds: number, radius: number)
 	local a, b = floorUnder(from), floorUnder(to)
+	local k = FxSize.get()
 	local rings, ribbons = {}, {}
 	for i = 1, 7 do
-		local d = radius * 0.7 + i * 0.55
+		local d = radius * 0.7 + i * 0.55 * k
 		local ring = part(
-			Vector3.new(0.5, d, d),
+			Vector3.new(0.5 * k, d, d),
 			CFrame.new(a),
 			if i % 2 == 0 then FLAME else EMBER,
 			0.55 + i * 0.03,
 			Enum.PartType.Cylinder
 		)
-		table.insert(rings, { Part = ring, Height = i * 1.25, Diameter = d })
+		table.insert(rings, { Part = ring, Height = i * 1.25 * k, Diameter = d })
 	end
-	local core = part(Vector3.new(9, 1.6, 1.6), CFrame.new(a), HOT, 0.45, Enum.PartType.Cylinder)
+	local core = part(Vector3.new(9, 1.6, 1.6) * k, CFrame.new(a), HOT, 0.45, Enum.PartType.Cylinder)
 	for strand = 1, 3 do
 		for n = 1, 9 do
-			local flame = part(Vector3.new(0.7, 0.7, 1.6), CFrame.new(a), if n % 2 == 0 then HOT else FLAME, 0.15)
+			local flame = part(Vector3.new(0.7, 0.7, 1.6) * k, CFrame.new(a), if n % 2 == 0 then HOT else FLAME, 0.15)
 			table.insert(ribbons, { Part = flame, Strand = strand, Step = n })
 		end
 	end
@@ -526,24 +543,24 @@ SHOW.FlameTornado = function(_who, from: Vector3, to: Vector3, seconds: number, 
 		spin += (now - last) * 9
 		last = now
 		local at = a:Lerp(b, alpha)
-		local sway = Vector3.new(math.sin(elapsed * 5) * 0.4, 0, math.cos(elapsed * 4) * 0.4)
+		local sway = Vector3.new(math.sin(elapsed * 5) * 0.4, 0, math.cos(elapsed * 4) * 0.4) * k
 		for _, r in rings do
-			local lean = sway * r.Height / 6
+			local lean = sway * r.Height / (6 * k)
 			r.Part.CFrame = CFrame.new(at + UP * r.Height + lean)
 				* CFrame.Angles(0, spin * (1 + r.Height * 0.05), 0)
 				* FLAT
 		end
-		core.CFrame = CFrame.new(at + UP * 4.5 + sway * 0.5) * CFrame.Angles(0, spin, 0) * FLAT
+		core.CFrame = CFrame.new(at + UP * 4.5 * k + sway * 0.5) * CFrame.Angles(0, spin, 0) * FLAT
 		for _, f in ribbons do
-			local h = f.Step * 0.95
+			local h = f.Step * 0.95 * k
 			local angle = spin * 1.3 + f.Strand * (math.pi * 2 / 3) + f.Step * 0.55
-			local reachOut = radius * 0.45 + f.Step * 0.32
+			local reachOut = radius * 0.45 + f.Step * 0.32 * k
 			f.Part.CFrame = CFrame.lookAt(
-				at + UP * h + outward(angle) * reachOut + sway * h / 6,
-				at + UP * (h + 0.5) + outward(angle + 0.6) * reachOut
+				at + UP * h + outward(angle) * reachOut + sway * h / (6 * k),
+				at + UP * (h + 0.5 * k) + outward(angle + 0.6) * reachOut
 			)
 		end
-		base.CFrame = CFrame.new(at + UP * 0.1) * FLAT
+		base.CFrame = CFrame.new(at + UP * 0.1 * k) * FLAT
 		if elapsed - lastScorch > 0.18 and not busy() then
 			lastScorch = elapsed
 			local mark = disc(at + UP * 0.03, radius * 1.4, CHAR, 0.3, Enum.Material.Slate)
@@ -650,19 +667,21 @@ end
 -- three shockwaves rolling across the ground.
 SHOW.Supernova = function(_who, _origin: Vector3, center: Vector3, radius: number)
 	local floor = floorUnder(center)
+	local k = FxSize.get()
 	rumble(floor, 1.1, 0.6, 50)
-	flash(floor + UP * 3, HOT, 14, radius * 4, 0.6)
-	local core = part(Vector3.one * 3, CFrame.new(floor + UP * 2), WHITE, 0, Enum.PartType.Ball)
+	flash(floor + UP * 3 * k, HOT, 14, radius * 4, 0.6)
+	local heart = CFrame.new(floor + UP * 2 * k)
+	local core = part(Vector3.one * 3 * k, heart, WHITE, 0, Enum.PartType.Ball)
 	fade(core, 0.35, { Size = Vector3.one * radius * 1.4 })
-	local fireball = part(Vector3.one * 3, CFrame.new(floor + UP * 2), FLAME, 0.15, Enum.PartType.Ball)
+	local fireball = part(Vector3.one * 3 * k, heart, FLAME, 0.15, Enum.PartType.Ball)
 	fade(fireball, 0.6, { Size = Vector3.one * radius * 2.1 })
-	local halo = part(Vector3.one * 3, CFrame.new(floor + UP * 2), EMBER, 0.5, Enum.PartType.Ball)
+	local halo = part(Vector3.one * 3 * k, heart, EMBER, 0.5, Enum.PartType.Ball)
 	fade(halo, 0.8, { Size = Vector3.one * radius * 2.6 })
 	for n = 0, 2 do
 		later(n * 0.12, function()
 			shockwave(
 				floor + UP * (0.1 + n * 0.05),
-				3,
+				3 * k,
 				radius * (2.2 + n * 0.5),
 				if n == 0 then HOT else FLAME,
 				0.5 + n * 0.1,
@@ -671,20 +690,20 @@ SHOW.Supernova = function(_who, _origin: Vector3, center: Vector3, radius: numbe
 		end)
 	end
 	local column = part(Vector3.new(radius * 0.8, 1, radius * 0.8), CFrame.new(floor), HOT, 0.2, Enum.PartType.Cylinder)
-	column.CFrame = CFrame.new(floor + UP * 0.5) * FLAT
-	fade(column, 0.5, { Size = Vector3.new(26, 0.5, 0.5), CFrame = CFrame.new(floor + UP * 13) * FLAT })
+	column.CFrame = CFrame.new(floor + UP * 0.5 * k) * FLAT
+	fade(column, 0.5, { Size = Vector3.new(26, 0.5, 0.5) * k, CFrame = CFrame.new(floor + UP * 13 * k) * FLAT })
 	for _ = 1, 10 do
 		local angle = math.random() * math.pi * 2
 		chunk(
-			floor + UP,
+			floor + UP * k,
 			Vector3.one * (0.4 + math.random() * 0.5),
 			MAGMA,
 			outward(angle) * (18 + math.random() * 18) + UP * (25 + math.random() * 20),
 			Enum.Material.Neon
 		)
 	end
-	CombatFx.burst(floor + UP * 2, EMBER, "Embers", 3)
-	CombatFx.burst(floor + UP * 2, Color3.fromRGB(110, 95, 90), "Smoke", 2.6)
+	CombatFx.burst(floor + UP * 2 * k, EMBER, "Embers", 3)
+	CombatFx.burst(floor + UP * 2 * k, Color3.fromRGB(110, 95, 90), "Smoke", 2.6)
 	CombatSound.play("Blast", floor, { Volume = 1.3, Pitch = 0.75 })
 	CombatSound.element("Impact", "Fire", floor, { Volume = 1.1 })
 end
@@ -748,7 +767,8 @@ end
 -- Hailstorm: a cloud spreads over the area and hail hammers the ground.
 SHOW.Hailstorm = function(_who, center: Vector3, radius: number, seconds: number)
 	local floor = floorUnder(center)
-	local top = floor + UP * 13
+	local k = FxSize.get()
+	local top = floor + UP * 13 * k
 	local puffs = {}
 	for i = 1, 11 do
 		local angle = i / 11 * math.pi * 2
@@ -756,7 +776,7 @@ SHOW.Hailstorm = function(_who, center: Vector3, radius: number, seconds: number
 		local s = radius * (0.8 + math.random() * 0.5)
 		local puff = ellipsoid(
 			Vector3.new(s, s * 0.4, s),
-			CFrame.new(top + outward(angle) * d + UP * (math.random() - 0.5)),
+			CFrame.new(top + outward(angle) * d + UP * (math.random() - 0.5) * k),
 			if i % 2 == 0 then SLATE else Color3.fromRGB(120, 140, 170),
 			1,
 			Enum.Material.SmoothPlastic
@@ -765,7 +785,7 @@ SHOW.Hailstorm = function(_who, center: Vector3, radius: number, seconds: number
 		table.insert(puffs, puff)
 	end
 	-- Snow and sleet pouring out of the cloud's underside.
-	local sheet = part(Vector3.new(radius * 1.8, 0.2, radius * 1.8), CFrame.new(top - UP * 1.5), ICE, 1)
+	local sheet = part(Vector3.new(radius * 1.8, 0.2, radius * 1.8), CFrame.new(top - UP * 1.5 * k), ICE, 1)
 	emitter(
 		attach(sheet),
 		WHITE,
@@ -783,12 +803,12 @@ SHOW.Hailstorm = function(_who, center: Vector3, radius: number, seconds: number
 		}
 	)
 	light(sheet, DEEP_ICE, 2, radius * 2.5)
-	local frost = disc(floor + UP * 0.04, 2, FROST, 0.55, Enum.Material.Glass)
+	local frost = disc(floor + UP * 0.04, 2 * k, FROST, 0.55, Enum.Material.Glass)
 	tween(frost, 0.6, { Size = Vector3.new(0.08, radius * 2, radius * 2) })
 	local rim = disc(floor + UP * 0.06, radius * 2, DEEP_ICE, 0.7)
 	-- Hailstones.
 	local ends = os.clock() + seconds
-	task.spawn(function()
+	task.spawn(FxSize.keep(function()
 		local n = 0
 		while os.clock() < ends do
 			n += 1
@@ -800,24 +820,25 @@ SHOW.Hailstorm = function(_who, center: Vector3, radius: number, seconds: number
 					for _, other in Players:GetPlayers() do
 						local r = other.Character and other.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 						if r and ((r.Position - floor) * Vector3.new(1, 0, 1)).Magnitude <= radius then
-							spot = floorUnder(r.Position) + outward(math.random() * 6) * math.random()
+							spot = floorUnder(r.Position) + outward(math.random() * 6) * math.random() * k
 							break
 						end
 					end
 				end
 				local stone = glass(
-					Vector3.new(0.7, 2.2, 0.7),
-					CFrame.new(spot + UP * 12) * CFrame.Angles(0.15, math.random() * 6, 0.1),
+					Vector3.new(0.7, 2.2, 0.7) * k,
+					CFrame.new(spot + UP * 12 * k) * CFrame.Angles(0.15, math.random() * 6, 0.1),
 					ICE,
 					0.05
 				)
-				local streak = part(Vector3.new(0.12, 3.5, 0.12), stone.CFrame * CFrame.new(0, 2.6, 0), WHITE, 0.5)
-				tween(stone, 0.18, { CFrame = CFrame.new(spot + UP * 0.8) }, Enum.EasingStyle.Linear)
-				tween(streak, 0.18, { CFrame = CFrame.new(spot + UP * 3.4) }, Enum.EasingStyle.Linear)
+				local streak =
+					part(Vector3.new(0.12, 3.5, 0.12) * k, stone.CFrame * CFrame.new(0, 2.6 * k, 0), WHITE, 0.5)
+				tween(stone, 0.18, { CFrame = CFrame.new(spot + UP * 0.8 * k) }, Enum.EasingStyle.Linear)
+				tween(streak, 0.18, { CFrame = CFrame.new(spot + UP * 3.4 * k) }, Enum.EasingStyle.Linear)
 				later(0.18, function()
-					fade(stone, 0.15, { Size = Vector3.new(1.1, 0.3, 1.1) })
+					fade(stone, 0.15, { Size = Vector3.new(1.1, 0.3, 1.1) * k })
 					fade(streak, 0.08)
-					shockwave(spot + UP * 0.08, 0.8, 3.2, ICE, 0.25, 0.15)
+					shockwave(spot + UP * 0.08, 0.8 * k, 3.2 * k, ICE, 0.25, 0.15)
 					if n % 3 == 0 then
 						CombatFx.burst(spot + UP * 0.4, ICE, "Shards", 0.6)
 					end
@@ -825,7 +846,7 @@ SHOW.Hailstorm = function(_who, center: Vector3, radius: number, seconds: number
 			end
 			task.wait(0.03)
 		end
-	end)
+	end))
 	CombatSound.play("Freeze", floor, { Volume = 1 })
 	CombatSound.element("Cast", "Frost", floor, { Volume = 0.8 })
 	later(seconds, function()
@@ -916,23 +937,24 @@ end
 -- Absolute Zero: a dome of ice crystallises over everything inside, then shatters.
 SHOW.AbsoluteZero = function(_who, _origin: Vector3, center: Vector3, radius: number)
 	local floor = floorUnder(center)
+	local k = FxSize.get()
 	rumble(floor, 0.7, 0.5, 40)
-	flash(floor + UP * 2, DEEP_ICE, 9, radius * 3, 0.6)
-	local dome = glass(Vector3.one * 2, CFrame.new(floor), ICE, 0.5)
+	flash(floor + UP * 2 * k, DEEP_ICE, 9, radius * 3, 0.6)
+	local dome = glass(Vector3.one * 2 * k, CFrame.new(floor), ICE, 0.5)
 	dome.Shape = Enum.PartType.Ball
 	dome.Material = Enum.Material.Ice
 	tween(dome, 0.3, { Size = Vector3.one * radius * 2 }, Enum.EasingStyle.Back)
-	local shine = part(Vector3.one * 2, CFrame.new(floor), WHITE, 0.82, Enum.PartType.Ball)
+	local shine = part(Vector3.one * 2 * k, CFrame.new(floor), WHITE, 0.82, Enum.PartType.Ball)
 	fade(shine, 0.3, { Size = Vector3.one * radius * 2.05 })
-	shockwave(floor + UP * 0.1, 2, radius * 2.4, ICE, 0.45)
+	shockwave(floor + UP * 0.1, 2 * k, radius * 2.4, ICE, 0.45)
 	local floorIce = disc(floor + UP * 0.05, radius * 2, FROST, 0.4, Enum.Material.Ice)
 	local crystals = { dome, floorIce }
 	for i = 1, 12 do
 		local angle = i / 12 * math.pi * 2
 		local at = floor + outward(angle) * radius * (0.55 + math.random() * 0.35)
-		local tall = 1.5 + math.random() * 2.5
+		local tall = (1.5 + math.random() * 2.5) * k
 		local c = glass(
-			Vector3.new(0.6, 0.2, 0.6),
+			Vector3.new(0.6, 0.2, 0.6) * k,
 			CFrame.new(at) * CFrame.Angles(math.sin(angle) * 0.4, 0, -math.cos(angle) * 0.4),
 			if i % 2 == 0 then DEEP_ICE else ICE,
 			0.1
@@ -941,7 +963,7 @@ SHOW.AbsoluteZero = function(_who, _origin: Vector3, center: Vector3, radius: nu
 			tween(
 				c,
 				0.15,
-				{ Size = Vector3.new(0.6, tall, 0.6), CFrame = c.CFrame * CFrame.new(0, tall / 2, 0) },
+				{ Size = Vector3.new(0.6 * k, tall, 0.6 * k), CFrame = c.CFrame * CFrame.new(0, tall / 2, 0) },
 				Enum.EasingStyle.Back
 			)
 		end)
@@ -963,7 +985,7 @@ SHOW.AbsoluteZero = function(_who, _origin: Vector3, center: Vector3, radius: nu
 			Acceleration = Vector3.new(0, 1, 0),
 		}
 	)
-	CombatFx.burst(floor + UP * 2, ICE, "Frost", 3)
+	CombatFx.burst(floor + UP * 2 * k, ICE, "Frost", 3)
 	CombatSound.play("Freeze", floor, { Volume = 1.3 })
 	CombatSound.play("Blast", floor, { Volume = 0.8, Pitch = 1.6 })
 	later(1.5, function()
@@ -1053,7 +1075,8 @@ end
 -- Storm Call: a thundercloud gathers over the area, lit from inside.
 SHOW.StormCall = function(_who, center: Vector3, radius: number, seconds: number)
 	local floor = floorUnder(center)
-	local top = floor + UP * 20
+	local k = FxSize.get()
+	local top = floor + UP * 20 * k
 	local puffs = {}
 	for i = 1, 10 do
 		local angle = i / 10 * math.pi * 2
@@ -1061,7 +1084,7 @@ SHOW.StormCall = function(_who, center: Vector3, radius: number, seconds: number
 		local s = radius * (0.6 + math.random() * 0.5)
 		local puff = ellipsoid(
 			Vector3.new(s, s * 0.4, s),
-			CFrame.new(top + outward(angle) * d + UP * (math.random() - 0.5) * 2),
+			CFrame.new(top + outward(angle) * d + UP * (math.random() - 0.5) * 2 * k),
 			STORM,
 			1,
 			Enum.Material.SmoothPlastic
@@ -1069,21 +1092,21 @@ SHOW.StormCall = function(_who, center: Vector3, radius: number, seconds: number
 		tween(puff, 0.5, { Transparency = 0.1 })
 		table.insert(puffs, puff)
 	end
-	local heart = part(Vector3.one, CFrame.new(top - UP), VOLT, 1)
+	local heart = part(Vector3.one * k, CFrame.new(top - UP * k), VOLT, 1)
 	local glow = light(heart, ARC, 0, radius * 3)
 	local rim = disc(floor + UP * 0.05, radius * 2, VOLT, 0.9)
 	local ends = os.clock() + seconds
-	task.spawn(function()
+	task.spawn(FxSize.keep(function()
 		while os.clock() < ends and heart.Parent do
 			-- The cloud flickers with lightning inside it.
 			glow.Brightness = if math.random() < 0.25 then 6 + math.random() * 6 else 0.5
 			if math.random() < 0.2 and not busy() then
 				local a = top + outward(math.random() * 6) * radius * 0.6
-				CombatVfx.lightning(a, a + outward(math.random() * 6) * radius * 0.5 - UP, ARC)
+				CombatVfx.lightning(a, a + outward(math.random() * 6) * radius * 0.5 - UP * k, ARC)
 			end
 			task.wait(0.07)
 		end
-	end)
+	end))
 	CombatSound.play("Zap", top, { Volume = 0.8, Pitch = 0.6 })
 	later(seconds, function()
 		for _, puff in puffs do
@@ -1117,25 +1140,26 @@ end
 -- A storm bolt lands (the last one bigger: it stuns).
 SHOW.StormBolt = function(_who, point: Vector3, radius: number, last: number)
 	local floor = floorUnder(point)
+	local k = FxSize.get()
 	local big = last == 1
 	strike(
-		floor + UP * 20 + Vector3.new(math.random() * 3 - 1.5, 0, math.random() * 3 - 1.5),
-		floor + UP * 0.3,
+		floor + (UP * 20 + Vector3.new(math.random() * 3 - 1.5, 0, math.random() * 3 - 1.5)) * k,
+		floor + UP * 0.3 * k,
 		VOLT,
 		if big then 1.4 else 0.8
 	)
 	if big then
 		later(0.05, function()
-			CombatVfx.lightning(floor + UP * 20 + Vector3.new(2, 0, 2), floor + UP * 0.3, ARC)
+			CombatVfx.lightning(floor + (UP * 20 + Vector3.new(2, 0, 2)) * k, floor + UP * 0.3 * k, ARC)
 		end)
 	end
-	flash(floor + UP * 2, VOLT, if big then 12 else 7, radius * 4, 0.3)
-	shockwave(floor + UP * 0.1, 1, radius * (if big then 3.4 else 2.4), VOLT, 0.35)
+	flash(floor + UP * 2 * k, VOLT, if big then 12 else 7, radius * 4, 0.3)
+	shockwave(floor + UP * 0.1, k, radius * (if big then 3.4 else 2.4), VOLT, 0.35)
 	local burn = disc(floor + UP * 0.04, radius * 1.3, Color3.fromRGB(40, 36, 50), 0.2, Enum.Material.Slate)
 	later(0.8, function()
 		fade(burn, 0.6)
 	end)
-	CombatFx.burst(floor + UP, VOLT, "Sparks", if big then 2.2 else 1.3)
+	CombatFx.burst(floor + UP * k, VOLT, "Sparks", if big then 2.2 else 1.3)
 	rumble(floor, if big then 0.7 else 0.35, 0.25, 30)
 	CombatSound.play("Zap", floor, { Volume = if big then 1.2 else 0.9, Pitch = 0.9 + math.random() * 0.3 })
 	if big then
@@ -1382,30 +1406,25 @@ SHOW.ToxicTide = function(_who, from: Vector3, to: Vector3, seconds: number, wid
 	local line = (b - a) * Vector3.new(1, 0, 1)
 	local direction = if line.Magnitude > 0.1 then line.Unit else Vector3.new(0, 0, -1)
 	local side = Vector3.new(-direction.Z, 0, direction.X)
+	local k = FxSize.get()
 	local columns = 7
 	local wall, crest = {}, {}
 	for i = 1, columns do
 		local offset = ((i - 0.5) / columns - 0.5) * width
-		table.insert(
-			wall,
-			{
-				Part = glass(Vector3.new(width / columns * 1.15, 1, 1.8), CFrame.new(a), TOXIC, 0.2),
-				Offset = offset,
-				Back = 0,
-			}
-		)
-		table.insert(
-			wall,
-			{
-				Part = part(Vector3.new(width / columns * 1.15, 1, 2.6), CFrame.new(a), LIME, 0.65),
-				Offset = offset,
-				Back = 1.6,
-			}
-		)
-		table.insert(
-			crest,
-			{ Part = ellipsoid(Vector3.new(width / columns * 1.4, 1.1, 1.6), CFrame.new(a), FOAM, 0.1), Offset = offset }
-		)
+		table.insert(wall, {
+			Part = glass(Vector3.new(width / columns * 1.15, 1, 1.8 * k), CFrame.new(a), TOXIC, 0.2),
+			Offset = offset,
+			Back = 0,
+		})
+		table.insert(wall, {
+			Part = part(Vector3.new(width / columns * 1.15, 1, 2.6 * k), CFrame.new(a), LIME, 0.65),
+			Offset = offset,
+			Back = 1.6 * k,
+		})
+		table.insert(crest, {
+			Part = ellipsoid(Vector3.new(width / columns * 1.4, 1.1 * k, 1.6 * k), CFrame.new(a), FOAM, 0.1),
+			Offset = offset,
+		})
 	end
 	local glow = part(Vector3.one, CFrame.new(a), LIME, 1)
 	light(glow, LIME, 4, width * 2)
@@ -1429,12 +1448,15 @@ SHOW.ToxicTide = function(_who, from: Vector3, to: Vector3, seconds: number, wid
 	animate(seconds, function(alpha, elapsed)
 		local front = a:Lerp(b, alpha)
 		-- Rises fast, rolls tall, then breaks as it arrives.
-		local height = if alpha < 0.2
-			then 1 + alpha / 0.2 * 6
-			elseif alpha < 0.85 then 7
-			else 7 * (1 - (alpha - 0.85) / 0.15) + 0.6
+		local height = k
+			* (
+				if alpha < 0.2
+					then 1 + alpha / 0.2 * 6
+					elseif alpha < 0.85 then 7
+					else 7 * (1 - (alpha - 0.85) / 0.15) + 0.6
+			)
 		for i, w in wall do
-			local ripple = math.sin(elapsed * 9 + i) * 0.4
+			local ripple = math.sin(elapsed * 9 + i) * 0.4 * k
 			local h = (height + ripple) * (if w.Back > 0 then 0.75 else 1)
 			local at = front + side * w.Offset - direction * w.Back
 			w.Part.Size = Vector3.new(w.Part.Size.X, h, w.Part.Size.Z)
@@ -1442,15 +1464,15 @@ SHOW.ToxicTide = function(_who, from: Vector3, to: Vector3, seconds: number, wid
 				* CFrame.Angles(math.rad(-14), 0, 0)
 		end
 		for i, c in crest do
-			local ripple = math.sin(elapsed * 9 + i * 2) * 0.4
-			c.Part.CFrame = CFrame.new(front + side * c.Offset + UP * (height + ripple) + direction * 0.8)
+			local ripple = math.sin(elapsed * 9 + i * 2) * 0.4 * k
+			c.Part.CFrame = CFrame.new(front + side * c.Offset + UP * (height + ripple) + direction * 0.8 * k)
 		end
 		glow.CFrame = CFrame.lookAt(front + UP * height, front + UP * height + direction)
 			* CFrame.Angles(0, math.rad(90), 0)
 		if elapsed - lastWet > 0.1 and not busy() then
 			lastWet = elapsed
 			local wet = part(
-				Vector3.new(width, 0.06, 1.6),
+				Vector3.new(width, 0.06, 1.6 * k),
 				CFrame.lookAt(front + UP * 0.04, front + UP * 0.04 + direction),
 				TOXIC,
 				0.4,
@@ -1463,14 +1485,14 @@ SHOW.ToxicTide = function(_who, from: Vector3, to: Vector3, seconds: number, wid
 		end
 	end, function()
 		for _, w in wall do
-			fade(w.Part, 0.3, { Size = Vector3.new(w.Part.Size.X, 0.4, 2.4) })
+			fade(w.Part, 0.3, { Size = Vector3.new(w.Part.Size.X, 0.4 * k, 2.4 * k) })
 		end
 		for _, c in crest do
 			fade(c.Part, 0.3)
 		end
 		fade(glow, 0.3)
-		CombatFx.burst(b + UP, FOAM, "Drips", 2.4)
-		shockwave(b + UP * 0.1, 2, width * 1.2, LIME, 0.5)
+		CombatFx.burst(b + UP * k, FOAM, "Drips", 2.4)
+		shockwave(b + UP * 0.1, 2 * k, width * 1.2, LIME, 0.5)
 		CombatSound.play("Corrode", b, { Volume = 1 })
 	end)
 	rumble(a, 0.5, 0.5, 30)
@@ -1483,9 +1505,10 @@ end
 -- make a pod with the teeth interlocked.
 SHOW.Maneater = function(_who, _origin: Vector3, center: Vector3, radius: number)
 	local floor = floorUnder(center)
+	local k = FxSize.get()
 	local yaw = math.random() * math.pi * 2
 	local base = CFrame.new(floor) * CFrame.Angles(0, yaw, 0)
-	local span = math.clamp(radius * 0.55, 3, 4.5)
+	local span = math.clamp(radius * 0.55, 3 * k, 4.5 * k)
 	local jaws = {}
 	for side = 0, 1 do
 		local pieces = {}
@@ -1517,7 +1540,7 @@ SHOW.Maneater = function(_who, _origin: Vector3, center: Vector3, radius: number
 			local x, y = math.sin(phi) * span * 1.12, span * 0.8 + math.cos(phi) * span * 0.78
 			add(
 				part(
-					Vector3.new(0.3, 1.1, 0.3),
+					Vector3.new(0.3, 1.1, 0.3) * k,
 					base,
 					Color3.fromRGB(252, 250, 232),
 					0,
@@ -1529,18 +1552,19 @@ SHOW.Maneater = function(_who, _origin: Vector3, center: Vector3, radius: number
 		end
 		-- Dark veins down its back.
 		add(
-			part(Vector3.new(0.25, span * 1.3, 0.25), base, VENOM, 0, nil, Enum.Material.SmoothPlastic),
+			part(Vector3.new(0.25 * k, span * 1.3, 0.25 * k), base, VENOM, 0, nil, Enum.Material.SmoothPlastic),
 			CFrame.new(0, span * 0.8, -span * 0.42)
 		)
 		jaws[side + 1] = { Pieces = pieces, Turn = CFrame.Angles(0, side * math.pi, 0) }
 	end
-	local stalk = part(Vector3.new(1, 1.6, 1.6), base, VENOM, 0, Enum.PartType.Cylinder, Enum.Material.SmoothPlastic)
+	local stalk =
+		part(Vector3.new(1, 1.6, 1.6) * k, base, VENOM, 0, Enum.PartType.Cylinder, Enum.Material.SmoothPlastic)
 	local leaves = {}
 	for i = 1, 7 do
 		local angle = i / 7 * math.pi * 2
 		local leaf = ellipsoid(
-			Vector3.new(1.8, 0.3, 4),
-			CFrame.new(floor + outward(angle) * 2.8 + UP * 0.2)
+			Vector3.new(1.8, 0.3, 4) * k,
+			CFrame.new(floor + (outward(angle) * 2.8 + UP * 0.2) * k)
 				* CFrame.Angles(0, -angle + math.pi / 2, 0)
 				* CFrame.Angles(math.rad(14), 0, 0),
 			if i % 2 == 0 then TOXIC else VENOM,
@@ -1549,7 +1573,7 @@ SHOW.Maneater = function(_who, _origin: Vector3, center: Vector3, radius: number
 		)
 		table.insert(leaves, leaf)
 	end
-	local glow = part(Vector3.one, CFrame.new(floor + UP * 2), LIME, 1)
+	local glow = part(Vector3.one * k, CFrame.new(floor + UP * 2 * k), LIME, 1)
 	light(glow, LIME, 4, 18)
 	local function pose(open: number, lift: number)
 		-- open: how far each jaw leans out (radians); lift: how far it's risen.
@@ -1560,17 +1584,17 @@ SHOW.Maneater = function(_who, _origin: Vector3, center: Vector3, radius: number
 				piece.Part.CFrame = frame * piece.Offset
 			end
 		end
-		local height = math.max(0.3, hinge + span * 0.2)
-		stalk.Size = Vector3.new(height, 1.6, 1.6)
+		local height = math.max(0.3 * k, hinge + span * 0.2)
+		stalk.Size = Vector3.new(height, 1.6 * k, 1.6 * k)
 		stalk.CFrame = CFrame.new(floor + UP * height / 2) * FLAT
 	end
 	pose(math.rad(70), 0)
-	CombatFx.burst(floor + UP * 0.5, Color3.fromRGB(120, 95, 70), "Smoke", 1.8)
-	shockwave(floor + UP * 0.08, 2, radius * 2.2, LIME, 0.35)
+	CombatFx.burst(floor + UP * 0.5 * k, Color3.fromRGB(120, 95, 70), "Smoke", 1.8)
+	shockwave(floor + UP * 0.08, 2 * k, radius * 2.2, LIME, 0.35)
 	for _ = 1, 8 do
 		local angle = math.random() * math.pi * 2
 		chunk(
-			floor + UP * 0.5,
+			floor + UP * 0.5 * k,
 			Vector3.one * (0.4 + math.random() * 0.4),
 			Color3.fromRGB(90, 70, 50),
 			outward(angle) * (8 + math.random() * 8) + UP * (16 + math.random() * 10)
@@ -1584,7 +1608,7 @@ SHOW.Maneater = function(_who, _origin: Vector3, center: Vector3, radius: number
 		animate(0.07, function(alpha)
 			pose(math.rad(60 - alpha * 58), span * 1.7)
 		end, function()
-			flash(floor + UP * 2, LIME, 7, 18, 0.3)
+			flash(floor + UP * 2 * k, LIME, 7, 18, 0.3)
 			CombatFx.burst(floor + UP * span, LIME, "Drips", 2)
 			rumble(floor, 0.6, 0.25, 26)
 			CombatSound.play("GuardBreak", floor, { Volume = 1, Pitch = 0.8 })
