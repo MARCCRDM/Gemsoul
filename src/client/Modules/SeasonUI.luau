@@ -19,10 +19,11 @@ local P = IronUi.Colors
 local BOLD, HEADING = IronUi.Bold, IronUi.Heading
 local new, text, box, button, clear = IronUi.new, IronUi.text, IronUi.box, IronUi.button, IronUi.clear
 
--- (on a phone on its side, shorter: the note under the track goes, so the
--- rest reads larger)
+-- (on a phone on its side, narrower and shorter, so it's drawn near full
+-- size: the track scrolls sideways, the XP bar is shorter and the note under
+-- the track goes)
 local SHORT = UiKit.short()
-local WIDTH, HEIGHT = 1000, if SHORT then 470 else 560
+local WIDTH, HEIGHT = if SHORT then 760 else 1000, if SHORT then 440 else 560
 -- What earns XP (Season.XP), the main loop first. Dungeon kills only while
 -- dungeons are open (Config.Features).
 local XP_LABELS = {
@@ -100,7 +101,7 @@ function SeasonUI.refresh()
 	local track = new("Frame", {
 		BackgroundColor3 = P.Slot,
 		Position = UDim2.fromOffset(70, 32),
-		Size = UDim2.fromOffset(420, 16),
+		Size = UDim2.fromOffset(if SHORT then 260 else 420, 16),
 	}, header)
 	UiKit.round(track, 8)
 	local fill = new("Frame", {
@@ -121,7 +122,8 @@ function SeasonUI.refresh()
 	local boostLeft = (profile.Boosts and profile.Boosts.XPUntil or 0) - (profile.ServerTime or os.time())
 	if boostLeft > 0 then
 		local boost = text(header, string.format("⚡ 2x XP: %d min left", math.ceil(boostLeft / 60)), 14, P.Good, BOLD)
-		boost.Position = UDim2.fromOffset(510, 30)
+		-- (a phone: under the bar, clear of the buttons on the right)
+		boost.Position = if SHORT then UDim2.fromOffset(70, 52) else UDim2.fromOffset(510, 30)
 		boost.Size = UDim2.fromOffset(200, 18)
 	end
 	local premium = season.Premium == true
@@ -271,7 +273,14 @@ function SeasonUI.refresh()
 		table.insert(ways, string.format("%s +%d", entry[2], Season.XP[entry[1]]))
 	end
 	local earn = text(body, "EARN XP:  " .. table.concat(ways, "   •   "), 13, P.Dim, BOLD)
-	earn.Position = UDim2.fromOffset(0, if SHORT then 336 else 340)
+	earn.Position = UDim2.fromOffset(0, if SHORT then 330 else 340)
+	if SHORT then
+		-- (one line, as wide as the window: it wraps rather than run off)
+		earn.AutomaticSize = Enum.AutomaticSize.None
+		earn.Size = UDim2.fromOffset(WIDTH - 48, 30)
+		earn.TextWrapped = true
+		earn.TextSize = 12
+	end
 	if SHORT then
 		return
 	end

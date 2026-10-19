@@ -70,12 +70,16 @@ local C = {
 	Ink = Color3.fromRGB(8, 10, 16),
 }
 local BLACK, BOLD, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
--- (on a phone on its side, shorter, so it's drawn larger: the product page
--- stacks tighter and the Free page scrolls)
+-- On a phone on its side (SHORT) the store has its own, smaller layout, so it
+-- is drawn near full size instead of shrunk: a slim header with the tabs, a
+-- three-column grid beside a compact product page, and every sheet sized to
+-- fit the screen below Roblox's buttons.
 local SHORT = UiKit.short()
-local W, H = 1100, if SHORT then 520 else 660
-local PAGE_X, PAGE_Y = 24, 80
-local PAGE_W, PAGE_H = W - 48, H - 100
+local W, H = if SHORT then 860 else 1100, if SHORT then 340 else 660
+local HEAD = if SHORT then 48 else 64
+local PAGE_X = if SHORT then 12 else 24
+local PAGE_Y = HEAD + (if SHORT then 6 else 16)
+local PAGE_W, PAGE_H = W - 2 * PAGE_X, H - PAGE_Y - (if SHORT then 8 else 20)
 local KIND_NAMES = {
 	Skin = "Weapon skin",
 	Suit = "Suit",
@@ -452,18 +456,28 @@ gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 UiKit.onTopbar(fit)
 
 -- Header: the name, the categories, an offer while one's open, coins, close.
-local brand = text(panel, "SUPPLY DEPOT", 20, C.Text, BLACK, 28, 14, 210, 26)
-brand.Name = "Brand"
-text(panel, "LOOKS ONLY  ·  NEVER STATS", 9, C.Faint, BOLD, 28, 40, 210, 12).Name = "Promise"
-local nav = new("Frame", {
+-- (On a phone: no name, the tabs from the left edge, scrolling if they must.)
+if not SHORT then
+	local brand = text(panel, "SUPPLY DEPOT", 20, C.Text, BLACK, 28, 14, 210, 26)
+	brand.Name = "Brand"
+	text(panel, "LOOKS ONLY  ·  NEVER STATS", 9, C.Faint, BOLD, 28, 40, 210, 12).Name = "Promise"
+end
+local nav = new(if SHORT then "ScrollingFrame" else "Frame", {
 	Name = "Nav",
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(240, 0),
-	Size = UDim2.fromOffset(560, 64),
+	Position = UDim2.fromOffset(if SHORT then 16 else 240, 0),
+	Size = UDim2.fromOffset(if SHORT then W - 16 - 190 else 560, HEAD),
 }, panel)
+if SHORT then
+	nav.BorderSizePixel = 0
+	nav.ScrollBarThickness = 0
+	nav.ScrollingDirection = Enum.ScrollingDirection.X
+	nav.CanvasSize = UDim2.fromOffset(0, 0)
+	nav.AutomaticCanvasSize = Enum.AutomaticSize.X
+end
 -- (Seven tabs: close together, so the offer's clock on the right never
 -- covers the last of them.)
-UiKit.list(nav, 16, true).VerticalAlignment = Enum.VerticalAlignment.Center
+UiKit.list(nav, if SHORT then 14 else 16, true).VerticalAlignment = Enum.VerticalAlignment.Center
 local navButtons = {}
 for i, id in Store.Tabs do
 	local b = new("TextButton", {
@@ -472,13 +486,13 @@ for i, id in Store.Tabs do
 		AutoButtonColor = false,
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 64),
+		Size = UDim2.fromOffset(0, HEAD),
 		Font = BOLD,
-		TextSize = 14,
+		TextSize = if SHORT then 15 else 14,
 		TextColor3 = C.Dim,
 		LayoutOrder = i,
 	}, nav)
-	local underline = box(b, C.Gold, 0, 60, 0, 3)
+	local underline = box(b, C.Gold, 0, HEAD - 4, 0, 3)
 	underline.Name = "Underline"
 	underline.Size = UDim2.new(1, 0, 0, 3)
 	round(underline, 2)
@@ -497,7 +511,7 @@ for i, id in Store.Tabs do
 	end)
 	navButtons[id] = b
 end
-box(panel, C.Line, 0, 64, W, 1, 0.92).Name = "HeaderRule"
+box(panel, C.Line, 0, HEAD, W, 1, 0.92).Name = "HeaderRule"
 
 local close = new("TextButton", {
 	Name = "Close",
@@ -505,7 +519,7 @@ local close = new("TextButton", {
 	AutoButtonColor = false,
 	BackgroundColor3 = C.Surface,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -20, 0, 14),
+	Position = UDim2.new(1, if SHORT then -12 else -20, 0, (HEAD - 36) / 2),
 	Size = UDim2.fromOffset(36, 36),
 }, panel)
 IronUi.cross(close, 14, C.Dim)
@@ -516,8 +530,8 @@ local corner = new("Frame", {
 	Name = "Corner",
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -68, 0, 14),
-	Size = UDim2.fromOffset(400, 36),
+	Position = UDim2.new(1, if SHORT then -58 else -68, 0, (HEAD - 36) / 2),
+	Size = UDim2.fromOffset(if SHORT then 130 else 400, 36),
 }, panel)
 local cornerList = UiKit.list(corner, 10, true)
 cornerList.HorizontalAlignment = Enum.HorizontalAlignment.Right
@@ -597,6 +611,8 @@ local function overlayCard(w: number, h: number): Frame
 	}, overlay)
 	round(card, 16)
 	stroke(card, C.Line, 1, 0.8)
+	-- (never bigger than the store itself)
+	new("UIScale", { Scale = math.min(1, (W - 16) / w, (H - 16) / h) }, card)
 	local x = new("TextButton", {
 		Name = "CloseSheet",
 		Text = "",
@@ -768,8 +784,9 @@ function showBundle(key: string)
 		return
 	end
 	-- (a short screen: the sheet is shorter, its summary stacked tighter)
+	-- (a phone: shorter still, and the buy button goes under the list)
 	local Y = if SHORT
-		then { Card = 474, List = 374, Pic = 110, Art = 96, Name = 118, About = 166, Lines = 212, Buy = 362 }
+		then { Card = 320, List = 172, Pic = 70, Art = 60, Name = 78, About = 108, Lines = 146, Buy = 258 }
 		else { Card = 540, List = 440, Pic = 150, Art = 130, Name = 162, About = 214, Lines = 268, Buy = 412 }
 	local card = overlayCard(860, Y.Card)
 	local items = Store.items(reward, function(id)
@@ -818,7 +835,9 @@ function showBundle(key: string)
 	if hero then
 		art(pic, "Cosmetic", hero, Y.Art)
 	end
-	local name = wrap(text(side, Store.productName(key), 21, C.Text, BLACK, 0, Y.Name, 286, 54))
+	local name = wrap(
+		text(side, Store.productName(key), if SHORT then 18 else 21, C.Text, BLACK, 0, Y.Name, 286, if SHORT then 26 else 54)
+	)
 	local tagline = if bundle
 		then bundle.Tagline
 		elseif key == "StarterPack" then Store.StarterPack.Tagline
@@ -826,7 +845,7 @@ function showBundle(key: string)
 		elseif kits and #kits == #Store.Kits then "All three squad kits, one per miner, and the FULL SQUAD title."
 		elseif kits then "Each kit dresses one of your miners."
 		else ""
-	local about = wrap(text(side, tagline, 12, C.Dim, MEDIUM, 0, Y.About, 286, 46))
+	local about = wrap(text(side, tagline, 12, C.Dim, MEDIUM, 0, Y.About, 286, if SHORT then 34 else 46))
 	local price = Store.robuxPrice(key) or 0
 	local separate = Store.separatePrice(reward)
 	local y = Y.Lines
@@ -863,7 +882,7 @@ function showBundle(key: string)
 		)
 		note.ZIndex = 22
 	end
-	local b = buyButton(side, key, 0, Y.Buy, 286, 46)
+	local b = if SHORT then buyButton(card, key, 26, Y.Buy, 500, 44) else buyButton(side, key, 0, Y.Buy, 286, 46)
 	b.ZIndex = 23
 	for _, d in { name, about } do
 		d.ZIndex = 22
@@ -942,8 +961,14 @@ end
 
 -- Catalog: weapon skins, suits, pickaxes --------------------------------------------------------------------
 
-local CARD_W, CARD_H, GAP = 163, 226, 12
-local GRID_W = 4 * CARD_W + 3 * GAP
+local CARD_W, GAP = 163, 12
+local COLS = if SHORT then 3 else 4
+-- Where a card's parts sit, top to bottom (shorter on a phone).
+local CARD = if SHORT
+	then { H = 196, Pic = 104, Art = 86, Name = 116, Kind = 135, Price = 156 }
+	else { H = 226, Pic = 128, Art = 104, Name = 142, Kind = 161, Price = 186 }
+local CARD_H = CARD.H
+local GRID_W = COLS * CARD_W + (COLS - 1) * GAP
 
 -- The looks of a kind: sold ones (sorted and filtered), then the earned.
 local function catalog(kind: string): ({ string }, { string })
@@ -991,8 +1016,8 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 	if not picked then
 		hoverEdge(card, edge, C.Line, 0.9)
 	end
-	local pic = well(card, color, 6, 6, CARD_W - 12, 128)
-	art(pic, "Cosmetic", id, 104)
+	local pic = well(card, color, 6, 6, CARD_W - 12, CARD.Pic)
+	art(pic, "Cosmetic", id, CARD.Art)
 	local rarity = pill(card, string.upper(RARITY_NAMES[cosmetic.Rarity] or ""), color, false, 9)
 	rarity.Position = UDim2.fromOffset(12, 12)
 	if isWorn or mine then
@@ -1000,11 +1025,11 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 		tag.AnchorPoint = Vector2.new(1, 0)
 		tag.Position = UDim2.new(1, -12, 0, 12)
 	end
-	local name = text(card, cosmetic.Name, 14, C.Text, BOLD, 12, 142, CARD_W - 24, 18)
+	local name = text(card, cosmetic.Name, 14, C.Text, BOLD, 12, CARD.Name, CARD_W - 24, 18)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	text(card, KIND_NAMES[cosmetic.Kind] or "", 11, C.Faint, MEDIUM, 12, 161, CARD_W - 24, 14)
+	text(card, KIND_NAMES[cosmetic.Kind] or "", 11, C.Faint, MEDIUM, 12, CARD.Kind, CARD_W - 24, 14)
 	if cosmetic.Robux and not mine then
-		text(card, robux(cosmetic.Robux), 17, C.Text, BLACK, 12, 186, CARD_W - 24, 26)
+		text(card, robux(cosmetic.Robux), 17, C.Text, BLACK, 12, CARD.Price, CARD_W - 24, 26)
 	elseif mine then
 		text(
 			card,
@@ -1013,13 +1038,13 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 			C.Good,
 			BOLD,
 			12,
-			186,
+			CARD.Price,
 			CARD_W - 24,
 			26
 		)
 	else
 		local how =
-			wrap(text(card, "Earn  ·  " .. Cosmetics.source(cosmetic), 11, C.Gold, BOLD, 12, 186, CARD_W - 24, 30))
+			wrap(text(card, "Earn  ·  " .. Cosmetics.source(cosmetic), 11, C.Gold, BOLD, 12, CARD.Price, CARD_W - 24, 30))
 		how.TextTruncate = Enum.TextTruncate.AtEnd
 	end
 	card:SetAttribute("UiSound", "Click")
@@ -1074,17 +1099,20 @@ local function productPage(id: string, x: number)
 	-- Where each part sits, top to bottom (tighter on a short screen).
 	local Y = if SHORT
 		then {
-			Pic = 150,
-			Art = 126,
-			Name = 172,
-			Desc = 202,
-			DescH = 34,
-			Price = 238,
-			Buy = 276,
-			Note = 322,
-			How = 268,
-			Free = 312,
-			Offer = 342,
+			Pic = 100,
+			Art = 84,
+			Name = 120,
+			NameSize = 20,
+			Desc = 146,
+			DescH = 28,
+			Price = 178,
+			PriceSize = 22,
+			Buy = 212,
+			BuyH = 40,
+			Note = 254,
+			How = 202,
+			Free = 238,
+			Offer = nil,
 			OfferH = 54,
 		}
 		else {
@@ -1095,6 +1123,9 @@ local function productPage(id: string, x: number)
 			DescH = 44,
 			Price = 322,
 			Buy = 364,
+			BuyH = 46,
+			NameSize = 24,
+			PriceSize = 28,
 			Note = 416,
 			How = 356,
 			Free = 400,
@@ -1110,15 +1141,18 @@ local function productPage(id: string, x: number)
 	local kindTag = pill(pic, string.upper(KIND_NAMES[cosmetic.Kind] or ""), C.Text, false, 10)
 	kindTag.AnchorPoint = Vector2.new(1, 0)
 	kindTag.Position = UDim2.new(1, -12, 0, 12)
-	text(side, cosmetic.Name, 24, C.Text, BLACK, 18, Y.Name, inner, 30).Name = "ProductName"
+	text(side, cosmetic.Name, Y.NameSize, C.Text, BLACK, 18, Y.Name, inner, 30).Name = "ProductName"
 	wrap(text(side, cosmetic.Description or "", 12, C.Dim, MEDIUM, 18, Y.Desc, inner, Y.DescH)).TextTruncate =
 		Enum.TextTruncate.AtEnd
 	local mine, isWorn = owned(id), worn(cosmetic.Kind) == id
 	if cosmetic.Robux and not mine then
-		text(side, robux(cosmetic.Robux), 28, C.Text, BLACK, 18, Y.Price, inner, 34).Name = "Price"
-		local yours = text(side, "One-time purchase  ·  yours to keep", 11, C.Faint, MEDIUM, 18, Y.Price, inner, 34)
-		yours.TextXAlignment = Enum.TextXAlignment.Right
-		buyButton(side, id, 18, Y.Buy, inner, 46)
+		text(side, robux(cosmetic.Robux), Y.PriceSize, C.Text, BLACK, 18, Y.Price, inner, 34).Name = "Price"
+		if not SHORT then
+			local yours =
+				text(side, "One-time purchase  ·  yours to keep", 11, C.Faint, MEDIUM, 18, Y.Price, inner, 34)
+			yours.TextXAlignment = Enum.TextXAlignment.Right
+		end
+		buyButton(side, id, 18, Y.Buy, inner, Y.BuyH)
 		if not live(id) and Store.testPrice(id) then
 			text(
 				side,
@@ -1146,11 +1180,11 @@ local function productPage(id: string, x: number)
 			30
 		)
 		if isWorn then
-			button(side, "Take it off", "Secondary", 18, Y.Buy, inner, 46, function()
+			button(side, "Take it off", "Secondary", 18, Y.Buy, inner, Y.BuyH, function()
 				equip(cosmetic.Kind, nil)
 			end)
 		else
-			button(side, "Wear it", "Primary", 18, Y.Buy, inner, 46, function()
+			button(side, "Wear it", "Primary", 18, Y.Buy, inner, Y.BuyH, function()
 				equip(cosmetic.Kind, id)
 			end).Name =
 				"Wear"
@@ -1167,18 +1201,19 @@ local function productPage(id: string, x: number)
 				18,
 				Y.How,
 				inner,
-				40
+				if SHORT then 34 else 40
 			)
 		)
 		if cosmetic.Exclusive == "Invite" or cosmetic.Exclusive == "Group" or cosmetic.Exclusive == "Streak" then
-			button(side, "See Free rewards", "Secondary", 18, Y.Free, inner, 40, function()
+			button(side, "See Free rewards", "Secondary", 18, Y.Free, inner, if SHORT then 32 else 40, function()
 				state.Tab = "Free"
 				refresh()
 			end)
 		end
 	end
 	-- The bundle that saves on it.
-	local deals = if cosmetic.Robux and not mine then Store.bundlesWith(id) else {}
+	-- (no room for it on a phone's product page: the Bundles page has them)
+	local deals = if cosmetic.Robux and not mine and Y.Offer then Store.bundlesWith(id) else {}
 	if #deals > 0 then
 		local key = deals[1]
 		local offer = box(side, C.Sale, 18, Y.Offer, inner, Y.OfferH, 0.88)
@@ -1212,6 +1247,10 @@ local function productPage(id: string, x: number)
 		end).Name =
 			"ViewBundle"
 	end
+	-- (a phone: only where the testing note isn't)
+	if SHORT and side:FindFirstChild("TestNote") then
+		return
+	end
 	text(
 		side,
 		if MinerRoster.Enabled
@@ -1221,7 +1260,7 @@ local function productPage(id: string, x: number)
 		C.Faint,
 		BOLD,
 		18,
-		PAGE_H - (if SHORT then 22 else 30),
+		PAGE_H - (if SHORT then 20 else 30),
 		inner,
 		16
 	)
@@ -1240,12 +1279,16 @@ local function drawCatalog(tab: string)
 	if not state.Selected[tab] or not Cosmetics.get(state.Selected[tab]) then
 		state.Selected[tab] = sold[1] or earned[1] or all[1]
 	end
-	text(page, Store.TabNames[tab], 22, C.Text, BLACK, 0, 0, 300, 28).Name = "PageTitle"
-	text(page, string.format("%d looks  ·  you own %d", #all, have), 12, C.Dim, MEDIUM, 0, 28, 300, 16)
+	-- (a phone: the tab is the title, and the sorting sits on top of the grid)
+	local top = if SHORT then 38 else 54
+	if not SHORT then
+		text(page, Store.TabNames[tab], 22, C.Text, BLACK, 0, 0, 300, 28).Name = "PageTitle"
+		text(page, string.format("%d looks  ·  you own %d", #all, have), 12, C.Dim, MEDIUM, 0, 28, 300, 16)
+	end
 	local controls = new("Frame", {
 		Name = "Controls",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(GRID_W - 480, 6),
+		Position = UDim2.fromOffset(GRID_W - 480, if SHORT then 0 else 6),
 		Size = UDim2.fromOffset(480, 30),
 	}, page)
 	UiKit.list(controls, 10, true).HorizontalAlignment = Enum.HorizontalAlignment.Right
@@ -1267,8 +1310,8 @@ local function drawCatalog(tab: string)
 		Name = "Products",
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(0, 54),
-		Size = UDim2.fromOffset(GRID_W + 10, PAGE_H - 54),
+		Position = UDim2.fromOffset(0, top),
+		Size = UDim2.fromOffset(GRID_W + 10, PAGE_H - top),
 		CanvasSize = UDim2.fromOffset(0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 4,
@@ -1281,7 +1324,7 @@ local function drawCatalog(tab: string)
 		end
 		local head = text(list, title, 11, C.Dim, BOLD, 0, 0, GRID_W, 16)
 		head.LayoutOrder = order
-		local rows = math.ceil(#ids / 4)
+		local rows = math.ceil(#ids / COLS)
 		local grid = new("Frame", {
 			Name = "Grid",
 			BackgroundTransparency = 1,
@@ -1388,6 +1431,10 @@ local function offerBanner(parent: Instance, key: string, w: number, order: numb
 	return banner
 end
 
+-- A squad kit's card: narrower on a phone, so the squad's summary fits beside.
+local KIT_W = if SHORT then 180 else 236
+local SLOT = if SHORT then 40 else 50
+
 local function kitCard(parent: Instance, kit: Store.Kit, order: number)
 	local on = state.Kits[kit.Id] == true
 	local reward = kit.Contents
@@ -1397,7 +1444,7 @@ local function kitCard(parent: Instance, kit: Store.Kit, order: number)
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = if on then C.Raised else C.Surface,
-		Size = UDim2.fromOffset(236, 262),
+		Size = UDim2.fromOffset(KIT_W, 262),
 		LayoutOrder = order,
 	}, parent)
 	round(card, 14)
@@ -1405,9 +1452,9 @@ local function kitCard(parent: Instance, kit: Store.Kit, order: number)
 	if not on then
 		hoverEdge(card, edge, C.Line, 0.9)
 	end
-	local pic = well(card, kit.Color, 8, 8, 220, 132)
+	local pic = well(card, kit.Color, 8, 8, KIT_W - 16, 132)
 	art(pic, "Cosmetic", reward.Cosmetics[1], 112)
-	local check = box(card, if on then kit.Color else C.Window, 196, 16, 26, 26, if on then 0 else 0.2)
+	local check = box(card, if on then kit.Color else C.Window, KIT_W - 40, 16, 26, 26, if on then 0 else 0.2)
 	check.Name = "Check"
 	round(check, 13)
 	stroke(check, if on then kit.Color else C.Line, 1.5, if on then 0 else 0.6)
@@ -1415,12 +1462,12 @@ local function kitCard(parent: Instance, kit: Store.Kit, order: number)
 		local tick = text(check, "✓", 15, C.Ink, BLACK, 0, 0, 26, 26)
 		tick.TextXAlignment = Enum.TextXAlignment.Center
 	end
-	text(card, kit.Name, 16, C.Text, BLACK, 14, 148, 208, 20)
-	text(card, string.upper(kit.Style) .. " STYLE", 10, kit.Color, BOLD, 14, 170, 208, 14)
+	text(card, kit.Name, 16, C.Text, BLACK, 14, 148, KIT_W - 28, 20)
+	text(card, string.upper(kit.Style) .. " STYLE", 10, kit.Color, BOLD, 14, 170, KIT_W - 28, 14)
 	for i, id in reward.Cosmetics do
-		local slot = box(card, C.Well, 14 + (i - 1) * 50, 192, 44, 44)
+		local slot = box(card, C.Well, 14 + (i - 1) * SLOT, 192, SLOT - 6, SLOT - 6)
 		round(slot, 8)
-		art(slot, "Cosmetic", id, 38)
+		art(slot, "Cosmetic", id, SLOT - 12)
 	end
 	local separate = Store.separatePrice(reward)
 	text(
@@ -1431,7 +1478,7 @@ local function kitCard(parent: Instance, kit: Store.Kit, order: number)
 		MEDIUM,
 		14,
 		240,
-		208,
+		KIT_W - 28,
 		14
 	)
 	card:SetAttribute("UiSound", "Click")
@@ -1464,11 +1511,11 @@ local function squadSection(parent: Instance, order: number)
 			table.insert(picked, kit.Id)
 		end
 	end
-	local summary = box(row, C.Surface, 0, 0, PAGE_W - 12 - 3 * 236 - 3 * 14, 262)
+	local summary = box(row, C.Surface, 0, 0, PAGE_W - 12 - 3 * KIT_W - 3 * 14, 262)
 	summary.Name = "SquadSummary"
 	summary.LayoutOrder = 9
 	round(summary, 14)
-	local sw = PAGE_W - 12 - 3 * 236 - 3 * 14 - 36
+	local sw = PAGE_W - 12 - 3 * KIT_W - 3 * 14 - 36
 	text(summary, "YOUR SQUAD", 10, C.Dim, BOLD, 18, 16, sw, 14)
 	local key = Store.kitKey(picked)
 	if not key then
@@ -1960,7 +2007,7 @@ local function drawHeader()
 	end
 	walletValue.Text = commas(profile().Coins or 0)
 	local key = offerKey()
-	deal.Visible = key ~= nil
+	deal.Visible = key ~= nil and not SHORT -- (a phone: the Bundles page leads with it)
 	if key then
 		local left = if key == "StarterPack" then starterLeft() else welcomeLeft()
 		deal.Text = Store.productName(key) .. "  ·  " .. clock(left)
@@ -2186,7 +2233,7 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	if gui.Enabled then
 		local key = offerKey()
-		deal.Visible = key ~= nil
+		deal.Visible = key ~= nil and not SHORT -- (a phone: the Bundles page leads with it)
 		if key then
 			local left = if key == "StarterPack" then starterLeft() else welcomeLeft()
 			deal.Text = Store.productName(key) .. "  ·  " .. clock(left)
