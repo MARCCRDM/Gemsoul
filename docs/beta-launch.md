@@ -37,7 +37,7 @@ the menus leave them out.
 | `Mining` | on | Outpost rocks and the Moon Mine |
 | `Market` | on | The Market board and trading |
 | `Dungeons` | **off** | See below |
-| `Mechs` | on | The Motor Pool mechs (off: no mechs are parked) |
+| `Mechs` | on | The Shelter garage's mechs (off: no mechs are parked) |
 | `MinerRoster` | **off** | Three miners per account; off, everyone plays one (see below) |
 
 **What `Dungeons` covers:**
@@ -157,7 +157,7 @@ Social, Feedback, Reports.
 - `run_dungeons` and `run_expedition`: their harnesses didn't load
   `ArmorSignatures` and `MinerRoster`, which the game code now needs.
 - `run_outpost`: brought up to date with the current lobby: no Field ring
-  rocks, retired secrets, and the Motor Pool's mech bays.
+  rocks, retired secrets, and the Shelter garage's mech bays.
 - `run_augment_ui`: now runs twice, with Rig Maneuvers on and with them
   retired (the live setting).
 

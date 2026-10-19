@@ -1042,13 +1042,20 @@ function OutpostServer.start()
 	for _ = 1, math.min(Rules.FieldNodeCount, #(site.FieldSpots or {})) do
 		spawnNode(true)
 	end
-	-- Prompts at the Probe (market) and the Arena gate.
+	-- Prompts at the Probe (refills), the Arena gate, and the Shelter's
+	-- Store and player Market counters.
+	local stations = site.Stations or {}
 	for _, spec in
 		{
 			{ site.Probe, "Probe", "Open the Exchange", "PROBE-7" },
 			{ site.Gate, "Gate", "Arena Uplink", "Duels · Rival · Party" },
+			{ stations.Store, "Store", "Open the Store", "STORE" },
+			{ stations.Market, "Market", "Open the Market", "PLAYER MARKET" },
 		}
 	do
+		if not spec[1] then
+			continue
+		end
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.ActionText, prompt.ObjectText = spec[3], spec[4]
 		prompt.KeyboardKeyCode = Enum.KeyCode.E

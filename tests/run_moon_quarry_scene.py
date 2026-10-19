@@ -60,13 +60,22 @@ World.Frontier=Frontier
 local site=World.build(origin,{})
 assert(site.Model.Landscape=="Moon Quarry" and site.Model.SkySetting=="MoonBase")
 assert(#site.Secrets==0 and #site.FieldSpots==0,"Retired extras returned")
-assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7058 and site.Spawn.Position.Y==3.5,"Spawn must face the field from the front of the pad")
+-- The Shelter in the middle: players arrive inside its door, facing in;
+-- its stations and services are all under its roof.
+local box=site.Shelter.Box
+local function inShelter(p) return math.abs(p.X)<box.X and math.abs(p.Z)<box.Y end
+assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7050 and site.Spawn.Position.Y==3.5,"Spawn isn't inside the Shelter's door")
+assert(site.Spawn.LookVector.Z<-.99,"Spawn doesn't face into the Shelter")
 assert(#site.ArrivalSpots==8,"Welcome mining field missing")
 for _,index in site.ArrivalSpots do
  local p=site.Spots[index].Position-origin.Position
- assert(p.Z<30 and math.abs(p.X)>=12 and math.abs(p.X)<=26,"Welcome nodes block the central path")
+ assert(p.Z>box.Y and math.abs(p.X)>=14 and math.abs(p.X)<=30,"Welcome nodes aren't outside the door, or block the lane out")
 end
 assert(site.Probe.Name=="ProbeScreen" and site.Board.Name=="BoardFace" and site.Gate.Name=="GatePad","Missing lobby services")
+for _,service in {site.Probe,site.Board,site.Gate,site.Stations.Store,site.Stations.Market} do
+ assert(inShelter(service.CFrame.Position-origin.Position),"A service outside the Shelter: "..service.Name)
+end
+assert(site.Stations.Store.CanCollide and site.Stations.Market.CanCollide,"The Store and Market counters aren't solid")
 assert(Rules.Radius==440 and Rules.NodeCount==210 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
 -- Every spot holds a rock: the field round the middle, the outcrops out
 -- to the walls (Shared.Frontier) and the three Rift Veins.
@@ -87,7 +96,7 @@ end
 for _,siteInfo in site.VeinSites do
  for _,cf in siteInfo.Rocks do
   local p=cf.Position-origin.Position
-  assert(Vector3.new(p.X,0,p.Z).Magnitude<Frontier.Rim and (p-Vector3.new(0,0,150)).Magnitude>=84,"A vein site in the walls or the motor pool")
+  assert(Vector3.new(p.X,0,p.Z).Magnitude<Frontier.Rim and not inShelter(p),"A vein site in the walls or the Shelter")
   for i,spot in site.Spots do
    local mine=false
    for _,vein in site.Veins do
@@ -120,13 +129,13 @@ for _,p in builtParts do
   roads+=1
   if p.ClassName=="WedgePart" and p.CanCollide then ramps+=1 end
  end
- if name=="MotorPool" then motor+=1 end
+ if name=="Shelter" then motor+=1 end
  if name=="Outpost" then base+=1 end
  if p.CanCollide and p.Size.Y==1040 and p.Size.Z==1040 then floor=p end
  assert(p.Name~="GrassSurface" and p.Name~="MeadowCloudBank" and p.Name~="Secret","Old lobby/retired secrets leaked")
 end
 assert(floor and math.abs(floor.CFrame.t[2]+floor.Size.X/2)<.001,"Quarry floor missing or wrong height")
-assert(roads>100 and ramps==5 and sky>=260 and motor>20 and base>200,"Original quarry landmarks missing")
+assert(roads>100 and ramps==5 and sky>=260 and motor>200 and base>200,"Quarry landmarks or the Shelter missing")
 -- The crater rim and the sky are sent whole: far off, streaming would never
 -- send them (the rim's far side is 900-1,200 studs from most of the quarry).
 local rim,skyModel=0,nil
@@ -149,8 +158,8 @@ for i,spot in site.Spots do
  local zone=Frontier.zoneOf(Vector3.new(p.X,0,p.Z).Magnitude,veins[i]~=nil)
  if veins[i]==Frontier.Veins.Guarded then zone="Guarded" end
  assert(site.Zones[i]==zone and math.abs(p.Y)<.001 and p.Magnitude<Rules.Radius,"Unsafe mining position/zone")
- assert((p-Vector3.new(0,0,150)).Magnitude>=84,"Rock in Motor Pool")
- assert((p-Vector3.new(0,0,70)).Magnitude>=40,"Rock in arrival area")
+ assert(not inShelter(p),"Rock in the Shelter")
+ assert((p-Vector3.new(72,0,118)).Magnitude>=40,"Rock on the landing pad")
  for j=i+1,#site.Spots do
   assert((spot.Position-site.Spots[j].Position).Magnitude>=12,"Mining nodes overlap")
  end
@@ -160,7 +169,7 @@ for i,spot in site.Spots do
  for spoke=0,5 do
   local a=spoke/6*math.pi*2+math.rad(30)
   local direction=Vector3.new(math.cos(a),0,math.sin(a))
-  local closest=direction*math.clamp(p:Dot(direction),60,420)
+  local closest=direction*math.clamp(p:Dot(direction),104,420)
   assert((p-closest).Magnitude>=14,"Mining body on haul road")
  end
 end
@@ -170,9 +179,12 @@ for i=0,10000 do
 end
 print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 5 ramps; services and safe sky; the crater rim and sky always load")
 local counts={Hauler=0,Mole=0,Digger=0,Skipper=0}
-assert(#site.Parking==8,"Motor Pool has missing bays")
+assert(#site.Parking==8,"The garage has missing bays")
 for _,bay in site.Parking do
  counts[bay.Kind]+=1
+ -- In the garage, facing the lane (south), in a row along the north wall.
+ local p=bay.CFrame.Position-origin.Position
+ assert(inShelter(p) and p.Z<-40 and p.Z>-56 and bay.CFrame.LookVector.Z>.99,"A bay outside the garage, or not facing its lane")
  local vehicle=Machines.build(bay.Kind,bay.CFrame)
  assert(vehicle.PrimaryPart.Name=="Chassis" and not vehicle.PrimaryPart.Massless,"Vehicle has no chassis at its root")
  -- It collides through a ball underneath (rides up steps) and a box above the

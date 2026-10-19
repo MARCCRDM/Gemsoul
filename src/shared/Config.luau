@@ -32,7 +32,7 @@ local Config = {
 		-- until their whole entry-to-reward flow passes testing; Owners can
 		-- still run them from the DEV panel's dungeon tests.
 		Dungeons = false,
-		-- The Motor Pool's drivable mechs (the Pilot prompt).
+		-- The garage's drivable mechs (the Shelter; the Pilot prompt).
 		Mechs = true,
 		-- Three miners per account (Shared.MinerRoster): switch between them in
 		-- the Inventory, counter-pick another between 1v1 rounds, and send the

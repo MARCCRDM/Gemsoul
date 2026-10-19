@@ -34,7 +34,7 @@
 ]]
 local Outpost = {}
 
--- The original moon quarry, with haul roads and a drivable Motor Pool.
+-- The original moon quarry, with haul roads and the Shelter in the middle (its garage holds the mechs).
 Outpost.Location = CFrame.new(0, 0, 7000)
 Outpost.Radius = 440 -- quarry rim; recovery allows the surrounding benches
 Outpost.NodeCount = 210 -- rocks out at once (every spot: the field round the middle, the outcrops and the Rift Veins)
@@ -176,10 +176,10 @@ function Outpost.rollSize(roll: number, zone: string?): string
 	return Outpost.SizeOrder[1]
 end
 
--- Big machines parked at the Motor Pool. Anyone can hop in and drive; they
+-- Big machines parked in the Shelter's garage. Anyone can hop in and drive; they
 -- don't dig or haul, they're for crossing the quarry (and showing off).
 -- Speeds in studs a second, Turn in radians a second at full lock.
--- All exosuits can pivot in place. Stable IDs preserve the Motor Pool bays.
+-- All exosuits can pivot in place. Stable IDs preserve the garage bays.
 Outpost.Machines = {
 	Hauler = {
 		Name = "Atlas Hauler Mech",

@@ -1,4 +1,4 @@
--- The Outpost's mechs: parked in the Motor Pool, one pilot each. No Roblox
+-- The Outpost's mechs: parked in the Shelter's garage, one pilot each. No Roblox
 -- seats: who sits in a seat doesn't replicate, and a seat's own controls,
 -- camera and jump-to-leave all got in the way of driving.
 --

@@ -523,6 +523,21 @@ do
 	end
 end
 check(site.Probe:FindFirstChildOfClass("ProximityPrompt") ~= nil, "The Probe has no prompt")
+-- The Shelter's Store and Market counters open those screens (OutpostScene).
+for kind, counter in { Store = site.Stations.Store, Market = site.Stations.Market } do
+	local prompt = counter:FindFirstChildOfClass("ProximityPrompt")
+	check(prompt and prompt:GetAttribute("PromptKind") == kind, "The Shelter's " .. kind .. " has no prompt")
+end
+-- Players arrive inside the Shelter, its mechs parked in the garage.
+do
+	local box = site.Shelter.Box
+	local p = site.Spawn.Position - Rules.Location.Position
+	check(math.abs(p.X) < box.X and math.abs(p.Z) < box.Y, "Players don't arrive in the Shelter")
+	for _, bay in site.Parking do
+		local q = bay.CFrame.Position - Rules.Location.Position
+		check(math.abs(q.X) < box.X and math.abs(q.Z) < box.Y, "A mech bay outside the Shelter's garage")
+	end
+end
 check(
 	replicated:FindFirstChild("Landmarks") and replicated.Landmarks:GetAttribute("OutpostSpawn") ~= nil,
 	"No way back from a duel"

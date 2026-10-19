@@ -1,6 +1,6 @@
 # Driving the mechs
 
-The Outpost's Motor Pool has eight mechs of four kinds (Atlas Hauler, Mole
+The garage in the Outpost's Shelter has eight mechs of four kinds (Atlas Hauler, Mole
 Drill, Forge Utility and Scout Pathfinder). Walk up to one and hold **E**
 ("Pilot") to climb into the cockpit. To drive:
 

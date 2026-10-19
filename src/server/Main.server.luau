@@ -142,7 +142,7 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			OutpostServer.onVeinSwing = KaijuWilds.veinSwing
 		end
 	end
-	-- The Motor Pool's machines, for driving round the quarry (Config.Features:
+	-- The garage's machines, for driving round the quarry (Config.Features:
 	-- off leaves the bays empty).
 	if Config.Features == nil or Config.Features.Mechs ~= false then
 		require(script.Parent.Systems.OutpostVehicles).start(OutpostServer.site())

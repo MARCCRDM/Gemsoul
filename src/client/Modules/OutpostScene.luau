@@ -46,7 +46,7 @@ local MinerLoot = require(script.Parent.MinerLoot)
 local MiningReveal = require(script.Parent.MiningWorldReveal)
 local PickImpacts = require(script.Parent.PickImpacts)
 local ProbeLayout = require(script.Parent.ProbeLayout)
--- Driving the Motor Pool's machines (runs on its own once loaded).
+-- Driving the garage's machines (runs on its own once loaded).
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
 local SkyRift = require(script.Parent.SkyRift)
@@ -1596,6 +1596,10 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		OutpostScene.openProbe()
 	elseif kind == "Gate" then
 		require(script.Parent.SocialUI).open()
+	elseif kind == "Store" then
+		require(script.Parent.ShopUI).open()
+	elseif kind == "Market" then
+		require(script.Parent.MarketBoardUI).open()
 	elseif kind == "Secret" then
 		task.spawn(function()
 			local result = GemClient.request("OutpostSecret", prompt:GetAttribute("SecretId"))
@@ -1688,7 +1692,7 @@ local function enterScene(result)
 	active = true
 	showWorld()
 	refreshHud()
-	UiKit.toast("Welcome to Saga Outpost. Rocks grow back after they're mined out.", P.Gold)
+	UiKit.toast("Welcome to the Saga Shelter. Head out the door to mine: the rocks grow back.", P.Gold)
 end
 
 local function exitScene()

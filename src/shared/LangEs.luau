@@ -979,7 +979,9 @@ return {
 	["Tap to mine"] = "Toca para minar",
 	["X to mine"] = "X para minar",
 	["Click to mine"] = "Clic para minar",
-	["Welcome to Saga Outpost. Rocks grow back after they're mined out."] = "Bienvenido al Puesto Saga. Las rocas vuelven a crecer después de agotarse.",
+	["Open the Store"] = "Abrir la Tienda",
+	["Open the Market"] = "Abrir el Mercado",
+	["Welcome to the Saga Shelter. Head out the door to mine: the rocks grow back."] = "Bienvenido al Refugio Saga. Sal por la puerta para minar: las rocas vuelven a crecer.",
 	["Walk to PROBE-{1} (the crashed probe, east side) and press E."] = "Camina hasta la SONDA-{1} (la sonda estrellada, lado este) y presiona E.",
 	-- your loot card (and the rocks it names)
 	["Rolling"] = "Girando",
