@@ -64,10 +64,9 @@ gone. See [mobile.md](mobile.md#mining-in-the-outpost).
 
 On a computer the card is in full above the PLAY dock. It hides,
 silently, while a menu or a fight has the screen, and it clears when you
-leave the Outpost. While you drive a mech, the card moves up above the
-mech's driving card (`MobileLayout.Drive`, shared with `VehicleDrive`), and
-the Outpost's key hint at the bottom is hidden, since the driving card
-lists the controls. The words are in the Spanish table
+leave the Outpost. While you drive a mech, the card moves up above its
+HOP OUT button (`MobileLayout.Drive`, shared with `VehicleDrive`), and the
+Outpost's key hint at the bottom is hidden. The words are in the Spanish table
 (rarities, elements, the stat names, the rocks, "Rock mined", "Gem pouch
 full").
 
@@ -84,7 +83,7 @@ full").
 - Tests:
   - `tests/run_loot_stack.py`: the stack's timing and order;
   - `tests/run_miner_loot.py`: the card, driven frame by frame, above a
-    mech's driving card, and slim at the top middle of a phone (no bars,
+    mech's HOP OUT button, and slim at the top middle of a phone (no bars,
     one row under it, none under a small phone's short card while it's up,
     claiming the top middle);
   - `tests/run_world_mining.py`: now also checks that your own find is

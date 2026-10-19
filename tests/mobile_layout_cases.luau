@@ -85,6 +85,14 @@ for _, s in SCREENS do
 		dock.PlayWidth <= dock.W and dock.PlayHeight + dock.Gap + dock.TileHeight <= dock.H,
 		label .. ": PLAY doesn't fit the dock"
 	)
+	-- In a mech: HOP OUT in PLAY's place (PLAY hides), above the tiles.
+	local drive = MobileLayout.Drive
+	local hop = { X = (screen.X - drive.W) / 2, Y = screen.Y - drive.Bottom - drive.H, W = drive.W, H = drive.H }
+	check(
+		math.abs(hop.Y - dock.Y) < 1e-6 and drive.H == dock.PlayHeight and drive.W <= dock.W,
+		label .. ": HOP OUT isn't in PLAY's place"
+	)
+	check(not MobileLayout.overlaps(hop, party), label .. ": HOP OUT overlaps the teammates' cards")
 	check(not MobileLayout.overlaps(card, wallet), label .. ": the coins overlap the pick card")
 	check(not MobileLayout.overlaps(wallet, closed), label .. ": the CHAT button overlaps the coins")
 	check(not MobileLayout.overlaps(wallet, dock), label .. ": the coins overlap the dock")

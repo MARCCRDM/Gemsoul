@@ -191,10 +191,10 @@ check(
 )
 check(card().Size.X.Offset == 360 and lit(card(), GemConfig.TierColors.Common) >= 0, "The full card wasn't rebuilt")
 check(not MobileLayout.topClaimed(), "A computer's card kept the top middle")
--- In a mech: above its driving card (MobileLayout.Drive), then back down.
+-- In a mech: above its HOP OUT button (MobileLayout.Drive), then back down.
 local drive = MobileLayout.Drive
 localPlayer:SetAttribute("MechPilot", 1)
-check(holder.Position.Y.Offset == -(drive.Bottom + drive.H + 10), "The card sits on the mech's driving card")
+check(holder.Position.Y.Offset == -(drive.Bottom + drive.H + 10), "The card sits on the mech's HOP OUT button")
 localPlayer:SetAttribute("MechPilot", nil)
 check(holder.Position.Y.Offset == -64, "The card stayed up after hopping out")
 

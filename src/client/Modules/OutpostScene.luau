@@ -252,7 +252,7 @@ local function fitOutpostHud()
 	end
 	PlayerCard.setBlocked(blocked or not hud.Enabled)
 	MinerLoot.setBlocked(blocked or not hud.Enabled)
-	-- (In a mech, its driving card has the controls.)
+	-- (Hidden in a mech: its HOP OUT button names the key.)
 	hint.Visible = not blocked and not mobile and player:GetAttribute("MechPilot") == nil
 	charge.Frame.Visible = expanded
 	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")

@@ -6,10 +6,13 @@ Drill, Forge Utility and Scout Pathfinder). Walk up to one and hold **E**
 
 - **W / S** (or the arrow keys) to go forward and back;
 - **A / D** to turn. The mechs turn on the spot;
-- **Space**, or the **HOP OUT** button on the driving card, to hop out.
+- **Space**, or the **HOP OUT** button, to hop out.
 
-A gamepad's left stick and the phone thumbstick work too. A card at the bottom
-shows the mech, its speed and the controls. An empty mech walks itself back
+A gamepad's left stick and the phone thumbstick work too. While you drive,
+the screen shows only HOP OUT, at the bottom middle (in PLAY's place on a
+phone; PLAY hides while you drive). With a keyboard it reads "HOP OUT ·
+SPACE". There used to be a driving card with the mech's name, its speed
+and the controls, but it was in the way. An empty mech walks itself back
 to its bay after 90 seconds.
 
 ![Mech lineup](mechs/mech-lineup.png)
@@ -32,11 +35,12 @@ from the logs. Every version depended on one of these:
 So all of them are gone.
 
 None of that was what stopped the mechs after Oct 15, though. The pilot's
-game treats some screens as menus: while one is open, the driving card hides.
+game treats some screens as menus: while one is open, the driving card hid
+(HOP OUT does now).
 The daily caches' screen (`StreakRewards`) was added to that list. That
 screen is always switched on, with only its button hidden. Back then, a menu
 also took away your controls and Space, so in the lobby every mech sat still
-and nobody could jump out. Now a menu only hides the card. Your controls and
+and nobody could jump out. Now a menu only hides HOP OUT. Your controls and
 the way out work whatever is on the screen.
 
 ### Getting in
@@ -148,9 +152,12 @@ Look in the Output (F9 in a live game) for `[Mech]` lines:
 | `[Mech] Server isn't hearing this pilot: ...` | client | You're moving on your screen, but the server hasn't passed on a move for 4 seconds. Others can't see you move |
 | `[Mech] couldn't park a <kind>: ...` | server | A mech failed to build |
 
-If you're moving and the server hasn't answered for 2 seconds, the driving
-card says "The server isn't answering: others can't see you move". At 4
-seconds your game sends one report per ride. The server takes at most 3 per
+If you're moving and the server hasn't answered for 2 seconds, you're told
+once a ride: "The server isn't answering: others can't see you move." At 4
+seconds your game sends one report per ride. Both count from when you set
+off, if that's later than the server's last answer: standing still, nothing
+is sent, so nothing comes back. (Before, the time stood still counted, so
+setting off after a pause could look like a quiet server.) The server takes at most 3 per
 ride, logs them with its own view and sends that view back to your Output.
 The server's lines also go to Feedback → Reports (owners only).
 
@@ -160,7 +167,7 @@ The server's lines also go to Feedback → Reports (owners only).
 | `src/server/World/OutpostMachines.luau` | Builds each mech: chassis, cockpit, hull, foot and bodywork |
 | `src/server/Systems/OutpostVehicles.luau` | Parks the mechs (anchored), runs the Pilot prompt, gets you in and out, checks `MechMove`, sends empty mechs home |
 | `src/server/Systems/SeatExit.luau` | Lets go of a pilot (and a seated player) before fights and drops |
-| `src/client/Modules/VehicleDrive.luau` | Your input (keys, then the controls), driving the mech, sending moves, the driving card and camera |
+| `src/client/Modules/VehicleDrive.luau` | Your input (keys, then the controls), driving the mech, sending moves, HOP OUT and the camera |
 | `src/client/Modules/MechAnimation.luau` | Glides everyone else's mechs between moves, and walks the legs |
 | `Remotes.MechMove` | Client to server: `(position, heading, speed, turn rate)` |
 | `Remotes.MechReport` | Client to server: the server isn't hearing you. Server to client: its view |
@@ -185,8 +192,11 @@ The server's lines also go to Feedback → Reports (owners only).
   - waiting for the mech to stream in, then driving;
   - sending moves, and stopping;
   - a wall and pushing through, and a failing cast;
-  - a server that isn't answering, and turning on the spot;
-  - an always-on screen, menus (they hide the card, nothing more);
+  - a server that isn't answering (told once), setting off after a stand
+    and turning on the spot (neither counts);
+  - HOP OUT alone in its place, naming Space on a keyboard (no driving
+    card);
+  - an always-on screen, menus (they hide HOP OUT, nothing more);
   - getting out by Space, jump or HOP OUT, before driving starts and with a
     menu open, but not while typing;
   - being let go, a respawn and the camera.

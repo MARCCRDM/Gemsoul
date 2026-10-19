@@ -250,7 +250,7 @@ local modules = {
 		round = function() end,
 	},
 	MechAnimation = {},
-	-- (The real one: the driving card's size and place, MobileLayout.Drive.)
+	-- (The real one: HOP OUT's size and place, MobileLayout.Drive.)
 	MobileLayout = luau.load(fs.readFile(ROOT .. "/src/client/Modules/MobileLayout.luau"), {
 		debugName = "MobileLayout",
 		environment = setmetatable({ Vector2 = R.Vector2 }, { __index = _G }),
@@ -332,17 +332,7 @@ local VehicleDrive = luau.load(fs.readFile(ROOT .. "/src/client/Modules/VehicleD
 		Vector3 = R.Vector3,
 		Vector2 = R.Vector2,
 		Color3 = R.Color3,
-		UDim2 = {
-			new = function()
-				return {}
-			end,
-			fromOffset = function()
-				return {}
-			end,
-			fromScale = function(x)
-				return { X = x }
-			end,
-		},
+		UDim2 = R.UDim2,
 		RaycastParams = {
 			new = function()
 				return {}
@@ -369,7 +359,18 @@ local VehicleDrive = luau.load(fs.readFile(ROOT .. "/src/client/Modules/VehicleD
 -- (It requires Shared.Outpost and Shared.MechPilot off ReplicatedStorage.)
 ReplicatedStorage.Shared = { Outpost = { Module = Rules }, MechPilot = { Module = MechPilot } }
 VehicleDrive = VehicleDrive()
-local title, blurb, speedLabel = texts[1], texts[2], texts[3]
+local hopOut = buttons["HOP OUT"]
+-- Said once a ride: the server isn't hearing you.
+local DEAF = "The server isn't answering: others can't see you move."
+local function said(text)
+	local count = 0
+	for _, toast in toasts do
+		if toast == text then
+			count += 1
+		end
+	end
+	return count
+end
 
 local step = renderSteps.MechPilotDrive
 check(step and step.Priority < 200, "Driving isn't bound before the camera moves")
@@ -417,7 +418,17 @@ check(
 )
 check(printed[#printed]:find("Piloting Hauler1", 1, true) ~= nil, "Starting wasn't logged")
 check(player.CameraMinZoomDistance == 24 and humanoid.Sit, "No camera fit, or not sat down")
-check(title.Text == "ATLAS HAULER MECH", "The card doesn't name the mech")
+-- No driving card (it was in the way): only HOP OUT, in its place.
+check(#texts == 0, "The driving card is back")
+local drive = modules.MobileLayout.Drive
+check(
+	hopOut
+		and hopOut.Size.X.Offset == drive.W
+		and hopOut.Size.Y.Offset == drive.H
+		and hopOut.Position.Y.Offset == -drive.Bottom,
+	"HOP OUT isn't in its place"
+)
+check(hopOut.Text == "HOP OUT  ·  SPACE", "HOP OUT doesn't name its key on a keyboard: " .. hopOut.Text)
 
 -- W: it moves at once, from this screen, and the server hears about it.
 local start = mech.Chassis.Position
@@ -426,7 +437,6 @@ local before = #sent
 frames(120)
 local here = mech.Chassis.Position
 check(start.Z - here.Z > 15 and math.abs(here.X - start.X) < 1e-3, "W didn't drive it forward")
-check(speedLabel.Text == "24", "The card doesn't show its speed: " .. speedLabel.Text)
 local moves = #sent - before
 check(moves >= 25 and moves <= 32, "Not about 15 moves a second: " .. moves .. " in 2 s")
 local lastMove = sent[#sent]
@@ -439,6 +449,14 @@ check(sent[#sent].Speed == 0, "Stopping wasn't sent")
 local quiet = #sent
 frames(60)
 check(#sent == quiet, "Kept sending while it stood still")
+-- Setting off after standing a while isn't the server going quiet (standing
+-- still, nothing was sent, so nothing came back).
+frames(300)
+keysDown = { W = true }
+frames(3)
+keysDown = {}
+check(said(DEAF) == 0 and #reports == 0, "Setting off after a stand counted as the server going quiet")
+frames(120)
 -- Steering: A turns it left.
 keysDown = { A = true }
 frames(30)
@@ -473,7 +491,6 @@ wallAt = mech.Chassis.Position.Z - 3 - 8
 keysDown = { W = true }
 frames(90) -- (8 studs from a standstill: there in about 1.1 s)
 check(mech.Chassis.Position.Z - 3 >= wallAt + 0.4 - 1e-3, "Drove into the wall")
-check(blurb.Text == "Something's in the way", "The card didn't say something's in the way")
 frames(75) -- (pushing a moment longer)
 check(toasts[#toasts] and toasts[#toasts]:find("pushing through", 1, true), "It never pushed through")
 local castsBefore = casts
@@ -489,44 +506,37 @@ frames(30)
 check((mech.Chassis.Position - stoodAt).Magnitude > 3, "A failing cast held the mech still")
 castsFail = false
 
--- A server that isn't answering: the card says so, then one report.
+-- A server that isn't answering: you're told once, then one report.
 quietServer = true
 frames(60)
-check(
-	blurb.Text ~= "The server isn't answering: others can't see you move",
-	"Said the server wasn't answering too soon"
-)
+check(said(DEAF) == 0, "Said the server wasn't answering too soon")
 frames(90)
-check(
-	blurb.Text == "The server isn't answering: others can't see you move",
-	"The card didn't say the server isn't answering"
-)
+check(said(DEAF) == 1, "Didn't say the server isn't answering")
 frames(150)
 check(#reports == 1 and warned[#warned]:find("isn't hearing", 1, true), "A server that isn't answering wasn't reported")
 frames(300)
-check(#reports == 1, "Reported again in the same ride")
+check(#reports == 1 and said(DEAF) == 1, "Reported or told again in the same ride")
 quietServer = false
 serverEcho()
 frames(1)
-check(blurb.Text ~= "The server isn't answering: others can't see you move", "Still saying the server isn't answering")
 keysDown = {}
 frames(120)
 -- Turning on the spot: the server answers with MechMotion alone.
 motionOnly, keysDown = true, { D = true }
 frames(60 * 5)
-check(blurb.Text ~= "The server isn't answering: others can't see you move", "Turning on the spot counted as no answer")
+check(said(DEAF) == 1, "Turning on the spot counted as no answer")
 check(#reports == 1, "Turning on the spot was reported")
 motionOnly, keysDown = false, {}
 frames(120)
 
--- A menu hides the card, and that's all: it still drives, and you can
+-- A menu hides HOP OUT, and that's all: it still drives, and you can
 -- still get out.
-check(hudGui.Enabled, "An always-on screen (the daily caches) hid the card")
+check(hudGui.Enabled, "An always-on screen (the daily caches) hid HOP OUT")
 dashboard:setEnabled(true)
 keysDown = { W = true }
 stoodAt = mech.Chassis.Position
 frames(30)
-check(not hudGui.Enabled, "The card stayed over a menu")
+check(not hudGui.Enabled, "HOP OUT stayed over a menu")
 check((mech.Chassis.Position - stoodAt).Magnitude > 0.5, "A menu took the controls")
 local exitsBefore = exits
 clockNow += 1
@@ -534,7 +544,7 @@ UserInputService.JumpRequest:Fire()
 check(exits == exitsBefore + 1, "Couldn't jump out with a menu open")
 dashboard:setEnabled(false)
 frames(1)
-check(hudGui.Enabled, "The card didn't come back after the menu")
+check(hudGui.Enabled, "HOP OUT didn't come back after the menu")
 -- Space, jump and HOP OUT all ask once (Space and jump come together).
 clockNow += 1
 UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Space })

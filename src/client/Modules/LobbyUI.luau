@@ -443,8 +443,8 @@ new("UIGradient", { Rotation = 90, Color = ColorSequence.new(GOLD_TOP, GOLD_BOTT
 local playCaption = text(play, "PLAY", 30, Color3.fromRGB(28, 18, 4), IronUi.Heading)
 playCaption.Size = UDim2.fromScale(1, 1)
 playCaption.TextStrokeTransparency = 1
--- In a mech, the driving card has the bottom of a phone's screen, where PLAY
--- sits (Client VehicleDrive).
+-- In a mech, its HOP OUT button takes PLAY's place at the bottom of a
+-- phone's screen (Client VehicleDrive).
 local function pilotingChanged()
 	play.Visible = player:GetAttribute("MechPilot") == nil
 end

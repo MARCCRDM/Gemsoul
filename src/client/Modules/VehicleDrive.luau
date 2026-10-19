@@ -21,7 +21,6 @@ task.spawn(function() require(script.Parent.MechAnimation) end)
 
 local VehicleDrive = {}
 local player = Players.LocalPlayer
-local P = IronUi.Colors
 
 local SEND_EVERY = 1 / 15 -- seconds between moves sent while it's moving
 -- Pushing into something this long, it goes through it for this long.
@@ -46,7 +45,9 @@ type Driving = {
 	SentMoving: boolean,
 	HeardAt: number,
 	MovedAt: number?,
+	MovingSince: number, -- (this stretch of moving began: the server can't have answered before)
 	Reported: boolean,
+	ToldDeaf: boolean,
 	-- Pushing into something.
 	PushedFor: number,
 	ThroughUntil: number,
@@ -182,9 +183,16 @@ local function send(d: Driving, force: boolean?)
 	end
 end
 
+-- How long it's been moving with no answer from the server (counted from
+-- the start of this stretch of moving: standing still, nothing is sent, so
+-- nothing comes back).
+local function unanswered(d: Driving, now: number): number
+	return now - math.max(d.HeardAt, d.MovingSince)
+end
+
 -- Moving, and the server hasn't answered for a while.
 local function deaf(d: Driving, now: number): boolean
-	return d.MovedAt ~= nil and now - d.MovedAt < DEAF_AFTER and now - d.HeardAt > DEAF_AFTER
+	return d.MovedAt ~= nil and now - d.MovedAt < DEAF_AFTER and unanswered(d, now) > DEAF_AFTER
 end
 
 local function report(d: Driving, source: string)
@@ -210,60 +218,30 @@ local function report(d: Driving, source: string)
 	end
 end
 
--- The driving card.
+-- On screen, only HOP OUT (a tap gets you out on any screen), where PLAY
+-- sits on a phone (it's hidden while you pilot: LobbyUI). No speed card: it
+-- was in the way, and the mech shows how fast it's going.
 local gui = UiKit.gui("DriveHud", 7) -- (over the lobby HUD)
 gui.Enabled = false
-local card = IronUi.new("Frame", {
+local hopOutButton = IronUi.new("TextButton", {
 	AnchorPoint = Vector2.new(0.5, 1),
 	Position = UDim2.new(0.5, 0, 1, -MobileLayout.Drive.Bottom),
 	Size = UDim2.fromOffset(MobileLayout.Drive.W, MobileLayout.Drive.H),
-	BackgroundColor3 = Color3.fromRGB(10, 12, 20),
-	BackgroundTransparency = 0.15,
-}, gui)
-UiKit.round(card, 10)
-IronUi.new("UIStroke", { Color = Color3.fromRGB(242, 182, 36), Transparency = 0.3, Thickness = 1.5 }, card)
-local title = IronUi.text(card, "", 15, Color3.fromRGB(242, 182, 36), IronUi.Bold)
-title.Position, title.Size = UDim2.fromOffset(14, 8), UDim2.fromOffset(220, 20)
-local blurb = IronUi.text(card, "", 11, P.Dim, IronUi.Body)
-blurb.Position, blurb.Size = UDim2.fromOffset(14, 27), UDim2.fromOffset(220, 14)
-local speedLabel = IronUi.text(card, "0", 30, P.Text, IronUi.Heading)
-speedLabel.AnchorPoint = Vector2.new(1, 0)
-speedLabel.Position, speedLabel.Size = UDim2.new(1, -14, 0, 4), UDim2.fromOffset(100, 34)
-speedLabel.TextXAlignment = Enum.TextXAlignment.Right
-local unit = IronUi.text(card, "STUDS/S", 10, P.Dim, IronUi.Bold)
-unit.AnchorPoint = Vector2.new(1, 0)
-unit.Position, unit.Size = UDim2.new(1, -14, 0, 36), UDim2.fromOffset(60, 12)
-unit.TextXAlignment = Enum.TextXAlignment.Right
-local track = IronUi.new("Frame", {
-	Position = UDim2.fromOffset(14, 47),
-	Size = UDim2.new(1, -28, 0, 5),
-	BackgroundColor3 = P.Inset,
-}, card)
-UiKit.round(track, 3)
-local fill =
-	IronUi.new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(242, 182, 36) }, track)
-UiKit.round(fill, 3)
-local controls = IronUi.text(card, "", 11, P.Dim, IronUi.Bold)
-controls.Position, controls.Size = UDim2.fromOffset(14, 57), UDim2.new(1, -28, 0, 14)
--- (Over the card's right corner: a tap gets you out on any screen.)
-local hopOutButton = IronUi.new("TextButton", {
-	AnchorPoint = Vector2.new(1, 1),
-	Position = UDim2.new(1, 0, 0, -6),
-	Size = UDim2.fromOffset(110, 30),
 	BackgroundColor3 = Color3.fromRGB(242, 182, 36),
 	Text = "HOP OUT",
-	TextSize = 14,
+	TextSize = 15,
 	TextColor3 = Color3.fromRGB(10, 12, 20),
 	Font = IronUi.Bold,
 	AutoButtonColor = true,
-}, card)
+}, gui)
 UiKit.round(hopOutButton, 8)
 
-local function controlText(): string
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return "Thumbstick to drive  |  Jump to hop out"
+-- (With a keyboard, the button names the key too.)
+local function hopOutText(): string
+	if UserInputService.KeyboardEnabled then
+		return "HOP OUT  ·  SPACE"
 	end
-	return "W/S drive  |  A/D steer  |  SPACE to hop out"
+	return "HOP OUT"
 end
 
 local function finish()
@@ -283,11 +261,11 @@ local function finish()
 	end
 end
 
--- A menu over the screen hides the driving card, nothing more: it never
+-- A menu over the screen hides HOP OUT, nothing more: it never
 -- takes your controls or the way out. (It used to do both. StreakRewards was
 -- on this list, and its screen is always on, only its button hidden, so in
 -- the lobby every mech sat still and nobody could get out.) Track instances,
--- so closing one of several overlays does not reveal the card.
+-- so closing one of several overlays does not bring the button back.
 local blockingScreens = {
 	Dashboard = true,
 	Shop = true,
@@ -361,7 +339,9 @@ local function begin(id: string)
 		SentMoving = false,
 		HeardAt = now,
 		MovedAt = nil,
+		MovingSince = 0,
 		Reported = false,
+		ToldDeaf = false,
 		PushedFor = 0,
 		ThroughUntil = 0,
 		Hinted = false,
@@ -382,9 +362,7 @@ local function begin(id: string)
 	local fit = model:GetAttribute("CameraFit") or math.max(14, chassis.Size.Z * 1.15)
 	player.CameraMaxZoomDistance = math.max(player.CameraMaxZoomDistance, fit * 2)
 	player.CameraMinZoomDistance = fit
-	title.Text = string.upper(spec.Name)
-	blurb.Text = spec.Blurb
-	controls.Text = controlText()
+	hopOutButton.Text = hopOutText()
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		pcall(function()
@@ -394,16 +372,12 @@ local function begin(id: string)
 	refreshHud()
 end
 
-local function hud(d: Driving, blockedBy: string?, now: number)
-	local speed = math.abs(d.Mech.Speed)
-	speedLabel.Text = tostring(math.floor(speed + 0.5))
-	fill.Size = UDim2.fromScale(math.clamp(speed / d.Spec.MaxSpeed, 0, 1), 1)
-	local line = if deaf(d, now)
-		then "The server isn't answering: others can't see you move"
-		elseif blockedBy then "Something's in the way"
-		else d.Spec.Blurb
-	if blurb.Text ~= line then
-		blurb.Text = line
+-- The server not hearing you is worth knowing (others can't see you move):
+-- said once a ride.
+local function hud(d: Driving, now: number)
+	if deaf(d, now) and not d.ToldDeaf then
+		d.ToldDeaf = true
+		UiKit.toast("The server isn't answering: others can't see you move.")
 	end
 end
 
@@ -452,13 +426,16 @@ function VehicleDrive.step(dt: number)
 	end
 	d.Chassis.CFrame = MechPilot.frame(m)
 	if m.Speed ~= 0 or d.Turn ~= 0 then
+		if not d.MovedAt or now - d.MovedAt > SEND_EVERY * 2 then
+			d.MovingSince = now
+		end
 		d.MovedAt = now
 	end
 	send(d)
-	if deaf(d, now) and now - d.HeardAt > DEAF_AFTER * 2 then
+	if deaf(d, now) and unanswered(d, now) > DEAF_AFTER * 2 then
 		report(d, source)
 	end
-	hud(d, blockedBy, now)
+	hud(d, now)
 	refreshHud()
 end
 

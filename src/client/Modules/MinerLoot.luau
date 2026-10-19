@@ -14,7 +14,7 @@
 -- no bars, and one row under it, so the middle of the screen (you, your
 -- kaiju, what's coming) and the dock stay clear; the live feed steps aside
 -- while it's up (MobileLayout.claimTop). On a computer it's in full above
--- the bottom of the screen, or above a mech's driving card
+-- the bottom of the screen, or above a mech's HOP OUT button
 -- (MobileLayout.Drive).
 --
 --   MinerLoot.push(loot)        the server's loot for a rock you mined
@@ -207,7 +207,7 @@ local function rebuild()
 end
 
 -- Where everything sits. On a computer: the card at the bottom, rows above
--- it (newest first), or above a mech's driving card. On a phone or a tablet
+-- it (newest first), or above a mech's HOP OUT button. On a phone or a tablet
 -- (touch, or a short window): slim, at the top middle, one row under it
 -- (a small phone's row shows once the card's gone).
 local function fit()
@@ -238,7 +238,7 @@ local function fit()
 		holder.AnchorPoint = Vector2.new(0, 0)
 		holder.Position = UDim2.fromOffset(spot.X, spot.Y)
 	else
-		-- (In a mech: above its driving card, bottom middle.)
+		-- (In a mech: above its HOP OUT button, bottom middle.)
 		local drive = MobileLayout.Drive
 		local piloting = Players.LocalPlayer:GetAttribute("MechPilot") ~= nil
 		holder.AnchorPoint = Vector2.new(0.5, 1)
