@@ -8,9 +8,12 @@ Drill, Forge Utility and Scout Pathfinder). Walk up to one and hold **E**
 - **A / D** to turn. The mechs turn on the spot;
 - **Space**, or the **HOP OUT** button, to hop out.
 
-A gamepad's left stick and the phone thumbstick work too. While you drive,
-the screen shows only HOP OUT, at the bottom middle (in PLAY's place on a
-phone; PLAY hides while you drive). With a keyboard it reads "HOP OUT ·
+A gamepad's left stick works too. On a phone or tablet, tap **Pilot** and
+drive with the **drive stick** at the bottom left, where Roblox's own
+thumbstick sits: up drives forward, down backs up, sideways turns. HOP OUT
+or the jump button gets you out. While you drive, the screen shows only HOP
+OUT, at the bottom middle (in PLAY's place on a phone; PLAY hides while you
+drive), and on a touch screen the drive stick. With a keyboard it reads "HOP OUT ·
 SPACE". There used to be a driving card with the mech's name, its speed
 and the controls, but it was in the way. An empty mech walks itself back
 to its bay after 90 seconds.
@@ -42,6 +45,36 @@ screen is always switched on, with only its button hidden. Back then, a menu
 also took away your controls and Space, so in the lobby every mech sat still
 and nobody could jump out. Now a menu only hides HOP OUT. Your controls and
 the way out work whatever is on the screen.
+
+### On a phone
+
+Driving on a phone used to go only through Roblox's thumbstick
+(`ControlModule:GetMoveVector()`). A keyboard never needed it, since your
+game reads the keys itself, so only phones could lose it. Three things could
+stop a phone's mech while a computer's drove fine:
+
+- **Roblox's controls switched off.** The menu camera and the scenes switch
+  them off and on (`controls:Disable()`/`Enable()`). With them off, the
+  thumbstick reads zero. Now the drive stick is the mech's own (a button in
+  `DriveHud`, read straight by `VehicleDrive`), so it drives whatever state
+  Roblox's controls are in. The drive stick comes before Roblox's thumbstick
+  in the order your input is read: keys, then the drive stick, then the
+  controls. Roblox's thumbstick still drives if you use it.
+- **The controls failing to load once.** If `PlayerModule` failed to load the
+  first time, it was never tried again, so the thumbstick was dead for the
+  whole session. Now it tries again every 2 seconds.
+- **Auto-jump.** On touch screens Roblox jumps you at whatever is in front
+  of you as you push the stick (`Humanoid.AutoJumpEnabled`). In the cockpit
+  that can be the mech's own bodywork, and a jump is the way out (or at least
+  stands you up out of the pose). Auto-jump is off while you pilot and comes
+  back when you get out.
+
+The drive stick is 112 points wide, 20 in from the left and 16 up from the
+bottom (`MobileLayout.Stick`). It's clear of the dock, HOP OUT, your coins,
+the pick card and your teammates' cards at every phone size
+(`tests/run_mobile_layout.py`). A touch on it is the stick's, not the
+camera's. Drag past its rim and the knob stays on the rim. Let go, or open a
+menu (which hides it), and the mech stops.
 
 ### Getting in
 
@@ -167,7 +200,7 @@ The server's lines also go to Feedback → Reports (owners only).
 | `src/server/World/OutpostMachines.luau` | Builds each mech: chassis, cockpit, hull, foot and bodywork |
 | `src/server/Systems/OutpostVehicles.luau` | Parks the mechs (anchored), runs the Pilot prompt, gets you in and out, checks `MechMove`, sends empty mechs home |
 | `src/server/Systems/SeatExit.luau` | Lets go of a pilot (and a seated player) before fights and drops |
-| `src/client/Modules/VehicleDrive.luau` | Your input (keys, then the controls), driving the mech, sending moves, HOP OUT and the camera |
+| `src/client/Modules/VehicleDrive.luau` | Your input (keys, then the drive stick on a touch screen, then the controls), driving the mech, sending moves, HOP OUT, the drive stick and the camera |
 | `src/client/Modules/MechAnimation.luau` | Glides everyone else's mechs between moves, and walks the legs |
 | `Remotes.MechMove` | Client to server: `(position, heading, speed, turn rate)` |
 | `Remotes.MechReport` | Client to server: the server isn't hearing you. Server to client: its view |
@@ -187,7 +220,7 @@ The server's lines also go to Feedback → Reports (owners only).
   getting in and out, moves from the pilot only, the limits on a move, the
   silent-pilot log and letting them out, reports, letting go of pilots who die, respawn, leave or
   get busy, and going home.
-- `tests/run_vehicle_transition.py` (52 checks, then the arena controls)
+- `tests/run_vehicle_transition.py` (66 checks, then the arena controls)
   runs the real client module under lune:
   - waiting for the mech to stream in, then driving;
   - sending moves, and stopping;
@@ -199,7 +232,12 @@ The server's lines also go to Feedback → Reports (owners only).
   - an always-on screen, menus (they hide HOP OUT, nothing more);
   - getting out by Space, jump or HOP OUT, before driving starts and with a
     menu open, but not while typing;
-  - being let go, a respawn and the camera.
+  - being let go, a respawn and the camera;
+  - Roblox's controls failing to load once (it tries again);
+  - a touch screen: the drive stick in its place, driving forward and
+    turning with Roblox's controls giving nothing, another finger ignored,
+    stopping when you let go or a menu hides it, and auto-jump off in the
+    cockpit and back after.
 - `tests/run_mech_animation.py` checks the gliding, the legs, and that your
   own mech isn't glided.
 - `tests/run_machines.py` and `tests/run_moon_quarry_scene.py` build every

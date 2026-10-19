@@ -2,8 +2,9 @@
 -- The lobby's pieces on a phone never overlap (MobileLayout): the pick card,
 -- your level and coins, the CHAT button (small screens with a keyboard), the
 -- opened chat, the dock (PLAY and its tiles), the teammates' cards, the
--- TASKS button and the board's strip under it, and your loot card at the top
--- middle, at every common phone size; the dock's tiles all fit. And who has
+-- TASKS button and the board's strip under it, your loot card at the top
+-- middle, and a mech's HOP OUT and drive stick, at every common phone size;
+-- the dock's tiles all fit. And who has
 -- the top middle (claimTop).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -93,6 +94,15 @@ for _, s in SCREENS do
 		label .. ": HOP OUT isn't in PLAY's place"
 	)
 	check(not MobileLayout.overlaps(hop, party), label .. ": HOP OUT overlaps the teammates' cards")
+	-- And on a touch screen, its drive stick at the bottom left (where
+	-- Roblox's thumbstick sits), clear of everything else on the HUD.
+	local stick = MobileLayout.stick(screen)
+	check(stick.X >= 0 and stick.Y + stick.H <= screen.Y, label .. ": the drive stick is off the screen")
+	check(stick.Y >= screen.Y * 0.4, label .. ": the drive stick isn't down at the bottom")
+	for name, other in { dock = dock, ["HOP OUT"] = hop, coins = wallet, ["pick card"] = card, ["teammates' cards"] = party } do
+		check(not MobileLayout.overlaps(stick, other), label .. ": the drive stick overlaps the " .. name)
+	end
+	check(MobileLayout.Stick.Knob < MobileLayout.Stick.Size, label .. ": the stick's knob is bigger than the stick")
 	check(not MobileLayout.overlaps(card, wallet), label .. ": the coins overlap the pick card")
 	check(not MobileLayout.overlaps(wallet, closed), label .. ": the CHAT button overlaps the coins")
 	check(not MobileLayout.overlaps(wallet, dock), label .. ": the coins overlap the dock")

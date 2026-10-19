@@ -3,7 +3,8 @@
 -- over the ground (Shared.MechPilot), and tells the server where it went.
 -- Waiting for the mech to stream in, the hello, sending (rate, stopping),
 -- steering, chat, a wall and pushing through, a failing cast, a server that
--- isn't answering, menus, getting out, being let go, a respawn, the camera.
+-- isn't answering, menus, getting out, being let go, a respawn, the camera,
+-- a controls load that fails once, and a touch screen's own drive stick.
 -- The real module under lune, with stand-ins for the services and the HUD.
 -- Run by tests/run_vehicle_transition.py.
 local fs = require("@lune/fs")
@@ -78,7 +79,8 @@ function player:WaitForChild(name)
 	assert(name == "PlayerGui")
 	return playerGui
 end
-local controlStub, moveVec = {}, nil
+-- (Roblox's controls fail to load the first time: a phone, still starting.)
+local controlStub, moveVec, controlsFail, controlLoads = {}, nil, 1, 0
 function controlStub:GetMoveVector()
 	return moveVec
 end
@@ -87,6 +89,11 @@ local playerScripts = {
 		return if name == "PlayerModule"
 			then { Module = {
 				GetControls = function()
+					controlLoads += 1
+					if controlsFail > 0 then
+						controlsFail -= 1
+						error("PlayerModule isn't ready")
+					end
 					return controlStub
 				end,
 			} }
@@ -160,7 +167,14 @@ local streamed = {}
 -- Services and remotes ------------------------------------------------------------------------
 local clockNow = 0
 local keysDown, focusedBox = {}, nil
-local UserInputService = { JumpRequest = signal(), InputBegan = signal(), TouchEnabled = false, KeyboardEnabled = true }
+local UserInputService = {
+	JumpRequest = signal(),
+	InputBegan = signal(),
+	InputChanged = signal(),
+	InputEnded = signal(),
+	TouchEnabled = false,
+	KeyboardEnabled = true,
+}
 function UserInputService:IsKeyDown(key)
 	return keysDown[key.Name] == true
 end
@@ -257,12 +271,16 @@ local modules = {
 	})(),
 }
 local texts = {}
-local buttons = {}
-function modules.IronUi.new(class, props)
+local buttons, named = {}, {}
+function modules.IronUi.new(class, props, parent)
 	props = props or {}
+	props.Parent = parent
 	if class == "TextButton" then
-		props.Activated = signal()
-		buttons[props.Text] = props
+		props.Activated, props.InputBegan = signal(), signal()
+		buttons[props.Name or props.Text] = props
+	end
+	if props.Name then
+		named[props.Name] = props
 	end
 	return props
 end
@@ -471,10 +489,12 @@ frames(30)
 check((mech.Chassis.Position - stoodAt).Magnitude < 1e-3, "Typing in chat drove the mech")
 focusedBox = nil
 keysDown = {}
--- A thumbstick (the controls' move vector) drives it too.
+-- A thumbstick (the controls' move vector) drives it too, though the
+-- controls failed to load the first time.
 moveVec = R.Vector3.new(0, 0, -1)
 stoodAt = mech.Chassis.Position
 frames(60)
+check(controlLoads >= 2, "A controls load that failed was never tried again")
 check((mech.Chassis.Position - stoodAt).Magnitude > 3, "The thumbstick didn't drive it")
 moveVec = nil
 frames(120)
@@ -600,6 +620,66 @@ check(not VehicleDrive.isDriving(), "Drove a mech that streamed out")
 mech.Parent = "Machines"
 frames(1)
 check(VehicleDrive.isDriving(), "Didn't pick the mech up once it was back")
+-- A touch screen: a drive stick of its own, bottom left, that drives with
+-- Roblox's controls giving nothing (a scene can switch them off on a phone).
+-- No auto-jump in the cockpit (a jump is the way out); it comes back after.
+check(buttons.DriveStick == nil, "A drive stick without a touch screen")
+player:SetAttribute("MechPilot", nil)
+frames(1)
+UserInputService.TouchEnabled, humanoid.AutoJumpEnabled = true, true
+player:SetAttribute("MechPilot", "Hauler1")
+frames(1)
+local pad, knob, layout = buttons.DriveStick, named.Knob, modules.MobileLayout.Stick
+check(pad and pad.Parent == hudGui and knob and knob.Parent == pad, "No drive stick on a touch screen")
+check(
+	pad.Size.X.Offset == layout.Size
+		and pad.Position.X.Offset == layout.Left
+		and pad.Position.Y.Offset == -layout.Bottom,
+	"The drive stick isn't in its place"
+)
+check(humanoid.AutoJumpEnabled == false, "Auto-jump stayed on in the cockpit")
+pad.AbsolutePosition, pad.AbsoluteSize = R.Vector2.new(20, 172), R.Vector2.new(layout.Size, layout.Size)
+local centre = R.Vector3.new(20 + layout.Size / 2, 172 + layout.Size / 2, 0)
+local touch = { UserInputType = Enum.UserInputType.Touch, Position = centre + R.Vector3.new(0, -40, 0) }
+moveVec = R.Vector3.zero
+-- Up: forward.
+stoodAt = mech.Chassis.Position
+pad.InputBegan:Fire(touch)
+frames(60)
+check((mech.Chassis.Position - stoodAt).Magnitude > 3 and sent[#sent].Speed > 0, "Pushing the stick up didn't drive it")
+check(knob.Position.Y.Offset < -30 and knob.Position.X.Offset == 0, "The stick's knob didn't follow the thumb")
+-- Dragged right (well past the rim: as far as it goes): it turns right.
+touch.Position = centre + R.Vector3.new(200, 0, 0)
+UserInputService.InputChanged:Fire(touch)
+frames(30)
+check(sent[#sent].Turn < 0, "Dragging the stick right didn't turn it right")
+check(math.abs(knob.Position.X.Offset - layout.Size / 2) < 1e-6, "The knob left the stick")
+-- Another finger (the camera) moves nothing.
+UserInputService.InputChanged:Fire({ UserInputType = Enum.UserInputType.Touch, Position = centre })
+check(knob.Position.X.Offset > 0, "Another finger moved the stick")
+-- Let go: it stops.
+UserInputService.InputEnded:Fire(touch)
+frames(120)
+check(sent[#sent].Speed == 0 and sent[#sent].Turn == 0, "Letting go of the stick didn't stop it")
+check(knob.Position.X.Offset == 0 and knob.Position.Y.Offset == 0, "The knob didn't spring back")
+-- A menu over the screen lets go of it (it's hidden), and it stops.
+touch.Position = centre + R.Vector3.new(0, -50, 0)
+pad.InputBegan:Fire(touch)
+frames(10)
+dashboard:setEnabled(true)
+frames(120)
+check(not hudGui.Enabled and sent[#sent].Speed == 0, "A menu over the stick left the mech driving")
+dashboard:setEnabled(false)
+frames(1)
+UserInputService.InputEnded:Fire(touch)
+-- Out: auto-jump is back.
+player:SetAttribute("MechPilot", nil)
+frames(1)
+check(humanoid.AutoJumpEnabled == true, "Auto-jump didn't come back after the mech")
+player:SetAttribute("MechPilot", "Hauler1")
+frames(1)
+moveVec = nil
+
 -- No remotes yet: it still drives (and says nothing).
 remotesHere = false
 keysDown = { W = true }
@@ -612,5 +692,5 @@ keysDown = {}
 print(
 	"PASS: "
 		.. checks
-		.. " vehicle drive checks (the pilot's screen: driving, sending, walls, a quiet server, menus, getting out)"
+		.. " vehicle drive checks (the pilot's screen: driving, sending, walls, a quiet server, menus, getting out, the touch stick)"
 )

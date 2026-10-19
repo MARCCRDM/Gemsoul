@@ -5,7 +5,8 @@
 -- ground (MechPilot.move: walls, kerbs, drops, the rim), then the mech is put
 -- there, you with it. About 15 times a second it tells the server where it
 -- is (MechMove); the server checks it and passes it on to everyone else.
--- Space (or jump) gets you out.
+-- Space (or jump) gets you out. On a touch screen it has a stick of its own
+-- (bottom left), so a phone never waits on Roblox's controls.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -52,6 +53,9 @@ type Driving = {
 	PushedFor: number,
 	ThroughUntil: number,
 	Hinted: boolean,
+	-- Your body, and its auto-jump from before (off while you pilot).
+	Humanoid: any,
+	AutoJump: boolean?,
 	Connections: { RBXScriptConnection },
 }
 local driving: Driving? = nil
@@ -63,12 +67,13 @@ local function blocked(): boolean
 		or player:GetAttribute("Expedition") ~= nil
 end
 
--- What the pilot is asking for, -1..1 each: the keys, else the controls'
--- move vector (a thumbstick, a gamepad).
+-- What the pilot is asking for, -1..1 each: the keys, else the drive stick
+-- (a touch screen), else the controls' move vector (a gamepad, Roblox's
+-- thumbstick).
 local controlModule = nil
-local loadingControls = false
+local loadingControls, controlsRetryAt = false, 0
 local function moveVector(): Vector3?
-	if controlModule == nil and not loadingControls then
+	if not controlModule and not loadingControls and os.clock() >= controlsRetryAt then
 		local scripts = player:FindFirstChild("PlayerScripts")
 		local module = scripts and scripts:FindFirstChild("PlayerModule")
 		if not module then
@@ -76,10 +81,15 @@ local function moveVector(): Vector3?
 		end
 		loadingControls = true
 		-- Requiring PlayerModule can yield during startup. Never suspend the
-		-- driving (or the keys) while it loads.
+		-- driving (or the keys) while it loads, and try again if it fails:
+		-- once, it used to leave a phone's thumbstick dead for the session.
 		task.spawn(function()
 			local ok, found = pcall(function() return require(module):GetControls() end)
-			controlModule = if ok and found then found else false
+			if ok and found then
+				controlModule = found
+			else
+				controlsRetryAt = os.clock() + 2
+			end
 			loadingControls = false
 		end)
 	end
@@ -97,7 +107,11 @@ local function held(...): boolean
 	end
 	return false
 end
--- Also says where the input came from: "keys", "controls" or "none".
+-- The drive stick, on a touch screen (built with the HUD, below): how far
+-- it's pushed, -1..1 each way (screen up is negative Y).
+local STICK_DEAD = 0.15
+local stickValue = Vector2.zero
+-- Also says where the input came from: "keys", "touch", "controls" or "none".
 local function pilotInput(): (number, number, string)
 	if UserInputService:GetFocusedTextBox() then return 0, 0, "none" end
 	local K = Enum.KeyCode
@@ -107,6 +121,9 @@ local function pilotInput(): (number, number, string)
 		if throttle ~= 0 or steer ~= 0 then
 			return throttle, steer, "keys"
 		end
+	end
+	if stickValue.Magnitude > STICK_DEAD then
+		return math.clamp(-stickValue.Y, -1, 1), math.clamp(stickValue.X, -1, 1), "touch"
 	end
 	local move = moveVector()
 	if move and move.Magnitude > 0.05 then
@@ -219,8 +236,9 @@ local function report(d: Driving, source: string)
 end
 
 -- On screen, only HOP OUT (a tap gets you out on any screen), where PLAY
--- sits on a phone (it's hidden while you pilot: LobbyUI). No speed card: it
--- was in the way, and the mech shows how fast it's going.
+-- sits on a phone (it's hidden while you pilot: LobbyUI), and on a touch
+-- screen the drive stick. No speed card: it was in the way, and the mech
+-- shows how fast it's going.
 local gui = UiKit.gui("DriveHud", 7) -- (over the lobby HUD)
 gui.Enabled = false
 local hopOutButton = IronUi.new("TextButton", {
@@ -236,6 +254,87 @@ local hopOutButton = IronUi.new("TextButton", {
 }, gui)
 UiKit.round(hopOutButton, 8)
 
+-- The drive stick: bottom left, where your thumb already is
+-- (MobileLayout.Stick). Driving on a phone used to go only through Roblox's
+-- thumbstick, which a scene can switch off and which loads late. Touch it and
+-- drag: up drives forward, down backs up, sideways turns. Built the first
+-- time you pilot on a touch screen.
+local stick: { Base: any, Knob: any, Touch: any }? = nil
+local function releaseStick()
+	stickValue = Vector2.zero
+	if stick then
+		stick.Touch = nil
+		stick.Knob.Position = UDim2.fromScale(0.5, 0.5)
+	end
+end
+local function pushStick(input)
+	local s = stick
+	if not s then
+		return
+	end
+	local reach = MobileLayout.Stick.Size / 2
+	local centre = s.Base.AbsolutePosition + s.Base.AbsoluteSize / 2
+	local offset = Vector2.new(input.Position.X, input.Position.Y) - centre
+	if offset.Magnitude > reach then
+		offset = offset.Unit * reach
+	end
+	stickValue = offset / reach
+	s.Knob.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
+end
+local function buildStick()
+	if stick or not UserInputService.TouchEnabled then
+		return
+	end
+	local layout = MobileLayout.Stick
+	-- (A button, so a touch on it is the stick's: not the camera's, nor
+	-- Roblox's thumbstick's.)
+	local base = IronUi.new("TextButton", {
+		Name = "DriveStick",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, layout.Left, 1, -layout.Bottom),
+		Size = UDim2.fromOffset(layout.Size, layout.Size),
+		BackgroundColor3 = Color3.fromRGB(10, 12, 20),
+		BackgroundTransparency = 0.45,
+		Text = "",
+		AutoButtonColor = false,
+	}, gui)
+	UiKit.round(base, layout.Size / 2)
+	IronUi.new("UIStroke", {
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border, -- (the ring, not the button's text)
+		Color = Color3.fromRGB(242, 182, 36),
+		Transparency = 0.35,
+		Thickness = 2,
+	}, base)
+	local knob = IronUi.new("Frame", {
+		Name = "Knob",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(layout.Knob, layout.Knob),
+		BackgroundColor3 = Color3.fromRGB(242, 182, 36),
+		BackgroundTransparency = 0.1,
+		Active = false,
+	}, base)
+	UiKit.round(knob, layout.Knob / 2)
+	stick = { Base = base, Knob = knob, Touch = nil }
+	base.InputBegan:Connect(function(input)
+		local s = stick
+		if s and s.Touch == nil and input.UserInputType == Enum.UserInputType.Touch then
+			s.Touch = input
+			pushStick(input)
+		end
+	end)
+end
+UserInputService.InputChanged:Connect(function(input)
+	if stick and input == stick.Touch then
+		pushStick(input)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if stick and input == stick.Touch then
+		releaseStick()
+	end
+end)
+
 -- (With a keyboard, the button names the key too.)
 local function hopOutText(): string
 	if UserInputService.KeyboardEnabled then
@@ -248,11 +347,17 @@ local function finish()
 	local d = driving
 	driving = nil
 	gui.Enabled = false
+	releaseStick()
 	if not d then
 		return
 	end
 	for _, connection in d.Connections do
 		connection:Disconnect()
+	end
+	if d.Humanoid and d.AutoJump ~= nil then
+		pcall(function()
+			d.Humanoid.AutoJumpEnabled = d.AutoJump
+		end)
 	end
 	-- (Not over the combat camera's zoom.)
 	if player.CameraMode ~= Enum.CameraMode.LockFirstPerson then
@@ -261,7 +366,7 @@ local function finish()
 	end
 end
 
--- A menu over the screen hides HOP OUT, nothing more: it never
+-- A menu over the screen hides HOP OUT (and the stick), nothing more: it never
 -- takes your controls or the way out. (It used to do both. StreakRewards was
 -- on this list, and its screen is always on, only its button hidden, so in
 -- the lobby every mech sat still and nobody could get out.) Track instances,
@@ -293,6 +398,9 @@ local function menuOpen(): boolean
 end
 local function refreshHud()
 	gui.Enabled = driving ~= nil and not blocked() and not menuOpen()
+	if not gui.Enabled and stick and stick.Touch then
+		releaseStick()
+	end
 end
 local function watchScreen(screen)
 	if not screen:IsA("ScreenGui") or (not blockingScreens[screen.Name] and screen.Name ~= "TrainingRewards") then return end
@@ -345,6 +453,8 @@ local function begin(id: string)
 		PushedFor = 0,
 		ThroughUntil = 0,
 		Hinted = false,
+		Humanoid = nil,
+		AutoJump = nil,
 		Connections = {},
 	}
 	d.World = VehicleDrive.world(d)
@@ -363,10 +473,19 @@ local function begin(id: string)
 	player.CameraMaxZoomDistance = math.max(player.CameraMaxZoomDistance, fit * 2)
 	player.CameraMinZoomDistance = fit
 	hopOutButton.Text = hopOutText()
+	buildStick()
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		pcall(function()
 			humanoid.Sit = true -- (the pose)
+		end)
+		-- No auto-jump in the cockpit. On a phone it can jump you at the
+		-- mech's own bodywork as you push the stick, and a jump is the way
+		-- out (or, at least, stands you up out of the pose).
+		d.Humanoid = humanoid
+		pcall(function()
+			d.AutoJump = humanoid.AutoJumpEnabled
+			humanoid.AutoJumpEnabled = false
 		end)
 	end
 	refreshHud()

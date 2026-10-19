@@ -41,18 +41,30 @@
 	                                       PLAY's place on a phone (PLAY hides
 	                                       while you pilot): its size and how
 	                                       far up it sits
+	  MobileLayout.stick(screen)           a mech's drive stick on a touch
+	                                       screen (VehicleDrive): bottom left,
+	                                       where Roblox's thumbstick sits,
+	                                       clear of the dock and the jump
+	                                       button; Stick is its size, the
+	                                       knob's and its place
 ]]
 local MobileLayout = {}
 
 MobileLayout.CardScale = 0.7
 MobileLayout.Margin = 12
 MobileLayout.Drive = { W = 160, H = 38, Bottom = 62 }
+MobileLayout.Stick = { Size = 112, Knob = 46, Left = 20, Bottom = 16 }
 MobileLayout.Tasks = { W = 112, H = 34 }
 MobileLayout.Board = { W = 236, H = 38 }
 MobileLayout.Loot = { W = 250, MinW = 170, H = 56, ShortH = 44, Top = 8 }
 
 function MobileLayout.card()
 	return { X = 12, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
+end
+
+function MobileLayout.stick(screen: Vector2)
+	local stick = MobileLayout.Stick
+	return { X = stick.Left, Y = screen.Y - stick.Bottom - stick.Size, W = stick.Size, H = stick.Size }
 end
 
 function MobileLayout.wallet()
