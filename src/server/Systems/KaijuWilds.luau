@@ -10,7 +10,8 @@
 	              and stops to look at anyone who comes close (Kaiju.Roam,
 	              KaijuMood on its model for the clients' poses). One
 	              leaves you and your kaiju alone until you start a fight:
-	              challenge it ("KaijuChallenge", its Challenge prompt) and
+	              challenge it ("KaijuChallenge", its Challenge prompt, shown
+	              only while it isn't in a fight or being tamed) and
 	              your kaiju goes in, or hit it while hunting (the combat
 	              kit out: SparServer). It fights those who started on it
 	              and their kaiju (its packmate close by joins in:
@@ -132,6 +133,7 @@ type Wild = {
 	Tries: number,
 	TameAt: { [Player]: number },
 	Fighter: any?, -- how a wild kaiju fights (KaijuFighter; a moon bug has none)
+	Challenge: ProximityPrompt?, -- a wild kaiju's Challenge prompt
 	LastFight: number?,
 	Bug: boolean,
 	Prey: Player?, -- a rift's critter: whoever drew it
@@ -331,10 +333,21 @@ local function foesNear(center: Vector3, radius: number, wide: boolean?): { any 
 	return list
 end
 
+-- Its Challenge prompt shows only while it's free to take on: not while
+-- it's in a fight (anyone's started on it) or held by a tame.
+local function showChallenge(wild: Wild)
+	local prompt = wild.Challenge
+	local free = next(wild.Engaged) == nil and not wild.Taming and wild.Enemy.Alive
+	if prompt and prompt.Enabled ~= free then
+		prompt.Enabled = free
+	end
+end
+
 -- A wild kaiju leaves you be until you start on it: who has, and since when.
 local function engage(wild: Wild, player: Player?, now: number)
 	if player and not wild.Bug then
 		wild.Engaged[player] = now
+		showChallenge(wild)
 		-- Its packmate close by comes to its defence (Kaiju.Wild.Defend).
 		for _, mate in if wild.Pack then wild.Pack.Members else {} do
 			local close = mate ~= wild
@@ -342,6 +355,7 @@ local function engage(wild: Wild, player: Player?, now: number)
 				and flat(mate.Enemy.Root.Position - wild.Enemy.Root.Position).Magnitude <= Kaiju.Wild.Defend
 			if close then
 				mate.Engaged[player] = now
+				showChallenge(mate)
 			end
 		end
 	end
@@ -1198,6 +1212,8 @@ local function brain(enemy, now: number)
 	-- (A critter's bombs in the air land whatever it's doing now.)
 	if wild.Bug then
 		bombsLand(enemy, wild, now)
+	else
+		showChallenge(wild)
 	end
 	-- Held by a tame: nothing else till it's over.
 	if wild.Taming then
@@ -1270,6 +1286,7 @@ local function brain(enemy, now: number)
 					wild.Engaged[player] = nil
 				end
 			end
+			showChallenge(wild)
 			if wild.Guard and awake and next(wild.Engaged) == nil then
 				wild.Swings = 0 -- (back to sleep)
 			end
@@ -1577,6 +1594,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Tries = 0,
 		TameAt = {},
 		Fighter = fighter,
+		Challenge = challenge,
 		Bug = false,
 		Engaged = engagedBy,
 		Guard = guard,
@@ -1905,6 +1923,7 @@ local function tame(player: Player, model: any)
 	local body = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	wild.TameAt[player] = now
 	wild.Taming = { Player = player, Ends = now + Kaiju.Tame.Cast, Health = if body then body.Health else 0 }
+	showChallenge(wild)
 	wild.Plan = nil
 	if wild.Fighter then
 		KaijuFighter.calm(wild.Fighter)

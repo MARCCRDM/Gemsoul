@@ -315,7 +315,9 @@ A wild kaiju leaves you and your kaiju alone until you start a fight with
 it. There are two ways:
 
 - **Challenge it:** hold **E** beside it (within 20 studs), with your kaiju
-  out or while you hunt. Your kaiju goes in.
+  out or while you hunt. Your kaiju goes in. The Challenge button shows
+  only while it's free: not while it's in a fight with anyone (until it's
+  home and has calmed down) or being tamed.
 - **Hit it** while you hunt.
 
 Then it fights everyone who started on it, and their kaiju. **Its packmate
@@ -572,7 +574,9 @@ your kaiju and a wild one, your kaiju comes out, fights with wind-ups,
 is hurt by element, knocked out and revived, recalled, switched, wild
 kaiju take the spread and pick their foes. A wild kaiju leaves a miner, a
 hunter and your kaiju alone till someone challenges or hits it, and forgets
-them once home; your kaiju (and its E) leaves it be till then. Heavies break
+them once home; your kaiju (and its E) leaves it be till then. Its Challenge
+prompt is off from the challenge till it forgets, and while it's being
+tamed. Heavies break
 guards, parries leave the attacker reeling, a wild kaiju hops from a
 hunter's charged heavy, the E winds up on the cast bar, a whole duel
 between two kaiju, kills pay their Gemsoul and EXP, taming (range, half

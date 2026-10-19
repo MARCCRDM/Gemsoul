@@ -1055,11 +1055,16 @@ pet.Root.CFrame = CFrame.new(outpost + Vector3.new(0, 0, 400)) -- (far off again
 local Challenge = registered.KaijuChallenge
 check(Challenge ~= nil, "No way to challenge a wild kaiju")
 check(enemy.Root:FindFirstChild("ChallengePrompt") ~= nil, "A wild kaiju has no Challenge prompt")
+-- (Its prompt shows only while nobody's in a fight with it.)
+local challengePrompt = enemy.Root:FindFirstChild("ChallengePrompt")
+KaijuWilds._brain(enemy, now)
+check(challengePrompt.Enabled, "A calm wild kaiju's Challenge prompt is off")
 rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(40, 0, 0))
 check(not Challenge(a, enemy.Model).Ok, "Challenged it from 40 studs")
 rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(3, 0, 0))
 check(not Challenge(a, make("Model")).Ok, "Challenged something that isn't a wild kaiju")
 check(Challenge(a, enemy.Model).Ok and wild.Engaged[a] ~= nil, "A hunter couldn't challenge it")
+check(not challengePrompt.Enabled, "Its Challenge prompt still shows in the fight")
 KaijuWilds._brain(enemy, now)
 check(enemy.Foe == a, "A challenged wild kaiju ignored its challenger")
 now += 10
@@ -1115,6 +1120,7 @@ pet.Root.CFrame = CFrame.new(outpost + Vector3.new(0, 0, 400)) -- (far off)
 now += 9
 KaijuWilds._brain(enemy, now)
 check(next(wild.Engaged) == nil, "It never forgot who started on it")
+check(challengePrompt.Enabled, "Its Challenge prompt didn't come back once it calmed down")
 now += Kaiju.RecallSeconds + 1
 pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
 KaijuServer._think(pet, now, 0.15)
@@ -1414,6 +1420,7 @@ check(
 	"It isn't held by the tame"
 )
 check(enemy.Model:GetAttribute("KaijuTameEnds") ~= nil, "No end time for the cast bar")
+check(not enemy.Root:FindFirstChild("ChallengePrompt").Enabled, "Its Challenge prompt shows while it's being tamed")
 local heldHealth = enemy.Humanoid.Health
 Enemies.damage(enemy, 500, b, false, nil, nil, nil)
 check(enemy.Alive and enemy.Humanoid.Health == heldHealth, "A held kaiju was hurt")
