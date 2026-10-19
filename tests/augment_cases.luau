@@ -16,10 +16,11 @@ check(not Tree.learn(profile, "StimDodge") and profile.Augments.Points == 2, "Ti
 check(not Tree.learn(profile, "ArmorPiercer"), "Insufficient point purchase")
 check(Tree.addXP(profile, 149) == 0 and profile.Augments.Points == 2, "XP below point boundary")
 check(Tree.addXP(profile, 1) == 1 and profile.Augments.Points == 3 and profile.Augments.Level == 2, "Point boundary award")
-check(Tree.addXP(profile, 150) == 1 and profile.Augments.Level == 3, "Level 3 boundary")
+check(Tree.addXP(profile, Tree.xpToNext(2)) == 1 and profile.Augments.Level == 3, "Level 3 boundary")
 check(Tree.learn(profile, "StimDodge") and profile.Augments.Points == 3, "Linked branch unlock")
 check(not Tree.learn(profile, "ArmorPiercer") and profile.Augments.Points == 3, "Tier III opened before level 6")
-check(Tree.addXP(profile, 450) == 3 and profile.Augments.Level == 6, "Level 6 boundary")
+check(Tree.addXP(profile, Tree.xpFor(6) - Tree.xpFor(3)) == 3 and profile.Augments.Level == 6, "Level 6 boundary")
+check(Tree.xpToNext(10) > 4 * Tree.xpToNext(1) and Tree.xpFor(11) > 4000, "Each level takes longer than the last")
 check(Tree.learn(profile, "ArmorPiercer") and profile.Augments.Points == 4, "Capstone purchase")
 -- Ranks: II costs the tier, III one more; never past III; never on a locked node.
 check(Tree.upgrade(profile, "ServoFlurry") and Tree.rank(profile, "ServoFlurry") == 2 and profile.Augments.Points == 3, "Rank II cost")
@@ -31,14 +32,14 @@ local reloaded = { Augments = { XP = profile.Augments.XP, Unlocked = table.clone
 data = Tree.initialize(reloaded)
 check(data.Points == 1 and data.Unlocked.ArmorPiercer and data.Ranks.ServoFlurry == 3, "Reload or forged points invalid")
 check(Tree.respec(reloaded) and reloaded.Augments.Points == 8 and reloaded.Augments.Spent == 0, "Point refund")
-check(reloaded.Augments.XP == 750 and not reloaded.Augments.Unlocked.ArmorPiercer and Tree.rank(reloaded, "ServoFlurry") == 0, "Reset lost XP or retained paid node")
+check(reloaded.Augments.XP == Tree.xpFor(6) and not reloaded.Augments.Unlocked.ArmorPiercer and Tree.rank(reloaded, "ServoFlurry") == 0, "Reset lost XP or retained paid node")
 check(Tree.respec(reloaded) and reloaded.Augments.Points == 8, "Repeated reset minted points")
 local forged = Tree.initialize({ Augments = { XP = 0, Unlocked = { ServoFlurry = true }, Ranks = { ServoFlurry = 99, HydraulicSlam = 3, BreachHammer = 3 } } })
 check(forged.Points >= 0 and forged.Spent <= forged.Earned and forged.Ranks.ServoFlurry <= 3 and not forged.Ranks.BreachHammer, "Forged ranks minted power")
 local corrupt = { Augments = { XP = 0/0, Points = 999999, Unlocked = { spoofed = true, ArmorPiercer = true, ServoFlurry = "true" } } }
 data = Tree.initialize(corrupt)
 check(data.XP == 0 and data.Points == 3 and not data.Unlocked.spoofed and not data.Unlocked.ArmorPiercer, "Corrupt save sanitization")
-local complete = { Augments = { XP = (Tree.UnlockPoints - Tree.StartingPoints) * Tree.XPPerPoint, Unlocked = {} } }
+local complete = { Augments = { XP = Tree.xpFor(Tree.UnlockPoints - Tree.StartingPoints + 1), Unlocked = {} } }
 Tree.initialize(complete)
 local total, seen = 0, {}
 for _, branch in Tree.Branches do
@@ -57,7 +58,7 @@ for _, branch in Tree.Branches do
 end
 check(total == Tree.UnlockPoints and complete.Augments.Points == 0 and complete.Augments.Spent == Tree.UnlockPoints, "Whole-tree point budget")
 local rankBudget = Tree.MaxPoints - Tree.UnlockPoints
-check(Tree.addXP(complete, 100000) == rankBudget and complete.Augments.Points == rankBudget, "Rank budget beyond unlocks")
+check(Tree.addXP(complete, Tree.xpFor(Tree.MaxLevel)) == rankBudget and complete.Augments.Points == rankBudget, "Rank budget beyond unlocks")
 check(Tree.addXP(complete, 100000) == 0 and complete.Augments.Level == Tree.MaxLevel, "Point cap bypass")
 check(Tree.addXP(complete, math.huge) == 0 and Tree.addXP(complete, -100) == 0, "Invalid XP accepted")
 local effects = Tree.effects(complete)
@@ -68,7 +69,7 @@ local harmony = { Augments = { XP = 100000, Unlocked = { ChargeRecycler = true, 
 Tree.initialize(harmony)
 check(not Tree.learn(harmony, "ElementalHarmony"), "Harmony with one Overcharge")
 check(Tree.learn(harmony, "IonOvercharge") and Tree.learn(harmony, "ElementalHarmony"), "Harmony with two Overcharges")
-local young = { Augments = { XP = (Tree.TierLevels[4] - 2) * Tree.XPPerPoint, Unlocked = { SurgePower = true, ElementalMastery = true } } }
+local young = { Augments = { XP = Tree.xpFor(Tree.TierLevels[4] - 1), Unlocked = { SurgePower = true, ElementalMastery = true } } }
 Tree.initialize(young)
 check(young.Augments.Level == Tree.TierLevels[4] - 1 and young.Augments.Unlocked.ElementalMastery and not Tree.learn(young, "ArcaneResonance"), "Master tier opened early")
 check(not Tree.upgrade(young, "ElementalMastery"), "Single-rank node ranked up")
@@ -111,7 +112,7 @@ check(not CombatServer._technology(source, "ServoFlurry", rv.Position) and Comba
 for _, other in playerList do other:SetAttribute("PvPEnabled", false) end
 source:SetAttribute("PvPEnabled", true); victim:SetAttribute("PvPEnabled", true)
 local progress = Tree.initialize(profiles[source])
-progress.XP = (Tree.UnlockPoints - Tree.StartingPoints) * Tree.XPPerPoint
+progress.XP = Tree.xpFor(Tree.UnlockPoints - Tree.StartingPoints + 1)
 Tree.initialize(profiles[source])
 for _, branch in Tree.Branches do
 	for _, id in Tree.Order[branch] do
@@ -158,8 +159,8 @@ Progress.addXP(trainee, "Mine", 10)
 check(profiles[trainee].Augments.XP == 150 and profiles[trainee].Augments.Points == 4 and profiles[trainee].Season.XP == 300, "Mining XP did not award point or XP boost affected tree budget")
 check(synced == 1, "Progress award did not sync saved profile")
 profiles[trainee].Boosts.XPUntil = 0
-Progress.addXP(trainee, "Mine", 10)
-check(profiles[trainee].Augments.XP == 300 and profiles[trainee].Augments.Points == 5 and synced == 2, "Second earned point duplicated or missing")
+Progress.addXP(trainee, "Mine", 15) -- (level 3 is 366 XP)
+check(profiles[trainee].Augments.XP == 375 and profiles[trainee].Augments.Points == 5 and synced == 2, "Second earned point duplicated or missing")
 Progress.addXP(trainee, "Unknown")
-check(profiles[trainee].Augments.XP == 300 and synced == 2, "Unknown XP reason awarded points")
+check(profiles[trainee].Augments.XP == 375 and synced == 2, "Unknown XP reason awarded points")
 print("PASS: " .. count .. " Augment Tree checks (21-node graph, migration, points, prerequisites, refunds, authority and live passive effects)")

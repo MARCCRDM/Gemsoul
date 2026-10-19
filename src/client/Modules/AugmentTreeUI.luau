@@ -871,9 +871,9 @@ function UI.refresh()
 		xpFill.Size = UDim2.fromScale(1, 1)
 		xpText.Text = "Highest Augment Level"
 	else
-		local into = data.XP % Tree.XPPerPoint
-		xpFill.Size = UDim2.fromScale(into / Tree.XPPerPoint, 1)
-		xpText.Text = string.format("%d / %d XP to level %d", into, Tree.XPPerPoint, data.Level + 1)
+		local into, need = Tree.progress(data.XP)
+		xpFill.Size = UDim2.fromScale(if need > 0 then into / need else 1, 1)
+		xpText.Text = string.format("%d / %d XP to level %d", into, need, data.Level + 1)
 	end
 
 	for id, tab in tabs do

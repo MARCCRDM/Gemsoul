@@ -619,11 +619,11 @@ local function refreshNews()
 	levelLabel.Text = tostring(level)
 	nameLabel.Text = player.DisplayName
 	local maxed = level >= Tree.MaxLevel
-	local into = xp % Tree.XPPerPoint
-	levelFill.Size = UDim2.fromScale(if maxed then 1 else math.clamp(into / Tree.XPPerPoint, 0, 1), 1)
+	local into, need = Tree.progress(xp)
+	levelFill.Size = UDim2.fromScale(if maxed then 1 else math.clamp(into / need, 0, 1), 1)
 	xpLabel.Text = if maxed
 		then "MAX LEVEL"
-		else string.format("%d / %d XP to level %d", into, Tree.XPPerPoint, level + 1)
+		else string.format("%d / %d XP to level %d", into, need, level + 1)
 	coinsLabel.Text = "◆ " .. formatCoins(profile.Coins or 0)
 	walletText.Text =
 		string.format('LV %d  <font color="#FFCA5B">◆ %s</font>', level, formatCoins(profile.Coins or 0))

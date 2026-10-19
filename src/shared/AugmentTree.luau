@@ -19,7 +19,7 @@
 ]]
 local Tech = require(script.Parent.CombatTechnology)
 local Tree = {}
-Tree.StartingPoints, Tree.XPPerPoint = 3, 150
+Tree.StartingPoints = 3
 Tree.MaxRank = 3
 -- Tiers, Elder Scrolls style: the level each opens at.
 Tree.TierNames = { "Novice", "Apprentice", "Adept", "Master" }
@@ -268,12 +268,41 @@ end
 local function finite(value)
 	return typeof(value) == "number" and value == value and math.abs(value) < math.huge
 end
-local function earned(xp)
-	return math.min(Tree.MaxPoints, Tree.StartingPoints + math.floor(xp / Tree.XPPerPoint))
-end
 Tree.MaxLevel = Tree.MaxPoints - Tree.StartingPoints + 1
+-- XP from `level` to the next: it grows every level, so the first few come
+-- in a session and the later ones take real play (150 at 1, ~1,200 at 10,
+-- ~3,500 at 20). A rock mined is 15 XP (Season.XP).
+function Tree.xpToNext(level: number): number
+	local n = math.max(0, level - 1)
+	return 150 + 60 * n + 6 * n * n
+end
+-- Total XP to reach each level (XPAt[1] = 0).
+local XPAt = { 0 }
+for level = 2, Tree.MaxLevel do
+	XPAt[level] = XPAt[level - 1] + Tree.xpToNext(level - 1)
+end
+-- Total XP to reach `level`.
+function Tree.xpFor(level: number): number
+	return XPAt[math.clamp(math.floor(level), 1, Tree.MaxLevel)]
+end
 function Tree.level(xp: number): number
-	return math.min(Tree.MaxLevel, 1 + math.floor(math.max(0, xp) / Tree.XPPerPoint))
+	xp = math.max(0, xp)
+	local level = 1
+	while level < Tree.MaxLevel and xp >= XPAt[level + 1] do
+		level += 1
+	end
+	return level
+end
+-- How far into its level `xp` is, and what that level needs (0, 0 at max).
+function Tree.progress(xp: number): (number, number)
+	local level = Tree.level(xp)
+	if level >= Tree.MaxLevel then
+		return 0, 0
+	end
+	return math.max(0, xp) - XPAt[level], Tree.xpToNext(level)
+end
+local function earned(xp)
+	return math.min(Tree.MaxPoints, Tree.StartingPoints + Tree.level(xp) - 1)
 end
 -- Miner progression is separate from Season XP. Even-stats PvP uses level 1.
 Tree.VitalsPerLevel = { Health = 5, Stamina = 2, Charge = 2 }

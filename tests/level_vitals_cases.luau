@@ -7,7 +7,7 @@ local profile = {Augments={XP=149}}
 check(Tree.vitals(profile).Health == 0, "No early level bonus")
 profile.Augments.XP = 150
 check(Tree.vitals(profile).Health == 5 and Tree.vitals(profile).Stamina == 102 and Tree.vitals(profile).Charge == 102, "Level two gains all three vitals")
-profile.Augments.XP = 1350
+profile.Augments.XP = Tree.xpFor(10)
 local v = Tree.vitals(profile)
 check(v.Level == 10 and v.Health == 45 and v.Stamina == 118 and v.Charge == 118, "Existing level ten miner gets retroactive bonuses")
 check(Tree.vitals(profile, "Even").Health == 0 and Tree.vitals(profile, "Even").Charge == 100, "Even matches normalize")
@@ -15,7 +15,7 @@ check(Tree.vitals(profile, "Full").Health == 45, "Full progression keeps bonuses
 check(Tree.vitals({Augments={XP=1e8}}).Health == (Tree.MaxLevel-1)*5, "Stats stop at miner level cap")
 
 local player, hum, root, loadout = makePlayer(9001, Vector3.zero, nil)
-profiles[player].Augments = {XP=1350,Unlocked={}}
+profiles[player].Augments = {XP=Tree.xpFor(10),Unlocked={}}
 Tree.initialize(profiles[player])
 Players.PlayerAdded.Fire(player)
 CombatServer.reset(player)
@@ -30,7 +30,7 @@ check(st.Resources.Stamina == 100 and st.Resources.Charge == 100, "Entering even
 check(player:GetAttribute("MaxStamina") == 100 and player:GetAttribute("MaxCharge") == 100, "HUD matches normalized caps")
 player:SetAttribute("MatchStats", "Full")
 check(player:GetAttribute("MaxStamina") == 118 and st.Resources.Stamina == 100, "Full match restores capacity without free refill")
-profiles[player].Augments.XP = 1500
+profiles[player].Augments.XP = Tree.xpFor(11)
 player:SetAttribute("MinerLevel", 11)
 check(player:GetAttribute("MaxCharge") == 120, "Live level-up immediately updates capacities")
 profiles[player].Augments.XP = 0
@@ -38,7 +38,7 @@ player:SetAttribute("MinerLevel", 1)
 check(player:GetAttribute("MaxCharge") == 100, "Switch to fresh miner removes previous bonuses")
 
 Players.GetPlayerFromCharacter = function(_, character) return if character == player.Character then player else nil end
-profiles[player].Augments.XP = 1350
+profiles[player].Augments.XP = Tree.xpFor(10)
 player:SetAttribute("MinerLevel", 10)
 root.Position = arena
 loadout.WeaponGem = {Id="level-test",Element="Fire",Tier="Common",Size=1,Clarity=1,Cut=1}

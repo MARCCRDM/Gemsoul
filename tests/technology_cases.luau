@@ -9,7 +9,7 @@ end
 local source, hs, rs, loadout = makePlayer(20, arena, nil)
 local victim, hv, rv, defense = makePlayer(21, arena + Vector3.new(0, 0, -5), nil)
 local progress = Tree.initialize(profiles[source])
-progress.XP = (Tree.UnlockPoints - Tree.StartingPoints) * Tree.XPPerPoint
+progress.XP = Tree.xpFor(Tree.UnlockPoints - Tree.StartingPoints + 1)
 for _, id in Tree.Order.RigManeuvers do
 	progress.Unlocked[id] = true
 end
