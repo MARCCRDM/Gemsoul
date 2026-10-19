@@ -42,17 +42,27 @@ Finds that come quickly stack:
   couldn't pay it (a full pouch: the server normally refuses that swing
   first). It becomes a red "Gem pouch full" row straight away, and the
   card stays.
-- **Rows** stack above the card, newest nearest it. Each one goes after
-  6 seconds. A desktop keeps 3 rows, a phone 1; with more than that, the
-  oldest go first.
+- **Rows** stack above the card, newest nearest it (under it on a phone).
+  Each one goes after 6 seconds. A desktop keeps 3 rows, a phone 1; with
+  more than that, the oldest go first.
 - **When you stop**, the last card folds into a row, then the rows go.
 
 ## Phones and Spanish
 
-![Phone and Spanish](mining/phone-and-spanish.png)
+![The card on a phone, before and after](mobile/mining-phone.png)
 
-On a touch screen the card sits above the PLAY dock. On a phone (a screen
-under 500 points tall) it's also drawn at 86% and keeps one row. It hides,
+On a phone or a tablet (a touch screen, or a window under 540 points tall)
+the card is slim and sits at the top middle, between the pick card and
+TASKS (`MobileLayout.loot`). It shows the reel, the rarity and element, and
+the gem's name with its worth, but no stat bars, and keeps one row under
+it. The middle of the screen and the PLAY dock stay clear. The live feed
+steps aside while the card is up. On a small phone (667 x 375) the card is
+shorter, ending above the task strip, and its row waits until the card has
+gone. See [mobile.md](mobile.md#mining-in-the-outpost).
+
+![In Spanish](mining/spanish.png)
+
+On a computer the card is in full above the PLAY dock. It hides,
 silently, while a menu or a fight has the screen, and it clears when you
 leave the Outpost. While you drive a mech, the card moves up above the
 mech's driving card (`MobileLayout.Drive`, shared with `VehicleDrive`), and
@@ -73,7 +83,9 @@ full").
 - `MiningWorldReveal.receive` skips packets whose `MinerId` is you.
 - Tests:
   - `tests/run_loot_stack.py`: the stack's timing and order;
-  - `tests/run_miner_loot.py`: the card, driven frame by frame, and above
-    a mech's driving card;
+  - `tests/run_miner_loot.py`: the card, driven frame by frame, above a
+    mech's driving card, and slim at the top middle of a phone (no bars,
+    one row under it, none under a small phone's short card while it's up,
+    claiming the top middle);
   - `tests/run_world_mining.py`: now also checks that your own find is
     never drawn over your head, while others still get it.

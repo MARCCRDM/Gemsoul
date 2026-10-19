@@ -720,25 +720,27 @@ local function fitDock()
 	local gapLeft = card.X + card.W + 8
 	local gapRight = size.X - 16 - board.Size.X.Offset - 8
 	LobbyFeed.setCompact(mobile, if mobile then { X = gapLeft, W = gapRight - gapLeft } else nil)
-	board.Position = UDim2.new(1, -16, 0, 64)
+	-- (On a phone, its one strip tucks in under the small TASKS button.)
+	board.Position = UDim2.new(1, -16, 0, if mobile then MobileLayout.board(size).Y else 64)
 	LobbyBoard.setHidden(picker.Visible)
 	bug.Visible = not picker.Visible and not mobile
 	if mobile then
 		local compact = MobileLayout.dock(size, #buttons)
 		local width, gap, tileHeight = compact.W, compact.Gap, compact.TileHeight
-		bar.AnchorPoint, bar.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -12)
-		bar.Size = UDim2.fromOffset(width, 52 + tileHeight)
-		local playWidth = math.min(220, width)
+		local tilesTop = compact.PlayHeight + gap
+		bar.AnchorPoint, bar.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -MobileLayout.Margin)
+		bar.Size = UDim2.fromOffset(width, tilesTop + tileHeight)
 		play.AnchorPoint = Vector2.new(0.5, 0)
-		play.Position, play.Size = UDim2.new(0.5, 0, 0, 0), UDim2.fromOffset(playWidth, 44)
-		playCaption.TextSize = 22
+		play.Position = UDim2.new(0.5, 0, 0, 0)
+		play.Size = UDim2.fromOffset(compact.PlayWidth, compact.PlayHeight)
+		playCaption.TextSize = 20
 		playCaption.Position, playCaption.Size = UDim2.fromOffset(0, 0), UDim2.fromScale(1, 1)
 		playSub.Visible = false
 		-- Level and coins up at the top left; nothing either side of PLAY.
 		local wallet = MobileLayout.wallet()
 		walletPill.AnchorPoint, walletPill.Position = Vector2.zero, UDim2.fromOffset(wallet.X, wallet.Y)
 		walletPill.Size = UDim2.fromOffset(wallet.W, wallet.H)
-		tiles.AnchorPoint, tiles.Position = Vector2.new(0, 0), UDim2.fromOffset(0, 52)
+		tiles.AnchorPoint, tiles.Position = Vector2.new(0, 0), UDim2.fromOffset(0, tilesTop)
 		tiles.Size = UDim2.fromOffset(width, tileHeight)
 		local tileWidth = math.floor((width - gap * math.max(0, #buttons - 1)) / math.max(1, #buttons))
 		-- Each tile: its icon, and its name small under it.

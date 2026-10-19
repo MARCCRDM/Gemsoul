@@ -24,6 +24,7 @@ local Rules = require(RS.Shared.TrainingRewards)
 local Tutorial = require(RS.Shared.Tutorial)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
+local MobileLayout = require(script.Parent.Modules.MobileLayout)
 local UiKit = require(script.Parent.Modules.UiKit)
 local player = Players.LocalPlayer
 
@@ -319,6 +320,15 @@ for i, o in objectives do
 	}
 end
 
+-- The button's size: small on a phone or a short window, where the board's
+-- strip tucks in under it (MobileLayout.tasks).
+local function launchSize(screen: Vector2): UDim2
+	local tasks = MobileLayout.Tasks
+	return if UserInputService.TouchEnabled or (screen.Y > 0 and screen.Y < 540)
+		then UDim2.fromOffset(tasks.W, tasks.H)
+		else UDim2.fromOffset(132, 40)
+end
+
 -- Where everything goes, for this screen.
 local laidOut = Vector2.zero
 local function layout()
@@ -327,6 +337,7 @@ local function layout()
 		return
 	end
 	laidOut = screen
+	launch.Size = launchSize(screen)
 	local short = screen.Y < 500
 	local width = math.max(280, math.min(if short then 900 else 780, screen.X - (if short then 20 else 48)))
 	local height = math.max(240, math.min(640, screen.Y - (if short then 12 else 48)))
@@ -555,6 +566,6 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 end)
-launch.Size = UDim2.fromOffset(132, if UserInputService.TouchEnabled then 44 else 40)
+launch.Size = launchSize(gui.AbsoluteSize)
 layout()
 refresh()

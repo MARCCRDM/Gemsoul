@@ -1,5 +1,7 @@
 -- Your own finds (MinerLoot): a gem rolls on a card, lands on the real gem
 -- with its stats as bars; finds that come quickly stack as rows above it.
+-- On a phone: slim, at the top middle, one row under it (a small phone's
+-- once the card's gone).
 local checks = 0
 local function check(value, message)
 	checks += 1
@@ -119,20 +121,76 @@ for _, row in live("LootRow") do
 end
 check(fullRow ~= nil, "Full pouch not shown")
 
--- A phone: above the dock, smaller, one row.
+-- A phone: slim, at the top middle (MobileLayout.loot), out of the way of
+-- you and the dock: the reel, the rarity, the name and the worth, no bars,
+-- and one row under it. The top middle is the card's while it's up (the
+-- live feed steps aside).
+check(not MobileLayout.topClaimed(), "A computer's card claimed a phone's top middle")
 local gui = live("MinerLoot")[1]
-gui.AbsoluteSize = { X = 844, Y = 332 }
-gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
-local holder = live("Stack")[1]
-check(holder.Position.Y.Offset == -104 and holder:FindFirstChildOfClass("UIScale").Scale < 1, "Phone fit missing")
+for _, screen in { { X = 667, Y = 339 }, { X = 844, Y = 332 } } do
+	gui.AbsoluteSize = screen
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+	local holder = live("Stack")[1]
+	local spot = MobileLayout.loot(screen)
+	local at = screen.X .. "x" .. screen.Y .. ": "
+	check(holder.AnchorPoint.Y == 0 and holder.Position.Y.Scale == 0, at .. "the card isn't hung from the top")
+	check(
+		holder.Position.X.Offset == spot.X and holder.Position.Y.Offset == spot.Y,
+		at .. "the card isn't at the top middle"
+	)
+	check(holder.Size.X.Offset == spot.W and holder.Size.Y.Offset == spot.H, at .. "the card isn't slim")
+	check(holder:FindFirstChildOfClass("UIScale").Scale == 1, at .. "the slim card was scaled down")
+	-- (what was on show is built again at the new size)
+	check(
+		#live("LootCard") == 1 and card().Size.X.Offset == spot.W and card().Size.Y.Offset == spot.H,
+		at .. "the card wasn't rebuilt slim"
+	)
+end
+local slimFind = gem("Rare", 9, 9, 9)
+Loot.push(slimFind)
+step(2)
+local slim = card()
+local slimSpot = MobileLayout.loot(gui.AbsoluteSize)
+check(slim and slim.Size.Y.Offset == slimSpot.H and slimSpot.H <= MobileLayout.Loot.H, "A phone's new card isn't slim")
+check(lit(slim, GemConfig.TierColors.Rare) == 0, "A slim card drew the stat bars")
+local slimWords = texts(slim)
+check(slimWords:find(GemConfig.shade(slimFind.Gem).Name, 1, true), "The slim card lost the gem's name")
+check(
+	slimWords:find("≈ " .. commas(GemConfig.value(slimFind.Gem)) .. " ◆", 1, true),
+	"The slim card lost the gem's worth"
+)
+check(MobileLayout.topClaimed(), "The card up on a phone didn't claim the top middle")
+Loot.push(gem("Common", 3, 4, 2))
 step(0.1)
-check(#live("LootRow") <= 1, "A phone kept more than one row")
+check(#live("LootRow") == 1, "A phone kept more than one row")
+local row = live("LootRow")[1]
+step(0.5)
+check(row.Position.Y.Offset >= slimSpot.H, "The row isn't under the slim card")
+check(row.Size.X.Offset == card().Size.X.Offset, "The row isn't the card's width")
+-- A small phone's card is short, with the board's strip just under it: the
+-- row waits while a card's up, then shows where the card was.
+gui.AbsoluteSize = { X = 667, Y = 339 }
+gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+local short = MobileLayout.loot(gui.AbsoluteSize)
+check(short.H == MobileLayout.Loot.ShortH, "667x339 no longer gets the short card")
+Loot.push(gem("Uncommon", 4, 4, 4))
+step(0.1)
+row = live("LootRow")[1]
+check(card() and row and not row.Visible, "A row showed under a short card")
+step(5)
+row = live("LootRow")[1]
+check(card() == nil and row and row.Visible, "The row didn't come back once the short card folded")
+check(row.Position.Y.Offset + row.Size.Y.Offset <= short.H, "The row isn't where the short card was")
+Loot.push(gem("Common", 3, 4, 2))
+local holder = live("Stack")[1]
 gui.AbsoluteSize = { X = 1366, Y = 710 }
 gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
 check(
 	holder.Position.Y.Offset == -64 and holder:FindFirstChildOfClass("UIScale").Scale == 1,
 	"Desktop fit not restored"
 )
+check(card().Size.X.Offset == 360 and lit(card(), GemConfig.TierColors.Common) >= 0, "The full card wasn't rebuilt")
+check(not MobileLayout.topClaimed(), "A computer's card kept the top middle")
 -- In a mech: above its driving card (MobileLayout.Drive), then back down.
 local drive = MobileLayout.Drive
 localPlayer:SetAttribute("MechPilot", 1)

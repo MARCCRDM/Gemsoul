@@ -287,6 +287,18 @@ gui.Enabled = false
 miningRoll.OnClientEvent:Fire({ MinerId = 9, MinerName = "Kade", Gem = { Tier = "Legendary", Element = "Fire" } })
 check(string.find(lines()[3], "Juno", 1, true) ~= nil, "The feed took a line while the lobby was hidden")
 gui.Enabled = true
+-- On a phone the feed steps aside while your loot card has the top middle
+-- (MobileLayout.claimTop), and comes back after.
+LobbyFeed.setCompact(true, { X = 230, W = 360 })
+check(stack.Visible ~= false, "The phone feed hid with nothing at the top")
+MobileLayout.claimTop("MinerLoot", true)
+check(stack.Visible == false, "The feed stayed under the loot card")
+MobileLayout.claimTop("MinerLoot", false)
+check(stack.Visible == true, "The feed didn't come back after the loot card")
+MobileLayout.claimTop("MinerLoot", true)
+LobbyFeed.setCompact(false)
+check(stack.Visible == true, "A computer's feed hid for a phone's loot card")
+MobileLayout.claimTop("MinerLoot", false)
 
 -- The welcome banner: only with a reward paid this session, and only once.
 LobbyFeed.welcome()

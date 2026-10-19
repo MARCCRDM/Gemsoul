@@ -13,6 +13,7 @@ source += module('Daily', 'src/shared/DailyChallenges.luau')
 source += module('Training', 'src/shared/TrainingRewards.luau')
 source += module('LobbyBoard', 'src/client/Modules/LobbyBoard.luau')
 source += module('Season', 'src/shared/Season.luau')
+source += module('MobileLayout', 'src/client/Modules/MobileLayout.luau')
 source += module('LobbyFeed', 'src/client/Modules/LobbyFeed.luau')
 source += read('tests/lobby_cases.luau')
 luau = ROOT / '.tools/luau/luau.exe'

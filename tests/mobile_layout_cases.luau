@@ -1,8 +1,10 @@
 -- lune run tests/mobile_layout_cases.luau <repo>
 -- The lobby's pieces on a phone never overlap (MobileLayout): the pick card,
 -- your level and coins, the CHAT button (small screens with a keyboard), the
--- opened chat, the dock (PLAY and its tiles) and the teammates' cards, at
--- every common phone size; the dock's tiles all fit.
+-- opened chat, the dock (PLAY and its tiles), the teammates' cards, the
+-- TASKS button and the board's strip under it, and your loot card at the top
+-- middle, at every common phone size; the dock's tiles all fit. And who has
+-- the top middle (claimTop).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -39,9 +41,50 @@ for _, s in SCREENS do
 	local function inside(r)
 		return r.X >= 0 and r.Y >= 0 and r.X + r.W <= screen.X and r.Y + r.H <= screen.Y
 	end
-	for name, r in { card = card, wallet = wallet, dock = dock, party = party, chat = closed, open = open } do
+	local tasks, board, loot = MobileLayout.tasks(screen), MobileLayout.board(screen), MobileLayout.loot(screen)
+	for name, r in
+		{
+			card = card,
+			wallet = wallet,
+			dock = dock,
+			party = party,
+			chat = closed,
+			open = open,
+			tasks = tasks,
+			board = board,
+			loot = loot,
+		}
+	do
 		check(inside(r), label .. ": the " .. name .. " runs off the screen")
 	end
+	-- The loot card at the top middle: clear of everything round it, never
+	-- too narrow to read, and well above the middle of the screen.
+	for name, r in
+		{
+			["pick card"] = card,
+			coins = wallet,
+			TASKS = tasks,
+			["board's strip"] = board,
+			dock = dock,
+			["teammates' cards"] = party,
+		}
+	do
+		check(not MobileLayout.overlaps(loot, r), label .. ": the loot card overlaps the " .. name)
+	end
+	check(loot.W >= MobileLayout.Loot.MinW, label .. ": the loot card is too narrow")
+	check(loot.H == MobileLayout.Loot.H or loot.H == MobileLayout.Loot.ShortH, label .. ": the loot card isn't slim")
+	check(
+		loot.H == MobileLayout.Loot.H or loot.W == MobileLayout.Loot.W,
+		label .. ": a short loot card isn't full width"
+	)
+	check(loot.Y + loot.H <= screen.Y * 0.3, label .. ": the loot card reaches the middle of the screen")
+	check(not MobileLayout.overlaps(tasks, board), label .. ": the board's strip overlaps TASKS")
+	check(board.Y - (tasks.Y + tasks.H) <= 8, label .. ": the board's strip isn't tucked in under TASKS")
+	check(not MobileLayout.overlaps(board, party), label .. ": the board's strip overlaps the teammates' cards")
+	check(
+		dock.PlayWidth <= dock.W and dock.PlayHeight + dock.Gap + dock.TileHeight <= dock.H,
+		label .. ": PLAY doesn't fit the dock"
+	)
 	check(not MobileLayout.overlaps(card, wallet), label .. ": the coins overlap the pick card")
 	check(not MobileLayout.overlaps(wallet, closed), label .. ": the CHAT button overlaps the coins")
 	check(not MobileLayout.overlaps(wallet, dock), label .. ": the coins overlap the dock")
@@ -65,7 +108,16 @@ for _, s in SCREENS do
 		local tame = { X = k.TameX, Y = k.Y, W = k.TameW, H = k.H }
 		local what = label .. (if chat then " (with CHAT)" else "")
 		check(inside(k) and inside(tame), what .. ": the kaiju card runs off the screen")
-		for name, r in { ["pick card"] = card, coins = wallet, dock = dock, ["teammates' cards"] = party, jump = jump } do
+		for name, r in
+			{
+				["pick card"] = card,
+				coins = wallet,
+				dock = dock,
+				["teammates' cards"] = party,
+				jump = jump,
+				["loot card"] = MobileLayout.loot(screen),
+			}
+		do
 			check(not MobileLayout.overlaps(k, r), what .. ": the kaiju card overlaps the " .. name)
 			check(not MobileLayout.overlaps(tame, r), what .. ": TAME overlaps the " .. name)
 		end
@@ -74,4 +126,27 @@ for _, s in SCREENS do
 		end
 	end
 end
-print("PASS: " .. checks .. " mobile layout checks (pick card, coins, chat, dock, teammates, kaiju, at 7 screen sizes)")
+-- The top middle: claimed and given back, each owner on its own; a listener
+-- hears each change (and not a repeat).
+local heard = 0
+MobileLayout.onTop(function()
+	heard += 1
+end)
+check(not MobileLayout.topClaimed(), "The top middle starts claimed")
+MobileLayout.claimTop("MinerLoot", true)
+MobileLayout.claimTop("MinerLoot", true)
+check(MobileLayout.topClaimed() and heard == 1, "A claim wasn't heard once")
+check(not MobileLayout.topClaimed("MinerLoot"), "An owner's own claim counted against it")
+MobileLayout.claimTop("Other", true)
+MobileLayout.claimTop("MinerLoot", false)
+check(
+	MobileLayout.topClaimed() and MobileLayout.topClaimed("MinerLoot"),
+	"One owner giving it back freed another's claim"
+)
+MobileLayout.claimTop("Other", false)
+check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given back")
+print(
+	"PASS: "
+		.. checks
+		.. " mobile layout checks (pick card, coins, chat, dock, teammates, kaiju, TASKS, board, loot card, at 7 screen sizes)"
+)

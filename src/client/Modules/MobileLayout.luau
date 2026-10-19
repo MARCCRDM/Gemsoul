@@ -9,8 +9,14 @@
 	                stops above the dock (and the card steps aside while it's
 	                open). Phones and tablets use Roblox's own chat instead
 	                (ChatFrame).
+	  top middle    your loot card (MinerLoot), slim, between the pick card
+	                and the TASKS button, clear of the board's strip; the
+	                live feed (LobbyFeed) steps aside while it's up
+	                (claimTop): the middle of the screen stays the game's
+	  top right     the TASKS button (TrainingRewards), the board's one slim
+	                strip (LobbyBoard) close under it, and teammates' health
+	                (PartyUI), hidden in a fight
 	  bottom middle the dock (LobbyUI): PLAY, and a row of tiles under it
-	  top right     teammates' health (PartyUI), hidden in a fight
 
 	Rects are { X, Y, W, H } in the ScreenGui's space (below the top bar).
 
@@ -19,6 +25,14 @@
 	  MobileLayout.chat(screen, open)      the chat box: CHAT button, or opened
 	  MobileLayout.dock(screen, tiles)     the dock, its PLAY and tile size
 	  MobileLayout.party(screen)           the teammates' cards
+	  MobileLayout.tasks(screen)           the TASKS button
+	  MobileLayout.board(screen)           the board's strip, under TASKS
+	  MobileLayout.loot(screen)            your loot card: top middle, as
+	                                       wide as fits (Loot.W at most)
+	  MobileLayout.claimTop(owner, on)     something has the top middle (a
+	                                       loot card); topClaimed(except?)
+	                                       says if anything else does, and
+	                                       onTop(fn) hears when that changes
 	  MobileLayout.kaiju(chat)             your kaiju's card (KaijuHud), under
 	                                       the coins (beside the CHAT button,
 	                                       if there is one), TAME beside it
@@ -32,6 +46,9 @@ local MobileLayout = {}
 MobileLayout.CardScale = 0.7
 MobileLayout.Margin = 12
 MobileLayout.Drive = { W = 340, H = 78, Bottom = 44 }
+MobileLayout.Tasks = { W = 112, H = 34 }
+MobileLayout.Board = { W = 236, H = 38 }
+MobileLayout.Loot = { W = 250, MinW = 170, H = 56, ShortH = 44, Top = 8 }
 
 function MobileLayout.card()
 	return { X = 12, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
@@ -43,10 +60,11 @@ function MobileLayout.wallet()
 end
 
 function MobileLayout.dock(screen: Vector2, tiles: number)
-	-- Clear of Roblox's jump button at the bottom right (and as wide on the left).
-	local width = math.min(420, math.max(240, screen.X - 280))
-	local gap, tileHeight, playHeight = 6, 44, 44
-	local height = playHeight + 8 + tileHeight
+	-- Clear of Roblox's jump button at the bottom right (and as wide on the
+	-- left); no wider than it needs, so the ground in front of you shows.
+	local width = math.min(392, math.max(240, screen.X - 280))
+	local gap, tileHeight, playHeight = 6, 44, 38
+	local height = playHeight + 6 + tileHeight
 	return {
 		X = (screen.X - width) / 2,
 		Y = screen.Y - MobileLayout.Margin - height,
@@ -55,6 +73,8 @@ function MobileLayout.dock(screen: Vector2, tiles: number)
 		Gap = gap,
 		TileWidth = math.floor((width - gap * math.max(0, tiles - 1)) / math.max(1, tiles)),
 		TileHeight = tileHeight,
+		PlayWidth = math.min(184, width),
+		PlayHeight = playHeight,
 	}
 end
 
@@ -76,6 +96,63 @@ end
 
 function MobileLayout.party(screen: Vector2)
 	return { X = screen.X - 16 - 220, Y = 132, W = 220, H = 40 }
+end
+
+function MobileLayout.tasks(screen: Vector2)
+	local t = MobileLayout.Tasks
+	return { X = screen.X - 16 - t.W, Y = 12, W = t.W, H = t.H }
+end
+
+function MobileLayout.board(screen: Vector2)
+	local tasks, b = MobileLayout.tasks(screen), MobileLayout.Board
+	return { X = screen.X - 16 - b.W, Y = tasks.Y + tasks.H + 6, W = b.W, H = b.H }
+end
+
+-- Between the pick card and TASKS, and clear of the board's strip under
+-- it. On a small phone, where that leaves it too narrow, it's shorter
+-- instead (Loot.ShortH: done above the strip) and as wide as up to TASKS.
+function MobileLayout.loot(screen: Vector2)
+	local l = MobileLayout.Loot
+	local card, tasks, board = MobileLayout.card(), MobileLayout.tasks(screen), MobileLayout.board(screen)
+	local left = card.X + card.W + 8
+	local right, height = tasks.X - 8, l.H
+	if l.Top + height > board.Y then
+		local clear = math.min(right, board.X - 8)
+		if clear - left >= l.W or l.Top + l.ShortH > board.Y then
+			right = clear
+		else
+			height = l.ShortH
+		end
+	end
+	local width = math.clamp(right - left, l.MinW, l.W)
+	return { X = math.floor(left + (right - left - width) / 2), Y = l.Top, W = width, H = height }
+end
+
+-- Who has the top middle (pure: no Roblox objects, so it's tested on its own).
+local claims: { [string]: boolean } = {}
+local listeners: { () -> () } = {}
+function MobileLayout.claimTop(owner: string, on: boolean)
+	if (claims[owner] == true) == on then
+		return
+	end
+	claims[owner] = if on then true else nil
+	for _, listener in listeners do
+		local ok, err = pcall(listener)
+		if not ok then
+			warn("MobileLayout.onTop: " .. tostring(err))
+		end
+	end
+end
+function MobileLayout.topClaimed(except: string?): boolean
+	for owner in claims do
+		if owner ~= except then
+			return true
+		end
+	end
+	return false
+end
+function MobileLayout.onTop(listener: () -> ())
+	table.insert(listeners, listener)
 end
 
 function MobileLayout.kaiju(chat: boolean?)

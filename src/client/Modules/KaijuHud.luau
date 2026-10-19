@@ -59,6 +59,7 @@ local KaijuTaming = require(script.Parent.KaijuTaming)
 local ChatFeed = require(script.Parent.ChatFeed)
 local LoadingFlow = require(script.Parent.LoadingFlow)
 local MobileLayout = require(script.Parent.MobileLayout)
+local Nameplates = require(script.Parent.Nameplates)
 local OutpostScene = require(script.Parent.OutpostScene)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
@@ -1277,17 +1278,33 @@ local function refresh()
 	end
 end
 
--- Wild nameplates: the server's own bar while you're not hunting.
-local function wildPlates()
+-- Nameplates over creatures (Nameplates): a wild one's and a critter's
+-- (the server's bar, while you're not hunting), your own kaiju's (no name,
+-- a slim bar while one's hurt) and other players' kaiju's; on a phone from
+-- closer, smaller.
+local function plates()
+	local phone = UserInputService.TouchEnabled or gui.AbsoluteSize.Y < 540
+	local shown = not Spar.hunting(player) and wantShown
 	local enemies = workspace:FindFirstChild("Enemies")
-	local show = not Spar.hunting(player) and wantShown
 	for _, model in if enemies then enemies:GetChildren() else {} do
-		if model:GetAttribute("KaijuWild") or model:GetAttribute("MoonBug") then
+		local wild = model:GetAttribute("KaijuWild")
+		if wild or model:GetAttribute("MoonBug") then
 			local root = model.PrimaryPart
 			local board = root and root:FindFirstChild("HealthBar")
-			if board and board:IsA("BillboardGui") and board.Enabled ~= show then
-				board.Enabled = show
+			if board and board:IsA("BillboardGui") then
+				Nameplates.apply(board, Nameplates.rule(if wild then "Wild" else "Critter", phone, nil, shown))
 			end
+		end
+	end
+	local kaiju = workspace:FindFirstChild("Kaiju")
+	for _, model in if kaiju then kaiju:GetChildren() else {} do
+		local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
+		local board = root and root:FindFirstChild("KaijuPlate")
+		if board and board:IsA("BillboardGui") then
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			local hurt = humanoid ~= nil and humanoid.Health < humanoid.MaxHealth * 0.995
+			local mine = model:GetAttribute("KaijuOwner") == player.UserId
+			Nameplates.apply(board, Nameplates.rule(if mine then "Mine" else "Other", phone, hurt))
 		end
 	end
 end
@@ -1352,7 +1369,7 @@ function KaijuHud.start()
 		if not ok then
 			warn("[KaijuHud]", err)
 		end
-		pcall(wildPlates)
+		pcall(plates)
 	end)
 end
 

@@ -9,7 +9,13 @@
 -- - every rock pays a gem, so the only find without one (a full pouch) is a
 --   row straight away.
 --
--- In a mech it sits above the driving card (MobileLayout.Drive).
+-- On a phone or a tablet it's slim and sits at the top middle
+-- (MobileLayout.loot): the reel, the rarity, the gem's name and its worth,
+-- no bars, and one row under it, so the middle of the screen (you, your
+-- kaiju, what's coming) and the dock stay clear; the live feed steps aside
+-- while it's up (MobileLayout.claimTop). On a computer it's in full above
+-- the bottom of the screen, or above a mech's driving card
+-- (MobileLayout.Drive).
 --
 --   MinerLoot.push(loot)        the server's loot for a rock you mined
 --   MinerLoot.setBlocked(on)    a menu or a fight has the screen: hide
@@ -34,9 +40,83 @@ local P = IronUi.Colors
 local PANEL = Color3.fromRGB(12, 17, 28)
 local TRACK = Color3.fromRGB(34, 42, 60)
 local GOLD = Color3.fromRGB(255, 202, 91)
-local CARD_W, CARD_H, ROW_H, GAP = 360, 124, 30, 6
-local WORTH_W = 66 -- "≈ 12,500 ◆"
-local WELL, CELL = 100, 84 -- the reel's window, and one gem on it
+local GAP = 6
+-- The card's sizes: W x H, a row's height, the reel's window (Well) and one
+-- gem on it (Cell, its art Art), the words' places, and whether the Size,
+-- Clarity and Cut bars show. Slim (a phone) is as wide as fits up there;
+-- Short, a small phone's, has no room for a row under it.
+local FULL = {
+	Slim = false,
+	W = 360,
+	H = 124,
+	Row = 30,
+	Pad = 12,
+	Well = 100,
+	Cell = 84,
+	Art = 76,
+	Spot = 70,
+	Bars = true,
+	Gap = 14,
+	HeaderY = 12,
+	HeaderH = 14,
+	Small = 10,
+	WorthY = 11,
+	WorthH = 16,
+	WorthW = 66,
+	Worth = 12,
+	NameY = 28,
+	NameH = 22,
+	Name = 16,
+	RowText = 12,
+	RowWorthW = 84,
+	WorthOnName = false,
+	Short = false,
+}
+local SLIM = {
+	Slim = true,
+	W = MobileLayout.Loot.W,
+	H = MobileLayout.Loot.H,
+	Row = 24,
+	Pad = 6,
+	Well = 44,
+	Cell = 40,
+	Art = 34,
+	Spot = 30,
+	Bars = false,
+	Gap = 8,
+	HeaderY = 7,
+	HeaderH = 12,
+	Small = 9,
+	WorthY = 24,
+	WorthH = 16,
+	WorthW = 54,
+	Worth = 11,
+	NameY = 21,
+	NameH = 20,
+	Name = 14,
+	RowText = 11,
+	RowWorthW = 64,
+	WorthOnName = true,
+	Short = false,
+}
+-- (Slim and short: a small phone's, done above the board's strip.)
+local SHORT = {
+	H = MobileLayout.Loot.ShortH,
+	Pad = 4,
+	Well = 36,
+	Cell = 32,
+	Art = 28,
+	Spot = 24,
+	HeaderY = 4,
+	HeaderH = 11,
+	NameY = 15,
+	NameH = 18,
+	Name = 13,
+	WorthY = 17,
+	WorthH = 15,
+	Short = true,
+}
+local D = FULL -- (the sizes now: a card keeps the ones it was built with)
 local TARGET = 14 -- the reel position the found gem sits at
 local SEGMENTS = 10
 local STATS = { "Size", "Clarity", "Cut" }
@@ -51,6 +131,7 @@ local connection: RBXScriptConnection? = nil
 local views = nil -- a viewport per rarity, cloned onto the reel
 local maxRows = 3
 local blocked = false
+local sync: () -> ()
 
 local function clock(): number
 	return os.clock()
@@ -104,37 +185,88 @@ local function tierLabel(tier: string): string
 	return string.upper(GemConfig.TierLabels[tier] or tier)
 end
 
--- Where everything sits: the card at the bottom, rows above it (newest
--- first). On a phone or a tablet it sits above the lobby's dock (PLAY and
--- its tiles: MobileLayout.dock); a short screen keeps one row.
+-- The top middle is the loot card's while it (or its row) is up on a phone.
+local function claim()
+	MobileLayout.claimTop("MinerLoot", D.Slim and not blocked and (cardUi ~= nil or next(rows) ~= nil))
+end
+
+-- Built again at new sizes (a phone turned, a window resized): the stack
+-- says what's on show, so nothing is lost.
+local function rebuild()
+	if cardUi then
+		cardUi.Frame:Destroy()
+		cardUi = nil
+	end
+	for id, row in rows do
+		row.Frame:Destroy()
+		rows[id] = nil
+	end
+	if sync and (stack.Card or #stack.Rows > 0) then
+		sync()
+	end
+end
+
+-- Where everything sits. On a computer: the card at the bottom, rows above
+-- it (newest first), or above a mech's driving card. On a phone or a tablet
+-- (touch, or a short window): slim, at the top middle, one row under it
+-- (a small phone's row shows once the card's gone).
 local function fit()
 	if not gui then
 		return
 	end
 	local size = gui.AbsoluteSize
 	local mobile = UserInputService.TouchEnabled or (size.Y > 0 and size.Y < 540)
-	local short = size.Y > 0 and size.Y < 500
-	maxRows = if short then 1 else 3
-	fitScale.Scale = if short then 0.86 else 1
-	-- (In a mech: above its driving card, bottom middle.)
-	local drive = MobileLayout.Drive
-	local piloting = Players.LocalPlayer:GetAttribute("MechPilot") ~= nil
-	local up = if piloting then drive.Bottom + drive.H + 10 elseif mobile then 104 else 64
-	holder.Position = UDim2.new(0.5, 0, 1, -up)
+	local spot = if mobile then MobileLayout.loot(size) else nil
+	local dims = FULL
+	if spot then
+		dims = table.clone(SLIM)
+		if spot.H < SLIM.H then
+			for key, value in SHORT do
+				dims[key] = value
+			end
+		end
+		dims.W = spot.W
+	end
+	if dims.W ~= D.W or dims.H ~= D.H or dims.Slim ~= D.Slim then
+		D = dims
+		rebuild()
+	end
+	maxRows = if mobile then 1 else 3
+	fitScale.Scale = 1
+	holder.Size = UDim2.fromOffset(D.W, D.H)
+	if spot then
+		holder.AnchorPoint = Vector2.new(0, 0)
+		holder.Position = UDim2.fromOffset(spot.X, spot.Y)
+	else
+		-- (In a mech: above its driving card, bottom middle.)
+		local drive = MobileLayout.Drive
+		local piloting = Players.LocalPlayer:GetAttribute("MechPilot") ~= nil
+		holder.AnchorPoint = Vector2.new(0.5, 1)
+		holder.Position = UDim2.new(0.5, 0, 1, -(if piloting then drive.Bottom + drive.H + 10 else 64))
+	end
+	claim()
 end
 Players.LocalPlayer:GetAttributeChangedSignal("MechPilot"):Connect(function()
 	fit()
 end)
 
 local function rowTop(index: number): number
-	local bottom = if cardUi then -GAP else CARD_H
-	return bottom - ROW_H - (index - 1) * (ROW_H + GAP)
+	if D.Slim then
+		-- (under the card, or where it was)
+		local top = if cardUi then D.H + GAP else 0
+		return top + (index - 1) * (D.Row + GAP)
+	end
+	local bottom = if cardUi then -GAP else D.H
+	return bottom - D.Row - (index - 1) * (D.Row + GAP)
 end
 
 local function layout()
+	-- (Short: the row waits while a card's up; the board's strip is under it.)
+	local hide = D.Short and cardUi ~= nil
 	for index, item in stack.Rows do
 		local row = rows[item.Id]
 		if row then
+			row.Frame.Visible = not hide
 			tween(row.Frame, 0.22, { Position = UDim2.fromOffset(0, rowTop(index)) })
 		end
 	end
@@ -150,7 +282,7 @@ local function ensureGui()
 	holder = new("Frame", {
 		Name = "Stack",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Size = UDim2.fromOffset(CARD_W, CARD_H),
+		Size = UDim2.fromOffset(D.W, D.H),
 		BackgroundTransparency = 1,
 	}, gui)
 	fitScale = new("UIScale", { Scale = 1 }, holder)
@@ -165,8 +297,8 @@ local function buildRow(item)
 	local color = if gem then GemConfig.TierColors[gem.Tier] or P.Text else GOLD
 	local frame = new("Frame", {
 		Name = "LootRow",
-		Position = UDim2.fromOffset(0, CARD_H - ROW_H),
-		Size = UDim2.fromOffset(CARD_W, ROW_H),
+		Position = UDim2.fromOffset(0, if D.Slim then rowTop(1) else D.H - D.Row),
+		Size = UDim2.fromOffset(D.W, D.Row),
 		BackgroundColor3 = PANEL,
 		BackgroundTransparency = 0.12,
 		ZIndex = 2,
@@ -175,7 +307,7 @@ local function buildRow(item)
 	new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.65 }, frame)
 	local dot = new("Frame", {
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 12, 0.5, 0),
+		Position = UDim2.new(0, D.Pad, 0.5, 0),
 		Size = UDim2.fromOffset(8, 8),
 		BackgroundColor3 = color,
 		Rotation = 45,
@@ -194,8 +326,10 @@ local function buildRow(item)
 	else
 		left, right = if loot.Full then "Gem pouch full" else "Rock mined", ""
 	end
-	text(frame, left, 12, if loot.Full and not gem then P.Bad else P.Text, 28, 0, CARD_W - 120, ROW_H)
-	text(frame, right, 12, GOLD, CARD_W - 96, 0, 84, ROW_H, Enum.TextXAlignment.Right)
+	local rightX = D.W - D.RowWorthW - D.Pad
+	local leftX = D.Pad + 16
+	text(frame, left, D.RowText, if loot.Full and not gem then P.Bad else P.Text, leftX, 0, rightX - leftX - 4, D.Row)
+	text(frame, right, D.RowText, GOLD, rightX, 0, D.RowWorthW, D.Row, Enum.TextXAlignment.Right)
 	return { Frame = frame }
 end
 
@@ -237,14 +371,15 @@ end
 
 local function buildCard(item)
 	local loot, gem = item.Loot, item.Loot.Gem
+	local d = D
 	local frame = new("Frame", {
 		Name = "LootCard",
-		Size = UDim2.fromOffset(CARD_W, CARD_H),
+		Size = UDim2.fromOffset(d.W, d.H),
 		BackgroundColor3 = PANEL,
 		BackgroundTransparency = 0.04,
 		ZIndex = 2,
 	}, holder)
-	UiKit.round(frame, 12)
+	UiKit.round(frame, if d.Slim then 10 else 12)
 	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.45 }, frame)
 	-- (once it lands, the card takes a wash of the gem's rarity from the left)
 	local wash = new("Frame", {
@@ -253,7 +388,7 @@ local function buildCard(item)
 		BackgroundTransparency = 1,
 		ZIndex = 2,
 	}, frame)
-	UiKit.round(wash, 12)
+	UiKit.round(wash, if d.Slim then 10 else 12)
 	new("UIGradient", {
 		Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 0),
@@ -270,8 +405,8 @@ local function buildCard(item)
 	-- The window: a glow behind it, the reel in it, a flash when it lands.
 	local glow = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(12 + WELL / 2, 12 + WELL / 2),
-		Size = UDim2.fromOffset(WELL + 14, WELL + 14),
+		Position = UDim2.fromOffset(d.Pad + d.Well / 2, d.Pad + d.Well / 2),
+		Size = UDim2.fromOffset(d.Well + d.Pad + 2, d.Well + d.Pad + 2),
 		BackgroundColor3 = P.Edge,
 		BackgroundTransparency = 0.92,
 		ZIndex = 2,
@@ -279,19 +414,19 @@ local function buildCard(item)
 	UiKit.round(glow, 999)
 	local well = new("Frame", {
 		Name = "Reel",
-		Position = UDim2.fromOffset(12, 12),
-		Size = UDim2.fromOffset(WELL, WELL),
+		Position = UDim2.fromOffset(d.Pad, d.Pad),
+		Size = UDim2.fromOffset(d.Well, d.Well),
 		BackgroundColor3 = Color3.fromRGB(18, 26, 40),
 		ClipsDescendants = true,
 		ZIndex = 3,
 	}, frame)
-	UiKit.round(well, 10)
+	UiKit.round(well, if d.Slim then 8 else 10)
 	local wellEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.3 }, well)
 	local punch = new("UIScale", { Scale = 1 }, well)
 	local spot = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(70, 70),
+		Size = UDim2.fromOffset(d.Spot, d.Spot),
 		BackgroundColor3 = P.Edge,
 		BackgroundTransparency = 0.85,
 		ZIndex = 3,
@@ -299,11 +434,12 @@ local function buildCard(item)
 	UiKit.round(spot, 999)
 	local cells = {}
 	for i = 1, 5 do
-		local cell = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(WELL, CELL), ZIndex = 4 }, well)
+		local cell =
+			new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(d.Well, d.Cell), ZIndex = 4 }, well)
 		local art = new("Frame", {
 			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset((WELL - 76) / 2, (CELL - 76) / 2),
-			Size = UDim2.fromOffset(76, 76),
+			Position = UDim2.fromOffset((d.Well - d.Art) / 2, (d.Cell - d.Art) / 2),
+			Size = UDim2.fromOffset(d.Art, d.Art),
 			ZIndex = 4,
 		}, cell)
 		cells[i] = { Frame = cell, Art = art }
@@ -325,14 +461,15 @@ local function buildCard(item)
 		BackgroundTransparency = 1,
 		ZIndex = 6,
 	}, well)
-	-- The words, and the chart.
-	local x = 12 + WELL + 14
-	local w = CARD_W - x - 12
-	local header = text(frame, "", 10, P.Dim, x, 12, w, 14) -- (narrows for the worth once it lands)
-	local worth = text(frame, "", 12, GOLD, x + w - WORTH_W, 11, WORTH_W, 16, Enum.TextXAlignment.Right)
-	local name = text(frame, "", 16, P.Text, x, 28, w, 22)
+	-- The words, and the chart (in full).
+	local x = d.Pad + d.Well + d.Gap
+	local w = d.W - x - d.Pad
+	local header = text(frame, "", d.Small, P.Dim, x, d.HeaderY, w, d.HeaderH) -- (narrows for the worth once it lands)
+	local worth =
+		text(frame, "", d.Worth, GOLD, x + w - d.WorthW, d.WorthY, d.WorthW, d.WorthH, Enum.TextXAlignment.Right)
+	local name = text(frame, "", d.Name, P.Text, x, d.NameY, w, d.NameH)
 	local bars = {}
-	for row, key in STATS do
+	for row, key in if d.Bars then STATS else {} do
 		local y = 58 + (row - 1) * 20
 		text(frame, string.upper(key), 9, P.Dim, x, y, 52, 14)
 		local segments = {}
@@ -365,6 +502,7 @@ local function buildCard(item)
 	end)
 	local ui = {
 		Item = item,
+		D = d,
 		Frame = frame,
 		Edge = edge,
 		Wash = wash,
@@ -397,6 +535,9 @@ end
 -- `amount` segments lit; `final`: the gem's own number, shown beside it.
 local function showBar(ui, key: string, amount: number, color: Color3, final: boolean)
 	local bar = ui.Bars[key]
+	if not bar then
+		return -- (slim: no bars)
+	end
 	amount = math.clamp(math.floor(amount), 0, SEGMENTS)
 	if bar.Shown == amount and bar.Final == final then
 		return
@@ -424,7 +565,7 @@ local function roll(ui, position: number, strength: number)
 			view.ZIndex, view.Parent = 4, cell.Art
 		end
 		-- (later gems come in from the top)
-		cell.Frame.Position = UDim2.fromOffset(0, (WELL - CELL) / 2 + (position - index) * CELL)
+		cell.Frame.Position = UDim2.fromOffset(0, (ui.D.Well - ui.D.Cell) / 2 + (position - index) * ui.D.Cell)
 	end
 	if ui.Index ~= center then
 		ui.Index = center
@@ -444,7 +585,8 @@ local function roll(ui, position: number, strength: number)
 end
 
 local function burst(ui, rank: number, color: Color3)
-	local cx, cy = 12 + WELL / 2, 12 + WELL / 2
+	local d = ui.D
+	local cx, cy = d.Pad + d.Well / 2, d.Pad + d.Well / 2
 	for i = 1, 4 + rank * 3 do
 		local angle = i * math.pi * 2 / (4 + rank * 3)
 		local spark = new("Frame", {
@@ -455,7 +597,7 @@ local function burst(ui, rank: number, color: Color3)
 			Rotation = 45,
 			ZIndex = 7,
 		}, ui.Frame)
-		local reach = 58 + rank * 8
+		local reach = (58 + rank * 8) * d.Well / FULL.Well
 		tween(spark, 0.6 + rank * 0.05, {
 			Position = UDim2.fromOffset(cx + math.cos(angle) * reach, cy + math.sin(angle) * reach),
 			BackgroundTransparency = 1,
@@ -481,7 +623,12 @@ local function land(ui)
 		element:ToHex(),
 		string.upper(GemConfig.elementName(gem.Element))
 	)
-	ui.Header.Size = UDim2.fromOffset(ui.Width - WORTH_W - 4, 14)
+	-- (Room for the worth: beside the rarity in full, beside the name slim.)
+	if ui.D.WorthOnName then
+		ui.Name.Size = UDim2.fromOffset(ui.Width - ui.D.WorthW - 4, ui.D.NameH)
+	else
+		ui.Header.Size = UDim2.fromOffset(ui.Width - ui.D.WorthW - 4, ui.D.HeaderH)
+	end
 	ui.Name.Text = GemConfig.shade(gem).Name
 	ui.Name.TextColor3 = P.Text
 	ui.Worth.Text = string.format("≈ %s ◆", commas(GemConfig.value(gem)))
@@ -534,7 +681,7 @@ end
 
 local step
 
-local function sync()
+function sync()
 	if cardUi and cardUi.Item ~= stack.Card then
 		cardUi.Frame:Destroy()
 		cardUi = nil
@@ -556,6 +703,7 @@ local function sync()
 		end
 	end
 	layout()
+	claim()
 	if (cardUi or next(rows)) and not connection then
 		connection = RunService.RenderStepped:Connect(step)
 	end
@@ -588,6 +736,7 @@ function MinerLoot.setBlocked(on: boolean)
 	if gui then
 		gui.Enabled = not on
 	end
+	claim()
 end
 
 function MinerLoot.close()
@@ -604,6 +753,7 @@ function MinerLoot.close()
 		connection:Disconnect()
 		connection = nil
 	end
+	claim()
 end
 
 -- For tests: what's on show.

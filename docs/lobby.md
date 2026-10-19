@@ -201,7 +201,11 @@ It is off for now with `Config.Features.ChatBox = false`. Setting it to
 - No "online" pill, no BUG button (SOCIAL has Feedback) and no chat box:
   Roblox's chat button in the top bar opens the chat, and words pop up as
   bubbles over heads. See [mobile.md](mobile.md#the-lobby-and-fights).
-- The feed fits between the pick card and the task strip.
+- The feed fits between the pick card and the task strip. It steps aside
+  while the slim loot card holds the top middle (see
+  [mobile.md](mobile.md#mining-in-the-outpost)).
+- TASKS is small, with the task strip right under it, and PLAY is
+  narrower and shorter.
 
 ## Tests
 
@@ -209,4 +213,4 @@ It is off for now with `Config.Features.ChatBox = false`. Setting it to
 | --- | --- | --- |
 | `tests/run_daily_challenges.py` | 22,446 rules + 8 server | One per group; stable rolls; progress; paying once; the bonus; new days; old saves. The server side: progress pushes, payouts, notes and the bonus |
 | `tests/run_chat_feed.py` | 57 | The real chat feed against chat and GUI doubles. Its place over the kaiju card, under the PLAY stack and on a short screen; names, your green and escaped markup; other channels kept out; system and loot lines; fading; ten shown and sixty kept; / and the hint; sending the trimmed line; Escape and empty lines; out of the Outpost, under a menu, in the intro and on a phone; the ChatBox switch |
-| `tests/run_lobby.py` | 34 board + 32 feed | The real board and feed against GUI doubles. Board: cards per screen; folded rows, tapping one open (one at a time) and closed; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside |
+| `tests/run_lobby.py` | 34 board + 36 feed | The real board and feed against GUI doubles. Board: cards per screen; folded rows, tapping one open (one at a time) and closed; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside; stepping aside for a phone's loot card (and not on a computer) |

@@ -37,9 +37,10 @@ phone game should be.
 - **The "online" pill is gone.** PLAY stands alone at the bottom centre.
 - **The six buttons under PLAY** are icons with their name small under
   them, 44 points tall.
-- **Tasks:** the TASKS button, and under it the next task as one slim
-  strip: its name and reward over a thin bar. Tap it to open Tasks. After
-  the first Tasks pages, the strip shows the next daily challenge instead.
+- **Tasks:** a small TASKS button (112 x 34), and right under it the next
+  task as one slim strip: its name and reward over a thin bar. Tap it to
+  open Tasks. After the first Tasks pages, the strip shows the next daily
+  challenge instead.
 - **No BUG button** on a phone. The same form is SOCIAL's Feedback button.
 - **The live feed** fits in the gap between the pick card and the task
   strip, so on a small phone they don't overlap.
@@ -62,6 +63,43 @@ bright.)
 - **The ring sits at the right edge**, under the right thumb: ATTACK in the
   corner, Q / E / R round it, GUARD and DODGE outside them.
 - **No chat box** in a fight (Roblox's chat button is still in the top bar).
+
+### Mining in the Outpost
+
+![Mining on a phone, before and after](mobile/mining-phone.png)
+
+Mining with your kaiju out covered the middle of the screen. The loot card
+sat over PLAY with its last find on top, and every creature's name and
+health bar showed at full size from far off. Now the middle is left to
+you, your kaiju and what's coming:
+
+- **The loot card** is slim and sits at the top middle, between the pick
+  card and TASKS (`MobileLayout.loot`). It shows the reel, the rarity and
+  element, and the gem's name with its worth, but no stat bars. The last
+  find sits as one row under it. The live feed steps aside while the card
+  is up (`MobileLayout.claimTop`) and comes back when it goes. See
+  [mining-loot.md](mining-loot.md#phones-and-spanish).
+- **PLAY** is narrower and shorter (184 x 38), and so is the dock under
+  it, so it takes up less of the bottom of the screen.
+- **TASKS and the task strip** are smaller and tucked into the top right
+  (`MobileLayout.tasks`, `MobileLayout.board`).
+- **Names over heads** (`Nameplates`, every few frames from `KaijuHud`):
+  - your own kaiju have no name (the team strip has them), and their bar
+    shows only while one is hurt;
+  - another player's kaiju show theirs from 30 studs;
+  - wild kaiju show theirs from 60 studs, and critters from 45;
+  - wild kaiju and critters show nothing while you hunt, since the fight's
+    own bars take over.
+
+  The names are smaller too. A computer keeps the longer distances (70,
+  160 and 90), but there too your own kaiju go unnamed, and their bar shows
+  only while hurt.
+
+On a small phone the card is shorter, so it ends above the task strip. Its
+row waits until the card has gone, then shows in its place. Each find is
+still in chat, and a full pouch still gets its message.
+
+![Mining on a small phone](mobile/mining-small-phone.png)
 
 ## The Inventory
 
@@ -200,6 +238,9 @@ get out from under Roblox's buttons, which it used to sit under.
 | `UiKit.topbar(width)`, `UiKit.onTopbar(fn)`, `UiKit.reserveTopbar(width)` | The strip Roblox's buttons sit in, a call when it changes, and room in it for DEV (see [Roblox's buttons](#roblox-s-buttons)) |
 | `UiKit.fit(label)` | Keeps a one-line label at its size, shrinking it only when its words don't fit |
 | `UiKit.shrinkRow(row, list)` | Shrinks a row laid out side by side to its parent's width when its contents outgrow it |
+| `MobileLayout.loot(screen)`, `tasks(screen)`, `board(screen)` | Where the slim loot card, TASKS and the task strip go on a phone |
+| `MobileLayout.claimTop(owner, on)`, `topClaimed()`, `onTop(fn)` | Who has the top middle (the loot card), so the feed can step aside |
+| `Nameplates.rule(kind, phone, hurt, shown)`, `Nameplates.apply(board, rule)` | When and from how far a creature's name and bar show |
 
 ## Also fixed
 

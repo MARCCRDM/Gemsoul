@@ -241,6 +241,22 @@ On a computer the strip sits at the bottom left, TAME above it:
 - **The Gem Vault** shows a Gemsoul's branches as the moves a kaiju casts,
   with KAIJU LV 5 by Q and KAIJU LV 10 by R.
 
+### Names over heads
+
+`Nameplates` keeps the names and bars over creatures out of the way.
+`KaijuHud` applies its rules every few frames.
+
+| Over | Shows | From (computer / phone) |
+| --- | --- | --- |
+| Your own kaiju | No name (the strip has them); the bar only while it's hurt | 70 / 70 studs |
+| Another player's kaiju | Name and bar | 70 / 30 studs |
+| A wild kaiju | Name and bar, except while you hunt (the fight's bars take over) | 160 / 60 studs |
+| A critter | Name and bar, except while you hunt | 90 / 45 studs |
+
+On a phone the names are smaller (11 points, not 13). Before this, a few
+plates could pile up over the middle of a phone's screen. See
+[mobile.md](mobile.md#mining-in-the-outpost).
+
 ## Hunting
 
 Your kaiju fights whether or not you do. To fight yourself, press HUNT: your
@@ -265,7 +281,7 @@ levels of the strongest kaiju near them, with half again the health of a
 kaiju of yours at their level: it takes you and your kaiju together. They
 stand about your height (yours come up to your knee). A fifth guards a Rift
 Vein (see [The vein guardian](#the-vein-guardian)). Their names show from
-160 studs off.
+160 studs off (60 on a phone; see [Names over heads](#names-over-heads)).
 
 They go about their day:
 
@@ -599,4 +615,5 @@ the glow pulses, a cast draws two beams from your hand and twelve motes
 that close in, the bar fills, and it ends on TAMED! or TAME BROKEN and
 goes.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
-card's place on every phone.
+card's place on every phone. `tests/run_nameplates.py` covers the
+nameplate rules, and that applying them changes only what differs.

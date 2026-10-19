@@ -12,7 +12,10 @@
 
 	  LobbyFeed.mount(gui)        builds both in the lobby's ScreenGui
 	  LobbyFeed.setCompact(on, span?)  phone layout, fitted to the gap it's
-	                                   given ({ X, W }) between the corners
+	                                   given ({ X, W }) between the corners;
+	                                   there, the feed steps aside while
+	                                   your loot card has the top middle
+	                                   (MobileLayout.claimTop)
 	  LobbyFeed.push(icon, text, color?)   adds a line (rich text)
 	  LobbyFeed.welcome()         shows the banner if there's a reward to show
 ]]
@@ -24,6 +27,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Season = require(ReplicatedStorage.Shared.Season)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local IronUi = require(script.Parent.IronUi)
+local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
@@ -485,6 +489,9 @@ function LobbyFeed.mount(gui: ScreenGui)
 		BackgroundTransparency = 1,
 	}, gui)
 	UiKit.list(stack, 4, false)
+	MobileLayout.onTop(function()
+		stack.Visible = not (compact and MobileLayout.topClaimed())
+	end)
 	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 	local roll = remotes and remotes:FindFirstChild("MiningRoll")
 	if roll and roll:IsA("RemoteEvent") then
@@ -513,6 +520,7 @@ function LobbyFeed.setCompact(on: boolean, span: { X: number, W: number }?)
 			stack.Position = UDim2.new(0.5, 0, 0, 12)
 		end
 		stack.Size = UDim2.fromOffset(width, 3 * 30)
+		stack.Visible = not (compact and MobileLayout.topClaimed())
 	end
 end
 
