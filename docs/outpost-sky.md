@@ -24,6 +24,8 @@ so the rim is built correctly; it just wasn't being sent.
 
 ## A rift in the sky
 
+*Since then (2026-10-20): the planets are gone (only stars and the rift), and the rift is redrawn with a soft glow, one violet light and shafts of light. See [fob-serious.md](fob-serious.md#the-sky).*
+
 Another dimension showing through a rip in space: a rift high in the north
 sky, past the red moon. It's drawn by each player's own client
 (`src/client/Modules/SkyRift.luau`); the server sends nothing.

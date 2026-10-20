@@ -74,6 +74,8 @@ colours and the Halloween decorations stay.
 
 ## INFO-9, the info rep
 
+*Since then (2026-10-20): INFO-9 and the crew talk like base staff, INFO-9 has 41 field tips and a "Threats and safety" topic, and the crew wear visors instead of faces. See [fob-serious.md](fob-serious.md).*
+
 ![INFO-9 by its kiosk, between the arena and the door](fob-barracks/info.jpg)
 
 INFO-9 (`Shared.Vendors.InfoBot`) is a robot built like the rest of the crew.

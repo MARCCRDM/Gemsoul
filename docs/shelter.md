@@ -43,6 +43,8 @@ now work here too (Ilsa buys gems at the Gem Gallery; Brutus, Tamsin,
 Borin and Garrick by their stations): see
 [probe-store-crew-quarry.md](probe-store-crew-quarry.md#the-crew).
 
+In the [serious round](fob-serious.md) (2026-10-20) the booths became shopfronts, the Moon Garden the survey table, every sign one system, and the Halloween dressing moved outside.
+
 - **Arriving**: players spawn just inside the main door, facing into the
   hall (`site.Spawn`).
 - **Out the door**: one wide door south (28 wide), an apron, and the

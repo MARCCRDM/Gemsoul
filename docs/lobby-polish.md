@@ -61,6 +61,8 @@ and their eyes and vents shine.
 
 ## The Moon Garden
 
+*Since then (2026-10-20): the Moon Garden is the survey table. See [fob-serious.md](fob-serious.md#the-hall).*
+
 ![The Moon Garden](lobby-polish/garden.jpg)
 
 The Moon Garden is on the west side of the hall, between the Store and

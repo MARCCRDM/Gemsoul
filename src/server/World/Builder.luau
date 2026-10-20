@@ -872,7 +872,20 @@ function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info)
 		Color = info.Tunic,
 		Material = Enum.Material.Fabric,
 	})
-	Builder.neon(model, frame, Vector3.new(2.7, 0.3, 1.5), CFrame.new(0, 3.4, 0), info.Color)
+	-- (On duty, a crew member's belt is a painted band in its station's
+	-- colour, not a light.)
+	if info.Visor then
+		Builder.part(model, frame, {
+			Name = "Belt",
+			Size = Vector3.new(2.7, 0.3, 1.5),
+			At = CFrame.new(0, 3.4, 0),
+			Color = info.Color,
+			Material = Enum.Material.SmoothPlastic,
+			CastShadow = false,
+		})
+	else
+		Builder.neon(model, frame, Vector3.new(2.7, 0.3, 1.5), CFrame.new(0, 3.4, 0), info.Color)
+	end
 	for _, x in { -1.75, 1.75 } do
 		Builder.part(model, frame, {
 			Name = "Arm",
@@ -883,11 +896,31 @@ function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info)
 			CastShadow = false,
 		})
 	end
-	local head = Builder.screen(model, frame, CFrame.new(0, 7.1, 0), Vector3.new(2.4, 2, 1.6), {
+	local head, face = Builder.screen(model, frame, CFrame.new(0, 7.1, 0), Vector3.new(2.4, 2, 1.6), {
 		Name = "Head",
 		Text = info.Face,
 		TextColor = info.Color,
 	})
+	-- A visor (Visor): one slit across the screen in its colour, brightest
+	-- in the middle, instead of a face.
+	if info.Visor then
+		local slit = Instance.new("Frame")
+		slit.Name = "Visor"
+		slit.AnchorPoint = Vector2.new(0.5, 0.5)
+		slit.Position = UDim2.fromScale(0.5, 0.42)
+		slit.Size = UDim2.fromScale(0.86, 0.13)
+		slit.BorderSizePixel = 0
+		slit.BackgroundColor3 = info.Color
+		slit.ZIndex = 2
+		slit.Parent = face.Parent
+		local fade = Instance.new("UIGradient")
+		fade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.7),
+			NumberSequenceKeypoint.new(0.5, 0),
+			NumberSequenceKeypoint.new(1, 0.7),
+		})
+		fade.Parent = slit
+	end
 	Builder.part(model, frame, {
 		Name = "Antenna",
 		Size = Vector3.new(0.15, 1.2, 0.15),
@@ -905,7 +938,14 @@ function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info)
 	billboard.MaxDistance = 70
 	billboard.LightInfluence = 0
 	billboard.Parent = head
-	for i, line in { { info.Name, Enum.Font.Arcade, info.Color }, { info.Role, Enum.Font.Code, Color3.new(1, 1, 1) } } do
+	for i, line in
+		if info.Visor
+			then {
+				{ info.Name, Enum.Font.GothamBold, Color3.fromRGB(236, 238, 242) },
+				{ info.Role, Enum.Font.GothamMedium, info.Color },
+			}
+			else { { info.Name, Enum.Font.Arcade, info.Color }, { info.Role, Enum.Font.Code, Color3.new(1, 1, 1) } }
+	do
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 0.5)
 		label.Position = UDim2.fromScale(0, (i - 1) * 0.5)

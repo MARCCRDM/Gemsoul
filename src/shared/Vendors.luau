@@ -15,6 +15,7 @@ export type Vendor = {
 	Color: Color3,
 	Tunic: Color3,
 	Face: string,
+	Visor: boolean?, -- a visor slit in its colour on its screen, in place of a Face
 	Greeting: string,
 	Options: { Option },
 }
@@ -144,17 +145,21 @@ local Vendors: { [string]: Vendor } = {
 }
 
 -- The Saga Shelter's crew, in the Outpost's lobby: the old town's
--- shopkeepers, moved up to the moon (the same names, faces and colours),
--- each by the station they run now. OutpostServer builds them where
--- OutpostWorld puts them (site.Crew).
-local function crew(from: string, role: string, greeting: string, options: { Option }): Vendor
-	local old = Vendors[from]
+-- shopkeepers, moved up to the moon (the same names), each by the station
+-- they run now. OutpostServer builds them where OutpostWorld puts them
+-- (site.Crew). On duty they wear the base's uniform: a charcoal tunic, a
+-- visor instead of a face (Visor), and their station's colour (Color, the
+-- same as the bar on its signs: Server OutpostWorld's STATION). They talk like staff on a working
+-- base: short, plain and exact, no jokes and no exclamation marks.
+local UNIFORM = Color3.fromRGB(52, 56, 64)
+local function crew(from: string, role: string, color: Color3, greeting: string, options: { Option }): Vendor
 	return {
-		Name = old.Name,
+		Name = Vendors[from].Name,
 		Role = role,
-		Color = old.Color,
-		Tunic = old.Tunic,
-		Face = old.Face,
+		Color = color,
+		Tunic = UNIFORM,
+		Face = "",
+		Visor = true,
 		Greeting = greeting,
 		Options = options,
 	}
@@ -163,112 +168,123 @@ end
 Vendors.GemBuyer = crew(
 	"Cutting",
 	"Gem Buyer",
-	"Ilsa, gem buyer. Bring me the stones you don't need: I pay coins on the spot, and coins buy anything on the player Market.",
+	Color3.fromRGB(226, 190, 112),
+	"Ilsa, gem buyer. I grade loose gems and pay coins on the spot, at the Market rate. Gems your loadouts use are never part of an offer.",
 	{
-		{ Text = "What will you give me for my gems?", Action = "Appraise" },
-		{ Text = "Pick a gem to sell", Action = "SellGems" },
+		{ Text = "Appraise my spare gems", Action = "Appraise" },
+		{ Text = "Sell a specific gem", Action = "SellGems" },
 		{
-			Text = "What makes a gem valuable?",
-			Reply = "Rarity first: one Legendary is worth more than a pouch of Commons. Then its Size, Clarity and Cut, each graded out of ten. The higher, the more I pay.",
+			Text = "How are gems valued?",
+			Reply = "Rarity sets the base: one Legendary outweighs a pouch of Commons. Size, Clarity and Cut are each graded 1 to 10, and every point raises the price.",
 		},
 		{
 			Text = "Which gems do you buy?",
-			Reply = "Any gem in your pouch. When I make an offer for your spares, I leave out the gems your loadouts use.",
+			Reply = "Any loose gem in your pouch. An appraisal only counts spares: gems used by any of your loadouts are left out.",
 		},
 	}
 )
 Vendors.ArenaMaster = crew(
 	"Arena",
 	"Arena Master",
-	"Brutus, arena master. Step through the Uplink for a 1v1. Win in a row and your swings come back.",
+	Color3.fromRGB(214, 84, 70),
+	"Brutus, arena master. The Uplink runs ranked 1v1 duels. Consecutive wins restore your swings; one loss resets the count.",
 	{
 		{ Text = "Find me a duel", Action = "Duels" },
 		{
-			Text = "What do win streaks give?",
-			Reply = "Queue a 1v1 and win in a row. Your first win brings back a tenth of your swings, the fifth a quarter, the tenth half, and ten in a row wins the tournament. A loss ends the run.",
+			Text = "What does a win streak pay?",
+			Reply = "First win: a tenth of your swings restored. Fifth: a quarter. Tenth: half, and the tournament title. A loss ends the run.",
 		},
 		{
 			Text = "Any advice?",
-			Reply = "Guard when they wind up, then punish. And bring your best gems: they power your Q, E and R.",
+			Reply = "Watch for the wind-up, guard, then punish the opening. Your sword, chest and shield gems power Q, E and R: socket your best before you queue.",
 		},
 	}
 )
-Vendors.Broker =
-	crew("Market", "Trade Broker", "Tamsin, trade broker. Every miner's gems and gear go up on my board.", {
+Vendors.Broker = crew(
+	"Market",
+	"Trade Broker",
+	Color3.fromRGB(96, 186, 156),
+	"Tamsin, trade broker. Every player listing for gems and gear clears through this board.",
+	{
 		{ Text = "Open the Market", Action = "Market" },
 		{
 			Text = "How does the Market work?",
-			Reply = "List a gem or a piece of gear at your price, or make an offer on someone else's. Coins change hands when a sale goes through.",
+			Reply = "List a gem or a piece of gear at your asking price, or make an offer on another miner's listing. Coins change hands when the sale clears.",
 		},
 		{
 			Text = "Where do I get coins?",
-			Reply = "Sell your spare gems to Ilsa, by the Gem Gallery.",
+			Reply = "Sell spare gems to Ilsa at the Gem Gallery, complete your daily challenges, or sell on this board.",
 		},
-	})
+	}
+)
 Vendors.Outfitter = crew(
 	"Forge",
 	"Outfitter",
-	"Borin, outfitter. Suits, helmets, picks and weapon skins: everything on these stands is in the Store.",
+	Color3.fromRGB(122, 150, 214),
+	"Borin, outfitter. Suits, helmets, picks and weapon skins. Everything on these stands is available in the Store.",
 	{
 		{ Text = "Open the Store", Action = "Store" },
 		{
 			Text = "Do skins change my stats?",
-			Reply = "No: a skin is looks only. Your gear's rolls and gems stay as they are.",
+			Reply = "No. Everything here is cosmetic. Your gear's rolls and socketed gems stay exactly as they are.",
 		},
 	}
 )
 Vendors.Foreman = crew(
 	"Mining",
 	"Mining Foreman",
-	"Garrick, foreman. Out that door is the quarry: every rock you break pays a gem.",
+	Color3.fromRGB(240, 178, 48),
+	"Garrick, mining foreman. The quarry is through the main door. Every rock you break yields one gem. The richer ground is farther out, and so is the rift activity.",
 	{
 		{
-			Text = "Where are the best rocks?",
-			Reply = "The further out, the richer. The Fringe starts 150 studs out, the Edge at 300, and three Rift Veins glow by the crater walls. One of them is guarded.",
+			Text = "Where is the best ground?",
+			Reply = "Yield improves with distance. The Fringe starts 150 studs out, the Edge at 300. Three Rift Veins surface by the crater walls; one of them is guarded.",
 		},
 		{
 			Text = "What are those critters?",
-			Reply = "Rift critters. The longer you mine out there, the more come through. Keep your kaiju close: they fight for you.",
+			Reply = "Rift critters. Activity rises the longer you work outside the Core. Keep your kaiju close: if your whole team goes down out there, the critters come for your gems.",
 		},
 		{
 			Text = "My swings ran out",
-			Reply = "PROBE-7 sells refills, and win streaks at Brutus's Uplink bring swings back.",
+			Reply = "Your pick recharges a swing every 12 seconds. PROBE-7 sells refills, and win streaks at Brutus's Uplink restore swings.",
 		},
 	}
 )
 
--- INFO-9, the Shelter's info rep: a robot by its kiosk near the door, with
--- answers to what new miners ask (by topic) and a tip or an insight about
--- the game whenever you want one. Its answers keep to the rules as they are
--- (Shared.GemRoller's odds, Shared.Kaiju's healing and revives, the swing
--- refills): change those and change these.
+-- INFO-9, the Shelter's information unit: a robot by its kiosk near the
+-- door, with answers to what new miners ask (by topic) and a field tip
+-- whenever you want one. Its answers keep to the rules as they are
+-- (Shared.GemRoller's odds, Shared.Kaiju's healing and revives, Shared.
+-- Frontier's bands, rifts and raids, Server HealthRegen's lobby healing,
+-- the swing refills): change those and change these.
 Vendors.InfoBot = {
 	Name = "INFO-9",
-	Role = "Info Rep",
-	Color = Color3.fromRGB(120, 226, 255),
-	Tunic = Color3.fromRGB(44, 72, 92),
-	Face = "^-^",
-	Greeting = "INFO-9, info rep. Ask me anything about the moon, or take a tip: I know a lot of them.",
+	Role = "Information",
+	Color = Color3.fromRGB(200, 214, 228),
+	Tunic = UNIFORM,
+	Face = "",
+	Visor = true,
+	Greeting = "INFO-9, base information. Choose a topic, or ask for a field tip.",
 	Options = {
-		{ Text = "Give me a tip", Action = "Tip" },
+		{ Text = "Give me a field tip", Action = "Tip" },
 		{
 			Text = "Mining and gems",
 			Options = {
 				{
 					Text = "How does mining work?",
-					Reply = "Walk up to a rock and swing. Every rock you break pays one gem, and the rocks grow back. Bigger rocks take more swings and hide better finds.",
+					Reply = "Walk up to a rock and swing. Every rock yields one gem when it breaks, and broken rocks grow back. Crystal Boulders take more swings than Regolith Chunks, and their gems roll rarer.",
 				},
 				{
 					Text = "What are the odds?",
-					Reply = "From any rock: Common 60%, Uncommon 25%, Rare 11%, Ultra-Rare 3.5% and Legendary 0.5%. Luck tilts them rarer.",
+					Reply = "For every gem: Common 60%, Uncommon 25%, Rare 11%, Ultra-Rare 3.5%, Legendary 0.5%. Luck shifts those odds toward the rarer tiers.",
 				},
 				{
-					Text = "Why mine further out?",
-					Reply = "Luck. Round the Shelter is the Core, safe and plain. Past 150 studs, the Fringe adds luck to every gem, past 300 the Edge adds more. Rift critters come with it.",
+					Text = "Why mine farther out?",
+					Reply = "Luck. The Core around the Shelter is safe and adds none. Past 150 studs, the Fringe adds luck to every gem; past 300, the Edge adds more. Rift activity rises with it.",
 				},
 				{
 					Text = "What do I do with spare gems?",
-					Reply = "Sell them to Ilsa at the Gem Gallery for coins, list them on the Market, or feed them to your kaiju to heal them.",
+					Reply = "Sell them to Ilsa at the Gem Gallery for coins, list them on the Market, or use them to heal your kaiju.",
 				},
 			},
 		},
@@ -277,63 +293,95 @@ Vendors.InfoBot = {
 			Options = {
 				{
 					Text = "How do kaiju fight?",
-					Reply = "Your team of three follows you and fights by itself: they split up the critters and flank them. They level up while you mine, too.",
+					Reply = "Your team of three follows you and fights on its own: they split up the targets and flank them. They also gain experience while you mine.",
 				},
 				{
 					Text = "How do I heal them?",
-					Reply = "Out of danger, open the kaiju panel's HEAL tab and give them gems: the rarer, the more it heals, and a gem of their own element heals twice as much. AUTO HEAL spends Commons first, then Uncommons.",
+					Reply = "Once you're clear of danger, open the kaiju panel's HEAL tab and give them gems. Rarer gems heal more, and a gem of their own element heals twice as much. AUTO HEAL spends Commons first, then Uncommons.",
 				},
 				{
 					Text = "One got knocked out",
-					Reply = "It comes back by itself after a cooldown, longer the higher its level, weak at 15% health: heal it with gems. Or revive it now for Robux, at half health.",
+					Reply = "It recovers on its own after a cooldown, longer at higher levels, and comes back at 15% health: heal it with gems. Or revive it now for Robux, at half health.",
 				},
 				{
-					Text = "How do kaiju battles work?",
-					Reply = "Tap KAIJU on another miner's card. You both get 15 seconds to place your kaiju: sturdy ones in the front row, a Razorback shooting from the back. Then they fight it out by themselves.",
+					Text = "How do I catch a wild kaiju?",
+					Reply = "Challenge one in the quarry and wear it down below half health without knocking it out: it glows gold. Then press CATCH and hold it in your gem's light. Taking a hit or moving off breaks the catch.",
 				},
 			},
 		},
 		{
-			Text = "Swings, mechs and more",
+			Text = "Threats and safety",
 			Options = {
 				{
+					Text = "What are rift critters?",
+					Reply = "Hostiles that come through rifts beyond the Core, more often the longer you work out there. Hit them with your pick to drive them back: it costs no swings.",
+				},
+				{
+					Text = "What is a gem raid?",
+					Reply = "If your whole kaiju team is knocked out beyond the Core, critters trip you and steal the newest gems from your trip. Hit a thief before it reaches its rift and the gem comes back. Back in the Core, your gems are safe.",
+				},
+				{
+					Text = "How do I recover health?",
+					Reply = "In the Outpost you heal on your own: a few seconds after your last hit, your health starts to refill. Sparring and being knocked down pause it.",
+				},
+				{
 					Text = "My swings ran out",
-					Reply = "Your free pick gets a swing back every 12 seconds, full again in two hours. PROBE-7 sells refills, and 1v1 win streaks at the Arena Uplink restore swings.",
-				},
-				{
-					Text = "How do I catch a wild kaiju?",
-					Reply = "Challenge one out in the quarry and wear it down to half health without knocking it out: it glows gold. Then press CATCH and hold it in your gem's light. Get hit or wander off and the catch breaks.",
-				},
-				{
-					Text = "Can I drive a mech?",
-					Reply = "Hop in at any bay in the garage and drive down either garage ramp. Mechs are for getting around: they don't mine or fight.",
-				},
-				{
-					Text = "What do invites give?",
-					Reply = "Invite a friend (INVITE) and when they join you get one of each reward coupon: a swing restore, a kaiju revive and double XP.",
+					Reply = "Your free pick gets a swing back every 12 seconds and is full again in two hours. PROBE-7 sells refills, and 1v1 win streaks at the Arena Uplink restore swings.",
 				},
 			},
 		},
 	},
 }
 
--- INFO-9's tips and insights, given in turn from a random start ("Tip").
+-- INFO-9's field tips, given in turn from a random start ("Tip"). Each is
+-- one fact, stated plainly; like the answers above, they keep to the rules.
 Vendors.Tips = {
-	"Bigger rocks take more swings but hide better finds. A Star Geode brings luck of its own.",
-	"The further from the Shelter you mine, the luckier your gems: the Fringe and the Edge add luck to every find.",
-	"Three Rift Veins glow by the crater walls, and they move now and then. One of them is guarded: bring your whole team.",
-	"The longer you mine out past the Core, the more rift critters come through. Keep your kaiju close.",
-	"Your kaiju can't take gems mid-fight: heal them once you're out of danger.",
-	"A gem of your kaiju's own element heals it twice as much.",
-	"With AUTO HEAL on, your kaiju eat your spare Commons first, then Uncommons, and never your best gems.",
-	"Kaiju level up while you mine, even when they aren't fighting.",
-	"Razorbacks are shooters: in a kaiju battle, put them in the back row.",
-	"Bulwarks and Carapaces soak up hits: put them in the front row of a battle formation.",
-	"Win streaks in 1v1s bring your swings back. A loss ends the run, so pick your fights.",
-	"Your free pick keeps refilling itself: a swing at a time, full again in two hours.",
-	"Skins are looks only: they never change your stats or your gems.",
-	"Ilsa never offers for the gems your loadouts use, so selling your spares is safe.",
-	"Mechs climb the garage ramps: drive out either garage door into the quarry.",
+	-- Mining
+	"Crystal Boulders take more swings than Regolith Chunks, but their gems roll rarer.",
+	"Every rock yields exactly one gem, and broken rocks grow back. A picked-over field fills up again.",
+	"The Fringe starts 150 studs from the Shelter and adds luck to every gem. The Edge starts at 300 and adds more.",
+	"Three Rift Veins surface by the crater walls and move from time to time. They are the richest ground in the quarry.",
+	"One Rift Vein is guarded. Bring your whole team before you go near it.",
+	"Clear a wandering rift and every miner who helped is Rift Charged: luckier gems for 60 seconds.",
+	"Your free pick gets a swing back every 12 seconds. A full charge takes two hours.",
+	"Swings bought from PROBE-7 are used before your free charge.",
+	-- Threats
+	"Rift activity rises the longer you work beyond the Core.",
+	"Your pick drives critters back, and hitting them costs no swings.",
+	"A critter winding up a TRIP shows it on its cast bar. Step out of reach or hit it to cancel it.",
+	"If your whole kaiju team goes down beyond the Core, critters raid your gems. Hit a thief before it reaches its rift to get the gem back.",
+	"Only loose gems from your current trip can be stolen. Gems socketed in your gear are always safe.",
+	"Gems from your trip are safe again once you're back in the Core.",
+	"In the Outpost your health refills on its own a few seconds after your last hit.",
+	"A creature's outline shows its health: green is healthy, amber is worn down, red is nearly done.",
+	"Wild kaiju and gem thieves stay outlined through rocks and walls, so you can track them.",
+	-- Kaiju
+	"Kaiju don't heal on their own. Give them gems once you're clear of danger.",
+	"A gem of a kaiju's own element heals it twice as much.",
+	"AUTO HEAL spends spare Commons first, then Uncommons. It never uses a rarer gem or one your loadouts use.",
+	"Kaiju gain experience while you mine, even when they aren't fighting.",
+	"A knocked-out kaiju comes back on its own after a cooldown. The higher its level, the longer it takes.",
+	"To catch a wild kaiju, wear it down below half health without knocking it out. It glows gold when it's ready.",
+	"A catch breaks if you take a hit or move away. Clear the area first.",
+	"To start a kaiju battle, tap KAIJU on another miner's card. You both get 15 seconds to set your formation.",
+	"Bulwarks and Carapaces take hits well: put them in the front row of a battle formation.",
+	"Razorbacks fight at range: keep them in the back row of a battle formation.",
+	-- Combat
+	"Raise your guard just before a melee hit lands to parry: you take far less damage, spend no stamina and stun your rival.",
+	"Hold your swing and release it on gold for a perfect hit.",
+	"Your sword's gem gives you Q, your chest's E and your shield's R. Swap a gem to swap the move.",
+	"Thermal beats Cryo, Cryo beats Ion, Ion beats Corrosive and Corrosive beats Thermal.",
+	"Press 1 to ask the nearest miner to spar. In a spar, only the two of you can hit each other.",
+	"Arena win streaks restore swings: a tenth on the first win, a quarter on the fifth, half on the tenth.",
+	"A loss ends your win streak. Choose your duels carefully.",
+	-- The base
+	"Ilsa never makes an offer for gems your loadouts use, so selling your spares is safe.",
+	"Skins never change stats. Your gear's rolls and gems stay as they are.",
+	"The Store's stands change every 40 seconds. Wait a few minutes to see everything on sale.",
+	"Mechs are parked in Bays 1 to 8. Drive out either garage door and down its ramp.",
+	"Mechs are for getting around. They can't mine or fight.",
+	"Invite a friend: when they join, you get a swing restore, a kaiju revive and a double XP coupon.",
+	"Daily challenges change every day. Finish all three for a bonus.",
 }
 
 return Vendors

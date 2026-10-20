@@ -1,21 +1,23 @@
 --[[
 	A rift in the Outpost's sky: a rip in space, with another dimension
-	showing through. It hangs in the north, 34 degrees up and past the red
-	moon, so the moon and the stars pass in front of it. Each player's own
-	client draws it (a BillboardGui far out in the black); the server sends
-	nothing.
+	showing through. It hangs in the north, 34 degrees up, beyond the
+	stars: nothing else is in the sky. Each player's own client draws it (a
+	BillboardGui far out in the black); the server sends nothing.
 
 	  the tear    a long, jagged rip leaning like "/", pointed at both ends
-	              and ragged along both sides, with the other side's glow
-	              inside: light flowing along it, a bright filament down
-	              its middle, and stars in colours ours doesn't have
-	  edges       white-hot torn edges, frayed, one side glowing magenta
-	              and the other cyan, flickering
-	  haze        a violet glow spilling out round it into the black
+	              and ragged along both sides, with the other side inside:
+	              a nebula flowing down it (soft, brightest down the
+	              middle), a white-hot filament, and stars in colours ours
+	              doesn't have
+	  edges       white-hot torn edges in a soft glow, frayed, one side a
+	              shade warmer and the other a shade cooler, flickering
+	  haze        the rift's violet glow spilling into the black, in soft
+	              bands that fade out to both sides
+	  rays        long faint shafts of its light breaking out sideways
 	  cracks      fractures running on into space from its ends and sides,
 	              faint, and flashing now and then
-	  shards      pieces of the sky breaking off its edges, spinning away
-	              and fading
+	  shards      dark slivers of the sky breaking off its edges, lit only
+	              along their rims, spinning away and fading
 	  seepage     sparks that leak from its edges and drift out and down, and
 	              glowing motes (3D) falling slowly toward the quarry
 	  surge       every few seconds it flares: the edges blaze, the glow
@@ -39,7 +41,7 @@
 ]]
 local SkyRift = {}
 
-SkyRift.Offset = { 315, 1455, -2135 } -- from the Outpost's middle: north, high, beyond the planets
+SkyRift.Offset = { 315, 1455, -2135 } -- from the Outpost's middle: north, high, beyond the stars
 SkyRift.Size = 1700 -- studs across: the picture, glow and all
 SkyRift.Length, SkyRift.Width = 0.64, 0.15 -- the tear's length, and its widest, as shares of that
 SkyRift.Tilt = 28 -- degrees it leans from upright, its top to the right
@@ -47,18 +49,24 @@ SkyRift.Points = 19 -- down each edge, tips included
 SkyRift.Motes, SkyRift.MoteLife = 20, 4.5 -- seeping sparks, and about how long each lasts
 SkyRift.Shards, SkyRift.ShardLife = 12, 7 -- breaking shards, and about how long each lasts
 SkyRift.SurgeEvery, SkyRift.Cracks = 9, 8
+SkyRift.Rays = 7 -- shafts of light breaking out of it
+SkyRift.HazeSteps = 11 -- slices along each band of its glow (more: smoother ends)
 
-local DEEP = Color3.fromRGB(40, 8, 72)
-local INSIDE = Color3.fromRGB(12, 4, 30)
-local VIOLET = Color3.fromRGB(150, 70, 255)
-local MAGENTA = Color3.fromRGB(255, 70, 210)
-local CYAN = Color3.fromRGB(80, 235, 255)
-local WHITE = Color3.fromRGB(240, 235, 255)
-local CRACK = Color3.fromRGB(235, 215, 255)
+-- One light, the rift's violet, from deep in the black to white-hot at the
+-- tear; its two torn sides a shade warmer and a shade cooler.
+local DEEP = Color3.fromRGB(34, 10, 70) -- the glow at its farthest
+local INSIDE = Color3.fromRGB(8, 4, 22) -- the other side's dark
+local VIOLET = Color3.fromRGB(122, 64, 230)
+local GLOW_EDGE = Color3.fromRGB(196, 168, 255) -- the glow nearest the tear, and the rays
+local EDGE_WARM = Color3.fromRGB(236, 150, 255)
+local EDGE_COOL = Color3.fromRGB(150, 182, 255)
+local WHITE = Color3.fromRGB(244, 240, 255)
+local CRACK = Color3.fromRGB(226, 210, 255)
+local SHARD = Color3.fromRGB(10, 8, 20) -- a sliver of the black, breaking off
 -- The other side's stars: pink, green and gold.
 local ALIEN = { Color3.fromRGB(255, 120, 220), Color3.fromRGB(120, 255, 190), Color3.fromRGB(255, 214, 120), WHITE }
--- The light inside, along the tear.
-local GLOW = { Color3.fromRGB(110, 30, 170), Color3.fromRGB(30, 120, 170), Color3.fromRGB(190, 40, 160) }
+-- The nebula inside, along the tear, top to bottom.
+local NEBULA = { Color3.fromRGB(96, 44, 186), Color3.fromRGB(44, 120, 176), Color3.fromRGB(156, 54, 168) }
 
 local function frac(x: number): number
 	return x - math.floor(x)
@@ -191,6 +199,20 @@ function SkyRift.draw(parent: Instance)
 	local function round(frame: Frame)
 		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, frame)
 	end
+	-- A soft falloff across a frame: clear at both sides, `core` at the
+	-- middle (its transparency there). `turn` 0 fades across its width, 90
+	-- across its height (a bar's thickness).
+	local function soft(frame: Frame, core: number, turn: number, colors: ColorSequence?)
+		new("UIGradient", {
+			Rotation = turn,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.5, core),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+			Color = colors or ColorSequence.new(WHITE),
+		}, frame)
+	end
 	local function mix(a: { number }, b: { number }, f: number): { number }
 		return { a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f }
 	end
@@ -211,33 +233,67 @@ function SkyRift.draw(parent: Instance)
 
 	local canvas = new("Frame", { Name = "Rift", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, parent)
 	local swell = new("UIScale", { Scale = 1 }, canvas)
-	-- A violet haze round it, along it, deepest at the tear (many faint
-	-- layers, so it fades smoothly rather than in bands).
+	-- The glow it casts into the black: three long soft bands along it (the
+	-- widest the faintest and the deepest in colour; each its width, length,
+	-- strength and colour across), each fading out to both sides and, in
+	-- steps along it, to both ends: no hard edges.
 	local HAZE = {
-		{ 0.36, 1, DEEP, 0.96 },
-		{ 0.3, 0.94, DEEP, 0.95 },
-		{ 0.25, 0.88, VIOLET, 0.955 },
-		{ 0.2, 0.83, VIOLET, 0.945 },
-		{ 0.16, 0.78, VIOLET, 0.935 },
-		{ 0.12, 0.73, MAGENTA, 0.92 },
-		{ 0.085, 0.68, MAGENTA, 0.89 },
+		{ 0.46, 0.98, 0.45, ColorSequence.new(DEEP, VIOLET:Lerp(DEEP, 0.35)) },
+		{ 0.26, 0.86, 0.6, ColorSequence.new(VIOLET:Lerp(DEEP, 0.25), VIOLET) },
+		{ 0.12, 0.74, 0.7, ColorSequence.new(VIOLET, GLOW_EDGE) },
 	}
 	local haze = {}
+	local holder = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		Rotation = SkyRift.Tilt,
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+	}, canvas)
 	for i, spec in HAZE do
-		local frame = new("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(spec[1], spec[2]),
-			Rotation = SkyRift.Tilt,
-			BackgroundColor3 = spec[3],
-			BackgroundTransparency = spec[4],
-			ZIndex = 1,
-		}, canvas)
-		round(frame)
-		haze[i] = frame
+		for k = 1, SkyRift.HazeSteps do
+			local s = (k - 0.5) / SkyRift.HazeSteps
+			local frame = new("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5 + (s - 0.5) * spec[2]),
+				Size = UDim2.fromScale(
+					spec[1] * (0.55 + 0.45 * math.sin(math.pi * s) ^ 0.5),
+					spec[2] / SkyRift.HazeSteps + 0.002
+				),
+				BackgroundColor3 = WHITE,
+				BackgroundTransparency = 1,
+				ZIndex = 1,
+			}, holder)
+			soft(frame, 0.05, 0, spec[4])
+			table.insert(haze, { Frame = frame, Layer = i, Fade = math.sin(math.pi * s) ^ 1.4 })
+		end
+	end
+	-- Light breaking out of it: long faint rays fanning from its middle,
+	-- each fading away from the tear.
+	local rays = {}
+	for k = 1, SkyRift.Rays do
+		local i = 4 + (k * 7) % (n - 7)
+		local sign = if k % 2 == 0 then -1 else 1
+		local from = if sign < 0 then left[i] else right[i]
+		local way = math.atan2(across[2] * sign, across[1] * sign) + (hash(k, 15) - 0.5) * 1.6
+		local reach = 0.07 + 0.16 * hash(k, 16)
+		local to = { from[1] + math.cos(way) * reach, from[2] + math.sin(way) * reach }
+		local ray = bar(canvas, from, to, 0, 2, 0.005 + 0.008 * hash(k, 17))
+		ray.BackgroundColor3 = GLOW_EDGE
+		ray.BackgroundTransparency = 0.8
+		-- (bright at the tear, gone at its tip)
+		new("UIGradient", {
+			Rotation = 0,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.35),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}, ray)
+		rays[k] = { Frame = ray, Seed = k * 1.37 }
 	end
 	-- Cracks running on into space: from both ends, along it, and from its
-	-- sides, out; each a zigzag of three.
+	-- sides, out; each a zigzag of three, thin and faint until they flash.
 	local cracks = {}
 	for k = 1, SkyRift.Cracks do
 		local at, way
@@ -257,7 +313,7 @@ function SkyRift.draw(parent: Instance)
 			local turn = way + (hash(k * 3 + j, 5) - 0.5) * 1.3
 			local reach = 0.022 + 0.022 * hash(k * 3 + j, 6)
 			local to = { from[1] + math.cos(turn) * reach, from[2] + math.sin(turn) * reach }
-			local line = bar(canvas, from, to, if j == 1 then 2 else 1, 3)
+			local line = bar(canvas, from, to, 1, 3)
 			line.BackgroundColor3 = CRACK
 			table.insert(lines, line)
 			from = to
@@ -277,20 +333,34 @@ function SkyRift.draw(parent: Instance)
 			slice.BackgroundTransparency = 0
 		end
 	end
-	-- Its light: a glow that flows along it, and a filament down the middle.
+	-- Its depths: a nebula of the other side's light flowing down it, soft
+	-- across its width (deep at the torn edges, brightest down the middle),
+	-- and a filament of white-hot light down the very middle.
 	local flow, filament = {}, {}
 	for i = 1, n - 1 do
 		local s = (i - 0.5) / (n - 1)
-		local glow = bar(canvas, mids[i], mids[i + 1], 0, 5, math.min(gaps[i], gaps[i + 1]) * 0.75)
-		glow.BackgroundColor3 = if s < 0.5 then GLOW[1]:Lerp(GLOW[2], s * 2) else GLOW[2]:Lerp(GLOW[3], s * 2 - 1)
+		local glow = bar(canvas, mids[i], mids[i + 1], 0, 5, math.min(gaps[i], gaps[i + 1]) * 0.9)
+		glow.BackgroundColor3 = WHITE
+		local tint = if s < 0.5 then NEBULA[1]:Lerp(NEBULA[2], s * 2) else NEBULA[2]:Lerp(NEBULA[3], s * 2 - 1)
+		soft(
+			glow,
+			0.05,
+			90,
+			ColorSequence.new({
+				ColorSequenceKeypoint.new(0, INSIDE:Lerp(tint, 0.4)),
+				ColorSequenceKeypoint.new(0.5, tint),
+				ColorSequenceKeypoint.new(1, INSIDE:Lerp(tint, 0.4)),
+			})
+		)
 		flow[i] = glow
-		local line = bar(canvas, mids[i], mids[i + 1], 2, 6)
-		line.BackgroundColor3 = WHITE:Lerp(CYAN, s)
+		local line = bar(canvas, mids[i], mids[i + 1], 3, 6)
+		line.BackgroundColor3 = WHITE:Lerp(GLOW_EDGE, s * 0.6)
+		soft(line, 0, 90)
 		filament[i] = line
 	end
 	-- The other side's stars, inside it.
 	local stars = {}
-	for k = 1, 14 do
+	for k = 1, 16 do
 		local i = 3 + (k * 5) % (n - 4)
 		local u = (hash(k, 4) - 0.5) * gaps[i] * 0.7
 		local star = new("Frame", {
@@ -303,53 +373,53 @@ function SkyRift.draw(parent: Instance)
 		round(star)
 		stars[k] = star
 	end
-	-- The torn edges: a glow (magenta down one side, cyan down the other)
-	-- and a white-hot line.
+	-- The torn edges: a soft glow (warmer down one side, cooler down the
+	-- other, both the rift's violet) round a white-hot line.
 	local edges = {}
 	for side, points in { left, right } do
-		local tint = if side == 1 then MAGENTA else CYAN
+		local tint = if side == 1 then EDGE_WARM else EDGE_COOL
 		for i = 1, n - 1 do
-			local glow = bar(canvas, points[i], points[i + 1], 7, 8)
-			glow.BackgroundColor3 = tint:Lerp(VIOLET, 0.25 * hash(i, side + 7))
+			local glow = bar(canvas, points[i], points[i + 1], 14, 8)
+			glow.BackgroundColor3 = tint
+			soft(glow, 0, 90)
 			local core = bar(canvas, points[i], points[i + 1], 2, 9)
 			core.BackgroundColor3 = WHITE
 			core.BackgroundTransparency = 0.05
 			table.insert(edges, { Glow = glow, Core = core, Seed = i * 1.7 + side * 3.1 })
 			-- (Frayed: a torn thread sticking out of the edge.)
 			local sign = if side == 1 then -1 else 1
-			for j = 1, 1 do
-				local at = mix(points[i], points[i + 1], hash(i * 2 + j, side + 9))
-				local turn = math.atan2(across[2] * sign, across[1] * sign) + (hash(i * 2 + j, side + 11) - 0.5) * 1.6
-				local reach = 0.006 + 0.012 * hash(i * 2 + j, side + 13)
-				local thread = bar(canvas, at, { at[1] + math.cos(turn) * reach, at[2] + math.sin(turn) * reach }, 1, 9)
-				thread.BackgroundColor3 = WHITE:Lerp(tint, 0.5)
-				thread.BackgroundTransparency = 0.25
-			end
+			local at = mix(points[i], points[i + 1], hash(i * 2 + 1, side + 9))
+			local turn = math.atan2(across[2] * sign, across[1] * sign) + (hash(i * 2 + 1, side + 11) - 0.5) * 1.6
+			local reach = 0.006 + 0.012 * hash(i * 2 + 1, side + 13)
+			local thread = bar(canvas, at, { at[1] + math.cos(turn) * reach, at[2] + math.sin(turn) * reach }, 1, 9)
+			thread.BackgroundColor3 = WHITE:Lerp(tint, 0.5)
+			thread.BackgroundTransparency = 0.35
 		end
 	end
-	-- Pieces of the sky breaking away.
+	-- Pieces of the sky breaking away: dark slivers of the black, lit only
+	-- along their edges, each its own long shape.
 	local shards = {}
 	for k = 1, SkyRift.Shards do
 		local shard = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			SizeConstraint = Enum.SizeConstraint.RelativeXX,
-			BackgroundColor3 = INSIDE,
+			BackgroundColor3 = SHARD,
 			BackgroundTransparency = 1,
 			ZIndex = 10,
 		}, canvas)
 		local rim = new("UIStroke", {
-			Thickness = 1.5,
-			Color = if k % 2 == 0 then MAGENTA else CYAN,
+			Thickness = 1,
+			Color = if k % 2 == 0 then EDGE_WARM else EDGE_COOL,
 			Transparency = 1,
 		}, shard)
-		shards[k] = { Frame = shard, Rim = rim }
+		shards[k] = { Frame = shard, Rim = rim, Long = 1.4 + hash(k, 21) * 1.4 }
 	end
 	-- The sparks seeping out.
 	local motes = {}
 	for k = 1, SkyRift.Motes do
 		local mote = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = ({ CYAN, VIOLET, MAGENTA, WHITE })[k % 4 + 1],
+			BackgroundColor3 = ({ EDGE_COOL, VIOLET, EDGE_WARM, WHITE })[k % 4 + 1],
 			BackgroundTransparency = 1,
 			ZIndex = 11,
 		}, canvas)
@@ -357,51 +427,54 @@ function SkyRift.draw(parent: Instance)
 		motes[k] = mote
 	end
 
-	local lastSurge = -1
+	local lastSurge, lastGlow = -1, -1
 	local function update(t: number)
 		local surge = SkyRift.surge(t)
 		local breathe = math.sin(t * 1.3)
-		swell.Scale = 1 + 0.008 * breathe + 0.035 * surge
-		for i, frame in haze do
-			local grow = 1 + 0.03 * math.sin(t * 0.7 + i) + 0.08 * surge
-			frame.Size = UDim2.fromScale(HAZE[i][1] * grow, HAZE[i][2] * grow)
-		end
-		-- (The haze's depth and the edges' thickness change only in a surge.)
-		if math.abs(surge - lastSurge) > 0.01 then
-			lastSurge = surge
-			for i, frame in haze do
-				frame.BackgroundTransparency = HAZE[i][4] - 0.1 * surge
+		swell.Scale = 1 + 0.008 * breathe + 0.03 * surge
+		-- (The haze breathes; its depth and the edges' width change only in a
+		-- surge.)
+		local glow = 0.04 * math.sin(t * 0.7)
+		if math.abs(surge - lastSurge) > 0.01 or math.abs(glow - lastGlow) > 0.01 then
+			lastSurge, lastGlow = surge, glow
+			for _, band in haze do
+				local depth = HAZE[band.Layer][3]
+				band.Frame.BackgroundTransparency = 1 - math.min(1, depth * band.Fade * (1 + 0.45 * surge) + glow)
 			end
 			for _, edge in edges do
-				edge.Glow.Size = UDim2.new(edge.Glow.Size.X.Scale, 2, 0, 7 + 6 * surge)
+				edge.Glow.Size = UDim2.new(edge.Glow.Size.X.Scale, 2, 0, 14 + 10 * surge)
 			end
+		end
+		for _, ray in rays do
+			ray.Frame.BackgroundTransparency =
+				math.clamp(0.72 + 0.22 * (0.5 + 0.5 * math.sin(t * 0.45 + ray.Seed * 2.3)) - 0.3 * surge, 0, 1)
 		end
 		for k, lines in cracks do
 			local lit = surge > 0.3 or SkyRift.crack(t, k)
 			for j, line in lines do
-				line.BackgroundTransparency = if lit then 0.05 + 0.15 * j else 0.7 + 0.08 * j
+				line.BackgroundTransparency = if lit then 0.1 + 0.15 * j else 0.8 + 0.05 * j
 			end
 		end
 		for i, glow in flow do
-			glow.BackgroundTransparency = 0.2 + 0.4 * (0.5 + 0.5 * math.sin(t * 1.6 - i * 0.35)) - 0.15 * surge
+			glow.BackgroundTransparency = 0.15 + 0.35 * (0.5 + 0.5 * math.sin(t * 1.2 - i * 0.3)) - 0.15 * surge
 		end
 		for i, line in filament do
-			line.BackgroundTransparency = 0.35 + 0.3 * (0.5 + 0.5 * math.sin(t * 2.3 - i * 0.8)) - 0.3 * surge
+			line.BackgroundTransparency = 0.2 + 0.3 * (0.5 + 0.5 * math.sin(t * 2.3 - i * 0.8)) - 0.2 * surge
 		end
 		for k, star in stars do
 			star.BackgroundTransparency = 0.15 + 0.6 * (0.5 + 0.5 * math.sin(t * (1.5 + k % 3) + k))
 		end
 		for _, edge in edges do
 			local flicker = 0.5 + 0.5 * math.sin(t * 6.3 + edge.Seed * 2.1) * math.sin(t * 2.9 + edge.Seed)
-			edge.Glow.BackgroundTransparency = math.max(0, 0.3 + 0.35 * flicker - 0.3 * surge)
+			edge.Glow.BackgroundTransparency = math.max(0, 0.15 + 0.3 * flicker - 0.15 * surge)
 		end
 		for k, shard in shards do
 			local x, y, turn, size, fade = SkyRift.shard(t, k)
 			shard.Frame.Position = UDim2.fromScale(x, y)
-			shard.Frame.Size = UDim2.fromScale(size, size)
+			shard.Frame.Size = UDim2.fromScale(size * shard.Long, size / shard.Long)
 			shard.Frame.Rotation = turn
 			shard.Frame.BackgroundTransparency = fade
-			shard.Rim.Transparency = fade
+			shard.Rim.Transparency = 0.3 + 0.7 * fade
 		end
 		for k, mote in motes do
 			local x, y, size, fade = SkyRift.mote(t, k)
@@ -460,7 +533,7 @@ function SkyRift.mount(at: CFrame)
 		NumberSequenceKeypoint.new(0.7, 0.55),
 		NumberSequenceKeypoint.new(1, 1),
 	})
-	seep.Color = ColorSequence.new(VIOLET, CYAN)
+	seep.Color = ColorSequence.new(VIOLET, EDGE_COOL)
 	seep.LightEmission, seep.LightInfluence = 1, 0
 	seep.Rotation, seep.RotSpeed = NumberRange.new(0, 360), NumberRange.new(-30, 30)
 	seep.Enabled = false

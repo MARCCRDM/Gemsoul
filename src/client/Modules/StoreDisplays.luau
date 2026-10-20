@@ -56,9 +56,12 @@ StoreDisplays.TurnReach = 90 -- ...and past this the turning ones keep still
 
 local V = Vector3.new
 local FLOOR = 0.86
-local VIOLET = Color3.fromRGB(196, 120, 255)
+-- Saga Outfitters' colour (the Store's: Server OutpostWorld's STATION.Store),
+-- a marking on the prices, never a light.
+local BRAND = Color3.fromRGB(122, 150, 214)
 local DARK = Color3.fromRGB(30, 32, 42)
 local STEEL = Color3.fromRGB(150, 158, 170)
+local WARM = Color3.fromRGB(255, 238, 214) -- the shop's display lighting
 
 -- Standing at `from`, turned to face `toward` (level), then `turn` more.
 local function facing(from: Vector3, toward: Vector3, turn: number?): CFrame
@@ -262,28 +265,28 @@ function StoreDisplays.build(at: CFrame): Displays
 	local function put(cframe: CFrame, size: Vector3, color: Color3, material: Enum.Material?, shape: string?)
 		return part(model, at * cframe, size, color, material, shape)
 	end
-	-- The lit back wall: a dark panel framed in violet, a light washing it.
+	-- The back wall: a dark panel in a steel frame, washed with warm light.
 	local panel = put(CFrame.new(WALL - 0.15, 8.6, 6), V(0.3, 11, 19), DARK, Enum.Material.Metal)
 	panel.Name = "DisplayWall"
 	local wash = Instance.new("SurfaceLight")
 	wash.Face = Enum.NormalId.Right
-	wash.Color = Color3.fromRGB(226, 214, 255)
+	wash.Color = WARM
 	wash.Range = 10
-	wash.Brightness = 1.2
+	wash.Brightness = 1
 	wash.Angle = 120
 	wash.Parent = panel
 	for _, y in { 3.1, 14.1 } do
-		put(CFrame.new(WALL, y, 6), V(0.16, 0.16, 19.2), VIOLET, Enum.Material.Neon)
+		put(CFrame.new(WALL, y, 6), V(0.3, 0.3, 19.2), STEEL, Enum.Material.Metal)
 	end
 	for _, z in { -3.5, 15.5 } do
-		put(CFrame.new(WALL, 8.6, z), V(0.16, 11.2, 0.16), VIOLET, Enum.Material.Neon)
+		put(CFrame.new(WALL, 8.6, z), V(0.3, 11.2, 0.3), STEEL, Enum.Material.Metal)
 	end
-	-- The helmets' shelf, and a strip of light over each weapon skin's plate.
+	-- The helmets' shelf, and a steel rail over each weapon skin's plate.
 	put(CFrame.new(WALL + 1.5, 11.2, 6), V(3, 0.24, 17.4), STEEL, Enum.Material.Metal)
 	for _, z in ROWS do
-		put(CFrame.new(WALL + 0.08, 6.86, z), V(0.12, 0.12, 2.4), VIOLET, Enum.Material.Neon)
+		put(CFrame.new(WALL + 0.1, 6.86, z), V(0.16, 0.12, 2.4), STEEL, Enum.Material.Metal)
 	end
-	-- The picks' plinths, a band of light round each near its top.
+	-- The picks' plinths, a steel collar round each near its top.
 	for _, z in ROWS do
 		put(
 			CFrame.new(-76, FLOOR + 1.3, z) * CFrame.Angles(0, 0, math.rad(90)),
@@ -294,13 +297,13 @@ function StoreDisplays.build(at: CFrame): Displays
 		)
 		put(
 			CFrame.new(-76, FLOOR + 2.3, z) * CFrame.Angles(0, 0, math.rad(90)),
-			V(0.12, 2.5, 2.5),
-			VIOLET,
-			Enum.Material.Neon,
+			V(0.16, 2.56, 2.56),
+			DARK,
+			Enum.Material.Metal,
 			"Cylinder"
 		)
 	end
-	-- The suits' turntables, ringed in light, each lit from its rim.
+	-- The suits' turntables, a steel rim round each, lit warm.
 	for _, z in { -8, 20 } do
 		put(
 			CFrame.new(-62, FLOOR + 0.35, z) * CFrame.Angles(0, 0, math.rad(90)),
@@ -312,14 +315,14 @@ function StoreDisplays.build(at: CFrame): Displays
 		local rim = put(
 			CFrame.new(-62, FLOOR + 0.06, z) * CFrame.Angles(0, 0, math.rad(90)),
 			V(0.12, 5, 5),
-			VIOLET,
-			Enum.Material.Neon,
+			STEEL,
+			Enum.Material.Metal,
 			"Cylinder"
 		)
 		local glow = Instance.new("PointLight")
-		glow.Color = VIOLET
+		glow.Color = WARM
 		glow.Range = 9
-		glow.Brightness = 0.8
+		glow.Brightness = 0.6
 		glow.Parent = rim
 		-- (its plate on a short post in front)
 		put(CFrame.new(-58.6, FLOOR + 0.5, z), V(0.24, 1, 0.24), STEEL, Enum.Material.Metal)
@@ -340,8 +343,8 @@ function StoreDisplays.build(at: CFrame): Displays
 		local lines = {}
 		for k, line in
 			{
-				{ 0, 0.6, Enum.Font.GothamBold, Color3.fromRGB(236, 240, 255) },
-				{ 0.58, 0.42, Enum.Font.GothamBlack, VIOLET },
+				{ 0, 0.6, Enum.Font.GothamBold, Color3.fromRGB(236, 234, 228) },
+				{ 0.58, 0.42, Enum.Font.GothamBold, BRAND },
 			}
 		do
 			local text = Instance.new("TextLabel")

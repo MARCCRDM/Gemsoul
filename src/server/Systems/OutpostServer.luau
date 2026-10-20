@@ -894,25 +894,22 @@ local function drawBoard()
 		l.Parent = gui
 		return l
 	end
-	label(
-		"SAGA OUTPOST  ·  HALL OF MINERS",
-		0,
-		14,
-		1140,
-		52,
-		44,
-		Color3.fromRGB(255, 196, 90),
-		Enum.Font.GothamBlack,
-		Enum.TextXAlignment.Center
-	)
+	-- (In the base's sign style: warm white condensed capitals, grey
+	-- headings, each column's colour a bar beside its heading.)
+	label("MINER STANDINGS", 40, 14, 1060, 52, 44, Color3.fromRGB(238, 234, 224), Enum.Font.Oswald)
 	for column, spec in
 		{
-			{ "Gear", "TOP ARMOR  ·  GEAR SCORE", Color3.fromRGB(110, 220, 255) },
-			{ "Wins", "MOST DUEL WINS", Color3.fromRGB(255, 110, 120) },
+			{ "Gear", "GEAR SCORE", Color3.fromRGB(122, 150, 214) },
+			{ "Wins", "DUEL WINS", Color3.fromRGB(214, 84, 70) },
 		}
 	do
 		local x = 40 + (column - 1) * 560
-		label(spec[2], x, 84, 520, 34, 28, spec[3])
+		local bar = Instance.new("Frame")
+		bar.BorderSizePixel = 0
+		bar.BackgroundColor3 = spec[3]
+		bar.Position, bar.Size = UDim2.fromOffset(x, 86), UDim2.fromOffset(6, 30)
+		bar.Parent = gui
+		label(spec[2], x + 16, 84, 504, 34, 28, Color3.fromRGB(160, 166, 176), Enum.Font.Oswald)
 		local rows = TopPlayers.board(spec[1])
 		for i = 1, 8 do
 			local row = rows[i]
@@ -948,12 +945,12 @@ local function drawSigns()
 			l.BackgroundTransparency = 1
 			l.Size, l.Position = UDim2.new(1, 0, 0, line[2] + 8), UDim2.fromOffset(0, line[3])
 			l.Text, l.TextSize = line[1], line[2]
-			l.TextColor3 = if i == 1 then color else Color3.fromRGB(220, 235, 255)
-			l.Font = if i == 1 then Enum.Font.GothamBlack else Enum.Font.GothamMedium
+			l.TextColor3 = if i == 1 then color else Color3.fromRGB(160, 166, 176)
+			l.Font = if i == 1 then Enum.Font.Oswald else Enum.Font.GothamMedium
 			l.Parent = gui
 		end
 	end
-	sign(site.Probe, "PROBE-7", "SWING REFILLS  ·  EXCHANGE", Color3.fromRGB(110, 220, 255))
+	sign(site.Probe, "PROBE-7", "SWING REFILLS", Color3.fromRGB(200, 230, 245))
 end
 
 -- An Easter egg found: paid once per player (and a bonus for the full set),

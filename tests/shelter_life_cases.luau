@@ -268,27 +268,40 @@ for i, entry in odds do
 	check((sparkles ~= nil) == (entry.Tier == "Legendary"), "Sparkles on the wrong gem")
 end
 
--- The garden's fireflies hang over the Moon Garden.
+-- The survey table's scan goes round over its map, under the benches' eyes.
 do
-	local garden = shelter:FindFirstChild("MoonGarden")
-	local flies = life.Model:FindFirstChild("Fireflies")
-	check(garden and flies, "No garden or no fireflies")
-	local q = here(flies.CFrame.Position)
+	local survey = shelter:FindFirstChild("SurveyTable")
+	local sweep = life.Model:FindFirstChild("SurveySweep")
+	check(survey and sweep and life.Sweep == sweep, "No survey table or no scan")
+	local map = survey:FindFirstChild("SurveyMap")
+	check(map and map:FindFirstChildOfClass("SurfaceGui"), "The survey table has no map")
+	local middle = Vector3.new(Life.Survey.X, 0, Life.Survey.Z)
 	local benches = 0
-	for _, d in garden:GetDescendants() do
+	for _, d in survey:GetDescendants() do
 		if d:IsA("Seat") then
 			benches += 1
 			local b = here(d.CFrame.Position)
-			check(math.abs(math.sqrt((b.X - q.X) ^ 2 + (b.Z - q.Z) ^ 2) - 11.5) < 0.1, "A bench away from the garden")
+			check(math.abs((Vector3.new(b.X, 0, b.Z) - middle).Magnitude - 11.5) < 0.1, "A bench away from the table")
 		end
 	end
-	check(benches == 4, "The garden doesn't have four benches")
+	check(benches == 4, "The survey table doesn't have four benches")
+	local seen = {}
+	for _, t in { 0, 1.5, 3, 4.5 } do
+		Life.pose(life, t)
+		local q = here(sweep.CFrame.Position)
+		local off = Vector3.new(q.X, 0, q.Z) - middle
+		check(math.abs(off.Magnitude - 2.5) < 0.05, "The scan isn't on the map")
+		check(math.abs(q.Y - (Life.Survey.Y + Life.SweepY)) < 0.01, "The scan isn't just over the map")
+		local mapTop = here(map.CFrame.Position).Y + map.Size.Y / 2
+		check(q.Y > mapTop, "The scan is under the glass")
+		table.insert(seen, off.Unit)
+	end
+	check(seen[1]:Dot(seen[3]) < -0.99, "The scan doesn't go round")
 end
 
--- The drones: in the hall, under the bunting and over everyone's heads,
--- clear of the tree, the arena's sign, the lamps and each other, gliding
--- (never jumping).
-local crown = Vector3.new(Life.Garden.X, Life.Garden.Y + 13.2, Life.Garden.Z)
+-- The drones: in the hall, under the lamps and over everyone's heads,
+-- clear of the arena's sign, the pendants and each other, gliding (never
+-- jumping).
 local last = {}
 for t = 0, 240, 0.25 do
 	local spots = {}
@@ -296,8 +309,7 @@ for t = 0, 240, 0.25 do
 		local q = Life.droneAt(k, t).Position
 		spots[k] = q
 		check(math.abs(q.X) < 78 and q.Z > -10 and q.Z < 56, "A drone leaves the hall")
-		check(q.Y > 18 and q.Y < 23, "A drone flies too low or into the bunting")
-		check((q - crown).Magnitude > 5, "A drone flies into the tree")
+		check(q.Y > 18 and q.Y < 23, "A drone flies too low or into the lamps")
 		check(not (math.abs(q.X) < 10 and math.abs(q.Z - 37.5) < 3), "A drone flies into the arena's sign")
 		for _, s in { -1, 1 } do
 			check((q - Vector3.new(s * 14, 28, 18)).Magnitude > 5, "A drone flies into a lamp")
@@ -321,5 +333,5 @@ print(
 		.. count
 		.. " parts drawn, "
 		.. built
-		.. " built: the hologram, the gallery's gems and odds, the garden, the drones)"
+		.. " built: the hologram, the gallery's gems and odds, the survey scan, the drones)"
 )

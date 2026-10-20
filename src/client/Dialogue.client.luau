@@ -24,8 +24,11 @@ local player = Players.LocalPlayer
 
 local WALK_AWAY_DISTANCE = 16
 local TYPE_SPEED = 60 -- characters per second
-local SCREEN_BG = Color3.fromRGB(8, 14, 12)
-local TEXT = Color3.fromRGB(210, 255, 225)
+-- The game's window look (IronUi.window): navy, a hairline edge, the
+-- speaker's station colour as a short bar under the name. The words sit
+-- in an inset, in plain Gotham.
+local SCREEN_BG = IronUi.Colors.Inset
+local TEXT = Color3.fromRGB(226, 230, 238)
 
 -- Quota --------------------------------------------------------------------
 
@@ -89,10 +92,9 @@ panel.Size = UDim2.fromScale(0.92, 0)
 panel.AutomaticSize = Enum.AutomaticSize.Y
 panel.BackgroundColor3 = Color3.new(1, 1, 1)
 panel.Parent = gui
--- The crystal window look; the shopkeeper's words stay on a green screen.
 local shade = Instance.new("UIGradient")
 shade.Rotation = 90
-shade.Color = ColorSequence.new(Color3.fromRGB(34, 26, 48), IronUi.Colors.Frame)
+shade.Color = ColorSequence.new(Color3.fromRGB(14, 18, 28), Color3.fromRGB(7, 9, 15))
 shade.Parent = panel
 
 local sizeLimit = Instance.new("UISizeConstraint")
@@ -100,12 +102,13 @@ sizeLimit.MaxSize = Vector2.new(620, math.huge)
 sizeLimit.Parent = panel
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 16)
+corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = panel
 
 local stroke = Instance.new("UIStroke")
-stroke.Thickness = 4
-stroke.Color = IronUi.Colors.Gold
+stroke.Thickness = 1
+stroke.Color = Color3.new(1, 1, 1)
+stroke.Transparency = 0.86
 stroke.Parent = panel
 
 local padding = Instance.new("UIPadding")
@@ -134,22 +137,29 @@ local function label(order: number, font: Enum.Font, size: number): TextLabel
 	return text
 end
 
-local header = label(1, IronUi.Heading, 24)
-IronUi.outline(header, 3)
-local body = label(2, Enum.Font.Code, 18)
+local header = label(1, IronUi.Heading, 20)
+-- (The speaker's colour, a short bar under their name.)
+local accent = Instance.new("Frame")
+accent.Size = UDim2.fromOffset(44, 3)
+accent.Position = UDim2.new(0, 0, 1, 4)
+accent.BorderSizePixel = 0
+accent.Parent = header
+local body = label(2, IronUi.Body, 17)
+body.LineHeight = 1.15
 body.BackgroundColor3 = SCREEN_BG
 body.BackgroundTransparency = 0
 local bodyCorner = Instance.new("UICorner")
-bodyCorner.CornerRadius = UDim.new(0, 10)
+bodyCorner.CornerRadius = UDim.new(0, 8)
 bodyCorner.Parent = body
 local bodyPad = Instance.new("UIPadding")
 for _, side in { "PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight" } do
-	bodyPad[side] = UDim.new(0, 10)
+	bodyPad[side] = UDim.new(0, 12)
 end
 bodyPad.Parent = body
 local bodyStroke = Instance.new("UIStroke")
-bodyStroke.Color = IronUi.Colors.Ink
-bodyStroke.Thickness = 2
+bodyStroke.Color = IronUi.Colors.Edge
+bodyStroke.Transparency = 0.5
+bodyStroke.Thickness = 1
 bodyStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 bodyStroke.Parent = body
 
@@ -191,18 +201,18 @@ local function close()
 	gui.Enabled = false
 end
 
--- A reply to pick: a chunky slab with the text on the left.
+-- A reply to pick: a slab in the game's slate, the text on the left.
 local function optionButton(order: number, text: string, color: Color3, onClick: () -> ())
 	local button, face = IronUi.chunk(options, {
-		Color = Color3.fromRGB(40, 58, 52),
-		Rim = Color3.fromRGB(110, 170, 150),
-		Size = UDim2.new(1, 0, 0, 44),
-		Radius = 10,
-		Lip = 4,
+		Color = IronUi.Colors.Slot,
+		Rim = IronUi.Colors.Edge,
+		Size = UDim2.new(1, 0, 0, 40),
+		Radius = 8,
+		Lip = 2,
 		Stripes = "None",
 	})
 	button.LayoutOrder = order
-	local reply = IronUi.label(button, face, "►  " .. text, 16)
+	local reply = IronUi.label(button, face, text, 16)
 	reply.TextColor3 = color
 	reply.TextXAlignment = Enum.TextXAlignment.Left
 	reply.TextWrapped = true
@@ -291,15 +301,15 @@ function actions.Appraise()
 	local commons, commonCoins = spareOffer("Common")
 	local uncommons, uncommonCoins = spareOffer("Uncommon")
 	if commons + uncommons == 0 then
-		say("No spare Commons or Uncommons on you. Pick a gem to sell, or go and break some rocks.")
+		say("No spare Commons or Uncommons in your pouch. Choose a gem to sell, or bring more from the quarry.")
 	elseif uncommons == 0 then
-		say(string.format("Spare Commons: %d, worth %d coins to me.", commons, commonCoins))
+		say(string.format("Spare Commons: %d. My offer: %d coins.", commons, commonCoins))
 	elseif commons == 0 then
-		say(string.format("Spare Uncommons: %d, worth %d coins to me.", uncommons, uncommonCoins))
+		say(string.format("Spare Uncommons: %d. My offer: %d coins.", uncommons, uncommonCoins))
 	else
 		say(
 			string.format(
-				"Spare Commons: %d, worth %d coins. Spare Uncommons: %d, worth %d coins.",
+				"Spare Commons: %d, %d coins. Spare Uncommons: %d, %d coins.",
 				commons,
 				commonCoins,
 				uncommons,
@@ -351,9 +361,9 @@ function actions.Appraise()
 	showMenu(items)
 end
 
--- Borin's stands: straight to that aisle of the Store.
+-- Borin's stands: straight to that section of the Store.
 function actions.Store()
-	say("Pick an aisle. Everything on my stands is in there.")
+	say("Which section of the Store?")
 	local items: { MenuItem } = {}
 	for _, aisle in
 		{
@@ -405,8 +415,8 @@ local function open(vendorId: string, part: BasePart)
 		return
 	end
 	current = { vendor = vendor, part = part }
-	bodyStroke.Color = vendor.Color
-	header.TextColor3 = vendor.Color
+	header.TextColor3 = TEXT
+	accent.BackgroundColor3 = vendor.Color
 	header.Text = string.upper(vendor.Name .. " // " .. vendor.Role)
 
 	-- Its options; a topic's (an option with Options of its own) shown in

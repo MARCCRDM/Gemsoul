@@ -94,54 +94,23 @@ end
 check(inside(0.5, 0.5) and inside(spine[4][1], spine[4][2]), "The middle isn't inside the tear")
 check(not inside(0.5, 0.05) and not inside(0.9, 0.5), "Far off counts as inside the tear")
 
--- The sky's bodies (OutpostWorld's sky; the gas giant's size is its rings),
--- as the rift's picture sees them from the quarry (the billboard faces you):
--- the tear and its cracks clear them all, and any the picture reaches passes
--- in front of it.
-local function cross(u, v)
-	return { u[2] * v[3] - u[3] * v[2], u[3] * v[1] - u[1] * v[3], u[1] * v[2] - u[2] * v[1] }
+-- Nothing else in the sky: OutpostWorld's sky is stars only (the planets
+-- that hung there are gone, so nothing competes with the rift).
+for _, body in {
+	{ "gas giant", "CFrame.new(-900, 520, -1500)" },
+	{ "home world", "CFrame.new(1100, 380, -1300)" },
+	{ "red moon", "CFrame.new(300, 700, -1700)" },
+} do
+	check(string.find(WorldSource, body[2], 1, true) == nil, "The " .. body[1] .. " is back in the sky")
 end
-local function dot(u, v)
-	return u[1] * v[1] + u[2] * v[2] + u[3] * v[3]
+do
+	local from = string.find(WorldSource, "local function sky(parent", 1, true)
+	local to = from and string.find(WorldSource, "\nend\n", from, true)
+	check(from and to, "OutpostWorld's sky moved: update these checks")
+	local body = string.sub(WorldSource, from, to)
+	local _, parts = string.gsub(body, "part%(", "")
+	check(parts == 1 and string.find(body, "for _ = 1, 260 do", 1, true) ~= nil, "The sky has more than its stars")
 end
-local forward = { rift[1] / distance, rift[2] / distance, rift[3] / distance }
-local rightward = cross(forward, { 0, 1, 0 })
-local r = length(rightward)
-rightward = { rightward[1] / r, rightward[2] / r, rightward[3] / r }
-local upward = cross(rightward, forward)
-local reach = math.deg(math.atan(SkyRift.Size / 2 / distance))
-local bodies = {
-	{ "gas giant", "CFrame.new(-900, 520, -1500)", { -900, 520, -1500 }, 700 },
-	{ "home world", "CFrame.new(1100, 380, -1300)", { 1100, 380, -1300 }, 136 },
-	{ "red moon", "CFrame.new(300, 700, -1700)", { 300, 700, -1700 }, 45 },
-}
-local overlapped = 0
-for _, body in bodies do
-	check(string.find(WorldSource, body[2], 1, true) ~= nil, "The " .. body[1] .. " moved: update these checks")
-	local at = { body[3][1] - eye[1], body[3][2] - eye[2], body[3][3] - eye[3] }
-	local depth = dot(at, forward)
-	-- (Where it is on the picture, and how big, in shares of it.)
-	local x = 0.5 + dot(at, rightward) / depth * distance / SkyRift.Size
-	local y = 0.5 - dot(at, upward) / depth * distance / SkyRift.Size
-	local radius = body[4] / depth * distance / SkyRift.Size
-	local nearest = math.huge
-	for i = 1, n - 1 do
-		for _, side in { left, right, spine } do
-			for f = 0, 1, 0.1 do
-				local px = side[i][1] + (side[i + 1][1] - side[i][1]) * f
-				local py = side[i][2] + (side[i + 1][2] - side[i][2]) * f
-				nearest = math.min(nearest, math.sqrt((px - x) ^ 2 + (py - y) ^ 2))
-			end
-		end
-	end
-	check(nearest > radius + 0.08, "The tear runs into the " .. body[1] .. ": " .. nearest - radius)
-	local degreesApart = math.deg(math.acos(math.clamp(dot(at, forward) / length(at), -1, 1)))
-	if degreesApart < math.deg(math.asin(body[4] / length(at))) + reach then
-		overlapped += 1
-		check(length(at) + body[4] < distance, "The " .. body[1] .. " is behind the rift's glow")
-	end
-end
-check(overlapped >= 1, "The rift's glow doesn't pass behind the red moon any more")
 -- The star dome is 1,700 studs out: the rift is beyond it too.
 check(distance - SkyRift.Size / 2 > 1700, "The rift reaches in front of the stars")
 
@@ -199,7 +168,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d sky rift checks (placement behind and clear of the planets, the tear, sparks, shards, surge, cracks)",
+		"PASS: %d sky rift checks (placement high in the north and alone in the sky, the tear, sparks, shards, surge, cracks)",
 		checks
 	)
 )
