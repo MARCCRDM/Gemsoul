@@ -4,19 +4,21 @@
 
 	  The gate     a Rift Gate's prompt (PromptKind Rift) opens its card:
 	               what's through it, who's going (your party's trip, if
-	               one of them is on the path), and going alone, a warning
+	               one of them is on the way), and going alone, a warning
 	               sign: GOING ALONE IS VERY DIFFICULT, with INVITE A FRIEND
 	               right beside it. ENTER (ENTER ALONE) goes in.
 	  Crossing     the screen goes dark while you go through ("THE RIFT",
 	               and the same warning when you're alone), then clears on
 	               the other side.
 	  In there     everything lit like the place (RiftClient.hellLighting:
-	               a red haze, the lava's glow; Scenes.outpostLighting puts
-	               the Outpost's back), and a strip along the top: which
-	               island (its pips: the four and the throne), how many
-	               critters are left, the boss, the gems you've found and
-	               how many of you are in. Through a way home (PromptKind
-	               RiftExit) and you're out.
+	               a burning dusk, no stars, the sky red at its edges and
+	               violet overhead; Scenes.outpostLighting puts the
+	               Outpost's back), and a strip along the top: which cave
+	               (its pips: the four and the throne), how many foes are
+	               left, the boss, the gems you've found and how many of
+	               you are in. Your combat kit is out the whole way (the
+	               server's). Through a way home (PromptKind RiftExit) and
+	               you're out.
 	  Down         knocked out at the boss: YOU'RE DOWN, the boss still
 	               standing, and what now: RESTORE (its cost: your health and
 	               your kaiju's), INVITE A FRIEND or BACK TO BASE (keeping
@@ -88,18 +90,21 @@ end
 
 -- The colours of the place ------------------------------------------------------------------------------------
 
--- A red haze over everything, the lava's glow blooming, the stars dimmed.
+-- A burning dusk: the sun just down (no disc, no stars), the air glowing
+-- orange-red at the horizon and bruised violet overhead, round the scar torn
+-- across the sky (World.RiftWorld's); the braziers' fire blooming.
 RiftClient.Hell = {
-	Ambient = Color3.fromRGB(84, 34, 30),
-	Outdoor = Color3.fromRGB(122, 52, 40),
-	Brightness = 1.4,
-	Exposure = 0.15,
-	Haze = { Density = 0.38, Offset = 0.2, Haze = 2.4, Glare = 0.15 },
-	HazeColor = Color3.fromRGB(190, 60, 34),
-	HazeDecay = Color3.fromRGB(90, 16, 10),
+	Clock = 17.8,
+	Ambient = Color3.fromRGB(96, 42, 40),
+	Outdoor = Color3.fromRGB(140, 64, 52),
+	Brightness = 1.6,
+	Exposure = 0.1,
+	Haze = { Density = 0.36, Offset = 0.15, Haze = 2.8, Glare = 0.5 },
+	HazeColor = Color3.fromRGB(215, 84, 52),
+	HazeDecay = Color3.fromRGB(92, 24, 64),
 	Grade = { Contrast = 0.14, Saturation = 0.12, Tint = Color3.fromRGB(255, 222, 205) },
 	Bloom = { Intensity = 0.6, Size = 28, Threshold = 1.2 },
-	Stars = 400,
+	Stars = 0,
 }
 
 local function effect(kind: string): any
@@ -113,7 +118,7 @@ end
 
 function RiftClient.hellLighting()
 	local hell = RiftClient.Hell
-	Lighting.ClockTime = 0
+	Lighting.ClockTime = hell.Clock
 	Lighting.Brightness = hell.Brightness
 	Lighting.Ambient = hell.Ambient
 	Lighting.OutdoorAmbient = hell.Outdoor
@@ -130,6 +135,7 @@ function RiftClient.hellLighting()
 	local sky = Lighting:FindFirstChildOfClass("Sky")
 	if sky then
 		sky.StarCount = hell.Stars
+		sky.CelestialBodiesShown = false
 	end
 end
 
@@ -338,13 +344,16 @@ function RiftClient.openGate(vein: any)
 	-- (A phone's screen is short: the essentials in a line.)
 	local lines = if small
 		then {
-			string.format("%d islands of critters, then a boss. Fall on the path and they rob you.", RiftRun.Rooms),
+			string.format("%d caves of critters and fighters, then a boss. Fall and they rob you.", RiftRun.Rooms),
 		}
 		else {
-			"Through the tear: the critters' own world, burning under a red moon.",
-			string.format("%d islands of brainrot critters, then one of the big ones on its throne.", RiftRun.Rooms),
-			"Your kaiju go in with you. Clear an island and you each find a gem.",
-			"Knocked out on the path, the critters rob you of what you found in there.",
+			"Through the tear: the critters' own world, caves under a burning sky.",
+			string.format(
+				"%d caves of brainrot critters and fighters, then one of the big ones on its throne.",
+				RiftRun.Rooms
+			),
+			"Go in with your combat kit and your kaiju. Clear a cave and you each find a gem.",
+			"Knocked out on the way, the critters rob you of what you found in there.",
 		}
 	for i, line in lines do
 		local l = text(panel, line, if i == 1 and not small then 13 else 12, if i == 1 then P.Text else P.Dim)
@@ -423,23 +432,25 @@ end
 -- The strip ---------------------------------------------------------------------------------------------------
 
 -- Its two lines from the Rift attributes: { Room, Left, Boss, Found,
--- Runners, Won, ExitIn (seconds) }.
+-- Runners, Won, ExitIn (seconds; nil while the boss's loot is still up) }.
 function RiftClient.stripText(state): (string, string)
 	local where
-	if state.Won then
+	if state.Won and state.ExitIn == nil then
+		where = "BOSS DOWN  ·  CLAIM, ROLL OR PASS"
+	elseif state.Won then
 		where = string.format("BOSS DOWN  ·  HOME IN %d:%02d", state.ExitIn // 60, state.ExitIn % 60)
 	elseif (state.Room or 1) > RiftRun.Rooms then
-		where = string.format("THRONE ISLAND  ·  %s", string.upper(state.Boss or "?"))
+		where = string.format("THRONE CAVE  ·  %s", string.upper(state.Boss or "?"))
 	elseif (state.Left or 0) > 0 then
 		where = string.format(
-			"ISLAND %d OF %d  ·  %d CRITTER%s LEFT",
+			"CAVE %d OF %d  ·  %d FOE%s LEFT",
 			state.Room,
 			RiftRun.Rooms,
 			state.Left,
 			if state.Left == 1 then "" else "S"
 		)
 	else
-		where = string.format("ISLAND %d OF %d", state.Room or 1, RiftRun.Rooms)
+		where = string.format("CAVE %d OF %d", state.Room or 1, RiftRun.Rooms)
 	end
 	local who = if (state.Runners or 1) <= 1 then "ALONE" else string.format("%d IN", state.Runners)
 	return where, string.format("FOUND %d  ·  %s", state.Found or 0, who)
@@ -454,7 +465,7 @@ local function stateOf()
 		Found = player:GetAttribute("RiftFound") or 0,
 		Runners = player:GetAttribute("RiftRunners") or 1,
 		Won = player:GetAttribute("RiftWon") == true,
-		ExitIn = if type(exit) == "number" then math.max(0, math.ceil(exit - serverNow())) else 0,
+		ExitIn = if type(exit) == "number" then math.max(0, math.ceil(exit - serverNow())) else nil,
 	}
 end
 
@@ -478,7 +489,7 @@ local function buildStrip()
 	local tag = text(bar, "THE RIFT", if small then 10 else 11, EMBER, BOLD)
 	tag.AutomaticSize = Enum.AutomaticSize.None
 	tag.Position, tag.Size = UDim2.fromOffset(12, 5), UDim2.fromOffset(80, 14)
-	-- The islands as pips, the throne's a bigger one: lit up to where you are.
+	-- The caves as pips, the throne's a bigger one: lit up to where you are.
 	table.clear(pips)
 	for i = 1, RiftRun.Rooms + 1 do
 		local throne = i > RiftRun.Rooms

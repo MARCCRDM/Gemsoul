@@ -335,25 +335,38 @@ end
 -- (Owner) by threat (Shared.Aggro). False when nobody's left (the raid is over).
 local function raidTarget(duel, now: number): boolean
 	local raid = duel.Raid
+	-- (A Rift trip's fighters: its runners are whoever's still in it,
+	-- hunting with their kit out, no raid session; Server.RiftServer ends
+	-- the trip, and them with it.)
+	local rift = duel.Dungeon ~= nil and duel.Dungeon.Rift == true
 	for i = #raid.Members, 1, -1 do
 		local member = raid.Members[i]
 		local _, humanoid = ownerRoot(member)
-		if
-			not member.Parent
-			or (not humanoid and not member:GetAttribute("DungeonSelecting"))
-			or member:GetAttribute("RaidId") ~= raid.Id
-			or member:GetAttribute("CombatSession") ~= "Raid"
-		then
+		local gone = if rift
+			then not member.Parent or member:GetAttribute("RiftRun") ~= raid.Id
+			else not member.Parent
+				or (not humanoid and not member:GetAttribute("DungeonSelecting"))
+				or member:GetAttribute("RaidId") ~= raid.Id
+				or member:GetAttribute("CombatSession") ~= "Raid"
+		if gone then
 			table.remove(raid.Members, i)
 			if duels[member] == duel then
 				duels[member] = nil
 			end
-			for _, other in raid.Members do
-				Remotes.Notify:FireClient(other, member.DisplayName .. " is down!")
+			if not rift then
+				for _, other in raid.Members do
+					Remotes.Notify:FireClient(other, member.DisplayName .. " is down!")
+				end
 			end
 		end
 	end
 	if #raid.Members == 0 then
+		if rift then
+			if duel.Enemy.Alive then
+				Enemies.remove(duel.Enemy)
+			end
+			return false
+		end
 		for _, member in raid.All do
 			if member.Parent then
 				member:SetAttribute("RaidId", nil)
@@ -379,7 +392,8 @@ local function raidTarget(duel, now: number): boolean
 	local candidates = {}
 	for _, member in raid.Members do
 		local memberRoot, humanoid = ownerRoot(member)
-		if memberRoot and humanoid and not member:GetAttribute("DungeonSelecting") then
+		local down = rift and (member:GetAttribute("SparDown") or 0) > workspace:GetServerTimeNow()
+		if memberRoot and humanoid and not member:GetAttribute("DungeonSelecting") and not down then
 			local distance = (memberRoot.Position - root.Position).Magnitude
 			table.insert(candidates, {
 				Key = member,
@@ -389,6 +403,9 @@ local function raidTarget(duel, now: number): boolean
 				HealthRatio = humanoid.Health / math.max(1, humanoid.MaxHealth),
 			})
 		end
+	end
+	if rift and #candidates == 0 then
+		return false -- (everyone in is down: it waits)
 	end
 	if enemy.Aggro.Target == nil and table.find(raid.Members, duel.Owner) then
 		enemy.Aggro.Target, enemy.Aggro.Since = duel.Owner, clock
@@ -1019,6 +1036,9 @@ local function think(enemy, now: number)
 	if owner:GetAttribute("DungeonSelecting") then return end
 	local root, humanoid = enemy.Root, enemy.Humanoid
 	local fallen = owner.Character and owner.Character:FindFirstChildOfClass("Humanoid")
+	if fallen and fallen.Health <= 0 and duel.Dungeon and duel.Dungeon.Rift then
+		return -- (the Rift deals with its fallen: Server.RiftServer)
+	end
 	if fallen and fallen.Health <= 0 then
 		if not duel.Raid and not duel.Dungeon then
 			countDuel(owner, false)
@@ -1771,7 +1791,9 @@ function spawnRival(owner: Player, raid, encounter)
 	-- for half and gives no rewards; a raid, a boss for the whole party.
 	local session = owner:GetAttribute("CombatSession")
 	if raid then
-		if session ~= "Raid" then
+		-- (A Rift trip's runners hunt with their kit out: no raid session.)
+		local rift = encounter ~= nil and encounter.Rift == true
+		if (rift and owner:GetAttribute("RiftRun") ~= raid.Id) or (not rift and session ~= "Raid") then
 			return
 		end
 	elseif session ~= "PvP" and session ~= "Training" then
@@ -1900,7 +1922,7 @@ function spawnRival(owner: Player, raid, encounter)
 		raidHealth, raidDamage = Matchmaking.raidScale(#raid.Members, raid.Wave)
 		health = math.floor(health * raidHealth)
 		if encounter then
-			health = math.floor(health * (if encounter.Boss then 2.2 else 0.38))
+			health = math.floor(health * (if encounter.Boss then 2.2 else 0.38) * (encounter.HealthScale or 1))
 			raidDamage *= if encounter.Boss then 1 else 0.65
 		end
 	end
@@ -2016,9 +2038,16 @@ function spawnRival(owner: Player, raid, encounter)
 	enemy.Duel = duel
 	if encounter then
 		duel.Dungeon = encounter
-		enemy.DungeonId = raid.Id
 		enemy.ElementWeakness = encounter.Spec.Weakness
-		enemy.Model:SetAttribute("DungeonId", raid.Id)
+		if encounter.Rift then
+			-- (A Rift trip's: anyone in there can hit it and be hit by it,
+			-- kaiju too, as they do the critters: KaijuServer.)
+			(enemy :: any).OutpostCreature = true
+			enemy.Model:SetAttribute("RiftRun", raid.Id)
+		else
+			enemy.DungeonId = raid.Id
+			enemy.Model:SetAttribute("DungeonId", raid.Id)
+		end
 		enemy.Model:SetAttribute("RaidBandit", encounter.Bandit == true)
 		enemy.Model:SetAttribute("ElementWeakness", encounter.Spec.Weakness)
 		enemy.Model:SetAttribute("ElementResistance", encounter.Spec.Element)

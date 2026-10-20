@@ -53,8 +53,11 @@
 	Critter (the roster id of what's coming through) and Prey (the UserId it
 	comes for); the dormant ones at the Rift Veins (site.Scars) carry
 	Dormant instead of a timeline, and stay. Each player carries
-	FrontierBand (Core, Fringe or Edge), FrontierNoise and FrontierStir
-	(how stirred up: both 0..1, in twentieths) for their HUD.
+	FrontierBand (Core, Fringe or Edge), FrontierBiome (the biome they're
+	in, Shared.Frontier.Biomes: nil in the core), FrontierNoise and
+	FrontierStir (how stirred up: both 0..1, in twentieths) for their HUD.
+	What comes through leans to the biome it comes through in (its own
+	kind of critter: KaijuWilds.pickWave).
 
 	  FrontierServer.start(site)
 	  FrontierServer.swing(player, swings)   a swing out there (OutpostServer)
@@ -299,13 +302,21 @@ local function openTears(): { Vector3 }
 	return spots
 end
 
+-- The element of the biome round `position` (nil in the core).
+local function homeAt(position: Vector3): string?
+	local biome = Frontier.biomeAt(position - center())
+	return biome and biome.Element
+end
+
 -- A swarm of `count` comes for `player`, trickling in: its rifts open near
 -- them one after another (Frontier.trickle), each well clear of the tears
 -- still open (Rift.Apart), Frontier.Swarm.PerRift critters out of each once
--- it has crackled its warning, any ranged ones last (KaijuWilds.pickWave).
+-- it has crackled its warning, any ranged ones last (KaijuWilds.pickWave:
+-- mostly the kind of the biome they're in).
 local function incursion(player: Player, band: string, count: number, raider: boolean?)
 	pending[player] = (pending[player] or 0) + count
-	local wave = KaijuWilds.pickWave(count, rng)
+	local here = rootOf(player)
+	local wave = KaijuWilds.pickWave(count, rng, if here then homeAt(here.Position) else nil)
 	local swarm = Frontier.Swarm
 	local tears = math.ceil(#wave / swarm.PerRift)
 	local times = Frontier.trickle(tears, rng)
@@ -620,7 +631,7 @@ local function wander(candidates: { any })
 			return Frontier.wanderSpot(root.Position, center(), rng)
 		end)
 	end
-	local wave = KaijuWilds.pickWave(count, rng)
+	local wave = KaijuWilds.pickWave(count, rng, homeAt(floor))
 	local apart = Frontier.Swarm.Out
 	local _, life = FrontierServer.open(
 		floor,
@@ -711,6 +722,7 @@ local function step(dt: number)
 			local away = player:GetAttribute("Outpost") ~= true or player:GetAttribute("RiftRun") ~= nil
 			if away and player:GetAttribute("FrontierBand") ~= nil then
 				player:SetAttribute("FrontierBand", nil)
+				player:SetAttribute("FrontierBiome", nil)
 			end
 			if away then
 				hauls[player], raiding[player] = nil, nil -- (gone from the Outpost: the trip's over)
@@ -724,6 +736,11 @@ local function step(dt: number)
 		local band = Frontier.band(Frontier.distance(root.Position, center()))
 		if player:GetAttribute("FrontierBand") ~= band then
 			player:SetAttribute("FrontierBand", band)
+		end
+		local biome = Frontier.biomeAt(root.Position - center())
+		local biomeId = biome and biome.Id
+		if player:GetAttribute("FrontierBiome") ~= biomeId then
+			player:SetAttribute("FrontierBiome", biomeId)
 		end
 		state.Stir = Frontier.settle(state.Stir, band, dt, now - state.LastSwing)
 		state.Told = math.min(state.Told, (Frontier.stage(state.Stir + 0.1)))

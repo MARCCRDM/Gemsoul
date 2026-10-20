@@ -120,6 +120,29 @@ finish = function(run, won, reason)
 	run.World.Folder:Destroy()
 	slots[run.Slot] = nil
 end
+-- A boss's gem (the loot its party claims and rolls for): of its element,
+-- Ultra Rare at gear tier 4, Legendary at 5, its surge at tier 4, rank III.
+-- (The Rift's boss pays the same: Server.RiftServer.)
+function Dungeon.bossGem(element: string, tier: number?)
+	local rng = Random.new()
+	local rarity = if tier == 5 then "Legendary" else "UltraRare"
+	local band = GemRoller.ByRarity[rarity]
+	local gem = {
+		Source = "PvEDrop",
+		Found = os.time(),
+		CutMethod = "Natural",
+		Id = PlayerData.newGemId(),
+		Element = element,
+		Tier = rarity,
+		SurgeTier = 4,
+		SurgeRank = 3,
+		Size = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
+		Clarity = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
+		Cut = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
+	}
+	gem.Surge = (if rng:NextNumber() < 0.5 then GemRoller.SurgeVariants else GemRoller.Surges)[gem.Element][4]
+	return gem
+end
 local function resolveLoot(run)
 	local loot = run.Loot
 	if not loot or loot.Resolved or run.Done then
@@ -149,23 +172,7 @@ local function resolveLoot(run)
 		winner = tied[dice:NextInteger(1, #tied)]
 	end
 	if winner and not run.Test then
-		local rng = Random.new()
-		local rarity = if loot.Tier == 5 then "Legendary" else "UltraRare"
-		local band = GemRoller.ByRarity[rarity]
-		local gem = {
-			Source = "PvEDrop",
-			Found = os.time(),
-			CutMethod = "Natural",
-			Id = PlayerData.newGemId(),
-			Element = loot.Element,
-			Tier = rarity,
-			SurgeTier = 4,
-			SurgeRank = 3,
-			Size = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
-			Clarity = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
-			Cut = rng:NextInteger(band.Metrics[1], band.Metrics[2]),
-		}
-		gem.Surge = (if rng:NextNumber() < 0.5 then GemRoller.SurgeVariants else GemRoller.Surges)[gem.Element][4]
+		local gem = Dungeon.bossGem(loot.Element, loot.Tier)
 		if not PlayerData.addGem(winner, gem) then
 			PlayerData.addCoins(winner, 500)
 			Remotes.Notify:FireClient(winner, "Gem pouch full: boss gem converted to 500 coins.")

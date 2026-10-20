@@ -354,12 +354,20 @@ local function spawnNode(field: boolean?, want: number?)
 	freeSpots[index] = nil
 	nextId += 1
 	-- Each zone grows its own mix (Shared.Outpost.Zones), its crystals in its
-	-- band's colour out along the trails (Shared.Frontier.Bands).
+	-- band's colour out along the trails (Shared.Frontier.Bands), its stone
+	-- its biome's (Shared.Frontier.Biomes).
 	local zone = site.Zones and site.Zones[index]
 	local size = Rules.rollSize(rng:NextNumber(), zone)
 	local spec = Rules.Sizes[size]
 	local band = zone and Frontier.Bands[zone]
-	local model = OutpostWorld.rock(size, site.Spots[index], rng, if band then band.Color else nil)
+	local biome = Frontier.biomeAt(site.Spots[index].Position - Rules.Location.Position)
+	local model = OutpostWorld.rock(
+		size,
+		site.Spots[index],
+		rng,
+		if band then band.Color else nil,
+		if biome then biome.Stone else nil
+	)
 	model.Name = "Rock" .. nextId
 	model:SetAttribute("NodeId", nextId)
 	model:SetAttribute("Size", size)
@@ -552,7 +560,15 @@ local function loot(player: Player, node, profile)
 	if (player:GetAttribute("RiftCharged") or 0) > workspace:GetServerTimeNow() then
 		luck += Frontier.Charged.Luck
 	end
-	local gem = Gems.award(player, "MiningNode", { Luck = luck, Silent = true })
+	-- Out in one of the biomes, its element comes up more (Frontier.Biome).
+	local spot = site and site.Spots[node.Spot]
+	local biome = spot and Frontier.biomeAt(spot.Position - Rules.Location.Position)
+	local gem = Gems.award(player, "MiningNode", {
+		Luck = luck,
+		Silent = true,
+		Home = biome and biome.Element,
+		Bias = Frontier.Biome.Bias,
+	})
 	if gem then
 		result.Gem = gem
 		result.Rarity = gem.Tier

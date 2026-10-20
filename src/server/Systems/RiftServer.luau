@@ -1,22 +1,26 @@
 --[[
 	The Rift on the server (Shared.RiftRun has the rules; see docs/rift.md):
 	a trip through a vein's Rift Gate (OutpostWorld.veinMarks) into the
-	critters' own world, built for it (World.RiftWorld) and gone with it.
+	critters' own world, built for it (World.RiftWorld: walled caves) and
+	gone with it.
 
 	  Going in    "RiftEnter", vein: through a gate you're standing at. You
 	              join your party's trip if one of them is still on the
-	              path (up to RiftRun.Party), or start one; your kaiju come
-	              with you (you keep Outpost, so KaijuServer keeps them out
-	              and brings them to you).
-	  The path    each island's pack of brainrot critters roams its island
-	              till you come (KaijuWilds.spawnBug: Stay, Wander), at your
-	              kaiju's level and up. Every one down, the wall of fire on
-	              the way out dies (RiftWorld.openGate), everyone in finds a
-	              cache (Gems.award "RiftCache": the gems you've found in
-	              here), and the next island's pack comes up. Fall off into
-	              the lava and you're back on the last island you reached,
-	              hurt (RiftRun.Fall).
-	  Falling     knocked out on the path (SparServer's knock-down, or
+	              way (up to RiftRun.Party), or start one. Your combat kit
+	              comes out and stays out till you're home
+	              (SparServer.riftKit: hunting, so a finishing blow knocks
+	              you down rather than kills you); your kaiju come with you
+	              (you keep Outpost, so KaijuServer keeps them out).
+	  The way     a cave's pack comes up once one of you walks in: brainrot
+	              critters (KaijuWilds.spawnBug: Stay, Wander) at your
+	              kaiju's level and up, and the pathway dungeon's fighters
+	              (Duelist.spawnDungeon, a Rift encounter: anyone in can hit
+	              them and be hit, kaiju too). Every one down, the wall of
+	              fire on the way out dies (RiftWorld.openGate) and everyone
+	              in finds a cache (Gems.award "RiftCache": the gems you've
+	              found in here). Through the floor somehow, back in the
+	              last cave you reached (RiftRun.Fall).
+	  Falling     knocked out on the way (SparServer's knock-down, or
 	              killed outright): the critters rob you (RiftRun.robCount
 	              of the gems you found in here, out of your pouch) and
 	              you're thrown back to base. Knocked out at the boss: you
@@ -26,28 +30,33 @@
 	              KaijuServer.restoreAll), "Home" (back to base, keeping
 	              what you found) or invite a friend (the client's); nothing
 	              chosen in RiftRun.Fallen seconds, home you go.
-	  The boss    one of the ten brainrot bosses at random, big
-	              (RiftRun.Boss): it tears through on its island once one of
-	              you sets foot there, and calls more critters through at
-	              each of RiftRun.Boss.Adds. Beaten: everyone still in gets
+	  The boss    one of the ten brainrot bosses at random, as the pathway
+	              dungeon's Colossus (a Duelist fighter with its every move,
+	              RiftRun.bossHealth times tougher): it tears through in the
+	              throne cave once one of you sets foot there, and calls
+	              critters and a fighter through at each of
+	              RiftRun.Boss.Adds. Beaten: everyone still in gets
 	              RiftRun.rewardCoins, a lucky cache, EXP for their kaiju
 	              and swings back on their pick (SwingRestore.Dungeon); the
-	              fallen are back up; the way home opens on its island
-	              (RiftWorld.openHome), and RiftRun.Exit seconds later
-	              everyone's home.
+	              fallen are back up; the way home opens, and its loot comes
+	              up: claim, roll or pass ("RiftLootChoice", the pathway
+	              dungeon's card: DungeonLoot), a fair roll for its gem
+	              (Dungeons.bossGem). RiftRun.Exit seconds after that's
+	              settled, everyone's home.
 	  Leaving     "RiftLeave": through a way home you're at (the landing's,
-	              or the boss island's once it's open), keeping what you found.
+	              or the throne cave's once it's open), keeping what you found.
 	  The gate    "RiftPeek": what going in looks like (the gate's card):
 	              { Party, Joining, Solo }.
 
-	A runner carries RiftRun (the trip's id), RiftRoom (the island they're on
-	the way to: 1..Rooms, Rooms + 1 the boss's), RiftLeft (critters left
+	A runner carries RiftRun (the trip's id), RiftRoom (the cave they're on
+	the way to: 1..Rooms, Rooms + 1 the throne cave), RiftLeft (foes left
 	there), RiftBoss (its name), RiftFound (gems found in here), RiftRunners
 	(how many in), RiftWon (the boss down) and RiftExitAt (server time
 	they're sent home then); knocked out at the boss, RiftFallen (server time
 	the choice runs out) and RiftRestore (what RESTORE costs). Nothing of the
 	Outpost's comes for them in there (FrontierServer, OutpostServer,
-	HealthRegen leave them be).
+	HealthRegen leave them be), and nothing else starts for them (spars,
+	duels, raids, kaiju battles, the Arena, expeditions).
 
 	  RiftServer.start(site)          site: the Outpost's (OutpostServer.site())
 	  RiftServer.runOf(player) -> run?
@@ -61,9 +70,12 @@ local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local RiftWorld = require(script.Parent.Parent.World.RiftWorld)
+local Duelist = require(script.Parent.Duelist)
+local Dungeons = require(script.Parent.Dungeons)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
 local KaijuServer = require(script.Parent.KaijuServer)
@@ -73,6 +85,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Restores = require(script.Parent.Restores)
 local Shop = require(script.Parent.Shop)
+local SparServer = require(script.Parent.SparServer)
 
 local RiftServer = {}
 
@@ -147,6 +160,9 @@ local CLEAR = {
 	"RiftExitAt",
 	"RiftFallen",
 	"RiftRestore",
+	"DungeonLoot",
+	"DungeonLootDeadline",
+	"DungeonLootTitle",
 }
 
 -- The trip's over: what's left of it goes.
@@ -163,6 +179,7 @@ local function finish(run)
 		end
 	end
 	table.clear(run.Foes)
+	Duelist.removeDungeon(run.Id)
 	if run.BossEnemy and run.BossEnemy.Alive then
 		Enemies.remove(run.BossEnemy)
 	end
@@ -206,6 +223,7 @@ local function home(player: Player, text: string?)
 		run.Fallen[player], run.Handled[player] = nil, nil
 	end
 	if player.Parent then
+		SparServer.riftKit(player, false)
 		player:SetAttribute("SparDown", nil)
 		local humanoid = humanoidOf(player)
 		if humanoid and humanoid.Health > 0 then
@@ -246,15 +264,15 @@ end
 
 local foeDied, victory
 
--- A spot on island `index`'s floor (a share of its radius out from the middle).
+-- A spot on cave `area`'s floor (a share of its radius out from the middle).
 local function spotOn(run, center: Vector3, radius: number, share: number): Vector3
 	local a = run.Rng:NextNumber(0, math.pi * 2)
 	local r = radius * share * math.sqrt(run.Rng:NextNumber(0.15, 1))
 	return center + Vector3.new(math.cos(a) * r, 0.5, math.sin(a) * r)
 end
 
--- One of the trip's critters (or its boss): it stays on its island,
--- roaming it till someone comes, and its death counts.
+-- One of the trip's critters: it stays in its cave, roaming it till
+-- someone comes, and its death counts.
 local function spawnFoe(run, at: Vector3, opts)
 	opts.Stay = true
 	opts.Wander = opts.Wander or { Home = at, Roam = 9, Notice = 26 }
@@ -275,13 +293,54 @@ local function spawnFoe(run, at: Vector3, opts)
 	return enemy
 end
 
--- Island `room`'s pack comes up.
+-- One of the pathway dungeon's fighters (Duelist: armed and armoured to
+-- `tier`, its every move), in the trip's: whoever's in it can hit it and be
+-- hit by it, kaiju too. `boss`: the Colossus.
+local function spawnFighter(run, at: Vector3, spec, tier: number, boss: boolean?, scale: number)
+	local members = {}
+	for _, player in run.Members do
+		if player.Parent and player.Character and not run.Fallen[player] then
+			table.insert(members, player)
+		end
+	end
+	if #members == 0 then
+		return nil
+	end
+	local enemy = Duelist.spawnDungeon(members, run.Id, {
+		Rift = true,
+		Room = math.min(run.Room, RiftRun.Rooms + 1),
+		GearTier = tier,
+		Center = at,
+		Spot = at + Vector3.new(0, if boss then 7 else 4, 0),
+		Spec = spec,
+		Boss = boss == true,
+		MinPlayers = 1,
+		HealthScale = scale,
+		OnDeath = function(e)
+			foeDied(run, e)
+		end,
+	})
+	if not enemy then
+		return nil
+	end
+	if not boss then
+		run.Foes[enemy] = true
+	end
+	return enemy
+end
+
+-- Cave `room`'s pack comes up: its critters, and the pathway dungeon's
+-- fighters among them.
 local function spawnRoom(run, room: number)
-	local island = run.World.Rooms[room]
+	if run.Spawned[room] then
+		return
+	end
+	run.Spawned[room] = true
+	local cave = run.World.Rooms[room]
 	local level = RiftRun.level(levelsOf(run), room)
 	local band = if room >= 3 then "Edge" else "Fringe"
 	for _, foe in RiftRun.pickFoes(room, #run.Members, run.Rng) do
-		local at = spotOn(run, island.Center, island.Radius, 0.55)
+		local at = spotOn(run, cave.Center, cave.Radius, 0.55)
 		local spec = nil
 		for _, entry in DungeonRules.Roster do
 			if entry.Id == foe.Critter then
@@ -300,6 +359,16 @@ local function spawnRoom(run, room: number)
 			Title = if foe.Elite and spec then string.format("Rift Brute · %s · Lv %d", spec.Name, level) else nil,
 		})
 	end
+	for _, spec in RiftRun.pickFighters(room, #run.Members, run.Rng) do
+		spawnFighter(
+			run,
+			spotOn(run, cave.Center, cave.Radius, 0.45),
+			spec,
+			RiftRun.fighterTier(room),
+			false,
+			RiftRun.Fighters.Health
+		)
+	end
 	show(run)
 end
 
@@ -309,55 +378,46 @@ local function hopIn(life): number
 	return if life then math.max(0, life.HopAt - serverNow()) else 0
 end
 
--- The boss tears through on its island: the tear opens, then out it comes.
+-- The boss tears through in the throne cave: the tear opens, then out it
+-- comes, the pathway dungeon's Colossus (RiftRun.Boss: tougher yet).
 local function summonBoss(run)
 	if run.Summoning or run.BossEnemy or run.Won then
 		return
 	end
 	run.Summoning = true
 	local arena = run.World.Boss
-	local at = arena.Center + Vector3.new(0, 0.5, -6)
+	local at = arena.Center + Vector3.new(0, 0.5, 0)
 	announce(run, string.format("The ground splits open. %s is coming through!", run.Boss.Name))
 	task.delay(hopIn(KaijuWilds.rift(at, run.World.Start.Position)), function()
 		if run.Done or run.Won then
 			return
 		end
-		local level = RiftRun.level(levelsOf(run), RiftRun.Rooms + 1)
-		local rule = RiftRun.Boss
-		local boss = spawnFoe(run, at, {
-			Spec = run.Boss,
-			Level = level,
-			Band = "Edge",
-			Scale = rule.Scale,
-			Health = RiftRun.bossHealth(#run.Members),
-			Damage = rule.Damage,
-			Reach = rule.Reach,
-			Title = string.format("RIFT BOSS · %s · Lv %d", run.Boss.Name, level),
-			Boss = true,
-			Wander = { Home = at, Roam = 6, Notice = 60 },
-		})
+		run.BossTier = RiftRun.bossTier(#run.Members, run.Rng)
+		local boss = spawnFighter(run, at, run.Boss, run.BossTier, true, RiftRun.bossHealth(#run.Members))
 		if not boss then
 			-- (It couldn't come through: rather than a trip stuck for good, it's won.)
 			warn("[Rift] the boss couldn't come through")
 			victory(run)
 			return
 		end
-		run.Foes[boss] = nil -- (it isn't an island's pack)
+		boss.Model:SetAttribute("RiftBoss", true)
 		run.BossEnemy = boss
 		fx("CritterGiggle", at + Vector3.new(0, 6, 0), "Cackle")
 		show(run)
 	end)
 end
 
--- Some of its critters through at once, round the boss (its Adds).
+-- Some of its critters through at once round the boss, and its fighters
+-- (its Adds).
 local function callAdds(run)
 	local boss = run.BossEnemy
 	if not boss or not boss.Alive then
 		return
 	end
+	local rule = RiftRun.Boss
 	local level = RiftRun.level(levelsOf(run), RiftRun.Rooms)
 	local arena = run.World.Boss
-	for _, id in Kaiju.wave(RiftRun.Boss.AddCount, run.Rng) do
+	for _, id in Kaiju.wave(rule.AddCount, run.Rng) do
 		local at = spotOn(run, arena.Center, arena.Radius, 0.6)
 		task.delay(hopIn(KaijuWilds.rift(at, boss.Root.Position)), function()
 			if not run.Done and not run.Won then
@@ -370,11 +430,22 @@ local function callAdds(run)
 			end
 		end)
 	end
+	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng)
+	for _ = 1, rule.AddFighters do
+		spawnFighter(
+			run,
+			spotOn(run, arena.Center, arena.Radius, 0.6),
+			fighters[1],
+			rule.AddTier,
+			false,
+			RiftRun.Fighters.Health
+		)
+	end
 	announce(run, string.format("%s calls its critters through!", run.Boss.Name))
 	show(run)
 end
 
--- Every runner still in finds a cache: a gem out of the island, luckier
+-- Every runner still in finds a cache: a gem out of the cave, luckier
 -- further in.
 local function caches(run, luck: number)
 	for _, player in run.Members do
@@ -388,21 +459,138 @@ local function caches(run, luck: number)
 	end
 end
 
--- Island `room` is clear: its fire dies down, a cache each, the next comes up.
+-- Cave `room` is clear: its fire dies down, a cache each, and the next
+-- cave's pack waits for whoever walks in.
 local function cleared(run, room: number)
 	RiftWorld.openGate(run.World.Gates[room])
 	caches(run, RiftRun.cacheLuck(room))
 	run.Room = room + 1
 	if room < RiftRun.Rooms then
-		announce(run, "Island cleared. The fire's down: on to the next.")
-		spawnRoom(run, room + 1)
+		announce(run, "Cave cleared. The fire's down: on to the next.")
 	else
-		announce(run, "The last island's clear. Something waits on the throne island.")
-		show(run)
+		announce(run, "The last cave's clear. Something waits on the throne.")
 	end
+	show(run)
 end
 
--- The boss is down: the trip's won.
+local LOOT = { "DungeonLoot", "DungeonLootDeadline", "DungeonLootTitle" }
+
+-- The boss's loot is settled (everyone chose, or the time's up): a fair roll
+-- among those who claimed or rolled, the gem to the highest (Dungeons.bossGem,
+-- as the pathway dungeon's), and the way home's clock starts.
+local function resolveLoot(run)
+	local loot = run.Loot
+	if not loot or loot.Resolved or run.Done then
+		return
+	end
+	loot.Resolved = true
+	local contenders = {}
+	for _, player in loot.Eligible do
+		if player.Parent and runOf[player] == run and loot.Choices[player] and loot.Choices[player] ~= "Pass" then
+			table.insert(contenders, player)
+		end
+	end
+	local winner, best, rolls, tied = nil, -1, {}, {}
+	for _, player in contenders do
+		local roll = run.Rng:NextInteger(1, 100)
+		table.insert(rolls, player.DisplayName .. " " .. roll)
+		if roll > best then
+			best, tied = roll, { player }
+		elseif roll == best then
+			table.insert(tied, player)
+		end
+	end
+	if #tied > 0 then
+		winner = tied[run.Rng:NextInteger(1, #tied)]
+	end
+	if winner then
+		local gem = Dungeons.bossGem(loot.Element, loot.Tier)
+		if PlayerData.addGem(winner, gem) then
+			run.Found[winner] = run.Found[winner] or {}
+			table.insert(run.Found[winner], gem.Id)
+		else
+			PlayerData.addCoins(winner, 500)
+			notify(winner, "Gem pouch full: boss gem converted to 500 coins.")
+		end
+	end
+	announce(
+		run,
+		if winner
+			then string.format(
+				"RIFT LOOT: %s wins the %s gem. %s",
+				winner.DisplayName,
+				GemConfig.elementName(loot.Element),
+				table.concat(rolls, " · ")
+			)
+			else "The boss's gem was passed."
+	)
+	for _, player in loot.Eligible do
+		if player.Parent then
+			for _, key in LOOT do
+				player:SetAttribute(key, nil)
+			end
+		end
+	end
+	run.ExitAt = os.clock() + RiftRun.Exit
+	run.ExitServer = serverNow() + RiftRun.Exit
+	show(run)
+end
+
+-- The boss's loot comes up for everyone still in: claim, roll or pass
+-- (the pathway dungeon's card, Client DungeonLoot), RiftRun.Loot.Seconds.
+local function beginLoot(run)
+	local eligible = table.clone(run.Members)
+	local tier = run.BossTier or 4
+	run.Loot = {
+		Eligible = eligible,
+		Choices = {},
+		Tier = tier,
+		Element = run.Boss.Element,
+		Deadline = os.clock() + RiftRun.Loot.Seconds,
+	}
+	local label = string.format(
+		"%s %s Gem  ·  Tier 4 / Rank III",
+		if tier == 5 then "Legendary" else "Ultra Rare",
+		GemConfig.elementName(run.Boss.Element)
+	)
+	for _, player in eligible do
+		player:SetAttribute("DungeonLootTitle", "RIFT BOSS DEFEATED")
+		player:SetAttribute("DungeonLootDeadline", serverNow() + RiftRun.Loot.Seconds)
+		player:SetAttribute("DungeonLoot", label)
+	end
+	task.delay(RiftRun.Loot.Seconds, function()
+		resolveLoot(run)
+	end)
+end
+
+-- "RiftLootChoice": claim, roll or pass on the boss's gem.
+local function lootChoice(player: Player, choice: any)
+	local run = runOf[player]
+	local loot = run and run.Loot
+	if not loot or loot.Resolved or not table.find(loot.Eligible, player) then
+		return reply(false, "No boss loot to choose.")
+	end
+	if choice ~= "Claim" and choice ~= "Roll" and choice ~= "Pass" then
+		return reply(false, "Choose Claim, Roll or Pass.")
+	end
+	if loot.Choices[player] then
+		return reply(false, "Your choice is already locked.")
+	end
+	loot.Choices[player] = choice
+	local all = true
+	for _, other in loot.Eligible do
+		if other.Parent and runOf[other] == run and not loot.Choices[other] then
+			all = false
+		end
+	end
+	if all then
+		resolveLoot(run)
+	end
+	return reply(true, "Choice locked: " .. choice)
+end
+
+-- The boss is down: the trip's won. Its loot comes up, and the way home
+-- opens (and takes everyone RiftRun.Exit seconds after the loot's settled).
 victory = function(run)
 	if run.Won then
 		return
@@ -414,6 +602,7 @@ victory = function(run)
 		end
 	end
 	table.clear(run.Foes)
+	Duelist.removeDungeon(run.Id)
 	local coins = RiftRun.rewardCoins(RiftRun.Rooms)
 	caches(run, RiftRun.Reward.Luck)
 	for _, player in run.Members do
@@ -433,8 +622,7 @@ victory = function(run)
 		)
 	end
 	RiftWorld.openHome(run.World)
-	run.ExitAt = os.clock() + RiftRun.Exit
-	run.ExitServer = serverNow() + RiftRun.Exit
+	beginLoot(run)
 	show(run)
 end
 
@@ -450,7 +638,7 @@ foeDied = function(run, enemy)
 		return
 	end
 	run.Foes[enemy] = nil
-	if next(run.Foes) == nil and run.Room <= RiftRun.Rooms then
+	if next(run.Foes) == nil and run.Room <= RiftRun.Rooms and run.Spawned[run.Room] then
 		cleared(run, run.Room)
 	else
 		show(run)
@@ -508,16 +696,17 @@ local function fallAtBoss(run, player: Player)
 	player:SetAttribute("SparDown", deadline + 1)
 end
 
--- Where `player` is on the path: the last island they've reached (0 the landing).
+-- Where `player` is on the way: the last cave they've reached (0 the
+-- landing, Rooms + 1 the throne cave).
 local function checkpoint(run, player: Player, root: BasePart)
 	local world = run.World
 	local reached = run.Reached[player] or 0
-	for i, island in world.Rooms do
-		if i > reached and (root.Position - island.Center).Magnitude <= island.Radius + 2 then
+	for i, cave in world.Rooms do
+		if i > reached and RiftWorld.inside(cave, root.Position, 2) then
 			reached = i
 		end
 	end
-	if (root.Position - world.Boss.Center).Magnitude <= world.Boss.Radius + 2 then
+	if RiftWorld.inside(world.Boss, root.Position, 2) then
 		reached = RiftRun.Rooms + 1
 	end
 	run.Reached[player] = reached
@@ -559,7 +748,8 @@ local function step(now: number)
 				end
 				continue
 			end
-			-- Off the path into the lava: back on the last island reached, hurt.
+			-- (Walled in, nobody falls; through the floor somehow, back in the
+			-- last cave reached.)
 			if root.Position.Y < floor - RiftRun.Fall.Below then
 				local back = if reached > RiftRun.Rooms
 					then run.World.Boss.Center
@@ -567,8 +757,10 @@ local function step(now: number)
 					else run.World.Start.Position
 				player.Character:PivotTo(CFrame.new(back + Vector3.new(0, 4, 0)))
 				root.AssemblyLinearVelocity = Vector3.zero
-				humanoid.Health = math.max(1, humanoid.Health - humanoid.MaxHealth * RiftRun.Fall.Hurt)
-				notify(player, "The lava throws you back out. That hurt.")
+			end
+			-- A cave's pack comes up once someone walks into it.
+			if run.Room <= RiftRun.Rooms and reached >= run.Room then
+				spawnRoom(run, run.Room)
 			end
 			if reached > RiftRun.Rooms and run.Room > RiftRun.Rooms then
 				summonBoss(run)
@@ -608,6 +800,8 @@ local function join(run, player: Player)
 	if root then
 		root.AssemblyLinearVelocity = Vector3.zero
 	end
+	-- (In there you fight: your combat kit comes out, and stays out.)
+	SparServer.riftKit(player, true)
 	show(run)
 	for _, other in run.Members do
 		if other ~= player then
@@ -698,12 +892,13 @@ local function enter(player: Player, vein: any)
 			Fallen = {},
 			Handled = {},
 			Reached = {},
+			Spawned = {},
+			Loot = nil,
 			Started = os.clock(),
 		}
 		runs[id] = run
 		slots[slot] = run
 		join(run, player)
-		spawnRoom(run, 1)
 	else
 		join(run, player)
 	end
@@ -732,7 +927,7 @@ local function leave(player: Player)
 	if not near then
 		return reply(
 			false,
-			"Find a way home first: the gate you came in by, or the throne island's once its boss is down."
+			"Find a way home first: the gate you came in by, or the throne cave's once its boss is down."
 		)
 	end
 	home(player, "Back home through the Rift, with what you found.")
@@ -794,6 +989,7 @@ function RiftServer.start(outpost)
 	Shop.register("RiftLeave", leave)
 	Shop.register("RiftChoice", choose)
 	Shop.register("RiftPeek", peek)
+	Shop.register("RiftLootChoice", lootChoice)
 	Players.PlayerRemoving:Connect(function(player)
 		if runOf[player] then
 			home(player, nil)
@@ -815,7 +1011,7 @@ end
 -- For tests.
 RiftServer._runs, RiftServer._step, RiftServer._enter = runs, step, enter
 RiftServer._leave, RiftServer._choose, RiftServer._finish = leave, choose, finish
-RiftServer._peek = peek
+RiftServer._peek, RiftServer._lootChoice = peek, lootChoice
 function RiftServer._setSite(outpost)
 	site = outpost
 end

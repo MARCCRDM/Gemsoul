@@ -1,4 +1,6 @@
 -- Server offers the reward; this panel submits only a choice, never a roll or item.
+-- (The pathway dungeon's boss and the Rift's: DungeonLoot set on you; in the
+-- Rift the choice goes to Server.RiftServer, and the title is DungeonLootTitle.)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -37,7 +39,8 @@ local function label(y, height, size)
 	t.Parent = panel
 	return t
 end
-label(18, 28, 22).Text = "COLOSSUS DEFEATED"
+local title = label(18, 28, 22)
+title.Text = "COLOSSUS DEFEATED"
 local item = label(54, 42, 18)
 label(100, 52, 13).Text =
 	"Claim if you want the gem. Multiple claims join the party roll. Roll enters directly; Pass declines. Highest roll wins; ties break randomly."
@@ -60,7 +63,8 @@ for i, choice in { "Claim", "Roll", "Pass" } do
 		end
 		locked = true
 		local ok, result = pcall(function()
-			return request:InvokeServer("DungeonLootChoice", choice)
+			local rift = player:GetAttribute("RiftRun") ~= nil
+			return request:InvokeServer(if rift then "RiftLootChoice" else "DungeonLootChoice", choice)
 		end)
 		status.Text = if ok and result then result.Message else "Connection failed. Retry."
 		if not ok or not result or not result.Ok then
@@ -73,6 +77,7 @@ local function refresh()
 	gui.Enabled = loot ~= nil
 	locked = false
 	item.Text = loot or ""
+	title.Text = player:GetAttribute("DungeonLootTitle") or "COLOSSUS DEFEATED"
 end
 player:GetAttributeChangedSignal("DungeonLoot"):Connect(refresh)
 RunService.RenderStepped:Connect(function()

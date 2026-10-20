@@ -187,13 +187,19 @@ for seed = 1, 6 do
 		end
 		table.insert(if r > 330 then outer else inner, #crop.Rocks)
 	end
-	-- Lone rocks between: about 15% of the frontier's, a few leading out of the core.
+	-- Lone rocks between: about 15% of the frontier's, a few at the spokes'
+	-- mouths leading out of the core (beside the road, not on it).
 	local stones = 0
 	for _, p in lone do
 		local r = flat(p)
 		check(r >= Frontier.Outcrop.From - 0.01 and r <= Frontier.Outcrop.To + 0.01, "A lone rock out of place")
-		if flat(p) < Frontier.Core + 25 then
-			stones += 1
+		for _, a in Frontier.Spokes do
+			local out = Vector3.new(math.cos(a), 0, math.sin(a))
+			local along = p:Dot(out)
+			local off = (p - out * along).Magnitude
+			if along > Frontier.Core and along < Frontier.Core + 35 and off >= 19.9 and off <= 30.1 then
+				stones += 1
+			end
 		end
 		if clearOfTheOutpost(p) then
 			kept += 1
@@ -617,7 +623,7 @@ end
 local clientEnv = setmetatable(table.clone(env), getmetatable(env))
 clientEnv.game = {
 	GetService = function()
-		return { Shared = { Frontier = "Frontier" } }
+		return { Shared = { Frontier = "Frontier", Outpost = "Outpost" } }
 	end,
 }
 clientEnv.Enum = roblox.Enum
@@ -662,6 +668,95 @@ end
 local lips = RiftTear.layout(Frontier.tear(5, 6), 0)
 check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 
+-- The Loop: four biomes round the core, a quarter each between the four
+-- spokes (due north, east, south, west), each weak to the one before it
+-- going round clockwise; out there their element comes up more.
+;(function()
+	local Beats = shared("ElementMatchup").Beats
+	check(#Frontier.Biomes == 4 and #Frontier.Spokes == 4, "Not four biomes between four spokes")
+	local north, east, south, west = Frontier.Spokes[1], Frontier.Spokes[2], Frontier.Spokes[3], Frontier.Spokes[4]
+	check(math.sin(north) < -0.99 and math.cos(east) > 0.99 and math.sin(south) > 0.99 and math.cos(west) < -0.99, "The spokes aren't due north, east, south and west")
+	local elements, names = {}, {}
+	for i, biome in Frontier.Biomes do
+		elements[biome.Element] = true
+		names[biome.Id] = true
+		check(Frontier.biomeOf(biome.Angle) == biome, biome.Id .. " isn't its own middle's")
+		local before = Frontier.Biomes[(i - 2) % 4 + 1]
+		check(Beats[before.Element] == biome.Element, biome.Id .. " isn't weak to the biome before it")
+		check(biome.Name and biome.Label and biome.Line and biome.Material, biome.Id .. " is missing its look or lines")
+		check(biome.Glow and biome.Tint and biome.Ambient and biome.Ground and biome.Stone, biome.Id .. " is missing a colour")
+		-- (Its quarter is the one between two spokes, its middle between them.)
+		for _, a in Frontier.Spokes do
+			check(Frontier.apart(a, biome.Angle) > math.pi / 4 - 1e-6, biome.Id .. " sits on a spoke")
+		end
+	end
+	check(elements.Fire and elements.Frost and elements.Shock and elements.Poison, "Not one biome per element")
+	check(names.Ashfall and names.Rimefrost and names.Stormglass and names.Blightwood, "The biomes' names")
+	-- North-east Ashfall (Thermal), then clockwise Rimefrost, Stormglass, Blightwood.
+	local function at(angle, r)
+		return Vector3.new(math.cos(angle) * r, 0, math.sin(angle) * r)
+	end
+	check(Frontier.biomeAt(at(-math.pi / 4, 250)).Id == "Ashfall", "North-east isn't Ashfall")
+	check(Frontier.biomeAt(at(math.pi / 4, 250)).Id == "Rimefrost", "South-east isn't Rimefrost")
+	check(Frontier.biomeAt(at(3 * math.pi / 4, 250)).Id == "Stormglass", "South-west isn't Stormglass")
+	check(Frontier.biomeAt(at(-3 * math.pi / 4, 250)).Id == "Blightwood", "North-west isn't Blightwood")
+	check(Frontier.biomeAt(at(0.4, Frontier.Core - 1)) == nil and Frontier.biomeAt(Vector3.zero) == nil, "A biome in the core")
+	check(Frontier.biomeAt(at(0.4, Frontier.Core + 1)) ~= nil, "No biome just out of the core")
+	-- Crossing a spoke changes biome; across one, the look's an even mix.
+	for i, a in Frontier.Spokes do
+		local left, right = Frontier.biomeAt(at(a - 0.05, 250)), Frontier.biomeAt(at(a + 0.05, 250))
+		check(left ~= right, "No change of biome across spoke " .. i)
+		local weights = Frontier.biomeMix(at(a, 250))
+		local sum, halves = 0, 0
+		for _, w in weights do
+			sum += w
+			if math.abs(w - 0.5) < 1e-6 then
+				halves += 1
+			end
+		end
+		check(math.abs(sum - 1) < 1e-6 and halves == 2, "Not an even mix on spoke " .. i)
+	end
+	for _, biome in Frontier.Biomes do
+		local weights, inward = Frontier.biomeMix(at(biome.Angle, 300))
+		check(math.abs(weights[table.find(Frontier.Biomes, biome)] - 1) < 1e-6 and inward == 1, biome.Id .. "'s middle isn't all its own")
+	end
+	local _, deep = Frontier.biomeMix(at(1, Frontier.Core - Frontier.Biome.Blend))
+	local _, edge = Frontier.biomeMix(at(1, Frontier.Core))
+	check(deep == 0 and math.abs(edge - 0.5) < 1e-6, "The look doesn't come in at the core's edge")
+	-- An element out there: its own Bias of the time, the rest alike; in the core, any alike.
+	local rng = Random.new(77)
+	for _, biome in Frontier.Biomes do
+		local counts, n = {}, 20000
+		for _ = 1, n do
+			local e = Frontier.pickElement(biome.Element, rng)
+			counts[e] = (counts[e] or 0) + 1
+		end
+		check(math.abs(counts[biome.Element] / n - Frontier.Biome.Bias) < 0.015, biome.Id .. "'s element isn't " .. Frontier.Biome.Bias)
+		for e, c in counts do
+			if e ~= biome.Element then
+				check(math.abs(c / n - (1 - Frontier.Biome.Bias) / 3) < 0.015, "The others aren't alike in " .. biome.Id)
+			end
+		end
+	end
+	local plain, n = {}, 20000
+	for _ = 1, n do
+		local e = Frontier.pickElement(nil, rng)
+		plain[e] = (plain[e] or 0) + 1
+	end
+	for _, e in { "Fire", "Frost", "Shock", "Poison" } do
+		check(math.abs(plain[e] / n - 0.25) < 0.015, "The core's elements aren't alike: " .. e)
+	end
+	-- A mined gem leans the same way (GemRoller.roll with a home); without one, as before.
+	local GemRoller = shared("GemRoller")
+	local mined = {}
+	for _ = 1, 8000 do
+		local gem = GemRoller.roll(rng, 0, nil, GemRoller.MiningWeights, "Frost", Frontier.Biome.Bias)
+		mined[gem.Element] = (mined[gem.Element] or 0) + 1
+	end
+	check(math.abs(mined.Frost / 8000 - Frontier.Biome.Bias) < 0.02, "Gems mined in Rimefrost aren't mostly Cryo")
+	check(GemRoller.roll(Random.new(5), 0).Element == GemRoller.roll(Random.new(5), 0).Element, "A plain roll isn't what it was")
+end)()
+
 -- The banners as you cross between bands.
 local FrontierHud = client("FrontierHud")
 for _, band in Frontier.BandOrder do
@@ -671,6 +766,28 @@ end
 -- The noise ring and stirred-up meter are off the HUD (the screen stays
 -- the game's); each stage past calm still has its note.
 check(FrontierHud.lit == nil and FrontierHud.stirRow == nil, "The noise ring is back on the HUD")
+-- A biome's banner, and its light: the Outpost's own in the core, the
+-- biome's out in it, half and half on a spoke.
+for _, biome in Frontier.Biomes do
+	local title, line, color = FrontierHud.biomeLines(biome.Id)
+	check(title == string.upper(biome.Name) and line == biome.Line and color == biome.Glow, biome.Id .. " has no banner")
+end
+check(FrontierHud.biomeLines("Nowhere") == nil and FrontierHud.biomeLines(nil) == nil, "A banner for no biome")
+do
+	local tint, ambient = roblox.Color3.fromRGB(248, 250, 255), roblox.Color3.fromRGB(150, 156, 176)
+	local function near(a, b)
+		return math.abs(a.R - b.R) < 1e-3 and math.abs(a.G - b.G) < 1e-3 and math.abs(a.B - b.B) < 1e-3
+	end
+	local inT, inA = FrontierHud.biomeLight(Vector3.new(20, 0, 10), tint, ambient)
+	check(near(inT, tint) and near(inA, ambient), "The core's light isn't the Outpost's")
+	for _, biome in Frontier.Biomes do
+		local t, a = FrontierHud.biomeLight(Vector3.new(math.cos(biome.Angle) * 300, 0, math.sin(biome.Angle) * 300), tint, ambient)
+		check(near(t, biome.Tint) and near(a, biome.Ambient), biome.Id .. "'s light isn't its own")
+	end
+	local first, second = Frontier.Biomes[1], Frontier.Biomes[2]
+	local t = FrontierHud.biomeLight(Vector3.new(300, 0, 0), tint, ambient)
+	check(near(t, first.Tint:Lerp(second.Tint, 0.5)), "The light across a spoke isn't half and half")
+end
 for i in Frontier.Disturbance.Stages do
 	check(i == 1 or Frontier.Disturbance.Notes[i] ~= nil, "Nobody's told of stage " .. i)
 end
@@ -723,7 +840,7 @@ end)()
 
 print(
 	string.format(
-		"PASS: %d frontier checks (bands, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids)",
+		"PASS: %d frontier checks (bands, the biomes and spokes, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids)",
 		checks
 	)
 )

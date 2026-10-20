@@ -1,6 +1,7 @@
 --[[
 	Rolls a mined gem, in order (Ability System v3.0):
 	  1. Element   25% each: Thermal (Fire), Cryo (Frost), Corrosive (Poison), Ion (Shock)
+	               (mined in one of the Outpost's biomes, its own element more often)
 	  2. Rarity    40% Common, 25% Uncommon, 20% Rare, 10% Ultra Rare, 5% Legendary
 	               (a mined gem: 60 / 25 / 11 / 3.5 / 0.5, GemRoller.MiningWeights)
 	  3. Tier      the Gem Surge it carries: Novice (1) to Master (4), by rarity
@@ -178,11 +179,31 @@ function GemRoller.rollRarity(rng, luck: number?, base: { number }?): string
 	return GemRoller.Rarities[#GemRoller.Rarities].Name
 end
 
+-- The element: one of the four alike, or, with a `home` element (mined
+-- in one of the Outpost's biomes, Shared.Frontier), `home` `bias` of the
+-- time and one of the other three alike otherwise.
+local function elementFor(rng, home: string?, bias: number?): string
+	if not home or not table.find(GemRoller.Elements, home) then
+		return pick(rng, GemRoller.Elements)
+	end
+	if rng:NextNumber() < (bias or 0) then
+		return home
+	end
+	local others = {}
+	for _, element in GemRoller.Elements do
+		if element ~= home then
+			table.insert(others, element)
+		end
+	end
+	return pick(rng, others)
+end
+
 -- The rolls, as saved gem fields. `rarity` (optional) sets the rarity
 -- instead of rolling it (an Arena Cache's Legendaries); `base` rolls it on
--- other weights (GemRoller.MiningWeights).
-function GemRoller.roll(rng, luck: number?, rarity: string?, base: { number }?)
-	local element = pick(rng, GemRoller.Elements)
+-- other weights (GemRoller.MiningWeights); `home` and `bias` lean its
+-- element (elementFor).
+function GemRoller.roll(rng, luck: number?, rarity: string?, base: { number }?, home: string?, bias: number?)
+	local element = elementFor(rng, home, bias)
 	rarity = if rarity and GemRoller.ByRarity[rarity] then rarity else GemRoller.rollRarity(rng, luck, base)
 	local rules = GemRoller.ByRarity[rarity]
 	local tier = pick(rng, rules.Tiers)

@@ -4097,16 +4097,27 @@ end
 end)()
 
 -- The Rift (Server.RiftServer) -----------------------------------------------------------------------------
--- Through a vein's gate: alone you're warned, your party joins you; each
--- island's pack comes up, and cleared, its fire dies and you each find a
--- gem; knocked out on the path you're robbed and thrown home; at the boss
--- you're kept down to choose (RESTORE for coins, or home with what you
--- found); the boss calls critters through as it weakens; off the path into
--- the lava you're back on the last island, hurt; beaten, everyone's paid
--- and the way home opens. Nothing of the Outpost's comes for you in there.
+-- Through a vein's gate: alone you're warned, your party joins you, and
+-- your combat kit's out till you're home; each cave's pack (critters and
+-- the pathway dungeon's fighters) comes up as someone walks in, and
+-- cleared, its fire dies and you each find a gem; knocked out on the way
+-- you're robbed and thrown home; at the boss (a Colossus) you're kept down
+-- to choose (RESTORE for coins, or home with what you found); it calls
+-- critters and a fighter through as it weakens; through the floor you're
+-- back in the last cave, unhurt; beaten, everyone's paid, its loot comes up
+-- (claim, roll or pass) and once that's settled the way home takes you.
+-- Nothing of the Outpost's comes for you in there.
 ;(function()
 	local RiftRun = shared("RiftRun")
+	local DungeonRules = shared("DungeonRules")
 	local built, opened, homesOpened = {}, {}, 0
+	-- (A cave's floor, as RiftWorld.inside reads it: square, and not far
+	-- above or below it.)
+	local function inside(area, position, margin)
+		local d = position - area.Center
+		local r = area.Radius + (margin or 0)
+		return math.abs(d.X) <= r and math.abs(d.Z) <= r and d.Y >= -12 and d.Y <= 60
+	end
 	server.RiftWorld = {
 		build = function(id, origin)
 			local base = origin.Position
@@ -4114,17 +4125,18 @@ end)()
 			folder.Parent = workspaceObject
 			local rooms, gates = {}, {}
 			for i = 1, RiftRun.Rooms do
-				rooms[i] = { Center = base + Vector3.new(0, 0, -92 * i), Radius = 28 }
+				rooms[i] = { Center = base + Vector3.new(0, 0, -116 * i), Radius = 42 }
 				gates[i] = make("Model", { Name = "FireGate" })
 			end
 			local home = make("Model", { Name = "WayHome" })
-			make("Part", { Name = "Opening", CFrame = CFrame.new(base + Vector3.new(0, 7, -500)) }).Parent = home
+			make("Part", { Name = "Opening", CFrame = CFrame.new(base + Vector3.new(0, 7, -640)) }).Parent = home
 			local world = {
 				Folder = folder,
 				Origin = origin,
 				Start = CFrame.new(base + Vector3.new(0, 3, 4)),
+				Landing = { Center = base, Radius = 26 },
 				Rooms = rooms,
-				Boss = { Center = base + Vector3.new(0, 4, -476), Radius = 46 },
+				Boss = { Center = base + Vector3.new(0, 0, -116 * (RiftRun.Rooms + 1)), Radius = 52 },
 				Gates = gates,
 				Exit = make("Part", { CFrame = CFrame.new(base + Vector3.new(0, 7, 12)) }),
 				Home = home,
@@ -4132,6 +4144,7 @@ end)()
 			table.insert(built, world)
 			return world
 		end,
+		inside = inside,
 		openGate = function(gate)
 			opened[gate] = true
 		end,
@@ -4152,6 +4165,49 @@ end)()
 			return 40
 		end,
 	}
+	-- Your combat kit (SparServer.riftKit): out going in, away coming home.
+	local kit = {}
+	server.SparServer = {
+		riftKit = function(player, on)
+			kit[player] = on
+			player:SetAttribute("Hunt", on or nil)
+			player:SetAttribute("Spar", on or nil)
+		end,
+	}
+	-- The boss's gem (Dungeons.bossGem: the pathway dungeon's).
+	server.Dungeons = {
+		bossGem = function(element, tier)
+			return {
+				Id = PlayerData.newGemId(),
+				Element = element,
+				Tier = if tier == 5 then "Legendary" else "UltraRare",
+				Source = "PvEDrop",
+			}
+		end,
+	}
+	-- The pathway dungeon's fighters (Duelist.spawnDungeon), each what it
+	-- was asked for.
+	local fighters = {}
+	DuelistStub.spawnDungeon = function(members, id, encounter)
+		local rig = DuelistStub.creatureBody(encounter.Spec)
+		rig.PrimaryPart.CFrame = CFrame.new(encounter.Spot)
+		local health = math.floor(500 * (if encounter.Boss then 2.2 else 0.38) * (encounter.HealthScale or 1))
+		local enemy = Enemies.adopt(rig, { Health = health }, { Home = encounter.Center })
+		enemy.OnDeath = encounter.OnDeath
+		enemy.Rift = id
+		rig:SetAttribute("RiftRun", id)
+		table.insert(fighters, { Enemy = enemy, Members = members, Id = id, Encounter = encounter })
+		return enemy
+	end
+	local removedDungeons = {}
+	DuelistStub.removeDungeon = function(id)
+		removedDungeons[id] = (removedDungeons[id] or 0) + 1
+		for _, entry in fighters do
+			if entry.Id == id and entry.Enemy.Alive then
+				Enemies.remove(entry.Enemy)
+			end
+		end
+	end
 	local awarded = 0
 	GemsStub.award = function(player, source, opts)
 		awarded += 1
@@ -4175,11 +4231,17 @@ end)()
 		profiles[player].Coins -= amount
 		return true
 	end
+	-- (A pouch with room for the boss's gem.)
+	local smallPouch = PlayerData.addGem
+	PlayerData.addGem = function(player, gem)
+		table.insert(profiles[player].Gems, gem)
+		return true
+	end
 	services.Debris = services.Debris or { AddItem = function() end }
 	local RiftServer = serverModule("RiftServer")
 	local site = { Spawn = CFrame.new(outpost + Vector3.new(0, 3, 0)) }
 	RiftServer.start(site)
-	for _, name in { "RiftEnter", "RiftLeave", "RiftChoice", "RiftPeek" } do
+	for _, name in { "RiftEnter", "RiftLeave", "RiftChoice", "RiftPeek", "RiftLootChoice" } do
 		check(registered[name] ~= nil, name .. " isn't a request")
 	end
 	local gate = make("Part", { CFrame = CFrame.new(outpost + Vector3.new(420, 5, 0)) })
@@ -4205,11 +4267,23 @@ end)()
 	local function enter(p, vein)
 		return registered.RiftEnter(p, vein)
 	end
+	local function tick()
+		now += 0.25
+		RiftServer._step(now)
+		runDelayed()
+	end
+	local function foesLeft(run)
+		local count = 0
+		for _ in run.Foes do
+			count += 1
+		end
+		return count
+	end
 	-- Not from afar, nor through a gate that isn't one.
 	check(not enter(a, 2).Ok and enter(a, 2).Message == "Walk up to a Rift Gate first.", "Into the Rift from afar")
 	rootA.CFrame = CFrame.new(gate.Position + Vector3.new(4, 0, 0))
 	check(not enter(a, 7).Ok, "Through a gate that isn't one")
-	-- Alone: warned, at the gate and in there.
+	-- Alone: warned, at the gate and in there; the kit comes out.
 	local peeked = registered.RiftPeek(a)
 	check(peeked.Ok and peeked.Solo == true and peeked.Party == 1 and not peeked.Joining, "Going alone isn't flagged")
 	local went = enter(a, 2)
@@ -4218,95 +4292,121 @@ end)()
 	check(run and a:GetAttribute("RiftRun") == run.Id, "No trip for them")
 	local world = built[#built]
 	check((rootA.Position - world.Start.Position).Magnitude < 8, "They didn't arrive on the landing")
+	check(kit[a] == true and a:GetAttribute("Hunt") == true, "Not in their combat kit going into the Rift")
 	check(noted(a, "You're in the Rift alone"), "Not warned in there about going alone")
 	check(not enter(a, 2).Ok, "Into the Rift twice")
 	check(not FrontierServer._eligible(a), "The Outpost's critters still come for someone in the Rift")
-	check(a:GetAttribute("RiftRoom") == 1 and a:GetAttribute("RiftLeft") == RiftRun.foeCount(1, 1), "The first island's pack isn't up")
-	local isBoss = false
+	-- On the landing, nothing's up yet; into the first cave, its pack is.
+	tick()
+	check(a:GetAttribute("RiftRoom") == 1 and foesLeft(run) == 0 and #fighters == 0, "The first cave's pack came before anyone walked in")
+	local function walkIn(p, area)
+		local root = if p == a then rootA else rootB
+		root.CFrame = CFrame.new(area.Center + Vector3.new(0, 3, 0))
+		tick()
+	end
+	walkIn(a, world.Rooms[1])
+	local critters, armed = 0, 0
 	for enemy in run.Foes do
 		local entry = KaijuWilds._wilds[enemy]
-		check(entry and entry.Stay and entry.Wander and enemy.Model:GetAttribute("RiftRun") == run.Id, "A critter of the Rift that wanders off")
-		check((enemy.Home - world.Rooms[1].Center).Magnitude <= world.Rooms[1].Radius, "A critter off its island")
-		isBoss = isBoss or enemy.Model:GetAttribute("RiftBoss") == true
+		if entry then
+			critters += 1
+			check(entry.Stay and entry.Wander and enemy.Model:GetAttribute("RiftRun") == run.Id, "A critter of the Rift that wanders off")
+			check(inside(world.Rooms[1], enemy.Home), "A critter out of its cave")
+		else
+			armed += 1
+		end
 	end
-	check(not isBoss, "A boss on the first island")
-	-- One of their party joins them through any gate (it's on the path).
+	check(critters == RiftRun.foeCount(1, 1), "The first cave's critters aren't up: " .. critters)
+	check(armed == RiftRun.fighterCount(1, 1) and armed >= 1, "No fighters among the first cave's critters: " .. armed)
+	check(a:GetAttribute("RiftLeft") == critters + armed, "The strip doesn't count the fighters")
+	for _, entry in fighters do
+		local enc = entry.Encounter
+		check(enc.Rift == true and entry.Id == run.Id and table.find(entry.Members, a), "A fighter not of the trip")
+		check(enc.GearTier == RiftRun.fighterTier(1) and enc.Boss == false, "A first cave fighter's gear")
+		check(enc.HealthScale == RiftRun.Fighters.Health and table.find(DungeonRules.Roster, enc.Spec), "A fighter not of the pathway dungeon's")
+		check(inside(world.Rooms[1], enc.Center), "A fighter out of its cave")
+	end
+	-- One of their party joins them through any gate (it's on the way).
 	parties[a] = { Members = { a, b } }
 	parties[b] = parties[a]
 	local seen = registered.RiftPeek(b)
 	check(seen.Joining == true and seen.Solo == false, "A party member wasn't told they'd join")
 	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
 	check(enter(b, 2).Ok and RiftServer.runOf(b) == run, "A party member didn't join the trip")
+	check(kit[b] == true, "The one who joined isn't in their kit")
 	check(a:GetAttribute("RiftRunners") == 2 and noted(a, "came through the gate"), "Not told who came through")
-	-- An island cleared: its fire dies, a gem each, the next pack's up.
-	local function clearIsland()
+	-- A cave cleared (critters and fighters): its fire dies, a gem each.
+	local function clearCave()
 		for enemy in table.clone(run.Foes) do
 			Enemies.damage(enemy, 1e6, a)
 		end
 		runDelayed()
 	end
-	clearIsland()
-	check(opened[world.Gates[1]], "The first island's fire didn't die down")
+	clearCave()
+	check(opened[world.Gates[1]], "The first cave's fire didn't die down")
 	check(#profiles[a].Gems == 1 and #profiles[b].Gems == 1 and profiles[a].Gems[1].Source == "RiftCache", "No cache for clearing it")
-	check(a:GetAttribute("RiftFound") == 1 and a:GetAttribute("RiftRoom") == 2, "Not shown the island's done")
-	check(a:GetAttribute("RiftLeft") == RiftRun.foeCount(2, 2), "The second island's pack isn't sized for two")
-	-- Off the path into the lava: back on the last island reached, hurt.
-	rootA.CFrame = CFrame.new(world.Rooms[1].Center + Vector3.new(0, 3, 0))
-	now += 0.25
-	RiftServer._step(now)
-	rootA.CFrame = CFrame.new(world.Rooms[1].Center + Vector3.new(30, -40, 0))
-	now += 0.25
-	RiftServer._step(now)
+	check(a:GetAttribute("RiftFound") == 1 and a:GetAttribute("RiftRoom") == 2, "Not shown the cave's done")
+	check(a:GetAttribute("RiftLeft") == 0 and not run.Spawned[2], "The next cave's pack came before anyone walked in")
+	walkIn(a, world.Rooms[2])
+	check(
+		foesLeft(run) == RiftRun.foeCount(2, 2) + RiftRun.fighterCount(2, 2),
+		"The second cave's pack isn't sized for two: " .. foesLeft(run)
+	)
+	-- (Walking back and forth doesn't bring up another.)
+	local packed = foesLeft(run)
+	walkIn(a, world.Rooms[1])
+	walkIn(a, world.Rooms[2])
+	check(foesLeft(run) == packed, "A cave's pack came up twice")
+	-- Through the floor somehow: back in the last cave reached, unhurt.
 	local hA = a.Character:FindFirstChildOfClass("Humanoid")
-	check((rootA.Position - world.Rooms[1].Center).Magnitude < 6, "Not put back on the island after the lava")
-	check(hA.Health < hA.MaxHealth and hA.Health >= hA.MaxHealth * (1 - RiftRun.Fall.Hurt) - 1e-6, "The lava didn't hurt")
-	hA.Health = hA.MaxHealth
-	-- Knocked out on the path: robbed, and thrown home.
+	rootA.CFrame = CFrame.new(world.Rooms[2].Center + Vector3.new(10, -40, 0))
+	tick()
+	check(inside(world.Rooms[2], rootA.Position) and (rootA.Position - world.Rooms[2].Center).Magnitude < 6, "Not put back in the cave")
+	check(hA.Health == hA.MaxHealth, "Hurt for falling through the floor")
+	-- Knocked out on the way: robbed, and thrown home, kit away.
 	b:SetAttribute("SparDown", now + 3)
-	now += 0.25
-	RiftServer._step(now)
-	check(#profiles[b].Gems == 0 and noted(b, "The critters robbed you"), "Not robbed going down on the path")
+	tick()
+	check(#profiles[b].Gems == 0 and noted(b, "The critters robbed you"), "Not robbed going down on the way")
 	check(b:GetAttribute("RiftRun") ~= nil, "Thrown home before the critters had their giggle")
 	now += 3
 	runDelayed()
 	check(b:GetAttribute("RiftRun") == nil and RiftServer.runOf(b) == nil, "Not thrown home")
 	check((rootB.Position - site.Spawn.Position).Magnitude < 1 and b:GetAttribute("SparDown") == nil, "Not back at base, whole")
+	check(kit[b] == false and b:GetAttribute("Hunt") == nil, "Still in their kit back at base")
 	check(a:GetAttribute("RiftRunners") == 1, "The trip still counts them")
-	-- The rest of the path, then the throne island: the boss comes through.
-	for _ = 2, RiftRun.Rooms do
-		clearIsland()
+	-- The rest of the way, then the throne cave: the boss comes through.
+	clearCave()
+	for i = 3, RiftRun.Rooms do
+		walkIn(a, world.Rooms[i])
+		check(next(run.Foes) ~= nil, "Cave " .. i .. "'s pack isn't up")
+		for _, entry in fighters do
+			if entry.Encounter.Room == i then
+				check(entry.Encounter.GearTier == RiftRun.fighterTier(i), "Cave " .. i .. "'s fighters' gear")
+			end
+		end
+		clearCave()
 	end
 	check(a:GetAttribute("RiftRoom") == RiftRun.Rooms + 1 and a:GetAttribute("RiftBoss") == run.Boss.Name, "Not at the boss")
 	check(run.BossEnemy == nil, "The boss came before anyone set foot there")
-	rootA.CFrame = CFrame.new(world.Boss.Center + Vector3.new(0, 3, 20))
-	now += 0.25
-	RiftServer._step(now)
-	runDelayed()
+	walkIn(a, world.Boss)
 	local boss = run.BossEnemy
 	check(boss and boss.Alive and boss.Model:GetAttribute("RiftBoss") == true, "The boss didn't come through")
-	local isOne = false
-	for _, spec in shared("DungeonRules").Bosses do
-		isOne = isOne or spec.Id == run.Boss.Id
-	end
-	check(isOne and KaijuWilds._wilds[boss].Species == run.Boss.Id, "The boss isn't one of the brainrot bosses")
-	check(string.find(boss.Model:GetAttribute("CombatTitle"), "RIFT BOSS", 1, true) ~= nil, "The boss isn't named one")
-	check(boss.Humanoid.MaxHealth > Kaiju.Bug.Health * RiftRun.Boss.Health * 0.9, "The boss isn't tough")
-	check(Kaiju.BugMoves[run.Boss.Id] ~= nil, "The boss has no move of its own")
-	-- Weakened, it calls its critters through.
+	local summoned = fighters[#fighters].Encounter
+	check(table.find(DungeonRules.Bosses, run.Boss) and summoned.Spec == run.Boss, "The boss isn't one of the brainrot bosses")
+	check(summoned.Boss == true and summoned.Rift == true, "The boss isn't a Colossus")
+	check(summoned.GearTier == 4 and summoned.HealthScale == RiftRun.bossHealth(1), "The boss's gear or health, alone")
+	check(#run.Boss.Moves >= 3, "The boss has no moves of its own")
+	check(run.Foes[boss] == nil, "The boss counted among its cave's foes")
+	-- Weakened, it calls its critters (and a fighter) through.
+	local before = #fighters
 	boss.Humanoid.Health = boss.Humanoid.MaxHealth * 0.6
-	now += 0.25
-	RiftServer._step(now)
-	runDelayed()
+	tick()
 	check(run.Adds[1] and not run.Adds[2], "It didn't call critters through")
-	local adds = 0
-	for _ in run.Foes do
-		adds += 1
-	end
-	check(adds == RiftRun.Boss.AddCount, "Not its critters through: " .. adds)
+	check(foesLeft(run) == RiftRun.Boss.AddCount + RiftRun.Boss.AddFighters, "Not its critters through: " .. foesLeft(run))
+	check(#fighters == before + RiftRun.Boss.AddFighters and fighters[#fighters].Encounter.GearTier == RiftRun.Boss.AddTier, "No fighter through with them")
 	-- Knocked out at the boss: kept down to choose.
 	a:SetAttribute("SparDown", now + 3)
-	now += 0.25
-	RiftServer._step(now)
+	tick()
 	check(type(a:GetAttribute("RiftFallen")) == "number" and a:GetAttribute("RiftRestore") == RiftRun.restoreCost(0), "Not asked what now")
 	check(a:GetAttribute("SparDown") > now + RiftRun.Fallen - 1, "Not kept down while they choose")
 	check(#profiles[a].Gems == RiftRun.Rooms, "Robbed at the boss")
@@ -4325,52 +4425,104 @@ end)()
 	end
 	-- Down again: the next RESTORE costs more; back to base keeps what they found.
 	a:SetAttribute("SparDown", now + 3)
-	now += 0.25
-	RiftServer._step(now)
+	tick()
 	check(a:GetAttribute("RiftRestore") == RiftRun.restoreCost(1) and RiftRun.restoreCost(1) > RiftRun.restoreCost(0), "RESTORE didn't go up")
 	check(registered.RiftChoice(a, "Home").Ok and a:GetAttribute("RiftRun") == nil, "Not home when they chose it")
-	check(#profiles[a].Gems == RiftRun.Rooms, "Home from the boss, robbed")
-	-- The last one out: the trip's gone, its critters and boss with it.
+	check(#profiles[a].Gems == RiftRun.Rooms and kit[a] == false, "Home from the boss, robbed or still in their kit")
+	-- The last one out: the trip's gone, its critters, fighters and boss with it.
 	check(run.Done and world.Folder.Destroyed and not boss.Alive, "The trip outlived its runners")
-	-- A trip won: everyone paid, the way home open, and home they go.
+	check((removedDungeons[run.Id] or 0) >= 1 and not fighters[#fighters].Enemy.Alive, "Its fighters outlived the trip")
+	-- A trip won, together: everyone paid, the boss's loot up for them.
+	local function throughToBoss()
+		for i = 1, RiftRun.Rooms do
+			walkIn(a, world.Rooms[i])
+			clearCave()
+		end
+		walkIn(a, world.Boss)
+	end
 	now += 1
 	rootA.CFrame = CFrame.new(gate.Position)
-	parties[a], parties[b] = nil, nil
-	check(enter(a, 2).Ok, "Couldn't go in again")
+	rootB.CFrame = CFrame.new(gate.Position)
+	check(enter(a, 2).Ok and enter(b, 2).Ok, "Couldn't go in again, together")
 	run = RiftServer.runOf(a)
 	world = built[#built]
-	check(world ~= built[1] and run.Id ~= nil, "Not a new trip")
-	for _ = 1, RiftRun.Rooms do
-		clearIsland()
-	end
-	rootA.CFrame = CFrame.new(world.Boss.Center + Vector3.new(0, 3, 20))
-	now += 0.25
-	RiftServer._step(now)
-	runDelayed()
+	check(world ~= built[1] and run.Id ~= nil and RiftServer.runOf(b) == run, "Not a new trip, together")
+	throughToBoss()
+	check(fighters[#fighters].Encounter.HealthScale == RiftRun.bossHealth(2), "The boss isn't tougher for two")
+	check(RiftRun.bossHealth(2) > RiftRun.bossHealth(1), "The boss's health doesn't grow with the party")
 	local coins = profiles[a].Coins
 	local found = #profiles[a].Gems
 	Enemies.damage(run.BossEnemy, 1e9, a)
 	check(run.Won and a:GetAttribute("RiftWon") == true and homesOpened >= 1, "Beating the boss didn't win the trip")
 	check(profiles[a].Coins == coins + RiftRun.rewardCoins(RiftRun.Rooms) and #profiles[a].Gems == found + 1, "Not paid for the boss")
 	check(restored[a] and noted(a, "is beaten!"), "No swings back or word of the win")
-	-- (Far from a way home, you can't just leave; at it, you can.)
-	check(not registered.RiftLeave(a).Ok, "Left the Rift from the middle of an island")
+	for _, p in { a, b } do
+		local label = p:GetAttribute("DungeonLoot")
+		check(type(label) == "string" and string.find(label, "Tier 4 / Rank III", 1, true) ~= nil, "No boss loot card")
+		check(string.find(label, shared("GemConfig").elementName(run.Boss.Element), 1, true) ~= nil, "The loot isn't of the boss's element")
+		check(p:GetAttribute("DungeonLootTitle") == "RIFT BOSS DEFEATED", "The loot card isn't the Rift's")
+		check(p:GetAttribute("DungeonLootDeadline") > now, "The loot card has no clock")
+	end
+	-- (Not sent home while the loot's still up.)
 	now += RiftRun.Exit + 1
 	RiftServer._step(now)
-	check(a:GetAttribute("RiftRun") == nil and run.Done, "Not sent home after the win")
-	-- Leaving through the landing's way home.
+	check(a:GetAttribute("RiftRun") == run.Id and run.ExitAt == nil, "Sent home before the loot was settled")
+	-- (Far from a way home, you can't just leave; at it, you can.)
+	check(not registered.RiftLeave(a).Ok, "Left the Rift from the middle of a cave")
+	-- Claim, roll or pass: only those, once each; all chosen, the roll's settled.
+	check(not registered.RiftLootChoice(a, "Grab").Ok, "A loot choice that isn't one")
+	check(registered.RiftLootChoice(a, "Claim").Ok, "Couldn't claim the boss's gem")
+	check(not registered.RiftLootChoice(a, "Pass").Ok, "Chose twice")
+	check(a:GetAttribute("DungeonLoot") ~= nil and run.ExitAt == nil, "Settled before everyone chose")
+	local gemsA, gemsB = #profiles[a].Gems, #profiles[b].Gems
+	check(registered.RiftLootChoice(b, "Pass").Ok, "Couldn't pass")
+	check(run.Loot.Resolved and run.ExitAt ~= nil, "Not settled once everyone chose")
+	check(#profiles[a].Gems == gemsA + 1 and #profiles[b].Gems == gemsB, "The gem didn't go to the one who claimed it")
+	local prize = profiles[a].Gems[#profiles[a].Gems]
+	check(prize.Source == "PvEDrop" and prize.Element == run.Boss.Element, "Not the boss's gem")
+	check(prize.Tier == (if run.Loot.Tier == 5 then "Legendary" else "UltraRare"), "The boss's gem at the wrong rarity")
+	check(noted(a, "RIFT LOOT: ") and noted(b, "RIFT LOOT: "), "Nobody told who won the gem")
+	check(a:GetAttribute("DungeonLoot") == nil and b:GetAttribute("DungeonLootDeadline") == nil, "The loot card stayed up")
+	check(not registered.RiftLootChoice(a, "Roll").Ok, "Chose after it was settled")
+	now += RiftRun.Exit + 1
+	RiftServer._step(now)
+	check(a:GetAttribute("RiftRun") == nil and b:GetAttribute("RiftRun") == nil and run.Done, "Not sent home after the win")
+	check(kit[a] == false and kit[b] == false, "Still in their kit after the win")
+	-- Nobody chooses: when its time's up, it's settled anyway; everyone
+	-- passes: nobody gets it.
+	parties[a], parties[b] = nil, nil
 	now += 1
 	rootA.CFrame = CFrame.new(gate.Position)
 	check(enter(a, 2).Ok, "Couldn't go in a third time")
+	run = RiftServer.runOf(a)
+	world = built[#built]
+	throughToBoss()
+	local gems = #profiles[a].Gems
+	Enemies.damage(run.BossEnemy, 1e9, a)
+	check(a:GetAttribute("DungeonLoot") ~= nil and not run.Loot.Resolved, "No loot for one alone")
+	now += RiftRun.Loot.Seconds + 0.1
+	runDelayed()
+	check(run.Loot.Resolved and run.ExitAt ~= nil and #profiles[a].Gems == gems + 1, "Not settled when the time ran out")
+	check(noted(a, "The boss's gem was passed."), "Not told nobody took it")
+	now += RiftRun.Exit + 1
+	RiftServer._step(now)
+	check(a:GetAttribute("RiftRun") == nil and a:GetAttribute("DungeonLootTitle") == nil, "Not home, or the loot card left behind")
+	-- Leaving through the landing's way home.
+	now += 1
+	rootA.CFrame = CFrame.new(gate.Position)
+	check(enter(a, 2).Ok, "Couldn't go in a fourth time")
 	world = built[#built]
 	rootA.CFrame = CFrame.new(world.Exit.Position)
 	check(registered.RiftLeave(a).Ok and a:GetAttribute("RiftRun") == nil, "Couldn't leave by the way home")
-	-- (Pouches and coins back as they were for what follows.)
+	-- (Pouches, coins and the kit back as they were for what follows.)
+	PlayerData.addGem = smallPouch
 	for _, p in { a, b } do
 		profiles[p].Gems, profiles[p].Coins = {}, 0
 		p:SetAttribute("SparDown", nil)
+		p:SetAttribute("Hunt", nil)
+		p:SetAttribute("Spar", nil)
 	end
-	print(string.format("  rift: %d caches handed out, %d trips", awarded, #built))
+	print(string.format("  rift: %d caches handed out, %d fighters, %d trips", awarded, #fighters, #built))
 end)()
 
 -- The rules' moods: the same roll, the same mood, and every one reachable.

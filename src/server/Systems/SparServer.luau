@@ -83,7 +83,7 @@ local function stateOf(player: Player): Spar.State
 	local humanoid = humanoidOf(player)
 	local profile = PlayerData.get(player)
 	local busy = nil
-	for _, name in { "CombatSession", "MatchId", "DungeonId", "Expedition", "DungeonSelecting", "RiftRun" } do
+	for _, name in { "CombatSession", "MatchId", "DungeonId", "Expedition", "DungeonSelecting" } do
 		if player:GetAttribute(name) then
 			busy = name
 		end
@@ -178,6 +178,13 @@ local function askProblem(player: Player, target: Player?, answering: boolean?):
 	local here = target ~= nil and target ~= player and target.Parent ~= nil
 	if not here or not target then
 		return Spar.askProblem({ Here = false, Name = "", Mine = stateOf(player), Theirs = stateOf(player) })
+	end
+	-- (Nobody spars in the Rift: it would knock a runner down, and the trip
+	-- would read it as a fall. Server.RiftServer.)
+	if player:GetAttribute("RiftRun") ~= nil then
+		return "Not in the Rift."
+	elseif target:GetAttribute("RiftRun") ~= nil then
+		return target.DisplayName .. " is in the Rift."
 	end
 	if Spar.hunting(player) then
 		return "Put your kit away first (1)."
@@ -292,6 +299,9 @@ local function hunt(player: Player, on: any)
 		if not Spar.hunting(player) then
 			return reply(true, "")
 		end
+		if player:GetAttribute("RiftRun") ~= nil then
+			return reply(false, "Your kit stays out in the Rift.")
+		end
 		local wait = Spar.stopWait({
 			Down = player:GetAttribute("SparDown"),
 			Hurt = player:GetAttribute("SparHurt"),
@@ -374,6 +384,30 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?, tri
 	)
 	task.delay(seconds, getUp, player, humanoid, not Spar.sparring(player), trip ~= nil)
 	return true
+end
+
+-- The Rift's (Server.RiftServer): going in, your combat kit comes out to
+-- hunt (a spar ended first); coming home, it's put away. In there it can't
+-- be put away (the "Hunt" request says so).
+function SparServer.riftKit(player: Player, on: boolean)
+	if not on then
+		if Spar.sparring(player) then
+			stop(player)
+		end
+		return
+	end
+	if Spar.hunting(player) then
+		return
+	end
+	if Spar.sparring(player) then
+		stop(player, player.DisplayName .. " went into the Rift.")
+	end
+	withdraw(player)
+	player:SetAttribute("SparDown", nil)
+	player:SetAttribute("SparHurt", nil)
+	CombatServer.reset(player)
+	player:SetAttribute("Hunt", true)
+	player:SetAttribute("Spar", true)
 end
 
 -- Tripped by a rift critter in the Outpost (a gem raid: Shared.Frontier.Raid):

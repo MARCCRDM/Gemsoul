@@ -1,38 +1,47 @@
 --[[
 	The Rift (docs/rift.md): a Rift Vein's gate opens on the critters' own
-	world, a burning pathway of islands over a sea of lava. Its rules, with
+	world, a walled pathway of caves open to a burning sky. Its rules, with
 	no Roblox services (Server.RiftServer runs a trip, Server.RiftWorld
 	builds the path, Client.RiftClient shows it).
 
-	  A trip     Rooms islands one after another, each with its own pack of
-	             brainrot critters (Foes by room, PerRunner more for each
-	             runner past the first; a ranged one only at the back,
-	             Kaiju.wave) and, from room Elite.From, now and then a big
-	             one among them (Elite). A wall of fire bars the way on
-	             until the island's cleared; cleared, everyone in finds a
-	             Cache (a gem, luckier further in). Then the boss, one of
-	             the ten brainrot bosses (DungeonRules.Bosses) at random,
-	             on its own island: big and tough (Boss: tougher with more
-	             runners), and at each of Boss.Adds (shares of its health
-	             left) it tears the ground open and Boss.AddCount critters
-	             come through. Beaten: Reward for everyone still in, and
-	             the way home opens (Exit seconds, then through it you go).
+	  The way    a landing, then Rooms caves one after another, then the
+	             throne cave, joined by passages on a grid (layout: the
+	             pathway dungeon's, a path that never touches itself).
+	             Walled all round: there's nowhere to fall.
+	  A cave     its own pack: brainrot critters (Foes by cave, PerRunner
+	             more for each runner past the first; a ranged one only at
+	             the back, Kaiju.wave) and, from cave Elite.From, now and
+	             then a big one among them (Elite), with the pathway
+	             dungeon's regular fighters among them (Fighters: armed and
+	             armoured to their gear tier). A wall of fire bars the way
+	             on until the cave's cleared; cleared, everyone in finds a
+	             Cache (a gem, luckier further in).
+	  The boss   one of the ten brainrot bosses (DungeonRules.Bosses) at
+	             random, as a Colossus: the pathway dungeon's boss fighter,
+	             with Boss.Health times its health (more with more
+	             runners). At each of Boss.Adds (shares of its health left)
+	             it tears the ground open and Boss.AddCount critters and
+	             Boss.AddFighters fighters come through. Beaten: its loot
+	             (Loot: claim, roll or pass, as in the pathway dungeon: a
+	             gem of its element, Ultra Rare at gear tier 4, Legendary
+	             at 5) and Reward for everyone still in, then the way home
+	             opens (Exit seconds, then through it you go).
 	  Levels     the critters come at the runners' kaiju's level (the
 	             average of their leads), Level.Base over it in the first
-	             room and PerRoom more each room; the boss Level.Boss over
-	             the last room's.
-	  Falling    knocked out on the path, the critters rob you (Rob.Share
-	             of the gems you've found in here, at least one) and you're
+	             cave and PerRoom more each cave; the boss's critters
+	             Level.Boss over the last cave's.
+	  Falling    knocked out on the way, the critters rob you (Rob.Share of
+	             the gems you've found in here, at least one) and you're
 	             thrown back to base. Knocked out at the boss, you choose:
 	             invite a friend, RESTORE (your health and your kaiju's
 	             team, for Restore.Coins, Grow times more each time in a
 	             trip) or back to base with what you found. Nothing chosen
-	             in Fallen seconds: back to base. Off the path into the
-	             lava (Fall.Below studs under it): back on the last island
-	             you reached, Fall.Hurt of your health gone.
+	             in Fallen seconds: back to base. (Through the floor
+	             somehow, Fall.Below studs under it: back in the last cave
+	             you reached.)
 	  Together   it's built for a party: up to Party runners, joining
 	             through any gate while their party's trip is still on the
-	             path. Going in alone, you're warned (RiftRun.solo).
+	             way. Going in alone, you're warned (RiftRun.solo).
 ]]
 local DungeonRules = require(script.Parent.DungeonRules)
 local Kaiju = require(script.Parent.Kaiju)
@@ -41,34 +50,48 @@ local RiftRun = {}
 
 RiftRun.Rooms = 4
 RiftRun.Party = 4
-RiftRun.Foes = { 3, 4, 5, 6 }
-RiftRun.PerRunner = 1.5
+RiftRun.Foes = { 2, 3, 3, 4 }
+RiftRun.PerRunner = 1
 RiftRun.Elite = { From = 2, Chance = 0.6, Scale = 1, Health = 4, Damage = 1.5, Reach = 1.6 }
+RiftRun.Fighters = { Count = { 1, 1, 2, 2 }, PerRunner = 0.5, Tier = { 1, 2, 2, 3 }, Health = 1.5 }
 RiftRun.Level = { Base = 2, PerRoom = 1, Boss = 3, Max = 30 }
 RiftRun.Boss = {
-	Scale = 1.7,
-	Health = 40,
-	Damage = 2.6,
-	Reach = 2.4,
-	PerRunner = 0.6,
+	Health = 1.8,
+	PerRunner = 0.5,
 	Adds = { 0.66, 0.33 },
 	AddCount = 3,
+	AddFighters = 1,
+	AddTier = 3,
 }
 RiftRun.Cache = { Luck = 0.12, PerRoom = 0.06 }
 RiftRun.Reward = { Coins = 300, PerRoom = 40, Luck = 0.6, Exp = 120 }
+RiftRun.Loot = { Seconds = 30 }
 RiftRun.Rob = { Share = 0.5 }
 RiftRun.Restore = { Coins = 150, Grow = 2 }
 RiftRun.Fallen = 60
-RiftRun.Fall = { Below = 30, Hurt = 0.15 }
-RiftRun.Exit = 25
+RiftRun.Fall = { Below = 20 }
+RiftRun.Exit = 20
 
--- How many critters come at room `room` (1..Rooms) for `runners` runners.
+-- How many critters come at cave `room` (1..Rooms) for `runners` runners.
 function RiftRun.foeCount(room: number, runners: number): number
 	local base = RiftRun.Foes[math.clamp(room, 1, #RiftRun.Foes)]
 	return base + math.floor((math.max(1, runners) - 1) * RiftRun.PerRunner + 0.5)
 end
 
--- Room `room`'s pack: { { Critter = roster id, Elite = boolean } }, a
+-- How many of the pathway dungeon's fighters stand in cave `room`.
+function RiftRun.fighterCount(room: number, runners: number): number
+	local rule = RiftRun.Fighters
+	local base = rule.Count[math.clamp(room, 1, #rule.Count)]
+	return base + math.floor((math.max(1, runners) - 1) * rule.PerRunner)
+end
+
+-- Their gear tier (1..5, DungeonLoadout) in cave `room`.
+function RiftRun.fighterTier(room: number): number
+	local tiers = RiftRun.Fighters.Tier
+	return tiers[math.clamp(room, 1, #tiers)]
+end
+
+-- Cave `room`'s critters: { { Critter = roster id, Elite = boolean } }, a
 -- ranged one only at the back (Kaiju.wave), and from Elite.From on, now
 -- and then the first of them a big one. `rng` has NextInteger and NextNumber.
 function RiftRun.pickFoes(room: number, runners: number, rng): { { Critter: string, Elite: boolean } }
@@ -87,7 +110,18 @@ function RiftRun.pickFoes(room: number, runners: number, rng): { { Critter: stri
 	return pack
 end
 
--- The critters' level in room `room` (Rooms + 1: the boss), for runners
+-- Cave `room`'s fighters: one of the pathway dungeon's roster (its element
+-- and moves: DungeonRules.Roster) for the whole cave.
+function RiftRun.pickFighters(room: number, runners: number, rng): { any }
+	local spec = DungeonRules.Roster[rng:NextInteger(1, #DungeonRules.Roster)]
+	local list = {}
+	for _ = 1, RiftRun.fighterCount(room, runners) do
+		table.insert(list, spec)
+	end
+	return list
+end
+
+-- The critters' level in cave `room` (Rooms + 1: the boss's), for runners
 -- whose lead kaiju are at `levels` (none: level 1).
 function RiftRun.level(levels: { number }, room: number): number
 	local sum = 0
@@ -108,10 +142,15 @@ function RiftRun.pickBoss(rng)
 	return DungeonRules.Bosses[rng:NextInteger(1, #DungeonRules.Bosses)]
 end
 
--- The boss's health times its kind's, for `runners` runners.
+-- The boss's health, times a Colossus's, for `runners` runners.
 function RiftRun.bossHealth(runners: number): number
 	local rule = RiftRun.Boss
 	return rule.Health * (1 + rule.PerRunner * (math.max(1, runners) - 1))
+end
+
+-- The boss's gear tier: 4 alone (its gem Ultra Rare), 4 or 5 for a party.
+function RiftRun.bossTier(runners: number, rng): number
+	return if runners <= 1 then 4 else rng:NextInteger(4, 5)
 end
 
 -- Which of Boss.Adds the boss has just come down past (its health `share`
@@ -125,7 +164,7 @@ function RiftRun.addsDue(share: number, done: { [number]: boolean }): number?
 	return nil
 end
 
--- A cleared room's cache: how lucky its gem is.
+-- A cleared cave's cache: how lucky its gem is.
 function RiftRun.cacheLuck(room: number): number
 	return RiftRun.Cache.Luck + RiftRun.Cache.PerRoom * (math.max(1, room) - 1)
 end
@@ -151,6 +190,40 @@ end
 -- Going in alone (warned: it's built for a party).
 function RiftRun.solo(runners: number): boolean
 	return runners <= 1
+end
+
+-- The way through: Rooms + 2 cells on a grid ({ X, Z }), the landing first
+-- and the throne cave last, each the next one's neighbour, and never one
+-- beside an earlier one but its own (the pathway dungeon's rule: the path
+-- doesn't touch itself). The first step is always +Z, so the landing faces
+-- the way in.
+local STEPS = { { 0, 1 }, { 1, 0 }, { -1, 0 }, { 0, -1 } }
+function RiftRun.layout(rng): { { X: number, Z: number } }
+	local cells = { { X = 0, Z = 0 } }
+	local used = { ["0:0"] = true }
+	for i = 2, RiftRun.Rooms + 2 do
+		local previous = cells[i - 1]
+		local free = {}
+		for _, d in if i == 2 then { STEPS[1] } else STEPS do
+			local x, z = previous.X + d[1], previous.Z + d[2]
+			local clear = not used[x .. ":" .. z]
+			for _, side in STEPS do
+				local ax, az = x + side[1], z + side[2]
+				if used[ax .. ":" .. az] and (ax ~= previous.X or az ~= previous.Z) then
+					clear = false
+				end
+			end
+			if clear then
+				table.insert(free, { X = x, Z = z })
+			end
+		end
+		-- (A path this short always has a free way on.)
+		assert(#free > 0, "The Rift's path has no way on")
+		local cell = free[rng:NextInteger(1, #free)]
+		used[cell.X .. ":" .. cell.Z] = true
+		table.insert(cells, cell)
+	end
+	return cells
 end
 
 return RiftRun

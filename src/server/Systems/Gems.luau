@@ -1,6 +1,8 @@
 --[[
 	The one place gems enter the game. Every source calls Gems.award:
-	  "MiningNode"   mining a node in the quarry (uses the free quota)
+	  "MiningNode"   mining a node in the quarry (uses the free quota; out in
+	                 one of the Outpost's biomes, opts.Home and opts.Bias lean
+	                 its element: Shared.Frontier.Biome)
 	  "VipMiningNode" mining a node in the VIP pit (luckier rolls)
 	  "MiningStore"  legacy store / expedition cache rewards
 	  "PvEDrop"      monster loot; pass opts.Luck for tougher monsters
@@ -20,11 +22,17 @@ local rng = Random.new()
 
 -- Recovers an enchant-ready gem for the player. Returns the gem, or nil if their
 -- inventory is full.
-function Gems.award(player: Player, source: string, opts: { Luck: number?, Silent: boolean? }?): GemConfig.Gem?
+function Gems.award(
+	player: Player,
+	source: string,
+	opts: { Luck: number?, Silent: boolean?, Home: string?, Bias: number? }?
+): GemConfig.Gem?
 	local gem = GemGenerator.generate(rng, source, {
 		Id = PlayerData.newGemId(),
 		Time = os.time(),
 		Luck = opts and opts.Luck,
+		Home = opts and opts.Home,
+		Bias = opts and opts.Bias,
 	})
 	if not PlayerData.addGem(player, gem) then
 		Remotes.Notify:FireClient(player, "Your gem pouch is full! Sell or use some gems first.")

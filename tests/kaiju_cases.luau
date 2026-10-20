@@ -596,6 +596,52 @@ do
 		end
 	end
 	check(withRanged > 200 and alone > 100, "No ranged ones at the back, or no lone critters, in 2000 swarms")
+	-- In one of the Outpost's biomes (Shared.Frontier), its own kind leans
+	-- the swarm: a fighter is its own `bias` of the time (the rest the other
+	-- fighters alike); a ranged own kind comes along more often instead,
+	-- still at the back and never alone.
+	for _, home in { "Sahur", "Tralalero", "Patapim" } do
+		local mine, fighters, others = 0, 0, {}
+		for _ = 1, 3000 do
+			for _, id in Kaiju.wave(r:NextInteger(1, 9), r, home, 0.6) do
+				if not Kaiju.isRanged(id) then
+					fighters += 1
+					if id == home then
+						mine += 1
+					else
+						others[id] = (others[id] or 0) + 1
+					end
+				end
+			end
+		end
+		local share = mine / fighters
+		check(share > 0.57 and share < 0.63, home .. "'s biome isn't mostly " .. home .. ": " .. share)
+		for id, n in others do
+			check(math.abs(n / (fighters - mine) - 0.5) < 0.04, "The other fighters aren't alike in " .. home .. "'s biome: " .. id)
+		end
+	end
+	local bombers, lone = 0, 0
+	for _ = 1, 2000 do
+		local count = r:NextInteger(1, 9)
+		local wave = Kaiju.wave(count, r, "Crocodilo", 0.6)
+		local seenRanged, ranged = false, 0
+		for _, id in wave do
+			if Kaiju.isRanged(id) then
+				ranged += 1
+				seenRanged = true
+			else
+				check(not seenRanged, "A fighter after a ranged one, in the ranged one's biome")
+			end
+		end
+		check(#wave == count and ranged < count, "A swarm of only bombers, or the wrong size")
+		if count >= 2 then
+			check(ranged >= 1, "No bomber in its own biome's swarm of " .. count)
+			bombers += ranged / count
+		else
+			lone += 1
+		end
+	end
+	check(bombers / (2000 - lone) > 0.25, "Bombers no more common in their own biome")
 end
 
 print(

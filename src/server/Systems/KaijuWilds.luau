@@ -101,9 +101,11 @@
 	                            with your kaiju out or hunting)
 
 	  KaijuWilds.spawnBug(at, opts) -> enemy?   a moon bug out of a rift
-	  KaijuWilds.pickWave(count, rng) -> { roster id }   what comes through,
-	                                            in order (a ranged one last)
-	  KaijuWilds.pickCritter(rng) -> roster id  one on its own (never ranged)
+	  KaijuWilds.pickWave(count, rng, home?) -> { roster id }   what comes
+	                                            through, in order (a ranged
+	                                            one last; `home`, a biome's
+	                                            element, leans it)
+	  KaijuWilds.pickCritter(rng, home?) -> roster id  one on its own (never ranged)
 	  KaijuWilds.isCritter(enemy) -> boolean    a rift's critter (not a wild kaiju)
 	  KaijuWilds.critterOf(model) -> enemy?     the rift's critter a model is
 	  KaijuWilds.bonk(enemy, player, from) -> boolean   a pickaxe's bonk on a critter
@@ -1853,7 +1855,9 @@ end
 -- `guard`, the guarded vein's (bigger).
 local function newWild(at: Vector3, level: number, guard: boolean, facing: Vector3?, species: string?): Wild
 	species = species or Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
-	local element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
+	-- (Out in one of the biomes, mostly of its element: Frontier.Biome.)
+	local biome = Frontier.biomeAt(at - Outpost.Location.Position)
+	local element = Frontier.pickElement(biome and biome.Element, rng)
 	local scale = if guard then Kaiju.Scale.Guardian else Kaiju.Scale.Wild
 	local soul = Kaiju.rollSoul(Gems.random(), element, {
 		Id = "wild",
@@ -2387,15 +2391,27 @@ local function bugDied(enemy)
 	KaijuWilds.done(enemy, true, totals)
 end
 
+-- The critter whose element is `element` (DungeonRules.Roster), if any.
+local function critterOf(element: string?): string?
+	for _, spec in DungeonRules.Roster do
+		if spec.Element == element and table.find(Kaiju.Critters, spec.Id) then
+			return spec.Id
+		end
+	end
+	return nil
+end
+
 -- What comes through for an encounter of `count`: roster ids, in the order
--- they come (Kaiju.wave: a ranged one never alone, and last).
-function KaijuWilds.pickWave(count: number, r): { string }
-	return Kaiju.wave(count, r or rng)
+-- they come (Kaiju.wave: a ranged one never alone, and last). Coming
+-- through in one of the Outpost's biomes, `home` (its element) leans it
+-- toward the biome's own kind (Frontier.Biome.Critter).
+function KaijuWilds.pickWave(count: number, r, home: string?): { string }
+	return Kaiju.wave(count, r or rng, critterOf(home), Frontier.Biome.Critter)
 end
 
 -- One critter on its own (never a ranged one): a roster id.
-function KaijuWilds.pickCritter(r): string
-	return Kaiju.wave(1, r or rng)[1]
+function KaijuWilds.pickCritter(r, home: string?): string
+	return Kaiju.wave(1, r or rng, critterOf(home), Frontier.Biome.Critter)[1]
 end
 
 local function rosterSpec(id: string?)

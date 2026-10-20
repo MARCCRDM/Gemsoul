@@ -125,10 +125,95 @@ Frontier.Bands = {
 Frontier.BandOrder = { "Core", "Fringe", "Edge" }
 Frontier.RiftColor = RIFT
 
+-- The Loop: four biomes round the core, a quarter of the quarry each,
+-- between the four Spokes (the Crossroads: haul roads due north, east, south
+-- and west out of the core; the ring road at 260 runs round through all
+-- four). Going round clockwise from the north-east (Angle: each one's
+-- middle), each is weak to the one before it (Shared.ElementMatchup:
+-- Thermal beats Cryo, Cryo beats Ion, Ion beats Corrosive, Corrosive beats
+-- Thermal), so what you find in one does well in the next. Out there a
+-- mined gem is of its biome's element Biome.Bias of the time (the other
+-- three share the rest), and so are its wild kaiju; its critters lean the
+-- same way (Biome.Critter). The core is the Hub: all four alike.
+--   Label    its ground's name on the crossroads signs
+--   Ground   the regolith's tint out there, and its Material (Enum.Material's name)
+--   Stone    its rocks' basalt
+--   Glow     its colour (signs, banners, its props' glow)
+--   Tint     the screen's grade there, and Ambient the outdoor light
+--   Line     the banner's line as you cross into it
+local NORTH = -math.pi / 2
+Frontier.Spokes = { NORTH, 0, math.pi / 2, math.pi }
+Frontier.Biomes = {
+	{
+		Id = "Ashfall",
+		Name = "Ashfall",
+		Label = "Thermal ground",
+		Element = "Fire",
+		Angle = -math.pi / 4,
+		Ground = Color3.fromRGB(70, 58, 58),
+		Material = "CrackedLava",
+		Stone = Color3.fromRGB(96, 62, 54),
+		Glow = Color3.fromRGB(255, 122, 58),
+		Tint = Color3.fromRGB(255, 232, 214),
+		Ambient = Color3.fromRGB(184, 146, 132),
+		Line = "Thermal ground  ·  Thermal gems, critters and kaiju",
+	},
+	{
+		Id = "Rimefrost",
+		Name = "Rimefrost",
+		Label = "Cryo ground",
+		Element = "Frost",
+		Angle = math.pi / 4,
+		Ground = Color3.fromRGB(196, 212, 230),
+		Material = "Snow",
+		Stone = Color3.fromRGB(112, 132, 166),
+		Glow = Color3.fromRGB(130, 214, 255),
+		Tint = Color3.fromRGB(228, 242, 255),
+		Ambient = Color3.fromRGB(150, 176, 210),
+		Line = "Cryo ground  ·  Cryo gems, critters and kaiju",
+	},
+	{
+		Id = "Stormglass",
+		Name = "Stormglass",
+		Label = "Ion ground",
+		Element = "Shock",
+		Angle = 3 * math.pi / 4,
+		Ground = Color3.fromRGB(96, 90, 122),
+		Material = "Salt",
+		Stone = Color3.fromRGB(100, 92, 136),
+		Glow = Color3.fromRGB(255, 222, 84),
+		Tint = Color3.fromRGB(250, 246, 228),
+		Ambient = Color3.fromRGB(164, 154, 190),
+		Line = "Ion ground  ·  Ion gems, critters and kaiju",
+	},
+	{
+		Id = "Blightwood",
+		Name = "Blightwood",
+		Label = "Corrosive ground",
+		Element = "Poison",
+		Angle = 5 * math.pi / 4,
+		Ground = Color3.fromRGB(74, 90, 62),
+		Material = "Mud",
+		Stone = Color3.fromRGB(70, 90, 66),
+		Glow = Color3.fromRGB(140, 232, 92),
+		Tint = Color3.fromRGB(234, 255, 228),
+		Ambient = Color3.fromRGB(140, 166, 132),
+		Line = "Corrosive ground  ·  Corrosive gems, critters and kaiju",
+	},
+}
+-- Bias: a biome's share of its own element (gems, wild kaiju); Critter: the
+-- share of an encounter's critters that are its own kind (when that kind
+-- fights up close: an Ion biome's own, the ranged one, comes in more often
+-- at the back instead); Blend: studs either side of the core's edge over
+-- which its look comes in.
+Frontier.Biome = { Bias = 0.6, Critter = 0.6, Blend = 60 }
+local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
+
 -- Outcrops (angles round the middle are radians: 0 east, a quarter turn
 -- south): Count of them From to To studs out, Apart studs between their
 -- middles, Step studs between their rocks; Lone of the frontier's rocks
--- set alone, Stones of those leading out of the core.
+-- set alone, Stones of those at the spokes' mouths (Spokes), leading out of
+-- the core.
 Frontier.Outcrop = {
 	From = 100,
 	To = 412,
@@ -136,7 +221,7 @@ Frontier.Outcrop = {
 	Apart = 36,
 	Step = 13.5,
 	Lone = 0.15,
-	Stones = 6,
+	Stones = 8,
 }
 -- Rift Veins: Count at once, Rocks each, moving every Every seconds (give
 -- or take Wobble) if not mined out first; at least Apart radians from each
@@ -287,6 +372,53 @@ function Frontier.zoneOf(distance: number, vein: boolean?): string
 	return if band == "Core" then "Common" else band
 end
 
+-- The biome whose quarter `angle` (radians round the middle) is in (on a
+-- spoke, the one clockwise of it).
+function Frontier.biomeOf(angle: number)
+	local turn = (angle - NORTH) % (math.pi * 2)
+	return Frontier.Biomes[math.floor(turn / (math.pi / 2)) % #Frontier.Biomes + 1]
+end
+
+-- The biome at `offset` from the middle (across the ground): nil in the
+-- core, the Hub.
+function Frontier.biomeAt(offset: Vector3)
+	if Vector3.new(offset.X, 0, offset.Z).Magnitude < Frontier.Core then
+		return nil
+	end
+	return Frontier.biomeOf(math.atan2(offset.Z, offset.X))
+end
+
+-- How much each biome's look counts at `offset`: a weight for each, in
+-- Frontier.Biomes' order, adding up to 1 (an even mix on a spoke), and how
+-- far in that look has come (0 well inside the core, 1 once Biome.Blend
+-- studs further out).
+function Frontier.biomeMix(offset: Vector3): ({ number }, number)
+	local angle = math.atan2(offset.Z, offset.X)
+	local weights = {}
+	for i, biome in Frontier.Biomes do
+		weights[i] = math.max(0, 1 - Frontier.apart(angle, biome.Angle) / (math.pi / 2))
+	end
+	local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+	local blend = Frontier.Biome.Blend
+	return weights, math.clamp((distance - (Frontier.Core - blend / 2)) / blend, 0, 1)
+end
+
+-- An element for a wild kaiju born where `home` (a biome's element) holds:
+-- `home` Biome.Bias of the time, else one of the other three alike; no
+-- home (the core), any of the four alike.
+function Frontier.pickElement(home: string?, rng): string
+	if home and rng:NextNumber() < Frontier.Biome.Bias then
+		return home
+	end
+	local others = {}
+	for _, element in ELEMENTS do
+		if element ~= home then
+			table.insert(others, element)
+		end
+	end
+	return others[rng:NextInteger(1, #others)]
+end
+
 -- How rich the ground is (0..1) at an offset from the middle: three soft
 -- waves across the quarry, their directions and phases from `rng`.
 function Frontier.field(rng): (Vector3) -> number
@@ -377,10 +509,19 @@ function Frontier.outcrops(rng): ({ any }, { Vector3 })
 	tries = 0
 	while #lone < wanted and tries < 4000 do
 		tries += 1
-		local stone = #lone < o.Stones
-		local r = if stone then rng:NextNumber(o.From, Frontier.Core + 25) else rng:NextNumber(Frontier.Core, o.To)
-		local a = rng:NextNumber(0, math.pi * 2)
-		local p = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+		local p
+		if #lone < o.Stones then
+			-- (At the spokes' mouths, either side of the road, just out of
+			-- the core: the first rock of each biome.)
+			local spokes = Frontier.Spokes
+			local out = Vector3.new(math.cos(spokes[#lone % #spokes + 1]), 0, math.sin(spokes[#lone % #spokes + 1]))
+			local side = Vector3.new(-out.Z, 0, out.X) * (if (#lone // #spokes) % 2 == 0 then 1 else -1)
+			p = out * rng:NextNumber(Frontier.Core + 5, Frontier.Core + 30) + side * rng:NextNumber(20, 30)
+		else
+			local r = rng:NextNumber(Frontier.Core, o.To)
+			local a = rng:NextNumber(0, math.pi * 2)
+			p = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+		end
 		if free(p) then
 			table.insert(lone, p)
 		end

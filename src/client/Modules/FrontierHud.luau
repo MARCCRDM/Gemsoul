@@ -4,9 +4,16 @@
 	  a banner     as you cross from one band of the Outpost into another
 	               (the server's FrontierBand on your Player: Core, Fringe,
 	               Edge; Shared.Frontier), in the band's colour, so you know
-	               where the critters start and how rich the rocks run. The
-	               same band's banner doesn't come back for a while
-	               (crossing to and fro at a boundary).
+	               where the critters start and how rich the rocks run; and
+	               as you cross into one of the biomes round the core
+	               (FrontierBiome: Ashfall, Rimefrost, Stormglass,
+	               Blightwood), in its colour, after the band's. The same
+	               banner doesn't come back for a while (crossing to and fro
+	               at a boundary).
+	  the light    out in the biomes the screen's grade and the outdoor
+	               light take on the biome's (Frontier.Biomes: Tint,
+	               Ambient), blending across the spokes and in from the
+	               core's edge (not in the Rift, which has its own).
 	  (No noise ring or stirred-up meter: the screen stays the game's. The
 	  critters coming are the sign.)
 	  arrows       a rift coming for you (its Prey is you) that opens off
@@ -22,6 +29,10 @@
 
 	  FrontierHud.start()
 	  FrontierHud.Lines[band] -> title, subtitle   (pure, for tests)
+	  FrontierHud.biomeLines(id) -> title, subtitle, colour   a biome's banner (pure)
+	  FrontierHud.biomeLight(offset, tint, ambient) -> tint, ambient   the
+	      grade and outdoor light at `offset` from the Outpost's middle,
+	      given the Outpost's own (pure)
 	  FrontierHud.edge(size, point, margin) -> Vector2, angle   where an
 	      arrow sits for a point off screen (pure)
 	  FrontierHud.nearest(spots, from, reach) -> index?, studs   the nearest
@@ -34,6 +45,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
+local Outpost = require(ReplicatedStorage.Shared.Outpost)
 
 local FrontierHud = {}
 
@@ -61,6 +73,30 @@ function FrontierHud.edge(size: Vector2, point: Vector2, margin: number): (Vecto
 	local halfW, halfH = math.max(1, middle.X - margin), math.max(1, middle.Y - margin)
 	local scale = math.min(halfW / math.max(math.abs(d.X), 1e-3), halfH / math.max(math.abs(d.Y), 1e-3))
 	return middle + d * scale, math.atan2(d.Y, d.X)
+end
+
+-- A biome's banner: its name, its line and its colour (nil for none).
+function FrontierHud.biomeLines(id: string?): (string?, string?, Color3?)
+	for _, biome in Frontier.Biomes do
+		if biome.Id == id then
+			return string.upper(biome.Name), biome.Line, biome.Glow
+		end
+	end
+	return nil, nil, nil
+end
+
+-- The grade's tint and the outdoor light at `offset` from the Outpost's
+-- middle: `tint` and `ambient` (the Outpost's own) in the core, the
+-- biomes' further out, blended across the spokes (Frontier.biomeMix).
+function FrontierHud.biomeLight(offset: Vector3, tint: Color3, ambient: Color3): (Color3, Color3)
+	local weights, inward = Frontier.biomeMix(offset)
+	local t, a = { 0, 0, 0 }, { 0, 0, 0 }
+	for i, biome in Frontier.Biomes do
+		local w = weights[i]
+		t[1], t[2], t[3] = t[1] + biome.Tint.R * w, t[2] + biome.Tint.G * w, t[3] + biome.Tint.B * w
+		a[1], a[2], a[3] = a[1] + biome.Ambient.R * w, a[2] + biome.Ambient.G * w, a[3] + biome.Ambient.B * w
+	end
+	return tint:Lerp(Color3.new(t[1], t[2], t[3]), inward), ambient:Lerp(Color3.new(a[1], a[2], a[3]), inward)
 end
 
 -- The nearest of `spots` within `reach` of `from`, across the ground.
@@ -107,6 +143,7 @@ local function banner(player: Player, gui: ScreenGui)
 	rule.BackgroundTransparency = 1
 	rule.Parent = frame
 	local token = 0
+	local busyUntil = 0
 	local function fade(to: number, seconds: number)
 		local info = TweenInfo.new(seconds, Enum.EasingStyle.Quad)
 		for _, text in { title, subtitle } do
@@ -117,6 +154,7 @@ local function banner(player: Player, gui: ScreenGui)
 	local function showLines(lines, color: Color3)
 		token += 1
 		local mine = token
+		busyUntil = os.clock() + FrontierHud.Hold + 0.4
 		title.Text, subtitle.Text = lines[1], lines[2]
 		title.TextColor3 = color
 		rule.BackgroundColor3 = color
@@ -159,6 +197,49 @@ local function banner(player: Player, gui: ScreenGui)
 			show(band)
 		end
 		last = band
+	end)
+	-- Into a biome: its banner, once the band's has had its moment.
+	player:GetAttributeChangedSignal("FrontierBiome"):Connect(function()
+		local id = player:GetAttribute("FrontierBiome")
+		local title, line, color = FrontierHud.biomeLines(id)
+		if not title then
+			return
+		end
+		task.delay(math.max(0, busyUntil - os.clock()), function()
+			local now = os.clock()
+			if player:GetAttribute("FrontierBiome") ~= id or (shown[id] and now - shown[id] < FrontierHud.Again) then
+				return
+			end
+			shown[id] = now
+			showLines({ title, line }, color :: Color3)
+		end)
+	end)
+end
+
+-- Out in the biomes, the light turns to theirs (a little each quarter
+-- second, so it drifts rather than snaps), from the Outpost's own grade
+-- (Scenes.OutpostFinish) and outdoor light (Scenes.spaceLighting's). Not in
+-- the Rift, nor anywhere but the Outpost: their lighting is their own.
+local OUTPOST_AMBIENT = Color3.fromRGB(150, 156, 176)
+local function biomeLight(player: Player)
+	local Lighting = game:GetService("Lighting")
+	local ok, Scenes = pcall(require, script.Parent.Scenes)
+	local tint = if ok and Scenes.OutpostFinish then Scenes.OutpostFinish.Grade.Tint else Color3.fromRGB(248, 250, 255)
+	task.spawn(function()
+		while true do
+			task.wait(0.25)
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if root and player:GetAttribute("Outpost") == true and player:GetAttribute("RiftRun") == nil then
+				local want, ambient =
+					FrontierHud.biomeLight(root.Position - Outpost.Location.Position, tint, OUTPOST_AMBIENT)
+				local grade = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+				if grade then
+					grade.TintColor = grade.TintColor:Lerp(want, 0.2)
+				end
+				Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(ambient, 0.2)
+			end
+		end
 	end)
 end
 
@@ -366,6 +447,7 @@ function FrontierHud.start()
 	gui.DisplayOrder = 12
 	gui.Parent = player:WaitForChild("PlayerGui")
 	banner(player, gui)
+	biomeLight(player)
 	chargedTag(player, gui)
 	arrows(player, gui)
 	sightings(player, gui)

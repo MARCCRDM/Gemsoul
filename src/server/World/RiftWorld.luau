@@ -1,41 +1,56 @@
 --[[
 	The Rift's world (Server.RiftServer runs a trip through it; the rules are
 	Shared.RiftRun's): the critters' own side, built for one trip and gone
-	with it. A pathway of basalt islands floating over a sea of lava, under
-	a blood-red moon and black spires: the landing (and the way home) first,
-	then RiftRun.Rooms islands joined by causeways caged in giant ribs, a
-	wall of fire across the way out of each until it's cleared, and last the
-	boss's island, ringed with spires round an obsidian throne. Ash falls
-	the whole way. (Each runner's client tints it all: Client.RiftClient.)
+	with it. A pathway of caves on the pathway dungeon's grid
+	(RiftRun.layout): the landing (and the way home) first, then
+	RiftRun.Rooms caves, then the throne cave, joined by passages. Every
+	cave and passage is walled in rock too tall to climb, its floor solid
+	from wall to wall: there's nowhere to fall. The walls break into
+	jagged crowns and overhanging ledges, arches of rock span the passages
+	with fangs hanging from them, and above it all the roof is open to a
+	burning sky with a scar torn across it. A wall of fire bars the way on
+	out of each cave until it's cleared. (Each runner's client lights it:
+	Client.RiftClient.)
 
 	  RiftWorld.build(id, origin, rng) -> {
 	      Folder, Origin (CFrame: the landing's middle, on its floor),
 	      Start (CFrame: where you land, facing the way in),
-	      Rooms ({ { Center (Vector3, on its floor), Radius } }),
-	      Boss ({ Center, Radius }),
-	      Gates ({ Model }: room n's wall of fire, on the way out of it),
-	      Exit (BasePart: the way home on the landing, its prompt "RiftExit"),
-	      Home (Model: the way home on the boss's island, shut till it's beaten),
+	      Landing ({ Center, Radius, Size }),
+	      Rooms ({ { Center (Vector3, on its floor), Radius, Size } }),
+	      Boss ({ Center, Radius, Size }),
+	      Gates ({ Model }: cave n's wall of fire, on the way out of it),
+	      Exit (BasePart: the way home in the landing, its prompt "RiftExit"),
+	      Home (Model: the way home in the throne cave, shut till it's beaten),
 	  }
+	  RiftWorld.inside(area, position, margin?)   on that cave's floor
 	  RiftWorld.openGate(gate)     the fire dies down and the way's open
-	  RiftWorld.openHome(world)    the way home on the boss's island opens
-	  RiftWorld.Spacing, RiftWorld.Floor   how far apart the islands are; how
-	      far under them the lava is
+	  RiftWorld.openHome(world)    the way home in the throne cave opens
+	  RiftWorld.Spacing, Landing, Cave, Throne, Passage, Wall, Thick: its
+	      measures (studs: cell to cell, the caves' floors, a passage's
+	      width, the walls' height and thickness)
 ]]
 local RiftRun = require(game:GetService("ReplicatedStorage").Shared.RiftRun)
 
 local RiftWorld = {}
 
-RiftWorld.Spacing = 92
-RiftWorld.Floor = 26
+RiftWorld.Spacing = 116
+RiftWorld.Landing = 52
+RiftWorld.Cave = 76
+RiftWorld.Throne = 96
+RiftWorld.Passage = 22
+RiftWorld.Wall = 34
+RiftWorld.Thick = 8
 
-local BASALT = Color3.fromRGB(46, 38, 38)
+local BASALT = Color3.fromRGB(70, 54, 50)
+local ROCK = Color3.fromRGB(96, 68, 58)
 local UNDER = Color3.fromRGB(30, 24, 25)
 local OBSIDIAN = Color3.fromRGB(24, 19, 24)
 local BONE = Color3.fromRGB(214, 200, 172)
 local LAVA = Color3.fromRGB(255, 78, 20)
 local EMBER = Color3.fromRGB(255, 142, 46)
 local BLOOD = Color3.fromRGB(150, 26, 20)
+local SCAR = Color3.fromRGB(255, 220, 236)
+local UP = Vector3.new(0, 1, 0)
 
 local function part(parent, cframe: CFrame, size: Vector3, color: Color3, material, shape: string?, solid: boolean?)
 	local p = Instance.new(
@@ -96,203 +111,271 @@ local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
 
--- A horn of obsidian out of the rock at `base`: three pieces, each smaller
--- and bent further over, leaning out along `yaw`.
-local function horn(parent, base: Vector3, yaw: number, length: number, width: number, rng)
-	local at = CFrame.new(base) * CFrame.Angles(0, yaw, 0)
-	local bend = rng:NextNumber(0.18, 0.32)
-	for i = 1, 3 do
-		local seg = length / 3
-		local w = width * (1.15 - i * 0.28)
-		at = at * CFrame.Angles(-bend, 0, 0)
-		part(parent, at * CFrame.new(0, seg / 2, 0), Vector3.new(w, seg + 0.3, w), OBSIDIAN, Enum.Material.Slate)
-		at = at * CFrame.new(0, seg, 0)
+-- A frame at `at`, its front (-Z) along `dir` across the ground. (Not
+-- CFrame.lookAt: lune's, which the tests build the Rift with, turns the
+-- other way along Z.)
+local function face(at: Vector3, dir: Vector3): CFrame
+	return CFrame.new(at) * CFrame.Angles(0, yawOf(dir), 0)
+end
+
+-- Square to the grid: the step from one cell to the next (or a cave's side).
+local function key(dir: Vector3): string
+	return math.round(dir.X) .. ":" .. math.round(dir.Z)
+end
+
+-- A rock face along the floor's edge from `a` to `b`, standing outside it
+-- (`inward` points into the cave): a solid slab Wall tall, so nobody climbs
+-- or sees out; boulders leaning on its inner side so it reads as rock and
+-- not a fence; jagged crowns along its top, now and then a ledge jutting
+-- in over the floor (the cave's lip); and a seam of glowing rock down it.
+local function rockFace(parent, a: Vector3, b: Vector3, inward: Vector3, rng, ledges: boolean)
+	local length = (b - a).Magnitude
+	if length < 2 then
+		return
+	end
+	local along = (b - a).Unit
+	local tall, thick = RiftWorld.Wall, RiftWorld.Thick
+	local mid = (a + b) / 2 - inward * thick / 2
+	local frame = face(mid, along)
+	part(
+		parent,
+		frame * CFrame.new(0, tall / 2, 0),
+		Vector3.new(thick, tall, length + thick),
+		ROCK,
+		Enum.Material.Slate,
+		nil,
+		true
+	).Name =
+		"RockWall"
+	-- (Its boulders: heaped at its foot, half sunk into it, never far out
+	-- over the floor.)
+	for _ = 1, math.max(1, math.floor(length / 11)) do
+		local s = rng:NextNumber(5, 11)
+		local at = a:Lerp(b, rng:NextNumber(0.08, 0.92)) + inward * rng:NextNumber(-1.5, 0.5) + UP * s * 0.35
+		part(
+			parent,
+			CFrame.new(at)
+				* CFrame.Angles(rng:NextNumber(-0.5, 0.5), rng:NextNumber(0, math.pi * 2), rng:NextNumber(-0.5, 0.5)),
+			Vector3.new(s, s * rng:NextNumber(0.6, 1), s * rng:NextNumber(0.7, 1.1)),
+			if rng:NextNumber() < 0.5 then BASALT else ROCK,
+			Enum.Material.Slate,
+			nil,
+			true
+		)
+	end
+	-- (Its crowns, leaning in over the cave.)
+	for _ = 1, math.max(1, math.floor(length / 14)) do
+		local at = a:Lerp(b, rng:NextNumber(0.05, 0.95)) - inward * thick * 0.4
+		local high = rng:NextNumber(6, 16)
+		part(
+			parent,
+			face(at + UP * (tall + high / 2 - 1), -inward)
+				* CFrame.Angles(rng:NextNumber(-0.25, -0.05), 0, rng:NextNumber(-0.15, 0.15)),
+			Vector3.new(rng:NextNumber(5, 9), high, rng:NextNumber(5, 8)),
+			OBSIDIAN,
+			Enum.Material.Slate,
+			"Wedge"
+		)
+	end
+	if ledges and length > 30 and rng:NextNumber() < 0.7 then
+		local span = length * rng:NextNumber(0.35, 0.6)
+		local at = a:Lerp(b, rng:NextNumber(0.3, 0.7)) + UP * (tall - 2.5)
+		part(
+			parent,
+			face(at + inward * 5, along) * CFrame.Angles(0, 0, rng:NextNumber(-0.05, 0.05)),
+			Vector3.new(12, 4, span),
+			BASALT,
+			Enum.Material.Slate
+		).Name =
+			"Ledge"
+	end
+	-- (Now and then a seam of glowing rock down it, low, where the cracks run in.)
+	if rng:NextNumber() < 0.5 then
+		local top = a:Lerp(b, rng:NextNumber(0.2, 0.8)) + inward * 0.05
+		local drop = rng:NextNumber(5, 9)
+		local seam = glow(
+			part(
+				parent,
+				face(top + UP * drop / 2, along) * CFrame.Angles(rng:NextNumber(-0.5, 0.5), 0, 0),
+				Vector3.new(0.4, drop, 1.2),
+				LAVA
+			)
+		)
+		seam.Name = "Seam"
+		seam.Transparency = 0.3
 	end
 end
 
--- A floating island: a basalt slab with its top at `center`, rough rocks
--- round its rim, its underside hanging in points over the lava, cracks
--- glowing in its floor, horns round its edge and a brazier or two.
-local function island(parent, center: Vector3, radius: number, rng, opts: { Horns: number?, Braziers: number? }?)
-	local model = Instance.new("Model")
-	model.Name = "Island"
-	model.Parent = parent
-	part(
-		model,
-		CFrame.new(center - Vector3.new(0, 4, 0)) * CFrame.Angles(0, 0, math.pi / 2),
-		Vector3.new(8, radius * 2, radius * 2),
-		BASALT,
-		Enum.Material.Basalt,
+-- A brazier: a bowl of fire on a short stem.
+local function brazier(parent, at: Vector3)
+	part(parent, CFrame.new(at + UP * 1.8), Vector3.new(1.4, 3.6, 1.4), OBSIDIAN, Enum.Material.Slate, nil, true)
+	local bowl = part(
+		parent,
+		CFrame.new(at + UP * 3.9) * CFrame.Angles(0, 0, math.pi / 2),
+		Vector3.new(1.2, 4, 4),
+		OBSIDIAN,
+		Enum.Material.Slate,
 		"Cylinder",
 		true
 	)
-	-- (Underneath, hanging rock tapering into the dark.)
-	for i = 1, 4 do
-		local a = i / 4 * math.pi * 2 + rng:NextNumber(-0.5, 0.5)
-		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * radius * rng:NextNumber(0.1, 0.45)
-		local w = radius * rng:NextNumber(0.7, 1.1)
-		local deep = rng:NextNumber(12, 22)
-		part(
-			model,
-			CFrame.new(center + off - Vector3.new(0, 8 + deep / 2, 0))
-				* CFrame.Angles(math.pi, rng:NextNumber(0, math.pi), 0),
-			Vector3.new(w, deep, w * 0.8),
-			UNDER,
-			Enum.Material.Basalt,
-			"CornerWedge"
-		)
-	end
-	-- Rough rocks round the rim (solid: no stepping off by accident there).
-	local rocks = math.floor(radius / 3)
-	for i = 1, rocks do
-		local a = i / rocks * math.pi * 2 + rng:NextNumber(-0.15, 0.15)
-		local at = center + Vector3.new(math.cos(a), 0, math.sin(a)) * (radius - 1.5)
-		local size = Vector3.new(rng:NextNumber(3, 7), rng:NextNumber(1.5, 4.5), rng:NextNumber(3, 6))
-		part(
-			model,
-			CFrame.new(at + Vector3.new(0, size.Y / 2 - 1, 0))
-				* CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, math.pi * 2), rng:NextNumber(-0.3, 0.3)),
-			size,
-			UNDER,
-			Enum.Material.Basalt,
-			nil,
-			true
-		)
-	end
-	-- Cracks in its floor with the lava's light coming through.
-	for _ = 1, math.floor(radius / 5) do
-		local a = rng:NextNumber(0, math.pi * 2)
-		local from = rng:NextNumber(0.15, 0.45) * radius
-		local length = rng:NextNumber(0.25, 0.45) * radius
-		local mid = center + Vector3.new(math.cos(a), 0, math.sin(a)) * (from + length / 2)
-		glow(
-			part(
-				model,
-				CFrame.new(mid + Vector3.new(0, 0.04, 0))
-					* CFrame.Angles(0, -a + math.pi / 2 + rng:NextNumber(-0.2, 0.2), 0),
-				Vector3.new(rng:NextNumber(0.3, 0.6), 0.1, length),
-				LAVA,
-				nil
-			)
-		)
-	end
-	local options = opts or {}
-	for i = 1, options.Horns or 3 do
-		local a = (i + rng:NextNumber(-0.3, 0.3)) / (options.Horns or 3) * math.pi * 2
-		local at = center + Vector3.new(math.cos(a), 0, math.sin(a)) * (radius - 2.5)
-		horn(model, at, a + math.pi / 2, rng:NextNumber(9, 15), rng:NextNumber(1.8, 2.6), rng)
-	end
-	for i = 1, options.Braziers or 2 do
-		local a = (i + 0.5) / (options.Braziers or 2) * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
-		local at = center + Vector3.new(math.cos(a), 0, math.sin(a)) * (radius * 0.72)
-		part(
-			model,
-			CFrame.new(at + Vector3.new(0, 1.5, 0)),
-			Vector3.new(1.4, 3, 1.4),
-			OBSIDIAN,
-			Enum.Material.Slate,
-			nil,
-			true
-		)
-		local bowl = part(
-			model,
-			CFrame.new(at + Vector3.new(0, 3.4, 0)) * CFrame.Angles(0, 0, math.pi / 2),
-			Vector3.new(1, 3.4, 3.4),
-			OBSIDIAN,
-			Enum.Material.Slate,
-			"Cylinder"
-		)
-		glow(part(model, CFrame.new(at + Vector3.new(0, 3.95, 0)), Vector3.new(2.6, 0.2, 2.6), EMBER))
-		fire(bowl, 5, 9)
-		light(bowl, EMBER, 26, 1.6)
-	end
-	return model
+	bowl.Name = "Brazier"
+	local coals = glow(part(parent, CFrame.new(at + UP * 4.55), Vector3.new(3, 0.3, 3), EMBER))
+	fire(coals, 6, 10)
+	light(coals, EMBER, 36, 2.2)
 end
 
--- A causeway from `a` to `b` (island tops, their radii `ra`, `rb`): slabs
--- of rock a little out of true, caged in giant ribs.
-local function causeway(parent, a: Vector3, ra: number, b: Vector3, rb: number, rng)
+-- A stalagmite: three blocks narrowing upward, leaning a little.
+local function stalagmite(parent, at: Vector3, high: number, rng)
+	local frame = CFrame.new(at) * CFrame.Angles(rng:NextNumber(-0.08, 0.08), rng:NextNumber(0, 6), 0)
+	local w = high * 0.32
+	for i = 1, 3 do
+		local seg = high / 3
+		frame = frame * CFrame.new(0, seg / 2, 0)
+		part(
+			parent,
+			frame,
+			Vector3.new(w * (1.2 - i * 0.3), seg + 0.4, w * (1.1 - i * 0.28)),
+			if i == 3 then OBSIDIAN else BASALT,
+			Enum.Material.Slate,
+			nil,
+			i == 1
+		)
+		frame = frame * CFrame.new(0, seg / 2, 0) * CFrame.Angles(rng:NextNumber(-0.1, 0.1), 0, 0)
+	end
+end
+
+local SIDES = { Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), Vector3.new(0, 0, -1) }
+
+-- A cave: a solid floor with cracks glowing in it, a rock face along each
+-- side but the way(s) in and out (`doors`: the sides, by key), a column of
+-- rock in each corner, braziers inside the corners and stalagmites by the
+-- walls (clear of the doors: the floor's middle is for fighting).
+local function cave(parent, center: Vector3, size: number, doors: { [string]: boolean }, rng)
 	local model = Instance.new("Model")
-	model.Name = "Causeway"
+	model.Name = "Cave"
 	model.Parent = parent
-	local dir = flat(b - a).Unit
-	local from = a + dir * (ra - 3)
-	local to = b - dir * (rb - 3)
-	local length = flat(to - from).Magnitude
-	local yaw = yawOf(dir)
-	-- (Islands stand at their own heights: it slopes from one to the next.)
-	local pitch = math.atan2(to.Y - from.Y, length)
-	local count = math.max(2, math.ceil(length / 12))
-	local seg = (to - from).Magnitude / count
-	for i = 1, count do
-		local mid = from:Lerp(to, (i - 0.5) / count)
-		local frame = CFrame.new(mid) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
+	local half = size / 2
+	part(
+		model,
+		CFrame.new(center - UP * 2),
+		Vector3.new(size + 2, 4, size + 2),
+		BASALT,
+		Enum.Material.Basalt,
+		nil,
+		true
+	).Name =
+		"Floor"
+	for _ = 1, math.floor(size / 9) do
+		local at = center + Vector3.new(rng:NextNumber(-half + 4, half - 4), 0.03, rng:NextNumber(-half + 4, half - 4))
+		local crack = glow(
+			part(
+				model,
+				CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
+				Vector3.new(rng:NextNumber(0.3, 0.7), 0.06, rng:NextNumber(5, 14)),
+				LAVA
+			)
+		)
+		crack.Name = "Crack"
+		crack.Transparency = 0.2
+	end
+	local gap = RiftWorld.Passage + 2
+	for _, d in SIDES do
+		local edge = center + d * half
+		local side = Vector3.new(-d.Z, 0, d.X)
+		local a, b = edge - side * half, edge + side * half
+		if doors[key(d)] then
+			rockFace(model, a, edge - side * gap / 2, -d, rng, false)
+			rockFace(model, edge + side * gap / 2, b, -d, rng, false)
+		else
+			rockFace(model, a, b, -d, rng, true)
+		end
+	end
+	local thick, tall = RiftWorld.Thick, RiftWorld.Wall
+	for _, c in { { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } } do
+		local corner = center + Vector3.new(c[1], 0, c[2]) * (half + thick / 2)
 		part(
 			model,
-			frame
-				* CFrame.new(0, -1.5 + rng:NextNumber(-0.15, 0.15), 0)
-				* CFrame.Angles(0, rng:NextNumber(-0.04, 0.04), 0),
-			Vector3.new(11 + rng:NextNumber(-1, 1), 3, seg + 1.2),
-			BASALT,
-			Enum.Material.Basalt,
+			CFrame.new(corner + UP * (tall / 2 + 3)) * CFrame.Angles(0, rng:NextNumber(0, 1), 0),
+			Vector3.new(thick + 3, tall + 6, thick + 3),
+			OBSIDIAN,
+			Enum.Material.Slate,
 			nil,
 			true
 		)
-		-- (A lip of rock along each side, knee high.)
-		for _, side in { -1, 1 } do
-			part(
-				model,
-				frame * CFrame.new(side * 5.4, 0.6, 0),
-				Vector3.new(1.2, 1.4 + rng:NextNumber(0, 0.6), seg + 0.4),
-				UNDER,
-				Enum.Material.Basalt,
-				nil,
-				true
-			)
-		end
-		-- A rib arching over it, every other slab: a curve of bone pieces
-		-- from one side over to the other.
-		if i % 2 == 0 then
-			local pieces = 9
-			for k = 0, pieces - 1 do
-				local t0, t1 = k / pieces * math.pi, (k + 1) / pieces * math.pi
-				local p0 = Vector3.new(math.cos(t0) * 8, math.sin(t0) * 13, 0)
-				local p1 = Vector3.new(math.cos(t1) * 8, math.sin(t1) * 13, 0)
-				local m = (p0 + p1) / 2
-				local span = p1 - p0
-				part(
-					model,
-					frame * CFrame.new(m) * CFrame.Angles(0, 0, math.atan2(span.Y, span.X)),
-					Vector3.new(span.Magnitude + 0.5, 1.1 - k * 0.04, 1.1),
-					BONE,
-					Enum.Material.SmoothPlastic
-				)
+		brazier(model, center + Vector3.new(c[1], 0, c[2]) * (half - 6))
+	end
+	for _, d in SIDES do
+		if not doors[key(d)] then
+			local side = Vector3.new(-d.Z, 0, d.X)
+			for _, s in { -1, 1 } do
+				local at = center + d * (half - 4) + side * s * rng:NextNumber(half * 0.3, half * 0.6)
+				stalagmite(model, at, rng:NextNumber(6, 13), rng)
 			end
 		end
 	end
 	return model
 end
 
--- A wall of fire across the way out of a room, at `at` on its rim, facing `dir`.
+-- A passage from one cave's door (`from`) to the next's (`to`): its floor,
+-- a rock face each side, and an arch of rock across it with fangs hanging
+-- from it (the cave closing in over your head, high enough to fight under).
+local function passage(parent, from: Vector3, to: Vector3, rng)
+	local model = Instance.new("Model")
+	model.Name = "Passage"
+	model.Parent = parent
+	local dir = flat(to - from).Unit
+	local length = (to - from).Magnitude
+	local mid = (from + to) / 2
+	local width = RiftWorld.Passage
+	local side = Vector3.new(-dir.Z, 0, dir.X)
+	part(model, face(mid - UP * 2, dir), Vector3.new(width + 2, 4, length + 4), BASALT, Enum.Material.Basalt, nil, true).Name =
+		"Floor"
+	rockFace(model, from + side * width / 2, to + side * width / 2, -side, rng, false)
+	rockFace(model, from - side * width / 2, to - side * width / 2, side, rng, false)
+	local tall = RiftWorld.Wall
+	local arch = face(mid + UP * (tall - 3), side)
+	part(model, arch, Vector3.new(14, 7, width + RiftWorld.Thick * 2 + 6), BASALT, Enum.Material.Slate).Name = "Arch"
+	for i = 1, 5 do
+		local across = (i - 3) * width / 5 + rng:NextNumber(-1, 1)
+		local long = rng:NextNumber(4, 9)
+		part(
+			model,
+			CFrame.new(mid + side * across + dir * rng:NextNumber(-4, 4) + UP * (tall - 6.5 - long / 2))
+				* CFrame.Angles(math.pi, rng:NextNumber(0, 6), 0),
+			Vector3.new(2.2, long, 2.2),
+			OBSIDIAN,
+			Enum.Material.Slate,
+			"Wedge"
+		).Name =
+			"Fang"
+	end
+	return model
+end
+
+-- A wall of fire across a passage (`dir`: the way on): a red heat-haze you
+-- can't pass, a curtain of flame tongues licking up in front of it, and a
+-- column of obsidian either side.
 local function gate(parent, at: Vector3, dir: Vector3, room: number)
 	local model = Instance.new("Model")
 	model.Name = "FireGate"
 	model:SetAttribute("Room", room)
 	model.Parent = parent
 	local frame = CFrame.new(at) * CFrame.Angles(0, yawOf(dir), 0)
-	-- (The barrier itself: a red heat-haze you can't pass, a curtain of
-	-- flame tongues licking up in front of it.)
-	local wall = part(model, frame * CFrame.new(0, 8, 0), Vector3.new(14, 16, 1.2), LAVA, Enum.Material.Neon, nil, true)
+	local width = RiftWorld.Passage
+	local wall =
+		part(model, frame * CFrame.new(0, 9, 0), Vector3.new(width, 18, 1.2), LAVA, Enum.Material.Neon, nil, true)
 	wall.Name = "Wall"
 	wall.Transparency = 0.78
 	wall.CastShadow = false
-	local inner = part(model, frame * CFrame.new(0, 7, -0.9), Vector3.new(12, 14, 0.4), EMBER, Enum.Material.Neon)
+	local inner =
+		part(model, frame * CFrame.new(0, 8, -0.9), Vector3.new(width - 2, 16, 0.4), EMBER, Enum.Material.Neon)
 	inner.Name = "Glow"
 	inner.Transparency = 0.85
 	local tongues = { LAVA, EMBER, Color3.fromRGB(255, 200, 96) }
-	for i = 0, 10 do
-		local x = -6.2 + i * 1.24
-		local tall = 7 + 7 * math.abs(math.sin(i * 1.7 + room)) + (if i % 3 == 0 then 2 else 0)
+	local count = math.floor(width / 1.3)
+	for i = 0, count - 1 do
+		local x = -width / 2 + 0.8 + i * (width - 1.6) / (count - 1)
+		local tall = 7 + 8 * math.abs(math.sin(i * 1.7 + room)) + (if i % 3 == 0 then 2 else 0)
 		local lick = part(
 			model,
 			frame * CFrame.new(x, tall / 2, -0.2 + (i % 2) * 0.4) * CFrame.Angles(0, 0, math.sin(i * 2.3) * 0.12),
@@ -304,17 +387,17 @@ local function gate(parent, at: Vector3, dir: Vector3, room: number)
 		lick.Transparency = 0.2 + (i % 3) * 0.12
 	end
 	for i = -1, 1 do
-		local base = part(model, frame * CFrame.new(i * 4.5, 0.5, 0), Vector3.new(1, 1, 1), LAVA, Enum.Material.Neon)
+		local base = part(model, frame * CFrame.new(i * 6.5, 0.5, 0), Vector3.new(1, 1, 1), LAVA, Enum.Material.Neon)
 		base.Name = "Flame"
 		base.Transparency = 1
 		fire(base, 9, 16)
 	end
-	light(wall, EMBER, 30, 2.4)
-	for _, side in { -1, 1 } do
+	light(wall, EMBER, 34, 2.4)
+	for _, s in { -1, 1 } do
 		part(
 			model,
-			frame * CFrame.new(side * 8.5, 9, 0),
-			Vector3.new(3, 18, 3),
+			frame * CFrame.new(s * (width / 2 + 1.5), 10, 0),
+			Vector3.new(3, 20, 3),
 			OBSIDIAN,
 			Enum.Material.Slate,
 			nil,
@@ -322,7 +405,7 @@ local function gate(parent, at: Vector3, dir: Vector3, room: number)
 		)
 		part(
 			model,
-			frame * CFrame.new(side * 8.5, 19.5, 0) * CFrame.Angles(0, if side > 0 then 0 else math.pi, 0),
+			frame * CFrame.new(s * (width / 2 + 1.5), 22, 0) * CFrame.Angles(0, if s > 0 then 0 else math.pi, 0),
 			Vector3.new(3, 4, 3),
 			OBSIDIAN,
 			Enum.Material.Slate,
@@ -333,7 +416,8 @@ local function gate(parent, at: Vector3, dir: Vector3, room: number)
 end
 
 -- A way home: a ring of black shards stood round an opening of light, its
--- prompt on the opening (PromptKind "RiftExit").
+-- prompt on the opening (PromptKind "RiftExit"). It faces the way `frame`
+-- does.
 local function wayHome(parent, frame: CFrame, open: boolean)
 	local model = Instance.new("Model")
 	model.Name = "WayHome"
@@ -370,225 +454,131 @@ local function wayHome(parent, frame: CFrame, open: boolean)
 	return model, opening
 end
 
-function RiftWorld.build(id: string, origin: CFrame, rng)
-	local folder = Instance.new("Folder")
-	folder.Name = "Rift_" .. id
-	folder.Parent = workspace
-	local base = origin.Position
-	-- The islands: the landing, the rooms zig-zagging in, the boss's.
-	local centers, radii = { base }, { 18 }
-	for room = 1, RiftRun.Rooms do
-		local side = if room % 2 == 1 then 1 else -1
-		centers[room + 1] = base
-			+ Vector3.new(side * rng:NextNumber(14, 28), rng:NextNumber(-2, 3), -RiftWorld.Spacing * room)
-		radii[room + 1] = 27 + room
-	end
-	local bossAt = base + Vector3.new(0, 4, -RiftWorld.Spacing * RiftRun.Rooms - 108)
-	table.insert(centers, bossAt)
-	table.insert(radii, 46)
-	for i, center in centers do
-		local boss = i == #centers
-		island(folder, center, radii[i], rng, {
-			Horns = if boss then 0 elseif i == 1 then 2 else 3,
-			Braziers = if boss then 0 elseif i == 1 then 2 else 3,
-		})
-		if i > 1 then
-			causeway(folder, centers[i - 1], radii[i - 1], center, radii[i], rng)
-		end
-	end
-	-- A wall of fire on the way out of each room.
-	local gates = {}
-	for room = 1, RiftRun.Rooms do
-		local at, toward = centers[room + 1], centers[room + 2]
-		local dir = flat(toward - at).Unit
-		gates[room] = gate(folder, at + dir * (radii[room + 1] - 4), dir, room)
-	end
-	-- The boss's island: a ring of spires round it, an obsidian throne at
-	-- the far side with fire either side, a scorched ring where it comes through.
-	local arena = Instance.new("Model")
-	arena.Name = "Throne"
-	arena.Parent = folder
-	for i = 1, 9 do
-		local a = (i - 0.5) / 9 * math.pi * 2 + math.pi / 2
-		if math.abs(math.sin(a) - 1) < 0.15 then
-			continue -- (the way in stays open)
-		end
-		local at = bossAt + Vector3.new(math.cos(a), 0, -math.sin(a)) * 43
-		local tall = rng:NextNumber(26, 44)
-		part(
-			arena,
-			CFrame.new(at + Vector3.new(0, tall / 2, 0)) * CFrame.Angles(0, a, rng:NextNumber(-0.08, 0.08)),
-			Vector3.new(4, tall, 4),
-			OBSIDIAN,
-			Enum.Material.Slate,
-			nil,
-			true
-		)
-		glow(
-			part(
-				arena,
-				CFrame.new(at + Vector3.new(0, tall * 0.55, 0)) * CFrame.Angles(0, a, 0) * CFrame.new(0, 0, -2.05),
-				Vector3.new(0.35, tall * 0.7, 0.1),
-				LAVA
-			)
-		)
-		part(
-			arena,
-			CFrame.new(at + Vector3.new(0, tall + 2.4, 0)) * CFrame.Angles(0, a, 0),
-			Vector3.new(4, 5, 4),
-			OBSIDIAN,
-			Enum.Material.Slate,
-			"CornerWedge"
-		)
-	end
-	local throne = bossAt + Vector3.new(0, 0, -34)
-	part(
-		arena,
-		CFrame.new(throne + Vector3.new(0, 2, 0)),
-		Vector3.new(20, 4, 10),
-		OBSIDIAN,
-		Enum.Material.Slate,
-		nil,
-		true
-	)
-	part(
-		arena,
-		CFrame.new(throne + Vector3.new(0, 5, -2)),
-		Vector3.new(14, 2.5, 6),
-		OBSIDIAN,
-		Enum.Material.Slate,
-		nil,
-		true
-	)
-	part(
-		arena,
-		CFrame.new(throne + Vector3.new(0, 14, -4.5)),
-		Vector3.new(12, 18, 2.5),
-		OBSIDIAN,
-		Enum.Material.Slate,
-		nil,
-		true
-	)
-	local skull = part(
-		arena,
-		CFrame.new(throne + Vector3.new(0, 25, -4.5)),
-		Vector3.new(7, 7, 7),
-		BONE,
-		Enum.Material.SmoothPlastic,
-		"Ball"
-	)
-	for _, side in { -1, 1 } do
-		glow(
-			part(
-				arena,
-				CFrame.new(skull.CFrame.Position + Vector3.new(side * 1.5, 0.4, 3)),
-				Vector3.new(1.4, 1.4, 1.4),
-				BLOOD,
-				nil,
-				"Ball"
-			)
-		)
+-- The throne at the far end of the throne cave (`facing`: toward the way
+-- in): a dais of obsidian, its back stood tall with a skull over it, fire
+-- either side, and the scorched ring in the middle where the boss comes
+-- through.
+local function throne(parent, center: Vector3, facing: Vector3, size: number)
+	local model = Instance.new("Model")
+	model.Name = "Throne"
+	model.Parent = parent
+	local seat = center - facing * (size / 2 - 12)
+	local frame = face(seat, facing)
+	part(model, frame * CFrame.new(0, 2, 0), Vector3.new(20, 4, 10), OBSIDIAN, Enum.Material.Slate, nil, true)
+	part(model, frame * CFrame.new(0, 5, 2), Vector3.new(14, 2.5, 6), OBSIDIAN, Enum.Material.Slate, nil, true)
+	part(model, frame * CFrame.new(0, 14, 4.5), Vector3.new(12, 18, 2.5), OBSIDIAN, Enum.Material.Slate, nil, true)
+	local skull =
+		part(model, frame * CFrame.new(0, 25, 4.5), Vector3.new(7, 7, 7), BONE, Enum.Material.SmoothPlastic, "Ball")
+	skull.Name = "Skull"
+	for _, s in { -1, 1 } do
+		glow(part(model, frame * CFrame.new(s * 1.5, 25.4, 1.5), Vector3.new(1.4, 1.4, 1.4), BLOOD, nil, "Ball"))
 		local pillar = part(
-			arena,
-			CFrame.new(throne + Vector3.new(side * 13, 6, 0)),
+			model,
+			frame * CFrame.new(s * 13, 6, 0),
 			Vector3.new(3, 12, 3),
 			OBSIDIAN,
 			Enum.Material.Slate,
 			nil,
 			true
 		)
-		local top = part(
-			arena,
-			CFrame.new(throne + Vector3.new(side * 13, 12.3, 0)),
-			Vector3.new(3.4, 0.6, 3.4),
-			EMBER,
-			Enum.Material.Neon
-		)
+		local top =
+			part(model, frame * CFrame.new(s * 13, 12.3, 0), Vector3.new(3.4, 0.6, 3.4), EMBER, Enum.Material.Neon)
 		fire(top, 10, 20)
-		light(pillar, EMBER, 40, 2.5)
+		light(pillar, EMBER, 44, 2.5)
 	end
-	glow(
+	local ring = glow(
 		part(
-			arena,
-			CFrame.new(bossAt + Vector3.new(0, 0.05, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+			model,
+			CFrame.new(center + UP * 0.05) * CFrame.Angles(0, 0, math.pi / 2),
 			Vector3.new(0.1, 30, 30),
 			BLOOD,
 			nil,
 			"Cylinder"
 		)
-	).Transparency =
-		0.55
+	)
+	ring.Transparency = 0.55
 	part(
-		arena,
-		CFrame.new(bossAt + Vector3.new(0, 0.08, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+		model,
+		CFrame.new(center + UP * 0.08) * CFrame.Angles(0, 0, math.pi / 2),
 		Vector3.new(0.1, 27, 27),
 		UNDER,
 		Enum.Material.Basalt,
 		"Cylinder"
 	)
-	-- The ways home: on the landing (open), and on the boss's island (shut
-	-- till it's beaten).
-	local _, exit = wayHome(folder, CFrame.new(base + Vector3.new(0, 0, 12)) * CFrame.Angles(0, math.pi, 0), true)
-	local home = wayHome(folder, CFrame.new(throne + Vector3.new(0, 0, 14)), false)
-	-- The lava sea: glowing, crusted over in patches, nothing to stand on.
-	local length = RiftWorld.Spacing * RiftRun.Rooms + 260
-	-- (Darker than the cracks' glow, and crusted over in places, so it
-	-- smoulders rather than blinds.)
-	local sea = glow(
-		part(
-			folder,
-			CFrame.new(base + Vector3.new(0, -RiftWorld.Floor, -length / 2 + 60)),
-			Vector3.new(900, 1, length + 500),
-			Color3.fromRGB(196, 50, 16)
-		)
-	)
-	sea.Name = "Lava"
-	for _ = 1, 80 do
-		local at = base
-			+ Vector3.new(rng:NextNumber(-380, 380), -RiftWorld.Floor + 0.6, rng:NextNumber(-length - 160, 220))
-		part(
-			folder,
-			CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0),
-			Vector3.new(rng:NextNumber(16, 60), 0.8, rng:NextNumber(12, 44)),
-			UNDER,
-			Enum.Material.Basalt
-		)
+	return model, seat, frame
+end
+
+-- The sky over it all (each client lights the air: RiftClient): a scar torn
+-- right across it, white-hot down the middle and bleeding red at its edges,
+-- with strands torn off it; banks of black cloud round the edges, lit red
+-- from below; ash falling the whole way.
+local function sky(parent, center: Vector3, span: number, rng)
+	local model = Instance.new("Model")
+	model.Name = "Sky"
+	model.Parent = parent
+	local high = center + UP * 260
+	local heading = rng:NextNumber(0, math.pi)
+	local dir = Vector3.new(math.cos(heading), 0, math.sin(heading))
+	local side = Vector3.new(-dir.Z, 0, dir.X)
+	local length = span * 1.5
+	local points = {}
+	for i = 0, 10 do
+		local t = i / 10
+		local wobble = if i == 0 or i == 10 then 0 else rng:NextNumber(-1, 1) * 28
+		table.insert(points, high + dir * (t - 0.5) * length + side * wobble + UP * rng:NextNumber(-12, 12))
 	end
-	-- Black spires all round, and the blood moon over the throne.
-	for i = 1, 22 do
-		local side = if i % 2 == 0 then 1 else -1
-		local z = -rng:NextNumber(-120, length + 140)
-		local x = side * rng:NextNumber(110, 320)
-		local tall = rng:NextNumber(90, 240)
-		local w = rng:NextNumber(12, 30)
-		part(
-			folder,
-			CFrame.new(base + Vector3.new(x, -RiftWorld.Floor + tall / 2, z))
-				* CFrame.Angles(rng:NextNumber(-0.06, 0.06), rng:NextNumber(0, math.pi), rng:NextNumber(-0.06, 0.06)),
-			Vector3.new(w, tall, w * 0.8),
-			OBSIDIAN,
-			Enum.Material.Slate
-		)
-		part(
-			folder,
-			CFrame.new(base + Vector3.new(x, -RiftWorld.Floor + tall + w * 0.6, z))
-				* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0),
-			Vector3.new(w, w * 1.4, w * 0.8),
-			OBSIDIAN,
-			Enum.Material.Slate,
-			"CornerWedge"
-		)
+	for i = 1, #points - 1 do
+		local a, b = points[i], points[i + 1]
+		local mid = (a + b) / 2
+		local t = math.abs((i - 0.5) / (#points - 1) - 0.5) * 2
+		local width = 4 + 12 * (1 - t)
+		local frame = face(mid, flat(b - a))
+		local rim = glow(part(model, frame, Vector3.new(width * 1.9, 3, (b - a).Magnitude + 3), BLOOD))
+		rim.Name = "ScarRim"
+		rim.Transparency = 0.35
+		glow(part(model, frame, Vector3.new(width, 4, (b - a).Magnitude + 2), SCAR)).Name = "Scar"
+		if i % 3 == 0 then
+			local strand = mid + side * (if i % 2 == 0 then 1 else -1) * rng:NextNumber(30, 60)
+			glow(
+				part(
+					model,
+					face((mid + strand) / 2, flat(strand - mid)),
+					Vector3.new(2, 2, (strand - mid).Magnitude),
+					Color3.fromRGB(255, 120, 150)
+				)
+			).Name =
+				"Strand"
+		end
 	end
-	local moon = glow(
-		part(folder, CFrame.new(bossAt + Vector3.new(60, 230, -420)), Vector3.new(170, 170, 170), BLOOD, nil, "Ball")
-	)
-	moon.Name = "BloodMoon"
-	moon.Transparency = 0.15
-	-- Ash falling the whole way.
-	local sky =
-		part(folder, CFrame.new(base + Vector3.new(0, 70, -length / 2)), Vector3.new(260, 1, length + 120), UNDER)
-	sky.Name = "Ash"
-	sky.Transparency = 1
+	for i = 1, 14 do
+		local a = i / 14 * math.pi * 2 + rng:NextNumber(-0.15, 0.15)
+		local r = span * rng:NextNumber(0.7, 0.95)
+		local at = center + Vector3.new(math.cos(a) * r, rng:NextNumber(150, 210), math.sin(a) * r)
+		local cloud = part(
+			model,
+			CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2),
+			Vector3.new(rng:NextNumber(16, 26), rng:NextNumber(120, 210), rng:NextNumber(120, 210)),
+			Color3.fromRGB(46, 16, 18),
+			Enum.Material.SmoothPlastic,
+			"Cylinder"
+		)
+		cloud.Name = "Cloud"
+		cloud.Transparency = 0.2
+		local under = glow(
+			part(
+				model,
+				CFrame.new(at - UP * 9) * CFrame.Angles(0, 0, math.pi / 2),
+				Vector3.new(1, cloud.Size.Y * 0.8, cloud.Size.Z * 0.8),
+				Color3.fromRGB(160, 40, 24),
+				nil,
+				"Cylinder"
+			)
+		)
+		under.Transparency = 0.6
+	end
+	local ashFrom = part(model, CFrame.new(center + UP * 70), Vector3.new(span, 1, span), UNDER)
+	ashFrom.Name = "Ash"
+	ashFrom.Transparency = 1
 	local ash = Instance.new("ParticleEmitter")
 	ash.EmissionDirection = Enum.NormalId.Bottom
 	ash.Rate = 70
@@ -598,21 +588,83 @@ function RiftWorld.build(id: string, origin: CFrame, rng)
 	ash.Size = NumberSequence.new(0.35)
 	ash.Color = ColorSequence.new(Color3.fromRGB(110, 96, 92), EMBER)
 	ash.LightEmission = 0.4
-	ash.Parent = sky
+	ash.Parent = ashFrom
+	return model
+end
+
+function RiftWorld.build(id: string, origin: CFrame, rng)
+	local folder = Instance.new("Folder")
+	folder.Name = "Rift_" .. id
+	folder.Parent = workspace
+	local base = origin.Position
+	local cells = RiftRun.layout(rng)
+	local spacing = RiftWorld.Spacing
+	local centers, sizes = {}, {}
+	for i, cell in cells do
+		centers[i] = base + Vector3.new(cell.X * spacing, 0, cell.Z * spacing)
+		sizes[i] = if i == 1 then RiftWorld.Landing elseif i == #cells then RiftWorld.Throne else RiftWorld.Cave
+	end
+	-- The caves, each open toward the one before it and the one after.
+	for i, center in centers do
+		local doors = {}
+		for _, j in { i - 1, i + 1 } do
+			if centers[j] then
+				doors[key(flat(centers[j] - center).Unit)] = true
+			end
+		end
+		cave(folder, center, sizes[i], doors, rng)
+	end
+	-- The passages, and a wall of fire across each one out of a cave.
+	local gates = {}
+	for i = 1, #centers - 1 do
+		local dir = flat(centers[i + 1] - centers[i]).Unit
+		local from, to = centers[i] + dir * sizes[i] / 2, centers[i + 1] - dir * sizes[i + 1] / 2
+		passage(folder, from, to, rng)
+		if i > 1 then
+			gates[i - 1] = gate(folder, (from + to) / 2, dir, i - 1)
+		end
+	end
+	-- The landing: the way home stood against its back wall, facing in.
+	local landing = centers[1]
+	local ahead = flat(centers[2] - landing).Unit
+	local back = landing - ahead * (RiftWorld.Landing / 2 - 3)
+	local _, exit = wayHome(folder, face(back, ahead), true)
+	-- The throne cave: the throne at its far end, the way home beside it.
+	local last = #centers
+	local bossAt = centers[last]
+	local facing = -flat(centers[last] - centers[last - 1]).Unit
+	local _, seat, seatFrame = throne(folder, bossAt, facing, RiftWorld.Throne)
+	local beside = seat + seatFrame.RightVector * 22
+	local home = wayHome(folder, face(beside, facing), false)
+	-- The sky, over the middle of it all.
+	local lo, hi = centers[1], centers[1]
+	for _, c in centers do
+		lo = Vector3.new(math.min(lo.X, c.X), base.Y, math.min(lo.Z, c.Z))
+		hi = Vector3.new(math.max(hi.X, c.X), base.Y, math.max(hi.Z, c.Z))
+	end
+	sky(folder, (lo + hi) / 2, math.max(hi.X - lo.X, hi.Z - lo.Z) + 300, rng)
 	local rooms = {}
 	for room = 1, RiftRun.Rooms do
-		rooms[room] = { Center = centers[room + 1], Radius = radii[room + 1] }
+		rooms[room] = { Center = centers[room + 1], Radius = RiftWorld.Cave / 2 + 4, Size = RiftWorld.Cave }
 	end
 	return {
 		Folder = folder,
 		Origin = origin,
-		Start = CFrame.new(base + Vector3.new(0, 3, 4)) * CFrame.Angles(0, yawOf(flat(centers[2] - base).Unit), 0),
+		Start = face(landing + ahead * 4 + UP * 3, ahead),
+		Landing = { Center = landing, Radius = RiftWorld.Landing / 2 + 4, Size = RiftWorld.Landing },
 		Rooms = rooms,
-		Boss = { Center = bossAt, Radius = 46 },
+		Boss = { Center = bossAt, Radius = RiftWorld.Throne / 2 + 4, Size = RiftWorld.Throne },
 		Gates = gates,
 		Exit = exit,
 		Home = home,
 	}
+end
+
+-- On `area`'s floor (a cave: { Center, Size }), `margin` studs of slack.
+function RiftWorld.inside(area, position: Vector3, margin: number?): boolean
+	local offset = position - area.Center
+	local half = area.Size / 2 + (margin or 0)
+	return math.abs(offset.X) <= half and math.abs(offset.Z) <= half and offset.Y > -12 and offset.Y < 60
 end
 
 function RiftWorld.openGate(gate: Model)

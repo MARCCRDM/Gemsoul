@@ -5,7 +5,10 @@
 	landing legs, ramps down from its doors: the mech garage with its
 	eight bays and a door at each end, the Store, the player Market, PROBE-7,
 	the leaderboard, the Arena Uplink and the kaiju arena); outside is the
-	quarry, where they mine and hunt. A working
+	quarry, where they mine and hunt: the Loop, four biomes round the core
+	between four haul roads due north, east, south and west, each with its
+	own ground, rock and landmarks and a sign for it either side of each
+	road (Shared.Frontier.Biomes). A working
 	frontier outpost runs along the north edge (habitat modules strung on
 	tubes, a refinery tower, a drill rig over its pit, conveyors, pipes and
 	floodlight masts), with the landing pad and shuttle south-east. Over it
@@ -38,9 +41,10 @@
 	      KeepOut ({ { Vector3, studs } }: the Shelter, buildings, workings,
 	      ramps and vein sites, for wild kaiju to keep clear of),
 	      Secrets (empty: retired Easter eggs stay disabled) }
-	  OutpostWorld.rock(size, cframe, rng, tint?) -> Model   one rock of that size
-	      (Shared.Outpost.Sizes), its main chunk named "Body"; `tint` colours
-	      its crystals (a frontier band's, Shared.Frontier.Bands)
+	  OutpostWorld.rock(size, cframe, rng, tint?, stone?) -> Model   one rock of
+	      that size (Shared.Outpost.Sizes), its main chunk named "Body"; `tint`
+	      colours its crystals (a frontier band's, Shared.Frontier.Bands),
+	      `stone` its basalt (a biome's, Shared.Frontier.Biomes)
 	  OutpostWorld.veinMarks(parent, scar, rng, color?, index?) -> Model   a vein's
 	      Rift Gate over its dormant rift: scorched bed, cracks, an arch of
 	      black rock with fire at its feet, and its "Enter the Rift" prompt
@@ -232,9 +236,15 @@ end
 -- chunks heaped on a scorched bed, ore veins in their sides and a crystal
 -- cluster bursting out of the top (the boulder has a second one breaking
 -- out of a flank).
-local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng, tint: Color3?): Model
+local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng, tint: Color3?, stone: Color3?): Model
 	local s = if big then 6 else 3.6
 	local glow = tint or GLOW
+	-- (Out in a biome, its basalt takes on the biome's stone.)
+	local basalt = if stone then BASALT:Lerp(stone, 0.7) else BASALT
+	local pale, dark = BASALT_LIGHT, BASALT_DARK
+	if stone then
+		pale, dark = pale:Lerp(stone, 0.5), dark:Lerp(stone, 0.5)
+	end
 	local function lean(low: number, high: number): number
 		return rng:NextNumber(low, high) * (if rng:NextNumber() < 0.5 then -1 else 1)
 	end
@@ -246,7 +256,7 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng, tint
 			model,
 			ground * CFrame.new(0, s * 0.18, 0) * CFrame.Angles(lean(0.3, 0.5), 0, lean(0.2, 0.4)),
 			Vector3.new(s * 0.78, s * 0.62, s * 0.7),
-			BASALT,
+			basalt,
 			Enum.Material.Basalt
 		)
 	)
@@ -267,7 +277,7 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng, tint
 					* CFrame.new(math.cos(a) * r, h * 0.15, math.sin(a) * r)
 					* CFrame.Angles(lean(0.2, 0.6), rng:NextNumber(0, 6.28), lean(0.2, 0.6)),
 				Vector3.new(w, h, w * rng:NextNumber(0.75, 1.1)),
-				BASALT:Lerp(if i % 2 == 0 then BASALT_LIGHT else BASALT_DARK, rng:NextNumber(0.2, 0.7)),
+				basalt:Lerp(if i % 2 == 0 then pale else dark, rng:NextNumber(0.2, 0.7)),
 				Enum.Material.Basalt
 			)
 		)
@@ -344,7 +354,7 @@ local function crystalRock(model: Model, big: boolean, cframe: CFrame, rng, tint
 				* CFrame.new(math.cos(a) * r, w * 0.25, math.sin(a) * r)
 				* CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, 6.28), rng:NextNumber(-0.4, 0.4)),
 			Vector3.new(w, w * 0.7, w * 0.85),
-			BASALT:Lerp(BASALT_DARK, rng:NextNumber(0, 1)),
+			basalt:Lerp(dark, rng:NextNumber(0, 1)),
 			Enum.Material.Basalt
 		)
 	end
@@ -379,13 +389,13 @@ local ROCK_TINT = {
 	Geode = Color3.fromRGB(100, 78, 128),
 }
 
-function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random, tint: Color3?): Model
+function OutpostWorld.rock(size: string, cframe: CFrame, rng: Random, tint: Color3?, stone: Color3?): Model
 	local model = Instance.new("Model")
 	model.Name = "Rock"
 	if size == "Pebble" or size == "Boulder" then
 		-- (Out along the trails their crystals warm from cyan to gold to
 		-- rose; a Rift Vein's are rift-touched violet.)
-		return crystalRock(model, size == "Boulder", cframe, rng, tint)
+		return crystalRock(model, size == "Boulder", cframe, rng, tint, stone)
 	end
 	local spec = ({
 		Monolith = { 8.5, Color3.fromRGB(84, 82, 96), SAGA, 9 },
@@ -1118,9 +1128,8 @@ end
 local NEAR_SPOTS = 52 -- rock spots in the field round the middle (the outcrops lead out from it)
 local NEAR_REACH = 140 -- studs: the field stays inside the core (Shared.Frontier.Core)
 
--- Connected triangles make a continuous crater surface rather than separate
--- vertical towers. Shared vertices keep the silhouette and slopes seam-free.
-local function craterFace(parent, at, a, b, c, color, material)
+-- Two wedges make the triangle a, b, c, `thick` studs through; returns them.
+local function triangle(parent, at, a, b, c, thick: number, color, material): { BasePart }
 	local ab, ac, bc = b - a, c - a, c - b
 	if ab:Dot(ab) > ac:Dot(ac) and ab:Dot(ab) > bc:Dot(bc) then
 		c, a = a, c
@@ -1131,12 +1140,30 @@ local function craterFace(parent, at, a, b, c, color, material)
 	local right, back = ac:Cross(ab).Unit, bc.Unit
 	local up = bc:Cross(right).Unit
 	local height = math.abs(ab:Dot(up))
+	local faces = {}
 	for _, spec in {
 		{ (a + b) / 2, right, back, math.abs(ab:Dot(back)) },
 		{ (a + c) / 2, -right, -back, math.abs(ac:Dot(back)) },
 	} do
-		local face = part(parent, at * CFrame.fromMatrix(spec[1], spec[2], up, spec[3]),
-			Vector3.new(0.6, height, math.max(0.05, spec[4])), color, material, "Wedge")
+		table.insert(
+			faces,
+			part(
+				parent,
+				at * CFrame.fromMatrix(spec[1], spec[2], up, spec[3]),
+				Vector3.new(thick, height, math.max(0.05, spec[4])),
+				color,
+				material,
+				"Wedge"
+			)
+		)
+	end
+	return faces
+end
+
+-- Connected triangles make a continuous crater surface rather than separate
+-- vertical towers. Shared vertices keep the silhouette and slopes seam-free.
+local function craterFace(parent, at, a, b, c, color, material)
+	for _, face in triangle(parent, at, a, b, c, 0.6, color, material) do
 		face.Name = "CraterSurface"
 	end
 end
@@ -1282,6 +1309,210 @@ local function road(parent, from: Vector3, to: Vector3, width: number)
 		part(parent, side * CFrame.new(0, 1.5, 0), Vector3.new(0.6, 3, 0.6), HAZARD, Enum.Material.SmoothPlastic)
 		part(parent, side * CFrame.new(0, 3.2, 0), Vector3.new(0.7, 0.4, 0.7), GLOW, Enum.Material.Neon)
 	end
+end
+
+-- The biomes' ground and landmarks (Shared.Frontier.Biomes) ---------------------------------------------
+
+-- Ashfall: a smouldering vent, an ember glowing in its throat.
+local function vent(parent, base: CFrame, rng, biome, smoke: boolean): number
+	local dark = biome.Stone:Lerp(Color3.new(0, 0, 0), 0.35)
+	disc(parent, base * CFrame.new(0, 0.7, 0), 6.5, 1.4, dark, Enum.Material.Basalt)
+	disc(parent, base * CFrame.new(0, 1.7, 0), 3.8, 1.2, dark, Enum.Material.Basalt)
+	local ember = disc(parent, base * CFrame.new(0, 2.32, 0), 2.6, 0.12, biome.Glow, Enum.Material.Neon)
+	for _ = 1, 2 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		part(
+			parent,
+			base
+				* CFrame.new(math.cos(a) * 4.6, 1.5, math.sin(a) * 4.6)
+				* CFrame.Angles(rng:NextNumber(-0.4, 0.4), a, rng:NextNumber(-0.3, 0.3)),
+			Vector3.new(1.6, 3.4, 2.4),
+			dark,
+			Enum.Material.Basalt,
+			"Wedge"
+		)
+	end
+	if smoke then
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		emitter.Rate, emitter.Lifetime = 3, NumberRange.new(3, 5)
+		emitter.Speed = NumberRange.new(3, 5)
+		emitter.Size = NumberSequence.new(2, 9)
+		emitter.Transparency = NumberSequence.new(0.65, 1)
+		emitter.Color = ColorSequence.new(Color3.fromRGB(120, 100, 96))
+		emitter.Parent = ember
+	end
+	return 7
+end
+
+-- Rimefrost: a cluster of ice spires on a drift of frost.
+local function spires(parent, base: CFrame, rng, biome): number
+	disc(parent, base * CFrame.new(0, 0.06, 0), 7, 0.12, biome.Ground, Enum.Material.Snow)
+	for i = 1, 3 do
+		local a = i / 3 * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		local h = rng:NextNumber(7, 15)
+		local ice = part(
+			parent,
+			base
+				* CFrame.new(math.cos(a) * 2.2, h / 2 - 0.5, math.sin(a) * 2.2)
+				* CFrame.Angles(math.sin(a) * 0.22, rng:NextNumber(0, 6.28), -math.cos(a) * 0.22),
+			Vector3.new(2.2, h, 2.2),
+			biome.Glow:Lerp(Color3.new(1, 1, 1), 0.55),
+			Enum.Material.Ice
+		)
+		ice.Transparency = 0.15
+	end
+	return 7
+end
+
+-- Stormglass: a pylon of storm glass with a charge running up its core.
+local function pylon(parent, base: CFrame, rng, biome): number
+	disc(parent, base * CFrame.new(0, 0.3, 0), 4.5, 0.6, biome.Stone, Enum.Material.Slate)
+	local h = rng:NextNumber(11, 18)
+	for i = 1, 2 do
+		local glass = part(
+			parent,
+			base
+				* CFrame.new(0, h / 2, 0)
+				* CFrame.Angles(0, i * math.pi / 4 + rng:NextNumber(0, 0.5), if i == 1 then 0.1 else -0.08),
+			Vector3.new(2.4, h, 2.4),
+			Color3.fromRGB(150, 132, 222),
+			Enum.Material.Glass
+		)
+		glass.Transparency = 0.3
+	end
+	part(parent, base * CFrame.new(0, h * 0.45, 0), Vector3.new(0.7, h * 0.8, 0.7), biome.Glow, Enum.Material.Neon)
+	return 5
+end
+
+-- Blightwood: a dead tree in the mud, a spore pod swelling on a branch.
+local function snag(parent, base: CFrame, rng, biome): number
+	disc(parent, base * CFrame.new(0, 0.06, 0), 6, 0.12, biome.Ground, Enum.Material.Mud)
+	local bark = Color3.fromRGB(58, 52, 44)
+	local h = rng:NextNumber(9, 13)
+	local trunk = base * CFrame.Angles(rng:NextNumber(-0.12, 0.12), rng:NextNumber(0, 6.28), 0)
+	part(parent, trunk * CFrame.new(0, h / 2, 0), Vector3.new(1.4, h, 1.4), bark, Enum.Material.Wood)
+	local tip = trunk
+	for i, side in { -1, 1 } do
+		local branch = trunk
+			* CFrame.new(0, h * (0.62 + i * 0.12), 0)
+			* CFrame.Angles(0, 0, side * 0.75)
+			* CFrame.new(0, 2.4, 0)
+		part(parent, branch, Vector3.new(0.7, 4.8, 0.7), bark, Enum.Material.Wood)
+		tip = branch * CFrame.new(0, 2.6, 0)
+	end
+	part(parent, tip, Vector3.new(1.8, 1.8, 1.8), biome.Glow, Enum.Material.Neon, "Ball")
+	return 6
+end
+
+local LANDMARK = { Ashfall = vent, Rimefrost = spires, Stormglass = pylon, Blightwood = snag }
+
+-- Each biome's ground and landmarks, out past the core in its quarter:
+-- BIOME_PATCHES broad patches of its ground (Ground, Material) and
+-- BIOME_LANDMARKS of its landmarks where `clear` says there's room; returns
+-- where those stand, as { Vector3, studs } to keep the rocks off.
+local BIOME_PATCHES, BIOME_LANDMARKS = 10, 6
+local function biomeGround(parent, at: CFrame, rng, Frontier, clear: (Vector3, number) -> boolean): { any }
+	local taken = {}
+	local quarter = math.pi / 4 - math.rad(6)
+	for _, biome in Frontier.Biomes do
+		local here = folder(parent, biome.Id)
+		for _ = 1, BIOME_PATCHES do
+			local a = biome.Angle + rng:NextNumber(-quarter, quarter)
+			local r = rng:NextNumber(Frontier.Core + 20, 400)
+			disc(
+				here,
+				at * CFrame.new(math.cos(a) * r, 0.04, math.sin(a) * r),
+				rng:NextNumber(30, 56),
+				0.06,
+				biome.Ground:Lerp(biome.Stone, rng:NextNumber(0.25, 0.6)),
+				Enum.Material[biome.Material]
+			)
+		end
+		local placed, tries = 0, 0
+		while placed < BIOME_LANDMARKS and tries < 200 do
+			tries += 1
+			local a = biome.Angle + rng:NextNumber(-quarter, quarter)
+			local r = rng:NextNumber(Frontier.Core + 35, 370)
+			local p = (at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)).Position
+			local roomy = clear(p, 0)
+			for _, other in taken do
+				if (other[1] - p).Magnitude < 44 then
+					roomy = false
+				end
+			end
+			if roomy then
+				placed += 1
+				local base = CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+				local reach = LANDMARK[biome.Id](here, base, rng, biome, placed % 2 == 1)
+				table.insert(taken, { p, reach + 6 })
+			end
+		end
+	end
+	return taken
+end
+
+-- Each biome's floor: its whole quarter of the quarry floor in its own
+-- ground, from the core's edge (ragged, but meeting at the spokes) out under
+-- the quarry walls, in FLOOR_SEGMENTS slices; the seams between biomes run
+-- under the spoke roads. Its parts are named for their biome ("AshfallFloor").
+local FLOOR_SEGMENTS, FLOOR_TINT = 8, 0.8
+local function biomeFloor(parent, at: CFrame, Frontier)
+	local floors = folder(parent, "BiomeFloor")
+	local rng = Random.new(1717) -- (its own: the rest of the layout draws from build's)
+	for _, biome in Frontier.Biomes do
+		local color = REGOLITH:Lerp(biome.Ground, FLOOR_TINT)
+		local material = Enum.Material[biome.Material]
+		local from = biome.Angle - math.pi / 4
+		local inner, outer = {}, {}
+		for i = 0, FLOOR_SEGMENTS do
+			local a = from + i / FLOOR_SEGMENTS * math.pi / 2
+			local out = Vector3.new(math.cos(a), 0, math.sin(a))
+			local edge = if i == 0 or i == FLOOR_SEGMENTS then Frontier.Core else Frontier.Core + rng:NextNumber(-12, 8)
+			-- (On the quarry floor, its top 0.04 up: under its patches (0.07), the
+			-- regolith's (0.1) and the roads (0.16). Out past where the chords
+			-- would leave a gap at the walls' foot.)
+			inner[i] = out * edge + Vector3.new(0, 0.02, 0)
+			outer[i] = out * (QUARRY + 8) + Vector3.new(0, 0.02, 0)
+		end
+		for i = 0, FLOOR_SEGMENTS - 1 do
+			for _, corners in { { inner[i], outer[i], outer[i + 1] }, { inner[i], outer[i + 1], inner[i + 1] } } do
+				for _, face in triangle(floors, at, corners[1], corners[2], corners[3], 0.04, color, material) do
+					face.Name = biome.Id .. "Floor"
+					face.CastShadow = false
+				end
+			end
+		end
+	end
+end
+
+-- At each spoke's mouth, just out of the core, a sign either side of the
+-- road naming the biome that side, facing whoever heads out; returns where
+-- they stand ({ Vector3, studs }, to keep the rocks off).
+local function crossroads(parent, at: CFrame, Frontier): { any }
+	local signs = folder(parent, "Crossroads")
+	local feet = {}
+	for _, a in Frontier.Spokes do
+		local out = Vector3.new(math.cos(a), 0, math.sin(a))
+		local right = Vector3.new(-out.Z, 0, out.X)
+		for _, side in { -1, 1 } do
+			-- (Right of the road heading out is clockwise round the Loop.)
+			local biome = Frontier.biomeOf(a + side * 0.1)
+			local foot = at.Position + out * (Frontier.Core + 30) + right * side * 15
+			part(signs, CFrame.new(foot + Vector3.new(0, 4.5, 0)), Vector3.new(0.8, 9, 0.8), STEEL, Enum.Material.Metal)
+			local high = foot + Vector3.new(0, 9.6, 0)
+			signPanel(
+				signs,
+				facingPoint(high, high - out),
+				Vector3.new(10, 3.4, 0.4),
+				string.upper(biome.Name),
+				biome.Label,
+				biome.Glow
+			)
+			table.insert(feet, { foot, 9 })
+		end
+	end
+	return feet
 end
 
 -- A striped jump ramp for the machines.
@@ -2139,19 +2370,20 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	root:SetAttribute("SkySetting", "MoonBase")
 	local rng = Random.new(4242)
 	local ground = folder(root, "Ground")
+	local Frontier = assert(OutpostWorld.Frontier, "OutpostWorld needs Shared.Frontier")
 	-- The quarry floor and its regolith, worked benches, and a continuous
 	-- natural crater rim. Invisible boundary walls stay beyond the benches.
 	solid(disc(ground, at * CFrame.new(0, -1, 0), 520, 2, REGOLITH, Enum.Material.Slate))
+	biomeFloor(ground, at, Frontier)
 	for _ = 1, 90 do
 		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(10, 430)
-		disc(
-			ground,
-			at * CFrame.new(math.cos(a) * r, 0.05, math.sin(a) * r),
-			rng:NextNumber(10, 34),
-			0.1,
-			REGOLITH:Lerp(REGOLITH_DARK, rng:NextNumber(0.1, 0.5)),
-			Enum.Material.Sand
-		)
+		local radius = rng:NextNumber(10, 34)
+		local color = REGOLITH:Lerp(REGOLITH_DARK, rng:NextNumber(0.1, 0.5))
+		-- (Out past the core, its biome's ground shows through: Shared.Frontier.Biomes.)
+		if r > Frontier.Core - 10 then
+			color = color:Lerp(Frontier.biomeOf(a).Ground, FLOOR_TINT)
+		end
+		disc(ground, at * CFrame.new(math.cos(a) * r, 0.05, math.sin(a) * r), radius, 0.1, color, Enum.Material.Sand)
 	end
 	for _, c in
 		{
@@ -2193,11 +2425,13 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		w.CastShadow = false
 	end
 
-	-- Haul roads out from the Shelter's walls, a ring road, and jump ramps on them.
+	-- Haul roads out from the Shelter's walls: the four spokes, due north,
+	-- east, south and west between the biomes (Shared.Frontier.Spokes: the
+	-- Crossroads), the ring road round through all four (the Loop), and jump
+	-- ramps on them.
 	local roads = folder(root, "Roads")
 	local roadLines = {}
-	for i = 0, 5 do
-		local a = i / 6 * math.pi * 2 + math.rad(30)
+	for _, a in Frontier.Spokes do
 		local from = (at * CFrame.new(math.cos(a) * 104, 0, math.sin(a) * 104)).Position
 		local to = (at * CFrame.new(math.cos(a) * 420, 0, math.sin(a) * 420)).Position
 		road(roads, from, to, 18)
@@ -2212,10 +2446,11 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		table.insert(roadLines, { from, to })
 	end
 	local ramps = {}
-	for i, spec in { { 0, 175 }, { 2, 330 }, { 3, 200 }, { 4, 345 }, { 5, 150 } } do
-		local a = spec[1] / 6 * math.pi * 2 + math.rad(30)
-		local p = (at * CFrame.new(math.cos(a) * spec[2], 0, math.sin(a) * spec[2])).Position
-		local outward = (at * CFrame.new(math.cos(a) * (spec[2] + 10), 0, math.sin(a) * (spec[2] + 10))).Position
+	-- (One on each spoke: north, east, south, west.)
+	for i, out in { 345, 215, 330, 200 } do
+		local a = Frontier.Spokes[i]
+		local p = (at * CFrame.new(math.cos(a) * out, 0, math.sin(a) * out)).Position
+		local outward = (at * CFrame.new(math.cos(a) * (out + 10), 0, math.sin(a) * (out + 10))).Position
 		-- Low end towards the outpost, so you hit it driving out.
 		jumpRamp(roads, CFrame.lookAt(p, p + (p - outward)))
 		ramps[i] = p
@@ -2613,10 +2848,18 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 		return true
 	end
+	-- The biomes round the core: their ground, their landmarks, and a sign
+	-- at each spoke's mouth (kept clear of the rocks after).
+	local biomes = folder(root, "Biomes")
+	for _, standing in biomeGround(biomes, at, rng, Frontier, clear) do
+		table.insert(keepOut, standing)
+	end
+	for _, standing in crossroads(biomes, at, Frontier) do
+		table.insert(keepOut, standing)
+	end
 	-- The frontier first (Shared.Frontier). Where the Rift Veins may surface
 	-- by the walls: every site with room for all six rocks (kept clear of
 	-- the outcrops, so a vein can always move there).
-	local Frontier = assert(OutpostWorld.Frontier, "OutpostWorld needs Shared.Frontier")
 	local zoneOf = {}
 	local function spotAt(offset: Vector3): Vector3
 		return (at * CFrame.new(offset.X, 0, offset.Z)).Position

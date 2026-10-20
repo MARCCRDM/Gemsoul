@@ -143,7 +143,48 @@ for _,p in builtParts do
  assert(p.Name~="GrassSurface" and p.Name~="MeadowCloudBank" and p.Name~="Secret","Old lobby/retired secrets leaked")
 end
 assert(floor and math.abs(floor.CFrame.t[2]+floor.Size.X/2)<.001,"Quarry floor missing or wrong height")
-assert(roads>100 and ramps==5 and sky>=260 and motor>200 and base>200,"Quarry landmarks or the Shelter missing")
+assert(roads>80 and ramps==4 and sky>=260 and motor>200 and base>200,"Quarry landmarks or the Shelter missing")
+-- The Loop: each biome's ground and landmarks in its own quarter, past the
+-- core; a sign each side of every spoke's mouth, naming the biome that side.
+local biomeParts,signs,glows={},0,{}
+for _,p in builtParts do
+ local folderName=p.Parent and p.Parent.Name
+ for _,biome in Frontier.Biomes do
+  if folderName==biome.Id then
+   biomeParts[biome.Id]=(biomeParts[biome.Id] or 0)+1
+   local q=p.CFrame.Position-origin.Position
+   local flatQ=Vector3.new(q.X,0,q.Z)
+   assert(flatQ.Magnitude>=Frontier.Core,"A biome's ground or landmark in the core: "..biome.Id)
+   assert(Frontier.biomeAt(flatQ)==biome,"A biome's ground or landmark out of its quarter: "..biome.Id)
+   if p.Material==Enum.Material.Neon then glows[biome.Id]=true end
+  end
+ end
+ if folderName=="Crossroads" and p.Name=="Sign" then signs+=1 end
+end
+for _,biome in Frontier.Biomes do
+ assert((biomeParts[biome.Id] or 0)>=30,"Too little of "..biome.Id..": "..tostring(biomeParts[biome.Id]))
+ assert(biome.Id=="Rimefrost" or glows[biome.Id],"No glow among "..biome.Id.."'s landmarks")
+end
+assert(signs==#Frontier.Spokes*2,"Not a sign each side of every spoke: "..signs)
+-- Each biome's floor: its whole quarter, from about the core's edge out under
+-- the walls, flat, in its own ground and material, with no shadows.
+local floorArea={}
+for _,p in builtParts do
+ for _,biome in Frontier.Biomes do
+  if p.Parent and p.Parent.Name=="BiomeFloor" and p.Name==biome.Id.."Floor" then
+   local q=p.CFrame.Position-origin.Position
+   assert(p.ClassName=="WedgePart" and math.abs(math.abs(p.CFrame.RightVector.Y)-1)<1e-6,"A floor piece that isn't flat: "..biome.Id)
+   assert(q.Y+p.Size.X/2>0 and q.Y+p.Size.X/2<.05,"A floor piece off the quarry floor: "..biome.Id)
+   assert(Frontier.apart(math.atan2(q.Z,q.X),biome.Angle)<=math.pi/4+1e-6,"A floor piece out of its quarter: "..biome.Id)
+   assert(p.Material==Enum.Material[biome.Material] and not p.CastShadow and not p.CanCollide,"A floor piece in the wrong ground: "..biome.Id)
+   floorArea[biome.Id]=(floorArea[biome.Id] or 0)+p.Size.Y*p.Size.Z/2
+  end
+ end
+end
+for _,biome in Frontier.Biomes do
+ local quarter=math.pi/4*((Rules.Radius+8)^2-Frontier.Core^2)
+ assert(math.abs((floorArea[biome.Id] or 0)/quarter-1)<.03,"A biome's floor doesn't cover its quarter: "..biome.Id.." "..tostring(floorArea[biome.Id]))
+end
 -- The crater rim and the sky are sent whole: far off, streaming would never
 -- send them (the rim's far side is 900-1,200 studs from most of the quarry).
 local rim,skyModel=0,nil
@@ -198,8 +239,7 @@ for i,spot in site.Spots do
  -- All radial haul roads and the ring road stay clear for machines.
  local radius=Vector3.new(p.X,0,p.Z).Magnitude
  assert(math.abs(radius-260)>12,"Mining body on ring road")
- for spoke=0,5 do
-  local a=spoke/6*math.pi*2+math.rad(30)
+ for _,a in Frontier.Spokes do
   local direction=Vector3.new(math.cos(a),0,math.sin(a))
   local closest=direction*math.clamp(p:Dot(direction),104,420)
   assert((p-closest).Magnitude>=14,"Mining body on haul road")
@@ -209,7 +249,7 @@ for i=0,10000 do
  local size=Rules.rollSize(i/10001,"Common")
  assert(size=="Pebble" or size=="Boulder","Rare mining object returned")
 end
-print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 5 ramps; services and safe sky; the crater rim and sky always load")
+print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 4 spokes and their ramps; the four biomes' floors, ground, landmarks and crossroads signs; services and safe sky; the crater rim and sky always load")
 local counts={Hauler=0,Mole=0,Digger=0,Skipper=0}
 assert(#site.Parking==8,"The garage has missing bays")
 for _,bay in site.Parking do

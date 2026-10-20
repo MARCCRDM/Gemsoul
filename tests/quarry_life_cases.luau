@@ -177,7 +177,7 @@ for _, d in site.Model:FindFirstChild("Roads"):GetChildren() do
 		table.insert(ramps, d)
 	end
 end
-check(#roads >= 6 and #ramps == 5, "The roads or ramps weren't found")
+check(#roads >= #Frontier.Spokes and #ramps == #Frontier.Spokes, "The roads or ramps weren't found")
 -- Where a point is on a road: across it (X) and along it (Z) from its
 -- middle. (Read from the road's middle and length, not its turn: lune's
 -- lookAt faces the other way. A haul road runs straight out from the
@@ -191,7 +191,7 @@ local function across(road, p: Vector3): Vector3
 	return Vector3.new(d:Dot(side), 0, d:Dot(along))
 end
 local lights = Life.lights()
-check(#lights >= 100, "Too few road lights: " .. #lights)
+check(#lights >= 20 * #Frontier.Spokes, "Too few road lights: " .. #lights)
 local perRoad = {}
 for _, light in lights do
 	local p = light.Position
@@ -217,7 +217,7 @@ for _, light in lights do
 	check(light.Band == band, "A road light in the wrong band's colour")
 	check(p.Y > 0.16 and p.Y < 0.6, "A road light isn't set in the road")
 end
-for road = 0, 5 do
+for road = 1, #Frontier.Spokes do
 	check((perRoad[road] or 0) >= 16, "Road " .. road .. " has too few lights")
 end
 for i, light in life.Lights do

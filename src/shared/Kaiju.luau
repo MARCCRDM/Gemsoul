@@ -586,23 +586,44 @@ end
 
 -- What comes through for an encounter of `count` (a list of critter ids,
 -- in the order they come): the fighters first, any ranged ones last (and
--- never on their own). `rng` has NextInteger and NextNumber.
-function Kaiju.wave(count: number, rng): { string }
+-- never on their own). `rng` has NextInteger and NextNumber. `home` (a
+-- critter id: the kind a biome's own, Shared.Frontier) leans it: a fighter
+-- is `home` `bias` of the time; a ranged `home` comes along more often
+-- (whenever there are two or more, about `bias` / 2 of them).
+function Kaiju.wave(count: number, rng, home: string?, bias: number?): { string }
 	local melee, ranged = {}, {}
 	for _, id in Kaiju.Critters do
 		table.insert(if Kaiju.isRanged(id) then ranged else melee, id)
 	end
 	local rules = Kaiju.Swarm.Ranged
 	local shots = 0
-	if #ranged > 0 and count >= rules.Min and rng:NextNumber() < rules.Chance then
+	local homeRanged = home ~= nil and table.find(ranged, home) ~= nil
+	local homeMelee = home ~= nil and table.find(melee, home) ~= nil
+	if homeRanged then
+		if count >= 2 then
+			shots = math.max(1, math.floor(count * (bias or 0) / 2 + 0.5))
+		end
+	elseif #ranged > 0 and count >= rules.Min and rng:NextNumber() < rules.Chance then
 		shots = math.max(1, math.floor(count / rules.Every))
+	end
+	local others = {}
+	for _, id in melee do
+		if id ~= home then
+			table.insert(others, id)
+		end
 	end
 	local wave = {}
 	for _ = 1, count - shots do
-		table.insert(wave, melee[rng:NextInteger(1, #melee)])
+		if homeMelee and rng:NextNumber() < (bias or 0) then
+			table.insert(wave, home :: string)
+		elseif homeMelee then
+			table.insert(wave, others[rng:NextInteger(1, #others)])
+		else
+			table.insert(wave, melee[rng:NextInteger(1, #melee)])
+		end
 	end
 	for _ = 1, shots do
-		table.insert(wave, ranged[rng:NextInteger(1, #ranged)])
+		table.insert(wave, if homeRanged then home :: string else ranged[rng:NextInteger(1, #ranged)])
 	end
 	return wave
 end

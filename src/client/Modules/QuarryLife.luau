@@ -54,8 +54,9 @@ local HAZARD = Color3.fromRGB(255, 196, 40)
 local WHITE = Color3.new(1, 1, 1)
 
 -- Where things are, in the quarry's frame (Server OutpostWorld.build).
-QuarryLife.Roads = { Count = 6, From = 116, To = 404, Step = 24, Side = 8.4, Ring = 260 }
-QuarryLife.Ramps = { { 0, 175 }, { 2, 330 }, { 3, 200 }, { 4, 345 }, { 5, 150 } } -- (road, studs out)
+-- (The haul roads are the four spokes, Frontier.Spokes: north, east, south, west.)
+QuarryLife.Roads = { From = 116, To = 404, Step = 24, Side = 8.4, Ring = 260 }
+QuarryLife.Ramps = { { 1, 345 }, { 2, 215 }, { 3, 330 }, { 4, 200 } } -- (spoke, studs out)
 QuarryLife.Pad = V(72, 1.15, 118) -- the landing pad's top
 QuarryLife.Drop = V(56, 18, -90) -- where the lifter hovers at the north outpost
 QuarryLife.Cruise = 62 -- the lifter's height between (well over the Shelter's skylight)
@@ -71,7 +72,7 @@ QuarryLife.Spires = { Count = 12, Out = 467, Top = 15 } -- clusters round the to
 
 -- A road's way out (radians round the middle: 0 east, a quarter turn south).
 local function roadAngle(road: number): number
-	return road / QuarryLife.Roads.Count * math.pi * 2 + math.rad(30)
+	return Frontier.Spokes[road]
 end
 
 local function bandOf(out: number): string
@@ -88,7 +89,7 @@ end
 function QuarryLife.lights(): { { Position: Vector3, Band: string, Road: number, Out: number } }
 	local spec = QuarryLife.Roads
 	local list = {}
-	for road = 0, spec.Count - 1 do
+	for road = 1, #Frontier.Spokes do
 		local a = roadAngle(road)
 		local along, across = V(math.cos(a), 0, math.sin(a)), V(-math.sin(a), 0, math.cos(a))
 		for out = spec.From, spec.To, spec.Step do

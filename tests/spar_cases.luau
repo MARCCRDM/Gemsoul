@@ -478,6 +478,32 @@ check(Hunt(a, true).Ok, "Couldn't hunt")
 now += Spar.SheatheLock + 1
 check(Spar_(a, false).Ok and a:GetAttribute("Hunt") == nil, "1 didn't end the hunt")
 
+-- Into the Rift (Server.RiftServer): a spar they were in ends, the kit comes
+-- out and stays out (nobody spars in there), and home it's put away.
+do
+	SparServer._stop(a)
+	SparServer._stop(b)
+	now += Spar.SheatheLock + 1
+	pair()
+	SparServer.riftKit(a, true)
+	a:SetAttribute("RiftRun", "R1")
+	check(Spar.hunting(a) and a:GetAttribute("SparWith") == nil, "Not in their kit going into the Rift, or still paired")
+	check(not Spar.sparring(b) and noted(b, "P1 went into the Rift."), "The spar didn't end, or nobody said why")
+	tick()
+	check(Spar.hunting(a), "The Rift ended the hunt")
+	now += Spar.SheatheLock + 1
+	check(Hunt(a, false).Message == "Your kit stays out in the Rift.", "Put the kit away in the Rift")
+	gap()
+	check(Ask(b, a.UserId).Message == "P1 is in the Rift.", "Asked a runner to spar")
+	gap()
+	check(Ask(a, b.UserId).Message == "Not in the Rift.", "A runner asked to spar")
+	SparServer.riftKit(a, true)
+	check(Spar.hunting(a), "Going in twice put the kit away")
+	a:SetAttribute("RiftRun", nil)
+	SparServer.riftKit(a, false)
+	check(not Spar.sparring(a) and a:GetAttribute("Hunt") == nil, "The kit stayed out back home")
+end
+
 -- Tripped by a gem raid's snatcher (a miner, kit away): down for the trip's
 -- seconds with their health untouched, then up with it still untouched.
 do
@@ -507,5 +533,5 @@ end
 print(
 	"PASS: "
 		.. checks
-		.. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both, hunting, a snatcher's trip)"
+		.. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both, hunting, the Rift's kit, a snatcher's trip)"
 )

@@ -14,18 +14,27 @@ type Gem = GemConfig.Gem
 	source: "MiningNode" | "MiningStore" | "PvEDrop" | "PvPWager"
 	opts.Luck: extra luck on top of the source's own (0-1)
 	opts.Id: unique id (the server passes a GUID)
+	opts.Home, opts.Bias: mined in one of the Outpost's biomes, its element
+	  (Home) comes up Bias of the time (Shared.Frontier.Biome)
 ]]
 function GemGenerator.generate(
 	rng: Random,
 	source: string,
-	opts: { Luck: number?, Id: string, Time: number, Rarity: string? }
+	opts: {
+		Luck: number?,
+		Id: string,
+		Time: number,
+		Rarity: string?,
+		Home: string?,
+		Bias: number?,
+	}
 ): Gem
 	local luck = math.clamp((GemConfig.SourceLuck[source] or 0) + (opts.Luck or 0), 0, 1)
 	-- Element, rarity, surge tier, surge rank and metrics (GemRoller).
 	-- (opts.Rarity sets the rarity: an Arena Cache's Legendaries; a mined
 	-- gem rolls mostly Commons, GemRoller.MiningWeights.)
 	local base = if GemRoller.MinedSources[source] then GemRoller.MiningWeights else nil
-	local rolled = GemRoller.roll(rng, luck, opts.Rarity, base)
+	local rolled = GemRoller.roll(rng, luck, opts.Rarity, base, opts.Home, opts.Bias)
 	return {
 		Id = opts.Id,
 		Element = rolled.Element,

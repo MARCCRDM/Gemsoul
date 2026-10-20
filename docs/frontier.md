@@ -9,6 +9,14 @@ way out, kite what comes through, and run back in when it gets too hot.
 
 ![The Outpost from above: the three bands, the outcrops, the Rift Veins and the guarded one](frontier/map.png)
 
+The quarry outside the core is also **the Loop**: four biomes, one for each
+element, a quarter of the quarry each, between four roads due north, east,
+south and west. Out there, gems, wild kaiju and critters lean 60% toward
+the biome's element. See [docs/biomes.md](biomes.md). (The map above is
+from before the Shelter and the Loop, when there were six roads. The bands
+are as drawn; for today's roads and buildings, see the map in
+`docs/biomes.md`.)
+
 ## The three bands
 
 Each band is measured across the ground from the middle of the Outpost.
@@ -50,7 +58,8 @@ dark seams in the ground joining them, so you can see it's one outcrop:
   different way each server, so some stretches are crowded and others
   bare;
 - about one rock in seven out there grows alone, between the outcrops. The
-  first six of those lead out of the core, so the way out starts close.
+  first eight of those stand at the four roads' mouths, two to each road,
+  so the way out of the core into each biome starts close.
 
 Outcrops stay clear of the roads, the buildings, the motor pool and the
 Rift Veins. A mined rock grows back in the same spot, so an outcrop stays
@@ -357,7 +366,7 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 
 | Where | What |
 | --- | --- |
-| `Shared.Frontier` | The rules: bands, colours and luck, the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), the guarded one and its guardian (`Veins.Guarded`, `Guardian`), pressure, stirring it up (`Disturbance`, `stir`, `settle`, `stage`, `capFor`), how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
+| `Shared.Frontier` | The rules: bands, colours and luck, the biomes and spokes (`docs/biomes.md`), the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), the guarded one and its guardian (`Veins.Guarded`, `Guardian`), pressure, stirring it up (`Disturbance`, `stir`, `settle`, `stage`, `capFor`), how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
 | `Shared.Outpost` | The Fringe, Edge, Vein and Guarded zones (the same rock mix, more luck) |
 | `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and Rift Gate (`veinMarks`, the guarded one's cracks red; `docs/rift.md`); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
 | `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot, except a vein's; moves a vein when it's mined out or its time comes (`moveVein`, `onVeinMoved`, and `VeinNews` on `workspace`); a swing at a vein's rock (`onVeinSwing`); every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |

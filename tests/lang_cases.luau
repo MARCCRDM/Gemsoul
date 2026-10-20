@@ -158,5 +158,17 @@ same(
 )
 same(Lang.translate("THE EDGE  ·  +16% LUCK"), "EL BORDE  ·  +16% DE SUERTE", "A rock's band tag")
 same(Lang.translate("RIFT VEIN  ·  +25% LUCK"), "VETA DE LA GRIETA  ·  +25% DE SUERTE", "A Rift Vein's tag")
+-- (a biome's banner, and the Rift's boss loot)
+same(Lang.translate("ASHFALL"), "CENIZAL", "A biome's banner")
+same(
+	Lang.translate("Ion ground  ·  Ion gems, critters and kaiju"),
+	"Terreno iónico  ·  Gemas, bichos y kaiju iónicos",
+	"A biome's line"
+)
+same(
+	Lang.translate("RIFT LOOT: Sam wins the Thermal gem. Sam 57 · Bo 33"),
+	"BOTÍN DE LA GRIETA: Sam gana la gema (Térmico). Sam 57 · Bo 33",
+	"Who won the Rift boss's gem"
+)
 Lang.setLocale("en")
-print("PASS: the frontier's text in Spanish")
+print("PASS: the frontier's and the Rift's text in Spanish")
