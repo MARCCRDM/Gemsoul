@@ -118,8 +118,14 @@ local World = luau.load(
 )()
 World.Frontier =
 	luau.load(fs.readFile(ROOT .. "/src/shared/Frontier.luau"), { debugName = "Frontier", environment = worldEnv })()
-local at = CFrame.new(0, 0, 7000)
-local site = World.build(at, R.Instance.new("Folder"))
+local Rules =
+	luau.load(fs.readFile(ROOT .. "/src/shared/Outpost.luau"), { debugName = "Outpost", environment = worldEnv })()
+World.Rules = Rules
+local quarry = CFrame.new(0, 0, 7000)
+local site = World.build(quarry, R.Instance.new("Folder"))
+-- (The client mounts it in the Shelter's frame, as OutpostScene does: the
+-- quarry's, lifted onto the Shelter's legs.)
+local at = quarry * CFrame.new(0, Rules.ShelterLift, 0)
 local shelter = site.Model:FindFirstChild("Shelter", true)
 check(shelter, "No Shelter")
 

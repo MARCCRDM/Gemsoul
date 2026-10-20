@@ -641,14 +641,15 @@ end
 
 -- Restore the original moon-base lighting, including after a bright arena
 -- or meadow visit. Keep the quarry readable beneath its stars and planets.
--- The finish: neon glows softly round its edges (the Shelter's trims, the
--- rocks' crystals, the hologram) without blooming over everything, a touch
--- of contrast and colour so it doesn't look flat, and a little sheen on
--- metal. No haze (space stays black) and no lift in brightness.
+-- The finish: neon glows softly round its edges (the Shelter's running
+-- lights, the rocks' crystals, the hologram) without blooming over
+-- everything, a touch of contrast and colour so it doesn't look flat, and
+-- only a faint sheen on metal (the Shelter's plate is meant to look worn,
+-- not polished). No haze (space stays black) and no lift in brightness.
 Scenes.OutpostFinish = {
 	Bloom = { Intensity = 0.3, Size = 24, Threshold = 1.6 },
 	Grade = { Contrast = 0.08, Saturation = 0.08, Tint = Color3.fromRGB(248, 250, 255) },
-	Specular = 0.35,
+	Specular = 0.18,
 }
 function Scenes.outpostLighting()
 	local finish = Scenes.OutpostFinish

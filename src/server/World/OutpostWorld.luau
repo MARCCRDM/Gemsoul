@@ -1,7 +1,8 @@
 --[[
 	Saga Outpost's world, built by the server so everyone shares it: a wide
 	crater basin on the moon, ringed by weathered crater slopes. In the middle
-	stands the Shelter, the base players arrive in (the mech garage with its
+	stands the Shelter, the base players arrive in (an armoured barracks on
+	landing legs, ramps down from its doors: the mech garage with its
 	eight bays and a door at each end, the Store, the player Market, PROBE-7,
 	the leaderboard, the Arena Uplink and the kaiju arena, dressed for
 	Halloween); outside is the quarry, where they mine and hunt. A working
@@ -11,13 +12,17 @@
 	planets hang in the black sky.
 
 	  OutpostWorld.build(at, parent) -> {
-	      Model, Spawn (CFrame: inside the Shelter's door, facing in),
+	      Model, Spawn (CFrame: inside the Shelter's door, facing in, on its
+	      floor: Shared.Outpost.ShelterLift over the quarry's),
 	      Probe (BasePart, the terminal), Board (BasePart with the
 	      leaderboard's face), Gate (BasePart), Stations ({ Store, Market }:
 	      the Shelter's counters, for their prompts), Crew ({ { Id, CFrame } }:
 	      where the Shelter's crew stand, by Shared.Vendors id, for
-	      OutpostServer to build them), Shelter ({ Box }: its
-	      half size, x and z, kept clear of rocks),
+	      OutpostServer to build them), Shelter ({ Box, Lift, Ramps,
+	      Feet }: its half size, x and z, kept clear of rocks; how high its
+	      floor stands; each ramp's footprint, { Middle (on the quarry
+	      floor), Half (half sizes, x and z), SlopeHalf (the slope's half
+	      width) }, the main door's first; where its legs stand),
 	      Spots ({ CFrame }, where rocks may grow), ArrivalSpots and
 	      NearSpots (indexes into Spots: the welcome field outside the
 	      Shelter's door, and the field round the middle, filled first),
@@ -45,6 +50,14 @@ local OutpostWorld = {}
 OutpostWorld.Frontier = (function()
 	local ok, module = pcall(function()
 		return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Frontier", 10))
+	end)
+	return if ok then module else nil
+end)()
+-- The Outpost's rules (Shared.Outpost: how high the Shelter stands on its
+-- legs, how long its ramps run). Offline scene tests hand it in here too.
+OutpostWorld.Rules = (function()
+	local ok, module = pcall(function()
+		return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Outpost", 10))
 	end)
 	return if ok then module else nil
 end)()
@@ -1451,19 +1464,32 @@ local function gemGallery(parent, at: CFrame)
 	return m
 end
 
--- The Shelter: the outpost's base in the middle of the basin, big enough to
--- hold the lobby (168 by 120 studs, the walls 34 high, a skylight over the
--- hall). Players arrive inside; outside is where they mine and hunt.
+-- The Shelter: the outpost's base in the middle of the basin, built like a
+-- barracks: a block of dark armour plate with rusted inserts and red running
+-- lights, a raised deck over the garage with two exhaust stacks glowing red,
+-- and the whole of it up on eight landing legs, its floor `lift` over the
+-- quarry's (Shared.Outpost.ShelterLift: a keel under the middle of it, set
+-- well back, so the legs stand clear and nobody gets under the hall). Big enough to hold the lobby (168 by 120 studs, the walls
+-- 34 high, a skylight over the hall). Players arrive inside; a wide ramp
+-- runs down from the main door to the quarry, and one from each garage
+-- door, gentle enough for the mechs to climb (ShelterRamp long).
 --   North: the mech garage, eight bays in a row facing a lane that runs out
 --   of a big door at each end (east and west), behind a barrier with gaps.
 --   The hall: the kaiju arena in the middle (a stage and stands, opening
 --   soon), the Store and the player Market on the west wall, PROBE-7 and the
---   leaderboard on the east, the Arena Uplink by the door, and how it all
---   works on the wall beside the door. One wide door south, to the quarry.
--- Dressed for Halloween. Returns its places, in `at`'s frame:
+--   leaderboard on the east, the Arena Uplink by the door, INFO-9's kiosk
+--   by the arena, and how it all works on the wall beside the door. One wide
+--   door south, to the quarry.
+-- Inside it's working kit, not a showroom: matte concrete underfoot, plate
+-- walls with a rusted band, warm work lights, no glossy tiles or trims.
+-- Dressed for Halloween. `at` is its floor's frame (the quarry's, lifted).
+-- Returns its places, in `at`'s frame:
 -- { Parking, Spawn, Probe, Board, Gate (CFrames for those builders), Store,
 --   Market (the counters, for their prompts), Crew ({ Id, CFrame }: where
---   its crew stand), Box (half sizes, x and z) }
+--   its crew stand), Box (half sizes, x and z), Ramps ({ { Middle, Half,
+--   SlopeHalf } }: each ramp and its landing, on the quarry floor, Half
+--   their half sizes, x and z, SlopeHalf the slope's half width), Feet
+--   ({ Vector3 }: where its legs stand) }
 local SHELTER = {
 	HalfWidth = 84, -- x, inside
 	HalfDepth = 60, -- z, inside
@@ -1473,12 +1499,21 @@ local SHELTER = {
 	Lane = { -36, -16 }, -- the garage lane's z, and its doors
 	LaneDoorHeight = 26,
 	Barrier = -14, -- z of the barrier between the garage and the hall
+	Landing = 10, -- how far each door's landing stands out from the wall
+	FrontRamp = { Landing = 27, Ramp = 19 }, -- the main door's (half widths)
+	LaneRamp = 12, -- each garage door's (half width: the lane and a little)
+	Keel = 12, -- how far in from the walls the keel under it is set
 }
-local function shelter(parent, at: CFrame)
+local ARMOR = Color3.fromRGB(96, 100, 110) -- the Shelter's plate: dark gunmetal
+local RUST = Color3.fromRGB(128, 76, 50) -- its armour inserts, weathered brown
+local RED = Color3.fromRGB(255, 62, 50) -- its running lights
+local function shelter(parent, at: CFrame, rules)
 	local m = folder(parent, "Shelter")
+	local lift = rules.ShelterLift
 	local W, D, H = SHELTER.HalfWidth, SHELTER.HalfDepth, SHELTER.Height
 	local laneN, laneS = SHELTER.Lane[1], SHELTER.Lane[2]
-	local walls = Color3.fromRGB(170, 176, 188)
+	local laneMid = (laneN + laneS) / 2
+	local walls = ARMOR
 	local function at3(x, y, z)
 		return at * CFrame.new(x, y, z)
 	end
@@ -1486,19 +1521,20 @@ local function shelter(parent, at: CFrame)
 		local p = at3(x, y, z).Position
 		return CFrame.lookAt(p, p + (at:VectorToWorldSpace(Vector3.new(dx, 0, dz))))
 	end
+	-- A box from `a` to `b` (points in `at`'s frame), `w` by `h` across.
+	local function beam(a: Vector3, b: Vector3, w: number, h: number, color)
+		local axis = (b - a).Unit
+		local side = axis:Cross(Vector3.new(0, 1, 0))
+		side = if side.Magnitude > 1e-3 then side.Unit else Vector3.new(1, 0, 0)
+		return part(m, at * CFrame.fromMatrix((a + b) / 2, side, axis:Cross(side), axis), Vector3.new(w, h, (b - a).Magnitude),
+			color, Enum.Material.Metal)
+	end
 
-	-- The floor: one slab under it all, the hall's polished (pale tiles, with
-	-- darker seams every 12 studs), the garage lane dark.
+	-- The floor: one slab under it all, matte concrete (the hall's a shade
+	-- paler), the garage lane dark.
 	solid(part(m, at3(0, 0.4, 0), Vector3.new(W * 2 + 4, 0.8, D * 2 + 4), CONCRETE, Enum.Material.Concrete))
 	part(m, at3(0, 0.83, (SHELTER.Barrier + D) / 2), Vector3.new(W * 2, 0.06, D - SHELTER.Barrier),
-		Color3.fromRGB(112, 118, 132), Enum.Material.SmoothPlastic)
-	local seam = Color3.fromRGB(84, 90, 104)
-	for x = -72, 72, 12 do
-		part(m, at3(x, 0.86, (SHELTER.Barrier + D) / 2), Vector3.new(0.14, 0.04, D - SHELTER.Barrier), seam)
-	end
-	for z = -2, 46, 12 do
-		part(m, at3(0, 0.86, z), Vector3.new(W * 2, 0.04, 0.14), seam)
-	end
+		Color3.fromRGB(104, 106, 112), Enum.Material.Concrete)
 	-- Where you arrive: a compass rose in the floor, a light at its heart.
 	local rose = at3(0, 0.86, D - 10)
 	disc(m, rose, 6.4, 0.06, SAGA)
@@ -1508,13 +1544,17 @@ local function shelter(parent, at: CFrame)
 			Vector3.new(if k % 2 == 0 then 11.4 else 7.4, 0.06, 0.36), SAGA)
 	end
 	disc(m, rose * CFrame.new(0, 0.05, 0), 1.1, 0.06, SAGA, Enum.Material.Neon)
-	part(m, at3(0, 0.83, (laneN + laneS) / 2), Vector3.new(W * 2 + 4, 0.06, laneS - laneN),
+	part(m, at3(0, 0.83, laneMid), Vector3.new(W * 2 + 4, 0.06, laneS - laneN),
 		Color3.fromRGB(36, 38, 44), Enum.Material.Slate)
-	for x = -78, 78, 12 do
-		part(m, at3(x, 0.88, (laneN + laneS) / 2), Vector3.new(4, 0.06, 0.5), HAZARD, Enum.Material.SmoothPlastic)
+	for x = -72, 72, 24 do
+		part(m, at3(x, 0.88, laneMid), Vector3.new(4, 0.06, 0.5), HAZARD, Enum.Material.SmoothPlastic)
 	end
-	-- An apron out of the main door.
-	solid(part(m, at3(0, 0.4, D + 7), Vector3.new(SHELTER.Door * 2 + 10, 0.8, 10), CONCRETE, Enum.Material.Concrete))
+
+	-- Under the floor, the keel: a block set well in from the walls, down to
+	-- the quarry floor, so the space under the edges is open (the legs
+	-- stand clear in it) and nobody walks in under the hall.
+	local keel = SHELTER.Keel
+	solid(part(m, at3(0, -lift / 2, 0), Vector3.new((W + 2 - keel) * 2, lift, (D + 2 - keel) * 2), HULL_DARK, Enum.Material.Metal))
 
 	-- The walls, round the doors: each length, its centre, and whether it's
 	-- a lintel over a door (no plinth on those).
@@ -1532,37 +1572,85 @@ local function shelter(parent, at: CFrame)
 		local x = s * (W + 1)
 		wall(x, (-D - 2 + laneN) / 2, 2, laneN + D + 2, 0, H)
 		wall(x, (laneS + D + 2) / 2, 2, D + 2 - laneS, 0, H)
-		wall(x, (laneN + laneS) / 2, 2, laneS - laneN, SHELTER.LaneDoorHeight, H, true)
+		wall(x, laneMid, 2, laneS - laneN, SHELTER.LaneDoorHeight, H, true)
 	end
-	-- Bands along every length, proud of both faces: a dark plinth, a row of
-	-- windows, and an orange glow under the roof.
+	-- Bands along every length, proud of both faces: a dark plinth, and up
+	-- under the roof a band of rusted plate.
 	for _, l in lengths do
 		local thick = Vector3.new(if l.SX > 2 then l.SX else 2.5, 0, if l.SZ > 2 then l.SZ else 2.5)
 		if not l.Lintel then
 			part(m, at3(l.X, 1.6, l.Z), thick + Vector3.new(0, 3.2, 0), HULL_DARK, Enum.Material.Metal)
 		end
-		part(m, at3(l.X, 28, l.Z), thick + Vector3.new(0, 3, 0) - Vector3.new(if l.SX > 2 then 1 else 0, 0, if l.SZ > 2 then 1 else 0),
-			Color3.fromRGB(34, 62, 100), Enum.Material.Glass)
-		part(m, at3(l.X, 31.2, l.Z), thick + Vector3.new(0, 0.5, 0), ORANGE, Enum.Material.Neon)
+		part(m, at3(l.X, 29, l.Z), thick + Vector3.new(0, 4, 0) - Vector3.new(if l.SX > 2 then 1 else 0, 0, if l.SZ > 2 then 1 else 0),
+			RUST, Enum.Material.CorrodedMetal)
 	end
-	-- Ribs up the outside, and heavier corners.
-	for _, x in { -78, -56, -34, 34, 56, 78 } do
-		part(m, at3(x, (H + 1) / 2, D + 2.2), Vector3.new(2.6, H + 1, 2.4), HULL_DARK, Enum.Material.Metal)
+	-- Outside: a red running light under the band (the front's broken round
+	-- the name), and rusted plates set into the front either side of the door.
+	for _, s in { -1, 1 } do
+		part(m, at3(s * 55, 26.4, D + 2.2), Vector3.new(62, 0.4, 0.3), RED, Enum.Material.Neon)
+		part(m, at3(s * (W + 2.2), 26.4, 0), Vector3.new(0.3, 0.4, D * 2 + 4), RED, Enum.Material.Neon)
+		for _, x in { 43, 69 } do
+			part(m, at3(s * x, 13, D + 2.3), Vector3.new(22, 16, 0.6), RUST, Enum.Material.CorrodedMetal)
+		end
 	end
-	for x = -78, 78, 26 do
-		part(m, at3(x, (H + 1) / 2, -D - 2.2), Vector3.new(2.6, H + 1, 2.4), HULL_DARK, Enum.Material.Metal)
+	-- Heavy ribs up the outside; armoured towers at the corners, a red
+	-- beacon on each; and deeper ribs over the other legs (two at the front,
+	-- one each side), down to them. The legs come out of the towers and
+	-- those ribs.
+	for _, x in { -56, -30, 30, 56 } do
+		local leg = math.abs(x) == 56
+		part(m, at3(x, if leg then (H - 3) / 2 else (H + 1) / 2, D + 2.8), Vector3.new(if leg then 5 else 4, if leg then H + 5 else H + 1, 3.6),
+			HULL_DARK, Enum.Material.Metal)
+	end
+	for _, x in { -52, -26, 0, 26, 52 } do
+		part(m, at3(x, (H + 1) / 2, -D - 2.8), Vector3.new(4, H + 1, 3.6), HULL_DARK, Enum.Material.Metal)
 	end
 	for _, s in { -1, 1 } do
-		for _, z in { -54, -6, 22, 50 } do
-			part(m, at3(s * (W + 2.2), (H + 1) / 2, z), Vector3.new(2.4, H + 1, 2.6), HULL_DARK, Enum.Material.Metal)
+		for _, z in { -54, -6 } do
+			part(m, at3(s * (W + 2.8), (H + 1) / 2, z), Vector3.new(3.6, H + 1, 4), HULL_DARK, Enum.Material.Metal)
 		end
+		part(m, at3(s * (W + 3), (H - 3) / 2, 24), Vector3.new(4, H + 5, 6), HULL_DARK, Enum.Material.Metal)
 		for _, z in { -1, 1 } do
-			solid(part(m, at3(s * (W + 2), (H + 3) / 2, z * (D + 2)), Vector3.new(5, H + 3, 5), HULL_DARK, Enum.Material.Metal))
+			local tower = at3(s * (W + 2), H / 2, z * (D + 2))
+			solid(part(m, tower, Vector3.new(7, H + 8, 7), HULL_DARK, Enum.Material.Metal))
+			local beacon = part(m, tower * CFrame.new(0, (H + 8) / 2 + 0.5, 0), Vector3.new(1.4, 1, 1.4), RED, Enum.Material.Neon)
+			if z > 0 then
+				light(beacon, RED, 18, 0.8)
+			end
 		end
 	end
 
-	-- The roof, round a raised skylight over the hall: glass sides and a
-	-- glass top, edged in orange.
+	-- The legs: one out of each corner tower, one out of each side's middle
+	-- rib and two out of the front's, each a heavy thigh angled down and
+	-- out from high on the wall to its knee, a yellow piston to the knee
+	-- from under the floor's edge, and a shin down to a broad pad on the
+	-- quarry floor.
+	local feet = {}
+	local legs = {}
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			table.insert(legs, { Vector3.new(sx * (W + 2), 0, sz * (D + 2)), Vector3.new(sx, 0, sz).Unit })
+		end
+		table.insert(legs, { Vector3.new(sx * (W + 2), 0, 24), Vector3.new(sx, 0, 0) })
+		table.insert(legs, { Vector3.new(sx * 56, 0, D + 2), Vector3.new(0, 0, 1) })
+	end
+	for _, leg in legs do
+		local base, out = leg[1], leg[2]
+		local hip = base + out * 1.5 + Vector3.new(0, 9, 0)
+		local knee = base + out * 11 + Vector3.new(0, 6 - lift, 0)
+		local foot = base + out * 13 + Vector3.new(0, 1.2 - lift, 0)
+		solid(beam(hip, knee, 4.4, 3.4, ARMOR))
+		solid(beam(knee, foot, 3.4, 3.4, HULL_DARK))
+		part(m, at * CFrame.new(knee), Vector3.one * 4.4, STEEL, Enum.Material.Metal, "Ball")
+		strut(m, (at * CFrame.new(base + Vector3.new(0, -0.6, 0))).Position, (at * CFrame.new(knee)).Position, 0.7, HAZARD)
+		solid(disc(m, at3(foot.X, 0.6 - lift, foot.Z), 4.4, 1.2, HULL_DARK, Enum.Material.DiamondPlate))
+		table.insert(feet, at3(foot.X, -lift, foot.Z).Position)
+	end
+
+	-- The roof, round a raised skylight over the hall (its glass dulled,
+	-- tinted, so the hall's not a greenhouse); behind it, over the garage,
+	-- the upper deck, the barracks' second storey, with its two exhaust
+	-- stacks glowing red.
 	local roofY = H + 0.6
 	local sky = { X = 34, Z0 = -2, Z1 = 40 }
 	local function roof(x, z, sx, sz)
@@ -1573,24 +1661,34 @@ local function shelter(parent, at: CFrame)
 	for _, s in { -1, 1 } do
 		roof(s * (sky.X + (W + 2 - sky.X) / 2), (sky.Z0 + sky.Z1) / 2, W + 2 - sky.X, sky.Z1 - sky.Z0)
 	end
-	local glass = Color3.fromRGB(60, 110, 160)
+	local glass = Color3.fromRGB(70, 84, 100)
 	local skyMid = (sky.Z0 + sky.Z1) / 2
 	for _, z in { sky.Z0, sky.Z1 } do
-		part(m, at3(0, roofY + 4.4, z), Vector3.new(sky.X * 2, 8, 0.4), glass, Enum.Material.Glass, nil, { Transparency = 0.35 })
+		part(m, at3(0, roofY + 4.4, z), Vector3.new(sky.X * 2, 8, 0.4), glass, Enum.Material.Glass, nil, { Transparency = 0.4 })
 	end
 	for _, s in { -1, 1 } do
-		part(m, at3(s * sky.X, roofY + 4.4, skyMid), Vector3.new(0.4, 8, sky.Z1 - sky.Z0), glass, Enum.Material.Glass, nil, { Transparency = 0.35 })
+		part(m, at3(s * sky.X, roofY + 4.4, skyMid), Vector3.new(0.4, 8, sky.Z1 - sky.Z0), glass, Enum.Material.Glass, nil, { Transparency = 0.4 })
 	end
-	part(m, at3(0, roofY + 8.6, skyMid), Vector3.new(sky.X * 2 + 1, 0.4, sky.Z1 - sky.Z0 + 1), glass, Enum.Material.Glass, nil, { Transparency = 0.45 })
+	part(m, at3(0, roofY + 8.6, skyMid), Vector3.new(sky.X * 2 + 1, 0.4, sky.Z1 - sky.Z0 + 1), glass, Enum.Material.Glass, nil, { Transparency = 0.5 })
 	part(m, at3(0, roofY + 8.3, skyMid), Vector3.new(sky.X * 2, 0.8, 1), HULL_DARK, Enum.Material.Metal)
-	for _, z in { sky.Z0, sky.Z1 } do
-		part(m, at3(0, roofY + 8.9, z), Vector3.new(sky.X * 2 + 1.2, 0.4, 0.5), ORANGE, Enum.Material.Neon)
+	local deckTop = roofY + 9.6
+	solid(part(m, at3(0, roofY + 5.1, -40), Vector3.new(136, 9, 36), ARMOR, Enum.Material.Metal))
+	part(m, at3(0, roofY + 6, -21.7), Vector3.new(130, 2.6, 0.6), RUST, Enum.Material.CorrodedMetal)
+	part(m, at3(0, roofY + 2.2, -21.8), Vector3.new(128, 0.4, 0.4), RED, Enum.Material.Neon)
+	for _, s in { -1, 1 } do
+		local stack = at3(s * 40, deckTop + 5, -48)
+		part(m, stack, Vector3.new(9, 10, 8), HULL_DARK, Enum.Material.Metal)
+		part(m, stack * CFrame.new(0, 5.6, 0), Vector3.new(10, 1.2, 9), ARMOR, Enum.Material.Metal)
+		local glow = part(m, stack * CFrame.new(0, 6.3, 0), Vector3.new(7, 0.3, 6), RED, Enum.Material.Neon)
+		light(glow, RED, 22, 1)
+		part(m, stack * CFrame.new(0, 2.2, 4.05), Vector3.new(6.4, 1.2, 0.2), RED, Enum.Material.Neon)
 	end
-	-- Lights: three over the garage, four along the hall's sides, two hung
-	-- over the arena from the skylight.
+	-- Lights: work lights over the garage, amber lamps along the hall's
+	-- sides, two hung over the arena from the skylight, and warm panels down
+	-- each side of the skylight, so the hall is evenly lit without glare.
 	for _, x in { -48, 0, 48 } do
-		local lamp = part(m, at3(x, roofY - 0.9, (laneN + SHELTER.Barrier) / 2 - 8), Vector3.new(10, 0.4, 3), GLOW, Enum.Material.Neon)
-		light(lamp, Color3.fromRGB(220, 240, 255), 52, 1.2)
+		local lamp = part(m, at3(x, roofY - 0.9, (laneN + SHELTER.Barrier) / 2 - 8), Vector3.new(10, 0.4, 3), AMBER, Enum.Material.Neon)
+		light(lamp, Color3.fromRGB(255, 232, 200), 52, 1.2)
 	end
 	for _, s in { -1, 1 } do
 		for _, z in { 8, 44 } do
@@ -1600,26 +1698,69 @@ local function shelter(parent, at: CFrame)
 		local hung = part(m, at3(s * 14, 28, 18), Vector3.new(2.4, 1.2, 2.4), AMBER, Enum.Material.Neon, "Ball")
 		tube(m, hung.CFrame.Position, at3(s * 14, roofY + 8.2, 18).Position, 0.08, HULL_DARK)
 		light(hung, Color3.fromRGB(255, 196, 130), 40, 1.3)
-		-- Cool white panels down each side of the skylight, so the hall is
-		-- evenly lit and its corners aren't left in the dark.
 		for _, z in { -4, 20, 44 } do
-			local panel = part(m, at3(s * 46, roofY - 0.75, z), Vector3.new(12, 0.3, 4), Color3.fromRGB(236, 242, 255), Enum.Material.Neon)
-			light(panel, Color3.fromRGB(232, 240, 255), 42, 0.9)
+			local panel = part(m, at3(s * 46, roofY - 0.75, z), Vector3.new(10, 0.3, 3), Color3.fromRGB(255, 236, 206), Enum.Material.Neon)
+			light(panel, Color3.fromRGB(255, 238, 214), 42, 0.9)
 		end
 	end
 
-	-- The main door: hazard posts, a canopy edged in orange, the name over it,
-	-- and inside, over it, the way to the quarry.
+	-- The main door: hazard posts inside, and outside an armoured gatehouse
+	-- standing out over the landing (two piers and a lintel, lit red down
+	-- the piers' inner edges and under the lintel, a sloped brow on top),
+	-- the name over it, and inside, over the door, the way to the quarry.
+	local gate = { Out = 8, Pier = 9.4, Top = SHELTER.DoorHeight + 4 }
 	for _, s in { -1, 1 } do
 		part(m, at3(s * (SHELTER.Door + 1.2), SHELTER.DoorHeight / 2, D + 1), Vector3.new(2.4, SHELTER.DoorHeight, 2.8), HAZARD, Enum.Material.Metal)
+		solid(part(m, at3(s * (SHELTER.Door + gate.Pier / 2), gate.Top / 2, D + 2 + gate.Out / 2), Vector3.new(gate.Pier, gate.Top, gate.Out),
+			HULL_DARK, Enum.Material.Metal))
+		part(m, at3(s * (SHELTER.Door + 0.4), SHELTER.DoorHeight / 2 + 1, D + 2 + gate.Out + 0.06), Vector3.new(0.3, SHELTER.DoorHeight - 6, 0.12),
+			RED, Enum.Material.Neon)
 	end
-	part(m, at3(0, SHELTER.DoorHeight + 1.5, D + 6.5), Vector3.new(SHELTER.Door * 2 + 12, 1, 9), HULL_DARK, Enum.Material.Metal)
-	part(m, at3(0, SHELTER.DoorHeight + 1, D + 11), Vector3.new(SHELTER.Door * 2 + 12, 0.4, 0.4), ORANGE, Enum.Material.Neon)
-	local name = signPanel(m, facing(0, 29.5, D + 2.3, 0, 1), Vector3.new(48, 7, 0.4), "SAGA SHELTER",
-		"MECH GARAGE  ·  STORE  ·  MARKET  ·  KAIJU ARENA", SAGA)
+	part(m, at3(0, (SHELTER.DoorHeight + gate.Top) / 2, D + 2 + gate.Out / 2), Vector3.new(SHELTER.Door * 2, gate.Top - SHELTER.DoorHeight, gate.Out),
+		ARMOR, Enum.Material.Metal)
+	part(m, at3(0, gate.Top + 1.3, D + 3 + gate.Out / 2) * CFrame.Angles(0, math.pi, 0), Vector3.new((SHELTER.Door + gate.Pier) * 2 + 1, 2.6, gate.Out + 2),
+		HULL_DARK, Enum.Material.Metal, "Wedge")
+	part(m, at3(0, SHELTER.DoorHeight + 0.2, D + 2 + gate.Out + 0.1), Vector3.new(SHELTER.Door * 2, 0.4, 0.4), RED, Enum.Material.Neon)
+	local name = signPanel(m, facing(0, 31.3, D + 2.5, 0, 1), Vector3.new(48, 5.4, 0.4), "SAGA SHELTER",
+		"FORWARD OPERATING BASE  ·  MECH GARAGE  ·  STORE  ·  MARKET", SAGA)
 	light(name, SAGA, 24, 1)
 	signPanel(m, facing(0, 25, D - 0.2, 0, -1), Vector3.new(26, 3.2, 0.4), "TO THE QUARRY",
 		"MINE ROCKS  ·  KITE CRITTERS  ·  TAME KAIJU", GLOW)
+
+	-- The ramps: a wide one from the main door down to the quarry, and one
+	-- from each garage door for the mechs (lift over ShelterRamp studs: a
+	-- mech climbs it). Each runs out from a landing at the floor's height, the
+	-- top of its slope edged in hazard paint, hazard stripes down its sides;
+	-- red beacons mark the foot of the main one.
+	local ramps = {}
+	local function ramp(edge: Vector3, out: Vector3, landingHalf: number, rampHalf: number, beacons: boolean)
+		local up = Vector3.new(0, 1, 0)
+		local f = at * CFrame.fromMatrix(edge, out:Cross(up), up, -out)
+		local tall, landing, run = lift + 0.8, SHELTER.Landing, rules.ShelterRamp
+		solid(part(m, f * CFrame.new(0, 0.8 - tall / 2, -landing / 2), Vector3.new(landingHalf * 2, tall, landing), CONCRETE, Enum.Material.Concrete))
+		local slope = f * CFrame.new(0, 0.8 - tall / 2, -landing - run / 2)
+		solid(part(m, slope, Vector3.new(rampHalf * 2, tall, run), CONCRETE, Enum.Material.Concrete, "Wedge"))
+		part(m, f * CFrame.new(0, 0.83, -landing + 0.4), Vector3.new(rampHalf * 2, 0.06, 0.8), HAZARD, Enum.Material.SmoothPlastic)
+		for _, s in { -1, 1 } do
+			part(m, slope * CFrame.new(s * (rampHalf - 0.6), 0.08, 0) * CFrame.Angles(-math.atan2(tall, run), 0, 0),
+				Vector3.new(0.9, 0.2, math.sqrt(tall * tall + run * run)), HAZARD, Enum.Material.SmoothPlastic)
+			if beacons then
+				local beacon = part(m, f * CFrame.new(s * (rampHalf + 1.2), 0.8 - lift, -landing - run + 1), Vector3.new(1, 1.6, 1), RED, Enum.Material.Neon)
+				light(beacon, RED, 12, 0.7)
+			end
+		end
+		local length, wide = landing + run, math.max(landingHalf, rampHalf)
+		local middle = edge + out * (length / 2)
+		table.insert(ramps, {
+			Middle = at3(middle.X, -lift, middle.Z).Position,
+			Half = if math.abs(out.X) > 0.5 then Vector2.new(length / 2, wide) else Vector2.new(wide, length / 2),
+			SlopeHalf = rampHalf,
+		})
+	end
+	ramp(Vector3.new(0, 0, D + 2), Vector3.new(0, 0, 1), SHELTER.FrontRamp.Landing, SHELTER.FrontRamp.Ramp, true)
+	for _, s in { -1, 1 } do
+		ramp(Vector3.new(s * (W + 2), 0, laneMid), Vector3.new(s, 0, 0), SHELTER.LaneRamp, SHELTER.LaneRamp, false)
+	end
 
 	-- The garage: eight bays along the north wall, facing the lane.
 	local bays = { "Hauler", "Hauler", "Mole", "Mole", "Digger", "Skipper", "Skipper", "Skipper" }
@@ -1648,9 +1789,9 @@ local function shelter(parent, at: CFrame)
 		for _, z in { laneN - 1, laneS + 1 } do
 			part(m, at3(s * (W - 0.7), SHELTER.LaneDoorHeight / 2, z), Vector3.new(1.4, SHELTER.LaneDoorHeight, 1.4), HAZARD, Enum.Material.Metal)
 		end
-		part(m, at3(s * (W + 1), SHELTER.LaneDoorHeight + 1.4, (laneN + laneS) / 2) * CFrame.Angles(0, math.rad(90), 0),
+		part(m, at3(s * (W + 1), SHELTER.LaneDoorHeight + 1.4, laneMid) * CFrame.Angles(0, math.rad(90), 0),
 			Vector3.new(laneS - laneN, 2.6, 2.6), HULL_DARK, Enum.Material.Metal, "Cylinder")
-		signPanel(m, facing(s * (W - 0.4), SHELTER.LaneDoorHeight + 3.4, (laneN + laneS) / 2, -s, 0),
+		signPanel(m, facing(s * (W - 0.4), SHELTER.LaneDoorHeight + 3.4, laneMid, -s, 0),
 			Vector3.new(10, 2.6, 0.4), "EXIT", nil, Color3.fromRGB(90, 255, 140))
 		for _, z in { -57, -53.5 } do
 			part(m, at3(s * 80.5, 2.1, z) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(2.6, 2.4, 2.4),
@@ -1666,13 +1807,13 @@ local function shelter(parent, at: CFrame)
 	web(m, at3(-W + 3, 28, -D + 3) * CFrame.Angles(0, math.rad(45), 0), 3.4)
 
 	-- The kaiju arena: a stage edged in glow, two tiers of stands open to the
-	-- door and the garage, pylons, and its sign over the way in.
+	-- door and the garage (plain plate, no trim), pylons, and its sign over
+	-- the way in.
 	local arena = at3(0, 0.8, 18)
 	solid(disc(m, arena * CFrame.new(0, 0.5, 0), 12.6, 1, ORANGE, Enum.Material.Neon))
 	solid(disc(m, arena * CFrame.new(0, 0.75, 0), 12, 1.5, Color3.fromRGB(46, 40, 60), Enum.Material.Slate))
 	part(m, arena * CFrame.new(0, 1.52, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.06, 10, 10), VIOLET,
 		Enum.Material.Neon, "Cylinder", { Transparency = 0.35 })
-	-- (Pale steel, each tier's front edge lit violet.)
 	for tier, spec in { { 16, 1.6 }, { 19.5, 3.2 } } do
 		local r, h = spec[1], spec[2]
 		for k = 0, 11 do
@@ -1680,9 +1821,8 @@ local function shelter(parent, at: CFrame)
 			if math.abs(math.cos(a)) >= 0.3 then
 				local seat = arena * CFrame.new(math.cos(a) * r, h / 2, math.sin(a) * r) * CFrame.Angles(0, math.pi / 2 - a, 0)
 				local length = 2 * math.pi * r / 12 - 0.6
-				solid(part(m, seat, Vector3.new(length, h, 3), if tier == 1 then Color3.fromRGB(176, 182, 196) else Color3.fromRGB(112, 118, 134),
+				solid(part(m, seat, Vector3.new(length, h, 3), if tier == 1 then Color3.fromRGB(110, 114, 124) else Color3.fromRGB(82, 86, 96),
 					Enum.Material.Metal))
-				part(m, seat * CFrame.new(0, h / 2 - 0.12, -1.52), Vector3.new(length, 0.2, 0.1), VIOLET, Enum.Material.Neon)
 			end
 		end
 	end
@@ -1742,6 +1882,7 @@ local function shelter(parent, at: CFrame)
 			"3  Your kaiju fight beside you. Heal them once you're clear.",
 			"4  Mechs wait in the garage: hop in, drive out either door.",
 			"5  Invite friends for reward coupons (INVITE).",
+			"6  Questions? INFO-9, by the arena, has answers and tips.",
 		}, "\n")
 		body.Parent = gui
 	end
@@ -1750,27 +1891,27 @@ local function shelter(parent, at: CFrame)
 	signPanel(m, facing(36, 21.5, 46, -0.7, 0.7), Vector3.new(18, 4, 0.4), "1V1 ARENA UPLINK",
 		"WIN STREAKS RESTORE YOUR SWINGS", Color3.fromRGB(255, 90, 110))
 
-	-- Halloween at the door: giant pumpkins (one in a witch's hat), little
-	-- ones, lights along the front, bats on the roof and a ghost.
+	-- Halloween at the door: giant pumpkins (one in a witch's hat) on the
+	-- quarry floor either side of the landing, little ones by them, lights
+	-- strung along the gatehouse, bats on the roof and a ghost.
 	for _, s in { -1, 1 } do
-		local giant = at3(s * 24, 0, D + 10) * CFrame.Angles(0, s * -.3, 0)
+		local giant = at3(s * 36, -lift, D + 8) * CFrame.Angles(0, s * -.3, 0)
 		pumpkin(m, giant, 3.2, nil)
 		if s < 0 then
 			witchHat(m, giant * CFrame.new(0, 3.2 * 1.75, 0) * CFrame.Angles(0, 0, -.15), 3.2)
 		end
-		pumpkin(m, at3(s * 31, 0, D + 13) * CFrame.Angles(0, s * .4, 0), 1.1, nil)
-		pumpkin(m, at3(s * 18.5, 0, D + 14) * CFrame.Angles(0, s * -.5, 0), .6, "Pearl")
+		pumpkin(m, at3(s * 41, -lift, D + 16) * CFrame.Angles(0, s * .4, 0), 1.1, nil)
 		for _, x in { 40, 70 } do
 			bat(m, at3(s * x, roofY + 1.6, D + 2) * CFrame.Angles(0, x * .1, .2))
 		end
 	end
-	stringLights(m, at3(-36, 26.6, D + 2.6).Position, at3(36, 26.6, D + 2.6).Position, 1.8, 13)
+	stringLights(m, at3(-23, 21.4, D + 2 + gate.Out + 0.6).Position, at3(23, 21.4, D + 2 + gate.Out + 0.6).Position, 1, 9)
 	ghost(m, at3(-40, 15, D + 9) * CFrame.Angles(0, -.3, -.1), 1.2)
 	pumpkin(m, at3(-20, 0.8, D - 6) * CFrame.Angles(0, math.pi + .3, 0), 1.5)
 	pumpkin(m, at3(20, 0.8, D - 6) * CFrame.Angles(0, math.pi - .3, 0), 1.3, "Pearl")
 	-- Bunting across the hall.
 	for _, z in { 2, 34 } do
-		bunting(m, at3(-W + 1, 27, z).Position, at3(W - 1, 27, z).Position, 3, 11, at:VectorToWorldSpace(Vector3.new(0, 0, 1)))
+		bunting(m, at3(-W + 1, 27, z).Position, at3(W - 1, 27, z).Position, 3, 9, at:VectorToWorldSpace(Vector3.new(0, 0, 1)))
 	end
 	-- The Moon Garden on the west side of the hall, the Gem Gallery on the
 	-- east, in front of the leaderboard.
@@ -1778,11 +1919,12 @@ local function shelter(parent, at: CFrame)
 	gemGallery(m, at3(30, 0.86, 4))
 
 	-- The crew: the old town's shopkeepers, each by the station they run
-	-- now (OutpostServer builds them, Shared.Vendors has their lines).
-	-- They stand beside their counters, not at them, so their Talk prompt
-	-- and the counter's don't sit on top of each other. Ilsa buys gems at a
-	-- desk in the Gem Gallery, the cases behind: a pale-topped counter lit
-	-- gold along its front edge, its name on the front, a balance on top.
+	-- now (OutpostServer builds them, Shared.Vendors has their lines), and
+	-- INFO-9, the info rep, by its kiosk. They stand beside their counters,
+	-- not at them, so their Talk prompt and the counter's don't sit on top
+	-- of each other. Ilsa buys gems at a desk in the Gem Gallery, the cases
+	-- behind: a pale-topped counter lit gold along its front edge, its name
+	-- on the front, a balance on top.
 	local gold = GALLERY_COLORS[5]
 	local desk = at3(31, 0.86, 4)
 	solid(part(m, desk * CFrame.new(0, 1.7, 0), Vector3.new(2.4, 3.4, 8), HULL_DARK, Enum.Material.Metal))
@@ -1808,6 +1950,12 @@ local function shelter(parent, at: CFrame)
 	for _, dz in { -1.3, 1.3 } do
 		disc(m, desk * CFrame.new(0, 4.75, 2 + dz), 0.6, 0.1, gold, Enum.Material.Metal)
 	end
+	-- INFO-9's kiosk, between the arena and the door, facing where players
+	-- arrive: a post with a screen on top.
+	local kiosk = facingPoint(at3(18.5, 0.86, 38).Position, at3(0, 0.86, D - 10).Position)
+	solid(part(m, kiosk * CFrame.new(0, 2.2, 0), Vector3.new(1.6, 4.4, 1.2), HULL_DARK, Enum.Material.Metal))
+	local screen = signPanel(m, kiosk * CFrame.new(0, 5.7, 0), Vector3.new(5, 2.6, 0.3), "INFO", "FAQS  ·  TIPS", GLOW)
+	light(screen, GLOW, 12, 0.6)
 	local function stand(x, z, tx, tz)
 		return facingPoint(at3(x, 0.86, z).Position, at3(tx, 0.86, tz).Position)
 	end
@@ -1817,6 +1965,7 @@ local function shelter(parent, at: CFrame)
 		{ Id = "Broker", CFrame = stand(-61, 52, 0, 52) }, -- Tamsin, by the Market
 		{ Id = "Outfitter", CFrame = stand(-58, 25.5, 0, 25.5) }, -- Borin, by the Store's suits
 		{ Id = "Foreman", CFrame = stand(-24.5, 49, 0, 50) }, -- Garrick, by the door
+		{ Id = "InfoBot", CFrame = stand(15, 41, 0, D - 10) }, -- INFO-9, by its kiosk
 	}
 
 	local spawnAt = at3(0, 3.5, D - 10).Position
@@ -1830,6 +1979,8 @@ local function shelter(parent, at: CFrame)
 		Market = market,
 		Crew = crew,
 		Box = Vector2.new(W + 4, D + 4),
+		Ramps = ramps,
+		Feet = feet,
 	}
 end
 
@@ -1862,7 +2013,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			{ -70, 100, 15 },
 			{ 95, -20, 8 },
 			{ -110, -40, 7 },
-			{ 20, 100, 13 },
+			{ 48, 150, 12 },
 			{ -110, -50, 10 },
 			{ 200, -260, 24 },
 			{ -230, -150, 18 },
@@ -1928,8 +2079,11 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		mast(roads, at * CFrame.new(math.cos(a) * 275, 0, math.sin(a) * 275), if i % 2 == 0 then SAGA else GLOW)
 	end
 
-	-- The Shelter in the middle: the lobby, the mech garage, the stations.
-	local home = shelter(root, at)
+	-- The Shelter in the middle, up on its legs: the lobby, the mech
+	-- garage, the stations.
+	local rules = assert(OutpostWorld.Rules, "OutpostWorld needs Shared.Outpost")
+	local lift = rules.ShelterLift
+	local home = shelter(root, at * CFrame.new(0, lift, 0), rules)
 	local parking = home.Parking
 
 	-- Old workings out in the quarry: a second drill rig and container stacks.
@@ -2136,8 +2290,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			end
 		end
 	end
-	-- Fuel tanks to the east, with a gantry (clear of the garage's east door).
-	local tanks = at * CFrame.new(150, 0, -20)
+	-- Fuel tanks to the east, with a gantry (clear of the garage's east
+	-- door and of the way down its ramp).
+	local tanks = at * CFrame.new(160, 0, 10)
 	for i, t in { { -7, 0, 8 }, { 7, 0, 8 }, { 0, 11, 6 } } do
 		local tankAt = tanks * CFrame.new(t[1], 0, t[2])
 		solid(
@@ -2240,7 +2395,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ (north * CFrame.new(72, 0, -14)).Position, 18 },
 		{ padAt.Position, 40 },
 		{ (at * CFrame.new(-150, 0, 40)).Position, 30 },
-		{ (at * CFrame.new(150, 0, -20)).Position, 24 },
+		{ (at * CFrame.new(160, 0, 10)).Position, 24 },
 		{ (at * CFrame.new(-108, 0, 22)).Position, 10 },
 		{ rigAt.Position, 16 },
 		-- (the container stacks out in the quarry)
@@ -2261,6 +2416,13 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	for _, p in benchRamps do
 		table.insert(keepOut, { p, 40 })
 	end
+	-- (and off the Shelter's ramps, and clear of its feet)
+	for _, r in home.Ramps do
+		table.insert(keepOut, { r.Middle, math.sqrt(r.Half.X ^ 2 + r.Half.Y ^ 2) + 4 })
+	end
+	for _, foot in home.Feet do
+		table.insert(keepOut, { foot, 8 })
+	end
 	-- Off the roads too (distance from each road's centre line).
 	local function onRoad(p: Vector3): boolean
 		for _, line in roadLines do
@@ -2276,9 +2438,10 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local spots = {}
 	local arrivalSpots = {}
 	-- The welcome rocks: two loose clusters right outside the Shelter's door,
-	-- flanking a clear lane out to the quarry.
-	for _, p in { { -15, 84 }, { 15, 84 }, { -27, 96 }, { 27, 96 },
-		{ -15, 108 }, { 15, 108 }, { -30, 122 }, { 30, 122 } } do
+	-- beside its ramp down and past its foot, flanking a clear lane out to
+	-- the quarry.
+	for _, p in { { -27, 80 }, { 27, 80 }, { -30, 96 }, { 30, 96 },
+		{ -16, 126 }, { 16, 126 }, { -28, 138 }, { 28, 138 } } do
 		table.insert(spots, at * CFrame.new(p[1], 0, p[2]))
 		table.insert(arrivalSpots, #spots)
 	end
@@ -2424,7 +2587,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Spawn = home.Spawn,
 		Stations = { Store = home.Store, Market = home.Market },
 		Crew = home.Crew,
-		Shelter = { Box = home.Box },
+		Shelter = { Box = home.Box, Lift = lift, Ramps = home.Ramps, Feet = home.Feet },
 		Probe = probeScreen,
 		Board = face,
 		Gate = gatePad,

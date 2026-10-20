@@ -57,6 +57,7 @@ source += r'''
 local origin=CFrame.new(0,0,7000)
 -- (Its outcrops and Rift Veins come from Shared.Frontier, handed in as the server finds it.)
 World.Frontier=Frontier
+World.Rules=Rules
 local site=World.build(origin,{})
 assert(site.Model.Landscape=="Moon Quarry" and site.Model.SkySetting=="MoonBase")
 assert(#site.Secrets==0 and #site.FieldSpots==0,"Retired extras returned")
@@ -64,12 +65,17 @@ assert(#site.Secrets==0 and #site.FieldSpots==0,"Retired extras returned")
 -- its stations and services are all under its roof.
 local box=site.Shelter.Box
 local function inShelter(p) return math.abs(p.X)<box.X and math.abs(p.Z)<box.Y end
-assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7050 and site.Spawn.Position.Y==3.5,"Spawn isn't inside the Shelter's door")
+assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7050 and site.Spawn.Position.Y==3.5+Rules.ShelterLift,"Spawn isn't inside the Shelter's door, on its floor")
 assert(site.Spawn.LookVector.Z<-.99,"Spawn doesn't face into the Shelter")
 assert(#site.ArrivalSpots==8,"Welcome mining field missing")
+-- (beside the ramp down from the door, or past its foot, off the lane out)
+local front=site.Shelter.Ramps[1]
+local frontMid=front.Middle-origin.Position
 for _,index in site.ArrivalSpots do
  local p=site.Spots[index].Position-origin.Position
- assert(p.Z>box.Y and math.abs(p.X)>=14 and math.abs(p.X)<=30,"Welcome nodes aren't outside the door, or block the lane out")
+ local beside=math.abs(p.X)>=front.SlopeHalf+6 and p.Z<frontMid.Z+front.Half.Y
+ local past=p.Z>=frontMid.Z+front.Half.Y+8 and math.abs(p.X)>=14
+ assert(p.Z>box.Y and math.abs(p.X)<=30 and (beside or past),"Welcome nodes aren't outside the door, or block the ramp or the lane out")
 end
 assert(site.Probe.Name=="ProbeScreen" and site.Board.Name=="BoardFace" and site.Gate.Name=="GatePad","Missing lobby services")
 for _,service in {site.Probe,site.Board,site.Gate,site.Stations.Store,site.Stations.Market} do
@@ -150,6 +156,30 @@ for _,p in builtParts do
 end
 assert(rim>1000 and skyModel and skyModel.ModelStreamingMode=="Persistent","Crater rim or sky missing or streamed")
 assert(#builtParts<4000,"Quarry scenery budget exceeded")
+-- The Shelter up on its legs: three solid ramps (the rules' slope, from its
+-- floor's height down to the quarry floor: a mech climbs it), and every
+-- one of its eight feet on the ground.
+assert(site.Shelter.Lift==Rules.ShelterLift and #site.Shelter.Ramps==3 and #site.Shelter.Feet==8,"The Shelter's lift, ramps or legs")
+local slopes={}
+for _,p in builtParts do
+ if p.Parent and p.Parent.Name=="Shelter" and p.ClassName=="WedgePart" and p.CanCollide and math.abs(p.Size.Z-Rules.ShelterRamp)<.001 then
+  assert(math.abs(p.Size.Y-(Rules.ShelterLift+.8))<.001 and math.abs(p.CFrame.Position.Y-p.Size.Y/2-origin.Position.Y)<.001,"A ramp that doesn't run from the floor to the ground")
+  table.insert(slopes,p)
+ end
+end
+assert(#slopes==3,"The Shelter's ramps aren't all there: "..#slopes)
+for _,foot in site.Shelter.Feet do assert(math.abs(foot.Y-origin.Position.Y)<.001,"A leg doesn't reach the ground") end
+-- (no rock on a ramp: every spot 2 studs clear of each slope)
+local function onSlope(q)
+ for _,w in slopes do
+  local d=q-w.CFrame.Position
+  local x=d.X*w.CFrame.r[1]+d.Z*w.CFrame.r[7]
+  local z=d.X*w.CFrame.r[3]+d.Z*w.CFrame.r[9]
+  if math.abs(x)<w.Size.X/2+2 and math.abs(z)<w.Size.Z/2+2 then return true end
+ end
+ return false
+end
+for _,spot in site.Spots do assert(not onSlope(spot.Position),"A rock on the Shelter's ramp") end
 local veins={}
 for v,vein in site.Veins do for _,index in vein.Spots do veins[index]=v end end
 for i,spot in site.Spots do
@@ -217,7 +247,9 @@ for _,bay in site.Parking do
  for _,name in {"Waist","LeftHip","LeftKnee","LeftAnkle","RightHip","RightKnee","RightAnkle","LeftShoulder","LeftElbow","RightShoulder","RightElbow"} do
   assert(joints[name],"Missing animated joint: "..name)
  end
- assert(seat.Position.Y>8 and seat.Position.Y<14,"Cockpit outside frame")
+ -- (Heights over the quarry floor's, less the Shelter's lift: the garage is up on its legs.)
+ local floorY=origin.Position.Y+Rules.ShelterLift
+ assert(seat.Position.Y-floorY>8 and seat.Position.Y-floorY<14,"Cockpit outside frame")
  local total=0
  for _,part in builtParts do
   if part.Parent==vehicle then
@@ -228,7 +260,7 @@ for _,bay in site.Parking do
  end
  assert(total>120 and total<240,"Mech detail budget changed: "..total)
  local bottom=vehicle.PrimaryPart.Position.Y-vehicle.PrimaryPart.Size.Y/2
- assert(bottom>=.8,"Vehicle spawned in Motor Pool floor")
+ assert(bottom>=floorY+.8,"Vehicle spawned in Motor Pool floor")
  assert((bay.CFrame.Position-origin.Position).Magnitude<Rules.Radius,"Vehicle outside recovery boundary")
 end
 assert(counts.Hauler==2 and counts.Mole==2 and counts.Digger==1 and counts.Skipper==3,"Original vehicle mix changed")
@@ -413,6 +445,7 @@ local bloom,grade=Lighting:FindFirstChildOfClass("BloomEffect"),Lighting:FindFir
 assert(bloom and bloom.Intensity==finish.Bloom.Intensity and bloom.Threshold==finish.Bloom.Threshold,"No soft bloom on the Outpost")
 assert(grade and grade.Brightness==0 and grade.Contrast==finish.Grade.Contrast and grade.Saturation==finish.Grade.Saturation,"No grade on the Outpost")
 assert(finish.Bloom.Intensity<=0.5 and finish.Grade.Contrast<=0.15 and finish.Grade.Saturation<=0.15,"The finish is overdone")
+assert(finish.Specular<=0.2 and Lighting.EnvironmentSpecularScale==finish.Specular,"The Outpost's metal shines")
 -- (A daytime visit's effects in their place.)
 for _,kind in {"Atmosphere","ColorCorrectionEffect","SunRaysEffect","BloomEffect"} do
  for i=#Lighting.Children,1,-1 do if Lighting.Children[i].ClassName==kind then table.remove(Lighting.Children,i) end end

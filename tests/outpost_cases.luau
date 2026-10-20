@@ -342,6 +342,7 @@ local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
 -- (Its trails come from Shared.Frontier, handed in as the server would find it.)
 local Frontier = load("src/shared/Frontier.luau", "Frontier", {})
 World.Frontier = Frontier
+World.Rules = Rules
 -- The Shelter's crew: Builder.vendor's robots, recorded where they're built.
 local Vendors = load("src/shared/Vendors.luau", "Vendors", {})
 local crewBuilt = {}
@@ -542,13 +543,22 @@ for kind, counter in { Store = site.Stations.Store, Market = site.Stations.Marke
 	local prompt = counter:FindFirstChildOfClass("ProximityPrompt")
 	check(prompt and prompt:GetAttribute("PromptKind") == kind, "The Shelter's " .. kind .. " has no prompt")
 end
--- The Shelter's crew: the old town's shopkeepers, each built where the
--- Shelter puts them, in its hall (south of the garage's barrier), clear of
--- each other, the counters, the Uplink's pad and where players arrive.
--- Every line they offer is a reply or an action the dialogue knows.
+-- The Shelter's crew: the old town's shopkeepers and INFO-9, the info rep,
+-- each built where the Shelter puts them, on its floor (up on its legs), in
+-- its hall (south of the garage's barrier), clear of each other, the
+-- counters, the Uplink's pad and where players arrive. Every line they
+-- offer is a reply, an action the dialogue knows, or a topic of those; and
+-- every one of INFO-9's lines and tips is in the Spanish table.
 do
-	local OG = { GemBuyer = "Ilsa", ArenaMaster = "Brutus", Broker = "Tamsin", Outfitter = "Borin", Foreman = "Garrick" }
-	check(#crewBuilt == 5 and #site.Crew == 5, "The Shelter's crew isn't all there: " .. #crewBuilt)
+	local OG = {
+		GemBuyer = "Ilsa",
+		ArenaMaster = "Brutus",
+		Broker = "Tamsin",
+		Outfitter = "Borin",
+		Foreman = "Garrick",
+		InfoBot = "INFO-9",
+	}
+	check(#crewBuilt == 6 and #site.Crew == 6, "The Shelter's crew isn't all there: " .. #crewBuilt)
 	local dialogue = fs.readFile(ROOT .. "/src/client/Dialogue.client.luau")
 	local function flat(p)
 		local q = p - Rules.Location.Position
@@ -567,25 +577,66 @@ do
 		check(built.Parent.Name == "Crew" and built.Parent.Parent == site.Model, built.Id .. " isn't in the Outpost's Crew")
 		local p = flat(built.Frame.Position)
 		check(math.abs(p.X) < box.X - 8 and p.Z > -14 and p.Z < box.Y - 8, built.Id .. " stands outside the Shelter's hall")
-		check(math.abs(built.Frame.Position.Y - (Rules.Location.Position.Y + 0.86)) < 0.01, built.Id .. " isn't on the floor")
+		check(
+			math.abs(built.Frame.Position.Y - (Rules.Location.Position.Y + Rules.ShelterLift + 0.86)) < 0.01,
+			built.Id .. " isn't on the floor"
+		)
 		for _, k in keep do
 			check((p - k[1]).Magnitude >= k[2], built.Id .. " stands on " .. k[3])
 		end
 		for j = i + 1, #crewBuilt do
 			check((p - flat(crewBuilt[j].Frame.Position)).Magnitude > 12, built.Id .. " stands on top of " .. crewBuilt[j].Id)
 		end
-		for _, option in info.Options do
-			check(
-				(option.Reply ~= nil) ~= (option.Action ~= nil),
-				built.Id .. "'s option needs a reply or an action: " .. option.Text
-			)
-			if option.Action then
-				check(
-					string.find(dialogue, "function actions." .. option.Action .. "()", 1, true) ~= nil,
-					"The dialogue can't do " .. built.Id .. "'s " .. option.Action
-				)
+		local function walk(options, topic)
+			for _, option in options do
+				local kinds = (if option.Reply then 1 else 0)
+					+ (if option.Action then 1 else 0)
+					+ (if option.Options then 1 else 0)
+				check(kinds == 1, built.Id .. "'s option needs a reply, an action or a topic: " .. option.Text)
+				check(not (topic and option.Options), built.Id .. "'s topic has a topic in it: " .. option.Text)
+				if option.Action then
+					check(
+						string.find(dialogue, "function actions." .. option.Action .. "()", 1, true) ~= nil,
+						"The dialogue can't do " .. built.Id .. "'s " .. option.Action
+					)
+				end
+				if option.Options then
+					-- (with Back, a topic fits the dialogue's five rows)
+					check(
+						#option.Options >= 1 and #option.Options <= 4,
+						built.Id .. "'s topic is too long: " .. option.Text
+					)
+					walk(option.Options, true)
+				end
 			end
 		end
+		check(#info.Options <= 4, built.Id .. " offers too many options for the dialogue's five rows")
+		walk(info.Options, false)
+	end
+	local Lang = load("src/shared/Lang.luau", "Lang", {})
+	local LangEs = load("src/shared/LangEs.luau", "LangEs", {})
+	local function spanish(text)
+		check(LangEs[(Lang.normalize(text))] ~= nil, "No Spanish for INFO-9's " .. text)
+	end
+	local bot = Vendors.InfoBot
+	spanish(bot.Greeting)
+	spanish(string.upper(bot.Name .. " // " .. bot.Role))
+	spanish(bot.Name .. ", " .. bot.Role)
+	spanish("What would you like to know?")
+	spanish("Back")
+	local function lines(options)
+		for _, option in options do
+			spanish(option.Text)
+			if option.Reply then
+				spanish(option.Reply)
+			end
+			lines(option.Options or {})
+		end
+	end
+	lines(bot.Options)
+	check(#Vendors.Tips >= 10, "INFO-9 is short of tips")
+	for _, tip in Vendors.Tips do
+		spanish(tip)
 	end
 end
 -- Players arrive inside the Shelter, its mechs parked in the garage.

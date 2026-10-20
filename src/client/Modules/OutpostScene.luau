@@ -1884,14 +1884,16 @@ end)
 -- cross from band to band.
 RiftTear.start()
 FrontierHud.start()
+-- (The Shelter's frame: the quarry's, lifted onto its legs.)
+local shelterFrame = Rules.Location * CFrame.new(0, Rules.ShelterLift, 0)
 RunService.RenderStepped:Connect(function(dt)
 	-- The rift in the sky, the Shelter's life (the hologram, the gallery's
 	-- gems, the drones), the Store's stands and the quarry's life (road
 	-- lights, searchlights, meteors, the lifter) show only while you're here.
 	if active then
 		SkyRift.mount(Rules.Location)
-		ShelterLife.mount(Rules.Location)
-		StoreDisplays.mount(Rules.Location)
+		ShelterLife.mount(shelterFrame)
+		StoreDisplays.mount(shelterFrame)
 		QuarryLife.mount(Rules.Location)
 	end
 	SkyRift.show(active)

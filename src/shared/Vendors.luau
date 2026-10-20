@@ -1,12 +1,14 @@
 -- The townsfolk who stand outside each shop. The server builds a robot for
 -- each entry; the client shows its dialogue when a player talks to it.
 --
--- Each option either has a Reply (text shown back) or an Action the client
+-- Each option either has a Reply (text shown back), an Action the client
 -- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
 -- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "RigManeuvers";
--- and for the Saga Shelter's crew, "Appraise", "Store", "Market" or "Duels".
+-- for the Saga Shelter's crew, "Appraise", "Store", "Market", "Duels" or
+-- "Tip" (INFO-9's next one, from Vendors.Tips) - or Options of its own: a
+-- topic, its questions shown in place of the menu (with a way back).
 
-export type Option = { Text: string, Reply: string?, Action: string? }
+export type Option = { Text: string, Reply: string?, Action: string?, Options: { Option }? }
 export type Vendor = {
 	Name: string,
 	Role: string,
@@ -234,5 +236,104 @@ Vendors.Foreman = crew(
 		},
 	}
 )
+
+-- INFO-9, the Shelter's info rep: a robot by its kiosk near the door, with
+-- answers to what new miners ask (by topic) and a tip or an insight about
+-- the game whenever you want one. Its answers keep to the rules as they are
+-- (Shared.GemRoller's odds, Shared.Kaiju's healing and revives, the swing
+-- refills): change those and change these.
+Vendors.InfoBot = {
+	Name = "INFO-9",
+	Role = "Info Rep",
+	Color = Color3.fromRGB(120, 226, 255),
+	Tunic = Color3.fromRGB(44, 72, 92),
+	Face = "^-^",
+	Greeting = "INFO-9, info rep. Ask me anything about the moon, or take a tip: I know a lot of them.",
+	Options = {
+		{ Text = "Give me a tip", Action = "Tip" },
+		{
+			Text = "Mining and gems",
+			Options = {
+				{
+					Text = "How does mining work?",
+					Reply = "Walk up to a rock and swing. Every rock you break pays one gem, and the rocks grow back. Bigger rocks take more swings and hide better finds.",
+				},
+				{
+					Text = "What are the odds?",
+					Reply = "From any rock: Common 60%, Uncommon 25%, Rare 11%, Ultra-Rare 3.5% and Legendary 0.5%. Luck tilts them rarer.",
+				},
+				{
+					Text = "Why mine further out?",
+					Reply = "Luck. Round the Shelter is the Core, safe and plain. Past 150 studs, the Fringe adds luck to every gem, past 300 the Edge adds more. Rift critters come with it.",
+				},
+				{
+					Text = "What do I do with spare gems?",
+					Reply = "Sell them to Ilsa at the Gem Gallery for coins, list them on the Market, or feed them to your kaiju to heal them.",
+				},
+			},
+		},
+		{
+			Text = "Kaiju",
+			Options = {
+				{
+					Text = "How do kaiju fight?",
+					Reply = "Your team of three follows you and fights by itself: they split up the critters and flank them. They level up while you mine, too.",
+				},
+				{
+					Text = "How do I heal them?",
+					Reply = "Out of danger, open the kaiju panel's HEAL tab and give them gems: the rarer, the more it heals, and a gem of their own element heals twice as much. AUTO HEAL spends Commons first, then Uncommons.",
+				},
+				{
+					Text = "One got knocked out",
+					Reply = "It comes back by itself after a cooldown, longer the higher its level, weak at 15% health: heal it with gems. Or revive it now for Robux, at half health.",
+				},
+				{
+					Text = "How do kaiju battles work?",
+					Reply = "Tap KAIJU on another miner's card. You both get 15 seconds to place your kaiju: sturdy ones in the front row, a Razorback shooting from the back. Then they fight it out by themselves.",
+				},
+			},
+		},
+		{
+			Text = "Swings, mechs and more",
+			Options = {
+				{
+					Text = "My swings ran out",
+					Reply = "Your free pick gets a swing back every 12 seconds, full again in two hours. PROBE-7 sells refills, and 1v1 win streaks at the Arena Uplink restore swings.",
+				},
+				{
+					Text = "How do I tame a wild kaiju?",
+					Reply = "Challenge one out in the quarry and wear it down to half health without knocking it out: it glows gold. Then cast your tame and hold it. Get hit or wander off and the cast breaks.",
+				},
+				{
+					Text = "Can I drive a mech?",
+					Reply = "Hop in at any bay in the garage and drive down either garage ramp. Mechs are for getting around: they don't mine or fight.",
+				},
+				{
+					Text = "What do invites give?",
+					Reply = "Invite a friend (INVITE) and when they join you get one of each reward coupon: a swing restore, a kaiju revive and double XP.",
+				},
+			},
+		},
+	},
+}
+
+-- INFO-9's tips and insights, given in turn from a random start ("Tip").
+Vendors.Tips = {
+	"Bigger rocks take more swings but hide better finds. A Star Geode brings luck of its own.",
+	"The further from the Shelter you mine, the luckier your gems: the Fringe and the Edge add luck to every find.",
+	"Three Rift Veins glow by the crater walls, and they move now and then. One of them is guarded: bring your whole team.",
+	"The longer you mine out past the Core, the more rift critters come through. Keep your kaiju close.",
+	"Your kaiju can't take gems mid-fight: heal them once you're out of danger.",
+	"A gem of your kaiju's own element heals it twice as much.",
+	"With AUTO HEAL on, your kaiju eat your spare Commons first, then Uncommons, and never your best gems.",
+	"Kaiju level up while you mine, even when they aren't fighting.",
+	"Razorbacks are shooters: in a kaiju battle, put them in the back row.",
+	"Bulwarks and Carapaces soak up hits: put them in the front row of a battle formation.",
+	"Win streaks in 1v1s bring your swings back. A loss ends the run, so pick your fights.",
+	"Your free pick keeps refilling itself: a swing at a time, full again in two hours.",
+	"Skins are looks only: they never change your stats or your gems.",
+	"Ilsa never offers for the gems your loadouts use, so selling your spares is safe.",
+	"Mechs climb the garage ramps: drive out either garage door into the quarry.",
+}
 
 return Vendors

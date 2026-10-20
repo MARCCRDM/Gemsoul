@@ -29,6 +29,7 @@ local Frontier = load("/src/shared/Frontier.luau", "Frontier")
 local Outpost = load("/src/shared/Outpost.luau", "Outpost")
 local W = load("/src/server/World/OutpostWorld.luau", "OutpostWorld")
 W.Frontier = Frontier
+W.Rules = Outpost
 local holder = R.Instance.new("Folder")
 local origin = R.CFrame.new(0, 0, 0)
 local site = W.build(origin, holder)

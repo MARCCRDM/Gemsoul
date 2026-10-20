@@ -387,6 +387,13 @@ function actions.Market()
 	require(script.Parent.Modules.MarketBoardUI).open()
 end
 
+-- INFO-9's tips and insights, one after another from a random start.
+local tipAt = math.random(1, #Vendors.Tips) - 1
+function actions.Tip()
+	tipAt = tipAt % #Vendors.Tips + 1
+	say(Vendors.Tips[tipAt])
+end
+
 function actions.Duels()
 	close()
 	require(script.Parent.Modules.SocialUI).open("Arena")
@@ -402,12 +409,19 @@ local function open(vendorId: string, part: BasePart)
 	header.TextColor3 = vendor.Color
 	header.Text = string.upper(vendor.Name .. " // " .. vendor.Role)
 
-	mainMenu = function()
+	-- Its options; a topic's (an option with Options of its own) shown in
+	-- place of them, with a way back.
+	local function menu(list: { any }, topic: boolean)
 		local items: { MenuItem } = {}
-		for _, option in vendor.Options do
+		for _, option in list do
 			table.insert(items, {
 				Text = option.Text,
 				Run = function()
+					if option.Options then
+						say("What would you like to know?")
+						menu(option.Options, true)
+						return
+					end
 					local action = option.Action and actions[option.Action]
 					if action then
 						action()
@@ -417,8 +431,15 @@ local function open(vendorId: string, part: BasePart)
 				end,
 			})
 		end
-		table.insert(items, { Text = "Goodbye", Color = UiKit.Colors.Dim, Run = close })
+		if topic then
+			table.insert(items, { Text = "Back", Color = UiKit.Colors.Dim, Run = mainMenu })
+		else
+			table.insert(items, { Text = "Goodbye", Color = UiKit.Colors.Dim, Run = close })
+		end
 		showMenu(items)
+	end
+	mainMenu = function()
+		menu(vendor.Options, false)
 	end
 	mainMenu()
 

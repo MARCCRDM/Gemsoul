@@ -36,6 +36,13 @@ local Outpost = {}
 
 -- The original moon quarry, with haul roads and the Shelter in the middle (its garage holds the mechs).
 Outpost.Location = CFrame.new(0, 0, 7000)
+-- The Shelter stands on landing legs, its floor ShelterLift studs over the
+-- quarry's, with ramps ShelterRamp studs long down from its doors (Server
+-- OutpostWorld: gentle enough for a mech to climb, Shared.MechPilot). Its
+-- frame, Location lifted that far, is where the client mounts its life
+-- (Client.ShelterLife, Client.StoreDisplays).
+Outpost.ShelterLift = 8
+Outpost.ShelterRamp = 40
 Outpost.Radius = 440 -- quarry rim; recovery allows the surrounding benches
 Outpost.NodeCount = 210 -- rocks out at once (every spot: the field round the middle, the outcrops and the Rift Veins)
 Outpost.FieldNodeCount = 0 -- this lobby uses the common quarry sites

@@ -1,7 +1,8 @@
 -- Shared.MechPilot: who pilots what (from attributes, no seats), and how a
 -- mech moves over the ground (the pilot's screen runs this, Client
 -- VehicleDrive): driving, steering, a rock, a pebble, a kerb, a ledge, a pit,
--- no ground loaded, the crater rim, pushing through. A stand-in world; the
+-- no ground loaded, the crater rim, pushing through, and up and down the
+-- ramps to the Shelter's garage doors. A stand-in world; the
 -- real drive maths (Shared.Outpost.drive). Run by tests/run_mech_pilot.py (lune).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -92,7 +93,7 @@ check(
 
 -- The world it moves through: the quarry floor at y = 0, areas raised, sunk
 -- or cut away, and rocks in the way.
-local areas = {} -- { X = { min, max }, Z = { min, max }, Y = its height, or Cut = true }
+local areas = {} -- { X = { min, max }, Z = { min, max }, Y = its height, or Cut = true, or Ramp = { From, To, Height } }
 local rocks = {} -- { Name, X, Z, Radius, Top }
 local function inside(area, x, z)
 	return x >= area.X[1] and x <= area.X[2] and z >= area.Z[1] and z <= area.Z[2]
@@ -106,8 +107,13 @@ local function surfaceAt(x, z, top)
 		end
 	end
 	for _, area in areas do
-		if inside(area, x, z) and area.Y and area.Y <= top and (best == nil or area.Y > best) then
-			best = area.Y
+		local y = area.Y
+		if area.Ramp then
+			-- (a slope along z: nothing at From, Height at To)
+			y = area.Ramp.Height * math.clamp((z - area.Ramp.From) / (area.Ramp.To - area.Ramp.From), 0, 1)
+		end
+		if inside(area, x, z) and y and y <= top and (best == nil or y > best) then
+			best = y
 		end
 	end
 	return best
@@ -123,6 +129,22 @@ local world = {
 		local length = direction.Magnitude
 		local ux, uz = direction.X / length, direction.Z / length
 		local best, name = nil, nil
+		-- A ramp's slope rising into the hull's bottom (its leading edge,
+		-- corner to corner, along the sweep).
+		local across = R.Vector3.new(-uz, 0, ux) * (size.X / 2)
+		for _, area in areas do
+			if area.Ramp then
+				for t = 0, length, 0.02 do
+					local edge = start + R.Vector3.new(ux, 0, uz) * (t + reach)
+					for _, corner in { edge - across, edge, edge + across } do
+						local y = surfaceAt(corner.X, corner.Z, bottom + 100)
+						if y and y > bottom and (best == nil or t < best) then
+							best, name = t, "a ramp"
+						end
+					end
+				end
+			end
+		end
 		for _, rock in rocks do
 			if rock.Top > bottom then
 				local dx, dz = rock.X - start.X, rock.Z - start.Z
@@ -241,6 +263,43 @@ areas = { { X = { -50, 50 }, Z = { 6800, 6890 }, Cut = true } }
 frames(60 * 2, 1, 0)
 check(m.Position.Z < 6890 and near(m.Position.Y, 6.2) and blocked == nil, "No ground held it still, or dropped it")
 areas = {}
+-- The Shelter's ramps (Server OutpostWorld): up from the quarry floor to
+-- its floor (ShelterLift up, on a slab 0.8 thick) over ShelterRamp studs,
+-- then a landing and the garage floor beyond. A mech drives straight up,
+-- up at an angle, and back down, never caught on the slope.
+local rise, run = Rules.ShelterLift + 0.8, Rules.ShelterRamp
+areas = {
+	{ X = { -40, 40 }, Z = { 6880 - run, 6880 }, Ramp = { From = 6880, To = 6880 - run, Height = rise } },
+	{ X = { -40, 40 }, Z = { 6700, 6880 - run }, Y = rise },
+}
+local function climb(seconds): boolean
+	local caught = false
+	for _ = 1, 60 * seconds do
+		frames(1, 1, 0)
+		caught = caught or blocked ~= nil
+	end
+	return caught
+end
+place(0, 6900, 0)
+local caught = climb(4)
+check(
+	not caught and m.Position.Z < 6880 - run - 5,
+	"Caught on the ramp up: " .. tostring(blocked) .. " at " .. m.Position.Z
+)
+check(near(m.Position.Y, rise + 6.2, 0.01), "Not up on the floor at the top of the ramp: " .. m.Position.Y)
+place(-18, 6900, math.rad(-25))
+caught = climb(4)
+check(
+	not caught and m.Position.Z < 6880 - run and near(m.Position.Y, rise + 6.2, 0.01),
+	"Caught driving up the ramp at an angle"
+)
+place(0, 6800, math.pi, rise)
+caught = climb(7)
+check(
+	not caught and m.Position.Z > 6890 and near(m.Position.Y, 6.2, 0.01) and m.Fall == 0,
+	"Didn't drive back down the ramp: " .. tostring(blocked) .. " at " .. m.Position.Z .. ", " .. m.Position.Y
+)
+areas = {}
 -- The crater rim.
 place(origin.X, origin.Z - Rules.Radius - 30, 0)
 frames(60 * 3, 1, 0)
@@ -251,5 +310,5 @@ check(blocked == "the crater rim", "Didn't say the rim is in the way")
 print(
 	"PASS: "
 		.. checks
-		.. " mech pilot checks (who pilots what, driving, rocks, pushing through, kerbs, ledges, a pit, no ground, the rim)"
+		.. " mech pilot checks (who pilots what, driving, rocks, pushing through, kerbs, ledges, a pit, no ground, the Shelter's ramps, the rim)"
 )

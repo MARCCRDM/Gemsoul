@@ -118,6 +118,8 @@ local World = luau.load(
 	{ debugName = "OutpostWorld", environment = worldEnv }
 )()
 World.Frontier = Frontier
+local Rules = load("Outpost")
+World.Rules = Rules
 local at = CFrame.new(-30, 0, 9000)
 local site = World.build(at, R.Instance.new("Folder"))
 local function here(p: Vector3): Vector3
@@ -336,12 +338,12 @@ end
 for _, doing in { "Resting", "Lifting", "Flying", "Lowering", "Hovering", "Rising", "Landing" } do
 	check(seen[doing], "The lifter never does " .. doing)
 end
--- (over the Shelter, well clear of its skylight)
+-- (over the Shelter, well clear of its skylight and upper deck, up on its legs)
 for t = 0, trip, 0.5 do
 	local frame = Life.lifterAt(t)
 	local p = frame.Position
 	if math.abs(p.X) < 90 and math.abs(p.Z) < 66 then
-		check(p.Y - Life.Hang > 46, "The lifter flies low over the Shelter")
+		check(p.Y - Life.Hang > 46 + Rules.ShelterLift, "The lifter flies low over the Shelter")
 	end
 end
 
