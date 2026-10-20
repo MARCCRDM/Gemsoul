@@ -1209,6 +1209,27 @@ check(enemy.Humanoid.Health < before and (enemy.KaijuCredit[a] or 0) > 0, "Its b
 enemy.FoeVictim = nil
 KaijuWilds._brain(enemy, now)
 check(enemy.Foe == pet, "The wild one didn't fight back")
+-- You walk off mid-fight (to mine): it sees the fight through, past the
+-- leash and past where it'd be put back beside you (Kaiju.Follow.Battle).
+do
+	local fightAt = pet.Root.Position
+	rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(Kaiju.Follow.Teleport + 10, 0, 0))
+	for _ = 1, 6 do
+		now += 0.15
+		KaijuServer._think(pet, now, 0.15)
+	end
+	check(pet.Target == enemy and pet.Fighter.Engaged, "Your kaiju left its fight when you walked off")
+	check((pet.Root.Position - fightAt).Magnitude < 20, "It was put back beside you mid-fight")
+	-- Too far (Battle studs): it gives up and is put back beside you.
+	rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(Kaiju.Follow.Battle + 20, 0, 0))
+	KaijuServer._think(pet, now, 0.15)
+	check(pet.Target == nil and (pet.Root.Position - rootA.Position).Magnitude < 20, "It fought on with you across the quarry")
+	-- Back beside it: on again.
+	rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(6, 0, 0))
+	pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0))
+	KaijuServer._think(pet, now, 0.15)
+	check(pet.Target == enemy, "It didn't take the fight up again")
+end
 -- Recalled: it stops, and the wild one lets it be.
 registered.KaijuRecall(a)
 KaijuServer._think(pet, now, 0.15)

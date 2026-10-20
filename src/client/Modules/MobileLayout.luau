@@ -9,13 +9,12 @@
 	                stops above the dock (and the card steps aside while it's
 	                open). Phones and tablets use Roblox's own chat instead
 	                (ChatFrame).
-	  top middle    your loot card (MinerLoot), slim, between the pick card
-	                and the TASKS button, clear of the board's strip; the
-	                live feed (LobbyFeed) steps aside while it's up
-	                (claimTop): the middle of the screen stays the game's
-	  top right     the TASKS button (TrainingRewards), the board's one slim
-	                strip (LobbyBoard) close under it, and teammates' health
-	                (PartyUI), hidden in a fight
+	  top middle    your loot card (MinerLoot), slim, right of the pick
+	                card; the live feed (LobbyFeed) steps aside while it's
+	                up (claimTop): the middle of the screen stays the game's
+	  top right     teammates' health (PartyUI), hidden in a fight. Nothing
+	                else: tasks and the day's challenges open from the
+	                dock's TASKS tile, and the lobby's board isn't shown
 	  bottom middle the dock (LobbyUI): PLAY, and a row of tiles under it
 
 	Rects are { X, Y, W, H } in the ScreenGui's space (below the top bar).
@@ -25,8 +24,6 @@
 	  MobileLayout.chat(screen, open)      the chat box: CHAT button, or opened
 	  MobileLayout.dock(screen, tiles)     the dock, its PLAY and tile size
 	  MobileLayout.party(screen)           the teammates' cards
-	  MobileLayout.tasks(screen)           the TASKS button
-	  MobileLayout.board(screen)           the board's strip, under TASKS
 	  MobileLayout.loot(screen)            your loot card: top middle, as
 	                                       wide as fits (Loot.W at most)
 	  MobileLayout.claimTop(owner, on)     something has the top middle (a
@@ -54,9 +51,7 @@ MobileLayout.CardScale = 0.7
 MobileLayout.Margin = 12
 MobileLayout.Drive = { W = 160, H = 38, Bottom = 62 }
 MobileLayout.Stick = { Size = 112, Knob = 46, Left = 20, Bottom = 16 }
-MobileLayout.Tasks = { W = 112, H = 34 }
-MobileLayout.Board = { W = 236, H = 38 }
-MobileLayout.Loot = { W = 250, MinW = 170, H = 56, ShortH = 44, Top = 8 }
+MobileLayout.Loot = { W = 250, MinW = 170, H = 56, Top = 8 }
 
 function MobileLayout.card()
 	return { X = 12, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
@@ -111,34 +106,13 @@ function MobileLayout.party(screen: Vector2)
 	return { X = screen.X - 16 - 220, Y = 132, W = 220, H = 40 }
 end
 
-function MobileLayout.tasks(screen: Vector2)
-	local t = MobileLayout.Tasks
-	return { X = screen.X - 16 - t.W, Y = 12, W = t.W, H = t.H }
-end
-
-function MobileLayout.board(screen: Vector2)
-	local tasks, b = MobileLayout.tasks(screen), MobileLayout.Board
-	return { X = screen.X - 16 - b.W, Y = tasks.Y + tasks.H + 6, W = b.W, H = b.H }
-end
-
--- Between the pick card and TASKS, and clear of the board's strip under
--- it. On a small phone, where that leaves it too narrow, it's shorter
--- instead (Loot.ShortH: done above the strip) and as wide as up to TASKS.
+-- Right of the pick card, in the middle of what's left of the top.
 function MobileLayout.loot(screen: Vector2)
 	local l = MobileLayout.Loot
-	local card, tasks, board = MobileLayout.card(), MobileLayout.tasks(screen), MobileLayout.board(screen)
-	local left = card.X + card.W + 8
-	local right, height = tasks.X - 8, l.H
-	if l.Top + height > board.Y then
-		local clear = math.min(right, board.X - 8)
-		if clear - left >= l.W or l.Top + l.ShortH > board.Y then
-			right = clear
-		else
-			height = l.ShortH
-		end
-	end
+	local card = MobileLayout.card()
+	local left, right = card.X + card.W + 8, screen.X - 16
 	local width = math.clamp(right - left, l.MinW, l.W)
-	return { X = math.floor(left + (right - left - width) / 2), Y = l.Top, W = width, H = height }
+	return { X = math.floor(left + (right - left - width) / 2), Y = l.Top, W = width, H = l.H }
 end
 
 -- Who has the top middle (pure: no Roblox objects, so it's tested on its own).

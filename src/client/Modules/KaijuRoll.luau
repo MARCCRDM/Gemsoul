@@ -102,7 +102,7 @@ end
 -- A kaiju for a card's window: built once, framed from the front quarter,
 -- turned about its own middle.
 local function stage(species: string, element: string)
-	local model = KaijuModels.build(species, element)
+	local model = KaijuModels.forPortrait(KaijuModels.build(species, element))
 	local cf, size = model:GetBoundingBox()
 	local reach = math.max(size.X, size.Y * 1.25, size.Z)
 	return {
@@ -403,9 +403,9 @@ function KaijuRoll.play(after: (() -> ())?)
 			Name = "KaijuView",
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
-			Ambient = Color3.fromRGB(150, 156, 176),
-			LightColor = Color3.fromRGB(255, 246, 232),
-			LightDirection = Vector3.new(-0.5, -0.8, 0.7),
+			Ambient = KaijuModels.Portrait.Ambient,
+			LightColor = KaijuModels.Portrait.LightColor,
+			LightDirection = KaijuModels.Portrait.LightDirection,
 			ZIndex = 4,
 		}, window)
 		local camera = Instance.new("Camera")

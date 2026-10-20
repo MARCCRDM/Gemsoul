@@ -58,7 +58,8 @@ end
 
 -- No profile yet: nothing drawn, nothing breaks.
 LobbyBoard.refresh()
--- A new player: streak, challenges and the first task on a desktop.
+-- A new player on a desktop: streak and challenges (no task card: tasks open
+-- from the menu's TASKS tile).
 GemClient.Profile = {
 	Coins = 300,
 	Daily = { Streak = 1 },
@@ -66,11 +67,11 @@ GemClient.Profile = {
 	Challenges = challengesView(0),
 }
 LobbyBoard.refresh()
-check(shown() == "Challenges,NextTask,Streak", "Desktop cards wrong: " .. shown())
+check(shown() == "Challenges,Streak", "Desktop cards wrong: " .. shown())
+check(card("NextTask") == nil, "The board still has a task card")
 -- Folded to rows: each its title, one line and a thin bar.
-check(LobbyBoard.layout() == 3 * 48 + 2 * 8, "The desktop cards aren't folded to rows: " .. LobbyBoard.layout())
--- On a phone, one slim strip: the task while learning, just its name and
--- reward over a bar.
+check(LobbyBoard.layout() == 2 * 48 + 8, "The desktop cards aren't folded to rows: " .. LobbyBoard.layout())
+-- What a card says (just what's on show).
 local function strip(name)
 	local root = card(name)
 	local function seen(node)
@@ -91,33 +92,26 @@ local function strip(name)
 	table.sort(words)
 	return table.concat(words, "|")
 end
+-- On a phone the board steps off the screen (the challenges are the Tasks
+-- window's DAILY page there), learning or not.
 LobbyBoard.setCompact(true)
-check(shown() == "NextTask", "Phone while learning should show the task: " .. shown())
-check(LobbyBoard.layout() == 38, "The phone's task isn't one slim strip: " .. LobbyBoard.layout())
-check(card("NextTask"):FindFirstChild("Title").Visible == false, "The phone strip kept its NEXT TASK heading")
-local _, words = string.gsub(strip("NextTask"), "|", "")
-check(words == 1, "The phone strip shows more than the task and its reward: " .. strip("NextTask"))
--- Past the first pages: the phone shows the challenges.
+check(LobbyBoard.layout() == 0 and column.Visible == false, "The board stayed up on a phone")
 local paid = {}
 for _, id in { "FirstRock", "ThreeRocks", "GemFind", "Enchant", "ThreeSlots", "EquipSurge" } do
 	paid[id] = true
 end
 GemClient.Profile.TrainingRewards = { Paid = paid, Counts = {} }
 LobbyBoard.refresh()
-check(shown() == "Challenges", "Phone after learning should show the challenges: " .. shown())
--- As a strip too: the next challenge to do, its count and its reward.
-check(LobbyBoard.layout() == 38, "The phone's challenges aren't one slim strip")
-check(card("Challenges"):FindFirstChild("Title").Visible == false, "The phone strip kept its heading")
-check(
-	strip("Challenges") == '3/10  <font color="#FFCA5B">+40 ◆</font>|Break 10 rocks',
-	"The phone strip doesn't show the next challenge: " .. strip("Challenges")
-)
+check(column.Visible == false, "The board came back on a phone after learning")
+LobbyBoard.setCompact(false)
+check(column.Visible == true and shown() == "Challenges,Streak", "The board didn't come back on a computer")
+LobbyBoard.setCompact(true)
 -- The PLAY menu open: the whole board steps aside.
+LobbyBoard.setCompact(false)
 LobbyBoard.setHidden(true)
 check(column.Visible == false, "The board stayed over the PLAY menu")
 LobbyBoard.setHidden(false)
 check(column.Visible == true, "The board didn't come back")
-LobbyBoard.setCompact(false)
 check(card("Challenges"):FindFirstChild("Title").Text == "DAILY CHALLENGES", "The desktop title is wrong")
 check(card("Challenges"):FindFirstChild("Title").Visible == true, "The desktop lost the heading")
 -- Folded, the challenges row names the next one to do; tapping a row opens
@@ -139,14 +133,13 @@ check(
 )
 card("Challenges").Activated:Fire()
 check(
-	openRows() == 3 and LobbyBoard.layout() == (40 + 3 * 48 + 26) + 2 * 48 + 2 * 8,
+	openRows() == 3 and LobbyBoard.layout() == (40 + 3 * 48 + 26) + 48 + 8,
 	"Tapping the challenges didn't open them: " .. LobbyBoard.layout()
 )
 card("Streak").Activated:Fire()
-check(openRows() == 0 and LobbyBoard.layout() == 88 + 2 * 48 + 2 * 8, "Opening the streak didn't fold the challenges")
+check(openRows() == 0 and LobbyBoard.layout() == 88 + 48 + 8, "Opening the streak didn't fold the challenges")
 card("Streak").Activated:Fire()
-check(LobbyBoard.layout() == 3 * 48 + 2 * 8, "Tapping the open streak didn't fold it")
--- The next task doesn't open in place: it opens the Tasks window (below).
+check(LobbyBoard.layout() == 2 * 48 + 8, "Tapping the open streak didn't fold it")
 card("Challenges").Activated:Fire()
 
 -- Challenge rows: progress, done marks, the bonus line.
@@ -213,38 +206,19 @@ LobbyBoard.unlock = nil
 -- A hidden lobby doesn't redraw as the profile changes (a fight syncs it
 -- with nothing to see); it catches up as it shows.
 gui.Enabled = false
-local before, tasks = texts(card("NextTask")), GemClient.Profile.TrainingRewards
-GemClient.Profile.TrainingRewards = { Paid = {}, Counts = {} }
+local before, streak = texts(card("Streak")), GemClient.Profile.Daily
+GemClient.Profile.Daily = { Streak = 1 }
 GemClient.Changed:Fire(GemClient.Profile)
-check(texts(card("NextTask")) == before, "The board redrew while the lobby was hidden")
+check(texts(card("Streak")) == before, "The board redrew while the lobby was hidden")
 gui.Enabled = true
-check(texts(card("NextTask")) ~= before, "The board didn't catch up as the lobby showed")
-GemClient.Profile.TrainingRewards = tasks
+check(texts(card("Streak")) ~= before, "The board didn't catch up as the lobby showed")
+GemClient.Profile.Daily = streak
 GemClient.Changed:Fire(GemClient.Profile)
-check(texts(card("NextTask")) == before, "The board didn't redraw with the lobby up")
--- Every task done: the task card goes.
-local all = {}
-for _, o in Training.Objectives do
-	all[o.Id] = true
-end
-GemClient.Profile.TrainingRewards = { Paid = all, Counts = {} }
-LobbyBoard.refresh()
-check(not card("NextTask").Visible, "The task card stayed with every task done")
--- Tapping the task opens the Tasks window (its OpenTasks event).
-GemClient.Profile.TrainingRewards = { Paid = {}, Counts = {} }
-LobbyBoard.refresh()
-local tasksGui = new("ScreenGui", { Name = "TrainingRewards", Parent = playerGui })
-local opened = 0
-local openEvent = new("BindableEvent", { Name = "OpenTasks", Parent = tasksGui })
-openEvent.Fire = function()
-	opened += 1
-end
-card("NextTask").Activated:Fire()
-check(opened == 1, "Tapping the task didn't open Tasks")
+check(texts(card("Streak")) == before, "The board didn't redraw with the lobby up")
 print(
 	"PASS: "
 		.. checks
-		.. " lobby board checks (cards per screen, phone choice, challenges, bonus, streak, unlock, tasks)"
+		.. " lobby board checks (cards per screen, none on a phone, challenges, bonus, streak, unlock)"
 )
 
 -- The live feed ------------------------------------------------------------------------------------

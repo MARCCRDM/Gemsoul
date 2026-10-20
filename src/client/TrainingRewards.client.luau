@@ -10,21 +10,26 @@
 	screen changes size or the window opens; words and bars only when the
 	profile changes.
 
+	It opens from the lobby menu's TASKS tile (LobbyUI fires its OpenTasks
+	event): nothing of it sits on the play screen. The day's three challenges
+	(Shared.DailyChallenges) and their all-three bonus are its DAILY page, so
+	a phone's screen keeps no strip for them either.
+
 	ScreenGui "TrainingRewards", with the BlocksMiningHud attribute while open
-	(OutpostScene and VehicleDrive step aside for it).
+	(OutpostScene and VehicleDrive step aside for it), and Open: how many
+	tasks and today's challenges are still to do (the menu tile's badge).
 ]]
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
-local UserInputService = game:GetService("UserInputService")
 local Config = require(RS.Shared.Config)
+local Daily = require(RS.Shared.DailyChallenges)
 local Lang = require(RS.Shared.Lang)
 local Rules = require(RS.Shared.TrainingRewards)
 local Tutorial = require(RS.Shared.Tutorial)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
-local MobileLayout = require(script.Parent.Modules.MobileLayout)
 local UiKit = require(script.Parent.Modules.UiKit)
 local player = Players.LocalPlayer
 
@@ -38,6 +43,7 @@ local CARD = Color3.fromRGB(21, 32, 46)
 local CHIP = Color3.fromRGB(27, 41, 56)
 local TRACK = Color3.fromRGB(40, 53, 69)
 local CATEGORY_COLORS = {
+	Daily = Color3.fromRGB(186, 140, 255),
 	Mining = GOLD,
 	Equipment = Color3.fromRGB(159, 171, 255),
 	Combat = Color3.fromRGB(255, 146, 119),
@@ -47,7 +53,7 @@ local CATEGORY_COLORS = {
 }
 -- Tasks for switched-off activities sit out (Config.Features).
 Rules.closeFor(Config.Features or {})
-local CATEGORIES = { "All" }
+local CATEGORIES = { "All", "Daily" }
 for _, name in { "Mining", "Equipment", "Combat", "PvP", "PvE", "Market" } do
 	if not Rules.Closed[name] then
 		table.insert(CATEGORIES, name)
@@ -111,33 +117,6 @@ local gui = new("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 }, player:WaitForChild("PlayerGui"))
 
--- The button that opens it (top right of the lobby). Its words are a label
--- of their own: the gradient would tint the button's own text near black.
-local launch = new("TextButton", {
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -16, 0, 12),
-	Size = UDim2.fromOffset(132, 40),
-	BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
-	Text = "",
-	AutoButtonColor = false,
-}, gui)
-UiKit.round(launch, 8)
-stroke(launch, CYAN, 0.65)
-new(
-	"UIGradient",
-	{ Color = ColorSequence.new(Color3.fromRGB(27, 47, 61), Color3.fromRGB(14, 24, 38)), Rotation = 90 },
-	launch
-)
-local launchLabel = new("TextLabel", {
-	Name = "Label",
-	BackgroundTransparency = 1,
-	Size = UDim2.fromScale(1, 1),
-	TextColor3 = Color3.fromRGB(222, 239, 247),
-	TextSize = 12,
-	Font = Enum.Font.GothamBold,
-	Text = "TASKS",
-}, launch)
-
 -- The window, over a dark shade that closes it when tapped.
 local shade = new("TextButton", {
 	Size = UDim2.fromScale(1, 1),
@@ -185,7 +164,7 @@ stroke(close, MUTED, 0.8)
 
 -- Filters: categories (scrolling sideways) and the To do / Done / All switch.
 local category, filter = "All", "Active"
-local refresh -- (below)
+local refresh, list -- (below)
 local categories = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
 	CanvasSize = UDim2.new(),
@@ -255,7 +234,7 @@ for i, f in FILTERS do
 end
 
 -- The tasks.
-local list = new("ScrollingFrame", {
+list = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
@@ -273,9 +252,9 @@ local footer = label(panel, "Rewards arrive by themselves as you play. No expiry
 footer.TextXAlignment = Enum.TextXAlignment.Center
 
 local cards = {}
-for i, o in objectives do
-	local accent = CATEGORY_COLORS[o.Category] or GOLD
-	local card = new("Frame", { BackgroundColor3 = CARD, LayoutOrder = i }, list)
+local function makeCard(id: string, index: number, category: string, name: string, hint: string, coins: number)
+	local accent = CATEGORY_COLORS[category] or GOLD
+	local card = new("Frame", { BackgroundColor3 = CARD, LayoutOrder = index }, list)
 	UiKit.round(card, 10)
 	local outline = stroke(card, accent, 0.85)
 	local stripe = new(
@@ -284,15 +263,15 @@ for i, o in objectives do
 		card
 	)
 	UiKit.round(stripe, 2)
-	local tag = label(card, string.upper(o.Category), 10, accent, Enum.Font.GothamBold)
-	local title = label(card, o.Name, 15, TEXT, Enum.Font.GothamBold)
-	local hint = label(card, o.Hint, 11, MUTED)
-	hint.TextWrapped, hint.TextYAlignment = true, Enum.TextYAlignment.Top
+	local tag = label(card, string.upper(category), 10, accent, Enum.Font.GothamBold)
+	local title = label(card, name, 15, TEXT, Enum.Font.GothamBold)
+	local words = label(card, hint, 11, MUTED)
+	words.TextWrapped, words.TextYAlignment = true, Enum.TextYAlignment.Top
 	local reward =
 		new("Frame", { AnchorPoint = Vector2.new(1, 0), BackgroundColor3 = Color3.fromRGB(50, 43, 28) }, card)
 	UiKit.round(reward, 8)
 	local rewardEdge = stroke(reward, GOLD, 0.75)
-	local amount = label(reward, "+" .. o.Coins, 15, GOLD, Enum.Font.GothamBold)
+	local amount = label(reward, "+" .. coins, 15, GOLD, Enum.Font.GothamBold)
 	amount.TextXAlignment, amount.Position, amount.Size =
 		Enum.TextXAlignment.Center, UDim2.fromOffset(0, 2), UDim2.new(1, 0, 0.6, 0)
 	local unit = label(reward, "COINS", 8, GOLD, Enum.Font.GothamBold)
@@ -301,14 +280,13 @@ for i, o in objectives do
 	local track, fill = bar(card, CYAN)
 	local status = label(card, "", 10, MUTED, Enum.Font.GothamBold)
 	status.TextXAlignment = Enum.TextXAlignment.Right
-	cards[o.Id] = {
-		Objective = o,
-		Index = i,
+	cards[id] = {
+		Index = index,
 		Frame = card,
 		Outline = outline,
 		Tag = tag,
 		Title = title,
-		Hint = hint,
+		Hint = words,
 		Reward = reward,
 		RewardEdge = rewardEdge,
 		Amount = amount,
@@ -319,15 +297,15 @@ for i, o in objectives do
 		Accent = accent,
 	}
 end
-
--- The button's size: small on a phone or a short window, where the board's
--- strip tucks in under it (MobileLayout.tasks).
-local function launchSize(screen: Vector2): UDim2
-	local tasks = MobileLayout.Tasks
-	return if UserInputService.TouchEnabled or (screen.Y > 0 and screen.Y < 540)
-		then UDim2.fromOffset(tasks.W, tasks.H)
-		else UDim2.fromOffset(132, 40)
+for i, o in objectives do
+	makeCard(o.Id, i, o.Category, o.Name, o.Hint, o.Coins)
 end
+-- Today's three challenges and their bonus lead the list (their words come
+-- with the day's challenges).
+for i = 1, 3 do
+	makeCard("Daily" .. i, i - 10, "Daily", "", "", 0)
+end
+makeCard("DailyBonus", -6, "Daily", "All three today", "Finish today's three challenges for a bonus.", Daily.Bonus)
 
 -- Where everything goes, for this screen.
 local laidOut = Vector2.zero
@@ -337,7 +315,6 @@ local function layout()
 		return
 	end
 	laidOut = screen
-	launch.Size = launchSize(screen)
 	local short = screen.Y < 500
 	local width = math.max(280, math.min(if short then 900 else 780, screen.X - (if short then 20 else 48)))
 	local height = math.max(240, math.min(640, screen.Y - (if short then 12 else 48)))
@@ -415,39 +392,94 @@ local function layout()
 	end
 end
 
+-- What's still to do: tasks not yet paid, and today's challenges not yet done.
+local function stillOpen(): number
+	local p = GemClient.Profile
+	local paid = p and p.TrainingRewards and p.TrainingRewards.Paid or {}
+	local done = 0
+	for _, o in objectives do
+		if paid[o.Id] == true then
+			done += 1
+		end
+	end
+	local open = #objectives - done
+	local view = p and p.Challenges
+	if type(view) == "table" and type(view.List) == "table" then
+		for _, item in view.List do
+			if item.Done ~= true then
+				open += 1
+			end
+		end
+	end
+	return open
+end
+
+-- A card's state: done (paid, green) or how far along it is.
+local function paint(c, complete: boolean, progress: number, goal: number)
+	c.Status.Text = if complete then "DONE" else progress .. " / " .. goal
+	c.Status.TextColor3 = if complete then GREEN else MUTED
+	c.Fill.Size = UDim2.fromScale(if complete then 1 else progress / math.max(1, goal), 1)
+	c.Fill.BackgroundColor3 = if complete then GREEN else CYAN
+	c.Outline.Color = if complete then GREEN else c.Accent
+	c.Outline.Transparency = if complete then 0.7 else 0.85
+	c.Unit.Text = if complete then "PAID" else "COINS"
+	c.Amount.TextColor3 = if complete then GREEN else GOLD
+	c.Unit.TextColor3 = c.Amount.TextColor3
+	c.RewardEdge.Color = c.Amount.TextColor3
+	c.Reward.BackgroundColor3 = if complete then Color3.fromRGB(24, 48, 40) else Color3.fromRGB(50, 43, 28)
+	-- Done ones sink to the bottom of "All".
+	c.Frame.LayoutOrder = (if complete then 1000 else 0) + c.Index
+end
+
+-- How long today's challenges have left.
+local function untilReset(): string
+	local left = 86400 - os.time() % 86400
+	local hours, minutes = left // 3600, (left % 3600) // 60
+	return if hours > 0 then string.format("%dh %02dm", hours, minutes) else string.format("%dm", math.max(1, minutes))
+end
+
 -- The words and bars, from the profile.
 refresh = function()
 	local p = GemClient.Profile
 	local state = p and p.TrainingRewards or {}
 	local paid, counts = state.Paid or {}, state.Counts or {}
 	local done, shown = 0, 0
+	local function show(c, inCategory: boolean, complete: boolean)
+		c.Frame.Visible = inCategory and (filter == "All" or (filter == "Completed") == complete)
+		if c.Frame.Visible then
+			shown += 1
+		end
+	end
 	for _, o in objectives do
 		local c = cards[o.Id]
 		local complete = paid[o.Id] == true
 		if complete then
 			done += 1
 		end
-		local inCategory = category == "All" or category == o.Category
-		local inFilter = filter == "All" or (filter == "Completed") == complete
-		c.Frame.Visible = inCategory and inFilter
-		if c.Frame.Visible then
-			shown += 1
-		end
-		local progress = math.min(o.Goal, counts[o.Event] or 0)
-		c.Status.Text = if complete then "DONE" else progress .. " / " .. o.Goal
-		c.Status.TextColor3 = if complete then GREEN else MUTED
-		c.Fill.Size = UDim2.fromScale(if complete then 1 else progress / o.Goal, 1)
-		c.Fill.BackgroundColor3 = if complete then GREEN else CYAN
-		c.Outline.Color = if complete then GREEN else c.Accent
-		c.Outline.Transparency = if complete then 0.7 else 0.85
-		c.Unit.Text = if complete then "PAID" else "COINS"
-		c.Amount.TextColor3 = if complete then GREEN else GOLD
-		c.Unit.TextColor3 = c.Amount.TextColor3
-		c.RewardEdge.Color = c.Amount.TextColor3
-		c.Reward.BackgroundColor3 = if complete then Color3.fromRGB(24, 48, 40) else Color3.fromRGB(50, 43, 28)
-		-- Done ones sink to the bottom of "All".
-		c.Frame.LayoutOrder = (if complete then 1000 else 0) + c.Index
+		show(c, category == "All" or category == o.Category, complete)
+		paint(c, complete, math.min(o.Goal, counts[o.Event] or 0), o.Goal)
 	end
+	-- Today's challenges, then the bonus for all three.
+	local view = p and p.Challenges
+	local today = if type(view) == "table" and type(view.List) == "table" then view.List else {}
+	local daily = category == "All" or category == "Daily"
+	local finished = 0
+	for i = 1, 3 do
+		local c, item = cards["Daily" .. i], today[i]
+		local complete = item ~= nil and item.Done == true
+		show(c, item ~= nil and daily, complete)
+		if item then
+			finished += if complete then 1 else 0
+			c.Title.Text, c.Hint.Text, c.Amount.Text = item.Name, item.Hint, "+" .. item.Coins
+			c.Tag.Text = "DAILY  ·  " .. untilReset()
+			paint(c, complete, math.min(item.Goal, item.Count or 0), item.Goal)
+		end
+	end
+	local bonus = cards.DailyBonus
+	local bonusPaid = type(view) == "table" and view.BonusDone == true
+	show(bonus, #today > 0 and daily, bonusPaid)
+	bonus.Amount.Text = "+" .. (if type(view) == "table" and view.Bonus then view.Bonus else Daily.Bonus)
+	paint(bonus, bonusPaid, finished, math.max(1, #today))
 	local total = #objectives
 	count.Text = string.format("%d / %d DONE", done, total)
 	overallFill.Size = UDim2.fromScale(if total > 0 then done / total else 0, 1)
@@ -466,21 +498,13 @@ refresh = function()
 		segment.BackgroundColor3 = if on then Color3.fromRGB(35, 65, 78) else CHIP
 		segment.TextColor3 = if on then CYAN else MUTED
 	end
-	launchLabel.Text = if done < total then string.format("TASKS  %d/%d", done, total) else "TASKS"
+	gui:SetAttribute("Open", stillOpen())
 end
 
--- While the window is shut only the TASKS count can change on screen: the
--- cards are redrawn when it opens (every sync redrawing them was a waste).
-local function refreshLaunch()
-	local p = GemClient.Profile
-	local paid = p and p.TrainingRewards and p.TrainingRewards.Paid or {}
-	local done = 0
-	for _, o in objectives do
-		if paid[o.Id] == true then
-			done += 1
-		end
-	end
-	launchLabel.Text = if done < #objectives then string.format("TASKS  %d/%d", done, #objectives) else "TASKS"
+-- While the window is shut only the menu tile's count can change: the cards
+-- are redrawn when it opens (every sync redrawing them was a waste).
+local function refreshCount()
+	gui:SetAttribute("Open", stillOpen())
 end
 
 -- Opening: on the first page with something left to do (Shared.TrainingRewards).
@@ -497,14 +521,7 @@ local function open()
 	list.CanvasPosition = Vector2.zero
 	shade.Visible = true
 end
-launch.Activated:Connect(function()
-	if shade.Visible then
-		shade.Visible = false
-	else
-		open()
-	end
-end)
--- Other screens open it too (the lobby's task tracker): fire OpenTasks.
+-- The lobby menu's TASKS tile opens it: fire OpenTasks.
 local openEvent = new("BindableEvent", { Name = "OpenTasks" }, gui)
 openEvent.Event:Connect(function()
 	if gui.Enabled then
@@ -517,13 +534,15 @@ end)
 shade.Activated:Connect(function()
 	shade.Visible = false
 end)
-GemClient.Changed:Connect(function()
+local function changed()
 	if shade.Visible then
 		refresh()
 	else
-		refreshLaunch()
+		refreshCount()
 	end
-end)
+end
+GemClient.Changed:Connect(changed)
+GemClient.ChallengesChanged:Connect(changed)
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 	if gui.Enabled then
 		layout()
@@ -566,6 +585,5 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 end)
-launch.Size = launchSize(gui.AbsoluteSize)
 layout()
 refresh()

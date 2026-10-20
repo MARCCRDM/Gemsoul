@@ -20,28 +20,28 @@ answer three questions at a glance:
 
 ## Right: the board
 
-`src/client/Modules/LobbyBoard.luau`, under TASKS and REPORT A BUG:
+`src/client/Modules/LobbyBoard.luau`, under REPORT A BUG (on a computer
+only: a phone's screen is kept for the game). Tasks aren't on it any more:
+they open from the menu's TASKS tile (see [play-screen.md](play-screen.md)).
+
 
 | Card | What it shows |
 | --- | --- |
 | Daily streak | The week of rewards, today's day, and what tomorrow pays |
 | Daily challenges | Today's three: progress bars, the coins each pays, the bonus for all three, and how long until new ones |
 | Next unlock | Only while a mode is still locked behind duels |
-| Next task | The next Tasks step with its hint and progress. Tapping it opens the Tasks window |
 
 A challenge that finishes flashes gold on its row.
 
 On a computer every card starts folded to a slim row: its title, one line
 of what matters and a thin bar. Tap the streak or the challenges to open
-that card; only one is open at a time, and tapping it again folds it. The
-next task's row opens the Tasks window.
+that card; only one is open at a time, and tapping it again folds it.
 
 | Card | Folded row |
 | --- | --- |
 | Daily streak | Tomorrow's reward, the week as a bar |
 | Daily challenges | The next one still to do, its count and coins; the time until new ones |
 | Next unlock | The mode and the duels still needed |
-| Next task | The task, its count and coins |
 
 ![The board folded, then the challenges and the streak opened](lobby/board-folded.png)
 
@@ -50,10 +50,9 @@ Gotham has no "▾" or "▴", and they showed in game as empty boxes. The
 challenges' row shows the time left on today's three on its own; the "↻"
 it led with was a box too.
 
-On a phone there is room for one slim strip, under TASKS:
-- the **next task** while a player is still learning (the first two Tasks
-  pages: mining and gear): its name and reward over a thin bar;
-- after that, the **next daily challenge** still to do, with its count.
+On a phone the board isn't shown at all: the top right is kept clear for
+the game. The day's challenges are the Tasks window's **DAILY** page there
+(and on a computer too), opened from the TASKS tile under PLAY.
 
 ## Daily challenges
 

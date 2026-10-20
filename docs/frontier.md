@@ -148,6 +148,10 @@ a dungeon or an expedition.
 
 ### Stirred up: the longer you mine, the harder it gets
 
+(The noise ring and the stirred-up row under it are off the HUD now, to
+keep the screen for the game: the critters coming are the sign. The image
+below is how they looked.)
+
 ![The row under the noise ring: calm (none), restless, stirred up, swarming (with Rift Charged under it)](frontier/stirred.png)
 
 Mining out there stirs the frontier up, and it pushes back harder the
@@ -169,9 +173,8 @@ half a minute.
 as loud; a critter comes up to 4 levels higher at full, a share of that on
 the way.) So a long session at the Edge ends with four or five level 13–17
 critters at a time instead of two or three level 9–13s, and they pay more
-EXP for it. The Outpost's cap of twelve still holds, shared fairly. A row
-under the noise ring names the stage with a bar that warms from gold to red,
-and you're told as it gets to each stage (once, until it's well settled
+EXP for it. The Outpost's cap of twelve still holds, shared fairly. You're
+told as it gets to each stage (once, until it's well settled
 again): "The frontier is restless: critters come sooner.", "...stirred up:
 more critters, and tougher.", "...swarming! Head back to the core to let it
 settle." A wandering rift opened near you comes stirred up the same way.
@@ -186,7 +189,8 @@ your kaiju. At most three critters are out of wandering rifts at once (of
 the twelve). If nobody is near when they'd hop out, it seals empty.
 
 Kill every critter from one and everyone who helped is **Rift Charged**:
-gems 10% luckier for 60 seconds. A tag under the noise ring counts it down.
+gems 10% luckier for 60 seconds. A RIFT CHARGED tag at the right of the
+screen counts it down.
 
 ### The critters
 
@@ -285,7 +289,7 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 | `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
-| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, the noise ring, arrows to rifts off screen and to the nearest wild kaiju (`nearest`), the stirred-up row under the noise ring (`stirRow`), the Rift Charged tag |
+| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, arrows to rifts off screen and to the nearest wild kaiju (`nearest`), the Rift Charged tag (no noise ring) |
 | `OutpostScene` (client) | The band and luck on a rock's label; the mine button bonks a critter close by |
 
 Tests: `tests/run_frontier.py` checks the rules (bands and zones, the luck
@@ -297,7 +301,7 @@ guarded vein's luck and its guardian's numbers, mining noise, stirring
 it up (how fast it builds and settles, the core settling it faster, the
 stages, louder swings, more critters per encounter and allowed at once,
 higher levels, never in the core), fair shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
-lopsided, the pieces each tear is drawn from, the banners, the noise ring and its stirred-up row,
+lopsided, the pieces each tear is drawn from, the banners, that the noise ring stays off the HUD,
 the nearest wild kaiju for its arrow
 and the arrows). `tests/run_kaiju.py` runs the server side: who rifts open
 round, swings drawing them, the warning, the caps, edge levels, stirring

@@ -9,7 +9,10 @@
 	                  name, health. Tap one to lock it.
 
 	Foes come from TargetLock.foes() (empty outside fights), so nothing shows
-	in the Outpost or the lobby. Runs on its own once required.
+	in the Outpost or the lobby. The Outpost's creatures (wild kaiju, moon
+	bugs, kaiju) get no overhead bar even then: their bodies show their
+	health (BodyHealth); they're still in the list. Runs on its own once
+	required.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -61,6 +64,12 @@ local function healthOf(model: Model): number
 		return 0
 	end
 	return math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+end
+-- The Outpost's creatures: health on the body, not over it (BodyHealth).
+local function onBody(model: Model): boolean
+	return model:GetAttribute("KaijuWild") ~= nil
+		or model:GetAttribute("MoonBug") ~= nil
+		or model:GetAttribute("KaijuOwner") ~= nil
 end
 local function dropping(model: Model): boolean
 	return (model:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow()
@@ -274,7 +283,7 @@ RunService.RenderStepped:Connect(function(dt)
 		-- Bars for foes only; the rest come down.
 		local keep = {}
 		for _, model in foes do
-			if not dropping(model) and barFor(model) then
+			if not dropping(model) and not onBody(model) and barFor(model) then
 				keep[model] = true
 			end
 		end

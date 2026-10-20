@@ -16,7 +16,7 @@
 -- kaiju, what's coming) and the dock stay clear; the live feed steps aside
 -- while it's up (MobileLayout.claimTop). On a computer it's compact, in the
 -- bottom right corner above the key hints, clear of the middle of the
--- screen, the noise ring (FrontierHud) and a mech's HOP OUT; where a short
+-- screen, the RIFT CHARGED tag (FrontierHud) and a mech's HOP OUT; where a short
 -- window leaves no room above it, its row waits until it's gone.
 --
 --   MinerLoot.push(loot)        the server's loot for a rock you mined
@@ -46,8 +46,7 @@ local GAP = 6
 -- gem on it (Cell, its art Art), the words' places, and whether the Size,
 -- Clarity and Cut bars show (where: BarY, a bar every BarStep, its label
 -- BarLabelW wide, segments SegW x SegH every SegStep). Desk (a computer) is
--- compact, for the corner; Slim (a phone) is as wide as fits up there;
--- Short, a small phone's, has no room for a row under it.
+-- compact, for the corner; Slim (a phone) is as wide as fits up there.
 local DESK = {
 	Slim = false,
 	W = 272,
@@ -80,7 +79,6 @@ local DESK = {
 	RowText = 11,
 	RowWorthW = 72,
 	WorthOnName = false,
-	Short = false,
 }
 local SLIM = {
 	Slim = true,
@@ -107,30 +105,12 @@ local SLIM = {
 	RowText = 11,
 	RowWorthW = 64,
 	WorthOnName = true,
-	Short = false,
-}
--- (Slim and short: a small phone's, done above the board's strip.)
-local SHORT = {
-	H = MobileLayout.Loot.ShortH,
-	Pad = 4,
-	Well = 36,
-	Cell = 32,
-	Art = 28,
-	Spot = 24,
-	HeaderY = 4,
-	HeaderH = 11,
-	NameY = 15,
-	NameH = 18,
-	Name = 13,
-	WorthY = 17,
-	WorthH = 15,
-	Short = true,
 }
 local D = DESK -- (the sizes now: a card keeps the ones it was built with)
 -- On a computer, the corner it sits in: Right and Bottom from the screen's
 -- edges (above the key hints: OutpostScene), and rows above it no higher
--- than Below past the middle of the screen (the noise ring and its tag end
--- there: FrontierHud).
+-- than Below past the middle of the screen (well clear of the RIFT CHARGED
+-- tag just under it: FrontierHud).
 MinerLoot.Corner = { Right = 16, Bottom = 56, Below = 104 }
 local TARGET = 14 -- the reel position the found gem sits at
 local SEGMENTS = 10
@@ -225,7 +205,7 @@ end
 
 -- Where everything sits. On a computer: compact, in the bottom right corner
 -- (MinerLoot.Corner), rows above it (newest first, as many as fit below the
--- noise ring, two at most). On a phone or a tablet (touch, or a short
+-- RIFT CHARGED tag, two at most). On a phone or a tablet (touch, or a short
 -- window): slim, at the top middle, one row under it. Where no row fits
 -- beside the card, it shows once the card's gone.
 local function fit()
@@ -238,11 +218,6 @@ local function fit()
 	local dims = DESK
 	if spot then
 		dims = table.clone(SLIM)
-		if spot.H < SLIM.H then
-			for key, value in SHORT do
-				dims[key] = value
-			end
-		end
 		dims.W = spot.W
 	end
 	if dims.W ~= D.W or dims.H ~= D.H or dims.Slim ~= D.Slim then
@@ -254,7 +229,7 @@ local function fit()
 	if spot then
 		holder.AnchorPoint = Vector2.new(0, 0)
 		holder.Position = UDim2.fromOffset(spot.X, spot.Y)
-		maxRows, rowsWait = 1, D.Short
+		maxRows, rowsWait = 1, false
 	else
 		-- (Clear of a mech's HOP OUT, which is bottom middle.)
 		local corner = MinerLoot.Corner
@@ -279,8 +254,8 @@ local function rowTop(index: number): number
 end
 
 function layout()
-	-- (No room for a row beside the card, a small phone's under its short
-	-- card or a short window's above it: the row waits while a card's up.)
+	-- (No room for a row above the card, a short window's: the row waits
+	-- while a card's up.)
 	local hide = rowsWait and cardUi ~= nil
 	for index, item in stack.Rows do
 		local row = rows[item.Id]

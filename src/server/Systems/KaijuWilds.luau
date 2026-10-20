@@ -1495,11 +1495,6 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 	})
 	local e = enemy :: any
 	local engagedBy = {}
-	-- (Its name over it from further off than a creature's: they roam far.)
-	local board = enemy.Root:FindFirstChild("HealthBar")
-	if board and board:IsA("BillboardGui") then
-		board.MaxDistance = 160
-	end
 	e.OutpostCreature = true
 	e.Engaged = engagedBy -- (the kaiju out only fight it for those who started on it)
 	e.Brain = brain

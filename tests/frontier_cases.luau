@@ -6,8 +6,8 @@
 -- (Shared.Outpost.Zones: the same mix everywhere, more luck), mining noise and incursions, stirring the
 -- frontier up (it builds with swings, settles when you stop, and brings more, higher-levelled critters), fair shares,
 -- critter levels and EXP, where rifts open (wandering ones too), their
--- timeline, their ragged, lopsided tears, and the HUD's noise ring and
--- arrows.
+-- timeline, their ragged, lopsided tears, and the HUD's banners and arrows
+-- (no noise ring).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -569,19 +569,10 @@ for _, band in Frontier.BandOrder do
 	local lines = FrontierHud.Lines[band]
 	check(lines and #lines[1] > 0 and #lines[2] > 0 and lines[1] == string.upper(lines[1]), band .. " has no banner")
 end
--- The noise ring: twenty dots, in twentieths.
-check(FrontierHud.lit(nil) == 0 and FrontierHud.lit(0.5) == 10 and FrontierHud.lit(1.4) == 20, "The noise ring's dots")
--- The stirred-up row: nothing while calm, then the stage's name over a bar,
--- warmer as it swarms.
-check(FrontierHud.stirRow(nil) == nil and FrontierHud.stirRow(0.2) == nil, "A calm frontier showed a stirred-up row")
-local restless, restlessColor, restlessFill = FrontierHud.stirRow(0.3)
-check(restless == "RESTLESS" and math.abs(restlessFill - 0.3) < 1e-9, "The restless row")
-local swarming, swarmingColor, swarmingFill = FrontierHud.stirRow(1.7)
-check(swarming == "SWARMING" and swarmingFill == 1, "The swarming row")
-check(swarmingColor ~= restlessColor and swarmingColor.G < restlessColor.G, "Swarming isn't redder than restless")
-for i, stage in Frontier.Disturbance.Stages do
-	local text = FrontierHud.stirRow(stage.At)
-	check(i == 1 or text == string.upper(stage.Name), "Stage " .. i .. "'s row")
+-- The noise ring and stirred-up meter are off the HUD (the screen stays
+-- the game's); each stage past calm still has its note.
+check(FrontierHud.lit == nil and FrontierHud.stirRow == nil, "The noise ring is back on the HUD")
+for i in Frontier.Disturbance.Stages do
 	check(i == 1 or Frontier.Disturbance.Notes[i] ~= nil, "Nobody's told of stage " .. i)
 end
 -- Arrows for rifts off screen: on the screen's edge, pointing at it.

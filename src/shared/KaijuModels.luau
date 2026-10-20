@@ -387,6 +387,31 @@ function KaijuModels.build(species: string, element: string): Model
 	return model
 end
 
+-- A kaiju in a portrait (the HUD's and the roll's ViewportFrames). A
+-- ViewportFrame has no sky and no sun bouncing off the ground, so the slate
+-- hide that reads fine in the world sat near black there: portraits light
+-- it brighter, from the camera's side, and lift the hide Lift of the way
+-- toward Hide. The plates, claws and glows keep their colours.
+KaijuModels.Portrait = {
+	Ambient = C(196, 198, 210),
+	LightColor = C(222, 216, 204),
+	LightDirection = V(-0.55, -0.75, 0.6),
+	Hide = C(150, 162, 192),
+	Lift = 0.4,
+}
+local function sameColor(a: Color3, b: Color3): boolean
+	return math.abs(a.R - b.R) + math.abs(a.G - b.G) + math.abs(a.B - b.B) < 1.5 / 255
+end
+function KaijuModels.forPortrait(model: Model): Model
+	local look = KaijuModels.Portrait
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and (sameColor(part.Color, BODY) or sameColor(part.Color, BODY2)) then
+			part.Color = part.Color:Lerp(look.Hide, look.Lift)
+		end
+	end
+	return model
+end
+
 -- Resizes a kaiju, keeping its joints' rest poses (and its hip height) right.
 function KaijuModels.scale(model: Model, scale: number)
 	local before = model:GetScale()

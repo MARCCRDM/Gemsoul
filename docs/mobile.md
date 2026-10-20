@@ -37,13 +37,12 @@ phone game should be.
 - **The "online" pill is gone.** PLAY stands alone at the bottom centre.
 - **The six buttons under PLAY** are icons with their name small under
   them, 44 points tall.
-- **Tasks:** a small TASKS button (112 x 34), and right under it the next
-  task as one slim strip: its name and reward over a thin bar. Tap it to
-  open Tasks. After the first Tasks pages, the strip shows the next daily
-  challenge instead.
+- **Tasks:** a TASKS tile in the dock under PLAY (a clipboard), with a gold
+  count of what's still to do. The top right corner is empty: no TASKS
+  button and no task or challenge strip (the challenges are the Tasks
+  window's DAILY page). See [play-screen.md](play-screen.md).
 - **No BUG button** on a phone. The same form is SOCIAL's Feedback button.
-- **The live feed** fits in the gap between the pick card and the task
-  strip, so on a small phone they don't overlap.
+- **The live feed** fits right of the pick card.
 
 ![The lobby on a small phone, before and after](mobile/lobby-small-phone.png)
 
@@ -81,15 +80,11 @@ you, your kaiju and what's coming:
   [mining-loot.md](mining-loot.md#phones-and-spanish).
 - **PLAY** is narrower and shorter (184 x 38), and so is the dock under
   it, so it takes up less of the bottom of the screen.
-- **TASKS and the task strip** are smaller and tucked into the top right
-  (`MobileLayout.tasks`, `MobileLayout.board`).
-- **Names over heads** (`Nameplates`, every few frames from `KaijuHud`):
-  - your own kaiju have no name (the team strip has them), and their bar
-    shows only while one is hurt;
-  - another player's kaiju show theirs from 30 studs;
-  - wild kaiju show theirs from 60 studs, and critters from 45;
-  - wild kaiju and critters show nothing while you hunt, since the fight's
-    own bars take over.
+- **TASKS** moved into the dock (there's no button or strip at the top
+  right now).
+- **Nothing over creatures' heads**: no names or health bars over kaiju,
+  wild kaiju or critters. Their bodies show how hurt they are
+  (`BodyHealth`; see [play-screen.md](play-screen.md)).
 
   The names are smaller too. A computer keeps the longer distances (70,
   160 and 90), but there too your own kaiju go unnamed, and their bar shows
@@ -238,9 +233,9 @@ get out from under Roblox's buttons, which it used to sit under.
 | `UiKit.topbar(width)`, `UiKit.onTopbar(fn)`, `UiKit.reserveTopbar(width)` | The strip Roblox's buttons sit in, a call when it changes, and room in it for DEV (see [Roblox's buttons](#roblox-s-buttons)) |
 | `UiKit.fit(label)` | Keeps a one-line label at its size, shrinking it only when its words don't fit |
 | `UiKit.shrinkRow(row, list)` | Shrinks a row laid out side by side to its parent's width when its contents outgrow it |
-| `MobileLayout.loot(screen)`, `tasks(screen)`, `board(screen)` | Where the slim loot card, TASKS and the task strip go on a phone |
+| `MobileLayout.loot(screen)` | Where the slim loot card goes on a phone |
 | `MobileLayout.claimTop(owner, on)`, `topClaimed()`, `onTop(fn)` | Who has the top middle (the loot card), so the feed can step aside |
-| `Nameplates.rule(kind, phone, hurt, shown)`, `Nameplates.apply(board, rule)` | When and from how far a creature's name and bar show |
+| `BodyHealth.watch(model)` | A creature's health on its body, not over its head |
 
 ## Also fixed
 

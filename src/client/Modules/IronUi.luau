@@ -299,6 +299,17 @@ function IronUi.emblem(parent: Instance, kind: string, color: Color3, size: numb
 		corner(outline(0.08, 0.5, 0.42, 0.34), UDim.new(0.3, 0))
 		bar(0.6, 0.47, 0.3, 0.07)
 		bar(0.715, 0.355, 0.07, 0.3)
+	elseif kind == "Tasks" then
+		-- A clipboard: its clip, a ticked line and two to do.
+		corner(outline(0.2, 0.16, 0.6, 0.72), UDim.new(0.12, 0))
+		bar(0.36, 0.1, 0.28, 0.1)
+		bar(0.29, 0.4, 0.1, 0.055, 45)
+		bar(0.33, 0.37, 0.16, 0.055, -50)
+		bar(0.52, 0.38, 0.2, 0.055)
+		for _, y in { 0.55, 0.7 } do
+			bar(0.3, y, 0.07, 0.055)
+			bar(0.43, y, 0.29, 0.055)
+		end
 	else
 		for i = 0, 2 do
 			local coin = outline(0.2 + i * 0.1, 0.17 + i * 0.16, 0.45, 0.3)

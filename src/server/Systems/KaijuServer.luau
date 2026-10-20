@@ -115,8 +115,6 @@ export type Pet = {
 	DodgeUntil: number,
 	BlockedAt: number?,
 	Dots: { { PerTick: number, Ticks: number, Element: string?, Next: number } },
-	Fill: Frame,
-	Label: TextLabel,
 	-- Its owner standing about: where (its spot by them) and since when, and
 	-- what it's doing meanwhile ({ Mood, Until, To? }: Kaiju.Roam.Pet).
 	IdleSpot: Vector3?,
@@ -230,45 +228,6 @@ function KaijuServer.place(model: Model, point: Vector3, look: Vector3?)
 	model:PivotTo(CFrame.lookAt(at, facing))
 end
 
--- Its nameplate: owner, name and level over a health bar.
-local function nameplate(pet: Pet)
-	local head = pet.Model:FindFirstChild("Head") :: BasePart?
-	local height = if head then head.Position.Y - pet.Root.Position.Y + head.Size.Y / 2 + 1.2 else 3
-	local board = Instance.new("BillboardGui")
-	board.Name = "KaijuPlate"
-	board.Size = UDim2.fromOffset(140, 30)
-	board.StudsOffsetWorldSpace = Vector3.new(0, height, 0)
-	board.MaxDistance = 70
-	board.Parent = pet.Root
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Size = UDim2.new(1, 0, 0, 16)
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 13
-	label.TextColor3 = GemConfig.ElementColors[pet.Element] or Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.4
-	label.Parent = board
-	local back = Instance.new("Frame")
-	back.BackgroundColor3 = Color3.fromRGB(20, 18, 16)
-	back.BorderSizePixel = 0
-	back.Position = UDim2.fromOffset(25, 18)
-	back.Size = UDim2.new(1, -50, 0, 6)
-	back.Parent = board
-	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
-	fill.BackgroundColor3 = Color3.fromRGB(96, 214, 120)
-	fill.BorderSizePixel = 0
-	fill.Size = UDim2.fromScale(1, 1)
-	fill.Parent = back
-	pet.Fill, pet.Label = fill, label
-end
-
-local function refreshPlate(pet: Pet)
-	local h = pet.Humanoid
-	pet.Fill.Size = UDim2.fromScale(math.clamp(h.Health / math.max(1, h.MaxHealth), 0, 1), 1)
-	pet.Label.Text = string.format("%s · Lv %d", Kaiju.title(pet.Record), pet.Record.Level)
-end
-
 -- Its health kept on its record (saved: it never comes back on its own).
 local function keepHealth(pet: Pet)
 	pet.Record.Health = math.max(0, math.floor(pet.Humanoid.Health + 0.5))
@@ -295,7 +254,6 @@ local function refresh(pet: Pet)
 	model:SetAttribute("KaijuExp", record.Exp or 0)
 	local next = Kaiju.expToNext(record.Level)
 	model:SetAttribute("KaijuExpNext", if next == math.huge then 0 else next)
-	refreshPlate(pet)
 end
 
 -- Out and back ------------------------------------------------------------------------------------
@@ -371,8 +329,6 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		GuardBrokenUntil = 0,
 		DodgeUntil = 0,
 		Dots = {},
-		Fill = nil :: any,
-		Label = nil :: any,
 		Slot = slot,
 	}
 	pet.Fighter = KaijuFighter.new({
@@ -395,7 +351,6 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	})
 	humanoid.MaxHealth = pet.Stats.Health
 	humanoid.Health = math.clamp(Kaiju.health(record), 1, pet.Stats.Health)
-	nameplate(pet)
 	refresh(pet)
 	KaijuServer.place(model, spotBy(root, slot), root.Position + root.CFrame.LookVector * 10)
 	model.Parent = folder
@@ -570,6 +525,14 @@ local function fair(owner: Player, enemy): boolean
 	end
 	local engaged = (enemy :: any).Engaged
 	return engaged == nil or engaged[owner] ~= nil
+end
+
+-- In a fight: on a foe that's still up and still its owner's to fight. (A
+-- kaiju in one sees it through, however far its owner walks off, up to
+-- Kaiju.Follow.Battle.)
+local function inFight(pet: Pet, owner: Player): boolean
+	local foe = pet.Target
+	return foe ~= nil and foe.Alive and fair(owner, foe)
 end
 
 -- Creatures its foes are (KaijuWilds marks them OutpostCreature), inside a
@@ -763,7 +726,6 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 		return outcome
 	end
 	if outcome == "Guarded" then
-		refreshPlate(pet)
 		return outcome -- (a guard keeps out what the element leaves)
 	end
 	-- (It flinches: CreatureAnimation.)
@@ -782,43 +744,58 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 	elseif status == "Vulnerable" then
 		pet.VulnerableUntil = now + 6
 	end
-	refreshPlate(pet)
 	return outcome
 end
 
 -- Fighting as a team (Shared.Squad): the creatures near its owner shared
 -- out among the team fit to fight (out, not recalled, not run off past the
--- leash): each its own while there are enough to go round, else as evenly
--- as can be, a creature after it (or after its owner, more so) counting
--- nearer, and the one it's on kept unless another is well nearer (one it's
--- on stays in the running a little past the engage range). Where two or more
--- share one, the side of it each fights from. Returns { [pet]: enemy } and
--- { [pet]: flank }.
+-- leash, or past Battle if it's in a fight): each its own while there are
+-- enough to go round, else as evenly as can be, a creature after it (or
+-- after its owner, more so) counting nearer, and the one it's on kept unless
+-- another is well nearer. The one it's on stays in the running while it's a
+-- little past the engage range of its owner or of the kaiju itself (a fight
+-- isn't dropped because its owner walked off), and so does a creature after
+-- a kaiju fighting away from its owner. Where two or more share one, the
+-- side of it each fights from. Returns { [pet]: enemy } and { [pet]: flank }.
 local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 	local engage = Kaiju.Follow.Engage
 	local fighters = {}
 	for _, pet in petsOf(player) do
 		local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
-		if pet.Model.Parent and pet.Humanoid.Health > 0 and now >= pet.RecallUntil and away <= Kaiju.Follow.Leash then
+		local inRange = away <= Kaiju.Follow.Leash or (inFight(pet, player) and away <= Kaiju.Follow.Battle)
+		if pet.Model.Parent and pet.Humanoid.Health > 0 and now >= pet.RecallUntil and inRange then
 			table.insert(fighters, pet)
 		end
 	end
 	local foes, listed = {}, {}
+	local function list(enemy)
+		if not listed[enemy] then
+			table.insert(foes, enemy)
+			listed[enemy] = true
+		end
+	end
 	for _, entry in creaturesNear(ownerRoot.Position, engage, player) do
-		table.insert(foes, entry.Enemy)
-		listed[entry.Enemy] = true
+		list(entry.Enemy)
 	end
 	for _, pet in fighters do
 		local current = pet.Target
 		if
 			current
-			and not listed[current]
-			and current.Alive
-			and fair(player, current)
-			and (current.Root.Position - ownerRoot.Position).Magnitude <= engage + 12
+			and inFight(pet, player)
+			and (
+				(current.Root.Position - ownerRoot.Position).Magnitude <= engage + 12
+				or (current.Root.Position - pet.Root.Position).Magnitude <= engage + 12
+			)
 		then
-			table.insert(foes, current)
-			listed[current] = true
+			list(current)
+		end
+		-- (Off fighting away from its owner: what comes at it there too.)
+		if flat(ownerRoot.Position - pet.Root.Position).Magnitude > engage then
+			for _, entry in creaturesNear(pet.Root.Position, engage, player) do
+				if (entry.Enemy :: any).Foe == pet then
+					list(entry.Enemy)
+				end
+			end
 		end
 	end
 	local targets = Squad.assign(fighters, foes, function(pet, enemy)
@@ -965,7 +942,10 @@ local function think(pet: Pet, now: number, _dt: number)
 		end
 	end
 	local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
-	if away > Kaiju.Follow.Teleport then
+	-- In a fight it sees it through, however far you've walked off to mine
+	-- (up to Kaiju.Follow.Battle): no running back, no putting back beside you.
+	local fighting = inFight(pet, owner) and away <= Kaiju.Follow.Battle
+	if away > Kaiju.Follow.Teleport and not fighting then
 		pet.Target = nil
 		KaijuFighter.calm(pet.Fighter)
 		KaijuServer.place(pet.Model, spotBy(ownerRoot, pet.Slot), ownerRoot.Position)
@@ -973,7 +953,7 @@ local function think(pet: Pet, now: number, _dt: number)
 	end
 	local recalled = now < pet.RecallUntil
 	local target, flank = nil, nil
-	if not recalled and away <= Kaiju.Follow.Leash then
+	if not recalled and (away <= Kaiju.Follow.Leash or fighting) then
 		local targets, flanks = teamPlan(owner, ownerRoot, now)
 		target, flank = targets[pet], flanks[pet]
 	end
@@ -1209,7 +1189,6 @@ local function applyHeal(player: Player, record, pet: Pet?, plan)
 	record.Health = math.max(1, math.floor(plan.Health + 0.5))
 	if pet then
 		pet.Humanoid.Health = math.min(pet.Humanoid.MaxHealth, record.Health)
-		refreshPlate(pet)
 		petFx("TriadAura", pet.Root, nil, pet.Element, "Heal", 1.5)
 	end
 	PlayerData.sync(player)

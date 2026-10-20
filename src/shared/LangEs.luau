@@ -161,6 +161,9 @@ return {
 	["Invite"] = "Invitar",
 	["Ranks"] = "Ranking",
 	["Tasks"] = "Tareas",
+	["Daily"] = "Diarios",
+	["All three today"] = "Los tres de hoy",
+	["Finish today's three challenges for a bonus."] = "Completa los tres desafíos de hoy y gana un extra.",
 	["Elements"] = "Elementos",
 	["Your gems"] = "Tus gemas",
 	["Loading"] = "Cargando",
@@ -205,7 +208,6 @@ return {
 
 	-- Lobby -------------------------------------------------------------------------------------------------
 	["PLAY"] = "JUGAR",
-	["TASKS  {1}/{2}"] = "TAREAS  {1}/{2}",
 	["🐞 REPORT A BUG"] = "🐞 REPORTAR FALLO",
 	["🐞 BUG"] = "🐞 FALLO",
 	["🐞 Bug"] = "🐞 Fallo",
@@ -240,7 +242,6 @@ return {
 	["NEXT UNLOCK"] = "PRÓXIMO DESBLOQUEO",
 	["{1} DUELS"] = "{1} DUELOS",
 	["{1} DUEL"] = "{1} DUELO",
-	["NEXT TASK"] = "SIGUIENTE TAREA",
 	["Casual 1v1"] = "Casual 1v1",
 	["Ranked 1v1"] = "Clasificatoria 1v1",
 	["Dungeon & Casual"] = "Mazmorra y Casual",

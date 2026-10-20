@@ -195,8 +195,11 @@ function Kaiju.size(scale: number): number
 end
 
 -- Your kaiju beside you: it takes on creatures within Engage studs of you,
--- runs back past Leash, and is put back beside you past Teleport.
-Kaiju.Follow = { Engage = 28, Leash = 45, Teleport = 90, Gap = 5 }
+-- runs back past Leash, and is put back beside you past Teleport. One in a
+-- fight sees it through, though: walk off to mine and it stays on its foe
+-- (and on whatever comes at it there) till the foe is down, unless you get
+-- Battle studs away (then it gives up and comes back to you).
+Kaiju.Follow = { Engage = 28, Leash = 45, Battle = 150, Teleport = 90, Gap = 5 }
 
 -- Fighting as a team (Shared.Squad): your kaiju share out the creatures (each
 -- its own while there are enough), flank one they share, and keep Space

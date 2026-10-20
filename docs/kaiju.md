@@ -156,6 +156,11 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   once you've started a fight with that one (see [Wild kaiju](#wild-kaiju)).
   They follow you everywhere in the Outpost (put back beside you if one falls
   far behind) and go away in a fight, a match or an expedition.
+- **They see a fight through.** Walk off to mine mid-fight and a kaiju
+  stays on its foe (and on whatever comes at it there) until the foe is
+  down. Only past 150 studs (`Kaiju.Follow.Battle`) does it give up and come
+  back to you. Out of a fight, it still runs back past 45 studs and is put
+  back beside you past 90.
 - **EXP** goes to each of them out: for kills and for the rocks you mine.
 - **Recall.** The server can still call all of them back to you for 4
   seconds (`KaijuRecall`), but the strip no longer has a button for it:
@@ -249,21 +254,15 @@ On a computer the strip sits at the bottom left, TAME above it:
 - **The Gem Vault** shows a Gemsoul's branches as the moves a kaiju casts,
   with KAIJU LV 5 by Q and KAIJU LV 10 by R.
 
-### Names over heads
+### Health on the body, nothing over heads
 
-`Nameplates` keeps the names and bars over creatures out of the way.
-`KaijuHud` applies its rules every few frames.
-
-| Over | Shows | From (computer / phone) |
-| --- | --- | --- |
-| Your own kaiju | No name (the strip has them); the bar only while it's hurt | 70 / 70 studs |
-| Another player's kaiju | Name and bar | 70 / 30 studs |
-| A wild kaiju | Name and bar, except while you hunt (the fight's bars take over) | 160 / 60 studs |
-| A critter | Name and bar, except while you hunt | 90 / 45 studs |
-
-On a phone the names are smaller (11 points, not 13). Before this, a few
-plates could pile up over the middle of a phone's screen. See
-[mobile.md](mobile.md#mining-in-the-outpost).
+Nothing floats over a creature's head: no name and no health bar over your
+kaiju, other players' kaiju, wild kaiju or critters (they piled up over the
+fight). Each body shows its own health instead (`BodyHealth`, handed every
+creature by `KaijuHud`): its colours sink toward a scorched red-black as it's
+hurt, it flashes white on every blow, and below 30% it smokes. Glowing parts
+keep their light. Your own team's health is on the team strip. See
+[play-screen.md](play-screen.md#health-on-the-body).
 
 ## Hunting
 
@@ -699,5 +698,5 @@ the glow pulses, a cast draws two beams from your hand and twelve motes
 that close in, the bar fills, and it ends on TAMED! or TAME BROKEN and
 goes.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
-card's place on every phone. `tests/run_nameplates.py` covers the
-nameplate rules, and that applying them changes only what differs.
+card's place on every phone. `tests/run_body_health.py` covers health on
+the body (the tint, the flash, the smoke, a heal, the glows left alone).

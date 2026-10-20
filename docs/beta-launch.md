@@ -114,7 +114,8 @@ is logged once per account:
 ## The lobby: next task and bug reports
 
 (The lobby has grown since: daily challenges, a live feed and a welcome-back
-banner. See [lobby.md](lobby.md).)
+banner. See [lobby.md](lobby.md). And the next task has left the play screen:
+Tasks open from the menu's TASKS tile. See [play-screen.md](play-screen.md).)
 
 **Next task.** The right-hand panel shows the next task, with:
 - its one-line hint;

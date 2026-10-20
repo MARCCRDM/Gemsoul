@@ -6,21 +6,17 @@
 	                    progress and coins, the all-three bonus, and when new
 	                    ones arrive
 	  NEXT UNLOCK       only while a mode is still locked
-	  NEXT TASK         the next Tasks step with its hint; tapping it opens
-	                    the Tasks window
 
-	On a computer each card is folded to a row: its title, one line of what
-	matters (tomorrow's reward, the next challenge, the task) and a thin bar.
-	Tapping the streak or the challenges opens that card (one at a time; tap
-	again to fold it); tapping the next task opens the Tasks window.
+	Each card is folded to a row: its title, one line of what matters
+	(tomorrow's reward, the next challenge) and a thin bar. Tapping the
+	streak or the challenges opens that card (one at a time; tap again to
+	fold it). Tasks aren't on it: they open from the menu's TASKS tile.
 
-	On a phone (compact) there's room for one slim strip: the next task while
-	the player is still learning (the first two Tasks pages), the challenges
-	after (the next one still to do). Each is one line, its reward on the
-	right, over a thin progress bar.
+	On a phone (compact) it's off the screen, which stays the game's: the
+	challenges are the Tasks window's DAILY page there.
 
 	  LobbyBoard.mount(gui)        builds it in the lobby's ScreenGui
-	  LobbyBoard.setCompact(on)    phone layout
+	  LobbyBoard.setCompact(on)    phone (the board steps off the screen)
 	  LobbyBoard.setHidden(on)     out of the way (the PLAY menu is open)
 	  LobbyBoard.refresh()         redraw from GemClient.Profile (it redraws
 	                               itself as the profile changes, while the
@@ -30,24 +26,21 @@
 	  LobbyBoard.Frame             the column (LobbyUI places it)
 	  -> LobbyBoard.layout() returns the column's height (0: nothing to show)
 ]]
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Daily = require(ReplicatedStorage.Shared.DailyChallenges)
-local Training = require(ReplicatedStorage.Shared.TrainingRewards)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
-local player = Players.LocalPlayer
 local P = IronUi.Colors
 local new = IronUi.new
 
 local LobbyBoard = {}
 
-local WIDE, NARROW = 224, 236
+local WIDE = 224
 local PANEL = Color3.fromRGB(14, 19, 29)
 local EDGE = Color3.fromRGB(72, 88, 112)
 local TRACK = Color3.fromRGB(40, 52, 70)
@@ -102,12 +95,12 @@ local function setFill(fill: Frame, share: number, animate: boolean)
 	end
 end
 
--- How tall a card is folded to a row (a computer) and as a phone's strip.
-local ROW, STRIP = 48, 38
--- The card open on a computer (nil: all folded).
+-- How tall a card is folded to a row.
+local ROW = 48
+-- The card open (nil: all folded).
 local expanded: string? = nil
 local function mode(key: string): string
-	return if compact then "phone" elseif expanded == key then "open" else "folded"
+	return if expanded == key then "open" else "folded"
 end
 
 -- A card: a dark glass panel, a coloured edge, a title and a note on the right.
@@ -152,28 +145,21 @@ local function card(name: string, order: number, accent: Color3, title: string)
 	return frame, note, heading, edge, chevron
 end
 
--- The title row for a mode: the title, the note (left of the chevron on a
--- computer), the coloured edge and the chevron (`mark`: which way it points
--- folded, "Down" for a card that opens or "Right" for one that opens a window).
-local TURN = { Down = 90, Right = 0 }
-local function placeTop(m: string, heading, note, edge, chevron, mark: string?)
+-- The title row for a mode: the title, the note (left of the chevron), the
+-- coloured edge and the chevron (down while folded, up while open).
+local function placeTop(m: string, heading, note, edge, chevron)
 	local y = if m == "open" then 10 else 5
-	heading.Visible = m ~= "phone"
 	heading.Position, heading.Size = UDim2.fromOffset(14, y), UDim2.new(1, -96, 0, 22)
-	note.Position = if m == "phone" then UDim2.new(1, -12, 0, 5) else UDim2.new(1, -28, 0, y)
-	edge.Position = UDim2.fromOffset(0, if m == "phone" then 10 elseif m == "open" then 12 else 15)
-	chevron.Visible = m ~= "phone" and mark ~= nil
+	note.Position = UDim2.new(1, -28, 0, y)
+	edge.Position = UDim2.fromOffset(0, if m == "open" then 12 else 15)
 	chevron.Position = UDim2.new(1, -8, 0, y)
-	chevron.Rotation = if m == "open" then -90 else TURN[mark] or 0
+	chevron.Rotation = if m == "open" then -90 else 90
 end
 
 -- Tapping a folded card opens it (and folds the one that was open).
 local function toggle(frame: TextButton, key: string)
 	IronUi.juice(frame, 1.02, 0.98)
 	frame.Activated:Connect(function()
-		if compact then
-			return
-		end
 		expanded = if expanded == key then nil else key
 		LobbyBoard.refresh()
 		LobbyBoard.layout()
@@ -204,7 +190,7 @@ local function buildStreak()
 	week.Position, week.Size = UDim2.fromOffset(14, 41), UDim2.new(1, -28, 0, 3)
 	local function place()
 		local m = mode("Streak")
-		placeTop(m, heading, note, edge, chevron, "Down")
+		placeTop(m, heading, note, edge, chevron)
 		for _, entry in dots do
 			entry.Dot.Visible = m == "open"
 		end
@@ -287,7 +273,7 @@ local function buildChallenges()
 	end
 	local bonus = label(frame, "", 11, P.Dim, IronUi.Heading)
 	bonus.RichText = true
-	-- Folded (and the phone's strip): the next challenge still to do, over its
+	-- Folded: the next challenge still to do, over its
 	-- bar (its count goes by the reward, so the name stays a string the
 	-- Spanish table knows).
 	local line = label(frame, "", 12, P.Text)
@@ -303,26 +289,18 @@ local function buildChallenges()
 	end
 	local function place()
 		local h = rowHeight()
-		local width = if compact then NARROW else WIDE
 		local m = mode("Challenges")
-		placeTop(m, heading, note, edge, chevron, "Down")
+		placeTop(m, heading, note, edge, chevron)
 		bonus.Visible = m == "open"
 		line.Visible, lineTrack.Visible, figure.Visible = m ~= "open", m ~= "open", m == "folded"
-		if m == "phone" then
-			line.Position, line.Size = UDim2.fromOffset(14, 6), UDim2.new(1, -104, 0, 20)
-			lineTrack.Position, lineTrack.Size = UDim2.fromOffset(14, 29), UDim2.new(1, -28, 0, 3)
-		else
-			line.Position, line.Size = UDim2.fromOffset(14, 21), UDim2.new(1, -110, 0, 16)
-			lineTrack.Position, lineTrack.Size = UDim2.fromOffset(14, 41), UDim2.new(1, -28, 0, 3)
-		end
+		line.Position, line.Size = UDim2.fromOffset(14, 21), UDim2.new(1, -110, 0, 16)
+		lineTrack.Position, lineTrack.Size = UDim2.fromOffset(14, 41), UDim2.new(1, -28, 0, 3)
 		for i, entry in rows do
 			entry.Row.Position, entry.Row.Size = UDim2.fromOffset(0, 38 + (i - 1) * h), UDim2.new(1, 0, 0, h)
 			entry.Name.Size = UDim2.new(1, -110, 0, 20)
-			entry.Hint.Visible = not compact
 			entry.Hint.Size = UDim2.new(1, -54, 0, 14)
-			local barY = if compact then 22 else 38
-			entry.Track.Position, entry.Track.Size = UDim2.fromOffset(40, barY), UDim2.fromOffset(width - 40 - 52, 4)
-			entry.Count.Position, entry.Count.Size = UDim2.new(1, -12, 0, barY - 5), UDim2.fromOffset(40, 14)
+			entry.Track.Position, entry.Track.Size = UDim2.fromOffset(40, 38), UDim2.fromOffset(WIDE - 40 - 52, 4)
+			entry.Count.Position, entry.Count.Size = UDim2.new(1, -12, 0, 33), UDim2.fromOffset(40, 14)
 		end
 		bonus.Position, bonus.Size = UDim2.fromOffset(14, 40 + 3 * h), UDim2.new(1, -28, 0, 18)
 	end
@@ -330,7 +308,7 @@ local function buildChallenges()
 		Frame = frame,
 		Height = function()
 			local m = mode("Challenges")
-			return if m == "phone" then STRIP elseif m == "open" then 40 + 3 * rowHeight() + 26 else ROW
+			return if m == "open" then 40 + 3 * rowHeight() + 26 else ROW
 		end,
 		Place = place,
 	}
@@ -361,9 +339,6 @@ local function buildChallenges()
 				nextUp.Goal,
 				nextUp.Coins
 			)
-			if compact then
-				note.Text = figure.Text
-			end
 			setFill(lineFill, nextUp.Count / nextUp.Goal, drawn)
 		else
 			line.Text = "Today's challenges done"
@@ -428,7 +403,9 @@ local function buildUnlock()
 			return ROW
 		end,
 		Place = function()
-			placeTop(mode("Unlock"), heading, note, edge, chevron, nil)
+			placeTop(mode("Unlock"), heading, note, edge, chevron)
+			chevron.Visible = false -- (nothing to open)
+			note.Position = UDim2.new(1, -12, 0, 5)
 		end,
 	}
 	refreshers.Unlock = function(profile)
@@ -444,76 +421,6 @@ local function buildUnlock()
 	end
 end
 
--- Next task -------------------------------------------------------------------------------------------
-
-local function openTasks()
-	local tasks = player.PlayerGui:FindFirstChild("TrainingRewards")
-	local open = tasks and tasks:FindFirstChild("OpenTasks")
-	if open and open:IsA("BindableEvent") then
-		open:Fire()
-	end
-end
-
-local learning = false -- still on the first Tasks pages (the phone shows the task then)
-
-local function buildTask()
-	local frame, note, heading, edge, chevron = card("NextTask", 4, CYAN, "NEXT TASK")
-	local name = label(frame, "", 13, P.Text)
-	name.Position, name.Size = UDim2.fromOffset(14, 32), UDim2.new(1, -28, 0, 18)
-	local hint = label(frame, "", 11, P.Dim, IronUi.Body)
-	hint.TextWrapped, hint.TextTruncate = true, Enum.TextTruncate.None
-	hint.TextYAlignment = Enum.TextYAlignment.Top
-	hint.Position, hint.Size = UDim2.fromOffset(14, 52), UDim2.new(1, -28, 0, 40)
-	local track, fill = bar(frame, CYAN)
-	track.Position, track.Size = UDim2.fromOffset(14, 96), UDim2.new(1, -72, 0, 5)
-	local count = label(frame, "", 10, P.Text, IronUi.Heading, Enum.TextXAlignment.Right)
-	count.AnchorPoint = Vector2.new(1, 0)
-	count.Position, count.Size = UDim2.new(1, -12, 0, 90), UDim2.fromOffset(44, 16)
-	frame.Activated:Connect(openTasks)
-	IronUi.juice(frame, 1.02, 0.98)
-	-- Folded to a row on a computer (its title, the task, its count and a
-	-- thin bar; the hint is in the Tasks window it opens); on a phone, one
-	-- slim strip: the task's name and its reward over a thin bar.
-	local function place()
-		local m = mode("NextTask")
-		placeTop(m, heading, note, edge, chevron, "Right")
-		hint.Visible, count.Visible = false, m ~= "phone"
-		if m == "phone" then
-			name.Position, name.Size = UDim2.fromOffset(14, 6), UDim2.new(1, -78, 0, 20)
-			track.Position, track.Size = UDim2.fromOffset(14, 29), UDim2.new(1, -28, 0, 3)
-		else
-			name.Position, name.Size = UDim2.fromOffset(14, 21), UDim2.new(1, -66, 0, 16)
-			count.Position, count.Size = UDim2.new(1, -12, 0, 21), UDim2.fromOffset(44, 16)
-			track.Position, track.Size = UDim2.fromOffset(14, 41), UDim2.new(1, -28, 0, 3)
-		end
-	end
-	cards.NextTask = {
-		Frame = frame,
-		Height = function()
-			return if compact then STRIP else ROW
-		end,
-		Place = place,
-	}
-	local drawn = false
-	refreshers.NextTask = function(profile)
-		local state = profile.TrainingRewards or {}
-		local paid = state.Paid or {}
-		local nextTask = Training.nextTask(paid)
-		local page = Training.currentPage(paid)
-		learning = page == "Mining" or page == "Equipment"
-		if nextTask then
-			local progress = math.min(nextTask.Goal, (state.Counts or {})[nextTask.Event] or 0)
-			name.Text = nextTask.Name
-			hint.Text = nextTask.Hint
-			note.Text = '<font color="#FFCA5B">+' .. nextTask.Coins .. " ◆</font>"
-			count.Text = progress .. "/" .. nextTask.Goal
-			setFill(fill, progress / nextTask.Goal, drawn)
-			drawn = true
-		end
-		return nextTask ~= nil
-	end
-end
-
 -- The column ------------------------------------------------------------------------------------------
 
 function LobbyBoard.mount(gui: ScreenGui)
@@ -525,11 +432,9 @@ function LobbyBoard.mount(gui: ScreenGui)
 	}, gui)
 	LobbyBoard.Frame = column
 	UiKit.list(column, 8, false)
-	Training.closeFor(Config.Features or {})
 	buildStreak()
 	buildChallenges()
 	buildUnlock()
-	buildTask()
 	-- Redrawn as the profile changes while the lobby is up, and as it shows
 	-- (a fight syncs the profile and counts challenges with nothing to see).
 	local function changed()
@@ -554,10 +459,7 @@ function LobbyBoard.mount(gui: ScreenGui)
 end
 
 function LobbyBoard.setCompact(on: boolean)
-	if on ~= compact then
-		compact = on
-		LobbyBoard.refresh() -- (the cards draw differently on a phone)
-	end
+	compact = on
 	LobbyBoard.layout()
 end
 
@@ -572,24 +474,26 @@ function LobbyBoard.layout(): number
 	if not column then
 		return 0
 	end
-	local width = if compact then NARROW else WIDE
-	-- One card on a phone: the next task while learning, the challenges after.
-	local phoneCard = if learning and has.NextTask then "NextTask" else "Challenges"
+	-- (Nothing on a phone: the screen there is the game's.)
+	if compact then
+		column.Visible = false
+		return 0
+	end
 	local height, shown = 0, 0
 	for key, entry in cards do
 		local frame = entry.Frame
-		frame.Visible = has[key] == true and (not compact or key == phoneCard)
+		frame.Visible = has[key] == true
 		if entry.Place then
 			entry.Place()
 		end
-		frame.Size = UDim2.fromOffset(width, entry.Height())
+		frame.Size = UDim2.fromOffset(WIDE, entry.Height())
 		if frame.Visible then
 			height += entry.Height()
 			shown += 1
 		end
 	end
 	height += math.max(0, shown - 1) * 8
-	column.Size = UDim2.fromOffset(width, math.max(height, 1))
+	column.Size = UDim2.fromOffset(WIDE, math.max(height, 1))
 	column.Visible = height > 0 and not hidden
 	return height
 end

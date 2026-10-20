@@ -45,8 +45,9 @@
 	                  KaijuDanger: Shared.Kaiju.Danger): IN A FIGHT then.
 	  The roll        a player still owed starter kaiju (from before the
 	                  roll, say) gets the roll here, once (KaijuRoll).
-	  Wild nameplates the server's health bar over wild kaiju and moon bugs
-	                  while you aren't hunting (FoeBars draws them while you are).
+	  No nameplates  nothing over a creature's head (yours, others', wild
+	                  kaiju, moon bugs): its body shows its health (BodyHealth,
+	                  handed every creature this finds).
 
 	  KaijuHud.start()     once, from Lobby.client
 	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
@@ -75,7 +76,7 @@ local KaijuTaming = require(script.Parent.KaijuTaming)
 local ChatFeed = require(script.Parent.ChatFeed)
 local LoadingFlow = require(script.Parent.LoadingFlow)
 local MobileLayout = require(script.Parent.MobileLayout)
-local Nameplates = require(script.Parent.Nameplates)
+local BodyHealth = require(script.Parent.BodyHealth)
 local OutpostScene = require(script.Parent.OutpostScene)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
@@ -135,9 +136,9 @@ end
 
 local function viewport(parent: Instance, props: { [string]: any }): ViewportFrame
 	props.BackgroundColor3 = props.BackgroundColor3 or TILE_BACK
-	props.Ambient = Color3.fromRGB(170, 170, 185)
-	props.LightColor = Color3.new(1, 1, 1)
-	props.LightDirection = Vector3.new(-0.4, -1, 0.6)
+	-- (Lit for a portrait: KaijuModels.Portrait.)
+	local look = KaijuModels.Portrait
+	props.Ambient, props.LightColor, props.LightDirection = look.Ambient, look.LightColor, look.LightDirection
 	return new("ViewportFrame", props, parent)
 end
 
@@ -153,7 +154,7 @@ local function modelFor(key: string, record): Model
 	if entry then
 		entry.Model:Destroy()
 	end
-	local model = KaijuModels.build(record.Species, record.Element)
+	local model = KaijuModels.forPortrait(KaijuModels.build(record.Species, record.Element))
 	built[key] = { Look = look, Model = model }
 	return model
 end
@@ -1690,33 +1691,20 @@ local function refresh()
 	end
 end
 
--- Nameplates over creatures (Nameplates): a wild one's and a critter's
--- (the server's bar, while you're not hunting), your own kaiju's (no name,
--- a slim bar while one's hurt) and other players' kaiju's; on a phone from
--- closer, smaller.
-local function plates()
-	local phone = UserInputService.TouchEnabled or gui.AbsoluteSize.Y < 540
-	local shown = not Spar.hunting(player) and wantShown
+-- Creatures show their health on their bodies (BodyHealth): wild kaiju
+-- and moon bugs (the server's HealthBar over them stays off), and every
+-- kaiju out.
+local function bodies()
 	local enemies = workspace:FindFirstChild("Enemies")
 	for _, model in if enemies then enemies:GetChildren() else {} do
-		local wild = model:GetAttribute("KaijuWild")
-		if wild or model:GetAttribute("MoonBug") then
-			local root = model.PrimaryPart
-			local board = root and root:FindFirstChild("HealthBar")
-			if board and board:IsA("BillboardGui") then
-				Nameplates.apply(board, Nameplates.rule(if wild then "Wild" else "Critter", phone, nil, shown))
-			end
+		if model:IsA("Model") and (model:GetAttribute("KaijuWild") or model:GetAttribute("MoonBug")) then
+			BodyHealth.watch(model)
 		end
 	end
 	local kaiju = workspace:FindFirstChild("Kaiju")
 	for _, model in if kaiju then kaiju:GetChildren() else {} do
-		local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
-		local board = root and root:FindFirstChild("KaijuPlate")
-		if board and board:IsA("BillboardGui") then
-			local humanoid = model:FindFirstChildOfClass("Humanoid")
-			local hurt = humanoid ~= nil and humanoid.Health < humanoid.MaxHealth * 0.995
-			local mine = model:GetAttribute("KaijuOwner") == player.UserId
-			Nameplates.apply(board, Nameplates.rule(if mine then "Mine" else "Other", phone, hurt))
+		if model:IsA("Model") then
+			BodyHealth.watch(model)
 		end
 	end
 end
@@ -1787,7 +1775,7 @@ function KaijuHud.start()
 		if not ok then
 			warn("[KaijuHud]", err)
 		end
-		pcall(plates)
+		pcall(bodies)
 		pcall(tickRevive)
 	end)
 end

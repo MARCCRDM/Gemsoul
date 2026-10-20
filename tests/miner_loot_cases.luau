@@ -163,20 +163,22 @@ local row = live("LootRow")[1]
 step(0.5)
 check(row.Position.Y.Offset >= slimSpot.H, "The row isn't under the slim card")
 check(row.Size.X.Offset == card().Size.X.Offset, "The row isn't the card's width")
--- A small phone's card is short, with the board's strip just under it: the
--- row waits while a card's up, then shows where the card was.
+-- A small phone's card is full height too (nothing's under it at the top
+-- right any more): the row shows under it while it's up, then moves up
+-- where the card was.
 gui.AbsoluteSize = { X = 667, Y = 339 }
 gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
-local short = MobileLayout.loot(gui.AbsoluteSize)
-check(short.H == MobileLayout.Loot.ShortH, "667x339 no longer gets the short card")
+local small = MobileLayout.loot(gui.AbsoluteSize)
+check(small.H == MobileLayout.Loot.H, "667x339 got a short card")
 Loot.push(gem("Uncommon", 4, 4, 4))
 step(0.1)
 row = live("LootRow")[1]
-check(card() and row and not row.Visible, "A row showed under a short card")
+check(card() and row and row.Visible, "A small phone's row didn't show under its card")
 step(5)
 row = live("LootRow")[1]
-check(card() == nil and row and row.Visible, "The row didn't come back once the short card folded")
-check(row.Position.Y.Offset + row.Size.Y.Offset <= short.H, "The row isn't where the short card was")
+check(card() == nil and row and row.Visible, "The row went once the card folded")
+step(0.5)
+check(row.Position.Y.Offset + row.Size.Y.Offset <= small.H, "The row isn't where the card was")
 Loot.push(gem("Common", 3, 4, 2))
 local holder = live("Stack")[1]
 gui.AbsoluteSize = { X = 1366, Y = 710 }

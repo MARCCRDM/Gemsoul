@@ -7,12 +7,8 @@
 	               where the critters start and how rich the rocks run. The
 	               same band's banner doesn't come back for a while
 	               (crossing to and fro at a boundary).
-	  the noise    a ring of twenty dots on the right, out past the core:
-	               how close your mining is to drawing critters
-	               (FrontierNoise, in twentieths). Nearly full, it glows red.
-	  stirred up   under it, once your mining has the frontier restless
-	               (FrontierStir; Frontier.Disturbance): its stage and a
-	               bar, gold to orange to red as it swarms.
+	  (No noise ring or stirred-up meter: the screen stays the game's. The
+	  critters coming are the sign.)
 	  arrows       a rift coming for you (its Prey is you) that opens off
 	               screen gets an arrow at the screen's edge, pointing at
 	               it, till its critter is out.
@@ -26,9 +22,6 @@
 
 	  FrontierHud.start()
 	  FrontierHud.Lines[band] -> title, subtitle   (pure, for tests)
-	  FrontierHud.lit(noise) -> dots lit (0..20)   (pure)
-	  FrontierHud.stirRow(stir) -> text?, color, fill   the stirred-up row:
-	      nil while calm (pure)
 	  FrontierHud.edge(size, point, margin) -> Vector2, angle   where an
 	      arrow sits for a point off screen (pure)
 	  FrontierHud.nearest(spots, from, reach) -> index?, studs   the nearest
@@ -51,37 +44,10 @@ FrontierHud.Lines = {
 }
 FrontierHud.Again = 20 -- seconds before the same band's banner shows again
 FrontierHud.Hold = 2.6
-FrontierHud.Dots = 20
-local RED = Color3.fromRGB(255, 80, 90)
-local DIM = Color3.fromRGB(60, 52, 76)
 
 local shown: { [string]: number } = {}
 FrontierHud.Sighting = 220 -- studs: how far off a wild kaiju gets an arrow
 local WILD = Color3.fromRGB(255, 176, 70)
-
--- Dots lit for `noise` (0..1).
-function FrontierHud.lit(noise: number?): number
-	return math.clamp(math.floor((noise or 0) * FrontierHud.Dots + 0.5), 0, FrontierHud.Dots)
-end
-
--- The stirred-up row's colour at each stage (none while calm).
-FrontierHud.StirColors = {
-	[2] = Color3.fromRGB(255, 206, 96),
-	[3] = Color3.fromRGB(255, 142, 64),
-	[4] = RED,
-}
-
--- The stirred-up row for `stir` (0..1): its text, colour and how full its
--- bar is; nil text while calm.
-function FrontierHud.stirRow(stir: number?): (string?, Color3, number)
-	local fill = math.clamp(stir or 0, 0, 1)
-	local index, stage = Frontier.stage(fill)
-	local color = FrontierHud.StirColors[index]
-	if not color then
-		return nil, DIM, fill
-	end
-	return string.upper(stage.Name), color, fill
-end
 
 -- Where an arrow sits for `point` (a screen point, possibly off screen or
 -- mirrored from behind the camera) on a screen of `size`, `margin` in from
@@ -196,125 +162,37 @@ local function banner(player: Player, gui: ScreenGui)
 	end)
 end
 
--- The noise ring, and the Rift Charged tag under it.
-local function noiseRing(player: Player, gui: ScreenGui)
-	local holder = Instance.new("Frame")
-	holder.Name = "Noise"
-	holder.AnchorPoint = Vector2.new(1, 0.5)
-	holder.Position = UDim2.new(1, -18, 0.5, 30)
-	holder.Size = UDim2.fromOffset(62, 80)
-	holder.BackgroundTransparency = 1
-	holder.Visible = false
-	holder.Parent = gui
-	local dots = {}
-	local radius = 24
-	for i = 1, FrontierHud.Dots do
-		local a = (i - 1) / FrontierHud.Dots * math.pi * 2 - math.pi / 2
-		local dot = Instance.new("Frame")
-		dot.AnchorPoint = Vector2.new(0.5, 0.5)
-		dot.Position = UDim2.fromOffset(31 + math.cos(a) * radius, 31 + math.sin(a) * radius)
-		dot.Size = UDim2.fromOffset(6, 6)
-		dot.BorderSizePixel = 0
-		dot.BackgroundColor3 = DIM
-		dot.Parent = holder
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(1, 0)
-		corner.Parent = dot
-		dots[i] = dot
-	end
-	local word = Instance.new("TextLabel")
-	word.BackgroundTransparency = 1
-	word.Position = UDim2.fromOffset(0, 22)
-	word.Size = UDim2.fromOffset(62, 18)
-	word.Font = Enum.Font.GothamBlack
-	word.TextSize = 10
-	word.Text = "NOISE"
-	word.TextColor3 = Color3.fromRGB(230, 225, 240)
-	word.TextStrokeTransparency = 0.5
-	word.Parent = holder
-	-- How stirred up: its stage over a thin bar.
-	local stirRow = Instance.new("Frame")
-	stirRow.Name = "Stirred"
-	stirRow.AnchorPoint = Vector2.new(1, 0)
-	stirRow.Position = UDim2.new(1, 0, 0, 62)
-	stirRow.Size = UDim2.fromOffset(84, 22)
-	stirRow.BackgroundTransparency = 1
-	stirRow.Visible = false
-	stirRow.Parent = holder
-	local stirWord = Instance.new("TextLabel")
-	stirWord.BackgroundTransparency = 1
-	stirWord.Size = UDim2.new(1, 0, 0, 13)
-	stirWord.Font = Enum.Font.GothamBlack
-	stirWord.TextSize = 10
-	stirWord.TextXAlignment = Enum.TextXAlignment.Right
-	stirWord.TextStrokeTransparency = 0.5
-	stirWord.Parent = stirRow
-	local stirBar = Instance.new("Frame")
-	stirBar.AnchorPoint = Vector2.new(1, 0)
-	stirBar.Position = UDim2.new(1, 0, 0, 15)
-	stirBar.Size = UDim2.new(1, 0, 0, 5)
-	stirBar.BorderSizePixel = 0
-	stirBar.BackgroundColor3 = DIM
-	stirBar.Parent = stirRow
-	local stirFill = Instance.new("Frame")
-	stirFill.BorderSizePixel = 0
-	stirFill.Size = UDim2.fromScale(0, 1)
-	stirFill.Parent = stirBar
-	for _, bar in { stirBar, stirFill } do
-		local round = Instance.new("UICorner")
-		round.CornerRadius = UDim.new(1, 0)
-		round.Parent = bar
-	end
+-- The Rift Charged tag on the right while it lasts (RiftCharged: gems come
+-- luckier). (The noise ring and the stirred-up meter are off the HUD: the
+-- critters coming say it well enough.)
+local function chargedTag(player: Player, gui: ScreenGui)
 	local charged = Instance.new("TextLabel")
 	charged.Name = "RiftCharged"
 	charged.BackgroundColor3 = Color3.fromRGB(40, 16, 64)
 	charged.BackgroundTransparency = 0.2
-	charged.AnchorPoint = Vector2.new(1, 0)
-	charged.Position = UDim2.new(1, 0, 0, 64)
+	charged.AnchorPoint = Vector2.new(1, 0.5)
+	charged.Position = UDim2.new(1, -18, 0.5, 30)
 	charged.Size = UDim2.fromOffset(132, 18)
 	charged.Font = Enum.Font.GothamBlack
 	charged.TextSize = 11
 	charged.TextColor3 = Frontier.RiftColor:Lerp(Color3.new(1, 1, 1), 0.35)
 	charged.Visible = false
-	charged.Parent = holder
+	charged.Parent = gui
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 5)
 	corner.Parent = charged
 
 	local function refresh()
-		local band = player:GetAttribute("FrontierBand")
-		local noise = player:GetAttribute("FrontierNoise")
-		local out = (band == "Fringe" or band == "Edge") and type(noise) == "number"
 		local ends = player:GetAttribute("RiftCharged")
 		local left = if type(ends) == "number" then ends - workspace:GetServerTimeNow() else 0
 		charged.Visible = left > 0
 		if left > 0 then
 			charged.Text = string.format("RIFT CHARGED · %ds", math.ceil(left))
 		end
-		holder.Visible = out or left > 0
-		local lit = FrontierHud.lit(noise)
-		local color = if lit >= FrontierHud.Dots - 3 then RED else Frontier.Bands[band or "Fringe"].Color
-		for i, dot in dots do
-			dot.Visible = out
-			dot.BackgroundColor3 = if i <= lit then color else DIM
-		end
-		word.Visible = out
-		local stirText, stirColor, stirShare = FrontierHud.stirRow(player:GetAttribute("FrontierStir"))
-		stirRow.Visible = out and stirText ~= nil
-		if stirRow.Visible then
-			stirWord.Text = stirText :: string
-			stirWord.TextColor3 = stirColor
-			stirFill.BackgroundColor3 = stirColor
-			stirFill.Size = UDim2.fromScale(stirShare, 1)
-		end
-		-- (Rift Charged sits under the stirred-up row when it shows.)
-		charged.Position = UDim2.new(1, 0, 0, if stirRow.Visible then 88 else 64)
 	end
-	for _, key in { "FrontierBand", "FrontierNoise", "FrontierStir", "RiftCharged" } do
-		player:GetAttributeChangedSignal(key):Connect(refresh)
-	end
+	player:GetAttributeChangedSignal("RiftCharged"):Connect(refresh)
 	refresh()
-	-- (The Rift Charged seconds tick down.)
+	-- (The seconds tick down.)
 	task.spawn(function()
 		while true do
 			task.wait(1)
@@ -488,7 +366,7 @@ function FrontierHud.start()
 	gui.DisplayOrder = 12
 	gui.Parent = player:WaitForChild("PlayerGui")
 	banner(player, gui)
-	noiseRing(player, gui)
+	chargedTag(player, gui)
 	arrows(player, gui)
 	sightings(player, gui)
 end

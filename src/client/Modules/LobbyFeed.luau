@@ -176,7 +176,7 @@ function LobbyFeed.welcome()
 		return
 	end
 	shownWelcome = true
-	-- (The Tasks button steps aside while it's up: TrainingRewards.client.)
+	-- (The Tasks window stays shut while it's up: TrainingRewards.client.)
 	root:SetAttribute("WelcomeOpen", true)
 	local shade = new("TextButton", {
 		Name = "Welcome",

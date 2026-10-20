@@ -57,8 +57,8 @@ compact (272 x 92) and in the bottom right corner (`MinerLoot.Corner`),
 above the key hints. The middle of the screen stays clear, and so does a
 mech's HOP OUT at the bottom middle, so the card no longer moves when you
 pilot. It keeps the Size, Clarity and Cut bars, smaller. Up to 2 rows
-stack above it, as many as fit below the noise ring and its RIFT CHARGED
-tag (`FrontierHud`, which end about halfway down plus 100). On a short
+stack above it, as many as fit up to about halfway down plus 100, well
+clear of the RIFT CHARGED tag (`FrontierHud`). On a short
 window with no room above the card, its row waits until the card has gone
 and then shows in its place.
 
@@ -97,9 +97,9 @@ full").
   - `tests/run_loot_stack.py`: the stack's timing and order;
   - `tests/run_miner_loot.py`: the card, driven frame by frame; on a
     computer compact in the bottom right corner, two rows at most, clear of
-    the noise ring, the row waiting on a short window, staying put in a
+    the RIFT CHARGED tag, the row waiting on a short window, staying put in a
     mech; and slim at the top middle of a phone (no bars, one row under it,
-    none under a small phone's short card while it's up, claiming the top
+    full height on a small phone too now the top right is clear, claiming the top
     middle);
   - `tests/run_world_mining.py`: now also checks that your own find is
     never drawn over your head, while others still get it.

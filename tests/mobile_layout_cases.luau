@@ -1,11 +1,11 @@
 -- lune run tests/mobile_layout_cases.luau <repo>
 -- The lobby's pieces on a phone never overlap (MobileLayout): the pick card,
 -- your level and coins, the CHAT button (small screens with a keyboard), the
--- opened chat, the dock (PLAY and its tiles), the teammates' cards, the
--- TASKS button and the board's strip under it, your loot card at the top
--- middle, and a mech's HOP OUT and drive stick, at every common phone size;
--- the dock's tiles all fit. And who has
--- the top middle (claimTop).
+-- opened chat, the dock (PLAY and its tiles, TASKS among them), the
+-- teammates' cards, your loot card at the top middle, and a mech's HOP OUT
+-- and drive stick, at every common phone size; the dock's tiles all fit.
+-- Nothing else is up at the top right (no TASKS button, no board strip).
+-- And who has the top middle (claimTop).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -32,7 +32,7 @@ local SCREENS = {
 	{ 932, 430 - 58 },
 	{ 1024, 768 - 36 },
 }
-local TILES = 6 -- INVENTORY, MARKET, STORE, RANKS, SOCIAL, INVITE
+local TILES = 7 -- INVENTORY, TASKS, MARKET, STORE, RANKS, SOCIAL, INVITE
 for _, s in SCREENS do
 	local screen = Vector2.new(s[1], s[2])
 	local label = s[1] .. "x" .. s[2]
@@ -42,7 +42,7 @@ for _, s in SCREENS do
 	local function inside(r)
 		return r.X >= 0 and r.Y >= 0 and r.X + r.W <= screen.X and r.Y + r.H <= screen.Y
 	end
-	local tasks, board, loot = MobileLayout.tasks(screen), MobileLayout.board(screen), MobileLayout.loot(screen)
+	local loot = MobileLayout.loot(screen)
 	for name, r in
 		{
 			card = card,
@@ -51,8 +51,6 @@ for _, s in SCREENS do
 			party = party,
 			chat = closed,
 			open = open,
-			tasks = tasks,
-			board = board,
 			loot = loot,
 		}
 	do
@@ -64,8 +62,6 @@ for _, s in SCREENS do
 		{
 			["pick card"] = card,
 			coins = wallet,
-			TASKS = tasks,
-			["board's strip"] = board,
 			dock = dock,
 			["teammates' cards"] = party,
 		}
@@ -73,15 +69,10 @@ for _, s in SCREENS do
 		check(not MobileLayout.overlaps(loot, r), label .. ": the loot card overlaps the " .. name)
 	end
 	check(loot.W >= MobileLayout.Loot.MinW, label .. ": the loot card is too narrow")
-	check(loot.H == MobileLayout.Loot.H or loot.H == MobileLayout.Loot.ShortH, label .. ": the loot card isn't slim")
-	check(
-		loot.H == MobileLayout.Loot.H or loot.W == MobileLayout.Loot.W,
-		label .. ": a short loot card isn't full width"
-	)
+	check(loot.H == MobileLayout.Loot.H, label .. ": the loot card isn't slim")
+	check(loot.W == MobileLayout.Loot.W, label .. ": the loot card isn't full width with the corner clear")
+	check(MobileLayout.tasks == nil and MobileLayout.board == nil, "A TASKS button or board strip is back on a phone")
 	check(loot.Y + loot.H <= screen.Y * 0.3, label .. ": the loot card reaches the middle of the screen")
-	check(not MobileLayout.overlaps(tasks, board), label .. ": the board's strip overlaps TASKS")
-	check(board.Y - (tasks.Y + tasks.H) <= 8, label .. ": the board's strip isn't tucked in under TASKS")
-	check(not MobileLayout.overlaps(board, party), label .. ": the board's strip overlaps the teammates' cards")
 	check(
 		dock.PlayWidth <= dock.W and dock.PlayHeight + dock.Gap + dock.TileHeight <= dock.H,
 		label .. ": PLAY doesn't fit the dock"
@@ -166,5 +157,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (pick card, coins, chat, dock, teammates, kaiju, TASKS, board, loot card, at 7 screen sizes)"
+		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, at 7 screen sizes)"
 )

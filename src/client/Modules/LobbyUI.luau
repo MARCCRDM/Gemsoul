@@ -1,11 +1,13 @@
 --[[
 	The lobby (the Saga Outpost): compact Play and Inventory controls on the
-	left, a two-column utility menu, level and coins, plus one small panel
-	on the right for the daily streak, the next mode to unlock and the next
-	task, a REPORT A BUG button by the TASKS button, and the PLAY menu that
+	left, a two-column utility menu (TASKS among it: the Tasks window, with
+	a count of what's still to do), level and coins, plus one small panel
+	on the right for the daily streak, the day's challenges and the next mode
+	to unlock, a REPORT A BUG button at the top right, and the PLAY menu that
 	picks what to play. On a phone: PLAY alone at the bottom centre with icon
-	buttons under it, level and coins at the top left, the next task as one
-	slim strip, and no bug button (SOCIAL has the form).
+	buttons under it (TASKS one of them), level and coins at the top left,
+	and nothing on the right: no board (the challenges are the Tasks
+	window's DAILY page) and no bug button (SOCIAL has the form).
 
 	  PRACTICE  1v1 Practice    a rival miner, coins on a win (always open)
 	            Squad Dungeon   three miners, a dungeon and its boss (not
@@ -673,7 +675,7 @@ task.spawn(function()
 	end
 end)
 
--- REPORT A BUG, beside the TASKS button (top right): the feedback form
+-- REPORT A BUG, at the top right: the feedback form
 -- (Social), which sends the build and where you were with it. Not on a
 -- phone, where the corner is kept clear: SOCIAL has the same form there
 -- (its Feedback button). Its words are a label of their own, so the
@@ -681,7 +683,7 @@ end)
 local bug = new("TextButton", {
 	Name = "ReportBug",
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -156, 0, 12),
+	Position = UDim2.new(1, -16, 0, 12),
 	Size = UDim2.fromOffset(132, 40),
 	BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
 	AutoButtonColor = false,
@@ -713,15 +715,14 @@ local function fitDock()
 	modes.Visible = false
 	status.Visible = not mobile
 	walletPill.Visible = mobile and not picker.Visible
-	-- The board under TASKS on the right; the live feed at the top centre (on
-	-- a phone, in the gap between the pick card and the board).
+	-- The board under REPORT A BUG on the right (not on a phone); the live
+	-- feed at the top centre (on a phone, right of the pick card).
 	LobbyBoard.setCompact(mobile)
 	local card = MobileLayout.card()
 	local gapLeft = card.X + card.W + 8
-	local gapRight = size.X - 16 - board.Size.X.Offset - 8
+	local gapRight = size.X - 16
 	LobbyFeed.setCompact(mobile, if mobile then { X = gapLeft, W = gapRight - gapLeft } else nil)
-	-- (On a phone, its one strip tucks in under the small TASKS button.)
-	board.Position = UDim2.new(1, -16, 0, if mobile then MobileLayout.board(size).Y else 64)
+	board.Position = UDim2.new(1, -16, 0, 64)
 	LobbyBoard.setHidden(picker.Visible)
 	bug.Visible = not picker.Visible and not mobile
 	if mobile then
@@ -755,6 +756,8 @@ local function fitDock()
 					child.Visible = true
 					child.AnchorPoint, child.Position = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 5)
 					child.Size = UDim2.fromOffset(tileHeight - 22, tileHeight - 22)
+				elseif child.Name == "NavBadge" then
+					child.AnchorPoint, child.Position = Vector2.new(1, 0), UDim2.new(1, -3, 0, 3)
 				elseif child:IsA("GuiObject") then child.Visible = false end
 			end
 		end
@@ -792,6 +795,8 @@ local function fitDock()
 				child.AnchorPoint = Vector2.new(0, 0.5)
 				child.Size, child.Position = UDim2.fromOffset(22, 22), UDim2.new(0, 10, 0.5, 0)
 			elseif child.Name == "NavChevron" then child.Visible = primary
+			elseif child.Name == "NavBadge" then
+				child.AnchorPoint, child.Position = Vector2.new(1, 0.5), UDim2.new(1, -6, 0.5, 0)
 			elseif child.Name == "Edge" then
 				child.Visible = true
 				child.Size = UDim2.new(0, 2, 1, -14)
@@ -850,6 +855,42 @@ end
 
 tile("INVENTORY", "Equipment", P.Gold, function()
 	showDashboard(true)
+end)
+-- Tasks and today's challenges: the Tasks window (TrainingRewards.client),
+-- with how many are still to do on the tile. (Nothing of them sits on the
+-- play screen.)
+local tasksTile = tile("TASKS", "Tasks", Color3.fromRGB(103, 218, 232), function()
+	local tasks = player.PlayerGui:FindFirstChild("TrainingRewards")
+	local open = tasks and tasks:FindFirstChild("OpenTasks")
+	if open and open:IsA("BindableEvent") then
+		open:Fire()
+	end
+end)
+local tasksBadge = new("Frame", {
+	Name = "NavBadge",
+	BackgroundColor3 = Color3.fromRGB(255, 202, 91),
+	Size = UDim2.fromOffset(18, 16),
+	Visible = false,
+	ZIndex = 3,
+}, tasksTile)
+UiKit.round(tasksBadge, 8)
+local tasksCount = text(tasksBadge, "", 10, Color3.fromRGB(40, 24, 0), IronUi.Heading)
+tasksCount.Size, tasksCount.TextStrokeTransparency, tasksCount.ZIndex = UDim2.fromScale(1, 1), 1, 3
+tasksCount:SetAttribute("NoTranslate", true)
+task.spawn(function()
+	local tasks = player:WaitForChild("PlayerGui"):WaitForChild("TrainingRewards", 60)
+	if not tasks then
+		return
+	end
+	local function count()
+		local open = tasks:GetAttribute("Open")
+		open = if type(open) == "number" then open else 0
+		tasksCount.Text = if open > 9 then "9+" else tostring(open)
+		tasksBadge.Size = UDim2.fromOffset(if open > 9 then 24 else 18, 16)
+		tasksBadge.Visible = open > 0
+	end
+	tasks:GetAttributeChangedSignal("Open"):Connect(count)
+	count()
 end)
 tile("MARKET", "Market", P.Gold, function()
 	require(script.Parent.MarketBoardUI).open()
