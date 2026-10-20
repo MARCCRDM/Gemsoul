@@ -501,6 +501,47 @@ local pet, wild, guard = Kaiju.size(Kaiju.Scale.Pet), Kaiju.size(Kaiju.Scale.Wil
 check(pet < 0.5 and pet < wild and wild < guard and guard <= 1, "Kaiju sizes out of order")
 check(Kaiju.Bug.Size > pet and Kaiju.Bug.Size < wild, "A critter isn't between a pet and a wild kaiju")
 check(Kaiju.size(1) == Kaiju.Height, "A model at scale 1 isn't its height")
+-- Moon bugs come as swarms (Kaiju.wave): weak alone, and the ranged one
+-- (Crocodilo) never alone, always at the back.
+do
+	local roster = shared("DungeonRules").Roster
+	check(#Kaiju.Critters == #roster, "The critters aren't the roster")
+	for i, spec in roster do
+		check(Kaiju.Critters[i] == spec.Id and Kaiju.BugMoves[spec.Id], "No critter " .. spec.Id)
+	end
+	check(Kaiju.isRanged("Crocodilo") and not Kaiju.isRanged("Sahur") and not Kaiju.isRanged(nil), "Who's ranged")
+	local croc = Kaiju.BugMoves.Crocodilo
+	check(croc.Keep > croc.Flee and croc.Range > croc.Keep, "The bomber can't keep its distance")
+	check(Kaiju.Bug.Damage <= 2 and Kaiju.Bug.Health <= 40, "A critter is no weaker for coming in swarms")
+	local r = Random.new(11)
+	local withRanged, alone = 0, 0
+	for _ = 1, 2000 do
+		local count = r:NextInteger(1, 9)
+		local wave = Kaiju.wave(count, r)
+		check(#wave == count, "A swarm came the wrong size")
+		local ranged, seenRanged = 0, false
+		for _, id in wave do
+			if Kaiju.isRanged(id) then
+				ranged += 1
+				seenRanged = true
+			else
+				check(not seenRanged, "A fighter came through after a ranged one")
+			end
+		end
+		check(ranged < count, "A swarm of only ranged ones")
+		check(count >= Kaiju.Swarm.Ranged.Min or ranged == 0, "A ranged one in a swarm too small for it")
+		check(ranged <= math.max(1, math.floor(count / Kaiju.Swarm.Ranged.Every)), "Too many ranged ones")
+		if ranged > 0 then
+			withRanged += 1
+		end
+		if count == 1 then
+			alone += 1
+			check(not Kaiju.isRanged(wave[1]), "A ranged one came alone")
+		end
+	end
+	check(withRanged > 200 and alone > 100, "No ranged ones at the back, or no lone critters, in 2000 swarms")
+end
+
 print(
 	string.format(
 		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, Gemsouls, your team, the starter roll, fighting as a team, sizes)",

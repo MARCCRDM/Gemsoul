@@ -295,15 +295,16 @@ check(Frontier.noise(0, "Edge", 3, 0, 0.5) > Frontier.noise(0, "Edge", 1, 0, 0.5
 check(Frontier.incursion("Core", 0.5) == 0, "Critters in the core")
 for roll = 0, 0.99, 0.01 do
 	local fringe, edge = Frontier.incursion("Fringe", roll), Frontier.incursion("Edge", roll)
-	check(fringe >= 1 and fringe <= Frontier.Caps.Fringe, "A fringe incursion's size")
-	check(edge >= 2 and edge <= 3 and edge <= Frontier.Caps.Edge, "An edge incursion's size")
+	-- (A swarm: three or four in the fringe, five or six at the edge.)
+	check(fringe >= 3 and fringe <= 4 and fringe <= Frontier.Caps.Fringe, "A fringe incursion's size")
+	check(edge >= 5 and edge <= 6 and edge <= Frontier.Caps.Edge, "An edge incursion's size")
 end
 check(Frontier.Caps.Edge > Frontier.Caps.Fringe and Frontier.Caps.Server >= Frontier.Caps.Edge * 3, "The caps")
 check(Frontier.Boost.Edge.Health > 1 and Frontier.Boost.Edge.Exp > 1, "Edge critters aren't worth more")
 -- A fair share of the Outpost's: the band's cap with few out there, a
--- slice of 12 with many, never none.
+-- slice of the Outpost's with many, never none.
 check(Frontier.share(Frontier.Caps.Edge, 1) == Frontier.Caps.Edge, "One player's share isn't the band's cap")
-check(Frontier.share(Frontier.Caps.Edge, 6) == 2, "Six out there don't get two each")
+check(Frontier.share(Frontier.Caps.Edge, 6) == math.floor(Frontier.Caps.Server / 6), "Six out there don't get a sixth each")
 check(Frontier.share(Frontier.Caps.Edge, 30) == 1, "A crowd left someone with none")
 
 -- Stirring it up: the longer you mine, the harder it pushes back ------------------------------------------
@@ -417,10 +418,12 @@ for _ = 1, 100 do
 	check(fringe >= 1 and fringe <= 4, "A fringe critter's level")
 	check(edge >= 9 and edge <= 13, "An edge critter's level")
 end
-check(Frontier.critterExp(1, "Fringe", 0) == 8, "A level-1 critter's EXP")
-check(Frontier.critterExp(10, "Fringe", 0) == 26, "A level-10 critter's EXP")
-check(Frontier.critterExp(10, "Edge", 0) == 39, "An edge critter isn't worth half again")
-check(Frontier.critterExp(10, "Edge", Frontier.Exp.Daily) == 10, "No quarter after the day's critters")
+-- (One of a swarm: a swarm's worth about what one critter was.)
+check(Frontier.critterExp(1, "Fringe", 0) == 3, "A level-1 critter's EXP")
+check(Frontier.critterExp(10, "Fringe", 0) == 11, "A level-10 critter's EXP")
+check(Frontier.critterExp(10, "Edge", 0) == 16, "An edge critter isn't worth half again")
+check(Frontier.critterExp(10, "Edge", Frontier.Exp.Daily) == 4, "No quarter after the day's critters")
+check(Frontier.Swarm.PerRift >= 2 and Frontier.Swarm.Stagger > 0 and Frontier.Swarm.Last > Frontier.Swarm.Stagger, "The swarm's timing")
 check(Frontier.critterExp(1, "Fringe", 999) >= 1, "A critter worth nothing")
 check(Frontier.Coins.Edge > Frontier.Coins.Fringe and Frontier.Coins.Guardian > Frontier.Coins.Edge, "Coins by band")
 check(Frontier.Bonk.Share > 0 and Frontier.Bonk.Share < 0.2 and Frontier.Bonk.Offer < Frontier.Bonk.Reach, "The bonk")

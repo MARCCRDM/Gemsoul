@@ -29,6 +29,7 @@ local ArenaStreak = {}
 
 ArenaStreak.GearOffered = 6 -- pieces of gear to choose from
 ArenaStreak.Picks = 3 -- of which you keep
+ArenaStreak.MaxWeapons = 1 -- swords at most among them (the rest armor and shields)
 ArenaStreak.Commission = 0.25 -- your cut of a leftover's Market price
 
 -- Wins: the streak. Gems: free gems (all yours), GemTier their rarity.

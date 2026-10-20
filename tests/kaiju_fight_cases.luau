@@ -203,4 +203,37 @@ check(Fight.decide(h, view, 0.5) == "Surge", "It doesn't cast its E from range")
 h.Body.StunUntil = 361
 check(Fight.decide(h, Fight.view(h, quiet(), 360, 3, 1), 0.5) == "Stagger", "A stunned kaiju acts")
 
+-- Against a swarm: surrounded, a light blow becomes a sweeping heavy more
+-- often than not (never with only one or two foes about); a heavy's arc.
+do
+	local c = fighter("Razorback")
+	c.NextSurge, c.NextDefense, c.NextAttack = math.huge, 999, 0
+	local lights, heavies, rolls = 0, 0, 0
+	for i = 0, 199 do
+		local roll = (i + 0.5) / 200
+		local v = Fight.view(c, quiet(), 400, 3, 1)
+		v.Crowd = 1
+		if Brain.decide(v, roll) == "Light" then
+			rolls += 1
+			check(Fight.decide(c, v, roll) == "Light", "One foe made a sweeping heavy")
+			v.Crowd = 3
+			local choice = Fight.decide(c, v, roll)
+			if choice == "Heavy" then
+				heavies += 1
+			elseif choice == "Light" then
+				lights += 1
+			end
+		end
+	end
+	check(rolls > 20, "No light blows to turn into sweeps")
+	local share = heavies / rolls
+	check(share > Fight.Cleave.Heavy - 0.15 and share < Fight.Cleave.Heavy + 0.15, "Surrounded, it sweeps: " .. share)
+	local ahead = roblox.Vector3.new(0, 0, -1)
+	check(Fight.inArc(ahead, roblox.Vector3.new(0.5, 0, -1), Fight.Cleave.Arc), "A foe ahead isn't in the arc")
+	check(not Fight.inArc(ahead, roblox.Vector3.new(0, 0, 1), Fight.Cleave.Arc), "A foe behind is in the arc")
+	check(not Fight.inArc(ahead, roblox.Vector3.new(1, 0, 0.3), Fight.Cleave.Arc), "A foe well to the side is in a stomp's arc")
+	check(Fight.inArc(ahead, roblox.Vector3.new(1, 0, 0.3), Fight.Cleave.RazorArc), "A tail lash doesn't reach round the side")
+	check(Fight.Cleave.Share > 0 and Fight.Cleave.Share < 1, "A sweep's share")
+end
+
 print(string.format("PASS: %d kaiju fight checks (styles, wind-ups, guard, parry, reads, the brain)", checks))

@@ -294,6 +294,8 @@ local function spotBy(root: BasePart, slot: number): Vector3
 	return root.Position + root.CFrame.RightVector * spot[1] - root.CFrame.LookVector * spot[2]
 end
 
+local creaturesNear -- (the creatures about a point: below)
+
 local function spawnPet(player: Player, record, slot: number): Pet?
 	local root = rootOf(player)
 	if not root then
@@ -347,6 +349,10 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		end,
 		Caster = function()
 			return KaijuServer.caster(pet)
+		end,
+		-- (The rest of a swarm round it: its heavies sweep through them.)
+		Around = function()
+			return creaturesNear(petRoot.Position, Kaiju.Follow.Gap * 3, player)
 		end,
 	})
 	humanoid.MaxHealth = pet.Stats.Health
@@ -537,7 +543,7 @@ end
 
 -- Creatures its foes are (KaijuWilds marks them OutpostCreature), inside a
 -- circle: those `owner`'s kaiju may fight.
-local function creaturesNear(center: Vector3, radius: number, owner: Player): { any }
+function creaturesNear(center: Vector3, radius: number, owner: Player): { any }
 	local list = {}
 	for _, enemy in Enemies.all() do
 		if
@@ -798,11 +804,15 @@ local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 			end
 		end
 	end
+	-- (It dives a swarm's bomber, and finishes off one that's nearly done.)
 	local targets = Squad.assign(fighters, foes, function(pet, enemy)
 		local after = (enemy :: any).Foe
 		local distance = (enemy.Root.Position - pet.Root.Position).Magnitude
+		local h = enemy.Humanoid
 		return Squad.cost(distance, pet.Target == enemy, after == pet)
 			- (if after == player then Kaiju.Squad.OwnerThreat else 0)
+			- (if enemy.Model:GetAttribute("CritterRanged") then Kaiju.Squad.Bomber else 0)
+			- (if h and h.Health < h.MaxHealth * 0.25 then Kaiju.Squad.Finish else 0)
 	end)
 	local groups, order = {}, {}
 	for _, pet in fighters do

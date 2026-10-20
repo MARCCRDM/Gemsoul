@@ -196,7 +196,15 @@ Your team, a pack of wild kaiju and the critters all fight as a side
 - **Who takes whom.** The nearest, but a critter already after a kaiju counts
   6 studs nearer to it, one after you 10 nearer, and a kaiju keeps the foe
   it's on unless another is 8 studs nearer, so they don't swap back and
-  forth (`Kaiju.Squad`, `Squad.Stick`, `Squad.Threat`).
+  forth (`Kaiju.Squad`, `Squad.Stick`, `Squad.Threat`). It **dives a
+  swarm's bomber** (a Crocodilo counts 8 studs nearer) and **finishes off**
+  one under a quarter of its health (5 studs nearer).
+- **Sweeping heavies.** A kaiju's heavy (a stomp, a slam, a tail lash) hits
+  every critter in reach inside its arc, not just its foe: each of the
+  others takes 60% of the blow (`KaijuFight.Cleave`; a stomp or slam's arc
+  is 150°, a Razorback's tail lash 220°). With three or more foes in reach
+  it swings a heavy for a light blow 60% of the time, so a swarm round it
+  gets swept.
 - **Flanking.** Two or more on one foe spread round it: two on opposite
   sides, three a third of a turn apart. Each works round to its side a step
   at a time (round the foe, not through it), keeping the side it came in on
@@ -417,16 +425,20 @@ element hits harder (125%). Recall your kaiju when it would finish the job.
 
 ### Moon bugs
 
-Little creatures that tear through reality at you: each comes through a
-rift of its own, a ragged tear in the air that crackles for a second and a
-half, lets it hop out at you, and seals. Mining out past the Outpost's core
-draws them (about 1 in 35 swings in the Fringe, 1 in 17 at the Edge), and
-now and then the frontier tears open by itself and a few roam round it; see
+Little creatures that tear through reality at you, in **swarms**: three or
+four at a time in the Fringe, five or six at the Edge, more when it's
+stirred up. They pour out of ragged tears in the air (up to three out of
+each, one after another) that crackle for a second and a half first, then
+seal. Each one alone is weak (30 health and a 1.6 bite at level 1, where
+one used to have 60 and 4), so a swarm hits about as hard as one or two
+used to, from all sides. Mining out past the Outpost's core draws them
+(about 1 in 35 swings in the Fringe, 1 in 17 at the Edge), and now and
+then the frontier tears open by itself and a swarm roams round it; see
 [frontier.md](frontier.md). For now they're the brainrot characters shrunk
 down: Tung Tung Tung Sahur, Tralalero Tralala, Brr Brr Patapim and
 Bombardiro Crocodilo.
 They're built light (no armour, nothing too small to see at their size),
-since a dozen can be about at once. Let your kaiju fight them, bonk them
+since twenty can be about at once. Let your kaiju fight them, bonk them
 with your pick, hunt them, or run back to the core, where they give up and
 slip back through rifts of their own.
 
@@ -442,6 +454,14 @@ come back for you.
 - **A bite winds up** (0.3 s, the body shows it coming), then it hops back
   out and circles a moment before it comes in again; your kaiju can parry it
   or punish it as it recovers.
+- **The swarm pounces together.** Once three or more of its fighters are on
+  one kaiju, every 4 to 7 seconds they all leap in at once, from up to 8
+  studs out, whether they've got their breath back or not (`Kaiju.Bug.Rush`).
+- **It works round behind you.** One on its own on a foe that's facing it
+  circles toward its back, 40° a step.
+- **Hurt, it turns wary.** Under 35% of its health it circles wider, takes
+  1.8 times as long to come back in, and hops clear more (a quarter more of
+  a chance).
 - **It dodges.** A kaiju's blow it sees coming it hops clear of, by chance
   (3 in 10; Tralalero more than half the time), at most once every 2.5 s.
 - **Each kind has its own move**, named on its cast bar, every 6 to 9 s:
@@ -453,17 +473,23 @@ come back for you.
   | **Patapim** | Spore Burst | a ring in warning, then spores round it: 1.3× to all inside 7 studs, poisoning, a cloud left behind |
   | **Crocodilo** | Carpet Bomb | three bombs round its foe, stunning |
 
-- **Crocodilo fights from a distance.** It keeps 11 studs off and lobs a bomb
-  every 2.2 s. A ring shows where each will land, and it lands where its foe
-  was: keep moving and it misses. It bites only one that closes in.
+- **Crocodilo is the swarm's ranged one, and only ranged.** It never
+  bites. It keeps 14 studs off and lobs a bomb every 2.2 s (its Carpet Bomb
+  from up to 24 studs). A ring shows where each will land, and it lands
+  where its foe was: keep moving and it misses. Close in past 8 studs and
+  it jets back out (every 2 seconds at most, untouchable for a moment as it
+  goes). It **never comes alone**: only a swarm of three or more has one,
+  at its back (7 in 10 swarms; one more for every five critters), and it
+  hops out last, a moment after the rest (`Kaiju.wave`).
 - **Your kaiju read their moves.** A slam or a dash reads as a heavy (they
   hop aside or brace), a burst or a lob as a cast.
 
 Their level comes from where they came through: 1 to 4 in the Fringe, 9 to
 13 at the Edge (tougher again: a quarter more health, a fifth more damage).
-Each one gives every kaiju that fought it 6 + 2 per level EXP (half again
-from the Edge; a quarter after your first 60 of the day), and whoever did
-the most to it 2 coins from the Fringe or 4 from the Edge, up to 300 a day.
+Each one gives every kaiju that fought it 2.5 + 0.8 per level EXP (half
+again from the Edge; a quarter after your first 150 of the day), and whoever
+did the most to it 1 coin from the Fringe or 2 from the Edge, up to 300 a
+day. (One of a swarm: a swarm pays about what one critter used to.)
 A kaiju left at home earns nothing from them.
 
 ## Levelling while you mine

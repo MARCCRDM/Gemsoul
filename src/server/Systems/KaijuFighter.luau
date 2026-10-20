@@ -27,6 +27,10 @@
 	  Strike(foe, amount, heavy, name) -> outcome   a blow landing on its foe
 	              ("Parried" leaves it reeling)
 	  Caster()    its caster, for any of its moves (KaijuAbilities.cast)
+	  Around()    (optional) the other foes about it, as victims: a heavy
+	              sweeps through those in reach inside its arc, and with a
+	              crowd of them in reach it swings heavies more
+	              (KaijuFight.Cleave)
 	}
 	foe = { Root, Pet? | Enemy? | Player? } (a victim, as KaijuAbilities' are)
 
@@ -255,6 +259,14 @@ local function reel(f, now: number, seconds: number)
 	animate(f, "Stagger", 0)
 end
 
+-- Is `other` (a victim) within a blow's reach of it (edge to edge, in the
+-- brain's studs)?
+local function inReach(f, other): boolean
+	local center = flat(other.Root.Position - f.Root.Position).Magnitude
+	local distance = math.max(0, center - other.Root.Size.X / 2)
+	return distance * Brain.Reach / f.Reach <= Brain.Reach + KaijuFight.HitRange
+end
+
 -- A wound-up blow lands (if its foe is still in reach), and may chain
 -- into the next of a combo.
 local function land(f, action, foe, now: number, distance: number, dir: Vector3)
@@ -277,7 +289,8 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 	end
 	local heavy = action.Kind == "Heavy"
 	local color = GemConfig.ElementColors[f.Element] or Color3.new(1, 1, 1)
-	local arc = if heavy then (if f.Species == "Razorback" then 220 else 150) else 100
+	local cleave = KaijuFight.Cleave
+	local arc = if heavy then (if f.Species == "Razorback" then cleave.RazorArc else cleave.Arc) else 100
 	fx(f, "Swing", nil, f.Root.Position, dir, f.Reach + 1, arc, color, heavy)
 	if heavy and f.Species ~= "Razorback" then
 		-- A stomp or a slam: a shockwave at its feet.
@@ -293,6 +306,17 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 				-- Turned aside just as its guard went up: it's left reeling.
 				reel(f, now, KaijuFight.ParryStagger)
 				return
+			end
+			-- A heavy sweeps on through the rest of a swarm in its arc.
+			if heavy and f.Around then
+				for _, other in f.Around() do
+					if other.Root ~= foe.Root and inReach(f, other) then
+						local toward = other.Root.Position - f.Root.Position
+						if KaijuFight.inArc(dir, toward, arc) then
+							f.Strike(other, amount * cleave.Share, true, name)
+						end
+					end
+				end
 			end
 		end
 	end
@@ -402,6 +426,16 @@ function KaijuFighter.step(f, foe, now: number)
 	local h = humanoid
 	local ratio = h.Health / math.max(1, h.MaxHealth)
 	local view = KaijuFight.view(f, readFoe(f, foe, now), now, distance, ratio)
+	-- (How many foes it has in reach: a crowd draws a sweeping heavy.)
+	if f.Around then
+		local crowd = if distance * Brain.Reach / f.Reach <= Brain.Reach + KaijuFight.HitRange then 1 else 0
+		for _, other in f.Around() do
+			if other.Root ~= foe.Root and inReach(f, other) then
+				crowd += 1
+			end
+		end
+		view.Crowd = crowd
+	end
 	-- Its R, hard pressed: low on health, or a heavy blow or a cast coming
 	-- (a ring only with its foe inside it).
 	local moves = f.Moves
@@ -561,7 +595,7 @@ function KaijuFighter.new(spec)
 	f.Element, f.Stats, f.Ability, f.Scale = spec.Element, spec.Stats, spec.Ability, spec.Scale or 1
 	f.Size = Kaiju.size(f.Scale)
 	f.FirstSurge = spec.FirstSurge
-	f.Strike, f.Caster = spec.Strike, spec.Caster
+	f.Strike, f.Caster, f.Around = spec.Strike, spec.Caster, spec.Around
 	f.Moves = spec.Moves or {}
 	f.NextQ, f.NextR = 0, 0
 	f.Swings, f.Engaged = 0, false

@@ -63,6 +63,7 @@ local DamageLog = require(script.Parent.DamageLog)
 
 local DungeonLoadout = require(ReplicatedStorage.Shared.DungeonLoadout)
 local BrainrotSkins = require(script.Parent.BrainrotSkins)
+local BrainrotBosses = require(script.Parent.BrainrotBosses)
 local ExpeditionAmbient = require(script.Parent.ExpeditionAmbient)
 local CombatEvents = require(script.Parent.CombatEvents)
 local Shop = require(script.Parent.Shop)
@@ -1859,14 +1860,19 @@ function spawnRival(owner: Player, raid, encounter)
 				child:Destroy()
 			end
 		end
-		BrainrotSkins.apply(
-			rig,
-			encounter.Spec,
-			GemConfig.ElementColors[encounter.Spec.Element],
-			encounter.Boss,
-			encounter.GearTier,
-			Classes.heldShield(loadout) ~= nil
-		)
+		-- (The bosses are their own creatures: BrainrotBosses. The rooms'
+		-- fighters wear armour to their gear tier.)
+		local accent = GemConfig.ElementColors[encounter.Spec.Element]
+		if not BrainrotBosses.apply(rig, encounter.Spec, accent, encounter.Boss) then
+			BrainrotSkins.apply(
+				rig,
+				encounter.Spec,
+				accent,
+				encounter.Boss,
+				encounter.GearTier,
+				Classes.heldShield(loadout) ~= nil
+			)
+		end
 	end
 	-- Equal ground: it's a new player with its own random kit, built by
 	-- exactly the rules that build yours. Its health, swing damage, armour,

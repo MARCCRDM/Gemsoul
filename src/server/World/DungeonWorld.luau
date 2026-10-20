@@ -37,7 +37,7 @@ function World.build(id, rooms, origin)
 	for i, room in rooms do
 		local center = origin + Vector3.new(room.X * Rules.Spacing, 0, room.Z * Rules.Spacing)
 		centers[i] = center
-		local color = GemConfig.ElementColors[Rules.Roster[room.Theme].Element]
+		local color = GemConfig.ElementColors[Rules.specOf(room).Element]
 		block(folder, "CanyonClearing", Vector3.new(64, 2, 64), center, Color3.fromRGB(103, 97, 83))
 		fillLight(folder, center + Vector3.new(-16, 16, 0), 48, 1.7)
 		fillLight(folder, center + Vector3.new(16, 16, 0), 48, 1.7)
@@ -185,7 +185,7 @@ function World.buildOpen(id, camps, origin)
 	for i, camp in camps do
 		local center = origin + Vector3.new(camp.X * Rules.Spacing, 0, camp.Z * Rules.Spacing)
 		centers[i] = center
-		local color = GemConfig.ElementColors[Rules.Roster[camp.Theme].Element]
+		local color = GemConfig.ElementColors[Rules.specOf(camp).Element]
 		ore[i] = center + Vector3.new(0, 3, 0)
 		for n = 1, 5 do
 			local angle = n * math.pi * 2 / 5

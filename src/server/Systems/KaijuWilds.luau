@@ -43,8 +43,9 @@
 	              whatever's left of it goes, and a fresh one sleeps at the
 	              new site.
 	  Moon bugs   the little brainrot creatures (DungeonRules' roster,
-	              shrunk), each through a rift of its own round a player out
-	              past the core (FrontierServer: Shared.Frontier). One hops
+	              shrunk), in swarms through rifts round a player out past
+	              the core (FrontierServer: Shared.Frontier), each one weak
+	              alone (Kaiju.Bug). One hops
 	              out at whoever drew it (a miner too, or a mech's pilot:
 	              KaijuWilds.prey), but a kaiju out close by draws it first
 	              (Kaiju.Bug.Draw: the prey's own before any other), the
@@ -54,8 +55,11 @@
 	              the other critters), bites after a wind-up and hops back
 	              out, hops clear of a kaiju's blow it sees coming, and uses
 	              its kind's own move (Kaiju.BugMoves: Sahur's Bat Slam,
-	              Tralalero's Shark Dash, Patapim's Spore Burst, Crocodilo's
-	              bombs from a distance), named on its cast bar. With
+	              Tralalero's Shark Dash, Patapim's Spore Burst), named on
+	              its cast bar. Crocodilo is the swarm's ranged one: it
+	              never bites, keeps its distance lobbing bombs (and its
+	              Carpet Bomb), jets back from one that closes in, and
+	              only ever comes at the back of a swarm (Kaiju.wave). With
 	              nobody to fight for a moment (Frontier.Leave), or after its
 	              life (Frontier.Life), it slips back through a rift. One out
 	              of a wandering rift (opts.Wander) roams round it instead,
@@ -80,7 +84,9 @@
 	                            with your kaiju out or hunting)
 
 	  KaijuWilds.spawnBug(at, opts) -> enemy?   a moon bug out of a rift
-	  KaijuWilds.pickCritter(rng) -> roster id  what comes through next
+	  KaijuWilds.pickWave(count, rng) -> { roster id }   what comes through,
+	                                            in order (a ranged one last)
+	  KaijuWilds.pickCritter(rng) -> roster id  one on its own (never ranged)
 	  KaijuWilds.isCritter(enemy) -> boolean    a rift's critter (not a wild kaiju)
 	  KaijuWilds.critterOf(model) -> enemy?     the rift's critter a model is
 	  KaijuWilds.bonk(enemy, player, from) -> boolean   a pickaxe's bonk on a critter
@@ -1047,8 +1053,43 @@ local function release(enemy, wild: Wild, move, victim, now: number)
 	end
 end
 
+-- A swarm's pounce on one foe (by its root): { At } (Kaiju.Bug.Rush).
+local rushes: { [any]: { At: number } } = {}
+
+-- Whether `enemy` (a fighter of a swarm on `victim`) pounces now: once at
+-- least Rush.Min of the swarm's fighters are on that foe, a pounce comes
+-- every Rush.Every seconds, and each of them leaps in once within its
+-- Window.
+local function rushNow(enemy, victim, now: number): boolean
+	local rules = Kaiju.Bug.Rush
+	local key = victim.Root
+	local rush = rushes[key]
+	if rush and now <= rush.At + rules.Window then
+		return now >= rush.At and (enemy :: any).RushedAt ~= rush.At
+	end
+	local who, count = (enemy :: any).Foe, 0
+	for other, w in wilds do
+		if w.Bug and other.Alive and (other :: any).Foe == who and not Kaiju.isRanged(w.Species) then
+			count += 1
+		end
+	end
+	if count >= rules.Min then
+		rushes[key] = { At = now + rng:NextNumber(rules.Every[1], rules.Every[2]) }
+	else
+		rushes[key] = nil
+	end
+	for k, old in rushes do
+		if now > old.At + 30 then
+			rushes[k] = nil -- (its foe long gone)
+		end
+	end
+	return false
+end
+
 -- One think of a critter fighting `victim`: in its place round its foe, it
--- bites and hops back out, hops clear of a blow coming, and uses its move.
+-- bites and hops back out, hops clear of a blow coming, uses its move,
+-- pounces with the rest of its swarm, works round behind a foe that faces
+-- it, and turns wary when hurt.
 local function critterFight(enemy, wild: Wild, victim, now: number)
 	local e = enemy :: any
 	local humanoid, root, kind = enemy.Humanoid, enemy.Root, enemy.Kind
@@ -1058,6 +1099,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 	local distance = offset.Magnitude
 	local dir = if distance > 0.01 then offset / distance else root.CFrame.LookVector
 	local reach = kind.Reach + victim.Root.Size.X / 2
+	local wary = humanoid.Health < humanoid.MaxHealth * rules.Skittish
 	if move and e.NextMove == nil then
 		e.NextMove = now + rng:NextNumber(1.5, math.max(2, move.Every * 0.6))
 	end
@@ -1081,7 +1123,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		e.Action, e.Windup = nil, nil
 		if action.Kind == "Bite" then
 			enemy.LastAttack = now
-			if distance > reach + 1 then
+			if distance > reach + 1 + (if action.Rush then rules.Rush.Leap else 0) then
 				return -- (it slipped away)
 			end
 			sizedFx(
@@ -1099,9 +1141,9 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 				Enemies.addStatus(enemy, "Stun", 1, KaijuFight.ParryStagger) -- (a kaiju's guard turned its bite)
 				return
 			end
-			-- Out again, to circle a moment before it comes back in.
+			-- Out again, to circle a moment before it comes back in (longer, hurt).
 			root.AssemblyLinearVelocity = -dir * rules.HopBack * 4 + Vector3.new(0, 8, 0)
-			e.RecoverUntil = now + rules.Recover
+			e.RecoverUntil = now + rules.Recover * (if wary then rules.Wary else 1)
 			e.Circle = if rng:NextNumber() < 0.5 then 1 else -1
 		elseif action.Kind == "Lob" then
 			enemy.LastAttack = now
@@ -1125,7 +1167,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 	-- A blow coming its way: a hop aside, by chance.
 	if now >= (e.NextDodge or 0) and incoming(enemy, now) then
 		e.NextDodge = now + rules.DodgeEvery
-		if rng:NextNumber() < ((move and move.Dodge) or rules.Dodge) then
+		if rng:NextNumber() < ((move and move.Dodge) or rules.Dodge) + (if wary then rules.WaryDodge else 0) then
 			local sign = if rng:NextNumber() < 0.5 then 1 else -1
 			local side = Vector3.new(-dir.Z, 0, dir.X) * sign
 			enemy.DodgeUntil = now + rules.DodgeFor
@@ -1155,6 +1197,19 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		return
 	end
 	local keep = move and move.Keep
+	local ranged = move ~= nil and move.Ranged == true
+	-- A ranged one (a Crocodilo) closed in on: it jets back out of reach.
+	if ranged and distance < move.Flee and now >= (e.NextFlee or 0) then
+		e.NextFlee = now + move.FleeEvery
+		local sign = if rng:NextNumber() < 0.5 then 1 else -1
+		local away = (-dir + Vector3.new(-dir.Z, 0, dir.X) * sign * 0.45).Unit
+		root.AssemblyLinearVelocity = away * 46 + Vector3.new(0, 14, 0)
+		enemy.DodgeUntil = now + rules.DodgeFor
+		act(enemy, "Dodge", 0, sign)
+		sizedFx(Kaiju.Bug.Size, "DodgeRoll", nil, root.Position, away, 8, true)
+		humanoid:MoveTo(victim.Root.Position - dir * keep)
+		return
+	end
 	-- From a distance (a Crocodilo): a bomb every so often.
 	if keep and move.Lob and distance <= move.Range and now - enemy.LastAttack >= move.Lob.Every then
 		e.Action = { Kind = "Lob", At = now + move.Lob.Windup }
@@ -1164,8 +1219,19 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		lookAt(root, victim.Root.Position)
 		return
 	end
-	-- A bite, once it's in reach and ready.
-	if distance <= reach and now - enemy.LastAttack >= kind.Rate and now >= (e.RecoverUntil or 0) then
+	-- The swarm's pounce: every fighter on this foe leaps in at once.
+	if not ranged and distance <= reach + rules.Rush.Leap and rushNow(enemy, victim, now) then
+		e.RushedAt = rushes[victim.Root].At
+		e.RecoverUntil = nil
+		e.Action = { Kind = "Bite", At = now + rules.BiteWindup, Rush = true }
+		e.Windup = { At = now + rules.BiteWindup }
+		root.AssemblyLinearVelocity = dir * math.min(60, distance * 6) + Vector3.new(0, 10, 0)
+		act(enemy, "Lunge", rules.BiteWindup)
+		lookAt(root, victim.Root.Position)
+		return
+	end
+	-- A bite, once it's in reach and ready (never a ranged one's).
+	if not ranged and distance <= reach and now - enemy.LastAttack >= kind.Rate and now >= (e.RecoverUntil or 0) then
 		e.Action = { Kind = "Bite", At = now + rules.BiteWindup }
 		e.Windup = { At = now + rules.BiteWindup }
 		act(enemy, "Slash", rules.BiteWindup)
@@ -1177,7 +1243,18 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 	-- bite), clear of the other critters: round its foe, not through it.
 	local standoff = keep or math.max(reach * 0.8, 1.5)
 	local here = flat(root.Position - victim.Root.Position)
-	local want = ringSlot(enemy, victim) or (if here.Magnitude > 0.05 then here.Unit else -dir)
+	local slot = ringSlot(enemy, victim)
+	local want = slot or (if here.Magnitude > 0.05 then here.Unit else -dir)
+	if not slot and not ranged and here.Magnitude > 0.05 then
+		-- On its own, with its foe facing it: round toward its back.
+		local look = flat(victim.Root.CFrame.LookVector)
+		if look.Magnitude > 0.05 and look.Unit:Dot(here.Unit) > 0.5 then
+			want = Squad.toward(here.Unit, -look.Unit, rules.Flank)
+		end
+	end
+	if wary then
+		standoff += rules.HopBack * 0.5
+	end
 	if now < (e.RecoverUntil or 0) then
 		standoff += rules.HopBack * 0.6
 		local swing = math.rad(35) * (e.Circle or 1)
@@ -1993,10 +2070,15 @@ local function bugDied(enemy)
 	KaijuWilds.done(enemy, true, totals)
 end
 
--- What comes through the next rift: a roster id (its rift crackles with it).
+-- What comes through for an encounter of `count`: roster ids, in the order
+-- they come (Kaiju.wave: a ranged one never alone, and last).
+function KaijuWilds.pickWave(count: number, r): { string }
+	return Kaiju.wave(count, r or rng)
+end
+
+-- One critter on its own (never a ranged one): a roster id.
 function KaijuWilds.pickCritter(r): string
-	local roll = r or rng
-	return DungeonRules.Roster[roll:NextInteger(1, #DungeonRules.Roster)].Id
+	return Kaiju.wave(1, r or rng)[1]
 end
 
 local function rosterSpec(id: string?)
@@ -2079,6 +2161,7 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 		rig:SetAttribute("MoonBug", true)
 		rig:SetAttribute("RiftBorn", true)
 		rig:SetAttribute("CritterLevel", level)
+		rig:SetAttribute("CritterRanged", Kaiju.isRanged(spec.Id) or nil) -- (kaiju dive the bomber)
 		local kind = {
 			Name = "Moon Bug",
 			Health = math.floor(Kaiju.Bug.Health * grow * boost.Health + 0.5),
@@ -2185,6 +2268,7 @@ end
 -- For tests.
 KaijuWilds._tame, KaijuWilds._brain, KaijuWilds._wilds = tame, brain, wilds
 KaijuWilds._challenge = challenge
+KaijuWilds._rushes = rushes
 KaijuWilds._spawnWild, KaijuWilds._packs = spawnWild, packs
 KaijuWilds._spawnGuardian, KaijuWilds._lifetimes = spawnGuardian, lifetimes
 function KaijuWilds._guardian()

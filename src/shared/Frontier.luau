@@ -155,9 +155,14 @@ Frontier.Noise = {
 	Gap = 8,
 }
 -- Critters at once round one player (more stay away), and in the whole
--- Outpost, shared fairly between those out there. (Each is a whole
--- brainrot body: dozens at once made the Outpost lag.)
-Frontier.Caps = { Fringe = 2, Edge = 3, Server = 12 }
+-- Outpost, shared fairly between those out there. They come as swarms
+-- (each one weak: Shared.Kaiju.Bug), but each is a whole brainrot body:
+-- the Outpost's cap keeps them from lagging it.
+Frontier.Caps = { Fringe = 5, Edge = 7, Server = 22 }
+-- A swarm through its rifts: up to PerRift critters out of each, Stagger
+-- seconds apart, its ranged ones (Shared.Kaiju.wave) Last seconds after
+-- the rest.
+Frontier.Swarm = { PerRift = 3, Stagger = 0.3, Last = 1.2 }
 -- Stirring the frontier up: the longer you mine out there, the harder it
 -- pushes back. Every swing past the core stirs it (PerSwing: full after
 -- about 400 swings in the fringe, 250 at the edge, six or four minutes of
@@ -179,8 +184,8 @@ Frontier.Disturbance = {
 	Stages = {
 		{ At = 0, Name = "Calm", Extra = 0, Cap = 0 },
 		{ At = 0.25, Name = "Restless", Extra = 0, Cap = 0 },
-		{ At = 0.5, Name = "Stirred up", Extra = 1, Cap = 1 },
-		{ At = 0.8, Name = "Swarming", Extra = 2, Cap = 2 },
+		{ At = 0.5, Name = "Stirred up", Extra = 2, Cap = 2 },
+		{ At = 0.8, Name = "Swarming", Extra = 3, Cap = 4 },
 	},
 	Notes = {
 		[2] = "The frontier is restless: critters come sooner.",
@@ -198,15 +203,15 @@ Frontier.Levels = { Fringe = { 1, 4 }, Edge = { 9, 13 } }
 Frontier.Boost = { Fringe = { Health = 1, Damage = 1, Exp = 1 }, Edge = { Health = 1.25, Damage = 1.2, Exp = 1.5 } }
 -- EXP for each kaiju that fought one: Base + PerLevel x its level (times
 -- its band's Boost.Exp); a quarter after Daily critters a day.
-Frontier.Exp = { Base = 6, PerLevel = 2, Daily = 60, After = 0.25 }
+Frontier.Exp = { Base = 2.5, PerLevel = 0.8, Daily = 150, After = 0.25 }
 -- Coins to whoever did the most to one, by band (a day's cap: Shared.Kaiju.Bug.DailyCoins).
-Frontier.Coins = { Fringe = 2, Edge = 4, Guardian = 40 }
+Frontier.Coins = { Fringe = 1, Edge = 2, Guardian = 40 }
 -- Wandering rifts: one every Every seconds or so somewhere out there, at
 -- most Max critters out of them at once (of the Server cap), Near to Far
 -- studs from whoever it's tied to. Its critters roam Roam studs round it
 -- for Life seconds, going for anyone who comes within Notice; it seals
 -- empty if its player is further than Seal studs off when they'd hop out.
-Frontier.Wander = { Every = { 40, 80 }, Max = 3, Near = 35, Far = 70, Roam = 26, Notice = 30, Life = 60, Seal = 110 }
+Frontier.Wander = { Every = { 40, 80 }, Max = 6, Near = 35, Far = 70, Roam = 26, Notice = 30, Life = 60, Seal = 110 }
 -- Clearing a wandering rift: everyone who helped is Rift Charged, gems
 -- this much luckier for Seconds.
 Frontier.Charged = { Luck = 0.1, Seconds = 60 }
@@ -506,9 +511,9 @@ end
 function Frontier.incursion(band: string, roll: number, stir: number?): number
 	local _, stage = Frontier.stage(stir)
 	if band == "Edge" then
-		return (if roll < 0.6 then 2 else 3) + stage.Extra
+		return (if roll < 0.6 then 5 else 6) + stage.Extra
 	elseif band == "Fringe" then
-		return (if roll < 0.75 then 1 else 2) + stage.Extra
+		return (if roll < 0.6 then 3 else 4) + stage.Extra
 	end
 	return 0
 end

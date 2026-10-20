@@ -6,9 +6,12 @@
 	  Mining noise   OutpostServer tells this of every swing (swing: on foot
 	                 or from a mech's cockpit), and anyone out past the core
 	                 makes a little noise each half second besides
-	                 (Frontier.noise). Full, an encounter: a rift or two open
-	                 near where they look, a moment apart, crackling a
-	                 moment first, and a critter hops out of each at them.
+	                 (Frontier.noise). Full, an encounter: a swarm. Its
+	                 rifts open near where they look, a moment apart,
+	                 crackling a moment first, and up to three critters hop
+	                 out of each at them, one after another; a ranged one
+	                 (Crocodilo) only ever at the back of a swarm, last
+	                 (Frontier.Swarm, Kaiju.wave).
 	  Wandering      every Wander.Every seconds or so the frontier tears
 	                 open by itself, Wander.Near to Far studs from someone
 	                 out there, and a few critters roam round it for a
@@ -49,6 +52,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
+local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local Outpost = require(ReplicatedStorage.Shared.Outpost)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local KaijuServer = require(script.Parent.KaijuServer)
@@ -250,42 +254,61 @@ local function openGround(root: BasePart, pick: () -> Vector3): Vector3
 	return floor
 end
 
--- `count` rifts open near `player`, a moment apart, a critter out of each
--- at them (once it has crackled its warning).
+-- A swarm of `count` comes for `player`: its rifts open near them a moment
+-- apart (up to Frontier.Swarm.PerRift critters out of each, once it has
+-- crackled its warning), and they hop out at them one after another, any
+-- ranged ones last (KaijuWilds.pickWave).
 local function incursion(player: Player, band: string, count: number)
 	pending[player] = (pending[player] or 0) + count
-	for i = 1, count do
-		task.delay((i - 1) * 0.35, function()
+	local wave = KaijuWilds.pickWave(count, rng)
+	local swarm = Frontier.Swarm
+	for r = 1, math.ceil(#wave / swarm.PerRift) do
+		local batch = table.move(wave, (r - 1) * swarm.PerRift + 1, math.min(#wave, r * swarm.PerRift), 1, {})
+		task.delay((r - 1) * 0.35, function()
 			local root = rootOf(player)
 			if not root or not eligible(player) then
-				arrived(player)
+				for _ = 1, #batch do
+					arrived(player)
+				end
 				return
 			end
 			local floor = openGround(root, function()
 				return Frontier.riftSpot(root.Position, root.CFrame.LookVector, center(), rng)
 			end)
-			local critter = KaijuWilds.pickCritter(rng)
-			local _, life = FrontierServer.open(floor, root.Position, { Critter = critter, Prey = player })
-			task.delay(life.HopAt - serverNow(), function()
-				arrived(player)
-				local target = rootOf(player)
-				if not target or not eligible(player) then
-					return -- (gone, or safe: the tear seals empty)
+			local _, life = FrontierServer.open(floor, root.Position, {
+				Critter = batch[1],
+				Prey = player,
+				Linger = Frontier.Rift.Linger
+					+ (#batch - 1) * swarm.Stagger
+					+ (if Kaiju.isRanged(batch[#batch]) then swarm.Last else 0),
+			})
+			for i, critter in batch do
+				local wait = life.HopAt - serverNow() + (i - 1) * swarm.Stagger
+				if Kaiju.isRanged(critter) then
+					wait += swarm.Last -- (at the back of the swarm)
 				end
-				local toward = flat(target.Position - floor)
-				toward = if toward.Magnitude > 0.1 then toward.Unit else Vector3.new(0, 0, -1)
-				local enemy = KaijuWilds.spawnBug(floor, {
-					Prey = player,
-					Band = band,
-					Critter = critter,
-					Level = Frontier.critterLevel(band, rng, stateOf(player).Stir),
-					Facing = target.Position,
-					Hop = toward * 24 + Vector3.new(0, 26, 0),
-				})
-				if enemy then
-					keep(player, enemy)
-				end
-			end)
+				task.delay(math.max(0, wait), function()
+					arrived(player)
+					local target = rootOf(player)
+					if not target or not eligible(player) then
+						return -- (gone, or safe: the tear seals empty)
+					end
+					local toward = flat(target.Position - floor)
+					toward = if toward.Magnitude > 0.1 then toward.Unit else Vector3.new(0, 0, -1)
+					local side = Vector3.new(-toward.Z, 0, toward.X) * ((i - 1) % 3 - 1) * 6
+					local enemy = KaijuWilds.spawnBug(floor, {
+						Prey = player,
+						Band = band,
+						Critter = critter,
+						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir),
+						Facing = target.Position,
+						Hop = toward * (if Kaiju.isRanged(critter) then 10 else 24) + side + Vector3.new(0, 26, 0),
+					})
+					if enemy then
+						keep(player, enemy)
+					end
+				end)
+			end
 		end)
 	end
 end
@@ -425,8 +448,8 @@ local function wander(candidates: { any })
 			return Frontier.wanderSpot(root.Position, center(), rng)
 		end)
 	end
-	local critter = KaijuWilds.pickCritter(rng)
-	local _, life = FrontierServer.open(floor, root.Position, { Critter = critter, Prey = player, Linger = 4 })
+	local wave = KaijuWilds.pickWave(count, rng)
+	local _, life = FrontierServer.open(floor, root.Position, { Critter = wave[1], Prey = player, Linger = 4 })
 	local group = { Player = player, Critters = {}, Pending = count, Helpers = {}, Killed = 0, Lost = false }
 	table.insert(wanders, group)
 	pending[player] = (pending[player] or 0) + count
@@ -441,7 +464,7 @@ local function wander(candidates: { any })
 			closeGroup(group)
 			return
 		end
-		for i = 1, count do
+		local function hop(i: number, critter: string)
 			local angle = (i / count) * math.pi * 2 + rng:NextNumber(-0.5, 0.5)
 			local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
 			local enemy = KaijuWilds.spawnBug(floor + out * 1.5, {
@@ -460,10 +483,35 @@ local function wander(candidates: { any })
 				table.insert(group.Critters, enemy)
 			end
 		end
-		if #group.Critters == 0 then
-			group.Lost = true
-			closeGroup(group)
+		local function settle()
+			if #group.Critters == 0 then
+				group.Lost = true
+				closeGroup(group)
+			end
 		end
+		-- The fighters out first; its ranged ones a moment later, at the back.
+		local later = 0
+		for i, critter in wave do
+			if Kaiju.isRanged(critter) then
+				later += 1
+			else
+				hop(i, critter)
+			end
+		end
+		if later == 0 then
+			settle()
+			return
+		end
+		group.Pending = later
+		task.delay(Frontier.Swarm.Last, function()
+			group.Pending = 0
+			for i, critter in wave do
+				if Kaiju.isRanged(critter) then
+					hop(i, critter)
+				end
+			end
+			settle()
+		end)
 	end)
 end
 

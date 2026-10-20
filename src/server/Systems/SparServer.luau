@@ -338,7 +338,7 @@ local function getUp(player: Player, humanoid: Humanoid, miner: boolean?)
 	-- (The spar may have ended while they were down: then they were healed
 	-- already, and need no guard. A miner still in the Outpost gets up
 	-- whole, too.)
-	if humanoid.Health > 0 and (Spar.sparring(player) or (miner and player:GetAttribute("Outpost") == true)) then
+	if humanoid.Health > 0 and (Spar.sparring(player) or (miner and Spar.knocksDown(player))) then
 		humanoid.Health = humanoid.MaxHealth
 		local guard = Instance.new("ForceField")
 		guard.Name = "SparGuard"

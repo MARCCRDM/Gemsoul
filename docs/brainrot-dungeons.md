@@ -3,7 +3,7 @@
 ## Entering a run
 Form a party of three or four in Social. Every member marks Ready; the leader selects **DUNGEON**. Queueing is server-validated. Living characters must be out of mining expeditions, duels and existing combat sessions. The roster is locked at deployment; there is no mid-run join.
 
-Five connected rooms are generated per run. Layout turns, room themes, pillar counts and fighter composition change. Each of the first four rooms has two or three fighters. Defeat them to open the next gate. Surviving players recover health and combat resources at each checkpoint. The fifth room has one Colossus: a 1.8× version of a selected roster character.
+Five connected rooms are generated per run. Layout turns, room themes, pillar counts and fighter composition change. Each of the first four rooms has two or three fighters. Defeat them to open the next gate. Surviving players recover health and combat resources at each checkpoint. The fifth room has one Colossus: one of the ten bosses (`DungeonRules.Bosses`, most of them two- or three-headed), at 1.8×; see [bosses-and-swarms.md](bosses-and-swarms.md). An open expedition's middle camp is one of them too.
 
 At least three survivors must reach the boss encounter. Losing a member after the boss has engaged does not reset the boss. Leaving the party, leaving combat, respawning, a full squad wipe, or the 15-minute limit removes the appropriate participants and cleans up empty runs. Up to eight isolated squads can run concurrently.
 
@@ -39,7 +39,8 @@ A cleared dungeon gives each surviving, still-enrolled player **300 coins and Sl
 - `src/shared/DungeonRules.luau`: roster, requirements, elemental rules and procedural path.
 - `src/server/World/DungeonWorld.luau`: connected rooms, lamps, corridors and gates.
 - `src/server/Systems/Dungeons.luau`: queue, session authority, progression and cleanup.
-- `src/server/Systems/BrainrotSkins.luau`: animated creature geometry.
+- `src/server/Systems/BrainrotSkins.luau`: animated creature geometry (the room fighters).
+- `src/server/Systems/BrainrotBosses.luau`: the ten bosses' bodies.
 - `src/client/Dungeon.client.luau`: first-person objective strip.
 - `tests/run_dungeons.py`: deterministic lifecycle/layout tests.
 

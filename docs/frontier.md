@@ -100,16 +100,19 @@ is in [kaiju.md](kaiju.md#the-vein-guardian).
 
 ![Six rifts: no two the same shape](frontier/rifts.png)
 
-Every critter comes through a rift of its own: a ragged tear in the air,
-never symmetrical and never the same shape twice. A tear:
+Critters come in swarms through rifts: ragged tears in the air, never
+symmetrical and never the same shape twice. Up to three come out of each.
+A tear:
 
 1. **opens and crackles** for a second and a half: it splits along a
    crooked crack, with the crackle and its critter's own sound (Sahur's
    bonk, Tralalero's whoosh, Patapim's frost, the croc's bomb), so you
    know what's coming and where;
-2. **lets the critter out**: it hops out at whoever drew it;
-3. **lingers** (1.8 s): a dark void with glowing lips and hairline cracks
-   off them;
+2. **lets the critters out**: they hop out at whoever drew it, 0.3 s
+   apart; a Crocodilo (the swarm's ranged one) last, a second after the
+   rest;
+3. **lingers** (1.8 s, longer while a swarm's still coming out): a dark
+   void with glowing lips and hairline cracks off them;
 4. **seals** (half a second) with a last flash.
 
 Rifts open 14–24 studs away, within 100° of where you're facing, on open
@@ -128,8 +131,8 @@ nearly full, it turns red.
 | Where | An encounter about every | Standing about | Critters at once |
 | --- | --- | --- | --- |
 | The core | never | never | 0 |
-| The Fringe | 30 to 40 swings | 7 minutes | 1 or 2 |
-| The Edge | 15 to 20 swings | 3 minutes | 2 or 3 |
+| The Fringe | 30 to 40 swings | 7 minutes | 3 or 4 |
+| The Edge | 15 to 20 swings | 3 minutes | 5 or 6 |
 
 Each swing's share of the noise varies (60% to 140%), so encounters don't
 come like clockwork, and the next can't come within 8 seconds of the last.
@@ -137,11 +140,18 @@ A mech's strike makes as much noise as the swings it spends, and its pilot
 is fair game: a critter that knocks them down throws them out of the
 cockpit. Back in the core, the noise dies down over a minute or so.
 
-Caps: two critters at once on one player in the Fringe, three at the Edge,
-twelve in the whole Outpost, shared fairly between everyone out there.
-Critters still on their way through a rift count. If more would come than
-the cap allows, only enough open to reach it. (Each critter is a whole
-brainrot body, so the caps are kept low; see [Performance](#performance).)
+Each critter alone is weak (a third of the health and two fifths of the
+bite one had), so a swarm hits about as hard as one or two used to, from
+all sides. Caps: five critters at once on one player in the Fringe, seven
+at the Edge, 22 in the whole Outpost, shared fairly between everyone out
+there. Critters still on their way through a rift count. If more would
+come than the cap allows, only enough come to reach it. (Each critter is a
+whole brainrot body, built light; the Outpost's cap keeps a crowd of them
+from lagging it. See [Performance](#performance).)
+
+A swarm of three or more may have a Crocodilo at its back (7 in 10, one
+more for every five critters): it only fights from range, keeps its
+distance and never comes alone ([kaiju.md](kaiju.md#moon-bugs)).
 
 No rifts open round you while you're sparring, knocked down, or in a fight,
 a dungeon or an expedition.
@@ -164,16 +174,16 @@ half a minute.
 
 | Stirred | Shown | Encounters | Critters per encounter | At once round you | Their level |
 | --- | --- | --- | --- | --- | --- |
-| 0–25% | nothing | as above | as above | 2 / 3 | as below |
-| 25–50% | RESTLESS (gold) | up to half again as often | as above | 2 / 3 | +1 |
-| 50–80% | STIRRED UP (orange) | up to 80% more often | one more | 3 / 4 | +2 to +3 |
-| 80–100% | SWARMING (red) | up to twice as often | two more | 4 / 5 | +3 to +4 |
+| 0–25% | nothing | as above | as above | 5 / 7 | as below |
+| 25–50% | RESTLESS (gold) | up to half again as often | as above | 5 / 7 | +1 |
+| 50–80% | STIRRED UP (orange) | up to 80% more often | two more | 7 / 9 | +2 to +3 |
+| 80–100% | SWARMING (red) | up to twice as often | three more | 9 / 11 | +3 to +4 |
 
 (At once: the Fringe / the Edge. Each swing's noise is 1 + the stir times
 as loud; a critter comes up to 4 levels higher at full, a share of that on
-the way.) So a long session at the Edge ends with four or five level 13–17
-critters at a time instead of two or three level 9–13s, and they pay more
-EXP for it. The Outpost's cap of twelve still holds, shared fairly. You're
+the way.) So a long session at the Edge ends with swarms of eight or nine
+level 13–17 critters instead of five or six level 9–13s, and they pay more
+EXP for it. The Outpost's cap of 22 still holds, shared fairly. You're
 told as it gets to each stage (once, until it's well settled
 again): "The frontier is restless: critters come sooner.", "...stirred up:
 more critters, and tougher.", "...swarming! Head back to the core to let it
@@ -182,11 +192,13 @@ settle." A wandering rift opened near you comes stirred up the same way.
 ### Wandering rifts
 
 Every 40 to 80 seconds the frontier tears open by itself, 35 to 70 studs from
-someone out there. Its tear lingers longer, and two or three critters roam
-round it for a minute, going for anyone who comes within about 22 studs, and
-for the player it opened near once they're within 30. Go round it, or bring
-your kaiju. At most three critters are out of wandering rifts at once (of
-the twelve). If nobody is near when they'd hop out, it seals empty.
+someone out there. Its tear lingers longer, and a swarm (at least two, as
+many as an encounter there would bring) roams round it for a minute, going
+for anyone who comes within about 22 studs, and for the player it opened
+near once they're within 30; any Crocodilo hops out a second after the
+rest. Go round it, or bring your kaiju. At most six critters are out of
+wandering rifts at once (of the 22). If nobody is near when they'd hop out,
+it seals empty.
 
 Kill every critter from one and everyone who helped is **Rift Charged**:
 gems 10% luckier for 60 seconds. A RIFT CHARGED tag at the right of the
@@ -217,10 +229,11 @@ damage.
 
 What one pays:
 
-- **EXP** for every kaiju that fought it: 6 + 2 per level, half again from
-  the Edge, a quarter after your first 60 critters of the day. A kaiju
-  left at home earns nothing.
-- **Coins** for whoever did the most to it: 2 from the Fringe, 4 from the
+- **EXP** for every kaiju that fought it: 2.5 + 0.8 per level, half again
+  from the Edge, a quarter after your first 150 critters of the day. A
+  kaiju left at home earns nothing. (A swarm pays about what one critter
+  used to.)
+- **Coins** for whoever did the most to it: 1 from the Fringe, 2 from the
   Edge, up to 300 a day.
 
 ### What you do about them
@@ -248,9 +261,10 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
   too small to see at their size (grain, rivets, laces, spores; never the
   face), carry no lights, and only their bigger parts cast shadows: 66 to 179
   parts, about 20 to 50 of them casting shadows (`BrainrotSkins.thin`).
-- **Fewer at once**: two round a player in the Fringe, three at the Edge,
-  twelve in the whole Outpost (it was three, six and thirty), shared
-  fairly, with critters still on their way counted.
+- **A cap on the whole Outpost**: five round a player in the Fringe, seven
+  at the Edge, 22 in the whole Outpost (they come as swarms now; it was two,
+  three and twelve, and thirty before that), shared fairly, with critters
+  still on their way counted.
 - **Fewer encounters**: they come from mining, about 1 in 35 swings in the
   Fringe and 1 in 17 at the Edge, instead of every 5 to 10 seconds out there.
 - **Only the rocks near you are lit.** Each rock's light is on within 70

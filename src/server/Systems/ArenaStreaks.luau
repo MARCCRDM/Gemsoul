@@ -7,7 +7,9 @@
 	ends it. Reaching a milestone pays its coins and title at once and opens
 	an Arena Cache: free gems and six pieces of Rare and Ultra-Rare gear,
 	rolled now and saved with the player (profile.Duel.StreakCaches), to
-	claim whenever they like. Claiming gives every gem and the
+	claim whenever they like. A cache's weapons are only the standard swords
+	(ExpandedItemTraits.rollable: no guns, hammers, axes, lances), one at
+	most, so the leftovers always hold armor. Claiming gives every gem and the
 	ArenaStreak.Picks pieces of gear chosen; the other gear goes up on the
 	Market from the Arena Vault (MarketBoard.vaultList), with a commission
 	for the player on each sale (paid through the Market's mailbox). A
@@ -42,12 +44,13 @@ local ArenaStreaks = {}
 
 local rng = Random.new()
 
--- Every piece of gear of one RarityTier: { Kind, Id, Name }.
+-- Every piece of gear of one RarityTier a roll can hand out: { Kind, Id,
+-- Name } (swords, shields and armor; ExpandedItemTraits.rollable).
 local function gearOfTier(tier: number)
 	local pool = {}
 	local function scan(kind: string, list)
 		for _, gear in list or {} do
-			if type(gear) == "table" and gear.RarityTier == tier then
+			if type(gear) == "table" and gear.RarityTier == tier and ExpandedTraits.rollable(gear) then
 				table.insert(pool, { Kind = kind, Id = gear.Id, Name = gear.Name, Def = gear })
 			end
 		end
@@ -92,7 +95,9 @@ local function shuffled(pool)
 end
 
 -- The cache for milestone `m`: about half gems, half gear, each piece Rare
--- or Ultra-Rare (ArenaStreak.rarities), no piece of gear twice.
+-- or Ultra-Rare (ArenaStreak.rarities), no piece of gear twice, and at most
+-- ArenaStreak.MaxWeapons swords (so whatever you keep, armor is left over
+-- for the Market).
 function ArenaStreaks.rollCache(m)
 	local gemTiers, gearTiers = ArenaStreak.rarities(m)
 	local items = {}
@@ -106,13 +111,21 @@ function ArenaStreaks.rollCache(m)
 		})
 	end
 	local decks = {}
+	local weapons = 0
 	for _, rarity in gearTiers do
 		if not decks[rarity] then
 			GEAR_POOLS[rarity] = GEAR_POOLS[rarity] or gearOfTier(ArenaStreak.GearTier[rarity])
 			decks[rarity] = shuffled(GEAR_POOLS[rarity])
 		end
-		local piece = table.remove(decks[rarity])
+		local deck = decks[rarity]
+		local piece = table.remove(deck)
+		while piece and piece.Kind == "Weapons" and weapons >= ArenaStreak.MaxWeapons do
+			piece = table.remove(deck)
+		end
 		if piece then
+			if piece.Kind == "Weapons" then
+				weapons += 1
+			end
 			table.insert(items, {
 				-- (its look rolled now, at its own tier as the Forge does, so the
 				-- 3D preview is exactly the piece you'll get)
@@ -347,15 +360,7 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	table.remove(duel.StreakCaches, index)
 	pcall(GearRolls.ensure, profile, rng)
 	PlayerData.sync(player)
-	if cache.Dev then
-		-- (a DEV test cache: the picks and gems are yours, the rest never reach
-		-- the Market)
-		return Shop.reply(
-			true,
-			string.format("DEV cache claimed. The other %d were dropped (test only).", #leftovers),
-			view(duel)
-		)
-	end
+	-- Every roll's leftovers go up on the Market (a DEV test cache's too).
 	task.spawn(vault, player, duel, leftovers)
 	return Shop.reply(
 		true,
@@ -394,7 +399,7 @@ local devRolls = 0 -- (so each test cache has its own id, and rolls afresh)
 
 -- DEV (test admins): roll a test cache for the milestone at `wins` and put
 -- it first in line, to see the roll and try claiming. No coins, no title,
--- nothing marked paid, and its leftovers never go up on the Market. One
+-- nothing marked paid; its leftovers go up on the Market like any roll's. One
 -- test cache at a time (a new one replaces the last).
 function ArenaStreaks.devCache(player: Player, wins: any)
 	local TestAdmin = require(script.Parent.TestAdmin)

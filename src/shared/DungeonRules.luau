@@ -42,6 +42,100 @@ Dungeon.Roster = {
 		Moves = { "ArmorPiercer", "KineticRam", "ServoFlurry" },
 	},
 }
+-- The bosses: the last room's, and an open expedition's middle camp
+-- (Server BrainrotBosses dresses them; most have two or three heads). Each
+-- is weak to what the Roster's fighters of its element are weak to (Fire
+-- to Frost, Frost to Shock, Shock to Poison, Poison to Fire).
+Dungeon.Bosses = {
+	{
+		Id = "Gattini",
+		Name = "Gattini Gemellini",
+		Element = "Shock",
+		Weakness = "Poison",
+		Shape = "TwinCat",
+		Moves = { "ServoFlurry", "StimDodge", "ThrusterLeap" },
+	},
+	{
+		Id = "Drago",
+		Name = "Bombardiro Drago",
+		Element = "Fire",
+		Weakness = "Frost",
+		Shape = "DragonCroc",
+		Moves = { "ArmorPiercer", "ThrusterLeap", "KineticRam" },
+	},
+	{
+		Id = "Paperotti",
+		Name = "Paperotti Gemelli",
+		Element = "Frost",
+		Weakness = "Shock",
+		Shape = "TwinDuck",
+		Moves = { "KineticRam", "StimDodge", "PneumaticJab" },
+	},
+	{
+		Id = "Ranocchio",
+		Name = "Ranocchio Avocadino",
+		Element = "Poison",
+		Weakness = "Fire",
+		Shape = "FrogAvocado",
+		Moves = { "ThrusterLeap", "TremorSlam", "PneumaticJab" },
+	},
+	{
+		Id = "Chimpanzini",
+		Name = "Chimpanzini Bananini",
+		Element = "Shock",
+		Weakness = "Poison",
+		Shape = "Chimpanzini",
+		Moves = { "ServoFlurry", "BreachHammer", "ThrusterLeap" },
+	},
+	{
+		Id = "SahurTrio",
+		Name = "Tung Tung Tung Sahur",
+		Element = "Fire",
+		Weakness = "Frost",
+		Shape = "SahurTrio",
+		Moves = { "HydraulicSlam", "BreachHammer", "TremorSlam" },
+		PoseProfile = "SahurBat",
+	},
+	{
+		Id = "TralaleroTwin",
+		Name = "Tralalero Tralala",
+		Element = "Frost",
+		Weakness = "Shock",
+		Shape = "TwinShark",
+		Moves = { "ServoFlurry", "StimDodge", "KineticRam" },
+	},
+	{
+		Id = "PatapimTrio",
+		Name = "Brr Brr Patapim",
+		Element = "Poison",
+		Weakness = "Fire",
+		Shape = "TreeTrio",
+		Moves = { "TremorSlam", "SeismicBreaker", "RiposteStance" },
+	},
+	{
+		Id = "Frigo",
+		Name = "Frigo Camelo",
+		Element = "Frost",
+		Weakness = "Shock",
+		Shape = "Frigo",
+		Moves = { "KineticRam", "SeismicBreaker", "RiposteStance" },
+	},
+	{
+		Id = "Cappuccino",
+		Name = "Cappuccino Assassino",
+		Element = "Shock",
+		Weakness = "Poison",
+		Shape = "Cappuccino",
+		Moves = { "ServoFlurry", "ArmorPiercer", "StimDodge" },
+	},
+}
+-- What fights as foe `kind` (an index) in `room` (a room or a camp): a
+-- boss room's from Bosses, any other's from the Roster. `kind` defaults to
+-- the room's Theme.
+function Dungeon.specOf(room, kind: number?)
+	local list = if room.Boss then Dungeon.Bosses else Dungeon.Roster
+	return list[kind or room.Theme]
+end
 local directions = { { 0, 1 }, { 1, 0 }, { -1, 0 }, { 0, -1 } }
 function Dungeon.generate(rng)
 	local rooms = { { X = 0, Z = 0 } }
@@ -68,7 +162,7 @@ function Dungeon.generate(rng)
 		used[room.X .. ":" .. room.Z] = true
 		table.insert(rooms, room)
 	end
-	local boss = rng:NextInteger(1, #Dungeon.Roster)
+	local boss = rng:NextInteger(1, #Dungeon.Bosses)
 	for i, room in rooms do
 		room.Index = i
 		room.Boss = i == Dungeon.RoomCount
@@ -127,7 +221,7 @@ function Dungeon.generateOpen(rng)
 		end
 		table.insert(camps, camp)
 	end
-	local boss = rng:NextInteger(1, #Dungeon.Roster)
+	local boss = rng:NextInteger(1, #Dungeon.Bosses)
 	table.insert(camps, {
 		Index = 10,
 		X = 0,

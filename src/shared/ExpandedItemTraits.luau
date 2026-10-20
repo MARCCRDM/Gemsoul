@@ -1065,11 +1065,23 @@ function Traits.obtainable(gear): boolean
 	return gear ~= nil and (Traits.PistolsObtainable or gear.WeaponType ~= "Pistol")
 end
 
+-- Can a roll (a mine find, an Arena Cache, any lottery) hand it out? Armor
+-- and shields, and of the weapons only the standard swords and their
+-- variants (saber, falchion, greatblade...): no guns, hammers, axes, lances.
+Traits.RollWeapons = { Sword = true }
+function Traits.rollable(gear): boolean
+	if not Traits.obtainable(gear) then
+		return false
+	end
+	local kind = gear.WeaponType or (gear.Attack and "Unknown") or nil
+	return kind == nil or Traits.RollWeapons[kind] == true
+end
+
 function Traits.pick(catalog, rng, weights)
 	weights = weights or Traits.Weights
 	local groups = {}
 	for _, gear in catalog do
-		if gear.StartPool and Traits.obtainable(gear) then
+		if gear.StartPool and Traits.rollable(gear) then
 			local rarity = gear.RarityTier
 			groups[rarity] = groups[rarity] or {}
 			table.insert(groups[rarity], gear)

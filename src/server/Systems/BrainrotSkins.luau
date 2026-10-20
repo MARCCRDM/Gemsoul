@@ -656,8 +656,14 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	if spec.Shape ~= "Wood" and gearTier ~= 0 then
 		armor(rig, spec, accent, gearTier or (if boss then 4 else 1), hasShield)
 	end
+	Skins.finish(rig, spec, boss)
+end
+
+-- After a body's dressed (here, or BrainrotBosses): a boss is scaled up,
+-- its moving details keep their rest poses, and the attributes clients read.
+function Skins.finish(rig, spec, boss)
 	if boss then
-		rig:ScaleTo(1.8)
+		rig:ScaleTo(spec.Scale or 1.8)
 	end
 	-- Model scaling updates joint offsets, but not arbitrary CFrame attributes.
 	for _, joint in rig:GetDescendants() do
@@ -667,9 +673,12 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	end
 	rig:SetAttribute("BrainrotCharacter", spec.Id)
 	rig:SetAttribute("CreatureShape", spec.Shape)
-	rig:SetAttribute("CombatPoseProfile", if spec.Id == "Sahur" then "SahurBat" else nil)
+	rig:SetAttribute("CombatPoseProfile", spec.PoseProfile or (if spec.Id == "Sahur" then "SahurBat" else nil))
 	rig:SetAttribute("DungeonBoss", boss)
 end
+
+-- The pieces the bosses are built from (BrainrotBosses).
+Skins.part, Skins.animate, Skins.eyes, Skins.barefoot, Skins.sneaker = part, animate, eyes, barefoot, sneaker
 -- A small copy (the Outpost's moon bugs): details too small to see at its
 -- size go (grain, rivets, laces, spores), but never its face, nor a part
 -- others hang off (a jaw's teeth) or one carrying an effect. Its lights go

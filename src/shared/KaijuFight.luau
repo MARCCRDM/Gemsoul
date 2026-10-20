@@ -30,6 +30,7 @@
 	  KaijuFight.read(fighter, now, ratio)   what a foe sees of a kaiju
 	  KaijuFight.view(fighter, foe, now, distance, ratio)   the brain's View
 	  KaijuFight.decide(fighter, view, roll) the brain's choice
+	  KaijuFight.inArc(dir, toward, arc)     is a foe inside a blow's arc?
 
 	A body is where a kaiju's guard and stuns live (its Enemies record or
 	its pet record): GuardUntil, GuardMult, GuardRaisedAt, ParrySpent,
@@ -92,6 +93,11 @@ KaijuFight.DodgeFor = 0.3 -- untouchable this long into a hop
 KaijuFight.Recover = 0.35 -- open to a counter this long after its last blow
 KaijuFight.HitRange = 1.5 -- a blow lands up to this far past its reach (the brain's studs)
 KaijuFight.FirstSurge = 3 -- its E, this long into a fight
+-- Against a swarm: a heavy sweeps through every foe in reach inside its
+-- arc (Arc degrees, a Razorback's tail lash RazorArc), each of the others
+-- taking Share of the blow; with Crowd or more foes in reach it swings a
+-- heavy for a light Heavy of the time.
+KaijuFight.Cleave = { Share = 0.6, Arc = 150, RazorArc = 220, Crowd = 3, Heavy = 0.6 }
 
 local BLOWS = { Light = true, Heavy = true, Punish = true, Lunge = true }
 
@@ -298,10 +304,24 @@ function KaijuFight.view(f, foe, now: number, distance: number, ratio: number)
 	}
 end
 
+-- Is a foe `toward` it (flat, from it) inside a blow of `arc` degrees
+-- swung along `dir` (flat, unit)?
+function KaijuFight.inArc(dir: Vector3, toward: Vector3, arc: number): boolean
+	local flatTo = Vector3.new(toward.X, 0, toward.Z)
+	if flatTo.Magnitude < 0.05 then
+		return true
+	end
+	return dir:Dot(flatTo.Unit) >= math.cos(math.rad(math.min(arc, 360) / 2)) - 1e-6
+end
+
 -- The brain's choice (`roll` in [0, 1)). It reads a threat, then waits a
--- beat before it reacts to the next.
+-- beat before it reacts to the next. Surrounded (view.Crowd foes in reach),
+-- a light blow becomes a sweeping heavy more often than not.
 function KaijuFight.decide(f, view, roll: number): string
 	local choice = Brain.decide(view, roll)
+	if choice == "Light" and (view.Crowd or 0) >= KaijuFight.Cleave.Crowd and (roll * 7.31) % 1 < KaijuFight.Cleave.Heavy then
+		choice = "Heavy"
+	end
 	if
 		(view.FoeCharging or view.FoeCasting or view.FoeAttacking)
 		and view.Distance <= Brain.Reach + 4

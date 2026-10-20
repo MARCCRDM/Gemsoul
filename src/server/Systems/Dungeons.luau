@@ -199,7 +199,7 @@ beginLoot = function(run, room)
 		Eligible = eligible,
 		Choices = {},
 		Tier = room.GearTier,
-		Element = Rules.Roster[room.Theme].Element,
+		Element = Rules.specOf(room).Element,
 		Deadline = os.clock() + 30,
 	}
 	for _, p in eligible do
@@ -233,7 +233,7 @@ local function spawnRoom(run, index)
 	run.Index = index
 	run.Remaining = #room.Foes
 	run.Cleared = false
-	local spec = Rules.Roster[room.Theme]
+	local spec = Rules.specOf(room)
 	for _, p in members do
 		p:SetAttribute("DungeonRoom", index)
 		p:SetAttribute("DungeonBoss", if room.Boss then spec.Name else nil)
@@ -268,7 +268,7 @@ local function spawnRoom(run, index)
 			Bandit = room.Bandit,
 			MinPlayers = if run.Test then 1 else Rules.Min,
 			Spot = center + Vector3.new(math.cos(angle) * 14, if room.Boss then 7 else 4, math.sin(angle) * 14),
-			Spec = Rules.Roster[kind],
+			Spec = Rules.specOf(room, kind),
 			Boss = room.Boss,
 			OnDeath = function()
 				if run.Done or (not run.OpenWorld and run.Index ~= index) then
@@ -396,7 +396,14 @@ local function queue(player, testMode)
 		end
 		run.Rooms = if run.OpenWorld then Rules.generateOpen(Random.new()) else Rules.generate(Random.new())
 		if testing and testMode == "Sahur" then
-			run.Rooms = { { Index = 1, X = 0, Z = 0, Boss = true, Theme = 1, Foes = { 1 }, Pillars = 2 } }
+			-- (Straight to the boss: the three-headed Tung Tung Tung Sahur.)
+			local sahur = 1
+			for i, spec in Rules.Bosses do
+				if spec.Id == "SahurTrio" then
+					sahur = i
+				end
+			end
+			run.Rooms = { { Index = 1, X = 0, Z = 0, Boss = true, Theme = sahur, Foes = { sahur }, Pillars = 2 } }
 		end
 		run.World = (if run.OpenWorld then World.buildOpen else World.build)(
 			id,

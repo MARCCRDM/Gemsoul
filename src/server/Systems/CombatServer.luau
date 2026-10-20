@@ -421,12 +421,14 @@ function CombatServer.onLethal(hook)
 end
 -- A sparring player isn't finished, just knocked down (SparServer); nor is
 -- anyone in the Outpost (a rift's critter can catch a miner out there).
+-- Only in the lobby, though: in a rival fight or a 1v1 started from it (the
+-- Outpost flag still on) the blow is a real one (Spar.knocksDown).
 function CombatServer.onSparLethal(hook)
 	sparLethalHook = hook
 end
 local function spared(player, humanoid, amount, source): boolean
 	if amount < humanoid.Health then return false end
-	if sparLethalHook and (Spar.sparring(player) or player:GetAttribute("Outpost") == true) then
+	if sparLethalHook and Spar.knocksDown(player) then
 		return sparLethalHook(player, humanoid, source)
 	end
 	if dungeonLethalHook and dungeonLethalHook(player, humanoid) then return true end

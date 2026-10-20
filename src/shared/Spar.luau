@@ -25,6 +25,11 @@
 	  Spar.active(player, now?)    kit out and on your feet: fighting
 	  Spar.fighting(player)        in a fight of any kind: an Arena session,
 	                               a match, or a spar
+	  Spar.inMatch(player)         in a real fight away from the lobby: a
+	                               rival, a duel, a dungeon, an expedition
+	  Spar.knocksDown(player)      a finishing blow knocks you down (in the
+	                               lobby only: a spar, a hunt, a critter
+	                               catching a miner), never in a match
 	  Spar.hunting(player)         the kit out alone, to hunt the Outpost's
 	                               creatures (KaijuWilds): a spar with no
 	                               partner, so no player can hit you or be hit
@@ -64,6 +69,25 @@ end
 
 function Spar.fighting(player: Instance): boolean
 	return player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil or Spar.sparring(player)
+end
+
+function Spar.inMatch(player: Instance): boolean
+	for _, name in { "CombatSession", "MatchId", "DungeonId", "Expedition" } do
+		if player:GetAttribute(name) ~= nil then
+			return true
+		end
+	end
+	return false
+end
+
+-- Knock-downs are the lobby's: in a rival fight, a 1v1, a dungeon or an
+-- expedition a finishing blow finishes you (the Outpost flag stays on
+-- through a match started from the lobby, so it alone isn't enough).
+function Spar.knocksDown(player: Instance): boolean
+	if Spar.inMatch(player) then
+		return false
+	end
+	return Spar.sparring(player) or player:GetAttribute("Outpost") == true
 end
 
 function Spar.hunting(player: Instance): boolean

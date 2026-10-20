@@ -315,8 +315,40 @@ check(
 	"Claimed into a full gem bag (the free gems need room too)"
 )
 
+-- Every roll's gear: swords (the standard ones) are the only weapons, one
+-- at most, so the armor and shields always outnumber what you keep: some
+-- armor is always left over for the Market. No guns, hammers, axes, lances.
+do
+	local weaponType = {}
+	for _, w in shared("ExpandedItemTraits").Catalog.Weapons do
+		weaponType[w.Id] = w.WeaponType
+	end
+	local seenSword = false
+	for _, m in Rules.Milestones do
+		for _ = 1, 25 do
+			local c = Server.rollCache(m)
+			local weapons, armor = 0, 0
+			for _, entry in c.Items do
+				if entry.Item.Kind == "Gear" then
+					if entry.Item.Slot == "Weapon" then
+						weapons += 1
+						seenSword = true
+						check(weaponType[entry.Item.Id] == "Sword", "A cache rolled a weapon that isn't a sword: " .. entry.Item.Id)
+					else
+						armor += 1
+					end
+				end
+			end
+			check(weapons <= Rules.MaxWeapons, "A cache rolled more than one sword")
+			check(armor > Rules.Picks, "A cache could leave no armor over for the Market")
+		end
+	end
+	check(seenSword, "No cache ever rolled a sword")
+end
+
 -- DEV test caches: test admins only; first in line; no coins, no title,
--- nothing marked paid; a new one replaces the last; leftovers never vaulted.
+-- nothing marked paid; a new one replaces the last; leftovers vaulted like
+-- any roll's.
 profile.Gems = {}
 local outsider = { UserId = 8, DisplayName = "Not Admin", SetAttribute = function() end }
 check(not handlers.DevStreakCache(outsider, 10).Ok, "A non-admin rolled a test cache")
@@ -344,7 +376,7 @@ for _, entry in dev.Items do
 end
 local devClaim = handlers.StreakClaim(player, dev.Id, { devGear[1], devGear[2], devGear[3] })
 check(devClaim.Ok and #profile.Gems == Rules.get(10).Gems, "A test cache couldn't be claimed")
-check(#vaulted == vaultedBefore, "A test cache's leftovers went to the Market")
+check(#vaulted == vaultedBefore + Rules.GearOffered - Rules.Picks, "A test cache's leftovers didn't go to the Market")
 check(#profile.Duel.StreakCaches == realCount, "The claimed test cache stayed")
 
 print(string.format("PASS: %d arena streak checks (milestones 10-200, free gems + pick 3 of 6 gear, claims, Arena Vault with commission, DEV test caches)", checks))

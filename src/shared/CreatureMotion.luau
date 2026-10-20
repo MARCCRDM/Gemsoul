@@ -28,6 +28,19 @@ function Motion.angles(kind: string, time: number, phase: number, amount: number
 		return math.sin(time * 2.1) * 0.015 + math.sin(phase * 2) * 0.03 * amount, 0, 0
 	elseif kind == "Moss" then
 		return math.sin(time * 1.6 + side) * 0.06 + amount * 0.08, 0, math.sin(phase + side) * amount * 0.08
+	elseif kind == "Head" then
+		-- one of a boss's heads (side tells them apart): it looks about on
+		-- its own, bobs as it walks, and lunges in on a blow
+		return math.sin(time * 1.3 + side * 1.7) * 0.05 + math.sin(phase * 2) * 0.04 * amount - attack * 0.24,
+			math.sin(time * 0.55 + side * 2.1) * 0.22 * (1 - attack),
+			math.sin(time * 0.8 + side) * 0.04
+	elseif kind == "Wing" then
+		-- flaps, faster on the move, and beats hard on a blow (side: which wing)
+		local flap = math.sin(time * (4 + amount * 4)) * (0.22 + amount * 0.18) + attack * 0.5
+		return 0, side * math.sin(time * 1.2) * 0.06, side * flap
+	elseif kind == "Blade" then
+		-- an extra arm's knife: twirls at rest, chops down and in on a blow
+		return math.sin(time * 2.4 + side) * 0.06 - attack * 1.1, side * math.sin(time * 1.5) * 0.08, -side * attack * 0.4
 	end
 	return 0, 0, 0
 end

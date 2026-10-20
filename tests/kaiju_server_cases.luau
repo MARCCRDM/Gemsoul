@@ -1799,15 +1799,17 @@ for _ = 1, 160 do
 	check(coming <= allowed, "More critters than the fringe allows")
 end
 check(#critterFor(b) >= 2, "Rifts stopped opening round a miner out in the fringe")
--- Standing about out there, not mining: hardly any (a trickle every few minutes).
+-- Standing about out there, not mining: hardly any (a trickle every few
+-- minutes: one swarm at most). (The swarms still hopping out first.)
+now += Frontier.Rift.Hop + Frontier.Swarm.Last + 3
+runDelayed()
 clearCritters()
-local before = #rifts()
 for _ = 1, 40 do
 	now += 0.5
 	FrontierServer._step(0.5)
 	runDelayed()
 end
-check(#critterFor(b) <= 1, "Standing still drew critters like mining")
+check(#critterFor(b) <= Frontier.incursion("Fringe", 0.99), "Standing still drew critters like mining")
 
 -- Out at the edge: tougher critters, from level 9 (on a calm frontier:
 -- stirred up, they come higher still, below).
@@ -1950,7 +1952,8 @@ local function stirringUp()
 	runDelayed() -- (the rifts open, a moment apart)
 	now += 0.35 * coming + 0.05
 	runDelayed()
-	now += Frontier.Rift.Hop + 0.1
+	-- (Out of each rift one after another, any ranged one last.)
+	now += Frontier.Rift.Hop + (Frontier.Swarm.PerRift - 1) * Frontier.Swarm.Stagger + Frontier.Swarm.Last + 0.1
 	runDelayed()
 	local list = critterFor(b)
 	check(#list == coming, "Not every swarming critter came through: " .. #list .. " of " .. coming)
@@ -2004,9 +2007,18 @@ check(off >= Frontier.Wander.Near - 1 and off <= Frontier.Wander.Far + 1, "A wan
 check(wanderRift:GetAttribute("Prey") == b.UserId, "A wandering rift isn't tied to anyone")
 now = wanderRift:GetAttribute("HopAt") + 0.05
 runDelayed()
+now += Frontier.Swarm.Last -- (any ranged one hops out last)
+runDelayed()
 local roamers = critterFor(b)
 check(#roamers >= 2 and KaijuWilds._wilds[roamers[1]].Wander ~= nil, "No critters roamed out of the wandering rift")
+-- (A fighter: a ranged one jets off from a player walking up, as it should.)
 local roamer = roamers[1]
+for _, critter in roamers do
+	if not Kaiju.isRanged(KaijuWilds._wilds[critter].Species) then
+		roamer = critter
+		break
+	end
+end
 KaijuWilds._brain(roamer, now)
 check(roamer.Foe == nil and roamer.Humanoid.MovingTo ~= nil, "A wandering critter went straight for its player")
 local fromRift = roamer.Humanoid.MovingTo - roamer.Home
@@ -2019,6 +2031,7 @@ for i, enemy in roamers do
 	if i == 1 then
 		enemy.KaijuCredit = { [a] = 5 }
 	end
+	enemy.DodgeUntil = 0 -- (not mid-hop)
 	Enemies.damage(enemy, 1e6, b)
 end
 check((b:GetAttribute("RiftCharged") or 0) > now and (a:GetAttribute("RiftCharged") or 0) > now, "Nobody Rift Charged")
@@ -3052,6 +3065,147 @@ local function teamFights()
 	now += move.Lob.Flight
 	KaijuWilds._brain(bomber, now)
 	check(team[1].Humanoid.Health == hp[team[1]], "A bomb hit a kaiju that moved off")
+	-- It only ever fights from range: closed in on, it jets back out (not a
+	-- bite), and with its jets spent it still never bites.
+	bo.Action, bo.Windup, bo.Bombs, bo.NextFlee = nil, nil, nil, 0
+	team[1].Root.CFrame = CFrame.new(bomber.Root.Position + Vector3.new(0, 0, -2))
+	bomber.LastAttack = now - 10
+	KaijuWilds._brain(bomber, now)
+	local jet = bomber.Root.AssemblyLinearVelocity
+	check(Vector3.new(jet.X, 0, jet.Z):Dot(Vector3.new(0, 0, 1)) > 20, "Closed in on, the bomber didn't jet back")
+	check(bo.Action == nil and bomber.Model:GetAttribute("ActionKind") == "Dodge", "It did something else than jet back")
+	check(
+		(bomber.Humanoid.MovingTo - team[1].Root.Position).Magnitude > move.Keep - 1,
+		"It jetted back but means to stay close"
+	)
+	for _ = 1, 6 do
+		now += 0.3
+		team[1].Root.CFrame = CFrame.new(bomber.Root.Position + Vector3.new(0, 0, -2)) -- (kept on it)
+		-- (A bite would be ready, its next bomb not yet.)
+		bo.Action, bo.Windup = nil, nil
+		bomber.LastAttack = now - (Kaiju.Bug.Rate + move.Lob.Every) / 2
+		KaijuWilds._brain(bomber, now)
+		check(not (bo.Action and bo.Action.Kind == "Bite"), "The bomber bit")
+		check(bomber.Model:GetAttribute("ActionKind") ~= "Slash", "The bomber wound up a bite")
+	end
+
+	-- Smarter fights ------------------------------------------------------------------------------------
+	-- (One kaiju on its own here: the other two well off.)
+	local function alone()
+		reset()
+		table.clear(KaijuWilds._rushes) -- (no pounce left over from the fights above)
+		team[2].Root.CFrame = CFrame.new(spot + Vector3.new(200, 0, 0))
+		team[3].Root.CFrame = CFrame.new(spot + Vector3.new(-200, 0, 0))
+		return team[1]
+	end
+	-- The swarm pounces together: three fighters on one kaiju, out of breath
+	-- or not, all leap in at once, once each, and every bite lands.
+	local prey = alone()
+	local pack = {}
+	for i = 1, 3 do
+		local turn = i * math.pi * 2 / 3
+		local bug = bugAt(prey.Root.Position + Vector3.new(math.cos(turn) * 5, 0, math.sin(turn) * 5), "Sahur")
+		local b3 = bug :: any
+		b3.NextMove, b3.NextDodge = math.huge, math.huge
+		table.insert(pack, bug)
+	end
+	for _ = 1, 2 do -- (the first think each picks its foe; then the pounce is set)
+		for _, bug in pack do
+			KaijuWilds._brain(bug, now)
+		end
+	end
+	local rush = KaijuWilds._rushes[prey.Root]
+	check(rush and rush.At > now, "Three on one kaiju and no pounce coming")
+	for _, bug in pack do
+		check(bug.Foe == prey, "Not all three on the one kaiju")
+		local b3 = bug :: any
+		b3.Action, b3.RecoverUntil, bug.LastAttack = nil, now + 100, now -- (out of breath)
+	end
+	now = rush.At + 0.01
+	local hp0 = prey.Humanoid.Health
+	for _, bug in pack do
+		KaijuWilds._brain(bug, now)
+		local b3 = bug :: any
+		check(b3.Action and b3.Action.Kind == "Bite" and b3.Action.Rush, "One held back from the pounce")
+		check(bug.Model:GetAttribute("ActionKind") == "Lunge", "A pounce with no leap")
+	end
+	now += Kaiju.Bug.BiteWindup
+	for _, bug in pack do
+		KaijuWilds._brain(bug, now)
+	end
+	check(prey.Humanoid.Health < hp0, "The pounce never landed")
+	for _, bug in pack do
+		local b3 = bug :: any
+		b3.RecoverUntil, bug.LastAttack = now + 100, now
+		KaijuWilds._brain(bug, now + 0.05)
+		check(not (b3.Action and b3.Action.Rush), "A critter pounced twice in one pounce")
+	end
+	-- Hurt, a critter turns wary: it takes longer to come back in.
+	prey = alone()
+	local hurt = bugAt(prey.Root.Position + Vector3.new(2.5, 0, 0), "Sahur")
+	local hb = hurt :: any
+	hb.NextMove, hb.NextDodge, hurt.LastAttack = math.huge, math.huge, 0
+	hurt.Humanoid.Health = hurt.Humanoid.MaxHealth * (Kaiju.Bug.Skittish / 2)
+	KaijuWilds._brain(hurt, now)
+	now += Kaiju.Bug.BiteWindup
+	KaijuWilds._brain(hurt, now)
+	check(
+		math.abs((hb.RecoverUntil or 0) - (now + Kaiju.Bug.Recover * Kaiju.Bug.Wary)) < 1e-6,
+		"A hurt critter came back in as soon as ever"
+	)
+	-- On its own on a kaiju facing it, a critter works round toward its back.
+	prey = alone()
+	local sneak = bugAt(prey.Root.Position + Vector3.new(0, 0, 9), "Sahur")
+	local sb = sneak :: any
+	sb.NextMove, sb.NextDodge, sneak.LastAttack = math.huge, math.huge, now
+	-- (Facing it, along +Z: Lune's CFrame.lookAt gets that one backwards.)
+	prey.Root.CFrame = CFrame.new(prey.Root.Position) * CFrame.Angles(0, math.pi, 0)
+	KaijuWilds._brain(sneak, now)
+	local look = prey.Root.CFrame.LookVector
+	local fromNow = (sneak.Root.Position - prey.Root.Position).Unit
+	local goingTo = sneak.Humanoid.MovingTo - prey.Root.Position
+	goingTo = Vector3.new(goingTo.X, 0, goingTo.Z).Unit
+	check(goingTo:Dot(look) < fromNow:Dot(look) - 0.15, "A critter stayed in front of a kaiju facing it")
+	-- Your kaiju dive a swarm's bomber, and finish off one nearly done.
+	prey = alone()
+	local near = bugAt(spot + Vector3.new(-6, 0, 12), "Sahur")
+	local bomberFar = bugAt(spot + Vector3.new(-6, 0, 17), "Crocodilo")
+	check(bomberFar.Model:GetAttribute("CritterRanged") == true, "The bomber isn't marked as ranged")
+	for _, bug in { near, bomberFar } do
+		(bug :: any).Foe = prey
+	end
+	KaijuServer._think(prey, now, 0.15)
+	check(prey.Target == bomberFar, "Your kaiju went for the nearer critter, not the bomber")
+	prey = alone()
+	local healthy = bugAt(spot + Vector3.new(-6, 0, 12), "Sahur")
+	local weak = bugAt(spot + Vector3.new(-6, 0, 15), "Patapim")
+	weak.Humanoid.Health = weak.Humanoid.MaxHealth * 0.1
+	for _, bug in { healthy, weak } do
+		(bug :: any).Foe = prey
+	end
+	KaijuServer._think(prey, now, 0.15)
+	check(prey.Target == weak, "Your kaiju left one nearly done for")
+	-- A heavy sweeps through the swarm: the critters in its arc are hit too,
+	-- one behind it isn't.
+	prey = alone()
+	local r = prey.Fighter.Reach * 0.8
+	local p0 = prey.Root.Position
+	local front = bugAt(p0 + Vector3.new(0, 0, -r), "Sahur")
+	local beside = bugAt(p0 + Vector3.new(r * math.sin(math.rad(40)), 0, -r * math.cos(math.rad(40))), "Patapim")
+	local behind = bugAt(p0 + Vector3.new(0, 0, r), "Tralalero")
+	for _, bug in { front, beside, behind } do
+		local bb = bug :: any
+		bb.NextDodge, bb.NextMove = math.huge, math.huge
+	end
+	prey.Target = front
+	prey.Fighter.Action = { Kind = "Heavy", At = now }
+	KaijuServer._think(prey, now, 0.15)
+	check(front.Humanoid.Health < front.Humanoid.MaxHealth, "The heavy missed its foe")
+	check(beside.Humanoid.Health < beside.Humanoid.MaxHealth, "The heavy didn't sweep through the one beside")
+	check(behind.Humanoid.Health == behind.Humanoid.MaxHealth, "The heavy hit one behind it")
+	local swept = beside.Humanoid.MaxHealth - beside.Humanoid.Health
+	local struck = front.Humanoid.MaxHealth - front.Humanoid.Health
+	check(swept < struck, "The sweep hit as hard as the blow")
 
 	-- A short fight walked through: three kaiju on six critters for twelve
 	-- seconds. Each its own foe all along, the critters two on each, never

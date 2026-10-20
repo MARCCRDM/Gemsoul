@@ -73,6 +73,21 @@ check(math.abs(Spar.stopWait({ Hurt = 49 }, 50) - (Spar.SheatheLock - 1)) < 1e-6
 check(Spar.stopWait({ Hurt = 40 }, 50) == 0, "Held long after the last hit")
 check(Spar.stopWait({ Down = 52 }, 50) == 2, "Stopped while knocked down")
 
+-- Knock-downs are the lobby's only: a miner or a sparring player in the
+-- Outpost goes down, but not in a rival fight, a 1v1, a dungeon or an
+-- expedition started from it (the Outpost flag still on).
+local function at(attrs)
+	return { GetAttribute = function(_, key) return attrs[key] end }
+end
+check(Spar.knocksDown(at({ Outpost = true })), "A miner in the lobby isn't knocked down")
+check(Spar.knocksDown(at({ Outpost = true, Spar = true })), "A sparring player isn't knocked down")
+for _, busy in { "CombatSession", "MatchId", "DungeonId", "Expedition" } do
+	check(not Spar.knocksDown(at({ Outpost = true, [busy] = "x" })), "Knocked down mid-match (" .. busy .. ")")
+	check(not Spar.knocksDown(at({ Outpost = true, Spar = true, [busy] = "x" })), "A spar's knock-down in a match (" .. busy .. ")")
+	check(Spar.inMatch(at({ [busy] = "x" })), "Not in a match with " .. busy)
+end
+check(not Spar.knocksDown(at({})), "Knocked down outside the Outpost")
+
 -- With the real CombatServer ----------------------------------------------------------------------
 
 function Players:GetPlayerByUserId(id)

@@ -204,8 +204,10 @@ Kaiju.Follow = { Engage = 28, Leash = 45, Battle = 150, Teleport = 90, Gap = 5 }
 -- Fighting as a team (Shared.Squad): your kaiju share out the creatures (each
 -- its own while there are enough), flank one they share, and keep Space
 -- studs apart (a critter BugSpace from another); a creature after you counts
--- OwnerThreat studs nearer.
-Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10 }
+-- OwnerThreat studs nearer, a swarm's ranged one (it bombs from the back)
+-- Bomber studs nearer, and one nearly done for (under a quarter of its
+-- health) Finish studs nearer: they dive the bomber and finish one off.
+Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10, Bomber = 8, Finish = 5 }
 
 -- Your team: the kaiju out with you at once. The beta opens all three
 -- slots from the start (the plan: a second when one of yours reaches level
@@ -307,17 +309,19 @@ Kaiju.Tame = { Cast = 2.5, Range = 30, Break = 38 }
 Kaiju.Spread = { 0.6, 1.4 }
 
 -- Moon bugs: they come through rifts round players out past the core
--- (Shared.Frontier), to kite and fight. A little EXP for your kaiju, a few
--- coins. Leash: how far from its rift one chases.
+-- (Shared.Frontier), to kite and fight. They come in swarms, three to six
+-- at a time and more when it's stirred up, so each one alone is weak: a
+-- small bite, little health. A little EXP for your kaiju, a coin. Leash:
+-- how far from its rift one chases.
 Kaiju.Bug = {
-	Health = 60,
-	Damage = 4,
+	Health = 30,
+	Damage = 1.6,
 	Rate = 1.4,
 	Speed = 13,
 	Reach = 4.5,
 	Aggro = 22,
-	Exp = 10,
-	Coins = 2,
+	Exp = 4,
+	Coins = 1,
 	DailyCoins = 300,
 	Scale = 0.55,
 	Size = 0.55, -- next to you (its rig is your size at scale 1: Kaiju.size)
@@ -334,6 +338,20 @@ Kaiju.Bug = {
 	Dodge = 0.3,
 	DodgeEvery = 2.5,
 	DodgeFor = 0.45,
+	-- A swarm pounces together: once at least Rush.Min of its fighters are
+	-- on one foe, every Rush.Every seconds (a range) they all leap in at
+	-- once from up to Rush.Leap studs out, within Rush.Window seconds,
+	-- whether they'd got their breath back or not.
+	Rush = { Min = 3, Every = { 4, 7 }, Window = 0.6, Leap = 8 },
+	-- Below Skittish of its health one turns wary: it circles wider, takes
+	-- Wary times as long to come back in, and hops clear more (WaryDodge
+	-- more of a chance).
+	Skittish = 0.35,
+	Wary = 1.8,
+	WaryDodge = 0.25,
+	-- On its own on a foe that's facing it, it works round toward its
+	-- back, up to Flank radians a step.
+	Flank = math.rad(40),
 }
 
 -- Each critter's own move (KaijuWilds), after a wind-up named on its cast
@@ -344,8 +362,10 @@ Kaiju.Bug = {
 --   Bombs   Count bombs lobbed round its foe (within Spread), each landing
 --           after Flight where its foe was: keep moving
 -- Mult: a share of its bite. Status: what it leaves. Dodge: its own chance
--- to hop clear. Keep: it fights from this far off, lobbing (Lob: a bomb every
--- Every seconds, the same way), biting only one that closes in.
+-- to hop clear. Ranged: it never bites; it keeps Keep studs off, lobbing
+-- (Lob: a bomb every Every seconds, the same way), and one closing in past
+-- Flee it jets back from (every FleeEvery seconds at most). It never comes
+-- alone, and comes through last (Kaiju.wave).
 Kaiju.BugMoves = {
 	Sahur = {
 		Name = "Bat Slam",
@@ -397,11 +417,49 @@ Kaiju.BugMoves = {
 		Mult = 1.2,
 		Status = "Stun",
 		Every = 9,
-		Range = 18,
-		Keep = 11,
+		Range = 24,
+		Ranged = true,
+		Keep = 14,
+		Flee = 8,
+		FleeEvery = 2,
 		Lob = { Every = 2.2, Windup = 0.45, Flight = 0.55, Radius = 3, Mult = 1 },
 	},
 }
+-- The critters, as DungeonRules.Roster has them.
+Kaiju.Critters = { "Sahur", "Tralalero", "Patapim", "Crocodilo" }
+-- A swarm's make-up (Kaiju.wave): one of at least Ranged.Min critters has
+-- a ranged one at its back (Ranged.Chance of the time), one more for every
+-- Ranged.Every.
+Kaiju.Swarm = { Ranged = { Min = 3, Every = 5, Chance = 0.7 } }
+
+-- Whether critter `id` fights from range (never alone, and last).
+function Kaiju.isRanged(id: string?): boolean
+	local move = Kaiju.BugMoves[id or ""]
+	return move ~= nil and move.Ranged == true
+end
+
+-- What comes through for an encounter of `count` (a list of critter ids,
+-- in the order they come): the fighters first, any ranged ones last (and
+-- never on their own). `rng` has NextInteger and NextNumber.
+function Kaiju.wave(count: number, rng): { string }
+	local melee, ranged = {}, {}
+	for _, id in Kaiju.Critters do
+		table.insert(if Kaiju.isRanged(id) then ranged else melee, id)
+	end
+	local rules = Kaiju.Swarm.Ranged
+	local shots = 0
+	if #ranged > 0 and count >= rules.Min and rng:NextNumber() < rules.Chance then
+		shots = math.max(1, math.floor(count / rules.Every))
+	end
+	local wave = {}
+	for _ = 1, count - shots do
+		table.insert(wave, melee[rng:NextInteger(1, #melee)])
+	end
+	for _ = 1, shots do
+		table.insert(wave, ranged[rng:NextInteger(1, #ranged)])
+	end
+	return wave
+end
 
 -- Healing (KaijuServer's "KaijuInfuse"): gems from your pouch heal a
 -- kaiju, never EXP. A gem's power by its rarity (Power), Same times for

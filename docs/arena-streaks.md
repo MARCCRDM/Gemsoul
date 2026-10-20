@@ -32,9 +32,13 @@ win of each run restore your pick's swings (10%, 25%, 50%). See
 (250 to 1000 come later: add rows to `Shared.ArenaStreak.Milestones`.)
 
 - **Pieces:** the free gems, then six pieces of gear (each card shows its stat
-  rolls, passive and affixes). Gear is drawn from every Rare (tier 3) or Ultra-Rare
-  (tier 4) piece (weapons, shields, helmets, armour, gloves, boots), never the
-  same one twice in a cache. A **Flawless** gem has Size, Clarity and Cut at 10
+  rolls, passive and affixes). Gear is drawn from the Rare (tier 3) and
+  Ultra-Rare (tier 4) swords, shields, helmets, armour, gloves and boots,
+  never the same one twice in a cache. The only weapons are the standard
+  swords and their variations (`ExpandedItemTraits.rollable`): never a gun,
+  hammer, axe, cleaver, lance or twin blades. A cache has at most one sword
+  (`ArenaStreak.MaxWeapons`), so at least two of the three you leave are
+  armour or a shield, and they go up on the Market. A **Flawless** gem has Size, Clarity and Cut at 10
   and its surge at the top rank. Each card is drawn in its rarity's colour.
 - **What counts:** Ranked 1v1 wins only. A loss ends the streak. Beating the
   same player twice in a row doesn't add (no trading wins with a friend).
@@ -92,5 +96,6 @@ milestone and opens it, roll and all (`DevStreakCache` in
 
 - Test caches pay no coins or title, and don't count as paid for the season.
 - The three pieces you keep and the gems go into your bags, so you can see them in your inventory.
-- The rest are dropped. They never go up on the Market.
+- The other three go up on the Market from the Arena Vault, as any cache's
+  do, so every roll leaves armour for the Market.
 - A new test cache replaces the last one.

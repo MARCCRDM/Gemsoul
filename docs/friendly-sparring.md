@@ -57,6 +57,12 @@ gives the rule:
 
 ## Nobody dies
 
+Only in the lobby: a spar, or a critter or wild kaiju in the Outpost. A
+fight that takes you out of the lobby (a rival, a 1v1, a dungeon, an
+expedition) is fought to the end as ever, even when you started it from
+the Outpost (`Spar.knocksDown`: never with a `CombatSession`, `MatchId`,
+`DungeonId` or `Expedition` on you).
+
 A blow that would take you to 0 health knocks you down instead. You fall, the
 screen tints red, and it counts down who did it and when you're back up:
 
