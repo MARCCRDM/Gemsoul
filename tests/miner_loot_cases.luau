@@ -1,8 +1,8 @@
 -- Your own finds (MinerLoot): a gem rolls on a card, lands on the real gem
 -- with its stats as bars; finds that come quickly stack as rows above it.
 -- On a computer: compact, in the bottom right corner, two rows at most.
--- On a phone: slim, at the top middle, one row under it (a small phone's
--- once the card's gone).
+-- On a phone: slim, in the top right under the toast's place (lower while a
+-- toast wraps), one row under it (a small phone's once the card's gone).
 local checks = 0
 local function check(value, message)
 	checks += 1
@@ -117,10 +117,10 @@ for _, row in live("LootRow") do
 end
 check(fullRow ~= nil, "Full pouch not shown")
 
--- A phone: slim, at the top middle (MobileLayout.loot), out of the way of
--- you and the dock: the reel, the rarity, the name and the worth, no bars,
--- and one row under it. The top middle is the card's while it's up (the
--- live feed steps aside).
+-- A phone: slim, in the top right under the toast's place (MobileLayout.loot),
+-- out of the way of you and the dock: the reel, then the rarity, the name and
+-- the worth one under another, no bars, and one row under it. The top is the
+-- card's while it's up (the live feed steps aside).
 check(not MobileLayout.topClaimed(), "A computer's card claimed a phone's top middle")
 local gui = live("MinerLoot")[1]
 for _, screen in { { X = 667, Y = 339 }, { X = 844, Y = 332 } } do
@@ -132,7 +132,7 @@ for _, screen in { { X = 667, Y = 339 }, { X = 844, Y = 332 } } do
 	check(holder.AnchorPoint.Y == 0 and holder.Position.Y.Scale == 0, at .. "the card isn't hung from the top")
 	check(
 		holder.Position.X.Offset == spot.X and holder.Position.Y.Offset == spot.Y,
-		at .. "the card isn't at the top middle"
+		at .. "the card isn't under the toast's place"
 	)
 	check(holder.Size.X.Offset == spot.W and holder.Size.Y.Offset == spot.H, at .. "the card isn't slim")
 	check(holder:FindFirstChildOfClass("UIScale").Scale == 1, at .. "the slim card was scaled down")
@@ -156,6 +156,40 @@ check(
 	"The slim card lost the gem's worth"
 )
 check(MobileLayout.topClaimed(), "The card up on a phone didn't claim the top middle")
+-- Three lines beside the reel, each the card's width: the worth has one of
+-- its own, under the name, so a long name still fits.
+local lines = {}
+for _, label in slim:GetDescendants() do
+	if label.ClassName == "TextLabel" and label.Text ~= "" and label.Visible ~= false then
+		table.insert(lines, label)
+	end
+end
+table.sort(lines, function(a, b)
+	return a.Position.Y.Offset < b.Position.Y.Offset
+end)
+check(#lines == 3, "The slim card isn't three lines")
+for i, label in lines do
+	check(label.Position.Y.Offset + label.Size.Y.Offset <= slimSpot.H, "A slim card's line runs off it")
+	check(label.Position.X.Offset + label.Size.X.Offset <= slimSpot.W, "A slim card's line runs off its side")
+	check(label.Size.X.Offset == lines[1].Size.X.Offset, "The slim card's lines aren't all its width")
+	if i > 1 then
+		local above = lines[i - 1]
+		check(label.Position.Y.Offset >= above.Position.Y.Offset + above.Size.Y.Offset, "The slim card's lines overlap")
+	end
+end
+check(lines[3].Text:find("◆", 1, true), "The worth isn't the slim card's last line")
+-- A toast that wraps past its place pushes the card down while it's up; it
+-- goes back once the toast's gone.
+local stackHolder = live("Stack")[1]
+UiKit.ToastBottom = slimSpot.Y + 20
+UiKit.ToastMoved:Fire()
+check(
+	stackHolder.Position.Y.Offset == slimSpot.Y + 20 + MobileLayout.Loot.Gap,
+	"A wrapped toast didn't push the card down"
+)
+UiKit.ToastBottom = 0
+UiKit.ToastMoved:Fire()
+check(stackHolder.Position.Y.Offset == slimSpot.Y, "The card didn't go back up when the toast went")
 Loot.push(gem("Common", 3, 4, 2))
 step(0.1)
 check(#live("LootRow") == 1, "A phone kept more than one row")
@@ -163,6 +197,8 @@ local row = live("LootRow")[1]
 step(0.5)
 check(row.Position.Y.Offset >= slimSpot.H, "The row isn't under the slim card")
 check(row.Size.X.Offset == card().Size.X.Offset, "The row isn't the card's width")
+-- (slim, the row has no room for the rarity's name: its colour says it)
+check(not texts(row):find("COMMON", 1, true) and texts(row):find("◆", 1, true), "The slim row's words don't fit")
 -- A small phone's card is full height too (nothing's under it at the top
 -- right any more): the row shows under it while it's up, then moves up
 -- where the card was.

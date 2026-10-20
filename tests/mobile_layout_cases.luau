@@ -2,8 +2,9 @@
 -- The lobby's pieces on a phone never overlap (MobileLayout): the pick card,
 -- your level and coins, the CHAT button (small screens with a keyboard), the
 -- opened chat, the dock (PLAY and its tiles, TASKS among them), the
--- teammates' cards, your loot card at the top middle, and a mech's HOP OUT
--- and drive stick, at every common phone size; the dock's tiles all fit.
+-- teammates' cards, a toast and your loot card under it at the top right,
+-- and a mech's HOP OUT and drive stick, at every common phone size; the
+-- dock's tiles all fit.
 -- Nothing else is up at the top right (no TASKS button, no board strip).
 -- And who has the top middle (claimTop).
 local fs = require("@lune/fs")
@@ -42,7 +43,7 @@ for _, s in SCREENS do
 	local function inside(r)
 		return r.X >= 0 and r.Y >= 0 and r.X + r.W <= screen.X and r.Y + r.H <= screen.Y
 	end
-	local loot = MobileLayout.loot(screen)
+	local loot, toast = MobileLayout.loot(screen), MobileLayout.toast(screen)
 	for name, r in
 		{
 			card = card,
@@ -52,27 +53,38 @@ for _, s in SCREENS do
 			chat = closed,
 			open = open,
 			loot = loot,
+			toast = toast,
 		}
 	do
 		check(inside(r), label .. ": the " .. name .. " runs off the screen")
 	end
-	-- The loot card at the top middle: clear of everything round it, never
-	-- too narrow to read, and well above the middle of the screen.
-	for name, r in
-		{
-			["pick card"] = card,
-			coins = wallet,
-			dock = dock,
-			["teammates' cards"] = party,
-		}
-	do
-		check(not MobileLayout.overlaps(loot, r), label .. ": the loot card overlaps the " .. name)
+	-- A toast at the top right, and the loot card (with its row) under it,
+	-- right-aligned with it: clear of everything round them, of Roblox's
+	-- slim tab on the right edge (about 24 points), and of each other.
+	local row = { X = loot.X, Y = loot.Y + loot.H + MobileLayout.Loot.Gap, W = loot.W, H = MobileLayout.Loot.Row }
+	check(toast.H <= 30 and toast.W <= 260, label .. ": a toast's place is too big")
+	check(loot.Y >= toast.Y + toast.H, label .. ": the loot card isn't under the toast")
+	check(loot.X + loot.W == toast.X + toast.W, label .. ": the loot card isn't right-aligned with the toast")
+	check(loot.W < toast.W, label .. ": the loot card is wider than a toast")
+	for name, r in { toast = toast, ["loot card"] = loot, ["loot row"] = row } do
+		check(r.X + r.W <= screen.X - 24, label .. ": the " .. name .. " runs under Roblox's tab on the right")
+		for other, o in
+			{
+				["pick card"] = card,
+				coins = wallet,
+				dock = dock,
+				["teammates' cards"] = party,
+			}
+		do
+			check(not MobileLayout.overlaps(r, o), label .. ": the " .. name .. " overlaps the " .. other)
+		end
 	end
-	check(loot.W >= MobileLayout.Loot.MinW, label .. ": the loot card is too narrow")
+	check(not MobileLayout.overlaps(loot, toast), label .. ": the loot card overlaps the toast")
 	check(loot.H == MobileLayout.Loot.H, label .. ": the loot card isn't slim")
-	check(loot.W == MobileLayout.Loot.W, label .. ": the loot card isn't full width with the corner clear")
+	check(loot.W == MobileLayout.Loot.W, label .. ": the loot card isn't its own width")
 	check(MobileLayout.tasks == nil and MobileLayout.board == nil, "A TASKS button or board strip is back on a phone")
-	check(loot.Y + loot.H <= screen.Y * 0.3, label .. ": the loot card reaches the middle of the screen")
+	-- (on the right edge, its row and all, well above the middle of the screen)
+	check(row.Y + row.H <= screen.Y * 0.42, label .. ": the loot card reaches the middle of the screen")
 	check(
 		dock.PlayWidth <= dock.W and dock.PlayHeight + dock.Gap + dock.TileHeight <= dock.H,
 		label .. ": PLAY doesn't fit the dock"
@@ -124,7 +136,8 @@ for _, s in SCREENS do
 				dock = dock,
 				["teammates' cards"] = party,
 				jump = jump,
-				["loot card"] = MobileLayout.loot(screen),
+				["loot card"] = loot,
+				toast = toast,
 			}
 		do
 			check(not MobileLayout.overlaps(k, r), what .. ": the kaiju card overlaps the " .. name)

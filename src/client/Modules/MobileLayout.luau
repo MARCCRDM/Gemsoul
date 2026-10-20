@@ -9,12 +9,18 @@
 	                stops above the dock (and the card steps aside while it's
 	                open). Phones and tablets use Roblox's own chat instead
 	                (ChatFrame).
-	  top middle    your loot card (MinerLoot), slim, right of the pick
-	                card; the live feed (LobbyFeed) steps aside while it's
-	                up (claimTop): the middle of the screen stays the game's
-	  top right     teammates' health (PartyUI), hidden in a fight. Nothing
-	                else: tasks and the day's challenges open from the
-	                dock's TASKS tile, and the lobby's board isn't shown
+	  top middle    the live feed (LobbyFeed), between the pick card and
+	                the toasts' place
+	  top right     a toast (UiKit.toast), one line here, as wide as its
+	                words; under it, right-aligned with it, your loot card
+	                (MinerLoot), slim, and one row under that (a toast that
+	                wraps to more lines pushes it down while it's up). Both
+	                keep clear of the slim tab Roblox puts on a phone's
+	                right edge. The live feed steps aside while the loot
+	                card is up (claimTop). Under them, teammates' health
+	                (PartyUI), hidden in a fight. Nothing else: tasks and
+	                the day's challenges open from the dock's TASKS tile,
+	                and the lobby's board isn't shown
 	  bottom middle the dock (LobbyUI): PLAY, and a row of tiles under it
 
 	Rects are { X, Y, W, H } in the ScreenGui's space (below the top bar).
@@ -24,9 +30,11 @@
 	  MobileLayout.chat(screen, open)      the chat box: CHAT button, or opened
 	  MobileLayout.dock(screen, tiles)     the dock, its PLAY and tile size
 	  MobileLayout.party(screen)           the teammates' cards
-	  MobileLayout.loot(screen)            your loot card: top middle, as
-	                                       wide as fits (Loot.W at most)
-	  MobileLayout.claimTop(owner, on)     something has the top middle (a
+	  MobileLayout.toast(screen)           a toast's place: top right, Toast.W
+	                                       at most, one line (Toast.H)
+	  MobileLayout.loot(screen)            your loot card: under the toast,
+	                                       right-aligned with it
+	  MobileLayout.claimTop(owner, on)     something has the top (a
 	                                       loot card); topClaimed(except?)
 	                                       says if anything else does, and
 	                                       onTop(fn) hears when that changes
@@ -51,7 +59,9 @@ MobileLayout.CardScale = 0.7
 MobileLayout.Margin = 12
 MobileLayout.Drive = { W = 160, H = 38, Bottom = 62 }
 MobileLayout.Stick = { Size = 112, Knob = 46, Left = 20, Bottom = 16 }
-MobileLayout.Loot = { W = 250, MinW = 170, H = 56, Top = 8 }
+-- (Right: from the screen's right edge, clear of Roblox's tab there.)
+MobileLayout.Toast = { W = 240, H = 28, Top = 8, Right = 30 }
+MobileLayout.Loot = { W = 196, H = 56, Row = 24, Gap = 6 }
 
 function MobileLayout.card()
 	return { X = 12, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
@@ -106,16 +116,18 @@ function MobileLayout.party(screen: Vector2)
 	return { X = screen.X - 16 - 220, Y = 132, W = 220, H = 40 }
 end
 
--- Right of the pick card, in the middle of what's left of the top.
-function MobileLayout.loot(screen: Vector2)
-	local l = MobileLayout.Loot
-	local card = MobileLayout.card()
-	local left, right = card.X + card.W + 8, screen.X - 16
-	local width = math.clamp(right - left, l.MinW, l.W)
-	return { X = math.floor(left + (right - left - width) / 2), Y = l.Top, W = width, H = l.H }
+function MobileLayout.toast(screen: Vector2)
+	local t = MobileLayout.Toast
+	return { X = screen.X - t.Right - t.W, Y = t.Top, W = t.W, H = t.H }
 end
 
--- Who has the top middle (pure: no Roblox objects, so it's tested on its own).
+-- Under the toast's place, right-aligned with it.
+function MobileLayout.loot(screen: Vector2)
+	local l, toast = MobileLayout.Loot, MobileLayout.toast(screen)
+	return { X = toast.X + toast.W - l.W, Y = toast.Y + toast.H + l.Gap, W = l.W, H = l.H }
+end
+
+-- Who has the top (pure: no Roblox objects, so it's tested on its own).
 local claims: { [string]: boolean } = {}
 local listeners: { () -> () } = {}
 function MobileLayout.claimTop(owner: string, on: boolean)

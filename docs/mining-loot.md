@@ -67,13 +67,19 @@ and then shows in its place.
 ![The card on a phone, before and after](mobile/mining-phone.png)
 
 On a phone or a tablet (a touch screen, or a window under 540 points tall)
-the card is slim and sits at the top middle, between the pick card and
-TASKS (`MobileLayout.loot`). It shows the reel, the rarity and element, and
-the gem's name with its worth, but no stat bars, and keeps one row under
-it. The middle of the screen and the PLAY dock stay clear. The live feed
-steps aside while the card is up. On a small phone (667 x 375) the card is
-shorter, ending above the task strip, and its row waits until the card has
-gone. See [mobile.md](mobile.md#mining-in-the-outpost).
+the card is slim, 196 points wide, and sits in the top right, right under
+the place toasts come up and right-aligned with it (`MobileLayout.loot`),
+clear of the slim tab Roblox puts on a phone's right edge. It shows the
+reel, then three lines beside it: the rarity and element, the gem's name
+across the card's full width, and its worth. There are no stat bars. It
+keeps one row under it, the gem's name in its rarity's colour (there's no
+room for the rarity's name too). While a toast is long enough to wrap onto a
+second line, the card moves down under it (`UiKit.toastBottom`,
+`UiKit.onToastMoved`) and back up when it goes. The middle of the screen
+and the PLAY dock stay clear. The live feed steps aside while the card is
+up. See [mobile.md](mobile.md#the-top-right-toasts-and-your-loot).
+
+![The top right on a phone: a toast and the loot card, before and now](mobile/phone-top-right.png)
 
 ![In Spanish](mining/spanish.png)
 
@@ -98,8 +104,9 @@ full").
   - `tests/run_miner_loot.py`: the card, driven frame by frame; on a
     computer compact in the bottom right corner, two rows at most, clear of
     the RIFT CHARGED tag, the row waiting on a short window, staying put in a
-    mech; and slim at the top middle of a phone (no bars, one row under it,
-    full height on a small phone too now the top right is clear, claiming the top
-    middle);
+    mech; and slim in the top right of a phone, under the toast's place
+    (three lines that fit it, no bars, one row under it with no rarity
+    name, moving down under a toast that wraps and back up, claiming the
+    top);
   - `tests/run_world_mining.py`: now also checks that your own find is
     never drawn over your head, while others still get it.

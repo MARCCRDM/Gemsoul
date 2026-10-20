@@ -101,23 +101,42 @@ is in [kaiju.md](kaiju.md#the-vein-guardian).
 ![Six rifts: no two the same shape](frontier/rifts.png)
 
 Critters come in swarms through rifts: ragged tears in the air, never
-symmetrical and never the same shape twice. Up to three come out of each.
+symmetrical and never the same shape twice. A swarm trickles in rather than
+landing all at once: each critter comes through a tear of its own
+(`Frontier.Swarm.PerRift`), and the tears open one after another, 1.1 to
+1.8 seconds apart (`Swarm.Every`, `Frontier.trickle`). A swarm of six takes
+about nine seconds to come through, and no more than three or four of its
+tears are ever open at once.
+
+![One swarm of six at the Edge, before and now: where its tears open and when its critters come out](frontier/swarm-trickle.png)
+
+The picture is a top-down diagram from a seeded run of the game's own rules
+(`Shared.Frontier`, before and after), not a screenshot. Before, two tears
+(here 8 studs apart) let all six critters out within a second. Now there
+are six tears, spread round the front of you, and the critters come out
+over seven seconds.
+
 A tear:
 
 1. **opens and crackles** for a second and a half: it splits along a
    crooked crack, with the crackle and its critter's own sound (Sahur's
    bonk, Tralalero's whoosh, Patapim's frost, the croc's bomb), so you
    know what's coming and where;
-2. **lets the critters out**: they hop out at whoever drew it, 0.3 s
-   apart; a Crocodilo (the swarm's ranged one) last, a second after the
-   rest;
-3. **lingers** (1.8 s, longer while a swarm's still coming out): a dark
-   void with glowing lips and hairline cracks off them;
+2. **lets its critter out**: it hops out at whoever drew it; a Crocodilo
+   (the swarm's ranged one) comes through the swarm's last tear, a second
+   after it opens;
+3. **lingers** (1.8 s): a dark void with glowing lips and hairline cracks
+   off them;
 4. **seals** (half a second) with a last flash.
 
-Rifts open 14–24 studs away, within 100° of where you're facing, on open
-ground level with you: never on top of a boulder or a container stack (the
-server tries a few spots). If one opens off your screen, an arrow at the
+Rifts open 16–30 studs away, within 110° of where you're facing, on open
+ground level with you: never on top of a boulder or a container stack.
+They open well apart: at least 16 studs (`Rift.Apart`) from every other
+tear still open, yours or anyone's, and, where there's room, from the
+swarm's tears that have already sealed. So a swarm spreads out round you
+rather than coming back through the same spot. The server tries up to 32
+spots and only weighs those on open ground (`riftSpot`'s `usable`). On the
+rare crowded moment, it takes the one furthest from the open tears. If one opens off your screen, an arrow at the
 screen's edge points at it until its critter is out. They never open in the
 core or past the walls.
 
@@ -193,10 +212,11 @@ settle." A wandering rift opened near you comes stirred up the same way.
 
 Every 40 to 80 seconds the frontier tears open by itself, 35 to 70 studs from
 someone out there. Its tear lingers longer, and a swarm (at least two, as
-many as an encounter there would bring) roams round it for a minute, going
-for anyone who comes within about 22 studs, and for the player it opened
-near once they're within 30; any Crocodilo hops out a second after the
-rest. Go round it, or bring your kaiju. At most six critters are out of
+many as an encounter there would bring) climbs out of it one at a time,
+0.6 seconds apart (`Swarm.Out`), the fighters first and any Crocodilo
+last. The tear stays open until the last one is out. The swarm roams round
+it for a minute, going for anyone who comes within about 22 studs, and for
+the player it opened near once they're within 30. Go round it, or bring your kaiju. At most six critters are out of
 wandering rifts at once (of the 22). If nobody is near when they'd hop out,
 it seals empty.
 
@@ -317,8 +337,13 @@ stages, louder swings, more critters per encounter and allowed at once,
 higher levels, never in the core), fair shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
 lopsided, the pieces each tear is drawn from, the banners, that the noise ring stays off the HUD,
 the nearest wild kaiju for its arrow
-and the arrows). `tests/run_kaiju.py` runs the server side: who rifts open
-round, swings drawing them, the warning, the caps, edge levels, stirring
+and the arrows; a swarm's tears a second or more apart, and each new tear
+16 studs or more from those still open). `tests/run_kaiju.py` runs the
+server side: who rifts open round, swings drawing them, the warning, the
+caps, edge levels, a swarming encounter trickling in (a tear for each
+critter, opening one after another, never two too close, never more than
+four open at once), a wandering rift's critters climbing out one by one,
+stirring
 it up (swings building it and the HUD told, being told once as it gets
 restless, a short pause not settling it, a swarming encounter bringing more
 critters past the calm cap at higher levels, settling once you stop and

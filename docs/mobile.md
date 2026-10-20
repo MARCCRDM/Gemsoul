@@ -38,11 +38,13 @@ phone game should be.
 - **The six buttons under PLAY** are icons with their name small under
   them, 44 points tall.
 - **Tasks:** a TASKS tile in the dock under PLAY (a clipboard), with a gold
-  count of what's still to do. The top right corner is empty: no TASKS
-  button and no task or challenge strip (the challenges are the Tasks
-  window's DAILY page). See [play-screen.md](play-screen.md).
+  count of what's still to do. There's no TASKS button and no task or
+  challenge strip in the top right: it's kept for toasts and your loot
+  card (see [The top right](#the-top-right-toasts-and-your-loot)). The
+  challenges are the Tasks window's DAILY page. See
+  [play-screen.md](play-screen.md).
 - **No BUG button** on a phone. The same form is SOCIAL's Feedback button.
-- **The live feed** fits right of the pick card.
+- **The live feed** fits between the pick card and the toasts' place.
 
 ![The lobby on a small phone, before and after](mobile/lobby-small-phone.png)
 
@@ -72,12 +74,13 @@ sat over PLAY with its last find on top, and every creature's name and
 health bar showed at full size from far off. Now the middle is left to
 you, your kaiju and what's coming:
 
-- **The loot card** is slim and sits at the top middle, between the pick
-  card and TASKS (`MobileLayout.loot`). It shows the reel, the rarity and
-  element, and the gem's name with its worth, but no stat bars. The last
-  find sits as one row under it. The live feed steps aside while the card
-  is up (`MobileLayout.claimTop`) and comes back when it goes. See
-  [mining-loot.md](mining-loot.md#phones-and-spanish).
+- **The loot card** is slim and sits in the top right, under the toasts'
+  place (`MobileLayout.loot`; see
+  [The top right](#the-top-right-toasts-and-your-loot)). It shows the reel,
+  the rarity and element, the gem's name and its worth, but no stat bars.
+  The last find sits as one row under it. The live feed steps aside while
+  the card is up (`MobileLayout.claimTop`) and comes back when it goes.
+  See [mining-loot.md](mining-loot.md#phones-and-spanish).
 - **PLAY** is narrower and shorter (184 x 38), and so is the dock under
   it, so it takes up less of the bottom of the screen.
 - **TASKS** moved into the dock (there's no button or strip at the top
@@ -90,11 +93,34 @@ you, your kaiju and what's coming:
   160 and 90), but there too your own kaiju go unnamed, and their bar shows
   only while hurt.
 
-On a small phone the card is shorter, so it ends above the task strip. Its
-row waits until the card has gone, then shows in its place. Each find is
-still in chat, and a full pouch still gets its message.
+Each find is still in chat, and a full pouch still gets its message.
 
-![Mining on a small phone](mobile/mining-small-phone.png)
+### The top right: toasts and your loot
+
+![The top right on a phone: a toast and the loot card, before and now](mobile/phone-top-right.png)
+
+A toast ("That rock is mined out.") and the loot card used to share the top
+right at the same height, so one sat on the other, and both were wider than
+their words. Now they stack in one column on the right:
+
+- **A toast** comes up in the top right (`MobileLayout.toast`): one at a
+  time, one line, only as wide as its words (240 points at most, wrapping
+  past that) and 30 points in from the edge, clear of the slim tab Roblox
+  puts on a phone's right side.
+- **The loot card** sits right under the toast's place, right-aligned with
+  it, and 196 points wide (it was 250). Its rarity, the gem's name and its
+  worth are three lines beside the reel, so a long name still fits. Its row
+  under it shows the gem's name in its rarity's colour, with no rarity
+  name, so the name isn't cut off. While a toast wraps onto a second line,
+  the card steps down under it, and back up when the toast goes.
+- The card and its row end above the teammates' cards (PartyUI). The live
+  feed in the top middle now stops short of the toasts' place.
+
+`tests/mobile_layout_cases.luau` checks, on every phone size, that the toast
+and the card (with its row) stay on the screen, clear of Roblox's tab, of
+each other, of the pick card, the coins, the dock, the teammates' cards and
+your kaiju's card, and that the card sits right under the toast and lines up
+with it.
 
 ## The Inventory
 
@@ -233,8 +259,10 @@ get out from under Roblox's buttons, which it used to sit under.
 | `UiKit.topbar(width)`, `UiKit.onTopbar(fn)`, `UiKit.reserveTopbar(width)` | The strip Roblox's buttons sit in, a call when it changes, and room in it for DEV (see [Roblox's buttons](#roblox-s-buttons)) |
 | `UiKit.fit(label)` | Keeps a one-line label at its size, shrinking it only when its words don't fit |
 | `UiKit.shrinkRow(row, list)` | Shrinks a row laid out side by side to its parent's width when its contents outgrow it |
-| `MobileLayout.loot(screen)` | Where the slim loot card goes on a phone |
-| `MobileLayout.claimTop(owner, on)`, `topClaimed()`, `onTop(fn)` | Who has the top middle (the loot card), so the feed can step aside |
+| `MobileLayout.toast(screen)` | A toast's place on a phone: top right, `Toast.W` (240) at most, one line (`Toast.H`) |
+| `MobileLayout.loot(screen)` | Where the slim loot card goes on a phone: under the toast's place, right-aligned with it |
+| `UiKit.toastBottom()`, `UiKit.onToastMoved(fn)` | How far down a phone's toast reaches, and a call when that changes (the loot card moves under one that wraps) |
+| `MobileLayout.claimTop(owner, on)`, `topClaimed()`, `onTop(fn)` | Who has the top (the loot card), so the feed can step aside |
 | `BodyHealth.watch(model)` | A creature's health on its body, not over its head |
 
 ## Also fixed

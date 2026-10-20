@@ -37,11 +37,15 @@
 	  Mining noise   every swing out there makes noise (Noise.Swing: more at
 	                 the edge), and a little more trickles in each second
 	                 you're out there (Noise.Idle). Full, an encounter:
-	                 critters tear through near you (Frontier.incursion).
+	                 critters tear through near you (Frontier.incursion),
+	                 one at a time, each out of a tear of its own, the
+	                 tears well apart (Rift.Apart) and opening a second or
+	                 two after one another (Swarm, Frontier.trickle).
 	  Wandering      every so often the frontier tears open by itself
 	                 (Wander), 35 to 70 studs from someone out there: a few
-	                 critters roam that patch for about a minute, going for
-	                 whoever comes close. Go round it, or bring your kaiju.
+	                 critters climb out of it one by one and roam that patch
+	                 for about a minute, going for whoever comes close. Go
+	                 round it, or bring your kaiju.
 	Stirred up: the longer you mine out there, the harder the frontier
 	pushes back (Disturbance): every swing stirs it, and it settles again
 	once you stop or head back to the core. Stirred up, your swings draw
@@ -72,7 +76,8 @@
 	  Frontier.share(cap, playersOut) -> critters at once round one player
 	  Frontier.critterLevel(band, rng, stir?) -> level
 	  Frontier.critterExp(level, band, today) -> EXP for a kaiju that fought it
-	  Frontier.riftSpot(position, facing, center, rng) -> Vector3   where a rift opens
+	  Frontier.riftSpot(position, facing, center, rng, others?, past?, usable?) -> Vector3?   where a rift opens
+	  Frontier.trickle(count, rng?) -> { seconds }   when each of an encounter's tears opens
 	  Frontier.wanderSpot(position, center, rng) -> Vector3   where a wandering rift opens
 	  Frontier.timeline(at, linger?) -> { OpenAt, HopAt, CloseAt, EndAt }
 	  Frontier.openness(timeline, now) -> 0..1   how wide a tear is
@@ -130,16 +135,19 @@ Frontier.Guardian = { Levels = { 16, 20 }, Wake = 3, Home = 30 }
 -- Rifts: seconds it takes to open, until the critter hops out (it
 -- crackles all that while: the warning), then lingers and seals; how tall
 -- (studs); and where round a player it opens (studs away, and how far
--- either side of where they face).
+-- either side of where they face), at least Apart studs from any other
+-- tear still open (the best of Tries spots, if it's crowded).
 Frontier.Rift = {
 	Open = 0.55,
 	Hop = 1.5,
 	Linger = 1.8,
 	Close = 0.45,
 	Height = { 4.5, 7.5 },
-	Near = 14,
-	Far = 24,
-	Spread = math.rad(100),
+	Near = 16,
+	Far = 30,
+	Spread = math.rad(110),
+	Apart = 16,
+	Tries = 32,
 }
 -- Mining noise: what a swing out in a band adds (an encounter at 1: about
 -- 1 in 35 swings in the fringe, 1 in 17 at the edge, each swing's share
@@ -159,10 +167,13 @@ Frontier.Noise = {
 -- (each one weak: Shared.Kaiju.Bug), but each is a whole brainrot body:
 -- the Outpost's cap keeps them from lagging it.
 Frontier.Caps = { Fringe = 5, Edge = 7, Server = 22 }
--- A swarm through its rifts: up to PerRift critters out of each, Stagger
--- seconds apart, its ranged ones (Shared.Kaiju.wave) Last seconds after
--- the rest.
-Frontier.Swarm = { PerRift = 3, Stagger = 0.3, Last = 1.2 }
+-- A swarm trickles in, never all at once: PerRift critters out of each
+-- tear (Stagger seconds apart), the tears opening one after another, Every
+-- seconds apart (somewhere in that range), each well clear of the others
+-- (Rift.Apart); its ranged ones (Shared.Kaiju.wave) come last, Last seconds
+-- after the rest of their tear. A wandering rift's critters climb out of
+-- its one tear one at a time, Out seconds apart.
+Frontier.Swarm = { PerRift = 1, Stagger = 0.3, Every = { 1.1, 1.8 }, Last = 1.2, Out = 0.6 }
 -- Stirring the frontier up: the longer you mine out there, the harder it
 -- pushes back. Every swing past the core stirs it (PerSwing: full after
 -- about 400 swings in the fringe, 250 at the edge, six or four minutes of
@@ -518,18 +529,70 @@ function Frontier.incursion(band: string, roll: number, stir: number?): number
 	return 0
 end
 
+local function gapTo(spot: Vector3, points: { Vector3 }?): number
+	local gap = math.huge
+	for _, point in points or {} do
+		gap = math.min(gap, Vector3.new(spot.X - point.X, 0, spot.Z - point.Z).Magnitude)
+	end
+	return gap
+end
+
 -- Where a rift opens round a player at `position` facing `facing` (a flat
 -- direction, or zero: then outward): near where they look, inside the walls
--- and outside the core. Returns a point at their height.
-function Frontier.riftSpot(position: Vector3, facing: Vector3, center: Vector3, rng): Vector3
+-- and outside the core, at least Rift.Apart studs from the tears still open
+-- (`others`, points) and, where it can, from its swarm's tears already
+-- sealed (`past`), so a swarm's tears spread out and don't open where one
+-- just shut. Only spots `usable` takes (the server's: open ground, level
+-- with the player), if given. Of Rift.Tries spots, the first clear of both;
+-- else the one furthest from the open tears, then from the sealed ones.
+-- Returns a point at their height (nil if `usable` took none).
+function Frontier.riftSpot(
+	position: Vector3,
+	facing: Vector3,
+	center: Vector3,
+	rng,
+	others: { Vector3 }?,
+	past: { Vector3 }?,
+	usable: ((Vector3) -> boolean)?
+): Vector3?
+	local rift = Frontier.Rift
 	local flat = Vector3.new(facing.X, 0, facing.Z)
 	if flat.Magnitude < 0.1 then
 		flat = Vector3.new(position.X - center.X, 0, position.Z - center.Z)
 	end
-	local angle = if flat.Magnitude > 0.01 then math.atan2(flat.Z, flat.X) else rng:NextNumber(0, math.pi * 2)
-	angle += rng:NextNumber(-Frontier.Rift.Spread, Frontier.Rift.Spread)
-	local reach = rng:NextNumber(Frontier.Rift.Near, Frontier.Rift.Far)
-	return Frontier.inFrontier(position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach, center, position.Y)
+	local ahead = if flat.Magnitude > 0.01 then math.atan2(flat.Z, flat.X) else rng:NextNumber(0, math.pi * 2)
+	local choosy = usable ~= nil or (others ~= nil and #others > 0) or (past ~= nil and #past > 0)
+	local best, bestScore = nil, -1
+	for _ = 1, if choosy then rift.Tries else 1 do
+		local angle = ahead + rng:NextNumber(-rift.Spread, rift.Spread)
+		local reach = rng:NextNumber(rift.Near, rift.Far)
+		local spot =
+			Frontier.inFrontier(position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach, center, position.Y)
+		if usable and not usable(spot) then
+			continue
+		end
+		local open, sealed = gapTo(spot, others), gapTo(spot, past)
+		if open >= rift.Apart and sealed >= rift.Apart then
+			return spot
+		end
+		-- (clear of the open ones first; of the sealed ones only after that)
+		local score = 100 * math.min(open, rift.Apart) + math.min(sealed, rift.Apart)
+		if score > bestScore then
+			best, bestScore = spot, score
+		end
+	end
+	return best
+end
+
+-- Seconds after an encounter starts that each of its `count` tears opens
+-- (`rng` spaces them Swarm.Every apart): one after another, never at once.
+function Frontier.trickle(count: number, rng): { number }
+	local every, at, times = Frontier.Swarm.Every, 0, {}
+	for i = 1, count do
+		times[i] = at
+		at += if rng then rng:NextNumber(every[1], every[2]) else every[1]
+	end
+	return times
 end
 
 -- A point brought inside the frontier (out of the core, inside the walls), at height `y`.

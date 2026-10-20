@@ -110,8 +110,11 @@ collides with or blocks anything. The owner's "TUNG TUNG" dungeon test
 | Coins each (Fringe / Edge) | 2 / 4 | 1 / 2 |
 
 A swarm hits about as hard as one or two critters used to, from all sides,
-and pays about what one used to. Up to three pour out of each rift, 0.3 s
-apart (`Frontier.Swarm`). The numbers are in `Kaiju.Bug` and `Frontier`.
+and pays about what one used to. It trickles in: one critter per rift,
+the rifts opening 1.1 to 1.8 s apart and at least 16 studs from each other
+(`Frontier.Swarm`, `Frontier.Rift.Apart`; see
+[frontier.md](frontier.md#rifts)). The numbers are in `Kaiju.Bug` and
+`Frontier`.
 
 The Outpost's cap went from 12 to 22, so more brainrot bodies are about at
 once. They're the thinned moon bugs (67 to 167 parts). Watch the frame rate

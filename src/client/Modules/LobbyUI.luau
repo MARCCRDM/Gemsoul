@@ -716,11 +716,12 @@ local function fitDock()
 	status.Visible = not mobile
 	walletPill.Visible = mobile and not picker.Visible
 	-- The board under REPORT A BUG on the right (not on a phone); the live
-	-- feed at the top centre (on a phone, right of the pick card).
+	-- feed at the top centre (on a phone, between the pick card and the
+	-- toasts' place at the top right).
 	LobbyBoard.setCompact(mobile)
 	local card = MobileLayout.card()
 	local gapLeft = card.X + card.W + 8
-	local gapRight = size.X - 16
+	local gapRight = MobileLayout.toast(size).X - 8
 	LobbyFeed.setCompact(mobile, if mobile then { X = gapLeft, W = gapRight - gapLeft } else nil)
 	board.Position = UDim2.new(1, -16, 0, 64)
 	LobbyBoard.setHidden(picker.Visible)

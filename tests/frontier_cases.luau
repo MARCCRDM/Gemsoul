@@ -423,7 +423,20 @@ check(Frontier.critterExp(1, "Fringe", 0) == 3, "A level-1 critter's EXP")
 check(Frontier.critterExp(10, "Fringe", 0) == 11, "A level-10 critter's EXP")
 check(Frontier.critterExp(10, "Edge", 0) == 16, "An edge critter isn't worth half again")
 check(Frontier.critterExp(10, "Edge", Frontier.Exp.Daily) == 4, "No quarter after the day's critters")
-check(Frontier.Swarm.PerRift >= 2 and Frontier.Swarm.Stagger > 0 and Frontier.Swarm.Last > Frontier.Swarm.Stagger, "The swarm's timing")
+-- A swarm trickles in: a critter out of each tear, the tears a second or
+-- more apart, never all at once; a wandering rift's critters out one by one.
+local swarm = Frontier.Swarm
+check(swarm.PerRift == 1 and swarm.Last > swarm.Stagger and swarm.Out >= 0.5, "The swarm's timing")
+check(swarm.Every[1] >= 1 and swarm.Every[2] >= swarm.Every[1], "A swarm's tears open too close together")
+for _ = 1, 50 do
+	local times = Frontier.trickle(6, rng)
+	check(#times == 6 and times[1] == 0, "A swarm's first tear waits")
+	for i = 2, 6 do
+		local gap = times[i] - times[i - 1]
+		check(gap >= swarm.Every[1] - 1e-9 and gap <= swarm.Every[2] + 1e-9, "Tears not a second or so apart: " .. gap)
+	end
+end
+check(#Frontier.trickle(0, rng) == 0 and Frontier.trickle(1).Count == nil, "A swarm of none")
 check(Frontier.critterExp(1, "Fringe", 999) >= 1, "A critter worth nothing")
 check(Frontier.Coins.Edge > Frontier.Coins.Fringe and Frontier.Coins.Guardian > Frontier.Coins.Edge, "Coins by band")
 check(Frontier.Bonk.Share > 0 and Frontier.Bonk.Share < 0.2 and Frontier.Bonk.Offer < Frontier.Bonk.Reach, "The bonk")
@@ -441,6 +454,89 @@ for _ = 1, 200 do
 	local angle = math.acos(math.clamp(Vector3.new(away.X, 0, away.Z).Unit:Dot(east), -1, 1))
 	check(angle <= Frontier.Rift.Spread + 0.01, "A rift behind a player heading out")
 end
+-- Well apart: a tear opens Rift.Apart studs or more from those still open
+-- round them (three at most at once: Swarm.Every apart, each gone in under
+-- four seconds); crowded, as far from them as it can.
+check(Frontier.Rift.Apart >= 14 and Frontier.Rift.Near >= 16, "Tears too close together")
+local life = Frontier.Rift.Hop + Frontier.Rift.Linger + Frontier.Rift.Close
+check(math.ceil(life / Frontier.Swarm.Every[1]) <= 4, "More than three of a swarm's tears open at once")
+for _ = 1, 300 do
+	local open = {}
+	for _ = 1, 3 do
+		local spot = Frontier.riftSpot(player, east * 16, center, rng, open)
+		for _, other in open do
+			check(flat(spot - other) >= Frontier.Rift.Apart - 0.01, "A tear opened on top of another")
+		end
+		local away = spot - player
+		check(
+			flat(away) >= Frontier.Rift.Near - 0.01 and flat(away) <= Frontier.Rift.Far + 0.01,
+			"A spaced tear too near or far"
+		)
+		table.insert(open, spot)
+	end
+end
+-- And a swarm's tears spread out over the whole swarm: a new one keeps
+-- clear of those already sealed too, where it can (not opening where one
+-- just shut), though the open ones come first.
+do
+	local close, encounters = 0, 300
+	for _ = 1, encounters do
+		local times, tears = Frontier.trickle(6, rng), {}
+		for i, at in times do
+			local open, sealed = {}, {}
+			for _, tear in tears do
+				table.insert(if tear.At + life > at then open else sealed, tear.Spot)
+			end
+			local spot = Frontier.riftSpot(player, east * 16, center, rng, open, sealed)
+			if #open < 3 then
+				for _, other in open do
+					check(flat(spot - other) >= Frontier.Rift.Apart - 0.01, "A swarm's tear opened on an open one")
+				end
+			end
+			if i == 2 then
+				check(flat(spot - tears[1].Spot) >= Frontier.Rift.Apart - 0.01, "A swarm's second tear by its first")
+			end
+			tears[i] = { Spot = spot, At = at }
+		end
+		local nearest = math.huge
+		for i = 1, #tears do
+			for j = i + 1, #tears do
+				nearest = math.min(nearest, flat(tears[i].Spot - tears[j].Spot))
+			end
+		end
+		close += nearest
+	end
+	check(close / encounters >= 10, "A swarm's tears bunch up over the swarm: " .. close / encounters)
+end
+-- Only on ground the server can use (`usable`: here, not on a stack of
+-- containers in front of them), even when that's the emptiest spot about.
+do
+	local function onStack(p)
+		return p.X > player.X + 12 and p.X < player.X + 26 and math.abs(p.Z - player.Z) < 5
+	end
+	local function usable(p)
+		return not onStack(p)
+	end
+	for _ = 1, 300 do
+		local tears = {}
+		for _ = 1, 6 do
+			local spot = Frontier.riftSpot(player, east * 16, center, rng, tears, tears, usable)
+			check(spot ~= nil and not onStack(spot), "A tear opened on ground the server can't use")
+			table.insert(tears, spot)
+		end
+	end
+	check(Frontier.riftSpot(player, east * 16, center, rng, nil, nil, function()
+		return false
+	end) == nil, "A tear opened where nothing was usable")
+end
+local crowd = {}
+for a = 0, 35 do
+	local angle = math.rad(a * 10)
+	for _, r in { 16, 22, 28 } do
+		table.insert(crowd, player + Vector3.new(math.cos(angle), 0, math.sin(angle)) * r)
+	end
+end
+check(Frontier.riftSpot(player, east * 16, center, rng, crowd) ~= nil, "No tear where it's crowded")
 -- Wandering rifts: Near to Far from whoever they're tied to, any way round,
 -- never in the core or the walls.
 local ways = {}

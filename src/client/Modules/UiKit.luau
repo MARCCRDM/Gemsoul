@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
+local MobileLayout = require(script.Parent.MobileLayout)
 local UiSound = require(script.Parent.UiSound)
 
 local UiKit = {}
@@ -278,9 +279,30 @@ end
 local toastGui: ScreenGui? = nil
 local toastHolder: Frame? = nil
 local toastCount = 0
+local toastListeners: { () -> () } = {}
 
--- Phones (a short landscape screen): small toasts in the top-left, clear of
--- the fight in the middle and the thumb buttons on the right.
+-- Hears when the toasts' height changes (one comes or goes, or wraps).
+function UiKit.onToastMoved(listener: () -> ())
+	table.insert(toastListeners, listener)
+end
+
+-- How far down the toasts reach on a phone, in a ScreenGui's space (0:
+-- none up, or not a phone): the loot card sits under them (MinerLoot).
+function UiKit.toastBottom(): number
+	if not (toastHolder and toastGui) or toastHolder.AnchorPoint.X ~= 1 then
+		return 0
+	end
+	for _, child in toastHolder:GetChildren() do
+		if child:IsA("Frame") then
+			return toastHolder.AbsolutePosition.Y - toastGui.AbsolutePosition.Y + toastHolder.AbsoluteSize.Y
+		end
+	end
+	return 0
+end
+
+-- Phones (a short landscape screen): one small toast at a time, in the top
+-- right (MobileLayout.toast), as wide as its words, clear of the fight in
+-- the middle and the thumb buttons lower down.
 local function phone(): boolean
 	local camera = workspace.CurrentCamera
 	return game:GetService("UserInputService").TouchEnabled
@@ -313,6 +335,11 @@ function UiKit.toast(message: string, color: Color3?)
 		holder.Parent = toastGui
 		local layout = UiKit.list(holder, 6)
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			for _, listener in toastListeners do
+				task.spawn(listener)
+			end
+		end)
 		toastHolder = holder
 	end
 	-- A chunky dark pill: coloured rim and edge stripe, white outlined text.
@@ -320,9 +347,10 @@ function UiKit.toast(message: string, color: Color3?)
 	local accent = color or K.Gold
 	local small = phone()
 	local layout = toastHolder:FindFirstChildOfClass("UIListLayout")
+	local slot = MobileLayout.Toast
 	toastHolder.AnchorPoint = if small then Vector2.new(1, 0) else Vector2.new(0.5, 0)
-	toastHolder.Position = if small then UDim2.new(1, -12, 0, 10) else UDim2.new(0.5, 0, 0, 12)
-	toastHolder.Size = if small then UDim2.new(0.45, 0, 0, 0) else UDim2.new(0.9, 0, 0, 0)
+	toastHolder.Position = if small then UDim2.new(1, -slot.Right, 0, slot.Top) else UDim2.new(0.5, 0, 0, 12)
+	toastHolder.Size = if small then UDim2.fromOffset(slot.W, 0) else UDim2.new(0.9, 0, 0, 0)
 	if layout then
 		layout.HorizontalAlignment = if small then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Center
 	end
@@ -365,7 +393,7 @@ function UiKit.toast(message: string, color: Color3?)
 	padding.PaddingRight = UDim.new(0, if small then 12 else 18)
 	padding.Parent = toast
 	local constraint = Instance.new("UISizeConstraint")
-	constraint.MaxSize = Vector2.new(if small then 360 else 620, math.huge)
+	constraint.MaxSize = Vector2.new(if small then slot.W else 620, math.huge)
 	constraint.Parent = toast
 	local stripe = Instance.new("Frame")
 	stripe.BackgroundColor3 = accent
@@ -383,9 +411,12 @@ function UiKit.toast(message: string, color: Color3?)
 	label.Text = message
 	label.TextWrapped = small
 	if small then
-		label.Size = UDim2.fromOffset(math.min(280, math.max(150, toastGui.AbsoluteSize.X * 0.45 - 30)), 0)
-		label.AutomaticSize = Enum.AutomaticSize.Y
+		-- (as wide as its words, wrapping past the toast's place; the
+		-- translated words, too, as the translator sets them)
 		label.TextXAlignment = Enum.TextXAlignment.Left
+		local wrap = Instance.new("UISizeConstraint")
+		wrap.MaxSize = Vector2.new(slot.W - 30, math.huge)
+		wrap.Parent = label
 	end
 	label.Parent = toast
 	local ink = Instance.new("UIStroke")

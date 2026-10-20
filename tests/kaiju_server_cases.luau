@@ -2060,21 +2060,64 @@ local function stirringUp()
 	check(state.Stir == held, "A pause between rocks settled it")
 
 	-- Swarming: an encounter brings its stage's more, higher-levelled, past
-	-- the calm edge's cap.
+	-- the calm edge's cap. (Any swarm still trickling in from before comes
+	-- through first.)
+	local drainUntil = now
+		+ Frontier.Swarm.Every[2] * Frontier.capFor("Edge", 1)
+		+ Frontier.Rift.Hop
+		+ Frontier.Swarm.Last
+	while now < drainUntil do
+		now += 0.1
+		runDelayed()
+	end
 	clearCritters()
-	runDelayed()
+	check(FrontierServer._pending[b] == nil, "A swarm still on its way after it all came through")
 	state.Stir, state.Noise, state.LastEncounter = 1, 1, -math.huge
 	now += 0.4
+	local swungAt = now
 	FrontierServer.swing(b)
 	local coming = FrontierServer._pending[b] or 0
 	check(coming > Frontier.Caps.Edge, "Swarming, an encounter brought no more critters: " .. coming)
 	check(coming <= Frontier.capFor("Edge", 1), "Swarming, past its cap: " .. coming)
-	runDelayed() -- (the rifts open, a moment apart)
-	now += 0.35 * coming + 0.05
+	-- It trickles in: a tear of its own for each, one after another, a
+	-- second or more apart, each well clear of those still open; never a
+	-- crowd hopping out at once.
+	local tears, seen, mostAtOnce = {}, {}, 0
+	local swarmEnd = now + Frontier.Swarm.Every[2] * coming + Frontier.Rift.Hop + Frontier.Swarm.Last + 0.5
+	while now < swarmEnd do
+		runDelayed()
+		local open = {}
+		for _, rift in rifts() do
+			if rift:GetAttribute("Prey") == b.UserId then
+				table.insert(open, rift)
+				if not seen[rift] and rift:GetAttribute("OpenAt") >= swungAt - 0.01 then
+					seen[rift] = true
+					table.insert(tears, rift)
+				end
+			end
+		end
+		for i = 1, #open do
+			for j = i + 1, #open do
+				local gap = open[i].Position - open[j].Position
+				check(
+					Vector3.new(gap.X, 0, gap.Z).Magnitude >= Frontier.Rift.Apart - 0.5,
+					"Two of a swarm's tears too close together"
+				)
+			end
+		end
+		mostAtOnce = math.max(mostAtOnce, #open)
+		now += 0.1
+	end
 	runDelayed()
-	-- (Out of each rift one after another, any ranged one last.)
-	now += Frontier.Rift.Hop + (Frontier.Swarm.PerRift - 1) * Frontier.Swarm.Stagger + Frontier.Swarm.Last + 0.1
-	runDelayed()
+	check(#tears == coming, "Not a tear for each swarming critter: " .. #tears .. " for " .. coming)
+	check(mostAtOnce <= 4, "Too many of a swarm's tears open at once: " .. mostAtOnce)
+	table.sort(tears, function(x, y)
+		return x:GetAttribute("OpenAt") < y:GetAttribute("OpenAt")
+	end)
+	for i = 2, #tears do
+		local gap = tears[i]:GetAttribute("OpenAt") - tears[i - 1]:GetAttribute("OpenAt")
+		check(gap >= Frontier.Swarm.Every[1] - 0.15, "A swarm's tears opened at once: " .. gap)
+	end
 	local list = critterFor(b)
 	check(#list == coming, "Not every swarming critter came through: " .. #list .. " of " .. coming)
 	for _, enemy in list do
@@ -2127,8 +2170,16 @@ check(off >= Frontier.Wander.Near - 1 and off <= Frontier.Wander.Far + 1, "A wan
 check(wanderRift:GetAttribute("Prey") == b.UserId, "A wandering rift isn't tied to anyone")
 now = wanderRift:GetAttribute("HopAt") + 0.05
 runDelayed()
-now += Frontier.Swarm.Last -- (any ranged one hops out last)
-runDelayed()
+-- One climbs out at a time (Swarm.Out apart), not the lot at once.
+check(#critterFor(b) == 1, "A wandering rift's critters came out all at once: " .. #critterFor(b))
+while (FrontierServer._pending[b] or 0) > 0 and now < wanderRift:GetAttribute("CloseAt") do
+	now += 0.1
+	runDelayed()
+end
+check(
+	FrontierServer._pending[b] == nil and now <= wanderRift:GetAttribute("CloseAt"),
+	"The tear sealed before they were all out"
+)
 local roamers = critterFor(b)
 check(#roamers >= 2 and KaijuWilds._wilds[roamers[1]].Wander ~= nil, "No critters roamed out of the wandering rift")
 -- (A fighter: a ranged one jets off from a player walking up, as it should.)

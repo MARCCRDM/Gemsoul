@@ -6,15 +6,18 @@
 	  Mining noise   OutpostServer tells this of every swing (swing: on foot
 	                 or from a mech's cockpit), and anyone out past the core
 	                 makes a little noise each half second besides
-	                 (Frontier.noise). Full, an encounter: a swarm. Its
-	                 rifts open near where they look, a moment apart,
-	                 crackling a moment first, and up to three critters hop
-	                 out of each at them, one after another; a ranged one
-	                 (Crocodilo) only ever at the back of a swarm, last
-	                 (Frontier.Swarm, Kaiju.wave).
+	                 (Frontier.noise). Full, an encounter: a swarm that
+	                 trickles in. Its rifts open near where they look, one
+	                 after another a second or two apart (Frontier.trickle),
+	                 each well clear of the tears still open (Rift.Apart),
+	                 crackling a moment first, and a critter hops out of
+	                 each at them (Swarm.PerRift); a ranged one (Crocodilo)
+	                 only ever at the back of a swarm, last (Frontier.Swarm,
+	                 Kaiju.wave).
 	  Wandering      every Wander.Every seconds or so the frontier tears
 	                 open by itself, Wander.Near to Far studs from someone
-	                 out there, and a few critters roam round it for a
+	                 out there, and a few critters climb out of it one at a
+	                 time (Swarm.Out apart) and roam round it for a
 	                 minute, going for whoever comes close. Cleared (every
 	                 one killed), everyone who helped is Rift Charged
 	                 (RiftCharged: the server time it runs out; mined gems
@@ -254,17 +257,31 @@ local function openGround(root: BasePart, pick: () -> Vector3): Vector3
 	return floor
 end
 
--- A swarm of `count` comes for `player`: its rifts open near them a moment
--- apart (up to Frontier.Swarm.PerRift critters out of each, once it has
--- crackled its warning), and they hop out at them one after another, any
--- ranged ones last (KaijuWilds.pickWave).
+-- Where the tears still open are (to keep a new one clear of them).
+local function openTears(): { Vector3 }
+	local spots = {}
+	for _, anchor in folder:GetChildren() do
+		if anchor:IsA("BasePart") and anchor:GetAttribute("Dormant") == nil then
+			table.insert(spots, anchor.Position)
+		end
+	end
+	return spots
+end
+
+-- A swarm of `count` comes for `player`, trickling in: its rifts open near
+-- them one after another (Frontier.trickle), each well clear of the tears
+-- still open (Rift.Apart), Frontier.Swarm.PerRift critters out of each once
+-- it has crackled its warning, any ranged ones last (KaijuWilds.pickWave).
 local function incursion(player: Player, band: string, count: number)
 	pending[player] = (pending[player] or 0) + count
 	local wave = KaijuWilds.pickWave(count, rng)
 	local swarm = Frontier.Swarm
-	for r = 1, math.ceil(#wave / swarm.PerRift) do
+	local tears = math.ceil(#wave / swarm.PerRift)
+	local times = Frontier.trickle(tears, rng)
+	local spots = {} -- (this swarm's tears so far: the next keeps clear of them too)
+	for r = 1, tears do
 		local batch = table.move(wave, (r - 1) * swarm.PerRift + 1, math.min(#wave, r * swarm.PerRift), 1, {})
-		task.delay((r - 1) * 0.35, function()
+		task.delay(times[r], function()
 			local root = rootOf(player)
 			if not root or not eligible(player) then
 				for _ = 1, #batch do
@@ -272,9 +289,19 @@ local function incursion(player: Player, band: string, count: number)
 				end
 				return
 			end
-			local floor = openGround(root, function()
-				return Frontier.riftSpot(root.Position, root.CFrame.LookVector, center(), rng)
+			-- (Open ground level with them first, then clear of the other
+			-- tears; nowhere like that, any open ground round about.)
+			local level = KaijuServer.ground(root.Position).Y
+			local look = root.CFrame.LookVector
+			local spot = Frontier.riftSpot(root.Position, look, center(), rng, openTears(), spots, function(at)
+				return math.abs(KaijuServer.ground(at).Y - level) <= 3
 			end)
+			local floor = if spot
+				then KaijuServer.ground(spot)
+				else openGround(root, function()
+					return Frontier.riftSpot(root.Position, look, center(), rng) :: Vector3
+				end)
+			table.insert(spots, floor)
 			local _, life = FrontierServer.open(floor, root.Position, {
 				Critter = batch[1],
 				Prey = player,
@@ -449,17 +476,22 @@ local function wander(candidates: { any })
 		end)
 	end
 	local wave = KaijuWilds.pickWave(count, rng)
-	local _, life = FrontierServer.open(floor, root.Position, { Critter = wave[1], Prey = player, Linger = 4 })
+	local apart = Frontier.Swarm.Out
+	local _, life = FrontierServer.open(
+		floor,
+		root.Position,
+		{ Critter = wave[1], Prey = player, Linger = 4 + (count - 1) * apart } -- (open till the last is out)
+	)
 	local group = { Player = player, Critters = {}, Pending = count, Helpers = {}, Killed = 0, Lost = false }
 	table.insert(wanders, group)
 	pending[player] = (pending[player] or 0) + count
 	task.delay(life.HopAt - serverNow(), function()
-		for _ = 1, count do
-			arrived(player)
-		end
-		group.Pending = 0
 		local target = rootOf(player)
 		if not target or not eligible(player) or flat(target.Position - floor).Magnitude > Frontier.Wander.Seal then
+			for _ = 1, count do
+				arrived(player)
+			end
+			group.Pending = 0
 			group.Lost = true -- (nobody near: it seals empty)
 			closeGroup(group)
 			return
@@ -483,35 +515,41 @@ local function wander(candidates: { any })
 				table.insert(group.Critters, enemy)
 			end
 		end
+		-- (Once the last is out: if none is left about, it's over.)
 		local function settle()
-			if #group.Critters == 0 then
-				group.Lost = true
-				closeGroup(group)
-			end
-		end
-		-- The fighters out first; its ranged ones a moment later, at the back.
-		local later = 0
-		for i, critter in wave do
-			if Kaiju.isRanged(critter) then
-				later += 1
-			else
-				hop(i, critter)
-			end
-		end
-		if later == 0 then
-			settle()
-			return
-		end
-		group.Pending = later
-		task.delay(Frontier.Swarm.Last, function()
-			group.Pending = 0
-			for i, critter in wave do
-				if Kaiju.isRanged(critter) then
-					hop(i, critter)
+			for _, enemy in group.Critters do
+				if enemy.Alive and groupOf[enemy] then
+					return
 				end
 			end
-			settle()
-		end)
+			group.Lost = group.Lost or group.Killed == 0
+			closeGroup(group)
+		end
+		-- One at a time (Swarm.Out apart): the fighters first, its ranged
+		-- ones at the back.
+		local order = {}
+		for i, critter in wave do
+			if not Kaiju.isRanged(critter) then
+				table.insert(order, i)
+			end
+		end
+		for i, critter in wave do
+			if Kaiju.isRanged(critter) then
+				table.insert(order, i)
+			end
+		end
+		for n, i in order do
+			task.delay((n - 1) * apart, function()
+				arrived(player)
+				group.Pending -= 1
+				if player.Parent then
+					hop(i, wave[i])
+				end
+				if group.Pending == 0 then
+					settle()
+				end
+			end)
+		end
 	end)
 end
 

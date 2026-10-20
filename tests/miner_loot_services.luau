@@ -124,7 +124,12 @@ local game = { GetService = function(_, id) return services[id] end }
 local P = {}
 for _, key in { "Edge", "Text", "Dim", "Bad", "Teal" } do P[key] = Color3.fromRGB(200, 200, 200) end
 local IronUi = { new = new, Heading = "GothamBold", Colors = P }
+-- (ToastBottom: how far down a toast reaches on a phone; a test sets it and
+-- calls ToastMoved.)
 local UiKit = { gui = function(name) return new("ScreenGui", { Name = name }, root) end, round = function() end }
+UiKit.ToastBottom, UiKit.ToastMoved = 0, signal()
+function UiKit.toastBottom() return UiKit.ToastBottom end
+function UiKit.onToastMoved(listener) UiKit.ToastMoved:Connect(listener) end
 local GemArt = {
 	viewport = function(parent, gem)
 		local view = new("ViewportFrame", { Gem = gem }, parent)

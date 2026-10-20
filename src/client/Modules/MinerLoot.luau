@@ -1,5 +1,5 @@
 -- Your own finds, as a card in the bottom right of the screen (the top
--- middle on a phone). (Other players see them over your head instead:
+-- right on a phone). (Other players see them over your head instead:
 -- MiningWorldReveal.)
 --
 -- A gem rolls through a reel and lands with a flash. Beside it go its
@@ -10,11 +10,12 @@
 -- - every rock pays a gem, so the only find without one (a full pouch) is a
 --   row straight away.
 --
--- On a phone or a tablet it's slim and sits at the top middle
--- (MobileLayout.loot): the reel, the rarity, the gem's name and its worth,
--- no bars, and one row under it, so the middle of the screen (you, your
--- kaiju, what's coming) and the dock stay clear; the live feed steps aside
--- while it's up (MobileLayout.claimTop). On a computer it's compact, in the
+-- On a phone or a tablet it's slim and sits in the top right, under the
+-- toast's place (MobileLayout.loot; lower while a toast wraps): the reel,
+-- then the rarity, the gem's name and its worth one under another, no bars,
+-- and one row under it, so the middle of the screen (you, your kaiju,
+-- what's coming) and the dock stay clear; the live feed steps aside while
+-- it's up (MobileLayout.claimTop). On a computer it's compact, in the
 -- bottom right corner above the key hints, clear of the middle of the
 -- screen, the RIFT CHARGED tag (FrontierHud) and a mech's HOP OUT; where a short
 -- window leaves no room above it, its row waits until it's gone.
@@ -78,13 +79,13 @@ local DESK = {
 	SegStep = 10,
 	RowText = 11,
 	RowWorthW = 72,
-	WorthOnName = false,
+	WorthBelow = false,
 }
 local SLIM = {
 	Slim = true,
 	W = MobileLayout.Loot.W,
 	H = MobileLayout.Loot.H,
-	Row = 24,
+	Row = MobileLayout.Loot.Row,
 	Pad = 6,
 	Well = 44,
 	Cell = 40,
@@ -92,19 +93,19 @@ local SLIM = {
 	Spot = 30,
 	Bars = false,
 	Gap = 8,
-	HeaderY = 7,
-	HeaderH = 12,
+	HeaderY = 5,
+	HeaderH = 11,
 	Small = 9,
-	WorthY = 24,
-	WorthH = 16,
+	WorthY = 35,
+	WorthH = 14,
 	WorthW = 54,
 	Worth = 11,
-	NameY = 21,
-	NameH = 20,
-	Name = 14,
+	NameY = 16,
+	NameH = 18,
+	Name = 13,
 	RowText = 11,
-	RowWorthW = 64,
-	WorthOnName = true,
+	RowWorthW = 60,
+	WorthBelow = true, -- (a line of its own, under the name: the card's narrow)
 }
 local D = DESK -- (the sizes now: a card keeps the ones it was built with)
 -- On a computer, the corner it sits in: Right and Bottom from the screen's
@@ -182,7 +183,7 @@ local function tierLabel(tier: string): string
 	return string.upper(GemConfig.TierLabels[tier] or tier)
 end
 
--- The top middle is the loot card's while it (or its row) is up on a phone.
+-- The top is the loot card's while it (or its row) is up on a phone.
 local function claim()
 	MobileLayout.claimTop("MinerLoot", D.Slim and not blocked and (cardUi ~= nil or next(rows) ~= nil))
 end
@@ -206,8 +207,9 @@ end
 -- Where everything sits. On a computer: compact, in the bottom right corner
 -- (MinerLoot.Corner), rows above it (newest first, as many as fit below the
 -- RIFT CHARGED tag, two at most). On a phone or a tablet (touch, or a short
--- window): slim, at the top middle, one row under it. Where no row fits
--- beside the card, it shows once the card's gone.
+-- window): slim, in the top right under the toast's place (and under a
+-- toast that wraps past it), one row under it. Where no row fits beside the
+-- card, it shows once the card's gone.
 local function fit()
 	if not gui then
 		return
@@ -228,7 +230,7 @@ local function fit()
 	holder.Size = UDim2.fromOffset(D.W, D.H)
 	if spot then
 		holder.AnchorPoint = Vector2.new(0, 0)
-		holder.Position = UDim2.fromOffset(spot.X, spot.Y)
+		holder.Position = UDim2.fromOffset(spot.X, math.max(spot.Y, UiKit.toastBottom() + MobileLayout.Loot.Gap))
 		maxRows, rowsWait = 1, false
 	else
 		-- (Clear of a mech's HOP OUT, which is bottom middle.)
@@ -281,6 +283,7 @@ local function ensureGui()
 	}, gui)
 	fitScale = new("UIScale", { Scale = 1 }, holder)
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+	UiKit.onToastMoved(fit)
 	fit()
 end
 
@@ -309,7 +312,11 @@ local function buildRow(item)
 	}, frame)
 	UiKit.round(dot, 2)
 	local left, right
-	if gem then
+	if gem and D.Slim then
+		-- (no room for the rarity's name: the name and the dot wear its colour)
+		left = string.format('<font color="#%s">%s</font>', color:ToHex(), GemConfig.shade(gem).Name)
+		right = string.format("≈ %s ◆", commas(GemConfig.value(gem)))
+	elseif gem then
 		left = string.format(
 			'<font color="#%s">%s</font>  %s',
 			color:ToHex(),
@@ -459,8 +466,10 @@ local function buildCard(item)
 	local x = d.Pad + d.Well + d.Gap
 	local w = d.W - x - d.Pad
 	local header = text(frame, "", d.Small, P.Dim, x, d.HeaderY, w, d.HeaderH) -- (narrows for the worth once it lands)
-	local worth =
-		text(frame, "", d.Worth, GOLD, x + w - d.WorthW, d.WorthY, d.WorthW, d.WorthH, Enum.TextXAlignment.Right)
+	-- (slim, the worth is a line of its own under the name; else right of the rarity)
+	local worthX, worthW = if d.WorthBelow then x else x + w - d.WorthW, if d.WorthBelow then w else d.WorthW
+	local align = if d.WorthBelow then Enum.TextXAlignment.Left else Enum.TextXAlignment.Right
+	local worth = text(frame, "", d.Worth, GOLD, worthX, d.WorthY, worthW, d.WorthH, align)
 	local name = text(frame, "", d.Name, P.Text, x, d.NameY, w, d.NameH)
 	local bars = {}
 	for row, key in if d.Bars then STATS else {} do
@@ -620,10 +629,8 @@ local function land(ui)
 		element:ToHex(),
 		string.upper(GemConfig.elementName(gem.Element))
 	)
-	-- (Room for the worth: beside the rarity in full, beside the name slim.)
-	if ui.D.WorthOnName then
-		ui.Name.Size = UDim2.fromOffset(ui.Width - ui.D.WorthW - 4, ui.D.NameH)
-	else
+	-- (Room for the worth beside the rarity in full; slim, it's under the name.)
+	if not ui.D.WorthBelow then
 		ui.Header.Size = UDim2.fromOffset(ui.Width - ui.D.WorthW - 4, ui.D.HeaderH)
 	end
 	ui.Name.Text = GemConfig.shade(gem).Name
