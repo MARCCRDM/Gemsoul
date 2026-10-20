@@ -6,6 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Crafting = require(ReplicatedStorage.Shared.Crafting)
+local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Vendors = require(ReplicatedStorage.Shared.Vendors)
 local CombatGuide = require(script.Parent.Modules.CombatGuide)
@@ -13,6 +15,7 @@ local AugmentTreeUI = require(script.Parent.Modules.AugmentTreeUI)
 local CharacterUI = require(script.Parent.Modules.CharacterUI)
 local TradeUI = require(script.Parent.Modules.TradeUI)
 local ForgeUI = require(script.Parent.Modules.ForgeUI)
+local GemClient = require(script.Parent.Modules.GemClient)
 local InventoryUI = require(script.Parent.Modules.InventoryUI)
 local IronUi = require(script.Parent.Modules.IronUi)
 local UiKit = require(script.Parent.Modules.UiKit)
@@ -75,6 +78,7 @@ refreshTerminals()
 local gui = Instance.new("ScreenGui")
 gui.Name = "Dialogue"
 gui.ResetOnSpawn = false
+gui.DisplayOrder = 20 -- (over the Outpost's HUD, where the Shelter's crew talk)
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
@@ -264,6 +268,129 @@ function actions.MarketSell()
 end
 
 local mainMenu: () -> ()
+
+-- The Saga Shelter's crew ---------------------------------------------------------
+
+local GOLD = Color3.fromRGB(255, 214, 120)
+
+-- Ilsa's offer for your spare gems of a tier: the loose ones no loadout
+-- uses (GemInventory.spare), at the Market's rate. -> how many, coins
+local function spareOffer(tier: string): (number, number)
+	local count, coins = 0, 0
+	for _, gem in GemInventory.spare(GemClient.Profile, tier) do
+		count += 1
+		coins += Crafting.marketPrice(gem)
+	end
+	return count, coins
+end
+
+local selling = false
+-- Ilsa looks over your spares, names her price for each lot, and buys a
+-- lot when you say so (the server checks it all again: Forge's SellSpare).
+function actions.Appraise()
+	local commons, commonCoins = spareOffer("Common")
+	local uncommons, uncommonCoins = spareOffer("Uncommon")
+	if commons + uncommons == 0 then
+		say("No spare Commons or Uncommons on you. Pick a gem to sell, or go and break some rocks.")
+	elseif uncommons == 0 then
+		say(string.format("Spare Commons: %d, worth %d coins to me.", commons, commonCoins))
+	elseif commons == 0 then
+		say(string.format("Spare Uncommons: %d, worth %d coins to me.", uncommons, uncommonCoins))
+	else
+		say(
+			string.format(
+				"Spare Commons: %d, worth %d coins. Spare Uncommons: %d, worth %d coins.",
+				commons,
+				commonCoins,
+				uncommons,
+				uncommonCoins
+			)
+		)
+	end
+	local function sell(tier: string)
+		if selling then
+			return
+		end
+		selling = true
+		task.spawn(function()
+			local result = GemClient.request("SellSpare", tier)
+			selling = false
+			if current then
+				say(result.Message or "")
+				mainMenu()
+			end
+		end)
+	end
+	local items: { MenuItem } = {}
+	if commons > 0 then
+		table.insert(items, {
+			Text = string.format("Sell my spare Commons (%d) for %d coins", commons, commonCoins),
+			Color = GOLD,
+			Run = function()
+				sell("Common")
+			end,
+		})
+	end
+	if uncommons > 0 then
+		table.insert(items, {
+			Text = string.format("Sell my spare Uncommons (%d) for %d coins", uncommons, uncommonCoins),
+			Color = GOLD,
+			Run = function()
+				sell("Uncommon")
+			end,
+		})
+	end
+	table.insert(items, { Text = "Pick a gem to sell", Run = actions.MarketSell })
+	table.insert(items, {
+		Text = "Back",
+		Color = UiKit.Colors.Dim,
+		Run = function()
+			mainMenu()
+		end,
+	})
+	showMenu(items)
+end
+
+-- Borin's stands: straight to that aisle of the Store.
+function actions.Store()
+	say("Pick an aisle. Everything on my stands is in there.")
+	local items: { MenuItem } = {}
+	for _, aisle in
+		{
+			{ "Suits", "Suits" },
+			{ "Helmets", "Helmets" },
+			{ "Picks", "Picks" },
+			{ "Weapon skins", "Skins" },
+			{ "Bundles", "Bundles" },
+		}
+	do
+		table.insert(items, {
+			Text = aisle[1],
+			Run = function()
+				close()
+				require(script.Parent.Modules.ShopUI).open(aisle[2])
+			end,
+		})
+	end
+	table.insert(items, {
+		Text = "Back",
+		Color = UiKit.Colors.Dim,
+		Run = function()
+			mainMenu()
+		end,
+	})
+	showMenu(items)
+end
+
+function actions.Market()
+	close()
+	require(script.Parent.Modules.MarketBoardUI).open()
+end
+
+function actions.Duels()
+	close()
+	require(script.Parent.Modules.SocialUI).open("Arena")
+end
 
 local function open(vendorId: string, part: BasePart)
 	local vendor = Vendors[vendorId]

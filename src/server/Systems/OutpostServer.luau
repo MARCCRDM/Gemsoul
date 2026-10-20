@@ -36,7 +36,9 @@
 	(OutpostServer.onVeinSwing: KaijuWilds). Rocks carry their state as attributes (Hp,
 	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
 	can show every swing; prompts carry PromptKind (Mine, Probe, Gate,
-	Spar, Duel, Party) for the client to act on.
+	Spar, Duel, Party) for the client to act on. The Shelter's crew
+	(site.Crew: Ilsa the gem buyer, Brutus, Tamsin, Borin and Garrick) are
+	Builder.vendor robots: their Talk prompt opens Client.Dialogue.
 
 	Every swing out past the core makes noise (OutpostServer.onSwing:
 	FrontierServer.swing, which brings the critters). A player Rift Charged
@@ -58,6 +60,8 @@ local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
+local Vendors = require(ReplicatedStorage.Shared.Vendors)
+local Builder = require(script.Parent.Parent.World.Builder)
 local OutpostWorld = require(script.Parent.Parent.World.OutpostWorld)
 local ChatChannels = require(script.Parent.ChatChannels)
 local Gems = require(script.Parent.Gems)
@@ -944,7 +948,7 @@ local function drawSigns()
 			l.Parent = gui
 		end
 	end
-	sign(site.Probe, "PROBE-7", "EXCHANGE  ·  PICKS  ·  MARKET", Color3.fromRGB(110, 220, 255))
+	sign(site.Probe, "PROBE-7", "SWING REFILLS  ·  EXCHANGE", Color3.fromRGB(110, 220, 255))
 end
 
 -- An Easter egg found: paid once per player (and a bonus for the full set),
@@ -1064,6 +1068,17 @@ function OutpostServer.start()
 		prompt.RequiresLineOfSight = false
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt.Parent = spec[1]
+	end
+	-- The Shelter's crew, where the Shelter puts them: talk to them (E) for
+	-- their lines and stations (Shared.Vendors, Client.Dialogue).
+	local crew = Instance.new("Folder")
+	crew.Name = "Crew"
+	crew.Parent = site.Model
+	for _, spot in site.Crew or {} do
+		local info = Vendors[spot.Id]
+		if info then
+			Builder.vendor(crew, spot.CFrame, spot.Id, info)
+		end
 	end
 	-- The hidden Easter eggs: a prompt that says nothing about what it is.
 	for _, part in site.Secrets or {} do

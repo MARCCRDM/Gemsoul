@@ -25,8 +25,8 @@ at its peak). Ribs run up the outside, with heavier corners.
 | --- | --- |
 | North | **Mech garage**: eight bays in a row along the north wall (BAY 1-8, each mech's name on its sign and a jack-o'-lantern over it), every mech facing the lane. The lane runs the full width to a **big door at each end** (east and west, 26 high, EXIT over them, hazard posts, the roller door rolled up). A barrier with three gaps keeps the hall clear. |
 | Middle | **Kaiju arena**: a stage edged in glow, two tiers of stands open to the door and the garage, pylons, and its sign (KAIJU ARENA, COMING SOON). The battles are still to be worked out. |
-| West wall | **STORE** booth (opens the Store) and **MARKET** booth (opens the player Market), each a counter with a prompt, a canopy and a lit sign. |
-| East wall | **PROBE-7** (the swing refills Exchange) and the **leaderboard**. |
+| West wall | **STORE** booth (opens the Store) and **MARKET** booth (opens the player Market), each a counter with a prompt, a canopy and a lit sign. The Store shows what it sells on stands: helmets, weapon skins and pickaxes behind the counter, suits on turntables either side ([the Store's stands](probe-store-crew-quarry.md#the-stores-stands)). |
+| East wall | **PROBE-7** (the swing refills Exchange), the probe that landed and unfolded into the station ([PROBE-7](probe-store-crew-quarry.md#probe-7-the-probe-that-became-the-station)), and the **leaderboard**. |
 | By the door | The **1V1 ARENA UPLINK** (duels, "win streaks restore your swings": see [swing-restores.md](swing-restores.md)) and **HOW IT WORKS** on the wall: mine outside, win 1v1s for swings, heal your kaiju once you're clear, mechs in the garage, invite friends for coupons. |
 | Over the door, inside | **TO THE QUARRY**: mine rocks, kite critters, tame kaiju. |
 
@@ -38,7 +38,10 @@ at its peak). Ribs run up the outside, with heavier corners.
 
 Since then the hall has gained the Moon Garden (west), the Gem Gallery
 (east), a kaiju hologram on the arena's stage, a tiled floor and more
-light: see [lobby-polish.md](lobby-polish.md).
+light: see [lobby-polish.md](lobby-polish.md). The old town's shopkeepers
+now work here too (Ilsa buys gems at the Gem Gallery; Brutus, Tamsin,
+Borin and Garrick by their stations): see
+[probe-store-crew-quarry.md](probe-store-crew-quarry.md#the-crew).
 
 - **Arriving**: players spawn just inside the main door, facing into the
   hall (`site.Spawn`).

@@ -14,7 +14,9 @@
 	      Model, Spawn (CFrame: inside the Shelter's door, facing in),
 	      Probe (BasePart, the terminal), Board (BasePart with the
 	      leaderboard's face), Gate (BasePart), Stations ({ Store, Market }:
-	      the Shelter's counters, for their prompts), Shelter ({ Box }: its
+	      the Shelter's counters, for their prompts), Crew ({ { Id, CFrame } }:
+	      where the Shelter's crew stand, by Shared.Vendors id, for
+	      OutpostServer to build them), Shelter ({ Box }: its
 	      half size, x and z, kept clear of rocks),
 	      Spots ({ CFrame }, where rocks may grow), ArrivalSpots and
 	      NearSpots (indexes into Spots: the welcome field outside the
@@ -583,62 +585,137 @@ local function tube(parent, from: Vector3, to: Vector3, radius: number, color: C
 	)
 end
 
--- The crashed probe: a battered sphere half in the dust, solar wings bent,
--- its screens woken up as a trading terminal.
+-- A sign: a dark panel with a title and a line under it, read from its
+-- front (build it with CFrame.lookAt(where, toward the reader)). Returns
+-- the panel, its SurfaceGui and the title.
+local function signPanel(parent, cframe: CFrame, size: Vector3, title: string, sub: string?, color: Color3)
+	local board = part(parent, cframe, size, HULL_DARK, Enum.Material.Metal)
+	board.Name = "Sign"
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(size.X * 20, size.Y * 20)
+	gui.LightInfluence = 0
+	gui.Parent = board
+	local head = Instance.new("TextLabel")
+	head.BackgroundTransparency = 1
+	head.Size = UDim2.fromScale(1, if sub then 0.62 else 1)
+	head.Text = title
+	head.TextScaled = true
+	head.Font = Enum.Font.GothamBlack
+	head.TextColor3 = color
+	head.Parent = gui
+	if sub then
+		local line = Instance.new("TextLabel")
+		line.BackgroundTransparency = 1
+		line.Position = UDim2.fromScale(0.03, 0.6)
+		line.Size = UDim2.fromScale(0.94, 0.34)
+		line.Text = sub
+		line.TextScaled = true
+		line.Font = Enum.Font.GothamMedium
+		line.TextColor3 = Color3.fromRGB(220, 235, 255)
+		line.Parent = gui
+	end
+	return board, gui, head
+end
+
+-- Standing at `from`, turned to face `toward` (level).
+local function facingPoint(from: Vector3, toward: Vector3): CFrame
+	return CFrame.new(from) * CFrame.Angles(0, math.atan2(-(toward.X - from.X), -(toward.Z - from.Z)), 0)
+end
+
+-- A rod of `radius` from `a` to `b` (a cylinder along it).
+local function strut(parent, a: Vector3, b: Vector3, radius: number, color: Color3, material)
+	local along = b - a
+	local axis = along.Unit
+	local up = if math.abs(axis.Y) < 0.95 then Vector3.new(0, 1, 0) else Vector3.new(1, 0, 0)
+	local side = axis:Cross(up).Unit
+	return part(
+		parent,
+		CFrame.fromMatrix((a + b) / 2, axis, side:Cross(axis).Unit, side),
+		Vector3.new(along.Magnitude, radius * 2, radius * 2),
+		color,
+		material or Enum.Material.Metal,
+		"Cylinder"
+	)
+end
+
+-- PROBE-7 STATION: the probe that brought the first miners' supplies,
+-- landed and unfolded where it came down. It stands on four landing legs
+-- over its pad; its top split into four petals that peeled back round the
+-- glowing core; its front hatch folded down over the terminal, its side
+-- bays opened into racks of swing refill cells, its solar wings swung out
+-- level and its mast telescoped up to the dish. Its name turns over it
+-- (ProbeSign: Client.OutpostScene turns it).
+-- Returns the terminal's screen.
+local PROBE_HULL = Color3.fromRGB(176, 164, 136)
+local PROBE_GOLD = Color3.fromRGB(214, 166, 72)
 local function probe(parent, at: CFrame)
 	local m = folder(parent, "Probe")
-	local tilt = at * CFrame.Angles(math.rad(14), 0, math.rad(-9))
-	solid(
-		part(
-			m,
-			tilt * CFrame.new(0, 6, 0),
-			Vector3.one * 18,
-			Color3.fromRGB(150, 140, 120),
-			Enum.Material.DiamondPlate,
-			"Ball"
-		)
+	local F = 0.86 -- the floor
+	local function p(x, y, z)
+		return (at * CFrame.new(x, F + y, z)).Position
+	end
+	local function cf(x, y, z)
+		return at * CFrame.new(x, F + y, z)
+	end
+	-- Its landing pad: hazard-ringed, scorched under the pod.
+	disc(m, cf(0, 0.03, 0), 12.5, 0.06, HAZARD)
+	disc(m, cf(0, 0.05, 0), 11.9, 0.06, Color3.fromRGB(48, 52, 60))
+	disc(m, cf(0, 0.07, 0), 6, 0.06, Color3.fromRGB(30, 30, 36))
+	-- The pod, its heat shield, and the core where the top opened.
+	solid(part(m, cf(0, 11, 0), Vector3.one * 12, PROBE_HULL, Enum.Material.DiamondPlate, "Ball"))
+	part(
+		m,
+		cf(0, 11, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		Vector3.new(1.6, 12.8, 12.8),
+		PROBE_GOLD,
+		Enum.Material.Metal,
+		"Cylinder"
 	)
 	part(
 		m,
-		tilt * CFrame.new(0, 6, 0),
-		Vector3.new(19, 2, 19),
-		Color3.fromRGB(196, 150, 60),
+		cf(0, 16, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		Vector3.new(0.5, 7, 7),
+		HULL_DARK,
 		Enum.Material.Metal,
-		"Cylinder",
-		{ CFrame = tilt * CFrame.new(0, 6, 0) * CFrame.Angles(0, 0, math.rad(90)) }
+		"Cylinder"
 	)
-	-- Scorched dust heaped where it hit.
-	for i = 0, 9 do
-		local a = i / 10 * math.pi * 2
+	local core = part(m, cf(0, 16.8, 0), Vector3.one * 3.2, GLOW, Enum.Material.Neon, "Ball")
+	core.Name = "ProbeCore"
+	light(core, GLOW, 24, 1.5)
+	-- The four petals of its top, peeled back on their hinges.
+	for k = 0, 3 do
+		local a = math.rad(45 + k * 90)
+		local out = Vector3.new(math.cos(a), 0, math.sin(a))
+		local hinge = Vector3.new(0, 16, 0) + out * 3.4
+		local tip = hinge + out * 4.4 + Vector3.new(0, -2.2, 0)
+		local petal =
+			strut(m, p(hinge.X, hinge.Y, hinge.Z), p(tip.X, tip.Y, tip.Z), 0.2, PROBE_HULL, Enum.Material.DiamondPlate)
+		petal.Shape = Enum.PartType.Block
+		petal.Size = Vector3.new(petal.Size.X, 0.35, 4.2)
 		part(
 			m,
-			at * CFrame.new(math.cos(a) * 10, 0.6, math.sin(a) * 10) * CFrame.Angles(0, -a, 0.3),
-			Vector3.new(6, 2.4, 8),
-			Color3.fromRGB(70, 66, 70),
-			Enum.Material.Slate
+			cf(hinge.X, hinge.Y, hinge.Z) * CFrame.Angles(0, -a, 0),
+			Vector3.new(0.6, 0.6, 3),
+			PROBE_GOLD,
+			Enum.Material.Metal,
+			"Cylinder"
 		)
 	end
-	-- Bent solar wings.
-	for _, side in { -1, 1 } do
-		local wing = tilt * CFrame.new(side * 13, 9, 0) * CFrame.Angles(math.rad(side * 18), 0, math.rad(side * 24))
-		part(m, wing, Vector3.new(12, 0.4, 7), Color3.fromRGB(40, 60, 110), Enum.Material.Glass)
-		for k = -2, 2 do
-			part(m, wing * CFrame.new(k * 2.3, 0.25, 0), Vector3.new(0.15, 0.1, 7), STEEL, Enum.Material.Metal)
-		end
-		part(m, tilt * CFrame.new(side * 8.5, 9, 0), Vector3.new(4, 0.6, 0.6), STEEL, Enum.Material.Metal)
+	-- Four landing legs: a strut to the knee, a hydraulic leg to the foot.
+	for k = 0, 3 do
+		local a = math.rad(45 + k * 90)
+		local hip = Vector3.new(math.cos(a) * 5.9, 9.5, math.sin(a) * 5.9)
+		local knee = Vector3.new(math.cos(a) * 10, 6.5, math.sin(a) * 10)
+		local foot = Vector3.new(math.cos(a) * 11, 0.5, math.sin(a) * 11)
+		strut(m, p(hip.X, hip.Y, hip.Z), p(knee.X, knee.Y, knee.Z), 0.55, STEEL)
+		strut(m, p(knee.X, knee.Y, knee.Z), p(foot.X, foot.Y, foot.Z), 0.38, HULL_DARK)
+		local sleeve = knee + (foot - knee) * 0.45
+		strut(m, p(knee.X, knee.Y, knee.Z), p(sleeve.X, sleeve.Y, sleeve.Z), 0.56, HAZARD)
+		part(m, cf(knee.X, knee.Y, knee.Z), Vector3.one * 1.4, STEEL, Enum.Material.Metal, "Ball")
+		solid(disc(m, cf(foot.X, 0.25, foot.Z), 1.5, 0.5, HULL_DARK, Enum.Material.Metal))
 	end
-	-- Antenna mast and dish.
-	part(m, tilt * CFrame.new(-3, 18, 2), Vector3.new(0.5, 9, 0.5), STEEL, Enum.Material.Metal)
-	part(
-		m,
-		tilt * CFrame.new(-3, 22.5, 2) * CFrame.Angles(math.rad(35), 0, 0),
-		Vector3.new(0.6, 5, 5),
-		HULL,
-		Enum.Material.Metal,
-		"Cylinder",
-		{ CFrame = tilt * CFrame.new(-3, 22.5, 2) * CFrame.Angles(math.rad(35), 0, math.rad(90)) }
-	)
-	-- The terminal: a lit console bolted to its face.
+	-- The terminal, and the front hatch folded down over it.
 	local console = solid(part(m, at * CFrame.new(0, 3, -10.5), Vector3.new(9, 6, 1.4), HULL_DARK, Enum.Material.Metal))
 	local screen = part(
 		m,
@@ -650,29 +727,101 @@ local function probe(parent, at: CFrame)
 	screen.Name = "ProbeScreen"
 	part(m, console.CFrame * CFrame.new(0, -2.2, -1.3), Vector3.new(8, 0.5, 2.2), HULL, Enum.Material.Metal)
 	light(screen, GLOW, 22, 2.5)
-	-- A holo ring turning over it (the client spins it; see OutpostScene).
-	local ring = part(
-		m,
-		at * CFrame.new(0, 22, 0),
-		Vector3.new(0.4, 22, 22),
-		GLOW,
-		Enum.Material.Neon,
-		"Cylinder",
-		{ Transparency = 0.55 }
-	)
-	ring.CFrame = at * CFrame.new(0, 22, 0) * CFrame.Angles(0, 0, math.rad(90))
-	ring.Name = "ProbeRing"
-	-- Cables from the probe into the ground.
-	for i = 1, 3 do
-		local a = math.rad(200 + i * 40)
-		tube(
-			m,
-			(tilt * CFrame.new(0, 3, 0)).Position,
-			(at * CFrame.new(math.cos(a) * 16, 0.3, math.sin(a) * 16)).Position,
-			0.35,
-			Color3.fromRGB(30, 30, 36)
-		)
+	local hatch = strut(m, p(0, 8.6, -5.4), p(0, 6.3, -10.2), 0.2, PROBE_HULL, Enum.Material.DiamondPlate)
+	hatch.Shape = Enum.PartType.Block
+	hatch.Size = Vector3.new(hatch.Size.X, 0.4, 7)
+	-- The side bays, opened into racks of swing refill cells.
+	for _, s in { -1, 1 } do
+		local x = s * 8.2
+		solid(part(m, cf(x, 3.6, 0), Vector3.new(3.2, 0.4, 6), HULL_DARK, Enum.Material.Metal))
+		part(m, cf(x + s * 1.5, 5.4, 0), Vector3.new(0.3, 4, 6), PROBE_HULL, Enum.Material.DiamondPlate)
+		part(m, cf(x, 7.5, 0), Vector3.new(3.4, 0.3, 6.4), PROBE_GOLD, Enum.Material.Metal)
+		for k = -1, 1 do
+			part(
+				m,
+				cf(x - s * 0.2, 4.7, k * 1.9) * CFrame.Angles(0, 0, math.rad(90)),
+				Vector3.new(1.8, 1.1, 1.1),
+				if k == 0 then SAGA else GLOW,
+				Enum.Material.Neon,
+				"Cylinder"
+			)
+		end
 	end
+	-- The solar wings, swung out level on their booms.
+	for _, s in { -1, 1 } do
+		strut(m, p(s * 5.8, 13.5, -1), p(s * 9, 13.5, -1), 0.35, STEEL)
+		local wing = cf(s * 13.5, 13.7, -1) * CFrame.Angles(math.rad(8), 0, 0)
+		part(m, wing, Vector3.new(9, 0.35, 7), Color3.fromRGB(40, 60, 110), Enum.Material.Glass)
+		for k = -1, 1 do
+			part(m, wing * CFrame.new(k * 3, 0.22, 0), Vector3.new(0.15, 0.1, 7), STEEL, Enum.Material.Metal)
+		end
+		part(m, wing * CFrame.new(0, 0, -3.55), Vector3.new(9, 0.12, 0.12), GLOW, Enum.Material.Neon)
+	end
+	-- The mast, telescoped up, the dish on top and a beacon.
+	strut(m, p(2.2, 16.2, 2.4), p(2.2, 21, 2.4), 0.45, STEEL)
+	strut(m, p(2.2, 21, 2.4), p(2.2, 25, 2.4), 0.33, HULL)
+	strut(m, p(2.2, 25, 2.4), p(2.2, 28.4, 2.4), 0.22, STEEL)
+	part(
+		m,
+		cf(2.2, 28.9, 2.4) * CFrame.Angles(math.rad(-35), 0, math.rad(90)),
+		Vector3.new(0.4, 5.2, 5.2),
+		HULL,
+		Enum.Material.Metal,
+		"Cylinder"
+	)
+	part(
+		m,
+		cf(2.2, 29.5, 2.0) * CFrame.Angles(math.rad(-35), 0, math.rad(90)),
+		Vector3.new(1.4, 0.4, 0.4),
+		HULL_DARK,
+		Enum.Material.Metal,
+		"Cylinder"
+	)
+	part(m, cf(2.2, 30.3, 2.4), Vector3.one * 0.6, Color3.fromRGB(255, 70, 70), Enum.Material.Neon, "Ball")
+	-- Its name in light over the core, turning (the client spins it; see
+	-- OutpostScene).
+	local holo = part(
+		m,
+		cf(0, 22.5, 0),
+		Vector3.new(12, 3.6, 0.1),
+		GLOW,
+		Enum.Material.SmoothPlastic,
+		nil,
+		{ Transparency = 1, CastShadow = false }
+	)
+	holo.Name = "ProbeSign"
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.CanvasSize = Vector2.new(480, 144)
+		gui.LightInfluence = 0
+		gui.Brightness = 2
+		gui.Parent = holo
+		local text = Instance.new("TextLabel")
+		text.BackgroundTransparency = 1
+		text.Size = UDim2.fromScale(1, 1)
+		text.Text = "PROBE-7"
+		text.TextScaled = true
+		text.Font = Enum.Font.GothamBlack
+		text.TextColor3 = GLOW
+		text.TextStrokeTransparency = 0.6
+		text.Parent = gui
+	end
+	-- Power cables from its belly into sockets in the floor.
+	for _, spot in { Vector3.new(-4, 0, 9.5), Vector3.new(4, 0, 9.5), Vector3.new(0, 0, 10.5) } do
+		strut(m, p(spot.X * 0.3, 5.4, 2), p(spot.X, 0.6, spot.Z), 0.3, Color3.fromRGB(30, 30, 36))
+		part(m, cf(spot.X, 0.3, spot.Z), Vector3.new(1.4, 0.6, 1.4), HAZARD, Enum.Material.Metal)
+	end
+	-- Its name, on the heat shield over the hatch.
+	local name = (at * CFrame.new(0, F + 13.6, -5.7)).Position
+	signPanel(
+		m,
+		facingPoint(name, name + at:VectorToWorldSpace(Vector3.new(0, 0, -1))),
+		Vector3.new(7, 1.5, 0.3),
+		"PROBE-7 STATION",
+		"SWING REFILLS",
+		GLOW
+	)
 	return screen
 end
 
@@ -1204,44 +1353,6 @@ local function jumpRamp(parent, at: CFrame)
 	end
 end
 
--- A sign: a dark panel with a title and a line under it, read from its
--- front (build it with CFrame.lookAt(where, toward the reader)). Returns
--- the panel, its SurfaceGui and the title.
-local function signPanel(parent, cframe: CFrame, size: Vector3, title: string, sub: string?, color: Color3)
-	local board = part(parent, cframe, size, HULL_DARK, Enum.Material.Metal)
-	board.Name = "Sign"
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.CanvasSize = Vector2.new(size.X * 20, size.Y * 20)
-	gui.LightInfluence = 0
-	gui.Parent = board
-	local head = Instance.new("TextLabel")
-	head.BackgroundTransparency = 1
-	head.Size = UDim2.fromScale(1, if sub then 0.62 else 1)
-	head.Text = title
-	head.TextScaled = true
-	head.Font = Enum.Font.GothamBlack
-	head.TextColor3 = color
-	head.Parent = gui
-	if sub then
-		local line = Instance.new("TextLabel")
-		line.BackgroundTransparency = 1
-		line.Position = UDim2.fromScale(0.03, 0.6)
-		line.Size = UDim2.fromScale(0.94, 0.34)
-		line.Text = sub
-		line.TextScaled = true
-		line.Font = Enum.Font.GothamMedium
-		line.TextColor3 = Color3.fromRGB(220, 235, 255)
-		line.Parent = gui
-	end
-	return board, gui, head
-end
-
--- Standing at `from`, turned to face `toward` (level).
-local function facingPoint(from: Vector3, toward: Vector3): CFrame
-	return CFrame.new(from) * CFrame.Angles(0, math.atan2(-(toward.X - from.X), -(toward.Z - from.Z)), 0)
-end
-
 -- The Moon Garden, a lounge in the hall round `at` (its middle, on the
 -- floor): a planter ringed in light under a lunar tree hung with glowing
 -- fruit, crystal flowers, and four benches (seats) facing the tree.
@@ -1351,7 +1462,8 @@ end
 --   works on the wall beside the door. One wide door south, to the quarry.
 -- Dressed for Halloween. Returns its places, in `at`'s frame:
 -- { Parking, Spawn, Probe, Board, Gate (CFrames for those builders), Store,
---   Market (the counters, for their prompts), Box (half sizes, x and z) }
+--   Market (the counters, for their prompts), Crew ({ Id, CFrame }: where
+--   its crew stand), Box (half sizes, x and z) }
 local SHELTER = {
 	HalfWidth = 84, -- x, inside
 	HalfDepth = 60, -- z, inside
@@ -1602,12 +1714,9 @@ local function shelter(parent, at: CFrame)
 		light(sign, color, 22, 0.8)
 		return counter
 	end
-	local store = booth(6, "STORE", "SKINS  ·  BUNDLES  ·  REFILLS", Color3.fromRGB(196, 120, 255))
-	for k, tint in { Color3.fromRGB(196, 120, 255), SAGA, GLOW } do
-		local z = 6 + (k - 2) * 5.5
-		part(m, at3(-W + 8, 2.3, z) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(3, 2.4, 2.4), STEEL, Enum.Material.Metal, "Cylinder")
-		part(m, at3(-W + 8, 4.8, z), Vector3.one * 1.8, tint, Enum.Material.Neon, "Ball")
-	end
+	-- (Its stands of suits, helmets, picks and skins are the client's:
+	-- Client.StoreDisplays.)
+	local store = booth(6, "STORE", "SKINS  ·  HELMETS  ·  PICKS  ·  SUITS", Color3.fromRGB(196, 120, 255))
 	local market = booth(40, "MARKET", "BUY  ·  SELL  ·  OFFER", Color3.fromRGB(90, 220, 170))
 	signPanel(m, facing(-W + 0.4, 9.5, 40, 1, 0), Vector3.new(18, 7, 0.4), "PLAYER MARKET", "GEMS AND GEAR FROM EVERY MINER", SAGA)
 	pumpkin(m, at3(-W + 12, 0.8, 22) * CFrame.Angles(0, 1.2, 0), 1.6)
@@ -1668,6 +1777,48 @@ local function shelter(parent, at: CFrame)
 	moonGarden(m, at3(-42, 0.86, 14))
 	gemGallery(m, at3(30, 0.86, 4))
 
+	-- The crew: the old town's shopkeepers, each by the station they run
+	-- now (OutpostServer builds them, Shared.Vendors has their lines).
+	-- They stand beside their counters, not at them, so their Talk prompt
+	-- and the counter's don't sit on top of each other. Ilsa buys gems at a
+	-- desk in the Gem Gallery, the cases behind: a pale-topped counter lit
+	-- gold along its front edge, its name on the front, a balance on top.
+	local gold = GALLERY_COLORS[5]
+	local desk = at3(31, 0.86, 4)
+	solid(part(m, desk * CFrame.new(0, 1.7, 0), Vector3.new(2.4, 3.4, 8), HULL_DARK, Enum.Material.Metal))
+	part(
+		m,
+		desk * CFrame.new(0.1, 3.5, 0),
+		Vector3.new(2.8, 0.2, 8.4),
+		Color3.fromRGB(206, 212, 224),
+		Enum.Material.SmoothPlastic
+	)
+	part(m, desk * CFrame.new(-1.3, 3.5, 0), Vector3.new(0.14, 0.24, 8.4), gold, Enum.Material.Neon)
+	local front = desk.Position + at:VectorToWorldSpace(Vector3.new(-1.25, 1.9, 0))
+	signPanel(
+		m,
+		facingPoint(front, front - at:VectorToWorldSpace(Vector3.new(1, 0, 0))),
+		Vector3.new(7, 1.9, 0.12),
+		"GEM BUYER",
+		"COINS FOR YOUR SPARE GEMS",
+		gold
+	)
+	part(m, desk * CFrame.new(0, 4.6, 2), Vector3.new(0.24, 2, 0.24), gold, Enum.Material.Metal)
+	part(m, desk * CFrame.new(0, 5.55, 2), Vector3.new(0.16, 0.16, 2.8), gold, Enum.Material.Metal)
+	for _, dz in { -1.3, 1.3 } do
+		disc(m, desk * CFrame.new(0, 4.75, 2 + dz), 0.6, 0.1, gold, Enum.Material.Metal)
+	end
+	local function stand(x, z, tx, tz)
+		return facingPoint(at3(x, 0.86, z).Position, at3(tx, 0.86, tz).Position)
+	end
+	local crew = {
+		{ Id = "GemBuyer", CFrame = stand(34.5, 4, 0, 4) }, -- Ilsa, behind her desk
+		{ Id = "ArenaMaster", CFrame = stand(47.5, 50, 0, 50) }, -- Brutus, by the Uplink
+		{ Id = "Broker", CFrame = stand(-61, 52, 0, 52) }, -- Tamsin, by the Market
+		{ Id = "Outfitter", CFrame = stand(-58, 25.5, 0, 25.5) }, -- Borin, by the Store's suits
+		{ Id = "Foreman", CFrame = stand(-24.5, 49, 0, 50) }, -- Garrick, by the door
+	}
+
 	local spawnAt = at3(0, 3.5, D - 10).Position
 	return {
 		Parking = parking,
@@ -1677,6 +1828,7 @@ local function shelter(parent, at: CFrame)
 		Gate = at3(36, 0.8, 46),
 		Store = store,
 		Market = market,
+		Crew = crew,
 		Box = Vector2.new(W + 4, D + 4),
 	}
 end
@@ -2271,6 +2423,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Model = root,
 		Spawn = home.Spawn,
 		Stations = { Store = home.Store, Market = home.Market },
+		Crew = home.Crew,
 		Shelter = { Box = home.Box },
 		Probe = probeScreen,
 		Board = face,

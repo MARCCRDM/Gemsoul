@@ -3,7 +3,8 @@
 --
 -- Each option either has a Reply (text shown back) or an Action the client
 -- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
--- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "RigManeuvers".
+-- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "RigManeuvers";
+-- and for the Saga Shelter's crew, "Appraise", "Store", "Market" or "Duels".
 
 export type Option = { Text: string, Reply: string?, Action: string? }
 export type Vendor = {
@@ -139,5 +140,99 @@ local Vendors: { [string]: Vendor } = {
 		},
 	},
 }
+
+-- The Saga Shelter's crew, in the Outpost's lobby: the old town's
+-- shopkeepers, moved up to the moon (the same names, faces and colours),
+-- each by the station they run now. OutpostServer builds them where
+-- OutpostWorld puts them (site.Crew).
+local function crew(from: string, role: string, greeting: string, options: { Option }): Vendor
+	local old = Vendors[from]
+	return {
+		Name = old.Name,
+		Role = role,
+		Color = old.Color,
+		Tunic = old.Tunic,
+		Face = old.Face,
+		Greeting = greeting,
+		Options = options,
+	}
+end
+
+Vendors.GemBuyer = crew(
+	"Cutting",
+	"Gem Buyer",
+	"Ilsa, gem buyer. Bring me the stones you don't need: I pay coins on the spot, and coins buy anything on the player Market.",
+	{
+		{ Text = "What will you give me for my gems?", Action = "Appraise" },
+		{ Text = "Pick a gem to sell", Action = "SellGems" },
+		{
+			Text = "What makes a gem valuable?",
+			Reply = "Rarity first: one Legendary is worth more than a pouch of Commons. Then its Size, Clarity and Cut, each graded out of ten. The higher, the more I pay.",
+		},
+		{
+			Text = "Which gems do you buy?",
+			Reply = "Any gem in your pouch. When I make an offer for your spares, I leave out the gems your loadouts use.",
+		},
+	}
+)
+Vendors.ArenaMaster = crew(
+	"Arena",
+	"Arena Master",
+	"Brutus, arena master. Step through the Uplink for a 1v1. Win in a row and your swings come back.",
+	{
+		{ Text = "Find me a duel", Action = "Duels" },
+		{
+			Text = "What do win streaks give?",
+			Reply = "Queue a 1v1 and win in a row. Your first win brings back a tenth of your swings, the fifth a quarter, the tenth half, and ten in a row wins the tournament. A loss ends the run.",
+		},
+		{
+			Text = "Any advice?",
+			Reply = "Guard when they wind up, then punish. And bring your best gems: they power your Q, E and R.",
+		},
+	}
+)
+Vendors.Broker =
+	crew("Market", "Trade Broker", "Tamsin, trade broker. Every miner's gems and gear go up on my board.", {
+		{ Text = "Open the Market", Action = "Market" },
+		{
+			Text = "How does the Market work?",
+			Reply = "List a gem or a piece of gear at your price, or make an offer on someone else's. Coins change hands when a sale goes through.",
+		},
+		{
+			Text = "Where do I get coins?",
+			Reply = "Sell your spare gems to Ilsa, by the Gem Gallery.",
+		},
+	})
+Vendors.Outfitter = crew(
+	"Forge",
+	"Outfitter",
+	"Borin, outfitter. Suits, helmets, picks and weapon skins: everything on these stands is in the Store.",
+	{
+		{ Text = "Open the Store", Action = "Store" },
+		{
+			Text = "Do skins change my stats?",
+			Reply = "No: a skin is looks only. Your gear's rolls and gems stay as they are.",
+		},
+	}
+)
+Vendors.Foreman = crew(
+	"Mining",
+	"Mining Foreman",
+	"Garrick, foreman. Out that door is the quarry: every rock you break pays a gem.",
+	{
+		{
+			Text = "Where are the best rocks?",
+			Reply = "The further out, the richer. The Fringe starts 150 studs out, the Edge at 300, and three Rift Veins glow by the crater walls. One of them is guarded.",
+		},
+		{
+			Text = "What are those critters?",
+			Reply = "Rift critters. The longer you mine out there, the more come through. Keep your kaiju close: they fight for you.",
+		},
+		{
+			Text = "My swings ran out",
+			Reply = "PROBE-7 sells refills, and win streaks at Brutus's Uplink bring swings back.",
+		},
+	}
+)
 
 return Vendors

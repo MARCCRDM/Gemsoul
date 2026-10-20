@@ -17,6 +17,8 @@ local Progress = require(script.Parent.Progress)
 local Shop = require(script.Parent.Shop)
 
 local RANGE = 40 -- studs from Hilde or Borin
+-- Who buys gems: Tamsin at the town's Market, Ilsa in the Saga Shelter.
+local BUYERS = { "Market", "GemBuyer" }
 local reply = Shop.reply
 
 local Forge = {}
@@ -51,8 +53,8 @@ end
 
 -- Tamsin at the Market buys stones for coins (less than Hilde's Marks).
 local function marketSell(player: Player, ids: any)
-	if not Nearby.vendor(player, { "Market" }, RANGE) then
-		return reply(false, "Tamsin trades at the Market in the town square.")
+	if not Nearby.vendor(player, BUYERS, RANGE) then
+		return reply(false, "Ilsa buys gems at the GEM BUYER desk in the Gem Gallery.")
 	end
 	local gems = pickGems(player, ids)
 	if not gems then
@@ -74,8 +76,8 @@ end
 -- Commons; this turns a session's into coins for the player market.
 local SPARE = { Common = true, Uncommon = true }
 local function sellSpare(player: Player, tier: any)
-	if not Nearby.vendor(player, { "Market" }, RANGE) then
-		return reply(false, "Tamsin trades at the Market in the town square.")
+	if not Nearby.vendor(player, BUYERS, RANGE) then
+		return reply(false, "Ilsa buys gems at the GEM BUYER desk in the Gem Gallery.")
 	end
 	local profile = PlayerData.get(player)
 	if typeof(tier) ~= "string" or not SPARE[tier] or not profile then

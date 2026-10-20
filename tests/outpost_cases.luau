@@ -342,12 +342,24 @@ local World = load("src/server/World/OutpostWorld.luau", "OutpostWorld", {})
 -- (Its trails come from Shared.Frontier, handed in as the server would find it.)
 local Frontier = load("src/shared/Frontier.luau", "Frontier", {})
 World.Frontier = Frontier
+-- The Shelter's crew: Builder.vendor's robots, recorded where they're built.
+local Vendors = load("src/shared/Vendors.luau", "Vendors", {})
+local crewBuilt = {}
+local Builder = {
+	vendor = function(parent, frame, id, info)
+		local model = R.Instance.new("Model")
+		model.Name = info.Name
+		model.Parent = parent
+		table.insert(crewBuilt, { Parent = parent, Frame = frame, Id = id, Info = info })
+		return model
+	end,
+}
 -- OutpostServer's requires resolve by name to the stand-ins above.
 local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
 	for _, name in
-		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "MechPilot", "Frontier", "SwingRestore" }
+		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "MechPilot", "Frontier", "SwingRestore", "Vendors" }
 	do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
@@ -367,6 +379,8 @@ local Server = (function()
 				Tutorial = { beat = function() return nil end }, -- (no mining tutorial running)
 				MechPilot = load("src/shared/MechPilot.luau", "MechPilot", {}),
 				SwingRestore = load("src/shared/SwingRestore.luau", "SwingRestore", {}),
+				Vendors = Vendors,
+				Builder = Builder,
 				Intro = { tutorialMined = function() return nil end },
 				OutpostWorld = World,
 				Gems = Gems,
@@ -527,6 +541,52 @@ check(site.Probe:FindFirstChildOfClass("ProximityPrompt") ~= nil, "The Probe has
 for kind, counter in { Store = site.Stations.Store, Market = site.Stations.Market } do
 	local prompt = counter:FindFirstChildOfClass("ProximityPrompt")
 	check(prompt and prompt:GetAttribute("PromptKind") == kind, "The Shelter's " .. kind .. " has no prompt")
+end
+-- The Shelter's crew: the old town's shopkeepers, each built where the
+-- Shelter puts them, in its hall (south of the garage's barrier), clear of
+-- each other, the counters, the Uplink's pad and where players arrive.
+-- Every line they offer is a reply or an action the dialogue knows.
+do
+	local OG = { GemBuyer = "Ilsa", ArenaMaster = "Brutus", Broker = "Tamsin", Outfitter = "Borin", Foreman = "Garrick" }
+	check(#crewBuilt == 5 and #site.Crew == 5, "The Shelter's crew isn't all there: " .. #crewBuilt)
+	local dialogue = fs.readFile(ROOT .. "/src/client/Dialogue.client.luau")
+	local function flat(p)
+		local q = p - Rules.Location.Position
+		return R.Vector3.new(q.X, 0, q.Z)
+	end
+	local box = site.Shelter.Box
+	local keep = {
+		{ flat(site.Spawn.Position), 9, "where players arrive" },
+		{ flat(site.Gate.CFrame.Position), 10, "the Uplink's pad" },
+		{ flat(site.Stations.Store.CFrame.Position), 9, "the Store's counter" },
+		{ flat(site.Stations.Market.CFrame.Position), 9, "the Market's counter" },
+	}
+	for i, built in crewBuilt do
+		local info = Vendors[built.Id]
+		check(info and built.Info == info and info.Name == OG[built.Id], "A crew member who isn't the OG one: " .. built.Id)
+		check(built.Parent.Name == "Crew" and built.Parent.Parent == site.Model, built.Id .. " isn't in the Outpost's Crew")
+		local p = flat(built.Frame.Position)
+		check(math.abs(p.X) < box.X - 8 and p.Z > -14 and p.Z < box.Y - 8, built.Id .. " stands outside the Shelter's hall")
+		check(math.abs(built.Frame.Position.Y - (Rules.Location.Position.Y + 0.86)) < 0.01, built.Id .. " isn't on the floor")
+		for _, k in keep do
+			check((p - k[1]).Magnitude >= k[2], built.Id .. " stands on " .. k[3])
+		end
+		for j = i + 1, #crewBuilt do
+			check((p - flat(crewBuilt[j].Frame.Position)).Magnitude > 12, built.Id .. " stands on top of " .. crewBuilt[j].Id)
+		end
+		for _, option in info.Options do
+			check(
+				(option.Reply ~= nil) ~= (option.Action ~= nil),
+				built.Id .. "'s option needs a reply or an action: " .. option.Text
+			)
+			if option.Action then
+				check(
+					string.find(dialogue, "function actions." .. option.Action .. "()", 1, true) ~= nil,
+					"The dialogue can't do " .. built.Id .. "'s " .. option.Action
+				)
+			end
+		end
+	end
 end
 -- Players arrive inside the Shelter, its mechs parked in the garage.
 do
