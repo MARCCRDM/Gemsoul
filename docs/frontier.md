@@ -273,6 +273,8 @@ What one pays:
 
 ### Gem raids: when your kaiju are all down
 
+![Gem snatchers running off with stolen gems (top); a wild kaiju's health outline, healthy, worn down and nearly done (bottom). Offline three.js render, not Roblox](frontier/gem-raid.png)
+
 Out past the core with your whole team knocked out, the critters smell
 your gems (`Frontier.Raid`; `FrontierServer.raid`, from
 `KaijuServer.onTeamDown`). At most once every 75 seconds:
