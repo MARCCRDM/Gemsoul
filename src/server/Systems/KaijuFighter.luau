@@ -6,7 +6,10 @@
 	combos, telegraphed heavies, guard and parry, hops aside, pounces,
 	counters, and its Gemsoul's moves (KaijuAbilities) after a wind-up you
 	can see on its cast bar: its E, its Q in place of a blow once it's
-	level 5, its R when it's hard pressed once it's level 10.
+	level 5, its R when it's hard pressed once it's level 10. A Razorback
+	fights from range between its combos (KaijuFight's Ranged): it hops
+	back after a combo and looses volleys of spines (Shot "Spine"), then
+	closes in again.
 
 	  KaijuFighter.new(spec) -> Fighter
 	  KaijuFighter.step(fighter, foe, now)   one think (every 0.15s) against `foe`
@@ -44,7 +47,8 @@
 	ring is cast only on a foe inside the ring at its size.
 
 	Its model carries, for every client (CreatureAnimation, FoeCastBar):
-	ActionKind (Light, Heavy, Punish, Lunge, Bolt, Nova, Dodge, Stagger),
+	ActionKind (Light, Heavy, Punish, Lunge, Bolt, Nova, Dodge, Stagger; a
+	volley of spines winds up as a Bolt),
 	ActionStart and ActionAt (server time: its wind-up and the blow),
 	ActionSide, ActionName and ActionElement (the cast bar, for a heavy or
 	its E), GuardUntil (server time, 0 when down).
@@ -83,7 +87,6 @@ end
 
 local fighters: { [Instance]: any } = {} -- by model
 
-local HEAVY_COLOR = Color3.fromRGB(255, 120, 60)
 local HEAVY_CHARGE = 0.45 -- a player's charge this long is a heavy (CombatActions Heavy.Charge)
 local FIRST_Q = 6 -- its Q this long into a fight (after its E, so they don't land together)
 local R_WINDUP = 0.25 -- a shell goes up quickly: it's a reaction
@@ -237,8 +240,8 @@ end
 
 -- Blows -------------------------------------------------------------------------------------------------
 
--- Winds up a blow (a heavy rings its feet in warning and names itself on
--- the cast bar).
+-- Winds up a blow (a heavy marks the ground at its feet in warning, in its
+-- element's look, and names itself on the cast bar).
 local function windup(f, kind: string, now: number)
 	local seconds = KaijuFight.windup(f.Style, kind)
 	f.Action = { Kind = kind, At = now + seconds, Hits = 1 }
@@ -247,8 +250,47 @@ local function windup(f, kind: string, now: number)
 	animate(f, kind, seconds, nil, if heavy then f.Style.Names.Heavy else nil)
 	if heavy then
 		local feet = f.Root.Position - Vector3.new(0, f.Root.Size.Y / 2 + f.Humanoid.HipHeight, 0)
-		fx(f, "Nova", feet, f.Reach + 0.5, HEAVY_COLOR, seconds)
+		-- (Only the warning: the blow itself lands with its own stomp or cleave.)
+		fx(f, "Telegraph", feet, f.Reach + 0.5, GemConfig.ElementColors[f.Element] or Color3.new(1, 1, 1), seconds)
 	end
+end
+
+-- A ranged fighter's hop back from its foe (along -`dir`), untouchable
+-- for a moment.
+local function hopBack(f, now: number, dir: Vector3)
+	local ranged = f.Style.Ranged
+	local k = f.Reach / Brain.Reach
+	f.NextHop = now + ranged.HopEvery
+	f.Body.DodgeUntil = now + KaijuFight.DodgeFor
+	animate(f, "Dodge", 0, if KaijuFighter.random() < 0.5 then 1 else -1)
+	f.Root.AssemblyLinearVelocity = -dir * ranged.HopBack * 6 * k + Vector3.new(0, 8 * k, 0)
+	fx(f, "DodgeRoll", nil, f.Root.Position, -dir, ranged.HopBack * k, true)
+end
+
+-- Out to range: back it hops, and its volleys start.
+local function toRange(f, now: number, dir: Vector3)
+	local ranged = f.Style.Ranged
+	f.Phase, f.MeleeHits = "Range", 0
+	f.VolleysLeft, f.NextVolley = ranged.Volleys, now + 0.45
+	hopBack(f, now, dir)
+end
+
+-- One spine of a volley, from its mouth at its foe: it lands at once if its
+-- foe's still within its reach (a hop aside dodges it).
+local function spine(f, foe, now: number, distance: number)
+	local ranged = f.Style.Ranged
+	local root = f.Root
+	local color = GemConfig.ElementColors[f.Element] or Color3.new(1, 1, 1)
+	local from = root.Position + root.CFrame.LookVector * root.Size.Z * 0.5 + Vector3.new(0, root.Size.Y * 0.2, 0)
+	fx(f, "Shot", nil, from, foe.Root.Position, color, "Spine")
+	if distance * Brain.Reach / f.Reach > ranged.Reach + KaijuFight.HitRange then
+		return
+	end
+	local body = f.Body
+	if now < (body.BlindUntil or 0) and KaijuFighter.random() < (body.Blind or 0.5) then
+		return
+	end
+	f.Strike(foe, f.Stats.Damage * ranged.Mult, nil :: any, ranged.Name)
 end
 
 local function reel(f, now: number, seconds: number)
@@ -271,7 +313,27 @@ end
 -- into the next of a combo.
 local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 	local body = f.Body
-	if action.Kind == "Surge" then
+	if action.Kind == "Volley" then
+		-- A volley of spines, Gap apart; then the next is a while off, and
+		-- after its last it closes in again.
+		local ranged = f.Style.Ranged
+		spine(f, foe, now, distance)
+		if (action.Shots or 1) > 1 then
+			f.Action = { Kind = "Volley", At = now + ranged.Gap, Shots = action.Shots - 1 }
+			return
+		end
+		f.VolleysLeft = (f.VolleysLeft or 1) - 1
+		f.NextVolley = now + ranged.Every * (0.85 + KaijuFighter.random() * 0.3)
+		if f.VolleysLeft <= 0 then
+			f.Phase, f.MeleeHits = "Melee", 0
+		end
+		table.insert(f.SwingTimes, now)
+		if #f.SwingTimes > 4 then
+			table.remove(f.SwingTimes, 1)
+		end
+		f.RecoverUntil = now + KaijuFight.Recover
+		return
+	elseif action.Kind == "Surge" then
 		KaijuAbilities.cast(f.Caster(), foe)
 		f.NextSurge = now + Kaiju.AbilityEvery
 		f.NextAttack = math.max(f.NextAttack, now + 0.4)
@@ -341,6 +403,46 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 	-- After a counter it presses straight on.
 	local pace = if action.Kind == "Punish" then 0.5 else 1
 	f.NextAttack = now + f.Rate * pace * (0.8 + KaijuFighter.random() * 0.4)
+	-- A ranged fighter's combo done up close: back it hops to shoot.
+	local ranged = f.Style.Ranged
+	if ranged and f.Phase ~= "Range" then
+		f.MeleeHits = (f.MeleeHits or 0) + (action.Hits or 1)
+		if f.MeleeHits >= ranged.Combo then
+			toRange(f, now, dir)
+		end
+	end
+end
+
+-- A ranged fighter out at range (KaijuFight.rangedMove): it keeps its
+-- distance, circling, and looses its volleys; pressed close it hops back,
+-- or bites.
+local function skirmish(f, foe, now: number, distance: number, dir: Vector3, side: Vector3)
+	local ranged = f.Style.Ranged
+	local root = f.Root
+	local k = f.Reach / Brain.Reach
+	local m = KaijuFight.rangedMove(f, distance * Brain.Reach / f.Reach, now)
+	f.Choice = m
+	if m == "Hop" then
+		lower(f, now)
+		hopBack(f, now, dir)
+	elseif m == "Bite" then
+		lower(f, now)
+		windup(f, "Light", now)
+		f.Humanoid:MoveTo(root.Position)
+	elseif m == "Volley" then
+		lower(f, now)
+		f.LastOffense = now
+		f.Action = { Kind = "Volley", At = now + ranged.Windup, Shots = ranged.Shots }
+		animate(f, "Bolt", ranged.Windup, nil, ranged.Name)
+		f.Humanoid:MoveTo(root.Position)
+	else
+		if now >= f.NextWeave then
+			f.Weave, f.NextWeave = -f.Weave, now + 1 + KaijuFighter.random() * 1.2
+		end
+		local band = if m == "Close" then ranged.Keep[2] * 0.85 else (ranged.Keep[1] + ranged.Keep[2]) / 2
+		walk(f, foe.Root.Position - dir * band * k + side * f.Weave * 3 * k)
+	end
+	face(f, foe.Root.Position)
 end
 
 -- One think -----------------------------------------------------------------------------------------------
@@ -453,6 +555,20 @@ function KaijuFighter.step(f, foe, now: number)
 	end
 	local choice = KaijuFight.decide(f, view, KaijuFighter.random())
 	f.Choice = choice
+	-- Out at range: only a stagger, a hop aside, a guard against a blow
+	-- coming or its E break off its shooting.
+	if
+		f.Phase == "Range"
+		and not (
+			choice == "Stagger"
+			or choice == "Dodge"
+			or choice == "Surge"
+			or (choice == "Guard" and (view.FoeCharging or view.FoeCasting))
+		)
+	then
+		skirmish(f, foe, now, distance, dir, side)
+		return
+	end
 	if choice == "Stagger" then
 		humanoid:MoveTo(root.Position)
 		if f.StaggeredFor ~= body.StunUntil then
@@ -575,6 +691,7 @@ function KaijuFighter.calm(f)
 	f.Action = nil
 	f.Body.GuardUntil = 0
 	f.FoeIdleSince, f.FarSince, f.RetreatUntil = nil, nil, nil
+	f.Phase, f.MeleeHits = nil, 0 -- (its next fight opens up close)
 	f.FoeSwings, f.LastFoeNext = nil, nil
 	f.Humanoid.AutoRotate = true
 	local align = f.Root:FindFirstChild("FaceAlign")

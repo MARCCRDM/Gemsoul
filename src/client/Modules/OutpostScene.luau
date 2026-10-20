@@ -1514,7 +1514,7 @@ end
 
 -- Prompts: rocks, the Probe, the gate, other miners -----------------------------------------------------
 
-local SOCIAL_KINDS = { Spar = true, Duel = true, Party = true }
+local SOCIAL_KINDS = { Spar = true, Duel = true, Party = true, Kaiju = true }
 
 -- Another miner's Duel, Spar and Party: one card beside them (PlayerCard).
 ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
@@ -1560,8 +1560,8 @@ ProximityPromptService.PromptHidden:Connect(function(prompt)
 	PlayerCard.hidden(prompt)
 end)
 
--- Duel, Spar or Party on another miner: from their prompt's key, or a
--- click or tap on their card.
+-- Duel, Spar, Party or a kaiju battle with another miner: from their
+-- prompt's key, or a click or tap on their card.
 local function socialAction(kind: string, target: number)
 	if not active or target == player.UserId then
 		return
@@ -1577,6 +1577,14 @@ local function socialAction(kind: string, target: number)
 	elseif kind == "Duel" then
 		local other = Players:GetPlayerByUserId(target)
 		ChallengeChooser.open(target, other and other.DisplayName)
+	elseif kind == "Kaiju" then
+		-- A kaiju battle: they get a card to accept (Shared.KaijuBattle).
+		task.spawn(function()
+			local result = GemClient.request("KaijuBattleAsk", target)
+			if result.Message and result.Message ~= "" then
+				UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
+			end
+		end)
 	elseif kind == "Party" then
 		task.spawn(function()
 			local result = GemClient.request("PartyInvite", target)

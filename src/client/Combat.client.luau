@@ -2138,102 +2138,71 @@ function handlers.Swing(
 	CombatVfx.slash(origin, direction, range, arc, color, big, if side == -1 then -1 else 1)
 end
 
-function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, look: string?)
+function handlers.Shot(_who: Player, from: Vector3, to: Vector3, color: Color3, look: string?, flight: number?)
 	local distance = (to - from).Magnitude
 	if distance < 0.5 then
 		return
 	end
 	local fireball = look == "Fireball"
+	-- (ElementFx is required where it's used: this script is at its limit
+	-- of locals.)
+	local ElementFx = require(script.Parent.Modules.ElementFx)
 	CombatSound.play(if fireball then "Bolt" else "Shot", from)
 	if fireball then
 		CombatSound.element("Cast", "Fire", from, { Volume = 0.5 })
 	end
-	-- A glowing round (or fireball) with a trail, and an impact where it lands.
-	CombatVfx.projectile(from, to, color, fireball)
+	if look == "Bomb" then
+		-- A bomb lobbed over (its blast is the Nova sent with it).
+		ElementFx.lob(from, to, color, flight or math.clamp(distance / 30, 0.4, 1.2))
+	elseif look == "Spine" then
+		-- A Razorback's spine.
+		ElementFx.spine(from, to, color)
+	elseif ElementFx.elementOf(color) and FxSize.get() ~= 1 then
+		-- A creature's shot, in its element: a fireball, an ice lance, a
+		-- lightning bolt, a glob of acid.
+		ElementFx.bolt(from, to, color)
+	else
+		-- A glowing round (or fireball) with a trail, and an impact where it lands.
+		CombatVfx.projectile(from, to, color, fireball)
+	end
 end
 
--- A ground blast. With a delay: a warning ring with its zones marked (the
--- core that stuns, the middle that staggers, the edge that only grazes),
--- pulsing faster as it comes, then the burst: a flash dome, two shockwaves
--- racing out along the ground, a pillar of light, embers, smoke and debris,
--- and a shake that's harder the closer to the centre you are.
+-- A ground blast, in its element's look (ElementFx). With a delay: the
+-- ground marked in warning (a bright edge, a fill sweeping out to it as the
+-- moment comes, the element stirring inside; a player's marks the core that
+-- stuns and the middle that staggers), then the blast out of the ground: a
+-- geyser of flame, a spire of ice, lightning out of the sky, a geyser of
+-- acid, with a shockwave, a scorch and a shake that's harder the closer you
+-- are. Without one: a quick burst at its feet.
 function handlers.Nova(center: Vector3, radius: number, color: Color3, delay: number)
+	local ElementFx = require(script.Parent.Modules.ElementFx)
 	local floor = floorUnder(center)
-	local k = FxSize.get() -- (a creature's: its pillar, and how far its shake reaches)
 	if delay and delay > 0 then
-		local red = Color3.fromRGB(255, 60, 40)
-		local warn = ring(floor, radius, red, 0.7)
-		local middle = ring(
-			floor + Vector3.new(0, 0.04, 0),
-			radius * Actions.Blast.StaggerZone,
-			Color3.fromRGB(255, 130, 40),
-			0.75
-		)
-		local core =
-			ring(floor + Vector3.new(0, 0.08, 0), radius * Actions.Blast.StunZone, Color3.fromRGB(255, 220, 90), 0.55)
+		-- (A creature's blasts have no stun or stagger zones: only a player's.)
+		local zones = if FxSize.get() == 1 then { Actions.Blast.StaggerZone, Actions.Blast.StunZone } else nil
 		CombatSound.play("NovaWarn", floor)
-		-- The rings pulse faster as the blast comes; the core flickers hardest.
-		task.spawn(FxSize.keep(function()
-			local stop = os.clock() + delay
-			while warn.Parent and os.clock() < stop do
-				local left = stop - os.clock()
-				local wave = 0.5 + 0.5 * math.sin(os.clock() * (8 + 30 * (1 - left / delay)))
-				warn.Transparency = 0.45 + 0.35 * wave
-				middle.Transparency = 0.55 + 0.3 * wave
-				core.Transparency = 0.25 + 0.45 * wave
-				task.wait()
-			end
-		end))
+		ElementFx.telegraph(floor, radius, color, delay, zones)
 		task.delay(
 			delay,
 			FxSize.keep(function()
-				warn:Destroy()
-				middle:Destroy()
-				core:Destroy()
-				-- A flash dome bursting out of the centre.
-				local dome = effectPart(Vector3.one * radius * 0.4, CFrame.new(floor), color, Enum.PartType.Ball)
-				dome.Transparency = 0.15
-				fade(dome, 0.35, Vector3.one * radius * 2)
-				-- Two shockwaves racing out along the ground.
-				local wave = ring(floor + Vector3.new(0, 0.1, 0), 1, color:Lerp(Color3.new(1, 1, 1), 0.35), 0.05)
-				fade(wave, 0.3, Vector3.new(0.3, radius * 2.1, radius * 2.1))
-				local after = ring(floor + Vector3.new(0, 0.12, 0), 1, color, 0.35)
-				fade(after, 0.65, Vector3.new(0.2, radius * 2.5, radius * 2.5))
-				-- A scorch mark with a glowing rim that cools, then fades.
-				CombatVfx.scorch(floor, radius, color)
-				local pillar =
-					effectPart(Vector3.new(2, 40, 2) * k, CFrame.new(floor + Vector3.new(0, 20 * k, 0)), color)
-				fade(pillar, 0.45, Vector3.new(radius * 0.8, 46 * k, radius * 0.8))
-				CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Embers", 1.8 + radius / 6)
-				CombatFx.burst(floor + Vector3.new(0, 0.6, 0), color, "Sparks", 1.5 + radius / 8)
-				CombatFx.burst(
-					floor + Vector3.new(0, 0.5, 0),
-					Color3.fromRGB(120, 110, 100),
-					"Smoke",
-					1.8 + radius / 10
-				)
-				CombatFx.burst(floor + Vector3.new(0, 0.5, 0), Color3.fromRGB(110, 100, 92), "Shards", 1.4)
-				CombatFx.flash(floor + Vector3.new(0, 3, 0), color, 8, radius * 3, 0.45)
+				ElementFx.erupt(floor, radius, color)
 				CombatSound.play("Blast", floor, { Volume = 1.2 })
 				CombatSound.element("Impact", CombatSound.elementOf(color), floor, { Volume = 0.9 })
-				local character = player.Character
-				local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-				if root then
-					local offset = root.Position - floor
-					local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
-					if distance <= radius + 14 * k then
-						local closeness = 1 - math.clamp(distance / (radius + 14 * k), 0, 1)
-						CombatFx.shake(0.02 + 0.05 * closeness, 0.3 + 0.3 * closeness)
-					end
-				end
 			end)
 		)
 		return
 	end
-	local blast = ring(floor, 1, color, 0.2)
-	fade(blast, 0.4, Vector3.new(0.2, radius * 2, radius * 2))
-	CombatFx.burst(floor + Vector3.new(0, 1, 0), color, "Sparks", 1 + radius / 10)
+	ElementFx.stomp(floor, radius, color)
 	CombatSound.play("Blast", floor, { Volume = 0.6, Pitch = 1.3 })
+end
+
+-- Only the warning, for a blow that lands with its own effect (a kaiju's
+-- heavy: its stomp or cleave; a critter's burst: the ground it leaves).
+function handlers.Telegraph(center: Vector3, radius: number, color: Color3, seconds: number)
+	local ElementFx = require(script.Parent.Modules.ElementFx)
+	local floor = floorUnder(center)
+	CombatSound.play("NovaWarn", floor, { Volume = 0.7 })
+	ElementFx.telegraph(floor, radius, color, seconds)
 end
 
 -- A ground blast caught you: stunned (and thrown out of it) at its core,
@@ -2254,38 +2223,13 @@ function handlers.Blasted(kind: string, seconds: number, push: Vector3?)
 	end
 end
 
+-- Ground that stays dangerous a while, in its element's look: burning,
+-- iced over, crackling or a bubbling pool of acid (ElementFx.field).
 function handlers.Zone(center: Vector3, radius: number, duration: number, color: Color3)
+	local ElementFx = require(script.Parent.Modules.ElementFx)
 	local floor = floorUnder(center)
 	CombatSound.play("Corrode", floor)
-	CombatFx.burst(floor + Vector3.new(0, 0.5, 0), color, "Smoke", 1 + radius / 8)
-	local disc = ring(floor, radius, color, 0.75)
-	local edge = ring(floor + Vector3.new(0, 0.05, 0), radius, color, 0.4)
-	edge.Size = Vector3.new(0.1, radius * 2, radius * 2)
-	local k = FxSize.get()
-	task.spawn(FxSize.keep(function()
-		local stop = os.clock() + duration
-		while os.clock() < stop and disc.Parent do
-			-- A churning pool: gas puffing up and bubbles rising and popping,
-			-- its edge breathing.
-			edge.Transparency = 0.3 + 0.25 * (0.5 + 0.5 * math.sin(os.clock() * 5))
-			local offset = Vector3.new((math.random() - 0.5) * radius * 1.6, 0, (math.random() - 0.5) * radius * 1.6)
-			CombatFx.burst(floor + offset + Vector3.new(0, 0.4, 0), color, "Smoke", 0.6)
-			local bubble = effectPart(
-				Vector3.one * 0.5 * k,
-				CFrame.new(floor + offset),
-				color:Lerp(Color3.new(1, 1, 1), 0.3),
-				Enum.PartType.Ball
-			)
-			bubble.Transparency = 0.3
-			fade(bubble, 0.5, Vector3.one * 0.9 * k)
-			TweenService:Create(bubble, TweenInfo.new(0.5, Enum.EasingStyle.Sine), {
-				CFrame = CFrame.new(floor + offset + Vector3.new(0, 2.5 * k, 0)),
-			}):Play()
-			task.wait(0.12)
-		end
-		fade(disc, 0.3)
-		fade(edge, 0.3)
-	end))
+	ElementFx.field(floor, radius, duration, color)
 end
 
 function handlers.Buff(who: Player, color: Color3)

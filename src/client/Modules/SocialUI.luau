@@ -1517,6 +1517,7 @@ end
 -- Open spar requests, by who asked: their card's dismiss. Once you're
 -- sparring, the rest come down (the server has dropped them).
 local sparCards: { [number]: () -> () } = {}
+local kaijuCards: { [number]: () -> () } = {}
 Players.LocalPlayer:GetAttributeChangedSignal("Spar"):Connect(function()
 	if Spar.sparring(Players.LocalPlayer) then
 		for from, dismiss in sparCards do
@@ -2006,6 +2007,36 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 				end)
 			end
 		)
+	elseif kind == "KaijuBattleAsk" and type(a) == "number" then
+		-- Someone near you asks for a kaiju battle (Shared.KaijuBattle).
+		if kaijuCards[a] then
+			kaijuCards[a]()
+		end
+		local from = a
+		kaijuCards[from] = prompt(
+			"◆",
+			"Kaiju battle",
+			string.format(
+				"%s wants a kaiju battle: your team against theirs. What your kaiju lose stays lost.",
+				tostring(b)
+			),
+			if type(c) == "number" then c else 20,
+			Color3.fromRGB(255, 132, 64),
+			function(accept)
+				kaijuCards[from] = nil
+				task.spawn(function()
+					local result = GemClient.request("KaijuBattleRespond", from, accept)
+					if result.Message and result.Message ~= "" then
+						UiKit.toast(result.Message, if result.Ok then P.Gold else P.Bad)
+					end
+				end)
+			end
+		)
+	elseif kind == "KaijuBattleAskOver" and type(a) == "number" then
+		if kaijuCards[a] then
+			kaijuCards[a]()
+			kaijuCards[a] = nil
+		end
 	elseif kind == "SparAskOver" and type(a) == "number" then
 		-- They're sparring with someone else now, busy, or gone.
 		if sparCards[a] then

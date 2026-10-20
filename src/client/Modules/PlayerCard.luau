@@ -1,10 +1,11 @@
--- Another miner near you: one small card beside them with DUEL, SPAR and
--- PARTY, in place of Roblox's three prompt panels stacked up over their head
--- (hard to read, and on a phone they covered the middle of the screen).
+-- Another miner near you: one small card beside them with DUEL, SPAR,
+-- PARTY and KAIJU (a kaiju battle), in place of Roblox's prompt panels
+-- stacked up over their head (hard to read, and on a phone they covered the
+-- middle of the screen).
 --
 -- The server still puts a prompt for each on the miner (OutpostServer,
 -- socialPrompts), drawn by nothing (Custom style): they decide who's in
--- range and take the keys (G, Z, F). OutpostScene passes on when they show
+-- range and take the keys (G, Z, F, V). OutpostScene passes on when they show
 -- and hide; the card is what you see, click or tap.
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -24,6 +25,7 @@ PlayerCard.Actions = {
 	{ Kind = "Duel", Label = "DUEL", Icon = "⚔", Key = "G", Pad = "X", Color = P.Gold },
 	{ Kind = "Spar", Label = "SPAR", Icon = "✦", Key = "Z", Pad = "Y", Color = P.Teal },
 	{ Kind = "Party", Label = "PARTY", Icon = "+", Key = "F", Pad = "B", Color = P.Good },
+	{ Kind = "Kaiju", Label = "KAIJU", Icon = "◆", Key = "V", Pad = "LB", Color = Color3.fromRGB(255, 132, 64) },
 }
 
 type Card = {
@@ -52,9 +54,10 @@ local function build(root: BasePart, target: number, inputType: Enum.ProximityPr
 	local touch = inputType == Enum.ProximityPromptInputType.Touch
 		or (inputType == nil and UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
 	local pad = inputType == Enum.ProximityPromptInputType.Gamepad
-	local buttonW, buttonH = if touch then 104 else 112, if touch then 44 else 34
+	local buttonW, buttonH = if touch then 92 else 100, if touch then 44 else 34
 	local gap, edge, nameH = 6, 8, 16
-	local width = buttonW * 3 + gap * 2 + edge * 2
+	local count = #PlayerCard.Actions
+	local width = buttonW * count + gap * (count - 1) + edge * 2
 	local height = edge + nameH + 4 + buttonH + edge
 	local gui = new("BillboardGui", {
 		Name = "PlayerCard",

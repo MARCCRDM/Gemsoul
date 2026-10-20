@@ -979,7 +979,7 @@ local function lob(
 	local e = enemy :: any
 	local from = enemy.Root.Position + Vector3.new(0, 1.5, 0)
 	local color = GemConfig.ElementColors[wild.Element]
-	sizedFx(Kaiju.Bug.Size, "Shot", nil, from, to, color, "Bomb")
+	sizedFx(Kaiju.Bug.Size, "Shot", nil, from, to, color, "Bomb", flight)
 	sizedFx(Kaiju.Bug.Size, "Nova", to, radius, color, flight) -- (the ring, then the blast as it lands)
 	e.Bombs = e.Bombs or {}
 	table.insert(e.Bombs, {
@@ -1188,9 +1188,16 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		}
 		act(enemy, move.Pose, move.Windup, nil, move.Name)
 		if move.Radius and (move.Shape == "Slam" or move.Shape == "Burst") then
-			-- A ring at its feet in warning: get out of it.
+			-- The ground at its feet marked in warning: get out of it. A slam's
+			-- goes off as it lands; a burst's leaves its element lingering
+			-- there (release's Zone).
 			local feet = root.Position - Vector3.new(0, root.Size.Y / 2 + humanoid.HipHeight, 0)
-			sizedFx(Kaiju.Bug.Size, "Nova", feet, move.Radius, GemConfig.ElementColors[wild.Element], move.Windup)
+			local color = GemConfig.ElementColors[wild.Element]
+			if move.Shape == "Slam" then
+				sizedFx(Kaiju.Bug.Size, "Nova", feet, move.Radius, color, move.Windup)
+			else
+				sizedFx(Kaiju.Bug.Size, "Telegraph", feet, move.Radius, color, move.Windup)
+			end
 		end
 		humanoid:MoveTo(root.Position)
 		lookAt(root, victim.Root.Position)

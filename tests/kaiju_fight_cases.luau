@@ -236,4 +236,45 @@ do
 	check(Fight.Cleave.Share > 0 and Fight.Cleave.Share < 1, "A sweep's share")
 end
 
-print(string.format("PASS: %d kaiju fight checks (styles, wind-ups, guard, parry, reads, the brain)", checks))
+-- A Razorback fights from range: out there it hops back when pressed (or
+-- bites, its hop spent), looses a volley when one's due and its foe is in
+-- range, closes in when too far, and circles in its band otherwise. The
+-- other two never do.
+do
+	check(Fight.style("Bulwark").Ranged == nil and Fight.style("Carapace").Ranged == nil, "Only a Razorback shoots")
+	local r = fighter("Razorback")
+	local ranged = r.Style.Ranged
+	check(ranged and ranged.Combo >= 1 and ranged.Shots >= 1 and ranged.Volleys >= 1, "A Razorback has no ranged kit")
+	check(ranged.Keep[1] > Brain.Reach + Fight.HitRange, "Its band starts inside bite reach")
+	check(ranged.Keep[1] < ranged.Keep[2] and ranged.Keep[2] <= ranged.Reach, "Its band and reach")
+	check(ranged.Mult * ranged.Shots < r.Style.Heavy * 1.2, "A volley outhits a tail lash")
+	r.NextHop, r.NextVolley, r.NextAttack = 0, 0, 0
+	check(Fight.rangedMove(r, ranged.Keep[1] - 1, 10) == "Hop", "Pressed close, it didn't hop back")
+	r.NextHop = 20
+	check(Fight.rangedMove(r, Brain.Reach, 10) == "Bite", "Pressed into reach, its hop spent, it didn't bite")
+	check(Fight.rangedMove(r, ranged.Keep[1] - 0.5, 10) == "Keep", "Pressed, out of bite reach, it stood")
+	check(Fight.rangedMove(r, (ranged.Keep[1] + ranged.Keep[2]) / 2, 10) == "Volley", "In its band, no volley")
+	check(Fight.rangedMove(r, ranged.Reach - 0.5, 10) == "Volley", "In reach past its band, no volley")
+	check(Fight.rangedMove(r, ranged.Reach + 3, 10) == "Close", "Out of reach, it didn't close in")
+	r.NextVolley = 12
+	check(Fight.rangedMove(r, (ranged.Keep[1] + ranged.Keep[2]) / 2, 10) == "Keep", "It shot before its next volley")
+	check(Fight.rangedMove(r, ranged.Keep[2] + 2, 10) == "Close", "Waiting, too far, it didn't close in")
+	-- Out at range it reads as a shooter (its foe closes in behind a guard);
+	-- a volley winding up reads as a cast.
+	r.Phase = "Range"
+	check(Fight.read(r, 10, 1).Ranged == true, "Shooting, it doesn't read as ranged")
+	r.Action = { Kind = "Volley", At = 10.5, Shots = 3 }
+	check(Fight.read(r, 10, 1).Casting == true, "A volley winding up doesn't read as a cast")
+	local other = fighter("Bulwark")
+	local seen = Fight.read(r, 10, 1)
+	check(Fight.view(other, seen, 10, 8, 1).FoeRanged == true, "Its foe doesn't see it shooting")
+	r.Phase, r.Action = nil, nil
+	check(not Fight.read(r, 10, 1).Ranged, "Up close, it reads as ranged")
+end
+
+print(
+	string.format(
+		"PASS: %d kaiju fight checks (styles, wind-ups, guard, parry, reads, the brain, the Razorback's range)",
+		checks
+	)
+)

@@ -13,6 +13,11 @@
 	Riposte), a pounce from mid range (Lunge), a hop aside (Dodge), circling
 	(Strafe), backing off hurt (Retreat), and its Gemsoul's E (Surge).
 
+	A Razorback, the lightest of the three, fights best from range (its
+	style's Ranged): a quick combo of bites up close, then it hops back and
+	looses volleys of spines from a distance, circling, hopping back again
+	when it's pressed, before it closes in for the next combo (rangedMove).
+
 	Distances: the brain thinks in a duellist's studs (Brain.Reach); a
 	kaiju's own are its reach at its size (KaijuFight.reach), so a distance
 	is scaled by Brain.Reach / its reach on the way in, and back on the way
@@ -31,6 +36,8 @@
 	  KaijuFight.view(fighter, foe, now, distance, ratio)   the brain's View
 	  KaijuFight.decide(fighter, view, roll) the brain's choice
 	  KaijuFight.inArc(dir, toward, arc)     is a foe inside a blow's arc?
+	  KaijuFight.rangedMove(fighter, distance, now)   a ranged fighter's
+	                                         move out at range
 
 	A body is where a kaiju's guard and stuns live (its Enemies record or
 	its pet record): GuardUntil, GuardMult, GuardRaisedAt, ParrySpent,
@@ -66,6 +73,26 @@ KaijuFight.Styles = {
 		ComboGap = 0.35,
 		GuardMult = 0.4,
 		Hop = 1.3,
+		-- Up close it lands Combo blows (a combo or two), then hops back
+		-- HopBack (a duellist's studs) and shoots: Volleys volleys, Every
+		-- seconds apart, each Shots spines Gap apart after a Windup, each
+		-- spine Mult of its Damage. It shoots from Keep[1] to Reach,
+		-- circling inside Keep; pressed closer than Keep[1] it hops back
+		-- again (at most every HopEvery seconds), or bites.
+		Ranged = {
+			Name = "Spine Volley",
+			Combo = 2,
+			HopBack = 12,
+			HopEvery = 2.5,
+			Keep = { 11, 17 },
+			Reach = 26,
+			Volleys = 3,
+			Every = 1.4,
+			Windup = 0.5,
+			Shots = 3,
+			Gap = 0.15,
+			Mult = 0.5,
+		},
 	},
 	Carapace = {
 		Names = { Light = "Shell Snap", Heavy = "Shell Slam", Punish = "Spike Jab", Lunge = "Rolling Charge" },
@@ -252,12 +279,13 @@ function KaijuFight.read(f, now: number, ratio: number)
 		Heavy = action ~= nil and action.Kind == "Heavy",
 		LastSwing = last,
 		Swings = swings,
-		Casting = action ~= nil and action.Kind == "Surge",
+		Casting = action ~= nil and (action.Kind == "Surge" or action.Kind == "Volley"),
 		Blocking = guard,
 		Recovering = action == nil and now < f.RecoverUntil,
 		Vulnerable = now < (body.StunUntil or 0) or now < (body.SlowUntil or 0),
 		Low = ratio < 0.3,
 		Busy = action ~= nil or guard or (last ~= nil and now - last < 1),
+		Ranged = f.Phase == "Range", -- (shooting from range: close in behind a guard)
 	}
 end
 
@@ -284,7 +312,7 @@ function KaijuFight.view(f, foe, now: number, distance: number, ratio: number)
 		FoeHeavy = foe.Heavy,
 		FoeAttacking = foe.LastSwing ~= nil and now - foe.LastSwing < 0.5,
 		FoeAggressive = foe.Swings >= 2,
-		FoeRanged = false,
+		FoeRanged = foe.Ranged == true,
 		GuardBroken = now < (body.GuardBrokenUntil or 0),
 		Guarding = guarding(body, now),
 		JustBlocked = body.BlockedAt ~= nil and now - body.BlockedAt < 0.5 and f.RiposteFor ~= body.BlockedAt,
@@ -312,6 +340,27 @@ function KaijuFight.inArc(dir: Vector3, toward: Vector3, arc: number): boolean
 		return true
 	end
 	return dir:Dot(flatTo.Unit) >= math.cos(math.rad(math.min(arc, 360) / 2)) - 1e-6
+end
+
+-- A ranged fighter (its style's Ranged) out at range, its foe `distance`
+-- off (the brain's studs): "Hop" back (pressed closer than Keep[1], its hop
+-- ready), "Bite" (pressed into reach, its hop not ready), "Volley" (its
+-- next one due, its foe within Keep[1] to Reach), "Close" (too far to
+-- shoot), or "Keep" (circling in its band till the next volley).
+function KaijuFight.rangedMove(f, distance: number, now: number): string
+	local ranged = f.Style.Ranged
+	if distance < ranged.Keep[1] then
+		if now >= (f.NextHop or 0) then
+			return "Hop"
+		elseif distance <= Brain.Reach + KaijuFight.HitRange and now >= f.NextAttack then
+			return "Bite"
+		end
+		return "Keep"
+	end
+	if distance <= ranged.Reach and now >= (f.NextVolley or 0) then
+		return "Volley"
+	end
+	return if distance > ranged.Keep[2] then "Close" else "Keep"
 end
 
 -- The brain's choice (`roll` in [0, 1)). It reads a threat, then waits a

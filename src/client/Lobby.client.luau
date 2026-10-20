@@ -43,6 +43,8 @@ SparKit.start()
 -- Your mini kaiju: its card, RECALL, HUNT and TAME, and the kaiju panel.
 if Config.Features == nil or Config.Features.Kaiju ~= false then
 	require(script.Parent.Modules.KaijuHud).start()
+	-- Kaiju battles: the formation board, the battle bar and the result.
+	require(script.Parent.Modules.KaijuBattleUI).start()
 end
 
 -- The lobby HUD: in the Outpost, not fighting (or sparring), not inside a

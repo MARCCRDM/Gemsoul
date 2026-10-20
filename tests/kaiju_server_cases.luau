@@ -206,6 +206,14 @@ local Players = {
 	GetPlayers = function()
 		return playerList
 	end,
+	GetPlayerByUserId = function(_, id)
+		for _, player in playerList do
+			if player.UserId == id then
+				return player
+			end
+		end
+		return nil
+	end,
 }
 local function makePlayer(id: number, at: Vector3)
 	local player = make("Player", { UserId = id, Name = "P" .. id, DisplayName = "P" .. id, Parent = true })
@@ -222,7 +230,7 @@ end
 
 -- Services and stand-in server modules ---------------------------------------------------------------------
 
-local notes, fxs = {}, {}
+local notes, fxs, socials = {}, {}, {}
 local function noted(player, text)
 	for _, note in notes do
 		if note[1] == player and string.find(note[2], text, 1, true) then
@@ -240,6 +248,11 @@ local Remotes = {
 	CombatFx = {
 		FireAllClients = function(_, kind, ...)
 			table.insert(fxs, { kind, ... })
+		end,
+	},
+	Social = {
+		FireClient = function(_, player, kind, ...)
+			table.insert(socials, { player, kind, ... })
 		end,
 	},
 }
@@ -882,13 +895,19 @@ local function healthAndInfusing()
 	pet = KaijuServer.pets()[a]
 	local _, starterMost = Kaiju.health(record)
 	check(not record.Down and record.DownUntil == nil, "Not back once its revive time was up")
-	check(record.Health == math.floor(starterMost * Kaiju.Revive.Health + 0.5), "Not back at half health")
+	check(record.Health == math.floor(starterMost * Kaiju.Revive.Health + 0.5), "Not back weak, at Revive.Health")
+	check(Kaiju.Revive.Health <= 0.2, "Back by itself, it isn't weak enough to need healing")
 	check(pet and pet.Record == record and pet.Humanoid.Health == record.Health, "Back, it didn't come out as it was")
 	check(noted(a, "back on its feet") and record.Level == levelBefore and record.Exp == expBefore, "Not told it's back, or given EXP")
 	-- Robux or a Revive coupon (reviveAll): every one that's down, back now.
 	KaijuServer.hurt(pet, 1e6, nil, nil)
 	check(record.Down, "Not knocked out again")
 	check(KaijuServer.reviveAll(a) == 1 and not record.Down, "reviveAll didn't bring it back")
+	check(
+		record.Health == math.floor(starterMost * Kaiju.Revive.Bought + 0.5),
+		"Bought back, it isn't at Revive.Bought"
+	)
+	check(Kaiju.Revive.Bought > Kaiju.Revive.Health, "Buying it back isn't better than waiting")
 	pet = KaijuServer.pets()[a]
 	check(pet and pet.Record == record, "Revived, it didn't come out")
 	check(KaijuServer.reviveAll(a) == 0, "reviveAll counted one that wasn't down")
@@ -1028,6 +1047,14 @@ local function autoHealing()
 	KaijuServer._autoHeal(a, now + 5)
 	check(said("out of spare Commons") == 1, "Running out of Commons wasn't said once")
 	check(has("ah4") and has("rare"), "Out of Commons, it took another gem")
+	-- Out of Commons, a spare Uncommon heals (never the Rare).
+	gem("un1", "Uncommon")
+	now += Kaiju.AutoHeal.Every + 0.1
+	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
+	before = pet.Humanoid.Health
+	KaijuServer._autoHeal(a, now)
+	check(not has("un1") and has("ah4") and has("rare"), "Out of Commons, auto heal didn't take the Uncommon")
+	check(pet.Humanoid.Health > before, "The Uncommon didn't heal")
 	profiles[a].Presets = nil
 	for _, g in table.clone(profiles[a].Gems) do
 		PlayerData.removeGem(a, g.Id)
@@ -1299,7 +1326,21 @@ check(
 )
 check(pet.Model:GetAttribute("ActionName") == KaijuFight.style(pet.Record.Species).Names.Heavy, "A heavy isn't named")
 check(pet.Model:GetAttribute("ActionAt") - now == KaijuFight.windup(fighter.Style, "Heavy"), "A heavy's wind-up")
-check(drew("Nova"), "No warning ring for a heavy")
+do
+	local warned = drew("Telegraph")
+	check(warned ~= nil, "No warning on the ground for a heavy")
+	check(not drew("Nova"), "A heavy's warning went off as a blast too (it lands as a stomp)")
+	local warnColor = nil
+	for _, value in warned or {} do
+		if typeof(value) == "Color3" then
+			warnColor = value
+		end
+	end
+	check(
+		warnColor == shared("GemConfig").ElementColors[pet.Record.Element],
+		"A heavy's warning isn't in its element's colour"
+	)
+end
 before = enemy.Humanoid.Health
 now += KaijuFight.windup(fighter.Style, "Heavy") + 0.01
 KaijuFighter.step(fighter, wildFoe, now)
@@ -1370,6 +1411,85 @@ before = enemy.Humanoid.Health
 Enemies.damage(enemy, 50, a, false, nil, true, nil)
 check(enemy.Humanoid.Health == before, "A swing mid-hop landed")
 CombatServerStub._state(a).ChargeStarted = nil
+
+-- A Razorback (the pet fighting as one): its combo landed up close, it
+-- hops back out of reach and looses volleys of spines (each a Shot
+-- "Spine", each landing), then closes in for the next combo.
+do
+	now += 5
+	settle(fighter)
+	settle(wf)
+	local style, phase = fighter.Style, fighter.Phase
+	fighter.Style = KaijuFight.style("Razorback")
+	local ranged = fighter.Style.Ranged
+	enemy.GuardUntil, enemy.DodgeUntil, enemy.StunUntil = 0, 0, 0
+	pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(fighter.Reach * 0.8, 0, 0))
+	pet.Root.AssemblyLinearVelocity = Vector3.zero
+	fightRoll = 0.95 -- (no combo goes on)
+	table.clear(fxs)
+	fighter.Action = { Kind = "Light", At = now, Hits = ranged.Combo }
+	KaijuFighter.step(fighter, wildFoe, now)
+	check(fighter.Phase == "Range", "Its combo done, a Razorback didn't go out to range")
+	check(drew("DodgeRoll") ~= nil and pet.DodgeUntil > now, "It didn't hop back")
+	local away = pet.Root.AssemblyLinearVelocity
+	check(away:Dot(pet.Root.Position - enemy.Root.Position) > 0, "It hopped toward its foe, not back")
+	-- Out at range: a volley, named on its cast bar, then its spines.
+	local band = (ranged.Keep[1] + ranged.Keep[2]) / 2 * fighter.Reach / shared("DuelistBrain").Reach
+	pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(band + enemy.Root.Size.X / 2, 0, 0))
+	now += 0.5
+	fightRoll = 0.5
+	KaijuFighter.step(fighter, wildFoe, now)
+	check(fighter.Action and fighter.Action.Kind == "Volley", "No volley from range: " .. tostring(fighter.Choice))
+	check(pet.Model:GetAttribute("ActionName") == ranged.Name, "A volley isn't named")
+	check(pet.Model:GetAttribute("ActionKind") == "Bolt", "A volley doesn't wind up as a Bolt")
+	table.clear(fxs)
+	local hp = enemy.Humanoid.Health
+	local shots = 0
+	for _ = 1, ranged.Shots + 2 do
+		if fighter.Action and fighter.Action.Kind == "Volley" then
+			now = fighter.Action.At
+			KaijuFighter.step(fighter, wildFoe, now)
+			shots += 1
+		end
+	end
+	local spines = 0
+	for _, entry in fxs do
+		local kind = if entry[1] == "Sized" then entry[3] else entry[1]
+		local look = if entry[1] == "Sized" then entry[8] else entry[6]
+		if kind == "Shot" and look == "Spine" then
+			spines += 1
+		end
+	end
+	check(shots == ranged.Shots and spines == ranged.Shots, "A volley isn't its spines: " .. shots .. "/" .. spines)
+	check(enemy.Humanoid.Health < hp, "Its spines didn't land")
+	check(fighter.VolleysLeft == ranged.Volleys - 1 and fighter.Phase == "Range", "One volley ended its shooting")
+	-- Its last volley shot: it closes in again.
+	fighter.VolleysLeft = 1
+	fighter.NextVolley = 0
+	now += 0.2
+	KaijuFighter.step(fighter, wildFoe, now)
+	for _ = 1, ranged.Shots + 2 do
+		if fighter.Action and fighter.Action.Kind == "Volley" then
+			now = fighter.Action.At
+			KaijuFighter.step(fighter, wildFoe, now)
+		end
+	end
+	check(fighter.Phase == "Melee", "After its last volley, it didn't go back in")
+	-- Pressed close out at range, it hops back again.
+	fighter.Phase, fighter.NextHop, fighter.NextVolley = "Range", 0, now + 5
+	pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(fighter.Reach * 0.5, 0, 0))
+	pet.DodgeUntil = 0
+	now += 0.3
+	KaijuFighter.step(fighter, wildFoe, now)
+	check(fighter.Choice == "Hop" and pet.DodgeUntil > now, "Pressed close, it didn't hop back")
+	-- Out of the fight, its next one opens up close.
+	KaijuFighter.calm(fighter)
+	check(fighter.Phase == nil, "Calm, it was still out at range")
+	fighter.Style, fighter.Phase = style, phase
+	fightRoll = nil
+	settle(fighter)
+	settle(wf)
+end
 
 -- Its E: after a wind-up on the cast bar, then cast (and not again for a while).
 now += 5
@@ -3416,6 +3536,240 @@ local function teamFights()
 end
 teamFights()
 
+-- Kaiju battles ---------------------------------------------------------------------------------------------
+-- Asked and accepted; each side's kaiju in their default places (the
+-- sturdy ones in front, a Razorback behind), moved about, both ready; then
+-- they fight it out by themselves, each side's shared out over the other's,
+-- till one side's down: the result to both, EXP, the losers knocked out
+-- for real. Walking off forfeits.
+do
+	-- (In a function of its own: this file is at its limit of locals.)
+	local run = function()
+		local KaijuBattle = shared("KaijuBattle")
+		local KaijuBattles = serverModule("KaijuBattles")
+		KaijuBattles.clock = function()
+			return now
+		end
+		KaijuBattles.start()
+		for _, name in
+			{ "KaijuBattleAsk", "KaijuBattleRespond", "KaijuBattleFormation", "KaijuBattleReady", "KaijuBattleLeave" }
+		do
+			check(registered[name] ~= nil, name .. " isn't a request")
+		end
+		Kaiju.SlotLevels = { 1, 1, 1 }
+		clearCritters()
+		for _, p in { a, b } do
+			for _, key in { "CombatSession", "MatchId", "DungeonId", "Expedition", "Hunt", "Spar" } do
+				p:SetAttribute(key, nil)
+			end
+			p:SetAttribute("Outpost", true)
+		end
+		local spot = center + Vector3.new(-320, 5, 60)
+		rootA.CFrame = CFrame.new(spot)
+		rootB.CFrame = CFrame.new(spot + Vector3.new(0, 0, 24))
+		now += 10
+		KaijuServer.reviveAll(b)
+		KaijuServer._upkeep(a, now)
+		KaijuServer._upkeep(b, now)
+		local teamA, teamB = KaijuServer.team(a), KaijuServer.team(b)
+		check(#teamA == 3 and #teamB == 3, "Not three out each for a battle: " .. #teamA .. "/" .. #teamB)
+		for _, pet in teamA do
+			pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1e5, 1e5
+		end
+		for _, pet in teamB do
+			pet.Humanoid.Health = math.max(1, math.floor(pet.Humanoid.MaxHealth * 0.05))
+		end
+		for _, pet in table.move(teamB, 1, 3, 4, table.clone(teamA)) do
+			pet.RecallUntil, pet.StunUntil, pet.Target, pet.Plan = 0, 0, nil, nil
+			settle(pet.Fighter)
+		end
+		local function told(player, kind)
+			local last = nil
+			for _, entry in socials do
+				if entry[1] == player and entry[2] == kind then
+					last = entry
+				end
+			end
+			return last
+		end
+		-- Too far apart: no ask.
+		rootB.CFrame = CFrame.new(spot + Vector3.new(0, 0, 90))
+		check(not registered.KaijuBattleAsk(a, b.UserId).Ok, "Asked someone too far off")
+		rootB.CFrame = CFrame.new(spot + Vector3.new(0, 0, 24))
+		now += 2
+		-- Asked: a card for them; asked again, no.
+		table.clear(socials)
+		check(registered.KaijuBattleAsk(a, b.UserId).Ok, "Couldn't ask for a kaiju battle")
+		local card = told(b, "KaijuBattleAsk")
+		check(card ~= nil and card[3] == a.UserId, "No card for the one asked")
+		now += 2
+		check(not registered.KaijuBattleAsk(a, b.UserId).Ok, "Asked twice")
+		-- Accepted: the formation phase, each side in its default places.
+		check(registered.KaijuBattleRespond(b, a.UserId, true).Ok, "Couldn't accept")
+		local battle = KaijuBattles.of(a)
+		check(battle ~= nil and KaijuBattles.of(b) == battle and battle.Phase == "Formation", "No battle")
+		check(
+			a:GetAttribute("KaijuBattle") == battle.Id and b:GetAttribute("KaijuBattle") == battle.Id,
+			"Not marked in it"
+		)
+		local stateA = told(a, "KaijuBattle")
+		stateA = stateA and stateA[3]
+		check(stateA and stateA.Side == "A" and stateA.Theirs == nil, "A foe's places shown before it starts")
+		check(stateA and #stateA.Units == 3, "Your kaiju in it, before it starts: " .. (stateA and #stateA.Units or 0))
+		for _, pet in teamA do
+			local cellId = battle.Formation[a][pet.Record.Id]
+			local cell = KaijuBattle.cell(cellId)
+			check(cell ~= nil, "A kaiju of yours has no place")
+			check(
+				cell and (cell.Row == "Back") == (pet.Record.Species == "Razorback"),
+				pet.Record.Species .. " isn't in its default row: " .. tostring(cellId)
+			)
+			local orders = KaijuServer.battle(pet, now)
+			check(orders and orders.Spot and not orders.Foe, "In the formation, a kaiju didn't make for its place")
+		end
+		-- Mid-battle: no recall, no other team.
+		check(not registered.KaijuRecall(a).Ok, "Recalled mid-battle")
+		-- Placing: a bad formation refused; a good one taken.
+		local ids = {}
+		for id in battle.Formation[a] do
+			table.insert(ids, id)
+		end
+		table.sort(ids)
+		check(
+			not registered.KaijuBattleFormation(
+				a,
+				{ [ids[1]] = "FrontLeft", [ids[2]] = "FrontLeft", [ids[3]] = "BackLeft" }
+			).Ok,
+			"Two on one place"
+		)
+		check(not registered.KaijuBattleFormation(a, { [ids[1]] = "FrontLeft" }).Ok, "A kaiju left without a place")
+		check(
+			not registered.KaijuBattleFormation(
+				a,
+				{ nope = "FrontLeft", [ids[2]] = "BackLeft", [ids[3]] = "BackRight" }
+			).Ok,
+			"Placed another's kaiju"
+		)
+		check(
+			not registered.KaijuBattleFormation(a, { [ids[1]] = "Moon", [ids[2]] = "BackLeft", [ids[3]] = "BackRight" }).Ok,
+			"Placed off the field"
+		)
+		local wanted = { [ids[1]] = "BackLeft", [ids[2]] = "FrontRight", [ids[3]] = "BackRight" }
+		check(registered.KaijuBattleFormation(a, wanted).Ok, "A good formation refused")
+		check(battle.Formation[a][ids[1]] == "BackLeft", "The formation wasn't taken")
+		-- Both ready: it starts, each kaiju at its place, facing the other side.
+		check(registered.KaijuBattleReady(a).Ok and battle.Phase == "Formation", "One ready started it")
+		check(registered.KaijuBattleReady(b).Ok and battle.Phase == "Battle", "Both ready didn't start it")
+		local started = now
+		check(not registered.KaijuBattleFormation(a, wanted).Ok, "Placed after it started")
+		for _, pet in teamA do
+			local at = KaijuBattle.cellSpot(battle.Field, "A", battle.Formation[a][pet.Record.Id])
+			local off = Vector3.new(pet.Root.Position.X - at.X, 0, pet.Root.Position.Z - at.Z).Magnitude
+			check(off < 1, "A kaiju didn't start at its place: " .. off)
+		end
+		local frontB = battle.Field.Center + battle.Field.Axis * KaijuBattle.Field.Front
+		local backA = battle.Field.Center - battle.Field.Axis * KaijuBattle.Field.Back
+		check(
+			(frontB - rootB.Position).Magnitude < (backA - rootB.Position).Magnitude,
+			"The sides are the wrong way round"
+		)
+		stateA = told(a, "KaijuBattle")[3]
+		check(
+			stateA.Phase == "Battle" and stateA.Theirs ~= nil and #stateA.Units == 6,
+			"Started, the foe's places still hidden"
+		)
+		-- Each has a foe on the other side.
+		for _, pet in teamA do
+			local orders = KaijuServer.battle(pet, now)
+			check(orders and orders.Foe and orders.Foe.Owner == b, "A kaiju of yours has no foe in the battle")
+		end
+		-- They fight it out: yours win (theirs came in nearly down).
+		table.clear(notes)
+		local expBefore = {}
+		for _, pet in teamA do
+			expBefore[pet.Record.Id] = pet.Record.Exp + pet.Record.Level * 1e6
+		end
+		local landed = false
+		for _ = 1, 600 do
+			now += 0.15
+			for _, pet in KaijuServer.all() do
+				if pet.Owner == a or pet.Owner == b then
+					KaijuServer._think(pet, now, 0.15)
+					-- (They walk where they're told: a step's worth.)
+					local h, from = pet.Humanoid, pet.Root.Position
+					local to = h.MovingTo
+					if to then
+						local way = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+						local step = math.min(way.Magnitude, (h.WalkSpeed or 16) * 0.15)
+						if step > 0.01 then
+							pet.Root.CFrame = CFrame.new(from + way.Unit * step)
+						end
+					end
+				end
+			end
+			flush()
+			for _, pet in teamB do
+				if pet.Humanoid.Health < pet.Humanoid.MaxHealth * 0.05 then
+					landed = true
+				end
+			end
+			KaijuBattles.step(battle, now)
+			if battle.Phase == "Over" then
+				break
+			end
+		end
+		check(landed, "No blow landed on the other side's kaiju")
+		check(battle.Phase == "Over", "The battle never ended")
+		check(battle.Result and battle.Result[a] == "Win" and battle.Result[b] == "Lose", "The wrong side won")
+		check(noted(a, "Your kaiju beat") and noted(b, "kaiju won the battle"), "Not told who won")
+		local downs = 0
+		for _, record in profiles[b].Kaiju.List do
+			if record.Down and record.DownUntil then
+				downs += 1
+			end
+		end
+		check(downs >= 3, "The losers' kaiju weren't knocked out for real: " .. downs)
+		check(now - started < KaijuBattle.BattleSeconds - 1, "It ran out of time instead of being won")
+		local gained = false
+		for _, pet in teamA do
+			if pet.Record.Exp + pet.Record.Level * 1e6 > expBefore[pet.Record.Id] then
+				gained = true
+			end
+		end
+		check(gained, "The winners' kaiju gained no EXP")
+		check(told(a, "KaijuBattle")[3].Result == "Win", "The result wasn't shown")
+		-- A moment later it's gone.
+		now += KaijuBattle.OverSeconds + 0.1
+		KaijuBattles.step(battle, now)
+		check(KaijuBattles.of(a) == nil and a:GetAttribute("KaijuBattle") == nil, "The battle never closed")
+		check(registered.KaijuRecall(a).Ok, "Still held as in a battle")
+		-- Walking off forfeits.
+		KaijuServer.reviveAll(b)
+		now += 5
+		KaijuServer._upkeep(b, now)
+		check(registered.KaijuBattleAsk(b, a.UserId).Ok, "Couldn't ask again")
+		check(registered.KaijuBattleRespond(a, b.UserId, true).Ok, "Couldn't accept again")
+		battle = KaijuBattles.of(a)
+		check(battle and battle.A == b, "The second battle didn't start")
+		rootA.CFrame = CFrame.new(spot + Vector3.new(0, 0, KaijuBattle.Leash + 30))
+		KaijuBattles.step(battle, now + 0.25)
+		check(
+			battle.Phase == "Over" and battle.Result[b] == "Win" and battle.Result[a] == "Lose",
+			"Walking off didn't forfeit"
+		)
+		registered.KaijuBattleLeave(b)
+		check(KaijuBattles.of(b) == nil, "Closing didn't let you go")
+		now += KaijuBattle.OverSeconds + 0.1
+		KaijuBattles.step(battle, now)
+		check(KaijuBattles.of(a) == nil, "The forfeit never closed")
+		rootA.CFrame = CFrame.new(spot)
+		for _, pet in teamA do
+			pet.Humanoid.MaxHealth, pet.Humanoid.Health = pet.Stats.Health, pet.Stats.Health
+		end
+	end
+	run()
+end
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do
@@ -3430,7 +3784,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles)",
 		checks
 	)
 )

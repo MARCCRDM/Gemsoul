@@ -29,9 +29,11 @@
 	(infusePlan: a gem of its own element worth double, one of the element
 	that beats it half), and only out of danger (Danger). Gems never give
 	EXP. healPick picks the gems for a heal; AutoHeal, switched on, heals
-	your team with your spare Commons by itself. One knocked out comes back
-	by itself once its revive time is up (Revive, reviveSeconds), or at once
-	for Robux or a Revive coupon; gems don't revive it.
+	your team with your spare Commons by itself, then your spare Uncommons
+	once the Commons run out (autoHealPick). One knocked out comes back by
+	itself once its revive time is up (Revive, reviveSeconds), weak, to be
+	healed with gems; or at once, and stronger, for Robux or a Revive
+	coupon. Gems don't revive it.
 
 	Pure data and logic, for the server, the client and tests.
 ]]
@@ -476,10 +478,11 @@ Kaiju.Infuse = {
 
 -- Knocked out: back by itself once Base seconds, and PerLevel more a level,
 -- have gone by (record.DownUntil, the server's clock: it counts while
--- you're away), at Health of its health. Or at once: Robux (the
+-- you're away), but weak, at Health of its health: heal it with gems
+-- before it fights again. Or at once, at Bought of its health: Robux (the
 -- "KaijuRevive" product, Shared.Store: every one of yours that's down) or
 -- a Revive coupon (Shared.Coupons).
-Kaiju.Revive = { Base = 60, PerLevel = 8, Health = 0.5 }
+Kaiju.Revive = { Base = 60, PerLevel = 8, Health = 0.15, Bought = 0.5 }
 
 -- How long one knocked out at its level stays down.
 function Kaiju.reviveSeconds(record): number
@@ -634,12 +637,14 @@ function Kaiju.infusePlan(record, gems: { any })
 end
 
 -- Auto heal (KaijuServer's "KaijuAutoHeal", the HUD's AUTO HEAL): on, your
--- spare Commons (Tier: never a rarer gem, never one a saved loadout names,
--- never a Gemsoul) heal your team by themselves, once you're out of danger
--- (Danger). At most one round every Every seconds, and never a gem that
--- would go to waste (healPick). It doesn't revive (Revive). Off till you
--- switch it on (Default), and kept in the roster (AutoHeal).
-Kaiju.AutoHeal = { Tier = "Common", Every = 1.5, Default = false }
+-- spare gems of Tiers heal your team by themselves, once you're out of
+-- danger (Danger): your Commons first, and your Uncommons only once the
+-- Commons have run out (autoHealPick). Never a rarer gem, never one a saved
+-- loadout names, never a Gemsoul. At most one round every Every seconds,
+-- and never a gem that would go to waste (healPick). It doesn't revive
+-- (Revive). Off till you switch it on (Default), and kept in the roster
+-- (AutoHeal).
+Kaiju.AutoHeal = { Tiers = { "Common", "Uncommon" }, Every = 1.5, Default = false }
 
 function Kaiju.autoHealOn(roster): boolean
 	if roster and roster.AutoHeal ~= nil then
@@ -680,6 +685,41 @@ function Kaiju.healPick(record, gems: { any }, toFull: boolean?): { any }
 		if toFull or health + gain <= most + 1e-6 then
 			table.insert(chosen, list[i])
 			health += gain
+		end
+	end
+	return chosen
+end
+
+-- The gems auto heal takes to mend a kaiju, out of `pools` (your spare
+-- gems by tier, { Common = {...}, Uncommon = {...} }): from the first of
+-- AutoHeal.Tiers, and from the next only once every gem of the one before
+-- is used, so an Uncommon goes only when the Commons are gone. None wasted
+-- (healPick), at most Infuse.Batch, none for one knocked out.
+function Kaiju.autoHealPick(record, pools: { [string]: { any } }): { any }
+	local chosen = {}
+	if not record or record.Down then
+		return chosen
+	end
+	local health, most = Kaiju.health(record)
+	local probe = table.clone(record)
+	for _, tier in Kaiju.AutoHeal.Tiers do
+		local pool = {}
+		for _, gem in pools[tier] or {} do
+			if type(gem) == "table" and not Kaiju.isSoul(gem) then
+				table.insert(pool, gem)
+			end
+		end
+		probe.Health = health
+		local picked = Kaiju.healPick(probe, pool, false)
+		for _, gem in picked do
+			if #chosen >= Kaiju.Infuse.Batch then
+				return chosen
+			end
+			table.insert(chosen, gem)
+			health += Kaiju.infusePower(gem, record) * most * Kaiju.Infuse.Mend
+		end
+		if #picked < #pool then
+			break -- (some of these are left: none of the next yet)
 		end
 	end
 	return chosen

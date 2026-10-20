@@ -157,7 +157,8 @@ fireKaiju.Down, fireKaiju.Health = true, 0
 local wait = Kaiju.reviveSeconds(fireKaiju)
 check(wait == Kaiju.Revive.Base + Kaiju.Revive.PerLevel * 5, "The revive wait isn't by level")
 check(Kaiju.reviveSeconds({ Level = 20 }) > wait, "A higher level doesn't wait longer")
-check(Kaiju.Revive.Health > 0 and Kaiju.Revive.Health <= 1, "The revive's rules")
+check(Kaiju.Revive.Health > 0 and Kaiju.Revive.Health <= 0.2, "Back by itself, it isn't weak")
+check(Kaiju.Revive.Bought > Kaiju.Revive.Health and Kaiju.Revive.Bought <= 1, "Bought back isn't stronger")
 check(select(1, Kaiju.health(fireKaiju)) == 0, "Down isn't no health")
 local manyStones = {}
 for i = 1, 200 do
@@ -203,7 +204,53 @@ check(#Kaiju.healPick(fireKaiju, batch(neutral, 200), true) == 0, "One that's do
 fireKaiju.Down, fireKaiju.Health = nil, nil
 -- Auto heal: off till switched on, kept in the roster; Commons only.
 check(not Kaiju.autoHealOn({ List = {} }) and Kaiju.autoHealOn({ List = {}, AutoHeal = true }), "Auto heal isn't off till it's switched on")
-check(Kaiju.AutoHeal.Tier == "Common" and Kaiju.AutoHeal.Every > 0, "Auto heal's rules")
+check(
+	Kaiju.AutoHeal.Tiers[1] == "Common" and Kaiju.AutoHeal.Tiers[2] == "Uncommon" and #Kaiju.AutoHeal.Tiers == 2,
+	"Auto heal doesn't take Commons, then Uncommons, and nothing rarer"
+)
+check(Kaiju.AutoHeal.Every > 0, "Auto heal's rules")
+-- Auto heal's pick (autoHealPick): Commons first; an Uncommon only once
+-- every spare Common is used; none wasted; none for one that's down.
+fireKaiju.Down, fireKaiju.Health = nil, most - most * Infuse.Mend * 3.5
+local pools = {
+	Common = { gem("Common", neutral, "c1"), gem("Common", neutral, "c2") },
+	Uncommon = { gem("Uncommon", neutral, "u1"), gem("Uncommon", neutral, "u2") },
+}
+picked = Kaiju.autoHealPick(fireKaiju, pools)
+-- (35% short: both Commons mend 20%; the 15% left is too little for an
+-- Uncommon's 20%, so none goes to waste.)
+check(
+	#picked == 2 and picked[1].Tier == "Common" and picked[2].Tier == "Common",
+	"Auto heal didn't take the Commons first"
+)
+fireKaiju.Health = most - most * Infuse.Mend * 5
+picked = Kaiju.autoHealPick(fireKaiju, pools)
+check(
+	#picked == 3 and picked[1].Tier == "Common" and picked[2].Tier == "Common" and picked[3].Tier == "Uncommon",
+	"Out of Commons, auto heal didn't go on with an Uncommon"
+)
+pools.Common = {
+	gem("Common", neutral, "c1"),
+	gem("Common", neutral, "c2"),
+	gem("Common", neutral, "c3"),
+	gem("Common", neutral, "c4"),
+}
+fireKaiju.Health = most - most * Infuse.Mend * 2.5
+picked = Kaiju.autoHealPick(fireKaiju, pools)
+check(
+	#picked == 2 and picked[1].Tier == "Common" and picked[2].Tier == "Common",
+	"Auto heal took an Uncommon while Commons were left"
+)
+pools.Common = {}
+fireKaiju.Health = most - most * Infuse.Mend * 1.5
+picked = Kaiju.autoHealPick(fireKaiju, pools)
+check(#picked == 0, "Auto heal wasted an Uncommon (20%) on 15% short")
+fireKaiju.Health = most - most * Infuse.Mend * 4
+picked = Kaiju.autoHealPick(fireKaiju, pools)
+check(#picked == 2 and picked[1].Tier == "Uncommon", "No Commons at all, auto heal didn't take Uncommons")
+fireKaiju.Down, fireKaiju.Health = true, 0
+check(#Kaiju.autoHealPick(fireKaiju, pools) == 0, "Auto heal picked gems for one that's down")
+fireKaiju.Down, fireKaiju.Health = nil, nil
 -- Down ones fill an empty place last.
 local downRoster = {
 	List = {

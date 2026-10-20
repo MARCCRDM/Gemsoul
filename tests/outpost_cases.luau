@@ -670,7 +670,7 @@ check(
 -- Drawn by the client as one card beside the miner (PlayerCard): no panels of
 -- Roblox's own stacked over them, and each its own key and gamepad button.
 local keys, pads = {}, {}
-for _, name in { "OutpostSpar", "OutpostDuel", "OutpostParty" } do
+for _, name in { "OutpostSpar", "OutpostDuel", "OutpostParty", "OutpostKaiju" } do
 	local prompt = anaRoot:FindFirstChild(name)
 	check(prompt and prompt.Style == R.Enum.ProximityPromptStyle.Custom, name .. " is drawn by Roblox, not the card")
 	check(prompt.UIOffset == R.Vector2.zero, name .. " is still stacked over the miner")
@@ -684,7 +684,7 @@ local function size(set)
 	end
 	return n
 end
-check(size(keys) == 3 and size(pads) == 3, "Two social prompts share a key or gamepad button")
+check(size(keys) == 4 and size(pads) == 4, "Two social prompts share a key or gamepad button")
 handlers.OutpostEnter(ben)
 
 -- Pick a rock and stand by it.

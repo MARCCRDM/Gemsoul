@@ -329,9 +329,10 @@ for slot = 1, #Kaiju.SlotLevels do
 	end)
 end
 
--- AUTO HEAL, at the strip's end: on, your spare Common gems heal the team
--- by themselves (Shared.Kaiju.AutoHeal, KaijuServer). It shows a Common and
--- how many you have spare; a tap switches it.
+-- AUTO HEAL, at the strip's end: on, your spare Common gems, then your
+-- spare Uncommons, heal the team by themselves (Shared.Kaiju.AutoHeal,
+-- KaijuServer). It shows the gem it takes next and how many you have
+-- spare; a tap switches it.
 local autoButton = new("TextButton", {
 	Name = "AutoHeal",
 	Text = "",
@@ -421,21 +422,25 @@ end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 player:GetAttributeChangedSignal("Hunt"):Connect(layout)
 
--- Your spare Commons (what AUTO HEAL uses, and what HEAL picks first):
--- loose, never one a saved loadout names, never a Gemsoul.
+-- Your spare Commons, then Uncommons (what AUTO HEAL uses, in that order:
+-- Kaiju.autoHealPick): loose, never one a saved loadout names, never a
+-- Gemsoul.
 local spareCommons = {}
 local function countCommons()
 	local list = {}
-	for _, gem in GemInventory.spare(GemClient.Profile, Kaiju.AutoHeal.Tier) do
-		if not Kaiju.isSoul(gem) then
-			table.insert(list, gem)
+	for _, tier in Kaiju.AutoHeal.Tiers do
+		for _, gem in GemInventory.spare(GemClient.Profile, tier) do
+			if not Kaiju.isSoul(gem) then
+				table.insert(list, gem)
+			end
 		end
 	end
 	spareCommons = list
 end
 
--- AUTO HEAL as it stands: ON (green) or OFF, and a Common of the lead's
--- element (those heal it double) with how many you have spare.
+-- AUTO HEAL as it stands: ON (green) or OFF, and the gem it takes next (a
+-- Common of the lead's element, those heal it double; an Uncommon once
+-- the Commons are gone) with how many you have spare.
 local function drawAuto(lead)
 	local on = Kaiju.autoHealOn(roster())
 	if autoWant ~= nil and autoWant ~= on then
@@ -452,15 +457,23 @@ local function drawAuto(lead)
 	autoCount.TextColor3 = if #spareCommons > 0 then P.Text else P.Bad:Lerp(P.Text, 0.3)
 	local element = (lead and lead.Element) or "Fire"
 	local sample = nil
+	local first = spareCommons[1] and spareCommons[1].Tier
 	for _, gem in spareCommons do
-		if gem.Element == element then
+		if gem.Element == element and gem.Tier == first then
 			sample = gem
 			break
 		end
 	end
 	sample = sample
 		or spareCommons[1]
-		or { Id = "AutoHeal" .. element, Element = element, Tier = Kaiju.AutoHeal.Tier, Size = 6, Clarity = 6, Cut = 5 }
+		or {
+			Id = "AutoHeal" .. element,
+			Element = element,
+			Tier = Kaiju.AutoHeal.Tiers[1],
+			Size = 6,
+			Clarity = 6,
+			Cut = 5,
+		}
 	if autoArt ~= sample.Id then
 		autoArt = sample.Id
 		for _, child in autoGem:GetChildren() do
@@ -1416,20 +1429,23 @@ local function drawHeal(record)
 	local on = Kaiju.autoHealOn(roster())
 	healHint.Text = if down
 		then "Gems and AUTO HEAL don't bring back one that's knocked out."
-		elseif on then "AUTO HEAL is on: your spare Commons heal your team between fights."
-		else "Switch on AUTO HEAL by your team and your spare Commons heal them by themselves."
+		elseif on then "AUTO HEAL is on: your spare Commons, then Uncommons, heal your team between fights."
+		else "Switch on AUTO HEAL by your team and your spare Commons, then Uncommons, heal them by themselves."
 	healHint.TextColor3 = if on and not down then P.Good else P.Dim
 	if down then
 		-- Knocked out: back by itself, or REVIVE (Robux) or COUPON now.
 		local coupons = Coupons.count(GemClient.Profile, "Revive")
 		local onSale = (Store.RobuxProducts.KaijuRevive or 0) ~= 0 or Store.testPrice("KaijuRevive") ~= nil
 		reviveTime.Text = reviveClock(record)
-		reviveLine.Text = string.format("%s comes back at half health.", Kaiju.title(record))
+		reviveLine.Text = string.format(
+			"It comes back weak, at %d%% health: heal it with gems.",
+			math.floor(Kaiju.Revive.Health * 100 + 0.5)
+		)
 		reviveCoupon.Text = if coupons > 0
 			then string.format("You have %d Revive coupon%s: COUPON brings it back free.", coupons, if coupons == 1 then "" else "s")
 			else "Invite a friend: a free Revive coupon for each one who joins."
 		healSummary.Text = "Knocked out"
-		healNote.Text = "Revive now: every one of yours that's down, back at once."
+		healNote.Text = "Revive now: every one of yours that's down, back at once, at half health."
 		healReady = onSale
 		healChosen = {}
 		healButton.Text = if onSale then "REVIVE  ·  R$ " .. tostring(Store.robuxPrice("KaijuRevive") or 0) else "COMING SOON"

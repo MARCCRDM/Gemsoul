@@ -65,6 +65,13 @@
 
 	The store and coupons ask here:
 	  KaijuServer.reviveAll(player) -> count   every one of theirs that's down, back now
+
+	A kaiju battle (KaijuBattles) sets KaijuServer.battle(pet, now) -> what
+	a pet of one in a battle does: { Spot, Look } to stand at its place in
+	the formation, or { Foe, Flank, Foes } to fight the other side's kaiju
+	(a blow or a move on another's pet lands through KaijuServer.hurt); nil
+	for one not in a battle. KaijuServer.battling(player) says when a
+	player's in one: their team can't be changed or recalled meanwhile.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -125,6 +132,14 @@ export type Pet = {
 
 -- The kaiju out, by player and kaiju id.
 local teams: { [Player]: { [string]: Pet } } = {}
+
+-- Kaiju battles (KaijuBattles sets these; see the top).
+KaijuServer.battle = function(_pet, _now): any
+	return nil
+end
+KaijuServer.battling = function(_player: Player): boolean
+	return false
+end
 local rng = Random.new()
 -- When a player owing a starter roll was first seen in the Outpost.
 local owedSince: { [Player]: number } = {}
@@ -345,7 +360,14 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		Ability = ability,
 		Moves = Kaiju.moves(record.Soul, record.Level),
 		Strike = function(foe, amount: number, heavy: boolean, _name: string): string
-			return if foe.Enemy then KaijuServer.strike(pet, foe.Enemy, amount, nil, heavy) else "Missed"
+			if foe.Enemy then
+				return KaijuServer.strike(pet, foe.Enemy, amount, nil, heavy)
+			elseif foe.Pet and KaijuServer.battle(pet, os.clock()) then
+				-- (Another's kaiju, in a battle.)
+				pet.LastFight = os.clock()
+				return KaijuServer.hurt(foe.Pet, amount, pet.Element, nil, heavy)
+			end
+			return "Missed"
 		end,
 		Caster = function()
 			return KaijuServer.caster(pet)
@@ -456,12 +478,14 @@ local function claimRoll(player: Player): { any }
 	return added
 end
 
--- One knocked out back on its feet (its revive time up, or bought): at
--- Kaiju.Revive.Health of its health.
-local function wake(record)
+-- One knocked out back on its feet: its revive time up, weak (at
+-- Kaiju.Revive.Health of its health, to be healed with gems), or bought
+-- (at Revive.Bought).
+local function wake(record, bought: boolean?)
 	local _, most = Kaiju.health({ Species = record.Species, Level = record.Level, Soul = record.Soul })
 	record.Down, record.DownUntil = nil, nil
-	record.Health = math.max(1, math.floor(most * Kaiju.Revive.Health + 0.5))
+	local share = if bought then Kaiju.Revive.Bought else Kaiju.Revive.Health
+	record.Health = math.max(1, math.floor(most * share + 0.5))
 end
 
 -- Puts the right kaiju out (or away) for `player`.
@@ -489,7 +513,13 @@ local function upkeep(player: Player, now: number)
 	end
 	if woke then
 		PlayerData.sync(player)
-		Remotes.Notify:FireClient(player, string.format("%s is back on its feet!", table.concat(woke, ", ")))
+		Remotes.Notify:FireClient(
+			player,
+			string.format(
+				"%s is back on its feet, but weak: heal with gems before the next fight.",
+				table.concat(woke, ", ")
+			)
+		)
 	end
 	local want = {}
 	if roster and canBeOut(player) then
@@ -637,10 +667,26 @@ function KaijuServer.caster(pet: Pet)
 		Body = pet,
 		Humanoid = pet.Humanoid,
 		Foes = function(center: Vector3, radius: number)
+			-- (In a battle: the other side's kaiju.)
+			local battle = KaijuServer.battle(pet, os.clock())
+			if battle and battle.Foes then
+				local list = {}
+				for _, other in battle.Foes do
+					if flat(other.Root.Position - center).Magnitude <= radius then
+						table.insert(list, { Root = other.Root, Pet = other })
+					end
+				end
+				return list
+			end
 			return creaturesNear(center, radius, pet.Owner)
 		end,
 		Hit = function(victim, amount: number, status: string?)
-			strike(pet, victim.Enemy, amount, status, nil)
+			if victim.Pet then
+				pet.LastFight = os.clock()
+				KaijuServer.hurt(victim.Pet, amount, pet.Element, status, nil)
+			elseif victim.Enemy then
+				strike(pet, victim.Enemy, amount, status, nil)
+			end
 		end,
 		Alive = function(): boolean
 			return pet.Model.Parent ~= nil and pet.Humanoid.Health > 0
@@ -951,6 +997,34 @@ local function think(pet: Pet, now: number, _dt: number)
 			end
 		end
 	end
+	-- In a kaiju battle: at its place in the formation, or fighting the
+	-- other side's kaiju (KaijuBattles).
+	local battle = KaijuServer.battle(pet, now)
+	if battle then
+		pet.Target = nil
+		settle(pet)
+		pet.IdleSpot = nil
+		local fighter = pet.Fighter
+		if battle.Foe then
+			pet.LastFight = now
+			fighter.Flank, fighter.Apart = battle.Flank, spacing(pet)
+			KaijuFighter.step(fighter, { Root = battle.Foe.Root, Pet = battle.Foe }, now)
+			return
+		end
+		KaijuFighter.calm(fighter)
+		h.WalkSpeed = math.max(pet.Stats.Speed, 16)
+		if battle.Spot and flat(battle.Spot - pet.Root.Position).Magnitude > 0.6 then
+			h:MoveTo(battle.Spot)
+		else
+			h:MoveTo(pet.Root.Position)
+			-- (Facing the other side, turned only when it's well off.)
+			local look = battle.Look
+			if look and flat(pet.Root.CFrame.LookVector):Dot(look) < 0.95 then
+				pet.Root.CFrame = CFrame.lookAt(pet.Root.Position, pet.Root.Position + look)
+			end
+		end
+		return
+	end
 	local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
 	-- In a fight it sees it through, however far you've walked off to mine
 	-- (up to Kaiju.Follow.Battle): no running back, no putting back beside you.
@@ -1097,6 +1171,9 @@ end
 -- Requests -----------------------------------------------------------------------------------------
 
 local function recall(player: Player)
+	if KaijuServer.battling(player) then
+		return reply(false, "Not during a kaiju battle.")
+	end
 	local out = petsOf(player)
 	if #out == 0 then
 		return reply(false, "Your kaiju aren't out.")
@@ -1125,6 +1202,9 @@ local function changeTeam(player: Player, ids: { string }): (boolean, string)
 		return true, ""
 	end
 	local now = os.clock()
+	if KaijuServer.battling(player) then
+		return false, "Not during a kaiju battle."
+	end
 	if lastSwitch[player] and now - lastSwitch[player] < 3 then
 		return false, "One moment."
 	end
@@ -1226,7 +1306,7 @@ function KaijuServer.reviveAll(player: Player): number
 	local count = 0
 	for _, record in (roster and roster.List) or {} do
 		if record.Down then
-			wake(record)
+			wake(record, true)
 			count += 1
 		end
 	end
@@ -1306,8 +1386,9 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 end
 
 -- Auto heal (Kaiju.AutoHeal): your spare Commons heal the team by
--- themselves, out of danger, each one hurt in one go. Quiet (it glows, and
--- the strip's count of Commons drops), but once for running out.
+-- themselves, out of danger, each one hurt in one go, then your spare
+-- Uncommons once the Commons are gone (Kaiju.autoHealPick). Quiet (it
+-- glows, and the strip's count of gems drops), but once for running out.
 local healAt, toldEmpty = {}, {}
 local function autoHeal(player: Player, now: number)
 	local profile = PlayerData.get(player)
@@ -1318,7 +1399,10 @@ local function autoHeal(player: Player, now: number)
 	if KaijuServer.inDanger(player, now) then
 		return
 	end
-	local commons = GemInventory.spare(profile, Kaiju.AutoHeal.Tier)
+	local pools = {}
+	for _, tier in Kaiju.AutoHeal.Tiers do
+		pools[tier] = GemInventory.spare(profile, tier)
+	end
 	local healed, stuck = false, false
 	for _, id in Kaiju.teamIds(roster) do
 		local record = roster.List[id]
@@ -1334,7 +1418,7 @@ local function autoHeal(player: Player, now: number)
 		end
 		local health, most = Kaiju.health(record)
 		if health < most then
-			local gems = Kaiju.healPick(record, commons, false)
+			local gems = Kaiju.autoHealPick(record, pools)
 			if #gems > 0 then
 				local plan = Kaiju.infusePlan(record, gems)
 				applyHeal(player, record, pet, plan)
@@ -1343,13 +1427,19 @@ local function autoHeal(player: Player, now: number)
 				for _, gem in plan.Used do
 					used[gem.Id] = true
 				end
-				for i = #commons, 1, -1 do
-					if used[commons[i].Id] then
-						table.remove(commons, i)
+				for _, pool in pools do
+					for i = #pool, 1, -1 do
+						if used[pool[i].Id] then
+							table.remove(pool, i)
+						end
 					end
 				end
-			elseif #commons == 0 then
-				stuck = true
+			else
+				local left = 0
+				for _, pool in pools do
+					left += #pool
+				end
+				stuck = stuck or left == 0
 			end
 		end
 	end
@@ -1357,7 +1447,10 @@ local function autoHeal(player: Player, now: number)
 		healAt[player], toldEmpty[player] = now + Kaiju.AutoHeal.Every, nil
 	elseif stuck and not toldEmpty[player] then
 		toldEmpty[player] = true
-		Remotes.Notify:FireClient(player, "Auto heal is out of spare Commons: mine more to keep your team going.")
+		Remotes.Notify:FireClient(
+			player,
+			"Auto heal is out of spare Commons and Uncommons: mine more to keep your team going."
+		)
 	end
 end
 

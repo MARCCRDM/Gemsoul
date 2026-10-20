@@ -440,10 +440,23 @@ local function requireScript(s)
 	return result
 end
 NumberRange = roblox.NumberRange
+-- Lune's CFrame.lookAt points the wrong way (and gives NaN straight up):
+-- the modules get Roblox's.
+local function lookAt(at, target, up)
+	local look = target - at
+	look = if look.Magnitude > 1e-6 then look.Unit else V3.new(0, 0, -1)
+	up = up or V3.new(0, 1, 0)
+	if math.abs(look:Dot(up.Unit)) > 0.999 then
+		up = V3.new(0, 0, 1)
+	end
+	local right = look:Cross(up).Unit
+	return CF.fromMatrix(at, right, right:Cross(look), -look)
+end
+local CFrameFixed = setmetatable({ lookAt = lookAt }, { __index = CF })
 function env(s)
 	return setmetatable({
 		script = s, require = requireScript, game = gameProxy, workspace = workspace, task = fakeTask, os = fakeOs,
-		Instance = FakeInstance, Vector3 = V3, Vector2 = roblox.Vector2, CFrame = CF, Color3 = C3,
+		Instance = FakeInstance, Vector3 = V3, Vector2 = roblox.Vector2, CFrame = CFrameFixed, Color3 = C3,
 		Enum = roblox.Enum, UDim = roblox.UDim, UDim2 = roblox.UDim2, ColorSequence = roblox.ColorSequence,
 		ColorSequenceKeypoint = roblox.ColorSequenceKeypoint, NumberSequence = roblox.NumberSequence,
 		NumberSequenceKeypoint = roblox.NumberSequenceKeypoint, NumberRange = roblox.NumberRange,
@@ -892,6 +905,148 @@ scenarios.PickHits = {
 		rock.CFrame = CF.new(0, 2.2, -8.5) * CF.Angles(0.15, 0.6, 0.1); rock.Parent = workspace
 		local kind, crit = row:match("^(%a+)( ?c?r?i?t?)$")
 		PickImpacts.play(kind, V3.new(0, 3, -5.9), V3.new(0, 3, 0), 0.7, crit == " crit", 1)
+	end,
+}
+
+-- The elements on the ground (ElementFx), at a wild kaiju's size: its
+-- blast warned of and going off, the ground a move leaves, a heavy blow's
+-- stomp, its bolt, and a critter's bomb. "before" rows replay what a
+-- blast was before: rings, then a pillar of light out of the ground.
+local ElementFx = requireScript(client.Modules.ElementFx)
+local WILD = Kaiju.size(Kaiju.Scale.Wild)
+local GROUND_AT = V3.new(0, 0.15, -8)
+local function oldNova(color, radius, delay, k)
+	-- (Combat.client's Nova as it was: a red ring, then a dome, waves and a pillar.)
+	local function neon(size, cf, c, shape, t)
+		local p = Instance.new("Part"); p.Anchored = true; p.Material = roblox.Enum.Material.Neon; p.Color = c
+		p.Size = size; p.CFrame = cf; p.Position = cf.Position; p.Transparency = t or 0
+		if shape then p.Shape = shape end
+		p.Parent = workspace
+		return p
+	end
+	local function ring(r, c, t)
+		return neon(V3.new(0.2, r * 2, r * 2), CF.new(GROUND_AT) * CF.Angles(0, 0, math.rad(90)), c, roblox.Enum.PartType.Cylinder, t)
+	end
+	local function fadeOut(part, seconds, grow)
+		TweenServiceFake:Create(part, TweenInfoFake.new(seconds), { Transparency = 1, Size = grow or part.Size }):Play()
+		fakeTask.delay(seconds, function() part.Parent = nil end)
+	end
+	local warn = ring(radius, C3.fromRGB(255, 60, 40), 0.55)
+	fakeTask.delay(delay, function()
+		warn.Parent = nil
+		local dome = neon(V3.one * radius * 0.4, CF.new(GROUND_AT), color, roblox.Enum.PartType.Ball, 0.15)
+		fadeOut(dome, 0.35, V3.one * radius * 2)
+		local wave = ring(1, color, 0.05)
+		fadeOut(wave, 0.3, V3.new(0.3, radius * 2.1, radius * 2.1))
+		local pillar = neon(V3.new(2, 40, 2) * k, CF.new(GROUND_AT + V3.new(0, 20 * k, 0)), color)
+		fadeOut(pillar, 0.45, V3.new(radius * 0.8, 46 * k, radius * 0.8))
+		FxSize.run(k, function()
+			CombatFx.burst(GROUND_AT + V3.new(0, 1, 0), color, "Embers", 1.8 + radius / 6)
+			CombatFx.burst(GROUND_AT + V3.new(0, 0.5, 0), C3.fromRGB(120, 110, 100), "Smoke", 1.8 + radius / 10)
+		end)
+	end)
+end
+local function kaijuRows(withBefore)
+	local rows = {}
+	for _, element in ELEMENTS do
+		if withBefore then
+			table.insert(rows, element .. " before")
+		end
+		table.insert(rows, element)
+	end
+	return rows
+end
+local function asKaiju(me, foe)
+	me.Parent, foe.Parent = nil, nil
+	stand(WILD)
+end
+scenarios.KaijuBlast = {
+	Frames = { 0.3, 0.8, 0.98, 1.08, 1.25, 1.6 },
+	Rows = kaijuRows(true),
+	Run = function(row, me, foe)
+		asKaiju(me, foe)
+		local element = row:match("^(%a+)")
+		local color = GemConfig.ElementColors[element]
+		local radius = 8 * WILD
+		if row:find("before") then
+			oldNova(color, radius, 0.9, WILD)
+			return
+		end
+		FxSize.run(WILD, function()
+			ElementFx.telegraph(GROUND_AT, radius, color, 0.9)
+			fakeTask.delay(0.9, FxSize.keep(function()
+				ElementFx.erupt(GROUND_AT, radius, color)
+			end))
+		end)
+	end,
+}
+scenarios.KaijuField = {
+	Frames = { 0.15, 0.5, 1.0, 1.6, 2.2 },
+	Rows = ELEMENTS,
+	Run = function(element, me, foe)
+		asKaiju(me, foe)
+		FxSize.run(WILD, function()
+			ElementFx.field(GROUND_AT, 8 * WILD, 2.5, GemConfig.ElementColors[element])
+		end)
+	end,
+}
+scenarios.KaijuStomp = {
+	Frames = { 0.6, 0.85, 1.0, 1.12, 1.3, 1.55 },
+	Rows = ELEMENTS,
+	Run = function(element, me, foe)
+		asKaiju(me, foe)
+		local color = GemConfig.ElementColors[element]
+		local feet = V3.new(0, 0.15, 0)
+		FxSize.run(WILD, function()
+			-- A heavy: its warning, then the stomp as it lands.
+			ElementFx.telegraph(feet, 3.5, color, 0.9)
+			fakeTask.delay(0.9, FxSize.keep(function()
+				ElementFx.stomp(feet, 3.5, color)
+			end))
+		end)
+	end,
+}
+scenarios.KaijuBolt = {
+	Frames = { 0.04, 0.09, 0.15, 0.22, 0.32, 0.5 },
+	Rows = ELEMENTS,
+	Run = function(element, me, foe)
+		asKaiju(me, foe)
+		FxSize.run(WILD, function()
+			ElementFx.bolt(V3.new(0, 2.6, -0.6), V3.new(0, 1.5, -15), GemConfig.ElementColors[element])
+		end)
+	end,
+}
+scenarios.KaijuSpine = {
+	Frames = { 0.04, 0.1, 0.17, 0.24, 0.32, 0.5 },
+	Rows = ELEMENTS,
+	Run = function(element, me, foe)
+		asKaiju(me, foe)
+		local color = GemConfig.ElementColors[element]
+		FxSize.run(WILD, function()
+			-- (A volley: three spines, Gap apart, at a foe 14 studs off.)
+			for i = 0, 2 do
+				fakeTask.delay(i * 0.15, FxSize.keep(function()
+					ElementFx.spine(V3.new(0, 2.4, -0.8), V3.new((i - 1) * 0.6, 1.4, -14), color)
+				end))
+			end
+		end)
+	end,
+}
+scenarios.KaijuBomb = {
+	Frames = { 0.2, 0.45, 0.7, 0.85, 1.0, 1.3 },
+	Rows = ELEMENTS,
+	Run = function(element, me, foe)
+		asKaiju(me, foe)
+		local color = GemConfig.ElementColors[element]
+		local bug = Kaiju.Bug.Size
+		FxSize.run(bug, function()
+			-- (KaijuWilds' lob: the bomb's Shot and the Nova it lands as.)
+			ElementFx.lob(V3.new(0, 2, 0), GROUND_AT, color, 0.75)
+			ElementFx.telegraph(GROUND_AT, 5 * bug, color, 0.75)
+			fakeTask.delay(0.75, FxSize.keep(function()
+				ElementFx.erupt(GROUND_AT, 5 * bug, color)
+			end))
+		end)
 	end,
 }
 

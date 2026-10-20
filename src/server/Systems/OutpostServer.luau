@@ -261,14 +261,14 @@ local function refreshKit(player: Player)
 	end
 end
 
--- "Ask to spar" (Z), "Challenge to a duel" (G) and "Invite to party" (F) on
--- each visitor, for others.
+-- "Ask to spar" (Z), "Challenge to a duel" (G), "Invite to party" (F) and
+-- "Kaiju battle" (V) on each visitor, for others.
 local function socialPrompts(player: Player, on: boolean)
 	local root = rootOf(player)
 	if not root then
 		return
 	end
-	for _, name in { "OutpostSpar", "OutpostDuel", "OutpostParty" } do
+	for _, name in { "OutpostSpar", "OutpostDuel", "OutpostParty", "OutpostKaiju" } do
 		local old = root:FindFirstChild(name)
 		if old then
 			old:Destroy()
@@ -282,6 +282,7 @@ local function socialPrompts(player: Player, on: boolean)
 		or player:GetAttribute("CombatSession") ~= nil
 		or player:GetAttribute("MatchId") ~= nil
 		or Spar.sparring(player)
+		or player:GetAttribute("KaijuBattle") ~= nil
 	then
 		return
 	end
@@ -290,6 +291,7 @@ local function socialPrompts(player: Player, on: boolean)
 			{ "OutpostSpar", "Spar", "Ask to spar", Enum.KeyCode.Z, Enum.KeyCode.ButtonY },
 			{ "OutpostDuel", "Duel", "Challenge to a duel", Enum.KeyCode.G, Enum.KeyCode.ButtonX },
 			{ "OutpostParty", "Party", "Invite to party", Enum.KeyCode.F, Enum.KeyCode.ButtonB },
+			{ "OutpostKaiju", "Kaiju", "Kaiju battle", Enum.KeyCode.V, Enum.KeyCode.ButtonL1 },
 		}
 	do
 		local prompt = Instance.new("ProximityPrompt")
@@ -297,13 +299,13 @@ local function socialPrompts(player: Player, on: boolean)
 		prompt.ActionText = spec[3]
 		prompt.ObjectText = player.DisplayName
 		prompt.KeyboardKeyCode = spec[4]
-		-- (Each its own gamepad button, so all three stay live together.)
+		-- (Each its own gamepad button, so all four stay live together.)
 		prompt.GamepadKeyCode = spec[5]
 		prompt.HoldDuration = 0.25
 		prompt.MaxActivationDistance = 10
 		prompt.RequiresLineOfSight = false
 		-- Drawn by the client as one card beside the miner (PlayerCard), not
-		-- as three of Roblox's panels stacked over them.
+		-- as four of Roblox's panels stacked over them.
 		prompt.Style = Enum.ProximityPromptStyle.Custom
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt:SetAttribute("TargetUserId", player.UserId)
@@ -1124,6 +1126,8 @@ function OutpostServer.start()
 		player:GetAttributeChangedSignal("MatchId"):Connect(fightChanged)
 		-- The combat kit out for a spar, or away again (SparServer).
 		player:GetAttributeChangedSignal("Spar"):Connect(fightChanged)
+		-- In a kaiju battle, or out of it (KaijuBattles).
+		player:GetAttributeChangedSignal("KaijuBattle"):Connect(fightChanged)
 		player.CharacterAdded:Connect(function(character)
 			-- Back on your feet at the Outpost after a respawn.
 			if player:GetAttribute("Outpost") then

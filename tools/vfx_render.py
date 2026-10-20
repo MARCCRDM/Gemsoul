@@ -25,6 +25,13 @@ CAMERAS = {
     "Picks": ((10.5, 6.2, -1.2), (0, 5.2, -1.2), 46),
     "PickLineup": ((0.6, 5.0, -6.2), (0, 4.4, 0), 40),
     "PickHits": ((8.5, 6.5, -1.5), (0, 3.2, -6.5), 52),
+    # A wild kaiju's elements on the ground (ElementFx), from beside it.
+    "KaijuBlast": ((15, 9, 3), (0, 3.2, -8), 60),
+    "KaijuField": ((12, 9, 1), (0, 0.8, -8), 55),
+    "KaijuStomp": ((8, 5, 5), (0, 1.2, 0), 55),
+    "KaijuBolt": ((14, 6, -2), (0, 2, -8), 58),
+    "KaijuBomb": ((13, 8, 2), (0, 2, -5), 58),
+    "KaijuSpine": ((14, 6, -2), (0, 2, -8), 58),
 }
 
 def shape_mesh(shape, sx, sy, sz):
