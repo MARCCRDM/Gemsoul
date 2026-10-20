@@ -131,20 +131,26 @@ Three kaiju fight beside you at once. You can keep 12; the others wait at
 home. (The plan is a second slot when one of yours reaches level 10 and a
 third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 
-![The starter roll: three kaiju, each landing on its card](kaiju/roll.png)
+![The starter roll: three reels spinning, then your three locked in](kaiju/roll.png)
 
-- **The starter roll.** Everyone starts with three kaiju, rolled like the
-  gems in the intro: right after the move reveal, three cards spin through
-  kaiju of every kind and element and land, one after another, on yours
-  (a random kind in a random element, never the same pair twice, nor one
-  you have already, each with a Gemsoul rolled like a mined gem). Each card
-  stands its kaiju in a spotlight in its element's colour, with its
-  Gemsoul's rarity, its kind and level, health, damage and speed as bars,
-  and its moves with their icons: E ready now, Q at level 5, R at 10. MEET
-  YOUR TEAM brings them out (on its own after 20 seconds), and **the three
+- **The starter roll.** Everyone starts with three kaiju, rolled on the
+  same reels as the gems in the intro: right after the move reveal, three
+  cards (each with a numbered keycap) spin a reel of kaiju, every one on
+  a glow in its Gemsoul's rarity and named under the window as it passes,
+  and land, one after another, on yours (a random kind in a random
+  element, never the same pair twice, nor one you have already, each with
+  a Gemsoul rolled like a mined gem). Each lands with a flash in its
+  rarity's colour and drops onto a stage in its element's colour; its E
+  move's badge rises out of the window, and the card fills in: its
+  Gemsoul and rarity, its name, health, damage and speed, what it's like,
+  and its moves with their icons (E ready now, Q at level 5, R at 10).
+  Until then the card holds blank slots where they go. START brings them
+  out (on its own after 20 seconds, the bar along its foot filling till
+  then; a click while they spin lands them all at once), and **the three
   rolled are your team**. The server makes the roll once and keeps it till
   it's claimed, so leaving doesn't reroll it; a roll left unclaimed is given
-  anyway after 90 seconds in the Outpost.
+  anyway after 90 seconds in the Outpost. On a phone the cards drop the
+  headline and what each kaiju is like, so they come out bigger.
 - **Everyone gets the full three, once** (`Kaiju.RollVersion`). The first
   roll only topped a player up to three, so someone with a kaiju already
   (the old first-visit starter) saw two cards; anyone who took that roll is
@@ -660,10 +666,19 @@ Proposed guardrails:
 | `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look, all at its caster's size (`Size`; effects sent `"Sized"`); its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
 | `SparServer` | `Hunt`: the kit out alone |
 | `KaijuHud` (client) | The team strip, AUTO HEAL, TAME, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
-| `KaijuRoll` (client) | The starter roll's screen: in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
+| `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
 | `KaijuTaming` (client) | The gold glow and READY TO TAME on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
 | `FxSize` (client) | How big the effect being drawn is: a creature's size, held while its effect draws (`run`), kept through its delays and frame loops (`keep`); `CombatFx`, `CombatSound`, `CombatVfx`, `MoveVfx`, `TriadVfx` and `ElementalDeath` draw at it |
 | `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk, their fight poses and their moods (`KaijuMood`: `CreatureMotion.Moods`) |
+
+`tests/run_kaiju_roll.py` runs the roll's screen on a stand-in clock: the
+reels (yours on the third cell, three different kaiju in sight while they
+spin, each named with its rarity), the cards landing in turn with only
+yours left in the window, the cards filled in (name, Gemsoul and rarity,
+stats, what it's like, moves ready and asleep), each one dropping onto its
+stage and settling, START (no "meet your team"), a failed claim saying so,
+a click landing them all, the start on its own after 20 seconds, and a
+phone's shorter cards.
 
 Tests: `tests/run_kaiju.py` checks the rules (your team's order, filling
 and size, the roll owed and its picks never repeating a kind and element)

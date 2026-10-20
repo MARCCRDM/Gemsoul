@@ -786,7 +786,7 @@ do
 		Kaiju.count(roster) == 3 and profiles[a].KaijuRolled and Kaiju.rollsOwed(profiles[a]) == 0,
 		"The roll didn't join you"
 	)
-	check(noted(a, "Meet your kaiju"), "Nobody told them about their kaiju")
+	check(noted(a, "Your kaiju: "), "Nobody told them about their kaiju")
 	check(#registered.KaijuRoll(a).Rolls == 0 and registered.KaijuRollClaim(a).Added == 0, "A second roll")
 	KaijuServer._upkeep(a, now)
 	local team = KaijuServer.team(a)
@@ -2934,7 +2934,7 @@ local function yourTeam()
 	check(Kaiju.count(profiles[b].Kaiju) == 0 and Kaiju.rollsOwed(profiles[b]) == 3, "Given the roll at once")
 	KaijuServer._upkeep(b, now + Kaiju.RollGrace + 1)
 	check(Kaiju.count(profiles[b].Kaiju) == 3 and profiles[b].KaijuRolled, "An unclaimed roll was never given")
-	check(noted(b, "Meet your kaiju"), "Not told about the kaiju given")
+	check(noted(b, "Your kaiju: "), "Not told about the kaiju given")
 	-- Always three: one who took an older roll (a short top-up, left saved
 	-- unclaimed here) gets a full new roll of three, once, and the three
 	-- rolled become the team.

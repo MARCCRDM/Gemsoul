@@ -472,7 +472,7 @@ local function claimRoll(player: Player): { any }
 		end
 		Remotes.Notify:FireClient(
 			player,
-			string.format("Meet your kaiju: %s! They fight beside you in the Outpost.", table.concat(names, ", "))
+			string.format("Your kaiju: %s. They fight beside you in the Outpost.", table.concat(names, ", "))
 		)
 	end
 	return added
