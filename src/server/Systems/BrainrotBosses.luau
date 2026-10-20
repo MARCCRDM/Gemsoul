@@ -68,7 +68,8 @@ local function eyePair(rig, bone, list, at: Vector3, spacing: number, r: number,
 	end
 end
 
--- Rounded limbs (arms and legs as long ellipsoids) in `color`.
+-- Rounded limbs (arms and legs as long ellipsoids) in `color`, with a ball
+-- at each elbow and knee so no gap opens as they bend.
 local function limbs(rig, color, arm: number, leg: number, armColor: Color3?)
 	for _, side in { "Left", "Right" } do
 		for _, seg in { "UpperArm", "LowerArm" } do
@@ -79,6 +80,8 @@ local function limbs(rig, color, arm: number, leg: number, armColor: Color3?)
 			local b = rig[side .. seg]
 			ball(rig, b, "Leg", V(leg, b.Size.Y + 0.25, leg), V(0, 0, 0), color)
 		end
+		ball(rig, rig[side .. "LowerArm"], "Elbow", V(arm, arm, arm) * 0.98, V(0, 0.45, 0), armColor or color)
+		ball(rig, rig[side .. "LowerLeg"], "KneeJoint", V(leg, leg, leg) * 0.98, V(0, 0.5, 0), color)
 	end
 end
 
@@ -97,20 +100,32 @@ local function paws(rig, color: Color3, fingers: number, nail: Color3?)
 	end
 end
 
--- A tail of `n` balls from the hips, curling up behind: it sways.
+-- A tail from the hips curling up behind, `n` segments long: each one
+-- stretched from point to point along the curve and overlapping the next,
+-- tapering to its tip, so it reads as one tail (not a string of beads). It
+-- sways. Returns its parts and where its tip is (in the hips' space).
 local function tail(rig, color: Color3, n: number, thick: number, lift: number)
 	local t = rig.LowerTorso
 	local list = {}
+	local points = {}
+	for i = 0, n do
+		local k = i / n
+		points[i] = V(0, -0.1 + k * k * lift, 0.55 + i * 0.42)
+	end
 	for i = 1, n do
+		local a, b = points[i - 1], points[i]
 		local k = (i - 1) / math.max(1, n - 1)
-		local size = thick * (1 - k * 0.55)
+		local size = thick * (1 - k * 0.5)
+		local along = b - a
+		-- (Its length along the segment: turned up by the curve's slope.)
+		local pitch = math.atan2(along.Y, along.Z)
 		table.insert(
 			list,
-			ball(rig, t, "Tail", V(size, size, size * 1.5), V(0, -0.1 + k * k * lift, 0.6 + i * 0.42), color)
+			ball(rig, t, "Tail", V(size, size, along.Magnitude + size * 0.9), (a + b) / 2, color, A(-pitch, 0, 0))
 		)
 	end
 	group(list, "Tail", CFrame.new(0, -0.1, 0.5), 1)
-	return list
+	return list, points[n]
 end
 
 -- The bat: knob, handle, taper and barrel, held as Sahur holds his.
@@ -187,16 +202,15 @@ local function twinCat(rig, accent)
 			ball(rig, rig[side .. "Foot"], "Toe", V(0.2, 0.18, 0.2), V((i - 2) * 0.2, 0, -0.68), light)
 		end
 	end
-	local list = tail(rig, grey, 6, 0.42, 2.2)
-	local tip = l.CFrame:PointToObjectSpace(list[#list].CFrame.Position)
-	animate(neon(ball(rig, l, "TailTip", V(0.22, 0.22, 0.22), tip + V(0, 0.15, 0.1), accent)), "Tail", CFrame.new(0, -0.1, 0.5), 1)
+	local _, tip = tail(rig, grey, 7, 0.42, 2.2)
+	animate(neon(ball(rig, l, "TailTip", V(0.24, 0.24, 0.24), tip, accent)), "Tail", CFrame.new(0, -0.1, 0.5), 1)
 end
 
 -- Bombardiro Drago -----------------------------------------------------------------------------------------
 -- A crocodile on two legs, with bat wings and a long tail; fire in its eyes.
 local function dragonCroc(rig, accent)
 	local t, h, l = rig.UpperTorso, rig.Head, rig.LowerTorso
-	local olive, belly, dark = C(98, 114, 60), C(200, 182, 122), C(70, 82, 44)
+	local olive, belly, dark = C(114, 144, 70), C(224, 208, 148), C(80, 104, 52)
 	ball(rig, t, "CrocTorso", V(2.1, 2.3, 1.5), V(0, 0.15, 0.05), olive)
 	for i = 0, 4 do
 		ball(rig, t, "BellyScale", V(1.2 - i * 0.05, 0.34, 0.32), V(0, -0.75 + i * 0.42, -0.66), belly)
@@ -384,7 +398,7 @@ local function chimpanzini(rig, accent)
 	for _, side in { "Left", "Right" } do
 		ball(rig, rig[side .. "Foot"], "MonkeyFoot", V(0.62, 0.3, 1.15), V(0, 0, -0.25), C(222, 186, 140))
 	end
-	tail(rig, fur, 5, 0.3, 2.4)
+	tail(rig, fur, 7, 0.3, 2.4)
 end
 
 -- Tung Tung Tung Sahur (three) ----------------------------------------------------------------------------
@@ -422,7 +436,8 @@ local function sahurTrio(rig, _accent)
 		end
 		local hand = rig[side .. "Hand"]
 		ball(rig, hand, "Palm", V(0.36, 0.36, 0.36), V(0, -0.02, 0), wood)
-		P(rig, rig[side .. "Foot"], "WoodenFoot", V(0.55, 0.32, 1.0), V(0, 0, -0.2), wood).Material = Enum.Material.Wood
+		P(rig, rig[side .. "Foot"], "WoodenFoot", V(0.6, 0.38, 1.05), V(0, 0, -0.2), wood, BALL).Material =
+			Enum.Material.Wood
 	end
 	bat(rig)
 end
@@ -462,9 +477,7 @@ local function twinShark(rig, accent)
 	end
 	Skins.sneaker(rig, rig.LeftFoot, V(0, 0.05, 0))
 	Skins.sneaker(rig, rig.RightFoot, V(0, 0.05, 0))
-	local fins = tail(rig, blue, 3, 0.7, 0.2)
-	local last = fins[#fins]
-	local base = l.CFrame:PointToObjectSpace(last.CFrame.Position)
+	local _, base = tail(rig, blue, 3, 0.7, 0.2)
 	local tailFins = {
 		P(rig, l, "UpperTailFin", V(0.14, 1.3, 0.9), base + V(0, 0.55, 0.35), C(52, 92, 146), "Wedge", A(0, math.pi, 0)),
 		P(rig, l, "LowerTailFin", V(0.14, 0.8, 0.7), base + V(0, -0.4, 0.35), C(52, 92, 146), "Wedge", A(0, 0, math.pi)),

@@ -88,7 +88,10 @@ bat poses. On top of that, their parts move (`CreatureMotion`):
 
 ![The ten bosses mid heavy blow: heads lunging, wings beating, knives coming down](bosses-and-swarms/bosses-heavy.png)
 
-They're light: 59 to 111 parts each, skeleton included. None of them
+Since then, they breathe while standing and swing their arms as they walk.
+Each has its own gait. See [brainrot-polish.md](brainrot-polish.md).
+
+They're light: 63 to 116 parts each, skeleton included. None of them
 collides with or blocks anything. The owner's "TUNG TUNG" dungeon test
 (F8) now meets the three-headed Sahur.
 
@@ -111,7 +114,7 @@ and pays about what one used to. Up to three pour out of each rift, 0.3 s
 apart (`Frontier.Swarm`). The numbers are in `Kaiju.Bug` and `Frontier`.
 
 The Outpost's cap went from 12 to 22, so more brainrot bodies are about at
-once. They're the thinned moon bugs (66 to 179 parts). Watch the frame rate
+once. They're the thinned moon bugs (67 to 167 parts). Watch the frame rate
 with a full Outpost in Studio. If it drops, `Frontier.Caps.Server` is the
 one number to lower.
 

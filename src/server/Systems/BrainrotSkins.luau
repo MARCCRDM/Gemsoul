@@ -179,8 +179,8 @@ local function wood(rig, _accent)
 		end
 		-- A plain wooden foot.
 		local foot = rig[side .. "Foot"]
-		part(rig, foot, "WoodenFoot", V(0.5, 0.3, 0.95), V(0, 0, -0.18), limb)
-		part(rig, foot, "Toes", V(0.5, 0.5, 0.5), V(0, -0.05, -0.62), limb, BALL)
+		part(rig, foot, "WoodenFoot", V(0.58, 0.36, 1.05), V(0, -0.02, -0.2), limb, BALL)
+		part(rig, foot, "Toes", V(0.52, 0.34, 0.46), V(0, -0.06, -0.62), limb, BALL)
 	end
 	-- The bat: a plain wooden baseball bat, knob, handle and barrel.
 	local h = rig.RightHand
@@ -223,15 +223,19 @@ local function shark(rig, accent)
 	local function part(r, bone, name, size, pos, color, shape, rotation)
 		return build(r, bone, name, size, if bone == t then pos + V(0, -1.35, 0) else pos, color, shape, rotation)
 	end
-	local skin = C(44, 66, 80)
+	local skin = C(74, 116, 150)
 	part(rig, t, "SharkBody", V(2.05, 1.85, 4.25), V(0, -0.1, 0.12), skin, BALL)
-	part(rig, t, "WhiteBelly", V(1.83, 1.1, 3.75), V(0, -0.56, -0.05), C(137, 153, 149), BALL)
+	part(rig, t, "WhiteBelly", V(1.83, 1.1, 3.75), V(0, -0.56, -0.05), C(226, 233, 236), BALL)
 	part(rig, t, "SharkSnout", V(1.62, 1.04, 2.05), V(0, -0.12, -1.62), skin, BALL)
 	part(rig, t, "OpenMouth", V(1.21, 0.22, 1.26), V(0, -0.5, -2.1), C(63, 28, 31), BALL)
-	part(rig, t, "LowerJaw", V(1.22, 0.26, 1.5), V(0, -0.69, -1.94), C(200, 210, 205), BALL)
+	part(rig, t, "LowerJaw", V(1.22, 0.26, 1.5), V(0, -0.69, -1.94), C(232, 236, 238), BALL)
 	for _, s in { -1, 1 } do
-		part(rig, t, "SharkEye", V(0.18, 0.16, 0.25), V(s * 0.68, 0.12, -2.02), accent, BALL)
-		part(rig, t, "EyeHighlight", V(0.05, 0.06, 0.06), V(s * 0.742, 0.16, -2.07), white, BALL)
+		-- Big round cartoon eyes on the sides of its snout, looking ahead.
+		part(rig, t, "EyeWhite", V(0.3, 0.36, 0.4), V(s * 0.6, 0.2, -1.9), C(248, 248, 244), BALL)
+		part(rig, t, "SharkEye", V(0.12, 0.22, 0.24), V(s * 0.72, 0.19, -1.98), accent, BALL)
+		part(rig, t, "Pupil", V(0.08, 0.13, 0.13), V(s * 0.765, 0.19, -2.0), dark, BALL)
+		part(rig, t, "EyeHighlight", V(0.05, 0.07, 0.07), V(s * 0.775, 0.27, -2.05), white, BALL)
+		part(rig, t, "Brow", V(0.08, 0.07, 0.36), V(s * 0.62, 0.42, -1.92), C(46, 76, 104), nil, A(s * 0.25, 0, 0))
 		for i = 1, 4 do
 			part(
 				rig,
@@ -239,7 +243,7 @@ local function shark(rig, accent)
 				"Gill",
 				V(0.035, 0.51 - i * 0.045, 0.052),
 				V(s * (0.99 - i * 0.015), -0.1, -0.85 + i * 0.17),
-				C(39, 65, 73),
+				C(52, 84, 112),
 				nil,
 				A(-0.15, 0, s * 0.08)
 			)
@@ -267,7 +271,7 @@ local function shark(rig, accent)
 			A(0, 0, s * 0.19)
 		)
 	end
-	part(rig, t, "DorsalFin", V(0.16, 1.55, 1.43), V(0, 1.05, 0.4), C(62, 91, 107), "Wedge", A(0, math.pi, 0))
+	part(rig, t, "DorsalFin", V(0.16, 1.55, 1.43), V(0, 1.05, 0.4), C(60, 98, 132), "Wedge", A(0, math.pi, 0))
 	part(rig, t, "TailPeduncle", V(0.63, 0.64, 2), V(0, -0.03, 2.55), skin, BALL)
 	part(rig, t, "UpperTailFin", V(0.16, 1.7, 1.25), V(0, 0.6, 3.37), skin, "Wedge", A(0, math.pi, 0))
 	part(rig, t, "LowerTailFin", V(0.15, 0.97, 1.01), V(0, -0.58, 3.42), skin, "Wedge", A(0, 0, math.pi))
@@ -280,7 +284,7 @@ local function shark(rig, accent)
 end
 local function tree(rig, accent)
 	local t, h = rig.UpperTorso, rig.Head
-	local bark, skin = C(92, 66, 38), C(134, 104, 67)
+	local bark, skin = C(120, 86, 52), C(198, 154, 106)
 	part(rig, t, "GnarledTrunk", V(1.95, 2.65, 1.3), V(0, -0.2, 0.08), bark, BALL)
 	part(rig, h, "MonkeyHead", V(1.65, 1.8, 1.35), V(0, 0, 0), bark, BALL)
 	part(rig, h, "FaceMask", V(1.23, 1.17, 0.5), V(0, 0.03, -0.57), skin, BALL)
@@ -294,7 +298,7 @@ local function tree(rig, accent)
 			"HeavyBrow",
 			V(0.62, 0.22, 0.27),
 			V(s * 0.35, 0.39, -0.94),
-			C(74, 101, 36),
+			C(88, 132, 52),
 			BALL,
 			A(0, 0, s * 0.32)
 		)
@@ -373,17 +377,17 @@ local function tree(rig, accent)
 		end
 	end
 	-- Layered leaf tufts hug the body; no spherical tree canopy.
-	for i = 1, 38 do
+	for i = 1, 26 do
 		local a = i * 2.39996
 		local y = -1.2 + (i % 9) * 0.39
-		local x, z = math.cos(a) * 0.88, math.sin(a) * 0.63
+		local x, z = math.cos(a) * 0.9, math.sin(a) * 0.65
 		part(
 			rig,
 			t,
 			"MossTuft",
-			V(0.51, 0.64, 0.25),
+			V(0.62, 0.72, 0.3),
 			V(x, y, z),
-			C(45 + (i % 4) * 9, 82 + (i % 5) * 10, 29 + (i % 3) * 7),
+			C(72 + (i % 4) * 10, 128 + (i % 5) * 10, 46 + (i % 3) * 8),
 			BALL,
 			A(0.15, a, 0.32)
 		)
@@ -396,7 +400,7 @@ local function tree(rig, accent)
 			"LeafHood",
 			V(0.53, 0.57, 0.37),
 			V(math.cos(a) * 0.66, 0.55 + math.sin(a) * 0.3, 0.13 + math.sin(a) * 0.41),
-			C(53, 104 + (i % 3) * 12, 35),
+			C(82, 148 + (i % 3) * 12, 56),
 			BALL,
 			A(0, a, 0.2)
 		)
@@ -416,16 +420,17 @@ local function tree(rig, accent)
 end
 local function croc(rig, accent)
 	local t = rig.UpperTorso
-	local green, metal = C(48, 72, 40), C(43, 58, 52)
+	local green, metal = C(82, 124, 64), C(104, 118, 98)
 	part(rig, t, "BomberFuselage", V(1.55, 1.45, 4.6), V(0, -0.13, 0.65), metal, BALL)
 	part(rig, t, "CrocSkull", V(1.67, 1.06, 1.6), V(0, -0.08, -1.14), green, BALL)
 	part(rig, t, "LongUpperSnout", V(1.29, 0.48, 2.85), V(0, -0.32, -2.48), green, BALL)
 	part(rig, t, "MouthCavity", V(1.08, 0.28, 2.44), V(0, -0.61, -2.35), C(53, 32, 24), BALL)
-	part(rig, t, "LowerJaw", V(1.19, 0.29, 2.83), V(0, -0.87, -2.39), C(139, 148, 88), BALL, A(-0.055, 0, 0))
+	part(rig, t, "LowerJaw", V(1.19, 0.29, 2.83), V(0, -0.87, -2.39), C(206, 204, 150), BALL, A(-0.055, 0, 0))
 	for _, s in { -1, 1 } do
 		part(rig, t, "RaisedEye", V(0.43, 0.34, 0.56), V(s * 0.57, 0.37, -1.6), green, BALL)
-		part(rig, t, "GoldEye", V(0.14, 0.17, 0.2), V(s * 0.735, 0.3, -1.77), C(255, 92, 24), BALL)
-		part(rig, t, "EyeSlit", V(0.07, 0.13, 0.06), V(s * 0.8, 0.3, -1.81), dark, BALL)
+		part(rig, t, "GoldEye", V(0.22, 0.26, 0.3), V(s * 0.72, 0.36, -1.76), C(255, 196, 48), BALL)
+		part(rig, t, "EyeSlit", V(0.07, 0.2, 0.08), V(s * 0.82, 0.36, -1.84), dark, BALL)
+		part(rig, t, "EyeGlint", V(0.05, 0.06, 0.05), V(s * 0.83, 0.43, -1.86), white, BALL)
 		part(rig, t, "Nostril", V(0.12, 0.08, 0.21), V(s * 0.34, -0.1, -3.47), dark, BALL)
 		for i = 1, 10 do
 			local z = -1.48 - i * 0.19
@@ -452,7 +457,7 @@ local function croc(rig, accent)
 			nil,
 			A(0, -s * 0.13, s * 0.04)
 		)
-		part(rig, t, "WingPanel", V(2.4, 0.035, 0.045), V(s * 2.48, -0.06, 0.6), C(43, 58, 52), nil, A(0, -s * 0.13, 0))
+		part(rig, t, "WingPanel", V(2.4, 0.035, 0.045), V(s * 2.48, -0.06, 0.6), C(78, 90, 74), nil, A(0, -s * 0.13, 0))
 		part(rig, t, "EngineNacelle", V(0.64, 0.62, 1.45), V(s * 1.9, -0.33, -0.1), C(106, 116, 92), BALL)
 		part(rig, t, "PropellerHub", V(0.28, 0.28, 0.4), V(s * 1.9, -0.33, -0.89), C(215, 176, 53), BALL)
 		for j = 0, 2 do
@@ -476,18 +481,18 @@ local function croc(rig, accent)
 			"ArmoredDorsalScute",
 			V(0.36, 0.36, 0.43),
 			V(0, 0.53, 0.5 + i * 0.25),
-			C(35, 48, 32),
+			C(58, 88, 48),
 			"Wedge",
 			A(0, math.pi, 0)
 		)
 	end
-	part(rig, t, "CockpitGlass", V(1.05, 0.62, 1.21), V(0, 0.64, -0.01), C(82, 138, 145), BALL)
+	part(rig, t, "CockpitGlass", V(1.05, 0.62, 1.21), V(0, 0.64, -0.01), C(118, 186, 204), BALL)
 	for _, z in { -0.46, 0.13, 0.48 } do
 		part(rig, t, "CanopyFrame", V(1.04, 0.065, 0.07), V(0, 0.79, z), C(135, 147, 123))
 	end
 	part(rig, t, "TailFin", V(0.14, 1.35, 1.1), V(0, 0.62, 2.7), C(211, 161, 38), "Wedge", A(0, math.pi, 0))
 	for i = 1, 6 do
-		part(rig, t, "SnoutScute", V(0.48, 0.075, 0.13), V(0, -0.04, -1.45 - i * 0.29), C(60, 85, 48), BALL)
+		part(rig, t, "SnoutScute", V(0.48, 0.075, 0.13), V(0, -0.04, -1.45 - i * 0.29), C(64, 100, 52), BALL)
 	end
 	for _, s in { -1, 1 } do
 		local p = part(rig, t, "IonEngineGlow", V(0.34, 0.34, 0.12), V(s * 1.9, -0.33, 0.6), accent, BALL)
@@ -508,6 +513,10 @@ local function creatureDetails(rig, shape, accent)
 				p.Material = Enum.Material.Wood
 			end
 		end
+		-- The sawn top: pale end grain the rings sit on.
+		local cap =
+			part(rig, t, "LogCap", V(0.05, 1.5, 1.5), V(0, 2.68, 0), C(216, 162, 100), CYL, A(0, 0, math.pi / 2))
+		cap.Material = Enum.Material.Wood
 		for ring = 1, 3 do
 			local radius = ring * 0.19
 			for i = 1, 12 do
@@ -518,10 +527,19 @@ local function creatureDetails(rig, shape, accent)
 		end
 	elseif shape == "Shark" then
 		for _, side in { -1, 1 } do
-			part(rig, t, "LateralStripe", V(0.06, 0.12, 2.35), V(side * 0.94, -1.57, 0.12), C(95, 125, 139), BALL)
+			part(rig, t, "LateralStripe", V(0.06, 0.12, 2.35), V(side * 0.94, -1.57, 0.12), C(132, 170, 198), BALL)
 			part(rig, t, "Nostril", V(0.08, 0.07, 0.14), V(side * 0.48, -1.35, -2.5), dark, BALL)
 			for i = 1, 3 do
-				part(rig, t, "FinRay", V(0.035, 0.65 + i * 0.18, 0.05), V(side * 0.09, -0.35, 0.08 + i * 0.24), C(91, 124, 141), nil, A(-0.18, 0, 0))
+				part(
+					rig,
+					t,
+					"FinRay",
+					V(0.035, 0.65 + i * 0.18, 0.05),
+					V(side * 0.09, -0.35, 0.08 + i * 0.24),
+					C(110, 150, 180),
+					nil,
+					A(-0.18, 0, 0)
+				)
 			end
 		end
 	elseif shape == "Tree" then
@@ -534,7 +552,15 @@ local function creatureDetails(rig, shape, accent)
 			end
 		end
 		for i = 1, 5 do
-			local p = part(rig, rig.Head, "HangingMoss", V(0.09, 0.35 + i * 0.06, 0.12), V((i - 3) * 0.24, -0.6, 0.45), C(72, 107, 45), BALL)
+			local p = part(
+				rig,
+				rig.Head,
+				"HangingMoss",
+				V(0.09, 0.35 + i * 0.06, 0.12),
+				V((i - 3) * 0.24, -0.6, 0.45),
+				C(96, 146, 62),
+				BALL
+			)
 			animate(p, "Moss", CFrame.new((i - 3) * 0.24, -0.32, 0.45), if i % 2 == 0 then -1 else 1)
 		end
 	else
@@ -570,68 +596,102 @@ local function creatureDetails(rig, shape, accent)
 	end
 end
 
+-- Armour fitted to each creature: rounded plates (a shell over a rim of
+-- trim that shows round its edge), each with its element's gem socket and
+-- two rivets, never flat slabs. The crown sits on the head bone, so it turns
+-- with the head.
 local function armor(rig, spec, accent, tier, hasShield)
-	local metal = C(48 + 12 * tier, 55 + 10 * tier, 63 + 9 * tier)
-	local trim = if tier == 5 then C(230, 184, 72) elseif tier == 4 then C(163, 110, 216) else C(116, 141, 164)
+	local metal = C(70 + 14 * tier, 78 + 12 * tier, 90 + 10 * tier)
+	local trim = if tier == 5 then C(236, 190, 78) elseif tier == 4 then C(170, 118, 222) else C(132, 160, 184)
 	local t = rig.UpperTorso
 	local horizontal = spec.Shape == "Shark" or spec.Shape == "Crocodile"
-	local function plate(bone, name, size, pos)
-		part(rig, bone, name, size, pos, metal)
-		part(rig, bone, name .. "Trim", V(size.X + 0.04, 0.07, 0.07), pos + V(0, size.Y / 2, -size.Z / 2 - 0.02), trim)
+	-- `face`: which way its gem looks (a unit direction in the bone's space).
+	local function plate(bone, name, size, pos, face: Vector3?)
+		local out = face or V(0, 0, -1)
+		local shell = part(rig, bone, name, size, pos, metal, BALL)
+		shell.Material = Enum.Material.Metal
+		local reach = math.abs(out.X) * size.X / 2 + math.abs(out.Y) * size.Y / 2 + math.abs(out.Z) * size.Z / 2
+		-- (The rim: wider than the shell across it, thinner along its face,
+		-- set back so only its edge shows.)
+		local function rim(n: number, facing: number): number
+			return if math.abs(facing) > 0.5 then n * 0.55 else n + 0.12
+		end
+		part(
+			rig,
+			bone,
+			name .. "Trim",
+			V(rim(size.X, out.X), rim(size.Y, out.Y), rim(size.Z, out.Z)),
+			pos - out * reach * 0.35,
+			trim,
+			BALL
+		)
 		local stone = part(
 			rig,
 			bone,
 			name .. "Socket",
-			V(0.16 + tier * 0.025, 0.2 + tier * 0.025, 0.12),
-			pos + V(0, 0, -size.Z / 2 - 0.05),
+			V(0.16 + tier * 0.025, 0.2 + tier * 0.025, 0.14),
+			pos + out * (reach - 0.02),
 			accent,
 			BALL
 		)
 		stone.Material = Enum.Material.Neon
+		local across = if math.abs(out.X) > 0.5 then V(0, 0, 1) else V(1, 0, 0)
+		local width = if math.abs(out.X) > 0.5 then size.Z else size.X
 		for _, side in { -1, 1 } do
 			part(
 				rig,
 				bone,
 				name .. "Rivet",
-				V(0.07, 0.07, 0.07),
-				pos + V(side * size.X * 0.35, size.Y * 0.3, -size.Z / 2 - 0.04),
+				V(0.08, 0.08, 0.08),
+				pos + across * side * width * 0.3 + out * (reach * 0.8) + V(0, size.Y * 0.2, 0),
 				trim,
 				BALL
 			)
 		end
 	end
 	if horizontal then
-		local y = if spec.Shape == "Shark" then -0.72 else 0.43
-		plate(t, "ArmoredCarapace", V(1.65, 0.22, 1.2), V(0, y, 0.75))
-		plate(t, "CranialArmor", V(0.72, 0.14, 0.55), V(0, if spec.Shape == "Shark" then -0.94 else y + 0.12, -1))
+		local shark = spec.Shape == "Shark"
+		local y = if shark then -0.62 else 0.43
+		plate(t, "ArmoredCarapace", V(1.55, 0.5, 1.45), V(0, y, 0.75), V(0, 1, 0))
+		plate(t, "CranialArmor", V(0.8, 0.32, 0.62), V(0, if shark then -0.84 else y + 0.08, -1), V(0, 1, 0))
 		for _, side in { -1, 1 } do
-			plate(t, "FlankGuard", V(0.18, 0.55, 0.8), V(side * 0.88, y - 0.3, 0.8))
-			plate(t, "TailGreave", V(0.2, 0.27, 0.5), V(side * 0.27, y - 0.2, 2.3))
+			plate(t, "FlankGuard", V(0.24, 0.62, 0.95), V(side * 0.86, y - 0.32, 0.8), V(side, 0, 0))
+			plate(t, "TailGreave", V(0.24, 0.32, 0.55), V(side * 0.3, y - 0.18, 2.25), V(side, 0, 0))
 		end
-		plate(t, "AegisPlate", V(0.78, 0.13, 0.6), V(0, y + 0.1, 1.65))
+		plate(t, "AegisPlate", V(0.85, 0.3, 0.7), V(0, y + 0.05, 1.7), V(0, 1, 0))
 	else
-		local crownY = if spec.Shape == "Wood" then 2.35 else 2.15
-		plate(t, "HelmetCrown", V(1.8, 0.22, 1.5), V(0, crownY, 0))
-		plate(t, "ChestArmor", V(1.35, 0.8, 0.2), V(0, -0.6, -0.79))
+		-- (Its crown on its head, so a head turning to its foe takes it along.)
+		local head = rig.Head
+		if spec.Shape == "Tree" then
+			plate(head, "HelmetCrown", V(1.45, 0.3, 1.25), V(0, 0.98, 0.08))
+		else
+			plate(head, "HelmetCrown", V(1.6, 0.34, 1.4), V(0, 0.55, 0))
+		end
+		plate(t, "ChestArmor", V(1.45, 0.95, 0.4), V(0, -0.55, -0.72))
 		for _, side in { "Left", "Right" } do
-			plate(rig[side .. "LowerArm"], side .. "Gauntlet", V(0.48, 0.58, 0.43), V(0, -0.15, 0))
-			plate(rig[side .. "LowerLeg"], side .. "Greave", V(0.5, 0.7, 0.4), V(0, -0.13, 0))
+			local out = V(if side == "Left" then -1 else 1, 0, 0)
+			plate(rig[side .. "LowerArm"], side .. "Gauntlet", V(0.66, 0.66, 0.66), V(0, -0.15, 0), out)
+			plate(rig[side .. "LowerLeg"], side .. "Greave", V(0.66, 0.78, 0.6), V(0, -0.13, -0.06))
 		end
 		if hasShield ~= false then
-			plate(rig.LeftLowerArm, "ElementShield", V(0.95, 1.2, 0.18), V(0, 0, -0.4))
+			plate(rig.LeftLowerArm, "ElementShield", V(1.05, 1.3, 0.3), V(0, 0, -0.45))
 		end
 	end
 	if tier >= 4 then
 		for _, side in { -1, 1 } do
-			part(
+			local crest = part(
 				rig,
-				t,
+				if horizontal then t else rig.Head,
 				"EliteArmorCrest",
-				V(0.13, 0.48, 0.28),
-				V(side * 0.72, if spec.Shape == "Shark" then -0.42 elseif horizontal then 0.55 else 2.65, 0.25),
+				V(0.13, 0.48, 0.32),
+				if horizontal
+					then V(side * 0.62, if spec.Shape == "Shark" then -0.3 else 0.62, 0.3)
+					else V(side * 0.55, 1.2, 0.1),
 				trim,
-				"Wedge"
+				"Wedge",
+				A(0, 0, -side * 0.25)
 			)
+			crest.Material = Enum.Material.Metal
 		end
 	end
 end

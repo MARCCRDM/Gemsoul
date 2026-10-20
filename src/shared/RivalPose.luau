@@ -639,34 +639,77 @@ function RivalPose.guardStep(phase: number, forward: number, side: number, amoun
 	}
 end
 
+-- How each creature walks and stands (by its CreatureShape; Default for
+-- any other): Stride, its hips' swing; Knee, how high a foot lifts; Arm,
+-- its arms' swing against the legs (0: arms it doesn't swing, a shark's
+-- fins on its legs, a plane's wings); Elbow, the arms' bend into a swing;
+-- Roll, its body rocking side to side (a waddle); Lean, forward (-) at rest;
+-- Breath, how deep it breathes, BreathRate how fast; Sway, its weight
+-- shifting while it stands; Length, studs it covers in a full stride (two
+-- steps) at scale 1, so its feet keep pace with the ground.
+RivalPose.Gaits = {
+	Default = { Length = 4.5, Stride = 0.55, Knee = 0.72, Arm = 0.32, Elbow = 0.18, Roll = 0.04, Lean = 0, Breath = 0.03, BreathRate = 2, Sway = 0.04 },
+	Wood = { Length = 4.5, Stride = 0.55, Knee = 0.6, Arm = 0.28, Elbow = 0.1, Roll = 0.035, Lean = 0, Breath = 0.025, BreathRate = 2, Sway = 0.03 },
+	Tree = { Length = 6.5, Stride = 0.42, Knee = 0.5, Arm = 0.16, Elbow = 0.1, Roll = 0.09, Lean = -0.16, Breath = 0.03, BreathRate = 1.5, Sway = 0.05 },
+	Shark = { Length = 3.5, Stride = 0.7, Knee = 0.72, Arm = 0, Elbow = 0, Roll = 0.035, Lean = -0.03, Breath = 0.025, BreathRate = 2.2, Sway = 0.03 },
+	Crocodile = { Length = 4.5, Stride = 0.55, Knee = 0.72, Arm = 0, Elbow = 0, Roll = 0.055, Lean = 0, Breath = 0.02, BreathRate = 1.8, Sway = 0.025 },
+	TwinDuck = { Length = 3.2, Stride = 0.45, Knee = 0.55, Arm = 0.2, Elbow = 0.1, Roll = 0.14, Lean = 0, Breath = 0.03, BreathRate = 2.4, Sway = 0.06 },
+	Chimpanzini = { Length = 4.2, Stride = 0.6, Knee = 0.8, Arm = 0.48, Elbow = 0.28, Roll = 0.06, Lean = -0.08, Breath = 0.035, BreathRate = 2.6, Sway = 0.05 },
+	Frigo = { Length = 5.5, Stride = 0.4, Knee = 0.5, Arm = 0.2, Elbow = 0.08, Roll = 0.05, Lean = 0, Breath = 0.02, BreathRate = 1.6, Sway = 0.025 },
+	TreeTrio = { Length = 6.5, Stride = 0.42, Knee = 0.5, Arm = 0.18, Elbow = 0.1, Roll = 0.09, Lean = -0.1, Breath = 0.03, BreathRate = 1.5, Sway = 0.05 },
+	FrogAvocado = { Length = 4.0, Stride = 0.5, Knee = 0.9, Arm = 0.3, Elbow = 0.2, Roll = 0.05, Lean = 0, Breath = 0.045, BreathRate = 2.8, Sway = 0.04 },
+	Cappuccino = { Length = 4.4, Stride = 0.6, Knee = 0.75, Arm = 0.42, Elbow = 0.25, Roll = 0.03, Lean = -0.06, Breath = 0.025, BreathRate = 2.2, Sway = 0.04 },
+	SahurTrio = { Length = 4.5, Stride = 0.55, Knee = 0.6, Arm = 0.28, Elbow = 0.1, Roll = 0.04, Lean = 0, Breath = 0.025, BreathRate = 2, Sway = 0.03 },
+}
+local function gaitOf(shape: string?)
+	return RivalPose.Gaits[shape or ""] or RivalPose.Gaits.Default
+end
+
 -- Creature locomotion follows distance travelled, so feet stop when the
 -- controller stops. These offsets never move the combat root or hitbox.
+-- Its arms swing against its legs, bending a little at the elbow into the
+-- forward swing, and its body rocks with each step.
 function RivalPose.creatureStep(shape: string, phase: number, forward: number, amount: number)
+	local gait = gaitOf(shape)
 	local swing = math.sin(phase)
 	local lift = math.cos(phase)
-	local stride = (if shape == "Tree" then 0.42 elseif shape == "Shark" then 0.7 else 0.55) * amount
-	local roll = (if shape == "Tree" then 0.09 elseif shape == "Crocodile" then 0.055 else 0.035) * amount
-	local arm = (if shape == "Tree" then 0.16 elseif shape == "Wood" then 0.28 else 0) * amount * swing * forward
+	local stride = gait.Stride * amount
+	local roll = gait.Roll * amount
+	local arm = gait.Arm * amount * swing * forward
+	local elbow = gait.Elbow * amount
 	return {
 		RightHip = { stride * swing * forward, 0, 0 },
 		LeftHip = { -stride * swing * forward, 0, 0 },
-		RightKnee = { -0.72 * amount * math.max(0, lift), 0, 0 },
-		LeftKnee = { -0.72 * amount * math.max(0, -lift), 0, 0 },
-		Waist = { -0.045 * amount, 0.045 * swing * amount, roll * swing },
-		RightShoulder = { -arm, 0, 0 }, LeftShoulder = { arm, 0, 0 },
+		RightKnee = { -gait.Knee * amount * math.max(0, lift), 0, 0 },
+		LeftKnee = { -gait.Knee * amount * math.max(0, -lift), 0, 0 },
+		Waist = { -0.045 * amount + 0.025 * amount * math.abs(lift), 0.045 * swing * amount, roll * swing },
+		RightShoulder = { -arm, 0, 0 },
+		LeftShoulder = { arm, 0, 0 },
+		RightElbow = { elbow * math.max(0, -swing * forward), 0, 0 },
+		LeftElbow = { elbow * math.max(0, swing * forward), 0, 0 },
 	}
 end
 
+-- A creature standing in its fighting stance: it breathes (its chest and
+-- shoulders rise and fall), shifts its weight now and then, and its head
+-- bobs with each breath.
 local function creatureStance(shape: string, t: number)
-	local breath = math.sin(t * (if shape == "Tree" then 1.5 else 2))
-	local lean = if shape == "Tree" then -0.16 elseif shape == "Shark" then -0.03 else 0
+	local gait = gaitOf(shape)
+	local breath = math.sin(t * gait.BreathRate)
+	local sway = math.sin(t * 0.7) * gait.Sway
+	local lean = gait.Lean
+	local b = gait.Breath
 	return {
-		Waist = { lean + 0.018 * breath, 0.025 * math.sin(t * 0.7), 0 },
-		Neck = { -lean * 0.5, 0, 0 },
-		RightShoulder = { 0.15, 0, 0.08 }, LeftShoulder = { 0.15, 0, -0.08 },
-		RightElbow = { 0.25, 0, 0 }, LeftElbow = { 0.25, 0, 0 },
-		RightHip = { 0.08, 0, 0 }, LeftHip = { 0.08, 0, 0 },
-		RightKnee = { -0.12, 0, 0 }, LeftKnee = { -0.12, 0, 0 },
+		Waist = { lean + b * breath, 0.6 * sway, 0.35 * sway },
+		Neck = { -lean * 0.5 - b * 0.6 * breath, -0.4 * sway, 0 },
+		RightShoulder = { 0.15 + b * 0.8 * breath, 0, 0.08 + b * 0.5 * breath },
+		LeftShoulder = { 0.15 + b * 0.8 * breath, 0, -0.08 - b * 0.5 * breath },
+		RightElbow = { 0.25, 0, 0 },
+		LeftElbow = { 0.25, 0, 0 },
+		RightHip = { 0.08, 0, -0.3 * sway },
+		LeftHip = { 0.08, 0, -0.3 * sway },
+		RightKnee = { -0.12, 0, 0 },
+		LeftKnee = { -0.12, 0, 0 },
 	}
 end
 
@@ -1086,6 +1129,11 @@ function RivalPose.lookAngles(model: Model, point: Vector3)
 		math.clamp(yaw, -RivalPose.LookYaw, RivalPose.LookYaw)
 end
 
+-- A joint is written once it has moved this far (radians) since it was
+-- last written: small enough that a slow breath shows as smooth motion,
+-- large enough that a body at rest isn't rewritten every frame.
+RivalPose.WriteStep = 0.0015
+
 -- Call every frame (clients pose every body: Client.BodyPoses) with the
 -- model and server time. Joints only change when they move noticeably.
 local nextSweep = 0
@@ -1176,8 +1224,7 @@ function RivalPose.update(
 	end
 	local follow = 1 - math.exp(-10 * step)
 	rig.Stride = (rig.Stride or 0) + (math.min(1, pace / 6) - (rig.Stride or 0)) * follow
-	local strideLength = if creature == "Tree" then 6.5 elseif creature == "Shark" then 3.5 else STRIDE_LENGTH
-	if creature then strideLength *= model:GetScale() end
+	local strideLength = if creature then gaitOf(creature).Length * model:GetScale() else STRIDE_LENGTH
 	rig.Phase = ((rig.Phase or 0) + pace * step * 2 * math.pi / strideLength) % (2 * math.pi)
 	if rig.Stride > 0.01 then
 		if creature and not guardUp then
@@ -1210,16 +1257,21 @@ function RivalPose.update(
 	for joint, entry in rig.Joints do
 		local angles = rig.Angles[joint]
 		local to = target[joint] or { 0, 0, 0 }
-		local moved = 0
 		for i = 1, 3 do
-			local step = (to[i] - angles[i]) * alpha
-			angles[i] += step
-			moved = math.max(moved, math.abs(step))
+			angles[i] += (to[i] - angles[i]) * alpha
 		end
+		-- How far it has moved since it was last written: a slow motion (a
+		-- breath, a sway, the tail of a blend) moves less than a write's worth
+		-- each frame, and measured frame by frame it was never written, so an
+		-- idle body stood frozen and then jumped.
+		local shown = entry.Shown or { 0, 0, 0 }
+		entry.Shown = shown
+		local moved =
+			math.max(math.abs(angles[1] - shown[1]), math.abs(angles[2] - shown[2]), math.abs(angles[3] - shown[3]))
 		-- The bend turns about the parent's own axes at the joint, so a rig
 		-- whose joint frames are rotated (R6, some avatars) bends the same way.
-		-- Written when it moves, or when something else has put the joint
-		-- back since (counted: RivalPose.inspect shows it).
+		-- Written when it has moved WriteStep, or when something else has put
+		-- the joint back since (counted: RivalPose.inspect shows it).
 		local current = (entry.Object :: any)[entry.Property]
 		local overridden = entry.Last ~= nil
 			and (
@@ -1230,11 +1282,12 @@ function RivalPose.update(
 		if overridden then
 			rig.Resets += 1
 		end
-		if moved > 0.002 or not entry.Last or overridden then
+		if moved > RivalPose.WriteStep or not entry.Last or overridden then
 			entry.Last = CFrame.new(entry.Rest.Position)
 				* CFrame.Angles(angles[1], angles[2], angles[3])
 				* entry.Rest.Rotation;
 			(entry.Object :: any)[entry.Property] = entry.Last
+			shown[1], shown[2], shown[3] = angles[1], angles[2], angles[3]
 		end
 	end
 end
@@ -1247,6 +1300,7 @@ local function toRest(rig)
 			(entry.Object :: any)[entry.Property] = entry.Rest
 		end
 		entry.Last = entry.Rest
+		entry.Shown = { 0, 0, 0 }
 		rig.Angles[joint] = { 0, 0, 0 }
 	end
 	rig.Hold, rig.UpperHold, rig.Stride, rig.Phase = 0, 0, 0, 0

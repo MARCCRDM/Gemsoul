@@ -183,4 +183,58 @@ do
 	check(shoulder.C0 == rest, "The first calm frame after a reset bent the joint again")
 	check(type(RivalPose.Attributes) == "table" and table.find(RivalPose.Attributes, "ActionKind"), "The pose attributes aren't listed")
 end
+-- A creature standing idle breathes: its waist is written again and again
+-- as it rises and falls (slow motion was once never written: it stood
+-- frozen), but not every frame, and it follows the breath smoothly.
+do
+	local m = Instance.new("Model")
+	local lower = part(m, "LowerTorso", Vector3.new(2, 0.4, 1), Vector3.new(0, 0, 0))
+	local upper = part(m, "UpperTorso", Vector3.new(2, 1.6, 1), Vector3.new(0, 1, 0))
+	part(m, "HumanoidRootPart", Vector3.new(2, 2, 1), Vector3.new(0, 0.5, 0))
+	humanoid(m)
+	local waist = motor("Waist", lower, upper, Vector3.new(0, 0.2, 0))
+	waist.Parent = upper
+	m:SetAttribute("CreatureShape", "Chimpanzini")
+	m.Parent = Instance.new("Folder")
+	-- (Lune's Model has no GetScale: the body as RivalPose sees it.)
+	local model = m
+	m = setmetatable({
+		GetScale = function()
+			return 1
+		end,
+	}, {
+		__index = function(_, key)
+			local value = model[key]
+			if type(value) == "function" then
+				return function(_, ...)
+					return value(model, ...)
+				end
+			end
+			return value
+		end,
+	})
+	local writes, last, jump, frames = 0, waist.C0, 0, 0
+	local t = 200
+	RivalPose.update(m, 1 / 60, t, t)
+	for _ = 1, 90 do -- (into its stance first)
+		t += 1 / 60
+		RivalPose.update(m, 1 / 60, t, t)
+	end
+	last = waist.C0
+	for _ = 1, 240 do
+		t += 1 / 60
+		frames += 1
+		RivalPose.update(m, 1 / 60, t, t)
+		if waist.C0 ~= last then
+			writes += 1
+			local a = select(1, last:ToEulerAnglesXYZ())
+			local b = select(1, waist.C0:ToEulerAnglesXYZ())
+			jump = math.max(jump, math.abs(a - b))
+			last = waist.C0
+		end
+	end
+	check(writes >= 8, "An idle creature's breath was hardly ever written: " .. writes)
+	check(writes < frames, "An idle creature was rewritten every frame")
+	check(jump < 0.01, "An idle creature's breath jumped: " .. jump)
+end
 print("PASS: " .. checks .. " rig pose checks (R15, upgraded joints, R6, late swings, eye to eye, reset)")

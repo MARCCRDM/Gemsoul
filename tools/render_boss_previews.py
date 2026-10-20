@@ -9,7 +9,7 @@ source=source.replace('if key == "Size" then', 'if key == "Size" and (className 
 source=source.replace('if key == "Color" then', 'if key == "Color" and className ~= "ParticleEmitter" then')
 source=source.replace('table.insert(builtParts, values)', 'table.insert(builtParts, _self)')
 source=source.replace('return setmetatable({t={x or 0,y or 0,z or 0}', 'if type(x)=="table" then x,y,z=x.X,x.Y,x.Z end\n return setmetatable({t={x or 0,y or 0,z or 0}')
-source+='\nvmt.__add=function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end\nVector3.zero=Vector3.new(0,0,0)\n'
+source+='\nvmt.__add=function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end\nvmt.__sub=function(a,b) return Vector3.new(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end\nvmt.__div=function(a,b) return Vector3.new(a.X/b,a.Y/b,a.Z/b) end\nvmt.__unm=function(a) return Vector3.new(-a.X,-a.Y,-a.Z) end\nvmt.__index=function(v,key) if key=="Magnitude" then return math.sqrt(v.X*v.X+v.Y*v.Y+v.Z*v.Z) end end\nVector3.zero=Vector3.new(0,0,0)\n'
 source+=(root/'tests/creature_geometry_harness.luau').read_text(encoding='utf-8')+'\n'
 source+='local Skins=(function()\n'+(root/'src/server/Systems/BrainrotSkins.luau').read_text(encoding='utf-8')+'\nend)()\n'
 source+='local Rules=(function()\n'+(root/'src/shared/DungeonRules.luau').read_text(encoding='utf-8').replace('local ElementMatchup = require(script.Parent.ElementMatchup)\n','')+'\nend)()\n'
