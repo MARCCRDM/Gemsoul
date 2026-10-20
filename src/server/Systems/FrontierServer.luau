@@ -64,6 +64,8 @@
 	  FrontierServer.mined(player, gem)      a gem mined (OutpostServer): this trip's haul
 	  FrontierServer.raid(player) -> boolean   a gem raid on them (their team's all down)
 	  FrontierServer.open(at, facing, opts?) -> anchor, timeline   a rift on the ground at `at`
+	      (opts: Critter, Prey, Linger, Hop; Height its size; Hell, burning
+	      the critters' world's colours: the Rift's own)
 	  FrontierServer.scar(at) -> anchor   a dormant rift (a vein's)
 	  FrontierServer.moveScar(index, at)  vein `index`'s dormant rift moves with it
 ]]
@@ -191,7 +193,7 @@ function FrontierServer.open(at: Vector3, facing: Vector3, opts: any?)
 	opts = opts or {}
 	nextSeed += 1
 	local seed = rng:NextInteger(1, 2 ^ 30) + nextSeed
-	local height = rng:NextNumber(Frontier.Rift.Height[1], Frontier.Rift.Height[2])
+	local height = opts.Height or rng:NextNumber(Frontier.Rift.Height[1], Frontier.Rift.Height[2])
 	local life = Frontier.timeline(serverNow(), opts.Linger, opts.Hop)
 	local anchor = Instance.new("Part")
 	anchor.Name = "Rift"
@@ -212,6 +214,9 @@ function FrontierServer.open(at: Vector3, facing: Vector3, opts: any?)
 	end
 	if opts.Prey then
 		anchor:SetAttribute("Prey", opts.Prey.UserId)
+	end
+	if opts.Hell then
+		anchor:SetAttribute("Hell", true) -- (in the critters' own world: RiftTear burns its colours)
 	end
 	anchor.Parent = folder
 	task.delay(life.EndAt - serverNow() + 0.2, function()
@@ -810,8 +815,8 @@ function FrontierServer.start(site)
 		scars[index] = FrontierServer.scar(scar)
 	end
 	-- A critter slipping back goes through a rift of its own.
-	KaijuWilds.rift = function(at: Vector3, facing: Vector3)
-		local _, life = FrontierServer.open(KaijuServer.ground(at), facing)
+	KaijuWilds.rift = function(at: Vector3, facing: Vector3, opts: any?)
+		local _, life = FrontierServer.open(KaijuServer.ground(at), facing, opts)
 		return life
 	end
 	KaijuWilds.done = critterDone

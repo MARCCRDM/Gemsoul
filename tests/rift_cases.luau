@@ -118,6 +118,35 @@ check(
 	"No more critters for more runners"
 )
 check(RiftRun.fighterCount(1, 1) >= 1, "A cave without a fighter")
+for room = 1, RiftRun.Rooms do
+	check(RiftRun.foeCount(room, 1) >= #Kaiju.SlotLevels, "Fewer critters in cave " .. room .. " than a team of kaiju")
+end
+-- Through tears of their own: spread over the cave's floor, clear of the
+-- runners, inside it; crowded, still one for each.
+do
+	local portal = RiftRun.Portal
+	check(portal.Every > 0 and portal.Leader > 7.5 and portal.Boss > portal.Leader, "The tears' timing or sizes")
+	local spotRng = Random.new(11)
+	local center = Vector3.new(500, 20, -300)
+	for trial = 1, 300 do
+		local count = 3 + trial % 6
+		local runners = { center + Vector3.new(spotRng:NextNumber(-20, 20), 0, spotRng:NextNumber(-20, 20)) }
+		local spots = RiftRun.portalSpots(center, 42, count, runners, spotRng)
+		check(#spots == count, "Not a tear for each")
+		for i, spot in spots do
+			local flat = Vector3.new(spot.X - center.X, 0, spot.Z - center.Z)
+			check(flat.Magnitude <= 42 * portal.Share + 1e-6 and spot.Y == center.Y, "A tear off the cave's floor")
+			local fromRunner = Vector3.new(spot.X - runners[1].X, 0, spot.Z - runners[1].Z).Magnitude
+			check(fromRunner >= portal.Clear - 1e-6, "A tear on top of a runner: " .. fromRunner)
+			for j = i + 1, #spots do
+				local apart = Vector3.new(spot.X - spots[j].X, 0, spot.Z - spots[j].Z).Magnitude
+				check(apart >= portal.Apart - 1e-6, "Two tears on top of each other: " .. apart)
+			end
+		end
+	end
+	local crowded = RiftRun.portalSpots(center, 6, 9, { center }, spotRng)
+	check(#crowded == 9, "A crowded cave lost a tear")
+end
 check(RiftRun.fighterCount(1, 3) > RiftRun.fighterCount(1, 1), "No more fighters for more runners")
 local rng = Random.new(5)
 local elites = { [1] = 0, [2] = 0, [3] = 0, [4] = 0 }

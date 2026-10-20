@@ -11,11 +11,17 @@
 	              (SparServer.riftKit: hunting, so a finishing blow knocks
 	              you down rather than kills you); your kaiju come with you
 	              (you keep Outpost, so KaijuServer keeps them out).
-	  The way     a cave's pack comes up once one of you walks in: brainrot
-	              critters (KaijuWilds.spawnBug: Stay, Wander) at your
-	              kaiju's level and up, and the pathway dungeon's fighters
-	              (Duelist.spawnDungeon, a Rift encounter: anyone in can hit
-	              them and be hit, kaiju too). Every one down, the wall of
+	  The way     a cave's pack comes up once one of you walks in, every
+	              one of it through a tear of its own in the cave's floor
+	              (KaijuWilds.rift, Hell: RiftRun.Portal), a moment apart:
+	              brainrot critters (KaijuWilds.spawnBug: Stay, Wander) at
+	              your kaiju's level and up, then the pathway dungeon's
+	              fighters that lead them (Duelist.spawnDungeon, a Rift
+	              encounter: anyone in can hit them and be hit, kaiju too;
+	              RiftLeader on their models: your lock takes them, your
+	              kaiju their critters). Till the last is through it's on
+	              its way (run.Coming, counted in RiftLeft), and the cave
+	              isn't clear. Every one down, the wall of
 	              fire on the way out dies (RiftWorld.openGate) and everyone
 	              in finds a cache (Gems.award "RiftCache": the gems you've
 	              found in here). Through the floor somehow, back in the
@@ -32,10 +38,10 @@
 	              chosen in RiftRun.Fallen seconds, home you go.
 	  The boss    one of the ten brainrot bosses at random, as the pathway
 	              dungeon's Colossus (a Duelist fighter with its every move,
-	              RiftRun.bossHealth times tougher): it tears through in the
-	              throne cave once one of you sets foot there, and calls
-	              critters and a fighter through at each of
-	              RiftRun.Boss.Adds. Beaten: everyone still in gets
+	              RiftRun.bossHealth times tougher, its cave's leader): it
+	              tears through in the throne cave once one of you sets foot
+	              there, and calls critters and a fighter through tears of
+	              their own at each of RiftRun.Boss.Adds. Beaten: everyone still in gets
 	              RiftRun.rewardCoins, a lucky cache, EXP for their kaiju
 	              and swings back on their pick (SwingRestore.Dungeon); the
 	              fallen are back up; the way home opens, and its loot comes
@@ -134,7 +140,7 @@ end
 
 -- Every runner's attributes, as the trip stands.
 local function show(run)
-	local left = 0
+	local left = run.Coming -- (those still on their way through)
 	for _ in run.Foes do
 		left += 1
 	end
@@ -276,7 +282,7 @@ end
 local function spawnFoe(run, at: Vector3, opts)
 	opts.Stay = true
 	opts.Wander = opts.Wander or { Home = at, Roam = 9, Notice = 26 }
-	opts.Facing = run.World.Start.Position
+	opts.Facing = opts.Facing or run.World.Start.Position
 	local enemy = KaijuWilds.spawnBug(at, opts)
 	if not enemy then
 		return nil
@@ -323,14 +329,82 @@ local function spawnFighter(run, at: Vector3, spec, tier: number, boss: boolean?
 	if not enemy then
 		return nil
 	end
+	-- (A pack's leader: the runners' lock goes for it first, their kaiju
+	-- for its critters: Client.TargetLock, KaijuServer.)
+	enemy.Model:SetAttribute("RiftLeader", true)
 	if not boss then
 		run.Foes[enemy] = true
 	end
 	return enemy
 end
 
--- Cave `room`'s pack comes up: its critters, and the pathway dungeon's
--- fighters among them.
+-- Where the runners stand (those up and about), to keep the tears off them
+-- and turn what comes through toward them.
+local function runnersAt(run): { Vector3 }
+	local list = {}
+	for _, player in run.Members do
+		local root = rootOf(player)
+		if root and not run.Fallen[player] then
+			table.insert(list, root.Position)
+		end
+	end
+	return list
+end
+
+-- The runner nearest `at` (where to face, and leap at), or `fallback`.
+local function nearestRunner(run, at: Vector3, fallback: Vector3): Vector3
+	local best, bestDistance = fallback, math.huge
+	for _, position in runnersAt(run) do
+		local distance = (position - at).Magnitude
+		if distance < bestDistance then
+			best, bestDistance = position, distance
+		end
+	end
+	return best
+end
+
+-- When a tear opened by KaijuWilds.rift lets its critter through (now, if
+-- none opened).
+local function hopIn(life): number
+	return if life then math.max(0, life.HopAt - serverNow()) else 0
+end
+
+local checkClear
+
+-- One foe through a tear of its own at `at`: the tear opens `after` seconds
+-- from now (`height` tall; the Outpost's size when nil) in the critters'
+-- world's colours, and out it comes, `arrive(facing)`, toward the nearest
+-- runner. It counts as on its way (run.Coming) until it's through.
+local function through(run, at: Vector3, after: number, height: number?, arrive: (Vector3) -> ())
+	run.Coming += 1
+	task.delay(after, function()
+		if run.Done or run.Won then
+			run.Coming -= 1
+			return
+		end
+		local life =
+			KaijuWilds.rift(at, nearestRunner(run, at, run.World.Start.Position), { Hell = true, Height = height })
+		task.delay(hopIn(life), function()
+			run.Coming -= 1
+			if not run.Done and not run.Won then
+				arrive(nearestRunner(run, at, run.World.Start.Position))
+			end
+			show(run)
+			checkClear(run)
+		end)
+	end)
+end
+
+-- A critter's leap out of its tear, at the runner it faces.
+local function leap(at: Vector3, facing: Vector3): Vector3
+	local toward = Vector3.new(facing.X - at.X, 0, facing.Z - at.Z)
+	toward = if toward.Magnitude > 0.1 then toward.Unit else Vector3.new(0, 0, -1)
+	return toward * RiftRun.Portal.Hop + Vector3.new(0, 24, 0)
+end
+
+-- Cave `room`'s pack comes up through the cave's floor, a tear at a time
+-- (RiftRun.Portal): its critters first, then the pathway dungeon's fighters
+-- that lead them.
 local function spawnRoom(run, room: number)
 	if run.Spawned[room] then
 		return
@@ -339,8 +413,12 @@ local function spawnRoom(run, room: number)
 	local cave = run.World.Rooms[room]
 	local level = RiftRun.level(levelsOf(run), room)
 	local band = if room >= 3 then "Edge" else "Fringe"
-	for _, foe in RiftRun.pickFoes(room, #run.Members, run.Rng) do
-		local at = spotOn(run, cave.Center, cave.Radius, 0.55)
+	local foes = RiftRun.pickFoes(room, #run.Members, run.Rng)
+	local leaders = RiftRun.pickFighters(room, #run.Members, run.Rng)
+	local spots = RiftRun.portalSpots(cave.Center, cave.Radius, #foes + #leaders, runnersAt(run), run.Rng)
+	local every = RiftRun.Portal.Every
+	for i, foe in foes do
+		local at = spots[i] + Vector3.new(0, 0.5, 0)
 		local spec = nil
 		for _, entry in DungeonRules.Roster do
 			if entry.Id == foe.Critter then
@@ -348,34 +426,30 @@ local function spawnRoom(run, room: number)
 			end
 		end
 		local elite = RiftRun.Elite
-		spawnFoe(run, at, {
-			Critter = foe.Critter,
-			Level = level,
-			Band = band,
-			Scale = if foe.Elite then elite.Scale else nil,
-			Health = if foe.Elite then elite.Health else nil,
-			Damage = if foe.Elite then elite.Damage else nil,
-			Reach = if foe.Elite then elite.Reach else nil,
-			Title = if foe.Elite and spec then string.format("Rift Brute · %s · Lv %d", spec.Name, level) else nil,
-		})
+		through(run, at, (i - 1) * every, nil, function(facing)
+			spawnFoe(run, at, {
+				Critter = foe.Critter,
+				Level = level,
+				Band = band,
+				Facing = facing,
+				Hop = leap(at, facing),
+				Scale = if foe.Elite then elite.Scale else nil,
+				Health = if foe.Elite then elite.Health else nil,
+				Damage = if foe.Elite then elite.Damage else nil,
+				Reach = if foe.Elite then elite.Reach else nil,
+				Title = if foe.Elite and spec
+					then string.format("Rift Brute · %s · Lv %d", spec.Name, level)
+					else nil,
+			})
+		end)
 	end
-	for _, spec in RiftRun.pickFighters(room, #run.Members, run.Rng) do
-		spawnFighter(
-			run,
-			spotOn(run, cave.Center, cave.Radius, 0.45),
-			spec,
-			RiftRun.fighterTier(room),
-			false,
-			RiftRun.Fighters.Health
-		)
+	for j, spec in leaders do
+		local at = spots[#foes + j] + Vector3.new(0, 0.5, 0)
+		through(run, at, (#foes + j - 1) * every, RiftRun.Portal.Leader, function()
+			spawnFighter(run, at, spec, RiftRun.fighterTier(room), false, RiftRun.Fighters.Health)
+		end)
 	end
 	show(run)
-end
-
--- When a tear opened by KaijuWilds.rift lets its critter through (now, if
--- none opened).
-local function hopIn(life): number
-	return if life then math.max(0, life.HopAt - serverNow()) else 0
 end
 
 -- The boss tears through in the throne cave: the tear opens, then out it
@@ -388,7 +462,12 @@ local function summonBoss(run)
 	local arena = run.World.Boss
 	local at = arena.Center + Vector3.new(0, 0.5, 0)
 	announce(run, string.format("The ground splits open. %s is coming through!", run.Boss.Name))
-	task.delay(hopIn(KaijuWilds.rift(at, run.World.Start.Position)), function()
+	local life = KaijuWilds.rift(
+		at,
+		nearestRunner(run, at, run.World.Start.Position),
+		{ Hell = true, Height = RiftRun.Portal.Boss }
+	)
+	task.delay(hopIn(life), function()
 		if run.Done or run.Won then
 			return
 		end
@@ -407,8 +486,8 @@ local function summonBoss(run)
 	end)
 end
 
--- Some of its critters through at once round the boss, and its fighters
--- (its Adds).
+-- Some of its critters through tears round the boss, then its fighters
+-- (its Adds), a tear at a time.
 local function callAdds(run)
 	local boss = run.BossEnemy
 	if not boss or not boss.Alive then
@@ -417,29 +496,28 @@ local function callAdds(run)
 	local rule = RiftRun.Boss
 	local level = RiftRun.level(levelsOf(run), RiftRun.Rooms)
 	local arena = run.World.Boss
-	for _, id in Kaiju.wave(rule.AddCount, run.Rng) do
-		local at = spotOn(run, arena.Center, arena.Radius, 0.6)
-		task.delay(hopIn(KaijuWilds.rift(at, boss.Root.Position)), function()
-			if not run.Done and not run.Won then
-				spawnFoe(
-					run,
-					at,
-					{ Critter = id, Level = level, Band = "Edge", Wander = { Home = at, Roam = 14, Notice = 60 } }
-				)
-				show(run)
-			end
+	local wave = Kaiju.wave(rule.AddCount, run.Rng)
+	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng)
+	local spots = RiftRun.portalSpots(arena.Center, arena.Radius, #wave + rule.AddFighters, runnersAt(run), run.Rng)
+	local every = RiftRun.Portal.Every
+	for i, id in wave do
+		local at = spots[i] + Vector3.new(0, 0.5, 0)
+		through(run, at, (i - 1) * every, nil, function(facing)
+			spawnFoe(run, at, {
+				Critter = id,
+				Level = level,
+				Band = "Edge",
+				Facing = facing,
+				Hop = leap(at, facing),
+				Wander = { Home = at, Roam = 14, Notice = 60 },
+			})
 		end)
 	end
-	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng)
-	for _ = 1, rule.AddFighters do
-		spawnFighter(
-			run,
-			spotOn(run, arena.Center, arena.Radius, 0.6),
-			fighters[1],
-			rule.AddTier,
-			false,
-			RiftRun.Fighters.Health
-		)
+	for j = 1, rule.AddFighters do
+		local at = spots[#wave + j] + Vector3.new(0, 0.5, 0)
+		through(run, at, (#wave + j - 1) * every, RiftRun.Portal.Leader, function()
+			spawnFighter(run, at, fighters[1], rule.AddTier, false, RiftRun.Fighters.Health)
+		end)
 	end
 	announce(run, string.format("%s calls its critters through!", run.Boss.Name))
 	show(run)
@@ -638,10 +716,20 @@ foeDied = function(run, enemy)
 		return
 	end
 	run.Foes[enemy] = nil
-	if next(run.Foes) == nil and run.Room <= RiftRun.Rooms and run.Spawned[run.Room] then
+	show(run)
+	checkClear(run)
+end
+
+-- The cave's whole pack is through and down: it's clear.
+checkClear = function(run)
+	if
+		not run.Done
+		and run.Room <= RiftRun.Rooms
+		and run.Spawned[run.Room]
+		and run.Coming == 0
+		and next(run.Foes) == nil
+	then
 		cleared(run, run.Room)
-	else
-		show(run)
 	end
 end
 
@@ -884,6 +972,7 @@ local function enter(player: Player, vein: any)
 			Members = {},
 			Room = 1,
 			Foes = {},
+			Coming = 0, -- (foes on their way through their tears)
 			Boss = RiftRun.pickBoss(rng),
 			BossEnemy = nil,
 			Adds = {},

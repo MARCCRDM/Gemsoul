@@ -11,11 +11,14 @@
 	  A cave     its own pack: brainrot critters (Foes by cave, PerRunner
 	             more for each runner past the first; a ranged one only at
 	             the back, Kaiju.wave) and, from cave Elite.From, now and
-	             then a big one among them (Elite), with the pathway
-	             dungeon's regular fighters among them (Fighters: armed and
-	             armoured to their gear tier). A wall of fire bars the way
-	             on until the cave's cleared; cleared, everyone in finds a
-	             Cache (a gem, luckier further in).
+	             then a big one among them (Elite), led by the pathway
+	             dungeon's regular fighters (Fighters: armed and armoured
+	             to their gear tier). The pack comes through tears in the
+	             cave's floor as you walk in, a tear at a time (Portal:
+	             the critters first, then their leaders). Your kaiju take
+	             the critters; you take the leaders. A wall of fire bars
+	             the way on until the cave's cleared; cleared, everyone in
+	             finds a Cache (a gem, luckier further in).
 	  The boss   one of the ten brainrot bosses (DungeonRules.Bosses) at
 	             random, as a Colossus: the pathway dungeon's boss fighter,
 	             with Boss.Health times its health (more with more
@@ -50,7 +53,7 @@ local RiftRun = {}
 
 RiftRun.Rooms = 4
 RiftRun.Party = 4
-RiftRun.Foes = { 2, 3, 3, 4 }
+RiftRun.Foes = { 3, 4, 4, 5 }
 RiftRun.PerRunner = 1
 RiftRun.Elite = { From = 2, Chance = 0.6, Scale = 1, Health = 4, Damage = 1.5, Reach = 1.6 }
 RiftRun.Fighters = { Count = { 1, 1, 2, 2 }, PerRunner = 0.5, Tier = { 1, 2, 2, 3 }, Health = 1.5 }
@@ -71,6 +74,12 @@ RiftRun.Restore = { Coins = 150, Grow = 2 }
 RiftRun.Fallen = 60
 RiftRun.Fall = { Below = 20 }
 RiftRun.Exit = 20
+-- Every foe comes through a tear of its own: Every seconds apart, each tear
+-- Apart studs or more from the pack's others and Clear from any runner,
+-- inside Share of the cave's radius; it leaps out Hop studs a second at
+-- the runners. A leader's tear stands Leader studs tall, the boss's Boss (a
+-- critter's is the Outpost's size, Shared.Frontier.Rift).
+RiftRun.Portal = { Every = 0.45, Apart = 9, Clear = 9, Share = 0.6, Hop = 18, Leader = 10, Boss = 16 }
 
 -- How many critters come at cave `room` (1..Rooms) for `runners` runners.
 function RiftRun.foeCount(room: number, runners: number): number
@@ -119,6 +128,42 @@ function RiftRun.pickFighters(room: number, runners: number, rng): { any }
 		table.insert(list, spec)
 	end
 	return list
+end
+
+-- Where a pack's `count` tears open on a cave's floor (`center`, `radius`):
+-- spread out (Portal.Apart) and clear of the runners standing at `avoid`
+-- (Portal.Clear), the best of a few tries when the cave's crowded. `rng` has
+-- NextNumber.
+function RiftRun.portalSpots(center: Vector3, radius: number, count: number, avoid: { Vector3 }, rng): { Vector3 }
+	local rule = RiftRun.Portal
+	local function apart(p: Vector3, q: Vector3): number
+		return Vector3.new(p.X - q.X, 0, p.Z - q.Z).Magnitude
+	end
+	local spots = {}
+	for _ = 1, count do
+		local best, bestRoom = nil, -math.huge
+		for _ = 1, 24 do
+			local a = rng:NextNumber(0, math.pi * 2)
+			local r = radius * rule.Share * math.sqrt(rng:NextNumber(0.05, 1))
+			local spot = center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+			-- (How much room it has, the tightest of its rules.)
+			local room = math.huge
+			for _, other in spots do
+				room = math.min(room, apart(spot, other) - rule.Apart)
+			end
+			for _, runner in avoid do
+				room = math.min(room, apart(spot, runner) - rule.Clear)
+			end
+			if room > bestRoom then
+				best, bestRoom = spot, room
+			end
+			if room >= 0 then
+				break
+			end
+		end
+		table.insert(spots, best :: Vector3)
+	end
+	return spots
 end
 
 -- The critters' level in cave `room` (Rooms + 1: the boss's), for runners

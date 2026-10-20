@@ -139,8 +139,13 @@ Frontier.RiftColor = RIFT
 --   Ground   the regolith's tint out there, and its Material (Enum.Material's name)
 --   Stone    its rocks' basalt
 --   Glow     its colour (signs, banners, its props' glow)
---   Tint     the screen's grade there, and Ambient the outdoor light
+--   Tint     the screen's grade there, Ambient the outdoor light and Fog
+--            its haze's colour
 --   Line     the banner's line as you cross into it
+--   Terrain  its ground in Roblox terrain (Frontier.ground): Main, with
+--            patches of Second (where the patch noise is under Share), and
+--            its lie of the land (Relief, up to Height studs, away from
+--            anything standing: OutpostWorld)
 local NORTH = -math.pi / 2
 Frontier.Spokes = { NORTH, 0, math.pi / 2, math.pi }
 Frontier.Biomes = {
@@ -156,7 +161,9 @@ Frontier.Biomes = {
 		Glow = Color3.fromRGB(255, 122, 58),
 		Tint = Color3.fromRGB(255, 232, 214),
 		Ambient = Color3.fromRGB(184, 146, 132),
+		Fog = Color3.fromRGB(112, 78, 64),
 		Line = "Thermal ground  ·  Thermal gems, critters and kaiju",
+		Terrain = { Main = "CrackedLava", Second = "Basalt", Share = 0.42, Relief = "Cones", Height = 6 },
 	},
 	{
 		Id = "Rimefrost",
@@ -170,7 +177,9 @@ Frontier.Biomes = {
 		Glow = Color3.fromRGB(130, 214, 255),
 		Tint = Color3.fromRGB(228, 242, 255),
 		Ambient = Color3.fromRGB(150, 176, 210),
+		Fog = Color3.fromRGB(160, 182, 210),
 		Line = "Cryo ground  ·  Cryo gems, critters and kaiju",
+		Terrain = { Main = "Snow", Second = "Glacier", Share = 0.38, Relief = "Drifts", Height = 4.5 },
 	},
 	{
 		Id = "Stormglass",
@@ -184,7 +193,9 @@ Frontier.Biomes = {
 		Glow = Color3.fromRGB(255, 222, 84),
 		Tint = Color3.fromRGB(250, 246, 228),
 		Ambient = Color3.fromRGB(164, 154, 190),
+		Fog = Color3.fromRGB(112, 102, 150),
 		Line = "Ion ground  ·  Ion gems, critters and kaiju",
+		Terrain = { Main = "Salt", Second = "Limestone", Share = 0.4, Relief = "Ridges", Height = 4 },
 	},
 	{
 		Id = "Blightwood",
@@ -198,7 +209,9 @@ Frontier.Biomes = {
 		Glow = Color3.fromRGB(140, 232, 92),
 		Tint = Color3.fromRGB(234, 255, 228),
 		Ambient = Color3.fromRGB(140, 166, 132),
+		Fog = Color3.fromRGB(96, 116, 78),
 		Line = "Corrosive ground  ·  Corrosive gems, critters and kaiju",
+		Terrain = { Main = "Mud", Second = "LeafyGrass", Share = 0.45, Relief = "Hummocks", Height = 3.5 },
 	},
 }
 -- Bias: a biome's share of its own element (gems, wild kaiju); Critter: the
@@ -208,6 +221,48 @@ Frontier.Biomes = {
 -- which its look comes in.
 Frontier.Biome = { Bias = 0.6, Critter = 0.6, Blend = 60 }
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
+
+-- The ground under the Loop, in Roblox terrain (OutpostWorld lays it):
+--   Cell    studs a side of one column of it (terrain's voxel)
+--   Reach   studs out from the middle it's laid to (under the quarry walls)
+--   Depth   studs of it under the quarry floor
+--   Sway    radians each border between two biomes swings off its spoke,
+--           far out (two waves, Waves radians of each per stud out, each
+--           border its own: they don't mirror each other); Calm studs past
+--           the core's edge it starts swaying, and from Calm[2] on fully,
+--           so at a spoke's mouth (its signs) it's on the road
+--   Seam    studs either side of a border over which the two grounds mix,
+--           swelling and narrowing along it
+--   Edge    the core's regolith gives way to a biome's ground over Edge[1]
+--           studs round Frontier.Core, its rim ragged by Edge[2]
+--   Patch   studs across a ground's patches of its second material
+--   Hub     the core's own ground (as a biome's Terrain)
+--   Colors  each material's colour (Terrain:SetMaterialColor)
+Frontier.Ground = {
+	Cell = 4,
+	Reach = 452,
+	Depth = 8,
+	Sway = { 0.24, 0.12 },
+	Waves = { 1 / 70, 1 / 31 },
+	Calm = { 20, 170 },
+	Seam = { 14, 40 },
+	Edge = { 24, 12 },
+	Patch = 26,
+	Seed = 2718,
+	Hub = { Main = "Slate", Second = "Concrete", Share = 0.38, Height = 0 },
+	Colors = {
+		Slate = Color3.fromRGB(122, 124, 132),
+		Concrete = Color3.fromRGB(98, 100, 110),
+		CrackedLava = Color3.fromRGB(78, 56, 50),
+		Basalt = Color3.fromRGB(58, 46, 46),
+		Snow = Color3.fromRGB(206, 220, 236),
+		Glacier = Color3.fromRGB(150, 192, 228),
+		Salt = Color3.fromRGB(112, 104, 146),
+		Limestone = Color3.fromRGB(146, 134, 180),
+		Mud = Color3.fromRGB(70, 86, 56),
+		LeafyGrass = Color3.fromRGB(84, 116, 54),
+	},
+}
 
 -- Outcrops (angles round the middle are radians: 0 east, a quarter turn
 -- south): Count of them From to To studs out, Apart studs between their
@@ -379,28 +434,190 @@ function Frontier.biomeOf(angle: number)
 	return Frontier.Biomes[math.floor(turn / (math.pi / 2)) % #Frontier.Biomes + 1]
 end
 
--- The biome at `offset` from the middle (across the ground): nil in the
--- core, the Hub.
+-- The ground's own noise: a lattice of values (0..1) from a hash, the same
+-- on every machine, and smooth noise over it (`size` studs a cell).
+local function mul32(a: number, b: number): number
+	-- (a * b mod 2^32, exactly: every partial product stays under 2^53.)
+	local aLo, aHi = a % 65536, a // 65536
+	local bLo, bHi = b % 65536, b // 65536
+	return (aLo * bLo + ((aHi * bLo + aLo * bHi) % 65536) * 65536) % 4294967296
+end
+local function lattice(ix: number, iz: number, salt: number): number
+	local h =
+		bit32.bxor(mul32(ix % 4294967296, 0x8DA6B343), mul32(iz % 4294967296, 0xD8163841), mul32(salt, 0xCB1AB31F))
+	-- (murmur3's finish: every bit of the input stirs every bit out.)
+	h = mul32(bit32.bxor(h, bit32.rshift(h, 16)), 0x85EBCA6B)
+	h = mul32(bit32.bxor(h, bit32.rshift(h, 13)), 0xC2B2AE35)
+	return bit32.bxor(h, bit32.rshift(h, 16)) / 4294967296
+end
+local function noise(x: number, z: number, size: number, salt: number): number
+	local fx, fz = x / size, z / size
+	local ix, iz = math.floor(fx), math.floor(fz)
+	local tx, tz = fx - ix, fz - iz
+	tx, tz = tx * tx * (3 - 2 * tx), tz * tz * (3 - 2 * tz)
+	local a, b = lattice(ix, iz, salt), lattice(ix + 1, iz, salt)
+	local c, d = lattice(ix, iz + 1, salt), lattice(ix + 1, iz + 1, salt)
+	local near = a + (b - a) * tx
+	return near + (c + (d - c) * tx - near) * tz
+end
+-- (Two octaves: patches with ragged edges.)
+local function patchy(x: number, z: number, size: number, salt: number): number
+	return noise(x, z, size, salt) * 0.68 + noise(x, z, size / 2.3, salt + 101) * 0.32
+end
+local function smooth(t: number): number
+	t = math.clamp(t, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+local function wrap(angle: number): number
+	return (angle + math.pi) % (math.pi * 2) - math.pi
+end
+
+-- Each border's own waves (its strength in each, their phases), from Seed.
+local borderWaves = {}
+do
+	local state = Frontier.Ground.Seed
+	local function nextValue(): number
+		state = (state * 16807) % 2147483647
+		return state / 2147483647
+	end
+	for k = 1, #Frontier.Spokes do
+		borderWaves[k] = {
+			0.7 + nextValue() * 0.6,
+			0.7 + nextValue() * 0.6,
+			nextValue() * math.pi * 2,
+			nextValue() * math.pi * 2,
+			nextValue() * math.pi * 2,
+		}
+	end
+end
+
+-- Where border `k` runs (an angle round the middle) `r` studs out: on
+-- Spokes[k] at the core's edge, swaying off it further out. Biomes[k] lies
+-- clockwise of it, the one before counterclockwise.
+function Frontier.border(k: number, r: number): number
+	local ground, w = Frontier.Ground, borderWaves[k]
+	local calm = smooth((r - Frontier.Core - ground.Calm[1]) / (ground.Calm[2] - ground.Calm[1]))
+	local sway = ground.Sway[1] * w[1] * math.sin(r * ground.Waves[1] + w[3])
+		+ ground.Sway[2] * w[2] * math.sin(r * ground.Waves[2] + w[4])
+	return Frontier.Spokes[k] + calm * sway
+end
+
+-- How wide the seam along border `k` is `r` studs out (studs either side).
+local function seamWidth(k: number, r: number): number
+	local seam = Frontier.Ground.Seam
+	return seam[1] + (seam[2] - seam[1]) * (0.5 + 0.5 * math.sin(r / 23 + borderWaves[k][5]))
+end
+
+-- The biome whose ground `x`, `z` (studs from the middle) is on, past its
+-- borders (index into Frontier.Biomes), and how its ground mixes there with
+-- its neighbour's across the nearer border: { [index] = weight }, adding up
+-- to 1 (half and half on a border).
+local function mixAt(x: number, z: number): (number, { [number]: number })
+	local n = #Frontier.Biomes
+	local r = math.sqrt(x * x + z * z)
+	local angle = math.atan2(z, x)
+	local off = {} -- (how far round from each border, radians)
+	for k = 1, n do
+		off[k] = wrap(angle - Frontier.border(k, r))
+	end
+	local home = 1
+	for i = 1, n do
+		if off[i] >= 0 and off[i % n + 1] < 0 then
+			home = i
+		end
+	end
+	local into = off[home] * r -- (studs in from its start border)
+	local before = -off[home % n + 1] * r -- (studs to its end border)
+	local weights = {}
+	if into <= before then
+		local t = smooth(0.5 + 0.5 * into / seamWidth(home, r))
+		weights[home], weights[(home - 2) % n + 1] = t, 1 - t
+	else
+		local next = home % n + 1
+		local t = smooth(0.5 + 0.5 * before / seamWidth(next, r))
+		weights[home], weights[next] = t, 1 - t
+	end
+	return home, weights
+end
+
+-- The biome at `offset` from the middle (across the ground), past its
+-- swaying borders: nil in the core, the Hub.
 function Frontier.biomeAt(offset: Vector3)
 	if Vector3.new(offset.X, 0, offset.Z).Magnitude < Frontier.Core then
 		return nil
 	end
-	return Frontier.biomeOf(math.atan2(offset.Z, offset.X))
+	local home = mixAt(offset.X, offset.Z)
+	return Frontier.Biomes[home]
 end
 
 -- How much each biome's look counts at `offset`: a weight for each, in
--- Frontier.Biomes' order, adding up to 1 (an even mix on a spoke), and how
--- far in that look has come (0 well inside the core, 1 once Biome.Blend
--- studs further out).
+-- Frontier.Biomes' order, adding up to 1 (half and half on a border, its
+-- own deep in it), and how far in that look has come (0 well inside the
+-- core, 1 once Biome.Blend studs further out).
 function Frontier.biomeMix(offset: Vector3): ({ number }, number)
-	local angle = math.atan2(offset.Z, offset.X)
+	local _, mix = mixAt(offset.X, offset.Z)
 	local weights = {}
-	for i, biome in Frontier.Biomes do
-		weights[i] = math.max(0, 1 - Frontier.apart(angle, biome.Angle) / (math.pi / 2))
+	for i in Frontier.Biomes do
+		weights[i] = mix[i] or 0
 	end
 	local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
 	local blend = Frontier.Biome.Blend
 	return weights, math.clamp((distance - (Frontier.Core - blend / 2)) / blend, 0, 1)
+end
+
+-- Each ground's lie of the land (0..1 of its Height) at `x`, `z`.
+local RELIEF = {
+	-- Ashfall: cinder cones, here and there.
+	Cones = function(x: number, z: number): number
+		return smooth((noise(x, z, 46, 11) - 0.6) / 0.22)
+	end,
+	-- Rimefrost: long drifts, blown one way.
+	Drifts = function(x: number, z: number): number
+		local u, v = x * 0.8 + z * 0.6, -x * 0.6 + z * 0.8
+		return smooth((noise(u * 0.45, v * 1.6, 30, 12) - 0.52) / 0.26)
+	end,
+	-- Stormglass: thin ridges of salt.
+	Ridges = function(x: number, z: number): number
+		local ridge = 1 - math.abs(noise(x, z, 58, 13) * 2 - 1)
+		return smooth((ridge - 0.72) / 0.22)
+	end,
+	-- Blightwood: soft hummocks, close together.
+	Hummocks = function(x: number, z: number): number
+		return smooth((noise(x, z, 20, 14) - 0.55) / 0.25)
+	end,
+}
+
+-- The ground `x`, `z` studs from the middle is (Roblox terrain): its
+-- material's name; whose ground it is (0 the core's, else an index into
+-- Frontier.Biomes: across a seam, either neighbour's, mixed in blotches);
+-- and how high the land would rise there (studs, before OutpostWorld keeps
+-- it flat round anything standing).
+function Frontier.ground(x: number, z: number): (string, number, number)
+	local ground = Frontier.Ground
+	local r = math.sqrt(x * x + z * z)
+	local angle = math.atan2(z, x)
+	local rim = Frontier.Core + ground.Edge[2] * (0.6 * math.sin(angle * 5 + 1.3) + 0.4 * math.sin(angle * 12 + 4.1))
+	local out = smooth((r - rim) / ground.Edge[1] + 0.5) -- (0 in the core, 1 out in a biome)
+	local home, weights = mixAt(x, z)
+	local height = 0
+	for i, weight in weights do
+		local spec = Frontier.Biomes[i].Terrain
+		height += weight * spec.Height * RELIEF[spec.Relief](x, z)
+	end
+	-- (The land only rises well out of the core.)
+	height *= smooth((r - Frontier.Core - 20) / 40)
+	local whose = 0
+	if patchy(x, z, 18, 21) < out then
+		whose = home
+		for i, weight in weights do
+			if i ~= home and patchy(x, z, 16, 22) < weight then
+				whose = i
+			end
+		end
+	end
+	local spec = if whose == 0 then ground.Hub else Frontier.Biomes[whose].Terrain
+	local material = if patchy(x, z, ground.Patch, 30 + whose) < spec.Share then spec.Second else spec.Main
+	return material, whose, height
 end
 
 -- An element for a wild kaiju born where `home` (a biome's element) holds:

@@ -271,6 +271,8 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 					Visible = sight[model],
 					-- Your Arena rival: always the one to lock.
 					Priority = rival,
+					-- A Rift pack's leader: the lock goes for it first (TargetLockRules).
+					Leader = model:GetAttribute("RiftLeader") == true,
 					Engaged = (engagedUntil[model] or 0) > now,
 				})
 			end

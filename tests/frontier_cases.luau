@@ -668,9 +668,10 @@ end
 local lips = RiftTear.layout(Frontier.tear(5, 6), 0)
 check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 
--- The Loop: four biomes round the core, a quarter each between the four
--- spokes (due north, east, south, west), each weak to the one before it
--- going round clockwise; out there their element comes up more.
+-- The Loop: four biomes round the core, about a quarter each between the
+-- four spokes (due north, east, south, west), their borders swaying off
+-- them further out, each weak to the one before it going round clockwise;
+-- out there their element comes up more, and their own ground.
 ;(function()
 	local Beats = shared("ElementMatchup").Beats
 	check(#Frontier.Biomes == 4 and #Frontier.Spokes == 4, "Not four biomes between four spokes")
@@ -684,7 +685,10 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 		local before = Frontier.Biomes[(i - 2) % 4 + 1]
 		check(Beats[before.Element] == biome.Element, biome.Id .. " isn't weak to the biome before it")
 		check(biome.Name and biome.Label and biome.Line and biome.Material, biome.Id .. " is missing its look or lines")
-		check(biome.Glow and biome.Tint and biome.Ambient and biome.Ground and biome.Stone, biome.Id .. " is missing a colour")
+		check(biome.Glow and biome.Tint and biome.Ambient and biome.Fog and biome.Ground and biome.Stone, biome.Id .. " is missing a colour")
+		local ground = biome.Terrain
+		check(ground and ground.Main and ground.Second and ground.Main ~= ground.Second, biome.Id .. " has no ground of its own")
+		check(Frontier.Ground.Colors[ground.Main] and Frontier.Ground.Colors[ground.Second], biome.Id .. "'s ground has no colour")
 		-- (Its quarter is the one between two spokes, its middle between them.)
 		for _, a in Frontier.Spokes do
 			check(Frontier.apart(a, biome.Angle) > math.pi / 4 - 1e-6, biome.Id .. " sits on a spoke")
@@ -702,19 +706,90 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 	check(Frontier.biomeAt(at(-3 * math.pi / 4, 250)).Id == "Blightwood", "North-west isn't Blightwood")
 	check(Frontier.biomeAt(at(0.4, Frontier.Core - 1)) == nil and Frontier.biomeAt(Vector3.zero) == nil, "A biome in the core")
 	check(Frontier.biomeAt(at(0.4, Frontier.Core + 1)) ~= nil, "No biome just out of the core")
-	-- Crossing a spoke changes biome; across one, the look's an even mix.
-	for i, a in Frontier.Spokes do
-		local left, right = Frontier.biomeAt(at(a - 0.05, 250)), Frontier.biomeAt(at(a + 0.05, 250))
-		check(left ~= right, "No change of biome across spoke " .. i)
-		local weights = Frontier.biomeMix(at(a, 250))
-		local sum, halves = 0, 0
-		for _, w in weights do
-			sum += w
-			if math.abs(w - 0.5) < 1e-6 then
-				halves += 1
-			end
+	-- The borders: on the spokes at their mouths (where the signs stand),
+	-- swaying off them further out, each its own way (no two alike, so the
+	-- biomes aren't mirror images), never into the next biome's middle.
+	local ground = Frontier.Ground
+	local swayed = {}
+	for k, spoke in Frontier.Spokes do
+		check(math.abs(Frontier.border(k, Frontier.Core + ground.Calm[1]) - spoke) < 1e-9, "Border " .. k .. " off its spoke at the mouth")
+		local most = 0
+		for r = Frontier.Core, ground.Reach, 4 do
+			local off = math.abs(Frontier.border(k, r) - spoke)
+			most = math.max(most, off)
+			check(off < math.pi / 4 - 0.15, "Border " .. k .. " swings into a biome's middle")
 		end
-		check(math.abs(sum - 1) < 1e-6 and halves == 2, "Not an even mix on spoke " .. i)
+		check(most > math.rad(6), "Border " .. k .. " runs straight down its spoke")
+		swayed[k] = Frontier.border(k, 380) - spoke
+	end
+	for k = 2, #swayed do
+		check(math.abs(swayed[k] - swayed[1]) > 0.02, "Borders " .. k .. " and 1 sway alike")
+	end
+	-- Crossing a border changes biome; on one, the look's an even mix, and
+	-- a seam's width either side it's all one biome's again.
+	for k in Frontier.Spokes do
+		for _, r in { 220, 300, 380 } do
+			local b = Frontier.border(k, r)
+			local left, right = Frontier.biomeAt(at(b - 0.03, r)), Frontier.biomeAt(at(b + 0.03, r))
+			check(left ~= right and right == Frontier.Biomes[k], "No change of biome across border " .. k)
+			local weights = Frontier.biomeMix(at(b, r))
+			local sum, halves = 0, 0
+			for _, w in weights do
+				sum += w
+				if math.abs(w - 0.5) < 1e-4 then -- (Vector3's floats: a hair off the line)
+					halves += 1
+				end
+			end
+			check(math.abs(sum - 1) < 1e-6 and halves == 2, "Not an even mix on border " .. k)
+			local beyond = (ground.Seam[2] + 1) / r
+			check(Frontier.biomeMix(at(b + beyond, r))[k] == 1, "A seam wider than Seam on border " .. k)
+		end
+	end
+	-- The ground (Roblox terrain): the core's regolith in the core, each
+	-- biome's own deep in it, both neighbours' in blotches across a seam,
+	-- the land flat in the core and never higher than the biome's Height.
+	do
+		local rng = Random.new(31)
+		local function isHub(material)
+			return material == ground.Hub.Main or material == ground.Hub.Second
+		end
+		for _, p in { { 0, 0 }, { 60, -40 }, { -90, 70 }, { 30, 110 } } do
+			local material, whose, rise = Frontier.ground(p[1], p[2])
+			check(isHub(material) and whose == 0 and rise == 0, "The core isn't regolith, flat")
+		end
+		for index, biome in Frontier.Biomes do
+			local own, mains, seconds = 0, 0, 0
+			for _ = 1, 400 do
+				local a = biome.Angle + rng:NextNumber(-0.25, 0.25)
+				local r = rng:NextNumber(Frontier.Core + 60, ground.Reach - 10)
+				local x, z = math.cos(a) * r, math.sin(a) * r
+				local material, whose, rise = Frontier.ground(x, z)
+				check(rise >= 0 and rise <= biome.Terrain.Height + 1e-9, biome.Id .. "'s land too high")
+				if Frontier.biomeMix(at(a, r))[index] == 1 then
+					check(whose == index, "Another's ground deep in " .. biome.Id)
+					own += 1
+					if material == biome.Terrain.Main then
+						mains += 1
+					elseif material == biome.Terrain.Second then
+						seconds += 1
+					end
+				end
+			end
+			check(own > 200 and mains > own * 0.35 and seconds > own * 0.12, biome.Id .. "'s ground isn't its two materials: " .. mains .. "/" .. seconds)
+			-- Across its start border, both its ground and the one before's.
+			local before = (index - 2) % #Frontier.Biomes + 1
+			local seen = {}
+			for _ = 1, 300 do
+				local r = rng:NextNumber(Frontier.Core + 80, ground.Reach - 20)
+				local b = Frontier.border(index, r)
+				local _, whose = Frontier.ground(math.cos(b + rng:NextNumber(-0.04, 0.04)) * r, math.sin(b + rng:NextNumber(-0.04, 0.04)) * r)
+				seen[whose] = true
+			end
+			check(seen[index] and seen[before], "No mixing across " .. biome.Id .. "'s border")
+		end
+		local a1, b1, c1 = Frontier.ground(123.4, -321.5)
+		local a2, b2, c2 = Frontier.ground(123.4, -321.5)
+		check(a1 == a2 and b1 == b2 and c1 == c2, "The ground isn't the same twice")
 	end
 	for _, biome in Frontier.Biomes do
 		local weights, inward = Frontier.biomeMix(at(biome.Angle, 300))
@@ -778,15 +853,18 @@ do
 	local function near(a, b)
 		return math.abs(a.R - b.R) < 1e-3 and math.abs(a.G - b.G) < 1e-3 and math.abs(a.B - b.B) < 1e-3
 	end
-	local inT, inA = FrontierHud.biomeLight(Vector3.new(20, 0, 10), tint, ambient)
-	check(near(inT, tint) and near(inA, ambient), "The core's light isn't the Outpost's")
+	local haze = roblox.Color3.fromRGB(86, 92, 110)
+	local inT, inA, inF = FrontierHud.biomeLight(Vector3.new(20, 0, 10), tint, ambient, haze)
+	check(near(inT, tint) and near(inA, ambient) and near(inF, haze), "The core's light and fog aren't the Outpost's")
 	for _, biome in Frontier.Biomes do
-		local t, a = FrontierHud.biomeLight(Vector3.new(math.cos(biome.Angle) * 300, 0, math.sin(biome.Angle) * 300), tint, ambient)
-		check(near(t, biome.Tint) and near(a, biome.Ambient), biome.Id .. "'s light isn't its own")
+		local t, a, f =
+			FrontierHud.biomeLight(Vector3.new(math.cos(biome.Angle) * 300, 0, math.sin(biome.Angle) * 300), tint, ambient, haze)
+		check(near(t, biome.Tint) and near(a, biome.Ambient) and near(f, biome.Fog), biome.Id .. "'s light or fog isn't its own")
 	end
 	local first, second = Frontier.Biomes[1], Frontier.Biomes[2]
-	local t = FrontierHud.biomeLight(Vector3.new(300, 0, 0), tint, ambient)
-	check(near(t, first.Tint:Lerp(second.Tint, 0.5)), "The light across a spoke isn't half and half")
+	local b = Frontier.border(2, 300)
+	local t, _, f = FrontierHud.biomeLight(Vector3.new(math.cos(b) * 300, 0, math.sin(b) * 300), tint, ambient, haze)
+	check(near(t, first.Tint:Lerp(second.Tint, 0.5)) and near(f, first.Fog:Lerp(second.Fog, 0.5)), "The light across a border isn't half and half")
 end
 for i in Frontier.Disturbance.Stages do
 	check(i == 1 or Frontier.Disturbance.Notes[i] ~= nil, "Nobody's told of stage " .. i)
@@ -840,7 +918,7 @@ end)()
 
 print(
 	string.format(
-		"PASS: %d frontier checks (bands, the biomes and spokes, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids)",
+		"PASS: %d frontier checks (bands, the biomes, their swaying borders and their ground, the spokes, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids)",
 		checks
 	)
 )

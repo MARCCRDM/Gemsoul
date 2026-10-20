@@ -30,9 +30,9 @@
 	  FrontierHud.start()
 	  FrontierHud.Lines[band] -> title, subtitle   (pure, for tests)
 	  FrontierHud.biomeLines(id) -> title, subtitle, colour   a biome's banner (pure)
-	  FrontierHud.biomeLight(offset, tint, ambient) -> tint, ambient   the
-	      grade and outdoor light at `offset` from the Outpost's middle,
-	      given the Outpost's own (pure)
+	  FrontierHud.biomeLight(offset, tint, ambient, fog?) -> tint, ambient, fog
+	      the grade, outdoor light and fog colour at `offset` from the
+	      Outpost's middle, given the Outpost's own (pure)
 	  FrontierHud.edge(size, point, margin) -> Vector2, angle   where an
 	      arrow sits for a point off screen (pure)
 	  FrontierHud.nearest(spots, from, reach) -> index?, studs   the nearest
@@ -88,15 +88,18 @@ end
 -- The grade's tint and the outdoor light at `offset` from the Outpost's
 -- middle: `tint` and `ambient` (the Outpost's own) in the core, the
 -- biomes' further out, blended across the spokes (Frontier.biomeMix).
-function FrontierHud.biomeLight(offset: Vector3, tint: Color3, ambient: Color3): (Color3, Color3)
+function FrontierHud.biomeLight(offset: Vector3, tint: Color3, ambient: Color3, fog: Color3?): (Color3, Color3, Color3)
 	local weights, inward = Frontier.biomeMix(offset)
-	local t, a = { 0, 0, 0 }, { 0, 0, 0 }
+	local t, a, f = { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }
 	for i, biome in Frontier.Biomes do
 		local w = weights[i]
 		t[1], t[2], t[3] = t[1] + biome.Tint.R * w, t[2] + biome.Tint.G * w, t[3] + biome.Tint.B * w
 		a[1], a[2], a[3] = a[1] + biome.Ambient.R * w, a[2] + biome.Ambient.G * w, a[3] + biome.Ambient.B * w
+		f[1], f[2], f[3] = f[1] + biome.Fog.R * w, f[2] + biome.Fog.G * w, f[3] + biome.Fog.B * w
 	end
-	return tint:Lerp(Color3.new(t[1], t[2], t[3]), inward), ambient:Lerp(Color3.new(a[1], a[2], a[3]), inward)
+	return tint:Lerp(Color3.new(t[1], t[2], t[3]), inward),
+		ambient:Lerp(Color3.new(a[1], a[2], a[3]), inward),
+		(fog or Color3.new(f[1], f[2], f[3])):Lerp(Color3.new(f[1], f[2], f[3]), inward)
 end
 
 -- The nearest of `spots` within `reach` of `from`, across the ground.
@@ -225,19 +228,24 @@ local function biomeLight(player: Player)
 	local Lighting = game:GetService("Lighting")
 	local ok, Scenes = pcall(require, script.Parent.Scenes)
 	local tint = if ok and Scenes.OutpostFinish then Scenes.OutpostFinish.Grade.Tint else Color3.fromRGB(248, 250, 255)
+	local haze = if ok and Scenes.OutpostFinish then Scenes.OutpostFinish.Fog.Color else Color3.fromRGB(86, 92, 110)
 	task.spawn(function()
 		while true do
 			task.wait(0.25)
 			local character = player.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 			if root and player:GetAttribute("Outpost") == true and player:GetAttribute("RiftRun") == nil then
-				local want, ambient =
-					FrontierHud.biomeLight(root.Position - Outpost.Location.Position, tint, OUTPOST_AMBIENT)
+				local want, ambient, fog =
+					FrontierHud.biomeLight(root.Position - Outpost.Location.Position, tint, OUTPOST_AMBIENT, haze)
 				local grade = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 				if grade then
 					grade.TintColor = grade.TintColor:Lerp(want, 0.2)
 				end
 				Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(ambient, 0.2)
+				local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+				if atmosphere then
+					atmosphere.Color = atmosphere.Color:Lerp(fog, 0.2)
+				end
 			end
 		end
 	end)

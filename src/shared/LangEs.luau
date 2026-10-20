@@ -2240,6 +2240,7 @@ return {
 	["Leave the Rift first."] = "Sal de la Grieta primero.",
 	["You are in the Rift."] = "Estás en la Grieta.",
 	["{=} is in the Rift."] = "{=} está en la Grieta.",
+	["LEADER"] = "LÍDER", -- (a Rift pack's leader, in the target list: FoeBars)
 	-- The Loop: the biomes round the core (Shared.Frontier.Biomes: FrontierHud's banner, the crossroads signs).
 	["Ashfall"] = "Cenizal",
 	["Rimefrost"] = "Escarcha",

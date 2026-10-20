@@ -37,6 +37,15 @@ local NumberRange={new=function(...) return {...} end}
 local NumberSequence=NumberRange
 local ColorSequence=NumberRange
 local PhysicalProperties=NumberRange
+local Region3={new=function(a,b) return {Min=a,Max=b} end}
+-- (The terrain the Loop's ground is laid in: what's written to it.)
+local terrainWrites,terrainColors={},{}
+local TerrainStub={
+ SetMaterialColor=function(_,material,color) terrainColors[material]=color end,
+ WriteVoxels=function(_,region,resolution,materials,occupancies)
+  table.insert(terrainWrites,{Region=region,Resolution=resolution,Materials=materials,Occupancies=occupancies})
+ end,
+}
 local instances={}
 local newInstance=Instance.new
 Instance.new=function(kind)
@@ -58,6 +67,7 @@ local origin=CFrame.new(0,0,7000)
 -- (Its outcrops and Rift Veins come from Shared.Frontier, handed in as the server finds it.)
 World.Frontier=Frontier
 World.Rules=Rules
+World.Terrain=TerrainStub
 local site=World.build(origin,{})
 assert(site.Model.Landscape=="Moon Quarry" and site.Model.SkySetting=="MoonBase")
 assert(#site.Secrets==0 and #site.FieldSpots==0,"Retired extras returned")
@@ -143,6 +153,7 @@ for _,p in builtParts do
  assert(p.Name~="GrassSurface" and p.Name~="MeadowCloudBank" and p.Name~="Secret","Old lobby/retired secrets leaked")
 end
 assert(floor and math.abs(floor.CFrame.t[2]+floor.Size.X/2)<.001,"Quarry floor missing or wrong height")
+assert(floor.Transparency==1,"The quarry floor shows through the Loop's ground")
 assert(roads>80 and ramps==4 and sky>=260 and motor>200 and base>200,"Quarry landmarks or the Shelter missing")
 -- The Loop: each biome's ground and landmarks in its own quarter, past the
 -- core; a sign each side of every spoke's mouth, naming the biome that side.
@@ -154,36 +165,86 @@ for _,p in builtParts do
    biomeParts[biome.Id]=(biomeParts[biome.Id] or 0)+1
    local q=p.CFrame.Position-origin.Position
    local flatQ=Vector3.new(q.X,0,q.Z)
-   assert(flatQ.Magnitude>=Frontier.Core,"A biome's ground or landmark in the core: "..biome.Id)
-   assert(Frontier.biomeAt(flatQ)==biome,"A biome's ground or landmark out of its quarter: "..biome.Id)
+   assert(flatQ.Magnitude>=Frontier.Core,"A biome's landmark in the core: "..biome.Id)
+   assert(Frontier.biomeAt(flatQ)==biome,"A biome's landmark out of its own ground: "..biome.Id)
    if p.Material==Enum.Material.Neon then glows[biome.Id]=true end
   end
  end
  if folderName=="Crossroads" and p.Name=="Sign" then signs+=1 end
 end
 for _,biome in Frontier.Biomes do
- assert((biomeParts[biome.Id] or 0)>=30,"Too little of "..biome.Id..": "..tostring(biomeParts[biome.Id]))
+ assert((biomeParts[biome.Id] or 0)>=15,"Too few landmarks in "..biome.Id..": "..tostring(biomeParts[biome.Id]))
  assert(biome.Id=="Rimefrost" or glows[biome.Id],"No glow among "..biome.Id.."'s landmarks")
 end
 assert(signs==#Frontier.Spokes*2,"Not a sign each side of every spoke: "..signs)
--- Each biome's floor: its whole quarter, from about the core's edge out under
--- the walls, flat, in its own ground and material, with no shadows.
-local floorArea={}
-for _,p in builtParts do
- for _,biome in Frontier.Biomes do
-  if p.Parent and p.Parent.Name=="BiomeFloor" and p.Name==biome.Id.."Floor" then
-   local q=p.CFrame.Position-origin.Position
-   assert(p.ClassName=="WedgePart" and math.abs(math.abs(p.CFrame.RightVector.Y)-1)<1e-6,"A floor piece that isn't flat: "..biome.Id)
-   assert(q.Y+p.Size.X/2>0 and q.Y+p.Size.X/2<.05,"A floor piece off the quarry floor: "..biome.Id)
-   assert(Frontier.apart(math.atan2(q.Z,q.X),biome.Angle)<=math.pi/4+1e-6,"A floor piece out of its quarter: "..biome.Id)
-   assert(p.Material==Enum.Material[biome.Material] and not p.CastShadow and not p.CanCollide,"A floor piece in the wrong ground: "..biome.Id)
-   floorArea[biome.Id]=(floorArea[biome.Id] or 0)+p.Size.Y*p.Size.Z/2
+-- The Loop's ground, in terrain: laid once, on terrain's grid, out under the
+-- walls; flush with the floor (0) wherever anything stands, and rising
+-- only out in the open; each biome's own materials, the core's regolith.
+assert(#terrainWrites==1,"The Loop's ground wasn't laid (once): "..#terrainWrites)
+local write=terrainWrites[1]
+local cell=Frontier.Ground.Cell
+assert(write.Resolution==cell,"Terrain at the wrong resolution")
+local rmin=write.Region.Min
+for _,v in {rmin.X,rmin.Y,rmin.Z} do assert(v%cell==0,"Terrain off its grid") end
+local mats,occs=write.Materials,write.Occupancies
+local nx,ny,nz=#mats,#mats[1],#mats[1][1]
+local function columnAt(x,z) -- (studs from the quarry's middle)
+ local i=math.floor((x+origin.Position.X-rmin.X)/cell)+1
+ local k=math.floor((z+origin.Position.Z-rmin.Z)/cell)+1
+ return i,k
+end
+local function height(i,k)
+ local top=rmin.Y
+ for y=1,ny do top+=occs[i][y][k]*cell end
+ return top-origin.Position.Y
+end
+local function surface(i,k)
+ local m="Air"
+ for y=1,ny do if occs[i][y][k]>0 then m=mats[i][y][k] end end
+ return m
+end
+local reach=Frontier.Ground.Reach
+assert(nx*cell>=reach*2 and nz*cell>=reach*2 and ny*cell>=Frontier.Ground.Depth,"Terrain doesn't reach the walls")
+local counts,tallest,laidCols={},0,0
+for i=1,nx do
+ for k=1,nz do
+  local x,z=rmin.X+(i-.5)*cell-origin.Position.X,rmin.Z+(k-.5)*cell-origin.Position.Z
+  if x*x+z*z<=reach*reach then
+   laidCols+=1
+   local h=height(i,k)
+   assert(h>=-1e-6,"A hole in the Loop's ground")
+   tallest=math.max(tallest,h)
+   local m=surface(i,k)
+   assert(m~="Air","No ground at a column")
+   counts[m]=(counts[m] or 0)+1
+   local want=Frontier.ground(x,z)
+   assert(m==want,"A column of the wrong ground")
   end
  end
 end
+assert(tallest>2 and tallest<=6+1e-6,"The land doesn't rise, or rises too far: "..tallest)
 for _,biome in Frontier.Biomes do
- local quarter=math.pi/4*((Rules.Radius+8)^2-Frontier.Core^2)
- assert(math.abs((floorArea[biome.Id] or 0)/quarter-1)<.03,"A biome's floor doesn't cover its quarter: "..biome.Id.." "..tostring(floorArea[biome.Id]))
+ assert((counts[biome.Terrain.Main] or 0)>1000 and (counts[biome.Terrain.Second] or 0)>300,"Too little of "..biome.Id.."'s ground")
+ assert(terrainColors[biome.Terrain.Main] and terrainColors[biome.Terrain.Second],"No colour for "..biome.Id.."'s ground")
+end
+local ci,ck=columnAt(0,0)
+assert(surface(ci,ck)==Frontier.Ground.Hub.Main or surface(ci,ck)==Frontier.Ground.Hub.Second,"The core isn't regolith")
+-- Flat wherever anything stands: every rock spot, every road, its signs.
+for _,spot in site.Spots do
+ local q=spot.Position-origin.Position
+ local i,k=columnAt(q.X,q.Z)
+ assert(math.abs(height(i,k))<1e-6,"The land rises under a rock spot")
+end
+for _,a in Frontier.Spokes do
+ for out=110,420,8 do
+  local i,k=columnAt(math.cos(a)*out,math.sin(a)*out)
+  assert(math.abs(height(i,k))<1e-6,"The land rises on a road")
+ end
+end
+for t=0,71 do
+ local a=t/72*math.pi*2
+ local i,k=columnAt(math.cos(a)*260,math.sin(a)*260)
+ assert(math.abs(height(i,k))<1e-6,"The land rises on the ring road")
 end
 -- The crater rim and the sky are sent whole: far off, streaming would never
 -- send them (the rim's far side is 900-1,200 studs from most of the quarry).
@@ -249,7 +310,7 @@ for i=0,10000 do
  local size=Rules.rollSize(i/10001,"Common")
  assert(size=="Pebble" or size=="Boulder","Rare mining object returned")
 end
-print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 4 spokes and their ramps; the four biomes' floors, ground, landmarks and crossroads signs; services and safe sky; the crater rim and sky always load")
+print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 4 spokes and their ramps; the Loop's ground in terrain (flat under every rock and road), the biomes' landmarks and crossroads signs; services and safe sky; the crater rim and sky always load")
 local counts={Hauler=0,Mole=0,Digger=0,Skipper=0}
 assert(#site.Parking==8,"The garage has missing bays")
 for _,bay in site.Parking do
@@ -503,7 +564,9 @@ Lighting.ExposureCompensation=.5
 Lighting:FindFirstChildOfClass("Sky").SkyboxUp="custom-day-sky"
 Scenes.outpostLighting()
 assert(Lighting.ClockTime==0 and Lighting.ExposureCompensation==0 and not clouds.Enabled,"Daylight leaked into quarry")
-assert(Lighting:FindFirstChildOfClass("Atmosphere").Density==0,"Atmosphere hides space")
+local atmosphere=Lighting:FindFirstChildOfClass("Atmosphere")
+assert(atmosphere.Density==Scenes.OutpostFinish.Fog.Density and atmosphere.Density>0 and atmosphere.Density<=0.35,"Quarry fog not slight")
+assert(atmosphere.Haze==0 and atmosphere.Glare==0,"Atmosphere hides space")
 assert(Lighting:FindFirstChildOfClass("ColorCorrectionEffect").Brightness==0,"Daytime grade retained")
 assert(Lighting:FindFirstChildOfClass("SunRaysEffect").Intensity==0,"Sun rays retained")
 local sky=Lighting:FindFirstChildOfClass("Sky")

@@ -5,7 +5,8 @@ dormant tear: a jagged arch of slate with fire at its feet. Walk up to one
 and you can go through, into the critters' own world: a walled pathway of
 caves open to a burning sky. You go in with your combat kit out and your
 kaiju beside you, fight your way through cave by cave against brainrot
-critters and the pathway dungeon's fighters, then face one of the ten
+critters and the pathway dungeon's fighters that lead them, every one of
+them tearing through the floor at you, then face one of the ten
 brainrot bosses, picked at random, as a Colossus on its throne.
 
 It's built for a party. You can go in alone, but the game warns you first.
@@ -81,19 +82,33 @@ The rules are `Shared.RiftRun`; the server is `Server.RiftServer`.
 | | |
 | --- | --- |
 | **Your kit** | Your combat kit comes out as you go through and stays out until you're home (`SparServer.riftKit`: hunting, as in the Outpost). You can't put it away in there: "Your kit stays out in the Rift." |
-| **Packs** | Each cave's pack comes up when the first runner walks in, not before |
-| **Critters** | 2, 3, 3, 4 in caves 1 to 4, plus 1 for each runner past the first. Brainrot critters from the Outpost's roster; a ranged one only at the back |
+| **Packs** | Each cave's pack comes up when the first runner walks in, not before. **Every one of it comes through a tear of its own** in the cave's floor, in the critters' world's colours (the Outpost's tears, `RiftTear`, Hell palette): one opens every 0.45 seconds, at least 9 studs from the others and from any runner. The critters come first, leaping out at the nearest runner, then their leaders through taller tears (10 studs). Until the last is through, the pack is on its way: the strip counts it in foes left, and the cave can't clear |
+| **Critters** | 3, 4, 4, 5 in caves 1 to 4 (never fewer than a team of three kaiju), plus 1 for each runner past the first. Brainrot critters from the Outpost's roster; a ranged one only at the back |
 | **Big ones** | From cave 2, a 60% chance that one of the critters is a **Rift Brute**: 4x health, 1.5x damage, longer reach |
-| **Fighters** | The pathway dungeon's regular fighters among them (`Duelist.spawnDungeon`): 1, 1, 2, 2 in caves 1 to 4, plus one for every two runners past the first, armed and armoured to gear tier 1, 2, 2, 3, each with 1.5x a room fighter's health. One of the dungeon's roster per cave, with its element and moves. Anyone in the trip can hit them and be hit by them, kaiju too |
+| **Fighters** | The pathway dungeon's regular fighters lead each pack (`Duelist.spawnDungeon`; `RiftLeader` on their models): 1, 1, 2, 2 in caves 1 to 4, plus one for every two runners past the first, armed and armoured to gear tier 1, 2, 2, 3, each with 1.5x a room fighter's health. One of the dungeon's roster per cave, with its element and moves. Anyone in the trip can hit them and be hit by them, kaiju too |
 | **Level** | The critters come at your team's level (the average of the runners' lead kaiju), +2 in cave 1, +1 more per cave; the boss's critters +3 over the last cave's. Capped at 30 |
 | **Caches** | Clear a cave (critters and fighters) and everyone in finds a gem (`RiftCache`, "Found in the Rift"), 12% luckier in cave 1 and 6% more each cave |
-| **The boss** | One of the ten brainrot bosses at random, as the pathway dungeon's **Colossus**: its boss fighter with every one of its moves, gear tier 4 alone or 4 to 5 in a party, and 1.8x a Colossus's health (+50% per extra runner). It tears through when the first runner reaches the throne cave. At 66% and 33% health it calls 3 critters and a tier-3 fighter through |
+| **The boss** | One of the ten brainrot bosses at random, as the pathway dungeon's **Colossus**: its boss fighter with every one of its moves, gear tier 4 alone or 4 to 5 in a party, and 1.8x a Colossus's health (+50% per extra runner). It tears through (a 16-stud tear) when the first runner reaches the throne cave; it's its cave's leader. At 66% and 33% health it calls 3 critters and a tier-3 fighter through, each through a tear of its own |
 | **Beaten** | Everyone still in: 300 coins + 40 per cave, a lucky cache, 120 EXP for their kaiju, and swings back on their pick (the dungeon restore). Anyone down gets up. The way home opens and the boss's loot comes up |
 | **Its loot** | The pathway dungeon's loot card, titled **RIFT BOSS DEFEATED**: a gem of the boss's element at Tier 4 / Rank III, Ultra Rare from a tier-4 boss and Legendary from a tier-5 one. Claim, Roll or Pass within 30 seconds (no answer is a pass). Everyone who claims or rolls rolls 1 to 100; the highest wins, ties broken at random. A full pouch gets 500 coins instead |
 | **Home** | 20 seconds after the loot is settled, everyone still in is home |
 
 While the loot is up the strip says **BOSS DOWN · CLAIM, ROLL OR PASS**;
 once it's settled, the home clock.
+
+### Who takes whom
+
+- **Your kaiju take the critters.** While any critter of the pack is about,
+  your kaiju fight only critters, sharing them out (two on one if there
+  are more kaiju than critters). Only once the critters are down do they
+  turn on the leaders (`KaijuServer`).
+- **You take the leader.** Your lock goes for the pack's leader first:
+  - the nearest fighter, or the boss, in range and in sight (or hitting
+    you), over any nearer critter;
+  - once you're on a leader, critters coming nearer don't pull it off;
+  - switching or tapping a target in the list still picks whoever you
+    like (`TargetLockRules`).
+- **The target list** marks them: **LEADER · their name**.
 
 ![The boss's loot](rift/loot.png)
 
@@ -158,9 +173,13 @@ fighters leave you be while you're down; with everyone down, they wait.
 
 | File | What |
 | --- | --- |
-| `src/shared/RiftRun.luau` | The rules: the layout, packs and fighters, levels, the boss, caches, rewards, the loot's time, robbery, RESTORE's price |
+| `src/shared/RiftRun.luau` | The rules: the layout, packs and fighters, where their tears open (`Portal`, `portalSpots`), levels, the boss, caches, rewards, the loot's time, robbery, RESTORE's price |
 | `src/server/World/RiftWorld.luau` | Builds a trip's world far off in the dark: walled caves, passages under arches, walls of fire, the throne cave, the ways home, the burning sky; `RiftWorld.inside` (is a spot in a cave) |
 | `src/server/Systems/RiftServer.luau` | Runs trips: `RiftEnter`, `RiftLeave`, `RiftChoice`, `RiftPeek`, `RiftLootChoice` |
+| `src/server/Systems/KaijuServer.luau` | Your kaiju take the critters before the leaders |
+| `src/shared/TargetLockRules.luau`, `src/client/Modules/TargetLock.luau` | Your lock takes the leader first |
+| `src/client/Modules/FoeBars.luau` | **LEADER** in the target list |
+| `src/server/Systems/FrontierServer.luau` | The tears (`open`: `Height`, `Hell`), through `KaijuWilds.rift` |
 | `src/server/Systems/Duelist.luau` | The fighters and the Colossus (`spawnDungeon` with a Rift encounter: its runners are whoever's in the trip, kaiju can fight them, `HealthScale`) |
 | `src/server/Systems/Dungeons.luau` | `Dungeons.bossGem`: the boss's gem, shared with the pathway dungeon |
 | `src/server/Systems/SparServer.luau` | `SparServer.riftKit`: the kit out going in, away coming home |
@@ -185,8 +204,9 @@ Boss and move names stay in English (they're names).
 
 | Suite | What it checks |
 | --- | --- |
-| `run_rift` | 23,241 checks: pack sizes, fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (802). And nothing else starts for a runner |
-| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in (critters and fighters), a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, the loot (claim, roll, pass, the time running out, the gem to the winner), the kit away at home. The fighters are stand-ins here: the real Duelist isn't loaded |
+| `run_rift` | 32,597 checks: pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (802). And nothing else starts for a runner |
+| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, the loot (claim, roll, pass, the time running out, the gem to the winner), the kit away at home. The fighters are stand-ins here: the real Duelist isn't loaded |
+| `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |
 | `run_outpost` | Each vein has its gate, prompt, arch, glow, cracks in its colour and its index |
 | `run_topbar` | The crossing is a cover; the card, strip and down window keep clear of Roblox's buttons |

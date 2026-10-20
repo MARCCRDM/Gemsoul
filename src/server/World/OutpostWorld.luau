@@ -7,8 +7,10 @@
 	the leaderboard, the Arena Uplink and the kaiju arena); outside is the
 	quarry, where they mine and hunt: the Loop, four biomes round the core
 	between four haul roads due north, east, south and west, each with its
-	own ground, rock and landmarks and a sign for it either side of each
-	road (Shared.Frontier.Biomes). A working
+	own ground (Roblox terrain, Shared.Frontier.ground: their borders sway
+	and mix, and the land rises where nothing stands), rock and landmarks,
+	and a sign for it either side of each road (Shared.Frontier.Biomes). A
+	working
 	frontier outpost runs along the north edge (habitat modules strung on
 	tubes, a refinery tower, a drill rig over its pit, conveyors, pipes and
 	floodlight masts), with the landing pad and shuttle south-east. Over it
@@ -41,6 +43,8 @@
 	      KeepOut ({ { Vector3, studs } }: the Shelter, buildings, workings,
 	      ramps and vein sites, for wild kaiju to keep clear of),
 	      Secrets (empty: retired Easter eggs stay disabled) }
+	  OutpostWorld.Terrain   the terrain the Loop's ground is laid in (the
+	      workspace's when not handed in; offline tests hand in their own)
 	  OutpostWorld.rock(size, cframe, rng, tint?, stone?) -> Model   one rock of
 	      that size (Shared.Outpost.Sizes), its main chunk named "Body"; `tint`
 	      colours its crystals (a frontier band's, Shared.Frontier.Bands),
@@ -1407,35 +1411,23 @@ end
 
 local LANDMARK = { Ashfall = vent, Rimefrost = spires, Stormglass = pylon, Blightwood = snag }
 
--- Each biome's ground and landmarks, out past the core in its quarter:
--- BIOME_PATCHES broad patches of its ground (Ground, Material) and
--- BIOME_LANDMARKS of its landmarks where `clear` says there's room; returns
--- where those stand, as { Vector3, studs } to keep the rocks off.
-local BIOME_PATCHES, BIOME_LANDMARKS = 10, 6
+-- Each biome's landmarks, out past the core deep in its own ground (where
+-- its look counts LANDMARK_DEEP or more, clear of its swaying borders):
+-- BIOME_LANDMARKS of them where `clear` says there's room; returns where
+-- they stand, as { Vector3, studs } to keep the rocks off.
+local BIOME_LANDMARKS, LANDMARK_DEEP = 6, 0.95
 local function biomeGround(parent, at: CFrame, rng, Frontier, clear: (Vector3, number) -> boolean): { any }
 	local taken = {}
-	local quarter = math.pi / 4 - math.rad(6)
-	for _, biome in Frontier.Biomes do
+	for index, biome in Frontier.Biomes do
 		local here = folder(parent, biome.Id)
-		for _ = 1, BIOME_PATCHES do
-			local a = biome.Angle + rng:NextNumber(-quarter, quarter)
-			local r = rng:NextNumber(Frontier.Core + 20, 400)
-			disc(
-				here,
-				at * CFrame.new(math.cos(a) * r, 0.04, math.sin(a) * r),
-				rng:NextNumber(30, 56),
-				0.06,
-				biome.Ground:Lerp(biome.Stone, rng:NextNumber(0.25, 0.6)),
-				Enum.Material[biome.Material]
-			)
-		end
 		local placed, tries = 0, 0
-		while placed < BIOME_LANDMARKS and tries < 200 do
+		while placed < BIOME_LANDMARKS and tries < 400 do
 			tries += 1
-			local a = biome.Angle + rng:NextNumber(-quarter, quarter)
+			local a = biome.Angle + rng:NextNumber(-math.pi / 3, math.pi / 3)
 			local r = rng:NextNumber(Frontier.Core + 35, 370)
-			local p = (at * CFrame.new(math.cos(a) * r, 0, math.sin(a) * r)).Position
-			local roomy = clear(p, 0)
+			local offset = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+			local p = (at * CFrame.new(offset)).Position
+			local roomy = Frontier.biomeMix(offset)[index] >= LANDMARK_DEEP and clear(p, 0)
 			for _, other in taken do
 				if (other[1] - p).Magnitude < 44 then
 					roomy = false
@@ -1452,38 +1444,115 @@ local function biomeGround(parent, at: CFrame, rng, Frontier, clear: (Vector3, n
 	return taken
 end
 
--- Each biome's floor: its whole quarter of the quarry floor in its own
--- ground, from the core's edge (ragged, but meeting at the spokes) out under
--- the quarry walls, in FLOOR_SEGMENTS slices; the seams between biomes run
--- under the spoke roads. Its parts are named for their biome ("AshfallFloor").
-local FLOOR_SEGMENTS, FLOOR_TINT = 8, 0.8
-local function biomeFloor(parent, at: CFrame, Frontier)
-	local floors = folder(parent, "BiomeFloor")
-	local rng = Random.new(1717) -- (its own: the rest of the layout draws from build's)
-	for _, biome in Frontier.Biomes do
-		local color = REGOLITH:Lerp(biome.Ground, FLOOR_TINT)
-		local material = Enum.Material[biome.Material]
-		local from = biome.Angle - math.pi / 4
-		local inner, outer = {}, {}
-		for i = 0, FLOOR_SEGMENTS do
-			local a = from + i / FLOOR_SEGMENTS * math.pi / 2
-			local out = Vector3.new(math.cos(a), 0, math.sin(a))
-			local edge = if i == 0 or i == FLOOR_SEGMENTS then Frontier.Core else Frontier.Core + rng:NextNumber(-12, 8)
-			-- (On the quarry floor, its top 0.04 up: under its patches (0.07), the
-			-- regolith's (0.1) and the roads (0.16). Out past where the chords
-			-- would leave a gap at the walls' foot.)
-			inner[i] = out * edge + Vector3.new(0, 0.02, 0)
-			outer[i] = out * (QUARRY + 8) + Vector3.new(0, 0.02, 0)
-		end
-		for i = 0, FLOOR_SEGMENTS - 1 do
-			for _, corners in { { inner[i], outer[i], outer[i + 1] }, { inner[i], outer[i + 1], inner[i + 1] } } do
-				for _, face in triangle(floors, at, corners[1], corners[2], corners[3], 0.04, color, material) do
-					face.Name = biome.Id .. "Floor"
-					face.CastShadow = false
+-- The ground under the Loop, in Roblox terrain (Shared.Frontier.ground):
+-- each biome's own materials, mixed in blotches across its swaying borders
+-- and ragged into the core's regolith, flush with the quarry floor. The land
+-- rises (each biome's Relief) only well clear of anything standing
+-- (`blocked`: { Vector3, studs }), of the roads (`roads`: { { from, to } },
+-- RoadHalf either side) and of the walls: RISE_CLEAR studs past them it
+-- starts, RISE_FULL past them it's up. Laid in OutpostWorld.Terrain
+-- (offline tests hand one in) or the workspace's; returns how many columns
+-- it laid (0 with no terrain to lay them in).
+local RISE_CLEAR, RISE_FULL, ROAD_HALF = 6, 26, 14
+local function biomeTerrain(at: CFrame, Frontier, blocked: { any }, roads: { any }): number
+	local terrain = OutpostWorld.Terrain
+	if not terrain then
+		local ok, found = pcall(function()
+			return workspace:FindFirstChildOfClass("Terrain")
+		end)
+		terrain = if ok then found else nil
+	end
+	if not terrain then
+		return 0
+	end
+	local ground = Frontier.Ground
+	for name, color in ground.Colors do
+		terrain:SetMaterialColor(Enum.Material[name], color)
+	end
+	local cell, reach, depth = ground.Cell, ground.Reach, ground.Depth
+	local origin = at.Position
+	-- (On terrain's grid: whole cells, wherever the quarry is.)
+	local min = Vector3.new(
+		math.floor((origin.X - reach) / cell) * cell,
+		math.floor((origin.Y - depth) / cell) * cell,
+		math.floor((origin.Z - reach) / cell) * cell
+	)
+	local size = math.ceil((origin.X + reach - min.X) / cell)
+	local deep = math.ceil((origin.Z + reach - min.Z) / cell)
+	local layers = math.ceil((origin.Y + ground.Depth - min.Y) / cell)
+	local function middle(i: number, k: number): (number, number)
+		return min.X + (i - 0.5) * cell - origin.X, min.Z + (k - 0.5) * cell - origin.Z
+	end
+	-- How much room each column has: studs past the nearest thing standing.
+	local room = table.create(size * deep, math.huge)
+	for _, b in blocked do
+		local center, radius = b[1] - origin, b[2]
+		local span = radius + RISE_FULL
+		local i0 = math.max(1, math.floor((center.X + origin.X - span - min.X) / cell) + 1)
+		local i1 = math.min(size, math.floor((center.X + origin.X + span - min.X) / cell) + 1)
+		local k0 = math.max(1, math.floor((center.Z + origin.Z - span - min.Z) / cell) + 1)
+		local k1 = math.min(deep, math.floor((center.Z + origin.Z + span - min.Z) / cell) + 1)
+		for i = i0, i1 do
+			for k = k0, k1 do
+				local x, z = middle(i, k)
+				local d = math.sqrt((x - center.X) ^ 2 + (z - center.Z) ^ 2) - radius
+				local index = (i - 1) * deep + k
+				if d < room[index] then
+					room[index] = d
 				end
 			end
 		end
 	end
+	local function roadRoom(x: number, z: number): number
+		local best = math.huge
+		for _, line in roads do
+			local ax, az = line[1].X - origin.X, line[1].Z - origin.Z
+			local dx, dz = line[2].X - origin.X - ax, line[2].Z - origin.Z - az
+			local t = math.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1)
+			local px, pz = ax + dx * t - x, az + dz * t - z
+			best = math.min(best, math.sqrt(px * px + pz * pz) - ROAD_HALF)
+		end
+		return best
+	end
+	local AIR = Enum.Material.Air
+	local materials, occupancies = table.create(size), table.create(size)
+	local laid = 0
+	for i = 1, size do
+		local mi, oi = table.create(layers), table.create(layers)
+		for y = 1, layers do
+			mi[y], oi[y] = table.create(deep, AIR), table.create(deep, 0)
+		end
+		materials[i], occupancies[i] = mi, oi
+		for k = 1, deep do
+			local x, z = middle(i, k)
+			local out = math.sqrt(x * x + z * z)
+			if out <= reach then
+				local name, _, rise = Frontier.ground(x, z)
+				local height = 0
+				if rise > 0.05 then
+					local clear = math.min(room[(i - 1) * deep + k], roadRoom(x, z), reach - 24 - out)
+					local t = math.clamp((clear - RISE_CLEAR) / (RISE_FULL - RISE_CLEAR), 0, 1)
+					height = rise * t * t * (3 - 2 * t)
+				end
+				local material = Enum.Material[name]
+				local top = origin.Y + height
+				for y = 1, layers do
+					local fill = math.clamp((top - (min.Y + (y - 1) * cell)) / cell, 0, 1)
+					if fill > 0 then
+						mi[y][k], oi[y][k] = material, fill
+					end
+				end
+				laid += 1
+			end
+		end
+	end
+	terrain:WriteVoxels(
+		Region3.new(min, min + Vector3.new(size * cell, layers * cell, deep * cell)),
+		cell,
+		materials,
+		occupancies
+	)
+	return laid
 end
 
 -- At each spoke's mouth, just out of the core, a sign either side of the
@@ -2373,18 +2442,19 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local Frontier = assert(OutpostWorld.Frontier, "OutpostWorld needs Shared.Frontier")
 	-- The quarry floor and its regolith, worked benches, and a continuous
 	-- natural crater rim. Invisible boundary walls stay beyond the benches.
-	solid(disc(ground, at * CFrame.new(0, -1, 0), 520, 2, REGOLITH, Enum.Material.Slate))
-	biomeFloor(ground, at, Frontier)
+	-- (Under the Loop's terrain, it's what you stand on: biomeTerrain hides
+	-- it once that's laid.)
+	local floor = solid(disc(ground, at * CFrame.new(0, -1, 0), 520, 2, REGOLITH, Enum.Material.Slate))
 	for _ = 1, 90 do
 		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(10, 430)
 		local radius = rng:NextNumber(10, 34)
 		local color = REGOLITH:Lerp(REGOLITH_DARK, rng:NextNumber(0.1, 0.5))
-		-- (Out past the core, its biome's ground shows through: Shared.Frontier.Biomes.)
-		if r > Frontier.Core - 10 then
-			color = color:Lerp(Frontier.biomeOf(a).Ground, FLOOR_TINT)
+		-- (Out past the core, the ground's the biomes' own: biomeTerrain.)
+		if r <= Frontier.Core - 10 then
+			disc(ground, at * CFrame.new(math.cos(a) * r, 0.05, math.sin(a) * r), radius, 0.1, color, Enum.Material.Sand)
 		end
-		disc(ground, at * CFrame.new(math.cos(a) * r, 0.05, math.sin(a) * r), radius, 0.1, color, Enum.Material.Sand)
 	end
+	local standing = {} -- (craters and masts out on the floor: the land stays flat round them)
 	for _, c in
 		{
 			{ 130, 40, 11 },
@@ -2406,6 +2476,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		}
 	do
 		crater(ground, at * CFrame.new(c[1], 0, c[2]), c[3])
+		table.insert(standing, { (at * CFrame.new(c[1], 0, c[2])).Position, c[3] + 4 })
 	end
 	local benchRamps = benches(ground, at)
 	craterRim(ground, at)
@@ -2458,6 +2529,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	for i = 0, 11 do
 		local a = i / 12 * math.pi * 2 + math.rad(15)
 		mast(roads, at * CFrame.new(math.cos(a) * 275, 0, math.sin(a) * 275), if i % 2 == 0 then SAGA else GLOW)
+		table.insert(standing, { (at * CFrame.new(math.cos(a) * 275, 0, math.sin(a) * 275)).Position, 4 })
 	end
 
 	-- The Shelter in the middle, up on its legs: the lobby, the mech
@@ -2960,6 +3032,25 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		for _, z in { -32, 32 } do
 			table.insert(keepOut, { (at * CFrame.new(x, 0, z)).Position, 46 })
 		end
+	end
+	-- The ground under it all (Shared.Frontier.ground), the land rising only
+	-- where nothing stands: no rock spot, vein site or its gate, building,
+	-- crater, mast or road.
+	local blocked = table.clone(keepOut)
+	for _, b in standing do
+		table.insert(blocked, b)
+	end
+	for _, cf in spots do
+		table.insert(blocked, { cf.Position, 7 })
+	end
+	for _, vs in veinSites do
+		for _, cf in vs.Rocks do
+			table.insert(blocked, { cf.Position, 7 })
+		end
+		table.insert(blocked, { vs.Scar.Position, 16 })
+	end
+	if biomeTerrain(at, Frontier, blocked, roadLines) > 0 then
+		floor.Transparency = 1
 	end
 	root.Parent = parent
 	return {

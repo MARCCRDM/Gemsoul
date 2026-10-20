@@ -645,8 +645,11 @@ end
 -- lights, the rocks' crystals, the hologram) without blooming over
 -- everything, a touch of contrast and colour so it doesn't look flat, and
 -- only a faint sheen on metal (the Shelter's plate is meant to look worn,
--- not polished). No haze (space stays black) and no lift in brightness.
+-- not polished). A slight fog over the ground (the far side of the quarry
+-- softens, each biome tints it: Client.FrontierHud) but no haze, so space
+-- stays black, and no lift in brightness.
 Scenes.OutpostFinish = {
+	Fog = { Density = 0.3, Offset = 0.12, Color = Color3.fromRGB(86, 92, 110), Decay = Color3.fromRGB(58, 62, 76) },
 	Bloom = { Intensity = 0.3, Size = 24, Threshold = 1.6 },
 	Grade = { Contrast = 0.08, Saturation = 0.08, Tint = Color3.fromRGB(248, 250, 255) },
 	Specular = 0.18,
@@ -673,6 +676,10 @@ function Scenes.outpostLighting()
 		end
 		return found
 	end
+	local fog = effect("Atmosphere")
+	fog.Density, fog.Offset, fog.Color, fog.Decay =
+		finish.Fog.Density, finish.Fog.Offset, finish.Fog.Color, finish.Fog.Decay
+	fog.Haze, fog.Glare = 0, 0
 	local bloom = effect("BloomEffect")
 	bloom.Intensity, bloom.Size, bloom.Threshold = finish.Bloom.Intensity, finish.Bloom.Size, finish.Bloom.Threshold
 	local grade = effect("ColorCorrectionEffect")

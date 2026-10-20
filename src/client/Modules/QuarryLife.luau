@@ -3,7 +3,7 @@
 	drawn by each player's own client (the server sends nothing). Everything
 	is timed by the server's clock, so everyone sees the same.
 
-	  road lights   lights set in the edges of the six haul roads, a pulse
+	  road lights   lights set in the edges of the four haul roads, a pulse
 	                running out along each, every light in its frontier
 	                band's colour (Shared.Frontier: cyan in the core, gold
 	                in the Fringe, rose out at the Edge), so the way out and

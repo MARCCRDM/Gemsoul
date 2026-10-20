@@ -2689,10 +2689,14 @@ local function riftsOnOpenGround()
 		return nil
 	end
 	local opened, count = {}, 0
+	local before = {} -- (still open from the soak, which stood here too: not these)
+	for _, rift in rifts() do
+		before[rift] = true
+	end
 	for _ = 1, 1500 do
 		swingFor(1, 0.4)
 		for _, rift in rifts() do
-			if not opened[rift] then
+			if not opened[rift] and not before[rift] then
 				opened[rift] = true
 				count += 1
 			end
@@ -3450,6 +3454,24 @@ local function teamFights()
 	end
 	KaijuServer._think(prey, now, 0.15)
 	check(prey.Target == weak, "Your kaiju left one nearly done for")
+	-- In the Rift your kaiju take the critters first: a pack's leader (its
+	-- fighter, the boss) is yours, and theirs only once no critter's left.
+	prey = alone()
+	local leader = bugAt(spot + Vector3.new(-6, 0, 11), "Sahur")
+	leader.Model:SetAttribute("RiftLeader", true)
+	local follower = bugAt(spot + Vector3.new(-6, 0, 19), "Patapim")
+	for _, bug in { leader, follower } do
+		(bug :: any).Foe = prey
+	end
+	KaijuServer._think(prey, now, 0.15)
+	check(prey.Target == follower, "Your kaiju went for the pack's leader before its critter")
+	for _, pet in team do
+		KaijuServer._think(pet, now, 0.15)
+		check(pet.Target ~= leader, "A kaiju of the team went for the leader with a critter about")
+	end
+	Enemies.remove(follower)
+	KaijuServer._think(prey, now + 0.5, 0.15)
+	check(prey.Target == leader, "Your kaiju left the leader alone with no critter left")
 	-- A heavy sweeps through the swarm: the critters in its arc are hit too,
 	-- one behind it isn't.
 	prey = alone()
@@ -3979,7 +4001,16 @@ end
 		end
 	end
 	check(snatchers == #raiders and snatchers >= Raid.Size, "Not all snatchers: " .. snatchers .. "/" .. #raiders)
+	-- (Those that came out nearest them first: one homed past its leash
+	-- from here, out of an earlier rift, wouldn't come for them.)
+	local function homeAway(enemy)
+		return ((enemy.Home - rootB.Position) * Vector3.new(1, 0, 1)).Magnitude
+	end
+	table.sort(melee, function(x, y)
+		return homeAway(x) < homeAway(y)
+	end)
 	check(#melee >= 3, "Too few snatchers to grab with")
+	check(homeAway(melee[3]) < Kaiju.Bug.Leash, "Too few snatchers out near them")
 	local function near(enemy)
 		enemy.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(3, 0, 0))
 	end
@@ -4250,8 +4281,12 @@ end)()
 	end
 	-- (Back to plain miners in the Outpost, nothing about them.)
 	clearCritters()
-	KaijuWilds.rift = function()
-		return nil -- (no tear to wait on: things come straight through)
+	-- Every foe through a tear of its own (FrontierServer.open's timeline:
+	-- through 1.5 s after it opens).
+	local tears = {}
+	KaijuWilds.rift = function(at, facing, opts)
+		table.insert(tears, { At = at, Facing = facing, Opts = opts or {}, Time = now })
+		return { OpenAt = now, HopAt = now + 1.5, CloseAt = now + 3.3, EndAt = now + 3.8 }
 	end
 	for _, p in { a, b } do
 		for _, key in { "CombatSession", "MatchId", "DungeonId", "Expedition", "Hunt", "Spar", "SparDown", "SparWith", "KaijuBattle" } do
@@ -4299,12 +4334,57 @@ end)()
 	-- On the landing, nothing's up yet; into the first cave, its pack is.
 	tick()
 	check(a:GetAttribute("RiftRoom") == 1 and foesLeft(run) == 0 and #fighters == 0, "The first cave's pack came before anyone walked in")
-	local function walkIn(p, area)
+	-- (Till whatever's coming is through its tear.)
+	local function settle()
+		for _ = 1, 60 do
+			if run.Coming == 0 and not (run.Summoning and not run.BossEnemy and not run.Won) then
+				return
+			end
+			tick()
+		end
+	end
+	local function walkIn(p, area, waiting)
 		local root = if p == a then rootA else rootB
 		root.CFrame = CFrame.new(area.Center + Vector3.new(0, 3, 0))
 		tick()
+		if not waiting then
+			settle()
+		end
 	end
-	walkIn(a, world.Rooms[1])
+	-- Walking in, the pack's on its way through the cave's floor: counted on
+	-- the strip, and the cave not clear for being empty yet.
+	local pack = RiftRun.foeCount(1, 1) + RiftRun.fighterCount(1, 1)
+	local tearsBefore = #tears
+	walkIn(a, world.Rooms[1], true)
+	check(run.Coming == pack and foesLeft(run) == 0, "The first cave's pack isn't on its way: " .. run.Coming)
+	check(a:GetAttribute("RiftLeft") == pack, "The strip doesn't count what's coming through")
+	tick()
+	check(not opened[world.Gates[1]] and run.Room == 1, "A cave cleared while its pack was still coming through")
+	settle()
+	check(run.Coming == 0 and foesLeft(run) == pack, "Not all of the pack came through: " .. foesLeft(run))
+	-- Each through a tear of its own, in the critters' world's colours, spread
+	-- over the cave's floor and clear of the runner, a moment apart: the
+	-- critters first, then their leaders through taller tears.
+	local mine = {}
+	for i = tearsBefore + 1, #tears do
+		table.insert(mine, tears[i])
+	end
+	check(#mine == pack, "Not a tear for each of the pack: " .. #mine)
+	for i, tear in mine do
+		check(tear.Opts.Hell == true, "A tear in the Outpost's colours in the Rift")
+		check(inside(world.Rooms[1], tear.At), "A tear out of its cave")
+		local flatA = Vector3.new(tear.At.X - rootA.Position.X, 0, tear.At.Z - rootA.Position.Z)
+		check(flatA.Magnitude >= RiftRun.Portal.Clear - 0.01, "A tear on top of the runner")
+		for j = i + 1, #mine do
+			local d = Vector3.new(tear.At.X - mine[j].At.X, 0, tear.At.Z - mine[j].At.Z).Magnitude
+			check(d >= RiftRun.Portal.Apart - 0.01, "Two tears on top of each other: " .. d)
+		end
+		if i > 1 then
+			check(tear.Time > mine[i - 1].Time, "Tears all at once")
+		end
+		local leaderTear = i > RiftRun.foeCount(1, 1)
+		check(tear.Opts.Height == (if leaderTear then RiftRun.Portal.Leader else nil), "A tear the wrong size for what came through it")
+	end
 	local critters, armed = 0, 0
 	for enemy in run.Foes do
 		local entry = KaijuWilds._wilds[enemy]
@@ -4318,6 +4398,11 @@ end)()
 	end
 	check(critters == RiftRun.foeCount(1, 1), "The first cave's critters aren't up: " .. critters)
 	check(armed == RiftRun.fighterCount(1, 1) and armed >= 1, "No fighters among the first cave's critters: " .. armed)
+	check(critters >= #Kaiju.SlotLevels, "Fewer critters than a team of kaiju: " .. critters)
+	for enemy in run.Foes do
+		local leader = enemy.Model:GetAttribute("RiftLeader") == true
+		check(leader == (KaijuWilds._wilds[enemy] == nil), "A critter marked a leader, or a fighter not")
+	end
 	check(a:GetAttribute("RiftLeft") == critters + armed, "The strip doesn't count the fighters")
 	for _, entry in fighters do
 		local enc = entry.Encounter
@@ -4397,10 +4482,15 @@ end)()
 	check(summoned.GearTier == 4 and summoned.HealthScale == RiftRun.bossHealth(1), "The boss's gear or health, alone")
 	check(#run.Boss.Moves >= 3, "The boss has no moves of its own")
 	check(run.Foes[boss] == nil, "The boss counted among its cave's foes")
-	-- Weakened, it calls its critters (and a fighter) through.
-	local before = #fighters
+	check(boss.Model:GetAttribute("RiftLeader") == true, "The boss isn't its cave's leader")
+	check(tears[#tears].Opts.Hell and tears[#tears].Opts.Height == RiftRun.Portal.Boss, "The boss didn't tear through")
+	-- Weakened, it calls its critters (and a fighter) through, each through
+	-- a tear of its own.
+	local before, tornBefore = #fighters, #tears
 	boss.Humanoid.Health = boss.Humanoid.MaxHealth * 0.6
 	tick()
+	settle()
+	check(#tears - tornBefore == RiftRun.Boss.AddCount + RiftRun.Boss.AddFighters, "Its adds didn't come through tears")
 	check(run.Adds[1] and not run.Adds[2], "It didn't call critters through")
 	check(foesLeft(run) == RiftRun.Boss.AddCount + RiftRun.Boss.AddFighters, "Not its critters through: " .. foesLeft(run))
 	check(#fighters == before + RiftRun.Boss.AddFighters and fighters[#fighters].Encounter.GearTier == RiftRun.Boss.AddTier, "No fighter through with them")

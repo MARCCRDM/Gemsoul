@@ -137,6 +137,58 @@ check(
 	Rules.update(s, { b("rival", 9, 0, true) }, 0.2, false) == "rival",
 	"Lock didn't return to the rival once the switched target was gone"
 )
+-- A Rift pack's leader: taken first, over nearer critters and those attacking
+-- you; once on it, nearer critters don't draw the lock off; off one, the
+-- leader takes it back. Hidden and quiet, or out of range, it isn't taken.
+local function leader(x)
+	x.Leader = true
+	return x
+end
+s = Rules.new()
+check(
+	Rules.update(
+		s,
+		{ c("critter", 4), c("bitey", 3, -1, true, true, false, true), leader(c("leader", 20, 0.2)) },
+		0,
+		false
+	) == "leader",
+	"The pack's leader didn't take the lock"
+)
+check(
+	Rules.update(s, { c("critter", 2), leader(c("leader", 20, 0.2)) }, 0.1, false) == "leader",
+	"A nearer critter drew the lock off the leader"
+)
+s = Rules.new()
+check(Rules.update(s, { c("critter", 4) }, 0, false) == "critter", "No lock on a lone critter")
+check(
+	Rules.update(s, { c("critter", 4), leader(c("leader", 25)) }, 0.1, false) == "leader",
+	"The leader didn't take the lock off a critter"
+)
+s = Rules.new()
+check(
+	Rules.update(s, { c("critter", 4), leader(c("hidden", 12, 1, false)) }, 0, false) == "critter",
+	"A hidden leader took the lock"
+)
+check(
+	Rules.update(s, { c("critter", 4), leader(c("far", Rules.Range + 5)) }, 0.1, false) == "critter",
+	"A leader out of range took the lock"
+)
+check(
+	Rules.update(s, { c("critter", 4), leader(c("striker", 30, -1, false, true, false, true)) }, 0.2, false)
+		== "striker",
+	"A leader attacking you from cover wasn't taken"
+)
+do
+	local p = Rules.new()
+	local list = {
+		{ Target = "critter", Distance = 4, Allowed = true, Visible = true, Facing = 1, Bearing = 0 },
+		leader({ Target = "leader", Distance = 15, Allowed = true, Visible = true, Facing = 1, Bearing = 0 }),
+	}
+	check(Rules.pick(p, list, "critter") == "critter", "Couldn't pick a critter with a leader about")
+	check(Rules.update(p, list, 1, false) == "critter", "A picked critter didn't hold against the leader")
+end
 print(
-	"PASS: " .. checks .. " nearest-enemy lock, rival hold, auto-engage, cover grace, range and target switching checks"
+	"PASS: "
+		.. checks
+		.. " nearest-enemy lock, rival hold, a pack's leader first, auto-engage, cover grace, range and target switching checks"
 )

@@ -10,9 +10,10 @@ way out, kite what comes through, and run back in when it gets too hot.
 ![The Outpost from above: the three bands, the outcrops, the Rift Veins and the guarded one](frontier/map.png)
 
 The quarry outside the core is also **the Loop**: four biomes, one for each
-element, a quarter of the quarry each, between four roads due north, east,
-south and west. Out there, gems, wild kaiju and critters lean 60% toward
-the biome's element. See [docs/biomes.md](biomes.md). (The map above is
+element, about a quarter of the quarry each, between four roads due north,
+east, south and west. Each has its own ground in Roblox terrain, and their
+borders sway and mix. Out there, gems, wild kaiju and critters lean 60%
+toward the biome's element. See [docs/biomes.md](biomes.md). (The map above is
 from before the Shelter and the Loop, when there were six roads. The bands
 are as drawn; for today's roads and buildings, see the map in
 `docs/biomes.md`.)

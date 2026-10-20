@@ -52,7 +52,9 @@ local function nameOf(model: Model): string
 	if other then
 		return other.DisplayName
 	end
-	return model:GetAttribute("RivalName") or model:GetAttribute("CombatTitle") or model.Name
+	local name = model:GetAttribute("RivalName") or model:GetAttribute("CombatTitle") or model.Name
+	-- (A Rift pack's leader, the one you're on: TargetLockRules.)
+	return if model:GetAttribute("RiftLeader") then "LEADER  ·  " .. name else name
 end
 local function tintOf(model: Model): Color3
 	local element = model:GetAttribute("RivalElement")

@@ -1,5 +1,9 @@
 -- Pure selection rules; presentation never grants permission to damage a target.
 -- The lock is automatic and goes for the nearest enemy:
+--   * a pack's leader comes first (a candidate's Leader: the Rift's fighters
+--     and its boss, while your kaiju take their critters): the nearest one
+--     in range and in sight, or attacking you, takes the lock from anything
+--     else, and once on one it isn't drawn off by nearer critters
 --   * with no target, it takes whatever is attacking you (nearest first,
 --     wherever it is), else the nearest enemy ahead of you, else your Arena
 --     rival wherever it is
@@ -115,6 +119,25 @@ local function nearestRival(candidates, exclude)
 	end
 	return best
 end
+-- The nearest pack leader that can be taken: in range, and in sight or
+-- attacking you.
+local function nearestLeader(candidates)
+	local best
+	for _, candidate in candidates do
+		if
+			candidate.Leader
+			and candidate.Allowed
+			and candidate.Distance > 0
+			and candidate.Distance <= Rules.Range
+			and (candidate.Visible or candidate.Engaged)
+			and (not best or candidate.Distance < best.Distance)
+		then
+			best = candidate
+		end
+	end
+	return best
+end
+
 -- `_turning` is kept for callers; turning never breaks the lock.
 function Rules.update(state, candidates, now, _turning)
 	-- A target you switched to holds until it's lost.
@@ -125,13 +148,21 @@ function Rules.update(state, candidates, now, _turning)
 		state.Target, state.HiddenSince, state.Pinned = nil, nil, false
 	end
 	state.Priority = false
+	local leader = nearestLeader(candidates)
 	if state.Target and keep(state, candidates, now) then
-		-- Held, unless another enemy is clearly nearer.
+		-- Held, unless another enemy is clearly nearer: a leader holds
+		-- against nearer critters, and off one, a leader takes it.
 		local current
 		for _, candidate in candidates do
 			if candidate.Target == state.Target then
 				current = candidate
 			end
+		end
+		if current.Leader then
+			return state.Target
+		elseif leader then
+			state.Target, state.HiddenSince = leader.Target, nil
+			return state.Target
 		end
 		local nearer = nearestRival(candidates, state.Target)
 		if nearer and nearer.Distance < current.Distance - Rules.SwitchMargin then
@@ -140,6 +171,11 @@ function Rules.update(state, candidates, now, _turning)
 		return state.Target
 	end
 	state.Target, state.HiddenSince = nil, nil
+	-- A pack's leader.
+	if leader then
+		state.Target = leader.Target
+		return state.Target
+	end
 	-- Whatever is attacking you, nearest first, wherever it is.
 	local engaged
 	for _, candidate in candidates do

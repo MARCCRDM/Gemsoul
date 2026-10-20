@@ -109,7 +109,7 @@
 	  KaijuWilds.isCritter(enemy) -> boolean    a rift's critter (not a wild kaiju)
 	  KaijuWilds.critterOf(model) -> enemy?     the rift's critter a model is
 	  KaijuWilds.bonk(enemy, player, from) -> boolean   a pickaxe's bonk on a critter
-	  KaijuWilds.rift(at, facing) -> timeline?  opens a rift (FrontierServer
+	  KaijuWilds.rift(at, facing, opts?) -> timeline?  opens a rift (FrontierServer
 	                                            sets it; a bug slips back through one)
 	  KaijuWilds.done(enemy, killed, totals)    a critter is gone (FrontierServer
 	                                            sets it: wandering rifts cleared)
@@ -646,8 +646,9 @@ local function crowd(enemy, wild: Wild, space: number): Vector3
 	return Squad.apart(here, others, space, wild.Serial)
 end
 
--- Opens a rift (FrontierServer sets this): returns its timeline, or nil.
-KaijuWilds.rift = function(_at: Vector3, _facing: Vector3)
+-- Opens a rift (FrontierServer sets this; `opts` as FrontierServer.open's:
+-- Height, Hell, ...): returns its timeline, or nil.
+KaijuWilds.rift = function(_at: Vector3, _facing: Vector3, _opts: any?)
 	return nil
 end
 -- A critter is gone, `killed` or slipped back (FrontierServer sets this).

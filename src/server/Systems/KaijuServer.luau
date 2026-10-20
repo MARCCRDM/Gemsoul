@@ -836,8 +836,10 @@ end
 -- another is well nearer. The one it's on stays in the running while it's a
 -- little past the engage range of its owner or of the kaiju itself (a fight
 -- isn't dropped because its owner walked off), and so does a creature after
--- a kaiju fighting away from its owner. Where two or more share one, the
--- side of it each fights from. Returns { [pet]: enemy } and { [pet]: flank }.
+-- a kaiju fighting away from its owner. In the Rift, the critters first: a
+-- pack's leaders (RiftLeader) only once none of its critters is left about.
+-- Where two or more share one, the side of it each fights from. Returns
+-- { [pet]: enemy } and { [pet]: flank }.
 local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 	local engage = Kaiju.Follow.Engage
 	local fighters = {}
@@ -878,6 +880,17 @@ local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 				end
 			end
 		end
+	end
+	-- In the Rift the critters come first: a pack's leaders (its fighters,
+	-- the boss) are yours, theirs only once no critter's left about.
+	local critters = {}
+	for _, enemy in foes do
+		if not enemy.Model:GetAttribute("RiftLeader") then
+			table.insert(critters, enemy)
+		end
+	end
+	if #critters > 0 then
+		foes = critters
 	end
 	-- (It dives a swarm's bomber, and finishes off one that's nearly done.)
 	local targets = Squad.assign(fighters, foes, function(pet, enemy)
