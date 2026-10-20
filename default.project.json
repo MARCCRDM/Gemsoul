@@ -7,6 +7,12 @@
         "$path": "src/shared"
       }
     },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "Future"
+      }
+    },
     "ReplicatedFirst": {
       "$className": "ReplicatedFirst",
       "Orientation": {

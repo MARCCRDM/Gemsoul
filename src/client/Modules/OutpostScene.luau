@@ -50,6 +50,7 @@ local ProbeLayout = require(script.Parent.ProbeLayout)
 require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
 local SkyRift = require(script.Parent.SkyRift)
+local ShelterLife = require(script.Parent.ShelterLife)
 local RiftTear = require(script.Parent.RiftTear)
 local FrontierHud = require(script.Parent.FrontierHud)
 local ThirdPerson = require(script.Parent.ThirdPerson)
@@ -1874,15 +1875,19 @@ end)
 RiftTear.start()
 FrontierHud.start()
 RunService.RenderStepped:Connect(function(dt)
-	-- The rift in the sky shows only while you're here.
+	-- The rift in the sky, and the Shelter's life (the hologram, the
+	-- gallery's gems, the drones), show only while you're here.
 	if active then
 		SkyRift.mount(Rules.Location)
+		ShelterLife.mount(Rules.Location)
 	end
 	SkyRift.show(active)
+	ShelterLife.show(active)
 	if not active then
 		return
 	end
 	SkyRift.step(dt)
+	ShelterLife.step(dt)
 	RiftTear.step(workspace:GetServerTimeNow())
 	local site = workspace:FindFirstChild("SagaOutpost")
 	local ring = site and site:FindFirstChild("Probe") and site.Probe:FindFirstChild("ProbeRing")

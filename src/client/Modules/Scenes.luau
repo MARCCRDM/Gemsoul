@@ -641,26 +641,42 @@ end
 
 -- Restore the original moon-base lighting, including after a bright arena
 -- or meadow visit. Keep the quarry readable beneath its stars and planets.
+-- The finish: neon glows softly round its edges (the Shelter's trims, the
+-- rocks' crystals, the hologram) without blooming over everything, a touch
+-- of contrast and colour so it doesn't look flat, and a little sheen on
+-- metal. No haze (space stays black) and no lift in brightness.
+Scenes.OutpostFinish = {
+	Bloom = { Intensity = 0.3, Size = 24, Threshold = 1.6 },
+	Grade = { Contrast = 0.08, Saturation = 0.08, Tint = Color3.fromRGB(248, 250, 255) },
+	Specular = 0.35,
+}
 function Scenes.outpostLighting()
+	local finish = Scenes.OutpostFinish
 	Scenes.spaceLighting()
 	Lighting.ExposureCompensation = 0
 	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 0.2
+	Lighting.EnvironmentSpecularScale = finish.Specular
 	local sky = Lighting:FindFirstChildOfClass("Sky")
 	if sky then
 		for face, suffix in { Bk = "bk", Dn = "dn", Ft = "ft", Lf = "lf", Rt = "rt", Up = "up" } do
 			sky["Skybox" .. face] = "rbxasset://textures/sky/sky512_" .. suffix .. ".tex"
 		end
 	end
-	local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
-	if bloom then
-		bloom.Intensity, bloom.Size, bloom.Threshold = 0.08, 20, 2
+	-- (Made here when the server's lighting has none: menu-only mode's
+	-- space lighting has no grade.)
+	local function effect(kind: string): any
+		local found = Lighting:FindFirstChildOfClass(kind)
+		if not found then
+			found = Instance.new(kind)
+			found.Parent = Lighting
+		end
+		return found
 	end
-	local grade = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
-	if grade then
-		grade.Brightness, grade.Contrast, grade.Saturation = 0, 0, 0
-		grade.TintColor = Color3.new(1, 1, 1)
-	end
+	local bloom = effect("BloomEffect")
+	bloom.Intensity, bloom.Size, bloom.Threshold = finish.Bloom.Intensity, finish.Bloom.Size, finish.Bloom.Threshold
+	local grade = effect("ColorCorrectionEffect")
+	grade.Brightness, grade.Contrast, grade.Saturation = 0, finish.Grade.Contrast, finish.Grade.Saturation
+	grade.TintColor = finish.Grade.Tint
 	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect")
 	if rays then
 		rays.Intensity = 0

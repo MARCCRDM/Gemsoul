@@ -36,6 +36,10 @@ at its peak). Ribs run up the outside, with heavier corners.
 
 ![The Market and Store booths on the west wall](shelter/west.png)
 
+Since then the hall has gained the Moon Garden (west), the Gem Gallery
+(east), a kaiju hologram on the arena's stage, a tiled floor and more
+light: see [lobby-polish.md](lobby-polish.md).
+
 - **Arriving**: players spawn just inside the main door, facing into the
   hall (`site.Spawn`).
 - **Out the door**: one wide door south (28 wide), an apron, and the
@@ -66,7 +70,8 @@ gone.
 The landing pad and shuttle are now south-east (72, 118). The solar array
 moved west (-150, 40), the fuel tanks east (150, -20, clear of the garage's
 east door), and the containers and crates that stood where the Shelter is
-were taken out. The scene stays under its part budget (3,833 of 4,000).
+were taken out. The scene stays under its part budget (3,833 of 4,000;
+3,944 since the lobby was filled in, see [lobby-polish.md](lobby-polish.md)).
 
 ## Files
 

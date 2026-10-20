@@ -1237,6 +1237,109 @@ local function signPanel(parent, cframe: CFrame, size: Vector3, title: string, s
 	return board, gui, head
 end
 
+-- Standing at `from`, turned to face `toward` (level).
+local function facingPoint(from: Vector3, toward: Vector3): CFrame
+	return CFrame.new(from) * CFrame.Angles(0, math.atan2(-(toward.X - from.X), -(toward.Z - from.Z)), 0)
+end
+
+-- The Moon Garden, a lounge in the hall round `at` (its middle, on the
+-- floor): a planter ringed in light under a lunar tree hung with glowing
+-- fruit, crystal flowers, and four benches (seats) facing the tree.
+local function moonGarden(parent, at: CFrame)
+	local m = folder(parent, "MoonGarden")
+	local teal = Color3.fromRGB(96, 236, 200)
+	-- The planter: a light on the floor round its rim, a steel bed, moss on top.
+	disc(m, at * CFrame.new(0, 0.03, 0), 8, 0.06, teal, Enum.Material.Neon)
+	solid(disc(m, at * CFrame.new(0, 0.9, 0), 7.4, 1.8, Color3.fromRGB(64, 68, 82), Enum.Material.Metal))
+	disc(m, at * CFrame.new(0, 1.85, 0), 6.9, 0.2, Color3.fromRGB(70, 128, 98), Enum.Material.Grass)
+	-- The lunar tree: a pale trunk, three boughs, a canopy of leaf clusters
+	-- and fruit that glows.
+	local bark = Color3.fromRGB(150, 136, 168)
+	solid(part(m, at * CFrame.new(0, 6.4, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(9, 1.8, 1.8), bark, Enum.Material.Wood, "Cylinder"))
+	for k = 0, 2 do
+		local a = math.rad(20 + k * 120)
+		local from = Vector3.new(0, 8.6, 0)
+		local to = Vector3.new(math.cos(a) * 3.8, 11.6, math.sin(a) * 3.8)
+		local mid = at * CFrame.new((from + to) / 2)
+		part(m, CFrame.lookAt(mid.Position, (at * CFrame.new(to)).Position) * CFrame.Angles(0, math.rad(90), 0),
+			Vector3.new((to - from).Magnitude + 0.6, 0.8, 0.8), bark, Enum.Material.Wood, "Cylinder")
+	end
+	local leaves = { Color3.fromRGB(70, 196, 168), Color3.fromRGB(116, 222, 190), Color3.fromRGB(88, 176, 200) }
+	local crown = part(m, at * CFrame.new(0, 13.2, 0), Vector3.one * 7, leaves[1], nil, "Ball")
+	light(crown, Color3.fromRGB(150, 255, 220), 30, 1.2)
+	for k = 0, 5 do
+		local a = math.rad(k * 60 + 30)
+		part(m, at * CFrame.new(math.cos(a) * 3.9, 11.6 + (k % 2) * 0.9, math.sin(a) * 3.9), Vector3.one * (4.6 + (k % 3) * 0.5),
+			leaves[k % 3 + 1], nil, "Ball")
+	end
+	local fruit = { Color3.fromRGB(255, 150, 230), Color3.fromRGB(255, 214, 120), Color3.fromRGB(150, 230, 255) }
+	for k = 0, 7 do
+		local a = math.rad(k * 45 + 10)
+		part(m, at * CFrame.new(math.cos(a) * (4.4 + (k % 2) * 0.8), 9.6 + (k % 3) * 0.5, math.sin(a) * (4.4 + (k % 2) * 0.8)),
+			Vector3.one * 0.9, fruit[k % 3 + 1], Enum.Material.Neon, "Ball")
+	end
+	-- Crystal flowers round the trunk.
+	for k = 0, 5 do
+		local a = math.rad(k * 60)
+		local base = at * CFrame.new(math.cos(a) * 4.6, 1.95, math.sin(a) * 4.6)
+		part(m, base * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(1.6, 0.25, 0.25), Color3.fromRGB(80, 150, 110), nil, "Cylinder")
+		part(m, base * CFrame.new(0, 1.75, 0), Vector3.new(0.8, 1, 0.8), fruit[k % 3 + 1], Enum.Material.Neon, "Ball")
+	end
+	-- Four benches facing the tree, between the paths.
+	for k = 0, 3 do
+		local a = math.rad(45 + k * 90)
+		local spot = (at * CFrame.new(math.cos(a) * 11.5, 0, math.sin(a) * 11.5)).Position
+		local face = facingPoint(spot, at.Position)
+		solid(part(m, face * CFrame.new(0, 0.65, 0), Vector3.new(4.4, 1.3, 1.4), HULL_DARK, Enum.Material.Metal))
+		local seat = Instance.new("Seat")
+		seat.Name = "GardenBench"
+		seat.Anchored = true
+		seat.Size = Vector3.new(5, 0.5, 1.9)
+		seat.CFrame = face * CFrame.new(0, 1.55, 0)
+		seat.Color = Color3.fromRGB(206, 212, 224)
+		seat.Material = Enum.Material.SmoothPlastic
+		seat.TopSurface, seat.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+		seat.Parent = m
+		part(m, face * CFrame.new(0, 2.7, 1.05), Vector3.new(5, 1.9, 0.35), Color3.fromRGB(206, 212, 224))
+	end
+	-- Its name, on a post by the path in from the hall.
+	part(m, at * CFrame.new(9.4, 1.6, 0), Vector3.new(0.5, 3.2, 0.5), STEEL, Enum.Material.Metal)
+	local spot = (at * CFrame.new(9.4, 3.9, 0)).Position
+	signPanel(m, facingPoint(spot, spot + at:VectorToWorldSpace(Vector3.new(1, 0, 0))), Vector3.new(7, 1.6, 0.3),
+		"MOON GARDEN", "TAKE A SEAT", teal)
+	return m
+end
+
+-- The Gem Gallery: five glass cases on plinths in an arc round `at` (on the
+-- floor, in front of the arc), one for each rarity, Common to Legendary,
+-- each lit in its colour. The client sets a gem spinning in each case and
+-- writes its odds on the plinth (Client.ShelterLife).
+local GALLERY_COLORS = {
+	Color3.fromRGB(200, 200, 200),
+	Color3.fromRGB(90, 220, 120),
+	Color3.fromRGB(80, 160, 255),
+	Color3.fromRGB(255, 90, 220),
+	Color3.fromRGB(255, 176, 60),
+}
+local function gemGallery(parent, at: CFrame)
+	local m = folder(parent, "GemGallery")
+	for i, color in GALLERY_COLORS do
+		local a = math.rad(-50 + (i - 1) * 25)
+		local spot = (at * CFrame.new(math.cos(a) * 13, 0, math.sin(a) * 13)).Position
+		local face = facingPoint(spot, at.Position)
+		local plinth = solid(part(m, face * CFrame.new(0, 1.7, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(3.4, 3, 3),
+			HULL_DARK, Enum.Material.Metal, "Cylinder"))
+		plinth.Name = "GalleryPlinth" .. i
+		part(m, face * CFrame.new(0, 3.48, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.16, 3.2, 3.2), color,
+			Enum.Material.Neon, "Cylinder")
+		solid(part(m, face * CFrame.new(0, 5.36, 0), Vector3.new(2.6, 3.6, 2.6), Color3.fromRGB(190, 220, 255), Enum.Material.Glass,
+			nil, { Transparency = 0.72, CastShadow = false }))
+		local cap = part(m, face * CFrame.new(0, 7.31, 0), Vector3.new(2.9, 0.3, 2.9), HULL_DARK, Enum.Material.Metal)
+		light(cap, color, 11, 1.6)
+	end
+	return m
+end
+
 -- The Shelter: the outpost's base in the middle of the basin, big enough to
 -- hold the lobby (168 by 120 studs, the walls 34 high, a skylight over the
 -- hall). Players arrive inside; outside is where they mine and hunt.
@@ -1272,10 +1375,27 @@ local function shelter(parent, at: CFrame)
 		return CFrame.lookAt(p, p + (at:VectorToWorldSpace(Vector3.new(dx, 0, dz))))
 	end
 
-	-- The floor: one slab under it all, the hall's polished, the garage lane dark.
+	-- The floor: one slab under it all, the hall's polished (pale tiles, with
+	-- darker seams every 12 studs), the garage lane dark.
 	solid(part(m, at3(0, 0.4, 0), Vector3.new(W * 2 + 4, 0.8, D * 2 + 4), CONCRETE, Enum.Material.Concrete))
 	part(m, at3(0, 0.83, (SHELTER.Barrier + D) / 2), Vector3.new(W * 2, 0.06, D - SHELTER.Barrier),
-		Color3.fromRGB(74, 78, 90), Enum.Material.SmoothPlastic)
+		Color3.fromRGB(112, 118, 132), Enum.Material.SmoothPlastic)
+	local seam = Color3.fromRGB(84, 90, 104)
+	for x = -72, 72, 12 do
+		part(m, at3(x, 0.86, (SHELTER.Barrier + D) / 2), Vector3.new(0.14, 0.04, D - SHELTER.Barrier), seam)
+	end
+	for z = -2, 46, 12 do
+		part(m, at3(0, 0.86, z), Vector3.new(W * 2, 0.04, 0.14), seam)
+	end
+	-- Where you arrive: a compass rose in the floor, a light at its heart.
+	local rose = at3(0, 0.86, D - 10)
+	disc(m, rose, 6.4, 0.06, SAGA)
+	disc(m, rose * CFrame.new(0, 0.01, 0), 6, 0.06, Color3.fromRGB(126, 132, 148))
+	for k = 0, 3 do
+		part(m, rose * CFrame.new(0, 0.03, 0) * CFrame.Angles(0, math.rad(k * 45), 0),
+			Vector3.new(if k % 2 == 0 then 11.4 else 7.4, 0.06, 0.36), SAGA)
+	end
+	disc(m, rose * CFrame.new(0, 0.05, 0), 1.1, 0.06, SAGA, Enum.Material.Neon)
 	part(m, at3(0, 0.83, (laneN + laneS) / 2), Vector3.new(W * 2 + 4, 0.06, laneS - laneN),
 		Color3.fromRGB(36, 38, 44), Enum.Material.Slate)
 	for x = -78, 78, 12 do
@@ -1368,6 +1488,12 @@ local function shelter(parent, at: CFrame)
 		local hung = part(m, at3(s * 14, 28, 18), Vector3.new(2.4, 1.2, 2.4), AMBER, Enum.Material.Neon, "Ball")
 		tube(m, hung.CFrame.Position, at3(s * 14, roofY + 8.2, 18).Position, 0.08, HULL_DARK)
 		light(hung, Color3.fromRGB(255, 196, 130), 40, 1.3)
+		-- Cool white panels down each side of the skylight, so the hall is
+		-- evenly lit and its corners aren't left in the dark.
+		for _, z in { -4, 20, 44 } do
+			local panel = part(m, at3(s * 46, roofY - 0.75, z), Vector3.new(12, 0.3, 4), Color3.fromRGB(236, 242, 255), Enum.Material.Neon)
+			light(panel, Color3.fromRGB(232, 240, 255), 42, 0.9)
+		end
 	end
 
 	-- The main door: hazard posts, a canopy edged in orange, the name over it,
@@ -1434,13 +1560,17 @@ local function shelter(parent, at: CFrame)
 	solid(disc(m, arena * CFrame.new(0, 0.75, 0), 12, 1.5, Color3.fromRGB(46, 40, 60), Enum.Material.Slate))
 	part(m, arena * CFrame.new(0, 1.52, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.06, 10, 10), VIOLET,
 		Enum.Material.Neon, "Cylinder", { Transparency = 0.35 })
+	-- (Pale steel, each tier's front edge lit violet.)
 	for tier, spec in { { 16, 1.6 }, { 19.5, 3.2 } } do
 		local r, h = spec[1], spec[2]
 		for k = 0, 11 do
 			local a = (k + 0.5) / 12 * math.pi * 2
 			if math.abs(math.cos(a)) >= 0.3 then
-				solid(part(m, arena * CFrame.new(math.cos(a) * r, h / 2, math.sin(a) * r) * CFrame.Angles(0, math.pi / 2 - a, 0),
-					Vector3.new(2 * math.pi * r / 12 - 0.6, h, 3), if tier == 1 then STEEL else HULL_DARK, Enum.Material.Metal))
+				local seat = arena * CFrame.new(math.cos(a) * r, h / 2, math.sin(a) * r) * CFrame.Angles(0, math.pi / 2 - a, 0)
+				local length = 2 * math.pi * r / 12 - 0.6
+				solid(part(m, seat, Vector3.new(length, h, 3), if tier == 1 then Color3.fromRGB(176, 182, 196) else Color3.fromRGB(112, 118, 134),
+					Enum.Material.Metal))
+				part(m, seat * CFrame.new(0, h / 2 - 0.12, -1.52), Vector3.new(length, 0.2, 0.1), VIOLET, Enum.Material.Neon)
 			end
 		end
 	end
@@ -1449,10 +1579,11 @@ local function shelter(parent, at: CFrame)
 		part(m, arena * CFrame.new(math.cos(a) * 13.6, 4.5, math.sin(a) * 13.6), Vector3.new(1, 9, 1), HULL_DARK, Enum.Material.Metal)
 		part(m, arena * CFrame.new(math.cos(a) * 13.6, 9.4, math.sin(a) * 13.6), Vector3.one * 1.6, ORANGE, Enum.Material.Neon, "Ball")
 	end
+	-- (Its sign up high, clear of the hologram on the stage.)
 	for _, s in { -1, 1 } do
-		part(m, arena * CFrame.new(s * 7, 6, 19.5), Vector3.new(0.8, 12, 0.8), HULL_DARK, Enum.Material.Metal)
+		part(m, arena * CFrame.new(s * 7, 8.5, 19.5), Vector3.new(0.8, 17, 0.8), HULL_DARK, Enum.Material.Metal)
 	end
-	signPanel(m, facing(0, 13.4, 18 + 19.5, 0, 1), Vector3.new(16, 3.4, 0.4), "KAIJU ARENA", "COMING SOON", VIOLET)
+	signPanel(m, facing(0, 18.4, 18 + 19.5, 0, 1), Vector3.new(16, 3.4, 0.4), "KAIJU ARENA", "COMING SOON", VIOLET)
 	for _, g in { { -8, 23, 12, 1.4, .4 }, { 9, 26, 22, 1.2, -.5 }, { 1, 29, 8, 1, 2.6 } } do
 		ghost(m, at3(g[1], g[2], g[3]) * CFrame.Angles(0, g[5], -.1), g[4])
 	end
@@ -1532,6 +1663,10 @@ local function shelter(parent, at: CFrame)
 	for _, z in { 2, 34 } do
 		bunting(m, at3(-W + 1, 27, z).Position, at3(W - 1, 27, z).Position, 3, 11, at:VectorToWorldSpace(Vector3.new(0, 0, 1)))
 	end
+	-- The Moon Garden on the west side of the hall, the Gem Gallery on the
+	-- east, in front of the leaderboard.
+	moonGarden(m, at3(-42, 0.86, 14))
+	gemGallery(m, at3(30, 0.86, 4))
 
 	local spawnAt = at3(0, 3.5, D - 10).Position
 	return {

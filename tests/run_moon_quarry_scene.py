@@ -407,7 +407,15 @@ local Scenes={}
 ''' + lighting + r'''
 Scenes.outpostLighting()
 assert(Lighting.ClockTime==0 and not Lighting:FindFirstChildOfClass("Sky").CelestialBodiesShown,"Fresh moon lighting not applied")
+-- The finish is made on a fresh entry (menu-only mode's server lighting has no grade).
+local finish=Scenes.OutpostFinish
+local bloom,grade=Lighting:FindFirstChildOfClass("BloomEffect"),Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+assert(bloom and bloom.Intensity==finish.Bloom.Intensity and bloom.Threshold==finish.Bloom.Threshold,"No soft bloom on the Outpost")
+assert(grade and grade.Brightness==0 and grade.Contrast==finish.Grade.Contrast and grade.Saturation==finish.Grade.Saturation,"No grade on the Outpost")
+assert(finish.Bloom.Intensity<=0.5 and finish.Grade.Contrast<=0.15 and finish.Grade.Saturation<=0.15,"The finish is overdone")
+-- (A daytime visit's effects in their place.)
 for _,kind in {"Atmosphere","ColorCorrectionEffect","SunRaysEffect","BloomEffect"} do
+ for i=#Lighting.Children,1,-1 do if Lighting.Children[i].ClassName==kind then table.remove(Lighting.Children,i) end end
  local effect=Instance.new(kind)
  effect.Parent=Lighting
  effect.Density,effect.Haze,effect.Glare,effect.Intensity,effect.Brightness=1,10,10,1,1
