@@ -13,8 +13,9 @@
 	(Client.SkyRift draws that).
 
 	  OutpostWorld.build(at, parent) -> {
-	      Model, Spawn (CFrame: inside the Shelter's door, facing in, on its
-	      floor: Shared.Outpost.ShelterLift over the quarry's),
+	      Model, Spawn (CFrame: in the Shelter's garage lane, facing bay 04's
+	      Mole drill, on its floor: Shared.Outpost.ShelterLift over the
+	      quarry's),
 	      Probe (BasePart, the terminal), Board (BasePart with the
 	      leaderboard's face), Gate (BasePart), Stations ({ Store, Market }:
 	      the Shelter's counters, for their prompts), Crew ({ { Id, CFrame } }:
@@ -40,9 +41,11 @@
 	  OutpostWorld.rock(size, cframe, rng, tint?) -> Model   one rock of that size
 	      (Shared.Outpost.Sizes), its main chunk named "Body"; `tint` colours
 	      its crystals (a frontier band's, Shared.Frontier.Bands)
-	  OutpostWorld.veinMarks(parent, scar, rng, color?) -> Model   a vein's scorched
-	      bed, cracks and beam of light over its dormant rift (moved with it;
-	      `color` the guarded vein's, Shared.Frontier.Bands.Guarded)
+	  OutpostWorld.veinMarks(parent, scar, rng, color?, index?) -> Model   a vein's
+	      Rift Gate over its dormant rift: scorched bed, cracks, an arch of
+	      black rock with fire at its feet, and its "Enter the Rift" prompt
+	      (moved with it; `color` the guarded vein's cracks,
+	      Shared.Frontier.Bands.Guarded)
 ]]
 local OutpostWorld = {}
 
@@ -1009,60 +1012,106 @@ end
 local DIRT = Color3.fromRGB(92, 86, 84)
 local CONCRETE = Color3.fromRGB(86, 90, 98)
 local QUARRY = 440 -- where the stepped quarry walls start (Shared.Outpost.Radius)
--- Glowing cracks in the ground along an outcrop's grain, so it sparkles
--- from afar without drawing a road: two or three thin strips.
-local function seam(parent, at: CFrame, grain: number, length: number, color: Color3, rng)
-	local along = CFrame.Angles(0, -grain, 0)
-	for i = 1, rng:NextInteger(2, 3) do
-		local off = (i - 2) * rng:NextNumber(3, 5)
-		local crack = part(
-			parent,
-			at * along * CFrame.new(rng:NextNumber(-3, 3), 0.11, off) * CFrame.Angles(0, rng:NextNumber(-0.25, 0.25), 0),
-			Vector3.new(length * rng:NextNumber(0.55, 0.9), 0.06, rng:NextNumber(0.16, 0.3)),
-			color,
-			Enum.Material.Neon
-		)
-		crack.Name = "SeamCrack"
-		crack.CastShadow = false
-	end
-end
-
--- Where a vein's dormant rift sits: scorched ground, cracks of the other
--- side's light running out from it, and a thin beam of violet light over it
--- you can see from the outpost (the tear itself is drawn by each player's
--- client: RiftTear). Its own model, so it moves with its vein. The guarded
--- vein's beam is its own `color`.
-function OutpostWorld.veinMarks(parent, at: CFrame, rng, color: Color3?): Model
+-- Where a vein's dormant rift sits: its Rift Gate, a way into the
+-- critters' own world (Server.RiftServer). Scorched ground with cracks of
+-- that world's fire running out from it, and over it an arch of black,
+-- jagged rock standing round the tear (drawn by each player's client in
+-- that world's colours: RiftTear), embers rising, fire at its feet, and
+-- its prompt ("Enter the Rift": PromptKind Rift, Vein `index`). Its own
+-- model, so it moves with its vein; the guarded vein's cracks are `color`.
+function OutpostWorld.veinMarks(parent, at: CFrame, rng, color: Color3?, index: number?): Model
 	local model = Instance.new("Model")
 	model.Name = "VeinMarks"
 	model.Parent = parent
-	local beam = part(
-		model,
-		at * CFrame.new(0, 90, 0) * CFrame.Angles(0, 0, math.pi / 2),
-		Vector3.new(180, 1.1, 1.1),
-		color or Color3.fromRGB(215, 90, 255),
-		Enum.Material.Neon,
-		"Cylinder"
-	)
-	beam.Name = "VeinBeam"
-	beam.Transparency = 0.55
-	beam.CastShadow = false
-	parent = model
-	local bed = disc(parent, at * CFrame.new(0, 0.06, 0), 5.5, 0.1, Color3.fromRGB(44, 30, 58), Enum.Material.Slate)
+	local hell = Color3.fromRGB(255, 84, 24)
+	local ember = Color3.fromRGB(255, 150, 52)
+	local black = Color3.fromRGB(26, 20, 24)
+	local bed = disc(model, at * CFrame.new(0, 0.06, 0), 7.5, 0.1, Color3.fromRGB(40, 24, 22), Enum.Material.Slate)
 	bed.CastShadow = false
-	for i = 1, 5 do
-		local a = i / 5 * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
-		local length = rng:NextNumber(2.5, 6)
+	for i = 1, 6 do
+		local a = i / 6 * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		local length = rng:NextNumber(3, 7)
 		local crack = part(
-			parent,
-			at * CFrame.Angles(0, a, 0) * CFrame.new(0, 0.13, -(1.2 + length / 2)),
-			Vector3.new(rng:NextNumber(0.14, 0.26), 0.06, length),
-			Color3.fromRGB(215, 90, 255),
+			model,
+			at * CFrame.Angles(0, a, 0) * CFrame.new(0, 0.13, -(1.6 + length / 2)),
+			Vector3.new(rng:NextNumber(0.16, 0.3), 0.06, length),
+			color or hell,
 			Enum.Material.Neon
 		)
 		crack.Name = "ScarCrack"
 		crack.CastShadow = false
 	end
+	-- The arch: jagged shards of black rock in a horseshoe round the tear
+	-- (5.4 up, about 9 tall: FrontierServer.scar), each bit set at its own
+	-- angle, the inside edge of each glowing.
+	local arch = Instance.new("Model")
+	arch.Name = "RiftGate"
+	arch.Parent = model
+	local middle = at * CFrame.new(0, 5.4, 0)
+	local pieces = 13
+	for i = 0, pieces - 1 do
+		local t = math.rad(-28) + i / (pieces - 1) * math.rad(236)
+		local r = 6.3 + rng:NextNumber(-0.3, 0.5)
+		local frame = middle * CFrame.new(math.cos(t) * r, math.sin(t) * r, 0) * CFrame.Angles(0, 0, t)
+		local long = rng:NextNumber(1.8, 3.4)
+		part(
+			arch,
+			frame * CFrame.new(long / 2 - 0.6, 0, 0) * CFrame.Angles(rng:NextNumber(-0.25, 0.25), rng:NextNumber(-0.2, 0.2), rng:NextNumber(-0.3, 0.3)),
+			Vector3.new(long, rng:NextNumber(1.6, 2.6), rng:NextNumber(1.4, 2.2)),
+			black,
+			Enum.Material.Slate,
+			if i % 3 == 0 then "Wedge" else nil
+		)
+		local edge = part(arch, frame * CFrame.new(-0.55, 0, 0), Vector3.new(0.18, 1.5, 0.5), hell, Enum.Material.Neon)
+		edge.CastShadow = false
+	end
+	-- Its feet, broken out of the ground either side, fire licking up them.
+	for _, side in { -1, 1 } do
+		local foot = part(
+			arch,
+			middle * CFrame.new(side * 6.2, -4.6, 0) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
+			Vector3.new(3.2, 2.4, 3),
+			black,
+			Enum.Material.Slate
+		)
+		local flame = Instance.new("Fire")
+		flame.Size = 4
+		flame.Heat = 9
+		flame.Color = ember
+		flame.SecondaryColor = Color3.fromRGB(150, 26, 20)
+		flame.Parent = foot
+	end
+	-- The hole's light, and embers rising out of it.
+	local heart = part(arch, middle, Vector3.new(1, 1, 1), hell, Enum.Material.Neon)
+	heart.Name = "Heart"
+	heart.Transparency = 1
+	local glow = Instance.new("PointLight")
+	glow.Color = hell
+	glow.Range = 22
+	glow.Brightness = 1.6
+	glow.Shadows = false
+	glow.Parent = heart
+	local embers = Instance.new("ParticleEmitter")
+	embers.EmissionDirection = Enum.NormalId.Top
+	embers.Rate = 9
+	embers.Lifetime = NumberRange.new(1.8, 3)
+	embers.Speed = NumberRange.new(2, 5)
+	embers.SpreadAngle = Vector2.new(40, 40)
+	embers.Size = NumberSequence.new(0.22)
+	embers.Color = ColorSequence.new(ember, hell)
+	embers.LightEmission = 1
+	embers.Parent = heart
+	-- The way in.
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "EnterRift"
+	prompt.ActionText = "Enter the Rift"
+	prompt.ObjectText = "RIFT GATE"
+	prompt.HoldDuration = 0.4
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("PromptKind", "Rift")
+	prompt:SetAttribute("Vein", index or 0)
+	prompt.Parent = heart
 	return model
 end
 
@@ -1719,14 +1768,10 @@ local function shelter(parent, at: CFrame, rules)
 		ramp(Vector3.new(s * (W + 2), 0, laneMid), Vector3.new(s, 0, 0), SHELTER.LaneRamp, SHELTER.LaneRamp, false)
 	end
 
-	-- The garage: eight bays along the north wall, facing the lane.
-	local bays = { "Hauler", "Hauler", "Mole", "Mole", "Digger", "Skipper", "Skipper", "Skipper" }
-	local names = {
-		Hauler = "ATLAS HAULER",
-		Mole = "MOLE DRILL",
-		Digger = "FORGE UTILITY",
-		Skipper = "SCOUT PATHFINDER",
-	}
+	-- The garage: eight bays along the north wall, facing the lane, a Mole
+	-- drill in every one (the base's standard mech).
+	local bays = table.create(8, "Mole")
+	local names = { Mole = "MOLE DRILL" }
 	local bayZ = -48
 	local parking = {}
 	for k = 0, #bays do
@@ -2066,10 +2111,13 @@ local function shelter(parent, at: CFrame, rules)
 		{ Id = "InfoBot", CFrame = stand(15, 41, 0, D - 10) }, -- INFO-9, by its kiosk
 	}
 
-	local spawnAt = at3(0, 3.5, D - 10).Position
+	-- Players arrive in the garage lane facing bay 04's Mole drill (the
+	-- camera starts behind them, over the barrier in the hall).
+	local spawnAt = at3(-66.5 + 3 * 19, 3.5, laneMid + 2).Position
+	local mech = parking[4].CFrame.Position
 	return {
 		Parking = parking,
-		Spawn = CFrame.lookAt(spawnAt, spawnAt + at.LookVector),
+		Spawn = facingPoint(spawnAt, mech),
 		Probe = at3(68, 0, 36) * CFrame.Angles(0, math.rad(90), 0),
 		Board = at3(72, 0, 2) * CFrame.Angles(0, math.rad(90), 0),
 		Gate = at3(36, 0.8, 46),
@@ -2569,7 +2617,6 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- by the walls: every site with room for all six rocks (kept clear of
 	-- the outcrops, so a vein can always move there).
 	local Frontier = assert(OutpostWorld.Frontier, "OutpostWorld needs Shared.Frontier")
-	local frontier = folder(root, "Frontier")
 	local zoneOf = {}
 	local function spotAt(offset: Vector3): Vector3
 		return (at * CFrame.new(offset.X, 0, offset.Z)).Position
@@ -2599,8 +2646,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			end
 		end
 	end
-	-- Outcrops: seams of rocks along a grain, glowing cracks round each, and
-	-- lone rocks between (a few leading out of the core).
+	-- Outcrops: seams of rocks along a grain (no glowing cracks on the
+	-- ground), and lone rocks between (a few leading out of the core).
 	local outcropSpots = {}
 	local function grow(offset: Vector3, zone: string, gap: number): boolean
 		local p = spotAt(offset)
@@ -2614,16 +2661,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 	local crops, lone = Frontier.outcrops(rng)
 	for _, crop in crops do
-		local grew = 0
 		for _, offset in crop.Rocks do
-			if grow(offset, Frontier.zoneOf(offset.Magnitude), 12) then
-				grew += 1
-			end
-		end
-		if grew > 0 then
-			local band = Frontier.band(crop.Middle.Magnitude)
-			local middle = at * CFrame.new(crop.Middle.X, 0, crop.Middle.Z)
-			seam(frontier, middle, crop.Grain, crop.Length, Frontier.Bands[band].Color, rng)
+			grow(offset, Frontier.zoneOf(offset.Magnitude), 12)
 		end
 	end
 	for _, offset in lone do

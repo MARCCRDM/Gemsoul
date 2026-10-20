@@ -97,9 +97,9 @@ function MobileLayout.dock(screen: Vector2, tiles: number)
 end
 
 function MobileLayout.chat(screen: Vector2, open: boolean)
-	local wallet = MobileLayout.wallet()
+	local health = MobileLayout.health()
 	if not open then
-		return { X = 12, Y = wallet.Y + wallet.H + 8, W = 76, H = 44 }
+		return { X = 12, Y = health.Y + health.H + 6, W = 76, H = 44 }
 	end
 	local dock = MobileLayout.dock(screen, 5)
 	local width = math.floor(math.clamp(screen.X * 0.38, 240, 340))
@@ -154,15 +154,33 @@ function MobileLayout.onTop(listener: () -> ())
 	table.insert(listeners, listener)
 end
 
-function MobileLayout.kaiju(chat: boolean?)
+-- Your health, just under your level and coins (LobbyUI), as wide.
+function MobileLayout.health()
 	local wallet = MobileLayout.wallet()
-	local x, y = 12, wallet.Y + wallet.H + 8
+	return { X = wallet.X, Y = wallet.Y + wallet.H + 4, W = wallet.W, H = 20 }
+end
+
+function MobileLayout.kaiju(chat: boolean?)
+	local health = MobileLayout.health()
+	-- (Wide enough for three tiles and two buttons: AUTO HEAL and CALL BACK.)
+	local w = 286
 	if chat then
-		-- (Beside the CHAT button: under it, a short screen runs into the dock.)
+		-- Beside the CHAT button (under it, a short screen runs into the
+		-- dock), CATCH under the button.
 		local button = MobileLayout.chat(Vector2.zero, false)
-		x, y = button.X + button.W + 8, button.Y
+		local x = button.X + button.W + 8
+		return {
+			X = x,
+			Y = button.Y,
+			W = w,
+			H = 50,
+			TameX = button.X,
+			TameY = button.Y + button.H + 6,
+			TameW = button.W,
+		}
 	end
-	return { X = x, Y = y, W = 236, H = 50, TameX = x + 236 + 8, TameW = 86 }
+	local x, y = 12, health.Y + health.H + 6
+	return { X = x, Y = y, W = w, H = 50, TameX = x + w + 8, TameY = y, TameW = 86 }
 end
 
 function MobileLayout.overlaps(a, b): boolean

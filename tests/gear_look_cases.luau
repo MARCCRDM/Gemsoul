@@ -857,6 +857,39 @@ for _, id in helmetIds do
 	)
 end
 
+-- A suit's Store preview is the suit alone: the sword and shield the
+-- mannequin wears it with aren't on the stand.
+do
+	local id = "SuitObsidian"
+	check(Equipment.cosmeticPreview(id), id .. ": no store preview")
+	local store = game:GetService("ReplicatedStorage"):FindFirstChild("CosmeticPreviews")
+	local preview = store and store:FindFirstChild(id)
+	check(preview ~= nil, id .. ": its preview isn't in the store")
+	local body, folder = wear(nil, { Suit = id })
+	local weapon = folder:FindFirstChild("Weapon")
+	local held = if weapon then parts(weapon) else {}
+	check(#held > 0, "the mannequin's kit holds no sword to leave out")
+	-- Every part of the preview, put back on the body, matches a part of
+	-- the suit or the body, never one of the sword's.
+	local origin = body:GetPivot()
+	local function near(a, b: BasePart)
+		return (a.Position - b.CFrame.Position).Magnitude < 0.01 and (a.Size - b.Size).Magnitude < 0.01
+	end
+	local fromSword = 0
+	for _, p in preview:GetChildren() do
+		if p:IsA("BasePart") then
+			local at = { Position = (origin * p.CFrame).Position, Size = p.Size }
+			for _, h in held do
+				if h.Transparency < 1 and near(at, h) then
+					fromSword += 1
+					break
+				end
+			end
+		end
+	end
+	check(fromSword == 0, string.format("%s: %d of the sword's parts are on the suit's stand", id, fromSword))
+end
+
 print(
 	string.format(
 		"PASS: %d gear look checks (stones on every gemmed piece, %d suits trimmed in real parts, %d skins held in first person, %d visor looks on 15 helmets, %d banded, %d helmet skins worn, nothing a preview can't draw)",

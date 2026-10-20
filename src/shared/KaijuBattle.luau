@@ -46,7 +46,7 @@ KaijuBattle.FormationSeconds = 15
 KaijuBattle.BattleSeconds = 90
 KaijuBattle.OverSeconds = 4 -- the result stays up this long
 KaijuBattle.Leash = 70 -- studs from the field's middle: walk off further and you forfeit
-KaijuBattle.Exp = { Win = 60, Lose = 20, Draw = 35 }
+KaijuBattle.Exp = { Win = 40, Lose = 14, Draw = 24 }
 
 -- The field (studs): each row's distance from the middle line (Front,
 -- Back), and the places' spacing across.

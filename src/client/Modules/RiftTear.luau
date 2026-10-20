@@ -17,7 +17,7 @@
 	  RiftTear.start()           watch workspace.Rifts (once)
 	  RiftTear.step(serverNow)   animate them (OutpostScene, every frame)
 	  RiftTear.layout(shape, open) -> lips   where its lips are, `open` 0..1 (pure)
-	  RiftTear.pieces(shape, open, plane, now, crackle?) -> { piece }   every
+	  RiftTear.pieces(shape, open, plane, now, crackle?, palette?) -> { piece }   every
 	      part of it at that moment: { CFrame, Size, Color, Transparency }
 	      (pure, so a test or a render can draw it too)
 ]]
@@ -35,6 +35,26 @@ local MAGENTA = Color3.fromRGB(255, 70, 210)
 local CYAN = Color3.fromRGB(80, 235, 255)
 local WHITE = Color3.fromRGB(240, 235, 255)
 local LIPS = { MAGENTA, VIOLET, CYAN, MAGENTA, WHITE, VIOLET, MAGENTA }
+-- Its colours: the other side's violets; a vein's Rift Gate (its anchor's
+-- Hell) burns the colours of the critters' world beyond it (Server.RiftWorld).
+RiftTear.Palettes = {
+	Rift = { Deep = DEEP, Heart = VIOLET, Lips = LIPS, Spark = WHITE, Stars = { MAGENTA, CYAN } },
+	Hell = {
+		Deep = Color3.fromRGB(36, 4, 2),
+		Heart = Color3.fromRGB(255, 70, 20),
+		Lips = {
+			Color3.fromRGB(255, 120, 30),
+			Color3.fromRGB(255, 56, 18),
+			Color3.fromRGB(255, 176, 64),
+			Color3.fromRGB(255, 120, 30),
+			Color3.fromRGB(255, 226, 160),
+			Color3.fromRGB(255, 56, 18),
+			Color3.fromRGB(255, 120, 30),
+		},
+		Spark = Color3.fromRGB(255, 232, 180),
+		Stars = { Color3.fromRGB(255, 96, 24), Color3.fromRGB(255, 190, 80) },
+	},
+}
 -- Each critter's cue as its rift crackles (a CombatSound, its pitch): the
 -- bonk of Sahur's bat, Tralalero's whoosh, Patapim's frost, the croc's bomb.
 RiftTear.CritterCues = {
@@ -115,7 +135,8 @@ end
 -- by its tilt): per row its left lip, right lip, the dark and its heart;
 -- then its hair cracks. `crackle` (studs) jitters its lips; `now` makes its
 -- heart flicker. Always the same count, in the same order.
-function RiftTear.pieces(shape, open: number, plane: CFrame, now: number, crackle: number?)
+function RiftTear.pieces(shape, open: number, plane: CFrame, now: number, crackle: number?, palette: any?)
+	local colors = palette or RiftTear.Palettes.Rift
 	local lips = RiftTear.layout(shape, open)
 	local thick = math.max(0.06, 0.035 * shape.Height) * (0.6 + 0.4 * open)
 	local hidden = open < 0.02
@@ -134,20 +155,20 @@ function RiftTear.pieces(shape, open: number, plane: CFrame, now: number, crackl
 		local l1, l2 = jitter(lips.Left[i]), jitter(lips.Left[i + 1])
 		local r1, r2 = jitter(lips.Right[i]), jitter(lips.Right[i + 1])
 		local cf, size = bar(plane, l1, l2, thick, -0.06)
-		add(cf, size, LIPS[(i - 1) % #LIPS + 1], if hidden then 1 else 0)
+		add(cf, size, colors.Lips[(i - 1) % #colors.Lips + 1], if hidden then 1 else 0)
 		cf, size = bar(plane, r1, r2, thick, -0.06)
-		add(cf, size, LIPS[(i + 2) % #LIPS + 1], if hidden then 1 else 0)
+		add(cf, size, colors.Lips[(i + 2) % #colors.Lips + 1], if hidden then 1 else 0)
 		cf, size = band(plane, l1, r1, l2, r2, 0.98, 0)
-		add(cf, size, DEEP, if hidden then 1 else 0.05)
+		add(cf, size, colors.Deep, if hidden then 1 else 0.05)
 		-- (Its heart flickers.)
 		cf, size = band(plane, l1, r1, l2, r2, 0.32, -0.03)
-		add(cf, size, VIOLET, if hidden then 1 else 0.2 + 0.25 * math.abs(math.sin(now * 9 + i)))
+		add(cf, size, colors.Heart, if hidden then 1 else 0.2 + 0.25 * math.abs(math.sin(now * 9 + i)))
 	end
 	for _, branch in shape.Branches do
 		-- (Running off its lip, growing as it opens; now and then a flicker.)
 		local from = if branch.Left then lips.Left[branch.Row] else lips.Right[branch.Row]
 		local cf, size = bar(plane, from, from + (branch[2] - branch[1]) * open, 0.05, -0.05)
-		add(cf, size, WHITE, if open < 0.2 then 1 elseif shake > 0 and math.random() < 0.15 then 0.75 else 0.15)
+		add(cf, size, colors.Spark, if open < 0.2 then 1 elseif shake > 0 and math.random() < 0.15 then 0.75 else 0.15)
 	end
 	return list
 end
@@ -164,27 +185,29 @@ local function build(anchor: BasePart)
 	local shape = Frontier.tear(seed, height)
 	local model = Instance.new("Model")
 	model.Name = "RiftTear"
+	local palette = if anchor:GetAttribute("Hell") then RiftTear.Palettes.Hell else RiftTear.Palettes.Rift
 	local tear = {
 		Anchor = anchor,
 		Model = model,
 		Shape = shape,
+		Palette = palette,
 		Dormant = anchor:GetAttribute("Dormant") == true,
 		Parts = {},
 		Flashed = false,
 		Snapped = false,
 		Sounded = false,
 	}
-	for _, spec in RiftTear.pieces(shape, 1, CFrame.identity, 0) do
+	for _, spec in RiftTear.pieces(shape, 1, CFrame.identity, 0, nil, palette) do
 		table.insert(tear.Parts, piece(model, spec.Color, 1))
 	end
 	-- Its glow on the ground, and its light.
-	tear.Floor = piece(model, VIOLET, 0.7)
+	tear.Floor = piece(model, palette.Heart, 0.7)
 	tear.Floor.Shape = Enum.PartType.Cylinder
 	local foot = anchor.Position - Vector3.new(0, height / 2 + 0.35, 0)
 	tear.Floor.Size = Vector3.new(0.06, height * 0.9, height * 0.9)
 	tear.Floor.CFrame = CFrame.new(foot) * CFrame.Angles(0, 0, math.pi / 2)
 	local light = Instance.new("PointLight")
-	light.Color = VIOLET
+	light.Color = palette.Heart
 	light.Range = height * 1.7
 	light.Brightness = 0
 	light.Shadows = false
@@ -196,8 +219,8 @@ local function build(anchor: BasePart)
 	local stars = Instance.new("ParticleEmitter")
 	stars.Texture = "rbxasset://textures/particles/sparkles_main.dds"
 	stars.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, MAGENTA),
-		ColorSequenceKeypoint.new(0.5, CYAN),
+		ColorSequenceKeypoint.new(0, palette.Stars[1]),
+		ColorSequenceKeypoint.new(0.5, palette.Stars[2]),
 		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 214, 120)),
 	})
 	stars.LightEmission = 1
@@ -284,7 +307,7 @@ local function animate(tear, now: number)
 	-- Crackling while it splits and seals: its lips jitter.
 	local crackle = if open > 0 and open < 0.98 and not tear.Dormant then 0.035 * shape.Height else 0.008 * shape.Height
 	local plane = anchor.CFrame * CFrame.Angles(0, 0, shape.Tilt)
-	for k, spec in RiftTear.pieces(shape, open, plane, now, crackle) do
+	for k, spec in RiftTear.pieces(shape, open, plane, now, crackle, tear.Palette) do
 		local part = tear.Parts[k]
 		part.Size, part.CFrame, part.Transparency = spec.Size, spec.CFrame, spec.Transparency
 	end

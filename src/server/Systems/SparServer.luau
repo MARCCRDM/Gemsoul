@@ -83,7 +83,7 @@ local function stateOf(player: Player): Spar.State
 	local humanoid = humanoidOf(player)
 	local profile = PlayerData.get(player)
 	local busy = nil
-	for _, name in { "CombatSession", "MatchId", "DungeonId", "Expedition", "DungeonSelecting" } do
+	for _, name in { "CombatSession", "MatchId", "DungeonId", "Expedition", "DungeonSelecting", "RiftRun" } do
 		if player:GetAttribute(name) then
 			busy = name
 		end
@@ -331,8 +331,9 @@ end
 -- of a spar, by a rift's critter in the Outpost; `tripped`: only tripped,
 -- so their health is what it was.)
 local function getUp(player: Player, humanoid: Humanoid, miner: boolean?, tripped: boolean?)
-	-- (Gone, or a new body since: nothing to do.)
-	if humanoidOf(player) ~= humanoid then
+	-- (Gone, or a new body since: nothing to do. Down at a Rift boss, they
+	-- stay down till they choose: Server.RiftServer gets them up.)
+	if humanoidOf(player) ~= humanoid or player:GetAttribute("RiftFallen") ~= nil then
 		return
 	end
 	player:SetAttribute("SparDown", nil)

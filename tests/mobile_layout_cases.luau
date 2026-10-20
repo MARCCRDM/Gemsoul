@@ -107,6 +107,15 @@ for _, s in SCREENS do
 	end
 	check(MobileLayout.Stick.Knob < MobileLayout.Stick.Size, label .. ": the stick's knob is bigger than the stick")
 	check(not MobileLayout.overlaps(card, wallet), label .. ": the coins overlap the pick card")
+	-- Your health under the coins, clear of everything else.
+	local health = MobileLayout.health()
+	check(inside(health), label .. ": the health bar runs off the screen")
+	for name, r in { coins = wallet, ["pick card"] = card, dock = dock, ["CHAT button"] = closed, ["teammates' cards"] = party } do
+		check(not MobileLayout.overlaps(health, r), label .. ": the health bar overlaps the " .. name)
+	end
+	for _, chat in { false, true } do
+		check(not MobileLayout.overlaps(health, MobileLayout.kaiju(chat)), label .. ": the kaiju card covers the health bar")
+	end
 	check(not MobileLayout.overlaps(wallet, closed), label .. ": the CHAT button overlaps the coins")
 	check(not MobileLayout.overlaps(wallet, dock), label .. ": the coins overlap the dock")
 	check(not MobileLayout.overlaps(wallet, party), label .. ": the coins overlap the teammates' cards")
@@ -126,7 +135,7 @@ for _, s in SCREENS do
 	-- Your kaiju's card and CATCH, with and without the CHAT button above.
 	for _, chat in { false, true } do
 		local k = MobileLayout.kaiju(chat)
-		local tame = { X = k.TameX, Y = k.Y, W = k.TameW, H = k.H }
+		local tame = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.H }
 		local what = label .. (if chat then " (with CHAT)" else "")
 		check(inside(k) and inside(tame), what .. ": the kaiju card runs off the screen")
 		for name, r in

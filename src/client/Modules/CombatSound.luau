@@ -90,6 +90,12 @@ CombatSound.Ids = {
 	Giggle2 = 0, -- critter_giggle_2.mp3
 	Giggle3 = 0, -- critter_giggle_3.mp3
 	Cackle = 0, -- critter_cackle.mp3
+	-- Levelling up, and a kaiju team called back or deployed
+	-- (tools/make_levelup_sounds.py; LevelUpFx).
+	LevelUp = 0, -- level_up.mp3
+	KaijuLevelUp = 0, -- kaiju_level_up.mp3
+	CallBack = 0, -- call_back.mp3
+	Deploy = 0, -- deploy.mp3
 }
 
 -- 0 mutes combat, 1 is full.
@@ -119,6 +125,10 @@ local LEVEL = {
 	RoarCarapace = 0.9,
 	Giggle = 0.85,
 	Cackle = 0.95,
+	LevelUp = 1,
+	KaijuLevelUp = 0.9,
+	CallBack = 0.7,
+	Deploy = 0.75,
 }
 
 -- Built-in stand-ins until a sound is uploaded: layers of { sound, speed,
@@ -195,6 +205,21 @@ local FALLBACK = {
 		{ S .. "uuhhh.mp3", 2.45, 0.28, 0.24 },
 		{ S .. "uuhhh.mp3", 2.25, 0.24, 0.37 },
 	},
+	-- Levelling up: a chime that climbs; a kaiju's higher and quicker.
+	LevelUp = {
+		{ S .. "electronicpingshort.wav", 0.8, 0.4 },
+		{ S .. "electronicpingshort.wav", 1.2, 0.35, 0.08 },
+		{ S .. "electronicpingshort.wav", 1.6, 0.3, 0.16 },
+		{ S .. "victory.wav", 1.1, 0.25, 0.2 },
+	},
+	KaijuLevelUp = {
+		{ S .. "electronicpingshort.wav", 1.1, 0.35 },
+		{ S .. "electronicpingshort.wav", 1.6, 0.3, 0.06 },
+		{ S .. "electronicpingshort.wav", 2.1, 0.25, 0.12 },
+	},
+	-- A kaiju into its Gemsoul (a falling ping), and out (a rising one).
+	CallBack = { { S .. "electronicpingshort.wav", 1.5, 0.3 }, { S .. "electronicpingshort.wav", 0.9, 0.25, 0.12 } },
+	Deploy = { { S .. "electronicpingshort.wav", 0.9, 0.3 }, { S .. "electronicpingshort.wav", 1.5, 0.3, 0.1 } },
 	Cackle = {
 		{ S .. "uuhhh.mp3", 1.7, 0.4 },
 		{ S .. "uuhhh.mp3", 2.1, 0.3, 0.2 },

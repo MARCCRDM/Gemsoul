@@ -12,8 +12,8 @@
 	  the suits    two mannequins on turntables either side of the counter,
 	               each wearing a suit
 
-	Every Every seconds each stand moves on to the next of its kind that
-	the Store sells (by the server's clock: everyone sees the same), so over
+	Every Every seconds (the suits every SuitEvery, turning faster too)
+	each stand moves on to the next of its kind that the Store sells (by the server's clock: everyone sees the same), so over
 	a few minutes every suit, helmet, weapon skin and pickaxe on sale comes
 	round. A plate under each names it and its price. The next turn's
 	previews are asked for ahead of time; a stand keeps what it shows until
@@ -50,6 +50,7 @@ local LiveLooks = require(script.Parent:WaitForChild("LiveLooks"))
 local StoreDisplays = {}
 
 StoreDisplays.Every = 40 -- seconds each stand shows a thing
+StoreDisplays.SuitEvery = 12 -- ...but a suit's: they come round often
 StoreDisplays.Middle = Vector3.new(-70, 0.86, 6) -- the Store, in the Shelter's frame
 StoreDisplays.Reach = 200 -- studs from the Store: past this it's put away
 StoreDisplays.TurnReach = 90 -- ...and past this the turning ones keep still
@@ -72,7 +73,8 @@ end
 -- Slots), its foot (At: where the bottom of the thing stands, facing the
 -- hall, east; or, Hung, where its middle hangs), how tall its kind is
 -- shown (Height: nil keeps a suit life size), whether its back is to the
--- wall (Back), how fast it turns (Turn, radians a second), and its price
+-- wall (Back), how fast it turns (Turn, radians a second), how long it
+-- shows each thing (Every: nil for StoreDisplays.Every), and its price
 -- plate.
 export type Stand = {
 	Kind: string,
@@ -83,6 +85,7 @@ export type Stand = {
 	Back: boolean?,
 	Hung: boolean?,
 	Turn: number?,
+	Every: number?,
 	Plate: CFrame,
 	PlateSize: Vector3,
 }
@@ -102,6 +105,7 @@ do
 			Back = spec.Back,
 			Hung = spec.Hung,
 			Turn = spec.Turn,
+			Every = spec.Every,
 			Plate = facing(plate, plate + hall),
 			PlateSize = spec.PlateSize,
 		})
@@ -148,7 +152,8 @@ do
 		})
 	end
 	-- The suits, life size on turntables either side of the counter, out
-	-- in the hall.
+	-- in the hall: the suit alone (no sword or shield: Server Equipment's
+	-- preview), turning briskly and changing often.
 	for k, z in { -8, 20 } do
 		add({
 			Kind = "Suit",
@@ -156,7 +161,8 @@ do
 			Slots = 2,
 			Foot = V(-62, FLOOR + 0.7, z),
 			Height = nil,
-			Turn = 0.35,
+			Turn = 0.9,
+			Every = StoreDisplays.SuitEvery,
 			PlateAt = V(-58.6, FLOOR + 1.3, z),
 			PlateSize = V(2.8, 0.75, 0.1),
 		})
@@ -182,7 +188,7 @@ function StoreDisplays.showing(stand: Stand, t: number): string?
 	if #list == 0 then
 		return nil
 	end
-	local turn = math.floor(t / StoreDisplays.Every)
+	local turn = math.floor(t / (stand.Every or StoreDisplays.Every))
 	return list[(turn * stand.Slots + stand.Slot - 1) % #list + 1]
 end
 
@@ -469,9 +475,9 @@ local function ask(now: number)
 	lastAsk = now
 	local store = previews()
 	local missing = {}
-	for _, t in { now, now + StoreDisplays.Every } do
+	for _, ahead in { 0, 1 } do
 		for _, spec in StoreDisplays.Stands do
-			local id = StoreDisplays.showing(spec, t)
+			local id = StoreDisplays.showing(spec, now + ahead * (spec.Every or StoreDisplays.Every))
 			if id and not asked[id] and not (store and store:FindFirstChild(id)) then
 				asked[id] = true
 				table.insert(missing, id)

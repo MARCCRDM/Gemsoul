@@ -18,6 +18,7 @@ COVERS = {
     "src/client/ArenaDrop.client.luau": "the drop pod's flash and streaks, no buttons",
     "src/client/Combat.client.luau": "damage numbers over the fight (the combat HUD itself sits below the strip)",
     "src/client/Modules/SparKit.luau": "a hit flash and the centred DOWNED banner, no buttons",
+    "src/client/Modules/RiftClient.luau": "the crossing into the Rift: a dark fade, the centred title and solo warning, no buttons (its gate card, strip and down window keep the inset)",
 }
 HELPERS = ("UiKit.clearTopbar", "UiKit.topbar", "UiKit.onTopbar", "UiKit.reserveTopbar")
 OVER_STRIP = re.compile(r"IgnoreGuiInset\s*=\s*true|ScreenInsets\s*=\s*Enum\.ScreenInsets\.None")

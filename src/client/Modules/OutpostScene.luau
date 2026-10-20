@@ -1611,6 +1611,10 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		require(script.Parent.ShopUI).open()
 	elseif kind == "Market" then
 		require(script.Parent.MarketBoardUI).open()
+	elseif kind == "Rift" then
+		require(script.Parent.RiftClient).openGate(prompt:GetAttribute("Vein"))
+	elseif kind == "RiftExit" then
+		require(script.Parent.RiftClient).leave()
 	elseif kind == "Secret" then
 		task.spawn(function()
 			local result = GemClient.request("OutpostSecret", prompt:GetAttribute("SecretId"))
@@ -1884,6 +1888,8 @@ end)
 -- cross from band to band.
 RiftTear.start()
 FrontierHud.start()
+-- The Rift: a vein's gate, the trip through it (Server.RiftServer).
+require(script.Parent.RiftClient).start()
 -- (The Shelter's frame: the quarry's, lifted onto its legs.)
 local shelterFrame = Rules.Location * CFrame.new(0, Rules.ShelterLift, 0)
 RunService.RenderStepped:Connect(function(dt)

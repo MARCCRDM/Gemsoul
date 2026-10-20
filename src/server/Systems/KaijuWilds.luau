@@ -78,8 +78,9 @@
 	              (KaijuWilds.knockDown: SparServer's). You down, snatchers
 	              run in, and each grabs one of this trip's gems
 	              (KaijuWilds.steal: FrontierServer's haul; Snatch.Max a
-	              knock-down), holds it up over its head (a glowing stone
-	              welded there, CarryingGem on its model, its arms up),
+	              knock-down), holds it up over its head (the very stone it
+	              took, drawn by each client: CarryingGem and CarriedGem* on
+	              its model, its arms up),
 	              cackles and runs for a rift that tears open Carry.Away
 	              studs off and waits for it (KaijuWilds.escape). It
 	              giggles all the way. Bonk it or knock it out first and the
@@ -185,6 +186,8 @@ type Wild = {
 	Raider: boolean?, -- a rift's critter in a gem raid: it trips and snatches (Frontier.Raid)
 	Loot: any?, -- the gem a snatcher's running off with
 	Carry: any?, -- where it's running to: { Spot, Life (its rift's timeline), GiggleAt, Gem (the stone over its head) }
+	Stay: boolean?, -- a Rift's: never slips back, roams its patch till someone comes
+	Size: number?, -- how big it stands next to you, if not a critter's (Kaiju.Bug.Size)
 }
 
 -- A pack of roaming wild kaiju: its den out in the frontier (they wander
@@ -231,7 +234,7 @@ end
 -- How big one stands next to you (Kaiju.size).
 local function sizeOf(wild: Wild): number
 	return if wild.Bug
-		then Kaiju.Bug.Size
+		then wild.Size or Kaiju.Bug.Size
 		else Kaiju.size(if wild.Guard then Kaiju.Scale.Guardian else Kaiju.Scale.Wild)
 end
 
@@ -1012,8 +1015,8 @@ local function lob(
 	local e = enemy :: any
 	local from = enemy.Root.Position + Vector3.new(0, 1.5, 0)
 	local color = GemConfig.ElementColors[wild.Element]
-	sizedFx(Kaiju.Bug.Size, "Shot", nil, from, to, color, "Bomb", flight)
-	sizedFx(Kaiju.Bug.Size, "Nova", to, radius, color, flight) -- (the ring, then the blast as it lands)
+	sizedFx(sizeOf(wild), "Shot", nil, from, to, color, "Bomb", flight)
+	sizedFx(sizeOf(wild), "Nova", to, radius, color, flight) -- (the ring, then the blast as it lands)
 	e.Bombs = e.Bombs or {}
 	table.insert(e.Bombs, {
 		At = now + flight,
@@ -1052,7 +1055,7 @@ local function release(enemy, wild: Wild, move, victim, now: number)
 			hitFoe(enemy, v, amount, wild.Element, move.Status, move.Heavy == true)
 		end
 	elseif move.Shape == "Burst" then
-		sizedFx(Kaiju.Bug.Size, "Zone", feet, move.Radius, move.Linger or 2, color)
+		sizedFx(sizeOf(wild), "Zone", feet, move.Radius, move.Linger or 2, color)
 		for _, v in victimsNear(enemy, wild, root.Position, move.Radius) do
 			hitFoe(enemy, v, amount, wild.Element, move.Status, nil)
 		end
@@ -1063,8 +1066,8 @@ local function release(enemy, wild: Wild, move, victim, now: number)
 		local dir = if away.Magnitude > 0.05 then away.Unit else root.CFrame.LookVector
 		local length = math.min(move.Length, away.Magnitude + 5)
 		root.AssemblyLinearVelocity = dir * (length / 0.3) + Vector3.new(0, 4, 0)
-		sizedFx(Kaiju.Bug.Size, "DodgeRoll", nil, start, dir, length, true)
-		sizedFx(Kaiju.Bug.Size, "Swing", nil, start, dir, move.Width + 1, 120, color, true)
+		sizedFx(sizeOf(wild), "DodgeRoll", nil, start, dir, length, true)
+		sizedFx(sizeOf(wild), "Swing", nil, start, dir, move.Width + 1, 120, color, true)
 		for _, v in victimsNear(enemy, wild, start + dir * (length / 2), length / 2 + move.Width) do
 			local rel = flat(v.Root.Position - start)
 			local along = math.clamp(rel:Dot(dir), 0, length)
@@ -1160,7 +1163,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 				return -- (it slipped away)
 			end
 			sizedFx(
-				Kaiju.Bug.Size,
+				sizeOf(wild),
 				"EnemySwing",
 				root.Position,
 				victim.Root.Position,
@@ -1226,7 +1229,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			enemy.DodgeUntil = now + rules.DodgeFor
 			root.AssemblyLinearVelocity = (side * 0.85 - dir * 0.5).Unit * 40 + Vector3.new(0, 10, 0)
 			act(enemy, "Dodge", 0, sign)
-			sizedFx(Kaiju.Bug.Size, "DodgeRoll", nil, root.Position, side, 6, true)
+			sizedFx(sizeOf(wild), "DodgeRoll", nil, root.Position, side, 6, true)
 			return
 		end
 	end
@@ -1247,9 +1250,9 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			local feet = root.Position - Vector3.new(0, root.Size.Y / 2 + humanoid.HipHeight, 0)
 			local color = GemConfig.ElementColors[wild.Element]
 			if move.Shape == "Slam" then
-				sizedFx(Kaiju.Bug.Size, "Nova", feet, move.Radius, color, move.Windup)
+				sizedFx(sizeOf(wild), "Nova", feet, move.Radius, color, move.Windup)
 			else
-				sizedFx(Kaiju.Bug.Size, "Telegraph", feet, move.Radius, color, move.Windup)
+				sizedFx(sizeOf(wild), "Telegraph", feet, move.Radius, color, move.Windup)
 			end
 		end
 		humanoid:MoveTo(root.Position)
@@ -1266,7 +1269,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		root.AssemblyLinearVelocity = away * 46 + Vector3.new(0, 14, 0)
 		enemy.DodgeUntil = now + rules.DodgeFor
 		act(enemy, "Dodge", 0, sign)
-		sizedFx(Kaiju.Bug.Size, "DodgeRoll", nil, root.Position, away, 8, true)
+		sizedFx(sizeOf(wild), "DodgeRoll", nil, root.Position, away, 8, true)
 		humanoid:MoveTo(victim.Root.Position - dir * keep)
 		return
 	end
@@ -1410,52 +1413,24 @@ local function weld(part: BasePart, to: BasePart)
 	joint.Parent = part
 end
 
--- The stone over a snatcher's head: a glowing gem in its colour, held high
--- (its arms up: a held "Buff", BodyPoses). Returns its parts.
+-- The gem over a snatcher's head: the very stone it took, held high (its
+-- arms up: a held "Buff", BodyPoses). What it is goes on its model (the
+-- gem's id, element, rarity and grades: CarriedGem*), and each client
+-- builds that stone over its head (GemArt, CritterFx.carried), so it looks
+-- like the gem in your pouch did. Returns the parts to clear when it lets
+-- go (none: the clients draw it).
+local CARRIED = { "CarriedGemId", "CarriedGemElement", "CarriedGemSize", "CarriedGemClarity", "CarriedGemCut" }
 local function holdUp(enemy, gem): { BasePart }
-	local root, model = enemy.Root, enemy.Model
-	local color = GemConfig.ElementColors[gem.Element]
-		or GemConfig.TierColors[gem.Tier]
-		or Color3.fromRGB(120, 230, 255)
-	local top = 2
-	pcall(function()
-		local box, size = model:GetBoundingBox()
-		top = box.Position.Y + size.Y / 2 - root.Position.Y
-	end)
-	local at = root.CFrame * CFrame.new(0, top + 0.9, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45))
-	local function piece(name: string, size: number, material: Enum.Material, transparency: number)
-		local part = Instance.new("Part")
-		part.Name = name
-		part.Size = Vector3.one * size
-		part.Material = material
-		part.Transparency = transparency
-		part.Color = color
-		part.CanCollide, part.CanQuery, part.CanTouch, part.Massless = false, false, false, true
-		part.CastShadow = false
-		part.CFrame = at
-		return part
-	end
-	local stone = piece("StolenGem", 1, Enum.Material.Glass, 0.2)
-	local core = piece("StolenGemCore", 0.5, Enum.Material.Neon, 0)
-	local light = Instance.new("PointLight")
-	light.Color, light.Brightness, light.Range = color, 2.5, 10
-	light.Parent = core
-	local sparkle = Instance.new("ParticleEmitter")
-	sparkle.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
-	sparkle.LightEmission = 1
-	sparkle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0) })
-	sparkle.Lifetime = NumberRange.new(0.4, 0.7)
-	sparkle.Rate = 8
-	sparkle.Speed = NumberRange.new(1, 2.5)
-	sparkle.SpreadAngle = Vector2.new(180, 180)
-	sparkle.Parent = core
-	weld(stone, root)
-	weld(core, stone)
-	stone.Parent, core.Parent = model, model
+	local model = enemy.Model
+	model:SetAttribute("CarriedGemId", tostring(gem.Id or "gem"))
+	model:SetAttribute("CarriedGemElement", gem.Element)
+	model:SetAttribute("CarriedGemSize", tonumber(gem.Size))
+	model:SetAttribute("CarriedGemClarity", tonumber(gem.Clarity))
+	model:SetAttribute("CarriedGemCut", tonumber(gem.Cut))
 	model:SetAttribute("CarryingGem", gem.Tier or "Common")
 	act(enemy, "Buff", 0.25)
 	model:SetAttribute("ActionHold", serverNow() + 600)
-	return { stone, core }
+	return {}
 end
 
 -- Its hands empty again.
@@ -1468,6 +1443,9 @@ local function letGo(enemy, wild: Wild)
 	end
 	wild.Carry, wild.Loot = nil, nil
 	enemy.Model:SetAttribute("CarryingGem", nil)
+	for _, key in CARRIED do
+		enemy.Model:SetAttribute(key, nil)
+	end
 	enemy.Model:SetAttribute("ActionHold", nil)
 end
 
@@ -1657,11 +1635,11 @@ local function brain(enemy, now: number)
 	local victim = if fromHome <= leash then chooseFoe(enemy, wild, kind.Aggro) else nil
 	e.FoeVictim = victim
 	e.Foe = if victim then (victim.Pet or victim.Player) else nil
-	if wild.Bug and now - wild.Born > (wild.Life or Frontier.Life) then
+	if wild.Bug and not wild.Stay and now - wild.Born > (wild.Life or Frontier.Life) then
 		slipBack(wild) -- (no critter stays for good)
 		return
 	end
-	if not victim and wild.Bug and wild.Wander and lingers(wild) then
+	if not victim and wild.Bug and wild.Wander and (wild.Stay or lingers(wild)) then
 		-- Out of a wandering rift, its player still about: it roams its patch.
 		wild.IdleSince = nil
 		roam(enemy, wild, now)
@@ -2475,25 +2453,35 @@ end
 --   Wander   out of a wandering rift: { Home, Roam, Notice }: it roams there
 --   Life     seconds before it slips back (Frontier.Life)
 --   Raider   a gem raid's: a snatcher from the start
+--   Spec     a whole roster entry instead of Critter (a Rift boss's:
+--            DungeonRules.Bosses)
+--   Scale    its body's scale (Kaiju.Bug.Scale), and its blows' and moves'
+--            look with it
+--   Health, Damage, Reach   times its kind's
+--   Title    its nameplate
+--   Stay     never slips back: it roams its patch (Wander) till someone
+--            comes (the Rift's: Server.RiftServer)
+--   Boss     a Rift boss (RiftBoss on its model, for the clients)
 -- }
 function KaijuWilds.spawnBug(at: Vector3, opts)
 	Duelist = Duelist or require(script.Parent.Duelist)
-	local spec = rosterSpec(opts.Critter) or DungeonRules.Roster[rng:NextInteger(1, #DungeonRules.Roster)]
+	local spec = opts.Spec or rosterSpec(opts.Critter) or DungeonRules.Roster[rng:NextInteger(1, #DungeonRules.Roster)]
 	local band = opts.Band or "Fringe"
 	local level = opts.Level or Frontier.critterLevel(band, rng)
 	local grow = 1 + Kaiju.Growth * (level - 1)
 	local boost = Frontier.Boost[band] or Frontier.Boost.Fringe
+	local scale = opts.Scale or Kaiju.Bug.Scale
 	local ok, result = pcall(function()
 		local color = GemConfig.ElementColors[spec.Element] or Color3.new(1, 1, 1)
 		local rig = Duelist.creatureBody(spec, color)
-		rig:ScaleTo(Kaiju.Bug.Scale)
+		rig:ScaleTo(scale)
 		for _, joint in rig:GetDescendants() do
 			if joint:IsA("Motor6D") and joint:GetAttribute("CreatureMotion") then
 				joint:SetAttribute("CreatureRest", joint.C0)
 			end
 		end
 		local humanoid = rig:FindFirstChildOfClass("Humanoid") :: Humanoid
-		humanoid.HipHeight = 1.9 * Kaiju.Bug.Scale
+		humanoid.HipHeight = 1.9 * scale
 		local foot = at + Vector3.new(0, humanoid.HipHeight + 1, 0)
 		local facing = opts.Facing or (at + Vector3.new(0, 0, -1))
 		local look = Vector3.new(facing.X, foot.Y, facing.Z)
@@ -2506,10 +2494,10 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 		rig:SetAttribute("CritterRanged", Kaiju.isRanged(spec.Id) or nil) -- (kaiju dive the bomber)
 		local kind = {
 			Name = "Moon Bug",
-			Health = math.floor(Kaiju.Bug.Health * grow * boost.Health + 0.5),
-			Damage = Kaiju.Bug.Damage * grow * boost.Damage,
+			Health = math.floor(Kaiju.Bug.Health * grow * boost.Health * (opts.Health or 1) + 0.5),
+			Damage = Kaiju.Bug.Damage * grow * boost.Damage * (opts.Damage or 1),
 			Speed = Kaiju.Bug.Speed,
-			Reach = Kaiju.Bug.Reach,
+			Reach = Kaiju.Bug.Reach * (opts.Reach or 1),
 			Rate = Kaiju.Bug.Rate,
 			Aggro = Kaiju.Bug.Aggro,
 			Coins = 0,
@@ -2517,11 +2505,12 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Luck = 0,
 			Respawn = 0,
 		}
+		local size = Kaiju.Bug.Size * scale / Kaiju.Bug.Scale
 		local enemy = Enemies.adopt(rig, kind, {
 			Element = spec.Element,
-			Title = string.format("Moon Bug · %s · Lv %d", spec.Name, level),
+			Title = opts.Title or string.format("Moon Bug · %s · Lv %d", spec.Name, level),
 			Home = at,
-			Size = Kaiju.Bug.Size,
+			Size = size,
 		})
 		local e = enemy :: any
 		e.OutpostCreature = true
@@ -2546,10 +2535,15 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Life = opts.Life,
 			Serial = serial + 1,
 			Raider = opts.Raider == true or nil,
+			Stay = opts.Stay == true or nil,
+			Size = if scale ~= Kaiju.Bug.Scale then size else nil,
 		}
 		serial += 1
 		if opts.Raider then
 			rig:SetAttribute("Raider", true)
+		end
+		if opts.Boss then
+			rig:SetAttribute("RiftBoss", true)
 		end
 		-- Out of the tear, at its prey.
 		if opts.Hop then

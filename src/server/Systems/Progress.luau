@@ -24,15 +24,21 @@ function Progress.addXP(player: Player, reason: string, times: number?)
 	profile.Season.XP += amount
 	local points = Tree.addXP(profile, base * (times or 1))
 	if points > 0 then
-		Remotes.Notify:FireClient(
-			player,
+		-- Seen by everyone near (the light over you), with your banner and
+		-- what it brought (LevelUpFx).
+		local level = Tree.level(profile.Augments.XP)
+		Remotes.CombatFx:FireAllClients(
+			"LevelUp",
+			player.Character or player,
+			level,
+			"Miner",
+			nil,
+			player.DisplayName,
 			string.format(
-				"MINER LEVEL UP! +%d Augment Point%s, +%d max Health, +%d max Stamina, +%d max Charge. Upgrades: K.",
+				"+%d augment point%s, +%d max health. Spend points with K.",
 				points,
 				if points == 1 then "" else "s",
-				points * Tree.VitalsPerLevel.Health,
-				points * Tree.VitalsPerLevel.Stamina,
-				points * Tree.VitalsPerLevel.Charge
+				points * Tree.VitalsPerLevel.Health
 			)
 		)
 	end

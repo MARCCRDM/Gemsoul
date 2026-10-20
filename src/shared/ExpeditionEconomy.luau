@@ -10,8 +10,11 @@ local rates = { Iron = 12, Timber = 8, Leather = 10, Cloth = 10, Mithril = 60, S
 	The scale keeps the average mined gem's price where the economy expects it.
 ]]
 Economy.GemValueScale = 0.045
+-- Grade points per grade of each (the x10, x5, x15 above).
+Economy.GemWeights = { Size = 10, Clarity = 5, Cut = 15 }
 function Economy.gemPotency(gem)
-	return gem.Size * 10 + gem.Clarity * 5 + (gem.Cut or 0) * 15
+	local w = Economy.GemWeights
+	return gem.Size * w.Size + gem.Clarity * w.Clarity + (gem.Cut or 0) * w.Cut
 end
 function Economy.gemValue(gem, tierValue)
 	return math.max(1, math.floor(tierValue * Economy.gemPotency(gem) * Economy.GemValueScale + 0.5))

@@ -1,4 +1,4 @@
-"""The quarry's life (QuarryLife): the road lights in their frontier bands' colours, the searchlights, the meteor showers, the cargo lifter clear of everything, the dust devils, the vents and the conveyor's ore (needs lune)."""
+"""The quarry's life (QuarryLife): the road lights in their frontier bands' colours (no searchlights), the meteor showers, the cargo lifter clear of everything, the dust devils, the vents and the conveyor's ore (needs lune)."""
 from pathlib import Path
 import shutil, subprocess
 ROOT = Path(__file__).resolve().parents[1]

@@ -123,6 +123,7 @@ end
 local function busy(player: Player): boolean
 	return player:GetAttribute("CombatSession") ~= nil
 		or player:GetAttribute("MatchId") ~= nil
+		or player:GetAttribute("RiftRun") ~= nil
 		or Spar.sparring(player)
 		or Spar.hunting(player)
 end

@@ -83,6 +83,15 @@ check(Kaiju.Species.Carapace.Guard > Kaiju.Species.Bulwark.Guard, "The shell isn
 for level = 1, Kaiju.MaxLevel - 2 do
 	check(Kaiju.expToNext(level + 1) > Kaiju.expToNext(level), "The EXP curve isn't rising at " .. level)
 end
+-- Levelling is slow: level 10 takes thousands of EXP (a rock is 3 to 13).
+do
+	local total = 0
+	for level = 1, 9 do
+		total += Kaiju.expToNext(level)
+	end
+	check(total >= 15000, "Level 10 comes too easily: " .. total .. " EXP")
+	check(Kaiju.mineExp("Boulder") <= 5 and Kaiju.killExp(10) <= 110, "EXP comes too fast")
+end
 check(Kaiju.expToNext(Kaiju.MaxLevel) == math.huge, "EXP past the cap")
 local record = { Level = 1, Exp = 0, Element = "Fire" }
 check(

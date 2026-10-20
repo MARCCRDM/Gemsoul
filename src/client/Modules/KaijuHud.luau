@@ -9,7 +9,11 @@
 	                  itself (tap it to revive it now). AUTO HEAL at
 	                  its end: a Common, how many you have spare, and ON or
 	                  OFF; on, your spare Commons heal the team by themselves
-	                  (Shared.Kaiju.AutoHeal, KaijuServer). Tap a tile for
+	                  (Shared.Kaiju.AutoHeal, KaijuServer). Beside it CALL
+	                  BACK: the team put away in its Gemsouls (each tile
+	                  AWAY); then DEPLOY brings it out again, only out of
+	                  danger (IN DANGER till then: Shared.Kaiju.away,
+	                  KaijuServer's KaijuDanger). Tap a tile for
 	                  the panel on that kaiju. Computer:
 	                  bottom left. Phone: under your level and coins, and at
 	                  the top right while you hunt (the fight's foe list has
@@ -355,6 +359,35 @@ autoState.TextXAlignment = Enum.TextXAlignment.Center
 local autoWant: boolean? = nil -- (switched here, till the roster says so)
 local autoArt: string? = nil
 
+-- CALL BACK, beside AUTO HEAL: the team put away in its Gemsouls. Called
+-- back, it's DEPLOY, which brings them out again, only out of danger (IN
+-- DANGER till then). A gem mark over the word: hollow while they're out,
+-- filled in once they're in it.
+local callButton = new("TextButton", {
+	Name = "CallBack",
+	Text = "",
+	AutoButtonColor = true,
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -5, 0.5, 0),
+	Size = UDim2.fromOffset(72, 52),
+	BackgroundColor3 = TILE_BACK,
+}, card)
+UiKit.round(callButton, 8)
+local callEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, callButton)
+local callMark = new("Frame", {
+	Name = "Mark",
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = P.Dim,
+	BackgroundTransparency = 1,
+	Rotation = 45,
+}, callButton)
+local callMarkEdge = new("UIStroke", { Color = P.Dim, Thickness = 1.5 }, callMark)
+local callTitle = label(callButton, "CALL BACK", 9, P.Dim, IronUi.Bold)
+callTitle.TextXAlignment = Enum.TextXAlignment.Center
+local callState = label(callButton, "", 8, P.Dim, IronUi.Bold)
+callState.TextXAlignment = Enum.TextXAlignment.Center
+local callWant: boolean? = nil -- (pressed here, till the roster says so)
+
 -- CATCH: beside the strip, when there's a wild kaiju to catch.
 local tame = new("TextButton", {
 	Name = "Tame",
@@ -386,7 +419,7 @@ local function layout()
 	local hunting = Spar.hunting(player)
 	-- (Beside the chat box's CHAT button on a small keyboard screen, while it's on.)
 	local spot = MobileLayout.kaiju(UserInputService.KeyboardEnabled and not ChatFeed.Enabled)
-	local w, h = if phone then spot.W else 300, if phone then spot.H else 62
+	local w, h = if phone then spot.W else 368, if phone then spot.H else 62
 	card.Size = UDim2.fromOffset(w, h)
 	tame.Size = UDim2.fromOffset(if phone then spot.TameW else 104, h)
 	local x, y
@@ -398,13 +431,16 @@ local function layout()
 		tame.Position = UDim2.fromOffset(screen.X - 12 - tame.Size.X.Offset, y + h + 6)
 	else
 		x, y = spot.X, spot.Y
-		tame.Position = UDim2.fromOffset(spot.TameX, y)
+		tame.Position = UDim2.fromOffset(spot.TameX, spot.TameY or y)
 	end
 	card.Position = UDim2.fromOffset(x, y)
-	-- The tiles share what AUTO HEAL leaves.
-	local buttonW, gap = if phone then 62 else 72, if phone then 4 else 6
+	-- The tiles share what AUTO HEAL and CALL BACK leave.
+	local buttonW, gap = if phone then 54 else 68, if phone then 4 else 6
 	local th = h - 10
-	local tw = math.min(math.floor(th * 1.25), math.floor((w - 10 - buttonW - 8 - gap * (#tiles - 1)) / #tiles))
+	local tw = math.min(
+		math.floor(th * 1.25),
+		math.floor((w - 10 - buttonW * 2 - gap - 8 - gap * (#tiles - 1)) / #tiles)
+	)
 	for slot, tile in tiles do
 		tile.Button.Position = UDim2.fromOffset(5 + (slot - 1) * (tw + gap), 5)
 		tile.Button.Size = UDim2.fromOffset(tw, th)
@@ -412,6 +448,16 @@ local function layout()
 	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or OFF.
 	local gemSize, gemY = if phone then 13 else 18, if phone then 3 else 4
 	autoButton.Size = UDim2.fromOffset(buttonW, th)
+	autoButton.Position = UDim2.new(1, -5 - buttonW - gap, 0.5, 0)
+	-- CALL BACK: its gem mark, then its name, and IN DANGER when it can't.
+	callButton.Size = UDim2.fromOffset(buttonW, th)
+	local mark = if phone then 10 else 12
+	callMark.Size = UDim2.fromOffset(mark, mark)
+	callMark.Position = UDim2.new(0.5, 0, 0, if phone then 6 else 8)
+	callTitle.Position = UDim2.new(0, 0, 0, if phone then 19 else 24)
+	callTitle.Size, callTitle.TextSize = UDim2.new(1, 0, 0, 11), if phone then 8 else 9
+	callState.Position = UDim2.new(0, 0, 1, -(if phone then 12 else 15))
+	callState.Size, callState.TextSize = UDim2.new(1, 0, 0, 10), if phone then 7 else 8
 	autoGem.Position, autoGem.Size = UDim2.fromOffset(6, gemY), UDim2.fromOffset(gemSize, gemSize)
 	autoCount.Position, autoCount.Size = UDim2.fromOffset(9 + gemSize, gemY), UDim2.new(1, -13 - gemSize, 0, gemSize)
 	autoCount.TextSize = if phone then 11 else 12
@@ -485,6 +531,29 @@ local function drawAuto(lead)
 	end
 end
 
+-- CALL BACK as it stands: CALL BACK while they're out; called back, DEPLOY
+-- (green when it can, IN DANGER while you're in danger).
+local function drawCall()
+	local away = Kaiju.away(roster())
+	if callWant ~= nil and callWant ~= away then
+		away = callWant
+	else
+		callWant = nil
+	end
+	local danger = player:GetAttribute("KaijuDanger") == true
+	local ready = away and not danger
+	callTitle.Text = if away then "DEPLOY" else "CALL BACK"
+	callTitle.TextColor3 = if ready then P.Good else if away then P.Dim else P.Text
+	callState.Text = if away and danger then "IN DANGER" elseif ready then "READY" else ""
+	callState.TextColor3 = if danger then P.Bad:Lerp(P.Text, 0.25) else P.Good
+	callEdge.Color = if ready then P.Good else P.Edge
+	callButton.BackgroundColor3 = if ready then P.Good:Lerp(INK, 0.78) else TILE_BACK
+	local markColor = if ready then P.Good elseif away then P.Dim else P.Text
+	callMark.BackgroundColor3, callMarkEdge.Color = markColor, markColor
+	-- (Filled in: they're in their Gemsouls.)
+	callMark.BackgroundTransparency = if away then 0 else 1
+end
+
 local function drawTile(tile, record, model: Model?, lead: boolean)
 	tile.Id = record.Id
 	local color = elementColor(record.Element)
@@ -510,9 +579,14 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 		dot.Frame.BackgroundTransparency = if ready then 0 elseif awake then 0.65 else 1
 		dot.Stroke.Transparency = if awake then 0 else 0.45
 	end
-	tile.Veil.Visible = record.Down == true
+	local away = Kaiju.away(roster())
+	tile.Veil.Visible = record.Down == true or away
 	if record.Down then
 		tile.VeilText.Text = "DOWN " .. reviveClock(record)
+		tile.VeilText.TextColor3 = P.Bad:Lerp(P.Text, 0.3)
+	elseif away then
+		tile.VeilText.Text = "AWAY"
+		tile.VeilText.TextColor3 = P.Dim
 	end
 end
 
@@ -1698,6 +1772,7 @@ local function refresh()
 		end
 	end
 	drawAuto(team[1] and data.List[team[1]])
+	drawCall()
 	-- TAME.
 	local target, chance = tameTarget()
 	tameModel = target
@@ -1740,6 +1815,26 @@ autoButton.Activated:Connect(function()
 		say(result)
 		if not (result and result.Ok) then
 			autoWant = nil -- (as it was)
+		end
+	end)
+end)
+callButton.Activated:Connect(function()
+	local data = roster()
+	if not data or busy then
+		return
+	end
+	local away = if callWant ~= nil then callWant else Kaiju.away(data)
+	if away and player:GetAttribute("KaijuDanger") == true then
+		UiKit.toast("Get clear of the fight first: your team deploys only out of danger.", P.Bad)
+		return
+	end
+	callWant = not away
+	pcall(refresh)
+	act(function()
+		local result = GemClient.request("KaijuCallBack", not away)
+		say(result)
+		if not (result and result.Ok) then
+			callWant = nil -- (as it was)
 		end
 	end)
 end)

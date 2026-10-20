@@ -201,7 +201,7 @@ for kind, n in kinds do
 		local shownNow = {}
 		for _, stand in Store.Stands do
 			if stand.Kind == kind then
-				local id = Store.showing(stand, turn * Store.Every + 1)
+				local id = Store.showing(stand, turn * (stand.Every or Store.Every) + 1)
 				check(not shownNow[id], "Two " .. kind .. " stands show " .. id .. " at once")
 				shownNow[id] = true
 				seen[id] = true
@@ -219,6 +219,16 @@ do
 	check(Store.showing(stand, Store.Every - 0.01) == first, "A stand changed in the middle of its turn")
 	check(Store.showing(stand, Store.Every) ~= first, "A stand didn't move on")
 	check(Store.showing(stand, 12345.6) == Store.showing(stand, 12345.6), "Not the same for everyone")
+end
+-- The suits turn briskly and change often.
+for _, stand in Store.Stands do
+	if stand.Kind == "Suit" then
+		check(stand.Turn and stand.Turn >= 0.8, "A suit turns too slowly")
+		check(stand.Every and stand.Every <= 15, "A suit stays up too long")
+		local first = Store.showing(stand, 0)
+		check(Store.showing(stand, stand.Every - 0.01) == first, "A suit changed in the middle of its turn")
+		check(Store.showing(stand, stand.Every) ~= first, "A suit didn't move on")
+	end
 end
 
 -- Stand-ins for the Shop's previews: the mannequin's frame faces -Z, and,

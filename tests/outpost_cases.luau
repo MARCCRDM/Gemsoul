@@ -526,15 +526,27 @@ do
 		local offset = scar.Position - Rules.Location.Position
 		check(R.Vector3.new(offset.X, 0, offset.Z).Magnitude > Frontier.Rim - 1, "A rift scar off the walls")
 	end
-	-- Glowing cracks round the outcrops (no crumb roads), and each vein's
-	-- marks with its beam of light.
-	local seams = site.Model:FindFirstChild("Frontier")
-	check(seams and #seams:GetChildren() >= 60 and #seams:GetChildren() <= 160, "No glowing cracks round the outcrops")
+	-- No glowing cracks on the ground round the outcrops, no crumb roads,
+	-- and each vein's marks.
+	check(site.Model:FindFirstChild("Frontier") == nil, "The glowing cracks round the outcrops are back")
 	check(site.Model:FindFirstChild("Trails") == nil, "The old trails are still there")
 	local marks = site.Model:FindFirstChild("Veins")
 	check(marks and #marks:GetChildren() == 3, "The veins have no marks")
 	for _, model in marks:GetChildren() do
-		check(model:FindFirstChild("VeinBeam") ~= nil, "A vein without its beam of light")
+		-- (No beam of light over it any more: its Rift Gate, the way in.)
+		check(model:FindFirstChild("VeinBeam") == nil, "A vein's beam of light is back")
+		local gate = model:FindFirstChild("RiftGate")
+		local heart = gate and gate:FindFirstChild("Heart")
+		local prompt = heart and heart:FindFirstChildOfClass("ProximityPrompt")
+		check(prompt and prompt:GetAttribute("PromptKind") == "Rift" and prompt.ActionText == "Enter the Rift", "A vein without its Rift Gate")
+		local shards = 0
+		for _, piece in gate:GetChildren() do
+			if piece:IsA("BasePart") and piece.Material == R.Enum.Material.Slate then
+				shards += 1
+			end
+		end
+		check(shards >= 12, "The gate's arch is missing its rock")
+		check(heart:FindFirstChildOfClass("PointLight") and heart:FindFirstChildOfClass("ParticleEmitter"), "The gate has no glow or embers")
 	end
 end
 check(site.Probe:FindFirstChildOfClass("ProximityPrompt") ~= nil, "The Probe has no prompt")
@@ -648,6 +660,16 @@ do
 		local q = bay.CFrame.Position - Rules.Location.Position
 		check(math.abs(q.X) < box.X and math.abs(q.Z) < box.Y, "A mech bay outside the Shelter's garage")
 	end
+	-- They arrive facing a Mole drill: one parked straight ahead, close.
+	local ahead = false
+	for _, bay in site.Parking do
+		local to = bay.CFrame.Position - site.Spawn.Position
+		to = R.Vector3.new(to.X, 0, to.Z)
+		if bay.Kind == "Mole" and to.Magnitude < 34 and to.Unit:Dot(site.Spawn.LookVector) > 0.97 then
+			ahead = true
+		end
+	end
+	check(ahead, "Players don't arrive facing a mech")
 end
 check(
 	replicated:FindFirstChild("Landmarks") and replicated.Landmarks:GetAttribute("OutpostSpawn") ~= nil,
@@ -987,10 +1009,16 @@ do
 		return list
 	end
 	check(#nodesOn(1) == Frontier.Veins.Rocks, "A vein isn't fully grown")
-	-- One is guarded: luckier rocks of its own zone, and its beam red.
+	-- One is guarded: luckier rocks of its own zone, and its gate's cracks
+	-- its colour; each gate's prompt says which vein it is.
 	local guarded = Frontier.Veins.Guarded
-	local function beamOf(v)
-		return veins[v].Marks and veins[v].Marks:FindFirstChild("VeinBeam")
+	local function crackOf(v)
+		return veins[v].Marks and veins[v].Marks:FindFirstChild("ScarCrack")
+	end
+	local function gatePrompt(v)
+		local gate = veins[v].Marks and veins[v].Marks:FindFirstChild("RiftGate")
+		local heart = gate and gate:FindFirstChild("Heart")
+		return heart and heart:FindFirstChildOfClass("ProximityPrompt")
 	end
 	local function sameColor(x, y)
 		return math.abs(x.R - y.R) + math.abs(x.G - y.G) + math.abs(x.B - y.B) < 0.01
@@ -1000,8 +1028,13 @@ do
 		for _, node in nodesOn(v) do
 			check(node.Zone == zone, "A vein " .. v .. " rock in the " .. tostring(node.Zone) .. " zone")
 		end
-		local color = if v == guarded then Frontier.Bands.Guarded.Color else Frontier.Bands.Vein.Color
-		check(beamOf(v) and sameColor(beamOf(v).Color, color), "Vein " .. v .. "'s beam is the wrong colour")
+		local crack = crackOf(v)
+		if v == guarded then
+			check(crack and sameColor(crack.Color, Frontier.Bands.Guarded.Color), "The guarded vein's gate isn't its colour")
+		else
+			check(crack and not sameColor(crack.Color, Frontier.Bands.Guarded.Color), "A plain vein's gate in the guarded colour")
+		end
+		check(gatePrompt(v) and gatePrompt(v):GetAttribute("Vein") == v, "Vein " .. v .. "'s gate doesn't say which vein it is")
 	end
 	-- Mine it out.
 	local before = siteOf(1)
@@ -1036,8 +1069,9 @@ do
 	local news = workspaceRoot:GetAttribute("VeinNews") or ""
 	check(string.find(news, Frontier.compass(after.Angle), 1, true), "No word of where it went")
 	check(string.find(news, "A guarded Rift Vein", 1, true) == (if guarded == 1 then 1 else nil), "The news")
-	local red = beamOf(guarded)
-	check(red and sameColor(red.Color, Frontier.Bands.Guarded.Color), "Moved, its beam isn't red")
+	local red = crackOf(guarded)
+	check(red and sameColor(red.Color, Frontier.Bands.Guarded.Color), "Moved, its gate isn't the guarded colour")
+	check(gatePrompt(1) and gatePrompt(1):GetAttribute("Vein") == 1, "Moved, its gate went without it")
 	-- Nothing grows back on top of the new rocks.
 	local count = #nodesOn(1)
 	advance(400)
@@ -1143,6 +1177,7 @@ check(profiles[ana].Coins == coinsBefore, "A retired secret paid out")
 check(#site.Parking > 0, "The Motor Pool has no bays")
 for _, bay in site.Parking do
 	check(Rules.Machines[bay.Kind] ~= nil, "A bay for an unknown machine: " .. tostring(bay.Kind))
+	check(bay.Kind == "Mole", "A bay without a Mole drill: " .. tostring(bay.Kind))
 end
 
 -- Only Ultra Rare and Legendary finds are called out to the server.

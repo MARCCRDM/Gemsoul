@@ -192,4 +192,28 @@ expect(near(CrowdControl.applyDebuff(tracker, "Slow", 0.5, 2, 0, true), 0.30), "
 expect(near(CrowdControl.applyDebuff(tracker, "Slow", 0.1, 2, 1, true), 0.30), "PvP debuffs don't stack")
 expect(CrowdControl.cleanse(tracker, 1.5) == "Slow" and CrowdControl.debuff(tracker, "Slow", 1.6) == 0, "Cleanse")
 
+-- The gem card's worth: its three grades at their weights, times its
+-- rarity's rate, is what it sells for (every tier, cut or rough).
+for _, tier in GemConfig.TierOrder do
+	for _, gem in
+		{
+			{ Id = "w", Element = "Shock", Tier = tier, Size = 8, Clarity = 7, Cut = 10 },
+			{ Id = "r", Element = "Frost", Tier = tier, Size = 3, Clarity = 2 },
+		}
+	do
+		local worth = GemConfig.worth(gem)
+		local points = 0
+		for _, grade in worth.Grades do
+			expect(grade.Points == grade.Grade * grade.Weight, "A grade's points")
+			points += grade.Points
+		end
+		expect(#worth.Grades == 3 and points == worth.Points, "The grade points don't add up")
+		expect(worth.Value == GemConfig.value(gem), "The card's worth isn't its price")
+		expect(math.abs(worth.Points * worth.Rate - worth.Value) <= 0.5 + 1e-6, "Points times the rate isn't its price")
+		expect(worth.Rank == GemConfig.TierRank[tier], "Its rarity's step")
+	end
+end
+local arc = GemConfig.worth({ Id = "a", Element = "Shock", Tier = "UltraRare", Size = 8, Clarity = 7, Cut = 10 })
+expect(arc.Points == 265 and near(arc.Rate, 5.4) and arc.Value == 1431, "Prismatic Arc Gold's worth")
+
 print("PASS: " .. metricChecks .. " gem directive checks (metrics, PvP, palette, value, affixes, DR, anti-heal)")

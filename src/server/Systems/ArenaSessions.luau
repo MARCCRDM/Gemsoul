@@ -22,6 +22,9 @@ local function enter(player, pvp)
 	if player:GetAttribute("Expedition") then
 		return Shop.reply(false, "Return from your expedition before entering the Arena.")
 	end
+	if player:GetAttribute("RiftRun") then
+		return Shop.reply(false, "Leave the Rift first.")
+	end
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")

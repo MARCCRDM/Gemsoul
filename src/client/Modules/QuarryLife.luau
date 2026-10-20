@@ -8,7 +8,6 @@
 	                band's colour (Shared.Frontier: cyan in the core, gold
 	                in the Fringe, rose out at the Edge), so the way out and
 	                how rich the ground is read from afar
-	  searchlights  two beams sweeping the sky over the north outpost
 	  meteors       a shower streaking over the crater every Shower seconds
 	  the lifter    a cargo lifter carrying a container from the landing pad
 	                to the north outpost and back, nav lights blinking
@@ -32,8 +31,6 @@
 	  QuarryLife.lights() -> { { Position, Band, Road, Out } }   every road light
 	  QuarryLife.glow(out, t) -> number   how lit a light `out` studs out is (0-1)
 	  QuarryLife.lifterAt(t) -> (CFrame, string)   the lifter, and what it's doing
-	  QuarryLife.searchAt(k, t) -> CFrame   searchlight k's beam: from its lamp,
-	                                      -Z along the beam
 	  QuarryLife.meteorAt(k, t) -> (CFrame?, number)   meteor k of the shower
 	                                      (its head, -Z the way it flies; nil
 	                                      while it isn't in the sky) and how
@@ -64,8 +61,6 @@ QuarryLife.Drop = V(56, 18, -90) -- where the lifter hovers at the north outpost
 QuarryLife.Cruise = 62 -- the lifter's height between (well over the Shelter's skylight)
 QuarryLife.Trip = 100 -- seconds, there and back with its rests
 QuarryLife.Hang = 6.55 -- from the bottom of the container it carries up to its middle
-QuarryLife.Searchlights = { V(-60, 0, -84), V(60, 0, -84) }
-QuarryLife.BeamLength = 300
 QuarryLife.Shower = 45 -- seconds between meteor showers
 QuarryLife.Meteors = 5 -- in each
 QuarryLife.Vents = { V(200, 0, -260), V(-330, 0, 80), V(170, 0, 220), V(-150, 0, 330) } -- in craters, clear of the rocks
@@ -182,17 +177,6 @@ function QuarryLife.lifterAt(t: number): (CFrame, string)
 	return at(pad, heading), "Resting"
 end
 
--- Searchlight k's beam at t: from its lamp, sweeping slowly round the sky
--- over the north outpost, always well up (-Z along the beam).
-function QuarryLife.searchAt(k: number, t: number): CFrame
-	local base = QuarryLife.Searchlights[k]
-	local lamp = base + V(0, 7.5, 0)
-	local swing = math.sin(t * 0.21 + k * 2.1)
-	local yaw = math.rad(if k == 1 then 30 else -30) + swing * math.rad(55)
-	local pitch = math.rad(58 + math.sin(t * 0.13 + k) * 14)
-	return CFrame.new(lamp) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
-end
-
 -- A small hash of whole numbers, 0-1, for the showers.
 local function hash(a: number, b: number): number
 	local x = math.sin(a * 127.1 + b * 311.7) * 43758.5453
@@ -261,7 +245,6 @@ export type Life = {
 	Lifter: Group,
 	NavLights: { BasePart },
 	Thrust: { BasePart },
-	Beams: { BasePart },
 	Meteors: { { Head: BasePart, Trail: BasePart } },
 	Devils: { BasePart },
 	Vents: { { Emitter: ParticleEmitter, Crack: BasePart } },
@@ -345,21 +328,6 @@ function QuarryLife.build(at: CFrame): Life
 		local p = part(roadLights, V(0.9, 0.24, 0.9), Frontier.Bands[spec.Band].Color, Enum.Material.Neon)
 		p.CFrame = at * CFrame.new(spec.Position)
 		table.insert(lights, { Part = p, Out = spec.Out, Here = spec.Position })
-	end
-	-- The searchlights: a mount, a lamp, and its beam.
-	local beams = {}
-	for k, base in QuarryLife.Searchlights do
-		local mount = part(model, V(3, 6, 3), DARK, Enum.Material.Metal)
-		mount.CFrame = at * CFrame.new(base + V(0, 3, 0))
-		local plinth = part(model, V(5, 0.6, 5), HAZARD, Enum.Material.Metal)
-		plinth.CFrame = at * CFrame.new(base + V(0, 0.3, 0))
-		local lamp = part(model, V(3, 3, 3), Color3.fromRGB(236, 244, 255), Enum.Material.Neon, "Ball")
-		lamp.CFrame = at * CFrame.new(base + V(0, 7.5, 0))
-		local beam =
-			part(model, V(QuarryLife.BeamLength, 8, 8), Color3.fromRGB(214, 232, 255), Enum.Material.Neon, "Cylinder")
-		beam.Name = "SearchBeam" .. k
-		beam.Transparency = 0.88
-		table.insert(beams, beam)
 	end
 	-- The meteors: a white-hot head and a long trail behind it.
 	local meteors = {}
@@ -455,7 +423,6 @@ function QuarryLife.build(at: CFrame): Life
 		Lifter = carrier,
 		NavLights = nav,
 		Thrust = thrust,
-		Beams = beams,
 		Meteors = meteors,
 		Devils = devils,
 		Vents = vents,
@@ -502,11 +469,6 @@ function QuarryLife.pose(life: Life, t: number, near: Vector3?)
 				light.Part.Transparency = want
 			end
 		end
-	end
-	-- The searchlights, each beam reaching out from its lamp.
-	for k, beam in life.Beams do
-		local cf = QuarryLife.searchAt(k, t)
-		put(beam, at * cf * CFrame.new(0, 0, -QuarryLife.BeamLength / 2) * CFrame.Angles(0, math.rad(90), 0))
 	end
 	-- The meteors (out of the sky between showers).
 	for k, m in life.Meteors do

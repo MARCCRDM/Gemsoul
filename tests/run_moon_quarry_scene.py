@@ -61,12 +61,14 @@ World.Rules=Rules
 local site=World.build(origin,{})
 assert(site.Model.Landscape=="Moon Quarry" and site.Model.SkySetting=="MoonBase")
 assert(#site.Secrets==0 and #site.FieldSpots==0,"Retired extras returned")
--- The Shelter in the middle: players arrive inside its door, facing in;
--- its stations and services are all under its roof.
+-- The Shelter in the middle: players arrive in its garage lane, facing
+-- bay 04's Mole drill; its stations and services are all under its roof.
 local box=site.Shelter.Box
 local function inShelter(p) return math.abs(p.X)<box.X and math.abs(p.Z)<box.Y end
-assert(site.Spawn.Position.X==0 and site.Spawn.Position.Z==7050 and site.Spawn.Position.Y==3.5+Rules.ShelterLift,"Spawn isn't inside the Shelter's door, on its floor")
-assert(site.Spawn.LookVector.Z<-.99,"Spawn doesn't face into the Shelter")
+local bay4=site.Parking[4].CFrame.Position
+assert(site.Spawn.Position.X==bay4.X and site.Spawn.Position.Z==7000-24 and site.Spawn.Position.Y==3.5+Rules.ShelterLift,"Spawn isn't in the garage lane, on its floor")
+assert(site.Parking[4].Kind=="Mole" and bay4.Z<site.Spawn.Position.Z,"No Mole drill in front of the spawn")
+assert(site.Spawn.LookVector.Z<-.99,"Spawn doesn't face the Mole drill")
 assert(#site.ArrivalSpots==8,"Welcome mining field missing")
 -- (beside the ramp down from the door, or past its foot, off the lane out)
 local front=site.Shelter.Ramps[1]
@@ -263,7 +265,7 @@ for _,bay in site.Parking do
  assert(bottom>=floorY+.8,"Vehicle spawned in Motor Pool floor")
  assert((bay.CFrame.Position-origin.Position).Magnitude<Rules.Radius,"Vehicle outside recovery boundary")
 end
-assert(counts.Hauler==2 and counts.Mole==2 and counts.Digger==1 and counts.Skipper==3,"Original vehicle mix changed")
+assert(counts.Mole==8 and counts.Hauler==0 and counts.Digger==0 and counts.Skipper==0,"Not a Mole drill in every bay")
 for _,size in {"Pebble","Boulder"} do
  for seed=1,40 do
   local partsBefore,lightsBefore=#builtParts,#builtLights

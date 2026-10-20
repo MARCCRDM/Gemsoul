@@ -29,7 +29,7 @@
 	or so anyway (put off while someone is mining it), whatever is left of
 	it goes and it surfaces at another site by the walls with room
 	(site.VeinSites), away from the other two: fresh rocks, its marks and
-	beam of light (OutpostWorld.veinMarks), its dormant rift and its
+	Rift Gate (OutpostWorld.veinMarks: the way into the Rift, Server.RiftServer), its dormant rift and its
 	guardian (OutpostServer.onVeinMoved: FrontierServer, KaijuWilds), and
 	word round the Outpost (workspace's VeinNews and VeinNewsAt:
 	FrontierHud's banner). A swing at a vein's rock tells its guardian
@@ -469,7 +469,7 @@ local function markVein(vein)
 	end
 	local guarded = vein == veins[Frontier.Veins.Guarded]
 	local color = if guarded then Frontier.Bands.Guarded.Color else nil
-	vein.Marks = OutpostWorld.veinMarks(veinFolder, site.VeinSites[vein.Site].Scar, rng, color)
+	vein.Marks = OutpostWorld.veinMarks(veinFolder, site.VeinSites[vein.Site].Scar, rng, color, table.find(veins, vein))
 end
 
 -- Vein `v` surfaces at another site: whatever's left of it goes, fresh
@@ -823,7 +823,8 @@ local function enter(player: Player)
 		player:RequestStreamAroundAsync(site.Spawn.Position)
 	end)
 	local character = player.Character :: Model
- local spawn = site.Spawn * CFrame.new(rng:NextNumber(-6, 6), 0, rng:NextNumber(-4, 4))
+	-- (A little apart from each other, the Mole drill still straight ahead.)
+	local spawn = site.Spawn * CFrame.new(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3))
  local profile = PlayerData.get(player)
  local tutorial = require(ReplicatedStorage.Shared.Tutorial).beat(profile)
  if tutorial and tutorial.Id == "Mine" then
@@ -1129,7 +1130,8 @@ function OutpostServer.start()
 		-- In a kaiju battle, or out of it (KaijuBattles).
 		player:GetAttributeChangedSignal("KaijuBattle"):Connect(fightChanged)
 		player.CharacterAdded:Connect(function(character)
-			-- Back on your feet at the Outpost after a respawn.
+			-- Back on your feet at the Outpost after a respawn (out of the Rift
+			-- too: Server.RiftServer has sent them home).
 			if player:GetAttribute("Outpost") then
 				task.wait(0.5)
 				if player.Character == character and site then
@@ -1178,6 +1180,7 @@ function OutpostServer.start()
 						and not player:GetAttribute("CombatSession")
 						and not player:GetAttribute("MatchId")
 						and not player:GetAttribute("DungeonId")
+						and not player:GetAttribute("RiftRun") -- (away in the Rift: Server.RiftServer)
 					then
 						local offset = root.Position - centre
 						local far = Vector3.new(offset.X, 0, offset.Z).Magnitude > Rules.Radius + 60
@@ -1218,6 +1221,14 @@ OutpostServer._veins = veins
 
 function OutpostServer.site()
 	return site
+end
+
+-- Vein `index`'s Rift Gate: the part its "Enter the Rift" prompt is on.
+function OutpostServer.veinGate(index: number): BasePart?
+	local vein = veins[index]
+	local marks = vein and vein.Marks
+	local gate = marks and marks:FindFirstChild("RiftGate")
+	return gate and gate:FindFirstChild("Heart") :: BasePart?
 end
 
 return OutpostServer

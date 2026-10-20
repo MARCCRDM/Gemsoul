@@ -259,7 +259,10 @@ end
 -- of them can be about at once).
 function Duelist.creatureBody(spec, accent: Color3): Model
 	local rig = buildBody(Color3.fromRGB(150, 130, 110))
-	BrainrotSkins.apply(rig, spec, accent, false, 0, false)
+	-- (A boss's own body, at its own size: the Rift's, Server.RiftServer.)
+	if not BrainrotBosses.apply(rig, spec, accent, false) then
+		BrainrotSkins.apply(rig, spec, accent, false, 0, false)
+	end
 	BrainrotSkins.thin(rig)
 	return rig
 end

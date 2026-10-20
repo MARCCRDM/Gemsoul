@@ -145,6 +145,7 @@ GemConfig.SourceLabels = {
 	PvPWager = "Won in a PvP duel",
 	StarterSpin = "Starter gem spin",
 	FirstStone = "Your first stone, from the mine",
+	RiftCache = "Found in the Rift",
 }
 
 -- What a gem does when socketed into a weapon.
@@ -178,6 +179,7 @@ GemConfig.SourceLuck = {
 	PvEDrop = 0.1, -- plus the monster's own bonus
 	StarterSpin = 0.25,
 	FirstStone = 0,
+	RiftCache = 0.1, -- plus how deep in it was (Shared.RiftRun.cacheLuck)
 }
 
 -- Natural facet quality: 1-10, rolled at recovery. Diamond cut is the only shape.
@@ -208,6 +210,35 @@ end
 -- Coin value: economy-only, see ExpeditionEconomy.gemValue.
 function GemConfig.value(gem: Gem): number
 	return ExpeditionEconomy.gemValue(gem, GemConfig.TierValue[gem.Tier] or 10)
+end
+
+-- What a gem's worth is made of, for the gem card: its three grades, each
+-- times its weight in grade points; those points at its rarity's rate in
+-- coins a point; and the total (GemConfig.value).
+export type Worth = {
+	Grades: { { Metric: string, Grade: number, Weight: number, Points: number } },
+	Points: number,
+	Tier: string,
+	Rank: number, -- 1-5, Common to Legendary
+	Rate: number, -- coins a grade point
+	Value: number,
+}
+function GemConfig.worth(gem: Gem): Worth
+	local grades, points = {}, 0
+	for _, metric in GemConfig.MetricOrder do
+		local grade = (gem :: any)[metric] or 0
+		local weight = ExpeditionEconomy.GemWeights[metric]
+		table.insert(grades, { Metric = metric, Grade = grade, Weight = weight, Points = grade * weight })
+		points += grade * weight
+	end
+	return {
+		Grades = grades,
+		Points = points,
+		Tier = gem.Tier,
+		Rank = GemConfig.TierRank[gem.Tier] or 1,
+		Rate = (GemConfig.TierValue[gem.Tier] or 10) * ExpeditionEconomy.GemValueScale,
+		Value = GemConfig.value(gem),
+	}
 end
 
 --[[

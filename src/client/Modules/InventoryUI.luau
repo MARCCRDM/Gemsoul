@@ -17,6 +17,7 @@ local BODY = Enum.Font.Gotham
 local BOLD = Enum.Font.GothamBold
 local MAX_WIDTH = 960
 local NARROW = 620 -- below this panel width the detail view covers the grid
+local SHORT = 500 -- below this screen height the stone sits beside its card
 
 type Options = {
 	Title: string?,
@@ -68,18 +69,20 @@ local function label(parent: Instance, text: string, size: number, color: Color3
 	}, parent)
 end
 
-local function pill(parent: Instance, text: string, color: Color3, order: number): Frame
+local function pill(parent: Instance, text: string, color: Color3, order: number, small: boolean?): Frame
+	local tall = if small then 22 else 26
 	local frame = new("Frame", {
 		BackgroundColor3 = color,
 		BackgroundTransparency = 0.78,
 		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 26),
+		Size = UDim2.fromOffset(0, tall),
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(frame, 13)
+	UiKit.round(frame, tall / 2)
 	new("UIStroke", { Color = color, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, frame)
-	local text_ = label(frame, text, 13, Color3.new(1, 1, 1), IronUi.Chunky)
+	local pad = if small then 8 else 10
+	new("UIPadding", { PaddingLeft = UDim.new(0, pad), PaddingRight = UDim.new(0, pad) }, frame)
+	local text_ = label(frame, text, if small then 11 else 13, Color3.new(1, 1, 1), IronUi.Chunky)
 	IronUi.outline(text_, 2)
 	text_.AutomaticSize = Enum.AutomaticSize.X
 	text_.Size = UDim2.fromScale(0, 1)
@@ -295,14 +298,31 @@ IronUi.label(backButton, backFace, "< Back", 14)
 local spinning: Model? = nil
 local spinningGem = nil
 
-local function statBar(name: string, value: number?, color: Color3, order: number)
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = order }, info)
-	local caption = label(row, name, 12, K.Dim, BOLD)
-	caption.Size = UDim2.new(0, 64, 1, 0)
+-- A small heading over a part of the card.
+local function heading(text: string, order: number)
+	local caption = label(info, text, 11, K.Dim, BOLD)
+	caption.LayoutOrder = order
+	return caption
+end
+
+-- One grade: its name and what it does over its ten pips, the grade on the
+-- right (two lines, so nothing runs into the pips at any width).
+local function statBar(name: string, role: string, value: number?, color: Color3, order: number)
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 32), LayoutOrder = order }, info)
+	local caption = label(row, name, 12, color, BOLD)
+	caption.Size = UDim2.new(0, 72, 0, 16)
+	local what = label(row, role, 12, K.Dim)
+	what.Position, what.Size = UDim2.fromOffset(74, 0), UDim2.new(1, -124, 0, 16)
+	what.TextTruncate = Enum.TextTruncate.AtEnd
+	local number = label(row, if value then value .. "/10" else "--", 13, K.Text, BOLD)
+	number.AnchorPoint = Vector2.new(1, 0)
+	number.Position = UDim2.fromScale(1, 0)
+	number.Size = UDim2.new(0, 48, 0, 16)
+	number.TextXAlignment = Enum.TextXAlignment.Right
 	local cells = new("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(66, 4),
-		Size = UDim2.new(1, -98, 0, 12),
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, 10),
 	}, row)
 	UiKit.list(cells, 3, true)
 	for i = 1, 10 do
@@ -313,11 +333,47 @@ local function statBar(name: string, value: number?, color: Color3, order: numbe
 		}, cells)
 		UiKit.round(cell, 3)
 	end
-	local number = label(row, if value then tostring(value) else "--", 14, K.Text, BOLD)
-	number.AnchorPoint = Vector2.new(1, 0)
-	number.Position = UDim2.fromScale(1, 0)
-	number.Size = UDim2.new(0, 28, 1, 0)
-	number.TextXAlignment = Enum.TextXAlignment.Right
+end
+
+-- Its rarity on the ladder: five steps, Common to Legendary, lit up to its own.
+local function rarityBar(gem, order: number)
+	local rank = GemConfig.TierRank[gem.Tier] or 1
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 32), LayoutOrder = order }, info)
+	label(row, "RARITY", 12, K.Text, BOLD).Size = UDim2.new(0.5, 0, 0, 16)
+	local step = label(row, string.format("TIER %d OF %d", rank, #GemConfig.TierOrder), 12, K.Dim, BOLD)
+	step.AnchorPoint, step.Position, step.Size = Vector2.new(1, 0), UDim2.fromScale(1, 0), UDim2.new(0.5, 0, 0, 16)
+	step.TextXAlignment = Enum.TextXAlignment.Right
+	local steps = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, 10),
+	}, row)
+	UiKit.list(steps, 4, true)
+	for i, tier in GemConfig.TierOrder do
+		local cell = new("Frame", {
+			Name = tier,
+			BackgroundColor3 = GemConfig.TierColors[tier],
+			BackgroundTransparency = if i <= rank then 0 else 0.8,
+			Size = UDim2.new(1 / #GemConfig.TierOrder, -4, 1, 0),
+			LayoutOrder = i,
+		}, steps)
+		UiKit.round(cell, 3)
+		if i == rank then
+			new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1.5 }, cell)
+		end
+	end
+end
+
+-- A line of the worth: what on the left, how much on the right.
+local function worthRow(what: string, amount: string, order: number, color: Color3?)
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 16), LayoutOrder = order }, info)
+	local left = label(row, what, 12, color or K.Text)
+	left.Size = UDim2.new(1, -64, 1, 0)
+	left.TextTruncate = Enum.TextTruncate.AtEnd
+	local right = label(row, amount, 12, color or K.Text, BOLD)
+	right.AnchorPoint, right.Position, right.Size = Vector2.new(1, 0), UDim2.fromScale(1, 0), UDim2.new(0, 64, 1, 0)
+	right.TextXAlignment = Enum.TextXAlignment.Right
+	return row
 end
 
 local function showDetail(gem)
@@ -349,32 +405,43 @@ local function showDetail(gem)
 	name.TextWrapped = true
 	name.AutomaticSize = Enum.AutomaticSize.Y
 	name.LayoutOrder = 1
+	local title =
+		label(info, GemConfig.title(gem) .. (if shade.Prismatic then "  ·  Prismatic" else ""), 12, K.Dim, BOLD)
+	title.LayoutOrder = 2
 
 	local badges = new("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		LayoutOrder = 2,
+		LayoutOrder = 3,
 	}, info)
-	UiKit.list(badges, 6, true).Wraps = true
-	pill(badges, string.upper(GemConfig.TierLabels[gem.Tier]), tierColor, 1)
-	pill(badges, string.upper(GemConfig.elementName(gem.Element)), GemConfig.ElementColors[gem.Element], 2)
+	UiKit.list(badges, 5, true).Wraps = true
+	pill(badges, string.upper(GemConfig.TierLabels[gem.Tier]), tierColor, 1, true)
+	pill(badges, string.upper(GemConfig.elementName(gem.Element)), GemConfig.ElementColors[gem.Element], 2, true)
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "GEM MINT" else "CUT " .. gem.Cut
-	pill(badges, state, if gem.Cut and gem.Cut >= 10 then K.Gold else K.Text, 3)
-
-	statBar("SIZE  ·  MAGNITUDE", gem.Size, tierColor, 3)
-	statBar("CLARITY  ·  DURATION", gem.Clarity, tierColor, 4)
-	statBar("CUT  ·  PRECISION", gem.Cut, K.Gold, 5)
-
-	local value = label(info, "💰 " .. commas(GemConfig.value(gem)), 24, P.Gold, IronUi.Chunky)
+	pill(badges, state, if gem.Cut and gem.Cut >= 10 then K.Gold else K.Text, 3, true)
+	local worth = GemConfig.worth(gem)
+	local value = label(info, "💰 " .. commas(worth.Value), 22, P.Gold, IronUi.Chunky)
 	IronUi.outline(value, 2)
-	value.LayoutOrder = 6
-	-- What it does in a weapon: the concrete numbers, not an abstract score.
-	for i, line in GemConfig.lines(gem, "Weapon") do
-		local tag = if line.Metric then string.format("  (%s %d)", line.Metric, line.Grade or 0) else ""
-		local effect = label(info, line.Text .. tag, 12, K.Text)
-		effect.LayoutOrder = 10 + i
+	value.LayoutOrder = 4
+
+	-- Everything its price comes from: its rarity and its three grades.
+	rarityBar(gem, 5)
+	statBar("SIZE", "Magnitude", gem.Size, tierColor, 6)
+	statBar("CLARITY", "Duration", gem.Clarity, P.Teal, 7)
+	statBar("CUT", "Precision", gem.Cut, K.Gold, 8)
+
+	-- How its price adds up: grade points, times its rarity's rate.
+	heading("HOW ITS VALUE ADDS UP", 9)
+	for i, grade in worth.Grades do
+		local named = string.upper(grade.Metric)
+			.. " "
+			.. (if grade.Metric == "Cut" and not gem.Cut then "--" else grade.Grade)
+		worthRow(string.format("%s  x%d", named, grade.Weight), commas(grade.Points), 9 + i, K.Dim)
 	end
+	worthRow("Grade points", commas(worth.Points), 13)
+	worthRow(GemConfig.TierLabels[gem.Tier] .. " rate", string.format("x%g", worth.Rate), 14, tierColor)
+	worthRow("Value", commas(worth.Value), 15, P.Gold)
 	if not gem.Cut then
 		local asCut = table.clone(gem)
 		asCut.Cut = 8
@@ -382,14 +449,23 @@ local function showDetail(gem)
 		asCut.Cut = 10
 		local mint = GemConfig.value(asCut)
 		local hint = label(info, string.format("Cut to 8: %s  |  Gem Mint: %s", commas(good), commas(mint)), 12, K.Dim)
-		hint.LayoutOrder = 7
+		hint.LayoutOrder = 16
+	end
+	-- What it does in a weapon: the concrete numbers, not an abstract score.
+	heading("IN A WEAPON", 19)
+	for i, line in GemConfig.lines(gem, "Weapon") do
+		local tag = if line.Metric then string.format("  (%s %d)", line.Metric, line.Grade or 0) else ""
+		local effect = label(info, line.Text .. tag, 12, K.Text)
+		effect.TextWrapped, effect.AutomaticSize = true, Enum.AutomaticSize.Y
+		effect.LayoutOrder = 20 + i
 	end
 	local origin = GemConfig.SourceLabels[gem.Source] or gem.Source
 	if gem.Found and gem.Found > 0 then
 		origin ..= ", " .. DateTime.fromUnixTimestamp(gem.Found):FormatLocalTime("MMM D", "en-us")
 	end
 	local found = label(info, origin, 12, K.Dim)
-	found.LayoutOrder = 20
+	found.TextWrapped, found.AutomaticSize = true, Enum.AutomaticSize.Y
+	found.LayoutOrder = 40
 
 	local options = current
 	if options and options.OnPick then
@@ -400,7 +476,7 @@ local function showDetail(gem)
 		end)
 		button.AutomaticSize = Enum.AutomaticSize.None
 		button.Size = UDim2.new(1, 0, 0, 50)
-		button.LayoutOrder = 30
+		button.LayoutOrder = 50
 	end
 end
 
@@ -500,16 +576,22 @@ local function card(gem, order: number)
 	pending[stage] = gem
 
 	local rarityText = if gem.Tier == "UltraRare" then "ULTRA" else string.upper(GemConfig.TierLabels[gem.Tier])
+	-- (Its cut on the left, its rarity on the right, each in its own half:
+	-- shrunk to fit rather than running into each other.)
 	local rarity = label(face, rarityText, 10, tierColor, BOLD)
 	rarity.AnchorPoint = Vector2.new(1, 0)
-	rarity.Position = UDim2.new(1, -8, 0, 6)
-	rarity.Size = UDim2.new(0.6, 0, 0, 12)
+	rarity.Position = UDim2.new(1, -6, 0, 6)
+	rarity.Size = UDim2.new(0.6, -8, 0, 12)
 	rarity.TextXAlignment = Enum.TextXAlignment.Right
+	rarity.TextScaled = true
+	new("UITextSizeConstraint", { MaxTextSize = 10 }, rarity)
 
 	local state = if not gem.Cut then "ROUGH" elseif gem.Cut >= 10 then "MINT" else "CUT " .. gem.Cut
 	local tag = label(face, state, 10, if gem.Cut then K.Gold else K.Dim, BOLD)
-	tag.Position = UDim2.fromOffset(8, 6)
-	tag.Size = UDim2.new(1, -16, 0, 12)
+	tag.Position = UDim2.fromOffset(6, 6)
+	tag.Size = UDim2.new(0.4, -6, 0, 12)
+	tag.TextScaled = true
+	new("UITextSizeConstraint", { MaxTextSize = 10 }, tag)
 
 	local name = label(face, shade.Name, 12, Color3.new(1, 1, 1), IronUi.Chunky)
 	IronUi.outline(name, 1.5)
@@ -561,6 +643,25 @@ end
 local function layout()
 	local width = math.min(gui.AbsoluteSize.X * 0.94, MAX_WIDTH)
 	narrow = width < NARROW
+	-- A short screen (a phone on its side): the stone to the left of its
+	-- card, not over it, so the card isn't pushed off the bottom.
+	local short = gui.AbsoluteSize.Y < SHORT
+	-- (And the header, toolbar and search squeezed up: no subtitle, no
+	-- search box, so the gems get the height.)
+	panel.Size = UDim2.fromScale(0.94, if short then 0.96 else 0.86)
+	headerBar.Size = UDim2.new(1, -10, 0, if short then 42 else 66)
+	header.Position = UDim2.fromOffset(16, if short then 6 else 12)
+	title.TextSize = if short then 20 else 24
+	subtitle.Visible = not short
+	pills.Position = UDim2.new(1, -56, 0, if short then 2 else 8)
+	toolbar.Position = UDim2.fromOffset(16, if short then 54 else 80)
+	search.Visible = not short
+	body.Position = UDim2.fromOffset(16, if short then 98 else 170)
+	body.Size = UDim2.new(1, -32, 1, if short then -106 else -184)
+	stageFrame.Size = if short then UDim2.new(0, 132, 1, 0) else UDim2.new(1, 0, 0, 180)
+	info.Position = if short then UDim2.fromOffset(136, 0) else UDim2.fromOffset(0, 186)
+	info.Size = if short then UDim2.new(1, -136, 1, 0) else UDim2.new(1, 0, 1, -186)
+	local side = if short then 412 else 286
 	if narrow then
 		grid.Size = UDim2.fromScale(1, 1)
 		detail.Size = UDim2.fromScale(1, 1)
@@ -569,9 +670,9 @@ local function layout()
 		grid.Visible = not detailOpen
 		backButton.Visible = true
 	else
-		grid.Size = UDim2.new(1, -300, 1, 0)
-		detail.Size = UDim2.new(0, 286, 1, 0)
-		emptyLabel.Size = UDim2.new(1, -310, 0, 60)
+		grid.Size = UDim2.new(1, -(side + 14), 1, 0)
+		detail.Size = UDim2.new(0, side, 1, 0)
+		emptyLabel.Size = UDim2.new(1, -(side + 24), 0, 60)
 		detail.Visible = true
 		grid.Visible = true
 		backButton.Visible = false

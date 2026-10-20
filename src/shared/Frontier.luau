@@ -230,7 +230,7 @@ Frontier.Levels = { Fringe = { 1, 4 }, Edge = { 9, 13 } }
 Frontier.Boost = { Fringe = { Health = 1, Damage = 1, Exp = 1 }, Edge = { Health = 1.25, Damage = 1.2, Exp = 1.5 } }
 -- EXP for each kaiju that fought one: Base + PerLevel x its level (times
 -- its band's Boost.Exp); a quarter after Daily critters a day.
-Frontier.Exp = { Base = 2.5, PerLevel = 0.8, Daily = 150, After = 0.25 }
+Frontier.Exp = { Base = 1.6, PerLevel = 0.5, Daily = 150, After = 0.25 }
 -- Coins to whoever did the most to one, by band (a day's cap: Shared.Kaiju.Bug.DailyCoins).
 Frontier.Coins = { Fringe = 1, Edge = 2, Guardian = 40 }
 -- Wandering rifts: one every Every seconds or so somewhere out there, at

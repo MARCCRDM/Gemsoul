@@ -50,12 +50,14 @@ end
 
 -- In the Outpost lobby: mining, hunting, out among its creatures; not in a
 -- match started from it, nor sparring with someone (a spar keeps its own
--- pace), nor knocked down (you get up whole anyway).
+-- pace), nor knocked down (you get up whole anyway), nor away in the Rift
+-- (no healing up on the path: Server.RiftServer).
 function HealthRegen.lobby(player: Player): boolean
 	return player:GetAttribute("Outpost") == true
 		and not Spar.inMatch(player)
 		and player:GetAttribute("SparWith") == nil
 		and not Spar.isDown(player)
+		and player:GetAttribute("RiftRun") == nil
 end
 
 local function removeDefault(character: Model)

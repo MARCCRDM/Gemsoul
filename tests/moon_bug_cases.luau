@@ -45,6 +45,11 @@ local from = assert(string.find(duelist, "local BODY = {", 1, true), "Duelist ha
 local _, to = string.find(duelist, "function Duelist.creatureBody.-\nend\n", from)
 assert(to, "Duelist has no creatureBody")
 env.BrainrotSkins = Skins
+-- (creatureBody dresses a boss as itself first: BrainrotBosses, on these Skins.)
+env.BrainrotBosses = luau.load(
+	read("src/server/Systems/BrainrotBosses.luau"):gsub("local Skins = require%b()", "local Skins = BrainrotSkins"),
+	{ debugName = "BrainrotBosses", environment = env }
+)()
 local Duelist = luau.load(
 	"local Duelist = {}\n" .. string.sub(duelist, from, to) .. "Duelist._buildBody = buildBody\nreturn Duelist\n",
 	{ debugName = "Duelist", environment = env }

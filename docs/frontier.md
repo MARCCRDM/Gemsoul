@@ -59,9 +59,10 @@ an outcrop.
 ## Rift Veins
 
 Three **Rift Veins** glow by the walls. Each is six rich violet rocks in two
-staggered rows round a **dormant rift**: a scar in the ground, a tear above
-it that never opens fully, and a violet beam 180 studs tall that you can
-see from anywhere in the Outpost.
+staggered rows round a **dormant rift**: a scar in the ground with glowing
+cracks, and a **Rift Gate** over it, a jagged arch of slate with fire at its
+feet and the tear hanging in it. The gate is a way into the critters' own
+world: see `docs/rift.md`. (It replaced the violet beam that stood here.)
 
 A Rift Vein doesn't stay put:
 
@@ -72,7 +73,7 @@ A Rift Vein doesn't stay put:
   20 seconds at a time);
 - it surfaces at one of 12 places round the walls, never one another vein
   has, and at least 70° round from the other two, so they stay spread out.
-  Fresh rocks grow there, and its scar, tear and beam go with it;
+  Fresh rocks grow there, and its scar, gate and tear go with it;
 - everyone in the Outpost gets a banner as it surfaces: **RIFT VEIN** "A
   Rift Vein surfaced to the north-east" (which way, from the middle).
 
@@ -82,7 +83,7 @@ camp them.
 ### The guarded vein
 
 One of the three is **guarded**. Its rocks are red, +110% luck (+35% on
-a vein's), and its beam is red, so you can tell it from afar. A wild kaiju
+a vein's), and its cracks glow red. A wild kaiju
 of level 16 to 20, a head taller than you, keeps a beat 30 studs in front of
 it: pacing, sniffing about, napping. It looks over anyone who comes close
 and roars at them now and then, but leaves them be. The first swing at its
@@ -358,7 +359,7 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 | --- | --- |
 | `Shared.Frontier` | The rules: bands, colours and luck, the outcrops (`outcrops`, on rich ground: `field`), the Rift Veins' sites, rocks and moves (`veinSites`, `veinAt`, `pickSite`, `compass`), the guarded one and its guardian (`Veins.Guarded`, `Guardian`), pressure, stirring it up (`Disturbance`, `stir`, `settle`, `stage`, `capFor`), how many come at once, where a rift opens, its timeline and openness, each tear's ragged shape |
 | `Shared.Outpost` | The Fringe, Edge, Vein and Guarded zones (the same rock mix, more luck) |
-| `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and beam (`veinMarks`, the guarded one's red); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
+| `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and Rift Gate (`veinMarks`, the guarded one's cracks red; `docs/rift.md`); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
 | `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot, except a vein's; moves a vein when it's mined out or its time comes (`moveVein`, `onVeinMoved`, and `VeinNews` on `workspace`); a swing at a vein's rock (`onVeinSwing`); every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
 | `FrontierServer` | Each player's band (`FrontierBand`), noise (`FrontierNoise`) and how stirred up (`FrontierStir`; told as it gets to each stage), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`, and move with their veins: `moveScar`) |
 | `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk`; the vein guardian (`veinSwing`, `veinMoved`) |
@@ -397,7 +398,7 @@ its part and shadow budget, no armour or lights, nothing left hanging loose,
 its whole face). `tests/run_outpost.py` and
 `tests/run_moon_quarry_scene.py` cover the zones, luck, regrowth and the
 built layout: the outcrops clear of the roads and buildings with room
-round every rock, their seams, the three veins and their beams (the
-guarded one's rocks and beam its own), a swing at a vein reaching its
+round every rock, their seams, the three veins and their gates (the
+guarded one's rocks and cracks its own), a swing at a vein reaching its
 guardian, and a vein moving (mined out or on time, not while it's being mined; fresh rocks, its
 scar, the banner, nothing growing back where it was).

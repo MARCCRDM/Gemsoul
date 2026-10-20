@@ -419,10 +419,10 @@ for _ = 1, 100 do
 	check(edge >= 9 and edge <= 13, "An edge critter's level")
 end
 -- (One of a swarm: a swarm's worth about what one critter was.)
-check(Frontier.critterExp(1, "Fringe", 0) == 3, "A level-1 critter's EXP")
-check(Frontier.critterExp(10, "Fringe", 0) == 11, "A level-10 critter's EXP")
-check(Frontier.critterExp(10, "Edge", 0) == 16, "An edge critter isn't worth half again")
-check(Frontier.critterExp(10, "Edge", Frontier.Exp.Daily) == 4, "No quarter after the day's critters")
+check(Frontier.critterExp(1, "Fringe", 0) == 2, "A level-1 critter's EXP")
+check(Frontier.critterExp(10, "Fringe", 0) == 7, "A level-10 critter's EXP")
+check(Frontier.critterExp(10, "Edge", 0) == 10, "An edge critter isn't worth half again")
+check(Frontier.critterExp(10, "Edge", Frontier.Exp.Daily) == 2, "No quarter after the day's critters")
 -- A swarm trickles in: a critter out of each tear, the tears a second or
 -- more apart, never all at once; a wandering rift's critters out one by one.
 local swarm = Frontier.Swarm

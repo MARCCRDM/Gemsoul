@@ -540,20 +540,28 @@ env = setmetatable({
 			return assert(services[name], name)
 		end,
 	},
+	-- (script.Parent.X, and further: script.Parent.Parent.World.X, by its name.)
 	script = {
 		Parent = setmetatable({}, {
 			__index = function(_, key)
-				return { Server = key }
+				local function path(name)
+					return setmetatable({ Server = name }, {
+						__index = function(_, sub)
+							return path(sub)
+						end,
+					})
+				end
+				return path(key)
 			end,
 		}),
 	},
 	require = function(target)
 		if type(target) == "string" then
 			return shared(target)
-		elseif target.Shared then
-			return shared(target.Shared)
+		elseif rawget(target, "Shared") then
+			return shared(rawget(target, "Shared"))
 		end
-		return serverModule(target.Server)
+		return serverModule(rawget(target, "Server"))
 	end,
 }, { __index = _G })
 -- (Shared modules find each other as script.Parent.Name.)
@@ -2832,12 +2840,13 @@ local function minedWithIt()
 	check(record.Level == level and record.Exp == exp, "A downed kaiju got mining EXP")
 	pet.Humanoid.Health = pet.Humanoid.MaxHealth
 	KaijuServer.mined(b, "Boulder") -- (b has none out)
-	-- A long session's rocks are worth a few early levels.
+	-- A long session's rocks are worth a couple of early levels, no more
+	-- (levelling is slow: Kaiju.ExpCurve).
 	local session = { Level = 1, Exp = 0 }
 	for i = 1, 130 do
 		Kaiju.addExp(session, Kaiju.mineExp(if i % 8 < 3 then "Boulder" else "Pebble"))
 	end
-	check(session.Level >= 3 and session.Level <= 5, "A long session's mining made level " .. session.Level)
+	check(session.Level >= 2 and session.Level <= 3, "A long session's mining made level " .. session.Level)
 end
 minedWithIt()
 
@@ -2883,6 +2892,26 @@ local function yourTeam()
 		check(member.RecallUntil == now + Kaiju.RecallSeconds, "Recall missed one of the team")
 	end
 	now += Kaiju.RecallSeconds + 0.1
+	-- Call back: the whole team away in its Gemsouls, none of it out (and
+	-- kept away through upkeep); deploying waits till you're out of
+	-- danger, then they're all back.
+	local inDanger = KaijuServer.inDanger
+	check(registered.KaijuCallBack(a, true).Ok, "Couldn't call the team back")
+	check(Kaiju.away(roster) and #KaijuServer.team(a) == 0, "Called back, the team's still out")
+	KaijuServer._upkeep(a, now)
+	check(#KaijuServer.team(a) == 0, "Upkeep put a called-back team out again")
+	KaijuServer.inDanger = function()
+		return true
+	end
+	check(not registered.KaijuCallBack(a, false).Ok and Kaiju.away(roster), "Deployed in danger")
+	KaijuServer.inDanger = function()
+		return false
+	end
+	check(registered.KaijuCallBack(a, false).Ok and not Kaiju.away(roster), "Couldn't deploy out of danger")
+	KaijuServer.inDanger = inDanger
+	squad = KaijuServer.team(a)
+	check(#squad == 3, "Deployed, the team isn't all out: " .. #squad)
+	check(not registered.KaijuCallBack(a, "yes").Ok, "Called back with nonsense")
 	-- EXP: each one out gets it.
 	local before = {}
 	for _, member in squad do
@@ -2988,6 +3017,62 @@ local function teamFights()
 	KaijuServer._upkeep(a, now)
 	local team = KaijuServer.team(a)
 	check(#team == 3, "Not three out for the team fights")
+
+	-- You jump, they jump: one after another in team order, a beat apart (and
+	-- not again while you're still going up); one fighting stays at it.
+	;(function()
+		local team = KaijuServer.team(a)
+		check(#team >= 2, "Not a team to jump after you")
+		for _, p in team do
+			p.Target, p.StunUntil, p.HopAt, p.HoppedAt = nil, 0, nil, nil
+			p.Humanoid.Jump = false
+		end
+		local t = now
+		rootA.AssemblyLinearVelocity = Vector3.zero
+		KaijuServer._hops(a, t)
+		rootA.AssemblyLinearVelocity = Vector3.new(4, 50, 0)
+		local jumpedAt = {}
+		for frame = 1, 90 do
+			t += 1 / 60
+			if frame > 20 then
+				rootA.AssemblyLinearVelocity = Vector3.new(4, 30 - frame, 0) -- (still in the air, coming down)
+			end
+			KaijuServer._hops(a, t)
+			for _, p in team do
+				if p.Humanoid.Jump then
+					check(jumpedAt[p] == nil, "A kaiju jumped twice for one jump of yours")
+					jumpedAt[p] = t - now
+					p.Humanoid.Jump = false
+				end
+			end
+		end
+		for i, p in team do
+			check(jumpedAt[p] ~= nil, "Your kaiju in slot " .. p.Slot .. " didn't jump after you")
+			if i > 1 then
+				local gap = jumpedAt[p] - jumpedAt[team[i - 1]]
+				check(gap > Kaiju.Hop.Stagger * 0.8, "Your kaiju jumped all at once, not one after another: " .. gap)
+			end
+		end
+		check(jumpedAt[team[1]] >= Kaiju.Hop.First * 0.8, "Your kaiju jumped before you did")
+		-- Landed and jumping again: so do they; one in a fight doesn't.
+		rootA.AssemblyLinearVelocity = Vector3.zero
+		KaijuServer._hops(a, t)
+		team[1].Target = { Root = team[1].Root }
+		rootA.AssemblyLinearVelocity = Vector3.new(0, 50, 0)
+		for _ = 1, 60 do
+			t += 1 / 60
+			KaijuServer._hops(a, t)
+		end
+		check(not team[1].Humanoid.Jump, "Your kaiju jumped out of its fight")
+		check(team[2].Humanoid.Jump, "Your kaiju didn't jump after you the second time")
+		for _, p in team do
+			p.Target, p.HopAt = nil, nil
+			p.Humanoid.Jump = false
+		end
+		rootA.AssemblyLinearVelocity = Vector3.zero
+		check(Kaiju.leapt(nil, 50) and not Kaiju.leapt(40, 50) and not Kaiju.leapt(0, 5), "Kaiju.leapt")
+	end)()
+
 	local bugs = {}
 	local function reset()
 		clearCritters()
@@ -3921,7 +4006,10 @@ end
 	check(not has("haul-4") and has("core-1"), "The pouch after the grab")
 	check(noted(b, "snatched your"), "Not told what was snatched")
 	check(thief.Model:GetAttribute("CarryingGem") == "Rare", "Not held up for all to see")
-	check(thief.Model:FindFirstChild("StolenGem") ~= nil, "No stone over its head")
+	-- (The very stone: what the clients build over its head, CritterFx.)
+	check(thief.Model:GetAttribute("CarriedGemId") == "haul-4", "Not the stone it took over its head")
+	check(thief.Model:GetAttribute("CarriedGemElement") == wild.Loot.Element, "The stone over its head isn't its element")
+	check(thief.Model:FindFirstChild("StolenGem") == nil, "A made-up stone over its head")
 	check(thief.Model:GetAttribute("ActionKind") == "Buff", "Its arms aren't up")
 	local giggled = false
 	for _, f in fxs do
@@ -3973,7 +4061,8 @@ end
 	check(KaijuWilds.bonk(bonked, b, rootB.Position), "A snatcher couldn't be bonked")
 	check(has("haul-3") and KaijuWilds._wilds[bonked].Loot == nil, "A bonked snatcher kept the gem")
 	check(bonked.Model:GetAttribute("CarryingGem") == nil, "Still holding it up")
-	check(noted(b, "Got it back"), "Not told it came back")
+	check(bonked.Model:GetAttribute("CarriedGemId") == nil, "Its stone still over its head")
+	check(noted(b, "Recovered. Your"), "Not told it came back")
 	local flew = false
 	for _, f in fxs do
 		if f[1] == "GemRecovered" then
@@ -4007,6 +4096,283 @@ end
 	FrontierServer._raids[b] = nil
 end)()
 
+-- The Rift (Server.RiftServer) -----------------------------------------------------------------------------
+-- Through a vein's gate: alone you're warned, your party joins you; each
+-- island's pack comes up, and cleared, its fire dies and you each find a
+-- gem; knocked out on the path you're robbed and thrown home; at the boss
+-- you're kept down to choose (RESTORE for coins, or home with what you
+-- found); the boss calls critters through as it weakens; off the path into
+-- the lava you're back on the last island, hurt; beaten, everyone's paid
+-- and the way home opens. Nothing of the Outpost's comes for you in there.
+;(function()
+	local RiftRun = shared("RiftRun")
+	local built, opened, homesOpened = {}, {}, 0
+	server.RiftWorld = {
+		build = function(id, origin)
+			local base = origin.Position
+			local folder = make("Folder", { Name = "Rift_" .. id })
+			folder.Parent = workspaceObject
+			local rooms, gates = {}, {}
+			for i = 1, RiftRun.Rooms do
+				rooms[i] = { Center = base + Vector3.new(0, 0, -92 * i), Radius = 28 }
+				gates[i] = make("Model", { Name = "FireGate" })
+			end
+			local home = make("Model", { Name = "WayHome" })
+			make("Part", { Name = "Opening", CFrame = CFrame.new(base + Vector3.new(0, 7, -500)) }).Parent = home
+			local world = {
+				Folder = folder,
+				Origin = origin,
+				Start = CFrame.new(base + Vector3.new(0, 3, 4)),
+				Rooms = rooms,
+				Boss = { Center = base + Vector3.new(0, 4, -476), Radius = 46 },
+				Gates = gates,
+				Exit = make("Part", { CFrame = CFrame.new(base + Vector3.new(0, 7, 12)) }),
+				Home = home,
+			}
+			table.insert(built, world)
+			return world
+		end,
+		openGate = function(gate)
+			opened[gate] = true
+		end,
+		openHome = function()
+			homesOpened += 1
+		end,
+	}
+	local parties = {}
+	server.Party = {
+		of = function(player)
+			return parties[player]
+		end,
+	}
+	local restored = {}
+	server.Restores = {
+		give = function(player)
+			restored[player] = (restored[player] or 0) + 1
+			return 40
+		end,
+	}
+	local awarded = 0
+	GemsStub.award = function(player, source, opts)
+		awarded += 1
+		local gem = {
+			Id = PlayerData.newGemId(),
+			Element = "Fire",
+			Tier = "Common",
+			Size = 3,
+			Clarity = 3,
+			Cut = 3,
+			Source = source,
+			Luck = opts and opts.Luck,
+		}
+		table.insert(profiles[player].Gems, gem)
+		return gem
+	end
+	PlayerData.spendCoins = function(player, amount)
+		if profiles[player].Coins < amount then
+			return false
+		end
+		profiles[player].Coins -= amount
+		return true
+	end
+	services.Debris = services.Debris or { AddItem = function() end }
+	local RiftServer = serverModule("RiftServer")
+	local site = { Spawn = CFrame.new(outpost + Vector3.new(0, 3, 0)) }
+	RiftServer.start(site)
+	for _, name in { "RiftEnter", "RiftLeave", "RiftChoice", "RiftPeek" } do
+		check(registered[name] ~= nil, name .. " isn't a request")
+	end
+	local gate = make("Part", { CFrame = CFrame.new(outpost + Vector3.new(420, 5, 0)) })
+	RiftServer.gateAt = function(index)
+		return if index == 2 then gate else nil
+	end
+	-- (Back to plain miners in the Outpost, nothing about them.)
+	clearCritters()
+	KaijuWilds.rift = function()
+		return nil -- (no tear to wait on: things come straight through)
+	end
+	for _, p in { a, b } do
+		for _, key in { "CombatSession", "MatchId", "DungeonId", "Expedition", "Hunt", "Spar", "SparDown", "SparWith", "KaijuBattle" } do
+			p:SetAttribute(key, nil)
+		end
+		p:SetAttribute("Outpost", true)
+		profiles[p].Gems, profiles[p].Coins = {}, 0
+		local h = p.Character:FindFirstChildOfClass("Humanoid")
+		h.MaxHealth, h.Health = 100, 100
+	end
+	a.Character.PrimaryPart, b.Character.PrimaryPart = rootA, rootB
+	rootA.CFrame = CFrame.new(outpost + Vector3.new(-300, 0, 0))
+	local function enter(p, vein)
+		return registered.RiftEnter(p, vein)
+	end
+	-- Not from afar, nor through a gate that isn't one.
+	check(not enter(a, 2).Ok and enter(a, 2).Message == "Walk up to a Rift Gate first.", "Into the Rift from afar")
+	rootA.CFrame = CFrame.new(gate.Position + Vector3.new(4, 0, 0))
+	check(not enter(a, 7).Ok, "Through a gate that isn't one")
+	-- Alone: warned, at the gate and in there.
+	local peeked = registered.RiftPeek(a)
+	check(peeked.Ok and peeked.Solo == true and peeked.Party == 1 and not peeked.Joining, "Going alone isn't flagged")
+	local went = enter(a, 2)
+	check(went.Ok and went.Runners == 1, "Couldn't go through the gate: " .. tostring(went.Message))
+	local run = RiftServer.runOf(a)
+	check(run and a:GetAttribute("RiftRun") == run.Id, "No trip for them")
+	local world = built[#built]
+	check((rootA.Position - world.Start.Position).Magnitude < 8, "They didn't arrive on the landing")
+	check(noted(a, "You're in the Rift alone"), "Not warned in there about going alone")
+	check(not enter(a, 2).Ok, "Into the Rift twice")
+	check(not FrontierServer._eligible(a), "The Outpost's critters still come for someone in the Rift")
+	check(a:GetAttribute("RiftRoom") == 1 and a:GetAttribute("RiftLeft") == RiftRun.foeCount(1, 1), "The first island's pack isn't up")
+	local isBoss = false
+	for enemy in run.Foes do
+		local entry = KaijuWilds._wilds[enemy]
+		check(entry and entry.Stay and entry.Wander and enemy.Model:GetAttribute("RiftRun") == run.Id, "A critter of the Rift that wanders off")
+		check((enemy.Home - world.Rooms[1].Center).Magnitude <= world.Rooms[1].Radius, "A critter off its island")
+		isBoss = isBoss or enemy.Model:GetAttribute("RiftBoss") == true
+	end
+	check(not isBoss, "A boss on the first island")
+	-- One of their party joins them through any gate (it's on the path).
+	parties[a] = { Members = { a, b } }
+	parties[b] = parties[a]
+	local seen = registered.RiftPeek(b)
+	check(seen.Joining == true and seen.Solo == false, "A party member wasn't told they'd join")
+	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
+	check(enter(b, 2).Ok and RiftServer.runOf(b) == run, "A party member didn't join the trip")
+	check(a:GetAttribute("RiftRunners") == 2 and noted(a, "came through the gate"), "Not told who came through")
+	-- An island cleared: its fire dies, a gem each, the next pack's up.
+	local function clearIsland()
+		for enemy in table.clone(run.Foes) do
+			Enemies.damage(enemy, 1e6, a)
+		end
+		runDelayed()
+	end
+	clearIsland()
+	check(opened[world.Gates[1]], "The first island's fire didn't die down")
+	check(#profiles[a].Gems == 1 and #profiles[b].Gems == 1 and profiles[a].Gems[1].Source == "RiftCache", "No cache for clearing it")
+	check(a:GetAttribute("RiftFound") == 1 and a:GetAttribute("RiftRoom") == 2, "Not shown the island's done")
+	check(a:GetAttribute("RiftLeft") == RiftRun.foeCount(2, 2), "The second island's pack isn't sized for two")
+	-- Off the path into the lava: back on the last island reached, hurt.
+	rootA.CFrame = CFrame.new(world.Rooms[1].Center + Vector3.new(0, 3, 0))
+	now += 0.25
+	RiftServer._step(now)
+	rootA.CFrame = CFrame.new(world.Rooms[1].Center + Vector3.new(30, -40, 0))
+	now += 0.25
+	RiftServer._step(now)
+	local hA = a.Character:FindFirstChildOfClass("Humanoid")
+	check((rootA.Position - world.Rooms[1].Center).Magnitude < 6, "Not put back on the island after the lava")
+	check(hA.Health < hA.MaxHealth and hA.Health >= hA.MaxHealth * (1 - RiftRun.Fall.Hurt) - 1e-6, "The lava didn't hurt")
+	hA.Health = hA.MaxHealth
+	-- Knocked out on the path: robbed, and thrown home.
+	b:SetAttribute("SparDown", now + 3)
+	now += 0.25
+	RiftServer._step(now)
+	check(#profiles[b].Gems == 0 and noted(b, "The critters robbed you"), "Not robbed going down on the path")
+	check(b:GetAttribute("RiftRun") ~= nil, "Thrown home before the critters had their giggle")
+	now += 3
+	runDelayed()
+	check(b:GetAttribute("RiftRun") == nil and RiftServer.runOf(b) == nil, "Not thrown home")
+	check((rootB.Position - site.Spawn.Position).Magnitude < 1 and b:GetAttribute("SparDown") == nil, "Not back at base, whole")
+	check(a:GetAttribute("RiftRunners") == 1, "The trip still counts them")
+	-- The rest of the path, then the throne island: the boss comes through.
+	for _ = 2, RiftRun.Rooms do
+		clearIsland()
+	end
+	check(a:GetAttribute("RiftRoom") == RiftRun.Rooms + 1 and a:GetAttribute("RiftBoss") == run.Boss.Name, "Not at the boss")
+	check(run.BossEnemy == nil, "The boss came before anyone set foot there")
+	rootA.CFrame = CFrame.new(world.Boss.Center + Vector3.new(0, 3, 20))
+	now += 0.25
+	RiftServer._step(now)
+	runDelayed()
+	local boss = run.BossEnemy
+	check(boss and boss.Alive and boss.Model:GetAttribute("RiftBoss") == true, "The boss didn't come through")
+	local isOne = false
+	for _, spec in shared("DungeonRules").Bosses do
+		isOne = isOne or spec.Id == run.Boss.Id
+	end
+	check(isOne and KaijuWilds._wilds[boss].Species == run.Boss.Id, "The boss isn't one of the brainrot bosses")
+	check(string.find(boss.Model:GetAttribute("CombatTitle"), "RIFT BOSS", 1, true) ~= nil, "The boss isn't named one")
+	check(boss.Humanoid.MaxHealth > Kaiju.Bug.Health * RiftRun.Boss.Health * 0.9, "The boss isn't tough")
+	check(Kaiju.BugMoves[run.Boss.Id] ~= nil, "The boss has no move of its own")
+	-- Weakened, it calls its critters through.
+	boss.Humanoid.Health = boss.Humanoid.MaxHealth * 0.6
+	now += 0.25
+	RiftServer._step(now)
+	runDelayed()
+	check(run.Adds[1] and not run.Adds[2], "It didn't call critters through")
+	local adds = 0
+	for _ in run.Foes do
+		adds += 1
+	end
+	check(adds == RiftRun.Boss.AddCount, "Not its critters through: " .. adds)
+	-- Knocked out at the boss: kept down to choose.
+	a:SetAttribute("SparDown", now + 3)
+	now += 0.25
+	RiftServer._step(now)
+	check(type(a:GetAttribute("RiftFallen")) == "number" and a:GetAttribute("RiftRestore") == RiftRun.restoreCost(0), "Not asked what now")
+	check(a:GetAttribute("SparDown") > now + RiftRun.Fallen - 1, "Not kept down while they choose")
+	check(#profiles[a].Gems == RiftRun.Rooms, "Robbed at the boss")
+	local poor = registered.RiftChoice(a, "Restore")
+	check(not poor.Ok and string.find(poor.Message, "Not enough coins", 1, true), "Restored for nothing")
+	profiles[a].Coins = 1000
+	local team = KaijuServer.team(a)
+	for _, pet in team do
+		pet.Humanoid.Health = 1
+	end
+	check(registered.RiftChoice(a, "Restore").Ok, "Couldn't restore")
+	check(profiles[a].Coins == 1000 - RiftRun.restoreCost(0), "RESTORE didn't cost its coins")
+	check(a:GetAttribute("RiftFallen") == nil and a:GetAttribute("SparDown") == nil and hA.Health == hA.MaxHealth, "Not back on their feet")
+	for _, pet in team do
+		check(pet.Humanoid.Health == pet.Humanoid.MaxHealth, "Their kaiju weren't restored")
+	end
+	-- Down again: the next RESTORE costs more; back to base keeps what they found.
+	a:SetAttribute("SparDown", now + 3)
+	now += 0.25
+	RiftServer._step(now)
+	check(a:GetAttribute("RiftRestore") == RiftRun.restoreCost(1) and RiftRun.restoreCost(1) > RiftRun.restoreCost(0), "RESTORE didn't go up")
+	check(registered.RiftChoice(a, "Home").Ok and a:GetAttribute("RiftRun") == nil, "Not home when they chose it")
+	check(#profiles[a].Gems == RiftRun.Rooms, "Home from the boss, robbed")
+	-- The last one out: the trip's gone, its critters and boss with it.
+	check(run.Done and world.Folder.Destroyed and not boss.Alive, "The trip outlived its runners")
+	-- A trip won: everyone paid, the way home open, and home they go.
+	now += 1
+	rootA.CFrame = CFrame.new(gate.Position)
+	parties[a], parties[b] = nil, nil
+	check(enter(a, 2).Ok, "Couldn't go in again")
+	run = RiftServer.runOf(a)
+	world = built[#built]
+	check(world ~= built[1] and run.Id ~= nil, "Not a new trip")
+	for _ = 1, RiftRun.Rooms do
+		clearIsland()
+	end
+	rootA.CFrame = CFrame.new(world.Boss.Center + Vector3.new(0, 3, 20))
+	now += 0.25
+	RiftServer._step(now)
+	runDelayed()
+	local coins = profiles[a].Coins
+	local found = #profiles[a].Gems
+	Enemies.damage(run.BossEnemy, 1e9, a)
+	check(run.Won and a:GetAttribute("RiftWon") == true and homesOpened >= 1, "Beating the boss didn't win the trip")
+	check(profiles[a].Coins == coins + RiftRun.rewardCoins(RiftRun.Rooms) and #profiles[a].Gems == found + 1, "Not paid for the boss")
+	check(restored[a] and noted(a, "is beaten!"), "No swings back or word of the win")
+	-- (Far from a way home, you can't just leave; at it, you can.)
+	check(not registered.RiftLeave(a).Ok, "Left the Rift from the middle of an island")
+	now += RiftRun.Exit + 1
+	RiftServer._step(now)
+	check(a:GetAttribute("RiftRun") == nil and run.Done, "Not sent home after the win")
+	-- Leaving through the landing's way home.
+	now += 1
+	rootA.CFrame = CFrame.new(gate.Position)
+	check(enter(a, 2).Ok, "Couldn't go in a third time")
+	world = built[#built]
+	rootA.CFrame = CFrame.new(world.Exit.Position)
+	check(registered.RiftLeave(a).Ok and a:GetAttribute("RiftRun") == nil, "Couldn't leave by the way home")
+	-- (Pouches and coins back as they were for what follows.)
+	for _, p in { a, b } do
+		profiles[p].Gems, profiles[p].Coins = {}, 0
+		p:SetAttribute("SparDown", nil)
+	end
+	print(string.format("  rift: %d caches handed out, %d trips", awarded, #built))
+end)()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do
@@ -4021,7 +4387,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, gem raids)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, gem raids, the Rift)",
 		checks
 	)
 )

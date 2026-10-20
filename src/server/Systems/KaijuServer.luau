@@ -4,7 +4,8 @@
 
 	  Your team    up to three kaiju out beside you whenever you're in the
 	               Outpost (in workspace.Kaiju), each at its own spot by you
-	               (Kaiju.TeamSpots). They follow you and take on any
+	               (Kaiju.TeamSpots). They follow you (jumping after you
+	               when you jump, one after another: Kaiju.Hop) and take on any
 	               creature that comes near you (wild kaiju and moon bugs),
 	               fighting as the Arena's duellist does (KaijuFighter):
 	               combos, heavies, guard and parry, hops, and their
@@ -20,6 +21,10 @@
 	               the team empty, until its revive time is up
 	               (record.DownUntil, Kaiju.reviveSeconds), or at once for
 	               Robux or a Revive coupon (KaijuServer.reviveAll).
+	  Call back    the whole team put away in its Gemsouls (roster.Away:
+	               Kaiju.away), none of it out till you deploy it again;
+	               it deploys only out of danger (KaijuServer.inDanger), so
+	               calling it back is no way out of a fight.
 	  Auto heal    switched on (Kaiju.AutoHeal, kept as roster.AutoHeal),
 	               your spare Commons heal your team by themselves, out of
 	               danger, never a gem wasted. Quiet, but for running out
@@ -42,6 +47,8 @@
 	                        not one that's down, nor one out while you're in
 	                        danger
 	  "KaijuAutoHeal", on   auto heal on or off
+	  "KaijuCallBack", away   true: the team put away (Kaiju.away); false:
+	                        deployed again, only out of danger
 	  "KaijuRoll"           the starter roll owed: { Rolls = { { Species, Element, Soul } } }
 	  "KaijuRollClaim"      take it: the kaiju join you
 
@@ -82,6 +89,7 @@ local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
+local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Squad = require(ReplicatedStorage.Shared.Squad)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
@@ -128,6 +136,9 @@ export type Pet = {
 	IdleSince: number?,
 	Plan: any?,
 	Slot: number, -- its place in the team (Kaiju.TeamSpots)
+	-- Jumping after its owner (Kaiju.Hop): when, and when it last did.
+	HopAt: number?,
+	HoppedAt: number?,
 }
 
 -- The kaiju out, by player and kaiju id.
@@ -146,6 +157,8 @@ local rng = Random.new()
 -- When a player owing a starter roll was first seen in the Outpost.
 local owedSince: { [Player]: number } = {}
 local lastSwitch: { [Player]: number } = {}
+-- How fast each owner was rising last frame (to see them jump: Kaiju.leapt).
+local rising: { [Player]: number } = {}
 local folder: Folder
 
 local function serverNow(): number
@@ -190,6 +203,8 @@ function KaijuServer.body(speciesId: string, element: string, scale: number): (M
 	humanoid.RequiresNeck = false
 	humanoid.BreakJointsOnDeath = false
 	humanoid.HipHeight = model:GetAttribute("KaijuHipHeight") or 1
+	humanoid.UseJumpPower = false
+	humanoid.JumpHeight = Kaiju.Hop.Height
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 	humanoid.Parent = model
@@ -524,7 +539,7 @@ local function upkeep(player: Player, now: number)
 		)
 	end
 	local want = {}
-	if roster and canBeOut(player) then
+	if roster and canBeOut(player) and not Kaiju.away(roster) then
 		for slot, id in Kaiju.teamIds(roster) do
 			-- (One knocked out keeps its place, down, till it's revived.)
 			if not roster.List[id].Down then
@@ -1075,6 +1090,36 @@ local function think(pet: Pet, now: number, _dt: number)
 	end
 end
 
+-- You jump, they jump: each kaiju following you (not fighting, reeling or in
+-- a kaiju battle) jumps after you in team order, a beat apart (Kaiju.Hop).
+-- Run every frame, so the beats land where they should.
+local function hops(player: Player, now: number)
+	local out = teams[player]
+	local ownerRoot = rootOf(player)
+	if not out or not next(out) or not ownerRoot then
+		rising[player] = nil
+		return
+	end
+	local rise = ownerRoot.AssemblyLinearVelocity.Y
+	if Kaiju.leapt(rising[player], rise) then
+		for _, pet in out do
+			if not pet.HopAt and (not pet.HoppedAt or now - pet.HoppedAt >= Kaiju.Hop.Rest) then
+				pet.HopAt = now + Kaiju.hopDelay(pet.Slot)
+			end
+		end
+	end
+	rising[player] = rise
+	for _, pet in out do
+		if pet.HopAt and now >= pet.HopAt then
+			pet.HopAt = nil
+			if pet.Model.Parent and not pet.Target and now >= pet.StunUntil and not KaijuServer.battle(pet, now) then
+				pet.HoppedAt = now
+				pet.Humanoid.Jump = true
+			end
+		end
+	end
+end
+
 -- For KaijuWilds ---------------------------------------------------------------------------------------
 
 -- Every kaiju out.
@@ -1117,6 +1162,20 @@ end
 -- EXP for each of `player`'s kaiju out (a kill, a moon bug), or for its
 -- lead if none is out (knocked out just as the kill landed). Their level
 -- and EXP show on their models at once; the profile's copy reaches the
+-- What `gained` levels just woke in a kaiju: a move ("Its R move,
+-- Tidal Crush, awakens."), or more health and damage.
+local function awoken(record, gained: number): string
+	for _, key in { "Q", "E", "R" } do
+		local move, awake = Kaiju.move(record.Soul, key, record.Level)
+		local _, before = Kaiju.move(record.Soul, key, record.Level - gained)
+		if awake and not before and move then
+			local info = GemTraits.Moves[move]
+			return string.format("Its %s move, %s, awakens.", key, if info and info.Name then info.Name else move)
+		end
+	end
+	return "More health and damage."
+end
+
 -- client on a level-up.
 function KaijuServer.reward(player: Player, exp: number)
 	local profile = PlayerData.get(player)
@@ -1145,9 +1204,23 @@ function KaijuServer.reward(player: Player, exp: number)
 		end
 		if gained > 0 then
 			levelled = true
-			Remotes.Notify:FireClient(player, string.format("%s reached level %d!", Kaiju.title(record), record.Level))
 			if pet then
-				petFx("TriadBreak", pet.Root.Position, 5 * PET_SIZE, pet.Element)
+				-- (Its light seen by everyone near, its banner on its owner's
+				-- screen: LevelUpFx.)
+				fx(
+					"LevelUp",
+					pet.Model,
+					record.Level,
+					"Kaiju",
+					pet.Element,
+					Kaiju.title(record),
+					awoken(record, gained)
+				)
+			else
+				Remotes.Notify:FireClient(
+					player,
+					string.format("%s reached level %d.", Kaiju.title(record), record.Level)
+				)
 			end
 		end
 	end
@@ -1199,6 +1272,46 @@ local function recall(player: Player)
 		pet.Model:SetAttribute("KaijuRecallUntil", serverNow() + Kaiju.RecallSeconds)
 	end
 	return reply(true, "")
+end
+
+-- The team called back (`away`), into its Gemsouls; or deployed again,
+-- only out of danger.
+local function callBack(player: Player, away: any)
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster or type(away) ~= "boolean" then
+		return reply(false, "You have no kaiju.")
+	end
+	if KaijuServer.battling(player) then
+		return reply(false, "Not during a kaiju battle.")
+	end
+	if away then
+		if Kaiju.away(roster) then
+			return reply(true, "")
+		end
+		roster.Away = true
+		local root = rootOf(player)
+		for _, pet in petsOf(player) do
+			fx("CallBack", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
+		end
+		despawn(player)
+		PlayerData.sync(player)
+		return reply(true, "Team called back. Deploy them again once you're clear of danger.")
+	end
+	if not Kaiju.away(roster) then
+		return reply(true, "")
+	end
+	if KaijuServer.inDanger(player, os.clock()) then
+		return reply(false, "Not while you're in danger: get clear of the fight first.")
+	end
+	roster.Away = nil
+	PlayerData.sync(player)
+	upkeep(player, os.clock())
+	local root = rootOf(player)
+	for _, pet in petsOf(player) do
+		fx("Deploy", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
+	end
+	return reply(true, "Team deployed.")
 end
 
 -- Puts `ids` out as the team (the first leads): only your own, not while
@@ -1323,6 +1436,31 @@ function KaijuServer.reviveAll(player: Player): number
 			wake(record, true)
 			count += 1
 		end
+	end
+	if count > 0 then
+		PlayerData.sync(player)
+		upkeep(player, os.clock())
+	end
+	return count
+end
+
+-- Every one of yours back to full health, the knocked out ones too (a
+-- Rift's RESTORE: Server.RiftServer). Returns how many it touched.
+function KaijuServer.restoreAll(player: Player): number
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	local count = 0
+	for _, record in (roster and roster.List) or {} do
+		local health, most = Kaiju.health(record)
+		if record.Down or health < most then
+			record.Down, record.DownUntil = nil, nil
+			record.Health = most
+			count += 1
+		end
+	end
+	for _, pet in teams[player] or {} do
+		pet.Humanoid.Health = pet.Humanoid.MaxHealth
+		keepHealth(pet)
 	end
 	if count > 0 then
 		PlayerData.sync(player)
@@ -1510,7 +1648,7 @@ end
 
 local function left(player: Player)
 	despawn(player)
-	teams[player], lastSwitch[player], owedSince[player] = nil, nil, nil
+	teams[player], lastSwitch[player], owedSince[player], rising[player] = nil, nil, nil, nil
 	healAt[player], toldEmpty[player] = nil, nil
 end
 
@@ -1523,6 +1661,7 @@ function KaijuServer.start()
 	Shop.register("KaijuActive", setActive)
 	Shop.register("KaijuInfuse", infuse)
 	Shop.register("KaijuAutoHeal", setAutoHeal)
+	Shop.register("KaijuCallBack", callBack)
 	Shop.register("KaijuRoll", rollRequest)
 	Shop.register("KaijuRollClaim", rollClaim)
 	Players.PlayerRemoving:Connect(left)
@@ -1531,6 +1670,12 @@ function KaijuServer.start()
 		thinkTimer += dt
 		upkeepTimer += dt
 		local now = os.clock()
+		for player in teams do
+			local ok, err = pcall(hops, player, now)
+			if not ok then
+				warn("[Kaiju] hops:", err)
+			end
+		end
 		if upkeepTimer >= 0.5 then
 			upkeepTimer = 0
 			for _, player in Players:GetPlayers() do
@@ -1542,8 +1687,12 @@ function KaijuServer.start()
 				if not ok then
 					warn("[Kaiju] auto heal:", err)
 				end
-				-- (The HUD's HEAL waits while you're in danger.)
-				local danger = teams[player] ~= nil and next(teams[player]) ~= nil and KaijuServer.inDanger(player, now)
+				-- (The HUD's HEAL waits while you're in danger, and so does
+				-- DEPLOY for a team called back.)
+				local profile = PlayerData.get(player)
+				local away = profile ~= nil and Kaiju.away(profile.Kaiju) and canBeOut(player)
+				local danger = ((teams[player] ~= nil and next(teams[player]) ~= nil) or away)
+					and KaijuServer.inDanger(player, now)
 				if player:GetAttribute("KaijuDanger") ~= (danger or nil) then
 					player:SetAttribute("KaijuDanger", danger or nil)
 				end
@@ -1566,6 +1715,7 @@ end
 KaijuServer._upkeep, KaijuServer._think, KaijuServer._infuse = upkeep, think, infuse
 KaijuServer._autoHeal = autoHeal
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
+KaijuServer._callBack, KaijuServer._hops = callBack, hops
 KaijuServer._despawn, KaijuServer._fair = despawn, fair
 KaijuServer._prepareRoll, KaijuServer._claimRoll = prepareRoll, claimRoll
 

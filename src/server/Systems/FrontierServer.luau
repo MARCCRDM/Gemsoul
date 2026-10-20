@@ -137,6 +137,7 @@ local function eligible(player: Player): boolean
 		or player:GetAttribute("MatchId") ~= nil
 		or player:GetAttribute("DungeonId") ~= nil
 		or player:GetAttribute("Expedition") ~= nil
+		or player:GetAttribute("RiftRun") ~= nil -- (away in the Rift: its own critters there)
 	then
 		return false
 	end
@@ -501,15 +502,17 @@ local function recover(player: Player?, gem, at: Vector3)
 	hauls[player] = haul
 	table.insert(haul, { Id = gem.Id })
 	local root = rootOf(player)
+	-- (The stone itself flies back: its look goes with it, CritterFx.)
 	Remotes.CombatFx:FireAllClients(
 		"GemRecovered",
 		at,
 		if root then root.Position else at,
-		GemConfig.ElementColors[gem.Element] or GemConfig.TierColors[gem.Tier]
+		GemConfig.ElementColors[gem.Element] or GemConfig.TierColors[gem.Tier],
+		{ Id = gem.Id, Element = gem.Element, Tier = gem.Tier, Size = gem.Size, Clarity = gem.Clarity, Cut = gem.Cut }
 	)
 	Remotes.Notify:FireClient(
 		player,
-		string.format("Got it back! Your %s is safe in your pouch.", GemConfig.displayName(gem))
+		string.format("Recovered. Your %s is back in your pouch.", GemConfig.displayName(gem))
 	)
 end
 
@@ -704,7 +707,8 @@ local function step(dt: number)
 		local state = stateOf(player)
 		local root = rootOf(player)
 		if not root or not eligible(player) then
-			local away = player:GetAttribute("Outpost") ~= true
+			-- (Away in the Rift counts as gone from the Outpost.)
+			local away = player:GetAttribute("Outpost") ~= true or player:GetAttribute("RiftRun") ~= nil
 			if away and player:GetAttribute("FrontierBand") ~= nil then
 				player:SetAttribute("FrontierBand", nil)
 			end
@@ -774,6 +778,8 @@ function FrontierServer.scar(at: CFrame): BasePart
 	anchor:SetAttribute("Seed", 7000 + nextSeed)
 	anchor:SetAttribute("Height", 9)
 	anchor:SetAttribute("Dormant", true)
+	-- (A vein's is its Rift Gate: it burns the critters' world's colours, RiftTear.)
+	anchor:SetAttribute("Hell", true)
 	anchor.Parent = folder
 	return anchor
 end

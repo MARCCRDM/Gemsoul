@@ -270,6 +270,12 @@ function IronUi.emblem(parent: Instance, kind: string, color: Color3, size: numb
 		do
 			bar(spec[1], spec[2], spec[3], spec[4])
 		end
+	elseif kind == "Pack" then
+		-- A field pack: its carry handle, the body, the flap and a pocket.
+		corner(outline(0.38, 0.08, 0.24, 0.16), UDim.new(1, 0))
+		corner(outline(0.2, 0.22, 0.6, 0.68), UDim.new(0.16, 0))
+		bar(0.2, 0.42, 0.6, 0.055)
+		corner(outline(0.33, 0.58, 0.34, 0.2), UDim.new(0.12, 0))
 	elseif kind == "Equipment" then
 		outline(0.22, 0.18, 0.56, 0.48)
 		bar(0.32, 0.72, 0.36, 0.055)
@@ -299,6 +305,14 @@ function IronUi.emblem(parent: Instance, kind: string, color: Color3, size: numb
 		corner(outline(0.08, 0.5, 0.42, 0.34), UDim.new(0.3, 0))
 		bar(0.6, 0.47, 0.3, 0.07)
 		bar(0.715, 0.355, 0.07, 0.3)
+	elseif kind == "Warning" then
+		-- A warning sign: a triangle and an exclamation mark (drawn, not a
+		-- glyph: some fonts show those as boxes).
+		bar(0.08, 0.79, 0.84, 0.065)
+		bar(0.29 - 0.421, 0.44, 0.842, 0.065, -60)
+		bar(0.71 - 0.421, 0.44, 0.842, 0.065, 60)
+		bar(0.465, 0.36, 0.07, 0.24)
+		bar(0.465, 0.65, 0.07, 0.07)
 	elseif kind == "Tasks" then
 		-- A clipboard: its clip, a ticked line and two to do.
 		corner(outline(0.2, 0.16, 0.6, 0.72), UDim.new(0.12, 0))

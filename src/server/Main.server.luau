@@ -148,6 +148,11 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 				task.spawn(KaijuWilds.veinMoved, index, scar)
 			end
 			OutpostServer.onVeinSwing = KaijuWilds.veinSwing
+			-- The Rift: through a vein's gate into the critters' world, a
+			-- pathway of islands to a brainrot boss (your kaiju come too).
+			local RiftServer = require(script.Parent.Systems.RiftServer)
+			RiftServer.gateAt = OutpostServer.veinGate
+			RiftServer.start(OutpostServer.site())
 		end
 	end
 	-- The garage's machines, for driving round the quarry (Config.Features:

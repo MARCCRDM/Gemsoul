@@ -2439,6 +2439,14 @@ end
 -- (CritterFx; a gem raid, Shared.Frontier.Raid).
 handlers.CritterGiggle = require(script.Parent.Modules.CritterFx).giggle
 handlers.GemRecovered = require(script.Parent.Modules.CritterFx).recovered
+-- (And the stone a snatcher runs off with, over its head: the gem itself.)
+require(script.Parent.Modules.CritterFx).start()
+
+-- Levelling up (a miner's, a kaiju's; yours with its banner), and a kaiju
+-- team called back or deployed (LevelUpFx).
+handlers.LevelUp = require(script.Parent.Modules.LevelUpFx).onLevelUp
+handlers.CallBack = require(script.Parent.Modules.LevelUpFx).onCallBack
+handlers.Deploy = require(script.Parent.Modules.LevelUpFx).onDeploy
 
 -- A creature's effect (a kaiju's, a critter's), drawn, sounded and shaken
 -- at its size: how big it stands next to a player (FxSize).

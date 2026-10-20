@@ -203,6 +203,22 @@ end
 -- Battle studs away (then it gives up and comes back to you).
 Kaiju.Follow = { Engage = 28, Leash = 45, Battle = 150, Teleport = 90, Gap = 5 }
 
+-- Jumping after you: when you jump (your root rising faster than Rise studs
+-- a second, from under Settle), the team following you jumps too, one after
+-- another in team order, Stagger seconds apart (the first First after you),
+-- each Height studs up and not again within Rest. One fighting stays at it.
+Kaiju.Hop = { Rise = 24, Settle = 8, First = 0.1, Stagger = 0.16, Height = 6, Rest = 0.6 }
+
+-- Whether you've just jumped: rising fast now from not rising before.
+function Kaiju.leapt(before: number?, rise: number): boolean
+	return rise >= Kaiju.Hop.Rise and (before == nil or before < Kaiju.Hop.Settle)
+end
+
+-- How long after you the one in team slot `slot` jumps.
+function Kaiju.hopDelay(slot: number): number
+	return Kaiju.Hop.First + (slot - 1) * Kaiju.Hop.Stagger
+end
+
 -- Fighting as a team (Shared.Squad): your kaiju share out the creatures (each
 -- its own while there are enough), flank one they share, and keep Space
 -- studs apart (a critter BugSpace from another); a creature after you counts
@@ -426,6 +442,134 @@ Kaiju.BugMoves = {
 		FleeEvery = 2,
 		Lob = { Every = 2.2, Windup = 0.45, Flight = 0.55, Radius = 3, Mult = 1 },
 	},
+	-- The Rift's bosses (Shared.RiftRun, DungeonRules.Bosses): the same
+	-- three kinds of move, each its own, at a boss's size.
+	Gattini = {
+		Name = "Twin Pounce",
+		Shape = "Dash",
+		Pose = "Lunge",
+		Windup = 0.6,
+		Length = 26,
+		Width = 7,
+		Mult = 2,
+		Status = "Stun",
+		Every = 6,
+		Min = 6,
+		Range = 26,
+		Dodge = 0.4,
+	},
+	Drago = {
+		Name = "Firebomb Dive",
+		Shape = "Slam",
+		Pose = "Heavy",
+		Windup = 1,
+		Radius = 13,
+		Mult = 2.4,
+		Heavy = true,
+		Status = "Burn",
+		Every = 7,
+		Range = 10,
+	},
+	Paperotti = {
+		Name = "Quack Squall",
+		Shape = "Burst",
+		Pose = "Nova",
+		Windup = 0.9,
+		Radius = 14,
+		Mult = 1.5,
+		Status = "Slow",
+		Linger = 3,
+		Every = 8,
+		Range = 12,
+	},
+	Ranocchio = {
+		Name = "Bog Leap",
+		Shape = "Slam",
+		Pose = "Heavy",
+		Windup = 0.9,
+		Radius = 12,
+		Mult = 2.2,
+		Heavy = true,
+		Status = "Poison",
+		Every = 7,
+		Range = 10,
+	},
+	Chimpanzini = {
+		Name = "Banana Smash",
+		Shape = "Slam",
+		Pose = "Heavy",
+		Windup = 0.9,
+		Radius = 12,
+		Mult = 2.3,
+		Heavy = true,
+		Status = "Stun",
+		Every = 7,
+		Range = 10,
+	},
+	SahurTrio = {
+		Name = "Triple Bat Slam",
+		Shape = "Slam",
+		Pose = "Heavy",
+		Windup = 1,
+		Radius = 13,
+		Mult = 2.5,
+		Heavy = true,
+		Status = "Burn",
+		Every = 7,
+		Range = 10,
+	},
+	TralaleroTwin = {
+		Name = "Twin Shark Dash",
+		Shape = "Dash",
+		Pose = "Lunge",
+		Windup = 0.6,
+		Length = 28,
+		Width = 7,
+		Mult = 2,
+		Status = "Slow",
+		Every = 6,
+		Min = 6,
+		Range = 28,
+		Dodge = 0.4,
+	},
+	PatapimTrio = {
+		Name = "Spore Storm",
+		Shape = "Burst",
+		Pose = "Nova",
+		Windup = 0.9,
+		Radius = 15,
+		Mult = 1.5,
+		Status = "Poison",
+		Linger = 4,
+		Every = 8,
+		Range = 12,
+	},
+	Frigo = {
+		Name = "Freezer Blast",
+		Shape = "Burst",
+		Pose = "Nova",
+		Windup = 0.9,
+		Radius = 14,
+		Mult = 1.6,
+		Status = "Slow",
+		Linger = 3,
+		Every = 8,
+		Range = 12,
+	},
+	Cappuccino = {
+		Name = "Knife Flurry",
+		Shape = "Dash",
+		Pose = "Lunge",
+		Windup = 0.5,
+		Length = 24,
+		Width = 6,
+		Mult = 2.1,
+		Status = "Burn",
+		Every = 5,
+		Min = 6,
+		Range = 24,
+		Dodge = 0.5,
+	},
 }
 -- The critters, as DungeonRules.Roster has them.
 Kaiju.Critters = { "Sahur", "Tralalero", "Patapim", "Crocodilo" }
@@ -510,7 +654,7 @@ Kaiju.Danger = { Calm = 4, Radius = 45 }
 -- Mining with it out: EXP for every rock you break, by the rock's size
 -- (Shared.Outpost.Sizes), so it levels while you mine (and fights the
 -- critters your swings bring).
-Kaiju.MineExp = { Pebble = 5, Boulder = 8, Monolith = 12, Geode = 20 }
+Kaiju.MineExp = { Pebble = 3, Boulder = 5, Monolith = 8, Geode = 13 }
 function Kaiju.mineExp(size: string?): number
 	return Kaiju.MineExp[size or "Pebble"] or Kaiju.MineExp.Pebble
 end
@@ -556,12 +700,14 @@ function Kaiju.stats(speciesId: string, level: number, rarity: string?)
 	}
 end
 
--- EXP from one level to the next.
+-- EXP from one level to the next: a steep climb (a level is earned over
+-- a session or two of mining and fighting, not a few minutes).
+Kaiju.ExpCurve = { Base = 110, Power = 1.65 }
 function Kaiju.expToNext(level: number): number
 	if level >= Kaiju.MaxLevel then
 		return math.huge
 	end
-	return math.floor(80 * level ^ 1.5)
+	return math.floor(Kaiju.ExpCurve.Base * level ^ Kaiju.ExpCurve.Power)
 end
 
 -- Adds EXP to a kaiju record ({ Level, Exp }); returns the levels gained.
@@ -584,7 +730,7 @@ end
 
 -- EXP for killing a wild kaiju of a level (a moon bug: Kaiju.Bug.Exp).
 function Kaiju.killExp(level: number): number
-	return 40 + 12 * math.max(1, level)
+	return 26 + 8 * math.max(1, level)
 end
 
 -- Its health: { now, most } (record.Health is kept; never hurt, it's
@@ -651,6 +797,13 @@ function Kaiju.autoHealOn(roster): boolean
 		return roster.AutoHeal == true
 	end
 	return Kaiju.AutoHeal.Default
+end
+
+-- Called back (roster.Away): the team is put away in its Gemsouls, none of
+-- it out, till you deploy it again; and it deploys only out of danger
+-- (Kaiju.Danger).
+function Kaiju.away(roster): boolean
+	return roster ~= nil and roster.Away == true
 end
 
 -- The gems to heal a kaiju with, out of `gems`: the strongest first (its

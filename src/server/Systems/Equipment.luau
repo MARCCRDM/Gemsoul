@@ -3242,9 +3242,21 @@ function Equipment.cosmeticPreview(id: string): boolean
 		local preview = Instance.new("Folder")
 		preview.Name = id
 		preview:SetAttribute("Kind", cosmetic.Kind)
+		-- (A suit is shown on its own: no sword or shield in its hands.)
+		local held = if cosmetic.Kind == "Suit"
+			then { folder:FindFirstChild("Weapon"), folder:FindFirstChild("Shield") }
+			else {}
+		local function inHand(part: Instance): boolean
+			for _, model in held do
+				if model and part:IsDescendantOf(model) then
+					return true
+				end
+			end
+			return false
+		end
 		local parts = {}
 		for _, part in source:GetDescendants() do
-			if part:IsA("BasePart") and part.Transparency < 1 then
+			if part:IsA("BasePart") and part.Transparency < 1 and not inHand(part) then
 				table.insert(parts, part)
 			end
 		end

@@ -40,6 +40,9 @@ function Raids.busy(player: Player): string?
 	if player:GetAttribute("Expedition") then
 		return name .. " is on an expedition."
 	end
+	if player:GetAttribute("RiftRun") then
+		return name .. " is in the Rift."
+	end
 	if player:GetAttribute("MatchId") or player:GetAttribute("DuelQueue") then
 		return name .. " is in a duel or the duel queue."
 	end

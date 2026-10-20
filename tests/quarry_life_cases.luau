@@ -1,5 +1,5 @@
 -- The quarry's life (Client QuarryLife) on Roblox instances (lune's roblox
--- library): the road lights, the searchlights, the meteor showers, the
+-- library): the road lights (and no searchlights), the meteor showers, the
 -- cargo lifter, the dust devils, the vents and the conveyor's ore. It
 -- lines up with the quarry the server builds (OutpostWorld): lights on the
 -- roads in their bands' colours, the lifter clear of everything, nothing
@@ -253,7 +253,7 @@ for _, light in life.Lights do
 end
 check(lit > 0 and dim > 0, "The road lights don't pulse")
 
--- Everything standing in the quarry (for the lifter and the searchlights to
+-- Everything standing in the quarry (for the lifter to
 -- keep clear of): every part that rises off the ground, but the crater's
 -- benches and rim, the invisible walls and the rocks' room.
 local standing = {}
@@ -347,30 +347,8 @@ for t = 0, trip, 0.5 do
 	end
 end
 
--- The searchlights: from their lamps by the north outpost, always well up
--- into the sky, sweeping.
-for k = 1, #Life.Searchlights do
-	local mount = Life.Searchlights[k]
-	for _, s in standing do
-		local m0, m1 = mount - Vector3.new(2.5, 0, 2.5), mount + Vector3.new(2.5, 9, 2.5)
-		check(clearOf(m0, m1, s), "Searchlight " .. k .. " stands in " .. s[1]:GetFullName())
-	end
-	local lowest, yaws = math.huge, {}
-	for t = 0, 120, 0.5 do
-		local cf = Life.searchAt(k, t)
-		local dir = cf.LookVector
-		local elevation = math.deg(math.asin(dir.Y))
-		lowest = math.min(lowest, elevation)
-		check((cf.Position - (mount + Vector3.new(0, 7.5, 0))).Magnitude < 0.01, "A beam doesn't come from its lamp")
-		yaws[math.floor(math.deg(math.atan2(dir.X, dir.Z)) / 10)] = true
-	end
-	check(lowest > 40, "A searchlight dips toward the ground: " .. lowest)
-	local spread = 0
-	for _ in yaws do
-		spread += 1
-	end
-	check(spread >= 6, "A searchlight doesn't sweep")
-end
+-- No searchlights: nothing sweeps the sky over the quarry.
+check(Life.Searchlights == nil and Life.searchAt == nil, "The searchlights are back")
 
 -- The meteors: every shower all of them, high over the crater, falling,
 -- and none between showers.
@@ -481,7 +459,7 @@ print(
 		.. count
 		.. " parts: "
 		.. #lights
-		.. " road lights, 2 searchlights, "
+		.. " road lights, no searchlights, "
 		.. Life.Meteors
 		.. " meteors, the lifter, "
 		.. Life.Devils

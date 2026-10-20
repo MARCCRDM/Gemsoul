@@ -1,13 +1,16 @@
 --[[
-	The lobby (the Saga Outpost): compact Play and Inventory controls on the
-	left, a two-column utility menu (TASKS among it: the Tasks window, with
-	a count of what's still to do), level and coins, plus one small panel
-	on the right for the daily streak, the day's challenges and the next mode
-	to unlock, a REPORT A BUG button at the top right, and the PLAY menu that
-	picks what to play. On a phone: PLAY alone at the bottom centre with icon
-	buttons under it (TASKS one of them), level and coins at the top left,
-	and nothing on the right: no board (the challenges are the Tasks
-	window's DAILY page) and no bug button (SOCIAL has the form).
+	The lobby (the Saga Outpost): the command column on the left (PLAY, then
+	one gunmetal panel of places to go: INVENTORY across it, a two-column
+	grid under it, TASKS among it with a count of what's still to do; every
+	icon in the one steel, lit amber on hover), your card under it (level,
+	name, coins, XP) and your health under that; one small panel on the
+	right for the daily streak, the day's challenges and the next mode to
+	unlock, a REPORT A BUG button at the top right, and the PLAY menu that
+	picks what to play. On a phone: PLAY alone at the bottom centre with
+	icon tiles under it (TASKS one of them), level and coins at the top
+	left with your health under them, and nothing on the right: no board
+	(the challenges are the Tasks window's DAILY page) and no bug button
+	(SOCIAL has the form).
 
 	  PRACTICE  1v1 Practice    a rival miner, coins on a win (always open)
 	            Squad Dungeon   three miners, a dungeon and its boss (not
@@ -28,6 +31,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
+local BodyHealth = require(script.Parent.BodyHealth)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -417,12 +421,45 @@ end
 close.Activated:Connect(LobbyUI.closePicker)
 
 -- The command stack (left) -------------------------------------------------------------------------
--- PLAY first, where the eye starts; then one big button per place to go;
--- then your level and coins. The right side shows what's happening (daily
--- streak, next unlock). On a phone the stack shrinks to thumb-sized rows.
-local GOLD_TOP, GOLD_BOTTOM = Color3.fromRGB(255, 214, 120), Color3.fromRGB(226, 156, 44)
-local STEEL = Color3.fromRGB(24, 31, 42)
-local STACK_W = 196
+-- PLAY first, where the eye starts; then one panel of places to go; then
+-- your card and your health. The right side shows what's happening (daily
+-- streak, next unlock). On a phone the stack shrinks to thumb-sized tiles.
+--
+-- One look throughout: gunmetal plates with a hairline of light along the
+-- top, a thin rim that lights amber when you point at it, every icon in
+-- the same steel (INVENTORY's in amber, the one place to go first). PLAY
+-- is the only coloured thing: a struck amber plate, no shine sweeping it.
+local GOLD_TOP, GOLD_BOTTOM = Color3.fromRGB(240, 178, 64), Color3.fromRGB(190, 118, 26)
+local GOLD_RIM = Color3.fromRGB(255, 222, 150)
+local GOLD_INK = Color3.fromRGB(36, 20, 2)
+local FACE_TOP, FACE_BOTTOM = Color3.fromRGB(40, 47, 60), Color3.fromRGB(26, 31, 41)
+local RIM = Color3.fromRGB(70, 80, 96)
+local ICON = Color3.fromRGB(164, 178, 200) -- every place's icon (INVENTORY's is amber)
+local PANEL = Color3.fromRGB(11, 14, 20)
+local STACK_W = 204
+local PAD = 6 -- inside the panel
+
+-- A hairline of light along the top edge of a plate.
+local function lip(parent: GuiObject, transparency: number?)
+	return new("Frame", {
+		Name = "Lip",
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = transparency or 0.86,
+		Position = UDim2.fromOffset(3, 1),
+		Size = UDim2.new(1, -6, 0, 1),
+		ZIndex = 2,
+	}, parent)
+end
+
+-- Its rim lights amber while you point at it.
+local function hoverRim(button: GuiButton, rim: UIStroke, base: Color3, lit: Color3)
+	button.MouseEnter:Connect(function()
+		rim.Color = lit
+	end)
+	button.MouseLeave:Connect(function()
+		rim.Color = base
+	end)
+end
 
 bar = new("Frame", {
 	AnchorPoint = Vector2.new(0, 0.5),
@@ -439,12 +476,14 @@ local play = new("TextButton", {
 	BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
 	AutoButtonColor = false,
 }, bar)
-UiKit.round(play, 6)
-new("UIStroke", { Color = Color3.fromRGB(255, 240, 200), Thickness = 2 }, play)
+UiKit.round(play, 4)
+local playRim = new("UIStroke", { Color = Color3.fromRGB(70, 42, 8), Thickness = 1.5 }, play)
 new("UIGradient", { Rotation = 90, Color = ColorSequence.new(GOLD_TOP, GOLD_BOTTOM) }, play)
-local playCaption = text(play, "PLAY", 30, Color3.fromRGB(28, 18, 4), IronUi.Heading)
+lip(play, 0.45).BackgroundColor3 = GOLD_RIM
+local playCaption = text(play, "PLAY", 30, GOLD_INK, Enum.Font.GothamBlack)
 playCaption.Size = UDim2.fromScale(1, 1)
 playCaption.TextStrokeTransparency = 1
+hoverRim(play, playRim, Color3.fromRGB(70, 42, 8), GOLD_RIM)
 -- In a mech, its HOP OUT button takes PLAY's place at the bottom of a
 -- phone's screen (Client VehicleDrive).
 local function pilotingChanged()
@@ -452,15 +491,14 @@ local function pilotingChanged()
 end
 player:GetAttributeChangedSignal("MechPilot"):Connect(pilotingChanged)
 pilotingChanged()
--- Under PLAY: who's around (or the modes, alone in a server).
-local playSub = text(play, "PRACTICE  ·  CASUAL  ·  RANKED", 10, Color3.fromRGB(92, 56, 8), IronUi.Heading)
+-- Under PLAY: who's around (or what it opens, alone in a server).
+local playSub = text(play, "SELECT A MODE", 10, Color3.fromRGB(78, 46, 6), IronUi.Heading)
 playSub.TextStrokeTransparency = 1
-IronUi.shine(play, 3.5)
-IronUi.juice(play)
+IronUi.juice(play, 1.015, 0.98)
 play.Activated:Connect(LobbyUI.openPicker)
 local modes = text(
 	bar,
-	if LobbyUI.DungeonsOpen then "1v1 PRACTICE  ·  DUNGEON  ·  RANKED" else "1v1 PRACTICE  ·  CASUAL  ·  RANKED",
+	if LobbyUI.DungeonsOpen then "1v1 PRACTICE, DUNGEON, RANKED" else "1v1 PRACTICE, CASUAL, RANKED",
 	11,
 	P.Text,
 	IronUi.Heading
@@ -469,15 +507,19 @@ modes.Position, modes.Size = UDim2.fromOffset(0, 70), UDim2.fromOffset(STACK_W, 
 modes.BackgroundColor3, modes.BackgroundTransparency = Color3.fromRGB(10, 14, 20), 0.25
 UiKit.round(modes, 4)
 
+-- The panel the places to go sit in (on a phone, only the tiles show).
 local tiles = new("Frame", {
+	Name = "Places",
 	Position = UDim2.fromOffset(0, 96),
 	Size = UDim2.fromOffset(STACK_W, 320),
-	BackgroundTransparency = 1,
+	BackgroundColor3 = PANEL,
+	BackgroundTransparency = 0.18,
 }, bar)
+UiKit.round(tiles, 5)
+local panelRim = new("UIStroke", { Color = Color3.fromRGB(58, 66, 80), Thickness = 1, Transparency = 0.2 }, tiles)
 -- Positions are explicit so Inventory can span both utility columns.
 
--- One row of the stack: a gunmetal plate, an emblem, the name, and a bright
--- edge in its colour on the left.
+-- One place to go: a gunmetal plate, its icon in steel, its name.
 local function tile(label: string, emblem: string, color: Color3, onClick: () -> ())
 	local b = new("TextButton", {
 		Size = UDim2.fromOffset(STACK_W, 46),
@@ -486,19 +528,11 @@ local function tile(label: string, emblem: string, color: Color3, onClick: () ->
 		BackgroundColor3 = Color3.new(1, 1, 1),
 		LayoutOrder = #tiles:GetChildren(),
 	}, tiles)
-	UiKit.round(b, 5)
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(42, 52, 66), STEEL),
-	}, b)
-	new("UIStroke", { Color = Color3.fromRGB(70, 82, 98), Thickness = 1.2 }, b)
-	local edge = new("Frame", {
-		BorderSizePixel = 0,
-		BackgroundColor3 = color,
-		Size = UDim2.new(0, 4, 1, -10),
-		Position = UDim2.fromOffset(0, 5),
-	}, b)
-	edge.Name = "Edge"
+	UiKit.round(b, 3)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(FACE_TOP, FACE_BOTTOM) }, b)
+	local rim = new("UIStroke", { Color = RIM, Thickness = 1 }, b)
+	lip(b)
+	hoverRim(b, rim, RIM, P.Gold:Lerp(RIM, 0.25))
 	local icon = IronUi.emblem(b, emblem, color, 28)
 	icon.Name = "NavIcon"
 	icon.AnchorPoint = Vector2.new(0, 0.5)
@@ -509,12 +543,14 @@ local function tile(label: string, emblem: string, color: Color3, onClick: () ->
 	name.Position = UDim2.new(0, 54, 0.5, 0)
 	name.Size = UDim2.new(1, -64, 0, 22)
 	name.TextXAlignment = Enum.TextXAlignment.Left
+	name.TextStrokeTransparency = 1
 	local chevron = text(b, "›", 22, P.Dim, IronUi.Heading)
 	chevron.Name = "NavChevron"
 	chevron.AnchorPoint = Vector2.new(1, 0.5)
 	chevron.Position = UDim2.new(1, -12, 0.5, 0)
 	chevron.Size = UDim2.fromOffset(16, 24)
-	IronUi.juice(b)
+	chevron.TextStrokeTransparency = 1
+	IronUi.juice(b, 1.015, 0.98)
 	b.Activated:Connect(onClick)
 	b.Name = label
 	return b
@@ -525,48 +561,87 @@ function LobbyUI.tile(label: string): GuiButton?
 	return tiles:FindFirstChild(label) :: GuiButton?
 end
 
--- Your card under the stack: level, name, coins and the XP to the next level.
+-- Your card under the stack: level, name, coins and the XP to the next
+-- level; your health under it.
 local status = new("Frame", {
 	Size = UDim2.fromOffset(STACK_W, 54),
-	BackgroundColor3 = Color3.fromRGB(12, 16, 24),
+	BackgroundColor3 = PANEL,
 	BackgroundTransparency = 0.12,
 }, bar)
-UiKit.round(status, 8)
-new("UIStroke", { Color = Color3.fromRGB(64, 78, 98), Thickness = 1, Transparency = 0.3 }, status)
+UiKit.round(status, 5)
+new("UIStroke", { Color = Color3.fromRGB(58, 66, 80), Thickness = 1, Transparency = 0.2 }, status)
 local levelBadge = new("Frame", {
-	BackgroundColor3 = Color3.new(1, 1, 1),
+	BackgroundColor3 = Color3.fromRGB(22, 26, 34),
 	Position = UDim2.fromOffset(8, 8),
 	Size = UDim2.fromOffset(38, 38),
 }, status)
 UiKit.round(levelBadge, 19)
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(GOLD_TOP, GOLD_BOTTOM) }, levelBadge)
-new("UIStroke", { Color = Color3.fromRGB(255, 240, 200), Thickness = 1.5 }, levelBadge)
-local levelLabel = text(levelBadge, "1", 16, Color3.fromRGB(40, 24, 0), IronUi.Heading)
+new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, levelBadge)
+local levelLabel = text(levelBadge, "1", 16, P.Gold, IronUi.Heading)
 levelLabel.Size = UDim2.fromScale(1, 1)
 levelLabel.TextStrokeTransparency = 1
 local nameLabel = text(status, "", 13, P.Text, IronUi.Heading, Enum.TextXAlignment.Left)
 nameLabel:SetAttribute("NoTranslate", true) -- (a player's name)
 nameLabel.Position, nameLabel.Size = UDim2.fromOffset(54, 7), UDim2.new(1, -140, 0, 18)
 nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+nameLabel.TextStrokeTransparency = 1
 local coinsLabel = text(status, "0", 13, P.Gold, IronUi.Heading, Enum.TextXAlignment.Right)
 coinsLabel.AnchorPoint = Vector2.new(1, 0)
 coinsLabel.Position, coinsLabel.Size = UDim2.new(1, -9, 0, 7), UDim2.fromOffset(84, 18)
+coinsLabel.TextStrokeTransparency = 1
 local levelTrack = new("Frame", {
 	BorderSizePixel = 0,
-	BackgroundColor3 = Color3.fromRGB(34, 44, 58),
+	BackgroundColor3 = Color3.fromRGB(34, 40, 52),
 	Position = UDim2.fromOffset(54, 30),
-	Size = UDim2.new(1, -63, 0, 6),
+	Size = UDim2.new(1, -63, 0, 5),
 }, status)
-UiKit.round(levelTrack, 3)
+UiKit.round(levelTrack, 2)
 local levelFill = new("Frame", {
 	BorderSizePixel = 0,
-	BackgroundColor3 = GOLD_BOTTOM,
+	BackgroundColor3 = GOLD_TOP,
 	Size = UDim2.fromScale(0, 1),
 }, levelTrack)
-UiKit.round(levelFill, 3)
+UiKit.round(levelFill, 2)
 local xpLabel = text(status, "", 10, P.Dim, IronUi.Body, Enum.TextXAlignment.Left)
 xpLabel.Position, xpLabel.Size = UDim2.fromOffset(54, 37), UDim2.new(1, -63, 0, 14)
 xpLabel.TextStrokeTransparency = 1
+
+-- Your health, under your card (and, on a phone, under the wallet): a bar
+-- in the colour your body's outline would be (green, amber, red: Client
+-- BodyHealth), and the numbers.
+local function healthBar(parent: Instance, name: string): { Frame: Frame, Fill: Frame, Value: TextLabel, Label: TextLabel }
+	local frame = new("Frame", {
+		Name = name,
+		BackgroundColor3 = PANEL,
+		BackgroundTransparency = 0.12,
+		Size = UDim2.fromOffset(STACK_W, 24),
+	}, parent)
+	UiKit.round(frame, 5)
+	new("UIStroke", { Color = Color3.fromRGB(58, 66, 80), Thickness = 1, Transparency = 0.2 }, frame)
+	local label = text(frame, "HEALTH", 10, P.Dim, IronUi.Heading, Enum.TextXAlignment.Left)
+	label.Position, label.Size = UDim2.fromOffset(9, 0), UDim2.new(0, 52, 1, 0)
+	label.TextStrokeTransparency = 1
+	local track = new("Frame", {
+		Name = "Track",
+		BackgroundColor3 = Color3.fromRGB(34, 40, 52),
+		Position = UDim2.new(0, 62, 0.5, -3),
+		Size = UDim2.new(1, -136, 0, 6),
+	}, frame)
+	UiKit.round(track, 3)
+	local fill = new("Frame", {
+		Name = "Fill",
+		BackgroundColor3 = BodyHealth.Outline.Good,
+		Size = UDim2.fromScale(1, 1),
+	}, track)
+	UiKit.round(fill, 3)
+	local value = text(frame, "100 / 100", 11, P.Text, IronUi.Heading, Enum.TextXAlignment.Right)
+	value:SetAttribute("NoTranslate", true)
+	value.AnchorPoint = Vector2.new(1, 0)
+	value.Position, value.Size = UDim2.new(1, -9, 0, 0), UDim2.new(0, 66, 1, 0)
+	value.TextStrokeTransparency = 1
+	return { Frame = frame, Fill = fill, Value = value, Label = label }
+end
+local health = healthBar(bar, "Health")
 
 -- On a phone: level and coins in a pill at the top left, under the pick
 -- card (MobileLayout.wallet).
@@ -583,6 +658,43 @@ local walletText = text(walletPill, "", 12, P.Text, IronUi.Heading)
 walletText.RichText = true
 walletText.Size = UDim2.fromScale(1, 1)
 walletText.TextStrokeTransparency = 1
+local phoneHealth = healthBar(gui, "PhoneHealth")
+phoneHealth.Frame.Visible = false
+phoneHealth.Label.Text = "HP"
+phoneHealth.Label.Size = UDim2.new(0, 24, 1, 0)
+phoneHealth.Frame:FindFirstChild("Track").Position = UDim2.new(0, 30, 0.5, -3)
+phoneHealth.Frame:FindFirstChild("Track").Size = UDim2.new(1, -96, 0, 6)
+phoneHealth.Value.Size = UDim2.new(0, 58, 1, 0)
+
+-- Your health as it is now, on both bars (redrawn as it changes).
+local function showHealth()
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local now, most = 100, 100
+	if humanoid then
+		now, most = math.max(0, humanoid.Health), math.max(1, humanoid.MaxHealth)
+	end
+	local share = math.clamp(now / most, 0, 1)
+	for _, meter in { health, phoneHealth } do
+		meter.Fill.Size = UDim2.fromScale(share, 1)
+		meter.Fill.BackgroundColor3 = BodyHealth.outlineColor(share)
+		meter.Value.Text = string.format("%d / %d", math.ceil(now), math.floor(most))
+	end
+end
+local healthWatch: RBXScriptConnection? = nil
+local function watchHealth(character: Model?)
+	if healthWatch then
+		healthWatch:Disconnect()
+		healthWatch = nil
+	end
+	local humanoid = character and (character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 5))
+	if humanoid and humanoid:IsA("Humanoid") then
+		healthWatch = humanoid.HealthChanged:Connect(showHealth)
+	end
+	showHealth()
+end
+player.CharacterAdded:Connect(watchHealth)
+task.defer(watchHealth, player.Character)
 
 local function formatCoins(coins: number): string
 	return (tostring(math.floor(coins)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
@@ -652,11 +764,9 @@ LobbyUI.crowd = crowd
 local function refreshCrowd()
 	local online, searching = crowd()
 	if searching > 0 then
-		playSub.Text = string.format("● %d ONLINE  ·  %d SEARCHING", online, searching)
+		playSub.Text = string.format("%d ONLINE, %d SEARCHING", online, searching)
 	else
-		playSub.Text = if online > 1
-			then string.format("● %d MINERS ONLINE", online)
-			else "PRACTICE  ·  CASUAL  ·  RANKED"
+		playSub.Text = if online > 1 then string.format("%d MINERS ONLINE", online) else "SELECT A MODE"
 	end
 end
 Players.PlayerAdded:Connect(refreshCrowd)
@@ -714,7 +824,12 @@ local function fitDock()
 	table.sort(buttons, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
 	modes.Visible = false
 	status.Visible = not mobile
+	health.Frame.Visible = not mobile
 	walletPill.Visible = mobile and not picker.Visible
+	phoneHealth.Frame.Visible = mobile and not picker.Visible
+	-- (The places' panel shows on a desktop; on a phone, the tiles alone.)
+	tiles.BackgroundTransparency = if mobile then 1 else 0.18
+	panelRim.Enabled = not mobile
 	-- The board under REPORT A BUG on the right (not on a phone); the live
 	-- feed at the top centre (on a phone, between the pick card and the
 	-- toasts' place at the top right).
@@ -742,6 +857,10 @@ local function fitDock()
 		local wallet = MobileLayout.wallet()
 		walletPill.AnchorPoint, walletPill.Position = Vector2.zero, UDim2.fromOffset(wallet.X, wallet.Y)
 		walletPill.Size = UDim2.fromOffset(wallet.W, wallet.H)
+		-- Your health just under it, as wide.
+		local hp = MobileLayout.health()
+		phoneHealth.Frame.Position = UDim2.fromOffset(hp.X, hp.Y)
+		phoneHealth.Frame.Size = UDim2.fromOffset(hp.W, hp.H)
 		tiles.AnchorPoint, tiles.Position = Vector2.new(0, 0), UDim2.fromOffset(0, tilesTop)
 		tiles.Size = UDim2.fromOffset(width, tileHeight)
 		local tileWidth = math.floor((width - gap * math.max(0, #buttons - 1)) / math.max(1, #buttons))
@@ -751,6 +870,10 @@ local function fitDock()
 			for _, child in button:GetChildren() do
 				if child.Name == "NavLabel" then
 					child.Visible, child.TextSize, child.TextScaled = true, 9, true
+					-- (All the same size: no larger than 9, smaller only to fit.)
+					local most = child:FindFirstChildOfClass("UITextSizeConstraint")
+						or new("UITextSizeConstraint", {}, child)
+					most.MaxTextSize = 9
 					child.AnchorPoint, child.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -4)
 					child.Size, child.TextXAlignment = UDim2.new(1, -6, 0, 11), Enum.TextXAlignment.Center
 				elseif child.Name == "NavIcon" then
@@ -759,56 +882,66 @@ local function fitDock()
 					child.Size = UDim2.fromOffset(tileHeight - 22, tileHeight - 22)
 				elseif child.Name == "NavBadge" then
 					child.AnchorPoint, child.Position = Vector2.new(1, 0), UDim2.new(1, -3, 0, 3)
+				elseif child.Name == "Lip" then
+					child.Visible = true
 				elseif child:IsA("GuiObject") then child.Visible = false end
 			end
 		end
 		return
 	end
-	local width, gap, utilityHeight = STACK_W, 4, 32
-	local utilityWidth = (width - gap) / 2
+	local width, gap, utilityHeight = STACK_W, 4, 34
+	local inner = width - PAD * 2
+	local utilityWidth = (inner - gap) / 2
 	bar.AnchorPoint, bar.Position = Vector2.zero, UDim2.fromOffset(16, 54)
 	play.AnchorPoint, play.Position = Vector2.zero, UDim2.fromOffset(0, 0)
-	play.Size, playCaption.TextSize = UDim2.fromOffset(width, 56), 26
-	playCaption.Position, playCaption.Size = UDim2.fromOffset(0, 5), UDim2.new(1, 0, 0, 30)
+	play.Size, playCaption.TextSize = UDim2.fromOffset(width, 58), 28
+	playCaption.Position, playCaption.Size = UDim2.fromOffset(0, 6), UDim2.new(1, 0, 0, 30)
 	playSub.Visible = true
-	playSub.Position, playSub.Size = UDim2.fromOffset(0, 35), UDim2.new(1, 0, 0, 14)
-	local top = 62
+	playSub.Position, playSub.Size = UDim2.fromOffset(0, 36), UDim2.new(1, 0, 0, 14)
+	local top = 64
 	tiles.AnchorPoint, tiles.Position = Vector2.zero, UDim2.fromOffset(0, top)
 	local utility = 0
 	for _, button in buttons do
 		local primary = button.Name == "INVENTORY"
 		if primary then
-			button.Position, button.Size = UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 40)
+			button.Position, button.Size = UDim2.fromOffset(PAD, PAD), UDim2.fromOffset(inner, 40)
 		else
-			button.Position = UDim2.fromOffset((utility % 2) * (utilityWidth + gap), 44 + math.floor(utility / 2) * (utilityHeight + gap))
+			button.Position = UDim2.fromOffset(
+				PAD + (utility % 2) * (utilityWidth + gap),
+				PAD + 40 + gap + math.floor(utility / 2) * (utilityHeight + gap)
+			)
 			button.Size = UDim2.fromOffset(utilityWidth, utilityHeight)
 			utility += 1
 		end
 		for _, child in button:GetChildren() do
 			if child.Name == "NavLabel" then
 				child.Visible, child.TextScaled, child.TextSize = true, false, if primary then 14 else 11
-				child.AnchorPoint = Vector2.new(if primary then 0 else 0.5, 0.5)
-				child.Position = if primary then UDim2.new(0, 40, 0.5, 0) else UDim2.fromScale(0.5, 0.5)
-				child.Size = if primary then UDim2.new(1, -64, 0, 20) else UDim2.new(1, -10, 0, 20)
-				child.TextXAlignment = if primary then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
-			elseif child.Name == "NavIcon" then
-				child.Visible = primary
+				local most = child:FindFirstChildOfClass("UITextSizeConstraint")
+				if most then
+					most:Destroy()
+				end
 				child.AnchorPoint = Vector2.new(0, 0.5)
-				child.Size, child.Position = UDim2.fromOffset(22, 22), UDim2.new(0, 10, 0.5, 0)
+				child.Position = if primary then UDim2.new(0, 40, 0.5, 0) else UDim2.new(0, 29, 0.5, 0)
+				child.Size = if primary then UDim2.new(1, -64, 0, 20) else UDim2.new(1, -33, 0, 20)
+				child.TextXAlignment = Enum.TextXAlignment.Left
+			elseif child.Name == "NavIcon" then
+				child.Visible = true
+				child.AnchorPoint = Vector2.new(0, 0.5)
+				local size = if primary then 22 else 15
+				child.Size, child.Position = UDim2.fromOffset(size, size), UDim2.new(0, if primary then 10 else 8, 0.5, 0)
 			elseif child.Name == "NavChevron" then child.Visible = primary
 			elseif child.Name == "NavBadge" then
-				child.AnchorPoint, child.Position = Vector2.new(1, 0.5), UDim2.new(1, -6, 0.5, 0)
-			elseif child.Name == "Edge" then
-				child.Visible = true
-				child.Size = UDim2.new(0, 2, 1, -14)
-				child.Position = UDim2.fromOffset(0, 7)
+				-- (At the corner, clear of the name.)
+				child.AnchorPoint, child.Position = Vector2.new(0.5, 0.5), UDim2.new(1, -5, 0, 2)
 			end
 		end
 	end
-	local tilesHeight = 40 + math.ceil(utility / 2) * (utilityHeight + gap)
+	local tilesHeight = PAD * 2 + 40 + math.ceil(utility / 2) * (utilityHeight + gap)
 	tiles.Size = UDim2.fromOffset(width, tilesHeight)
-	status.Position, status.Size = UDim2.fromOffset(0, top + tilesHeight + 8), UDim2.fromOffset(width, 54)
-	bar.Size = UDim2.fromOffset(width, top + tilesHeight + 8 + 54)
+	local below = top + tilesHeight + 6
+	status.Position, status.Size = UDim2.fromOffset(0, below), UDim2.fromOffset(width, 54)
+	health.Frame.Position, health.Frame.Size = UDim2.fromOffset(0, below + 58), UDim2.fromOffset(width, 24)
+	bar.Size = UDim2.fromOffset(width, below + 58 + 24)
 end
 picker:GetPropertyChangedSignal("Visible"):Connect(function()
 	gui:SetAttribute("ModePickerOpen", picker.Visible)
@@ -854,13 +987,13 @@ function LobbyUI.closeDashboard()
 	showDashboard(false)
 end
 
-tile("INVENTORY", "Equipment", P.Gold, function()
+tile("INVENTORY", "Pack", P.Gold, function()
 	showDashboard(true)
 end)
 -- Tasks and today's challenges: the Tasks window (TrainingRewards.client),
 -- with how many are still to do on the tile. (Nothing of them sits on the
 -- play screen.)
-local tasksTile = tile("TASKS", "Tasks", Color3.fromRGB(103, 218, 232), function()
+local tasksTile = tile("TASKS", "Tasks", ICON, function()
 	local tasks = player.PlayerGui:FindFirstChild("TrainingRewards")
 	local open = tasks and tasks:FindFirstChild("OpenTasks")
 	if open and open:IsA("BindableEvent") then
@@ -869,12 +1002,13 @@ local tasksTile = tile("TASKS", "Tasks", Color3.fromRGB(103, 218, 232), function
 end)
 local tasksBadge = new("Frame", {
 	Name = "NavBadge",
-	BackgroundColor3 = Color3.fromRGB(255, 202, 91),
+	BackgroundColor3 = P.Gold,
 	Size = UDim2.fromOffset(18, 16),
 	Visible = false,
 	ZIndex = 3,
 }, tasksTile)
 UiKit.round(tasksBadge, 8)
+new("UIStroke", { Color = PANEL, Thickness = 1.5 }, tasksBadge)
 local tasksCount = text(tasksBadge, "", 10, Color3.fromRGB(40, 24, 0), IronUi.Heading)
 tasksCount.Size, tasksCount.TextStrokeTransparency, tasksCount.ZIndex = UDim2.fromScale(1, 1), 1, 3
 tasksCount:SetAttribute("NoTranslate", true)
@@ -893,20 +1027,20 @@ task.spawn(function()
 	tasks:GetAttributeChangedSignal("Open"):Connect(count)
 	count()
 end)
-tile("MARKET", "Market", P.Gold, function()
+tile("MARKET", "Market", ICON, function()
 	require(script.Parent.MarketBoardUI).open()
 end)
-tile("STORE", "Coins", P.Amethyst, function()
+tile("STORE", "Coins", ICON, function()
 	require(script.Parent.ShopUI).toggle()
 end)
-tile("RANKS", "Ranks", RED, function()
+tile("RANKS", "Ranks", ICON, function()
 	require(script.Parent.TopPlayersUI).toggle()
 end)
-tile("SOCIAL", "Social", P.Teal, function()
+tile("SOCIAL", "Social", ICON, function()
 	require(script.Parent.SocialUI).toggle()
 end)
 -- Bring a friend: Kindred Edge and the friend ladder (Modules/ReferralUI).
-tile("INVITE", "Invite", Color3.fromRGB(60, 210, 240), function()
+tile("INVITE", "Invite", ICON, function()
 	require(script.Parent.ReferralUI).toggle()
 end)
 

@@ -133,6 +133,8 @@ local function busy(player: Player): string?
 		return "is in an Arena session"
 	elseif player:GetAttribute("Expedition") then
 		return "is on an expedition"
+	elseif player:GetAttribute("RiftRun") then
+		return "is in the Rift"
 	elseif not alive(player) then
 		return "isn't ready"
 	elseif not PlayerData.get(player) then
